@@ -15,13 +15,12 @@ import { useLageSnapshots } from './useLageSnapshots';
 import { bandStil } from './KartenFuss';
 import { useViewport } from '../../components/useViewport';
 
-/** Feste Anzeigedauer je Stand im Replay (D/LFH-322). */
+/** Feste Anzeigedauer je Stand im Replay. */
 export const ANZEIGE_MS = 2500;
 
-// Ein-/Ausklappen ist eine Per-User-Anzeigevorliebe, KEINE Ansichts-Konfiguration: die Leiste
-// liegt über der Karte und ist ein Werkzeug auf Abruf, kein Dauerelement. Deshalb localStorage
-// (Muster wie alarmTon/ThemeModeProvider) und bewusst NICHT der Konfig-Bag von `useKartenAnsicht`
-// — dort würde sie geteilt und jede Klapp-Aktion machte die Ansicht schmutzig.
+// Ein-/Ausklappen ist eine Anzeigevorliebe je Benutzer, keine Ansichts-Konfiguration: deshalb
+// localStorage und nicht der Konfig-Bag von `useKartenAnsicht` — dort würde sie geteilt, und jede
+// Klapp-Aktion machte die Ansicht schmutzig.
 const SPEICHER_SCHLUESSEL = 'lfh:lagekarte:zeitachse-eingeklappt';
 
 /** Gemerkte Wahl: `true`/`false`, oder `null`, wenn nie gewählt wurde. */
@@ -35,13 +34,10 @@ function gespeichertEingeklappt(): boolean | null {
 }
 
 /**
- * Startzustand der Leiste (Nacharbeit 22.09.2026). Eine gemerkte Wahl gewinnt IMMER (sonst
- * drehte sich die Leiste beim Neuladen selbst zurück — dieselbe Regel wie bei der Dichte in
- * `useViewport`). Ohne Wahl startet sie eingeklappt, wo die Karte eng ist — unter `xl`
- * (1200 px). Gemessen ausgeklappt: 222 von 623 px Kartenhöhe bei 375 px Breite, 168 px in drei
- * Zeilen bei 1024 px (dort teilen sich Modulpanel, Karte und Leiste die Breite, die Karte ist
- * rund 440 px schmal); bei 1440 px eine Zeile. Die Leiste ist ein Werkzeug auf Abruf (LFH-353),
- * kein Dauerelement. Rein und exportiert, damit die Vorrangregel ohne Rendern prüfbar ist.
+ * Startzustand der Leiste. Eine gemerkte Wahl gewinnt immer (sonst drehte sich die Leiste beim
+ * Neuladen zurück). Ohne Wahl startet sie eingeklappt, wo die Karte eng ist — unter `xl`:
+ * ausgeklappt belegte sie bei 375 px ein Drittel der Kartenhöhe, bei 1024 px drei Zeilen. Rein und
+ * exportiert.
  */
 export function startEingeklappt(gemerkt: boolean | null, kartenEng: boolean): boolean {
   return gemerkt ?? kartenEng;
@@ -56,17 +52,13 @@ function merkeEingeklappt(wert: boolean): void {
 }
 
 /**
- * Die Reihe der gesicherten Stände. Sie teilt sich die Zeile mit Sichern und Zeitleiste
- * (Nacharbeit Neuentwurf, 22.09.2026): ohne `flex`-Basis und `minWidth: 0` nahm sie als
- * Flex-Kind ihre volle Inhaltsbreite an, brach in eine ZWEITE Zeile um und machte die über
- * der Karte liegende Leiste doppelt so hoch — gemessen bei 1440 × 900 rund 100 statt 50 px.
- * Jetzt schrumpft sie auf den Rest der Zeile und rollt waagerecht; erst unter 120 px Rest
- * bricht sie um. Rein und exportiert, damit die Zusicherung ohne Layout prüfbar ist.
+ * Die Reihe der gesicherten Stände teilt sich die Zeile mit Sichern und Zeitleiste. Ohne
+ * `flex`-Basis und `minWidth: 0` nahm sie ihre volle Inhaltsbreite an, brach in eine zweite Zeile
+ * um und verdoppelte die Höhe der Leiste. Jetzt schrumpft sie auf den Rest und rollt waagerecht;
+ * erst unter 120 px Rest bricht sie um. Rein und exportiert.
  *
- * 120 statt 160 (LFH-373, in der CI gemessen): unter den Linux-Schriften sind Feld und „Stand
- * sichern" 7 px breiter als unter macOS. Bei 1440 px lag die erste Reihe mit 160 px Basis dann
- * 3 px über dem Band (783 von 780 px), und der Einklapp-Pfeil rutschte allein in eine dritte
- * Reihe. Mit 120 px bleiben dort 37 px Luft.
+ * 120 statt 160: unter Linux-Schriften sind Feld und „Stand sichern" breiter als unter macOS, bei
+ * 1440 px rutschte der Einklapp-Pfeil sonst in eine dritte Reihe.
  */
 export const standLeisteStil: CSSProperties = {
   display: 'flex',
@@ -78,17 +70,15 @@ export const standLeisteStil: CSSProperties = {
 };
 
 /**
- * Das Bezeichnungsfeld neben „Stand sichern" (LFH-373). Vorher fest 180 px breit: seit der
- * Fuß vor der Knopfspalte endet, ist das Band bei 390 px im Handschuh-Betrieb schmaler als
- * Feld plus Knopf — das nicht umbrechbare `Space.Compact` ragte gemessen über den Bandrand
- * und fing die Klicks auf die Kartenknöpfe ab. Jetzt bevorzugt 180 px, schrumpfbar.
+ * Das Bezeichnungsfeld neben „Stand sichern": bevorzugt 180 px, schrumpfbar. Fest 180 px ragte das
+ * nicht umbrechbare `Space.Compact` bei 390 px im Handschuh-Betrieb über den Bandrand und fing
+ * Klicks auf die Kartenknöpfe ab.
  */
 export const sichernFeldStil: CSSProperties = { flex: '0 1 180px', minWidth: 0 };
 
 /**
- * Der Zeitleisten-Block (Aktuell · Abspielen · Schieber · Stand). Er darf umbrechen: ohne
- * Umbruch lag seine Mindestbreite (Knöpfe, Schieber ≥ 120, Stand ≥ 96) über der Bandbreite,
- * und nur das Schrumpfen des Abspielknopfs hielt ihn im Band (LFH-373).
+ * Der Zeitleisten-Block (Aktuell · Abspielen · Schieber · Stand) darf umbrechen: seine
+ * Mindestbreite lag sonst über der Bandbreite.
  */
 export const zeitleisteStil: CSSProperties = {
   display: 'flex',
@@ -99,7 +89,7 @@ export const zeitleisteStil: CSSProperties = {
   minWidth: 0,
 };
 
-/** Der Abspielknopf schrumpft nicht: als Flex-Kind fiel er gemessen auf 16 px Breite (LFH-373). */
+/** Der Abspielknopf schrumpft nicht: als Flex-Kind fiel er auf 16 px Breite. */
 export const abspielenStil: CSSProperties = { flexShrink: 0 };
 
 interface SnapshotLeisteProps {
@@ -115,32 +105,23 @@ interface SnapshotLeisteProps {
 }
 
 function chipLabel(bezeichnung: string | null | undefined, standAt: string): string {
-  // formatZeitKurz (dayjs.utc) statt new Date(): stand_at ist ein naiver UTC-Wire-String
-  // ('YYYY-MM-DD HH:MM:SS') → new Date() läse ihn als Lokalzeit (LFH-321-Review).
+  // `formatZeitKurz` (dayjs.utc) statt `new Date()`: `stand_at` ist ein naiver UTC-Wire-String.
   return bezeichnung?.trim() || formatZeitKurz(standAt);
 }
 
 /**
- * Snapshot-/Zeitachsen-Band unter der Karte (C/LFH-321 + D/LFH-322): „Stand sichern" (Live),
- * die Auswahl gespeicherter Stände (Chips) und der Replay über die Zeitleiste (Slider +
- * Play/Pause mit fester Anzeigedauer, Vorladen des nächsten Dokuments gegen Flackern). Die
- * Auswahl schaltet die Karte über `?snapshot=` in den schreibgeschützten Historien-Modus.
+ * Snapshot-/Zeitachsen-Band unter der Karte: „Stand sichern" (Live), die Auswahl gespeicherter
+ * Stände und der Replay (Schieber + Play/Pause mit fester Anzeigedauer, Vorladen des nächsten
+ * Dokuments gegen Flackern). Die Auswahl schaltet die Karte über `?snapshot=` in den
+ * schreibgeschützten Historien-Modus.
  *
- * Ein-/ausklappbar (LFH-353): das Band liegt über der Karte und ist ein Werkzeug auf Abruf, kein
- * Dauerelement. Eingeklappt bleibt nur ein kleiner Knopf unten links stehen; der Zustand ist
- * per-User gemerkt (localStorage), NICHT Teil der geteilten Ansichts-Konfiguration.
+ * Ein-/ausklappbar: das Band liegt über der Karte und ist ein Werkzeug auf Abruf; eingeklappt
+ * bleibt ein kleiner Knopf unten links. Der Zustand ist je Benutzer gemerkt, nicht Teil der
+ * geteilten Ansicht.
  *
- * **Keine punktuellen Klein-Angaben mehr (LFH-366 · B5f).** Die sieben Steuerelemente hier
- * trugen sie und waren damit auf 30 px festgenagelt — auch im Handschuh-Betrieb. Der Einwand
- * dagegen ist echt und war der Grund für die eigene Betrachtung im Ticket: die Leiste schwebt
- * ÜBER der Karte, grössere Knöpfe verdecken Kartenfläche. Er trägt trotzdem nicht, weil diese
- * Leiste als einzige der Kartenaufbauten bereits eine Antwort auf ihren Flächenverbrauch hat:
- * sie klappt ein (LFH-353), und eingeklappt bleibt genau ein Knopf stehen. Wer die Karte
- * braucht, klappt zu; wer die Zeitachse bedient, braucht sie treffbar. Eine Taste, die man im
- * Handschuh dreimal anfassen muss, kostet mehr Lage als ein Band, das man wegklappen kann.
- *
- * Der Zeilenumbruch ist mitgedacht: der Rahmen trägt `flexWrap: 'wrap'`, die Leiste wird auf
- * höheren Dichtestufen also höher statt breiter und schneidet nichts ab.
+ * Keine punktuellen Klein-Angaben: größere Knöpfe verdecken zwar Kartenfläche, aber die Leiste
+ * klappt dafür ein — wer die Zeitachse bedient, braucht sie treffbar. Der Rahmen trägt `flexWrap:
+ * 'wrap'`, auf höheren Dichtestufen wird die Leiste höher statt breiter.
  */
 export function SnapshotLeiste({
   einsatzId,
@@ -156,9 +137,8 @@ export function SnapshotLeiste({
   const [bezeichnung, setBezeichnung] = useState('');
   const [spielt, setSpielt] = useState(false);
   const { abBreite } = useViewport();
-  // Abgeleitet statt einmalig gesetzt: die Breitenstufe steht im ersten Render noch nicht
-  // fest (antds Breakpoint-Beobachter meldet sich erst nach dem Einhängen), ein
-  // `useState`-Startwert läse sie also immer als „breit".
+  // Abgeleitet statt einmalig gesetzt: die Breitenstufe steht im ersten Render noch nicht fest
+  // (antds Breakpoint-Beobachter meldet sich erst nach dem Einhängen).
   const [wahl, setWahl] = useState<boolean | null>(gespeichertEingeklappt);
   const eingeklappt = startEingeklappt(wahl, !abBreite('xl'));
 
@@ -180,8 +160,8 @@ export function SnapshotLeiste({
     [qc, einsatzId],
   );
 
-  // Replay: nach fester Anzeigedauer einen Schritt weiter. Kettet über den aktiverSnapshotId-
-  // Wechsel (jeder Schritt aktualisiert ?snapshot= → dieser Effekt läuft neu). Am Ende stoppen.
+  // Replay: nach fester Anzeigedauer einen Schritt weiter. Jeder Schritt ändert ?snapshot=, dieser
+  // Effekt läuft dann neu. Am Ende stoppen.
   useEffect(() => {
     if (!spielt) return;
     const next = aktiverIndex + 1;
@@ -223,9 +203,8 @@ export function SnapshotLeiste({
   const klappeUm = (zu: boolean) => {
     setWahl(zu);
     merkeEingeklappt(zu);
-    // Einklappen stoppt eine laufende Wiedergabe: ein Replay, das die Karte weiterschaltet,
-    // während die Pause-Taste nicht sichtbar ist, wäre eine Falle. Der Historien-Modus selbst
-    // bleibt bestehen — der Rückweg steht im HistorienBanner.
+    // Einklappen stoppt eine laufende Wiedergabe: ein Replay mit unsichtbarer Pause-Taste wäre eine
+    // Falle. Der Historien-Modus bleibt — der Rückweg steht im HistorienBanner.
     if (zu) setSpielt(false);
   };
 
@@ -240,8 +219,7 @@ export function SnapshotLeiste({
           aria-label="Zeitachse einblenden"
           onClick={() => klappeUm(false)}
           style={{
-            // Eingeklappt bleibt der Knopf unten links — jetzt als linksbündiges Band im
-            // `KartenFuss` (LFH-355) statt absolut positioniert.
+            // Eingeklappt bleibt der Knopf unten links, als linksbündiges Band im `KartenFuss`.
             ...bandStil('links'),
             background: token.colorBgElevated,
             boxShadow: token.boxShadow,
@@ -255,14 +233,13 @@ export function SnapshotLeiste({
 
   return (
     <div
-      // Stabiler Griff für die Überdeckungsmessung in `e2e/lagekarte-smoke.spec.ts`
-      // (LFH-355) — die Klassen dieser Leiste sind antd-Interna.
+      // Stabiler Griff für `e2e/lagekarte-smoke.spec.ts` — die Klassen dieser Leiste sind
+      // antd-Interna.
       data-lfh="zeitachse"
       style={{
-        // Volle Kartenbreite, aber IM Fuß-Rahmen (LFH-355): absolut positioniert lag dieses
-        // Band auf demselben `zIndex: 5` wie die ZeichnenSteuerung und verdeckte sie — als
-        // Flow-Band stapeln sich beide, statt sich zu überlagern. Nachgiebig (LFH-713): passt
-        // der Fuß nicht in die Karte, wird dieses Band niedriger und rollt in sich.
+        // Volle Kartenbreite im Fuß-Rahmen: als Flow-Band stapelt es sich mit der
+        // ZeichnenSteuerung, statt sie zu verdecken. Nachgiebig: passt der Fuß nicht in die Karte,
+        // wird dieses Band niedriger und rollt in sich.
         ...bandStil('voll', true),
         display: 'flex',
         alignItems: 'center',
@@ -286,8 +263,7 @@ export function SnapshotLeiste({
           />
           <Button
             type="primary"
-            // Hülle `aria-hidden`: das Symbol brachte sonst sein englisches Label „camera" in den
-            // zugänglichen Namen („camera Stand sichern", CLAUDE.md „Ein Emoji ist keine Ikone").
+            // Hülle `aria-hidden`: das Symbol brächte sonst „camera" in den zugänglichen Namen.
             icon={
               <span aria-hidden="true" style={{ display: 'inline-flex' }}>
                 <CameraOutlined />
@@ -358,8 +334,8 @@ export function SnapshotLeiste({
         </div>
       )}
 
-      {/* Ganz rechts, `marginLeft: auto` trägt auch dann, wenn der Zeitleisten-Block mit
-          seinem flex:1 fehlt (Schreibrecht, aber noch keine Stände). */}
+      {/* Ganz rechts; `marginLeft: auto` trägt auch ohne den Zeitleisten-Block (Schreibrecht,
+          aber noch keine Stände). */}
       <Tooltip title="Zeitachse ausblenden">
         <Button
           type="text"

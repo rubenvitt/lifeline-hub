@@ -35,19 +35,13 @@ const SICHTEN: { key: Sicht; label: string }[] = [
 ];
 
 /**
- * Das EINE Spaltenregister der Schadensliste (LFH-340 · C5, Bauform aus LFH-330 · B2).
+ * Das eine Spaltenregister der Schadensliste. Funktion von `einsatzId`, weil die Geschädigt-Spalte
+ * Deeplinks baut (`geschaedigtAnzeige(s, einsatzId)`). Durch `spaltenFuer<Schaden>()` geführt, nie
+ * annotiert: eine Annotation weitete die Schlüsselliterale auf `string`.
  *
- * Funktion von `einsatzId` statt Modulkonstante — anders als `tierSpalten`: die
- * Geschädigt-Spalte baut Deeplinks (`geschaedigtAnzeige(s, einsatzId)`). Durch
- * `spaltenFuer<Schaden>()` geführt, nie annotiert: eine Annotation weitete die
- * Schlüsselliterale auf `string`, und der Kartenplan nähme danach jeden Tippfehler
- * unbemerkt an.
- *
- * TYP UND AUSMASS SIND SPALTENFILTER, keine Selects über der Liste mehr. Beide sind
- * geschlossene Wertemengen aus `schadenHelfer` und stehen damit dort, wo die Werte
- * stehen; die frühere Werkzeugzeile trug drei Bedienelemente für etwas, das das
- * Primitiv mitbringt. Die Reiterachse (Status) bleibt außen — sie ist das Arbeitsfach,
- * nicht eine Einengung darin.
+ * Typ und Ausmaß sind Spaltenfilter: geschlossene Wertemengen aus `schadenHelfer`, dort, wo die
+ * Werte stehen. Die Reiterachse (Status) bleibt außen — sie ist das Arbeitsfach, nicht eine
+ * Einengung darin.
  */
 const schaedenSpalten = (einsatzId: number) =>
   spaltenFuer<Schaden>()([
@@ -55,10 +49,10 @@ const schaedenSpalten = (einsatzId: number) =>
       title: 'Reg.-Nr.',
       key: 'reg',
       immerSichtbar: true,
-      // Über die ZAHL sortiert — über den Text läge „S-10" vor „S-9".
+      // Über die Zahl sortiert — über den Text läge „S-10" vor „S-9".
       sortWert: (s) => s.registrier_nr,
       suchText: (s) => schadenRegistrierAnzeige(s.registrier_nr),
-      // KEIN Anker: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden Zweigen.
+      // Kein Anker: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden Zweigen.
       render: (_, s) => (
         <Typography.Text strong style={monoStil(13, 500)}>
           {schadenRegistrierAnzeige(s.registrier_nr)}
@@ -81,8 +75,7 @@ const schaedenSpalten = (einsatzId: number) =>
     {
       title: 'Ausmaß',
       key: 'ausmass',
-      // Nach SCHWERE sortiert, nicht alphabetisch: „gering" vor „groß" vor „katastrophal"
-      // wäre alphabetisch g-g-k und damit zufällig fast richtig, „mittel" fiele ans Ende.
+      // Nach Schwere sortiert, nicht alphabetisch — „mittel" fiele sonst ans Ende.
       sortWert: (s) => (Object.keys(AUSMASS_META) as Ausmass[]).indexOf(s.ausmass),
       filter: {
         werte: (Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({
@@ -98,9 +91,8 @@ const schaedenSpalten = (einsatzId: number) =>
       key: 'ort',
       ellipsis: true,
       sortWert: (s) => s.ort,
-      // Beschreibung trägt zur Suche bei, ohne eine eigene Spalte zu belegen: sie ist
-      // Fließtext und in einer Vergleichstabelle nicht lesbar, aber das, wonach jemand
-      // sucht, der den Ort nicht mehr weiß.
+      // Die Beschreibung trägt zur Suche bei, ohne eigene Spalte: Fließtext ist in einer
+      // Vergleichstabelle nicht lesbar, aber das, wonach sucht, wer den Ort nicht mehr weiß.
       suchText: (s) => [s.ort, s.beschreibung].filter(Boolean).join(' '),
       render: (_, s) => s.ort,
     },
@@ -122,13 +114,11 @@ const schaedenSpalten = (einsatzId: number) =>
       title: 'seit',
       key: 'seit',
       /**
-       * Alter des Eintrags aus `erfasst_at`. `geaendert_at` wäre der naheliegende und
-       * falsche Griff: es läuft bei jeder Übergabe und jedem Statuswechsel weiter und
-       * beantwortet „wann wurde der Satz zuletzt angefasst", nicht „seit wann steht dieser
-       * Schaden offen" — dieselbe Unterscheidung wie in `TierePage.tsx`.
+       * Alter des Eintrags aus `erfasst_at`, nicht `geaendert_at`: das läuft bei jeder Übergabe und
+       * jedem Statuswechsel weiter und beantwortet „wann zuletzt angefasst", nicht „seit wann
+       * offen" (wie in `TierePage.tsx`).
        *
-       * Keine Breitenschwelle: die Zeitachse ist der Zweck dieser Spalte, und eine Spalte,
-       * die schon unter 1200 px verschwindet, wäre in jeder jsdom-Prüfung abwesend.
+       * Keine Breitenschwelle: die Zeitachse ist der Zweck der Spalte.
        */
       sortWert: (s) => s.erfasst_at,
       render: (_, s) => <ZeitAnzeige wert={s.erfasst_at} />,
@@ -137,17 +127,13 @@ const schaedenSpalten = (einsatzId: number) =>
       title: 'Verortet',
       key: 'verortet',
       /**
-       * LFH-340 · C5, Befund M39. Die Liste sagte kein Wort darüber, welche Schäden auf der
-       * Karte stehen — und genau das ist die Frage, mit der man vor der Karte sitzt.
+       * Welche Schäden stehen auf der Karte? Die Frage, mit der man vor der Karte sitzt.
        *
-       * Als IKONE, nicht als Emoji: ein Emoji nimmt Zeichnung, Farbe und Breite aus der
-       * Systemschrift statt aus dem Entwurf und stünde in eigener Farbe neben einer Zeile,
-       * deren Farbgebung Bedeutung trägt. Die `aria-hidden`-Hülle ist Pflicht — ein
-       * `@ant-design/icons`-Knoten bringt ein eigenes englisches `aria-label` mit
-       * („environment"), das sonst in jeder Zeile als eigenes Vorleseziel steht.
+       * Als Ikone, nicht als Emoji; die `aria-hidden`-Hülle ist Pflicht — ein
+       * `@ant-design/icons`-Knoten bringt ein englisches `aria-label` („environment") mit, das
+       * sonst in jeder Zeile vorgelesen würde.
        *
-       * Filterachse statt Sortierung: „zeig mir die Unverorteten" ist die Arbeitsfrage,
-       * „sortiere nach verortet" ist keine.
+       * Filterachse statt Sortierung: „zeig mir die Unverorteten" ist die Arbeitsfrage.
        */
       sortWert: (s) => (s.lat != null && s.lon != null ? 1 : 0),
       filter: {
@@ -197,8 +183,8 @@ export default function SchaedenPage() {
 
   const [erfassenOffen, setErfassenOffen] = useState(false);
 
-  // Schaden-Liste wird über den konsolidierten Einsatz-Live-Stream (useEinsatzLiveStream
-  // im EinsatzLayout, `schaden`-Event → 'einsatz-schaeden') live gehalten — LFH-206.
+  // Die Schaden-Liste hält der Einsatz-Live-Stream im EinsatzLayout aktuell (`schaden` →
+  // 'einsatz-schaeden').
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
@@ -211,8 +197,8 @@ export default function SchaedenPage() {
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
   const spalten = useMemo(() => schaedenSpalten(einsatzId), [einsatzId]);
 
-  // Schnellaktion: ?neu=1 öffnet die Erfassung (Command-Palette, LFH-11).
-  // Warten bis der Einsatz geladen ist; Param immer löschen, aber Modal nur bei Schreibrecht öffnen.
+  // Schnellaktion: ?neu=1 öffnet die Erfassung (Command-Palette). Warten bis der Einsatz geladen
+  // ist; Param immer löschen, Modal nur bei Schreibrecht.
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading) return;
@@ -222,13 +208,9 @@ export default function SchaedenPage() {
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh]);
 
   /**
-   * SEITENZUSTAND — nur `einsatzQuery` (LFH-331 · B3, D3), und erst seit LFH-340 · C5.
-   *
-   * Bis dahin stand hier ausdrücklich KEIN Frühausstieg, begründet damit, dass die Seite
-   * „keine Breadcrumb trägt und ohne den Einsatz auskommt". Beides ist mit dem gemeinsamen
-   * Seitenkopf nicht mehr wahr: Breadcrumb, Titelzeile und Einsatz-Status hängen an
-   * `einsatzQuery.data`. Ohne sie gäbe es keinen Rahmen, in dem ein Listenfehler stehen
-   * könnte — dieselbe Lage wie auf `PersonenPage`/`TierePage`, und deshalb dieselbe Antwort.
+   * Seitenzustand — nur `einsatzQuery`: Breadcrumb, Titelzeile und Einsatz-Status hängen an
+   * `einsatzQuery.data`; ohne sie gibt es keinen Rahmen für einen Listenfehler. Dieselbe Antwort
+   * wie auf `PersonenPage`/`TierePage`.
    */
   if (einsatzQuery.isLoading) {
     return <SeitenSkeleton />;
@@ -249,18 +231,14 @@ export default function SchaedenPage() {
   const sichtbar = filterSchaeden(alle, { sicht });
 
   /**
-   * LISTENZUSTAND — an der Stelle der Liste entschieden, nie als Frühausstieg
-   * (LFH-331 · B3, D3).
+   * Listenzustand — an der Stelle der Liste entschieden, nie als Frühausstieg.
    *
-   * Gemessen wird an `alle`, NICHT an `sichtbar`: die gefilterte Menge ist bei gesetztem
-   * Reiter, Spaltenfilter oder Suchbegriff regelmäßig leer, während Zeilen im
-   * Zwischenspeicher stehen — an ihr gemessen kippte die Seite bei jedem engen Filter in
-   * den Fehlerzweig.
+   * Gemessen an `alle`, nicht an `sichtbar`: die gefilterte Menge ist bei Reiter, Spaltenfilter
+   * oder Suche regelmäßig leer, während Zeilen im Zwischenspeicher stehen.
    *
-   * Ohne Zeilen tritt der Fehler an die Stelle der Liste, sonst behauptet „Keine Schäden
-   * in dieser Sicht" eine leere Menge, wo bloß der Abruf scheiterte. Mit Zeilen bleiben sie
-   * stehen und bekommen ein Banner: echt, nur womöglich alt. Der Ladezweig steht bewusst
-   * nicht hier, sondern am Primitiv (`ladend`).
+   * Ohne Zeilen tritt der Fehler an die Stelle der Liste, sonst behauptete „Keine Schäden in dieser
+   * Sicht" eine leere Menge. Mit Zeilen bleiben sie stehen und bekommen ein Banner. Der Ladezweig
+   * liegt am Primitiv (`ladend`).
    */
   const listeGescheitert = schaedenQuery.isError && alle.length === 0;
   const standVeraltet = schaedenQuery.isError && alle.length > 0;
@@ -297,8 +275,8 @@ export default function SchaedenPage() {
           </Button>
         )
       }
-      // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette, LFH-391 · B5)
-      // — mit DEMSELBEN Rechte-Riegel wie der Knopf darüber.
+      // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette) — mit demselben
+      // Rechte-Riegel wie der Knopf.
       neueZeile={darfSchreiben ? () => setErfassenOffen(true) : undefined}
       hinweis={
         !darfSchreiben &&
@@ -307,8 +285,8 @@ export default function SchaedenPage() {
         )
       }
     >
-      {/* Statusfilter als Segmentleiste (Neuentwurf) statt antds Reitern: eine Wahl, die die
-          Liste darunter filtert — `radiogroup`, kein Reiterfeld je Segment. */}
+      {/* Statusfilter als Segmentleiste: eine Wahl, die die Liste darunter filtert —
+          `radiogroup`, kein Reiterfeld je Segment. */}
       <Segmentleiste
         beschriftung="Schäden nach Status filtern"
         wert={sicht}
@@ -331,15 +309,11 @@ export default function SchaedenPage() {
 
           <Datensicht
             /**
-             * Vier Reiter, EINE Sichtstelle — der Schlüssel trägt deshalb die Statusachse.
-             * Ohne ihn steht dieselbe Instanz über allen vier Mengen: React sieht denselben
-             * Komponententyp an derselben Baumstelle und montiert nicht neu, sondern reicht
-             * weiter. Suchbegriff und Spaltenfilter leben IM Primitiv und filterten danach
-             * eine Menge, für die sie nie gemeint waren — im Reiter „Offen" nach einer
-             * Straße gesucht, auf „Alle" gewechselt, und dort steht eine fremde Menge auf
-             * diesen Ort zusammengestrichen. Kein Fehler, keine Warnung, nur fehlende
-             * Zeilen. Dieselbe Falle ist an `PersonenPage` und `TierePage` gemessen und
-             * dort ebenso behoben.
+             * Vier Reiter, eine Sichtstelle — der Schlüssel trägt deshalb die Statusachse. Ohne ihn
+             * reichte React dieselbe Instanz über alle vier Mengen weiter, und Suchbegriff und
+             * Spaltenfilter im Primitiv filterten eine fremde Menge: im Reiter „Offen" nach einer
+             * Straße gesucht, auf „Alle" gewechselt, und dort fehlen still Zeilen. Dieselbe Falle
+             * ist an `PersonenPage` und `TierePage` behoben.
              */
             key={sicht}
             bezeichnung="Schäden im Einsatz"
@@ -349,9 +323,8 @@ export default function SchaedenPage() {
             ladend={schaedenQuery.isLoading}
             leerText="Keine Schäden in dieser Sicht"
             suche={{ platzhalter: 'S-Nr., Ort, Beschreibung' }}
-            // Spiegelt die Backend-Ordnung (`ORDER BY registrier_nr DESC`): der jüngste
-            // Schaden oben. Die Sortierung liegt jetzt trotzdem im Client — der Sortierpfeil
-            // der Spalte dreht sie um, ohne einen Nachladevorgang.
+            // Spiegelt die Backend-Ordnung (`ORDER BY registrier_nr DESC`): der jüngste Schaden
+            // oben. Die Sortierung liegt im Client, der Sortierpfeil dreht sie ohne Nachladen um.
             standardSortierung={{ spalte: 'reg', richtung: 'ab' }}
             onZeileKlick={(s) => navigate(schadenDetailPfad(einsatzId, s.id))}
             karte={schadenKarte(einsatzId)}

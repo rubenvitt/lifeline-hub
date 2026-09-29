@@ -464,7 +464,7 @@ async fn entfernen_ist_soft_delete() {
     assert_eq!(anhaenge, 1, "Soft-Delete lässt die Bytes stehen");
 
     // Kein Bypass über die modul-lose generische Route: auch nach dem Soft-Delete bleibt der
-    // Anhang dort gesperrt (`LinkerStand` zählt gelöschte Dokumente mit, LFH-632 E1).
+    // Anhang dort gesperrt (`LinkerStand` zählt gelöschte Dokumente mit).
     let aid: i64 = sqlx::query_scalar("SELECT anhang_id FROM einsatz_dokument WHERE id = ?")
         .bind(did)
         .fetch_one(&pool)
@@ -555,9 +555,9 @@ async fn abgeschlossener_einsatz_ablegen_ist_409() {
     assert_eq!(status, StatusCode::CONFLICT, "{json:?}");
 }
 
-/// Entscheidung E5: eine fremde **Org** scheitert am Einsatz-Extractor (Org-Floor) mit 403,
-/// auf ALLEN vier Routen — vorher stand hier „403 oder 404", das eine 404 aus einem
-/// Handler-Pfad (Ownership statt Org-Grenze) still hätte durchgehen lassen.
+/// Eine fremde **Org** scheitert am Einsatz-Extractor (Org-Floor) mit 403, auf ALLEN vier
+/// Routen — bewusst nicht „403 oder 404", das eine 404 aus einem Handler-Pfad (Ownership
+/// statt Org-Grenze) still durchgehen ließe.
 #[tokio::test]
 async fn fremde_org_ist_403() {
     let (app, pool) = setup_mit_pool().await;
@@ -587,7 +587,7 @@ async fn fremde_org_ist_403() {
 
 // ---------- LFH-21: Abschottung der Schaden-Anhänge ----------
 
-/// Spec „Nicht in der Dokumentenablage“: ein Foto an einem Schaden steht nicht in der Ablage.
+/// Ein Foto an einem Schaden steht nicht in der Dokumentenablage.
 #[tokio::test]
 async fn schaden_anhang_erscheint_nicht_in_der_ablage() {
     let (app, pool) = setup_mit_pool().await;
@@ -600,10 +600,10 @@ async fn schaden_anhang_erscheint_nicht_in_der_ablage() {
     assert_eq!(json.as_array().unwrap().len(), 0, "{json:?}");
 }
 
-/// Spec „Recht auf Dokumente genügt nicht“: wer Dokumente sieht, aber nicht Schäden, bekommt
-/// an der Schadensroute 403. Die 404 über den generischen Download belegt HIER nichts (diese
-/// Person hat nicht abgelegt, für sie wäre ein ungebundener Anhang ohnehin 404, D12) — die
-/// Aussage tragen die Uploader-Tests in `tests/anhang.rs`; hier steht sie nur als Spec-Zeile.
+/// Recht auf Dokumente genügt nicht: wer Dokumente sieht, aber nicht Schäden, bekommt an der
+/// Schadensroute 403. Die 404 über den generischen Download belegt HIER nichts (diese Person
+/// hat nicht abgelegt, für sie wäre ein ungebundener Anhang ohnehin 404) — die Aussage tragen
+/// die Uploader-Tests in `tests/anhang.rs`.
 #[tokio::test]
 async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
     let (app, pool) = setup_mit_pool().await;

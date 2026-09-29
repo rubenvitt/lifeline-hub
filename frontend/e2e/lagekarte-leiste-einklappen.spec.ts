@@ -1,26 +1,21 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
- * Die Kartenleiste lässt sich auch am Fükw ausblenden, und die Wahl bleibt gemerkt (LFH-715).
+ * Die Kartenleiste lässt sich auch am Fükw ausblenden, und die Wahl bleibt gemerkt. Bei
+ * 1366 px bleiben mit Leiste rund 800 px Karte; ausgeblendet müssen es ≥ 1000 px sein.
  *
- * Befund aus dem C9-Abgleich: ab `lg` stand die 300-px-Leiste fest neben der Karte. Bei
- * 1366 px blieben nach Rail (60), Modulpanel (208) und Leiste rechnerisch rund 797 px Karte;
- * das Akzeptanzkriterium verlangt mit ausgeblendeter Leiste ≥ 1000 px.
+ * Gemessen wird das PAAR am MapLibre-Canvas, nicht an der Kartenspalte (die kann breit sein,
+ * bevor die Karte nachgemessen hat). Ohne die Vorher-Messung wäre „≥ 1000" auch grün, wenn die
+ * Leiste gar nicht gerendert würde.
  *
- * Gemessen wird das **Paar**, und zwar am MapLibre-Canvas, nicht an der Kartenspalte: die
- * Spalte kann breit sein, während die Karte noch nicht nachgemessen hat. Ohne die Vorher-Messung
- * wäre „≥ 1000" auch dann grün, wenn die Leiste gar nicht gerendert würde.
- *
- * Die Wahl ist je Breitenklasse gemerkt (`lg` und darunter getrennt, `leistenWahl.ts`). 900 px
- * liegt unter `lg` (992) und über `md` (768): dort ist die Vorgabe offen, ein Ausblenden am Fükw
- * darf sie nicht mitnehmen.
+ * Die Wahl ist je Breitenklasse gemerkt (`leistenWahl.ts`). 900 px liegt zwischen `md` und
+ * `lg`: dort ist die Vorgabe offen, ein Ausblenden am Fükw darf sie nicht mitnehmen.
  */
 
 const FUEKW = { width: 1366, height: 768 };
 const UNTER_LG = { width: 900, height: 768 };
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-// Login-/Anlege-Helfer kopiert — es gibt kein geteiltes e2e-Hilfsmodul.
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill('admin');

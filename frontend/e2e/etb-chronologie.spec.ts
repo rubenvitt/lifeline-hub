@@ -1,54 +1,19 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Die ETB-Chronologie als Layoutmessung (LFH-342 · C7, Befunde H59/H64).
+ * Die ETB-Chronologie als Layoutmessung: das Tagebuch ist auf ALLEN Breiten eine Zeitachse
+ * (`src/etb/EtbZeitachse.tsx`, Struktur-Pins in `EtbZeitachse.test.tsx`). Gemessen wird, dass
+ * der Meldungstext Platz hat und nichts überläuft.
  *
- * FORTGESCHRIEBEN DURCH DEN NEUENTWURF (S4, 21.09.2026): das Tagebuch ist auf ALLEN
- * Breiten eine Zeitachse (`src/etb/EtbZeitachse.tsx`), die Tabelle ab `xl` (LFH-464), ihr
- * Spaltenschalter und die fixierte Kennung sind entfallen. Die Befunde unten bleiben als
- * Herleitung stehen; gemessen wird jetzt dieselbe Aussage — der Meldungstext hat Platz,
- * nichts läuft über — an der Zeitachse. Die Pins der Struktur liegen in
- * `src/etb/EtbZeitachse.test.tsx`.
+ * DER GESÄTE TEXT DER ERSTEN BLÖCKE IST KURZ: für die ≥50-%-Zusicherung ist ein kurzer Text
+ * der schwere Fall (ein langer machte sie trivial). Den langen Text prüft der dritte Block.
  *
- * WARUM HIER UND NICHT IN VITEST: jsdom rechnet kein Layout (`vite.config.ts` fährt
- * `css: false`) — alle Breiten sind dort 0, `boundingBox` gibt es nicht. Dass die
- * Zeitachse auf jeder Breite steht, pinnt `src/etb/EtbZeitachse.test.tsx`;
- * hier geht es um die gemessene Wirkung, und die beiden Akzeptanzkriterien des Tickets
- * sind genau solche Messungen.
+ * GEMESSEN WIRD GEGEN DIE CONTENTBREITE, nie gegen den eigenen Container: der Befund ist in
+ * der Contentbreite formuliert, und ein Verhältnis zu einem mitwachsenden Container kann
+ * kleiner werden, obwohl der Text mehr Platz hat.
  *
- * DER BEFUND, gegen den gemessen wird: im Fükw (1366 px, geöffnetes ModulPanel, 1033 px
- * Contentbreite) belegten sechs fest verdrahtete Nebenspalten 884 px, dem Meldungstext
- * blieben 149 px — 14 % für ausgerechnet die beweissichernde Aussage. Bei 390 px standen
- * 278 px verfügbare Breite gegen dasselbe 884-px-Gerüst.
- *
- * DER GESÄTE TEXT DIESER BEIDEN BLÖCKE IST DETERMINISTISCH UND KURZ, und das ist kein
- * Zufall: ein kurzer Text ist für die ≥50-%-Zusicherung der SCHWERE Fall, weil der
- * Überschuss dann allein aus der Verteilung der ungebundenen Spalte kommt — ein langer
- * machte sie trivial. Der lange Text ist die Aufgabe des dritten Blocks (LFH-523), und
- * dort wird die Zusicherung zusätzlich UNTER Langtextlast nachgemessen.
- *
- * FORTGESCHRIEBEN DURCH LFH-523: die Tabelle der Chronologie ist seit dem nicht mehr
- * inhaltsgetrieben. Die Inhaltsspalte trägt `mindestBreite`, `KatalogTabelle` rechnet
- * daraus eine feste `scroll.x`-Zahl (`Σ(width) + mindestBreite`), und antds `min-width:
- * 100%` bleibt daneben stehen. Für den KURZEN Text ändert das nichts — liegt die Zahl
- * unter der Containerbreite, ist die benutzte Breite dieselbe wie zuvor und die
- * Layoutrechnung verteilt identisch; die Fassungen gehen erst auseinander, wenn
- * `max-content` den Container übersteigt. Die Messungen dieser beiden Blöcke sind deshalb
- * unverändert gültig.
- *
- * GEMESSEN WIRD GEGEN DIE SICHT, nicht gegen die Tabelle. Der Grund von LFH-342 — bei sehr
- * langem Inhalt wuchs die Tabelle über den Container und ein Verhältnis Spalte-zu-Tabelle
- * wurde kleiner, obwohl der Text MEHR Platz hatte — ist mit LFH-523 entfallen; die
- * Bezugsgröße bleibt trotzdem die Contentbreite, denn sie ist die Größe, in der der Befund
- * formuliert ist, und sie bleibt richtig, wenn die Tabelle wieder wachsen dürfte.
- *
- * BEWUSST KEIN Device-Descriptor und kein zweites Playwright-Projekt: ein
- * `devices['iPhone …']` zöge webkit nach, und ein Browser-Download ist im Repo nirgends
- * abgesichert (gleichlautend in fünf Bestands-Specs begründet). Anmelden und Säen laufen am
- * Fükw-Maß, erst danach wird umgestellt — Vorgehen aus `seitenrinne.spec.ts`.
- *
- * SEEDING PER `page.request`: die Session ist Cookie-basiert (`api/client.ts:35/46/56`,
- * `credentials: 'same-origin'`), `page.request` teilt den Cookie-Jar des Kontexts.
+ * Kein Device-Descriptor; Anmelden und Säen am Fükw-Maß, erst danach umstellen. Seeding per
+ * `page.request`.
  */
 
 const ADMIN = 'admin';
@@ -60,10 +25,7 @@ const FUEKW = { width: 1366, height: 768 };
 /** Anteil der Contentbreite, den der Meldungstext im Fükw mindestens bekommt (AK#1). */
 const MINDESTANTEIL = 0.5;
 
-/**
- * Subpixel-Spielraum, aus `datensicht-schmal.spec.ts:26-46` übernommen. `boundingBox()`
- * liefert Fließkomma, und Chromium rechnet unter Last anders als im Einzellauf.
- */
+/** Subpixel-Spielraum: `boundingBox()` liefert Fließkomma, Chromium rechnet unter Last anders. */
 const SUBPIXEL = 0.5;
 
 const MELDUNG = 'Keller Musterweg 3 unter Wasser';
@@ -136,18 +98,13 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
 });
 
 /**
- * Die Zeitachse auf ALLEN Breiten (Neuentwurf S4, 21.09.2026) — ersetzt die Messung der
- * `xl`-Schwelle aus LFH-464. Die Schwelle gibt es nicht mehr: das Tagebuch ist auf jedem
- * Schirm eine Zeitachse, eine Tabelle steht nirgends. Gemessen wird, dass das stimmt (keine
- * `.ant-table`, genau eine Ereigniszeile), dass nichts überläuft (Rumpf UND jeder
- * Scrollcontainer der Sicht) und dass der Meldungstext Platz hat.
+ * Die Zeitachse auf ALLEN Breiten: keine `.ant-table`, genau eine Ereigniszeile, kein Überlauf
+ * (Rumpf UND jeder Scrollcontainer der Sicht), und der Meldungstext hat Platz.
  *
- * DIE ANTEILSSCHWELLEN SIND SETZUNGEN, KEINE MESSWERTE [abgeleitet]: die Zeitachse stellt
- * links Zeit/Nr. und rechts Verfasser/Weg/Aktion neben den Text. Bei 390 px im
- * Handschuhbetrieb nimmt allein der Aktionsknopf 72 px; 30 % ist deshalb der Boden für
- * schmale Schirme, ab 1200 px die Hälfte der Sicht (die C7-Zusicherung „der Meldungstext
- * bekommt mindestens die halbe Fläche" in Zeitachsenform). Der erste Lauf hängt die
- * Messwerte an; wer die Schwellen schärft, schärft sie gegen diese Anhänge.
+ * DIE ANTEILSSCHWELLEN SIND SETZUNGEN [abgeleitet]: neben dem Text stehen Zeit/Nr. und
+ * Verfasser/Weg/Aktion, bei 390 px im Handschuh nimmt allein der Aktionsknopf 72 px. 30 % ist
+ * der Boden für schmale Schirme, ab 1200 px die Hälfte der Sicht. Die Messwerte hängen am
+ * Lauf; wer die Schwellen schärft, schärft sie gegen diese Anhänge.
  */
 test.describe('Neuentwurf S4: Zeitachse auf allen Breiten', () => {
   test.use({ hasTouch: true });
@@ -203,14 +160,9 @@ test.describe('Neuentwurf S4: Zeitachse auf allen Breiten', () => {
 });
 
 /**
- * Der lange Meldungstext bricht um (LFH-523, fortgeschrieben auf die Zeitachse).
- *
- * Der Befund von LFH-523 lag im TABELLENZWEIG (ein umbrechbarer Text blieb einzeilig und
- * trieb die Tabelle 1122 px über die Sicht). Den Zweig gibt es nicht mehr; die Aussage
- * bleibt als Wächter stehen, weil sie die ist, die der Leser braucht: ein langer Text ist
- * mehrzeilig, liegt in der Sicht, und nichts scrollt seitlich — weder der Rumpf noch ein
- * Container darin. Die positive Hälfte (Sicht und Text messbar, Text mehrzeilig) bleibt,
- * sonst wäre „kein Überlauf" auch bei einer leeren Seite wahr.
+ * Der lange Meldungstext bricht um: mehrzeilig, in der Sicht, und nichts scrollt seitlich —
+ * weder der Rumpf noch ein Container darin (LFH-523). Die positive Hälfte (Text messbar und
+ * mehrzeilig) bleibt, sonst wäre „kein Überlauf" auch bei einer leeren Seite wahr.
  */
 test.describe('LFH-523: langer Meldungstext in der Zeitachse', () => {
   test.use({ hasTouch: true });
@@ -282,8 +234,6 @@ test.describe('LFH-523: langer Meldungstext in der Zeitachse', () => {
   }
 });
 
-// Login-/Anlege-Helfer aus `kernfluss.spec.ts` kopiert — es gibt (noch) kein geteiltes
-// e2e-Hilfsmodul (gleichlautend in fünf Bestands-Specs vermerkt).
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -323,8 +273,7 @@ test('bei 390 px scrollt der Seitenrumpf nicht seitlich, und die Chronologie ste
 
   const bereich = page.getByRole('region', { name: 'Einsatztagebuch' });
   await expect(bereich).toHaveCount(1);
-  // Der gesäte Eintrag ist der Anker. Ohne ihn wäre „kein Tabellenelement" auch bei einer
-  // leeren, fehlgeschlagenen oder weggeleiteten Seite wahr.
+  // Der gesäte Eintrag ist der Anker — sonst wäre die Aussage auch bei einer leeren Seite wahr.
   await expect(bereich.getByText(MELDUNG)).toHaveCount(1);
 
   const mass = await page.evaluate(() => ({
@@ -358,16 +307,15 @@ test('bei 1366 px bekommt der Meldungstext mindestens die halbe Zeitachsenbreite
   await expect(bereich).toHaveCount(1);
   await expect(bereich.getByText(MELDUNG)).toHaveCount(1);
 
-  // Die Seitenleiste „Bilanz" steht ab `xl` rechts daneben — gemessen wird gegen die
-  // Zeitachse selbst, nicht gegen den Inhaltsbereich mit Leiste.
+  // Die Bilanz steht ab `xl` rechts daneben — gemessen wird gegen die Zeitachse selbst.
   await expect(page.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeVisible();
   const text = await bereich.locator('.markdown').first().boundingBox();
   const flaeche = await bereich.boundingBox();
   expect(text, 'Meldungstext nicht messbar').not.toBeNull();
   expect(flaeche, 'Sichtfläche nicht messbar').not.toBeNull();
 
-  // Der Textblock ist so breit wie seine Spalte (Blockelement), also misst dies die
-  // Spalte, die der Text bekommt — nicht die Länge des kurzen Textes.
+  // Der Textblock ist so breit wie seine Spalte, das misst also die Spalte, die der Text
+  // bekommt — nicht die Länge des kurzen Textes.
   const anteil = text!.width / flaeche!.width;
   expect(
     anteil,

@@ -7,8 +7,8 @@ use crate::staerke::Staerke;
 use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::{HashMap, HashSet};
 
-/// Editierbare Felder einer Einheit (Führer wird separat über `setze_fuehrer` gesetzt,
-/// da er Mitgliedschaft voraussetzt und eine eigene ETB-Aktion ist).
+/// Editierbare Felder einer Einheit. Der Führer wird über `setze_fuehrer` gesetzt, weil er
+/// Mitgliedschaft voraussetzt und eine eigene ETB-Aktion ist.
 #[derive(Debug)]
 pub struct EinheitDaten<'a> {
     pub name: &'a str,
@@ -19,7 +19,7 @@ pub struct EinheitDaten<'a> {
     pub soll_unterfuehrer: Option<i64>,
     pub soll_mannschaft: Option<i64>,
     pub bemerkung: Option<&'a str>,
-    /// LFH-614: eigener Rufname der Einheit (Freitext, z. B. „Florian HM 12/44").
+    /// Eigener Rufname der Einheit (Freitext, z. B. „Florian HM 12/44“).
     pub funkrufname: Option<&'a str>,
     pub kommunikationsmittel: Option<&'a str>,
     pub erreichbarkeit: Option<&'a str>,
@@ -84,19 +84,16 @@ impl Row {
     }
 }
 
-/// Status einer Einheit (LFH-609, Entscheidung des Auftraggebers vom 22.09.2026).
+/// Status einer Einheit (LFH-609).
 ///
-/// - **Mit Fahrzeugen abgeleitet**: tragen alle denselben Status, gilt er; „Seit“ ist der
-///   JÜNGSTE Wechsel (seit dann stehen alle darin) und `None`, sobald ein Fahrzeug keinen
-///   Zeitpunkt kennt — das Maximum über bekannte Werte wäre ein erfundener Zeitpunkt.
-///   Sonst ist die Einheit `Gemischt` mit Verteilung und ohne „Seit“; eine gemeinsame
-///   Kategorie (S3 + S4 → gebunden) bleibt dabei erhalten. Tragen alle Fahrzeuge keinen
-///   Status, gibt es keinen (`Ohne`).
-/// - **Ohne Fahrzeug**: der Handstatus als Rückfall, sonst `Ohne`.
+/// - **Mit Fahrzeugen abgeleitet:** tragen alle denselben Status, gilt er; „Seit“ ist der
+///   JÜNGSTE Wechsel und `None`, sobald ein Fahrzeug keinen Zeitpunkt kennt (ein Maximum über
+///   die bekannten Werte wäre erfunden). Sonst `Gemischt` mit Verteilung ohne „Seit“; eine
+///   gemeinsame Kategorie (S3 + S4 → gebunden) bleibt erhalten. Ohne jeden Status `Ohne`.
+/// - **Ohne Fahrzeug:** der Handstatus als Rückfall, sonst `Ohne`.
 ///
-/// Ein gespeicherter Handstatus an einer Einheit MIT Fahrzeugen wird nicht gezeigt: die
-/// Fahrzeuge führen. Er bleibt stehen und gilt wieder, wenn die Einheit ihre Fahrzeuge
-/// abgibt — mit seinem damaligen „Seit“, der dann ehrlich sagt, wie alt er ist.
+/// Ein Handstatus an einer Einheit MIT Fahrzeugen wird nicht gezeigt, bleibt aber stehen und
+/// gilt wieder, wenn die Einheit ihre Fahrzeuge abgibt — mit seinem damaligen „Seit“.
 pub fn leite_status_ab(
     fahrzeuge: &[EinheitMitgliedFahrzeug],
     hand: Option<StatusWert>,
@@ -202,9 +199,8 @@ const SELECT_AUFGELOEST: &str = "\
     LEFT JOIN einsatzabschnitt ab ON ab.id = e.abschnitt_id \
     LEFT JOIN einsatz_personal fp ON fp.id = e.fuehrer_id";
 
-/// Satzweise geladene Anreicherungsdaten EINES Einsatzes (LFH-225/F23): Mitglieder,
-/// eigene Stärke und Sprechgruppen aller Einheiten sowie die Unterstellungskanten —
-/// je eine Abfrage über den ganzen Einsatz statt sechs je Einheit.
+/// Satzweise geladene Anreicherung EINES Einsatzes: Mitglieder, eigene Stärke, Sprechgruppen
+/// und Unterstellungskanten — je eine Abfrage über den ganzen Einsatz statt sechs je Einheit.
 struct Anreicherung {
     /// Eigene Ist-Stärke je Einheit; fehlender Eintrag = keine wertbaren Kräfte.
     staerken: HashMap<i64, Staerke>,
@@ -217,11 +213,9 @@ struct Anreicherung {
 }
 
 impl Anreicherung {
-    /// Kumulierte Ist-Stärke: eigene + alle unterstellten Einheiten (rekursiv),
-    /// vollständig im Speicher — ohne weitere Abfrage. Cycle-sicher über ein
-    /// Visited-Set (schützt vor korrupten Altdaten). Bewusst iterativ statt
-    /// `WITH RECURSIVE`: so bleibt der Zyklusschutz ohne eigene Tiefenbegrenzung
-    /// erhalten. Keine neue Stärke-Logik — summiert nur `staerken`.
+    /// Kumulierte Ist-Stärke (eigene + alle unterstellten Einheiten), vollständig im Speicher.
+    /// Iterativ mit Visited-Set statt `WITH RECURSIVE`, damit korrupte Zyklen terminieren. Summiert
+    /// nur `staerken`.
     fn ist_kumuliert(&self, wurzel_id: i64) -> Staerke {
         let mut summe = Staerke::neu(0, 0, 0);
         let mut stack = vec![wurzel_id];
@@ -276,17 +270,15 @@ async fn anreicherung_laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Anreic
     })
 }
 
-/// Setzt die abgeleiteten Anzeigen für einen Satz Zeilen **desselben** Einsatzes
-/// zusammen. Die Anreicherung wird einmal für den ganzen Einsatz geladen — konstant
-/// viele Abfragen statt sechs je Einheit (LFH-225/F23). `laden()` ruft die Funktion
-/// mit einem Ein-Element-Satz auf, damit es genau EINE Anreicherungslogik gibt.
-/// `soll` ist Override (falls vollständig) sonst Typ-Soll (falls vorhanden) sonst `None`.
+/// Setzt die Anzeigen für Zeilen desselben Einsatzes zusammen; die Anreicherung wird einmal für
+/// den ganzen Einsatz geladen. Auch `laden()` nutzt diese Funktion, damit es genau eine
+/// Anreicherungslogik gibt. `soll` ist der Override (falls vollständig), sonst das Typ-Soll,
+/// sonst `None`.
 async fn zu_anzeige_batch(
     pool: &SqlitePool,
     einsatz_id: i64,
     rows: Vec<Row>,
 ) -> Result<Vec<EinheitAnzeige>, AppError> {
-    // Ohne Zeilen gibt es nichts anzureichern — die Sammelabfragen bleiben aus.
     if rows.is_empty() {
         return Ok(Vec::new());
     }
@@ -386,11 +378,9 @@ pub async fn laden(
         .ok_or(AppError::NotFound)
 }
 
-/// `NotFound`, falls die Einheit nicht (mehr) zu diesem Einsatz gehört. Bewusst eine
-/// nackte Existenz-Abfrage: für eine reine Zugehörigkeitsprüfung wäre `laden()` seit
-/// LFH-225/F23 der teuerste denkbare Weg — es zieht die Anreicherung des GANZEN
-/// Einsatzes, um sie sofort wieder zu verwerfen.
-/// Executor-generisch: [`anlegen_tx`] prüft auf der offenen Verbindung (LFH-690).
+/// `NotFound`, falls die Einheit nicht (mehr) zum Einsatz gehört. Eine nackte
+/// Existenz-Abfrage, weil `laden()` die Anreicherung des ganzen Einsatzes zöge.
+/// Executor-generisch, damit [`anlegen_tx`] auf der offenen Verbindung prüft.
 async fn pruefe_gehoert_zum_einsatz(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
@@ -405,8 +395,8 @@ async fn pruefe_gehoert_zum_einsatz(
     t.map(|_| ()).ok_or(AppError::NotFound)
 }
 
-/// `NotFound`, falls der Abschnitt nicht zu diesem Einsatz gehört. Executor-generisch:
-/// [`anlegen_tx`] prüft auf der offenen Verbindung (LFH-690).
+/// `NotFound`, falls der Abschnitt nicht zum Einsatz gehört. Executor-generisch (s.
+/// [`anlegen_tx`]).
 async fn pruefe_abschnitt(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
@@ -449,10 +439,10 @@ async fn waere_zyklus(
     Ok(false)
 }
 
-/// Validiert typ (eigene Org), abschnitt (selber Einsatz) und parent (selber Einsatz) beim
-/// Anlegen, auf der Verbindung des Aufrufers (LFH-690: so sieht die Prüfung auch Zeilen
-/// derselben offenen Transaktion). Eine Zyklenprüfung entfällt: eine Einheit, die es noch
-/// nicht gibt, kann nicht eigener Vorfahr werden. Beim Umhängen prüft [`validiere_patch`].
+/// Validiert typ (eigene Org), abschnitt und parent (selber Einsatz) beim Anlegen auf der
+/// Verbindung des Aufrufers (so sieht die Prüfung auch Zeilen derselben offenen Transaktion).
+/// Keine Zyklenprüfung: eine neue Einheit kann nicht eigener Vorfahr sein; beim Umhängen prüft
+/// [`validiere_patch`].
 async fn validiere(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -473,11 +463,8 @@ async fn validiere(
     Ok(())
 }
 
-/// Legt eine Einheit an (nach Validierung). `org_id` für die Typ-Prüfung.
-///
-/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, Prüfungen und Insert
-/// laufen im Autocommit einer geliehenen Verbindung. Die Anzeige wird danach über den Pool
-/// geladen, nachdem die Verbindung zurückgegeben ist.
+/// Legt eine Einheit an; `org_id` für die Typ-Prüfung. Pool-Hülle um [`anlegen_tx`] ohne eigene
+/// Transaktion; die Anzeige wird nach Rückgabe der Verbindung über den Pool geladen.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -492,11 +479,9 @@ pub async fn anlegen(
     laden(pool, einsatz_id, id).await
 }
 
-/// Legt eine Einheit auf einer offenen Verbindung/Transaktion an, samt Prüfung von Typ
-/// (eigene Org), Abschnitt und übergeordneter Einheit auf derselben Verbindung (LFH-690,
-/// Demo-Import in EINER Transaktion). Öffnet und committet selbst nichts. Liefert die neue
-/// `id`, nicht die Anzeige: deren Anreicherung (Stärke, Mitglieder, Sprechgruppen) sind
-/// sechs Sammelabfragen über den Pool, und der Import braucht sie nicht.
+/// Legt eine Einheit auf einer offenen Verbindung an, samt Prüfung von Typ, Abschnitt und
+/// übergeordneter Einheit auf derselben Verbindung (Demo-Import in EINER Transaktion). Öffnet
+/// und committet nichts. Liefert die `id`, weil die Anreicherung über den Pool liest.
 pub async fn anlegen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -531,8 +516,8 @@ pub async fn anlegen_tx(
     Ok(id)
 }
 
-/// Teil-Patch der editierbaren Felder (LFH-306, ohne Führer): äußere `Option` = „im Patch
-/// enthalten?", innere = Wert (`Some(None)` setzt die Spalte auf NULL).
+/// Teil-Patch (Tri-State, ohne Führer): äußere `Option` = „im Patch?“, innere = Wert
+/// (`Some(None)` setzt NULL).
 #[derive(Debug, Default)]
 pub struct EinheitPatch<'a> {
     pub name: Option<&'a str>,
@@ -549,10 +534,8 @@ pub struct EinheitPatch<'a> {
     pub sortier: Option<i64>,
 }
 
-/// Validiert nur die **gesendeten** FK-Felder. `Some(None)` (Zuordnung lösen) und ein
-/// absentes Feld brauchen keine Prüfung — es gibt keinen neuen Bezug zu prüfen. Damit
-/// entfällt hier auch jede Effektivzustands-Bildung: die drei Prüfungen hängen je an
-/// EINER Spalte, nicht an einer Kombination (anders als das Soll-Trio im Handler).
+/// Validiert nur die gesendeten FK-Felder; `Some(None)` und ein fehlendes Feld bringen keinen
+/// neuen Bezug. Jede Prüfung hängt an EINER Spalte (anders als das Soll-Trio im Handler).
 async fn validiere_patch(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -579,10 +562,9 @@ async fn validiere_patch(
     Ok(())
 }
 
-/// Die drei Soll-Spalten **roh** (für die Effektivzustands-Prüfung des Trios beim
-/// Teil-PATCH, LFH-306). `EinheitAnzeige.soll` glättet ein inkonsistentes Trio still auf
-/// `None`; gegen dieses geglättete Trio darf der Handler nicht validieren.
-/// `NotFound`, falls die Einheit nicht zum Einsatz gehört.
+/// Die drei Soll-Spalten roh, für die Effektivzustands-Prüfung des Trios beim Teil-PATCH.
+/// `EinheitAnzeige.soll` glättet ein inkonsistentes Trio auf `None`; dagegen darf der Handler
+/// nicht validieren. `NotFound`, falls die Einheit nicht zum Einsatz gehört.
 pub async fn soll_roh(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -599,14 +581,12 @@ pub async fn soll_roh(
     .ok_or(AppError::NotFound)
 }
 
-/// Teil-Patch der editierbaren Felder (ohne Führer). Parent-Wechsel zyklenfrei. `NotFound`,
+/// Teil-Patch der editierbaren Felder (ohne Führer), Parent-Wechsel zyklenfrei; `NotFound`,
 /// falls die Einheit nicht zum Einsatz gehört.
 ///
-/// Flag/Wert-Paare mit **nummerierten** Parametern (LFH-266/F12, Vorlage `person/repo.rs`):
-/// nur gesendete Spalten werden angefasst. Die Nummerierung ist bei zwölf aufeinanderfolgenden
-/// Paaren keine Stilfrage — eine um eine Position verschobene Bind-Kette vertauschte
-/// gleichtypige Nachbarspalten (`kommunikationsmittel`↔`erreichbarkeit`,
-/// `abschnitt_id`↔`ueber_einheit_id`) STILL, ohne Compile- und ohne Laufzeitfehler.
+/// Flag/Wert-Paare mit nummerierten Parametern: nur gesendete Spalten werden angefasst, und
+/// eine verschobene Bind-Kette kann gleichtypige Nachbarn (`kommunikationsmittel`↔
+/// `erreichbarkeit`, `abschnitt_id`↔`ueber_einheit_id`) nicht still vertauschen.
 pub async fn patche(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -666,19 +646,17 @@ pub async fn patche(
     laden(pool, einsatz_id, id).await
 }
 
-/// Ergebnis von [`setze_hand_status_tx`]: die Labels vor/nach dem Setzen, `None` wenn
-/// sich nichts geändert hat (kein ETB-Eintrag).
+/// Ergebnis von [`setze_hand_status_tx`]: die Labels vor und nach dem Setzen.
 pub struct HandStatusWechsel {
     pub name: String,
     pub vorher: Option<String>,
     pub nachher: Option<String>,
 }
 
-/// Setzt den Handstatus einer Einheit (LFH-609) auf einer offenen Transaktion. `status_id`
-/// ist bereits gegen den Katalog der Org geprüft (`None` = löschen). Eine Einheit mit
-/// Fahrzeug führt ihren Status über die Fahrzeuge → SETZEN ist `UnprocessableEntity` (der
-/// Zusammenhang verbietet die Aktion, nicht das Feld), Löschen bleibt erlaubt. `status_seit` springt nur bei einem
-/// echten Wechsel. Liefert `None`, wenn der Status unverändert blieb.
+/// Setzt den Handstatus einer Einheit auf einer offenen Transaktion; `status_id` ist gegen den
+/// Katalog der Org geprüft (`None` = löschen). Mit Fahrzeugen führen die Fahrzeuge, SETZEN ist
+/// dann `UnprocessableEntity`; Löschen bleibt erlaubt. `status_seit` springt nur bei einem
+/// echten Wechsel. `None`, wenn der Status unverändert blieb.
 pub async fn setze_hand_status_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -703,9 +681,8 @@ pub async fn setze_hand_status_tx(
     if alt_id == status_id {
         return Ok(None);
     }
-    // LÖSCHEN bleibt auch mit Fahrzeugen erlaubt: ein gespeicherter Handstatus tauchte
-    // sonst unvermeidlich wieder auf, sobald die Einheit ihre Fahrzeuge abgibt — mit einem
-    // Wert, den niemand mehr entfernen könnte, solange sie welche hat.
+    // LÖSCHEN bleibt mit Fahrzeugen erlaubt: sonst tauchte ein gespeicherter Handstatus beim
+    // Abgeben der Fahrzeuge wieder auf, ohne dass ihn vorher jemand entfernen konnte.
     if fahrzeuge > 0 && status_id.is_some() {
         return Err(AppError::UnprocessableEntity(
             "Die Einheit führt ihren Status über ihre Fahrzeuge".into(),
@@ -737,7 +714,7 @@ pub async fn setze_hand_status_tx(
     }))
 }
 
-/// Reine Geo-/Symbol-Felder einer Einheit. `Some(None)` = auf NULL, `None` = unverändert.
+/// Geo-/Symbol-Felder einer Einheit. `Some(None)` = NULL, `None` = unverändert.
 #[derive(Debug, Default)]
 pub struct PositionPatch<'a> {
     pub lat: Option<Option<f64>>,
@@ -746,7 +723,7 @@ pub struct PositionPatch<'a> {
     pub tz_organisation: Option<Option<&'a str>>,
 }
 
-/// Setzt/ändert/löscht Position + Symbol-Felder. KEIN ETB-Schreibpfad (Lage-Pflege).
+/// Setzt/ändert/löscht Position und Symbol-Felder; schreibt kein ETB.
 pub async fn aktualisiere_position(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -780,9 +757,9 @@ pub async fn aktualisiere_position(
     laden(pool, einsatz_id, einheit_id).await
 }
 
-/// Reine Validierung (kein Write): Einheit gehört zum Einsatz, und bei `Some(ep)` ist die
-/// Person Mitglied *dieser* Einheit. `NotFound`/`Validation`. Wird im Route-Handler **vor**
-/// jeglichem Write aufgerufen, damit ein ungültiger Führer kein Teil-Update hinterlässt.
+/// Reine Validierung: die Einheit gehört zum Einsatz, und bei `Some(ep)` ist die Person Mitglied
+/// dieser Einheit. Wird vor jedem Write gerufen, damit ein ungültiger Führer kein Teil-Update
+/// hinterlässt.
 pub async fn pruefe_fuehrer(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -832,10 +809,9 @@ pub async fn setze_fuehrer(
     Ok(())
 }
 
-/// Löst eine Einheit auf, auf offener Connection/Tx (F06/LFH-244 Tier-A: atomar mit dem
-/// System-ETB-Eintrag): alle Mitglieder freigeben (`einheit_id = NULL` an Personal +
-/// Fahrzeug + Material), Unter-Einheiten auf den Parent hochziehen, dann löschen.
-/// `NotFound`, falls nicht zum Einsatz.
+/// Löst eine Einheit auf einer offenen Verbindung auf (atomar mit dem System-ETB): Mitglieder
+/// freigeben (`einheit_id = NULL` an Personal, Fahrzeug, Material), Unter-Einheiten an den
+/// Parent hängen, dann löschen. `NotFound`, falls nicht zum Einsatz.
 pub async fn loese_auf_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -850,8 +826,8 @@ pub async fn loese_auf_tx(
     .await?
     .ok_or(AppError::NotFound)?;
 
-    // LFH-635: der CASCADE entfernt die Ablösungsschichten der Einheit, ihre Auto-Fristen
-    // hängen aber ohne FK daran und liefen sonst als Geister im Scheduler weiter.
+    // CASCADE entfernt die Ablösungsschichten, ihre Auto-Fristen hängen aber ohne FK daran und
+    // liefen sonst als Geister im Scheduler weiter.
     crate::abloesung::repo::loesche_fristen_der_einheit_tx(conn, id).await?;
     sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE einheit_id = ?")
         .bind(id)
@@ -875,7 +851,7 @@ pub async fn loese_auf_tx(
     Ok(())
 }
 
-/// Pool-Wrapper (eigene Tx, hält die Freigaben + Hochzug + Löschung atomar).
+/// Pool-Wrapper mit eigener Transaktion.
 pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
     loese_auf_tx(&mut tx, einsatz_id, id).await?;
@@ -887,7 +863,7 @@ pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<()
 mod tests {
     use super::*;
 
-    // ── LFH-609: Ableitung des Einheitenstatus ──────────────────────────────────────
+    // ── Ableitung des Einheitenstatus ──────────────────────────────────────────────
 
     fn sw(id: i64, kategorie: crate::katalog::StatusKategorie, sortier: i64) -> StatusWert {
         StatusWert {
@@ -1075,9 +1051,8 @@ mod tests {
         (einsatz, e.id)
     }
 
-    /// LFH-690: Abschnitt, Einheit und Untereinheit entstehen in EINER Transaktion. Die
-    /// Prüfungen müssen die noch nicht committeten Zeilen sehen. Über den Pool (Datei/WAL:
-    /// eigener Snapshot) endete die Abschnitt-Prüfung in `NotFound`.
+    /// Abschnitt, Einheit und Untereinheit entstehen in EINER Transaktion; die Prüfungen müssen die
+    /// noch nicht committeten Zeilen sehen.
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn einheit_auf_abschnitt_aus_derselben_transaktion() {
         let (_dir, pool) = crate::db::test_pool_datei().await;
@@ -1244,7 +1219,7 @@ mod tests {
 
     #[tokio::test]
     async fn deaktivierter_typ_bleibt_beim_aktualisieren_gueltig() {
-        // Entscheidung 4: ein deaktivierter Typ bleibt für bestehende Einheiten gültig.
+        // Ein deaktivierter Typ bleibt für bestehende Einheiten gültig.
         let pool = crate::db::test_pool().await;
         let (einsatz, b) = setup(&pool).await;
         let typ: i64 = sqlx::query_scalar(
@@ -1266,11 +1241,8 @@ mod tests {
         crate::einheit::typ_repo::deaktivieren(&pool, 1, typ)
             .await
             .unwrap();
-        // PATCH (nur Name) muss trotzdem gelingen, Typ bleibt referenziert.
-        // LFH-306: der Patch enthält `typ_id` gar nicht mehr — der Typ bleibt allein
-        // dadurch stehen, dass er nicht angefasst wird. Der zweite Patch unten sendet ihn
-        // ausdrücklich mit, damit die Zusage „deaktivierter Typ bleibt setzbar" weiter
-        // geprüft wird und nicht bloß am Nicht-Anfassen hängt.
+        // PATCH nur des Namens gelingt. Der zweite Patch sendet `typ_id` ausdrücklich mit, damit
+        // „deaktivierter Typ bleibt setzbar“ geprüft wird und nicht bloß am Nicht-Anfassen hängt.
         let nachher = patche(
             &pool,
             einsatz,
@@ -1369,7 +1341,7 @@ mod tests {
             .unwrap_err(),
             AppError::Validation(_)
         ));
-        // Grenzt ab: `null` löst die Zuordnung und darf nicht in die Zyklenprüfung laufen.
+        // `null` löst die Zuordnung und läuft nicht in die Zyklenprüfung.
         assert!(patche(
             &pool,
             einsatz,
@@ -1384,9 +1356,7 @@ mod tests {
         .is_ok());
     }
 
-    /// Kern von LFH-306: nicht gesendete Spalten bleiben stehen. Unter dem alten
-    /// Vollersatz nullte ein Patch ohne diese Keys Bemerkung, Kommunikationsmittel,
-    /// Erreichbarkeit und das Soll-Trio und setzte `sortier` auf 0.
+    /// Nicht gesendete Spalten bleiben stehen (Bemerkung, Kommunikation, Soll-Trio, `sortier`).
     #[tokio::test]
     async fn patche_laesst_nicht_gesendete_spalten_stehen() {
         let pool = crate::db::test_pool().await;
@@ -1434,9 +1404,8 @@ mod tests {
         assert_eq!(nachher.sortier, 42);
     }
 
-    /// Bind-Reihenfolge der zwölf Flag/Wert-Paare: alle Spalten in EINEM Patch auf distinkte
-    /// Werte setzen und einzeln prüfen. Eine verschobene Kette vertauschte gleichtypige
-    /// Nachbarspalten (`kommunikationsmittel`↔`erreichbarkeit`) still.
+    /// Bind-Reihenfolge der zwölf Flag/Wert-Paare: alle Spalten in EINEM Patch auf distinkte Werte
+    /// setzen und einzeln prüfen.
     #[tokio::test]
     async fn patche_setzt_jede_spalte_an_ihren_platz() {
         let pool = crate::db::test_pool().await;
@@ -1723,14 +1692,11 @@ mod tests {
         assert_eq!(einheit_id, None, "Material muss beim Auflösen frei werden");
     }
 
-    // ── LFH-225/F23: Kantenfälle der Satz-Aggregation ────────────────────────────
-    // Die Anreicherung von `liste()`/`laden()` läuft satzbasiert (eine Abfrage je
-    // Mitgliedsart über den ganzen Einsatz). Diese Tests pinnen das Verhalten an den
-    // Rändern fest, an denen eine Sammelabfrage anders reagieren könnte als die alten
-    // Einzelabfragen.
+    // ── Kantenfälle der Satz-Aggregation ────────────────────────────────────────────
+    // Die Anreicherung von `liste()`/`laden()` läuft satzbasiert; diese Tests pinnen die Ränder,
+    // an denen eine Sammelabfrage anders reagieren könnte als Einzelabfragen.
 
-    /// Einsatz ohne Einheiten: leere Liste, keine Panik. (Die Sammelabfragen dürfen
-    /// bei leerer Eingabe gar nicht erst laufen.)
+    /// Einsatz ohne Einheiten: leere Liste; die Sammelabfragen laufen bei leerer Eingabe nicht.
     #[tokio::test]
     async fn liste_ohne_einheiten_ist_leer() {
         let pool = crate::db::test_pool().await;
@@ -1738,8 +1704,8 @@ mod tests {
         assert!(liste(&pool, einsatz).await.unwrap().is_empty());
     }
 
-    /// Einheit ohne jedes Mitglied: leere Mitgliederlisten und Null-Stärke — ein
-    /// fehlender Eintrag in der Sammel-Map darf nicht zu `NotFound` o. Ä. führen.
+    /// Einheit ohne Mitglied: leere Listen und Null-Stärke; ein fehlender Map-Eintrag führt nicht
+    /// zu `NotFound`.
     #[tokio::test]
     async fn einheit_ohne_mitglieder_liefert_leere_listen_und_nullstaerke() {
         let pool = crate::db::test_pool().await;
@@ -1756,11 +1722,9 @@ mod tests {
         assert!(e.sprechgruppen.is_empty());
     }
 
-    /// Regression (Pflicht, LFH-225/F23): korrupte Altdaten mit Zyklus in der
-    /// Unterstellung. Der Zyklusschutz per Visited-Set muss die Baum-Summierung
-    /// terminieren lassen — sonst hängt jeder Listenabruf des Einsatzes.
-    /// Der Zyklus wird per direktem UPDATE gelegt, weil `waere_zyklus` ihn über die
-    /// reguläre Schreib-API verhindert.
+    /// Korrupte Altdaten mit Zyklus in der Unterstellung: das Visited-Set lässt die Summierung
+    /// terminieren, sonst hinge jeder Listenabruf. Der Zyklus wird per UPDATE gelegt, weil
+    /// `waere_zyklus` ihn über die API verhindert.
     #[tokio::test]
     async fn ist_kumuliert_terminiert_bei_korruptem_zyklus() {
         let pool = crate::db::test_pool().await;
@@ -1818,8 +1782,7 @@ mod tests {
         );
     }
 
-    /// `laden()` und der passende Eintrag aus `liste()` müssen Feld für Feld identisch
-    /// sein — beide teilen sich dieselbe Anreicherungslogik.
+    /// `laden()` und der passende Eintrag aus `liste()` sind Feld für Feld identisch.
     #[tokio::test]
     async fn laden_ist_identisch_zum_eintrag_aus_liste() {
         let pool = crate::db::test_pool().await;
@@ -1898,8 +1861,8 @@ mod tests {
         assert_eq!(alle[0].ist_kumuliert, Staerke::neu(1, 1, 2));
     }
 
-    /// LFH-237/F08: Eine Einheit auflösen, die als Auftrag-Empfänger referenziert wird —
-    /// der Bezug wird per ON DELETE SET NULL (Migration 0088) freigegeben statt zu blockieren.
+    /// Eine als Auftrag-Empfänger referenzierte Einheit auflösen: der Bezug wird per ON DELETE SET
+    /// NULL freigegeben.
     #[tokio::test]
     async fn aufloesen_setzt_empfaenger_einheit_null() {
         let pool = crate::db::test_pool().await;

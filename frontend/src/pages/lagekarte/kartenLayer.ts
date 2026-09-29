@@ -11,8 +11,8 @@ import { farbenDunkel } from '../../theme/tokens';
 import { plakettenBildId, plakettenSchrift, zonenPlakette, type Plakette } from './plakette';
 
 export type { BildOverlay };
-// Die Plakette ist seit LFH-622 ein eigenes Modul (Marker brauchen sie auch, und
-// `markerLayer` → `kartenLayer` wäre ein Importkreis); die Bestandsimporte laufen weiter.
+// Die Plakette ist ein eigenes Modul (Marker brauchen sie auch, `markerLayer` → `kartenLayer` wäre
+// ein Importkreis); die Bestandsimporte laufen weiter über diesen Re-Export.
 export { PLAKETTE_PRAEFIX, plakettenBild, plakettenBildId, zonenPlakette } from './plakette';
 
 export interface AktiveFachebene {
@@ -21,12 +21,9 @@ export interface AktiveFachebene {
 }
 
 /**
- * Zentrale (Re-)Anlage der entitätslosen Karten-Layer (Abschnittsflächen + Zonen).
- *
- * Warum hier und nicht in `Kartenflaeche.tsx`: nur `import type` von maplibre-gl →
- * kein WebGL-Laufzeitimport → in jsdom testbar. So lässt sich die *Sequenz* nach
- * einem Basemap-/Theme-Wechsel (Style-Wechsel → zuverlässige Re-Anlage) ohne Karte
- * prüfen — genau der Pfad, der vorher fehlte und alle Zeichnungen verschwinden ließ.
+ * Zentrale (Re-)Anlage der entitätslosen Karten-Layer (Abschnittsflächen + Zonen). Hier und nicht
+ * in `Kartenflaeche.tsx`, weil nur `import type` von maplibre-gl nötig ist — so ist die Sequenz
+ * nach einem Style-Wechsel in jsdom prüfbar.
  */
 
 export interface ZoneFeature {
@@ -34,13 +31,13 @@ export interface ZoneFeature {
   geometrie: GeoJsonGeometry;
   label: string | null;
   stil: ZoneStil;
-  /** Gefahrenzone: Umriss gestrichelt (Neuentwurf S5). Nur Darstellung, keine Geometrie. */
+  /** Gefahrenzone: Umriss gestrichelt. Nur Darstellung. */
   gestrichelt?: boolean;
   /** Farben der Beschriftungsplakette aus den Rollen des aktiven Modus. Ohne Angabe: Nacht. */
   plakette?: ZonenPlakette;
 }
 
-/** Farben der Beschriftungsplakette — seit LFH-622 für Zonen UND Marker (`plakette.ts`). */
+/** Farben der Beschriftungsplakette — für Zonen und Marker (`plakette.ts`). */
 export type ZonenPlakette = Plakette;
 
 export type FlaechenFeatureCollection = {
@@ -149,11 +146,10 @@ export function sorgeFuerZonenLayer(map: MapLibreMap, daten: ZonenFeatureCollect
       paint: { 'fill-color': ['get', 'fillColor'], 'fill-opacity': ['get', 'fillOpacity'] },
     });
   }
-  // Durchgezogen und gestrichelt als ZWEI gefilterte Layer statt eines datengetriebenen
-  // `line-dasharray`: Arrays lassen sich nicht aus Feature-Properties lesen, und ein Layer,
-  // den MapLibre bei der Validierung ablehnt, fehlt STILL — die Zonen stünden ohne Umriss da.
-  // Der Klick-Handler hängt an `zonen-line`: gestrichelt sind nur Gefahrengebiete, und die
-  // sind Flächen, die über `zonen-fill` angeklickt werden.
+  // Durchgezogen und gestrichelt als zwei gefilterte Layer statt eines datengetriebenen
+  // `line-dasharray`: Arrays lassen sich nicht aus Properties lesen, und ein abgelehnter Layer
+  // fehlt still. Der Klick-Handler hängt an `zonen-line` — gestrichelt sind nur Gefahrengebiete,
+  // und die werden über `zonen-fill` angeklickt.
   if (!map.getLayer('zonen-line')) {
     map.addLayer({
       id: 'zonen-line',
@@ -176,11 +172,9 @@ export function sorgeFuerZonenLayer(map: MapLibreMap, daten: ZonenFeatureCollect
       },
     });
   }
-  // Beschriftung im Entwurfsstil: Plakette (9-Slice-Bild, `icon-text-fit`) statt Halo,
-  // Versalien per `text-transform` — der Text selbst bleibt, wie `zonenBeschriftung` ihn
-  // baut. Die Schrift wählt `plakettenSchrift` je Glyphen-Server: Mono nur offline, wo der
-  // eigene Server sie führt. Eine fremde Familie beantwortet der Server mit 404, und MapLibre
-  // zeichnet dann in einer lokalen Systemschrift.
+  // Plakette (9-Slice-Bild, `icon-text-fit`) statt Halo, Versalien per `text-transform`. Die
+  // Schrift wählt `plakettenSchrift` je Glyphen-Server: Mono nur offline, wo der eigene Server sie
+  // führt (eine fremde Familie beantwortet er mit 404).
   if (!map.getLayer('zonen-label')) {
     const schrift = plakettenSchrift(map.getStyle());
     map.addLayer({
@@ -214,8 +208,8 @@ export function reAnlegenAlles(
   marker?: MarkerFeatureCollection,
   einsatzort?: MarkerFeatureCollection,
 ) {
-  // Bilder zuerst (vor abschnitte-fill, das gleich angelegt wird → beforeId noch nicht da:
-  // daher OHNE beforeId anlegen und danach abschnitte/zonen drüber legen).
+  // Bilder zuerst, ohne beforeId (abschnitte-fill gibt es noch nicht); Abschnitte und Zonen legen
+  // sich danach darüber.
   synchronisiereBildLayer(map, bilder);
   sorgeFuerAbschnittLayer(map, flaechen);
   (map.getSource('abschnitte') as GeoJSONSource | undefined)?.setData(flaechen as never);
@@ -230,15 +224,10 @@ export function reAnlegenAlles(
 }
 
 /**
- * Nach einem Style-Wechsel (`setStyle`: Basemap/Theme) sind alle Custom-Sources/Layer
- * weg. Die Re-Anlage NICHT an `styledata` + `isStyleLoaded()` hängen (unzuverlässig:
- * beim Online-Wechsel wird der Style gesetzt, bevor die Tiles geladen sind — das
- * `styledata`-Event mit `isStyleLoaded()===true` bleibt dann aus, und die Zeichnungen
- * kämen erst beim nächsten Daten-Update zurück). Stattdessen über den bewährten
- * render-Frame-Poller `wendeKartenDatenAn` — derselbe Pfad wie beim Zeichnen.
- *
- * `getFlaechen`/`getZonen` werden ERST im vertagten Lauf gelesen → die zuletzt
- * bekannten Daten landen auf der Karte.
+ * Nach `setStyle` sind alle Custom-Sources/Layer weg. Die Re-Anlage hängt nicht an `styledata` +
+ * `isStyleLoaded()` — beim Online-Wechsel bleibt dieses Event aus, bis die Tiles geladen sind —,
+ * sondern am render-Frame-Poller `wendeKartenDatenAn`. `getFlaechen`/`getZonen` werden erst im
+ * vertagten Lauf gelesen.
  */
 export function planeReAnlegenNachStyle(
   map: Pick<MapLibreMap, 'isStyleLoaded' | 'on' | 'off'> & MapLibreMap,

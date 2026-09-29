@@ -9,16 +9,9 @@ import { globalKeys } from '../../api/queryKeys';
 import { Paneel } from '../../components/instrument';
 
 /**
- * Trefflächenboden für die Beschriftungszeile — REIN und exportiert, damit die Zusicherung
- * über die Dichtestufen ohne Render prüfbar ist (`test/utils.tsx:31` montiert ein nacktes
- * `ConfigProvider`, jsdom rechnet kein Layout).
- *
- * ZWEI Angaben, nicht eine (Konvention aus LFH-365): `minHeight` aus `controlHeight` PLUS
- * die Polsterung. Aufgelöste Tokens, nie `var(--lfh-*)`.
- *
- * Bewusst lokal statt aus `pages/lagekarte/Sidebar.tsx` importiert: Lagekarte →
- * Einstellungen wäre eine Fremdkopplung. `Datensicht`, `SlashMenu` und `Sidebar` halten
- * je eine eigene.
+ * Trefflächenboden für die Beschriftungszeile — rein und exportiert, damit die Zusicherung ohne
+ * Render prüfbar ist. Zwei Angaben: `minHeight` aus `controlHeight` plus Polsterung, aus
+ * aufgelösten Tokens. Bewusst lokal statt aus `pages/lagekarte/Sidebar.tsx` importiert.
  */
 export function zeilenzielStil(token: {
   controlHeight: number;
@@ -34,27 +27,14 @@ export function zeilenzielStil(token: {
 }
 
 /**
- * Admin-Sektion `/admin/einstellungen/anmeldung` — Auth-Provider an-/abschalten (LFH-280).
- * Kein Form/Speichern-Button: jede Umschaltung speichert sofort (`providerSchalten`). Der
- * Passwort-Provider bleibt garantiert nicht-deaktivierbar (letzter Admin-Login-Weg). Edit nur
- * system_rolle=admin; Führungskräfte sehen read-only.
+ * Admin-Sektion `/admin/einstellungen/anmeldung` — Auth-Provider an-/abschalten. Jede Umschaltung
+ * speichert sofort. Der Passwort-Provider bleibt nicht deaktivierbar (letzter Admin-Login-Weg).
+ * Bearbeiten nur für `system_rolle=admin`, Führungskräfte sehen read-only.
  *
- * DER SPERRGRUND STEHT SICHTBAR (LFH-370 · B5j, Befund M17). Vorher hing er allein im
- * Tooltip eines Wrapper-`<span>` — auf dem Führungs-Tablet gibt es kein Hover, der Grund
- * war dort überhaupt nicht erreichbar. Und er deckte nur EINEN der drei Sperrfälle ab:
- * eine Führungskraft sah die komplette Liste ausgegraut, ohne jede Begründung. „Ausgegraut"
- * allein ist zudem eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1).
- *
- * Gewählt ist damit die Familie „Grund zusätzlich als sichtbarer gedämpfter Kurztext"
- * (Präzedenz `pages/lagekarte/Sidebar.tsx:558-572`, `karten/OfflineRegionPicker.tsx:244-247`)
- * statt „Grund am Element, Klick tut nichts" (`ModulPanel.tsx:141-142`, `AppLayout.tsx:29-38`)
- * — die trägt den Grund an einer Stelle, die Touch nicht erreicht.
- *
- * Die Ticket-Frage „was tut ein Label-Klick am GESPERRTEN Switch?" ist damit nicht
- * beantwortet, sondern aufgelöst: an gesperrten Zeilen entsteht gar kein `<label>`. Ein
- * Label-Klick auf ein `disabled` Steuerelement leitet der Browser ohnehin nicht weiter
- * (gemessen: 0 Aufrufe) — er wäre still, und ein stiller Klick ist keine definierte
- * Reaktion. Dieselbe Regel wie beim Lesezweig in LFH-369: ohne Aktion keine Aufforderung.
+ * Der Sperrgrund steht sichtbar als gedämpfter Kurztext, nicht nur im Tooltip: auf dem Tablet gibt
+ * es kein Hover, und „ausgegraut" allein ist eine Ein-Kanal-Aussage (WCAG 1.4.1). An gesperrten
+ * Zeilen entsteht kein `<label>`: den Klick auf ein `disabled` Steuerelement leitet der Browser
+ * ohnehin nicht weiter — ohne Aktion keine Aufforderung.
  */
 export default function Anmeldeverfahren() {
   const { benutzer } = useAuth();
@@ -62,8 +42,8 @@ export default function Anmeldeverfahren() {
   const { token } = theme.useToken();
   const istAdmin = benutzer?.system_rolle === 'admin';
 
-  // Admin-Endpoint (LFH-277): liefert die VOLLE Liste inkl. deaktivierter Provider — nur so
-  // kann diese Seite Toggles für deaktivierte Verfahren rendern.
+  // Admin-Endpoint: liefert die volle Liste inkl. deaktivierter Provider — nur so gibt es Toggles
+  // für sie.
   const providerQuery = useQuery({
     queryKey: globalKeys.authProvider(),
     queryFn: providerListeAdmin,
@@ -76,10 +56,9 @@ export default function Anmeldeverfahren() {
       // Server-Wahrheit (inkl. abgelehntem Zustand) direkt übernehmen.
       qc.setQueryData(globalKeys.authProvider(), liste);
     },
-    // KEIN `onError`-Toast mehr (LFH-345 · C10, H14): die Ablehnung hängt an
-    // `mutation.error` und steht als `<SpeicherFehler>` über der Liste, die betroffene
-    // Zeile trägt zusätzlich eine Marke. Der Schalter selbst springt ohnehin von selbst
-    // zurück — die Anzeige liest aus dem Query, es gibt kein optimistisches Update.
+    // Kein `onError`-Toast: die Ablehnung steht als `<SpeicherFehler>` über der Liste, die Zeile
+    // trägt eine Marke. Der Schalter springt von selbst zurück (die Anzeige liest aus dem Query,
+    // kein optimistisches Update).
   });
 
   const provider = providerQuery.data ?? [];
@@ -111,9 +90,9 @@ export default function Anmeldeverfahren() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360 }}>
             {provider.map((p) => {
               const istPasswort = p.id === 'passwort';
-              // Die drei Sperrquellen getrennt statt vermischt: nur zwei davon sind dauerhaft
-              // und verdienen einen Text. `isPending` ist vorübergehend und bekommt keinen —
-              // ein Grund, der nach 200 ms wieder verschwindet, ist Rauschen.
+              // Die drei Sperrquellen getrennt: nur zwei sind dauerhaft und verdienen einen Text.
+              // `isPending` ist vorübergehend — ein Grund, der nach 200 ms verschwindet, ist
+              // Rauschen.
               const bedienbar = istAdmin && !istPasswort;
               const gesperrt = !bedienbar || schaltenMutation.isPending;
               const sperrGrund = !istAdmin
@@ -125,8 +104,8 @@ export default function Anmeldeverfahren() {
                 ? 'Nur Benutzer mit der Systemrolle „Admin" dürfen Anmeldeverfahren umschalten'
                 : 'Garantierter Admin-Login-Weg — nicht deaktivierbar';
               const feldId = `anmeldeverfahren-${p.id}`;
-              // Nur die abgelehnte Zeile wird markiert (H14). `variables` trägt die Zeile,
-              // an der die Mutation zuletzt gescheitert ist.
+              // Nur die abgelehnte Zeile markieren; `variables` trägt die zuletzt gescheiterte
+              // Zeile.
               const hatFehler = schaltenMutation.isError && schaltenMutation.variables?.id === p.id;
               return (
                 <div
@@ -140,10 +119,9 @@ export default function Anmeldeverfahren() {
                     borderInlineStart: hatFehler ? `3px solid ${token.colorError}` : undefined,
                   }}
                 >
-                  {/* Ein `<label htmlFor>` NUR an der bedienbaren Zeile — sonst ein `<span>`
-                    ohne Zeigerform. Das `aria-label` am Switch bleibt und schlägt das Label
-                    (gemessen), die Bestandsnamen ändern sich also nicht. Wer es später als
-                    „doppelt" entfernt, bekommt STILL einen anderen Accessible Name. */}
+                  {/* Ein `<label htmlFor>` nur an der bedienbaren Zeile, sonst ein `<span>`. Das
+                      `aria-label` am Switch bleibt und schlägt das Label — wer es als „doppelt"
+                      entfernt, ändert still den Accessible Name. */}
                   {bedienbar ? (
                     <label
                       htmlFor={feldId}
@@ -155,8 +133,8 @@ export default function Anmeldeverfahren() {
                     <span style={{ ...zeilenzielStil(token), flex: 1 }}>{p.anzeigename}</span>
                   )}
                   {sperrGrund && (
-                    // Kurzwort sichtbar, lange Begründung im Tooltip darüber — und der Tooltip
-                    // hängt an einem NICHT gesperrten Element, braucht also keinen Wrapper.
+                    // Kurzwort sichtbar, lange Begründung im Tooltip — an einem nicht gesperrten
+                    // Element, also ohne Wrapper.
                     <Tooltip title={langGrund}>
                       <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
                         {sperrGrund}

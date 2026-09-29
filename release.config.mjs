@@ -1,46 +1,31 @@
 /**
- * semantic-release (LFH-522/LFH-527).
+ * semantic-release.
  *
- * Bewusst `.mjs` statt `.releaserc.json`: die drei nicht offensichtlichen Entscheidungen
- * unten (0.x-Regel, vorbereitete Kanäle, zwei Versionsdateien) brauchen ihre Begründung am
- * Ort — JSON kann das nicht tragen.
+ * `.mjs` statt `.releaserc.json`, damit die Entscheidungen unten ihre Begründung am Ort tragen.
  *
- * Die Versionsquelle ist NICHT dieses Paket. Die Root-`package.json` bleibt auf `0.0.0`
- * stehen und ist reines Werkzeug; die Version der Anwendung steht in `Cargo.toml` und
- * `frontend/package.json` und wird unten per `exec` gesetzt. Deshalb fehlt
- * `@semantic-release/npm` in der Plugin-Liste — es würde die Werkzeug-`package.json`
- * bumpen und (schlimmer) einen npm-Publish versuchen.
+ * Die Versionsquelle ist NICHT dieses Paket: die Root-`package.json` bleibt auf `0.0.0` und ist
+ * reines Werkzeug; die Anwendungsversion steht in `Cargo.toml` und `frontend/package.json` und
+ * wird unten per `exec` gesetzt. Deshalb fehlt `@semantic-release/npm` — es bumpte die
+ * Werkzeug-`package.json` und versuchte einen npm-Publish.
  */
 
 /*
- * DER TEXT DES GITHUB-RELEASES WIRD GEKAPPT — 125 000 Zeichen sind GitHubs harte Grenze.
+ * DER TEXT DES GITHUB-RELEASES WIRD GEKAPPT — 125 000 Zeichen sind GitHubs harte Grenze
+ * (sonst 422 „body is too long"). Die Notizen umfassen alle Commits seit dem letzten Release
+ * DESSELBEN Kanals, der erste Merge `alpha → main` also die ganze Historie.
  *
- * Gemessen im Lauf 34499645278: `POST /repos/…/releases` antwortete mit 422 und
- * `body is too long (maximum is 125000 characters)`; die Notizen waren 233 746 Zeichen lang.
- * Das ist kein Einmalfall des ersten Releases, auch wenn er ihn zuerst getroffen hat: die
- * Notizen umfassen alle Commits seit dem letzten Release DESSELBEN Kanals — der erste Merge
- * von `alpha` nach `main` stellt dieselbe Liste über die ganze Historie noch einmal.
+ * Der Abbruch käme an der teuersten Stelle: Changelog, Versions-Commit und Tag wären gepusht,
+ * und weil `artefakte.yml` an `release: published` hängt, entstünden nie Binaries.
  *
- * Der Abbruch kommt an der teuersten Stelle: Changelog, Versions-Commit und Tag sind dann
- * bereits gepusht. Zurück bleibt ein Tag ohne Release — und weil `artefakte.yml` an
- * `release: published` hängt, entstehen für dieses Tag nie Binaries. Genau die Lage, die der
- * Nebenläufigkeits-Kommentar in ci.yml beschreibt, nur aus einer anderen Ursache.
- *
- * Gekappt wird NUR dieser eine Text, nicht `nextRelease.notes`: CHANGELOG.md wird vorher
- * geschrieben und bleibt vollständig. Nichts geht verloren, es steht eine Datei weiter —
- * darauf zeigt der angehängte Hinweis.
- *
- * Warum eine Vorlage und kein eigenes Plugin: dauerhaft ändern ließe sich `nextRelease.notes`
- * nur in `generateNotes`. Eine Kürzung im prepare-Schritt wäre bis zum publish wieder weg —
- * semantic-release ERZEUGT die Notizen neu, sobald ein prepare-Plugin den gitHead bewegt hat,
- * und der Versions-Commit tut genau das. In `generateNotes` zu kappen träfe aber die
- * CHANGELOG.md mit. `releaseBodyTemplate` ist die dokumentierte Schraube für genau diesen Text.
+ * Gekappt wird NUR dieser Text, nicht `nextRelease.notes`: CHANGELOG.md bleibt vollständig,
+ * darauf zeigt der angehängte Hinweis. Eine Kürzung im prepare-Schritt wäre bis zum publish
+ * wieder weg (semantic-release erzeugt die Notizen nach dem Versions-Commit neu), eine in
+ * `generateNotes` träfe die CHANGELOG.md mit — `releaseBodyTemplate` ist die dokumentierte
+ * Schraube für genau diesen Text.
  */
 /*
- * 120 000 statt der vollen 125 000: die Fehlermeldung spricht von „characters", gezählt wird
- * hier aber in UTF-16-Einheiten, und die Notizen tragen Umlaute und Emoji. Zwischen beiden
- * Zählweisen liegen bei diesem Text rund 0,4 % (232 804 Zeichen zu 233 746 Bytes) — der
- * Abstand kostet nichts und nimmt die Frage aus dem Spiel, welche Zählung GitHub meint.
+ * 120 000 statt 125 000: gezählt wird hier in UTF-16-Einheiten, und die Notizen tragen Umlaute
+ * und Emoji — der Abstand nimmt die Frage aus dem Spiel, welche Zählung GitHub meint.
  */
 const RELEASE_BODY_GRENZE = 120000;
 
@@ -67,36 +52,22 @@ const RELEASE_BODY_TEMPLATE = [
 ].join('\n');
 
 /*
- * JEDER RELEASE KOMMENTIERT SEINE ENTHALTENEN PULL REQUESTS.
+ * JEDER RELEASE KOMMENTIERT SEINE ENTHALTENEN PULL REQUESTS — die Rückrichtung des Changelogs,
+ * denn wer eine Änderung sucht, landet über die Suche zuerst beim PR. Kommentiert wird, was
+ * `@semantic-release/github` dem Release zurechnet: PRs, deren Merge-Commit seit dem letzten
+ * Release DESSELBEN Kanals liegt, plus die Issues, die sie per Schlüsselwort schließen.
  *
- * Das ist die Rückrichtung des Changelogs: die Notizen sagen, was in einer Version steckt —
- * am Pull Request selbst stand bisher nichts. Wer Wochen später eine Änderung sucht, landet
- * über die Suche IMMER zuerst beim PR, nie beim Release. `successComment: false` hat genau
- * diese eine Spur gekappt.
+ * ZWEI KOMMENTARE JE PULL REQUEST SIND DER NORMALFALL (Vorabversion auf `alpha`, dann stabil
+ * nach `alpha → main`) — deshalb nennt der Text den Kanal.
  *
- * Kommentiert wird, was `@semantic-release/github` dem Release zurechnet: die PRs, deren
- * Merge-Commit in der Spanne seit dem letzten Release DESSELBEN Kanals liegt, plus die
- * Issues, die deren Beschreibung oder Commits per Schlüsselwort schließen.
+ * DIE BERECHTIGUNG HÄNGT AN DER GITHUB APP, nicht am Workflow: kommentiert wird mit dem
+ * App-Token, der **Issues: Read & Write** und **Pull requests: Read** braucht. Fehlt das, ist
+ * der Fehlermodus STILL: das Plugin protokolliert 403/404 nur (`success.js`), der Lauf bleibt
+ * grün. Im Job-Protokoll nach „Not allowed to add a comment" suchen.
  *
- * ZWEI KOMMENTARE JE PULL REQUEST SIND DER NORMALFALL, kein Fehler: `alpha` released jeden
- * Merge als Vorabversion, der bewusste Merge `alpha → main` stellt dieselben Commits noch
- * einmal als stabiles Release. Genau deshalb nennt der Text den Kanal — ohne ihn stünden
- * zwei fast gleiche Sätze untereinander, und der Unterschied wäre allein die Versionsnummer.
- *
- * DIE BERECHTIGUNG HÄNGT AN DER GITHUB APP, nicht am Workflow: `permissions:` in
- * `release.yml` gilt für `GITHUB_TOKEN`, kommentiert wird aber mit dem App-Token. Die App
- * braucht **Issues: Read & Write** (PR-Kommentare laufen über die Issue-Route) und
- * **Pull requests: Read**. Fehlt das, ist der Fehlermodus STILL: der Plugin-Code behandelt
- * 403 und 404 als Protokollzeile und nicht als Fehler (`success.js`), der Lauf bleibt grün
- * und die Kommentare fehlen einfach. Wer sie vermisst, sucht also im Job-Protokoll nach
- * „Not allowed to add a comment", nicht nach einem roten Schritt.
- *
- * Die Vorlage folgt denselben Lodash-Regeln wie RELEASE_BODY_TEMPLATE oben (`%>` und `<%=`
- * ohne Zeichen dazwischen, `\n` als Escape, kein `${`). Sie ist die einzige Stelle des
- * Plugins, deren Auswertung NICHT im try/catch liegt — eine kaputte Vorlage bricht den
- * `success`-Schritt, also nach dem Veröffentlichen: Release und Tag stünden, der Lauf wäre
- * rot. Deshalb ist sie gegen `lodash.template` mit den Vorgabe-Trennzeichen durchgerechnet
- * worden (PR, Vorab; PR, stabil; Issue; Release ohne URL), nicht bloß hingeschrieben.
+ * Die Vorlage folgt denselben Lodash-Regeln wie RELEASE_BODY_TEMPLATE. Ihre Auswertung liegt
+ * als einzige NICHT im try/catch des Plugins: eine kaputte Vorlage bricht den `success`-Schritt
+ * nach dem Veröffentlichen — Release und Tag stünden, der Lauf wäre rot.
  */
 const SUCCESS_COMMENT_TEMPLATE = [
   '<%',
@@ -117,12 +88,10 @@ const SUCCESS_COMMENT_TEMPLATE = [
 ].join('\n');
 
 /*
- * DIE VORLAGE FÜR DIE KI-NOTIZEN — nach dem Muster von einsatzzeichen, auf die Leserschaft
- * dieses Projekts gedreht: wer im Einsatz führt oder den Hub betreibt, nicht wer den Code
- * kennt. `{{version}}` und `{{commits}}` setzt das Plugin ein, jeweils GENAU EINMAL (es
- * ersetzt nur das erste Vorkommen). Die Versionsüberschrift schreibt das Modell bewusst
- * nicht: sie kommt aus den konventionellen Notizen, damit Format und Vergleichslink im
- * CHANGELOG gleich bleiben.
+ * DIE VORLAGE FÜR DIE KI-NOTIZEN, gerichtet an wer im Einsatz führt oder den Hub betreibt.
+ * `{{version}}` und `{{commits}}` setzt das Plugin je GENAU EINMAL ein (nur das erste
+ * Vorkommen). Die Versionsüberschrift schreibt das Modell nicht: sie kommt aus den
+ * konventionellen Notizen, damit Format und Vergleichslink im CHANGELOG gleich bleiben.
  */
 const KI_PROMPT = `Erstelle Release Notes für Version {{version}} von Lifeline Hub – Führungsunterstützung für Einsatzlagen im Bevölkerungsschutz (Einsatztagebuch, Lagekarte, Kräfte und Mittel, Betroffenen- und Schadenserfassung, Meldungen, Aufträge und Befehle, Lageberichte), ausgeliefert als eine ausführbare Datei, die auch ohne Internetverbindung läuft.
 
@@ -154,23 +123,17 @@ export default {
   /*
    * ARBEIT LÄUFT AUF `alpha`, `main` IST DIE FREIGABE.
    *
-   * `alpha` ist der Default-Branch: dorthin gehen Pull Requests, dort öffnet Dependabot,
-   * davon zweigt neue Arbeit ab. Jeder Merge erzeugt dort einen VORAB-Release
-   * (`X.Y.Z-alpha.N`). Ein stabiles Release entsteht ausschließlich, wenn `alpha` bewusst
-   * nach `main` gemergt wird — solange das niemand tut, gibt es schlicht keins. Genau das
-   * ist für ein Projekt gewollt, das noch nie ausgeliefert hat.
+   * `alpha` ist der Default-Branch; jeder Merge dort erzeugt einen VORAB-Release
+   * (`X.Y.Z-alpha.N`). Ein stabiles Release entsteht ausschließlich durch den bewussten Merge
+   * `alpha → main`.
    *
-   * `beta` steht als Zwischenstufe bereit, existiert aber nicht. semantic-release ignoriert
-   * konfigurierte Branches, die es im Repository nicht gibt („If `name` doesn't match to any
-   * branch existing in the repository, the definition will be ignored", Workflow-
-   * Konfiguration) — und „Repository" heißt dabei das REMOTE, nicht die lokale Kopie:
-   * ein nur lokal angelegter Branch wird nicht erkannt (gemessen beim Einrichten). Der Kanal
-   * wird also allein durch `git push origin alpha:beta` scharf.
+   * `beta` ist vorbereitet, existiert aber nicht: semantic-release ignoriert konfigurierte
+   * Branches, die es auf dem REMOTE nicht gibt (ein nur lokaler Branch zählt nicht). Scharf
+   * wird der Kanal durch `git push origin alpha:beta`.
    *
-   * KEIN BOOTSTRAP-TAG. Ohne vorhandenen Tag setzt semantic-release die erste Version selbst;
-   * auf einem Vorabkanal ist das `1.0.0-alpha.1`. Das ist bewusst so gewählt: ein von Hand
-   * gesetztes Start-Tag wäre ein manueller Schritt in einem Flow, dessen ganzer Zweck es ist,
-   * keine zu haben.
+   * KEIN BOOTSTRAP-TAG: ohne Tag setzt semantic-release die erste Version selbst
+   * (`1.0.0-alpha.1`); ein Start-Tag von Hand wäre ein manueller Schritt in einem Flow, der
+   * keine haben soll.
    */
   branches: [
     'main',
@@ -184,40 +147,25 @@ export default {
       {
         preset: 'conventionalcommits',
         /*
-         * KEINE `releaseRules`-Sonderregel — normale SemVer.
-         *
-         * Ein früherer Entwurf hob hier „breaking → minor" heraus, um in 0.x zu bleiben. Das
-         * ist mit dem Wechsel auf den Vorabkanal hinfällig und wäre sogar falsch: die Zählung
-         * startet bei `1.0.0-alpha.1`, wir sind also gar nicht in 0.x. Innerhalb des Kanals
-         * zählt ohnehin nur der Vorab-Zähler hoch (alpha.1 → alpha.2), unabhängig davon, ob
-         * ein Commit `feat` oder `BREAKING CHANGE` trägt. Erst nach dem ersten stabilen
-         * `1.0.0` bewegt ein Bruch die Hauptversion — und dann soll er das auch.
+         * KEINE `releaseRules`-Sonderregel — normale SemVer. Die Zählung startet bei
+         * `1.0.0-alpha.1`; im Vorabkanal zählt nur der Vorab-Zähler, erst nach dem ersten
+         * stabilen `1.0.0` bewegt ein Bruch die Hauptversion.
          */
       },
     ],
     /*
-     * `conventionalcommits` als Preset — und die Version des Presets ist gepinnt, nicht frei.
-     *
-     * Gemessen im ersten echten Release-Versuch: mit
-     * `conventional-changelog-conventionalcommits@10` bricht der Lauf im Schritt
-     * `generateNotes` ab — „Missing helper: … requires conventional-changelog-writer@9 or
-     * newer". Version 10 des Presets setzt den neuen Writer voraus, semantic-release 25 bringt
-     * aber `conventional-changelog-writer@8` mit. Der Fehler kommt NICHT beim Installieren,
-     * sondern mitten im Release, nach Analyse und Changelog — also an der teuersten Stelle.
-     *
-     * Deshalb steht in package.json `^9.3.1`, und .github/dependabot.yml sperrt den
-     * Major-Bump. Beides fällt erst, wenn semantic-release seinen Writer auf 9 hebt.
+     * `conventionalcommits` als Preset, dessen Version gepinnt ist: Version 10 setzt
+     * `conventional-changelog-writer@9` voraus, semantic-release 25 bringt aber `@8` mit, und
+     * der Lauf bräche mitten in `generateNotes` („Missing helper"). Deshalb `^9.3.1` in
+     * package.json und eine Major-Sperre in .github/dependabot.yml, bis semantic-release
+     * seinen Writer hebt.
      */
     /*
-     * DIE NOTIZEN SCHREIBT CLAUDE, die konventionellen bleiben die Rückfallebene — und die
-     * Quelle der Kopfzeile (Version, Vergleichslink, Datum). Übernommen aus einsatzzeichen,
-     * aber hinter einer eigenen Hülle statt als nacktes Plugin: warum, steht im Kopf von
-     * `scripts/release/ki-notizen.mjs` (zwei verschiedene Texte je Version, Fehlertext als
-     * Release-Text, stilles Abschneiden nach 100 Commits). `preset` geht an den
-     * konventionellen Generator, `promptTemplate` an Claude.
-     *
-     * Ohne das Secret `ANTHROPIC_API_KEY` läuft der Release unverändert mit den
-     * konventionellen Notizen weiter — Warnung im Protokoll, kein roter Lauf.
+     * DIE NOTIZEN SCHREIBT CLAUDE, die konventionellen bleiben Rückfallebene und Quelle der
+     * Kopfzeile (Version, Vergleichslink, Datum). Warum hinter einer eigenen Hülle, steht im
+     * Kopf von `scripts/release/ki-notizen.mjs`. `preset` geht an den konventionellen
+     * Generator, `promptTemplate` an Claude. Ohne das Secret `ANTHROPIC_API_KEY` läuft der
+     * Release mit den konventionellen Notizen weiter — Warnung, kein roter Lauf.
      */
     [
       './scripts/release/ki-notizen.mjs',
@@ -230,22 +178,13 @@ export default {
         /*
          * ZWEI VERSIONSDATEIEN, EIN LAUF.
          *
-         * `cargo set-version` ist auf `-p lifeline-hub` beschränkt: die Workspace-Member
-         * `karten-katalog` und `karten-service` sind interne Crates mit eigener
-         * Versionsgeschichte und werden nicht mit der Anwendung mitgezählt. Ohne `-p`
-         * bumpt der Befehl alle drei.
+         * `-p lifeline-hub`: `karten-katalog` und `karten-service` sind interne Crates mit
+         * eigener Versionsgeschichte. `cargo set-version` zieht `Cargo.lock` mit, deshalb
+         * steht sie bei den Assets (sonst wäre der Baum nach dem Release dirty).
          *
-         * `cargo set-version` zieht `Cargo.lock` mit — deshalb steht die Lock-Datei unten
-         * bei den Assets. Fehlte sie, wäre der Arbeitsbaum nach dem Release dirty und der
-         * nächste `--frozen-lockfile`-Lauf bräche.
-         *
-         * FÜRS FRONTEND `pnpm pkg set`, NICHT `pnpm version` — gemessen, nicht Geschmack:
-         * `pnpm version` bricht mit ERR_PNPM_UNCLEAN_WORKING_TREE ab, sobald der Baum
-         * Änderungen trägt. Genau das ist hier IMMER der Fall: `@semantic-release/changelog`
-         * läuft in derselben `prepare`-Phase VOR diesem Befehl und hat CHANGELOG.md bereits
-         * geschrieben. Der naheliegende Befehl hätte also jeden Release zerrissen — und zwar
-         * NACH Analyse und Changelog, mitten im Lauf. `pnpm pkg set` kennt diese Prüfung
-         * nicht, schreibt nur die Versionszeile und lässt die Formatierung unangetastet.
+         * Fürs Frontend `pnpm pkg set`, NICHT `pnpm version`: das bricht mit
+         * ERR_PNPM_UNCLEAN_WORKING_TREE ab, und der Baum trägt hier IMMER Änderungen, weil
+         * `@semantic-release/changelog` in derselben `prepare`-Phase vorher CHANGELOG.md schreibt.
          */
         prepareCmd:
           'cargo set-version -p lifeline-hub ${nextRelease.version}' +
@@ -257,10 +196,8 @@ export default {
       {
         assets: ['Cargo.toml', 'Cargo.lock', 'frontend/package.json', 'CHANGELOG.md'],
         /*
-         * `[skip ci]` verhindert die Schleife Release → Push auf main → Gate → Release.
-         * Der Artefakt-Workflow hängt am `release: published`-Ereignis und nicht am Push,
-         * er läuft also trotzdem. Der übersprungene Gate-Lauf prüfte ohnehin nur einen
-         * Commit, der außer Versionsfeldern und Changelog nichts ändert.
+         * `[skip ci]` verhindert die Schleife Release → Push → Gate → Release. Der
+         * Artefakt-Workflow hängt am `release: published`-Ereignis und läuft trotzdem.
          */
         message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}',
       },
@@ -269,30 +206,18 @@ export default {
       '@semantic-release/github',
       {
         /*
-         * OHNE ASSETS — die kommen aus `.github/workflows/artefakte.yml`, das auf das
-         * fertige Release reagiert. Die Binaries hier anzuhängen hieße, sechs Builds auf
-         * vier Runnertypen in diesen einen Job zu ziehen und sie zu serialisieren.
+         * OHNE ASSETS — die baut `.github/workflows/artefakte.yml` auf das fertige Release hin,
+         * statt sechs Builds auf vier Runnertypen in diesem Job zu serialisieren.
          */
-        /*
-         * Der Kommentar an den enthaltenen PRs — Begründung, Berechtigung und Fallen stehen
-         * oben bei SUCCESS_COMMENT_TEMPLATE.
-         */
+        // Begründung, Berechtigung und Fallen: oben bei SUCCESS_COMMENT_TEMPLATE.
         successComment: SUCCESS_COMMENT_TEMPLATE,
-        /*
-         * KEINE Etiketten dazu. Der Vorgabewert setzte je Release ein `released on @<kanal>`
-         * an jeden PR — bei zwei Releases je PR (alpha, dann stabil) also zwei Etiketten, die
-         * das Repository nebenbei selbst anlegt. Die Aussage steht bereits im Kommentar, und
-         * verlangt war eine Spur am PR, keine zweite Taxonomie. Wer sie doch will, streicht
-         * diese eine Zeile — der Vorgabewert ist an.
-         */
+        // Keine `released on @<kanal>`-Etiketten (Vorgabe an): die Aussage steht im Kommentar,
+        // und das Plugin legte die Etiketten nebenbei im Repository an.
         releasedLabels: false,
         /*
-         * Bei einem GESCHEITERTEN Release wird weiterhin kein Issue angelegt — bewusst: die
-         * Aufgabenverwaltung dieses Projekts ist ClickUp, und ein roter Lauf meldet sich
-         * ohnehin. `failCommentCondition: false` statt des früheren `failComment: false`:
-         * verhaltensgleich (`fail.js` und `success.js` prüfen beide Zweige), aber ohne die
-         * DEPRECATION-Warnung, die das Plugin für die alte Schreibweise in jeden Lauf
-         * schreibt. Dieselbe Warnung galt `successComment: false` und fällt mit ihm weg.
+         * Kein Issue bei einem GESCHEITERTEN Release: die Aufgabenverwaltung ist ClickUp, und
+         * ein roter Lauf meldet sich selbst. `failCommentCondition` statt `failComment`, das
+         * eine DEPRECATION-Warnung in jeden Lauf schriebe.
          */
         failCommentCondition: false,
         /*

@@ -1,22 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Ablösung: eine FREMD angelegte Schicht verschiebt keine Karte, bis das Sammelbanner
- * bedient wird (LFH-647, Prüfliste LFH-635 Kriterium 12, WCAG 3.2.5).
+ * Ablösung: eine FREMD angelegte Schicht verschiebt keine Karte, bis das Sammelbanner bedient
+ * wird (WCAG 3.2.5). Ob das Banner seine Werkzeugzeile beim Erscheinen HÖHER macht — bei
+ * 390 px und in höheren Dichtestufen, wenn Banner oder Segmentleiste umbrechen —, rechnet
+ * jsdom nicht; deshalb drei Kontexte.
  *
- * WARUM HIER UND NICHT NUR IN VITEST: `AbloesungPage.test.tsx` belegt, dass die Karte
- * zurückgehalten wird und dass das Banner in der Werkzeugzeile steht, die es vorher schon gab.
- * Ob das Banner diese Zeile beim Erscheinen HÖHER macht — und damit alle Karten doch nach
- * unten schiebt —, rechnet jsdom nicht. Genau das passiert, wenn Banner oder Segmentleiste
- * umbrechen, also bei 390 px und in den höheren Dichtestufen; deshalb drei Kontexte.
+ * DIE FREMDE SCHICHT KOMMT OBEN AN (kürzerer Rhythmus, die Server-Ordnung nach Fälligkeit
+ * stellt sie vor die gezeigten) — landete sie unten, bewiese der Test nichts.
  *
- * DIE FREMDE SCHICHT KOMMT OBEN AN. Gesät sind zwei Schichten mit 6 h Rhythmus, die fremde
- * bekommt 30 min — die Server-Ordnung nach Fälligkeit stellt sie VOR die gezeigten. Landete
- * sie unten, verschöbe sich auch ohne Schleuse nichts, und der Test bewiese nichts.
- *
- * „FREMD" heißt hier: am Frontend vorbei per API angelegt. Die Seite erkennt eigene
- * Neuzugänge an den Antworten ihrer eigenen Aufrufe; ein `page.request.post` ist keiner.
- * Die Karte erreicht die Seite über das Live-Ereignis `abloesung`, wie im Betrieb.
+ * „Fremd" heißt: am Frontend vorbei per API angelegt. Die Seite erkennt eigene Neuzugänge an
+ * den Antworten ihrer eigenen Aufrufe; die Karte kommt über das Live-Ereignis `abloesung`.
  */
 
 const ADMIN = 'admin';
@@ -30,7 +24,6 @@ const KONTEXTE = [
   { name: 'mobil', viewport: { width: 390, height: 844 }, dichte: 'komfortabel' },
 ] as const;
 
-// Helfer wie in `gate3-trefflaeche.spec.ts` — es gibt (noch) kein geteiltes e2e-Hilfsmodul.
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -40,10 +33,9 @@ async function anmelden(page: Page) {
 }
 
 /**
- * Die Schriften kommen über `@font-face` (`theme/schriften.css`) und tauschen nach dem Laden die
- * Zeilenmaße. Unter Last (volles Gate) lag der Tausch gemessen zwischen Vorher- und
- * Nachher-Messung: Karte 2 stand vorher bei y=491, nachher bei 490 — ein Befund über die Schrift,
- * nicht über die Schleuse. Gemessen wird deshalb erst mit geladenen Schriften.
+ * Die Schriften kommen über `@font-face` und tauschen nach dem Laden die Zeilenmaße; unter Last
+ * fiel der Tausch zwischen Vorher- und Nachher-Messung. Gemessen wird erst mit geladenen
+ * Schriften.
  */
 async function schriftenGeladen(page: Page) {
   await page.evaluate(async () => {
@@ -151,13 +143,9 @@ for (const kontext of KONTEXTE) {
 }
 
 /**
- * LFH-660: eine FREMDE Rhythmusänderung ordnet vorhandene Karten nicht unter dem Cursor um.
- *
- * DIE GEÄNDERTE KARTE STEHT IN DER MITTE. Drei Schichten mit 6 h, die mittlere wird fremd auf
- * 30 min gesetzt — die Server-Ordnung stellte sie nach OBEN. Stünde sie unten, fiele weder ein
- * Umordnen noch ein Höhensprung ihres frischen Inhalts auf die Karten darunter auf. Gemessen
- * wird deshalb die Oberkante JEDER Karte, nicht nur der ersten: „Inhalt frisch" darf die
- * geänderte Karte nicht höher machen, sonst rutschte die untere trotz eingefrorener Folge.
+ * Eine FREMDE Rhythmusänderung ordnet vorhandene Karten nicht unter dem Cursor um. Die
+ * geänderte Karte steht in der MITTE (die Server-Ordnung stellte sie nach oben), und gemessen
+ * wird die Oberkante JEDER Karte: „Inhalt frisch" darf die geänderte Karte nicht höher machen.
  */
 for (const kontext of KONTEXTE) {
   test(`Ablösung (${kontext.name}, ${kontext.dichte}): fremde Rhythmusänderung ordnet erst mit dem Banner um`, async ({

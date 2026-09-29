@@ -1,7 +1,7 @@
-//! Persistenter Reverse-Geocoding-Cache (Tabelle `geocoding_cache`). Schlüssel = auf
-//! ~100 m gerundete Koordinate als INTEGER-Paar. Cache-Fehler sind nicht fatal:
-//! Lesen → Miss, Schreiben → nur geloggt (eine erfolgreiche Geocodierung darf nie an
-//! einem Cache-Schreibfehler scheitern — Stil von `karte/cache.rs`).
+//! Persistenter Reverse-Geocoding-Cache (Tabelle `geocoding_cache`). Schlüssel = auf ~100 m
+//! gerundete Koordinate als INTEGER-Paar. Cache-Fehler sind nicht fatal: Lesen → Miss,
+//! Schreiben → nur geloggt (eine erfolgreiche Geocodierung darf nie an einem Cache-Schreibfehler
+//! scheitern).
 
 use sqlx::SqlitePool;
 

@@ -1,18 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Chat-Layout und Auftragsseite auf dem Handschirm (LFH-343 · C8, Befunde H51/M72).
+ * Chat-Layout und Auftragsseite auf dem Handschirm: bleibt das Eingabefeld sichtbar, wenn der
+ * Nachrichtenstrom lang wird? Das hängt an einer Höhenkette über mehrere Flex-Ebenen.
  *
- * WARUM HIER UND NICHT IN VITEST: `vite.config.ts` fährt Vitest mit `css: false`,
- * und jsdom rechnet kein Layout. Die eine Frage, die dieses Paket beantworten
- * muss — bleibt das Eingabefeld sichtbar, wenn der Nachrichtenstrom lang wird —
- * hängt an einer Höhenkette über mehrere Flex-Ebenen und ist ausschließlich im
- * Browser messbar.
- *
- * `toBeInViewport()` statt `toBeVisible()`: ein Element, das unterhalb des
- * sichtbaren Bereichs steht, IST sichtbar im Sinne von `toBeVisible` — genau der
- * Zustand, den H51 beschreibt („das Eingabefeld wandert nach jeder Nachricht aus
- * dem Bild"). Die schwächere Zusicherung wäre auch im kaputten Zustand grün.
+ * `toBeInViewport()` statt `toBeVisible()`: ein Element unterhalb des sichtbaren Bereichs ist
+ * im Sinne von `toBeVisible` sichtbar — genau der Fehlerzustand.
  */
 
 const ADMIN = 'admin';
@@ -20,8 +13,6 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 const SCHMAL = { width: 390, height: 844 };
 
-// Login-/Anlege-Helfer aus `kopfzeile-schmal.spec.ts` kopiert — es gibt (noch)
-// kein geteiltes e2e-Hilfsmodul.
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -55,9 +46,8 @@ test('Chat: die Eingabe bleibt bei langem Strom sichtbar — auch nach dem Absen
   const eingabe = page.getByPlaceholder('Nachricht…');
   await expect(eingabe).toBeVisible();
 
-  // Genug Nachrichten, dass der Strom deutlich höher wird als der Schirm. Über
-  // die Oberfläche gesendet statt per API: geprüft werden soll das Layout NACH
-  // dem Absenden, und genau dieser Weg erzeugt es.
+  // Genug Nachrichten, dass der Strom höher wird als der Schirm. Über die Oberfläche gesendet:
+  // geprüft wird das Layout NACH dem Absenden.
   for (let i = 1; i <= 12; i += 1) {
     await eingabe.fill(
       `Probe ${i} — Deichabschnitt Nord meldet Lage unverändert, Kräfte im Einsatz.`,
@@ -66,8 +56,7 @@ test('Chat: die Eingabe bleibt bei langem Strom sichtbar — auch nach dem Absen
     await expect(page.getByText(`Probe ${i} —`, { exact: false })).toBeVisible();
   }
 
-  // Der Kern von H51: nach dem letzten Absenden steht die Eingabe weiterhin im
-  // sichtbaren Bereich, nicht darunter.
+  // Nach dem letzten Absenden steht die Eingabe weiterhin im sichtbaren Bereich.
   await expect(eingabe).toBeInViewport();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 });
@@ -82,9 +71,8 @@ test('Chat: unter md trägt eine Segmentleiste die Kanäle, nicht die Seitenspal
   await page.goto(`/einsaetze/${einsatzId}/chat`);
   await expect(page.getByPlaceholder('Nachricht…')).toBeVisible();
 
-  // Die Kanalliste wird unter `md` NICHT bloß ausgeblendet, sondern durch die
-  // Leiste ersetzt — sonst stünden beide Navigationen im Baum und die Aussage
-  // wäre bedeutungslos (dieselbe Regel wie beim Navigations-Drawer, LFH-329/B1).
+  // Die Kanalliste wird unter `md` durch die Leiste ERSETZT, nicht bloß ausgeblendet — sonst
+  // stünden beide Navigationen im Baum.
   await expect(page.getByTestId('kanal-leiste')).toBeVisible();
   await expect(page.getByTestId('kanal-spalte')).toHaveCount(0);
 
@@ -99,14 +87,12 @@ test('Aufträge: auf 390 px scrollt der Body nicht waagerecht', async ({ page })
 
   await page.setViewportSize(SCHMAL);
   await page.goto(`/einsaetze/${einsatzId}/auftraege`);
-  // Reiterkopf `Bereichskopf` (h3, Augenbraue in CSS-Versalien); `level` trennt ihn vom h1-Seitentitel
-  // „Aufträge/Befehle" — ohne `exact`, damit die Groß-/Kleinschreibung des Namens egal ist.
+  // Reiterkopf (h3, Versalien per CSS); `level` trennt ihn vom h1-Seitentitel, ohne `exact`,
+  // damit die Schreibweise egal ist.
   await expect(page.getByRole('heading', { level: 3, name: 'Aufträge' })).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 
-  // Das Erfassungsformular ist der Teil, den C8 umgebaut hat (vier sichtbare
-  // Felder plus Collapse) — aufgeklappt gemessen, sonst prüfte die Zusicherung
-  // eine Fläche, die es im Betrieb so nicht gibt.
+  // Das Erfassungsformular aufgeklappt gemessen — die Fläche, die es im Betrieb gibt.
   await page.getByRole('button', { name: /Auftrag erteilen/ }).click();
   await expect(page.getByLabel('Auftrag / Was')).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);

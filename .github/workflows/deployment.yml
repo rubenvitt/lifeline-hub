@@ -1,4 +1,4 @@
-# Deployment anlegen (LFH-602) — meldet ein fertiges Release als GitHub-Deployment an.
+# Deployment anlegen — meldet ein fertiges Release als GitHub-Deployment an.
 #
 # DIESER WORKFLOW ROLLT NICHTS AUS. Er legt nur das Deployment an und setzt es auf `queued`.
 # Das eigentliche Ausrollen übernimmt ein Pull-Agent auf dem Zielserver: er fragt die

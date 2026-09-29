@@ -96,8 +96,8 @@ pub async fn anlegen(
     laden(pool, org_id, id).await
 }
 
-/// Teil-Patch der editierbaren Felder (LFH-306, Tri-State): äußere `Option` = „im Patch
-/// enthalten?", innere = Wert (`Some(None)` setzt die Soll-Spalte auf NULL).
+/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“, innere = Wert (`Some(None)` setzt die
+/// Soll-Spalte auf NULL).
 #[derive(Debug, Default)]
 pub struct TypPatch<'a> {
     pub label: Option<&'a str>,
@@ -107,11 +107,9 @@ pub struct TypPatch<'a> {
     pub sortier: Option<i64>,
 }
 
-/// Die drei Soll-Spalten **roh**, ohne die Glättung von [`zu_typ`] — Grundlage der
-/// Effektivzustands-Prüfung beim Teil-PATCH (LFH-306). `zu_typ` bildet ein (theoretisch)
-/// inkonsistentes Trio still auf `None` ab; gegen dieses geglättete Trio darf der Handler
-/// nicht validieren, sonst hinge die Prüfung an einer Annahme statt an der Zeile.
-/// `NotFound` bei fremder/unbekannter id.
+/// Die drei Soll-Spalten roh, ohne die Glättung von [`zu_typ`] — Grundlage der
+/// Effektivzustands-Prüfung beim Teil-PATCH. Gegen ein geglättetes Trio hinge die Prüfung an
+/// einer Annahme statt an der Zeile. `NotFound` bei fremder/unbekannter id.
 pub async fn soll_roh(
     pool: &SqlitePool,
     org_id: i64,
@@ -128,11 +126,11 @@ pub async fn soll_roh(
     .ok_or(AppError::NotFound)
 }
 
-/// Teil-Patch der editierbaren Felder (org-scoped). `NotFound`/`Conflict` analog.
+/// Teil-Patch der editierbaren Felder (org-scoped); `NotFound`/`Conflict` analog.
 ///
-/// Flag/Wert-Paare mit nummerierten Parametern (Vorlage `person/repo.rs`): nur gesendete
-/// Spalten werden angefasst. Geschrieben wird **nur der Patch**, nie das im Handler
-/// gemergte Soll-Trio — sonst wäre es wieder ein Vollersatz.
+/// Flag/Wert-Paare mit nummerierten Parametern: nur gesendete Spalten werden angefasst.
+/// Geschrieben wird nur der Patch, nie das im Handler gemergte Soll-Trio (sonst wieder ein
+/// Vollersatz).
 pub async fn patche(
     pool: &SqlitePool,
     org_id: i64,
@@ -185,13 +183,9 @@ pub async fn deaktivieren(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(),
     Ok(())
 }
 
-/// Ob ein Typ mit dieser id zur Org gehört (POST/PATCH-Einheit-Validierung). Bewusst
-/// **ohne** `aktiv`-Filter: ein deaktivierter Typ bleibt für bestehende Einheiten-
-/// Referenzen gültig (Entscheidung 4), damit das PATCH einer Einheit, deren Typ
-/// inzwischen deaktiviert wurde, nicht fehlschlägt. Die Auswahl *neuer* Typen filtert
-/// das FE über `GET /api/einheit-typen` (nur aktive).
-///
-/// Executor-generisch: `einheit::repo::anlegen_tx` prüft auf der offenen Verbindung (LFH-690).
+/// Ob ein Typ zur Org gehört. Ohne `aktiv`-Filter: ein deaktivierter Typ bleibt für bestehende
+/// Einheiten gültig, damit deren PATCH nicht scheitert; neue Typen wählt das Frontend aus
+/// `GET /api/einheit-typen` (nur aktive). Executor-generisch für `einheit::repo::anlegen_tx`.
 pub async fn ist_in_org(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     org_id: i64,
@@ -271,9 +265,8 @@ mod tests {
         ));
     }
 
-    /// Migriert aus `aktualisiere_ersetzt_felder` (LFH-306): ein Vollbody verhält sich
-    /// weiterhin wie ein Vollersatz — zusätzlich prüft der Test jetzt jede Spalte
-    /// einzeln (Bind-Reihenfolge der Flag/Wert-Kette).
+    /// Ein Vollbody verhält sich wie ein Vollersatz; jede Spalte wird einzeln geprüft
+    /// (Bind-Reihenfolge).
     #[tokio::test]
     async fn patche_setzt_gesendete_felder() {
         let pool = crate::db::test_pool().await;
@@ -300,8 +293,7 @@ mod tests {
         assert_eq!(neu.sortier, 45);
     }
 
-    /// Der Kern von LFH-306: nicht gesendete Spalten bleiben stehen. Unter dem alten
-    /// Vollersatz fiel hier das Trio auf NULL und `sortier` auf 0.
+    /// Nicht gesendete Spalten bleiben stehen (Soll-Trio, `sortier`).
     #[tokio::test]
     async fn patche_laesst_nicht_gesendete_spalten_stehen() {
         let pool = crate::db::test_pool().await;
@@ -325,8 +317,8 @@ mod tests {
         assert_eq!(neu.sortier, 40, "unberührt");
     }
 
-    /// Einzelnes Soll-Feld setzen, die anderen beiden stehen lassen — das ist der Fall,
-    /// den die Effektivzustands-Prüfung im Handler überhaupt erst erlaubt.
+    /// Ein einzelnes Soll-Feld setzen, die anderen beiden stehen lassen — der Fall, den erst die
+    /// Effektivzustands-Prüfung im Handler erlaubt.
     #[tokio::test]
     async fn patche_einzelnes_soll_feld_laesst_die_anderen_stehen() {
         let pool = crate::db::test_pool().await;

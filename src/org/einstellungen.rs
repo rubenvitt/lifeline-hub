@@ -1,10 +1,9 @@
-//! Org-weite Einstellungen (admin-einstellungen) — 1:1 per Organisation.
+//! Org-weite Einstellungen — 1:1 je Organisation.
 //!
-//! Spiegelt `einsatz::einstellungen` ohne einsatzspezifische Felder (kein
-//! standard_modul, basemap_modus, karten_zoom_start, fachebenen_sichtbar, keine
-//! Nummern-Startwerte — Startwerte bleiben rein pro Einsatz). Effektivwert =
-//! Einsatz-Override ?? Org-Default ?? hartkodierter Fallback (Task 3). Validatoren
-//! aus `einsatz::einstellungen` wiederverwenden, nicht duplizieren.
+//! Spiegelt `einsatz::einstellungen` ohne einsatzspezifische Felder (kein standard_modul,
+//! basemap_modus, karten_zoom_start, fachebenen_sichtbar, keine Nummern-Startwerte).
+//! Effektivwert = Einsatz-Override ?? Org-Default ?? fester Fallback. Die Validatoren kommen aus
+//! `einsatz::einstellungen`.
 
 use crate::error::AppError;
 use serde::Serialize;
@@ -27,8 +26,8 @@ pub struct OrgEinstellungen {
     pub etb_nummer_praefix: Option<String>,
     pub meldung_nummer_praefix: Option<String>,
     pub auftrag_nummer_praefix: Option<String>,
-    // Präfix der Einsatznummer (LFH-617): NICHT display-only — `einsatz::repo::anlegen`
-    // friert es in die Nummer ein. NULL = `einsatz::nummer::PRAEFIX_VORGABE`.
+    // Präfix der Einsatznummer: NICHT nur Anzeige — `einsatz::repo::anlegen` friert es in die
+    // Nummer ein. NULL = `einsatz::nummer::PRAEFIX_VORGABE`.
     pub einsatz_nummer_praefix: Option<String>,
     // Default-Fristen.
     pub meldung_bestaetigung_frist_min: Option<i64>,
@@ -88,8 +87,8 @@ impl OrgEinstellungen {
         }
     }
 
-    /// Schlanke API-Darstellung ohne Audit-Felder — für Einsatz-Endpoint (non-admin).
-    /// Schützt `geaendert_at`/`geaendert_von` vor Leak an Einsatz-Mitglieder.
+    /// Schlanke Darstellung ohne Audit-Felder für den Einsatz-Endpoint, damit
+    /// `geaendert_at`/`geaendert_von` nicht an Einsatz-Mitglieder gehen.
     pub fn anzeige_hinweis(&self) -> OrgEinstellungenHinweis {
         OrgEinstellungenHinweis {
             org_id: self.org_id,
@@ -160,8 +159,7 @@ pub struct OrgEinstellungenHinweis {
     pub auto_etb_eintraege: Option<i64>,
 }
 
-/// Eingabe für `speichern`; bereits vom Handler getrimmt/validiert.
-/// Validatoren aus `einsatz::einstellungen` wiederverwenden (nicht duplizieren).
+/// Eingabe für `speichern`, vom Handler bereits getrimmt und validiert.
 #[derive(Debug, Default)]
 pub struct OrgEinstellungenDaten<'a> {
     pub zeitzone: Option<&'a str>,
@@ -180,11 +178,8 @@ pub struct OrgEinstellungenDaten<'a> {
     pub geocoder_url: Option<&'a str>,
 }
 
-/// Lädt die Org-Einstellungen; existiert keine Zeile, werden Defaults
-/// (alle `None`) zurückgegeben. Strikt per `org_id` (Org-Isolation).
-///
-/// Executor-generisch (Pool oder offene Verbindung): `meldung::repo::anlegen_tx` liest die
-/// Einstellungen in derselben Transaktion (LFH-690).
+/// Lädt die Org-Einstellungen; ohne Zeile Defaults (alle `None`). Strikt per `org_id`.
+/// Executor-generisch, damit `meldung::repo::anlegen_tx` in derselben Transaktion liest.
 pub async fn laden_oder_default(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     org_id: i64,
@@ -264,8 +259,8 @@ mod tests {
     use crate::db;
     use sqlx::SqlitePool;
 
-    /// Legt Org(1) + Benutzer an; liefert benutzer_id.
-    /// Kein Einsatz nötig — `org_einstellungen` ist 1:1 per Org.
+    /// Org(1) + Benutzer; liefert die benutzer_id. `org_einstellungen` ist 1:1 je Org, ein Einsatz
+    /// ist nicht nötig.
     async fn fixture(pool: &SqlitePool) -> i64 {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(pool)

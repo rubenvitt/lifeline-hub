@@ -4,12 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Der Druck des Meldebilds (LFH-338 · C3, LFH-330 · B2, seit LFH-71 über `druck/druck.css`).
+ * Der Druck des Meldebilds über `druck/druck.css`.
  *
- * Geprüft wird die CSS-QUELLE (Bauform von `lageberichtPrint.test.ts`): jsdom lädt diese
- * Datei nicht und kennt kein `@media print`. Ob die Tabellen-Neutralisierer WIRKEN, misst
- * `e2e/meldebild-tabelle.spec.ts`; hier steht, dass sie dastehen und dass die Datei die
- * gemeinsame Mechanik nicht ein zweites Mal trägt.
+ * Geprüft wird die CSS-Quelle: jsdom lädt diese Datei nicht und kennt kein `@media print`. Ob die
+ * Tabellen-Neutralisierer wirken, misst `e2e/meldebild-tabelle.spec.ts`; hier steht, dass sie
+ * dastehen und dass die Datei die gemeinsame Mechanik nicht ein zweites Mal trägt.
  */
 const HIER = dirname(fileURLToPath(import.meta.url));
 const DATEI = 'kraefteuebersichtPrint.css';
@@ -92,8 +91,8 @@ describe('kraefteuebersichtPrint.css — die Mechanik liegt in `druck/druck.css`
   });
 
   it('setzt keine zweite Umbruch- oder Tabellenkopfregel', () => {
-    // `thead { display: table-header-group }` und `tr { break-inside: avoid }` stehen seit
-    // LFH-71 für alle Druckstücke in `druck.css`.
+    // `thead { display: table-header-group }` und `tr { break-inside: avoid }` stehen für alle
+    // Druckstücke in `druck.css`.
     expect(css).not.toMatch(/break-(after|before|inside)\s*:/);
     expect(css).not.toMatch(/table-header-group/);
   });

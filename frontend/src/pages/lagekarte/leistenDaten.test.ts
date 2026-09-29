@@ -72,8 +72,8 @@ describe('ebenenZeilen', () => {
   });
 
   it('zählt Zonen aus der ungegatterten Liste — auch bei abgeschalteter Ebene', () => {
-    // `zonenFeatures` wäre bei `layer.zone = false` leer; die Zeile zeigte dann „0" für
-    // Zonen, die es gibt. Deshalb kommt die Zahl von außen, nicht aus den Markern.
+    // `zonenFeatures` wäre bei `layer.zone = false` leer, die Zeile zeigte „0" für vorhandene Zonen
+    // — deshalb kommt die Zahl von außen.
     const zeilen = ebenenZeilen([], 3, { ...ALLE_AN, zone: false }, false);
     const zone = zeilen.find((z) => z.key === 'zone')!;
     expect(zone.anzahl).toBe(3);
@@ -85,7 +85,7 @@ describe('ebenenZeilen', () => {
     expect(zeilen.every((z) => z.anzahl === '—')).toBe(true);
   });
 
-  // Ebene „Betroffene" (LFH-648): die Zeile folgt dem ZUGRIFF, nicht bloß dem Schalter.
+  // Ebene „Betroffene": die Zeile folgt dem Zugriff, nicht bloß dem Schalter.
   it('„Betroffene" ohne Personenangabe: keine Zeile (Vorgabe „ausgeblendet")', () => {
     const zeilen = ebenenZeilen([], 0, ALLE_AN, false);
     expect(zeilen.map((z) => z.key)).not.toContain('person');
@@ -134,7 +134,7 @@ describe('ebenenZeilen', () => {
     expect(zeilen.map((z) => z.key)).not.toContain('person');
   });
 
-  // Ebene „Betreuungsstellen" (LFH-673): dieselbe Zugriffsregel, die Zahl aus den Markern.
+  // Ebene „Betreuungsstellen": dieselbe Zugriffsregel, die Zahl aus den Markern.
   it('„Betreuungsstellen" ohne Angabe: keine Zeile (Vorgabe „ausgeblendet")', () => {
     const zeilen = ebenenZeilen([marker('betreuungsstelle')], 0, ALLE_AN, false);
     expect(zeilen.map((z) => z.key)).not.toContain('betreuungsstelle');
@@ -175,8 +175,8 @@ describe('ebenenFarbe', () => {
   });
 
   it('„Betroffene" trägt kein Bedien-Blau: die Marker zeichnen Sichtungsfarben, die Zeile bleibt neutral', () => {
-    // Blau bedient (LFH-352) — und das Farbfeld einer Zeile kann fünf Sichtungsfarben nicht
-    // erklären; das tut die Sichtungslegende (LFH-648).
+    // Blau bedient — und ein Farbfeld kann fünf Sichtungsfarben nicht erklären; das tut die
+    // Sichtungslegende.
     expect(ebenenFarbe('person', farbenDunkel)).not.toBe(farbenDunkel.bedien);
     expect(ebenenFarbe('person', farbenDunkel)).toBe(farbenDunkel.text2);
   });

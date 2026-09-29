@@ -3,7 +3,7 @@
 #[test]
 #[ignore]
 fn https_handshake_dokumentiert() {
-    // Platzhalter-Doku: der echte HTTPS-Smoke läuft manuell (Task 6 Step 3),
-    // weil TLS-Serving einen Prozess + Port + Cert braucht (nicht in der Unit-Suite).
-    // Verifiziert: `curl -k https://127.0.0.1:8443/api/health` → 200.
+    // Platzhalter-Doku: der echte HTTPS-Smoke läuft manuell, weil TLS-Serving einen Prozess +
+    // Port + Cert braucht (nicht in der Unit-Suite). Prüfung: `curl -k
+    // https://127.0.0.1:8443/api/health` → 200.
 }

@@ -1,8 +1,8 @@
 //! Vorhersage-Reihe `WV` einer PEGELONLINE-Station als Vorschlag für die Prognose (LFH-628).
 //!
-//! Gemessen am 22.09.2026: `GET {basis}/stations/{uuid}/WV/measurements.json` liefert
+//! `GET {basis}/stations/{uuid}/WV/measurements.json` liefert
 //! `[{ "initialized", "timestamp", "value", "type": "forecast" | "estimate" }, …]` in cm,
-//! im 2-h-Raster, rund vier Tage voraus (Quelle BfG). Nur **43** Stationen führen die Reihe;
+//! im 2-h-Raster, rund vier Tage voraus (Quelle BfG). Nur wenige Stationen führen die Reihe;
 //! alle anderen antworten mit 404. Die Reihe **ersetzt** die Handerfassung deshalb nicht,
 //! sie belegt sie vor, wo sie existiert — und auch dort bleibt der Handwert maßgeblich: die
 //! Hochwasservorhersagezentrale eines Landes kann eine andere Zahl nennen als die BfG.

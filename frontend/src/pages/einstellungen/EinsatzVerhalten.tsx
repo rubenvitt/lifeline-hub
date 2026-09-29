@@ -28,14 +28,9 @@ const AUTO_ETB_OPTIONEN: { value: boolean; label: string }[] = [
 ];
 
 /**
- * Sektion `…/einstellungen/verhalten` (LFH-345 · C10) — Nummernkreise, Fristen, Auto-ETB.
- *
- * **Die einzige zweispaltige Sektion.** Neun Felder in einer Spalte sind eine lange Rolle;
- * „Allgemein" (5) und „Aufbewahrung" (1) bleiben einspaltig, zwei Spalten für ein Feld wären
- * Zierde. Die Schwelle ist `lg` und kommt aus `useViewport` — dem einzigen erlaubten Zugang
- * zu Breitenfragen (LFH-329 · B1). Das Raster selbst liegt als reine Funktion in
- * `einsatzEinstellungenForm`, damit die Ungleichheit über beide Breiten ohne Render prüfbar
- * ist (jsdom rechnet kein Layout).
+ * Sektion `…/einstellungen/verhalten` — Nummernkreise, Fristen, Auto-ETB. Die einzige zweispaltige
+ * Sektion (neun Felder). Die Schwelle `lg` kommt aus `useViewport`, das Raster liegt als reine
+ * Funktion in `einsatzEinstellungenForm`.
  */
 export default function EinsatzVerhalten() {
   const { id } = useParams();
@@ -47,7 +42,7 @@ export default function EinsatzVerhalten() {
   const { abBreite } = useViewport();
   const daten = useEinstellungenDaten(einsatzId);
 
-  // KEIN `onError`-Toast (H14) — der Fehler steht als Alert über dem Formular.
+  // Kein `onError`-Toast — der Fehler steht als Alert über dem Formular.
   const speichern = useMutation({
     mutationFn: (werte: FormWerteVerhalten) =>
       speichereEinstellungen(einsatzId, {
@@ -56,7 +51,7 @@ export default function EinsatzVerhalten() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: einsatzKeys.einstellungen(einsatzId) });
-      // Die Rückmeldefrist steckt im `faellig_at` der Rückmeldungen (LFH-610).
+      // Die Rückmeldefrist steckt im `faellig_at` der Rückmeldungen.
       qc.invalidateQueries({ queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId) });
       message.success('Einstellungen gespeichert');
     },
@@ -116,8 +111,8 @@ export default function EinsatzVerhalten() {
                 },
               ] as const
             ).map((nk) => (
-              // Präfix und Startwert eines Kreises gehören zusammen und bleiben deshalb auch
-              // im Zweispalter EIN Rasterfeld — getrennt stünden sie in verschiedenen Spalten.
+              // Präfix und Startwert eines Kreises bleiben ein Rasterfeld, sonst stünden sie in
+              // verschiedenen Spalten.
               <div
                 key={nk.key}
                 style={{ display: 'flex', gap: token.margin, alignItems: 'flex-start' }}
@@ -138,11 +133,8 @@ export default function EinsatzVerhalten() {
                 <Form.Item
                   label={`Startwert ${nk.label}`}
                   name={`${nk.key}_nummer_start`}
-                  // `flex: 0 1 160px` statt `width: 160`: das Feld wandert mit diesem Umbau in
-                  // den Radius von `components/feldbreiten.guard.test.ts` (Bereich
-                  // `pages/einstellungen/`), und der Guard hat recht — eine feste Pixelbreite
-                  // ragt am schmalen Schirm über den Rand und drückt die Seite waagerecht breit.
-                  // Die Basis bleibt bei 160 px, aber `flex-shrink: 1` lässt sie darunter mitgehen.
+                  // `flex: 0 1 160px` statt `width: 160`: eine feste Pixelbreite ragte am schmalen
+                  // Schirm über den Rand (`feldbreiten.guard.test.ts`).
                   style={{ flex: '0 1 160px' }}
                   tooltip="Erste laufende Nummer (Default 1)."
                 >

@@ -2,70 +2,32 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { kontrast, randKontrast } from './kontrast-kern';
 
 /**
- * Kriterium 5 der Prüfliste Einsatztauglichkeit für `/einsaetze/:id/verpflegung` (LFH-634,
- * Aufgabe 6.2, Muster `abloesung-kontrast.spec.ts`): Kontrast der ZUSAMMENGESETZTEN Paare in
- * Tag und Nacht, gemessen im Browser mit dem geteilten Messkern (`kontrast-kern.ts`), ohne
- * Farbwerte aus dem Produkt zu importieren — eine schlechte Palette muss rot werden.
+ * Kriterium 5 der Prüfliste für `/einsaetze/:id/verpflegung`: Kontrast der ZUSAMMENGESETZTEN
+ * Paare in Tag und Nacht, mit dem geteilten Messkern (`kontrast-kern.ts`) und ohne Farbwerte
+ * aus dem Produkt — eine schlechte Palette muss rot werden.
  *
- * GESÄT: je Einstufung ein laufendes bzw. anstehendes Zeitfenster —
- *  · „Frühstück Kontrast" UNTERDECKUNG (begonnen, Fehlmenge): eine gültige Ausgabe mit
- *    Sonderkost und Bemerkung, eine ZURÜCKGENOMMENE Ausgabe, Sonderkost-Fehlmenge „fehlt 8
- *    vegan" neben einer gedeckten Kostform;
- *  · „Mittag Kontrast" GEDECKT durch eine Ausgabe;
- *  · „Abendessen Kontrast" OFFEN (Beginn in drei Stunden) mit Sonderkost-Fehlmenge ohne Alarm.
+ * GESÄT: „Frühstück Kontrast" in UNTERDECKUNG (gültige Ausgabe mit Sonderkost und Bemerkung,
+ * eine zurückgenommene, Sonderkost-Fehlmenge „fehlt 8 vegan"), „Mittag Kontrast" GEDECKT,
+ * „Abendessen Kontrast" OFFEN (Beginn in drei Stunden, Fehlmenge ohne Alarm).
  *
- * SCHRANKEN (Literale; Kriterium 5 und WCAG 1.4.11):
- *  · Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1 — für JEDEN Text im Seiteninhalt, im Seitenkopf und in
- *    den beiden Hauptdialogen („Zeitfenster anlegen", „Ausgabe erfassen"), gefunden über den
- *    Textbaum statt über eine Selektorliste; gemessen gegen den Grund, auf dem er WIRKLICH
- *    steht (LFH-618, Regel 3: Kartenfläche, Etikett-Tönung, Dialogfläche);
- *  · der linke Rand der Karte, wo er einen Zustand trägt (gedeckt, Unterdeckung), gegen den
- *    Seitengrund und gegen die eigene Kartenfläche: ≥ 3 : 1;
- *  · der Rand des Etiketts gegen die Kartenfläche und gegen seine eigene Tönung: ≥ 3 : 1.
+ * SCHRANKEN (Literale): Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1 für JEDEN Text in Inhalt, Seitenkopf
+ * und den beiden Hauptdialogen — über den Textbaum gefunden, gegen den Grund gemessen, auf dem
+ * er WIRKLICH steht. Zustandstragende Kartenränder und Etikettränder ≥ 3 : 1 (WCAG 1.4.11).
  *
- * DER KRITISCHE FALL — „Unterdeckung" im Tagmodus (LFH-618, Regel 1): Etikett, Fehlmenge im
- * Kennzahlenband und die Sonderkost-Fehlmenge laufen über `alarmText`, nicht über die
- * Füllfarbe `alarm` (die trägt den Tagesboden 7 : 1 nicht). Die drei Paare sind deshalb
- * NICHT nur Teil des Textbaums, sondern stehen einzeln und benannt an der Unterdeckungskarte
- * — über den Textbaum wären „8" oder „60" zwischen drei Karten nicht zuzuordnen, und eine
- * benannte Zusicherung ist die Stelle, an der die Mutationsprobe rot wird.
+ * DER KRITISCHE FALL „Unterdeckung" am Tag: Etikett, Fehlmenge im Kennzahlenband und
+ * Sonderkost-Fehlmenge laufen über `alarmText`, nicht über `alarm` (trägt den Tagesboden nicht).
+ * Die drei Paare stehen einzeln und benannt — im Textbaum wären „8" oder „60" nicht zuzuordnen.
+ * Nachts ist `alarmText` wertgleich mit `alarm`.
  *
- * ZWEI BENANNTE AUSNAHMEN, dieselben wie in `abloesung-kontrast.spec.ts`, beide Eigenschaften
- * geteilter Rollen bzw. Primitive, nicht dieser Seite; hier gilt bis dahin die absolute
- * Untergrenze 4,5 : 1 aus Kriterium 5, der Zielwert steht in jeder Meldung:
- *  · TERTIÄRTEXT (`schwach`) → LFH-643, in BEIDEN Modi: Augenbrauen (Kennzahltitel,
- *    „Sonderkost"), die Einheit „EP" hinter der Kennzahl, der Hinweis (Bemerkung) einer
- *    Ausgabenzeile (`Zeitachseneintrag`, `hinweisTon` `schwach`), `Typography type="secondary"`
- *    samt „Stand" und den Sonderkost-Hinweisen der Dialoge, Feldhilfe, Platzhalter, Ortspfad im
- *    Seitenkopf bis auf das letzte Glied;
- *  · WEISS AUF `bedien` in jedem Primärknopf (Kopfaktion, Absende-Knopf der Dialoge) → LFH-661,
- *    nur am Tag.
- * Jeder andere Text — Bezeichnung, Zeitraum, Etikett, Kennzahlwerte, Sonderkost-Zeilen,
- * Ausgabenzeile, Typwort, Knöpfe, Feldbeschriftungen, Seitentitel und Kopf-Meta — trägt den
- * vollen Boden. FALLEN DIE AUSNAHMEN, wenn LFH-643/LFH-661 landen.
+ * ZWEI BENANNTE AUSNAHMEN (geteilte Rollen; bis dahin 4,5 : 1, Zielwert in jeder Meldung):
+ *  · Tertiärtext (`schwach`) → LFH-643, beide Modi;
+ *  · Weiß auf `bedien` im Primärknopf → LFH-661, nur am Tag.
+ * Fallen die Ausnahmen, wenn LFH-643/LFH-661 landen.
  *
- * DER RAND DER OFFENEN KARTE ist KEIN Zustandsträger: „offen" trägt die Linienfarbe
- * (`ZeitfensterKarte`: `stufe === 'offen' ? rollen.linie : …`), die Bedeutung liegt am
- * neutralen Etikett. 1.4.11 ist auf ihn nicht anwendbar — gemessen und angehängt wird er
- * trotzdem, und zugesichert wird, dass er sich von den beiden Zustandsrändern UNTERSCHEIDET.
- *
- * SICHTBARER TEXT UNTER `aria-hidden`: der Textbaum überspringt ihn (er wird nicht vorgelesen,
- * aber gesehen). Die Legende der Bedarfs-Aufgliederung („Kräfte 60 · Betreute 30 · weitere 0",
- * `gedaempft`) ist so ein Fall und wird deshalb eigens gemessen, mit vollem Boden.
- *
- * NICHT GEMESSEN: Platzhalter, die Attribute eines `<input>` sind (RangePicker „Beginn"/„Ende",
- * DatePicker „jetzt") — sie sind kein Textknoten, und der Messkern kennt kein `::placeholder`.
- *
- * MUTATIONSPROBE (Aufgabe 6.2, am 24.09.2026 lokal gefahren, nicht committet): `alarmText` →
- * `alarm` an DREI Stellen — der Alarm-Text in `components/instrument/statusFlaeche.ts`
- * (Etikett „Unterdeckung"), `zahlFarbe` für den Ton `alarm` in
- * `components/instrument/Kennzahl.tsx` (Fehlmenge im Kennzahlenband) und die Farbe von
- * `sonderkost-fehlt` in `verpflegung/ZeitfensterKarte.tsx`. Ergebnis: der TAGLAUF rot an allen
- * drei benannten Zusicherungen — „Unterdeckung: Etikett" 5,52 : 1 (auf `alarmFlaeche`),
- * „Unterdeckung: Fehlmenge" 6,78 : 1 (auf Weiß, der Fläche der Kennzahlzelle), „Unterdeckung:
- * Sonderkost-Fehlmenge" 6,21 : 1 (auf `paneel`) — und an denselben drei Wortlauten im
- * Textbaum; sonst nichts. Der Nachtlauf blieb grün: nachts ist `alarmText` wertgleich mit
- * `alarm` (#ff6b6b), er KANN diese Mutation nicht sehen. Danach zurückgesetzt.
+ * Der Rand der OFFENEN Karte trägt keinen Zustand (Linienfarbe) — gemessen und angehängt, und
+ * zugesichert, dass er sich von den Zustandsrändern unterscheidet. Sichtbarer Text unter
+ * `aria-hidden` (Legende der Bedarfs-Aufgliederung) überspringt der Textbaum; er wird eigens
+ * gemessen. Nicht gemessen: Platzhalter-Attribute von `<input>` (kein Textknoten).
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
@@ -74,8 +36,8 @@ const BODEN = 4.5;
 const ZUSTAND = 3;
 
 /**
- * Tertiärtext, enumeriert — und zwar ausschließlich über Selektoren, die den TRÄGER selbst
- * treffen, nie einen Container: `closest()` senkte sonst still den Boden für alles darin.
+ * Tertiärtext, enumeriert — nur über Selektoren, die den TRÄGER selbst treffen, nie einen
+ * Container: `closest()` senkte sonst still den Boden für alles darin.
  */
 const TERTIAER = [
   '.ant-typography-secondary',
@@ -124,11 +86,9 @@ interface Textknoten {
   primaer: boolean;
 }
 
-/** Jedes SICHTBARE Element unter `wurzel` mit eigenem Text — als Locator über eine
- *  Messmarke, dazu ob es zu einer der Ausnahmen (Tertiärtext, Primärknopf) gehört.
- *  Anders als bei der Ablösung wird Unsichtbares übersprungen: die Dialoge tragen ihre
- *  eingeklappten Felder per `forceRender` im Baum, und ein unsichtbarer Text hätte einen
- *  Kontrast, den niemand sieht. Die Bereiche werden deshalb vor der Messung AUFGEKLAPPT. */
+/** Jedes SICHTBARE Element unter `wurzel` mit eigenem Text, als Locator über eine Messmarke,
+ *  dazu ob es zu einer Ausnahme gehört. Unsichtbares wird übersprungen (die Dialoge tragen
+ *  eingeklappte Felder per `forceRender`), die Bereiche werden deshalb vorher AUFGEKLAPPT. */
 async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
   const funde = await wurzel.evaluate((w, tertiaer) => {
     for (const alt of document.querySelectorAll('[data-kontrastprobe]'))
@@ -218,9 +178,8 @@ for (const modus of ['light', 'dark'] as const) {
     await page.goto(`/einsaetze/${einsatzId}/verpflegung`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
     await expect(page.locator('[data-lfh="verpflegung-karte"]')).toHaveCount(KARTEN.length);
-    // Den EINGESCHWUNGENEN Stand messen: „Nachfordern" (und damit das Menü an der
-    // Unterdeckungskarte) hängt an den Modul-Overrides, die nach dem ersten Bild eintreffen.
-    // Vorher trüge die Karte zwei Knöpfe, deren Messmarken danach ins Leere zeigten.
+    // Den EINGESCHWUNGENEN Stand messen: das Menü an der Unterdeckungskarte hängt an den
+    // Modul-Overrides, die nach dem ersten Bild eintreffen — vorher zeigten Messmarken ins Leere.
     await expect(
       karteZu(page, 'Frühstück Kontrast').getByRole('button', {
         name: /^Aktionen zu Zeitfenster Frühstück Kontrast /,
@@ -313,8 +272,7 @@ for (const modus of ['light', 'dark'] as const) {
     const messeTexte = async (wurzel: Locator, flaeche: string) => {
       await page.mouse.move(0, 0);
       const knoten = await textknoten(wurzel);
-      // Ein Dialog blendet mit Opacity ein; der Messkern lehnt das ab, statt scheinpräzise
-      // zu rechnen. Erst messen, wenn der erste Knoten eben steht.
+      // Ein Dialog blendet mit Opacity ein; erst messen, wenn der erste Knoten steht.
       await expect(async () => {
         await kontrast(knoten[0].ziel);
       }).toPass({ timeout: 10_000 });
@@ -354,8 +312,7 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(dialog).toBeVisible();
       await dialog.getByRole('button', { name: bereich }).click();
       await expect(dialog.getByLabel(bereichsFeld, { exact: true })).toBeVisible();
-      // Das Aufklappen animiert Höhe UND Opacity (`ant-motion-collapse`); der Messkern lehnt
-      // Opacity ab. Erst messen, wenn die Bewegung vorbei ist.
+      // Das Aufklappen animiert Höhe UND Opacity; erst messen, wenn die Bewegung vorbei ist.
       await expect(dialog.locator('.ant-collapse-panel')).toHaveCount(1);
       await expect(dialog.locator('.ant-collapse-panel')).not.toHaveClass(/ant-motion-collapse/);
       await messeTexte(dialog, titel);
@@ -363,9 +320,8 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(dialog).toBeHidden();
     }
 
-    // Die Probe hat die Texte wirklich gesehen — sonst wäre ein grüner Lauf leer. Und die
-    // tragenden liefen OHNE Ausnahme: eine zu weit gefasste Ausnahme-Liste senkte sonst still
-    // den Boden für genau die Paare, um die es geht.
+    // Die Probe hat die Texte wirklich gesehen, und die tragenden liefen OHNE Ausnahme — eine
+    // zu weit gefasste Ausnahme-Liste senkte sonst still den Boden.
     const pruefeGesehen = (pflicht: string | RegExp, tragend: boolean) => {
       const treffer = gemessen.filter(([t]) =>
         typeof pflicht === 'string' ? t === pflicht : pflicht.test(t),

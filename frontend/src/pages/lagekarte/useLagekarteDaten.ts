@@ -40,37 +40,42 @@ import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 import { personenZugriffVon } from './personenEbene';
 import { betreuungZugriffVon } from './betreuungEbene';
 
-/** Name der Personen-Quelle im Ausfallhinweis — die Seite filtert sie für Kopfzahl und
- *  „Nicht verortet" heraus, die Personen nie enthalten (LFH-648). */
+/**
+ * Name der Personen-Quelle im Ausfallhinweis — die Seite filtert sie für Kopfzahl und „Nicht
+ * verortet" heraus, die Personen nie enthalten.
+ */
 export const QUELLE_BETROFFENE = 'Betroffene';
 
 /** Registry-Eintrag des Moduls „Personen" — die Frage „darf diese Ebene laden" hängt daran. */
 const PERSONEN_MODUL = modulRegistry.find((m) => m.key === 'personen');
-/** Registry-Eintrag des Moduls „Betreuung" (LFH-673) — Grenze der Ebene „Betreuungsstellen". */
+/** Registry-Eintrag des Moduls „Betreuung" — Grenze der Ebene „Betreuungsstellen". */
 const BETREUUNG_MODUL = modulRegistry.find((m) => m.key === 'betreuung');
 
 interface LagekarteDatenArgs {
   einsatzId: number;
   /** Zonen-Layer sichtbar (layer.zone, UI-State) → als Parameter, um die Grenze sauber zu halten. */
   zeigeZonen: boolean;
-  /** Aktive Ansicht (B/LFH-320): filtert die ansichtsgebundenen Objekte (Zonen, freie Zeichen)
-   *  client-seitig auf die der Ansicht PLUS die ansichtslosen. `undefined` = alles zeigen. */
+  /**
+   * Aktive Ansicht: filtert die ansichtsgebundenen Objekte (Zonen, freie Zeichen) client-seitig auf
+   * die der Ansicht plus die ansichtslosen. `undefined` = alles zeigen.
+   */
   aktiveAnsichtId?: number;
-  /** Datenquelle (C/LFH-321): Live-Zustand (Default) oder ein eingefrorener Snapshot
-   *  (Historien-Modus). Im Snapshot-Modus kommen ALLE Objekte + der Org-TZ-Default + die
-   *  Gefahrengebiet-Warnstufen aus dem Dokument, und `darfSchreiben` ist hart `false`. */
+  /**
+   * Datenquelle: Live-Zustand (Default) oder ein eingefrorener Snapshot. Im Snapshot-Modus kommen
+   * alle Objekte, der Org-TZ-Default und die Gefahrengebiet-Warnstufen aus dem Dokument, und
+   * `darfSchreiben` ist hart `false`.
+   */
   quelle?: Standquelle;
 }
 
 /**
- * Daten-Leg der Lagekarte: alle Domänen-Queries (SSE-Live via EinsatzLayout, deshalb keine
- * eigene EventSource hier) plus die reinen Marker-/Flächen-/Zonen-Ableitungen. `zonenFeatures`
- * hängt bewusst nur an `zeigeZonen` (nicht am ganzen Layer-State), damit die Grenze sauber bleibt.
+ * Daten-Leg der Lagekarte: alle Domänen-Queries (live über EinsatzLayout, keine eigene EventSource)
+ * plus die reinen Marker-/Flächen-/Zonen-Ableitungen. `zonenFeatures` hängt nur an `zeigeZonen`,
+ * nicht am ganzen Layer-State.
  *
- * **Standquelle (C/LFH-321):** Alle Live-Queries sind im Snapshot-Modus abgeschaltet
- * (`enabled: liveAn`); stattdessen liefert `snapQuery` das eingefrorene Dokument, aus dem die
- * ROHEN DTO-Listen in dieselben Ableiter (`baueMarker` etc.) fließen — die Rückgabeform bleibt
- * identisch, die Konsumenten bleiben unverändert.
+ * **Standquelle:** im Snapshot-Modus sind alle Live-Queries abgeschaltet (`enabled: liveAn`);
+ * `snapQuery` liefert das Dokument, dessen rohe DTO-Listen in dieselben Ableiter fließen — die
+ * Rückgabeform bleibt identisch.
  */
 export function useLagekarteDaten({
   einsatzId,
@@ -80,9 +85,8 @@ export function useLagekarteDaten({
 }: LagekarteDatenArgs) {
   const { benutzer } = useAuth();
   // Kartenstil-Module (`marker.ts`, `zonenStil.ts`) erzeugen MapLibre-`paint`-Werte und haben
-  // deshalb keinen eigenen `useToken()`-Zugang (LFH-328/A2). Diese Ebene kennt den aktiven
-  // Modus und reicht den Token durch — der Modus wird NICHT über `document.documentElement`
-  // geraten (globaler Seiteneffekt, in Tests nicht gesetzt).
+  // keinen `useToken()`-Zugang; diese Ebene reicht den Token des aktiven Modus durch, statt ihn aus
+  // `document.documentElement` zu raten.
   const { token } = theme.useToken();
   const istSnapshot = quelle.typ === 'snapshot';
   const liveAn = !istSnapshot;
@@ -144,9 +148,8 @@ export function useLagekarteDaten({
     queryFn: () => listeLageMeldungen(einsatzId),
     enabled: liveAn,
   });
-  // Letzte Rückmeldung je Einheit für das Paneel „Ausgewählt" (LFH-610). Nur live: der
-  // gesicherte Stand trägt keine Rückmeldungen, und eine heutige Meldung neben einem
-  // eingefrorenen Lagebild wäre eine falsche Aussage über diesen Stand.
+  // Letzte Rückmeldung je Einheit für das Paneel „Ausgewählt". Nur live: der gesicherte Stand trägt
+  // keine Rückmeldungen, eine heutige Meldung neben einem eingefrorenen Lagebild wäre falsch.
   const rueckmeldungenQuery = useQuery({
     queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId),
     queryFn: () => holeRueckmeldungen(einsatzId),
@@ -157,14 +160,12 @@ export function useLagekarteDaten({
     queryFn: () => listeFuehrungskraefte(einsatzId),
     enabled: liveAn,
   });
-  // Ebene „Betroffene" (LFH-648). Die Zugriffsgrenze ist diese Query, nicht der Schalter
-  // (`personenEbene.ts`): sie läuft erst, wenn die Overrides feststehen UND das Modul
-  // „Personen" im Client frei ist; ein 403 des Servers kippt den Zustand danach auf
-  // „gesperrt". Der Key ist der argumentlose Bestands-Accessor — dasselbe Cache-Fach wie
-  // Personenseite, Dashboard, Chat und Palette, live invalidiert vom `person`-Event (das
-  // ausschließlich an Leser mit „Personen" geht, `src/live/mod.rs`). Kein eigenes Fach.
-  // Overrides sind Render-Kontext wie Config/Einstellungen, kein Teil des gesicherten Stands —
-  // sie laden auch im Historien-Modus: ein ausgeblendetes Modul zeigt dort ebenfalls keine Zeile.
+  // Ebene „Betroffene": die Zugriffsgrenze ist diese Query, nicht der Schalter
+  // (`personenEbene.ts`). Sie läuft erst, wenn die Overrides feststehen und das Modul „Personen" im
+  // Client frei ist; ein 403 kippt danach auf „gesperrt". Der Key ist der argumentlose
+  // Bestands-Accessor, dasselbe Fach wie Personenseite, Dashboard, Chat und Palette, live
+  // invalidiert vom `person`-Event (nur an Leser mit „Personen", `src/live/mod.rs`). Overrides sind
+  // Render-Kontext und laden auch im Historien-Modus.
   const overridesQuery = useQuery({
     queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId),
@@ -192,11 +193,10 @@ export function useLagekarteDaten({
   });
   // Nur bei freiem Modul: ein 403 ist „gesperrt" (Zustand der Zeile), kein Ausfall.
   const personenFehler = personenZugriff === 'frei' && personenQuery.isError;
-  // Ebene „Betreuungsstellen" (LFH-673): dieselbe Grenze wie bei „Betroffene" — die Query
-  // läuft erst, wenn die Overrides feststehen und das Modul im Client frei ist; ein 403 kippt
-  // auf „gesperrt" (Zeile mit Grund), nie auf einen Quellenfehler. Das Fach ist die Übersicht
-  // der Modulseite (`einsatzKeys.betreuung`), live invalidiert vom `betreuung`-Event, das nur
-  // Leser mit Modulrecht bekommen. Im Historien-Modus kommen die Stellen aus dem Dokument.
+  // Ebene „Betreuungsstellen": dieselbe Grenze wie bei „Betroffene"; ein 403 kippt auf „gesperrt",
+  // nie auf einen Quellenfehler. Das Fach ist die Übersicht der Modulseite
+  // (`einsatzKeys.betreuung`), live invalidiert vom `betreuung`-Event, das nur Leser mit Modulrecht
+  // bekommen. Im Historien-Modus kommen die Stellen aus dem Dokument.
   const betreuungVorab = betreuungZugriffVon({
     rechteBekannt: overridesQuery.isFetched,
     modul: BETREUUNG_MODUL,
@@ -223,16 +223,16 @@ export function useLagekarteDaten({
     queryFn: ladeOrganisation,
     enabled: liveAn,
   });
-  // Config + Einstellungen sind reiner Render-Kontext (Style-Katalog, Basemap-Defaults), kein Teil
-  // des eingefrorenen Lagebilds → auch im Historien-Modus live.
+  // Config + Einstellungen sind Render-Kontext (Style-Katalog, Basemap-Defaults), kein Teil des
+  // Lagebilds → auch im Historien-Modus live.
   const configQuery = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
   const einstellungenQuery = useQuery({
     queryKey: einsatzKeys.einstellungen(einsatzId),
     queryFn: () => ladeEinstellungen(einsatzId),
   });
 
-  // Effektive Rohquellen: im Snapshot-Modus die eingefrorenen DTO-Listen aus dem Dokument, sonst
-  // die Live-Query-Daten. Beide Seiten haben dieselbe Form → dieselben Ableiter darunter.
+  // Effektive Rohquellen: im Snapshot-Modus die DTO-Listen aus dem Dokument, sonst die Live-Daten —
+  // dieselbe Form, dieselben Ableiter.
   const snap = istSnapshot ? (snapQuery.data?.daten as SnapshotDaten | undefined) : undefined;
   const einsatz = istSnapshot ? snap?.einsatz : einsatzQuery.data;
   const uhsRoh = istSnapshot ? snap?.uhs : uhsQuery.data;
@@ -245,8 +245,8 @@ export function useLagekarteDaten({
   const gebieteRoh = istSnapshot ? snap?.gefahrengebiete : gebieteQuery.data;
   const lageMeldungenRoh = istSnapshot ? snap?.lagemeldungen : lageMeldungenQuery.data;
   const fkRoh = istSnapshot ? snap?.fuehrungskraefte : fkQuery.data;
-  // Ohne Modulrecht leer, auch wenn ein früherer Abruf noch im Cache steht; nach einem Fehler
-  // ebenso (react-query lässt `data` stehen — ein stiller Altstand).
+  // Ohne Modulrecht leer, auch wenn ein früherer Abruf im Cache steht; nach einem Fehler ebenso
+  // (react-query lässt `data` stehen).
   const stellenRoh =
     betreuungZugriff !== 'frei'
       ? undefined
@@ -255,8 +255,8 @@ export function useLagekarteDaten({
         : betreuungQuery.isError
           ? undefined
           : betreuungQuery.data?.stellen;
-  // Bezirke (LFH-673) hinter derselben Grenze: ihre Bezeichnung und ihr Räumungszustand
-  // beschriften die Bezirksflächen, die jeder Karten-Leser sieht.
+  // Bezirke hinter derselben Grenze: Bezeichnung und Räumungszustand beschriften die
+  // Bezirksflächen, die jeder Karten-Leser sieht.
   const bezirkeRoh =
     betreuungZugriff !== 'frei'
       ? undefined
@@ -265,16 +265,15 @@ export function useLagekarteDaten({
         : betreuungQuery.isError
           ? undefined
           : betreuungQuery.data?.bezirke;
-  // Global-Scope-Freeze (Advisor): Org-TZ-Default aus dem Dokument, NICHT der Live-Query — sonst
-  // schriebe eine Org-Umbenennung den historischen Stand um.
+  // Org-TZ-Default aus dem Dokument, nicht aus der Live-Query — sonst schriebe eine Org-Umbenennung
+  // den historischen Stand um.
   const orgDefault = (istSnapshot ? snap?.org_default : orgQuery.data?.tz_organisation) ?? null;
 
   // Schreibsperre im Historien-Modus: hart `false` → alle UI-Schreibpfade (prop-gegatet) fallen weg.
   const darfSchreiben = istSnapshot ? false : darfImEinsatzSchreiben(einsatz, benutzer);
 
-  // Ansichts-Filter (B/LFH-320, client-seitig): Objekte der aktiven Ansicht PLUS die
-  // ansichtslosen (`ansicht_id == null`). `== null` fängt sowohl `null` als auch das per
-  // skip_serializing_if weggelassene Feld (`undefined`).
+  // Ansichts-Filter (client-seitig): Objekte der aktiven Ansicht plus die ansichtslosen. `== null`
+  // fängt `null` und das per skip_serializing_if weggelassene Feld.
   const zonen = useMemo(
     () => (zonenRoh ?? []).filter((z) => z.ansicht_id == null || z.ansicht_id === aktiveAnsichtId),
     [zonenRoh, aktiveAnsichtId],
@@ -346,7 +345,7 @@ export function useLagekarteDaten({
     return m;
   }, [bezirkeRoh]);
 
-  // Beschriftungsplakette aus den Rollen des aktiven Modus (Neuentwurf S5).
+  // Beschriftungsplakette aus den Rollen des aktiven Modus.
   const plakette = useMemo(() => zonenPlakette(rollenwerte(token)), [token]);
 
   const zonenFeatures = useMemo<ZoneFeature[]>(
@@ -354,20 +353,18 @@ export function useLagekarteDaten({
       (zeigeZonen ? zonen : []).flatMap((z) => {
         const g = parseGeometry(z.geometrie);
         if (!g) return [];
-        // EINE Ableitung der Stufe für BEIDE Kanäle: Farbe und Beschriftung dürfen nicht
-        // auseinanderlaufen (LFH-357). Den FEHLENDEN Nachschlag behandeln sie aber
-        // verschieden, und das ist Absicht (Codex-Review): `ladt` hängt an `einsatz`/`config`,
-        // nicht an der Gebiets-Query — die Zone wird also gezeichnet, während der Nachschlag
-        // noch leer ist (Ladefenster) oder leer bleibt (gescheiterter Abruf). Die Farbe rundet
-        // dann vorsichtshalber auf `keine` (Alarm, unveränderte A2-Entscheidung), der Text
-        // nicht: „keine" wäre dort eine Behauptung über Daten, die es gerade nicht gibt.
+        // Eine Ableitung der Stufe für beide Kanäle, damit Farbe und Beschriftung nicht
+        // auseinanderlaufen (LFH-357). Den fehlenden Nachschlag behandeln sie absichtlich
+        // verschieden: `ladt` hängt nicht an der Gebiets-Query, die Zone wird also auch ohne
+        // Nachschlag gezeichnet. Die Farbe rundet dann vorsichtshalber auf `keine` (Alarm), der
+        // Text nicht — „keine" wäre eine Behauptung über fehlende Daten.
         const gebietId = z.typ === 'gefahrengebiet' ? z.gefahrengebiet_id : null;
         const warnstufe = gebietId != null ? gebietWarnstufe.get(gebietId) : undefined;
         const stil =
           gebietId != null
             ? gefahrengebietStil(warnstufe ?? 'keine', token)
             : zoneStil(z.typ, z.farbe);
-        // Bezirksfläche (LFH-673): Name und Räumungszustand nur, wenn der Bezirk lesbar ist.
+        // Bezirksfläche: Name und Räumungszustand nur, wenn der Bezirk lesbar ist.
         const beschriftung =
           z.typ === 'evakuierungsbezirk'
             ? bezirkBeschriftung(
@@ -383,7 +380,7 @@ export function useLagekarteDaten({
             geometrie: g,
             label: beschriftung,
             stil,
-            // Gefahrenzonen gestrichelt (Neuentwurf S5) — reine Darstellung am Zonentyp.
+            // Gefahrenzonen gestrichelt — reine Darstellung am Zonentyp.
             gestrichelt: z.typ === 'gefahrengebiet',
             plakette,
           },
@@ -392,26 +389,18 @@ export function useLagekarteDaten({
     [zonen, zeigeZonen, gebietWarnstufe, bezirkNachId, token, plakette],
   );
 
-  // Benannter Quellenkatalog (LFH-331 · B3): Query-Zustand → der Name, unter dem eine
-  // Einsatzkraft die Quelle kennt. Er wird IM Callback gebaut, nicht daneben — ein außen
-  // gebautes Array hätte pro Render neue Identität, die Memoisierung liefe leer und die
-  // Abhängigkeitsprüfung verlangte es trotzdem in der Liste. Verglichen werden deshalb die
-  // `isError`-BOOLEANS.
+  // Benannter Quellenkatalog (LFH-331): Query-Zustand → der Name, unter dem eine Einsatzkraft die
+  // Quelle kennt. Im Callback gebaut, damit die Memoisierung an den `isError`-Booleans hängt statt
+  // an einem Array mit neuer Identität.
   //
-  // NICHT im Katalog: `organisation`, `karte/config`, `einstellungen` und die Rückmeldungen. Sie sind
-  // Render-Kontext, kein Lagebild — ihr Ausfall lässt kein Objekt von der Karte
-  // verschwinden. `karte/config` hat mit dem Basemap-Fallback bereits einen eigenen
-  // sichtbaren Ausfallpfad („Keine Basemap konfiguriert …" in der Sidebar); ein zweiter,
-  // widersprechender Text daneben verwirrt mehr, als er meldet. `organisation` liefert nur
-  // den TZ-Vorgabewert — sein Ausfall zeichnet ein taktisches Zeichen mit der
-  // Vorgabe-Organisation statt mit der eigenen, aber es fehlt nichts. Und `einstellungen`
-  // trägt Anzeigekonventionen (Koordinatenformat, Zeitzone), keinen Kartengegenstand. Die
-  // Rückmeldungen (LFH-610) hängen am Leserecht auf „Meldungen": ein 403 ist für Rollen ohne
-  // das Modul der Normalfall und stünde sonst dauerhaft im Ausfallbanner — fehlen sie, fehlt
-  // im Paneel „Ausgewählt" nur der Block „Letzte Meldung".
+  // Nicht im Katalog: `organisation`, `karte/config`, `einstellungen` und die Rückmeldungen —
+  // Render-Kontext, ihr Ausfall lässt kein Objekt verschwinden. `karte/config` hat mit dem
+  // Basemap-Fallback schon einen eigenen sichtbaren Ausfallpfad in der Sidebar; `organisation`
+  // liefert nur den TZ-Vorgabewert; `einstellungen` trägt Anzeigekonventionen. Die Rückmeldungen
+  // hängen am Leserecht auf „Meldungen": ein 403 ist für Rollen ohne das Modul normal und stünde
+  // sonst dauerhaft im Banner.
   //
-  // Die live/snapshot-Weiche spiegelt `ladt`: im Historien-Modus sind alle elf Live-Queries
-  // abgeschaltet, die EINE Quelle ist das eingefrorene Dokument.
+  // Die live/snapshot-Weiche spiegelt `ladt`: im Historien-Modus ist das Dokument die eine Quelle.
   const fehlerhafteQuellen = useMemo<string[]>(() => {
     if (istSnapshot) return snapQuery.isError ? ['Gesicherter Stand'] : [];
     const katalog: [string, boolean][] = [
@@ -426,8 +415,8 @@ export function useLagekarteDaten({
       ['Gefahrengebiete', gebieteQuery.isError],
       ['Lagemeldungen', lageMeldungenQuery.isError],
       ['Personal', fkQuery.isError],
-      // Betreuungsstellen stehen in Kopfzahl und „Nicht verortet" wie die UHS — ihr Ausfall
-      // ist ein Ausfall des Lagebilds. Ein 403 ist es nicht (`betreuungFehler`).
+      // Betreuungsstellen stehen in Kopfzahl und „Nicht verortet" wie die UHS, ihr Ausfall ist ein
+      // Ausfall des Lagebilds. Ein 403 ist es nicht (`betreuungFehler`).
       ['Betreuungsstellen', betreuungFehler],
       [QUELLE_BETROFFENE, personenFehler],
     ];
@@ -450,9 +439,8 @@ export function useLagekarteDaten({
     personenFehler,
   ]);
 
-  // Erneuter Abruf: gezielt nur die GESCHEITERTEN Quellen. Ein pauschales Invalidieren träfe
-  // auch die elf gesunden Listen und liefe im Historien-Modus gegen abgeschaltete Queries.
-  // Bewusst KEIN Namenskatalog hier — die Namen leben genau einmal, oben.
+  // Erneuter Abruf nur der gescheiterten Quellen. Pauschales Invalidieren träfe die gesunden Listen
+  // und liefe im Historien-Modus gegen abgeschaltete Queries. Die Namen leben genau einmal, oben.
   const neuLaden = () => {
     for (const q of [
       snapQuery,
@@ -497,9 +485,9 @@ export function useLagekarteDaten({
     [verortet, taktisch.verortet, flaechen, lageMeldungMarker, freieZeichenMarker],
   );
 
-  // Betroffene (LFH-648) als EIGENE Liste, nie in `alleVerortet`: das speist Startausschnitt
-  // und Kopfzahl „verortet", und die sollen weder vom Schalter noch vom Modulrecht abhängen.
-  // Nach einem Fehler `[]` statt der Altdaten, die react-query stehenlässt.
+  // Betroffene als eigene Liste, nie in `alleVerortet`: das speist Startausschnitt und Kopfzahl
+  // „verortet", die weder vom Schalter noch vom Modulrecht abhängen sollen. Nach einem Fehler `[]`
+  // statt der stehengebliebenen Altdaten.
   const personenDaten =
     personenZugriff === 'frei' && !personenQuery.isError ? personenQuery.data : undefined;
   const personenVerortet = useMemo(
@@ -522,12 +510,11 @@ export function useLagekarteDaten({
     // Rohdaten-/Status-Durchreichungen (für Ladegate, Basemap/Fachebenen-Hooks, Panels).
     einsatz,
     darfSchreiben,
-    // Ladegate spiegelt die aktive Quelle: im Snapshot-Modus die Dokument-Query (eine disabled
-    // Live-Query meldet isLoading=false → sonst „fertig geladen" bei leerem Dokument, Marker-Pop-in).
+    // Ladegate spiegelt die aktive Quelle: im Snapshot-Modus die Dokument-Query (eine abgeschaltete
+    // Live-Query meldet isLoading=false → sonst „fertig" bei leerem Dokument, Marker-Pop-in).
     ladt: istSnapshot ? snapQuery.isLoading : einsatzQuery.isLoading || configQuery.isLoading,
-    // Stehen ALLE Quellen der Marker fest (geladen oder gescheitert)? `ladt` hängt nur an
-    // Einsatz und Config — die Startansicht der Karte (`startAnsicht.ts`) braucht aber das
-    // vollständige Bild, sonst entschiede sie über eine halb geladene Markermenge.
+    // Stehen alle Quellen der Marker fest (geladen oder gescheitert)? Die Startansicht
+    // (`startAnsicht.ts`) braucht das vollständige Bild; `ladt` hängt nur an Einsatz und Config.
     markerLaden: istSnapshot
       ? snapQuery.isLoading
       : einsatzQuery.isLoading ||
@@ -539,36 +526,34 @@ export function useLagekarteDaten({
         freieZeichenQuery.isLoading ||
         lageMeldungenQuery.isLoading ||
         fkQuery.isLoading ||
-        // Vor feststehenden Rechten weiß niemand, ob Stellen kommen (LFH-673) — sie speisen
-        // den Startausschnitt wie die UHS.
+        // Vor feststehenden Rechten weiß niemand, ob Stellen kommen; sie speisen den
+        // Startausschnitt wie die UHS.
         !overridesQuery.isFetched ||
         betreuungQuery.isLoading,
-    // Namen der Lagebild-Quellen, deren Abruf scheiterte (LFH-331 · B3) — leer = vollständig.
-    // Die Kürzung für die Anzeige liegt bewusst NICHT hier: sie ist Darstellung, und ein Hook,
-    // der schon kürzt, nähme der Seite die Wahl (und dem Test die Zählbarkeit).
+    // Namen der Lagebild-Quellen, deren Abruf scheiterte (leer = vollständig). Die Kürzung für die
+    // Anzeige ist Darstellung und liegt bei der Seite.
     fehlerhafteQuellen,
     /** Erneuter Abruf genau der gescheiterten Quellen. */
     neuLaden,
     config: configQuery.data,
     einstellungen: einstellungenQuery.data,
     einstellungenLaedt: einstellungenQuery.isLoading,
-    // Ansichts-gefiltert (B/LFH-320): nur Objekte der aktiven Ansicht + ansichtslose.
+    // Ansichts-gefiltert: nur Objekte der aktiven Ansicht + ansichtslose.
     zonen,
-    // UNGEFILTERT und ob die Liste feststeht (LFH-673): ein Deeplink auf eine Bezirksfläche
-    // muss sie auch finden, wenn sie in einer anderen Ansicht liegt, und einen Auftrag ohne
-    // Treffer räumen können, statt ewig zu warten.
+    // Ungefiltert und ob die Liste feststeht: ein Deeplink auf eine Bezirksfläche muss sie auch in
+    // einer anderen Ansicht finden und einen Auftrag ohne Treffer räumen können.
     zonenAlle: zonenRoh ?? [],
     zonenGeladen: istSnapshot ? !snapQuery.isLoading : zonenQuery.isFetched,
     // Stehen die Modulrechte fest? Der Platzier-Auftrag für eine Stelle wartet darauf.
     rechteBekannt: overridesQuery.isFetched,
     gebiete: gebieteRoh ?? [],
-    // Evakuierungsbezirke (LFH-673) für den Zonen-Inspector — leer ohne Modulrecht.
+    // Evakuierungsbezirke für den Zonen-Inspector — leer ohne Modulrecht.
     bezirke: bezirkeRoh ?? [],
-    // Ansichts-gefilterte freie Zeichen für den Inspector-Lookup (Etappe 4, LFH-170).
+    // Ansichts-gefilterte freie Zeichen für den Inspector-Lookup.
     freieZeichen,
-    // Rohlisten für das Datenraster im Paneel „Ausgewählt" (Neuentwurf S5): die Marker tragen
-    // nur Name/Ort/Zeichen, Stärke, Abschnitt oder Status stehen allein im DTO. Dieselben
-    // Listen wie oben — im Historien-Modus also der eingefrorene Stand, nicht der Live-Zustand.
+    // Rohlisten für das Datenraster im Paneel „Ausgewählt": die Marker tragen nur Name/Ort/Zeichen,
+    // Stärke, Abschnitt oder Status stehen allein im DTO. Im Historien-Modus der eingefrorene
+    // Stand.
     rohdaten: {
       einheiten: einheitenRoh ?? [],
       fahrzeuge: fahrzeugeRoh ?? [],
@@ -577,8 +562,7 @@ export function useLagekarteDaten({
       schaeden: schaedenRoh ?? [],
       abschnitte: abschnitteRoh ?? [],
       betreuungsstellen: stellenRoh ?? [],
-      // Nur ein erfolgreicher Live-Abruf; nach Fehler bleibt `data` in react-query stehen und
-      // wäre ein stiller Altstand.
+      // Nur ein erfolgreicher Live-Abruf; nach Fehler bliebe `data` als stiller Altstand stehen.
       rueckmeldungen:
         istSnapshot || rueckmeldungenQuery.isError ? undefined : rueckmeldungenQuery.data,
     },
@@ -588,15 +572,17 @@ export function useLagekarteDaten({
     zonenFeatures,
     alleVerortet,
     nichtVerortetAlle,
-    // Ebene „Betreuungsstellen" (LFH-673): Zugriffszustand für die Zeile; die Marker stehen
-    // in `verortet`/`alleVerortet`/`nichtVerortetAlle` wie die UHS.
+    // Ebene „Betreuungsstellen": Zugriffszustand für die Zeile; die Marker stehen in
+    // `verortet`/`alleVerortet`/`nichtVerortetAlle` wie die UHS.
     betreuungZugriff,
-    // Ebene „Betroffene" (LFH-648): Zugriffszustand für Zeile/Legende, Marker getrennt.
+    // Ebene „Betroffene": Zugriffszustand für Zeile/Legende, Marker getrennt.
     personenZugriff,
     personenVerortet,
-    /** Die Personenliste scheiterte bei freiem Modul (kein 403). Steht zugleich als
-     *  `QUELLE_BETROFFENE` in `fehlerhafteQuellen` — die Seite trennt beides, weil Personen
-     *  weder Kopfzahl noch „Nicht verortet" speisen. */
+    /**
+     * Die Personenliste scheiterte bei freiem Modul (kein 403). Steht zugleich als
+     * `QUELLE_BETROFFENE` in `fehlerhafteQuellen`; die Seite trennt beides, weil Personen weder
+     * Kopfzahl noch „Nicht verortet" speisen.
+     */
     personenFehler,
   };
 }

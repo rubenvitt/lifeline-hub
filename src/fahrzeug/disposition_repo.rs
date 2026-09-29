@@ -6,8 +6,8 @@ use crate::error::AppError;
 use crate::staerke::Staerke;
 use sqlx::{SqliteConnection, SqlitePool};
 
-/// SELECT mit aufgelöster Live-Identität (LEFT JOIN fahrzeug) und Status (LEFT JOIN
-/// fahrzeug_status). Die Wahl Live vs. Snapshot trifft `zu_anzeige` mit `einsatz_aktiv`.
+/// SELECT mit aufgelöster Live-Identität (LEFT JOIN fahrzeug) und Status. Live oder Snapshot
+/// wählt `zu_anzeige` mit `einsatz_aktiv`.
 const SELECT_AUFGELOEST: &str = "\
     SELECT ef.id, ef.einsatz_id, ef.fahrzeug_id, ef.einheit_id, ef.status_id, \
            ef.snap_funkrufname, ef.snap_kennzeichen, ef.snap_fahrzeugtyp, ef.snap_opta, \
@@ -60,8 +60,8 @@ struct Row {
     status_farbe: Option<String>,
 }
 
-/// Auflösungsregel: Live-Felder aus dem Stamm nur, wenn ein Stamm-Bezug besteht,
-/// der Einsatz aktiv ist UND das Fahrzeug noch in Dienst ist. Sonst Snapshot.
+/// Auflösungsregel: Live-Felder nur mit Stamm-Bezug, aktivem Einsatz UND Fahrzeug in Dienst,
+/// sonst Snapshot.
 fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
     let live = row.fahrzeug_id.is_some()
         && einsatz_aktiv
@@ -109,8 +109,8 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
         tz_fachaufgabe: row.tz_fachaufgabe,
         tz_organisation: row.tz_organisation,
         aktueller_br_id: row.aktueller_br_id,
-        // Soll-Besatzung aus dem Stamm-Live-Join: nur vollständig gepflegte Soll-Stärke
-        // ergibt `Some`; Ad-hoc-Fahrzeuge (kein Stamm-Join) liefern lauter NULL → `None`.
+        // Soll-Besatzung aus dem Stamm-Join: nur eine vollständige Soll-Stärke ergibt `Some`;
+        // Ad-hoc-Fahrzeuge liefern `None`.
         soll_besatzung: match (row.soll_fuehrer, row.soll_unterfuehrer, row.soll_mannschaft) {
             (Some(f), Some(u), Some(m)) => Some(Staerke::neu(f as u16, u as u16, m as u16)),
             _ => None,
@@ -166,8 +166,8 @@ pub async fn laden_anzeige(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
-/// Wie [`laden_anzeige`], aber auf einer offenen Connection/Transaktion (für den
-/// In-Tx-Reload beim atomaren Disponieren/Aktualisieren, F06/LFH-244 Tier-A).
+/// Wie [`laden_anzeige`], auf einer offenen Verbindung (Reload in der Transaktion beim atomaren
+/// Disponieren/Aktualisieren).
 pub async fn laden_anzeige_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -185,11 +185,10 @@ pub async fn laden_anzeige_tx(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
-/// Disponiert ein Stamm-Fahrzeug auf einer offenen Connection/Transaktion (F06/LFH-244
-/// Tier-A). Prüft Org-Zugehörigkeit + Dienststatus, friert den Identitäts-Schnappschuss
-/// ein und setzt den ersten `gebunden`-Status. `NotFound` bei fremdem/unbekanntem
-/// Fahrzeug, `Validation` bei außer Dienst, `Conflict` bei Doppel-Disposition.
-/// Liefert die neue `ef_id`.
+/// Disponiert ein Stamm-Fahrzeug auf einer offenen Verbindung: prüft Org und Dienststatus,
+/// friert den Identitäts-Snapshot ein und setzt den ersten `gebunden`-Status. `NotFound` bei
+/// fremdem/unbekanntem Fahrzeug, `Validation` bei außer Dienst, `Conflict` bei
+/// Doppel-Disposition. Liefert die `ef_id`.
 pub async fn disponiere_stamm_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -269,8 +268,7 @@ pub async fn disponiere_stamm(
 }
 
 /// Disponiert ein Ad-hoc-externes Fahrzeug (`fahrzeug_id = NULL`) auf einer offenen
-/// Connection/Transaktion (F06/LFH-244 Tier-A); `snap_*` sind die eigentlichen Daten.
-/// Initial-Status = erster `gebunden`. Liefert die neue `ef_id`.
+/// Verbindung; `snap_*` sind die eigentlichen Daten. Initialstatus ist der erste `gebunden`.
 pub async fn disponiere_adhoc_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -313,13 +311,11 @@ pub async fn disponiere_adhoc(
     disponiere_adhoc_tx(&mut conn, einsatz_id, org_id, daten, disponiert_von).await
 }
 
-/// Aktualisiert Status und/oder Bemerkung einer Dispositionszeile auf einer offenen
-/// Connection/Transaktion (F06/LFH-244 Tier-A). `status_id` nutzt COALESCE (`None` =
-/// unverändert); `status_seit` springt nur bei einem ECHTEN Wechsel (LFH-609) — derselbe
-/// Status erneut gesendet ist keiner, sonst läse „Seit“ den letzten Klick statt des Wechsels; `bemerkung` ist Drei-Zustands (wie `PositionPatch`): `None` = unverändert,
-/// `Some(None)` = explizit auf NULL, `Some(Some(x))` = setzen. Getrimmt/leer-kollabiert wird
-/// in der Route (F12-c/LFH-266), nicht hier.
-/// `NotFound`, falls die Zeile nicht zum Einsatz gehört.
+/// Aktualisiert Status und/oder Bemerkung auf einer offenen Verbindung. `status_id` per COALESCE
+/// (`None` = unverändert). `status_seit` springt nur bei einem ECHTEN Wechsel, sonst läse
+/// „Seit“ den letzten Klick. `bemerkung` ist Tri-State (`None` = unverändert, `Some(None)` =
+/// NULL, `Some(Some(x))` = setzen); getrimmt wird in der Route. `NotFound`, falls die Zeile
+/// nicht zum Einsatz gehört.
 pub async fn aktualisiere_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -360,7 +356,7 @@ pub async fn aktualisiere(
     aktualisiere_tx(&mut conn, einsatz_id, ef_id, status_id, bemerkung).await
 }
 
-/// Reine Geo-/Symbol-Felder einer Disposition. `Some(None)` = auf NULL, `None` = unverändert.
+/// Geo-/Symbol-Felder einer Disposition. `Some(None)` = NULL, `None` = unverändert.
 #[derive(Debug, Default)]
 pub struct PositionPatch<'a> {
     pub lat: Option<Option<f64>>,
@@ -369,9 +365,9 @@ pub struct PositionPatch<'a> {
     pub tz_organisation: Option<Option<&'a str>>,
 }
 
-/// Setzt/ändert/löscht Position + Symbol-Felder einer Dispositionszeile. Liefert die
-/// aufgelöste Anzeige (`einsatz_aktiv` steuert Live vs. Snapshot). `NotFound`, falls
-/// die Zeile nicht zum Einsatz gehört.
+/// Setzt/ändert/löscht Position und Symbol-Felder und liefert die aufgelöste Anzeige
+/// (`einsatz_aktiv` steuert Live/Snapshot). `NotFound`, falls die Zeile nicht zum Einsatz
+/// gehört.
 pub async fn aktualisiere_position(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -413,13 +409,11 @@ pub async fn aktualisiere_position(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
-/// Entfernt eine Dispositionszeile aus dem Einsatz (der Stamm bleibt). `NotFound`,
-/// falls nicht zum Einsatz gehörend.
+/// Entfernt eine Dispositionszeile (der Stamm bleibt); `NotFound`, falls nicht zum Einsatz.
 ///
-/// Transaktional (LFH-9): vor dem DELETE wird die Fahrzeug-Besatzung freigegeben
-/// (`einsatz_personal.fahrzeug_id = NULL`). Die Kräfte werden frei, nicht gelöscht;
-/// ohne diesen Schritt scheitert das DELETE am FK-Constraint. Schlägt das DELETE auf
-/// `NotFound` durch (fremdes/unbekanntes Fahrzeug), rollt die TX die Freigabe zurück.
+/// Vor dem DELETE wird die Besatzung freigegeben (`einsatz_personal.fahrzeug_id = NULL`); die
+/// Kräfte werden frei, nicht gelöscht, sonst scheiterte das DELETE am FK. Ein `NotFound` rollt
+/// die Freigabe zurück.
 pub async fn entferne_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -440,8 +434,7 @@ pub async fn entferne_tx(
     Ok(())
 }
 
-/// Pool-Wrapper: entfernt eine Dispositionszeile in eigener Transaktion (Besatzungs-
-/// Freigabe + DELETE atomar; `NotFound` rollt die Freigabe zurück).
+/// Pool-Wrapper mit eigener Transaktion (Freigabe und DELETE atomar).
 pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ef_id: i64) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
     entferne_tx(&mut tx, einsatz_id, ef_id).await?;
@@ -746,9 +739,8 @@ mod tests {
         ));
     }
 
-    /// LFH-9: Soll-Besatzung = Live-Join der Stamm-`staerke_*`. Nur Stamm-Fahrzeuge mit
-    /// vollständiger Soll-Stärke liefern `Some`; Ad-hoc-Fahrzeuge (kein Stamm) liefern
-    /// `None` — nicht 0/0/0 vortäuschen.
+    /// Soll-Besatzung aus dem Stamm: nur Stamm-Fahrzeuge mit vollständiger Soll-Stärke liefern
+    /// `Some`, Ad-hoc-Fahrzeuge `None` — nicht 0/0/0 vortäuschen.
     #[tokio::test]
     async fn soll_besatzung_aus_stamm_staerke_adhoc_none() {
         let pool = crate::db::test_pool().await;
@@ -793,9 +785,8 @@ mod tests {
         );
     }
 
-    /// LFH-9 (höchstes Risiko): Fahrzeug entfernen gibt die Besatzung transaktional frei —
-    /// kein Orphan. Ohne die Freigabe vor dem DELETE scheitert dieses am FK-Constraint
-    /// (FK-Enforcement ist an), die Kraft bleibt als freie Kraft erhalten.
+    /// Fahrzeug entfernen gibt die Besatzung transaktional frei; ohne Freigabe scheiterte das
+    /// DELETE am FK, die Kraft bleibt als freie Kraft erhalten.
     #[tokio::test]
     async fn entferne_gibt_besatzung_frei_statt_orphan() {
         let pool = crate::db::test_pool().await;
@@ -820,8 +811,8 @@ mod tests {
         assert_eq!(fahrzeug_id, None, "Besatzung wird frei, nicht gelöscht");
     }
 
-    /// LFH-237/F08: Ein Fahrzeug entfernen, das als Auftrag-Empfänger referenziert wird —
-    /// der Bezug wird per ON DELETE SET NULL (Migration 0088) freigegeben statt zu blockieren.
+    /// Ein als Auftrag-Empfänger referenziertes Fahrzeug entfernen: der Bezug wird per ON DELETE
+    /// SET NULL freigegeben.
     #[tokio::test]
     async fn entferne_setzt_empfaenger_fahrzeug_null() {
         let pool = crate::db::test_pool().await;

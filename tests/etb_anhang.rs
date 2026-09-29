@@ -382,8 +382,8 @@ async fn gebundener_anhang_ist_422() {
     );
 }
 
-/// LFH-21, Spec „ETB-Eintrag verknüpft Schaden-Datei“: als die ablegende Person (D12)
-/// 422 „bereits gebunden“, kein Eintrag, keine Verknüpfung.
+/// ETB-Eintrag verknüpft Schaden-Datei (LFH-21): als die ablegende Person 422 „bereits
+/// gebunden“, kein Eintrag, keine Verknüpfung.
 #[tokio::test]
 async fn schaden_anhang_nicht_an_etb_verknuepfbar() {
     let (app, pool, _live) = setup_mit_pool_und_live().await;
@@ -478,8 +478,8 @@ async fn elf_anhaenge_sind_400_elf_doppelte_nicht() {
     assert_eq!(anhang_ids(&v), vec![a]);
 }
 
-/// Gegenstück zum Elfer-Fall (Review C1): genau zehn verschiedene Anhänge gehen durch. Erst
-/// dieses Paar nagelt den Vergleich fest — mit `>=` statt `>` bliebe der Elfer-Fall grün.
+/// Gegenstück zum Elfer-Fall: genau zehn verschiedene Anhänge gehen durch. Erst dieses Paar
+/// nagelt den Vergleich fest — mit `>=` statt `>` bliebe der Elfer-Fall grün.
 #[tokio::test]
 async fn zehn_anhaenge_gehen_durch() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
@@ -711,12 +711,12 @@ async fn freier_anhang_ist_ueber_die_etb_route_nicht_ladbar() {
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
 
-// ------------- Ungebundene ETB-Uploads über die generische Route (Review C1) -------------
+// ------------------ Ungebundene ETB-Uploads über die generische Route ------------------
 
 /// Ein hochgeladener, noch nicht gebundener ETB-Anhang ist über die modul-lose generische
-/// Route nur für die hochladende Person erreichbar (design.md D12). Sonst könnte eine Person
-/// mit gesperrtem ETB-Modul die Fotos im Fenster bis zum Binden laden (IDs sind fortlaufend)
-/// und jede schreibende Person sie löschen. Fremde bekommen 404 — die Existenz bleibt verdeckt.
+/// Route nur für die hochladende Person erreichbar. Sonst könnte eine Person mit gesperrtem
+/// ETB-Modul die Fotos im Fenster bis zum Binden laden (IDs sind fortlaufend) und jede
+/// schreibende Person sie löschen. Fremde bekommen 404 — die Existenz bleibt verdeckt.
 #[tokio::test]
 async fn ungebundener_etb_upload_ist_generisch_nur_fuer_die_hochladende_person() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
@@ -745,10 +745,10 @@ async fn ungebundener_etb_upload_ist_generisch_nur_fuer_die_hochladende_person()
     );
 }
 
-/// Gegenstück beim Binden (Review C1, design.md D12): wer einen fremden, noch ungebundenen
-/// Upload in `anhang_ids` nennt, bekommt dieselbe Antwort wie für eine unbekannte ID. Sonst
-/// holte er sich die Datei über den eigenen Eintrag und die ETB-Route — oder erführe aus
-/// 400/201, welche IDs gerade frei herumliegen.
+/// Gegenstück beim Binden: wer einen fremden, noch ungebundenen Upload in `anhang_ids` nennt,
+/// bekommt dieselbe Antwort wie für eine unbekannte ID. Sonst holte er sich die Datei über den
+/// eigenen Eintrag und die ETB-Route — oder erführe aus 400/201, welche IDs gerade frei
+/// herumliegen.
 #[tokio::test]
 async fn fremder_ungebundener_upload_laesst_sich_nicht_binden() {
     let (app, pool, _live) = setup_mit_pool_und_live().await;
@@ -799,7 +799,7 @@ async fn fremder_ungebundener_upload_laesst_sich_nicht_binden() {
     assert_eq!(anhang_ids(&v), vec![a]);
 }
 
-// ---------- client_id: Replay nur bei gleichem Inhalt (Review C1, WICHTIG 1) ----------
+// ---------------------- client_id: Replay nur bei gleichem Inhalt ----------------------
 
 /// Zwei Browser-Tabs mit demselben Entwurf X: Tab 1 sendet, Tab 2 bearbeitet X weiter und
 /// sendet mit derselben client_id. Der Replay darf dann NICHT den Eintrag aus Tab 1 als

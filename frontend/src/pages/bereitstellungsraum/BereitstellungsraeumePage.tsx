@@ -56,14 +56,9 @@ export default function BereitstellungsraeumePage() {
     { title: 'Standort', dataIndex: 'standort', render: (s: string | null) => s ?? '—' },
   ];
 
-  // ZWEI EBENEN, getrennt gehalten (LFH-331 · B3, D3):
-  //
-  // SEITENZUSTAND — nur `einsatzQuery`. Breadcrumb und Schreibrecht hängen an ihr, ohne sie
-  // gibt es keinen Rahmen; nur sie rechtfertigt einen Frühausstieg.
-  //
-  // LISTENZUSTAND — `brQuery`. Sie entschied hier früher mit über die ganze Seite: bis ihre
-  // Antwort da war, stand alles im Ladebild, und scheiterte sie, blieb es dabei — ohne jede
-  // Aussage, was los ist. Ihr Zustand gehört an die Stelle der Liste (unten).
+  // Zwei Ebenen: der Seitenzustand hängt nur an `einsatzQuery` (Breadcrumb, Schreibrecht) und
+  // rechtfertigt einen Frühausstieg. Der Zustand von `brQuery` gehört an die Stelle der Liste
+  // (unten), nicht vor die ganze Seite.
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.error) {
     return (
@@ -79,22 +74,13 @@ export default function BereitstellungsraeumePage() {
   const sichtbar = alle.filter((br) => !br.storniert_at);
 
   /**
-   * ZWEI LAGEN, ZWEI ANTWORTEN (D3) — der Fehler allein reicht als Bedingung NICHT.
+   * Ohne Zeilen im Zwischenspeicher ersetzt der Fehler die Tabelle, sonst behauptete der Leertext
+   * eine leere Lage. Mit Zeilen bleiben sie stehen und bekommen ein Banner — sie sind echt, nur
+   * womöglich alt.
    *
-   * Ohne Zeilen im Zwischenspeicher tritt der Fehler an die Stelle der Tabelle, sonst
-   * behauptet „Noch keine Bereitstellungsräume erfasst" eine leere Lage, wo bloß der Abruf
-   * scheiterte. MIT Zeilen bleiben sie stehen und bekommen ein Banner: sie sind echt, nur
-   * womöglich alt. Ein Fehler, der die Zeilen wegräumt, nähme der Einsatzkraft Daten, die
-   * sie eben noch hatte.
-   *
-   * Gemessen an `alle`, NICHT an `sichtbar` — dieselbe Achse wie in `TierePage`/`SchaedenPage`.
-   * Die Begründung trägt hier allerdings anders und das soll nicht unbenannt bleiben:
-   * `storniert_at` ist kein vom Bediener gesetzter Filter, der Fall „Filter eng, Cache voll"
-   * tritt hier also nicht laufend auf. Gewählt ist die ungefilterte Achse trotzdem, weil eine
-   * zweite Messgrundlage für dieselbe Weiche genau der Befund wäre, den B3 behebt.
-   * BENANNTE FOLGE: sind ALLE Räume storniert und scheitert die Aktualisierung, steht das
-   * Banner über einer Tabelle, die „Noch keine … erfasst" zeigt. Das ist die ehrlichere der
-   * beiden Aussagen — der Bestand ist tatsächlich leer, nur eben womöglich veraltet leer.
+   * Gemessen an `alle`, nicht an `sichtbar` — dieselbe Achse wie in `TierePage`/`SchaedenPage`.
+   * Folge: sind alle Räume storniert und scheitert die Aktualisierung, steht das Banner über einer
+   * Tabelle mit Leertext. Das ist ehrlich — der Bestand ist leer, nur womöglich veraltet.
    */
   const listeGescheitert = brQuery.isError && alle.length === 0;
   const standVeraltet = brQuery.isError && alle.length > 0;
@@ -119,15 +105,12 @@ export default function BereitstellungsraeumePage() {
           Neu
         </Button>
       }
-      // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette, LFH-391 · B5)
-      // — mit DEMSELBEN Rechte-Riegel wie der Knopf darüber (dort `disabled`).
+      // Zweiter Bedienweg auf die Primäraktion, mit demselben Rechte-Riegel wie der Knopf.
       neueZeile={schreibgeschuetzt ? undefined : () => setAnlegen(true)}
     >
-      {/* Der Fehler TAUSCHT die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (D3): `Datensicht` führt den Kartenzweig an `Liste`, und deren Vertrag kennt
-          keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer der
-          beiden Formen. Ohne diese Weiche behauptet „Noch keine Bereitstellungsräume
-          erfasst" auch dann eine leere Lage, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Fehler tauscht die Tabelle aus: `Datensicht` führt den Kartenzweig an `Liste`,
+          deren Vertrag keinen Fehlerbegriff kennt — ein Prop am Tabellen-Primitiv wirkte nur in
+          einer Form. */}
       {listeGescheitert ? (
         <SeitenFehler
           text="Bereitstellungsräume konnten nicht geladen werden"
@@ -137,12 +120,9 @@ export default function BereitstellungsraeumePage() {
       ) : (
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void brQuery.refetch()} />}
-          {/* `!brQuery.isLoading` statt `brQuery.isSuccess`: eine vollständig stornierte Liste
-              bleibt auch dann ein Leerzustand, wenn eine NACHFOLGENDE Aktualisierung scheitert
-              (`standVeraltet`) — react-query setzt `status` dabei auf `'error'`, `isSuccess`
-              wird also false, obwohl die (leeren) Zeilen aus dem Zwischenspeicher weiter
-              gültig sind. Gemessen: der D3-Regressionstest „alles storniert + Fehler ergibt
-              Banner" erwartet den Leertext WEITER sichtbar, `isSuccess` verfehlte das. */}
+          {/* `!isLoading` statt `isSuccess`: scheitert eine nachfolgende Aktualisierung, setzt
+              react-query `status` auf `'error'`, die (leeren) Zeilen aus dem Cache gelten aber
+              weiter. */}
           {!brQuery.isLoading && sichtbar.length === 0 && (
             <SeitenLeer
               titel="Noch keine Bereitstellungsräume erfasst"

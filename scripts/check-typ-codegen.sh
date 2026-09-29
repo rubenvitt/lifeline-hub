@@ -21,9 +21,7 @@ PNPM="mise exec pnpm@11.10.0 -- pnpm"
 
 echo "==> [1/4] openapi.json aus dem Backend emittieren + gegen committete Version prüfen"
 # openapi_spec_aktuell schreibt frontend/src/api/openapi.json neu, wenn es vom Code abweicht,
-# und schlägt dann fehl. ohne_dev_env: Dev-Vars aus mise/.env leaken sonst in den Testlauf.
-# Früher stand hier eine handgepflegte `env -u`-Liste mit drei Variablen, während die .env
-# dreizehn setzte — genau diese Drift hat später die OIDC-Config-Tests gekippt (LFH-235/F17).
+# und schlägt dann fehl. ohne_dev_env: Dev-Variablen aus mise/.env leakten sonst in den Testlauf.
 ohne_dev_env cargo test --test openapi_spec_aktuell
 
 echo "==> [2/4] types.generated.ts aus openapi.json regenerieren"

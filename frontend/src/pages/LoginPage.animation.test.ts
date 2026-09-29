@@ -4,26 +4,20 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Die Anmelde-Animation darf den Absende-Knopf nicht überholen (LFH-345 · C10, Befund M18).
+ * Die Anmelde-Animation darf den Absende-Knopf nicht überholen (LFH-345, M18): wer schnell tippt
+ * und Enter drückt, trifft sonst einen halb durchsichtigen Knopf.
  *
- * Gemessen am 24.08.2026 stand der Anmelden-Knopf bei 0,46 s Versatz plus 0,6 s Dauer erst
- * nach **1,06 s** vollständig da — auf einem Einsatzgerät ist das die Zeit, in der jemand
- * ins Leere tippt. Die Karte kam 0,15 s später als der Hintergrund, die Felder gestaffelt
- * bei 0,3 und 0,38 s.
- *
- * Geprüft wird die CSS-QUELLE, nicht ein gerechneter Stil: jsdom rechnet kein Layout und
- * führt keine Animationen aus; `getComputedStyle` auf eine Keyframe-Animation liefert dort
- * nichts Belastbares. Der Text ist die Wahrheit, die im Browser ankommt.
+ * Geprüft wird die CSS-Quelle, nicht ein gerechneter Stil: jsdom rechnet kein Layout und führt
+ * keine Animationen aus.
  */
 const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'LoginPage.css'), 'utf8');
 
 /**
- * Schneidet den Regelkörper eines Selektors heraus (erste Fundstelle); `''`, wenn es die
- * Regel nicht gibt.
+ * Schneidet den Regelkörper eines Selektors heraus (erste Fundstelle); `''`, wenn es die Regel
+ * nicht gibt.
  *
- * Die Abwesenheit ist hier ein gültiger Zustand und kein Fehler: eine Zeile, die ihren
- * eigenen Versatz VERLOREN hat, fällt auf die gemeinsame Regel zurück — genau das ist das
- * Entstaffeln. Deshalb summiert {@link sichtbarNach} über mehrere Selektoren.
+ * Die Abwesenheit ist ein gültiger Zustand: eine Zeile ohne eigenen Versatz fällt auf die
+ * gemeinsame Regel zurück. Deshalb summiert {@link sichtbarNach} über mehrere Selektoren.
  */
 function regelOderLeer(selektor: string): string {
   const start = css.indexOf(selektor);
@@ -89,17 +83,16 @@ describe('Anmelde-Animation (M18)', () => {
     expect(verzoegerungAus(regel('.login-karte {'))).toBe(0);
   });
 
-  // Die schaerfere Fassung derselben Aussage: die Staffelung ist nicht klein geworden,
-  // sondern WEG. Eine eigene Versatz-Regel je Zeile ist genau das, was M18 beanstandet —
-  // ihre Abwesenheit laesst sich nicht durch einen niedrigen Wert vortaeuschen.
+  // Die schärfere Fassung: die Staffelung ist weg, nicht klein. Die Abwesenheit einer Versatz-Regel
+  // je Zeile lässt sich nicht durch einen niedrigen Wert vortäuschen.
   it('gibt weder Feldern noch Absende-Knopf einen eigenen Versatz', () => {
     expect(verzoegerungAus(regelOderLeer('.login-karte .ant-form-item:nth-of-type(1)'))).toBe(0);
     expect(verzoegerungAus(regelOderLeer('.login-karte .ant-form-item:nth-of-type(2)'))).toBe(0);
     expect(verzoegerungAus(regelOderLeer('.login-karte .login-absenden'))).toBe(0);
   });
 
-  // Gegenaussage: die Animation ist ENTSTAFFELT, nicht abgeschafft — ein CSS ganz ohne
-  // `animation` erfuellte alle Schranken oben und waere trotzdem eine andere Seite.
+  // Gegenaussage: entstaffelt, nicht abgeschafft — ein CSS ohne `animation` erfüllte alle Schranken
+  // oben.
   it('behaelt eine Eingangsanimation ueberhaupt', () => {
     expect(dauerAus(regel(GEMEINSAM))).toBeGreaterThan(0);
     expect(dauerAus(regel('.login-karte {'))).toBeGreaterThan(0);

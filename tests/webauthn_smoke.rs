@@ -1,4 +1,4 @@
-//! WebAuthn/Passkey-Login-Smoke (LFH-275, Increment 4). `#[ignore]`: braucht einen laufenden
+//! WebAuthn/Passkey-Login-Smoke (LFH-275). `#[ignore]`: braucht einen laufenden
 //! `--tls`-Server unter einem Hostnamen (nicht IP, siehe `docs/betrieb-webauthn.md`) + einen
 //! Browser mit Authenticator (Plattform wie Touch ID/Windows Hello oder Roaming wie ein
 //! Sicherheitsschlüssel) — nicht Teil der Unit-Suite (kein `navigator.credentials`-WebAuthn-API

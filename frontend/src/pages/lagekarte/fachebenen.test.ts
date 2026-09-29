@@ -24,12 +24,9 @@ const feat = (lon: number, lat: number) => ({
 
 describe('Fachebenen-Registry', () => {
   it('enthält die vier v1-Quellen, Hochwasser, ODL, Luftqualität, KRITIS/Energie und die BAB-Lage', () => {
-    // Reihenfolge = Anzeigereihenfolge im Panel. `hochwasser` steht neben `pegelonline`,
-    // weil es dieselbe Frage beantwortet: dort der rohe Wasserstand, hier die amtliche
-    // Bewertung (LFH-77). `odl` (LFH-78) folgt als zweite bewertete Messnetz-Ebene,
-    // `luftqualitaet` (LFH-79) als dritte. `energie` (LFH-81) steht neben `kritis`: beide
-    // sind Infrastruktur im Kartenausschnitt, und KRITIS führt die Umspannwerke, die MaStR
-    // nicht kennt. `autobahn` (LFH-80) hängt hinten an — eigene Fragestellung.
+    // Reihenfolge = Anzeigereihenfolge im Panel. `hochwasser` steht neben `pegelonline` (roher
+    // Wasserstand vs. amtliche Bewertung), `odl` und `luftqualitaet` folgen als weitere Messnetze,
+    // `energie` steht neben `kritis` (beides Infrastruktur), `autobahn` hinten.
     expect(fachebeneKeys()).toEqual([
       'nina',
       'dwd',
@@ -49,8 +46,7 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.energie.bboxAbhaengig).toBe(true);
   });
   it('Farbe der Energieanlagen fällt mit keiner Bestandsebene zusammen (LFH-81)', () => {
-    // Handgeschriebene Literale der sechs Bestandsfarben, nicht aus FACHEBENEN gelesen:
-    // sonst prüfte der Test die Registry gegen sich selbst.
+    // Handgeschriebene Literale der Bestandsfarben, nicht aus FACHEBENEN gelesen.
     const bestand = ['#cf1322', '#d48806', '#096dd9', '#08979c', '#c41d7f', '#531dab'];
     expect(bestand).not.toContain(FACHEBENEN.energie.farbe.toLowerCase());
     // Und über alle Ebenen: jede Farbe genau einmal — gilt auch für eine achte Ebene.
@@ -77,12 +73,12 @@ describe('Fachebenen-Registry', () => {
   });
   it('führt die ODL-Ebene bundesweit, im Takt der Quelle und mit sichtbarem Geltungsbereich', () => {
     expect(FACHEBENEN.odl.geometrieTyp).toBe('punkt');
-    // ~358 KB normalisiert, 1 676 Sonden — keine bbox-Pflicht wie bei KRITIS (design.md, E7).
+    // Keine bbox-Pflicht wie bei KRITIS (~358 KB, 1 676 Sonden).
     expect(FACHEBENEN.odl.bboxAbhaengig).toBe(false);
     // = serverseitige TTL: die Quelle hat Stundentakt, häufiger zu fragen wird nicht frischer.
     expect(FACHEBENEN.odl.pollMs).toBe(600_000);
-    // Als TEXT, nicht als Tooltip (LFH-80): wer die Ebene für Einsatzmessungen hält, liest
-    // eine Messtrupp-Lücke als „alles unauffällig".
+    // Als Text, nicht als Tooltip: wer die Ebene für Einsatzmessungen hält, liest eine
+    // Messtrupp-Lücke als „alles unauffällig".
     expect(FACHEBENEN.odl.geltung).toMatch(/ortsfeste/);
     expect(FACHEBENEN.odl.geltung).toMatch(/keine Einsatzmessungen/);
   });
@@ -97,42 +93,38 @@ describe('Fachebenen-Registry', () => {
     expect(istBboxAbhaengig('energie')).toBe(true);
     expect(istBboxAbhaengig('dwd')).toBe(false);
     expect(fachebeneKeys().filter(istBboxAbhaengig)).toEqual(['kritis', 'energie']);
-    // Die Autobahn-Ebene aggregiert das ganze Netz serverseitig — sie darf NICHT in den
-    // bbox-Zweig geraten, sonst bliebe sie ohne Viewport-Meldung dauerhaft leer.
+    // Die Autobahn-Ebene aggregiert serverseitig — im bbox-Zweig bliebe sie ohne Viewport-Meldung
+    // leer.
     expect(istBboxAbhaengig('autobahn')).toBe(false);
   });
   it('jeder fachebeneKeys()-Eintrag hat auch eine Definition (und umgekehrt)', () => {
     // Beide Richtungen: ein Key ohne Def stürzt beim Rendern ab, eine Def ohne Key ist
-    // unerreichbar und fällt sonst niemandem auf.
+    // unerreichbar.
     expect([...fachebeneKeys()].sort()).toEqual(Object.keys(FACHEBENEN).sort());
   });
   it('taktet die Autobahn-Ebene kurz, solange sie aufwärmt (LFH-80)', () => {
-    // Der erste Lauf hängt serverseitig an keinem Request; bis er durch ist, meldet die
-    // Ebene `offline`. Mit dem regulären 600-s-Takt sähe der Bediener zehn Minuten lang
-    // nichts, obwohl die Daten nach ~30 s bereitstehen.
+    // Der erste Lauf hängt serverseitig an keinem Request; bis er durch ist, meldet die Ebene
+    // `offline`. Mit dem regulären Takt sähe der Bediener zehn Minuten nichts.
     const kurz = FACHEBENEN.autobahn.aufwaermPollMs!;
     const lang = FACHEBENEN.autobahn.pollMs;
     expect(kurz).toBeLessThan(lang);
     expect(fachebeneTakt('autobahn', undefined)).toBe(kurz);
     expect(fachebeneTakt('autobahn', 'offline')).toBe(kurz);
 
-    // Und die Gegenaussage, die die Regel erst scharf macht: ein ERREICHTER Zustand fällt
-    // auf den regulären Takt zurück. `leer` gehört dazu — „Quelle erreichbar, gerade nichts
-    // zu melden" ist ein gültiges Ende, kurz zu takten brächte dort nichts.
+    // Gegenaussage: ein erreichter Zustand (auch `leer`) fällt auf den regulären Takt zurück.
     expect(fachebeneTakt('autobahn', 'ok')).toBe(lang);
     expect(fachebeneTakt('autobahn', 'leer')).toBe(lang);
   });
 
   it('taktet KRITIS nur in der Aufwärmphase und sonst gar nicht (LFH-83)', () => {
-    // Der erste Import des OSM-Extrakts läuft minutenlang im Hintergrund; bis dahin meldet
-    // die Ebene `offline`. Ohne kurzen Takt erschiene der erste Bestand erst beim nächsten
-    // Pannen — wer die Karte nicht bewegt, sähe die Ebene nie.
+    // Der erste Import des OSM-Extrakts läuft minutenlang; ohne kurzen Takt erschiene der Bestand
+    // erst beim nächsten Pannen.
     const kurz = FACHEBENEN.kritis.aufwaermPollMs!;
     expect(kurz).toBeGreaterThan(0);
     expect(fachebeneTakt('kritis', undefined)).toBe(kurz);
     expect(fachebeneTakt('kritis', 'offline')).toBe(kurz);
-    // Gegenaussage: mit Bestand ist die Ebene bbox-getrieben und pollt NICHT. `0` schaltet
-    // in react-query den Timer ab (queryObserver: `#currentRefetchInterval === 0` → return).
+    // Mit Bestand ist die Ebene bbox-getrieben und pollt nicht: `0` schaltet in react-query den
+    // Timer ab.
     expect(FACHEBENEN.kritis.pollMs).toBe(0);
     expect(fachebeneTakt('kritis', 'ok')).toBe(0);
     expect(fachebeneTakt('kritis', 'leer')).toBe(0);
@@ -145,18 +137,14 @@ describe('Fachebenen-Registry', () => {
   });
 
   it('nennt bei KRITIS die Herkunft: OSM, wöchentlicher Stand, keine amtliche Liste (LFH-83)', () => {
-    // Wer die Ebene für die amtliche KRITIS-Liste hält, liest eine Lücke als „hier ist
-    // nichts" — dieselbe Falle wie bei ODL und Autobahn, deshalb dieselbe Textzeile.
+    // Wer die Ebene für die amtliche KRITIS-Liste hält, liest eine Lücke als „hier ist nichts".
     expect(FACHEBENEN.kritis.geltung).toMatch(/OpenStreetMap/);
     expect(FACHEBENEN.kritis.geltung).toMatch(/wöchentlich/);
     expect(FACHEBENEN.kritis.geltung).toMatch(/keine amtliche KRITIS-Liste/);
   });
 
   it('nur ODL, Luftqualität, KRITIS und Autobahn nennen einen einschränkenden Geltungsbereich', () => {
-    // Das ist das Akzeptanzkriterium „Limitation (nur BAB) transparent" als Zusicherung.
-    // Die Gegenaussage trägt sie mit: stünde der Satz an jeder Ebene, sagte er nichts.
-    // ODL (LFH-78): nur ortsfestes Messnetz. Luftqualität (LFH-79): Messpunkte, keine Aussage
-    // zwischen den Stationen. KRITIS (LFH-83): OSM-Stand, keine amtliche Liste.
+    // „Nur BAB" als Zusicherung, mit Gegenaussage: stünde der Satz an jeder Ebene, sagte er nichts.
     expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
     const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
     expect(mitGeltung).toEqual(['odl', 'luftqualitaet', 'kritis', 'autobahn']);
@@ -170,7 +158,6 @@ describe('Fachebenen-Registry', () => {
     }
   });
   it('BBOX_MIN_ZOOM bleibt die bisherige KRITIS-Schwelle 10', () => {
-    // Der Wert ist beim Umbenennen unverändert geblieben (LFH-81, design.md Entscheidung 6).
     expect(BBOX_MIN_ZOOM).toBe(10);
   });
 });
@@ -211,22 +198,21 @@ describe('rasterBbox', () => {
     expect(a).toBe('6.95,50.9,7,50.95');
   });
   it('hält den Schlüssel auf Deutschland-Ebene beim Pannen um einen Bruchteil der Breite stabil', () => {
-    // Deutschland-Ansicht, ~12° breit. Mit dem Stadtraster (0,05°) erzeugte jede
-    // Verschiebung um mehr als ~5 km einen neuen Query-Key und damit eine neue Abfrage
-    // über das ganze Land. Um 0,3° verschoben (~20 km) bleibt der Schlüssel gleich.
+    // Deutschland-Ansicht, ~12° breit: mit dem Stadtraster (0,05°) erzeugte jede Verschiebung um
+    // mehr als ~5 km eine neue Abfrage übers ganze Land. Um 0,3° verschoben bleibt der Schlüssel
+    // gleich.
     const a = rasterBbox('4.1,46.6,16.1,55.3');
     const b = rasterBbox('4.4,46.8,16.4,55.5');
     expect(a).toBe(b);
   });
   it('wechselt den Schlüssel, wenn die Ansicht die Rasterzelle wirklich verlässt', () => {
-    // Gegenaussage — „stabil" allein erfüllte auch eine Funktion, die immer denselben
-    // String liefert.
+    // Gegenaussage — „stabil" erfüllte auch eine Funktion, die immer denselben String liefert.
     expect(rasterBbox('6.96,50.91,6.99,50.94')).not.toBe(rasterBbox('7.06,50.91,7.09,50.94'));
     expect(rasterBbox('4.1,46.6,16.1,55.3')).not.toBe(rasterBbox('9.1,46.6,21.1,55.3'));
   });
   it('wechselt das Raster mit der Zoomstufe: Stadt- und Landesausschnitt am selben Ort', () => {
-    // Die Leiterstufe hängt an der Breite, nicht an der Lage — derselbe Mittelpunkt auf
-    // zwei Zoomstufen liefert zwei verschiedene Schlüssel, sonst lüde das Herauszoomen nie.
+    // Die Leiterstufe hängt an der Breite: derselbe Mittelpunkt auf zwei Zoomstufen liefert zwei
+    // Schlüssel, sonst lüde das Herauszoomen nie.
     expect(rasterBbox('6.96,50.91,6.99,50.94')).not.toBe(rasterBbox('5.5,50,8.5,52'));
   });
   it.each([
@@ -242,17 +228,16 @@ describe('rasterBbox', () => {
     expect(n).toBeGreaterThanOrEqual(n0);
   });
   it('bleibt im gültigen Koordinatenbereich, auch wenn die Karte über die Welt hinaus zeigt', () => {
-    // Auf kleinster Zoomstufe meldet MapLibre Längen jenseits ±180 (Weltkopien). Das
-    // Backend lehnt solche bboxes mit 400 ab — die Ebene stünde dann als `offline` da.
+    // Auf kleinster Zoomstufe meldet MapLibre Längen jenseits ±180 (Weltkopien); das Backend lehnte
+    // solche bboxes mit 400 ab.
     const [w, s, e, n] = rasterBbox('-250.3,-88.1,250.7,88.4').split(',').map(Number);
     expect(w).toBeGreaterThanOrEqual(-180);
     expect(e).toBeLessThanOrEqual(180);
     expect(s).toBeGreaterThanOrEqual(-90);
     expect(n).toBeLessThanOrEqual(90);
   });
-  // Review LFH-83: nur Kappen reichte nicht — eine Weltkopie jenseits ±180 wurde zu
-  // „180,…,180,…" (west = ost → 400), und Deutschland in der Kopie bei 365–376° blieb leer.
-  // Geprüft wird die Invariante, an der das Backend scheitert, über eine Tabelle.
+  // Nur Kappen reichte nicht: eine Weltkopie wurde zu „180,…,180,…" (west = ost → 400). Geprüft
+  // wird die Invariante, an der das Backend scheitert.
   it.each([
     ['182,50,183,51'],
     ['365,47,376,56'],
@@ -281,9 +266,8 @@ describe('rasterBbox', () => {
   });
   it('rastert mit fester Weite, wenn eine übergeben wird (Energie, LFH-81)', () => {
     expect(rasterBbox('7.01,51.51,7.12,51.58', 0.05)).toBe('7,51.5,7.15,51.6');
-    // Ein Zoom-10-Ausschnitt (~0,9° bei rund 1300 px Kartenbreite): die Leiter rundet auf
-    // 0,25° nach außen und vergrößert die Overpass-Abfrage merklich, das feste Stadtraster
-    // bleibt nah am Ausschnitt. Genau deshalb nimmt Energie nicht die Leiter.
+    // Ein Zoom-10-Ausschnitt: die Leiter rundet auf 0,25° nach außen und vergrößert die
+    // Overpass-Abfrage merklich — deshalb nimmt Energie nicht die Leiter.
     const zoom10 = '7.13,51.21,8.03,51.76';
     const breite = (b: string) => {
       const [w, , e] = b.split(',').map(Number);
@@ -316,7 +300,7 @@ describe('mergeFeatures', () => {
   });
 });
 
-// Energie-Feature mit Properties (LFH-81): Koordinate + Herkunft + MaStR-Angaben.
+// Energie-Feature mit Properties: Koordinate + Herkunft + MaStR-Angaben.
 const energie = (lon: number, lat: number, props: Record<string, unknown>) => ({
   type: 'Feature' as const,
   geometry: { type: 'Point', coordinates: [lon, lat] },
@@ -346,8 +330,8 @@ describe('mergeEnergieFeatures (LFH-81)', () => {
   });
 
   it('entfernt reine MaStR-Punkte, deren Nummer ein osm+mastr-Punkt schon trägt', () => {
-    // Im Ausfall stand die Einheit als eigener MaStR-Punkt da; später ordnet das Backend sie
-    // einer OSM-Anlage zu. Ohne Bereinigung stünde dieselbe Anlage doppelt auf der Karte.
+    // Im Teilausfall stand die Einheit als eigener MaStR-Punkt da; später ordnet das Backend sie
+    // einer OSM-Anlage zu — ohne Bereinigung stünde die Anlage doppelt.
     const m = new Map();
     mergeEnergieFeatures(
       m,

@@ -8,31 +8,27 @@ pub async fn connect(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
         .filename(db_path)
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
-        // busy_timeout explizit (F09/LFH-240): sqlx-sqlite setzt zwar 5s per Default,
-        // aber sichtbar dokumentiert, worauf die Writer-Disziplin (BEGIN IMMEDIATE +
-        // zentraler Busy-Retry, src/tx.rs) aufbaut. Beim Lock-Upgrade greift der Timeout
-        // prinzipbedingt nicht — dafür BEGIN IMMEDIATE.
+        // `busy_timeout` explizit (entspricht der sqlx-Vorgabe): darauf baut die Writer-Disziplin
+        // (`BEGIN IMMEDIATE` + Busy-Retry in `src/tx.rs`). Beim Lock-Upgrade greift er nicht —
+        // dafür
+        // `BEGIN IMMEDIATE`.
         .busy_timeout(std::time::Duration::from_secs(5))
         .foreign_keys(true);
 
     SqlitePoolOptions::new()
         .max_connections(5)
-        // acquire_timeout explizit (G09/LFH-228): der sqlx-Default von 30 s lässt
-        // Backpressure als stillen 30-Sekunden-Hänger erscheinen, der am Ende als 500
-        // beantwortet wird. 10 s macht daraus ehrlichen, schnellen Lastabwurf (503).
+        // `acquire_timeout` explizit: die sqlx-Vorgabe von 30 s ließe Backpressure als stillen
+        // Hänger
+        // erscheinen, der am Ende als 500 endet; 10 s macht daraus schnellen Lastabwurf (503).
         //
-        // Warum nicht kürzer: `write_retry!` (src/tx.rs) startet mit
-        // `begin_with("BEGIN IMMEDIATE")` — es checkt also ERST eine Pool-Verbindung aus
-        // und wartet DANN bis zu `busy_timeout` (5 s, oben) am BEGIN auf den Write-Lock.
-        // Unter Schreib-Contention können dadurch alle 5 Slots völlig legitim in dieser
-        // Wartephase stehen; jeder Wert < 5 s würde nebenläufige LESER mit 503 abweisen,
-        // obwohl der Pool gar nicht erschöpft ist. 10 s liegt über einer vollen legitimen
-        // BEGIN-Wartephase plus Puffer und deutlich unter dem Default.
-        //
-        // Bewusst NICHT abgedeckt: der Worst Case eines Schreibers
-        // (`MAX_VERSUCHE` = 4 × 5 s ≈ 20 s, siehe src/tx.rs) — ein 20-Sekunden-Hänger ist
-        // für einen Leser ohnehin kein akzeptables Verhalten und soll als 503 sichtbar
-        // werden statt zugewartet.
+        // Nicht kürzer: `write_retry!` checkt ERST eine Verbindung aus und wartet DANN bis zu
+        // `busy_timeout` (5 s) am BEGIN. Unter Schreib-Contention können alle Slots legitim in
+        // dieser
+        // Phase stehen; jeder Wert < 5 s wiese nebenläufige Leser ab, obwohl der Pool nicht
+        // erschöpft
+        // ist. Den Worst Case eines Schreibers (4 × 5 s, s. `src/tx.rs`) deckt der Wert bewusst
+        // nicht
+        // ab — ein Leser soll dann 503 sehen.
         .acquire_timeout(std::time::Duration::from_secs(10))
         .connect_with(options)
         .await
@@ -43,20 +39,17 @@ pub async fn migrate(pool: &SqlitePool) -> Result<(), sqlx::migrate::MigrateErro
     sqlx::migrate!("./migrations").run(pool).await
 }
 
-/// In-Memory-Pool für Tests (eine Verbindung, damit dieselbe DB geteilt wird),
-/// inklusive eingespielter Migrationen.
+/// In-Memory-Pool für Tests (eine Verbindung, damit dieselbe DB geteilt wird), mit
+/// eingespielten Migrationen.
 ///
-/// **Migriert wird einmal je Testprozess, nicht je Test.** Das Einspielen aller Migrationen
-/// kostete gemessen ~460 ms im Debug-Build, bei rund 1700 Aufrufen je Lauf ein zweistelliger
-/// Minutenanteil der Rust-Suite. Der erste Aufruf migriert deshalb eine Vorlage und hält sie als
-/// Abbild (`sqlite3_serialize`); jeder Aufruf spielt dieses Abbild per `sqlite3_deserialize` in
-/// eine FRISCHE `:memory:`-Verbindung ein (~5 ms). Die DB ist danach dieselbe wie vorher —
-/// dieselbe Art (`:memory:`, kein WAL, eine Verbindung), dasselbe Schema, dieselbe
-/// `_sqlx_migrations`-Tabelle —, und jeder Test bekommt seine eigene Kopie, geteilt wird nur
-/// das unveränderliche Abbild.
+/// **Migriert wird einmal je Testprozess, nicht je Test.** Der erste Aufruf migriert eine
+/// Vorlage und hält sie als Abbild (`sqlite3_serialize`); jeder Aufruf spielt es per
+/// `sqlite3_deserialize` in eine FRISCHE `:memory:`-Verbindung ein. Art, Schema und
+/// `_sqlx_migrations` sind dieselben wie nach einer Migration, und jeder Test bekommt seine
+/// eigene Kopie.
 ///
-/// Wer eine Migration selbst prüfen will, nimmt [`migrate`] auf einem eigenen Pool, nicht
-/// diese Funktion: hier läuft die Migrationskette nur beim ersten Aufruf.
+/// Wer eine Migration selbst prüfen will, nimmt [`migrate`] auf einem eigenen Pool: hier läuft
+/// die Migrationskette nur beim ersten Aufruf.
 pub async fn test_pool() -> SqlitePool {
     static VORLAGE: tokio::sync::OnceCell<Vec<u8>> = tokio::sync::OnceCell::const_new();
 
@@ -84,9 +77,9 @@ pub async fn test_pool() -> SqlitePool {
 
 /// Die leere Hülle von [`test_pool`]: eine `:memory:`-Verbindung mit Foreign Keys.
 ///
-/// `max_connections(1)` ist tragend: jede weitere Verbindung auf `:memory:` wäre eine
-/// EIGENE, leere Datenbank. `foreign_keys` ist eine Verbindungs-Einstellung und überlebt das
-/// Einspielen des Abbilds.
+/// `max_connections(1)` ist tragend: jede weitere Verbindung auf `:memory:` wäre eine eigene,
+/// leere Datenbank. `foreign_keys` ist eine Verbindungs-Einstellung und überlebt das Einspielen
+/// des Abbilds.
 async fn leerer_test_pool() -> SqlitePool {
     let options = SqliteConnectOptions::new()
         .filename(":memory:")
@@ -99,24 +92,15 @@ async fn leerer_test_pool() -> SqlitePool {
         .expect("In-Memory-Pool")
 }
 
-/// Datei-basierter SQLite-Pool mit Produktions-Parität (WAL, mehrere Verbindungen,
-/// `busy_timeout`) für Nebenläufigkeits-/Locking-Tests (F28/LFH-246). Anders als
-/// [`test_pool`] (`:memory:`, eine Verbindung, kein WAL) macht diese Variante die
-/// Write-Contention-/`SQLITE_BUSY`-Fehlerklasse überhaupt sichtbar.
+/// Datei-basierter Pool mit Produktions-Parität (WAL, mehrere Verbindungen, `busy_timeout`) für
+/// Nebenläufigkeits-/Locking-Tests; erst damit wird die `SQLITE_BUSY`-Fehlerklasse sichtbar.
 ///
-/// Gibt den `TempDir`-Guard MIT zurück: fällt er aus dem Scope, verschwinden
-/// `.db` + `-wal` + `-shm`. Der Aufrufer MUSS ihn halten (`let (_dir, pool) = …`,
-/// nicht `let (_, pool)`), sonst reißt Drop die Datei mitten im Test weg.
+/// Der `TempDir`-Guard kommt mit zurück und MUSS gehalten werden (`let (_dir, pool) = …`, nicht
+/// `let (_, pool)`), sonst verschwindet die Datei mitten im Test.
 ///
-/// Bewusst nur für die wenigen nebenläufigkeitskritischen Tests gedacht — die ~250
-/// bestehenden [`test_pool`]-Tests bleiben unangetastet (Datei + `multi_thread` ist teurer).
-///
-/// Die Prod-Parität endet bewusst beim `acquire_timeout` (G09/LFH-228): der Nutzer
-/// `tx::tests::nebenlaeufige_read_then_write_ohne_lost_update` fährt 40 parallele Tasks
-/// gegen diese 5 Slots, 35 davon warten also per Definition in der Pool-Queue. Ein
-/// gesetztes `acquire_timeout` würde dort unter Maschinenlast zu sporadischen
-/// `PoolTimedOut`-Fehlschlägen führen — Flakiness ohne Gegenwert, denn die
-/// Timeout-Konfiguration selbst ist in `connect_setzt_acquire_timeout` direkt geprüft.
+/// Ohne `acquire_timeout`: `tx::tests::nebenlaeufige_read_then_write_ohne_lost_update` lässt
+/// viele Tasks in der Pool-Queue warten, ein Timeout brächte dort nur Flakiness. Die
+/// Timeout-Konfiguration prüft `connect_setzt_acquire_timeout`.
 pub async fn test_pool_datei() -> (tempfile::TempDir, SqlitePool) {
     let dir = tempfile::tempdir().expect("Temp-Verzeichnis");
     let path = dir.path().join("test.db");
@@ -137,11 +121,9 @@ pub async fn test_pool_datei() -> (tempfile::TempDir, SqlitePool) {
     (dir, pool)
 }
 
-/// Eindeutiges, prozess-lokales Daten-/Karten-Verzeichnis für Integrationstests (F09/LFH-240):
-/// jeder Aufruf liefert einen frischen Pfad, damit per-Pfad memoisierte Cache-DBs
-/// (`cache_db`, `karte::tile_cache`) sich zwischen Tests NICHT kontaminieren. Bewusst ohne
-/// Cleanup (kleines Verzeichnis unter `temp_dir`, vom OS geräumt) — spart Guard-Ripple durch
-/// die Test-Setups.
+/// Eindeutiges Daten-/Karten-Verzeichnis je Aufruf, damit per Pfad memoisierte Cache-DBs
+/// (`cache_db`, `karte::tile_cache`) sich zwischen Tests nicht kontaminieren. Ohne Cleanup
+/// (kleines Verzeichnis unter `temp_dir`).
 pub fn test_karten_dir() -> std::path::PathBuf {
     use std::sync::atomic::{AtomicU64, Ordering};
     static N: AtomicU64 = AtomicU64::new(0);
@@ -179,10 +161,9 @@ mod tests {
 
     #[tokio::test]
     async fn connect_setzt_acquire_timeout() {
-        // G09/LFH-228: Regressionsschutz für die acquire_timeout-Zeile. Ohne sie gilt der
-        // sqlx-Default von 30 s — Backpressure wird dann zum stillen 30-Sekunden-Hänger.
-        // Deterministisch über den PoolOptions-Getter geprüft, statt den Pool wirklich zu
-        // erschöpfen (das würde bei JEDEM cargo test acquire_timeout lang warten).
+        // Regressionsschutz für `acquire_timeout`, über den PoolOptions-Getter statt durch
+        // Erschöpfen
+        // des Pools geprüft.
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.db");
         let pool = connect(path.to_str().unwrap()).await.unwrap();
@@ -194,13 +175,10 @@ mod tests {
         );
     }
 
-    /// Jede Migrationsnummer genau einmal. Parallele Branches greifen gern zur selben
-    /// nächsten freien Nummer, und beim Merge kollidiert das textuell nicht — die Dateien
-    /// heissen ja verschieden. Erst beim Einspielen scheitert `_sqlx_migrations.version`,
-    /// und zwar in JEDEM Test, der eine Datenbank anlegt, mit einer Meldung, die keine
-    /// Datei nennt (gemessen am 22.09.2026: dreimal `0106` nach #97/#98/#99). Dieser Test
-    /// nennt die Kollision beim Namen — aber nur im EIGENEN Stand. Gegen den aktuellen
-    /// Ziel-Branch prüft `scripts/check-migrationen.sh` (LFH-658), und zwar vor dem Merge.
+    /// Jede Migrationsnummer genau einmal. Parallele Branches greifen gern zur selben Nummer; beim
+    /// Merge kollidiert das textuell nicht, erst beim Einspielen scheitert jeder DB-Test mit einer
+    /// Meldung ohne Dateinamen. Dieser Test nennt die Kollision — aber nur im eigenen Stand; gegen
+    /// den Ziel-Branch prüft `scripts/check-migrationen.sh` (LFH-658).
     #[test]
     fn migrationsnummern_sind_eindeutig() {
         let mut je_nummer: std::collections::BTreeMap<i64, Vec<String>> = Default::default();
@@ -222,12 +200,10 @@ mod tests {
         );
     }
 
-    /// LFH-658: sqlx 0.9 spielt eine kleinere Version, die NACH einer größeren auftaucht,
-    /// still nach — kein „applied out of order", kein Fehler. Eine Datenbank, die `0118`
-    /// schon hat, nimmt ein später gemergtes `0117` also einfach mit, eine frische Datenbank
-    /// spielt beide in Nummernfolge. Darauf ruht die Regel „anhängen, nicht einschieben"
-    /// aus `scripts/check-migrationen.sh`: sie ist die einzige Stelle, die den Einschub
-    /// bemerkt. Wird sqlx hier strenger, ist dieser Test rot und die Regel neu zu bewerten.
+    /// sqlx 0.9 spielt eine kleinere Version, die nach einer größeren auftaucht, still nach. Darauf
+    /// ruht die Regel „anhängen, nicht einschieben“ aus `scripts/check-migrationen.sh`, die einzige
+    /// Stelle, die den Einschub bemerkt. Wird sqlx hier strenger, ist dieser Test rot und die Regel
+    /// neu zu bewerten.
     #[tokio::test]
     async fn sqlx_spielt_eingeschobene_kleinere_version_still_nach() {
         use sqlx::migrate::{Migration, MigrationType, Migrator};
@@ -286,10 +262,9 @@ mod tests {
             .expect("die eingeschobene Migration ist angewendet");
     }
 
-    /// Das Abbild in [`test_pool`] muss DIESELBE Datenbank liefern, die eine frische Migration
-    /// erzeugt — sonst prüften alle DB-Tests gegen ein Schema, das es in Produktion nicht gibt.
-    /// Verglichen wird der vollständige Schema-Text (Tabellen, Indizes, Trigger, FTS-Schatten)
-    /// plus die Migrationsbuchhaltung.
+    /// Das Abbild in [`test_pool`] muss dieselbe Datenbank liefern wie eine frische Migration.
+    /// Verglichen werden der vollständige Schema-Text (Tabellen, Indizes, Trigger, FTS-Schatten)
+    /// und die Migrationsbuchhaltung.
     #[tokio::test]
     async fn test_pool_gleicht_einer_frisch_migrierten_db() {
         async fn schema(pool: &SqlitePool) -> Vec<(String, String, Option<String>)> {
@@ -318,9 +293,8 @@ mod tests {
         assert_eq!(m.len(), sqlx::migrate!("./migrations").iter().count());
     }
 
-    /// Jeder Aufruf ist eine EIGENE Datenbank: geteilt wird nur das Abbild, nie der Inhalt.
-    /// Und `foreign_keys` ist eine Verbindungs-Einstellung — sie muss das Einspielen überleben,
-    /// sonst liefen alle FK-Prüfungen der Suite still ins Leere.
+    /// Jeder Aufruf ist eine eigene Datenbank; geteilt wird nur das Abbild. `foreign_keys` muss das
+    /// Einspielen überleben, sonst liefen alle FK-Prüfungen der Suite still ins Leere.
     #[tokio::test]
     async fn test_pool_ist_je_aufruf_isoliert_und_prueft_foreign_keys() {
         let a = test_pool().await;
@@ -358,9 +332,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_pool_datei_ist_wal_und_haelt_mehrere_verbindungen() {
-        // Prod-Parität (F28/LFH-246): WAL an, und >1 Verbindung gleichzeitig haltbar —
-        // genau das, was test_pool() (:memory:, max_connections(1)) NICHT kann und
-        // weshalb die Nebenläufigkeits-Fehlerklasse dort strukturell unsichtbar ist.
+        // Prod-Parität: WAL an und mehr als eine Verbindung gleichzeitig — genau das kann
+        // `test_pool()` nicht.
         let (_dir, pool) = test_pool_datei().await;
 
         let mut conn_a = pool.acquire().await.expect("erste Verbindung");
@@ -384,9 +357,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_pool_datei_deckt_read_then_write_busy_auf() {
-        // Harness-Selbstcheck (F28): auf der Datei-/WAL-Konfiguration wird die
-        // read-then-write-Upgrade-Kollision als SQLITE_BUSY sichtbar — die Klasse, die
-        // F09 (LFH-240) behebt und die test_pool() prinzipbedingt nicht zeigen kann.
+        // Selbstcheck: auf der Datei-/WAL-Konfiguration wird die read-then-write-Upgrade-Kollision
+        // als
+        // SQLITE_BUSY sichtbar.
         let (_dir, pool) = test_pool_datei().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Halter')")
             .execute(&pool)
@@ -400,9 +373,8 @@ mod tests {
             .await
             .unwrap();
 
-        // Reader→Writer A: deferred BEGIN, erst SELECT (Read-Snapshot), dann Write →
-        // Upgrade unter gehaltenem Writer ⇒ sofortiges SQLITE_BUSY (der busy_timeout
-        // greift beim Lock-Upgrade prinzipbedingt nicht, sqlx-sqlite options/mod.rs:181).
+        // Reader→Writer A: deferred BEGIN, SELECT, dann Write → Upgrade unter gehaltenem Writer ⇒
+        // sofortiges SQLITE_BUSY (der busy_timeout greift beim Lock-Upgrade nicht).
         let mut tx_a = pool.begin().await.unwrap();
         let _: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM organisation")
             .fetch_one(&mut *tx_a)
@@ -575,9 +547,9 @@ mod tests {
             .await
             .unwrap();
 
-        // einsatzart-Default ist 'realeinsatz'. angelegt_at hat den konstanten
-        // Migrations-Default '' (der Backfill betrifft nur Bestandszeilen; neue
-        // Zeilen bekommen den Wert erst in repo::anlegen, Task 4).
+        // einsatzart-Default ist 'realeinsatz'; angelegt_at hat den Migrations-Default '' (neue
+        // Zeilen
+        // bekommen den Wert erst in `repo::anlegen`).
         let id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung, begonnen_at) \
              VALUES (1, 'Lage', '2026-05-23 09:00:00') RETURNING id",
@@ -698,9 +670,9 @@ mod tests {
 
     #[tokio::test]
     async fn etb_client_id_migration_partieller_unique() {
-        // F03/LFH-261: client_id trägt die Offline-Idempotenz. Der UNIQUE-Index ist
-        // PARTIELL (WHERE client_id IS NOT NULL), damit die vielen NULL-Einträge
-        // (System-/abgeleitete Einträge, Online-Direkterfassung ohne Id) nicht kollidieren.
+        // client_id trägt die Offline-Idempotenz. Der UNIQUE-Index ist partiell (`WHERE client_id
+        // IS
+        // NOT NULL`), damit die vielen NULL-Einträge nicht kollidieren.
         let pool = test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(&pool)
@@ -760,8 +732,9 @@ mod tests {
 
     #[tokio::test]
     async fn betreuung_client_id_migration_partieller_unique() {
-        // LFH-675: Stand- und Belegungsmeldungen tragen denselben Idempotenzschlüssel wie ETB,
-        // Person und Meldung — je Meldereihe eindeutig pro Einsatz, NULL beliebig oft.
+        // Stand- und Belegungsmeldungen tragen denselben Idempotenzschlüssel — je Meldereihe
+        // eindeutig
+        // pro Einsatz, NULL beliebig oft.
         let pool = test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(&pool)
@@ -1012,8 +985,8 @@ mod tests {
     #[tokio::test]
     async fn fahrzeug_status_migration_constraints_und_seed() {
         let pool = test_pool().await;
-        // Org NACH der Migration anlegen → Migrations-Seed greift hier NICHT
-        // (das Seeding der neuen Org ist bootstrap_admins Aufgabe, separat getestet).
+        // Org nach der Migration angelegt → der Migrations-Seed greift nicht (neue Orgs seedet
+        // `bootstrap_admin`).
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(&pool)
             .await
@@ -1194,7 +1167,7 @@ mod tests {
     #[tokio::test]
     async fn einheit_typ_migration_constraints_und_nullable_soll() {
         let pool = test_pool().await;
-        // Org NACH der Migration → Migrations-Seed greift NICHT (bootstrap seedet neue Orgs).
+        // Org nach der Migration → der Migrations-Seed greift nicht.
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(&pool)
             .await
@@ -1365,9 +1338,8 @@ mod tests {
     #[tokio::test]
     async fn qualifikation_und_personal_status_schema_akzeptiert_einfuegungen() {
         let pool = test_pool().await;
-        // Org NACH den Migrationen anlegen → Seed greift NICHT (CROSS JOIN lief auf leerer
-        // Org-Menge). Wir prüfen daher den Seed über bootstrap in Task 9; hier nur, dass
-        // ein manuell geseedeter Eintrag einfügbar ist (Schema/CHECK korrekt).
+        // Org nach den Migrationen → der Seed greift nicht; geprüft wird nur, dass ein manuell
+        // geseedeter Eintrag einfügbar ist.
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(&pool)
             .await
@@ -1603,11 +1575,9 @@ mod tests {
         );
     }
 
-    // --- E-5 Schaden: Constraints ---
+    // --- Schaden: Constraints ---
 
-    /// Legt Org, Benutzer, Einsatz per rohem SQL an und gibt (benutzer_id, einsatz_id) zurück.
-    /// Spalten gemäß Migrationen 0002/0003: benutzer.org_id, system_rolle ∈ {admin,keiner};
-    /// einsatz.org_id NOT NULL, KEIN erstellt_von.
+    /// Legt Org, Benutzer, Einsatz per rohem SQL an und liefert (benutzer_id, einsatz_id).
     async fn schaden_setup(pool: &sqlx::SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT INTO organisation (name) VALUES ('O')")
             .execute(pool)
@@ -1711,7 +1681,7 @@ mod tests {
         );
     }
 
-    // --- E-5 Schaden: 4‑Wege-Geschädigt-Exklusivität (Migration 0033) ---
+    // --- Schaden: Geschädigt-Exklusivität (Migration 0033) ---
 
     /// Legt eine Einsatzkraft (einsatz_personal, Ad-hoc) an und liefert deren id.
     /// einsatz_id + snap_name sind NOT NULL; personal_id darf NULL sein (Ad-hoc extern).
@@ -1805,27 +1775,11 @@ mod tests {
         );
     }
 
-    // --- Migration 0062: uhs FK-Integrität nach Daten-Bereinigung ---
+    // --- Migration 0062: uhs-FK-Integrität nach Daten-Bereinigung ---
     //
-    // Was dieser Test absichert:
-    // Migration 0062 migriert Altdaten (typ='bereitstellungsraum' → 'sonstige'). Der
-    // Tabellen-Rebuild (CHECK-Nachzug) wurde zurückgestellt, weil sqlx-sqlite 0.8.6
-    // jede Migration in einer eigenen Transaktion ausführt und `migration.no_tx` für
-    // das SQLite-Backend ignoriert → `PRAGMA foreign_keys=OFF` innerhalb der Tx ist
-    // ein No-op → `DROP TABLE uhs` würde eingehende FKs (uhs_platz ON DELETE CASCADE,
-    // person_uhs_belegung NOT NULL) gefährden (stille Daten-Vernichtung oder Deploy-Blockade).
-    //
-    // Dieser Test verifiziert, dass nach allen Migrationen (test_pool() spielt die volle
-    // Kette bis zur neuesten Migration ein, inkl. des 0082-Rebuilds) die `uhs`-Tabelle mit
-    // ihren eingehenden FKs korrekt nutzbar ist: Einfügen
-    // von uhs + uhs_platz + person_uhs_belegung und Lesen aller drei Zeilen beweist, dass
-    // das Schema FK-konsistent ist.
-    //
-    // HINWEIS: Zum Zeitpunkt von 0062 erlaubte der DB-CHECK 'bereitstellungsraum' noch
-    // (Verbot nur in UhsTyp::parse() auf Applikationsebene); dieser Test prüft daher NUR
-    // die FK-Integrität, nicht die CHECK-Ablehnung. Der CHECK-Nachzug erfolgt in Migration
-    // 0082 (sqlx 0.9 honoriert `-- no-transaction`); dessen Regression steht in
-    // migration_0082_uhs_typ_check_ohne_bereitstellungsraum.
+    // Nach der vollen Migrationskette (inkl. des 0082-Rebuilds) ist `uhs` mit ihren eingehenden
+    // FKs nutzbar: uhs, uhs_platz und person_uhs_belegung lassen sich einfügen und lesen. Die
+    // CHECK-Ablehnung prüft `migration_0082_uhs_typ_check_ohne_bereitstellungsraum`.
     #[tokio::test]
     async fn migration_0062_uhs_fk_integritaet_nach_datenbereinigung() {
         let pool = test_pool().await;
@@ -1928,13 +1882,10 @@ mod tests {
         );
     }
 
-    // --- Migration 0082: uhs-typ-CHECK ohne 'bereitstellungsraum' (LFH-119 / LFH-174) ---
+    // --- Migration 0082: uhs-typ-CHECK ohne 'bereitstellungsraum' ---
     //
-    // Nachzug zu 0062: der FK-sichere no-tx-Rebuild (sqlx 0.9 honoriert `-- no-transaction`)
-    // zieht den DB-CHECK eng nach, sodass 'bereitstellungsraum' auch auf DB-Ebene abgelehnt
-    // wird (Defense-in-Depth zusätzlich zu UhsTyp::parse). Der Test verifiziert zugleich, dass
-    // der Rebuild die eingehenden FKs (uhs_platz, person_uhs_belegung), die Zusatzspalten
-    // (lat/lon aus 0034) und die beiden Indizes erhält.
+    // Der no-tx-Rebuild lehnt 'bereitstellungsraum' auch auf DB-Ebene ab und erhält die
+    // eingehenden FKs, lat/lon und beide Indizes.
     #[tokio::test]
     async fn migration_0082_uhs_typ_check_ohne_bereitstellungsraum() {
         let pool = test_pool().await;
@@ -1982,7 +1933,7 @@ mod tests {
             .unwrap_or_else(|e| panic!("gültiger typ '{typ}' muss akzeptiert werden: {e}"));
         }
 
-        // 2) Kern von LFH-119: Der CHECK lehnt 'bereitstellungsraum' jetzt auf DB-Ebene ab.
+        // 2) Der CHECK lehnt 'bereitstellungsraum' auf DB-Ebene ab.
         let bad = sqlx::query(
             "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
              VALUES (?, 'bereitstellungsraum', 'BR 1', ?, ?)",
@@ -2080,12 +2031,11 @@ mod tests {
         );
     }
 
-    // --- Migration 0119: lage_zone-Rebuild für den Zonentyp 'evakuierungsbezirk' (LFH-673) ---
+    // --- Migration 0119: lage_zone-Rebuild für den Zonentyp 'evakuierungsbezirk' ---
     //
-    // Der erste Rebuild von lage_zone. Geprüft an einer Zone, die VOR dem Rebuild existiert
-    // (auf der leeren test_pool()-DB ist die Tabelle bei 0119 leer, ein Kopierfehler bliebe
-    // dort unsichtbar): sie übersteht Umbau samt gefahrengebiet_id (0041) und ansicht_id (0095),
-    // die Indizes sind die alten plus der neue, kein FK hängt, und der neue Typ ist einfügbar.
+    // Geprüft an einer Zone, die VOR dem Rebuild existiert (auf der leeren Vorlage bliebe ein
+    // Kopierfehler unsichtbar): sie übersteht den Umbau samt gefahrengebiet_id und ansicht_id, die
+    // Indizes sind die alten plus der neue, kein FK hängt, und der neue Typ ist einfügbar.
     #[tokio::test]
     async fn migration_0119_lage_zone_rebuild_erhaelt_zeilen_und_indizes() {
         use sqlx::migrate::Migrator;
@@ -2250,17 +2200,13 @@ mod tests {
         assert!(unbekannt.is_err(), "der CHECK lehnt weiter Unbekanntes ab");
     }
 
-    // Deckt den Sicherheitsnetz-Zweig von 0082 ab (UPDATE 'bereitstellungsraum' → 'sonstige'
-    // VOR dem Copy). Auf der leeren test_pool()-DB ist uhs bei 0082 leer, der Zweig greift
-    // dort nie — würde man ihn entfernen, bliebe die Suite grün, während eine reale DB mit
-    // einer verbliebenen 'bereitstellungsraum'-Zeile beim `INSERT … SELECT` am neuen CHECK
-    // bräche (Deploy-Blockade). Hier bilden wir genau diese Alt-DB nach und wenden die ECHTE
-    // Migration (include_str!) an: fehlt das Sicherheitsnetz, wird dieser Test rot.
+    // Deckt den Sicherheitsnetz-Zweig von 0082 ab (UPDATE 'bereitstellungsraum' → 'sonstige' vor
+    // dem Copy). Auf der leeren Vorlage greift er nie; eine reale DB mit einer solchen Zeile bräche
+    // ohne ihn am neuen CHECK. Hier läuft die echte Migration (include_str!) gegen genau diese
+    // Alt-DB.
     #[tokio::test]
     async fn migration_0082_sicherheitsnetz_bereinigt_altzeile_vor_rebuild() {
-        // Isolierter Pool ohne FK-Zwang: die 0082-uhs_new-FKs zeigen auf einsatz/benutzer,
-        // die hier nicht existieren — der Rebuild läuft (PRAGMA foreign_keys=OFF), und nach
-        // der Migration triggern nur FK-freie SELECTs.
+        // Isolierter Pool ohne FK-Zwang: die FKs von 0082 zeigen auf hier fehlende Tabellen.
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect_with(
@@ -2271,8 +2217,8 @@ mod tests {
             .await
             .expect("In-Memory-Pool");
 
-        // uhs im ALTEN Stand: 0027-CHECK erlaubt noch 'bereitstellungsraum', + lat/lon (0034),
-        // ohne FK-Klauseln (für diesen Zweig irrelevant). Spaltenmenge = 0082-Copy-Liste.
+        // uhs im alten Stand (CHECK erlaubt noch 'bereitstellungsraum', + lat/lon), ohne
+        // FK-Klauseln.
         sqlx::query(
             "CREATE TABLE uhs ( \
                 id            INTEGER PRIMARY KEY AUTOINCREMENT, \
@@ -2309,7 +2255,7 @@ mod tests {
         .await
         .unwrap();
 
-        // Die ECHTE Migration 0082 anwenden (Multi-Statement inkl. PRAGMA-Toggle + Rebuild).
+        // Die echte Migration 0082 anwenden (Multi-Statement inkl. PRAGMA-Toggle und Rebuild).
         let migration =
             include_str!("../migrations/0082_uhs_typ_check_ohne_bereitstellungsraum.sql");
         sqlx::raw_sql(migration)
@@ -2379,15 +2325,10 @@ mod tests {
         }
     }
 
-    // --- Migration 0089: auftrag_empfaenger.* FK → ON DELETE SET NULL (LFH-237 / F08) ---
+    // --- Migration 0089: auftrag_empfaenger.* FK → ON DELETE SET NULL ---
     //
-    // Die vier Dispositions-FKs (abschnitt_id/einheit_id/person_id/fahrzeug_id) trugen bis 0057
-    // keine ON-DELETE-Aktion → das Hard-Delete einer referenzierten Dispositions-Entität scheiterte
-    // am FK und blockierte Kern-Workflows (Einheit auflösen, Person/Fahrzeug entfernen, Abschnitt
-    // auflösen). 0089 baut auftrag_empfaenger auf ON DELETE SET NULL um; snap_anzeige (NOT NULL)
-    // trägt die historische Anzeige weiter. Dieser Test verifiziert für alle vier Spalten: Löschen
-    // der Ziel-Entität gelingt, die Empfänger-Zeile überlebt, die FK-Spalte ist NULL, snap_anzeige
-    // bleibt, und der Auftrag-Bezug (auftrag_id) ist unberührt.
+    // Für alle vier Dispositions-FKs: das Löschen der Ziel-Entität gelingt, die Empfänger-Zeile
+    // überlebt mit NULL in der FK-Spalte, `snap_anzeige` und `auftrag_id` bleiben.
     #[tokio::test]
     async fn migration_0089_auftrag_empfaenger_fk_set_null_bei_dispo_delete() {
         let pool = test_pool().await;
@@ -2505,7 +2446,7 @@ mod tests {
         assert_eq!(verletzungen, 0, "kein dangling FK nach SET-NULL-Löschungen");
     }
 
-    /// Mappt die FK-Spalte auf den empfaenger_typ (für die snap_anzeige-Wiedererkennung im Test).
+    /// Mappt die FK-Spalte auf den empfaenger_typ.
     fn _typ_of(spalte: &str) -> &'static str {
         match spalte {
             "abschnitt_id" => "abschnitt",
@@ -2516,11 +2457,9 @@ mod tests {
         }
     }
 
-    // Deckt den Copy-Branch des 0089-Rebuilds ab (INSERT … SELECT der 13 Spalten). Auf der
-    // leeren test_pool()-DB ist auftrag_empfaenger bei 0089 leer, der Branch kopiert 0 Zeilen —
-    // ein falscher Spaltenname bliebe dort unbemerkt, während eine reale DID mit Bestandsdaten
-    // still Spalten verlöre. Hier bilden wir eine befüllte Alt-DB (0057-Form) nach und wenden
-    // die ECHTE Migration (include_str!) an: fehlt/verrutscht eine Spalte, wird der Test rot.
+    // Deckt den Copy-Branch des 0089-Rebuilds ab: auf der leeren Vorlage kopiert er 0 Zeilen, und
+    // ein falscher Spaltenname bliebe unbemerkt. Hier eine befüllte Alt-DB (0057-Form) mit der
+    // echten Migration (include_str!).
     #[tokio::test]
     async fn migration_0089_kopiert_bestandsdaten_vollstaendig() {
         // Isolierter Pool ohne FK-Zwang (die 0089-FKs zeigen auf hier fehlende Tabellen).
@@ -2534,7 +2473,7 @@ mod tests {
             .await
             .expect("In-Memory-Pool");
 
-        // auftrag_empfaenger im 0057-Stand (Live-Form vor 0089), ohne FK-Klauseln.
+        // auftrag_empfaenger im 0057-Stand, ohne FK-Klauseln.
         sqlx::query(
             "CREATE TABLE auftrag_empfaenger ( \
                 id INTEGER PRIMARY KEY, \
@@ -2548,10 +2487,9 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        // Vollständig belegte Bestandszeile — inkl. der VIER Dispositions-FKs (der Daseinsgrund
-        // von 0089). foreign_keys(false) erlaubt hier dangling FK-Werte; entscheidend ist, dass
-        // der INSERT…SELECT-Copy diese Spalten durchreicht (eine symmetrische Spalten-Auslassung
-        // aus beiden Migrations-Listen würde sie sonst still auf NULL defaulten).
+        // Vollständig belegte Bestandszeile inkl. der vier Dispositions-FKs; entscheidend ist, dass
+        // der
+        // Copy sie durchreicht (eine symmetrische Auslassung defaultete sie still auf NULL).
         sqlx::query(
             "INSERT INTO auftrag_empfaenger \
                 (id, auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, \
@@ -2562,7 +2500,7 @@ mod tests {
         .await
         .unwrap();
 
-        // Die ECHTE Migration 0089 anwenden.
+        // Die echte Migration 0089 anwenden.
         let migration =
             include_str!("../migrations/0089_auftrag_empfaenger_on_delete_set_null.sql");
         sqlx::raw_sql(migration)
@@ -2610,8 +2548,7 @@ mod tests {
             "die Nicht-Dispo-Spalten müssen den Rebuild verlustfrei überleben"
         );
 
-        // Die VIER Dispositions-FKs + funktion_text — der Daseinsgrund von 0089 — müssen
-        // ebenfalls durchgereicht werden (nicht still auf NULL defaulten).
+        // Die vier Dispositions-FKs und funktion_text müssen ebenfalls durchgereicht werden.
         let (ab, ei, pe, fz, fu): (
             Option<i64>,
             Option<i64>,
@@ -2652,12 +2589,10 @@ mod tests {
         assert_eq!(idx, 1, "Index muss nach dem Rebuild neu angelegt sein");
     }
 
-    // --- Migration 0090: UNIQUE(einsatz_id, lfd_nr) auf meldung + auftrag (LFH-259 / F34) ---
+    // --- Migration 0090: UNIQUE(einsatz_id, lfd_nr) auf meldung + auftrag ---
     //
-    // etb/person/tier/schaden trugen UNIQUE(einsatz_id, nr), meldung/auftrag nicht — die
-    // server-autoritative, lückenlose lfd_nr war dort nur code-seitig gesichert. Ein Bug in
-    // einem internen Schreibpfad könnte still doppelte Nummern persistieren; die Anzeige-Nummer
-    // ist aber das operative Referenzmittel im Sprechfunk. 0089 zieht den UNIQUE-Index nach.
+    // Die Anzeige-Nummer ist das Referenzmittel im Sprechfunk; der Index schützt sie gegen einen
+    // Bug in einem internen Schreibpfad.
     #[tokio::test]
     async fn migration_0090_meldung_lfd_nr_unique_je_einsatz() {
         let pool = test_pool().await;
@@ -2757,12 +2692,11 @@ mod tests {
             .expect("mehrere NULL-lfd_nr müssen erlaubt bleiben (Altbestand)");
     }
 
-    // --- Migration 0111: Lagedaten an einsatz_person (LFH-613) ---
+    // --- Migration 0111: Lagedaten an einsatz_person ---
     //
-    // test_pool() spielt 0111 auf einer LEEREN DB ein — der Backfill aus person_verbleib liefe
-    // dort über null Zeilen und ein falscher Tiebreak bliebe unsichtbar. Hier eine befüllte
-    // Alt-DB (einsatz_person im Minimalzuschnitt, person_verbleib aus der ECHTEN 0025) und die
-    // ECHTE 0111 per include_str!: zwei Ereignisse in derselben Sekunde entscheidet id DESC.
+    // Auf der leeren Vorlage liefe der Backfill über null Zeilen. Hier eine befüllte Alt-DB mit
+    // person_verbleib aus der echten 0025 und die echte 0111: zwei Ereignisse in derselben Sekunde
+    // entscheidet id DESC.
     #[tokio::test]
     async fn migration_0111_backfill_nimmt_juengstes_verbleib_ereignis() {
         let pool = SqlitePoolOptions::new()
@@ -2794,8 +2728,8 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        // Person 1: id 1 und 2 in derselben Sekunde (id 2 gewinnt), id 3 ist jünger angelegt,
-        // aber zeitlich älter — der Zeitpunkt ordnet vor der id.
+        // Person 1: id 1 und 2 in derselben Sekunde (id 2 gewinnt); id 3 ist jünger angelegt, aber
+        // zeitlich älter — der Zeitpunkt ordnet vor der id.
         sqlx::query(
             "INSERT INTO person_verbleib \
                 (id, einsatz_id, person_id, art, ziel, status, zeitpunkt_at, erfasst_von) VALUES \
@@ -2888,8 +2822,7 @@ mod tests {
         aus
     }
 
-    /// DDL ohne Tabellennamen und mit zusammengefasstem Leerraum — für den Vergleich
-    /// „nur der CHECK hat sich geändert".
+    /// DDL ohne Tabellennamen, Leerraum zusammengefasst — für „nur der CHECK hat sich geändert“.
     fn ddl_normalisiert(sql: &str) -> String {
         let ohne_kopf = sql
             .replacen("CREATE TABLE \"person_verbleib\"", "CREATE TABLE T", 1)
@@ -2898,8 +2831,8 @@ mod tests {
         ohne_kopf.split_whitespace().collect::<Vec<_>>().join(" ")
     }
 
-    /// Alt-DB im 0025-Stand mit FK-Zwang (Prod-Parität) und minimalen Eltern-Tabellen, damit
-    /// `foreign_key_check` echte Aussagen trifft statt an fehlenden Tabellen zu scheitern.
+    /// Alt-DB im 0025-Stand mit FK-Zwang und minimalen Eltern-Tabellen, damit
+    /// `foreign_key_check` echte Aussagen trifft.
     async fn alt_db_person_verbleib() -> SqlitePool {
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
@@ -2928,11 +2861,10 @@ mod tests {
         pool
     }
 
-    // --- Migration 0112: Leaf-Rebuild von person_verbleib mit 'notunterkunft' (LFH-613) ---
+    // --- Migration 0112: Leaf-Rebuild von person_verbleib mit 'notunterkunft' ---
     //
-    // Auf test_pool() wäre person_verbleib bei 0112 leer: ein vergessener Spaltenname im Copy
-    // oder eine verlorene Sequenz bliebe dort unsichtbar. Hier eine befüllte 0025-DB, deren
-    // höchste Zeile gelöscht ist (Sequenz > MAX(id)), und die ECHTE 0112 per include_str!.
+    // Eine befüllte 0025-DB, deren höchste Zeile gelöscht ist (Sequenz > MAX(id)), und die echte
+    // 0112: ein vergessener Spaltenname oder eine verlorene Sequenz fiele sonst nicht auf.
     #[tokio::test]
     async fn migration_0112_person_verbleib_rebuild_erhaelt_zeilen_sequenz_und_schema() {
         let pool = alt_db_person_verbleib().await;
@@ -3043,9 +2975,8 @@ mod tests {
         assert_eq!(fk_verletzungen, 0, "foreign_key_check ist leer");
     }
 
-    // Randfall der Sequenz-Übernahme: sind ALLE Zeilen gelöscht, kopiert der Rebuild nichts
-    // und die neue Tabelle hätte gar keinen sqlite_sequence-Eintrag — ohne die Übernahme
-    // begänne die Nummerierung wieder bei 1.
+    // Sind ALLE Zeilen gelöscht, kopiert der Rebuild nichts; ohne Übernahme der Sequenz begänne die
+    // Nummerierung wieder bei 1.
     #[tokio::test]
     async fn migration_0112_erhaelt_sequenz_auch_bei_leerer_tabelle() {
         let pool = alt_db_person_verbleib().await;
@@ -3078,10 +3009,9 @@ mod tests {
         assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
     }
 
-    /// LFH-617: 0115 übernimmt nur Bestandsnummern im EXAKTEN Muster `JJJJ-NNN` in die
-    /// Zahlenspalten. Läuft gegen die ECHTE Migration (include_str!) auf einem Minimal-Schema
-    /// des Vorstands — ein `2026-01` neben `2026-001` ergäbe sonst dasselbe Zahlenpaar und
-    /// spränge den neuen Unique-Index mitten in der Migration.
+    /// 0115 übernimmt nur Bestandsnummern im exakten Muster `JJJJ-NNN` in die Zahlenspalten. Gegen
+    /// die echte Migration auf einem Minimal-Schema: `2026-01` neben `2026-001` ergäbe sonst
+    /// dasselbe Zahlenpaar und spränge den Unique-Index mitten in der Migration.
     #[tokio::test]
     async fn migration_0115_uebernimmt_nur_exakte_bestandsnummern() {
         let pool = SqlitePoolOptions::new()
@@ -3152,11 +3082,10 @@ mod tests {
             .expect("mehrere NULL-Zahlenpaare bleiben erlaubt (Altbestand)");
     }
 
-    // --- Migration 0121: Verweis Verbleib → Betreuungsstelle (LFH-674) ---
+    // --- Migration 0121: Verweis Verbleib → Betreuungsstelle ---
     //
-    // Zwei ADD COLUMN mit FK; betreuungsstelle ist danach kein Leaf mehr. Gemessen wird auf
-    // der voll migrierten Vorlage: beide Spalten zeigen mit SET NULL auf die Stelle, der
-    // partielle Index existiert, und der FK-Check ist leer.
+    // Auf der voll migrierten Vorlage: beide Spalten zeigen mit SET NULL auf die Stelle, der
+    // partielle Index existiert, der FK-Check ist leer.
     #[tokio::test]
     async fn migration_0121_verbleib_verweist_auf_betreuungsstelle() {
         let pool = test_pool().await;

@@ -71,16 +71,12 @@ const bericht: LageberichtAnzeige = {
 };
 
 /**
- * FORTSCHREIBUNGSKETTE, additiv neben `bericht` angelegt (LFH-330 · B2, Bündel III):
- * `bericht` wird von `setupDetail` über `lagebericht7Abschnitte` weiterverwendet, ein Umbau
- * dort träfe die zehn Detailseiten-Tests dieser Datei mit.
+ * Fortschreibungskette, neben `bericht` angelegt (den `setupDetail` über `lagebericht7Abschnitte`
+ * weiterverwendet). Zwei Fassungen mit identischem Titel — die Fortschreibung legt eine neue Zeile
+ * mit `version + 1` an, der Vorgänger bleibt freigegeben liegen.
  *
- * Zwei Fassungen mit identischem Titel — die Fortschreibung legt eine neue Zeile mit
- * `version + 1` an, der Vorgänger bleibt freigegeben liegen.
- *
- * ABSICHTLICH AUFSTEIGEND, also GEGEN die Serverordnung (`zeitstand DESC, id DESC`): in
- * Serverordnung wäre jede Sortierbehauptung unfälschbar grün und `standardSortierung`
- * ungeprüft.
+ * Absichtlich aufsteigend, also gegen die Serverordnung (`zeitstand DESC, id DESC`): in
+ * Serverordnung wäre jede Sortierbehauptung unfälschbar grün.
  */
 const KETTE: LageberichtAnzeige[] = [
   {
@@ -142,17 +138,13 @@ function setupDetail(lb: LageberichtAnzeige) {
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get(`/api/einsaetze/7/lageberichte/${lb.id}`, () => HttpResponse.json(stand)),
     /*
-     * Erfolgreicher PATCH als Grundrauschen: mehrere dieser Tests tippen und verlassen ein
-     * Feld, was den Blur-Autosave auslöst. Ohne Handler scheitert der Request, und seit
-     * LFH-494 steht der Grund dann als sichtbares „Nicht gespeichert" in der Seite statt in
-     * einem Toast — Rauschen, das eine spätere Fehlersuche kostet. Wer einen FEHLSCHLAG
+     * Erfolgreicher PATCH als Grundrauschen: mehrere Tests verlassen ein Feld und lösen den
+     * Blur-Autosave aus. Ohne Handler stünde „Nicht gespeichert" in der Seite. Wer einen Fehlschlag
      * braucht, nimmt `setupLebend` bzw. einen eigenen Handler.
      *
-     * Der Handler SPIEGELT den Body und gibt nicht `lb` zurück — das ist gemessen nötig:
-     * nach erfolgreichem Autosave fällt der Merker, und der auf die Invalidierung folgende
-     * Refetch schreibt den Serverstand zurück ins Formular. Ein Handler, der den alten
-     * Stand liefert, modellierte einen Server, der nichts speichert, und löschte das eben
-     * Getippte wieder aus dem Feld (zwei Bestandstests dieser Datei wurden davon rot).
+     * Der Handler spiegelt den Body statt `lb` zurückzugeben: nach erfolgreichem Autosave fällt der
+     * Merker, und der folgende Refetch schreibt den Serverstand ins Formular. Ein Handler mit altem
+     * Stand modellierte einen Server, der nichts speichert, und löschte das Getippte wieder.
      */
     http.patch(`/api/einsaetze/7/lageberichte/${lb.id}`, async ({ request }) => {
       const body = (await request.json()) as Partial<LageberichtAnzeige>;
@@ -181,18 +173,17 @@ describe('LageberichtDetailPage', () => {
   it('Entwurf-Editor stellt die Abschnitts-Felder mit autoSize statt fixer Mini-Höhe dar', async () => {
     setupDetail(lagebericht7Abschnitte);
     const feld = (await screen.findByLabelText('Auftrag')) as HTMLTextAreaElement;
-    // autoSize lässt das Feld mit dem Inhalt mitwachsen (kein fixer rows={4}-Kasten)
-    // und schaltet den browser-nativen Resize-Griff ab — kein zufälliger Mini-Griff (AK#2).
-    // autoSize löst in rc-textarea eine Resize-Messung aus, die overflowY:hidden setzt
-    // (nach Flush der Effects via findBy); ein fixer rows-Kasten hat kein Inline-Style.
+    // autoSize lässt das Feld mit dem Inhalt wachsen und schaltet den nativen Resize-Griff ab.
+    // autoSize löst in rc-textarea eine Resize-Messung aus, die overflowY:hidden setzt; ein fixer
+    // rows-Kasten hat kein Inline-Style.
     expect(feld.style.overflowY).toBe('hidden');
     expect(feld).not.toHaveAttribute('rows', '4');
   });
 
   it('Freigeben speichert den getippten Inhalt zuvor — ein eben befüllter Entwurf wird nicht als „leer" abgelehnt', async () => {
-    // Backend-Semantik nachgebildet: POST /freigeben nimmt KEINEN Body und validiert
-    // den PERSISTIERTEN Stand. Wer tippt und direkt freigibt (ohne „Entwurf speichern"),
-    // bekam bisher „Der Bericht ist leer", obwohl Text im Feld steht.
+    // Backend-Semantik nachgebildet: POST /freigeben nimmt keinen Body und validiert den
+    // persistierten Stand. Wer tippt und direkt freigibt, darf nicht „Der Bericht ist leer"
+    // bekommen.
     let persistierte = lagebericht7Abschnitte.abschnitte.map((a) => ({ ...a }));
     let status = 'entwurf';
     server.use(
@@ -233,7 +224,7 @@ describe('LageberichtDetailPage', () => {
 
     const auftrag = await screen.findByLabelText('Auftrag');
     await userEvent.type(auftrag, 'Hochwasser steigt');
-    // Bewusst OHNE vorher „Entwurf speichern" zu klicken.
+    // Bewusst ohne vorher „Entwurf speichern" zu klicken.
     await userEvent.click(screen.getByRole('button', { name: /Freigeben/i }));
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: /Freigeben/i }));
@@ -282,9 +273,8 @@ describe('LageberichtDetailPage', () => {
     setupDetail(lagebericht7Abschnitte);
     const auftragFeld = await screen.findByLabelText('Auftrag');
     await userEvent.type(auftragFeld, '## Schwerpunkt\n- Punkt A');
-    // Vorgabe: KEINE Vorschau neben dem Text (H62 — der Split kostete die halbe
-    // Schreibbreite und war für 2108 px Scrollstrecke mitverantwortlich). Im Entwurf steht
-    // über dem Text nur der Seitentitel (`unterEbene` 1, LFH-621): `##` wird h3.
+    // Vorgabe: keine Vorschau neben dem Text (der Split kostete die halbe Schreibbreite). Im
+    // Entwurf steht über dem Text nur der Seitentitel (`unterEbene` 1): `##` wird h3.
     expect(screen.queryByRole('heading', { name: 'Schwerpunkt' })).toBeNull();
     // Der Umschalter ist eine Einstellung in eigener Zeile, keine Aktion in der Knopfreihe.
     await userEvent.click(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' }));
@@ -331,9 +321,8 @@ describe('LageberichtDetailPage', () => {
     await screen.findByLabelText('Auftrag');
     const koepfe = await screen.findAllByRole('tab');
     expect(koepfe).toHaveLength(8);
-    // Leer-Marke im Klartext (zweiter Kanal), befüllter Abschnitt ohne Marke. Exakter Name:
-    // seit antd 6.6 ist der Aufklapp-Pfeil `aria-hidden` und stellt dem Namen kein
-    // „expanded "/„collapsed " mehr voran (bis 6.5.2 schon, `Collapse.js`/`renderExpandIcon`).
+    // Leer-Marke im Klartext (zweiter Kanal), befüllter Abschnitt ohne Marke. Exakter Name: der
+    // Aufklapp-Pfeil ist in antd 6.6 `aria-hidden` und stellt dem Namen nichts voran.
     expect(screen.getByRole('tab', { name: /^Auftrag$/ })).toBeInTheDocument();
     expect(
       screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }),
@@ -343,8 +332,8 @@ describe('LageberichtDetailPage', () => {
     await userEvent.click(screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }));
     await userEvent.type(screen.getByLabelText('Anlass des Lagevortrags'), 'Pegel steigt');
     expect(screen.queryByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ })).toBeNull();
-    // Alle acht Editoren stehen im DOM — ein Speichern schickt keinen Abschnitt leer.
-    // `[id]`: rc-textarea hängt für `autoSize` ein neuntes, unbeschriftetes Messfeld ein.
+    // Alle acht Editoren stehen im DOM — ein Speichern schickt keinen Abschnitt leer. `[id]`:
+    // rc-textarea hängt für `autoSize` ein neuntes, unbeschriftetes Messfeld ein.
     expect(document.querySelectorAll('textarea[id]')).toHaveLength(8);
   });
 
@@ -364,7 +353,7 @@ describe('LageberichtDetailPage', () => {
       ],
     });
     // Markdown-Überschrift (`##` unter dem Abschnittskopf h3 → h5, `unterEbene` 3) muss als Heading
-    // gerendert sein, nicht als Rohtext "## Schwerpunkt"
+    // gerendert sein, nicht als Rohtext "## Schwerpunkt".
     expect(
       await screen.findByRole('heading', { name: 'Schwerpunkt', level: 5 }),
     ).toBeInTheDocument();
@@ -379,11 +368,8 @@ describe('LageberichtDetailPage', () => {
 });
 
 /**
- * Detailseite mit nachschiebbarem Serverstand: der Handler liest aus einer Variablen.
- *
- * Auf MODULEBENE, weil drei Describe-Blöcke davon leben (Verlustschutz H63, Speicherfehler
- * LFH-494, Einstiegsfokus LFH-495) — eine Kopie je Block wäre drei Fixtures für denselben
- * Aufbau, und die erste Abweichung fiele niemandem auf.
+ * Detailseite mit nachschiebbarem Serverstand: der Handler liest aus einer Variablen. Auf
+ * Modulebene, weil drei Describe-Blöcke davon leben.
  */
 function setupLebend(start: LageberichtAnzeige) {
   let stand = start;
@@ -418,13 +404,10 @@ function setupLebend(start: LageberichtAnzeige) {
 }
 
 /**
- * Verlustschutz am Lageberichtsentwurf (LFH-348 · C13, Befund H63).
- *
- * Der reale Fremdschreib-Pfad: dieser Bericht ändert sich serverseitig (zweiter Tab, anderes
- * Stabsmitglied) → `LiveEvent::Lagebericht` → Invalidierung → neue Objektidentität → der
- * Sync-Effekt schrieb den Serverstand kommentarlos über ungespeicherte Eingaben. Ein
- * Refetch mit UNVERÄNDERTEM Stand tut das nicht (Structural Sharing) — deshalb schiebt jeder
- * Test hier einen geänderten Stand nach, nicht bloß eine Invalidierung.
+ * Verlustschutz am Lageberichtsentwurf (LFH-348). Der reale Fremdschreib-Pfad: der Bericht ändert
+ * sich serverseitig → `LiveEvent::Lagebericht` → Invalidierung → neue Objektidentität. Ein Refetch
+ * mit unverändertem Stand ändert dank Structural Sharing nichts — deshalb schiebt jeder Test einen
+ * geänderten Stand nach, nicht bloß eine Invalidierung.
  */
 describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)', () => {
   it('überschreibt getippten Text NICHT, wenn der Bericht serverseitig geändert wurde', async () => {
@@ -436,9 +419,9 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
       titel: 'Fremde Fassung',
       aktualisiert_at: '2026-06-02 12:00:00',
     });
-    // ZUERST warten, bis der neue Stand nachweislich ANGEKOMMEN ist: die Überschrift kommt
-    // aus der Query, nicht aus dem Formular — der unabhängige Zeuge. Ohne ihn bestünde die
-    // Zusicherung darunter beim ersten Versuch auch ohne jeden Riegel (C7, gemessen).
+    // Zuerst warten, bis der neue Stand angekommen ist: die Überschrift kommt aus der Query, nicht
+    // aus dem Formular — der unabhängige Zeuge. Ohne ihn bestünde die Zusicherung darunter auch
+    // ohne Riegel.
     await screen.findByRole('heading', { name: 'Fremde Fassung' });
     expect(screen.getByLabelText('Auftrag')).toHaveValue('Meine Fassung');
   });
@@ -498,8 +481,8 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
     await userEvent.type(await screen.findByLabelText('Auftrag'), 'offen');
     await userEvent.click(screen.getByRole('button', { name: 'weiter' }));
     await screen.findByRole('heading', { name: 'Zweiter Bericht' });
-    // Dieselbe Komponente, andere ID: ohne Remount hielte der Riegel des alten Berichts
-    // den neuen Serverstand fern, und das Feld zeigte „offen" statt „Text 13".
+    // Dieselbe Komponente, andere ID: ohne Remount hielte der Riegel des alten Berichts den neuen
+    // Serverstand fern.
     expect(await screen.findByLabelText('Auftrag')).toHaveValue('Text 13');
   });
 
@@ -531,7 +514,7 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
   it('macht den Zeitstand im Entwurf editierbar und schickt ihn als UTC-Wirestring (N23)', async () => {
     const { patches } = setupLebend(lagebericht7Abschnitte);
     const feld = await screen.findByLabelText('Zeitstand');
-    // Der Wert kommt über den Sync-Effekt NACH dem ersten Render — deshalb `waitFor`.
+    // Der Wert kommt über den Sync-Effekt nach dem ersten Render — deshalb `waitFor`.
     await waitFor(() =>
       expect(feld).toHaveValue(alsOrtszeit('2026-06-02 10:00:00')!.format('DD.MM.YYYY HH:mm')),
     );
@@ -542,32 +525,27 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
 });
 
 /**
- * ── SPEICHERFEHLER IN DER SEITE (LFH-494, Nachzug C13/N2) ──────────────────────
+ * ── Speicherfehler in der Seite (LFH-494) ──
  *
- * Fortschreibung von C10/H14 auf die Entwurfsseiten. Der Grund eines gescheiterten
- * Autosave stand ausschliesslich in einem `message.error` und war nach rund drei Sekunden
- * weg; sichtbar blieb „ungespeicherte Änderungen" — das WAS ohne das WARUM.
+ * Der Grund eines gescheiterten Autosave steht in der Seite, nicht nur im Toast; sonst bliebe
+ * „ungespeicherte Änderungen" — das Was ohne das Warum.
  *
- * Beide Aussagen gehören als Paar hierher, und die zweite ist die schärfere: ein Alert, der
- * NIE geht, ist so falsch wie einer, der zu früh geht. `.ant-message`-Abgrenzung wie in den
- * C10-Tests — antds Toast rendert INNERHALB des RTL-Containers, ein blosses `findByText`
- * bliebe mit zurückgedrehtem Umbau grün.
+ * Beide Aussagen als Paar: ein Alert, der nie geht, ist so falsch wie einer, der zu früh geht.
+ * `.ant-message`-Abgrenzung, weil antds Toast innerhalb des RTL-Containers rendert.
  *
- * Ausgelöst wird über `onBlur`, nicht über die 30-s-Frist: die Frist steht im Hook-Test
+ * Ausgelöst über `onBlur`, nicht über die 30-s-Frist: die Frist steht im Hook-Test
  * (`entwurf/useEntwurfVerlustschutz.test.tsx`), und Fake-Timer vertragen sich nicht mit
  * `userEvent.type`.
  */
 /**
- * ── EINSTIEGSFOKUS (LFH-495, Nachzug C13/N3) ───────────────────────────────────
+ * ── Einstiegsfokus (LFH-495) ──
  *
- * Beide Entwurfsseiten hatten keinen; die Bedienentscheidung ist der ERSTE LEERE Abschnitt
- * (Begründung in `entwurf/Einstiegsfokus.tsx`). Die Mechanik des Fokussierens steht in
- * `entwurf/Einstiegsfokus.test.tsx`; hier steht, was die SEITE daraus macht — der offene
- * Abschnitt des Akkordeons folgt derselben Wahl, sonst stünde der Cursor in einem
- * zugeklappten Editor.
+ * Die Bedienentscheidung ist der erste leere Abschnitt (Begründung in `entwurf/Einstiegsfokus.tsx`,
+ * Mechanik in dessen Test). Hier steht, was die Seite daraus macht: der offene Abschnitt des
+ * Akkordeons folgt derselben Wahl, sonst stünde der Cursor in einem zugeklappten Editor.
  */
 describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
-  /** Die ersten zwei Abschnitte befüllt: der Einstieg ist damit der DRITTE. */
+  /** Die ersten zwei Abschnitte befüllt: der Einstieg ist damit der dritte. */
   const teilweiseBefuellt: LageberichtAnzeige = {
     ...lagebericht7Abschnitte,
     abschnitte: lagebericht7Abschnitte.abschnitte.map((a, i) => ({
@@ -597,9 +575,8 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
   });
 
   it('lässt den offenen Abschnitt beim Befüllen NICHT weiterwandern', async () => {
-    // Die scharfe Aussage: der Einstieg wird EINMAL je Bericht bestimmt. Wäre er eine
-    // lebende Ableitung, klappte das Akkordeon beim ersten Autosave auf „Lageentwicklung"
-    // weiter — unter dem Cursor der Person, die gerade schreibt.
+    // Der Einstieg wird einmal je Bericht bestimmt. Als lebende Ableitung klappte das Akkordeon
+    // beim ersten Autosave weiter — unter dem Cursor der Person, die gerade schreibt.
     const { fremdeAenderung, patches } = setupLebend(teilweiseBefuellt);
     const feld = await screen.findByLabelText('Eigene Lage');
     await userEvent.type(feld, 'jetzt befüllt');
@@ -615,9 +592,8 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
   });
 
   it('setzt offenen Abschnitt und Vorschau-Schalter beim Wechsel auf einen anderen Bericht zurück', async () => {
-    // Die dritte Hook-Zusicherung aus dem Ticket: `key={lbId}` ist der Reset. Beide
-    // Zustände gehören zu EINEM Bericht — ein mitgeschleppter offener Abschnitt zeigte am
-    // nächsten Bericht einen Abschnitt, den niemand gewählt hat.
+    // `key={lbId}` ist der Reset: beide Zustände gehören zu einem Bericht — ein mitgeschleppter
+    // offener Abschnitt zeigte am nächsten Bericht einen, den niemand gewählt hat.
     const zweiter: LageberichtAnzeige = {
       ...lagebericht7Abschnitte,
       id: 13,
@@ -718,10 +694,9 @@ describe('LageberichtDetailPage — Speicherfehler in der Seite (LFH-494)', () =
 
 describe('LageberichtePage', () => {
   it('zeigt den Grund eines gescheiterten Anlegens im Dialog, nicht nur im Toast (LFH-494)', async () => {
-    // Die Erfassungs-Hülle lässt die Werte bei Ablehnung stehen (B4/LFH-332) — bis dahin
-    // aber ohne Grund: der Dialog sah nach dem Verschwinden des Toasts unverändert aus.
-    // Dieser Pfad läuft weiter über `mutation.error` und räumt beim nächsten Absenden;
-    // anders als beim Autosave drückt hier ein Mensch den Knopf, es gibt keinen Auto-Retry.
+    // Die Erfassungs-Hülle lässt die Werte bei Ablehnung stehen, und der Grund steht dabei. Dieser
+    // Pfad läuft über `mutation.error` und räumt beim nächsten Absenden; anders als beim Autosave
+    // drückt hier ein Mensch den Knopf, es gibt keinen Auto-Retry.
     server.use(
       http.post('/api/einsaetze/7/lageberichte', () =>
         HttpResponse.json({ error: 'Titel bereits vergeben' }, { status: 409 }),
@@ -743,15 +718,13 @@ describe('LageberichtePage', () => {
 
   it('ersetzt den Grund beim nächsten Absenden, statt ihn zu stapeln (Gegenaussage)', async () => {
     /*
-     * Die zutreffende Hälfte des AK für DIESEN Pfad: hier räumt react-query beim Übergang
-     * nach `pending`, weil ein Mensch den Knopf drückt. Der Autosave der Entwurfsseiten
-     * räumt dagegen erst bei Erfolg — dort wiederholt eine Frist von selbst.
+     * Hier räumt react-query beim Übergang nach `pending`, weil ein Mensch den Knopf drückt; der
+     * Autosave räumt dagegen erst bei Erfolg.
      *
-     * Gemessen wird mit einem ZWEITEN Fehlschlag und anderem Wortlaut, nicht mit einem
-     * Erfolg: antds Modal räumt sein DOM erst nach der Schliess-Transition (`afterClose`),
-     * und die läuft in jsdom nie — der alte Knoten stünde nach dem Schliessen weiterhin im
-     * Dokument, und die Abwesenheits-Zusicherung wäre unfälschbar rot. Mit offenem Dialog
-     * misst der Fall genau das, was er behauptet: der Grund wird ERSETZT.
+     * Gemessen mit einem zweiten Fehlschlag und anderem Wortlaut, nicht mit einem Erfolg: antds
+     * Modal räumt sein DOM erst nach der Schließ-Transition, die in jsdom nie läuft — die
+     * Abwesenheits-Zusicherung wäre unfälschbar rot. Mit offenem Dialog misst der Fall genau, dass
+     * der Grund ersetzt wird.
      */
     let zweiter = false;
     server.use(
@@ -775,8 +748,8 @@ describe('LageberichtePage', () => {
   });
 
   it('trägt beim erneuten Öffnen keinen Grund aus dem vorigen Versuch', async () => {
-    // Derselbe Store-überlebt-das-Schliessen-Fall wie beim Titelvorschlag: ohne `reset()`
-    // stünde der Fehler des letzten Anlegeversuchs über einem frischen, leeren Formular.
+    // Der Store überlebt das Schließen: ohne `reset()` stünde der Fehler des letzten Anlegeversuchs
+    // über einem frischen, leeren Formular.
     server.use(
       http.post('/api/einsaetze/7/lageberichte', () =>
         HttpResponse.json({ error: 'Titel bereits vergeben' }, { status: 409 }),
@@ -810,9 +783,8 @@ describe('LageberichtePage', () => {
   });
 
   it('zeigt leeren Zustand ohne eigenen Leer-Knoten', async () => {
-    // WÄCHTER, kein Treiber: auch mit der alten Tabelle grün. Der Riss entsteht erst,
-    // wenn `leerText` WEGGELASSEN wird — dann greift der Fallback in `Liste.tsx` und
-    // rendert einen `.ant-empty`-Knoten (LFH-331/B3 verlangt null solcher Knoten).
+    // Wächter: der Riss entsteht, wenn `leerText` weggelassen wird — dann rendert der Fallback in
+    // `Liste.tsx` einen `.ant-empty`-Knoten.
     const { container } = setup([]);
     await screen.findByText(/Noch keine Lageberichte/i);
     expect(container.querySelector('.ant-empty')).toBeNull();
@@ -836,8 +808,8 @@ describe('LageberichtePage', () => {
     // Die Vorlage steht je KETTE einmal, nicht je Fassung.
     expect(screen.getAllByText('Freier Bericht')).toHaveLength(1);
 
-    // Gruppenköpfe mit Zähler über KÖPFE, Entwürfe zuerst (`gruppen.reihenfolge`).
-    // Trennzeichen und Zählerform gehören dem Primitiv → `[·(]` auf der Region.
+    // Gruppenköpfe mit Zähler über Köpfe, Entwürfe zuerst (`gruppen.reihenfolge`). Trennzeichen und
+    // Zählerform gehören dem Primitiv → `[·(]` auf der Region.
     expect(sicht).toHaveTextContent(/Entwürfe\s*[·(]\s*1/);
     expect(sicht).toHaveTextContent(/Freigegeben\s*[·(]\s*1/);
     const text = sicht.textContent ?? '';
@@ -861,20 +833,20 @@ describe('LageberichtePage', () => {
     const titel = await screen.findByLabelText('Titel');
     await waitFor(() => expect(titel).toHaveFocus());
     expect((titel as HTMLInputElement).value).toMatch(/^Lageüberblick \d{4}$/);
-    // Erfassungs-Norm B4: der Absende-Knopf liegt IM Formular — Enter sendet; und kein
-    // antd-Footer, in dem ein Knopf ausserhalb des `<form>` stünde.
+    // Der Absende-Knopf liegt im Formular — Enter sendet; kein antd-Footer, in dem ein Knopf
+    // außerhalb des `<form>` stünde.
     const knopf = screen.getByRole('button', { name: 'Anlegen' });
     expect(knopf.closest('form')).not.toBeNull();
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
-    // Drittes, optionales Feld: der Zeitstand (Backend konnte es schon, die UI bot es nie an).
+    // Drittes, optionales Feld: der Zeitstand.
     expect(screen.getByLabelText('Zeitstand')).toBeInTheDocument();
   });
 
   it('trägt beim zweiten Öffnen einen frischen Titelvorschlag, nicht den Speicher des ersten', async () => {
-    // Der Speicher von rc-field-form überlebt `destroyOnHidden` und gewinnt gegen
-    // `initialValues` (gemessen, Review LFH-348). Wer den Vorschlag über `initialValues`
-    // setzt, sieht beim zweiten Öffnen den Stand des ersten — hier durch einen eigenen
-    // Wortlaut sichtbar gemacht, weil zwei Uhrzeiten im selben Test gleich sein können.
+    // Der Speicher von rc-field-form überlebt `destroyOnHidden` und gewinnt gegen `initialValues`.
+    // Wer den Vorschlag über `initialValues` setzt, sieht beim zweiten Öffnen den Stand des ersten
+    // — hier durch eigenen Wortlaut sichtbar gemacht, weil zwei Uhrzeiten im selben Test gleich
+    // sein können.
     setup();
     await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
     const erstes = await screen.findByLabelText('Titel');
@@ -922,8 +894,8 @@ describe('LageberichtePage', () => {
     setup(KETTE);
     await screen.findAllByRole('link', { name: 'Lage 10:00' });
 
-    // „zur Information" steht NUR im Vorlagen-Label, in keinem Titel — ein nur auf den
-    // Titel gelegter `suchText` wäre hier rot.
+    // „zur Information" steht nur im Vorlagen-Label, in keinem Titel — ein nur auf den Titel
+    // gelegter `suchText` wäre hier rot.
     await userEvent.type(screen.getByPlaceholderText('Titel oder Vorlage'), 'zur Information');
 
     expect(screen.queryAllByRole('link', { name: 'Lage 10:00' })).toHaveLength(0);
@@ -932,8 +904,8 @@ describe('LageberichtePage', () => {
 
   it('trägt Überschrift und Kennzahlenzeile', async () => {
     setup(KETTE);
-    // Seitenkopf des Neuentwurfs (`EinsatzSeite`): der Titel ist die h4 der Kopfleiste,
-    // die Mengen stehen als Mono-Meta daneben — kein eigener Titelblock mehr.
+    // Seitenkopf (`EinsatzSeite`): der Titel ist die Überschrift der Kopfleiste, die Mengen stehen
+    // als Mono-Meta daneben.
     expect(
       await screen.findByRole('heading', { name: 'Lageberichte', level: 1 }),
     ).toBeInTheDocument();
@@ -942,19 +914,15 @@ describe('LageberichtePage', () => {
 });
 
 /**
- * ── ZEITSTAND DER FASSUNGSZEILE (LFH-350 · H60) ─────────────────────────────────
+ * ── Zeitstand der Fassungszeile (LFH-350) ──
  *
- * Die Spalte „Fassung" gab `zeitstand` bis dahin roh aus — ein UTC-Wirestring ohne
- * Zonenkennung, also um den Zonenversatz falsch. `sortWert` bleibt bewusst der Wirestring
- * (lexikografisch korrekt sortierbar), nur die ANZEIGE läuft über `ZeitAnzeige`.
+ * Die Anzeige läuft über `ZeitAnzeige`; `sortWert` bleibt der Wirestring (lexikografisch
+ * sortierbar).
  *
- * Die Zone wird AUSDRÜCKLICH gestellt und der Cache dafür VORBELEGT — beides ist gemessen
- * nötig: (1) ohne Provider fällt `useAnzeigeKonventionen` auf `DEFAULT_KONVENTIONEN` und
- * damit auf die LOKALE Zone der ausführenden Maschine zurück; (2) nur den Provider
- * einzuhängen genügt nicht, weil die Einstellungs-Abfrage ERST NACH dem ersten Render
- * auflöst — die Behauptung hat dann längst getroffen, und auf einem Berliner Rechner wäre
- * der Test auch mit `zeitzone: 'UTC'` grün geblieben (Gegenprobe gefahren). `setQueryData`
- * stellt die Zone vor dem ersten Render; der MSW-Handler bedient nur den Refetch.
+ * Die Zone wird ausdrücklich gestellt und der Cache vorbelegt: ohne Provider fiele
+ * `useAnzeigeKonventionen` auf die lokale Zone zurück, und nur den Provider einzuhängen genügt
+ * nicht, weil die Einstellungs-Abfrage erst nach dem ersten Render auflöst. `setQueryData` stellt
+ * die Zone vor dem ersten Render; der MSW-Handler bedient nur den Refetch.
  */
 function setupMitZone(berichte: LageberichtAnzeige[]) {
   server.use(
@@ -965,9 +933,8 @@ function setupMitZone(berichte: LageberichtAnzeige[]) {
       HttpResponse.json({ einsatz_id: 7, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } }),
     ),
   );
-  // Bewusst NICHT `neuerQueryClient()`: dessen `gcTime: 0` räumt einen per `setQueryData`
-  // gesetzten, noch unbeobachteten Eintrag beim ersten `await` weg (CLAUDE.md,
-  // Query-Key-Registry). Hier hinge die Zone dann still wieder am MSW-Refetch.
+  // Bewusst nicht `neuerQueryClient()`: dessen `gcTime: 0` räumt einen per `setQueryData`
+  // gesetzten, unbeobachteten Eintrag beim ersten `await` weg.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(einsatzKeys.einstellungen(7), {
     einsatz_id: 7,

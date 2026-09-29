@@ -158,10 +158,9 @@ async fn fahrzeug_voll(app: &axum::Router, admin: &str, funkrufname: &str) -> i6
     json["id"].as_i64().unwrap()
 }
 
-/// **Der schärfste Test der Route.** `sondersignal` liegt auf einer NOT-NULL-Spalte und trug
-/// im alten Vollersatz-Body ein `#[serde(default)] bool` — jeder PATCH ohne das Feld setzte
-/// die Spalte still auf `false` (das Blaulicht verschwand beim Ändern der Bemerkung).
-/// Fällt gegen HEAD hart durch.
+/// **Der schärfste Test der Route.** `sondersignal` liegt auf einer NOT-NULL-Spalte; ein
+/// Vollersatz-Body mit `#[serde(default)] bool` setzte die Spalte bei jedem PATCH ohne das
+/// Feld still auf `false` (das Blaulicht verschwand beim Ändern der Bemerkung).
 #[tokio::test]
 async fn patch_ohne_sondersignal_behaelt_true() {
     let app = setup().await;
@@ -207,8 +206,7 @@ async fn patch_sondersignal_false_setzt_auf_false() {
 
 /// **Der breiteste unterscheidende Test** — zugleich der Bind-Reihenfolge-Test über HTTP:
 /// alle 13 Felder distinkt setzen, EINES patchen, die anderen zwölf EINZELN prüfen.
-/// Unter dem alten Vollersatz-Verhalten wurde jedes fehlende Feld zu `None` und nullte
-/// seine Spalte.
+/// Ein Vollersatz machte jedes fehlende Feld zu `None` und nullte seine Spalte.
 #[tokio::test]
 async fn patch_nur_bemerkung_laesst_zehn_nachbarfelder_stehen() {
     let app = setup().await;
@@ -260,9 +258,9 @@ async fn patch_kennzeichen_null_loescht() {
     assert_eq!(json["opta"], "OPTA-1", "Nachbarfeld unberührt");
 }
 
-/// Effektivzustands-Prüfung (Abschnitt 4 des Musters): EIN Stärke-Feld zu patchen ist
-/// zulässig, weil der Bestand die anderen zwei trägt — ein naiver Teil-Patch sähe zwei
-/// `None` und lehnte mit „Stärke muss vollständig … sein" ab.
+/// Effektivzustands-Prüfung: EIN Stärke-Feld zu patchen ist zulässig, weil der Bestand die
+/// anderen zwei trägt — ein naiver Teil-Patch sähe zwei `None` und lehnte mit „Stärke muss
+/// vollständig … sein" ab.
 #[tokio::test]
 async fn patch_ein_staerke_feld_ist_ok_und_laesst_die_anderen_stehen() {
     let app = setup().await;

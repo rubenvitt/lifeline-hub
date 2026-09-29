@@ -33,14 +33,9 @@ function dialog(over: Partial<GefahrenZelleDetailsProps> = {}) {
 }
 
 /**
- * Der Dialog wird hier DIREKT geprüft, nicht über die Matrix — und das ist kein
- * Bequemlichkeitsschnitt.
- *
- * Über die Matrix ist der Zellwechsel nur mit Schliessen dazwischen erreichbar; dabei
- * springt `offen` um, und das allein löst den Vorbeleg-Effekt schon aus. Gemessen: nimmt
- * man `kennung` aus dessen Abhängigkeiten, bleibt die volle Matrix-Suite grün. Eine
- * Abhängigkeit, die kein Fall unterscheiden kann, ist eine Behauptung — hier bekommt sie
- * einen Beleg an der Vertragsgrenze der Komponente selbst: gleiche Öffnung, andere Zelle.
+ * Direkt geprüft, nicht über die Matrix: dort ist ein Zellwechsel nur mit Schließen dazwischen
+ * erreichbar, und schon `offen` löst den Vorbeleg-Effekt aus. Hier: gleiche Öffnung, andere Zelle —
+ * der Beleg, dass `kennung` in den Abhängigkeiten steht.
  */
 describe('GefahrenZelleDetails', () => {
   it('belegt neu, wenn die Kennung wechselt, ohne dass der Dialog schliesst', async () => {
@@ -66,10 +61,8 @@ describe('GefahrenZelleDetails', () => {
   });
 
   /**
-   * Die Gegenprobe zum Fall darüber: DIESELBE Kennung mit frisch geladenem Inhalt darf
-   * das Formular nicht anfassen. Ohne diesen Fall wäre „hängt an der Kennung" von
-   * „hängt an den Daten" nicht zu unterscheiden — und Letzteres ist genau der Fehler,
-   * gegen den die Ref gebaut ist.
+   * Gegenprobe: dieselbe Kennung mit frisch geladenem Inhalt lässt das Formular in Ruhe — sonst
+   * wäre „hängt an der Kennung" von „hängt an den Daten" nicht zu unterscheiden.
    */
   it('belegt NICHT neu, wenn nur der Inhalt derselben Zelle nachlädt', () => {
     const { rerender } = renderMitProviders(

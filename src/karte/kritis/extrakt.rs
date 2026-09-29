@@ -1,20 +1,18 @@
 //! Liest die KRITIS-Objekte aus einer `.osm.pbf`-Datei.
 //!
-//! OSM speichert Koordinaten nur an Nodes. Damit auch Flächenobjekte (ein Klinikgelände als
-//! Way, eine Schule als Multipolygon-Relation) einen Punkt bekommen, läuft der Leser in bis
-//! zu drei Durchläufen über die Datei:
+//! OSM speichert Koordinaten nur an Nodes. Damit auch Flächenobjekte (Way, Multipolygon-Relation)
+//! einen Punkt bekommen, läuft der Leser in bis zu drei Durchläufen:
 //!
-//! 1. getaggte Nodes → direkt ein Objekt; getaggte Ways → Node-Referenzen merken; getaggte
-//!    Relations → Member merken (Ways und Nodes).
+//! 1. getaggte Nodes → Objekt; getaggte Ways → Node-Referenzen merken; getaggte Relations →
+//!    Member merken.
 //! 2. nur falls Relations Ways referenzieren: deren Node-Referenzen merken.
 //! 3. Koordinaten aller gemerkten Node-IDs einsammeln.
 //!
-//! Punkt eines Ways/einer Relation ist die **Mitte der Bounding-Box** seiner Nodes — das,
-//! was Overpass mit `out center` lieferte. Die Punkte liegen damit dort, wo sie vor LFH-83
-//! lagen. Verschachtelte Relations (Relation als Member) werden nicht aufgelöst.
+//! Punkt eines Ways/einer Relation ist die **Mitte der Bounding-Box** seiner Nodes (wie
+//! Overpass `out center`). Verschachtelte Relations werden nicht aufgelöst.
 //!
-//! Synchron und CPU-lastig: der Aufrufer läuft in `spawn_blocking`. Die Durchläufe selbst
-//! verteilen sich über `par_map_reduce` auf alle Kerne.
+//! Synchron und CPU-lastig: der Aufrufer läuft in `spawn_blocking`; die Durchläufe verteilen
+//! sich über `par_map_reduce`.
 
 use crate::karte::normalisierung::{ist_kritis_tag, kritis_properties};
 use osmpbf::{Element, ElementReader, RelMemberType};
@@ -59,8 +57,8 @@ impl Durchlauf1 {
     }
 }
 
-/// Properties aus einem Tag-Iterator — `None`, wenn kein KRITIS-Tag dabei ist. Der billige
-/// Vorfilter läuft zuerst, damit für die übergroße Mehrheit der Objekte keine Map entsteht.
+/// Properties aus einem Tag-Iterator, `None` ohne KRITIS-Tag. Der billige Vorfilter läuft
+/// zuerst, damit für die große Mehrheit der Objekte keine Map entsteht.
 fn properties_aus<'a>(tags: impl Iterator<Item = (&'a str, &'a str)> + Clone) -> Option<Value> {
     if !tags.clone().any(|(k, v)| ist_kritis_tag(k, v)) {
         return None;
@@ -204,8 +202,7 @@ pub fn lies_extrakt(pfad: &Path) -> Result<Vec<KritisObjekt>, osmpbf::Error> {
                 });
             }
         }
-        // Ohne eine einzige auflösbare Koordinate (Extrakt-Rand, kaputte Referenz) gibt es
-        // keinen Punkt — lieber weglassen als bei 0/0 im Golf von Guinea zeichnen.
+        // Ohne auflösbare Koordinate gibt es keinen Punkt — lieber weglassen als bei 0/0 zeichnen.
         if let Some((w, s, e, n)) = bbox {
             fertig.push(punkt(
                 o.osm_typ,
@@ -253,8 +250,8 @@ mod tests {
         assert_eq!(k.properties["notaufnahme"], "ja");
     }
 
-    /// Way-Punkt = Mitte der Bounding-Box (wie Overpass `out center`), nicht Mittel der Nodes
-    /// — der geschlossene Ring wiederholt den ersten Node, ein Mittelwert läge daneben.
+    /// Way-Punkt = Mitte der Bounding-Box, nicht Mittel der Nodes — der geschlossene Ring
+    /// wiederholt den ersten Node.
     #[test]
     fn way_punkt_ist_bbox_mitte() {
         let o = fixture();
@@ -277,8 +274,7 @@ mod tests {
     fn fehlende_datei_ist_fehler() {
         assert!(lies_extrakt(Path::new("/gibt/es/nicht.osm.pbf")).is_err());
     }
-    /// Messung gegen einen echten Extrakt (LFH-83, Aufgabe 6.2) — nicht Teil der Suite.
-    /// Aufruf (Release, Spitzen-RSS über `time -l`):
+    /// Messung gegen einen echten Extrakt, nicht Teil der Suite. Aufruf:
     /// `KRITIS_PBF=/pfad/germany-latest.osm.pbf cargo test --release --lib
     ///  kritis::extrakt::tests::messung_echter_extrakt -- --ignored --nocapture`
     #[tokio::test]

@@ -9,26 +9,22 @@ export interface ZoneStil {
   lineWidth: number;
 }
 
-/** Voreingestellter Stil je typisierter Zone (eine Wahrheit; nicht gespeichert).
+/**
+ * Voreingestellter Stil je typisierter Zone (eine Wahrheit; nicht gespeichert).
  *
- *  BEWUSST NICHT auf die Rollen gezogen (LFH-328/A2): `ZoneTyp` ist keines der Enums des
- *  Statusfarb-Vertrags, keiner dieser Werte steht in Gate 5, und ein Umzug wäre der
- *  Bestands-Sweep, den A2 ausdrücklich verbietet (Spec: „die ~20 Farb-/Label-Maps
- *  außerhalb der Vertrags-Enums nicht anfassen"). Gleiches gilt für
- *  {@link FREIE_SKIZZE_FALLBACK} — `#1677ff` steht identisch in `zonenStil.test.ts:20`
- *  gepinnt, während `marker.ts` denselben Literalwert verliert; das ist kein Versehen,
- *  sondern die Grenze zwischen Rollenfarbe und Nutzer-/Katalogfarbe. */
+ * Bewusst nicht auf die Rollen gezogen: `ZoneTyp` ist kein Enum des Statusfarb-Vertrags. Gleiches
+ * gilt für {@link FREIE_SKIZZE_FALLBACK} (`#1677ff`, in `zonenStil.test.ts` gepinnt) — die Grenze
+ * zwischen Rollenfarbe und Nutzer-/Katalogfarbe.
+ */
 const STILE: Record<Exclude<ZoneTyp, 'freie_skizze'>, ZoneStil> = {
   gefahrengebiet: { fillColor: '#cf1322', fillOpacity: 0.2, lineColor: '#cf1322', lineWidth: 2 },
   absperrbereich: { fillColor: '#fa8c16', fillOpacity: 0.2, lineColor: '#fa8c16', lineWidth: 2 },
   absperrgrenze: { fillColor: '#cf1322', fillOpacity: 0, lineColor: '#cf1322', lineWidth: 4 },
   sperrgebiet: { fillColor: '#8c8c8c', fillOpacity: 0.3, lineColor: '#595959', lineWidth: 2 },
-  // LFH-673 (design.md D9, Entscheidung 24.09.2026): Siena-Braun, der einzige noch freie
-  // Farbton der Karte. NICHT Violett — `#722ed1` ist exakt der Stil der Abschnittsflächen
-  // (`kartenLayer.ts`) —, NICHT Petrol (Fachebene Hochwasser), kein Rot/Orange/Grau der
-  // Gefahren- und Sperrflächen. Linie gegen beide Blindkarten-Gründe gerechnet: 3,36 : 1
-  // nachts (`#0f1115`), 4,58 : 1 tags (`#e8e8e8`), also ≥ 3 : 1 (WCAG 1.4.11). Den
-  // Räumungszustand trägt die Beschriftung, nicht die Farbe.
+  // Siena-Braun (LFH-673, design.md D9), der einzige noch freie Farbton der Karte: nicht Violett
+  // (`#722ed1` ist der Stil der Abschnittsflächen), nicht Petrol (Hochwasser), kein Rot/Orange/Grau
+  // der Gefahren- und Sperrflächen. Linie gegen beide Blindkarten-Gründe: 3,36 : 1 nachts, 4,58 : 1
+  // tags, also ≥ 3 : 1 (WCAG 1.4.11). Den Räumungszustand trägt die Beschriftung.
   evakuierungsbezirk: {
     fillColor: '#a0522d',
     fillOpacity: 0.15,
@@ -62,7 +58,7 @@ export const ZONE_TYPEN: ZoneTypInfo[] = [
   { typ: 'absperrgrenze', label: 'Absperrgrenze', geometrie: 'LineString' },
   { typ: 'sperrgebiet', label: 'Sperrgebiet', geometrie: 'Polygon' },
   { typ: 'freie_skizze', label: 'Freie Skizze', geometrie: 'beides' },
-  // LFH-673: Fläche eines Evakuierungsbezirks; zugeordnet wird im Zonen-Inspector.
+  // Fläche eines Evakuierungsbezirks; zugeordnet wird im Zonen-Inspector.
   { typ: 'evakuierungsbezirk', label: 'Evakuierungsbezirk', geometrie: 'Polygon' },
 ];
 
@@ -72,18 +68,14 @@ export function zoneTypLabel(typ: ZoneTyp): string {
 }
 
 /**
- * Stil einer gefahrengebiet-Zone, abgeleitet aus der höchsten Warnstufe ihres Gebiets.
+ * Stil einer gefahrengebiet-Zone, abgeleitet aus der höchsten Warnstufe ihres Gebiets. Die Skala
+ * steht als `warnstufeKarte` im Statusfarb-Vertrag (`theme/statusFarben.ts`); dass `keine` die
+ * Alarmrolle trägt (ein unbewertetes Gebiet wird vorsichtshalber als Gefahr gezeigt), ist dort
+ * begründet.
  *
- * Die Skala steht seit A2 (LFH-328) als `warnstufeKarte` im Statusfarb-Vertrag
- * (`theme/statusFarben.ts`) — hier lag sie früher als `WARNSTUFE_KARTE` mit fünf eigenen
- * Hex-Werten. Dass `keine` weiterhin die Alarmrolle trägt (ein unbewertetes Gefahrengebiet
- * wird vorsichtshalber als Gefahr dargestellt, nicht „ruhiger" als `niedrig`), ist dort
- * dokumentiert und begründet; A2 hat die Entscheidung übernommen, nicht neu getroffen.
- *
- * DIESES MODUL ERZEUGT MapLibre-`paint`-WERTE, keine DOM-Styles — es hat also keinen
- * `useToken()`-Zugang und bekommt den Token von der aufrufenden Ebene
- * (`useLagekarteDaten`) durchgereicht. Den Modus über `document.documentElement.dataset`
- * zu raten wäre ein globaler Seiteneffekt und in Tests nicht gesetzt.
+ * Dieses Modul erzeugt MapLibre-`paint`-Werte, keine DOM-Styles — es hat keinen `useToken()`-Zugang
+ * und bekommt den Token von `useLagekarteDaten` durchgereicht, statt den Modus aus
+ * `document.documentElement` zu raten.
  */
 export function gefahrengebietStil(warnstufe: Warnstufe, token: GlobalToken): ZoneStil {
   const c = rollenFarbe(warnstufeKarte[warnstufe].rolle, token);
@@ -93,34 +85,22 @@ export function gefahrengebietStil(warnstufe: Warnstufe, token: GlobalToken): Zo
 /**
  * Beschriftung einer Zone auf der Kartenfläche (LFH-357).
  *
- * DIE FARBE TRÄGT DIE SKALA NICHT. `warnstufeKarte` bildet fünf Stufen auf zwei
- * unterscheidbare Rollen ab (`achtung`: niedrig/mittel · `alarm`: keine/hoch/akut) — ein
- * Gebiet der Stufe `niedrig` und eines der Stufe `mittel` sahen auf der Karte identisch
- * aus, ebenso `hoch`, `akut` und ein Gebiet ohne gesetzte Stufe. A2 (LFH-328) hielt das
- * für gedeckt („wer die fünf Stufen unterscheiden muss, nutzt `label` oder `form`"), aber
- * auf der Kartenfläche stand keiner der beiden Kanäle: der Zonen-Text trug den ZONENNAMEN,
- * und `form` kann es grundsätzlich nicht — es hat drei Zeichen für fünf Stufen.
+ * Die Farbe trägt die Skala nicht: `warnstufeKarte` bildet fünf Stufen auf zwei unterscheidbare
+ * Rollen ab (`achtung`: niedrig/mittel · `alarm`: keine/hoch/akut), und `form` hat nur drei Zeichen
+ * für fünf Stufen. Der tragende zweite Kanal ist deshalb der Text (WCAG 1.4.1); sein Wortlaut kommt
+ * allein aus {@link warnstufeKarte}`[stufe].label` — wer das Wort dort ändert, ändert die
+ * Kartenbeschriftung mit.
  *
- * Der tragende zweite Kanal ist deshalb der TEXT (WCAG 1.4.1, A1 Festlegung 5), und sein
- * Wortlaut kommt aus dem Vertrag: {@link warnstufeKarte}`[stufe].label` ist die einzige
- * Quelle. Wer das Wort dort ändert, ändert die Kartenbeschriftung mit — das ist Absicht.
+ * „keine" heißt „keine Stufe gesetzt", nicht „keine Gefahr" und nicht „unbewertet": im Backend
+ * (`src/gefahr/repo.rs`, Severity-MAX) entsteht Rang 0 sowohl ohne Bewertung als auch aus lauter
+ * `keine`-Zellen, die Fälle sind nicht trennbar. Die rote Fläche ist die Vorsichtsentscheidung aus
+ * {@link gefahrengebietStil}.
  *
- * „keine Stufe" heißt „keine Stufe gesetzt", nicht „keine Gefahr" — und genau deshalb
- * steht dort nicht „unbewertet": gemessen am Backend (`src/gefahr/repo.rs`, Severity-MAX)
- * entsteht Rang 0 SOWOHL aus gar keiner Bewertung ALS AUCH aus lauter `keine`-Zellen. Die
- * Abfrage kann die beiden Fälle nicht trennen; ein Wort, das es behauptet, wäre falsch.
- * Dass die Fläche dabei trotzdem rot bleibt, ist die Vorsichtsentscheidung aus
- * {@link gefahrengebietStil} — der Text sagt jetzt dazu, worauf sie sich stützt.
- *
- * DREI Zustände, nicht zwei. `null` ist der Normalfall JEDER anderen Zonenart: sie trägt
- * keine Stufe, also bleibt ihr Name unverändert — die Stufe gehört ans Gefahrengebiet, nicht
- * an die Zone. `'unbekannt'` ist der Fall, in dem der Nachschlag ins Leere geht: das Ladegate
- * der Karte hängt an `einsatz`/`config`, NICHT an der Gefahrengebiete-Query
- * (`useLagekarteDaten.ts`) — die Karte zeichnet Zonen also, während die Gebiete noch laden
- * oder ihr Abruf gescheitert ist. Für die FARBE wird das vorsichtshalber wie `keine`
- * behandelt (Alarm, unverändert); für den TEXT nicht, denn dort wäre „keine" eine Behauptung
- * über Daten, die es gerade nicht gibt — derselbe Maßstab wie eine Zeile höher bei
- * „unbewertet". Gefunden im Codex-Review zu LFH-357.
+ * Drei Zustände: `null` ist der Normalfall jeder anderen Zonenart (Name unverändert). `'unbekannt'`
+ * heißt, der Nachschlag geht ins Leere — das Ladegate der Karte hängt nicht an der
+ * Gefahrengebiete-Query (`useLagekarteDaten.ts`), Zonen werden also gezeichnet, während die Gebiete
+ * laden oder gescheitert sind. Die Farbe behandelt das vorsichtshalber wie `keine`, der Text nicht:
+ * „keine" wäre dort eine Behauptung über fehlende Daten.
  */
 export function zonenBeschriftung(
   label: string | null | undefined,
@@ -133,15 +113,15 @@ export function zonenBeschriftung(
 }
 
 /**
- * Beschriftung einer Bezirksfläche (LFH-673, design.md D9) — Muster „NAME · STUFE" wie oben.
+ * Beschriftung einer Bezirksfläche (LFH-673) — Muster „NAME · STUFE" wie oben.
  *
  * Der Name ist der Zonenname, sonst die Bezeichnung des Bezirks, sonst das Typwort. Den
- * Räumungszustand trägt der TEXT, nicht die Farbe (zweiter Kanal zuerst); das Wort kommt aus
- * {@link raeumungszustand}, derselben Quelle wie auf der Betreuungsseite.
+ * Räumungszustand trägt der Text, nicht die Farbe; das Wort kommt aus {@link raeumungszustand},
+ * derselben Quelle wie auf der Betreuungsseite.
  *
- * `bezirk = null` heißt: nicht zugeordnet ODER nicht lesbar (kein Modulrecht, Betreuung lädt
- * noch). Beides zeigt nur Name bzw. Typwort — ein Bezirksname oder Zustand stünde sonst bei
- * Personen, die das Modul nicht lesen dürfen, auf der Karte.
+ * `bezirk = null` heißt nicht zugeordnet oder nicht lesbar (kein Modulrecht, Betreuung lädt noch).
+ * Beides zeigt nur Name bzw. Typwort — sonst stünden Bezirksname oder Zustand bei Personen ohne
+ * Modulrecht auf der Karte.
  */
 export function bezirkBeschriftung(
   label: string | null | undefined,
@@ -154,12 +134,11 @@ export function bezirkBeschriftung(
 }
 
 /**
- * Das Stufenwort der Plakette „NAME · STUFE" (Neuentwurf S5, Versalien per Layer-Stil).
+ * Das Stufenwort der Plakette „NAME · STUFE" (Versalien per Layer-Stil).
  *
- * Eine echte Stufe steht allein („hoch"), weil das Wort dort für sich spricht. Die beiden
- * Sonderzustände brauchen das Bezugswort, sonst kippt ihre Aussage: „WERK · KEINE" läse sich
- * als „keine Gefahr" — gemeint ist „keine Stufe gesetzt" (siehe oben) —, und „unbekannt"
- * allein sagte nicht, WAS unbekannt ist. Der Wortlaut der Stufe bleibt der des Vertrags.
+ * Eine echte Stufe steht allein („hoch"). Die Sonderzustände brauchen das Bezugswort: „WERK ·
+ * KEINE" läse sich als „keine Gefahr", und „unbekannt" allein sagte nicht, was unbekannt ist. Der
+ * Wortlaut der Stufe bleibt der des Vertrags.
  */
 function stufenWort(warnstufe: Warnstufe | 'unbekannt'): string {
   if (warnstufe === 'unbekannt') return 'Stufe unbekannt';

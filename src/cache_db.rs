@@ -1,13 +1,11 @@
-//! Prozess-weiter Cache-Pool für externe Nachschlage-Caches (Reverse-Geocoding,
-//! Fachebenen), ausgelagert aus der operativen DB (F09/LFH-240): diese hochfrequenten,
-//! nie-fatalen Cache-Writes sollen NICHT um den operativen Writer konkurrieren (der jetzt
-//! unter BEGIN-IMMEDIATE-Disziplin läuft). Vorbild: [`crate::karte::tile_cache`] —
-//! per-Pfad memoisiert, eigene DB-Datei, kein AppState-Feld (LFH-182-Lektion).
+//! Prozessweiter Cache-Pool für externe Nachschlage-Caches (Reverse-Geocoding, Fachebenen,
+//! KRITIS), getrennt von der operativen DB: die häufigen, nie fatalen Cache-Writes sollen nicht
+//! um den operativen Writer konkurrieren. Per Pfad memoisiert, eigene DB-Datei, kein
+//! AppState-Feld (wie [`crate::karte::tile_cache`]).
 //!
-//! Die operativen Migrationen legen `geocoding_cache`/`fachebenen_cache` weiterhin an
-//! (Repo-Unit-Tests nutzen sie über `db::test_pool`); in Produktion greifen die Handler
-//! auf DIESEN Pool zu (mit Fallback auf den operativen Pool, falls die Cache-DB nicht
-//! angelegt werden kann — Cache-Fehler sind nie fatal).
+//! Die operativen Migrationen legen `geocoding_cache`/`fachebenen_cache` weiterhin an (für die
+//! Repo-Unit-Tests); in Produktion nutzen die Handler DIESEN Pool, mit Rückfall auf den
+//! operativen, falls die Cache-DB nicht angelegt werden kann.
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::SqlitePool;
@@ -40,9 +38,8 @@ async fn schema_anlegen(pool: &SqlitePool) -> sqlx::Result<()> {
     )
     .execute(pool)
     .await?;
-    // KRITIS-Bestand aus dem OSM-Extrakt (LFH-83, `karte::kritis::bestand`). Der Import
-    // tauscht `kritis_objekt` samt Index aus; hier stehen sie nur, damit die Route vor dem
-    // ersten Import eine leere Tabelle statt eines Fehlers findet.
+    // KRITIS-Bestand (`karte::kritis::bestand`). Der Import tauscht Tabelle und Index aus; hier
+    // stehen sie nur, damit die Route vor dem ersten Import eine leere Tabelle findet.
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS kritis_objekt (\
              osm_typ         TEXT    NOT NULL, \
@@ -85,9 +82,9 @@ async fn schema_anlegen(pool: &SqlitePool) -> sqlx::Result<()> {
     Ok(())
 }
 
-/// Liefert den (memoisierten) Cache-Pool für ein Daten-Verzeichnis. Erzeugt DB-Datei +
-/// Schema beim ersten Aufruf. Per-Pfad ⇒ Tests mit eigenem Verzeichnis sind isoliert. Hält
-/// den std-Mutex NIE über ein `await` (`!Send`) → Doppel-Check (wie `tile_cache`).
+/// Memoisierter Cache-Pool für ein Daten-Verzeichnis; legt DB-Datei und Schema beim ersten
+/// Aufruf an. Der std-Mutex wird nie über ein `await` gehalten (`!Send`), daher der
+/// Doppel-Check.
 pub async fn cache_pool(daten_dir: &Path) -> sqlx::Result<SqlitePool> {
     let pfad = daten_dir.join("nachschlage-cache.db");
     {

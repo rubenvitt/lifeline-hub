@@ -1,8 +1,7 @@
-//! Aggregator für externe Fachebenen (NINA, DWD, PEGELONLINE, KRITIS/OSM-Extrakt).
-//! `FachebenenState` trägt außerdem die Basis-URLs und Bremsen der Einsatz-Nachschlagequellen
-//! (Pegel LFH-606, Wetter LFH-633).
-//! Holt externe Geodaten, normalisiert sie zu GeoJSON und liefert einen
-//! einheitlichen Umschlag mit definiertem Offline-Verhalten.
+//! Aggregator für externe Fachebenen (NINA, DWD, PEGELONLINE, KRITIS/OSM-Extrakt u. a.): holt
+//! Geodaten, normalisiert sie zu GeoJSON und liefert einen einheitlichen Umschlag mit
+//! definiertem Offline-Verhalten. `FachebenenState` trägt außerdem Basis-URLs und Bremsen der
+//! Einsatz-Nachschlagequellen (Pegel, Wetter).
 
 pub mod assets;
 pub mod cache;
@@ -23,23 +22,14 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-/// Betriebs-/Sicherheitsschalter der Karten-Module, prozessweit einmal beim Serverstart
-/// via [`init_karte_config`] aus der CLI/ENV-`Config` gesetzt (LFH-239/F18).
+/// Betriebs-/Sicherheitsschalter der Karten-Module, einmal beim Serverstart per
+/// [`init_karte_config`] aus der CLI/ENV-`Config` gesetzt (LFH-239). Damit stehen sie in
+/// `--help` und im Startup-Log, und eine ambient gesetzte Variable kann den SSRF-Guard nicht
+/// still schwächen.
 ///
-/// Vorher lasen `download.rs` und `katalog.rs` ihre Schalter bei JEDEM Aufruf direkt per
-/// `std::env::var`. Das hatte drei Folgen: die Schalter tauchten weder in `--help` noch im
-/// Startup-Log auf, ein geleaktes `LIFELINE_DOWNLOAD_ALLOW_LOOPBACK=1` schwächte den
-/// SSRF-Guard unbemerkt auch auf dem öffentlichen Proxy-Pfad, und die Security-Tests
-/// kippten reproduzierbar, sobald die Variable ambient in der Umgebung stand.
-///
-/// Bewusst ein prozessweiter `OnceLock` statt `AppState`: der kritische Aufrufer
-/// (`proxy::ssrf_redirect_policy`) ist ein `'static`-Closure in einem `OnceLock`-Client
-/// und kommt an den AppState gar nicht heran. Gleiches Muster wie
-/// `anhang::init_scan_config`.
-///
-/// Nebeneffekt, der die Test-Flakiness an der Wurzel erledigt: im Testprozess wird der
-/// `OnceLock` nie initialisiert, also gilt der sichere Default — unabhängig davon, was
-/// in der Umgebung steht.
+/// Prozessweiter `OnceLock` statt `AppState`, weil der kritische Aufrufer
+/// (`proxy::ssrf_redirect_policy`) ein `'static`-Closure in einem `OnceLock`-Client ist. Im
+/// Testprozess bleibt er uninitialisiert, dort gilt also immer der sichere Default.
 #[derive(Debug, Clone, Default)]
 pub struct KarteConfig {
     /// Dev-Escape: erlaubt Downloads von Loopback-Adressen (auch http). Default AUS.
@@ -56,37 +46,32 @@ pub fn init_karte_config(cfg: KarteConfig) {
     let _ = KARTE_CONFIG.set(cfg);
 }
 
-/// Aktuelle Karten-Konfiguration; ohne Initialisierung gilt der sichere Default
-/// (kein Loopback-Escape, einkompilierte Manifest-URL) — z.B. in Tests.
+/// Aktuelle Karten-Konfiguration; ohne Initialisierung (z. B. in Tests) der sichere Default.
 pub fn karte_config() -> &'static KarteConfig {
     KARTE_CONFIG.get_or_init(KarteConfig::default)
 }
 
-/// Geteilter Zustand des Aggregators. Der Cache liegt persistent in der DB (siehe `cache`)
-/// und nutzt den AppState-Pool. `inflight` verhindert mehrfache parallele Hintergrund-
-/// Refreshes desselben Schlüssels (Stale-while-revalidate).
+/// Geteilter Zustand des Aggregators. Der Cache liegt in der DB (s. `cache`); `inflight`
+/// verhindert parallele Hintergrund-Refreshes desselben Schlüssels.
 #[derive(Clone)]
 pub struct FachebenenState {
     pub client: reqwest::Client,
     pub inflight: Arc<Mutex<HashSet<String>>>,
-    /// Basis-URL der PEGELONLINE-REST-API für die Zeitreihen je Station (LFH-606,
-    /// `crate::pegel::abruf`). Produktiv [`PEGELONLINE_BASIS_URL`]; Integrationstests lenken
-    /// sie über [`FachebenenState::mit_pegel_basis_url`] auf eine nicht erreichbare Adresse,
-    /// damit kein Test ins Netz geht.
+    /// Basis-URL der PEGELONLINE-REST-API für Zeitreihen (`crate::pegel::abruf`). Tests lenken sie
+    /// über [`FachebenenState::mit_pegel_basis_url`] um, damit kein Test ins Netz geht.
     pub pegel_basis_url: Arc<str>,
-    /// Letzter gescheiterter Zeitreihenabruf je Station (LFH-606). Während der Abkühlung
-    /// (`pegel::abruf::ABKUEHLUNG`) wird die Station nicht erneut angefragt — sonst warteten
-    /// bei einer unbekannten UUID oder hängenden Quelle alle Aufrufe bis zur Frist. Prozess-
-    /// lokal und je `AppState`, damit Tests einander nicht über einen Static beeinflussen.
+    /// Letzter gescheiterter Zeitreihenabruf je Station. Während der Abkühlung
+    /// (`pegel::abruf::ABKUEHLUNG`) wird die Station nicht erneut angefragt, sonst warteten bei
+    /// unbekannter UUID oder hängender Quelle alle Aufrufe bis zur Frist. Je `AppState`, damit
+    /// Tests
+    /// einander nicht beeinflussen.
     pub pegel_fehlschlag: Arc<Mutex<HashMap<String, Instant>>>,
-    /// Basis-URL von Bright Sky für Warnungen und Vorhersage am Einsatzort (LFH-633,
-    /// `crate::wetter::abruf`). Produktiv [`BRIGHTSKY_BASIS_URL`]; an einer Stelle
-    /// austauschbar, etwa gegen eine eigene Instanz. Tests lenken sie über
-    /// [`FachebenenState::mit_wetter_basis_url`] auf einen lokalen Stub.
+    /// Basis-URL von Bright Sky für Warnungen und Vorhersage (`crate::wetter::abruf`), etwa gegen
+    /// eine eigene Instanz austauschbar. Tests lenken sie über
+    /// [`FachebenenState::mit_wetter_basis_url`] auf einen Stub.
     pub wetter_basis_url: Arc<str>,
-    /// Letzter gescheiterter Wetterabruf je Cache-Schlüssel (LFH-633). Bewusst getrennt von
-    /// [`Self::pegel_fehlschlag`]: ein Ausfall von Bright Sky sperrt keine Pegelstation und
-    /// umgekehrt.
+    /// Letzter gescheiterter Wetterabruf je Cache-Schlüssel, getrennt von
+    /// [`Self::pegel_fehlschlag`]: ein Ausfall von Bright Sky sperrt keine Pegelstation.
     pub wetter_fehlschlag: Arc<Mutex<HashMap<String, Instant>>>,
 }
 

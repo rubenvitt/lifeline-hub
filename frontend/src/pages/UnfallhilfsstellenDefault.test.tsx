@@ -99,10 +99,8 @@ describe('UnfallhilfsstellenDefault', () => {
   });
 
   /**
-   * AK4-Partnerpaar (LFH-331 · B3). Vor dem Umbau zeigte der Fehlerfall eine Meldung
-   * ohne Wiederholung; der Leertext war ein antd-Leer-Element mit eingebettetem Knopf.
-   * Beide Hälften nennen dasselbe Literal, damit die negative Zusicherung eine Aussage
-   * über die Weiche bleibt und nicht über die Schreibweise des Strings.
+   * Partnerpaar: beide Hälften nennen dasselbe Literal, damit die negative Zusicherung eine Aussage
+   * über die Weiche bleibt, nicht über die Schreibweise.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 })));

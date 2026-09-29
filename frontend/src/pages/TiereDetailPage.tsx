@@ -39,8 +39,10 @@ import type { AbschlussGrund, Tier, TierStatus } from '../api/types';
 import HalterPicker, { type HalterWert } from '../personen/HalterPicker';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 
-/** Formularwerte der Bearbeiten-Maske: der Patch plus die zusammengesetzte
- *  Halter-Auswahl, die erst beim Absenden in das XOR-Feldpaar zerlegt wird. */
+/**
+ * Formularwerte der Bearbeiten-Maske: der Patch plus die zusammengesetzte Halter-Auswahl, die erst
+ * beim Absenden in das XOR-Feldpaar zerlegt wird.
+ */
 type TierFormWerte = TierPatch & { halter?: HalterWert | null };
 
 const STATUS_META = TIER_STATUS;
@@ -83,10 +85,9 @@ export default function TiereDetailPage() {
   const { message, modal } = App.useApp();
   const [editForm] = Form.useForm<TierFormWerte>();
   const editSitzung = useEditSitzung<TierFormWerte>(editForm);
-  // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen"
-  // verengt: `basis` ist dort nicht optional. Mit `editSitzung.sitzung?.basis` wäre der
-  // unmögliche Fall still ein Schreiben OHNE Lock — also genau der blinde Overwrite,
-  // gegen den F10 gebaut ist.
+  // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen" verengt:
+  // `basis` ist dort nicht optional. Mit `editSitzung.sitzung?.basis` wäre der unmögliche Fall
+  // still ein Schreiben ohne Lock.
   const sitzung = editSitzung.sitzung;
   const bearbeiten = sitzung != null;
   const [abschlussOffen, setAbschlussOffen] = useState(false);
@@ -117,13 +118,12 @@ export default function TiereDetailPage() {
     enabled: idGueltig,
   });
 
-  // Optimistisches Lock (LFH-299/F10): `basis` trägt den beim ÖFFNEN der Maske eingefrorenen
-  // geaendert_at-Stand (LFH-303 — aus den Live-Query-Daten gelesen hebelte ein
-  // Hintergrund-Refetch das Lock aus); ein 409 öffnet den Konfliktdialog (neu laden vs.
-  // überschreiben), statt still zu überschreiben.
+  // Optimistisches Lock: `basis` trägt den beim Öffnen der Maske eingefrorenen geaendert_at-Stand
+  // (aus den Live-Query-Daten gelesen hebelte ein Hintergrund-Refetch das Lock aus); ein 409 öffnet
+  // den Konfliktdialog, statt still zu überschreiben.
   const editMutation = useMutation({
-    // `basis` ist eine `CasBasis` und damit nur aus `useEditSitzung` zu bekommen: ein
-    // blanker `t.geaendert_at` aus den Live-Query-Daten bricht hier den Typcheck (LFH-303).
+    // `basis` ist eine `CasBasis` und nur aus `useEditSitzung` zu bekommen: ein blanker
+    // `t.geaendert_at` bricht hier den Typcheck.
     mutationFn: (v: { daten: TierPatch; basis?: CasBasis; overwrite?: boolean }) =>
       aktualisiereTier(einsatzId, tierId, v.daten, v.overwrite ? undefined : v.basis),
     onSuccess: () => {
@@ -131,11 +131,9 @@ export default function TiereDetailPage() {
       editSitzung.beende();
     },
     onError: (e, v) => {
-      // Nur der ERSTE 409 (Save MIT Baseline) ist der Sperrkonflikt. Anders als beim
-      // Person-PATCH (Referenz LFH-241) kennt die Tier-Route einen ZWEITEN 409: den
-      // Storno-Guard, der vor der CAS greift und den `overwrite` nicht umgehen kann.
-      // Ein 409 auf den Overwrite muss deshalb die echte Servermeldung zeigen, statt
-      // denselben Dialog erneut zu öffnen — sonst wäre „Überschreiben" ein toter Button.
+      // Nur der erste 409 (Save mit Baseline) ist der Sperrkonflikt. Die Tier-Route kennt einen
+      // zweiten 409, den Storno-Guard vor der CAS, den `overwrite` nicht umgeht. Ein 409 auf den
+      // Overwrite zeigt deshalb die Servermeldung, sonst wäre „Überschreiben" ein toter Knopf.
       if (istKonflikt(e) && !v.overwrite) {
         modal.confirm({
           title: 'Zwischenzeitlich geändert',
@@ -184,7 +182,7 @@ export default function TiereDetailPage() {
     onError: fehler,
   });
 
-  // NaN-/Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
+  // Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
   if (!idGueltig) {
     return <Navigate to={tierePfad(einsatzId)} replace />;
   }
@@ -217,9 +215,8 @@ export default function TiereDetailPage() {
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  // Eine Detail-Zelle: im Edit-Modus ein noStyle-Form.Item mit Input, sonst die Read-Anzeige.
-  // So bleibt beim Bearbeiten dasselbe Datenraster stehen — nur die Werte werden zu Feldern,
-  // statt die ganze Ansicht gegen ein separates Formular zu tauschen.
+  // Eine Detail-Zelle: im Edit-Modus ein noStyle-Form.Item mit Input, sonst die Anzeige — dasselbe
+  // Datenraster bleibt stehen.
   const zelle = (name: string, input: React.ReactNode, anzeige: React.ReactNode) =>
     bearbeiten ? (
       <Form.Item name={name} noStyle>
@@ -276,7 +273,7 @@ export default function TiereDetailPage() {
         {zelle(
           'halter',
           <HalterPicker einsatzId={einsatzId} />,
-          // Klick auf R-nnn führt direkt zur (auditierten) Personen-Detailseite des Halters.
+          // Klick auf R-nnn führt zur (auditierten) Personen-Detailseite des Halters.
           t.halter_person_id != null ? (
             <Button
               type="link"

@@ -78,10 +78,8 @@ describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
   });
 
   /**
-   * Der Kopf trägt die Phasenfarbe der gemeinsamen Achse, nicht das Preset-Grün
-   * (LFH-493) — der Zwilling der Probe in `BefehlDetailPage.test.tsx`. Beide Module
-   * liegen auf derselben Achse (`phase.ts`: „bewusst dieselbe … und nicht deren
-   * Alias"); wer nur eines umstellt, hat die Divergenz bloß verschoben.
+   * Der Kopf trägt die Phasenfarbe der gemeinsamen Achse, nicht das Preset-Grün — Zwilling der
+   * Probe in `BefehlDetailPage.test.tsx`. Beide Module liegen auf derselben Achse (`phase.ts`).
    */
   it('malt den freigegebenen Status in der Phasenfarbe, nicht im Preset-Grün', async () => {
     vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
@@ -92,9 +90,8 @@ describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
     } as never);
     vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
     renderBei('/einsaetze/1/lageberichte/9');
-    // Neuentwurf: die Phase trägt eine getönte Statusfläche (`StatusChip`), kein antd-Tag.
-    // Die Aussage bleibt dieselbe — die Farbe kommt aus der Phasenachse (`abgeschlossen` →
-    // Ton `normal`), nicht aus einem handgeschriebenen Grün, und es gibt kein Tag-Preset.
+    // Die Phase trägt eine getönte Statusfläche (`StatusChip`); die Farbe kommt aus der Phasenachse
+    // (`abgeschlossen` → Ton `normal`), nicht aus einem handgeschriebenen Grün.
     const etikett = (await screen.findByText('Freigegeben')).closest('[data-lfh="status-chip"]');
     expect(etikett).toHaveAttribute('data-ton', 'normal');
     expect(etikett!.closest('[data-phase]')).toHaveAttribute('data-phase', 'abgeschlossen');
@@ -103,19 +100,16 @@ describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
 });
 
 /**
- * ── ZEITSTAND IN DER ANZEIGEZONE (LFH-350 · H60) ────────────────────────────────
+ * ── Zeitstand in der Anzeigezone (LFH-350) ──
  *
- * `zeitstand` ist ein UTC-Wirestring OHNE Zonenkennung (`YYYY-MM-DD HH:mm:ss`). Roh
- * ausgegeben stand er um den Zonenversatz falsch — im Sommer zwei Stunden zu früh, und
- * zwar ohne Fehlerbild: die Zahl sieht plausibel aus.
+ * `zeitstand` ist ein UTC-Wirestring ohne Zonenkennung; roh ausgegeben stünde er um den
+ * Zonenversatz falsch, ohne Fehlerbild.
  *
- * Die Zone wird AUSDRÜCKLICH gestellt und der Cache dafür VORBELEGT — beides ist gemessen
- * nötig: (1) ohne Provider fällt `useAnzeigeKonventionen` auf `DEFAULT_KONVENTIONEN` und
- * damit auf die LOKALE Zone der ausführenden Maschine zurück; (2) nur den Provider
- * einzuhängen genügt nicht, weil die Einstellungs-Abfrage ERST NACH dem ersten Render
- * auflöst — `findByText` hat dann längst getroffen, und auf einem Berliner Rechner wäre der
- * Test auch mit `zeitzone: 'UTC'` grün geblieben (Gegenprobe gefahren: 4 von 5 Tests
- * blieben es). `setQueryData` stellt die Zone vor dem ersten Render.
+ * Die Zone wird ausdrücklich gestellt und der Cache vorbelegt: ohne Provider fiele
+ * `useAnzeigeKonventionen` auf die lokale Zone der Maschine zurück, und nur den Provider
+ * einzuhängen genügt nicht, weil die Einstellungs-Abfrage erst nach dem ersten Render auflöst — auf
+ * einem Berliner Rechner bliebe der Test sonst auch mit `zeitzone: 'UTC'` grün. `setQueryData`
+ * stellt die Zone vor dem ersten Render.
  */
 function renderMitZone(route: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -164,21 +158,17 @@ describe('LageberichtDetailPage — Zeitstand (LFH-350 · H60)', () => {
 
     // 12:00 UTC → 14:00 Sommerzeit in Berlin → DDHHmm + Monatskürzel + Jahr.
     expect(await screen.findByText('Zeitstand: 251400JUL2026')).toBeInTheDocument();
-    // Gegenaussage: der Wirestring darf nirgends mehr sichtbar sein.
+    // Gegenaussage: der Wirestring ist nirgends sichtbar.
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });
 
 /**
- * ── GESCHEITERTE FREIGABE (LFH-535, Nachzug N5 aus LFH-348 · C13) ──────────────
+ * ── Gescheiterte Freigabe (LFH-535) ──
  *
- * Der Zwilling zu `BefehlDetailPage.test.tsx`. Die Bedienentscheidung gilt ausdrücklich
- * für BEIDE Seiten gemeinsam — sonst entsteht wieder die Divergenz, die LFH-348 · C13 mit
- * dem geteilten Verlustschutz-Hook geschlossen hat; Träger ist hier die geteilte
- * Komponente `entwurf/FreigabeDialog.tsx`.
- *
- * Die Zusicherung hat zwei Hälften: der Grund steht IM Dialog UND nicht in der
- * Message-Queue. Ohne die zweite bliebe der Test grün, wenn der Toast zurückkäme.
+ * Zwilling zu `BefehlDetailPage.test.tsx`; die Entscheidung gilt für beide Seiten, Träger ist
+ * `entwurf/FreigabeDialog.tsx`. Zwei Hälften: der Grund steht im Dialog und nicht in der
+ * Message-Queue.
  */
 describe('LageberichtDetailPage — gescheiterte Freigabe (LFH-535)', () => {
   beforeEach(() => {
@@ -194,8 +184,7 @@ describe('LageberichtDetailPage — gescheiterte Freigabe (LFH-535)', () => {
     vi.mocked(lageberichteApi.aktualisiereLagebericht).mockResolvedValue(
       bericht({ status: 'entwurf' }) as never,
     );
-    // Die Suite fährt ohne `clearMocks`: der Zähler liefe sonst über die Tests dieser
-    // Datei weiter, und „nicht aufgerufen" wäre nach dem ersten Test nie wieder grün.
+    // Die Suite fährt ohne `clearMocks`: der Zähler liefe sonst über die Tests der Datei weiter.
     vi.mocked(lageberichteApi.gibLageberichtFrei).mockClear();
   });
 
@@ -223,8 +212,8 @@ describe('LageberichtDetailPage — gescheiterte Freigabe (LFH-535)', () => {
     expect(treffer.closest('.ant-message')).toBeNull();
     expect(toastsMit('Abschnitt „Auftrag" ist leer')).toHaveLength(0);
     expect(within(dialog).getByText('Freigabe fehlgeschlagen')).toBeInTheDocument();
-    // „Offen" heisst in jsdom „nicht in der Verlassen-Bewegung": antds Modal räumt seinen
-    // Knoten erst am Ende der Zoom-Animation ab, und jsdom feuert kein `transitionend`.
+    // „Offen" heißt in jsdom „nicht in der Verlassen-Bewegung": antds Modal räumt seinen Knoten
+    // erst am Ende der Zoom-Animation ab, und jsdom feuert kein `transitionend`.
     expect(dialog).not.toHaveClass('ant-zoom-leave');
   });
 
@@ -269,11 +258,10 @@ describe('LageberichtDetailPage — gescheiterte Freigabe (LFH-535)', () => {
 });
 
 /**
- * ── DRUCKWURZEL (LFH-71) ─────────────────────────────────────────────────────────
+ * ── Druckwurzel (LFH-71) ──
  *
- * Zwilling des Blocks in `BefehlDetailPage.test.tsx`: `druck/druck.css` blendet im Druck
- * alles außerhalb der Wurzel per `display: none` aus. Hier steht, dass es genau eine gibt
- * und dass Abschnittstitel und Editor-Vorschau im Entwurf in ihr liegen.
+ * Zwilling des Blocks in `BefehlDetailPage.test.tsx`: genau eine Wurzel, und Abschnittstitel und
+ * Editor-Vorschau liegen im Entwurf in ihr.
  */
 describe('LageberichtDetailPage — Druckwurzel (LFH-71)', () => {
   beforeEach(() => {
@@ -322,7 +310,7 @@ describe('LageberichtDetailPage — Druckwurzel (LFH-71)', () => {
 });
 
 /**
- * ── DRUCKKOPF UND DRUCKKNOPF (LFH-22) ───────────────────────────────────────────
+ * ── Druckkopf und Druckknopf (LFH-22) ──
  *
  * Zwilling des Blocks in `BefehlDetailPage.test.tsx`.
  */

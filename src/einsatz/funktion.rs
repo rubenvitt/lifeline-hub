@@ -1,26 +1,21 @@
-//! Funktion eines Mitglieds im Einsatz (LFH-615): „S2 Lage" im Kopf, „Vitt · S2" am
-//! ETB-Verfasser (Neuentwurf „Instrumententafel").
+//! Funktion eines Mitglieds im Einsatz (LFH-615): „S2 Lage“ im Kopf, „Vitt · S2“ am
+//! ETB-Verfasser.
 //!
-//! **Eine Ableitung, zwei Formen.** Die Funktion ist kein gespeichertes Stammfeld, sondern
-//! folgt aus zwei vorhandenen Achsen:
+//! Die Funktion ist kein gespeichertes Feld, sondern folgt aus zwei Achsen:
 //!
-//! 1. **Besetzte Sachgebiete** (`einsatz_stabsfunktion`, transitiv über
-//!    `personal.benutzer_id`, LFH-46). Eine ausdrückliche Besetzung ist die stärkere
-//!    Aussage über die Funktion und gewinnt deshalb.
-//! 2. **Einsatzrolle `einsatzleitung`** → „EL", aber nur ohne Sachgebiet. Die Rolle ist die
-//!    Rechteachse; auch ein Führungsassistent am Gerät kann sie tragen, und er besetzt dann
-//!    in aller Regel ein Sachgebiet.
+//! 1. **Besetzte Sachgebiete** (`einsatz_stabsfunktion`, über `personal.benutzer_id`) — die
+//!    stärkere Aussage, sie gewinnt.
+//! 2. **Einsatzrolle `einsatzleitung`** → „EL“, aber nur ohne Sachgebiet; die Rolle ist die
+//!    Rechteachse und kann auch ein Führungsassistent tragen.
 //!
-//! Sonst gibt es **keine** Funktion — `fuehrungspersonal`/`beobachter` ohne Besetzung
-//! bleiben leer, statt eine zu erfinden.
+//! Sonst gibt es keine Funktion, statt eine zu erfinden.
 //!
-//! **`fuehrungsstelle` fließt bewusst nicht ein**: sie ist die Empfänger-Vorbelegung der
-//! ETB-Erfassung (LFH-461), nicht die eigene Funktion, und sie steht in der
-//! Schwärzungs-Registry auf `Scrub` — ein ETB-Snapshot davon hebelte die Schwärzung aus.
+//! `fuehrungsstelle` fließt nicht ein: sie ist die Empfänger-Vorbelegung der ETB-Erfassung und
+//! steht in der Schwärzungs-Registry auf `Scrub` — ein ETB-Snapshot davon hebelte die
+//! Schwärzung aus.
 //!
-//! Die Ableitung liegt im Backend aus demselben Grund wie [`Sachgebiet::label`]: der
-//! ETB-Snapshot ist ein Führungsnachweis und darf nicht davon abhängen, welches Frontend ihn
-//! erzeugt hat.
+//! Die Ableitung liegt im Backend, weil der ETB-Snapshot ein Führungsnachweis ist und nicht vom
+//! erzeugenden Frontend abhängen darf.
 
 use super::EinsatzRolle;
 use crate::error::AppError;
@@ -36,12 +31,11 @@ pub struct Funktion {
     pub bezeichnung: String,
 }
 
-/// Leitet die Funktion ab. Rein — beide Konsumenten (Einsatzkopf und ETB-Snapshot) rufen
-/// genau diese Funktion.
+/// Leitet die Funktion ab. Rein — Einsatzkopf und ETB-Snapshot rufen genau diese Funktion.
 ///
-/// Mehrere Sachgebiete werden **alle** genannt, in S1–S6-Folge und ohne Dubletten („S2/S3"):
-/// der Snapshot ist ein Nachweis, und ein still weggelassenes S3 wäre darin eine Lücke. Der
-/// Klartext entfällt dann, weil „S2 Lage/S3 Einsatz" die Kopfzeile sprengte.
+/// Mehrere Sachgebiete werden alle genannt, in S1–S6-Folge ohne Dubletten („S2/S3“): ein still
+/// weggelassenes S3 wäre im Nachweis eine Lücke. Der Klartext entfällt dann, weil er die
+/// Kopfzeile sprengte.
 pub fn ableiten(sachgebiete: &[Sachgebiet], rolle: Option<EinsatzRolle>) -> Option<Funktion> {
     let mut sg: Vec<Sachgebiet> = sachgebiete.to_vec();
     sg.sort();
@@ -76,9 +70,8 @@ fn kuerzel(sg: Sachgebiet) -> String {
     sg.as_str().to_uppercase()
 }
 
-/// Lädt Rolle und Sachgebiete eines Benutzers auf einer beliebigen Connection/Transaktion und
-/// leitet daraus die Kurzform ab — für den ETB-Snapshot in `etb::repo::anlegen_tx`, damit er
-/// in DERSELBEN Transaktion wie der Eintrag entsteht.
+/// Lädt Rolle und Sachgebiete auf einer beliebigen Verbindung und leitet die Kurzform ab — für
+/// den ETB-Snapshot in `etb::repo::anlegen_tx`, in derselben Transaktion wie der Eintrag.
 pub async fn kurz_fuer(
     conn: &mut SqliteConnection,
     einsatz_id: i64,

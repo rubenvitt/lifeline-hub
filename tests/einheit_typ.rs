@@ -121,8 +121,8 @@ async fn typ_mit_trio(app: &axum::Router, admin: &str, label: &str) -> i64 {
 }
 
 /// **Der unterscheidende Test der Route.** Ein Patch ohne Soll-Felder und ohne `sortier`
-/// darf beide nicht anfassen. Unter dem alten Vollersatz nullte derselbe Request das
-/// Trio und setzte `sortier` auf 0 (`#[serde(default)]`).
+/// darf beide nicht anfassen. Ein Vollersatz nullte mit demselben Request das Trio und setzte
+/// `sortier` auf 0 (`#[serde(default)]`).
 #[tokio::test]
 async fn patch_ohne_soll_felder_laesst_trio_und_sortier_stehen() {
     let app = setup().await;

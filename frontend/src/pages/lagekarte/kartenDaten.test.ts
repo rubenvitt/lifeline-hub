@@ -2,11 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { wendeKartenDatenAn } from './kartenDaten';
 
 /**
- * Regressionsschutz für den „Zone verschwindet nach dem Zeichnen, erst nach Reload
- * sichtbar"-Bug: MapLibre verwirft setData still, solange der Style nicht geladen
- * ist (terra-draw baut beim Zeichnen Layer auf/ab). Die Anwendung muss dann auf den
- * ersten Frame mit geladenem Style nachgezogen werden — nicht still verworfen und
- * nicht erst bei `idle` (das kostete den Zeichner Sekunden).
+ * Regressionsschutz: MapLibre verwirft setData still, solange der Style nicht geladen ist
+ * (terra-draw baut beim Zeichnen Layer auf/ab). Die Anwendung muss auf den ersten Frame mit
+ * geladenem Style nachgezogen werden — nicht verworfen und nicht erst bei `idle`.
  */
 describe('wendeKartenDatenAn', () => {
   /** Minimale Karte mit den von wendeKartenDatenAn genutzten Methoden. */

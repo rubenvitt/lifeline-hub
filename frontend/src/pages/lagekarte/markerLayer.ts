@@ -12,13 +12,11 @@ import { SK_KURZZEICHEN } from '../../personen/personenKarte';
 import { farbenDunkel } from '../../theme/tokens';
 import { plakettenBildId, plakettenSchrift, zonenPlakette, type Plakette } from './plakette';
 
-// Felder, die eine Layer-Expression, ein Filter, der Klick-Handler oder die Cluster-Aggregation liest:
-// schluessel (Klick→Inspector), typ (clusterProperties → Donut-Segmente), farbe (marker-kreis
-// circle-color), icon (marker-symbol icon-image + kreis/symbol-Diskriminierung), statusFarbe
-// (marker-status-ring), beschriftung/plakette/textFarbe/rang (Plaketten-Layer, LFH-622).
-// `label` selbst bleibt weggelassen: die Plakette liest `beschriftung`, und die fehlt genau
-// dort, wo ein label kein Name ist (Lagemeldung, Platzhalter) — ein Filter auf `label` sähe
-// den Unterschied nicht.
+// Felder, die eine Layer-Expression, ein Filter, der Klick-Handler oder die Cluster-Aggregation
+// liest: schluessel (Klick → Inspector), typ (Donut-Segmente), farbe (marker-kreis), icon
+// (marker-symbol + Kreis/Symbol-Unterscheidung), statusFarbe (marker-status-ring),
+// beschriftung/plakette/textFarbe/rang (Plaketten-Layer). `label` fehlt: die Plakette liest
+// `beschriftung`, und die fehlt genau dort, wo ein label kein Name ist.
 export interface MarkerProps {
   schluessel: string;
   typ: string;
@@ -33,11 +31,11 @@ export interface MarkerProps {
   rang?: number;
   /** Kurzzeichen IM Kreis (`KarteMarker.kurzzeichen`), ohne Mindestzoom sichtbar. */
   kurzzeichen?: string;
-  /** Durchmesser der unsichtbaren Trefferzone (`KarteMarker.trefferDurchmesser`, LFH-650). */
+  /** Durchmesser der unsichtbaren Trefferzone (`KarteMarker.trefferDurchmesser`). */
   treffer?: number;
   /** Sichtung (`KarteMarker.sichtung`) — Summand der Cluster-Aggregation `s_<kategorie>`. */
   sk?: string;
-  /** Eigene Cluster-Quelle (`KarteMarker.clusterQuelle`, LFH-648) — liest `teileNachQuelle`. */
+  /** Eigene Cluster-Quelle (`KarteMarker.clusterQuelle`) — liest `teileNachQuelle`. */
   quelle?: 'personen';
 }
 
@@ -53,8 +51,8 @@ export type MarkerFeatureCollection = {
 };
 
 /**
- * Vorrang der Plaketten, wenn der Platz nicht für alle reicht: wer führt, vor wem fährt,
- * vor den Orten. Der Einsatzort hat eine eigene Quelle und steht ohnehin über allen.
+ * Vorrang der Plaketten bei Platzmangel: wer führt, vor wem fährt, vor den Orten. Der Einsatzort
+ * hat eine eigene Quelle und steht ohnehin über allen.
  */
 const PLAKETTEN_RANG: Partial<Record<MarkerTyp, number>> = {
   fuehrung: 0,
@@ -67,7 +65,7 @@ const PLAKETTEN_RANG: Partial<Record<MarkerTyp, number>> = {
   freies_zeichen: 7,
 };
 
-/** Der Name auf der Plakette — oder keiner, wo das label keiner ist (LFH-622). */
+/** Der Name auf der Plakette — oder keiner, wo das label keiner ist. */
 function beschriftungVon(mk: KarteMarker): string | undefined {
   if (mk.typ === 'lagemeldung') return undefined; // „Meldung #412": Nummer, kein Name
   if (mk.typ === 'freies_zeichen' && mk.label === FREIES_ZEICHEN_ERSATZLABEL) return undefined;
@@ -97,8 +95,10 @@ function toFeature(mk: KarteMarker, plakette: Plakette): MarkerFeature {
   };
 }
 
-/** Clusterbare Marker (alle außer dem Einsatzort) als FeatureCollection. `plakette` trägt
- *  die aufgelösten Rollen des aktiven Modus; ohne Angabe Nacht (Vorgabe des Neuentwurfs). */
+/**
+ * Clusterbare Marker (alle außer dem Einsatzort) als FeatureCollection. `plakette` trägt die
+ * aufgelösten Rollen des aktiven Modus; ohne Angabe Nacht.
+ */
 export function baueMarkerFc(
   markers: KarteMarker[],
   plakette: Plakette = zonenPlakette(farbenDunkel),
@@ -122,45 +122,37 @@ export function baueEinsatzortFc(
 
 export const MARKER_CLUSTER_QUELLE = 'marker-cluster';
 /**
- * Eigene geclusterte Quelle der Betroffenen (LFH-648). Personen clustern NUR untereinander:
- * in `marker-cluster` schluckte ein Cluster aus 40 Betroffenen bei MANV-Dichte die
- * Fahrzeuge daneben — genau der Dichte-Schaden, den die Ebene nicht anrichten darf. Ihre
- * Layer liegen unter allen übrigen Markern (`MARKER_LAYER_REIHENFOLGE`).
+ * Eigene geclusterte Quelle der Betroffenen: Personen clustern nur untereinander — in
+ * `marker-cluster` schluckte ein Cluster aus 40 Betroffenen die Fahrzeuge daneben. Ihre Layer
+ * liegen unter allen übrigen Markern (`MARKER_LAYER_REIHENFOLGE`).
  */
 export const PERSONEN_CLUSTER_QUELLE = 'marker-personen';
 /** Alle geclusterten Marker-Quellen (Spider-Controller: die Quelle des geöffneten Clusters). */
 export const CLUSTER_QUELLEN = [MARKER_CLUSTER_QUELLE, PERSONEN_CLUSTER_QUELLE] as const;
 /**
- * Klickziele der Personen-CLUSTER (LFH-648). Sie sind bewusst WebGL-Layer und kein DOM-Donut
- * wie die Kräfte-Cluster: ein DOM-Marker hängt ÜBER dem Canvas, ein Personen-Donut deckte
- * damit ein Fahrzeugzeichen zu und fing dessen Klick ab (Review-Befund). Als Layer liegen sie
- * in `MARKER_LAYER_REIHENFOLGE` ganz unten. Kein Teil von `MARKER_KLICK_LAYER` — ein Klick
- * darauf fächert auf, er wählt nichts für den Inspector aus.
+ * Klickziele der Personen-Cluster. Bewusst WebGL-Layer und kein DOM-Donut: ein DOM-Marker hängt
+ * über dem Canvas und fing Klicks auf Fahrzeugzeichen ab. Kein Teil von `MARKER_KLICK_LAYER` — ein
+ * Klick fächert auf, er wählt nichts für den Inspector aus.
  */
 export const PERSONEN_CLUSTER_KLICK_LAYER = [
   'personen-cluster-kreis',
   'personen-cluster-zahl',
 ] as const;
 export type ClusterQuelle = (typeof CLUSTER_QUELLEN)[number];
-/**
- * Schlüssel eines Clusters über alle Quellen: `cluster_id` ist nur JE Quelle eindeutig. Ohne
- * Präfix überschrieben sich zwei Donuts mit derselben id im DOM-Sync gegenseitig.
- */
+/** Schlüssel eines Clusters über alle Quellen: `cluster_id` ist nur je Quelle eindeutig. */
 export function clusterSchluessel(quelle: ClusterQuelle, clusterId: number | string): string {
   return `${quelle}:${clusterId}`;
 }
-/** Die unsichtbaren Trefferzonen (LFH-650/LFH-711) — Klickziel, aber keine Zeichnung. */
+/** Die unsichtbaren Trefferzonen — Klickziel, aber keine Zeichnung. */
 export function istTrefferzone(layerId: string): boolean {
   return layerId.endsWith('-treffer');
 }
 /**
- * Entscheidet einen Karten-Klick für die Personen-Cluster (LFH-648): ist das oberste GEZEICHNETE
- * Feature am Klickpunkt ein Personen-Cluster, wird er aufgefächert. Liegt ein anderes Zeichen
- * darüber, gehört der Klick ihm — genau das ist die Zusicherung „Personen verdecken keine Kräfte".
- * Trefferzonen zählen dabei nicht (Review LFH-711): sie liegen über den Clustern, sind aber nicht
- * zu sehen, und ein sichtbarer Cluster darf nicht von einem unsichtbaren Kreis daneben verdeckt
- * werden. `Kartenflaeche` unterdrückt dann auch die Markerauswahl desselben Klicks. Rein, damit
- * sie ohne WebGL prüfbar ist; `features` kommt von `queryRenderedFeatures` (oben zuerst).
+ * Entscheidet einen Karten-Klick für die Personen-Cluster: ist das oberste gezeichnete Feature ein
+ * Personen-Cluster, wird er aufgefächert; liegt ein anderes Zeichen darüber, gehört der Klick ihm
+ * („Personen verdecken keine Kräfte"). Trefferzonen zählen nicht — ein sichtbarer Cluster darf
+ * nicht von einem unsichtbaren Kreis daneben verdeckt werden. Rein; `features` kommt von
+ * `queryRenderedFeatures` (oben zuerst).
  */
 export function personenClusterTreffer(
   features: readonly {
@@ -186,8 +178,7 @@ export const SPIDER_LEAVES_QUELLE = 'spider-leaves';
 export const SPIDER_LEGS_QUELLE = 'spider-legs';
 // Die Plakette ist Klickziel wie ihr Zeichen: wer den Namen trifft, meint den Marker.
 export const MARKER_KLICK_LAYER = [
-  // Einzel-Personen der Lagekarte (LFH-648); ihre CLUSTER sind kein Inspector-Ziel, sondern
-  // fächern auf (`PERSONEN_CLUSTER_KLICK_LAYER`).
+  // Einzel-Personen der Lagekarte; ihre Cluster fächern auf (`PERSONEN_CLUSTER_KLICK_LAYER`).
   'personen-treffer',
   'personen-kreis',
   'personen-kurz',
@@ -212,16 +203,13 @@ export const SPIDER_KLICK_LAYER = [
   'spider-label',
 ] as const;
 
-// Cluster werden als DOM-Donut-Marker gerendert (clusterDonut + Kartenflaeche), NICHT als
-// circle/symbol-Layer → kein Cluster-Layer in dieser Liste. Die transienten Spider-Layer liegen
-// ganz oben (Beinchen unter den Leaf-Symbolen).
-// Die Plaketten liegen UNTER den Zeichen (LFH-622): MapLibre vergibt den Platz von der
-// obersten Ebene abwärts. So belegen die Zeichen (allow-overlap) ihren Platz zuerst, und die
-// Kollision hält jede Plakette von fremden Zeichen fern — lägen die Plaketten oben, deckten
-// sie Nachbarzeichen zu. Der Einsatzort-Name liegt über den übrigen und gewinnt gegen sie.
+// Cluster sind DOM-Donut-Marker (clusterDonut + Kartenflaeche), kein Layer in dieser Liste. Die
+// transienten Spider-Layer liegen ganz oben (Beinchen unter den Leaf-Symbolen). Die Plaketten
+// liegen unter den Zeichen: MapLibre vergibt Platz von oben nach unten, die Zeichen (allow-overlap)
+// belegen ihn zuerst, und keine Plakette deckt ein Nachbarzeichen zu. Der Einsatzort-Name liegt
+// über den übrigen.
 const MARKER_LAYER_REIHENFOLGE = [
-  // Betroffene auf der Lagekarte (LFH-648) zuunterst: jedes Kräfte-/Objektzeichen liegt über
-  // ihnen, auch über ihren Clustern.
+  // Betroffene zuunterst: jedes Kräfte-/Objektzeichen liegt über ihnen und ihren Clustern.
   'personen-cluster-kante',
   'personen-cluster-kreis',
   'personen-cluster-zahl',
@@ -250,23 +238,19 @@ const MARKER_LAYER_REIHENFOLGE = [
   'spider-symbol',
 ] as const;
 
-// Geteilte Paint/Layout-Configs für Einzelmarker- UND Spider-Leaf-Layer (DRY: identische Optik).
-// Die Spider-Source ist ungeclustert → die Spider-Layer nutzen dieselben Paints, aber andere Filter.
+// Geteilte Paint/Layout-Configs für Einzelmarker- und Spider-Leaf-Layer. Die Spider-Source ist
+// ungeclustert → dieselben Paints, andere Filter.
 const STATUS_RING_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': 20,
   'circle-color': ['get', 'statusFarbe'],
   'circle-opacity': 0.9,
 };
 /**
- * Unsichtbare Trefferzone (LFH-650): ein Kreis mit dem Durchmesser aus der Feature-Eigenschaft
- * `treffer`, ohne Füllung und ohne Rand. Er liegt UNTER allen Markerebenen und ist Klickziel
- * wie sie — MapLibre prüft beim Treffertest die Geometrie, nicht die Deckkraft (gemessen in
- * `e2e/gate3-trefflaeche.spec.ts`, „Betroffene Karte …": ein Klick mit Versatz neben den
- * gezeichneten Kreis öffnet die Person). Überlappen sich Zonen, wählt der Klick-Handler das
- * nächstgelegene Merkmal ({@link naechstesMerkmal}). Nur Features mit `treffer` erzeugen eine
- * Zone. Seit LFH-711 setzt jeder Marker-Builder der Lagekarte die Eigenschaft (Kräfte, Objekte,
- * Lagemeldungen, freie Zeichen, Abschnitte, Einsatzort), nicht mehr nur `personenMarker`; die
- * dunkle Außenkante ({@link KANTE_PAINT}) bleibt dagegen den Personen vorbehalten.
+ * Unsichtbare Trefferzone: ein Kreis mit dem Durchmesser aus `treffer`, ohne Füllung und Rand,
+ * unter allen Markerebenen und Klickziel wie sie — MapLibre prüft die Geometrie, nicht die
+ * Deckkraft (`e2e/gate3-trefflaeche.spec.ts`). Bei Überlappung wählt der Klick-Handler das
+ * nächstgelegene Merkmal ({@link naechstesMerkmal}). Jeder Marker-Builder der Lagekarte setzt
+ * `treffer`; die dunkle Außenkante ({@link KANTE_PAINT}) bleibt den Personen vorbehalten.
  */
 const TREFFER_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': ['/', ['get', 'treffer'], 2],
@@ -274,20 +258,13 @@ const TREFFER_PAINT: CircleLayerSpecification['paint'] = {
   'circle-stroke-width': 0,
 };
 /**
- * Dunkle Außenkante der Personen-Marker (LFH-650): 2 px Schwarz AUSSERHALB des weißen
- * Rands von {@link KREIS_PAINT} (MapLibre zeichnet `circle-stroke` außen, der Rand endet bei
- * 9 + 2 = 11 px). Zwei, nicht anderthalb Pixel: bei 1,5 px zerfiel die Kante bei DPR 1 in
- * Kantenglättung, gemessen 3,60 statt ≥ 17 gegen den hellen Grund. Der weiße Rand allein ist auf heller Grundlage keine Kante — gemessen
- * gegen den Kartengrund `#e8e8e8` (`e2e/betroffene-kontrast.spec.ts`), und SK II gelb füllt
- * dort auch nicht aus. Weiß UND Schwarz nebeneinander halten gegen JEDEN Grund ≥ 3 : 1
- * (WCAG 1.4.11): max(K(weiß, g), K(schwarz, g)) ≥ √21 ≈ 4,58 für jede Farbe g — deshalb
- * trägt die Kante auch auf Grundkarten, die e2e nicht lädt. Dieselbe Hell-Dunkel-Paarung wie
- * das Kurzzeichen (`KURZ_PAINT`). Nur für Features mit `sk`: die Lagekarte bleibt gleich.
+ * Dunkle Außenkante der Personen-Marker: 2 px Schwarz außerhalb des weißen Rands von {@link
+ * KREIS_PAINT} (der Rand endet bei 9 + 2 = 11 px). Zwei, nicht anderthalb Pixel: bei 1,5 px zerfiel
+ * die Kante bei DPR 1 in Kantenglättung. Weiß und Schwarz nebeneinander halten gegen jeden Grund ≥
+ * 3 : 1 (WCAG 1.4.11): max(K(weiß, g), K(schwarz, g)) ≥ √21 ≈ 4,58. Nur für Features mit `sk`.
  *
- * Bewusst `'#000'` und NICHT `sichtungsfarben.schwarz`: die Kante ist eine Kontur, keine
- * Sichtungsaussage — sie steht an JEDEM Personen-Marker gleich. Aus der Sichtungsachse gelesen
- * sähe sie wie eine Bindung an „Tote" aus, die es nicht gibt; „tot" unterscheidet sich durch
- * die gefüllte Fläche und das Kürzel „T". Gleicher Wert wie der Text von `KURZ_PAINT`.
+ * Bewusst `'#000'` und nicht `sichtungsfarben.schwarz`: die Kante ist eine Kontur, keine
+ * Sichtungsaussage — aus der Sichtungsachse gelesen sähe sie wie eine Bindung an „Tote" aus.
  */
 const KANTE_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': 13,
@@ -300,11 +277,9 @@ const KREIS_PAINT: CircleLayerSpecification['paint'] = {
   'circle-stroke-width': 2,
 };
 /**
- * Kurzzeichen im Kreis (LFH-613, Betroffenen-Karte): die Sichtung als Wort-Kürzel („II")
- * IN der Markerfläche — der zweite Kanal neben der Farbe (WCAG 1.4.1), der anders als die
- * Plakette WEDER am Mindestzoom hängt NOCH einer Kollision weicht. Schwarz mit weißem Hof
- * liest sich auf allen Sichtungsfarben (rot/gelb/grün/blau/schwarz) — dieselbe Hell-Dunkel-
- * Paarung wie der weiße Kreisrand von `KREIS_PAINT`.
+ * Kurzzeichen im Kreis (Betroffenen-Karte): die Sichtung als Kürzel („II") in der Markerfläche —
+ * der zweite Kanal neben der Farbe, der anders als die Plakette weder am Mindestzoom hängt noch
+ * einer Kollision weicht. Schwarz mit weißem Hof liest sich auf allen Sichtungsfarben.
  */
 function kurzLayout(
   schrift: string[] | undefined,
@@ -329,19 +304,16 @@ const SYMBOL_LAYOUT: SymbolLayerSpecification['layout'] = {
 };
 
 /**
- * Ab dieser Zoomstufe tragen Marker ihre Namensplakette (LFH-622). Darunter ist die Karte
- * Übersicht: die Cluster fassen ohnehin bis Zoom 14 zusammen, und einzelne Namen zwischen
- * Donuts lesen sich als Rauschen. Der aufgefächerte Spider ist ausgenommen.
+ * Ab dieser Zoomstufe tragen Marker ihre Namensplakette. Darunter ist die Karte Übersicht (die
+ * Cluster fassen bis Zoom 14 zusammen). Der aufgefächerte Spider ist ausgenommen.
  */
 export const BESCHRIFTUNG_AB_ZOOM = 12;
 
 /**
- * Plakette neben dem Zeichen im Entwurfsstil (Neuentwurf S5): 9-Slice-Bild (`plakette.ts`)
- * per `icon-text-fit` um den Namen. Kollision bleibt AN — die umgekehrte Regel der Zeichen,
- * die nie verschwinden dürfen: eine Plakette darf weichen. Vorher probiert sie die vier
- * Seiten ihres Zeichens (`text-variable-anchor`); der Abstand von 3 em (bei 10 px Schrift
- * 30 px) setzt sie neben das auf ≤ 34 px normierte Zeichen plus die Lücke des Entwurfs.
- * Die Schrift wählt `plakettenSchrift` nach dem Glyphen-Server des aktiven Stils.
+ * Plakette neben dem Zeichen: 9-Slice-Bild (`plakette.ts`) per `icon-text-fit` um den Namen.
+ * Kollision bleibt an — anders als ein Zeichen darf eine Plakette weichen; vorher probiert sie die
+ * vier Seiten (`text-variable-anchor`). 3 em Abstand setzen sie neben das auf ≤ 34 px normierte
+ * Zeichen. Die Schrift wählt `plakettenSchrift` nach dem Glyphen-Server des aktiven Stils.
  */
 function plakettenLayout(
   schrift: string[] | undefined,
@@ -363,11 +335,10 @@ const PLAKETTEN_PAINT: SymbolLayerSpecification['paint'] = { 'text-color': ['get
 const leerFc = (): MarkerFeatureCollection => ({ type: 'FeatureCollection', features: [] });
 
 /**
- * Teilt die clusterbaren Marker auf ihre Quellen (LFH-648): was `clusterQuelle: 'personen'`
- * trägt (die Betroffenen der Lagekarte), in `marker-personen`, alles andere in
- * `marker-cluster`. Datengetrieben statt über einen Kartenschalter: die Betroffenen-Karte
- * setzt das Feld nicht und behält ihre Sichtungs-Donuts (LFH-650), und `kartenLayer.ts` muss
- * nach einem Stilwechsel nichts weiter wissen. Die EINE Stelle der Zuordnung.
+ * Teilt die clusterbaren Marker auf ihre Quellen: `clusterQuelle: 'personen'` (Betroffene der
+ * Lagekarte) nach `marker-personen`, alles andere nach `marker-cluster`. Datengetrieben statt über
+ * einen Kartenschalter — die Betroffenen-Karte setzt das Feld nicht, und `kartenLayer.ts` muss nach
+ * einem Stilwechsel nichts wissen. Die eine Stelle der Zuordnung.
  */
 function teileNachQuelle(
   marker: MarkerFeatureCollection,
@@ -388,7 +359,7 @@ function clusterRadius(zuschlag: number): ExpressionSpecification {
 
 /**
  * MapLibre-Ausdruck „Wert der dringlichsten Sichtung im Cluster": die erste Kategorie aus
- * `SK_DRINGLICHKEIT`, deren Zähler `s_<kategorie>` (aus `clusterTypProperties`) positiv ist.
+ * `SK_DRINGLICHKEIT`, deren Zähler `s_<kategorie>` positiv ist.
  */
 function nachDringlichkeit(
   wert: (k: (typeof SK_DRINGLICHKEIT)[number]) => string,
@@ -406,9 +377,8 @@ function nachDringlichkeit(
 
 /** Clusterquelle mit den Einstellungen, die beide Marker-Quellen teilen. */
 function clusterQuelle(data: MarkerFeatureCollection) {
-  // clusterRadius:45 px — moderates Zusammenfassen erst bei echtem Gedränge (dezent, kein
-  // aggressives Verschmelzen schon bei lockerer Streuung). clusterMaxZoom:14 — ab Zoom 14
-  // wird nicht mehr geclustert (Einzelmarker), passend zur Detailarbeit auf Stadt-/Objektebene.
+  // clusterRadius 45 px: zusammengefasst wird erst bei echtem Gedränge. clusterMaxZoom 14: darüber
+  // Einzelmarker für die Detailarbeit.
   return {
     type: 'geojson' as const,
     data: data as never,
@@ -421,10 +391,9 @@ function clusterQuelle(data: MarkerFeatureCollection) {
 }
 
 /**
- * Idempotent: Sources (Cluster + ungeclusterter Einsatzort) und circle/symbol-Layer für
- * Marker + Clustering. Style-Wechsel entfernt Sources/Layer → bei der Re-Anlage erneut aufrufen.
- * Layer-Reihenfolge (Mal-Reihenfolge von unten): Status-Ring, Kreis (Lagemeldung), TZ-Symbol,
- * Einsatzort-Symbol. Cluster sind separate DOM-Donut-Marker (clusterDonut), kein Layer.
+ * Idempotent: Sources (Cluster + ungeclusterter Einsatzort) und circle/symbol-Layer. Nach einem
+ * Style-Wechsel erneut aufrufen. Mal-Reihenfolge von unten: Status-Ring, Kreis (Lagemeldung),
+ * TZ-Symbol, Einsatzort-Symbol. Cluster sind DOM-Donut-Marker.
  */
 export function sorgeFuerMarkerLayer(
   map: MapLibreMap,
@@ -438,10 +407,9 @@ export function sorgeFuerMarkerLayer(
   if (!map.getSource(MARKER_EINSATZORT_QUELLE)) {
     map.addSource(MARKER_EINSATZORT_QUELLE, { type: 'geojson', data: einsatzort as never });
   }
-  // FMS-Status-Ring (nur Fahrzeuge mit Status) — Kreis HINTER dem Symbol, der über dessen Rand
-  // hinausragt → erscheint als farbiger Ring. radius:20 (=40px Durchmesser) > die in Kartenflaeche
-  // auf ≤34px normierte Symbolgröße (ZIEL_PX), analog zum früheren 3px-DOM-Border. statusFarbe
-  // tragen ausschließlich Fahrzeuge (konstantes TZ) → ein fester Radius genügt.
+  // FMS-Status-Ring (nur Fahrzeuge mit Status): ein Kreis hinter dem Symbol, der über dessen Rand
+  // hinausragt. radius 20 (40 px) > die in Kartenflaeche auf ≤ 34 px normierte Symbolgröße; nur
+  // Fahrzeuge tragen `statusFarbe`, ein fester Radius genügt.
   if (!map.getLayer('marker-status-ring')) {
     map.addLayer({
       id: 'marker-status-ring',
@@ -469,7 +437,7 @@ export function sorgeFuerMarkerLayer(
       paint: { ...KANTE_PAINT },
     });
   }
-  // Lagemeldung (kein TZ) — einfacher Kreis (heutige Optik: farbig, weißer Rand).
+  // Lagemeldung (kein TZ) — einfacher Kreis, farbig mit weißem Rand.
   if (!map.getLayer('marker-kreis')) {
     map.addLayer({
       id: 'marker-kreis',
@@ -489,12 +457,9 @@ export function sorgeFuerMarkerLayer(
       layout: { ...SYMBOL_LAYOUT },
     });
   }
-  // Cluster-Bubbles bewusst NICHT als circle/symbol-Layer — sie werden als DOM-Donut-Marker
-  // gerendert (clusterDonut + DOM-Sync in Kartenflaeche): weiche Schatten + Typ-Zusammensetzung,
-  // was WebGL-circle nicht kann. Die unclustered Einzelpunkte bleiben die Layer oben.
-  // Einsatzort (eigene, ungeclusterte Source) — immer als Einzelsymbol sichtbar.
-  // Trefferzone des Einsatzorts (LFH-711): eigene Quelle, also eigene Zone — `marker-treffer`
-  // sieht den Einsatzort nicht, weil `baueMarkerFc` ihn aus `marker-cluster` herausnimmt.
+  // Cluster-Bubbles sind DOM-Donut-Marker, kein Layer (weiche Schatten + Typ-Zusammensetzung kann
+  // WebGL-circle nicht). Der Einsatzort (eigene, ungeclusterte Source) ist immer als Einzelsymbol
+  // sichtbar und hat eine eigene Trefferzone — `marker-treffer` sieht ihn nicht.
   if (!map.getLayer('marker-einsatzort-treffer')) {
     map.addLayer({
       id: 'marker-einsatzort-treffer',
@@ -512,8 +477,8 @@ export function sorgeFuerMarkerLayer(
       layout: { ...SYMBOL_LAYOUT },
     });
   }
-  // Namensplaketten (LFH-622). Die Schrift nur lesen, wenn überhaupt ein Layer fehlt —
-  // `getStyle` serialisiert den ganzen Stil.
+  // Namensplaketten. Die Schrift nur lesen, wenn ein Layer fehlt — `getStyle` serialisiert den
+  // ganzen Stil.
   const fehlt = (id: string) => !map.getLayer(id);
   const schrift =
     fehlt('marker-label') ||
@@ -526,13 +491,10 @@ export function sorgeFuerMarkerLayer(
     fehlt('spider-kurz')
       ? plakettenSchrift(map.getStyle())
       : undefined;
-  // Betroffene (LFH-648): Kreis in Sichtungsfarbe, Kürzel darin, Plakette „R-042 · SK II" ab
-  // `BESCHRIFTUNG_AB_ZOOM` — dieselbe Optik wie die übrigen Kreis-Marker, nur aus der eigenen
-  // Quelle. Kein Symbol- und kein Status-Layer: Personen tragen weder TZ noch FMS-Status.
-  // Personen-Cluster der Lagekarte: Kreis in der Farbe der DRINGLICHSTEN Sichtung (dieselbe
-  // Aggregation `s_<kategorie>` wie der Sichtungs-Donut der Betroffenen-Karte, LFH-650), darin
-  // Zahl und Kürzel — die Kategorie also nie allein über die Farbe (WCAG 1.4.1). Weißer Rand
-  // plus schwarze Außenkante wie am Einzelmarker (`KANTE_PAINT`): hält gegen jeden Grund.
+  // Betroffene: Kreis in Sichtungsfarbe, Kürzel darin, Plakette ab `BESCHRIFTUNG_AB_ZOOM` — aus der
+  // eigenen Quelle, ohne Symbol- und Status-Layer. Personen-Cluster: Kreis in der Farbe der
+  // dringlichsten Sichtung (Aggregation `s_<kategorie>`), darin Zahl und Kürzel — die Kategorie nie
+  // allein über die Farbe. Weißer Rand plus schwarze Außenkante wie am Einzelmarker.
   if (fehlt('personen-cluster-kante')) {
     map.addLayer({
       id: 'personen-cluster-kante',
@@ -580,8 +542,8 @@ export function sorgeFuerMarkerLayer(
       paint: { ...KURZ_PAINT },
     });
   }
-  // Trefferzone und Außenkante der Einzel-Personen wie in `marker-cluster` (LFH-650) — die
-  // Personen der Lagekarte tragen `treffer`/`sk` aus `personenMarker`.
+  // Trefferzone und Außenkante der Einzel-Personen wie in `marker-cluster`; die Personen tragen
+  // `treffer`/`sk` aus `personenMarker`.
   if (fehlt('personen-treffer')) {
     map.addLayer({
       id: 'personen-treffer',
@@ -667,10 +629,9 @@ export function sorgeFuerMarkerLayer(
 }
 
 /**
- * Idempotent: zwei ungeclusterte Sources (Leaves + Beinchen) und ihre Layer für das Auffächern
- * (Spiderfy). Die Daten setzt der Controller in Kartenflaeche via setzeSpiderDaten; initial leer.
- * Beinchen (Linien zum Anker) ZUERST → unter den Leaf-Symbolen. Die Leaf-Layer spiegeln die
- * Einzelmarker-Optik (geteilte Paints), Filter ohne point_count (Spider-Source ist ungeclustert).
+ * Idempotent: zwei ungeclusterte Sources (Leaves + Beinchen) und ihre Layer für das Auffächern. Die
+ * Daten setzt der Controller in Kartenflaeche (`setzeSpiderDaten`). Beinchen zuerst, also unter den
+ * Leaf-Symbolen; die Leaf-Layer spiegeln die Einzelmarker-Optik.
  */
 function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
   if (!map.getSource(SPIDER_LEAVES_QUELLE)) {
@@ -742,8 +703,7 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       paint: { ...KURZ_PAINT },
     });
   }
-  // Ohne Mindestzoom: aufgefächert wird, um zu unterscheiden — dort ist der Name der Zweck.
-  // Mit Kollision wie überall: sich überdeckende Namen unterscheiden nichts.
+  // Ohne Mindestzoom: aufgefächert wird, um zu unterscheiden. Mit Kollision wie überall.
   if (!map.getLayer('spider-label')) {
     map.addLayer({
       id: 'spider-label',
@@ -757,14 +717,12 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
 }
 
 /**
- * Hält die Marker-Layer über allen anderen Daten-Layern (Abschnitte/Zonen/Bilder/Fachebenen).
- * moveLayer ohne beforeId schiebt ans Ende (= oben); die Reihenfolge erhält die Mal-Reihenfolge
- * (Status-Ring unten … Einsatzort-Symbol oben).
+ * Hält die Marker-Layer über allen anderen Daten-Layern: moveLayer ohne beforeId schiebt ans Ende,
+ * die Reihenfolge erhält die Mal-Reihenfolge.
  *
- * Muss nach JEDER dynamischen Layer-Anlage einer anderen Ebene erneut laufen: jene legen ohne
- * beforeId an und landen sonst über den Markern (verdecken sie + fangen ihre Klicks ab). Beim
- * Mount racet zudem der Marker-render-Poller mit den anderen Daten-Pollern; das Pinnen macht die
- * Reihenfolge unabhängig davon. (DOM-Marker lagen früher immer über dem Canvas.)
+ * Muss nach jeder dynamischen Layer-Anlage einer anderen Ebene erneut laufen — jene landen sonst
+ * über den Markern und fangen deren Klicks ab. Beim Mount macht das Pinnen die Reihenfolge
+ * unabhängig vom Rennen der Render-Poller.
  */
 export function pinneMarkerLayerNachOben(map: MapLibreMap) {
   for (const id of MARKER_LAYER_REIHENFOLGE) {
@@ -799,11 +757,9 @@ export function setzeSpiderDaten(
 }
 
 /**
- * Das Merkmal, das einem Klickpunkt am NÄCHSTEN liegt (Review LFH-650). Seit den Trefferzonen
- * überlappen die Klickflächen benachbarter Marker regelmäßig (Zone 48/72 px, Spider-Abstand
- * 40 px); MapLibre liefert die Treffer aber in Zeichenreihenfolge, nicht nach Abstand. Ohne
- * diese Wahl öffnete ein Tipp neben Person A womöglich die obenauf gezeichnete Person B.
- * Rein, damit die Wahl ohne WebGL prüfbar ist; `projiziere` ist `map.project`.
+ * Das Merkmal, das einem Klickpunkt am nächsten liegt. Mit den Trefferzonen überlappen die
+ * Klickflächen benachbarter Marker (Zone 48/72 px, Spider-Abstand 40 px); MapLibre liefert die
+ * Treffer in Zeichenreihenfolge, nicht nach Abstand. Rein; `projiziere` ist `map.project`.
  */
 export function naechstesMerkmal<F extends { geometry?: { type: string; coordinates?: unknown } }>(
   merkmale: readonly F[],

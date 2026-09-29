@@ -23,21 +23,15 @@ import { alsBackendZeit } from '../etb/filterZeit';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 
 /**
- * Lageberichte als Kartensicht (LFH-330 · B2, Bündel III) — der Zwilling der Befehlsliste.
+ * Lageberichte als Kartensicht — Zwilling der Befehlsliste. `form="karte"` in jeder Breite: ein
+ * Lagebericht wird als Einheit gelesen (Vorlage, Fassung, Freigabestand), nicht spaltenweise
+ * verglichen.
  *
- * `form="karte"` in JEDER Breite: ein Lagebericht wird als EINHEIT gelesen (Vorlage,
- * Fassung, Freigabestand), nicht spaltenweise verglichen. Beide Flächen werden gemeinsam
- * umgestellt, weil sie bis auf die Fachbegriffe gleich gebaut sind — nur eine von beiden
- * umzustellen erzeugte eine Divergenz zwischen zwei nahezu identischen Seiten.
- *
- * SEIT LFH-348 · C13 (Befund N23) ZEIGT DIE SICHT KETTENKÖPFE, NICHT BERICHTE. Die
- * Fortschreibung legt eine NEUE Zeile mit `version + 1` und demselben Titel an, der
- * Vorgänger bleibt freigegeben liegen — die Liste trug damit je Kette n gleichnamige
- * Karten, unterscheidbar nur an der Fassung, und der Arbeitsvorrat („welcher Stand ist der
- * aktuelle?") war nicht ablesbar. Jetzt trägt jede Kette EINE Karte mit dem jüngsten Stand
- * im Kopf und den Vorgängern als Links in der Fassungszeile (`lageberichte/ketten.ts`).
- * Suche, Filter und Gruppen laufen über den Kopf; ein Vorgänger ist über seinen Link
- * erreichbar, aber kein eigener Treffer.
+ * Die Sicht zeigt Kettenköpfe, nicht Berichte. Die Fortschreibung legt eine neue Zeile mit `version
+ * + 1` und demselben Titel an, der Vorgänger bleibt freigegeben liegen. Jede Kette trägt eine Karte
+ * mit dem jüngsten Stand im Kopf und den Vorgängern als Links in der Fassungszeile
+ * (`lageberichte/ketten.ts`). Suche, Filter und Gruppen laufen über den Kopf; ein Vorgänger ist
+ * über seinen Link erreichbar, aber kein eigener Treffer.
  */
 
 function vorlageLabel(schluessel: LageberichtVorlageKey | string): string {
@@ -45,10 +39,9 @@ function vorlageLabel(schluessel: LageberichtVorlageKey | string): string {
 }
 
 /**
- * Die Spalten brauchen die `einsatzId` (Vorgänger-Links) und entstehen deshalb in der
- * Komponente — mit `spaltenFuer`, weil der Guard die Marke je Konsumentendatei verlangt.
- * Nie annotieren — eine Typangabe weitete `K` auf `string`, und der Kartenplan nähme danach
- * jeden Slot-Tippfehler stillschweigend an.
+ * Die Spalten brauchen die `einsatzId` (Vorgänger-Links) und entstehen in der Komponente — mit
+ * `spaltenFuer`, weil der Guard die Marke je Konsumentendatei verlangt. Nie annotieren: eine
+ * Typangabe weitete `K` auf `string`, und der Kartenplan nähme Slot-Tippfehler an.
  */
 function lageberichtSpalten(einsatzId: number) {
   return spaltenFuer<KettenKopf>()([
@@ -58,14 +51,14 @@ function lageberichtSpalten(einsatzId: number) {
       immerSichtbar: true,
       sortWert: (k) => k.kopf.titel,
       suchText: (k) => k.kopf.titel,
-      // KEIN Anker hier: den Link setzt `karte.titel.ziel`, sonst verschachtelte Links.
+      // Kein Anker hier: den Link setzt `karte.titel.ziel`, sonst verschachtelte Links.
       render: (_t, k) => k.kopf.titel,
     },
     {
       key: 'status',
       title: 'Status',
       // Sekundärslot statt `karte.status`: das Modul bleibt auf der Phasenachse aus
-      // `kommunikation/phase.ts`, die bewusst außerhalb des A2-Statusfarb-Vertrags liegt.
+      // `kommunikation/phase.ts`, die bewusst außerhalb des Statusfarb-Vertrags liegt.
       render: (_t, k) => (
         <StatusBadge
           phase={LAGEBERICHT_STATUS[k.kopf.status].phase}
@@ -75,8 +68,7 @@ function lageberichtSpalten(einsatzId: number) {
     },
     {
       key: 'vorlage',
-      // Bezeichnung „Vorlage" beibehalten — beim Lagebericht heißt die Achse so, beim Befehl
-      // „Schema". Eine Umbenennung wäre eine fachliche Änderung ohne Anlass.
+      // Beim Lagebericht heißt die Achse „Vorlage", beim Befehl „Schema".
       title: 'Vorlage',
       suchText: (k) => vorlageLabel(k.kopf.vorlage),
       filter: {
@@ -89,13 +81,11 @@ function lageberichtSpalten(einsatzId: number) {
       key: 'fassung',
       title: 'Fassung',
       sortWert: (k) => k.kopf.zeitstand,
-      // v-Nummer, Zeitstand und Ersteller in EINER Zeile — drei Slots sind das Maximum.
-      // `zeitstand` läuft seit LFH-350 (F2/H60) durch `ZeitAnzeige` (taktische DTG in der
-      // Anzeigezone), gleichlautend mit der Detailseite. `sortWert` bleibt der rohe
-      // UTC-Wirestring: der sortiert lexikografisch korrekt, die DTG (`DDHHmm…`) nicht.
-      // Die Vorgänger als Deeplinks aus dem Spalten-`render` — erlaubt, weil NICHT die
-      // Titelspalte (deren Anker setzt das Primitiv); der Klick-Riegel im Primitiv trennt
-      // den Link-Klick vom Zeilenklick (LFH-340 · C5).
+      // v-Nummer, Zeitstand und Ersteller in einer Zeile — drei Slots sind das Maximum. `zeitstand`
+      // läuft durch `ZeitAnzeige` (taktische DTG in der Anzeigezone); `sortWert` bleibt der
+      // UTC-Wirestring, der lexikografisch sortiert, die DTG nicht. Die Vorgänger als Deeplinks aus
+      // dem Spalten-`render` — erlaubt, weil nicht die Titelspalte; der Klick-Riegel im Primitiv
+      // trennt Link- und Zeilenklick.
       render: (_t, k) => (
         <>
           {`v${k.kopf.version} · `}
@@ -126,8 +116,7 @@ interface AnlegenWerte {
 }
 
 /**
- * Titelvorschlag aus der Uhrzeit — die Konvention, die der Platzhalter schon nannte
- * („Lageüberblick 10:30 Uhr"), jetzt vorbelegt in taktischer Schreibweise. Rein und
+ * Titelvorschlag aus der Uhrzeit („Lageüberblick 10:30 Uhr") in taktischer Schreibweise. Rein und
  * exportiert, damit die Form ohne Uhr prüfbar ist.
  */
 export function titelVorschlag(jetzt: Dayjs): string {
@@ -164,26 +153,22 @@ export default function LageberichtePage() {
         ...(w.zeitstand ? { zeitstand: alsBackendZeit(w.zeitstand) } : {}),
       }),
     onSuccess: invalidate,
-    // KEIN Toast (LFH-494): der Grund steht im Dialog. Die Erfassungs-Hülle lässt die Werte
-    // bei Ablehnung stehen (B4/LFH-332) — bis dahin aber ohne Grund, der Dialog sah nach dem
-    // Verschwinden des Toasts unverändert aus. Hier bleibt es bei `mutation.error` mit
-    // react-querys Räumen beim Absenden: anders als beim Autosave der Entwurfsseiten
-    // (`useEntwurfVerlustschutz`) drückt hier ein Mensch den Knopf, es gibt keinen Auto-Retry.
+    // Kein Toast: der Grund steht im Dialog, der die Werte bei Ablehnung stehen lässt. Es bleibt
+    // bei `mutation.error` mit react-querys Räumen beim Absenden — anders als beim Autosave drückt
+    // hier ein Mensch den Knopf, es gibt keinen Auto-Retry.
   });
 
   /**
-   * Der Titelvorschlag wird BEIM ÖFFNEN in den Formularspeicher geschrieben — nicht über
-   * `initialValues`. Gemessen (Review LFH-348): der Speicher von rc-field-form überlebt das
-   * Abhängen der Kinder (`destroyOnHidden`), und beim nächsten Einhängen gewinnt der alte
-   * Store gegen neue `initialValues` (`useForm.js`: `merge(initialValues, store)`). Ein
-   * zweites Öffnen um 14:15 zeigte sonst „Lageüberblick 1030" — in einer Kette, in der die
-   * Uhrzeit im Titel der Ordnungsschlüssel ist, eine falsche Angabe in einer Führungsunterlage.
-   * Dieselbe Falle beschreibt `components/Erfassung.tsx` am `ErfassungsModal`.
+   * Der Titelvorschlag wird beim Öffnen in den Formularspeicher geschrieben, nicht über
+   * `initialValues`: der Speicher von rc-field-form überlebt `destroyOnHidden`, und beim nächsten
+   * Einhängen gewinnt der alte Store (`merge(initialValues, store)`). Ein zweites Öffnen zeigte
+   * sonst die Uhrzeit des ersten — in einer Kette, in der die Uhrzeit im Titel der
+   * Ordnungsschlüssel ist, eine falsche Angabe. Dieselbe Falle beschreibt
+   * `components/Erfassung.tsx`.
    *
-   * Der Vorschlag braucht den EFFEKT (der Formularspeicher steht erst nach dem Einhängen);
-   * das Räumen des letzten Fehlers braucht ihn NICHT und liegt deshalb im Öffnen-Handler
-   * (LFH-494). Ein Effekt läuft nach dem Paint — der abgelehnte Versuch von vorhin stünde
-   * sonst ein Bild lang über einem frisch vorbelegten Formular.
+   * Der Vorschlag braucht den Effekt (der Formularspeicher steht erst nach dem Einhängen); das
+   * Räumen des letzten Fehlers liegt im Öffnen-Handler, weil ein Effekt nach dem Paint läuft und
+   * der alte Grund sonst ein Bild lang über einem frischen Formular stünde.
    */
   useEffect(() => {
     if (anlegenOffen) form.setFieldsValue({ titel: titelVorschlag(dayjs()) });
@@ -209,9 +194,9 @@ export default function LageberichtePage() {
   const entwuerfe = berichte.filter((lb) => lb.status === 'entwurf').length;
 
   return (
-    // Die Mengen im Kopf zählen den BESTAND, während die Gruppenköpfe das ANGEZEIGTE
-    // zählen — bei aktiver Suche laufen die Zahlen deshalb auseinander. Gewollt: der
-    // Seitenkopf ist die Lageauskunft, der Gruppenkopf die Auskunft über die Trefferliste.
+    // Die Mengen im Kopf zählen den Bestand, die Gruppenköpfe das Angezeigte — bei aktiver Suche
+    // laufen die Zahlen auseinander. Gewollt: der Seitenkopf ist die Lageauskunft, der Gruppenkopf
+    // die Auskunft über die Trefferliste.
     <EinsatzSeite
       titel="Lageberichte"
       meta={`${berichte.length} Berichte in ${koepfe.length} Ketten · ${entwuerfe} im Entwurf`}
@@ -227,9 +212,9 @@ export default function LageberichtePage() {
       }
       aktionen={
         darfSchreiben && (
-          // Kein `size`-Prop: Träger der Dichte ist das Dichte-Token am `ConfigProvider`.
-          // `aria-label` gegen antds Icon-Etikett: `<span role="img" aria-label="plus">`
-          // fließt sonst in den berechneten Namen ein („plus Neuer Bericht", gemessen).
+          // Kein `size`-Prop: die Dichte trägt das Token am `ConfigProvider`. `aria-label` gegen
+          // antds Icon-Etikett: `<span role="img" aria-label="plus">` flösse sonst in den Namen ein
+          // („plus Neuer Bericht").
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -262,17 +247,15 @@ export default function LageberichtePage() {
         karte={{
           art: 'plan',
           titel: { spalte: 'titel', ziel: (k) => lageberichtDetailPfad(einsatzId, k.kopf.id) },
-          // Keine `aktion`: Freigeben/Fortschreiben/Drucken liegen auf der Detailseite,
-          // die einzige Interaktion der Zeile ist der Titel-Link.
+          // Keine `aktion`: Freigeben/Fortschreiben/Drucken liegen auf der Detailseite, die einzige
+          // Interaktion der Zeile ist der Titel-Link.
           sekundaer: ['status', 'vorlage', 'fassung'],
         }}
       />
 
-      {/*
-        Erfassungs-Hülle (B4/LFH-332): Absende-Knopf IM Formular (Enter sendet), Fokus im
-        ersten Feld — das ist der Titel, deshalb steht er vor der Vorlage (N23 verlangt den
-        Fokus dort). Drei Felder, innerhalb der LFH-19-Modal-Grenze.
-      */}
+      {/* Erfassungs-Hülle: Absende-Knopf im Formular (Enter sendet), Fokus im ersten Feld — das
+          ist der Titel, deshalb steht er vor der Vorlage. Drei Felder, innerhalb der
+          Modal-Grenze. */}
       <ErfassungsModal<AnlegenWerte>
         offen={anlegenOffen}
         titel="Neuer Lagebericht"
@@ -284,9 +267,8 @@ export default function LageberichtePage() {
         onFertig={() => setAnlegenOffen(false)}
         onAbbrechen={() => setAnlegenOffen(false)}
       >
-        {/* Der Grund der Ablehnung steht ÜBER den Feldern, deren Werte stehen geblieben
-            sind — sonst ist der unveränderte Dialog von „nichts passiert" nicht zu
-            unterscheiden (LFH-494). */}
+        {/* Der Grund der Ablehnung steht über den stehengebliebenen Feldern — sonst wäre der
+            unveränderte Dialog von „nichts passiert" nicht zu unterscheiden. */}
         {anlegenMutation.error != null && (
           <div style={{ marginBottom: token.marginSM }}>
             <SpeicherFehler fehler={anlegenMutation.error} titel="Nicht angelegt" />

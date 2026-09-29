@@ -1,31 +1,7 @@
 use axum::http::StatusCode;
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, login_cookie, setup};
-
-// ---------- Harness ----------
-
-async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let app = build_router(AppState {
-        pool: pool.clone(),
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (app, pool)
-}
+use common::{anfrage, benutzer_anlegen, login_cookie, setup, setup_mit_pool};
 
 // ---------- Tests ----------
 

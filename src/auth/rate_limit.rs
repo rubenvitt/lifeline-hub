@@ -1,23 +1,11 @@
-//! Rate-Limit für fehlgeschlagene Anmeldeversuche (LFH-249/F30).
+//! Rate-Limit für fehlgeschlagene Anmeldeversuche (LFH-249).
 //!
-//! Ohne Bremse ist das Login beliebig oft pro Sekunde probierbar — bei einem System, das
-//! im Einsatz auch mal offen im Netz hängt, ist das die billigste Angriffsfläche
-//! überhaupt.
+//! In-code statt Fremd-Crate, um keinen neuen Abhängigkeitsbaum hereinzuholen.
 //!
-//! **In-code statt Fremd-Crate** (z.B. `tower_governor`): ein neuer Abhängigkeitsbaum
-//! widerspräche der Supply-Chain-Härtung aus LFH-253/G01, und das Projekt hat für
-//! prozessweiten Zustand bereits ein Muster (`LazyLock`-Statics). Der Bedarf hier ist
-//! eine Handvoll Zeilen.
-//!
-//! **Bewusst großzügig parametrisiert.** Eine ganze Wache kann hinter einer NAT-IP
-//! hängen; eine zu enge Schwelle sperrt dann im Ernstfall alle gleichzeitig aus, und ein
-//! Aussperren im Einsatz ist ein echter Betriebsschaden. Deshalb:
-//! - nur FEHLVERSUCHE zählen (erfolgreiche Anmeldungen räumen den Zähler),
-//! - [`MAX_FEHLVERSUCHE`] pro [`FENSTER`] je Quelle,
-//! - die Sperre läuft von selbst aus, es gibt keine dauerhafte Blockliste.
-//!
-//! Die Spur der Fehlversuche liegt zusätzlich in `auth_audit` — auch wer unterhalb der
-//! Schwelle bleibt, ist damit auswertbar.
+//! Bewusst großzügig: eine ganze Wache kann hinter einer NAT-IP hängen, und ein Aussperren im
+//! Einsatz ist ein echter Betriebsschaden. Deshalb zählen nur Fehlversuche (ein Erfolg räumt
+//! den Zähler), [`MAX_FEHLVERSUCHE`] je [`FENSTER`] und Quelle, und die Sperre läuft von selbst
+//! aus. Die Spur der Fehlversuche steht zusätzlich in `auth_audit`.
 
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -30,17 +18,14 @@ pub const MAX_FEHLVERSUCHE: usize = 10;
 /// Beobachtungsfenster für Fehlversuche.
 pub const FENSTER: Duration = Duration::from_secs(300);
 
-/// Fehlversuche je Quell-IP mit Zeitstempel. Prozessweit wie die übrigen Statics des
-/// Projekts — kein `AppState`, damit die vielen inline-`AppState`-Konstruktionen in Tests
+/// Fehlversuche je Quell-IP. Prozessweit statt in `AppState`, damit Test-Konstruktionen
 /// unberührt bleiben.
 static FEHLVERSUCHE: LazyLock<Mutex<HashMap<IpAddr, Vec<Instant>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// Ist diese Quelle aktuell gesperrt? Liefert `true`, wenn bereits zu viele Fehlversuche
-/// im Fenster liegen.
+/// Ist diese Quelle aktuell gesperrt?
 ///
-/// Synchron und ohne `await` — der `MutexGuard` darf einen `.await` nicht überleben, sonst
-/// wird der Handler `!Send` und axum nimmt ihn nicht mehr an.
+/// Synchron: der `MutexGuard` darf kein `.await` überleben, sonst wird der Handler `!Send`.
 pub fn ist_gesperrt(ip: IpAddr) -> bool {
     let mut map = FEHLVERSUCHE.lock().unwrap_or_else(|e| e.into_inner());
     let Some(versuche) = map.get_mut(&ip) else {
@@ -62,10 +47,8 @@ pub fn fehlversuch(ip: IpAddr) {
     versuche.push(Instant::now());
 }
 
-/// Räumt die Quelle nach erfolgreicher Anmeldung.
-///
-/// Wichtig gegen die NAT-Falle: sobald sich jemand aus dem Netz erfolgreich anmeldet,
-/// ist der Zähler für alle dahinter wieder frei.
+/// Räumt die Quelle nach erfolgreicher Anmeldung — damit ist der Zähler für alle hinter
+/// derselben NAT-IP wieder frei.
 pub fn erfolg(ip: IpAddr) {
     let mut map = FEHLVERSUCHE.lock().unwrap_or_else(|e| e.into_inner());
     map.remove(&ip);

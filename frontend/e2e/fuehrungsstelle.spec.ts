@@ -40,8 +40,8 @@ for (const breite of [1280, 390]) {
       path: testInfo.outputPath('fuehrungsstelle-pflegen.png'),
       animations: 'disabled',
     });
-    // LFH-461 Review: der Detail-Refetch nach dem Speichern kommt erst an,
-    // nachdem über die SPA-Navigation das ETB mit seinem alten Cache geöffnet ist.
+    // Der Detail-Refetch nach dem Speichern kommt erst an, nachdem über die SPA-Navigation das
+    // ETB mit seinem alten Cache geöffnet ist.
     let freigeben!: () => void;
     const antwort = new Promise<void>((resolve) => {
       freigeben = resolve;

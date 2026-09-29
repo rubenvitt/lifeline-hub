@@ -11,13 +11,10 @@ async function anmelden(page: Page) {
   await expect(page).toHaveURL(/\/einsaetze/);
 }
 
-// Regression LFH-13: Eine Platz-Karte ließ sich im Browser nicht verschieben, weil
-// onDragEnd wegen fehlender Drop-Zone unter der freien Layout-Fläche frühzeitig
-// returnte. Dieser Test deckt den Maus-Drag einer Platz-Karte und den PATCH-Roundtrip
-// (pos_x/pos_y, genau einmal) ab. Der Flow nutzt die aktuelle kompakte UHS-Navigation
-// (LFH-25): kein „Neu"/„+ Platz"/„OK" mehr, sondern Leerzustand „Erste UHS anlegen" und
-// „Plätze anlegen" (Typ + Menge). Eine frisch angelegte UHS ist `geplant` → der
-// Bearbeiten-Modus (Platz-Karten ziehbar) ist standardmäßig aktiv.
+// Eine Platz-Karte lässt sich per Maus verschieben, und die Layout-Mutation feuert genau
+// einen PATCH (pos_x/pos_y) — früher kehrte `onDragEnd` mangels Drop-Zone unter der freien
+// Fläche früh zurück (LFH-13). Eine frisch angelegte UHS ist `geplant`, der Bearbeiten-Modus
+// (Karten ziehbar) ist damit aktiv.
 test('UHS Grundriss: Platz-Karte per Maus verschieben löst genau einen PATCH aus', async ({
   page,
 }) => {
@@ -38,11 +35,10 @@ test('UHS Grundriss: Platz-Karte per Maus verschieben löst genau einen PATCH au
   await page.getByPlaceholder('z. B. BHP 50').fill(uhsName);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
 
-  // Detail öffnen — der Grundriss wird direkt angezeigt (kein „Grundriss"-Tab mehr).
+  // Detail öffnen — der Grundriss wird direkt angezeigt.
   await page.getByRole('button', { name: uhsName }).click();
 
-  // Einen Platz anlegen (Default Typ „Bett", Menge 1 → „Bett 1"). Der Server vergibt die
-  // Bezeichnung; es gibt keine manuelle Namenseingabe mehr.
+  // Einen Platz anlegen (Vorgabe „Bett", Menge 1 → „Bett 1"); die Bezeichnung vergibt der Server.
   await page.getByRole('button', { name: 'Plätze anlegen' }).click();
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
 

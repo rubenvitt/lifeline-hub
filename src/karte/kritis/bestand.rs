@@ -1,15 +1,13 @@
-//! KRITIS-Bestand in der Nachschlage-Cache-DB (LFH-83): Austausch nach einem Import und
-//! Abfrage je Karten-Ausschnitt.
+//! KRITIS-Bestand in der Nachschlage-Cache-DB (LFH-83): Austausch nach einem Import und Abfrage
+//! je Karten-Ausschnitt.
 //!
-//! **Warum nicht `fachebenen_cache`:** dessen Prune-on-Write räumt alles älter als zwei Tage
-//! weg — ein Wochenbestand wäre nach dem dritten Tag verschwunden. Und ein JSON-Blob je
-//! bbox lässt sich nicht nach Ausschnitt abfragen. **Warum nicht die operative DB:** der
-//! Bestand ist aus dem Extrakt jederzeit neu zu erzeugen, gehört also weder in Sicherungen
-//! noch unter die Writer-Disziplin des Einsatzbetriebs.
+//! Nicht in `fachebenen_cache`, weil dessen Prune-on-Write nach zwei Tagen räumt und ein
+//! JSON-Blob je bbox nicht nach Ausschnitt abfragbar ist. Nicht in der operativen DB, weil der
+//! Bestand jederzeit neu erzeugbar ist und weder in Sicherungen noch unter die Writer-Disziplin
+//! des Einsatzbetriebs gehört.
 //!
 //! Der Austausch ist atomar: geschrieben wird in `kritis_objekt_neu`, erst ein vollständiger
-//! Lauf tauscht in EINER Transaktion. Die Route sieht deshalb nie einen halben Bestand, und
-//! ein abgebrochener Lauf hinterlässt nur eine Staging-Tabelle, die der nächste verwirft.
+//! Lauf tauscht in EINER Transaktion. Die Route sieht nie einen halben Bestand.
 
 use super::extrakt::KritisObjekt;
 use super::KRITIS_ATTRIB;
@@ -17,19 +15,17 @@ use crate::karte::typen::{Bbox, FachebeneAntwort};
 use serde_json::{json, Value};
 use sqlx::SqlitePool;
 
-/// Obergrenze der Features je Antwort (Spec „Viele Objekte werden serverseitig verdichtet").
+/// Obergrenze der Features je Antwort; darüber wird verdichtet.
 pub const MAX_FEATURES: i64 = 5_000;
 
-/// Rasterweiten in Grad, aufsteigend. Gewählt wird die kleinste, bei der höchstens
-/// [`MAX_FEATURES`] Zellen auf den Ausschnitt fallen. Fest und am Nullmeridian/Äquator
-/// verankert — zwei Ausschnitte mit derselben Weite teilen sich also dieselben Zellen.
-/// Die obersten Stufen fangen auch einen Weltausschnitt (360° / 5° × 180° / 5° = 2 592).
+/// Rasterweiten in Grad, aufsteigend; gewählt wird die kleinste mit höchstens [`MAX_FEATURES`]
+/// Zellen im Ausschnitt. Fest und am Nullmeridian/Äquator verankert, damit Ausschnitte gleicher
+/// Weite dieselben Zellen teilen. Die oberen Stufen fangen auch einen Weltausschnitt.
 const RASTER_LEITER: [f64; 11] = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0];
 
-/// Versatz, mit dem `CAST(… AS INTEGER)` (schneidet zur Null hin ab) zum Abrunden wird: jede
-/// Zellennummer ist damit positiv. Bei der kleinsten Weite 0,01° reicht der Bereich bis
-/// −180 / 0,01 = −18 000; 100 000 lässt reichlich Luft. Rust rechnet dieselbe Formel
-/// (IEEE-754 wie SQLite), damit Zellgrenzen auf beiden Seiten identisch fallen.
+/// Versatz, mit dem `CAST(… AS INTEGER)` (schneidet zur Null hin ab) zum Abrunden wird; jede
+/// Zellennummer ist damit positiv. Rust rechnet dieselbe Formel (IEEE-754 wie SQLite), damit
+/// Zellgrenzen auf beiden Seiten identisch fallen.
 const ZELL_VERSATZ: f64 = 100_000.0;
 
 fn zelle(koordinate: f64, weite: f64) -> i64 {
@@ -80,8 +76,8 @@ pub async fn ersetze_bestand(
     objekte: &[KritisObjekt],
     meta: &ImportMeta,
 ) -> Result<(), sqlx::Error> {
-    // Eine Staging-Tabelle aus einem abgebrochenen Lauf ist unvollständig — nie weiterbauen.
-    // (Dasselbe gilt für `kritis_zelle_neu`, die unten vor ihrer Befüllung verworfen wird.)
+    // Eine Staging-Tabelle aus einem abgebrochenen Lauf ist unvollständig — nie weiterbauen (gilt
+    // auch für `kritis_zelle_neu`).
     sqlx::query("DROP TABLE IF EXISTS kritis_objekt_neu")
         .execute(pool)
         .await?;
@@ -98,8 +94,7 @@ pub async fn ersetze_bestand(
     .execute(pool)
     .await?;
 
-    // Befüllen in EINER Transaktion: einige hunderttausend Einzel-Inserts sind in SQLite
-    // nur mit gemeinsamem Commit schnell (sonst ein fsync je Zeile).
+    // Befüllen in EINER Transaktion: sonst ein fsync je Zeile.
     let mut tx = pool.begin().await?;
     for o in objekte {
         sqlx::query(
@@ -117,9 +112,8 @@ pub async fn ersetze_bestand(
     }
     tx.commit().await?;
 
-    // Sammelpunkte je Stufe der Rasterleiter vorberechnen (LFH-83, Aufgabe 3.2): zur
-    // Abfragezeit gerechnet kostete die Deutschland-Ansicht über 400 000 Objekte gemessen
-    // 384 ms im Release-Build. Die Zellformel ist dieselbe wie in `zelle()`.
+    // Sammelpunkte je Rasterstufe vorberechnen — zur Abfragezeit kostete die Deutschland-Ansicht
+    // Hunderte Millisekunden. Die Zellformel ist dieselbe wie in `zelle()`.
     sqlx::query("DROP TABLE IF EXISTS kritis_zelle_neu")
         .execute(pool)
         .await?;
@@ -181,8 +175,7 @@ pub async fn ersetze_bestand(
     tx.commit().await
 }
 
-/// Ein Lauf ohne neuen Extrakt: nur den Zeitpunkt fortschreiben, damit die Fälligkeit neu
-/// beginnt. Der Bestand und sein `stand` bleiben unberührt.
+/// Ein Lauf ohne neuen Extrakt: nur den Zeitpunkt fortschreiben. Bestand und `stand` bleiben.
 pub async fn bestaetige_unveraendert(
     pool: &SqlitePool,
     importiert_at: i64,
@@ -222,8 +215,8 @@ async fn abfrage_roh(pool: &SqlitePool, b: &Bbox) -> Result<Option<FachebeneAntw
     let Some(meta) = meta(pool).await else {
         return Ok(None);
     };
-    // Gedeckelt gezählt: für die Entscheidung genügt „mehr als die Grenze", und ein volles
-    // COUNT über ganz Deutschland liefe durch alle Indexeinträge der Längengrad-Spanne.
+    // Gedeckelt gezählt: „mehr als die Grenze“ genügt, und ein volles COUNT über Deutschland liefe
+    // durch alle Indexeinträge der Spanne.
     let anzahl: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM (SELECT 1 FROM kritis_objekt \
          WHERE lon BETWEEN ? AND ? AND lat BETWEEN ? AND ? LIMIT 5001)",
@@ -268,10 +261,9 @@ async fn abfrage_roh(pool: &SqlitePool, b: &Bbox) -> Result<Option<FachebeneAntw
     )))
 }
 
-/// Je berührter Rasterzelle ein Punkt (Mittel der Koordinaten) mit `anzahl`, aus den beim
-/// Import vorberechneten Zellen (`kritis_zelle`, Schlüssel = exakter Leiterwert). Die Zelle
-/// zählt immer ganz — sonst lieferten zwei überlappende Ausschnitte für dieselbe Zelle zwei
-/// verschiedene Zahlen, und ein Bündel änderte beim Pannen seine Größe.
+/// Je berührter Rasterzelle ein Punkt (Koordinatenmittel) mit `anzahl`, aus den vorberechneten
+/// Zellen (`kritis_zelle`). Die Zelle zählt immer ganz, sonst änderte ein Bündel beim Pannen
+/// seine Größe.
 async fn sammelpunkte(pool: &SqlitePool, b: &Bbox) -> Result<Vec<Value>, sqlx::Error> {
     let w = rasterweite(b);
     let rows: Vec<(i64, f64, f64)> = sqlx::query_as(
@@ -395,8 +387,8 @@ mod tests {
         assert_eq!(m.etag.as_deref(), Some("\"abc\""));
     }
 
-    /// Ein abgebrochener Lauf hinterlässt eine halbe Staging-Tabelle; der nächste darf darauf
-    /// nicht aufbauen, und der Live-Bestand bleibt bis zum Tausch unberührt.
+    /// Ein abgebrochener Lauf hinterlässt eine halbe Staging-Tabelle; der nächste baut nicht darauf
+    /// auf, und der Live-Bestand bleibt bis zum Tausch unberührt.
     #[tokio::test]
     async fn liegengebliebene_staging_tabelle_wird_verworfen() {
         let (_d, p) = pool().await;
@@ -486,8 +478,8 @@ mod tests {
         assert_eq!(a.status, FachebeneStatus::Ok);
     }
 
-    /// Zwei überlappende Ausschnitte gleicher Rasterweite liefern für gemeinsame Zellen
-    /// identische Sammelpunkte — auch für eine Zelle, die einer der beiden nur anschneidet.
+    /// Zwei überlappende Ausschnitte gleicher Rasterweite liefern für gemeinsame Zellen identische
+    /// Sammelpunkte, auch für angeschnittene Zellen.
     #[tokio::test]
     async fn ueberlappende_ausschnitte_teilen_sammelpunkte() {
         let (_d, p) = pool().await;
@@ -530,7 +522,7 @@ mod tests {
         assert!(rasterweite(&bbox(-180.0, -90.0, 180.0, 90.0)) <= 20.0);
     }
 
-    /// LFH-265-Anker: die reale Form (Einzelobjekt UND Sammelpunkt) passt auf das Schema.
+    /// Die reale Form (Einzelobjekt und Sammelpunkt) passt auf das Schema.
     #[tokio::test]
     async fn ausgabe_passt_auf_den_geojson_anker() {
         let (_d, p) = pool().await;
@@ -545,8 +537,7 @@ mod tests {
             .expect("Anker beschreibt die reale KRITIS-Form");
         }
     }
-    /// Messung (LFH-83, Aufgabe 3.2) — nicht Teil der Suite, weil sie Sekunden kostet und
-    /// Zeiten keine Zusicherung sind. Aufruf:
+    /// Messung, nicht Teil der Suite. Aufruf:
     /// `cargo test --lib --release kritis::bestand::tests::messung_de -- --ignored --nocapture`
     #[tokio::test]
     #[ignore]

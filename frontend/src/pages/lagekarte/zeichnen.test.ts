@@ -80,7 +80,7 @@ vi.mock('terra-draw', () => ({
     setMode(mode: string) {
       this.mode = mode;
     }
-    // Wie terra-draw 1.34 (im Bundle gemessen): beide WERFEN, solange die Instanz gestoppt ist.
+    // Wie terra-draw 1.34: beide werfen, solange die Instanz gestoppt ist.
     undo() {
       if (!this.enabled) throw new Error('Terra Draw is not enabled');
       aufrufe.undo += 1;
@@ -246,8 +246,8 @@ describe('createZeichnung — Punktstand und Zurücknehmen (LFH-712)', () => {
   });
 
   it('zählt, was terra-draw setzt — ein Klick ohne gesetzten Punkt zählt nicht', () => {
-    // Mikro-Ziehen am Tablet: MapLibre meldet einen Klick, terra-draw setzt keinen Punkt.
-    // Ein eigener Klickzähler zeigte „1 Punkt" für eine leere Figur, „zurück" stünde frei.
+    // Mikro-Ziehen am Tablet: MapLibre meldet einen Klick, terra-draw setzt keinen Punkt. Ein
+    // Klickzähler zeigte „1 Punkt" für eine leere Figur.
     const { zeichnung, klick, letzter } = aufbau();
     zeichnung.starten('polygon');
     aufrufe.verschlucken = true;

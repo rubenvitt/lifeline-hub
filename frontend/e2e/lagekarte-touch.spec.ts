@@ -1,33 +1,22 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
 
-// LFH-713 (LFH-100 P5): die Lagekarte unter Touch, gemessen statt angenommen.
-//
-// Bis hierher galt für die Touch-Bedienung der Karte nur, was MapLibre per Vorgabe mitbringt,
-// und kein Test lief mit `hasTouch`. Gate 1 misst den Querlauf bei 390 und 768 px, aber keine
-// Bedienbarkeit; die gestapelten Fußbänder (LFH-355) waren nur bei 1024/1280/1440 px klickend
-// belegt. Diese Datei fährt beide Führungskontexte mit Fingern: Handschirm (390 px) und
-// Führungs-Tablet (1024 px).
+// Die Lagekarte unter Touch, auf Handschirm (390 px) und Führungs-Tablet (1024 px).
 //
 // Jede Geste belegt ihre Wirkung am KARTENZUSTAND (`getZoom`/`getCenter`/`getBearing`/
-// `getPitch`, Auswahl im Paneel, gespeicherte Zone), nie an einem Bildschirmfoto. Und jede
-// Kartengeste startet hinter einer Trefferwache (`aufKarte`): ein Finger, der auf einem Band
-// oder Knopf landet, bewegt die Karte nicht — die Aussage „keine Wirkung" wäre dann wertlos.
-// Der Tipp auf den Donut und das Rollen der Zeitachse haben je eine eigene Wache.
+// `getPitch`, Auswahl im Paneel, gespeicherte Zone), nie an einem Bildschirmfoto. Jede
+// Kartengeste startet hinter einer Trefferwache (`aufKarte`): ein Finger auf einem Band oder
+// Knopf bewegt die Karte nicht, „keine Wirkung" wäre dann wertlos.
 //
-// Die Mehrfinger-Gesten laufen über CDP `Input.dispatchTouchEvent`, weil Playwrights
-// `touchscreen` nur einzelne Tipps kennt. Die Punkte tragen eine stabile `id`: MapLibre ordnet
-// die Finger zwischen zwei Ereignissen über `identifier` zu.
+// Mehrfinger-Gesten laufen über CDP `Input.dispatchTouchEvent` (Playwrights `touchscreen`
+// kennt nur Tipps); die Punkte tragen eine stabile `id`, MapLibre ordnet die Finger über
+// `identifier` zu.
 //
-// Zwei Befunde dieser Messung sind im selben Ticket behoben, und die Tests hier waren vorher rot:
-//  - Ein senkrechter Zwei-Finger-Zug kippte die Karte auf 60°. Eine Lagekarte bleibt Draufsicht
-//    (Entscheidung 25.09.2026): `touchPitch: false` + `maxPitch: 0` in `Kartenflaeche.tsx`.
-//    Achtung beim Nachbauen: MapLibre kippt nur, wenn die Finger NEBENEINANDER liegen und sich
-//    gemeinsam senkrecht bewegen — und nach OBEN; ein Zug nach unten deckelt bei Neigung 0 und
-//    sähe auch ohne Abschaltung „ungekippt" aus. Deshalb die Positivkontrolle am Kartenzentrum.
-//  - Bei 390 px blieb im Zeichenmodus mit ausgeklappter Zeitachse keine Karte zum Tippen: die
-//    Leiste halbierte die Karte, der Fuß (412 px) deckte den Rest und ragte in den Seitenkopf.
-//    Seit LFH-713 schließt die Werkzeugwahl unter `lg` die Leiste (`LagekartePage.tsx`), und
-//    der Fuß endet an der Karte (`KartenFuss.tsx`).
+// Zwei Festlegungen, die hier gemessen werden:
+//  - Die Lagekarte bleibt Draufsicht (`touchPitch: false` + `maxPitch: 0`). MapLibre kippt nur,
+//    wenn die Finger NEBENEINANDER liegen und sich gemeinsam nach OBEN bewegen; ein Zug nach
+//    unten sähe auch ohne Abschaltung ungekippt aus — deshalb die Positivkontrolle.
+//  - Unter `lg` schließt die Werkzeugwahl die Leiste, und der Fuß endet an der Karte — sonst
+//    bliebe bei 390 px im Zeichenmodus keine Karte zum Tippen.
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -59,10 +48,9 @@ interface Stand {
   pitch: number;
 }
 
-// Ort der Lage. Drei Einheiten wenige Meter auseinander bilden bei Zoom 14 EINEN Kräfte-Cluster
-// (DOM-Donut, fächert per Tipp auf); die vierte steht rund 670 m östlich, bei Zoom 14 gut
-// 100 px vom Cluster entfernt, und bleibt ein Einzelzeichen (WebGL-Layer). Damit sind die drei
-// Trefferwege der Karte abgedeckt: Einzelmarker, Donut, Spider-Leaf.
+// Drei Einheiten wenige Meter auseinander bilden bei Zoom 14 EINEN Kräfte-Cluster (DOM-Donut);
+// die vierte steht rund 670 m östlich und bleibt ein Einzelzeichen (WebGL). Damit sind die drei
+// Trefferwege abgedeckt: Einzelmarker, Donut, Spider-Leaf.
 const MITTE: [number, number] = [8.8, 53.0775];
 const EINZEL: [number, number] = [MITTE[0] + 0.01, MITTE[1]];
 /** Blickpunkt für die Tipps: zwischen Traube und Einzelzeichen, beide je rund 58 px daneben —
@@ -93,8 +81,7 @@ async function einheitAn(page: Page, einsatzId: number, name: string, ll: [numbe
   expect(antwort.ok(), `Position ${name}: ${await antwort.text()}`).toBeTruthy();
 }
 
-/** Einsatz mit der Traube und dem Einzelzeichen. Kein Modulname im Einsatznamen: die Palette
- *  sucht Module und Einsätze gemeinsam (siehe `lagekarte-smoke.spec.ts`). */
+/** Einsatz mit der Traube und dem Einzelzeichen. Kein Modulname im Einsatznamen (Palette). */
 async function einsatzMitLage(page: Page): Promise<number> {
   const einsatzId = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Fingerlage ${Date.now()}`,
@@ -160,8 +147,7 @@ async function aufSchirm(page: Page, ll: [number, number]): Promise<Punkt> {
 
 /**
  * Trefferwache: an jedem Punkt liegt der Karten-Canvas obenauf — kein Band, kein Knopf, kein
- * Donut. Ohne sie wäre „die Geste hat nicht gekippt" auch dann grün, wenn der Finger auf der
- * Zeitachse lag.
+ * Donut. Sonst wäre „die Geste hat nicht gekippt" auch grün, wenn der Finger daneben lag.
  */
 async function aufKarte(page: Page, punkte: Punkt[], wo: string) {
   const treffer = await page.evaluate(
@@ -188,8 +174,8 @@ async function kartenMitte(page: Page): Promise<Punkt> {
     .locator('canvas.maplibregl-canvas')
     .boundingBox();
   expect(box, 'Canvas hat keine Box').not.toBeNull();
-  // Der Fuß-Rahmen reicht bis zur Oberkante der Karte (LFH-713); frei ist nur, was über seinem
-  // obersten BAND liegt.
+  // Der Fuß-Rahmen reicht bis zur Oberkante der Karte; frei ist nur, was über seinem obersten
+  // BAND liegt.
   const oberstesBand = await page
     .locator('[data-lfh="karten-fuss"] > *')
     .first()
@@ -305,7 +291,7 @@ for (const viewport of [
       // Abstand ×4 → rund zwei Stufen; die Schwelle bleibt locker gegen Trägheit.
       expect(nachPinch.zoom, 'Spreizen zoomt hinein').toBeGreaterThan(ZOOM + 1);
 
-      // ── Drehen: erlaubt, „Norden" holt die Ausrichtung zurück (Entscheidung 25.09.2026) ─
+      // ── Drehen: erlaubt, „Norden" holt die Ausrichtung zurück ─────────────────────────
       await springe(page, MITTE, ZOOM);
       m = await kartenMitte(page);
       await geste(page, cdp, [bogen(m, 80, 180, 240), bogen(m, 80, 0, 60)], 'Drehen');
@@ -333,20 +319,17 @@ for (const viewport of [
       );
       const nachKippen = await stand(page);
       expect(nachKippen.pitch, 'Kipp-Geste kippt nicht').toBe(0);
-      // Positivkontrolle: die Geste KAM an — sie hat die Karte verschoben. Ohne diese Zeile
-      // wäre „Neigung 0" auch dann grün, wenn die Finger nie die Karte erreicht hätten.
+      // Positivkontrolle: die Geste KAM an und hat die Karte verschoben.
       expect(
         Math.abs(nachKippen.lat - vorKippen.lat),
         'Zwei-Finger-Zug erreicht die Karte',
       ).toBeGreaterThan(0.0005);
 
-      // Die Draufsicht hängt nicht nur an der Geste: `maxPitch: 0` schließt auch die Tastatur
-      // (Umschalt+↑ kippt in MapLibre um 10°). Positivkontrolle ist Umschalt+→, das dreht —
-      // Drehen bleibt erlaubt, und es belegt, dass die Tasten die Karte erreichen.
+      // `maxPitch: 0` schließt auch die Tastatur (Umschalt+↑ kippt sonst um 10°).
+      // Positivkontrolle ist Umschalt+→, das dreht.
       await springe(page, MITTE, ZOOM);
       await page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas').focus();
-      // Jede Taste für sich abwarten: MapLibre rechnet den nächsten Schritt vom AKTUELLEN Stand,
-      // eine schnell folgende Taste überschriebe die laufende Animation der vorigen.
+      // Jede Taste für sich abwarten: eine schnell folgende überschriebe die laufende Animation.
       await page.keyboard.press('Shift+ArrowUp');
       await ruhe(page);
       expect((await stand(page)).pitch, 'Umschalt+↑ kippt nicht').toBe(0);
@@ -370,9 +353,8 @@ for (const viewport of [
       await ruhe(page);
       await springe(page, ZWISCHEN, ZOOM);
 
-      // Einzelzeichen (WebGL-Layer, Klickweg `map.on('click', layer)`). Wiederholt, bis die
-      // Marker-Quelle steht — der erste Tipp kann vor dem ersten Render der Zeichen landen.
-      // Ein Wiederholtipp ist hier harmlos: er wählt dasselbe Zeichen erneut.
+      // Einzelzeichen (WebGL-Layer). Wiederholt, bis die Marker-Quelle steht; ein
+      // Wiederholtipp wählt dasselbe Zeichen erneut.
       await expect(async () => {
         const p = await aufSchirm(page, EINZEL);
         await aufKarte(page, [p], 'Einzelzeichen');
@@ -380,12 +362,11 @@ for (const viewport of [
         await expect(ausgewaehlt(page).getByText('Pumpe Ost')).toBeVisible({ timeout: 1_000 });
       }).toPass({ timeout: 20_000 });
       await page.keyboard.press('Escape');
-      // Die Auswahl kann die Karte auf das Zeichen führen; jede Bewegung klappte einen Spider
-      // zu. Also zurück auf den Blickpunkt, und erst tippen, wenn die Karte steht.
+      // Die Auswahl kann die Karte bewegen, und jede Bewegung klappte einen Spider zu. Also
+      // zurück auf den Blickpunkt und erst tippen, wenn die Karte steht.
       await springe(page, ZWISCHEN, ZOOM);
 
-      // Cluster: ein DOM-Donut über dem Canvas. Erst warten, bis er steht, dann GENAU EINMAL
-      // tippen — ein zweiter Tipp schaltet den Spider wieder zu (Umschalten in `oeffne`).
+      // Cluster: ein DOM-Donut. GENAU EINMAL tippen — ein zweiter Tipp klappt den Spider zu.
       const donut = page.locator('.maplibregl-marker').filter({ hasText: '3' });
       await expect(donut).toHaveCount(1);
       const box = (await donut.boundingBox())!;
@@ -414,8 +395,7 @@ for (const viewport of [
         })
         .toBe(3);
       // … und ein aufgefächertes Zeichen ist per Tipp anwählbar. Der Punkt kommt aus der
-      // Spider-Quelle selbst (Pixelversatz um den Cluster), nicht aus der Geokoordinate der
-      // Einheit — die liegt unter dem Donut.
+      // Spider-Quelle (Pixelversatz), die Geokoordinate der Einheit läge unter dem Donut.
       const ziel = await page.evaluate(() => {
         const k = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
         const f = k
@@ -428,8 +408,7 @@ for (const viewport of [
         return { x: r.left + px.x, y: r.top + px.y };
       });
       await aufKarte(page, [ziel], 'Spider-Leaf');
-      // Abstand zum Donut-Tipp: zwei Tipps binnen 500 ms und 30 px wären ein Doppeltipp-Zoom,
-      // und jede Bewegung klappt den Spider zu.
+      // Abstand zum Donut-Tipp: zwei Tipps binnen 500 ms und 30 px wären ein Doppeltipp-Zoom.
       await page.waitForTimeout(600);
       await tippe(page, ziel);
       const gewaehlt = ausgewaehlt(page);
@@ -448,23 +427,19 @@ for (const viewport of [
       await ruhe(page);
       await springe(page, MITTE, ZOOM);
 
-      // Vorbedingung wie im Smoke (LFH-355): die Bänder stapeln nur dann gegeneinander, wenn
-      // die Zeitachse AUSGEKLAPPT steht. Unter `xl` startet sie eingeklappt — also einblenden,
-      // wie es eine Einsatzkraft täte, und den Zustand zusichern, sonst wäre der Klick auf die
-      // Bänder unten still wertlos statt rot.
+      // Vorbedingung: die Bänder stapeln nur mit AUSGEKLAPPTER Zeitachse gegeneinander. Unter
+      // `xl` startet sie eingeklappt — also einblenden und den Zustand zusichern.
       await page.getByRole('button', { name: 'Zeitachse einblenden' }).tap();
       await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
 
-      // Der Weg einer Einsatzkraft: „Zeichenwerkzeuge" auf der Karte öffnet die Leiste mit dem
-      // Paneel „Zeichnen" — bei 390 px ist die Leiste sonst zu —, dort das Werkzeug wählen.
+      // „Zeichenwerkzeuge" auf der Karte öffnet die Leiste mit dem Paneel „Zeichnen".
       const zeichnen = async () => {
         await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).tap();
         await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).tap();
       };
       const abschliessen = page.getByRole('button', { name: 'Abschließen' });
 
-      // ── Abbrechen wird GETIPPT, nicht nur gesehen (LFH-355: `toBeVisible` belegt keine
-      // Klickbarkeit) ───────────────────────────────────────────────────────────────────────
+      // ── Abbrechen wird GETIPPT, nicht nur gesehen ───────────────────────────────────────
       await zeichnen();
       await expect(abschliessen).toBeVisible();
       await page.getByRole('button', { name: 'Abbrechen' }).tap();
@@ -476,8 +451,7 @@ for (const viewport of [
       const schmal = viewport.width < 992; // unter `lg` liegt die Leiste unter der Karte
       const canvas = page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas');
       if (schmal) {
-        // Die Werkzeugwahl gibt die Karte frei (LFH-713): die Leiste schließt, die Karte hat
-        // wieder die volle Höhe. Vorher halbierte die Leiste sie, und der Fuß deckte den Rest.
+        // Die Werkzeugwahl gibt die Karte frei: die Leiste schließt, die Karte hat volle Höhe.
         await expect(page.getByRole('button', { name: 'Leiste einblenden' })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Gefahrengebiet zeichnen' })).toHaveCount(0);
       }
@@ -495,8 +469,7 @@ for (const viewport of [
         await page.waitForTimeout(600);
       }
       await abschliessen.tap();
-      // „Speichern" statt der Warnung „Mindestens 3 …": terra-draw hat die drei Tipps als
-      // Punkte angenommen.
+      // „Speichern" statt der Warnung „Mindestens 3 …": die drei Tipps sind angenommen.
       const speichern = page.getByRole('button', { name: 'Speichern', exact: true });
       await expect(speichern).toBeVisible();
       await speichern.tap();
@@ -516,11 +489,9 @@ for (const viewport of [
 
       if (schmal) {
         // ── Der Fuß bleibt in der Karte, auch wenn er höher wird als sie ───────────────────
-        // Die Serie hat das Werkzeug neu scharf geschaltet (Zeichen-Steuerung steht). Wer jetzt
-        // die Leiste zurückholt, halbiert die Karte wieder, und der Fuß ist höher als sie.
-        // Unten verankert und ohne Obergrenze ragte er gemessen 50 px über die Karte in den
-        // Seitenkopf und deckte dort „Leiste ausblenden". Der Tipp auf genau diesen Knopf ist der
-        // Beleg — `toBeVisible` wäre auch verdeckt grün (LFH-355).
+        // Mit zurückgeholter Leiste ist der Fuß höher als die Karte. Unten verankert ohne
+        // Obergrenze ragte er in den Seitenkopf und deckte „Leiste ausblenden" — der Tipp auf
+        // genau diesen Knopf ist der Beleg.
         await expect(abschliessen).toBeVisible();
         await page.getByRole('button', { name: 'Leiste einblenden' }).tap();
         await expect(page.getByRole('button', { name: 'Gefahrengebiet zeichnen' })).toBeVisible();
@@ -532,8 +503,8 @@ for (const viewport of [
           steuerung.y,
           'Zeichen-Steuerung beginnt nicht über der Karte',
         ).toBeGreaterThanOrEqual(karte.y);
-        // Was nicht passt, gibt die Zeitachse ab und rollt in sich. Vorbedingung: sie ist hier
-        // wirklich gestaucht, sonst prüfte das Rollen nichts.
+        // Was nicht passt, gibt die Zeitachse ab und rollt in sich. Vorbedingung: sie ist
+        // wirklich gestaucht.
         const zeitachseEl = page.locator('[data-lfh="zeitachse"]');
         const rollen = () =>
           zeitachseEl.evaluate((e) => ({
@@ -541,8 +512,8 @@ for (const viewport of [
             mehr: e.scrollHeight - e.clientHeight,
           }));
         expect((await rollen()).mehr, 'Zeitachse ist gestaucht').toBeGreaterThan(0);
-        // Der Finger setzt im Polster des Bands auf, nicht auf Feld oder Schieberegler — ein
-        // Tipp auf die Schiene schaltete sonst in den Historienmodus.
+        // Der Finger setzt im Polster des Bands auf — ein Tipp auf die Schiene schaltete in den
+        // Historienmodus.
         const zeitachse = (await zeitachseEl.boundingBox())!;
         const start = { x: zeitachse.x + 5, y: zeitachse.y + zeitachse.height / 2 };
         const unterFinger = await page.evaluate(
@@ -563,9 +534,8 @@ for (const viewport of [
         await expect
           .poll(async () => (await rollen()).oben, { message: 'Zeitachse rollt per Finger' })
           .toBeGreaterThan(0);
-        // In genau diesem Zustand — Leiste offen, Fuß übervoll — bleiben das oberste Band und
-        // der Seitenkopf bedienbar. Getippt, nicht gesehen: der Serien-Schalter oben im Fuß,
-        // dann „Leiste ausblenden", das der Fuß vorher deckte.
+        // In genau diesem Zustand bleiben das oberste Band und der Seitenkopf bedienbar —
+        // getippt: der Serien-Schalter, dann „Leiste ausblenden".
         const serie = page.getByRole('switch', { name: 'Weitere zeichnen' });
         await expect(serie).toBeChecked();
         await serie.tap();

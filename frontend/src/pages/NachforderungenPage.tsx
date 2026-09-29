@@ -41,10 +41,10 @@ export default function NachforderungenPage() {
   const { token } = useRollen();
 
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
-  // Inline-Erfassen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Sidebar.
+  // Inline-Erfassen-Formular: per Kopf-Knopf auf-/zugeklappt, kein Drawer.
   const [formOffen, setFormOffen] = useState(false);
-  // Vorbelegung aus `?neu=1&art=…` (LFH-634, D9). Lebt nur, solange die Erfassung offen ist:
-  // wer schließt und neu öffnet, bekommt die leere Maske, nicht den alten Auftrag.
+  // Vorbelegung aus `?neu=1&art=…`. Lebt nur, solange die Erfassung offen ist: wer schließt und neu
+  // öffnet, bekommt die leere Maske.
   const [vorbelegung, setVorbelegung] = useState<NachforderungVorbelegung | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const schliesseFormular = () => {
@@ -59,7 +59,7 @@ export default function NachforderungenPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  // Offen/Abgeschlossen-Trennung erfolgt clientseitig → ALLE Nachforderungen laden.
+  // Offen/Abgeschlossen-Trennung clientseitig → alle Nachforderungen laden.
   const nfQuery = useQuery({
     queryKey: einsatzKeys.nachforderungen(einsatzId),
     queryFn: () => listeNachforderungen(einsatzId, {}),
@@ -67,8 +67,8 @@ export default function NachforderungenPage() {
 
   const invalidiere = () =>
     qc.invalidateQueries({ queryKey: einsatzKeys.nachforderungen(einsatzId) });
-  // Bei Fehler (insb. 422 aus der optimistischen Sperre) zusätzlich invalidieren,
-  // damit der ggf. veraltete View den echten Status nachlädt.
+  // Bei Fehler (insb. 422 aus der optimistischen Sperre) zusätzlich invalidieren, damit ein
+  // veralteter View den echten Status nachlädt.
   const fehler = (e: unknown) => {
     message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
     invalidiere();
@@ -76,10 +76,8 @@ export default function NachforderungenPage() {
 
   const anlegenMutation = useMutation({
     mutationFn: (d: NeueNachforderung) => legeNachforderungAn(einsatzId, d),
-    // LFH-343/C8: kein `setFormOffen(false)` mehr — das Inline-Formular bleibt
-    // offen, damit die nächste Nachforderung ohne Aufklappen weitergeht. Der
-    // conditional Render des Paneels würde es sonst unmounten, samt Serienzähler
-    // und Wertübernahme (Muster: `pages/MeldungenPage.tsx`, LFH-332/B4).
+    // Das Inline-Formular bleibt nach dem Anlegen offen, damit die nächste Nachforderung ohne
+    // Aufklappen folgt; ein Zuklappen unmountete es samt Serienzähler und Wertübernahme.
     onSuccess: () => {
       invalidiere();
       message.success('Nachforderung abgesetzt');
@@ -87,13 +85,12 @@ export default function NachforderungenPage() {
     onError: fehler,
   });
   /**
-   * Fortschaltung und Rücknahme laufen durch DIESELBE Mutation (LFH-343 · C8).
-   * `vorher` ist der Stand VOR dem Klick und damit das Ziel des Rückwegs — er
-   * wird übergeben statt abgeleitet, weil `NAECHSTER` rückwärts mehrdeutig wäre,
-   * sobald die Kette einmal einen Abzweig bekommt.
+   * Fortschaltung und Rücknahme laufen durch dieselbe Mutation. `vorher` ist der Stand vor dem
+   * Klick und damit das Ziel des Rückwegs — übergeben statt abgeleitet, weil `NAECHSTER` rückwärts
+   * mehrdeutig wäre, sobald die Kette einen Abzweig bekommt.
    *
-   * `zurueck` unterscheidet die beiden Richtungen: die Rücknahme darf keinen
-   * eigenen Rückgängig-Toast erzeugen, sonst schaukelte sich das Paar endlos auf.
+   * `zurueck` unterscheidet die Richtungen: die Rücknahme darf keinen eigenen Rückgängig-Toast
+   * erzeugen, sonst schaukelte sich das Paar endlos auf.
    */
   const statusMutation = useMutation({
     mutationFn: ({
@@ -126,18 +123,17 @@ export default function NachforderungenPage() {
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
 
   /**
-   * Erfassung per Deeplink (LFH-634, D9): `?neu=1` öffnet sie, eine Vorbelegung
+   * Erfassung per Deeplink: `?neu=1` öffnet sie, eine Vorbelegung
    * (`art`/`bezeichnung`/`anzahl`/`begruendung`) füllt sie. Apply-then-clean wie der
-   * Platzier-Auftrag in `LagekartePage.tsx`: erst anwenden, dann räumen, `replace` statt
-   * eines neuen Verlaufseintrags, und `searchParams` wird kopiert statt in-place mutiert.
-   * Ein stehengebliebener Auftrag öffnete das Formular sonst bei jedem Neuladen.
+   * Platzier-Auftrag in `LagekartePage.tsx`: erst anwenden, dann räumen, `replace`, `searchParams`
+   * kopiert statt mutiert. Ein stehengebliebener Auftrag öffnete das Formular bei jedem Neuladen.
    *
-   * Der Lade-Riegel steht VOR dem Räumen: `darfImEinsatzSchreiben` liefert für einen noch
-   * nicht geladenen Einsatz `false`. Ohne Riegel räumte der erste Commit den Parameter und
-   * der Deeplink wäre bei F5 oder aus einem neuen Tab still verloren.
+   * Der Lade-Riegel steht vor dem Räumen: `darfImEinsatzSchreiben` liefert für einen noch nicht
+   * geladenen Einsatz `false`; ohne Riegel ginge der Deeplink bei F5 oder aus einem neuen Tab still
+   * verloren.
    *
-   * Eine unbrauchbare Vorbelegung wird ganz verworfen (`parseNachforderungVorbelegung`),
-   * die Erfassung öffnet dann leer. Ohne Schreibrecht öffnet nichts — geräumt wird trotzdem.
+   * Eine unbrauchbare Vorbelegung wird ganz verworfen (`parseNachforderungVorbelegung`), die
+   * Erfassung öffnet dann leer. Ohne Schreibrecht öffnet nichts — geräumt wird trotzdem.
    */
   useEffect(() => {
     const neu = searchParams.get('neu') === '1';
@@ -176,8 +172,8 @@ export default function NachforderungenPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
   const alle = nfQuery.data ?? [];
 
-  // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen
-  // (eingetroffen → abgeschlossen, abgelehnt → ausnahme zählen als „abgeschlossen").
+  // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik (eingetroffen und
+  // abgelehnt zählen als „abgeschlossen").
   const istAbg = (n: Nachforderung) =>
     istAbgeschlossen(NACHFORDERUNG_STATUS[n.status]?.phase ?? 'offen');
   const offene = alle.filter((n) => !istAbg(n));
@@ -250,8 +246,8 @@ export default function NachforderungenPage() {
             card={false}
             vorbelegung={vorbelegung}
             senden={anlegenMutation.isPending}
-            // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn die
-            // Nachforderung wirklich angekommen ist (LFH-332/B4).
+            // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn die Nachforderung
+            // angekommen ist.
             onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
           />
         </Paneel>

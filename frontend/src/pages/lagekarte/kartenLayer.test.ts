@@ -19,17 +19,10 @@ const leereFlaechen = baueFlaechenFc([]);
 const leereZonen = baueZonenFc([]);
 
 /**
- * Regressionsschutz für „alle Zeichnungen verschwinden beim Basemap-/Theme-Wechsel,
- * erst nach dem Zeichnen einer neuen erscheinen sie wieder".
- *
- * Root Cause: Die Re-Anlage der Custom-Layer nach `setStyle` hing am `styledata`-Event
- * mit `isStyleLoaded()`-Gate. Beim Wechsel auf einen Online-Style (Tiles laden noch)
- * feuert kein `styledata` mit geladenem Style → keine Re-Anlage. Erst ein Daten-Update
- * (= neue Zone zeichnen) lief über den zuverlässigen render-Frame-Poller.
- *
- * Der Fix verdrahtet den Style-Wechsel an genau diesen Poller. Geprüft wird hier das
- * *Wann*: keine vorzeitige Anlage, aber zuverlässige Anlage beim ersten Frame mit
- * geladenem Style.
+ * Regressionsschutz: nach einem Basemap-/Theme-Wechsel müssen die Zeichnungen zurückkommen. Die
+ * Re-Anlage hing am `styledata`-Event mit `isStyleLoaded()`-Gate; beim Wechsel auf einen
+ * Online-Style kam das nie. Jetzt läuft sie über den render-Frame-Poller — geprüft wird das Wann:
+ * keine vorzeitige Anlage, aber zuverlässige beim ersten Frame mit geladenem Style.
  */
 
 /** Fake-Map mit Source-Registry; protokolliert addSource/addLayer und treibt render-Frames. */
@@ -158,9 +151,8 @@ describe('reAnlegenAlles', () => {
 
 describe('Luftqualitätsebene nach Stilwechsel (LFH-79)', () => {
   it('steht nach einem Basemap-/Theme-Wechsel samt Daten wieder auf der Karte', () => {
-    // `reAnlegenAlles` ist generisch über die aktiven Ebenen — dieser Test belegt, dass das
-    // für die Luftqualitätsebene auch gilt: Source, Kreis-Layer und die zuletzt bekannten
-    // Stationen kommen über den render-Frame-Poller zurück.
+    // `reAnlegenAlles` ist generisch über die aktiven Ebenen — auch die Luftqualitätsebene kommt
+    // über den Poller zurück.
     let geladen = false;
     const { map, addSource, setData } = fakeMap(() => geladen);
     const stationen = {
@@ -199,8 +191,7 @@ describe('planeReAnlegenNachStyle', () => {
       () => baueZonenFc([ZONE]),
     );
 
-    // Frame während des Tile-Ladens → noch nichts angelegt (das ist der Bug-Kern:
-    // styledata-Gate hätte hier resigniert und nie wieder re-angelegt).
+    // Frame während des Tile-Ladens → noch nichts angelegt.
     map.feuere('render');
     expect(addSource).not.toHaveBeenCalled();
   });
@@ -282,8 +273,8 @@ describe('planeReAnlegenNachStyle — Marker', () => {
 });
 
 /**
- * Neuentwurf S5: Zonenbeschriftung als Plakette (dunkler Grund, Rahmen `linieStark`,
- * Versalien) und Gefahrenzonen gestrichelt. Nur Darstellung — keine neue Geometrie.
+ * Zonenbeschriftung als Plakette (dunkler Grund, Rahmen `linieStark`, Versalien) und Gefahrenzonen
+ * gestrichelt — nur Darstellung.
  */
 describe('Zonen im Entwurfsstil', () => {
   it('trägt Strichelung und Plakettenfarben als Feature-Properties', () => {
@@ -315,8 +306,8 @@ describe('Zonen im Entwurfsstil', () => {
     const strich = specs.find((l) => l.id === 'zonen-line-gestrichelt')!;
     expect(durch.filter).toEqual(['!=', ['get', 'gestrichelt'], true]);
     expect(strich.filter).toEqual(['==', ['get', 'gestrichelt'], true]);
-    // Ein konstantes Array, KEIN datengetriebener Ausdruck (Arrays aus Properties lehnt
-    // MapLibre ab — der Layer fehlte dann still).
+    // Ein konstantes Array, kein datengetriebener Ausdruck: Arrays aus Properties lehnt MapLibre
+    // ab, der Layer fehlte dann still.
     expect(strich.paint?.['line-dasharray']).toEqual([3, 2]);
     expect(durch.paint?.['line-dasharray']).toBeUndefined();
     const label = specs.find((l) => l.id === 'zonen-label')!;
@@ -325,8 +316,8 @@ describe('Zonen im Entwurfsstil', () => {
     expect(label.layout?.['icon-text-fit']).toBe('both');
   });
 
-  // LFH-622: ohne `text-font` fordert MapLibre „Open Sans Regular,Arial Unicode MS Regular"
-  // an. Die führt der eigene Glyphen-Server nicht: 404, lokaler Rückfall, eine Warnung je Zeichen.
+  // Ohne `text-font` forderte MapLibre „Open Sans Regular,Arial Unicode MS Regular" an — die führt
+  // der eigene Glyphen-Server nicht (404, eine Warnung je Zeichen).
   it('fordert offline die eingebettete Mono-Schrift an, ohne Glyphen-Server keine', () => {
     const labelLayout = (stil: unknown) => {
       const { map } = fakeMap(() => true, stil);

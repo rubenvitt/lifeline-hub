@@ -1,8 +1,5 @@
-//! Cross-Modul-Hooks der UHS-Domäne (LFH-124). Rein pool-basiert — die
-//! SSE-/Transport-Emission bleibt Sache des aufrufenden Route-Handlers, damit die
-//! Domäne nicht an `AppState`/`live` koppelt. Vorher lag dieser Hook als
-//! `routes::einsatz_uhs::auto_austritt` in einem Route-Modul und wurde von
-//! `routes::einsatz_person` route-übergreifend aufgerufen.
+//! Cross-Modul-Hooks der UHS-Domäne (LFH-124). Rein pool-basiert; die SSE-Emission bleibt beim
+//! aufrufenden Route-Handler, damit die Domäne nicht an `AppState`/`live` koppelt.
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::person::{registrier_anzeige, repo as person_repo};
@@ -10,9 +7,8 @@ use crate::uhs::belegung_repo::{self, AustrittInfo};
 use crate::uhs::repo as uhs_repo;
 use sqlx::SqlitePool;
 
-/// Ergebnis eines tatsächlich erfolgten Auto-Austritts. Trägt, was der aufrufende
-/// Route-Handler per SSE emittieren muss: den frisch geschriebenen ETB-Eintrag
-/// (ETB-Live-Stream) sowie die betroffene `uhs_id`/`person_id` (Board-Events).
+/// Ergebnis eines erfolgten Auto-Austritts: was der Route-Handler per SSE emittieren muss (den
+/// neuen ETB-Eintrag sowie `uhs_id`/`person_id` für die Board-Events).
 #[derive(Debug)]
 pub struct AutoAustrittEffekt {
     pub uhs_id: i64,
@@ -20,16 +16,14 @@ pub struct AutoAustrittEffekt {
     pub etb_eintrag: etb::EtbEintragAnzeige,
 }
 
-/// Auto-Austritt einer Person aus ihrer UHS-Belegung (Cross-Modul-Hook: Personen-Storno,
-/// Status verstorben/abgemeldet, Verbleib Transport/Entlassung). Führt den belegung-Austritt
-/// aus und schreibt — falls tatsächlich ein Austritt-Event passiert ist — den pseudonymen
-/// ETB-System-Eintrag mit Anlass-Notiz. Rein pool-basiert.
+/// Auto-Austritt einer Person aus ihrer UHS-Belegung (Personen-Storno, Status
+/// verstorben/abgemeldet, Verbleib Transport/Entlassung). Schreibt bei einem echten Austritt den
+/// pseudonymen System-ETB-Eintrag mit Anlass-Notiz.
 ///
-/// Gibt `Some(effekt)` zurück, wenn ein Austritt stattfand, damit der Route-Handler die
-/// SSE-Events emittiert (Transport bleibt in der Route, LFH-124). `None`, wenn die Person
-/// nicht belegt war — der Reservierungs-Cleanup lief dann trotzdem. **Wird sequentiell nach
-/// dem auslösenden Repo-Update gerufen (Codebase-Konvention für Cross-Modul-Wirkung;
-/// akzeptiertes Risiko-Fenster).**
+/// `Some(effekt)` bei einem Austritt, damit der Handler die SSE-Events emittiert; `None`, wenn
+/// die Person nicht belegt war (der Reservierungs-Cleanup lief trotzdem). **Wird sequentiell
+/// nach dem auslösenden Repo-Update gerufen** (Konvention für Cross-Modul-Wirkung; akzeptiertes
+/// Risiko-Fenster).
 pub async fn auto_austritt(
     pool: &SqlitePool,
     einsatz_id: i64,

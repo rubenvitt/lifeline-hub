@@ -108,11 +108,8 @@ describe('ModulEinstellungsListe', () => {
 });
 
 /**
- * Zeilensperre und Fehlermarke je Zeile (LFH-345 · C10, Befunde H15/H14).
- *
- * Der Bestand sperrte bei JEDER laufenden Mutation ALLE 50 Steuerelemente. Wer eine Rolle
- * umstellte, konnte für die Dauer des PUT nirgends sonst etwas anfassen — und der Fehler
- * meldete sich nur als Toast, der die betroffene Zeile nicht benannte.
+ * Zeilensperre und Fehlermarke je Zeile: eine laufende Mutation sperrt nur ihre Zeile, und der
+ * Fehler benennt die betroffene Zeile.
  */
 describe('ModulEinstellungsListe · Zeilenzustand (LFH-345)', () => {
   it('sperrt NUR die gerade mutierende Zeile, nicht die ganze Liste', () => {
@@ -130,7 +127,7 @@ describe('ModulEinstellungsListe · Zeilenzustand (LFH-345)', () => {
     expect(markiert[0].getAttribute('data-modul-zeile')).toBe('etb');
   });
 
-  // Die Gegenaussage: ohne sie waere eine Liste, die JEDE Zeile markiert, ebenfalls gruen.
+  // Gegenaussage: sonst wäre eine Liste, die jede Zeile markiert, ebenfalls grün.
   it('markiert ohne Fehler gar keine Zeile', () => {
     renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
 
@@ -138,16 +135,9 @@ describe('ModulEinstellungsListe · Zeilenzustand (LFH-345)', () => {
   });
 });
 
-/**
- * Trefffläche und Stapelung (LFH-345 · C10, Befunde H16/M17).
- *
- * Die Zeile belegte fest 268 px (64 Sichtbar + 180 Rolle + Abstände); bei 390 px blieben
- * unter 100 px fürs Modul-Label. Das Raster ist jetzt `minmax(0,1fr) auto auto` und stapelt
- * unter `md`.
- */
+/** Trefffläche und Stapelung: Raster `minmax(0,1fr) auto auto`, gestapelt unter `md`. */
 describe('ModulEinstellungsListe · Trefffläche und Stapelung (LFH-345)', () => {
-  // Prüfbar ist der Inline-Style, nicht ein Pixel — jsdom rechnet kein Layout. Die Böden
-  // stehen als Literale da: aus dem Token zurückgelesen prüften sie den Token gegen sich selbst.
+  // Prüfbar ist der Inline-Style, nicht ein Pixel. Die Böden stehen als Literale da.
   it('traegt den Boden der Stufe an der Beschriftung — und die ZWEITE Angabe daneben', () => {
     expect(modulZeilenStil({ controlHeight: 30, paddingSM: 8, padding: 12 }).minHeight).toBe(30);
     expect(modulZeilenStil({ controlHeight: 72, paddingSM: 16, padding: 24 }).minHeight).toBe(72);
@@ -166,9 +156,8 @@ describe('ModulEinstellungsListe · Trefffläche und Stapelung (LFH-345)', () =>
     expect(props.sichtbarSpalte.aufSichtbar).toHaveBeenCalledWith('etb', false);
   });
 
-  // Dieselbe Regel wie in `Anmeldeverfahren` (LFH-370): an gesperrten Zeilen entsteht gar
-  // kein `<label>` — ein Label-Klick auf ein `disabled` Steuerelement leitet der Browser
-  // ohnehin nicht weiter, er waere also eine Aufforderung ohne Reaktion.
+  // An gesperrten Zeilen entsteht kein `<label>`: den Klick auf ein `disabled` Steuerelement leitet
+  // der Browser nicht weiter.
   it('gibt der gesperrten Zeile ausdruecklich KEIN Label', () => {
     renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} darfVerwalten={false} />);
 
@@ -179,10 +168,10 @@ describe('ModulEinstellungsListe · Trefffläche und Stapelung (LFH-345)', () =>
     setzeViewportBreite(390);
     renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
 
-    // Der Kopf benennt Spalten. Ohne Spalten benennt er nichts — und ein Kopf ueber
-    // gestapelten Zeilen behauptet eine Ordnung, die es nicht gibt.
+    // Ein Kopf über gestapelten Zeilen benennt keine Spalten und behauptet eine Ordnung, die es
+    // nicht gibt.
     expect(screen.queryByText('Sichtbar')).toBeNull();
-    // Der Schalter selbst bleibt bedienbar; nur seine Ueberschrift faellt weg.
+    // Der Schalter bleibt bedienbar, nur seine Überschrift fällt weg.
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeInTheDocument();
   });
 
@@ -194,22 +183,14 @@ describe('ModulEinstellungsListe · Trefffläche und Stapelung (LFH-345)', () =>
   });
 });
 
-/**
- * Kategorie-Gruppierung, Filterfeld und der Text an den nicht ausblendbaren Modulen
- * (LFH-346 · A9, Befund M48).
- *
- * 25 Modulzeilen lagen flach untereinander — ohne Ordnung, ohne Weg, eine bestimmte Zeile zu
- * finden, und ohne Auskunft darüber, WARUM zwei von ihnen gesperrt sind.
- */
+/** Kategorie-Gruppierung, Filterfeld und der Text an den nicht ausblendbaren Modulen. */
 describe('ModulEinstellungsListe · Gruppierung und Filter (LFH-346)', () => {
   it('gruppiert die Module in die sechs Registry-Kategorien — in der Ordnung der Icon-Rail', async () => {
     renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
 
     const koepfe = await screen.findAllByRole('heading', { level: 3 });
-    // Gepinnt gegen `kategorien` selbst, nicht gegen eine Literal-Liste: die Reihenfolge ist
-    // die der Icon-Rail (`modulRegistry.ts`), eine eigene Sortierung hier waere eine zweite
-    // Wahrheit. Der Plan nannte ein `modulNachKategorie()` — das gibt es nicht, die Registry
-    // fuehrt `kategorien` + `moduleNachKategorie(key)`.
+    // Gepinnt gegen `kategorien` selbst: die Reihenfolge ist die der Icon-Rail, eine eigene
+    // Sortierung wäre eine zweite Wahrheit.
     expect(koepfe.map((h) => h.textContent)).toEqual(kategorien.map((k) => k.label));
   });
 
@@ -220,12 +201,10 @@ describe('ModulEinstellungsListe · Gruppierung und Filter (LFH-346)', () => {
 
     expect(screen.getByText('Lagekarte')).toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: 'Sichtbar: ETB' })).toBeNull();
-    // Eine Kategorie-Ueberschrift ohne Zeilen darunter behauptet eine Gruppe, die die
-    // gefilterte Liste nicht hat. Mutationsprobe: faellt der Leer-Riegel weg, stehen alle
-    // sechs Koepfe ueber einer einzigen Zeile und diese Aussage wird rot — ohne sie waere
-    // sie trivial gruen, weil es vor A9 ueberhaupt keine Ueberschriften gab.
+    // Eine Kategorie-Überschrift ohne Zeilen behauptet eine Gruppe, die die gefilterte Liste nicht
+    // hat.
     expect(screen.queryByRole('heading', { name: 'Kommunikation' })).toBeNull();
-    // Die Gegenaussage: die Kategorie MIT Treffer behaelt ihren Kopf.
+    // Gegenaussage: die Kategorie mit Treffer behält ihren Kopf.
     expect(screen.getByRole('heading', { name: 'Lage' })).toBeInTheDocument();
   });
 
@@ -247,7 +226,7 @@ describe('ModulEinstellungsListe · Gruppierung und Filter (LFH-346)', () => {
     ).toBeInTheDocument();
   });
 
-  // Die Gegenaussage: der Text steht NUR an den zwei gesperrten Zeilen, nicht an allen 25.
+  // Gegenaussage: der Text steht nur an den zwei gesperrten Zeilen.
   it('haengt den Text NICHT an ein ausblendbares Modul', () => {
     renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
 
@@ -259,12 +238,9 @@ describe('ModulEinstellungsListe · Gruppierung und Filter (LFH-346)', () => {
 });
 
 /**
- * Der Sperrgrund je Zeile (LFH-383, Zwilling von `Anmeldeverfahren` aus LFH-370 · B5j).
- *
- * Drei Quellen sperren eine Zeile — die Modul-Eigenschaft, das fehlende Recht und der eigene
- * Schreibvorgang. Vorher standen sie in EINEM `disabled`-Ausdruck; nur die erste trug einen
- * Text. Die tragenden Aussagen sind die negativen: kein Rechte-Text an einer bedienbaren oder
- * bloß schreibenden Zeile, und an „Einsatzdaten“ ohne Recht genau EIN Grund.
+ * Sperrgrund je Zeile. Drei Quellen sperren eine Zeile: Modul-Eigenschaft, fehlendes Recht, eigener
+ * Schreibvorgang. Die tragenden Aussagen sind die negativen: kein Rechte-Text an einer bedienbaren
+ * oder bloß schreibenden Zeile, und an „Einsatzdaten“ ohne Recht genau ein Grund.
  */
 describe('ModulEinstellungsListe · Sperrgrund je Zeile (LFH-383)', () => {
   const RECHTE = {
@@ -276,8 +252,7 @@ describe('ModulEinstellungsListe · Sperrgrund je Zeile (LFH-383)', () => {
     return screen.getByText(label).closest('[data-modul-zeile]') as HTMLElement;
   }
 
-  // Vorrang ohne Render: die Modul-Eigenschaft gilt auch für Verwaltende und sagt deshalb
-  // mehr als das Recht; der Schreibvorgang ist vorübergehend und kommt zuletzt.
+  // Vorrang ohne Render: Modul vor Recht vor Schreibvorgang.
   it('leitet den Grund mit festem Vorrang ab: Modul vor Recht vor Schreibvorgang', () => {
     expect(modulSperrGrund({ ausblendbar: false, darfVerwalten: false, laeuft: true })).toBe(
       'modul',
@@ -322,8 +297,7 @@ describe('ModulEinstellungsListe · Sperrgrund je Zeile (LFH-383)', () => {
     expect(screen.queryByText('nur lesen')).toBeNull();
   });
 
-  // Der Schreibvorgang bekommt keinen Text (ein Grund, der nach 200 ms geht, ist Rauschen),
-  // aber einen eigenen Kanal: den Ladezustand am Steuerelement selbst.
+  // Der Schreibvorgang bekommt keinen Text, aber den Ladezustand am Steuerelement.
   it('zeigt an der schreibenden Zeile keinen Text, aber den Ladezustand am Schalter', () => {
     renderMitProviders(
       <ModulEinstellungsListe {...einsatzProps()} rechteGrund={RECHTE} laeuftKey="etb" />,
@@ -335,7 +309,7 @@ describe('ModulEinstellungsListe · Sperrgrund je Zeile (LFH-383)', () => {
     // Der zugängliche Name bleibt stehen: das `aria-label` schlägt die Lade-Ikone.
     const schalter = screen.getByRole('switch', { name: 'Sichtbar: ETB' });
     expect(schalter).toHaveClass('ant-switch-loading');
-    // Die Gegenaussage: eine ruhende Zeile lädt nicht.
+    // Gegenaussage: eine ruhende Zeile lädt nicht.
     expect(screen.getByRole('switch', { name: 'Sichtbar: Chat' })).not.toHaveClass(
       'ant-switch-loading',
     );

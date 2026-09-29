@@ -1,18 +1,15 @@
 import type { EinsatzAnzeige } from '../api/types';
 
 /**
- * Reine Ableitungen der Einsatzkachel (Einsatzliste/Startseite, Neuentwurf).
+ * Reine Ableitungen der Einsatzkachel (Einsatzliste/Startseite).
  *
- * Eigene Datei mit eigenem Basename neben `EinsaetzePage.tsx` (CLAUDE.md,
- * `direkteinstiegKern`: ein gleichnamiges `.ts` beschattet die Komponente).
+ * Eigener Basename neben `EinsaetzePage.tsx`: ein gleichnamiges `.ts` beschattete die Komponente.
  */
 
 /**
- * Die Einsatznummer der Kachel: die interne Nummer, sonst die Leitstellennummer, sonst
- * KEINE. Dieselbe Regel wie `einsatzKennung` im Einsatz-Kopf (`einsatz/EinsatzLayout.tsx`)
- * — hier als eigene Funktion, weil der Import das ganze Layout (Rail, Router-Teile) in die
- * Startseite zöge. Die Datenbank-`id` ist ausdrücklich KEINE Einsatznummer
- * (Neuentwurf, Entscheidung 4: nichts erfinden).
+ * Die Einsatznummer der Kachel: die interne Nummer, sonst die Leitstellennummer, sonst keine.
+ * Dieselbe Regel wie `einsatzKennung` in `einsatz/EinsatzLayout.tsx` — eigene Funktion, weil der
+ * Import das ganze Layout in die Startseite zöge. Die Datenbank-`id` ist keine Einsatznummer.
  */
 export function kachelKennung(
   einsatz: Pick<EinsatzAnzeige, 'einsatznummer_intern' | 'leitstellen_nr'>,

@@ -1,27 +1,18 @@
-//! Recovery-Code-Persistenz (LFH-43, Increment 5 „MFA/TOTP"): die zehn bei einem
-//! TOTP-Enrollment ausgegebenen Einmal-Codes (`totp::neue_recovery_codes`) werden NIE im
-//! Klartext gespeichert, nur als sha256-Hash (`totp::hash_recovery`) in
-//! `totp_recovery_code` (Migration 0083).
+//! Recovery-Code-Persistenz (LFH-43): die Einmal-Codes stehen nie im Klartext, nur als
+//! SHA-256 in `totp_recovery_code`.
 //!
-//! **[MUST — Plan „Global Constraints", atomarer single-use Verbrauch]:**
-//! [`verbrauche_recovery_code`] ist EIN einzelnes `UPDATE ... WHERE ... AND benutzt_at IS
-//! NULL` + `rows_affected() == 1`-Prüfung — bewusst KEIN SELECT-then-UPDATE. Ein
-//! SELECT-then-UPDATE hätte ein Double-Spend-Race-Fenster (zwei nebenläufige Requests mit
-//! demselben Code sehen beide das SELECT-Ergebnis „unbenutzt", bevor einer von ihnen
-//! schreibt); das einzelne bedingte UPDATE macht SQLite den Race für uns dicht.
+//! [`verbrauche_recovery_code`] ist EIN bedingtes `UPDATE … AND benutzt_at IS NULL` mit
+//! Prüfung von `rows_affected() == 1`, kein SELECT-then-UPDATE: das hätte ein
+//! Double-Spend-Fenster für zwei nebenläufige Requests mit demselben Code.
 
 use sqlx::SqlitePool;
 
 use crate::auth::totp::hash_recovery;
 use crate::error::AppError;
 
-/// Ersetzt die Recovery-Codes von `benutzer_id`: löscht alle vorhandenen Zeilen und legt für
-/// jeden Klartext-Code aus `codes_klartext` eine neue Zeile mit `hash_recovery(code)` an. Wird
-/// bei Erst-Enrollment UND bei jedem Re-Enroll aufgerufen (Re-Enroll erzeugt frische Codes und
-/// invalidiert damit alte automatisch — kein separater „alte Codes löschen"-Schritt nötig).
-///
-/// DELETE + INSERTs laufen in einer Transaktion, damit ein Fehler mitten in den INSERTs nicht
-/// einen Nutzer ohne jegliche gültigen Recovery-Codes zurücklässt (weder alte noch neue).
+/// Ersetzt die Recovery-Codes von `benutzer_id` (Erst- und Re-Enroll; alte Codes werden damit
+/// ungültig). DELETE und INSERTs laufen in einer Transaktion, damit ein Fehler niemanden ohne
+/// gültige Codes zurücklässt.
 pub async fn speichere_recovery_codes(
     pool: &SqlitePool,
     benutzer_id: i64,
@@ -47,14 +38,8 @@ pub async fn speichere_recovery_codes(
     Ok(())
 }
 
-/// Verbraucht EINEN Recovery-Code atomar-einmalig: `true`, wenn `code_klartext` (gehasht) zu
-/// `benutzer_id` einen noch unbenutzten Code trifft (und ihn dabei als benutzt markiert);
-/// `false` bei unbekanntem Hash, bereits verbrauchtem Code oder einem Code, der zu einem
-/// ANDEREN Nutzer gehört.
-///
-/// **Atomar per Konstruktion:** ein einzelnes `UPDATE ... WHERE benutzer_id = ? AND
-/// code_hash = ? AND benutzt_at IS NULL`, dessen `rows_affected()` entscheidet — kein
-/// vorheriges SELECT, das ein Double-Spend-Race öffnen würde (s. Moduldoc).
+/// Verbraucht EINEN Recovery-Code atomar: `true`, wenn der Code zu `benutzer_id` gehört und
+/// noch unbenutzt war (er ist dann als benutzt markiert); sonst `false`.
 pub async fn verbrauche_recovery_code(
     pool: &SqlitePool,
     benutzer_id: i64,
@@ -74,12 +59,8 @@ pub async fn verbrauche_recovery_code(
     Ok(ergebnis.rows_affected() == 1)
 }
 
-/// Löscht alle Recovery-Codes von `benutzer_id` (Admin-Reset, Task 6: keine stale Codes nach
-/// einem `totp_secret`-Reset). Executor-generisch (Präzedenz `gefahr::repo::gebiet_anlegen`),
-/// damit der Aufrufer (`routes::benutzer::totp_reset`) sie in DERSELBEN Transaktion wie das
-/// `UPDATE benutzer SET totp_secret = NULL, totp_aktiviert = 0 ...` aufrufen kann (Plan-MUST
-/// „Admin-Reset in einer Transaktion") — mit `&SqlitePool` weiterhin genauso aufrufbar wie
-/// bisher (s. Tests unten).
+/// Löscht alle Recovery-Codes von `benutzer_id` (Admin-Reset). Executor-generisch, damit der
+/// Reset in derselben Transaktion wie das Zurücksetzen von `totp_secret` läuft.
 pub async fn loesche_recovery_codes(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     benutzer_id: i64,
@@ -174,8 +155,7 @@ mod tests {
             "Code eines anderen Nutzers darf nicht verbrauchbar sein"
         );
 
-        // Erikas eigener Verbrauch muss weiterhin funktionieren (Code ist nicht fälschlich
-        // als benutzt markiert worden).
+        // Erikas eigener Code ist nicht fälschlich als benutzt markiert.
         let eigener_verbrauch = verbrauche_recovery_code(&pool, erika, "aaaa-1111")
             .await
             .unwrap();

@@ -19,30 +19,6 @@ async fn fahrzeug_anlegen(app: &axum::Router, admin: &str, funkrufname: &str) ->
     json["id"].as_i64().unwrap()
 }
 
-/// Legt eine Stamm-Person an + disponiert sie in den Einsatz → liefert einsatz_personal.id.
-async fn person_anlegen(app: &axum::Router, admin: &str, einsatz: i64, name: &str) -> i64 {
-    let (s1, stamm) = anfrage(
-        app,
-        "POST",
-        "/api/personal",
-        admin,
-        Some(&format!(r#"{{"name":"{name}"}}"#)),
-    )
-    .await;
-    assert_eq!(s1, StatusCode::CREATED);
-    let pid = stamm["id"].as_i64().unwrap();
-    let (s2, dispo) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
-        admin,
-        Some(&format!(r#"{{"personal_id":{pid}}}"#)),
-    )
-    .await;
-    assert_eq!(s2, StatusCode::CREATED);
-    dispo["id"].as_i64().unwrap()
-}
-
 /// Disponiert ein Stamm-Fahrzeug in den Einsatz → liefert einsatz_fahrzeug.id.
 async fn fahrzeug_disponieren(
     app: &axum::Router,
@@ -71,7 +47,7 @@ async fn besatzung_zuordnen_freigeben_mit_etb() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
-    let ep = person_anlegen(&app, &admin, einsatz, "Anna").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
 
     // Vor Zuordnung: freie Kraft (fahrzeug_id null) → erscheint im Frei-Pool-Picker.
     let (_, personal) = anfrage(
@@ -166,7 +142,7 @@ async fn besatzung_beobachter_darf_nicht_zuordnen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
-    let ep = person_anlegen(&app, &admin, einsatz, "Anna").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
 
     let erika_id = benutzer_anlegen(&app, &admin, "erika", "keine").await;
     rolle_setzen(&app, &admin, einsatz, erika_id, "beobachter").await;
@@ -192,7 +168,7 @@ async fn fahrzeug_entfernen_gibt_besatzung_frei() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
-    let ep = person_anlegen(&app, &admin, einsatz, "Anna").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
     assert_eq!(
         anfrage(
             &app,

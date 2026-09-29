@@ -55,8 +55,9 @@ import {
 } from '../components/SeitenZustand';
 import './EinheitDetailPage.css';
 
-/** Die echte Höhe zählt: Handschuh-Stufe und umgebrochene Aktionen verändern die Leiste.
- * Der Scrollabstand muss schon VOR dem nativen Fokus-Scroll am Ziel stehen (LFH-446).
+/**
+ * Die echte Höhe zählt: Handschuh-Stufe und umgebrochene Aktionen verändern die Leiste. Der
+ * Scrollabstand muss schon vor dem nativen Fokus-Scroll am Ziel stehen.
  */
 function beobachteAktionsleiste(leiste: HTMLDivElement | null, abstand: number) {
   const formular = leiste?.closest('form');
@@ -76,31 +77,17 @@ function beobachteAktionsleiste(leiste: HTMLDivElement | null, abstand: number) 
 }
 
 /**
- * Vollseiten-Detail einer Einheit (LFH-339 · C4, Befund M26).
+ * Vollseiten-Detail einer Einheit (LFH-339): mehrere Sektionen, deutlich über fünf Felder,
+ * deeplink-würdig — nach LFH-19 eine eigene Route. Referenzmuster sind `BefehlDetailPage` und
+ * `PersonenDetailPage`.
  *
- * ── WARUM EINE EIGENE ROUTE ────────────────────────────────────────────────────────────
+ * Die drei Zuordnungen (Personal, Fahrzeuge, Material) wirken sofort — jeder Klick schreibt. Sie
+ * liegen deshalb außerhalb des Formulars, je in einem Paneel mit dem Hinweis „wirkt sofort", nicht
+ * unter einem Speichern-Knopf, der sie nicht betrifft. Das Formular endet mit einer sticky
+ * Aktionsleiste, sonst wäre der Knopf bei neun Feldern aus dem Bild gescrollt.
  *
- * Die Ansicht lag bis hierher in der rechten Hälfte der Listenseite und trug dort NEUN
- * Formularfelder plus DREI Zuordnungslisten in einer Karte — mit dem Speichern-Knopf
- * mitten im Inhalt. Nach LFH-19 ist das keine Auswahl in einer Listenhälfte mehr, sondern
- * eine Detail-/Bearbeitungsansicht: mehrere Sektionen, deutlich über fünf Felder,
- * Deep-Link-würdig. Referenzmuster sind `BefehlDetailPage` und `PersonenDetailPage`.
- *
- * ── DIE ENTWIRRUNG IST DER EIGENTLICHE INHALT ──────────────────────────────────────────
- *
- * Die drei Zuordnungen (Personal, Fahrzeuge, Material) wirken SOFORT — jeder Klick auf
- * „Zuordnen" oder „Entfernen" schreibt. Sie standen trotzdem INNERHALB des `<Form>`, unter
- * einem Speichern-Knopf, der sie nicht betrifft. Das ist zweierlei Bedienlogik unter einer
- * Überschrift, und von aussen ist nicht zu sehen, welche Handlung wann wirkt.
- *
- * Sie liegen deshalb jetzt ausserhalb des Formulars, je in einem eigenen Paneel mit
- * ausdrücklichem Hinweis „wirkt sofort". Das Formular endet vorher mit einer STICKY
- * Aktionsleiste — bei neun Feldern ist der Knopf sonst aus dem Bild gescrollt, während man
- * das letzte Feld ausfüllt.
- *
- * Der Führer-Wechsel bleibt bewusst bei den Mitgliedern und NICHT im Formular: er baut
- * seinen PATCH-Body aus dem Server-Stand, nicht aus den Formularwerten — ungespeicherte
- * Kopf-Edits werden dabei nicht mitgesendet (Vollersatz-Vertrag der Route).
+ * Der Führer-Wechsel bleibt bei den Mitgliedern und nicht im Formular: er baut seinen PATCH-Body
+ * aus dem Server-Stand, ungespeicherte Kopf-Edits gehen nicht mit (Vollersatz-Vertrag der Route).
  */
 
 interface KopfWerte {
@@ -256,9 +243,8 @@ export default function EinheitDetailPage() {
     onError: fehler,
   });
   const fuehrerSetzen = useMutation({
-    // Baut den PATCH-Body bewusst aus dem Server-Stand (`aktuell`), nicht aus dem
-    // Formular: ungespeicherte Kopf-Edits werden NICHT mitgesendet (Vollersatz-Vertrag).
-    // Führer-Markieren ist eine eigenständige Aktion; zuerst Kopfdaten „Speichern".
+    // Baut den PATCH-Body aus dem Server-Stand (`aktuell`), nicht aus dem Formular: ungespeicherte
+    // Kopf-Edits werden nicht mitgesendet (Vollersatz-Vertrag). Zuerst Kopfdaten „Speichern".
     mutationFn: (epId: number | null) => {
       const e = aktuell!;
       return aktualisiereEinheit(einsatzId, e.id, {
@@ -295,7 +281,7 @@ export default function EinheitDetailPage() {
     }
   }, [aktuell, form]);
 
-  // Ungültige Route-ID führt zurück zur Liste (Muster `parseRouteId`, LFH-25).
+  // Ungültige Route-ID führt zurück zur Liste.
   if (!idGueltig) return <Navigate to={einheitenPfad(einsatzId)} replace />;
 
   if (einsatzQuery.isLoading || einheitenQuery.isLoading) return <SeitenSkeleton />;
@@ -321,10 +307,8 @@ export default function EinheitDetailPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   /**
-   * Die Liste kam an, die Einheit ist nicht darin: sie wurde aufgelöst oder die ID ist
-   * erfunden. Das ist ein anderer Fall als „Abruf gescheitert" (darüber) und bekommt
-   * deshalb einen eigenen Wortlaut samt Weg zurück — ein Fehler-Alert behauptete hier
-   * einen Ausfall, den es nicht gab.
+   * Die Liste kam an, die Einheit ist nicht darin (aufgelöst oder erfundene ID). Ein anderer Fall
+   * als „Abruf gescheitert" und deshalb ein eigener Wortlaut samt Weg zurück.
    */
   if (!aktuell) {
     return (
@@ -351,10 +335,9 @@ export default function EinheitDetailPage() {
   const freiesMaterial = (materialQuery.data ?? []).filter((m) => m.einheit_id == null);
 
   /**
-   * Was ein leerer Zuordnungs-Pool bedeutet, hängt daran, OB die Liste überhaupt ankam
-   * (LFH-331 · B3). Scheitert der Abruf, filtern die drei Ausdrücke oben auf die leere
-   * Menge, und das Auswahlfeld behauptete „Keine freien Personen" — eine Aussage über den
-   * Bestand, die niemand geprüft hat.
+   * Was ein leerer Zuordnungs-Pool bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,
+   * filtern die Ausdrücke oben auf die leere Menge, und das Auswahlfeld behauptete „Keine freien
+   * Personen".
    */
   const personalInhalt =
     nichtGefundenInhalt(personalQuery, {
@@ -383,8 +366,8 @@ export default function EinheitDetailPage() {
         alignItems: 'center',
         gap: token.margin,
         flexWrap: 'wrap',
-        // Bedienziel-Boden aus der Dichteachse (LFH-365): eine handgebaute Zeile schuldet
-        // `minHeight` PLUS Polsterung — die Polsterung allein trägt den Boden nicht.
+        // Bedienziel-Boden aus der Dichteachse: eine handgebaute Zeile schuldet `minHeight` plus
+        // Polsterung.
         minHeight: token.controlHeight,
         paddingBlock: token.paddingXXS,
       }}
@@ -407,8 +390,8 @@ export default function EinheitDetailPage() {
         />
       }
       titel={aktuell.name}
-      // Typ und Stärke im Mono-Meta des Seitenkopfs (Neuentwurf S6: „Stärke 24 / 47 / 186 /
-      // 257"). Soll nur, wenn gesetzt — eine erfundene Soll-Stärke wäre eine Behauptung.
+      // Typ und Stärke im Mono-Meta des Seitenkopfs. Soll nur, wenn gesetzt — eine erfundene
+      // Soll-Stärke wäre eine Behauptung.
       meta={
         <>
           {aktuell.typ_label && <>{aktuell.typ_label} · </>}
@@ -421,10 +404,8 @@ export default function EinheitDetailPage() {
           ) : null}
         </>
       }
-      /* Der ÄLTESTE erfolgreiche Stand über alle hier dargestellten Bestände — nicht der
-         jüngste. Diese Seite zeigt Einheit, Abschnitte und die drei Zuordnungspools
-         nebeneinander; ein Datenstand, der nur die frischeste Quelle nennt, behauptete
-         Aktualität für Zahlen, die älter sind (LFH-339 · C4). */
+      /* Der älteste erfolgreiche Stand über alle dargestellten Bestände, nicht der jüngste:
+         sonst behauptete der Datenstand Aktualität für ältere Zahlen. */
       dataUpdatedAt={gemeinsamerDatenstand(
         einheitenQuery.dataUpdatedAt,
         abschnitteQuery.dataUpdatedAt,
@@ -446,9 +427,8 @@ export default function EinheitDetailPage() {
               <Input />
             </Form.Item>
             <Form.Item label="Typ" name="typ_id">
-              {/* Der Typkatalog ist die einzige Fremdquelle dieses Formulars. Fällt er aus,
-                stünde hier ein Auswahlfeld ohne Einträge — die Typzuordnung wäre unmöglich,
-                und zwar lautlos. Der Ausfall steht deshalb im Feld selbst. */}
+              {/* Der Typkatalog ist die einzige Fremdquelle des Formulars. Fällt er aus, wäre
+                  die Typzuordnung lautlos unmöglich; der Ausfall steht deshalb im Feld selbst. */}
               <Select
                 allowClear
                 placeholder="Typ wählen"
@@ -472,9 +452,9 @@ export default function EinheitDetailPage() {
               <TreeSelect allowClear placeholder="Unterstellung" treeData={parentOptionen} />
             </Form.Item>
 
-            {/* BOS-Fachsprache (Befund N6): die Größe heißt Soll-Stärke und wird als
-              Führer / Unterführer / Mannschaft angegeben. Die Eingaberegel steht als
-              gedämpfte Hilfszeile, nicht in Klammern im Etikett. */}
+            {/* BOS-Fachsprache: die Größe heißt Soll-Stärke (Führer / Unterführer /
+                Mannschaft). Die Eingaberegel steht als Hilfszeile, nicht in Klammern im
+                Etikett. */}
             <Form.Item
               label="Soll-Stärke (F/UF/M)"
               extra="Entweder alle drei Werte angeben oder alle leer lassen — teilweise gefüllt wird nicht übernommen."
@@ -491,8 +471,8 @@ export default function EinheitDetailPage() {
             </Form.Item>
 
             <SektionHeader titel="Funk / Kommunikation" ueberschrift="h3" />
-            {/* LFH-614: der Rufname der EINHEIT, nicht eines ihrer Fahrzeuge. Leer gelassen
-              zeigt das Meldebild höchstens den Rufnamen des einzigen Fahrzeugs. */}
+            {/* Der Rufname der Einheit, nicht eines ihrer Fahrzeuge. Leer gelassen zeigt das
+                Meldebild höchstens den Rufnamen des einzigen Fahrzeugs. */}
             <Form.Item
               label="Funkrufname"
               name="funkrufname"
@@ -525,15 +505,12 @@ export default function EinheitDetailPage() {
 
             {darfSchreiben && (
               /**
-               * STICKY am unteren Rand des Formularblocks (Befund M26): bei neun Feldern ist
-               * ein Knopf am Blockende aus dem Bild gescrollt, während man das letzte Feld
-               * ausfüllt — und dort stand er vorher auch noch MITTEN im Inhalt, mit drei
-               * Zuordnungslisten darunter.
+               * Sticky am unteren Rand des Formularblocks: bei neun Feldern wäre ein Knopf am
+               * Blockende aus dem Bild gescrollt, während man das letzte Feld ausfüllt.
                *
-               * `size="middle"` an der Reihe, nicht der Vorgabewert: hier steht ein
-               * `danger`-Knopf neben einer neutralen Aktion, und antds Vorgabe-`small`
-               * bindet auf `abstand.xs` (3/5/7 px je Dichtestufe) — zu wenig Trennung
-               * zwischen „Speichern" und „Auflösen".
+               * `size="middle"` an der Reihe: hier steht ein `danger`-Knopf neben einer neutralen
+               * Aktion, und antds Vorgabeabstand (`abstand.xs`) trennt „Speichern" und „Auflösen"
+               * zu wenig.
                */
               <div
                 ref={(el) => beobachteAktionsleiste(el, token.marginSM)}
@@ -566,15 +543,11 @@ export default function EinheitDetailPage() {
           </Form>
         </Paneel>
 
-        {/**
-         * ── DIE DREI ZUORDNUNGEN LIEGEN AUSSERHALB DES FORMULARS ─────────────────────────
-         *
-         * Das ist der Kern von Befund M26. Jede Handlung hier wirkt SOFORT — es gibt nichts
-         * zu speichern. Innerhalb des `<Form>` standen sie unter einem Speichern-Knopf, der
-         * sie nicht betrifft: zweierlei Bedienlogik unter einer Überschrift, von aussen
-         * nicht unterscheidbar. Der Hinweis in jedem Zuordnungs-Paneel sagt es zusätzlich in
-         * Worten, weil die Trennung allein durch Position eine Vermutung bliebe.
-         */}
+        {/* ── Die drei Zuordnungen liegen außerhalb des Formulars ──
+
+            Jede Handlung hier wirkt sofort, es gibt nichts zu speichern. Der Hinweis in jedem
+            Paneel sagt es zusätzlich in Worten, weil die Trennung allein durch Position eine
+            Vermutung bliebe. */}
         <Paneel titel="Personal" meta={aktuell.personal_mitglieder.length} koerperPolster>
           <p style={{ margin: 0, marginBottom: token.marginXS, color: rollen.gedaempft }}>
             Zuordnungen wirken sofort — hier gibt es nichts zu speichern.

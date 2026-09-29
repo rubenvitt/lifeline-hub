@@ -31,34 +31,34 @@ export default function LoginPage() {
   const location = useLocation();
   const [form] = Form.useForm<FormWerte>();
   const [totpForm] = Form.useForm<TotpFormWerte>();
-  // Der OIDC-Callback leitet JEDEN Fehlschlag generisch auf `/login?fehler=oidc` (Backend
-  // `oidc_fehler_redirect`, bewusst ohne IdP-Detail) — ohne diese Auswertung sähe ein
-  // gescheiterter SSO-Login aus, als wäre nichts passiert.
+  // Der OIDC-Callback leitet jeden Fehlschlag generisch auf `/login?fehler=oidc` (bewusst ohne
+  // IdP-Detail) — ohne diese Auswertung sähe ein gescheiterter SSO-Login aus, als wäre nichts
+  // passiert.
   const [fehler, setFehler] = useState<string | null>(() =>
     new URLSearchParams(location.search).get('fehler') === 'oidc'
       ? 'Die Anmeldung über Single Sign-On ist fehlgeschlagen'
       : null,
   );
-  // Welche Aktion gerade läuft — steuert den Spinner GEZIELT (nur der geklickte Button lädt),
-  // während `disabled` über das Form weiterhin ALLE Wege sperrt (kein paralleler Doppel-Login).
+  // Welche Aktion gerade läuft — steuert den Spinner gezielt (nur der geklickte Knopf lädt),
+  // während `disabled` über das Form alle Wege sperrt (kein paralleler Doppel-Login).
   const [laedt, setLaedt] = useState<'passwort' | 'passkey' | 'totp' | null>(null);
   /** Riegel gegen zwei gleichzeitige `totp/finish` — s. `totpAbsenden`. */
   const sendetRef = useRef(false);
   const [devBenutzer, setDevBenutzer] = useState<DevBenutzer[]>([]);
   const [provider, setProvider] = useState<AuthProvider[]>([]);
-  // Zweite Login-Stufe (LFH-43, TOTP): `login()` meldet „MFA erforderlich" statt eines
-  // Benutzers (s. `AuthContext.LoginErgebnis`) → die erste Stufe (Passwort/OIDC/Passkey) weicht
-  // einer TOTP-Code-Eingabe. Kein Session-Cookie existiert an dieser Stelle noch.
+  // Zweite Login-Stufe (TOTP): `login()` meldet „MFA erforderlich" statt eines Benutzers (s.
+  // `AuthContext.LoginErgebnis`) → die erste Stufe weicht einer Code-Eingabe. Ein Session-Cookie
+  // gibt es an dieser Stelle noch nicht.
   const [mfaAktiv, setMfaAktiv] = useState(false);
-  // In der TOTP-Stufe: Recovery-Code statt Authenticator-Code eingeben. Beide landen im selben
-  // Feld/Endpoint (`totp/finish` unterscheidet serverseitig nicht) — der Umschalter trennt nur
-  // die EINGABE-Ergonomie: 6-stellig-numerisch vs. freies Recovery-Format.
+  // In der TOTP-Stufe: Recovery-Code statt Authenticator-Code. Beide landen im selben Endpoint
+  // (`totp/finish` unterscheidet nicht); der Umschalter trennt nur die Eingabe-Ergonomie
+  // (6-stellig-numerisch vs. freies Recovery-Format).
   const [recoveryModus, setRecoveryModus] = useState(false);
 
   const zielPfad = (location.state as { von?: string } | null)?.von ?? '/einsaetze';
 
-  // Nur im Dev-Build: verfügbare Seed-Benutzer laden. Der gesamte Block steht
-  // hinter `import.meta.env.DEV` und entfällt im Production-Build per DCE.
+  // Nur im Dev-Build: verfügbare Seed-Benutzer laden. Der Block steht hinter `import.meta.env.DEV`
+  // und entfällt im Production-Build per DCE.
   useEffect(() => {
     if (import.meta.env.DEV) {
       devBenutzerLaden()
@@ -68,7 +68,7 @@ export default function LoginPage() {
     }
   }, []);
 
-  // Aktive Auth-Provider laden (LFH-57), um das Passwort-Formular bedingt zu rendern.
+  // Aktive Auth-Provider laden, um das Passwort-Formular bedingt zu rendern.
   useEffect(() => {
     providerListe()
       .then(setProvider)
@@ -80,25 +80,23 @@ export default function LoginPage() {
       );
   }, []);
 
-  // provider.length === 0 hält das Formular sichtbar, solange die Liste lädt
-  // (kein Flackern, kein Aussperren bei Ladefehler).
+  // provider.length === 0 hält das Formular sichtbar, solange die Liste lädt (kein Flackern, kein
+  // Aussperren bei Ladefehler).
   const passwortAktiv =
     provider.length === 0 || provider.some((p) => p.typ === 'passwort' && p.aktiviert);
-  // Aktive OIDC-Provider (LFH-41): jeder rendert einen eigenen Redirect-Button.
+  // Aktive OIDC-Provider: jeder rendert einen eigenen Redirect-Knopf.
   const ssoProvider = provider.filter((p) => p.typ === 'oidc' && p.aktiviert);
-  // Passkey-Login (LFH-275): nur bei aktivem webauthn-Provider UND Secure Context — WebAuthn
-  // verlangt https/localhost, der Button wäre sonst ein Fake-Button (analog OIDC-Precedent).
+  // Passkey-Login nur bei aktivem webauthn-Provider und Secure Context — WebAuthn verlangt
+  // https/localhost, der Knopf wäre sonst ohne Funktion.
   const webauthnAktiv = provider.some((p) => p.typ === 'webauthn' && p.aktiviert);
   const passkeyAktiv = webauthnAktiv && window.isSecureContext;
-  // Der Passkey-Login ist seit LFH-313 usernameless und braucht das Benutzername-Feld NICHT mehr.
-  // Der Formular-Container bleibt sichtbar, sobald Passwort- ODER Passkey-Login aktiv ist — das
-  // Benutzername-/Passwort-Feld selbst hängt aber an `passwortAktiv` (s. unten), damit im reinen
-  // Passkey-Betrieb kein leeres Benutzername-Feld übrig bleibt.
+  // Der Passkey-Login ist usernameless. Der Formular-Container bleibt sichtbar, sobald Passwort-
+  // oder Passkey-Login aktiv ist; die Benutzername-/Passwort-Felder hängen an `passwortAktiv`,
+  // damit im reinen Passkey-Betrieb kein leeres Feld übrig bleibt.
   const formSichtbar = passwortAktiv || passkeyAktiv;
 
-  // OIDC ist ein Browser-Redirect-Flow (kein fetch/XHR): der Server leitet auf den
-  // Identity-Provider weiter, daher ein echter Full-Page-Redirect. `von` trägt das
-  // schon berechnete Redirect-Ziel weiter, damit der Callback dorthin zurückführt.
+  // OIDC ist ein Browser-Redirect-Flow (kein fetch/XHR), daher ein echter Full-Page-Redirect. `von`
+  // trägt das Redirect-Ziel weiter, damit der Callback dorthin zurückführt.
   function starteOidcAnmeldung() {
     window.location.assign(`/api/auth/oidc/start?von=${encodeURIComponent(zielPfad)}`);
   }
@@ -115,9 +113,9 @@ export default function LoginPage() {
       navigate(zielPfad, { replace: true });
     } catch (e) {
       if (e instanceof ApiError) {
-        // Der Server antwortet bewusst mit dem generischen 401 „Nicht angemeldet" (NO-user-
-        // enumeration, s. `password::anmelden`) — für die Anzeige bleibt die Meldung genauso
-        // enumeration-sicher, wird aber verständlich formuliert.
+        // Der Server antwortet bewusst mit dem generischen 401 (keine User-Enumeration, s.
+        // `password::anmelden`) — die Anzeige bleibt ebenso enumeration-sicher, nur verständlich
+        // formuliert.
         setFehler(e.status === 401 ? 'Benutzername oder Passwort ist falsch' : e.message);
       } else {
         setFehler('Verbindung zum Server fehlgeschlagen');
@@ -127,22 +125,16 @@ export default function LoginPage() {
     }
   }
 
-  // Zweite Login-Stufe (LFH-43): Body ist ein TOTP- ODER Recovery-Code — dasselbe Feld/
-  // Endpoint, `totp/finish` unterscheidet serverseitig nicht zwischen beiden. Anders als beim
-  // ersten Schritt (`AuthContext.login` postet die Anmeldedaten und übernimmt den Benutzer
-  // selbst) steht die Session hier bereits nach `totp/finish` per Cookie — analog dem
-  // Passkey-Pfad muss der Client den Benutzer nur noch per `aktualisiere()` (`/api/auth/me`) in
-  // den Context nachladen.
+  // Zweite Login-Stufe: der Body ist ein TOTP- oder Recovery-Code, `totp/finish` unterscheidet
+  // nicht. Anders als `AuthContext.login` steht die Session hier bereits nach `totp/finish` per
+  // Cookie — der Client lädt den Benutzer nur per `aktualisiere()` (`/api/auth/me`) nach.
   async function totpAbsenden(werte: TotpFormWerte) {
-    // Doppelabsende-Riegel (LFH-345 · C10, M20). Seit die sechste Ziffer selbst absendet,
-    // gibt es ZWEI Wege zu diesem Aufruf — der Auto-Weg und der Knopf darunter, der als
-    // Rückfallweg bleibt. Wer die letzte Ziffer tippt und sofort auf „Anmelden" drückt,
-    // löste sonst zwei `totp/finish` aus; der zweite scheitert, weil ein TOTP-Code genau
-    // einmal gültig ist, und meldete „Code ungültig" für einen Code, der gerade
-    // funktioniert hat (im Test gemessen: ['login','totpFinish','totpFinish']).
-    // Der Riegel steht HIER und nicht am Knopf: ein `loading`-Knopf ignoriert Klicks,
-    // aber die Eingabetaste erreicht ihn gar nicht erst — dieselbe Begründung wie beim
-    // `sendetRef` in `components/Erfassung.tsx`.
+    // Doppelabsende-Riegel: die sechste Ziffer sendet selbst ab, der Knopf bleibt als Rückfallweg —
+    // zwei Wege zu diesem Aufruf. Wer die letzte Ziffer tippt und sofort „Anmelden" drückt, löste
+    // sonst zwei `totp/finish` aus; der zweite scheitert, weil ein TOTP-Code genau einmal gültig
+    // ist, und meldete „Code ungültig". Der Riegel steht hier und nicht am Knopf: die Eingabetaste
+    // erreicht einen `loading`-Knopf gar nicht erst (wie `sendetRef` in
+    // `components/Erfassung.tsx`).
     if (sendetRef.current) return;
     sendetRef.current = true;
     setFehler(null);
@@ -154,8 +146,8 @@ export default function LoginPage() {
     } catch (e) {
       setFehler(e instanceof ApiError ? e.message : 'Code ungültig');
     } finally {
-      // Der Riegel fällt IM finally, nicht erst beim nächsten Render: nach einer Ablehnung
-      // muss der nächste Versuch sofort möglich sein.
+      // Der Riegel fällt im finally: nach einer Ablehnung muss der nächste Versuch sofort möglich
+      // sein.
       sendetRef.current = false;
       setLaedt(null);
     }
@@ -174,21 +166,17 @@ export default function LoginPage() {
     totpForm.resetFields(['code']);
   }
 
-  // Passkey-Login (usernameless/discoverable, LFH-313): KEIN Benutzername nötig — der
-  // Authenticator entdeckt den Benutzer selbst. discoverable/start → navigator.credentials.get
-  // (via `startAuthentication` aus `@simplewebauthn/browser`, leere `allowCredentials` → der
-  // Browser zeigt einen Konto-Picker) → discoverable/finish. Anders als beim Passwort-Pfad
-  // (`AuthContext.login` postet die Anmeldedaten selbst) steht die Session hier bereits nach
-  // `finish` per Cookie — der Client muss den Benutzer nur noch per `aktualisiere()`
-  // (`/api/auth/me`) in den Context nachladen.
+  // Passkey-Login (usernameless/discoverable): der Authenticator entdeckt den Benutzer selbst.
+  // discoverable/start → navigator.credentials.get (`startAuthentication`, leere `allowCredentials`
+  // → Konto-Picker) → discoverable/finish. Die Session steht nach `finish` per Cookie; der Client
+  // lädt den Benutzer per `aktualisiere()` nach.
   //
-  // TRADEOFF (discoverable-only): Der Konto-Picker bietet NUR discoverable/resident Credentials
-  // an. Passkeys auf Authenticatoren, die non-resident anlegen (typisch: manche Roaming-Security-
-  // Keys — die Registrierung nutzt `require_resident_key(false)`), erscheinen hier NICHT. Auf
-  // Platform-Authenticatoren (Touch ID/iCloud, Windows Hello) sind Passkeys immer discoverable.
-  // Der benutzergebundene Weg (Backend `/auth/{start,finish}`) bleibt als Fallback erhalten, wird
-  // vom FE aber nicht mehr angeboten. Universeller Resident-Key-Zwang bei der Registrierung ist
-  // auf LFH-277 vertagt (bräuchte die schwerere AttestedResidentKey-API).
+  // Tradeoff: der Konto-Picker bietet nur discoverable/resident Credentials an. Passkeys auf
+  // Authenticatoren, die non-resident anlegen (manche Roaming-Keys; die Registrierung nutzt
+  // `require_resident_key(false)`), erscheinen hier nicht. Auf Platform-Authenticatoren (Touch
+  // ID/iCloud, Windows Hello) sind Passkeys immer discoverable. Der benutzergebundene Weg
+  // (`/auth/{start,finish}`) bleibt im Backend, das Frontend bietet ihn nicht an.
+  // Resident-Key-Zwang bei der Registrierung: LFH-277.
   async function mitPasskeyAnmelden() {
     setFehler(null);
     setLaedt('passkey');
@@ -244,9 +232,8 @@ export default function LoginPage() {
                 name="code"
                 rules={[{ required: true, message: 'Bitte Code eingeben' }]}
               >
-                {/* Seit LFH-345 · C10 das geteilte Primitiv (M20) — dieselbe Eingabe stand
-                    auf der Profilseite als nacktes `<Input>` ohne eine dieser Angaben. Sechs
-                    Ziffern senden ab, der Knopf darunter bleibt der Rückfallweg. */}
+                {/* Das geteilte OTP-Primitiv (auch auf der Profilseite). Sechs Ziffern senden
+                    ab, der Knopf darunter bleibt der Rückfallweg. */}
                 <OtpEingabe autoFocus onVoll={() => totpForm.submit()} />
               </Form.Item>
             )}
@@ -271,7 +258,8 @@ export default function LoginPage() {
           </Form>
         ) : (
           <>
-            {/* Dev-Schnellanmeldung: nur im Dev-Build und nur wenn der Endpoint Benutzer lieferte. */}
+            {/* Dev-Schnellanmeldung: nur im Dev-Build und nur, wenn der Endpoint Benutzer
+                lieferte. */}
             {import.meta.env.DEV && devBenutzer.length > 0 && (
               <div className="login-dev">
                 <span className="login-dev__titel">Dev-Schnellanmeldung</span>

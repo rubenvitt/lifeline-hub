@@ -60,9 +60,9 @@ describe('baueClusterDonut', () => {
 });
 
 /**
- * Personen-Cluster (LFH-650): statt eines Rosé-Segments (`#be185d`, außerhalb der Tokens und
- * neben SK-I-Rot) zeigt der Ring die Zusammensetzung nach Sichtung in den Farben der
- * Sichtungsachse, der Kern das Kürzel der dringlichsten Kategorie.
+ * Personen-Cluster: der Ring zeigt die Zusammensetzung nach Sichtung in den Farben der
+ * Sichtungsachse (kein Rosé-Segment außerhalb der Tokens neben SK-I-Rot), der Kern das Kürzel der
+ * dringlichsten Kategorie.
  */
 describe('Personen-Cluster nach Sichtung (LFH-650)', () => {
   it('aggregiert Personen je Sichtung (s_<k>) und die größte Trefferzone', () => {
@@ -90,7 +90,7 @@ describe('Personen-Cluster nach Sichtung (LFH-650)', () => {
     ]);
     expect(JSON.stringify(segs).toLowerCase()).not.toContain('#be185d');
     expect(Object.values(CLUSTER_TYP_FARBE)).not.toContain('#be185d');
-    // LFH-673: Betreuungsstellen tragen ein eigenes Cyan, abgesetzt vom UHS-Blau.
+    // Betreuungsstellen tragen ein eigenes Cyan, abgesetzt vom UHS-Blau.
     expect(CLUSTER_TYP_FARBE.betreuungsstelle).toBe('#0891b2');
     expect(CLUSTER_TYP_FARBE.betreuungsstelle).not.toBe(CLUSTER_TYP_FARBE.uhs);
   });
@@ -132,9 +132,8 @@ describe('Personen-Cluster nach Sichtung (LFH-650)', () => {
 describe('setzeHuelleDurchlaessig (Review LFH-650)', () => {
   it('lässt bei offenem Spider die Hülle durch, der Ring bleibt klickbar — und stellt es zurück', () => {
     /**
-     * In `handschuh` reicht die 72-px-Hülle über die inneren Pixel der aufgefächerten Blätter
-     * (Blätter ab 40 px, ihr Kreis ab 27 px vom Mittelpunkt). Offen muss sie durchlassen, sonst
-     * klappt ein Tipp auf ein Blatt den Spider zu, statt die Person zu öffnen.
+     * In `handschuh` reicht die 72-px-Hülle über die inneren Pixel der aufgefächerten Blätter.
+     * Offen muss sie durchlassen, sonst klappt ein Tipp auf ein Blatt den Spider zu.
      */
     const huelle = baueClusterDonut({ point_count: 2, c_person: 2, s_sk2: 2, treffer: 72 });
     const ring = huelle.firstElementChild as HTMLElement;

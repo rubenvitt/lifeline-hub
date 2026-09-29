@@ -1,6 +1,6 @@
-//! Integrationstests für Lage-Snapshots (LFH-321, Inkrement C).
-//! Task 1: Persistenz — Metadaten-Liste (ohne `daten`), Volldokument, Einsatz-Scoping.
-//! Task 2: Capture `erzeuge` — Einfrieren des vollen Lagebilds (Immutabilität, Vollständigkeit).
+//! Integrationstests für Lage-Snapshots (LFH-321): Persistenz (Metadaten-Liste ohne `daten`,
+//! Volldokument, Einsatz-Scoping), Capture `erzeuge` (Einfrieren des vollen Lagebilds,
+//! Immutabilität, Vollständigkeit) und die HTTP-Routen.
 
 use axum::http::StatusCode;
 use lifeline_hub::einheit::repo::{self as einheit_repo, EinheitDaten, EinheitPatch};
@@ -259,7 +259,7 @@ async fn snapshot_hat_alle_quellen_und_friert_org_default_ein() {
     );
 }
 
-// ---------- Task 3: HTTP-Routen ----------
+// ---------- HTTP-Routen ----------
 
 #[tokio::test]
 async fn post_erzeugt_snapshot_201_liste_ohne_daten_einzel_mit_daten() {
@@ -428,7 +428,7 @@ async fn fremder_einsatz_ist_404() {
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
 
-// ---------- Review-Fix #2: Modul-Redaktion des Snapshot-Dokuments ----------
+// ---------- Modul-Redaktion des Snapshot-Dokuments ----------
 
 #[tokio::test]
 async fn snapshot_dokument_redigiert_gesperrtes_modul_fuer_den_leser() {

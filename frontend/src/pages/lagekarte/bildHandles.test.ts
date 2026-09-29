@@ -2,10 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Ecken } from '../../api/kartenbilder';
 
 /**
- * Verdrahtung der Bildgriffe (LFH-711) gegen einen nachgebauten `maplibregl.Marker` — jsdom
- * hat kein WebGL, und geprüft wird hier nicht die Karte, sondern welche Griffe an ihr HÄNGEN.
- * Der Nachbau hält nur, was `bildHandles.ts` benutzt: Element, Position, Anhängen/Abziehen und
- * die Zieh-Ereignisse.
+ * Verdrahtung der Bildgriffe gegen einen nachgebauten `maplibregl.Marker` (jsdom hat kein WebGL).
+ * Geprüft wird, welche Griffe an der Karte hängen.
  */
 const angehaengt = new Set<FakeMarker>();
 

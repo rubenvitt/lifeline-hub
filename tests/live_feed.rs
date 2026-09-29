@@ -13,12 +13,10 @@ use common::{einsatz_anlegen, login_cookie, setup};
 
 /// Der Feed schickt sein erstes Byte **sofort**, nicht erst mit dem Keep-Alive.
 ///
-/// Gemessen: direkt am Backend standen die Header nach 1,6 ms, durch den Vite-Dev-Proxy
-/// erst nach 15,0 s. `http-proxy-3` setzt Status und Header nur und schickt sie mit dem
-/// ersten Body-Byte, und das war ohne Ereignis der Keep-Alive-Kommentar nach
-/// `KeepAlive::default()` = 15 s. So lange stand die Kopfleiste auf „VERBINDE", weil
-/// `EventSource.onopen` die Header braucht. Jeder Proxy, der bis zum ersten Byte puffert,
-/// verhält sich so.
+/// Proxies wie `http-proxy-3` (Vite-Dev-Proxy) setzen Status und Header erst mit dem ersten
+/// Body-Byte ab. Ohne Ereignis war das der Keep-Alive-Kommentar nach `KeepAlive::default()` =
+/// 15 s — so lange stand die Kopfleiste auf „VERBINDE", weil `EventSource.onopen` die Header
+/// braucht. Jeder Proxy, der bis zum ersten Byte puffert, verhält sich so.
 ///
 /// Das erste Frame besteht **nur aus Kommentarzeilen** (`:`): der Browser verwirft es,
 /// und ohne `id:`-Zeile bleibt die `Last-Event-ID` des Reconnect-Resyncs, wie sie war.
