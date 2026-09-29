@@ -6,7 +6,7 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
-import { farbenDunkel } from '../theme/tokens';
+import { rahmenFarben } from '../theme/tokens';
 import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
 import AppLayout from './AppLayout';
 import { adminFixture } from '../test/fixtures';
@@ -151,9 +151,9 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
       </CommandPaletteProvider>,
     );
     const text = (await screen.findByText('Verwaltung')).closest('span');
-    // Die ROLLE ist die Aussage, nicht die Zahl: `farbenDunkel.schwach` hält gegen den
-    // Kopfzeilengrund den Kontrast. jsdom rechnet keine Farbmischung, hier steht die Herkunft.
-    expect(text).toHaveStyle({ color: farbenDunkel.schwach });
+    // Die ROLLE ist die Aussage, nicht die Zahl: `rahmenFarben.gesperrt` (LFH-434). Die Zahl
+    // rechnet `theme/rahmenKontrast.test.ts`.
+    expect(text).toHaveStyle({ color: rahmenFarben.gesperrt });
   });
 
   it('zeigt für Berechtigte den freien Link ohne Sperrhinweis', async () => {
@@ -189,5 +189,34 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
     // Immer noch der GESPERRTE Zweig — sonst prüfte die Zeile darunter einen Zustand ohne Tag.
     expect(screen.queryByRole('link', { name: 'Verwaltung' })).toBeNull();
     expect(screen.queryByText('Keine Berechtigung')).toBeNull();
+  });
+
+  /**
+   * LFH-434: die Sperre trägt auf JEDER Breite einen Kanal ohne Farbe. `cursor: not-allowed`
+   * sieht man auf Touch nicht, und der Tag steht erst ab `lg`.
+   */
+  it.each([390, 1366])('trägt auf %i px das Schloss vor dem gesperrten Link', async (breite) => {
+    setzeViewportBreite(breite);
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <AppLayout />
+      </CommandPaletteProvider>,
+    );
+    const gesperrt = (await screen.findByText('Verwaltung')).closest('.ant-typography')!;
+    const schloss = gesperrt.querySelector('[data-lfh="sperr-schloss"]');
+    expect(schloss).not.toBeNull();
+    // Dekoration: das Wort (bzw. der Tag) trägt den Namen, kein zweites Vorleseziel.
+    expect(schloss).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('zeigt dem Berechtigten kein Schloss', async () => {
+    server.use(meHandler(adminFixture({ anzeigename: 'A' })));
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <AppLayout />
+      </CommandPaletteProvider>,
+    );
+    await screen.findByRole('link', { name: 'Verwaltung' });
+    expect(document.querySelector('[data-lfh="sperr-schloss"]')).toBeNull();
   });
 });

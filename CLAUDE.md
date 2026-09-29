@@ -377,6 +377,12 @@ anwendbar), „nicht geprüft" ist keins.
   `meldungen.bestaetigung_ueberfaellig`) gilt `HELLIGKEIT_BODEN_WARNUNG` (abgeleitet über
   Kriterium 5, Guard `theme/helligkeit.test.ts`); Quellen melden sich nur über `useWarnsperre`
   (heute allein `EinsatzLayout`). Die Sperre ändert nie die Wahl.
+- **Der dauerdunkle Rahmen hält die Tag-Schwelle** (LFH-434): die Schwelle aus Kriterium 5
+  folgt dem Umgebungslicht, nicht dem Token. Bedienbarer Text auf Kopfleiste/Rail ≥ 7 : 1 auf
+  jedem Rahmengrund (`grund`/`feld`/`aktiv`), Stufen nur `rahmenFarben.text`/`.gedaempft`;
+  `rahmenFarben.gesperrt` (≥ 4,5) nur für Gesperrtes, dann mit Zeichen ohne Farbe auf jeder
+  Breite (Schloss in `AppLayout.tsx`). Gerechnet in `theme/rahmenKontrast.test.ts` (pinnt die
+  Schlüsselmenge); gilt für jede weitere dauerdunkle Fläche.
 - **Rot steht nicht bündig neben Neutralem:** `<Space>` mit `danger` und weiterer Aktion trägt
   `size="middle"` (`aktionsabstand.guard.test.ts`).
 - **Destruktiv ist nicht gleich destruktiv** (LFH-363): Umkehrbares („Außer Dienst",
