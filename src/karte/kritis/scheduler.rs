@@ -1,14 +1,12 @@
 //! Periodische Erneuerung des KRITIS-Bestands aus dem OSM-Extrakt (LFH-83).
 //!
-//! Muster wie `backup::scheduler`: ein dünner Tokio-Task ruft [`tick_einmal`], die Logik ist
-//! ohne laufenden Scheduler testbar. Anders als die Sicherung ist der Import **Default-an**
-//! (Schalter `--kritis-extrakt`), weil die Ebene sonst leer bliebe.
+//! Ein dünner Tokio-Task ruft [`tick_einmal`]; die Logik ist ohne laufenden Scheduler testbar.
+//! Der Import ist per Vorgabe an (`--kritis-extrakt`), sonst bliebe die Ebene leer.
 //!
-//! Ablauf je Tick: fällig? → `HEAD` auf den Extrakt → unverändert (gleiches `ETag` bzw.
+//! Ablauf je Tick: fällig? → `HEAD` auf den Extrakt → unverändert (`ETag` bzw.
 //! `Last-Modified`)? dann nur den Zeitpunkt fortschreiben → sonst herunterladen, einlesen
-//! (`spawn_blocking`), Bestand atomar tauschen. Die heruntergeladene Datei wird in jedem Fall
-//! gelöscht; ein gescheiterter Lauf lässt den bisherigen Bestand unberührt, und der nächste
-//! Tick versucht es erneut, weil `importiert_at` nicht fortgeschrieben wurde.
+//! (`spawn_blocking`), Bestand atomar tauschen. Die Datei wird in jedem Fall gelöscht; ein
+//! gescheiterter Lauf lässt den Bestand unberührt und schreibt `importiert_at` nicht fort.
 
 use super::bestand::{self, ImportMeta};
 use super::extrakt;
@@ -20,25 +18,22 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-/// Wartezeit nach dem Serverstart bis zur ersten Prüfung — Start und erste Anfragen sollen
-/// nicht mit einem Multi-GB-Download und dem CPU-lastigen Einlesen konkurrieren.
+/// Wartezeit nach dem Start, damit Start und erste Anfragen nicht mit dem Multi-GB-Download
+/// konkurrieren.
 const START_VERZOEGERUNG: Duration = Duration::from_secs(60);
 
-/// Takt der Fälligkeitsprüfung. Die Fälligkeit selbst hängt am gespeicherten
-/// `importiert_at`, überlebt also Neustarts; der Tick trägt keinen eigenen Zustand.
+/// Takt der Fälligkeitsprüfung. Die Fälligkeit hängt am gespeicherten `importiert_at` und
+/// überlebt Neustarts.
 const PRUEF_TAKT: Duration = Duration::from_secs(3600);
 
-/// Obergrenze der Extrakt-Größe. Der Deutschland-Extrakt liegt bei rund 4–5 GB; die Grenze
-/// fängt eine falsch konfigurierte URL (Planet-Datei, ~80 GB) ab, bevor die Platte vollläuft.
+/// Obergrenze der Extrakt-Größe (Deutschland ~4–5 GB); fängt eine falsch konfigurierte URL
+/// (Planet-Datei) ab, bevor die Platte vollläuft.
 const MAX_EXTRAKT_BYTES: u64 = 20 * 1024 * 1024 * 1024;
 
-/// Mindestabstand nach einem Lauf, der beim Herunterladen oder danach gescheitert ist (Review
-/// LFH-83). Ohne ihn wäre der nächste stündliche Tick sofort wieder fällig und lüde dieselben
-/// 4–5 GB erneut — bei einem dauerhaften Fehler (Platte voll, unlesbares Format) bis zu 24-mal
-/// am Tag gegen Geofabrik. Bewusst eine Zeitsperre und kein Vergleich mit den Headern des
-/// gescheiterten Versuchs: Geofabrik leitet auf wechselnde Spiegel um, deren `ETag`s sich
-/// unterscheiden — ein Header-Vergleich griffe dann nie. Ein gescheitertes `HEAD` (kein Netz)
-/// kostet nichts und sperrt nicht: ohne Internet soll der erste Import nicht Stunden warten.
+/// Mindestabstand nach einem Lauf, der beim oder nach dem Herunterladen gescheitert ist; sonst
+/// lüde ein dauerhafter Fehler stündlich 4–5 GB neu. Eine Zeitsperre statt Header-Vergleich,
+/// weil Geofabrik auf Spiegel mit wechselnden `ETag`s umleitet. Ein gescheitertes `HEAD` kostet
+/// nichts und sperrt nicht, damit der erste Import ohne Netz nicht Stunden wartet.
 pub const FEHLER_ABSTAND: Duration = Duration::from_secs(6 * 3600);
 
 /// Threads des Einlesens (siehe `lade_und_lies`).
@@ -116,9 +111,8 @@ fn header(resp: &reqwest::Response, name: reqwest::header::HeaderName) -> Option
         .map(String::from)
 }
 
-/// Ein Lauf. `url` ist bereits geprüft (https bzw. Dev-Loopback, siehe [`starte`]).
-/// `fehlversuch` hält der Aufrufer über die Ticks: ein Lauf, der ab dem Download scheitert,
-/// setzt ihn, ein gelungener Import löscht ihn (siehe [`FEHLER_ABSTAND`]).
+/// Ein Lauf. `url` ist bereits geprüft (s. [`starte`]). `fehlversuch` hält der Aufrufer über die
+/// Ticks: ein Scheitern ab dem Download setzt ihn, ein gelungener Import löscht ihn.
 pub async fn tick_einmal(
     pool: &SqlitePool,
     verzeichnis: &Path,
@@ -154,8 +148,8 @@ pub async fn tick_einmal(
     if !darf_laden(*fehlversuch, jetzt) {
         return Ok(TickErgebnis::Zurueckgestellt);
     }
-    // Ab hier kostet ein Fehlschlag einen Multi-GB-Download: bis zum Erfolg gilt der Versuch
-    // als gescheitert.
+    // Ab hier kostet ein Fehlschlag einen Multi-GB-Download; bis zum Erfolg gilt der Versuch als
+    // gescheitert.
     *fehlversuch = Some(jetzt);
 
     tokio::fs::create_dir_all(verzeichnis)
@@ -163,12 +157,12 @@ pub async fn tick_einmal(
         .map_err(|e| format!("{} nicht anlegbar: {e}", verzeichnis.display()))?;
     let datei = verzeichnis.join("extrakt.osm.pbf.part");
     let ergebnis = lade_und_lies(client, url, &datei).await;
-    // Die Datei ist 4–5 GB groß — sie bleibt nie liegen, auch nicht nach einem Fehler.
+    // Die Datei bleibt nie liegen, auch nicht nach einem Fehler.
     let _ = tokio::fs::remove_file(&datei).await;
     let objekte = ergebnis?;
 
-    // Ein Extrakt ohne ein einziges Objekt ist kein leeres Deutschland, sondern eine falsche
-    // Datei (Fehlkonfiguration, Wartungsseite). Er ersetzt den Bestand nicht.
+    // Ein Extrakt ohne ein einziges Objekt ist eine falsche Datei (Fehlkonfiguration,
+    // Wartungsseite) und ersetzt den Bestand nicht.
     if objekte.is_empty() {
         return Err("Extrakt enthält keine KRITIS-Objekte — Bestand bleibt".into());
     }
@@ -206,10 +200,8 @@ async fn lade_und_lies(
     .map_err(|e| format!("Download {url}: {e}"))?;
     let pfad = datei.to_path_buf();
     tokio::task::spawn_blocking(move || {
-        // Eigener Pool statt des globalen: gemessen am DE-Extrakt (Aufgabe 6.2) nahm der
-        // globale Pool alle 16 Kerne und 3,6 GB Spitze; mit 4 Threads sind es ~0,6 GB bei
-        // rund drei Minuten. Ein wöchentlicher Hintergrundlauf soll den Einsatzbetrieb
-        // nicht ausbremsen.
+        // Eigener, kleiner Pool: der globale nähme alle Kerne und ein Vielfaches an Speicher. Der
+        // wöchentliche Hintergrundlauf soll den Einsatzbetrieb nicht ausbremsen.
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(IMPORT_THREADS)
             .thread_name(|i| format!("kritis-import-{i}"))
@@ -222,8 +214,8 @@ async fn lade_und_lies(
     .map_err(|e| format!("Einlesen abgebrochen: {e}"))?
 }
 
-/// Verhindert einen zweiten Scheduler im selben Prozess — zwei Läufe gleichzeitig luden
-/// denselben Extrakt doppelt und schrieben in dieselbe Staging-Tabelle.
+/// Verhindert einen zweiten Scheduler im selben Prozess (doppelter Download, dieselbe
+/// Staging-Tabelle).
 static GESTARTET: AtomicBool = AtomicBool::new(false);
 
 /// Startet den Hintergrund-Job. Abgeschaltet oder mit unbrauchbarer URL wird kein Task
@@ -417,7 +409,7 @@ mod tests {
         assert_eq!(gets.load(Ordering::SeqCst), 1);
     }
 
-    /// Spec „Unveränderter Extrakt": fällig, aber gleiches ETag → kein GET, nur Zeitpunkt.
+    /// Fällig, aber gleiches ETag → kein GET, nur der Zeitpunkt.
     #[tokio::test]
     async fn unveraenderter_extrakt_wird_nicht_geladen() {
         let (d, p) = pool().await;
@@ -438,8 +430,8 @@ mod tests {
         assert_eq!(m.anzahl, 3);
     }
 
-    /// Spec „Abgebrochener Lauf": eine kaputte Datei lässt den alten Bestand stehen, räumt
-    /// sich weg und schreibt die Fälligkeit NICHT fort (der nächste Tick versucht es erneut).
+    /// Eine kaputte Datei lässt den alten Bestand stehen, räumt sich weg und schreibt die
+    /// Fälligkeit nicht fort.
     #[tokio::test]
     async fn kaputter_extrakt_laesst_den_bestand_stehen() {
         let (d, p) = pool().await;
@@ -485,7 +477,7 @@ mod tests {
         .await;
         assert!(e.is_err());
         assert!(bestand::meta(&p).await.is_none());
-        // Ein gescheitertes HEAD hat nichts geladen — es sperrt den nächsten Versuch nicht.
+        // Ein gescheitertes HEAD hat nichts geladen und sperrt den nächsten Versuch nicht.
         assert_eq!(fehlversuch, None);
     }
 
@@ -497,9 +489,8 @@ mod tests {
         assert!(darf_laden(Some(1_000), 1_000 + sperre));
     }
 
-    /// Review LFH-83: ein dauerhaft scheiternder Lauf lud jede Stunde 4–5 GB neu. Nach einem
-    /// Fehlschlag ab dem Download gibt es innerhalb von FEHLER_ABSTAND keinen zweiten GET —
-    /// auch wenn der Spiegel ein anderes ETag meldet; danach wird es erneut versucht.
+    /// Nach einem Fehlschlag ab dem Download gibt es innerhalb von FEHLER_ABSTAND keinen zweiten
+    /// GET, auch bei anderem ETag; danach wird es erneut versucht.
     #[tokio::test]
     async fn nach_fehlschlag_kein_neuer_download_vor_ablauf_der_sperre() {
         let (d, p) = pool().await;

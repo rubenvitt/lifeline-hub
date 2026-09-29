@@ -1,13 +1,8 @@
 //! Generische Datei-Anhang-Infrastruktur (LFH-102).
 //!
-//! Bewusst als **Top-Level-Modul** geschnitten — nicht unter `kommunikation` —,
-//! weil Anhänge modulübergreifend gedacht sind (Chat dockt jetzt an, ETB/Lageobjekte
-//! können dieselbe `anhang`-Tabelle später nutzen). Die chat-spezifische Verknüpfung
-//! (`chat_nachricht_anhang`) lebt deshalb im `chat`-Modul, nicht hier.
-//!
-//! Dateien werden als BLOB in der SQLite-DB gespeichert (siehe Migration 0052):
-//! ein einziger Zustands-Container, vom file-copy-/VACUUM-INTO-Backup automatisch
-//! miterfasst.
+//! Top-Level-Modul, weil Anhänge modulübergreifend sind; modulspezifische Verknüpfungen (z. B.
+//! `chat_nachricht_anhang`) leben im jeweiligen Modul. Dateien liegen als BLOB in der SQLite-DB
+//! und sind damit automatisch im Backup.
 
 pub mod repo;
 
@@ -16,16 +11,13 @@ use serde::Serialize;
 use std::sync::OnceLock;
 use utoipa::ToSchema;
 
-/// Maximale Upload-Größe pro Datei (25 MiB). Muss mit dem Body-Limit der
-/// Upload-Route (`DefaultBodyLimit`) zusammenpassen und ist bewusst am späteren
-/// clamd-`StreamMaxLength` (Default 25M, LFH-114) orientiert.
+/// Maximale Upload-Größe je Datei (25 MiB). Muss zum Body-Limit der Upload-Routen passen und
+/// entspricht dem clamd-`StreamMaxLength` (Default 25M).
 pub const MAX_GROESSE: usize = 25 * 1024 * 1024;
 
-/// Erlaubte MIME-Typen (Allowlist). Bewusst kuratiert: Bilder, PDF, einfache
-/// Texte/CSV und Office-Open-XML — das deckt die typischen BOS-Dokumente
-/// (Fotos, Lagekarten als PDF, Listen) ab, ohne ausführbare Inhalte zuzulassen.
-/// Erweiterbar; eine echte Inhalts-Sniffing-Prüfung folgt mit der AV-Anbindung
-/// (LFH-114) — heute wird der aus der Dateiendung abgeleitete MIME-Typ geprüft.
+/// Erlaubte MIME-Typen (Allowlist): Bilder, PDF, einfache Texte/CSV und Office-Open-XML — die
+/// typischen BOS-Dokumente, ohne ausführbare Inhalte. Geprüft wird der aus der Dateiendung
+/// abgeleitete Typ.
 pub const ERLAUBTE_MIME: &[&str] = &[
     "image/jpeg",
     "image/png",
@@ -66,8 +58,8 @@ pub fn pruefe_groesse(len: usize) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Allowlist der Dokumentenablage (LFH-632, E4): die Chat-Liste plus HEIC/HEIF
-/// (iPhone-Kamera-Standard) und TIFF (Scans). Der Chat bleibt bei [`ERLAUBTE_MIME`].
+/// Allowlist der Dokumentenablage: die Chat-Liste plus HEIC/HEIF (iPhone-Kamera) und TIFF
+/// (Scans). Der Chat bleibt bei [`ERLAUBTE_MIME`].
 pub const ERLAUBTE_MIME_DOKUMENT: &[&str] = &[
     "image/jpeg",
     "image/png",
@@ -84,18 +76,15 @@ pub const ERLAUBTE_MIME_DOKUMENT: &[&str] = &[
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ];
 
-/// Allowlist der Erfassungsmodule (LFH-21, design.md D3) — heute Schäden, später Personen,
-/// Tiere, UHS; deshalb modulneutral benannt. Kamerabilder und PDF:
-/// - HEIC/HEIF ist das Standardformat der iPhone-Kamera; ohne sie scheitert das häufigste
-///   Endgerät am Schadensort.
+/// Allowlist der Erfassungsmodule (heute Schäden, daher modulneutral benannt): Kamerabilder und
+/// PDF.
+/// - HEIC/HEIF ist das Standardformat der iPhone-Kamera.
 /// - JPEG/PNG/WebP decken Android-Kameras, Screenshots und Messenger-Weiterleitungen.
 /// - PDF trägt Kostenvoranschlag, Gutachten, Übergabeprotokoll.
 ///
-/// Nicht enthalten: Office und Text/CSV (gehören in die Dokumentenablage, kein
-/// Erfassungsnachweis), GIF (keine Kameraquelle), TIFF (Scanformat der Ablage, im Browser
-/// nicht darstellbar). Echte Teilmenge von [`ERLAUBTE_MIME_DOKUMENT`] (Unit-Test). Das
-/// Frontend spiegelt die Liste als `ERFASSUNG_ACCEPT` in `api/upload.ts` — ändern heißt dort
-/// mit ändern.
+/// Nicht enthalten: Office und Text/CSV (gehören in die Ablage), GIF, TIFF (im Browser nicht
+/// darstellbar). Echte Teilmenge von [`ERLAUBTE_MIME_DOKUMENT`] (Unit-Test). Das Frontend
+/// spiegelt die Liste als `ERFASSUNG_ACCEPT` in `api/upload.ts` — dort mit ändern.
 pub const ERLAUBTE_MIME_ERFASSUNG: &[&str] = &[
     "image/jpeg",
     "image/png",
@@ -105,17 +94,14 @@ pub const ERLAUBTE_MIME_ERFASSUNG: &[&str] = &[
     "application/pdf",
 ];
 
-/// Leitet den MIME-Typ aus der Dateiendung ab (mime_guess) und prüft ihn gegen
-/// die Chat-Allowlist [`ERLAUBTE_MIME`]. Der vom Client gemeldete Content-Type wird bewusst
-/// NICHT als Sicherheitsentscheidung herangezogen (manipulierbar) — die Endung ist hier
-/// die maßgebliche, knappe Heuristik; echtes Content-Sniffing folgt mit LFH-114.
+/// Leitet den MIME-Typ aus der Dateiendung ab und prüft ihn gegen [`ERLAUBTE_MIME`]. Der vom
+/// Client gemeldete Content-Type ist manipulierbar und wird nicht herangezogen.
 pub fn ermittle_mime(dateiname: &str) -> Result<String, AppError> {
     ermittle_mime_aus(dateiname, ERLAUBTE_MIME)
 }
 
-/// Wie [`ermittle_mime`], aber gegen eine übergebene Allowlist. `mime_guess` kennt
-/// `.heic`/`.heif`/`.tif`/`.tiff` selbst (gemessen, mime_guess 2.0.5) — eine eigene
-/// Endungstabelle ist deshalb nicht nötig; der Unit-Test unten pinnt das.
+/// Wie [`ermittle_mime`], gegen eine übergebene Allowlist. `mime_guess` kennt
+/// `.heic`/`.heif`/`.tif`/`.tiff` selbst (der Unit-Test pinnt das).
 pub fn ermittle_mime_aus(dateiname: &str, erlaubt: &[&str]) -> Result<String, AppError> {
     let mime = mime_guess::from_path(dateiname)
         .first_raw()
@@ -128,12 +114,10 @@ pub fn ermittle_mime_aus(dateiname: &str, erlaubt: &[&str]) -> Result<String, Ap
     Ok(mime.to_string())
 }
 
-/// **Die eine Prüfkette vor jedem Persistieren** (LFH-21, design.md D3): Typ aus der Endung
-/// gegen `erlaubt`, Größe, Virenscan — in dieser Reihenfolge. Liefert den serverseitig
-/// ermittelten MIME. Gerufen von [`hochladen_multipart`] (generischer und ETB-Upload), der
-/// Dokumentenablage und der Schaden-Ablage; eine dritte Kopie der drei Aufrufe wäre die
-/// Stelle, an der die Wege bei der nächsten Prüfung (Content-Sniffing, LFH-114) still
-/// auseinanderliefen.
+/// **Die eine Prüfkette vor jedem Persistieren:** Typ aus der Endung gegen `erlaubt`, Größe,
+/// Virenscan — in dieser Reihenfolge; liefert den serverseitig ermittelten MIME. Gerufen von
+/// [`hochladen_multipart`], der Dokumentenablage und der Schaden-Ablage, damit die Wege bei der
+/// nächsten Prüfung nicht still auseinanderlaufen.
 pub async fn pruefe_vor_persist(
     dateiname: &str,
     daten: &[u8],
@@ -141,29 +125,21 @@ pub async fn pruefe_vor_persist(
 ) -> Result<String, AppError> {
     let mime = ermittle_mime_aus(dateiname, erlaubt)?;
     pruefe_groesse(daten.len())?;
-    // AV-Scan (LFH-114): scan-vor-persist gegen clamd (config-getrieben, Default
-    // fail-closed). Ohne konfigurierten clamd ein No-op.
+    // AV-Scan vor dem Persistieren (Default fail-closed); ohne konfigurierten clamd ein No-op.
     scan(scan_config(), daten).await?;
     Ok(mime)
 }
 
-/// Liest alle Datei-Felder eines Multipart-Uploads, prüft je Feld Endung gegen `erlaubt`,
-/// Größe und Virenscan (scan-vor-persist) und legt jede Datei als ungebundenen Anhang des
-/// Einsatzes an. Felder ohne Dateiname werden übersprungen; kommt keine Datei an, ist das
-/// 400 „Keine Datei im Upload".
+/// Liest alle Datei-Felder eines Multipart-Uploads, prüft je Feld Endung, Größe und Virenscan
+/// und legt jede Datei als ungebundenen Anhang des Einsatzes an. Felder ohne Dateiname werden
+/// übersprungen; ohne Datei → 400 „Keine Datei im Upload“.
 ///
-/// **Der eine Upload-Pfad für zwei Routen** (LFH-117): der generische Upload
-/// (`routes::anhang::hochladen`, [`ERLAUBTE_MIME`]) und der ETB-Upload
-/// (`routes::etb::anhang_hochladen`, [`ERLAUBTE_MIME_DOKUMENT`]) unterscheiden sich nur in
-/// den Gates davor und in der Allowlist. Eine kopierte Schleife wäre die Stelle, an der die
-/// beiden bei der nächsten Prüfung (Content-Sniffing) still auseinanderliefen.
+/// Ein Pfad für den generischen und den ETB-Upload; sie unterscheiden sich nur in den Gates
+/// davor und der Allowlist.
 ///
-/// Best-Effort pro Feld (vorbestehendes LFH-102-Muster, keine umschließende Transaktion):
-/// scheitert ein späteres Feld (MIME/Größe oder AV-Fund, LFH-114), bleiben die bereits
-/// persistierten sauberen BLOBs verwaist zurück. Bewusst toleriert — es landet KEIN
-/// gefundener Schadcode in der DB (scan-vor-persist pro Feld), und verwaiste Anhänge nimmt
-/// der Aufräumlauf nach der Karenz ([`repo::sweep_verwaiste`]). Atomarität (Tx über alle
-/// Felder) wäre ein eigener Task, nicht Teil von LFH-114.
+/// Best-Effort je Feld ohne umschließende Transaktion: scheitert ein späteres Feld, bleiben die
+/// bereits gespeicherten sauberen BLOBs verwaist zurück. Schadcode landet nie in der DB, und
+/// verwaiste Anhänge räumt [`repo::sweep_verwaiste`] nach der Karenz.
 pub async fn hochladen_multipart(
     pool: &sqlx::SqlitePool,
     einsatz_id: i64,
@@ -177,13 +153,14 @@ pub async fn hochladen_multipart(
         .await
         .map_err(|e| AppError::Validation(format!("Multipart-Fehler: {e}")))?
     {
-        // Nur echte Datei-Felder (mit Dateiname) verarbeiten; sonstige überspringen.
+        // Nur echte Datei-Felder (mit Dateiname) verarbeiten.
         let Some(dateiname) = feld.file_name().map(str::to_string) else {
             continue;
         };
-        // Frühe Endungsprüfung VOR dem Lesen der Bytes: ein verbotener Typ wird ohne Lesen
-        // abgewiesen, auch über dem Body-Limit. `pruefe_vor_persist` prüft sie danach noch
-        // einmal mit — das kostet nichts und hält die Kette an einer Stelle.
+        // Frühe Endungsprüfung VOR dem Lesen der Bytes, damit ein verbotener Typ ohne Lesen
+        // abgewiesen
+        // wird. `pruefe_vor_persist` prüft sie danach noch einmal, damit die Kette an einer Stelle
+        // bleibt.
         ermittle_mime_aus(&dateiname, erlaubt)?;
         let daten = feld
             .bytes()
@@ -199,12 +176,9 @@ pub async fn hochladen_multipart(
     Ok(angelegt)
 }
 
-/// Baut einen sicheren `Content-Disposition`-Wert: reiner ASCII-Fallback plus
-/// RFC-5987 `filename*` mit prozent-kodiertem UTF-8, damit Dateinamen mit
-/// Umlauten korrekt ankommen, ohne dass `HeaderValue::from_str` scheitert.
-/// Geteilte Asset-Auslieferungs-Infrastruktur (LFH-238): sowohl der generische
-/// Anhang-Download als auch der Karten-Hintergrundbild-Download nutzen sie, damit
-/// beide Pfade konsistent `attachment` mit korrekt kodiertem Dateinamen liefern.
+/// Sicherer `Content-Disposition`-Wert: ASCII-Fallback plus RFC-5987 `filename*` mit
+/// prozent-kodiertem UTF-8, damit Umlaute ankommen, ohne dass `HeaderValue::from_str` scheitert.
+/// Geteilt von Anhang- und Hintergrundbild-Download.
 pub fn content_disposition(dateiname: &str) -> String {
     let ascii: String = dateiname
         .chars()
@@ -235,7 +209,7 @@ fn prozent_kodiere(s: &str) -> String {
     out
 }
 
-/// Ergebnis eines AV-Scans (LFH-114) — Eingabe für die reine [`entscheide`]-Logik.
+/// Ergebnis eines AV-Scans — Eingabe für die reine [`entscheide`]-Logik.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ScanErgebnis {
     /// clamd meldet die Bytes als sauber.
@@ -249,20 +223,16 @@ pub enum ScanErgebnis {
 /// Default-Timeout (Sekunden) für den clamd-Scan.
 const DEFAULT_CLAMD_TIMEOUT_SEKUNDEN: u64 = 30;
 
-/// Konfiguration des Upload-AV-Scans (LFH-114), prozessweit einmal via
-/// [`init_scan_config`] beim Serverstart gesetzt (aus der CLI/ENV-`Config`).
+/// Konfiguration des Upload-AV-Scans, einmal beim Serverstart per [`init_scan_config`] gesetzt.
 #[derive(Debug, Clone)]
 pub struct ScanConfig {
-    /// clamd-Adresse: TCP `host:port` oder Unix-Socket `unix:/pfad`. `None` → Scan
-    /// deaktiviert (No-op-Seam; der Default-Build ohne clamd bleibt single-binary).
+    /// clamd-Adresse: TCP `host:port` oder Unix-Socket `unix:/pfad`. `None` → Scan deaktiviert.
     pub clamd_addr: Option<String>,
-    /// Verhalten bei nicht erreichbarem clamd: `false` (Default) = fail-closed (Upload
-    /// ablehnen, 503), `true` = fail-open (durchlassen — Feld-/Offline-Kompromiss).
+    /// Verhalten bei nicht erreichbarem clamd: `false` (Default) = fail-closed (503), `true` =
+    /// fail-open (Feld-/Offline-Kompromiss).
     pub fail_open: bool,
-    /// Max. Wartezeit auf clamd; danach gilt der Scan als „nicht erreichbar" (die
-    /// fail-open/closed-Entscheidung greift). Verhindert, dass ein hängender clamd
-    /// (Verbindung angenommen, aber keine Antwort) den Upload-Request unbegrenzt blockiert
-    /// — ein Hänger wäre für fail-closed schlimmer als eine abgelehnte Verbindung.
+    /// Max. Wartezeit auf clamd; danach gilt der Scanner als „nicht erreichbar“. Ein clamd, der die
+    /// Verbindung annimmt, aber nie antwortet, blockierte den Upload sonst unbegrenzt.
     pub timeout: std::time::Duration,
 }
 
@@ -278,9 +248,8 @@ impl Default for ScanConfig {
 
 static SCAN_CONFIG: OnceLock<ScanConfig> = OnceLock::new();
 
-/// Setzt die prozessweite Scan-Konfiguration (einmal beim Serverstart). Idempotent —
-/// ein zweiter Aufruf wird ignoriert; bewusst NICHT in AppState, um die ~20 inline
-/// AppState-Test-Konstruktionen nicht zu brechen (analog zu prozessweiten Caches).
+/// Setzt die prozessweite Scan-Konfiguration (einmal beim Start, idempotent). Nicht in
+/// `AppState`, um die Inline-Test-Konstruktionen nicht zu brechen.
 pub fn init_scan_config(cfg: ScanConfig) {
     let _ = SCAN_CONFIG.set(cfg);
 }
@@ -290,8 +259,8 @@ pub fn scan_config() -> &'static ScanConfig {
     SCAN_CONFIG.get_or_init(ScanConfig::default)
 }
 
-/// Reine Entscheidung aus AV-Ergebnis + fail-Modus → persistieren (`Ok`) oder ablehnen.
-/// Bewusst getrennt von der Netz-I/O, damit ohne laufenden clamd testbar.
+/// Reine Entscheidung aus AV-Ergebnis und fail-Modus → persistieren (`Ok`) oder ablehnen; ohne
+/// laufenden clamd testbar.
 pub fn entscheide(ergebnis: ScanErgebnis, fail_open: bool) -> Result<(), AppError> {
     match ergebnis {
         ScanErgebnis::Sauber => Ok(()),
@@ -310,16 +279,14 @@ pub fn entscheide(ergebnis: ScanErgebnis, fail_open: bool) -> Result<(), AppErro
     }
 }
 
-/// AV-Scan eines Upload-Puffers (scan-vor-persist, LFH-114). Ohne konfigurierte
-/// `clamd_addr` (oder im `--no-default-features`-Build ohne das `clamav`-Cargo-Feature) ein
-/// No-op → `Ok`; das Binary bleibt so oder so single-binary. Bei Fund → 422, bei nicht erreichbarem
-/// clamd → fail-open/closed gemäß [`ScanConfig`].
+/// AV-Scan eines Upload-Puffers vor dem Persistieren. Ohne `clamd_addr` (oder ohne das
+/// `clamav`-Feature) ein No-op → `Ok`. Fund → 422, clamd nicht erreichbar → fail-open/closed
+/// gemäß [`ScanConfig`].
 pub async fn scan(cfg: &ScanConfig, daten: &[u8]) -> Result<(), AppError> {
     let Some(addr) = cfg.clamd_addr.as_deref() else {
         return Ok(());
     };
-    // Timeout gegen einen hängenden clamd: nach Ablauf gilt der Scanner als nicht
-    // erreichbar, damit die fail-open/closed-Entscheidung greift statt der Request hängt.
+    // Timeout gegen einen hängenden clamd, damit die fail-open/closed-Entscheidung greift.
     let ergebnis = match tokio::time::timeout(cfg.timeout, clamd_scan(addr, daten)).await {
         Ok(e) => e,
         Err(_zeitueberschritten) => {
@@ -335,16 +302,14 @@ pub async fn scan(cfg: &ScanConfig, daten: &[u8]) -> Result<(), AppError> {
 
 #[cfg(not(feature = "clamav"))]
 async fn clamd_scan(_addr: &str, _daten: &[u8]) -> ScanErgebnis {
-    // `clamav`-Feature nicht einkompiliert, aber eine Adresse ist gesetzt → bewusste
-    // Fehlkonfiguration. Sicherer Default: als „nicht erreichbar" behandeln, damit
-    // fail-closed greift statt still ungescannt zu persistieren. Der Serverstart warnt
-    // zusätzlich (main.rs).
+    // Adresse gesetzt, aber `clamav`-Feature fehlt: Fehlkonfiguration, als „nicht erreichbar“
+    // behandelt, damit fail-closed greift statt still ungescannt zu speichern. Der Serverstart
+    // warnt zusätzlich.
     ScanErgebnis::ScannerNichtErreichbar
 }
 
-/// Streamt den Puffer per INSTREAM an clamd und übersetzt die Antwort in ein
-/// [`ScanErgebnis`]. Jeder Verbindungs-/Protokollfehler wird bewusst zu
-/// `ScannerNichtErreichbar` (die fail-open/closed-Entscheidung trifft [`entscheide`]).
+/// Streamt den Puffer per INSTREAM an clamd. Jeder Verbindungs-/Protokollfehler wird zu
+/// `ScannerNichtErreichbar`; die Politik entscheidet [`entscheide`].
 #[cfg(feature = "clamav")]
 async fn clamd_scan(addr: &str, daten: &[u8]) -> ScanErgebnis {
     let antwort = clamd_verbinden(addr, daten).await;
@@ -357,15 +322,12 @@ async fn clamd_scan(addr: &str, daten: &[u8]) -> ScanErgebnis {
     }
 }
 
-/// Verbindet je nach Adressform zu clamd. **Der `unix:`-Zweig existiert nur unter Unix**
-/// (LFH-522): `clamav_client::tokio::Socket` ist in der Crate mit `#[cfg(unix)]` gated, weil
-/// Unix-Domain-Sockets kein Windows-Konzept sind. Ohne diese Trennung ist das gesamte Crate
-/// auf `x86_64-pc-windows-gnu` nicht übersetzbar (E0422) — gemessen beim Cross-Build-Spike.
+/// Verbindet je nach Adressform zu clamd. **Der `unix:`-Zweig existiert nur unter Unix**:
+/// `clamav_client::tokio::Socket` ist `#[cfg(unix)]`-gated, ohne die Trennung wäre das Crate auf
+/// `x86_64-pc-windows-gnu` nicht übersetzbar (E0422).
 ///
-/// Unter Windows bleibt der TCP-Zweig; eine dort konfigurierte `unix:`-Adresse landet als
-/// gewöhnlicher Verbindungsfehler bei `ScannerNichtErreichbar` und damit in derselben
-/// fail-open/closed-Entscheidung wie jeder andere Ausfall — kein neuer Fehlerpfad, aber eine
-/// laute Warnung, weil die Konfiguration auf dieser Plattform nie funktionieren kann.
+/// Unter Windows landet eine `unix:`-Adresse als Verbindungsfehler bei `ScannerNichtErreichbar`
+/// (dieselbe fail-open/closed-Entscheidung), mit lauter Warnung.
 #[cfg(all(feature = "clamav", unix))]
 async fn clamd_verbinden(addr: &str, daten: &[u8]) -> clamav_client::IoResult {
     if let Some(pfad) = addr.strip_prefix("unix:") {
@@ -402,12 +364,10 @@ async fn clamd_verbinden(addr: &str, daten: &[u8]) -> clamav_client::IoResult {
     .await
 }
 
-/// Übersetzt eine clamd-INSTREAM-Antwort in ein [`ScanErgebnis`]. clamd endet mit
-/// `OK` (sauber), `<Sig> FOUND` (Fund) oder `<Meldung> ERROR` (Betriebsfehler, z.B.
-/// `INSTREAM size limit exceeded. ERROR` oder OOM). Ein ERROR / unerwartetes Format wird
-/// bewusst als `ScannerNichtErreichbar` behandelt, damit die fail-open/closed-Politik
-/// greift, statt einen Scanner-BETRIEBSfehler dem Nutzer als Virenfund (422) zu melden.
-/// (`clamav_client::clean` allein wertet JEDES Nicht-`OK` als Fund — daher hier explizit.)
+/// Übersetzt eine clamd-INSTREAM-Antwort: `OK` (sauber), `<Sig> FOUND` (Fund) oder
+/// `<Meldung> ERROR` (Betriebsfehler, z. B. Größenlimit). ERROR und unerwartete Formate gelten
+/// als `ScannerNichtErreichbar`, damit ein Betriebsfehler nicht als Virenfund (422) beim Nutzer
+/// landet. `clamav_client::clean` allein wertete jedes Nicht-`OK` als Fund.
 #[cfg(feature = "clamav")]
 fn klassifiziere_antwort(antwort: &[u8]) -> ScanErgebnis {
     let s = String::from_utf8_lossy(antwort);
@@ -428,8 +388,7 @@ fn klassifiziere_antwort(antwort: &[u8]) -> ScanErgebnis {
 mod tests {
     use super::*;
 
-    /// LFH-632: die Dokumenten-Allowlist erkennt HEIC/HEIF/TIFF über `mime_guess`, die
-    /// Chat-Allowlist lehnt sie weiter ab (E4).
+    /// Die Dokumenten-Allowlist erkennt HEIC/HEIF/TIFF, die Chat-Allowlist lehnt sie ab.
     #[test]
     fn dokument_allowlist_kennt_heic_und_tiff_chat_nicht() {
         for (datei, mime) in [
@@ -454,8 +413,7 @@ mod tests {
         }
     }
 
-    /// LFH-21, design.md D3: die Erfassungs-Allowlist (Schäden, später Personen/Tiere/UHS)
-    /// nimmt Kamerabilder samt HEIC/HEIF und PDF, sonst nichts.
+    /// Die Erfassungs-Allowlist nimmt Kamerabilder samt HEIC/HEIF und PDF, sonst nichts.
     #[test]
     fn erfassung_allowlist_nimmt_kamerabilder_und_pdf() {
         for (datei, mime) in [
@@ -537,7 +495,7 @@ mod tests {
         assert!(!cd.contains("\"v2\""));
     }
 
-    // --- AV-Scan-Entscheidung (LFH-114) ---
+    // --- AV-Scan-Entscheidung ---
 
     #[test]
     fn entscheide_sauber_ist_ok() {
@@ -594,8 +552,8 @@ mod tests {
     #[cfg(feature = "clamav")]
     #[test]
     fn klassifiziere_error_ist_nicht_erreichbar_nicht_fund() {
-        // clamd-BETRIEBSfehler dürfen NICHT als Virenfund (422) beim Nutzer landen,
-        // sondern als „nicht erreichbar" die fail-open/closed-Politik durchlaufen.
+        // clamd-Betriebsfehler landen nicht als Virenfund (422), sondern durchlaufen die
+        // fail-open/closed-Politik.
         assert_eq!(
             klassifiziere_antwort(b"INSTREAM size limit exceeded. ERROR\0"),
             ScanErgebnis::ScannerNichtErreichbar
@@ -607,8 +565,7 @@ mod tests {
     }
 
     // --- Echter I/O-Pfad gegen nicht erreichbaren clamd (nur mit `clamav`-Feature) ---
-    // Braucht KEINEN laufenden clamd: 127.0.0.1:1 verweigert die Verbindung → der
-    // ScannerNichtErreichbar-Zweig + die fail-open/closed-Entscheidung werden real geübt.
+    // 127.0.0.1:1 verweigert die Verbindung; kein laufender clamd nötig.
 
     #[cfg(feature = "clamav")]
     #[tokio::test]
@@ -643,8 +600,8 @@ mod tests {
     #[cfg(feature = "clamav")]
     #[tokio::test]
     async fn scan_gegen_haengenden_clamd_timeout_lehnt_ab() {
-        // Ein clamd, der die Verbindung ANNIMMT aber nie antwortet, darf den Upload nicht
-        // unbegrenzt blockieren: der Scan muss per Timeout abbrechen und fail-closed ablehnen.
+        // Ein clamd, der annimmt, aber nie antwortet, darf den Upload nicht blockieren: Timeout und
+        // fail-closed.
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap().to_string();
         tokio::spawn(async move {
@@ -668,7 +625,7 @@ mod tests {
         );
     }
 
-    // No-op ohne Adresse gilt in BEIDEN Builds → un-gated (läuft im Default-`cargo test`).
+    // No-op ohne Adresse gilt in beiden Builds, deshalb ohne Feature-Gate.
     #[tokio::test]
     async fn scan_ohne_adresse_ist_noop() {
         let cfg = ScanConfig {
@@ -678,10 +635,9 @@ mod tests {
         assert!(scan(&cfg, b"x").await.is_ok(), "ohne clamd-Adresse → No-op");
     }
 
-    // Fehlkonfig-Pfad des `--no-default-features`-Builds (Feature AUS, aber Adresse gesetzt):
-    // der not-feature clamd_scan liefert ScannerNichtErreichbar → „kein stiller ungescannter
-    // Upload". Läuft nur unter `cargo test --no-default-features` (ohne Netz — der not-feature
-    // clamd_scan ist konstant und kehrt sofort zurück); im Default-Build greift der echte Pfad.
+    // Fehlkonfig-Pfad des `--no-default-features`-Builds (Feature aus, Adresse gesetzt) →
+    // `ScannerNichtErreichbar`, kein stiller ungescannter Upload. Läuft nur unter
+    // `cargo test --no-default-features`.
 
     #[cfg(not(feature = "clamav"))]
     #[tokio::test]

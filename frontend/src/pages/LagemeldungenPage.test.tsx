@@ -69,9 +69,8 @@ describe('LagemeldungenPage', () => {
   });
 
   /**
-   * Rückweg zur Quellmeldung (LFH-348 · C13, Befund M85) über den Builder aus
-   * `routing/deeplinks.ts` — kein Inline-Template-Literal (LFH-25); der Grep auf
-   * `einsaetze/${` in der Seite ist Teil des Akzeptanzkriteriums.
+   * Rückweg zur Quellmeldung über den Builder aus `routing/deeplinks.ts`, kein
+   * Inline-Template-Literal.
    */
   it('verlinkt die Quellmeldung über meldungenPfad und zeigt die Uhrzeit unter dem Tageskopf', async () => {
     renderPage();
@@ -93,7 +92,7 @@ describe('LagemeldungenPage', () => {
     const sicht = await screen.findByRole('region', { name: 'Lagemeldungen' });
     await within(sicht).findByText('Neu');
     const text = sicht.textContent ?? '';
-    // Liste ABSICHTLICH aufsteigend geliefert: nur so ist die Umkehr beweiskräftig.
+    // Liste absichtlich aufsteigend geliefert: nur so ist die Umkehr beweiskräftig.
     expect(text.indexOf('Neu')).toBeLessThan(text.indexOf('Alt'));
     const tag = (s: string) => alsOrtszeit(s)!.format('DD.MM.YYYY');
     expect(text.indexOf(tag('2026-06-13 07:00:00'))).toBeLessThan(
@@ -163,12 +162,11 @@ describe('LagemeldungenPage', () => {
   });
 
   /**
-   * Der Wortlaut bleibt byte-gleich; getauscht wird der Knoten (LFH-331 · B3). Die
-   * zweite Zusicherung ist die tragende — die erste war vor dem Umbau genauso grün.
+   * Der Wortlaut bleibt gleich, getauscht wird der Knoten; die zweite Zusicherung ist die tragende.
    *
-   * Keine Primäraktion: eine Lagemeldung entsteht nicht hier, sondern dadurch, dass
-   * jemand anderswo eine Meldung als lagerelevant übergibt. Ein Knopf auf die
-   * Meldungsliste führte zur Voraussetzung, nicht aus dem Leerzustand heraus.
+   * Keine Primäraktion: eine Lagemeldung entsteht, indem jemand anderswo eine Meldung als
+   * lagerelevant übergibt. Ein Knopf auf die Meldungsliste führte zur Voraussetzung, nicht aus dem
+   * Leerzustand heraus.
    */
   it('zeigt Leerzustand ohne Lageobjekte', async () => {
     listeLageMeldungen.mockResolvedValue([]);

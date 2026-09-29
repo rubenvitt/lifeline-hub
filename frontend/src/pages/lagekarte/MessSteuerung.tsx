@@ -21,13 +21,9 @@ const FORMEN = [
 ] as const;
 
 /**
- * Band im Kartenfuß fürs Messwerkzeug (LFH-616) — Geschwister der `ZeichnenSteuerung`,
- * gleiche Bauform (Flow-Band, LFH-355), aber OHNE Speichern: eine Messung ist ein Blick auf
- * die Karte, kein Lageobjekt.
- *
- * Der ausdrückliche „Abschließen"-Knopf ist die Antwort auf den Handschuh-Kontext: ein
- * Doppelklick ist dort keine verlässliche Geste (CLAUDE.md, Führungs-Tablet). Präsentations-
- * frei wie das Geschwister — keine Karten- oder terra-draw-Kenntnis, nur Props.
+ * Band im Kartenfuß fürs Messwerkzeug — gleiche Bauform wie `ZeichnenSteuerung`, aber ohne
+ * Speichern: eine Messung ist ein Blick, kein Lageobjekt. Der ausdrückliche „Abschließen"-Knopf,
+ * weil ein Doppelklick mit Handschuh keine verlässliche Geste ist. Präsentationsfrei, nur Props.
  */
 export default function MessSteuerung(props: MessSteuerungProps) {
   const { token, rollen } = useRollen();
@@ -53,8 +49,8 @@ export default function MessSteuerung(props: MessSteuerungProps) {
           onWechsel={props.onForm}
           beschriftung="Messform"
         />
-        {/* `<output>`: der Wert ist das Ergebnis einer Bedienung, keine Überschrift. Bewusst
-            ohne `aria-live` — er ändert sich bei jeder Zeigerbewegung. */}
+        {/* `<output>`: der Wert ist das Ergebnis einer Bedienung. Ohne `aria-live` — er ändert
+            sich bei jeder Zeigerbewegung. */}
         <output data-lfh="messwert" style={{ display: 'block' }}>
           <span style={{ ...monoStil(20, 500), color: rollen.text }}>{ergebnis.haupt}</span>
           {ergebnis.neben && (

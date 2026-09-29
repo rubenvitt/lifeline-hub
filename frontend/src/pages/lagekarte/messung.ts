@@ -1,11 +1,9 @@
 import { formatFlaeche, formatLaenge, lineLaengeM, polygonFlaecheM2, polygonUmfangM } from './geo';
 
 /**
- * Messwerkzeug der Lagekarte (LFH-616, Entwurf S5): Strecke oder Fläche.
- *
- * Rein und ohne terra-draw — die Zeichnung liefert `messZeichnung.ts`, gerechnet wird hier
- * mit denselben Funktionen, aus denen der Inspector die Kennzahlen einer Fläche liest
- * (`geo.ts`, LFH-146). Zwei Rechenwege für „wie groß ist das" wären der Fehlerfall.
+ * Messwerkzeug der Lagekarte: Strecke oder Fläche. Rein, ohne terra-draw — gerechnet wird mit
+ * denselben Funktionen, aus denen der Inspector die Kennzahlen liest (`geo.ts`); zwei Rechenwege
+ * wären der Fehlerfall.
  */
 export type MessForm = 'strecke' | 'flaeche';
 

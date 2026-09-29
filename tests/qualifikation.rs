@@ -145,10 +145,9 @@ async fn qualifikation_anlegen(app: &axum::Router, admin: &str, label: &str, sor
 }
 
 /// **Der unterscheidende Test dieser Route.** `qualifikation` hat keine nullable Spalte,
-/// also gibt es hier keinen null-vs-absent-Tri-State — der einzige echte Verlustpfad war
-/// das `#[serde(default)] sortier: i64` am Vollersatz-Body: ein PATCH, der nur das Label
-/// ändert, setzte `sortier` still auf 0 und verschob den Eintrag in der Katalogliste.
-/// Fällt gegen HEAD hart durch.
+/// also gibt es hier keinen null-vs-absent-Tri-State — der einzige echte Verlustpfad ist ein
+/// Vollersatz-Body mit `#[serde(default)] sortier: i64`: ein PATCH, der nur das Label ändert,
+/// setzte `sortier` still auf 0 und verschob den Eintrag in der Katalogliste.
 #[tokio::test]
 async fn patch_ohne_sortier_laesst_sortier_stehen() {
     let app = setup().await;

@@ -1,6 +1,6 @@
 //! Persistenz der Lage-Snapshots. `daten` liegt als JSON-String in einer `TEXT`-Spalte; die
-//! Liste selektiert `daten` bewusst **nicht** (Größe). Der Capture `erzeuge` (LFH-321, Task 2)
-//! sammelt das volle Lagebild über Pool-Reuse ein.
+//! Liste selektiert `daten` wegen der Größe nicht. `erzeuge` sammelt das volle Lagebild über den
+//! Pool ein.
 
 use crate::error::AppError;
 use serde::Deserialize;
@@ -16,9 +16,9 @@ pub struct NeuerLageSnapshot {
     pub notiz: Option<String>,
 }
 
-/// PATCH-Body — **nur** Metadaten. `daten`/`stand_at`/`erstellt_*` sind strukturell NICHT
-/// enthalten (Unveränderlichkeit ist typseitig erzwungen). Tri-State (`Option<Option<T>>`):
-/// absent = unverändert, `null` = löschen, Wert = setzen.
+/// PATCH-Body — nur Metadaten. `daten`/`stand_at`/`erstellt_*` sind nicht enthalten, die
+/// Unveränderlichkeit ist typseitig erzwungen. Tri-State: absent = unverändert, `null` =
+/// löschen, Wert = setzen.
 #[derive(Debug, Deserialize)]
 pub struct PatchLageSnapshot {
     #[serde(default)]
@@ -153,9 +153,8 @@ pub async fn loesche(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<bool
     Ok(res.rows_affected() > 0)
 }
 
-/// Aktualisiert **nur** die Metadaten (Tri-State: `None` = Feld unverändert, `Some(None)` =
-/// auf NULL, `Some(Some(v))` = setzen). `daten`/`stand_at`/`erstellt_*` bleiben unangetastet —
-/// das ist die Unveränderlichkeits-Garantie. Kein gesetztes Feld = No-op.
+/// Aktualisiert nur die Metadaten (Tri-State). `daten`/`stand_at`/`erstellt_*` bleiben
+/// unangetastet — die Unveränderlichkeits-Garantie. Kein gesetztes Feld = No-op.
 pub async fn patche_meta(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -182,15 +181,15 @@ pub async fn patche_meta(
     Ok(())
 }
 
-/// Eingefrorenes Lagebild (`schema_version = 1`). Jedes Feld ist die **rohe `*Anzeige`-DTO-Liste**
-/// der jeweiligen Lagekarte-Quelle — so bleiben Inspector-Felder (status/staerke/abschnitt_id …)
-/// erhalten und das Frontend leitet Marker im Replay durch die unveränderten `baueMarker`-Ableiter.
+/// Eingefrorenes Lagebild (`schema_version = 1`). Jedes Feld ist die rohe `*Anzeige`-DTO-Liste
+/// der jeweiligen Lagekarte-Quelle, damit Inspector-Felder erhalten bleiben und das Frontend im
+/// Replay dieselben `baueMarker`-Ableiter nutzt.
 #[derive(serde::Serialize)]
 struct SnapshotDaten {
     version: u32,
     stand_at: String,
-    /// Eingefrorener Org-TZ-Default (`organisation.tz_organisation`) — Fallback in der
-    /// Marker-Ableitung; muss eingefroren werden, sonst ändert eine Org-Umbenennung den Stand.
+    /// Eingefrorener Org-TZ-Default (`organisation.tz_organisation`), Fallback der
+    /// Marker-Ableitung; sonst änderte eine Org-Umbenennung den Stand.
     #[serde(skip_serializing_if = "Option::is_none")]
     org_default: Option<String>,
     einsatz: crate::einsatz::EinsatzAnzeige,
@@ -203,26 +202,25 @@ struct SnapshotDaten {
     abschnitte: Vec<crate::einsatzabschnitt::EinsatzabschnittAnzeige>,
     zonen: Vec<crate::lage_zone::LageZoneAnzeige>,
     freie_zeichen: Vec<crate::freies_zeichen::FreiesZeichenAnzeige>,
-    /// Enthält `hoechste_warnstufe` je Gebiet — die Zonen-Färbung; ebenfalls einzufrieren.
+    /// Enthält `hoechste_warnstufe` je Gebiet (die Zonen-Färbung), ebenfalls eingefroren.
     gefahrengebiete: Vec<crate::gefahr::GefahrengebietAnzeige>,
     lagemeldungen: Vec<crate::meldung::LageMeldungAnzeige>,
-    /// Nur Metadaten/ID-Referenz — die BLOB-Bytes bleiben live (kein 5-MB-Grundriss je Stand).
+    /// Nur Metadaten; die BLOB-Bytes bleiben live (kein 5-MB-Grundriss je Stand).
     bilder: Vec<crate::karte_hintergrundbild::HintergrundbildAnzeige>,
-    /// Betreuungsstellen mit Koordinate (LFH-673) — Marker im Rückblick. Am Modul Betreuung
-    /// gegatet (`REDIGIERBARE_MODUL_FELDER`).
+    /// Betreuungsstellen mit Koordinate (Marker im Rückblick); am Modul Betreuung gegatet
+    /// (`REDIGIERBARE_MODUL_FELDER`).
     betreuungsstellen: Vec<crate::betreuung::BetreuungsstelleAnzeige>,
-    /// Evakuierungsbezirke (LFH-673) — Bezeichnung und Räumungszustand beschriften die
-    /// Bezirksflächen in `zonen`. Ebenfalls am Modul Betreuung gegatet.
+    /// Evakuierungsbezirke — beschriften die Bezirksflächen in `zonen`; ebenfalls am Modul
+    /// Betreuung gegatet.
     evakuierungsbezirke: Vec<crate::betreuung::EvakuierungsbezirkAnzeige>,
 }
 
-/// Capture: friert das volle Lagebild eines Einsatzes in EIN JSON-Dokument ein (LFH-321, C).
+/// Friert das volle Lagebild eines Einsatzes in EIN JSON-Dokument ein.
 ///
-/// Sammelt über **Pool-Reuse** dieselben Roh-`*Anzeige`-DTOs ein, die auch die Lagekarte speisen.
-/// Bewusst **keine** echte Read-Transaktion (jede `liste` nutzt eine eigene Pool-Connection) — für
-/// einen manuell ausgelösten Stand akzeptiert; SQLite serialisiert Writes, das Torn-Read-Fenster ist
-/// winzig. Global-Scope-Ableitungsinputs (`org_default`, gefahrengebiet-Warnstufe über die
-/// Gebiets-Liste) werden mit eingefroren — sonst schriebe ein späterer Config-Wechsel den Stand um.
+/// Sammelt über den Pool dieselben `*Anzeige`-DTOs, die auch die Lagekarte speisen — bewusst
+/// ohne gemeinsame Read-Transaktion; für einen manuell ausgelösten Stand ist das winzige
+/// Torn-Read-Fenster akzeptiert. Global abgeleitete Eingaben (`org_default`, Warnstufen der
+/// Gebiete) werden mit eingefroren, sonst schriebe ein späterer Config-Wechsel den Stand um.
 pub async fn erzeuge(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -241,25 +239,24 @@ pub async fn erzeuge(
         .fetch_one(pool)
         .await?;
 
-    // Eine Abfrage für beide Betreuungsfelder: dieselbe Übersicht wie die Modulseite, also
-    // nur nicht stornierte Stellen und Bezirke (LFH-673).
+    // Eine Abfrage für beide Betreuungsfelder, wie die Modulseite: nur nicht stornierte Stellen und
+    // Bezirke.
     let betreuung = crate::betreuung::repo::uebersicht(pool, einsatz_id).await?;
 
     let daten = SnapshotDaten {
         version: 1,
         stand_at: stand_at.clone(),
         org_default,
-        // Der Snapshot hat keinen abfragenden Benutzer — dieselbe Begründung wie für
-        // `None` bei Rolle und Führungsstelle: es gibt niemanden, dessen Sachgebiete
-        // hier gemeint wären.
+        // Der Snapshot hat keinen abfragenden Benutzer, dessen Rolle oder Sachgebiete gemeint
+        // wären.
         einsatz: einsatz.anzeige(None, None, Vec::new()),
         ansichten: crate::karten_ansicht::repo::liste(pool, einsatz_id).await?,
         uhs: crate::uhs::repo::liste(pool, einsatz_id, None, None).await?,
-        // inkl_storniert=false: der Stand spiegelt das sichtbare Lagebild, nicht stornierte Schäden.
+        // Der Stand spiegelt das sichtbare Lagebild, ohne stornierte Schäden.
         schaeden: crate::schaden::repo::liste(pool, einsatz_id, None, None, None, None, false)
             .await?,
         einheiten: crate::einheit::repo::liste(pool, einsatz_id).await?,
-        // Fahrzeuge aus der einsatz-scoped Disposition (NICHT dem org-weiten Fuhrpark).
+        // Fahrzeuge aus der einsatz-scoped Disposition, nicht aus dem org-weiten Fuhrpark.
         fahrzeuge: crate::fahrzeug::disposition_repo::liste(pool, einsatz_id, einsatz_aktiv)
             .await?,
         // Nur Führungskräfte werden Marker (EL/AL), nicht das gesamte Personal.

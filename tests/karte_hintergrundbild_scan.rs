@@ -50,8 +50,7 @@ fn multipart_bild(boundary: &str, daten: &[u8]) -> Vec<u8> {
 
 /// Fail-closed + unerreichbarer clamd: Ein valides PNG (MIME/Ecken/Größe ok) muss am
 /// AV-Scan scheitern (503) — Beweis, dass der Upload den Scan-Seam durchläuft und nicht
-/// still ungescannt persistiert. Vor LFH-238 umging der Hintergrundbild-Upload den Scan
-/// (→ 201).
+/// still ungescannt persistiert (sonst 201).
 #[tokio::test]
 async fn upload_ohne_erreichbaren_scanner_wird_fail_closed_abgelehnt() {
     // Prozessglobal, VOR dem ersten scan_config()-Zugriff (den erst der Upload-Handler tut).

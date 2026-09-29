@@ -28,19 +28,15 @@ const RECHTE_TEXT =
   'Nur die Einsatzleitung oder ein System-Admin darf die Modul-Sichtbarkeit dieses Einsatzes ändern — die Werte stehen hier zum Nachlesen.';
 
 /**
- * Sektion `…/einstellungen/module` (LFH-345 · C10, Befund H15) — Modul-Sichtbarkeit und
- * Rollen-Schranke je Modul.
+ * Sektion `…/einstellungen/module` — Modul-Sichtbarkeit und Rollen-Schranke je Modul.
  *
- * **Sie hat als einzige Sektion keine Speicher-Leiste**, und das ist der Befund selbst: die
- * Liste speichert je Zeile SOFORT und stand bis dahin unter einem Speichern-Knopf, der sie
- * gar nicht betraf — zweierlei Bedienlogik unter einer Überschrift, von außen nicht zu
- * unterscheiden. Dieselbe Trennung hat LFH-339/M26 an der Einheiten-Detailseite gezogen.
+ * Keine Speicher-Leiste: die Liste speichert je Zeile sofort; ein Speichern-Knopf darüber beträfe
+ * sie nicht.
  *
- * **Die Rechte-Achse ist eine ANDERE als in den drei Formular-Sektionen** (`darfEinsatzLeiten`
- * statt `darfImEinsatzSchreiben`): Modul-Overrides darf nur die Einsatzleitung oder ein
- * System-Admin verwalten — das deckt das Backend-Gate `einsatzleitung|admin`. Führungspersonal
- * darf die Einstellungen ändern, die Modulsichtbarkeit aber nicht; beim Aufteilen der Seite
- * dürfen die beiden Achsen nicht verschmelzen.
+ * Andere Rechte-Achse als die Formular-Sektionen (`darfEinsatzLeiten` statt
+ * `darfImEinsatzSchreiben`): Modul-Overrides verwalten nur Einsatzleitung und System-Admin
+ * (Backend-Gate `einsatzleitung|admin`). Führungspersonal darf Einstellungen ändern, die
+ * Modulsichtbarkeit nicht.
  */
 export default function EinsatzModule() {
   const { id } = useParams();
@@ -60,8 +56,7 @@ export default function EinsatzModule() {
     queryFn: () => ladeOrgModulEinstellungen(),
   });
 
-  // KEIN `onError`-Toast (H14): eine gescheiterte Zeile bleibt als Alert stehen, zusätzlich
-  // markiert `fehlerKey` genau die betroffene Zeile.
+  // Kein `onError`-Toast: der Fehler bleibt als Alert stehen, `fehlerKey` markiert die Zeile.
   const overrideMutation = useMutation({
     mutationFn: (vars: { modulKey: string; update: ModulOverrideUpdate }) =>
       setzeModulOverride(einsatzId, vars.modulKey, vars.update),
@@ -73,12 +68,9 @@ export default function EinsatzModule() {
 
   if (daten.laedt || overridesQuery.isLoading) return <SeitenSkeleton />;
   /**
-   * Ein gescheiterter Override-Abruf darf NICHT in die Liste fallen (gefunden im Review zu
-   * C10, im Bestand seit je so). Das `?? {}` unten liest sich sonst als „alle Module
-   * sichtbar, keine Rollenschranke" — und der nächste Schalterklick schickt genau diesen
-   * erfundenen Zustand als Bestandswert in einen Vollersatz-PUT. Eine gepflegte
-   * Rollenschranke wäre damit weg, ohne dass irgendwo ein Fehler steht: dieselbe stumme
-   * Fehlerklasse, gegen die dieses ganze Ticket antritt.
+   * Ein gescheiterter Override-Abruf darf nicht in die Liste fallen: `?? {}` hieße sonst „alle
+   * sichtbar, keine Rollenschranke", und der nächste Schalterklick schickte diesen erfundenen Stand
+   * als Bestandswert in den Vollersatz-PUT — eine gepflegte Rollenschranke wäre still weg.
    */
   if (overridesQuery.isError) {
     return (
@@ -114,8 +106,7 @@ export default function EinsatzModule() {
             overrideMutation.mutate({
               modulKey,
               update: {
-                // Die Sichtbarkeit MUSS mitfahren: der PUT ist Vollersatz — ohne den
-                // Bestandswert nullt eine reine Rollen-Änderung das Ausblenden.
+                // Die Sichtbarkeit muss mitfahren: der PUT ist Vollersatz.
                 sichtbar: sichtbarVon(modulKey),
                 benoetigte_rolle: (val || null) as ModulOverrideUpdate['benoetigte_rolle'],
               },
@@ -129,17 +120,16 @@ export default function EinsatzModule() {
                 modulKey,
                 update: {
                   sichtbar: checked,
-                  // LFH-120: Backend typisiert benoetigte_rolle als freien Option<String>
-                  // (generiert `string | null`); FE verengt auf die gültigen Rollen-Codes.
+                  // Backend typisiert `benoetigte_rolle` als freien String; das FE verengt auf die
+                  // Rollen-Codes.
                   benoetigte_rolle: (overrides[modulKey]?.benoetigte_rolle ??
                     null) as ModulOverrideUpdate['benoetigte_rolle'],
                 },
               }),
           }}
           darfVerwalten={darfModuleVerwalten}
-          // Zwei Ursachen, zwei Wörter (LFH-383): `darfEinsatzLeiten` verlangt einen aktiven
-          // Einsatz, ein abgeschlossener sperrt also auch die Einsatzleitung. Ein Rollenwort
-          // an der Zeile widerspräche dann dem Seitenbanner „Einsatz abgeschlossen".
+          // Zwei Ursachen, zwei Wörter: ein abgeschlossener Einsatz sperrt auch die Einsatzleitung,
+          // ein Rollenwort widerspräche dann dem Seitenbanner.
           rechteGrund={
             daten.istAktiv
               ? { kurz: 'nur Einsatzleitung', lang: RECHTE_TEXT }
@@ -148,7 +138,7 @@ export default function EinsatzModule() {
                   lang: 'Der Einsatz ist abgeschlossen — seine Einstellungen sind eingefroren.',
                 }
           }
-          // Nur die schreibende Zeile ist gesperrt (H15), nur die gescheiterte markiert (H14).
+          // Nur die schreibende Zeile ist gesperrt, nur die gescheiterte markiert.
           laeuftKey={overrideMutation.isPending ? overrideMutation.variables.modulKey : null}
           fehlerKey={overrideMutation.isError ? overrideMutation.variables.modulKey : null}
           hinweisVon={(key) => orgRollenHinweis(orgModulDefaults[key])}

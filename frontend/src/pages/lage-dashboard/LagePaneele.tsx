@@ -1,8 +1,7 @@
 /**
- * Die drei Paneele des Lage-Dashboards (Neuentwurf S3): Gefahrenmatrix · Sichtung ·
- * Meldungsstrom. Rein darstellend — Abfragen, Zustände und die Wassermarke des Stroms hält
- * die Seite (`LageDashboardPage.tsx`), die Ableitungen liegen in `lageVerdichtung.ts` und
- * `meldungsstrom.ts`.
+ * Die drei Paneele des Lage-Dashboards: Gefahrenmatrix · Sichtung · Meldungsstrom. Rein darstellend
+ * — Abfragen, Zustände und Wassermarke hält `LageDashboardPage.tsx`, die Ableitungen liegen in
+ * `lageVerdichtung.ts` und `meldungsstrom.ts`.
  */
 import type { CSSProperties } from 'react';
 import type { EtbEintragAnzeige, Sichtungskategorie } from '../../api/types';
@@ -87,8 +86,8 @@ export function GefahrenmatrixPaneel({
                   className={MATRIX_KLASSE.zeile}
                   style={{ gap: token.paddingSM }}
                 >
-                  {/* Silbentrennung statt Bruch an beliebiger Stelle: „Erkrankung/Verletzung"
-                      bräche sonst als „…/Verl|etzung" (`lang="de"` steht in index.html). */}
+                  {/* Silbentrennung statt Bruch an beliebiger Stelle (`lang="de"` steht in
+                      index.html). */}
                   <span
                     style={{
                       fontSize: 12,
@@ -132,8 +131,7 @@ export function GefahrenmatrixPaneel({
               );
             })}
           </ul>
-          {/* Legende in DERSELBEN Geometrie wie die Balken (`matrixGeometrie.ts`): jedes
-              Wort steht mittig unter seinem Segment. */}
+          {/* Legende in derselben Geometrie wie die Balken (`matrixGeometrie.ts`). */}
           <div
             aria-hidden="true"
             data-lfh="gefahrenlegende"
@@ -166,10 +164,7 @@ export function GefahrenmatrixPaneel({
   );
 }
 
-/**
- * Beschreibung je Sichtungskategorie (BBK, Triage/Sichtung). Das Kürzel und die Farbe
- * kommen aus dem Vertrag (`sichtung`, `sichtungsfarben`), die Beschreibung ist Satz.
- */
+/** Beschreibung je Sichtungskategorie (BBK). Kürzel und Farbe kommen aus dem Vertrag. */
 const SICHTUNG_BESCHREIBUNG: Record<Sichtungskategorie, string> = {
   sk1: 'akute vitale Bedrohung',
   sk2: 'schwer verletzt / erkrankt',
@@ -193,7 +188,7 @@ export function SichtungsPaneel({
   zeilen: SichtungsZeile[];
   erfasst: number;
   ohneSichtung: number;
-  /** „Transportiert / offen" aus `transportBilanz` (LFH-613). */
+  /** „Transportiert / offen" aus `transportBilanz`. */
   transport: { transportiert: number; offen: number };
   onNeuladen: () => void;
   onPersonen: () => void;
@@ -205,12 +200,9 @@ export function SichtungsPaneel({
       titel="Sichtung"
       meta={zustand === 'daten' ? `${erfasst} erfasst` : undefined}
       aktion={<PaneelLink label="Personen" onKlick={onPersonen} />}
-      // Fuß: „Ohne Sichtung" und „Transportiert / offen" (LFH-613,
-      // `personenBilanz.transportBilanz` — gezählt nach Verbleib-Art, eine Voranmeldung ist
-      // kein Transport; „offen" ist dieselbe Lücke wie auf der Betroffenen-Seite).
-      // „Ohne Sichtung" steht seit LFH-650 IMMER, auch mit 0: kam und ging die Zeile live mit
-      // dem Wert, schob sie die Transport-Zeile und das ganze Paneel mit (Prüfliste LFH-613,
-      // Tabelle 5, Nr. 12). Eine 0 ist hier eine Aussage — alle Erfassten sind gesichtet.
+      // Fuß: „Ohne Sichtung" und „Transportiert / offen" (`transportBilanz`: nach Verbleib-Art,
+      // eine Voranmeldung ist kein Transport). „Ohne Sichtung" steht immer, auch mit 0 — sonst
+      // schob die live kommende und gehende Zeile das Paneel.
       fuss={
         zustand === 'daten' ? (
           <span style={{ display: 'grid', gap: token.paddingXS }}>
@@ -269,9 +261,8 @@ export function SichtungsPaneel({
                     gap: token.paddingSM,
                   }}
                 >
-                  {/* Das Kürzel steht in Textfarbe, die BBK-Farbe im umrandeten Farbfeld
-                      davor (Muster `SichtungsTag`): Gelb auf hellem und Schwarz auf dunklem
-                      Grund wären als Schrift unlesbar, und Schwarz färbt nie Text. */}
+                  {/* Kürzel in Textfarbe, die BBK-Farbe im umrandeten Farbfeld davor: Gelb auf
+                      Hell und Schwarz auf Dunkel wären als Schrift unlesbar. */}
                   <span
                     style={{
                       display: 'inline-flex',
@@ -332,8 +323,10 @@ export function SichtungsPaneel({
   );
 }
 
-/** Wortlaut je Verbindungszustand — `Record` über die volle Union, damit eine fünfte
- *  Variante den Build bricht. `idle` ist „noch nicht offen", nicht „live" (LFH-336 · M3). */
+/**
+ * Wortlaut je Verbindungszustand — `Record` über die volle Union. `idle` ist „noch nicht offen",
+ * nicht „live".
+ */
 const VERBINDUNG: Record<LiveVerbindungsStatus, string> = {
   idle: 'Verbindung wird aufgebaut',
   open: 'live',
@@ -365,8 +358,7 @@ export function MeldungsstromPaneel({
   onErfassen: () => void;
 }) {
   const { rollen } = useRollen();
-  // „live" nur bei offener Leitung — bei totem Stream liefert der Cache brav alte Daten,
-  // und ein stehengebliebenes „live" wäre genau die Falschaussage, gegen die LFH-336 antrat.
+  // „live" nur bei offener Leitung — bei totem Stream liefert der Cache weiter alte Daten.
   const metaFarbe =
     liveStatus === 'open'
       ? rollen.bedien

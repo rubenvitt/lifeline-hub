@@ -5,30 +5,24 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Die Abstände der rechten Kartenleiste kommen aus der Dichte-Staffel, nicht aus einer Zahl
- * (LFH-377, A2-Linie).
+ * Die Abstände der rechten Kartenleiste kommen aus der Dichte-Staffel, nicht aus einer Zahl.
+ * Haarlinien trennen die Abschnitte (`KlappPaneel`/`LeistenAbschnitt`), gepolstert mit
+ * `token.padding`.
  *
- * Vor dem Neuentwurf stapelte die Leiste rund zwölf `Card` mit hartem `marginBottom: 12` und
- * trug selbst `padding: 12` — 12 px in jeder Dichtestufe. Seit S5 trennen Haarlinien die
- * Abschnitte (`KlappPaneel`/`LeistenAbschnitt`), gepolstert mit `token.padding`. Übrig war ein
- * Nachzügler aus dem alten Kartenstapel (`AnsichtSwitcher`, `marginBottom: 12` IN einem schon
- * gepolsterten Paneel) und eine Handvoll Abstände in der Bild-Zeile.
+ * Geprüft wird die Quelle, nicht ein Pixelabstand: jsdom rechnet kein Layout, und `test/utils.tsx`
+ * mountet ein nacktes `ConfigProvider`. Der Scan läuft über den TS-Syntaxbaum, damit ein Kommentar
+ * mit einer Zahl das Gate nicht füllt.
  *
- * Geprüft wird die QUELLE, nicht ein gemessener Pixelabstand: jsdom rechnet kein Layout, und
- * `test/utils.tsx` mountet ein nacktes `ConfigProvider` — eine Abstandsmessung im Vitest mäße
- * antd-Vorgaben. Der Scan läuft über den TS-Syntaxbaum statt per Regex, damit ein Kommentar,
- * der die alte Zahl zitiert, das Gate nicht füllt.
+ * Was der Scan sieht: Stil-Schlüssel `margin*`/`padding*`/`gap`/`rowGap`/`columnGap` mit Zahl,
+ * Zeichenkette mit Zahl oder Zahl-Stück in einem Template (`` `0 ${x}px 4px` ``), auch hinter `?:`,
+ * `as`, `satisfies` und Klammern; die Kurzschreibweise (`{ gap }`) als Befund, weil ihr Wert nicht
+ * an der Stelle steht; `size` an `Space`/`Space.Compact`, `gap` an `Flex` und `gutter` an `Row`,
+ * jeweils auch als Array.
  *
- * **Was der Scan sieht:** Stil-Schlüssel `margin*`/`padding*`/`gap`/`rowGap`/`columnGap` mit
- * Zahl, Zeichenkette mit Zahl oder Zahl-Stück in einem Template (`` `0 ${x}px 4px` ``), auch
- * hinter `?:`, `as`, `satisfies` und Klammern; die Kurzschreibweise (`{ gap }`) als Befund,
- * weil ihr Wert nicht an der Stelle steht; `size` an `Space`/`Space.Compact`, `gap` an `Flex`
- * und `gutter` an `Row`, jeweils auch als Array.
- *
- * **Was er NICHT sieht** (Teil des Vertrags, nicht Beiwerk): einen Wert aus einer Variablen
- * (`padding: rand` mit `const rand = 12`), einen Spread aus einer Hilfsfunktion in einer
- * anderen Datei, Stile aus CSS-Dateien (die Leiste hat dort keine Abstände; `lagekarte.css`
- * polstert nur die Maßstabsleiste der Karte) und Bausteine außerhalb der drei Dateien.
+ * Was er nicht sieht (Teil des Vertrags): einen Wert aus einer Variablen (`padding: rand` mit
+ * `const rand = 12`), einen Spread aus einer Hilfsfunktion in einer anderen Datei, Stile aus
+ * CSS-Dateien (die Leiste hat dort keine Abstände; `lagekarte.css` polstert nur die Maßstabsleiste)
+ * und Bausteine außerhalb der drei Dateien.
  */
 
 const hier = dirname(fileURLToPath(import.meta.url));

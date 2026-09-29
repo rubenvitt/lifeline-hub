@@ -1,18 +1,14 @@
 /**
- * Ableitungen des Führungsüberblicks (Neuentwurf „Instrumententafel", Screen S2).
+ * Ableitungen des Führungsüberblicks. Die Seite entscheidet über Form, diese Datei über Bedeutung
+ * (wie `pages/lage-dashboard/lagebild.ts`). Alles ist rein und nimmt die Uhr als Argument `jetzt`:
+ * die Seite tickt, der Test stellt die Zeit.
  *
- * Die Seite entscheidet über Form, diese Datei über Bedeutung — dieselbe Trennung wie
- * `pages/lage-dashboard/lagebild.ts`. Alles hier ist REIN und nimmt die Uhr als Argument
- * (`jetzt`, Muster `stab/lagebesprechungZustand.ts`): die Seite tickt, der Test stellt die
- * Zeit, niemand braucht Fake-Timer.
+ * Der Basename ist bewusst nicht `ueberblick.ts` neben `UeberblickPage.tsx` (Kollisionsregel
+ * `direkteinstiegKern`).
  *
- * Der Basename ist bewusst nicht `ueberblick.ts` neben `UeberblickPage.tsx` — die
- * Kollisionsregel aus CLAUDE.md (`direkteinstiegKern`) gilt sinngemäß für jedes
- * Modulpaar aus Komponente und reinem Kern.
- *
- * ZEIT: jeder Wire-String ist UTC OHNE Zonenkennung. Verglichen wird ausschließlich über
- * {@link zeitpunkt} (`dayjs.utc`), nie über `dayjs(s)` — das läse Ortszeit und verschöbe
- * das 60-Minuten-Fenster still um den Zonenversatz.
+ * Zeit: jeder Wire-String ist UTC ohne Zonenkennung. Verglichen wird nur über {@link zeitpunkt}
+ * (`dayjs.utc`), nie über `dayjs(s)` — das läse Ortszeit und verschöbe das 60-Minuten-Fenster still
+ * um den Zonenversatz.
  */
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -76,10 +72,11 @@ function ms(wire: string | null | undefined): number | null {
 
 // ── Kennzahlen ──────────────────────────────────────────────────────────────────
 
-/** Statusrolle → Ton der Kennzahl. Exhaustiv über die volle Rolle, damit eine neue Rolle
- *  den Build bricht. `KennzahlTon` kennt seit 22.09.2026 auch `normal`/`bedien` (für das
- *  Meldebild-Statusband) — hier bleiben sie bewusst neutral: „keine Gefahr" ist die neutrale
- *  Zahl, keine grüne, und eine Warnstufe ist keine Bedienbeziehung. */
+/**
+ * Statusrolle → Ton der Kennzahl, exhaustiv, damit eine neue Rolle den Build bricht. `normal` und
+ * `bedien` bleiben hier neutral: „keine Gefahr" ist die neutrale Zahl, und eine Warnstufe ist keine
+ * Bedienbeziehung.
+ */
 const ROLLE_ALS_TON: Record<Statusrolle, KennzahlTon> = {
   alarm: 'alarm',
   achtung: 'achtung',
@@ -124,9 +121,10 @@ interface WarnstufeKennzahl {
   anzahlAktiv: number;
 }
 
-/** Höchste Warnstufe über alle Gefahrengebiete — gelesen über `warnstufeKennzahl`, nicht
- *  über `warnstufeKarte` (Begründung in `lagebild.ts`: ohne Gebiet ist nichts gemeldet,
- *  nicht „vorsichtshalber Gefahr"). */
+/**
+ * Höchste Warnstufe über alle Gefahrengebiete — über `warnstufeKennzahl`, nicht `warnstufeKarte`
+ * (Begründung in `lagebild.ts`).
+ */
 export function warnstufeKennzahlVon(gebiete: Gefahrengebiet[]): WarnstufeKennzahl {
   const v = verdichteGefahrengebiete(gebiete);
   const d = warnstufeKennzahl[v.hoechste];
@@ -139,13 +137,9 @@ export function warnstufeKennzahlVon(gebiete: Gefahrengebiet[]): WarnstufeKennza
 }
 
 /**
- * Notiz der Warnstufen-Kennzahl: die Gebietszahl, dahinter die Pegel-Notiz aus
- * `pegel/pegelKennzahl.ts:pegelNotizKurz` („Pegel 6,84 m steigend", LFH-606).
- *
- * Die Pegel-Notiz wird ANGEHÄNGT, nicht an die Stelle der Gebietszahl gesetzt: die Zahl der
- * Gebiete mit Warnstufe ist die Begründung des Werts, der Pegel ist die Lage daneben — der
- * Entwurf S2 zeigt nur den Pegel, verlöre aber genau die Aussage, die die Kennzahl erklärt.
- * Ohne festgelegten Pegel (`null`) bleibt es bei der Gebietszahl. Rein.
+ * Notiz der Warnstufen-Kennzahl: die Gebietszahl, dahinter die Pegel-Notiz (`pegelNotizKurz`).
+ * Angehängt statt ersetzt: die Gebietszahl begründet den Wert, der Pegel ist die Lage daneben. Ohne
+ * festgelegten Pegel (`null`) nur die Gebietszahl.
  */
 export function warnstufeNotiz(anzahlAktiv: number, pegelNotiz: string | null): string {
   const gebiete =
@@ -197,10 +191,8 @@ function istOffen(a: Auftrag): boolean {
 }
 
 /**
- * Offene Aufträge in Lesefolge: überfällige zuerst, dann nach Frist aufsteigend; ohne
- * Frist ans Ende („unbestimmt ist nicht dringend", `lagebild.ts:auftragszeilen`). Bei
- * Gleichstand nach Erteilung, zuletzt nach id — damit ein Live-Refetch dieselbe Folge
- * liefert und keine Zeile springt.
+ * Offene Aufträge in Lesefolge: überfällige zuerst, dann nach Frist; ohne Frist ans Ende. Bei
+ * Gleichstand nach Erteilung, zuletzt nach id — ein Live-Refetch liefert dieselbe Folge.
  */
 export function offeneAuftraege(auftraege: Auftrag[]): Auftrag[] {
   return auftraege.filter(istOffen).sort((a, b) => {
@@ -218,9 +210,10 @@ export function offeneAuftraege(auftraege: Auftrag[]): Auftrag[] {
   });
 }
 
-/** „an …" — die Anzeigenamen der Empfänger, wie sie beim Erteilen festgehalten wurden;
- *  `null`, wenn keiner festgehalten ist (die Seite schreibt dann „ohne Empfänger" statt
- *  „an ohne Empfänger"). */
+/**
+ * „an …" — die Empfängernamen, wie beim Erteilen festgehalten; `null`, wenn keiner (die Seite
+ * schreibt dann „ohne Empfänger").
+ */
 export function empfaengerText(a: Auftrag): string | null {
   const namen = (a.empfaenger ?? []).map((e) => e.snap_anzeige.trim()).filter(Boolean);
   return namen.length > 0 ? namen.join(', ') : null;
@@ -233,7 +226,7 @@ export function folgeText(anzahl: number): string | null {
 
 // ── Einsatzabschnitte ───────────────────────────────────────────────────────────
 
-/** Einheiten je Kategorie ihres Status (LFH-609). */
+/** Einheiten je Kategorie ihres Status. */
 export interface EinheitenVerteilung {
   bereit: number;
   gebunden: number;
@@ -260,28 +253,30 @@ export interface AbschnittZeile {
   /** Offene Aufträge an diesen Abschnitt (oder einen Unterabschnitt), jüngste zuerst. */
   auftraege: Auftrag[];
   /**
-   * Stehen die Rückmeldungen fest (LFH-610)? `false` solange sie laden, bei 403 (kein
-   * Leserecht auf „Meldungen") und bei Fehler — dann zeigt die Zeile GAR NICHTS dazu, auch
-   * kein „—": ein Strich behauptete „keine Rückmeldung", und das weiß die Seite nicht.
+   * Stehen die Rückmeldungen fest? `false` beim Laden, bei 403 und bei Fehler — dann zeigt die
+   * Zeile nichts dazu, auch kein „—": ein Strich behauptete „keine Rückmeldung".
    */
   rueckmeldungBekannt: boolean;
   /** Jüngste Rückmeldung im Teilbaum (Abschnitte direkt UND Einheiten darin); `null`, wenn
    *  keine vorliegt oder {@link rueckmeldungBekannt} `false` ist. */
   letzteRueckmeldung: LetzteRueckmeldung | null;
-  /** Alle Aufträge an den Teilbaum, jeder einmal; erledigt = vollzogen oder abgenommen.
-   *  Eine ZÄHLUNG, keine Fortschrittsangabe — jeder Auftrag wiegt gleich, deshalb steht
-   *  sie neben der Einschätzung und nicht an ihrer Stelle (LFH-608). */
+  /**
+   * Alle Aufträge an den Teilbaum; erledigt = vollzogen oder abgenommen. Eine Zählung, keine
+   * Fortschrittsangabe — jeder Auftrag wiegt gleich, deshalb steht sie neben der Einschätzung.
+   */
   auftragsbilanz: { erledigt: number; gesamt: number };
-  /** Die folgenden vier gehören dem OBERSTEN Abschnitt selbst, nicht dem Teilbaum:
-   *  eine Beurteilung lässt sich nicht aufsummieren. `null` = nicht gepflegt (LFH-608). */
+  /**
+   * Die folgenden vier gehören dem obersten Abschnitt selbst, nicht dem Teilbaum: eine Beurteilung
+   * lässt sich nicht aufsummieren. `null` = nicht gepflegt.
+   */
   kurzbezeichnung: string | null;
   lagezustand: AbschnittLagezustand | null;
   abschnittsauftrag: string | null;
   fortschritt: number | null;
-  /** Schlechtester Lagezustand eines Unterabschnitts, NUR wenn er schlechter ist als der
-   *  eigene. Die Kante bleibt die Beurteilung des Abschnitts selbst; die Seite setzt den
-   *  Unterabschnitt als eigenes Etikett mit Rollenrand daneben, damit ein kritischer
-   *  Unterabschnitt nicht hinter einer grünen Kante verschwindet. */
+  /**
+   * Schlechtester Lagezustand eines Unterabschnitts, nur wenn schlechter als der eigene — damit ein
+   * kritischer Unterabschnitt nicht hinter einer grünen Kante verschwindet.
+   */
   unterLage: AbschnittLagezustand | null;
 }
 
@@ -360,15 +355,12 @@ function einheitenVerteilung(einheiten: readonly (Einheit | undefined)[]): Einhe
 }
 
 /**
- * Eine Zeile je OBERSTEM Abschnitt, die Zahlen KUMULIERT über Unterabschnitte — so liest
- * es das Meldebild (`baueKraeftebild`), und so summieren sich die Zeilen zur Einsatzstärke.
- * Die Sammelzeile „Ohne Abschnitt" steht am Ende, wenn sie etwas trägt: ohne sie gingen
- * die Kräfte außerhalb jedes Abschnitts still aus der Summe verloren.
+ * Eine Zeile je oberstem Abschnitt, Zahlen kumuliert über Unterabschnitte (wie `baueKraeftebild`),
+ * so summieren sich die Zeilen zur Einsatzstärke. Die Sammelzeile „Ohne Abschnitt" steht am Ende,
+ * wenn sie etwas trägt — sonst gingen diese Kräfte still aus der Summe verloren.
  *
- * Das Raster bereit / gebunden / Ausfall zählt die EINHEITEN im Teilbaum nach der
- * Kategorie ihres Status (LFH-609, Entwurf S2) — abgeleitet aus den Fahrzeugen oder von
- * Hand. Bis dahin stand hier die Verfügbarkeit der Mittel, weil es keinen Einheitenstatus
- * gab; die Seite beschriftet die Zeile entsprechend.
+ * Das Raster bereit / gebunden / Ausfall zählt die Einheiten im Teilbaum nach der Kategorie ihres
+ * Status (abgeleitet aus den Fahrzeugen oder von Hand).
  */
 export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
   const { baum } = baueKraeftebild(r.abschnitte, r.einheiten, r.personal, r.fahrzeuge, r.material);
@@ -418,8 +410,8 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
       abschnittsauftrag: abschnitt?.abschnittsauftrag ?? null,
       fortschritt: abschnitt?.fortschritt ?? null,
       unterLage: lageRang(unterLage) > lageRang(eigeneLage) ? unterLage : null,
-      // Anders als bei den Aufträgen KEIN Kurzschluss auf leeren `teilbaum`: die Sammelzeile
-      // „Ohne Abschnitt" hat keine Abschnitt-ids, ihre Einheiten melden trotzdem zurück.
+      // Kein Kurzschluss auf leeren `teilbaum`: „Ohne Abschnitt" hat keine Abschnitt-ids, ihre
+      // Einheiten melden trotzdem zurück.
       rueckmeldungBekannt: r.rueckmeldungen != null,
       letzteRueckmeldung:
         r.rueckmeldungen != null
@@ -446,9 +438,8 @@ interface EntscheidungsAuswahl {
 }
 
 /**
- * Entscheidungen der letzten Stunde, jüngste zuerst. Ist die Stunde leer, die letzten
- * {@link ENTSCHEIDUNGEN_RUECKFALL} — und der Modus sagt es, damit die Seite die
- * Überschrift nicht lügen lässt.
+ * Entscheidungen der letzten Stunde, jüngste zuerst. Ist die Stunde leer, die letzten {@link
+ * ENTSCHEIDUNGEN_RUECKFALL} — der Modus sagt es, damit die Überschrift nicht lügt.
  */
 export function entscheidungenAuswahl(
   eintraege: EtbEintragAnzeige[],
@@ -472,8 +463,10 @@ export type MarkenArt =
 export interface Marke {
   key: string;
   art: MarkenArt;
-  /** id des Auftrags, der Erinnerung bzw. des Pegels; `null` bei der Lagebesprechung und der
-   *  Ablösung (eine Ablösungsmarke fasst mehrere Schichten zusammen, LFH-635). */
+  /**
+   * id des Auftrags, der Erinnerung bzw. des Pegels; `null` bei Lagebesprechung und Ablösung (eine
+   * Ablösungsmarke fasst mehrere Schichten zusammen).
+   */
   id: number | null;
   zeit: string;
   text: string;
@@ -503,21 +496,14 @@ function pegelBezeichnung(p: Pick<PegelAnzeige, 'name' | 'gewaesser'>): string {
 }
 
 /**
- * Die anstehenden Fristen aus fünf Quellen: Frist offener Aufträge, Fälligkeit offener
- * Erinnerungen, nächste Lagebesprechung, der erwartete Höchststand an einem maßgeblichen
- * Pegel (LFH-628) und fällige Ablösungen (LFH-635). Aufsteigend nach Zeit — Überfälliges
- * steht damit oben, und das ist gewollt: es ist die Marke, die schon gerissen ist.
+ * Anstehende Fristen aus fünf Quellen: offene Aufträge, offene Erinnerungen, nächste
+ * Lagebesprechung, erwarteter Höchststand an einem maßgeblichen Pegel, fällige Ablösungen.
+ * Aufsteigend nach Zeit, Überfälliges also oben.
  *
- * Die Pegel-Prognose ist davon ausgenommen: sie ist keine Frist, die jemand reißen kann,
- * sondern eine Erwartung. Ein verstrichener Höchststand ist VORBEI, nicht „überfällig" —
- * er wird vor dem Sortieren herausgefiltert und steht nie als Alarm oben (Entscheidung des
- * Auftraggebers vom 22.09.2026). Solange er aussteht, bewertet ihn dieselbe Regel wie die
- * übrigen Marken („in 23 min", knapp = `achtung`).
- *
- * Ablösungen kommen als eigene Quelle (je Abschnitt und Minute zusammengefasst:
- * „Ablösung Deichwache Nord, 2 Einheiten"); ihre Auto-Fristen in den Erinnerungen werden
- * deshalb hier ÜBERSPRUNGEN — sonst stünde dieselbe Ablösung doppelt, einmal davon als
- * Vorwarnung eine halbe Stunde früher.
+ * Die Pegel-Prognose ist keine Frist, sondern eine Erwartung: verstrichen ist sie vorbei, nicht
+ * „überfällig", und fällt vor dem Sortieren heraus. Ablösungen kommen als eigene Quelle (je
+ * Abschnitt und Minute zusammengefasst); ihre Auto-Fristen in den Erinnerungen werden deshalb
+ * übersprungen, sonst stünde dieselbe Ablösung doppelt.
  */
 export function naechsteMarken(
   auftraege: Auftrag[],
@@ -571,8 +557,8 @@ export function naechsteMarken(
         art: 'pegelprognose',
         id: p.id,
         zeit: prognose.zeitpunkt,
-        // Stationsname, Gewässer als Zusatz: es gibt eine Marke je festgelegtem Pegel, und
-        // zwei Pegel am selben Gewässer wären unter „Pegel WESER" nicht zu unterscheiden.
+        // Gewässer nur als Zusatz: zwei Pegel am selben Gewässer wären sonst nicht zu
+        // unterscheiden.
         text: `Erwarteter Höchststand Pegel ${pegelBezeichnung(p)}: ${wasserstandMeter(prognose.hoechststand_cm)} m`,
       });
     }
@@ -588,9 +574,8 @@ export function naechsteMarken(
 }
 
 /**
- * Grund der fehlenden Schreibberechtigung als ganzer Satz (C10/M16, C11/M45): die
- * Primäraktion steht gesperrt da, der Satz nennt den Grund. Nennt die zwei Schreibwege,
- * die der Überblick anbietet — Einträge erfassen und Abschnitte anlegen.
+ * Grund der fehlenden Schreibberechtigung als ganzer Satz; nennt die zwei Schreibwege des
+ * Überblicks.
  */
 export function ueberblickRechteText(einsatzStatus: EinsatzStatus): string {
   return einsatzStatus !== 'aktiv'

@@ -83,9 +83,8 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      // Der Wire-Wert ist kein Bildschirmtext (LFH-341 · M54). Farbe und Beschriftung
-      // kommen aus `theme/statusFarben.ts` — dieselbe Quelle, aus der `MaterialPage`
-      // liest, damit dasselbe Enum nicht zwei Farbbehandlungen bekommt.
+      // Farbe und Beschriftung aus `theme/statusFarben.ts` — dieselbe Quelle wie `MaterialPage`,
+      // damit dasselbe Enum nicht zwei Farbbehandlungen bekommt.
       render: (status: MaterialStatus) => (
         <span data-testid="material-status-zelle">
           <StatusTag darstellung={materialStatus[status]} />
@@ -96,25 +95,12 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
       title: 'Aktion',
       key: 'aktion',
       render: (_: unknown, em: EinsatzMaterial) =>
-        // KEINE Rückfrage — entschieden in LFH-378/B5l nach der Trennlinie aus LFH-363:
-        // umkehrbar bekommt `danger` und Abstand, aber KEINE zusätzliche Reibung; die
-        // Rückfrage ist dem Unumkehrbaren vorbehalten. Diese Aktion setzt `uhs_id: null`
-        // und ist über „Material zuordnen" direkt darüber wiederherstellbar — es geht
-        // kein Datensatz und kein Feld verloren, das Material wandert zurück in die
-        // Auswahlliste. CLAUDE.md nennt „eine gelöste Zuordnung" wörtlich als Beispiel.
-        // LFH-367/B5g hatte das Popconfirm nur gehärtet (`okButtonProps={{ danger }}`),
-        // weil das Entfernen einer bestehenden Rückfrage eine Bedienentscheidung ist und
-        // nicht in sein Akzeptanzkriterium gehörte; hier ist sie getroffen.
+        // Keine Rückfrage: die gelöste Zuordnung ist umkehrbar (über „Material zuordnen" darüber),
+        // also `danger` und Abstand, aber keine zusätzliche Reibung.
         !schreibgeschuetzt ? (
-          // Ohne Größen-Prop: die Fläche erbt die Dichtestufe. Anders als die vier
-          // Knöpfe der Platzkarte hängt diese Zelle an keiner Backend-Konstante —
-          // die Tabelle wächst mit.
-          //
-          // `loading` je ZEILE, nicht je Mutation: `loesenMut` bedient alle Zeilen, ein
-          // pauschales `isPending` legte die ganze Spalte lahm. Es ersetzt den Riegel, den
-          // die entfernte Rückfrage nebenbei mitbrachte — ohne ihn setzt jeder weitere
-          // Klick einen weiteren PATCH ab, samt Invalidierung, Live-Ereignis und einer
-          // zweiten Erfolgsmeldung für eine Aktion, die einmal stattgefunden hat.
+          // Ohne Größen-Prop: die Zelle hängt an keiner Backend-Konstante, die Tabelle wächst mit.
+          // `loading` je Zeile, nicht je Mutation (`loesenMut` bedient alle Zeilen): es fängt den
+          // zweiten Klick ab, den sonst die Rückfrage abgefangen hätte.
           <Button
             danger
             loading={loesenMut.isPending && loesenMut.variables === em.id}
@@ -143,28 +129,17 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
         locale={{ emptyText: 'Kein Material dieser UHS zugeordnet' }}
         loading={materialQuery.isLoading}
       />
-      {/* Erfassungs-Norm LFH-332/B4 statt handgebautem `<Modal onOk>`: der Absende-Knopf
-          liegt im `<form>` statt in der Modal-Fusszeile, der Fokus steht beim Öffnen im
-          Auswahlfeld, und zurückgesetzt wird auf jedem Weg hinaus.
-
-          ENTER SENDET HIER TROTZDEM NICHT AB, und das ist keine Lücke des Umbaus:
-          `@rc-component/select` ruft in `BaseSelect/index.js:246` bei jedem Enter
-          `event.preventDefault()`, solange der Modus nicht `combobox` ist („Do not submit
-          form when type in the input"), und öffnet stattdessen die Liste. Ein `Select` ist
-          damit von der Enter-Zusicherung ausgenommen wie eine `Input.TextArea` — die greift
-          für `Input`/`InputNumber`/`DatePicker`. Gemessen 31.07.2026, LFH-378/B5l; belegt
-          wird deshalb die Struktur, nicht die Taste (s. `MaterialTab.test.tsx`).
-
-          Kein `serie`: Material wird je UHS in Einzelstücken zugeordnet, nicht im
-          Minutentakt erfasst. Ein Feld — weit im Budget von ≤ ~3. */}
+      {/* Erfassungshülle: Absende-Knopf im `<form>`, Fokus im Auswahlfeld, Reset auf jedem Weg
+          hinaus. Enter sendet hier trotzdem nicht ab — rc-select ruft bei jedem Enter
+          `preventDefault()` (siehe `MaterialTab.test.tsx`). Kein `serie`: Material wird einzeln
+          zugeordnet. */}
       <ErfassungsModal<ZuordnenWerte>
         offen={zuordnenOffen}
         titel="Material zuordnen"
         form={form}
         erfassenText="Zuordnen"
         laeuft={zuordnenMut.isPending}
-        // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der
-        // Datensatz angekommen ist. Ein abgelehnter PATCH lässt die Auswahl stehen.
+        // `mutateAsync`: ein abgelehnter PATCH lässt die Auswahl stehen.
         onErfassen={(werte) => zuordnenMut.mutateAsync(werte.em_id)}
         onFertig={() => setZuordnenOffen(false)}
         onAbbrechen={() => setZuordnenOffen(false)}
@@ -172,8 +147,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
         <Form.Item<ZuordnenWerte>
           name="em_id"
           label="Material"
-          // Pflicht statt eines deaktivierten Absende-Knopfes: ein Knopf, der nicht sagt,
-          // warum er nicht geht, war die zweite Hälfte des alten `okButtonProps.disabled`.
+          // Pflicht statt eines deaktivierten Absende-Knopfes, der nicht sagt, warum er nicht geht.
           rules={[{ required: true, message: 'Bitte Material auswählen' }]}
         >
           <Select

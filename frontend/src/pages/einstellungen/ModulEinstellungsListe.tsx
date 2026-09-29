@@ -13,17 +13,10 @@ import {
 import { ROLLEN_OPTIONEN } from './optionen';
 
 /**
- * Trefflächenboden der Beschriftungszeile — REIN und exportiert, damit die Zusicherung über
- * die Dichtestufen ohne Render prüfbar ist (`test/utils.tsx` montiert ein nacktes
- * `ConfigProvider`, jsdom rechnet kein Layout).
- *
- * ZWEI Angaben, nicht eine (Konvention aus LFH-365): `minHeight` aus `controlHeight` PLUS
- * die Polsterung. Die Polsterung allein trägt den Boden nicht — im Handschuh-Betrieb käme
- * eine Zeile damit auf grob 54 px gegen die geforderten 72. Aufgelöste Tokens, nie
- * `var(--lfh-*)`.
- *
- * Bewusst lokal statt aus `Anmeldeverfahren.tsx` importiert — dieselbe Arbeitsteilung wie
- * dort: `Datensicht`, `SlashMenu`, `Sidebar` und `Anmeldeverfahren` halten je eine eigene.
+ * Trefflächenboden der Beschriftungszeile — rein und exportiert, damit die Zusicherung ohne Render
+ * prüfbar ist. Zwei Angaben: `minHeight` aus `controlHeight` plus Polsterung (die allein käme im
+ * Handschuh-Betrieb auf grob 54 statt 72 px). Aufgelöste Tokens, nie `var(--lfh-*)`. Bewusst lokal
+ * statt aus `Anmeldeverfahren.tsx` importiert.
  */
 export function modulZeilenStil(token: {
   controlHeight: number;
@@ -42,12 +35,9 @@ export function modulZeilenStil(token: {
 type ModulSperrGrund = 'modul' | 'rechte' | 'laeuft';
 
 /**
- * Die drei Sperrquellen einer Zeile, getrennt statt in einem `disabled`-Ausdruck vermischt
- * (LFH-383). REIN und exportiert, damit der Vorrang ohne Render prüfbar ist.
- *
- * Vorrang: **Modul vor Recht vor Schreibvorgang.** Die Modul-Eigenschaft gilt auch für
- * Verwaltende und ist deshalb die genauere Aussage — an „Einsatzdaten" ohne Recht steht genau
- * EIN Grund, nicht zwei nebeneinander. Der Schreibvorgang ist vorübergehend und kommt zuletzt.
+ * Die drei Sperrquellen einer Zeile, getrennt statt in einem `disabled`-Ausdruck. Rein und
+ * exportiert. Vorrang: Modul vor Recht vor Schreibvorgang — die Modul-Eigenschaft gilt auch für
+ * Verwaltende und ist die genauere Aussage; der Schreibvorgang ist vorübergehend.
  */
 export function modulSperrGrund(zeile: {
   ausblendbar: boolean;
@@ -67,16 +57,14 @@ interface SperrWortlaut {
 }
 
 const MODUL_GRUND: SperrWortlaut = {
-  // Der Kurztext ist Bestand (LFH-346 · A9) und in den Tests wörtlich gepinnt.
+  // Der Kurztext ist in den Tests wörtlich gepinnt.
   kurz: 'immer sichtbar, nicht ausblendbar',
   lang: 'Selbst-Aussperr-Schutz: Einsatzdaten und Einstellungen lassen sich weder ausblenden noch auf eine Rolle beschränken — sonst käme niemand mehr an diese Einstellungen zurück.',
 };
 
 /**
- * Rückfall, wenn der Aufrufer keinen Wortlaut für das fehlende Recht mitgibt. Bewusst ein
- * Wort, das in JEDEM Fall stimmt: auf Einsatz-Ebene sperrt nicht nur die Rolle, sondern auch
- * ein abgeschlossener Einsatz — ein fest verdrahtetes „nur Verwaltung" widerspräche dort dem
- * Seitenbanner „Einsatz abgeschlossen".
+ * Rückfall ohne Wortlaut vom Aufrufer — ein Wort, das in jedem Fall stimmt: auf Einsatz-Ebene
+ * sperrt auch ein abgeschlossener Einsatz, „nur Verwaltung" widerspräche dort dem Seitenbanner.
  */
 const RECHTE_GRUND_RUECKFALL: SperrWortlaut = {
   kurz: 'nur lesen',
@@ -102,89 +90,42 @@ interface ModulEinstellungsListeProps {
   darfVerwalten: boolean;
   /**
    * Warum `darfVerwalten` fehlt — vom Aufrufer, weil nur er die Ursache kennt (Rolle oder
-   * abgeschlossener Einsatz). Der Langtext ist derselbe wie der `rechteText` seines
-   * `RechteHinweis`. Fehlt er, steht „nur lesen".
+   * abgeschlossener Einsatz). Fehlt es, steht „nur lesen".
    */
   rechteGrund?: SperrWortlaut;
-  /** Modul-Key der gerade mutierenden Zeile; nur DIESE ist gesperrt. */
+  /** Modul-Key der gerade mutierenden Zeile; nur diese ist gesperrt. */
   laeuftKey?: string | null;
-  /** Modul-Key der zuletzt fehlgeschlagenen Zeile; nur DIESE wird markiert. */
+  /** Modul-Key der zuletzt fehlgeschlagenen Zeile; nur diese wird markiert. */
   fehlerKey?: string | null;
   /** Gedämpfter Zusatz unter dem Select, z. B. der geerbte Org-Default. */
   hinweisVon?: (modulKey: string) => ReactNode;
 }
 
 /**
- * Modul-Zeilenliste der Einstellungsseiten (LFH-328 · A2, umgebaut in LFH-345 · C10).
+ * Modul-Zeilenliste der Einstellungsseiten, für Einsatz-Ebene (drei Spalten mit Sichtbar-Schalter)
+ * und Org-Ebene (zwei Spalten).
  *
- * Zusammengezogen aus zwei handgebauten Listen: der Einsatz-Ebene (drei Spalten mit
- * Sichtbar-Schalter) und der Org-Ebene (zwei Spalten). Die Unterschiede beider Aufrufer
- * sind Props geworden; was gleich war — Zeilenraster, aria-Namen — steht nur noch hier.
+ * Callbacks statt einer Mutation als Prop: die Payloads unterscheiden sich fachlich, und der
+ * Aufrufer kennt seinen Endpunkt. `istModulAusblendbar` wird hier ausgewertet: das ist eine
+ * Eigenschaft des Moduls, keine Berechtigungsfrage, und gilt auch für Verwaltende.
  *
- * **Bewusst Callbacks statt einer Mutation als Prop:** die Payloads unterscheiden sich
- * fachlich (`{sichtbar, benoetigte_rolle}` gegen `{rolle}`), und der Aufrufer kennt seinen
- * Endpunkt. Die Liste meldet nur, WAS geändert wurde.
+ * Raster `minmax(0, 1fr) auto auto` statt fester Breiten; der Rollen-Select nimmt die volle
+ * Spaltenbreite (eine feste Mindestbreite drängte ihn aus der schmalen Karte). Unter `md`
+ * gestapelt, und die Spaltenköpfe fallen dann ganz weg. Die Köpfe stehen einmal über allen Blöcken,
+ * weil das Raster über alle Gruppen dasselbe ist.
  *
- * **`istModulAusblendbar` wird hier ausgewertet, nicht vom Aufrufer:** Stammdaten und
- * Einstellungen selbst lassen sich weder ausblenden noch auf eine Rolle beschränken — das
- * ist eine Eigenschaft des Moduls, keine Berechtigungsfrage, und muss deshalb auch für
- * Verwaltende gesperrt bleiben.
+ * `laeuftKey` sperrt nur die schreibende Zeile. Der fehlgeschlagene Wert springt von selbst zurück
+ * (kein optimistisches Update); `fehlerKey` markiert die Zeile am linken Rand.
  *
- * ── Was LFH-345 geändert hat ────────────────────────────────────────────────────
- * **Raster statt fester Breiten (H16).** Die Zeile belegte fest 268 px (64 + 180 + zwei
- * Abstände); bei 390 px Gerätebreite blieben unter 100 px fürs Modul-Label. Jetzt
- * `minmax(0, 1fr) auto auto`, und der Rollen-Select nimmt die volle Spaltenbreite statt
- * einer festen — dieselbe Beobachtung wie beim `Select` in `Datensicht.tsx:234-236`
- * (LFH-369): eine feste Mindestbreite drängt das Steuerelement aus der schmalen Karte.
+ * Gruppierung und Reihenfolge aus `kategorien` (`einsatz/modulRegistry.ts`), dieselbe Quelle wie
+ * die Icon-Rail. Das Filterfeld trägt ein echtes `<label htmlFor>`; eine Kategorie ohne Treffer
+ * fällt ganz weg, und trifft der Filter nirgends, sagt die Liste das.
  *
- * **Gestapelt unter `md`.** Label als Zeilentitel, Schalter und Rolle darunter. Die
- * Spaltenköpfe fallen dann GANZ weg: ein Kopf über gestapelten Zeilen benennt keine
- * Spalten mehr, sondern behauptet eine Ordnung, die es nicht gibt.
- *
- * **Zeilensperre statt Listensperre (H15).** Vorher sperrte jede laufende Mutation alle 50
- * Steuerelemente. `laeuftKey` sperrt nur die Zeile, die gerade schreibt.
- *
- * **Fehlermarke je Zeile (H14).** Der fehlgeschlagene Wert springt von selbst zurück (die
- * Anzeige liest aus dem Query, es gibt kein optimistisches Update) — was fehlte, war die
- * Angabe, WELCHE Zeile es war. Der linke Rand trägt sie, nach dem Muster der
- * Kommunikations-Karten aus LFH-343/C8.
- *
- * ── Was LFH-346 · A9 geändert hat (Befund M48) ──────────────────────────────────
- * **Gruppierung statt 25 flacher Zeilen.** Die Blöcke und ihre Reihenfolge kommen aus
- * `kategorien` (`einsatz/modulRegistry.ts`) — dieselbe Quelle, aus der die Icon-Rail liest.
- * Eine eigene Sortierung hier wäre eine zweite Wahrheit, die beim nächsten Modul auseinander
- * liefe.
- *
- * **Filterfeld über der Liste**, mit echtem `<label htmlFor>` (antd erzeugt keins) und ohne
- * `size`-Angabe — die Höhe erbt vom `ConfigProvider` (Dichteachse LFH-329/B1). Eine
- * Kategorie ohne Treffer fällt GANZ weg: eine Überschrift ohne Zeilen darunter behauptet eine
- * Gruppe, die die gefilterte Liste nicht hat. Trifft der Filter nirgends, sagt die Liste das,
- * statt eine leere Fläche unter dem Feld stehen zu lassen.
- *
- * **Die Spaltenköpfe stehen EINMAL über allen Blöcken**, nicht je Block: sie benennen die
- * Spalten des Rasters, und das Raster ist über alle Gruppen dasselbe. Sechsmal wiederholt
- * wären sie Zierde, die den Blick auf die Gruppenwechsel zerschneidet.
- *
- * **„immer sichtbar, nicht ausblendbar" an den zwei gesperrten Zeilen.** Sie standen grau da,
- * ohne Grund — und Grau allein ist eine Ein-Kanal-Aussage (WCAG 1.4.1), dieselbe Sorte
- * Befund, die LFH-345/M16 auf Blockebene gelöst hat.
- *
- * ── Was LFH-383 geändert hat (Zwilling von `Anmeldeverfahren`, LFH-370 · B5j) ─────
- * **Jede der drei Sperrquellen ist je Zeile unterschieden** (`modulSperrGrund`). Die
- * Modul-Eigenschaft und das fehlende Recht tragen ein gedämpftes Kurzwort, die lange
- * Begründung steht im Tooltip DARÜBER — nicht allein im Tooltip: auf dem Führungs-Tablet gibt
- * es kein Hover. Der Wortlaut fürs Recht kommt vom Aufrufer (`rechteGrund`).
- *
- * **Das Kurzwort steht auch dann an jeder Zeile, wenn der `RechteHinweis` darüber dasselbe
- * sagt.** Das reibt sich mit LFH-346/M45 (dort entfällt die Zeilenaktion, weil ein Satz auf
- * der Seite den Grund nennt) — hier aber bleibt das Steuerelement grau STEHEN, und ein grauer
- * Schalter ohne Wort ist genau der Befund; `Anmeldeverfahren` hält es ebenso.
- *
- * **Der Schreibvorgang bekommt keinen Text, sondern den Ladezustand am Steuerelement.** Ein
- * Grund, der nach 200 ms wieder geht, ist Rauschen (Begründung wie in `Anmeldeverfahren`);
- * unterschieden ist er trotzdem, und zwar dort, wo geschrieben wird. `loading` benennt den
- * Schalter nicht um — anders als an einem `Button` trägt er ein eigenes `aria-label`, das die
- * Lade-Ikone schlägt (gepinnt über die Namensabfrage im Test).
+ * Sperrgründe je Zeile (`modulSperrGrund`): Modul-Eigenschaft und fehlendes Recht tragen ein
+ * gedämpftes Kurzwort, die Begründung steht im Tooltip darüber (Tablet: kein Hover). Das Kurzwort
+ * steht auch dann, wenn der `RechteHinweis` dasselbe sagt — ein grauer Schalter ohne Wort ist eine
+ * Ein-Kanal-Aussage. Der Schreibvorgang zeigt sich nur als `loading` am Steuerelement; das
+ * `aria-label` des Schalters schlägt die Lade-Ikone.
  */
 export default function ModulEinstellungsListe({
   rollenSpalte,
@@ -200,8 +141,7 @@ export default function ModulEinstellungsListe({
   const { token } = theme.useToken();
   const { istSchmal } = useViewport();
   const [filter, setFilter] = useState('');
-  // `useId`, nicht ein fester String: die Liste ist ein Bauteil, und zwei Instanzen auf einer
-  // Seite trügen sonst dieselbe `id` — das `<label for>` zeigte dann auf das falsche Feld.
+  // `useId`: zwei Instanzen auf einer Seite trügen sonst dieselbe `id`.
   const filterId = useId();
 
   const suchtext = filter.trim().toLowerCase();
@@ -214,9 +154,8 @@ export default function ModulEinstellungsListe({
     }))
     .filter((g) => g.module.length > 0);
 
-  // Gestapelt: eine Spalte, Label oben. Breit: Label dehnbar, die beiden Steuerspalten
-  // nehmen ihren Inhalt. `minmax(0, 1fr)` statt `1fr`, damit ein langes Label die
-  // Nachbarspalten nicht aus dem Container schiebt.
+  // `minmax(0, 1fr)` statt `1fr`, damit ein langes Label die Nachbarspalten nicht aus dem Container
+  // schiebt.
   const raster: CSSProperties = istSchmal
     ? { display: 'grid', gridTemplateColumns: '1fr', gap: token.marginXXS }
     : {
@@ -231,18 +170,15 @@ export default function ModulEinstellungsListe({
     const laeuft = laeuftKey === m.key;
     const sperrGrund = modulSperrGrund({ ausblendbar, darfVerwalten, laeuft });
     const gesperrt = sperrGrund !== null;
-    // Nur die zwei dauerhaften Gründe tragen einen Text; der Schreibvorgang zeigt sich am
-    // Steuerelement (`loading`).
+    // Nur die zwei dauerhaften Gründe tragen einen Text; der Schreibvorgang zeigt sich als
+    // `loading`.
     const wortlaut =
       sperrGrund === 'modul' ? MODUL_GRUND : sperrGrund === 'rechte' ? rechteGrund : null;
     const hinweis = hinweisVon?.(m.key);
     const hatFehler = fehlerKey === m.key;
     const feldId = `modul-sichtbar-${m.key}`;
-    // Ein `<label htmlFor>` NUR an der bedienbaren Zeile — sonst ein `<span>` ohne
-    // Zeigerform. Dieselbe Regel wie in `Anmeldeverfahren` (LFH-370): ein Label-Klick
-    // auf ein `disabled` Steuerelement leitet der Browser nicht weiter, er waere also
-    // eine Aufforderung ohne Reaktion. Das `aria-label` am Switch bleibt und schlaegt
-    // das Label (gemessen) — die Bestandsnamen aendern sich dadurch nicht.
+    // Ein `<label htmlFor>` nur an der bedienbaren Zeile (Klick auf `disabled` leitet der Browser
+    // nicht weiter). Das `aria-label` am Switch schlägt das Label, die Namen ändern sich nicht.
     const bedienbar = Boolean(sichtbarSpalte) && !gesperrt;
     const beschriftungStil: CSSProperties = {
       ...modulZeilenStil(token),
@@ -250,15 +186,14 @@ export default function ModulEinstellungsListe({
       gap: token.marginXS,
       flexWrap: 'wrap',
     };
-    // Der Modulname steht in einem EIGENEN Element, nicht als nackter Textknoten neben dem
-    // Zusatz: sonst trüge die Hülle beide Texte, und eine Abfrage auf den Modulnamen fände
-    // die Zeile nicht mehr (`textContent` der Hülle wäre „Einsatzdatenimmer sichtbar …").
+    // Der Modulname steht in einem eigenen Element: sonst fände eine Abfrage auf den Namen die
+    // Zeile nicht mehr (`textContent` der Hülle wäre „Einsatzdatenimmer sichtbar …").
     const beschriftung = (
       <>
         <span>{m.label}</span>
         {wortlaut && (
-          // Kurzwort sichtbar, lange Begründung im Tooltip darüber — und der Tooltip hängt an
-          // einem NICHT gesperrten Element, braucht also keinen Wrapper.
+          // Kurzwort sichtbar, Begründung im Tooltip — an einem nicht gesperrten Element, also ohne
+          // Wrapper.
           <Tooltip title={wortlaut.lang}>
             <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
               {wortlaut.kurz}

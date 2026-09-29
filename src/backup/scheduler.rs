@@ -1,20 +1,12 @@
-//! Automatische Sicherungen (LFH-251/F31) — gespiegeltes Muster von
-//! `einsatz::purge_scheduler`: ein dünner Tokio-`interval`-Task ruft periodisch
-//! [`tick_einmal`]; die Logik selbst ist ohne laufenden Scheduler testbar.
+//! Automatische Sicherungen (LFH-251): ein dünner Tokio-`interval`-Task ruft periodisch
+//! [`tick_einmal`]; die Logik ist ohne laufenden Scheduler testbar.
 //!
-//! **Warum überhaupt:** bis hierher gab es nur das manuelle CLI-Subkommando und den
-//! Admin-Download. Damit hing die rechtssichere Einsatzdokumentation an der Disziplin des
-//! Operators — ein Plattendefekt zwischen zwei Sicherungen verliert Einsätze.
+//! **Opt-in:** ohne `--backup-verzeichnis` passiert nichts. Jede Sicherung schreibt eine Datei
+//! in DB-Größe (die DB trägt BLOB-Anhänge), was auf einem Einsatz-Notebook Platte und I/O
+//! spürbar belastet.
 //!
-//! **Opt-in, nicht Default-AN.** Ohne `--backup-verzeichnis` passiert nichts (No-op-Seam,
-//! dasselbe Muster wie `--clamav-addr`). Grund: jede Sicherung schreibt eine Datei in
-//! DB-Größe — die Datenbank trägt Anhänge und Hintergrundbilder als BLOBs (bis 25 MiB je
-//! Stück). Auf einem Einsatz-Notebook ist das eine spürbare Verhaltensänderung bei
-//! Plattenplatz und I/O, die niemand ungefragt bekommen sollte.
-//!
-//! **Rotation:** es bleiben die jüngsten [`BackupConfig::behalten`] Dateien liegen, ältere
-//! werden nach jedem Lauf gelöscht. Ohne Rotation liefe die Platte irgendwann voll — und
-//! eine vollgelaufene Platte im Einsatz ist schlimmer als ein fehlendes Backup.
+//! **Rotation:** es bleiben die jüngsten [`BackupConfig::behalten`] Dateien; ohne Rotation
+//! liefe die Platte irgendwann voll, und das ist im Einsatz schlimmer als ein fehlendes Backup.
 
 use crate::error::AppError;
 use sqlx::SqlitePool;
@@ -37,13 +29,10 @@ pub struct BackupConfig {
     pub behalten: usize,
 }
 
-/// Erzeugt eine Sicherung im Zielverzeichnis und rotiert alte weg. Liefert den Pfad der
-/// neuen Datei.
+/// Erzeugt eine Sicherung im Zielverzeichnis, rotiert alte weg und liefert den Pfad.
 ///
-/// Nutzt `erzeuge_sicherung` (nicht `vacuum_into`): das scrubbt die `session`-Tabelle.
-/// Eine rotierende Datei im Dateisystem ist zwar kein Export nach außen, aber sie liegt
-/// potenziell auf einem USB-Medium — Bearer-Tokens haben darin nichts verloren.
-/// Defense-in-Depth schlägt hier die Bequemlichkeit beim Wiedereinspielen.
+/// Über `erzeuge_sicherung` (nicht `vacuum_into`), das die `session`-Tabelle leert: die Datei
+/// liegt potenziell auf einem USB-Medium, Bearer-Tokens haben darin nichts verloren.
 pub async fn tick_einmal(
     pool: &SqlitePool,
     verzeichnis: &Path,
@@ -63,11 +52,8 @@ pub async fn tick_einmal(
     Ok(ziel)
 }
 
-/// Löscht die ältesten automatischen Sicherungen, bis nur noch `behalten` übrig sind.
-///
-/// Sortiert nach Dateinamen: der Zeitstempel ist so formatiert, dass lexikographische und
-/// chronologische Reihenfolge übereinstimmen. Fremde Dateien im Verzeichnis werden über
-/// das Präfix ausgefiltert und nie angefasst.
+/// Löscht die ältesten automatischen Sicherungen, bis `behalten` übrig sind. Der Zeitstempel
+/// im Namen sortiert lexikographisch wie chronologisch; fremde Dateien filtert das Präfix aus.
 fn rotiere(verzeichnis: &Path, behalten: usize) -> Result<(), AppError> {
     let Ok(eintraege) = std::fs::read_dir(verzeichnis) else {
         return Ok(());
@@ -93,8 +79,7 @@ fn rotiere(verzeichnis: &Path, behalten: usize) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Startet den Hintergrund-Scheduler. Ohne konfiguriertes Verzeichnis ein No-op —
-/// es wird nicht einmal ein Task gespawnt.
+/// Startet den Hintergrund-Scheduler; ohne Verzeichnis wird kein Task gespawnt.
 pub fn starte_backup_scheduler(pool: SqlitePool, config: BackupConfig) {
     let Some(verzeichnis) = config.verzeichnis else {
         return;
@@ -108,8 +93,7 @@ pub fn starte_backup_scheduler(pool: SqlitePool, config: BackupConfig) {
 
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(config.intervall);
-        // Der erste Tick feuert sofort — den überspringen, sonst sichert jeder
-        // Serverstart erst einmal.
+        // Der erste Tick feuert sofort — überspringen, sonst sicherte jeder Serverstart.
         ticker.tick().await;
         loop {
             ticker.tick().await;
@@ -199,8 +183,8 @@ mod tests {
             .await
             .unwrap();
 
-        // Rotierende Sicherungen landen potenziell auf einem USB-Medium — Bearer-Tokens
-        // dürfen darin nicht auftauchen.
+        // Rotierende Sicherungen landen potenziell auf einem USB-Medium; Bearer-Tokens dürfen darin
+        // nicht stehen.
         let kopie = crate::db::connect(pfad.to_str().unwrap()).await.unwrap();
         let anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM session")
             .fetch_one(&kopie)

@@ -13,13 +13,12 @@ import {
 } from '../../routing/deeplinks';
 
 /**
- * Lagekarte-lokaler Adapter: bildet einen Karten-Marker auf seinen Fach-Modul-Deeplink ab
- * (LFH-25). Dünner Wrapper über die zentralen deeplinks-Builder — KEINE eigenen Pfad-Templates.
+ * Bildet einen Karten-Marker auf seinen Fach-Modul-Deeplink ab — dünner Wrapper über die zentralen
+ * deeplinks-Builder, keine eigenen Pfad-Templates.
  *
- * Nimmt bewusst den ganzen Marker (nicht typ+id): `lagemeldung` verlinkt auf die QUELL-Meldung
- * (`lageMeldung.meldungId`), nicht auf `marker.id` (= LageMeldung-id). UHS hat eine echte
- * Item-Route; Schaden hat seit LFH-148 ebenfalls eine Vollseiten-Item-Route; die taktischen
- * Listen (Einheit/Fahrzeug/Personal/Abschnitt) werden per Query-Param selektiert.
+ * Nimmt den ganzen Marker: `lagemeldung` verlinkt auf die Quell-Meldung (`lageMeldung.meldungId`),
+ * nicht auf `marker.id`. UHS und Schaden haben Item-Routen, die taktischen Listen
+ * (Einheit/Fahrzeug/Personal/Abschnitt) werden per Query-Param selektiert.
  */
 export function markerToUrl(marker: KarteMarker, einsatzId: number): string {
   switch (marker.typ) {
@@ -35,10 +34,10 @@ export function markerToUrl(marker: KarteMarker, einsatzId: number): string {
       return personalPfad(einsatzId, { personal: marker.id });
     case 'abschnitt':
       return einsatzabschnittePfad(einsatzId, { abschnitt: marker.id });
-    // Betroffene (LFH-648): Vollseiten-Detail → Item-Route, nicht `personenPfad(?person=)`.
+    // Betroffene: Vollseiten-Detail → Item-Route.
     case 'person':
       return personDetailPfad(einsatzId, marker.id);
-    // Betreuungsstelle (LFH-673): keine Detailroute, Auswahl per `?stelle=` (LFH-639 D7).
+    // Betreuungsstelle: keine Detailroute, Auswahl per `?stelle=`.
     case 'betreuungsstelle':
       return betreuungPfad(einsatzId, { stelle: marker.id });
     case 'lagemeldung':

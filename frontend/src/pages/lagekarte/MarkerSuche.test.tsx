@@ -72,8 +72,7 @@ describe('MarkerSuche (LFH-716)', () => {
     zeige();
     await userEvent.type(suchfeld(), 'Kranwagen');
     expect(screen.getByText('Kein Kartenobjekt zu „Kranwagen“')).toBeInTheDocument();
-    // Ohne diese Aussage bliebe der Test grün, auch wenn leere Gruppen mit je einem
-    // eigenen Leerkasten („Keine Daten") stehen blieben.
+    // Sonst bliebe der Test grün, auch wenn leere Gruppen je einen eigenen Leerkasten behielten.
     expect(screen.queryByText('Keine Daten')).toBeNull();
     expect(screen.queryByRole('button', { name: 'BHP Nord' })).toBeNull();
   });
@@ -106,8 +105,8 @@ describe('MarkerSuche (LFH-716)', () => {
 });
 
 /**
- * Das Akzeptanzkriterium aus LFH-716 als gerendertes Paar: dieselben Daten, einmal mit und
- * einmal ohne Modulrecht, durch dieselbe Quelle, die die Leiste bekommt.
+ * Dieselben Daten einmal mit und einmal ohne Modulrecht, durch dieselbe Quelle wie die Leiste —
+ * kein Name aus gesperrten Modulen.
  */
 describe('MarkerSuche — kein Name aus gesperrten Modulen (LFH-716)', () => {
   const verortet = [marker('uhs', 1, 'UHS Süd'), marker('betreuungsstelle', 2, 'Turnhalle Mitte')];

@@ -83,17 +83,13 @@ interface GefahrenmatrixVerdichtung {
 }
 
 /**
- * Verdichtet die Matrizen aller Gefahrengebiete eines Einsatzes (Neuentwurf S3).
+ * Verdichtet die Matrizen aller Gefahrengebiete eines Einsatzes.
  *
- * „KEINE" UND „UNBEWERTET" SIND ZWEI AUSSAGEN. Eine Bewertung mit Warnstufe `keine` ist
- * eine Meldung („hier ist nachgesehen worden, es besteht keine Gefahr"); ein Typ ohne jede
- * Bewertung ist eine Lücke. Die erste steht als Zeile mit leerem Balken und dem Wort
- * „keine" da, die zweite erscheint NICHT als Zeile, sondern als Zähler darunter — sonst
- * sähen dreizehn Zeilen „keine" aus wie ein geprüfter, ruhiger Einsatz.
+ * „keine" und „unbewertet" sind zwei Aussagen: Warnstufe `keine` ist eine Meldung und steht als
+ * Zeile mit leerem Balken; ein Typ ohne jede Bewertung ist eine Lücke und erscheint nur als Zähler
+ * — sonst sähen dreizehn Zeilen „keine" aus wie ein geprüfter, ruhiger Einsatz.
  *
- * Die Reihenfolge ist die des Katalogs (`GEFAHRENTYPEN`), nicht die Dringlichkeit: eine
- * Zeile steht in jedem Zustand an ihrem Platz (Prüfliste Kriterium 9). Das deckt sich mit
- * dem Entwurf, der ebenfalls nicht nach Stufe sortiert.
+ * Reihenfolge des Katalogs, nicht der Dringlichkeit (Prüfliste Kriterium 9).
  */
 export function verdichteGefahrenmatrix(
   bewertungen: readonly GefahrBewertung[],
@@ -127,11 +123,8 @@ const SICHTUNG_IMMER: readonly Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4
 const SICHTUNG_FALLS_VORHANDEN: readonly Sichtungskategorie[] = ['tot', 'unverletzt'];
 
 /**
- * Sichtungsbild aus der SK-Verteilung (Neuentwurf S3).
- *
- * Der Anteil bezieht sich auf alle gesichteten Personen (SK I–IV, tot, unverletzt) — nicht
- * auf alle erfassten: eine Person ohne Sichtung hat keine Kategorie, sie gehört nicht in
- * den Nenner eines Kategorienanteils. Die Ungesichteten nennt die Seite separat.
+ * Sichtungsbild aus der SK-Verteilung. Der Anteil bezieht sich auf alle Gesichteten (SK I–IV, tot,
+ * unverletzt), nicht auf alle Erfassten — Ungesichtete nennt die Seite separat.
  */
 export function sichtungsZeilen(sk: SkVerteilung): SichtungsZeile[] {
   const gesichtet = sk.sk1 + sk.sk2 + sk.sk3 + sk.sk4 + sk.tot + sk.unverletzt;
@@ -167,8 +160,8 @@ export function verdichtePersonen(personen: Person[]): BetroffeneVerdichtung {
 }
 
 /**
- * Jüngster Lagebericht nach `erstellt_at`. Das Format 'YYYY-MM-DD HH:MM:SS' ist
- * lexikografisch sortierbar. Null bei leerer Liste.
+ * Jüngster Lagebericht nach `erstellt_at` (das Format ist lexikografisch sortierbar). Null bei
+ * leerer Liste.
  */
 export function neuesterLagebericht(berichte: LageberichtAnzeige[]): LageberichtAnzeige | null {
   if (berichte.length === 0) return null;

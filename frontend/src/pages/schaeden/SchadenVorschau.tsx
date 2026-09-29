@@ -11,15 +11,9 @@ import SchadenDaten from './SchadenDaten';
 import { STATUS_META } from './schadenHelfer';
 
 /**
- * Lese-Vorschau eines Schadens in der Sprungpalette (LFH-664).
- *
- * Quelle ist die Schadensliste — das Fach der Palette, live über den SSE-Fan-out —, NICHT das
- * Detailfach `einsatzKeys.schaden`: das steht in `NICHT_LIVE_KEYS`, eine Vorschau darauf
- * verpasste Live-Änderungen. Die Listenform trägt alles, was die Vorschau zeigt.
- *
- * Der Inhalt ist das Datenraster der Detailseite (`SchadenDaten`), ohne Eingaben und ohne
- * „Auf Karte verorten" — die Vorschau liest nur. Die Ort-Zeile unter einer Koordinate fehlt,
- * weil sie ein eigener Serverabruf ist (siehe `SchadenDaten.ortZeile`).
+ * Lese-Vorschau eines Schadens in der Sprungpalette. Quelle ist die (live) Schadensliste, nicht das
+ * Detailfach `einsatzKeys.schaden` — das steht in `NICHT_LIVE_KEYS`. Inhalt ist `SchadenDaten` ohne
+ * Eingaben, ohne „Auf Karte verorten" und ohne Ort-Zeile (eigener Serverabruf).
  */
 export default function SchadenVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {
   const select = useCallback((liste: Schaden[]) => liste.find((s) => s.id === id), [id]);

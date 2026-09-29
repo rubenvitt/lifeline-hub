@@ -40,12 +40,9 @@ fn zufalls_passwort() -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// Legt beim ersten Start eine Organisation und ein Admin-Konto an,
-/// sofern noch kein Benutzer existiert. Idempotent: bei vorhandenen
-/// Benutzern passiert nichts.
-///
-/// `admin_passwort = None` → es wird ein Zufalls-Passwort erzeugt und im
-/// Ergebnis zurückgegeben (der Aufrufer loggt es).
+/// Legt beim ersten Start eine Organisation und ein Admin-Konto an, sofern noch kein Benutzer
+/// existiert (idempotent). `admin_passwort = None` erzeugt ein Zufalls-Passwort, das im
+/// Ergebnis zurückkommt.
 pub async fn bootstrap_admin(
     pool: &SqlitePool,
     org_name: &str,

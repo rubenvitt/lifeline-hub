@@ -51,7 +51,7 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 
 const { Text } = Typography;
 
-/** Grund der fehlenden Schreibberechtigung als ganzer Satz (C10/M16). */
+/** Grund der fehlenden Schreibberechtigung als ganzer Satz. */
 function abloesungRechteText(status: EinsatzStatus): string {
   return status !== 'aktiv'
     ? 'Der Einsatz ist abgeschlossen — die Ablösungen sind nur noch lesbar.'
@@ -65,22 +65,19 @@ type Rhythmusziel =
 /**
  * Fachmodul Ablösung (LFH-635): Schichten der Einheiten, nach Fälligkeit geordnet.
  *
- * FORM: eine LISTE, keine Tabelle (LFH-330/B2) — die Frage ist „was ist mit dieser Einheit?",
- * nicht „welche von diesen ist die richtige?", und die Ordnung ist die Fälligkeit, die der
- * Server festlegt. Neue Schichten landen deshalb an ihrem Fälligkeitsplatz, auch OBERHALB
- * einer gezeigten Karte. Fremde Neuzugänge warten darum hinter dem Sammelbanner, eigene
- * stehen sofort (LFH-647). Die Folge der gezeigten Karten ist eingefroren, ihr Inhalt frisch:
- * eine fremde Änderung von Rhythmus oder Beginn ordnet erst mit dem Banner um, eine eigene
- * sofort (LFH-660). Regeln in `abloesung/zufluss.ts`.
+ * Form: eine Liste, keine Tabelle — die Frage ist „was ist mit dieser Einheit?", und die Ordnung
+ * ist die Fälligkeit, die der Server festlegt. Neue Schichten landen an ihrem Fälligkeitsplatz,
+ * auch oberhalb gezeigter Karten; fremde Neuzugänge warten deshalb hinter dem Sammelbanner, eigene
+ * stehen sofort (LFH-647). Die Folge der gezeigten Karten ist eingefroren, ihr Inhalt frisch: eine
+ * fremde Änderung von Rhythmus oder Beginn ordnet erst mit dem Banner um, eine eigene sofort
+ * (LFH-660). Regeln in `abloesung/zufluss.ts`.
  *
- * DAS BANNER NIMMT KEINE EIGENE ZEILE. Es steht in der Segmentzeile, die immer gerendert wird
- * und deren Höhe es nicht ändert (`nowrap`, gleiche Steuerhöhe, Text mit Auslassung) — ein
- * Banner, das beim Eintreffen Platz nähme, schöbe genau die Karten weg, die es schützen soll.
- * Kein `sticky`-Overlay wie in der ETB-Zeitachse: es verdeckte die oberste, also die
- * dringlichste Karte (Prüfliste Kriterium 13). Die Höhe misst `e2e/abloesung-zufluss.spec.ts`.
+ * Das Banner nimmt keine eigene Zeile: es steht in der immer gerenderten Segmentzeile, deren Höhe
+ * es nicht ändert — sonst schöbe es die Karten weg, die es schützen soll. Kein `sticky`-Overlay: es
+ * verdeckte die oberste, also dringlichste Karte. Die Höhe misst `e2e/abloesung-zufluss.spec.ts`.
  *
- * DIE UHR tickt alle 30 s (`useUhr`): Einstufung und „in x min" laufen mit, ohne Abruf.
- * Nichts blinkt — der Hinweis bei Fälligkeit kommt einmalig über die AlarmZentrale.
+ * Die Uhr tickt alle 30 s (`useUhr`): Einstufung und „in x min" laufen ohne Abruf mit. Nichts
+ * blinkt; der Hinweis bei Fälligkeit kommt einmalig über die AlarmZentrale.
  */
 export default function AbloesungPage() {
   const { id } = useParams();
@@ -96,8 +93,8 @@ export default function AbloesungPage() {
   const [vollzugSchicht, setVollzugSchicht] = useState<Abloesung | null>(null);
   const [abloeserSchicht, setAbloeserSchicht] = useState<Abloesung | null>(null);
   const [rhythmusZiel, setRhythmusZiel] = useState<Rhythmusziel | null>(null);
-  // An den Einsatz gebunden: wechselt die Route den Einsatz bei stehender Komponente, wären
-  // sonst alle Schichten des neuen Einsatzes „fremde Neuzugänge".
+  // An den Einsatz gebunden: wechselt die Route den Einsatz bei stehender Komponente, wären sonst
+  // alle Schichten des neuen Einsatzes „fremde Neuzugänge".
   const [zuflussZustand, setZuflussZustand] = useState<{ einsatzId: number } & Zuflussstand>({
     einsatzId,
     ...LEERER_ZUFLUSSSTAND,
@@ -133,17 +130,16 @@ export default function AbloesungPage() {
   const laufende = useMemo(() => laufendQuery.data ?? [], [laufendQuery.data]);
   const vorgaben = useMemo(() => vorgabenQuery.data ?? [], [vorgabenQuery.data]);
 
-  // ── Live-Zufluss (LFH-647) ─────────────────────────────────────────────────────────
-  // NUR die gerenderte Liste nimmt `sichtbar`. Kopfzeile, Segmentzähler, Fälligkeitszahl und
-  // die freien Einheiten rechnen mit der vollen Menge: die Zahlen dürfen nicht lügen, und ein
-  // „Schicht beginnen" für eine Einheit, deren Schicht nur zurückgehalten ist, lehnte der
+  // ── Live-Zufluss ── Nur die gerenderte Liste nimmt `sichtbar`. Kopfzeile, Zähler,
+  // Fälligkeitszahl und freie Einheiten rechnen mit der vollen Menge: die Zahlen dürfen nicht
+  // lügen, und „Schicht beginnen" für eine Einheit mit nur zurückgehaltener Schicht lehnte der
   // Server ab.
   const zufluss: Zuflussstand =
     zuflussZustand.einsatzId === einsatzId ? zuflussZustand : LEERER_ZUFLUSSSTAND;
   const { sichtbar, zurueckgehalten, umgeordnet } = teileZufluss(laufende, zufluss);
-  // Nachführen IM RENDER (Zustandsangleich an die Daten, Muster `EtbZeitachse`), nicht im
-  // Effekt: ein Effekt ließe einen Bildaufbau mit veraltetem Stand durch. `nachgefuehrt`
-  // liefert `null`, wenn nichts zu tun ist — das ist der Riegel gegen die Schleife.
+  // Nachführen im Render (Muster `EtbZeitachse`), nicht im Effekt: der ließe einen Bildaufbau mit
+  // veraltetem Stand durch. `nachgefuehrt` liefert `null`, wenn nichts zu tun ist — der Riegel
+  // gegen die Schleife.
   if (laufendQuery.data) {
     const neu = nachgefuehrt(zufluss, sichtbar, umgeordnet);
     if (neu || zuflussZustand.einsatzId !== einsatzId) {
@@ -155,8 +151,8 @@ export default function AbloesungPage() {
       const basis = z.einsatzId === einsatzId ? z : { einsatzId, ...LEERER_ZUFLUSSSTAND };
       return { ...basis, eigene: new Set([...basis.eigene, id]) };
     });
-  // Eine eigene Änderung ordnet ihre Karten sofort ein (LFH-660). Gerufen NACH dem Refetch,
-  // mit dessen Daten: der Render-Stand `laufende` ist zu diesem Zeitpunkt veraltet.
+  // Eine eigene Änderung ordnet ihre Karten sofort ein. Gerufen nach dem Refetch mit dessen Daten;
+  // `laufende` ist dann veraltet.
   const ordneEin = (auswahl: (s: Abloesung) => boolean) => {
     const frisch =
       qc.getQueryData<Abloesung[]>(einsatzKeys.abloesungListe(einsatzId, 'laufend')) ?? [];
@@ -195,8 +191,8 @@ export default function AbloesungPage() {
 
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.abloesungen(einsatzId) });
 
-  // Fehler stehen IM jeweiligen Dialog (SpeicherFehler); `mutateAsync` lehnt ab, die Hülle
-  // lässt die Felder stehen (LFH-332/B4).
+  // Fehler stehen im jeweiligen Dialog (SpeicherFehler); `mutateAsync` lehnt ab, die Hülle lässt
+  // die Felder stehen.
   const beginnenMut = useMutation({
     mutationFn: (body: Parameters<typeof beginneSchicht>[1]) => beginneSchicht(einsatzId, body),
     onSuccess: (a) => {
@@ -226,9 +222,8 @@ export default function AbloesungPage() {
       abloesungId: number;
       body: Parameters<typeof vollzieheAbloesung>[2];
     }) => vollzieheAbloesung(einsatzId, abloesungId, body),
-    // Der Vollzug hat einen serverseitigen Rückweg → Rückgängig-Toast statt Rückfrage
-    // (LFH-343 · C8). Der Dialog davor ist keine Rückfrage, sondern die Erfassung von
-    // Zeitpunkt und Ablöser.
+    // Der Vollzug hat einen serverseitigen Rückweg → Rückgängig-Toast statt Rückfrage. Der Dialog
+    // davor erfasst Zeitpunkt und Ablöser, er ist keine Rückfrage.
     onSuccess: (v) => {
       if (v.folgeschicht) merkeEigene(v.folgeschicht.id);
       invalidiere();
@@ -246,12 +241,11 @@ export default function AbloesungPage() {
       abloesungId: number;
       body: Parameters<typeof aendereSchicht>[2];
     }) => aendereSchicht(einsatzId, abloesungId, body),
-    // Rhythmus oder Beginn verschieben die Fälligkeit: die eigene Karte rückt an ihren Platz,
-    // und zwar erst NACH dem Refetch — vorher stünde sie mit altem Inhalt am neuen Platz. Trifft
-    // der Live-Refetch vor der eigenen Antwort ein, meldet das Banner diese eine Rundreise lang
-    // „Reihenfolge geändert" (kurzer, benannter Rest; die Höhe der Werkzeugzeile ändert sich
-    // dabei nicht). Scheitert der Refetch, wird nichts eingeordnet, und der nächste Abruf zeigt
-    // die eigene Änderung wie eine fremde hinter dem Banner.
+    // Rhythmus oder Beginn verschieben die Fälligkeit: die eigene Karte rückt erst nach dem Refetch
+    // an ihren Platz, sonst stünde sie mit altem Inhalt am neuen. Trifft der Live-Refetch vor der
+    // eigenen Antwort ein, meldet das Banner diese eine Rundreise lang „Reihenfolge geändert".
+    // Scheitert der Refetch, zeigt der nächste Abruf die Änderung wie eine fremde hinter dem
+    // Banner.
     onSuccess: async (a, { body }) => {
       message.success('Schicht geändert');
       if (body.rhythmus_minuten === undefined && body.beginn_at === undefined) {
@@ -265,11 +259,10 @@ export default function AbloesungPage() {
   const vorgabeMut = useMutation({
     mutationFn: ({ abschnittId, minuten }: { abschnittId: number; minuten: number | null }) =>
       setzeAbloesungVorgabe(einsatzId, abschnittId, minuten),
-    // Eine neu gesetzte Vorgabe schreibt der Server nur in die Schichten ihres Abschnitts, die
-    // ihr folgen (`rhythmus_quelle = 'abschnitt'`); eine entfernte lässt jede Schicht stehen.
-    // Genau diese werden eingeordnet — eine fremd umgeordnete Schicht mit eigenem Rhythmus im
-    // selben Abschnitt bleibt eingefroren. Die Antwort trägt keine Schichten, also nach dem
-    // Refetch (Rennen und Fehlerpfad wie bei `aendernMut`).
+    // Eine neue Vorgabe schreibt der Server nur in die Schichten ihres Abschnitts, die ihr folgen
+    // (`rhythmus_quelle = 'abschnitt'`); eine entfernte lässt jede Schicht stehen. Genau diese
+    // werden eingeordnet — eine fremd umgeordnete Schicht mit eigenem Rhythmus bleibt eingefroren.
+    // Nach dem Refetch, wie bei `aendernMut`.
     onSuccess: async (_, { abschnittId, minuten }) => {
       message.success('Rhythmus-Vorgabe gespeichert');
       if (minuten == null) {
@@ -315,7 +308,7 @@ export default function AbloesungPage() {
           ]}
         />
       }
-      // Gesperrt statt versteckt (C10/M16): der Hinweis darunter nennt den Grund.
+      // Gesperrt statt versteckt: der Hinweis darunter nennt den Grund.
       aktionen={
         <Button type="primary" disabled={!darfSchreiben} onClick={oeffneBeginnen}>
           Schicht beginnen
@@ -458,8 +451,8 @@ export default function AbloesungPage() {
         )}
       </Paneel>
 
-      {/* Dialoge werden je Ziel frisch montiert: `initialValues` greift nur beim Einhängen,
-          und der Speicher von rc-field-form überlebt sonst ein Schließen (CLAUDE.md, B4). */}
+      {/* Dialoge werden je Ziel frisch montiert: `initialValues` greift nur beim Einhängen, und
+          der Speicher von rc-field-form überlebt sonst ein Schließen. */}
       {beginnenOffen && (
         <SchichtBeginnenDialog
           offen

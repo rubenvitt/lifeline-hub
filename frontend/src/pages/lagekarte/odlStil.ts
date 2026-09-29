@@ -3,15 +3,13 @@ import { odlStufe, rollenFarbe, type StatusDarstellung } from '../../theme/statu
 import type { FeatureCollection, OdlBewertung, OdlStufe } from '../../api/fachebenen';
 
 /**
- * Darstellung der BfS-ODL-Ebene (LFH-78): Rollenfarbe und Punktdurchmesser je Stufe, in die
- * Feature-Properties eingebacken — dieselbe Bauform und Begründung wie `hochwasserStil.ts`
- * (die Kartenstil-Module haben keinen `useToken()`-Zugang, LFH-328/A2).
+ * Darstellung der BfS-ODL-Ebene: Rollenfarbe und Punktdurchmesser je Stufe, eingebacken wie in
+ * `hochwasserStil.ts`.
  *
- * DER RADIUS IST DER ZWEITE KANAL, nicht Schmuck: ein Kreis trägt keine Beschriftung. Die
- * Lücke zwischen `normal` und `erhoeht` ist absichtlich groß — gemessen stehen ~1 600
- * Sonden im natürlichen Bereich, und eine erhöhte muss dazwischen auffallen, ohne dass man
- * die Farbe unterscheiden können muss. `keine_messung` bleibt sichtbar (klein): eine
- * ausgefallene Sonde ist in einer CBRN-Lage eine Lücke im Lagebild.
+ * Der Radius ist der zweite Kanal: die Lücke zwischen `normal` und `erhoeht` ist absichtlich groß,
+ * damit eine erhöhte Sonde zwischen ~1 600 normalen auffällt, auch ohne Farbunterscheidung.
+ * `keine_messung` bleibt sichtbar (klein): eine ausgefallene Sonde ist in einer CBRN-Lage eine
+ * Lücke im Lagebild.
  */
 const RADIUS: Record<OdlStufe, number> = {
   keine_messung: 3,
@@ -21,9 +19,9 @@ const RADIUS: Record<OdlStufe, number> = {
 };
 
 /**
- * Unbekanntes/fehlendes Wort → `keine_messung`: die Ebene erfindet keine Bewertung. Still
- * wie bei `hochwasserStil.ts`, gedeckt durch die beidseitigen Wort-Pins
- * (`karte::normalisierung::odl_tests` ↔ `theme/statusFarben.test.ts`/`odlStil.test.ts`).
+ * Unbekanntes/fehlendes Wort → `keine_messung`: die Ebene erfindet keine Bewertung. Gedeckt durch
+ * die beidseitigen Wort-Pins (`karte::normalisierung::odl_tests` ↔
+ * `theme/statusFarben.test.ts`/`odlStil.test.ts`).
  */
 function alsStufe(roh: unknown): OdlStufe {
   return typeof roh === 'string' && roh in odlStufe ? (roh as OdlStufe) : 'keine_messung';
@@ -56,7 +54,7 @@ export function faerbeOdl(fc: FeatureCollection, token: GlobalToken): FeatureCol
   };
 }
 
-/** Grundlage der Stufe einer Sonde, aus den Properties gelesen (LFH-598). */
+/** Grundlage der Stufe einer Sonde, aus den Properties gelesen. */
 type OdlGrundlage =
   | {
       art: Extract<OdlBewertung, 'standort'>;
@@ -71,9 +69,8 @@ function endlich(v: unknown): number | null {
 }
 
 /**
- * `standort` nur, wenn das Wort stimmt UND Grundpegel und Faktor als Zahlen dastehen — sonst
- * `absolut`. Ein unbekanntes Wort oder ein halber Satz Felder zeigt also keinen Grundpegel,
- * statt einen Maßstab zu erfinden, der für die Stufe nicht gegolten hat.
+ * `standort` nur, wenn das Wort stimmt und Grundpegel und Faktor als Zahlen dastehen, sonst
+ * `absolut` — lieber kein Grundpegel als ein erfundener Maßstab.
  */
 export function odlGrundlage(p: Record<string, unknown> | undefined): OdlGrundlage {
   const grundpegel = endlich(p?.grundpegel);

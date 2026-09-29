@@ -65,8 +65,7 @@ export default function BrDetailPage() {
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
 
-  // Diesen BR als „zuletzt ausgewählt" merken — der Default-Einstieg landet beim
-  // nächsten Mal wieder hier (Muster `UhsDetailPage.tsx`).
+  // Diesen BR als „zuletzt ausgewählt" merken — der Default-Einstieg landet wieder hier.
   useEffect(() => {
     if (detailQuery.isSuccess) merkeLetztenBr(einsatzId, brId);
   }, [detailQuery.isSuccess, einsatzId, brId]);
@@ -102,8 +101,8 @@ export default function BrDetailPage() {
 
   const belegungMut = useMutation({
     mutationFn: belegeBr.bind(null, einsatzId, brId),
-    // Fester Schlüssel (N8): ein serieller Zuweisen/Entfernen-Lauf ERSETZT den stehenden
-    // Toast statt ihn zu stapeln — dieselbe Bauform wie `kommunikation/rueckgaengig.tsx`.
+    // Fester Schlüssel: ein serieller Lauf ersetzt den stehenden Toast statt ihn zu stapeln (wie
+    // `kommunikation/rueckgaengig.tsx`).
     onSuccess: () => {
       message.success({ content: 'Erfolgreich', key: 'br-belegung' });
       invalidate();
@@ -111,7 +110,7 @@ export default function BrDetailPage() {
     onError: fehler,
   });
 
-  // Deeplink-Robustheit (LFH-25): ungültige BR-ID → zurück zur Liste (nach allen Hooks).
+  // Ungültige BR-ID → zurück zur Liste (nach allen Hooks).
   if (!idGueltig) {
     return <Navigate to={listenPfad} replace />;
   }
@@ -152,18 +151,14 @@ export default function BrDetailPage() {
     belegungMut.mutate({ objekt_typ: 'fahrzeug', objekt_id: fahrzeugId, art: 'austritt' });
   }
 
-  // Typ und Stärke aus der Einheiten-/Fahrzeugliste (LFH-347 · M58): `BrEinheitKurz` trägt nur
-  // id+name, die vollen Daten liegen in Queries, die die Sidebar ohnehin braucht.
+  // Typ und Stärke aus Einheiten-/Fahrzeugliste: `BrEinheitKurz` trägt nur id+name.
   const einheitVon = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e]));
   const fahrzeugVon = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f]));
   const bereitgestellt = br.einheiten
     .map((e) => einheitVon.get(e.id))
     .filter((e): e is Einheit => e != null);
-  // Final-Review Befund A: `bereitgestellt` verwirft lautlos jede Einheit, die in
-  // `einheitenQuery.data` fehlt (Query lädt noch, ist gescheitert, oder der Cache ist
-  // nur teilweise gefüllt). Eine Summe über diese verkürzte Menge wäre eine zu kleine,
-  // aber vollständig aussehende Zahl neben Namen, die die Liste sehr wohl zeigt — die
-  // MENGE entscheidet, nicht `isSuccess`: auch ein Teilausfall ist unvollständig.
+  // `bereitgestellt` verwirft jede Einheit, die in `einheitenQuery.data` fehlt. Eine Summe darüber
+  // wäre zu klein, sähe aber vollständig aus — deshalb entscheidet die Menge, nicht `isSuccess`.
   const unvollstaendig = bereitgestellt.length < br.einheiten.length;
   const summe = unvollstaendig ? null : summiereStaerke(bereitgestellt);
   const fahrzeugZahl = br.fahrzeuge.length;
@@ -228,10 +223,8 @@ export default function BrDetailPage() {
         <Datenfeld label="Notiz">{br.notiz ?? '—'}</Datenfeld>
       </Datenraster>
 
-      {/* Unter `md` stapeln statt der 240-px-Sidebar neben dem Hauptbereich (LFH-341 · H40) —
-          dieselbe Form wie Gefahrengebietsliste und Gliederungsbaum. Ohne diese Weiche würde
-          die volle Breite der `KraefteOhneBrSidebar`-Karte den Flex-Container weiterhin in
-          eine Spalte quetschen, obwohl die Karte selbst schon auf `100%` steht. */}
+      {/* Unter `md` stapeln statt 240-px-Sidebar daneben; sonst quetschte der Flex-Container die
+          100%-Karte weiter in eine Spalte. */}
       <div
         data-testid="br-detail-rahmen"
         style={{
@@ -241,11 +234,9 @@ export default function BrDetailPage() {
           alignItems: breit ? 'flex-start' : 'stretch',
         }}
       >
-        {/* Hauptbereich: bereitgestellte Kräfte */}
         <div style={{ flex: 1 }}>
-          {/* Zahl führt (Neuentwurf S1): Stärke und Fahrzeugzahl als Kennzahlen. Bei
-              unvollständiger Einheitenliste steht „—" mit dem Grund als Notiz — eine zu
-              kleine Summe sähe sonst vollständig aus (Final-Review Befund A). */}
+          {/* Stärke und Fahrzeugzahl als Kennzahlen. Bei unvollständiger Einheitenliste „—" mit
+              Grund — eine zu kleine Summe sähe sonst vollständig aus. */}
           <div data-testid="br-summe" style={{ marginBottom: abstand.md }}>
             <Kennzahlenband beschriftung="Bereitgestellte Kräfte">
               <Kennzahl
@@ -332,7 +323,6 @@ export default function BrDetailPage() {
           />
         </div>
 
-        {/* Sidebar: freie Kräfte */}
         <KraefteOhneBrSidebar
           alleEinheiten={einheitenQuery.data ?? []}
           alleFahrzeuge={fahrzeugeQuery.data ?? []}

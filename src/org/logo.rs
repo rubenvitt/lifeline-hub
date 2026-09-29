@@ -1,9 +1,9 @@
-//! Logo der Organisation (LFH-22, design.md D8).
+//! Logo der Organisation (LFH-22).
 //!
-//! Eigene 1:1-Tabelle `org_logo` statt Spalten an `organisation`: der BLOB bleibt aus jeder
-//! Abfrage der Stammdaten heraus, und „kein Logo" ist die fehlende Zeile. Die Tabelle hat
-//! keine `einsatz_id` und keinen CASCADE-Pfad zu `einsatz` — sie liegt damit außerhalb der
-//! Schwärzungsmenge (`einsatz::schwaerzung_registry`), was dort ein Guard festhält.
+//! Eigene 1:1-Tabelle `org_logo`: der BLOB bleibt aus jeder Stammdaten-Abfrage heraus, und
+//! „kein Logo“ ist die fehlende Zeile. Ohne `einsatz_id` und ohne CASCADE-Pfad zu `einsatz`
+//! liegt sie außerhalb der Schwärzungsmenge (`einsatz::schwaerzung_registry`, dort per Guard
+//! festgehalten).
 
 use crate::error::AppError;
 use serde::Serialize;
@@ -14,10 +14,9 @@ use utoipa::ToSchema;
 /// `0124_org_logo.sql`; das Body-Limit der Route liegt 64 KiB darüber (Multipart-Rahmen).
 pub const MAX_GROESSE: usize = 1024 * 1024;
 
-/// `Cache-Control` des Logo-Abrufs. **Nicht** `ASSET_CACHE_CONTROL` (immutable): die Adresse
-/// `/api/organisation/logo` ist stabil, der Inhalt nicht. `no-cache` lässt den Browser
-/// speichern, zwingt ihn aber zur Rückfrage mit dem ETag — ein neues Logo ist sofort da,
-/// ein unverändertes kostet nur ein 304.
+/// `Cache-Control` des Logo-Abrufs. Nicht `ASSET_CACHE_CONTROL` (immutable): die Adresse ist
+/// stabil, der Inhalt nicht. `no-cache` lässt den Browser speichern, zwingt ihn aber zur
+/// Rückfrage mit dem ETag — ein neues Logo ist sofort da, ein unverändertes kostet ein 304.
 pub const CACHE_CONTROL: &str = "private, no-cache";
 
 /// Metadaten des Logos ohne Bytes — hängen als `logo` an der `OrganisationAnzeige`.
@@ -61,9 +60,8 @@ pub struct LogoInhalt {
     pub daten: Vec<u8>,
 }
 
-/// Typ, Prüfsumme und Bytes in EINER Abfrage; `None` = kein Logo. Getrennt gelesen lieferte
-/// ein Ersetzen zwischen beiden Abfragen die Bytes des neuen Logos unter Typ und ETag des
-/// alten.
+/// Typ, Prüfsumme und Bytes in EINER Abfrage; `None` = kein Logo. Getrennt gelesen lieferte ein
+/// Ersetzen dazwischen die Bytes des neuen Logos unter Typ und ETag des alten.
 pub async fn inhalt(pool: &SqlitePool, org_id: i64) -> Result<Option<LogoInhalt>, AppError> {
     Ok(
         sqlx::query_as::<_, LogoInhalt>(
@@ -213,9 +211,7 @@ mod tests {
         super::entfernen(&pool, 1).await.unwrap();
     }
 
-    /// Typ, Prüfsumme und Bytes kommen aus EINER Abfrage (Review Welle B): der Abruf las
-    /// vorher Metadaten und Bytes getrennt, und ein Ersetzen dazwischen lieferte die Bytes
-    /// des neuen Logos unter Typ und ETag des alten.
+    /// Typ, Prüfsumme und Bytes kommen aus EINER Abfrage (s. [`inhalt`]).
     #[tokio::test]
     async fn inhalt_liefert_typ_pruefsumme_und_bytes_aus_einer_zeile() {
         let pool = pool_mit_org().await;

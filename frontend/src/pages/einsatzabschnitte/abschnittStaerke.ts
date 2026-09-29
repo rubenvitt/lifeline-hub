@@ -24,7 +24,7 @@ export function nachfahrenInkl(abschnitte: Einsatzabschnitt[], id: number): Set<
 export interface AbschnittStaerken {
   /** Nur direkt zugeordnete Einheiten — die Bedeutung der Bestandszeile „Stärke (F/UF/M//Σ)". */
   eigene: Staerke | null;
-  /** Über `nachfahrenInkl` — der Wert, den der Einsatzleiter sonst im Kopf addieren muss (H37). */
+  /** Über `nachfahrenInkl` summiert — Abschnitt inklusive aller Unterabschnitte. */
   inklUnter: Staerke | null;
 }
 

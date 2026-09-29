@@ -33,7 +33,7 @@ describe('zuUpdate', () => {
       etb_nummer_praefix: 'EB-',
       meldung_nummer_praefix: 'M-',
       auftrag_nummer_praefix: 'A-',
-      // LFH-617: fehlte es hier, nullte jedes Speichern der ANZEIGE-Sektion das Präfix.
+      // Fehlte es hier, nullte jedes Speichern der Anzeige-Sektion das Präfix.
       einsatz_nummer_praefix: 'WF-',
       meldung_bestaetigung_frist_min: 30,
       auftrag_quittierung_frist_min: 45,

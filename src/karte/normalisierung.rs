@@ -1,14 +1,11 @@
 //! Reine Normalisierungs-Funktionen (rohe Quell-Antwort → GeoJSON-FeatureCollection).
-//! Pro Quelle in den jeweiligen Phasen befüllt.
 
 use serde_json::{json, Value};
 
-/// PEGELONLINE `stations.json` (mit `includeTimeseries`) → GeoJSON-Points. Der aktuelle
-/// Wasserstand stammt aus der Zeitreihe `shortname == "W"` (Stationen führen mehrere
-/// Reihen: W=Wasserstand, Q=Abfluss, …). Zusätzlich Gewässer, Stations-km, Zeitpunkt und
-/// die fachliche Einordnung (`stateMnwMhw`: niedrig/normal/hoch). Die Stations-`uuid` geht
-/// additiv mit (LFH-606): über sie legt ein Einsatz seinen maßgeblichen Pegel fest und
-/// holt dessen Zeitreihe (`crate::pegel`).
+/// PEGELONLINE `stations.json` (mit `includeTimeseries`) → GeoJSON-Points. Der Wasserstand
+/// kommt aus der Zeitreihe `shortname == "W"`; dazu Gewässer, Stations-km, Zeitpunkt und
+/// `stateMnwMhw`. Die Stations-`uuid` geht mit, weil ein Einsatz über sie seinen maßgeblichen
+/// Pegel festlegt (`crate::pegel`).
 pub fn normalisiere_pegelonline(roh: &Value) -> Value {
     let stationen = roh.as_array().cloned().unwrap_or_default();
     let features: Vec<Value> = stationen
@@ -27,7 +24,6 @@ pub fn normalisiere_pegelonline(roh: &Value) -> Value {
                 .and_then(|v| v.as_str());
             let km = st.get("km").and_then(|v| v.as_f64());
             let uuid = st.get("uuid").and_then(|v| v.as_str());
-            // Wasserstand-Zeitreihe heraussuchen.
             let w = st
                 .get("timeseries")
                 .and_then(|t| t.as_array())
@@ -62,11 +58,9 @@ pub fn normalisiere_pegelonline(roh: &Value) -> Value {
     json!({ "type": "FeatureCollection", "features": features })
 }
 
-/// Kombiniert die NINA-`mapData`-Liste (Metadaten je `id`) mit den separat geladenen
-/// Einzel-Geometrien (`id` → GeoJSON-Value von `/warnings/{id}.geojson`) zu einer
-/// FeatureCollection. Jede Warnung kann mehrere Features (Polygone) tragen. Beschreibungs-
-/// texte liefert die NINA-`mapData`/`.geojson` nicht — daher Titel/Schwere/Dringlichkeit/
-/// Typ/Beginn aus den Metadaten (das volle CAP-`.json` bewusst nicht zusätzlich geladen).
+/// Kombiniert die NINA-`mapData`-Liste (Metadaten je `id`) mit den Einzel-Geometrien zu einer
+/// FeatureCollection; eine Warnung kann mehrere Polygone tragen. Titel/Schwere/Dringlichkeit/
+/// Typ/Beginn kommen aus den Metadaten, das volle CAP-`.json` wird nicht geladen.
 pub fn kombiniere_nina(map_data: &Value, geometrien: &[(String, Value)]) -> Value {
     use std::collections::HashMap;
     let meta: HashMap<&str, &Value> = map_data
@@ -88,8 +82,8 @@ pub fn kombiniere_nina(map_data: &Value, geometrien: &[(String, Value)]) -> Valu
     let mut features: Vec<Value> = Vec::new();
     for (id, geo) in geometrien {
         let info = meta.get(id.as_str());
-        // WICHTIG: serde_json sortiert Objekt-Schlüssel alphabetisch (BTreeMap), d. h.
-        // `values().next()` lieferte "ar" (Arabisch) vor "de". Daher gezielt Deutsch wählen.
+        // serde_json sortiert Objekt-Schlüssel alphabetisch; `values().next()` lieferte "ar" vor
+        // "de". Deshalb gezielt Deutsch wählen.
         let titel = info
             .and_then(|w| w.get("i18nTitle"))
             .and_then(|t| t.as_object())
@@ -128,17 +122,14 @@ pub fn kombiniere_nina(map_data: &Value, geometrien: &[(String, Value)]) -> Valu
 
 /// Hochwasserklasse des LHP als Wire-Wert.
 ///
-/// Die Klassenlehre stammt aus dem Portal selbst (`js/lage-basics.js`, Kopfkommentar von
-/// `getColorLagePegel`): `-1` keine Daten/veraltet · `0` kein Hochwasser · `1` kleines ·
-/// `2` mittleres · `3` großes · `4` sehr großes Hochwasser. `UNK = 1` kennzeichnet einen
-/// Pegel, der GAR KEINE Meldeklassen führt — ohne Daten (`HW = -1`) bleibt aber „keine
-/// Daten" die stärkere Aussage, sonst sähe ein veralteter Pegel aus wie ein bloß
-/// unklassifizierter.
+/// Klassen laut Portal (`js/lage-basics.js`, `getColorLagePegel`): `-1` keine Daten/veraltet ·
+/// `0` kein Hochwasser · `1`–`4` kleines bis sehr großes Hochwasser. `UNK = 1` heißt: der Pegel
+/// führt keine Meldeklassen; ohne Daten (`HW = -1`) bleibt aber „keine Daten“ die stärkere
+/// Aussage.
 ///
-/// Diese Zeichenketten sind der Wire-Vertrag zu `frontend/src/api/fachebenen.ts`
-/// (`HochwasserKlasse`) und dort byte-gepinnt. Sie stehen in KEINEM OpenAPI-Schema:
-/// Fachebenen-Properties sind `HashMap<String, Value>`, ein registriertes Enum wäre eine
-/// Waise, auf die nichts zeigt. Deshalb sind die Literale hier UND dort gepinnt.
+/// Die Zeichenketten sind Wire-Vertrag zu `frontend/src/api/fachebenen.ts` (`HochwasserKlasse`)
+/// und stehen in keinem OpenAPI-Schema (die Properties sind `HashMap<String, Value>`). Deshalb
+/// sind die Literale hier UND dort gepinnt.
 fn hochwasser_klasse(hw: Option<&str>, unklassifiziert: bool) -> &'static str {
     match hw {
         Some("-1") => "keine_daten",
@@ -153,12 +144,11 @@ fn hochwasser_klasse(hw: Option<&str>, unklassifiziert: bool) -> &'static str {
     }
 }
 
-/// LHP `get_lagepegel.php` (Struct-of-Arrays) → GeoJSON-Punkte je Pegel.
+/// LHP `get_lagepegel.php` → GeoJSON-Punkte je Pegel.
 ///
-/// Die Antwort ist KEINE Liste von Objekten, sondern sechs gleich lange Arrays
-/// (`PGNAME`/`PGNR`/`HW`/`UNK`/`LAT`/`LON`), die über den Index zusammengehören.
-/// LAT/LON kommen als Zeichenketten und werden hier zu Zahlen — ein String-Paar ist
-/// kein gültiges GeoJSON, und MapLibre zeichnet es kommentarlos nicht.
+/// Die Antwort sind sechs gleich lange Arrays (`PGNAME`/`PGNR`/`HW`/`UNK`/`LAT`/`LON`), die über
+/// den Index zusammengehören. LAT/LON kommen als Strings und werden zu Zahlen — einen
+/// String-Punkt zeichnet MapLibre kommentarlos nicht.
 pub fn normalisiere_hochwasser(roh: &Value) -> Value {
     let spalte = |name: &str| roh.get(name).and_then(|v| v.as_array());
     let (Some(pgnr), Some(lat), Some(lon)) = (spalte("PGNR"), spalte("LAT"), spalte("LON")) else {
@@ -167,8 +157,8 @@ pub fn normalisiere_hochwasser(roh: &Value) -> Value {
     let name = spalte("PGNAME");
     let hw = spalte("HW");
     let unk = spalte("UNK");
-    // Nur so weit laufen, wie ALLE Pflichtspalten reichen — eine verkürzte Spalte darf
-    // keine Zeile an die falschen Koordinaten heften.
+    // Nur so weit laufen, wie alle Pflichtspalten reichen, damit eine verkürzte Spalte keine Zeile
+    // an falsche Koordinaten heftet.
     let n = pgnr.len().min(lat.len()).min(lon.len());
     let zahl = |v: Option<&Value>| -> Option<f64> {
         match v? {
@@ -207,27 +197,21 @@ pub fn normalisiere_hochwasser(roh: &Value) -> Value {
     json!({ "type": "FeatureCollection", "features": features })
 }
 
-/// Obergrenze des natürlichen ODL-Bereichs in Deutschland laut BfS („zwischen 0,05 und
-/// 0,2 Mikrosievert pro Stunde", ODL-Info, Messwertinterpretation). Inklusiv.
+/// Obergrenze des natürlichen ODL-Bereichs in Deutschland laut BfS (0,05–0,2 µSv/h), inklusiv.
 const ODL_NATUERLICH_BIS: f64 = 0.2;
-/// 3 × Obergrenze. Angelehnt an den vom BfS genannten Faktor 3 — der dort aber
-/// STANDORTBEZOGEN gemeint ist, nicht absolut.
+/// 3 × Obergrenze, angelehnt an den BfS-Faktor 3 — der dort aber standortbezogen gemeint ist.
 const ODL_STARK_AB: f64 = 3.0 * ODL_NATUERLICH_BIS;
 /// Einheit, in der die Bänder gerechnet sind — und die die Quelle für jede Sonde führt.
 const ODL_EINHEIT: &str = "µSv/h";
 
-/// Absolute Bewertungsstufe einer ODL-Sonde als Wire-Wert (LFH-78) — seit LFH-598 der
-/// RÜCKFALL: liegt für die Sonde ein Standort-Grundpegel vor, überschreibt
-/// `karte::odl_grundpegel::bewerte` diese Stufe bei Auslieferung mit der relativen.
+/// Absolute Bewertungsstufe einer ODL-Sonde als Wire-Wert (LFH-78). Rückfall: liegt ein
+/// Standort-Grundpegel vor, überschreibt `karte::odl_grundpegel::bewerte` sie mit der
+/// relativen Stufe.
 ///
-/// DIE BÄNDER SIND EINE PROJEKT-EINTEILUNG, KEINE BfS-SCHWELLE. Das BfS veröffentlicht
-/// keinen absoluten Schwellenwert für „erhöht", sondern empfiehlt eine standortbezogene
-/// Bewertung. Die Bänder gelten, bis ein Grundpegel da ist (erster Start, zu wenig
-/// Historie). Entschieden mit dem Menschen am 21.09.2026; Herleitung in
-/// `docs/fachebenen-quellen.md`.
-///
-/// Die Zeichenketten sind der Wire-Vertrag zu `frontend/src/api/fachebenen.ts`
-/// (`OdlStufe`) und wie bei [`hochwasser_klasse`] auf BEIDEN Seiten gepinnt.
+/// Die Bänder sind eine Projekt-Einteilung, keine BfS-Schwelle; das BfS empfiehlt
+/// standortbezogene Bewertung. Herleitung in `docs/fachebenen-quellen.md`. Die Zeichenketten
+/// sind Wire-Vertrag zu `OdlStufe` in `frontend/src/api/fachebenen.ts`, auf beiden Seiten
+/// gepinnt.
 fn odl_stufe(wert: Option<f64>) -> &'static str {
     match wert {
         None => "keine_messung",
@@ -237,13 +221,12 @@ fn odl_stufe(wert: Option<f64>) -> &'static str {
     }
 }
 
-/// BfS-WFS `opendata:odlinfo_odl_1h_latest` (GeoJSON) → GeoJSON-Punkte je Sonde (LFH-78).
+/// BfS-WFS `opendata:odlinfo_odl_1h_latest` (GeoJSON, EPSG:4326) → GeoJSON-Punkte je Sonde,
+/// reduziert auf die gelesenen Felder.
 ///
-/// Die Quelle liefert bereits GeoJSON in EPSG:4326; normalisiert wird auf die gelesenen
-/// Felder (~890 KB → ~358 KB). Sonden OHNE Messwert (defekt, Testbetrieb) bleiben drin:
-/// eine ausgefallene Sonde ist in einer CBRN-Lage Information, kein Rauschen. Für sie
-/// fehlen `wert` und `messende` ganz, statt als `null` zu erscheinen — dieselbe
-/// Ehrlichkeit wie bei optionalen Response-Feldern (Norm ab LFH-265).
+/// Sonden ohne Messwert (defekt, Testbetrieb) bleiben drin — in einer CBRN-Lage ist eine
+/// ausgefallene Sonde Information. Für sie fehlen `wert` und `messende` ganz, statt `null` zu
+/// sein.
 pub fn normalisiere_odl(roh: &Value) -> Value {
     let features: Vec<Value> = roh
         .get("features")
@@ -263,9 +246,10 @@ pub fn normalisiere_odl(roh: &Value) -> Value {
                     };
                     let wert = p.and_then(|p| p.get("value")).and_then(|v| v.as_f64());
                     let einheit = text("unit").unwrap_or(ODL_EINHEIT);
-                    // Die Bänder sind in µSv/h gerechnet. Unter fremder Einheit wird NICHT
-                    // bewertet — sonst stünde nach einer Umstellung auf nSv/h jede Sonde auf
-                    // `stark_erhoeht`. Der Wert bleibt mit seiner Einheit sichtbar.
+                    // Die Bänder sind in µSv/h gerechnet; unter fremder Einheit wird nicht bewertet
+                    // (sonst stünde
+                    // nach einer Umstellung auf nSv/h jede Sonde auf `stark_erhoeht`). Der Wert
+                    // bleibt sichtbar.
                     let stufe = if einheit == ODL_EINHEIT {
                         odl_stufe(wert)
                     } else {
@@ -330,7 +314,7 @@ mod nina_tests {
 
     #[test]
     fn waehlt_deutschen_titel_trotz_alphabetischer_schluessel() {
-        // serde_json sortiert Keys alphabetisch → "ar" käme vor "de"; wir wollen Deutsch.
+        // serde_json sortiert Keys alphabetisch → "ar" käme vor "de".
         let map_data = json!([
             { "id": "abc", "i18nTitle": { "ar": "تحذير", "de": "Stromausfall", "en": "Power outage" } }
         ]);
@@ -349,10 +333,9 @@ mod nina_tests {
         assert_eq!(fc["features"].as_array().unwrap().len(), 0);
     }
 
-    /// LFH-265: Der Schema-Anker `GeoJsonFeatureCollection` muss die TATSÄCHLICH produzierte
-    /// Form beschreiben — sonst lügt `types.generated.ts` über die Fachebenen-Antwort.
-    /// Beleg per Deserialisierung des echten Normalisierer-Outputs (ein `to_value`-Roundtrip
-    /// über `FachebeneAntwort::ok` prüfte nur den Test-Eigeninput).
+    /// Der Schema-Anker `GeoJsonFeatureCollection` muss die tatsächlich produzierte Form
+    /// beschreiben, sonst lügt `types.generated.ts`. Belegt per Deserialisierung des echten
+    /// Normalisierer-Outputs.
     #[test]
     fn nina_output_passt_auf_den_geojson_anker() {
         let map_data = json!([
@@ -368,10 +351,9 @@ mod nina_tests {
     }
 }
 
-/// Tag-Paare, an denen ein OSM-Objekt als KRITIS-Objekt erkannt wird (LFH-83). Exakt die
-/// Auswahl der früheren Overpass-Query; `social_facility` zählt mit JEDEM Wert (`None`).
-/// Eine Quelle für Import-Filter und Kategorie — sonst könnte der Filter ein Objekt
-/// durchlassen, dem die Kategorie dann nur noch „kritis" zuordnen kann.
+/// Tag-Paare, an denen ein OSM-Objekt als KRITIS-Objekt erkannt wird (LFH-83);
+/// `social_facility` zählt mit jedem Wert (`None`). Eine Quelle für Import-Filter und Kategorie,
+/// damit kein Objekt durchkommt, dem keine Kategorie zugeordnet werden kann.
 pub const KRITIS_TAGS: [(&str, Option<&str>); 11] = [
     ("amenity", Some("hospital")),
     ("amenity", Some("clinic")),
@@ -386,18 +368,16 @@ pub const KRITIS_TAGS: [(&str, Option<&str>); 11] = [
     ("amenity", Some("police")),
 ];
 
-/// True, wenn das Tag-Paar eines der [`KRITIS_TAGS`] ist — der billige Vorfilter beim
-/// Lesen des Extrakts, bevor Tags in eine Map gesammelt werden.
+/// True, wenn das Tag-Paar eines der [`KRITIS_TAGS`] ist — billiger Vorfilter beim Lesen des
+/// Extrakts.
 pub fn ist_kritis_tag(k: &str, v: &str) -> bool {
     KRITIS_TAGS
         .iter()
         .any(|(tk, tv)| *tk == k && tv.is_none_or(|tv| tv == v))
 }
 
-/// OSM-Tags eines Objekts → flache KRITIS-Properties (`titel`, `kategorie`, `adresse`,
-/// `betreiber`, `telefon`, `website`, `notaufnahme`); `None`, wenn kein KRITIS-Tag
-/// gesetzt ist. Alles flache Skalare — MapLibre stringifiziert verschachtelte Objekte
-/// beim Query.
+/// OSM-Tags → flache KRITIS-Properties; `None` ohne KRITIS-Tag. Nur flache Skalare, weil
+/// MapLibre verschachtelte Objekte beim Query stringifiziert.
 pub fn kritis_properties<'a>(tag: impl Fn(&str) -> Option<&'a str>) -> Option<Value> {
     let kategorie = kritis_kategorie(&tag)?;
     let titel = tag("name").unwrap_or_else(|| kategorie_label(kategorie));
@@ -481,8 +461,8 @@ mod kritis_tests {
         kritis_properties(|k| m.get(k).map(String::as_str))
     }
 
-    /// Jede der elf Tag-Kombinationen der früheren Overpass-Query → ihre Kategorie. Die
-    /// Wörter sind Schnittstelle (Frontend `KATEGORIE_LABEL`) und hier wörtlich gepinnt.
+    /// Jede der elf Tag-Kombinationen → ihre Kategorie. Die Wörter sind Schnittstelle (Frontend
+    /// `KATEGORIE_LABEL`) und hier wörtlich gepinnt.
     #[test]
     fn jede_tag_kombination_hat_ihre_kategorie() {
         let erwartet = [
@@ -580,7 +560,7 @@ mod pegelonline_tests {
         assert_eq!(f["properties"]["wert"], 320.0);
         assert_eq!(f["properties"]["einheit"], "cm");
         assert_eq!(f["properties"]["zustand"], "hoch");
-        // LFH-606: die uuid geht additiv mit — Auswahlliste und Karten-Schnellweg brauchen sie.
+        // Die uuid geht mit — Auswahlliste und Karten-Schnellweg brauchen sie.
         assert_eq!(
             f["properties"]["uuid"],
             "a6ee8177-107b-47dd-bcfd-30960ccc6e9c"
@@ -604,7 +584,7 @@ mod pegelonline_tests {
         assert_eq!(fc["features"].as_array().unwrap().len(), 0);
     }
 
-    /// LFH-265: siehe `nina_output_passt_auf_den_geojson_anker`.
+    /// Siehe `nina_output_passt_auf_den_geojson_anker`.
     #[test]
     fn pegelonline_output_passt_auf_den_geojson_anker() {
         let roh = json!([
@@ -624,7 +604,7 @@ mod pegelonline_tests {
         .expect("Anker beschreibt die reale PEGELONLINE-Form");
     }
 
-    /// LFH-265: auch die Leer-Antwort (jede `FachebeneAntwort::offline`) muss auf den Anker passen.
+    /// Auch die Leer-Antwort (jede `FachebeneAntwort::offline`) muss auf den Anker passen.
     #[test]
     fn leere_collection_passt_auf_den_geojson_anker() {
         serde_json::from_value::<crate::karte::typen::GeoJsonFeatureCollection>(
@@ -638,8 +618,8 @@ mod pegelonline_tests {
 mod hochwasser_tests {
     use super::*;
 
-    /// Ausschnitt einer echten `get_lagepegel.php`-Antwort (abgerufen 20.09.2026):
-    /// Struct-of-Arrays, LAT/LON als Zeichenketten, `HW` teils `null`.
+    /// Ausschnitt einer echten `get_lagepegel.php`-Antwort: Struct-of-Arrays, LAT/LON als Strings,
+    /// `HW` teils `null`.
     fn roh() -> Value {
         json!({
             "PGNAME": ["Wittenberge / Elbe", "Wiesloch / Leimbach", "Hohensaaten West AP / Havel-Oder-Wasserstrasse"],
@@ -661,8 +641,7 @@ mod hochwasser_tests {
         assert_eq!(fc["features"].as_array().unwrap().len(), 3);
         let f = feature(&fc, 0);
         assert_eq!(f["geometry"]["type"], "Point");
-        // Koordinaten als ZAHLEN, nicht als Zeichenketten — GeoJSON verlangt das, und
-        // MapLibre zeichnet einen String-Punkt stillschweigend gar nicht.
+        // Koordinaten als Zahlen — einen String-Punkt zeichnet MapLibre stillschweigend nicht.
         assert_eq!(f["geometry"]["coordinates"], json!([11.7594, 52.9855]));
         assert_eq!(f["properties"]["titel"], "Wittenberge / Elbe");
         assert_eq!(f["properties"]["pgnr"], "BB_503050");
@@ -707,9 +686,7 @@ mod hochwasser_tests {
 
     #[test]
     fn unklassifizierter_pegel_ohne_daten_bleibt_keine_daten() {
-        // UNK=1 UND HW=-1 → „unklassifiziert, keine Daten/veraltet" (LHP-Klassenlehre).
-        // Die fehlenden Daten sind die stärkere Aussage; sonst sähe ein veralteter Pegel
-        // aus wie einer, der bloß keine Meldestufen führt.
+        // UNK=1 UND HW=-1 → „keine Daten“: die fehlenden Daten sind die stärkere Aussage.
         let fc = normalisiere_hochwasser(&roh());
         assert_eq!(feature(&fc, 2)["properties"]["klasse"], "keine_daten");
     }
@@ -731,9 +708,8 @@ mod hochwasser_tests {
 
     #[test]
     fn hochwasser_output_passt_auf_den_geojson_anker() {
-        // `typen.rs` verspricht für `GeoJsonFeatureCollection`, der Anker sei „belegt durch
-        // die `from_value`-Tests in `karte::normalisierung`" — jeder Normalisierer hält
-        // diesen Teil des Versprechens selbst.
+        // `typen.rs` verspricht, der Anker `GeoJsonFeatureCollection` sei durch die
+        // `from_value`-Tests hier belegt — jeder Normalisierer hält diesen Teil selbst.
         serde_json::from_value::<crate::karte::typen::GeoJsonFeatureCollection>(
             normalisiere_hochwasser(&roh()),
         )
@@ -750,9 +726,8 @@ mod hochwasser_tests {
 
 // ----------------------------------------------------------------------- AUTOBAHN
 
-/// Dienstpfad der Autobahn-API → Kategorie dieser Fachebene. Der Antwort-Schlüssel ist bei
-/// allen drei Diensten gleich dem Pfadsegment (`{"webcam":[…]}`, `{"roadworks":[…]}`,
-/// `{"closure":[…]}` — gemessen), deshalb trägt `dienst` beides.
+/// Dienstpfad der Autobahn-API → Kategorie. Der Antwort-Schlüssel ist bei allen drei Diensten
+/// gleich dem Pfadsegment (`{"webcam":[…]}` …), deshalb trägt `dienst` beides.
 fn autobahn_kategorie(dienst: &str) -> Option<&'static str> {
     match dienst {
         "webcam" => Some("webcam"),
@@ -771,9 +746,8 @@ fn autobahn_label(kategorie: &str) -> &'static str {
     }
 }
 
-/// Eine Koordinate der Autobahn-API. Sie kommt je nach Dienst als **Zahl** (gemessen bei
-/// `roadworks`/`closure`) oder als **String** (so das Beispiel der bundesAPI-Spec bei
-/// `webcam`) — beide Formen müssen tragen, sonst fällt ein ganzer Dienst still weg.
+/// Eine Koordinate der Autobahn-API kommt je nach Dienst als Zahl (`roadworks`/`closure`) oder
+/// als String (`webcam`); beide Formen müssen tragen, sonst fällt ein Dienst still weg.
 fn autobahn_zahl(v: Option<&Value>) -> Option<f64> {
     match v? {
         Value::Number(n) => n.as_f64(),
@@ -782,8 +756,8 @@ fn autobahn_zahl(v: Option<&Value>) -> Option<f64> {
     }
 }
 
-/// `description` ist ein Array von Zeilen mit Leerzeilen als Absatztrenner. Leere Zeilen
-/// fallen weg, der Rest wird zu einem Block; nichts Verwertbares → None.
+/// `description` ist ein Array von Zeilen mit Leerzeilen als Absatztrenner; leere Zeilen fallen
+/// weg, der Rest wird ein Block; nichts Verwertbares → None.
 fn autobahn_beschreibung(item: &Value) -> Option<String> {
     let zeilen: Vec<&str> = item
         .get("description")?
@@ -800,19 +774,15 @@ fn autobahn_beschreibung(item: &Value) -> Option<String> {
     }
 }
 
-/// Autobahn-App-API → GeoJSON-Punkte. Eingabe ist je Eintrag `(strasse, dienst, antwort)`,
-/// wobei `antwort` die rohe Dienst-Antwort ist (`{"<dienst>": [ … ]}`).
+/// Autobahn-App-API → GeoJSON-Punkte. Eingabe je Eintrag `(strasse, dienst, antwort)` mit der
+/// rohen Dienst-Antwort (`{"<dienst>": [ … ]}`).
 ///
-/// Zwei bewusste Verengungen, beide gemessen (LFH-80):
-/// * **`future == true` fällt weg.** Die API führt auch noch nicht begonnene Maßnahmen
-///   (3171 Baustellen gesamt gegen 1882 laufende am 20.09.2026). Für Anfahrt und
-///   Lageaufklärung zählt der Ist-Zustand; eine Baustelle in drei Wochen ist Rauschen.
-/// * **`isBlocked` wird NICHT übernommen.** Über alle 1950 laufenden Baustellen und
-///   Sperrungen stand es ausnahmslos auf `"false"` — das Feld trägt keine Information,
-///   und ein Merkmal, das immer „nein" sagt, führt am Einsatzplatz in die Irre.
-///
-/// Die **Geometrie der Quelle (`geometry`, LineString) wird bewusst verworfen**: der
-/// Ticket-Zuschnitt sind Punkte, und die Linienzüge verdreifachen die Nutzlast.
+/// Bewusste Verengungen (LFH-80):
+/// * **`future == true` fällt weg** — für Anfahrt und Lageaufklärung zählt der Ist-Zustand.
+/// * **`isBlocked` wird nicht übernommen** — es steht bei laufenden Maßnahmen ausnahmslos auf
+///   `"false"`, und ein Merkmal, das immer „nein“ sagt, führt am Einsatzplatz in die Irre.
+/// * **Die LineString-Geometrie wird verworfen** — der Zuschnitt sind Punkte, und die Linien
+///   verdreifachten die Nutzlast.
 pub fn normalisiere_autobahn(roh: &[(String, String, Value)]) -> Value {
     let mut features: Vec<Value> = Vec::new();
     for (strasse, dienst, antwort) in roh {
@@ -920,8 +890,8 @@ mod autobahn_tests {
         assert_eq!(k, vec!["sperrung", "webcam"]);
     }
 
-    /// Die Bild-URL der Webcam ist der Zweck dieser Ebene (LFH-80) — sie muss als Property
-    /// ankommen, samt Betreiber und Videolink.
+    /// Die Bild-URL der Webcam ist der Zweck dieser Ebene und muss samt Betreiber und Videolink
+    /// ankommen.
     #[test]
     fn webcam_traegt_bild_link_und_betreiber() {
         let roh = [dienst(
@@ -944,9 +914,9 @@ mod autobahn_tests {
         assert_eq!(p["betreiber"], "NRW");
     }
 
-    /// Gemessene Falle: `coordinate` kommt bei `roadworks`/`closure` als ZAHL, im
-    /// Spec-Beispiel der Webcams als STRING. Trägt nur eine Form, fällt ein ganzer Dienst
-    /// still weg — ohne Fehler, ohne roten Test, nur ohne Features.
+    /// `coordinate` kommt bei `roadworks`/`closure` als Zahl, bei Webcams als String. Trägt nur
+    /// eine
+    /// Form, fällt ein ganzer Dienst still weg.
     #[test]
     fn koordinate_traegt_als_zahl_und_als_string() {
         let als_zahl = [dienst(
@@ -979,9 +949,8 @@ mod autobahn_tests {
         assert_eq!(fc["features"][0]["properties"]["titel"], "läuft");
     }
 
-    /// `isBlocked` stand über alle 1950 gemessenen laufenden Einträge auf `"false"` — ein
-    /// Merkmal ohne Information gehört nicht in die Karte. Die Gegenaussage ist die
-    /// schärfere: sie fällt auf, wenn jemand das Feld „der Vollständigkeit halber" nachzieht.
+    /// `isBlocked` trägt keine Information und gehört nicht in die Karte. Fällt auf, wenn jemand
+    /// das Feld „der Vollständigkeit halber“ nachzieht.
     #[test]
     fn is_blocked_wird_nicht_uebernommen() {
         let roh = [dienst(
@@ -1032,7 +1001,7 @@ mod autobahn_tests {
         );
     }
 
-    /// LFH-265: siehe `nina_output_passt_auf_den_geojson_anker`.
+    /// Siehe `nina_output_passt_auf_den_geojson_anker`.
     #[test]
     fn autobahn_output_passt_auf_den_geojson_anker() {
         let roh = [dienst(
@@ -1054,9 +1023,8 @@ mod autobahn_tests {
 mod odl_tests {
     use super::*;
 
-    /// Ausschnitt einer echten `odlinfo_odl_1h_latest`-Antwort (abgerufen 21.09.2026), auf
-    /// die gelesenen Felder gekürzt: eine Sonde in Betrieb, eine defekte und eine im
-    /// Testbetrieb — die beiden letzten gemessen OHNE Wert und ohne Messende.
+    /// Ausschnitt einer echten `odlinfo_odl_1h_latest`-Antwort, auf die gelesenen Felder gekürzt:
+    /// eine Sonde in Betrieb, eine defekte und eine im Testbetrieb (beide ohne Wert und Messende).
     fn roh() -> Value {
         json!({
             "type": "FeatureCollection",
@@ -1130,16 +1098,15 @@ mod odl_tests {
 
     #[test]
     fn sonde_ohne_messwert_bleibt_mit_eigener_stufe() {
-        // Eine ausgefallene Sonde ist in einer CBRN-Lage eine Lücke im Lagebild — sie
-        // wird nicht verworfen, sondern als „keine Messung" gezeigt.
+        // Eine ausgefallene Sonde wird nicht verworfen, sondern als „keine Messung“ gezeigt.
         let fc = normalisiere_odl(&roh());
         for (i, betrieb) in [(1, "defekt"), (2, "Testbetrieb")] {
             let p = &fc["features"][i]["properties"];
             assert_eq!(p["stufe"], "keine_messung");
             assert_eq!(p["betrieb"], betrieb);
             let o = p.as_object().unwrap();
-            // Presence statt `== Null`: ein fehlender Key und `null` sind beim
-            // Index-Zugriff nicht unterscheidbar (CLAUDE.md, Typ-Codegen-Testfalle).
+            // Presence statt `== Null`: fehlender Key und `null` sind beim Index-Zugriff nicht
+            // unterscheidbar.
             assert!(!o.contains_key("wert"), "kein erfundener Messwert");
             assert!(!o.contains_key("messende"));
         }
@@ -1147,8 +1114,8 @@ mod odl_tests {
 
     #[test]
     fn baender_pinnen_die_wire_woerter_und_grenzen() {
-        // Die Wörter sind der Vertrag zu `frontend/src/api/fachebenen.ts` (`OdlStufe`) und
-        // stehen in keinem OpenAPI-Schema — deshalb hier wörtlich.
+        // Die Wörter sind der Vertrag zu `OdlStufe` im Frontend und stehen in keinem
+        // OpenAPI-Schema.
         assert_eq!(stufe_zu(json!(0.042)), "normal");
         assert_eq!(stufe_zu(json!(0.2)), "normal"); // BfS: „zwischen 0,05 und 0,2"
         assert_eq!(stufe_zu(json!(0.21)), "erhoeht");
@@ -1170,21 +1137,21 @@ mod odl_tests {
 
     #[test]
     fn fremde_einheit_wird_nicht_bewertet() {
-        // Die Bänder sind µSv/h. Stellte die Quelle auf nSv/h um, stünde sonst jede Sonde
-        // bundesweit auf `stark_erhoeht` — in einer CBRN-Lage der schlimmste Fehlalarm.
+        // Die Bänder sind µSv/h. Nach einer Umstellung der Quelle auf nSv/h stünde sonst jede Sonde
+        // auf `stark_erhoeht`.
         let mut f = sonde(json!(115.0));
         f["properties"]["unit"] = json!("nSv/h");
         let fc = normalisiere_odl(&json!({ "features": [f] }));
         let p = &fc["features"][0]["properties"];
         assert_eq!(p["stufe"], "keine_messung");
-        // Der Wert bleibt mit SEINER Einheit sichtbar — verworfen wird nur die Bewertung.
+        // Der Wert bleibt mit seiner Einheit sichtbar, verworfen wird nur die Bewertung.
         assert_eq!(p["wert"], 115.0);
         assert_eq!(p["einheit"], "nSv/h");
     }
 
     #[test]
     fn fehlende_einheit_gilt_als_mikrosievert() {
-        // Beobachtet trägt jede Sonde `unit`; fehlt es, ist µSv/h die dokumentierte Einheit.
+        // Fehlt `unit`, ist µSv/h die dokumentierte Einheit.
         let fc = normalisiere_odl(&json!({ "features": [sonde(json!(0.7))] }));
         assert_eq!(fc["features"][0]["properties"]["stufe"], "stark_erhoeht");
         assert_eq!(fc["features"][0]["properties"]["einheit"], "µSv/h");
@@ -1214,18 +1181,16 @@ mod odl_tests {
 
 // ------------------------------------------------------------ ENERGIE (LFH-81)
 //
-// Hybride Fachebene „Energieanlagen": OSM `power=plant` für die Standorte (auch die
-// konventionellen Kraftwerke, die das Marktstammdatenregister ohne Koordinaten führt) und
-// der bundesweite MaStR-Abzug der Einheiten über 10 MW. Beide Teile werden hier zu Punkten
-// mit denselben flachen Properties normalisiert und bei der Anfrage zusammengeführt.
-// Herleitung: `openspec/changes/lfh-81-fachebene-energie/design.md`.
+// Hybride Fachebene „Energieanlagen“: OSM `power=plant` für die Standorte (auch
+// konventionelle Kraftwerke, die das MaStR ohne Koordinaten führt) und der bundesweite
+// MaStR-Abzug der Einheiten über 10 MW, beide zu Punkten mit denselben flachen Properties
+// normalisiert. Herleitung: `openspec/changes/lfh-81-fachebene-energie/design.md`.
 
 use crate::karte::typen::Bbox;
 
 /// Schwelle des Rauschfilters für nicht-konventionelle OSM-Anlagen: **mindestens** 10 MW.
-/// Bewusst NICHT dieselbe Vergleichsart wie beim MaStR-Abruf (`~gt~10000`, also strikt
-/// **über** 10 MW, beim Upstream gefiltert) — die Spec legt beide Grenzen getrennt fest, und
-/// eine Anlage mit genau 10 MW aus OSM ist drin, eine MaStR-Einheit mit genau 10 000 kW nicht.
+/// Anders als beim MaStR-Abruf (`~gt~10000`, strikt über 10 MW) — die Spec legt beide Grenzen
+/// getrennt fest.
 pub(crate) const ENERGIE_OSM_MIN_MW: f64 = 10.0;
 
 /// Anlagenart aus dem MaStR-Feld `EnergietraegerName`. Unbekanntes → `sonstige`.
@@ -1245,17 +1210,17 @@ pub(crate) fn anlagenart_mastr(energietraeger: &str) -> &'static str {
     }
 }
 
-/// Anlagenart aus OSM `plant:source`. Mehrfachwerte (`biogas;solar`) zählen mit dem ERSTEN
-/// Wert. `None` heißt „keine Quellenangabe" (für den Rauschfilter), ein unbekannter Wert
-/// ergibt `sonstige`.
+/// Anlagenart aus OSM `plant:source`; bei Mehrfachwerten (`biogas;solar`) zählt der erste.
+/// `None` heißt „keine Quellenangabe“, ein unbekannter Wert ergibt `sonstige`.
 pub(crate) fn anlagenart_osm(plant_source: Option<&str>) -> Option<&'static str> {
     let erster = plant_source?.split(';').next()?.trim().to_lowercase();
     let art = match erster.as_str() {
         "" => return None,
         "coal" | "lignite" => "kohle",
         "gas" => "gas",
-        // Bewusst Biomasse, nicht Gas: Biogasanlagen gibt es zu Tausenden im Kleinformat,
-        // als „konventionell" gezählt kämen sie ohne Leistungsschwelle durch.
+        // Biomasse, nicht Gas: Biogasanlagen gibt es zu Tausenden im Kleinformat, als
+        // „konventionell“
+        // kämen sie ohne Leistungsschwelle durch.
         "biogas" | "biomass" => "biomasse",
         "oil" => "oel",
         "nuclear" => "kern",
@@ -1291,8 +1256,7 @@ fn anlagenart_label(anlagenart: &str) -> &'static str {
     }
 }
 
-/// Rundet auf drei Nachkommastellen (1 kW) — Summen aus Kilowatt-Angaben tragen sonst
-/// Gleitkomma-Rauschen wie `53.49999999`.
+/// Rundet auf 1 kW, gegen Gleitkomma-Rauschen aus Kilowatt-Summen.
 fn runde_mw(mw: f64) -> f64 {
     (mw * 1000.0).round() / 1000.0
 }
@@ -1308,8 +1272,9 @@ pub(crate) fn lies_leistung_mw(roh: &str) -> Option<f64> {
         "kw" => 0.001,
         "mw" => 1.0,
         "gw" => 1000.0,
-        // Ohne Einheit ist eine Zahl nicht eindeutig; alles andere (`yes`, `~50`,
-        // `12,1 MW`, `5 MW;3 MW`) auch nicht. Eine geschätzte Zahl erscheint nie als Messwert.
+        // Ohne Einheit ist eine Zahl nicht eindeutig, `yes`, `~50`, `12,1 MW`, `5 MW;3 MW` auch
+        // nicht.
+        // Eine geschätzte Zahl erscheint nie als Messwert.
         _ => return None,
     };
     let wert: f64 = zahl.parse().ok()?;
@@ -1318,12 +1283,10 @@ pub(crate) fn lies_leistung_mw(roh: &str) -> Option<f64> {
 
 /// Overpass-JSON (`power=plant`) → FeatureCollection mit Rauschfilter.
 ///
-/// Konventionelle Anlagen bleiben immer. Andere fallen weg, wenn ihre getaggte Leistung
-/// unter [`ENERGIE_OSM_MIN_MW`] liegt; ohne auswertbare Leistung bleiben sie als
-/// **Kandidat** stehen (`leistung_mw: null`) — trifft sie bei der Zusammenführung eine
-/// MaStR-Einheit, trägt die die Leistung, sonst fällt sie dort heraus. Ohne Quellenangabe
-/// UND ohne Leistung fällt eine Anlage gleich hier weg. Nur `power=plant` zählt; ein
-/// Umspannwerk gehört zur KRITIS-Ebene, ein `generator` ist ein Einzelaggregat.
+/// Konventionelle Anlagen bleiben immer. Andere fallen unter [`ENERGIE_OSM_MIN_MW`] weg; ohne
+/// auswertbare Leistung bleiben sie als **Kandidat** (`leistung_mw: null`), den erst eine
+/// MaStR-Einheit bei der Zusammenführung trägt. Ohne Quellenangabe UND ohne Leistung fällt eine
+/// Anlage gleich weg. Umspannwerke gehören zur KRITIS-Ebene, `generator` sind Einzelaggregate.
 pub fn normalisiere_energie_osm(roh: &Value) -> Value {
     let elemente = roh
         .get("elements")
@@ -1351,8 +1314,9 @@ pub fn normalisiere_energie_osm(roh: &Value) -> Value {
             let leistung = g("plant:output:electricity").and_then(lies_leistung_mw);
             let art = match (art, leistung) {
                 (None, None) => return None,
-                // Pumpspeicher führt MaStR unter „Speicher"; gleiche Art ist die Bedingung der
-                // Zusammenführung, sonst stünde das Werk neben seinen eigenen Turbinen.
+                // Pumpspeicher führt MaStR unter „Speicher“; gleiche Art ist Bedingung der
+                // Zusammenführung,
+                // sonst stünde das Werk neben seinen eigenen Turbinen.
                 (Some("wasser"), _) if g("plant:method") == Some("water-pumped-storage") => {
                     "speicher"
                 }
@@ -1403,10 +1367,9 @@ fn punkt_koordinate(f: &Value) -> Option<(f64, f64)> {
 
 /// MaStR-Antwort (`{"Total":n,"Data":[…]}`) → Punkte.
 ///
-/// Fehlt die `Data`-Liste oder ist sie keine Liste, ist das ein `Err` und **keine** leere
-/// Collection: die Filterfelder des Endpunkts sind Anzeigenamen des Portals und können sich
-/// still ändern, und ein Leerstand sähe aus wie „keine Großanlagen in Deutschland".
-/// Einheiten ohne Koordinate werden übersprungen (der Upstream-Filter sortiert sie schon aus).
+/// Fehlt die `Data`-Liste, ist das ein `Err`, keine leere Collection: die Filterfelder sind
+/// Anzeigenamen des Portals und können sich still ändern, und ein Leerstand sähe aus wie „keine
+/// Großanlagen in Deutschland“. Einheiten ohne Koordinate werden übersprungen.
 pub fn normalisiere_energie_mastr(roh: &Value) -> Result<Vec<Value>, String> {
     let daten = roh
         .get("Data")
@@ -1458,41 +1421,33 @@ pub fn normalisiere_energie_mastr(roh: &Value) -> Result<Vec<Value>, String> {
         .collect())
 }
 
-/// Rand der OSM-Abfrage in Vielfachen des Zuordnungsradius (siehe [`fuehre_energie_zusammen`]).
-/// `quellen::erneuere_energie_osm` fragt Overpass auf die um diesen Rand erweiterte bbox.
+/// Rand der OSM-Abfrage in Vielfachen des Zuordnungsradius (s. [`fuehre_energie_zusammen`]).
 pub const ENERGIE_OSM_RAND_RADIEN: f64 = 3.0;
 /// Rand der MaStR-Einheiten, die in die Zuordnung eingehen, in Vielfachen des Radius.
 const ENERGIE_MASTR_RAND_RADIEN: f64 = 2.0;
 
 /// Führt die OSM- und MaStR-Punkte für einen Ausschnitt zusammen.
 ///
-/// Jede MaStR-Einheit geht an die **nächste** OSM-Anlage **gleicher** Anlagenart im Umkreis
-/// von `radius_m`; mehrere Einheiten an einer Anlage summieren ihre Leistung, geführt werden
-/// Nummer, Id, Betreiber und Status der größten, `mastr_nummern` nennt alle. Der Punkt
-/// bleibt am OSM-Standort (die OSM-Mitte trifft die Anlage besser als der Einheitenpunkt),
-/// die Herkunft wird `osm+mastr`. Übrige MaStR-Einheiten erscheinen als eigene Punkte. Eine
-/// nicht-konventionelle OSM-Anlage ohne Leistung (Kandidat aus
-/// [`normalisiere_energie_osm`]) erscheint nur mit Treffer.
+/// Jede MaStR-Einheit geht an die **nächste** OSM-Anlage **gleicher** Art im Umkreis
+/// `radius_m`; mehrere Einheiten summieren ihre Leistung, Nummer/Id/Betreiber/Status kommen von
+/// der größten, `mastr_nummern` nennt alle. Der Punkt bleibt am OSM-Standort, die Herkunft wird
+/// `osm+mastr`. Übrige Einheiten erscheinen als eigene Punkte; ein OSM-Kandidat ohne Leistung
+/// nur mit Treffer.
 ///
-/// **Der Abgleich läuft über einen erweiterten Rand, nicht über den Ausschnitt** (Review-
-/// Befund zu LFH-81). Beschnitte man beide Seiten vorher auf die bbox, entstünde an der
-/// Kante eine Doppelung: die Einheit liegt drin, ihre OSM-Anlage 1 km weiter draußen → im
-/// einen Ausschnitt ein eigener `mastr`-Punkt, im Nachbarausschnitt ein `osm+mastr`-Punkt,
-/// und das Frontend sammelt beim Verschieben beide auf. Der Rand ist so gewählt, dass die
-/// Antwort für jeden ausgegebenen Punkt dieselbe ist wie in jedem anderen Ausschnitt:
+/// **Abgeglichen wird über einen erweiterten Rand, nicht über den Ausschnitt.** Sonst entstünde
+/// an der Kante eine Doppelung (links ein `mastr`-Punkt, rechts ein `osm+mastr`-Punkt), die das
+/// Frontend beim Verschieben aufsammelt. Der Rand macht die Antwort für jeden ausgegebenen Punkt
+/// in jedem Ausschnitt gleich:
 ///
-/// - ausgegeben wird eine OSM-Anlage, wenn sie selbst im Ausschnitt liegt ODER eine ihr
-///   zugeordnete Einheit — sie liegt also höchstens `r` vor der Kante;
-/// - deren Einheiten liegen höchstens `r` von ihr, also höchstens `2 r` vor der Kante;
-/// - wohin eine solche Einheit gehört, entscheidet die nächste Anlage in `r` um sie, also
-///   bis `3 r` vor der Kante.
+/// - ausgegeben wird eine OSM-Anlage, wenn sie selbst oder eine zugeordnete Einheit im
+///   Ausschnitt liegt — also höchstens `r` vor der Kante;
+/// - deren Einheiten liegen höchstens `2 r` vor der Kante;
+/// - ihre Zuordnung entscheidet die nächste Anlage in `r` um sie, also bis `3 r`.
 ///
-/// Deshalb gehen Einheiten aus `2 r` und OSM-Anlagen aus `3 r` in den Abgleich
-/// ([`ENERGIE_OSM_RAND_RADIEN`] trägt die Overpass-Abfrage mit). Ein Rand von nur `r`
-/// verschöbe die Abweichung eine Stufe nach außen: dann zählte dieselbe Anlage in zwei
-/// Nachbarausschnitten verschieden viele Einheiten. Ein reiner `mastr`-Punkt erscheint,
-/// wenn die Einheit im Ausschnitt liegt. Der Punkt einer zusammengeführten Anlage kann
-/// damit bis `r` außerhalb der bbox stehen — das ist gewollt, er ist derselbe wie nebenan.
+/// Deshalb gehen Einheiten aus `2 r` und OSM-Anlagen aus `3 r` ein
+/// ([`ENERGIE_OSM_RAND_RADIEN`] trägt die Overpass-Abfrage mit). Ein reiner `mastr`-Punkt
+/// erscheint, wenn die Einheit im Ausschnitt liegt; der Punkt einer zusammengeführten Anlage kann
+/// bis `r` außerhalb der bbox stehen — gewollt, er ist derselbe wie nebenan.
 pub fn fuehre_energie_zusammen(
     osm: &[Value],
     mastr: &[Value],
@@ -1543,8 +1498,7 @@ pub fn fuehre_energie_zusammen(
             Some((i, _)) => zugeordnet[i].push(m),
             None if im_ausschnitt(&m) => {
                 let mut f = m.clone();
-                // Aus dem Einzelwert gebildet statt aus dem Normalisierer gelesen: ein
-                // Cache-Stand von vor dem Feld trägt es nicht.
+                // Aus dem Einzelwert gebildet: ein älterer Cache-Stand trägt das Feld nicht.
                 f["properties"]["mastr_nummern"] = json!(nummer(m));
                 ergebnis.push(f);
             }
@@ -1573,8 +1527,9 @@ pub fn fuehre_energie_zusammen(
             .iter()
             .filter_map(|e| mw(e))
             .fold(None, |acc, x| Some(acc.unwrap_or(0.0) + x));
-        // Lexikographisch über die Zeichenketten (`SEE…`), nicht numerisch — die Reihenfolge
-        // ist damit unabhängig von der Reihenfolge des Abzugs und in jedem Ausschnitt gleich.
+        // Lexikographisch sortiert, damit die Reihenfolge unabhängig vom Abzug und in jedem
+        // Ausschnitt
+        // gleich ist.
         let mut nummern: Vec<String> = einheiten.iter().filter_map(|e| nummer(e)).collect();
         nummern.sort();
         let gp = &groesste["properties"];
@@ -1600,11 +1555,8 @@ pub fn fuehre_energie_zusammen(
     osm_punkte
 }
 
-/// Quellennennung aus den tatsächlich beitragenden Teilen.
-///
-/// Genannt wird nur, was zu den ausgelieferten Punkten beiträgt (Spec „Korrekte
-/// Quellennennung": MUST NOT eine Quelle nennen, die nichts beiträgt). Ohne Beitrag bleibt
-/// die Zeile leer — dann ist auch nichts eingezeichnet.
+/// Quellennennung aus den tatsächlich beitragenden Teilen; eine Quelle ohne Beitrag wird nicht
+/// genannt.
 pub fn energie_attribution(osm_traegt_bei: bool, mastr_traegt_bei: bool) -> String {
     let mut teile = Vec::new();
     if osm_traegt_bei {
@@ -1618,9 +1570,8 @@ pub fn energie_attribution(osm_traegt_bei: bool, mastr_traegt_bei: bool) -> Stri
 
 /// OSM-Nennung (ODbL), wortgleich mit der KRITIS-Ebene.
 pub const ENERGIE_OSM_ATTRIB: &str = "© OpenStreetMap-Beitragende (ODbL)";
-/// MaStR-Nennung nach §2 dl-de/by-2-0, Bereitsteller laut Impressum des Portals. Den Link
-/// auf die Lizenz und den Datensatz tragen `docs/fachebenen-quellen.md` und der Inspector —
-/// die Attributionszeile der Karte ist Klartext.
+/// MaStR-Nennung nach §2 dl-de/by-2-0. Lizenz- und Datensatz-Link tragen
+/// `docs/fachebenen-quellen.md` und der Inspector.
 pub const ENERGIE_MASTR_ATTRIB: &str = "Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0";
 
 /// Trägt eine Herkunft zum OSM- bzw. MaStR-Teil bei? Liefert `(osm, mastr)`.
@@ -1680,7 +1631,7 @@ mod energie_tests {
             } })
     }
 
-    // ---- 1.2 Anlagenart
+    // ---- Anlagenart
 
     #[test]
     fn anlagenart_aus_mastr_energietraeger() {
@@ -1722,7 +1673,7 @@ mod energie_tests {
             ("solar", "solar"),
             ("biomass", "biomasse"),
             ("battery", "speicher"),
-            // Mehrfachwert: der ERSTE zählt, und Biogas ist Biomasse, nicht Gas.
+            // Mehrfachwert: der erste zählt, und Biogas ist Biomasse.
             ("biogas;solar", "biomasse"),
             ("gas; oil", "gas"),
             ("geothermal", "sonstige"),
@@ -1745,7 +1696,7 @@ mod energie_tests {
         }
     }
 
-    // ---- 1.3 Leistungsleser
+    // ---- Leistungsleser
 
     #[test]
     fn leistung_wird_tolerant_gelesen() {
@@ -1773,7 +1724,7 @@ mod energie_tests {
         }
     }
 
-    // ---- 1.4 OSM-Normalisierer mit Rauschfilter
+    // ---- OSM-Normalisierer mit Rauschfilter
 
     #[test]
     fn kleine_solaranlage_erscheint_nicht() {
@@ -1819,8 +1770,7 @@ mod energie_tests {
         assert_eq!(fs[0]["properties"]["leistung_mw"], json!(690.0));
     }
 
-    /// Die OSM-Grenze ist „mindestens 10 MW" (≥), anders als MaStR (> 10 MW, beim
-    /// Upstream). Eine spätere Vereinheitlichung auf eine Vergleichsart färbt das rot.
+    /// Die OSM-Grenze ist „mindestens 10 MW“ (≥), anders als MaStR (> 10 MW).
     #[test]
     fn osm_grenze_ist_mindestens_zehn_mw() {
         assert_eq!(
@@ -1838,9 +1788,8 @@ mod energie_tests {
         .is_empty());
     }
 
-    /// Erneuerbare ohne Leistung bleiben im OSM-Teil als KANDIDAT stehen: trifft sie eine
-    /// MaStR-Einheit, trägt die die Leistung (design.md, Risiken). Ohne Treffer fällt sie
-    /// erst bei der Zusammenführung heraus (siehe `fuehre_*`-Tests).
+    /// Erneuerbare ohne Leistung bleiben im OSM-Teil als Kandidat stehen; ohne Treffer fallen sie
+    /// erst bei der Zusammenführung heraus.
     #[test]
     fn erneuerbare_ohne_leistung_bleibt_kandidat() {
         let fs = features(&normalisiere_energie_osm(&anlage(
@@ -1851,9 +1800,9 @@ mod energie_tests {
         assert_eq!(fs[0]["properties"]["leistung_mw"], Value::Null);
     }
 
-    /// MaStR führt Pumpspeicher unter „Speicher", OSM als `plant:source=hydro` mit
-    /// `plant:method=water-pumped-storage`. Ohne Angleichung stünde ein Pumpspeicherwerk
-    /// neben seinen eigenen Turbinen (live gemessen am PSW Happurg: fünf Punkte statt einem).
+    /// MaStR führt Pumpspeicher unter „Speicher“, OSM als `hydro` mit
+    /// `plant:method=water-pumped-storage`. Ohne Angleichung stünde ein Pumpspeicherwerk neben
+    /// seinen eigenen Turbinen.
     #[test]
     fn pumpspeicher_ist_speicher_wie_im_mastr() {
         let roh = json!({ "elements": [ { "type": "way", "id": 1,
@@ -1916,7 +1865,7 @@ mod energie_tests {
         assert_eq!(fs[0]["properties"]["betreiber"], "Stadtwerke");
     }
 
-    /// LFH-265: siehe `nina_output_passt_auf_den_geojson_anker`.
+    /// Siehe `nina_output_passt_auf_den_geojson_anker`.
     #[test]
     fn energie_osm_output_passt_auf_den_geojson_anker() {
         let roh: Value = serde_json::from_str(OVERPASS_RUHR).unwrap();
@@ -1926,9 +1875,8 @@ mod energie_tests {
         .expect("Anker beschreibt die reale Energie-Form");
     }
 
-    /// Echter Overpass-Abzug (Ruhrgebiet, 21.09.2026, 30 Objekte, auf die gelesenen Tags
-    /// gekürzt), durch Normalisierer UND Zusammenführung ohne MaStR-Teil: die zwei großen
-    /// Kraftwerke stehen drin, keine PV-Kleinanlage und keine Biogasanlage ohne Leistung.
+    /// Echter Overpass-Abzug (Ruhrgebiet, auf die gelesenen Tags gekürzt), ohne MaStR-Teil: die
+    /// großen Kraftwerke stehen drin, keine PV-Kleinanlage und keine Biogasanlage ohne Leistung.
     #[test]
     fn echter_ruhr_abzug_zeigt_grosskraftwerke_und_keine_kleinanlagen() {
         let roh: Value = serde_json::from_str(OVERPASS_RUHR).unwrap();
@@ -1967,7 +1915,7 @@ mod energie_tests {
         assert_eq!(scholven["properties"]["betreiber"], "Uniper Kraftwerke");
     }
 
-    // ---- 1.5 MaStR-Normalisierer
+    // ---- MaStR-Normalisierer
 
     #[test]
     fn mastr_auszug_wird_zu_punkten() {
@@ -2018,8 +1966,7 @@ mod energie_tests {
         assert!(normalisiere_energie_mastr(&roh).unwrap().is_empty());
     }
 
-    /// Eine Antwort ohne `Data`-Liste ist ein FEHLSCHLAG, kein Leerstand — ein Leerstand
-    /// sähe aus wie „keine Großanlagen in Deutschland", und niemand würde misstrauisch.
+    /// Eine Antwort ohne `Data`-Liste ist ein Fehlschlag, kein Leerstand.
     #[test]
     fn mastr_formfehler_ist_err_und_keine_leere_collection() {
         assert!(normalisiere_energie_mastr(&json!({ "Total": 0 })).is_err());
@@ -2038,7 +1985,7 @@ mod energie_tests {
         .expect("Anker beschreibt die reale MaStR-Form");
     }
 
-    // ---- 1.6 Zusammenführung und bbox
+    // ---- Zusammenführung und bbox
 
     fn bbox() -> Bbox {
         Bbox::parse("6.5,51.0,7.5,52.0").unwrap()
@@ -2137,9 +2084,9 @@ mod energie_tests {
 
     #[test]
     fn nur_anlagen_im_ausschnitt() {
-        // Je Quelle ein Punkt drin, einer draußen: der OSM-Teil ist auf einen Rand um die
-        // bbox abgefragt und ragt über sie hinaus. Eine Anlage dort ohne zugeordnete Einheit
-        // im Ausschnitt erscheint nicht.
+        // Je Quelle ein Punkt drin, einer draußen. Eine OSM-Anlage im Rand ohne zugeordnete Einheit
+        // im
+        // Ausschnitt erscheint nicht.
         let osm = vec![
             punkt(7.0, 51.5, "gas", None, "osm"),
             punkt(7.504, 51.5, "gas", None, "osm"),
@@ -2158,7 +2105,7 @@ mod energie_tests {
         assert!(koord.contains(&json!([6.8, 51.2])));
     }
 
-    // ---- Rand des Ausschnitts (Review-Befund 2)
+    // ---- Rand des Ausschnitts
 
     /// Zwei Nachbarausschnitte mit gemeinsamer Kante bei 7,0° O, 51,25° N.
     fn nachbarn() -> (Bbox, Bbox) {
@@ -2168,10 +2115,8 @@ mod energie_tests {
         )
     }
 
-    /// Die MaStR-Einheit liegt im linken Ausschnitt, ihre OSM-Anlage (~1 km entfernt) im
-    /// rechten. Vorher entstand links ein eigener `mastr`-Punkt, rechts ein `osm`-Punkt —
-    /// nach dem Verschieben der Karte standen beide auf ihr. Jetzt liefern beide
-    /// Ausschnitte denselben einen `osm+mastr`-Punkt am OSM-Standort.
+    /// Die MaStR-Einheit liegt links, ihre OSM-Anlage (~1 km) rechts: beide Ausschnitte liefern
+    /// denselben einen `osm+mastr`-Punkt am OSM-Standort.
     #[test]
     fn randanlage_ergibt_in_beiden_nachbarausschnitten_denselben_punkt() {
         let (links, rechts) = nachbarn();
@@ -2185,8 +2130,8 @@ mod energie_tests {
         assert_eq!(l, r);
     }
 
-    /// Die Randanlage summiert in beiden Ausschnitten dieselben Einheiten: `u2` liegt ~2,4 km
-    /// hinter der Kante (außerhalb eines Randes von nur einem Radius), gehört aber zu `o`.
+    /// Die Randanlage summiert in beiden Ausschnitten dieselben Einheiten, auch `u2` ~2,4 km hinter
+    /// der Kante.
     #[test]
     fn randanlage_summiert_in_beiden_ausschnitten_dieselben_einheiten() {
         let (links, rechts) = nachbarn();
@@ -2203,12 +2148,9 @@ mod energie_tests {
         assert_eq!(l, r);
     }
 
-    /// Die zweite Stufe desselben Randfalls: die OSM-Anlage `o` (rechts) bekommt ihre
-    /// Einheit `u1` aus dem linken Ausschnitt; eine zweite Einheit `u2` liegt zwar im
-    /// Radius von `o`, gehört aber zur noch näheren Anlage `o3` weiter östlich. Links darf
-    /// `o` deshalb nicht plötzlich zwei Einheiten tragen, nur weil `o3` dort nicht gesehen
-    /// wird. Das belegt den erweiterten Rand über den Radius hinaus (Einheiten 2 r,
-    /// OSM 3 r) — mit einem Rand von nur einem Radius stünde links `mastr_einheiten: 2`.
+    /// Zweite Stufe desselben Randfalls: `u2` liegt im Radius von `o`, gehört aber zur näheren
+    /// Anlage `o3` weiter östlich. Links darf `o` deshalb nicht zwei Einheiten tragen; das belegt
+    /// den Rand von 2 r bzw. 3 r.
     #[test]
     fn randanlage_zaehlt_in_beiden_ausschnitten_dieselben_einheiten() {
         let (links, rechts) = nachbarn();
@@ -2237,7 +2179,7 @@ mod energie_tests {
         assert_eq!(an_o(&l), an_o(&r));
     }
 
-    // ---- MaStR-Nummern aller Einheiten (Review-Befund 3)
+    // ---- MaStR-Nummern aller Einheiten
 
     #[test]
     fn mastr_nummern_nennt_alle_einheiten_sortiert() {
@@ -2285,7 +2227,7 @@ mod energie_tests {
         assert_eq!(wkw["properties"]["mastr_nummern"], "SEE980008908440");
     }
 
-    // ---- 1.7 Quellennennung
+    // ---- Quellennennung
 
     #[test]
     fn quellennennung_nur_aus_beitragenden_teilen() {

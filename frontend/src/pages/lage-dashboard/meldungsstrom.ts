@@ -1,12 +1,8 @@
 /**
- * Meldungsstrom des Lage-Dashboards (Neuentwurf S3, drittes Paneel) — reine Ableitungen.
- *
- * Der Strom zeigt die jüngsten ETB-Einträge ALLER Typen. Er ist ein Live-Strom, und die
- * Bedien-Leitlinie (Festlegung 6, CLAUDE.md) verbietet, neue Einträge unter dem Cursor
- * einzuschieben: sie werden als Sammelbanner angekündigt und erst auf Zuruf gezeigt.
- * Die Weiche dafür ist eine WASSERMARKE (`angezeigtBis`, höchste gezeigte lfd. Nr.) — die
- * Seite hält sie als Zustand, diese Datei rechnet, was sie sichtbar lässt und was sie
- * zurückhält.
+ * Meldungsstrom des Lage-Dashboards — reine Ableitungen. Der Strom zeigt die jüngsten ETB-Einträge
+ * aller Typen; neue werden nicht unter dem Cursor eingeschoben, sondern per Sammelbanner
+ * angekündigt. Die Weiche ist eine Wassermarke (`angezeigtBis`, höchste gezeigte lfd. Nr.): die
+ * Seite hält sie, diese Datei rechnet, was sichtbar bleibt und was zurückgehalten wird.
  */
 import type { EtbEintragAnzeige, MeldeWeg } from '../../api/types';
 import { verfasserText } from '../../etb/verfasser';
@@ -17,13 +13,12 @@ import {
 } from '../../anzeige/format';
 import { MELDEWEG_OPTIONEN } from '../../etb/schnellerfassungModell';
 
-/** Wie viele Einträge das Paneel zeigt. Sieben sind der Entwurf (S3) auf dem Fükw-Schirm. */
+/** Wie viele Einträge das Paneel zeigt (Entwurf S3). */
 const STROM_ZEIGEN = 7;
 
 /**
- * Wie viele Einträge abgerufen werden. Mehr als gezeigt, damit nach einer Welle neuer
- * Einträge die bisher gezeigten noch im Fenster liegen — sonst wäre das Paneel leer, bis
- * jemand „anzeigen" drückt.
+ * Wie viele Einträge abgerufen werden — mehr als gezeigt, damit nach einer Welle neuer Einträge die
+ * bisher gezeigten noch im Fenster liegen.
  */
 export const STROM_ABRUF = 30;
 
@@ -44,11 +39,8 @@ export function hoechsteLfdNr(eintraege: readonly EtbEintragAnzeige[]): number {
 }
 
 /**
- * Soll die Wassermarke auf den jüngsten Stand springen?
- *
- * Ja, wenn noch keine gesetzt ist (erster Abruf) oder wenn unter ihr NICHTS mehr steht —
- * ein leeres Paneel hat keinen Cursor, unter dem etwas springen könnte, und ein Banner
- * über einer leeren Fläche wäre eine Aufforderung ohne Grund. Rein.
+ * Soll die Wassermarke auf den jüngsten Stand springen? Ja beim ersten Abruf oder wenn unter ihr
+ * nichts mehr steht — über einem leeren Paneel wäre ein Banner eine Aufforderung ohne Grund. Rein.
  */
 export function wassermarkeNachziehen(
   eintraege: readonly EtbEintragAnzeige[],
@@ -59,10 +51,7 @@ export function wassermarkeNachziehen(
   return !eintraege.some((e) => e.lfd_nr <= angezeigtBis);
 }
 
-/**
- * Was der Strom zeigt und was er zurückhält. Sortiert selbst (lfd. Nr. absteigend), statt
- * sich auf die Serverreihenfolge zu verlassen. Rein.
- */
+/** Was der Strom zeigt und was er zurückhält. Sortiert selbst (lfd. Nr. absteigend). Rein. */
 export function stromAuswahl(
   eintraege: readonly EtbEintragAnzeige[],
   angezeigtBis: number | null,
@@ -91,10 +80,8 @@ const MELDEWEG_LABEL = Object.fromEntries(
 ) as Record<MeldeWeg, string>;
 
 /**
- * Quelle eines Eintrags: „von · Meldeweg" (Entwurf: „Deichwache Nord · Funk").
- *
- * Fehlt das `von`, steht der Erfasser samt Funktions-Snapshot da („Vitt · S2", LFH-615) —
- * er ist dann die einzige belegte Herkunft. Ein fehlender Meldeweg fällt weg, statt als „unbekannt" eine Angabe zu behaupten. Rein.
+ * Quelle eines Eintrags: „von · Meldeweg". Fehlt `von`, steht der Erfasser samt Funktions-Snapshot
+ * da („Vitt · S2"). Ein fehlender Meldeweg fällt weg. Rein.
  */
 export function stromQuelle(e: EtbEintragAnzeige): string {
   const von = e.von?.trim() || verfasserText(e);

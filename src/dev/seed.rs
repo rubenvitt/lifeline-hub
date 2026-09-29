@@ -2,9 +2,8 @@ use crate::auth::{password, ORG_ROLLE_FUEHRUNGSKRAFT, ORG_ROLLE_KEINE, ROLLE_ADM
 use crate::error::AppError;
 use sqlx::SqlitePool;
 
-/// Ein Seed-Benutzer. **Interne** Struktur — bewusst NICHT `Serialize`:
-/// `system_rolle`/`org_rolle` dürfen nicht über den Dev-Endpoint nach außen.
-/// Für die Endpoint-Antwort gibt es den separaten `DevBenutzerResponse`-Typ.
+/// Ein Seed-Benutzer. Intern und bewusst nicht `Serialize`: `system_rolle`/`org_rolle` dürfen
+/// nicht über den Dev-Endpoint hinaus; dafür gibt es `DevBenutzerResponse`.
 pub struct DevBenutzer {
     pub benutzername: &'static str,
     /// Einheitliches Klartext-Dev-Passwort (siehe SEED_PASSWORT).
@@ -60,9 +59,8 @@ pub const SEED_BENUTZER: &[DevBenutzer] = &[
     },
 ];
 
-/// Fester Name der Dev-Organisation. `config.org_name` wird im Dev-Seed
-/// bewusst ignoriert — Dev-Daten sollen unabhängig von der Server-Konfiguration
-/// reproduzierbar sein.
+/// Fester Name der Dev-Organisation; `config.org_name` wird ignoriert, damit Dev-Daten
+/// reproduzierbar sind.
 const SEED_ORG_NAME: &str = "Entwicklung";
 
 /// Seed-Einsätze: (bezeichnung, stichwort, status). `bezeichnung` ist der
@@ -73,10 +71,8 @@ const SEED_EINSAETZE: &[(&str, &str, &str)] = &[
     ("Sturmtief Abschluss", "Unwetter", "abgeschlossen"),
 ];
 
-/// Legt reproduzierbare Dev-Testdaten an. Idempotent: mehrfacher Aufruf
-/// erzeugt keine Duplikate. Wird in `main` NACH `bootstrap_admin` aufgerufen und
-/// nutzt dessen Organisation (oder legt selbst eine an, falls keine existiert);
-/// die Seed-Benutzer werden per Upsert auf den bekannten Dev-Stand gesetzt.
+/// Legt reproduzierbare Dev-Testdaten an, idempotent. Läuft in `main` NACH `bootstrap_admin` und
+/// nutzt dessen Organisation; die Seed-Benutzer werden per Upsert auf den Dev-Stand gesetzt.
 pub async fn dev_seed(pool: &SqlitePool) -> Result<(), AppError> {
     let org_id = organisation_anlegen(pool).await?;
     benutzer_seeden(pool, org_id).await?;
@@ -103,13 +99,10 @@ async fn organisation_anlegen(pool: &SqlitePool) -> Result<i64, AppError> {
     Ok(id)
 }
 
-/// Seedet die `SEED_BENUTZER` per Upsert über den natürlichen Schlüssel
-/// `benutzername`. Existiert ein Konto bereits — insbesondere der von
-/// `bootstrap_admin` angelegte Admin (mit Zufalls-/Config-Passwort) —, werden
-/// seine Felder inkl. des auf das **Dev-Passwort** zurückgesetzten Hashes
-/// überschrieben. So sind die Dev-Konten reproduzierbar und der
-/// `/api/dev/users`-Login-Picker funktioniert auch nach `bootstrap_admin`.
-/// (Das Argon2-Hashing läuft dadurch bei jedem Start — im Dev-Build akzeptabel.)
+/// Seedet `SEED_BENUTZER` per Upsert über `benutzername`. Ein vorhandenes Konto — auch der
+/// Admin aus `bootstrap_admin` — wird inklusive Passwort-Hash auf den Dev-Stand gesetzt, damit
+/// der Login-Picker funktioniert. Argon2 läuft dadurch bei jedem Start (im Dev-Build
+/// akzeptabel).
 async fn benutzer_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError> {
     for b in SEED_BENUTZER {
         let hash = password::hash(b.passwort)?;
@@ -316,8 +309,8 @@ mod tests {
     #[tokio::test]
     async fn dev_seed_nach_bootstrap_setzt_admin_passwort_zurueck() {
         let pool = crate::db::test_pool().await;
-        // Reihenfolge wie in main: bootstrap_admin zuerst (Org + Admin + Kataloge,
-        // hier mit zufälligem Bootstrap-Passwort), dann dev_seed.
+        // Reihenfolge wie in `main`: `bootstrap_admin` zuerst (mit zufälligem Passwort), dann
+        // `dev_seed`.
         crate::auth::bootstrap::bootstrap_admin(
             &pool,
             "Org",

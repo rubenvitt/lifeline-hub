@@ -17,16 +17,13 @@ import {
 import type { EinsatzEinstellungen } from '../api/types';
 
 /**
- * Datenkontext der Einstellungs-Sektionen (LFH-345 · C10, H15/M15; seit LFH-606 auch „Pegel").
+ * Datenkontext der Einstellungs-Sektionen.
  *
- * **Bewusst ein Hook, kein `useOutletContext`.** Jede Sektion stellt ihre Queries selbst und
- * hat ihren eigenen Lade-/Fehler-Riegel; sie ist damit ohne dieses Layout montierbar — was
- * nicht nur die Tests trägt, sondern eine echte Falle schließt: `Form initialValues` wird
- * genau einmal beim Mount gelesen. Eine Sektion, die ohne Daten montiert, zeigt ein leeres
- * Formular, und der nächste Klick auf Speichern schickt einen Vollersatz-PUT aus lauter
- * `null` — der Datensatz wäre weg, ohne Fehlermeldung. Ein Kontext vom Elternteil verschöbe
- * diese Frage nur nach oben. TanStack führt die gleichen Query-Keys ohnehin zusammen, der
- * doppelte Aufruf kostet also keinen zweiten Request.
+ * **Bewusst ein Hook, kein `useOutletContext`.** Jede Sektion stellt ihre Queries selbst und hat
+ * ihren eigenen Lade-/Fehler-Riegel. Das schließt eine Falle: `Form initialValues` wird genau
+ * einmal beim Mount gelesen. Eine Sektion, die ohne Daten montiert, zeigt ein leeres Formular, und
+ * der nächste Klick auf Speichern schickt einen Vollersatz-PUT aus lauter `null`. TanStack führt
+ * gleiche Query-Keys zusammen, der doppelte Aufruf kostet keinen zweiten Request.
  */
 interface EinstellungenDaten {
   laedt: boolean;
@@ -63,10 +60,8 @@ export function useEinstellungenDaten(einsatzId: number): EinstellungenDaten {
 }
 
 /**
- * Erklärt die fehlende Berechtigung auf den Sektionen mit Einsatz-Schreibrecht gleich (M16).
- *
- * Ausgegraut allein ist eine Ein-Kanal-Aussage und nennt keinen Grund; der Text steht hier
- * statt viermal daneben, damit er nicht auseinanderläuft.
+ * Erklärt die fehlende Berechtigung auf allen Sektionen mit Einsatz-Schreibrecht gleich. Ausgegraut
+ * allein nennt keinen Grund; der Text steht einmal, damit er nicht auseinanderläuft.
  */
 export const RECHTE_TEXT =
   'Nur die Einsatzleitung, Führungspersonal oder ein System-Admin darf die Einstellungen dieses Einsatzes ändern — die Werte stehen hier zum Nachlesen.';
@@ -81,24 +76,16 @@ function sektionAus(pathname: string): EinstellungenSektion {
 }
 
 /**
- * Sektions-Layout der Einsatz-Einstellungen (LFH-345 · C10, Befunde H15/M15).
+ * Sektions-Layout der Einsatz-Einstellungen: drei Formular-Sektionen, die sich einen
+ * Vollersatz-Merge teilen (`einstellungen/einsatzEinstellungenForm.ts`), und die Modulliste als
+ * eigene Sektion — sie speichert je Zeile sofort und gehört nicht unter einen Speichern-Knopf.
  *
- * Die Seite trug bis dahin fünfzehn Formularfelder UND die Modul-Sichtbarkeitsliste in einem
- * Zug, mit einem Speichern-Knopf im Kopf, der die Liste gar nicht betraf (die speichert je
- * Zeile sofort). Zerlegt in vier Reiter: drei Formular-Sektionen, die sich einen
- * **Vollersatz-Merge** teilen (`einstellungen/einsatzEinstellungenForm.ts`), und die Liste
- * als eigene Sektion — sie hat kein Speichern und gehört deshalb nicht unter einen
- * Speichern-Knopf.
+ * **Der Kopf-Aktionen-Slot bleibt leer.** Die Speichern-Leiste liegt sticky am unteren Rand der
+ * Sektion und damit im `<form>`; nur so sendet Enter ab (ein Knopf im Kopf-Slot liegt außerhalb des
+ * `<form>`).
  *
- * **Der Kopf-Aktionen-Slot bleibt leer.** Die Speichern-Leiste liegt sticky am unteren Rand
- * der jeweiligen Sektion und damit IM `<form>`; nur so sendet Enter ab (Erfassungs-Norm
- * B4/LFH-332 — ein Knopf im Kopf-Slot ist ein DOM-Geschwister außerhalb des `<form>` und
- * kann nichts übermitteln). „Genau eine Primäraktion im Kopf" (LFH-340 · C5) ist damit
- * trivial erfüllt statt verletzt.
- *
- * Die aktive Sektion kommt aus der URL, nicht aus eigenem State — dasselbe Muster wie
- * `AdminLayout` (LFH-284). Ein zweiter Zustand neben dem Pfad ginge bei jedem Deeplink
- * auseinander.
+ * Die aktive Sektion kommt aus der URL, nicht aus eigenem State (Muster `AdminLayout`) — ein
+ * zweiter Zustand ginge bei jedem Deeplink auseinander.
  */
 export default function EinsatzEinstellungenPage() {
   const { id } = useParams();
@@ -122,8 +109,7 @@ export default function EinsatzEinstellungenPage() {
   return (
     <EinsatzSeite
       titel="Einstellungen"
-      // Reine Formularseite: ausdrücklich die schmale Lesebreite, unabhängig von der Vorgabe
-      // des Primitivs (die für Arbeitsflächen breit wird).
+      // Reine Formularseite: ausdrücklich die schmale Lesebreite.
       breite="schmal"
       beschreibung={`Einsatzbezogene Einstellungen für „${daten.einsatz.bezeichnung}". Gelten nur für diesen Einsatz.`}
       hinweis={
@@ -136,12 +122,10 @@ export default function EinsatzEinstellungenPage() {
         )
       }
     >
-      {/* Die Reiter als Segmentleiste im Tablist-Modus (Neuentwurf: Radius 0, Fugenraster
-          statt antds Unterstrich-Reitern). Die aktive Sektion kommt weiter aus der URL; ein
-          Wechsel — Klick oder Pfeiltaste — navigiert auf die Sektions-Route. Das EINE
-          Reiterfeld darunter trägt den `<Outlet>`: nur das aktive Feld ist gebaut, und ein
-          leeres Feld je inaktivem Reiter wäre für Hilfsmittel eine Beschriftung ohne
-          Gegenstand. */}
+      {/* Die Reiter als Segmentleiste im Tablist-Modus. Die aktive Sektion kommt aus der URL;
+          ein Wechsel (Klick oder Pfeiltaste) navigiert auf die Sektions-Route. Das eine
+          Reiterfeld darunter trägt den `<Outlet>`: ein leeres Feld je inaktivem Reiter wäre für
+          Hilfsmittel eine Beschriftung ohne Gegenstand. */}
       <Segmentleiste
         rolle="tablist"
         beschriftung="Einstellungsbereiche"

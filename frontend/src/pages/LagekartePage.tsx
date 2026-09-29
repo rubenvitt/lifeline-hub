@@ -38,6 +38,9 @@ import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
+import { LEERER_ZEICHENSTAND, type ZeichenStand } from './lagekarte/zeichnen';
+import { escGehoertOverlay, escStufe, QUITTUNG_VERWORFEN } from './lagekarte/zeichnenEsc';
+import { EIGENPOSITION_SPERRGRUND, useEigenposition } from './lagekarte/useEigenposition';
 import MessSteuerung from './lagekarte/MessSteuerung';
 import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
@@ -56,13 +59,9 @@ import { useLageSnapshots } from './lagekarte/useLageSnapshots';
 import type { Standquelle } from './lagekarte/snapshotDaten';
 
 /**
- * So viele Quellen werden namentlich genannt, bevor der Rest zur Zahl wird.
- *
- * Drei, weil der Grenzfall der Totalausfall ist: dann scheitern alle elf, und
- * „Lagebild unvollständig: Einsatzdaten, Unfallhilfsstellen, Schäden, Einheiten, Fahrzeuge,
- * Einsatzabschnitte, …" ist eine Zeile, die im Einsatz niemand liest. Die Zahl trägt die
- * Aussage „das ist nicht ein Ausfall, sondern alle", die ersten drei Namen den Einstieg für
- * den Einzelfall — und der ist der häufigere.
+ * So viele Quellen werden namentlich genannt, bevor der Rest zur Zahl wird. Beim Totalausfall
+ * scheitern alle elf, und eine Aufzählung liest im Einsatz niemand; die Zahl trägt „alle", die
+ * ersten drei Namen den Einstieg für den häufigeren Einzelfall.
  */
 const QUELLEN_NAMEN_MAX = 3;
 
@@ -74,7 +73,7 @@ export function quellenMeldung(quellen: string[]): string {
   return `Lagebild unvollständig: ${kopf} und ${rest === 1 ? 'eine' : rest} weitere`;
 }
 
-/** Breite der rechten Kartenleiste ab `lg` (Neuentwurf S5). */
+/** Breite der rechten Kartenleiste ab `lg`. */
 export const LEISTE_BREITE = 300;
 
 /**
@@ -99,50 +98,48 @@ export default function LagekartePage() {
   // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren,
   // Abschnitt-/Zone-Zeichnen abschließen).
   const kartenRef = useRef<KartenHandle>(null);
-  const [zeichnenBereit, setZeichnenBereit] = useState(false);
+  const [zeichenStand, setZeichenStand] = useState<ZeichenStand>(LEERER_ZEICHENSTAND);
 
-  // Neuentwurf S5: Rahmen, Überlagerungen, rechte Leiste.
   const { token } = useRollen();
   const farben = useModusFarben();
   const { abBreite, istSchmal } = useViewport();
   const breit = abBreite('lg');
-  // Unter `lg` liegt die Leiste UNTER der Karte, ab `lg` rechts daneben. Auf jeder Breite
-  // lässt sie sich ausblenden (LFH-715), die Wahl bleibt je Breitenklasse gemerkt; Vorgabe und
-  // Vorrang stehen in `lagekarte/leistenWahl.ts`.
+  // Unter `lg` liegt die Leiste unter der Karte, ab `lg` rechts daneben. Auf jeder Breite lässt sie
+  // sich ausblenden, die Wahl bleibt je Breitenklasse gemerkt; Vorgabe und Vorrang in
+  // `lagekarte/leistenWahl.ts`.
   const leistenWahl = useLeistenWahl(breit);
-  /** Scharfe Griffsorte beim Bild-Einpassen (LFH-711). Vorgabe: Größe. */
+  /** Scharfe Griffsorte beim Bild-Einpassen. Vorgabe: Größe. */
   const [griffModus, setGriffModus] = useState<GriffModus>('groesse');
   // Zeigerkoordinate: die Karte meldet, nur die Anzeige rendert mit (siehe `mausPosition.ts`).
   const zeigerQuelle = useMemo(() => erzeugeZeigerQuelle(), []);
-  // Band des Kartenfusses, in das die MapLibre-Maßstabsleiste gehängt wird. State statt Ref,
-  // damit `Kartenflaeche` den Effekt fährt, sobald das Band im Baum steht.
+  // Band des Kartenfußes, in das die MapLibre-Maßstabsleiste gehängt wird. State statt Ref, damit
+  // `Kartenflaeche` den Effekt fährt, sobald das Band im Baum steht.
   const [massstabZiel, setMassstabZiel] = useState<HTMLDivElement | null>(null);
   // Zeichnen-Knopf über der Karte → Paneel „Zeichnen" der Leiste öffnen (Zähler, s. Sidebar).
   const [zeichnenAnfrage, setZeichnenAnfrage] = useState(0);
-  // Laufende Messung (LFH-616): Karte meldet, nur das Mess-Band rendert mit (`messQuelle.ts`).
+  // Laufende Messung: die Karte meldet, nur das Mess-Band rendert mit (`messQuelle.ts`).
   const messQuelle = useMemo(() => erzeugeMessQuelle(), []);
 
   // Karten-Config vorziehen — dieselbe globale Query wie in useLagekarteDaten (react-query
-  // dedupliziert), aber hier zuerst, weil useKartenAnsicht sie für die config-validierte
-  // Hydration der Ansicht braucht (löst die Zirkularität config↔layer↔config auf).
+  // dedupliziert), aber zuerst, weil useKartenAnsicht sie für die config-validierte Hydration
+  // braucht (löst die Zirkularität config↔layer↔config).
   const { data: config } = useQuery({
     queryKey: globalKeys.karteConfig(),
     queryFn: ladeKarteConfig,
   });
 
-  // Aktive Ansicht (B/LFH-320) aus dem ?ansicht=-Query-Param; die Seite besitzt die URL,
-  // der Hook liest sie als Prop (bleibt Router-frei/testbar).
+  // Aktive Ansicht aus ?ansicht=; die Seite besitzt die URL, der Hook liest sie als Prop (bleibt
+  // Router-frei).
   const ansichtParam = parseRouteId(searchParams.get('ansicht') ?? undefined) ?? undefined;
 
-  // Historien-Modus (C/LFH-321): ?snapshot=<id> schaltet die Karte auf einen eingefrorenen,
-  // schreibgeschützten Stand. Die Seite besitzt die URL; die Daten-Hooks lesen die Quelle als Prop.
+  // Historien-Modus: ?snapshot=<id> schaltet die Karte auf einen eingefrorenen, schreibgeschützten
+  // Stand. Die Daten-Hooks lesen die Quelle als Prop.
   const snapshotParam = parseRouteId(searchParams.get('snapshot') ?? undefined) ?? undefined;
   const quelle: Standquelle =
     snapshotParam != null ? { typ: 'snapshot', id: snapshotParam } : { typ: 'live' };
 
-  // Zentraler Config-State der Karte (LFH-319/320): Basemap/Fachebenen/Layer + Schmutzig-
-  // Erkennung, „Für den Einsatz speichern" und die Ansichts-Verwaltung. Löst die drei
-  // getrennten localStorage-Quellen ab.
+  // Zentraler Config-State der Karte: Basemap/Fachebenen/Layer + Schmutzig-Erkennung, „Für den
+  // Einsatz speichern" und die Ansichts-Verwaltung.
   const {
     ansichten,
     aktiveAnsicht,
@@ -173,8 +170,8 @@ export default function LagekartePage() {
     speichertGerade,
   } = useKartenAnsicht({ einsatzId, config, aktiveAnsichtId: ansichtParam });
 
-  // Domänen-Daten + Marker-Ableitungen (SSE-Live liegt im EinsatzLayout, keine eigene
-  // EventSource hier — eine 2. Verbindung/Seite spränge das HTTP/1.1-6-Limit).
+  // Domänen-Daten + Marker-Ableitungen. Live liegt im EinsatzLayout; eine zweite Verbindung je
+  // Seite spränge das HTTP/1.1-Limit von 6.
   const {
     einsatz,
     darfSchreiben,
@@ -201,12 +198,11 @@ export default function LagekartePage() {
     betreuungZugriff,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
 
-  // Ebene „Betroffene" (LFH-648): gezeichnet nur bei eingeschaltetem Schalter UND freiem
-  // Modul. Personen sind nur wählbar (Marker-Klick, Inspector), solange sie gezeichnet werden;
-  // für die übrigen Ebenen bleibt `alleVerortet` der Lookup wie bisher. Startausschnitt und
-  // Kopfzahl bleiben auf `alleVerortet` und damit ohne Personen.
-  // `clusterQuelle`: auf DIESER Karte clustern Personen getrennt und liegen unter den Kräften
-  // (`PERSONEN_CLUSTER_QUELLE`); die Betroffenen-Karte setzt es nicht.
+  // Ebene „Betroffene": gezeichnet nur bei eingeschaltetem Schalter und freiem Modul. Personen sind
+  // nur wählbar, solange sie gezeichnet werden; für die übrigen Ebenen bleibt `alleVerortet` der
+  // Lookup. Startausschnitt und Kopfzahl bleiben ohne Personen. `clusterQuelle`: auf dieser Karte
+  // clustern Personen getrennt und liegen unter den Kräften (`PERSONEN_CLUSTER_QUELLE`); die
+  // Betroffenen-Karte setzt es nicht.
   const personenAufKarte = useMemo(
     () =>
       layer.person && personenZugriff === 'frei'
@@ -218,8 +214,8 @@ export default function LagekartePage() {
     () => (personenAufKarte.length ? [...alleVerortet, ...personenAufKarte] : alleVerortet),
     [alleVerortet, personenAufKarte],
   );
-  // Objektsuche der Leiste (LFH-716): dieselbe Menge wie `waehlbar`, aber mit eigener
-  // Modulprüfung je Typ — „kein Name ohne Recht" hängt so nicht an der Datenquelle (D1).
+  // Objektsuche der Leiste: dieselbe Menge wie `waehlbar`, aber mit eigener Modulprüfung je Typ —
+  // „kein Name ohne Recht" hängt so nicht an der Datenquelle.
   const suchbar = useMemo(
     () =>
       suchbareMarker({
@@ -252,7 +248,7 @@ export default function LagekartePage() {
   });
 
   // Stabiler Fehler-Handler (message aus App.useApp ist stabil) → als ehrliche Dep in Effekten
-  // nutzbar (u. a. Blob-URL-Effekt in useKartenbilder), ohne diese neu auszulösen.
+  // nutzbar, ohne sie neu auszulösen.
   const fehler = useCallback(
     (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
     [message],
@@ -264,9 +260,8 @@ export default function LagekartePage() {
     [message],
   );
 
-  // „In dieser Ansicht speichern": aktuellen Karten-Zustand in die AKTIVE Ansicht schreiben
-  // (nicht einsatzweit, LFH-320/323), mit Erfolgs-/Fehler-Feedback (die Mutation wirft —
-  // hier gefangen).
+  // „In dieser Ansicht speichern": den Karten-Zustand in die aktive Ansicht schreiben (nicht
+  // einsatzweit), mit Erfolgs-/Fehler-Feedback (die Mutation wirft, hier gefangen).
   const onAnsichtSpeichern = useCallback(async () => {
     try {
       await speichern();
@@ -276,8 +271,8 @@ export default function LagekartePage() {
     }
   }, [speichern, message, fehler]);
 
-  // Ansichtswechsel schreibt ?ansicht= (Deeplink-Muster: Query-Param). Der Hook re-seedet
-  // daraufhin Config/Layer/Fachebenen aus der Zielansicht.
+  // Ansichtswechsel schreibt ?ansicht=; der Hook seedet Config/Layer/Fachebenen daraufhin aus der
+  // Zielansicht.
   const waehleAnsicht = useCallback(
     (id: number) => {
       const naechste = new URLSearchParams(searchParams);
@@ -292,7 +287,7 @@ export default function LagekartePage() {
   const aktiverSnapshot =
     snapshotParam != null ? snapshots.find((s) => s.id === snapshotParam) : undefined;
 
-  // Snapshot wählen/verlassen: ?snapshot= setzen bzw. räumen (Deeplink-Muster wie ?ansicht=).
+  // Snapshot wählen/verlassen: ?snapshot= setzen bzw. räumen.
   const waehleSnapshot = useCallback(
     (id: number | null) => {
       const naechste = new URLSearchParams(searchParams);
@@ -363,6 +358,7 @@ export default function LagekartePage() {
     zoneEntwurf,
     zoneBestaetigung,
     zoneSpeichern,
+    abschnittSpeichern,
     zoneZeichnenNonce,
     zoneAuswahl,
     auswahl,
@@ -388,6 +384,7 @@ export default function LagekartePage() {
     aendereSymbol,
     bestaetigungSpeichern,
     bestaetigungVerwerfen,
+    onBestaetigungZurueck,
     onPlatzierenStart,
     onPlatzierenAbbrechen,
     onAbschnittZeichnenStart,
@@ -442,27 +439,23 @@ export default function LagekartePage() {
     onBildMittelpunkt,
   } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, quelle, fehler });
 
-  // Betroffene (LFH-648) laufen getrennt von `alleVerortet` und nur bei freiem Modul
-  // „Personen" auf die Karte — der Schalter allein genügt nicht, er gehört einer geteilten
-  // Ansicht (`personenEbene.ts`).
+  // Betroffene laufen getrennt von `alleVerortet` und nur bei freiem Modul „Personen" auf die Karte
+  // — der Schalter gehört einer geteilten Ansicht und genügt allein nicht (`personenEbene.ts`).
   const sichtbareMarker = useMemo(
     () => [...alleVerortet.filter((m) => layer[m.typ]), ...personenAufKarte],
     [alleVerortet, layer, personenAufKarte],
   );
-  // Startausschnitt aus den Daten (Ansichtszentrum → Einsatzort → Objekte); die Karte wendet
-  // ihn genau einmal an. Über ALLE verorteten Objekte, nicht nur die sichtbaren Ebenen: eine
-  // ausgeblendete Ebene ändert nicht, wo der Einsatz liegt.
-  // `undefined`, solange eine Marker-Quelle ODER die Ansichtsliste noch lädt: die Karte
-  // entscheidet erst über das vollständige Bild — die Ansicht steht in der Reihenfolge ganz
-  // vorn, und die Karte wendet den Start nur einmal an.
+  // Startausschnitt aus den Daten (Ansichtszentrum → Einsatzort → Objekte); die Karte wendet ihn
+  // genau einmal an. Über alle verorteten Objekte: eine ausgeblendete Ebene ändert nicht, wo der
+  // Einsatz liegt. `undefined`, solange eine Marker-Quelle oder die Ansichtsliste noch lädt.
   const startOffen = markerLaden || ansichtenLaden;
   const start = useMemo(
     () => (startOffen ? undefined : startAnsicht(alleVerortet, aktiveAnsicht)),
     [startOffen, alleVerortet, aktiveAnsicht],
   );
   const aktiverMarker = waehlbar.find((m) => m.schluessel === auswahl) ?? null;
-  // Freies taktisches Zeichen zur Marker-Auswahl (LFH-170): der Inspector editiert den ROHEN
-  // Record, nicht die gestrippte Marker-tz (sonst verlöre der Editor gestrippte Overlays).
+  // Freies taktisches Zeichen zur Marker-Auswahl: der Inspector editiert den rohen Record, nicht
+  // die gestrippte Marker-tz (sonst verlöre der Editor gestrippte Overlays).
   const ausgewaehltesZeichen =
     freieZeichen.find((z) => `freies_zeichen-${z.id}` === auswahl) ?? null;
   const ausgewaehlteZone = useMemo(
@@ -475,30 +468,82 @@ export default function LagekartePage() {
     return teile.length ? teile.join(' · ') : null;
   }, [basisAttribution, fachebenenAttribution]);
 
-  // Reverse-Deeplink (LFH-155): ?gefahrengebiet=<id> von der GefahrenPage → die zugehörige
-  // Zone selektieren und anfliegen, dann den Param räumen (apply-then-clean, StrictMode-fest
-  // wie GefahrenPage LFH-150: searchParams NICHT in-place mutieren). Läuft, sobald die Zonen
-  // geladen sind (zonen ist unabhängig vom zone-Layer-Toggle vorhanden).
+  // Reverse-Deeplink ?gefahrengebiet=<id> von der GefahrenPage → zugehörige Zone selektieren und
+  // anfliegen, dann den Param räumen (apply-then-clean, `searchParams` nicht in-place mutieren).
+  // Läuft, sobald die Zonen geladen sind.
   /**
-   * Escape beendet das Messen (LFH-616) — ein Blick-Werkzeug muss sich so leicht schließen
-   * lassen, wie es geöffnet wird. Am Fenster, nicht am Canvas: der hat den Fokus nur nach
-   * einem Klick. terra-draw bricht selbst erst beim `keyup` ab — dann ist der Modus schon
-   * beendet; es gibt also keinen zweistufigen Ablauf „erst Entwurf, dann Werkzeug".
-   * Nicht, wenn jemand gerade schreibt oder ein anderer Handler die Taste schon genommen hat
-   * (ein offenes Menü, ein Dialog). Die übrigen Modi bekommen das bewusst NICHT mit: dort
-   * steht ein Entwurf, der mehr kostet als eine Messung.
+   * Escape beendet das Messen — ein Blick-Werkzeug muss sich so leicht schließen lassen, wie es
+   * geöffnet wird. Am Fenster, nicht am Canvas: der hat den Fokus nur nach einem Klick. Nicht, wenn
+   * jemand schreibt oder ein anderer Handler die Taste schon genommen hat (Menü, Dialog). Beim
+   * Zeichnen ist Esc zweistufig (nächster Effekt); die übrigen Modi bekommen die Taste bewusst
+   * nicht.
    */
   useEffect(() => {
     if (!messForm) return;
     const taste = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
-      const ziel = e.target as HTMLElement | null;
+      const ziel = e.target instanceof Element ? e.target : null;
       if (ziel?.closest('input, textarea, [contenteditable="true"]')) return;
+      // Ein offenes Menü/Dialog schließt selbst per Esc, ohne `preventDefault`.
+      if (escGehoertOverlay(e)) return;
       onMessenBeenden();
     };
     window.addEventListener('keydown', taste);
     return () => window.removeEventListener('keydown', taste);
   }, [messForm, onMessenBeenden]);
+
+  /**
+   * Esc beim Zeichnen ist zweistufig (LFH-712): erst die Figur, dann der Modus. Die Stufe
+   * entscheidet `escStufe`; hier wird nur ausgeführt. terra-draw hat seine Abbruchtaste abgegeben
+   * (`zeichnen.ts`). `keydown`, nicht `keyup`: ein `keyup`-Zuhörer liefe nach terra-draws Abbruch
+   * und sähe eine leere Figur. Am Fenster: auch mit Fokus auf einem Knopf der Steuerung wirkt die
+   * Taste.
+   *
+   * Die Ausführung liegt in einem Ref, der bei jedem Render neu gesetzt wird: die Handler sind je
+   * Render neu, der Zuhörer soll nur am Modus hängen.
+   */
+  // Eigenposition: nur auf dem Gerät, beim ersten Standort einmal anfliegen; danach folgt die Karte
+  // nicht, der Ausschnitt bleibt frei verschiebbar.
+  const eigenposition = useEigenposition({
+    onFehler: (text) => message.warning(text),
+    onErsterFix: (p) => setFlyToZiel({ lng: p.lon, lat: p.lat }),
+  });
+
+  const zeichenmodusAktiv = zoneEntwurf != null || zeichneAbschnittId != null;
+  const escAusfuehrenRef = useRef<() => void>(() => {});
+  escAusfuehrenRef.current = () => {
+    const stufe = escStufe({
+      phase: zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen',
+      speichernLaeuft: zoneSpeichern || abschnittSpeichern,
+      punkte: zeichenStand.punkte,
+      serieGespeichert: zeichneAbschnittId != null ? 0 : zoneSerieAnzahl,
+    });
+    if (stufe === 'zurueckZumZeichnen') {
+      onBestaetigungZurueck();
+      message.info(QUITTUNG_VERWORFEN);
+    } else if (stufe === 'verwerfen') {
+      kartenRef.current?.zeichnungVerwerfen();
+      message.info(QUITTUNG_VERWORFEN);
+    } else if (stufe === 'fertig') {
+      onZoneZeichnenFertig();
+    } else if (stufe === 'abbrechen') {
+      onZeichnenAbbrechen();
+    }
+  };
+  useEffect(() => {
+    if (!zeichenmodusAktiv) return;
+    const taste = (e: KeyboardEvent) => {
+      // `repeat`: eine gehaltene Taste liefe sonst durch beide Stufen.
+      if (e.key !== 'Escape' || e.defaultPrevented || e.repeat) return;
+      const ziel = e.target instanceof Element ? e.target : null;
+      if (ziel?.closest('input, textarea, [contenteditable="true"]')) return;
+      if (escGehoertOverlay(e)) return;
+      e.preventDefault();
+      escAusfuehrenRef.current();
+    };
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [zeichenmodusAktiv]);
 
   useEffect(() => {
     const ziel = parseRouteId(searchParams.get('gefahrengebiet') ?? undefined);
@@ -514,13 +559,12 @@ export default function LagekartePage() {
     setSearchParams(naechste, { replace: true });
   }, [zonen, searchParams, setSearchParams, setZoneAuswahl, setFlyToZiel]);
 
-  // Bezirksfläche (LFH-673): ?evakuierungsbezirk=<id> von der Betreuungsseite — apply-then-
-  // clean wie `?gefahrengebiet=`, aber mit zwei Unterschieden, weil der Sprung aus einem
-  // anderen Modul kommt und die Kartenansicht nicht kennt (Review LFH-673, Befund 1):
-  // (1) gesucht wird in ALLEN Zonen; liegt die Fläche in einer anderen Ansicht, wechselt die
-  //     Karte zuerst dorthin (`?ansicht=`), der Auftrag bleibt für die nächste Runde stehen;
+  // Bezirksfläche: ?evakuierungsbezirk=<id> von der Betreuungsseite, apply-then-clean wie
+  // `?gefahrengebiet=`, mit zwei Unterschieden, weil der Sprung die Kartenansicht nicht kennt:
+  // (1) gesucht wird in allen Zonen; liegt die Fläche in einer anderen Ansicht, wechselt die Karte
+  //     zuerst dorthin (`?ansicht=`), der Auftrag bleibt für die nächste Runde stehen;
   // (2) ein unbrauchbarer Wert oder ein Auftrag ohne Fläche wird geräumt, sobald die Zonen
-  //     feststehen — sonst stünde er bei jedem Neuladen wieder in der Adresse.
+  //     feststehen.
   useEffect(() => {
     const roh = searchParams.get('evakuierungsbezirk');
     if (roh === null) return;
@@ -561,47 +605,30 @@ export default function LagekartePage() {
   ]);
 
   /**
-   * Platzier-Auftrag von außen (LFH-340 · C5): `?platzieren=schaden:5` schickt die Karte in
-   * den Platzier-Modus für genau dieses Objekt — der nächste Klick setzt seine Koordinate.
-   * Dasselbe apply-then-clean wie beim Gefahrengebiet-Deeplink darüber: `searchParams` wird
-   * NICHT in-place mutiert (StrictMode-fest), und der Parameter wird geräumt, weil ein
-   * stehengebliebener Auftrag die Karte bei jedem Neuladen erneut in den Modus schickte.
+   * Platzier-Auftrag von außen: `?platzieren=schaden:5` schickt die Karte in den Platzier-Modus für
+   * dieses Objekt. apply-then-clean wie beim Gefahrengebiet-Deeplink, weil ein stehengebliebener
+   * Auftrag die Karte bei jedem Neuladen erneut in den Modus schickte. `darfSchreiben` ist
+   * Bedingung: der Modus endet in einem PATCH, ein Beobachter liefe nach dem Klick in einen 403.
    *
-   * `darfSchreiben` ist Bedingung, nicht Höflichkeit: der Platzier-Modus endet in einem
-   * PATCH, den ein Beobachter nicht senden darf — ohne den Riegel liefe er in einen 403,
-   * nachdem er bereits auf die Karte geklickt hat.
+   * ── Der Lade-Riegel ist der Kern ──
    *
-   * ── DER LADE-RIEGEL IST DER KERN, NICHT DIE FORMALIE ────────────────────────
-   *
-   * `if (ladt) return` MUSS vor dem Räumen stehen, und zwar wegen einer Kette, die im
-   * Review gemessen wurde: `darfImEinsatzSchreiben` kennt kein „noch unbekannt" — für
-   * `einsatz === undefined` liefert es schlicht `false` (`einsatz/schreibrecht.ts`). Während
-   * des Abrufs ist `einsatz` regulär leer, und `EinsatzLayout` rendert den `<Outlet/>` dabei
-   * weiter (sein Frühausstieg hängt nur an `isError`). Effekte laufen nach dem ersten
-   * Commit, also VOR dem `if (ladt)` weiter unten.
-   *
-   * Ohne diesen Riegel bricht genau der Fall, für den ein Deeplink existiert: F5, neuer Tab
-   * oder ein geteilter Link. Der Effekt feuert mit `darfSchreiben === false`, löscht den
-   * Parameter und steigt aus — die Karte steht im Normalmodus, der Auftrag ist weg, es gibt
-   * keine Meldung und keinen zweiten Versuch. Der In-App-Weg über `SchaedenDetailPage`
-   * verdeckt das: der trifft denselben Cache-Eintrag und hat `darfSchreiben` schon im ersten
-   * Render. Dieselbe Wartebedingung trägt der Gefahrengebiet-Effekt darüber („auf spätere
-   * Runde warten") und `SchaedenPage.tsx` für `?neu=1`.
+   * `if (ladt) return` muss vor dem Räumen stehen: `darfImEinsatzSchreiben` liefert für `einsatz
+   * === undefined` schlicht `false` (`einsatz/schreibrecht.ts`), und `EinsatzLayout` rendert den
+   * `<Outlet/>` während des Abrufs weiter. Ohne Riegel feuerte der Effekt bei F5, neuem Tab oder
+   * geteiltem Link mit `darfSchreiben === false`, löschte den Parameter und stiege aus. Der
+   * In-App-Weg über `SchaedenDetailPage` verdeckt das, weil `darfSchreiben` dort schon im ersten
+   * Render steht.
    */
   useEffect(() => {
     const auftrag = parsePlatzierenAuftrag(searchParams.get('platzieren'));
     if (!auftrag) return;
     if (ladt) return;
-    // Eine Stelle (LFH-673) platziert nur, wer das Modul Betreuung lesen darf — sonst endete
-    // der Klick auf die Karte in einem 403, die späteste denkbare Absage (Review, Befund 4).
-    // Bis die Rechte feststehen, bleibt der Auftrag stehen.
+    // Eine Stelle platziert nur, wer das Modul Betreuung lesen darf — sonst endete der Klick in
+    // einem 403. Bis die Rechte feststehen, bleibt der Auftrag stehen.
     const istStelle = auftrag.typ === 'betreuungsstelle';
     if (istStelle && !rechteBekannt) return;
-    // ERST ANWENDEN, DANN RÄUMEN — apply-then-clean heißt genau diese Reihenfolge, und der
-    // Gefahrengebiet-Effekt darüber hält sie ebenso (`setZoneAuswahl`/`setFlyToZiel` vor dem
-    // `delete`). Umgekehrt gemessen: mit dem Räumen zuerst kam die Navigation nicht durch,
-    // während der Modus startete — der Parameter blieb in der URL stehen und der nächste
-    // Neuladen-Vorgang schickte die Karte erneut hinein.
+    // Erst anwenden, dann räumen: mit dem Räumen zuerst kam die Navigation nicht durch, während der
+    // Modus startete, und der Parameter blieb in der URL stehen.
     if (darfSchreiben && (!istStelle || betreuungZugriff === 'frei')) onPlatzierenStart(auftrag);
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('platzieren');
@@ -617,18 +644,14 @@ export default function LagekartePage() {
   ]);
 
   /**
-   * Koordinatensprung (LFH-619): `?zentrum=<lat>,<lon>` aus der Sprungpalette — anfliegen,
-   * dann räumen. Dasselbe apply-then-clean wie die beiden Deeplinks darüber; ein
-   * stehengebliebener Mittelpunkt zöge die Karte bei jedem Neuladen zurück an die Stelle.
+   * Koordinatensprung: `?zentrum=<lat>,<lon>` aus der Sprungpalette — anfliegen, dann räumen, sonst
+   * zöge ein Neuladen die Karte zurück. Kein Schreibrecht nötig: Anfliegen ist Lesen. Ein
+   * unbrauchbarer Wert wird trotzdem geräumt.
    *
-   * KEIN Schreibrecht nötig: Anfliegen ist Lesen. Ein unbrauchbarer Wert wird trotzdem
-   * geräumt, er hätte beim nächsten Laden nichts Besseres zu sagen.
-   *
-   * `if (ladt) return` aus demselben Grund wie beim Platzier-Auftrag: erst mit der
-   * `Kartenflaeche` gibt es eine Karte, die das Ziel annimmt. Das Ziel geht über `flyToZiel`,
-   * NICHT über die Startansicht — der Anflug belegt die Karteninstanz als „gestartet"
-   * (`startAufKarteRef` in `Kartenflaeche.tsx`), die später fertig geladene Startansicht zieht
-   * die Karte also nicht wieder weg.
+   * `if (ladt) return` wie beim Platzier-Auftrag: erst mit der `Kartenflaeche` gibt es eine Karte,
+   * die das Ziel annimmt. Das Ziel geht über `flyToZiel`, nicht über die Startansicht — der Anflug
+   * belegt die Karteninstanz als gestartet (`startAufKarteRef`), die später geladene Startansicht
+   * zieht sie also nicht wieder weg.
    */
   useEffect(() => {
     const roh = searchParams.get('zentrum');
@@ -647,12 +670,12 @@ export default function LagekartePage() {
 
   const onlineStyles = config?.online_styles ?? [];
   const quellenFehler = fehlerhafteQuellen.length > 0;
-  // Ohne die Personenliste (LFH-648): Personen speisen weder die Kopfzahl noch „Nicht
-  // verortet" — ihr Ausfall darf dort keine Zahl zu „—" machen. Der Hinweis nennt sie trotzdem.
+  // Ohne die Personenliste: Personen speisen weder Kopfzahl noch „Nicht verortet", ihr Ausfall darf
+  // dort keine Zahl zu „—" machen. Der Hinweis nennt sie trotzdem.
   const lagebildFehler = fehlerhafteQuellen.some((q) => q !== QUELLE_BETROFFENE);
 
-  // „Ausgewählt": die Inspectors, die vorher über der Karte schwebten, stehen jetzt in der
-  // rechten Leiste. Mehrere gleichzeitig (Marker UND Zone) bleiben möglich, wie bisher.
+  // „Ausgewählt": die Inspectors stehen in der rechten Leiste. Mehrere gleichzeitig (Marker und
+  // Zone) bleiben möglich.
   const auswahlInhalt =
     (aktiverMarker && aktiverMarker.typ !== 'freies_zeichen') ||
     ausgewaehltesZeichen ||
@@ -688,8 +711,7 @@ export default function LagekartePage() {
             properties={fachebeneAuswahl.properties}
             geometrie={fachebeneAuswahl.geometrie}
             onSchliessen={() => setFachebeneAuswahl(null)}
-            // Schnellweg „Als maßgeblichen Pegel festlegen" (LFH-606); wirkt nur an
-            // PEGELONLINE-Punkten.
+            // Schnellweg „Als maßgeblichen Pegel festlegen"; wirkt nur an PEGELONLINE-Punkten.
             pegelBezug={{ einsatzId, darfSchreiben: !!darfSchreiben }}
           />
         )}
@@ -711,9 +733,8 @@ export default function LagekartePage() {
       </>
     ) : null;
 
-  // Eine Auswahl holt die ausgeblendete Leiste zurück — sonst wählte man auf der Karte ein
-  // Objekt und sähe nichts davon. Ebenso ein Platzier-Modus (Objekt, Bild, Zeichen): sein
-  // einziger „Abbrechen"-Knopf steht in der Leiste, ausgeblendet säße man im Modus fest.
+  // Eine Auswahl holt die ausgeblendete Leiste zurück — sonst wählte man ein Objekt und sähe nichts
+  // davon. Ebenso ein Platzier-Modus: sein einziger „Abbrechen"-Knopf steht in der Leiste.
   // Abgeleitet, nicht per Effekt: endet beides, gilt wieder die eigene Wahl.
   const leisteErzwungen =
     auswahlInhalt != null ||
@@ -732,22 +753,18 @@ export default function LagekartePage() {
       : leisteErzwungen
         ? 'Platzieren beenden, um die Leiste auszublenden'
         : null;
-  // Unter `lg` gibt die Wahl eines Zeichenwerkzeugs die Karte frei (LFH-713, Entscheidung
-  // 28.09.2026) — Vorbild ist der Navigations-Drawer, der beim Modulklick schließt. Gemessen
-  // bei 390 px: die offene Leiste halbierte die Karte (680 → 374 px), und der Fuß mit
-  // Zeichen-Steuerung und ausgeklappter Zeitachse (412 px) deckte den Rest; es blieb keine
-  // Karte, auf die man die Punkte hätte tippen können. Nur für diese Sitzung (`verberge`, nicht
-  // `merke`): zwischen `md` und `lg` ist die Leiste per Vorgabe offen, und eine Zeichnung soll
-  // sie dort nicht dauerhaft schließen. Keine Sperre: „Leiste einblenden" holt sie zurück.
-  // Beide Startwege räumen die Auswahl selbst (`useKartenInteraktion`), sonst hielte
-  // `auswahlInhalt` die Leiste offen.
+  // Unter `lg` gibt die Wahl eines Zeichenwerkzeugs die Karte frei (Vorbild Navigations-Drawer):
+  // bei 390 px halbierte die offene Leiste die Karte, und der Fuß deckte den Rest. Nur für diese
+  // Sitzung (`verberge`, nicht `merke`): zwischen `md` und `lg` ist die Leiste per Vorgabe offen
+  // und soll dort nicht dauerhaft schließen. „Leiste einblenden" holt sie zurück. Beide Startwege
+  // räumen die Auswahl selbst, sonst hielte `auswahlInhalt` die Leiste offen.
   const karteFreigeben = () => {
     if (!breit) leistenWahl.verberge();
   };
 
-  // Die Kartengrundlage: ab `md` als Segmentleiste über der Karte (Neuentwurf S5). Auf dem
-  // Handschirm bräche die Leiste mit mehreren Online-Stilen in vier Zeilen um und läge über
-  // Knopfblock und Karte — dort steht sie im Paneel „Kartengrundlage" der Leiste.
+  // Die Kartengrundlage: ab `md` als Segmentleiste über der Karte. Auf dem Handschirm bräche sie
+  // mit mehreren Online-Stilen mehrzeilig um und läge über Knopfblock und Karte — dort steht sie im
+  // Paneel „Kartengrundlage" der Leiste.
   const grundlageWahl = (
     <GrundlageLeiste
       einzeilig={!istSchmal}
@@ -808,9 +825,8 @@ export default function LagekartePage() {
         attribution={attribution}
         markers={sichtbareMarker}
         onKarteKlick={onKarteKlick}
-        // LFH-208: Map-Marker-Klick während eines exklusiven Modus (Platzieren/Zeichnen/…)
-        // öffnet kein Panel. Nur der Map-Pfad ist gegatet — die Leisten-Selektion
-        // (onMarkerWaehlen direkt an die Leiste) bleibt frei.
+        // Ein Marker-Klick während eines exklusiven Modus öffnet kein Panel. Nur der Kartenpfad ist
+        // gegatet, die Leisten-Selektion bleibt frei.
         onMarkerKlick={(schluessel) => {
           if (!exklusiverModusAktiv) onMarkerWaehlen(schluessel);
         }}
@@ -830,12 +846,12 @@ export default function LagekartePage() {
         zoneZeichnenNonce={zoneZeichnenNonce}
         onZoneKlick={onZoneKlick}
         onZoneGezeichnet={onZoneGezeichnet}
-        onZeichnenBereitAenderung={setZeichnenBereit}
+        onZeichnenStandAenderung={setZeichenStand}
         messen={messForm}
         onMessung={(geometrie, fertig) => messQuelle.melde({ geometrie, fertig })}
         fachebenen={aktiveFachebenen}
-        // Der Ausschnitt hängt an JEDER sichtbaren bbox-Ebene, nicht mehr an KRITIS
-        // allein (LFH-81) — sonst bliebe „Energie an, KRITIS aus" dauerhaft leer.
+        // Der Ausschnitt hängt an jeder sichtbaren bbox-Ebene — sonst bliebe „Energie an, KRITIS
+        // aus" leer.
         onBboxAenderung={
           braucheViewportBbox(fachebenenSichtbar)
             ? (b) => setViewportBbox(rasterBbox(b))
@@ -849,6 +865,7 @@ export default function LagekartePage() {
         griffModus={griffModus}
         onZeigerLage={zeigerQuelle.melde}
         massstabZiel={massstabZiel}
+        eigenposition={eigenposition.position}
       />
       <KartenUeberlagerung
         grundlage={istSchmal ? null : grundlageWahl}
@@ -858,6 +875,14 @@ export default function LagekartePage() {
         onNorden={() => kartenRef.current?.nachNorden()}
         onMessen={() => (messForm ? onMessenBeenden() : onMessenStart('strecke'))}
         messenAktiv={messForm != null}
+        eigenposition={{
+          an: eigenposition.an,
+          sperrGrund:
+            eigenposition.verfuegbarkeit === 'bereit'
+              ? null
+              : EIGENPOSITION_SPERRGRUND[eigenposition.verfuegbarkeit],
+          onUmschalten: eigenposition.umschalten,
+        }}
         leiste={
           breit
             ? {
@@ -876,9 +901,9 @@ export default function LagekartePage() {
             : undefined
         }
       />
-      {/* Gemeinsamer unterer Rand (LFH-355): Zeichnen-Steuerung, Maßstab und Zeitachse als
-          Flow-Bänder in einer Spalte — zwei Elemente im Fluss können sich nicht überlagern.
-          Die Begründung steht in `lagekarte/KartenFuss.tsx`. */}
+      {/* Gemeinsamer unterer Rand: Zeichnen-Steuerung, Maßstab und Zeitachse als Flow-Bänder in
+          einer Spalte — zwei Elemente im Fluss überlagern sich nicht. Begründung in
+          `lagekarte/KartenFuss.tsx`. */}
       <KartenFuss>
         <ZeichnenSteuerung
           aktiv={zoneEntwurf != null || zoneBestaetigung != null || zeichneAbschnittId != null}
@@ -891,7 +916,12 @@ export default function LagekartePage() {
           }
           phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
           speichernLaeuft={zoneSpeichern}
-          abschliessenMoeglich={zeichnenBereit}
+          abschliessenMoeglich={zeichenStand.bereit}
+          punkte={zeichenStand.punkte}
+          punktZurueckMoeglich={zeichenStand.kannZurueck}
+          onPunktZurueck={() => {
+            kartenRef.current?.punktZurueck();
+          }}
           onAbschliessen={() => {
             const abgeschlossen =
               zeichneAbschnittId != null
@@ -908,8 +938,7 @@ export default function LagekartePage() {
           onAbbrechen={onZeichnenAbbrechen}
           onSpeichern={bestaetigungSpeichern}
           onVerwerfen={bestaetigungVerwerfen}
-          // Serienmodus nur für Zonen (LFH-332/M76) — eine Abschnittsfläche gehört zu genau
-          // einem Abschnitt, für sie gibt es keine Folge.
+          // Serienmodus nur für Zonen — eine Abschnittsfläche gehört zu genau einem Abschnitt.
           serie={zeichneAbschnittId != null ? undefined : zoneSerie}
           onSerieWechsel={zeichneAbschnittId != null ? undefined : setZoneSerie}
           serieAnzahl={zeichneAbschnittId != null ? undefined : zoneSerieAnzahl}
@@ -931,15 +960,14 @@ export default function LagekartePage() {
           onNeu={() => kartenRef.current?.neuMessen()}
           onBeenden={onMessenBeenden}
         />
-        {/* Maßstab (metrisch): MapLibres `ScaleControl`, von `Kartenflaeche` über seine
-            `IControl`-Schnittstelle in dieses Band gehängt — nicht in MapLibres eigene Ecke,
-            die absolut über dem Fuß läge. */}
+        {/* Maßstab: MapLibres `ScaleControl`, von `Kartenflaeche` über `IControl` in dieses
+            Band gehängt — nicht in MapLibres Ecke, die absolut über dem Fuß läge. */}
         <div
           ref={setMassstabZiel}
           className="lfh-massstab"
           data-lfh="massstab"
-          // Rein visuell: die Zahl darin schreibt MapLibre bei jeder Bewegung neu, und ein
-          // Vorleser hätte mit „500 m" ohne Bezug nichts gewonnen.
+          // Rein visuell: MapLibre schreibt die Zahl bei jeder Bewegung neu, und „500 m" ohne Bezug
+          // hülfe einem Vorleser nicht.
           aria-hidden="true"
           style={{
             ...bandStil('links'),
@@ -964,10 +992,9 @@ export default function LagekartePage() {
     <aside
       id="lagekarte-leiste"
       aria-label="Kartenleiste"
-      // Ausgeblendet bleibt die Leiste MONTIERT (LFH-715, Review): abgehängt verlöre die
-      // Sidebar ihren Zustand (Zeichen-Entwurf, Suche, Rollposition), und ihr Effekt auf
-      // `zeichnenAnfrage` feuerte beim Wiedereinhängen erneut — eine spätere Auswahl klappte
-      // dann „Zeichnen" auf und rollte die Leiste vom Inspector weg.
+      // Ausgeblendet bleibt die Leiste montiert: abgehängt verlöre die Sidebar ihren Zustand
+      // (Zeichen-Entwurf, Suche, Rollposition), und ihr Effekt auf `zeichnenAnfrage` feuerte beim
+      // Wiedereinhängen erneut.
       hidden={!leisteIstSichtbar}
       style={
         !leisteIstSichtbar
@@ -980,8 +1007,8 @@ export default function LagekartePage() {
                 borderInlineStart: `1px solid ${farben.linie}`,
               }
             : {
-                // Unter `lg`: unterer Bereich. Höchstens die halbe Fläche — die Karte bleibt
-                // die Hauptsache und auf 390 px bedienbar; die Leiste scrollt in sich.
+                // Unter `lg`: unterer Bereich, höchstens die halbe Fläche — die Karte bleibt auf
+                // 390 px bedienbar, die Leiste scrollt in sich.
                 flex: '0 0 45%',
                 minHeight: 0,
                 borderBlockStart: `1px solid ${farben.linie}`,
@@ -993,8 +1020,8 @@ export default function LagekartePage() {
         nichtVerortet={nichtVerortetAlle}
         verortet={alleVerortet}
         suchbar={suchbar}
-        // Betroffene zählen nicht zum Lagebild-Fehler oben, gehören aber bei eingeschalteter
-        // Ebene zur Suche — ihr Ausfall macht die Suche unvollständig (Review LFH-716, M1).
+        // Betroffene zählen nicht zum Lagebild-Fehler, gehören aber bei eingeschalteter Ebene zur
+        // Suche — ihr Ausfall macht sie unvollständig.
         suchbarUnvollstaendig={lagebildFehler || (personenFehler && layer.person)}
         darfSchreiben={!!darfSchreiben}
         platzierungZiel={platzierungZiel}
@@ -1067,10 +1094,9 @@ export default function LagekartePage() {
         ansichtBusy={ansichtBusy}
         auswahl={auswahlInhalt}
         zeichnenAnfrage={zeichnenAnfrage}
-        /* Drei Sektionen, drei Ursachen (LFH-331 · B3). Der Slot an „Nicht verortet" hängt
-           an denselben elf Lagebild-Quellen wie das Overlay oben; er wiederholt deren Namen
-           nicht, sondern trägt den erneuten Abruf — die eine Handlung, die das Overlay
-           bewusst nicht anbietet, weil es für elf Quellen zugleich spricht. */
+        /* Drei Sektionen, drei Ursachen. Der Slot an „Nicht verortet" hängt an denselben elf
+           Lagebild-Quellen wie das Overlay; er trägt den erneuten Abruf — die Handlung, die das
+           Overlay nicht anbietet, weil es für elf Quellen zugleich spricht. */
         sektionFehler={{
           nichtVerortet: lagebildFehler
             ? { text: 'Objektlisten konnten nicht geladen werden', onWiederholen: neuLaden }
@@ -1095,31 +1121,28 @@ export default function LagekartePage() {
   );
 
   return (
-    // Der Höhenrahmen des Projekts (LFH-459, `FensterRahmen`): die Arbeitsfläche endet am
-    // Fensterrand, gemessen in `dvh` — nicht mehr das frühere `calc(100vh - 120px)` mit einer
-    // geratenen Kopfhöhe. Nicht über `EinsatzSeite.fensterInhalt`: die Karte baut ihren Kopf
-    // selbst (Ansichtswahl im Kopf, keine Seitenebene für „Neue Zeile"), und Karte plus
-    // 300-px-Leiste brauchen die ganze Inhaltsfläche. Kopf und Titel folgen den exportierten
-    // Stilen von `EinsatzSeite`.
+    // Der Höhenrahmen (`FensterRahmen`): die Arbeitsfläche endet am Fensterrand, gemessen in `dvh`.
+    // Nicht über `EinsatzSeite.fensterInhalt`: die Karte baut ihren Kopf selbst, und Karte plus
+    // 300-px-Leiste brauchen die ganze Inhaltsfläche. Kopf und Titel folgen den exportierten Stilen
+    // von `EinsatzSeite`.
     <FensterRahmen kopf={kopf} mindestHoehe={360}>
       <div
         data-lfh="lagekarte-flaeche"
         style={{
           display: 'flex',
           flexDirection: 'column',
-          // Bis an die Ränder des Inhaltsbereichs, wie die Kopfleiste darüber: die Karte
-          // führt (Neuentwurf S5), eine Rinne um sie wäre toter Rand.
+          // Bis an die Ränder des Inhaltsbereichs, wie die Kopfleiste darüber: die Karte führt,
+          // eine Rinne wäre toter Rand.
           height: 'calc(100% + var(--lfh-seiten-polsterung))',
           marginInline: 'calc(-1 * var(--lfh-seiten-polsterung))',
           minHeight: 0,
         }}
       >
-        {/* Warn-Overlay (AK6, LFH-331 · B3): eine Karte ohne Objekt sieht aus wie eine Lage
-            ohne Objekt — der Ausfall einer Domänen-Quelle ist der einzige Fehler dieser
-            Seite, der sich als gültiger Zustand tarnt. Deshalb steht er dauerhaft und
-            namentlich da: `banner`-Alert, kein `closable`, KEIN Knopf (ein Wiederhol-Knopf
-            könnte nur EINE der elf Quellen meinen). Im Fluss über der Fläche, nicht
-            schwebend: oben auf der Karte liegen die Überlagerungen. */}
+        {/* Warn-Overlay: eine Karte ohne Objekt sieht aus wie eine Lage ohne Objekt — der
+            Ausfall einer Domänen-Quelle tarnt sich als gültiger Zustand. Deshalb steht er
+            dauerhaft und namentlich da: `banner`-Alert, kein `closable`, kein Knopf (ein
+            Wiederhol-Knopf könnte nur eine der elf Quellen meinen). Im Fluss über der Fläche,
+            nicht schwebend: oben auf der Karte liegen die Überlagerungen. */}
         {quellenFehler && (
           <div data-testid="lagebild-unvollstaendig">
             <Alert
@@ -1127,10 +1150,9 @@ export default function LagekartePage() {
               showIcon
               banner
               title={quellenMeldung(fehlerhafteQuellen)}
-              /* Zwei Sätze, weil die Lage zweierlei ist: im Live-Betrieb fehlen EINZELNE
-                 Quellen und der Rest der Karte stimmt. Scheitert dagegen das Snapshot-
-                 Dokument, gibt es keinen Ersatz — „unvollständig, nicht leer" wäre dort die
-                 Unwahrheit, und zwar die gefährliche Richtung. */
+              /* Zwei Sätze: live fehlen einzelne Quellen und der Rest stimmt. Scheitert das
+                 Snapshot-Dokument, gibt es keinen Ersatz — „unvollständig, nicht leer" wäre dort
+                 falsch, und zwar in der gefährlichen Richtung. */
               description={
                 snapshotParam != null
                   ? 'Der gesicherte Stand konnte nicht abgerufen werden — die Karte ist leer, nicht aktuell.'

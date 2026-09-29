@@ -1,17 +1,14 @@
-//! Demo-Daten zur Laufzeit (LFH-690). Die Routen werden nur mit `--demo-daten` registriert
-//! (`app::RouterOptionen`), die Handler sehen den Schalter deshalb nie: existiert die Route,
-//! ist er an. Alle Endpunkte stehen hinter [`AdminUser`] (anonym 401, jede andere Rolle 403).
+//! Demo-Daten zur Laufzeit (LFH-690). Die Routen existieren nur mit `--demo-daten`
+//! (`app::RouterOptionen`), die Handler prüfen den Schalter deshalb nicht. Alle Endpunkte
+//! stehen hinter [`AdminUser`] (anonym 401, jede andere Rolle 403).
 //!
-//! **Die Org ist die des Admins** (`benutzer.org_id`, LFH-232), nie eine aus der
-//! Zeilenreihenfolge. Jede Schreibaktion läuft in genau einem `write_retry!`, und jede Antwort
-//! trägt den neuen Status, gelesen in derselben Transaktion wie die Änderung (design.md D3).
+//! Die Org ist die des Admins (`benutzer.org_id`). Jede Schreibaktion läuft in genau einem
+//! `write_retry!`, und jede Antwort trägt den Status aus derselben Transaktion.
 //!
-//! **`lagged` nach Entfernen und Neu-Import** (D7): Nach dem Commit geht das vorhandene
-//! Kontrollereignis [`LiveEvent::Lagged`] auf den Kanal des alten Demo-Einsatzes, über den
-//! öffentlichen [`crate::live::LiveHub::publiziere_event`] und mit derselben Nutzlast
-//! (`resync`) wie das synthetische `lagged` des SSE-Builders (`routes/support.rs`). Eine neue
-//! Variante braucht es nicht, und gesendet wird nie aus der Transaktion heraus: ein Rollback
-//! oder ein Wiederholversuch hätte sonst ein falsches Signal hinterlassen.
+//! **`lagged` nach Entfernen und Neu-Import:** nach dem Commit geht [`LiveEvent::Lagged`] mit
+//! der Nutzlast `resync` über [`crate::live::LiveHub::publiziere_event`] auf den Kanal des alten
+//! Demo-Einsatzes. Nie aus der Transaktion heraus: ein Rollback oder Wiederholversuch
+//! hinterließe sonst ein falsches Signal.
 
 use chrono::Timelike;
 use sqlx::SqliteConnection;
@@ -28,15 +25,11 @@ use axum::Json;
 /// Liest den Stand der Demo-Daten einer Org auf einer Verbindung.
 ///
 /// - Aktiver Kopf: `importiert`, Kopf samt Einsatzbezeichnung, Bericht des Imports.
-/// - Kein aktiver Kopf: `importiert: false` und der Bericht des jüngsten geschlossenen Kopfes
-///   (also der des Entfernens), sonst kein Bericht. „Jüngster“ nach `id`, nicht nach
-///   `entfernt_at`: das hat Sekundenauflösung und stünde bei Entfernen, Import, Entfernen in
-///   derselben Sekunde gleich; die Kopf-IDs steigen monoton (`AUTOINCREMENT`).
+/// - Kein aktiver Kopf: `importiert: false` und der Bericht des jüngsten geschlossenen Kopfes,
+///   sonst keiner. „Jüngster“ nach `id` (monoton), nicht nach `entfernt_at` (Sekundenauflösung).
 ///
-/// Der Einsatz wird per `LEFT JOIN` und nur in der eigenen Org gelesen. Fehlt er (von der
-/// Aufbewahrung gelöscht, oder der Kopf zeigt auf keinen Einsatz der Org), bleibt der Import
-/// trotzdem „importiert“ mit leerer Bezeichnung: der Kopf sperrt den nächsten Import weiter
-/// (409), und ein Status „nicht importiert“ daneben wäre eine Aussage gegen den Zustand.
+/// Der Einsatz wird per `LEFT JOIN` nur in der eigenen Org gelesen. Fehlt er, bleibt der Import
+/// „importiert“ mit leerer Bezeichnung: der Kopf sperrt den nächsten Import weiter (409).
 async fn status_tx(conn: &mut SqliteConnection, org_id: i64) -> Result<DemoDatenStatus, AppError> {
     let aktiv: Option<(i64, String, i64, String, String)> = sqlx::query_as(
         "SELECT d.id, d.importiert_at, d.einsatz_id, COALESCE(e.bezeichnung, ''), d.bericht \
@@ -79,9 +72,8 @@ fn bericht_lesen(json: &str) -> Result<DemoBericht, AppError> {
         .map_err(|e| AppError::Internal(format!("Demo-Bericht nicht lesbar: {e}")))
 }
 
-/// Die ID des Demo-Einsatzes, den der aktive Kopf der Org nennt — nur, wenn es ihn in der
-/// eigenen Org gibt. Zeigt der Kopf ins Leere oder auf einen fremden Einsatz, löscht
-/// `entfernen_tx` keinen Einsatz, und es gibt keinen Kanal, dem ein `lagged` gälte.
+/// ID des Demo-Einsatzes des aktiven Kopfes, nur wenn es ihn in der eigenen Org gibt; sonst
+/// löscht `entfernen_tx` keinen Einsatz, und kein Kanal bekommt ein `lagged`.
 async fn alter_demo_einsatz_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -96,14 +88,14 @@ async fn alter_demo_einsatz_tx(
     .await?)
 }
 
-/// Importzeitpunkt: echte Uhr in UTC, auf Sekunden gekürzt, wie `importieren_tx` ihn schreibt.
-/// Einmal vor `write_retry!` gelesen, damit ein Wiederholversuch dieselbe Szenariouhr nimmt.
+/// Importzeitpunkt: UTC, auf Sekunden gekürzt. Einmal vor `write_retry!` gelesen, damit ein
+/// Wiederholversuch dieselbe Szenariouhr nimmt.
 fn jetzt() -> chrono::NaiveDateTime {
     let t = chrono::Utc::now().naive_utc();
     t.with_nanosecond(0).unwrap_or(t)
 }
 
-/// Resynchronisation für offene Tabs des entfernten Demo-Einsatzes (D7). Nur nach dem Commit.
+/// Resynchronisation für offene Tabs des entfernten Demo-Einsatzes; nur nach dem Commit.
 fn resync_senden(state: &AppState, alt: Option<i64>) {
     if let Some(einsatz_id) = alt {
         state
@@ -135,9 +127,9 @@ pub async fn importieren(
     Ok((StatusCode::CREATED, Json(status)))
 }
 
-/// POST /api/demo-daten/neu — Demo-Daten entfernen und neu importieren, in EINER Transaktion
-/// (D11): scheitert der Import, rollt auch das Entfernen zurück. Ohne aktiven Import läuft nur
-/// der Import. 200; 422 bei fehlendem Katalogeintrag.
+/// POST /api/demo-daten/neu — entfernen und neu importieren in EINER Transaktion: scheitert der
+/// Import, rollt auch das Entfernen zurück. Ohne aktiven Import nur der Import. 200; 422 bei
+/// fehlendem Katalogeintrag.
 pub async fn neu_importieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,

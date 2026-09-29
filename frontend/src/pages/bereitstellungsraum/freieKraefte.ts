@@ -9,7 +9,7 @@ interface KraefteGruppe {
 const OHNE_TYP = 'Ohne Typ';
 const FAHRZEUGE = 'Fahrzeuge ohne Einheit';
 
-/** Gruppierung + Suche der freien Kräfte (LFH-347 · M58), rein und ohne Render prüfbar. */
+/** Gruppierung + Suche der freien Kräfte, rein und ohne Render prüfbar. */
 export function gruppiereFreieKraefte(
   einheiten: Einheit[],
   fahrzeuge: EinsatzFahrzeug[],

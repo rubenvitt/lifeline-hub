@@ -11,10 +11,9 @@ use sqlx::SqlitePool;
 use std::path::PathBuf;
 use tower::limit::ConcurrencyLimitLayer;
 
-/// Admission-Control für die BLOB-Asset-Downloads (LFH-258): begrenzt die gleichzeitig
-/// laufenden Voll-BLOB-Reads (bis 25 MiB je Anhang → RAM-Druck). BEWUSST nur auf die
-/// Download-Routen gelegt, NICHT Router-weit — ein globaler Limiter würde die langlebigen
-/// SSE-Streams (eine EventSource je Einsatz, HTTP/1.1-6-Verbindungs-Limit) aushungern.
+/// Begrenzt die gleichzeitig laufenden Voll-BLOB-Reads der Asset-Downloads (bis 25 MiB je
+/// Anhang → RAM-Druck). Nur auf den Download-Routen, nicht routerweit — ein globaler Limiter
+/// hungerte die langlebigen SSE-Streams aus.
 const MAX_GLEICHZEITIGE_ASSET_DOWNLOADS: usize = 16;
 
 /// Geteilter Anwendungszustand, der an alle Handler übergeben wird.
@@ -23,29 +22,25 @@ pub struct AppState {
     pub pool: SqlitePool,
     pub live: LiveHub,
     pub fachebenen: FachebenenState,
-    /// Lokales Daten-Verzeichnis für Offline-Karten (aus `db_path` abgeleitet, siehe
-    /// `config::default_karten_dir`). Maschinen-lokaler Filesystem-Root — bewusst NICHT in der DB
-    /// (ein gespeicherter absoluter Pfad wäre nach Backup/Restore auf anderem Host falsch).
+    /// Lokales Verzeichnis für Offline-Karten (s. `config::default_karten_dir`). Nicht in der DB,
+    /// weil ein absoluter Pfad nach Backup/Restore auf einem anderen Host falsch wäre.
     pub karten_dir: PathBuf,
-    /// Dedizierter HTTP-Client für Offline-Karten-Downloads (LFH-181): connect-Timeout, KEIN
-    /// Globaltimeout (große Downloads), SSRF-prüfende Redirect-Policy. Separat vom kurzlebigen
-    /// `fachebenen.client` (8 s Timeout).
+    /// HTTP-Client für Offline-Karten-Downloads: Connect-Timeout, kein Gesamt-Timeout (große
+    /// Downloads), SSRF-prüfende Redirect-Policy. Getrennt vom kurzlebigen `fachebenen.client`.
     pub download_client: reqwest::Client,
     /// Transienter Download-Fortschritt je Karte-`id` (in-memory, keine DB-Spalte).
     pub download_fortschritt: crate::karte::download::FortschrittMap,
-    /// Basis-URL des zentralen karten-service (LFH-203, Komponente A) für den Region-Bau-Trigger.
-    /// Operator-konfiguriert (ENV LIFELINE_KARTEN_SERVICE_URL); `None` = Bau-Feature aus.
+    /// Basis-URL des karten-service für den Region-Bau; `None` = Bau-Feature aus.
     pub karten_service_url: Option<String>,
-    /// Bearer-Token für den karten-service. Bleibt server-side (nie im Browser). `None` = Feature aus.
+    /// Bearer-Token für den karten-service; bleibt serverseitig. `None` = Feature aus.
     pub karten_service_token: Option<String>,
 }
 
-/// Schalter, die nur das Routing betreffen (LFH-690, design.md D1).
+/// Schalter, die nur das Routing betreffen (LFH-690).
 ///
-/// Bewusst NICHT im `AppState`: ein Feld dort bräche jede der vielen Test-Konstruktionen für
-/// einen Wert, den kein Handler braucht — existiert eine bedingte Route, ist ihr Schalter an.
-/// Und bewusst kein prozessweiter `OnceLock`: der ließe „aus“ und „an“ nicht im selben
-/// Test-Binary prüfen.
+/// Nicht im `AppState`, weil ein Feld dort jede Test-Konstruktion bräche und kein Handler den
+/// Wert braucht. Kein prozessweiter `OnceLock`, weil der „aus“ und „an“ nicht im selben
+/// Test-Binary prüfen ließe.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RouterOptionen {
     /// Registriert die Routen unter `/api/demo-daten` (`--demo-daten`). Ohne den Schalter
@@ -53,10 +48,8 @@ pub struct RouterOptionen {
     pub demo_daten: bool,
 }
 
-/// Baut den Axum-Router mit allen Routen und dem geteilten Zustand. Die Kartenkonfig kommt
-/// zur Laufzeit aus der DB-Registry (kein Karte-Parameter/Extension mehr — LFH-179).
-///
-/// Vorgabe-Optionen, also ohne die bedingten Routen; siehe [`build_router_mit`].
+/// Baut den Axum-Router mit allen Routen und dem geteilten Zustand, mit Vorgabe-Optionen (ohne
+/// die bedingten Routen); s. [`build_router_mit`].
 pub fn build_router(state: AppState) -> Router {
     build_router_mit(state, RouterOptionen::default())
 }
@@ -169,12 +162,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             delete(routes::einsatz::mitglied_entfernen),
         )
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
-        // Kanonischer Live-Feed des Einsatzes (F01/LFH-227) — ersetzt die 9
-        // modul-benannten `…/stream`-Routen; die Modul-Berechtigung wirkt als
-        // Post-Filter pro Event statt als Gate der Route.
+        // Kanonischer Live-Feed des Einsatzes; die Modul-Berechtigung wirkt als Filter je Event
+        // statt
+        // als Gate der Route.
         .route("/api/einsaetze/{id}/live", get(routes::live::stream))
-        // Modulzähler des Navigationsrahmens (LFH-612): modul-lose Gate-Route wie `/live`,
-        // die Modulrechte filtern die Felder.
+        // Modulzähler: modul-lose Gate-Route wie `/live`, die Modulrechte filtern die Felder.
         .route(
             "/api/einsaetze/{id}/modul-zaehler",
             get(routes::modul_zaehler::liste),
@@ -190,8 +182,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/etb/{eintrag_id}/auftrag",
             post(routes::etb::auftrag_erteilen),
         )
-        // ETB-Anhänge (LFH-117): Upload mit Body-Limit wie die übrigen Datei-Routen (der
-        // Default von 2 MiB kappte still), Download mit dem Asset-Concurrency-Cap.
+        // ETB-Anhänge: Upload mit Body-Limit (die Vorgabe von 2 MiB kappte still), Download mit dem
+        // Asset-Concurrency-Cap.
         .route(
             "/api/einsaetze/{id}/etb/anhaenge",
             post(routes::etb::anhang_hochladen).layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
@@ -246,8 +238,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/chat/nachrichten/{mid}/bezug",
             delete(routes::chat::bezug_loeschen),
         )
-        // Generische Anhänge (LFH-102). Body-Limit etwas über MAX_GROESSE (25 MiB)
-        // für Multipart-Overhead; der Default (2 MiB) würde Uploads kappen.
+        // Generische Anhänge. Body-Limit etwas über MAX_GROESSE (25 MiB) für den
+        // Multipart-Overhead.
         .route(
             "/api/einsaetze/{id}/anhaenge",
             post(routes::anhang::hochladen).layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
@@ -260,8 +252,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                     MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
                 )),
         )
-        // Dokumentenablage (LFH-632): eigener Präfix mit Modul-Gate; Upload/Download wie Anhänge
-        // mit Body-Limit und Download-Concurrency-Cap.
+        // Dokumentenablage: eigener Präfix mit Modul-Gate; Upload/Download wie Anhänge.
         .route(
             "/api/einsaetze/{id}/dokumente",
             get(routes::dokument::liste)
@@ -315,23 +306,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/auftraege/{aid}/abnehmen",
             post(routes::auftrag::abnehmen),
         )
-        // Maßgebliche Pegel (LFH-606): Kennzahl für Dashboard und Überblick, Gate `OhneModul`.
+        // Maßgebliche Pegel: Kennzahl für Dashboard und Überblick, Gate `OhneModul`.
         .route(
             "/api/einsaetze/{id}/pegel",
             get(routes::pegel::liste)
                 .put(routes::pegel::ersetzen)
                 .post(routes::pegel::anfuegen),
         )
-        // 24-h-Verlauf je Pegel (LFH-633) für die Modulseite „Wetter & Pegel", modul-los wie
-        // die Liste. Das statische Segment `verlauf` schlägt `{pegel_id}` ohnehin.
+        // 24-h-Verlauf je Pegel, modul-los wie die Liste. Das statische Segment `verlauf` schlägt
+        // `{pegel_id}`.
         .route(
             "/api/einsaetze/{id}/pegel/verlauf",
             get(routes::pegel::verlauf),
         )
-        // Wetter am Einsatzort (LFH-633): Warnungen und Vorhersage, am Modul `wetter-pegel`
-        // gegatet. Ein Quellausfall ist kein HTTP-Fehler, sondern ein Zustand je Teil.
+        // Wetter am Einsatzort, am Modul `wetter-pegel` gegatet. Ein Quellausfall ist kein
+        // HTTP-Fehler, sondern ein Zustand je Teil.
         .route("/api/einsaetze/{id}/wetter", get(routes::wetter::anzeige))
-        // Prognose am einzelnen Pegel (LFH-628): eigene Routen, nicht im Vollersatz-PUT.
+        // Prognose am einzelnen Pegel: eigene Routen, nicht im Vollersatz-PUT.
         .route(
             "/api/einsaetze/{id}/pegel/{pegel_id}/prognose",
             put(routes::pegel::prognose_setzen).delete(routes::pegel::prognose_loeschen),
@@ -340,9 +331,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/pegel/{pegel_id}/vorhersage",
             get(routes::pegel::vorhersage_lesen),
         )
-        // Stab (LFH-46): Führungsorganisation S1–S6. Flache Kette wie die Nachbarn.
-        // Ablösung (LFH-635). `vorgaben` vor `{aid}` ist für axum egal (statisches Segment
-        // schlägt Parameter), steht aber zur Lesbarkeit zuerst.
+        // Stab (S1–S6) und Ablösung. `vorgaben` steht vor `{aid}` nur zur Lesbarkeit.
         .route(
             "/api/einsaetze/{id}/abloesungen",
             get(routes::abloesung::liste).post(routes::abloesung::beginnen),
@@ -367,9 +356,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/abloesungen/{aid}/vollzug/zuruecknehmen",
             post(routes::abloesung::zuruecknehmen),
         )
-        // Betreuung (LFH-639): Evakuierungsbezirke und Betreuungsstellen mit je einer
-        // Meldereihe. Rücknahmen hängen an der Meldung, nicht am Objekt — die Route kennt
-        // Bezirk bzw. Stelle erst aus der Meldung.
+        // Betreuung: Evakuierungsbezirke und Betreuungsstellen mit je einer Meldereihe. Rücknahmen
+        // hängen an der Meldung; Bezirk bzw. Stelle kennt die Route erst aus ihr.
         .route(
             "/api/einsaetze/{id}/betreuung",
             get(routes::betreuung::uebersicht),
@@ -418,7 +406,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/betreuung/belegungen/{mid}/zuruecknehmen",
             post(routes::betreuung::belegung_zuruecknehmen),
         )
-        // Verpflegung (LFH-634): Zeitfenster mit Bedarf, Ausgaben dagegen.
+        // Verpflegung: Zeitfenster mit Bedarf, Ausgaben dagegen.
         .route(
             "/api/einsaetze/{id}/verpflegung",
             get(routes::verpflegung::uebersicht),
@@ -679,8 +667,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/schaeden/{sid}",
             delete(routes::einsatz_schaden::stornieren),
         )
-        // Schaden-Anhänge (LFH-21): Modul-Gate `schaeden`; Upload/Download wie die
-        // Dokumentenablage mit Body-Limit und Download-Concurrency-Cap.
+        // Schaden-Anhänge: Modul-Gate `schaeden`; Upload/Download wie die Dokumentenablage.
         .route(
             "/api/einsaetze/{id}/schaeden/{sid}/anhaenge",
             get(routes::schaden_anhang::liste)
@@ -918,9 +905,9 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/gefahrengebiete/{gid}/matrix/bewertung",
             put(routes::gefahr::bewerten),
         )
-        // Archiv-Namensraum der Aufbewahrung (LFH-23): nur System-Admin der eigenen Org,
-        // nur lesend bis auf das Wiederherstellen. Die Lesesperre der regulären
-        // Einsatz-Routen bleibt davon unberührt (Guard in tests/aufbewahrung.rs).
+        // Archiv-Namensraum der Aufbewahrung: nur System-Admin der eigenen Org, nur lesend bis auf
+        // das
+        // Wiederherstellen (Guard in tests/aufbewahrung.rs).
         .route("/api/aufbewahrung", get(routes::aufbewahrung::uebersicht))
         .route(
             "/api/aufbewahrung/einsaetze/{id}",
@@ -939,8 +926,9 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/organisation",
             patch(routes::organisation::aktualisieren),
         )
-        // Logo der Organisation (LFH-22): 1 MiB Nutzlast plus 64 KiB für den Multipart-Rahmen.
-        // Die Größengrenze selbst prüft der Handler (400); das Limit fängt nur Übergrößen ab.
+        // Logo der Organisation: 1 MiB Nutzlast plus 64 KiB Multipart-Rahmen. Die Größengrenze
+        // prüft
+        // der Handler (400); das Limit fängt nur Übergrößen ab.
         .route(
             "/api/organisation/logo",
             get(routes::organisation::logo_lesen)
@@ -1147,8 +1135,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     #[cfg(feature = "dev-seeds")]
     let router = router.route("/api/dev/users", get(routes::dev::users));
 
-    // Demo-Daten (LFH-690): nur mit `--demo-daten` registriert. Ohne den Schalter fällt der
-    // Pfad in den `/api/`-404-Fallback — kein 401/403/405, das seine Existenz verriete.
+    // Demo-Daten nur mit `--demo-daten`. Ohne Schalter fällt der Pfad in den `/api/`-404-Fallback
+    // — kein 401/403/405, das seine Existenz verriete.
     let router = if opt.demo_daten {
         router
             .route(
@@ -1171,26 +1159,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/karte/fachebenen/{quelle}",
             get(routes::karte::fachebenen),
         )
-        // Offline-Tile-Endpoint (LFH-195, Shortbread/MBTiles): liest die aktive Karte per
-        // gecachtem read-only-Reader (mbtiles::reader_fuer) statt sie komplett auszuliefern.
-        // Kompat-Route (erste sichtbare Region); neue Clients nutzen die region-adressierte Route.
+        // Offline-Tiles der aktiven Karte über den gecachten read-only-Reader. Kompat-Route (erste
+        // sichtbare Region); neue Clients nutzen die region-adressierte Route.
         .route(
             "/api/karte/offline/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_tiles),
         )
-        // Eingebettete Welt-Übersicht (LFH-207, Low-Zoom-Basis): statischer „welt"-Pfad VOR der
-        // dynamischen {karte_id}-Route (axum priorisiert statisch, hier zusätzlich explizit voran).
+        // Eingebettete Welt-Übersicht: der statische „welt“-Pfad steht vor der `{karte_id}`-Route.
         .route(
             "/api/karte/offline/welt/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_welt_tiles),
         )
-        // Region-adressierter Tile-Endpoint (LFH-188, Multi-Region): je sichtbarer Region eine
-        // eigene Vector-Source; N Regionen werden gemeinsam gezeichnet.
+        // Region-adressierter Tile-Endpoint: je sichtbarer Region eine eigene Vector-Source.
         .route(
             "/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_tiles_region),
         )
-        // Eingebettete Offline-Glyphs/Sprite (LFH-195, Task 2.4): rust-embed statt Proxy/Fetch.
+        // Eingebettete Offline-Glyphs/Sprite (rust-embed).
         .route(
             "/api/karte/offline/fonts/{fontstack}/{datei}",
             get(routes::karte::offline_fonts),
@@ -1199,7 +1184,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/karte/offline/sprites/{datei}",
             get(routes::karte::offline_sprite),
         )
-        // Style-/Tile-Proxy (LFH-182, öffentlich): verbirgt Upstream-Key/-URL für proxied Quellen.
+        // Style-/Tile-Proxy (öffentlich): verbirgt Upstream-Key und -URL.
         .route(
             "/api/karte/proxy/{id}/style.json",
             get(routes::karte::proxy_style),
@@ -1285,36 +1270,30 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
 
     router
         .fallback(crate::static_files::serve)
-        // Methoden-Mismatch (LFH-267/F22): axums Default-405 hat einen LEEREN Body und bricht
-        // damit den {error}-Vertrag. Der Fallback greift nur, wenn der Pfad existiert, die
-        // Methode aber nicht registriert ist.
+        // Axums Default-405 hat einen leeren Body und bräche den `{error}`-Vertrag. Der Fallback
+        // greift
+        // nur, wenn der Pfad existiert, die Methode aber nicht.
         .method_not_allowed_fallback(methode_nicht_erlaubt)
-        // Panik-Abfederung (LFH-260/F35): fängt eine Handler-Panik und antwortet mit 500 +
-        // {error}-JSON, statt die Verbindung ohne Antwort abzureißen — Letzteres klassifiziert
-        // das Frontend als Netzwerkfehler und der Offline-Puffer als „kein Netz".
+        // Fängt eine Handler-Panik und antwortet mit 500 + `{error}`, statt die Verbindung
+        // abzureißen
+        // (das hielte das Frontend für „kein Netz“).
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic))
-        // Zulassungssteuerung (LFH-226/G08): Zeitbudget + Gleichzeitigkeits-Cap mit Lastabwurf.
-        // Muss AUSSERHALB des `CatchPanicLayer` liegen, damit sie eine Handler-Panik nicht als
-        // Unwind durch ihren eigenen Rumpf bekommt, sondern die von `CatchPanicLayer` erzeugte
-        // 500-Antwort. Die Ausnahmeliste greift trotzdem: `MatchedPath` wird beim Routing
-        // gesetzt, also bevor irgendein per `Router::layer` montierter Layer läuft.
+        // Zulassungssteuerung: Zeitbudget und Gleichzeitigkeits-Cap mit Lastabwurf. Muss AUSSERHALB
+        // des `CatchPanicLayer` liegen, damit sie dessen 500-Antwort bekommt statt eines Unwinds.
+        // `MatchedPath` ist beim Routing gesetzt, die Ausnahmeliste greift also trotzdem.
         .layer(axum::middleware::from_fn_with_state(
             crate::zulassung::Zulassung::default(),
             crate::zulassung::zulassung,
         ))
-        // Request-Instrumentierung (LFH-249/F30). Reihenfolge ist Absicht: `.layer()` hängt
-        // nach AUSSEN, der Trace-Layer liegt also außerhalb von CatchPanic UND Zulassung.
-        // Er sieht damit beides — die abgefederten Panik-500er und die Lastabwürfe der
-        // Zulassungssteuerung. Ein Lastabwurf, den niemand im Log sieht, wäre im
-        // Einsatzbetrieb genau die Sorte Vorfall, die man hinterher nicht rekonstruieren kann.
-        //
-        // Der eigentliche Gewinn ist, dass `src/error.rs` NICHT angefasst werden muss: sobald
-        // jeder Handler in diesem Span läuft, erben die bestehenden `tracing::error!`-Zeilen
-        // Methode, Pfad und Request-ID von selbst. Vorher war ein „Datenbankfehler" im Log
-        // keinem Endpunkt und keinem Aufrufer zuzuordnen.
+        // Request-Instrumentierung. `.layer()` hängt nach außen, der Trace-Layer liegt also
+        // außerhalb
+        // von CatchPanic UND Zulassung und sieht Panik-500er wie Lastabwürfe. Jeder Handler läuft
+        // in
+        // diesem Span, deshalb tragen die `tracing::error!`-Zeilen Methode, Pfad und Request-ID.
         .layer(tower_http::trace::TraceLayer::new_for_http().make_span_with(MakeSpanMitRequestId))
-        // Request-ID zuerst setzen (ganz außen), damit sie im Span oben schon dasteht, und
-        // in die Antwort spiegeln — so kann ein Nutzer die ID aus dem Fehlerfall melden.
+        // Request-ID ganz außen setzen, damit sie im Span schon steht, und in die Antwort spiegeln
+        // — so
+        // kann ein Nutzer sie aus dem Fehlerfall melden.
         .layer(tower_http::request_id::PropagateRequestIdLayer::x_request_id())
         .layer(tower_http::request_id::SetRequestIdLayer::x_request_id(
             tower_http::request_id::MakeRequestUuid,
@@ -1322,11 +1301,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .with_state(state)
 }
 
-/// Baut den `tracing`-Span jedes HTTP-Requests.
-///
-/// Eigene Implementierung statt `DefaultMakeSpan`, weil dieses die Request-ID nicht kennt —
-/// und genau die ist der Faden, an dem im Betrieb ein gemeldeter Fehler zu den zugehörigen
-/// Logzeilen zurückführt.
+/// Baut den `tracing`-Span jedes HTTP-Requests. Eigene Implementierung, weil `DefaultMakeSpan`
+/// die Request-ID nicht kennt.
 #[derive(Clone, Copy)]
 struct MakeSpanMitRequestId;
 
@@ -1346,12 +1322,8 @@ impl<B> tower_http::trace::MakeSpan<B> for MakeSpanMitRequestId {
     }
 }
 
-/// Antwort auf einen Methoden-Mismatch (LFH-267/F22): 405 mit demselben `{error}`-JSON-Envelope
-/// wie `AppError`.
-///
-/// Bewusst als rohes Tupel statt über `AppError`: der Fehlertyp trägt keine 405-Variante, und
-/// eine nur für diesen Router-Fallback einzuführen wäre Ballast — der Status kommt hier ohnehin
-/// aus dem `IntoResponse` des Handlers. Vorbild ist [`on_panic`], das denselben Weg geht.
+/// 405 mit demselben `{error}`-JSON wie `AppError`. Als rohes Tupel, weil `AppError` keine
+/// 405-Variante trägt (wie [`on_panic`]).
 async fn methode_nicht_erlaubt() -> axum::response::Response {
     (
         axum::http::StatusCode::METHOD_NOT_ALLOWED,
@@ -1360,9 +1332,8 @@ async fn methode_nicht_erlaubt() -> axum::response::Response {
         .into_response()
 }
 
-/// Antwort auf eine im Handler abgefangene Panik (LFH-260/F35): 500 mit demselben
-/// `{error}`-JSON-Envelope wie `AppError`. Der Panik-Grund bleibt im Log (tracing), nicht
-/// in der Antwort.
+/// 500 mit demselben `{error}`-JSON wie `AppError` nach einer abgefangenen Panik; der Grund
+/// bleibt im Log.
 fn on_panic(_err: Box<dyn std::any::Any + Send + 'static>) -> axum::response::Response {
     tracing::error!("Handler-Panik durch CatchPanicLayer abgefangen");
     (
@@ -1386,9 +1357,8 @@ mod tests {
         assert_eq!(json["error"], "Interner Serverfehler");
     }
 
-    /// LFH-260/F35: verifiziert die Verdrahtung end-to-end — eine ECHTE Handler-Panik muss von
-    /// `CatchPanicLayer::custom(on_panic)` durch die tower-Service-Kette gefangen und als
-    /// 500 + {error}-JSON beantwortet werden (statt die Verbindung ohne Antwort abzureißen).
+    /// Eine echte Handler-Panik wird durch die Service-Kette gefangen und als 500 + `{error}`
+    /// beantwortet.
     #[tokio::test]
     async fn catch_panic_layer_faengt_echte_panik_durch_die_service_kette() {
         use axum::body::Body;

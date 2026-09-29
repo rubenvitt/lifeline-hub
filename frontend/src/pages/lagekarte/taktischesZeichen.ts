@@ -39,11 +39,11 @@ interface TzEingabe {
   fachaufgabe?: string | null; // tz_fachaufgabe am Objekt (manueller Override)
   organisation?: string | null; // tz_organisation am Objekt (manueller Override)
   orgDefault?: string | null; // Org-Default aus /api/organisation
-  // Fahrzeug-Rohfelder für die Ableitung (LFH-171); manuelle tz_*-Overrides bleiben vorrangig.
+  // Fahrzeug-Rohfelder für die Ableitung; manuelle tz_*-Overrides bleiben vorrangig.
   fahrzeugtyp?: string | null; // Freitext-Typ → spezifischeres Grundzeichen + Fachaufgabe
   opta?: string | null; // OPTA → Organisation-Fallback (best effort, unvalidiert)
   traegerorganisation?: string | null; // Trägerorganisation → Organisation (primär)
-  // Personal-Felder für die Ableitung (LFH-172); manueller tz_fachaufgabe-Override bleibt vorrangig.
+  // Personal-Felder für die Ableitung; ein manueller tz_fachaufgabe-Override bleibt vorrangig.
   funktion?: string | null; // Qualifikations-/Funktionstext → Fachaufgabe
   istFuehrungskraft?: boolean; // setzt den DV-102-Funktions-Indikator 'fuehrungskraft'
 }
@@ -53,9 +53,9 @@ export type TzProps = Pick<
   'grundzeichen' | 'organisation' | 'fachaufgabe' | 'einheit' | 'symbol' | 'farbe' | 'funktion'
 >;
 
-// Fahrzeugtyp (Freitext) → spezifischeres DV-102-Grundzeichen. Konservativ: nur eindeutige
-// Fälle; alles andere behält das generische 'kraftfahrzeug-landgebunden'. `kraftrad` ist in
-// der Library deprecated → 'zweirad'. (LFH-171)
+// Fahrzeugtyp (Freitext) → spezifischeres DV-102-Grundzeichen. Konservativ: nur eindeutige Fälle,
+// sonst das generische 'kraftfahrzeug-landgebunden'. `kraftrad` ist in der Library deprecated →
+// 'zweirad'.
 export function grundzeichenAusFahrzeugtyp(
   fahrzeugtyp: string | null | undefined,
 ): GrundzeichenId | undefined {
@@ -69,7 +69,7 @@ export function grundzeichenAusFahrzeugtyp(
   return undefined;
 }
 
-// Freitext (Trägerorganisation bzw. OPTA) → DV-102-OrganisationId per Schlüsselwort. (LFH-171)
+// Freitext (Trägerorganisation bzw. OPTA) → DV-102-OrganisationId per Schlüsselwort.
 export function organisationAusText(text: string | null | undefined): OrganisationId | undefined {
   const t = text?.trim().toLowerCase();
   if (!t) return undefined;
@@ -82,8 +82,8 @@ export function organisationAusText(text: string | null | undefined): Organisati
   return undefined;
 }
 
-// Fahrzeugtyp (Freitext) → Fachaufgabe (kuratierte Whitelist; Reihenfolge = Priorität). Kein
-// Treffer → keine Fachaufgabe (lieber generisch als falsch). (LFH-171)
+// Fahrzeugtyp (Freitext) → Fachaufgabe (kuratierte Whitelist, Reihenfolge = Priorität). Kein
+// Treffer → keine Fachaufgabe (lieber generisch als falsch).
 export function fachaufgabeAusFahrzeugtyp(
   fahrzeugtyp: string | null | undefined,
 ): FachaufgabeId | undefined {
@@ -97,8 +97,8 @@ export function fachaufgabeAusFahrzeugtyp(
   return undefined;
 }
 
-// Personal-Funktions-/Qualifikationstext (Freitext) → Fachaufgabe (schmale Whitelist;
-// Reihenfolge = Priorität). Kein Treffer → keine Ableitung (bleibt beim fuehrung-Default). (LFH-172)
+// Funktions-/Qualifikationstext → Fachaufgabe (schmale Whitelist, Reihenfolge = Priorität). Kein
+// Treffer → keine Ableitung.
 export function fachaufgabeAusFunktion(
   funktion: string | null | undefined,
 ): FachaufgabeId | undefined {
@@ -111,12 +111,10 @@ export function fachaufgabeAusFunktion(
   return undefined;
 }
 
-// accepts-Gating (taktische-zeichen-core): manche Grundzeichen rendern bestimmte Overlays NICHT
-// — die Library ignoriert sie still. Wir setzen sie deshalb gar nicht erst, damit der
-// Icon-Dedup-Key (markerIcons.tzIconKey) nicht divergiert und kein Phantom-Overlay entsteht.
-// Wahrheitsquelle ist der `accepts`-Katalog jedes Grundzeichens (KEINE handgepflegten Sets, die
-// gegen den Katalog driften könnten). LFH-170 braucht das für beliebige Grundzeichen der freien
-// Zeichen; baueTzProps nutzt dieselbe Prüfung.
+// accepts-Gating: manche Grundzeichen rendern bestimmte Overlays nicht, die Library ignoriert sie
+// still. Wir setzen sie gar nicht erst, damit der Icon-Dedup-Key (`tzIconKey`) nicht divergiert und
+// kein Phantom-Overlay entsteht. Wahrheitsquelle ist der `accepts`-Katalog jedes Grundzeichens,
+// keine handgepflegte Liste.
 const AKZEPTIERTE_OVERLAYS: ReadonlyMap<string, ReadonlySet<ComponentType>> = new Map(
   grundzeichenKatalog.map((g) => [g.id, new Set(g.accepts ?? [])]),
 );
@@ -127,9 +125,11 @@ export function grundzeichenAkzeptiert(grundzeichen: string, overlay: ComponentT
   return AKZEPTIERTE_OVERLAYS.get(grundzeichen)?.has(overlay) ?? false;
 }
 
-/** Leitet die DV-102-Spec aus App-Feldern ab. Priorität je Overlay:
- *  manueller Objekt-Override (tz_*) ?? aus Fahrzeugtyp/Träger/OPTA abgeleitet ?? Typ-/Org-Default.
- *  accepts-Gating entfernt Overlays, die das gewählte Grundzeichen nicht rendert. */
+/**
+ * Leitet die DV-102-Spec aus App-Feldern ab. Priorität je Overlay: manueller Override (tz_*) ??
+ * abgeleitet aus Fahrzeugtyp/Träger/OPTA ?? Typ-/Org-Default. Das accepts-Gating entfernt Overlays,
+ * die das Grundzeichen nicht rendert.
+ */
 export function baueTzProps(e: TzEingabe): TzProps {
   const grundzeichen: GrundzeichenId =
     e.objekttyp === 'fahrzeug'
@@ -148,8 +148,8 @@ export function baueTzProps(e: TzEingabe): TzProps {
     (e.objekttyp === 'abschnitt' || e.objekttyp === 'fuehrung' ? 'fuehrung' : undefined)) as
     FachaufgabeId | undefined;
 
-  // DV-102-Funktions-Indikator: nur für als Führungskraft markierte Personen (Person-Grundzeichen
-  // akzeptiert 'funktion'). Die Library-Enum kennt nur fuehrungskraft|sonderfunktion.
+  // DV-102-Funktions-Indikator nur für als Führungskraft markierte Personen. Die Library-Enum kennt
+  // nur fuehrungskraft|sonderfunktion.
   const funktion: FunktionId | undefined =
     e.objekttyp === 'fuehrung' && e.istFuehrungskraft ? 'fuehrungskraft' : undefined;
 
@@ -176,8 +176,10 @@ export function einsatzortTz(): TzProps {
   return { grundzeichen: 'anlass' };
 }
 
-/** Schaden: Warn-Dreieck „gefahr"; das Ausmaß steuert ausschließlich die Farbe (Form trägt
- *  die Bedeutung, daher farbenblind-tauglich). Farbe ist garantiert gesetzt. */
+/**
+ * Schaden: Warn-Dreieck „gefahr"; das Ausmaß steuert nur die Farbe (die Form trägt die Bedeutung,
+ * farbenblind-tauglich). Die Farbe ist immer gesetzt.
+ */
 export function schadenTz(ausmass: Ausmass): TzProps & { farbe: string } {
   return { grundzeichen: 'gefahr', farbe: AUSMASS_FARBE[ausmass] ?? AUSMASS_FALLBACK };
 }
@@ -195,9 +197,11 @@ export function uhsTz(typ: UhsTyp): TzProps {
   return UHS_TZ[typ];
 }
 
-/** Betreuungsstelle (LFH-673): Grundzeichen „stelle" + Fachaufgabe „betreuung" nach DV 102 —
- *  für alle vier Einrichtungsstufen dasselbe Zeichen; der Katalog kennt keine Variante je
- *  Stufe, die Art steht deshalb in der Unterzeile des Inspectors. */
+/**
+ * Betreuungsstelle: Grundzeichen „stelle" + Fachaufgabe „betreuung" nach DV 102, für alle vier
+ * Einrichtungsstufen dasselbe (der Katalog kennt keine Variante je Stufe) — die Art steht in der
+ * Unterzeile des Inspectors.
+ */
 export function betreuungsstelleTz(): TzProps {
   return { grundzeichen: 'stelle', fachaufgabe: 'betreuung' };
 }

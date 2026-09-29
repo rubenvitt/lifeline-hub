@@ -144,11 +144,9 @@ pub(super) async fn kopf_anlegen(pool: &SqlitePool, org_id: i64, einsatz_id: i64
 }
 
 /// Alle Zeilen einer Tabelle unter einer Bedingung mit genau einem Parameter, jede Zeile als
-/// Text aus `quote()` aller Spalten, in `rowid`-Reihenfolge. Der Vergleich ist damit
-/// zeilengleich statt bloß gleich viele: eine geänderte Spalte fällt auf, nicht nur eine
-/// fehlende Zeile.
-///
-/// `tabelle` und `bedingung` sind feste Literale aus den Demo-Testmodulen, nie Eingabe.
+/// `quote()`-Text aller Spalten, in `rowid`-Reihenfolge — so fällt auch eine geänderte Spalte
+/// auf, nicht nur eine fehlende Zeile. `tabelle` und `bedingung` sind feste Literale aus den
+/// Demo-Tests.
 pub(super) async fn zeilen(
     pool: &SqlitePool,
     tabelle: &str,

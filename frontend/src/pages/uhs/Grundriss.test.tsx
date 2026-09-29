@@ -85,10 +85,9 @@ function uhsDetail(over: Partial<UhsDetail>): UhsDetail {
 }
 
 /**
- * Rendert mit dem App-Theme der gewählten Dichtestufe (LFH-359). Die Platzkarte liest ihre
- * Bedienform aus den aufgelösten Tokens (`platzBedienform`); antds Vorgaben ohne Theme
- * (`marginSM` 12) ergäben die Kartenform — einen Zustand, den die App in `kompakt` nie hat.
- * Vorgabe ist deshalb `kompakt`, die Tests der Kartenform reichen `komfortabel` herein.
+ * Rendert mit dem App-Theme der gewählten Dichtestufe: die Platzkarte liest ihre Bedienform aus den
+ * Tokens (`platzBedienform`), antds Vorgaben ohne Theme ergäben einen Zustand, den die App in
+ * `kompakt` nie hat.
  */
 function renderGrundriss(
   uhs: UhsDetail,
@@ -99,8 +98,7 @@ function renderGrundriss(
   server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const ergebnis = render(
-    // MemoryRouter: der Detail-Drawer (PersonDetailDrawer) nutzt useNavigate; in der App
-    // läuft Grundriss immer unter einer Route.
+    // MemoryRouter: der Detail-Drawer nutzt useNavigate.
     <MemoryRouter>
       <QueryClientProvider client={qc}>
         <ConfigProvider theme={{ token: antdToken(farbenDunkel, dichte) }}>
@@ -123,14 +121,12 @@ describe('Grundriss – Belegt-Anzeige (LFH-18)', () => {
     expect(await screen.findByText(/R-007/)).toBeInTheDocument();
     // … und der Platz muss als belegt gekennzeichnet sein.
     expect(screen.getByText('belegt')).toBeInTheDocument();
-    // Ein belegter „freier" Platz ist nicht mehr frei: der „frei"-Tag entfällt,
-    // „belegt" ist der einzige Status (Bug-Fix: zuvor „frei / belegt" parallel).
+    // Ein belegter „freier" Platz ist nicht mehr frei: „belegt" ist der einzige Status.
     expect(screen.queryByText('frei')).not.toBeInTheDocument();
   });
 
   it('zeigt bei belegtem, NICHT-freiem Platz beide Status (z. B. defekt + belegt)', async () => {
-    // Nur „frei" widerspricht „belegt". defekt/gesperrt/… sind eigenständige
-    // Zustände, die auch bei Belegung informativ bleiben.
+    // Nur „frei" widerspricht „belegt"; defekt/gesperrt/… bleiben auch bei Belegung informativ.
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({
       plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'defekt' })],
@@ -266,9 +262,8 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
   });
 
   it('setzt den Fokus beim Öffnen auf „Ziel", nicht auf das vorbelegte „Art"', async () => {
-    // LFH-332/B4: die Erfassungshülle fokussiert das ERSTE bedienbare Feld. Deshalb steht
-    // „Ziel" im Formular vor „Art" — „Art" ist mit Transport vorbelegt und nichts, was der
-    // Erfassende zuerst tippt. Der Test pinnt die Feldreihenfolge über ihre Wirkung.
+    // Die Erfassungshülle fokussiert das erste bedienbare Feld, deshalb steht „Ziel" vor „Art" (die
+    // mit Transport vorbelegt ist). Der Test pinnt die Feldreihenfolge über ihre Wirkung.
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, [p]);
@@ -282,9 +277,8 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
   });
 
   it('lässt Dialog und Eingaben stehen, wenn das Speichern scheitert', async () => {
-    // LFH-332/B4: die Hülle leert erst NACH erfolgreichem Speichern. Das setzt voraus,
-    // dass `onErfassen` bei einem Fehler ablehnt (mutateAsync, nicht mutate) — sonst
-    // wäre der Wortlaut weg, obwohl der Verbleib nie ankam.
+    // Die Hülle leert erst nach erfolgreichem Speichern — das setzt `mutateAsync` in `onErfassen`
+    // voraus, sonst wäre der Wortlaut trotz Fehler weg.
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     server.use(
@@ -302,20 +296,7 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     expect(screen.getByRole('textbox', { name: /Ziel/ })).toHaveValue('KH Mitte');
   });
 
-  // LFH-332/B4, Zusicherung 3: zurückgesetzt wird auf BEIDEN Wegen. Vor dem Umbau tat das
-  // der Aufrufer selbst (onSuccess UND onCancel), jetzt die Hülle.
-  //
-  // GEMESSENE LÜCKE (29.07., gehört NICHT dieser Datei): der Abbrechen-Weg hat zwei
-  // Auslöser, und nur einer läuft durch den Reset der Hülle. `ErfassungsModal` reicht
-  // `onAbbrechen` roh an `Modal.onCancel` weiter, während `form.resetFields()` allein im
-  // `abbrechen()` von `ErfassungsFormular` steht — also hinter dem Abbrechen-KNOPF. Escape,
-  // das Kreuz und der Maskenklick gehen daran vorbei; `destroyOnHidden` rettet nichts, weil
-  // der Formularspeicher beim Aufrufer liegt (`Form.useForm()`), nicht im zerstörten DOM.
-  // Gemessen: nach Escape steht beim Wiederöffnen „KH Mitte" im Ziel-Feld. Der Fix ist eine
-  // Zeile in `components/Erfassung.tsx` (Modal-`onCancel` durch denselben Griff wie den
-  // Knopf leiten) und trifft alle Aufrufer der Hülle — deshalb hier nur der Knopf-Weg
-  // gepinnt und die Lücke gemeldet, statt sie lokal mit einem verbotenen Aufrufer-Reset
-  // zuzukleistern (Regel 3 des Umbaus).
+  // Zurückgesetzt wird auf jedem Weg hinaus; hier gepinnt ist der Abbrechen-Knopf.
   it('leert den Dialog nach dem Abbrechen per Knopf (auch die Vorbelegung ist wieder da)', async () => {
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
@@ -330,8 +311,8 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
 
     await userEvent.click(oeffnen);
     expect(await screen.findByRole('textbox', { name: /Ziel/ })).toHaveValue('');
-    // Art steht wieder auf der Vorbelegung. antd v6 trägt den gewählten Eintrag als
-    // `title` am Select-Inhalt — das Eingabefeld der Combobox ist immer leer.
+    // antd v6 trägt den gewählten Eintrag als `title` am Select-Inhalt — das Eingabefeld der
+    // Combobox ist immer leer.
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByTitle('Transport')).toBeInTheDocument();
     expect(within(dialog).queryByTitle('Entlassung vor Ort')).not.toBeInTheDocument();
@@ -400,8 +381,7 @@ describe('Grundriss – Spalten-Fluss (LFH-58)', () => {
     renderGrundriss(uhs, [p]);
     expect(await screen.findByText('Auf Transport gebracht')).toBeInTheDocument();
     expect(await screen.findByText('Transport → KH Mitte')).toBeInTheDocument();
-    // Auto-Austritt leert aktuelle_uhs_id → die Person darf NICHT zusätzlich links
-    // unter „Noch nicht aufgenommen" auftauchen (sonst Doppelanzeige).
+    // Auto-Austritt leert aktuelle_uhs_id → keine Doppelanzeige unter „Noch nicht aufgenommen".
     expect(screen.getAllByText(/R-009/)).toHaveLength(1);
   });
 
@@ -485,17 +465,20 @@ describe('Grundriss – Read-only (schreibgeschuetzt)', () => {
 });
 
 describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
-  /** Öffnet das geladene Dropdown-Menü der Platzkarte. antd lässt die Portale
-   *  geschlossener Dropdowns im Baum stehen — deshalb über das SICHTBARE greifen. */
+  /**
+   * Das geöffnete Dropdown-Menü der Platzkarte — über das sichtbare greifen, antd lässt Portale
+   * geschlossener Dropdowns stehen.
+   */
   function offenesMenue(): HTMLElement {
     const offen = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
     if (!offen) throw new Error('kein offenes Dropdown-Menü im Baum');
     return offen as HTMLElement;
   }
 
-  /** Wählt im geöffneten Patienten-Auswahlfeld den Eintrag mit dieser Kennung.
-   *  Über das SICHTBARE Dropdown greifen: dieselbe Person steht zugleich in der linken
-   *  Spalte, ein blosser Textgriff wäre mehrdeutig. */
+  /**
+   * Wählt im geöffneten Patienten-Auswahlfeld den Eintrag mit dieser Kennung — über das sichtbare
+   * Dropdown, weil dieselbe Person auch in der linken Spalte steht.
+   */
   async function waehlePatient(kennung: RegExp) {
     await userEvent.click(await screen.findByRole('combobox', { name: 'Patient' }));
     const liste = await waitFor(() => {
@@ -524,9 +507,8 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   }
 
   it('weist eine noch nicht aufgenommene Person per Klick auf den Platz zu (art=eintritt)', async () => {
-    // AK1: der Weg läuft OHNE jedes Drag-Ereignis. Gepinnt wird der abgeschickte Body,
-    // nicht ein Mock auf useMutation — ein Mock wäre auch dann grün, wenn der Klickweg
-    // bloss den bestehenden DragEnd-Handler synthetisch auslöste.
+    // Der Weg läuft ohne Drag-Ereignis. Gepinnt wird der abgeschickte Body, nicht ein Mock auf
+    // useMutation — der wäre auch grün, wenn der Klickweg bloß den DragEnd-Handler auslöste.
     const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
     const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     const senke: { body: unknown } = { body: null };
@@ -567,8 +549,8 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     });
     expect(screen.getByText('belegt')).toBeInTheDocument();
 
-    // Ein unabhängiger Live-/Refetch-Stand, der während unseres Requests eintrifft, darf
-    // beim Fehler nicht durch einen Snapshot der gesamten Personenliste verloren gehen.
+    // Ein Live-/Refetch-Stand, der während des Requests eintrifft, darf beim Fehler nicht durch
+    // einen Snapshot der Personenliste verloren gehen.
     let refetchFreigeben: (() => void) | undefined;
     const refetchGate = new Promise<void>((resolve) => {
       refetchFreigeben = resolve;
@@ -621,18 +603,10 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   });
 
   it('bietet den Zuweisungsweg auch über das Platzaktionen-Menü an', async () => {
-    // Der Wurzelklick ist die grosse Berührungsfläche; im Fükw (Tastatur+Maus) ist das
-    // Menü der Weg dorthin, weil ein `div onClick` keinen Tastaturzugang hat. Ein eigener
-    // Knopf auf der Karte scheidet aus — die Zeile trägt mit vier Knöpfen ihre volle Breite
-    // (`platzBedienform`, Dateikopf). In den Berührungsstufen steht er ohnehin im Kartenmenü.
-    //
-    // DER NAME SAGT BEWUSST NICHT „Tastaturweg": gefahren wird hier mit der Maus. Der Weg
-    // ist für die Tastatur gedacht, aber ein antd-Dropdown mit `trigger={['click']}` ist
-    // in jsdom nicht per Tastatur zu öffnen (gemessen: Enter auf dem Auslöser, danach
-    // Pfeil und Enter im Menü — der Dialog bleibt zu). Belegt ist damit, DASS der Eintrag
-    // existiert und den Dialog öffnet; NICHT, dass eine Tastatur ihn erreicht. Ein
-    // Testname, der das behauptet, wäre die Sorte Zusicherung, die diese Datei an drei
-    // anderen Stellen ausgeräumt hat.
+    // Im Fükw ist das Menü der Weg zum Zuweisen, weil ein `div onClick` keinen Tastaturzugang hat
+    // (`platzBedienform`, Dateikopf). Der Test fährt mit der Maus: ein antd-Dropdown mit
+    // `trigger={['click']}` ist in jsdom nicht per Tastatur zu öffnen. Belegt ist, dass der Eintrag
+    // existiert und den Dialog öffnet — nicht, dass eine Tastatur ihn erreicht.
     const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
     const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, [p]);
@@ -644,12 +618,9 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   });
 
   it('löst beim Klick auf einen Menüeintrag NICHT zusätzlich die Platzzuweisung aus', async () => {
-    // AK2 / gemessener Portal-Fall (LFH-365/MetaChip): das Dropdown rendert im Portal,
-    // sein Synthetic Event steigt aber im KOMPONENTEN-Baum auf und erreicht den
-    // Wurzel-onClick der Karte. Ein stopPropagation am Auslöser allein genügt dort nicht.
-    // MIT zuweisbarer Person rendern: ohne sie zeigte der Dialog „Niemand zuweisbar" statt
-    // eines Auswahlfelds, und eine Prüfung auf die Auswahl wäre blind — gemessen, der Test
-    // blieb dann auch mit entferntem Riegel grün. Geprüft wird deshalb der DIALOG.
+    // Das Dropdown rendert im Portal, sein Synthetic Event steigt aber im Komponentenbaum auf und
+    // erreicht den Wurzel-onClick der Karte. Mit zuweisbarer Person rendern, sonst zeigte der
+    // Dialog „Niemand zuweisbar" und die Prüfung bliebe auch ohne Riegel grün.
     const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
     const uhs = uhsDetail({
       status: 'aktiv',
@@ -667,8 +638,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   });
 
   it('löst beim Klick auf einen Aktions-Button NICHT zusätzlich die Platzzuweisung aus', async () => {
-    // Zweite Hälfte von AK2: die direkten Icon-Buttons stoppten bisher nur `pointerdown`,
-    // nicht `click` — ein Wurzel-onClick feuerte damit bei jedem Aktionsklick mit.
+    // Die direkten Icon-Buttons müssen auch `click` stoppen, nicht nur `pointerdown`.
     const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
     const uhs = uhsDetail({
       status: 'aktiv',
@@ -685,13 +655,9 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   });
 
   it('reagiert nicht auf den Klick, wenn der Platz bereits belegt ist', async () => {
-    // Festlegung LFH-367: nur unbelegte Plätze nehmen per Klick auf. Ein belegter Platz
-    // trägt bereits eigene Klickziele (Personenkarte, Transport, Zurückweisen).
-    //
-    // Die ZWEITE Person ist der Grund, dass dieser Test etwas belegt: mit dem Belegenden
-    // allein wäre die Kandidatenmenge leer (er steht weder im Wartebereich noch unter
-    // „noch nicht aufgenommen"), der Dialog zeigte „Niemand zuweisbar" statt einer Auswahl
-    // — und eine Prüfung darauf bliebe auch ohne die `belegtVon`-Bedingung grün. Gemessen.
+    // Nur unbelegte Plätze nehmen per Klick auf; ein belegter trägt eigene Klickziele. Die zweite
+    // Person ist nötig: mit dem Belegenden allein wäre die Kandidatenmenge leer, und die Prüfung
+    // bliebe auch ohne die `belegtVon`-Bedingung grün.
     const belegend = person({
       id: 7,
       registrier_nr: 7,
@@ -711,9 +677,8 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   });
 
   it('nimmt auch einen defekten oder gesperrten Platz per Klick auf', async () => {
-    // Festlegung LFH-367: „frei" ist UNBELEGT, nicht `verfuegbarkeit === 'frei'`. Der
-    // Drag-Weg prüft die Verfügbarkeit ebenfalls nicht — der Klickweg darf nicht strenger
-    // sein als die Geste, die er ersetzt.
+    // „frei" heißt unbelegt, nicht `verfuegbarkeit === 'frei'` — der Klickweg ist nicht strenger
+    // als der Drag-Weg.
     const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
     const uhs = uhsDetail({
       status: 'aktiv',
@@ -737,8 +702,8 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   });
 
   it('bietet keinen Zuweisungsweg im Bearbeiten-Modus (dort verschiebt der Klick Layout)', async () => {
-    // Im Bearbeiten-Modus ist die Karte Drag-Source fürs Layout. Ein Zuweisungsdialog
-    // daneben stellte den Klick gegen die Geste, die dort gemeint ist.
+    // Im Bearbeiten-Modus ist die Karte Drag-Source fürs Layout; ein Zuweisungsdialog stellte den
+    // Klick gegen die gemeinte Geste.
     const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
     const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, [p]);
@@ -750,7 +715,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   });
 
   it('meldet statt eines Dialogs, wenn niemand zuweisbar ist', async () => {
-    // Kein Dialog mit totem Primär-Knopf: der hätte nichts zu erfassen und schlösse nur.
+    // Kein Dialog mit totem Primär-Knopf.
     const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, []);
 
@@ -762,12 +727,9 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
 });
 
 describe('Grundriss – Berührungsbedienung: kein Scroll-Riegel (LFH-367/B5g, AK3)', () => {
-  // Das AK des Elterntickets forderte `touchAction: 'none'` auf beiden Draggables. In der
-  // Fassung wäre es eine REGRESSION: alle drei Träger liegen in overflow:auto-Containern,
-  // und die Angabe schaltet natives Scrollen auf dem Element ab — das Tablet könnte die
-  // Platzliste nicht mehr scrollen. Der PointerSensor deckt Berührung über Pointer Events
-  // bereits ab (dnd-kit empfiehlt PointerSensor ODER MouseSensor+TouchSensor, nicht beides).
-  // Geprüft wird der Inline-Style, nicht ein Pixel: jsdom rechnet kein Layout.
+  // Kein `touchAction: 'none'` auf den Draggables: alle liegen in overflow:auto-Containern, die
+  // Angabe schaltete das native Scrollen ab. Der PointerSensor deckt Berührung ab. Geprüft wird der
+  // Inline-Style.
   it('setzt auf der Platzkarte keine Angabe, die das Scrollen der Fläche abschaltet', async () => {
     const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, []);
@@ -787,9 +749,8 @@ describe('Grundriss – Berührungsbedienung: kein Scroll-Riegel (LFH-367/B5g, A
 });
 
 describe('Grundriss – Personenkarte im Neuentwurf (LFH-621)', () => {
-  // Kein antd-`Tag` mehr: die Karte ist eine Personenmarke in Paneel-Optik, die
-  // Registriernummer läuft Mono. Die e2e-Specs greifen sie über `data-lfh`, nicht über
-  // eine antd-Klasse — die Abwesenheit von `.ant-tag` ist deshalb Teil der Aussage.
+  // Kein antd-`Tag`: die Karte ist eine Personenmarke, die e2e-Specs greifen sie über `data-lfh` —
+  // die Abwesenheit von `.ant-tag` gehört zur Aussage.
   it('rendert die Karte als Personenmarke mit Mono-Nummer, nicht als antd-Tag', async () => {
     const p = person({ id: 7, registrier_nr: 7, name: 'Müller', aktuelle_uhs_id: null });
     renderGrundriss(uhsDetail({}), [p]);
@@ -850,10 +811,8 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
 });
 
 /**
- * Kartenform der Platzkarte in den Berührungsstufen (LFH-359 + LFH-379). Gerendert mit dem
- * App-Theme der Stufe `komfortabel`: dort wählt `platzBedienform` die Karte als EINZIGES Ziel,
- * ein Tipp öffnet das Aktionsmenü. Die Trefffläche selbst misst Playwright
- * (`uhs-grundriss-touch.spec.ts`) — jsdom rechnet kein Layout.
+ * Kartenform der Platzkarte in den Berührungsstufen: in `komfortabel` ist die Karte das einzige
+ * Ziel, ein Tipp öffnet das Aktionsmenü. Die Trefffläche misst `uhs-grundriss-touch.spec.ts`.
  */
 describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
   function offenesMenue(): HTMLElement {
@@ -864,14 +823,15 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
   const keinOffenesMenue = () =>
     document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]') === null;
   /**
-   * „Das Menü ist zu" wird am AUSLÖSER gelesen (`aria-expanded`), nicht am Portal: antd hängt
-   * `ant-dropdown-hidden` erst am Ende der Ausblend-Animation an, und jsdom feuert kein
-   * `transitionend` — das Portal sähe dort offen aus (gemessen).
+   * „Menü zu" wird am Auslöser gelesen (`aria-expanded`): antd hängt `ant-dropdown-hidden` erst am
+   * Ende der Animation an, und jsdom feuert kein `transitionend`.
    */
   const menueZu = (name = 'Aktionen zu Bett 1') =>
     expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
-  /** Die Menüeinträge in Reihenfolge, per Teilstring greifbar (Icons bringen ihr
-   *  englisches aria-label mit, s. `platzMenueEintraege`). */
+  /**
+   * Die Menüeinträge in Reihenfolge, per Teilstring greifbar (Icons bringen englische aria-label
+   * mit).
+   */
   const eintraege = () =>
     within(offenesMenue())
       .getAllByRole('menuitem')
@@ -945,15 +905,15 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
   });
 
   /**
-   * Ein Tipp auf die Personenmarke der Karte ist in dieser Form KEIN eigener Weg: er steigt
-   * zur Karte auf und öffnet das Menü (verschachtelte 24-px-Ziele verbieten die Stufen).
+   * Ein Tipp auf die Personenmarke ist hier kein eigener Weg: er steigt zur Karte auf und öffnet
+   * das Menü (verschachtelte 24-px-Ziele verbieten die Stufen).
    */
   it('öffnet beim Tipp auf die Personenmarke das Menü, nicht direkt den Drawer', async () => {
     renderGrundriss(unbelegt(), [belegtePerson()], false, 'komfortabel');
     await userEvent.click(await screen.findByText(/R-007/));
     expect(eintraege()[0]).toContain('Verbleib / Entlassung erfassen');
-    // Der Drawer ist ein `dialog` und stünde sofort im Baum (sein Inhalt lädt erst danach —
-    // eine Textprüfung auf den Inhalt wäre blind, gemessen per Mutationsprobe).
+    // Der Drawer ist ein `dialog` und stünde sofort im Baum — eine Textprüfung auf seinen erst
+    // später geladenen Inhalt wäre blind.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -969,8 +929,8 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
         return HttpResponse.json({});
       }),
     );
-    // MIT zuweisbarer Person: sonst zeigte ein fälschlich ausgelöster Zuweisungsweg nur
-    // eine Meldung statt eines Dialogs, und die Prüfung darauf wäre blind.
+    // Mit zuweisbarer Person: sonst zeigte ein fälschlich ausgelöster Zuweisungsweg nur eine
+    // Meldung, und die Prüfung wäre blind.
     renderGrundriss(uhs, [wartend()], false, 'komfortabel');
     await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
     await userEvent.click(within(offenesMenue()).getByText('als defekt markieren'));
@@ -992,16 +952,14 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     await waitFor(() => menueZu());
     karte.focus();
     await userEvent.keyboard(' ');
-    // Am AUSLÖSER gelesen, nicht am Portal: das alte Portal stünde in jsdom nach Esc noch
-    // sichtbar im Baum (kein `transitionend`), eine Prüfung der Einträge wäre hier blind.
+    // Am Auslöser gelesen, nicht am Portal (kein `transitionend` in jsdom).
     expect(karte).toHaveAttribute('aria-expanded', 'true');
   });
 
   /**
-   * Im Bearbeiten-Modus gehört die Leertaste dem Tastatur-Zug des Layouts (dnd-kits
-   * KeyboardSensor). Und das Enter, das einen laufenden Zug ABLEGT, darf nicht zusätzlich das
-   * Menü öffnen — dnd-kit beendet den Zug an `document`, Reacts Handler an der Karte läuft
-   * vorher und sähe sonst ein gewöhnliches Enter.
+   * Im Bearbeiten-Modus gehört die Leertaste dem Tastatur-Zug (dnd-kit KeyboardSensor). Das Enter,
+   * das einen Zug ablegt, darf nicht zusätzlich das Menü öffnen — dnd-kit beendet den Zug an
+   * `document`, der Handler an der Karte läuft vorher.
    */
   it('lässt im Bearbeiten-Modus die Leertaste dem Zug und öffnet beim Ablegen kein Menü', async () => {
     // dnd-kits KeyboardSensor ruft beim Start `scrollIntoView`, das jsdom nicht kennt.
@@ -1025,9 +983,9 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
   });
 
   /**
-   * Spec „kein weiteres Klickziel verschachtelt" — an einer BELEGTEN Karte, denn nur dort
-   * steckt die ziehbare Personenmarke darin. dnd-kits `useDraggable` setzt `role="button"`
-   * und `tabIndex` auch bei `disabled`; eine unbelegte Karte sähe diesen Fall nie.
+   * Kein weiteres Klickziel verschachtelt — geprüft an einer belegten Karte, denn nur dort steckt
+   * die ziehbare Personenmarke; `useDraggable` setzt `role="button"` und `tabIndex` auch bei
+   * `disabled`.
    */
   it('trägt auch bei belegtem Platz kein fokussierbares Ziel in der Karte', async () => {
     renderGrundriss(unbelegt(), [belegtePerson()], false, 'komfortabel');
@@ -1035,8 +993,8 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     await within(karte).findByText(/R-007/);
     expect(within(karte).queryAllByRole('button')).toHaveLength(0);
     expect(karte.querySelectorAll('[tabindex]:not([tabindex="-1"])')).toHaveLength(0);
-    // Die Kinder eines benannten Knopfs sind präsentational — Belegung und Person hängen
-    // deshalb als Beschreibung am Kartenknopf.
+    // Kinder eines benannten Knopfs sind präsentational — Belegung und Person hängen als
+    // Beschreibung am Kartenknopf.
     expect(karte).toHaveAccessibleDescription(/belegt.*R-007/);
   });
 
@@ -1049,10 +1007,9 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
   });
 
   /**
-   * Ein Live-Update, das die Belegung ändert, baut die Einträge um: aus „Patient zuweisen"
-   * würde „Verbleib / Entlassung erfassen", und hinten erschiene das `danger` „zurückweisen"
-   * — unter dem Finger, dieselbe Lage, gegen die LFH-457 gebaut ist. Das offene Menü gehört
-   * zu dem Zustand, in dem es geöffnet wurde, und schließt, wenn der sich ändert.
+   * Ein Live-Update, das die Belegung ändert, baut die Einträge um (aus „Patient zuweisen" würde
+   * „Verbleib / Entlassung erfassen", dazu ein `danger` „zurückweisen") — unter dem Finger. Das
+   * offene Menü gehört zu seinem Zustand und schließt, wenn der sich ändert.
    */
   it('schließt ein offenes Menü, wenn sich die Belegung des Platzes live ändert', async () => {
     const { client } = renderGrundriss(unbelegt(), [wartend()], false, 'komfortabel');
@@ -1068,8 +1025,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     await within(karte).findByText(/R-005/);
     expect(karte).toHaveAttribute('aria-expanded', 'false');
 
-    // Und es bleibt zu, wenn die Belegung zurückspringt (zweites Live-Update, Rollback
-    // nach 409): der gemerkte Zustand „frei" darf das Menü nicht von selbst wieder öffnen.
+    // Und es bleibt zu, wenn die Belegung zurückspringt (Rollback nach 409).
     act(() => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), [wartend()]);
     });
@@ -1114,25 +1070,14 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
 });
 
 /**
- * Bedienform der Platzkarte je Dichtestufe (LFH-359 + LFH-379; Vorgänger LFH-378 · B5l).
+ * Bedienform der Platzkarte je Dichtestufe. Die Karte ist fest 140 × 116 px (Innenraum 124 × 100),
+ * weil `raster_position` im Backend die Felder vergibt. Eine Zeile aus vier Knöpfen passt nur in
+ * `kompakt` (4 × 24 + 3 × 7 = 117 ≤ 124, Höhe 24); ab `komfortabel` reißen Höhe und Breite, dort
+ * wird die ganze Karte das eine Bedienziel mit Menü.
  *
- * Die Karte ist fest 140 × 116 px (Innenraum 124 × 100), weil `raster_position` im Backend
- * die Felder vergibt. Eine Aktionszeile aus vier Knöpfen trägt sie nur, solange die Knöpfe in
- * die 24 px hohe Zeile UND samt dem vollen `marginSM` neben „zurückweisen" (LFH-363) in die
- * 124 px Breite passen. Das gilt nur in `kompakt`: 4 × 24 + 3 × 7 = 117. Ab `komfortabel`
- * reißt schon die Höhe (48 > 24) — und die Breite (4 × 48 = 192), das war LFH-379. Dort wird
- * die ganze Karte das eine Bedienziel und öffnet ein Menü.
- *
- * Der Deckel aus LFH-378 (`aktionsabstand`, Ergebnis 7 / 0 / 0) ist entfallen: er schützte
- * eine Zeile, die zu breit war, und die gibt es nicht mehr. In der Zeilenform ist der Abstand
- * schlicht `marginSM`, und die Zeilenform gibt es nur, wenn der hineinpasst.
- *
- * ── WARUM EINE REINE FUNKTION UND NICHT DAS DOM ─────────────────────────────────
- *
- * `test/utils.tsx` montiert ein nacktes `ConfigProvider` OHNE unser Theme, und jsdom rechnet
- * kein Layout. Geprüft wird deshalb die Entscheidung je Stufe, mit den Tokens aus
- * `antdToken(…, stufe)` (ein Staffelwechsel in `tokens.ts` zieht den Test mit) gegen
- * LITERALE Böden (sonst prüfte der Token sich selbst).
+ * Geprüft wird die reine Entscheidung je Stufe mit den Tokens aus `antdToken(…, stufe)` gegen
+ * literale Böden — `test/utils.tsx` montiert ein nacktes `ConfigProvider`, jsdom rechnet kein
+ * Layout.
  */
 describe('Grundriss – Bedienform der Platzkarte je Dichtestufe (LFH-359/LFH-379)', () => {
   const tokenFuer = (stufe: Dichte) => {
@@ -1149,9 +1094,8 @@ describe('Grundriss – Bedienform der Platzkarte je Dichtestufe (LFH-359/LFH-37
   it('trägt in kompakt die Knopfzeile mit vollem marginSM, und sie passt in die Karte', () => {
     const form = platzBedienform(tokenFuer('kompakt'));
     expect(form).toEqual({ form: 'zeile', abstand: 7 });
-    // AK 1 LFH-379: Knopfbreiten + Lücken ≤ Innenbreite. Die Knöpfe sind icon-only und
-    // damit `controlHeightSM` breit (antd `genSizeSmallButtonStyle`), der Boden in kompakt
-    // ist 24 (A1 Gate 3).
+    // Knopfbreiten + Lücken ≤ Innenbreite. Icon-only-Knöpfe sind `controlHeightSM` breit, der Boden
+    // in kompakt ist 24.
     const t = tokenFuer('kompakt');
     expect(t.controlHeightSM).toBeGreaterThanOrEqual(24);
     expect(
@@ -1164,7 +1108,7 @@ describe('Grundriss – Bedienform der Platzkarte je Dichtestufe (LFH-359/LFH-37
     expect(platzBedienform(tokenFuer('handschuh'))).toEqual({ form: 'karte' });
   });
 
-  /** AK 2 LFH-379: ein dichteblinder Festwert flöge erst an der Ungleichheit auf. */
+  /** Ein dichteblinder Festwert flöge erst an der Ungleichheit auf. */
   it('ist über zwei Dichtestufen ungleich, statt auf einem Festwert zu kleben', () => {
     expect(platzBedienform(tokenFuer('kompakt'))).not.toEqual(
       platzBedienform(tokenFuer('komfortabel')),
@@ -1172,9 +1116,8 @@ describe('Grundriss – Bedienform der Platzkarte je Dichtestufe (LFH-359/LFH-37
   });
 
   /**
-   * Die Lücke geht UNGEDECKELT ein: passt der volle `marginSM` neben „zurückweisen" nicht,
-   * gibt es keine Zeile (AK 4 LFH-379, Trennlinie LFH-363). Mit Deckel (der Weg aus LFH-378)
-   * käme hier `zeile` mit einer kleineren Lücke heraus.
+   * Die Lücke geht ungedeckelt ein: passt der volle `marginSM` neben „zurückweisen" nicht, gibt es
+   * keine Zeile.
    */
   it('baut keine Zeile, in der die Lücke neben dem Gefahrknopf gekürzt werden müsste', () => {
     // 4 × 24 + 3 × 10 = 126 > 124.
@@ -1191,8 +1134,7 @@ describe('Grundriss – Bedienform der Platzkarte je Dichtestufe (LFH-359/LFH-37
   });
 
   it('trägt als Kartenziel in jeder Stufe mindestens die volle Steuerhöhe in beiden Achsen', () => {
-    // Literale Böden der Staffel (A1 Festlegung 4): 30 / 48 / 72. Die Kartenmaße kommen aus
-    // der Komponente — wer die Karte verkleinert, soll hier auffliegen, nicht an einer Kopie.
+    // Literale Böden der Staffel: 30 / 48 / 72. Die Kartenmaße kommen aus der Komponente.
     for (const [stufe, boden] of [
       ['kompakt', 30],
       ['komfortabel', 48],
@@ -1206,11 +1148,9 @@ describe('Grundriss – Bedienform der Platzkarte je Dichtestufe (LFH-359/LFH-37
 });
 
 /**
- * Inhalt des Platzmenüs (LFH-359). EINE reine Ableitung für beide Formen: die Zeilenform
- * behält ihr „…"-Menü unverändert, die Kartenform nimmt die Knöpfe der Zeile als Einträge
- * mit auf — Primäraktion oben, Gefahr hinter dem Trenner (LFH-365). Geprüft wird die
- * Schlüsselfolge (Trenner als „—") und die Sperren; die Beschriftung prüfen die
- * Render-Tests der Kartenform.
+ * Inhalt des Platzmenüs — eine Ableitung für beide Formen: die Zeilenform behält ihr „…"-Menü, die
+ * Kartenform nimmt die Knöpfe der Zeile als Einträge mit (Primäraktion oben, Gefahr hinter dem
+ * Trenner). Geprüft werden Schlüsselfolge (Trenner als „—") und Sperren.
  */
 describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
   const grund = {
@@ -1290,10 +1230,7 @@ describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
       expect(gefahr(items)).toEqual(['zurueckweisen', 'storno']);
     });
 
-    /**
-     * LFH-457: sperren statt entfernen. Gesperrt ist, was eine zweite Bewegung derselben
-     * Person anstößt; „Person öffnen" und die Verfügbarkeiten bleiben frei.
-     */
+    /** Sperren statt entfernen: gesperrt ist, was eine zweite Bewegung derselben Person anstößt. */
     it('sperrt bei laufender Belegung die Bewegungen der Person, entfernt aber nichts', () => {
       const lage = { ...grund, form: 'karte' as const, belegt: true, wartebereich: true };
       const frei = platzMenueEintraege(lage);
@@ -1316,14 +1253,8 @@ describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
 });
 
 /**
- * Der Breitenboden der Knöpfe gilt auch in der Aktionszeile (LFH-381, Ausnahme gefallen mit
- * LFH-379).
- *
- * LFH-381 hatte die vier Knöpfe der Zeile per `minWidth: 0` vom Boden des Kontexts
- * ausgenommen, weil sie ab `komfortabel` sonst über die 124 px breite Karte hinausliefen. Die
- * Zeile gibt es seit LFH-379 nur noch in `kompakt`, und dort ist der Boden (24 px) genau das
- * Quadrat, mit dem `platzBedienform` rechnet: 4 × 24 + 3 × 7 = 117 ≤ 124. Die Ausnahme wäre
- * tote Logik und ist entfernt; gepinnt wird deshalb, dass alle vier den Boden TRAGEN.
+ * Der Breitenboden der Knöpfe gilt auch in der Aktionszeile: die Zeile gibt es nur in `kompakt`,
+ * und dort ist der Boden (24 px) genau das Quadrat, mit dem `platzBedienform` rechnet.
  */
 describe('Grundriss – Aktionszeile mit Breitenboden (LFH-381/LFH-379)', () => {
   it('alle vier Knöpfe der Platzkarte tragen in kompakt den Boden des Kontexts', async () => {
@@ -1362,8 +1293,10 @@ describe('Grundriss – Aktionszeile mit Breitenboden (LFH-381/LFH-379)', () => 
 });
 
 describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () => {
-  /** Zwei Plätze: „Bett 1" belegt (Ausgangspunkt der Belegungs-Mutation), „Bett 2" frei
-   *  (der Platz, an dem danach das Menü geöffnet wird — genau der gemeldete Bedienweg). */
+  /**
+   * Zwei Plätze: „Bett 1" belegt (Ausgangspunkt der Belegungs-Mutation), „Bett 2" frei (dort wird
+   * danach das Menü geöffnet).
+   */
   function zweiPlaetze() {
     return uhsDetail({
       status: 'aktiv',
@@ -1374,8 +1307,9 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
     });
   }
 
-  /** Belegungs-Route, deren Antwort erst auf Zuruf kommt — die Mutation bleibt so lange
-   *  `pending`, und genau dieses Fenster ist der Gegenstand des Befunds. */
+  /**
+   * Belegungs-Route, deren Antwort erst auf Zuruf kommt — die Mutation bleibt so lange `pending`.
+   */
   function haengendeBelegung(personId: number) {
     let freigeben: (() => void) | undefined;
     const tor = new Promise<void>((aufloesen) => {
@@ -1400,10 +1334,10 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
     return () => freigeben?.();
   }
 
-  /** Das ZULETZT geöffnete Menü. antd lässt die Portale geschlossener Dropdowns im Baum
-   *  stehen und markiert sie in jsdom nicht immer als `hidden` — ein `querySelector` traf
-   *  deshalb das Menü des zuerst geöffneten Platzes (gemessen: „Zurück in den
-   *  Wartebereich" statt der Verfügbarkeiten). */
+  /**
+   * Das zuletzt geöffnete Menü. antd markiert Portale geschlossener Dropdowns in jsdom nicht immer
+   * als `hidden`, ein `querySelector` träfe das Menü des zuerst geöffneten Platzes.
+   */
   function menue(): HTMLElement | null {
     const offen = document.querySelectorAll(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
@@ -1418,11 +1352,8 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
   }
 
   it('lässt das Platzmenü eines anderen Platzes erreichbar, während eine Belegung läuft', async () => {
-    // DER BEFUND, gemessen (LFH-457): `belegMut.isPending` fuhr als `schreibgeschuetzt` in
-    // die Platzkarte, und die rendert ihren Menü-Auslöser unter `{!schreibgeschuetzt && …}`.
-    // Damit verschwanden während JEDER Belegung ALLE Auslöser aus dem Baum — im Browser
-    // gemessen 26 bis 397 ms lang. Ein Portal-Overlay stirbt mit seinem Auslöser; wer in
-    // diesem Fenster klickt, greift ins Leere.
+    // Während einer Belegung dürfen die Menü-Auslöser nicht verschwinden: ein Portal-Overlay stirbt
+    // mit seinem Auslöser, ein Klick in diesem Fenster ginge ins Leere (LFH-457).
     const belegend = person({
       id: 7,
       registrier_nr: 7,
@@ -1434,8 +1365,8 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
 
     await starteBelegung();
 
-    // Die Mutation läuft noch (die Route ist nicht freigegeben) — trotzdem ist das Menü
-    // des NACHBARPLATZES erreichbar und bleibt offen.
+    // Die Mutation läuft noch — trotzdem ist das Menü des Nachbarplatzes erreichbar und bleibt
+    // offen.
     const ausloeser = screen.getByRole('button', { name: /Platzaktionen zu Bett 2/ });
     await userEvent.click(ausloeser);
     expect(within(menue()!).getByText('als in Aufbereitung markieren')).toBeInTheDocument();
@@ -1444,9 +1375,7 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
   });
 
   it('startet während einer laufenden Belegung KEINE zweite über den Klickweg', async () => {
-    // Die Gegenaussage: `belegMut.isPending` hatte einen Zweck — es verhinderte, dass
-    // parallel eine zweite Belegung angestoßen wird. Der Schutz muss die Trennung
-    // überleben, sonst tauscht der Fix einen Bedienbefund gegen einen Datenbefund.
+    // Gegenaussage: während einer laufenden Belegung darf keine zweite angestoßen werden.
     const belegend = person({
       id: 7,
       registrier_nr: 7,
@@ -1462,9 +1391,9 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
     // Wurzelklick auf den freien Nachbarplatz — kein Zuweisungsdialog.
     await userEvent.click(screen.getAllByTestId('platz-karte')[1]);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    // … und der Menüweg dorthin steht GESPERRT da, statt zu verschwinden: ein Eintrag,
-    // der aus dem offenen Menü fällt und später wiederkommt, verschöbe die Liste unter
-    // dem Cursor. Geprüft wird beides — dass er sichtbar ist UND nicht auslöst.
+    // … und der Menüweg dorthin steht gesperrt da, statt zu verschwinden: ein Eintrag, der aus dem
+    // offenen Menü fällt und wiederkommt, verschöbe die Liste unter dem Cursor. Geprüft wird, dass
+    // er sichtbar ist und nicht auslöst.
     await userEvent.click(screen.getByRole('button', { name: /Platzaktionen zu Bett 2/ }));
     const eintrag = within(menue()!).getByRole('menuitem', { name: /Patient zuweisen/ });
     expect(eintrag).toHaveAttribute('aria-disabled', 'true');
@@ -1475,11 +1404,8 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
   });
 
   it('sperrt „Zurück in den Wartebereich" an einer FREMDEN Karte, statt ihn zu entfernen', async () => {
-    // Derselbe Vertrag wie beim Eintrag darüber, und der unauffälligere Fall: der Rückweg
-    // hing an `belegMut.isPending` und fiel damit während JEDER Belegung aus dem Menü
-    // JEDER belegten Karte — auch an Karten, die mit der laufenden Bewegung nichts zu tun
-    // haben. Das ist genau der Mechanismus, den dieses Ticket abgestellt hat; bei
-    // `autoFocus: true` verliert eine Tastaturbedienung dabei ihren Platz.
+    // Derselbe Vertrag für den Rückweg: er darf während einer Belegung an keiner belegten Karte aus
+    // dem Menü fallen, auch nicht an unbeteiligten.
     const bewegt = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const fremd = person({ id: 9, registrier_nr: 9, aktuelle_uhs_id: 1, aktueller_platz_id: 11 });
     const freigeben = haengendeBelegung(5);
@@ -1497,14 +1423,9 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
   });
 
   it('sperrt die Patientenaktionen der Zielkarte, solange die Belegung läuft', async () => {
-    // Die zweite Hälfte desselben Schutzes, und die unauffälligere: das OPTIMISTISCHE
-    // Update setzt die Person sofort auf den Zielplatz, also erscheinen dort auch sofort
-    // „Verbleib / Entlassung erfassen" und „zurückweisen" — beide auf DIESELBE Person und
-    // denselben Endpunkt wie die noch laufende Belegung. Solange `belegMut.isPending` als
-    // `schreibgeschuetzt` durchfuhr, war das strukturell unmöglich; seit der Trennung muss
-    // es ausdrücklich gesperrt werden, sonst tauscht der Fix einen Bedienbefund gegen
-    // einen Datenbefund. Gesperrt, nicht entfernt — ein Verschwinden wäre genau der
-    // Mechanismus, gegen den dieses Ticket geschrieben ist.
+    // Das optimistische Update setzt die Person sofort auf den Zielplatz; dort erscheinen „Verbleib
+    // / Entlassung erfassen" und „zurückweisen" für dieselbe Person und denselben Endpunkt wie die
+    // laufende Belegung — sie müssen gesperrt sein, nicht entfernt.
     const wartend = person({
       id: 5,
       registrier_nr: 5,

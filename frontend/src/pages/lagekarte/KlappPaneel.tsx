@@ -3,22 +3,18 @@ import { TbChevronDown, TbChevronRight } from 'react-icons/tb';
 import { augenbraueStil, monoStil, paneelKopfStil, useRollen } from '../../components/instrument';
 
 /**
- * Abschnitt der rechten Kartenleiste (Neuentwurf S5). Zwei Formen desselben Kopfes:
+ * Abschnitt der rechten Kartenleiste, zwei Formen desselben Kopfes:
+ * - fest (`LeistenAbschnitt`): Ebenen und Ausgewählt, nicht wegklappbar.
+ * - einklappbar (`KlappPaneel`): Nicht verortet, Einsatzort, Zeichnen, Ansichten, Fachebenen,
+ *   Bilder, Kartengrundlage.
  *
- * - **fest** (`LeistenAbschnitt`): Ebenen und Ausgewählt — die Leiste TRÄGT diese beiden,
- *   sie lassen sich nicht wegklappen.
- * - **einklappbar** (`KlappPaneel`): alles, was die alte Leiste als Karten stapelte (Nicht
- *   verortet, Einsatzort, Zeichnen, Ansichten, Fachebenen, Bilder, Kartengrundlage). Nichts
- *   davon ist entfallen, es steht nur nicht mehr dauerhaft offen.
+ * Kein `Paneel` aus `components/instrument`: dessen Rahmen umläuft alle vier Seiten, gestapelt
+ * stünden die Linien doppelt. Kopf und Augenbraue sind dieselben (`paneelKopfStil`,
+ * `augenbraueStil`), getrennt wird über die Haarlinie unten.
  *
- * Kein `Paneel` aus `components/instrument`: dessen Rahmen umläuft alle vier Seiten, und
- * gestapelt in der Leiste stünden die Linien doppelt. Kopf und Augenbraue sind dieselben
- * (`paneelKopfStil`, `augenbraueStil`), getrennt wird über die Haarlinie unten.
- *
- * Der Klappkopf ist ein `<button>` IN der Überschrift (APG-Disclosure): der Name bleibt
- * Überschrift im Baum, `aria-expanded` trägt den Zustand als Wort, nicht nur als Pfeil. Als
- * handgebautes Bedienziel trägt er die zwei Angaben (`minHeight` aus `controlHeight` plus
- * Polsterung, {@link klappKopfStil}).
+ * Der Klappkopf ist ein `<button>` in der Überschrift (APG-Disclosure): der Name bleibt
+ * Überschrift, `aria-expanded` trägt den Zustand. Als handgebautes Bedienziel trägt er `minHeight`
+ * plus Polsterung ({@link klappKopfStil}).
  */
 
 /** Stil des Klappkopfs — rein und exportiert (Muster `bedienzielStil`). */
@@ -125,8 +121,8 @@ export function KlappPaneel({
           </span>
         </button>
       </h2>
-      {/* Zugeklappt wird NICHT gerendert: die Leiste trägt viel Bedienung, und versteckte
-          Steuerelemente im Baum wären für Tastatur und Vorleser Ziele ohne Sicht. */}
+      {/* Zugeklappt wird nicht gerendert: versteckte Steuerelemente im Baum wären für Tastatur
+          und Vorleser Ziele ohne Sicht. */}
       {offen && (
         <div
           id={koerperId}
@@ -186,8 +182,8 @@ export function paneeleLesen(roh: string | null): Record<PaneelKennung, boolean>
 }
 
 /**
- * Offen/zu je Paneel, pro Gerät gemerkt (Bequemlichkeit, kein Einsatzzustand — deshalb
- * `localStorage`, jede Lese- und Schreibstelle abgesichert).
+ * Offen/zu je Paneel, pro Gerät gemerkt — eine Bequemlichkeit, deshalb `localStorage` mit
+ * abgesicherten Zugriffen.
  */
 export function usePaneelZustand() {
   const [zustand, setZustand] = useState<Record<PaneelKennung, boolean>>(() => {

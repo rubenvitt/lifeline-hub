@@ -1,4 +1,4 @@
-//! Integrationstests für GET/PUT /api/org-einstellungen (admin-einstellungen, Task 4).
+//! Integrationstests für GET/PUT /api/org-einstellungen.
 //!
 //! Berechtigungsmatrix:
 //!   GET  — admin ✓, fuehrungskraft ✓, nicht eingeloggt → 401
@@ -192,7 +192,7 @@ async fn get_ohne_login_ist_401() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
-// ─── Modul-Rollen-Defaults (Task 5) ────────────────────────────────────────
+// ─── Modul-Rollen-Defaults ─────────────────────────────────────────────────
 
 /// PUT /api/org-modul-einstellungen/:modul_key mit Cookie und Body; liefert (StatusCode, Body).
 async fn put_modul_einstellung(

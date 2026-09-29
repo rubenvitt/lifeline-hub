@@ -5,12 +5,6 @@ import { Route, Routes } from 'react-router';
 import { renderMitProviders } from '../../test/utils';
 import EinsatzVerhalten from './EinsatzVerhalten';
 
-/**
- * Sektion „Verhalten & Automatik" (LFH-345 · C10). Die fachlichen Aussagen stammen aus dem
- * Bestandstest von `EinsatzEinstellungenPage` (LFH-133, Task 15, Finding E) und sind
- * unverändert gültig.
- */
-
 const { benutzerRolle } = vi.hoisted(() => ({ benutzerRolle: { wert: 'admin' } }));
 
 vi.mock('../../auth/AuthContext', () => ({
@@ -180,8 +174,7 @@ describe('EinsatzVerhalten', () => {
   });
 
   it('laesst die fremden Sektionen als Bestandswert mitfahren (Vollersatz-PUT)', async () => {
-    // Die Aussage, die den ganzen Umbau trägt: Speichern HIER darf die Aufbewahrungsfrist,
-    // das Standard-Modul und die Karten-Defaults nicht nullen.
+    // Speichern hier darf Aufbewahrungsfrist, Standard-Modul und Karten-Defaults nicht nullen.
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       ...BASIS,
       standard_modul: 'etb',
@@ -209,9 +202,8 @@ describe('EinsatzVerhalten', () => {
   });
 
   /**
-   * Der Tastaturvertrag der Erfassungs-Norm (B4/LFH-332), hier per Tastendruck belegt statt
-   * nur strukturell: diese Sektion hat echte `Input`-Felder. Auf „Allgemein" geht das nicht —
-   * `@rc-component/select` verschluckt jedes Enter mit `preventDefault()`.
+   * Der Tastaturvertrag der Erfassungs-Norm, hier per Tastendruck belegt: diese Sektion hat echte
+   * `Input`-Felder (auf „Allgemein" verschluckt rc-select jedes Enter).
    */
   it('sendet bei Enter im Praefix-Feld ab (der Knopf liegt im <form>)', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue(BASIS as never);

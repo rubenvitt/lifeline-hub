@@ -1,29 +1,29 @@
-//! Der harte Löschweg der Demo-Daten (LFH-690, design.md D7).
+//! Der harte Löschweg der Demo-Daten (LFH-690).
 //!
-//! **Die sicherheitskritischste Stelle des Features.** Das ETB eines echten Einsatzes schützt
-//! in der Datenbank nichts außer der WHERE-Bedingung, mit der hier gelöscht wird. Der Löschweg
-//! ist deshalb strukturell an die Marke gebunden:
+//! **Die sicherheitskritischste Stelle des Features.** Das ETB eines echten Einsatzes schützt in
+//! der Datenbank nichts außer der WHERE-Bedingung, mit der hier gelöscht wird. Der Löschweg ist
+//! deshalb strukturell an die Marke gebunden:
 //!
-//! - Die Einsatz-ID kommt **ausschließlich aus dem aktiven Kopf** der eigenen Organisation,
-//!   nie aus der Anfrage, und die Org steht im WHERE von `demo_import` **und** von `einsatz`.
-//!   Ein Kopf, der auf einen Einsatz einer fremden Org zeigt, löscht nichts.
-//! - Stammdaten fallen nur, wenn sie eine Marke dieses Kopfes tragen und zur eigenen Org
-//!   gehören. Ob eine Zeile noch verwiesen wird, entscheidet die Datenbank selbst: je Zeile ein
-//!   `SAVEPOINT`, und ein Fremdschlüsselfehler (SQLite-Code 787) heißt „behalten“. Das trägt
-//!   nur, solange kein Fremdschlüssel auf `fahrzeug`/`personal`/`material` kaskadiert und keiner
-//!   aufgeschoben ist (Guard `kein_fk_kaskadiert_in_stammdaten` in `schema_tests.rs`) und die
-//!   Verbindung Fremdschlüssel sofort prüft (Laufzeitprüfung in [`fk_pruefung_sicherstellen`]).
+//! - Die Einsatz-ID kommt **ausschließlich aus dem aktiven Kopf** der eigenen Organisation, nie
+//!   aus der Anfrage, und die Org steht im WHERE von `demo_import` **und** von `einsatz`. Ein
+//!   Kopf, der auf einen fremden Einsatz zeigt, löscht nichts.
+//! - Stammdaten fallen nur mit einer Marke dieses Kopfes und in der eigenen Org. Ob eine Zeile
+//!   noch verwiesen wird, entscheidet die Datenbank: je Zeile ein `SAVEPOINT`, und ein
+//!   Fremdschlüsselfehler (787) heißt „behalten“. Das trägt nur, solange kein Fremdschlüssel auf
+//!   `fahrzeug`/`personal`/`material` kaskadiert oder aufgeschoben ist (Guard
+//!   `kein_fk_kaskadiert_in_stammdaten` in `schema_tests.rs`) und die Verbindung Fremdschlüssel
+//!   sofort prüft ([`fk_pruefung_sicherstellen`]).
 //!
-//! Die Funktion committet nicht; der Aufrufer fährt sie in `write_retry!` (allein oder, beim
-//! Neu-Import, vor `importieren_tx` in derselben Transaktion, D11).
+//! Die Funktion committet nicht; der Aufrufer fährt sie in `write_retry!` (allein oder beim
+//! Neu-Import vor `importieren_tx` in derselben Transaktion).
 
 use sqlx::SqliteConnection;
 
 use super::{DemoBericht, DemoBerichtZeile, DemoStammdatenArt, DemoVorgang};
 use crate::error::AppError;
 
-/// Wie eine Stammdatenart gelöscht wird. Alle Statements sind feste Literale je Tabelle
-/// (sqlx 0.9, design.md D4); ein interpolierter Tabellenname kommt hier nicht vor.
+/// Wie eine Stammdatenart gelöscht wird. Alle Statements sind feste Literale je Tabelle, ohne
+/// interpolierten Tabellennamen.
 struct Loeschweg {
     art: DemoStammdatenArt,
     /// Läuft im selben Savepoint VOR dem Löschen der Zeile. Bindet `(id, org_id)`.
@@ -32,15 +32,15 @@ struct Loeschweg {
     loeschen: &'static str,
 }
 
-/// Reihenfolge nach D7: Personal zuerst (samt Qualifikationen), dann Fahrzeug, dann Material.
-/// Die Reihenfolge der Berichtszeilen ist davon unabhängig (siehe [`bericht_zeilen`]).
+/// Reihenfolge: Personal zuerst (samt Qualifikationen), dann Fahrzeug, dann Material. Die
+/// Reihenfolge der Berichtszeilen ist davon unabhängig (s. [`bericht_zeilen`]).
 const LOESCHWEGE: [Loeschweg; 3] = [
     Loeschweg {
         art: DemoStammdatenArt::Personal,
-        // Die Qualifikationen gehören zur Person und fallen mit ihr. Sie liegen im Savepoint
-        // der Person: scheitert die Person an einer Disposition, bringt `ROLLBACK TO` sie
-        // zurück. Die Org-Bedingung sitzt in der Unterabfrage, damit auch hier nichts
-        // Fremdes fällt.
+        // Die Qualifikationen fallen mit der Person, im selben Savepoint: scheitert die Person an
+        // einer
+        // Disposition, bringt `ROLLBACK TO` sie zurück. Die Org-Bedingung sitzt in der
+        // Unterabfrage.
         vorlauf: Some(
             "DELETE FROM personal_qualifikation \
              WHERE personal_id = (SELECT id FROM personal WHERE id = ? AND org_id = ?)",
@@ -68,17 +68,17 @@ enum Ausgang {
     NichtVorhanden,
 }
 
-/// Entfernt die Demo-Daten der Organisation (design.md D7) und liefert den Bericht.
+/// Entfernt die Demo-Daten der Organisation und liefert den Bericht.
 ///
-/// 1. Aktiven Kopf der Org laden, sonst `Conflict` (409, D3).
+/// 1. Aktiven Kopf der Org laden, sonst `Conflict` (409).
 /// 2. Den Einsatz des Kopfes löschen; die Kaskade räumt alles darunter, auch einen
 ///    soft-gelöschten oder geschwärzten Demo-Einsatz.
 /// 3. Je markierter Stammdatenzeile `SAVEPOINT` → `DELETE` → `RELEASE`; bei einem
 ///    Fremdschlüsselfehler `ROLLBACK TO` und „behalten“. Jede Marke fällt.
-/// 4. Kopf schließen (`entfernt_at`, Bericht). Er bleibt als Historie und ID-Sperre (D6).
+/// 4. Kopf schließen (`entfernt_at`, Bericht). Er bleibt als Historie und ID-Sperre.
 ///
-/// Kein `admin_id`: der Kopf hat keine Spalte „entfernt von“ und der Bericht keinen Akteur.
-/// Die Org des Admins reicht für jede Bedingung.
+/// Kein `admin_id`: weder Kopf noch Bericht kennen einen Akteur; die Org reicht für jede
+/// Bedingung.
 pub async fn entfernen_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -95,10 +95,8 @@ pub async fn entfernen_tx(
 
     fk_pruefung_sicherstellen(conn).await?;
 
-    // Die ID kommt aus dem Kopf, nie aus der Anfrage, und die Org steht in BEIDEN WHERE:
-    // im Kopf (nur der aktive Kopf der eigenen Org) und im Einsatz (nur ein Einsatz der
-    // eigenen Org). Ohne das zweite löschte ein Kopf mit fremder `einsatz_id` einen echten
-    // Einsatz einer anderen Org samt ETB.
+    // Die ID kommt aus dem Kopf, und die Org steht in BEIDEN WHERE. Ohne die zweite Bedingung
+    // löschte ein Kopf mit fremder `einsatz_id` einen echten Einsatz einer anderen Org samt ETB.
     let geloescht = sqlx::query(
         "DELETE FROM einsatz \
          WHERE id = (SELECT einsatz_id FROM demo_import \
@@ -112,8 +110,8 @@ pub async fn entfernen_tx(
     .await?
     .rows_affected();
     if geloescht == 0 {
-        // Kein Einsatz der eigenen Org unter dieser ID. Der Kopf wird trotzdem geschlossen,
-        // sonst sperrte er den nächsten Import für immer.
+        // Kein Einsatz der eigenen Org unter dieser ID. Der Kopf wird trotzdem geschlossen, sonst
+        // sperrte er den nächsten Import für immer.
         tracing::warn!(
             org_id,
             kopf_id,
@@ -245,19 +243,16 @@ async fn zeile_loeschen(
     }
 }
 
-/// `true`, wenn der Fehler eine Fremdschlüsselverletzung ist. sqlx 0.9 liest den
-/// erweiterten SQLite-Code (`sqlite3_extended_errcode`) und bildet
+/// `true` bei einer Fremdschlüsselverletzung: sqlx 0.9 bildet den erweiterten Code
 /// `SQLITE_CONSTRAINT_FOREIGNKEY` (787) auf `ErrorKind::ForeignKeyViolation` ab.
 pub(crate) fn ist_fk_verletzung(fehler: &sqlx::Error) -> bool {
     matches!(fehler, sqlx::Error::Database(db) if db.is_foreign_key_violation())
 }
 
-/// Der Savepoint erkennt „noch verwiesen“ nur, wenn die Verbindung Fremdschlüssel prüft und
-/// sie **sofort** prüft. Ohne Prüfung gelänge jedes Stammdaten-DELETE und ließe
-/// Dispositionen echter Einsätze ins Leere zeigen; aufgeschoben käme der Fehler erst beim
-/// COMMIT und bräche den ganzen Vorgang ab, statt die Zeile zu behalten. Beides ist heute
-/// ausgeschlossen (`db::connect` setzt `foreign_keys(true)`, `defer_foreign_keys` setzt
-/// niemand) — die Prüfung hält das zur Laufzeit fest, statt es anzunehmen.
+/// Der Savepoint erkennt „noch verwiesen“ nur, wenn die Verbindung Fremdschlüssel **sofort**
+/// prüft. Ohne Prüfung gelänge jedes DELETE und ließe Dispositionen echter Einsätze ins Leere
+/// zeigen; aufgeschoben käme der Fehler erst beim COMMIT und bräche alles ab. Beides ist heute
+/// ausgeschlossen — diese Prüfung hält es zur Laufzeit fest, statt es anzunehmen.
 async fn fk_pruefung_sicherstellen(conn: &mut SqliteConnection) -> Result<(), AppError> {
     let an: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
         .fetch_one(&mut *conn)
@@ -273,7 +268,7 @@ async fn fk_pruefung_sicherstellen(conn: &mut SqliteConnection) -> Result<(), Ap
     Ok(())
 }
 
-/// Je Art eine Zeile, immer alle drei, in Enum-Reihenfolge — auch mit Nullen. `angelegt` und
+/// Je Art eine Zeile, immer alle drei, in Enum-Reihenfolge, auch mit Nullen. `angelegt` und
 /// `mitbenutzt` gehören zum Import-Bericht und stehen hier auf 0.
 fn bericht_zeilen(zaehler: &[(DemoStammdatenArt, i64, i64)]) -> Vec<DemoBerichtZeile> {
     [

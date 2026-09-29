@@ -30,27 +30,25 @@ export interface FreiesZeichenPickerProps {
   wert: FreiesZeichenUpdate;
   onChange: (spec: FreiesZeichenUpdate) => void;
   /**
-   * Enter im Picker (LFH-716, D4): auf einer Kachel, in einem Suchfeld und in der
-   * Bezeichnung. Ohne diesen Callback (Inspector) sendet Enter nichts — das Platzieren
-   * gehört der Leiste, nicht dem Werteditor.
+   * Enter im Picker: auf einer Kachel, in einem Suchfeld und in der Bezeichnung. Ohne diesen
+   * Callback (Inspector) sendet Enter nichts — das Platzieren gehört der Leiste.
    *
-   * **Der Callback bringt die Spec MIT**, obwohl der Aufrufer sie hält: die Bezeichnung wird
-   * erst beim Verlassen übernommen, und eine per Enter gewählte Kachel steht in derselben
-   * Runde noch nicht im State des Aufrufers. Ein argumentloser Callback platzierte das
-   * Zeichen, das VOR dem Tastendruck gewählt war.
+   * Der Callback bringt die Spec mit: die Bezeichnung wird erst beim Verlassen übernommen, und eine
+   * per Enter gewählte Kachel steht in derselben Runde noch nicht im State des Aufrufers.
    */
   onAbsenden?: (spec: FreiesZeichenUpdate) => void;
   /**
-   * Fokus beim Einhängen ins Grundzeichen-Suchfeld. Vorgabe AN — die Leiste hängt den Picker
-   * erst nach „Taktisches Zeichen platzieren" ein, wer ihn öffnet, will tippen. Der Inspector
-   * hängt beim Marker-Klick ein und setzt `false`: ein Feld, das sich dabei den Fokus nimmt,
-   * verschluckt die nächste Tastatureingabe auf der Karte.
+   * Fokus beim Einhängen ins Grundzeichen-Suchfeld, Vorgabe an (wer die Leiste öffnet, will
+   * tippen). Der Inspector setzt `false`: er hängt beim Marker-Klick ein und verschluckte sonst die
+   * nächste Tastatureingabe auf der Karte.
    */
   autoFokus?: boolean;
 }
 
-/** Die 5 accepts-gegateten Overlay-Felder. `key` ist zugleich der ComponentType fürs
- *  {@link grundzeichenAkzeptiert}-Gating und der FreiesZeichenUpdate-Feldname. */
+/**
+ * Die 5 accepts-gegateten Overlay-Felder. `key` ist zugleich der ComponentType fürs {@link
+ * grundzeichenAkzeptiert}-Gating und der Feldname in FreiesZeichenUpdate.
+ */
 type OverlayKey = 'organisation' | 'fachaufgabe' | 'symbol' | 'einheit' | 'funktion';
 
 interface KatalogEintrag {
@@ -58,8 +56,10 @@ interface KatalogEintrag {
   label: string;
 }
 
-/** Die vier Overlays, die als Text-`Select` hinter „Details" bleiben. `symbol` fehlt: es hat
- *  mit 84 Einträgen ein eigenes Bild-Raster — dort war der Textkatalog am teuersten. */
+/**
+ * Die vier Overlays als Text-`Select` hinter „Details". `symbol` hat ein eigenes Bild-Raster (84
+ * Einträge).
+ */
 const DETAIL_OVERLAYS: {
   key: Exclude<OverlayKey, 'symbol'>;
   label: string;
@@ -95,12 +95,8 @@ const RASTER_REIHEN = 4;
 const SPALTE_MIN = 78;
 
 /**
- * Trefflächen-Geometrie einer Katalog-Kachel — rein und exportiert, damit die Zusicherung
- * über die Dichtestufen prüfbar ist, ohne zu rendern (Muster `bedienzielStil`).
- *
- * Der Boden ist die Dichte-Staffel (`controlHeight` 30/48/72), in Höhe UND Breite. In kompakt
- * macht die 40-px-Zeichnung die Kachel ohnehin größer; im Handschuh trägt der Boden. Radius
- * aus dem Token (Instrumententafel: 0), keine eigene Zahl daneben.
+ * Trefflächen-Geometrie einer Katalog-Kachel — rein und exportiert. Boden ist die Dichte-Staffel
+ * (`controlHeight`) in Höhe und Breite; Radius aus dem Token.
  */
 export function kachelStil(token: {
   controlHeight: number;
@@ -127,11 +123,9 @@ export function kachelStil(token: {
 }
 
 /**
- * Farben einer Kachel aus den Rollen des aktiven Modus — rein und exportiert.
- *
- * Gewählt und hervorgehoben (Zeiger) liegen auf `flaeche3`, nicht auf `flaeche2`: die liegt am
- * Tag bei 1,01–1,08 : 1 auf `paneel` und wäre schlicht nicht da (LFH-618, Regel 2). Die Wahl
- * trägt zusätzlich den Bedienrand; der zweite Kanal ist `aria-checked`, nicht die Farbe.
+ * Farben einer Kachel aus den Rollen des aktiven Modus — rein und exportiert. Gewählt und
+ * hervorgehoben liegen auf `flaeche3`, nicht `flaeche2` (die am Tag auf `paneel` unsichtbar ist).
+ * Die Wahl trägt zusätzlich den Bedienrand; der zweite Kanal ist `aria-checked`.
  */
 export function kachelFarben(
   rollen: Farbrollen,
@@ -139,8 +133,7 @@ export function kachelFarben(
   hervorgehoben = false,
 ): CSSProperties {
   return {
-    // Ruhe-Rand ist `steuerRahmen`, nicht `linie`: der Rand grenzt ein Bedienziel ab, und
-    // `linie` ist dekorativ und hält WCAG 1.4.11 nicht (siehe `Farbrollen.linie`).
+    // Ruhe-Rand ist `steuerRahmen`: `linie` ist dekorativ und hält WCAG 1.4.11 nicht.
     borderColor: gewaehlt ? rollen.bedien : rollen.steuerRahmen,
     background: gewaehlt || hervorgehoben ? rollen.flaeche3 : rollen.paneel,
     color: rollen.text,
@@ -148,8 +141,8 @@ export function kachelFarben(
 }
 
 /**
- * Benennt ein Zeichen aus seinen Katalog-Bestandteilen — der zugängliche Name der
- * „zuletzt verwendet"-Kacheln. Rein, damit die Reihenfolge prüfbar ist.
+ * Benennt ein Zeichen aus seinen Katalog-Bestandteilen — der zugängliche Name der „zuletzt
+ * verwendet"-Kacheln. Rein.
  */
 export function zeichenName(spec: FreiesZeichenUpdate): string {
   const roh = spec as unknown as Record<string, unknown>;
@@ -165,9 +158,11 @@ export function zeichenName(spec: FreiesZeichenUpdate): string {
   return teile.join(' · ');
 }
 
-/** Entfernt beim Grundzeichen-Wechsel alle Overlays, die das neue Grundzeichen laut
- *  accepts-Katalog nicht rendert — → `null` (nicht `undefined`) für den Whole-Spec-PATCH,
- *  damit kein Phantom-Overlay den tz-Icon-Key divergieren lässt. */
+/**
+ * Entfernt beim Grundzeichen-Wechsel alle Overlays, die das neue Grundzeichen nicht rendert — als
+ * `null` (nicht `undefined`) für den Whole-Spec-PATCH, damit kein Phantom-Overlay den tz-Icon-Key
+ * verändert.
+ */
 function strippeNichtAkzeptierte(spec: FreiesZeichenUpdate): FreiesZeichenUpdate {
   const gz = spec.grundzeichen;
   return {
@@ -204,15 +199,11 @@ interface KachelProps {
 }
 
 /**
- * Eine Katalog-Kachel: gezeichnetes Zeichen UND Name.
+ * Eine Katalog-Kachel: Zeichnung und Name — ein Piktogramm allein ist keine Beschriftung, und die
+ * Namen durchsucht die Suche. Die Grafik hängt in einer `aria-hidden`-Hülle.
  *
- * **Beides, nicht nur das Bild** — ein Piktogramm allein ist keine Beschriftung (WCAG 1.4.1),
- * und die Namen sind das, was die Suche durchsucht. Die Grafik hängt in einer
- * `aria-hidden`-Hülle, sonst trüge das SVG einen eigenen Namensbeitrag in die Kachel.
- *
- * `memo` plus Klick-/Tasten-Delegation an der Gruppe: eine Pfeilfunktion je Kachel wechselte
- * bei jedem Anschlag im Suchfeld die Identität, und das Memo stünde nutzlos da. Das
- * Stilobjekt kommt fertig gemischt und identitätsstabil vom Raster.
+ * `memo` plus Klick-/Tasten-Delegation an der Gruppe: eine Pfeilfunktion je Kachel wechselte bei
+ * jedem Anschlag die Identität. Das Stilobjekt kommt identitätsstabil vom Raster.
  */
 const Kachel = memo(function Kachel(p: KachelProps) {
   return (
@@ -259,10 +250,8 @@ interface RasterProps {
 const PFEILE: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 
 /**
- * Suchfeld plus Kachel-Raster.
- *
- * Der Suchtext liegt HIER und nicht in der Spec: er ist Bedienzustand, kein Datenwert. Läge
- * er oben, liefe jeder Anschlag als Entwurfsänderung durch die Kartenseite.
+ * Suchfeld plus Kachel-Raster. Der Suchtext ist Bedienzustand und liegt hier, nicht in der Spec —
+ * sonst liefe jeder Anschlag als Entwurfsänderung durch die Kartenseite.
  */
 function Raster({
   art,
@@ -282,9 +271,8 @@ function Raster({
   const sichtbare = eintraege.filter((e) => e.id == null || passt(e, suche));
   const treffer = sichtbare.filter((e) => e.id != null);
 
-  // Die Stilobjekte MÜSSEN über Renders identisch bleiben: sie gehen in die memoisierte
-  // Kachel, ein je Render frisches Objekt setzte `memo` still außer Kraft. Drei Zustände
-  // genügen, deshalb drei Objekte statt eines je Kachel.
+  // Die Stilobjekte müssen über Renders identisch bleiben, sonst setzte ein frisches Objekt `memo`
+  // außer Kraft. Drei Zustände, drei Objekte.
   const basis = useMemo(() => kachelStil(token), [token]);
   const stile = useMemo(
     () => ({
@@ -295,8 +283,8 @@ function Raster({
     [basis, rollen],
   );
 
-  // Rollender Tabstopp: die Gruppe ist EIN Tabstopp. Ist die Auswahl weggefiltert, übernimmt
-  // die erste sichtbare Kachel — sonst wäre das Raster nach einer Suche nicht erreichbar.
+  // Rollender Tabstopp: die Gruppe ist ein Tabstopp. Ist die Auswahl weggefiltert, übernimmt die
+  // erste sichtbare Kachel.
   const tabbarId = sichtbare.some((e) => e.id === gewaehlt) ? gewaehlt : (sichtbare[0]?.id ?? null);
 
   const kachelVon = (ziel: EventTarget) =>
@@ -397,15 +385,8 @@ function Raster({
 }
 
 /**
- * Controlled Editor für die DV-102-Spec eines freien taktischen Zeichens (LFH-170;
- * Bild-Raster, „zuletzt verwendet" und Enter seit LFH-716, Kandidat aus LFH-344 · M62).
- *
- * **Warum kein Textkatalog mehr:** ein Zeichen war nur über seinen DV-102-Begriff
- * auffindbar. Das Raster zeigt, was man bekommt, bevor man es wählt; die Suche steht als
- * zweiter Weg daneben.
- *
- * **Kein `<Form>`/`ErfassungsFormular`:** das Absenden gehört ihm nicht, der Platzier-Knopf
- * steht in der Leiste. Er bleibt ein `wert`/`onChange`-Editor mit optionalem Enter-Weg.
+ * Controlled Editor für die DV-102-Spec eines freien taktischen Zeichens: Bild-Raster mit Suche,
+ * „zuletzt verwendet" und Enter-Weg. Kein `<Form>`: das Absenden gehört der Leiste.
  */
 export default function FreiesZeichenPicker({
   wert,
@@ -416,8 +397,8 @@ export default function FreiesZeichenPicker({
   const { token, rollen } = useRollen();
   const [zuletzt, setZuletzt] = useState(leseZuletztVerwendet);
 
-  // Geschrieben wird an der PLATZIER-Stelle (`useKartenInteraktion`), nicht hier. Ohne dieses
-  // Signal zeigte ein montierter Picker den Stand vom Einhängen.
+  // Geschrieben wird an der Platzier-Stelle (`useKartenInteraktion`); ohne das Signal zeigte ein
+  // montierter Picker den Stand vom Einhängen.
   useEffect(() => abonniereZuletztVerwendet(() => setZuletzt(leseZuletztVerwendet())), []);
 
   const mitGrundzeichen = (gz: string): FreiesZeichenUpdate =>
@@ -425,17 +406,20 @@ export default function FreiesZeichenPicker({
   const mitOverlay = (key: OverlayKey, v: string | null): FreiesZeichenUpdate =>
     ({ ...wert, [key]: v }) as FreiesZeichenUpdate;
 
-  /** Übernimmt eine Spec und sendet sie ab — dieselbe frisch gebaute Spec an beide, weil der
-   *  Aufrufer seinen State in dieser Runde noch nicht hat. */
+  /**
+   * Übernimmt eine Spec und sendet sie — dieselbe frische Spec an beide, weil der Aufrufer seinen
+   * State in dieser Runde noch nicht hat.
+   */
   const uebernimmUndSende = (spec: FreiesZeichenUpdate) => {
     if (!onAbsenden) return;
     onChange(spec);
     onAbsenden(spec);
   };
 
-  /** Ein Griff in die Leiste tauscht das ZEICHEN, nicht die Platzierung: Name und
-   *  Ansichts-Bindung des Entwurfs bleiben. Felder einzeln gesetzt, damit kein Overlay des
-   *  alten Entwurfs überlebt. */
+  /**
+   * Ein Griff in die Leiste tauscht das Zeichen, nicht die Platzierung: Name und Ansichts-Bindung
+   * bleiben. Felder einzeln gesetzt, damit kein Overlay des alten Entwurfs überlebt.
+   */
   const uebernimm = (z: FreiesZeichenUpdate) =>
     onChange(
       strippeNichtAkzeptierte({
@@ -453,15 +437,12 @@ export default function FreiesZeichenPicker({
   const mitLabel = (roh: string): FreiesZeichenUpdate => ({ ...wert, label: roh.trim() || null });
 
   /**
-   * Die Bezeichnung ist kontrolliert, mit eigenem Tipp-Merker (Review LFH-716, I2). Ein
-   * `defaultValue` fror den Wortlaut beim Einhängen ein: nach einer übernommenen fremden
-   * Änderung zeigte der Inspector den alten Namen, und schon Fokussieren und Verlassen schrieb
-   * ihn zurück. Jetzt folgt das Feld `wert.label`, solange nicht getippt wird, und übernommen
-   * wird nur, was wirklich getippt wurde. Kein `key={wert.label}`: der Remount verwürfe Text,
-   * den jemand gerade tippt, wenn in dem Moment eine fremde Änderung kommt.
+   * Die Bezeichnung ist kontrolliert, mit eigenem Tipp-Merker: das Feld folgt `wert.label`, solange
+   * nicht getippt wird, und übernommen wird nur Getipptes — ein `defaultValue` zeigte nach einer
+   * fremden Änderung den alten Namen und schriebe ihn beim Verlassen zurück. Kein
+   * `key={wert.label}`: der Remount verwürfe gerade Getipptes.
    *
-   * Übernommen wird weiter erst beim Verlassen, nicht je Anschlag — sonst liefe jedes Zeichen
-   * als Entwurfsänderung durch die Kartenseite.
+   * Übernommen wird erst beim Verlassen, nicht je Anschlag.
    */
   const [bezeichnung, setBezeichnung] = useState(wert.label ?? '');
   const [bezeichnungGetippt, setBezeichnungGetippt] = useState(false);
@@ -495,8 +476,8 @@ export default function FreiesZeichenPicker({
         >
           {zuletzt.map((z) => {
             const name = zeichenName(z);
-            /* NICHT der Name als React-Key: zwei Einträge dürfen sich nur in der Farbe
-               unterscheiden, und die steht nicht im Namen. */
+            /* Nicht der Name als React-Key: zwei Einträge dürfen sich nur in der Farbe
+               unterscheiden. */
             const key = [
               z.grundzeichen,
               z.organisation,
@@ -507,9 +488,8 @@ export default function FreiesZeichenPicker({
               z.farbe,
             ].join('|');
             return (
-              /* Name als `aria-label` samt Tooltip statt sichtbaren Satzes: sechs
-                 ausgeschriebene DV-102-Namen sprengten die Leiste, und das Zeichen hat diese
-                 Person gerade selbst gesetzt. Der Katalog darunter bleibt beschriftet. */
+              /* Name als `aria-label` samt Tooltip: sechs ausgeschriebene DV-102-Namen sprengten
+                 die Leiste. */
               <Tooltip key={key} title={name}>
                 <button
                   type="button"
@@ -572,8 +552,8 @@ export default function FreiesZeichenPicker({
           {
             key: 'details',
             label: 'Details',
-            // Ohne `forceRender` stünden die Felder erst beim Aufklappen im Baum — jede
-            // Zählung „offen liegen nur zwei" wäre dann trivial erfüllt.
+            // Ohne `forceRender` stünden die Felder erst beim Aufklappen im Baum — die Zählung
+            // „offen liegen nur zwei" wäre trivial.
             forceRender: true,
             children: (
               <div data-lfh="zeichen-details">
@@ -593,9 +573,8 @@ export default function FreiesZeichenPicker({
                     ) : null,
                   )}
 
-                  {/* `key` am Farbfeld: unkontrolliert (`defaultValue`), und ein Griff in
-                      „zuletzt verwendet" bringt eine fremde Farbe mit — ohne Remount zeigte
-                      der Farbtupfer weiter die alte. */}
+                  {/* `key` am unkontrollierten Farbfeld: ein Griff in „zuletzt verwendet" bringt
+                      eine fremde Farbe mit. */}
                   <Input
                     key={`farbe-${wert.farbe ?? ''}`}
                     aria-label="Farbe"
@@ -623,8 +602,8 @@ export default function FreiesZeichenPicker({
                     }}
                     onPressEnter={() => {
                       const geaendert = bezeichnungUebernehmen();
-                      // Mit `onAbsenden` (Leiste) platziert Enter; ohne (Inspector) übernimmt
-                      // es nur, damit der getippte Name nicht beim Zurückfallen verloren geht.
+                      // Mit `onAbsenden` (Leiste) platziert Enter; ohne (Inspector) übernimmt es
+                      // nur den getippten Namen.
                       if (onAbsenden) uebernimmUndSende(geaendert ?? wert);
                       else if (geaendert) onChange(geaendert);
                     }}

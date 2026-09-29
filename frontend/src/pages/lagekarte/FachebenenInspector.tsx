@@ -22,16 +22,13 @@ import KartenDetailCard from './KartenDetailCard';
 interface FachebenenInspectorProps {
   quelle: FachebeneQuelle;
   properties: Record<string, unknown>;
-  /** Volle (un-geclippte) Geometrie des angeklickten Features → Fläche/Umfang/Länge (LFH-146). */
+  /** Volle (ungeclippte) Geometrie des angeklickten Features → Fläche/Umfang/Länge. */
   geometrie?: { type: string; coordinates: unknown } | null;
   onSchliessen: () => void;
   /**
-   * Einsatzbezug für den Schnellweg „Als maßgeblichen Pegel festlegen" an einem
-   * PEGELONLINE-Punkt (LFH-606). Optional und als PROP statt Context: der Inspektor bleibt
-   * ohne Einsatz montierbar (reine Anzeige fremder Daten), und erst mit diesem Bezug hängt
-   * er sich an Abfrage und Mutation — ein neuer Querschnitts-Context für eine Stelle wäre
-   * mehr Mechanik als Bedarf. `darfSchreiben` ist das Einsatz-Schreibrecht der Lagekarte
-   * (im Snapshot-Modus hart `false`), dieselbe Achse wie das Backend-Gate der Pegel-Routen.
+   * Einsatzbezug für den Schnellweg „Als maßgeblichen Pegel festlegen" an einem PEGELONLINE-Punkt.
+   * Als Prop statt Context: der Inspektor bleibt ohne Einsatz montierbar. `darfSchreiben` ist das
+   * Einsatz-Schreibrecht der Lagekarte (im Snapshot-Modus `false`).
    */
   pegelBezug?: { einsatzId: number; darfSchreiben: boolean };
 }
@@ -100,8 +97,7 @@ const DRINGLICHKEIT: Record<string, string> = {
   Unknown: 'Unbekannt',
 };
 
-// PEGELONLINE stateMnwMhw ist englisch; nur die aussagekräftigen Werte als Tag zeigen
-// (unknown/commented/out-dated → kein Tag).
+// PEGELONLINE `stateMnwMhw` ist englisch; nur aussagekräftige Werte werden ein Tag.
 const ZUSTAND: Record<string, { label: string; color: string }> = {
   high: { label: 'Hoch', color: 'red' },
   normal: { label: 'Normal', color: 'green' },
@@ -167,18 +163,15 @@ function WarnungInhalt({ p }: { p: Record<string, unknown> }) {
 }
 
 /**
- * Schnellweg „Als maßgeblichen Pegel festlegen" (LFH-606, Entscheidung 2 des Auftraggebers).
+ * Schnellweg „Als maßgeblichen Pegel festlegen".
  *
- * Ist die Station schon maßgeblich, steht das als MARKE statt des Knopfs — auch ohne
- * Schreibrecht, denn es ist eine Aussage über den Einsatz, keine Aktion. Der Knopf selbst
- * braucht Schreibrecht und eine `uuid`; ohne `uuid` (ältere Antwort, fremde Quelle) gibt es
- * nichts, was festgelegt werden könnte, und der Block entfällt.
+ * Ist die Station schon maßgeblich, steht das als Marke statt des Knopfs, auch ohne Schreibrecht.
+ * Der Knopf braucht Schreibrecht und eine `uuid`; ohne `uuid` entfällt der Block.
  *
- * Bei fünf festgelegten Pegeln steht der Knopf GESPERRT mit Grund und Weg in die
- * Einstellungen, statt zu verschwinden (C10/M16) — der Server lehnte einen sechsten ohnehin
- * ab (POST auf eine volle Liste → 422), das wäre die späteste denkbare Absage. Gespeichert wird per POST (hinten
- * anfügen, idempotent); die Antwort ist die volle Liste und landet per `setQueryData` im
- * gemeinsamen Cache-Eintrag von Dashboard, Überblick und Einstellungen.
+ * Bei fünf festgelegten Pegeln steht der Knopf gesperrt mit Grund und Weg in die Einstellungen,
+ * statt zu verschwinden (der Server lehnte einen sechsten mit 422 ab). Gespeichert wird per POST
+ * (hinten anfügen, idempotent); die Antwort ist die volle Liste und landet per `setQueryData` im
+ * gemeinsamen Cache von Dashboard, Überblick und Einstellungen.
  */
 function PegelFestlegen({
   einsatzId,
@@ -197,14 +190,14 @@ function PegelFestlegen({
   const { message } = App.useApp();
   const qc = useQueryClient();
   const pegelQ = useQuery(pegelAbfrage(einsatzId));
-  // KEIN `onError`-Toast (H14): der Fehler bleibt im Panel stehen.
+  // Kein `onError`-Toast: der Fehler bleibt im Panel stehen.
   const festlegen = useMutation({
     // Derselbe Scope wie die Einstellungssektion: Schreibwege auf die Liste laufen nacheinander.
     scope: pegelSchreibScope(einsatzId),
     mutationFn: () => fuegePegelHinzu(einsatzId, { station_uuid: uuid, name, gewaesser }),
     onSuccess: (liste) => {
       qc.setQueryData(einsatzKeys.pegel(einsatzId), liste);
-      // Auslöser der Lagekennzahl am Einsatz (LFH-640) — siehe `EinsatzPegel`.
+      // Auslöser der Lagekennzahl am Einsatz — siehe `EinsatzPegel`.
       void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       message.success('Als maßgeblicher Pegel festgelegt');
     },
@@ -262,12 +255,8 @@ function PegelInhalt({
   return (
     <>
       {wert ? (
-        // WEDER `EinsatzSeite` NOCH `SektionHeader` (LFH-328/A2, Norm §7.1): das hier war
-        // nie eine Überschrift, sondern ein MESSWERT („320 cm" + Zustand). Der Inspektor ist
-        // ein Panel in der Lagekarten-Leiste, hat also gar kein Seitenlayout, und ein
-        // `<h3>Pegelstand 320 cm</h3>` wäre für einen Screenreader eine Gliederungsebene, die
-        // es nicht gibt. Die Rolle fällt deshalb weg, das visuelle Gewicht bleibt: `Text` in
-        // Kennzahlen-Stimme mit `fontSizeHeading3` aus dem Theme statt einer eigenen Zahl.
+        // Keine Überschrift, sondern ein Messwert („320 cm" + Zustand): ein `<h3>` wäre eine
+        // Gliederungsebene, die es nicht gibt. Das visuelle Gewicht kommt aus `fontSizeHeading3`.
         <Typography.Text
           strong
           style={{
@@ -293,8 +282,8 @@ function PegelInhalt({
       </Descriptions>
       {pegelBezug && s(p.uuid) && (
         <PegelFestlegen
-          // `key` aus der Station: ein Klick auf einen anderen Punkt hängt einen FRISCHEN
-          // Block ein — sonst trüge Station B Fehler und Ladezustand der Mutation von A.
+          // `key` aus der Station: ein anderer Punkt hängt einen frischen Block ein, sonst trüge
+          // Station B Fehler und Ladezustand der Mutation von A.
           key={s(p.uuid)!.toLowerCase()}
           einsatzId={pegelBezug.einsatzId}
           darfSchreiben={pegelBezug.darfSchreiben}
@@ -348,11 +337,9 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
 }
 
 /**
- * LHP-Pegel (LFH-77). Trägt genau das, was `get_lagepegel.php` liefert: Name, Nummer und
- * Meldeklasse. Der Wasserstand in Zentimetern steht bewusst NICHT hier — er käme aus
- * `get_infospegel.php`, einem Einzelabruf je Pegel gegen einen Token-gesicherten Endpunkt
- * (siehe `docs/fachebenen-quellen.md`). Wer die Zahl braucht, schaltet die
- * PEGELONLINE-Ebene daneben ein; genau diese Arbeitsteilung ist der Zweck der Ebene.
+ * LHP-Pegel: Name, Nummer und Meldeklasse, wie `get_lagepegel.php` sie liefert. Der Wasserstand
+ * fehlt bewusst — er käme aus einem Token-gesicherten Einzelabruf je Pegel
+ * (`docs/fachebenen-quellen.md`); dafür gibt es die PEGELONLINE-Ebene.
  */
 function HochwasserInhalt({ p }: { p: Record<string, unknown> }) {
   return (
@@ -374,9 +361,8 @@ const ODL_ZAHL = new Intl.NumberFormat('de-DE', {
 });
 
 /**
- * Faktor mit ZWEI Nachkommastellen („1,52 ×"), so genau wie das Backend ihn liefert. Mit einer
- * stünde „1,5 ×" sowohl neben „unauffällig" (1,48) als auch neben „erhöht" (1,52) — gerade im
- * Regenfall, den der Hinweis erklären soll.
+ * Faktor mit zwei Nachkommastellen: mit einer stünde „1,5 ×" neben „unauffällig" (1,48) wie neben
+ * „erhöht" (1,52).
  */
 const ODL_FAKTOR = new Intl.NumberFormat('de-DE', {
   minimumFractionDigits: 2,
@@ -384,20 +370,15 @@ const ODL_FAKTOR = new Intl.NumberFormat('de-DE', {
 });
 
 /**
- * ODL-Sonde des BfS (LFH-78/LFH-598): Stufe als Wort, Messwert, Messende, Betriebsstatus — und
- * der Maßstab, nach dem die Stufe gebildet ist. Seit LFH-598 gibt es ZWEI: den
- * Standort-Grundpegel der Sonde (Faktor-Schwellen 1,5 × / 3 ×) und, solange keiner vorliegt,
- * die absoluten Bänder am natürlichen Bereich. Die Stufen-Labels nennen bewusst keinen der
- * beiden (`theme/statusFarben.ts`), der Maßstab steht deshalb HIER, je Sonde.
+ * ODL-Sonde des BfS: Stufe als Wort, Messwert, Messende, Betriebsstatus — und der Maßstab der
+ * Stufe: der Standort-Grundpegel der Sonde (Faktor-Schwellen 1,5 × / 3 ×) oder, ohne ihn, die
+ * absoluten Bänder am natürlichen Bereich. Die Stufen-Labels nennen keinen Maßstab, deshalb steht
+ * er hier.
  *
- * Der Hinweissatz ist KEIN Kleingedrucktes zum Weglassen: das BfS veröffentlicht keinen
- * Schwellenwert für „erhöht", und ohne ihn läse sich die Stufe wie eine amtliche Bewertung
- * (Spec, Anforderung „Die Einteilung gibt sich als Projekt-Einteilung zu erkennen").
- *
- * Eine Sonde ohne Messwert zeigt „kein Messwert" statt einer Zahl, und das Messende fehlt
- * dann ganz — die Quelle liefert für defekte Sonden keins. Das Messende steht auch bei
- * aktuellen Werten: gemessen hängt ein Teil der Sonden Stunden hinter dem Stundenwert, und
- * eine eigene Stufe „veraltet" gibt es bewusst nicht (LFH-78, design.md, Entscheidung 6).
+ * Der Hinweissatz ist Pflicht: das BfS veröffentlicht keinen Schwellenwert für „erhöht", ohne ihn
+ * läse sich die Stufe wie eine amtliche Bewertung. Ohne Messwert „kein Messwert" und kein Messende.
+ * Das Messende steht auch bei aktuellen Werten, weil manche Sonden Stunden hinterher hängen und es
+ * keine Stufe „veraltet" gibt.
  */
 function OdlInhalt({ p }: { p: Record<string, unknown> }) {
   const { token } = theme.useToken();
@@ -437,8 +418,7 @@ function OdlInhalt({ p }: { p: Record<string, unknown> }) {
         </Typography.Paragraph>
       ) : (
         <Typography.Paragraph type="secondary" style={hinweisStil}>
-          {/* Nur wo ein Grundpegel überhaupt gälte: mit Messwert in µSv/h. Unter fremder Einheit
-              wird gar nicht bewertet, der Satz stimmte dort nicht. */}
+          {/* Nur mit Messwert in µSv/h — unter fremder Einheit wird nicht bewertet. */}
           {wert !== null &&
             (s(p.einheit) ?? 'µSv/h') === 'µSv/h' &&
             'Für diese Sonde liegt noch kein Grundpegel vor. '}
@@ -466,10 +446,9 @@ const LUFT_KOMPONENTEN: [string, string][] = [
 ];
 
 /**
- * UBA-Luftmessstation (LFH-79). Die Stufe steht als WORT (zweiter Kanal zur Farbe auf der
- * Karte), der Messzeitpunkt immer — die Quelle hinkt rund zwei Stunden hinterher, und ein
- * Wert ohne Zeit läse sich als „jetzt". Die unvollständige Datenbasis ist ein Hinweis, keine
- * Farbe: der Index ist die amtliche Einstufung, nur aus weniger Komponenten gebildet.
+ * UBA-Luftmessstation. Die Stufe steht als Wort (zweiter Kanal), der Messzeitpunkt immer — die
+ * Quelle hinkt rund zwei Stunden hinterher. Die unvollständige Datenbasis ist ein Hinweis, keine
+ * Farbe: der Index bleibt die amtliche Einstufung.
  */
 function LuftqualitaetInhalt({ p }: { p: Record<string, unknown> }) {
   const unbekannt = Object.keys(p)
@@ -515,17 +494,12 @@ function LuftqualitaetInhalt({ p }: { p: Record<string, unknown> }) {
 }
 
 /**
- * Standbild einer BAB-Webcam. Eigene Komponente, damit der Aufrufer sie über `key={bild}`
- * strukturell zurücksetzen kann: der Fehlerzustand gehört zu GENAU DIESEM Bild, nicht zum
- * Panel. Ein Merker im Panel überlebte den Wechsel auf eine andere Kamera — und ein Merker,
- * der nur die zuletzt gescheiterte URL vergleicht, überlebte den Weg A → B → **A**: bei der
- * Rückkehr stünde weiter „nicht abrufbar", ohne es noch einmal zu versuchen, obwohl die
- * Verbindung inzwischen wieder da sein kann. Mit dem `key` stellt sich die Frage nicht.
+ * Standbild einer BAB-Webcam. Eigene Komponente, damit der Aufrufer sie per `key={bild}`
+ * zurücksetzt: der Fehlerzustand gehört zu genau diesem Bild — auch auf dem Weg A → B → A beginnt
+ * jeder Wechsel mit einem frischen Versuch.
  *
- * Das Bild kommt NICHT über den Backend-Proxy, sondern direkt vom Betreiber (die Quelle
- * liefert nur die URL). Ohne Internet am Gerät — der Normalfall, für den die Lagekarte
- * offline-fähig ist — lädt es also nicht. Ein kaputtes Bildsymbol wäre in einer
- * Führungsoberfläche die schlechteste Antwort: es sagt nicht, WAS fehlt.
+ * Das Bild kommt direkt vom Betreiber, nicht über den Backend-Proxy, und lädt ohne Internet am
+ * Gerät nicht. Statt eines kaputten Bildsymbols steht dann der Grund.
  */
 function WebcamStandbild({ bild, titel }: { bild: string; titel: string | null }) {
   const { token } = theme.useToken();
@@ -539,8 +513,7 @@ function WebcamStandbild({ bild, titel }: { bild: string; titel: string | null }
     );
   }
   return (
-    /* Bewusst ohne feste Höhe — die Betreiber liefern verschiedene Seitenverhältnisse, ein
-       erzwungenes Maß schnitte den Fahrbahnrand ab. */
+    /* Ohne feste Höhe — die Betreiber liefern verschiedene Seitenverhältnisse. */
     <img
       src={bild}
       alt={titel ? `Webcam-Standbild: ${titel}` : 'Webcam-Standbild'}
@@ -578,15 +551,13 @@ const HERKUNFT: Record<string, string> = {
 const MW = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
 
 /**
- * Energieanlage (LFH-81). Die Properties sind flach und tragen `null` für Unbekanntes;
- * MapLibre liefert null-Properties beim Klick aber als FEHLEND — beide Fälle laufen hier
- * denselben Weg (`s()` bzw. die Zahlprüfung sehen `null` und `undefined` gleich).
+ * Energieanlage. Die Properties tragen `null` für Unbekanntes, MapLibre liefert sie beim Klick aber
+ * als fehlend — beide Fälle laufen denselben Weg.
  */
 function EnergieInhalt({ p }: { p: Record<string, unknown> }) {
   const artRoh = s(p.anlagenart);
   const art = artRoh ? (ANLAGENART[artRoh as EnergieAnlagenart] ?? artRoh) : null;
-  // Nur eine echte Zahl ist ein Messwert. Eine Zeichenkette erschiene sonst als Leistung,
-  // obwohl sie nie gemessen wurde — der Vermerk „unbekannt" ist dann die ehrliche Antwort.
+  // Nur eine echte Zahl ist ein Messwert; sonst ist „unbekannt" die ehrliche Antwort.
   const mw =
     typeof p.leistung_mw === 'number' && Number.isFinite(p.leistung_mw) ? p.leistung_mw : null;
   const herkunftRoh = s(p.herkunft);
@@ -628,15 +599,13 @@ function EnergieInhalt({ p }: { p: Record<string, unknown> }) {
           )}
         </Descriptions.Item>
       )}
-      {/* Mehrere Einheiten an einer Anlage summieren ihre Leistung (design.md,
-          Entscheidung 4); die Nummer ist die der größten Einheit. Die Zahl sagt, dass
-          Leistung und Nummer nicht dieselbe Einheit beschreiben. */}
+      {/* Mehrere Einheiten summieren ihre Leistung; die Nummer ist die der größten Einheit. Die
+          Zahl sagt, dass Leistung und Nummer nicht dieselbe Einheit beschreiben. */}
       {einheiten != null && (
         <Descriptions.Item label="MaStR-Einheiten">{einheiten}</Descriptions.Item>
       )}
-      {/* Die Lizenz verlangt die Nennung samt Verweis auf den Lizenztext (design.md,
-          Entscheidung 5). Die Attributionszeile der Karte ist Klartext und kann keinen Link
-          tragen — der Verweis steht deshalb hier, an jedem Punkt mit MaStR-Anteil. */}
+      {/* Die Lizenz verlangt die Nennung samt Verweis auf den Lizenztext; die Attributionszeile
+          der Karte kann keinen Link tragen. */}
       {ausMastr && (
         <Descriptions.Item label="Lizenz">
           <a href="https://www.govdata.de/dl-de/by-2-0" target="_blank" rel="noopener noreferrer">
@@ -661,9 +630,7 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
           {kategorieLabel(kategorie)}
         </Tag>
       )}
-      {/* Das Standbild IST der Zweck der Webcam-Kategorie (LFH-80): visuelle Lagebestätigung
-          an der BAB. Der `key` bindet den Fehlerzustand an die URL — ein Wechsel der Kamera
-          (auch hin und zurück) beginnt mit einem frischen Versuch. */}
+      {/* Der `key` bindet den Fehlerzustand an die URL — jeder Kamerawechsel beginnt frisch. */}
       {bild && <WebcamStandbild key={bild} bild={bild} titel={titel} />}
       <Descriptions column={1}>
         {s(p.strasse) && <Descriptions.Item label="Autobahn">{s(p.strasse)}</Descriptions.Item>}
@@ -675,9 +642,8 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
           <Descriptions.Item label="Betreiber">{s(p.betreiber)}</Descriptions.Item>
         )}
       </Descriptions>
-      {/* Die Quelle liefert `description` als Zeilen-Array; der Normalisierer fügt sie mit
-          \n zusammen. `pre-line` hält diese Gliederung — ohne sie steht „Länge: 1.36 km
-          Max. 80 km/h Maximale Durchfahrtsbreite: 3.25 m" in einem Zug. */}
+      {/* Der Normalisierer fügt die Zeilen von `description` mit \n zusammen; `pre-line` hält
+          die Gliederung. */}
       {beschreibung && (
         <Typography.Paragraph
           style={{ marginTop: 8, marginBottom: 0, fontSize: 13, whiteSpace: 'pre-line' }}
@@ -685,13 +651,9 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
           {beschreibung}
         </Typography.Paragraph>
       )}
-      {/* Eigenständige AKTION, nicht ein Anker im Fließtext — und damit ein Bedienziel, das
-          die Dichtestaffel halten muss (30/48/72). Bewusst ein antd-`Button type="link"`
-          statt eines nackten `<a>` mit handgesetzter `minHeight`: so erbt es `controlHeight`
-          vom `ConfigProvider` und schuldet nicht die zwei Angaben aus LFH-365. Dieselbe
-          Begründung wie beim Platzhalter in `BemerkungZelle` (LFH-369). Die
-          `telefon`/`website`-Anker im KRITIS-Zweig bleiben nackt: die stehen als WERT in einer
-          `Descriptions`-Zeile, nicht als Aktion auf eigener Zeile. */}
+      {/* Eigenständige Aktion und damit Bedienziel: ein antd-`Button type="link"` erbt
+          `controlHeight`, ein nackter `<a>` nicht. Die `telefon`/`website`-Anker im KRITIS-Zweig
+          bleiben nackt — sie stehen als Wert in einer `Descriptions`-Zeile. */}
       {link && (
         <div style={{ marginTop: 8 }}>
           <Button
@@ -720,7 +682,7 @@ export default function FachebenenInspector({
   const { token } = theme.useToken();
   const p = properties;
   const istWarnung = quelle === 'nina' || quelle === 'dwd';
-  // Fläche/Umfang/Länge rein clientseitig aus der (auch Multi-*) Geometrie (LFH-146).
+  // Fläche/Umfang/Länge rein clientseitig aus der (auch Multi-*) Geometrie.
   const kennzahlen = geometrie ? geoKennzahlen(geometrie) : null;
 
   let titel: string;
@@ -739,8 +701,8 @@ export default function FachebenenInspector({
     <KartenDetailCard
       titel={titel}
       akzentFarbe={
-        // Die Luftqualitätsebene färbt je Station nach ihrer Stufe; der Akzent folgt dem, sonst
-        // stünde neben einem Alarm-Tag die Ebenenfarbe — eine Farbe mit zwei Bedeutungen.
+        // Die Luftqualitätsebene färbt je Station nach Stufe; der Akzent folgt dem, sonst hätte
+        // eine Farbe zwei Bedeutungen.
         quelle === 'luftqualitaet'
           ? rollenFarbe(luftqualitaetDarstellung(p.klasse).rolle, token)
           : FACHEBENEN[quelle].farbe
@@ -760,14 +722,13 @@ export default function FachebenenInspector({
       ) : quelle === 'luftqualitaet' ? (
         <LuftqualitaetInhalt p={p} />
       ) : quelle === 'energie' ? (
-        // VOR dem Rückfall: jede unbekannte Quelle fiele still in den KRITIS-Inhalt, und der
-        // zeigte von einer Energieanlage nur den Betreiber.
+        // Vor dem Rückfall: jede unbekannte Quelle fiele sonst still in den KRITIS-Inhalt.
         <EnergieInhalt p={p} />
       ) : (
         <KritisInhalt p={p} />
       )}
-      {/* Abstand am Aufrufer, nicht im Primitiv: `GeoKennzahlen` rendert ohne Kennzahlen
-          nichts, ein Wrapper mit `marginTop` hinterließe sonst eine leere Lücke. */}
+      {/* Abstand am Aufrufer: `GeoKennzahlen` rendert ohne Kennzahlen nichts, ein Wrapper mit
+          `marginTop` hinterließe eine Lücke. */}
       {kennzahlen && (
         <div style={{ marginTop: token.marginSM }}>
           <GeoKennzahlen kennzahlen={kennzahlen} />

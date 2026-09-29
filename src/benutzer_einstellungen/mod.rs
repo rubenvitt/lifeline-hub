@@ -1,23 +1,17 @@
-//! Benutzer-Präferenzen (LFH-391 · Etappe D) — ein Schlüssel/Wert-Fach je Benutzer.
+//! Benutzer-Präferenzen (LFH-391) — ein Schlüssel/Wert-Fach je Benutzer.
 //!
-//! Erster Konsument ist das Gedächtnis der Kommandopalette: sie merkt sich die zuletzt
-//! ausgeführten Befehls-**IDs** (keine Beschriftungen, keine Ziele — aufgelöst wird gegen
-//! die gerade gebaute Befehlsliste). Der Speicher weiß davon nichts; für ihn ist der Wert
-//! ein opaker Text.
+//! Erster Konsument ist das Gedächtnis der Kommandopalette: die zuletzt ausgeführten
+//! Befehls-**IDs**, aufgelöst gegen die gerade gebaute Befehlsliste. Für den Speicher ist der
+//! Wert opaker Text.
 //!
-//! **Warum ein offener Schlüsselraum, aber eine geschlossene Whitelist.** Eine Spalte je
-//! Präferenz hätte die nächste Präferenz wieder zu einer Migration gemacht — der
-//! Schlüsselraum ist deshalb Daten, keine Struktur. Frei *schreibbar* ist er trotzdem
-//! nicht: ohne Whitelist wäre das Fach ein unbegrenzter, vom Client bestimmter
-//! Schreibspeicher (jeder Aufrufer könnte beliebig viele Zeilen je Benutzer anlegen), und
-//! ein Tippfehler (`zuletzt_befehl`) schriebe still in einen Schlüssel, den niemand liest.
-//! Mit der Whitelist ist die Zeilenzahl je Benutzer durch ihre Länge gedeckelt — eine
-//! zusätzliche Mengenbegrenzung wäre doppelt gemoppelt. Eine neue Präferenz kostet
-//! [`BEKANNTE_SCHLUESSEL`] eine Zeile und keine Migration.
+//! **Offener Schlüsselraum, geschlossene Whitelist:** Schlüssel sind Daten, damit eine neue
+//! Präferenz keine Migration braucht. Ohne Whitelist wäre das Fach aber ein unbegrenzter,
+//! clientbestimmter Speicher, und ein Tippfehler schriebe still in einen Schlüssel, den niemand
+//! liest. Die Whitelist deckelt zugleich die Zeilenzahl je Benutzer. Eine neue Präferenz kostet
+//! eine Zeile in [`BEKANNTE_SCHLUESSEL`].
 //!
-//! Bewusst NICHT gebaut: ein Löschweg (`DELETE`) und ein Typsystem über den Werten. Wer
-//! seine Liste leeren will, schreibt `[]`; ein leerer Wert ist abgelehnter Unfug, kein
-//! Löschbefehl (LFH-267: vorhandenes, aber leeres Pflichtfeld → 400).
+//! Bewusst ohne Löschweg und ohne Typsystem über den Werten: wer die Liste leeren will,
+//! schreibt `[]`; ein leerer Wert ist 400.
 
 pub mod repo;
 
@@ -32,12 +26,9 @@ pub const SCHLUESSEL_ZULETZT_BEFEHLE: &str = "zuletzt_befehle";
 /// die Tabelle bleibt unangetastet.
 pub const BEKANNTE_SCHLUESSEL: &[&str] = &[SCHLUESSEL_ZULETZT_BEFEHLE];
 
-/// Obergrenze für einen Wert, in **Zeichen** (nicht Bytes — sonst hinge die Grenze an der
-/// Kodierung und ein Umlaut zählte doppelt).
-///
-/// Hergeleitet vom einzigen Konsumenten: die Palette merkt sich eine Handvoll IDs der Form
-/// `datensatz:person:12345`; selbst 40 solcher Einträge samt JSON-Rahmen bleiben deutlich
-/// darunter. Die Zahl ist eine Schranke gegen Missbrauch, kein Feldbudget.
+/// Obergrenze für einen Wert in **Zeichen** (nicht Bytes, sonst hinge sie an der Kodierung).
+/// Eine Schranke gegen Missbrauch mit viel Luft: auch 40 Palette-IDs samt JSON-Rahmen bleiben
+/// deutlich darunter.
 pub const WERT_MAX_LAENGE: usize = 2000;
 
 /// Ist der Schlüssel Teil des gültigen Raums?
@@ -48,21 +39,19 @@ pub fn ist_gueltiger_schluessel(schluessel: &str) -> bool {
 /// Alle Präferenzen eines Benutzers. `eintraege` ist sparse — nur gesetzte Schlüssel
 /// stehen darin, eine leere Map heißt „nichts gespeichert".
 //
-// Die Doc-Kommentare dieses Typs landen über utoipa in `openapi.json` und von dort in
-// `types.generated.ts`; die Begründungen bleiben deshalb bewusst als `//`-Kommentare hier
-// und wandern nicht in den Frontend-Vertrag.
+// Die Doc-Kommentare dieses Typs landen über utoipa in `openapi.json`; Begründungen stehen
+// deshalb als `//`-Kommentare.
 //
-// `BTreeMap` statt `HashMap`: die Schlüsselreihenfolge auf dem Draht ist damit stabil —
-// eine wechselnde erzeugte sonst Cache-Rauschen und unlesbare Test-Diffs.
+// `BTreeMap` statt `HashMap`: stabile Schlüsselreihenfolge auf dem Draht, ohne Cache-Rauschen
+// und wechselnde Test-Diffs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct BenutzerEinstellungenAnzeige {
     /// Schlüssel → opaker Wert.
     pub eintraege: BTreeMap<String, String>,
     /// Zeitpunkt der jüngsten Änderung; fehlt, solange nichts gespeichert ist.
     //
-    // `skip_serializing_if` ist hier keine Kosmetik (Norm aus CLAUDE.md/LFH-265): der Key
-    // FEHLT bei `None`, statt als `null` zu erscheinen — nur so kann der Client „noch nie
-    // geschrieben" von „geschrieben, Wert unbekannt" trennen.
+    // Der Key FEHLT bei `None` statt `null` zu sein — nur so trennt der Client „noch nie
+    // geschrieben“ von „geschrieben, Wert unbekannt“.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub geaendert_at: Option<String>,
 }
@@ -90,8 +79,8 @@ mod tests {
         assert!(!ist_gueltiger_schluessel("zuletzt_befehle_v2"));
     }
 
-    /// Die tragende Hälfte der Norm: `None` verschwindet, `Some` erscheint. Ein Test nur
-    /// auf `Some` bliebe grün, wenn `skip_serializing_if` fehlte.
+    /// `None` verschwindet, `Some` erscheint. Ein Test nur auf `Some` bliebe grün, wenn
+    /// `skip_serializing_if` fehlte.
     #[test]
     fn leerer_stand_serialisiert_ohne_geaendert_at() {
         let json = serde_json::to_value(BenutzerEinstellungenAnzeige::leer()).unwrap();

@@ -1,6 +1,6 @@
 //! Abruf von Warnungen und Vorhersage für den Einsatzort mit Cache (LFH-633).
 //!
-//! Das Muster ist `pegel::abruf`, die Bremsen sind dieselben (design.md D3):
+//! Das Muster und die Bremsen sind die von `pegel::abruf`:
 //!
 //! - frisch (jünger als die TTL) → sofort, ohne Netz;
 //! - abgelaufen, aber unter der Obergrenze → **sofort** den alten Stand ausliefern und im
@@ -21,7 +21,7 @@
 //! **Der Schlüssel trägt außerdem die Organisation** (nicht die Anfrage): ein instanzweit
 //! geteilter Eintrag verriete über `abgerufen_at`, dass eine FREMDE Organisation in den
 //! letzten Stunden am selben Ort Wetter abgefragt hat — also dort einen Einsatz führt. Geteilt
-//! wird deshalb nur innerhalb einer Organisation (Review LFH-633).
+//! wird deshalb nur innerhalb einer Organisation.
 //!
 //! Der Cache hält die Warnungen **ungefiltert**; abgelaufene entfernt [`anzeige`] bei jeder
 //! Antwort (`quelle::gueltige`), vergangene Vorhersagestunden ebenso

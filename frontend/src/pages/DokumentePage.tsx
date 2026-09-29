@@ -24,35 +24,28 @@ import DownloadAnker from '../components/DownloadAnker';
 /**
  * Dokumentenablage eines Einsatzes (LFH-632), strukturgleich zu `SchaedenPage`.
  *
- * ── DER TITEL IST EIN NATIVER DOWNLOAD-ANKER, UND ZWAR IN BEIDEN ZWEIGEN ──────────
+ * ── Der Titel ist ein nativer Download-Anker, in beiden Zweigen ──
  *
- * Der Kartenplan kennt `titel.ziel` — das rendert aber einen react-router-`<Link>`, also
- * eine CLIENT-Navigation. Ein Ziel unter `/api/…/datei` liefe damit in den Router statt in
- * den Download (die Seite zeigte den Fangzweig, keine Datei). `titel.ziel` ist hier also
- * unbrauchbar und bleibt UNGESETZT.
+ * `titel.ziel` rendert einen react-router-`<Link>`, also eine Client-Navigation; ein Ziel unter
+ * `/api/…/datei` liefe in den Router statt in den Download. `titel.ziel` bleibt deshalb ungesetzt.
  *
  * Ohne `ziel` nimmt der Kartenzweig den Titel aus demselben Spalten-`render` wie die Tabelle
- * (`zelle(titelSpalte, …)` in `Datensicht`). Deshalb trägt das `render` der Titelspalte den
- * echten `<a href download>` — Lesende UND Schreibende bekommen den Download in Tabelle und
- * Karte, ohne Ausweich-Primäraktion. Die Regel „trägt `titel.ziel` einen Wert, darf das
- * `render` keinen Anker erzeugen" greift nicht: `ziel` ist leer, es gibt keinen zweiten Link
- * und nichts zu verschachteln. Ein `onZeileKlick` gibt es nicht — der Anker-Riegel der
- * Datensicht hätte also nichts zu entscheiden; eine Zeile, deren Klick eine Datei zieht,
- * wäre ohnehin eine Überraschung.
+ * (`zelle(titelSpalte, …)` in `Datensicht`). Deshalb trägt das `render` der Titelspalte den echten
+ * `<a href download>` — Lesende und Schreibende bekommen den Download in Tabelle und Karte. Die
+ * Regel „trägt `titel.ziel` einen Wert, darf das `render` keinen Anker erzeugen" greift nicht: es
+ * gibt keinen zweiten Link. Ein `onZeileKlick` gibt es nicht; eine Zeile, deren Klick eine Datei
+ * zieht, wäre eine Überraschung.
  *
- * Der Anker trägt die Höhe aus `controlHeight` selbst (`components/DownloadAnker`, seit LFH-21
- * geteilt mit den Schaden-Anhängen): ein Inline-`<a>`
- * erbt keine Steuerhöhe (gemessen 17 px, LFH-396). Die Bauform (`inline-flex` + `minHeight`)
- * ist die des Titel-Links, den das Primitiv bei gesetztem `ziel` selbst rendert.
+ * Der Anker trägt die Höhe aus `controlHeight` selbst (`components/DownloadAnker`): ein
+ * Inline-`<a>` erbt keine Steuerhöhe.
  *
- * ── ENTFERNEN ─────────────────────────────────────────────────────────────────
+ * ── Entfernen ──
  *
- * Eine einzige Zeilenaktion, also keine Bündelung. Sie ist aus Sicht der Oberfläche
- * UNUMKEHRBAR (es gibt keinen Wiederherstellen-Weg), deshalb Rückfrage mit rotem OK-Knopf.
- * Im Kartenzweig trägt die Aktion das Primitiv (`PrimaerAktion` mit `bestaetigung` und
- * `bestaetigungGefahr`): der Auslöser bleibt neutral („Rot bedient nichts"), der OK-Knopf der
- * Rückfrage ist rot wie in der Tabelle. `zugaenglicherName` trägt den Titel, damit n Karten
- * nicht n gleichnamige „Entfernen"-Knöpfe liefern.
+ * Eine einzige Zeilenaktion, also keine Bündelung. Für die Oberfläche unumkehrbar (kein
+ * Wiederherstellen-Weg), deshalb Rückfrage mit rotem OK-Knopf. Im Kartenzweig trägt die Aktion das
+ * Primitiv (`PrimaerAktion` mit `bestaetigung` und `bestaetigungGefahr`): der Auslöser bleibt
+ * neutral („Rot bedient nichts"). `zugaenglicherName` trägt den Titel, damit n Karten nicht n
+ * gleichnamige „Entfernen"-Knöpfe liefern.
  */
 
 const rechteText = (status: EinsatzStatus) =>
@@ -69,9 +62,9 @@ function bezugText(d: Dokument): string | null {
 }
 
 /**
- * Das EINE Spaltenregister (Bauform `SchaedenPage`). Funktion von `einsatzId` (Download-Pfad)
- * und vom Schreibrecht (Aktionsspalte), durch `spaltenFuer<Dokument>()` geführt, nie
- * annotiert — sonst weitete sich `K` auf `string` und der Kartenplan nähme Tippfehler an.
+ * Das eine Spaltenregister (Bauform `SchaedenPage`). Funktion von `einsatzId` (Download-Pfad) und
+ * Schreibrecht (Aktionsspalte), durch `spaltenFuer<Dokument>()` geführt, nie annotiert — sonst
+ * weitete sich `K` auf `string` und der Kartenplan nähme Tippfehler an.
  */
 const dokumentSpalten = (
   einsatzId: number,
@@ -228,8 +221,8 @@ export default function DokumentePage() {
     [darfSchreibenRoh, entfernen],
   );
 
-  // Schnellaktion: ?neu=1 öffnet den Dialog (Command-Palette). Param immer löschen, Dialog
-  // nur mit Schreibrecht — Muster `SchaedenPage`.
+  // Schnellaktion: ?neu=1 öffnet den Dialog (Command-Palette). Param immer löschen, Dialog nur mit
+  // Schreibrecht.
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading) return;
@@ -238,7 +231,7 @@ export default function DokumentePage() {
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh]);
 
-  // SEITENZUSTAND — nur `einsatzQuery`: ohne Einsatz gibt es keinen Rahmen (LFH-331 · B3).
+  // Seitenzustand — nur `einsatzQuery`: ohne Einsatz gibt es keinen Rahmen.
   if (einsatzQuery.isLoading) {
     return <SeitenSkeleton />;
   }
@@ -254,7 +247,7 @@ export default function DokumentePage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  // LISTENZUSTAND — an der Stelle der Liste, gemessen an der Vollmenge (LFH-331 · B3, D3).
+  // Listenzustand — an der Stelle der Liste, gemessen an der Vollmenge.
   const alle = dokumenteQuery.data ?? [];
   const listeGescheitert = dokumenteQuery.isError && alle.length === 0;
   const standVeraltet = dokumenteQuery.isError && alle.length > 0;
@@ -283,7 +276,7 @@ export default function DokumentePage() {
           ]}
         />
       }
-      // Gesperrt statt fehlend (LFH-345 · M16): der Rechte-Hinweis darüber nennt den Grund.
+      // Gesperrt statt fehlend: der Rechte-Hinweis darüber nennt den Grund.
       aktionen={
         <Button type="primary" disabled={!darfSchreiben} onClick={() => setAblegenOffen(true)}>
           Dokument ablegen

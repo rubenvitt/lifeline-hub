@@ -8,8 +8,8 @@ import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import EtbPage from './EtbPage';
 
-// Normaler Benutzer (kein System-Admin): die Rollen-Tests prüfen die EINSATZ-Rolle,
-// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+// Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
+// schreibrecht.test.ts ab.
 const nutzer = {
   id: 1,
   anzeigename: 'Nutzer',
@@ -70,7 +70,7 @@ describe('EtbPage – Abschließen', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Einsatz abschließen' }));
     // Popconfirm bestätigen
     await userEvent.click(await screen.findByRole('button', { name: 'Ja' }));
-    // Beschriftung aus dem Statusfarb-Vertrag (LFH-358), nicht der Wire-Wert.
+    // Beschriftung aus dem Statusfarb-Vertrag, nicht der Wire-Wert.
     await waitFor(() => expect(screen.getByText('Abgeschlossen')).toBeInTheDocument());
   });
 

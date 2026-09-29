@@ -1,5 +1,5 @@
 //! Reine Auswertung einer PEGELONLINE-Zeitreihe (LFH-606): Parsen, jüngste Messung, Trend
-//! und der 24-h-Verlauf für die Modulseite „Wetter & Pegel" (LFH-633).
+//! und der 24-h-Verlauf für die Modulseite „Wetter & Pegel".
 //!
 //! **Warum Regression statt Differenz:** „jetzt minus vor einer Stunde" hängt an genau zwei
 //! Messungen; ein einzelner Ausreißer an einer der beiden schlägt voll auf den Trend durch

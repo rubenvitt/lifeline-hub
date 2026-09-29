@@ -5,9 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { MATRIX_KLASSE } from './matrixGeometrie';
 
 /**
- * Die Geometrie der Gefahrenmatrix steht als CSS (Container-Abfrage auf die Paneelbreite).
- * Geprüft wird die QUELLE — jsdom rechnet weder Layout noch `@container`. Muster:
- * `pages/LoginPage.animation.test.ts`.
+ * Die Geometrie steht als CSS (Container-Abfrage auf die Paneelbreite); geprüft wird die Quelle,
+ * weil jsdom weder Layout noch `@container` rechnet.
  */
 const css = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), 'gefahrenmatrix.css'),

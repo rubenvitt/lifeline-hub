@@ -6,9 +6,8 @@ import { personDetailPfad, personalPfad } from '../../routing/deeplinks';
 import type { Schaden, SchadenAbschlussGrund, SchadenStatus, SchadenTyp } from '../../api/types';
 import type { GeschaedigtWert } from './GeschaedigtPicker';
 
-// Gemeinsame Anzeige-/Mapping-Helfer für Schäden-Liste (SchaedenPage) und
-// -Detailseite (SchaedenDetailPage). Insbesondere die Geschädigt-XOR-Abbildung auf die
-// vier Backend-Felder liegt damit an EINER Stelle (sonst fehleranfällig dupliziert).
+// Gemeinsame Anzeige-/Mapping-Helfer für Schäden-Liste und -Detailseite; die Geschädigt-XOR-
+// Abbildung auf die vier Backend-Felder liegt damit an einer Stelle.
 
 export {
   schadenStatus as STATUS_META,
@@ -41,12 +40,10 @@ function pad3(nr: number): string {
   return String(nr).padStart(3, '0');
 }
 
-/** Reiterachse der Schäden-Liste: Status oder „alle".
- *
- *  SEIT LFH-340 · C5 nur noch das. Typ, Ausmaß und Freitextsuche lagen bis dahin ebenfalls
- *  hier und wurden aus drei Bedienelementen über der Tabelle gespeist; sie sind in das
- *  `Datensicht`-Primitiv gewandert (Spaltenfilter bzw. `suche`), das beides mitbringt.
- *  Zwei Filterketten übereinander wären eine, die niemand mehr überblickt. */
+/**
+ * Reiterachse der Schäden-Liste: Status oder „alle". Typ, Ausmaß und Freitextsuche laufen im
+ * `Datensicht`-Primitiv (Spaltenfilter bzw. `suche`).
+ */
 export function filterSchaeden(
   alle: Schaden[],
   opts: { sicht: SchadenStatus | 'alle' },
@@ -58,11 +55,9 @@ export function filterSchaeden(
 export function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNode {
   if (s.geschaedigt_registrier_nr != null) {
     const label = `R-${pad3(s.geschaedigt_registrier_nr)}`;
-    // Storniert bleibt grauer Text ohne Deeplink (Status-quo-Optik).
     if (s.geschaedigt_storniert_at) {
       return <Typography.Text type="secondary">Geschädigt (storniert): {label}</Typography.Text>;
     }
-    // Deeplink auf die Personen-Detailseite (LFH-25), falls die Person-id bekannt ist.
     return s.geschaedigt_person_id != null ? (
       <Link to={personDetailPfad(einsatzId, s.geschaedigt_person_id)}>
         <StatusTag darstellung={bezugsDarstellung(label)} />
@@ -72,7 +67,6 @@ export function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNo
     );
   }
   if (s.geschaedigt_personal_id != null) {
-    // Einsatzkraft → Personal-Liste mit Zeilen-Selektion (?personal=, LFH-25).
     return (
       <Link to={personalPfad(einsatzId, { personal: s.geschaedigt_personal_id })}>
         <StatusTag darstellung={bezugsDarstellung(s.geschaedigt_personal_name ?? 'Einsatzkraft')} />

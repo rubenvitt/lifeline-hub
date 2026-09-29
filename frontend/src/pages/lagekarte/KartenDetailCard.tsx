@@ -13,7 +13,7 @@ interface KartenDetailCardProps {
   kachel?: ReactNode;
   /** Mono-Unterzeile unter dem Namen (Objektart, Kennung). */
   unterzeile?: ReactNode;
-  /** Veraltet: die Breite gibt jetzt die Leiste vor. Bleibt, damit Aufrufer nicht brechen. */
+  /** Veraltet: die Breite gibt die Leiste vor; bleibt, damit Aufrufer nicht brechen. */
   width?: number;
   children: ReactNode;
 }
@@ -22,16 +22,13 @@ interface KartenDetailCardProps {
 const KACHEL_KANTE = 38;
 
 /**
- * Ein gewähltes Objekt im Paneel „Ausgewählt" der rechten Kartenleiste (Neuentwurf S5).
+ * Ein gewähltes Objekt im Paneel „Ausgewählt" der rechten Kartenleiste, im Fluss der Leiste (als
+ * schwebende Karte verdeckte es das gewählte Objekt am rechten Rand). Kopf mit Symbol-Kachel, Name
+ * und Mono-Unterzeile, darunter der Inhalt des Inspectors — alle vier Inspectors nutzen diese
+ * Bauform.
  *
- * Bis zum Neuentwurf schwebte diese Karte absolut oben rechts ÜBER der Karte — und verdeckte
- * dabei genau den Ausschnitt, in dem das gewählte Objekt lag, sobald es am rechten Rand stand.
- * Jetzt steht sie IM FLUSS der Leiste: Kopf mit Symbol-Kachel (38 px, Rahmen in Objektfarbe),
- * Name und Mono-Unterzeile, darunter der Inhalt des jeweiligen Inspectors. Alle vier
- * Inspectors (Marker, Zone, freies Zeichen, Fachebene) hängen an dieser einen Bauform.
- *
- * Der Name ist eine Überschrift (`h3` unter dem `h2` des Paneels) — mehrere gleichzeitig
- * gewählte Objekte (Marker und Zone) stehen damit als getrennte Abschnitte im Baum.
+ * Der Name ist ein `h3` unter dem `h2` des Paneels, damit mehrere gewählte Objekte als getrennte
+ * Abschnitte im Baum stehen.
  */
 export default function KartenDetailCard({
   titel,
@@ -94,7 +91,7 @@ export default function KartenDetailCard({
             </div>
           )}
         </div>
-        {/* Kein `size` — die Trefffläche kommt aus `controlHeight` (Dichte-Staffel). */}
+        {/* Kein `size` — die Trefffläche kommt aus `controlHeight`. */}
         <Button
           type="text"
           onClick={onSchliessen}

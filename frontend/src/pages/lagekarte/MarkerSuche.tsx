@@ -4,32 +4,22 @@ import { SearchOutlined } from '@ant-design/icons';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
 /*
- * Wert-Import aus `./Sidebar`, die ihrerseits `MarkerSuche` importiert — ein Zyklus, der
- * bewusst stehen bleibt: `bedienzielStil` ist repo-weit das zitierte Referenzmuster für eine
- * reine, exportierte Stilfunktion, und mehrere Dateien verweisen namentlich auf ihren Ort.
- *
- * Laufzeitsicher, weil `bedienzielStil` eine gehobene `export function` ist, die erst beim
- * Rendern gerufen wird. Wer hier eine Konstante auf Modulebene aus `Sidebar` ableitet, bricht
- * das — dann ist der Umzug fällig.
+ * Wert-Import aus `./Sidebar`, die ihrerseits `MarkerSuche` importiert — ein bewusster Zyklus:
+ * `bedienzielStil` ist das repo-weit zitierte Referenzmuster und bleibt an seinem Ort.
+ * Laufzeitsicher, weil es eine gehobene `export function` ist, die erst beim Rendern läuft. Wer aus
+ * `Sidebar` eine Konstante auf Modulebene ableitet, bricht das.
  */
 import { bedienzielStil } from './Sidebar';
 import type { KarteMarker } from './marker';
 import { gruppiereTreffer } from './objektsuche';
 
 /**
- * Suchfeld über die wählbaren verorteten Kartenobjekte (LFH-716; Kandidat aus LFH-344 · M63).
+ * Suchfeld über die wählbaren verorteten Kartenobjekte — eine Liste, keine Tabelle (hier wird
+ * gesucht und angesprungen, nicht verglichen).
  *
- * **Liste, keine Tabelle** (CLAUDE.md, „Die Liste ist die zweite Frage"): hier wird gesucht
- * und angesprungen, nicht verglichen.
- *
- * **Leere Gruppen fallen weg, der Leerzustand steht EINMAL.** `Liste` baut sich ihren
- * Leerzustand selbst, sobald `dataSource` leer ist — neun leere Gruppen wären neun Kästen.
- *
- * **Welche Objekte überhaupt hier stehen, entscheidet der Aufrufer** über `suchbareMarker`
- * (`objektsuche.ts`) — dort sitzen die Modulsperren für Betreuung und Betroffene.
- *
- * **Keine Entprellung:** gefiltert wird lokal über eine geladene Liste, eine Frist brächte nur
- * Verzögerung ohne eingesparte Abfrage.
+ * Leere Gruppen fallen weg, der Leerzustand steht einmal (`Liste` baute sonst je Gruppe einen).
+ * Welche Objekte hier stehen, entscheidet der Aufrufer über `suchbareMarker` (`objektsuche.ts`),
+ * dort sitzen die Modulsperren. Keine Entprellung: gefiltert wird lokal.
  */
 interface MarkerSucheProps {
   marker: KarteMarker[];
@@ -52,8 +42,8 @@ export default function MarkerSuche({
   return (
     <div>
       <Input
-        // Eigener Name, weil `allowClear` einen zweiten Knopf in denselben Wrapper hängt und
-        // eine Abfrage über den Platzhalter dann mehrdeutig wird.
+        // Eigener Name: `allowClear` hängt einen zweiten Knopf in denselben Wrapper, eine Abfrage
+        // über den Platzhalter wäre mehrdeutig.
         aria-label="Kartenobjekte suchen"
         placeholder="Kartenobjekte suchen"
         allowClear
@@ -69,8 +59,8 @@ export default function MarkerSuche({
       />
 
       {gruppen.length === 0 ? (
-        // Der Fehlerzweig steht vorn: „Nichts verortet" und „kein Kartenobjekt zu X" sind
-        // Aussagen über die Lage, und im Fehlerfall hat sie niemand geprüft.
+        // Der Fehlerzweig steht vorn: „Nichts verortet" wäre eine Aussage über die Lage, die im
+        // Fehlerfall niemand geprüft hat.
         <SeitenLeer
           titel={
             zaehlerUnbekannt

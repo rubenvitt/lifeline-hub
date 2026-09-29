@@ -1,19 +1,14 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
-// Namespace-Import, weil maplibre-gl ab 6 echtes ESM ohne Default-Export ist (v5 lieferte ein
-// UMD-Bundle, aus dem Bundler/TS per CJS-Interop einen Default synthetisierten). Bewusst KEIN
-// named-Import der Klassen: `Map` würde den globalen `Map` beschatten, den die tzRegistry unten
-// als `useRef<Map<string, TzProps>>` nutzt — der Fehler landete dann auf der Registry-Zeile und
-// zeigte von der Ursache weg. `import * as ns, { type X }` ist kein gültiges ES, daher zwei Zeilen.
+// Namespace-Import: maplibre-gl ab 6 ist ESM ohne Default-Export. Kein named-Import der Klassen:
+// `Map` beschattete den globalen `Map`, den die tzRegistry als `useRef<Map<string, TzProps>>`
+// nutzt. `import * as ns, { type X }` ist kein gültiges ES, daher zwei Zeilen.
 import * as maplibregl from 'maplibre-gl';
 import type { LngLatLike, StyleSpecification, GeoJSONSource } from 'maplibre-gl';
-// Der Worker MUSS explizit verdrahtet werden, und zwar mit `?worker&url`, nicht `?url`:
-// maplibre 6 baut seine Worker-URL zur Laufzeit aus `import.meta.url` in einer Variablen zusammen
-// (`web_worker.ts`), was kein Bundler statisch sieht — ohne das hier emittiert `vite build` die
-// Worker-Datei gar nicht erst, mit exit 0 und ohne Warnung. Zur Laufzeit lädt dann der Style, aber
-// es kommt keine einzige Kachel. `?url` allein ist die Falle daneben: es emittiert zwar eine Datei,
-// die aber weiter ihre Geschwisterdatei `maplibre-gl-shared.mjs` importiert und daran stirbt.
-// `?worker&url` bündelt self-contained — und nur diese Variante landet als `.js` im
-// Workbox-Precache-Manifest, ist also auch offline da.
+// Der Worker muss explizit verdrahtet werden, mit `?worker&url`, nicht `?url`: maplibre 6 baut die
+// Worker-URL zur Laufzeit zusammen, was kein Bundler sieht — ohne das emittiert `vite build` die
+// Worker-Datei nicht (exit 0, keine Warnung), und es kommt keine Kachel. `?url` allein emittiert
+// eine Datei, die ihre Geschwisterdatei `maplibre-gl-shared.mjs` importiert und daran stirbt.
+// `?worker&url` bündelt self-contained und landet im Workbox-Precache (offline da).
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -43,7 +38,7 @@ import { baueClusterDonut, setzeHuelleDurchlaessig } from './clusterDonut';
 import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { werteFachebenenKlickAus } from './geo';
-import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
+import { createZeichnung, type Zeichnung, type ZeichenModus, type ZeichenStand } from './zeichnen';
 import { createMessung, type MessZeichnung } from './messZeichnung';
 import type { MessForm, MessGeometrie } from './messung';
 import { wendeKartenDatenAn } from './kartenDaten';
@@ -81,15 +76,13 @@ import type { FachebeneQuelle } from '../../api/fachebenen';
 import { PUNKT_ZOOM, type StartAnsicht } from './startAnsicht';
 import { zonenPlakette } from './plakette';
 import { useRollen } from '../../components/instrument/rollenwerte';
+import { eigenpositionFc, sorgeFuerEigenpositionLayer } from './eigenpositionLayer';
+import type { Eigenposition } from './useEigenposition';
 
-// Worker-URL setzen, bevor die erste Map entsteht — diese Datei ist die einzige Stelle im Repo,
-// die eine Map erzeugt. Der Guard davor ist keine Paranoia, sondern deckt eine gemessene Bruchlinie
-// ab: maplibre nimmt die URL intern als `config.WORKER_URL || defaultWorkerUrl()` — ein `||`, kein
-// `??`. Käme hier je ein falsy Wert an (Vite-Versionswechsel, jemand streicht das `&url`, anderer
-// Build-Modus), fiele maplibre STILL auf seinen Default zurück. Und der ist die perfide Variante:
-// unter Dev löst er auf eine echte, von Vite ausgelieferte Datei auf und alles bleibt grün — im
-// Prod-Build zeigt er auf `/assets/maplibre-gl-worker.mjs`, das es dort nicht gibt, und die Karte
-// lädt keine einzige Kachel. Dev grün, Prod tot, ohne eine Fehlermeldung. Lieber hier laut brechen.
+// Worker-URL setzen, bevor die erste Map entsteht (nur diese Datei erzeugt eine). Der Guard deckt
+// eine Bruchlinie ab: maplibre nimmt `config.WORKER_URL || defaultWorkerUrl()`. Bei einem falsy
+// Wert fiele es still auf seinen Default zurück — der funktioniert unter Dev, zeigt im Prod-Build
+// aber ins Leere, und die Karte lädt keine Kachel. Lieber hier laut brechen.
 if (!workerUrl)
   throw new Error('maplibre-Worker-URL ist leer — `?worker&url` hat nichts geliefert');
 maplibregl.setWorkerUrl(workerUrl);
@@ -99,34 +92,23 @@ interface KartenAnfrage {
   ein: string;
   aus: string;
 }
-/** Obergrenze des DEV-Mitschnitts. Eine offene Karte holt Kacheln im Sekundentakt; ohne Deckel
- *  wüchse die Liste über eine Dev-Sitzung unbegrenzt. 40 reicht für jede Zusicherung — die
- *  ersten Einträge sind Style/Glyphs/Kacheln des ersten Laufs, und genau die werden geprüft. */
+/**
+ * Obergrenze des DEV-Mitschnitts — eine offene Karte holt Kacheln im Sekundentakt. 40 reichen: die
+ * Zusicherungen prüfen den ersten Lauf.
+ */
 const ANFRAGEN_DECKEL = 40;
 
 /**
  * `transformRequest` der Karte — plus DEV-Mitschnitt unter `window.__lfhKartenAnfragen`.
  *
- * WARUM DER MITSCHNITT SEIN MUSS (LFH-356, gemessen): die Absolutierung ist vom Netz aus
- * NICHT beobachtbar. Der Versuch, sie über die tatsächlich abgesetzte Kachel-URL zu belegen,
- * scheitert — mit ENTFERNTEM `transformRequest` lud der Kachel-Fixture-Lauf unverändert
- * durch: 4 Kachel-Anfragen, alle absolut, `map.loaded()` true. Grund: maplibre 6 fetcht im
- * Worker über `new Request(url)`, und der löst eine root-relative URL gegen
- * `self.location` des WORKER-SKRIPTS auf — das liegt bei uns same-origin
- * (`setWorkerUrl` oben), also kommt dasselbe heraus. Ein Test auf die Netz-Wirkung wäre
- * grün, ohne dass diese Zeile je liefe: er könnte nicht rot werden.
+ * Die Absolutierung der root-relativen Proxy-URLs ist vom Netz aus nicht beobachtbar: maplibre
+ * fetcht im Worker über `new Request(url)` und löst gegen `self.location` des Worker-Skripts auf,
+ * das bei uns same-origin liegt. Tragend ist sie trotzdem: bei cross-origin Worker-URL baut
+ * maplibre den Worker aus einem Blob, dessen `self.location` opak ist — „Failed to parse URL"
+ * (LFH-182). Wer Assets auf ein CDN legt, fällt ohne diese Zeile hinein.
  *
- * Die Absolutierung bleibt trotzdem tragend, und zwar nicht hypothetisch: ist die
- * Worker-URL cross-origin, baut maplibre den Worker aus einem **Blob**
- * (`maplibre-gl.mjs`: `if (!istCrossOrigin(url)) return new Worker(url)`, sonst
- * `createObjectURL`). In einem `blob:`-Worker hat `self.location` einen opaken Pfad, gegen
- * den sich `/api/karte/proxy/…` nicht auflösen lässt — genau das „Failed to parse URL" aus
- * LFH-182. Wer Assets je auf ein CDN legt, fällt ohne diese Zeile sofort hinein.
- *
- * Der Mitschnitt ist damit die einzige Stelle, an der „läuft der Seam?" widerlegbar ist —
- * dieselbe Begründung wie beim Karten-Handle `__lfhKarte` weiter unten, und wie dort ist
- * die Zeile im Prod-Build weg (`import.meta.env.DEV` ist dann die Konstante `false`, der
- * Zweig fällt beim Bündeln heraus).
+ * Der Mitschnitt ist deshalb die einzige Stelle, an der „läuft der Seam?" widerlegbar ist. Im
+ * Prod-Build fällt der Zweig heraus (`import.meta.env.DEV` ist `false`).
  */
 function transformiereKartenAnfrage(url: string): { url: string } {
   const ergebnis = absolutiereProxyAnfrage(url);
@@ -138,7 +120,7 @@ function transformiereKartenAnfrage(url: string): { url: string } {
   return ergebnis;
 }
 
-// Re-Export: LagekartePage importiert ZoneFeature weiterhin aus Kartenflaeche.
+// Re-Export: LagekartePage importiert ZoneFeature aus Kartenflaeche.
 export type { ZoneFeature };
 
 export interface KartenflaecheProps {
@@ -151,11 +133,9 @@ export interface KartenflaecheProps {
   /** Beim Setzen sanft hinfliegen. */
   flyToZiel?: { lng: number; lat: number } | null;
   /**
-   * Startansicht aus den Einsatzdaten (`startAnsicht.ts`). `undefined` heißt „noch nicht
-   * entschieden" (Daten laden), `null` „nichts verortet, Übersicht behalten". Sie greift
-   * GENAU EINMAL je Karte: danach gehört der Ausschnitt der Bedienung — ein Live-Update, das
-   * einen neuen Marker bringt, darf den Ausschnitt nicht wegziehen. Ein früherer `flyToZiel`
-   * (Deeplink) verbraucht sie ebenfalls.
+   * Startansicht aus den Einsatzdaten (`startAnsicht.ts`). `undefined` = noch nicht entschieden,
+   * `null` = nichts verortet, Übersicht behalten. Greift genau einmal je Karte: danach gehört der
+   * Ausschnitt der Bedienung. Ein früherer `flyToZiel` (Deeplink) verbraucht sie ebenfalls.
    */
   startAnsicht?: StartAnsicht | null;
   /** Style-Ladefehler (online nicht erreichbar) → Page stuft ab. */
@@ -174,17 +154,21 @@ export interface KartenflaecheProps {
   zonen?: ZoneFeature[];
   /** Zonen-Zeichenmodus (Polygon/Linie) aktiv. */
   zoneZeichnen?: ZeichenModus | null;
-  /** Monoton steigend bei jedem Zonen-Zeichnen-Start; erzwingt ein Re-Fire des Effekts auch bei
-   *  gleich bleibendem Modus (Zone→Zone mit gleichem Polygon-Modus), damit starten() einen
-   *  offenen Entwurf verwirft. */
+  /**
+   * Steigt bei jedem Zonen-Zeichnen-Start; erzwingt ein Re-Fire des Effekts auch bei gleichem
+   * Modus, damit `starten()` einen offenen Entwurf verwirft.
+   */
   zoneZeichnenNonce?: number;
   /** Callback nach abgeschlossenem Zeichnen einer Zone. */
   onZoneGezeichnet?: (geometrie: GeoJsonGeometry) => void;
-  /** true, sobald im aktiven Abschnitts-/Zonen-Entwurf mindestens drei Punkte gesetzt sind. */
-  onZeichnenBereitAenderung?: (bereit: boolean) => void;
+  /**
+   * Stand der laufenden Abschnitts-/Zonen-Figur: Punktzahl, „Abschließen" frei, „Letzten Punkt
+   * zurück" frei. Gemeldet bei jeder Änderung.
+   */
+  onZeichnenStandAenderung?: (stand: ZeichenStand) => void;
   /** Klick auf eine Zone → Inspector. */
   onZoneKlick?: (id: number) => void;
-  /** Messwerkzeug (LFH-616): aktive Form oder `null`. */
+  /** Messwerkzeug: aktive Form oder `null`. */
   messen?: MessForm | null;
   /** Laufender bzw. abgeschlossener Messentwurf; `null` = nichts gesetzt. */
   onMessung?: (geometrie: MessGeometrie | null, fertig: boolean) => void;
@@ -196,8 +180,10 @@ export interface KartenflaecheProps {
   onBboxAenderung?: (bbox: string) => void;
   /** Aktueller Zoom nach Bewegung — für „näher heranzoomen"-Hinweise bbox-abhängiger Ebenen. */
   onZoomAenderung?: (zoom: number) => void;
-  /** Klick auf ein Fachebenen-Objekt → liefert dessen Properties + Quelle + volle Geometrie
-   *  (für Detail-Panel; Geometrie un-geclippt aus der geladenen FeatureCollection, LFH-146). */
+  /**
+   * Klick auf ein Fachebenen-Objekt → Properties + Quelle + volle, ungeclippte Geometrie aus der
+   * geladenen FeatureCollection.
+   */
   onFachebeneKlick?: (
     properties: Record<string, unknown>,
     quelle: FachebeneQuelle,
@@ -208,26 +194,31 @@ export interface KartenflaecheProps {
   /** Callback, wenn Platzier-Geometrie per Drag verändert wurde. */
   onPlatzierGeometrie?: (ecken: Ecken) => void;
   /**
-   * Welche Griffsorte im Platzier-Modus scharf ist (LFH-711). Vorgabe `groesse` (Ecken und
-   * Kanten). Alle zehn Griffe in Fingergröße auf einem daumengroßen Bild lägen übereinander;
-   * welchen man erwischte, entschiede die Reihenfolge im DOM statt die Absicht.
+   * Welche Griffsorte im Platzier-Modus scharf ist, Vorgabe `groesse` (Ecken und Kanten). Alle zehn
+   * Griffe in Fingergröße lägen auf einem kleinen Bild übereinander.
    */
   griffModus?: GriffModus;
   /** Zeigerlage über der Karte (Koordinatenanzeige); `null`, sobald er die Karte verlässt. */
   onZeigerLage?: (lage: { lat: number; lon: number } | null) => void;
   /**
-   * Ziel-Element der Maßstabsleiste. MapLibres `ScaleControl` hängt sich sonst in seine
-   * eigene Ecke (`.maplibregl-ctrl-bottom-left`) — absolut über der Karte, genau dort, wo
-   * `KartenFuss` die Bänder im Fluss stapelt (LFH-355). Deshalb wird es über seine
-   * öffentliche `IControl`-Schnittstelle (`onAdd`/`onRemove`) in ein Band des Fußes gehängt.
+   * Ziel-Element der Maßstabsleiste. MapLibres `ScaleControl` hinge sonst absolut in seiner Ecke,
+   * genau dort, wo `KartenFuss` die Bänder im Fluss stapelt — deshalb über `onAdd`/`onRemove` in
+   * ein Band des Fußes gehängt.
    */
   massstabZiel?: HTMLElement | null;
+  /**
+   * Eigener Gerätestandort als Punkt mit Genauigkeitskreis; `null` = aus. Nur Darstellung — das
+   * Anfliegen übernimmt die Seite über `flyToZiel`.
+   */
+  eigenposition?: Eigenposition | null;
 }
 
 /** Imperative Karten-API für die Page: Upload-Platzierung + Auf-Bild-Zentrieren. */
 export interface KartenHandle {
-  /** Initiale Bild-Ecken für einen Upload: achsenparalleles Rechteck mittig im
-   *  aktuellen Viewport, Breite ~50 % der kürzeren View-Kante, Seitenverhältnis = `ar`. */
+  /**
+   * Initiale Bild-Ecken für einen Upload: achsenparalleles Rechteck mittig im Viewport, Breite ~50
+   * % der kürzeren Kante, Seitenverhältnis `ar`.
+   */
   initialeEckenFuerBild(ar: number): Ecken | null;
   /** Karte auf die Bild-Ecken einpassen (fitBounds). */
   zentriereAufEcken(ecken: Ecken): void;
@@ -235,7 +226,11 @@ export interface KartenHandle {
   zoneAbschliessen(): boolean;
   /** Aktives Abschnitt-Zeichnen abschließen. No-op, wenn nicht aktiv. */
   abschnittAbschliessen(): boolean;
-  /** Laufende Messung abschließen (LFH-616); false bei zu wenigen Punkten. */
+  /** Zuletzt gesetzten Punkt der laufenden Figur zurücknehmen; false ohne Punkt. */
+  punktZurueck(): boolean;
+  /** Angefangene Figur verwerfen, im Zeichenmodus bleiben (erste Esc-Stufe). */
+  zeichnungVerwerfen(): void;
+  /** Laufende Messung abschließen; false bei zu wenigen Punkten. */
   messungAbschliessen(): boolean;
   /** Messung verwerfen und in derselben Form neu beginnen. */
   neuMessen(): void;
@@ -247,9 +242,8 @@ export interface KartenHandle {
 }
 
 /**
- * Der Personen-Cluster, dem ein Klick gehört, oder `null` (LFH-648, Review LFH-711). EINE
- * Abfrage für beide Klickwege — Auffächern und Markerauswahl —, damit sie nie verschieden
- * entscheiden: sonst fächerte derselbe Tipp auf UND öffnete einen Inspector.
+ * Der Personen-Cluster, dem ein Klick gehört, oder `null`. Eine Abfrage für beide Klickwege
+ * (Auffächern und Markerauswahl), sonst fächerte derselbe Tipp auf und öffnete einen Inspector.
  */
 function personenClusterAm(map: maplibregl.Map, punkt: maplibregl.PointLike) {
   const layers = [
@@ -282,7 +276,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     onZoneKlick,
     messen,
     onMessung,
-    onZeichnenBereitAenderung,
+    onZeichnenStandAenderung,
+    eigenposition,
     fachebenen,
     onBboxAenderung,
     onZoomAenderung,
@@ -299,8 +294,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  // Namensplaketten der Marker in den Rollen des aktiven Modus (LFH-622) — dieselbe
-  // Plakette wie an den Zonen. `rollen` ist eine der zwei Paletten-Konstanten, also stabil.
+  // Namensplaketten der Marker in den Rollen des aktiven Modus — dieselbe Plakette wie an den
+  // Zonen. `rollen` ist eine Paletten-Konstante, also stabil.
   const { rollen, token } = useRollen();
   const markerPlakette = useMemo(() => zonenPlakette(rollen), [rollen]);
   // Aktuelle Marker-Daten als FeatureCollections; nach setStyle re-angelegt (analog flaechenDatenRef).
@@ -312,20 +307,21 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     type: 'FeatureCollection',
     features: [],
   });
+  // Eigenposition: zuletzt gezeichnete Daten + Farbe, nach setStyle re-angelegt.
+  const eigenpositionRef = useRef({ daten: eigenpositionFc(null), farbe: rollen.bedien });
   // Image-Key → TzProps; der styleimagemissing-Handler erzeugt daraus lazy die Karten-Icons.
   const tzRegistryRef = useRef<Map<string, TzProps>>(new Map());
-  // Cluster-DOM-Donut-Marker (`clusterSchluessel` → Marker). clusterDomRef = alle bekannten,
-  // clusterDomOnScreenRef = aktuell auf der Karte (Mapbox-Donut-Sync-Muster). Nur für
-  // `marker-cluster`: Personen-Cluster (LFH-648) sind WebGL-Layer, damit sie UNTER den Kräften
-  // liegen — ein DOM-Donut hinge über dem Canvas.
+  // Cluster-DOM-Donut-Marker (`clusterSchluessel` → Marker): alle bekannten bzw. aktuell auf der
+  // Karte. Nur für `marker-cluster` — Personen-Cluster sind WebGL-Layer, damit sie unter den
+  // Kräften liegen.
   const clusterDomRef = useRef<Record<string, maplibregl.Marker>>({});
   const clusterDomOnScreenRef = useRef<Record<string, maplibregl.Marker>>({});
-  // Offener Spider: Cluster-Schlüssel (Quelle + cluster_id) oder null. spiderTokenRef entwertet in-flight getClusterLeaves
-  // (Race-Guard: schneller A→B-Wechsel darf nicht A's Leaves über B malen).
+  // Offener Spider: Cluster-Schlüssel oder null. `spiderTokenRef` entwertet laufende
+  // `getClusterLeaves` (schneller A→B-Wechsel darf nicht A's Leaves über B malen).
   const spiderOffenRef = useRef<string | null>(null);
   const spiderTokenRef = useRef(0);
-  // Controller-Funktionen als Refs, damit der DOM-Donut-Klickhandler + die Daten-/Style-Effekte sie
-  // aufrufen können, ohne als Dependency neu zu binden.
+  // Controller-Funktionen als Refs, damit Donut-Klickhandler und Effekte sie aufrufen können, ohne
+  // neu zu binden.
   const oeffneSpiderRef = useRef<
     (
       quelle: (typeof CLUSTER_QUELLEN)[number],
@@ -335,11 +331,11 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     ) => void
   >(() => {});
   const schliesseSpiderRef = useRef<() => void>(() => {});
-  // Entscheidet, welches error-Event die Basemap abstuft (LFH-325): Kachel-Fehler nie,
-  // höchstens eine Abstufung je angewandtem Style, nach dem Laden gar keine mehr.
+  // Entscheidet, welches error-Event die Basemap abstuft: Kachel-Fehler nie, höchstens eine
+  // Abstufung je angewandtem Style, nach dem Laden keine mehr.
   const stilWaechterRef = useRef(neuerStilFehlerWaechter());
-  // Eigene AttributionControl (statt der eingebauten), damit customAttribution je View
-  // gesetzt werden kann. Wird bei Attribution-Wechsel entfernt und neu hinzugefügt.
+  // Eigene AttributionControl, damit `customAttribution` je View gesetzt werden kann — bei Wechsel
+  // entfernt und neu angelegt.
   const attribControlRef = useRef<maplibregl.AttributionControl | null>(null);
   // Aktuelle Flächendaten; nach setStyle ist die Source leer → re-Anlage liest hieraus.
   const flaechenDatenRef = useRef<FlaechenFeatureCollection>(baueFlaechenFc(flaechen));
@@ -351,34 +347,42 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // Aktuelle Bild-Overlays; nach setStyle re-angelegt.
   const bilderRef = useRef<BildOverlay[]>([]);
   const vorherigeBilderRef = useRef<Set<number>>(new Set());
-  // Zuletzt angewandter Style. Der Konstruktor wendet den initialen Style an → der
-  // [style]-Effekt soll NUR auf echte Wechsel reagieren (sonst lädt diff:false beim
-  // Mount den Style unnötig komplett neu).
+  // Zuletzt angewandter Style: der Konstruktor wendet den initialen an, der [style]-Effekt reagiert
+  // nur auf echte Wechsel (sonst lüde `diff: false` beim Mount alles neu).
   const angewandterStyleRef = useRef(style);
   // Zeichen-Controller (terra-draw) über Renders hinweg.
   const drawRef = useRef<Zeichnung | null>(null);
   // Eigener Zeichen-Controller für Zonen (Polygon ODER Linie).
   const zoneDrawRef = useRef<Zeichnung | null>(null);
-  // onFlaecheGezeichnet stabil halten, damit eine neue Identität den Draw nicht mitten im Zeichnen neu aufsetzt.
+  // Stabil halten, damit eine neue Identität den Draw nicht mitten im Zeichnen neu aufsetzt.
   const onFlaecheGezeichnetRef = useRef(onFlaecheGezeichnet);
   onFlaecheGezeichnetRef.current = onFlaecheGezeichnet;
   const onZoneGezeichnetRef = useRef(onZoneGezeichnet);
   onZoneGezeichnetRef.current = onZoneGezeichnet;
-  const onZeichnenBereitAenderungRef = useRef(onZeichnenBereitAenderung);
-  onZeichnenBereitAenderungRef.current = onZeichnenBereitAenderung;
-  // Dritter Controller: Messen (LFH-616). Eigene Instanz, weil er bei jeder Änderung meldet
-  // statt erst beim Abschluss — Begründung in `messZeichnung.ts`.
+  const onZeichnenStandAenderungRef = useRef(onZeichnenStandAenderung);
+  onZeichnenStandAenderungRef.current = onZeichnenStandAenderung;
+  // Welcher Controller zeichnet, sagen die Props — der Handle fragt genau diesen (Zone vor
+  // Abschnitt; beide zugleich lässt der Modus-Reducer nicht zu).
+  const zeichnenArtRef = useRef({ zeichnen, zoneZeichnen });
+  zeichnenArtRef.current = { zeichnen, zoneZeichnen };
+  // Dritter Controller: Messen. Eigene Instanz, weil er bei jeder Änderung meldet statt erst beim
+  // Abschluss (`messZeichnung.ts`).
   const messRef = useRef<MessZeichnung | null>(null);
   const onMessungRef = useRef(onMessung);
   onMessungRef.current = onMessung;
   const messenRef = useRef(messen);
   messenRef.current = messen;
 
-  // Imperative API für die Page: Upload-Platzierung (Viewport-Mitte, Bild-Seitenverhältnis)
-  // und Auf-Bild-Zentrieren. Pixel-Raum via project/unproject → exakt, ohne cos(lat)-Verzerrung.
-  useImperativeHandle(
-    ref,
-    () => ({
+  // Imperative API für die Page: Upload-Platzierung und Auf-Bild-Zentrieren. Pixel-Raum via
+  // project/unproject — exakt, ohne cos(lat)-Verzerrung.
+  useImperativeHandle(ref, () => {
+    const aktiveZeichnung = () =>
+      zeichnenArtRef.current.zoneZeichnen
+        ? zoneDrawRef.current
+        : zeichnenArtRef.current.zeichnen
+          ? drawRef.current
+          : null;
+    return {
       initialeEckenFuerBild(ar) {
         const map = mapRef.current;
         if (!map) return null;
@@ -404,6 +408,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       abschnittAbschliessen() {
         return drawRef.current?.abschliessen() ?? false;
       },
+      punktZurueck() {
+        return aktiveZeichnung()?.punktZurueck() ?? false;
+      },
+      zeichnungVerwerfen() {
+        aktiveZeichnung()?.verwerfen();
+      },
       messungAbschliessen() {
         return messRef.current?.abschliessen() ?? false;
       },
@@ -420,17 +430,14 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       nachNorden() {
         mapRef.current?.resetNorthPitch();
       },
-    }),
-    [],
-  );
+    };
+  }, []);
 
   // Karte einmalig erzeugen.
   useEffect(() => {
     if (!containerRef.current) return;
-    // Mitschnitt VOR dem Konstruktor leeren, nicht danach: `transformRequest` feuert bereits
-    // für Style und Glyphs, während `new maplibregl.Map` läuft. Und leeren überhaupt, weil ein
-    // Test sonst Einträge einer längst entfernten Karte läse — dieselbe Falle wie beim
-    // Karten-Handle unten, nur ohne die Rettung, dass ein `delete` sie sichtbar macht.
+    // Mitschnitt vor dem Konstruktor leeren: `transformRequest` feuert schon für Style und Glyphs,
+    // während `new maplibregl.Map` läuft. Sonst läse ein Test Einträge einer entfernten Karte.
     if (import.meta.env.DEV)
       (window as unknown as { __lfhKartenAnfragen?: KartenAnfrage[] }).__lfhKartenAnfragen = [];
     const map = new maplibregl.Map({
@@ -439,42 +446,28 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       center: [10.45, 51.16], // Mitte DE als neutraler Start
       zoom: 5,
       attributionControl: false,
-      // maplibre 6 hat hierfür den Default 4 eingeführt — eine Option, die wir nie gesetzt haben
-      // und die das Rendering trotzdem ändert. Effektive Kachel-maxzoom wäre dann
-      // max(source.maxzoom, maxZoom-4); unsere Offline-Weltübersicht hat maxzoom 6, es würden also
-      // z7-18 aus EINEM z6-Tile client-seitig gesliced. Netzseitig harmlos (die echte Kachel-URL
-      // wird weiter korrekt geholt), aber MapLibre dokumentiert selbst geänderte Label-Platzierung,
-      // und auf Feldgeräten ist das Slicing auch eine CPU-/Speicherfrage. `undefined` stellt das
-      // v5-Verhalten her — der Konstruktor merged per Spread, ein explizites undefined überschreibt
-      // den Default also wirklich (nachgelesen in map.ts:723, `_zoomLevelsToOverscale` ist
-      // `number | undefined`). Bewusste Entscheidung, kein Versehen: wer Overscaling will, setzt
-      // hier eine Zahl und prüft die Basemap-Beschriftung auf einem echten Gerät nach.
+      // maplibre 6 setzt hier per Vorgabe 4 — die effektive Kachel-maxzoom wäre dann
+      // max(source.maxzoom, maxZoom-4), unsere Offline-Weltübersicht (maxzoom 6) würde für z7–18
+      // client-seitig gesliced. Das ändert die Label-Platzierung und kostet auf Feldgeräten CPU und
+      // Speicher. `undefined` stellt das v5-Verhalten her (der Konstruktor merged per Spread). Wer
+      // Overscaling will, setzt eine Zahl und prüft die Beschriftung auf einem echten Gerät.
       zoomLevelsToOverscale: undefined,
-      // Server-Proxy-URLs (/api/karte/proxy/…, LFH-182) sind root-relativ; in einem
-      // Blob-Tile-Worker ohne auflösbare Base scheitern sie. Hier gegen die Origin
-      // absolutieren — Begründung und DEV-Mitschnitt oben an `transformiereKartenAnfrage`.
+      // Proxy-URLs (/api/karte/proxy/…) sind root-relativ und scheitern in einem Blob-Worker ohne
+      // Base — siehe `transformiereKartenAnfrage`.
       transformRequest: transformiereKartenAnfrage,
-      // Eine Lagekarte bleibt Draufsicht (LFH-713, Entscheidung 25.09.2026) — das gilt mit dieser
-      // Komponente auch für die Betroffenen-Karte (`personen/BetroffeneKarte.tsx`): Drehen per Pinch
-      // bleibt erlaubt, „Nach Norden ausrichten" holt die Ausrichtung zurück; Kippen nicht.
-      // Zwei Angaben, weil sie Verschiedenes tun, beide gemessen in `e2e/lagekarte-touch.spec.ts`:
-      // `touchPitch: false` schaltet die Zwei-Finger-Kippgeste ab — mit ihr kippte ein
-      // senkrechter Zwei-Finger-Zug auf 60°, und selbst bei gedeckelter Neigung schluckte der
-      // aktive Kipp-Erkenner den Zug, statt die Karte zu verschieben. `maxPitch: 0` deckelt die
-      // Neigung selbst und schließt damit die übrigen Wege (gemessen: Umschalt+↑ kippte ohne
-      // sie um 10°; Rechts-Ziehen über `pitchWithRotate` folgt aus dem Deckel, ungemessen),
-      // ohne deren Drehen mit abzuschalten.
+      // Eine Lagekarte bleibt Draufsicht (auch die Betroffenen-Karte): Drehen per Pinch bleibt,
+      // „Nach Norden ausrichten" holt die Ausrichtung zurück; Kippen nicht. Zwei Angaben, gemessen
+      // in `e2e/lagekarte-touch.spec.ts`: `touchPitch: false` schaltet die Zwei-Finger-Kippgeste ab
+      // (ihr Erkenner schluckte sonst den Verschiebe-Zug), `maxPitch: 0` deckelt die Neigung und
+      // schließt die übrigen Wege (Umschalt+↑), ohne das Drehen abzuschalten.
       touchPitch: false,
       maxPitch: 0,
     });
-    // KEIN `NavigationControl` mehr (Neuentwurf S5): Zoom, Nordung und Zeichnen stehen im
-    // Knopfblock der Überlagerung (`KartenUeberlagerung.tsx`) und rufen den Handle oben.
-    // Fenster für die Basemap-Abstufung schließen, sobald der STYLE steht — NICHT erst bei
-    // 'load'. 'load' wartet auf das Absetzen aller sichtbaren Kacheln (Map.loaded →
-    // Style.loaded → TileManager.loaded), sein Fenster umfasst also den kompletten ersten
-    // Kachel-Lauf. 'style.load' feuert dagegen in Style._load, also erst nachdem das
-    // Style-JSON geladen und angewandt wurde — und bei einem gescheiterten Style-Fetch gar
-    // nicht (dort feuert stattdessen ein ErrorEvent). Genau die richtige Trennlinie (LFH-325).
+    // Kein `NavigationControl`: Zoom, Nordung und Zeichnen stehen im Knopfblock der Überlagerung.
+    //
+    // Das Fenster der Basemap-Abstufung schließt bei 'style.load', nicht bei 'load': 'load' wartet
+    // auf alle sichtbaren Kacheln, 'style.load' feuert, sobald das Style-JSON angewandt ist — und
+    // bei gescheitertem Style-Fetch gar nicht (dort kommt ein ErrorEvent).
     map.on('style.load', () => {
       stilWaechterRef.current.stilGeladen();
     });
@@ -486,14 +479,14 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       }
       synchronisiereBildLayer(map, bilderRef.current, 'abschnitte-fill');
     });
-    // Taktische Zeichen lazy als Karten-Icons: MapLibre meldet fehlende icon-image-IDs; wir rendern
-    // das TZ on-demand und registrieren es. Race-Guard, weil das Event während des async Bild-Ladens
-    // mehrfach für dieselbe ID feuern kann (sonst wirft addImage "image already exists").
+    // Taktische Zeichen lazy als Karten-Icons: MapLibre meldet fehlende icon-image-IDs, wir rendern
+    // on-demand. Race-Guard, weil das Event während des asynchronen Ladens mehrfach für dieselbe ID
+    // feuern kann (sonst wirft addImage "image already exists").
     const ladendeIcons = new Set<string>();
     map.on('styleimagemissing', (e) => {
       const id = e.id;
-      // Beschriftungsplakette der Zonen und Marker (9-Slice, Farben stehen in der Id). Nach `setStyle`
-      // sind alle Bilder weg; dieser Handler legt sie beim nächsten Bedarf wieder an.
+      // Beschriftungsplakette der Zonen und Marker (9-Slice, Farben in der Id). Nach `setStyle`
+      // sind alle Bilder weg; dieser Handler legt sie bei Bedarf neu an.
       if (id.startsWith(PLAKETTE_PRAEFIX)) {
         const bild = plakettenBild(id);
         if (!bild || map.hasImage(id)) return;
@@ -505,10 +498,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       if (map.hasImage(id) || ladendeIcons.has(id)) return;
       const tz = tzRegistryRef.current.get(id);
       if (!tz) return;
-      // erzeugeTaktischesZeichen kann bei nicht-DV-102-konformen tz-Werten (organisation/fachaufgabe
-      // werden in baueTzProps ungeprüft gecastet) synchron werfen. ZUERST erzeugen, ERST DANACH zu
-      // ladendeIcons hinzufügen — sonst bliebe die id bei einem Throw dauerhaft im Guard hängen
-      // (Icon nie wieder ladbar) und der Fehler flöge ungefangen aus dem MapLibre-Callback.
+      // `erzeugeTaktischesZeichen` kann bei nicht DV-102-konformen Werten synchron werfen. Zuerst
+      // erzeugen, dann zu `ladendeIcons` hinzufügen — sonst bliebe die id bei einem Throw dauerhaft
+      // im Guard und der Fehler flöge ungefangen aus dem MapLibre-Callback.
       let bild;
       try {
         bild = erzeugeTaktischesZeichen(tz);
@@ -519,9 +511,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       const { dataUrl, size } = bild;
       const img = new Image(size[0], size[1]);
       img.onload = () => {
-        // Auf einheitliche Marker-Größe normieren: pixelRatio so, dass die größere Symboldimension
-        // ~ZIEL_PX wird (TZ-SVGs haben je Grundzeichen abweichende size). Erst dadurch deckt der
-        // feste Status-Ring-Radius (markerLayer.ts, radius:20=40px) das Symbol verlässlich ab.
+        // Auf einheitliche Marker-Größe normieren (die TZ-SVGs haben je Grundzeichen abweichende
+        // Größe); erst so deckt der feste Status-Ring (markerLayer.ts, radius 20) das Symbol ab.
         const ZIEL_PX = 34;
         const pixelRatio = Math.max(size[0], size[1]) / ZIEL_PX;
         if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio });
@@ -533,49 +524,37 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       img.src = dataUrl;
     });
     mapRef.current = map;
-    // Testhaken für den Browser-Smoke (e2e/lagekarte-smoke.spec.ts): die Karte lebt in WebGL, ihr
-    // Zustand ist im DOM praktisch unsichtbar — ein toter Tile-Worker lässt Canvas, Controls und
-    // Cursor unverändert stehen (gemessen), nur `map.loaded()` kippt. Ohne einen Griff auf die
-    // Instanz gäbe es keine Assertion, die das fängt. `import.meta.env.DEV` heißt: im Prod-Build
-    // ist die Zeile weg, e2e läuft unter Vite-Dev also mit Haken, Auslieferung ohne.
-    // Bewusst statt der früher genutzten React-Fiber-Traversierung: die hängt an React-Internas
-    // und reißt beim nächsten React-Sprung — als Kartenfehler getarnt.
+    // Testhaken für den Browser-Smoke (e2e/lagekarte-smoke.spec.ts): die Karte lebt in WebGL, ein
+    // toter Tile-Worker lässt das DOM unverändert, nur `map.loaded()` kippt. Im Prod-Build ist die
+    // Zeile weg.
     if (import.meta.env.DEV) (window as unknown as { __lfhKarte?: unknown }).__lfhKarte = map;
     return () => {
       map.remove(); // zerstört auch die AttributionControl
       mapRef.current = null;
-      // Testhaken mit abräumen: sonst zeigt er nach dem Verlassen der Seite auf eine ENTFERNTE
-      // Map. Ein späterer Test läse dann Zustand von einer toten Instanz und wäre grün, ohne dass
-      // je eine Karte lief — genau die Sorte stiller Fehlbeleg, gegen die der Haken existiert.
-      // (Unter StrictMode ist die Reihenfolge Effekt A → Cleanup A → Effekt B, der Haken zeigt
-      // danach also korrekt auf die zweite, lebende Instanz.)
+      // Testhaken mit abräumen: sonst zeigte er auf eine entfernte Map, und ein späterer Test wäre
+      // grün, ohne dass eine Karte lief. (Unter StrictMode zeigt er danach korrekt auf die zweite
+      // Instanz.)
       if (import.meta.env.DEV) {
         delete (window as unknown as { __lfhKarte?: unknown }).__lfhKarte;
-        // Mitschnitt mit abräumen, aus demselben Grund: eine stehengebliebene Liste stammte
-        // von der entfernten Karte, und ein Test darauf wäre grün, ohne dass eine Karte lief.
+        // Mitschnitt mit abräumen, aus demselben Grund.
         delete (window as unknown as { __lfhKartenAnfragen?: unknown }).__lfhKartenAnfragen;
       }
-      // Ref nullen: sonst sieht der Attribution-Effekt nach StrictMode-Remount eine
-      // stale Control der entfernten Map und ruft removeControl auf bereits Zerstörtem.
+      // Ref nullen: sonst ruft der Attribution-Effekt nach StrictMode-Remount `removeControl` auf
+      // der entfernten Map.
       attribControlRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Style wechseln (Basemap-Umschalter / Theme). Bewusst KEIN Zurücksetzen des
-  // Geladen-Zustands: ein Style-Ladefehler nach manuellem Wechsel wird NICHT über
-  // onStyleFehler gemeldet (das würde transiente Tile-Errors als Fehler werten).
-  // `stilAngewandt()` schärft nur die EINE Abstufung je Style neu — damit bleibt die
-  // Degradationskette online→offline→blind bei echter Nicht-Erreichbarkeit erhalten,
-  // ohne dass zwei Fehler im selben Ladefenster zwei Stufen springen (LFH-325).
+  // Style wechseln (Basemap-Umschalter / Theme). Kein Zurücksetzen des Geladen-Zustands: ein
+  // Ladefehler nach manuellem Wechsel wird nicht über `onStyleFehler` gemeldet (sonst zählten
+  // transiente Tile-Errors). `stilAngewandt()` schärft nur die eine Abstufung je Style neu, die
+  // Kette online → offline → blind bleibt erhalten.
   //
-  // WICHTIG `diff: false`: per Default difft setStyle und ist bei URL-/Vektor-Styles
-  // ASYNCHRON (erst Fetch, dann Diff). In diesem Fenster liefert isStyleLoaded() noch
-  // den ALTEN Style als „geladen" → der render-Poll würde zu früh laufen (Sources noch
-  // da, No-Op), und der nachgelagerte Diff wischt unsere Layer weg → Zeichnungen
-  // verschwinden NUR bei Vektor-Basemaps. `diff: false` setzt synchron einen frischen,
-  // ungeladenen Style (isStyleLoaded() sofort false) → der Poll vertagt zuverlässig auf
-  // den ersten geladenen Frame und legt Abschnitte/Zonen neu an — für ALLE Style-Typen.
+  // `diff: false` ist Pflicht: per Vorgabe difft setStyle bei URL-/Vektor-Styles asynchron, in
+  // diesem Fenster meldet `isStyleLoaded()` den alten Style als geladen, der Poll liefe zu früh,
+  // und der spätere Diff wischte unsere Layer weg (nur bei Vektor-Basemaps). `diff: false` setzt
+  // synchron einen ungeladenen Style, der Poll vertagt zuverlässig.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -584,10 +563,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     angewandterStyleRef.current = style;
     stilWaechterRef.current.stilAngewandt();
     // Eine laufende Messung überlebt `setStyle` nicht: `diff: false` wirft die Sources des
-    // terra-draw-Adapters mit weg, und der legt sie nicht neu an — die nächste Zeigerbewegung
-    // (`setData`) und spätestens das Beenden (`removeSource`) würfen (Review LFH-616). Die
-    // Messung wird deshalb VOR dem Wechsel geräumt und danach in derselben Form neu begonnen;
-    // der Messwert ist ein Blick, kein Entwurf, sein Verlust beim Kartenwechsel ist hinnehmbar.
+    // terra-draw-Adapters weg, und der legt sie nicht neu an. Die Messung wird vor dem Wechsel
+    // geräumt und danach in derselben Form neu begonnen.
     const messForm = messenRef.current;
     if (messForm) messRef.current?.stoppen();
     map.setStyle(style, { diff: false });
@@ -606,10 +583,17 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       () => markerDatenRef.current,
       () => einsatzortDatenRef.current,
     );
+    // Zuletzt angemeldet → dieser Poller läuft zuletzt, der Punkt liegt oben.
+    wendeKartenDatenAn(map, () =>
+      sorgeFuerEigenpositionLayer(
+        map,
+        eigenpositionRef.current.daten,
+        eigenpositionRef.current.farbe,
+      ),
+    );
   }, [style]);
 
-  // AttributionControl je nach aktivem View neu setzen (config-autoritativ). MapLibre
-  // bietet keinen Setter für customAttribution → Control entfernen und neu anlegen.
+  // AttributionControl je View neu setzen: MapLibre hat keinen Setter für `customAttribution`.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -632,11 +616,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const handler = (e: maplibregl.MapMouseEvent) =>
       onKarteKlick?.({ lng: e.lngLat.lng, lat: e.lngLat.lat });
     map.on('click', handler);
-    // Nur der INITIALE Style-Ladefehler stuft die Basemap ab. MapLibre feuert 'error' auch
-    // für einzelne fehlende Tiles — und zwar ZWANGSLÄUFIG vor 'load', weil 'load' selbst auf
-    // das Absetzen aller sichtbaren Kacheln wartet (siehe stilFehlerWaechter.ts). Die
-    // Klassifikation liegt deshalb im Wächter; hier wird nur verdrahtet und laut protokolliert,
-    // damit eine Abstufung im Feld nachvollziehbar ist statt still die Karte zu leeren.
+    // Nur der initiale Style-Ladefehler stuft die Basemap ab. MapLibre feuert 'error' auch für
+    // einzelne fehlende Tiles, und zwar zwangsläufig vor 'load' (siehe stilFehlerWaechter.ts). Die
+    // Klassifikation liegt im Wächter; hier wird verdrahtet und laut protokolliert.
     const fehler = (e: unknown) => {
       if (!stilWaechterRef.current.meldeFehler(e as { tile?: unknown })) return;
       console.warn('[Lagekarte] Basemap-Style nicht ladbar → Abstufung der Anzeige', e);
@@ -649,8 +631,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, [onKarteKlick, onStyleFehler]);
 
-  // Zeigerlage melden (Koordinatenanzeige der Überlagerung). Über eine Ref, damit eine neue
-  // Callback-Identität die Handler nicht bei jedem Render ab- und anmeldet.
+  // Zeigerlage melden, über eine Ref, damit eine neue Callback-Identität die Handler nicht bei
+  // jedem Render neu bindet.
   const onZeigerLageRef = useRef(onZeigerLage);
   onZeigerLageRef.current = onZeigerLage;
   useEffect(() => {
@@ -667,9 +649,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, []);
 
-  // Maßstabsleiste (metrisch) in das Band des Kartenfußes hängen — siehe `massstabZiel`.
-  // `onAdd` legt das Element im Kartencontainer an und abonniert `move`; `appendChild`
-  // VERSCHIEBT es in das Band. `onRemove` räumt Element und Abo wieder ab.
+  // Maßstabsleiste (metrisch) in das Band des Kartenfußes hängen: `onAdd` legt das Element an und
+  // abonniert `move`, `appendChild` verschiebt es ins Band, `onRemove` räumt ab.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !massstabZiel) return;
@@ -680,12 +661,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, [massstabZiel]);
 
-  // Startansicht einmalig anwenden. Steht VOR dem fly-to-Effekt: kommen beide in derselben
-  // Runde (Deeplink `?gefahrengebiet=`), läuft das fly-to danach und gewinnt.
-  // „Verbraucht" hängt an der KARTENINSTANZ, nicht an einem Boolean: unter StrictMode (Vite-
-  // Dev, e2e) läuft der Erzeugungs-Effekt zweimal, die erste Karte wird entfernt — ein
-  // Boolean-Ref überlebte das und ließe die zweite, sichtbare Karte auf der Übersicht stehen
-  // (so im Browser gemessen).
+  // Startansicht einmalig anwenden, vor dem fly-to-Effekt (kommen beide in derselben Runde, gewinnt
+  // das fly-to). „Verbraucht" hängt an der Karteninstanz, nicht an einem Boolean: unter StrictMode
+  // wird die erste Karte entfernt, ein Boolean-Ref ließe die zweite auf der Übersicht stehen.
   const startAufKarteRef = useRef<maplibregl.Map | null>(null);
   useEffect(() => {
     const map = mapRef.current;
@@ -720,9 +698,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     flaechenDatenRef.current = fc; // unbedingt: load/styledata/idle-Handler lesen daraus
     const map = mapRef.current;
     if (!map) return;
-    // Style noch nicht geladen → Anwendung auf das nächste idle vertagen (sonst ginge
-    // eine frisch gezeichnete Fläche bis zum Reload verloren). Immer aus dem Ref lesen,
-    // damit ein vertagter Lauf die zuletzt bekannten Daten einspielt.
+    // Style noch nicht geladen → auf das nächste idle vertagen, sonst ginge eine frisch gezeichnete
+    // Fläche bis zum Reload verloren. Immer aus dem Ref lesen.
     wendeKartenDatenAn(map, () => {
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
       const src = map.getSource('abschnitte') as maplibregl.GeoJSONSource | undefined;
@@ -750,10 +727,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     zonenDatenRef.current = fc; // unbedingt: load/styledata/idle-Handler lesen daraus
     const map = mapRef.current;
     if (!map) return;
-    // Style noch nicht geladen (z. B. während terra-draw seine Zeichen-Layer auf-/abbaut)
-    // → Anwendung auf das nächste idle vertagen, sonst bliebe die frisch gezeichnete Zone
-    // bis zum Reload unsichtbar. Immer aus dem Ref lesen → vertagter Lauf nutzt die
-    // aktuellsten Daten.
+    // Style noch nicht geladen (z. B. während terra-draw seine Layer auf-/abbaut) → auf das nächste
+    // idle vertagen. Immer aus dem Ref lesen.
     wendeKartenDatenAn(map, () => {
       sorgeFuerZonenLayer(map, zonenDatenRef.current);
       const src = map.getSource('zonen') as maplibregl.GeoJSONSource | undefined;
@@ -779,8 +754,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, [onZoneKlick]);
 
-  // Aktive Fachebenen rendern: Source/Layer sicherstellen, Daten einspielen,
-  // inaktive entfernen. Vertagt über wendeKartenDatenAn (Style evtl. nicht geladen).
+  // Aktive Fachebenen rendern: Source/Layer sicherstellen, Daten einspielen, inaktive entfernen.
+  // Vertagt über `wendeKartenDatenAn`.
   const vorherigeFachebenenRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const map = mapRef.current;
@@ -799,14 +774,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         setzeFachebeneDaten(map, fe.def.key, fe.daten);
       }
       vorherigeFachebenenRef.current = aktivKeys as Set<string>;
-      // Fachebenen-Layer werden ohne beforeId angelegt (landen oben) → Marker erneut nach oben
-      // pinnen, sonst verdecken frisch aktivierte Fachebenen die Marker und fangen ihre Klicks ab.
+      // Fachebenen-Layer landen oben → Marker erneut nach oben pinnen, sonst verdecken sie die
+      // Marker und fangen deren Klicks ab.
       pinneMarkerLayerNachOben(map);
     });
   }, [fachebenen]);
 
-  // Bild-Overlays synchronisieren: anlegen/aktualisieren/entfernen.
-  // Analog zum Fachebenen-Effekt; beforeId='abschnitte-fill' hält Bilder unter den Vektorlayern.
+  // Bild-Overlays synchronisieren; `beforeId='abschnitte-fill'` hält sie unter den Vektorlayern.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -821,10 +795,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     });
   }, [bilder]);
 
-  // Marker als GeoJSON-Layer rendern + Clustering. Ersetzt das frühere DOM-Marker-Rendering.
-  // ALS LETZTER Daten-Effekt registriert (nach dem Bild-Effekt) → der Marker-render-Poller läuft
-  // zuletzt, die Marker-Layer liegen über Abschnitten/Zonen/Bildern; zusätzlich pinnt
-  // sorgeFuerMarkerLayer sie per moveLayer nach oben.
+  // Marker als GeoJSON-Layer + Clustering. Als letzter Daten-Effekt registriert → sein Poller läuft
+  // zuletzt, die Marker-Layer liegen über Abschnitten/Zonen/Bildern; `sorgeFuerMarkerLayer` pinnt
+  // sie zusätzlich nach oben.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -832,8 +805,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const einsatzort = baueEinsatzortFc(markers, markerPlakette);
     markerDatenRef.current = marker;
     einsatzortDatenRef.current = einsatzort;
-    // Registry für styleimagemissing füllen (Key → TzProps). tzIconKey ist die EINE Quelle der
-    // Key-Bildung (identisch zum icon-Property aus baueMarkerFc) → DRY.
+    // Registry für styleimagemissing (Key → TzProps). `tzIconKey` ist die eine Quelle der
+    // Key-Bildung, identisch zum icon-Property aus `baueMarkerFc`.
     const registry = new Map<string, TzProps>();
     for (const mk of markers) {
       if (mk.tz) registry.set(tzIconKey(mk.tz), mk.tz);
@@ -842,29 +815,45 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     wendeKartenDatenAn(map, () =>
       reAnlegenMarker(map, markerDatenRef.current, einsatzortDatenRef.current),
     );
-    // Cluster-Zusammensetzung kann sich geändert haben → DOM-Donuts verwerfen; der render-Sync baut
-    // sie mit frischen Typ-Counts neu auf (ein wiederverwendeter cluster_id zeigte sonst stale Segmente).
+    // Cluster-Zusammensetzung kann sich geändert haben → DOM-Donuts verwerfen; ein
+    // wiederverwendeter `cluster_id` zeigte sonst veraltete Segmente.
     for (const id in clusterDomOnScreenRef.current) clusterDomOnScreenRef.current[id].remove();
     clusterDomOnScreenRef.current = {};
     clusterDomRef.current = {};
-    // Offener Spider hielte einen veralteten getClusterLeaves-Snapshot (cluster_ids ändern sich) →
-    // bei jeder Daten-Änderung (SSE/Query-Invalidation) einklappen.
+    // Ein offener Spider hielte einen veralteten `getClusterLeaves`-Stand → bei jeder
+    // Daten-Änderung einklappen.
     schliesseSpiderRef.current?.();
   }, [markers, markerPlakette]);
+
+  // Eigenposition nachführen. Nach dem Marker-Effekt registriert, damit sie über den Markern liegt.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    eigenpositionRef.current = {
+      daten: eigenpositionFc(eigenposition ?? null),
+      farbe: rollen.bedien,
+    };
+    wendeKartenDatenAn(map, () =>
+      sorgeFuerEigenpositionLayer(
+        map,
+        eigenpositionRef.current.daten,
+        eigenpositionRef.current.farbe,
+      ),
+    );
+  }, [eigenposition, rollen.bedien]);
 
   // Einzel-Marker-Klick → Inspector (schluessel) + Cursor. Cluster-Klick läuft über die
   // DOM-Donut-Marker (eigener Effekt unten).
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    // EIN Handler über alle Klickebenen, nicht einer je Ebene (Review LFH-650): je Ebene feuerte
-    // ein Tipp, der Kreis, Kurzzeichen und Trefferzone zugleich trifft, `onMarkerKlick` bis zu
-    // dreimal — seit den überlappenden Trefferzonen womöglich mit VERSCHIEDENEN Schlüsseln.
-    // Gewählt wird das Merkmal, das dem Klickpunkt am nächsten liegt.
+    // Ein Handler über alle Klickebenen: je Ebene feuerte ein Tipp auf Kreis, Kurzzeichen und
+    // Trefferzone `onMarkerKlick` bis zu dreimal, womöglich mit verschiedenen Schlüsseln. Gewählt
+    // wird das Merkmal, das dem Klickpunkt am nächsten liegt.
     const klickMarker = (e: maplibregl.MapLayerMouseEvent) => {
       // Gehört der Klick einem Personen-Cluster, fächert der Karten-Klick unten auf; hier wird
-      // dann nichts gewählt (Review LFH-711). Sonst öffnete die unsichtbare Zone eines Zeichens
-      // daneben dessen Inspector, während der sichtbare Cluster, auf den getippt wurde, zu bliebe.
+      // nichts gewählt — sonst öffnete die unsichtbare Zone eines Zeichens daneben dessen
+      // Inspector.
       if (personenClusterAm(map, e.point)) return;
       const merkmal = naechstesMerkmal(e.features ?? [], e.point, (ll) => map.project(ll));
       const schluessel = merkmal?.properties?.schluessel;
@@ -888,24 +877,22 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, [onMarkerKlick]);
 
-  // Cluster als DOM-Donut-Marker (Mapbox-Donut-Muster): bei jedem render die sichtbaren Cluster aus
-  // der Source lesen und HTML-Donut-Marker erzeugen/wiederverwenden/entfernen. Der Donut zeigt die
-  // Typ-Zusammensetzung + Gesamtzahl mit weichem Schatten (was ein WebGL-circle nicht kann); Klick
-  // zoomt auf den Auflösungs-Zoom. Einzelmarker bleiben die GeoJSON-Symbol/Circle-Layer.
+  // Cluster als DOM-Donut-Marker: bei jedem render die sichtbaren Cluster aus der Source lesen und
+  // HTML-Donuts erzeugen/wiederverwenden/entfernen. Der Donut zeigt die Typ-Zusammensetzung mit
+  // Schatten (was ein WebGL-circle nicht kann).
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const aktualisiere = () => {
-      // Solange Kacheln nachladen, bleiben die stehenden Donuts, wie sie sind — sonst flackerten
-      // sie bei jedem Zoom/Pan weg und wieder her (Review-Befund LFH-648).
+      // Solange Kacheln nachladen, bleiben die stehenden Donuts — sonst flackerten sie bei jedem
+      // Zoom.
       if (!map.isSourceLoaded(MARKER_CLUSTER_QUELLE)) return;
       const neu: Record<string, maplibregl.Marker> = {};
       for (const f of map.querySourceFeatures(MARKER_CLUSTER_QUELLE)) {
         const props = f.properties as Record<string, unknown>;
         if (!props.cluster) continue;
         const clusterId = Number(props.cluster_id);
-        // Derselbe Schlüssel wie der offene Spider (`spiderOffenRef`): die Hülle eines Donuts
-        // (LFH-650) findet so ihren Cluster wieder.
+        // Derselbe Schlüssel wie der offene Spider (`spiderOffenRef`).
         const id = clusterSchluessel(MARKER_CLUSTER_QUELLE, clusterId);
         if (neu[id]) continue; // querySourceFeatures kann denselben Cluster über mehrere Tiles liefern
         let marker = clusterDomRef.current[id];
@@ -914,9 +901,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           const el = baueClusterDonut(props);
           el.addEventListener('click', (ev) => {
             ev.stopPropagation();
-            // Donut-Klick fächert auf (statt reinzuzoomen); der Controller toggelt/fällt bei
-            // Großclustern auf Reinzoomen zurück. stopPropagation → erreicht den allgemeinen
-            // map-click NICHT (Re-Klick läuft über oeffne, nicht über das Leer-Klick-Einklappen).
+            // Donut-Klick fächert auf (bei Großclustern Rückfall auf Reinzoomen).
+            // `stopPropagation`, damit der allgemeine map-click nicht einklappt.
             oeffneSpiderRef.current?.(
               MARKER_CLUSTER_QUELLE,
               clusterId,
@@ -947,11 +933,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, []);
 
-  // Spider-Controller: Cluster-Donut-Klick fächert die Leaves auf (statt reinzuzoomen) und klappt
-  // zuverlässig wieder ein. WebGL-Laufzeit → lebt hier (einzige MapLibre-Stelle). Setup-once ([]),
-  // Map über Ref. Einklapp-Trigger: Karten-Move/Zoom, leerer Klick, ESC, erneuter/anderer
-  // Cluster-Klick (Toggle/A→B via oeffne); Live-Daten-Änderung ([markers]-Effekt) und Style-Wechsel
-  // ([style]-Effekt) rufen schliesse() über schliesseSpiderRef.
+  // Spider-Controller: Donut-Klick fächert die Leaves auf und klappt zuverlässig wieder ein.
+  // Setup-once, Map über Ref. Einklappen bei Karten-Move/Zoom, leerem Klick, ESC, erneutem oder
+  // anderem Cluster-Klick; Daten- und Style-Wechsel rufen `schliesse()` über `schliesseSpiderRef`.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -962,9 +946,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       if (spiderOffenRef.current === null) return;
       setzeHuelleDurchlaessig(clusterDomRef.current[spiderOffenRef.current]?.getElement(), false);
       spiderOffenRef.current = null;
-      // mapRef wird im Map-Cleanup ZUERST genullt (Effekt-Reihenfolge) → beim Unmount mit offenem
-      // Spider ist die Map schon entfernt; getSource würfe sonst (kein internes Guard). Token-Bump
-      // läuft trotzdem, damit kein in-flight-Lauf nach dem Unmount noch malt.
+      // `mapRef` wird im Map-Cleanup zuerst genullt → beim Unmount mit offenem Spider ist die Map
+      // schon weg, und `getSource` würfe. Der Token-Bump läuft trotzdem.
       if (mapRef.current) setzeSpiderDaten(map, leer, leer);
     };
 
@@ -980,8 +963,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         return;
       } // Toggle / erneuter Klick
       schliesse(); // A→B: A einklappen
-      // Die Quelle des geklickten Donuts fragen: ein Personen-Cluster kennt `marker-cluster`
-      // nicht (LFH-648). Die Spider-Quellen bleiben gemeinsam — offen ist höchstens einer.
+      // Die Quelle des geklickten Donuts fragen: ein Personen-Cluster kennt `marker-cluster` nicht.
+      // Die Spider-Quellen sind gemeinsam — offen ist höchstens einer.
       const src = map.getSource(quelle) as GeoJSONSource | undefined;
       if (!src) return;
       // Großcluster → Fallback: reinzoomen (verkleinert Cluster, dann erneut auffächerbar).
@@ -1020,9 +1003,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const aufKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') schliesse();
     };
-    // Karten-Klick: ein Personen-Cluster (WebGL-Layer, LFH-648) fächert auf — aber nur, wenn er
-    // das OBERSTE Feature am Punkt ist. Jeder andere Klick klappt ein wie bisher (leerer Klick,
-    // Leaf-Routing, Klick auf ein Kräfte-Zeichen über dem Cluster).
+    // Karten-Klick: ein Personen-Cluster (WebGL-Layer) fächert auf, wenn er das oberste Feature am
+    // Punkt ist. Jeder andere Klick klappt ein.
     const klick = (e: maplibregl.MapMouseEvent) => {
       const treffer = personenClusterAm(map, e.point);
       if (treffer)
@@ -1053,12 +1035,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, []);
 
-  // Viewport nach Kartenbewegung melden: Zoom (für „näher heranzoomen"-Hinweise) immer,
-  // bbox nur ab BBOX_MIN_ZOOM. KRITIS selbst bräuchte das Gate seit LFH-83 nicht mehr (der
-  // Server verdichtet große Ausschnitte aus dem Extrakt zu Sammelpunkten, keine Overpass-Anfrage
-  // mehr) — aber Energie (LFH-81) fragt für `power=plant` weiterhin LIVE bei Overpass an, und
-  // der Handler ist für alle bbox-abhängigen Ebenen gemeinsam. Das Gate bleibt deshalb an, es
-  // schützt jetzt Energie vor einer Welt-weiten Anfrage.
+  // Viewport nach Kartenbewegung melden: Zoom immer, bbox erst ab `BBOX_MIN_ZOOM` — das Gate
+  // schützt Energie (fragt `power=plant` live bei Overpass an) vor einer weltweiten Anfrage.
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1079,7 +1057,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       timer = setTimeout(verarbeite, 600);
     };
 
-    verarbeite(); // initial (z. B. wenn eine bbox-Ebene aktiviert wird, während die Karte bereits passend gezoomt ist)
+    verarbeite(); // initial (z. B. wenn eine bbox-Ebene bei passendem Zoom aktiviert wird)
     map.on('moveend', melde);
     return () => {
       if (timer) clearTimeout(timer);
@@ -1087,10 +1065,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, [onBboxAenderung, onZoomAenderung]);
 
-  // Klick auf ein Fachebenen-Objekt → meldet Properties + Quelle nach oben (Detail-Panel).
-  // Handler je aktivem anklickbaren Layer (Closure über die Quelle); Cursor wird zur Hand.
-  // Gebündelte Ebenen (KRITIS, LFH-83): ein Bündel oder Server-Sammelpunkt zoomt hinein, statt
-  // ein Detail-Panel zu öffnen — die Unterscheidung trifft `entscheideFachebeneKlick`.
+  // Klick auf ein Fachebenen-Objekt → Properties + Quelle nach oben (Detail-Panel). Gebündelte
+  // Ebenen (KRITIS): ein Bündel oder Server-Sammelpunkt zoomt hinein — entscheidet
+  // `entscheideFachebeneKlick`.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -1101,14 +1078,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         const klick = (e: maplibregl.MapLayerMouseEvent) => {
           const feature = e.features?.[0];
           const props = (feature?.properties ?? {}) as Record<string, unknown>;
-          // Nur gebündelte Ebenen kennen Bündel und Sammelpunkte; jede andere bleibt beim
-          // Detail-Panel, egal was ihre Properties tragen.
+          // Nur gebündelte Ebenen kennen Bündel und Sammelpunkte.
           const ziel: FachebeneKlickZiel = fe.def.buendeln
             ? entscheideFachebeneKlick(props)
             : { art: 'einzel' };
           if (ziel.art !== 'einzel') {
-            // Mittelpunkt aus dem Feature (Punktgeometrie), nicht aus dem Klickort — sonst
-            // zöge das Hineinzoomen den Bündelrand statt des Bündels in die Bildmitte.
+            // Mittelpunkt aus dem Feature, nicht aus dem Klickort — sonst zöge das Hineinzoomen den
+            // Bündelrand in die Bildmitte.
             const g = feature?.geometry;
             const center: [number, number] =
               g?.type === 'Point'
@@ -1127,8 +1103,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
             }
             return;
           }
-          // Properties und volle Geometrie aus DEMSELBEN Feature (LFH-282, siehe
-          // `werteFachebenenKlickAus`).
+          // Properties und volle Geometrie aus demselben Feature (siehe `werteFachebenenKlickAus`).
           const aus = werteFachebenenKlickAus(
             feature,
             { lng: e.lngLat.lng, lat: e.lngLat.lat },
@@ -1167,7 +1142,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           (g) => {
             if (g.type === 'Polygon') onFlaecheGezeichnetRef.current?.(g);
           },
-          (bereit) => onZeichnenBereitAenderungRef.current?.(bereit),
+          (stand) => onZeichnenStandAenderungRef.current?.(stand),
           'td-abschnitt',
         );
       }
@@ -1186,7 +1161,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         zoneDrawRef.current = createZeichnung(
           map,
           (g) => onZoneGezeichnetRef.current?.(g),
-          (bereit) => onZeichnenBereitAenderungRef.current?.(bereit),
+          (stand) => onZeichnenStandAenderungRef.current?.(stand),
           'td-zone',
         );
       }
@@ -1194,8 +1169,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     } else if (zoneDrawRef.current) {
       zoneDrawRef.current.stoppen();
     }
-    // zoneZeichnenNonce wird hier nicht gelesen — sie erzwingt bewusst ein Re-Fire bei
-    // gleich bleibendem Modus (Zone→Zone-Wechsel), damit starten() einen offenen Entwurf verwirft.
+    // `zoneZeichnenNonce` wird nicht gelesen — sie erzwingt ein Re-Fire bei gleichem Modus, damit
+    // `starten()` einen offenen Entwurf verwirft.
   }, [zoneZeichnen, zoneZeichnenNonce]);
 
   // Messen an-/abschalten bzw. die Form wechseln; `starten` verwirft dabei die alte Figur.
@@ -1231,12 +1206,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
 
   // Bild-Manipulationsgriffe (Ecken/Drehen/Verschieben) im Platzier-Modus.
   const handlesRef = useRef<BildHandles | null>(null);
-  // Modus und Maße gehen über Refs in die Erzeugung (LFH-711): als Deps des Effekts unten
-  // zerstörten und bauten sie die Griffe bei jedem Umschalten neu. Aus demselben Grund hängt
-  // jener Effekt nur an der Bild-ID. Einen Wechsel mitten in einer Ziehgeste stellt
-  // `bildHandles` selbst bis `dragend` zurück. Die Maße (Stufe, Rolle
-  // `bedien`) gelten ab dem nächsten Platzieren; ein Stufenwechsel mitten im Einpassen ist
-  // kein Fall, für den sich ein Neuaufbau lohnt.
+  // Modus und Maße gehen über Refs in die Erzeugung: als Deps zerstörten sie die Griffe bei jedem
+  // Umschalten. Einen Wechsel mitten in einer Ziehgeste stellt `bildHandles` bis `dragend` zurück;
+  // die Maße gelten ab dem nächsten Platzieren.
   const griffModusRef = useRef<GriffModus>(griffModus ?? 'groesse');
   const griffKontextRef = useRef<GriffKontext>({
     controlHeight: token.controlHeight,
@@ -1244,10 +1216,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   });
   griffKontextRef.current = { controlHeight: token.controlHeight, bedien: rollen.bedien };
 
-  // Griffe erzeugen/zerstören — NUR an der Bild-ID hängen, damit ecken-Änderungen
-  // (numerische Eingabe / Refetch nach Commit) die Griffe nicht zerstören/neu erzeugen
-  // (würde eine laufende Ziehgeste unterbrechen). Live-Vorschau + PATCH erst bei dragend
-  // kapselt bildHandles selbst.
+  // Griffe nur an der Bild-ID erzeugen/zerstören, damit Ecken-Änderungen (Eingabe, Refetch) keine
+  // laufende Ziehgeste unterbrechen. Live-Vorschau + PATCH bei dragend kapselt `bildHandles`.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !platzierBild) {
@@ -1273,14 +1243,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platzierBild?.id]);
 
-  // Ein Moduswechsel schaltet die LAUFENDE Griffgruppe um, statt sie neu zu bauen (s. o.).
+  // Ein Moduswechsel schaltet die laufende Griffgruppe um, statt sie neu zu bauen.
   useEffect(() => {
     griffModusRef.current = griffModus ?? 'groesse';
     handlesRef.current?.setzeModus(griffModusRef.current);
   }, [griffModus]);
 
-  // Externe Ecken-Änderungen (numerische Mittelpunkt-Eingabe / Refetch nach Commit) an die
-  // Griffe spiegeln. Läuft nicht mid-drag (der drag setzt die Geometrie selbst kontinuierlich).
+  // Externe Ecken-Änderungen an die Griffe spiegeln; läuft nicht mid-drag.
   useEffect(() => {
     if (platzierBild) handlesRef.current?.setzeEcken(platzierBild.ecken);
     // eslint-disable-next-line react-hooks/exhaustive-deps

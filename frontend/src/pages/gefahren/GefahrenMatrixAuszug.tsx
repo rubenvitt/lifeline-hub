@@ -7,21 +7,15 @@ import { GEFAHRENTYPEN, SCHUTZOBJEKTE, kombinationGueltig } from './gefahrenSche
 import { SPALTENKOPF, zellFlaechenStil } from './GefahrenMatrix';
 
 /**
- * Auszug der Gefahrenmatrix zum Lesen — für die Gefahrengebiet-Vorschau der Sprungpalette
- * (LFH-664, Entscheidung 5a des Auftraggebers).
+ * Auszug der Gefahrenmatrix zum Lesen, für die Gefahrengebiet-Vorschau der Sprungpalette.
  *
- * Zeilen sind nur die Gefahrentypen, die mindestens eine Zelle über „keine" tragen; Spalten
- * bleiben alle fünf Schutzobjekte, damit die Matrixgestalt der Fachseite erhalten bleibt.
- * Ohne solche Zeile steht ein Satz statt einer leeren Tabelle.
+ * Zeilen: nur Gefahrentypen mit mindestens einer Zelle über „keine"; Spalten: alle fünf
+ * Schutzobjekte. Ohne solche Zeile steht ein Satz statt einer leeren Tabelle. Keine Bedienung — die
+ * volle `GefahrenMatrix` zeigte 13 Zeilen gesperrter Knöpfe. Kopf und Zellfläche kommen aus
+ * `GefahrenMatrix`, damit beide dieselbe Zelle zeigen.
  *
- * Keine Bedienung: eine einfache Tabelle ohne Menü, ohne Knopf. Die volle `GefahrenMatrix`
- * mit `darfSchreiben={false}` zeigte 13 Zeilen gesperrter Knöpfe — genau das Bild, das der
- * Auftraggeber nicht will. Kopf und Zellfläche kommen aus `GefahrenMatrix`
- * (`SPALTENKOPF`, `zellFlaechenStil`), damit Auszug und Matrix dieselbe Zelle zeigen.
- *
- * Drei Zellzustände, im Text UND im zugänglichen Namen getrennt (WCAG 1.4.1):
- * bewertet → Kürzel der Stufe (auch „–" für ausdrücklich „keine"), gültig aber ohne
- * Bewertung → leer, „nicht bewertet"; ungültiges Paar → „n. a.", „nicht anwendbar".
+ * Drei Zellzustände, im Text und im zugänglichen Namen getrennt: bewertet → Kürzel (auch „–" für
+ * „keine"); gültig ohne Bewertung → leer, „nicht bewertet"; ungültig → „n. a.", „nicht anwendbar".
  */
 export default function GefahrenMatrixAuszug({ matrix }: { matrix: GefahrBewertung[] }) {
   const { token, rollen } = useRollen();

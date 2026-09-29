@@ -12,14 +12,11 @@ import { ABSCHLUSS_LABEL, AUSMASS_META, TYP_LABEL, geschaedigtAnzeige } from './
 type SchadenEingabeFeld = 'typ' | 'ausmass' | 'ort' | 'beschreibung' | 'geschaedigt';
 
 /**
- * Die Schadensdaten als Datenraster — EIN Bauteil für die Detailseite und die Vorschau der
- * Sprungpalette (LFH-664). Zwei Kopien wären zwei Stellen, an denen ein Feld fehlen kann.
+ * Die Schadensdaten als Datenraster — ein Bauteil für Detailseite und Palettenvorschau.
  *
- * BEARBEITEN AN ORT UND STELLE: die Seite übergibt im Bearbeiten-Modus je Feld ihren
- * `Form.Item noStyle`-Knoten über `eingabe`; das Raster bleibt dasselbe, statt gegen ein
- * separates Formular getauscht zu werden. Regeln (Pflichtfeld Ort) hängen am `Form.Item` der
- * Seite — dieses Bauteil weiß nichts von einem Formular. Die Vorschau übergibt nichts und
- * bekommt damit die reine Anzeige.
+ * Im Bearbeiten-Modus übergibt die Seite je Feld ihren `Form.Item noStyle`-Knoten über `eingabe`;
+ * das Raster bleibt dasselbe. Regeln (Pflichtfeld Ort) hängen am `Form.Item` der Seite. Ohne
+ * `eingabe` ist es reine Anzeige.
  */
 export default function SchadenDaten({
   schaden: s,
@@ -37,8 +34,7 @@ export default function SchadenDaten({
   verortenLink?: boolean;
   /**
    * Ort-Zeile (Ortsname, Peilung) unter der Koordinate. Sie ist ein eigener Serverabruf; die
-   * Palettenvorschau lässt sie weg, weil sie ohne zusätzlichen Abruf auskommen muss
-   * (Spec „Die Vorschau liest den Stand der Trefferliste").
+   * Palettenvorschau lässt sie deshalb weg.
    */
   ortZeile?: boolean;
   spalten?: number;
@@ -53,16 +49,9 @@ export default function SchadenDaten({
       <Datenfeld label="Beschreibung" breit>
         {eingabe?.beschreibung ?? (s.beschreibung || '—')}
       </Datenfeld>
-      {/**
-       * VERORTUNG (LFH-340 · C5, Befund M39). Bis dahin sagte die Seite kein Wort darüber,
-       * ob dieser Schaden auf der Karte steht — obwohl `lat`/`lon` seit jeher am Datensatz
-       * hängen und die Karte sie setzen kann. Eine Lage, die man nicht verorten kann, weil
-       * niemand sieht, dass sie unverortet ist, ist so gut wie nicht erfasst.
-       *
-       * Die Koordinate wird hier NICHT eingegeben: `SchadenEingabe` kennt kein lat/lon
-       * (nur `SchadenPatch` tut es), und ein Eingabefeld wäre eine Backend-Erweiterung.
-       * Der Weg ist deshalb der Auftrag an die Karte — sie hat die Mechanik bereits.
-       */}
+      {/* Verortung sichtbar machen: eine unverortete Lage, die niemand als unverortet sieht, ist
+          so gut wie nicht erfasst. Keine Koordinateneingabe hier (`SchadenEingabe` kennt kein
+          lat/lon, LFH-453), der Weg ist der Auftrag an die Karte. */}
       <Datenfeld label="Verortung">
         {s.lat != null && s.lon != null ? (
           <KoordinatenAnzeige

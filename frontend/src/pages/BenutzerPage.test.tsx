@@ -232,12 +232,9 @@ describe('BenutzerPage', () => {
   });
 
   /**
-   * LFH-346 · A1: „Deaktivieren" trug ÜBERHAUPT keine Ladeanzeige — anders als
-   * „Reaktivieren" daneben, das seit jeher zeilenweise scopt. Ein Klick auf eine
-   * unumkehrbar wirkende Aktion ohne jede Rückmeldung lädt zum zweiten Klick ein.
-   *
-   * Die zweite Zeile ist die schärfere Hälfte: ein ungescoptes
-   * `loading={deaktivieren.isPending}` erfüllte die erste Erwartung ebenfalls.
+   * „Deaktivieren" zeigt eine zeilenweise Ladeanzeige: ohne Rückmeldung lädt eine unumkehrbar
+   * wirkende Aktion zum zweiten Klick ein. Die zweite Zeile ist die schärfere Hälfte — ein
+   * ungescoptes `loading={deaktivieren.isPending}` erfüllte die erste ebenfalls.
    */
   it('zeigt den Ladezustand beim Deaktivieren NUR an der geklickten Zeile', async () => {
     server.use(
@@ -276,9 +273,8 @@ describe('BenutzerPage', () => {
     );
   });
 
-  // Ordnung statt bloßer Anwesenheit: geprüft wird, was Suche, Sortierung und Statusfilter mit
-  // den Zeilen TUN. Die stehende Kopfzeile schiebt eine verborgene Messzeile als erste
-  // Körperzeile ein, deshalb die Verengung auf `tr.ant-table-row`.
+  // Geprüft wird, was Suche, Sortierung und Statusfilter mit den Zeilen tun. Die stehende Kopfzeile
+  // schiebt eine verborgene Messzeile als erste Körperzeile ein, deshalb `tr.ant-table-row`.
   it('sucht, sortiert und filtert die Benutzerliste', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
@@ -318,8 +314,8 @@ describe('BenutzerPage', () => {
     await userEvent.clear(feld);
     await waitFor(() => expect(namen()).toHaveLength(2));
 
-    // Zweimal klicken: aufsteigend ist hier die Serverreihenfolge, erst absteigend beweist,
-    // dass wirklich sortiert wird.
+    // Zweimal klicken: aufsteigend ist hier die Serverreihenfolge, erst absteigend beweist das
+    // Sortieren.
     const kopf = screen.getByRole('columnheader', { name: /Name/ });
     await userEvent.click(kopf);
     await userEvent.click(kopf);
@@ -336,10 +332,9 @@ describe('BenutzerPage', () => {
   });
 
   /**
-   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
-   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
-   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
-   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   * Partnerpaar: die negative Hälfte allein belegte nichts (ein geänderter Leertext machte sie
+   * trivial grün). Erst die positive Hälfte mit gleichem Literal macht sie zu einer Aussage über
+   * die Zustandsweiche.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
@@ -400,12 +395,10 @@ describe('BenutzerPage', () => {
   });
 
   /**
-   * Seit LFH-346 · A6 stehen BEIDE Dialoge unbedingt im Baum, und antd lässt den
-   * geschlossenen als `role="dialog"` stehen. Über den zugänglichen Namen sind sie
-   * NICHT zu trennen: `@rc-component/util`s `useId` liefert unter `NODE_ENV=test`
-   * die Konstante `'test-id'` (`hooks/useId.js:57`) — beide `aria-labelledby` zeigen
-   * damit auf dasselbe Element, und `getByRole('dialog', { name })` griffe stets den
-   * ersten. Unterschieden wird deshalb an der sichtbaren Überschrift.
+   * Beide Dialoge stehen unbedingt im Baum, und antd lässt den geschlossenen als `role="dialog"`
+   * stehen. Über den zugänglichen Namen sind sie nicht zu trennen: `useId` aus `@rc-component/util`
+   * liefert unter `NODE_ENV=test` die Konstante `'test-id'`, beide `aria-labelledby` zeigen auf
+   * dasselbe Element. Unterschieden wird an der sichtbaren Überschrift.
    */
   function dialogMitTitel(titel: string): HTMLElement {
     const treffer = screen
@@ -418,8 +411,8 @@ describe('BenutzerPage', () => {
   }
 
   /**
-   * Zwei Benutzer, damit „Bearbeiten"-Zeilen unterscheidbar sind. Eigene Hülle, weil
-   * die Prüfungen unten den Anlegen- UND den Bearbeiten-Dialog brauchen.
+   * Zwei Benutzer, damit „Bearbeiten"-Zeilen unterscheidbar sind; die Prüfungen brauchen Anlegen-
+   * und Bearbeiten-Dialog.
    */
   function renderMitZwei() {
     server.use(
@@ -443,14 +436,10 @@ describe('BenutzerPage', () => {
   }
 
   /**
-   * LFH-346 · A6. DIE Zusicherung des Umbaus auf `ErfassungsModal`, für BEIDE Dialoge
-   * dieser Seite: Enter kommt aus der eingebauten Formularübermittlung des Browsers,
-   * und die greift nur, wenn der Knopf IM `<form>` liegt. Per Tastendruck ist das hier
-   * nicht belegbar — beide Masken tragen `Select`, und `@rc-component/select` ruft bei
-   * jedem Enter `preventDefault()`. Beide Hälften zusammen sind die Aussage: keine
-   * antd-Fusszeile (dort stünde der Knopf als DOM-Geschwister ausserhalb, Befund H69)
-   * UND der Knopf hat tatsächlich ein `form` als Vorfahr. Mutationsprobe: dreht man
-   * auf `<Modal onOk okText="…">` zurück, fallen beide Abfragen.
+   * Die Zusicherung von `ErfassungsModal` für beide Dialoge: Enter kommt aus der nativen
+   * Formularübermittlung und greift nur, wenn der Knopf im `<form>` liegt. Per Tastendruck nicht
+   * belegbar — beide Masken tragen `Select`, das bei Enter `preventDefault()` ruft. Beide Hälften
+   * sind die Aussage: keine antd-Fußzeile und der Knopf hat ein `form` als Vorfahr.
    */
   it('beide Dialoge tragen keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
     renderMitZwei();
@@ -471,16 +460,12 @@ describe('BenutzerPage', () => {
   });
 
   /**
-   * Die zweite Zusicherung der Hülle. Bis hierher trugen BEIDE Masken ein
-   * handgesetztes `autoFocus` am ersten Feld; das ist weg, den Fokus setzt die Hülle.
-   * Zwei Quellen für denselben Fokus wären eine zu viel.
+   * Den Fokus setzt die Hülle, kein handgesetztes `autoFocus`.
    *
-   * BEWUSST ZWEI Tests statt einem: beide Masken haben ein Feld `anzeigename`, und
-   * antds `Form.Item` leitet daraus die DOM-`id` ab. In jsdom räumt `destroyOnHidden`
-   * den geschlossenen Dialog nicht ab (die Schliessanimation läuft dort nie zu Ende) —
-   * beide Eingaben stünden gleichzeitig mit derselben `id` im Baum, und
-   * `getByLabelText` löste über `for` auf die des FALSCHEN Dialogs auf. Ein Test, der
-   * beide nacheinander öffnet, scheitert daran und nicht am Fokus.
+   * Bewusst zwei Tests: beide Masken haben ein Feld `anzeigename`, antds `Form.Item` leitet daraus
+   * die DOM-`id` ab. In jsdom räumt `destroyOnHidden` den geschlossenen Dialog nicht ab (die
+   * Schließanimation läuft nie zu Ende), und `getByLabelText` löste über `for` auf die Eingabe des
+   * falschen Dialogs auf.
    */
   it('setzt im Anlegen-Dialog den Fokus ins erste Feld', async () => {
     renderMitZwei();
@@ -498,15 +483,10 @@ describe('BenutzerPage', () => {
   });
 
   /**
-   * Der Sonderfall des Umbaus. Bis LFH-346 · A6 hängte der Bearbeiten-Dialog über
-   * `key={zuBearbeiten.id}` am `<Form>` einen frischen Baum ein — die Hülle setzt
-   * stattdessen selbst auf allen vier Auswegen zurück, und die Vorbelegung läuft
-   * über einen Effekt. Diese Prüfung ist die Stelle, an der auffiele, wenn beim
-   * Wegfall des `key` die Vorbelegung mit verschwände: der zweite Benutzer trüge
-   * dann Namen und Rollen des ersten.
+   * Die Hülle setzt auf allen vier Auswegen zurück, die Vorbelegung läuft über einen Effekt. Hier
+   * fiele auf, wenn die Vorbelegung fehlte: der zweite Benutzer trüge Namen und Rollen des ersten.
    *
-   * Bewusst mit einem WERTUNTERSCHIED in allen drei Feldern — ein Vorrat, in dem
-   * sich nur der Name unterscheidet, liesse die beiden Rollen-Selects ungeprüft.
+   * Bewusst mit Wertunterschied in allen drei Feldern — sonst blieben die Rollen-Selects ungeprüft.
    */
   it('zeigt beim Wechsel von Benutzer A zu Benutzer B wirklich B', async () => {
     server.use(
@@ -564,9 +544,8 @@ describe('BenutzerPage', () => {
   });
 
   /**
-   * `onErfassen` bekommt `mutateAsync`, nicht `mutate` — sonst löste die Hülle den
-   * Erfolgszweig aus, während der Server ablehnt: Felder leer, Dialog zu, kein Konto.
-   * Geprüft wird das Ergebnis, nicht die Schreibweise.
+   * `onErfassen` bekommt `mutateAsync`, nicht `mutate` — sonst löste die Hülle den Erfolgszweig
+   * aus, während der Server ablehnt. Geprüft wird das Ergebnis.
    */
   it('lässt nach einer Ablehnung den Anlegen-Dialog samt Wortlaut stehen', async () => {
     server.use(
@@ -599,14 +578,10 @@ describe('BenutzerPage', () => {
   });
 
   /**
-   * LFH-346 · A8, Befund N20. Die tragende Prüfung des Collapse-Umbaus — nicht die
-   * Zählung darunter: beide Hälften der Zählung stünden grün, während der Rumpf zwei
-   * Felder verliert.
-   *
-   * Ohne `forceRender` sind die beiden Rollen-Selects nicht montiert, und `onFinish`
-   * liefert nur montierte Felder. `system_rolle` und `org_rolle` sind im DTO optional
-   * — sie fielen also lautlos aus dem Rumpf, und der Server setzte SEINE Vorgabe
-   * statt der, die die Maske eingeklappt zusagt. Kein Fehler, kein roter Test.
+   * Die tragende Prüfung des Collapse-Umbaus: ohne `forceRender` sind die beiden Rollen-Selects
+   * nicht montiert, und `onFinish` liefert nur montierte Felder. `system_rolle` und `org_rolle`
+   * sind im DTO optional — sie fielen lautlos aus dem Rumpf, und der Server setzte seine Vorgabe
+   * statt der zugesagten.
    */
   it('schickt die Rollen-Vorgaben mit, auch wenn niemand aufklappt', async () => {
     let rumpf: Record<string, unknown> | null = null;
@@ -644,9 +619,8 @@ describe('BenutzerPage', () => {
   });
 
   /**
-   * Die Gegenprobe: eine aufgeklappt GEWÄHLTE Rolle schlägt die Vorgabe. Ohne sie
-   * belegte die Prüfung darüber nur, dass irgendwoher zwei Vorgabewerte kommen —
-   * nicht, dass der Speicher gelesen wird, in dem auch die Wahl landet.
+   * Gegenprobe: eine aufgeklappt gewählte Rolle schlägt die Vorgabe — belegt, dass der Speicher
+   * gelesen wird, in dem auch die Wahl landet.
    */
   it('eine aufgeklappt gewählte Rolle kommt gewählt an', async () => {
     let rumpf: Record<string, unknown> | null = null;
@@ -674,8 +648,8 @@ describe('BenutzerPage', () => {
     const dialog = dialogMitTitel('Neuen Benutzer anlegen');
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
     await userEvent.click(await within(dialog).findByLabelText('Org-Rolle'));
-    // Die Optionsliste hängt im Portal, nicht im Dialog — gegriffen wird sie global,
-    // und zwar über den echten Options-Knoten (antd hört auf dessen Klick).
+    // Die Optionsliste hängt im Portal, nicht im Dialog; gegriffen wird der echte Options-Knoten
+    // (antd hört auf dessen Klick).
     await userEvent.click(await screen.findByText('Führungskraft (darf Einsätze anlegen)'));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
@@ -684,12 +658,10 @@ describe('BenutzerPage', () => {
   });
 
   /**
-   * Das Feldbudget des Anlegen-Dialogs (LFH-346 · A8): drei sichtbare Felder statt
-   * fünf. Der Bearbeiten-Dialog hat drei und bleibt unangetastet.
+   * Das Feldbudget des Anlegen-Dialogs: drei sichtbare Felder statt fünf.
    *
-   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — die beiden
-   * Rollen sind `Select` und fehlten in der Rollenzählung. Die zweite Hälfte ist
-   * Pflicht: „höchstens drei" allein erfüllte auch ein Dialog ganz ohne Felder.
+   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` (die Rollen sind `Select`). Die
+   * zweite Hälfte ist Pflicht: „höchstens drei" erfüllte auch ein Dialog ohne Felder.
    */
   it('der Anlegen-Dialog zeigt drei Felder und deckt zwei beim Aufklappen auf', async () => {
     renderMitZwei();

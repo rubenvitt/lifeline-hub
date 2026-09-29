@@ -52,7 +52,7 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseBelegungOfflineFaehig, erfasseStandOfflineFaehig } from '../offline/schreiben';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 
-/** Grund der fehlenden Schreibberechtigung als ganzer Satz (C10/M16). */
+/** Grund der fehlenden Schreibberechtigung als ganzer Satz. */
 function betreuungRechteText(status: EinsatzStatus): string {
   return status !== 'aktiv'
     ? 'Der Einsatz ist abgeschlossen — Bezirke und Betreuungsstellen sind nur noch lesbar.'
@@ -60,9 +60,9 @@ function betreuungRechteText(status: EinsatzStatus): string {
 }
 
 /**
- * Welcher Dialog offen ist — EINER zur Zeit, jeder frisch montiert (`initialValues`). Der
- * Datensatz hier ist der Stand beim Öffnen und dient nur als Rückfall, falls er aus dem Cache
- * verschwindet (fremd storniert): der Dialog bekommt den AKTUELLEN (LFH-681).
+ * Welcher Dialog offen ist — einer zur Zeit, jeder frisch montiert (`initialValues`). Der Datensatz
+ * ist der Stand beim Öffnen und nur Rückfall, falls er aus dem Cache verschwindet (fremd
+ * storniert); der Dialog bekommt den aktuellen.
  */
 type Dialog =
   | { art: 'bezirkAnlegen' }
@@ -78,25 +78,25 @@ type Dialog =
 type Hervorhebung = { art: 'bezirk' | 'stelle'; id: number } | null;
 
 /**
- * Fachmodul Betreuung (LFH-639, design.md D7): EINE Route, zwei Blöcke, keine Detailroute.
+ * Fachmodul Betreuung (LFH-639): eine Route, zwei Blöcke, keine Detailroute.
  *
  * - **Evakuierung** — Karten, weil gelesen wird („was ist mit diesem Bezirk?").
  * - **Betreuungsstellen** — Tabelle, weil verglichen wird („welche hat noch Platz?").
  *
- * KOPF: genau EINE Primäraktion, „Evakuierungsbezirk anlegen" (LFH-340). „Betreuungsstelle
- * anlegen" steht sekundär im eigenen Blockkopf.
+ * Kopf: genau eine Primäraktion, „Evakuierungsbezirk anlegen". „Betreuungsstelle anlegen" steht
+ * sekundär im eigenen Blockkopf.
  *
- * MELDEN OHNE RÜCKFRAGE, MIT RÜCKWEG (LFH-343): Stand und Belegung haben einen serverseitigen
- * Rückweg (Rücknahme-Route, D3). Der Toast nimmt die `meldung_id` der GERADE angelegten
- * Meldung — nie `bezirk.stand.id`: bei einer nachgetragenen, älteren Meldung ist der aktuelle
- * Stand eine ANDERE Meldung, und „Rückgängig" nähme sonst die falsche zurück.
+ * Melden ohne Rückfrage, mit Rückweg: Stand und Belegung haben eine serverseitige Rücknahme. Der
+ * Toast nimmt die `meldung_id` der gerade angelegten Meldung — nie `bezirk.stand.id`: bei einer
+ * nachgetragenen, älteren Meldung ist der aktuelle Stand eine andere, und „Rückgängig" nähme die
+ * falsche zurück.
  *
- * FEHLER: die der Dialoge stehen IM Dialog (`SpeicherFehler`), die einer Rücknahme — die keinen
- * Dialog hat — an der Seite (`SeitenHinweise`, C10/H14). Erfolg quittiert der Toast.
+ * Fehler der Dialoge stehen im Dialog (`SpeicherFehler`), die einer Rücknahme (ohne Dialog) an der
+ * Seite (`SeitenHinweise`). Erfolg quittiert der Toast.
  *
- * LIVE: alle Mutationen und das `betreuung`-Ereignis invalidieren `einsatzKeys.betreuung`.
- * Fremd angelegte Zeilen erscheinen über das Sammelbanner der `Datensicht`, solange der Fokus
- * in einer Sicht liegt (Vorgabe `zufluss="sammelbanner"`).
+ * Live: alle Mutationen und das `betreuung`-Ereignis invalidieren `einsatzKeys.betreuung`. Fremd
+ * angelegte Zeilen erscheinen über das Sammelbanner der `Datensicht`, solange der Fokus in einer
+ * Sicht liegt.
  */
 export default function BetreuungPage() {
   const { id } = useParams();
@@ -138,7 +138,7 @@ export default function BetreuungPage() {
   const aktuellerBezirk = (b: Evakuierungsbezirk) => bezirke.find((x) => x.id === b.id) ?? b;
   const aktuelleStelle = (s: Betreuungsstelle) => stellen.find((x) => x.id === s.id) ?? s;
 
-  // Cross-Modul-Deeplinks (LFH-25): `?bezirk=` / `?stelle=` heben die Zeile hervor.
+  // Cross-Modul-Deeplinks: `?bezirk=` / `?stelle=` heben die Zeile hervor.
   useQueryParamSelektion('bezirk', betreuungQuery.isSuccess, (bid) => {
     if (bezirke.some((b) => b.id === bid)) setHervorhebung({ art: 'bezirk', id: bid });
   });
@@ -155,17 +155,16 @@ export default function BetreuungPage() {
     void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }, [qc, einsatzId]);
   /**
-   * Nach einer Bezirksänderung zusätzlich den Einsatz (LFH-607): Anlegen, Räumung und
-   * Stornieren können die Lagekennzahl `evakuiert` kippen, und der Einsatz-Key ist nicht live
-   * (`NICHT_LIVE_KEYS`) — ohne diese Zeile sähe die festlegende Person den neuen Zuschnitt des
-   * Lage-Dashboards erst beim nächsten Fokus. Stand- und Stellenmeldungen kippen ihn nie.
+   * Nach einer Bezirksänderung zusätzlich den Einsatz: Anlegen, Räumung und Stornieren können die
+   * Lagekennzahl `evakuiert` kippen, und der Einsatz-Key ist nicht live (`NICHT_LIVE_KEYS`). Stand-
+   * und Stellenmeldungen kippen ihn nie.
    */
   const invalidiereBezirk = useCallback(() => {
     invalidiere();
     void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
   }, [invalidiere, qc, einsatzId]);
 
-  // ── Evakuierungsbezirke ─────────────────────────────────────────────────────────────
+  // ── Evakuierungsbezirke ──
   const bezirkAnlegenMut = useMutation({
     mutationFn: (body: EvakuierungsbezirkEingabe) => legeBezirkAn(einsatzId, body),
     onSuccess: (b) => {
@@ -205,11 +204,10 @@ export default function BetreuungPage() {
     },
     onError: invalidiere,
   });
-  // Beide Rücknahmen melden ihren Fehler an DERSELBEN Stelle über der Seite (C10/H14). Ohne
-  // Räumen bliebe ein alter Fehler dort für immer stehen — die Rücknahme startet aus dem
-  // Toast, ein erneutes Absenden in derselben Maske gibt es nicht — und verdeckte über das
-  // `??` jede spätere Ablehnung der anderen Rücknahme. Jede Rücknahme räumt deshalb die
-  // andere, jede Meldung räumt beide.
+  // Beide Rücknahmen melden ihren Fehler an derselben Stelle über der Seite. Ohne Räumen bliebe ein
+  // alter Fehler dort stehen (die Rücknahme startet aus dem Toast, ein erneutes Absenden gibt es
+  // nicht) und verdeckte über das `??` jede spätere Ablehnung der anderen. Jede Rücknahme räumt
+  // deshalb die andere, jede Meldung beide.
   const { reset: resetStandZurueck, mutate: standZuruecknehmen } = standZurueckMut;
   const { reset: resetBelegungZurueck, mutate: belegungZuruecknehmen } = belegungZurueckMut;
   const nimmStandmeldungZurueck = (meldungId: number) => {
@@ -224,10 +222,9 @@ export default function BetreuungPage() {
     resetStandZurueck();
     resetBelegungZurueck();
   };
-  // Stand- und Belegungsmeldungen kommen vom Handschirm, oft ohne Netz (LFH-675): ohne
-  // Verbindung werden sie mit dem Erfassungszeitpunkt vorgemerkt und später gesendet.
-  // „Vorgemerkt" ist ein Erfolg ohne Rückweg — eine `meldung_id` gibt es noch nicht; der
-  // Dialog schließt, weil der Wortlaut in IndexedDB liegt (design.md D8).
+  // Stand- und Belegungsmeldungen kommen vom Handschirm, oft ohne Netz: ohne Verbindung werden sie
+  // mit dem Erfassungszeitpunkt vorgemerkt und später gesendet. „Vorgemerkt" ist ein Erfolg ohne
+  // Rückweg (noch keine `meldung_id`); der Dialog schließt, weil der Wortlaut in IndexedDB liegt.
   const standMut = useMutation({
     mutationFn: ({ bezirk, body }: { bezirk: Evakuierungsbezirk; body: StandmeldungEingabe }) => {
       if (!benutzer) throw new Error('Nicht angemeldet');
@@ -251,7 +248,7 @@ export default function BetreuungPage() {
     },
   });
 
-  // ── Betreuungsstellen ───────────────────────────────────────────────────────────────
+  // ── Betreuungsstellen ──
   const stelleAnlegenMut = useMutation({
     mutationFn: (body: BetreuungsstelleEingabe) => legeStelleAn(einsatzId, body),
     onSuccess: (s) => {
@@ -267,9 +264,9 @@ export default function BetreuungPage() {
       message.success(`Betreuungsstelle ${s.bezeichnung} gespeichert`);
     },
   });
-  // Die Leermeldung vor dem Schließen (D4): eigene Mutation ohne Rückgängig-Toast — sie ist
-  // Teil des Schließens, und ein Rückweg auf die 0 ließe eine geschlossene, belegte Stelle zu
-  // (der Server lehnt das ohnehin ab, 422).
+  // Die Leermeldung vor dem Schließen: eigene Mutation ohne Rückgängig-Toast — sie ist Teil des
+  // Schließens, ein Rückweg auf die 0 ließe eine geschlossene, belegte Stelle zu (der Server lehnt
+  // das mit 422 ab).
   const leermeldungMut = useMutation({
     mutationFn: (stelleId: number) => meldeBelegung(einsatzId, stelleId, { belegt: 0 }),
     onSuccess: invalidiere,
@@ -305,7 +302,7 @@ export default function BetreuungPage() {
     },
   });
 
-  // ── Öffnen: jede Öffnung beginnt ohne den Fehler der letzten ────────────────────────
+  // ── Öffnen: jede Öffnung beginnt ohne den Fehler der letzten ──
   const { reset: resetBezirkAnlegen } = bezirkAnlegenMut;
   const { reset: resetBezirkAendern } = bezirkAendernMut;
   const { reset: resetBezirkStornieren } = bezirkStornierenMut;
@@ -340,7 +337,7 @@ export default function BetreuungPage() {
   );
   const bezirkAktion = useCallback(
     (aktion: BezirkAktion, bezirk: Evakuierungsbezirk) => {
-      // LFH-673: Sprung auf die Karte; dort wählt die Seite eine Fläche und räumt den Parameter.
+      // Sprung auf die Karte; dort wählt die Seite eine Fläche und räumt den Parameter.
       if (aktion === 'karte') {
         navigate(lagekartePfad(einsatzId, { evakuierungsbezirk: bezirk.id }));
         return;
@@ -357,7 +354,7 @@ export default function BetreuungPage() {
   );
   const stelleAktion = useCallback(
     (aktion: StelleAktion, stelle: Betreuungsstelle) => {
-      // LFH-673: Sprung in den Platziermodus der Lagekarte; dort räumt die Karte den Auftrag.
+      // Sprung in den Platziermodus der Lagekarte; dort räumt die Karte den Auftrag.
       if (aktion === 'verorten') {
         navigate(
           lagekartePfad(einsatzId, { platzieren: { typ: 'betreuungsstelle', id: stelle.id } }),
@@ -388,8 +385,8 @@ export default function BetreuungPage() {
   }
   const einsatz = einsatzQuery.data;
 
-  // Fehler ist nicht leer (LFH-331 · B3): ohne Daten tritt der Fehler an die Stelle der
-  // Blöcke, mit Daten bleiben sie stehen und bekommen ein Banner.
+  // Fehler ist nicht leer: ohne Daten tritt der Fehler an die Stelle der Blöcke, mit Daten bleiben
+  // sie stehen und bekommen ein Banner.
   const gescheitert = betreuungQuery.isError && betreuungQuery.data == null;
   const veraltet = betreuungQuery.isError && betreuungQuery.data != null;
   const ladend = betreuungQuery.isLoading;
@@ -397,8 +394,8 @@ export default function BetreuungPage() {
   return (
     <EinsatzSeite
       titel="Betreuung"
-      // „n voll" auch HIER, nicht nur im Blockkopf der Stellen (LFH-678): der Seitenkopf ist die
-      // einzige Zeile, die mit vielen Bezirkskarten noch über der Falz steht (Kriterium 9).
+      // „n voll" auch hier, nicht nur im Blockkopf der Stellen: der Seitenkopf ist die einzige
+      // Zeile, die mit vielen Bezirkskarten über der Falz steht.
       meta={
         betreuungQuery.data
           ? `${bezirke.length} ${bezirke.length === 1 ? 'Bezirk' : 'Bezirke'} · ${stellen.length} ${stellen.length === 1 ? 'Betreuungsstelle' : 'Betreuungsstellen'}${volleStellenSegment(stellen)}`
@@ -414,7 +411,7 @@ export default function BetreuungPage() {
           ]}
         />
       }
-      // Gesperrt statt versteckt (C10/M16): der Hinweis darunter nennt den Grund.
+      // Gesperrt statt versteckt: der Hinweis darunter nennt den Grund.
       aktionen={
         <Button type="primary" disabled={!darfSchreiben} onClick={oeffneBezirkAnlegen}>
           Evakuierungsbezirk anlegen
@@ -463,7 +460,7 @@ export default function BetreuungPage() {
       )}
 
       {/* Dialoge je Ziel frisch montiert: `initialValues` greift nur beim Einhängen, und der
-          Speicher von rc-field-form überlebt sonst ein Schließen (CLAUDE.md, B4). */}
+          Speicher von rc-field-form überlebt sonst ein Schließen. */}
       {dialog?.art === 'bezirkAnlegen' && (
         <BezirkAnlegenDialog
           abschnitte={abschnitte}

@@ -59,9 +59,8 @@ export function stationsLabel(s: Pick<PegelStation, 'name' | 'gewaesser' | 'km'>
 }
 
 /**
- * Stationen aus der Fachebenen-Antwort. Nur Features mit `uuid` sind wählbar — ohne sie
- * gäbe es nichts, was das Backend festlegen könnte. Die Eigenschaft heißt `titel`, nicht
- * `name` (`karte/normalisierung.rs`). Sortiert nach Name, Tiebreak uuid. Rein.
+ * Stationen aus der Fachebenen-Antwort. Nur Features mit `uuid` sind wählbar. Die Eigenschaft heißt
+ * `titel`, nicht `name` (`karte/normalisierung.rs`). Sortiert nach Name, Tiebreak uuid. Rein.
  */
 export function stationenAus(features: readonly { properties?: unknown }[]): PegelStation[] {
   const aus: PegelStation[] = [];
@@ -114,63 +113,36 @@ export function wendeAn<T extends { station_uuid: string }>(
 type Aenderung = { art: 'hinzufuegen'; station: PegelEingabe } | PegelOperation;
 
 /**
- * Sektion `…/einstellungen/pegel` (LFH-606) — die maßgeblichen Pegel des Einsatzes.
+ * Sektion `…/einstellungen/pegel` — die maßgeblichen Pegel des Einsatzes.
  *
- * ── SPEICHERWEG: SOFORT, WIE DIE MODUL-LISTE ───────────────────────────────────────
- * Die Sektion ist eine LISTE, kein Formular, und folgt deshalb der Bestandssektion, die
- * ebenfalls eine Liste ist (`EinsatzModule`, LFH-345 · H15): jede Handlung — Hinzufügen,
- * Entfernen, Hoch, Runter — speichert sofort, es gibt keine Speicher-Leiste. Drei Gründe:
+ * Speicherweg: sofort, wie die Modul-Liste. Jede Handlung (Hinzufügen, Entfernen, Hoch, Runter)
+ * speichert sofort, es gibt keine Speicher-Leiste:
+ * 1. Kein Entwurf, der verloren gehen kann — ein Verlustschutz für höchstens fünf Zeilen wäre mehr
+ *    Mechanik als Inhalt.
+ * 2. Der Karten-Schnellweg (Fachebenen-Inspector) speichert ebenfalls sofort; zwei Bedienlogiken
+ *    für dieselbe Liste wären der Fehlerfall.
+ * 3. Die Enter-Zusicherung der Erfassungs-Norm greift nicht: das einzige Eingabeelement ist ein
+ *    `Select`, und rc-select schluckt Enter.
  *
- *  1. **Kein Entwurf, der verloren gehen kann.** Eine Leiste hielte einen lokalen Entwurf
- *     neben dem Serverstand; wer nach dem Umordnen den Reiter wechselt, verlöre ihn still —
- *     und ein Verlustschutz (`useEntwurfVerlustschutz`) für höchstens fünf Zeilen wäre mehr
- *     Mechanik als Inhalt.
- *  2. **Der Karten-Schnellweg speichert ebenfalls sofort** (POST aus dem
- *     Fachebenen-Inspector). Zwei Bedienlogiken für dieselbe Liste wären der Fehlerfall, den
- *     H15 an der Modul-Liste beseitigt hat.
- *  3. **Die Enter-Zusicherung der Erfassungs-Norm (B4) greift hier gar nicht**: es gibt kein
- *     Textfeld, und das einzige Eingabeelement ist ein `Select` — rc-select schluckt Enter
- *     ohnehin (`BaseSelect/index.js:246`, CLAUDE.md). Ein `<form>` hätte nichts zu tragen.
+ * Hinzufügen geht über POST (hinten anfügen, idempotent) und überschreibt so keine gleichzeitige
+ * Änderung. Umordnen und Entfernen holen die Liste vor dem PUT frisch und benennen die Station über
+ * ihre uuid — der Cache kann bis zu 5 min alt sein. Während eine Änderung läuft, ist die ganze
+ * Liste gesperrt (jede Handlung schreibt die ganze Liste). Kein optimistisches Update; der Grund
+ * einer gescheiterten Änderung steht als `SpeicherFehler` über der Liste.
  *
- * Der Preis ist ein Vollersatz-PUT je Pfeildruck; bei höchstens fünf Zeilen ist das kein
- * Preis. **Hinzufügen geht über POST** (hinten anfügen, idempotent), nicht über den PUT: es
- * braucht die eigene Liste nicht als Basis und überschreibt damit keine gleichzeitige
- * Änderung von anderer Stelle. Umordnen und Entfernen holen die Liste vor dem PUT frisch und
- * benennen die Station über ihre uuid (Review LFH-606): der Cache-Stand kann bis zu 5 min alt
- * sein, ein Index daraus träfe nach einer Festlegung über die Karte die falsche Zeile.
+ * Rechte: dieselbe Achse wie die Formular-Sektionen (`darfImEinsatzSchreiben`). Ohne Recht:
+ * `RechteHinweis`, Auswahl und „Hinzufügen" gesperrt, die Zeilenaktionen entfallen.
  *
- * Während eine Änderung läuft, ist die GANZE Liste gesperrt, „Hinzufügen“ eingeschlossen —
- * anders als die Modul-Liste („eine Zeile sperrt sich selbst", C10/H15): dort schreibt jede
- * Zeile ihren eigenen Datensatz, hier schreibt jede Handlung die ganze Liste. Es gibt kein optimistisches
- * Update: die Anzeige liest aus der Abfrage, eine gescheiterte Änderung ist also sichtbar
- * nicht geschehen, und der Grund steht als `SpeicherFehler` über der Liste.
+ * Zeilenaktionen (Nach oben, Nach unten, Entfernen, Prognose) gebündelt im Menü. An den Enden ist
+ * „Nach oben"/„Nach unten" gesperrt statt weggelassen, sonst wechselte die Bedienform je Zeile.
+ * Entfernen ist umkehrbar (wieder hinzufügen), deshalb ohne Rückfrage.
  *
- * ── RECHTE ──────────────────────────────────────────────────────────────────────────
- * Dieselbe Achse wie die Formular-Sektionen (`darfImEinsatzSchreiben`) — das Backend-Gate
- * der Pegel-Routen ist das der Einsatz-Kopfdaten. Ohne Recht: `RechteHinweis`, Auswahl und
- * „Hinzufügen" stehen gesperrt da (C10/M16); die Zeilenaktionen entfallen ganz (C11/M45:
- * n gesperrte Menüs kosten Platz für null Handlung, der Grund steht einmal oben).
+ * Prognose: eigene Routen am Pegel, nicht der Vollersatz-PUT der Liste — Umordnen lässt sie stehen.
+ * Löschen ist über den Rückgängig-Toast umkehrbar. Eine verstrichene Prognose steht als
+ * „abgelaufen" da, bis jemand sie löscht oder erneuert.
  *
- * ── ZEILENAKTIONEN ──────────────────────────────────────────────────────────────────
- * Drei Aktionen je Zeile (Nach oben, Nach unten, Entfernen) → gebündelt im Dreipunkt-Menü
- * (Bündelungsregel LFH-365). An den Enden ist „Nach oben"/„Nach unten" GESPERRT statt
- * weggelassen: sonst hätte die erste Zeile zwei Aktionen und bekäme nach der Kardinalitäts-
- * regel direkte Knöpfe, die zweite ein Menü — eine Liste mit wechselnder Bedienform.
- * Entfernen ist umkehrbar (wieder hinzufügen) und trägt deshalb keine Rückfrage (LFH-378).
- *
- * ── PROGNOSE (LFH-628) ─────────────────────────────────────────────────────────────
- * Je Zeile „Prognose erfassen…"/„Prognose ändern…" (Dialog `PegelPrognoseModal`) und
- * „Prognose löschen" im selben Menü. Die Prognose hat eigene Routen am Pegel, nicht den
- * Vollersatz-PUT der Liste — Umordnen lässt sie stehen. Löschen ist umkehrbar über den
- * Rückgängig-Toast (LFH-343 · C8: der Rückweg existiert serverseitig, derselbe PUT mit dem
- * alten Wert), deshalb ohne Rückfrage. Eine verstrichene Prognose steht in der Zeile als
- * „abgelaufen", bis jemand sie löscht oder erneuert — Dashboard und Überblick zeigen sie
- * dann schon nicht mehr.
- *
- * ── FACHEBENE NICHT ERREICHBAR ─────────────────────────────────────────────────────
- * Die Stationsliste kommt aus der Fachebene `pegelonline` (derselbe Cache-Eintrag wie auf
- * der Lagekarte). Antwortet sie nicht, sagt ein Hinweis das; die festgelegte Liste bleibt
- * bedienbar (Entfernen, Umordnen), nur das Hinzufügen wartet.
+ * Ist die Fachebene `pegelonline` nicht erreichbar, sagt ein Hinweis das; die festgelegte Liste
+ * bleibt bedienbar, nur das Hinzufügen wartet.
  */
 export default function EinsatzPegel() {
   const { id } = useParams();
@@ -190,18 +162,15 @@ export default function EinsatzPegel() {
     queryFn: () => ladeFachebene('pegelonline'),
   });
 
-  // KEIN `onError`-Toast (H14): der Fehler steht als Alert über der Liste.
+  // Kein `onError`-Toast: der Fehler steht als Alert über der Liste.
   //
-  // ALLE Schreibwege laufen durch EINE Mutation mit gemeinsamem `scope` (auch der
-  // Karten-Schnellweg nutzt ihn): TanStack reiht Mutationen desselben Scopes hintereinander.
-  // Parallel kämen POST und PUT in Ankunftsreihenfolge an, und ein PUT mit der Altliste nähme
-  // die gerade hinzugefügte Station wieder heraus.
+  // Alle Schreibwege laufen durch eine Mutation mit gemeinsamem `scope` (auch der Karten-
+  // Schnellweg): TanStack reiht sie hintereinander. Parallel nähme ein PUT mit der Altliste die
+  // gerade hinzugefügte Station wieder heraus.
   //
-  // Umordnen und Entfernen bauen ihren Vollersatz-PUT NICHT aus dem Cache: der Key ist nicht
-  // live und wird nur alle 5 min erneuert, eine zwischenzeitliche Festlegung über die Karte
-  // fehlte dort — und der PUT entfernte sie still. Deshalb vor dem PUT frisch holen und die
-  // Operation über die `station_uuid` auf DIESE Liste anwenden. Steht die Station dort nicht
-  // mehr, wird nichts gesendet; die frische Liste steht dann im Cache.
+  // Umordnen und Entfernen bauen ihren PUT nicht aus dem Cache (nicht live, 5-min-Frische), sondern
+  // holen frisch und wenden die Operation über die `station_uuid` an. Steht die Station nicht mehr
+  // dort, wird nichts gesendet.
   const aendern = useMutation({
     scope: pegelSchreibScope(einsatzId),
     mutationFn: async (a: Aenderung): Promise<{ liste: PegelAnzeige[]; gesendet: boolean }> => {
@@ -215,8 +184,8 @@ export default function EinsatzPegel() {
     },
     onSuccess: ({ liste, gesendet }, a) => {
       qc.setQueryData(einsatzKeys.pegel(einsatzId), liste);
-      // Die Festlegung ist Auslöser der Lagekennzahl am Einsatz (LFH-640): ohne das hier sähe
-      // das Lage-Dashboard den neuen Zuschnitt erst beim nächsten Einsatz-Abruf.
+      // Die Festlegung löst die Lagekennzahl am Einsatz aus — sonst sähe das Lage-Dashboard den
+      // neuen Zuschnitt erst beim nächsten Einsatz-Abruf.
       if (gesendet) void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       if (a.art === 'hinzufuegen') setAuswahl(null);
       if (gesendet) message.success('Pegel gespeichert');
@@ -224,8 +193,8 @@ export default function EinsatzPegel() {
     },
   });
 
-  // Prognose löschen (LFH-628) mit Rückgängig-Weg: derselbe PUT mit dem alten Wert. Beide
-  // laufen im Schreib-Scope der Liste, damit ein gleichzeitiges Umordnen sie nicht überholt.
+  // Prognose löschen mit Rückgängig-Weg (derselbe PUT mit dem alten Wert). Beide laufen im
+  // Schreib-Scope der Liste, damit ein gleichzeitiges Umordnen sie nicht überholt.
   const prognoseLoeschen = useMutation({
     scope: pegelSchreibScope(einsatzId),
     mutationFn: (p: PegelAnzeige) => loeschePrognose(einsatzId, p.id),
@@ -252,9 +221,8 @@ export default function EinsatzPegel() {
 
   if (daten.laedt || pegelQ.isLoading) return <SeitenSkeleton />;
   /*
-   * Ohne Bestand kein Bearbeiten: ein gescheiterter Abruf fiele sonst in die leere Liste,
-   * und der nächste Pfeil schickte genau diese erfundene Leere als Vollersatz-PUT — die
-   * festgelegten Pegel wären weg (dieselbe Falle wie in `EinsatzModule`).
+   * Ohne Bestand kein Bearbeiten: ein gescheiterter Abruf fiele sonst in die leere Liste, und der
+   * nächste Pfeil schickte diese erfundene Leere als Vollersatz-PUT.
    */
   if (pegelQ.isError || !pegelQ.data) {
     return (
@@ -272,9 +240,9 @@ export default function EinsatzPegel() {
     aendern.isPending || prognoseLoeschen.isPending || prognoseWiederherstellen.isPending;
   const voll = liste.length >= PEGEL_MAX;
   const festgelegt = new Set(liste.map((p) => p.station_uuid.toLowerCase()));
-  // Keine Auswahl möglich: der Abruf scheitert, oder die Antwort trägt keine wählbare Station
-  // (Quelle `offline` ohne Cache-Bestand, `leer`, oder nur Punkte ohne uuid). Mit Bestand aus
-  // dem Cache bleibt die Auswahl nutzbar, auch wenn die Quelle gerade `offline` meldet.
+  // Keine Auswahl möglich: Abruf gescheitert, oder keine wählbare Station (`offline` ohne
+  // Cache-Bestand, `leer`, oder nur Punkte ohne uuid). Mit Cache-Bestand bleibt die Auswahl
+  // nutzbar, auch wenn die Quelle `offline` meldet.
   const stationenFehlen = stationenQ.isError || (stationenQ.data != null && stationen.length === 0);
   const quelleOffline = stationenQ.isError || stationenQ.data?.status === 'offline';
   const gewaehlt = stationen.find((s) => s.uuid === auswahl) ?? null;
@@ -354,7 +322,7 @@ export default function EinsatzPegel() {
                               danger: true,
                             },
                           ],
-                          // Zuordnung am MENÜ, nicht je Eintrag (LFH-365).
+                          // Zuordnung am Menü, nicht je Eintrag.
                           onClick: ({ key }) => {
                             const uuid = p.station_uuid;
                             if (key === 'hoch')
@@ -368,7 +336,7 @@ export default function EinsatzPegel() {
                           },
                         }}
                       >
-                        {/* Der Name trägt die Zeilenkennung (LFH-364). Kein `size`. */}
+                        {/* Der Name trägt die Zeilenkennung. Kein `size`. */}
                         <Button
                           type="text"
                           icon={<MoreOutlined />}
@@ -410,8 +378,7 @@ export default function EinsatzPegel() {
           )}
         />
 
-        {/* Sichtbares Label ÜBER dem Feld (Prüfliste Kriterium 15), kein bloßes aria-label:
-            der Platzhalter verschwindet mit der ersten Eingabe. */}
+        {/* Sichtbares Label über dem Feld, kein bloßes aria-label. */}
         <label
           htmlFor={auswahlId}
           style={{

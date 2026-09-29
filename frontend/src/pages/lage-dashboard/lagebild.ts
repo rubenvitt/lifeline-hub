@@ -1,13 +1,10 @@
 /**
- * Datenmodell des Lage-Dashboards (LFH-352 · A0, neu gedacht mit dem Neuentwurf S3).
- *
- * Verdichtet die Queries der Seite auf ein flaches, darstellungsneutrales Lagebild. Die
- * Trennung ist Absicht: die Seite entscheidet über Form, diese Datei über Bedeutung —
+ * Datenmodell des Lage-Dashboards: verdichtet die Queries der Seite auf ein flaches,
+ * darstellungsneutrales Lagebild. Die Seite entscheidet über Form, diese Datei über Bedeutung —
  * welche Zahl alarmiert, welcher Wortlaut zu ihr gehört.
  *
- * Gefahrenmatrix, Sichtungsbild und Meldungsstrom haben eigene Ableitungen
- * (`lageVerdichtung.ts`, `meldungsstrom.ts`): sie hängen an eigenen Abfragen mit eigenem
- * Datenzustand und gehören nicht in ein Lagebild, das erst mit dem Einsatz entsteht.
+ * Gefahrenmatrix, Sichtungsbild und Meldungsstrom haben eigene Ableitungen (`lageVerdichtung.ts`,
+ * `meldungsstrom.ts`), weil sie an eigenen Abfragen mit eigenem Datenzustand hängen.
  */
 import type {
   Auftrag,
@@ -53,13 +50,15 @@ import {
   type SkVerteilung,
 } from './lageVerdichtung';
 
-/** Die Datenzustände, die eine Gestaltungssprache tragen muss. `fehler` und `leer` sind
- *  bewusst getrennt — der Sweep-Befund lautet „Fehler sieht aus wie leer" (LFH-326). */
+/**
+ * Die Datenzustände einer Fläche. `fehler` und `leer` sind bewusst getrennt: Fehler darf nicht
+ * aussehen wie leer.
+ */
 export type Datenzustand = 'daten' | 'laden' | 'fehler' | 'leer';
 
 /**
- * Alle Kennzahl-Etiketten, die das Band tragen kann (LFH-640). Die Reihe eines Einsatzes ist
- * eine Auswahl von sechs davon — siehe {@link kennzahlReihe}.
+ * Alle Kennzahl-Etiketten, die das Band tragen kann; die Reihe eines Einsatzes wählt sechs davon
+ * ({@link kennzahlReihe}).
  */
 export const KENNZAHL_ETIKETTEN = [
   'Pegel',
@@ -75,28 +74,23 @@ export const KENNZAHL_ETIKETTEN = [
 export type KennzahlEtikett = (typeof KENNZAHL_ETIKETTEN)[number];
 
 /**
- * Die Kennzahlreihe hat IMMER sechs Plätze (LFH-640, Entscheidung des Auftraggebers vom
- * 23.09.2026; Spec `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`).
- * Sechs teilen sich 6 → 3 → 2 Spalten ohne Rest, und die Platzzahl steht fest, bevor irgendeine
- * Abfrage da ist: die Ladeplätze vor dem Einsatz-Abruf halten die Bandhöhe (Kriterium 12).
+ * Die Reihe hat immer sechs Plätze (Spec
+ * `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`): sechs teilen
+ * sich 6 → 3 → 2 Spalten ohne Rest, und die Platzzahl steht vor jeder Abfrage fest, damit die
+ * Ladeplätze die Bandhöhe halten.
  */
 export const KENNZAHL_PLAETZE = 6;
 
 type Lageplatz = 'A' | 'B';
 
 /**
- * Heimatplatz und Rang jeder Lagekennzahl. JEDE Kennzahl hat genau EINEN Platz — sie steht
- * dort oder gar nicht, sie rutscht nie (Prüfliste Kriterium 9: dieselbe Größe an derselben
- * Stelle). Deshalb füllt die Reihe NICHT nach Rang auf: sonst änderte eine Entscheidung zwei
- * Plätze statt einem. Konkurrieren zwei aktive Kandidaten um einen Platz, gewinnt der
- * kleinere Rang.
+ * Heimatplatz und Rang jeder Lagekennzahl. Jede Kennzahl hat genau einen Platz und rutscht nie
+ * (Kriterium 9) — deshalb füllt die Reihe nicht nach Rang auf, sonst änderte eine Entscheidung zwei
+ * Plätze. Konkurrieren zwei aktive Kandidaten, gewinnt der kleinere Rang. Der `Record` bricht den
+ * Build bei einer neuen `Lagekennzahl`-Variante.
  *
- * Der `Record` über `Lagekennzahl` ist Absicht: bringt der Typ-Codegen eine neue Variante,
- * bricht diese Datei den Build, statt sie still zu übergehen.
- *
- * „Evakuiert" (LFH-607) ist aktiv, sobald eine Evakuierung angeordnet ist — ein aktiver
- * Evakuierungsbezirk samt Plangröße (`src/einsatz/lagekennzahl.rs`), nie abhängig von der
- * Zahl der Evakuierten.
+ * „Evakuiert" ist aktiv, sobald eine Evakuierung angeordnet ist (`src/einsatz/lagekennzahl.rs`),
+ * nie abhängig von der Zahl der Evakuierten.
  */
 const LAGEKENNZAHL: Record<
   Lagekennzahl,
@@ -107,11 +101,9 @@ const LAGEKENNZAHL: Record<
 };
 
 /**
- * Was ein Lageplatz ohne aktiven Kandidaten trägt — echte Daten aus jeder Lage, nie ein
- * Platzhalter („Weglassen statt erfinden", `umsetzung.md` Punkt 4). Über Kreuz gewählt:
- * Platz A ist frei, wenn kein Pegel festgelegt ist (MANV, Brand, Unfall) — dort ist der
- * offene Verbleib die Führungsfrage. Platz B ist frei, solange keine Evakuierung angeordnet
- * ist; ein Hochwasser mit Pegel behält so „Schäden offen".
+ * Was ein Lageplatz ohne aktiven Kandidaten trägt — echte Daten, nie ein Platzhalter. Platz A ist
+ * frei, wenn kein Pegel festgelegt ist (MANV, Brand, Unfall): dort ist der offene Verbleib die
+ * Führungsfrage. Platz B ist frei ohne Evakuierung; ein Hochwasser behält so „Schäden offen".
  */
 const FUELLUNG: Record<Lageplatz, KennzahlEtikett> = {
   A: 'Verbleib offen',
@@ -119,9 +111,8 @@ const FUELLUNG: Record<Lageplatz, KennzahlEtikett> = {
 };
 
 /**
- * Die sechs Etiketten eines Einsatzes aus seinen aktiven Lagekennzahlen
- * (`EinsatzAnzeige.lagekennzahlen`). Plätze 2, 4, 5, 6 sind der Kern, Plätze 1 und 3 die
- * Lageplätze A und B. Rein.
+ * Die sechs Etiketten eines Einsatzes aus seinen aktiven Lagekennzahlen. Plätze 2, 4, 5, 6 sind der
+ * Kern, 1 und 3 die Lageplätze A und B. Rein.
  */
 export function kennzahlReihe(aktiv: readonly Lagekennzahl[]): KennzahlEtikett[] {
   const belegung = (platz: Lageplatz): KennzahlEtikett => {
@@ -154,19 +145,13 @@ interface Kennzahl {
   ton: KennzahlTon;
   /** Modul-Route für `einsatzModulPfad` (die Seite baut den Pfad über `routing/deeplinks`). */
   route: string;
-  /**
-   * Fertiger Pfad, wo das Ziel kein Modul-Einstieg ist (Pegel → Einstellungssektion, gebaut
-   * über `einsatzEinstellungenPfad`). Hat Vorrang vor {@link Kennzahl.route}.
-   */
+  /** Fertiger Pfad, wo das Ziel kein Modul-Einstieg ist. Hat Vorrang vor {@link Kennzahl.route}. */
   zielPfad?: string;
-  /**
-   * Die Zelle führt nirgends hin — ihr Modul ist für die Person nicht frei oder das steht noch
-   * nicht fest (LFH-607, „Evakuiert"). Ein Link wäre ein Sprung ins Leere.
-   */
+  /** Die Zelle führt nirgends hin — ihr Modul ist nicht frei oder das steht noch nicht fest. */
   ohneZiel?: boolean;
 }
 
-/** Der Führungsstand unter den drei Paneelen: was vorher eigene Kacheln hatte. */
+/** Der Führungsstand unter den drei Paneelen. */
 interface Fuehrungsstand {
   auftraegeOffen: number;
   auftraegeUeberfaellig: number;
@@ -194,26 +179,26 @@ interface Lagebild {
   fuehrung: Fuehrungsstand;
 }
 
-/** Warnstufe → Ton, aus {@link warnstufeKennzahl} (nicht `warnstufeKarte`: „keine" ist hier
- *  „kein Alarmbeitrag", nicht „vorsichtshalber Gefahr"). Seit LFH-606 trägt ihn der
- *  Warnstufen-Hinweis im Seitenkopf — die Kennzahl im Band ist dem Pegel gewichen. Rein. */
+/**
+ * Warnstufe → Ton aus {@link warnstufeKennzahl} (nicht `warnstufeKarte`: „keine" ist hier „kein
+ * Alarmbeitrag", nicht „vorsichtshalber Gefahr"). Trägt den Warnstufen-Hinweis im Seitenkopf. Rein.
+ */
 export function warnstufeTon(w: Warnstufe): KennzahlTon {
   const rolle = warnstufeKennzahl[w].rolle;
   return rolle === 'alarm' ? 'alarm' : rolle === 'achtung' ? 'achtung' : 'neutral';
 }
 
 /**
- * Ein Wirestring (UTC ohne Zonenkennung, `YYYY-MM-DD HH:MM:SS`) als Epoche. `NaN` bei
- * Unbrauchbarem. Rein — kein dayjs-Plugin nötig, weil nur die Differenz gebraucht wird.
+ * Ein Wirestring (UTC ohne Zonenkennung) als Epoche, `NaN` bei Unbrauchbarem. Rein — nur die
+ * Differenz wird gebraucht.
  */
 export function wireAlsEpoche(wire: string): number {
   return Date.parse(`${wire.trim().replace(' ', 'T')}Z`);
 }
 
 /**
- * Einsatzdauer als `H:MM` (Stunden laufen über 24 hinaus weiter: „26:05"), gerechnet vom
- * Beginn bis `jetzt` bzw. bis zum Abschluss. Ein Beginn in der Zukunft oder ein
- * unlesbarer Wert ergibt `—:——`, keine negative Dauer. Rein.
+ * Einsatzdauer als `H:MM` (Stunden laufen über 24 weiter: „26:05"), bis `jetzt` bzw. zum Abschluss.
+ * Ein Beginn in der Zukunft oder ein unlesbarer Wert ergibt `—:——`. Rein.
  */
 export function einsatzdauer(beginn: string, jetzt: number, ende?: string | null): string {
   const von = wireAlsEpoche(beginn);
@@ -247,17 +232,13 @@ export function standText(
   return `Stand ${inZone(new Date(datenstand).toISOString(), konv).format('HH:mm')}`;
 }
 
-/**
- * Schwelle der Notiz „n seit über 4 h" an der Kennzahl „Vermisste" (LFH-613).
- * Quelle: Neuentwurf S3 (`docs/design/2026-09-21-neuentwurf/neuentwurf.dc.html`, Kennzahl
- * „Vermisste", Notiz „3 seit über 4 h"). Eine gesetzte Zahl aus dem Entwurf, keine Norm.
- */
+/** Schwelle der Notiz „n seit über 4 h" an „Vermisste" — gesetzt im Neuentwurf S3, keine Norm. */
 export const VERMISST_LANG_MS = 4 * 60 * 60_000;
 
 /**
- * Wie viele Vermisste sind länger als {@link VERMISST_LANG_MS} vermisst, gemessen an `jetzt`?
- * Rein — die Seite reicht ihren Uhr-Takt durch, damit die Notiz OHNE neue Daten nachzieht.
- * Ein fehlendes oder unlesbares `vermisst_seit` zählt nicht (keine erfundene Dauer).
+ * Wie viele Vermisste sind länger als {@link VERMISST_LANG_MS} vermisst? Die Seite reicht ihren
+ * Uhr-Takt durch, damit die Notiz ohne neue Daten nachzieht. Fehlendes `vermisst_seit` zählt nicht.
+ * Rein.
  */
 export function langeVermisst(
   personen: readonly Pick<Person, 'status' | 'vermisst_seit'>[],
@@ -279,16 +260,12 @@ export function vermisstNotiz(vermisst: number, lang: number): string {
 }
 
 /**
- * Was die Seite über die Evakuierung weiß (LFH-607). Anders als die übrigen Quellen hat diese
- * vier Fälle, weil ihr Abruf am Modulrecht hängt ({@link evakuierungStand}):
- *
- *  - `laden` / `fehler` — der Zustand IHRER Abfrage; die Zelle zeigt „····" bzw. „?", die
- *    übrigen Kennzahlen bleiben lesbar.
- *  - `kein-zugriff` — das Modul Betreuung ist für die Person ausgeblendet oder gesperrt, es
- *    wird nicht abgerufen. Die Zelle BLEIBT auf ihrem Platz (Kriterium 9: die Reihe hängt
- *    allein am Einsatz, nie am Rollenzuschnitt) und benennt den Grund statt einer Zahl.
- *  - `daten` — die Kennzahl, oder `null`, wenn die Übersicht keinen aktiven Bezirk hat,
- *    während der (nicht live gehaltene) Einsatz den Auslöser noch trägt.
+ * Was die Seite über die Evakuierung weiß. Vier Fälle, weil der Abruf am Modulrecht hängt:
+ * - `laden` / `fehler` — Zustand ihrer Abfrage; „····" bzw. „?".
+ * - `kein-zugriff` — Betreuung ist ausgeblendet oder gesperrt, es wird nicht abgerufen. Die Zelle
+ *   bleibt auf ihrem Platz (Kriterium 9) und nennt den Grund statt einer Zahl.
+ * - `daten` — die Kennzahl, oder `null`, wenn kein aktiver Bezirk da ist, der (nicht live
+ *   gehaltene) Einsatz den Auslöser aber noch trägt.
  */
 export type EvakuierungStand =
   | { zustand: 'laden' }
@@ -297,9 +274,8 @@ export type EvakuierungStand =
   | { zustand: 'daten'; kennzahl: EvakuierungKennzahl | null };
 
 /**
- * Hook-Zustand → {@link EvakuierungStand}. `aus` heißt „kein Zugriff": der Hook meldet es erst,
- * wenn die Seite ihn `bereit` gemeldet hat, also Benutzer und Modul-Overrides feststehen —
- * vorher liefert er `laden`. Rein.
+ * Hook-Zustand → {@link EvakuierungStand}. `aus` heißt „kein Zugriff"; vor `bereit` liefert der
+ * Hook `laden`. Rein.
  */
 export function evakuierungStand(z: EvakuierungKennzahlZustand): EvakuierungStand {
   switch (z.zustand) {
@@ -322,7 +298,6 @@ export function evakuierungDatenzustand(e: EvakuierungStand): Datenzustand {
 /** Wert und Notiz der Zelle „Evakuiert" aus dem Stand. Rein. */
 function evakuiertZelle(e: EvakuierungStand): Pick<Kennzahl, 'wert' | 'notiz'> {
   switch (e.zustand) {
-    // Bei `laden`/`fehler` zeichnet die Kennzahl ihren Zustand selbst („····" / „?").
     case 'laden':
     case 'fehler':
       return { wert: '', notiz: '' };
@@ -330,8 +305,8 @@ function evakuiertZelle(e: EvakuierungStand): Pick<Kennzahl, 'wert' | 'notiz'> {
       return { wert: '—', notiz: 'Modul Betreuung nicht freigegeben' };
     case 'daten': {
       if (e.kennzahl == null) return { wert: '—', notiz: 'keine geplante Evakuierung' };
-      // EINE Formatierung mit dem Blockkopf der Modulseite (`betreuungText.ts`). Ohne jede
-      // Meldung „—" statt 0: „nichts gemeldet" ist nicht „niemand evakuiert".
+      // Formatierung wie der Blockkopf der Modulseite (`betreuungText.ts`). Ohne Meldung „—" statt
+      // 0: „nichts gemeldet" ist nicht „niemand evakuiert".
       const { evakuiert, notiz } = kennzahlTeile(e.kennzahl);
       return { wert: evakuiert ?? '—', notiz };
     }
@@ -352,28 +327,25 @@ export interface Rohdaten {
   abschnitte: Einsatzabschnitt[];
   auftraege: Auftrag[];
   meldungen: Meldung[];
-  /** Maßgebliche Pegel in Reihenfolge (LFH-606), erster = Leitpegel. */
+  /** Maßgebliche Pegel in Reihenfolge, erster = Leitpegel. */
   pegel: PegelAnzeige[];
   /**
-   * Ziel der Pegel-Kennzahl (LFH-633): die Modulseite „Wetter & Pegel", wenn sie für die
-   * Person frei ist (`pegelZielPfad`). Ohne Angabe die Pflege in Einstellungen › Pegel. Die
-   * Entscheidung trifft die Seite — diese Datei kennt weder Benutzer noch Overrides.
+   * Ziel der Pegel-Kennzahl: „Wetter & Pegel", wenn frei (`pegelZielPfad`), sonst die Pflege in
+   * Einstellungen › Pegel. Entscheidet die Seite — diese Datei kennt weder Benutzer noch Overrides.
    */
   pegelZiel?: string;
-  /** Stand der Evakuierungskennzahl (LFH-607), siehe {@link evakuierungStand}. */
+  /** Stand der Evakuierungskennzahl, siehe {@link evakuierungStand}. */
   evakuierung: EvakuierungStand;
   /**
-   * Ziel der Zelle „Evakuiert": die Modulseite Betreuung — aber nur, wenn feststeht, dass sie
-   * für die Person frei ist. Ohne Angabe führt die Zelle nirgends hin, auch beim Laden: bis die
-   * Freigaben da sind, könnte das Modul ausgeblendet sein (dieselbe Vorsicht wie `pegelZiel`).
+   * Ziel der Zelle „Evakuiert": die Modulseite Betreuung, nur wenn feststeht, dass sie frei ist.
+   * Ohne Angabe führt die Zelle nirgends hin, auch beim Laden.
    */
   evakuierungZiel?: string;
 }
 
 /**
- * `reihe` ist die Kennzahlreihe, die die Seite gerade zeigt — sie HÄLT ihren Zuschnitt, wenn
- * während der Betrachtung ein neuer ankommt (Sammelbanner, siehe `LageDashboardPage`). Ohne
- * Angabe gilt die Reihe des Einsatzes.
+ * `reihe` ist die Kennzahlreihe, die die Seite gerade zeigt (sie hält ihren Zuschnitt, siehe
+ * `LageDashboardPage`). Ohne Angabe gilt die Reihe des Einsatzes.
  */
 export function baueLagebild(
   r: Rohdaten,
@@ -402,9 +374,8 @@ export function baueLagebild(
   // `KennzahlEtikett` erzwingt, dass jedes Etikett gebaut wird.
   const alle: Record<KennzahlEtikett, Kennzahl> = {
     Pegel: {
-      // Ziel: die Modulseite „Wetter & Pegel" mit Verlauf (LFH-633), wenn sie frei ist —
-      // sonst die Einstellungssektion, wo festgelegt wird. Die Lagekarte zeigte zwar die
-      // Stationen, kann aber per Deeplink weder die Ebene einschalten noch eine ansteuern.
+      // Ziel: „Wetter & Pegel" mit Verlauf, wenn frei, sonst die Einstellungssektion. Die Lagekarte
+      // taugt nicht: per Deeplink kann sie die Ebene weder einschalten noch eine Station ansteuern.
       etikett: 'Pegel',
       wert: pegel.wert,
       einheit: pegel.einheit,
@@ -414,8 +385,8 @@ export function baueLagebild(
       zielPfad: r.pegelZiel ?? einsatzEinstellungenPfad(r.einsatz.id, 'pegel'),
     },
     'Verbleib offen': {
-      // Angetroffene ohne Verbleib — dieselbe Zählung wie „Transportiert / offen" im Fuß des
-      // Sichtungspaneels (`transportBilanz`). Die Kennzahl ist der Blickfang ohne Pegel.
+      // Angetroffene ohne Verbleib — dieselbe Zählung wie „Transportiert / offen" im
+      // Sichtungspaneel.
       etikett: 'Verbleib offen',
       wert: String(transport.offen),
       notiz: `${transport.transportiert} transportiert`,
@@ -430,8 +401,8 @@ export function baueLagebild(
       route: 'personen',
     },
     Kräfte: {
-      // Die Gesamtstärke führt; F/UF/M//Σ steht in der Notiz, damit die BOS-Schreibweise
-      // nicht verloren geht, die vorher das Band und die Kräfte-Kachel trugen.
+      // Die Gesamtstärke führt; F/UF/M//Σ steht in der Notiz, damit die BOS-Schreibweise erhalten
+      // bleibt.
       etikett: 'Kräfte',
       wert: String(kraefte.staerke.gesamt),
       notiz: `${r.einheiten.length} Einheiten · ${staerkeText(kraefte.staerke)}`,
@@ -446,8 +417,7 @@ export function baueLagebild(
       route: 'personen',
     },
     Evakuiert: {
-      // Kein Ton: für „Evakuiert" ist keine Schwelle festgelegt. Mehr Evakuierte als geplant
-      // ist eine Aussage über die Plangröße, keine Alarmlage.
+      // Kein Ton: für „Evakuiert" gibt es keine Schwelle; mehr als geplant ist keine Alarmlage.
       etikett: 'Evakuiert',
       ...evakuiertZelle(r.evakuierung),
       ton: 'neutral',
@@ -481,12 +451,12 @@ export function baueLagebild(
     betroffeneGesamt: betroffene.gesamt,
     hoechsteWarnstufe: gefahren.hoechste,
     fuehrung: {
-      // Dieselbe Statusmenge wie vorher die Aufträge-Kachel: alles außer vollzogen/abgenommen.
+      // Alles außer vollzogen/abgenommen.
       auftraegeOffen: r.auftraege.filter(
         (a) => a.bearbeitungsstatus !== 'vollzogen' && a.bearbeitungsstatus !== 'abgenommen',
       ).length,
-      // Unabhängig vom Filter darüber (src/auftrag/repo.rs): ein vollzogener Auftrag mit
-      // unquittiertem Empfänger und abgelaufener Frist ist trotzdem überfällig.
+      // Unabhängig vom Filter darüber (src/auftrag/repo.rs): auch ein vollzogener Auftrag mit
+      // unquittiertem Empfänger und abgelaufener Frist ist überfällig.
       auftraegeUeberfaellig: r.auftraege.filter((a) => a.ist_ueberfaellig).length,
       meldungenOffen: r.meldungen.filter((m) => m.ist_offen).length,
       meldungenNeu: r.meldungen.filter((m) => m.status === 'neu').length,
