@@ -57,5 +57,5 @@ Code. Vitest aus `frontend/` über `mise exec -- pnpm -C <abs>/frontend vitest r
   (b) Fristfilter ausgebaut → der Fristtest wird rot; (c) Benutzer-ID
   aus dem Schlüssel entfernt → der Trennungstest wird rot; (d) `linkFaenger` an der
   Überblick-Wurzel entfernt → der Kennzahl-Test wird rot. Danach alles zurückgesetzt und grün.
-- [ ] 6.3 ClickUp LFH-436: Entscheidung und Begründung als Kommentar (Verweis auf diesen Change),
+- [x] 6.3 ClickUp LFH-436: Entscheidung und Begründung als Kommentar (Verweis auf diesen Change),
   Abnahmekriterien abhaken
