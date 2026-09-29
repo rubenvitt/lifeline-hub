@@ -93,6 +93,7 @@ const basisProps: SidebarProps = {
   bildPlatzierenId: null,
   bildPlatzierZentrum: null,
   griffModus: 'groesse',
+  griffKantenAus: 'keine',
   onGriffModus: vi.fn(),
   ansichten: [],
   aktiveAnsichtId: undefined,
@@ -373,6 +374,23 @@ describe('Sidebar Bild-Hintergründe', () => {
     rerender(<Sidebar {...props} griffModus="drehen" />);
     expect(screen.getByText(/zum Drehen/i)).toBeInTheDocument();
     expect(screen.queryByText(/frei strecken/i)).toBeNull();
+  });
+
+  it('sagt, wenn die Karte Kantengriffe mangels Platz ausblendet (LFH-764)', () => {
+    const props = {
+      ...basisProps,
+      darfSchreiben: true,
+      bilder: [bildLageplan],
+      bildPlatzierenId: 1,
+    };
+    const { rerender } = renderMitProviders(
+      <Sidebar {...props} griffModus="groesse" griffKantenAus="alle" />,
+    );
+    const hinweis = () => document.querySelector('[data-lfh="bildgriff-hinweis"]')?.textContent;
+    expect(hinweis()).toMatch(/heranzoomen/i);
+    expect(hinweis()).not.toMatch(/Kanten = frei strecken/);
+    rerender(<Sidebar {...props} griffModus="groesse" griffKantenAus="keine" />);
+    expect(hinweis()).toMatch(/Kanten = frei strecken/);
   });
 
   it('zeigt den Griff-Umschalter nur im Platzier-Modus mit Schreibrecht (LFH-711)', () => {

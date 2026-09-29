@@ -26,7 +26,7 @@ import {
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { TbLayersIntersect } from 'react-icons/tb';
 import { monoStil, Segmentleiste, useRollen } from '../../components/instrument';
-import { griffHinweis, type GriffModus } from './bildGriffe';
+import { griffHinweis, type GriffModus, type KantenAus } from './bildGriffe';
 import { KlappPaneel, LeistenAbschnitt, usePaneelZustand } from './KlappPaneel';
 import {
   ebenenFarbe,
@@ -289,6 +289,8 @@ export interface SidebarProps {
   bildPlatzierenId: number | null;
   /** Scharfe Griffsorte beim Bild-Einpassen. */
   griffModus: GriffModus;
+  /** Wie viele Kantengriffe die Karte mangels Platz ausblendet (LFH-764) — der Hinweis sagt es. */
+  griffKantenAus: KantenAus;
   onGriffModus: (modus: GriffModus) => void;
   /** Aktueller Mittelpunkt des Platzier-Bilds (für die numerische Eingabe). */
   bildPlatzierZentrum: LatLon | null;
@@ -1248,7 +1250,10 @@ export default function Sidebar(props: SidebarProps) {
                       style={{ fontSize: 12, display: 'block' }}
                       data-lfh="bildgriff-hinweis"
                     >
-                      {griffHinweis(props.griffModus)} Oder Mittelpunkt numerisch:
+                      {griffHinweis(props.griffModus, {
+                        kantenAus: props.griffKantenAus,
+                      })}{' '}
+                      Oder Mittelpunkt numerisch:
                     </Typography.Text>
                     <div style={{ marginTop: token.marginSM }}>
                       <KoordinatenEingabe

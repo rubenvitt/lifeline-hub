@@ -30,7 +30,7 @@ import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN } from './lagekarte/zonenStil';
 import Kartenflaeche, { type KartenHandle } from './lagekarte/Kartenflaeche';
-import type { GriffModus } from './lagekarte/bildGriffe';
+import type { GriffModus, KantenAus } from './lagekarte/bildGriffe';
 import Sidebar, { platzierObjekt } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
 import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
@@ -108,6 +108,12 @@ export default function LagekartePage() {
   const breit = abBreite('lg');
   /** Scharfe Griffsorte beim Bild-Einpassen. Vorgabe: Größe. */
   const [griffModus, setGriffModus] = useState<GriffModus>('groesse');
+  // Wie viele Kantengriffe die Karte mangels Platz ausblendet (LFH-764) — für den Hinweis der Leiste.
+  const [griffKantenAus, setGriffKantenAus] = useState<KantenAus>('keine');
+  const onGriffStand = useCallback(
+    (stand: { kantenAus: KantenAus }) => setGriffKantenAus(stand.kantenAus),
+    [],
+  );
   // Zeigerkoordinate: die Karte meldet, nur die Anzeige rendert mit (siehe `mausPosition.ts`).
   const zeigerQuelle = useMemo(() => erzeugeZeigerQuelle(), []);
   // Band des Kartenfußes, in das die MapLibre-Maßstabsleiste gehängt wird. State statt Ref, damit
@@ -896,6 +902,7 @@ export default function LagekartePage() {
         platzierBild={aktivesPlatzierBild}
         onPlatzierGeometrie={onPlatzierGeometrie}
         griffModus={griffModus}
+        onGriffStand={onGriffStand}
         onZeigerLage={zeigerQuelle.melde}
         massstabZiel={massstabZiel}
         eigenposition={eigenposition.position}
@@ -1117,6 +1124,7 @@ export default function LagekartePage() {
         bildPlatzierenId={bildPlatzierenId}
         bildPlatzierZentrum={bildPlatzierZentrum}
         griffModus={griffModus}
+        griffKantenAus={griffKantenAus}
         onGriffModus={setGriffModus}
         ansichten={ansichten ?? []}
         aktiveAnsichtId={aktiveAnsichtId}
