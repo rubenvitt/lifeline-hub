@@ -11,33 +11,10 @@
 
 use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
-use sqlx::SqlitePool;
 use tower::ServiceExt;
 
 mod common;
-use common::{benutzer_anlegen, login_cookie};
-
-async fn setup_with_pool() -> (axum::Router, SqlitePool) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let router = build_router(AppState {
-        pool: pool.clone(),
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, pool)
-}
+use common::{benutzer_anlegen, login_cookie, setup_mit_pool};
 
 async fn status_von(app: &axum::Router, uri: &str, cookie: Option<&str>) -> StatusCode {
     let mut req = Request::builder().uri(uri);
@@ -56,7 +33,7 @@ async fn org_floor_sperrt_fremde_org_fuehrungskraft_ueber_migrierte_route() {
     // Eine Org-1-Führungskraft (KEIN Mitglied) trifft einen Einsatz der Org 2 über die
     // migrierte Sub-Route GET .../meldungen. Der Extractor-Org-Floor
     // (darf_fremdeinsatz_lesen: Führungskraft nur EIGENE Org) sperrt VOR dem Handler → 403.
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
 
     // Fremde Org 2 mit eigenem aktivem Einsatz (rohes SQL, wie in tests/einsatz.rs;
@@ -93,7 +70,7 @@ async fn org_floor_sperrt_fremde_org_fuehrungskraft_ueber_migrierte_route() {
 
 #[tokio::test]
 async fn extractor_unbekannter_einsatz_ist_404() {
-    let (app, _pool) = setup_with_pool().await;
+    let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let status = status_von(&app, "/api/einsaetze/999999/meldungen", Some(&admin)).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
@@ -101,7 +78,7 @@ async fn extractor_unbekannter_einsatz_ist_404() {
 
 #[tokio::test]
 async fn extractor_ohne_session_ist_401() {
-    let (app, _pool) = setup_with_pool().await;
+    let (app, _pool) = setup_mit_pool().await;
     let status = status_von(&app, "/api/einsaetze/1/meldungen", None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }

@@ -1,29 +1,15 @@
 //! LFH-458: atomare Aufnahme mit UHS, Offline-Replay und Rechte-Grenzen.
 use axum::http::StatusCode;
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::live::{LiveEvent, LiveHub};
 use serde_json::{json, Value};
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen};
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup_mit_pool_und_live,
+};
 
 async fn setup() -> (axum::Router, sqlx::SqlitePool, LiveHub, String, i64, i64) {
-    let pool = lifeline_hub::db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let live = LiveHub::new();
-    let app = build_router(AppState {
-        pool: pool.clone(),
-        live: live.clone(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
+    let (app, pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let (s, uhs) = anfrage(

@@ -4,101 +4,13 @@
 //! ETB-Pseudonymisierung, Rechte-Matrix, Cross-Einsatz-404 und
 //! Read-only-409 für abgeschlossene Einsätze.
 
-use axum::body::{to_bytes, Body};
-use axum::http::{header, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
-use serde_json::{json, Value};
-use tower::ServiceExt;
+use axum::http::StatusCode;
+use serde_json::json;
 
 mod common;
-use common::login_cookie;
-
-// ---------- Harness (an tests/einsatz_person.rs angelehnt) ----------
-
-/// Liefert Router + Pool (Pool wird für DB-Direktquery-Verifikation und
-/// für den Test-Shortcut „Einsatz abschließen" benötigt). `SqlitePool` ist
-/// billig klonbar und teilt dieselbe In-Memory-DB.
-async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let router = build_router(AppState {
-        pool: pool.clone(),
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, pool)
-}
-
-/// Generischer JSON-Request-Helfer: liefert (Status, JSON-Body).
-/// `body` als `serde_json::Value` ist kompakter als String-Formatting.
-async fn json_request(
-    app: &axum::Router,
-    method: &str,
-    uri: &str,
-    cookie: &str,
-    body: Option<&Value>,
-) -> (StatusCode, Value) {
-    let mut req = Request::builder()
-        .method(method)
-        .uri(uri)
-        .header(header::COOKIE, cookie);
-    let body = match body {
-        Some(b) => {
-            req = req.header(header::CONTENT_TYPE, "application/json");
-            Body::from(b.to_string())
-        }
-        None => Body::empty(),
-    };
-    let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
-    let status = resp.status();
-    let bytes = to_bytes(resp.into_body(), 1024 * 1024).await.unwrap();
-    let value = if bytes.is_empty() {
-        Value::Null
-    } else {
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
-    };
-    (status, value)
-}
+use common::{anfrage_json, einsatz_anlegen, login_cookie, person_anlegen, setup_mit_pool};
 
 // ---------- Domänen-Helfer ----------
-
-/// Legt einen Einsatz an (Body wie in tests/einsatz_person.rs).
-async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
-    let (s, v) = json_request(
-        app,
-        "POST",
-        "/api/einsaetze",
-        cookie,
-        Some(&json!({"bezeichnung": "Lage"})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED);
-    v["id"].as_i64().unwrap()
-}
-
-/// Legt eine Person ohne identifizierende Felder an.
-async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
-    let (s, v) = json_request(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
-        cookie,
-        Some(&json!({})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED);
-    v["id"].as_i64().unwrap()
-}
 
 /// Legt eine UHS an und versetzt sie sofort in den Status `aktiv`.
 async fn uhs_anlegen_und_aktivieren(
@@ -107,7 +19,7 @@ async fn uhs_anlegen_und_aktivieren(
     einsatz: i64,
     bez: &str,
 ) -> i64 {
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -117,7 +29,7 @@ async fn uhs_anlegen_und_aktivieren(
     .await;
     assert_eq!(s, StatusCode::CREATED);
     let uhs = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
@@ -131,7 +43,7 @@ async fn uhs_anlegen_und_aktivieren(
 
 /// Legt einen Platz in einer UHS an.
 async fn platz_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i64, bez: &str) -> i64 {
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze"),
@@ -145,7 +57,7 @@ async fn platz_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i64,
 
 /// Inhalte aller System-ETB-Einträge eines Einsatzes (chronologisch).
 async fn etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {
-    let (_, v) = json_request(
+    let (_, v) = anfrage_json(
         app,
         "GET",
         &format!("/api/einsaetze/{einsatz}/etb"),
@@ -168,7 +80,7 @@ async fn anlegen_liefert_geplant_und_keinen_etb() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -205,7 +117,7 @@ async fn ungueltiger_status_uebergang_ist_422() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
-    let (_, v) = json_request(
+    let (_, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -215,7 +127,7 @@ async fn ungueltiger_status_uebergang_ist_422() {
     .await;
     let uhs = v["id"].as_i64().unwrap();
     // geplant → aufgeloest (terminal) → versuch aktiv:
-    let (s_ok, _) = json_request(
+    let (s_ok, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
@@ -224,7 +136,7 @@ async fn ungueltiger_status_uebergang_ist_422() {
     )
     .await;
     assert_eq!(s_ok, StatusCode::OK);
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
@@ -240,8 +152,8 @@ async fn geplante_uhs_akzeptiert_keine_belegung() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
-    let person = person_anlegen(&app, &cookie, einsatz).await;
-    let (_, v) = json_request(
+    let person = person_anlegen(&app, &cookie, einsatz, "{}").await;
+    let (_, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -250,7 +162,7 @@ async fn geplante_uhs_akzeptiert_keine_belegung() {
     )
     .await;
     let uhs = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung"),
@@ -267,8 +179,8 @@ async fn aufloesen_blockt_bei_aktiver_belegung_409() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
-    let person = person_anlegen(&app, &cookie, einsatz).await;
-    let (s, _) = json_request(
+    let person = person_anlegen(&app, &cookie, einsatz, "{}").await;
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung"),
@@ -278,7 +190,7 @@ async fn aufloesen_blockt_bei_aktiver_belegung_409() {
     .await;
     assert_eq!(s, StatusCode::CREATED);
     // Status-Wechsel aufgeloest:
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
@@ -288,7 +200,7 @@ async fn aufloesen_blockt_bei_aktiver_belegung_409() {
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "Auflösung bei Belegung → 409");
     // Storno-Verhalten identisch:
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs}"),
@@ -305,10 +217,10 @@ async fn inbox_mehrfach_belegung_erlaubt() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
-    let p1 = person_anlegen(&app, &cookie, einsatz).await;
-    let p2 = person_anlegen(&app, &cookie, einsatz).await;
+    let p1 = person_anlegen(&app, &cookie, einsatz, "{}").await;
+    let p2 = person_anlegen(&app, &cookie, einsatz, "{}").await;
     for p in [p1, p2] {
-        let (s, _) = json_request(
+        let (s, _) = anfrage_json(
             &app,
             "POST",
             &format!("/api/einsaetze/{einsatz}/personen/{p}/uhs-belegung"),
@@ -331,10 +243,10 @@ async fn doppelbelegung_eines_platzes_ist_konflikt() {
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
     let platz = platz_anlegen(&app, &cookie, einsatz, uhs, "Bett 3").await;
-    let p1 = person_anlegen(&app, &cookie, einsatz).await;
-    let p2 = person_anlegen(&app, &cookie, einsatz).await;
+    let p1 = person_anlegen(&app, &cookie, einsatz, "{}").await;
+    let p2 = person_anlegen(&app, &cookie, einsatz, "{}").await;
     let body = json!({"art": "eintritt", "uhs_id": uhs, "platz_id": platz});
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{p1}/uhs-belegung"),
@@ -343,7 +255,7 @@ async fn doppelbelegung_eines_platzes_ist_konflikt() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED);
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{p2}/uhs-belegung"),
@@ -361,9 +273,9 @@ async fn auto_aufbereitung_und_etb_text_inbox() {
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
     let platz = platz_anlegen(&app, &cookie, einsatz, uhs, "Bett 3").await;
-    let person = person_anlegen(&app, &cookie, einsatz).await;
+    let person = person_anlegen(&app, &cookie, einsatz, "{}").await;
     // Eintritt auf Platz + expliziter Austritt → Aufbereitung + zwei ETB-Texte:
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung"),
@@ -372,7 +284,7 @@ async fn auto_aufbereitung_und_etb_text_inbox() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED);
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung"),
@@ -410,8 +322,8 @@ async fn reservierte_person_belegt_loest_reservierung() {
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
     let platz = platz_anlegen(&app, &cookie, einsatz, uhs, "Bett 3").await;
-    let person = person_anlegen(&app, &cookie, einsatz).await;
-    let (s, _) = json_request(
+    let person = person_anlegen(&app, &cookie, einsatz, "{}").await;
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/{platz}/verfuegbarkeit"),
@@ -421,7 +333,7 @@ async fn reservierte_person_belegt_loest_reservierung() {
     .await;
     assert_eq!(s, StatusCode::OK);
     // Belegen mit der reservierten Person → erlaubt + Reservierung weg:
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung"),
@@ -451,9 +363,9 @@ async fn fremde_person_auf_reservierten_platz_ist_422() {
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
     let platz = platz_anlegen(&app, &cookie, einsatz, uhs, "Bett 3").await;
-    let p_res = person_anlegen(&app, &cookie, einsatz).await;
-    let p_andere = person_anlegen(&app, &cookie, einsatz).await;
-    let (s, _) = json_request(
+    let p_res = person_anlegen(&app, &cookie, einsatz, "{}").await;
+    let p_andere = person_anlegen(&app, &cookie, einsatz, "{}").await;
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/{platz}/verfuegbarkeit"),
@@ -462,7 +374,7 @@ async fn fremde_person_auf_reservierten_platz_ist_422() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{p_andere}/uhs-belegung"),
@@ -479,9 +391,9 @@ async fn cross_modul_status_verstorben_loest_auto_austritt_aus() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
-    let person = person_anlegen(&app, &cookie, einsatz).await;
+    let person = person_anlegen(&app, &cookie, einsatz, "{}").await;
     // Status auf betroffen (für sauberen Übergang):
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/status"),
@@ -490,7 +402,7 @@ async fn cross_modul_status_verstorben_loest_auto_austritt_aus() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung"),
@@ -500,7 +412,7 @@ async fn cross_modul_status_verstorben_loest_auto_austritt_aus() {
     .await;
     assert_eq!(s, StatusCode::CREATED);
     // Status → verstorben löst Auto-Austritt aus:
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/status"),
@@ -531,8 +443,8 @@ async fn cross_modul_verbleib_transport_loest_auto_austritt_aus() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
-    let person = person_anlegen(&app, &cookie, einsatz).await;
-    let (s, _) = json_request(
+    let person = person_anlegen(&app, &cookie, einsatz, "{}").await;
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/status"),
@@ -541,7 +453,7 @@ async fn cross_modul_verbleib_transport_loest_auto_austritt_aus() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung"),
@@ -550,7 +462,7 @@ async fn cross_modul_verbleib_transport_loest_auto_austritt_aus() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED);
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/verbleib"),
@@ -575,8 +487,8 @@ async fn cross_modul_verbleib_notunterkunft_loest_auto_austritt_aus() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
-    let person = person_anlegen(&app, &cookie, einsatz).await;
-    let (s, _) = json_request(
+    let person = person_anlegen(&app, &cookie, einsatz, "{}").await;
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/status"),
@@ -585,7 +497,7 @@ async fn cross_modul_verbleib_notunterkunft_loest_auto_austritt_aus() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung"),
@@ -594,7 +506,7 @@ async fn cross_modul_verbleib_notunterkunft_loest_auto_austritt_aus() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED);
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/verbleib"),
@@ -626,8 +538,8 @@ async fn cross_modul_storno_loest_reservierung_auf_auch_ohne_belegung() {
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
     let platz = platz_anlegen(&app, &cookie, einsatz, uhs, "Bett 3").await;
-    let person = person_anlegen(&app, &cookie, einsatz).await;
-    let (s, _) = json_request(
+    let person = person_anlegen(&app, &cookie, einsatz, "{}").await;
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/{platz}/verfuegbarkeit"),
@@ -637,7 +549,7 @@ async fn cross_modul_storno_loest_reservierung_auf_auch_ohne_belegung() {
     .await;
     assert_eq!(s, StatusCode::OK);
     // Person stornieren (NICHT belegt) → Reservierungs-Cleanup muss trotzdem laufen:
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{einsatz}/personen/{person}"),
@@ -666,7 +578,7 @@ async fn etb_text_enthaelt_nur_pseudonym_keinen_namen() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen"),
@@ -676,7 +588,7 @@ async fn etb_text_enthaelt_nur_pseudonym_keinen_namen() {
     .await;
     assert_eq!(s, StatusCode::CREATED);
     let person = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung"),
@@ -699,7 +611,7 @@ async fn material_verortung_schreibt_keinen_etb() {
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
     // Material ad-hoc disponieren (schreibt selbst einen ETB-Eintrag):
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/material"),
@@ -711,7 +623,7 @@ async fn material_verortung_schreibt_keinen_etb() {
     let em = v["id"].as_i64().unwrap();
     // Snapshot NACH Disponierung — wir messen nur die Wirkung der Verortung:
     let vorher = etb_inhalte(&app, &cookie, einsatz).await.len();
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/material/{em}"),
@@ -733,7 +645,7 @@ async fn beobachter_kann_keine_uhs_anlegen() {
     let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin_cookie).await;
     // Beobachter-Benutzer (org_rolle default `keine`):
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         "/api/benutzer",
@@ -748,7 +660,7 @@ async fn beobachter_kann_keine_uhs_anlegen() {
     assert_eq!(s, StatusCode::CREATED);
     let beob_id = v["id"].as_i64().unwrap();
     // Mitgliedschaft als Beobachter:
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "PUT",
         &format!("/api/einsaetze/{einsatz}/mitglieder/{beob_id}"),
@@ -758,7 +670,7 @@ async fn beobachter_kann_keine_uhs_anlegen() {
     .await;
     assert_eq!(s, StatusCode::OK);
     let beob_cookie = login_cookie(&app, "beob", "startpw12").await;
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -777,7 +689,7 @@ async fn fremder_einsatz_ist_404() {
     let einsatz_b = einsatz_anlegen(&app, &cookie).await;
     let uhs_a = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz_a, "BHP A").await;
     // UHS aus Einsatz A über Einsatz B abrufen → 404:
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{einsatz_b}/uhs/{uhs_a}"),
@@ -804,7 +716,7 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
     .execute(&pool)
     .await
     .unwrap();
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
@@ -824,7 +736,7 @@ async fn verorten_setzt_lat_lon_und_liste_liefert_sie() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -835,7 +747,7 @@ async fn verorten_setzt_lat_lon_und_liste_liefert_sie() {
     assert_eq!(s, StatusCode::CREATED);
     let uhs_id = v["id"].as_i64().unwrap();
 
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
@@ -847,7 +759,7 @@ async fn verorten_setzt_lat_lon_und_liste_liefert_sie() {
     assert_eq!(v["lat"].as_f64(), Some(50.1));
     assert_eq!(v["lon"].as_f64(), Some(8.6));
 
-    let (s, liste) = json_request(
+    let (s, liste) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -864,7 +776,7 @@ async fn verorten_loeschen_setzt_beide_auf_null() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
-    let (_s, v) = json_request(
+    let (_s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -873,7 +785,7 @@ async fn verorten_loeschen_setzt_beide_auf_null() {
     )
     .await;
     let uhs_id = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
@@ -882,7 +794,7 @@ async fn verorten_loeschen_setzt_beide_auf_null() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
@@ -900,7 +812,7 @@ async fn patch_auf_storniertem_uhs_ist_409() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
-    let (_s, v) = json_request(
+    let (_s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -909,7 +821,7 @@ async fn patch_auf_storniertem_uhs_ist_409() {
     )
     .await;
     let uhs_id = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
@@ -918,7 +830,7 @@ async fn patch_auf_storniertem_uhs_ist_409() {
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
@@ -939,7 +851,7 @@ async fn plaetze_bulk_legt_mehrere_mit_auto_namen_an() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"),
@@ -963,7 +875,7 @@ async fn plaetze_bulk_unbekannter_typ_ist_400() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"),
@@ -985,7 +897,7 @@ async fn plaetze_bulk_menge_null_oder_zu_gross_ist_422() {
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
     for menge in [0, 51] {
-        let (s, _) = json_request(
+        let (s, _) = anfrage_json(
             &app,
             "POST",
             &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"),
@@ -1006,7 +918,7 @@ async fn verorten_nur_lat_ist_422() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
-    let (_s, v) = json_request(
+    let (_s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -1015,7 +927,7 @@ async fn verorten_nur_lat_ist_422() {
     )
     .await;
     let uhs_id = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
@@ -1035,7 +947,7 @@ async fn verorten_nur_lon_ist_422() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
-    let (_s, v) = json_request(
+    let (_s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -1044,7 +956,7 @@ async fn verorten_nur_lon_ist_422() {
     )
     .await;
     let uhs_id = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
@@ -1064,7 +976,7 @@ async fn verorten_ausserhalb_range_ist_422() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
-    let (_s, v) = json_request(
+    let (_s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -1073,7 +985,7 @@ async fn verorten_ausserhalb_range_ist_422() {
     )
     .await;
     let uhs_id = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
@@ -1089,7 +1001,7 @@ async fn verorten_lon_ausserhalb_range_ist_422() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
-    let (_s, v) = json_request(
+    let (_s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/uhs"),
@@ -1098,7 +1010,7 @@ async fn verorten_lon_ausserhalb_range_ist_422() {
     )
     .await;
     let uhs_id = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
