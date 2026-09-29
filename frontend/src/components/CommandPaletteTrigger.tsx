@@ -50,7 +50,7 @@ export function suchfeldStil(token: {
     padding: `${token.paddingXS}px ${token.paddingSM}px`,
     background: rahmenFarben.feld,
     border: `1px solid ${farbenDunkel.linieStark}`,
-    color: rahmenFarben.schwach,
+    color: rahmenFarben.gedaempft,
     fontSize: 13,
     textAlign: 'left',
     boxShadow: 'none',
@@ -122,7 +122,7 @@ export default function CommandPaletteTrigger() {
       >
         {SUCHFELD_TEXT}
       </span>
-      <Tastenkuerzel aria-hidden style={{ color: rahmenFarben.schwach }}>
+      <Tastenkuerzel aria-hidden style={{ color: rahmenFarben.gedaempft }}>
         {kuerzel}
       </Tastenkuerzel>
     </Button>

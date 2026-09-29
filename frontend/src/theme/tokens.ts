@@ -217,7 +217,14 @@ export const farbenDunkel: Farbrollen = {
  * Der RAHMEN (Kommandoleiste 52 px, Rail 60 px) bleibt in BEIDEN Modi dunkel. Deshalb eine
  * modusunabhängige Palette statt weiterer `Farbrollen`: dort müsste der Nachtblock sie
  * wertgleich doppeln, und diese Redundanz verbietet `rollen.guard.test.ts`. Die Werte zeigen
- * auf die Nachtpalette statt sie zu kopieren. Rot ist hier nur `marke` (aktive Rail-Kategorie).
+ * auf die Nachtpalette statt sie zu kopieren. Rot ist hier `marke` (aktive Rail-Kategorie) und
+ * `alarm` (Störungswort der SYNC-Zelle).
+ *
+ * Kontrast (LFH-434): der Rahmen wird auch bei Tageslicht gelesen, deshalb hält bedienbarer Text
+ * die TAG-Schwelle ≥ 7 : 1 auf jedem Rahmengrund (`grund` · `feld` · `aktiv`): text 16,15 ·
+ * 15,02 · 14,74 — gedaempft 8,04 · 7,47 · 7,33. Eine schwächere Textstufe gibt es im Rahmen nur
+ * für Gesperrtes: `gesperrt` 5,17 auf `grund` (Boden 4,5; WCAG 1.4.3 nimmt inaktive Komponenten
+ * aus), die Sperre trägt zusätzlich ein Zeichen ohne Farbe. Gerechnet in `rahmenKontrast.test.ts`.
  */
 export const rahmenFarben = {
   grund: farbenDunkel.kopf,
@@ -227,8 +234,19 @@ export const rahmenFarben = {
   feld: farbenDunkel.flaeche2,
   linie: farbenDunkel.linie,
   text: farbenDunkel.text,
-  gedaempft: farbenDunkel.gedaempft,
-  schwach: farbenDunkel.schwach,
+  /**
+   * Zweite Textstufe: Uhr, Menüs, Suchfeld-Hinweis, inaktive Rail-Etiketten. Eigener Wert statt
+   * `farbenDunkel.gedaempft` (`#9aa2ab`, 6,96 auf `feld`): der hielte im Suchfeld die
+   * Tag-Schwelle nicht (LFH-434).
+   */
+  gedaempft: '#a0a8b1',
+  /** NUR für gesperrte Einträge, nie für bedienbaren Text (LFH-434). */
+  gesperrt: farbenDunkel.schwach,
+  /**
+   * Störungswort (GETRENNT/OFFLINE/PRÜFEN). Eigener Wert statt `farbenDunkel.alarm` (`#ff6b6b`,
+   * 6,96 auf `grund`): hier 7,18 (LFH-434).
+   */
+  alarm: '#ff7070',
   marke: farbenDunkel.marke,
 } as const;
 
