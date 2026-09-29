@@ -5,7 +5,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useLinkClickHandler, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Einsatzart, EinsatzAnzeige } from '../api/types';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { formatZeitKurz } from '../anzeige/format';
@@ -203,8 +203,7 @@ export default function EinsaetzePage() {
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
       navigate(einsatzPfad(neuerEinsatz.id));
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Einsatz konnte nicht angelegt werden'),
+    onError: (e) => message.error(fehlerText(e, 'Einsatz konnte nicht angelegt werden')),
   });
 
   const [suche, setSuche] = useState('');

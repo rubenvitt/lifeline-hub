@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
 import { legeEinsatzSprechgruppeAn, listeEinsatzSprechgruppen } from '../api/sprechgruppen';
 import type { Betriebsart, Sprechgruppe } from '../api/types';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 
 interface SprechgruppenPickerProps {
   einsatzId: number;
@@ -68,7 +68,7 @@ export default function SprechgruppenPicker({
       setAnlegenOffen(false);
       message.success(`Sprechgruppe „${neu.bezeichnung}" angelegt`);
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Anlegen fehlgeschlagen')),
   });
 
   const anlegen = () => {

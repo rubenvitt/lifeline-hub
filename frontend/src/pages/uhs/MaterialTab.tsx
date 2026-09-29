@@ -4,7 +4,6 @@ import { Select } from '../../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listeEinsatzMaterial, aktualisiereDisposition } from '../../api/einsatzMaterial';
 import type { EinsatzMaterial, MaterialStatus, UhsDetail } from '../../api/types';
-import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import KatalogTabelle from '../../components/KatalogTabelle';
 import { ErfassungsModal } from '../../components/Erfassung';
@@ -12,6 +11,7 @@ import Datenstand from '../../components/Datenstand';
 import StatusTag from '../../components/StatusTag';
 import { monoStil } from '../../components/instrument';
 import { materialStatus } from '../../theme/statusFarben';
+import { useFehlerMeldung } from '../../components/useFehlerMeldung';
 
 interface Props {
   einsatzId: number;
@@ -44,8 +44,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
     qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhs.id) });
   }
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   const loesenMut = useMutation({
     mutationFn: (emId: number) => aktualisiereDisposition(einsatzId, emId, { uhs_id: null }),

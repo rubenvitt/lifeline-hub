@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { App, Collapse, Form, Input } from 'antd';
 import { Select } from '../../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../../api/client';
+import { fehlerText } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import { legeSchadenAn, type SchadenEingabe } from '../../api/einsatzSchaden';
 import type { Ausmass, SchadenTyp } from '../../api/types';
@@ -72,8 +72,7 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     },
-    onError: (e: unknown) =>
-      message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
+    onError: (e: unknown) => message.error(fehlerText(e)),
   });
 
   /**
