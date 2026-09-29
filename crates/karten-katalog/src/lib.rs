@@ -50,8 +50,9 @@ pub enum JobStatus {
 pub struct BuildJob {
     pub id: u64,
     pub slug: String,
-    /// Inline statt `$ref`: [`JobStatus`] ist datentragend und bewusst kein registriertes
-    /// Component-Schema — utoipa bettet die Union direkt hier ein.
+    // Inline statt `$ref`: [`JobStatus`] ist datentragend und bewusst kein registriertes
+    // Component-Schema — utoipa bettet die Union direkt hier ein. Bewusst `//`, nicht `///`:
+    // eine Feldbeschreibung wickelt utoipa 6 in ein `allOf` (Test unten).
     #[cfg_attr(feature = "schema", schema(inline))]
     pub status: JobStatus,
     pub gestartet: String,
@@ -343,6 +344,13 @@ mod schema_tests {
         assert!(
             matches!(o.properties.get("status"), Some(RefOr::T(_))),
             "BuildJob.status muss inline sein (kein $ref auf ein JobStatus-Component)",
+        );
+        // Die Union selbst, nicht in ein `allOf` gewickelt: utoipa 6 legt eine Feldbeschreibung
+        // als zweites `allOf`-Glied `{type: object}` daneben, und openapi-typescript macht
+        // daraus `… & Record<string, never>` — `fehler` würde `never`.
+        assert!(
+            matches!(o.properties.get("status"), Some(RefOr::T(Schema::OneOf(_)))),
+            "BuildJob.status muss die JobStatus-Union als oneOf sein, nicht allOf",
         );
 
         let RefOr::T(Schema::Object(o)) = RegionDto::schema() else {
