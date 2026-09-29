@@ -1,17 +1,12 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
 
 /**
- * ETB-Druckansicht (LFH-22, design.md D5/D10) gegen einen echten Server.
+ * ETB-Druckansicht gegen einen echten Server: Vollabruf über MEHR als eine Serverseite (höchstens
+ * 500 je Anfrage), Ordnung nach Nummer, Berichtigung außerhalb einer gefilterten Auswahl und das
+ * Druckbild unter `emulateMedia('print')`. Die Seitenlogik deckt `etb/druckAbruf.test.ts`.
  *
- * WAS HIER STEHT UND NICHT IN VITEST: der Vollabruf über MEHR als eine Serverseite (die Liste
- * liefert höchstens 500 je Anfrage), die Ordnung nach Nummer über echte Daten, die
- * Berichtigung außerhalb einer gefilterten Auswahl und das Druckbild unter
- * `emulateMedia('print')`. Die Seitenlogik selbst (Cursor, Abbruch, Riegel) deckt
- * `etb/druckAbruf.test.ts`; hier geht es darum, dass Server und Client zusammen passen.
- *
- * SEEDING: über 500 Einträge per `page.request` in parallelen Bündeln. Die Session ist
- * Cookie-basiert, `page.request` teilt den Cookie-Jar. Eigene, großzügige Frist: auf den
- * 2-vCPU-Shards der CI kostet das Säen spürbar Zeit, und es ist Vorbereitung, keine Aussage.
+ * Über 500 Einträge werden per `page.request` in parallelen Bündeln gesät; großzügige Frist,
+ * weil das auf den 2-vCPU-Shards Zeit kostet.
  */
 
 const ADMIN = 'admin';

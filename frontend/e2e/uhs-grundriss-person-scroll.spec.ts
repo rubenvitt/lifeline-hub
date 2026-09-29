@@ -21,8 +21,8 @@ async function ziehe(page: Page, quelle: Locator, ziel: Locator) {
   await page.mouse.up();
 }
 
-/** Legt Einsatz + Person + aktive UHS mit 1 Platz an und weist die Person dem Platz zu.
- *  Liefert den (eindeutigen) Personennamen zurück. */
+/** Legt Einsatz + Person + aktive UHS mit einem Platz an und weist die Person ihm zu.
+ *  Liefert den eindeutigen Personennamen. */
 async function setupBelegterPlatz(page: Page): Promise<string> {
   await anmelden(page);
   const einsatzName = `E2E UHS Move ${Date.now()}`;
@@ -35,8 +35,7 @@ async function setupBelegterPlatz(page: Page): Promise<string> {
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await page.getByRole('button', { name: 'Schnellerfassung' }).click();
   const personName = `MovePat${Date.now()}`;
-  // „Name" liegt seit LFH-340 · C5 eingeklappt — die Sichtungskategorie ist ins sichtbare
-  // Feldbudget gerückt. Der Name bleibt der Anker dieser Specs, er ist nur einen Klick weiter.
+  // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
@@ -59,47 +58,34 @@ async function setupBelegterPlatz(page: Page): Promise<string> {
   await ziehe(page, page.getByText(personName).first(), page.getByText('Bett 1'));
   await expect(page.getByText('belegt')).toBeVisible();
 
-  // UND DANN WARTEN, BIS DER UMBAU DURCH IST — sonst zieht der Test in einen
-  // Wettlauf. Gemessen (Zeitverlauf nach dem Zug): das POST auf
-  // `…/uhs-belegung` kommt bei +403 ms als 201 zurück, „belegt" steht bei
-  // +400 ms — aber die zwei Invalidierungen (`/uhs`, `/personen`) landen erst
-  // bei +433 ms, und der Name steht bis +717 ms DOPPELT im Baum. Wer in diesem
-  // Fenster den zweiten Zug beginnt, greift ein Layout, das gleich umbricht:
-  // die Geste läuft, das Ziel verschiebt sich, der Drop verfehlt. Der Zug tat
-  // dann nichts, und beide Tests unten schlugen fehl, obwohl die Funktion
-  // arbeitet — mit 1 s Wartezeit davor waren sie gemessen grün.
-  //
-  // KEINE feste Wartezeit, sondern die Bedingung selbst: genau EINE Personenmarke mit dem
-  // Namen (über `data-lfh`, nicht über eine antd-Klasse — LFH-621).
-  // Ein `waitForTimeout` wäre auf einer langsameren Maschine wieder zu kurz und
-  // hier meist zu lang.
+  // Warten, bis der Umbau durch ist: die Invalidierungen landen nach der 201-Antwort, und bis
+  // dahin steht der Name doppelt im Baum. Ein zweiter Zug in diesem Fenster griffe ein Layout,
+  // das gleich umbricht, und verfehlte den Drop. Bedingung statt fester Wartezeit: genau EINE
+  // Personenmarke mit dem Namen (über `data-lfh`).
   await expect(
     page.locator('[data-lfh="personenkarte"]').filter({ hasText: personName }),
   ).toHaveCount(1);
   return personName;
 }
 
-/** Drop-Target zu einem Spalten-Titel: der Paneel-Körper (dort sitzt die Droppable —
- *  NICHT der Kopf, sonst verfehlt der Drop die Drop-Zone). Seit dem Neuentwurf sind die
- *  Seitenspalten `Paneel`e statt antd-`Card`s: Kopf ist das erste, Körper das zweite Kind. */
+/** Drop-Target zu einem Spalten-Titel: der Paneel-Körper (zweites Kind), nicht der Kopf —
+ *  dort sitzt das Droppable. */
 function dropZone(page: Page, titel: string): Locator {
   return page.locator('[data-lfh="paneel"]', { hasText: titel }).locator(':scope > div').nth(1);
 }
 
-// Neu: eine belegte Person ist ziehbar → in den Transport-Bereich rechts ziehen öffnet
-// den Transport-Abschluss-Screen (ändert Patientendaten, daher Modal statt Sofortbuchung).
+// Eine belegte Person in den Transport-Bereich ziehen öffnet den Abschluss-Screen (ändert
+// Patientendaten, daher Modal statt Sofortbuchung).
 test('UHS Grundriss: belegte Person in den Transport-Bereich ziehen öffnet den Abschluss-Screen', async ({
   page,
 }) => {
   const personName = await setupBelegterPlatz(page);
   await ziehe(page, page.getByText(personName).first(), dropZone(page, 'Auf Transport gebracht'));
-  // Der Abschluss-Screen ist der „Verbleib erfassen"-Dialog (Titel enthält den Personennamen,
-  // Art-Auswahl mit Default „Transport"). Früherer Titel „In Transport bringen" existiert nicht mehr.
+  // Der Abschluss-Screen ist der „Verbleib erfassen"-Dialog.
   await expect(page.getByRole('dialog')).toContainText('Verbleib erfassen');
 });
 
-// Neu: eine belegte Person in den Wartebereich (links) ziehen → verlässt den Platz,
-// bleibt aber in der UHS (Belegung ohne Platz).
+// Eine belegte Person in den Wartebereich ziehen räumt den Platz; sie bleibt in der UHS.
 test('UHS Grundriss: belegte Person in den Wartebereich ziehen räumt den Platz', async ({
   page,
 }) => {
@@ -111,12 +97,10 @@ test('UHS Grundriss: belegte Person in den Wartebereich ziehen räumt den Platz'
   await expect(page.getByText(personName).first()).toBeVisible();
 });
 
-// Regression (Bug LFH-17): Platz-Karten müssen unabhängig von Belegung, Titellänge
-// (Umbruch) und Tag-Anzahl EXAKT gleich groß bleiben — sonst „springt" das Layout und
-// Karten überlappen. Dieser Test baut den Worst Case (langer 2-zeiliger Titel + belegt +
-// Aufbereitung) neben kurzen/leeren Karten und prüft: (a) alle Karten gleich hoch,
-// (b) keine Karte höher als der Raster-Zeilenabstand (120px), (c) keine Aktions-Icons
-// werden durch overflow:hidden abgeschnitten.
+// Platz-Karten bleiben unabhängig von Belegung, Titellänge und Tag-Anzahl EXAKT gleich groß,
+// sonst springt das Layout und Karten überlappen (LFH-17). Worst Case (langer zweizeiliger
+// Titel + belegt + Aufbereitung) neben kurzen Karten: (a) alle gleich hoch, (b) keine höher
+// als der Raster-Zeilenabstand (120 px), (c) keine Aktions-Icons abgeschnitten.
 test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch/Tags egal)', async ({
   page,
 }) => {
@@ -131,8 +115,7 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await page.getByRole('button', { name: 'Schnellerfassung' }).click();
   const personName = `UniPat${Date.now()}`;
-  // „Name" liegt seit LFH-340 · C5 eingeklappt — die Sichtungskategorie ist ins sichtbare
-  // Feldbudget gerückt. Der Name bleibt der Anker dieser Specs, er ist nur einen Klick weiter.
+  // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
@@ -165,40 +148,16 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
   // Behandlungsplatz 1 belegen (2-zeiliger Titel + belegt + Person + Aktionen).
   await ziehe(page, page.getByText(personName).first(), page.getByText('Behandlungsplatz 1'));
   await expect(page.getByText('belegt')).toBeVisible();
-  // Behandlungsplatz 2 (unbelegt) zusätzlich auf „aufbereitung" → testet die Tag-Zeile
-  // (eine feste, nicht umbrechende Zeile) als dritte mögliche Varianzquelle.
+  // Behandlungsplatz 2 zusätzlich auf „aufbereitung" — die Tag-Zeile als dritte Varianzquelle.
   const bp2 = page.locator('[data-testid="platz-karte"]', { hasText: 'Behandlungsplatz 2' });
-  // CSS-Selektor auf das echte <button> — nicht getByRole, sonst trifft der von dnd-kit
-  // mit role="button"+aria-disabled versehene Karten-Div (im Nicht-Edit deaktiviert).
-  // Präfix-Selektor (LFH-341 · H40): der Auslöser trägt seit der Zeilenkennung
-  // `Platzaktionen zu <bezeichnung>` — hier „Platzaktionen zu Behandlungsplatz 2".
+  // CSS-Selektor auf das echte <button>: `getByRole` träfe den Karten-Div, den dnd-kit mit
+  // `role="button"` versieht.
   //
-  // ┌─ HIER WIRD EIN BEDIENBEFUND GEDÄMPFT, KEIN TESTFEHLER — LFH-519 ────────────────────┐
-  // │ Der Block fing ursprünglich ZWEI Dinge ab, die für eins gehalten wurden. Das eine   │
-  // │ ist behoben (LFH-457): der Menü-Auslöser verschwand während jeder Belegung aus dem  │
-  // │ Baum, weil `belegMut.isPending` als `schreibgeschuetzt` in die Platzkarte fuhr.     │
-  // │ Dass er das nicht mehr tut, misst `uhs-grundriss-menue-belegung.spec.ts` — dort     │
-  // │ ohne jede Wiederholmechanik.                                                        │
-  // │                                                                                     │
-  // │ Was BLEIBT und wofür dieser Block jetzt allein steht: der ERSTE Klick auf den       │
-  // │ Auslöser öffnet das Dropdown nach einem Drag unter Last nicht. Gemessen — der Klick  │
-  // │ kommt an (der Knopf bekommt den Fokus), das Portal entsteht trotzdem nie, auch nach  │
-  // │ 10 s nicht; ein zweiter Klick öffnet. Das ist ein eigener Befund und steht in        │
-  // │ LFH-519.                                                                            │
-  // │                                                                                     │
-  // │ Warum die Dämpfung hier vertretbar ist: dieser Test MISST etwas anderes — gleiche   │
-  // │ Kartenhöhen und nicht abgeschnittene Icons. Das Menü ist Aufbau, nicht Gegenstand.  │
-  // └─────────────────────────────────────────────────────────────────────────────────────┘
-  //
-  // Zur Mechanik, knapp: gedämpft wird über ein begrenztes NEU-ÖFFNEN, nicht über eine
-  // längere Frist. Die Eigenfrist am `menuitem` bleibt KURZ (2 s), damit ein ausbleibendes
-  // Menü schnell auffällt und neu aufgemacht wird — der Block soll nicht 20 s auf ein Menü
-  // warten, das aus einem anderen Grund ausbleibt. Auch der Auslöser-Klick ist befristet:
-  // verschwände der Knopf selbst, scheiterte der Test sonst erst am Test-Timeout und damit
-  // ohne brauchbare Diagnose. Doppelt angewandt werden kann die Verfügbarkeit nicht — der
-  // Wiederholblock greift nur, wenn der Eintrag gar nicht geklickt wurde.
-  // Nicht auf `networkidle` warten: auf Einsatzrouten bleibt ein SSE-Strom offen, die
-  // Bedingung tritt nie ein (LFH-385).
+  // Gedämpft wird hier ein BEDIENBEFUND (LFH-519): nach einem Drag unter Last öffnet der
+  // erste Klick das Dropdown manchmal nicht, ein zweiter schon. Vertretbar, weil dieser Test
+  // Kartenhöhen misst — das Menü ist Aufbau, nicht Gegenstand. Gedämpft wird über
+  // begrenztes Neu-Öffnen mit kurzen Fristen, damit ein aus anderem Grund fehlendes Menü
+  // schnell mit Diagnose scheitert. Kein `networkidle` (SSE-Strom bleibt offen).
   await expect(async () => {
     await bp2.locator('button[aria-label^="Platzaktionen"]').click({ timeout: 5_000 });
     await page
@@ -243,18 +202,14 @@ async function scrollAhneMasse(
   });
 }
 
-// Regression: Eine Personenkarte wurde beim Drag mit `transform: translate()` INLINE
-// verschoben, während sie Kind der linken Spalte (overflow:auto) blieb. Das vergrößert
-// die scrollbare Region des Containers → es erscheint eine Scrollbar, die mit der
-// Drag-Distanz dynamisch wächst. Fix: Person-Drag rendert via DragOverlay (Portal),
-// der Originalknoten bewegt sich nicht mehr. Dieser Test misst die Scroll-Region des
-// Spalten-Containers WÄHREND der Drag noch aktiv ist (gedrückte Maus).
+// Eine Personenkarte, die beim Drag per `transform` INLINE in der linken Spalte
+// (overflow:auto) verschoben wird, vergrößert deren Scroll-Region. Deshalb rendert der
+// Person-Drag über ein DragOverlay (Portal); gemessen WÄHREND des Drags.
 test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spalte', async ({
   page,
 }) => {
   await anmelden(page);
 
-  // Einsatz anlegen.
   const einsatzName = `E2E UHS PersonScroll ${Date.now()}`;
   await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
   await page.getByLabel('Bezeichnung').fill(einsatzName);
@@ -266,8 +221,7 @@ test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spal
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await page.getByRole('button', { name: 'Schnellerfassung' }).click();
   const personName = `PatScroll${Date.now()}`;
-  // „Name" liegt seit LFH-340 · C5 eingeklappt — die Sichtungskategorie ist ins sichtbare
-  // Feldbudget gerückt. Der Name bleibt der Anker dieser Specs, er ist nur einen Klick weiter.
+  // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
@@ -292,8 +246,8 @@ test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spal
   const vor = await scrollAhneMasse(karte);
   expect(vor.scrollWidth).toBeLessThanOrEqual(vor.clientWidth + 1);
 
-  // Drag starten und WEIT nach rechts/unten ziehen (über die Spaltenkante hinaus),
-  // Maus aber gedrückt halten — der Inline-Transform ist nur während des Drags aktiv.
+  // Weit nach rechts/unten ziehen und die Maus gedrückt halten — der Transform wirkt nur
+  // während des Drags.
   const box = await karte.boundingBox();
   expect(box).not.toBeNull();
   const cx = box!.x + box!.width / 2;
@@ -302,20 +256,15 @@ test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spal
   await page.mouse.down();
   await page.mouse.move(cx + 400, cy + 200, { steps: 16 });
 
-  // Kernassertion: trotz weit nach rechts geschobener Karte darf die scrollbare
-  // Region der linken Spalte nicht über ihre sichtbare Breite hinauswachsen.
+  // Die scrollbare Region der Spalte darf nicht über ihre sichtbare Breite wachsen.
   const waehrend = await scrollAhneMasse(karte);
   await page.mouse.up();
 
   expect(waehrend.scrollWidth).toBeLessThanOrEqual(waehrend.clientWidth + 1);
 });
 
-// Regression (Bug LFH-17): Beim Zuweisen eines Patienten wuchs die belegte Platz-Karte
-// (zusätzliche Tags, Name, Aktionsbuttons) über den Raster-Zeilenabstand (SCHRITT_Y=120px)
-// hinaus und überlappte die Karte der nächsten Zeile → „Layout-Bruch". Fix: kompakte
-// Aktionen (Menü statt Buttons), nur EIN Status-Tag bei belegt+frei, einzeiliges Label
-// mit Ellipsis → stabile, namenslängen-unabhängige Höhe. Test misst die reale Layout-Höhe
-// einer belegten Karte (langer Name als Stresstest) und prüft die Nicht-Überlappung.
+// Eine belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (SCHRITT_Y = 120 px) und
+// überlappt nicht die nächste Zeile (LFH-17) — mit langem Namen als Stresstest der Ellipsis.
 test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (kein Overlap)', async ({
   page,
 }) => {
@@ -332,8 +281,7 @@ test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await page.getByRole('button', { name: 'Schnellerfassung' }).click();
   const personName = `Maximiliane-Charlotte von Lindenberg-Hohenfels ${Date.now()}`;
-  // „Name" liegt seit LFH-340 · C5 eingeklappt — die Sichtungskategorie ist ins sichtbare
-  // Feldbudget gerückt. Der Name bleibt der Anker dieser Specs, er ist nur einen Klick weiter.
+  // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
@@ -373,8 +321,7 @@ test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (
   // Belegung bestätigt (Karte zeigt „belegt").
   await expect(page.getByText('belegt')).toBeVisible();
 
-  // Reale Layout-Höhe der absolut positionierten „Bett 1"-Karte: muss <= 120px bleiben,
-  // sonst ragt sie in die Karte der nächsten Rasterzeile (Bett 6) hinein.
+  // Reale Layout-Höhe der absolut positionierten Karte: ≤ 120 px, sonst ragt sie in Bett 6.
   const kartenHoehe = await bett1Text.evaluate((el) => {
     let n: HTMLElement | null = el as HTMLElement;
     while (n) {
@@ -387,9 +334,8 @@ test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (
   expect(kartenHoehe).toBeLessThanOrEqual(120);
 });
 
-// Gegenprobe: Der DragOverlay (Portal) darf die dnd-kit-Kollisionserkennung NICHT
-// brechen — ein Person→Platz-Drop muss weiterhin die Belegung auslösen. Der Overlay
-// ist rein visuell; `over` wird aus dem (translatierten) Original-Rect berechnet.
+// Gegenprobe: das DragOverlay darf die Kollisionserkennung nicht brechen — `over` wird aus
+// dem Original-Rect berechnet, ein Person→Platz-Drop löst weiter die Belegung aus.
 test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin aus', async ({
   page,
 }) => {
@@ -405,8 +351,7 @@ test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin au
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await page.getByRole('button', { name: 'Schnellerfassung' }).click();
   const personName = `PatDrop${Date.now()}`;
-  // „Name" liegt seit LFH-340 · C5 eingeklappt — die Sichtungskategorie ist ins sichtbare
-  // Feldbudget gerückt. Der Name bleibt der Anker dieser Specs, er ist nur einen Klick weiter.
+  // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
@@ -445,19 +390,16 @@ test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin au
   });
   await page.mouse.up();
 
-  // Kernassertion: der Drop traf den PLATZ (platz_id gesetzt), nicht versehentlich die
-  // Inbox/Wartebereich. Das beweist, dass dnd-kits Kollisionserkennung trotz DragOverlay
-  // weiterhin das korrekte Droppable bestimmt. (Die UHS ist hier 'geplant', daher lehnt
-  // das Backend die eigentliche Belegung per Domänenregel ab — irrelevant für den Drop.)
+  // Der Drop traf den PLATZ (platz_id gesetzt). Die UHS ist 'geplant', das Backend lehnt die
+  // Belegung fachlich ab — für den Drop irrelevant.
   const req = await belegungPromise;
   const body = JSON.parse(req.postData() ?? '{}') as { platz_id?: number | null };
   expect(typeof body.platz_id).toBe('number');
 });
 
-// LFH-621: die Personenmarke ersetzt den antd-Tag und behauptet dessen Höhe — dichteunabhängig,
-// weil die belegte Platzkarte an `SCHRITT_Y = 120` aus dem Backend hängt (Rechnung im Kopf von
-// `Grundriss.tsx`: der Streifen ist mit 24 px eingeplant). jsdom rechnet kein Layout, und die
-// Marke mischt Mono und Satzschrift in einer Zeile — deshalb hier gemessen, in zwei Stufen.
+// Die Personenmarke hält ihre Höhe dichteunabhängig: die belegte Platzkarte hängt an
+// `SCHRITT_Y = 120` (der Streifen ist mit 24 px eingeplant, `Grundriss.tsx`). Die Marke
+// mischt Mono und Satzschrift in einer Zeile — deshalb im Browser, in zwei Stufen.
 test('UHS Grundriss: Personenmarke auf der Platzkarte behält ihre Höhe in jeder Dichtestufe', async ({
   page,
 }) => {

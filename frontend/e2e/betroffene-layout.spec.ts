@@ -1,22 +1,16 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
- * Layoutstabilität der Betroffenen-Flächen (LFH-650, Nachzug zur LFH-613-Prüfliste,
- * Kriterium 12 „kein Sprung unter dem Cursor", Tabellen 1, 2, 4 und 5).
+ * Layoutstabilität der Betroffenen-Flächen (Kriterium 12 „kein Sprung unter dem Cursor").
  *
- * ZWEI MESSARTEN, bewusst getrennt:
- *  - **Geometrie**, wo die Verschiebung auf eine EIGENE Eingabe folgt (Zustand speichern,
- *    Tippen in der Schnellerfassung). Die CLS-Definition nimmt solche Verschiebungen aus
- *    (`hadRecentInput`, 500 ms) — sie wäre dort blind und bliebe trivial bei 0. Gemessen wird
- *    deshalb, um wie viele Pixel die Zeile bzw. der Inhalt darunter wandert.
- *  - **CLS-Beitrag**, wo die Änderung von AUSSEN kommt (Live-Ereignis, Nachladen). Muster
- *    aus `pegel-pruefliste.spec.ts` (LFH-606 [M5]): Marke setzen, wenn die Seite ruhig steht,
- *    dann nur zählen, was danach und ohne Eingabe verschiebt. Die Aufbau-Einträge davor
- *    werden nicht dem Messobjekt angelastet (dort Kopfzeilen-Umbruch unter Linux, CI-Befund).
+ * ZWEI MESSARTEN:
+ *  - GEOMETRIE, wo die Verschiebung auf eine EIGENE Eingabe folgt: CLS nimmt solche
+ *    Verschiebungen aus (`hadRecentInput`) und bliebe trivial bei 0.
+ *  - CLS-BEITRAG, wo die Änderung von AUSSEN kommt: Marke setzen, wenn die Seite ruhig steht,
+ *    dann nur zählen, was danach ohne Eingabe verschiebt (Muster `pegel-pruefliste.spec.ts`).
  *
- * Seeding per `page.request`: die Session ist Cookie-basiert und teilt den Cookie-Jar. Ein
- * Schreibzugriff darüber ist für die Seite ein FREMDER — er kommt über den Live-Strom
- * (`person`-Ereignis → Invalidierung), genau wie von einer zweiten Stelle.
+ * Seeding per `page.request` ist für die Seite ein FREMDER Schreibzugriff — er kommt über den
+ * Live-Strom, wie von einer zweiten Stelle.
  */
 
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -127,10 +121,9 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
   const werte: string[] = [];
 
   for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
-    // Je Stufe drei frische Personen. Die Liste sortiert nach Registriernummer ABSTEIGEND
-    // (Review LFH-650: ohne Anker war die gemessene Zeile in `kompakt` die letzte, und die
-    // Folgezeilen-Prüfung lief leer). Der Anker wird deshalb ZUERST angelegt und steht damit
-    // direkt unter der ersten; die zweite bekommt die Koordinate.
+    // Je Stufe drei frische Personen. Die Liste sortiert nach Registriernummer ABSTEIGEND: der
+    // Anker wird ZUERST angelegt und steht damit direkt unter der ersten, sonst liefe die
+    // Folgezeilen-Prüfung leer.
     await post(page, `/api/einsaetze/${einsatzId}/personen`, { name: `Anker ${dichte}` });
     const erste = await post(page, `/api/einsaetze/${einsatzId}/personen`, {
       name: `Zustand ${dichte}`,
@@ -143,8 +136,7 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
     await stelleDichte(page, dichte);
     const zeile = (id: number) => page.locator(`tr.ant-table-row[data-row-key="${id}"]`);
     await expect(zeile(erste)).toBeVisible();
-    // Alle Zeilen der Tabelle in DOM-Reihenfolge; gemessen wird die, die auf die jeweilige
-    // Zeile folgt — egal, wie die Tabelle sortiert.
+    // Gemessen wird die Zeile, die in DOM-Reihenfolge folgt — egal, wie die Tabelle sortiert.
     const folgeZeile = (id: number) =>
       page.locator(`tr.ant-table-row[data-row-key="${id}"] + tr.ant-table-row`);
 
@@ -162,9 +154,8 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
     await expect(knopf).not.toHaveClass(/ant-btn-loading/);
     const nachher = await kasten(zeile(erste));
     const dh = nachher.height - vorher.height;
-    // RELATIV zur eigenen Zeile: `Tab` schiebt den Fokus weiter, und in `handschuh` scrollt
-    // der Browser ihn dabei ins Bild — die absolute Lage wanderte gemessen um 40 px, ohne
-    // dass die Tabelle ihre Form änderte.
+    // RELATIV zur eigenen Zeile: `Tab` schiebt den Fokus weiter, und in `handschuh` scrollt der
+    // Browser ihn ins Bild, ohne dass die Tabelle ihre Form ändert.
     const dFolge = (await kasten(folge)).y - nachher.y - (folgeVorher.y - vorher.y);
     expect(
       Math.abs(dh),
@@ -188,8 +179,8 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
     expect
       .soft(b.summe, `CLS-Beitrag der Live-Koordinate (${dichte}) [${b.quellen}]`)
       .toBeLessThanOrEqual(0.1);
-    // Die CLS-Schwelle allein meldete ein Einschieben von ~20 px nie (Review LFH-650: der
-    // Anteil einer Zeile am Viewport ist klein). Die Zeilenhöhe ist die schärfere Aussage.
+    // Die CLS-Schwelle allein meldete ein Einschieben von ~20 px nie; die Zeilenhöhe ist die
+    // schärfere Aussage.
     expect(
       Math.abs(hoeheNachher - hoeheVorher),
       `Zeilenhöhe nach Live-Koordinate (${dichte}): ${hoeheVorher} → ${hoeheNachher}`,
@@ -212,8 +203,7 @@ test('Schnellerfassung bei 390 px: die Hinweiszeile beim Tippen von „Name sk2 
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   const feld = page.getByRole('textbox', { name: 'Kurzeingabe Person' });
   await expect(feld).toBeVisible();
-  // Was UNTER der Zeile steht: der erste Inhalt nach der Erfassungszeile — gemessen wird der
-  // Filterreiter „Alle", der auf jeder Breite über der Liste steht.
+  // Was UNTER der Zeile steht: der Filterreiter „Alle", auf jeder Breite über der Liste.
   const darunter = page
     .getByRole('tab', { name: 'Alle', exact: true })
     .or(page.getByRole('radio', { name: 'Alle', exact: true }))
@@ -232,7 +222,7 @@ test('Schnellerfassung bei 390 px: die Hinweiszeile beim Tippen von „Name sk2 
     description: `390 px, Verschiebung des Inhalts darunter je Schritt: ${werte.join(' · ')} — größte ${groesste.toFixed(1)}px`,
   });
   // Eine eigene Eingabe darf den Inhalt darunter nicht um mehr als eine Zeile schieben
-  // (Kürzel-Hinweis 11 px Mono ≈ 16 px Zeilenhöhe); gemessen wird, ob es mehr ist.
+  // (Kürzel-Hinweis 11 px Mono ≈ 16 px Zeilenhöhe).
   expect(groesste, 'Verschiebung des Inhalts unter der Erfassungszeile').toBeLessThanOrEqual(16);
 });
 
@@ -300,8 +290,8 @@ test('Lage-Dashboard: Sichtungspaneel beim ersten Laden und beim Wechsel „Ohne
   await anmelden(page);
   const werte: string[] = [];
   for (const breite of [1366, 1024, 390]) {
-    // Je Breite ein FRISCHER Einsatz mit nur einer gesichteten Person: sonst ist „Ohne Sichtung"
-    // ab der zweiten Breite schon > 0, und der „Wechsel 0 → 1" wäre keiner (Review LFH-650).
+    // Je Breite ein FRISCHER Einsatz mit nur einer gesichteten Person — sonst wäre der
+    // „Wechsel 0 → 1" ab der zweiten Breite keiner.
     const einsatzId = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E Fuss ${breite} ${Date.now()}`,
     });
@@ -340,8 +330,7 @@ test('Lage-Dashboard: Sichtungspaneel beim ersten Laden und beim Wechsel „Ohne
     });
     await wartenBisRuhig(page);
     const wechsel = await beitragAb(page, m2);
-    // Geometrie neben der CLS: die Transport-Zeile darf beim Wechsel nicht wandern — genau das
-    // tat sie, als „Ohne Sichtung" erst ab > 0 erschien.
+    // Geometrie neben der CLS: die Transport-Zeile darf beim Wechsel nicht wandern.
     const dTransport =
       (await kasten(page.locator('[data-lfh="transport-bilanz"]'))).y - transportVorher.y;
     expect

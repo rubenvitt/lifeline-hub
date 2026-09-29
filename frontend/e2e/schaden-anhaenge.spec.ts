@@ -3,19 +3,14 @@ import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
 
 /**
- * Fotos und Dateien an einem Schaden im Browser (LFH-21).
+ * Fotos und Dateien an einem Schaden im Browser: der Download (ob aus `<a href download>` ein
+ * Download mit dem Dateinamen wird, entscheidet der Browser mit dem `Content-Disposition`), der
+ * Fokus beim Öffnen (der verborgene Datei-Input ist nicht fokussierbar), die Tab-Reihenfolge
+ * im Dialog (antds `Upload` kann einen zweiten Tab-Stopp um den Auslöser legen) und die
+ * Treffflächen über die Dichte-Staffel.
  *
- * Was nur hier messbar ist: der Download (ein echter `<a href download>` auf die
- * Schadensroute — ob ein Download-Ereignis mit dem Dateinamen entsteht, entscheidet der
- * Browser mit dem `Content-Disposition` des Backends), der Fokus beim Öffnen (der verborgene
- * Datei-Input ist im Browser nicht fokussierbar), die Tab-Reihenfolge im Dialog (LFH-117 hatte
- * an antds `Upload` einen zweiten Tab-Stopp um den Auslöser gemessen) und die Treffflächen über
- * die Dichte-Staffel. Belege der Prüfliste
- * `docs/superpowers/specs/2026-09-25-lfh-21-pruefliste.md`.
- *
- * Bewusst geklickt, nicht nur `toBeVisible` (CLAUDE.md, LFH-355): sichtbar ist kein Beleg für
- * bedienbar. Kein `networkidle` (offener SSE-Strom, LFH-385). Der Fixture-Name trägt keinen
- * Modulnamen (Memory `e2e-fixture-namen-ohne-modulnamen`).
+ * Geklickt, nicht nur `toBeVisible`. Kein `networkidle` (SSE-Strom). Der Fixture-Name trägt
+ * keinen Modulnamen.
  */
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -30,7 +25,6 @@ const STAFFEL = [
 
 const JPG = Buffer.from('\xff\xd8\xff\xe0 e2e schaden', 'binary');
 
-// Login-/Anlege-Helfer kopiert — es gibt (noch) kein geteiltes e2e-Hilfsmodul.
 async function anmelden(page: Page, modus?: 'light' | 'dark') {
   // Der Modus muss VOR dem ersten Laden stehen — der Bootstrap in `index.html` liest ihn.
   if (modus) await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
@@ -144,9 +138,8 @@ test('legt ab, lädt herunter, schreibt den pseudonymen ETB-Nachweis und entfern
   expect(fremd.status()).toBe(404);
 });
 
-// Serienfokus (Code-Review C2): nach „Speichern und nächste“ muss der Fokus wieder auf
-// „Datei wählen“ stehen. jsdom fokussiert den versteckten Datei-Input klaglos und ist dafür
-// blind — nur der Browser entscheidet.
+// Nach „Speichern und nächste“ steht der Fokus wieder auf „Datei wählen“. jsdom fokussiert
+// den versteckten Datei-Input klaglos und ist dafür blind.
 test('nach „Speichern und nächste“ steht der Fokus wieder auf „Datei wählen“', async ({ page }) => {
   test.setTimeout(60_000);
   await page.setViewportSize(FUEKW);
@@ -243,7 +236,7 @@ test.describe('Dichte-Staffel: Download-Anker und Entfernen am Schaden', () => {
   }
 });
 
-// Kriterium 5: Tag ≥ 7, Nacht ≥ 5 — als Literale (Muster `hellmodus-kontrast`).
+// Kriterium 5: Tag ≥ 7, Nacht ≥ 5 — als Literale.
 const KONTRAST_ZIEL = { light: 7, dark: 5 } as const;
 
 for (const modus of ['light', 'dark'] as const) {
@@ -278,9 +271,9 @@ for (const modus of ['light', 'dark'] as const) {
   });
 }
 
-// Kriterium 13 (Review C2): gemessen statt offen gelassen, Muster `dokumente.spec.ts`. Die
-// Detailseite muss scrollen, sonst wandert nichts unter die stehende Kopfzeile; der Durchlauf
-// muss die Zeilen des Paneels erreichen, sonst wäre „0 verdeckt“ trivial wahr.
+// Kriterium 13: die Detailseite muss scrollen, sonst wandert nichts unter die stehende
+// Kopfzeile; der Durchlauf muss die Zeilen des Paneels erreichen, sonst wäre „0 verdeckt"
+// trivial wahr.
 test('Fokus nie verdeckt: Tab-Durchlauf durch die Anhangliste unter der Kopfzeile', async ({
   page,
 }, testInfo) => {

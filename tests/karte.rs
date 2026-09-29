@@ -19,25 +19,21 @@ async fn pool() -> sqlx::SqlitePool {
 /// Baut den Router um einen vorhandenen Pool. `karten_dir` ist für die hier getesteten Pfade
 /// belanglos (Tiles nutzen absolute Pfade bzw. den Traversal-Guard) → Wegwerf-Tempverzeichnis.
 fn app_mit_pool(pool: sqlx::SqlitePool) -> axum::Router {
+    app_mit(pool, lifeline_hub::db::test_karten_dir())
+}
+
+/// Wie [`app_mit_pool`], mit eigenem `karten_dir`.
+fn app_mit(pool: sqlx::SqlitePool, karten_dir: std::path::PathBuf) -> axum::Router {
     build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-        karten_dir: lifeline_hub::db::test_karten_dir(),
+        karten_dir,
+        ..common::test_state(&pool, &LiveHub::new())
     })
 }
 
 /// Bootstrappt eine Org + Admin und liefert (Router, Admin-Session-Cookie).
 async fn admin_app() -> (axum::Router, String) {
-    let pool = pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let app = app_mit_pool(pool);
+    let (app, _pool) =
+        common::setup_mit_state(|s| s.karten_dir = lifeline_hub::db::test_karten_dir()).await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     (app, cookie)
 }
@@ -134,16 +130,7 @@ async fn offline_tiles_liefert_gzip_mvt_mit_tms_flip() {
     schreibe_fixture_mbtiles(&dir.path().join(dateiname), &[0xAB, 0xCD]).await;
     registriere_und_aktiviere(&pool, dateiname, "pbf").await;
 
-    let app = build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-        karten_dir: dir.path().to_path_buf(),
-    });
+    let app = app_mit(pool, dir.path().to_path_buf());
 
     // Vorhandene Kachel: XYZ (z=1,x=0,y=0) -> TMS row = (2^1-1)-0 = 1 -> Treffer.
     let req = Request::builder()
@@ -182,16 +169,7 @@ async fn offline_tiles_raster_liefert_png_ohne_gzip_und_config_meldet_raster() {
     schreibe_fixture_mbtiles(&dir.path().join(dateiname), png).await;
     registriere_und_aktiviere(&pool, dateiname, "png").await;
 
-    let app = build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-        karten_dir: dir.path().to_path_buf(),
-    });
+    let app = app_mit(pool, dir.path().to_path_buf());
 
     // Raster-Kachel: image/png, KEIN gzip, Blob round-trippt.
     let req = Request::builder()
@@ -245,16 +223,7 @@ async fn offline_tiles_ungueltiges_z_liefert_204_ohne_panic() {
     schreibe_fixture_mbtiles(&dir.path().join(dateiname), &[0xAB, 0xCD]).await;
     registriere_und_aktiviere(&pool, dateiname, "pbf").await;
 
-    let app = build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-        karten_dir: dir.path().to_path_buf(),
-    });
+    let app = app_mit(pool, dir.path().to_path_buf());
     let req = Request::builder()
         .uri("/api/karte/offline/tiles/99/0/0")
         .body(Body::empty())
@@ -359,14 +328,10 @@ async fn config_endpoint_blind_modus_ohne_konfiguration() {
 /// der Config-Handler prüft nur Anwesenheit, ruft den Service NICHT auf.
 fn app_mit_pool_und_karten_service(pool: sqlx::SqlitePool) -> axum::Router {
     build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: Some("http://127.0.0.1:1".into()),
         karten_service_token: Some("t".into()),
         karten_dir: lifeline_hub::db::test_karten_dir(),
+        ..common::test_state(&pool, &LiveHub::new())
     })
 }
 
@@ -483,16 +448,7 @@ async fn fachebenen_autobahn_liefert_gecachte_antwort() {
     );
     lifeline_hub::karte::cache::setze(&cache, "autobahn", &gecacht).await;
 
-    let app = build_router(AppState {
-        pool: pool().await,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-        karten_dir: dir,
-    });
+    let app = app_mit(pool().await, dir);
     let res = anfrage(&app, "GET", "/api/karte/fachebenen/autobahn", None, None).await;
     assert_eq!(res.status(), StatusCode::OK);
     let v: serde_json::Value =
@@ -521,16 +477,7 @@ async fn fachebenen_kritis_ohne_bbox_ist_400() {
 /// teilen sich ein Karten-Verzeichnis, damit der Test den Bestand vorher setzen kann.
 async fn kritis_app() -> (axum::Router, sqlx::SqlitePool) {
     let karten_dir = lifeline_hub::db::test_karten_dir();
-    let app = build_router(AppState {
-        pool: pool().await,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-        karten_dir: karten_dir.clone(),
-    });
+    let app = app_mit(pool().await, karten_dir.clone());
     let cache = lifeline_hub::cache_db::cache_pool(&karten_dir)
         .await
         .unwrap();
@@ -642,16 +589,7 @@ async fn fachebenen_kritis_aus_dem_bestand() {
 async fn fachebenen_hochwasser_wird_bedient() {
     use lifeline_hub::karte::typen::FachebeneAntwort;
     let karten_dir = lifeline_hub::db::test_karten_dir();
-    let app = build_router(AppState {
-        pool: pool().await,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-        karten_dir: karten_dir.clone(),
-    });
+    let app = app_mit(pool().await, karten_dir.clone());
     let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
         .await
         .unwrap();
@@ -685,16 +623,7 @@ async fn fachebenen_hochwasser_wird_bedient() {
 async fn fachebenen_luftqualitaet_wird_bedient() {
     use lifeline_hub::karte::typen::FachebeneAntwort;
     let karten_dir = lifeline_hub::db::test_karten_dir();
-    let app = build_router(AppState {
-        pool: pool().await,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-        karten_dir: karten_dir.clone(),
-    });
+    let app = app_mit(pool().await, karten_dir.clone());
     let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
         .await
         .unwrap();
@@ -739,16 +668,7 @@ async fn fachebenen_luftqualitaet_wird_bedient() {
 async fn fachebenen_odl_wird_bedient() {
     use lifeline_hub::karte::typen::FachebeneAntwort;
     let karten_dir = lifeline_hub::db::test_karten_dir();
-    let app = build_router(AppState {
-        pool: pool().await,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-        karten_dir: karten_dir.clone(),
-    });
+    let app = app_mit(pool().await, karten_dir.clone());
     let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
         .await
         .unwrap();
@@ -792,16 +712,7 @@ async fn fachebenen_odl_bewertet_gegen_den_grundpegel() {
     use lifeline_hub::karte::odl_grundpegel::{Grundpegel, GrundpegelKarte};
     use lifeline_hub::karte::typen::FachebeneAntwort;
     let karten_dir = lifeline_hub::db::test_karten_dir();
-    let app = build_router(AppState {
-        pool: pool().await,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-        karten_dir: karten_dir.clone(),
-    });
+    let app = app_mit(pool().await, karten_dir.clone());
     let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
         .await
         .unwrap();
@@ -876,16 +787,7 @@ async fn fachebenen_energie_kaputte_bbox_ist_400() {
 async fn fachebenen_energie_wird_aus_beiden_teilen_bedient() {
     use lifeline_hub::karte::typen::FachebeneAntwort;
     let karten_dir = lifeline_hub::db::test_karten_dir();
-    let app = build_router(AppState {
-        pool: pool().await,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-        karten_dir: karten_dir.clone(),
-    });
+    let app = app_mit(pool().await, karten_dir.clone());
     let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
         .await
         .unwrap();
@@ -2133,20 +2035,12 @@ async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
 /// Bau-Trigger-Test braucht es EINE konkrete (Mock-)Adresse statt der toten `127.0.0.1:1` aus
 /// `app_mit_pool_und_karten_service`.
 async fn admin_app_mit_karten_service(url: &str, token: &str) -> (axum::Router, String) {
-    let pool = pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let app = build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: Some(url.to_string()),
-        karten_service_token: Some(token.to_string()),
-        karten_dir: lifeline_hub::db::test_karten_dir(),
-    });
+    let (app, _pool) = common::setup_mit_state(|s| {
+        s.karten_service_url = Some(url.to_string());
+        s.karten_service_token = Some(token.to_string());
+        s.karten_dir = lifeline_hub::db::test_karten_dir();
+    })
+    .await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     (app, cookie)
 }

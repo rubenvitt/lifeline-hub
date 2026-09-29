@@ -6,10 +6,8 @@
 //! Die Fachlogik der Schreibpfade prüfen `src/betreuung/repo/tests.rs`; hier geht es um das,
 //! was erst die Route leistet: Body-Extraktion, Enum- und Zeit-Parsing, Gates, Live.
 
-use axum::body::Body;
-use axum::http::{header, Request, StatusCode};
+use axum::http::StatusCode;
 use serde_json::Value;
-use tower::ServiceExt;
 
 mod common;
 use common::*;
@@ -1060,41 +1058,6 @@ async fn fremde_organisation_wird_abgewiesen() {
 }
 
 // ── Live-Verteilung ─────────────────────────────────────────────────────────────────────────
-
-/// Liest den Anfang eines offenen SSE-Stroms, bis für `stille_ms` nichts mehr kommt
-/// (Muster `tests/modul_override.rs`).
-async fn sse_anfang_lesen(body: Body, stille_ms: u64) -> String {
-    use http_body_util::BodyExt;
-    let mut body = body;
-    let mut gelesen = String::new();
-    while let Ok(Some(Ok(frame))) = tokio::time::timeout(
-        std::time::Duration::from_millis(stille_ms),
-        std::pin::Pin::new(&mut body).frame(),
-    )
-    .await
-    {
-        if let Some(daten) = frame.data_ref() {
-            gelesen.push_str(&String::from_utf8_lossy(daten));
-        }
-    }
-    gelesen
-}
-
-async fn live_oeffnen(app: &axum::Router, cookie: &str, eid: i64) -> axum::response::Response {
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .uri(format!("/api/einsaetze/{eid}/live"))
-                .header(header::COOKIE, cookie.to_string())
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    resp
-}
 
 /// Paar: ein Leser MIT Modulrecht bekommt `betreuung`, einer OHNE bekommt es nicht. Die
 /// Nutzlast trägt nur Kennungen — Bezeichnung und Anzahl verlassen den Server nicht.

@@ -1,49 +1,30 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
 
 /**
- * Druck im normalen Fluss (LFH-71, design.md D1/D10 des Changes `lfh-22-druck-export`).
+ * Druck im normalen Fluss: ein Druckstück (Lagebericht lesend und im Entwurf, Befehl) steht
+ * unter `@media print` im NORMALEN Dokumentfluss — die Druckwurzel ist `position: static` und
+ * beginnt oben, App-Rahmen und schwebende Ebenen (eine offene `message`) sind `display: none`.
+ * Nur so drucken Firefox und Safari mehrseitig; einen absolut positionierten Druckbereich
+ * schneiden sie nach Seite 1 ab.
  *
- * WAS BEWIESEN WIRD: ein Druckstück (Lagebericht lesend und im Entwurf, Befehl) steht unter
- * `@media print` im NORMALEN Dokumentfluss — die Druckwurzel ist `position: static` und
- * beginnt oben auf der Seite, der App-Rahmen (Kopfleiste, Rail, Modulpanel) und schwebende
- * Ebenen (eine offene `message`) sind `display: none`, belegen also keinen Platz. Genau das
- * ist die Bedingung, unter der Firefox und Safari mehrseitig drucken: ein absolut
- * positionierter Druckbereich wird dort nach der ersten Seite abgeschnitten.
+ * DISKRIMINIEREND sind `position` der Wurzel und `display` des Rahmens: das alte Muster
+ * (`visibility: hidden` plus `position: absolute`) lag auch oben und trug den Text auch
+ * jenseits einer A4-Höhe.
  *
- * WARUM DIESE AUSSAGEN DISKRIMINIEREN: das alte Muster (`body * { visibility: hidden }` plus
- * `position: absolute` am Druckbereich) liegt AUCH oben auf der Seite und trägt den Text
- * AUCH unterhalb einer A4-Höhe. Beides allein wäre also am alten Stand grün. Rot wird der
- * alte Stand an `position` der Wurzel und an `display` des Rahmens: `visibility: hidden`
- * lässt die Kopfleiste im Layout stehen.
+ * NICHT BEWIESEN: Firefox und Safari selbst (Playwright fährt nur Chromium, `page.pdf()` gibt
+ * es nur dort) — die prüft die Prüfliste von Hand. Die PDF-Seitenzahl ist Plausibilität; den
+ * PDF-Text prüft der Spec nicht (subsetted und komprimiert).
  *
- * WAS NICHT BEWIESEN WIRD: Firefox und Safari selbst. Playwright fährt hier nur Chromium,
- * und `page.pdf()` gibt es nur dort. Die beiden Browser prüft die Prüfliste von Hand.
- * Die PDF-Seitenzahl unten ist eine PLAUSIBILITÄT (keine Leerseiten, kein Abschneiden in
- * Chromium), kein Nachweis für die anderen Browser. Den Text im PDF prüft der Spec nicht:
- * die Glyphen sind subsetted und komprimiert, das bräuchte einen PDF-Parser als neue
- * Abhängigkeit.
- *
- * MUTATIONSPROBE (Stand vor 1.1/1.2, also mit dem alten Muster in den drei `*Print.css`,
- * gemessen am 25.09.2026 gegen das Binary von Commit 3ce922d2): alle drei Druckstück-Tests
- * ROT, jeweils an der ersten diskriminierenden Aussage — „Druckwurzel steht im Fluss"
- * erwartet `static`, bekam `absolute`. Mit ausgeschalteter Positionsprüfung scheitert
- * derselbe Stand an „Kopfleiste im Druck ausgeblendet" (`flex` statt `none`). Der
- * Zähler-Selbsttest ist auf beiden Ständen grün (er prüft den Zähler, nicht den Code).
- *
- * SEEDING PER `page.request`: die Session ist Cookie-basiert, `page.request` teilt den
- * Cookie-Jar des Kontexts (Vorgehen aus `lagebericht-schmal.spec.ts`).
+ * Seeding per `page.request`.
  */
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 /**
- * A4 in CSS-Pixeln bei 96 px/in: 210 × 297 mm → 793,7 × 1122,5 px. [abgeleitet]
- *
- * Der Seitenrand kommt aus `@page { margin: 15mm }` in `src/druck/druck.css`: nutzbar
- * bleiben 180 × 267 mm → 680 × 1009 px. Das Sichtfeld wird auf die nutzbare Breite gestellt,
- * weil `emulateMedia` nur die Medienabfrage schaltet und die Layoutbreite beim Sichtfeld
- * lässt (Herleitung in `meldebild-tabelle.spec.ts`, `A4_DRUCKBREITE`).
+ * A4 in CSS-Pixeln bei 96 px/in: 210 × 297 mm → 793,7 × 1122,5 px. [abgeleitet] Nach dem
+ * `@page`-Rand (15 mm) bleiben 680 × 1009 px. Das Sichtfeld wird auf die nutzbare Breite
+ * gestellt, weil `emulateMedia` die Layoutbreite beim Sichtfeld lässt.
  */
 const A4_HOEHE = 1122;
 const NUTZ_BREITE = 680;
@@ -54,7 +35,6 @@ const SUBPIXEL = 1;
 
 const ENDMARKE = 'ENDMARKE-LETZTER-ABSCHNITT';
 
-// Login-/Anlege-Helfer wie in den Bestands-Specs — es gibt (noch) kein geteiltes Hilfsmodul.
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -72,11 +52,9 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 }
 
 /**
- * Schreibende Anfrage mit bis zu drei Versuchen bei 503. Unter drei parallelen Workern
- * antwortete die Freigabe gemessen einmal mit „Dienst vorübergehend ausgelastet — bitte
- * erneut versuchen" (SQLite-Schreibkonflikt nach Busy-Retries, `error.rs`). Das Seeding ist
- * Vorbereitung, keine Aussage; der Server sagt selbst, dass ein zweiter Versuch richtig ist.
- * Jede andere Antwort geht unverändert durch.
+ * Schreibende Anfrage mit bis zu drei Versuchen bei 503: unter parallelen Workern antwortet
+ * SQLite gelegentlich „vorübergehend ausgelastet". Das Seeding ist Vorbereitung, keine
+ * Aussage; jede andere Antwort geht unverändert durch.
  */
 async function mitWiederholung(anfrage: () => Promise<APIResponse>): Promise<APIResponse> {
   let antwort = await anfrage();
@@ -174,11 +152,9 @@ async function befehlSaeen(page: Page, einsatzId: string, freigeben = true): Pro
 }
 
 /**
- * Lage der Druckwurzel, des Rahmens und der Endmarke im aktuellen Medium.
- *
- * Über `evaluate` und `getComputedStyle`, NICHT über `toBeVisible`: die Aussage ist
- * „belegt keinen Platz" (`display: none`), und `toBeVisible` trennt das nicht von
- * `visibility: hidden` — genau der Unterschied, um den es geht.
+ * Lage der Druckwurzel, des Rahmens und der Endmarke im aktuellen Medium, über
+ * `getComputedStyle` — `toBeVisible` trennt `display: none` nicht von `visibility: hidden`,
+ * genau den Unterschied, um den es geht.
  */
 async function druckLage(page: Page) {
   return page.evaluate((endmarke) => {
@@ -190,17 +166,13 @@ async function druckLage(page: Page) {
       const el = document.querySelector(sel);
       return el ? getComputedStyle(el).display : 'fehlt';
     };
-    // Die Endmarke als TEXTKNOTEN im gerenderten Markdown — nicht im Textfeld des Editors,
-    // das im Druck ausgeblendet ist und den Wert nur als Eigenschaft trägt. Nur ein
-    // DARGESTELLTER Knoten zählt (`getClientRects`): eine verborgene Druckfassung oder
-    // Vorschau trüge den Text auch, aber nicht aufs Papier.
+    // Die Endmarke als DARGESTELLTER Textknoten im gerenderten Markdown (`getClientRects`) —
+    // nicht im Textfeld des Editors und nicht in einer verborgenen Fassung.
     const knoten = Array.from(wurzel.querySelectorAll('.markdown p')).find(
       (p) => p.textContent?.includes(endmarke) && p.getClientRects().length > 0,
     ) as HTMLElement | undefined;
-    // Ein Textfeld im Druck ist Rohtext in Bildschirmhöhe — abgeschnitten, sobald der Text
-    // länger ist als das Feld (Review Welle B, Lagebericht-Entwurf in der Vorgabe).
-    // `getClientRects`, nicht `display` des Felds: im Split-Layout weicht die ganze
-    // Eingabespalte, das Feld selbst behält sein `display`.
+    // Ein Textfeld im Druck ist Rohtext in Bildschirmhöhe, abgeschnitten, sobald der Text
+    // länger ist. `getClientRects`, weil im Split-Layout die ganze Eingabespalte weicht.
     const textfelder = Array.from(wurzel.querySelectorAll('textarea')).filter(
       (t) => t.getClientRects().length > 0,
     ).length;
@@ -228,9 +200,8 @@ function seitenImPdf(pdf: Buffer): number {
 }
 
 async function pruefeDruckImFluss(page: Page, fall: string) {
-  // Vorbedingung am Bildschirm, im BREITEN Sichtfeld (Rail und Modulpanel gibt es erst ab
-  // `lg`): der Rahmen steht wirklich da — sonst prüfte der Druck eine Seite, auf der es
-  // nichts auszublenden gibt.
+  // Vorbedingung am Bildschirm, breit (Rail und Modulpanel gibt es erst ab `lg`): der Rahmen
+  // steht — sonst gäbe es im Druck nichts auszublenden.
   await page.setViewportSize({ width: 1280, height: 900 });
   const schirm = await druckLage(page);
   expect(schirm.kopfleiste, `${fall}: Kopfleiste steht am Bildschirm`).not.toBe('none');
@@ -253,13 +224,12 @@ async function pruefeDruckImFluss(page: Page, fall: string) {
     expect(rahmen.meldung, `${fall}: offene Meldung im Druck ausgeblendet`).toBe('none');
   }
 
-  // Die Marke erst NACH den Layoutaussagen: am alten Stand fehlt sie ohnehin, und die
-  // Mutationsprobe soll an der Mechanik rot werden, nicht an der fehlenden Marke.
+  // Die Marke erst NACH den Layoutaussagen: der Test soll an der Mechanik rot werden.
   expect(rahmen.wurzelAnzahl, `${fall}: genau eine Druckwurzel`).toBe(1);
   expect(rahmen.textfelder, `${fall}: kein Eingabefeld für Abschnittstext auf Papier`).toBe(0);
   if (rahmen.titelUmbruch !== 'kein Entwurfstitel') {
-    // Belegt die KASKADE (die Regel greift am Entwurfstitel), nicht den Umbruch selbst —
-    // den zeigt nur das Blatt (Handprüfung, LFH-729).
+    // Belegt die KASKADE (die Regel greift am Entwurfstitel), nicht den Umbruch selbst — den
+    // zeigt nur das Blatt (Handprüfung).
     expect(rahmen.titelUmbruch, `${fall}: Abschnittstitel bleibt bei seinem Text`).toBe('avoid');
   }
 
@@ -308,12 +278,10 @@ test('Lagebericht (freigegeben) druckt im normalen Fluss über mehrere Seiten', 
 });
 
 /**
- * Die VORGABE der Entwurfsseite: „Vorschau neben dem Text" ist aus, die Editoren stehen im
- * Toggle-Layout mit geschlossener Vorschau. Review Welle B: genau dieser Zustand druckte die
- * `<textarea>` (Rohtext in Bildschirmhöhe, der letzte Abschnitt abgeschnitten); der Test
- * hakte vorher „Vorschau neben dem Text" an und prüfte nur das Split-Layout. Diskriminierend
- * ist die Endmarke des LETZTEN (zugeklappten) Abschnitts als dargestellter Markdown-Absatz
- * jenseits der ersten Seite, und kein sichtbares Textfeld im Druck.
+ * Die VORGABE der Entwurfsseite: „Vorschau neben dem Text" aus, Toggle-Layout mit
+ * geschlossener Vorschau — der Zustand, in dem die `<textarea>` am ehesten mitgedruckt wird.
+ * Diskriminierend: die Endmarke des LETZTEN (zugeklappten) Abschnitts steht als dargestellter
+ * Markdown-Absatz jenseits der ersten Seite, und kein Textfeld ist im Druck sichtbar.
  */
 test('Lagebericht (Entwurf, Vorgabe ohne Vorschau) druckt jeden Abschnitt vollständig als Markdown', async ({
   page,

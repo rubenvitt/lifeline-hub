@@ -1,37 +1,11 @@
 use axum::http::StatusCode;
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
 use serde_json::Value;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup,
-    system_etb_anzahl,
+    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, rolle_setzen, setup,
+    setup_mit_live, system_etb_anzahl,
 };
-
-// ---------- Harness (identisch zu tests/einsatz_fahrzeug.rs) ----------
-
-/// Wie `setup`, behält aber ein Handle auf den `LiveHub`, um Live-Events zu abonnieren.
-async fn setup_mit_hub() -> (axum::Router, LiveHub) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let live = LiveHub::new();
-    let router = build_router(AppState {
-        pool,
-        live: live.clone(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, live)
-}
 
 // ---------- Zusatz-Helfer ----------
 
@@ -414,20 +388,6 @@ async fn patch_menge_unter_eins_ist_400() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
-/// Bildet eine Einheit (Admin) und liefert ihre id.
-async fn einheit_bilden(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
-    let (status, json) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
-        cookie,
-        Some(&format!(r#"{{"name":"{name}"}}"#)),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED);
-    json["id"].as_i64().unwrap()
-}
-
 #[tokio::test]
 async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
     let app = setup().await;
@@ -569,7 +529,7 @@ async fn fremde_em_id_an_einheit_ist_404() {
 /// Fehlplatzierung des Events hinter den ETB-Schreibbedingungen (menge/status).
 #[tokio::test]
 async fn reine_bemerkung_publiziert_material_event() {
-    let (app, live) = setup_mit_hub().await;
+    let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
@@ -610,7 +570,7 @@ async fn reine_bemerkung_publiziert_material_event() {
 /// als Beifang des `einheit`-Events.
 #[tokio::test]
 async fn material_an_einheit_zuordnen_publiziert_material_event() {
-    let (app, live) = setup_mit_hub().await;
+    let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;

@@ -1,8 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Fokussierter e2e für LFH-142 (ETB-Entwurf-Tabs + Autosave). Umgeht bewusst die
-// Einsatz-Modul-Navigation (die kernfluss.spec.ts derzeit stale macht), indem nach
-// dem Anlegen direkt die ETB-Modul-URL angesteuert wird.
+// ETB-Entwurf-Tabs und Autosave; nach dem Anlegen wird direkt die ETB-Modul-URL angesteuert.
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -45,14 +43,13 @@ test('ETB-Entwurf-Tab: Eintrag erfassen landet in der Zeitachse, Entwurf-Tab wir
   await feld.fill(inhalt);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
-  // Erst den stabilen Zustand nach dem Absenden abwarten: das Eingabefeld ist geleert
-  // und der Tab auf einen neuen leeren Entwurf zurückgesetzt. (Während des Tippens
-  // spiegelt das Tab-Label den Inhalt — ein zu generischer getByText(inhalt) träfe
-  // darum transient sowohl Tab-Label als auch textarea.)
+  // Erst den stabilen Zustand nach dem Absenden abwarten: Feld geleert, Tab auf einen neuen
+  // leeren Entwurf zurückgesetzt. Während des Tippens spiegelt das Tab-Label den Inhalt, ein
+  // `getByText(inhalt)` träfe dann Tab-Label und textarea.
   await expect(page.getByPlaceholder('Inhalt …')).toHaveValue('');
 
-  // Der erfasste Eintrag steht in der Zeitachse (Neuentwurf S4 — eine Tabelle gibt es auf
-  // keiner Breite mehr). Die Region grenzt ihn gegen Tab-Label und Eingabefeld ab.
+  // Der erfasste Eintrag steht in der Zeitachse; die Region grenzt ihn gegen Tab-Label und
+  // Eingabefeld ab.
   const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
   await expect(zeitachse.getByText(inhalt, { exact: true })).toBeVisible();
 });

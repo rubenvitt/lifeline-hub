@@ -1,25 +1,9 @@
-# Lokale Dev-Infrastruktur: S3-kompatibles Object-Storage (Garage) für den
-# `karten-service` (Komponente A, LFH-204). Start über `mise run garage`,
-# Abriss über `mise run clean:docker`.
+# Lokale Dev-Infrastruktur: S3-kompatibles Object-Storage (Garage) für den `karten-service`.
+# Start über `mise run garage`, Abriss über `mise run clean:docker`. Nur Entwicklung —
+# lifeline-hub selbst läuft ohne Docker (docs/ops/lfh-204-karten-service-ops-runbook.md).
 #
-# Bewusst NUR Entwicklungs-Infrastruktur. lifeline-hub selbst läuft ohne
-# Laufzeit-Docker (single binary) — siehe
-# docs/ops/lfh-204-karten-service-ops-runbook.md. Diese Datei ersetzt nichts
-# davon, sie stellt nur das lokale Gegenstück zum produktiven S3/R2-Bucket.
-#
-# Zugangsdaten sind absichtlich feste Dev-Vorgaben: das Bucket trägt
-# ausschließlich öffentliche ODbL-Kartendaten, und die passenden AWS_*-Werte
-# stehen in der (gitignorten) .env.
-#
-# Warum Garage und nicht mehr MinIO: `minio/minio` und `minio/mc` sind von
-# Docker Hub entfernt worden (die Hub-API antwortet für beide mit
-# „object not found"), ein `docker compose up` lief damit in „pull access
-# denied". Garage deckt denselben Bedarf mit EINEM Service ab — der frühere
-# `minio-init`-Service samt zweitem Image entfällt, weil `--single-node` das
-# Cluster-Layout und `--default-bucket` Schlüssel und Bucket selbst anlegen.
-#
-# Passend dazu gehören in die (gitignorte) .env — eine .env aus der MinIO-Zeit
-# zeigt auf Port 9000 und läuft nach dem Wechsel ins Leere:
+# Die Zugangsdaten sind feste Dev-Vorgaben: das Bucket trägt nur öffentliche ODbL-Kartendaten.
+# Dazu gehören in die (gitignorte) .env:
 #
 #   KS_STORAGE_BUCKET=maps
 #   KS_BASE_URL=http://localhost:3902
@@ -31,23 +15,21 @@
 #   AWS_REGION=garage
 #   AWS_ALLOW_HTTP=true
 #
-# KS_BASE_URL trägt bewusst `localhost` (nicht 127.0.0.1) und KEIN `/maps`:
-# der Lesepfad wird Host-basiert zugeordnet, den passenden Bucket-Alias setzt
-# `mise run garage`. Begründung dort und in src/karte/download.rs.
+# KS_BASE_URL trägt bewusst `localhost` (nicht 127.0.0.1) und KEIN `/maps`: der Lesepfad wird
+# Host-basiert zugeordnet, den Bucket-Alias setzt `mise run garage` (Begründung dort und in
+# src/karte/download.rs).
 #
-# ACHTUNG: `docker compose up` allein genügt NICHT. Website-Flag und Bucket-Alias
-# — ohne die der unsignierte Lesepfad mit 404 antwortet — setzt ausschließlich
-# `mise run garage`. Beides liegt in den Metadaten und überlebt Neustarts; nach
-# `docker compose down -v` (oder auf einem frischen Klon) muss der Task laufen.
-# Das ist der Unterschied zum abgelösten MinIO, dessen Init ein compose-Service war:
-# das Garage-Image bringt keine Shell mit, und seine CLI erreicht den Knoten nur
-# über dessen RPC-Socket — ein Fremdcontainer hat den nicht.
+# ACHTUNG: `docker compose up` allein genügt NICHT. Website-Flag und Bucket-Alias — ohne die der
+# unsignierte Lesepfad mit 404 antwortet — setzt nur `mise run garage`; nach
+# `docker compose down -v` oder auf einem frischen Klon muss der Task laufen. Ein
+# Init-Container geht nicht: das Image hat keine Shell, und die CLI erreicht den Knoten nur über
+# dessen RPC-Socket.
 
 name: lfh
 
 services:
   garage:
-    # v2.3.0 brachte `--single-node`/`--default-bucket`; darunter wäre die
+    # Ab v2.3.0 gibt es `--single-node`/`--default-bucket`; darunter wäre die
     # `garage layout assign`/`apply`-Zeremonie von Hand nötig.
     image: dxflrs/garage:v2.4.1
     container_name: lfh-garage
@@ -65,10 +47,7 @@ services:
       - lfh-garage-data:/var/lib/garage/data
     restart: unless-stopped
     healthcheck:
-      # Das Image bringt WEDER Shell NOCH curl mit (gemessen: `exec: "sh":
-      # executable file not found`) — anders als das frühere MinIO-Image, dessen
-      # Healthcheck curl rief. Der Test ruft deshalb die Binary direkt; ein
-      # CMD-SHELL-Einzeiler oder ein HTTP-Check per curl liefe ins Leere.
+      # Das Image hat weder Shell noch curl, deshalb ruft der Test die Binary direkt.
       test: ['CMD', '/garage', 'status']
       interval: 2s
       timeout: 3s
@@ -77,7 +56,6 @@ services:
 
 volumes:
   # Feste Namen, damit `mise run clean:docker` sie ohne Projektpräfix trifft.
-  # Garage trennt Metadaten (Bucket-/Schlüsselverwaltung) von den Nutzdaten.
   lfh-garage-meta:
     name: lfh-garage-meta
   lfh-garage-data:

@@ -1,9 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Browser-Smoke der jsdom-blinden Deeplink-Mechanismen (LFH-25): <Navigate>-Redirect bei
-// strukturell ungültiger Detail-ID und ?eintrag=-Highlight/Scroll im ETB. Die href-Generierung
-// und die State-Konsumierung sind in den Unit-Tests abgedeckt; hier geht es um das reale
-// Router-/DOM-Verhalten.
+// Browser-Smoke der jsdom-blinden Deeplink-Mechanismen: <Navigate>-Redirect bei ungültiger
+// Detail-ID und ?eintrag=-Highlight/Scroll im ETB (reales Router-/DOM-Verhalten).
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -46,10 +44,9 @@ test('ETB-Deeplink ?eintrag= hebt den adressierten Eintrag im Browser hervor', a
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   /*
-   * Seit dem Neuentwurf (21.09.2026) ist das Tagebuch auf jeder Breite eine Zeitachse, kein
-   * `<tr>` mehr (`etb/EtbZeitachse.tsx`, e2e `etb-chronologie`). Die Zeile trägt dieselbe
-   * Marke wie ein Kartenzweig der Datensicht (`data-lfh="datensicht-karte"`, daran findet
-   * `scrolleZurZeile` sie) und ihren Schlüssel in `data-zeile` statt `data-row-key`.
+   * Das Tagebuch ist eine Zeitachse ohne `<tr>`. Die Zeile trägt die Marke
+   * `data-lfh="datensicht-karte"` (daran findet `scrolleZurZeile` sie) und ihren Schlüssel in
+   * `data-zeile`.
    */
   const sicht = page.getByRole('region', { name: 'Einsatztagebuch' });
   const zeile = sicht.getByTestId('etb-ereigniszeile').filter({ hasText: inhalt });
@@ -57,10 +54,9 @@ test('ETB-Deeplink ?eintrag= hebt den adressierten Eintrag im Browser hervor', a
   const zeilenSchluessel = await zeile.getAttribute('data-zeile');
   expect(zeilenSchluessel).toBeTruthy();
   /*
-   * Der Zeilenschlüssel trägt seit LFH-342 · C7 das Sortenpräfix (`eintrag-<id>`) — die
-   * Queue-`id` eines offline gepufferten Eintrags kollidierte sonst mit der DB-`id`. Der
-   * Query-Param nimmt weiterhin die nackte DB-`id`; ohne diese Trennung ginge
-   * `?eintrag=eintrag-9` an `parseRouteId` vorbei und der Sprung liefe still ins Leere.
+   * Der Zeilenschlüssel trägt das Sortenpräfix (`eintrag-<id>`), damit die Queue-`id` eines
+   * offline gepufferten Eintrags nicht mit der DB-`id` kollidiert. Der Query-Param nimmt die
+   * nackte DB-`id` — `?eintrag=eintrag-9` fiele an `parseRouteId` still durch.
    */
   const eintragId = zeilenSchluessel!.replace(/^eintrag-/, '');
   expect(eintragId).toMatch(/^\d+$/);

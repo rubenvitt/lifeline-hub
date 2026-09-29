@@ -1,66 +1,12 @@
 use axum::http::StatusCode;
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::{LiveHub, LiveNachricht};
 use serde_json::{json, Value};
 use std::time::Duration;
-use tokio::sync::broadcast::Receiver;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen};
-
-async fn setup() -> (axum::Router, LiveHub) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let live = LiveHub::new();
-    let router = build_router(AppState {
-        pool,
-        live: live.clone(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, live)
-}
-
-async fn system_etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {
-    let (_, json) = anfrage(
-        app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
-        cookie,
-        None,
-    )
-    .await;
-    json.as_array()
-        .unwrap()
-        .iter()
-        .filter(|e| e["typ"] == "system")
-        .map(|e| e["inhalt"].as_str().unwrap().to_string())
-        .collect()
-}
-
-async fn recv_until_tag(
-    rx: &mut Receiver<LiveNachricht>,
-    tag: &str,
-    timeout: Duration,
-) -> LiveNachricht {
-    loop {
-        let n = tokio::time::timeout(timeout, rx.recv())
-            .await
-            .unwrap_or_else(|_| panic!("Timeout: kein '{tag}'-Event empfangen"))
-            .expect("Broadcast-Kanal geschlossen");
-        if n.event.as_str() == tag {
-            return n;
-        }
-    }
-}
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, recv_until_tag, rolle_setzen,
+    setup_mit_live, system_etb_inhalte,
+};
 
 fn bewertung(typ: &str, objekt: &str, warn: &str) -> String {
     json!({"gefahrentyp": typ, "schutzobjekt": objekt, "warnstufe": warn}).to_string()
@@ -93,7 +39,7 @@ async fn gefahrengebiet_anlegen(
 
 #[tokio::test]
 async fn matrix_leer_dann_put_dann_upsert() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
@@ -133,7 +79,7 @@ async fn matrix_leer_dann_put_dann_upsert() {
 
 #[tokio::test]
 async fn keine_leert_die_zelle() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
@@ -164,7 +110,7 @@ async fn keine_leert_die_zelle() {
 /// damit niemand die Datei pauschal auf einen der beiden Codes kippt (LFH-305).
 #[tokio::test]
 async fn ungueltiger_enum_ist_400_kombination_bleibt_422() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
@@ -222,7 +168,7 @@ async fn ungueltiger_enum_ist_400_kombination_bleibt_422() {
 
 #[tokio::test]
 async fn etb_bei_warnstufenwechsel_nicht_bei_reiner_beschreibung() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
@@ -271,7 +217,7 @@ async fn etb_bei_warnstufenwechsel_nicht_bei_reiner_beschreibung() {
 
 #[tokio::test]
 async fn sse_feuert_bei_put() {
-    let (app, live) = setup().await;
+    let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
@@ -292,7 +238,7 @@ async fn sse_feuert_bei_put() {
 
 #[tokio::test]
 async fn gebiete_liste_zeigt_zonen_und_hoechste_warnstufe() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
@@ -323,7 +269,7 @@ async fn gebiete_liste_zeigt_zonen_und_hoechste_warnstufe() {
 
 #[tokio::test]
 async fn fremdes_einsatz_gid_ist_notfound() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let a = einsatz_anlegen(&app, &admin).await;
     let b = einsatz_anlegen(&app, &admin).await;
@@ -342,7 +288,7 @@ async fn fremdes_einsatz_gid_ist_notfound() {
 
 #[tokio::test]
 async fn berechtigung_beobachter_liest_schreibt_nicht() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
@@ -377,7 +323,7 @@ async fn berechtigung_beobachter_liest_schreibt_nicht() {
 
 #[tokio::test]
 async fn org_isolation_fremder_nutzer_abgewiesen() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
@@ -400,7 +346,7 @@ async fn org_isolation_fremder_nutzer_abgewiesen() {
 
 #[tokio::test]
 async fn umbenennen_setzt_label_und_fremdes_gid_ist_404() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
@@ -436,7 +382,7 @@ async fn umbenennen_setzt_label_und_fremdes_gid_ist_404() {
 /// Gegenstück: `patch_label_null_loescht_label`.
 #[tokio::test]
 async fn patch_ohne_label_laesst_label_stehen() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
@@ -455,7 +401,7 @@ async fn patch_ohne_label_laesst_label_stehen() {
 
 #[tokio::test]
 async fn patch_label_null_loescht_label() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
