@@ -418,6 +418,9 @@ describe('An- und Abmelden über mehrere Tabs (LFH-387)', () => {
         },
       });
     await starte();
+    // „fertig" steht schon, bevor der Start Annas Datensatz anlegt (`lagebildStarten` läuft
+    // danach). Ohne dieses Warten überschrieb der Start Brunos Stand in der CI gelegentlich.
+    await waitFor(async () => expect((await lagebildLesen())?.benutzer.id).toBe(anna.id));
     sitzung = bruno;
     await brunosStand();
     ergebnisLogout = undefined;
