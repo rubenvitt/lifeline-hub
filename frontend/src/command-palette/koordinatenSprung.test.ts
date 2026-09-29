@@ -39,8 +39,8 @@ describe('erkenneKoordinate — an der FORM, nicht am eingestellten Format', () 
   });
 
   it('MGRS mit weniger Stellen (1 km) bleibt erlaubt, wenn der Rückweg passt', () => {
-    // 4 Ziffern ≙ 1-km-Quadrat. Dieselbe Zeichenkette muss beim Zurückrechnen herauskommen —
-    // das ist der Riegel gegen die Kennungen im Negativtest unten.
+    // 4 Ziffern ≙ 1-km-Quadrat. Beim Zurückrechnen muss dieselbe Zeichenkette herauskommen; das ist
+    // der Riegel gegen die Kennungen im Negativtest unten.
     const km = formatiere(BERLIN.lat, BERLIN.lon, 'mgrs').replace(
       /(\d{2})\d{3} (\d{2})\d{3}$/,
       '$1 $2',
@@ -55,8 +55,8 @@ describe('erkenneKoordinate — an der FORM, nicht am eingestellten Format', () 
   });
 
   it('erkennt KEINE Koordinate in Suchbegriffen, Kennungen und Zahlen', () => {
-    // Die tragende Hälfte: jeder Fehlgriff hier stellte eine Kartenzeile VOR einen
-    // Nummerntreffer oder eine Modulzeile.
+    // Die tragende Hälfte: jeder Fehlgriff stellte eine Kartenzeile VOR einen Nummerntreffer oder
+    // eine Modulzeile.
     for (const s of [
       '',
       'deich',
@@ -74,10 +74,8 @@ describe('erkenneKoordinate — an der FORM, nicht am eingestellten Format', () 
       '32U MV 123 4567', // ungerade Ziffernzahl
       'Florian 1/44-1',
       '1/3/18//22', // Stärke-Schreibweise
-      // Review-Befund zu LFH-619: Fahrzeug-/Einheitenkennungen und Uhrzeiten haben die Form
-      // „Zahl · Buchstabe · zwei Buchstaben · Ziffern" — die mgrs-Bibliothek rechnet sie
-      // ungeprüft in Punkte im Südpazifik um. Ohne Riegel stünde die Kartenzeile oben und
-      // Enter flöge die Karte weg, statt das Fahrzeug zu öffnen.
+      // Fahrzeugkennungen und Uhrzeiten haben die MGRS-Form, und die mgrs-Bibliothek rechnet sie
+      // ungeprüft in Punkte um; Enter flöge sonst die Karte an, statt das Fahrzeug zu öffnen.
       '1 HLF 20',
       '1 TLF 3000',
       '2 DLK 23',

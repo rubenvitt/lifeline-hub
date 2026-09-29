@@ -6,31 +6,24 @@ import { SeitenLeer } from './SeitenZustand';
 import { useRollen } from './instrument/rollenwerte';
 
 /**
- * Schlanker, nicht-deprecated Ersatz für antd `<List>` (LFH-167).
+ * Schlanker Ersatz für antds deprecated `<List>` (LFH-167; Entfernung in antd v7).
  *
- * antd 6 hat `List`/`List.Item`/`List.Item.Meta` als deprecated markiert (Entfernung in v7).
- * Dieses Modul bildet die im Projekt genutzte Teilmenge (vertikale Liste, Trennlinien,
- * Größen small/default, bordered, Header, Loading, Leer-Zustand, Item mit Aktionen/Klick,
- * Meta aus Titel + Beschreibung) über Flex-Layout + Theme-Tokens nach. Farben kommen aus
- * `theme.useToken()` → dark-safe.
+ * Bildet die genutzte Teilmenge nach (vertikale Liste, Trennlinien, Größen small/default,
+ * bordered, Header, Loading, Leer-Zustand, Item mit Aktionen/Klick, Meta aus Titel +
+ * Beschreibung), über Flex-Layout + Theme-Tokens.
  *
- * **Innenabstände (LFH-328/T14).** Sie lagen als Pixel-Literale (16/24) bzw. als
- * `paddingContent*` im Code und waren damit von der Dichte-Staffel abgekoppelt: `antdToken()`
- * überschreibt `padding`/`paddingSM`/`paddingXS`/`paddingLG`, **nicht** die `size*`-Map-Tokens,
- * aus denen antd die `paddingContent*`-Aliase ableitet — gemessen bleiben die bei 16/16/12/8,
- * egal welche Dichtestufe gesetzt ist. Deshalb steht hier jetzt die jeweils gleichwertige,
- * dichteabhängige Quelle derselben antd-Alias-Kette (`alias.js`):
+ * **Innenabstände (LFH-328/T14).** `antdToken()` überschreibt `padding`/`paddingSM`/
+ * `paddingXS`/`paddingLG`, **nicht** die `size*`-Map-Tokens, aus denen antd die
+ * `paddingContent*`-Aliase ableitet — die blieben in jeder Dichtestufe bei 16/16/12/8. Hier
+ * steht deshalb die gleichwertige, dichteabhängige Quelle derselben Alias-Kette:
  * `paddingContentHorizontalSM`/`padding` ← `size` · `paddingContentHorizontalLG`/`paddingLG`
  * ← `sizeLG` · `paddingContentVertical`/`paddingSM` ← `sizeSM` ·
- * `paddingContentVerticalSM`/`paddingXS` ← `sizeXS`. Unter dem antd-Standardtheme sind die
- * Werte damit unverändert (16/24/12/8), unter `kompakt` fallen sie auf 11/18/7/3 und ziehen
- * bei einer Dichteumschaltung (B5) mit. Gepinnt in `Liste.test.tsx`.
+ * `paddingContentVerticalSM`/`paddingXS` ← `sizeXS`. Unter dem antd-Standardtheme 16/24/12/8,
+ * unter `kompakt` 11/18/7/3. Gepinnt in `Liste.test.tsx`.
  *
- * **Optik des Neuentwurfs „Instrumententafel" (21.09.2026).** Karten ohne Schatten und
- * ohne Rundung; die umrandete Liste steht auf `flaeche` mit Rahmen `linie` (die dekorative
- * Haarlinie, nicht antds Steuerrahmen `colorBorder`), die Zeilen trennt `flaeche3` — der
- * Paneel-Trenner des Entwurfs (`#16191d`). Die Rollen kommen über
- * `instrument/rollenwerte.ts` aus der Palette des aktiven Modus; antd kennt `flaeche3` nicht.
+ * **Optik.** Karten ohne Schatten und ohne Rundung; die umrandete Liste steht auf `flaeche` mit
+ * Rahmen `linie` (die dekorative Haarlinie, nicht antds `colorBorder`), die Zeilen trennt
+ * `flaeche3`. Die Rollen kommen über `instrument/rollenwerte.ts`; antd kennt `flaeche3` nicht.
  */
 
 const { useToken } = theme;
@@ -86,19 +79,12 @@ export function Liste<T>({
 
   const headerPaddingInline = bordered ? (size === 'small' ? token.padding : token.paddingLG) : 0;
 
-  // Zwei Wege, wie antds `List`: mit `emptyText` steht nur dieser Text in der zentrierten
-  // Box; ohne ihn trug der Fallback bis LFH-331 (B3) antds eigenes Leer-Element mit Bild.
-  // Das ist jetzt `SeitenLeer` — dasselbe Primitiv, das alle übrigen Leerzustände tragen,
-  // und damit dieselbe Form für dieselbe Tatsache.
+  // Mit `emptyText` steht nur dieser Text in der zentrierten Box; ohne ihn trägt `SeitenLeer`
+  // den Fallback „Keine Daten" — dieselbe Form wie alle übrigen Leerzustände. Wer eine echte
+  // Aussage will, setzt `emptyText`.
   //
-  // Der Fallback-Titel bleibt „Keine Daten": genau das zeigten die zehn Masken in
-  // Produktion schon vorher (`ConfigProvider locale={deDE}`). Der Umzug ist am Wortlaut
-  // also folgenlos — er tauscht den Knoten, nicht die Aussage. Wer einer Maske eine echte
-  // Aussage geben will, setzt `emptyText`; dafür ist die Prop da.
-  //
-  // Die Ladeunterdrückung darüber bleibt unverändert und lebt hier an genau EINER Stelle
-  // (B3/D4): solange geladen wird, wird nichts über die Menge behauptet — sonst blitzte
-  // der Leerzustand hinter dem Spinner auf, bevor überhaupt Daten da sein können.
+  // Die Ladeunterdrückung lebt an genau EINER Stelle (B3/D4): solange geladen wird, wird nichts
+  // über die Menge behauptet, sonst blitzte der Leerzustand hinter dem Spinner auf.
   const leer = loading ? null : emptyText != null ? (
     <div
       style={{
@@ -155,9 +141,9 @@ interface ListenEintragBasisProps {
   style?: CSSProperties;
   className?: string;
   /**
-   * Markiert die aktuelle Zeile (z. B. den offenen Chat-Kanal). Landet am WURZELelement —
-   * bei einer Auswahlzeile also an dem Knoten mit `role="button"`. An einem inneren
-   * Element sagt der Vorleser die Rolle ohne „aktuell" an (LFH-621).
+   * Markiert die aktuelle Zeile (z. B. den offenen Chat-Kanal). Landet am WURZELelement, also am
+   * Knoten mit `role="button"` — an einem inneren Element sagte der Vorleser die Rolle ohne
+   * „aktuell" an (LFH-621).
    */
   'aria-current'?: AriaAttributes['aria-current'];
 }
@@ -200,11 +186,10 @@ export function ListenEintrag({
       gap: token.padding,
       paddingBlock,
       paddingInline,
-      // Die Spread-Position ist TRAGEND, nicht Stil (LFH-366): ein Aufrufer, der einen
-      // Trefflächenboden setzt, übergibt die Kurzform `padding` (`bedienzielStil` in
-      // `pages/lagekarte/Sidebar.tsx`), und die gewinnt nur, weil sie SPÄTER deklariert wird.
-      // Nach vorn gezogen fiele die Polsterungshälfte der „ZWEI Angaben"-Konvention still weg,
-      // während `minHeight` überlebt — und kein Test sähe es.
+      // Die Spread-Position ist TRAGEND (LFH-366): ein Aufrufer mit Trefflächenboden übergibt die
+      // Kurzform `padding` (`bedienzielStil` in `pages/lagekarte/Sidebar.tsx`), und die gewinnt nur,
+      // weil sie SPÄTER steht. Nach vorn gezogen fiele die Polsterungshälfte der „ZWEI
+      // Angaben"-Konvention still weg.
       ...style,
     },
   };
@@ -264,9 +249,9 @@ interface ListenEintragMetaProps {
 
 export function ListenEintragMeta({ title, description }: ListenEintragMetaProps) {
   const { token } = useToken();
-  // Bildet antd `List.Item.Meta` nach: Titel als <h4> (heading-Rolle + emphasized), darunter
-  // die Beschreibung. Overrides exakt wie antd (margin/color/fontSize/lineHeight); alle übrigen
-  // Eigenschaften (u. a. font-weight) erbt das <h4> aus derselben globalen Kaskade wie zuvor.
+  // Bildet antd `List.Item.Meta` nach: Titel als <h4> (heading-Rolle + emphasized), darunter die
+  // Beschreibung. Overrides wie antd (margin/color/fontSize/lineHeight); den Rest erbt das <h4>
+  // aus der globalen Kaskade.
   return (
     <div style={{ minWidth: 0 }}>
       {title != null && (

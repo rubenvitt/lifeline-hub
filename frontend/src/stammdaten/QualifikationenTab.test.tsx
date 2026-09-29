@@ -2,21 +2,13 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import QualifikationenTab from './QualifikationenTab';
+import { adminFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-26 10:00:00',
-};
-const nichtAdmin = { ...admin, system_rolle: 'keiner' };
+const admin = adminFixture();
+const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
 
 /**
  * Die Fixture kommt in FACHLICHER Reihenfolge (`sortier` 10 vor 60), die zugleich NICHT die
@@ -37,14 +29,10 @@ const labels = (c: HTMLElement) =>
 // leeren Katalog der AK4-Hälfte.
 function render(benutzer: typeof admin, katalog: typeof quals = quals) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+    meHandler(benutzer),
     http.get('/api/qualifikationen', () => HttpResponse.json(katalog)),
   );
-  return renderMitProviders(
-    <AuthProvider>
-      <QualifikationenTab />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<QualifikationenTab />);
 }
 
 describe('QualifikationenTab', () => {
@@ -117,14 +105,10 @@ describe('QualifikationenTab', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/qualifikationen', () => new HttpResponse(null, { status: 500 })),
     );
-    renderMitProviders(
-      <AuthProvider>
-        <QualifikationenTab />
-      </AuthProvider>,
-    );
+    renderMitProviders(<QualifikationenTab />);
 
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Keine Qualifikationen')).not.toBeInTheDocument();

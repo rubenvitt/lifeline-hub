@@ -47,15 +47,12 @@ const SPALTEN: TableColumnsType<Zeile> = [
 ];
 
 /**
- * Alle DOM-Erwartungen sind am realen jsdom-Rendering von antd 6 / @rc-component/table
- * gemessen (Discovery-Lauf), nicht aus der Bibliotheksquelle abgeleitet:
- * - die stehende Kopfzeile erzeugt einen eigenen Kopf-Container `ant-table-sticky-holder`
- *   und zieht Kopf und Körper in ZWEI `<table>`-Elemente auseinander,
- * - die Fixierung einer Spalte wird intern von 'left' auf 'start' normalisiert, die
- *   Kopfzelle trägt daher `ant-table-cell-fix-start` (nicht `…-fix-left`),
- * - der waagerechte Scrollcontainer schlägt sich als `width: max-content` auf der
- *   Körper-`<table>` nieder — der billigste ehrliche Beleg, dass der Prop wirkt und
- *   nicht bloß durchgereicht wird.
+ * Die DOM-Erwartungen folgen dem realen jsdom-Rendering von antd 6 / @rc-component/table:
+ * - die stehende Kopfzeile erzeugt `ant-table-sticky-holder` und zieht Kopf und Körper in ZWEI
+ *   `<table>`-Elemente auseinander,
+ * - die Fixierung wird intern von 'left' auf 'start' normalisiert (`ant-table-cell-fix-start`),
+ * - der Scrollcontainer schlägt sich als `width: max-content` auf der Körper-`<table>` nieder —
+ *   der Beleg, dass der Prop wirkt und nicht bloß durchgereicht wird.
  */
 describe('KatalogTabelle', () => {
   it('trägt waagerechten Scrollcontainer, fixierte Kopfzeile und fixierte Identifierspalte', () => {
@@ -83,12 +80,10 @@ describe('KatalogTabelle', () => {
   });
 
   /**
-   * Druck (LFH-71): mit `sticky` legt rc-table den Kopf in eine EIGENE Tabelle im
-   * Sticky-Halter — der Körper, der über die Blätter läuft, hat dann kein `thead`, und die
-   * Regel `thead { display: table-header-group }` wiederholt nichts. Bei `beforeprint` rendert
-   * das Primitiv deshalb ohne `sticky` (EINE Tabelle mit Kopf und Körper), bei `afterprint`
-   * wieder mit. Synchron geprüft, ohne `act`: der Browser friert das Druckbild direkt nach
-   * den Listenern ein (Strg+P und der Knopf über `useDrucken` laufen beide hierüber).
+   * Druck (LFH-71): mit `sticky` legt rc-table den Kopf in eine EIGENE Tabelle, der Körper hat
+   * dann kein `thead`, und die Kopfwiederholung greift nicht. Bei `beforeprint` rendert das
+   * Primitiv deshalb ohne `sticky`, bei `afterprint` wieder mit. Synchron geprüft, ohne `act`:
+   * der Browser friert das Druckbild direkt nach den Listenern ein.
    */
   it('legt im Druck Kopf und Körper in EINE Tabelle und stellt danach die stehende Kopfzeile wieder her', () => {
     const { container } = renderMitProviders(
@@ -103,7 +98,7 @@ describe('KatalogTabelle', () => {
       Array.from(container.querySelectorAll('table')).some(
         (t) => t.querySelector('thead') !== null && t.querySelector('tbody tr') !== null,
       );
-    // Vorbedingung (LFH-330): am Bildschirm steht der Kopf getrennt im Sticky-Halter.
+    // Vorbedingung: am Bildschirm steht der Kopf getrennt im Sticky-Halter.
     expect(container.querySelector('.ant-table-sticky-holder')).not.toBeNull();
     expect(koerperMitKopf()).toBe(false);
 
@@ -151,8 +146,7 @@ describe('KatalogTabelle', () => {
     expect(eigen.container.querySelectorAll('th.ant-table-cell-fix-start')).toHaveLength(0);
     eigen.unmount();
 
-    // eine Spaltengruppe an Position 0 wird nicht fixiert (rc-table verlangt dort
-    // eine Blattspalte; eine stillschweigende Fixierung wäre wirkungslos oder kaputt)
+    // Eine Spaltengruppe an Position 0 wird nicht fixiert: rc-table verlangt dort eine Blattspalte.
     const gruppe = renderMitProviders(
       <KatalogTabelle<Zeile>
         rowKey="id"
@@ -165,12 +159,11 @@ describe('KatalogTabelle', () => {
   });
 
   /**
-   * Die Ladeunterdrückung des Leerknotens (LFH-331 · B3, D4). Sie lebt im Primitiv, nicht an
-   * den Aufrufstellen — geprüft wird sie deshalb hier und nur hier.
+   * Die Ladeunterdrückung des Leerknotens (LFH-331 · B3) lebt im Primitiv und wird nur hier
+   * geprüft.
    *
-   * `dataSource={[]}` ist die tragende Wahl: bei FEHLENDER `dataSource` unterdrückt antd
-   * schon selbst (`InternalTable.js`, `rawData === EMPTY_LIST`), ein Test darauf wäre auch
-   * ohne unsere Stelle grün und bewiese nichts.
+   * `dataSource={[]}` ist die tragende Wahl: bei FEHLENDER `dataSource` unterdrückt antd schon
+   * selbst, ein Test darauf bewiese nichts.
    */
   const LEERTEXT = 'Noch keine Fahrzeuge erfasst';
 
@@ -212,13 +205,10 @@ describe('KatalogTabelle', () => {
 
   it('pinnt antds Leerknoten-Vertrag: `emptyText: null` unterdrückt ohne Rückfall', () => {
     /**
-     * Der Mechanismus der Unterdrückung ist antd-Verhalten, kein zugesicherter Vertrag:
-     * `InternalTable.js` bewertet `typeof locale?.emptyText !== 'undefined'`, weshalb `null`
-     * durchgeht und NICHT auf `renderEmpty` zurückfällt. Kippte ein antd-Bump das auf eine
-     * `!= null`-Prüfung, stünde plötzlich wieder ein Leerknoten (`.ant-empty`, Bild +
-     * „Keine Daten") hinter dem Spinner — lautlos, weil kein anderer Test darauf zeigt.
-     *
-     * Deshalb ohne `locale`: geprüft wird der Rückfallpfad selbst, nicht unser Leertext.
+     * Die Unterdrückung ist antd-Verhalten, kein Vertrag: `InternalTable.js` prüft
+     * `typeof locale?.emptyText !== 'undefined'`, `null` fällt also NICHT auf `renderEmpty` zurück.
+     * Kippte ein antd-Bump das auf `!= null`, stünde lautlos wieder ein Leerknoten hinter dem
+     * Spinner. Deshalb ohne `locale`: geprüft wird der Rückfallpfad selbst.
      */
     const ladend = renderMitProviders(
       <KatalogTabelle<Zeile>
@@ -232,8 +222,8 @@ describe('KatalogTabelle', () => {
     expect(ladend.container.querySelector('.ant-empty')).toBeNull();
     ladend.unmount();
 
-    // Gegenprobe: ohne Ladezustand rendert derselbe Aufruf antds Leerknoten — der Pin oben
-    // misst also die Unterdrückung und nicht bloß eine Tabelle, die nie einen Leerknoten hat.
+    // Gegenprobe: ohne Ladezustand rendert derselbe Aufruf antds Leerknoten — der Pin oben misst
+    // also die Unterdrückung.
     const ruhend = renderMitProviders(
       <KatalogTabelle<Zeile> rowKey="id" columns={SPALTEN} dataSource={[]} pagination={false} />,
     );
@@ -284,10 +274,8 @@ describe('KatalogTabelle', () => {
 /**
  * Suche, Blätterung und die durchgereichten antd-Haken (LFH-330 · B2).
  *
- * Die Suche ist **opt-in**: `pages/SchaedenPage.tsx` trägt bereits ein eigenes
- * `Input.Search` mit anderer Semantik (Ort/Beschreibung), das ETB (heute die Zeitachse
- * `etb/EtbZeitachse.tsx`) sucht serverweit über seine eigene Filterleiste, und `Datensicht`
- * bringt im Tabellenzweig sein eigenes Feld mit. Default-AN erzeugte in allen drei Fällen ein zweites Suchfeld.
+ * Die Suche ist **opt-in**: manche Seiten tragen eine eigene Suche mit anderer Semantik, und
+ * `Datensicht` bringt ihr eigenes Feld mit. Default-AN erzeugte ein zweites Suchfeld.
  */
 describe('KatalogTabelle · Suche', () => {
   const ZWEI: Zeile[] = [
@@ -387,9 +375,8 @@ describe('KatalogTabelle · Suche', () => {
   });
 
   it('die Werkzeugzeile liegt AUSSERHALB des Tabellenrahmens', () => {
-    // `katalogtabelle-schmal.spec.ts` misst `scrollWidth` am `.ant-table`-Wurzelknoten
-    // gegen 390 px. Eine Leiste INNERHALB dieses Knotens zählte in das Maß hinein und
-    // machte die Messung stumpf — die Zeile muss deshalb ein Geschwister sein.
+    // `katalogtabelle-schmal.spec.ts` misst `scrollWidth` am `.ant-table`-Wurzelknoten; eine Leiste
+    // INNERHALB zählte mit. Die Zeile muss deshalb ein Geschwister sein.
     const { container } = renderMitProviders(
       <KatalogTabelle<Zeile>
         rowKey="id"
@@ -406,13 +393,9 @@ describe('KatalogTabelle · Suche', () => {
 
   it('render-only-Spalten tragen NICHT zur Suche bei (die dokumentierte Grenze)', async () => {
     /**
-     * Muster `stammdaten/FahrzeugeTab.tsx:40`: `{ title: 'Stärke', key: 'staerke', render }`
-     * ohne `dataIndex`. Der Zellinhalt ist erst nach dem Rendern bekannt, die Suche läuft
-     * über die Rohdaten — der Begriff „Sonderrecht" ist hier also unerreichbar.
-     *
-     * Die Zusicherung gilt seit LFH-346 · C11 für Spalten OHNE `suchText`, also für die
-     * Vorgabe und damit für elf der zwölf Aufrufstellen. Der Gegenlauf steht direkt
-     * darunter; erst das Paar sagt, dass der Haken der Unterschied ist.
+     * Spalte ohne `dataIndex` mit `render` (Muster `stammdaten/FahrzeugeTab.tsx`): die Suche läuft
+     * über die Rohdaten, „Sonderrecht" ist hier unerreichbar. Gilt für Spalten OHNE `suchText`; erst
+     * das Paar mit dem Fall darunter zeigt, dass der Haken der Unterschied ist.
      */
     const mitRenderOnly: TableColumnsType<Zeile> = [
       { title: 'Funkrufname', dataIndex: 'funkrufname', key: 'funkrufname' },
@@ -438,12 +421,8 @@ describe('KatalogTabelle · Suche', () => {
 
   it('MIT suchText trägt dieselbe render-only-Spalte sehr wohl bei', async () => {
     /**
-     * Die zweite Hälfte des Paares darüber, und die einzige, die den Haken belegt: gleiche
-     * Spaltenliste, gleicher Begriff — nur der `suchText` kommt dazu. Ohne diesen Gegenlauf
-     * wäre die negative Zusicherung von einer kaputten Suche nicht zu unterscheiden.
-     *
-     * Anlass ist `stammdaten/EtbBausteineTab.tsx`: dort war der Inhaltstext mit der
-     * Zwei-Zeilen-Zelle aus dem Korpus gefallen (LFH-346).
+     * Die zweite Hälfte des Paares: gleiche Spalten, gleicher Begriff, nur `suchText` kommt dazu.
+     * Ohne sie wäre die negative Zusicherung von einer kaputten Suche nicht zu unterscheiden.
      */
     const mitHaken: KatalogSpalte<Zeile>[] = [
       { title: 'Funkrufname', dataIndex: 'funkrufname', key: 'funkrufname' },
@@ -474,12 +453,9 @@ describe('KatalogTabelle · Suche', () => {
 
   it('suchText GEWINNT über den dataIndex derselben Spalte, es summiert sich nicht', async () => {
     /**
-     * Die Vorrangregel ist nur an einer Spalte prüfbar, deren Haken den Rohwert VERDECKT
-     * statt ihn zu erweitern: hier liefert `suchText` allein „Sonderrecht", der `dataIndex`
-     * derselben Spalte trüge „Florian 1/44/1" bei. Ein Haken, der bloss zum `dataIndex`
-     * hinzuträte, liesse „Florian" weiter treffen — genau das ist die Mutation, die dieser
-     * Test rot färbt. Der ETB-Fall kann das nicht belegen: sein Haken ist eine Obermenge
-     * seines `dataIndex`, dort sehen Vorrang und Vereinigung gleich aus.
+     * Die Vorrangregel ist nur an einer Spalte prüfbar, deren Haken den Rohwert VERDECKT: `suchText`
+     * liefert allein „Sonderrecht", der `dataIndex` trüge „Florian 1/44/1" bei. Ein Haken, der bloß
+     * hinzuträte, ließe „Florian" weiter treffen.
      */
     const verdeckend: KatalogSpalte<Zeile>[] = [
       {
@@ -502,8 +478,7 @@ describe('KatalogTabelle · Suche', () => {
     await userEvent.type(feld, 'Florian');
     expect(container.querySelectorAll('tr.ant-table-row')).toHaveLength(0);
 
-    // Gegenprobe: der Haken selbst trifft — sonst bewiese die Null oben nur, dass die
-    // Suche gar nichts findet.
+    // Gegenprobe: der Haken selbst trifft, sonst bewiese die Null oben nur eine leere Suche.
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Sonderrecht');
     expect(container.querySelectorAll('tr.ant-table-row')).toHaveLength(2);
@@ -511,10 +486,9 @@ describe('KatalogTabelle · Suche', () => {
 
   it('gesucht wird nur in ANGEZEIGTEN Spalten, nicht über alle Datenfelder', async () => {
     /**
-     * Die naheliegende falsche Bauform ist `Object.values(zeile).some(…)`. Sie fände auch
-     * Felder, für die es gar keine Spalte gibt — der Benutzer sieht dann eine Zeile ohne
-     * erkennbaren Grund im Ergebnis stehen. Gesucht wird deshalb je Spalte, nicht je Feld;
-     * `typ` ist hier bewusst NICHT bespaltet.
+     * Gesucht wird je Spalte, nicht je Feld: `Object.values(zeile).some(…)` fände auch Felder ohne
+     * Spalte, und die Zeile stünde ohne erkennbaren Grund im Ergebnis. `typ` ist hier bewusst NICHT
+     * bespaltet.
      */
     const nurName: TableColumnsType<Zeile> = [
       { title: 'Funkrufname', dataIndex: 'funkrufname', key: 'funkrufname' },
@@ -537,9 +511,8 @@ describe('KatalogTabelle · Suche', () => {
 
   it('die Suche läuft den VOLLEN dataIndex-Pfad, nicht nur das letzte Glied', async () => {
     /**
-     * `bezugsSchluessel` reduziert `['meta','id']` auf `'id'` — als Suchresolver läse es
-     * `zeile['id']` statt `zeile.meta.id` und lieferte still den falschen Wert. Deshalb
-     * hat die Suche ihren eigenen, pfadlaufenden Resolver.
+     * `bezugsSchluessel` reduziert `['meta','id']` auf `'id'` und läse `zeile['id']` statt
+     * `zeile.meta.id`. Deshalb hat die Suche ihren eigenen, pfadlaufenden Resolver.
      */
     interface Tief {
       id: number;
@@ -571,10 +544,8 @@ describe('KatalogTabelle · Suche', () => {
 
   it('/ fokussiert das Suchfeld — aber nicht aus einem Eingabefeld heraus', () => {
     /**
-     * `etb/schnellerfassungModell.ts` erkennt das Slash-Menü am TEXTINHALT der Textarea,
-     * nicht an einer Tastenbindung, und `pages/EtbPage.tsx` rendert Schnellerfassung und
-     * Tabelle auf derselben Seite. Ein globales `/` ohne Target-Prüfung fräße dort den
-     * Slash der Schnellerfassung.
+     * Eine Schnellerfassung erkennt ihr Slash-Menü am TEXTINHALT eines Feldes auf derselben Seite.
+     * Ein globales `/` ohne Target-Prüfung fräße dort den Slash.
      */
     const { container } = renderMitProviders(
       <>
@@ -602,10 +573,8 @@ describe('KatalogTabelle · Suche', () => {
 
   it('bei zwei montierten Instanzen greift das /-Kürzel gar nicht', () => {
     /**
-     * `pages/uhs/UhsDetailPage.tsx:130` rendert `Tabs` OHNE `destroyOnHidden` — nach dem
-     * Besuch beider Reiter sind zwei Tabellen gleichzeitig montiert. Zwei Kürzel, die um
-     * denselben Fokus streiten, sind schlimmer als keins: der Fokus landete abhängig von
-     * der Montagereihenfolge irgendwo.
+     * Seiten mit `Tabs` ohne `destroyOnHidden` montieren zwei Tabellen gleichzeitig. Zwei Kürzel,
+     * die um denselben Fokus streiten, sind schlimmer als keins.
      */
     const spion = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { container } = renderMitProviders(
@@ -648,8 +617,7 @@ describe('KatalogTabelle · Blätterung', () => {
     }));
 
   it('unterhalb der Schwelle wird nicht geblättert', () => {
-    // Antds Default ist `DEFAULT_PAGE_SIZE = 10` — ohne eigene Ableitung blätterten
-    // 40 Zeilen bereits, und die Aufrufstellen bekämen eine Leiste, die sie nie wollten.
+    // Antds Default ist `DEFAULT_PAGE_SIZE = 10` — ohne eigene Ableitung blätterten schon 40 Zeilen.
     const { container } = renderMitProviders(
       <KatalogTabelle<Zeile> rowKey="id" columns={SPALTEN} dataSource={vieleZeilen(40)} />,
     );
@@ -658,10 +626,8 @@ describe('KatalogTabelle · Blätterung', () => {
   });
 
   it('oberhalb der Schwelle wird geblättert, OHNE Größenumschalter', () => {
-    // `@rc-component/pagination`: `showSizeChanger = total > totalBoundaryShowSizeChanger`
-    // (Grenze 50). Genau ab der Zeilenzahl, ab der geblättert wird, erschiene also das
-    // breiteste Element der Leiste von selbst — auf einer Route, die bei 390 px gemessen
-    // wird. Deshalb explizit `false`.
+    // `@rc-component/pagination` zeigt `showSizeChanger` ab 50 Zeilen von selbst — genau ab der
+    // Blätterungsschwelle, auf einer Route, die bei 390 px gemessen wird. Deshalb explizit `false`.
     const { container } = renderMitProviders(
       <KatalogTabelle<Zeile> rowKey="id" columns={SPALTEN} dataSource={vieleZeilen(60)} />,
     );
@@ -671,8 +637,8 @@ describe('KatalogTabelle · Blätterung', () => {
   });
 
   it('ein übergebenes pagination={false} gewinnt auch über der Schwelle', () => {
-    // Erweiterung des Bestandspins oben, der mit LEERER dataSource prüft und dort
-    // strukturell nicht fallen kann. `??` statt `||`, damit `false` gewinnt.
+    // Wie der Pin oben, aber mit Zeilen, sodass er fallen kann. `??` statt `||`, damit `false`
+    // gewinnt.
     const { container } = renderMitProviders(
       <KatalogTabelle<Zeile>
         rowKey="id"
@@ -687,10 +653,9 @@ describe('KatalogTabelle · Blätterung', () => {
 
   it('die Blätterleiste bleibt beim Suchen stehen (kein Layoutsprung)', async () => {
     /**
-     * Die Schwelle rechnet gegen `dataSource.length`, NICHT gegen die gefilterte Menge —
-     * sonst verschwände die Leiste beim Tippen unter 50 Treffer und erzeugte genau den
-     * Sprung, gegen den Prüflisten-Kriterium 12 existiert. `hideOnSinglePage` ist aus
-     * demselben Grund nicht der Mechanismus (es rechnet gegen die gerenderte Menge).
+     * Die Schwelle rechnet gegen `dataSource.length`, NICHT gegen die gefilterte Menge — sonst
+     * verschwände die Leiste beim Tippen (Kriterium 12). `hideOnSinglePage` scheidet aus demselben
+     * Grund aus.
      */
     const daten = [...vieleZeilen(60), { id: 999, funkrufname: 'Rotkreuz Sonderfall', typ: 'GW' }];
     const { container } = renderMitProviders(
@@ -735,9 +700,8 @@ describe('KatalogTabelle · durchgereichte Sortierung und Filter', () => {
     );
     expect(namen(container)).toEqual(['Rotkreuz 2/83/1', 'Florian 1/44/1']);
 
-    // Der Auslöser sitzt in der Kopfzelle, die das Primitiv unbedingt fixiert
-    // (`position: sticky` in einem `overflow: auto`-Container). jsdom rechnet dort kein
-    // Layout — dass der Klick auch am 390-px-Schirm ankommt, ist hier NICHT belegt.
+    // Der Auslöser sitzt in der fixierten Kopfzelle. jsdom rechnet kein Layout — dass der Klick
+    // am 390-px-Schirm ankommt, ist hier NICHT belegt.
     const kopf = container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!;
     await userEvent.click(kopf);
     expect(namen(container)).toEqual(['Florian 1/44/1', 'Rotkreuz 2/83/1']);
@@ -745,14 +709,11 @@ describe('KatalogTabelle · durchgereichte Sortierung und Filter', () => {
 
   it('filters MIT onFilter filtert, filters OHNE onFilter ist ein No-op', async () => {
     /**
-     * Gemessen in `antd/es/table/hooks/useFilter/index.js`: die Filter-UI erscheint,
-     * sobald `column.filters` gesetzt ist — gefiltert wird aber nur bei vorhandenem
-     * `onFilter`. Ein Test, der den Trichter oder den Quelltext prüft, wäre grün, während
-     * die Filterung nichts tut. Deshalb wird die ZEILENMENGE geprüft, in beiden Fällen.
+     * antd zeigt die Filter-UI, sobald `column.filters` gesetzt ist, gefiltert wird aber nur mit
+     * `onFilter`. Deshalb wird die ZEILENMENGE geprüft, in beiden Fällen.
      *
-     * Die Menüknöpfe werden über die Klasse gegriffen, nicht über ihren Text: `test/utils`
-     * montiert `ConfigProvider` OHNE Locale, die Produktion setzt `deDE` — „Reset"/„OK"
-     * gegen „Zurücksetzen"/„OK" wäre eine umgebungsabhängige Zusicherung.
+     * Die Menüknöpfe werden über die Klasse gegriffen: `test/utils` montiert `ConfigProvider` OHNE
+     * Locale, die Produktion setzt `deDE`.
      */
     const basis = { title: 'Typ', dataIndex: 'typ' as const, key: 'typ' };
     const werte = [{ text: 'Löschfahrzeug', value: 'LF' }];
@@ -801,32 +762,21 @@ describe('KatalogTabelle · durchgereichte Sortierung und Filter', () => {
 /**
  * Die Fließspalte (LFH-523).
  *
- * DER BEFUND: `scroll={{ x: 'max-content' }}` macht die Tabellenbreite INHALTSGETRIEBEN.
- * Eine Spalte ohne `width` trägt damit ihre volle `max-content`-Breite bei — ein
- * 209-Zeichen-Meldungstext bleibt einzeilig und bläst die Tabelle auf (gemessen im
- * Handschuhmodus: 1484 px Text gegen 936 px Sicht, 1122 px innerer Überlauf). Der
- * Kartenzweig derselben Daten bricht denselben Text um; die Tabelle hat nur keinen
- * Deckel, gegen den sie umbrechen könnte.
+ * BEFUND: `scroll={{ x: 'max-content' }}` macht die Tabellenbreite INHALTSGETRIEBEN; eine
+ * Spalte ohne `width` trägt ihre volle `max-content`-Breite bei, ein langer Text bleibt
+ * einzeilig und bläst die Tabelle auf.
  *
- * DIE DECKELUNG: trägt genau EINE Spalte {@link KatalogSpalte.mindestBreite}, rechnet das
- * Primitiv `Σ(width der übrigen) + mindestBreite` aus und setzt DIESE Zahl als `scroll.x`.
- * Antd behält daneben sein `min-width: 100%` — die Tabelle füllt also weiter den Container
- * und scrollt erst darunter in sich.
+ * DECKELUNG: trägt genau EINE Spalte {@link KatalogSpalte.mindestBreite}, setzt das Primitiv
+ * `Σ(width der übrigen) + mindestBreite` als `scroll.x`. `min-width: 100%` bleibt, die Tabelle
+ * füllt also den Container und scrollt erst darunter.
  *
- * WARUM DAS DIE C7-ZUSICHERUNG NICHT ANFASST: liegt die gerechnete Zahl UNTER der
- * Containerbreite, ist die benutzte Breite in beiden Fassungen dieselbe (`min-width: 100%`
- * gewinnt), und die Spaltenverteilung der `auto`-Layoutrechnung ist damit Zeichen für
- * Zeichen die alte. Verschieden verhalten sich die beiden erst, wenn `max-content` den
- * Container ÜBERSTEIGT — also genau im Befund.
+ * C7 BLEIBT UNBERÜHRT: liegt die Zahl unter der Containerbreite, ist die benutzte Breite in
+ * beiden Fassungen dieselbe und die `auto`-Verteilung identisch.
  *
- * DIE GEMESSENE FALLE, wegen der `tableLayout` mitgesetzt wird:
- * `@rc-component/table/es/Table.js` wählt das Layout selbst —
- * `if (fixColumn) return mergedScrollX === 'max-content' ? 'auto' : 'fixed'`. Dieses
- * Primitiv fixiert Spalte 0 IMMER, `fixColumn` ist also gesetzt; eine Zahl statt
- * `'max-content'` kippte das Layout still auf `fixed`. Unter `fixed` ist eine
- * Spaltenbreite bindend statt bevorzugt — die 96 px der ETB-Aktionsspalte schnitten den
- * 72-px-Knopf der Handschuhstufe an. `auto` respektiert die Mindestinhaltsbreite und ist
- * zugleich das Layout, das der Bestand schon hat (vier Bestandstests pinnen es).
+ * FALLE, wegen der `tableLayout` mitgesetzt wird: rc-table wählt
+ * `if (fixColumn) return mergedScrollX === 'max-content' ? 'auto' : 'fixed'`. Spalte 0 ist
+ * immer fixiert, eine Zahl kippte das Layout still auf `fixed` — dort ist eine Spaltenbreite
+ * bindend, und eine 96-px-Aktionsspalte schnitte den 72-px-Knopf der Handschuhstufe an.
  */
 describe('KatalogTabelle — Fließspalte (LFH-523)', () => {
   interface Lang {
@@ -856,11 +806,9 @@ describe('KatalogTabelle — Fließspalte (LFH-523)', () => {
     );
     const tabelle = koerperTabelle(container);
 
-    // 88 + 320 + 96. Die Zahl steht als Literal da: aus der Spaltenliste zurückgerechnet
-    // prüfte sie die Rechnung gegen sich selbst.
+    // 88 + 320 + 96, als Literal: zurückgerechnet prüfte die Zahl die Rechnung gegen sich selbst.
     expect(tabelle.style.width).toBe('504px');
-    // Der Container bleibt die UNTERGRENZE — sonst stünde eine schmale Tabelle in einer
-    // breiten Fläche, und die C7-Zusicherung fiele mit ihr.
+    // Der Container bleibt die UNTERGRENZE, sonst fiele die C7-Zusicherung.
     expect(tabelle.style.minWidth).toBe('100%');
   });
 
@@ -868,16 +816,13 @@ describe('KatalogTabelle — Fließspalte (LFH-523)', () => {
     const { container } = renderMitProviders(
       <KatalogTabelle<Lang> rowKey="id" columns={FLIESS} dataSource={LANG} pagination={false} />,
     );
-    // Die Mutationsprobe zu dieser Zeile ist das Weglassen des `tableLayout`-Props im
-    // Primitiv: dann steht hier `fixed`, und die Aktionsspalte schnitte in der
-    // Handschuhstufe ihren Knopf an.
+    // Ohne das `tableLayout`-Prop im Primitiv stünde hier `fixed`.
     expect(koerperTabelle(container).style.tableLayout).toBe('auto');
   });
 
   it('rechnet über die ÜBERGEBENEN Spalten, nicht über eine gemerkte Garnitur', () => {
-    // `Datensicht` filtert `abBreite`-Spalten HERAUS, bevor sie hier ankommen. Rechnete das
-    // Primitiv über eine Vollmenge, wäre der Deckel bei ausgeblendeten Nebenspalten zu
-    // breit und der Überlauf bliebe genau dort, wo der Befund gemessen wurde.
+    // `Datensicht` filtert `abBreite`-Spalten HERAUS, bevor sie ankommen. Über die Vollmenge
+    // gerechnet wäre der Deckel zu breit.
     const { container } = renderMitProviders(
       <KatalogTabelle<Lang>
         rowKey="id"
@@ -900,7 +845,7 @@ describe('KatalogTabelle — Fließspalte (LFH-523)', () => {
     );
     const tabelle = koerperTabelle(container);
     expect(tabelle.style.width).toBe('max-content');
-    // Und das Layout bleibt unangetastet — der Opt-in ändert nichts an den 18 Katalogen.
+    // Das Layout bleibt unangetastet — der Opt-in ändert nichts an den Katalogen.
     expect(tabelle.style.tableLayout).toBe('auto');
   });
 
@@ -909,8 +854,8 @@ describe('KatalogTabelle — Fließspalte (LFH-523)', () => {
     const { container } = renderMitProviders(
       <KatalogTabelle<Lang>
         rowKey="id"
-        // `aktion` ohne `width`: die Summe wäre geraten. Ein geratener Deckel ist
-        // schlechter als keiner — er behauptete eine Breite, die die Spalte nicht hält.
+        // `aktion` ohne `width`: die Summe wäre geraten, und ein geratener Deckel ist schlechter als
+        // keiner.
         columns={[FLIESS[0], FLIESS[1], { title: '', key: 'aktion', render: () => 'x' }]}
         dataSource={LANG}
         pagination={false}
@@ -931,8 +876,8 @@ describe('KatalogTabelle — Fließspalte (LFH-523)', () => {
         pagination={false}
       />,
     );
-    // Zwei fließende Spalten sind kein Deckel, sondern zwei Reste — welche der beiden den
-    // Überschuss bekommt, entschiede die Layoutrechnung und nicht der Entwurf.
+    // Zwei fließende Spalten sind zwei Reste; welche den Überschuss bekommt, entschiede die
+    // Layoutrechnung.
     expect(koerperTabelle(container).style.width).toBe('max-content');
     expect(warnung).toHaveBeenCalledWith(expect.stringContaining('Fließspalte'));
     warnung.mockRestore();
@@ -940,9 +885,8 @@ describe('KatalogTabelle — Fließspalte (LFH-523)', () => {
 });
 
 /**
- * Die Breitenrechnung für sich (LFH-523) — rein und ohne Rendern, wie `bedienzielStil` und
- * `aktionsabstand`. Die Rendertests darüber belegen die VERDRAHTUNG; hier stehen die Zweige,
- * die über ein gerendertes antd nur umständlich erreichbar wären.
+ * Die Breitenrechnung für sich, rein und ohne Rendern. Die Rendertests darüber belegen die
+ * VERDRAHTUNG, hier stehen die Zweige.
  */
 describe('fliessBreite', () => {
   interface X {
@@ -965,8 +909,8 @@ describe('fliessBreite', () => {
   });
 
   it('verweigert die Rechnung bei einer Breite in Zeichenkettenform', () => {
-    // `width: '20%'` ist relativ zur Tabelle, die wir gerade erst ausrechnen — die Summe
-    // wäre zirkulär. Antds Typ lässt die Form zu, also muss die Rechnung sie abfangen.
+    // `width: '20%'` ist relativ zur Tabelle, die gerade ausgerechnet wird — zirkulär. Antds Typ
+    // lässt die Form zu, die Rechnung fängt sie ab.
     const mass = fliessBreite<X>([
       { key: 'a', width: '20%' },
       { key: 'b', mindestBreite: 320 },
@@ -976,8 +920,7 @@ describe('fliessBreite', () => {
   });
 
   it('verweigert die Rechnung bei einer Spaltengruppe', () => {
-    // Eine Gruppe hat keine eigene Blattbreite; ihre Kinder tragen sie. Sie mitzuzählen
-    // hieße, eine Zahl zu erfinden.
+    // Eine Gruppe hat keine eigene Blattbreite; sie mitzuzählen hieße, eine Zahl zu erfinden.
     const mass = fliessBreite<X>([
       { key: 'g', children: [{ key: 'a', width: 80 }] } as unknown as KatalogSpalte<X>,
       { key: 'b', mindestBreite: 320 },
@@ -1004,10 +947,10 @@ describe('fliessBreite', () => {
 });
 
 /**
- * Freiraum unter der stehenden Kopfzeile (LFH-677, WCAG 2.4.11). Die WIRKUNG ist nur im
- * Browser messbar (`e2e/betreuung-pruefliste.spec.ts`, Rückwärtslauf) — jsdom rechnet kein
- * Layout. Hier stehen die zwei Hälften, die ohne Layout prüfbar sind: die Höhe kommt aus der
- * stehenden Kopfzeile, und die Regel, die sie liest, steht in der Gestaltungssprache.
+ * Freiraum unter der stehenden Kopfzeile (LFH-677, WCAG 2.4.11). Die WIRKUNG misst nur der
+ * Browser (`e2e/betreuung-pruefliste.spec.ts`). Hier stehen die zwei Hälften ohne Layout: die
+ * Höhe kommt aus der stehenden Kopfzeile, und die Regel, die sie liest, steht in der
+ * Gestaltungssprache.
  */
 describe('KatalogTabelle — Freiraum unter der stehenden Kopfzeile', () => {
   it('setzt die Variable auf die Höhe der stehenden Kopfzeile', () => {
@@ -1038,8 +981,8 @@ describe('KatalogTabelle — Freiraum unter der stehenden Kopfzeile', () => {
   });
 
   it('die Regel in der Gestaltungssprache liest die Variable an JEDEM Ziel im Tabellenkörper', () => {
-    // `scroll-margin` wirkt am Element, das in die Sicht gerollt wird — also am Fokusziel
-    // selbst, nicht an der Zeile. Deshalb `*` unter `.ant-table-tbody`.
+    // `scroll-margin` wirkt am Element, das in die Sicht gerollt wird — am Fokusziel selbst.
+    // Deshalb `*` unter `.ant-table-tbody`.
     const css = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), '..', 'theme', 'sprache.css'),
       'utf8',

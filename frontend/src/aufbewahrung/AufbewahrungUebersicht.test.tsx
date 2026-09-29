@@ -3,16 +3,17 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { describe, expect, it } from 'vitest';
-import type { AufbewahrungEintrag } from '../api/types';
+import type { AufbewahrungEintrag, BenutzerAnzeige } from '../api/types';
 import { formatZeit } from '../anzeige/format';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import AufbewahrungUebersicht from './AufbewahrungUebersicht';
+import { adminFixture, benutzerFixture } from '../test/fixtures';
 
 /** Übersicht (LFH-23, tasks.md 6.8). */
 
-const ME_ADMIN = { id: 1, anzeigename: 'Admin', system_rolle: 'admin', org_rolle: 'keine' };
-const ME_FK = { id: 2, anzeigename: 'FK', system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };
+const ME_ADMIN = adminFixture();
+const ME_FK = benutzerFixture({ id: 2, anzeigename: 'FK', org_rolle: 'fuehrungskraft' });
 
 const EINTRAEGE: AufbewahrungEintrag[] = [
   {
@@ -56,9 +57,9 @@ function Ort() {
   return <output aria-label="Ort">{useLocation().pathname}</output>;
 }
 
-function zeige(me: Record<string, unknown> = ME_ADMIN) {
+function zeige(me: BenutzerAnzeige = ME_ADMIN) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(me)),
+    meHandler(me),
     http.get('/api/aufbewahrung', () => HttpResponse.json(EINTRAEGE)),
   );
   return renderMitProviders(

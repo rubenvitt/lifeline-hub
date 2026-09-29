@@ -10,13 +10,9 @@ interface OtpEingabeProps {
   /** Von `Form.Item` injiziert; bekommt JEDE Änderung. */
   onChange?: (wert: string) => void;
   /**
-   * Von `Form.Item` injiziert — MUSS durchgereicht werden.
-   *
-   * Ohne sie trägt das gerenderte `<input>` keine `id`, das `<label for>` des `Form.Item`
-   * zeigt ins Leere, und `getByLabelText` findet das Feld nicht mehr (gemessen: zehn
-   * Bestandstests fielen so aus, mit „no form control was found associated to that label").
-   * Vorlesende Hilfsmittel verlieren dabei denselben Bezug — der Testausfall ist nur die
-   * sichtbare Hälfte des Schadens.
+   * Von `Form.Item` injiziert — MUSS durchgereicht werden. Ohne sie trägt das `<input>` keine
+   * `id`, das `<label for>` zeigt ins Leere, und Vorlesende wie `getByLabelText` verlieren den
+   * Bezug.
    */
   id?: string;
   /** Genau einmal je vollständigem Code — der Weg zum automatischen Absenden. */
@@ -25,33 +21,23 @@ interface OtpEingabeProps {
 }
 
 /**
- * Sechsstellige TOTP-Eingabe (LFH-345 · C10, Befund M20).
- *
- * Die Anmeldeseite hatte `inputMode="numeric"`, `pattern`, `maxLength` und die
- * Ziffern-Optik, die Profilseite ein nacktes `<Input>` — dieselbe Aufgabe, zweimal
- * verschieden gebaut, und die schlechtere Hälfte stand dort, wo man 2FA EINRICHTET.
+ * Sechsstellige TOTP-Eingabe (LFH-345 · C10) — eine Bauform für Anmeldung und Profil.
  *
  * ── Warum ein Merker statt eines Effekts ────────────────────────────────────────
- * `onChange` feuert erneut, sobald der Wert wieder sechsstellig ist — eine zweite Meldung
- * mit demselben vollen Code (Einfügen auf die Auswahl, Rerender-Echo) löste sonst ein
- * zweites `enrollFinish`/`totp/finish` aus, und ein TOTP-Code ist serverseitig genau einmal
- * gültig: der zweite Aufruf scheitert und meldet „Code ungültig" für einen Code, der gerade
- * funktioniert hat. Der Merker hält den zuletzt GEMELDETEN Code, nicht ein Flag auf „ist
- * sechsstellig" — eine Flanke wäre nach dem Rerender längst vorbei (dieselbe Beobachtung wie
- * beim Fokus-Nachlauf in LFH-369).
+ * `onChange` feuert erneut, sobald der Wert wieder sechsstellig ist; eine zweite Meldung mit
+ * demselben Code (Einfügen auf die Auswahl, Rerender-Echo) löste ein zweites
+ * `enrollFinish`/`totp/finish` aus, und ein TOTP-Code ist serverseitig genau einmal gültig. Der
+ * Merker hält den zuletzt GEMELDETEN Code, kein Flag auf „ist sechsstellig" — eine Flanke wäre
+ * nach dem Rerender vorbei.
  *
- * **Der Merker überlebt ein `resetFields()` des Aufrufers**, weil er nicht am Wert hängt:
- * wird das Feld von außen geleert und danach derselbe Code EINGEFÜGT (also ohne Zwischenwert
- * kürzerer Länge), bleibt das Auto-Absenden aus. Das ist kein Deadlock — der Bestätigen-Knopf
- * steht daneben und ist genau dafür der Rückfallweg —, aber es ist die Grenze des Riegels und
- * gehört hier hin statt in eine Überraschung.
+ * **Der Merker überlebt ein `resetFields()` des Aufrufers**: wird das Feld von außen geleert und
+ * derselbe Code EINGEFÜGT (ohne kürzeren Zwischenwert), bleibt das Auto-Absenden aus. Kein
+ * Deadlock — der Bestätigen-Knopf ist der Rückfallweg —, aber die Grenze des Riegels.
  *
  * ── Warum keine Größen-Angabe ───────────────────────────────────────────────────
- * Beide Aufrufer trugen `size="large"`. Am Primitiv wäre das eine neue Größen-Prop an einem
- * interaktiven Element und damit ein Verstoß gegen die Dichte-Politik (LFH-333/B5,
- * erzwungen von `components/dichte.guard.test.ts`): die Höhe erbt das Feld vom
- * `ConfigProvider`, die Dichtestufe entscheidet. Die auffällige ZIFFERN-Optik bleibt und
- * kommt aus `login-otp` (Sperrung, tabellarische Ziffern, Schriftgrad).
+ * Eine Größen-Prop an einem interaktiven Element verstieße gegen die Dichte-Politik
+ * (`components/dichte.guard.test.ts`): die Höhe erbt das Feld vom `ConfigProvider`. Die
+ * Ziffern-Optik kommt aus `login-otp` (Sperrung, tabellarische Ziffern, Schriftgrad).
  */
 export default function OtpEingabe({ value, onChange, id, onVoll, autoFocus }: OtpEingabeProps) {
   const zuletztGemeldet = useRef<string | null>(null);
@@ -65,8 +51,7 @@ export default function OtpEingabe({ value, onChange, id, onVoll, autoFocus }: O
         onVoll?.(wert);
       }
     } else {
-      // Unvollständig heisst: der nächste volle Code ist wieder neu, auch wenn er gleich
-      // lautet. Ohne dieses Zurücksetzen bliebe ein zweiter Anlauf mit demselben Code still.
+      // Unvollständig heißt: der nächste volle Code ist wieder neu, auch wenn er gleich lautet.
       zuletztGemeldet.current = null;
     }
   }

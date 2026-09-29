@@ -1,0 +1,65 @@
+{
+  "art": "probe",
+  "caches": {
+    "workbox-precache-v2-https://localhost:8443/": 21
+  },
+  "cookieEnabled": true,
+  "eventSource": true,
+  "idb": {
+    "datenbanken": [],
+    "schreibtest": {
+      "ok": true,
+      "zaehlerNachher": 1,
+      "zaehlerVorher": 0
+    },
+    "vorhanden": true
+  },
+  "isSecureContext": true,
+  "label": "laden+8s",
+  "online": true,
+  "print": "function",
+  "sichtbarkeit": "hidden",
+  "storage": {
+    "estimate": {
+      "quota": 20615843021,
+      "usage": 4901605
+    },
+    "persisted": false
+  },
+  "sw": {
+    "controller": null,
+    "registrierungen": [
+      {
+        "active": null,
+        "installing": true,
+        "scope": "https://localhost:8443/",
+        "waiting": false
+      }
+    ],
+    "unterstuetzt": true
+  },
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+  "url": "https://localhost:8443/login",
+  "webauthn": {
+    "capabilities": {
+      "conditionalCreate": true,
+      "conditionalGet": true,
+      "conditionalMediation": true,
+      "extension:largeBlob": true,
+      "extension:prf": true,
+      "hybridTransport": true,
+      "passkeyPlatformAuthenticator": true,
+      "relatedOrigins": true,
+      "signalAllAcceptedCredentials": true,
+      "signalCurrentUserDetails": true,
+      "signalUnknownCredential": true,
+      "userVerifyingPlatformAuthenticator": true
+    },
+    "conditional": false,
+    "credentials": true,
+    "publicKeyCredential": true,
+    "uvpa": false
+  },
+  "webgl": "webgl2",
+  "zeit": "2026-09-28T16:05:30.720Z"
+}

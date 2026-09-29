@@ -4,15 +4,13 @@ import type { FormInstance } from 'antd';
 declare const casBasisMarke: unique symbol;
 
 /**
- * Der Baseline-Stand des optimistischen Locks (LFH-241/F10) — ein `geaendert_at`, das
- * beim BETRETEN des Edit-Modus eingefroren wurde.
+ * Der Baseline-Stand des optimistischen Locks (LFH-241/F10) — ein `geaendert_at`, das beim
+ * BETRETEN des Edit-Modus eingefroren wurde.
  *
- * Die Marke ist der eigentliche Riegel dieses Moduls und kein Typ-Schmuck: `CasBasis` ist
- * nach `string` zuweisbar (die API-Funktionen nehmen weiterhin `string`), ein blanker
- * `string` aber NICHT nach `CasBasis`. Ein `basis: t.geaendert_at` direkt aus den
- * Live-Query-Daten — genau der Defekt aus LFH-303 — bricht damit den Typcheck, statt
- * still das Falsche zu senden. Ein Regex-Guard sähe die Schreibweise
- * `const b = t.geaendert_at` nicht; der Typ sieht sie.
+ * Die Marke ist der Riegel dieses Moduls: `CasBasis` ist nach `string` zuweisbar (die
+ * API-Funktionen nehmen `string`), ein blanker `string` aber NICHT nach `CasBasis`. Ein
+ * `basis: t.geaendert_at` direkt aus den Live-Query-Daten bricht damit den Typcheck; ein
+ * Regex-Guard sähe `const b = t.geaendert_at` nicht, der Typ sieht es.
  *
  * Erzeugt wird eine `CasBasis` ausschließlich in {@link useEditSitzung}.
  */
@@ -45,25 +43,16 @@ export interface EditSitzungSteuerung<W> {
 
 /**
  * Die gemeinsame Bearbeiten-Sitzung der drei Seiten mit optimistischem Lock
- * (`PersonenDetailPage`, `TiereDetailPage`, `SchaedenDetailPage`).
+ * (`PersonenDetailPage`, `TiereDetailPage`, `SchaedenDetailPage`, LFH-303).
  *
- * **Der Defekt, gegen den sie gebaut ist** (LFH-303): Tier- und Schadensseite lasen die
- * Baseline erst im `onFinish` aus den Live-Query-Daten. Der QueryClient fährt
- * `staleTime: 10_000` und lässt TanStacks Vorgaben `refetchOnWindowFocus` /
- * `refetchOnReconnect` (beide `true`) stehen. Wer während offener Maske das Fenster
- * wechselt und nach mehr als zehn Sekunden zurückkommt, bekommt einen
- * Hintergrund-Refetch — im Cache steht dann der FREMDE, neuere Stand. Beim Speichern ging
- * genau der als Baseline raus, der Server verglich den fremden Stand mit sich selbst, die
- * Prüfung passte, und die fremde Änderung war still überschrieben. Also exakt der
- * Lost-Update, den F10 verhindern sollte, nur mit Fensterwechsel als Auslöser.
+ * Die Baseline darf nicht beim Absenden aus den Live-Query-Daten kommen: ein
+ * Hintergrund-Refetch (`refetchOnWindowFocus`, `refetchOnReconnect`, jede `invalidateQueries`
+ * auf den Detail-Key) legte den FREMDEN, neueren Stand in den Cache, der Server verglich ihn
+ * mit sich selbst, und die fremde Änderung wäre still überschrieben. Ein abgeschaltetes Flag
+ * schlösse nur einen Auslöser; der eingefrorene Stand schließt die Klasse.
  *
- * **Warum einfrieren und nicht `refetchOnWindowFocus` abschalten:** der Fensterwechsel ist
- * nur EINER von mehreren Auslösern ohne Nutzeranlass — `refetchOnReconnect` tut bei einem
- * Netzwechsel dasselbe, und jede `invalidateQueries` auf den Detail-Key ebenso. Ein
- * abgeschaltetes Flag schlösse einen Auslöser; der eingefrorene Stand schließt die Klasse.
- *
- * Das Formular wird MIT befüllt, weil nur so Werte und Basis nachweislich aus einem
- * Snapshot stammen: zwei getrennte Aufrufe könnten wieder auseinanderlaufen.
+ * Das Formular wird MIT befüllt, weil nur so Werte und Basis nachweislich aus einem Snapshot
+ * stammen.
  */
 export function useEditSitzung<W extends object>(form: FormInstance<W>): EditSitzungSteuerung<W> {
   const [sitzung, setSitzung] = useState<EditSitzung<W> | null>(null);

@@ -26,20 +26,19 @@ export interface PersonEingabe {
   antreff_ort?: string | null;
   melder_kontakt?: string | null;
   notiz?: string | null;
-  /** Zustand in Kurzform (Freitext, LFH-613). `null` leert im PATCH. */
+  /** Zustand in Kurzform (Freitext). `null` leert im PATCH. */
   zustand?: string | null;
   /**
-   * Fundort-Koordinate (WGS84, LFH-613). Nur als Paar: eine halbe Koordinate ist 422 — im
-   * PATCH gegen den Bestand geprüft, `{ antreff_lon: null }` allein scheitert also.
+   * Fundort-Koordinate (WGS84). Nur als Paar: eine halbe Koordinate ist 422, im PATCH gegen den
+   * Bestand geprüft; `{ antreff_lon: null }` allein scheitert also.
    */
   antreff_lat?: number | null;
   antreff_lon?: number | null;
   /**
-   * „vermisst seit" als `YYYY-MM-DD HH:MM:SS` in UTC (LFH-613). Nur bei Status `vermisst`
-   * (sonst 422), höchstens 5 min in der Zukunft (sonst 400). Beim Anlegen ohne Angabe setzt
-   * der Server die Meldezeit. Im PATCH ist `null` ein 400 — das Feld darf deshalb nie über
-   * die Formular-Lesart von `patchBody` (`undefined` → `null`) mitlaufen, wenn es nicht
-   * gesetzt werden soll.
+   * „vermisst seit“ als `YYYY-MM-DD HH:MM:SS` in UTC. Nur bei Status `vermisst` (sonst 422),
+   * höchstens 5 min in der Zukunft (sonst 400). Beim Anlegen ohne Angabe setzt der Server die
+   * Meldezeit. Im PATCH ist `null` ein 400; das Feld darf deshalb nie über die Formular-Lesart
+   * (`undefined` → `null`) mitlaufen, wenn es nicht gesetzt werden soll.
    */
   vermisst_seit?: string | null;
 }
@@ -51,16 +50,14 @@ export interface PersonAnlegenEingabe extends PersonEingabe {
   status?: Extract<PersonStatus, 'erfasst' | 'vermisst' | 'betroffen'>;
   client_id?: string;
   /**
-   * Erst-Sichtung in derselben Anlage (LFH-340 · C5). Das Backend schreibt sie in DERSELBEN
-   * Transaktion und hebt `erfasst → betroffen`; die Antwort trägt bereits `aktuelle_sichtung`.
-   *
-   * Kein nachgeschobener POST auf `/sichtung`: der liefe an der Offline-Queue vorbei, deren
-   * Idempotenz an `client_id` DIESES Requests hängt. Serverseitig ist die Kombination mit
-   * `status: 'vermisst'` ein 422 — eine vermisste Person ist nicht angetroffen.
+   * Erst-Sichtung in derselben Anlage: das Backend schreibt sie in DERSELBEN Transaktion und hebt
+   * `erfasst → betroffen`; die Antwort trägt bereits `aktuelle_sichtung`. Kein nachgeschobener
+   * POST auf `/sichtung`: der liefe an der `client_id`-Idempotenz der Offline-Queue vorbei. Mit
+   * `status: 'vermisst'` ist das 422.
    */
   sichtung?: Sichtungskategorie;
-  /** Wartebereich-Eintritt in derselben Transaktion wie die Anlage (LFH-458).
-   * Bleibt beim Offline-Replay an der client_id; `vermisst` + UHS ist 422. */
+  /** Wartebereich-Eintritt in derselben Transaktion wie die Anlage (bleibt beim Offline-Replay an
+   * der client_id); `vermisst` + UHS ist 422. */
   uhs_id?: number | null;
 }
 
@@ -70,8 +67,7 @@ export function listePersonen(einsatzId: number, status?: PersonStatus): Promise
 }
 
 export function ladePerson(einsatzId: number, personId: number): Promise<PersonDetail> {
-  // Schreibt serverseitig EINEN detail-Audit-Eintrag (E‑1-Mechanik, unverändert
-  // in E‑2 — der medizinische Verlauf ist Teil derselben Antwort).
+  // Schreibt serverseitig EINEN detail-Audit-Eintrag.
   return apiGet<PersonDetail>(`/api/einsaetze/${einsatzId}/personen/${personId}`);
 }
 
@@ -83,15 +79,13 @@ export function legePersonAn(
   return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen`, 'POST', daten, optionen);
 }
 
-/** Bearbeitet die Identitäts-/Kontextfelder. `basisGeaendertAt` (der beim Laden gelesene Stand,
- *  LFH-241/F10) aktiviert das optimistische Lock: stimmt er serverseitig nicht mehr → 409. Ohne
- *  ihn (Overwrite aus dem Konfliktdialog) wird bewusst blind überschrieben.
+/** Bearbeitet die Identitäts-/Kontextfelder. `basisGeaendertAt` aktiviert das optimistische
+ *  Lock (stimmt der Stand nicht mehr → 409); ohne ihn (Overwrite aus dem Konfliktdialog) wird
+ *  bewusst blind überschrieben.
  *
- *  PATCH-Semantik (LFH-266/F12): ein gesendetes `null` LEERT das Feld, ein fehlender Key lässt
- *  es unverändert. Geleerte Formularfelder werden dafür zu `null` normalisiert — die Regeln
- *  samt der `undefined`-Falle stehen an `api/patchTriState.ts`. `daten` kommt hier aus EINEM
- *  Formular, deshalb die formular-Lesart (`undefined` = geleert = löschen). Beim POST
- *  (`legePersonAn`) gilt das NICHT — dort heißt `null` schlicht „nicht gesetzt". */
+ *  `daten` kommt aus EINEM Formular, deshalb die Formular-Lesart (`undefined` = geleert =
+ *  löschen, siehe `api/patchTriState.ts`). Beim POST (`legePersonAn`) heißt `null` dagegen
+ *  „nicht gesetzt“. */
 export function aktualisierePerson(
   einsatzId: number,
   personId: number,
@@ -125,7 +119,7 @@ export function registrierAnzeige(nr: number): string {
   return registrierNummer('R', nr);
 }
 
-/** E‑2: Sichtung (Triage) erfassen. Hebt erfasst→betroffen serverseitig an. */
+/** Sichtung (Triage) erfassen. Hebt erfasst→betroffen serverseitig an. */
 export function erfasseSichtung(
   einsatzId: number,
   personId: number,
@@ -145,8 +139,8 @@ export interface VerbleibEingabe {
   status?: VerbleibStatus | null;
   notiz?: string | null;
   /**
-   * LFH-674: Betreuungsstelle, nur bei `art: 'notunterkunft'` (sonst 422) und nur mit
-   * Lesezugriff auf das Modul Betreuung (sonst 403). Der Server kopiert keinen Namen ins Ziel.
+   * Betreuungsstelle, nur bei `art: 'notunterkunft'` (sonst 422) und nur mit Lesezugriff auf das
+   * Modul Betreuung (sonst 403). Der Server kopiert keinen Namen ins Ziel.
    */
   betreuungsstelle_id?: number | null;
 }
@@ -162,7 +156,7 @@ export function erfasseVerbleib(
   );
 }
 
-/** E‑2: Befund-/Verlaufsnotiz (append-only, KEIN ETB-Eintrag). */
+/** Befund-/Verlaufsnotiz (append-only, KEIN ETB-Eintrag). */
 export function legeNotizAn(
   einsatzId: number,
   personId: number,
@@ -175,7 +169,7 @@ export function legeNotizAn(
   );
 }
 
-/** E‑2: Vermisstenabgleich vorschlagen (Verdacht). `vermisstPersonId` ist :pid. */
+/** Vermisstenabgleich vorschlagen (Verdacht). `vermisstPersonId` ist :pid. */
 export function schlageAbgleichVor(
   einsatzId: number,
   vermisstPersonId: number,
@@ -188,7 +182,7 @@ export function schlageAbgleichVor(
   );
 }
 
-/** E‑2: Abgleich entscheiden — nur Einsatzleitung. */
+/** Abgleich entscheiden, nur Einsatzleitung. */
 export function entscheideAbgleich(
   einsatzId: number,
   vermisstPersonId: number,

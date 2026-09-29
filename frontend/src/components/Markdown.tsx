@@ -26,17 +26,13 @@ export type UnterEbene = 1 | 2 | 3 | 4 | 5;
 type Ebene = 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
- * Überschriften im Inhalt stehen UNTER der Gliederung der Seite, nie neben ihr (gemessen im
- * ETB am 22.09.2026: sechs `h1` auf einer Seite). Ein `# Lageüberblick` im Text ist eine
- * Gliederung INNERHALB des Eintrags, nicht eine zweite Seite.
+ * Überschriften im Inhalt stehen UNTER der Gliederung der Seite, nie neben ihr: ein
+ * `# Lageüberblick` im Text gliedert INNERHALB des Eintrags.
  *
- * Wie tief das ist, weiß nur der EINBAUORT (LFH-621) — dieselbe Regel wie `Paneel
- * ueberschrift` und `Augenbraue als`: die Ebene folgt der Gliederung der Seite. `unterEbene`
- * nennt die Ebene der nächsten Überschrift über dem Text, `#` wird die Stufe darunter,
- * `##` die nächste usw. Vorher rückte ein fester Versatz von drei alles pauschal nach
- * unten; damit fielen `###` und tiefer auch dort auf `h6` zusammen, wo über dem Text nur der
- * Seitentitel oder ein Tageskopf steht, und ein Vorleser konnte drei Quellstufen nicht mehr
- * unterscheiden. `h6` bleibt der Boden — erst jenseits davon fällt etwas zusammen, und ARIA-
+ * Wie tief das ist, weiß nur der EINBAUORT (LFH-621), wie bei `Paneel ueberschrift` und
+ * `Augenbraue als`. `unterEbene` nennt die Ebene der nächsten Überschrift über dem Text, `#` wird
+ * die Stufe darunter, `##` die nächste usw. Kein fester Versatz, sonst fielen `###` und tiefer
+ * auch dort auf `h6` zusammen, wo nur der Seitentitel darübersteht. `h6` ist der Boden; ARIA-
  * Stufen über 6 werten Vorleser uneinheitlich aus.
  *
  * Die OPTIK bleibt die der Quellebene: die Klasse `md-h<n>` trägt die ursprüngliche Stufe,

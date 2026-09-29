@@ -10,37 +10,14 @@ import BrDetailPage from './BrDetailPage';
 import { AuthProvider } from '../../auth/AuthContext';
 import { setzeViewportBreite } from '../../test/viewport';
 import type { BrDetail, EinsatzAnzeige, Einheit, EinsatzFahrzeug } from '../../api/types';
+import { einsatzFixture } from '../../test/fixtures';
 
 // `BrSwitcher` feuert eine eigene `listeBr`-Query ohne MSW-Handler (`onUnhandledRequest: 'error'`);
 // diese Datei testet die Seiten-Komposition, nicht den Switcher.
 vi.mock('./BrSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
 
 function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
-  return {
-    id: 1,
-    bezeichnung: 'Test-Einsatz',
-    stichwort: null,
-    status: 'aktiv',
-    begonnen_at: 'x',
-    abgeschlossen_at: null,
-    abgeschlossen_von: null,
-    einsatzart: 'realeinsatz',
-    einsatznummer_intern: null,
-    angelegt_at: 'x',
-    leitstellen_nr: null,
-    einsatzort: null,
-    einsatzort_lat: null,
-    einsatzort_lon: null,
-    meldende_stelle: null,
-    sachverhalt: null,
-    anzahl_betroffene_initial: null,
-    meine_rolle: 'fuehrungspersonal',
-    org_id: 1,
-    org_name: 'Org',
-    meine_sachgebiete: [],
-    lagekennzahlen: [],
-    ...over,
-  };
+  return einsatzFixture({ bezeichnung: 'Test-Einsatz', meine_rolle: 'fuehrungspersonal', ...over });
 }
 
 function brDetail(over: Partial<BrDetail> = {}): BrDetail {

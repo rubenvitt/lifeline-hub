@@ -3,22 +3,14 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import EtbPage from './EtbPage';
+import { benutzerFixture } from '../test/fixtures';
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
 // schreibrecht.test.ts ab.
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  benutzername: 'nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const nutzer = benutzerFixture();
 function einsatz(status: string) {
   return {
     id: 7,
@@ -36,7 +28,7 @@ describe('EtbPage – Abschließen', () => {
   it('schließt einen aktiven Einsatz als Einsatzleitung ab', async () => {
     let abgeschlossen = false;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json(einsatz(abgeschlossen ? 'abgeschlossen' : 'aktiv')),
       ),
@@ -60,11 +52,9 @@ describe('EtbPage – Abschließen', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+      </Routes>,
       { route: '/einsaetze/7/etb' },
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Einsatz abschließen' }));
@@ -76,7 +66,7 @@ describe('EtbPage – Abschließen', () => {
 
   it('zeigt den Abschließen-Button nicht für Nicht-Einsatzleitung', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz('aktiv'), meine_rolle: 'fuehrungspersonal' }),
       ),
@@ -96,11 +86,9 @@ describe('EtbPage – Abschließen', () => {
       ),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+      </Routes>,
       { route: '/einsaetze/7/etb' },
     );
     await screen.findByRole('heading', { name: 'Einsatztagebuch' });
@@ -109,7 +97,7 @@ describe('EtbPage – Abschließen', () => {
 
   it('zeigt Beobachtern keine Schreib-/Verwaltungsaktionen (read-only)', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz('aktiv'), meine_rolle: 'beobachter' }),
       ),
@@ -129,11 +117,9 @@ describe('EtbPage – Abschließen', () => {
       ),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+      </Routes>,
       { route: '/einsaetze/7/etb' },
     );
     await screen.findByRole('heading', { name: 'Einsatztagebuch' });

@@ -1,0 +1,34 @@
+2026-09-28 18:15:04.220766n] 0x1260a0710 - [PID=83432] ProcessThrottler::updateThrottleStateIfNeeded: sending ProcessDidResume IPC because the process was suspended (probable wakeup reason: WebPageProxy::runJavaScriptInFrameInScriptWorld)
+2026-09-28 18:15:04.220835n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState: type=2
+2026-09-28 18:15:04.220838n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState(Foreground) Taking foreground assertion for network process
+2026-09-28 18:15:04.230978n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState: type=1
+2026-09-28 18:15:04.230978n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState(Background) Taking background assertion for network process
+2026-09-28 18:15:04.235683n] WebContent[83432]: [sessionID=1] WebProcess::prepareToSuspend: isSuspensionImminent=0, remainingRunTime=0.003475s
+2026-09-28 18:15:07.132888n] WebContent[83432]: [sessionID=1] WebProcess::prepareToSuspend: Process is ready to suspend
+2026-09-28 18:15:07.158700n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState: type=0
+2026-09-28 18:15:07.158705n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState(Suspended) Release all assertions for network process
+2026-09-28 18:18:21.777730n] 0x1260a0710 - [PID=83432] ProcessThrottler::updateThrottleStateIfNeeded: sending ProcessDidResume IPC because the process was suspended (probable wakeup reason: WebPage_SetActivityState)
+2026-09-28 18:18:21.777930n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState: type=1
+2026-09-28 18:18:21.777938n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState(Background) Taking background assertion for network process
+2026-09-28 18:18:21.810836n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState: type=2
+2026-09-28 18:18:21.810836n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState(Foreground) Taking foreground assertion for network process
+2026-09-28 18:18:21.821423n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState: type=1
+2026-09-28 18:18:21.821424n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState(Background) Taking background assertion for network process
+2026-09-28 18:18:21.849959n] WebContent[83432]: [sessionID=1] WebProcess::prepareToSuspend: isSuspensionImminent=0, remainingRunTime=0.027796s
+2026-09-28 18:18:26.283251n] WebContent[83432]: [sessionID=1] WebProcess::prepareToSuspend: Process is ready to suspend
+2026-09-28 18:18:26.283457n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState: type=0
+2026-09-28 18:18:26.283466n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState(Suspended) Release all assertions for network process
+2026-09-28 18:22:20.800185n] 0x1260a0710 - [PID=83432] ProcessThrottler::updateThrottleStateIfNeeded: sending ProcessDidResume IPC because the process was suspended (probable wakeup reason: WebPage_SetActivityState)
+2026-09-28 18:22:20.800261n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState: type=1
+2026-09-28 18:22:20.800266n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState(Background) Taking background assertion for network process
+2026-09-28 18:26:19.809747n] WebContent[83432]: [sessionID=1] WebProcess::prepareToSuspend: isSuspensionImminent=0, remainingRunTime=8.956622s
+2026-09-28 18:26:19.908168n] 0x1260a0710 - [PID=83432] ProcessThrottler::updateThrottleStateIfNeeded: sending ProcessDidResume IPC because the WebProcess is still processing request to suspend=10 (probable wakeup reason: WebPageProxy::runJavaScriptInFrameInScriptWorld)
+2026-09-28 18:26:19.908235n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState: type=2
+2026-09-28 18:26:19.908235n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState(Foreground) Taking foreground assertion for network process
+2026-09-28 18:26:19.936527n] WebContent[83432]: [sessionID=1] WebProcess::prepareToSuspend: Process is ready to suspend
+2026-09-28 18:26:19.938830n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState: type=1
+2026-09-28 18:26:19.938830n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState(Background) Taking background assertion for network process
+2026-09-28 18:26:19.939559n] WebContent[83432]: [sessionID=1] WebProcess::prepareToSuspend: isSuspensionImminent=0, remainingRunTime=0.000192s
+2026-09-28 18:26:39.940382n] 0x1260a0710 - [PID=83432] ProcessThrottler::prepareToSuspendTimeoutTimerFired: Updating process assertion to allow suspension
+2026-09-28 18:26:39.940687n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState: type=0
+2026-09-28 18:26:39.940711n] 0x1260a0680 - [PID=83432] WebProcessProxy::didChangeThrottleState(Suspended) Release all assertions for network process

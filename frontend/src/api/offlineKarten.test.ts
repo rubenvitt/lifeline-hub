@@ -55,8 +55,8 @@ describe('ladeBauStatus', () => {
     const jobs = await ladeBauStatus();
     const status = jobs[0].status;
     expect(status.status).toBe('failed');
-    // Union-Narrowing (LFH-323): `fehler` existiert nur auf dem failed-Zweig der diskriminierten
-    // Union — das `throw` narrowt für TS und lässt den Test laut scheitern, wenn nicht failed.
+    // `fehler` existiert nur auf dem failed-Zweig der Union; das `throw` narrowt für TS und lässt
+    // den Test laut scheitern.
     if (status.status !== 'failed') throw new Error('Job sollte failed sein');
     expect(status.fehler).toBe('Timeout beim Upload');
   });

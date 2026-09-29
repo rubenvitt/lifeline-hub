@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { ModulOverrides } from '../api/types';
 import { modulRegistry } from './modulRegistry';
 import {
   berechneAbloesungZaehler,
@@ -11,19 +11,11 @@ import {
   darfZaehlerZeigen,
   ZAEHLER_QUELLEN,
 } from './useModulZaehler';
+import { benutzerFixture } from '../test/fixtures';
 
 dayjs.extend(utc);
 
-const benutzer: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'E',
-  benutzername: 'e',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-08-06 10:00:00',
-  totp_aktiviert: false,
-};
+const benutzer = benutzerFixture({ anzeigename: 'E' });
 
 describe('Modul-Zähler', () => {
   // Bis LFH-612 rechnete der Browser diese Zahlen aus vollen Listen; die Wortlaute sind seither

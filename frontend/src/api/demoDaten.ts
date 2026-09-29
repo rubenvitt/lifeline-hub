@@ -2,19 +2,16 @@ import type { DemoDatenStatus } from './types';
 import { apiGet, apiSend } from './client';
 
 /**
- * Demo-Daten der eigenen Organisation (LFH-690, design.md D2/D3).
+ * Demo-Daten der eigenen Organisation (LFH-690). Alle vier Endpunkte antworten mit demselben
+ * {@link DemoDatenStatus} aus derselben Transaktion wie der Vorgang; ein zweiter Abruf ist nicht
+ * nötig.
  *
- * Alle vier Endpunkte antworten mit demselben {@link DemoDatenStatus}, und zwar aus derselben
- * Transaktion wie der Vorgang selbst — nach einem Schreibaufruf ist ein zweiter Abruf also
- * nicht nötig, um zu wissen, wo man steht.
- *
- * Ohne `--demo-daten` am Backend sind die Routen nicht registriert: jeder Aufruf endet dann
- * in 404. Das ist KEIN Fehlerbild, sondern die Aussage „nicht freigeschaltet“ — es gibt dafür
- * bewusst keine zweite Quelle (kein Flag an `/api/karte/config` oder `/api/auth/me`).
+ * Ohne `--demo-daten` am Backend sind die Routen nicht registriert: 404 heißt „nicht
+ * freigeschaltet“, es gibt dafür bewusst keine zweite Quelle.
  *
  * Statuscodes: GET 200 · POST 201 · POST `/neu` 200 · DELETE 200; 409 bei „schon importiert“
- * (POST) bzw. „nichts importiert“ (DELETE), 422 bei fehlendem Katalogeintrag, 401/403 wie
- * überall. Alle Fehler kommen als {@link ApiError} mit dem Servertext.
+ * (POST) bzw. „nichts importiert“ (DELETE), 422 bei fehlendem Katalogeintrag. Fehler kommen als
+ * {@link ApiError} mit dem Servertext.
  */
 
 const PFAD = '/api/demo-daten';

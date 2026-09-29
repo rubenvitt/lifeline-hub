@@ -1,4 +1,3 @@
-// frontend/src/command-palette/useKoordinatenSprung.ts
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
@@ -14,20 +13,14 @@ import type { Befehl, Oeffnung, PaletteModus } from './typen';
 const FRISCH_MS = 60_000;
 
 /**
- * Beschaffung für den Koordinatensprung (LFH-619): Rechte und eingestelltes Format.
+ * Beschaffung für den Koordinatensprung: Rechte und eingestelltes Format.
  *
- * LAZY WIE `useDatensaetze`: abgefragt wird erst, wenn der ENTPRELLTE Rest die Form einer
- * Koordinate hat. Die Palette hängt auf App-Ebene und rendert erst beim Öffnen; ein eager
- * Abruf feuerte bei jedem `Strg/⌘+K`.
+ * LAZY wie `useDatensaetze`: abgefragt wird erst, wenn der ENTPRELLTE Rest die Form einer
+ * Koordinate hat. Die Einsatz-Einstellungen holt der Hook selbst, weil die Palette außerhalb des
+ * `EinsatzAnzeigeProvider` hängt; das Fach füllt `EinsatzLayout` ohnehin.
  *
- * Die Einsatz-Einstellungen holt der Hook selbst, weil die Palette AUSSERHALB des
- * `EinsatzAnzeigeProvider` hängt — dessen Hook lieferte hier nur die Defaults. Das Fach ist
- * dasselbe, das `EinsatzLayout` ohnehin füllt; auf einer Einsatzseite kostet das keinen Request.
- *
- * Rückgabe ist eine FUNKTION über den lebenden Rest, keine fertige Zeile: der Rest, aus dem
- * die Rechte angefragt wurden, hinkt der Eingabe um die Entprellung hinterher. Die Palette
- * fragt mit dem, was gerade im Feld steht — sonst stünde nach dem Löschen einer Ziffer noch
- * 300 ms lang ein Punkt da, den niemand mehr gemeint hat.
+ * Rückgabe ist eine FUNKTION über den lebenden Rest, damit nach dem Löschen einer Ziffer nicht
+ * 300 ms lang ein veralteter Punkt dasteht.
  */
 export function useKoordinatenSprung({
   einsatzId,

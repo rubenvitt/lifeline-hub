@@ -2,56 +2,32 @@ import { describe, expect, it } from 'vitest';
 import { scanneApiTypen, type ApiTypFund } from './apiTypScan';
 
 /**
- * Guard (LFH-265, Teil A): im API-Seam werden Response-Formen NICHT von Hand beschrieben.
+ * Guard (LFH-265): im API-Seam werden Response-Formen NICHT von Hand beschrieben. Eine
+ * handgerollte Response-Form driftet still gegen das Backend (der Client liest ein Feld, das es
+ * nicht mehr gibt); der Typ-Codegen ist die Gegenmaßnahme.
  *
- * WARUM. Eine handgerollte Response-Form driftet STILL gegen das Backend. Es gibt keinen roten
- * Test und keinen auffälligen Request — der Client liest ein Feld, das es nicht mehr gibt, und
- * bekommt `undefined`. Genau diese Klasse hat LFH-265 im Karten-Bereich gemessen: `maxzoom` und
- * `update_verfuegbar` waren in der Handrolle OPTIONAL, obwohl das Backend sie immer liefert, und
- * `OnlineStyle.typ` war ein FE-eigener Union statt des generierten. Der Typ-Codegen (LFH-120) ist
- * die Gegenmaßnahme; dieser Guard hält den erreichten Stand.
+ * Mechanik wie `queryKeys.guard.test.ts`: TS-AST, das Glob bleibt im Guard-Test. Erfasste Formen
+ * und die Grenzen des Scanners stehen im Kopf von `apiTypScan.ts`.
  *
- * ERKENNUNGS-MECHANIK GEERBT von `queryKeys.guard.test.ts` / `queryKeyScan.ts` (LFH-312):
- * TS-AST statt zeilenlokaler Regex, das `import.meta.glob` bleibt im Guard-Test statt im Scanner.
- * Bewusst KEINE zweite zeilenbasierte Variante. Erfasste Formen und die Grenzen des Scanners
- * stehen im Kopfkommentar von `apiTypScan.ts` — die Liste ist Teil des Vertrags.
+ * ZWEISTUFIGE, PERMANENTE ERLAUBNIS (Request-DTOs bleiben handgerollt):
+ *  STUFE 1: Namenskonvention ({@link REQUEST_DTO_KONVENTION}): `…Eingabe`, `…Patch`, `…Body`,
+ *    `…Filter`, `…Update`, `Neuer…`/`Neue…`/`Neues…`/`Patch…`. Trägt, weil Response-Typen die
+ *    Namen ihrer Rust-Gegenstücke erben (`…Anzeige`, `…Antwort`, `…Detail`).
+ *  STUFE 2: benannte Ausnahmen ({@link AUSNAHMEN}) MIT Begründung; ein Stale-Check hält die
+ *    Liste frei von Leichen.
  *
- * ─────────────────────────────────────────────────────────────────────────────────────────
- * ZWEISTUFIGE ERLAUBNIS. Anders als die queryKeys-Allowlist ist diese Erlaubnis PERMANENT,
- * keine Migrationsschuld: Request-/Eingabe-DTOs bleiben laut CLAUDE.md („Noch handgepflegt
- * (bewusst, FE-lokal)") dauerhaft handgerollt. Sie schrumpft nicht auf leer.
- *
- *  STUFE 1 — NAMENSKONVENTION ({@link REQUEST_DTO_KONVENTION}). Request-DTOs heißen in diesem
- *    Repo durchgängig `…Eingabe`, `…Patch`, `…Body`, `…Filter`, `…Update` oder `Neuer…`/
- *    `Neue…`/`Neues…`/`Patch…`. Gemessen: 62 der 75 exportierten Objekt-Typen im API-Seam.
- *    Die Konvention trägt, WEIL Response-Typen die Namen ihrer Rust-Gegenstücke erben
- *    (`…Anzeige`, `…Antwort`, `…Detail`) und diese Suffixe nie treffen.
- *
- *  STUFE 2 — GEMESSENE AUSNAHMEN ({@link AUSNAHMEN}). Alles, was Stufe 1 nicht trifft, braucht
- *    einen Eintrag MIT Begründung. Seed gegen den Stand dieses Branches gemessen (13 Einträge),
- *    nicht abgeschrieben. Ein STALE-CHECK unten hält die Liste frei von Leichen.
- *
- * WAS DIESER GUARD NICHT LEISTET:
- *  - Er prüft die FORM (Handrolle vs. Re-Export), nicht die RICHTIGKEIT des Re-Exports. Dass
- *    `OfflineKarte` auf `OfflineKarteAntwort` und nicht auf `OfflineKarte` zeigt, sichert der
- *    Typecheck an den ~30 Karten-Konsumenten, nicht dieser Test.
- *  - Er sieht nur `frontend/src/api/`. Eine Response-Form, die sich in eine Seiten-Komponente
- *    verirrt, ist unsichtbar — der API-Seam ist aber per Konvention der einzige Ort, an dem
- *    Response-Typen entstehen ("Komponenten importieren ausschließlich von hier").
- * ─────────────────────────────────────────────────────────────────────────────────────────
+ * NICHT geleistet: die RICHTIGKEIT eines Re-Exports (das sichert der Typecheck der
+ * Konsumenten), und nur `frontend/src/api/` wird gesehen.
  */
 
-/** Siehe STUFE 1 oben. Bewusst am ENDE des Namens bzw. am Anfang verankert — ein `…Filter`
- *  irgendwo in der Mitte (`FilterAnzeige`) soll nicht durchrutschen. */
+/** Siehe STUFE 1 oben. Am ENDE bzw. am Anfang verankert, damit `FilterAnzeige` nicht
+ *  durchrutscht. */
 const REQUEST_DTO_KONVENTION = /(Eingabe|Patch|Body|Filter|Update)$|^(Neuer|Neue|Neues|Patch)[A-Z]/;
 
 /**
- * STUFE 2 — Schlüssel `<dateiname>#<Name>` → Begründung. Datei-qualifiziert, weil Namen
- * kollidieren (`AdhocEingabe`/`StatusEingabe` gibt es je zweimal).
- *
- * EIN EINTRAG IST EINE ENTSCHEIDUNG, KEIN FREIBRIEF: er behauptet, dass für diese Form KEIN
- * generiertes Schema existiert oder existieren kann. Wer hier etwas einträgt, das ein Rust
- * `ToSchema`-Gegenstück hat, hebelt den Codegen aus.
+ * STUFE 2: Schlüssel `<dateiname>#<Name>` → Begründung, datei-qualifiziert, weil Namen
+ * kollidieren. Ein Eintrag behauptet, dass für diese Form KEIN generiertes Schema existiert;
+ * wer etwas mit `ToSchema`-Gegenstück einträgt, hebelt den Codegen aus.
  */
 const AUSNAHMEN: Record<string, string> = {
   // ── Scanner-/Guard-Infrastruktur: keine API-DTOs, nur zufällig in diesem Ordner. ──
@@ -74,10 +50,6 @@ const AUSNAHMEN: Record<string, string> = {
     'FE-lokale Formgebung: Rust serialisiert `fachebenen_sichtbar` untypisiert (`unknown`), ' +
     'es gibt also kein Schema zum Re-Exportieren. Bereits in types.ts so dokumentiert (LFH-120).',
 
-  // LFH-323: Die karten-service-Durchreiche (BauJob/BauJobStatus/BaubareRegion) ist KEINE Ausnahme
-  // mehr — die Wire-Typen liegen im geteilten Crate `karten-katalog` und laufen durch den Codegen;
-  // die drei FE-Typen sind jetzt Re-Exporte (siehe MIGRIERTE_RESPONSE_TYPEN unten).
-
   // ── Response-Formen ohne Codegen-Gegenstück, jeweils mit dokumentiertem Grund. ──
   'auth.ts#MfaErforderlich':
     'Zweig einer `#[serde(untagged)]`-Union (`LoginAntwort`), bewusst NICHT im Typ-Codegen ' +
@@ -93,9 +65,8 @@ const AUSNAHMEN: Record<string, string> = {
 };
 
 /**
- * Die durch LFH-265 (Teil A) migrierten Response-Formen. Sie MÜSSEN Re-Exporte bleiben — dieser
- * Pin macht den erreichten Endstand explizit, statt ihn nur implizit aus „nicht auf der Liste"
- * folgen zu lassen. Er ist zugleich das Ziel der Mutationsprobe (siehe unten).
+ * Migrierte Response-Formen: sie MÜSSEN Re-Exporte bleiben. Der Pin macht den Endstand
+ * explizit, statt ihn nur aus „nicht auf der Liste“ folgen zu lassen.
  */
 const MIGRIERTE_RESPONSE_TYPEN = [
   'OnlineStyle',
@@ -106,7 +77,7 @@ const MIGRIERTE_RESPONSE_TYPEN = [
   'VorhandeneKarte', // offlineKarten.ts
   'BauJob',
   'BauJobStatus',
-  'BaubareRegion', // offlineKarten.ts (LFH-323, karten-service-Kontrakt)
+  'BaubareRegion', // offlineKarten.ts (karten-service-Kontrakt)
   'OnlineQuelle', // onlineQuellen.ts
   'FeatureCollection',
   'FachebeneAntwort', // fachebenen.ts
@@ -115,8 +86,8 @@ const MIGRIERTE_RESPONSE_TYPEN = [
   'OrtVorschau', // ortVorschau.ts
 ] as const;
 
-// Alle API-Seam-Quellen als Rohtext (Vite). Das Glob bleibt bewusst HIER und nicht im Scanner —
-// sonst landete bei einem versehentlichen Produktiv-Import der Quelltext im App-Bundle.
+// Das Glob bleibt bewusst HIER und nicht im Scanner, sonst landete bei einem versehentlichen
+// Produktiv-Import der Quelltext im App-Bundle.
 const dateien = import.meta.glob('/src/api/**/*.ts', {
   query: '?raw',
   import: 'default',
@@ -128,7 +99,7 @@ function istAusgeschlossen(pfad: string): boolean {
   // paths/components/…`. Sie zu scannen hieße, den Codegen gegen sich selbst zu wenden.
   if (pfad.endsWith('/types.generated.ts')) return true;
   // Tests bauen Fixtures und pinnen Formen bewusst. `.typetest.ts` zählt mit (endet NICHT auf
-  // `.test.ts` — vor „test" steht ein „e", kein Punkt) und wäre sonst mitgescannt.
+  // `.test.ts`).
   return /\.(type)?test\.ts$/.test(pfad);
 }
 
@@ -139,9 +110,8 @@ const FUNDE: ApiTypFund[] = Object.entries(dateien)
 const zeige = (f: ApiTypFund): string => `${f.pfad}:${f.zeile}  ${f.name} [${f.art}]`;
 
 /**
- * LEERLAUF-SCHUTZ (Muster aus queryKeys.guard.test.ts). Der Hauptguard hat die Form „für jeden
- * Fund gilt …" und wäre über einer LEEREN Fundmenge trivial wahr. Ein kaputtes Glob, ein zu
- * breiter Ausschluss oder ein Scanner, der nichts mehr meldet, sähe dann wie ein grüner Lauf aus.
+ * LEERLAUF-SCHUTZ: der Hauptguard („für jeden Fund gilt …“) wäre über einer LEEREN Fundmenge
+ * trivial wahr.
  */
 describe('API-Response-Typen-Guard: der Scan läuft überhaupt', () => {
   it('scannt den API-Seam und findet exportierte Objekt-Typen', () => {
@@ -150,8 +120,8 @@ describe('API-Response-Typen-Guard: der Scan läuft überhaupt', () => {
   });
 
   it('erkennt beide Formen (interface UND Objekt-Typ-Alias)', () => {
-    // Ohne diesen Test könnte der `objekt-alias`-Zweig des Scanners still kaputtgehen und die
-    // naheliegendste Umgehung (`export type X = { … }` statt `export interface X`) stünde offen.
+    // Hält den `objekt-alias`-Zweig lebendig; sonst stünde `export type X = { … }` als Umgehung
+    // offen.
     const probe = scanneApiTypen(
       'probe.ts',
       [
@@ -203,8 +173,8 @@ describe('API-Response-Typen-Guard: die Ausnahmeliste bleibt ehrlich', () => {
   });
 
   it('enthält keinen Eintrag, den schon die Konvention trägt', () => {
-    // Ein doppelt abgedeckter Eintrag ist harmlos, aber irreführend: er suggeriert eine
-    // Entscheidung, wo die Konvention längst greift — und überlebt so das Löschen der Form.
+    // Ein doppelt abgedeckter Eintrag suggeriert eine Entscheidung, wo die Konvention greift, und
+    // überlebt so das Löschen der Form.
     const redundant = Object.keys(AUSNAHMEN).filter((k) =>
       REQUEST_DTO_KONVENTION.test(k.split('#')[1]),
     );
@@ -212,8 +182,8 @@ describe('API-Response-Typen-Guard: die Ausnahmeliste bleibt ehrlich', () => {
   });
 
   it('jeder Eintrag trägt eine echte Begründung (kein Platzhalter)', () => {
-    // Ohne diesen Test wäre `'…': ''` ein gültiger Freikauf und die Beweislast der Stufe 2 wäre
-    // still weg. Schwelle bewusst niedrig — geprüft wird Vorhandensein, nicht Qualität.
+    // Ohne diesen Test wäre `'…': ''` ein gültiger Freikauf. Geprüft wird Vorhandensein, nicht
+    // Qualität.
     const duenn = Object.entries(AUSNAHMEN)
       .filter(([, grund]) => grund.trim().length < 20)
       .map(([k]) => k);

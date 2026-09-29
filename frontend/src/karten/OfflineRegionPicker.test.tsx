@@ -2,21 +2,13 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import type { BauJob, OfflineKarte, OfflineKatalogEintrag } from '../api/offlineKarten';
 import OfflineRegionPicker from './OfflineRegionPicker';
+import { adminFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-06-26 10:00:00',
-};
+const admin = adminFixture();
 
 const bremenEintrag: OfflineKatalogEintrag = {
   name: 'Bremen',
@@ -60,7 +52,7 @@ function mockPicker(
     bauVerfuegbar = true,
   } = opts;
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/karte/config', () =>
       HttpResponse.json({
         online_styles: [],
@@ -81,11 +73,7 @@ function mockPicker(
 }
 
 function render() {
-  return renderMitProviders(
-    <AuthProvider>
-      <OfflineRegionPicker offen onClose={() => {}} />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<OfflineRegionPicker offen onClose={() => {}} />);
 }
 
 describe('OfflineRegionPicker', () => {

@@ -1,4 +1,3 @@
-// frontend/src/command-palette/befehle.test.ts
 import { describe, it, expect, vi } from 'vitest';
 import {
   baueBefehle,
@@ -15,17 +14,9 @@ import type {
   ModulOverride,
   Koordinatenformat,
 } from '../api/types';
+import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 
-const fuehrungskraft: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'EL',
-  benutzername: 'el',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-  aktiv: true,
-  erstellt_at: '',
-  totp_aktiviert: false,
-};
+const fuehrungskraft = benutzerFixture({ anzeigename: 'EL', org_rolle: 'fuehrungskraft' });
 const sichter: BenutzerAnzeige = { ...fuehrungskraft, id: 2, org_rolle: 'keine' };
 const admin: BenutzerAnzeige = { ...fuehrungskraft, id: 3, system_rolle: 'admin' };
 
@@ -102,9 +93,7 @@ describe('baueBefehle — Navigation/Berechtigung', () => {
       baueBefehle(kontext({ benutzer: fuehrungskraft })).some((x) => x.id === 'nav:benutzer'),
     ).toBe(false);
   });
-  // LFH-328/M8: vorher hingen auch diese zwei an `system_rolle === 'admin'` allein — eine
-  // Führungskraft sah „Verwaltung" in der Topbar und durfte die Route betreten, fand den
-  // Eintrag hier aber nicht. Jetzt teilen sich Topbar, Route und Palette `darfVerwaltung`.
+  // Topbar, Route und Palette teilen sich `darfVerwaltung`.
   it('zeigt Verwaltung und Stammdaten auch der Führungskraft', () => {
     const b = baueBefehle(kontext({ benutzer: fuehrungskraft }));
     expect(b.some((x) => x.id === 'nav:admin')).toBe(true);
@@ -122,30 +111,7 @@ describe('baueBefehle — Navigation/Berechtigung', () => {
   });
 });
 
-const aktiverEinsatz: EinsatzAnzeige = {
-  id: 7,
-  bezeichnung: 'Hochwasser Nord',
-  stichwort: 'THW',
-  status: 'aktiv',
-  begonnen_at: '',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-  org_id: 1,
-  org_name: 'KV',
-  meine_sachgebiete: [],
-  lagekennzahlen: [],
-};
+const aktiverEinsatz = einsatzFixture({ id: 7, bezeichnung: 'Hochwasser Nord', stichwort: 'THW' });
 const beendet: EinsatzAnzeige = {
   ...aktiverEinsatz,
   id: 8,
@@ -171,11 +137,8 @@ describe('baueBefehle — Schnellaktionen', () => {
     ]);
   });
   /**
-   * Die Ziele stammen aus `routing/deeplinks.ts` (LFH-331 · B3), nicht aus einem
-   * Vorlagentext von Hand. Der Unterschied ist an EINER Zeile messbar und war ein
-   * echter Fehler: die Unfallhilfsstellen liegen unter `/unfallhilfsstellen/liste`,
-   * während `/unfallhilfsstellen` auf `UnfallhilfsstellenDefault` zeigt — eine Seite,
-   * die `?neu=1` gar nicht liest. Die Schnellaktion lief also ins Leere.
+   * Die Ziele stammen aus `routing/deeplinks.ts`: `/unfallhilfsstellen` zeigt auf eine Seite, die
+   * `?neu=1` nicht liest, die Schnellaktion braucht die Listenroute.
    */
   it('baut die Schnellaktions-Ziele über die Deeplink-Registry (UHS auf die Listenroute)', () => {
     const k = kontext();
@@ -237,9 +200,7 @@ describe('baueBefehle — Schnelleinstellungen', () => {
   });
 
   it('Schnelleinstellung Bediendichte ruft setDichte mit der Stufe', () => {
-    // Der zweite Bedienweg neben dem Kopfzeilen-Umschalter (LFH-329 · B1). Er
-    // trägt alle drei Stufen: die Kopfzeile legt ihre Umschalter auf schmalem
-    // Schirm ab, und ohne diesen Weg wäre die Stufe dann unerreichbar.
+    // Die Palette trägt alle drei Stufen als Weg neben dem Benutzermenü.
     const k = kontext();
     const b = baueBefehle(k);
     for (const id of ['dichte:kompakt', 'dichte:komfortabel', 'dichte:handschuh']) {
@@ -332,8 +293,7 @@ describe('Tastaturaktionen', () => {
     expect(kuerzelFuerTastaturAktion('filter-zuruecksetzen', 'Mozilla/5.0 (Macintosh)')).toBe(
       '⌘ ⌫',
     );
-    // Gegenaussage zu den drei gebundenen Ids (LFH-391 · B3): eine Aktion OHNE Tastenweg
-    // hat kein Kürzel. Bis hierher fiel jede unbekannte Id auf das Filter-Kürzel durch.
+    // Gegenaussage: eine Aktion OHNE Tastenweg hat kein Kürzel.
     expect(kuerzelFuerTastaturAktion('neue-zeile', 'Mozilla/5.0 (X11; Linux x86_64)')).toBeNull();
     expect(kuerzelFuerTastaturAktion('spalten', 'Mozilla/5.0 (Macintosh)')).toBeNull();
   });
@@ -381,11 +341,8 @@ describe('Tastaturaktionen', () => {
     expect(befehl).toBeDefined();
     expect(befehl!.label).toBe('Neue Zeile');
     /*
-     * Bewusst `in` statt `toBeUndefined()`: ein gesetztes `kuerzel: undefined` wäre von
-     * einem fehlenden Schlüssel nicht zu unterscheiden — dieselbe Presence-Falle, die
-     * CLAUDE.md für serde-Antworten beschreibt. Und die Aussage ist nicht kosmetisch:
-     * vorher schrieb `baueBefehle` das Kürzel unbedingt, jede ungebundene Aktion trug
-     * damit sichtbar „Strg + Rücktaste" — das Kürzel des Filter-Zurücksetzens.
+     * `in` statt `toBeUndefined()`: ein gesetztes `kuerzel: undefined` wäre von einem fehlenden
+     * Schlüssel nicht zu unterscheiden. Sonst trüge eine ungebundene Aktion ein fremdes Kürzel.
      */
     expect('kuerzel' in befehl!).toBe(false);
 
@@ -408,10 +365,8 @@ describe('Tastaturaktionen', () => {
 
   it('die Ordnungsliste deckt jede TastaturAktionId genau einmal', () => {
     /*
-     * Das Record erzwingt die Vollständigkeit der DEFINITIONEN über den Typcheck (TS2741);
-     * die REIHENFOLGE kann es nicht erzwingen, weil ein Record keine vertragliche Ordnung
-     * hat. Genau diese Lücke schließt dieser Guard: eine Id ohne Eintrag in der
-     * Ordnungsliste erschiene sonst nie in der Palette — stumm, ohne Typfehler.
+     * Das Record erzwingt die Vollständigkeit der DEFINITIONEN (TS2741), die REIHENFOLGE nicht;
+     * eine Id ohne Eintrag in der Ordnungsliste erschiene sonst still nie in der Palette.
      */
     expect([...TASTATUR_AKTION_REIHENFOLGE].sort()).toEqual(Object.keys(TASTATUR_AKTIONEN).sort());
     expect(new Set(TASTATUR_AKTION_REIHENFOLGE).size).toBe(TASTATUR_AKTION_REIHENFOLGE.length);
@@ -420,8 +375,7 @@ describe('Tastaturaktionen', () => {
 
 describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () => {
   it('ordnet Schnellaktionen VOR Module', () => {
-    // Die Aussage hängt an GRUPPEN_REIHENFOLGE, nicht an der Einfügereihenfolge in
-    // baueBefehle — geprüft wird deshalb die Konstante.
+    // Die Aussage hängt an GRUPPEN_REIHENFOLGE, nicht an der Einfügereihenfolge in baueBefehle.
     const s = GRUPPEN_REIHENFOLGE.indexOf('schnellaktionen');
     const m = GRUPPEN_REIHENFOLGE.indexOf('module');
     expect(s).toBeGreaterThanOrEqual(0);
@@ -440,22 +394,15 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
     const befehle = baueBefehle({ ...kontext(), einsatzId: 1, zuletztModulKeys: ['etb'] });
     const zuletzt = befehle.filter((b) => b.gruppe === 'zuletzt');
     expect(zuletzt).toHaveLength(1);
-    // modulRegistry führt 'etb' unter dem Kürzel-Label 'ETB' (nicht der Beschreibung
-    // 'Einsatztagebuch.') — baueBefehle übernimmt `m.label` unverändert.
+    // modulRegistry führt 'etb' unter dem Label 'ETB'; baueBefehle übernimmt `m.label` unverändert.
     expect(zuletzt[0].label).toBe('ETB');
   });
 
   /**
-   * PAAR mit der Zeile darüber: das Modul, auf dessen Seite die Palette geöffnet wurde,
-   * fällt aus der Abkürzung (LFH-391 · C4, Arbeitspunkt 3 — der zweite Konsument der
-   * aktuellen Route).
-   *
-   * Ein Sprung auf die Seite, auf der man steht, ist keine Abkürzung — und bei genau drei Plätzen kostet er den nützlichsten. Der Fall
-   * ist der NORMALFALL und nicht die Ausnahme: `merkeModulBesuch` schreibt bei jeder
-   * bewussten Modulwahl, der jüngste Eintrag ist also fast immer die aktuelle Seite.
-   *
-   * Die zweite Hälfte („ein ANDERES Modul bleibt") ist tragend: ein Riegel, der die ganze
-   * Gruppe leert, wäre sonst ebenso grün.
+   * PAAR mit der Zeile darüber: das Modul, auf dessen Seite die Palette geöffnet wurde, fällt aus
+   * der Abkürzung. Das ist der Normalfall, weil `merkeModulBesuch` bei jeder Modulwahl schreibt.
+   * Die zweite Hälfte („ein ANDERES Modul bleibt“) trägt: ein Riegel, der die ganze Gruppe leert,
+   * wäre sonst ebenso grün.
    */
   it('lässt das Modul, auf dem man steht, aus Zuletzt heraus', () => {
     const befehle = baueBefehle({
@@ -470,8 +417,7 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
   });
 
   it('nimmt ein ausgeblendetes Modul NICHT in Zuletzt auf', () => {
-    // Die Gegenaussage: ohne sie bliebe die Filterung unbewiesen, und ein entzogenes
-    // Modul stünde weiter als Abkürzung in der Palette.
+    // Gegenaussage: ohne sie stünde ein entzogenes Modul unbewiesen weiter als Abkürzung da.
     const befehle = baueBefehle({
       ...kontext(),
       einsatzId: 1,
@@ -482,9 +428,8 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
   });
 
   it('nimmt ein rollen-gesperrtes Modul NICHT in Zuletzt auf', () => {
-    // Zweiter Freigabe-Filter, unabhängig vom ersten: `istModulSichtbar` und
-    // `istModulGesperrt` sind zwei getrennte Prüfungen in `baueBefehle` — ohne diesen
-    // Test bliebe unbewiesen, dass die Zuletzt-Schleife BEIDE anwendet.
+    // Zweiter Freigabe-Filter: `istModulSichtbar` und `istModulGesperrt` sind getrennte Prüfungen;
+    // die Zuletzt-Schleife muss BEIDE anwenden.
     const overrides = { etb: ueberschreibung({ benoetigte_rolle: 'fuehrungskraft' }) };
     const befehle = baueBefehle({
       ...kontext(),
@@ -497,10 +442,8 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
   });
 
   /**
-   * Die Palette ist ein Weg der BEWUSSTEN Modulwahl und zeichnet deshalb auf
-   * (LFH-337 · Fix-Welle, Befund B4). `baueBefehle` bleibt dabei rein: es ruft nur den
-   * injizierten Callback, die `einsatzId`-Bindung und der Speicherzugriff liegen in
-   * `useBefehle`.
+   * Die Palette ist ein Weg der BEWUSSTEN Modulwahl und zeichnet auf. `baueBefehle` bleibt rein:
+   * es ruft nur den injizierten Callback.
    */
   it('meldet beim Ausführen eines Modul-Befehls den Besuch, bevor es navigiert', () => {
     const reihenfolge: string[] = [];
@@ -511,14 +454,12 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
     befehle.find((b) => b.id === 'modul:etb')!.ausfuehren();
 
     expect(merkeModulBesuch).toHaveBeenCalledWith('etb');
-    // Die REIHENFOLGE ist tragend: erst merken, dann navigieren — der Routenwechsel löst
-    // den Render aus, der den Speicher wieder liest.
+    // Erst merken, dann navigieren: der Routenwechsel löst den Render aus, der den Speicher liest.
     expect(reihenfolge).toEqual(['merke:etb', 'nav:/einsaetze/5/etb']);
   });
 
   it('meldet den Besuch auch beim Ausführen eines Zuletzt-Befehls', () => {
-    // Zweiter Weg, eigene Schleife — ohne diese Zeile bliebe unbewiesen, dass sie
-    // dasselbe tut wie die Modul-Schleife.
+    // Zweiter Weg, eigene Schleife: sie muss dasselbe tun wie die Modul-Schleife.
     const merkeModulBesuch = vi.fn();
     const befehle = baueBefehle({ ...kontext(), zuletztModulKeys: ['etb'], merkeModulBesuch });
 
@@ -528,9 +469,7 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
   });
 
   it('lässt eine Schnellaktion den Besuch NICHT melden', () => {
-    // Gegenaussage: eine Schnellaktion („Neue Person erfassen") ist keine Modulwahl,
-    // sondern ein Erfassungssprung. Ohne sie wäre „nur Modul- und Zuletzt-Befehle
-    // zeichnen auf" unbewiesen.
+    // Gegenaussage: eine Schnellaktion ist ein Erfassungssprung, keine Modulwahl.
     const merkeModulBesuch = vi.fn();
     const befehle = baueBefehle({ ...kontext(), merkeModulBesuch });
 
@@ -540,8 +479,8 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
   });
 
   it('vergibt Zuletzt-Befehlen eigene ids, die nicht mit den Modul-Befehlen kollidieren', () => {
-    // Dieselbe id zweimal im Baum macht `aria-activedescendant` mehrdeutig und die
-    // React-Keys instabil — die Palette rendert dasselbe Modul in ZWEI Gruppen.
+    // Dieselbe id zweimal im Baum machte `aria-activedescendant` mehrdeutig und die React-Keys
+    // instabil.
     const befehle = baueBefehle({ ...kontext(), einsatzId: 1, zuletztModulKeys: ['etb'] });
     const ids = befehle.map((b) => b.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -549,11 +488,8 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
 });
 
 /**
- * Das Gedächtnis zuletzt AUSGEFÜHRTER Befehle (LFH-391 · Etappe D).
- *
- * Zwei Hälften, die zusammen den Vertrag tragen: `merkeBefehl` an der SCHREIBseite (welche
- * Gruppen dürfen überhaupt hinein) und die Auflösung an der LESEseite (gespeichert sind IDs,
- * aufgelöst wird gegen die gerade gebaute Liste).
+ * Das Gedächtnis zuletzt AUSGEFÜHRTER Befehle: `merkeBefehl` an der SCHREIBseite (welche Gruppen
+ * dürfen hinein) und die Auflösung an der LESEseite (IDs gegen die gerade gebaute Liste).
  */
 describe('baueBefehle — Zuletzt ausgeführt', () => {
   it('baut aus gemerkten IDs eine eigene Gruppe in der Reihenfolge der IDs', () => {
@@ -565,10 +501,8 @@ describe('baueBefehle — Zuletzt ausgeführt', () => {
   });
 
   /**
-   * DER KERN der Entscheidung „IDs statt Beschriftungen": eine ID, die die aktuelle Liste
-   * nicht mehr enthält, erzeugt gar keine Zeile. Hier über das ENTZOGENE RECHT geprüft —
-   * `nav:admin` existiert nur für `darfVerwaltung`. Damit ist der Rechtefilter gratis, ohne
-   * eine zweite Wahrheit über Berechtigungen.
+   * IDs statt Beschriftungen: eine ID, die die aktuelle Liste nicht enthält, erzeugt keine Zeile.
+   * Geprüft über das entzogene Recht (`nav:admin` nur mit `darfVerwaltung`).
    */
   it('löst eine ID nicht auf, die es in der aktuellen Liste nicht mehr gibt', () => {
     const mitRecht = baueBefehle({
@@ -582,7 +516,7 @@ describe('baueBefehle — Zuletzt ausgeführt', () => {
       zuletztBefehlIds: ['nav:admin'],
     });
     expect(ohneRecht.some((x) => x.gruppe === 'ausgefuehrt')).toBe(false);
-    // Gegenprobe zur Trivialität: die Gruppe ist leer, nicht die ganze Liste.
+    // Gegenprobe: die Gruppe ist leer, nicht die ganze Liste.
     expect(ohneRecht.some((x) => x.id === 'nav:profil')).toBe(true);
   });
 
@@ -592,10 +526,8 @@ describe('baueBefehle — Zuletzt ausgeführt', () => {
   });
 
   /**
-   * DER DUBLETTENRIEGEL liegt an der SCHREIBseite (`GRUPPE_MERKBAR`) — und muss beim LESEN
-   * ein zweites Mal greifen: ein Serverstand kann von einem älteren Client stammen, der die
-   * Regel noch nicht kannte. Ohne diesen Riegel stünde dasselbe Modul zum DRITTEN Mal in der
-   * Liste (Module, Zuletzt, Zuletzt ausgeführt).
+   * Der Dublettenriegel greift auch beim LESEN: ein älterer Client kannte die Regel nicht, sonst
+   * stünde dasselbe Modul zum DRITTEN Mal in der Liste.
    */
   it('löst eine gemerkte Modul-ID NICHT auf, auch wenn sie im Serverstand steht', () => {
     const b = baueBefehle({
@@ -662,18 +594,12 @@ describe('baueBefehle — was ins Gedächtnis kommt', () => {
   });
 
   /**
-   * Eine Zeile aus dem Gedächtnis meldet die ID des ORIGINALS, nicht ihre eigene. Sonst
-   * wüchse bei jedem Griff darauf ein `ausgefuehrt:ausgefuehrt:…`, das beim nächsten Aufbau
-   * gegen nichts mehr auflöst — das Gedächtnis vergässe genau die Befehle, die man am
-   * häufigsten benutzt.
+   * Eine Gedächtniszeile meldet die ID des ORIGINALS, sonst wüchse ein `ausgefuehrt:ausgefuehrt:…`
+   * an, das nicht mehr auflöst.
    */
   /**
-   * ABMELDEN GEHÖRT NICHT INS GEDÄCHTNIS (Review-Befund zu Etappe D). Es liegt in
-   * `navigation` — zusammen mit Profil, Stammdaten und Administration, die zu Recht merkbar
-   * sind —, hat aber als einziger Befehl der Palette keinen Rückweg: das Gedächtnis stünde
-   * ZUOBERST und ist vorausgewählt, `Strg/⌘+K` gefolgt von Enter beendete also die Sitzung
-   * statt den erwarteten Kontextbefehl auszulösen. Ausgeführt wird er weiterhin — merkbar ist
-   * er nicht.
+   * Abmelden gehört NICHT ins Gedächtnis: als oberste, vorausgewählte Zeile beendete
+   * `Strg/⌘+K` + Enter die Sitzung. Ausgeführt wird es weiterhin.
    */
   it('meldet das Ausführen von Abmelden NICHT, führt ihn aber aus', () => {
     const merkeBefehl = vi.fn();
@@ -687,14 +613,12 @@ describe('baueBefehle — was ins Gedächtnis kommt', () => {
     expect(merkeBefehl).not.toHaveBeenCalled();
   });
 
-  /** Wie beim Gruppenriegel gilt der Ausschluss AUCH BEIM LESEN: ein Serverstand kann von
-   *  einem älteren Client stammen, der die Regel noch nicht kannte — und genau die Benutzer,
-   *  denen der Befund passiert ist, tragen ihn schon im Fach. */
+  /** Der Ausschluss gilt AUCH BEIM LESEN: ein älterer Serverstand kann Abmelden schon tragen. */
   it('löst ein gemerktes Abmelden nicht auf, auch wenn es im Serverstand steht', () => {
     const b = baueBefehle({ ...kontext(), zuletztBefehlIds: ['nav:abmelden'] });
 
     expect(b.some((x) => x.gruppe === 'ausgefuehrt')).toBe(false);
-    // Gegenprobe zur Trivialität: der Befehl selbst steht weiter in der Navigation.
+    // Gegenprobe: der Befehl selbst steht weiter in der Navigation.
     expect(b.some((x) => x.id === 'nav:abmelden')).toBe(true);
   });
 
@@ -710,14 +634,10 @@ describe('baueBefehle — was ins Gedächtnis kommt', () => {
 });
 
 /**
- * LFH-645: die Öffnungsart läuft als Argument durch `ausfuehren` bis zu `navigate`, `ziel` ist
- * die Marke, an der die Palette entscheidet, ob Strg/⌘+↵ überhaupt greift. Die Bauform hat
- * genau EINE Fehlerrichtung, die kein anderer Test sieht: ein Bauort setzt `ziel`, reicht das
- * Argument aber nicht durch — dann öffnet „neuer Tab" still im aktuellen Tab.
- *
- * Der Kontext belegt deshalb JEDE Gruppe, auch das Gedächtnis: eine Gedächtniszeile ist eine
- * Spread-Kopie ihres Originals, ihre Wicklung in `mitGedaechtnis` muss das Argument ebenfalls
- * weitergeben.
+ * Die Öffnungsart läuft als Argument durch `ausfuehren` bis zu `navigate`; `ziel` ist die Marke
+ * für Strg/⌘+↵. Einzige Fehlerrichtung: ein Bauort setzt `ziel`, reicht das Argument aber nicht
+ * durch, dann öffnet „neuer Tab“ still hier. Der Kontext belegt JEDE Gruppe, auch das
+ * Gedächtnis (Spread-Kopie mit eigener Wicklung).
  */
 describe('baueBefehle — Öffnungsart und Ziel (LFH-645)', () => {
   function vollerKontext() {

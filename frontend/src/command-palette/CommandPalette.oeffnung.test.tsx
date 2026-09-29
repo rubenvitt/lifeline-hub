@@ -1,8 +1,6 @@
-// frontend/src/command-palette/CommandPalette.oeffnung.test.tsx
-//
-// Öffnungswege der Sprungpalette (LFH-645, Raycast-Muster): Strg/⌘+↵ öffnet das Ziel in einem
-// neuen Tab, → zeigt eine Vorschau IN der Palette. Die Szenarien folgen
-// `openspec/changes/lfh-645-palette-vorschau-neuer-tab/specs/sprungpalette/spec.md`.
+// Öffnungswege der Sprungpalette: Strg/⌘+↵ öffnet das Ziel in einem neuen Tab, → zeigt eine
+// Vorschau IN der Palette (Szenarien aus
+// `openspec/changes/lfh-645-palette-vorschau-neuer-tab/specs/sprungpalette/spec.md`).
 import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
@@ -153,8 +151,8 @@ describe('CommandPalette · → Vorschau (LFH-645)', () => {
 
   it('Esc führt zurück — Begriff und Markierung bleiben, die Palette bleibt offen', async () => {
     const u = userEvent.setup();
-    // Startansicht: `aktionen` steht vor `datensaetze`. Die Person ist also die ZWEITE Zeile —
-    // die Rückkehr muss genau sie wieder markieren, nicht auf die erste zurückfallen.
+    // Startansicht: `aktionen` steht vor `datensaetze`, die Person ist die ZWEITE Zeile; die Rückkehr
+    // muss genau sie wieder markieren.
     const { schliesse, feld } = palette([speichern(), person()]);
     await u.keyboard('{ArrowDown}{ArrowRight}');
     expect(vorschauRegion()).not.toBeNull();
@@ -198,10 +196,8 @@ describe('CommandPalette · → Vorschau (LFH-645)', () => {
   });
 
   it('scrollt die markierte Zeile nach der Rückkehr wieder in den Blick (Review-Befund)', async () => {
-    // Die Liste hängt in der Vorschau aus und kommt mit `scrollTop` 0 zurück. `aktiv` ändert
-    // sich beim Rückweg nicht — hinge das Einscrollen nur daran, stünde die Markierung
-    // ausserhalb des Blicks. jsdom rechnet kein Layout; geprüft wird der Aufruf am richtigen
-    // Knoten, der Blick selbst im Browser.
+    // Die Liste kommt aus der Vorschau mit `scrollTop` 0 zurück, `aktiv` ändert sich nicht. jsdom
+    // rechnet kein Layout; geprüft wird der Aufruf am richtigen Knoten.
     const u = userEvent.setup();
     const original = Element.prototype.scrollIntoView;
     const scrolle = vi.fn();
@@ -209,17 +205,14 @@ describe('CommandPalette · → Vorschau (LFH-645)', () => {
     try {
       palette([speichern(), person()]);
       await u.keyboard('{ArrowDown}{ArrowRight}');
-      // Beide Übergänge werden abgewartet, bevor gezählt wird: unter CI-Last lief das `waitFor`
-      // unten auch mit fünf Sekunden leer (PR #121, Frontend-Suite 4/4, lokal nicht
-      // nachstellbar). Ohne diese Anker ist nicht zu unterscheiden, ob das Einscrollen fehlt
-      // oder die Tastenfolge die Vorschau noch gar nicht geöffnet bzw. verlassen hatte.
+      // Beide Übergänge abwarten, bevor gezählt wird: unter CI-Last wäre sonst nicht zu unterscheiden,
+      // ob das Einscrollen fehlt oder die Vorschau noch gar nicht offen bzw. verlassen war.
       await waitFor(() => expect(vorschauRegion()).not.toBeNull());
       scrolle.mockClear();
       await u.keyboard('{Escape}');
       await waitFor(() => expect(vorschauRegion()).toBeNull());
-      // `waitFor`: das Einscrollen läuft im Effekt nach dem Rückweg. Unter CI-Last kam dieser
-      // Effekt erst nach dem `keyboard`-Await an (gemessen in PR #122: 1 von 4 Shards rot,
-      // lokal 5/5 grün) — die Aussage ist „wird eingescrollt", nicht „im selben Tick".
+      // `waitFor`: das Einscrollen läuft im Effekt nach dem Rückweg, unter Last erst nach dem
+      // `keyboard`-Await.
       await waitFor(() => {
         expect(scrolle).toHaveBeenCalled();
         expect(scrolle.mock.contexts[scrolle.mock.contexts.length - 1]).toBe(
@@ -318,14 +311,12 @@ describe('CommandPalette · Fußzeile und Zeilenmarke (LFH-645)', () => {
   });
 
   /**
-   * Seit LFH-665 ist die Vorschau-Marke das TIPPZIEL selbst, und es steht an JEDER Zeile mit
-   * Vorschau — auf Touch gibt es kein Hover, ein Ziel, das erst an der markierten Zeile
-   * erschiene, sähe niemand vor dem Tipp. Die frühere `kbd`-→-Marke ist entfallen: zwei
-   * Pfeile nebeneinander sagten dasselbe zweimal.
+   * Die Vorschau-Marke ist das TIPPZIEL selbst, an JEDER Zeile mit Vorschau (Touch kennt kein
+   * Hover).
    */
   it('jede Zeile mit Vorschau trägt das Vorschau-Ziel, eine Modulzeile nicht', async () => {
     const u = userEvent.setup();
-    // Startansicht: `datensaetze` vor `module` — die Person ist die erste, markierte Zeile.
+    // Startansicht: `datensaetze` vor `module`, die Person ist die erste, markierte Zeile.
     palette([person(), modul()]);
     expect(vorschauZiel('Florian Mustermann')).not.toBeNull();
     expect(vorschauZiel('ETB')).toBeNull();
@@ -358,9 +349,8 @@ describe('CommandPalette · Fußzeile und Zeilenmarke (LFH-645)', () => {
 });
 
 /**
- * Das Tippziel (LFH-665): der Weg in die Vorschau für Finger und Maus. Geprüft als PAAR — ein
- * Tipp aufs Ziel öffnet die Vorschau, ein Tipp auf die übrige Zeile öffnet den Datensatz wie
- * bisher. Die eine Hälfte allein wäre auch dann grün, wenn das Ziel die Zeile verdrängte.
+ * Das Tippziel als PAAR: ein Tipp aufs Ziel öffnet die Vorschau, ein Tipp auf die übrige Zeile den
+ * Datensatz. Die eine Hälfte allein wäre auch grün, wenn das Ziel die Zeile verdrängte.
  */
 describe('CommandPalette · Tippziel für die Vorschau (LFH-665)', () => {
   it('ein Klick aufs Ziel öffnet die Vorschau statt des Datensatzes', () => {
@@ -372,9 +362,8 @@ describe('CommandPalette · Tippziel für die Vorschau (LFH-665)', () => {
     // Der Klick schlägt NICHT zur Zeile durch.
     expect(aus).not.toHaveBeenCalled();
     expect(schliesse).not.toHaveBeenCalled();
-    // Nur die Gegenprobe „der Klick wirft den Fokus nicht aus dem Feld": ein synthetischer
-    // Klick verschiebt in jsdom nie den Fokus. Getragen wird die Fokus-Zusicherung vom
-    // `mousedown`-Test unten und vom `toBeFocused()` im Browser (`palette-oeffnung.spec.ts`).
+    // Nur die Gegenprobe: ein synthetischer Klick verschiebt in jsdom nie den Fokus. Die
+    // Fokus-Zusicherung tragen der `mousedown`-Test unten und `palette-oeffnung.spec.ts`.
     expect(feld).toHaveFocus();
   });
 
@@ -416,8 +405,8 @@ describe('CommandPalette · Tippziel für die Vorschau (LFH-665)', () => {
   });
 
   /**
-   * Der Fokus bleibt im Suchfeld: `mousedown` auf dem Ziel wird abgefangen. Sonst verlöre die
-   * Combobox den Fokus, und ↵ (öffnen) und Esc (zurück) gingen nach dem Tipp ins Leere.
+   * Der Fokus bleibt im Suchfeld (`mousedown` abgefangen); sonst gingen ↵ und Esc nach dem Tipp
+   * ins Leere.
    */
   it('nimmt dem Suchfeld beim Drücken nicht den Fokus', () => {
     palette([person()]);
@@ -428,9 +417,8 @@ describe('CommandPalette · Tippziel für die Vorschau (LFH-665)', () => {
 
   it('der zugängliche Name der Zeile bleibt ihr Label', () => {
     palette([person()]);
-    // Das Ziel ist `aria-hidden`: der zugängliche Weg in die Vorschau bleibt →, und die
-    // Option darf keinen zweiten Namensteil bekommen (Kinder einer Option sind ohnehin
-    // präsentational).
+    // Das Ziel ist `aria-hidden`: der zugängliche Weg bleibt →, und die Option bekommt keinen
+    // zweiten Namensteil.
     expect(vorschauZiel('Florian Mustermann')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByRole('option', { name: 'Florian Mustermann' })).toBeInTheDocument();
   });

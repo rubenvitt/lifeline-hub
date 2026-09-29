@@ -1,7 +1,6 @@
-// LFH-120: Barrel über die aus Rust generierten Schemas (frontend/src/api/types.generated.ts).
-// Backend-Typ-Drift bricht jetzt tsc/Build statt still zur Laufzeit. Nicht von Hand pflegen —
-// Response-Typen ändern sich über die Rust-Structs + `pnpm gen:types` (schreibt types.generated.ts
-// aus src/api/openapi.json). FE-lokale Typen (Eingabe-Bodies, Record-Maps) sind unten markiert.
+// Barrel über die aus Rust generierten Schemas (`types.generated.ts`, LFH-120). Nicht von Hand
+// pflegen: Response-Typen ändern sich über die Rust-Structs + `scripts/check-typ-codegen.sh`.
+// FE-lokale Typen (Eingabe-Bodies, Record-Maps) sind unten als „kein Backend-Schema“ markiert.
 import type {
   EinheitId,
   FachaufgabeId,
@@ -17,7 +16,7 @@ type S = components['schemas'];
 // ============================== Auth ==============================
 export type AuthProvider = S['AuthProviderAnzeige'];
 export type AuthProviderTyp = S['AuthProviderTyp'];
-// LFH-43 (Increment 5): TOTP-Enroll-DTOs (`/api/auth/totp/enroll/start|finish`).
+// TOTP-Enroll-DTOs (`/api/auth/totp/enroll/start|finish`).
 export type TotpEnrollStart = S['TotpEnrollStart'];
 export type TotpEnrollFinish = S['TotpEnrollFinish'];
 
@@ -33,9 +32,9 @@ export type Lagekennzahl = S['Lagekennzahl'];
 export type EinsatzAnzeige = S['EinsatzAnzeige'];
 export type MitgliedAnzeige = S['MitgliedAnzeige'];
 export type StichwortVorschlag = S['StichwortVorschlag'];
-/** Präferenzen des angemeldeten Benutzers (LFH-391 · Etappe D). `eintraege` ist SPARSE —
- *  ein fehlender Schlüssel heisst „nie geschrieben"; der Wert ist ein opaker Text, dessen
- *  Form nur der Besitzer des Schlüssels kennt. */
+/** Präferenzen des angemeldeten Benutzers. `eintraege` ist SPARSE: ein fehlender Schlüssel
+ *  heißt „nie geschrieben“; der Wert ist ein opaker Text, dessen Form nur der Besitzer des
+ *  Schlüssels kennt. */
 export type BenutzerEinstellungen = S['BenutzerEinstellungenAnzeige'];
 
 // ============================== Karten-/Anzeige-Defaults ==============================
@@ -44,24 +43,22 @@ export type Zeitformat = S['Zeitformat'];
 export type EinheitenSystem = S['EinheitenSystem'];
 export type Koordinatenformat = S['Koordinatenformat'];
 
-/** Sichtbarkeit der externen Lage-Layer (LFH-69) als Karten-Default pro Einsatz.
- *  LFH-120: kein Backend-Schema — Rust serialisiert `fachebenen_sichtbar` untypisiert
- *  (EinstellungenAnzeige.fachebenen_sichtbar: unknown); FE-lokale Formgebung. */
+/** Sichtbarkeit der externen Lage-Layer als Karten-Default pro Einsatz. Kein Backend-Schema:
+ *  Rust serialisiert `fachebenen_sichtbar` untypisiert; FE-lokale Formgebung. */
 export interface FachebenenSichtbar {
   nina: boolean;
   dwd: boolean;
   pegelonline: boolean;
-  // Nachgezogen in LFH-78: die Form kannte nur die vier v1-Quellen, obwohl die Spalte seit
-  // LFH-77/80 auch diese Schlüssel trägt. Opak durchgereicht, also ohne Laufzeitfolge —
-  // aber ein Typ, der weniger Felder behauptet als die Daten haben, führt in die Irre.
+  // Opak durchgereicht, aber ein Typ, der weniger Felder behauptet als die Daten haben, führt
+  // in die Irre.
   hochwasser: boolean;
   odl: boolean;
   kritis: boolean;
   autobahn: boolean;
 }
 
-// ============================== LFH-690 Demo-Daten ==============================
-/** Stand der Demo-Daten der eigenen Organisation — die eine Antwort aller vier Endpunkte.
+// ============================== Demo-Daten ==============================
+/** Stand der Demo-Daten der eigenen Organisation, die eine Antwort aller vier Endpunkte.
  *  `import` fehlt ohne aktiven Import, `bericht` fehlt, solange nie importiert wurde. */
 export type DemoDatenStatus = S['DemoDatenStatus'];
 export type DemoImportKopf = S['DemoImportKopf'];
@@ -74,7 +71,7 @@ export type DemoVorgang = S['DemoVorgang'];
 export type OrgEinstellungen = S['OrgEinstellungenAnzeige'];
 
 /** PUT-Body für org-weite Einstellungen (PUT /api/org-einstellungen, Vollersatz).
- *  LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. */
+ *  Kein Backend-Schema, FE-lokal. */
 export interface OrgEinstellungenUpdate {
   zeitzone: string | null;
   zeitformat: Zeitformat | null;
@@ -96,13 +93,12 @@ export interface OrgEinstellungenUpdate {
 
 /** Org-weite Modul-Rollen-Defaults (GET /api/org-modul-einstellungen).
  *  Map modul_key → benoetigte_rolle; fehlt ein Key = kein Org-Default (frei).
- *  LFH-120: kein Backend-Schema — Record-Map, FE-lokal. */
+ *  Kein Backend-Schema, FE-lokal. */
 export type OrgModulEinstellungen = Record<string, 'admin' | 'fuehrungskraft' | null>;
 
 export type EinsatzEinstellungen = S['EinstellungenMitOrgDefaults'];
 
-/** PUT-Eingabe (Vollersatz) der Einsatz-Einstellungen.
- *  LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. */
+/** PUT-Eingabe (Vollersatz) der Einsatz-Einstellungen. Kein Backend-Schema, FE-lokal. */
 export interface EinstellungenUpdate {
   standard_modul: string | null;
   basemap_modus: BasemapModus | null;
@@ -112,7 +108,7 @@ export interface EinstellungenUpdate {
   zeitformat: Zeitformat | null;
   einheiten: EinheitenSystem | null;
   koordinatenformat: Koordinatenformat | null;
-  // Verhalten & Automatik (LFH-133).
+  // Verhalten & Automatik.
   etb_nummer_praefix: string | null;
   etb_nummer_start: number | null;
   meldung_nummer_praefix: string | null;
@@ -131,11 +127,10 @@ export interface EinstellungenUpdate {
 export type ModulOverride = S['EinsatzModulOverride'];
 
 /** Map `modul_key → Override`; fehlt ein Key, gilt der Registry-Default (sichtbar, frei).
- *  LFH-120: kein Backend-Schema — Record-Map, FE-lokal. */
+ *  Kein Backend-Schema, FE-lokal. */
 export type ModulOverrides = Record<string, ModulOverride>;
 
-/** PUT-Eingabe eines einzelnen Modul-Overrides.
- *  LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. */
+/** PUT-Eingabe eines einzelnen Modul-Overrides. Kein Backend-Schema, FE-lokal. */
 export interface ModulOverrideUpdate {
   sichtbar: boolean;
   benoetigte_rolle: 'admin' | 'fuehrungskraft' | null;
@@ -156,7 +151,7 @@ export type ModulZaehler = S['ModulZaehlerAnzeige'];
 /** Trefferzahl eines ETB-Filters ohne Seitendeckel (LFH-619, Sammeltreffer der Palette). */
 export type EtbAnzahl = S['EtbAnzahlAnzeige'];
 
-// ============================== LFH-298 SSE-Live-Feed ==============================
+// ============================== SSE-Live-Feed ==============================
 /** Wire-Event-Namen des Einsatz-Live-Feeds; Kontrakt gegen `EINSATZ_STREAM_EVENTS`
  *  (queryKeys.ts) via `liveEvent.contract.test.ts`. Wahrheitsquelle: Rust `LiveEvent`. */
 export type LiveEvent = S['LiveEvent'];
@@ -186,8 +181,7 @@ export type EinsatzPersonal = S['EinsatzPersonalAnzeige'];
 export type Betriebsart = S['Betriebsart'];
 export type Sprechgruppe = S['SprechgruppeAnzeige'];
 
-/** Eingabe-Body für Anlegen und PATCH einer Sprechgruppe.
- *  LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. */
+/** Eingabe-Body für Anlegen und PATCH einer Sprechgruppe. Kein Backend-Schema, FE-lokal. */
 export interface SprechgruppeEingabe {
   bezeichnung: string;
   betriebsart: Betriebsart;
@@ -278,9 +272,9 @@ export type LageZone = S['LageZoneAnzeige'];
 // ============================== LFH-170 Freie taktische Zeichen ==============================
 export type FreiesZeichen = S['FreiesZeichenAnzeige'];
 
-/** POST-Body für ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt).
- *  LFH-120/170: kein Backend-Schema — Eingabe-Body, FE-lokal. Overlays nutzen die
- *  DV-102-ID-Unions aus `taktische-zeichen-core` für FE-Typsicherheit. */
+/** POST-Body für ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt). Kein
+ *  Backend-Schema, FE-lokal; Overlays nutzen die DV-102-ID-Unions aus
+ *  `taktische-zeichen-core`. */
 export interface NeuesFreiesZeichen {
   lat: number;
   lon: number;
@@ -296,18 +290,17 @@ export interface NeuesFreiesZeichen {
   ansicht_id?: number | null;
 }
 
-/** PATCH-Body (Whole-Spec-Overwrite ohne lat/lon — v1 nicht verschiebbar). LFH-170. */
+/** PATCH-Body (Whole-Spec-Overwrite ohne lat/lon, nicht verschiebbar). */
 export type FreiesZeichenUpdate = Omit<NeuesFreiesZeichen, 'lat' | 'lon'>;
 
 // ============================== LFH-319 Kartenansichten ==============================
 export type KartenAnsicht = S['KartenAnsichtAnzeige'];
 export type KartenTheme = S['KartenTheme'];
 
-/** PATCH-Body einer Ansicht (LFH-319/320). FE-lokal (kein Backend-Schema). Drei unabhängige
- *  Operationen im selben Endpunkt: „Für den Einsatz speichern" (Config-Vollersatz — die
- *  Config-Felder), Umbenennen (`name`) und Standard-Setzen (`ist_standard: true`). Ein reines
- *  Umbenennen sendet NUR `name` (ohne Config-Felder), sonst würde der Vollersatz die Config
- *  wischen. `layer_sichtbar`/`fachebenen_sichtbar` sind serialisierte Bool-Maps. */
+/** PATCH-Body einer Ansicht, FE-lokal. Drei unabhängige Operationen im selben Endpunkt: „Für
+ *  den Einsatz speichern“ (Config-Vollersatz), Umbenennen (`name`) und Standard-Setzen
+ *  (`ist_standard: true`). Ein reines Umbenennen sendet NUR `name`, sonst wischte der
+ *  Vollersatz die Config. `layer_sichtbar`/`fachebenen_sichtbar` sind serialisierte Bool-Maps. */
 export interface PatchKartenAnsicht {
   name?: string;
   ist_standard?: boolean;
@@ -321,8 +314,8 @@ export interface PatchKartenAnsicht {
   zoom?: number | null;
 }
 
-/** POST-Body „Als neue Ansicht speichern" (LFH-320): Pflicht-`name` + der aktuelle
- *  Karten-Zustand (dieselben Config-Felder wie beim Speichern). Nie Standard. */
+/** POST-Body „Als neue Ansicht speichern“: Pflicht-`name` + der aktuelle Karten-Zustand
+ *  (dieselben Config-Felder wie beim Speichern). Nie Standard. */
 export interface NeueKartenAnsicht {
   name: string;
   basemap_modus?: BasemapModus | null;
@@ -339,14 +332,14 @@ export interface NeueKartenAnsicht {
 export type LageSnapshot = S['LageSnapshotAnzeige'];
 export type LageSnapshotDokument = S['LageSnapshotDokument'];
 
-/** POST-Body „Stand sichern" (LFH-321): optionale Bezeichnung/Notiz. FE-lokal (kein Backend-Schema). */
+/** POST-Body „Stand sichern“: optionale Bezeichnung/Notiz. FE-lokal. */
 export interface NeuerLageSnapshot {
   bezeichnung?: string | null;
   notiz?: string | null;
 }
 
-/** PATCH-Body eines Snapshots (LFH-321): NUR Metadaten — `daten`/`stand_at`/`erstellt_*` sind
- *  unveränderlich und im DTO nicht enthalten. `null` löscht das Feld, absent lässt es unverändert. */
+/** PATCH-Body eines Snapshots: NUR Metadaten, `daten`/`stand_at`/`erstellt_*` sind
+ *  unveränderlich. `null` löscht das Feld, absent lässt es unverändert. */
 export interface PatchLageSnapshot {
   bezeichnung?: string | null;
   notiz?: string | null;
@@ -396,9 +389,9 @@ export type Sachgebiet = S['Sachgebiet'];
 export type BesetzungArt = S['BesetzungArt'];
 
 /**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `PUT …/stab/besetzung/{sachgebiet}`, FE-lokal.
- * `personal_id` ist `einsatz_personal.id` (= `EinsatzPersonal.id`). Überzählige Felder sind 422
- * (`src/routes/stab.rs:80-118`) — Aufrufer schicken NUR das Feld, das die Art verlangt.
+ * Kein Backend-Schema: Eingabe-Body von `PUT …/stab/besetzung/{sachgebiet}`, FE-lokal.
+ * `personal_id` ist `einsatz_personal.id` (= `EinsatzPersonal.id`). Überzählige Felder sind 422;
+ * Aufrufer schicken NUR das Feld, das die Art verlangt.
  */
 export interface BesetzungBody {
   besetzung_art: BesetzungArt;
@@ -407,11 +400,11 @@ export interface BesetzungBody {
 }
 
 /**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/stab/lagebesprechungen`, FE-lokal.
+ * Kein Backend-Schema: Eingabe-Body von `POST …/stab/lagebesprechungen`, FE-lokal.
  *
- * `naechste_at` ist DREIWERTIG (`src/routes/stab.rs:193-194, 233-237`): Schlüssel fehlt =
- * Termin unverändert · `null` = löschen · Wert = setzen. Ein leerer String löscht STILL
- * (`support::trimme_tri`) — Aufrufer schicken nie `''`. Zeiten als UTC 'YYYY-MM-DD HH:mm:ss'.
+ * `naechste_at` ist DREIWERTIG: Schlüssel fehlt = Termin unverändert · `null` = löschen · Wert =
+ * setzen. Ein leerer String löscht STILL (`support::trimme_tri`), Aufrufer schicken nie `''`.
+ * Zeiten als UTC 'YYYY-MM-DD HH:mm:ss'.
  */
 export interface LagebesprechungAbschlussBody {
   entschluss: string;
@@ -428,9 +421,9 @@ export type AbloesungEinstufung = S['Einstufung'];
 export type RhythmusQuelle = S['RhythmusQuelle'];
 
 /**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/abloesungen`, FE-lokal.
- * Ohne `rhythmus_minuten` gilt die Vorgabe des Abschnitts der Einheit (fehlt die, 400);
- * ohne `beginn_at` der Zeitpunkt der Anlage. Zeiten als UTC 'YYYY-MM-DD HH:mm:ss'.
+ * Kein Backend-Schema: Eingabe-Body von `POST …/abloesungen`, FE-lokal. Ohne
+ * `rhythmus_minuten` gilt die Vorgabe des Abschnitts der Einheit (fehlt die, 400); ohne
+ * `beginn_at` der Zeitpunkt der Anlage. Zeiten als UTC 'YYYY-MM-DD HH:mm:ss'.
  */
 export interface SchichtBeginnenBody {
   einheit_id: number;
@@ -439,10 +432,9 @@ export interface SchichtBeginnenBody {
 }
 
 /**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `PATCH …/abloesungen/{id}`, FE-lokal.
- * DREIWERTIG (`src/routes/abloesung.rs`, `Aendern`): Schlüssel fehlt = unverändert ·
- * `rhythmus_minuten: null` = zurück zur Abschnittsvorgabe · `abloesende_einheit_id: null` =
- * Planung aufheben.
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/abloesungen/{id}`, FE-lokal. DREIWERTIG:
+ * Schlüssel fehlt = unverändert · `rhythmus_minuten: null` = zurück zur Abschnittsvorgabe ·
+ * `abloesende_einheit_id: null` = Planung aufheben.
  */
 export interface SchichtAendernBody {
   beginn_at?: string;
@@ -450,7 +442,7 @@ export interface SchichtAendernBody {
   abloesende_einheit_id?: number | null;
 }
 
-/** LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/abloesungen/{id}/vollzug`. */
+/** Kein Backend-Schema: Eingabe-Body von `POST …/abloesungen/{id}/vollzug`. */
 export interface VollzugBody {
   vollzogen_at?: string;
   abloesende_einheit_id?: number;
@@ -475,15 +467,12 @@ export type BelegungKopfzahlStelle = S['BelegungKopfzahlStelle'];
 export type BezirkMeldung = S['BezirkMeldungAnzeige'];
 /** Wie {@link BezirkMeldung}, für Belegungsmeldungen einer Stelle. */
 export type StelleMeldung = S['StelleMeldungAnzeige'];
-/** Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen. */
+/** Eine Standmeldung im Verlauf eines Bezirks, zurückgenommene eingeschlossen. */
 export type StandVerlaufEintrag = S['StandVerlaufEintrag'];
-/** Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676). */
+/** Eine Belegungsmeldung im Verlauf einer Stelle. */
 export type BelegungVerlaufEintrag = S['BelegungVerlaufEintrag'];
 
-/**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/betreuung/bezirke`
- * (`BezirkAnlegen` in `src/routes/betreuung.rs`), FE-lokal.
- */
+/** Kein Backend-Schema: Eingabe-Body von `POST …/betreuung/bezirke` (`BezirkAnlegen`), FE-lokal. */
 export interface EvakuierungsbezirkEingabe {
   bezeichnung: string;
   /** Ganzzahlig ≥ 1; fehlt oder kleiner → 400. */
@@ -495,10 +484,9 @@ export interface EvakuierungsbezirkEingabe {
 }
 
 /**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `PATCH …/betreuung/bezirke/{id}`
- * (`BezirkAendern`). DREIWERTIG bei `abschnitt_id`/`sammelstelle`/`notiz`: Schlüssel fehlt =
- * unverändert · `null` = lösen bzw. leeren. Ein PATCH ohne tatsächliche Änderung schreibt
- * keinen ETB-Eintrag.
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/betreuung/bezirke/{id}` (`BezirkAendern`).
+ * DREIWERTIG bei `abschnitt_id`/`sammelstelle`/`notiz`: Schlüssel fehlt = unverändert · `null` =
+ * lösen bzw. leeren. Ein PATCH ohne tatsächliche Änderung schreibt keinen ETB-Eintrag.
  */
 export interface EvakuierungsbezirkPatch {
   bezeichnung?: string;
@@ -511,22 +499,21 @@ export interface EvakuierungsbezirkPatch {
 }
 
 /**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/betreuung/bezirke/{id}/staende`
- * (`StandMelden`). `evakuiert` ist eine ABSOLUTE Anzahl (≥ 0), kein Delta. Ohne
- * `zeitpunkt_at` gilt „jetzt"; sonst UTC `YYYY-MM-DD HH:mm:ss` über `alsBackendZeit`
- * (`etb/filterZeit.ts`), höchstens 60 s in der Zukunft.
+ * Kein Backend-Schema: Eingabe-Body von `POST …/betreuung/bezirke/{id}/staende` (`StandMelden`).
+ * `evakuiert` ist eine ABSOLUTE Anzahl (≥ 0), kein Delta. Ohne `zeitpunkt_at` gilt „jetzt“, sonst
+ * UTC `YYYY-MM-DD HH:mm:ss` über `alsBackendZeit`, höchstens 60 s in der Zukunft.
  */
 export interface StandmeldungEingabe {
   evakuiert: number;
   erhebung: Erhebung;
   zeitpunkt_at?: string;
-  /** Idempotenzschlüssel der Offline-Queue (LFH-675); ein Replay liefert die gespeicherte Meldung. */
+  /** Idempotenzschlüssel der Offline-Queue; ein Replay liefert die gespeicherte Meldung. */
   client_id?: string;
 }
 
 /**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/betreuung/stellen`
- * (`StelleAnlegen`). Ohne Kapazität gibt es keine Zahl freier Plätze.
+ * Kein Backend-Schema: Eingabe-Body von `POST …/betreuung/stellen` (`StelleAnlegen`). Ohne
+ * Kapazität gibt es keine Zahl freier Plätze.
  */
 export interface BetreuungsstelleEingabe {
   bezeichnung: string;
@@ -539,10 +526,10 @@ export interface BetreuungsstelleEingabe {
 }
 
 /**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `PATCH …/betreuung/stellen/{id}`
- * (`StelleAendern`). DREIWERTIG bei `abschnitt_id`/`kapazitaet_personen`/`standort`/`notiz`:
- * Schlüssel fehlt = unverändert · `null` = lösen bzw. „keine Kapazität" bzw. leeren.
- * `status: 'geschlossen'` bei Belegung > 0 ist 422 (design.md D4).
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/betreuung/stellen/{id}` (`StelleAendern`).
+ * DREIWERTIG bei `abschnitt_id`/`kapazitaet_personen`/`standort`/`notiz`: Schlüssel fehlt =
+ * unverändert · `null` = lösen bzw. „keine Kapazität“ bzw. leeren. `status: 'geschlossen'` bei
+ * Belegung > 0 ist 422.
  */
 export interface BetreuungsstellePatch {
   bezeichnung?: string;
@@ -552,29 +539,29 @@ export interface BetreuungsstellePatch {
   status?: BetreuungsstelleStatus;
   standort?: string | null;
   notiz?: string | null;
-  /** Koordinate (LFH-673): als Paar senden; `null`/`null` entfernt die Verortung. */
+  /** Koordinate: als Paar senden; `null`/`null` entfernt die Verortung. */
   lat?: number | null;
   lon?: number | null;
 }
 
 /**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/betreuung/stellen/{id}/belegungen`
+ * Kein Backend-Schema: Eingabe-Body von `POST …/betreuung/stellen/{id}/belegungen`
  * (`BelegungMelden`). Absolute Anzahl (≥ 0); Zeitpunkt wie bei {@link StandmeldungEingabe}.
- * Nicht `BelegungEingabe` — den Namen trägt die UHS-Belegung (`api/einsatzUhs.ts`).
+ * Nicht `BelegungEingabe`, den Namen trägt die UHS-Belegung (`api/einsatzUhs.ts`).
  */
 export interface BelegungsmeldungEingabe {
   belegt: number;
   zeitpunkt_at?: string;
-  /** Idempotenzschlüssel wie bei {@link StandmeldungEingabe} (LFH-675). */
+  /** Idempotenzschlüssel wie bei {@link StandmeldungEingabe}. */
   client_id?: string;
 }
 
 // ============================== LFH-634 Verpflegung ==============================
 /** Übersicht `GET …/verpflegung`: alle Zeitfenster nach Beginn. */
 export type Verpflegung = S['VerpflegungAnzeige'];
-/** Zeitfenster samt Bedarf, ausgegebener Menge, Fehlmenge und Ausgaben (design.md D2). */
+/** Zeitfenster samt Bedarf, ausgegebener Menge, Fehlmenge und Ausgaben. */
 export type VerpflegungZeitfenster = S['ZeitfensterAnzeige'];
-/** Eine Ausgabe; von der Nachforderung trägt sie nur `nachforderung_id` (design.md D4). */
+/** Eine Ausgabe; von der Nachforderung trägt sie nur `nachforderung_id`. */
 export type VerpflegungAusgabe = S['AusgabeAnzeige'];
 /** Antwort auf Erfassen/Zurücknehmen: `ausgabe_id` ist die betroffene Ausgabe — ein
  *  Rückgängig nimmt diese Kennung, `zeitfenster` trägt die nachgerechnete Deckung. */
@@ -582,21 +569,20 @@ export type VerpflegungAusgabeErgebnis = S['AusgabeErgebnis'];
 export type VerpflegungBedarf = S['Bedarf'];
 /** Gesamt plus je Kostform — Form von `ausgegeben` und `fehlmenge`. */
 export type Portionen = S['Portionen'];
-/** Die fünf festen Kostformen als Teilmenge (design.md D1). */
+/** Die fünf festen Kostformen als Teilmenge. */
 export type Sonderkost = S['Sonderkost'];
 export type Kostform = keyof Sonderkost;
 
 /**
- * LFH-120: kein Backend-Schema — `sonderkost` in den Eingabe-Bodies (`SonderkostEingabe` in
- * `src/verpflegung/mod.rs`). Jedes Feld optional; beim PATCH ersetzen gesetzte Felder, fehlende
- * bleiben stehen.
+ * Kein Backend-Schema: `sonderkost` in den Eingabe-Bodies (`SonderkostEingabe`). Jedes Feld
+ * optional; beim PATCH ersetzen gesetzte Felder, fehlende bleiben stehen.
  */
 export type SonderkostEingabe = Partial<Sonderkost>;
 
 /**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/verpflegung/zeitfenster`
- * (`ZeitfensterAnlegen` in `src/routes/verpflegung.rs`). Zeiten als UTC `YYYY-MM-DD HH:mm:ss`
- * oder ISO mit Zone; `bis_at` muss nach `von_at` liegen (sonst 422).
+ * Kein Backend-Schema: Eingabe-Body von `POST …/verpflegung/zeitfenster` (`ZeitfensterAnlegen`).
+ * Zeiten als UTC `YYYY-MM-DD HH:mm:ss` oder ISO mit Zone; `bis_at` muss nach `von_at` liegen
+ * (sonst 422).
  */
 export interface ZeitfensterEingabe {
   bezeichnung: string;
@@ -609,15 +595,15 @@ export interface ZeitfensterEingabe {
 }
 
 /**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `PATCH …/verpflegung/zeitfenster/{id}`
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/verpflegung/zeitfenster/{id}`
  * (`ZeitfensterAendern`). Zweiwertig: Schlüssel fehlt = unverändert, es gibt kein `null`.
  * Wertgleichheit schreibt weder ETB-Eintrag noch Ereignis.
  */
 export type ZeitfensterPatch = Partial<ZeitfensterEingabe>;
 
 /**
- * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/verpflegung/zeitfenster/{id}/ausgaben`
- * (`AusgabeErfassen`). Ohne `zeitpunkt_at` gilt „jetzt"; `menge` > 0; die Sonderkost ist
+ * Kein Backend-Schema: Eingabe-Body von `POST …/verpflegung/zeitfenster/{id}/ausgaben`
+ * (`AusgabeErfassen`). Ohne `zeitpunkt_at` gilt „jetzt“; `menge` > 0; die Sonderkost ist
  * Teilmenge der Menge (sonst 422). Eine fremde `nachforderung_id` ist 404.
  */
 export interface AusgabeEingabe {
@@ -632,7 +618,7 @@ export interface AusgabeEingabe {
 // ============================== LFH-51 Terminierte Erinnerungen ==============================
 export type Erinnerung = S['ErinnerungAnzeige'];
 
-/** LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. */
+/** Kein Backend-Schema: Eingabe-Body, FE-lokal. */
 export interface NeueErinnerung {
   titel: string;
   beschreibung?: string;
@@ -640,7 +626,7 @@ export interface NeueErinnerung {
   faellig_at: string;
   intervall_minuten?: number;
   empfaenger_funktion?: string;
-  /** Generischer Sachbezug (z. B. 'etb' + ETB-Eintrag-ID, LFH-106); both-or-neither. */
+  /** Generischer Sachbezug (z. B. 'etb' + ETB-Eintrag-ID); both-or-neither. */
   bezug_typ?: string;
   bezug_id?: number;
 }
@@ -653,7 +639,7 @@ export type Richtung = S['Richtung'];
 export type AuftragEmpfaenger = S['AuftragEmpfaengerAnzeige'];
 export type Auftrag = S['AuftragDetail'];
 
-/** LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. */
+/** Kein Backend-Schema: Eingabe-Body, FE-lokal. */
 export interface NeuerEmpfaenger {
   empfaenger_typ: EmpfaengerTyp;
   abschnitt_id?: number;
@@ -665,7 +651,7 @@ export interface NeuerEmpfaenger {
   extern_bezeichnung?: string;
 }
 
-/** LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. */
+/** Kein Backend-Schema: Eingabe-Body, FE-lokal. */
 export interface NeuerAuftrag {
   auftrag_text: string;
   absicht?: string;
@@ -684,14 +670,14 @@ export interface NeuerAuftrag {
   empfaenger: NeuerEmpfaenger[];
 }
 
-// --- Meldungen (eingehend) (LFH-54) ---
+// --- Meldungen (eingehend) ---
 export type MeldungPrioritaet = S['Prioritaet'];
 export type MeldungStatus = S['MeldungStatus'];
 export type Meldungsart = S['Meldungsart'];
 export type MeldungMeldeweg = S['MeldeWeg'];
 export type Meldung = S['MeldungAnzeige'];
 
-/** LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. */
+/** Kein Backend-Schema: Eingabe-Body, FE-lokal. */
 export interface NeueMeldung {
   absender: string;
   empfaenger?: string;
@@ -702,20 +688,20 @@ export interface NeueMeldung {
   richtung?: Richtung;
   /** Ereigniszeit (UTC) 'YYYY-MM-DD HH:mm:ss'. Pflicht (≠ Erfassungszeit). */
   ereigniszeit: string;
-  /** Bestätigungspflicht erzwingen; undefined ⇒ aus Sofort-Klassifikation abgeleitet (LFH-97). */
+  /** Bestätigungspflicht erzwingen; undefined ⇒ aus Sofort-Klassifikation abgeleitet. */
   bestaetigung_pflicht?: boolean;
   /** Override der Default-Bestätigungsfrist (Minuten ab Eingang). */
   bestaetigung_frist_min?: number;
   /** Stabiler Offline-Idempotenzschlüssel; bei Replay liefert der Server die
    * bereits angelegte Meldung statt einer Dublette. */
   client_id?: string;
-  /** Strukturierter Absender (LFH-610): Einheit ODER Abschnitt dieses Einsatzes, nie beide. */
+  /** Strukturierter Absender: Einheit ODER Abschnitt dieses Einsatzes, nie beide. */
   einheit_id?: number;
   abschnitt_id?: number;
 }
 
 export type LageMeldung = S['LageMeldungAnzeige'];
-/** Letzte Rückmeldung je Einheit bzw. direkt gebundenem Abschnitt (LFH-610). */
+/** Letzte Rückmeldung je Einheit bzw. direkt gebundenem Abschnitt. */
 export type Rueckmeldungen = S['RueckmeldungenAnzeige'];
 export type LetzteRueckmeldung = S['LetzteRueckmeldung'];
 
@@ -725,7 +711,7 @@ export type NachforderungStatus = S['NachforderungStatus'];
 export type AdressatKategorie = S['AdressatKategorie'];
 export type Nachforderung = S['NachforderungAnzeige'];
 
-/** LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. */
+/** Kein Backend-Schema: Eingabe-Body, FE-lokal. */
 export interface NeueNachforderung {
   art: string;
   bezeichnung: string;
@@ -738,7 +724,7 @@ export interface NeueNachforderung {
   angefordert_at?: string;
 }
 
-// ============================== LFH-23 Aufbewahrung (Archiv des Org-Admins) ==============================
+// ============================== Aufbewahrung (Archiv des Org-Admins) ==============================
 /** Aufbewahrungszustand eines abgeschlossenen Einsatzes (sechs Werte, `retention::zustand`). */
 export type AufbewahrungZustand = S['AufbewahrungZustand'];
 /** Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). */
@@ -752,16 +738,15 @@ export type ArchivSchaden = S['ArchivSchadenAnzeige'];
 /** ETB-Eintrag der Archivakte im Wortlaut, ohne Anhänge und Rückverweise. */
 export type ArchivEtbEintrag = S['ArchivEtbEintragAnzeige'];
 
-/** Body von `POST /api/aufbewahrung/einsaetze/{id}/wiederherstellen`.
- *  LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. `retention_bis` ist PFLICHT:
- *  ein Zeitpunkt in der Zukunft (UTC, `YYYY-MM-DD HH:mm:ss`) oder `null` für unbegrenzt. */
+/** Body von `POST /api/aufbewahrung/einsaetze/{id}/wiederherstellen`. Kein Backend-Schema,
+ *  FE-lokal. `retention_bis` ist PFLICHT: ein Zeitpunkt in der Zukunft (UTC,
+ *  `YYYY-MM-DD HH:mm:ss`) oder `null` für unbegrenzt. */
 export interface WiederherstellenBody {
   retention_bis: string | null;
 }
 
-/** Body von `PUT /api/einsaetze/{id}/aufbewahrungsfrist` (LFH-130). `null` hebt die Frist
- *  auf; eine Verkürzung braucht `bestaetigt: true`, sonst 409.
- *  LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. */
+/** Body von `PUT /api/einsaetze/{id}/aufbewahrungsfrist`. `null` hebt die Frist auf; eine
+ *  Verkürzung braucht `bestaetigt: true`, sonst 409. Kein Backend-Schema, FE-lokal. */
 export interface FristSetzenBody {
   retention_bis: string | null;
   bestaetigt?: boolean;
