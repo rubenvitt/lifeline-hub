@@ -123,10 +123,15 @@ neben `cargo tauri build` mit.
 - **Ablauf:**
   - Nach dem Laden der Anwendung prüft ein Hintergrund-Task (`tauri-plugin-updater`, Timeout
     10 s). Fehler und Zeitüberschreitung werden nur geloggt.
-  - Bei einem Treffer fragt ein nativer Dialog (`tauri-plugin-dialog`): „Lifeline Hub X.Y.Z ist
-    verfügbar (installiert: A.B.C). Jetzt aktualisieren?“ mit „Aktualisieren“ und „Später“.
-  - „Aktualisieren“ ruft `download_and_install`, danach `app.restart()`. Auf Windows beendet der
-    NSIS-Installer die Hülle selbst, deshalb gilt `installMode: "passive"`.
+  - Bei einem Treffer fragt ein nativer Dialog (`tauri-plugin-dialog`) mit Versionsnummer, ob
+    geladen wird („Laden“/„Später“). `download` prüft dabei die Signatur.
+  - Ist das Update geladen, fragt ein zweiter Dialog, ob **jetzt** neu gestartet wird („Jetzt neu
+    starten“/„Später“); erst dann `install` und `app.restart()`. Grund (Review 29.09.2026): der
+    Download dauert im ELW-Uplink Sekunden bis Minuten, ein unangekündigter Neustart verlöre, was
+    in der Zwischenzeit getippt wurde. Auf Windows beendet der NSIS-Installer die Hülle selbst,
+    deshalb gilt `installMode: "passive"`.
+  - Eine Sperre (`AtomicBool`) hält Start- und Menüprüfung auseinander: nie zwei Dialoge oder
+    Downloads gleichzeitig.
 - **Keine wiederkehrende Prüfung** während der Laufzeit: Die Hülle soll mitten in der Lage nicht
   mit Dialogen stören. Der Menüeintrag „Nach Updates suchen…“ prüft auf Wunsch und meldet auch
   „Sie verwenden die aktuelle Version“.
@@ -237,8 +242,9 @@ Keine Daten- und keine API-Migration.
 1. Nach dem Merge laufen Alpha-Releases unverändert, ohne Desktop-Jobs.
 2. Vor dem ersten stabilen Release:
    - Secrets setzen (D6).
-   - `artefakte.yml` per Dispatch mit `desktop: true` gegen den jüngsten Alpha-Tag laufen lassen
-     und die Pakete installieren.
+   - `artefakte.yml` per Dispatch mit `desktop: true` gegen einen Alpha-Tag laufen lassen, der
+     NACH dem Merge entstanden ist (ältere Tags haben kein `src-tauri/`), und die Pakete
+     installieren.
 3. Das erste stabile Release (`alpha → main`) erzeugt die Pakete und `latest.json`.
 
 Rückweg: Die Desktop-Jobs lassen sich über die Ausgabe `desktop` abschalten, ohne die

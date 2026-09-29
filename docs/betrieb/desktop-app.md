@@ -40,10 +40,12 @@ Systeme warnen deshalb beim ersten Öffnen:
 ## Erster Start und Serveradresse
 
 Beim ersten Start fragt die App nach der **Serveradresse**, zum Beispiel
-`https://elw.local:8443`. Angenommen wird nur `https` mit Hostnamen, denn Offline-Betrieb
-(Service Worker) und Passkeys brauchen eine gesicherte Verbindung. Das Zertifikat des Servers
+`https://elw.local:8443`. Angenommen wird nur `https` mit Hostnamen und ohne Name/Passwort vor
+„@“, denn Offline-Betrieb (Service Worker) und Passkeys brauchen eine gesicherte Verbindung. Das Zertifikat des Servers
 muss der Rechner kennen, so wie bei einem Browser (mkcert-CA oder ein öffentliches Zertifikat,
-siehe [betrieb-tls.md](../betrieb-tls.md)). Sonst zeigt das Fenster nur eine Fehlerseite.
+siehe [betrieb-tls.md](../betrieb-tls.md)). Sonst bleibt das Fenster leer (macOS) oder zeigt eine
+Fehlerseite (Windows). Nach einem Netzausfall fordert Menü „Lifeline Hub“ → „Neu laden“ (macOS:
+Menü „Fenster“) die Seite neu an.
 
 Die Adresse bleibt gespeichert, und jeder weitere Start lädt sie direkt:
 - macOS: `~/Library/Application Support/dev.rubeen.lifeline.desktop/verbindung.json`
@@ -81,14 +83,17 @@ und GitHub lässt Vorabversionen bei „latest“ aus.
 
 - **Ohne Internet** (Einsatz-LAN) scheitert die Prüfung nach höchstens 10 s still. Die App
   läuft normal weiter, eine Fehlermeldung erscheint nicht.
-- **Gibt es ein Update,** fragt die App mit Versionsnummer nach: „Aktualisieren“ oder „Später“.
-  Sie installiert **nie ohne Zustimmung**, denn das Update startet die App neu. Unter Windows
-  beendet der Installer sie dafür.
+- **Gibt es ein Update,** fragt die App **zweimal**: erst mit Versionsnummer, ob geladen wird
+  („Laden“/„Später“), dann — wenn das Update da ist — ob **jetzt** neu gestartet wird („Jetzt neu
+  starten“/„Später“). Sie installiert nie ohne Zustimmung und startet nie unangekündigt neu;
+  was zwischen den Fragen getippt wird, geht also nicht verloren. „Später“ im zweiten Dialog
+  verwirft den Download, beim nächsten Start kommt das Angebot wieder. Unter Windows beendet der
+  Installer die App zum Neustart selbst.
 - **Auf Wunsch prüfen:** Menü „Lifeline Hub“ → „Nach Updates suchen…“. Das meldet auch „Sie
   verwenden die aktuelle Version“.
 - Jedes Update ist signiert. Passt die Signatur nicht zum öffentlichen Schlüssel in der App
-  (`src-tauri/tauri.conf.json`, `plugins.updater.pubkey`), installiert sie nichts und läuft in
-  der alten Version weiter.
+  (`src-tauri/tauri.conf.json`, `plugins.updater.pubkey`), meldet sie das nach dem Laden,
+  installiert nichts und läuft in der alten Version weiter.
 
 ## Signaturschlüssel des Updaters
 
@@ -124,7 +129,9 @@ trotzdem.
   `release.config.mjs`). `tauri.conf.json` trägt keine eigene Version, der Test
   `version_gleich_der_anwendungsversion` in `src-tauri` hält beide gleich.
 - `artefakte.yml` baut die App nur bei stabilen Tags. Vor dem ersten stabilen Release lässt sich
-  der Bau per „Run workflow“ mit einem Alpha-Tag und `desktop: true` prüfen. Dabei entsteht
+  der Bau per „Run workflow“ mit einem Alpha-Tag und `desktop: true` prüfen — mit einem Tag,
+  der **nach** dem Merge von LFH-721 entstanden ist; ältere Tags haben weder `src-tauri/` noch
+  das Manifest-Skript. Dabei entsteht
   auch ein `latest.json` am Alpha-Release. Das ist unschädlich, weil die Apps nur das stabile
   „latest“ lesen.
 - `latest.json` erzeugt `scripts/release/desktop-manifest.mjs` aus den tatsächlich gebauten

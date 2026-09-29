@@ -14,6 +14,7 @@ pub enum AdressFehler {
     Unlesbar,
     KeinHttps,
     OhneHost,
+    MitZugangsdaten,
 }
 
 impl fmt::Display for AdressFehler {
@@ -27,6 +28,9 @@ impl fmt::Display for AdressFehler {
                 "Nur https-Adressen sind möglich: Offline-Betrieb und Passkey brauchen eine gesicherte Verbindung."
             }
             AdressFehler::OhneHost => "Der Adresse fehlt der Hostname, z. B. elw.local.",
+            AdressFehler::MitZugangsdaten => {
+                "Die Adresse darf keinen Namen und kein Passwort vor „@“ enthalten."
+            }
         })
     }
 }
@@ -49,6 +53,11 @@ pub fn pruefe_adresse(eingabe: &str) -> Result<Url, AdressFehler> {
     let nach_schema = &eingabe[eingabe.find(':').map_or(0, |i| i + 1)..];
     if nach_schema.starts_with("///") || url.host_str().is_none_or(str::is_empty) {
         return Err(AdressFehler::OhneHost);
+    }
+    // `https://elw.local:8443@evil.example` hat den Host `evil.example` — im Bestätigungsdialog
+    // läse sich der vorn stehende Name wie der vertraute Server.
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err(AdressFehler::MitZugangsdaten);
     }
     Ok(url)
 }
@@ -97,6 +106,20 @@ mod tests {
                 "{eingabe}: {fehler:?}"
             );
             assert!(fehler.to_string().contains("Hostname"));
+        }
+    }
+
+    #[test]
+    fn zugangsdaten_in_der_adresse_werden_abgelehnt() {
+        // `elw.local` ist hier Benutzername, der Host ist `evil.example` — im Bestätigungsdialog
+        // läse sich das wie der vertraute Server.
+        for eingabe in [
+            "https://elw.local:8443@evil.example",
+            "https://nutzer@elw.local:8443",
+        ] {
+            let fehler = pruefe_adresse(eingabe).unwrap_err();
+            assert_eq!(fehler, AdressFehler::MitZugangsdaten, "{eingabe}");
+            assert!(fehler.to_string().contains("@"));
         }
     }
 

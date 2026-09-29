@@ -308,8 +308,9 @@ jobs:
             exit 1
           fi
           # Die Hülle muss die Release-Version tragen, sonst vergleicht ihr Updater falsch.
-          # Gesetzt wird sie von release.config.mjs (prepareCmd).
-          grep -qx "version = \"$VERSION\"" Cargo.toml \
+          # Gesetzt wird sie von release.config.mjs (prepareCmd). `tr`: der Windows-Checkout
+          # trägt CRLF (core.autocrlf), und `grep -x` sähe das \r am Zeilenende.
+          tr -d '\r' < Cargo.toml | grep -qx "version = \"$VERSION\"" \
             || { echo "FEHLER: src-tauri/Cargo.toml trägt nicht die Version $VERSION." >&2; exit 1; }
           cargo tauri build --ci --target "$ZIEL" --bundles "$BUNDLES"
 
@@ -361,14 +362,16 @@ jobs:
           path: versand/
           retention-days: 7
 
-  # latest.json entsteht aus dem, was TATSÄCHLICH gebaut wurde: `always()`, damit eine
-  # gescheiterte Plattform nur aus dem Manifest fällt, statt die andere mitzunehmen. Ohne ein
+  # latest.json entsteht aus dem, was TATSÄCHLICH gebaut wurde: `!cancelled()`, damit eine
+  # gescheiterte Plattform nur aus dem Manifest fällt, statt die andere mitzunehmen. Ein
+  # ABGEBROCHENER Lauf veröffentlicht nichts — sonst zeigte „latest“ bis zum nächsten Release auf
+  # ein Manifest mit nur der Plattform, die zufällig schon fertig war. Ohne ein
   # einziges Paket bricht das Skript ab (scripts/release/desktop-manifest.mjs, Selbsttest in
   # Schritt 8 von check-all.sh).
   desktop-veroeffentlichen:
     name: Desktop-Pakete und latest.json ans Release hängen
     needs: [vorbereiten, desktop]
-    if: always() && needs.vorbereiten.outputs.desktop == 'true'
+    if: ${{ !cancelled() && needs.vorbereiten.outputs.desktop == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

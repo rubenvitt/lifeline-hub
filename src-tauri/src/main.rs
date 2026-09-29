@@ -14,6 +14,7 @@ mod menue;
 mod update;
 mod verbindung;
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -52,6 +53,10 @@ struct Vorbelegung {
 #[derive(Default)]
 struct Zustand {
     vorbelegung: Mutex<Vorbelegung>,
+    /// Origins, deren Freigabe schon gesetzt ist. Tauri kennt kein Zurücknehmen einer
+    /// Laufzeit-Capability: nach einem Serverwechsel behält die alte Origin bis zum Neustart
+    /// `drucken` — mehr nicht, die Adresse ändern kann auch sie nicht.
+    freigegeben: Mutex<HashSet<String>>,
 }
 
 fn konfig_dir(app: &AppHandle) -> PathBuf {
@@ -64,21 +69,42 @@ fn fenster(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window(FENSTER)
 }
 
-/// Gibt der Serverseite zur Laufzeit genau ihre Origin frei — und dort nur `drucken`.
-fn server_freigeben(app: &AppHandle, server: &Url) {
+/// Kennung und URL-Muster der Laufzeit-Freigabe für die Origin von `server`.
+fn freigabe(server: &Url) -> (String, String) {
     let origin = server.origin().ascii_serialization();
     let kennung = format!(
         "server-{}",
         origin.replace(|c: char| !c.is_ascii_alphanumeric(), "-")
     );
+    (kennung, format!("{origin}/*"))
+}
+
+/// Gibt der Serverseite zur Laufzeit genau ihre Origin frei — und dort nur `drucken`.
+fn server_freigeben(app: &AppHandle, server: &Url) {
+    let (kennung, muster) = freigabe(server);
+    if !app
+        .state::<Zustand>()
+        .freigegeben
+        .lock()
+        .unwrap()
+        .insert(kennung.clone())
+    {
+        return;
+    }
     let capability = tauri::ipc::CapabilityBuilder::new(kennung)
-        .remote(format!("{origin}/*"))
+        .remote(muster.clone())
         .window(FENSTER)
         .permission("allow-drucken");
     if let Err(fehler) = app.add_capability(capability) {
         // Ohne Freigabe fehlt nur der native Druck; die Anwendung selbst läuft.
-        log::warn!("Freigabe für {origin} nicht gesetzt: {fehler}");
+        log::warn!("Freigabe für {muster} nicht gesetzt: {fehler}");
     }
+}
+
+/// Was ins Protokoll darf: Origin und Pfad, nie die Query — die trägt Freitext (ETB-Suche `?q=`,
+/// Namen Betroffener), und die Protokolldatei bleibt liegen.
+fn fuers_protokoll(url: &Url) -> String {
+    format!("{}{}", url.origin().ascii_serialization(), url.path())
 }
 
 fn lade_server(app: &AppHandle, server: &Url) -> Result<(), String> {
@@ -156,8 +182,10 @@ fn deeplinks_verarbeiten(app: &AppHandle, links: Vec<Url>) {
 /// nennt (desktop-huelle: „Ein Serverwechsel per Deeplink wird bestätigt“).
 fn bestaetige_wechsel(app: &AppHandle, alt: Option<Url>, neu: Url) {
     let alt = alt.map(String::from).unwrap_or_default();
+    // Host eigens genannt: der Host entscheidet, wohin die Anmeldung geht.
+    let host = neu.host_str().unwrap_or_default();
     let text = format!(
-        "Mit dem Server {neu} verbinden?\n\nDie bisherige Verbindung {alt} wird ersetzt. \
+        "Mit dem Server {host} verbinden?\n\nNeue Adresse: {neu}\nBisherige Adresse: {alt}\n\n\
          Verbinden Sie nur, wenn Sie den Link aus Ihrer Einsatzorganisation erhalten haben."
     );
     let handle = app.clone();
@@ -199,7 +227,6 @@ fn main() {
         )
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Zustand::default())
         .invoke_handler(tauri::generate_handler![
@@ -213,10 +240,10 @@ fn main() {
         .setup(|app| {
             let handle = app.handle().clone();
 
-            #[cfg(any(windows, target_os = "linux"))]
+            // Nur im Entwicklungslauf das Schema selbst registrieren; installiert trägt es der
+            // Installer ein — ein Release-Build soll den Eintrag nicht auf sich umbiegen.
+            #[cfg(all(debug_assertions, any(windows, target_os = "linux")))]
             {
-                // Im Entwicklungslauf das Schema selbst registrieren; installiert trägt es
-                // der Installer ein.
                 let _ = app.deep_link().register_all();
             }
 
@@ -237,7 +264,7 @@ fn main() {
                 // („Maske oder Server? Welcher?“).
                 .on_page_load(|_fenster, seite| {
                     if matches!(seite.event(), tauri::webview::PageLoadEvent::Finished) {
-                        log::info!("Seite geladen: {}", seite.url());
+                        log::info!("Seite geladen: {}", fuers_protokoll(seite.url()));
                     }
                 })
                 // Downloads: Vorgabeverhalten beider Webviews — Download-Ordner, Umlaute
@@ -245,7 +272,8 @@ fn main() {
                 .on_download(|_fenster, ereignis| {
                     if let DownloadEvent::Finished { url, success, .. } = ereignis {
                         log::info!(
-                            "Download {url}: {}",
+                            "Download {}: {}",
+                            fuers_protokoll(&url),
                             if success { "fertig" } else { "gescheitert" }
                         );
                     }
@@ -277,6 +305,33 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn freigabe_gilt_genau_fuer_die_origin() {
+        let (kennung, muster) =
+            freigabe(&Url::parse("https://elw.local:8443/einsaetze/1?q=x").unwrap());
+        assert_eq!(muster, "https://elw.local:8443/*");
+        assert_eq!(kennung, "server-https---elw-local-8443");
+        // Standardport fällt aus der Origin, IPv6 behält die Klammern im Muster.
+        let (_, muster) = freigabe(&Url::parse("https://elw.local:443/").unwrap());
+        assert_eq!(muster, "https://elw.local/*");
+        let (kennung, muster) = freigabe(&Url::parse("https://[fd00::1]:8443/").unwrap());
+        assert_eq!(muster, "https://[fd00::1]:8443/*");
+        assert!(kennung
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-'));
+    }
+
+    #[test]
+    fn protokoll_enthaelt_keine_query() {
+        let url = Url::parse("https://elw.local:8443/einsaetze/1/etb?q=M%C3%BCller#x").unwrap();
+        assert_eq!(
+            fuers_protokoll(&url),
+            "https://elw.local:8443/einsaetze/1/etb"
+        );
+    }
+
     /// Die Hülle trägt die Anwendungsversion; ihr Updater vergleicht sie mit `latest.json`.
     /// Beide setzt `prepareCmd` in `release.config.mjs` — fehlt dort `-p lifeline-desktop`,
     /// driftet die Hülle still und bietet jedes Update erneut an.

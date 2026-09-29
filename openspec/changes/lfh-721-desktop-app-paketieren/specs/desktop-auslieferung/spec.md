@@ -46,8 +46,10 @@ Eine installierte Vorab- oder Testversion MUST dabei keinen eigenen Kanal kennen
 - **THEN** bietet sie kein Update an
 
 ### Requirement: Ein Update wird nur nach Zustimmung und mit gültiger Signatur installiert
-Findet die Hülle eine neuere Version, MUST sie die Versionsnummer nennen und vor dem Installieren
-zustimmen lassen. Bei Ablehnung MUST sie ohne Neustart weiterlaufen. Ein Update, dessen Signatur
+Findet die Hülle eine neuere Version, MUST sie die Versionsnummer nennen und vor dem Laden
+zustimmen lassen. Ein geladenes Update MUST sie erst nach einer zweiten Zustimmung zum Neustart
+installieren, damit zwischenzeitlich Getipptes nicht unangekündigt verloren geht. Bei Ablehnung
+MUST sie ohne Neustart weiterlaufen. Ein Update, dessen Signatur
 nicht zum im Paket hinterlegten öffentlichen Schlüssel passt, MUST NOT installiert werden.
 
 #### Scenario: Update abgelehnt
@@ -55,8 +57,12 @@ nicht zum im Paket hinterlegten öffentlichen Schlüssel passt, MUST NOT install
 - **THEN** bleibt die geladene Anwendung ohne Unterbrechung bedienbar
 
 #### Scenario: Update angenommen
-- **WHEN** jemand dem Update auf `1.3.0` zustimmt
+- **WHEN** jemand dem Laden von `1.3.0` und danach dem Neustart zustimmt
 - **THEN** installiert die Hülle `1.3.0` und startet danach als `1.3.0` neu
+
+#### Scenario: Geladen, Neustart verschoben
+- **WHEN** jemand das Update lädt und den Neustart mit „Später“ ablehnt
+- **THEN** läuft die Hülle ohne Neustart in der bisherigen Version weiter
 
 #### Scenario: Manipuliertes Archiv
 - **WHEN** das heruntergeladene Update-Archiv nicht zur Signatur im Manifest passt

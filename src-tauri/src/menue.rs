@@ -6,10 +6,11 @@
 //! gehen Kopieren/Einfügen im Webview nur über Menüeinträge; WebView2 kann es selbst.
 
 use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 const SERVER_WECHSELN: &str = "server-wechseln";
 const UPDATES_SUCHEN: &str = "updates-suchen";
+const NEU_LADEN: &str = "neu-laden";
 
 pub fn bauen(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let wechseln = MenuItem::with_id(app, SERVER_WECHSELN, "Server wechseln…", true, None::<&str>)?;
@@ -20,6 +21,8 @@ pub fn bauen(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         None::<&str>,
     )?;
+    // Ohne Browserleiste der einzige Weg, eine Seite nach einem Netzausfall neu anzufordern.
+    let neu_laden = MenuItem::with_id(app, NEU_LADEN, "Neu laden", true, None::<&str>)?;
     let trenner = || PredefinedMenuItem::separator(app);
 
     #[cfg(target_os = "macos")]
@@ -62,6 +65,8 @@ pub fn bauen(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             "Fenster",
             true,
             &[
+                &neu_laden,
+                &trenner()?,
                 &PredefinedMenuItem::minimize(app, Some("Im Dock ablegen"))?,
                 &PredefinedMenuItem::maximize(app, Some("Zoomen"))?,
                 &PredefinedMenuItem::fullscreen(app, Some("Vollbild"))?,
@@ -80,6 +85,7 @@ pub fn bauen(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             true,
             &[
                 &wechseln,
+                &neu_laden,
                 &updates,
                 &trenner()?,
                 &PredefinedMenuItem::quit(app, Some("Beenden"))?,
@@ -93,6 +99,11 @@ pub fn behandeln(app: &AppHandle, ereignis: MenuEvent) {
     match ereignis.id().as_ref() {
         SERVER_WECHSELN => crate::zeige_maske(app, None),
         UPDATES_SUCHEN => crate::update::auf_wunsch_pruefen(app.clone()),
+        NEU_LADEN => {
+            if let Some(fenster) = app.get_webview_window(crate::FENSTER) {
+                let _ = fenster.reload();
+            }
+        }
         _ => {}
     }
 }
