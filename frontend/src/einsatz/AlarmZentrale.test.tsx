@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { App as AntApp } from 'antd';
 import { StrictMode, useState } from 'react';
-import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
+import { MemoryRouter, Routes, Route, useLocation, useNavigate, useParams } from 'react-router';
 import AlarmZentrale from './AlarmZentrale';
 import { istAlarmGemutet } from '../alarm/alarmTon';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
@@ -16,6 +16,8 @@ function AlarmTestRoute({ mitSteuerung }: { mitSteuerung: boolean }) {
   const { notification } = AntApp.useApp();
   const navigate = useNavigate();
   const location = useLocation();
+  // Die ID reicht im App-Baum der Einsatzrahmen herein; hier steht die Route an seiner Stelle.
+  const einsatzId = Number(useParams().id);
   const [sichtbar, setSichtbar] = useState(true);
 
   return (
@@ -42,7 +44,7 @@ function AlarmTestRoute({ mitSteuerung }: { mitSteuerung: boolean }) {
           </button>
         </>
       )}
-      {sichtbar && <AlarmZentrale />}
+      {sichtbar && <AlarmZentrale einsatzId={einsatzId} />}
       <output data-testid="route">
         {location.pathname}
         {location.search}
