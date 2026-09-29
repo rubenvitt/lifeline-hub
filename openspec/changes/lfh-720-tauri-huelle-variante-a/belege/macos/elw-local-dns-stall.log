@@ -1,0 +1,6 @@
+2026-09-28 18:04:04.748655C2.1.1 Hostname#7f7d5f56:8443 in_progress resolver (satisfied (Path is satisfied), interface: en0[802.11], ipv4, ipv6, uses wifi, LQM: good)] event: resolver:start_dns @9.967s
+2026-09-28 18:04:06.748889C2.1.1 Hostname#7f7d5f56:8443 in_progress resolver (satisfied (Path is satisfied), interface: en0[802.11], ipv4, ipv6, uses wifi, LQM: good)] event: resolver:dns_stall @11.967s
+2026-09-28 18:04:55.422815] event: client:end_activity @60.641s, activity <nw_activity 16:2 [74690FEA-6025-4351-9C64-C96C9809F5A0] (reporting strategy default) complete (reason failure)>
+2026-09-28 18:04:55.422856C2 30F64018-148C-4032-B741-1604E47EA358 Hostname#7f7d5f56:8443 quic, pid: 24768, expected workload: 0, main document url hash: eba8152c, url hash: eba8152c, definite, attribution: developer] cancel
+2026-09-28 18:04:55.422948C2 Hostname#7f7d5f56:8443 quic, pid: 24768, expected workload: 0, main document url hash: eba8152c, url hash: eba8152c, definite, attribution: developer] cancelled
+2026-09-28 18:04:55.426961w_connection_report_state_with_handler_on_nw_queue [C2] reporting state cancelled

@@ -1,0 +1,4 @@
+{
+  "ergebnis": "{\"loaded\":true,\"styleLoaded\":true,\"tiles\":true,\"zoom\":13,\"mitte\":{\"lng\":9.732,\"lat\":52.3759},\"quellen\":[\"basemap-1:vector:/api/karte/offline/1/tiles/{z}/{x}/{y}?v=20260928164018\"],\"layer\":24,\"glyphs\":\"/api/karte/offline/fonts/{fontstack}/{range}.pbf\",\"gerendert\":596,\"fehler\":[\"There is no tile manager with ID 'marker-cluster'\",\"Invalid sprite URL \\\"/api/karte/offline/sprites/basemap\\\", must be absolute. Modify style specification directly or use TransformStyleFunction to correct the issue dynamically\",\"There is no tile manager with ID 'marker-cluster'\",\"There is no tile manager with ID 'marker-cluster'\",\"There is no tile manager with ID 'marker-cluster'\"],\"gl\":\"WebGL2RenderingContext\"}",
+  "name": "wk20"
+}

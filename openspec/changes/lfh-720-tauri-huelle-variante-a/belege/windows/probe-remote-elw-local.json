@@ -1,0 +1,82 @@
+{
+  "art": "probe",
+  "caches": {
+    "workbox-precache-v2-https://elw.local:8443/": 22
+  },
+  "cookieEnabled": true,
+  "eventSource": true,
+  "idb": {
+    "datenbanken": [],
+    "schreibtest": {
+      "ok": true,
+      "zaehlerNachher": 1,
+      "zaehlerVorher": 0
+    },
+    "vorhanden": true
+  },
+  "isSecureContext": true,
+  "label": "laden+8s",
+  "online": true,
+  "print": "function",
+  "sichtbarkeit": "visible",
+  "storage": {
+    "estimate": {
+      "quota": 10743483920,
+      "usage": 6065680,
+      "usageDetails": {
+        "caches": 6046720,
+        "indexedDB": 1754,
+        "serviceWorkerRegistrations": 17206
+      }
+    },
+    "persisted": false
+  },
+  "sw": {
+    "controller": null,
+    "registrierungen": [
+      {
+        "active": "activated",
+        "installing": false,
+        "scope": "https://elw.local:8443/",
+        "waiting": false
+      }
+    ],
+    "unterstuetzt": true
+  },
+  "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+  "url": "https://elw.local:8443/login",
+  "webauthn": {
+    "capabilities": {
+      "conditionalCreate": true,
+      "conditionalGet": true,
+      "extension:appid": true,
+      "extension:appidExclude": true,
+      "extension:cmtgKey": false,
+      "extension:credBlob": true,
+      "extension:credProps": true,
+      "extension:credentialProtectionPolicy": true,
+      "extension:crossDeviceFallbackUrl": false,
+      "extension:enforceCredentialProtectionPolicy": true,
+      "extension:getCredBlob": true,
+      "extension:hmacCreateSecret": true,
+      "extension:largeBlob": true,
+      "extension:minPinLength": true,
+      "extension:payment": true,
+      "extension:prf": true,
+      "hybridTransport": false,
+      "immediateGet": true,
+      "passkeyPlatformAuthenticator": false,
+      "relatedOrigins": true,
+      "signalAllAcceptedCredentials": true,
+      "signalCurrentUserDetails": true,
+      "signalUnknownCredential": true,
+      "userVerifyingPlatformAuthenticator": false
+    },
+    "conditional": true,
+    "credentials": true,
+    "publicKeyCredential": true,
+    "uvpa": false
+  },
+  "webgl": "webgl2",
+  "zeit": "2026-09-29T06:48:23.325Z"
+}

@@ -1,0 +1,19 @@
+Ereignistypen: ['etb']
+takt  1 A-unsichtbar             Latenz_ms=-14
+takt  2 A-unsichtbar             Latenz_ms=-12
+takt  3 A-unsichtbar             Latenz_ms=116606
+takt  4 B-minimiert              Latenz_ms=15297
+takt  5 B-minimiert              Latenz_ms=-16
+takt  6 B-minimiert              Latenz_ms=-12
+takt  7 B-minimiert              Latenz_ms=30084
+takt  8 B-minimiert              Latenz_ms=-3
+takt  9 ende                     Latenz_ms=-38
+takt 10 ende                     Latenz_ms=-76
+16:32:30 B-minimiert sse-fehler  0
+16:32:37 B-minimiert sse-offen  
+16:34:08 B-minimiert sse-fehler  0
+16:34:11 B-minimiert sse-offen  
+ticks None n= 1 min/median/max 15002 15002 15002
+ticks A-unsichtbar n= 1 min/median/max 23211 23211 23211
+ticks B-minimiert n= 6 min/median/max 15195 15738 162076
+ticks ende n= 6 min/median/max 15970 16022 16975
