@@ -69,8 +69,12 @@ abgelehnt wurde. Das Ergebnis der Prüfung MUST ohne manuelles Neuladen wirken:
 - **THEN** bleibt die Anmeldeseite stehen, und eine Anmeldung als anderer Benutzer ist möglich
 
 #### Scenario: Anstoß während einer laufenden Prüfung
-- **WHEN** ein Tab gerade prüft und währenddessen ein weiterer Wechsel gemeldet wird
-- **THEN** prüft der Tab nach dem laufenden Lauf genau einmal erneut
+- **WHEN** ein Tab gerade prüft oder erstmals lädt und währenddessen ein weiterer Wechsel gemeldet wird
+- **THEN** prüft der Tab danach genau einmal erneut
+
+#### Scenario: Veraltete Antwort nach eigenem Login
+- **WHEN** eine Prüfung vor einem Login im selben Tab angefragt wurde und ihre Antwort danach eintrifft
+- **THEN** verwirft der Tab diese Antwort, statt den frischen Login zurückzurollen oder einen Konflikt zu melden
 
 #### Scenario: Offline bleibt der Tab stehen
 - **WHEN** Tab 1 zeigt A, ist offline und erhält eine Wechselmeldung
@@ -80,11 +84,14 @@ abgelehnt wurde. Das Ergebnis der Prüfung MUST ohne manuelles Neuladen wirken:
 Erkennt ein Tab, dass die Sitzung einem anderen Benutzer gehört als dem angezeigten, SHALL er
 einen blockierenden Dialog zeigen, der beide Benutzer mit Anzeigenamen nennt und erklärt, dass
 aus diesem Tab nichts mehr unter dem bisherigen Benutzer gespeichert wird. Der Dialog MUST
-genau eine Primäraktion „Als <neuer Benutzer> weiterarbeiten“ tragen; sie übernimmt den neuen
-Benutzer, verwirft die zwischengespeicherten Daten des bisherigen Benutzers und führt zur
-Startseite. Der Dialog MUST sich nicht per Escape, Kreuz oder Maske schließen lassen. Solange
-er steht, MUST jede Schreibanfrage des Tabs weiter die Kennung des bisherigen Benutzers tragen.
-Eine Ablehnung mit 412 MUST NOT zur Abmeldung führen.
+genau eine Primäraktion „Als <neuer Benutzer> weiterarbeiten“ tragen; sie lädt die Startseite
+neu, sodass der Tab den neuen Benutzer vom Server lädt und nichts aus dem Zustand des
+bisherigen Benutzers übrig bleibt. Der Dialog MUST sich nicht per Escape, Kreuz oder Maske
+schließen lassen. Solange er steht, und bis zum Neuladen, MUST jede Schreibanfrage des Tabs
+weiter die Kennung des bisherigen Benutzers tragen — auch ein Entwurf, den die Seite beim
+Verlassen noch speichern will. Eine Ablehnung mit 412 MUST NOT zur Abmeldung führen. Der
+Offline-Abgleich MUST während des Konflikts ruhen; vorgemerkte Einträge bleiben dem
+bisherigen Benutzer, und der Dialog MUST das sagen.
 
 #### Scenario: Konflikt nach schnellem Wechsel
 - **WHEN** Tab 1 zeigt A und in Tab 2 meldet sich B an, ohne dass A sich vorher abmeldet
@@ -96,7 +103,11 @@ Eine Ablehnung mit 412 MUST NOT zur Abmeldung führen.
 
 #### Scenario: Weiterarbeiten als neuer Benutzer
 - **WHEN** im Konfliktdialog „Als B weiterarbeiten“ gewählt wird
-- **THEN** zeigt Tab 1 die Startseite als B, ohne Daten, die unter A geladen wurden
+- **THEN** lädt Tab 1 die Startseite neu und zeigt sie als B, ohne Daten, die unter A geladen wurden
+
+#### Scenario: Offener Entwurf beim Weiterarbeiten
+- **WHEN** in Tab 1 ein ungesicherter Entwurf von A offen ist und „Als B weiterarbeiten“ gewählt wird
+- **THEN** wird der Entwurf nicht unter B gespeichert
 
 #### Scenario: 412 meldet nicht ab
 - **WHEN** eine Schreibanfrage von Tab 1 mit 412 abgelehnt wird

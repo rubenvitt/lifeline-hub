@@ -85,7 +85,10 @@ zusammengefasst (ein `useRef<Promise>`) — mit genau einem Nachlauf, wenn währ
 weiterer Anstoß kam: der Lauf kann eine Antwort von vor dem gemeldeten Wechsel bekommen haben. 401 → `abmeldenLokal()` + `meldeSitzungAbgelaufen()`
 (bestehende Wache leitet mit Rückkehr-URL um). Netzfehler → nichts. Der Konflikt steht als
 `konflikt: { bisher, jetzt } | null` im Context; `erwarteterBenutzer` bleibt auf `bisher`.
-`weiterAls()` übernimmt `jetzt`, räumt `konflikt`.
+*Nachtrag Umsetzung (Review):* Ein Generationszähler in `uebernimm` markiert jeden
+Benutzerwechsel; Erstladen und Prüfung verwerfen eine `/me`-Antwort, die vor einem Wechsel
+angefragt wurde, und prüfen nach. Anstöße während des Erstladens werden vorgemerkt und danach
+nachgeholt. Ein `weiterAls()` im Context gibt es nicht (s. D8).
 
 **D7 — Logout-Pfade.**
 - `logout()` (Knopf): Server-Logout mit Kopf. 412 → nicht lokal abmelden, `pruefe()` zeigt den
@@ -102,11 +105,16 @@ dieser Weg erzeugt den Konflikt in den übrigen Tabs. `BenutzerMenu` navigiert n
 `logout()` `true` liefert.
 
 **D8 — Konfliktdialog im Sitzungs-Layout.** `auth/BenutzerKonfliktDialog.tsx` neben
-`useSitzungsWache` (dort sind `QueryClient`, Router und `AntApp` verfügbar). antd `Modal` mit
-`closable={false}`, `keyboard={false}`, `maskClosable={false}`, eigener Fuß mit genau einem
-Primärknopf. „Als B weiterarbeiten“: `queryClient.clear()`, `weiterAls()`,
-`navigate('/', { replace: true })` (Startseite = Einsatzliste). Kein Erfassungsformular, daher
-nicht `Erfassung.tsx`.
+`useSitzungsWache`. antd `Modal` mit `closable={false}`, `keyboard={false}`,
+`mask={{ closable: false }}`, eigener Fuß mit genau einem Primärknopf. „Als B weiterarbeiten“
+lädt `/einsaetze` NEU (`auth/seiteNeuLaden.ts`), statt den Benutzer im laufenden Baum
+umzustellen. *Nachtrag Umsetzung (Review):* Beim Umstellen im Baum bliebe die Seite von A
+montiert; ihr Navigationsschutz hielte den Seitenwechsel an, und Autosave oder „Speichern und
+weiter“ schrieben ihren Entwurf mit der Kennung von B — der Server nähme ihn an. Beim Neuladen
+trägt alles, was die alte Seite noch absenden will, die Kennung von A und scheitert mit 412.
+Der Offline-Abgleich ruht während des Konflikts (`abgleichFuer` in `offline/useOfflineSync.ts`),
+sonst liefe er alle 30 s gegen 412 und stieße jedes Mal eine Prüfung an; der Dialog sagt, dass
+vorgemerkte Einträge bei A bleiben. Kein Erfassungsformular, daher nicht `Erfassung.tsx`.
 
 **D9 — Tests.**
 - Rust `tests/sitzung_benutzerwechsel.rs`: Paare je Extractor-Familie (Einsatzmodul-Schreibroute
@@ -136,7 +144,12 @@ nicht `Erfassung.tsx`.
 - [Prüfung bei jedem Sichtbarwerden kostet einen `me()`-Aufruf] → billig (ein indizierter
   SELECT); zusammengefasst, wenn schon eine läuft.
 - [Konfliktdialog verwirft ungesicherte Eingaben] → bewusst; der Dialog sagt es. Schreiben
-  unter A ist ohnehin unmöglich, solange B die Sitzung hält.
+  unter A ist ohnehin unmöglich, solange B die Sitzung hält. Hat die Seite von A ungesicherte
+  Änderungen, fragt der Browser beim Neuladen nach (`beforeunload`); bleibt die Person, steht
+  der Dialog weiter.
+- [Behaltene Erfassungswerte in `sessionStorage` (`components/erfassungsSitzung.ts`) tragen
+  keinen Benutzer im Schlüssel] → überleben das Neuladen und belegen B's Masken mit A's Werten
+  vor. Vorbestand, nicht Teil dieses Changes; Nachzug LFH-785.
 
 ## Migration Plan
 

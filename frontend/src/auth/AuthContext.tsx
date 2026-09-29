@@ -28,7 +28,7 @@ export type LoginErgebnis = { status: 'ok' } | { status: 'mfa_erforderlich' };
 /** Die Sitzung gehört einem anderen Benutzer als dem, den dieser Tab zeigt (LFH-387): in einem
  *  anderen Tab hat sich `jetzt` angemeldet. Der Tab bleibt bei `bisher` — seine
  *  Schreibanfragen tragen weiter dessen Kennung und scheitern am Server mit 412 —, bis die
- *  Person per {@link AuthWert.weiterAls} übernimmt. */
+ *  Person im `BenutzerKonfliktDialog` die Seite neu lädt. */
 export interface BenutzerKonflikt {
   bisher: BenutzerAnzeige;
   jetzt: BenutzerAnzeige;
@@ -47,10 +47,11 @@ interface AuthWert {
    *  Sitzungsablauf: die Sitzung ist ohnehin tot, und ein Server-Logout träfe in der Lücke
    *  „401 → Logout“ eine inzwischen in einem anderen Tab neu angelegte Sitzung. */
   abmeldenLokal: () => void;
-  /** Steht, solange die Sitzung einem anderen Benutzer gehört (LFH-387). */
+  /** Steht, solange die Sitzung einem anderen Benutzer gehört (LFH-387). Aufgelöst wird er
+   *  NICHT im laufenden Baum, sondern durch Neuladen (`BenutzerKonfliktDialog`): eine noch
+   *  montierte Seite des bisherigen Benutzers könnte sonst dessen Entwurf unter dem neuen
+   *  speichern. */
   konflikt: BenutzerKonflikt | null;
-  /** Löst den {@link konflikt}: übernimmt den neuen Benutzer. Den Cache räumt der Aufrufer. */
-  weiterAls: () => void;
   /** Lädt `/api/auth/me` neu und übernimmt den Benutzer in den Context — für Login-Wege,
    *  die (anders als `login()`) die Session ohne einen Aufruf von `authApi.login`
    *  etablieren, z.B. den WebAuthn-Passkey-Login (LFH-275) oder den zweiten Schritt des
@@ -71,39 +72,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const laedtRef = useRef(true);
   const laufendePruefung = useRef<Promise<void> | null>(null);
   const nachlaufNoetig = useRef(false);
+  /** Zählt jeden Wechsel des Benutzers. Eine `/me`-Antwort, die VOR einem Wechsel angefragt
+   *  wurde (Erstladen oder Prüfung, parallel zu Login/`aktualisiere`), ist veraltet und wird
+   *  verworfen — statt einen frischen Login zurückzurollen oder einen Schein-Konflikt zu melden. */
+  const generation = useRef(0);
 
   /** Einziger Weg, den Benutzer zu setzen: hält den erwarteten Benutzer der Schreibanfragen
    *  (`api/client.ts`) synchron mit dem Zustand — ein Effekt ließe ein Render-Fenster offen,
    *  in dem der Tab schon B zeigt, aber noch als A schreibt (oder umgekehrt). */
   const uebernimm = useCallback((b: BenutzerAnzeige | null) => {
+    generation.current++;
     benutzerRef.current = b;
     setzeErwartetenBenutzer(b?.id ?? null);
     setBenutzer(b);
   }, []);
-
-  useEffect(() => {
-    let aktiv = true;
-    authApi
-      .me()
-      .then((b) => {
-        if (aktiv) uebernimm(b);
-      })
-      .catch((e) => {
-        if (!aktiv) return;
-        // 401 = nicht angemeldet (erwartet); andere Fehler ebenfalls als „anonym" behandeln
-        if (!(e instanceof ApiError)) console.error('Auth-Prüfung fehlgeschlagen', e);
-        uebernimm(null);
-      })
-      .finally(() => {
-        if (!aktiv) return;
-        laedtRef.current = false;
-        setLaedt(false);
-      });
-    return () => {
-      aktiv = false;
-      setzeErwartetenBenutzer(null);
-    };
-  }, [uebernimm]);
 
   const abmeldenLokal = useCallback(() => {
     const warAngemeldet = benutzerRef.current !== null;
@@ -117,20 +99,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Prüft, wem die Sitzung gehört (LFH-387). Die Wahrheit ist `GET /api/auth/me`; Anstöße
    *  (Kanal, 412, Sichtbarkeit) tragen keine Daten. Anstöße während eines Laufs lösen genau
    *  EINEN Nachlauf aus — zusammengefasst, aber nicht verschluckt: der Lauf kann eine Antwort
-   *  von vor dem Wechsel bekommen haben, den der spätere Anstoß meldet. Vor dem Erstladen wird
-   *  nicht geprüft — das Erstladen IST die Prüfung. */
+   *  von vor dem Wechsel bekommen haben, den der spätere Anstoß meldet. Während des Erstladens
+   *  wird nur vorgemerkt: der Anstoß kann einen Wechsel melden, den das laufende Erstladen noch
+   *  nicht sieht. */
   const pruefe = useCallback(
     function pruefeSelbst(): Promise<void> {
-      if (laedtRef.current) return Promise.resolve();
-      if (laufendePruefung.current) {
+      if (laedtRef.current || laufendePruefung.current) {
         nachlaufNoetig.current = true;
-        return laufendePruefung.current;
+        return laufendePruefung.current ?? Promise.resolve();
       }
       const lauf = (async () => {
+        const angefragtIn = generation.current;
+        const veraltet = () => {
+          if (generation.current === angefragtIn) return false;
+          nachlaufNoetig.current = true;
+          return true;
+        };
         let aufServer: BenutzerAnzeige;
         try {
           aufServer = await authApi.me();
         } catch (e) {
+          if (veraltet()) return;
           // Keine gültige Sitzung: lokal abmelden, die Sitzungswache leitet mit Rückkehrziel zur
           // Anmeldung. Server nicht erreichbar (offline) oder sonstiger Fehler: nichts ändern.
           if (e instanceof ApiError && e.status === 401 && benutzerRef.current) {
@@ -139,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           return;
         }
+        if (veraltet()) return;
         const lokal = benutzerRef.current;
         if (!lokal) {
           // In einem anderen Tab angemeldet, dieser Tab war anonym: übernehmen.
@@ -159,6 +149,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [abmeldenLokal, uebernimm],
   );
+
+  useEffect(() => {
+    let aktiv = true;
+    const angefragtIn = generation.current;
+    // Nur übernehmen, wenn in der Zwischenzeit nichts anderes den Benutzer gesetzt hat — die
+    // Anmeldeseite ist während des Erstladens bedienbar, ein Login kann schneller sein.
+    const aktuell = () => aktiv && generation.current === angefragtIn;
+    authApi
+      .me()
+      .then((b) => {
+        if (aktuell()) uebernimm(b);
+      })
+      .catch((e) => {
+        if (!aktuell()) return;
+        // 401 = nicht angemeldet (erwartet); andere Fehler ebenfalls als „anonym" behandeln
+        if (!(e instanceof ApiError)) console.error('Auth-Prüfung fehlgeschlagen', e);
+        uebernimm(null);
+      })
+      .finally(() => {
+        if (!aktiv) return;
+        laedtRef.current = false;
+        setLaedt(false);
+        if (nachlaufNoetig.current) {
+          nachlaufNoetig.current = false;
+          void pruefe();
+        }
+      });
+    return () => {
+      aktiv = false;
+      setzeErwartetenBenutzer(null);
+    };
+  }, [pruefe, uebernimm]);
 
   useEffect(() => {
     const anstossen = () => void pruefe();
@@ -227,16 +249,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     meldeAuthWechsel({ art: 'angemeldet' });
   }, [uebernimm]);
 
-  const weiterAls = useCallback(() => {
-    if (!konflikt) return;
-    uebernimm(konflikt.jetzt);
-    setKonflikt(null);
-    sitzungsMeldungZuruecksetzen();
-  }, [konflikt, uebernimm]);
-
   const wert = useMemo<AuthWert>(
-    () => ({ benutzer, laedt, login, logout, aktualisiere, abmeldenLokal, konflikt, weiterAls }),
-    [benutzer, laedt, login, logout, aktualisiere, abmeldenLokal, konflikt, weiterAls],
+    () => ({ benutzer, laedt, login, logout, aktualisiere, abmeldenLokal, konflikt }),
+    [benutzer, laedt, login, logout, aktualisiere, abmeldenLokal, konflikt],
   );
 
   return <AuthContext.Provider value={wert}>{children}</AuthContext.Provider>;

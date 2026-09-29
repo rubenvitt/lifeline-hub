@@ -72,28 +72,40 @@ afterEach(() => {
 let ergebnisLogout: boolean | undefined;
 
 function Sonde() {
-  const { benutzer, laedt, konflikt, login, logout, weiterAls } = useAuth();
-  if (laedt) return <div>lädt…</div>;
+  const { benutzer, laedt, konflikt, login, logout } = useAuth();
+  // Die Knöpfe stehen auch während des Erstladens: die Anmeldeseite ist dann bedienbar.
   return (
     <div>
+      <span data-testid="laedt">{laedt ? 'lädt' : 'fertig'}</span>
       <span data-testid="name">{benutzer ? benutzer.anzeigename : 'anonym'}</span>
       <span data-testid="konflikt">
         {konflikt ? `${konflikt.bisher.anzeigename}→${konflikt.jetzt.anzeigename}` : '—'}
       </span>
       <button onClick={() => void login('anna', 'pw')}>login</button>
       <button onClick={() => void logout().then((ab) => (ergebnisLogout = ab))}>logout</button>
-      <button onClick={weiterAls}>weiter</button>
     </div>
   );
 }
 
-async function starte(erwartet = 'Anna Admin') {
+function rendere() {
   render(
     <AuthProvider>
       <Sonde />
     </AuthProvider>,
   );
-  await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent(erwartet));
+}
+
+async function starte(erwartet = 'Anna Admin') {
+  rendere();
+  await waitFor(() => expect(screen.getByTestId('laedt')).toHaveTextContent('fertig'));
+  expect(screen.getByTestId('name')).toHaveTextContent(erwartet);
+}
+
+/** Eine `/me`-Antwort, die erst auf Freigabe herausgeht. */
+function gehaltenesMe() {
+  let freigeben: () => void = () => {};
+  const gesperrt = new Promise<void>((r) => (freigeben = r));
+  return { gesperrt, freigeben: () => freigeben() };
 }
 
 const pruefenAnstossen = () => act(() => void window.dispatchEvent(new Event(BENUTZER_PRUEFEN)));
@@ -145,17 +157,6 @@ describe('AuthProvider prüft den Benutzer (LFH-387)', () => {
     expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin');
     // Solange der Konflikt steht, schreibt der Tab weiter als Anna — der Server lehnt ab.
     expect(await kopfBeimSchreiben()).toBe('1');
-  });
-
-  it('„weiter als“ übernimmt den neuen Benutzer und löst den Konflikt', async () => {
-    await starte();
-    sitzung = bruno;
-    pruefenAnstossen();
-    await waitFor(() => expect(screen.getByTestId('konflikt')).not.toHaveTextContent('—'));
-    await userEvent.click(screen.getByText('weiter'));
-    expect(screen.getByTestId('name')).toHaveTextContent('Bruno Beispiel');
-    expect(screen.getByTestId('konflikt')).toHaveTextContent('—');
-    expect(await kopfBeimSchreiben()).toBe('2');
   });
 
   it('Konflikt löst sich, wenn die Sitzung wieder dem bisherigen Benutzer gehört', async () => {
@@ -285,6 +286,92 @@ describe('Zwei Tabs, schneller Wechsel (LFH-387)', () => {
       expect(screen.getByTestId('konflikt')).toHaveTextContent('Anna Admin→Bruno Beispiel'),
     );
     expect(meAufrufe).toBe(vorher + 2);
+  });
+});
+
+describe('Veraltete /me-Antworten überschreiben keinen neueren Wechsel (LFH-387)', () => {
+  it('ein spätes 401 des Erstladens rollt einen zwischenzeitlichen Login nicht zurück', async () => {
+    sitzung = null;
+    const halt = gehaltenesMe();
+    server.use(
+      http.get('/api/auth/me', async () => {
+        meAufrufe++;
+        if (meAufrufe === 1) {
+          await halt.gesperrt;
+          return HttpResponse.json({ error: 'x' }, { status: 401 });
+        }
+        return HttpResponse.json(sitzung as typeof anna);
+      }),
+    );
+    rendere();
+    await waitFor(() => expect(meAufrufe).toBe(1));
+    await userEvent.click(screen.getByText('login'));
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin'));
+    halt.freigeben();
+    await waitFor(() => expect(screen.getByTestId('laedt')).toHaveTextContent('fertig'));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin');
+    expect(await kopfBeimSchreiben()).toBe('1');
+  });
+
+  it('eine Prüfung, die vor einem Login gestartet ist, meldet danach nicht ab', async () => {
+    sitzung = null;
+    await starte('anonym');
+    const halt = gehaltenesMe();
+    let gehalten = true;
+    server.use(
+      http.get('/api/auth/me', async () => {
+        meAufrufe++;
+        if (gehalten) {
+          gehalten = false;
+          await halt.gesperrt;
+          return HttpResponse.json({ error: 'x' }, { status: 401 });
+        }
+        return HttpResponse.json(sitzung as typeof anna);
+      }),
+    );
+    const ablauf = vi.fn();
+    window.addEventListener(SITZUNG_ABGELAUFEN, ablauf);
+    try {
+      const vorher = meAufrufe;
+      pruefenAnstossen();
+      await waitFor(() => expect(meAufrufe).toBe(vorher + 1));
+      await userEvent.click(screen.getByText('login'));
+      await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin'));
+      halt.freigeben();
+      // Die veraltete Antwort wird verworfen und genau einmal nachgeprüft.
+      await waitFor(() => expect(meAufrufe).toBe(vorher + 2));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin');
+      expect(screen.getByTestId('konflikt')).toHaveTextContent('—');
+      expect(ablauf).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(SITZUNG_ABGELAUFEN, ablauf);
+    }
+  });
+
+  it('ein Anstoß während des Erstladens wird danach nachgeholt', async () => {
+    const halt = gehaltenesMe();
+    server.use(
+      http.get('/api/auth/me', async () => {
+        meAufrufe++;
+        if (meAufrufe === 1) {
+          await halt.gesperrt;
+          return HttpResponse.json(anna);
+        }
+        return HttpResponse.json(sitzung as typeof anna);
+      }),
+    );
+    rendere();
+    await waitFor(() => expect(meAufrufe).toBe(1));
+    // Während das Erstladen noch Anna liefert, meldet sich in einem anderen Tab Bruno an.
+    sitzung = bruno;
+    pruefenAnstossen();
+    halt.freigeben();
+    await waitFor(() =>
+      expect(screen.getByTestId('konflikt')).toHaveTextContent('Anna Admin→Bruno Beispiel'),
+    );
+    expect(meAufrufe).toBe(2);
   });
 });
 

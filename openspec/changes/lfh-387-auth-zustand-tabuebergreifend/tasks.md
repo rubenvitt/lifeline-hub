@@ -32,6 +32,13 @@
 - [x] 5.2 CLAUDE.md: Absatz „Sitzung über mehrere Tabs (LFH-387)“ (Kopf + `CurrentUser`, Logout-412, Wache meldet nur lokal ab, Kanal ist Komfort, Server ist Wahrheit); verifizieren: Absatz verweist auf dieses `design.md`
 - [x] 5.3 Prüfliste Einsatztauglichkeit für den Konfliktdialog als `pruefliste.md`, jede Zeile mit Verdikt; verifizieren: keine Zeile „nicht geprüft“
 
-## 6. Integration
+## 6. Review-Befunde
 
-- [ ] 6.1 `./scripts/check-all.sh` vollständig; verifizieren: alle Schritte grün (Ausgabe ohne `| tail`)
+- [x] 6.1 Konflikt per Neuladen statt Umstellen im Baum (`auth/seiteNeuLaden.ts`, `weiterAls` entfällt), Offline-Abgleich ruht im Konflikt (`abgleichFuer`), Dialog nennt vorgemerkte Einträge; verifizieren: `BenutzerKonfliktDialog.test.tsx` (lädt neu, stellt die Kennung NICHT um), `useOfflineSync.test.tsx`
+- [x] 6.2 Generationszähler: veraltete `/me`-Antworten aus Erstladen/Prüfung verworfen, Anstoß während des Erstladens nachgeholt; verifizieren: drei Tests „Veraltete /me-Antworten …“ in `AuthContext.pruefen.test.tsx` (vorher rot)
+- [x] 6.3 Schreibwege-Guard schärfer (`new Request`, nicht-literale `fetch`-Optionen, `<Upload action>`, `<form method>`; Kommentare ignoriert); verifizieren: Gegenproben im Guard-Test
+- [x] 6.4 Testgüte: e2e (c) mit Gegenprobe „Tab 2 bleibt ohne Anstoß“, LoginPage-Abwesenheit erst nach gelaufener Prüfung, ein Provider je Test; Folgeticket LFH-785 für benutzerlose `sessionStorage`-Schlüssel
+
+## 7. Integration
+
+- [ ] 7.1 `./scripts/check-all.sh` vollständig; verifizieren: alle Schritte grün (Ausgabe ohne `| tail`)

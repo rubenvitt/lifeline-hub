@@ -14,7 +14,7 @@ Begründung). Aus Quelltext Geschlossenes trägt **[abgeleitet]**.
 | --- | --- | --- | --- |
 | 1 | Treffläche | erfüllt [abgeleitet] | Einziges Bedienziel ist ein antd-`Button` ohne `size`; seine Höhe kommt aus `controlHeight` des `ConfigProvider` (30/48/72 px), der Boden `minWidth` aus `antdKnopf()`. Kein handgebautes Bedienziel. |
 | 2 | Handschuh-Modus | erfüllt [abgeleitet] | Folgt der Dichte-Staffel über den Provider (72 px in `handschuh`); keine punktuelle Größe (`dichte.guard.test.ts` grün). |
-| 3 | Rückmeldung vor der Serverantwort | erfüllt | „Als … weiterarbeiten“ ist rein lokal (Cache räumen, Benutzer übernehmen, Navigation) — kein Serverruf, Wirkung sofort (`BenutzerKonfliktDialog.test.tsx`). |
+| 3 | Rückmeldung vor der Serverantwort | erfüllt | „Als … weiterarbeiten“ lädt die Startseite neu; der Browser zeigt den Ladevorgang sofort (`BenutzerKonfliktDialog.test.tsx`, e2e Fall a). |
 | 4 | Kritische Aktion mit zweiter Handlung | nicht anwendbar | Die Aktion verwirft nur den Anzeigezustand eines Tabs, der ohnehin nichts mehr speichern kann; nichts wird gelöscht oder abgeschlossen. Der Dialog selbst ist die zweite Handlung nach dem Wechsel in einem anderen Tab. |
 | 5 | Kontrast in beiden Modi | erfüllt [abgeleitet] | Standard-`Modal` und Primärknopf aus den Theme-Tokens (`theme/tokens.ts`), keine eigenen Farbwerte; die Modal-Flächen sind durch die bestehenden Kontrastmessungen der Rollen gedeckt. |
 | 6 | Kein Status allein über Farbe | erfüllt | Der Zustand steht als Titel „Anderer Benutzer angemeldet“ und als Satz mit beiden Anzeigenamen; keine Statusfarbe. |

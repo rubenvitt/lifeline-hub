@@ -1,8 +1,7 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setzeErwartetenBenutzer } from '../api/client';
 import type { BenutzerAnzeige } from '../api/types';
 import type { BenutzerKonflikt } from './AuthContext';
 import BenutzerKonfliktDialog from './BenutzerKonfliktDialog';
@@ -25,7 +24,12 @@ const bruno: BenutzerAnzeige = {
 };
 
 let konflikt: BenutzerKonflikt | null = null;
-const weiterAls = vi.fn();
+const { seiteNeuLaden } = vi.hoisted(() => ({ seiteNeuLaden: vi.fn() }));
+vi.mock('./seiteNeuLaden', () => ({ seiteNeuLaden }));
+vi.mock('../api/client', async (echt) => ({
+  ...(await echt<typeof import('../api/client')>()),
+  setzeErwartetenBenutzer: vi.fn(),
+}));
 
 vi.mock('./AuthContext', async (echt) => ({
   ...(await echt<typeof import('./AuthContext')>()),
@@ -37,30 +41,17 @@ vi.mock('./AuthContext', async (echt) => ({
     aktualisiere: vi.fn(),
     abmeldenLokal: vi.fn(),
     konflikt,
-    weiterAls,
   }),
 }));
 
 afterEach(() => {
   konflikt = null;
-  weiterAls.mockReset();
+  seiteNeuLaden.mockReset();
+  vi.mocked(setzeErwartetenBenutzer).mockReset();
 });
 
 function zeige() {
-  const client = new QueryClient();
-  const leeren = vi.spyOn(client, 'clear');
-  render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/einsaetze/7/etb?eintrag=3']}>
-        <Routes>
-          <Route path="/einsaetze" element={<div>Einsatzliste</div>} />
-          <Route path="*" element={<div>Einsatzseite</div>} />
-        </Routes>
-        <BenutzerKonfliktDialog />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-  return { leeren };
+  render(<BenutzerKonfliktDialog />);
 }
 
 describe('BenutzerKonfliktDialog (LFH-387)', () => {
@@ -90,20 +81,29 @@ describe('BenutzerKonfliktDialog (LFH-387)', () => {
     await new Promise((r) => setTimeout(r, 30));
     const nachEscape = screen.getByRole('dialog');
     expect(nachEscape.closest('.ant-zoom-leave')).toBeNull();
-    expect(weiterAls).not.toHaveBeenCalled();
+    expect(seiteNeuLaden).not.toHaveBeenCalled();
   });
 
-  it('„Als B weiterarbeiten“ räumt den Cache, übernimmt B und führt zur Startseite', async () => {
+  it('„Als B weiterarbeiten“ lädt die Startseite neu, ohne den Benutzer im laufenden Baum umzustellen', async () => {
+    // Umstellen im laufenden Baum hieße: die noch montierte Seite von A schriebe ihren
+    // Entwurf (Autosave, „Speichern und weiter“ im Navigationsschutz) mit der Kennung von B.
+    // Bleibt die Kennung bei A, scheitert jeder solche Rest am Server mit 412.
     konflikt = { bisher: anna, jetzt: bruno };
-    const { leeren } = zeige();
-    expect(screen.getByText('Einsatzseite')).toBeInTheDocument();
+    zeige();
     await userEvent.click(
       within(await screen.findByRole('dialog')).getByRole('button', {
         name: 'Als Bruno Beispiel weiterarbeiten',
       }),
     );
-    expect(leeren).toHaveBeenCalledTimes(1);
-    expect(weiterAls).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText('Einsatzliste')).toBeInTheDocument();
+    expect(seiteNeuLaden).toHaveBeenCalledExactlyOnceWith('/einsaetze');
+    expect(setzeErwartetenBenutzer).not.toHaveBeenCalled();
+  });
+
+  it('nennt vorgemerkte Offline-Einträge ehrlich', async () => {
+    konflikt = { bisher: anna, jetzt: bruno };
+    zeige();
+    expect(await screen.findByRole('dialog')).toHaveTextContent(
+      /Vorgemerkte Einträge bleiben für Anna Admin liegen/,
+    );
   });
 });

@@ -149,15 +149,19 @@ test('(c) Sitzungsablauf: Tab 1 führt zur Anmeldung mit Rückkehrziel, Tab 2 fo
   const tab2 = await ctx.newPage();
 
   await anmelden(tab1, ADMIN, ADMIN_PW);
-  const einsatzId = await einsatzAnlegen(ctx);
-  await tab2.goto(`/einsaetze/${einsatzId}/etb`);
-  await expect(tab2.getByPlaceholder('Inhalt …')).toBeVisible();
+  // Tab 2 auf einer Seite ohne Live-Strom und ohne eigene Abfragen im Hintergrund: seine
+  // Umleitung soll an der Meldung aus Tab 1 hängen, nicht an einer eigenen 401.
+  await tab2.goto('/profil');
+  await expect(tab2).toHaveURL(/\/profil$/);
   await tab1.goto('/einsaetze');
   await expect(tab1.getByRole('button', { name: 'Neuer Einsatz' })).toBeVisible();
 
   // Die Sitzung endet an der App vorbei (wie ein serverseitiger Ablauf).
   const aus = await ctx.request.post('/api/auth/logout');
   expect(aus.status()).toBe(204);
+  // Gegenprobe: ohne Anstoß aus Tab 1 bleibt Tab 2, wo es ist.
+  await tab2.waitForTimeout(500);
+  await expect(tab2).toHaveURL(/\/profil$/);
 
   // Tab 1 schreibt → 401 → Anmeldung mit Rückkehrziel.
   await tab1.getByRole('button', { name: 'Neuer Einsatz' }).click();

@@ -74,7 +74,7 @@ import ModulStub from './einsatz/ModulStub';
 import { modulRegistry } from './einsatz/modulRegistry';
 import { EINSTELLUNGEN_SEKTIONEN } from './routing/deeplinks';
 import LiveStatusBanner from './live/LiveStatusBanner';
-import { useOfflineSync } from './offline/useOfflineSync';
+import { abgleichFuer, useOfflineSync } from './offline/useOfflineSync';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider';
 
@@ -169,8 +169,8 @@ const EINSTELLUNGEN_ROUTEN = (
 /** Genau eine Betriebszeile für alle angemeldeten Routen. Die beiden vorhandenen
  *  Layout-Zweige (globale Topbar und Einsatz-Workspace) bleiben darunter Geschwister. */
 function BetriebsLayout() {
-  const { benutzer } = useAuth();
-  useOfflineSync(benutzer?.id);
+  const { benutzer, konflikt } = useAuth();
+  useOfflineSync(abgleichFuer(benutzer, konflikt !== null));
   return (
     <>
       <LiveStatusBanner benutzerId={benutzer?.id} />

@@ -71,6 +71,5 @@ export function authWertFixture(benutzer: BenutzerAnzeige | null): ReturnType<ty
     aktualisiere: vi.fn(),
     abmeldenLokal: vi.fn(),
     konflikt: null,
-    weiterAls: vi.fn(),
   };
 }

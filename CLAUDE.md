@@ -666,8 +666,11 @@ originweit, der Benutzer steht pro Tab — **der Server ist die Wahrheit, der Ka
   `false` und meldet nicht ab. Die Sitzungswache meldet nach 401 **nur lokal** ab
   (`abmeldenLokal`) — ein Server-Logout träfe eine inzwischen neue Sitzung.
 - Jede 412 stößt `lfh:benutzer-pruefen` an, der Provider prüft per `/me` (auch auf Kanalmeldung
-  `auth/authKanal.ts` und Sichtbarkeit); fremder Benutzer → `BenutzerKonfliktDialog` (eine
-  Aktion, nicht schließbar). Ein Kanalobjekt je Tab (kein Selbst-Echo).
+  `auth/authKanal.ts` und Sichtbarkeit; Generationszähler verwirft veraltete Antworten); fremder
+  Benutzer → `BenutzerKonfliktDialog` (eine Aktion, nicht schließbar). Ein Kanalobjekt je Tab
+  (kein Selbst-Echo). **Der Konflikt wird per Neuladen gelöst, nie im laufenden Baum** — sonst
+  speicherte eine noch montierte Seite von A ihren Entwurf mit der Kennung von B. Offline-Abgleich
+  ruht im Konflikt (`abgleichFuer`).
 
 ## Backend — Statuscode-Konvention (LFH-267/F22)
 

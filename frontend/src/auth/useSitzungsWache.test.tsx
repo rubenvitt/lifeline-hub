@@ -17,7 +17,6 @@ vi.mock('./AuthContext', async (echt) => ({
     aktualisiere: vi.fn(),
     abmeldenLokal,
     konflikt: null,
-    weiterAls: vi.fn(),
   }),
 }));
 
