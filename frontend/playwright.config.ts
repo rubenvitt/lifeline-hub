@@ -128,10 +128,10 @@ export default defineConfig({
    * Der Deckel hilft nicht gegen FREMDE Last (LFH-398): arbeitet die Maschine nebenher, liefert
    * die Suite keine belastbare Aussage. Dann kippt bis zur Hälfte der Tests in Timeouts,
    * wandernd, bei vervielfachter Laufzeit. Das Fehlerbild führt in die Irre: der Seiten-Snapshot
-   * zeigt nur den Knopf der Query-Devtools, die Vite-Konsole scheiternde Auth-Prüfungen. Das
-   * sieht nach einem Render- oder Auth-Defekt aus, ist aber Last. Gegenprobe: die rote Datei
-   * allein fahren und die Lastmittel ansehen. Keine längere Frist — ein Test, der nur mit
-   * mehr Geduld grün wird, misst die Maschine.
+   * zeigt nur den Knopf der Query-Devtools, weil die App ihre ersten Abrufe (Sitzung, Einsatz)
+   * nicht rechtzeitig bekam. Das sieht nach einem Render- oder Auth-Defekt aus, ist aber Last.
+   * Gegenprobe: die rote Datei allein fahren und den Load Average ansehen. Keine längere Frist —
+   * ein Test, der nur mit mehr Geduld grün wird, misst die Maschine.
    */
   workers: Number(process.env.PW_WORKERS ?? 3),
   /*
