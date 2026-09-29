@@ -80,10 +80,8 @@ pub async fn anlegen(
     laden(pool, org_id, id).await
 }
 
-/// Teil-Patch der editierbaren Felder (LFH-306, Tri-State): die äußere `Option` sagt
-/// „im Patch enthalten?" — `None` lässt die Spalte unverändert. Bei den nullable Spalten
-/// `meldeweg`/`veranlassung` trägt der Wert selbst noch eine `Option`: `Some(None)` setzt
-/// sie auf NULL.
+/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“; bei `meldeweg`/`veranlassung` setzt
+/// `Some(None)` NULL.
 #[derive(Debug, Default)]
 pub struct BausteinPatch<'a> {
     pub label: Option<&'a str>,
@@ -94,15 +92,13 @@ pub struct BausteinPatch<'a> {
     pub sortier: Option<i64>,
 }
 
-/// Teil-Patch der editierbaren Felder (org-scoped), setzt `aktualisiert_at`.
-/// `NotFound` bei fremder/unbekannter id, `Conflict` bei Label-Dublette.
+/// Teil-Patch der editierbaren Felder (org-scoped), setzt `aktualisiert_at`. `NotFound` bei
+/// fremder/unbekannter id, `Conflict` bei Label-Dublette.
 ///
-/// Flag/Wert-Paare statt COALESCE (LFH-266/F12, Vorlage `personal/status_repo.rs`): erst so
-/// lassen sich `meldeweg`/`veranlassung` über die API wieder auf NULL setzen, und ein nicht
-/// gesendetes Feld fasst seine Spalte nicht an. Die Parameter sind nummeriert, weil eine um
-/// eine Position verschobene Bind-Kette gleichtypige Nachbarspalten (`label`↔`typ`↔`inhalt`,
-/// `meldeweg`↔`veranlassung`) STILL vertauschen würde — abgesichert von
-/// `patche_setzt_jede_spalte_an_ihren_platz` in `tests/etb_baustein.rs`.
+/// Flag/Wert-Paare statt COALESCE: so lassen sich `meldeweg`/`veranlassung` wieder auf NULL
+/// setzen, und ein nicht gesendetes Feld bleibt stehen. Nummerierte Parameter, damit eine
+/// verschobene Bind-Kette gleichtypige Nachbarn nicht still vertauscht
+/// (`patche_setzt_jede_spalte_an_ihren_platz` in `tests/etb_baustein.rs`).
 pub async fn patche(
     pool: &SqlitePool,
     org_id: i64,

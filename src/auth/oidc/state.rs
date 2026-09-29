@@ -1,41 +1,26 @@
-//! Kurzlebiger, prozessweiter State-Store für den OIDC-Authorization-Code-Flow
-//! (LFH-41, Increment 3): hält `csrf`/`nonce`/`pkce_verifier`/Ziel-Pfad zwischen
-//! `GET /api/auth/oidc/start` (Speichern) und `GET /api/auth/oidc/callback`
-//! (Entnehmen) vor.
+//! Kurzlebiger, prozessweiter State-Store für den OIDC-Authorization-Code-Flow: hält
+//! csrf/nonce/pkce_verifier/Ziel-Pfad zwischen `/api/auth/oidc/start` und `/callback`.
 //!
-//! Bewusst als plain `String`s statt `openidconnect`-Typen (`Nonce`,
-//! `PkceCodeVerifier`, …) — entkoppelt dieses Modul von der `openidconnect`-Crate
-//! und hält es ohne Netz/Discovery testbar. Der Callback-Handler (Task 6)
-//! rekonstruiert `Nonce::new(s)` / `PkceCodeVerifier::new(s)` aus den Strings.
+//! Plain `String`s statt `openidconnect`-Typen, damit das Modul ohne Netz testbar bleibt.
 //!
-//! **MUST — !Send-Disziplin** (Global Constraint des Plans
-//! `2026-07-14-auth-provider-increment-3-oidc-sso.md`): `entnehme` lockt den
-//! std-`Mutex`, `remove`t den Eintrag und gibt den `MutexGuard` SOFORT frei —
-//! die Funktion endet, BEVOR der Aufrufer irgendein `.await` ausführt. Dieses
-//! Modul selbst enthält daher kein einziges `.await`. Ein std-`Mutex`-Guard, der
-//! über ein `.await` gehalten wird, macht den umschließenden axum-Handler
-//! `!Send` — und current-thread-Tests fangen das nicht ab (Memory:
-//! mutex-guard-await-send-axum).
+//! **!Send-Disziplin:** `entnehme` gibt den std-`MutexGuard` frei, bevor der Aufrufer irgendein
+//! `.await` ausführt; dieses Modul enthält kein `.await`. Ein Guard über `.await` machte den
+//! axum-Handler `!Send`, und current-thread-Tests fangen das nicht ab.
 
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
-/// Lebensdauer eines State-Eintrags. Nach Ablauf liefert `entnehme` `None`,
-/// selbst wenn der Eintrag noch physisch in der Map steht (aufgeräumt wird er
-/// beim nächsten `entnehme`-Versuch für genau diesen Key).
+/// Lebensdauer eines State-Eintrags. Abgelaufene Einträge liefert `entnehme` nicht mehr, auch
+/// wenn sie noch in der Map stehen.
 const TTL: Duration = Duration::from_secs(10 * 60);
 
-/// Prozessweiter State-Store. Bewusst KEIN `AppState`-Feld (siehe Plan)
-/// — der Flow ist kurzlebig und pro-Prozess, kein Persistenzbedarf.
+/// Prozessweiter State-Store; kurzlebig, ohne Persistenzbedarf.
 static STORE: LazyLock<Mutex<HashMap<String, (StateEintrag, Instant)>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// Ein an einen state-Key gebundener Satz aus csrf-Flow-Daten: `nonce` und
-/// `pkce_verifier` werden gegen die IdP-Antwort im Callback geprüft,
-/// `ziel_pfad` ist die Seite, auf die nach erfolgreichem Login weitergeleitet
-/// wird. Der `csrf`-Wert selbst ist der Map-Key (`state_key`) — er steckt
-/// nicht redundant im Eintrag.
+/// Die an einen state-Key gebundenen Flow-Daten: `nonce` und `pkce_verifier` werden im Callback
+/// geprüft, `ziel_pfad` ist das Weiterleitungsziel. Der csrf-Wert selbst ist der Map-Key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StateEintrag {
     pub nonce: String,
@@ -43,30 +28,19 @@ pub struct StateEintrag {
     pub ziel_pfad: String,
 }
 
-/// Speichert `eintrag` unter `state_key` mit einer Ablaufzeit von `TTL` ab
-/// jetzt. Ein evtl. vorhandener Eintrag unter demselben Key wird überschrieben.
-///
-/// Räumt vor dem Einfügen opportunistisch alle bereits abgelaufenen Einträge
-/// auf — verhindert unbegrenztes Wachstum der Map durch abgebrochene
-/// (`/oidc/start` ohne folgenden `/callback`) oder gespammte Start-Flows.
+/// Speichert `eintrag` unter `state_key` mit Ablauf `TTL`; ein vorhandener Eintrag wird
+/// überschrieben. Räumt vorher abgelaufene Einträge weg, damit abgebrochene oder gespammte
+/// Start-Flows die Map nicht unbegrenzt wachsen lassen.
 pub fn speichere(state_key: String, eintrag: StateEintrag) {
     let jetzt = Instant::now();
     let ablauf = jetzt + TTL;
     let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
-    // Opportunistisch abgelaufene Einträge aufräumen — verhindert unbegrenztes
-    // Wachstum durch nie abgeholte (abgebrochene/gespammte) /oidc/start-Flows.
     store.retain(|_, (_, entry_ablauf)| *entry_ablauf > jetzt);
     store.insert(state_key, (eintrag, ablauf));
 }
 
-/// Entnimmt den Eintrag zu `state_key` — **einmalig**: der Eintrag wird beim
-/// Zugriff aus der Map entfernt, ein zweiter `entnehme`-Aufruf mit demselben Key
-/// liefert daher `None`. Liefert ebenso `None`, wenn der Key unbekannt ist oder
-/// der Eintrag bereits abgelaufen ist.
-///
-/// Lockt den Store, `remove`t den Eintrag und gibt den `MutexGuard` frei, bevor
-/// die Funktion zurückkehrt — der Aufrufer darf danach beliebig `.await`en,
-/// ohne dass ein Guard über die Await-Grenze hinweg gehalten wird.
+/// Entnimmt den Eintrag zu `state_key` **einmalig**; ein zweiter Aufruf liefert `None`, ebenso
+/// ein unbekannter oder abgelaufener Key. Der Guard ist bei der Rückkehr freigegeben.
 pub fn entnehme(state_key: &str) -> Option<StateEintrag> {
     let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
     let (eintrag, ablauf) = store.remove(state_key)?;
@@ -78,10 +52,8 @@ pub fn entnehme(state_key: &str) -> Option<StateEintrag> {
     Some(eintrag)
 }
 
-/// Test-only: fügt einen Eintrag mit einer explizit vorgegebenen Ablaufzeit
-/// ein — erlaubt es, einen bereits abgelaufenen Eintrag zu konstruieren, ohne
-/// in echten Tests 10 Minuten warten zu müssen. Nicht außerhalb von Tests
-/// exponiert.
+/// Test-only: Eintrag mit vorgegebener Ablaufzeit, um einen abgelaufenen Eintrag ohne Warten zu
+/// erzeugen.
 #[cfg(test)]
 fn speichere_mit_ablauf(state_key: String, eintrag: StateEintrag, ablauf: Instant) {
     let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
@@ -132,11 +104,9 @@ mod tests {
     #[test]
     fn abgelaufener_eintrag_liefert_none() {
         let key = "state-abgelaufen".to_string();
-        // Bewusst kein `Instant::now() - Duration::from_secs(...)`: `Instant`s
-        // `Sub` panickt bei Unterlauf, was auf einem Host mit <1h Monotonic-
-        // Uptime zuschlagen kann. `entnehme` prüft `jetzt >= ablauf` — ein
-        // `ablauf` von "jetzt" liest sich einen Moment später bereits als
-        // abgelaufen, ganz ohne Subtraktion.
+        // Kein `Instant::now() - …`: das panickt bei Unterlauf auf Hosts mit kurzer Uptime. Ein
+        // Ablauf
+        // von „jetzt“ ist einen Moment später bereits abgelaufen.
         let ablauf_in_der_vergangenheit = Instant::now();
         speichere_mit_ablauf(key.clone(), eintrag("/ziel"), ablauf_in_der_vergangenheit);
 

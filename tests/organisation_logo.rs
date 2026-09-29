@@ -1,5 +1,5 @@
-//! Logo der Organisation (LFH-22, design.md D8): `POST|GET|DELETE /api/organisation/logo`
-//! und das Feld `logo` an `GET /api/organisation`.
+//! Logo der Organisation (LFH-22): `POST|GET|DELETE /api/organisation/logo` und das Feld
+//! `logo` an `GET /api/organisation`.
 //!
 //! Der fail-closed-Pfad des Virenscans (503) steht in `tests/organisation_logo_scan.rs`:
 //! `init_scan_config` setzt eine prozessweite OnceLock und kippte hier jeden Upload auf 503.
@@ -134,7 +134,7 @@ async fn org(app: &axum::Router, cookie: &str) -> Value {
 }
 
 /// Presence per `contains_key`: `json["logo"] == Value::Null` wäre auch bei `"logo": null`
-/// grün und unterschiede „fehlt" nicht von „null" (CLAUDE.md, Typ-Codegen).
+/// grün und unterschiede „fehlt" nicht von „null".
 fn hat_logo(org: &Value) -> bool {
     org.as_object().unwrap().contains_key("logo")
 }
@@ -268,8 +268,8 @@ async fn genau_1_mib_angenommen_ein_byte_mehr_ist_400() {
 }
 
 /// Eine Datei deutlich über dem Body-Limit der Route (1 MiB + 64 KiB) ist ebenfalls 400,
-/// nicht 413: die Spec verlangt für „über 1 MiB" 400, und der realistische Fall ist ein
-/// großes Foto direkt an die API — die Vorprüfung im Client schützt nur die Oberfläche.
+/// nicht 413: „über 1 MiB" ist 400, und der realistische Fall ist ein großes Foto direkt an
+/// die API — die Vorprüfung im Client schützt nur die Oberfläche.
 #[tokio::test]
 async fn zwei_mib_ueber_dem_body_limit_ist_400_und_das_logo_bleibt() {
     let app = setup().await;
@@ -446,7 +446,7 @@ async fn patch_antwort_traegt_das_logo_mit() {
     assert_eq!(json["logo"]["mime"], "image/png");
 }
 
-// --- Trennung der Organisationen (3.4) -------------------------------------------------
+// --- Trennung der Organisationen -------------------------------------------------------
 
 /// Legt Org B mit einer Leserin und einem Admin an. Der Admin ist serverweit `admin`
 /// (`system_rolle`), gehört aber zu B — genau der Fall, an dem sich zeigt, dass die Route

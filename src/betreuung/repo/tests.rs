@@ -219,9 +219,9 @@ async fn stelle_stornieren(w: &Welt, id: i64) -> Result<Geschrieben, AppError> {
     })
 }
 
-/// Setzt den Anlagezeitpunkt einer Stelle. Angelegt wird zur echten Uhrzeit, die Stichtage der
-/// Kopfzahl-Tests liegen aber fest am 23.09.2026 — ohne diesen Griff stünde jede Stelle NACH
-/// dem Stichtag und fiele aus der Kopfzahl (LFH-679).
+/// Setzt den Anlagezeitpunkt einer Stelle. Die Stichtage der Kopfzahl-Tests liegen fest am
+/// 23.09.2026; mit der echten Uhrzeit stünde jede Stelle NACH dem Stichtag und fiele aus der
+/// Kopfzahl.
 async fn angelegt_um(w: &Welt, id: i64, t: &str) {
     sqlx::query("UPDATE betreuungsstelle SET angelegt_at = ? WHERE id = ?")
         .bind(t)
@@ -853,9 +853,8 @@ async fn gleicher_zeitpunkt_ist_keine_nachtragung() {
     assert!(!e.2.contains("nachgetragen"), "{}", e.2);
 }
 
-/// Der Fall aus dem Review: 212 um 12:00, 480 um 14:00, 300 für 13:00 nachgetragen und
-/// wieder zurückgenommen. Der Stand ist durchgehend 480; kein Eintrag darf eine Änderung
-/// unterstellen.
+/// 212 um 12:00, 480 um 14:00, 300 für 13:00 nachgetragen und wieder zurückgenommen: der Stand
+/// ist durchgehend 480, kein Eintrag darf eine Änderung unterstellen.
 #[tokio::test]
 async fn nachtrag_und_ruecknahme_des_nachtrags_nennen_den_bleibenden_stand() {
     let w = welt().await;
@@ -1738,7 +1737,7 @@ async fn kopfzahl_ohne_meldungen_summiert_nichts() {
     assert_eq!(k.stellen[0].belegt, None);
 }
 
-// ── LFH-679: „ohne Meldung“ nur für Stellen, die zum Stichtag betrieben sein konnten ────────
+// ── „ohne Meldung“ nur für Stellen, die zum Stichtag betrieben sein konnten ────────────────
 
 /// (Bezeichnung, belegt) je ausgewiesener Stelle.
 fn je_stelle(k: &BelegungKopfzahl) -> Vec<(&str, Option<i64>)> {
@@ -1959,8 +1958,8 @@ async fn einsatz_loeschen_kaskadiert_sauber() {
     }
 }
 
-/// D4 (Controller-Entscheid): An einer geschlossenen Stelle ist eine Rücknahme 422 — sonst
-/// stünde die Stelle nach Rücknahme der Leermeldung „geschlossen und belegt“ da.
+/// An einer geschlossenen Stelle ist eine Rücknahme 422 — sonst stünde die Stelle nach
+/// Rücknahme der Leermeldung „geschlossen und belegt“ da.
 #[tokio::test]
 async fn ruecknahme_an_geschlossener_stelle_ist_422_und_aendert_nichts() {
     let w = welt().await;
@@ -2303,9 +2302,8 @@ async fn belegung_schluessel_einer_anderen_stelle_ist_422() {
     assert_eq!(aktuelle_belegung(&w, b).await, None);
 }
 
-/// Der Beleg aus dem Ticket: weil jede Meldung eine ABSOLUTE Zahl trägt, ist weder eine
-/// verspätet gesendete ältere Meldung noch ihr Replay gefährlich. Die ältere wird Nachtrag,
-/// ihr Replay ist wirkungslos — ein Delta hätte an beiden Stellen doppelt gezählt.
+/// Jede Meldung trägt eine ABSOLUTE Zahl: eine verspätet gesendete ältere Meldung wird Nachtrag,
+/// ihr Replay ist wirkungslos. Ein Delta hätte an beiden Stellen doppelt gezählt.
 #[tokio::test]
 async fn verspaetete_offline_meldung_und_ihr_replay_lassen_den_stand_stehen() {
     let w = welt().await;

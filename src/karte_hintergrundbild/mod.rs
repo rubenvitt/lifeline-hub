@@ -40,8 +40,7 @@ pub fn pruefe_groesse(len: usize) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Erkennt den MIME-Typ an den Magic-Bytes (robuster als Dateiendung).
-/// Erlaubt nur PNG und JPEG.
+/// Erkennt den MIME-Typ an den Magic-Bytes (robuster als die Endung); nur PNG und JPEG.
 pub fn erkenne_bild_mime(daten: &[u8]) -> Result<&'static str, AppError> {
     const PNG: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
     const JPEG: &[u8] = &[0xFF, 0xD8, 0xFF];

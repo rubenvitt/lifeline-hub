@@ -20,12 +20,10 @@ const SELECT_SICHTUNG: &str = "\
     SELECT id, einsatz_id, person_id, kategorie, notiz, gesichtet_at, gesichtet_von \
     FROM person_sichtung";
 
-/// Erfasst eine Sichtung append-only und aktualisiert den Cache — beides sowie der
-/// optionale `erfasst→betroffen`-Hub laufen auf der übergebenen offenen
-/// Connection/Transaktion (F06/LFH-244, Tier-A: der Aufrufer bündelt das mit dem
-/// System-ETB-Eintrag in EINE `write_retry!`-Tx). `kategorie` muss bereits validiert
-/// sein (Handler). Bei `hebe_auf_betroffen` wird die Person vorab `erfasst→betroffen`
-/// gehoben (Annahme 5). Liefert die frische Anzeige via In-Tx-Reload.
+/// Erfasst eine Sichtung append-only und aktualisiert den Cache, samt optionalem Heben
+/// `erfasst→betroffen`, auf der offenen Verbindung des Aufrufers (der bündelt es mit dem
+/// System-ETB in EINE `write_retry!`-Transaktion). `kategorie` ist bereits validiert. Liefert
+/// die frische Anzeige.
 pub async fn erfassen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -73,9 +71,8 @@ pub async fn erfassen_tx(
     laden_tx(conn, einsatz_id, id).await
 }
 
-/// Pool-Wrapper: erfasst eine Sichtung in EINER eigenen Transaktion (bündelt den
-/// optionalen Status-Hub, den INSERT und die Cache-Aktualisierung atomar) und lädt die
-/// Anzeige. Delegiert an [`erfassen_tx`].
+/// Pool-Wrapper: erfasst eine Sichtung in EINER eigenen Transaktion (Status-Hub, INSERT und
+/// Cache atomar) und lädt die Anzeige.
 pub async fn erfassen(
     pool: &SqlitePool,
     einsatz_id: i64,

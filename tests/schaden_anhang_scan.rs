@@ -1,12 +1,12 @@
 //! Dediziertes Test-Binary (LFH-21): die Schaden-Ablage läuft durch den AV-Scan, BEVOR
-//! irgendetwas gespeichert wird — Spec „Scanner nicht erreichbar“: 503, weder Datei noch
+//! irgendetwas gespeichert wird — Scanner nicht erreichbar: 503, weder Datei noch
 //! Verknüpfung noch ETB-Eintrag.
 //!
 //! Eigenes Binary, weil `init_scan_config` eine prozessglobale OnceLock setzt: fail-closed
 //! gegen einen unerreichbaren clamd kippte sonst jeden Upload der übrigen Suite auf 503
 //! (Muster `tests/karte_hintergrundbild_scan.rs`). Läuft in BEIDEN Builds: Default (clamav
-//! an) → echter Verbindungsversuch gegen `127.0.0.1:1` (ECONNREFUSED); `--no-default-features`
-//! → Stub, gleiches Ergebnis.
+//! an) → echter Verbindungsversuch gegen `127.0.0.1:1` (ECONNREFUSED);
+//! `--no-default-features` → Stub, gleiches Ergebnis.
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};

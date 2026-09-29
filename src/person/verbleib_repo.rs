@@ -41,12 +41,10 @@ const SELECT_VERBLEIB: &str = "\
            zeitpunkt_at, erfasst_von, betreuungsstelle_id \
     FROM person_verbleib";
 
-/// Erfasst ein Verbleib-Ereignis append-only und aktualisiert den Verbleib-Cache an der
-/// Person in DERSELBEN Transaktion: die Kurzform `aktueller_verbleib` (vom Handler berechnet)
-/// und — seit LFH-613 — Art, Ziel und Status als eigene Spalten, seit LFH-674 auch den Verweis
-/// auf die Betreuungsstelle. Der neue Eintrag ist per
-/// Definition der jüngste (`zeitpunkt_at` = jetzt, höchste id), der Cache spiegelt also
-/// genau das Ereignis, das `liste_je_person` zuoberst liefert.
+/// Erfasst ein Verbleib-Ereignis append-only und aktualisiert in DERSELBEN Transaktion den
+/// Verbleib-Cache an der Person: die Kurzform `aktueller_verbleib` (vom Handler berechnet), Art,
+/// Ziel, Status und den Verweis auf die Betreuungsstelle. Der neue Eintrag ist per Definition
+/// der jüngste, der Cache spiegelt also genau das, was `liste_je_person` zuoberst liefert.
 pub async fn erfassen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -182,8 +180,8 @@ mod tests {
         .unwrap()
     }
 
-    /// LFH-674: Der Verweis auf die Betreuungsstelle geht ins Ereignis UND in den Cache der
-    /// Person; ein späterer Verbleib ohne Verweis leert den Cache, der Verlauf behält ihn.
+    /// Der Verweis auf die Betreuungsstelle geht ins Ereignis UND in den Cache; ein späterer
+    /// Verbleib ohne Verweis leert den Cache, der Verlauf behält ihn.
     #[tokio::test]
     async fn erfassen_pflegt_verweis_auf_betreuungsstelle() {
         let pool = test_pool().await;
@@ -231,7 +229,7 @@ mod tests {
         );
     }
 
-    /// Ohne Verweis fehlt das Feld in der Anzeige (Norm LFH-265), statt `null` zu tragen.
+    /// Ohne Verweis fehlt das Feld in der Anzeige, statt `null` zu tragen.
     #[tokio::test]
     async fn anzeige_ohne_verweis_laesst_feld_weg() {
         let pool = test_pool().await;
@@ -275,8 +273,8 @@ mod tests {
         assert_eq!(cache.as_deref(), Some("Transport → KH Mitte"));
     }
 
-    /// LFH-613: Art, Ziel und Status gehen als eigene Cache-Spalten mit — und ein späteres
-    /// Ereignis ohne Ziel/Status leert sie, statt den Vorwert stehen zu lassen.
+    /// Art, Ziel und Status gehen als eigene Cache-Spalten mit, und ein späteres Ereignis ohne
+    /// Ziel/Status leert sie.
     #[tokio::test]
     async fn erfassen_pflegt_art_ziel_und_status_im_cache() {
         let pool = test_pool().await;

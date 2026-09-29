@@ -1,12 +1,11 @@
-//! Serverseitiger Tile-Cache (LFH-190) vor `proxy::hole_asset` für binäre Assets
-//! (Tiles/Sprite/Glyphs). Liegt in einer **separaten** SQLite-Datei (`<karten_dir>/tile-cache.db`)
-//! mit eigenem Pool — damit hochfrequente Tile-Writes im Einsatz NICHT gegen operative Writes
-//! (Lagebericht/Meldung/ETB) um den Single-Writer der Haupt-DB konkurrieren.
+//! Serverseitiger Tile-Cache (LFH-190) vor `proxy::hole_asset` für Tiles/Sprite/Glyphs. Liegt
+//! in einer **separaten** SQLite-Datei (`<karten_dir>/tile-cache.db`) mit eigenem Pool, damit
+//! hochfrequente Tile-Writes nicht mit operativen Writes um den Single-Writer der Haupt-DB
+//! konkurrieren.
 //!
-//! Respektiert die Upstream-Caching-Header (`Cache-Control`/`ETag`), revalidiert bedingt
-//! (`If-None-Match` → 304), serviert bei Upstream-Ausfall den (Stale-)Cache weiter
-//! (Resilienz, passt zur Offline-DNA) und evictet per LRU unter einem Größen-Cap. Cache-Fehler
-//! sind NIE fatal: Lesen → Miss, Schreiben → ignoriert.
+//! Respektiert `Cache-Control`/`ETag`, revalidiert bedingt (`If-None-Match` → 304), serviert
+//! bei Upstream-Ausfall den Stale-Cache weiter und evictet per LRU unter einem Größen-Cap.
+//! Cache-Fehler sind NIE fatal: Lesen → Miss, Schreiben → ignoriert.
 
 use crate::karte::proxy::{self, AssetAntwort, ProxyFehler, Revalidiert};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
@@ -16,16 +15,15 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
-/// Cache-Obergrenze (Summe der Bytes). Keine eigene CLI-Option (Konvention LFH-179: sinnvoller
-/// Default statt Flag-Wildwuchs).
+/// Cache-Obergrenze in Bytes (feste Vorgabe, keine CLI-Option).
 pub const TILE_CACHE_CAP_BYTES: i64 = 256 * 1024 * 1024;
 
-/// Eviction läuft nur jede N-te Schreiboperation (O(n)-SUM nicht pro Miss; Überschuss ≤ N×Tile).
+/// Eviction nur jede N-te Schreiboperation (die SUM ist O(n)); Überschuss ≤ N × Tile.
 const EVICT_INTERVALL: u64 = 16;
 static EVICT_ZAEHLER: AtomicU64 = AtomicU64::new(0);
 
-/// `letzter_zugriff` wird bei einem Hit nur fortgeschrieben, wenn er älter als diese Schwelle ist
-/// — sonst würde jeder *Lese*-Zugriff zu einem Write (heiße Tiles ≤ 1 Write/Stunde).
+/// `letzter_zugriff` wird bei einem Hit nur fortgeschrieben, wenn er älter als diese Schwelle
+/// ist — sonst würde jeder Lesezugriff zum Write.
 const BERUEHR_SCHWELLE_SEK: i64 = 3600;
 
 // ===== Cacheability =====
@@ -70,7 +68,7 @@ pub fn cache_plan(cache_control: Option<&str>) -> CachePlan {
     }
 }
 
-/// Cache-Schlüssel: SHA256-Hex der finalen Upstream-URL (inkl. Key). Speichert KEINEN Klartext.
+/// Cache-Schlüssel: SHA256-Hex der finalen Upstream-URL (inkl. Key); kein Klartext.
 fn sha256_hex(s: &str) -> String {
     use sha2::{Digest, Sha256};
     let digest = Sha256::digest(s.as_bytes());
@@ -90,7 +88,7 @@ pub fn unix_now() -> i64 {
         .unwrap_or(0)
 }
 
-// ===== Pool (per-Pfad memoisiert — kein AppState-Feld, LFH-182-Lektion) =====
+// ===== Pool (per Pfad memoisiert, kein AppState-Feld) =====
 
 static POOLS: OnceLock<Mutex<HashMap<PathBuf, SqlitePool>>> = OnceLock::new();
 
@@ -118,9 +116,9 @@ async fn schema_anlegen(pool: &SqlitePool) -> sqlx::Result<()> {
     Ok(())
 }
 
-/// Liefert den (memoisierten) Cache-Pool für ein `karten_dir`. Erzeugt DB-Datei + Schema beim
-/// ersten Aufruf. Per-Pfad ⇒ Tests mit eigenem Temp-`karten_dir` sind isoliert. Hält den std-Mutex
-/// NIE über ein `await` (`!Send`, LFH-Memory) → Doppel-Check.
+/// Memoisierter Cache-Pool für ein `karten_dir`; legt DB-Datei und Schema beim ersten Aufruf
+/// an. Per Pfad, damit Tests mit eigenem Temp-Verzeichnis isoliert sind. Der std-Mutex wird nie
+/// über ein `await` gehalten (`!Send`), daher der Doppel-Check.
 pub async fn cache_pool(karten_dir: &Path) -> sqlx::Result<SqlitePool> {
     let pfad = karten_dir.join("tile-cache.db");
     {
@@ -271,8 +269,8 @@ async fn evict_throttled(pool: &SqlitePool, cap: i64) {
     }
 }
 
-/// Baut die Auslieferungs-Antwort aus einem Cache-Eintrag: `Cache-Control: public, max-age=<Rest>`
-/// (≥0), ETag durchgereicht → Browser cacht weiter korrekt.
+/// Auslieferungs-Antwort aus einem Cache-Eintrag: `Cache-Control: public, max-age=<Rest>` und
+/// durchgereichtes ETag, damit der Browser korrekt weitercacht.
 fn aus_cache(row: CacheRow, now: i64) -> AssetAntwort {
     let rest = (row.expires_at - now).max(0);
     AssetAntwort {
@@ -328,7 +326,7 @@ pub async fn hole_asset_cached(
                     speichere_falls_cachebar(cache_pool, &schluessel, &a, now).await;
                     return Ok(a);
                 }
-                // Upstream-Ausfall → Stale-on-error (Resilienz, Offline-DNA).
+                // Upstream-Ausfall → Stale-on-error.
                 Err(_) => return Ok(aus_cache(row, now)),
             }
         }
@@ -347,11 +345,9 @@ pub async fn hole_asset_cached(
     Ok(a)
 }
 
-/// Cache-bewusster Asset-Abruf, der den Cache-Pool selbst beschafft. Schlägt die Beschaffung
-/// fehl (korrupte/nicht öffenbare `tile-cache.db`, volle Platte), wird auf einen Direkt-Fetch
-/// OHNE Cache degradiert — **Cache-Fehler sind NIE fatal** (Modulvertrag, s. o.): eine verwerfbare
-/// Cache-Datei darf zu „kein Caching" führen, nicht zu „keine Kacheln" (sonst stürbe der ganze
-/// Online-Proxy ab, obwohl der Direkt-Fetch funktioniert).
+/// Cache-bewusster Asset-Abruf, der den Pool selbst beschafft. Scheitert das (korrupte
+/// `tile-cache.db`, volle Platte), wird auf einen Direkt-Fetch ohne Cache degradiert: eine
+/// verwerfbare Cache-Datei darf zu „kein Caching“ führen, nicht zu „keine Kacheln“.
 pub async fn hole_asset_via_cache_oder_direkt(
     karten_dir: &Path,
     client: &reqwest::Client,
@@ -388,8 +384,8 @@ mod tests {
         pool
     }
 
-    /// Loopback-Upstream mit **Hit-Zähler** + `If-None-Match`→304-Unterstützung (keystone:
-    /// beweist, dass ein Cache-Hit den Upstream NICHT erneut trifft).
+    /// Loopback-Upstream mit Hit-Zähler und `If-None-Match`→304; belegt, dass ein Cache-Hit den
+    /// Upstream nicht erneut trifft.
     async fn spawn_zaehlend(
         cache_control: &'static str,
         etag: Option<&'static str>,
@@ -481,7 +477,7 @@ mod tests {
         assert_eq!(a1.bytes, b"TILE");
         assert_eq!(hits.load(Ordering::SeqCst), 1, "Miss → ein Upstream-Call");
 
-        // Innerhalb der TTL → Cache-Hit, KEIN zweiter Upstream-Call (keystone).
+        // Innerhalb der TTL → Cache-Hit ohne zweiten Upstream-Call.
         let a2 = hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1100)
             .await
             .unwrap();
@@ -588,9 +584,8 @@ mod tests {
 
     #[tokio::test]
     async fn pool_fehler_degradiert_auf_direkt_fetch() {
-        // `karten_dir` unter eine reguläre DATEI legen → cache_pool() kann dort keine
-        // tile-cache.db anlegen (Parent ist kein Verzeichnis → ENOTDIR) → Err. Erwartung: KEIN
-        // Fehler nach außen, sondern Direkt-Fetch (Cache-Fehler sind nie fatal, Modulvertrag).
+        // `karten_dir` unter einer regulären Datei → `cache_pool()` scheitert (ENOTDIR). Erwartet
+        // wird kein Fehler, sondern ein Direkt-Fetch.
         let client = reqwest::Client::new();
         let (u, hits) = spawn_zaehlend("public, max-age=300", None, b"DIRECT".to_vec()).await;
         let tmp = tempfile::tempdir().unwrap();

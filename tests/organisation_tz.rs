@@ -64,9 +64,8 @@ async fn patch_als_admin_setzt_org_default() {
 }
 
 /// `tz_organisation` wird gegen die ERLAUBTE_ORG-Allowlist geprüft — enum-artig, scheitert
-/// am Feld selbst → 400 (LFH-305). Bis dahin war diese Stelle ungetestet; die Datei hatte
-/// überhaupt keinen Fehlerfall außer 403. Der Positiv-Zweig belegt, dass der 400 aus der
-/// Allowlist kommt und nicht aus der Admin-Prüfung davor.
+/// am Feld selbst → 400 (LFH-305). Der Positiv-Zweig belegt, dass der 400 aus der Allowlist
+/// kommt und nicht aus der Admin-Prüfung davor.
 #[tokio::test]
 async fn patch_unbekannte_organisation_ist_400() {
     let app = setup().await;
@@ -115,7 +114,7 @@ async fn patch_als_nicht_admin_ist_403() {
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
 
-// --- Name der Organisation (LFH-22, design.md D7) -------------------------------------
+// --- Name der Organisation (LFH-22) ---------------------------------------------------
 
 /// Liest den aktuellen Namen über die Route (dieselbe Sicht wie das Frontend).
 async fn org_name(app: &axum::Router, cookie: &str) -> String {

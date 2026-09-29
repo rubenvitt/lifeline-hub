@@ -1,67 +1,38 @@
-//! Kurzlebiger, prozessweiter State-Store für den zweistufigen Passwort→TOTP-Login
-//! (LFH-43, Increment 5): hält die `benutzer_id` zwischen dem Passwort-Schritt
-//! (`POST /api/auth/login`, Passwort ok + `totp_aktiviert` → Speichern) und dem
-//! TOTP-Schritt (`POST /api/auth/totp/finish`, Entnehmen) vor.
+//! Kurzlebiger, prozessweiter State-Store für den zweistufigen Passwort→TOTP-Login (LFH-43):
+//! hält die `benutzer_id` zwischen `POST /api/auth/login` und `POST /api/auth/totp/finish`.
+//! Dasselbe Muster wie `oidc/state.rs`. Der Client bekommt nur einen hochentropischen Key im
+//! HttpOnly-Cookie `mfa_pending`, nie die `benutzer_id`.
 //!
-//! Analog zu `oidc/state.rs` (LFH-41) und `webauthn/state.rs` (LFH-275) — 1:1
-//! dasselbe Muster (TTL, Einmal-Nutzung, Guard-sync-only, Poison-safe-Lock,
-//! opportunistischer Sweep). Der Pending-Key ist der Träger des HttpOnly-Cookies
-//! `mfa_pending` (Task 5) — NICHT die `benutzer_id` selbst wird an den Client
-//! gegeben, nur ein high-entropy Token, der auf diesen Store zeigt.
+//! **Pending-State → Session:** `/auth/totp/finish` leitet die `benutzer_id` AUS diesem Store
+//! ab — nie aus client-gelieferten Anmeldedaten.
 //!
-//! **MUST — Pending-State→Session-Gating** (Global Constraint des Plans
-//! `2026-07-14-auth-provider-increment-5-mfa-totp.md`, „der Crux"): `/auth/totp/finish`
-//! leitet `benutzer_id` AUS diesem Store ab — NIE aus einem client-gelieferten
-//! Username/Passwort. Der Store ist die einzige Brücke zwischen dem Passwort-Schritt
-//! und der Session-Anlage für `totp_aktiviert`-Nutzer.
-//!
-//! **MUST — !Send-Disziplin** (Global Constraint „Guard-drop-vor-await"): `entnehme`
-//! lockt den std-`Mutex`, `remove`t den Eintrag und gibt den `MutexGuard` SOFORT
-//! frei — die Funktion endet, BEVOR der Aufrufer `session::anlegen().await` (Task 5)
-//! ausführt. Dieses Modul selbst enthält daher kein einziges `.await`. Ein
-//! std-`Mutex`-Guard, der über ein `.await` gehalten wird, macht den umschließenden
-//! axum-Handler `!Send` — und current-thread-Tests fangen das nicht ab (Memory:
-//! mutex-guard-await-send-axum).
+//! **!Send-Disziplin:** `entnehme` gibt den std-`MutexGuard` frei, bevor der Aufrufer
+//! `session::anlegen().await` ausführt; dieses Modul enthält kein `.await`.
 
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
-/// Lebensdauer eines Pending-MFA-Eintrags. Nach Ablauf liefert `entnehme` `None`,
-/// selbst wenn der Eintrag noch physisch in der Map steht (aufgeräumt wird er beim
-/// nächsten `entnehme`-Versuch für genau diesen Key bzw. opportunistisch beim
-/// nächsten `speichere`).
+/// Lebensdauer eines Pending-Eintrags. Abgelaufene Einträge liefert `entnehme` nicht mehr.
 const TTL: Duration = Duration::from_secs(5 * 60);
 
-/// Prozessweiter State-Store. Bewusst KEIN `AppState`-Feld (siehe Plan) — der
-/// Pending-MFA-Zustand ist kurzlebig und pro-Prozess, kein Persistenzbedarf.
+/// Prozessweiter State-Store; kurzlebig, ohne Persistenzbedarf.
 static STORE: LazyLock<Mutex<HashMap<String, (i64, Instant)>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// Speichert `benutzer_id` unter `key` mit einer Ablaufzeit von `TTL` ab jetzt. Ein
-/// evtl. vorhandener Eintrag unter demselben Key wird überschrieben.
-///
-/// Räumt vor dem Einfügen opportunistisch alle bereits abgelaufenen Einträge auf —
-/// verhindert unbegrenztes Wachstum der Map durch abgebrochene (Passwort ok, aber nie
-/// abgeschlossener TOTP-Schritt) oder gespammte Login-Versuche.
+/// Speichert `benutzer_id` unter `key` mit Ablauf `TTL`; ein vorhandener Eintrag wird
+/// überschrieben. Räumt vorher abgelaufene Einträge weg, damit abgebrochene oder gespammte
+/// Logins die Map nicht unbegrenzt wachsen lassen.
 pub fn speichere(key: String, benutzer_id: i64) {
     let jetzt = Instant::now();
     let ablauf = jetzt + TTL;
     let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
-    // Opportunistisch abgelaufene Einträge aufräumen — verhindert unbegrenztes
-    // Wachstum durch nie abgeholte (abgebrochene/gespammte) Passwort→TOTP-Flows.
     store.retain(|_, (_, entry_ablauf)| *entry_ablauf > jetzt);
     store.insert(key, (benutzer_id, ablauf));
 }
 
-/// Entnimmt die `benutzer_id` zu `key` — **einmalig**: der Eintrag wird beim Zugriff
-/// aus der Map entfernt, ein zweiter `entnehme`-Aufruf mit demselben Key liefert daher
-/// `None`. Liefert ebenso `None`, wenn der Key unbekannt ist oder der Eintrag bereits
-/// abgelaufen ist.
-///
-/// Lockt den Store, `remove`t den Eintrag und gibt den `MutexGuard` frei, bevor die
-/// Funktion zurückkehrt — der Aufrufer darf danach beliebig `.await`en, ohne dass ein
-/// Guard über die Await-Grenze hinweg gehalten wird.
+/// Entnimmt die `benutzer_id` zu `key` **einmalig**; ein zweiter Aufruf liefert `None`, ebenso
+/// ein unbekannter oder abgelaufener Key. Der Guard ist bei der Rückkehr freigegeben.
 pub fn entnehme(key: &str) -> Option<i64> {
     let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
     let (benutzer_id, ablauf) = store.remove(key)?;
@@ -73,9 +44,8 @@ pub fn entnehme(key: &str) -> Option<i64> {
     Some(benutzer_id)
 }
 
-/// Test-only: fügt einen Eintrag mit einer explizit vorgegebenen Ablaufzeit ein —
-/// erlaubt es, einen bereits abgelaufenen Eintrag zu konstruieren, ohne in echten
-/// Tests 5 Minuten warten zu müssen. Nicht außerhalb von Tests exponiert.
+/// Test-only: Eintrag mit vorgegebener Ablaufzeit, um einen abgelaufenen Eintrag ohne Warten zu
+/// erzeugen.
 #[cfg(test)]
 fn speichere_mit_ablauf(key: String, benutzer_id: i64, ablauf: Instant) {
     let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
@@ -117,11 +87,9 @@ mod tests {
     #[test]
     fn abgelaufener_eintrag_liefert_none() {
         let key = "mfa-abgelaufen".to_string();
-        // Bewusst kein `Instant::now() - Duration::from_secs(...)`: `Instant`s `Sub`
-        // panickt bei Unterlauf, was auf einem Host mit <1h Monotonic-Uptime
-        // zuschlagen kann. `entnehme` prüft `jetzt >= ablauf` — ein `ablauf` von
-        // "jetzt" liest sich einen Moment später bereits als abgelaufen, ganz ohne
-        // Subtraktion.
+        // Kein `Instant::now() - …`: das panickt bei Unterlauf auf Hosts mit kurzer Uptime. Ein
+        // Ablauf
+        // von „jetzt“ ist einen Moment später bereits abgelaufen.
         let ablauf_in_der_vergangenheit = Instant::now();
         speichere_mit_ablauf(key.clone(), 99, ablauf_in_der_vergangenheit);
 

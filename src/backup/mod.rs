@@ -12,19 +12,14 @@ fn escape_sql_string(pfad: &str) -> String {
     pfad.replace('\'', "''")
 }
 
-/// Erzeugt eine konsistente Sicherungskopie der Datenbank in `ziel`.
-///
-/// Nutzt `VACUUM INTO`, das im WAL-Modus auch während laufender Schreibzugriffe
-/// einen konsistenten Snapshot als einzelne Datei schreibt. `ziel` darf noch
-/// nicht existieren (sonst schlägt VACUUM INTO fehl) und muss server-kontrolliert
-/// sein — niemals ein direkt vom Client gelieferter Pfad.
-///
-/// Liefert die Größe der erzeugten Datei in Bytes.
+/// Erzeugt eine konsistente Sicherungskopie der Datenbank in `ziel` per `VACUUM INTO`, das im
+/// WAL-Modus auch während Schreibzugriffen einen konsistenten Snapshot schreibt. `ziel` darf
+/// noch nicht existieren und muss server-kontrolliert sein, nie ein Client-Pfad. Liefert die
+/// Größe in Bytes.
 ///
 /// # Warnung
-/// Liefert eine UN-gescrubbte Vollkopie inkl. der `session`-Tabelle (Bearer-Tokens).
-/// Für JEDEN nach außen gehenden Export `erzeuge_sicherung` nutzen — das scrubbt die
-/// Sessions. `pub(crate)`, damit kein neuer Export-Pfad diese Bereinigung umgeht.
+/// Liefert eine UN-gescrubbte Vollkopie inkl. `session` (Bearer-Tokens). Jeder Export nach
+/// außen nimmt `erzeuge_sicherung`; `pub(crate)`, damit kein neuer Export-Pfad das umgeht.
 pub(crate) async fn vacuum_into(pool: &SqlitePool, ziel: &Path) -> Result<u64, AppError> {
     let ziel_str = ziel
         .to_str()
@@ -40,12 +35,11 @@ pub(crate) async fn vacuum_into(pool: &SqlitePool, ziel: &Path) -> Result<u64, A
     Ok(groesse)
 }
 
-/// Leert die `session`-Tabelle in einer bereits geschriebenen Sicherungsdatei.
+/// Leert die `session`-Tabelle in einer geschriebenen Sicherungsdatei.
 ///
-/// Öffnet die Datei bewusst im `Delete`-Journal-Modus, NICHT im sqlx-Default WAL: ein
-/// `DELETE` im WAL-Modus landete in einem `<ziel>-wal`-Seitenfile, das ein späteres
-/// `std::fs::read` der Hauptdatei (Download/CLI-Ausgabe) nicht sähe — die Sessions wären
-/// weiterhin exportiert.
+/// Bewusst im `Delete`-Journal-Modus statt WAL: ein `DELETE` im WAL-Modus landete in
+/// `<ziel>-wal`, das ein späteres `std::fs::read` der Hauptdatei nicht sähe — die Sessions
+/// wären weiter exportiert.
 async fn scrub_sessions(ziel: &Path) -> Result<(), AppError> {
     use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
 
@@ -58,16 +52,13 @@ async fn scrub_sessions(ziel: &Path) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Erzeugt eine konsistente Sicherung wie [`vacuum_into`], entfernt aber die flüchtigen
-/// Session-Tokens aus der exportierten Kopie: ein geleaktes Backup soll keine verwertbaren
-/// Bearer-Secrets nach außen tragen (Defense-in-Depth; Sessions sind ohnehin re-loginbar).
-/// `passwort_hash`/`totp_secret` bleiben erhalten, damit die Sicherung restore-fähig ist.
-/// Liefert die Größe der bereinigten Datei in Bytes.
+/// Wie [`vacuum_into`], aber ohne Session-Tokens in der Kopie: ein geleaktes Backup trägt keine
+/// verwertbaren Bearer-Secrets. `passwort_hash`/`totp_secret` bleiben, damit die Sicherung
+/// restore-fähig ist. Liefert die Größe in Bytes.
 pub async fn erzeuge_sicherung(pool: &SqlitePool, ziel: &Path) -> Result<u64, AppError> {
     vacuum_into(pool, ziel).await?;
-    // Fail-closed: schlägt der Session-Scrub fehl, darf keine un-bereinigte Teildatei
-    // (noch mit session-Zeilen) am Zielpfad zurückbleiben. Der HTTP-Pfad räumt via tempdir
-    // ohnehin auf; der CLI-Pfad schreibt an einen User-Pfad und würde es sonst nicht.
+    // Fail-closed: scheitert der Scrub, darf keine un-bereinigte Datei am Zielpfad bleiben. Der
+    // HTTP-Pfad räumt über das Tempdir auf, der CLI-Pfad schreibt an einen Benutzer-Pfad.
     if let Err(e) = scrub_sessions(ziel).await {
         let _ = std::fs::remove_file(ziel);
         return Err(e);

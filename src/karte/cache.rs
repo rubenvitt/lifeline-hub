@@ -1,27 +1,22 @@
-//! Persistenter Cache (SQLite-Tabelle `fachebenen_cache`) mit TTL für Fachebenen-Antworten.
-//! Schlüssel: `quelle` bzw. `quelle:<raster-bbox>`. Überlebt Backend-Neustarts.
+//! Persistenter Cache (`fachebenen_cache`) mit TTL für Fachebenen-Antworten. Schlüssel:
+//! `quelle` bzw. `quelle:<raster-bbox>`.
 //!
-//! Cache-Fehler (DB-Lese-/Schreibfehler) sind NICHT fatal: Lesen → behandelt als Miss,
-//! Schreiben → geloggt UND gemeldet. Eine erfolgreiche externe Abfrage darf nie an einem
-//! Cache-Schreibfehler scheitern — wohl aber muss ein Aufrufer, dessen einziges Ergebnis
-//! der Eintrag IST, erfahren, dass er nicht steht (siehe `setze`).
+//! Cache-Fehler sind nicht fatal: Lesen → Miss, Schreiben → geloggt UND gemeldet. Eine
+//! erfolgreiche externe Abfrage scheitert nie am Cache; ein Aufrufer, dessen einziges Ergebnis
+//! der Eintrag ist, erfährt aber, dass er nicht steht (s. `setze`).
 
 use crate::karte::typen::FachebeneAntwort;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sqlx::SqlitePool;
 
-/// Maximalalter, ab dem Einträge beim Schreiben weggeräumt werden (Prune-on-Write).
-/// Bewusst über der längsten TTL (früher KRITIS mit 24 h; KRITIS liegt seit LFH-83 in einer
-/// eigenen Tabelle, siehe `karte::kritis::bestand`) → begrenzt die Tabelle dauerhaft,
-/// ohne gültiges Stale-Serving zu verlieren.
+/// Maximalalter für Prune-on-Write; über der längsten TTL, damit Stale-Serving erhalten bleibt.
+/// KRITIS liegt in einer eigenen Tabelle (`karte::kritis::bestand`).
 const MAX_ALTER_SEKUNDEN: i64 = 2 * 24 * 3600;
 
-/// Vom Prune ausgenommen: der ODL-Grundpegel (LFH-598). Er wird nur geschrieben, wenn die
-/// BfS-Zeitreihe brauchbar antwortet; jeder andere Schreibvorgang (der `odl`-Eintrag alle
-/// zehn Minuten) löste sonst das Prune aus. Nach zwei Tagen gestörter Zeitreihe wäre er
-/// weg — samt Sperrklinken-Gedächtnis —, obwohl die Spec verlangt, ihn weiterzuverwenden.
-/// Ein Eintrag, ~100 KB; er wächst nicht.
+/// Vom Prune ausgenommen: der ODL-Grundpegel. Er wird nur bei brauchbarer BfS-Zeitreihe
+/// geschrieben; nach zwei Tagen gestörter Zeitreihe wäre er sonst samt
+/// Sperrklinken-Gedächtnis weg, obwohl er weiterverwendet werden soll. Ein Eintrag, ~100 KB.
 const DAUERHAFT: &str = crate::karte::odl_grundpegel::CACHE_SCHLUESSEL;
 
 fn deserialisiere(json: &str) -> Option<FachebeneAntwort> {
@@ -85,25 +80,20 @@ pub async fn stale(pool: &SqlitePool, schluessel: &str) -> Option<FachebeneAntwo
     json.and_then(|j| deserialisiere(&j))
 }
 
-/// Eintrag speichern (Upsert) und dabei überalterte Einträge wegräumen.
+/// Eintrag speichern (Upsert) und überalterte Einträge wegräumen.
 ///
-/// Liefert `true`, wenn der Eintrag danach TATSÄCHLICH steht. Die meisten Ebenen dürfen das
-/// ignorieren: sie reichen ihre frische Antwort im selben Request ans Frontend weiter, ein
-/// misslungener Schreibvorgang kostet dort nur einen erneuten Abruf beim nächsten Poll.
-/// Für die Autobahn-Ebene ist es dagegen tragend — ihr Fächer hängt an keinem Request, sein
-/// EINZIGES Ergebnis ist dieser Eintrag (siehe `quellen::erneuere_autobahn`).
+/// Liefert `true`, wenn der Eintrag danach tatsächlich steht. Die meisten Ebenen dürfen das
+/// ignorieren, weil sie ihre Antwort im selben Request weiterreichen. Für die Autobahn-Ebene ist
+/// es tragend: ihr einziges Ergebnis ist dieser Eintrag (s. `quellen::erneuere_autobahn`). Ohne
+/// `#[must_use]`, weil die übrigen Aufrufer den Wert zu Recht ignorieren.
 ///
-/// Bewusst **ohne** `#[must_use]`: fünf der sechs Aufrufer ignorieren den Wert zu Recht, und
-/// ein Gate, das an fünf Stellen mit `let _ =` stummgeschaltet wird, sichert nichts zu.
-///
-/// Ein gescheitertes Prune zählt NICHT als Fehlschlag — der Eintrag steht dann bereits.
+/// Ein gescheitertes Prune zählt nicht als Fehlschlag.
 pub async fn setze(pool: &SqlitePool, schluessel: &str, antwort: &FachebeneAntwort) -> bool {
     setze_wert(pool, schluessel, antwort).await
 }
 
-/// Wie [`setze`], aber für jeden serialisierbaren Wert — die Tabelle hält ohnehin JSON-Text.
-/// Genutzt für Einträge, die kein Fachebenen-Umschlag sind (LFH-598: `odl:grundpegel`).
-/// Prune-on-Write gilt für sie genauso.
+/// Wie [`setze`], aber für jeden serialisierbaren Wert (z. B. `odl:grundpegel`). Prune-on-Write
+/// gilt genauso.
 pub async fn setze_wert<T: Serialize + ?Sized>(
     pool: &SqlitePool,
     schluessel: &str,
@@ -130,8 +120,7 @@ pub async fn setze_wert<T: Serialize + ?Sized>(
         tracing::warn!("Fachebenen-Cache: Schreibfehler: {e}");
         return false;
     }
-    // Prune-on-Write: überalterte Einträge entfernen (begrenzt die Tabelle dauerhaft).
-    // Ausgenommen sind die DAUERHAFTEN Schlüssel (s. dort).
+    // Prune-on-Write, ausgenommen die dauerhaften Schlüssel.
     if let Err(e) = sqlx::query(
         "DELETE FROM fachebenen_cache WHERE unixepoch() - gespeichert_at > ? \
          AND schluessel <> ?",
@@ -229,12 +218,8 @@ mod tests {
 
     #[tokio::test]
     async fn schreibfehler_wird_gemeldet_statt_nur_geloggt() {
-        // Ohne Tabelle scheitert das INSERT — der Stellvertreter für „SQLite busy /
-        // Platte voll / read-only". Der Rückgabewert ist die einzige Spur, an der ein
-        // Aufrufer das bemerken kann; nur geloggt sah ein misslungener Schreibvorgang für
-        // ihn wie ein geglückter aus. `erneuere_autobahn` hängt genau daran: dort ist der
-        // Eintrag das EINZIGE Ergebnis des Laufs, und ein stillschweigend verworfener
-        // Schreibvorgang liesse den Aufwärm-Takt alle 20 s einen neuen Fächer anstossen.
+        // Ohne Tabelle scheitert das INSERT — Stellvertreter für SQLite busy/Platte voll/read-only.
+        // Der Rückgabewert ist die einzige Spur für den Aufrufer (`erneuere_autobahn` hängt daran).
         let pool = crate::db::test_pool().await;
         sqlx::query("DROP TABLE fachebenen_cache")
             .execute(&pool)

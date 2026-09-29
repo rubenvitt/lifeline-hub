@@ -73,7 +73,7 @@ async fn anlegen_lehnt_leeren_titel_ab() {
         Some(r#"{"titel":"  ","faellig_at":"2026-06-11 10:00"}"#),
     )
     .await;
-    // Leerer Titel → AppError::Validation → 400 (Bestandskonvention, vgl. src/error.rs + tests/chat.rs).
+    // Leerer Titel → AppError::Validation → 400 (Konvention, vgl. src/error.rs + tests/chat.rs).
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
@@ -145,8 +145,8 @@ async fn erinnerung_bezug_unbekannter_typ_ist_400() {
 
 #[tokio::test]
 async fn erinnerung_bezug_gueltige_etb_ist_201() {
-    // Regression: der EtbPage-Frontend-Pfad postet bezug_typ='etb' + ETB-Eintrag-ID
-    // desselben Einsatzes — muss weiter grün bleiben.
+    // Der EtbPage-Frontend-Pfad postet bezug_typ='etb' + ETB-Eintrag-ID desselben Einsatzes —
+    // das muss durchgehen.
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
@@ -208,10 +208,10 @@ async fn erledigen_anderer_einsatz_ist_404() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
-/// Rücknahme von Erledigt/Quittiert (LFH-343 · C8, Befund H50).
+/// Rücknahme von Erledigt/Quittiert (LFH-343).
 ///
-/// Beide Knöpfe schalten seither mit EINEM Klick statt mit Rückfrage; der
-/// Rückgängig-Toast braucht dafür einen Weg, den der Server annimmt.
+/// Beide Knöpfe schalten mit EINEM Klick statt mit Rückfrage; der Rückgängig-Toast braucht
+/// dafür einen Weg, den der Server annimmt.
 #[tokio::test]
 async fn oeffnen_nimmt_erledigt_und_quittiert_zurueck() {
     let app = setup().await;

@@ -20,9 +20,9 @@ use std::fs;
 /// abgegrenzt.
 ///
 /// Bewusst NICHT über die Nadel `.route("<pfad>"` gesucht: `rustfmt` bricht längere Aufrufe
-/// um, sodass Pfad-Literal und `.route(` auf verschiedenen Zeilen stehen — von den acht
-/// Ausnahmen träfe eine solche Nadel nur die zwei kurzen. Stattdessen wird jeder Aufruf
-/// zerlegt und sein ERSTES String-Literal (das Pfad-Argument) verglichen.
+/// um, sodass Pfad-Literal und `.route(` auf verschiedenen Zeilen stehen — eine solche Nadel
+/// träfe nur die kurzen Aufrufe. Stattdessen wird jeder Aufruf zerlegt und sein ERSTES
+/// String-Literal (das Pfad-Argument) verglichen.
 ///
 /// Ein Pfad kann mehrfach registriert sein (getrennte `MethodRouter` auf demselben Pfad,
 /// z. B. Liste vs. Upload der Hintergrundbilder) — deshalb eine Liste, nicht ein Treffer.

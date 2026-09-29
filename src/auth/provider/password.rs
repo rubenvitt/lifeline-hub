@@ -1,104 +1,59 @@
-//! Passwort-Provider — extrahierte Login-Logik (verhaltensneutral aus routes/auth.rs).
+//! Passwort-Provider: Login-Logik mit gedrosselter Schlüsselableitung (LFH-270, LFH-310).
 //!
-//! ## Drosselung der Schlüsselableitung (LFH-270/G07)
+//! Argon2id kostet je Lauf ~19 MiB und ~50–100 ms; der Login ist damit der teuerste
+//! unauthentifizierte Endpoint. Deshalb:
 //!
-//! Argon2id ist bewusst teuer (OWASP-Defaults: ~19 MiB Speicher, t=2 je Lauf). Der Login ist
-//! damit der teuerste unauthentifizierte Endpoint des Systems — und war ungedrosselt. Zwei
-//! Eigenschaften machten das gefährlich:
-//!
-//! 1. Der KDF lief **synchron im async-Handler**: jeder Lauf belegte einen Tokio-Worker
-//!    vollständig. Bereits ~Kernzahl gleichzeitige Logins ließen alles andere verhungern —
-//!    auch Lesezugriffe, SSE und `/api/health`.
-//! 2. Der `None`-Arm brennt einen **vollen Wegwerf-Hash** als Timing-Angleich. Ein Angreifer
-//!    braucht also **keinen gültigen Benutzernamen**; jeder Fantasie-Login kostet vollen KDF.
-//!
-//! Beides wird hier adressiert: die KDF-Arbeit wandert per `spawn_blocking` vom Worker-Pool
-//! weg, und ein Semaphore deckelt die gleichzeitigen Läufe. **Das Semaphore ist der wirksame
-//! Teil** — `spawn_blocking` allein würde den DoS nur von CPU auf Speicher verschieben, weil
-//! der Blocking-Pool bis auf 512 Threads wächst (× ~19 MiB je laufendem Hash).
-//!
-//! Das Gate umschließt bewusst **alle** Arme des Matches, die beiden Wegwerf-Hashes
-//! eingeschlossen — andernfalls bliebe genau der Vektor aus Punkt 2 offen.
-//!
-//! ## Drei Arme, ein Argon2-Lauf (LFH-310)
-//!
-//! Die Angleichung der Antwortzeit greift nur, wenn sie **jeden** Weg trifft. Sie tat das
-//! lange nur für zwei: der Treffer-Arm verifiziert, der `None`-Arm brennt einen Wegwerf-Hash
-//! — ein SSO-only-Konto aber (Sentinel-`passwort_hash` aus LFH-41, bewusst kein PHC-String)
-//! scheiterte schon am Parsen und antwortete in ~0 ms statt nach ~50–100 ms. Damit waren
-//! genau die per SSO angebundenen Konten per Timing aufzählbar. Den Ausgleich trägt seither
-//! [`password::wegwerf_lauf`], gerufen aus dem Parse-Fehler-Zweig von
-//! [`password::verifizieren`] — also **innerhalb** der Closure und damit unter demselben
-//! KDF-Platz wie die beiden anderen Arme, ohne zusätzlichen Lauf je Anmeldeversuch.
-//!
-//! ## Warum der KDF-Platz IN der Blocking-Closure liegt
-//!
-//! Ein `spawn_blocking`-Task läuft weiter, wenn sein `JoinHandle` fällt — tokio bricht ihn
-//! nicht ab. Läge der Platz im await-baren Future (also außerhalb der Closure), gäbe ihn ein
-//! Client-Abbruch sofort frei, während der Argon2-Lauf im Blocking-Pool weiterrechnet. Das
-//! Gate zählte dann nur noch die *wartenden* Handler statt der *laufenden* Hashes: ein
-//! Angreifer, der jede Anfrage sofort trennt, könnte beliebig viele Läufe akkumulieren
-//! (gemessen: der Platz fiel nach 22 ms zurück, der Hash lief 3 s weiter). Der Platz wandert
-//! deshalb per `move` in die Closure — dort hängt seine Lebensdauer an der nicht
-//! abbrechbaren Arbeit.
-//!
-//! ## Warum es ZWEI Semaphore braucht
-//!
-//! Das KDF-Gate lässt Wartende zu (s. [`WARTEFRIST`]). Ein wartender Login belegt dabei
-//! einen der Plätze der Zulassungssteuerung ([`crate::zulassung`]) — genug gleichzeitige
-//! Fantasie-Logins hätten also den globalen Cap geleert und die **gesamte** API in den
-//! Lastabwurf geschickt, `/api/health` eingeschlossen. Der Andrangs-Deckel
-//! ([`MAX_ANDRANG`]) begrenzt deshalb vorgelagert und **ohne zu warten**, wie viele
-//! Anmeldungen überhaupt in die Warteschlange dürfen.
+//! - **Jeder Arm kostet genau einen Argon2-Lauf** — Treffer, unbekannter Name (Wegwerf-Hash)
+//!   und SSO-only-Sentinel (Wegwerf-Lauf in [`password::verifizieren`]). Sonst verrät die
+//!   Antwortzeit, ob und welche Art Konto existiert. Ein Angreifer braucht damit keinen gültigen
+//!   Namen, um vollen KDF auszulösen.
+//! - **Der KDF läuft per `spawn_blocking`**, sonst blockiert er einen Tokio-Worker.
+//! - **Ein Semaphore deckelt die gleichzeitigen Läufe** und umschließt alle Arme. Er ist der
+//!   wirksame Teil: `spawn_blocking` allein verschöbe den DoS nur auf Speicher (bis zu 512
+//!   Blocking-Threads × ~19 MiB).
+//! - **Der KDF-Platz liegt IN der Blocking-Closure.** Ein `spawn_blocking`-Task läuft weiter,
+//!   wenn sein `JoinHandle` fällt; läge der Platz im abbrechbaren Future, gäbe ein
+//!   Client-Abbruch ihn frei, während der Hash weiterrechnet.
+//! - **Ein zweiter, vorgelagerter Semaphore ([`MAX_ANDRANG`])** weist ohne Warten ab. Ein
+//!   wartender Login hält einen Platz der Zulassungssteuerung ([`crate::zulassung`]); ohne
+//!   diesen Deckel könnte eine Login-Flut die gesamte API in den Lastabwurf drängen.
 use crate::auth::{password, Benutzer};
 use crate::error::AppError;
 use sqlx::SqlitePool;
 use std::sync::{Arc, LazyLock};
 use tokio::sync::Semaphore;
 
-/// Gleichzeitig zugelassene KDF-Läufe.
-///
-/// Die Hälfte der verfügbaren Parallelität, mindestens 2: der Speicherbedarf ist der harte
-/// Deckel (Plätze × ~19 MiB), und der Login soll auch unter Last nie die gesamte Maschine
-/// für sich beanspruchen.
+/// Gleichzeitig zugelassene KDF-Läufe: die Hälfte der Parallelität, mindestens 2. Der
+/// Speicherbedarf (Plätze × ~19 MiB) ist der harte Deckel.
 fn kdf_plaetze() -> usize {
     std::thread::available_parallelism()
         .map(|n| (n.get() / 2).max(2))
         .unwrap_or(2)
 }
 
-/// Wie lange ein Anmeldeversuch auf einen freien KDF-Platz wartet, bevor er abgewiesen wird.
+/// Wie lange ein Anmeldeversuch auf einen freien KDF-Platz wartet, bevor er mit 503 abgewiesen
+/// wird.
 ///
-/// Ein sofortiges Abweisen (`try_acquire`) wäre der reinere Lastabwurf — es trifft aber schon
-/// bei einer gewöhnlichen Anmeldewelle zu: mehr gleichzeitige Anmeldungen als Plätze sind im
-/// Schichtwechsel einer Lage der Normalfall, nicht der Angriff. Die Testsuite hat das
-/// aufgedeckt (parallele Logins im selben Prozess liefen in 503).
-///
-/// Deshalb eine kurze, gedeckelte Wartezeit: ein Burst wird in Wellen abgearbeitet
-/// (ein KDF-Lauf dauert ~50-100 ms), eine echte Flut reißt die Frist sofort und bekommt 503.
-/// Unbegrenztes Queueing entsteht dabei nicht — wie viele Anmeldungen überhaupt gleichzeitig
-/// warten können, deckelt bereits die Zulassungssteuerung ([`crate::zulassung`]).
+/// Nicht `try_acquire`: mehr gleichzeitige Anmeldungen als Plätze sind im Schichtwechsel der
+/// Normalfall und sollen in Wellen abgearbeitet werden. Unbegrenztes Warten verhindert
+/// [`MAX_ANDRANG`].
 const WARTEFRIST: std::time::Duration = std::time::Duration::from_secs(3);
 
-/// Wie viele Anmeldeversuche gleichzeitig überhaupt auf einen KDF-Platz warten dürfen.
-///
-/// Deutlich kleiner als [`crate::zulassung::MAX_GLEICHZEITIGE_REQUESTS`] (256): ein wartender
-/// Login hält einen Zulassungsplatz, also darf der Login nie mehr als einen kleinen Bruchteil
-/// davon binden — sonst drängt eine Login-Flut die gesamte übrige API in den Lastabwurf.
-/// Großzügig genug für jede reale Anmeldewelle, weil ein Platz nach ~50–100 ms weiterrückt.
+/// Wie viele Anmeldeversuche gleichzeitig auf einen KDF-Platz warten dürfen. Klein gegen
+/// [`crate::zulassung::MAX_GLEICHZEITIGE_REQUESTS`], weil jeder Wartende einen Zulassungsplatz
+/// hält.
 const MAX_ANDRANG: usize = 32;
 
-/// Prozessweite Gates — bewusst `static` und keine `AppState`-Felder: die Grenzen sind eine
-/// Eigenschaft der Maschine, nicht des Anwendungszustands, und zusätzliche Pflichtfelder
-/// in `AppState` würden jede Test-Konstruktion brechen.
+/// Prozessweite Gates als `static`: die Grenzen sind eine Eigenschaft der Maschine, und
+/// zusätzliche `AppState`-Felder brächen jede Test-Konstruktion.
 static KDF_GATE: LazyLock<Arc<Semaphore>> =
     LazyLock::new(|| Arc::new(Semaphore::new(kdf_plaetze())));
 
 /// Vorgelagerter Andrangs-Deckel, s. [`MAX_ANDRANG`].
 static ANDRANG: LazyLock<Arc<Semaphore>> = LazyLock::new(|| Arc::new(Semaphore::new(MAX_ANDRANG)));
 
-/// Die drei Stellschrauben des Login-Schutzes, gebündelt — damit Tests sie deterministisch
-/// setzen können, ohne an den prozessweiten Gates zu drehen.
+/// Die Stellschrauben des Login-Schutzes, gebündelt, damit Tests sie deterministisch setzen
+/// können.
 pub(crate) struct Schranken {
     /// Deckelt, wer überhaupt warten darf (sofortiges Abweisen).
     pub andrang: Arc<Semaphore>,
@@ -119,13 +74,9 @@ impl Schranken {
     }
 }
 
-/// Prüft Anmeldedaten und liefert den aktiven Benutzer. `AppError::Unauthorized`
-/// bei unbekanntem Benutzer ODER falschem Passwort. Gleicht die Antwortzeit an
-/// (Wegwerf-Hash), damit sich existierende Benutzer nicht per Timing enumerieren lassen —
-/// auch SSO-only-Konten, deren Sentinel-Hash gar nicht erst parsbar ist (LFH-310).
-///
-/// Bei dauerhaft ausgeschöpftem KDF-Gate: `AppError::ServiceUnavailable` (503), nachdem
-/// [`WARTEFRIST`] erfolglos verstrichen ist.
+/// Prüft Anmeldedaten und liefert den aktiven Benutzer. `AppError::Unauthorized` bei
+/// unbekanntem Benutzer ODER falschem Passwort, mit angeglichener Antwortzeit (auch für
+/// SSO-only-Konten). 503, wenn nach [`WARTEFRIST`] kein KDF-Platz frei wurde.
 pub async fn anmelden(
     pool: &SqlitePool,
     benutzername: &str,
@@ -134,8 +85,7 @@ pub async fn anmelden(
     anmelden_mit_schranken(pool, benutzername, passwort, &Schranken::produktiv()).await
 }
 
-/// Kern von [`anmelden`] mit injizierbaren Schranken — nur damit Tests Erschöpfung
-/// deterministisch und ohne mehrsekündige Laufzeit herstellen können.
+/// Kern von [`anmelden`] mit injizierbaren Schranken für Tests.
 pub(crate) async fn anmelden_mit_schranken(
     pool: &SqlitePool,
     benutzername: &str,
@@ -150,9 +100,7 @@ pub(crate) async fn anmelden_mit_schranken(
     .fetch_optional(pool)
     .await?;
 
-    // Erste Schranke: wer nicht einmal warten darf, wird SOFORT abgewiesen. Ohne diesen
-    // Deckel könnte eine Login-Flut über die Wartefrist alle Plätze der Zulassungssteuerung
-    // binden und damit die gesamte übrige API in den Lastabwurf drängen.
+    // Erste Schranke: wer nicht einmal warten darf, wird sofort abgewiesen (s. [`MAX_ANDRANG`]).
     let Ok(_andrang) = schranken.andrang.clone().try_acquire_owned() else {
         tracing::warn!("Login-Andrang über {MAX_ANDRANG}, Anmeldeversuch sofort abgewiesen (503)");
         return Err(AppError::ServiceUnavailable(
@@ -172,14 +120,9 @@ pub(crate) async fn anmelden_mit_schranken(
         ));
     };
 
-    // Argon2id ist rechen- und speicherintensiv und blockiert den aufrufenden Thread für die
-    // volle Dauer. Auf dem async-Executor ausgeführt hieße das: ein Worker steht still. Der
-    // gesamte Match — Verifikation UND beide Wegwerf-Hashes — wandert deshalb auf den
-    // Blocking-Pool.
-    //
-    // `platz` wandert MIT in die Closure: ein `spawn_blocking`-Task überlebt das Fallen seines
-    // JoinHandle. Läge der Platz draußen, gäbe ein Client-Abbruch ihn frei, während der Hash
-    // noch rechnet — das Gate zählte dann Wartende statt laufender Hashes (s. Modul-Doku).
+    // Der gesamte Match — Verifikation UND beide Wegwerf-Hashes — läuft auf dem Blocking-Pool.
+    // `platz` wandert mit in die Closure, damit ein Client-Abbruch ihn nicht freigibt, solange der
+    // Hash noch rechnet (s. Modul-Doku).
     let passwort = passwort.to_string();
     tokio::task::spawn_blocking(move || {
         let _platz = platz;
@@ -196,9 +139,7 @@ pub(crate) async fn anmelden_mit_schranken(
     .map_err(|e| AppError::Internal(format!("KDF-Task abgebrochen: {e}")))?
 }
 
-/// Eine Meldung für beide Abweisungsgründe: nach außen ist der Zustand derselbe („gerade zu
-/// viel los"), und die Unterscheidung Andrang/KDF-Gate ist eine Betriebsinformation, die ins
-/// Log gehört, nicht in die Antwort.
+/// Eine Meldung für beide Abweisungsgründe; die Unterscheidung Andrang/KDF-Gate gehört ins Log.
 const ANMELDUNG_AUSGELASTET: &str = "Anmeldung vorübergehend ausgelastet — bitte erneut versuchen.";
 
 #[cfg(test)]
@@ -208,8 +149,7 @@ mod tests {
     /// Kurz genug, dass die Erschöpfungs-Tests in Millisekunden laufen statt in Sekunden.
     const TEST_FRIST: std::time::Duration = std::time::Duration::from_millis(80);
 
-    /// Schranken mit weitem Andrang (der ist hier nie der Prüfgegenstand) und den übergebenen
-    /// KDF-Grenzen.
+    /// Schranken mit weitem Andrang und den übergebenen KDF-Grenzen.
     fn schranken(kdf_plaetze: usize, wartefrist: std::time::Duration) -> Schranken {
         Schranken {
             andrang: Arc::new(Semaphore::new(MAX_ANDRANG)),
@@ -234,8 +174,7 @@ mod tests {
         .unwrap();
     }
 
-    /// Ein per OIDC JIT-provisioniertes Konto: existiert, hat aber kein lokales Passwort,
-    /// sondern den Sentinel aus LFH-41.
+    /// Ein per OIDC JIT-provisioniertes Konto ohne lokales Passwort (Sentinel).
     async fn sso_only_benutzer(pool: &SqlitePool) {
         sqlx::query(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, aktiv) \
@@ -247,8 +186,7 @@ mod tests {
         .unwrap();
     }
 
-    /// Der schnellste von drei Anmeldeversuchen — das Minimum kommt der reinen Rechenzeit am
-    /// nächsten, weil eine Störung einen Lauf nur verlangsamen kann.
+    /// Der schnellste von drei Anmeldeversuchen — Störungen können einen Lauf nur verlangsamen.
     async fn schnellster_versuch(
         pool: &SqlitePool,
         name: &str,
@@ -290,8 +228,7 @@ mod tests {
         assert!(matches!(err, AppError::Unauthorized));
     }
 
-    /// LFH-270/G07: bleibt das Gate über die Wartefrist hinaus voll, wird abgewiesen —
-    /// statt unbegrenzt zu warten oder einen weiteren Argon2-Lauf zu starten.
+    /// Bleibt das Gate über die Wartefrist hinaus voll, wird abgewiesen.
     #[tokio::test]
     async fn erschoepftes_gate_weist_ab_statt_zu_hashen() {
         let pool = crate::db::test_pool().await;
@@ -308,9 +245,8 @@ mod tests {
         );
     }
 
-    /// Der eigentliche DoS-Vektor: der Wegwerf-Hash im `None`-Arm kostet einen vollen
-    /// Argon2-Lauf OHNE gültigen Benutzernamen. Läge das Gate nur um den Verifikations-Zweig,
-    /// bliebe er ungedrosselt — dieser Test hält genau das fest.
+    /// Der Wegwerf-Hash im `None`-Arm kostet einen vollen Argon2-Lauf ohne gültigen Namen und muss
+    /// deshalb ebenfalls unter dem Gate stehen.
     #[tokio::test]
     async fn auch_der_unbekannte_benutzer_laeuft_durch_das_gate() {
         let pool = crate::db::test_pool().await;
@@ -327,13 +263,8 @@ mod tests {
         );
     }
 
-    /// LFH-310: der Sentinel-Zweig brennt seit diesem Ticket einen Wegwerf-Hash — und dieser
-    /// Lauf muss ebenso unter dem Gate stehen wie die beiden anderen Arme. Läge er darunter
-    /// hinweg, hätte LFH-270 ein Loch genau in der Größe der SSO-only-Konten.
-    ///
-    /// Der Test war auch VOR dem Fix grün, und das ist kein Mangel: das Gate liegt vor dem
-    /// Match, umschließt also jeden Arm von selbst. Er hält genau diese Lage fest — wer das
-    /// Gate je in die Arme hinein verschiebt, lässt ihn rot werden.
+    /// Auch der Wegwerf-Lauf des Sentinel-Zweigs steht unter dem Gate. Das Gate liegt vor dem
+    /// Match; wer es in die Arme verschiebt, macht diesen Test rot.
     #[tokio::test]
     async fn auch_das_sso_only_konto_laeuft_durch_das_gate() {
         let pool = crate::db::test_pool().await;
@@ -351,14 +282,9 @@ mod tests {
         );
     }
 
-    /// Das Akzeptanzkriterium von LFH-310, am tatsächlichen Angriffsweg gemessen: der
-    /// Anmeldeversuch gegen ein SSO-only-Konto darf nicht schneller antworten als einer gegen
-    /// einen erfundenen Benutzernamen — sonst sind genau die SSO-Konten aufzählbar.
-    ///
-    /// Verglichen wird der **schnellste** von drei Läufen je Seite (Störungen verlangsamen
-    /// nur) und als **Verhältnis**, nicht gegen ein Millisekunden-Literal: die Lücke, die der
-    /// Test fängt, ist drei Größenordnungen breit (gemessen im Debug-Build vor dem Fix:
-    /// 505 ms unbekannter Name gegen 280 µs SSO-only-Konto).
+    /// Ein Versuch gegen ein SSO-only-Konto darf nicht schneller antworten als einer gegen einen
+    /// erfundenen Namen, sonst sind die SSO-Konten aufzählbar. Verglichen wird der schnellste von
+    /// drei Läufen je Seite als Verhältnis, nicht gegen ein Millisekunden-Literal.
     #[tokio::test]
     async fn sso_only_konto_antwortet_nicht_schneller_als_ein_unbekannter_name() {
         let pool = crate::db::test_pool().await;
@@ -377,18 +303,13 @@ mod tests {
         );
     }
 
-    /// Die Anmeldewelle: mehr gleichzeitige Logins als Plätze ist im Schichtwechsel einer Lage
-    /// der Normalfall. Sie müssen in Wellen abgearbeitet werden, nicht abgewiesen — genau
-    /// dieses Verhalten hatte ein sofort abweisendes `try_acquire` gebrochen (aufgedeckt von
-    /// der Testsuite, die parallele Logins fährt).
+    /// Mehr gleichzeitige Logins als Plätze werden in Wellen abgearbeitet, nicht abgewiesen.
     #[tokio::test]
     async fn anmeldewelle_wird_bedient_statt_abgewiesen() {
         let pool = crate::db::test_pool().await;
         benutzer_mit_pw(&pool, "geheim123").await;
-        // EIN Platz, vier gleichzeitige Anmeldungen — ohne Warten wären drei davon 503.
-        // Die Frist ist bewusst großzügig und NICHT die Produktionsfrist: unter paralleler
-        // Testlast steigt ein Argon2-Lauf von ~50-100 ms deutlich an, und der Test soll die
-        // Warte-Semantik prüfen, nicht die Maschinengeschwindigkeit.
+        // Ein Platz, vier gleichzeitige Anmeldungen. Die Frist ist großzügig, weil Argon2 unter
+        // paralleler Testlast deutlich langsamer wird; geprüft wird die Warte-Semantik.
         let s = Arc::new(schranken(1, std::time::Duration::from_secs(60)));
 
         let mut laeufe = Vec::new();
@@ -411,10 +332,7 @@ mod tests {
         }
     }
 
-    /// Review-Befund (HOCH): ein `spawn_blocking`-Task überlebt das Fallen seines JoinHandle.
-    /// Läge der KDF-Platz im abbrechbaren Future statt in der Closure, gäbe ein Client-Abbruch
-    /// ihn frei, während der Argon2-Lauf weiterrechnet — ein Angreifer, der jede Anfrage sofort
-    /// trennt, könnte dann beliebig viele Läufe akkumulieren (Blocking-Pool: 512 × ~19 MiB).
+    /// Ein abgebrochener Login gibt den KDF-Platz erst frei, wenn der Argon2-Lauf fertig ist.
     #[tokio::test]
     async fn abgebrochener_login_gibt_den_platz_nicht_vorzeitig_frei() {
         let pool = crate::db::test_pool().await;
@@ -426,8 +344,8 @@ mod tests {
             let lauf = anmelden_mit_schranken(&pool, "max", "geheim123", &s);
             tokio::pin!(lauf);
 
-            // Das Future so weit treiben, bis es den Platz wirklich genommen hat — vorher zu
-            // verwerfen würde nichts beweisen (es hinge dann noch in der DB-Abfrage).
+            // Erst verwerfen, wenn das Future den Platz wirklich hält (vorher hinge es in der
+            // DB-Abfrage).
             let mut belegt = false;
             for _ in 0..2000 {
                 tokio::select! {
@@ -441,7 +359,7 @@ mod tests {
             }
             assert!(belegt, "Platz wurde nie belegt — Test greift ins Leere");
 
-            // Hier fällt `lauf` — genau das tut hyper, wenn der Client die Verbindung trennt.
+            // Hier fällt `lauf`, wie bei einem Verbindungsabbruch des Clients.
         }
 
         assert_eq!(
@@ -452,10 +370,7 @@ mod tests {
         );
     }
 
-    /// Review-Befund (HOCH): ein wartender Login belegt einen Platz der Zulassungssteuerung.
-    /// Ohne vorgelagerten Andrangs-Deckel hätte eine Login-Flut den globalen Cap geleert und
-    /// die gesamte übrige API in den Lastabwurf gedrängt. Überzählige müssen deshalb SOFORT
-    /// abgewiesen werden, nicht erst nach der Wartefrist.
+    /// Überzählige Wartende werden sofort abgewiesen, nicht erst nach der Wartefrist.
     #[tokio::test]
     async fn ueberzaehliger_andrang_wird_sofort_abgewiesen_statt_zu_warten() {
         let pool = crate::db::test_pool().await;
@@ -484,8 +399,7 @@ mod tests {
         );
     }
 
-    /// Der Platz muss nach jedem Versuch zurückfallen — sonst sperrt sich der Login nach
-    /// wenigen Anmeldungen dauerhaft selbst aus.
+    /// Der Platz fällt nach jedem Versuch zurück, sonst sperrt sich der Login selbst aus.
     #[tokio::test]
     async fn platz_faellt_nach_jedem_versuch_zurueck() {
         let pool = crate::db::test_pool().await;
