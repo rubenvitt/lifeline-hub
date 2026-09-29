@@ -26,7 +26,8 @@
  * Zuhörer beim Abonnieren synchron auf und liest dabei nur `matches`.
  */
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { Route, Routes } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { server } from '../test/server';
@@ -158,6 +159,46 @@ describe('BenutzerMenu — unter lg', () => {
     // heißen deshalb genau wie ihr Text — deren Prüfungen dürfen exakt sein.
     expect(await screen.findByRole('menuitem', { name: /Profil/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Abmelden/ })).toBeInTheDocument();
+  });
+});
+
+/** LFH-387: „Abmelden“ aus einem veralteten Tab beendet keine fremde Sitzung und verlässt die
+ *  Seite nicht — der Server lehnt mit 412 ab, der Tab zeigt den Benutzerkonflikt. */
+describe('Abmelden', () => {
+  function zeigeMitAnmeldeseite(logoutStatus: number) {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+      http.post('/api/auth/logout', () =>
+        logoutStatus === 204
+          ? new HttpResponse(null, { status: 204 })
+          : HttpResponse.json({ error: 'fremd' }, { status: logoutStatus }),
+      ),
+    );
+    return renderMitProviders(
+      <ThemeModeProvider>
+        <Routes>
+          <Route path="/login" element={<div>Anmeldeseite</div>} />
+          <Route path="*" element={<BenutzerMenu />} />
+        </Routes>
+      </ThemeModeProvider>,
+    );
+  }
+
+  it('führt nach dem Abmelden zur Anmeldeseite', async () => {
+    zeigeMitAnmeldeseite(204);
+    await oeffne();
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Abmelden/ }));
+    expect(await screen.findByText('Anmeldeseite')).toBeInTheDocument();
+  });
+
+  it('bleibt stehen, wenn der Server das Abmelden mit 412 ablehnt', async () => {
+    zeigeMitAnmeldeseite(412);
+    await oeffne();
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Abmelden/ }));
+    await waitFor(() => expect(screen.queryByText('Anmeldeseite')).not.toBeInTheDocument());
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByText('Anmeldeseite')).not.toBeInTheDocument();
+    expect(await trigger()).toBeInTheDocument();
   });
 });
 

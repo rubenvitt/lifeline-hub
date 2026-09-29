@@ -1,5 +1,5 @@
-/** Fehler einer API-Antwort mit Nicht-2xx-Status. Trägt den Statuscode und die
- *  Server-Meldung aus dem `{ error }`-Format. */
+import { BENUTZER_PRUEFEN } from '../auth/sitzungsEvent';
+
 export type HttpMethode = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /** Zusätzliche Metadaten für einen schreibenden API-Aufruf.
@@ -14,8 +14,31 @@ export interface ApiSendOptionen {
 
 export const OFFLINE_QUEUE_BENUTZER_HEADER = 'X-Offline-Queue-Benutzer-Id';
 
+/** Kopf, mit dem jede schreibende Anfrage den Benutzer nennt, den dieser Tab anzeigt (LFH-387).
+ *  Das Session-Cookie gilt originweit; meldet sich in einem anderen Tab jemand anderes an,
+ *  lehnt der Server Schreibanfragen dieses Tabs mit 412 ab, statt sie still unter der fremden
+ *  Sitzung auszuführen (`CurrentUser`-Extractor, `src/auth/session.rs`). */
+export const ERWARTETER_BENUTZER_HEADER = 'X-Erwarteter-Benutzer-Id';
+
+/** Der Benutzer, den dieser Tab anzeigt. Gesetzt vom `AuthProvider`, und zwar synchron an
+ *  denselben Stellen wie sein `benutzer` — ein Effekt ließe ein Render-Fenster mit altem Wert. */
+let erwarteterBenutzer: number | null = null;
+
+export function setzeErwartetenBenutzer(id: number | null): void {
+  erwarteterBenutzer = id;
+}
+
+/** Köpfe einer schreibenden Anfrage, die jeder Schreibweg (`apiSend`, `apiUpload`) trägt. */
+function schreibKoepfe(): Record<string, string> {
+  return erwarteterBenutzer == null
+    ? {}
+    : { [ERWARTETER_BENUTZER_HEADER]: String(erwarteterBenutzer) };
+}
+
 const NETZFEHLER_TEXT = 'Keine Verbindung — die Aktion wurde NICHT abgeschickt';
 
+/** Fehler einer API-Antwort mit Nicht-2xx-Status. Trägt den Statuscode und die
+ *  Server-Meldung aus dem `{ error }`-Format. */
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -52,6 +75,9 @@ export function istKonflikt(e: unknown): e is ApiError {
 }
 
 async function fehlerWerfen(res: Response): Promise<never> {
+  // 412 heißt: die Sitzung gehört (vielleicht) nicht mehr dem Benutzer, den dieser Tab zeigt.
+  // Nie abmelden — nur prüfen lassen; das entscheidet der AuthProvider (LFH-387).
+  if (res.status === 412) window.dispatchEvent(new CustomEvent(BENUTZER_PRUEFEN));
   let message = `Serverfehler (${res.status})`;
   try {
     const body = (await res.json()) as { error?: unknown };
@@ -106,6 +132,7 @@ export async function apiUpload<T>(
     const res = await fetch(pfad, {
       method: 'POST',
       credentials: 'same-origin',
+      headers: schreibKoepfe(),
       body: formData,
       signal: AbortSignal.timeout(optionen.timeoutMs ?? 15_000),
     });
@@ -123,7 +150,7 @@ export async function apiSend<T>(
   optionen: ApiSendOptionen = {},
 ): Promise<T> {
   try {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = methode === 'GET' ? {} : schreibKoepfe();
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (optionen.offlineQueueBenutzerId != null) {
       headers[OFFLINE_QUEUE_BENUTZER_HEADER] = String(optionen.offlineQueueBenutzerId);

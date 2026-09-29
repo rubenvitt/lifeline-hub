@@ -8,7 +8,7 @@ import { SITZUNG_ABGELAUFEN } from './sitzungsEvent';
  *  Vorgänger-Brücke saß in `EinsatzLayout` und ließ damit `/admin`, `/profil`, die Stammdaten
  *  und die Einsatzliste ohne jede 401-Behandlung. */
 export function useSitzungsWache(): void {
-  const { logout } = useAuth();
+  const { abmeldenLokal } = useAuth();
   const navigate = useNavigate();
   const { pathname, search, hash } = useLocation();
 
@@ -21,15 +21,19 @@ export function useSitzungsWache(): void {
       // Vollständige Rückkehr-URL: `pathname` allein verliert die Deeplink-Selektion des
       // Query-Param-Musters (`?einheit=`, `?meldung=`, ETB `?eintrag=` — s. CLAUDE.md).
       const von = `${pathname}${search}${hash}`;
-      // `AuthContext.logout` wirft heute nicht mehr (räumt im `finally`). Das `catch` hält
-      // die Umleitung trotzdem unabhängig davon: an einem sicherheitsrelevanten Seam soll
-      // eine gebrochene Zusage keine unbehandelte Rejection und keinen hängenden Nutzer
-      // erzeugen.
-      void logout()
-        .catch(() => {})
-        .finally(() => navigate('/login', { replace: true, state: { von } }));
+      // NUR lokal abmelden (LFH-387): die Sitzung ist abgelaufen, serverseitig gibt es nichts
+      // zu beenden. Ein `POST /api/auth/logout` liefe mit dem Cookie, das der Browser JETZT
+      // hält — hat sich zwischen der 401 und diesem Ruf in einem anderen Tab jemand angemeldet,
+      // beendete er dessen Sitzung. Die Umleitung hängt trotzdem nicht am Abmelden: an einem
+      // sicherheitsrelevanten Seam soll eine gebrochene Zusage keinen hängenden Nutzer erzeugen.
+      try {
+        abmeldenLokal();
+      } catch (e) {
+        console.error('Lokales Abmelden nach Sitzungsablauf fehlgeschlagen', e);
+      }
+      navigate('/login', { replace: true, state: { von } });
     };
     window.addEventListener(SITZUNG_ABGELAUFEN, beiAblauf);
     return () => window.removeEventListener(SITZUNG_ABGELAUFEN, beiAblauf);
-  }, [logout, navigate, pathname, search, hash]);
+  }, [abmeldenLokal, navigate, pathname, search, hash]);
 }

@@ -1,10 +1,12 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
+import { Route, Routes } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
+import { BENUTZER_PRUEFEN } from '../auth/sitzungsEvent';
 import LoginPage from './LoginPage';
 
 const { startAuthenticationMock } = vi.hoisted(() => ({ startAuthenticationMock: vi.fn() }));
@@ -695,6 +697,57 @@ describe('LoginPage', () => {
         ).not.toBeInTheDocument(),
       );
       expect(screen.queryByText('Verbindung zum Server fehlgeschlagen')).not.toBeInTheDocument();
+    });
+  });
+
+  /** LFH-387: meldet sich in einem anderen Tab jemand an, zieht die Anmeldeseite nach. */
+  describe('Anmeldung aus einem anderen Tab', () => {
+    const anna = {
+      id: 1,
+      anzeigename: 'Anna Admin',
+      benutzername: 'anna',
+      system_rolle: 'admin',
+      org_rolle: 'keine',
+      aktiv: true,
+      erstellt_at: '2026-05-23 10:00:00',
+    };
+
+    function zeigeLoginMitZiel(angemeldet: boolean) {
+      let sitzung: typeof anna | null = angemeldet ? anna : null;
+      server.use(
+        http.get('/api/auth/me', () =>
+          sitzung ? HttpResponse.json(sitzung) : HttpResponse.json({ error: 'x' }, { status: 401 }),
+        ),
+        http.get('/api/dev/users', () => HttpResponse.json([])),
+        http.get('/api/auth/providers', () => HttpResponse.json([])),
+      );
+      renderMitProviders(
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/einsaetze" element={<div>Einsatzliste</div>} />
+          </Routes>
+        </AuthProvider>,
+        { route: '/login' },
+      );
+      return { anmelden: () => (sitzung = anna) };
+    }
+
+    it('übernimmt eine Anmeldung aus einem anderen Tab und verlässt die Anmeldeseite', async () => {
+      const { anmelden } = zeigeLoginMitZiel(false);
+      await screen.findByLabelText('Benutzername');
+      anmelden();
+      act(() => void window.dispatchEvent(new Event(BENUTZER_PRUEFEN)));
+      expect(await screen.findByText('Einsatzliste')).toBeInTheDocument();
+    });
+
+    it('lässt eine schon angemeldete Person auf der Anmeldeseite (Benutzerwechsel bleibt möglich)', async () => {
+      zeigeLoginMitZiel(true);
+      await screen.findByLabelText('Benutzername');
+      act(() => void window.dispatchEvent(new Event(BENUTZER_PRUEFEN)));
+      await new Promise((r) => setTimeout(r, 30));
+      expect(screen.queryByText('Einsatzliste')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Benutzername')).toBeInTheDocument();
     });
   });
 });

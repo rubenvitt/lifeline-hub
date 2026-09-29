@@ -4,16 +4,27 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { useSitzungsWache } from './useSitzungsWache';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from './sitzungsEvent';
 
-const logout = vi.fn(() => Promise.resolve());
+const logout = vi.fn(() => Promise.resolve(true));
+const abmeldenLokal = vi.fn();
 
 vi.mock('./AuthContext', async (echt) => ({
   ...(await echt<typeof import('./AuthContext')>()),
-  useAuth: () => ({ benutzer: null, laedt: false, login: vi.fn(), logout, aktualisiere: vi.fn() }),
+  useAuth: () => ({
+    benutzer: null,
+    laedt: false,
+    login: vi.fn(),
+    logout,
+    aktualisiere: vi.fn(),
+    abmeldenLokal,
+    konflikt: null,
+    weiterAls: vi.fn(),
+  }),
 }));
 
 afterEach(() => {
   sitzungsMeldungZuruecksetzen();
   logout.mockClear();
+  abmeldenLokal.mockReset();
 });
 
 /** Rendert die Wache unter `route` und macht Pfad + Rückkehr-URL sichtbar. */
@@ -39,7 +50,16 @@ describe('useSitzungsWache', () => {
     const { getByTestId } = renderWache('/admin/benutzer');
     window.dispatchEvent(new CustomEvent(SITZUNG_ABGELAUFEN));
     await waitFor(() => expect(getByTestId('ort').textContent).toMatch(/^\/login\|/));
-    expect(logout).toHaveBeenCalledTimes(1);
+    expect(abmeldenLokal).toHaveBeenCalledTimes(1);
+  });
+
+  it('ruft keinen Server-Logout — er träfe eine inzwischen neue Sitzung (LFH-387)', async () => {
+    // Zwischen der 401 dieses Tabs und seinem Logout kann sich in einem anderen Tab jemand
+    // angemeldet haben; `POST /api/auth/logout` liefe dann mit DESSEN Cookie.
+    const { getByTestId } = renderWache('/einsaetze/7/etb');
+    window.dispatchEvent(new CustomEvent(SITZUNG_ABGELAUFEN));
+    await waitFor(() => expect(getByTestId('ort').textContent).toMatch(/^\/login\|/));
+    expect(logout).not.toHaveBeenCalled();
   });
 
   it('nimmt Query-String und Hash in die Rückkehr-URL auf', async () => {
@@ -50,15 +70,19 @@ describe('useSitzungsWache', () => {
     );
   });
 
-  it('leitet auch dann um, wenn logout() scheitert', async () => {
-    // Netzabriss oder 5xx aus session::loeschen. Die Umleitung darf davon nicht abhängen,
-    // und die durchgereichte Rejection darf nicht unbehandelt bleiben.
-    logout.mockImplementationOnce(() => Promise.reject(new Error('Netz weg')));
+  it('leitet auch dann um, wenn das lokale Abmelden wirft', async () => {
+    // Sicherheitsrelevanter Seam: eine gebrochene Zusage darf keinen hängenden Nutzer erzeugen.
+    abmeldenLokal.mockImplementationOnce(() => {
+      throw new Error('kaputt');
+    });
+    const konsole = vi.spyOn(console, 'error').mockImplementation(() => {});
     const { getByTestId } = renderWache('/einsaetze/7/lage-dashboard');
     window.dispatchEvent(new CustomEvent(SITZUNG_ABGELAUFEN));
     await waitFor(() =>
       expect(getByTestId('ort').textContent).toBe('/login|/einsaetze/7/lage-dashboard'),
     );
+    expect(konsole).toHaveBeenCalled();
+    konsole.mockRestore();
   });
 
   it('leitet auf der Login-Seite nicht erneut um (keine Schleife)', async () => {
@@ -66,6 +90,6 @@ describe('useSitzungsWache', () => {
     window.dispatchEvent(new CustomEvent(SITZUNG_ABGELAUFEN));
     await new Promise((r) => setTimeout(r, 20));
     expect(getByTestId('ort').textContent).toBe('/login|');
-    expect(logout).not.toHaveBeenCalled();
+    expect(abmeldenLokal).not.toHaveBeenCalled();
   });
 });
