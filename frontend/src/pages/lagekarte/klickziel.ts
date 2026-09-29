@@ -5,13 +5,14 @@
  *  1. das oberste GEZEICHNETE Punktziel (Markerzeichen samt Plakette, aufgefächertes Zeichen,
  *     Personen-Cluster, Fachebenen-Punkt oder -Bündel),
  *  2. sonst eine Trefferzone — der Marker, dessen Punkt dem Tipp am nächsten liegt,
- *  3. sonst die oberste eigene Fläche (Zone, Abschnitt),
- *  4. sonst die oberste Fachebenen-Fläche.
+ *  3. sonst die Flächen (Zone, Abschnitt, Fachebenen-Fläche): genau eine wird direkt gewählt, zwei
+ *     oder mehr verschiedene melden sich als `mehrdeutig` — dann wählt der Mensch im Menü (LFH-812),
+ *     denn keine Rangfolge unter übereinanderliegenden Flächen trifft immer, was er meint.
  * Eine Trefferzone steht also jedem gezeichneten Punktziel nach (sonst nähme ihr unsichtbarer Ring
  * einem KRITIS-Bündel oder Pegel daneben den Tipp) und schlägt jede Fläche (Marker liegen fast
  * immer in einer Zone oder einem Abschnitt, die Zone aus LFH-711 wäre sonst dort wirkungslos).
- * Eigene Flächen gehen Fachebenen-Flächen vor: NINA-/DWD-Warnungen liegen über Zonen und decken oft
- * einen Kreis ab (Entscheidung 29.09.2026). Ein Auswahlmenü für übereinanderliegende Flächen: LFH-812.
+ * Im Menü stehen eigene Flächen vor Fachebenen-Flächen: NINA-/DWD-Warnungen liegen über Zonen und
+ * decken oft einen Kreis ab (Entscheidung 29.09.2026, LFH-764).
  * Rein; `merkmale` kommt von `queryRenderedFeatures` (oben zuerst).
  */
 import {
@@ -52,20 +53,59 @@ export function ordneKlickebene(layerId: string): Klickebene | null {
 }
 
 const PUNKTZIELE = new Set<Klickebene>(['marker', 'personenCluster', 'fachebene']);
-const EIGENE_FLAECHEN = new Set<Klickebene>(['zone', 'abschnitt']);
+const FLAECHEN = new Set<Klickebene>(['zone', 'abschnitt', 'fachebeneFlaeche']);
 
 interface Merkmal {
+  id?: string | number;
   layer: { id: string };
   properties: Record<string, unknown> | null;
   geometry: { type: string; coordinates?: unknown };
 }
+
+/** Eine Fläche am Tipppunkt, wie sie das Auswahlmenü anbietet (LFH-812). */
+export type Flaechenziel<F extends Merkmal> =
+  { art: 'zone'; merkmal: F } | { art: 'abschnitt'; merkmal: F } | { art: 'fachebene'; merkmal: F };
 
 export type Klickziel<F extends Merkmal> =
   | { art: 'marker'; merkmal: F }
   | { art: 'personenCluster'; clusterId: number; center: [number, number]; anzahl: number }
   | { art: 'fachebene'; merkmal: F }
   | { art: 'zone'; merkmal: F }
-  | { art: 'abschnitt'; merkmal: F };
+  | { art: 'abschnitt'; merkmal: F }
+  | { art: 'mehrdeutig'; flaechen: Flaechenziel<F>[] };
+
+/**
+ * Wer dieselbe Fläche ist: Die Karte meldet eine Zone über Füllung UND Umriss und ein Polygon an
+ * Kachelgrenzen mehrfach. Fachebenen-Merkmale tragen oft keine Feature-id; dann stehen ihre
+ * Properties für sie — zwei identisch beschriebene Meldungen wären für den Menschen ohnehin dieselbe
+ * Wahl.
+ */
+function flaechenSchluessel(ebene: Klickebene, merkmal: Merkmal): string {
+  if (ebene === 'zone' || ebene === 'abschnitt')
+    return `${ebene}:${String(merkmal.properties?.id)}`;
+  return merkmal.id != null
+    ? `${merkmal.layer.id}#${String(merkmal.id)}`
+    : `${merkmal.layer.id}:${JSON.stringify(merkmal.properties ?? {})}`;
+}
+
+/** Die verschiedenen Flächen am Punkt: eigene vor Fachebenen, je Gruppe oben zuerst. */
+function flaechenAm<F extends Merkmal>(
+  eingeordnet: { merkmal: F; ebene: Klickebene }[],
+): Flaechenziel<F>[] {
+  const gesehen = new Set<string>();
+  const eigene: Flaechenziel<F>[] = [];
+  const fachebenen: Flaechenziel<F>[] = [];
+  for (const { merkmal, ebene } of eingeordnet) {
+    if (!FLAECHEN.has(ebene)) continue;
+    const schluessel = flaechenSchluessel(ebene, merkmal);
+    if (gesehen.has(schluessel)) continue;
+    gesehen.add(schluessel);
+    if (ebene === 'zone') eigene.push({ art: 'zone', merkmal });
+    else if (ebene === 'abschnitt') eigene.push({ art: 'abschnitt', merkmal });
+    else fachebenen.push({ art: 'fachebene', merkmal });
+  }
+  return [...eigene, ...fachebenen];
+}
 
 /** Der Gewinner eines Tipps, oder `null`, wenn am Punkt kein Klickziel liegt. */
 export function entscheideKlickziel<F extends Merkmal>(
@@ -106,10 +146,8 @@ export function entscheideKlickziel<F extends Merkmal>(
   const zone = naechster(['treffer']);
   if (zone) return { art: 'marker', merkmal: zone };
 
-  const eigene = eingeordnet.find((x) => EIGENE_FLAECHEN.has(x.ebene));
-  if (eigene?.ebene === 'zone') return { art: 'zone', merkmal: eigene.merkmal };
-  if (eigene?.ebene === 'abschnitt') return { art: 'abschnitt', merkmal: eigene.merkmal };
-
-  const fremde = eingeordnet.find((x) => x.ebene === 'fachebeneFlaeche');
-  return fremde ? { art: 'fachebene', merkmal: fremde.merkmal } : null;
+  const flaechen = flaechenAm(eingeordnet);
+  if (flaechen.length === 0) return null;
+  if (flaechen.length === 1) return flaechen[0];
+  return { art: 'mehrdeutig', flaechen };
 }

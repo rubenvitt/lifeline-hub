@@ -15,8 +15,8 @@ import { fachebeneClickLayerIds } from './fachebenenLayer';
 
 /**
  * Wem ein Tipp auf der Lagekarte gehört (LFH-764): genau einem Ziel. Rangfolge: oberstes
- * gezeichnetes Punktziel, dann Trefferzone (nächster Marker), dann oberste Fläche. Die Merkmale
- * kommen wie aus `queryRenderedFeatures`: oben zuerst.
+ * gezeichnetes Punktziel, dann Trefferzone (nächster Marker), dann die Flächen — eine direkt, mehrere
+ * als Auswahl (LFH-812). Die Merkmale kommen wie aus `queryRenderedFeatures`: oben zuerst.
  */
 type M = {
   layer: { id: string };
@@ -129,37 +129,119 @@ describe('entscheideKlickziel', () => {
     });
   });
 
-  it('ohne Punktziel und Trefferzone gewinnt die oberste Fläche', () => {
+  it('ohne Punktziel und Trefferzone: genau eine Fläche wird direkt gewählt', () => {
     const zone = flaeche('zonen-fill', 3);
     const abschnitt = flaeche('abschnitte-fill', 9);
-    expect(entscheideKlickziel([zone, abschnitt], klick, projiziere)).toEqual({
-      art: 'zone',
-      merkmal: zone,
-    });
-    expect(entscheideKlickziel([abschnitt, zone], klick, projiziere)).toEqual({
-      art: 'abschnitt',
-      merkmal: abschnitt,
-    });
-  });
-
-  it('eine eigene Fläche geht einer Fachebenen-Fläche darüber vor (Warnung über der Zone)', () => {
-    // NINA-/DWD-Warnflächen liegen über Zonen und Abschnitten und decken oft einen Kreis ab;
-    // „oberste Fläche" machte jede Zone darunter unerreichbar (Entscheidung 29.09.2026).
     const dwd = flaeche('fachebene-dwd-fill', 1);
-    const zone = flaeche('zonen-fill', 3);
-    const abschnitt = flaeche('abschnitte-fill', 9);
-    expect(entscheideKlickziel([dwd, zone], klick, projiziere)).toEqual({
-      art: 'zone',
-      merkmal: zone,
-    });
-    expect(entscheideKlickziel([dwd, abschnitt], klick, projiziere)).toEqual({
+    expect(entscheideKlickziel([zone], klick, projiziere)).toEqual({ art: 'zone', merkmal: zone });
+    expect(entscheideKlickziel([abschnitt], klick, projiziere)).toEqual({
       art: 'abschnitt',
       merkmal: abschnitt,
     });
-    // Ohne eigene Fläche bleibt die Warnung antippbar.
     expect(entscheideKlickziel([dwd], klick, projiziere)).toEqual({
       art: 'fachebene',
       merkmal: dwd,
+    });
+  });
+
+  // LFH-812: keine Rangfolge unter Flächen trifft immer, was der Mensch meint — er wählt selbst.
+  describe('mehrere Flächen übereinander (LFH-812)', () => {
+    const zone = flaeche('zonen-fill', 3);
+    const abschnitt = flaeche('abschnitte-fill', 9);
+
+    it('Zone über Abschnitt: mehrdeutig, in Zeichenreihenfolge', () => {
+      expect(entscheideKlickziel([zone, abschnitt], klick, projiziere)).toEqual({
+        art: 'mehrdeutig',
+        flaechen: [
+          { art: 'zone', merkmal: zone },
+          { art: 'abschnitt', merkmal: abschnitt },
+        ],
+      });
+      expect(entscheideKlickziel([abschnitt, zone], klick, projiziere)).toEqual({
+        art: 'mehrdeutig',
+        flaechen: [
+          { art: 'abschnitt', merkmal: abschnitt },
+          { art: 'zone', merkmal: zone },
+        ],
+      });
+    });
+
+    it('eigene Flächen vor Fachebenen, auch wenn die Fachebene oben liegt', () => {
+      const dwd = flaeche('fachebene-dwd-fill', 1);
+      const nina = flaeche('fachebene-nina-fill', 2);
+      expect(entscheideKlickziel([dwd, zone, nina, abschnitt], klick, projiziere)).toEqual({
+        art: 'mehrdeutig',
+        flaechen: [
+          { art: 'zone', merkmal: zone },
+          { art: 'abschnitt', merkmal: abschnitt },
+          { art: 'fachebene', merkmal: dwd },
+          { art: 'fachebene', merkmal: nina },
+        ],
+      });
+    });
+
+    it('dieselbe Zone über Füllung und Umriss zählt einmal: direkt gewählt', () => {
+      const linie = flaeche('zonen-line', 3);
+      expect(entscheideKlickziel([linie, zone], klick, projiziere)).toEqual({
+        art: 'zone',
+        merkmal: linie,
+      });
+    });
+
+    it('zwei verschiedene Zonen mit Füllung und Umriss: je Zone ein Eintrag', () => {
+      const andere = flaeche('zonen-fill', 4);
+      const ziel = entscheideKlickziel(
+        [flaeche('zonen-line', 3), zone, andere, flaeche('zonen-line-gestrichelt', 4)],
+        klick,
+        projiziere,
+      );
+      expect(ziel?.art).toBe('mehrdeutig');
+      if (ziel?.art !== 'mehrdeutig') return;
+      expect(ziel.flaechen.map((f) => f.merkmal.properties?.id)).toEqual([3, 4]);
+    });
+
+    it('Kachel-Duplikate einer Fachebenen-Meldung ohne id zählen einmal', () => {
+      const teil = (): M => ({
+        layer: { id: 'fachebene-dwd-fill' },
+        properties: { EVENT: 'STURMBÖEN', IDENTIFIER: 'x1' },
+        geometry: { type: 'Polygon', coordinates: [] },
+      });
+      const a = teil();
+      expect(entscheideKlickziel([a, teil()], klick, projiziere)).toEqual({
+        art: 'fachebene',
+        merkmal: a,
+      });
+    });
+
+    it('zwei Fachebenen-Meldungen derselben Ebene bleiben zwei Einträge', () => {
+      const a = { ...flaeche('fachebene-dwd-fill', 1), properties: { EVENT: 'FROST' } };
+      const b = { ...flaeche('fachebene-dwd-fill', 1), properties: { EVENT: 'GLÄTTE' } };
+      const ziel = entscheideKlickziel([a, b], klick, projiziere);
+      expect(ziel).toEqual({
+        art: 'mehrdeutig',
+        flaechen: [
+          { art: 'fachebene', merkmal: a },
+          { art: 'fachebene', merkmal: b },
+        ],
+      });
+    });
+
+    it('eine Feature-id der Fachebene unterscheidet, auch bei gleichen Properties', () => {
+      const a = { ...flaeche('fachebene-nina-fill', 1), id: 'a', properties: {} };
+      const b = { ...flaeche('fachebene-nina-fill', 1), id: 'b', properties: {} };
+      expect(entscheideKlickziel([a, b], klick, projiziere)?.art).toBe('mehrdeutig');
+    });
+
+    it('Trefferzone und Punktziel schlagen weiterhin mehrere Flächen', () => {
+      const z = zoneVon('einheit-1', 20);
+      expect(entscheideKlickziel([z, zone, abschnitt], klick, projiziere)).toEqual({
+        art: 'marker',
+        merkmal: z,
+      });
+      expect(entscheideKlickziel([pegel, zone, abschnitt], klick, projiziere)).toEqual({
+        art: 'fachebene',
+        merkmal: pegel,
+      });
     });
   });
 
