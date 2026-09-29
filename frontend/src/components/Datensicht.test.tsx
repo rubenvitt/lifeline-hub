@@ -536,7 +536,7 @@ describe('pruefeKartenplan()', () => {
         karte,
         baum,
         aufklappzeile: () => 'Besatzung',
-        gruppen: { schluessel: () => 'a', etikett: (w) => w },
+        gruppen: { schluessel: () => 'a', etikett: (w) => w, unterEbene: 1 },
       },
       'Meldebild',
     );
@@ -986,10 +986,28 @@ describe('Datensicht · Kartenzweig', () => {
         schluessel: (f) => f.traeger ?? 'ohne',
         etikett: (w) => (w === 'FW' ? 'Feuerwehr' : 'Hilfsorganisation'),
         reihenfolge: ['FW', 'HiOrg'],
+        unterEbene: 1,
       },
     });
     expect(screen.getByText('Feuerwehr · 2')).toBeInTheDocument();
     expect(screen.getByText('Hilfsorganisation · 1')).toBeInTheDocument();
+  });
+
+  it('Gruppenköpfe im Kartenzweig sind Überschriften unter `unterEbene` und benennen ihre Liste (LFH-470)', () => {
+    setzeViewportBreite(390);
+    rendere({
+      gruppen: {
+        schluessel: (f) => f.traeger ?? 'ohne',
+        etikett: (w) => (w === 'FW' ? 'Feuerwehr' : 'Hilfsorganisation'),
+        reihenfolge: ['FW', 'HiOrg'],
+        unterEbene: 1,
+      },
+    });
+    expect(screen.getAllByRole('heading', { level: 2 }).map((k) => k.textContent)).toEqual([
+      'Feuerwehr · 2',
+      'Hilfsorganisation · 1',
+    ]);
+    expect(screen.getByRole('list', { name: 'Feuerwehr · 2' })).toBeVisible();
   });
 
   it('leerText läuft über emptyText — es entsteht KEIN Empty-Knoten', () => {
@@ -1790,6 +1808,7 @@ describe('Datensicht · Zeilenschleuse', () => {
       etikett: (w: string) =>
         w === 'FW' ? 'Feuerwehr' : w === 'HiOrg' ? 'Hilfsorganisation' : 'ohne Träger',
       reihenfolge: ['FW', 'HiOrg'],
+      unterEbene: 1 as const,
     };
     const { rerender } = rendere({ gruppen });
     expect(screen.getByText('Feuerwehr · 2')).toBeInTheDocument();

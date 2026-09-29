@@ -14,7 +14,8 @@ import {
 } from 'react';
 import { Link } from 'react-router';
 import KatalogTabelle, { type KatalogSpalte } from './KatalogTabelle';
-import { Liste, ListenEintrag } from './Liste';
+import { Liste, ListenEintrag, type ListenKopf } from './Liste';
+import type { UnterEbene } from './Markdown';
 import { Select } from './Select';
 import StatusTag from './StatusTag';
 import StatusWahl, { type StatusBedienung } from './StatusWahl';
@@ -301,6 +302,14 @@ interface Gruppierung<T> {
 }
 
 /**
+ * Was die Sicht über die Achse hinaus braucht: die Gruppenköpfe des Kartenzweigs sind
+ * Überschriften (LFH-470), deren Ebene nur der Einbauort kennt — Ebene der nächsten Überschrift
+ * über der Sicht (Seitentitel = 1, Paneel = 2, …). Getrennt von {@link Gruppierung}, weil
+ * `effektiveDaten` nur die Achse liest.
+ */
+type SichtGruppierung<T> = Gruppierung<T> & { unterEbene: UnterEbene };
+
+/**
  * Feldname, unter dem `T` Kinder DESSELBEN Typs trägt — sonst `never`. `-?` allein genügt
  * nicht: `T[K]` trägt bei optionalen Feldern weiter `| undefined`, deshalb `NonNullable`.
  */
@@ -371,7 +380,7 @@ interface DatensichtProps<T extends object, K extends string> {
   onSortierung?: (s: Sortierung<NoInfer<K>>) => void;
   /** Freitextsuche über alle Spalten mit `suchText`. Im Baummodus verboten. */
   suche?: { platzhalter: string };
-  gruppen?: Gruppierung<T>;
+  gruppen?: SichtGruppierung<T>;
   /** Baumsicht. Schließt `suche`, Spaltenfilter, `gruppen`, `aufklappzeile` und `aufklappen` aus. */
   baum?: BaumSicht<T>;
   /** Default `'sammelbanner'`. */
@@ -1455,11 +1464,11 @@ export default function Datensicht<T extends object, const K extends string>(
     );
   };
 
-  const kartenListe = (zeilenMenge: readonly T[], kopf?: ReactNode) => (
+  const kartenListe = (zeilenMenge: readonly T[], kopf?: ListenKopf) => (
     <Liste
       dataSource={zeilenMenge}
       rowKey={(zeile) => schluessel(zeile)}
-      header={kopf}
+      kopf={kopf}
       loading={ladend}
       // `emptyText` statt eines eigenen Leerzustands-Knotens.
       emptyText={leerText}
@@ -1474,12 +1483,14 @@ export default function Datensicht<T extends object, const K extends string>(
       <>
         {gruppenKarten.map((g) => (
           <div key={g.wert}>
-            {kartenListe(
-              g.zeilen,
-              <Typography.Text strong>
-                {g.etikett} · {g.zeilen.length}
-              </Typography.Text>,
-            )}
+            {kartenListe(g.zeilen, {
+              inhalt: (
+                <Typography.Text strong>
+                  {g.etikett} · {g.zeilen.length}
+                </Typography.Text>
+              ),
+              unterEbene: gruppen.unterEbene,
+            })}
           </div>
         ))}
         {gruppenKarten.length === 0 && kartenListe([])}

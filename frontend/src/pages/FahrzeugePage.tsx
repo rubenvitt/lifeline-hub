@@ -702,6 +702,8 @@ export default function FahrzeugePage() {
                 schluessel: (ef) => kategorieVon(ef.status_kategorie),
                 etikett: kategorieEtikett,
                 reihenfolge: KATEGORIE_REIHENFOLGE,
+                // Die Gruppenköpfe stehen direkt unter dem Seitentitel (h1).
+                unterEbene: 1,
               }}
               zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
               // Besatzung je Fahrzeug eingeklappt, per Icon aufklappbar; die Ist/Soll-Stärke steht

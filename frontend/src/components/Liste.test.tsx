@@ -162,6 +162,69 @@ describe('Liste', () => {
 });
 
 /**
+ * Gruppenkopf als Überschrift (LFH-470): ein Vorleser springt zwischen Überschriften, nicht
+ * zwischen Divs. Die Ebene kennt nur der Einbauort — deshalb `unterEbene` wie bei `Markdown`.
+ */
+describe('Liste — Kopf ist eine Überschrift und benennt die Liste', () => {
+  it('rendert den Kopf als Überschrift eine Ebene unter `unterEbene`', () => {
+    renderMitProviders(
+      <Liste
+        kopf={{ inhalt: 'Unfallhilfsstelle (2)', unterEbene: 2 }}
+        dataSource={['A', 'B']}
+        renderItem={(t) => <ListenEintrag>{t}</ListenEintrag>}
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 3, name: 'Unfallhilfsstelle (2)' })).toBeVisible();
+  });
+
+  it('folgt dem Einbauort, statt eine feste Ebene zu setzen', () => {
+    renderMitProviders(
+      <Liste
+        kopf={{ inhalt: 'Entwürfe', unterEbene: 5 }}
+        dataSource={['A']}
+        renderItem={(t) => <ListenEintrag>{t}</ListenEintrag>}
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 6, name: 'Entwürfe' })).toBeVisible();
+  });
+
+  it('verbindet die Liste per aria-labelledby mit ihrem Kopf', () => {
+    renderMitProviders(
+      <Liste
+        kopf={{ inhalt: 'Unfallhilfsstelle (2)', unterEbene: 2 }}
+        dataSource={['A', 'B']}
+        renderItem={(t) => <ListenEintrag>{t}</ListenEintrag>}
+      />,
+    );
+    const liste = screen.getByRole('list', { name: 'Unfallhilfsstelle (2)' });
+    const kopf = screen.getByRole('heading', { name: 'Unfallhilfsstelle (2)' });
+    expect(liste.getAttribute('aria-labelledby')).toBe(kopf.id);
+  });
+
+  it('ohne Kopf: weder Überschrift noch Verweis', () => {
+    renderMitProviders(
+      <Liste dataSource={['A']} renderItem={(t) => <ListenEintrag>{t}</ListenEintrag>} />,
+    );
+    expect(screen.queryByRole('heading')).toBeNull();
+    expect(screen.getByRole('list').hasAttribute('aria-labelledby')).toBe(false);
+  });
+
+  it('bei leerer Menge bleibt der Kopf, ein Verweis ins Leere entsteht nicht', () => {
+    const { container } = renderMitProviders(
+      <Liste
+        kopf={{ inhalt: 'Entwürfe', unterEbene: 1 }}
+        dataSource={[]}
+        emptyText="Keine Entwürfe"
+        renderItem={(t: string) => <ListenEintrag>{t}</ListenEintrag>}
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 2, name: 'Entwürfe' })).toBeVisible();
+    expect(screen.queryByRole('list')).toBeNull();
+    expect(container.querySelector('[aria-labelledby]')).toBeNull();
+  });
+});
+
+/**
  * Innenabstände (LFH-328/T14): zieht `Liste` bei einer Dichteumschaltung nicht mit, bleibt die
  * Dichte-Staffel in ihren Masken folgenlos.
  *
@@ -177,7 +240,7 @@ function abstaende(size: 'small' | 'default', dichte?: Dichte) {
       <Liste
         size={size}
         bordered
-        header={<span>Kopf</span>}
+        kopf={{ inhalt: <span>Kopf</span>, unterEbene: 2 }}
         dataSource={['A']}
         renderItem={(t) => <ListenEintrag>{t}</ListenEintrag>}
       />

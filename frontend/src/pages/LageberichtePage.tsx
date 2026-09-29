@@ -242,6 +242,8 @@ export default function LageberichtePage() {
           schluessel: (k) => k.kopf.status,
           etikett: (w) => (w === 'entwurf' ? 'Entwürfe' : 'Freigegeben'),
           reihenfolge: ['entwurf', 'freigegeben'],
+          // Die Gruppenköpfe stehen direkt unter dem Seitentitel (h1).
+          unterEbene: 1,
         }}
         karte={{
           art: 'plan',

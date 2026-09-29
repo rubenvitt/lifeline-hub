@@ -153,6 +153,8 @@ export default function BefehlListe({
           schluessel: (b) => b.status,
           etikett: (w) => (w === 'entwurf' ? 'Entwürfe' : 'Freigegeben'),
           reihenfolge: ['entwurf', 'freigegeben'],
+          // Die Gruppenköpfe stehen unter dem `Bereichskopf` (h3).
+          unterEbene: 3,
         }}
         karte={{
           art: 'plan',
