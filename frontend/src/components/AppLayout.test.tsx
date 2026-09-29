@@ -109,6 +109,15 @@ describe('AppLayout (globale Topbar)', () => {
     expect(screen.getByRole('button', { name: 'Suchen' })).toBeInTheDocument();
   });
 
+  it('setzt den Kopfgrund aus rahmenFarben.grund, statt antds Header-Default zu erben (LFH-437)', async () => {
+    setup(admin);
+    await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
+    // Jede Kontrastaussage über Text in der Kopfleiste rechnet gegen diesen Grund
+    // (`theme/rahmenKontrast.test.ts`). Fehlte er am `Header`, erbte die Leiste still antds
+    // `Layout.headerBg` — kein Wert aus `theme/tokens.ts`, und die Rechnung gälte nicht mehr.
+    expect(screen.getByRole('banner')).toHaveStyle({ backgroundColor: rahmenFarben.grund });
+  });
+
   describe('unter lg', () => {
     // Breite VOR dem Render: antds Beobachter liest beim Abonnieren nur `matches`.
     beforeEach(() => setzeViewportBreite(390));

@@ -1,6 +1,6 @@
 // Öffnungswege der Sprungpalette: Strg/⌘+↵ öffnet das Ziel in einem neuen Tab, → zeigt eine
 // Vorschau IN der Palette (Szenarien aus
-// `openspec/changes/lfh-645-palette-vorschau-neuer-tab/specs/sprungpalette/spec.md`).
+// `openspec/changes/archive/2026-09-29-lfh-645-palette-vorschau-neuer-tab/specs/sprungpalette/spec.md`).
 import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { fireEvent, screen, waitFor } from '@testing-library/react';

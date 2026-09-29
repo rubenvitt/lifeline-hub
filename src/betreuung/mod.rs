@@ -14,7 +14,7 @@
 //! (D5): `etb_eintrag.inhalt` bleibt beim Schwärzen erhalten. Die Textfunktionen in
 //! [`etb_text`] nehmen diese Freitexte deshalb gar nicht erst entgegen.
 //!
-//! Spec: `openspec/changes/lfh-639-fachmodul-betreuung/`
+//! Spec: `openspec/changes/archive/2026-09-29-lfh-639-fachmodul-betreuung/`
 
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
