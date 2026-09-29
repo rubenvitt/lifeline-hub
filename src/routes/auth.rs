@@ -258,11 +258,16 @@ pub async fn providers(
     Ok(Json(public_provider_projektion(liste)))
 }
 
-/// GET /api/auth/providers/admin — Admin-only, volle Liste inkl. deaktivierter Provider.
+/// GET /api/auth/providers/admin — volle Liste inkl. deaktivierter Provider für den
+/// Admin-Bereich. Lesen darf auch die Org-Führungskraft (`darf_admin_bereich`), die Sektion
+/// „Anmeldeverfahren" zeigt ihr die Liste nur lesend; Schalten bleibt Admin-only (LFH-435).
 pub async fn providers_admin(
     State(state): State<AppState>,
-    _admin: crate::auth::session::AdminUser,
+    CurrentUser(benutzer): CurrentUser,
 ) -> Result<Json<Vec<crate::auth::provider::AuthProviderAnzeige>>, AppError> {
+    if !benutzer.darf_admin_bereich() {
+        return Err(AppError::Forbidden);
+    }
     let liste = crate::auth::provider::registry::liste(&state.pool).await?;
     Ok(Json(liste))
 }
