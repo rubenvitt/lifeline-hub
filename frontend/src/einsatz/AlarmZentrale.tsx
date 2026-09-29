@@ -2,7 +2,7 @@ import { App, Badge, Button, Dropdown, Tooltip } from 'antd';
 import { CheckCircleOutlined, DesktopOutlined, StopOutlined } from '@ant-design/icons';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { TbBell, TbBellOff } from 'react-icons/tb';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate } from 'react-router';
 import {
   ALARM_TON_STATUS_EVENT,
   alarmTonStatus,
@@ -107,14 +107,12 @@ function desktopZustand(permission: NotificationPermission | 'unsupported'): Des
  * Ablösungshinweise (von useEinsatzLiveStream ausgelöst) und zeigt NICHT selbst-schließende
  * Toasts mit Deeplink zur Quelle, optional eine Desktop-Benachrichtigung bei Hintergrund-Tab.
  * EIN globaler Mute (Per-User, localStorage) schaltet ALLE Alarmtöne. Im Layout-Kopf montiert,
- * wirkt also seitenunabhängig. Toasts über `App.useApp().notification` (kein statischer Import,
+ * wirkt also seitenunabhängig; die Einsatz-ID reicht der Rahmen schon geprüft herein (LFH-438). Toasts über `App.useApp().notification` (kein statischer Import,
  * sonst Kontext-Leak in Tests).
  */
-export default function AlarmZentrale() {
+export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   const { notification } = App.useApp();
   const navigate = useNavigate();
-  const { id } = useParams();
-  const einsatzId = Number(id);
   const instanzId = useId();
   const [gemutet, setGemutet] = useState(istAlarmGemutet());
   const [permission, setPermission] = useState(desktopPermission());
