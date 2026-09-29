@@ -108,6 +108,35 @@ ohne die Lücke zuzudecken:
   weiterhin fest auf 48 und unterschreiten damit in `handschuh` die geforderten 72. Das ist keine
   stille Dauerausnahme, sondern ein benannter Rest → **LFH-384**. Der e2e-Nachweis nimmt diese
   vier Stellen im Handschuh-Durchgang ausdrücklich aus; er wäre dort per Konstruktion rot.
+  **Nachtrag 29.09.2026 — abgeschlossen mit LFH-384**, siehe den Abschnitt „Z2 — abschliessendes
+  Verdikt" unten.
+
+### Z2 — abschliessendes Verdikt (Nachtrag 29.09.2026, LFH-384)
+
+**Verdikt: erfüllt.** Der Navigationsrahmen folgt der Dichte-Staffel an allen vier Stellen, auf
+beiden Achsen, wo das Ziel icon-only ist. Eine Dauerausnahme nach dem Muster der UHS-Platzkarte
+(B5g) gibt es für den Rahmen **nicht**; entschieden hat der Auftraggeber am 29.09.2026.
+
+| Stelle | bei B5j | nach LFH-384 |
+| --- | --- | --- |
+| IconRail, Zielhöhe | fest 48 (Befund B5j) | `Math.max(62, controlHeight)` → 62 / 62 / 72 (vor LFH-384 nachgezogen) |
+| IconRail, Zielbreite | Spalte fest 60 px → Ziel 59 px | Spalte `railBreite()` = `max(60, controlHeight + 1)` → 60 / 60 / 73, Ziel 59 / 59 / 72 |
+| Markenzelle der Kopfleiste | fest 60 px | liest dieselbe `railBreite()` und fluchtet weiter mit der Rail |
+| Hamburger | fest 48 | `navGriffMass()` = `Math.max(48, controlHeight)` → 48 / 48 / 72, Breite und Höhe (Formel vor LFH-384 nachgezogen, jetzt benannt) |
+| Drawer-Schliesser | fest `minWidth`/`minHeight` 48 | `navGriffMass()` → 48 / 48 / 72 |
+| Akkordeon-Kopf | fest 48 | `Math.max(48, controlHeight)` → 48 / 48 / 72 (Befund LFH-537; gate3 mass ihn bis LFH-384 noch gegen `fest48`) |
+
+**Breitenwirkung.** Die Rail-Spalte wächst nur in `handschuh`, und dort um 13 px. Am
+Führungs-Tablet quer (1024 px) kostet das 13 px Inhalt. Diese Stufe wählt man bewusst, eine
+Vorbelegung über die Zeigerart landet auf `komfortabel`. In `kompakt` und `komfortabel`
+ändert sich nichts.
+
+**Nachweis.** `frontend/e2e/trefflaeche-tablet.spec.ts` misst im Handschuh-Durchgang die
+Rail-Ziele in Höhe und Breite (quer, 1024 px) sowie Hamburger, Akkordeon-Köpfe,
+Drawer-Modulzeilen und Schliesser (hochkant, 768 px, Drawer-Zweig); die Ausnahme im
+Dateikopf ist entfallen. `frontend/e2e/gate3-trefflaeche.spec.ts` hat den Boden `fest48`
+gestrichen. Die reinen Funktionen `railBreite` (`components/Kopfleiste.test.tsx`) und
+`navGriffMass` (`einsatz/EinsatzLayout.test.tsx`) sind gegen Literale gepinnt.
 
 ### Was diese Prüfliste nicht beweist
 

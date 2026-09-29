@@ -41,7 +41,7 @@ interface Props {
 
 /**
  * 48 px ist die Trefffläche des Berührungsfalls (Material 48 dp), dieselbe Zahl wie an der
- * Rail — eine Trefffläche, keine Dichte-Angabe.
+ * Rail — ein BODEN unter der Staffel, nie ihr Deckel: `handschuh` hält 72 (LFH-384).
  */
 const TREFFLAECHE = 48;
 

@@ -52,10 +52,19 @@ import { useWarnsperre } from '../theme/ThemeModeProvider';
 const { Header, Content } = Layout;
 
 /**
- * 48 px (Material 48 dp) — Boden für den Hamburger (Handschuh: 72 px) und den Schließen-Knopf
- * des Drawers, der von Haus aus kleiner ist.
+ * 48 px (Material 48 dp) — Boden für den Hamburger und den Schließen-Knopf des Drawers, der
+ * von Haus aus kleiner ist. Gelesen wird nur {@link navGriffMass}.
  */
 const TREFFLAECHE = 48;
+
+/**
+ * Kantenmaß der zwei Griffe des Drawer-Zweigs (Hamburger, Drawer-Schließer): A1-Boden, darüber
+ * die Staffel — 48 / 48 / 72; eine feste 48 unterschritt `handschuh` um 24 px (LFH-384). Rein
+ * und exportiert, damit die Zusicherung ohne Rendern prüfbar ist.
+ */
+export function navGriffMass(token: { controlHeight: number }): number {
+  return Math.max(TREFFLAECHE, token.controlHeight);
+}
 
 /**
  * Die Kommandoleiste: 52 px auf dem modusunabhängig dunklen Rahmengrund, Haarlinie unten,
@@ -282,8 +291,8 @@ export default function EinsatzLayout() {
                 // `flexShrink: 0`: sonst drückt der Inhalt daneben den Knopf auf dem Handschirm auf die halbe
                 // Trefffläche. Die Farbe folgt dem dunklen Rahmengrund, nicht dem Modus.
                 style={{
-                  width: Math.max(TREFFLAECHE, token.controlHeight),
-                  height: Math.max(TREFFLAECHE, token.controlHeight),
+                  width: navGriffMass(token),
+                  height: navGriffMass(token),
                   flexShrink: 0,
                   color: rahmenFarben.text,
                 }}
@@ -418,7 +427,8 @@ export default function EinsatzLayout() {
           open={navOffen}
           onClose={() => setNavOffen(false)}
           destroyOnHidden
-          styles={{ close: { minWidth: TREFFLAECHE, minHeight: TREFFLAECHE } }}
+          // Der Schließer folgt der Staffel wie der Hamburger, der ihn öffnet (LFH-384).
+          styles={{ close: { minWidth: navGriffMass(token), minHeight: navGriffMass(token) } }}
         >
           <ModulAkkordeon
             kategorien={kategorien}

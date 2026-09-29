@@ -15,10 +15,13 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * eine Regression auf 44–47 px durch. Der Handschuh-Durchgang belegt, dass die Zeile der
  * STUFE folgt und kein festes `minHeight: 48` trägt.
  *
- * Kein routenweiter Scan: Drawer-Schließer und Akkordeon-Kopf tragen ein festes
- * `minHeight: 48` (LFH-537); sie stehen auf dieser Route nicht im Baum, ein Scan auf schmalem
- * Schirm liefe aber per Konstruktion rot. IconRail und Hamburger rechnen dagegen
- * `Math.max(48, controlHeight)` und folgen der Staffel.
+ * DER NAVIGATIONSRAHMEN FOLGT DER STAFFEL AUF BEIDEN ACHSEN (LFH-384). Die vier Stellen, die
+ * bis dahin ausgenommen waren — IconRail, Hamburger, Drawer-Schließer, Akkordeon-Kopf —
+ * rechnen `Math.max(48, controlHeight)`; die Rail-Spalte wächst in `handschuh` auf 73 px
+ * (72 Ziel + Haarlinie), statt ihre Breite als Dauerausnahme zu behalten (Entscheidung vom
+ * 29.09.2026, Nachtrag Z2 in `docs/superpowers/specs/2026-07-28-rahmen-pruefliste.md`).
+ * Rail und Modul-Panel misst der Durchgang am Tablet QUER (1024, inline-Rahmen), Hamburger,
+ * Akkordeon und Schließer der Durchgang HOCHKANT (768, unter antds `lg` — der Drawer-Zweig).
  *
  * DIE BREITE der Blasenknöpfe trägt einen Boden am Kontext (`antdKnopf()`, `minWidth` =
  * kleine Steuerhöhe). Eine bloße Breitenmessung pinnte den Wortlaut — mit langem `okText`
@@ -30,6 +33,9 @@ test.use({ hasTouch: true });
 
 /** Führungs-Tablet nach A1: 1024 × 768, über antds `lg` (992) — der inline-Rahmen steht. */
 const TABLET = { width: 1024, height: 768 };
+
+/** Dasselbe Tablet hochkant: 768 liegt unter antds `lg`, der Rahmen wird zum Drawer. */
+const TABLET_HOCHKANT = { width: 768, height: 1024 };
 
 /**
  * Subpixel-Spielraum für JEDEN Maßvergleich: `boundingBox()` liefert Fließkomma
@@ -158,13 +164,18 @@ for (const { dichte, soll } of STAFFEL) {
 
     // ── (b) die Kategorie-Ziele der IconRail ──────────────────────────────────────────
     // Auf die Landmarke gescopt: „Lage" steht auch als Panel-Überschrift im Baum.
+    // BEIDE Achsen: die Spalte ist fest, ein Ziel kann nur so breit sein wie sie (LFH-384).
     const rail = page.getByRole('navigation', { name: 'Kategorien' });
     for (const kategorie of ['Führung', 'Lage']) {
-      await haeltTreffflaeche(
+      const breite = await haeltTreffflaeche(
         rail.getByRole('button', { name: kategorie, exact: true }),
         soll,
         `Kategorie-Ziel „${kategorie}"`,
       );
+      expect(
+        breite,
+        `Kategorie-Ziel „${kategorie}" (gemessen ${breite}px breit, Soll ≥ ${soll})`,
+      ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
     }
 
     // ── (c) die AKTIONSKNÖPFE einer Bestätigungsblase, nicht ihr Auslöser ─────────────
@@ -210,6 +221,83 @@ for (const { dichte, soll } of STAFFEL) {
     // die Bedienbarkeit.
     await blase.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     await expect(blase).toHaveCount(0);
+  });
+}
+
+/**
+ * Der Drawer-Zweig am Tablet HOCHKANT: Hamburger, Akkordeon-Köpfe, Modulzeilen im Drawer und
+ * der Drawer-Schließer. Bis LFH-384 nahm diese Datei die Stellen im Handschuh-Durchgang aus —
+ * Schließer und Kopf standen fest auf 48 und wären per Konstruktion rot gewesen.
+ *
+ * Die icon-only-Griffe (Hamburger, Schließer) auf BEIDEN Achsen: sie setzen Breite und Höhe
+ * aus derselben Zahl, und ein Griff, der nur in der Höhe wächst, trifft man mit dem Handschuh
+ * trotzdem nicht. Die Köpfe und Modulzeilen sind drawerbreit, dort zählt die Höhe.
+ */
+for (const { dichte, soll } of STAFFEL) {
+  test(`Führungs-Tablet hochkant, Stufe ${dichte}: Hamburger, Akkordeon und Drawer-Schließer halten ${soll} px`, async ({
+    page,
+  }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `Trefflaeche Drawer ${dichte} ${Date.now()}`);
+
+    await page.setViewportSize(TABLET_HOCHKANT);
+    // `…/personal` klappt „Kräfte & Mittel" auf — die Modulzeilen stehen ohne Klick im Drawer.
+    await page.goto(`/einsaetze/${einsatzId}/personal`);
+    if (dichte === 'handschuh') {
+      await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+        DICHTE_SCHLUESSEL,
+        dichte,
+      ] as const);
+      await page.reload();
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+
+    // Wache: hier gilt der Drawer-Zweig — sonst mäße der Test den inline-Rahmen ein zweites Mal.
+    await expect(page.getByRole('navigation', { name: 'Kategorien' })).toHaveCount(0);
+
+    const hamburger = page.getByRole('button', { name: 'Navigation öffnen' });
+    const griffBreite = await haeltTreffflaeche(hamburger, soll, 'Hamburger');
+    expect(
+      griffBreite,
+      `Hamburger (gemessen ${griffBreite}px breit, Soll ≥ ${soll})`,
+    ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
+
+    await hamburger.click();
+    const drawer = page.getByRole('dialog');
+    await expect(drawer).toBeVisible();
+    const nav = drawer.getByRole('navigation', { name: 'Einsatz-Navigation' });
+    await expect(nav).toBeVisible();
+
+    // Kategorie-Köpfe tragen `aria-expanded`, Modulknöpfe nicht — das trennt beide ohne
+    // Strukturselektor. Mindestmengen: sechs Kategorien, fünf Module in „Kräfte & Mittel".
+    const koepfe = nav.locator('button[aria-expanded]');
+    const module = nav.locator('button:not([aria-expanded])');
+    expect(await koepfe.count(), 'mindestens sechs Akkordeon-Köpfe').toBeGreaterThanOrEqual(6);
+    expect(await module.count(), 'mindestens fünf Modulzeilen').toBeGreaterThanOrEqual(5);
+    for (const [menge, name] of [
+      [koepfe, 'Akkordeon-Kopf'],
+      [module, 'Drawer-Modulzeile'],
+    ] as const) {
+      const anzahl = await menge.count();
+      for (let i = 0; i < anzahl; i += 1) {
+        await haeltTreffflaeche(menge.nth(i), soll, `${name} #${i + 1}`);
+      }
+    }
+
+    const schliesser = drawer.locator('.ant-drawer-close');
+    const schliesserBreite = await haeltTreffflaeche(schliesser, soll, 'Drawer-Schließer');
+    expect(
+      schliesserBreite,
+      `Drawer-Schließer (gemessen ${schliesserBreite}px breit, Soll ≥ ${soll})`,
+    ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `${dichte}: Hamburger ${griffBreite}px, Schließer ${schliesserBreite}px breit`,
+    });
+
+    // Der Schließer bedient: der Klick schließt den Drawer.
+    await schliesser.click();
+    await expect(drawer).toBeHidden();
   });
 }
 

@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { theme } from 'antd';
-import { RAIL_BREITE } from '../components/Kopfleiste';
+import { railBreite } from '../components/Kopfleiste';
 import { form, rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 import type { Kategorie, KategorieKey } from './modulRegistry';
 import { fussFokusabstandStil, useFussFokusabstand } from './fussFokusabstand';
@@ -116,7 +116,8 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
         background: rahmenFarben.grund,
         borderInlineEnd: `1px solid ${rahmenFarben.linie}`,
         minHeight: '100%',
-        width: RAIL_BREITE,
+        // Wächst in `handschuh` mit, damit das Ziel auch in der Breite 72 hält (LFH-384).
+        width: railBreite(token),
         flexShrink: 0,
         boxSizing: 'border-box',
       }}

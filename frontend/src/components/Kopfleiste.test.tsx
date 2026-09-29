@@ -8,6 +8,7 @@ import {
   syncZeigtWort,
   formatiereUhr,
   kopfZelleStil,
+  railBreite,
   syncZustand,
   wortmarkeStil,
 } from './Kopfleiste';
@@ -70,6 +71,22 @@ describe('Kopfleiste · Stile', () => {
     expect(stil.minHeight).toBe(52);
     expect(stil.borderInlineEnd).toContain('1px solid');
     expect(kopfZelleStil({ padding: 11 }, 'keiner').borderInlineEnd).toBeUndefined();
+  });
+
+  it('die Rail-Spalte wächst in `handschuh` mit, sonst hält sie die Entwurfsbreite (LFH-384)', () => {
+    // Literale, nicht aus `dichten` zurückgelesen. 73 = 72 px Ziel plus die 1-px-Haarlinie,
+    // die in der `border-box`-Spalte von der Zielbreite abgeht.
+    const t = (s: keyof typeof dichten) => ({ controlHeight: dichten[s].zeilenhoehe });
+    expect(railBreite(t('kompakt'))).toBe(60);
+    expect(railBreite(t('komfortabel'))).toBe(60);
+    expect(railBreite(t('handschuh'))).toBe(73);
+  });
+
+  it('das Ziel in der Rail-Spalte hält auf jeder Stufe die Steuerhöhe in der Breite', () => {
+    for (const s of Object.keys(dichten) as (keyof typeof dichten)[]) {
+      const controlHeight = dichten[s].zeilenhoehe;
+      expect(railBreite({ controlHeight }) - 1).toBeGreaterThanOrEqual(controlHeight);
+    }
   });
 
   it('formatiert die Uhr als HH:MM', () => {

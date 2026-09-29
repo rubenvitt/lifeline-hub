@@ -279,6 +279,9 @@ anwendbar), „nicht geprüft" ist keins.
   Schuldmenge `OFFEN` schrumpft nur, im selben Commit wie der Fix; Stand: UHS-Platzkarte in
   `pages/uhs/Grundriss.tsx`, nur in `kompakt`, sonst `platzBedienform`). `Card`/`Descriptions`/
   `Space`/`Liste` dürfen klein bleiben.
+- **Der Navigationsrahmen hat keine Dichte-Ausnahme** (LFH-384): die 48 ist Boden, nie Deckel
+  (`Math.max(48, controlHeight)`, Griffe über `navGriffMass`); die Rail-Spalte wächst mit
+  (`railBreite` in `components/Kopfleiste.tsx`, 73 px in `handschuh`).
 - Knopfboden `minWidth` = `controlHeightSM` (`antdKnopf()` in `theme/tokens.ts`). `Switch` über
   `switchMasse`/`antdKomponenten(farben, dichte)`; Nachweis am CSS der `css-var-…`-Klasse über
   `innerHTML`, nicht `textContent`. Schalter in fester Breite brechen um, statt zu kürzen

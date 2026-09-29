@@ -25,14 +25,32 @@ import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
  * DER RAHMEN IST IN BEIDEN MODI DUNKEL. Alle Farben kommen deshalb aus `rahmenFarben` bzw.
  * `farbenDunkel`, NICHT aus dem modusabhängigen antd-Token.
  *
- * MASSE: 52 px Kopfhöhe und 60 px Markenzelle sind LAYOUTMASSE, keine Trefflächen. Die Kopfhöhe
- * ist ein BODEN: in `komfortabel`/`handschuh` wachsen die Bedienziele (48 / 72), und die Leiste
- * wächst mit.
+ * MASSE: 52 px Kopfhöhe und 60 px Markenzelle sind LAYOUTMASSE, keine Trefflächen. Beide sind
+ * BÖDEN: in `komfortabel`/`handschuh` wachsen die Bedienziele (48 / 72), und der Rahmen wächst
+ * mit — die Markenzelle folgt der Rail-Spalte ({@link railBreite}, LFH-384).
  */
 export const KOPF_HOEHE = 52;
 
-/** Breite der Rail und damit der Markenzelle links oben — beide fluchten im Entwurf. */
-export const RAIL_BREITE = 60;
+/**
+ * Breite der Rail und damit der Markenzelle links oben — beide fluchten im Entwurf. Die
+ * 60 px sind ein BODEN, nicht die Breite: gelesen wird immer {@link railBreite}.
+ */
+const RAIL_BREITE = 60;
+
+/** Die Haarlinie rechts an Rail und Markenzelle; sie geht in der Spalte vom Ziel ab. */
+const RAIL_LINIE = 1;
+
+/**
+ * Breite der Rail-Spalte zur Dichtestufe (LFH-384): die Entwurfsbreite als Boden, darüber
+ * wächst sie mit, bis das Kategorie-Ziel auch in der BREITE `controlHeight` hält — in
+ * `handschuh` 73 px (72 Ziel + Haarlinie), sonst 60. Entscheidung des Auftraggebers vom
+ * 29.09.2026: die Spalte wächst, statt die Breite als Dauerausnahme festzuschreiben; der
+ * Preis sind 13 px Inhalt, und nur in der Stufe, die man bewusst wählt. REIN und exportiert,
+ * damit die Zusicherung ohne Rendern prüfbar ist (antds Seed im Vitest kennt die Staffel nicht).
+ */
+export function railBreite(token: { controlHeight: number }): number {
+  return Math.max(RAIL_BREITE, token.controlHeight + RAIL_LINIE);
+}
 
 /**
  * Eine Zelle der Kommandoleiste: volle Höhe, Inhalt mittig, Haarlinie als Trenner.
@@ -85,13 +103,15 @@ export const KOPF_SUCHE_FLEX = '1 1 180px';
 
 /** Markenzelle: 14-px-Quadrat in `marke`, in Rail-Breite. Reine Dekoration. */
 export function Markenzelle() {
+  const { token } = theme.useToken();
+  const breite = railBreite(token);
   return (
     <div
       aria-hidden="true"
       data-lfh="kopf-marke"
       style={{
-        width: RAIL_BREITE,
-        flex: `0 0 ${RAIL_BREITE}px`,
+        width: breite,
+        flex: `0 0 ${breite}px`,
         minHeight: KOPF_HOEHE,
         display: 'flex',
         alignItems: 'center',
