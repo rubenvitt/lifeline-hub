@@ -30,6 +30,7 @@ interface MapHaken {
   listImages(): string[];
   getImage(id: string): { data: { width: number; height: number } } | null | undefined;
   setStyle(style: unknown, opts: { diff: boolean }): void;
+  queryRenderedFeatures(o: { layers: string[] }): Array<{ properties: { typ?: string } }>;
 }
 
 async function anmelden(page: Page) {
@@ -372,5 +373,58 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
     await expect
       .poll(zeichenBilder, { timeout: 15_000, message: 'Zeichen nach Stilwechsel nicht zurück' })
       .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68 }]);
+  });
+
+  // Gezählt wird, was GEZEICHNET ist, nicht, was registriert ist: MapLibre 6 baut die Bildantwort
+  // einer Kachel, bevor es `styleimagemissing` feuert — ein erst dort angelegtes Bild fehlte im
+  // laufenden Layout, und nach einem Stilwechsel kommt ohne neue Daten kein weiteres Layout.
+  test('jedes Schadenszeichen ist gezeichnet, auch nach einem Stilwechsel', async ({ page }) => {
+    await anmelden(page);
+    const eid = await einsatzAnlegenUndOeffnen(page);
+    const ort = { lat: 49.3519, lon: 9.1457 };
+    await einsatzortSetzen(page, eid, ort);
+    // Je ein Quadrant um den Einsatzort: im Bild bei Zoom 14, und weit genug auseinander, dass
+    // nichts zum Cluster zusammenfällt (clusterRadius 45 px).
+    const lagen = [
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1],
+    ];
+    for (const [i, ausmass] of ['gering', 'mittel', 'gross', 'katastrophal'].entries()) {
+      const r = await page.request.post(`/api/einsaetze/${eid}/schaeden`, {
+        data: {
+          typ: 'sachschaden',
+          ausmass,
+          ort: `Schadenstelle ${i + 1}`,
+          lat: ort.lat + 0.0028 * lagen[i][0],
+          lon: ort.lon + 0.004 * lagen[i][1],
+        },
+      });
+      expect(r.ok(), await r.text()).toBeTruthy();
+    }
+    await page.goto(`/einsaetze/${eid}/lagekarte`);
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+    );
+    const gezeichnet = () =>
+      page.evaluate(() => {
+        const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+        if (!map) return null;
+        return map
+          .queryRenderedFeatures({ layers: ['marker-symbol'] })
+          .filter((f) => f.properties.typ === 'schaden').length;
+      });
+    await expect
+      .poll(gezeichnet, { timeout: 10_000, message: 'nicht jedes Schadenszeichen ist gezeichnet' })
+      .toBe(4);
+
+    await page.evaluate(() => {
+      const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte!;
+      map.setStyle(map.getStyle(), { diff: false });
+    });
+    await expect
+      .poll(gezeichnet, { timeout: 10_000, message: 'nach dem Stilwechsel fehlen Zeichen' })
+      .toBe(4);
   });
 });
