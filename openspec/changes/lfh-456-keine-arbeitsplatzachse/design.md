@@ -10,8 +10,13 @@ Zur Motivation siehe `proposal.md`. Stand am 29.09.2026 (Worktree auf `origin/al
   `einsatz/schreibrecht.ts` sie aus. Keine davon kennt einen fachlichen Arbeitsplatz.
 - **Kontext-Achse (LFH-327):** gilt je Gerät. Theme, Dichte und Helligkeit stehen im
   `localStorage` (`lifeline-hub.theme`, `.dichte`, `.helligkeit`, `theme/ThemeModeProvider.tsx`).
-  Die Vorgabe `komfortabel` ist dort als „Fükw-Arbeitsplatz“ kommentiert. Gemeint ist das
-  Gerät, nicht die Person.
+  Die Vorgabe `kompakt` (`DICHTE_DEFAULT`) ist dort als „Fükw-Arbeitsplatz“ kommentiert.
+  Gemeint ist das Gerät, nicht die Person.
+- **Je Person gespeichert** ist allein das Befehlsgedächtnis der Sprungpalette („Zuletzt“,
+  `command-palette/zuletztBefehle.ts`). Es liegt serverseitig, damit am geteilten Fükw die
+  nächste Schicht nicht das Gedächtnis der vorigen erbt. Der Schlüsselraum ist geschlossen:
+  `benutzer_einstellungen::BEKANNTE_SCHLUESSEL` enthält nur `zuletzt_befehle`, jeder andere
+  Schlüssel gibt 400 (`tests/benutzer_einstellungen.rs::unbekannter_schluessel_ist_400`).
 - **Startziel:** `standard_modul` ist eine Einstellung **des Einsatzes** und gilt für alle
   Beteiligten (`src/einsatz/einstellungen.rs`, `einsatz/DefaultModulRedirect.tsx`,
   Rückfall `redirectZiel()` = Führung · Überblick). Einen Hebel je Person oder je Gerät gibt
@@ -20,8 +25,9 @@ Zur Motivation siehe `proposal.md`. Stand am 29.09.2026 (Worktree auf `origin/al
   inzwischen zwei Produktiv-Aufrufer:
   - `pages/uhs/UhsDetailPage.tsx`: „Patient aufnehmen“ als Primäraktion, nur mit
     Schreibrecht und bei UHS-Status `aktiv`, mit `?uhs=<id>`. Das kam mit LFH-341/C6.
-  - `pages/lage-dashboard/LagePaneele.tsx`: im Sichtungspaneel die Leeraktion
-    „Person aufnehmen“.
+  - `pages/lage-dashboard/LageDashboardPage.tsx` (`onAufnehmen`): die Leeraktion
+    „Person aufnehmen“ im Sichtungspaneel, das `LagePaneele.tsx` rendert. Sie hängt nicht am
+    Schreibrecht, die Zielseite prüft selbst (D2).
 - **Präzedenzfälle ohne Achse:**
   - Die Sprungmarken (LFH-620, `einsatz/sprungmarken.ts`) „Patienten“ und „Vermisste“ sind
     Einstiege, die nach Aufgabe geschnitten sind, ohne Modul und ohne Rollenbezug.
@@ -87,10 +93,10 @@ ausblenden, wie in der UHS-Kopfzeile.
   Einen rollenbezogenen Einstieg gibt es nicht.
 - Wer den ganzen Tag aufnimmt, legt sich die Adresse als Lesezeichen an.
 - Die Palette behält „Neue Person erfassen“ für die Einzelerfassung (Liste + Modal). Ein
-  eigener Aufnahme-Befehl würde gegen `schnellaktionen.guard.test.ts` laufen: Jede
-  Schnellaktion trägt `?neu=1` auf einer Seite, die das liest, und die Aufnahme-Route liest es
-  nicht. Außerdem pinnt `befehle.test.ts` die Tabelle per `toEqual`. Die Trennung ist also
-  schon strukturell gesichert.
+  eigener Aufnahme-Befehl macht `befehle.test.ts` rot: Dort sind die Liste der
+  Schnellaktions-IDs und ihre Ziele per `toEqual` gepinnt. `schnellaktionen.guard.test.ts`
+  hält ihn nur so lange fern, wie das Ziel kein `neu=1` trägt. Der Guard prüft je Modul und
+  löst keine Routen auf. Ein Ziel `…/personen/aufnahme?neu=1` käme dort also durch.
 
 ### D4 — Fachliche Arbeitsplätze und ihr heutiger Einstieg
 
@@ -100,7 +106,7 @@ ausblenden, wie in der UHS-Kopfzeile.
 | Einzelerfassung einer Person | Personenliste + `ErfassungsModal` | Sprungpalette „Neue Person erfassen“ (`personenPfad(…, { neu: true })`) |
 | Sichtung | Personen im Sichtungsraster | Sprungmarke „Patienten“ (LFH-620), Sichtungspaneel im Überblick |
 | UHS-/BHP-/BTP-Leitung | `uhsDetailPfad` (Grundriss, Belegung) | Modul Unfallhilfsstellen, Sprungpalette |
-| Bereitstellungsraum | `bereitstellungsraumDetailPfad` | Modul Bereitstellungsräume, Sprungpalette |
+| Bereitstellungsraum | `bereitstellungsraumDetailPfad` | Modul Bereitstellungsräume (die Palette führt nur das Modul, keine einzelnen Räume) |
 | Führungsassistenz | ETB mit Erfassungsleiste, Stab (`stabPfad`), Überblick als Startseite | Modulnavigation, Sprungpalette, `standard_modul` des Einsatzes |
 | Transportorganisation | **keine eigene Fläche** | Transport ist eine Verbleib-Art der Person (`personen/verbleibErfassungKern.ts`). Die Bilanz „Transportiert / offen“ steht im Sichtungspaneel |
 
@@ -119,12 +125,27 @@ Variante 2 wird neu vorgelegt, wenn **eine** dieser Bedingungen belegt ist:
 Eine Anforderung, die Rechte vom Arbeitsplatz abhängig machen will, fällt nicht darunter. Sie
 gehört an die Rechteachse und wäre eine eigene Entscheidung gegen D2.
 
+### Belege je Szenario
+
+| Szenario | Beleg |
+|---|---|
+| Gleiche Rechte, gleiche Bedienung | Kein Test. Getragen durch Review: `redirectZiel`/`aufloeseStandardModul` (`einsatz/modulRegistry.ts`) nehmen keinen Benutzer, `meine_rolle` liest nur `einsatz/schreibrecht.ts`. Ein Test wird bewusst nicht gebaut, weil eine Abwesenheit über alle Seiten keinen scharfen Guard hat |
+| Es gibt keine Arbeitsplatzwahl | Serverseitig `tests/benutzer_einstellungen.rs::unbekannter_schluessel_ist_400` (geschlossener Schlüsselraum). Im Gerät (`localStorage`) nur durch Review |
+| Einstieg gewährt kein Schreibrecht | `pages/personen/AufnahmePage.test.tsx` (Beobachter: „Keine Schreibberechtigung“, keine Maske) |
+| Aufnahme aus der Unfallhilfsstelle / Keine Aufnahme in einer geplanten UHS | `pages/uhs/UhsDetailPage.test.tsx` (LFH-341 · H38) |
+| Aufnahme aus dem leeren Sichtungspaneel | `pages/lage-dashboard/LageDashboardPage.test.tsx` (Leeraktion „Person aufnehmen“) |
+| Lesezeichen auf die Aufnahme | `pages/personen/AufnahmePage.test.tsx` (rendert unter `/einsaetze/:id/personen/aufnahme`) |
+| Palette führt zur Einzelerfassung | `command-palette/befehle.test.ts` (Ziel-Pin), `pages/PersonenPage.test.tsx` (`?neu=1` öffnet die Maske) |
+
 ## Risks / Trade-offs
 
 - [Eine Person muss ihren Arbeitsplatz selbst finden] → Die Einstiege sitzen dort, wo die Arbeit
   anfällt (UHS-Kopf, Überblick), und die Adresse ist stabil. Reicht das nicht, greift D5.
 - [Das Ticket ging von null Aufrufern aus, die Lage hat sich seitdem verschoben] → Der Stand ist
-  in Context belegt, und die Spec zitiert die tragenden Tests. Fällt ein Einstieg weg, wird
-  sein Test rot.
+  in Context belegt. „Belege je Szenario“ nennt die tragenden Tests. Fällt ein Einstieg weg,
+  wird sein Test rot.
+- [Die beiden Abwesenheits-Szenarien haben keinen Test] → Getragen durch den geschlossenen
+  Schlüsselraum am Server und durch Review. Eine Arbeitsweise im `localStorage` fiele erst im
+  Review auf.
 - [Die Kontext-Achse wird als „Arbeitsplatz“ missverstanden, siehe Kommentar in
   `ThemeModeProvider.tsx`] → Der CLAUDE.md-Absatz sagt ausdrücklich, dass das Gerät gemeint ist.

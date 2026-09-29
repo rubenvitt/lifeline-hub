@@ -12,15 +12,17 @@ aufgabengeschnittene Flächen, nicht als dritte Bedienachse neben Form und Konte
 
 Startziel eines Einsatzes, Primäraktion einer Seite, Reihenfolge der Module und Dichte-Vorgabe
 SHALL NOT davon abhängen, welchen fachlichen Arbeitsplatz eine Person besetzt. Das gilt auch
-für eine gewählte oder gemerkte „Arbeitsweise“. Unterschiede zwischen zwei Personen im selben
-Einsatz auf demselben Gerät MUST allein aus ihren Rechten kommen (Rolle im Einsatz,
-Systemrolle, Modulfreigabe) oder aus Einstellungen, die für alle gelten: Einstellungen des
-Einsatzes sowie Theme, Dichte und Helligkeit des Geräts.
+für eine gewählte oder gemerkte „Arbeitsweise“. Unterscheiden sich diese vier Größen zwischen
+zwei Personen im selben Einsatz auf demselben Gerät, MUST der Unterschied allein aus ihren
+Rechten kommen (Rolle im Einsatz, Systemrolle, Modulfreigabe). Einstellungen des Einsatzes und
+Theme, Dichte und Helligkeit des Geräts gelten für beide gleich. Das Befehlsgedächtnis der
+Sprungpalette („Zuletzt“) ist je Person gespeichert. Es ordnet nur Palettenzeilen und berührt
+keine der vier Größen.
 
 #### Scenario: Gleiche Rechte, gleiche Bedienung
 
-- **WHEN** zwei Personen mit derselben Rolle im Einsatz nacheinander denselben Einsatz auf
-  demselben Gerät öffnen
+- **WHEN** zwei Personen mit denselben Rechten (Rolle im Einsatz, Systemrolle, Modulfreigabe)
+  nacheinander denselben Einsatz auf demselben Gerät öffnen
 - **THEN** landen beide auf demselben Startziel und sehen dieselbe Modulreihenfolge
 - **AND** zeigt jede Seite beiden dieselbe Primäraktion
 

@@ -17,7 +17,8 @@ Entschieden am 29.09.2026: **keine dritte Achse** (Variante 1 aus LFH-456).
   Leeraktion eines Paneels, Sprungpalette sowie Deeplink bzw. Lesezeichen am Gerät. Was am
   Gerät hängt, trägt die Kontext-Achse aus LFH-327.
 - Festgehalten wird auch die **Nicht-Zuständigkeit**: Rechte und Datensichtbarkeit kommen
-  weiter allein aus `EinsatzRolle` und `einsatz/schreibrecht.ts`. Keine Arbeitsplatzangabe
+  weiter allein aus `EinsatzRolle`, Systemrolle und Modulfreigabe (ausgewertet in
+  `einsatz/schreibrecht.ts` und `berechtigung::erlaubte_module`). Keine Arbeitsplatzangabe
   verändert sie, und keine Rolle formt Startziel, Primäraktion oder Modulreihenfolge.
 - Benannt werden die fachlichen Arbeitsplätze mit ihrem heutigen Einstieg. Wo es keinen gibt
   (Transportorganisation), steht das als Lücke da und wird nicht erfunden.
@@ -43,7 +44,6 @@ Entschieden am 29.09.2026: **keine dritte Achse** (Variante 1 aus LFH-456).
 
 - `CLAUDE.md`: neuer Absatz im Frontend-Teil.
 - `openspec/specs/bedien-arbeitsplatz/spec.md` (nach dem Archivieren).
-- Code: keiner. Das spezifizierte Verhalten besteht schon. Belege sind
-  `pages/uhs/UhsDetailPage.test.tsx` (LFH-341 · H38) und die Tests des Überblicks für die
-  Leeraktion „Person aufnehmen“.
+- Code: keiner. Das spezifizierte Verhalten besteht schon. Die Belege je Szenario stehen in
+  `design.md` („Belege je Szenario“).
 - ClickUp: LFH-456 wird mit Variante 1 abgeschlossen, ohne Folge-Tasks.

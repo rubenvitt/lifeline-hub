@@ -489,7 +489,8 @@ Spec `bedien-arbeitsplatz`).
   taugt. Was je Standort verschieden ist, trägt die Kontext-Achse **am Gerät**; „Fükw-Arbeitsplatz“
   in `ThemeModeProvider.tsx` meint das Gerät. Keine Wahl einer „Arbeitsweise“, keine Vorbelegung
   von Startziel, Primäraktion, Modulreihenfolge oder Dichte je Person; `standard_modul` gilt für
-  den ganzen Einsatz.
+  den ganzen Einsatz. Je Person liegt nur das Palettengedächtnis „Zuletzt“
+  (`benutzer_einstellungen::BEKANNTE_SCHLUESSEL`, geschlossener Schlüsselraum).
 - **Nicht zuständig für Rechte:** Sichtbarkeit und Schreibrecht kommen allein aus `EinsatzRolle`,
   Systemrolle und Modulfreigabe (`einsatz/schreibrecht.ts`, `berechtigung::erlaubte_module`); ein
   Einstieg ist keine Freigabe, die Zielseite prüft selbst. Stabsfunktionen S1–S6 ebenso (LFH-46).

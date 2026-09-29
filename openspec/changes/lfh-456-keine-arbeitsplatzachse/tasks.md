@@ -5,8 +5,10 @@
 - [x] 1.1 Die Szenarien der Spec laufen gegen die tragenden Tests. Dazu grün ausführen:
   `pages/uhs/UhsDetailPage.test.tsx` (LFH-341 · H38), `pages/lage-dashboard/LageDashboardPage.test.tsx`
   (Leeraktion „Person aufnehmen“), `pages/personen/AufnahmePage.test.tsx` (ohne Schreibrecht),
-  `command-palette/befehle.test.ts` und `command-palette/schnellaktionen.guard.test.ts`.
-  Nachweis: Vitest-Lauf dieser fünf Dateien ohne Fehler.
+  `command-palette/befehle.test.ts`, `command-palette/schnellaktionen.guard.test.ts` und
+  `pages/PersonenPage.test.tsx` (`?neu=1` öffnet die Maske), dazu serverseitig
+  `tests/benutzer_einstellungen.rs` (geschlossener Schlüsselraum). Nachweis: Vitest-Lauf dieser
+  sechs Dateien und `cargo test --test benutzer_einstellungen` ohne Fehler.
 
 ## 2. Verankerung
 
