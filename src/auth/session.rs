@@ -288,8 +288,8 @@ mod tests {
 
     #[tokio::test]
     async fn sitzung_laeuft_nach_sitzung_tagen_ab() {
-        // LFH-779: das Cookie-`Max-Age` rechnet mit derselben Konstante; wer hier die Dauer
-        // ändert, ändert beide.
+        // LFH-779: das Cookie-`Max-Age` rechnet mit derselben Konstante. Die Cookie-Tests
+        // pinnen die 7 Tage bewusst als Literal: eine andere Dauer ist eine Entscheidung.
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
         anlegen(&pool, id).await.unwrap();
