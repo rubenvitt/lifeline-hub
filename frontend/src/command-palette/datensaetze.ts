@@ -1,4 +1,3 @@
-// frontend/src/command-palette/datensaetze.ts
 import {
   auftragLabel,
   kuerze,
@@ -55,19 +54,14 @@ import type {
 } from '../api/types';
 
 /**
- * Der REINE Trefferkern des Datensatz-Finders (LFH-391 · C1).
+ * Der REINE Trefferkern des Datensatz-Finders: Eingabe sind fertig geladene Listen, ein
+ * Suchbegriff und die `einsatzId`, kein Hook, kein `fetch`. Die Beschaffung liegt in
+ * `useDatensaetze.ts`.
  *
- * Eingabe sind FERTIG GELADENE Listen, ein Suchbegriff und die `einsatzId` — kein `useQuery`,
- * kein Hook, kein `fetch`. Nur so ist der Kern ohne Netz und ohne Render prüfbar; die
- * Beschaffung liegt daneben in `useDatensaetze.ts`.
- *
- * KEINE API-ADRESSE UND KEIN PFAD ENTSTEHEN HIER VON HAND: `routing/inlinePfade.guard.test.ts`
- * ist auf `command-palette/` gescopt, und sein Muster trifft nicht nur Routen, sondern auch
- * API-Adressen — in `/api/einsaetze/<id>/personen` steckt dieselbe Zeichenfolge. Jedes Ziel
- * kommt aus `routing/deeplinks.ts`, jeder Abruf über die Clients in `api/*.ts`.
- *
- * Der Guard liest ROHTEXT, kein AST: er trifft auch einen KOMMENTAR. Die Adresse oben steht
- * deshalb mit `<id>` statt mit einer Interpolationsklammer da (im Bauen einmal getreten).
+ * Kein Pfad und keine API-Adresse entstehen hier von Hand: jedes Ziel kommt aus
+ * `routing/deeplinks.ts`, jeder Abruf über `api/*.ts`. `routing/inlinePfade.guard.test.ts` liest
+ * ROHTEXT und trifft auch Kommentare; Adressen stehen hier deshalb mit `<id>` statt
+ * Interpolationsklammer.
  */
 
 /** Sortenbuchstabe einer gedruckten Kennung: R-042 ist eine Person, S-042 ein Schaden. */
@@ -83,27 +77,22 @@ export interface DatensatzQuellen {
   personal?: EinsatzPersonal[];
   einheiten?: Einheit[];
   /**
-   * Antwort des ETB-CURSORS (`before_lfd_nr = n + 1, limit = 1`). Sie geht ausschliesslich
-   * in den Zahlenzweig und wird dort gegen die gesuchte Nummer GEPRÜFT: `before_lfd_nr`
-   * filtert strikt `<` bei `ORDER BY lfd_nr DESC`, bei einer Nummernlücke liefert der Cursor
-   * also den nächstälteren Eintrag. Ohne den Gleichheitsvergleich böte die Palette still den
-   * falschen Eintrag an — und kein anderer Test sähe das.
+   * Antwort des ETB-CURSORS (`before_lfd_nr = n + 1, limit = 1`), nur für den Zahlenzweig und
+   * dort gegen die gesuchte Nummer GEPRÜFT: bei einer Nummernlücke liefert der Cursor den
+   * nächstälteren Eintrag, ohne Gleichheitsvergleich böte die Palette still den falschen an.
    */
   etbNummer?: EtbEintragAnzeige[];
   /**
-   * SERVERSEITIG per `q` bestätigte ETB-Volltexttreffer. Sie gehen ohne zweiten lokalen
-   * Filter durch: `fts_query` sucht über inhalt/von/an/veranlassung, die Fundstelle steht
-   * also regelmässig NICHT im Label — ein Nachfiltern über das Label würfe genau diese
-   * Treffer weg.
+   * SERVERSEITIG per `q` bestätigte ETB-Volltexttreffer, ohne zweiten lokalen Filter:
+   * `fts_query` sucht über inhalt/von/an/veranlassung, die Fundstelle steht oft NICHT im Label.
    */
   etbText?: EtbEintragAnzeige[];
   /**
-   * Trefferzahl des ETB-Volltexts OHNE Seitendeckel (`GET …/etb/anzahl`, LFH-619). Sie trägt
-   * den Sammeltreffer „Alle Einträge zu …", der auf die gefilterte ETB-Seite springt — die
-   * einzelnen Einträge darüber sind auf fünf gedeckelt, die Zahl nicht.
+   * Trefferzahl des ETB-Volltexts OHNE Seitendeckel (`GET …/etb/anzahl`). Trägt den Sammeltreffer
+   * „Alle Einträge zu …“; die Einzeltreffer sind auf fünf gedeckelt, die Zahl nicht.
    */
   etbAnzahl?: EtbAnzahl;
-  /** LFH-619: Lageberichte (im Kern auf die Kettenköpfe reduziert), Gefahrengebiete, Abschnitte. */
+  /** Lageberichte (im Kern auf die Kettenköpfe reduziert), Gefahrengebiete, Abschnitte. */
   lageberichte?: LageberichtAnzeige[];
   gefahrengebiete?: Gefahrengebiet[];
   abschnitte?: Einsatzabschnitt[];
@@ -114,59 +103,38 @@ export interface DatensatzKontext {
   /** Der Rest hinter einem eventuellen Präfix, nicht die rohe Eingabe. */
   suche: string;
   /**
-   * Der Präfixmodus, der die Quellenmenge einschränkt (LFH-391 · C3).
-   *
-   * PFLICHTFELD, kein optionales mit Vorgabe 'alles': ein vergessener Modus liefe still in
-   * die volle Menge, und genau das ist der Fehler, den man nicht sieht.
+   * Der Präfixmodus, der die Quellenmenge einschränkt. PFLICHTFELD: ein vergessener Modus liefe
+   * still in die volle Menge.
    */
   modus: PaletteModus;
   benutzer: BenutzerAnzeige | null;
   overrides?: ModulOverrides;
   /**
-   * Modulschlüssel der Seite, auf der die Palette geöffnet wurde — `null` ausserhalb eines
-   * Moduls (LFH-391 · C4, Arbeitspunkt 3 des Tickets).
-   *
-   * Er kommt aus `modulAusPfad` (`einsatz/modulRegistry.ts`), also aus der AKTUELLEN ROUTE,
-   * und beantwortet die Frage, die das Ticket stellt: wer im Kräfte-Modul einen
-   * Funkrufnamen tippt, meint mit hoher Wahrscheinlichkeit ein Fahrzeug und nicht die
-   * gleichnamige Person. Wie weit der Vorteil reicht, steht am Sortierschlüssel in
-   * {@link baueDatensatzTreffer}.
-   *
-   * PFLICHTFELD wie `modus`: ein vergessener Kontext ist von „steht in keinem Modul" nicht
-   * zu unterscheiden, und das ist genau der Fall, den niemand bemerkt.
+   * Modulschlüssel der Seite, auf der die Palette geöffnet wurde (`modulAusPfad`), `null` außerhalb
+   * eines Moduls. Wer im Kräfte-Modul einen Funkrufnamen tippt, meint eher das Fahrzeug als die
+   * gleichnamige Person; wie weit der Vorteil reicht, steht in {@link baueDatensatzTreffer}.
+   * PFLICHTFELD wie `modus`: ein vergessener Kontext sähe aus wie „in keinem Modul“.
    */
   aktuellerModulKey: string | null;
-  /** `oeffnung` fehlt = im aktuellen Tab (LFH-645). */
+  /** `oeffnung` fehlt = im aktuellen Tab. */
   navigate: (pfad: string, oeffnung?: Oeffnung) => void;
   quellen: DatensatzQuellen;
 }
 
 /**
- * Höchstens so viele TEXT-Treffer je Quelle …
- *
- * Beide Deckel greifen NACH dem Ordnen (siehe `baueDatensatzTreffer`): die Stufe entscheidet,
- * wer hineinkommt, nicht die Reihenfolge, in der der Server die Liste geliefert hat.
+ * Höchstens so viele TEXT-Treffer je Quelle … Beide Deckel greifen NACH dem Ordnen: die Stufe
+ * entscheidet, wer hineinkommt, nicht die Lieferreihenfolge des Servers.
  */
 const DECKEL_JE_QUELLE = 5;
 /** … und so viele Datensatz-Treffer insgesamt. Nummerntreffer zählen mit, fallen aber nie weg. */
 const DECKEL_GESAMT = 15;
 
 /**
- * Liest eine gedruckte Kennung als Zahl (LFH-391 · C1).
+ * Liest eine gedruckte Kennung als Zahl, für einen EXAKTEN Zahlenvergleich: Fuse über eine Zahl
+ * träfe bei '42' auch R-142 und R-420; bei einer Registriernummer wäre das ein falscher Patient.
  *
- * Fuse über eine Zahl ist unbelegbar: bei `threshold: 0.4` und zweistelligem Muster hängt das
- * Ergebnis an der Bitap-Fehlertoleranz, und '42' träfe R-142, R-420 und R-421 gleichrangig mit.
- * Bei einer Registriernummer ist das keine Unschärfe, sondern ein falscher Patient. Eine
- * gedruckte Kennung wird abgetippt, nicht erraten — deshalb ein EXAKTER Zahlenvergleich.
- *
- * Führende Nullen fallen weg: `registrier_nr` IST eine Zahl, `R-042` nur ihre Anzeige
- * (`registrierAnzeige`). Wer vom Papier abtippt, tippt die Nullen mit.
- *
- * Der Sortenbuchstabe BINDET ('R-42' findet die Person 42, nicht den Schaden 42) — er ist
- * genau die Information, die auf dem Papier steht, und kostet nichts. '#' und die blanke Zahl
- * binden nicht. ('#' ist hier bewusst schon zugelassen: bekommt die Palette später den
- * ETB-Modus '#', zerlegt `parsePraefix` die Eingabe vorher, und diese Stelle sieht die Zahl
- * ohne Zeichen — beide Wege bleiben damit gültig.)
+ * Führende Nullen fallen weg (`R-042` ist nur die Anzeige der Zahl). Der Sortenbuchstabe BINDET
+ * ('R-42' findet die Person 42, nicht den Schaden 42); '#' und die blanke Zahl binden nicht.
  */
 export function zahlAusSuche(suche: string): { nummer: number; sorte: Nummernsorte | null } | null {
   const treffer = /^(?:([rs#])[-\s]?)?(\d+)$/i.exec(suche.trim());
@@ -178,7 +146,7 @@ export function zahlAusSuche(suche: string): { nummer: number; sorte: Nummernsor
   };
 }
 
-/** Eine auf ihre suchbaren Merkmale reduzierte Zeile — eine Form für alle zwölf Entitäten. */
+/** Eine auf ihre suchbaren Merkmale reduzierte Zeile, eine Form für alle Entitäten. */
 interface Kandidat {
   modulKey: string;
   id: number;
@@ -215,15 +183,15 @@ function baueQuelle<T>(
     label: (x: T) => string;
     ziel: (einsatzId: number, x: T) => string;
     /**
-     * Das Vorschauziel (LFH-664) — in DERSELBEN Tabelle wie Beschriftung und Sprungziel,
-     * damit die Zuordnung je Quelle an einer Stelle steht und nicht in `befehlFuer`.
+     * Das Vorschauziel, in DERSELBEN Tabelle wie Beschriftung und Sprungziel, damit die Zuordnung je
+     * Quelle an einer Stelle steht und nicht in `befehlFuer`.
      */
     vorschau?: (einsatzId: number, x: T) => VorschauZiel;
   },
   extra: { sorte?: Nummernsorte; serverGefiltert?: boolean } = {},
 ): Quelle {
-  // Der Modulschlüssel wird NICHT je Zeile hingeschrieben, sondern aus `QUELLE_MODUL`
-  // gezogen — dieselbe Tabelle, an der auch der Abruf seine Rechte prüft.
+  // Der Modulschlüssel kommt aus `QUELLE_MODUL`, derselben Tabelle, an der der Abruf seine Rechte
+  // prüft.
   const modulKey: string = QUELLE_MODUL[quelle];
   return {
     quelle,
@@ -243,22 +211,16 @@ function baueQuelle<T>(
 }
 
 /**
- * Die zwölf Module in EINER Tabelle — Rechteschlüssel, Nummernfeld, Beschriftung und Ziel je
- * Zeile beieinander. Verteilt auf zwölf Zweige wäre jede der vier Regeln zwölfmal zu prüfen.
+ * Die Module in EINER Tabelle: Rechteschlüssel, Nummernfeld, Beschriftung und Ziel je Zeile
+ * beieinander.
  *
- * DIE REIHENFOLGE IST NUR GLEICHSTANDSACHSE, keine Rangfolge: über die Stufe deckelt
- * `baueDatensatzTreffer`, die sichtbare Ordnung macht `ordneTreffer`. Sie folgt der
- * Erfassungshäufigkeit wie
- * `SCHNELLAKTIONEN` (befehle.ts) — im Einsatz wird nach Personen, ETB-Einträgen und Schäden
- * gesucht, nach Einheiten am seltensten.
+ * Die Reihenfolge ist nur Gleichstandsachse (die Ordnung machen Stufe und `ordneTreffer`); sie
+ * folgt der Erfassungshäufigkeit wie `SCHNELLAKTIONEN`.
  *
- * DIE BESCHRIFTUNG IST WIEDERVERWENDET, nicht neu erfunden: `personLabel` behandelt den
- * NULLBAREN Namen (MANV ohne Identität) bereits richtig und fällt auf 'R-042' zurück,
- * `schadenLabel`/`meldungLabel` bringen die formatierte Nummer über
- * `schadenRegistrierAnzeige`/`registrierAnzeige` mit. Die vier fehlenden (ETB, Fahrzeug,
- * Personal, Einheit) entstehen hier und NICHT in `chat/bezug.ts`: dessen Typen hängen am
- * `BezugTyp`-Union mit genau sechs Mitgliedern, und diese vier sind keine Bezugstypen — sie
- * dort einzutragen hiesse, den Chat-Wire-Kontrakt für ein Palettenlabel zu verbreitern.
+ * Beschriftungen sind wiederverwendet (`personLabel` fällt bei fehlendem Namen auf 'R-042'
+ * zurück, `schadenLabel`/`meldungLabel` bringen die Nummer mit). ETB, Fahrzeug, Personal und
+ * Einheit entstehen hier und NICHT in `chat/bezug.ts`: das hinge sie an den Chat-Wire-Kontrakt
+ * `BezugTyp`.
  */
 function quellen(k: DatensatzKontext): Quelle[] {
   const q = k.quellen;
@@ -278,8 +240,8 @@ function quellen(k: DatensatzKontext): Quelle[] {
       },
       { sorte: 'person' },
     ),
-    // Zwei ETB-Quellen, zwei Verträge — siehe `DatensatzQuellen`. Der Cursorzweig steht
-    // zuerst, damit ein Eintrag, den beide Abfragen liefern, als NUMMERNtreffer gilt.
+    // Zwei ETB-Quellen, zwei Verträge (siehe `DatensatzQuellen`). Der Cursorzweig steht zuerst,
+    // damit ein Eintrag, den beide liefern, als NUMMERNtreffer gilt.
     baueQuelle('etbNummer', 'zahl', q.etbNummer, e, {
       id: (x) => x.id,
       nummer: (x) => x.lfd_nr,
@@ -329,8 +291,8 @@ function quellen(k: DatensatzKontext): Quelle[] {
     }),
     baueQuelle('auftraege', 'beide', q.auftraege, e, {
       id: (a) => a.id,
-      // `AuftragAnzeige.lfd_nr` ist NULLBAR (per ADD COLUMN eingeführt). Ohne diesen Riegel
-      // fiele `null` im Vergleich auf `0` oder matchte jede Zahl, je nach Schreibweise.
+      // `AuftragAnzeige.lfd_nr` ist NULLBAR; ohne diesen Riegel fiele `null` auf `0` oder matchte
+      // jede Zahl.
       nummer: (a) => a.lfd_nr ?? null,
       label: auftragZeile,
       ziel: (id, a) => auftraegePfad(id, { auftrag: a.id }),
@@ -355,13 +317,9 @@ function quellen(k: DatensatzKontext): Quelle[] {
       ziel: (id, x) => einheitDetailPfad(id, x.id),
       vorschau: (einsatzId, x) => ({ art: 'einheit', einsatzId, id: x.id }),
     }),
-    // LFH-619. Hinten in der Tabelle, weil nach Führungsunterlagen seltener gesucht wird als
-    // nach Personen und Kräften — die Stufe ordnet ohnehin davor.
-    //
-    // Von einem Lagebericht nur der KETTENKOPF: jede Fortschreibung ist ein eigener
-    // Datensatz mit demselben Titel, und zwei gleichnamige Zeilen, von denen eine auf einen
-    // überholten Stand springt, sind genau das Bild, gegen das die Lageberichte-Liste
-    // `kettenKoepfe` benutzt (LFH-348 · N23).
+    // Hinten, weil nach Führungsunterlagen seltener gesucht wird. Von einem Lagebericht nur der
+    // KETTENKOPF: jede Fortschreibung trägt denselben Titel, eine Zeile spränge auf einen
+    // überholten Stand (wie `kettenKoepfe` in der Lageberichte-Liste).
     baueQuelle(
       'lageberichte',
       'text',
@@ -376,8 +334,7 @@ function quellen(k: DatensatzKontext): Quelle[] {
     ),
     baueQuelle('gefahrengebiete', 'text', q.gefahrengebiete, e, {
       id: (g) => g.id,
-      // Derselbe Rückfall wie auf der Gefahrenseite: ein unbenanntes Gebiet heisst dort
-      // „Gefahrengebiet #3", hier also auch.
+      // Derselbe Rückfall wie auf der Gefahrenseite: ein unbenanntes Gebiet heißt „Gefahrengebiet #3“.
       label: (g) => gefahrengebietName(g.label, g.id),
       ziel: (id, g) => gefahrenPfad(id, { gefahrengebiet: g.id }),
       vorschau: (einsatzId, g) => ({ art: 'gefahrengebiet', einsatzId, id: g.id }),
@@ -392,9 +349,8 @@ function quellen(k: DatensatzKontext): Quelle[] {
 }
 
 /**
- * Vorschauziel eines ETB-Eintrags (LFH-664) — mit `lfdNr`, weil kein Fach einen Eintrag über
- * seine `id` adressiert: die Vorschau liest ihn über den Nummerncursor und prüft die `id`.
- * Beide ETB-Quellen (Nummer und Volltext) teilen es, der Datensatz trägt die Nummer ja immer.
+ * Vorschauziel eines ETB-Eintrags, mit `lfdNr`, weil kein Fach einen Eintrag über seine `id`
+ * adressiert (Nummerncursor, danach `id`-Prüfung). Beide ETB-Quellen teilen es.
  */
 function etbVorschau(einsatzId: number, x: EtbEintragAnzeige): VorschauZiel {
   return { art: 'etb', einsatzId, id: x.id, lfdNr: x.lfd_nr };
@@ -406,21 +362,10 @@ function etbLabel(x: EtbEintragAnzeige): string {
 }
 
 /**
- * Auftragszeile: laufende Nummer plus gekürzter Auftragstext (Review-Befund zu C1).
- *
- * `auftragLabel` (chat/bezug.ts) ist NUR der gekürzte Text. Wer die auf Papier stehende
- * Nummer 42 abtippte, bekam „Aufträge/Befehle · Abschnitt erkunden" — die gesuchte 42 stand
- * nirgends in der Antwort, der Treffer war nicht nachprüfbar. Und zwei Aufträge mit
- * gleichlautendem Text („Lage melden", „Rückmeldung" sind im Betrieb üblich) ergaben zwei
- * identische Zeilen.
- *
- * `chat/bezug.ts` bleibt unverändert: dort speist `auftragLabel` die Bezug-Optionen des
- * Chats, wo der Typ schon gewählt ist und keine gedruckte Nummer abgetippt wird — das wäre
- * eine eigene Entscheidung, kein Nebenprodukt dieses Fixes. Die Kürzung kommt trotzdem aus
- * derselben Funktion, damit nicht zwei Grenzen nebeneinanderstehen.
- *
- * `lfd_nr` ist NULLBAR (per ADD COLUMN eingeführt) — ohne Nummer bleibt die reine Textzeile
- * stehen statt eines „#null".
+ * Auftragszeile: laufende Nummer plus gekürzter Auftragstext. Ohne Nummer wäre ein Treffer auf
+ * die abgetippte 42 nicht nachprüfbar, und gleichlautende Aufträge („Lage melden“) ergäben
+ * identische Zeilen. Die Kürzung kommt aus `auftragLabel` (chat/bezug.ts). `lfd_nr` ist NULLBAR,
+ * dann bleibt die reine Textzeile.
  */
 function auftragZeile(a: Auftrag): string {
   return a.lfd_nr == null ? auftragLabel(a) : `#${a.lfd_nr} · ${auftragLabel(a)}`;
@@ -429,32 +374,22 @@ function auftragZeile(a: Auftrag): string {
 /**
  * Bildet die geladenen Listen auf Treffer der Gruppe `datensaetze` ab.
  *
- * ZWEI DURCHGÄNGE, in dieser Reihenfolge: erst der Zahlenzweig über alle nummerierten
- * Quellen, dann der Textzweig. Ein Datensatz, den beide finden, steht damit als
- * Nummerntreffer da — die stärkere Aussage gewinnt.
+ * ZWEI DURCHGÄNGE: erst der Zahlenzweig, dann der Textzweig; ein Datensatz, den beide finden,
+ * steht als Nummerntreffer da.
  *
- * DIE RECHTEACHSE IST DIE LESEACHSE `istModulFreigegeben`, nicht `darfImEinsatzSchreiben`:
- * ein Beobachter darf lesen und behält seine Suche. Sie wird JE MODUL gefragt — 'Kräfte'
- * zerfällt in `fahrzeuge`, `personal` und `einheiten`, die in der Registry drei getrennte
- * Einträge mit eigener Sichtbarkeits- und Rollenschranke sind; ein Sammelbegriff wäre eine
- * vierte, erfundene Achse.
+ * Die Rechteachse ist die LESEACHSE `istModulFreigegeben` je Modul (ein Beobachter behält seine
+ * Suche), nicht `darfImEinsatzSchreiben`.
  *
- * `score` ist für alle Treffer {@link UNBEWERTET}: sie sind nicht durch Fuse gelaufen, es
- * gibt also keine Bewertung, die man hochreichen könnte — und eine 0 hätte für sie den
- * BESTMÖGLICHEN Wert behauptet. Die Ordnung tragen Stufe und, bei gleicher Stufe, der
- * bewertete Befehl. Begründung am Konstantenkopf in `fuzzy.ts`.
+ * `score` ist für alle Treffer {@link UNBEWERTET}: sie liefen nicht durch Fuse, eine 0 behauptete
+ * den bestmöglichen Wert (siehe `fuzzy.ts`).
  *
- * DER MODUSFILTER STEHT HIER EIN ZWEITES MAL, obwohl `useDatensaetze` die gesperrten Listen
- * gar nicht erst holt — und der Grund ist gemessen (`useDatensaetze.test.tsx`, „hält die
- * Antwort einer abgeschalteten Query im Cache"): TanStack schaltet mit `enabled: false` das
- * NACHLADEN ab, nicht die AUSLIEFERUNG. Wer 'meier' ohne Präfix tippt und danach '@'
- * davorsetzt, hat die Schadensliste im Cache; ohne diesen Riegel stünde sie im Kräfte-Modus
- * weiter in der Liste, und das Präfix wäre von „wirkungslos" nicht zu unterscheiden.
+ * DER MODUSFILTER STEHT HIER EIN ZWEITES MAL, obwohl `useDatensaetze` gesperrte Listen gar nicht
+ * holt: `enabled: false` schaltet das Nachladen ab, nicht die Auslieferung aus dem Cache. Ohne
+ * Riegel stünde nach '@' eine zuvor geladene Schadensliste weiter da.
  */
 export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
   const suche = k.suche.trim();
-  // Ohne Begriff entstehen keine Treffer: die Startansicht ist kuratiert (LFH-337 · M11),
-  // und `''`-Teilzeichenketten passten ohnehin auf jede Zeile jeder Liste.
+  // Ohne Begriff keine Treffer: die Startansicht ist kuratiert.
   if (!suche) return [];
 
   const zahl = zahlAusSuche(suche);
@@ -468,13 +403,9 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
 
   const gesehen = new Set<string>();
   /**
-   * Der Heimvorteil des Moduls, in dem der Benutzer gerade steht (LFH-391 · C4) — 0 gewinnt.
-   *
-   * Er sitzt in BEIDEN Sortierschlüsseln unten an derselben Stelle: hinter der Stufe, vor der
-   * Quellenreihenfolge. Vor der Stufe wäre er kein Rangvorteil mehr, sondern ein Modulfilter
-   * — jeder beliebige Teiltreffer des eigenen Moduls stünde dann vor dem, was wirklich so
-   * heisst. Und hinter der Quelle wäre er wirkungslos, denn die Quelle ist bei zwei
-   * verschiedenen Modulen nie gleich.
+   * Der Heimvorteil des Moduls, in dem der Benutzer steht (0 gewinnt). In BEIDEN
+   * Sortierschlüsseln hinter der Stufe und vor der Quellenreihenfolge: davor wäre er ein
+   * Modulfilter, dahinter wirkungslos.
    */
   const heim = (kand: Kandidat): 0 | 1 => (kand.modulKey === k.aktuellerModulKey ? 0 : 1);
   /** Nummerntreffer mit ihren Ordnungsachsen — gedeckelt werden sie nie, geordnet schon. */
@@ -500,9 +431,8 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
       if (zahl.sorte !== null && zahl.sorte !== qu.sorte) continue;
       for (const kand of qu.kandidaten) {
         if (kand.nummer !== zahl.nummer || gesehen.has(schluessel(kand))) continue;
-        // Stufe 0 — die Suche IST die Kennung. Aus dem Label liesse sie sich nicht ablesen
-        // (dort steht 'Personen · R-042 · Müller'), und ein Fuzzy-Treffer auf Stufe 2
-        // stünde sonst VOR dem exakten Nummerntreffer. Siehe `Treffer.stufe`.
+        // Stufe 0: die Suche IST die Kennung. Aus dem Label ('Personen · R-042 · Müller') ließe sie sich
+        // nicht ablesen, ein Fuzzy-Treffer stünde sonst vor dem exakten Nummerntreffer.
         nummerRoh.push({
           treffer: alsTreffer(kand, 0),
           heim: heim(kand),
@@ -517,14 +447,11 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
     if (qu.zweig === 'zahl') continue;
     for (const kand of qu.kandidaten) {
       if (gesehen.has(schluessel(kand))) continue;
-      // Teilzeichenkette ohne Rücksicht auf Groß-/Kleinschreibung — dieselbe Regel wie die
-      // Suchachse der `Datensicht` (Datensicht.tsx:475-479). Gesucht wird über das
-      // BASISLABEL: was in der Zeile steht, danach kann man suchen.
+      // Teilzeichenkette ohne Groß-/Kleinschreibung, dieselbe Regel wie die Suchachse der
+      // `Datensicht`, über das BASISLABEL.
       if (!qu.serverGefiltert && !kand.basisLabel.toLowerCase().includes(klein)) continue;
-      // Die Stufe kommt aus dem Basislabel OHNE die Modulherkunft davor: mit ihr ergäbe die
-      // Suche 'personen' für JEDEN Personendatensatz Stufe 1 („Label beginnt damit") — die
-      // ganze Liste stünde damit auf der Stufe der Modulseite und über allem, was wirklich
-      // so heisst. Die Herkunft ist Beschriftung, keine Suchachse.
+      // Die Stufe kommt aus dem Basislabel OHNE Modulherkunft: sonst stünde bei 'personen' jede Person
+      // auf Stufe 1 über allem, was wirklich so heißt.
       const stufe = textStufe(kand.basisLabel, suche);
       roh.push({
         treffer: alsTreffer(kand, stufe),
@@ -536,31 +463,17 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
     }
   }
 
-  // ERST ORDNEN, DANN DECKELN (Review-Befund zu C1). Vorher schnitten beide Deckel in
-  // LISTENreihenfolge, und wer hineinkam, hing daran, in welcher Reihenfolge der Server die
-  // Zeilen geliefert hat: fünf „Obermeier" (Stufe 3) füllten die Personenquelle und
-  // verdrängten den gesuchten „Meier" (Stufe 2) — Nachtippen half nicht, weil 'meier'
-  // ebenfalls Teilzeichenkette von 'Obermeier' ist. Am Gesamtdeckel dasselbe eine Etage
-  // höher: drei randvolle Quellen auf Stufe 2 liessen für das Fahrzeug „Nord 1" auf Stufe 1
-  // keinen Platz. Die Stufe entscheidet jetzt, WER in den Deckel kommt.
-  //
-  // Der Quellenrang ist TIEBREAK, nicht Primärachse — er hält bei gleicher Stufe die
-  // Erfassungshäufigkeit aus der Quellentabelle. Der Eingabeindex darunter macht die Ordnung
-  // unabhängig von der Stabilität von `sort`, wie in `ordneTreffer`.
-  //
-  // Der Heimvorteil (LFH-391 · C4) steht zwischen Stufe und Quelle und erbt damit dieselbe
-  // Wirkung auf den Deckel: die Einheiten stehen in der Quellentabelle zuletzt, und wer im
-  // Modul „Einheiten" steht und einen Einheitennamen tippt, bekam den Treffer bei drei
-  // randvollen Quellen davor gar nicht zu sehen. Eine Umsortierung NACH dem Deckeln könnte
-  // das nicht heilen — deshalb sitzt er im Schlüssel und nicht dahinter.
+  // ERST ORDNEN, DANN DECKELN: sonst verdrängten fünf „Obermeier“ (Stufe 3) den gesuchten „Meier“
+  // (Stufe 2), je nach Lieferreihenfolge. Die Stufe entscheidet, WER in den Deckel kommt.
+  // Heimvorteil zwischen Stufe und Quelle, Quellenrang als Tiebreak, der Eingabeindex macht die
+  // Ordnung unabhängig von der Stabilität von `sort`. Nach dem Deckeln umzusortieren könnte einen
+  // verdrängten Heimtreffer nicht zurückholen.
   roh.sort(
     (a, b) => a.stufe - b.stufe || a.heim - b.heim || a.quelle - b.quelle || a.index - b.index,
   );
 
-  // Nummerntreffer werden NIE weggedeckelt: sie sind eine exakte Gleichheit auf einer
-  // eindeutigen Kennung, ihre Zahl ist strukturell klein (höchstens eine je Quelle). Geordnet
-  // werden sie trotzdem — sie stehen alle auf Stufe 0, die Herkunft ist dort die einzige
-  // Achse, die '42' in Person, Meldung und Auftrag noch auseinanderhalten kann.
+  // Nummerntreffer werden NIE weggedeckelt (exakte Gleichheit, höchstens einer je Quelle). Geordnet
+  // werden sie trotzdem, die Herkunft trennt '42' in Person, Meldung und Auftrag.
   nummerRoh.sort((a, b) => a.heim - b.heim || a.quelle - b.quelle || a.index - b.index);
   const nummerTreffer = nummerRoh.map((x) => x.treffer);
   const platz = Math.max(0, DECKEL_GESAMT - nummerTreffer.length);
@@ -577,32 +490,26 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
   return [...nummerTreffer, ...textTreffer, ...(sammel ? [sammel] : [])];
 }
 
-/** Id des ETB-Sammeltreffers — eine je Suche, deshalb kein Datensatz-Id-Teil. */
+/** Id des ETB-Sammeltreffers, eine je Suche. */
 const ETB_SAMMEL_ID = 'datensatz:etb:suche';
 
 /**
  * Beschriftung des Sammeltreffers. EINE Stelle, weil `sichtbareDatensaetze` sie gegen den
- * lebenden Begriff vergleicht — zwei Schreibweisen liefen still auseinander.
+ * lebenden Begriff vergleicht.
  */
 function etbSammelLabel(suche: string): string {
   return `Alle Einträge zu „${suche}“`;
 }
 
 /**
- * Der ETB-Sammeltreffer „Alle Einträge zu „deich“" mit Trefferzahl (LFH-619, Neuentwurf S2).
+ * Der ETB-Sammeltreffer „Alle Einträge zu „deich““ mit Trefferzahl.
  *
- * Er steht HINTER allen Einzeltreffern und ausserhalb beider Deckel: er ist der Weg zu allen,
- * nicht der beste Treffer. Vorn stünde er vor dem einen Eintrag, den jemand gerade gesucht
- * hat, und Enter führte auf eine Liste statt auf den Eintrag.
+ * Er steht in der SICHTBAREN Ordnung HINTER allen Einzeltreffern (Stufe 3 plus
+ * `UNBEWERTET + 1` ist strikt schlechter als jeder Einzeltreffer) und außerhalb beider Deckel:
+ * er ist der Weg zu allen, nicht der beste Treffer; Enter soll auf den gesuchten Eintrag führen.
  *
- * „Hinten" heisst in der SICHTBAREN Ordnung, nicht im Array (Review-Befund): `ordneTreffer`
- * sortiert nach Stufe und Score neu. Stufe 3 plus `UNBEWERTET + 1` ist strikt schlechter als
- * jeder Einzeltreffer — mit der vorigen Stufe 2 stand er bei jeder Mehrwortsuche vorn, weil
- * dort jeder Einzeltreffer auf Stufe 3 fällt.
- *
- * NUR IM TEXTZWEIG: eine gedruckte Nummer fragt der ETB über den Cursor, „Einträge zu 42"
- * wäre eine Suche nach der Zahl im Text, die niemand gestellt hat. Bei null Treffern gibt es
- * keine Zeile — „0 Treffer" als anwählbare Zeile führte auf eine leere Seite.
+ * NUR IM TEXTZWEIG (eine gedruckte Nummer fragt der Cursor). Bei null Treffern gibt es keine
+ * Zeile.
  */
 function etbSammeltreffer(k: DatensatzKontext, suche: string): Treffer | null {
   const erlaubt = PALETTE_MODI[k.modus].quellen;
@@ -632,37 +539,25 @@ function schluessel(kand: Kandidat): string {
 }
 
 /**
- * Die Umkehr von {@link schluessel} — Modulschlüssel eines Datensatz-Treffers, `null` für
- * jeden anderen Befehl.
- *
- * DIREKT NEBEN DEM ERZEUGER, damit die Form an EINER Stelle steht; getrennt wären es zwei
- * Meinungen über dieselbe Zeichenkette. Die Herkunft aus dem `Treffer` zu lesen wäre
- * hübscher, kostete aber ein neues Feld an `fuzzy.ts:Treffer` — das trägt jeder Befehl der
- * Palette, und 42 statische Befehle haben keine Datenquelle.
+ * Die Umkehr von {@link schluessel}: Modulschlüssel eines Datensatz-Treffers, `null` für jeden
+ * anderen Befehl. Direkt neben dem Erzeuger, damit die Form an EINER Stelle steht.
  */
 function modulKeyAusId(befehlId: string): string | null {
-  // `suche` ist der ETB-Sammeltreffer (LFH-619) — er gehört zum ETB wie jeder Eintrag und muss
-  // denselben Riegeln unterliegen; ohne ihn liefe er als „nicht unsere Achse" überall durch.
+  // `suche` ist der ETB-Sammeltreffer; er unterliegt denselben Riegeln wie jeder ETB-Eintrag.
   const t = /^datensatz:([^:]+):(?:\d+|suche)$/.exec(befehlId);
   return t ? t[1] : null;
 }
 
 /**
- * Mirror von `fts_query` (src/etb/repo.rs): trägt die Eingabe überhaupt ein Token, auf das
- * der ETB-Volltext antworten KANN? (Review-Befund 6 zu Etappe C.)
+ * Spiegel von `fts_query` (src/etb/repo.rs): trägt die Eingabe überhaupt ein Token, auf das der
+ * ETB-Volltext antworten KANN?
  *
- * Das Backend wirft je Token alles weg, was kein einziges alphanumerisches Zeichen trägt —
- * und lässt den MATCH-Filter GANZ WEG, wenn danach nichts übrig ist (`.filter(|s|
- * !s.is_empty())`). Auf '??' (ebenso '--', '...', '<>', zwei Emoji) kam damit gemessen die
- * ungefilterte Liste der fünf jüngsten Einträge zurück, und die Palette bot sie als Treffer
- * an: Treffer für eine Suche, die niemand beantwortet hat. Der Riegel liegt im FRONTEND,
- * weil die Route ihren Vertrag hält — ein leerer Filter ist für die ETB-Seite (Blättern ohne
- * Suchbegriff) genau richtig.
+ * Das Backend verwirft Tokens ohne alphanumerisches Zeichen und lässt den MATCH-Filter ganz weg,
+ * wenn nichts übrig bleibt; auf '??' kämen die jüngsten Einträge ungefiltert zurück. Der Riegel
+ * liegt im Frontend, weil ein leerer Filter für die ETB-Seite richtig ist.
  *
- * `\p{Alphabetic}` + `\p{N}` spiegeln Rusts `char::is_alphanumeric` (Alphabetic-Eigenschaft
- * ODER Zahlkategorie), nicht das engere `\p{L}` der Wortgrenze in `fuzzy.ts`: eine Kopie,
- * die weniger durchlässt als das Original, hielte eine Anfrage zurück, die der Server
- * beantwortet hätte.
+ * `\p{Alphabetic}` + `\p{N}` spiegeln Rusts `char::is_alphanumeric`; eine engere Kopie hielte
+ * Anfragen zurück, die der Server beantwortet hätte.
  */
 export function etbVolltextMoeglich(suche: string): boolean {
   return suche.split(/\s+/).some((t) => /[\p{Alphabetic}\p{N}]/u.test(t));
@@ -675,30 +570,16 @@ function modulKeysDesModus(modus: PaletteModus): Set<string> | null {
 }
 
 /**
- * Die Riegel an der ANZEIGE (Review-Befunde 4, 5 und 6 zu Etappe C).
+ * Die Riegel an der ANZEIGE, dieselben wie am Abruf: eine anstehende Trefferliste belegt nicht,
+ * dass die AKTUELLE Eingabe sie rechtfertigt.
  *
- * DIESELBEN Riegel wie am Abruf (`datensatzAbrufAktiv`, `enabled`) — und sie stehen hier ein
- * zweites Mal, weil eine anstehende Trefferliste kein Beleg dafür ist, dass die AKTUELLE
- * Eingabe sie rechtfertigt. Zwei gemessene Wege, wie sie auseinanderlaufen:
+ *  - **warmer Cache**: `enabled: false` schaltet das Nachladen ab, nicht die Auslieferung.
+ *    Nach dem Kürzen von '@meier' auf '@m' stünde sonst eine Ein-Zeichen-Suche aus dem Cache da.
+ *  - **Entprellung**: die Treffer hinken der Eingabe bis zu 300 ms nach; in '>meier' stünde
+ *    sonst eine Personenzeile unter „Nur Aktionen“, ausführbar per Enter.
  *
- *  - **der warme Cache**: `enabled: false` schaltet das Nachladen ab, nicht die Auslieferung
- *    (`useDatensaetze.test.tsx`, „hält die Antwort einer abgeschalteten Query im Cache"). Wer
- *    '@meier' tippt und per Rücktaste auf '@m' kürzt, bekam eine Ein-Zeichen-Suche über den
- *    warmen Cache — im Kräfte-Modus sind die statischen Befehle ausgefiltert, die Liste
- *    bestand also AUSSCHLIESSLICH daraus, und die Aufforderung „Mindestens 2 Zeichen"
- *    erschien nicht, weil sie am leeren Zweig hängt.
- *  - **die Entprellung**: der Stand, aus dem die Treffer gebaut wurden, hinkt der Eingabe um
- *    bis zu 300 ms hinterher. In '>meier' stand deshalb eine Personenzeile unter der Marke
- *    „Nur Aktionen" — markierbar und per Enter ausführbar, also ein Weg aus dem Modus heraus.
- *
- * Gefiltert wird über die QUELLENMENGE des Modus, nicht bloss über „zeigt dieser Modus
- * überhaupt Datensätze": sonst überlebte ein Nachläufer jeden Wechsel INNERHALB der
- * Datensatz-Modi ('@meier' → '#meier'). Für den Aktionen-Modus ist die Menge leer, damit
- * fällt sein Fall als Sonderfall weg.
- *
- * Rein und exportiert nach dem Repo-Muster von `bedienzielStil`: nur so ist die Zusicherung
- * ohne Render prüfbar — und nur so steht sie an EINER Stelle statt in drei Bedingungen im
- * JSX.
+ * Gefiltert wird über die QUELLENMENGE des Modus, sonst überlebte ein Nachläufer den Wechsel
+ * '@meier' → '#meier'. Rein und exportiert, damit die Zusicherung ohne Render prüfbar ist.
  */
 export function sichtbareDatensaetze(
   treffer: Treffer[],
@@ -711,44 +592,37 @@ export function sichtbareDatensaetze(
   const etbOffen = etbVolltextMoeglich(s);
   return treffer.filter((t) => {
     const modulKey = modulKeyAusId(t.befehl.id);
-    // Kein Datensatz-Schlüssel: nicht unsere Achse. Still wegzuwerfen, was wir nicht
-    // einordnen können, verstecke einen Fehler, statt ihn zu zeigen.
+    // Kein Datensatz-Schlüssel: nicht unsere Achse. Still wegzuwerfen, was wir nicht einordnen
+    // können, versteckte einen Fehler.
     if (modulKey === null) return true;
     if (erlaubteModule !== null && !erlaubteModule.has(modulKey)) return false;
-    // Der Sammeltreffer trägt seinen Begriff in Beschriftung UND Ziel (Review-Befund zu
-    // LFH-619): gebaut aus dem entprellten Stand, spränge er nach dem Weitertippen auf eine
-    // Suche, die niemand mehr gestellt hat. Ein veralteter Einzeltreffer führt wenigstens auf
-    // einen echten Eintrag; dieser nicht — er gilt deshalb nur für genau den lebenden Begriff.
+    // Der Sammeltreffer trägt seinen Begriff in Beschriftung UND Ziel; aus dem entprellten Stand
+    // gebaut, spränge er auf eine veraltete Suche. Er gilt nur für genau den lebenden Begriff.
     if (t.befehl.id === ETB_SAMMEL_ID && t.befehl.label !== etbSammelLabel(s)) return false;
-    // Beide ETB-Zweige teilen sich den Modulschlüssel, und keiner kann ohne alphanumerisches
-    // Token antworten: der Volltext läuft dort ins Leere (siehe oben), der Zahlenzweig
-    // verlangt ohnehin Ziffern.
+    // Beide ETB-Zweige teilen den Modulschlüssel, und keiner kann ohne alphanumerisches Token
+    // antworten.
     return modulKey !== QUELLE_MODUL.etbText || etbOffen;
   });
 }
 
 /**
- * Ein Datensatz-Treffer ist ein gewöhnlicher `Befehl` und läuft durch dieselbe
- * `role="option"`-Schleife wie jeder andere — nur so erbt er den Bedienziel-Boden aus
- * `palettenZeilenStil`. Ein eigener Renderzweig verlöre ihn still, und kein Gate sähe das.
- *
- * Die Ikone kommt aus der `modulRegistry`, die Modulherkunft ebenso: eine zweite
- * Namensquelle fällt niemandem auf, weil beide Seiten plausibel aussehen (Befund M14).
+ * Ein Datensatz-Treffer ist ein gewöhnlicher `Befehl` in derselben `role="option"`-Schleife; nur
+ * so erbt er den Bedienziel-Boden aus `palettenZeilenStil`. Ikone und Modulherkunft kommen aus
+ * der `modulRegistry`, keine zweite Namensquelle.
  */
 function befehlFuer(kand: Kandidat, navigate: DatensatzKontext['navigate']): Befehl {
   const m = modulRegistry.find((x) => x.key === kand.modulKey);
   return {
     id: schluessel(kand),
     gruppe: 'datensaetze',
-    // Die Modulherkunft steht seit dem Neuentwurf als KONTEXT rechts, nicht mehr als Präfix
-    // im Label — und als Schlagwort, damit „personen" weiterhin Personen-Datensätze findet.
+    // Die Modulherkunft steht als KONTEXT rechts und als Schlagwort, damit „personen“ weiter
+    // Personen-Datensätze findet.
     label: kand.basisLabel,
     kontext: m?.label ?? kand.modulKey,
     schlagworte: [m?.label ?? kand.modulKey],
     icon: m?.icon,
     ...sprungZu(kand.ziel, navigate),
-    // Die Vorschau in der Palette (LFH-645, Taste →). Welche Sorte sie zeigt, sagt die
-    // Quellentabelle (`quellen`), nicht diese Stelle (LFH-664).
+    // Welche Vorschau-Sorte, sagt die Quellentabelle (`quellen`), nicht diese Stelle.
     ...(kand.vorschau ? { vorschau: kand.vorschau } : {}),
   };
 }

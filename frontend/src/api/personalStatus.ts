@@ -1,5 +1,5 @@
 import type { PersonalStatus, StatusKategorie } from './types';
-import { apiGet, apiSend } from './client';
+import { katalogApi } from './katalogApi';
 
 export interface StatusEingabe {
   label: string;
@@ -8,18 +8,9 @@ export interface StatusEingabe {
   sortier: number;
 }
 
-export function listePersonalStatus(): Promise<PersonalStatus[]> {
-  return apiGet<PersonalStatus[]>('/api/personal-status');
-}
+const api = katalogApi<PersonalStatus, StatusEingabe>('/api/personal-status');
 
-export function legeStatusAn(daten: StatusEingabe): Promise<PersonalStatus> {
-  return apiSend<PersonalStatus>('/api/personal-status', 'POST', daten);
-}
-
-export function aktualisiereStatus(id: number, daten: StatusEingabe): Promise<PersonalStatus> {
-  return apiSend<PersonalStatus>(`/api/personal-status/${id}`, 'PATCH', daten);
-}
-
-export function deaktiviereStatus(id: number): Promise<void> {
-  return apiSend<void>(`/api/personal-status/${id}/deaktivieren`, 'POST');
-}
+export const listePersonalStatus = api.liste;
+export const legeStatusAn = api.legeAn;
+export const aktualisiereStatus = api.aktualisiere;
+export const deaktiviereStatus = api.deaktiviere;

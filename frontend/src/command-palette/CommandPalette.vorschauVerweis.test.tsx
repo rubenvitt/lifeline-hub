@@ -1,8 +1,5 @@
-// frontend/src/command-palette/CommandPalette.vorschauVerweis.test.tsx
-//
-// Verweise in der Vorschau schließen die Palette (LFH-664, Spec „Verweise in der Vorschau
-// schließen die Palette"). Eine Meldungsvorschau trägt „↗ Auftrag", eine Auftragsvorschau
-// „↗ ETB-Eintrag" — ohne Riegel navigierte die App UNTER der offenen Palette weg.
+// Verweise in der Vorschau schließen die Palette: eine Meldungsvorschau trägt „↗ Auftrag“, eine
+// Auftragsvorschau „↗ ETB-Eintrag“; ohne Riegel navigierte die App UNTER der offenen Palette.
 import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { fireEvent, screen } from '@testing-library/react';

@@ -50,9 +50,8 @@ describe('Schnellerfassungszeile', () => {
 
   /**
    * LFH-373, opt-in `gestapelt`: auf schmalem Schirm steht das Feld auf eigener, voller Zeile,
-   * Präfix und Hinweis folgen darunter. Gemessen vorher im ETB bei 390 px: das Feld auf 158
-   * von 366 px eingezwängt, der Platzhalter brach es mehrzeilig. Ohne die Eigenschaft bleibt
-   * alles wie bisher — die Personenseite nutzt dieselbe Hülle.
+   * Präfix und Hinweis folgen darunter. Ohne die Eigenschaft bleibt die Zeile einzeilig — die
+   * Personenseite nutzt dieselbe Hülle.
    */
   it('gestapelt: Feld zuerst und volle Breite, Hinweis rechts in der zweiten Zeile', () => {
     const t = { controlHeight: 30, paddingSM: 12 };
@@ -60,8 +59,8 @@ describe('Schnellerfassungszeile', () => {
     const z = zellenStile(farbenHell, t, true);
     expect(zeile.flexWrap).toBe('wrap');
     expect(z.feld).toMatchObject({ flex: '1 1 100%' });
-    // Kein CSS-`order` (Review LFH-373): die sichtbare Folge kommt aus dem DOM, sonst wichen
-    // Tab- und Lesefolge von ihr ab (Typ unten → Feld oben → Vorschau unten).
+    // Kein CSS-`order`: die sichtbare Folge kommt aus dem DOM, sonst wichen Tab- und Lesefolge von
+    // ihr ab.
     expect(z.feld.order).toBeUndefined();
     expect(z.hinweis.marginInlineStart).toBe('auto');
     expect(z.praefix.borderInlineEnd).toBeUndefined();

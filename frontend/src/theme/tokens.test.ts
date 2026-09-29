@@ -1,26 +1,13 @@
 /**
- * Die Dichte-Staffel als Träger (LFH-328 · A2, aus A1 Festlegung 4).
- *
- * A2 baut den TRÄGER, nicht die Umschaltung: `antdToken()` nimmt die Stufe als
- * Parameter entgegen, die aktive Stufe bleibt fest `kompakt`. Die Kontext- oder
- * Benutzerwahl ist B5. Was dieser Test beweisen muss, sagt die Spec §2.1
- * wörtlich: „dass die drei Stufen unterschiedliche Tokens erzeugen".
- *
- * Deshalb prüft er nicht nur `controlHeight`/`fontSize`, sondern auch die
- * Abstände: ein `antdToken`, das die Stufe entgegennimmt, `padding*` aber
- * weiterhin aus der Modulkonstante liest, wäre bei allen anderen Erwartungen
- * grün und trotzdem halb verdrahtet.
+ * Die Dichte-Staffel als Träger (A1 Festlegung 4): die drei Stufen erzeugen unterschiedliche
+ * Tokens. Geprüft werden auch die Abstände: ein `antdToken`, das `padding*` weiter aus der
+ * Modulkonstante läse, wäre sonst halb verdrahtet und trotzdem grün.
  */
 import { describe, expect, it } from 'vitest';
 import { abstand, antdToken, dichten, farbenHell, flaeche, type Dichte } from './tokens';
-// Eigene Importzeile, damit der geschlossene §2.2-Pin unten in einem reinen
-// Additions-Diff stehen bleibt (eine erweiterte Importzeile wäre eine Änderung).
 import { seitenrinne } from './tokens';
-// Ebenfalls eigene Zeile, aus demselben Grund wie die Zeile darüber.
 import { navDrawerBreite } from './tokens';
-// Ebenfalls eigene Zeile (LFH-380).
 import { antdKomponenten, switchMasse } from './tokens';
-// Eigene Zeile (LFH-677), aus demselben Grund.
 import { farbenDunkel } from './tokens';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -57,9 +44,8 @@ describe('Dichte-Staffel (A1 Festlegung 4)', () => {
     expect(abstand).toBe(dichten.kompakt.abstand);
   });
 
-  // Handgeschriebene Literale, KEIN Rückgriff auf `dichten.x.kleineZeilenhoehe`:
-  // sonst prüfte der Test die Konstante gegen sich selbst und bliebe grün, wenn
-  // die Staffel verrutscht (Byte-Pin-Lektion aus der Query-Key-Registry).
+  // Literale statt `dichten.x.kleineZeilenhoehe`, sonst prüfte der Test die Konstante gegen sich
+  // selbst.
   it('setzt die kleine Steuerhöhe je Stufe auf den A1-Gate-3-Boden (LFH-361 · B5a)', () => {
     expect(dichten.kompakt.kleineZeilenhoehe).toBe(24);
     expect(dichten.komfortabel.kleineZeilenhoehe).toBe(48);
@@ -72,14 +58,9 @@ describe('Dichte-Staffel (A1 Festlegung 4)', () => {
   });
 
   /**
-   * Der Kern von B5a. Ohne diesen Token leitet antd `controlHeightSM` mit dem
-   * Faktor 0,75 aus `controlHeight` ab (`genControlHeight.js`) — komfortabel
-   * ergäbe 36 px und risse damit den Gate-3-Boden von 48.
-   *
-   * Der zweite `expect` je Stufe ist die eigentliche Aussage: er schließt aus,
-   * dass hier zufällig derselbe Wert steht, den antd ohnehin gerechnet hätte.
-   * Nur bei `komfortabel`/`handschuh` fallen Boden und Zeilenhöhe zusammen —
-   * dort ist die Abgrenzung gegen 0,75 × Zeilenhöhe der ganze Beweis.
+   * Ohne diesen Token leitet antd `controlHeightSM` mit Faktor 0,75 ab (komfortabel 36 px statt
+   * des Gate-3-Bodens 48). Der zweite `expect` je Stufe schließt aus, dass zufällig derselbe Wert
+   * steht, den antd ohnehin gerechnet hätte.
    */
   it('reicht die kleine Steuerhöhe durch, statt sie antd ableiten zu lassen', () => {
     for (const stufe of ['kompakt', 'komfortabel', 'handschuh'] as const) {
@@ -120,7 +101,6 @@ describe('Flächenmaße als Token', () => {
   });
 
   it('trägt die gemessenen Baselines aus der Spec §2.2 (ohne die entfallene Listenbreite)', () => {
-    // `seiteBreit` (960) ist mit dem Neuentwurf entfallen: Listen füllen die Inhaltsbreite.
     expect(flaeche).toEqual({
       seiteSchmal: 900,
       zustandOben: 80,
@@ -131,29 +111,21 @@ describe('Flächenmaße als Token', () => {
 });
 
 /**
- * Die Seitenrinne ist die VIEWPORT-Achse, nicht die Dichte-Achse und keine
- * §2.2-Baseline — deshalb ein eigener Export statt zweier Schlüssel in
- * `flaeche` (dessen `toEqual`-Pin oben ist erschöpfend und trüge sonst einen
- * Namen, der nicht mehr stimmt). Träger im Browser ist die Custom-Property in
- * `rollen.css`; dass beide Seiten dieselben Stufen tragen, bewacht
+ * Die Seitenrinne ist die VIEWPORT-Achse, deshalb ein eigener Export statt Schlüsseln in
+ * `flaeche` (dessen `toEqual`-Pin oben ist erschöpfend). Die CSS-Seite bewacht
  * `rollen.guard.test.ts`.
  */
 describe('Seitenrinne (LFH-329 · B1)', () => {
   it('exportiert die Seitenrinne als Viewport-Paar (LFH-329 · B1)', () => {
     expect(seitenrinne).toEqual({ breit: 24, schmal: 12 });
-    // Benannte Diagnose gegen ein vertauschtes Paar: ein `toEqual` allein
-    // meldet nur einen Objektdiff, nicht die verdrehte Richtung.
+    // Benannte Diagnose gegen ein vertauschtes Paar.
     expect(seitenrinne.schmal).toBeLessThan(seitenrinne.breit);
   });
 });
 
 /**
- * Die Breite des Navigations-Drawers ist wie die Seitenrinne eine
- * VIEWPORT-Aussage und keine §2.2-Baseline — deshalb ein eigener Export statt
- * eines sechsten Schlüssels in `flaeche`. Der `toEqual`-Pin dort ist
- * erschöpfend und trägt den Namen „die fünf gemessenen Baselines"; ein
- * zusätzlicher Schlüssel machte beides unwahr (dieselbe Begründung, aus der
- * `seitenrinne` daneben steht).
+ * Die Breite des Navigations-Drawers ist wie die Seitenrinne eine VIEWPORT-Aussage, deshalb
+ * ein eigener Export statt eines Schlüssels in `flaeche`.
  */
 describe('Navigations-Drawer (LFH-329 · B1/H11)', () => {
   it('exportiert die Breite des Navigations-Drawers als Token (LFH-329 · B1)', () => {
@@ -161,26 +133,16 @@ describe('Navigations-Drawer (LFH-329 · B1/H11)', () => {
   });
 
   it('lässt den geschlossenen Flächen-Pin unberührt', () => {
-    // Der Drawer bekommt bewusst KEINEN Platz in `flaeche`. Ohne diese Zeile
-    // würde ein späteres Verschieben dorthin nur den Namen des Pins oben
-    // verbiegen, ohne dass hier etwas rot wird.
-    // Vier seit 22.09.2026: `seiteBreit` ist mit dem Neuentwurf entfallen (Listen füllen die
-    // Inhaltsbreite) — ein Wegfall, kein Zuzug; `navDrawer` bleibt ausgeschlossen.
+    // Der Drawer bekommt bewusst KEINEN Platz in `flaeche`.
     expect(Object.keys(flaeche)).toHaveLength(4);
     expect(flaeche).not.toHaveProperty('navDrawer');
   });
 });
 
 /**
- * Der Kippschalter folgt der Staffel (LFH-380).
- *
- * antd rechnet die Schalterhöhe NICHT aus `controlHeight`, sondern aus der Schrift
- * (`switch/style/index.js`, `prepareComponentToken`: `fontSize × lineHeight`) — gemessen
- * 21,5 / 23 / 23 px, im Handschuh ein Drittel des Bodens. Die Böden stehen hier als
- * LITERALE, nicht aus `dichten` zurückgelesen — sonst prüfte die Zusicherung den Token
- * gegen sich selbst. Kein Render: jsdom rechnet kein Layout, und `test/utils.tsx` montiert
- * ein nacktes `ConfigProvider`. Ob antd die Namen honoriert, belegt der Durchleitungs-Test
- * in `ThemeModeProvider.test.tsx`.
+ * Der Kippschalter folgt der Staffel (LFH-380): antd rechnet seine Höhe aus der Schrift, nicht
+ * aus `controlHeight`. Die Böden stehen als LITERALE da. Kein Render (jsdom rechnet kein
+ * Layout); ob antd die Namen honoriert, belegt `ThemeModeProvider.test.tsx`.
  */
 describe('Switch-Maße (LFH-380)', () => {
   const STUFEN: Dichte[] = ['kompakt', 'komfortabel', 'handschuh'];
@@ -196,9 +158,8 @@ describe('Switch-Maße (LFH-380)', () => {
   });
 
   it('zieht den abhängigen Satz mit — der Griff füllt die Spur in jeder Stufe', () => {
-    // antd leitet Griff, Mindestbreite und Innenränder in `prepareComponentToken` aus der
-    // SCHRIFT ab, und ein überschriebener Komponententoken rechnet die übrigen nicht nach.
-    // Wer nur `trackHeight` setzt, bekommt einen 18-px-Griff in einer 72-px-Spur.
+    // antd leitet Griff, Mindestbreite und Innenränder aus der SCHRIFT ab und rechnet sie bei einem
+    // überschriebenen Token nicht nach; nur `trackHeight` ergäbe einen 18-px-Griff in 72-px-Spur.
     for (const d of STUFEN) {
       const m = switchMasse(dichten[d]);
       expect(m.handleSize + 2 * m.trackPadding, d).toBe(m.trackHeight);
@@ -213,8 +174,8 @@ describe('Switch-Maße (LFH-380)', () => {
   });
 
   it('antdKomponenten trägt die Maße der GEWÄHLTEN Stufe, nicht die kompakte', () => {
-    // Die Rechnung allein belegt nicht, dass sie an der globalen Stelle hängt. Ein
-    // vergessener Dichte-Parameter ließe den Schalter still auf kompakt stehen.
+    // Die Rechnung muss auch an der globalen Stelle hängen; ein vergessener Dichte-Parameter ließe
+    // den Schalter still auf kompakt stehen.
     expect(antdKomponenten(farbenHell, 'kompakt').Switch).toMatchObject({ trackHeight: 24 });
     expect(antdKomponenten(farbenHell, 'komfortabel').Switch).toMatchObject({ trackHeight: 48 });
     expect(antdKomponenten(farbenHell, 'handschuh').Switch).toMatchObject({ trackHeight: 72 });
@@ -222,14 +183,11 @@ describe('Switch-Maße (LFH-380)', () => {
 });
 
 /**
- * Der gewählte Radio-Knopf (Knopfform) schreibt seinen TEXT in antds `colorPrimary` — am Tag
- * `bedien` auf Weiß, gemessen 6,59 : 1 und damit unter dem Tagesboden 7 : 1 (LFH-677,
- * `e2e/betreuung-pruefliste.spec.ts`). Blauer Bedien-TEXT nimmt `bedienText` (LFH-650).
+ * Der gewählte Radio-Knopf (Knopfform) schreibt seinen TEXT in antds `colorPrimary`, am Tag
+ * 6,59 : 1 und damit unter dem Tagesboden 7 : 1. Blauer Bedien-TEXT nimmt `bedienText`.
  *
- * Die Regel sitzt im global geladenen `index.css` und trifft NUR den Text. Ein Komponenten-Token
- * `Radio.colorPrimary` war der erste Anlauf und ist verworfen (Review LFH-677): antd rechnet
- * daraus auch die gefüllte Scheibe des normalen Radios, die Fläche des Knopfstils `solid` und
- * die Hover-Fläche — nachts stand der weiße Punkt dann auf `#8ec2f0` bei rund 1,9 : 1.
+ * Die Regel sitzt im global geladenen `index.css` und trifft NUR den Text. Ein Token
+ * `Radio.colorPrimary` färbte auch Scheibe, `solid`-Fläche und Hover-Fläche.
  */
 describe('Radio-Knopf: Text in bedienText (LFH-677)', () => {
   // `index.css` lädt global (`main.tsx`); `sprache.css` nur mit den Bausteinen, die es importieren.

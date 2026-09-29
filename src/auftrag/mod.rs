@@ -10,51 +10,44 @@ pub use eingabe::{
 };
 
 use crate::kommunikation::{AdressatKategorie, Prioritaet, Richtung};
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
 /// Priorität eines Auftrags (TEXT in der DB, im Code validiert).
-pub const PRIO_SOFORT: &str = "sofort";
-pub const PRIO_DRINGEND: &str = "dringend";
-pub const PRIO_NORMAL: &str = "normal";
+pub const PRIO_SOFORT: &str = Prioritaet::Sofort.as_str();
+pub const PRIO_DRINGEND: &str = Prioritaet::Dringend.as_str();
+pub const PRIO_NORMAL: &str = Prioritaet::Normal.as_str();
 
 /// Empfänger-Diskriminator (Spiegel des DB-CHECK auf auftrag_empfaenger).
-pub const EMPF_ABSCHNITT: &str = "abschnitt";
-pub const EMPF_EINHEIT: &str = "einheit";
-pub const EMPF_FUNKTION: &str = "funktion";
-pub const EMPF_PERSON: &str = "person";
-pub const EMPF_FAHRZEUG: &str = "fahrzeug";
+pub const EMPF_ABSCHNITT: &str = EmpfaengerTyp::Abschnitt.as_str();
+pub const EMPF_EINHEIT: &str = EmpfaengerTyp::Einheit.as_str();
+pub const EMPF_FUNKTION: &str = EmpfaengerTyp::Funktion.as_str();
+pub const EMPF_PERSON: &str = EmpfaengerTyp::Person.as_str();
+pub const EMPF_FAHRZEUG: &str = EmpfaengerTyp::Fahrzeug.as_str();
 /// Externer Adressat (LFH-87): Leitstelle, Nachbar-EA, übergeordnete Führung, andere BOS.
-pub const EMPF_EXTERN: &str = "extern";
+pub const EMPF_EXTERN: &str = EmpfaengerTyp::Extern.as_str();
 
 /// Externe Adressat-Kategorie (code-validiert, kein DB-CHECK).
-pub const EXTERN_LEITSTELLE: &str = "leitstelle";
-pub const EXTERN_NACHBAR_EA: &str = "nachbar_ea";
-pub const EXTERN_UEBERGEORDNET: &str = "uebergeordnet";
-pub const EXTERN_ANDERE_BOS: &str = "andere_bos";
+pub const EXTERN_LEITSTELLE: &str = AdressatKategorie::Leitstelle.as_str();
+pub const EXTERN_NACHBAR_EA: &str = AdressatKategorie::NachbarEa.as_str();
+pub const EXTERN_UEBERGEORDNET: &str = AdressatKategorie::Uebergeordnet.as_str();
+pub const EXTERN_ANDERE_BOS: &str = AdressatKategorie::AndereBos.as_str();
 
-/// Bearbeitungsstatus eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
-/// Wire == `bearbeitungsstatus`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AuftragBearbeitungsstatus {
-    Offen,
-    InArbeit,
-    Vollzogen,
-    Abgenommen,
+wire_enum! {
+    /// Bearbeitungsstatus eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
+    /// Wire == `bearbeitungsstatus`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AuftragBearbeitungsstatus {
+        Offen => "offen",
+        InArbeit => "in_arbeit",
+        Vollzogen => "vollzogen",
+        Abgenommen => "abgenommen",
+    }
+    try_from = |s| format!("Ungültiger AuftragBearbeitungsstatus: {s}");
 }
 
 impl AuftragBearbeitungsstatus {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            AuftragBearbeitungsstatus::Offen => BEARB_OFFEN,
-            AuftragBearbeitungsstatus::InArbeit => BEARB_IN_ARBEIT,
-            AuftragBearbeitungsstatus::Vollzogen => BEARB_VOLLZOGEN,
-            AuftragBearbeitungsstatus::Abgenommen => BEARB_ABGENOMMEN,
-        }
-    }
-
     /// Ob der Auftrag noch offen ist, also nicht abgeschlossen (LFH-612, Modulzähler).
     ///
     /// Spiegelt die Phasen des Frontends (`AUFTRAG_STATUS` in `kommunikation/phase.ts`):
@@ -67,65 +60,19 @@ impl AuftragBearbeitungsstatus {
             AuftragBearbeitungsstatus::Vollzogen | AuftragBearbeitungsstatus::Abgenommen => false,
         }
     }
-
-    /// Parst einen gespeicherten/übergebenen Bearbeitungsstatus; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<AuftragBearbeitungsstatus> {
-        match s {
-            BEARB_OFFEN => Some(AuftragBearbeitungsstatus::Offen),
-            BEARB_IN_ARBEIT => Some(AuftragBearbeitungsstatus::InArbeit),
-            BEARB_VOLLZOGEN => Some(AuftragBearbeitungsstatus::Vollzogen),
-            BEARB_ABGENOMMEN => Some(AuftragBearbeitungsstatus::Abgenommen),
-            _ => None,
-        }
-    }
 }
 
-impl TryFrom<String> for AuftragBearbeitungsstatus {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        AuftragBearbeitungsstatus::parse(&s)
-            .ok_or_else(|| format!("Ungültiger AuftragBearbeitungsstatus: {s}"))
-    }
-}
-
-/// Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
-/// Wire == `empfaenger_typ`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EmpfaengerTyp {
-    Abschnitt,
-    Einheit,
-    Funktion,
-    Person,
-    Fahrzeug,
-    Extern,
-}
-
-impl EmpfaengerTyp {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            EmpfaengerTyp::Abschnitt => EMPF_ABSCHNITT,
-            EmpfaengerTyp::Einheit => EMPF_EINHEIT,
-            EmpfaengerTyp::Funktion => EMPF_FUNKTION,
-            EmpfaengerTyp::Person => EMPF_PERSON,
-            EmpfaengerTyp::Fahrzeug => EMPF_FAHRZEUG,
-            EmpfaengerTyp::Extern => EMPF_EXTERN,
-        }
-    }
-
-    /// Parst einen gespeicherten/übergebenen Empfänger-Typ; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<EmpfaengerTyp> {
-        match s {
-            EMPF_ABSCHNITT => Some(EmpfaengerTyp::Abschnitt),
-            EMPF_EINHEIT => Some(EmpfaengerTyp::Einheit),
-            EMPF_FUNKTION => Some(EmpfaengerTyp::Funktion),
-            EMPF_PERSON => Some(EmpfaengerTyp::Person),
-            EMPF_FAHRZEUG => Some(EmpfaengerTyp::Fahrzeug),
-            EMPF_EXTERN => Some(EmpfaengerTyp::Extern),
-            _ => None,
-        }
+wire_enum! {
+    /// Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
+    /// Wire == `empfaenger_typ`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum EmpfaengerTyp {
+        Abschnitt => "abschnitt",
+        Einheit => "einheit",
+        Funktion => "funktion",
+        Person => "person",
+        Fahrzeug => "fahrzeug",
+        Extern => "extern",
     }
 }
 
@@ -156,35 +103,29 @@ where
 }
 
 pub fn extern_kategorie_gueltig(k: &str) -> bool {
-    matches!(
-        k,
-        EXTERN_LEITSTELLE | EXTERN_NACHBAR_EA | EXTERN_UEBERGEORDNET | EXTERN_ANDERE_BOS
-    )
+    AdressatKategorie::parse(k).is_some()
 }
 
 /// Effektiver Bearbeitungsstatus (abgeleitet, fürs Frontend).
-pub const BEARB_OFFEN: &str = "offen";
-pub const BEARB_IN_ARBEIT: &str = "in_arbeit";
-pub const BEARB_VOLLZOGEN: &str = "vollzogen";
-pub const BEARB_ABGENOMMEN: &str = "abgenommen";
+pub const BEARB_OFFEN: &str = AuftragBearbeitungsstatus::Offen.as_str();
+pub const BEARB_IN_ARBEIT: &str = AuftragBearbeitungsstatus::InArbeit.as_str();
+pub const BEARB_VOLLZOGEN: &str = AuftragBearbeitungsstatus::Vollzogen.as_str();
+pub const BEARB_ABGENOMMEN: &str = AuftragBearbeitungsstatus::Abgenommen.as_str();
 
 /// Richtungskennzeichnung intern/extern (LFH-87, TEXT in der DB, im Code validiert).
-pub const RICHTUNG_INTERN: &str = "intern";
-pub const RICHTUNG_EXTERN: &str = "extern";
+pub const RICHTUNG_INTERN: &str = Richtung::Intern.as_str();
+pub const RICHTUNG_EXTERN: &str = Richtung::Extern.as_str();
 
 pub fn prioritaet_gueltig(p: &str) -> bool {
-    matches!(p, PRIO_SOFORT | PRIO_DRINGEND | PRIO_NORMAL)
+    Prioritaet::parse(p).is_some()
 }
 
 pub fn richtung_gueltig(r: &str) -> bool {
-    matches!(r, RICHTUNG_INTERN | RICHTUNG_EXTERN)
+    Richtung::parse(r).is_some()
 }
 
 pub fn empfaenger_typ_gueltig(t: &str) -> bool {
-    matches!(
-        t,
-        EMPF_ABSCHNITT | EMPF_EINHEIT | EMPF_FUNKTION | EMPF_PERSON | EMPF_FAHRZEUG | EMPF_EXTERN
-    )
+    EmpfaengerTyp::parse(t).is_some()
 }
 
 /// Anzeige eines Auftrags inkl. abgeleiteter Felder und der Vollzugs-Achse aus

@@ -1,6 +1,7 @@
 import type { Schaden, SchadenAnhang, SchadenStatus, SchadenTyp, Ausmass } from './types';
-import { apiGet, apiSend, apiUpload } from './client';
+import { apiGet, apiSend, apiUpload, mitParametern } from './client';
 import { UPLOAD_TIMEOUT_MS } from './upload';
+import { registrierNummer } from '../anzeige/registrierNummer';
 
 /** Felder beim Anlegen (Typ + Ort + Ausmaß Pflicht; Rest optional). Geschädigt FK XOR Freitext. */
 export interface SchadenEingabe {
@@ -42,15 +43,15 @@ export interface SchaedenFilter {
 }
 
 export function listeSchaeden(einsatzId: number, filter: SchaedenFilter = {}): Promise<Schaden[]> {
-  const params = new URLSearchParams();
-  if (filter.status) params.set('status', filter.status);
-  if (filter.typ) params.set('typ', filter.typ);
-  if (filter.ausmass) params.set('ausmass', filter.ausmass);
-  if (filter.geschaedigtPersonId != null)
-    params.set('geschaedigt_person_id', String(filter.geschaedigtPersonId));
-  if (filter.inklStorniert) params.set('inkl_storniert', 'true');
-  const q = params.toString();
-  return apiGet<Schaden[]>(`/api/einsaetze/${einsatzId}/schaeden${q ? `?${q}` : ''}`);
+  return apiGet<Schaden[]>(
+    mitParametern(`/api/einsaetze/${einsatzId}/schaeden`, {
+      status: filter.status,
+      typ: filter.typ,
+      ausmass: filter.ausmass,
+      geschaedigt_person_id: filter.geschaedigtPersonId,
+      inkl_storniert: filter.inklStorniert,
+    }),
+  );
 }
 
 export function ladeSchaden(einsatzId: number, schadenId: number): Promise<Schaden> {
@@ -62,10 +63,9 @@ export function legeSchadenAn(einsatzId: number, daten: SchadenEingabe): Promise
 }
 
 /**
- * Optimistisches Lock (LFH-300/F10): `basisGeaendertAt` trägt den beim Laden gelesenen
- * `geaendert_at`-Stand. Ist er veraltet → 409 statt stillem Overwrite. Ohne Baseline
- * (Lagekarten-Drag lat/lon, Geschädigt-Zuordnung aus der Personen-Detailseite,
- * Konfliktdialog-Overwrite) wird bewusst blind geschrieben.
+ * Optimistisches Lock: `basisGeaendertAt` trägt den beim Laden gelesenen `geaendert_at`-Stand;
+ * veraltet → 409. Ohne Baseline (Lagekarten-Drag lat/lon, Geschädigt-Zuordnung aus der
+ * Personen-Detailseite, Konfliktdialog-Overwrite) wird bewusst blind geschrieben.
  */
 export function aktualisiereSchaden(
   einsatzId: number,
@@ -109,10 +109,10 @@ export function storniereSchaden(einsatzId: number, schadenId: number): Promise<
 
 /** Registriernummer-Anzeige wie im Backend (S-007). */
 export function schadenRegistrierAnzeige(nr: number): string {
-  return `S-${String(nr).padStart(3, '0')}`;
+  return registrierNummer('S', nr);
 }
 
-// ---------- Fotos und Dateien (LFH-21) ----------
+// ---------- Fotos und Dateien ----------
 
 const anhangBasis = (einsatzId: number, schadenId: number) =>
   `/api/einsaetze/${einsatzId}/schaeden/${schadenId}/anhaenge`;
@@ -126,9 +126,8 @@ export function listeSchadenAnhaenge(
 }
 
 /**
- * Legt EINE Datei am Schaden ab (Feld `datei`, design.md D5). Mehrere Fotos entstehen über
- * den Serienmodus des Dialogs, jedes mit eigenem ETB-Nachweis. Timeout wie die übrigen
- * Uploads (25 MiB samt Virenscan über Mobilfunk).
+ * Legt EINE Datei am Schaden ab (Feld `datei`). Mehrere Fotos entstehen über den Serienmodus des
+ * Dialogs, jedes mit eigenem ETB-Nachweis. Timeout wie die übrigen Uploads.
  */
 export function legeSchadenAnhangAb(
   einsatzId: number,
@@ -152,9 +151,9 @@ export function entferneSchadenAnhang(
 }
 
 /**
- * Download über die modul-gegatete Schadensroute — nie über `/anhaenge/{aid}` des Einsatzes
- * (dort 404, die Datei ist modulgebunden). Ein API-Pfad, keine Navigation, deshalb hier und
- * nicht in `routing/deeplinks.ts` (wie `dokumentDownloadPfad`).
+ * Download über die modul-gegatete Schadensroute, nie über `/anhaenge/{aid}` des Einsatzes (dort
+ * 404, die Datei ist modulgebunden). Ein API-Pfad, keine Navigation, deshalb nicht in
+ * `routing/deeplinks.ts`.
  */
 export function schadenAnhangDownloadPfad(
   einsatzId: number,

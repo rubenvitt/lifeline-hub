@@ -3,11 +3,9 @@ import { einsatzKeys } from './queryKeys';
 import type { PegelAnzeige, PegelVerlauf, PegelVorhersageAntwort } from './types';
 
 /**
- * Maßgebliche Pegel eines Einsatzes (LFH-606).
- *
- * Alle drei Routen antworten mit der VOLLSTÄNDIGEN Liste in Reihenfolge, je Eintrag mit der
- * jüngsten Messung. Die Mutationen setzen die Antwort deshalb per `setQueryData` auf
- * {@link einsatzKeys.pegel}, statt eine Invalidierung mit zweitem Abruf auszulösen.
+ * Maßgebliche Pegel eines Einsatzes. Alle drei Routen antworten mit der VOLLSTÄNDIGEN Liste in
+ * Reihenfolge, je Eintrag mit der jüngsten Messung; die Mutationen setzen die Antwort deshalb
+ * per `setQueryData` auf {@link einsatzKeys.pegel}.
  */
 
 /** Eine Station, wie sie gewählt wird (Snapshot von Name und Gewässer zum Festlegen). */
@@ -40,7 +38,7 @@ export function fuegePegelHinzu(einsatzId: number, station: PegelEingabe): Promi
   return apiSend<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/pegel`, 'POST', station);
 }
 
-/** Erwarteter Höchststand (LFH-628): Wert in cm, Zeitpunkt ISO-8601 (`toISOString()`). */
+/** Erwarteter Höchststand: Wert in cm, Zeitpunkt ISO-8601 (`toISOString()`). */
 export interface PrognoseEingabe {
   hoechststand_cm: number;
   zeitpunkt: string;
@@ -65,8 +63,8 @@ export function loeschePrognose(einsatzId: number, pegelId: number): Promise<Peg
 }
 
 /**
- * Vorschlag aus der PEGELONLINE-Vorhersage-Reihe `WV` (LFH-628): höchster künftiger Wert.
- * Ohne Reihe (die meisten Stationen) fehlt `vorhersage`; das ist kein Fehler.
+ * Vorschlag aus der PEGELONLINE-Vorhersage-Reihe `WV`: höchster künftiger Wert. Ohne Reihe (die
+ * meisten Stationen) fehlt `vorhersage`; das ist kein Fehler.
  */
 export function ladeVorhersage(
   einsatzId: number,
@@ -76,12 +74,9 @@ export function ladeVorhersage(
 }
 
 /**
- * Einmalige Nachfrage, wenn einem Eintrag die Messung fehlt (LFH-606, Prüfliste O2).
- *
- * PUT und POST warten nie auf PEGELONLINE: eine neu festgelegte, noch nicht gecachte
- * Station kommt ohne Messung zurück, der Abruf läuft im Hintergrund (Backend
- * `Modus::NurCache`). Ohne Nachfrage stünde die Kennzahl bis zum nächsten 5-min-Takt auf
- * „Stand unbekannt“, obwohl die Messung Sekunden später im Cache liegt.
+ * Einmalige Nachfrage, wenn einem Eintrag die Messung fehlt. PUT und POST warten nie auf
+ * PEGELONLINE: eine neu festgelegte Station kommt ohne Messung zurück, der Abruf läuft im
+ * Hintergrund. Ohne Nachfrage stünde „Stand unbekannt“ bis zum nächsten 5-min-Takt.
  */
 export const PEGEL_NACHFRAGE_MS = 10_000;
 
@@ -105,15 +100,12 @@ interface LueckenVermerk {
  * Nächster Abruf-Abstand als reine Funktion von Daten, Datenstand und Vermerk.
  *
  * Kurz ({@link PEGEL_NACHFRAGE_MS}) genau für den Datenstand, an dem eine Lücke ZUERST
- * auftauchte; jeder spätere Datenstand mit derselben Lücke (die Nachfrage kam, die Messung
- * fehlt weiter) fällt auf den 5-min-Takt zurück — keine Schleife. Eine NEUE Lücke (andere
- * Station) bekommt ihre eigene Nachfrage.
+ * auftauchte; jeder spätere Datenstand mit derselben Lücke fällt auf den 5-min-Takt zurück,
+ * keine Schleife. Eine NEUE Lücke bekommt ihre eigene Nachfrage.
  *
- * IDEMPOTENT je Datenstand, und das ist tragend: TanStack wertet `refetchInterval` nicht nur
- * nach einem Abruf aus, sondern bei JEDEM Render (`setOptions`) und jeder Zustandsänderung
- * der Abfrage (`onQueryUpdate` → `#updateTimers`). Eine Funktion, die beim ersten Aufruf
- * „jetzt kurz“ vermerkt und beim zweiten „schon erledigt“ antwortet, setzte das kurze
- * Intervall sofort wieder auf 5 min zurück, bevor es feuert. Rein.
+ * IDEMPOTENT je Datenstand, und das trägt: TanStack wertet `refetchInterval` bei JEDEM Render
+ * und jeder Zustandsänderung der Abfrage aus. Eine Funktion, die beim ersten Aufruf „kurz“
+ * vermerkt und beim zweiten „erledigt“ antwortet, setzte das Intervall zurück, bevor es feuert.
  */
 export function naechsterPegelAbruf(
   daten: readonly PegelAnzeige[] | undefined,
@@ -131,11 +123,9 @@ export function naechsterPegelAbruf(
 }
 
 /**
- * Vermerk je Cache-Eintrag. Am `Query`-Objekt statt in einer Komponente: alle Leser teilen
- * den Eintrag (Dashboard, Überblick, Einstellungen, Karte), und eine Komponente, die neu
- * montiert, darf die Nachfrage nicht erneut auslösen. Die WeakMap räumt sich mit dem
- * Eintrag; einen eigenen Timer gibt es nicht — das Intervall gehört TanStack und endet mit
- * dem letzten Beobachter.
+ * Vermerk je Cache-Eintrag, am `Query`-Objekt statt in einer Komponente: alle Leser teilen den
+ * Eintrag, und eine neu montierte Komponente darf die Nachfrage nicht erneut auslösen. Die
+ * WeakMap räumt sich mit dem Eintrag; das Intervall gehört TanStack.
  */
 const luecken = new WeakMap<object, LueckenVermerk | null>();
 
@@ -153,9 +143,8 @@ function refetchIntervall(query: {
 
 /**
  * Die EINE Abfrage-Konfiguration für alle Leser (Dashboard, Überblick, Einstellungen,
- * Lagekarte): gleicher Key, gleicher Takt — sonst zöge der Leser mit dem kürzesten Intervall
- * die anderen mit, ohne dass es irgendwo stünde. Der Takt ist 5 min, mit einer einmaligen
- * kurzen Nachfrage bei fehlender Messung ({@link naechsterPegelAbruf}).
+ * Lagekarte): gleicher Key, gleicher Takt, sonst zöge der Leser mit dem kürzesten Intervall die
+ * anderen still mit. 5 min, plus einmalige Nachfrage bei fehlender Messung.
  */
 export function pegelAbfrage(einsatzId: number) {
   return {
@@ -175,19 +164,18 @@ export function pegelSchreibScope(einsatzId: number) {
 }
 
 /**
- * 24-h-Verlauf aller festgelegten Pegel (LFH-633), in Pegel-Reihenfolge. Eine Station ohne
- * Stand kommt mit leerer Reihe. Eigene Route statt Feld in der Liste: die Liste lesen auch
- * Dashboard und Überblick alle 5 min, die Reihe braucht nur die Modulseite.
+ * 24-h-Verlauf aller festgelegten Pegel, in Pegel-Reihenfolge; eine Station ohne Stand kommt mit
+ * leerer Reihe. Eigene Route, weil die Liste auch Dashboard und Überblick alle 5 min lesen, die
+ * Reihe aber nur die Modulseite braucht.
  */
 export function ladeVerlauf(einsatzId: number): Promise<PegelVerlauf[]> {
   return apiGet<PegelVerlauf[]>(`/api/einsaetze/${einsatzId}/pegel/verlauf`);
 }
 
 /**
- * Abfrage des Verlaufs im 5-min-Takt. Liste und Verlauf lesen im Backend denselben
- * Cache-Eintrag, sind aber ZWEI Anfragen: im Normalfall zeigen Wert und Linie einen Stand,
- * zugesichert ist das nicht. Die 10-s-Nachfrage der Liste hat der Verlauf nicht — die Seite
- * zieht ihn deshalb nach, wenn ein Wert ohne Reihe dasteht (`verlaufLuecke`).
+ * Abfrage des Verlaufs im 5-min-Takt. Liste und Verlauf sind ZWEI Anfragen, ein gemeinsamer
+ * Stand ist nicht zugesichert. Die 10-s-Nachfrage der Liste hat der Verlauf nicht; die Seite
+ * zieht ihn nach, wenn ein Wert ohne Reihe dasteht (`verlaufLuecke`).
  */
 export function pegelVerlaufAbfrage(einsatzId: number) {
   return {

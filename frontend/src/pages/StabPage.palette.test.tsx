@@ -3,12 +3,13 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import type { TastaturAktionen } from '../command-palette/typen';
 import StabPage from './StabPage';
+import { benutzerFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
 /**
  * „Neue Zeile" der Stab-Seite mit demselben Rechte-Riegel wie die Kopfaktion. Eigene Datei aus
@@ -25,23 +26,13 @@ vi.mock('../command-palette/useBefehle', () => ({
     })),
 }));
 
-class FakeEventSource {
-  addEventListener() {}
-  removeEventListener() {}
-  close() {}
-}
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
   sessionStorage.clear();
 });
 afterEach(() => vi.unstubAllGlobals());
 
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-};
+const nutzer = benutzerFixture({ org_rolle: 'fuehrungskraft' });
 const einsatzAktiv = {
   id: 1,
   bezeichnung: 'Lage',
@@ -57,20 +48,18 @@ function render(
     HttpResponse.json({ anzahl_lagebesprechungen: 0, besetzung: [] }),
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/stab', stab),
     http.get('/api/einsaetze/1/stab/lagebesprechungen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <CommandPaletteProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/stab" element={<StabPage />} />
-        </Routes>
-      </CommandPaletteProvider>
-    </AuthProvider>,
+    <CommandPaletteProvider>
+      <Routes>
+        <Route path="/einsaetze/:id/stab" element={<StabPage />} />
+      </Routes>
+    </CommandPaletteProvider>,
     { route: '/einsaetze/1/stab' },
   );
 }

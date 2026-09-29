@@ -3,68 +3,41 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Guard der Katalogtabellen (LFH-329 · B1, Gate 2 aus A1; Schließung LFH-330 · G1;
- * Ordnung LFH-330 · O).
+ * Guard der Katalogtabellen (LFH-329 · B1, Gate 2; Schließung LFH-330 · G1; Ordnung LFH-330 · O).
  *
- * DREI Teile, und sie fangen verschiedene Ausfälle:
+ * Drei Teile, und sie fangen verschiedene Ausfälle:
  *
- * 1. **Das Inventar** — die namentliche 18er-Liste unten. Diese Tabellen laufen über EIN
- *    Primitiv (`components/KatalogTabelle.tsx`), das waagerechten Scrollcontainer, stehende
- *    Kopfzeile und fixierte Identifierspalte setzt. Fiele eine davon auf antd zurück, bräche
- *    nichts sichtbar — sie verschwände am schmalen Schirm still aus dem Gate.
- * 2. **Die Schließung** — ein Scan über den ganzen Dateikorpus `frontend/src`: außerhalb des
- *    Primitivs und der namentlich freigestellten Ausnahmen gibt es KEIN rohes
- *    antd-Tabellenelement. Ohne diesen Teil sagte der Guard bloß „diese 18 sind migriert"
- *    und nichts über die neunzehnte, neu hinzukommende. `datensicht.guard.test.ts` verweist
- *    im Dateikopf für genau diesen Fall hierher („ein Konsument, der gar nichts von
- *    `Datensicht` weiß") — bis LFH-330 · G1 war das ein Versprechen ohne Gegenstand.
+ * 1. **Das Inventar** — die namentliche 18er-Liste unten läuft über EIN Primitiv
+ *    (`components/KatalogTabelle.tsx`: Scrollcontainer, stehende Kopfzeile, fixierte Kennung).
+ *    Fiele eine auf antd zurück, verschwände sie am schmalen Schirm still aus dem Gate.
+ * 2. **Die Schließung** — ein Scan über `frontend/src`: außerhalb des Primitivs und der
+ *    namentlichen Ausnahmen gibt es KEIN rohes antd-Tabellenelement. Ohne ihn sagte der Guard
+ *    nichts über eine neu hinzukommende Tabelle.
  * 3. **Die Ordnung** — die dreizehn Kataloge tragen Sortierung, Filterachse und Freitextsuche
- *    auch WIRKLICH, nicht bloß das Primitiv darunter. Das schließt genau den Ausgangsbefund
- *    von LFH-330: Fähigkeiten am Primitiv vorhanden, an den Aufrufstellen nicht angeschlossen.
- *    Teil 1 sähe einen Rückbau nicht — `<KatalogTabelle>` ohne einen einzigen `sorter` ist dort
- *    tadellos. Siehe {@link ordnungsBefunde}.
+ *    an der Aufrufstelle, nicht bloß das Primitiv darunter. Teil 1 sähe einen Rückbau nicht.
+ *    Siehe {@link ordnungsBefunde}.
  *
- * ── BEKANNTE GRENZEN, und sie sind Teil des Vertrags ────────────────────────────
+ * ── BEKANNTE GRENZEN, Teil des Vertrags ───────────────────────────────────────────
  *
- * 1. **Die 18er-Liste bleibt handgepflegt, nicht erschnüffelt.** Eine neue Katalogseite in
- *    `stammdaten/` taucht dort nicht von selbst auf. Bindet sie antd direkt ein, fängt sie
- *    die Schließung; baut sie korrekt auf dem Primitiv, steht sie danach trotzdem nicht im
- *    Inventar. Das Inventar sichert den benannten Bestand gegen Rückfall, nicht den Zuwachs
- *    gegen Auslassung — dafür ist es die falsche Bauart, und ein Verzeichnis-Scan wäre die
- *    falsch-positive (Modals, Listen, Untertabellen wollen kein Primitiv).
- * 2. **Andere Darstellungsformen sieht keiner der drei Teile.** Eine Liste aus
- *    handgesetzten `div`s oder über `components/Liste.tsx` ist hier unsichtbar; die Formfrage
- *    Tabelle-gegen-Liste regelt die Bedien-Leitlinie, nicht dieser Scan.
- * 3. **Die Aliastür bleibt offen.** Ein `import { Table as AntTabelle }` mit anschließendem
- *    `<AntTabelle` entgeht der Marke. Bewusst nicht abgedeckt: dafür müsste der Scanner
- *    Importbindungen auflösen, und im Bestand ist der Fall nirgends belegt.
- * 4. **Der Guard liest über `node:fs`, nicht über `import.meta.glob`** — dieselbe
- *    Begründung wie in `theme/gate5.guard.test.ts`: der Glob liefert je nach Vitest-
- *    Konfiguration Leerstrings und macht den Scan zur Attrappe.
- * 5. **Kommentare sind ausgenommen.** Über die abgelöste Schreibweise darf man reden.
- *    Der Stripper trägt einen Block-Zustand über Zeilengrenzen; ein `//` innerhalb eines
- *    Strings blendet den Zeilenrest aus — das erzeugt Falsch-Negative, nie Falsch-Positive.
- * 6. **Der Scanner beweist sich selbst** (die Selbstbeweis-Fälle): ohne diesen Beleg wäre ein
- *    verunglücktes Muster still grün und der Guard wertlos.
- * 7. **Die Ordnung zählt Vorkommen, nicht Wirkung.** Sie belegt, dass `sorter`, `filters` und
- *    das `suche`-Prop an der Aufrufstelle STEHEN — nicht, dass die Vergleichsfunktion richtig
- *    vergleicht. Das prüfen die Verhaltenstests (`KatalogTabelle.test.tsx` und die
- *    Seiten-Tests); dieses Gate fängt allein den stillen Rückbau. Ebenso ungesehen bleibt ein
- *    zur Laufzeit abgeschaltetes Prop (`suche={istAdmin ? … : undefined}`): im Bestand gibt es
- *    den Fall nicht, und ein Muster dagegen wäre Vorratshaltung. Käme er, gehört er hierher.
- * 8. **Auch die Ordnung sieht keine String-Literale** — siehe den WARNSATZ an
- *    {@link rohtabellenBefunde}. Ein `const hinweis = 'sorter: fehlt';` in einer der dreizehn
- *    Dateien erfüllte ihr `sorter`-Soll. Der Stripper deckt Kommentare ab, und nur die.
- *
- *    **Für DIESEN Teil ist er heute nicht tragend, und das ist gemessen:** über alle dreizehn
- *    Dateien ändert er keine einzige der vier Zählungen. Grund ist die Doppelpunkt-Form der
- *    Muster — die Prosa führt genau EIN nacktes Vorkommen (`filters` in
- *    `karten/OnlineQuellenVerwaltung.tsx:65`, „BEWUSST OHNE `filters`"), und dem fehlt der
- *    Doppelpunkt. Er bleibt trotzdem, aus zwei Gründen: es ist dieselbe Funktion, die die
- *    Schließung braucht (dort IST sie tragend), und der Abstand zwischen jener Prosastelle und
- *    einem gezählten Treffer beträgt ein Zeichen. Der Selbstbeweis unten zeigt den Mechanismus
- *    deshalb an einem gebauten Fall, nicht am Bestand — wer den Stripper hier herausnimmt,
- *    sieht kein rotes Gate und hat die Zusicherung trotzdem auf Prosa gestellt.
+ * 1. **Die 18er-Liste ist handgepflegt.** Sie sichert den Bestand gegen Rückfall, nicht den
+ *    Zuwachs gegen Auslassung; ein Verzeichnis-Scan wäre falsch-positiv (Modals, Listen,
+ *    Untertabellen wollen kein Primitiv).
+ * 2. **Andere Darstellungsformen sieht keiner der drei Teile** (handgesetzte `div`s,
+ *    `components/Liste.tsx`); die Formfrage regelt die Bedien-Leitlinie.
+ * 3. **Die Aliastür bleibt offen.** `import { Table as AntTabelle }` entgeht der Marke; dafür
+ *    müsste der Scanner Importbindungen auflösen, und der Fall ist nirgends belegt.
+ * 4. **Gelesen wird über `node:fs`, nicht `import.meta.glob`** (siehe `theme/gate5.guard.test.ts`).
+ * 5. **Kommentare sind ausgenommen.** Der Stripper trägt einen Block-Zustand über Zeilengrenzen;
+ *    ein `//` in einem String blendet den Zeilenrest aus — Falsch-Negative, nie Falsch-Positive.
+ * 6. **Der Scanner beweist sich selbst** (Selbstbeweis-Fälle), sonst wäre ein verunglücktes
+ *    Muster still grün.
+ * 7. **Die Ordnung zählt Vorkommen, nicht Wirkung.** Ob die Vergleichsfunktion richtig
+ *    vergleicht, prüfen die Verhaltenstests; dieses Gate fängt den stillen Rückbau. Ein zur
+ *    Laufzeit abgeschaltetes Prop (`suche={istAdmin ? … : undefined}`) sieht es nicht.
+ * 8. **Auch die Ordnung sieht keine String-Literale** (WARNSATZ an {@link rohtabellenBefunde}).
+ *    Für diesen Teil ändert der Stripper heute keine Zählung (die Muster tragen den Doppelpunkt,
+ *    die Prosa nicht); er bleibt, weil die Schließung dieselbe Funktion braucht und ein Zeichen
+ *    Abstand genügte. Der Selbstbeweis zeigt ihn deshalb an einem gebauten Fall.
  */
 
 /** Wurzel des Scans: `frontend/src`, über `process.cwd()` aufgelöst (siehe gate5.guard). */
@@ -77,21 +50,12 @@ const SRC = (() => {
 })();
 
 /**
- * Die achtzehn Tabellen hinter dem Primitiv — dreizehn Kataloge (zehn Stammdaten-Reiter,
- * zwei Karten-Sektionen, Benutzer) und fünf Einsatz-/Verwaltungstabellen, die LFH-330 · B2
- * als Überlaufschutz nachgezogen hat.
+ * Die achtzehn Tabellen hinter dem Primitiv — dreizehn Kataloge (zehn Stammdaten-Reiter, zwei
+ * Karten-Sektionen, Benutzer) und fünf Einsatz-/Verwaltungstabellen als Überlaufschutz.
  *
- * Die fünf Neuzugänge sind ausdrücklich KEINE `Datensicht`-Konsumenten (E3/E4): sie
- * bekommen nur waagerechten Scrollcontainer, stehende Kopfzeile und fixierte Kennung. Ihr
- * Guard-Ort ist deshalb dieses Inventar und nicht `datensicht.guard.test.ts`.
- *
- * `etb/EtbTabelle.tsx` war die neunzehnte Konsumentin und ist seit LFH-342 · C7 **nach
- * oben** herausgefallen — dieselbe Bewegung wie bei `pages/SchaedenPage.tsx` in C5: sie
- * bindet `KatalogTabelle` nicht mehr selbst ein, sondern läuft über `Datensicht` (das
- * seinerseits durch das Primitiv rendert). Mit dem Neuentwurf (21.09.2026) ist sie ganz
- * entfallen: das Tagebuch ist die Zeitachse `etb/EtbZeitachse.tsx` und läuft weder über
- * `Datensicht` noch über dieses Primitiv. Der Restposten LFH-330 · AP8 ist eingelöst und
- * nicht mehr offen.
+ * Die fünf sind KEINE `Datensicht`-Konsumenten: sie bekommen nur Scrollcontainer, stehende
+ * Kopfzeile und fixierte Kennung, ihr Guard-Ort ist deshalb dieses Inventar. Das ETB ist eine
+ * Zeitachse und läuft über keines der beiden Primitive.
  */
 const KATALOGE = [
   'stammdaten/QualifikationenTab.tsx',
@@ -110,17 +74,9 @@ const KATALOGE = [
 ];
 
 /**
- * Die fünf Nachzügler des Überlaufschutzes. Getrennt gehalten, weil eine Zusicherung nur
- * für die Kataloge gilt (die Blätterungsschwelle unten) — eine flache Gesamtliste könnte das
- * nicht ausdrücken, ohne die Nachzügler mitzuverpflichten.
- *
- * SECHS BIS LFH-340 · C5. `pages/SchaedenPage.tsx` ist herausgefallen, und zwar nach oben:
- * sie bindet `KatalogTabelle` nicht mehr selbst ein, sondern läuft über `Datensicht` (das
- * seinerseits durch das Primitiv rendert). Ihr Guard-Ort ist damit
- * `datensicht.guard.test.ts` — dieselbe Zuordnung wie bei `PersonenPage`/`TierePage`, die
- * hier ebenfalls nie standen. Der Kommentar über {@link KATALOGE} hatte für genau diesen
- * Fall vorgesorgt („Rüstet jemand `pages/SchaedenPage.tsx` später Sortierung nach …"); der
- * Weg ist jetzt gegangen, nur eine Ebene höher als dort vermutet.
+ * Die fünf Nachzügler des Überlaufschutzes, getrennt gehalten, weil die Blätterungsschwelle nur
+ * für die Kataloge gilt. Wer über `Datensicht` rendert (`SchaedenPage`, `PersonenPage`,
+ * `TierePage`), gehört nach `datensicht.guard.test.ts`, nicht hierher.
  */
 const UEBERLAUF_NACHZUG = [
   'pages/bereitstellungsraum/BereitstellungsraeumePage.tsx',
@@ -171,10 +127,26 @@ function treffer(text: string, muster: RegExp): number {
   return text.match(muster)?.length ?? 0;
 }
 
-const QUELLEN = KATALOGTABELLEN.map((pfad) => ({
-  pfad,
-  text: ohneKommentare(readFileSync(join(SRC, pfad), 'utf8')),
-}));
+/**
+ * Geteilte Bausteine der Kataloge: wer einen davon nutzt, trägt dessen Tabelle, Suche oder
+ * Spalten. Ihr Text wird deshalb an den des Katalogs angehängt; geprüft wird weiter je
+ * Katalog, und was kein Baustein mitbringt, muss im Katalog selbst stehen.
+ */
+const HUELLEN: [RegExp, string][] = [
+  [elementMuster('KatalogVerwaltung'), 'stammdaten/KatalogVerwaltung.tsx'],
+  // Status- und Aktionsspalte der Dienststatus-Kataloge (Fahrzeuge, Personal, Material).
+  [/\bdienststatusSpalten</g, 'stammdaten/dienststatus.tsx'],
+];
+
+function katalogText(pfad: string): string {
+  const eigen = ohneKommentare(readFileSync(join(SRC, pfad), 'utf8'));
+  const huellen = HUELLEN.filter(([marke]) => treffer(eigen, marke) > 0).map(([, huelle]) =>
+    ohneKommentare(readFileSync(join(SRC, huelle), 'utf8')),
+  );
+  return [eigen, ...huellen].join('\n');
+}
+
+const QUELLEN = KATALOGTABELLEN.map((pfad) => ({ pfad, text: katalogText(pfad) }));
 
 // ── Teil 3: die Ordnung der dreizehn Kataloge (LFH-330 · O) ───────────────────────
 
@@ -183,57 +155,45 @@ const SORTER_MUSTER = /\bsorter:/g;
 const FILTER_MUSTER = /\bfilters:/g;
 const ONFILTER_MUSTER = /\bonFilter:/g;
 /**
- * Das `suche`-Prop ist opt-in (`KatalogTabelle.tsx:57`, `suche?: { platzhalter: string }`) —
- * ohne es existiert weder Feld noch `/`-Kürzel. Die öffnende Zuweisung gehört mit ins Muster:
- * ein bloßes `suche` träfe auch jede gleichnamige Variable oder Destrukturierung.
+ * Das `suche`-Prop ist opt-in; die öffnende Zuweisung gehört ins Muster, ein bloßes `suche`
+ * träfe jede gleichnamige Variable.
  *
- * Alle vier Muster tragen `g` und werden über `treffer()` nur mit `String.match` gefahren —
- * das setzt `lastIndex` zurück, anders als `.test()`/`.exec()`. Wer hier auf `.test()`
- * umstellt, holt sich die Falle, vor der der Zeilenzähler der Schließung warnt.
+ * Alle vier Muster tragen `g` und laufen über `treffer()` nur mit `String.match`, das
+ * `lastIndex` zurücksetzt. `.test()`/`.exec()` holten die Falle zurück.
  */
 const SUCHE_MUSTER = /\bsuche=\{/g;
 
 /**
  * Die drei Kataloge OHNE Filterachse — jeder mit Begründung, und jeder muss GEBRAUCHT werden.
- * Bekommt einer von ihnen später doch eine Filterachse, meldet {@link ordnungsBefunde} den
- * Eintrag als tot; er wird dann gestrichen, nicht geduldet. Ein toter Eintrag deckte sonst
- * still den nächsten Rückbau in derselben Datei — dieselbe Bauart wie {@link AUSNAHMEN}.
+ * Bekommt einer doch eine Filterachse, meldet {@link ordnungsBefunde} den Eintrag als tot; er
+ * deckte sonst still den nächsten Rückbau (Bauart wie {@link AUSNAHMEN}).
  */
 const OHNE_FILTERACHSE: Record<string, string> = {
-  // `StichwortVorschlag` = `{ id, text }`. Zwei Spalten (Stichwort, Aktionen), keine davon
-  // trägt eine Achse zum Sieben. Eine Filterachse müsste man erfinden.
+  // `StichwortVorschlag` = `{ id, text }`: keine Spalte trägt eine Achse zum Sieben.
   'stammdaten/StichworteTab.tsx':
     'nur Text und Aktionen — der Datensatz trägt keine siebbare Achse',
-  // Die einzige denkbare Achse wäre `aktiv`, und die siebt schon der Server:
-  // `personal/qualifikation_repo.rs:55` liefert `WHERE org_id = ? AND aktiv = 1`. Die Liste
-  // enthält also gar keine inaktive Zeile, gegen die ein Filter etwas ausrichten könnte.
+  // Die einzige denkbare Achse wäre `aktiv`, und die siebt der Server
+  // (`personal/qualifikation_repo.rs`, `aktiv = 1`).
   'stammdaten/QualifikationenTab.tsx':
     'Aktiv-Achse serverseitig gesiebt (personal/qualifikation_repo.rs:55, WHERE aktiv = 1)',
-  // Gleiche Lage, zweite Quelle: `einheit/typ_repo.rs:70` liefert `WHERE org_id = ? AND
-  // aktiv = 1`. `EinheitTyp` trägt darüber hinaus weder Status noch Kategorie; die Begründung
-  // steht auch am Spaltenblock der Datei selbst.
+  // Wie oben: `einheit/typ_repo.rs` liefert nur `aktiv = 1`, und `EinheitTyp` trägt weder
+  // Status noch Kategorie.
   'stammdaten/EinheitTypenTab.tsx':
     'Aktiv-Achse serverseitig gesiebt (einheit/typ_repo.rs:70, WHERE aktiv = 1)',
 };
 
 /**
- * Fehlende Ordnung in den dreizehn Katalogen UND tote Filter-Ausnahmen in EINER Liste —
- * Bauart wie {@link rohtabellenBefunde}. Rein und exportiert, damit die Selbstbeweis-Fälle
- * sie ohne Dateisystem prüfen können.
+ * Fehlende Ordnung in den dreizehn Katalogen UND tote Filter-Ausnahmen in EINER Liste. Rein und
+ * exportiert für die Selbstbeweis-Fälle.
  *
- * Warum `filters` UND `onFilter` zusammen verlangt werden: eine Spalte mit `filters`, aber
- * ohne `onFilter` malt in antd das Aufklappmenü und siebt nichts. Das ist der Ausgangsbefund
- * dieses Tickets im Kleinen — Fähigkeit sichtbar, nicht angeschlossen. Deshalb reicht
- * „mindestens eins" nicht: die Zahlen müssen ÜBEREINSTIMMEN, sonst deckte eine funktionierende
- * Filterspalte eine tote daneben (gemessen im Bestand: 10 Dateien, Paarung durchweg 1:1,
- * `SprechgruppenTab.tsx` 2:2).
+ * `filters` und `onFilter` müssen in der ZAHL übereinstimmen: eine Spalte mit `filters` ohne
+ * `onFilter` malt in antd das Menü und siebt nichts, und „mindestens eins" ließe eine
+ * funktionierende Filterspalte eine tote daneben decken.
  *
- * GRENZE dieser Paarung: sie zählt je DATEI, nicht je Spalte. Eine Spalte mit `filters` ohne
- * `onFilter` und eine zweite mit `onFilter` ohne `filters` gleichen sich zu 1:1 aus und kämen
- * durch. Im Bestand gibt es den Fall nicht, und die Spaltenzuordnung verlangte einen Parser
- * statt eines Zählers — der Aufwand steht nicht dafür.
+ * GRENZE: gezählt wird je DATEI, nicht je Spalte. Eine Spalte nur mit `filters` und eine nur mit
+ * `onFilter` gleichen sich aus; die Spaltenzuordnung verlangte einen Parser.
  *
- * `quellen` trägt bereits ENTKOMMENTIERTEN Text — siehe Grenze 8 im Dateikopf.
+ * `quellen` trägt bereits ENTKOMMENTIERTEN Text (Grenze 8).
  */
 export function ordnungsBefunde(
   quellen: { pfad: string; text: string }[],
@@ -259,9 +219,8 @@ export function ordnungsBefunde(
   }
 
   for (const eintrag of Object.keys(ohneFilterachse)) {
-    // Ein Eintrag auf eine Datei, die gar nicht geprüft wird (Tippfehler, Umbenennung,
-    // Verschiebung), wäre wirkungslos und dabei unsichtbar — er sieht wie eine gültige
-    // Begründung aus und deckt in Wahrheit nichts.
+    // Ein Eintrag auf eine ungeprüfte Datei (Tippfehler, Umbenennung) sähe wie eine gültige
+    // Begründung aus und deckte nichts.
     if (!bekannt.has(eintrag)) befunde.push(`unbekannte Filter-Ausnahme: ${eintrag}`);
   }
   return befunde;
@@ -274,16 +233,14 @@ const ENDUNGEN = /\.(ts|tsx)$/;
 
 /**
  * Namentlich freigestellt — Begründung je Eintrag, und jeder Eintrag muss GEBRAUCHT werden
- * (siehe {@link rohtabellenBefunde}: eine tote Freistellung wird gemeldet, nicht geduldet).
+ * (eine tote Freistellung meldet {@link rohtabellenBefunde}).
  */
 const AUSNAHMEN = [
   // Das Primitiv selbst. Es bindet antd ein, damit es niemand sonst tun muss.
   '/src/components/KatalogTabelle.tsx',
-  // Flächencodierung Gefahrentyp × Schutzobjekt: eine Matrix, in der jede Zelle ein eigener
-  // Sachverhalt ist — kein Listenvergleich, also auch keine Katalogtabelle. Sie trägt
-  // waagerechten Bildlauf, die fixierte Kennungsspalte (`fixed: 'left'`) und seit
-  // LFH-368/B5h auch die stehende Kopfzeile (`sticky`) selbst. Der Restposten von LFH-330
-  // ist damit eingelöst; die Freistellung bleibt, weil die Sorte bleibt.
+  // Matrix Gefahrentyp × Schutzobjekt: jede Zelle ein eigener Sachverhalt, kein Listenvergleich.
+  // Sie trägt Bildlauf, fixierte Kennungsspalte und stehende Kopfzeile selbst (letzteres
+  // prüft der Fall „GefahrenMatrix" unten).
   '/src/pages/gefahren/GefahrenMatrix.tsx',
 ];
 
@@ -302,19 +259,16 @@ function lieseKorpus(verzeichnis: string, praefix = '/src'): Record<string, stri
 }
 
 /**
- * Rohe antd-Tabellenelemente im ganzen Korpus. Meldet Verstöße UND tote Freistellungen in
- * EINER Liste — Bauart aus `useViewport.guard.test.ts`. Rein und exportiert, damit die
- * Selbstbeweis-Fälle sie ohne Dateisystem prüfen können.
+ * Rohe antd-Tabellenelemente im ganzen Korpus: Verstöße UND tote Freistellungen in EINER Liste.
+ * Rein und exportiert für die Selbstbeweis-Fälle.
  *
- * WARNSATZ, gemessen: **der Kommentar-Stripper sieht STRING-LITERALE nicht.** Zwölf der
- * vierzehn repoweiten Fundstellen stehen heute in Selbstbeweis-Konstanten dieser Datei und
- * von `datensicht.guard.test.ts`; grün bleibt die Schließung allein durch den
- * `*.test.*`-Ausschluss unten. Wer eine solche Konstante in eine PRODUKTIVdatei legt, bricht
- * die Schließung und sucht die Ursache dann im Muster statt hier.
+ * WARNSATZ: **der Kommentar-Stripper sieht STRING-LITERALE nicht.** Fast alle repoweiten
+ * Fundstellen stehen in Selbstbeweis-Konstanten der Guard-Tests; grün bleibt die Schließung
+ * allein durch den `*.test.*`-Ausschluss. Eine solche Konstante in einer Produktivdatei bricht
+ * die Schließung.
  *
- * Die Marke ist {@link elementMuster} — dieselbe Funktion wie im Inventar, absichtlich nicht
- * nachgebaut: nur so gilt ihr bereits geführter Selbstbeweis (`<TableColumnsType` ist kein
- * Tabellenelement, `<Table<T>` schon) auch für diese Hälfte.
+ * Die Marke ist {@link elementMuster}, dieselbe Funktion wie im Inventar: so gilt ihr
+ * Selbstbeweis (`<TableColumnsType` ist kein Tabellenelement, `<Table<T>` schon) auch hier.
  */
 export function rohtabellenBefunde(dateien: Record<string, string>, ausnahmen: string[]): string[] {
   const befunde: string[] = [];
@@ -327,10 +281,8 @@ export function rohtabellenBefunde(dateien: Record<string, string>, ausnahmen: s
     ohneKommentare(inhalt)
       .split('\n')
       .forEach((zeile, i) => {
-        // `elementMuster()` liefert ein /g/-Regex — deshalb je Zeile ein FRISCHES. Ein
-        // hochgezogenes, wiederverwendetes trüge seinen `lastIndex` über Zeilengrenzen und
-        // überspränge Fundstellen still; genau die Falle, die `useViewport.guard.test.ts`
-        // durch ein Muster ohne `g` umgeht.
+        // `elementMuster()` liefert ein /g/-Regex, deshalb je Zeile ein FRISCHES: ein
+        // wiederverwendetes trüge seinen `lastIndex` über Zeilengrenzen und überspränge Fundstellen.
         if (treffer(zeile, elementMuster('Table')) === 0) return;
         if (freigestellt) {
           belegt.add(pfad);
@@ -375,17 +327,12 @@ describe('KatalogTabelle-Inventar', () => {
 
   it('die Blätterungsschwelle der Kataloge hat lebende Konsumenten', () => {
     /**
-     * Ohne diese Zusicherung ist `BLAETTER_SCHWELLE` eine Attrappe: das Primitiv blättert
-     * ab fünfzig Zeilen, aber ein Aufrufer mit `pagination={false}` schaltet das ab — und
-     * zwar lautlos, weil abgeschaltete Blätterung genauso aussieht wie eine Liste unter der
-     * Schwelle. Gemessen war das der Zustand direkt nach der Einführung: zwanzig Konsumenten,
-     * zwanzig Abschaltungen, null Wirkung.
+     * Ohne diese Zusicherung ist `BLAETTER_SCHWELLE` eine Attrappe: `pagination={false}` schaltet
+     * lautlos ab, und abgeschaltete Blätterung sieht aus wie eine Liste unter der Schwelle.
      *
-     * Nur die dreizehn Kataloge sind verpflichtet. Die sechs Nachzügler des Überlaufschutzes
-     * dürfen weiter abschalten — dort ist Blätterung fachlich nicht bestellt (Audit-Protokoll,
-     * Abschnitts-Mitglieder), und `components/Datensicht.tsx` schaltet sie mit eigener,
-     * im Code hinterlegter Begründung ab: eine Seitenblätterung schnitte die Zeilenschleuse
-     * entzwei, und Kriterium 12 hat Vorrang.
+     * Nur die dreizehn Kataloge sind verpflichtet. Die Nachzügler dürfen abschalten (Blätterung
+     * fachlich nicht bestellt), `Datensicht` ebenso: eine Seitenblätterung schnitte die
+     * Zeilenschleuse entzwei, und Kriterium 12 hat Vorrang.
      */
     const abgeschaltet = QUELLEN.filter(
       (q) => KATALOGE.includes(q.pfad) && /pagination=\{false\}/.test(q.text),
@@ -415,11 +362,8 @@ describe('KatalogTabelle-Inventar', () => {
 
   it('die generische Schreibweise wird richtig zugeordnet (Selbstbeweis)', () => {
     /**
-     * Die sechs Migrationen von LFH-330 · B2 schreiben durchweg die generische Form
-     * (`<KatalogTabelle<Uhs>`), weil `T extends object` sonst nicht gebunden ist. Genau darauf
-     * ruht die ganze Migrationsprüfung — also wird beide Richtungen belegt: `<Table<Foo>` MUSS
-     * als antd-Tabelle zählen, `<KatalogTabelle<Foo>` darf es NICHT (dort steht vor `Table`
-     * kein `<`). Ohne diesen Fall wäre eine Migration grün, die gar nichts getauscht hat.
+     * Beide Richtungen: `<Table<Foo>` MUSS als antd-Tabelle zählen, `<KatalogTabelle<Foo>` darf es
+     * NICHT (vor `Table` steht kein `<`). Sonst wäre eine Migration grün, die nichts getauscht hat.
      */
     const probe = ohneKommentare(
       [
@@ -438,19 +382,12 @@ describe('KatalogTabelle-Ordnung', () => {
 
   it('die dreizehn Kataloge sind vollzählig', () => {
     /**
-     * Der Zuschnitt ist die halbe Zusicherung: fiele ein Katalog aus `KATALOG_QUELLEN`
-     * heraus, prüfte der Fall darunter ihn nicht mehr und bliebe still grün.
+     * Der Zuschnitt ist die halbe Zusicherung: fiele ein Katalog aus `KATALOG_QUELLEN`, prüfte ihn
+     * der Fall darunter nicht mehr.
      *
-     * Warum die Nachzügler des Überlaufschutzes draußen bleiben, ist gemessen: sie tragen
-     * heute 0× `sorter`, 0× `filters` und 0× `suche`. Sie mitzufordern hieße, das Gate rot
-     * zu gebären — ihre Ordnung ist ein eigener Auftrag.
-     *
-     * Diese Null wird bewusst NICHT festgeschrieben, und der Fall ist eingetreten:
-     * `pages/SchaedenPage.tsx` hat mit LFH-340 · C5 Sortierung, Filter und Suche bekommen.
-     * Der hier vorgezeichnete Weg („die Datei wandert nach `KATALOGE`") wurde dabei NICHT
-     * genommen — sie hat das alles über `Datensicht` bekommen, bindet `KatalogTabelle` also
-     * gar nicht mehr selbst ein und ist aus diesem Inventar ganz herausgefallen. Für die
-     * verbliebenen fünf gilt der Weg unverändert.
+     * Die Nachzügler bleiben draußen, weil sie heute keine Ordnung tragen; sie mitzufordern
+     * gebäre das Gate rot. Diese Null wird bewusst NICHT festgeschrieben: bekommt einer Ordnung,
+     * wandert er nach `KATALOGE` (oder, über `Datensicht`, ganz aus diesem Inventar).
      */
     expect(KATALOG_QUELLEN).toHaveLength(13);
     expect(KATALOG_QUELLEN.map((q) => q.pfad)).toEqual(KATALOGE);
@@ -469,10 +406,8 @@ describe('KatalogTabelle-Ordnung', () => {
 
   it('Selbstbeweis: fehlende Sortierung, fehlende Suche und fehlender Filter werden benannt', () => {
     /**
-     * Drei Ausfälle in einem Baum, damit belegt ist, dass die Befunde sich nicht gegenseitig
-     * verdecken (die Schleife sammelt, sie bricht nicht ab). Ohne diesen Fall wäre ein
-     * verunglücktes Muster still grün — dieselbe Begründung wie bei den Selbstbeweis-Fällen
-     * der Schließung.
+     * Drei Ausfälle in einem Baum: die Befunde verdecken sich nicht gegenseitig (die Schleife
+     * sammelt, sie bricht nicht ab).
      */
     const baum = [
       {
@@ -493,9 +428,8 @@ describe('KatalogTabelle-Ordnung', () => {
 
   it('Selbstbeweis: eine Filterspalte ohne onFilter siebt nichts und wird gemeldet', () => {
     /**
-     * Der Fall, den „mindestens ein `filters`" nicht fängt: Datei `e` hat ZWEI Filterspalten,
-     * aber nur eine ist angeschlossen. Das Aufklappmenü der zweiten erscheint und tut nichts —
-     * genau die Sorte stiller Fehler, gegen die dieses Gate gebaut ist.
+     * Der Fall, den „mindestens ein `filters`" nicht fängt: Datei `e` hat ZWEI Filterspalten, nur
+     * eine ist angeschlossen.
      */
     const baum = [
       {
@@ -509,9 +443,8 @@ describe('KatalogTabelle-Ordnung', () => {
 
   it('Totmeldung: eine nachgerüstete Filterachse erzwingt die Streichung ihres Eintrags', () => {
     /**
-     * Bekommt einer der drei Ausnahmekataloge doch eine Filterachse, ist seine Begründung
-     * überholt. Sie stehen zu lassen wäre kein harmloser Altbestand: der Eintrag deckte danach
-     * still den Rückbau ebendieser neuen Achse.
+     * Bekommt ein Ausnahmekatalog doch eine Filterachse, ist seine Begründung überholt; stehen
+     * gelassen deckte sie still den Rückbau ebendieser Achse.
      */
     const baum = [
       {
@@ -527,9 +460,8 @@ describe('KatalogTabelle-Ordnung', () => {
 
   it('Totmeldung: eine Ausnahme auf eine ungeprüfte Datei wird gemeldet', () => {
     /**
-     * Der zweite Weg in die Wirkungslosigkeit: der Eintrag ist nicht überholt, sondern
-     * verfehlt sein Ziel (Tippfehler, Umbenennung, Verschiebung der Datei). Er liest sich wie
-     * eine gültige Begründung und deckt in Wahrheit gar nichts.
+     * Der zweite Weg in die Wirkungslosigkeit: der Eintrag verfehlt sein Ziel (Tippfehler,
+     * Umbenennung) und deckt nichts.
      */
     const baum = [
       {
@@ -548,14 +480,9 @@ describe('KatalogTabelle-Ordnung', () => {
 
   it('Selbstbeweis: der Stripper hält die Prosa aus den Zählungen heraus', () => {
     /**
-     * Der Fall ist GEBAUT, nicht dem Bestand entnommen, und Grenze 8 sagt warum: heute ändert
-     * der Stripper an keiner der dreizehn Dateien eine Zählung. Er sichert also nicht gegen
-     * etwas Vorhandenes, sondern gegen die Bauart des Gates — die dreizehn begründen ihre
-     * Entscheidungen ausführlich in Prosa, und ohne Stripper prüfte das Gate, ob jemand über
-     * Sortierung REDET.
-     *
-     * Die Gegenprobe ist der eigentliche Beleg: dieselbe Datei, die NICHTS tut, ist ohne
-     * Stripper vollkommen tadellos — null Befunde, allein aus Kommentartext.
+     * Der Fall ist GEBAUT (Grenze 8): er sichert gegen die Bauart des Gates — ohne Stripper prüfte
+     * es, ob jemand über Sortierung REDET. Die Gegenprobe ist der Beleg: dieselbe Datei, die
+     * NICHTS tut, ist ohne Stripper tadellos, allein aus Kommentartext.
      */
     const roh = [
       '// sorter: hier nur erwähnt, nicht gesetzt',
@@ -585,10 +512,8 @@ describe('KatalogTabelle-Schließung', () => {
 
   it('Sentinel: der Korpus ist wirklich gelesen', () => {
     /**
-     * Zwei Netze gegen einen stillen Leerlauf, und sie fangen Verschiedenes: eine falsche
-     * Wurzel oder Endung ließe den Korpus schrumpfen (das hier), und der Guard fände dann
-     * schlicht nichts mehr. Die Totmeldung oben ist das zweite Netz — bei leerem Korpus
-     * gölten BEIDE Ausnahmen als tot, der Schließungstest wird also rot statt grün.
+     * Zwei Netze gegen stillen Leerlauf: eine falsche Wurzel oder Endung ließe den Korpus schrumpfen
+     * (das hier), und bei leerem Korpus gölten beide Ausnahmen als tot (die Totmeldung).
      */
     expect(Object.keys(KORPUS).length).toBeGreaterThan(200);
     expect(KORPUS['/src/components/KatalogTabelle.tsx'] ?? '').not.toBe('');
@@ -610,9 +535,8 @@ describe('KatalogTabelle-Schließung', () => {
 
   it('Totmeldung: eine migrierte Ausnahme erzwingt die Streichung ihres Eintrags', () => {
     /**
-     * Ohne diesen Fall bliebe eine Freistellung nach der Migration stehen und deckte
-     * stillschweigend den nächsten Rückfall in derselben Datei. Der Guard verlangt deshalb
-     * das Streichen, statt den toten Eintrag zu dulden.
+     * Eine Freistellung nach der Migration deckte still den nächsten Rückfall in derselben Datei;
+     * der Guard verlangt das Streichen.
      */
     const baum = {
       '/src/pages/gefahren/GefahrenMatrix.tsx': 'const a = <KatalogTabelle rowKey="typ" />;',
@@ -625,9 +549,8 @@ describe('KatalogTabelle-Schließung', () => {
 
   it('Selbstbeweis: der Zeilenzähler überspringt keine zweite Fundstelle', () => {
     /**
-     * `elementMuster()` trägt das `g`-Flag. Würde das Muster über die Zeilen hinweg
-     * wiederverwendet, trüge es seinen `lastIndex` mit und fände die zweite Fundstelle je
-     * nach Spaltenlage nicht mehr — ein Falsch-Negativ, das kein anderer Fall hier zeigt.
+     * `elementMuster()` trägt `g`. Über Zeilen wiederverwendet, fände es die zweite Fundstelle je
+     * nach Spaltenlage nicht mehr.
      */
     const baum = {
       '/src/pages/Zwei.tsx': [
@@ -647,18 +570,12 @@ describe('KatalogTabelle-Schließung', () => {
 describe('Freistellungen tragen ihre Begründung (LFH-368 · B5h)', () => {
   it('die Gefahrenmatrix hat die stehende Kopfzeile, die ihre Ausnahme verspricht', () => {
     /**
-     * Geprüft wird der Prop-Wert im QUELLTEXT, kein Pixel — jsdom rechnet kein Layout, und
-     * `position: sticky` hat dort keine geometrische Wirkung. Bauart wie
-     * `aktionsabstand.guard.test.ts`.
+     * Geprüft wird der Prop-Wert im QUELLTEXT, kein Pixel: jsdom rechnet kein Layout. Bauart wie
+     * `aktionsabstand.guard.test.ts`. Hält die Aussage bei {@link AUSNAHMEN} fest, dass die Matrix
+     * ihre stehende Kopfzeile selbst trägt.
      *
-     * Der Kommentar bei {@link AUSNAHMEN} behauptet seit LFH-368, der Restposten von LFH-330
-     * (stehende Kopfzeile) sei eingelöst. Ein Versprechen ohne Prüfung ist genau die tote
-     * Ausnahme, die die andere Hälfte dieser Datei verhindert.
-     *
-     * `ohneKommentare` ist NICHT Beiwerk: {@link KORPUS} trägt anders als {@link QUELLEN}
-     * ROHTEXT, und über dem Prop steht in `GefahrenMatrix.tsx` ein dreizeiliger Kommentar,
-     * der ihn erklärt. Ohne den Stripper füllte eine Umformatierung dieses Kommentars das
-     * Gate mit seiner eigenen Prosa — derselbe Fehlertyp, vor dem Grenze 8 im Dateikopf warnt.
+     * `ohneKommentare` ist nötig, weil {@link KORPUS} ROHTEXT trägt und über dem Prop ein
+     * erklärender Kommentar steht (Grenze 8).
      */
     const quelle = ohneKommentare(KORPUS['/src/pages/gefahren/GefahrenMatrix.tsx'] ?? '');
     expect(quelle).toMatch(/^\s*sticky\s*$/m);
@@ -668,19 +585,15 @@ describe('Freistellungen tragen ihre Begründung (LFH-368 · B5h)', () => {
 // ── Teil 4: der Zähler kann nicht lügen (LFH-374) ─────────────────────────────────
 
 /**
- * antds eigene Ausblendwege. Beide verbärgen eine Spalte, die der Spaltenzähler nicht kennt:
- * `responsive` nach Breite, `hidden` unbedingt. `KatalogSpalte` sperrt sie am Typ — aber nur
- * an Objektliteralen; eine als `TableColumnsType<T>` annotierte Liste bleibt zuweisbar. Dieser
- * Guard schließt die Lücke je Konsumentendatei.
+ * antds eigene Ausblendwege (`responsive` nach Breite, `hidden` unbedingt) verbärgen eine
+ * Spalte, die der Spaltenzähler nicht kennt. `KatalogSpalte` sperrt sie am Typ, aber nur an
+ * Objektliteralen; dieser Guard schließt die Lücke je Konsumentendatei. Die Doppelpunkt-Form
+ * trifft `overflow: 'hidden'` nicht.
  *
- * Doppelpunkt-Form wie die Ordnungsmuster: `overflow: 'hidden'` trifft nicht (dort steht das
- * Wort als Wert, nicht als Schlüssel).
- *
- * BLINDE FLECKEN, gemessen und benannt: der Scan liest nur die achtzehn Konsumentendateien.
- * Eine Spaltenliste, die in eine Hilfsdatei ausgelagert ist (Muster
- * `personen/personenSpalten.tsx`), sieht er nicht — und eine Typassertion
- * (`[…] as KatalogSpalte<X>[]`, so an den Aktionsspalten beider Kartenverwaltungen) hebelt die
- * Typsperre aus. Wer eine Spaltenliste auslagert, nimmt die Datei hier mit auf.
+ * BLINDE FLECKEN: gelesen werden nur die achtzehn Konsumentendateien. Eine ausgelagerte
+ * Spaltenliste (Muster `personen/personenSpalten.tsx`) sieht er nicht, und eine Typassertion
+ * (`[…] as KatalogSpalte<X>[]`) hebelt die Typsperre aus. Wer eine Spaltenliste auslagert,
+ * nimmt die Datei hier mit auf.
  */
 const AUSBLEND_MUSTER = /\b(?:responsive|hidden)\s*:/g;
 
@@ -708,8 +621,8 @@ describe('KatalogTabelle · Spaltenzähler (LFH-374)', () => {
 
   it('Datensicht setzt spaltenSchalter nie — es rendert seinen eigenen Schalter', () => {
     /**
-     * Zwei Schalter mit zwei Zuständen wären der Fehlerfall (D5). Das Gegenstück zur Laufzeit
-     * steht in `Datensicht.test.tsx` („genau EIN Spaltenschalter").
+     * Zwei Schalter mit zwei Zuständen wären der Fehlerfall. Das Gegenstück zur Laufzeit steht in
+     * `Datensicht.test.tsx` („genau EIN Spaltenschalter").
      */
     const datensicht = ohneKommentare(
       readFileSync(join(SRC, 'components', 'Datensicht.tsx'), 'utf8'),

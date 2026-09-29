@@ -8,18 +8,19 @@ pub mod session;
 pub mod totp;
 pub mod webauthn;
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
 /// Wert der System-Rolle für Administratoren (serverweite Verwaltung).
-pub const ROLLE_ADMIN: &str = "admin";
+pub const ROLLE_ADMIN: &str = SystemRolle::Admin.as_str();
 /// Wert der System-Rolle für reguläre Benutzer ohne Admin-Rechte.
-pub const ROLLE_KEINER: &str = "keiner";
+pub const ROLLE_KEINER: &str = SystemRolle::Keiner.as_str();
 
 /// Org-weite Rolle, die das Anlegen von Einsätzen erlaubt (orthogonal zu `system_rolle`).
-pub const ORG_ROLLE_FUEHRUNGSKRAFT: &str = "fuehrungskraft";
+pub const ORG_ROLLE_FUEHRUNGSKRAFT: &str = OrgRolle::Fuehrungskraft.as_str();
 /// Org-weite Rolle ohne besondere Befugnisse (Default).
-pub const ORG_ROLLE_KEINE: &str = "keine";
+pub const ORG_ROLLE_KEINE: &str = OrgRolle::Keine.as_str();
 
 /// Sentinel-`passwort_hash` für SSO-only-Benutzer (JIT-provisioniert via OIDC, LFH-41
 /// Increment 3): bewusst KEIN `$argon2`-PHC-String, damit `password::verifizieren`
@@ -33,74 +34,24 @@ pub const ORG_ROLLE_KEINE: &str = "keine";
 /// [`password::verifizieren`] mit.
 pub const PASSWORT_HASH_SSO_ONLY: &str = "!sso-kein-lokales-passwort";
 
-/// System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum SystemRolle {
-    Admin,
-    Keiner,
+wire_enum! {
+    /// System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum SystemRolle {
+        Admin => "admin",
+        Keiner => "keiner",
+    }
+    try_from = |s| format!("Ungültige SystemRolle: {s}");
 }
 
-impl SystemRolle {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            SystemRolle::Admin => ROLLE_ADMIN,
-            SystemRolle::Keiner => ROLLE_KEINER,
-        }
+wire_enum! {
+    /// Org-weite Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `org_rolle`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum OrgRolle {
+        Fuehrungskraft => "fuehrungskraft",
+        Keine => "keine",
     }
-
-    /// Parst einen gespeicherten/übergebenen Rollenwert; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<SystemRolle> {
-        match s {
-            ROLLE_ADMIN => Some(SystemRolle::Admin),
-            ROLLE_KEINER => Some(SystemRolle::Keiner),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for SystemRolle {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        SystemRolle::parse(&s).ok_or_else(|| format!("Ungültige SystemRolle: {s}"))
-    }
-}
-
-/// Org-weite Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `org_rolle`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum OrgRolle {
-    Fuehrungskraft,
-    Keine,
-}
-
-impl OrgRolle {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            OrgRolle::Fuehrungskraft => ORG_ROLLE_FUEHRUNGSKRAFT,
-            OrgRolle::Keine => ORG_ROLLE_KEINE,
-        }
-    }
-
-    /// Parst einen gespeicherten/übergebenen Rollenwert; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<OrgRolle> {
-        match s {
-            ORG_ROLLE_FUEHRUNGSKRAFT => Some(OrgRolle::Fuehrungskraft),
-            ORG_ROLLE_KEINE => Some(OrgRolle::Keine),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for OrgRolle {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        OrgRolle::parse(&s).ok_or_else(|| format!("Ungültige OrgRolle: {s}"))
-    }
+    try_from = |s| format!("Ungültige OrgRolle: {s}");
 }
 
 /// Interner Benutzer-Datensatz inklusive Passwort-Hash.

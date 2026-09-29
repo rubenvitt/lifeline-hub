@@ -10,37 +10,32 @@ import { statusFlaeche, type StatusTon } from './statusFlaeche';
 import '../../theme/sprache.css';
 
 /**
- * Kennzahl und Kennzahlenband (Neuentwurf S1/S2/S6) — „Zahl führt".
+ * Kennzahl und Kennzahlenband — „Zahl führt".
  *
- * Eine Zelle: Augenbraue · Zahl Mono 500 in drei Stufen (22 / 32 / 40 aus
- * `schriftskala`) · optionale Einheit Mono 12 `schwach` · Notiz 11 `gedaempft` ·
- * optionaler Aufgliederungsbalken. Das Band setzt n Zellen ins FUGENRASTER: `gap: 1px`
- * auf `linie`, jede Zelle auf `flaeche`.
+ * Eine Zelle: Augenbraue · Zahl Mono 500 in drei Stufen (22 / 32 / 40 aus `schriftskala`) ·
+ * optionale Einheit Mono 12 `schwach` · Notiz 11 `gedaempft` · optionaler Aufgliederungsbalken.
+ * Das Band setzt n Zellen ins FUGENRASTER: `gap: 1px` auf `linie`, jede Zelle auf `flaeche`.
  *
- * ── DATENZUSTÄNDE, übernommen aus dem Lage-Dashboard (LFH-331 · B3) ────────────────
+ * ── DATENZUSTÄNDE (wie im Lage-Dashboard, LFH-331 · B3) ────────────────────────────
  *
  * `laden` → „····" mit `aria-busy`, Notiz „wird abgerufen". `fehler` → „?" mit
- * `title="Stand unbekannt"`, Notiz „Stand unbekannt". Das ist wörtlich die Weiche aus
- * `pages/lage-dashboard/LageDashboardPage.tsx`, deren Tests die Strings pinnen: wer das
- * Dashboard auf diesen Baustein zieht, verliert nichts. Eine NULL ist ein Wert, kein
- * Zustand — „Fehler sieht aus wie leer" ist der Sweep-Befund, gegen den die drei Formen
- * verschieden aussehen. Der Ton gilt nur im Zustand `daten`: ein „?" in Alarmrot
+ * `title="Stand unbekannt"`, Notiz „Stand unbekannt". Die Strings pinnen die Tests von
+ * `pages/lage-dashboard/LageDashboardPage.tsx`. Eine NULL ist ein Wert, kein Zustand — die drei
+ * Formen sehen verschieden aus. Der Ton gilt nur im Zustand `daten`: ein „?" in Alarmrot
  * behauptete eine Lage, die niemand kennt.
  *
  * ── TON UND ZWEITER KANAL ──────────────────────────────────────────────────────────
  *
  * `achtung`/`alarm` färben die Zahl UND setzen eine abgestufte Innenkante (3 bzw. 6 px,
- * `inset`-Schatten, null Layout): die beiden bewerteten Stufen unterscheiden sich auch
- * ohne Farbe, und die Zeile springt beim Statuswechsel nicht (keine stufenabhängige
- * Schriftgröße).
+ * `inset`-Schatten, null Layout): die beiden Eskalationsstufen unterscheiden sich auch ohne
+ * Farbe, und die Zeile springt nicht.
  *
- * `normal`/`bedien` (22.09.2026, für das Meldebild-Statusband: „frei", „am Einsatzort")
- * färben nur die Zahl und setzen KEINE Kante — die abgestufte Kante trennt die beiden
- * ESKALATIONSstufen; ein Zustand ohne Handlungsbedarf bekommt keine. Der zweite Kanal ist
- * dort das Wort in Augenbraue und Notiz.
+ * `normal`/`bedien` (etwa „frei", „am Einsatzort" im Meldebild) färben nur die Zahl, ohne
+ * Kante: ein Zustand ohne Handlungsbedarf bekommt keine. Der zweite Kanal ist dort das Wort in
+ * Augenbraue und Notiz.
  *
- * KONTRAST DER ZAHL (übernommen aus `kraefte/statusbandStil.ts`, gerechnet 22.09.2026 nach
- * WCAG gegen `flaeche` — den Grund von `.lfh-kennzahl`; Boden Tag ≥ 7 : 1, Nacht ≥ 5 : 1):
+ * KONTRAST DER ZAHL (WCAG, gegen `flaeche` als Grund von `.lfh-kennzahl`; Boden Tag ≥ 7 : 1,
+ * Nacht ≥ 5 : 1):
  *
  * | Ton     | Rolle der Zahl | Tag (auf #ffffff) | Nacht (auf #0f1215) |
  * |---------|----------------|-------------------|---------------------|
@@ -49,27 +44,22 @@ import '../../theme/sprache.css';
  * | achtung | achtungText    | 9,22              | 11,75               |
  * | alarm   | alarmText      | 8,96              |  6,77               |
  *
- * `neutral` steht in `text` (Tag 18,47). Bis LFH-618 (22.09.2026) stand die Zahl TAGS bei
- * `achtung`/`alarm` ebenfalls in `text`, weil die Füllfarben als Text den Boden nicht tragen
- * (6,92 bzw. 6,78) und die Textrollen fehlten — der Ton war am Tag nur an Kante und Punkt
- * zu sehen. Jetzt färben beide Modi.
+ * `neutral` steht in `text` (Tag 18,47). Die Füllfarben selbst tragen den Tagesboden als Text
+ * nicht, deshalb die `…Text`-Rollen.
  *
- * ── STATUSPUNKT (Neuentwurf S6, Statusstufen-Kacheln) ──────────────────────────────
+ * ── STATUSPUNKT ────────────────────────────────────────────────────────────────────
  *
- * `punkt` setzt ein 8-px-Quadrat in der Tonfarbe VOR die Augenbraue — die Kachel benennt
- * damit eine STUFE (S1 … S6), nicht eine Bewertung der Zahl; deshalb ist er von `ton`
- * getrennt. Er ist Dekoration (`aria-hidden`): der zweite Kanal ist die Augenbraue mit dem
- * Stufenwort. Wie `ton` gilt er nur im Zustand `daten` — bei `laden`/`fehler` steht er
- * neutral an seinem Platz, damit die Zeile nicht springt und kein Ton eine unbekannte Lage
- * behauptet.
+ * `punkt` setzt ein 8-px-Quadrat in der Tonfarbe VOR die Augenbraue — die Kachel benennt damit
+ * eine STUFE (S1 … S6), keine Bewertung der Zahl; deshalb getrennt von `ton`. Dekoration
+ * (`aria-hidden`), der zweite Kanal ist die Augenbraue. Nur im Zustand `daten` getönt, sonst
+ * neutral an seinem Platz.
  *
  * ── KLICKBAR ────────────────────────────────────────────────────────────────────────
  *
  * Mit `ziel` wird die ganze Zelle ein `<Link>` — ein handgebautes Bedienziel mit den ZWEI
- * Angaben aus LFH-365 (`minHeight: token.controlHeight` plus Polsterung aus der Staffel).
- * Grund (`flaeche`) sowie Hover/Fokus tragen die Klassen `lfh-kennzahl` /
- * `lfh-kennzahl--ziel` in `sprache.css` — ein Inline-Grund schlüge jede `:hover`-Regel. Im Zustand `laden`
- * bleibt die Zelle trotzdem ein Link: das Ziel (die Liste) existiert auch ohne Zahl.
+ * Angaben aus LFH-365. Grund sowie Hover/Fokus tragen die Klassen `lfh-kennzahl` /
+ * `lfh-kennzahl--ziel` in `sprache.css`. Auch im Zustand `laden` bleibt die Zelle ein Link: das
+ * Ziel existiert ohne Zahl.
  */
 
 export type KennzahlZustand = 'daten' | 'laden' | 'fehler';
@@ -118,9 +108,8 @@ export function zahlFarbe(
 }
 
 /**
- * Farbe des Statuspunkts — die KANTE der Statusfläche (`statusFlaeche`), also dieselbe
- * Rollenfarbe, die `StatusZelle`/`StatusChip` als Rand tragen. Außerhalb von `daten` neutral.
- * Rein.
+ * Farbe des Statuspunkts — die KANTE der Statusfläche (`statusFlaeche`), dieselbe Rollenfarbe
+ * wie der Rand von `StatusZelle`/`StatusChip`. Außerhalb von `daten` neutral. Rein.
  */
 export function punktFarbe(
   rollen: Parameters<typeof statusFlaeche>[0],
@@ -131,9 +120,8 @@ export function punktFarbe(
 }
 
 /**
- * Stil der Zelle — rein und exportiert (Muster `bedienzielStil`), damit Boden und Kante
- * ohne Render prüfbar sind. `minHeight` steht IMMER da, nicht nur klickbar: ein Band mit
- * gemischten Zellen soll nicht in der Höhe springen, wenn eine davon ein Ziel bekommt.
+ * Stil der Zelle — rein und exportiert (Muster `bedienzielStil`). `minHeight` steht IMMER da,
+ * nicht nur klickbar: ein Band mit gemischten Zellen springt sonst in der Höhe.
  */
 export function kennzahlStil(
   rollen: Pick<Farbrollen, 'text' | 'achtung' | 'alarm'>,

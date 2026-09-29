@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
-import { ApiError } from '../api/client';
 import {
   CHAT_SEITENGROESSE,
   bearbeiteNachricht,
@@ -66,6 +65,7 @@ import { Segmentleiste, useRollen } from '../components/instrument';
  */
 const CHAT_MINDESTHOEHE = 320;
 import { useViewport } from '../components/useViewport';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -245,8 +245,7 @@ export default function ChatPage() {
     enabled: typAktiv('auftrag'),
   });
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
   const invalidiereNachrichten = () =>
     qc.invalidateQueries({ queryKey: einsatzKeys.chatNachrichten(einsatzId) });
 

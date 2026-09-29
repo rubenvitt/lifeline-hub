@@ -1,19 +1,16 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
-use crate::einsatz::repo as einsatz_repo;
-use crate::extract::JsonBody;
-use crate::extract::PfadParam;
-use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "einsatzabschnitte";
+use crate::einsatz::einstellungen::etb_startwert;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Einsatzabschnitte;
 use crate::einsatzabschnitt::repo::{self as abschnitt_repo, AbschnittDaten, AbschnittPatch};
 use crate::einsatzabschnitt::{AbschnittLagezustand, EinsatzabschnittAnzeige};
 use crate::error::AppError;
-use crate::routes::support::{pruefe_kommunikationsmittel, trimme, trimme_tri};
+use crate::extract::JsonBody;
+use crate::extract::PfadParam;
+use crate::live::LiveEvent;
+use crate::routes::support::{
+    deserialize_optional_field, pflicht, pruefe_kommunikationsmittel, trimme, trimme_tri,
+};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -21,10 +18,9 @@ use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): Abschnitt (Fläche/Symbol) hat sich geändert.
 fn sse_abschnitt(state: &AppState, einsatz_id: i64, aid: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "abschnitt_id": aid }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Abschnitt, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Abschnitt, "abschnitt_id", aid);
 }
 
 /// Längster zulässiger Kurzname — ein Rufname wie „EA-Nord", kein zweiter Name.
@@ -69,20 +65,9 @@ fn lage_wort(l: Option<AbschnittLagezustand>) -> &'static str {
 /// GET /api/einsaetze/{id}/abschnitte — flache Liste (Baum baut das FE). Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Einsatzabschnitte>,
 ) -> Result<Json<Vec<EinsatzabschnittAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(abschnitt_repo::liste(&state.pool, einsatz_id).await?))
 }
 
@@ -109,27 +94,11 @@ pub struct AbschnittBody {
 /// POST /api/einsaetze/{id}/abschnitte — anlegen. Schreibrecht + aktiv. ETB-Eintrag.
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
     JsonBody(body): JsonBody<AbschnittBody>,
 ) -> Result<(StatusCode, Json<EinsatzabschnittAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
-    let name = body.name.trim().to_string();
-    if name.is_empty() {
-        return Err(AppError::Validation("Name darf nicht leer sein".into()));
-    }
+    let einsatz_id = ctx.einsatz.id;
+    let name = pflicht(&body.name, "Name")?;
     let bemerkung = trimme(body.bemerkung);
     let mittel = trimme(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(mittel.as_deref())?;
@@ -165,7 +134,7 @@ pub async fn anlegen(
     if let Some(ids) = body.sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
             &state.pool,
-            einsatz.org_id,
+            ctx.einsatz.org_id,
             einsatz_id,
             anzeige.id,
             &ids,
@@ -176,10 +145,10 @@ pub async fn anlegen(
     super::etb_system_degradiert(
         &state,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         &crate::einsatzabschnitt::etb_text_angelegt(&anzeige.name, anzeige.lagezustand),
     )
-    .await?;
+    .await;
     sse_abschnitt(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
@@ -191,54 +160,27 @@ pub async fn anlegen(
 #[derive(Debug, Deserialize)]
 pub struct AbschnittPatchBody {
     pub name: Option<String>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub ueber_abschnitt_id: Option<Option<i64>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub leiter_id: Option<Option<i64>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub bemerkung: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub kommunikationsmittel: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub erreichbarkeit: Option<Option<String>>,
     pub sortier: Option<i64>,
     /// Sprechgruppen-IDs; `Some` ersetzt die Zuordnung vollständig, `None` lässt sie
     /// unverändert — das Feld war schon vor LFH-306 tri-state.
     pub sprechgruppe_ids: Option<Vec<i64>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub kurzbezeichnung: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub lagezustand: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub abschnittsauftrag: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub fortschritt: Option<Option<i64>>,
 }
 
@@ -248,29 +190,14 @@ pub struct AbschnittPatchBody {
 /// mit Zeitpunkt und Urheber ins Tagebuch.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, aid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
+    PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<AbschnittPatchBody>,
 ) -> Result<Json<EinsatzabschnittAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let name = match body.name {
         Some(n) => {
-            let n = n.trim().to_string();
-            if n.is_empty() {
-                return Err(AppError::Validation("Name darf nicht leer sein".into()));
-            }
+            let n = pflicht(&n, "Name")?;
             Some(n)
         }
         None => None,
@@ -315,9 +242,7 @@ pub async fn aktualisieren(
     // Zuordnung: scheitert die mit 422, bleibt der gespeicherte Wechsel trotzdem nicht
     // undokumentiert (LFH-608, Review). Der Eintrag entsteht nur bei echtem Wechsel.
     if let Some(neu) = lagezustand {
-        let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-            .await?
-            .etb_startwert();
+        let startwert = etb_startwert(&state.pool, einsatz_id).await?;
         let etb_id = crate::write_retry!(&state.pool, |conn| {
             match abschnitt_repo::setze_lagezustand_tx(conn, einsatz_id, aid, neu).await? {
                 Some(wechsel) => {
@@ -331,7 +256,7 @@ pub async fn aktualisieren(
                         crate::etb::system_audit_tx(
                             conn,
                             einsatz_id,
-                            benutzer.id,
+                            ctx.benutzer.id,
                             startwert,
                             &text,
                         )
@@ -350,7 +275,7 @@ pub async fn aktualisieren(
     if let Some(ids) = body.sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
             &state.pool,
-            einsatz.org_id,
+            ctx.einsatz.org_id,
             einsatz_id,
             aid,
             &ids,
@@ -365,33 +290,19 @@ pub async fn aktualisieren(
 /// DELETE /api/einsaetze/{id}/abschnitte/{aid} — auflösen (Reparenting). ETB-Eintrag.
 pub async fn aufloesen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, aid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
+    PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let vorher = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
     // F06/LFH-244 Tier-A: Auflösen (Reparenting + Freigaben + DELETE) + System-ETB-Eintrag
     // atomar in EINER Tx (BEGIN IMMEDIATE + Retry). ETB-Text aus dem VOR der Tx geladenen
     // `vorher` (Name unverändert). SSE erst nach dem Commit (Reinheits-Kontrakt).
     let text = format!("Abschnitt «{}» aufgelöst", vorher.name);
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         abschnitt_repo::loese_auf_tx(conn, einsatz_id, aid).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(())
     })?;
     sse_abschnitt(&state, einsatz_id, aid);
@@ -400,43 +311,22 @@ pub async fn aufloesen(
 
 #[derive(Debug, Deserialize)]
 pub struct FlaecheBody {
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub flaeche_geojson: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub tz_fachaufgabe: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub tz_organisation: Option<Option<String>>,
 }
 
 /// PATCH /api/einsaetze/{id}/abschnitte/{aid}/flaeche — Lage-Pflege, KEIN ETB.
 pub async fn flaeche(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, aid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
+    PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<FlaecheBody>,
 ) -> Result<Json<EinsatzabschnittAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if let Some(Some(gj)) = &body.flaeche_geojson {
         let v: serde_json::Value = serde_json::from_str(gj).map_err(|_| {
             AppError::UnprocessableEntity("flaeche_geojson ist kein gültiges JSON".into())

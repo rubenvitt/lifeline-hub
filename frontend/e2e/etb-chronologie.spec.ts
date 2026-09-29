@@ -269,7 +269,6 @@ test('bei 390 px scrollt der Seitenrumpf nicht seitlich, und die Chronologie ste
 
   await page.setViewportSize(HANDSCHIRM);
   await page.goto(`/einsaetze/${einsatzId}/etb`);
-  await page.waitForLoadState('networkidle');
 
   const bereich = page.getByRole('region', { name: 'Einsatztagebuch' });
   await expect(bereich).toHaveCount(1);
@@ -301,7 +300,6 @@ test('bei 1366 px bekommt der Meldungstext mindestens die halbe Zeitachsenbreite
 
   await page.setViewportSize(FUEKW);
   await page.goto(`/einsaetze/${einsatzId}/etb`);
-  await page.waitForLoadState('networkidle');
 
   const bereich = page.getByRole('region', { name: 'Einsatztagebuch' });
   await expect(bereich).toHaveCount(1);

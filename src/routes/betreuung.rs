@@ -34,7 +34,7 @@
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 use crate::app::AppState;
@@ -47,6 +47,7 @@ use crate::betreuung::{
     BetreuungsstelleAnzeige, BezirkMeldungAnzeige, EvakuierungsbezirkAnzeige, StandVerlaufEintrag,
     StelleMeldungAnzeige, StelleNamentlich,
 };
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Betreuung;
 use crate::error::AppError;
@@ -58,10 +59,8 @@ use crate::routes::support;
 /// Zeitpunkt, der weiter in der Zukunft liegt, ist für sich unbrauchbar → 400.
 pub const ZUKUNFT_TOLERANZ_SEKUNDEN: i64 = 60;
 
-const DRAHT: &str = "%Y-%m-%d %H:%M:%S";
-
 fn draht(t: DateTime<Utc>) -> String {
-    t.format(DRAHT).to_string()
+    crate::zeit::formatiere(t.naive_utc())
 }
 
 /// Meldezeitpunkt: fehlt/leer → `jetzt`, sonst normalisiert (400 bei Unlesbarem) und höchstens
@@ -74,8 +73,8 @@ fn meldezeitpunkt(eingabe: Option<&str>, jetzt: DateTime<Utc>) -> Result<String,
         Some(s) if !s.is_empty() => crate::etb::normalisiere_zeit(s)?,
         _ => return Ok(draht(jetzt)),
     };
-    let t = NaiveDateTime::parse_from_str(&zeit, DRAHT)
-        .map_err(|_| AppError::Validation(format!("Ungültiger Zeitpunkt '{zeit}'")))?
+    let t = crate::zeit::parse(&zeit)
+        .ok_or_else(|| AppError::Validation(format!("Ungültiger Zeitpunkt '{zeit}'")))?
         .and_utc();
     if (t - jetzt).num_seconds() > ZUKUNFT_TOLERANZ_SEKUNDEN {
         return Err(AppError::Validation(format!(
@@ -114,14 +113,6 @@ fn publiziere_wirksam(state: &AppState, einsatz_id: i64, g: &repo::Geschrieben, 
     if !g.etb_ids.is_empty() || g.still_geaendert {
         publiziere(state, einsatz_id, &g.etb_ids, objekt);
     }
-}
-
-async fn startwert(state: &AppState, einsatz_id: i64) -> Result<i64, AppError> {
-    Ok(
-        crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-            .await?
-            .etb_startwert(),
-    )
 }
 
 fn enum_opt<T: TryFrom<String, Error = String>>(s: Option<String>) -> Result<Option<T>, AppError> {
@@ -243,7 +234,7 @@ pub async fn bezirk_anlegen(
         sammelstelle: req.sammelstelle,
         notiz: req.notiz,
     };
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::bezirk_anlegen_tx(conn, einsatz_id, benutzer_id, startwert, &eingabe).await
@@ -292,7 +283,7 @@ pub async fn bezirk_aendern(
         sammelstelle: req.sammelstelle,
         notiz: req.notiz,
     };
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::bezirk_aendern_tx(conn, einsatz_id, bid, benutzer_id, startwert, &eingabe).await
@@ -311,7 +302,7 @@ pub async fn bezirk_stornieren(
     PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<EvakuierungsbezirkAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let (g, geloeste_zonen) = crate::write_retry!(&state.pool, |conn| {
         repo::bezirk_stornieren_tx(conn, einsatz_id, bid, benutzer_id, startwert).await
@@ -387,7 +378,7 @@ pub async fn stand_melden(
         zeitpunkt_at: meldezeitpunkt(req.zeitpunkt_at.as_deref(), Utc::now())?,
         client_id,
     };
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     // Die Transaktion sucht den Schlüssel noch einmal: zwei Flushes, die beide am Vorab-Lookup
     // vorbeikamen, entscheidet `BEGIN IMMEDIATE` — der zweite ist dann ein Replay (`neu: false`).
@@ -432,7 +423,7 @@ pub async fn stand_zuruecknehmen(
     PfadParam((_eid, stand_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<BezirkMeldungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let m = crate::write_retry!(&state.pool, |conn| {
         repo::stand_zuruecknehmen_tx(conn, einsatz_id, stand_id, benutzer_id, startwert).await
@@ -476,7 +467,7 @@ pub async fn stelle_anlegen(
         standort: req.standort,
         notiz: req.notiz,
     };
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::stelle_anlegen_tx(conn, einsatz_id, benutzer_id, startwert, &eingabe).await
@@ -536,7 +527,7 @@ pub async fn stelle_aendern(
         lat: req.lat,
         lon: req.lon,
     };
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::stelle_aendern_tx(conn, einsatz_id, sid, benutzer_id, startwert, &eingabe).await
@@ -554,7 +545,7 @@ pub async fn stelle_stornieren(
     PfadParam((_eid, sid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<BetreuungsstelleAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::stelle_stornieren_tx(conn, einsatz_id, sid, benutzer_id, startwert).await
@@ -605,7 +596,7 @@ pub async fn belegung_melden(
         zeitpunkt_at: meldezeitpunkt(req.zeitpunkt_at.as_deref(), Utc::now())?,
         client_id,
     };
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let m = crate::write_retry!(&state.pool, |conn| {
         repo::belegung_melden_tx(conn, einsatz_id, sid, benutzer_id, startwert, &eingabe).await
@@ -626,7 +617,7 @@ pub async fn belegung_zuruecknehmen(
     PfadParam((_eid, mid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<StelleMeldungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let m = crate::write_retry!(&state.pool, |conn| {
         repo::belegung_zuruecknehmen_tx(conn, einsatz_id, mid, benutzer_id, startwert).await
@@ -643,7 +634,7 @@ mod tests {
     use super::*;
 
     fn t(s: &str) -> DateTime<Utc> {
-        NaiveDateTime::parse_from_str(s, DRAHT).unwrap().and_utc()
+        crate::zeit::parse_utc(s).unwrap()
     }
 
     #[test]

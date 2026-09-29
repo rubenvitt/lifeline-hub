@@ -7,16 +7,15 @@ import type {
   FristSetzenBody,
   WiederherstellenBody,
 } from './types';
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, mitParametern } from './client';
 
 /**
- * Aufbewahrung abgeschlossener Einsätze (LFH-23, design.md D2).
+ * Aufbewahrung abgeschlossener Einsätze (LFH-23).
  *
- * Der Archiv-Namensraum `/api/aufbewahrung` steht NEBEN der Lesesperre der regulären
- * Einsatz-Routen: nur der System-Admin der eigenen Organisation kommt hinein (sonst 403),
- * ein unbekannter Einsatz ist 404, ein aktiver 409. Bis auf das Wiederherstellen liest er
- * nur. Die Frist selbst ändert man dagegen am Einsatz (`PUT …/aufbewahrungsfrist`,
- * Einsatzleitung oder System-Admin) — an einem vorgemerkten Einsatz ist das 422 (erst
+ * Der Archiv-Namensraum `/api/aufbewahrung` steht NEBEN der Lesesperre der regulären Routen: nur
+ * der System-Admin der eigenen Organisation kommt hinein (sonst 403), ein unbekannter Einsatz ist
+ * 404, ein aktiver 409. Bis auf das Wiederherstellen liest er nur. Die Frist ändert man am
+ * Einsatz (`PUT …/aufbewahrungsfrist`); an einem vorgemerkten Einsatz ist das 422 (erst
  * wiederherstellen), an einem geschwärzten 409.
  */
 
@@ -44,12 +43,13 @@ export function ladeArchivEtb(
   einsatzId: number,
   filter: ArchivEtbFilter = {},
 ): Promise<ArchivEtbEintrag[]> {
-  const q = new URLSearchParams();
-  if (filter.typ) q.set('typ', filter.typ);
-  if (filter.beforeLfdNr != null) q.set('before_lfd_nr', String(filter.beforeLfdNr));
-  if (filter.limit != null) q.set('limit', String(filter.limit));
-  const s = q.toString();
-  return apiGet<ArchivEtbEintrag[]>(`${BASIS}/einsaetze/${einsatzId}/etb${s ? `?${s}` : ''}`);
+  return apiGet<ArchivEtbEintrag[]>(
+    mitParametern(`${BASIS}/einsaetze/${einsatzId}/etb`, {
+      typ: filter.typ,
+      before_lfd_nr: filter.beforeLfdNr,
+      limit: filter.limit,
+    }),
+  );
 }
 
 /** `POST …/wiederherstellen` — Vormerkung aufheben, neue Frist setzen (Pflicht). */

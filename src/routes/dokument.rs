@@ -16,15 +16,14 @@ use crate::einsatz::modul::Dokumente;
 use crate::error::AppError;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
+use crate::routes::support::pflicht;
 
 use super::support::anhang_antwort;
 
 fn sse(state: &AppState, einsatz_id: i64) {
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Dokument,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Dokument);
 }
 
 /// GET /api/einsaetze/{id}/dokumente — lebende Dokumente, neueste zuerst.
@@ -42,10 +41,7 @@ fn validiere(
     bezug_typ: Option<String>,
     bezug_id: Option<String>,
 ) -> Result<(String, DokumentKategorie, Option<Bezug>), AppError> {
-    let titel = titel.map(|t| t.trim().to_string()).unwrap_or_default();
-    if titel.is_empty() {
-        return Err(AppError::Validation("Titel darf nicht leer sein".into()));
-    }
+    let titel = pflicht(titel.as_deref().unwrap_or_default(), "Titel")?;
     if titel.chars().count() > TITEL_MAX {
         return Err(AppError::Validation(format!(
             "Titel ist länger als {TITEL_MAX} Zeichen"

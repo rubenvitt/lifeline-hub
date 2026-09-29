@@ -101,19 +101,6 @@ pub async fn gib_personal_frei_tx(
     Ok(name)
 }
 
-/// Pool-Wrapper (eigene Tx, hält die beiden UPDATEs atomar).
-pub async fn gib_personal_frei(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    einheit_id: i64,
-    ep_id: i64,
-) -> Result<String, AppError> {
-    let mut tx = pool.begin().await?;
-    let name = gib_personal_frei_tx(&mut tx, einsatz_id, einheit_id, ep_id).await?;
-    tx.commit().await?;
-    Ok(name)
-}
-
 /// Ordnet ein Fahrzeug einer Einheit zu (exklusiv), auf offener Connection/Tx. `NotFound`
 /// analog. Liefert den Funkrufnamen.
 pub async fn ordne_fahrzeug_zu_tx(
@@ -168,17 +155,6 @@ pub async fn gib_fahrzeug_frei_tx(
         .execute(&mut *conn)
         .await?;
     Ok(name)
-}
-
-/// Pool-Wrapper.
-pub async fn gib_fahrzeug_frei(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    einheit_id: i64,
-    ef_id: i64,
-) -> Result<String, AppError> {
-    let mut conn = pool.acquire().await?;
-    gib_fahrzeug_frei_tx(&mut conn, einsatz_id, einheit_id, ef_id).await
 }
 
 /// Ordnet eine Material-Dispozeile einer Einheit zu (exklusiv; Material kann kein Führer
@@ -236,17 +212,6 @@ pub async fn gib_material_frei_tx(
         .execute(&mut *conn)
         .await?;
     Ok(row)
-}
-
-/// Pool-Wrapper.
-pub async fn gib_material_frei(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    einheit_id: i64,
-    em_id: i64,
-) -> Result<(String, i64), AppError> {
-    let mut conn = pool.acquire().await?;
-    gib_material_frei_tx(&mut conn, einsatz_id, einheit_id, em_id).await
 }
 
 #[derive(sqlx::FromRow)]
@@ -605,7 +570,9 @@ mod tests {
 
         // Freigeben.
         assert_eq!(
-            gib_personal_frei(&pool, einsatz, b, ep).await.unwrap(),
+            gib_personal_frei_tx(&mut *pool.acquire().await.unwrap(), einsatz, b, ep)
+                .await
+                .unwrap(),
             "Anna"
         );
         assert_eq!(einheit_von(&pool, ep).await, None);
@@ -619,7 +586,9 @@ mod tests {
         ordne_personal_zu(&pool, einsatz, a, ep).await.unwrap();
         // Freigeben aus B (gehört aber zu A) → NotFound.
         assert!(matches!(
-            gib_personal_frei(&pool, einsatz, b, ep).await.unwrap_err(),
+            gib_personal_frei_tx(&mut *pool.acquire().await.unwrap(), einsatz, b, ep)
+                .await
+                .unwrap_err(),
             AppError::NotFound
         ));
     }
@@ -637,7 +606,9 @@ mod tests {
             .await
             .unwrap();
 
-        gib_personal_frei(&pool, einsatz, a, ep).await.unwrap();
+        gib_personal_frei_tx(&mut *pool.acquire().await.unwrap(), einsatz, a, ep)
+            .await
+            .unwrap();
         let fuehrer: Option<i64> =
             sqlx::query_scalar("SELECT fuehrer_id FROM einsatz_einheit WHERE id = ?")
                 .bind(a)
@@ -762,7 +733,9 @@ mod tests {
         );
         assert_eq!(fahrzeug_mitglieder(&pool, a).await.unwrap().len(), 1);
         assert_eq!(
-            gib_fahrzeug_frei(&pool, einsatz, a, ef).await.unwrap(),
+            gib_fahrzeug_frei_tx(&mut *pool.acquire().await.unwrap(), einsatz, a, ef)
+                .await
+                .unwrap(),
             "Florian 1"
         );
         assert!(fahrzeug_mitglieder(&pool, a).await.unwrap().is_empty());
@@ -890,11 +863,15 @@ mod tests {
 
         // Freigeben aus falscher Einheit (a) → NotFound.
         assert!(matches!(
-            gib_material_frei(&pool, einsatz, a, em).await.unwrap_err(),
+            gib_material_frei_tx(&mut *pool.acquire().await.unwrap(), einsatz, a, em)
+                .await
+                .unwrap_err(),
             AppError::NotFound
         ));
         // Freigeben aus b.
-        gib_material_frei(&pool, einsatz, b, em).await.unwrap();
+        gib_material_frei_tx(&mut *pool.acquire().await.unwrap(), einsatz, b, em)
+            .await
+            .unwrap();
         assert!(material_mitglieder(&pool, b).await.unwrap().is_empty());
     }
 }

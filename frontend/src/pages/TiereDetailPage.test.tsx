@@ -3,60 +3,22 @@ import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import TiereDetailPage from './TiereDetailPage';
 import type { Tier } from '../api/types';
+import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
-class FakeEventSource {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {
-    this.closed = true;
-  }
-}
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
 // schreibrecht.test.ts ab.
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  benutzername: 'nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-29 10:00:00',
-};
-const einsatzAktiv = {
-  id: 1,
-  bezeichnung: 'Hochwasser',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '2026-05-29 08:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '2026-05-29 08:00:00',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-};
-const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
+const nutzer = benutzerFixture();
+const einsatzAktiv = einsatzFixture();
+const einsatzBeobachter = einsatzFixture({ meine_rolle: 'beobachter' });
 
 // Quelle der Halter-Combobox (lädt beim Öffnen des Edit-Formulars). Der HalterPicker liest nur
 // id/registrier_nr/name/vorname.
@@ -104,7 +66,7 @@ function render(
   route = '/einsaetze/1/tiere/10',
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(tier)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([einePerson])),
@@ -112,13 +74,11 @@ function render(
   // extra-Handler separat voranstellen, damit sie Vorrang vor den Defaults haben.
   if (extra.length > 0) server.use(...extra);
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/tiere" element={<div>LISTE</div>} />
-        <Route path="/einsaetze/:id/tiere/:tierId" element={<TiereDetailPage />} />
-        <Route path="/einsaetze/:id/personen/:personId" element={<div>PERSON-DETAIL</div>} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/tiere" element={<div>LISTE</div>} />
+      <Route path="/einsaetze/:id/tiere/:tierId" element={<TiereDetailPage />} />
+      <Route path="/einsaetze/:id/personen/:personId" element={<div>PERSON-DETAIL</div>} />
+    </Routes>,
     { route },
   );
 }

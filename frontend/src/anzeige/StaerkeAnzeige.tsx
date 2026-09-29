@@ -1,4 +1,5 @@
 import type { Staerke } from '../api/types';
+import { staerkeText } from './staerke';
 
 /**
  * Reine Darstellung einer taktischen Stärke als `F/UF/M//Σ` (Gesamt = Summe, BOS-Schreibweise
@@ -9,7 +10,5 @@ import type { Staerke } from '../api/types';
  * Textknoten splitten und deren `getByText`-Substring-Matches grün bleiben.
  */
 export default function StaerkeAnzeige({ wert }: { wert: Staerke | null }) {
-  if (!wert) return <>—</>;
-  const { fuehrer, unterfuehrer, mannschaft } = wert;
-  return <>{`${fuehrer}/${unterfuehrer}/${mannschaft}//${fuehrer + unterfuehrer + mannschaft}`}</>;
+  return <>{staerkeText(wert)}</>;
 }

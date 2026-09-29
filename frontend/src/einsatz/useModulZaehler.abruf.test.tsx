@@ -5,8 +5,9 @@ import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { ModulOverrides } from '../api/types';
 import { useModulZaehler } from './useModulZaehler';
+import { benutzerFixture } from '../test/fixtures';
 
 /**
  * Der Hook des Modulzählers am Draht (LFH-639, Prüfliste Tabelle 3 „Sichtbarkeit"). Der Test
@@ -20,16 +21,7 @@ import { useModulZaehler } from './useModulZaehler';
  * aus `test/server.ts`.
  */
 
-const benutzer: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'E',
-  benutzername: 'e',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-09-23 08:00:00',
-  totp_aktiviert: false,
-};
+const benutzer = benutzerFixture({ anzeigename: 'E' });
 
 const PFAD = '/api/einsaetze/7/betreuung';
 

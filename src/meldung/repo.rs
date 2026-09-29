@@ -125,7 +125,7 @@ pub async fn anlegen_idempotent(
         // wir den Gewinner und liefern eine idempotente Antwort.
         Err(e) => match bestehende_client_id(pool, einsatz_id, cid).await? {
             Some(id) => {
-                let aktuell = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+                let aktuell = crate::zeit::jetzt();
                 Ok((laden(pool, id, &aktuell).await?, false))
             }
             None => Err(e),

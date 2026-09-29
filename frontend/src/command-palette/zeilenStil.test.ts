@@ -1,17 +1,11 @@
-// frontend/src/command-palette/zeilenStil.test.ts
 import { describe, it, expect } from 'vitest';
 import { palettenZeilenStil, vorschauZielStil } from './zeilenStil';
 import { dichten } from '../theme/tokens';
 
 /**
- * Trefflächenboden der Palettenzeile (LFH-365, Nacharbeit zu LFH-335).
- *
- * Geprüft wird die REINE Funktion, nicht ein gerenderter Wert: `test/utils.tsx` montiert ein
- * nacktes `ConfigProvider` OHNE unser Theme — eine gerenderte Höhe belegte antd-Vorgaben statt
- * der Staffel —, und jsdom rechnet ohnehin kein Layout.
- *
- * Die Böden stehen als LITERALE da. Aus dem Token zurückgelesen prüften sie den Token gegen
- * sich selbst und blieben grün, egal welche Zahl dort steht.
+ * Trefflächenboden der Palettenzeile. Geprüft wird die REINE Funktion: `test/utils.tsx` montiert
+ * ein nacktes `ConfigProvider` ohne unser Theme, und jsdom rechnet kein Layout. Die Böden stehen
+ * als LITERALE da, aus dem Token gelesen prüften sie sich selbst.
  */
 describe('palettenZeilenStil', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({
@@ -28,9 +22,8 @@ describe('palettenZeilenStil', () => {
   });
 
   /**
-   * ZWEI Angaben, nicht eine (Konvention aus LFH-365): die Polsterung allein trägt den Boden
-   * nicht — sie kommt im Handschuh-Betrieb auf grob 54 px gegen die geforderten 72. Sie muss
-   * trotzdem da sein und ebenfalls mitziehen, sonst klebt der Text an der Kante.
+   * ZWEI Angaben: die Polsterung allein trägt den Boden nicht (Handschuh rund 54 statt 72 px), muss
+   * aber mitziehen, sonst klebt der Text an der Kante.
    */
   it('trägt neben der Höhe eine mitziehende Polsterung', () => {
     expect(palettenZeilenStil(tokenFuer('kompakt')).padding).toBe('3px 7px');
@@ -38,9 +31,8 @@ describe('palettenZeilenStil', () => {
   });
 
   /**
-   * Die eigentliche Aussage: der Wert ZIEHT MIT. Ein festgenagelter Stil bestünde die
-   * Literal-Prüfung oben nicht, ein aus einer Konstante gelesener aber schon — die
-   * Ungleichheit über die Stufen ist das, was eine Verwechslung der Quelle auffliegen ließe.
+   * Der Wert ZIEHT MIT: ein aus einer Konstante gelesener Stil bestünde die Literal-Prüfung oben,
+   * die Ungleichheit über die Stufen nicht.
    */
   it('wächst über die Dichtestufen, statt auf einer Stufe zu kleben', () => {
     const stufen = (['kompakt', 'komfortabel', 'handschuh'] as const).map((s) =>
@@ -54,12 +46,8 @@ describe('palettenZeilenStil', () => {
 });
 
 /**
- * Das Tippziel „Vorschau" an einer Palettenzeile (LFH-665).
- *
- * Seit LFH-645 öffnet → eine Lese-Vorschau, aber nur per Tastatur. Auf dem Führungs-Tablet
- * öffnete ein Tipp die Zeile, an die Vorschau kam niemand heran. Das Ziel ist ein
- * handgebautes Bedienziel und schuldet deshalb dieselben ZWEI Angaben wie die Zeile — hier
- * in beiden Richtungen, weil es ein Quadrat am Rand ist und kein Band über die volle Breite.
+ * Das Tippziel „Vorschau“: ein handgebautes Bedienziel mit denselben ZWEI Angaben, hier in beiden
+ * Richtungen, weil es ein Quadrat am Rand ist.
  */
 describe('vorschauZielStil', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({
@@ -95,18 +83,16 @@ describe('vorschauZielStil', () => {
   });
 
   /**
-   * Die Treffertrennung. Die Zeile ist content-box (gemessen in `gate3-trefflaeche.spec.ts`:
-   * 36 / 58 / 86 = Boden + 2 × paddingXS). Das Ziel zieht sich deshalb um genau die
-   * Zeilenpolsterung nach rechts und in der Höhe heraus: es endet bündig an der Zeilenkante
-   * und füllt ihre volle Höhe. Sonst bliebe rechts und über/unter ihm ein Streifen, der zur
-   * Zeile gehört — genau dort, wo der Daumen das Ziel verfehlt, öffnete er den Datensatz.
+   * Die Treffertrennung: die Zeile ist content-box (Boden + 2 × paddingXS), das Ziel zieht sich um
+   * genau die Zeilenpolsterung heraus und endet bündig an der Kante. Sonst bliebe ein Streifen, in
+   * dem ein verfehlter Tipp den Datensatz öffnete.
    */
   it('sitzt bündig an der rechten Zeilenkante und füllt die volle Zeilenhöhe', () => {
     for (const stufe of ['kompakt', 'handschuh'] as const) {
       const t = tokenFuer(stufe);
       const stil = vorschauZielStil(t);
-      // Gegen die Polsterung der ZEILE gerechnet, nicht gegen eine eigene Konstante: ändert
-      // `palettenZeilenStil` seine Polsterung, bricht die Bündigkeit — und dieser Test mit.
+      // Gegen die Polsterung der ZEILE gerechnet: ändert `palettenZeilenStil` sie, bricht dieser Test
+      // mit.
       const [oben, rechts] = palettenZeilenStil({ ...t, marginSM: t.paddingSM })
         .padding.split(' ')
         .map((w) => Number.parseFloat(w));

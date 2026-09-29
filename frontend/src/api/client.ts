@@ -44,9 +44,25 @@ export function fehlerText(e: unknown, standard = 'Aktion fehlgeschlagen'): stri
   return standard;
 }
 
-/** True, wenn der Fehler ein optimistischer Sperrkonflikt (HTTP 409) ist — der Datensatz
- *  wurde seit dem Laden von jemand anderem geändert (LFH-241/F10). Der Aufrufer bietet dann
- *  „neu laden vs. überschreiben" an, statt den Fehler nur generisch zu melden. */
+/**
+ * Hängt die gesetzten Parameter als Query an (`URLSearchParams`-Kodierung). Ohne Wert gilt
+ * `undefined`, `null`, `''` und `false`; eine `0` bleibt stehen.
+ */
+export function mitParametern(
+  pfad: string,
+  parameter: Record<string, string | number | boolean | null | undefined>,
+): string {
+  const p = new URLSearchParams();
+  for (const [name, wert] of Object.entries(parameter)) {
+    if (wert != null && wert !== '' && wert !== false) p.set(name, String(wert));
+  }
+  const q = p.toString();
+  return q ? `${pfad}?${q}` : pfad;
+}
+
+/** True, wenn der Fehler ein optimistischer Sperrkonflikt (HTTP 409) ist: der Datensatz wurde
+ *  seit dem Laden von jemand anderem geändert. Der Aufrufer bietet dann „neu laden vs.
+ *  überschreiben“ an. */
 export function istKonflikt(e: unknown): e is ApiError {
   return e instanceof ApiError && e.status === 409;
 }
@@ -136,11 +152,9 @@ export async function apiSend<T>(
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return fehlerWerfen(res);
-    // Leerer Body: nicht nur 204 No Content (z.B. Logout), sondern auch 200/201 ohne
-    // Json-Wrapper (z.B. die WebAuthn-Finish-Endpunkte, die nur `StatusCode` liefern,
-    // LFH-275). Aufrufer solcher Endpunkte MÜSSEN T = void verwenden — der Cast ist nur
-    // unter dieser Vertragsannahme sicher. `res.json()` auf leerem Body würfe sonst einen
-    // kryptischen SyntaxError statt sauber `undefined` zu liefern.
+    // Leerer Body: nicht nur 204, sondern auch 200/201 ohne Json (z. B. WebAuthn-Finish). Aufrufer
+    // solcher Endpunkte MÜSSEN T = void verwenden, nur dann ist der Cast sicher; `res.json()`
+    // würfe auf leerem Body einen SyntaxError.
     const text = await res.text();
     if (text.length === 0) return undefined as T;
     return JSON.parse(text) as T;

@@ -221,9 +221,6 @@ pub struct AusgabeErgebnis {
 
 // ── Zeiten ──────────────────────────────────────────────────────────────────────────────────
 
-/// Drahtformat der Zeitpunkte: UTC ohne Zonenkennung.
-pub const DRAHT: &str = "%Y-%m-%d %H:%M:%S";
-
 /// Obergrenze je Zahlfeld in EP (Bedarfsteil, Menge, Kostform). Eine Verpflegungslage mit mehr
 /// als 100 000 Portionen in EINEM Zeitfenster oder EINER Ausgabe gibt es nicht; ohne Grenze
 /// ließ die Summe zweier Ausgaben mit `i64::MAX` die Deckung überlaufen (Review LFH-634) —
@@ -234,9 +231,9 @@ pub const MAX_EP: i64 = 100_000;
 /// Liest einen Zeitpunkt im Drahtformat. Als Rundreise: chrono nimmt beim Parsen auch
 /// ungepolsterte Felder an, die als Text falsch sortierten. Unlesbar → 400.
 pub fn draht_lesen(feld: &str, s: &str) -> Result<DateTime<Utc>, AppError> {
-    match chrono::NaiveDateTime::parse_from_str(s, DRAHT) {
-        Ok(t) if t.format(DRAHT).to_string() == s => Ok(t.and_utc()),
-        _ => Err(AppError::Validation(format!(
+    match crate::zeit::parse_streng(s) {
+        Some(t) => Ok(t.and_utc()),
+        None => Err(AppError::Validation(format!(
             "{feld}: ungültiger Zeitpunkt '{s}' (erwartet: YYYY-MM-DD HH:MM:SS, UTC)"
         ))),
     }

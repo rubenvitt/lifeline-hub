@@ -8,9 +8,8 @@ import {
 } from './organisation';
 
 /**
- * Pfad, Methode und Body der Organisations-Aufrufe (LFH-22, design.md D7/D8). Der Server
- * nimmt beim PATCH beide Felder optional; wer hier ein Feld mitschickt, das er nicht ändern
- * will, überschreibt es.
+ * Pfad, Methode und Body der Organisations-Aufrufe. Der PATCH nimmt beide Felder optional; wer
+ * ein Feld mitschickt, das er nicht ändern will, überschreibt es.
  */
 describe('api/organisation', () => {
   let fetchMock: ReturnType<typeof vi.spyOn>;

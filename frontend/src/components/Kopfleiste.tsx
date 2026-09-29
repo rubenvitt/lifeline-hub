@@ -19,17 +19,15 @@ import { einsaetzePfad } from '../routing/deeplinks';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
 
 /**
- * Bausteine der Kommandoleiste (Neuentwurf „Instrumententafel", `shell.dc.html`) — geteilt
- * von der Ebene-1-Shell (`AppLayout`) und dem Einsatz-Workspace (`EinsatzLayout`).
+ * Bausteine der Kommandoleiste (`shell.dc.html`) — geteilt von der Ebene-1-Shell (`AppLayout`)
+ * und dem Einsatz-Workspace (`EinsatzLayout`).
  *
  * DER RAHMEN IST IN BEIDEN MODI DUNKEL. Alle Farben kommen deshalb aus `rahmenFarben` bzw.
- * `farbenDunkel` und NICHT aus dem modusabhängigen antd-Token — ein Tagmodus-Wert auf dem
- * dunklen Kopfgrund verschwände (dieselbe Begründung, die `IconRail` seit A2 trägt).
+ * `farbenDunkel`, NICHT aus dem modusabhängigen antd-Token.
  *
- * MASSE: 52 px Kopfhöhe und 60 px Markenzelle sind LAYOUTMASSE des Entwurfs, keine
- * Trefflächen. Die Kopfhöhe ist ein BODEN: in `komfortabel`/`handschuh` wachsen die
- * Bedienziele mit der Dichte-Staffel (48 / 72), und die Leiste wächst mit — gedeckelt wird
- * nie das Ziel, nur der Rahmen folgt ihm.
+ * MASSE: 52 px Kopfhöhe und 60 px Markenzelle sind LAYOUTMASSE, keine Trefflächen. Die Kopfhöhe
+ * ist ein BODEN: in `komfortabel`/`handschuh` wachsen die Bedienziele (48 / 72), und die Leiste
+ * wächst mit.
  */
 export const KOPF_HOEHE = 52;
 
@@ -39,9 +37,9 @@ export const RAIL_BREITE = 60;
 /**
  * Eine Zelle der Kommandoleiste: volle Höhe, Inhalt mittig, Haarlinie als Trenner.
  *
- * Rein und exportiert (Muster `bedienzielStil`): die Zelle ist KEIN Bedienziel, sie trägt
- * eines. Die Polsterung zieht mit der Dichte (`token.padding` = 11 / 18 / 26) — der Entwurf
- * skizziert 14 px, die Staffel ist die verbindliche Quelle.
+ * Rein und exportiert (Muster `bedienzielStil`): die Zelle ist KEIN Bedienziel, sie trägt eines.
+ * Die Polsterung zieht mit der Dichte (`token.padding`); die Staffel ist die verbindliche Quelle,
+ * nicht der Entwurfswert.
  */
 export function kopfZelleStil(
   token: { padding: number },
@@ -67,29 +65,19 @@ export function kopfZelleStil(
 /**
  * Flex-Angaben der wachsenden Kopfgruppen im Einsatz-Workspace — rein und exportiert.
  *
- * Der Einsatzname ist die Identität der Seite, das Suchfeld nur ein Auslöser. Ab `lg`
- * teilten sich beide den Überschuss früher zu gleichen Teilen (`1 1 240px` / `1 1 280px`);
- * gemessen bei 1440 px blieben dem Namen 92 px, und „Übung Hochwasser Neckartal" endete nach
- * „Übung Hoch…", während das Suchfeld 451 px breit war. Dabei deckte die Namensbasis von
- * 240 px nicht einmal den festen Teil der Gruppe (Marke 60 · Wortmarke · Nummer · Abstände,
- * gemessen ≈ 270 px in `kompakt`) — der Name lebte allein vom Überschuss.
+ * Der Einsatzname ist die Identität der Seite, das Suchfeld nur ein Auslöser. Ab `lg` startet
+ * die Namensgruppe mit 340 px (fester Teil aus Marke, Wortmarke, Nummer ≈ 270 px plus Name) und
+ * wächst dreimal so stark wie die Suche; die Suche startet bei 180 px und SCHRUMPFT zuerst. Ihre
+ * Obergrenze hält `CommandPaletteTrigger` (`SUCHFELD_MAX_BREITE`).
  *
- * Jetzt (ab `lg`): die Namensgruppe startet mit 340 px (fester Teil plus gut 70 px Name)
- * und wächst dreimal so stark wie die Suche; die Suche startet bei 180 px und SCHRUMPFT
- * zuerst. Ihre Obergrenze von 520 px hält weiter `CommandPaletteTrigger`
- * (`SUCHFELD_MAX_BREITE`). Gemessen: 1440 px → Name ungekürzt.
+ * Die BASEN entscheiden zugleich den Umbruch (`flexWrap` am Kopf): die rechte Zellgruppe wandert
+ * in eine zweite Zeile, sobald Namensbasis + Suchbasis + rechte Gruppe die Breite übersteigen.
+ * Die Summe 340 + 180 = 520 px hält den Umbruchpunkt (≈ 1100 px in `kompakt`); kleiner würde der
+ * Name bei mittleren Breiten auf 0 px gedrückt.
  *
- * Die BASEN entscheiden zugleich den Umbruch (`flexWrap` am Kopf): die rechte Zellgruppe
- * wandert in eine zweite Zeile, sobald Namensbasis + Suchbasis + rechte Gruppe die Breite
- * übersteigen. Die Summe der Basen ist mit 340 + 180 = 520 px BEWUSST dieselbe wie vorher
- * (240 + 280): der Umbruch setzt also nicht früher ein als bisher (≈ 1100 px in `kompakt`),
- * das Führungs-Tablet verliert keine Zeile. Die Summe nur zu verkleinern, ginge nicht:
- * mit 240 + 160 blieb bei 992 px alles einzeilig und der Name stand gemessen auf 0 px.
- *
- * UNTER `lg` gilt {@link KOPF_NAME_FLEX_SCHMAL}, die bestehende Verdichtung: dort gibt es
- * keine Suchzelle, und eine 400-px-Basis bräche auf dem Tablet die Kopfzeile unnötig um.
- * `minWidth: 0` bleibt an allen Aufrufstellen Pflicht — ohne sie kürzt ein Flex-Kind nicht,
- * sondern läuft über (Gate 1).
+ * UNTER `lg` gilt {@link KOPF_NAME_FLEX_SCHMAL}: dort gibt es keine Suchzelle. `minWidth: 0`
+ * bleibt an allen Aufrufstellen Pflicht — ohne sie kürzt ein Flex-Kind nicht, sondern läuft
+ * über (Gate 1).
  */
 export const KOPF_NAME_FLEX = '3 1 340px';
 export const KOPF_NAME_FLEX_SCHMAL = '1 1 240px';
@@ -117,9 +105,9 @@ export function Markenzelle() {
 }
 
 /**
- * Stil der Wortmarke — ein Link zur Einsatzliste und damit ein handgebautes Bedienziel:
- * ZWEI Angaben (LFH-365), `minHeight` aus `controlHeight` plus Polsterung. Ein `<a>` erbt
- * keine Steuerhöhe (LFH-396, gemessen 17 px) — ohne `minHeight` fiele sie unter Gate 3.
+ * Stil der Wortmarke — ein Link zur Einsatzliste und damit ein handgebautes Bedienziel: ZWEI
+ * Angaben (LFH-365), `minHeight` aus `controlHeight` plus Polsterung. Ein `<a>` erbt keine
+ * Steuerhöhe.
  */
 export function wortmarkeStil(token: { controlHeight: number; paddingXS: number }): CSSProperties {
   return {
@@ -153,9 +141,9 @@ export function Wortmarke() {
 /**
  * Ein Takt, der zur vollen Minute tickt — für Uhr und Einsatzdauer.
  *
- * Erst ein `setTimeout` bis zur nächsten Minutengrenze, danach ein Minutenintervall: ein
- * bloßes `setInterval(60 000)` ab dem Einhängen zeigte bis zu 59 s lang die alte Minute.
- * Liefert Millisekunden (primitiv, damit Konsumenten ihn in Dependency-Arrays führen dürfen).
+ * Erst ein `setTimeout` bis zur nächsten Minutengrenze, danach ein Minutenintervall; ein bloßes
+ * `setInterval(60 000)` zeigte bis zu 59 s die alte Minute. Liefert Millisekunden (primitiv, für
+ * Dependency-Arrays).
  */
 export function useMinutenTakt(): number {
   const [jetzt, setJetzt] = useState(() => Date.now());
@@ -180,10 +168,9 @@ export function formatiereUhr(ms: number): string {
 }
 
 /**
- * Die Uhr der Kommandoleiste (Mono 14/500). Browserzeit, nicht die Anzeigezone eines
- * Einsatzes: der Kopf liegt AUSSERHALB des `EinsatzAnzeigeProvider` und steht auch auf der
- * Einsatzliste, wo es keine Einsatzzone gibt. Eine Uhr, die je Route die Zone wechselt,
- * wäre schlimmer als eine, die immer die Ortszeit des Geräts zeigt.
+ * Die Uhr der Kommandoleiste (Mono 14/500). Browserzeit, nicht die Anzeigezone eines Einsatzes:
+ * der Kopf liegt AUSSERHALB des `EinsatzAnzeigeProvider` und steht auch auf der Einsatzliste.
+ * Eine Uhr, die je Route die Zone wechselt, wäre schlimmer.
  */
 export function Uhr() {
   const { token } = theme.useToken();
@@ -211,8 +198,7 @@ export function Uhr() {
 
 /**
  * Die Zustände der SYNC-Anzeige. `ruhe` heißt „nichts zu melden UND keine Live-Verbindung
- * erwartet" — auf der Einsatzliste läuft kein SSE-Strom, ein dauerhaftes „verbinde …" dort
- * wäre eine Falschmeldung.
+ * erwartet" — auf der Einsatzliste läuft kein SSE-Strom.
  */
 export type SyncZustand =
   'verbunden' | 'verbinde' | 'getrennt' | 'offline' | 'ausstehend' | 'abgelehnt' | 'ruhe';
@@ -220,13 +206,12 @@ export type SyncZustand =
 /**
  * Leitet den Zustand ab — REIN und exportiert, damit die Rangfolge ohne Rendern prüfbar ist.
  *
- * Rangfolge: was Daten gefährdet, geht vor dem, was nur verzögert. `offline` vor `getrennt`
- * (ohne Netz ist der Strom zwangsläufig weg — der Grund ist der Netzverlust), abgelehnte
- * Offline-Aktionen vor dem Verbindungsaufbau (sie verlangen eine Handlung), ausstehende
- * nach dem Aufbau (sie gehen von selbst hinaus, sobald er steht).
+ * Was Daten gefährdet, geht vor dem, was nur verzögert: `offline` vor `getrennt` (ohne Netz ist
+ * der Strom zwangsläufig weg), abgelehnte Offline-Aktionen vor dem Verbindungsaufbau (sie
+ * verlangen eine Handlung), ausstehende danach (sie gehen von selbst hinaus).
  *
- * `idle` ist der Zustand VOR dem ersten Verbindungsversuch — im Einsatz also „verbinde",
- * nie „getrennt": sonst meldete jeder Kaltstart Alarm.
+ * `idle` ist der Zustand VOR dem ersten Verbindungsversuch — im Einsatz „verbinde", nie
+ * „getrennt", sonst meldete jeder Kaltstart Alarm.
  */
 export function syncZustand(eingabe: {
   online: boolean;
@@ -256,7 +241,7 @@ interface SyncDarstellung {
 /**
  * Wort, Satz und Farbe je Zustand. Die Farben sind die NACHT-Rollen, weil der Kopf in beiden
  * Modi dunkel ist: `normal` für die stehende Verbindung, `achtung` für Verzug, `alarm` für
- * Verlust. Rot bedient hier nichts — die Anzeige ist ein Zustand, kein Knopf.
+ * Verlust. Die Anzeige ist ein Zustand, kein Knopf.
  */
 export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstellung> = {
   verbunden: {
@@ -298,19 +283,17 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
 };
 
 /**
- * SYNC-Anzeige: Antennen-Ikone + Wort (Mono 11). Eine ANZEIGE, kein Bedienziel — die
- * Handlungen (Neu laden, abgelehnte Aktionen prüfen) trägt weiter die Betriebszeile
- * (`LiveStatusBanner`), die dieselbe Quelle liest. Zwei Anzeigen, EIN Store (LFH-336 · M3).
+ * SYNC-Anzeige: Antennen-Ikone + Wort (Mono 11). Eine ANZEIGE, kein Bedienziel — die Handlungen
+ * trägt die Betriebszeile (`LiveStatusBanner`) aus demselben Store (LFH-336 · M3).
  *
- * `liveErwartet`: nur der Einsatz-Workspace hält einen SSE-Strom. Auf der Einsatzliste ist
- * der Store dauerhaft `idle`; dort erscheint die Zelle nur bei Netzverlust oder offener Queue.
+ * `liveErwartet`: nur der Einsatz-Workspace hält einen SSE-Strom. Auf der Einsatzliste erscheint
+ * die Zelle nur bei Netzverlust oder offener Queue.
  *
  * `kompakt` (unter `md`): nur Ikone, das Wort wandert in den zugänglichen Namen und `title`.
  *
- * `ruheOhneWort` (zwischen `md` und `xl`, Führungs-Tablet): nur der RUHEZUSTAND „SYNC" steht
- * als Ikone — er ist der Normalfall und kostete bei 1024 px die Einzeiligkeit des Kopfes.
- * Jede Störung (VERBINDE, QUEUE, GETRENNT, OFFLINE, PRÜFEN) behält ihr Wort: sie soll
- * auffallen, und Farbe allein wäre ein Kanal (WCAG 1.4.1).
+ * `ruheOhneWort` (zwischen `md` und `xl`): nur der RUHEZUSTAND „SYNC" steht als Ikone. Jede
+ * Störung (VERBINDE, QUEUE, GETRENNT, OFFLINE, PRÜFEN) behält ihr Wort — Farbe allein wäre ein
+ * Kanal (WCAG 1.4.1).
  */
 export function syncZeigtWort(
   zustand: Exclude<SyncZustand, 'ruhe'>,
@@ -345,9 +328,8 @@ export function SyncAnzeige({
     <div
       data-lfh="kopf-sync"
       data-zustand={zustand}
-      // `img` und NICHT `status`: die Betriebszeile (`LiveStatusBanner`) meldet dieselben
-      // Zustände aus demselben Store bereits an — eine zweite Live-Region sagte jede
-      // Störung doppelt an (Alarmbudget, EEMUA 191). Hier nur Name und `title`.
+      // `img` und NICHT `status`: die Betriebszeile meldet dieselben Zustände schon an, eine zweite
+      // Live-Region sagte jede Störung doppelt an (EEMUA 191).
       role="img"
       aria-label={satz}
       title={satz}
@@ -386,10 +368,9 @@ export function KopfRechts({ children }: { children: ReactNode }) {
         borderInlineStart: `1px solid ${rahmenFarben.linie}`,
         flexShrink: 0,
         maxWidth: '100%',
-        // `wrap` als Sicherheitsnetz, nicht als Regelfall: die Gruppe bricht als GANZES in
-        // eine eigene Kopfzeile um (Header-`wrap`); nur wenn sie selbst breiter ist als der
-        // Schirm (390 px in `handschuh`), dürfen ihre Zellen umbrechen — sonst liefe die
-        // Leiste waagerecht über (Gate 1), was schwerer wiegt als eine weitere Zeile.
+        // `wrap` als Sicherheitsnetz: die Gruppe bricht als GANZES in eine eigene Kopfzeile um; nur wenn
+        // sie selbst breiter ist als der Schirm, brechen ihre Zellen um — sonst liefe die Leiste
+        // waagerecht über (Gate 1).
         flexWrap: 'wrap',
       }}
     >

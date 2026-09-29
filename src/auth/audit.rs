@@ -16,6 +16,7 @@
 //! eigene — [`AUFBEWAHRUNG_TAGE`], durchgesetzt von [`purge_abgelaufene`] im
 //! Purge-Scheduler.
 
+use crate::wire_enum::wire_enum;
 use sqlx::SqlitePool;
 
 /// Aufbewahrungsfrist der Audit-Spur in Tagen.
@@ -25,22 +26,15 @@ use sqlx::SqlitePool;
 /// personenbezogener Anmeldedaten entsteht.
 pub const AUFBEWAHRUNG_TAGE: i64 = 90;
 
-/// Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in
-/// `migrations/0091_auth_audit.sql` — beide Seiten müssen zusammenpassen.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Ereignis {
-    LoginOk,
-    LoginFehlgeschlagen,
-    Logout,
-}
-
-impl Ereignis {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Ereignis::LoginOk => "login_ok",
-            Ereignis::LoginFehlgeschlagen => "login_fehlgeschlagen",
-            Ereignis::Logout => "logout",
-        }
+wire_enum! {
+    #[wire(ohne_serde)]
+    /// Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in
+    /// `migrations/0091_auth_audit.sql` — beide Seiten müssen zusammenpassen.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum Ereignis {
+        LoginOk => "login_ok",
+        LoginFehlgeschlagen => "login_fehlgeschlagen",
+        Logout => "logout",
     }
 }
 

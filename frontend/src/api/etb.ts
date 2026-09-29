@@ -20,7 +20,7 @@ export interface EtbFilterWerte {
   von?: string;
   bis?: string;
   erfasser_id?: number;
-  /** „Betrifft Einheit" (LFH-616): Auftrag an die Einheit ODER ihr Name in von/an. */
+  /** „Betrifft Einheit“: Auftrag an die Einheit ODER ihr Name in von/an. */
   einheit_id?: number;
 }
 
@@ -30,9 +30,8 @@ export interface EtbAbfrage extends EtbFilterWerte {
 }
 
 /**
- * Die Filtermerkmale als Query-Parameter. Liste UND Zählung bauen sie hier (LFH-612): der
- * Kopf zeigt „n Treffer", und n muss genau die Menge sein, die die Liste liefert — zwei
- * Abbildungen liefen beim ersten neuen Filterfeld still auseinander.
+ * Die Filtermerkmale als Query-Parameter. Liste UND Zählung bauen sie hier: „n Treffer“ muss
+ * genau die Menge sein, die die Liste liefert.
  */
 function filterParameter(filter: EtbFilterWerte): URLSearchParams {
   const qs = new URLSearchParams();
@@ -52,7 +51,7 @@ export function listeEtb(einsatzId: number, params: EtbAbfrage = {}): Promise<Et
   return apiGet<EtbEintragAnzeige[]>(`/api/einsaetze/${einsatzId}/etb?${qs.toString()}`);
 }
 
-/** Exakte Zahl der Einträge gesamt und je Typ, über denselben Filter wie die Liste (LFH-612). */
+/** Exakte Zahl der Einträge gesamt und je Typ, über denselben Filter wie die Liste. */
 export function ladeEtbZaehler(
   einsatzId: number,
   filter: EtbFilterWerte = {},
@@ -62,8 +61,8 @@ export function ladeEtbZaehler(
 }
 
 /**
- * Trefferzahl eines ETB-Filters ohne Seitendeckel (LFH-619). Derselbe Filter wie
- * {@link listeEtb}, aber ohne `limit`/`before_lfd_nr` — die Route zählt ungedeckelt.
+ * Trefferzahl eines ETB-Filters ohne Seitendeckel. Derselbe Filter wie {@link listeEtb}, aber
+ * ohne `limit`/`before_lfd_nr`.
  */
 export function zaehleEtb(einsatzId: number, params: EtbFilterWerte = {}): Promise<EtbAnzahl> {
   const qs = filterParameter(params).toString();
@@ -80,26 +79,25 @@ export interface NeuerEintrag {
   ereigniszeit?: string;
   erfasst_lokal_at?: string;
   berichtigt_eintrag_id?: number;
-  /** Client-generierte Idempotenz-UUID (F03/LFH-261). Stabil über Online-Direktsenden
-   *  UND Offline-Enqueue+Flush, damit ein Retry keine Dublette erzeugt. */
+  /** Client-generierte Idempotenz-UUID. Stabil über Online-Direktsenden UND
+   *  Offline-Enqueue+Flush, damit ein Retry keine Dublette erzeugt. */
   client_id?: string;
-  /** Zuvor über {@link ladeEtbAnhangHoch} hochgeladene Dateien (LFH-117). Fährt in der
-   *  Offline-Queue als JSON mit: nur der UPLOAD braucht Netz, das Erfassen danach nicht. */
+  /** Zuvor über {@link ladeEtbAnhangHoch} hochgeladene Dateien. Fährt in der Offline-Queue mit:
+   *  nur der UPLOAD braucht Netz. */
   anhang_ids?: number[];
 }
 
 /**
- * Höchstzahl der Anhänge je Eintrag (LFH-117, design.md D4) — Spiegel von
- * `MAX_ANHAENGE_JE_EINTRAG` in `src/routes/etb.rs`. Die Erfassung prüft sie schon bei der
- * Wahl: sonst liefe erst der Upload aller Dateien, und das Erfassen scheiterte danach mit 400.
+ * Höchstzahl der Anhänge je Eintrag, Spiegel von `MAX_ANHAENGE_JE_EINTRAG` in
+ * `src/routes/etb.rs`. Die Erfassung prüft sie schon bei der Wahl, sonst scheiterte das
+ * Erfassen erst nach allen Uploads mit 400.
  */
 export const ETB_ANHAENGE_MAX = 10;
 
 /**
- * Lädt EINE Datei für einen ETB-Eintrag hoch (LFH-117, design.md D2) und liefert ihre
- * Anzeige. Eine Datei je Anfrage: das Body-Limit gilt für die ganze Anfrage, und ein
- * gescheiterter Upload soll die schon oben liegenden nicht mitnehmen. Timeout wie die
- * Dokumentenablage (25 MiB samt Virenscan über Mobilfunk).
+ * Lädt EINE Datei für einen ETB-Eintrag hoch (LFH-117). Eine Datei je Anfrage: das Body-Limit
+ * gilt für die ganze Anfrage, und ein gescheiterter Upload soll die übrigen nicht mitnehmen.
+ * Timeout wie die Dokumentenablage (25 MiB samt Virenscan über Mobilfunk).
  */
 export async function ladeEtbAnhangHoch(einsatzId: number, datei: File): Promise<Anhang> {
   const fd = new FormData();
@@ -111,9 +109,8 @@ export async function ladeEtbAnhangHoch(einsatzId: number, datei: File): Promise
 }
 
 /**
- * Download-Pfad eines ETB-Anhangs (LFH-117, design.md D6) — ein API-Pfad, keine
- * Navigation, deshalb hier und nicht in `routing/deeplinks.ts` (wie `dokumentDownloadPfad`).
- * Die generische Route `/anhaenge/{aid}` antwortet für ETB-Anhänge 404.
+ * Download-Pfad eines ETB-Anhangs: ein API-Pfad, keine Navigation, deshalb nicht in
+ * `routing/deeplinks.ts`. Die generische Route `/anhaenge/{aid}` antwortet für ETB-Anhänge 404.
  */
 export function etbAnhangPfad(einsatzId: number, eintragId: number, anhangId: number): string {
   return `/api/einsaetze/${einsatzId}/etb/${eintragId}/anhaenge/${anhangId}`;
@@ -127,9 +124,8 @@ export function erfasseEtb(
   return apiSend<EtbEintragAnzeige>(`/api/einsaetze/${einsatzId}/etb`, 'POST', eintrag, optionen);
 }
 
-/** Aus einem ETB-Eintrag direkt einen Auftrag erteilen (ETB→Auftrag, LFH-112).
- *  Legt den Auftrag an und setzt `auftrag.quell_etb_eintrag_id` auf den Quell-Eintrag;
- *  liefert den erzeugten Auftrag zurück. */
+/** Aus einem ETB-Eintrag direkt einen Auftrag erteilen. Setzt `auftrag.quell_etb_eintrag_id`
+ *  auf den Quell-Eintrag und liefert den erzeugten Auftrag. */
 export function erteileAuftragAusEtb(
   einsatzId: number,
   eintragId: number,
@@ -138,15 +134,15 @@ export function erteileAuftragAusEtb(
   return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/etb/${eintragId}/auftrag`, 'POST', daten);
 }
 
-/** Eigener Lesestand im Tagebuch (LFH-611): Marke, letzte Sichtung, fremde Einträge darüber. */
+/** Eigener Lesestand im Tagebuch: Marke, letzte Sichtung, fremde Einträge darüber. */
 export function ladeEtbLesemarke(einsatzId: number): Promise<EtbLesemarke> {
   return apiGet<EtbLesemarke>(`/api/einsaetze/${einsatzId}/etb/lesemarke`);
 }
 
 /**
- * „Alle als gesichtet markieren" (LFH-611). `bisLfdNr` ist `hoechste_lfd_nr` der zuletzt
- * gelesenen Lesemarke — markiert wird, was das Banner angesagt hat, nicht was zwischen
- * Anzeige und Klick eintraf. Der Server rückt nur vorwärts.
+ * „Alle als gesichtet markieren“. `bisLfdNr` ist `hoechste_lfd_nr` der zuletzt gelesenen
+ * Lesemarke: markiert wird, was das Banner angesagt hat, nicht was danach eintraf. Der Server
+ * rückt nur vorwärts.
  */
 export function setzeEtbLesemarke(einsatzId: number, bisLfdNr: number): Promise<EtbLesemarke> {
   return apiSend<EtbLesemarke>(`/api/einsaetze/${einsatzId}/etb/lesemarke`, 'POST', {

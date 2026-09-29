@@ -5,47 +5,35 @@ import { describe, expect, it } from 'vitest';
 /**
  * Guard (LFH-329 · B1/H24): **`useViewport` ist der einzige Zugang zur Medienabfrage-API.**
  *
- * Ohne Guard wäre „einziger Zugang" eine Behauptung. Der Schaden einer Umgehung ist still:
- * eine zweite, handgeschriebene Breitenabfrage bricht nichts sichtbar, sie driftet nur von
- * antds Schwellen weg — und die Suite bleibt grün, weil der Test-Stub jede Abfrage brav
- * beantwortet, egal wer sie stellt.
+ * Eine zweite, handgeschriebene Breitenabfrage bricht nichts sichtbar, sie driftet nur von antds
+ * Schwellen weg — und die Suite bleibt grün, weil der Test-Stub jede Abfrage beantwortet.
  *
  * ── SCAN-MARKE ─────────────────────────────────────────────────────────────────────────
- * Groß-/kleinschreibungsempfindlich und OHNE offene Klammer. Beide Eigenschaften sind
- * gemessen, nicht geraten:
+ * Groß-/kleinschreibungsempfindlich und OHNE offene Klammer:
  *
- * - **Ohne Klammer**, weil `test/viewport.ts` die API nicht aufruft, sondern per
- *   `Object.defineProperty` INSTALLIERT — mit Klammer wäre der Eintrag dort tot, und die
- *   Installation (der zweite Weg, sich an der Regel vorbeizumogeln) bliebe ungesehen.
- * - **Groß-/kleinschreibungsempfindlich**, weil `setup.ts` nur noch `installiereMatchMedia`
- *   ruft. Der Bezeichner trägt ein großes M und trifft die Marke strukturell nicht — sonst
- *   müsste die setupFile mit auf die Allowlist, obwohl sie die API gar nicht mehr anfasst.
+ * - **Ohne Klammer**, weil `test/viewport.ts` die API per `Object.defineProperty` INSTALLIERT;
+ *   mit Klammer bliebe dieser Weg ungesehen.
+ * - **Groß-/kleinschreibungsempfindlich**, weil `setup.ts` nur `installiereMatchMedia` ruft; das
+ *   große M trifft die Marke nicht, die setupFile braucht keinen Allowlist-Eintrag.
  *
- * ── BEKANNTE GRENZEN, und sie sind Teil des Vertrags ───────────────────────────────────
+ * ── BEKANNTE GRENZEN, Teil des Vertrags ────────────────────────────────────────────────
  *
- * 1. **Dynamische Zugriffe entgehen dem Scan.** `window['match' + 'Media']` steht in keiner
- *    Fundstelle. Bewusst nicht abgedeckt: ein Scanner dafür bräuchte eine Auswertung von
- *    Zeichenketten-Arithmetik und fände mehr Fehlalarme als Funde.
- * 2. **Testdateien sind ausgenommen** (`*.test.*`). Sie dürfen die API direkt stellen — die
- *    Stub-Tests in `test/viewport.test.ts` tun genau das, und dieser Guard selbst trägt die
- *    Marke in seiner eigenen Prosa und in seinen Selbst-Beweis-Fällen.
- * 3. **Codegen ist ausgenommen** (`*.generated.*`), wie in den übrigen Guards.
- * 4. **Die Allowlist steht dateiweise, nicht zeilenweise.** `ThemeModeProvider.tsx` wird von
- *    der Dichte-Arbeit ohnehin angefasst und verschiebt dabei seine Zeilennummern; ein
- *    Zeilenanker wäre nach dem ersten fremden Umbau falsch. Gegen stilles Veralten hilft
- *    stattdessen die Meldung TOTER Einträge: verschwindet die letzte Fundstelle einer
- *    freigestellten Datei, verlangt der Guard das Streichen des Eintrags.
+ * 1. **Dynamische Zugriffe entgehen dem Scan** (`window['match' + 'Media']`); ein Scanner dafür
+ *    fände mehr Fehlalarme als Funde.
+ * 2. **Testdateien sind ausgenommen** (`*.test.*`): Stub-Tests stellen die API direkt, und
+ *    dieser Guard trägt die Marke in Prosa und Selbstbeweisen.
+ * 3. **Codegen ist ausgenommen** (`*.generated.*`).
+ * 4. **Die Allowlist steht dateiweise, nicht zeilenweise** — ein Zeilenanker veraltete beim
+ *    ersten fremden Umbau. Gegen stilles Veralten meldet der Guard TOTE Einträge.
  *
- * Der Kommentar-Stripper ist aus `theme/gate5.guard.test.ts` (dort Zeilen 79–110) BEWUSST
- * kopiert statt importiert: ein Import aus einer anderen `*.test.ts` würde deren
- * `describe`-Blöcke ein zweites Mal registrieren, und eine Auslagerung in ein geteiltes
- * Modul hieße, eine fremde, gepinnte Gate-Datei anzufassen.
+ * Der Kommentar-Stripper ist aus `theme/gate5.guard.test.ts` kopiert statt importiert: ein
+ * Import aus einer anderen `*.test.ts` registrierte deren `describe`-Blöcke ein zweites Mal.
  */
 
 /**
- * Wurzel des Scans: `frontend/src`. Über `process.cwd()` aufgelöst, NICHT über
- * `import.meta.url` — unter Vitest ist das keine `file:`-URL, `fileURLToPath` wirft dort.
- * Beide üblichen Arbeitsverzeichnisse (`frontend/` und Repo-Wurzel) werden probiert.
+ * Wurzel des Scans: `frontend/src`, über `process.cwd()` aufgelöst, NICHT über
+ * `import.meta.url` (unter Vitest keine `file:`-URL). Beide üblichen Arbeitsverzeichnisse werden
+ * probiert.
  */
 const SRC = (() => {
   for (const kandidat of ['src', 'frontend/src']) {
@@ -59,17 +47,10 @@ const SRC = (() => {
 const ENDUNGEN = /\.(ts|tsx)$/;
 
 /**
- * Die Scan-Marke. Siehe Dateikopf: ohne Klammer, groß-/kleinschreibungsempfindlich.
- *
- * ZWEI Muster, nicht eines. `matchMedia` allein deckte nur den halben Vertrag:
- * antds `Grid.useBreakpoint()` ruft die Browser-API nicht selbst auf, sondern über
- * `responsiveObserver` — gemessen enthält `antd/es/grid/hooks/useBreakpoint.js`
- * NULL Vorkommen von `matchMedia`, und die Fundstelle liegt in `node_modules`,
- * also außerhalb dieses Scans. Ein direktes `Grid.useBreakpoint()` in einer
- * Komponente wäre am Guard vorbeigelaufen — und hätte genau die Semantik
- * umgangen, für die es das Primitiv gibt: `useBreakpoint` liefert auf dem ersten
- * Render eine leere Map, jedes `!screens.lg` ist dort wahr, und am Fükw-Schirm
- * blitzte für einen Frame das Handlayout auf. `abBreiteAus` dreht genau das um
+ * Die Scan-Marke (siehe Dateikopf). ZWEI Muster: antds `Grid.useBreakpoint()` stellt die
+ * Browser-API über `responsiveObserver` in `node_modules`, außerhalb des Scans. Ein direkter
+ * Aufruf umginge die Semantik des Primitivs: `useBreakpoint` liefert auf dem ersten Render eine
+ * leere Map, und am Fükw-Schirm blitzte das Handlayout auf. `abBreiteAus` dreht das um
  * („unbekannt ⇒ breit").
  */
 const MARKE = /matchMedia|\buseBreakpoint\b/;
@@ -99,9 +80,8 @@ function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, str
 }
 
 /**
- * Blendet Kommentarinhalt aus und behält die Zeilenzahl bei (Index = Zeile − 1).
- * Trägt den Block-Zustand über Zeilengrenzen, damit auch Fortsetzungszeilen fallen.
- * Kopie aus `theme/gate5.guard.test.ts:79-110` — Begründung im Dateikopf.
+ * Blendet Kommentarinhalt aus und behält die Zeilenzahl bei (Index = Zeile − 1), Block-Zustand
+ * über Zeilengrenzen. Kopie aus `theme/gate5.guard.test.ts` (siehe Dateikopf).
  */
 function ohneKommentare(inhalt: string): string[] {
   const zeilen: string[] = [];
@@ -137,8 +117,8 @@ function ohneKommentare(inhalt: string): string[] {
 }
 
 /**
- * Beide Befundarten in einer Liste: nicht freigestellte Fundstellen UND tote
- * Allowlist-Einträge. Exportiert, damit die Selbst-Beweis-Fälle sie ohne Dateisystem prüfen.
+ * Beide Befundarten in einer Liste: nicht freigestellte Fundstellen UND tote Allowlist-Einträge.
+ * Exportiert für die Selbstbeweis-Fälle.
  */
 export function verstoesse(dateien: Record<string, string>, allowlist: string[]): string[] {
   const befunde: string[] = [];
@@ -177,8 +157,7 @@ describe('Viewport-Guard (LFH-329): useViewport ist der einzige Zugang', () => {
   });
 
   it('Sentinel: mehr als 200 Dateien gescannt', () => {
-    // Ohne diesen Fall wäre ein kaputtes Scan-Muster (falsche Wurzel, falsche Endung)
-    // still grün — der Guard fände dann schlicht nichts mehr.
+    // Sonst wäre ein kaputtes Scan-Muster (falsche Wurzel, falsche Endung) still grün.
     expect(Object.keys(dateien).length).toBeGreaterThan(200);
     expect(dateien['/src/theme/ThemeModeProvider.tsx'] ?? '').not.toBe('');
   });
@@ -212,8 +191,7 @@ describe('Viewport-Guard (LFH-329): useViewport ist der einzige Zugang', () => {
   });
 
   it('tote Allowlist-Einträge werden gemeldet', () => {
-    // Damit die Liste nicht still veraltet: wer die letzte Fundstelle entfernt, streicht
-    // den Eintrag mit — sonst stünde dort dauerhaft eine Freistellung ohne Gegenstand.
+    // Wer die letzte Fundstelle entfernt, streicht den Eintrag mit.
     const baum = { '/src/theme/Egal.tsx': 'const x = 1;' };
 
     expect(verstoesse(baum, ['/src/test/viewport.ts'])).toEqual([

@@ -1,5 +1,6 @@
 import type { Personal, PersonalVorschlaege, StaerkePosition } from './types';
 import { apiGet, apiSend } from './client';
+import { setzeDienststatusUnter } from './katalogApi';
 
 /** Deutsche Labels der taktischen Stärke-Position (zentral, LFH-4). */
 export const POSITION_LABELS: Record<StaerkePosition, string> = {
@@ -39,12 +40,10 @@ export function ladePersonalVorschlaege(): Promise<PersonalVorschlaege> {
 export type PersonalNeu = { name: string } & Partial<Omit<PersonalEingabe, 'name'>>;
 
 /**
- * PATCH ist ein ECHTER Teil-Patch (LFH-306) — Begruendung wortgleich bei `FahrzeugPatch`:
- * die auf vier Felder gekuerzte Schnellerfassung darf die vier NICHT gezeigten (Telefon,
- * Staerke-Position, Benutzer-Konto, Bemerkung) nicht als `null` mitschicken.
- *
- * `qualifikation_ids` ist dabei der gefaehrlichste Key: `Some([])` LEERT die Zuordnung
- * vollstaendig (`src/routes/personal.rs:86`), absent laesst sie stehen.
+ * PATCH ist ein ECHTER Teil-Patch (wie `FahrzeugPatch`): die auf vier Felder gekürzte
+ * Schnellerfassung darf die nicht gezeigten Felder nicht als `null` mitschicken.
+ * `qualifikation_ids` ist der gefährlichste Key: `[]` LEERT die Zuordnung, absent lässt sie
+ * stehen.
  */
 export type PersonalPatch = Partial<PersonalEingabe>;
 
@@ -57,6 +56,5 @@ export function aktualisierePerson(id: number, daten: PersonalPatch): Promise<Pe
 }
 
 export function setzeDienststatus(id: number, inDienst: boolean): Promise<Personal> {
-  const pfad = inDienst ? 'in-dienst' : 'ausser-dienst';
-  return apiSend<Personal>(`/api/personal/${id}/${pfad}`, 'POST');
+  return setzeDienststatusUnter<Personal>('/api/personal', id, inDienst);
 }
