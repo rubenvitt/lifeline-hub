@@ -42,15 +42,21 @@ fn hash_token(token: &str) -> String {
         .collect()
 }
 
-/// Legt eine neue Session für den Benutzer an (TTL 7 Tage) und liefert den Token.
+/// Lebensdauer einer Sitzung ab Anmeldung, ohne Verlängerung. Eine Quelle für den Ablauf in
+/// der DB und das `Max-Age` des Cookies (LFH-779), damit das Cookie nie länger lebt als die
+/// Sitzung dahinter und umgekehrt.
+pub const SITZUNG_TAGE: i64 = 7;
+
+/// Legt eine neue Session für den Benutzer an (TTL [`SITZUNG_TAGE`]) und liefert den Token.
 pub async fn anlegen(pool: &SqlitePool, benutzer_id: i64) -> Result<String, AppError> {
     let token = neuer_token();
     sqlx::query(
         "INSERT INTO session (token_hash, benutzer_id, expires_at) \
-         VALUES (?, ?, datetime('now', '+7 days'))",
+         VALUES (?, ?, datetime('now', ?))",
     )
     .bind(hash_token(&token))
     .bind(benutzer_id)
+    .bind(format!("+{SITZUNG_TAGE} days"))
     .execute(pool)
     .await?;
     Ok(token)
@@ -278,6 +284,25 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(treffer, 0, "Klartext-Token darf keine Session matchen");
+    }
+
+    #[tokio::test]
+    async fn sitzung_laeuft_nach_sitzung_tagen_ab() {
+        // LFH-779: das Cookie-`Max-Age` rechnet mit derselben Konstante; wer hier die Dauer
+        // ändert, ändert beide.
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 1).await;
+        anlegen(&pool, id).await.unwrap();
+
+        let tage: f64 =
+            sqlx::query_scalar("SELECT julianday(expires_at) - julianday('now') FROM session")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(
+            (tage - SITZUNG_TAGE as f64).abs() < 0.01,
+            "Ablauf nach {SITZUNG_TAGE} Tagen erwartet, war {tage}"
+        );
     }
 
     #[tokio::test]
