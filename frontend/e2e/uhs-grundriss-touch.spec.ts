@@ -275,6 +275,10 @@ test.describe('UHS-Grundriss unter Touch', () => {
     const { personName } = await setupPatientUndPlatz(page, 40);
 
     const spalte = page.getByTestId('warteliste-scroll');
+    // Erst messen, wenn die Personenliste da ist (LFH-398): das Setup wartet nur auf „Bett 1"
+    // aus der Platzabfrage, die Liste kommt aus einer eigenen. Unter paralleler Last maß die
+    // Vorbedingung sonst die leere Spalte. Eine Antwort bringt alle 41 Personen.
+    await expect(spalte.getByText(personName)).toBeVisible();
     const masse = await spalte.evaluate((el) => ({
       scrollHeight: el.scrollHeight,
       clientHeight: el.clientHeight,
