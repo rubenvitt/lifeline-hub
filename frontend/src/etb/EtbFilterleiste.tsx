@@ -7,39 +7,28 @@ import { alsBackendZeit, alsOrtszeit } from './filterZeit';
 /**
  * Filterleiste des Einsatztagebuchs.
  *
- * **Zwei Quellen für einen Filter — bewusst geduldet, nicht übersehen (LFH-331 · B3).**
- * Diese Leiste hält in `werte` eine eigene Kopie des Filters, und ihre vier Felder sind
- * unkontrolliert: den sichtbaren Stand kennt allein das DOM. `EtbPage` hält denselben
- * Filter ein zweites Mal, weil er in den Query-Key geht. Beide Stände laufen nur deshalb
- * nicht auseinander, weil `aktualisiere` sie bei jeder Änderung zusammenführt.
+ * **Zwei Quellen für einen Filter — bewusst geduldet (LFH-331).** Die Leiste hält in `werte`
+ * eine eigene Kopie, ihre Felder sind unkontrolliert: den sichtbaren Stand kennt allein das
+ * DOM. `EtbPage` hält denselben Filter ein zweites Mal für den Query-Key. Beide laufen nicht
+ * auseinander, weil `aktualisiere` sie bei jeder Änderung zusammenführt.
  *
- * **Folge für „Filter zurücksetzen":** ein Reset, der nur den Seitenzustand räumt, ließe
- * die sichtbaren Eingaben stehen — und der nächste Tastendruck mischte die alte Kopie über
- * `{ ...werte, ...teil }` wieder ein. Der Aufrufer setzt die Leiste deshalb per `key` neu
- * auf (`pages/EtbPage.tsx`), statt sie zu kontrollieren.
+ * **Folge für „Filter zurücksetzen":** ein Reset nur des Seitenzustands ließe die sichtbaren
+ * Eingaben stehen, und der nächste Tastendruck mischte die alte Kopie wieder ein. Der Aufrufer
+ * setzt die Leiste deshalb per `key` neu auf (`pages/EtbPage.tsx`).
  *
- * **Warum weiterhin nicht kontrolliert (LFH-342 · C7):** die Umkehr von
- * {@link alsBackendZeit} EXISTIERT jetzt — `etb/filterZeit.ts`, mit einem Test beidseits
- * beider Sommerzeit-Grenzen, weil ihr Fehlermodus eine STILLE Verschiebung um den
- * Zonenversatz ist: kein roter Test, kein Fehlerbild, nur ein falscher Zeitraum in der
- * Führungsunterlage. Damit ist der Grund entfallen, der die Hydrierung verhinderte — aber
- * nicht der Grund gegen die laufende Zwei-Wege-Bindung. Die Leiste nimmt ihren
- * ANFANGSSTAND aus `startWerte` (einmalig, über `defaultValue`) und bleibt danach die
- * Quelle des sichtbaren Standes. Das Remount per `key` bleibt der Weg, sie zurückzusetzen.
+ * **Warum nicht kontrolliert:** die Umkehr von {@link alsBackendZeit} existiert
+ * (`etb/filterZeit.ts`), aber eine laufende Zwei-Wege-Bindung bleibt unerwünscht. Die Leiste
+ * nimmt ihren ANFANGSSTAND aus `startWerte` (einmalig, über `defaultValue`) und ist danach die
+ * Quelle des sichtbaren Standes.
  *
- * **Die Entprellung liegt HIER und nicht in der Seite (Befund M80).** Nur die Leiste
- * unterscheidet die Achsen: `q` wächst zeichenweise, `typ`/`von`/`bis` springen. Eine
- * Entprellung in `EtbPage` verzögerte auch die Auswahl eines Typs — Wartezeit ohne Nutzen.
- * Der sichtbare Text hängt bewusst NICHT an der Frist; verzögert wird allein die Meldung
- * nach außen, sonst sähe die Bedienung aus wie ein hängendes Feld.
+ * **Die Entprellung liegt HIER und nicht in der Seite.** Nur die Leiste unterscheidet die
+ * Achsen: `q` wächst zeichenweise, `von`/`bis` springen. Der sichtbare Text hängt NICHT an der
+ * Frist; verzögert wird allein die Meldung nach außen.
  *
- * **Der Typ gehört seit dem Neuentwurf (S4, 21.09.2026) NICHT mehr hierher**, sondern der
- * Segmentleiste im Seitenkopf. Damit liefen zwei Filterquellen mit verschiedener Frist
- * nebeneinander, und die Leiste meldet deshalb nur noch IHRE Schlüssel (`q`, `von`, `bis`)
- * — nie den ganzen Filter aus ihrer Kopie. Meldete sie den ganzen, überschriebe ein
- * Nachläufer der Suchfrist den eben gewählten Typ mit einem Stand, der ihn nicht kennt.
- * Zusammengeführt wird in der Seite gegen den AKTUELLEN Filter
- * (`zeitachseModell.ts`, `filterZusammenfuehren`).
+ * **Der Typ gehört der Segmentleiste im Seitenkopf**, nicht hierher. Die Leiste meldet deshalb
+ * nur IHRE Schlüssel (`q`, `von`, `bis`) — meldete sie den ganzen Filter, überschriebe ein
+ * Nachläufer der Suchfrist den eben gewählten Typ. Zusammengeführt wird in der Seite gegen den
+ * AKTUELLEN Filter (`zeitachseModell.ts`, `filterZusammenfuehren`).
  */
 
 /** Die Schlüssel, die diese Leiste führt. Ein geleerter Wert kommt als `undefined`. */
@@ -54,15 +43,13 @@ interface Props {
    */
   startWerte?: EtbFilterWerte;
   /**
-   * Kontrollierte Filter der SEITE, die in derselben Zeile stehen sollen (LFH-616: die
-   * Einheit). Sie sind hier nur zu Gast — die Leiste meldet sie nicht, ihre Quelle ist die
-   * URL wie beim Typ oben; sonst liefe die Zwei-Quellen-Frage aus dem Dateikopf ein drittes
-   * Mal.
+   * Kontrollierte Filter der SEITE, die in derselben Zeile stehen sollen (LFH-616: die Einheit).
+   * Die Leiste meldet sie nicht, ihre Quelle ist die URL wie beim Typ.
    */
   zusatz?: ReactNode;
 }
 
-/** Frist der Volltext-Entprellung. ~300 ms ist die Vorgabe aus dem Befund M80. */
+/** Frist der Volltext-Entprellung. */
 const ENTPRELLUNG_MS = 300;
 
 export default function EtbFilterleiste({ onChange, startWerte, zusatz }: Props) {

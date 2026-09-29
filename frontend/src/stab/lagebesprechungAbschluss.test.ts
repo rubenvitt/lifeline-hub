@@ -114,8 +114,8 @@ describe('abschlussBody — Tri-State von naechste_at', () => {
 });
 
 /**
- * Ruling 10 (LFH-543-Ledger): die Maske ändert oder löscht nur den Termin, den sie beim Öffnen
- * gesehen hat. Jede Regel steht als Paar — verändert wird je Paar genau EINE Eingabe.
+ * Die Maske ändert oder löscht nur den Termin, den sie beim Öffnen gesehen hat. Jede Regel
+ * steht als Paar — verändert wird je Paar genau EINE Eingabe.
  */
 describe('abschlussBody — nur der gesehene Termin wird angefasst (Ruling 10)', () => {
   const TERMIN = wire('2026-09-13T10:45:00Z');

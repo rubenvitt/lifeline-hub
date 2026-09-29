@@ -52,12 +52,9 @@ describe('EinsatzSwitcher', () => {
   });
 
   /**
-   * Ein Rahmen mit `flex: 1; min-width: 0` im Layout reicht NICHT: der Name
-   * sitzt in einem antd-Knopf, und der kürzt ohne eigenes `overflow` nicht,
-   * sondern schiebt die Kopfzeile breit. Diese Hälfte gehört deshalb hierher.
-   *
-   * jsdom rechnet kein Layout — geprüft werden die gesetzten Eigenschaften.
-   * Dass daraus wirklich ein „…" wird, belegt `e2e/kopfzeile-schmal.spec.ts`.
+   * Ein Rahmen mit `flex: 1; min-width: 0` im Layout reicht NICHT: ein antd-Knopf kürzt ohne
+   * eigenes `overflow` nicht. jsdom rechnet kein Layout, geprüft werden die gesetzten
+   * Eigenschaften; das „…" belegt `e2e/kopfzeile-schmal.spec.ts`.
    */
   it('ein langer Name kürzt und steht vollständig im title', async () => {
     const lang = 'Hochwasser Nord — Deichverteidigung Abschnitt West, Lage 3';
@@ -76,10 +73,8 @@ describe('EinsatzSwitcher', () => {
     // kippte der zugängliche Name und die zwei Fälle oben mit ihm.
     expect(knopf).not.toHaveAttribute('aria-label');
 
-    // DIE TRAGENDE ZEILE: ohne `maxWidth` bemäße sich der inline-flex-Knopf am
-    // Inhalt, das `overflow: hidden` darunter klippte nie, und die drei
-    // Behauptungen dahinter wären grün durch Nichtstun (per Mutationsprobe
-    // belegt: ohne diese Zeile bleibt der Test auch ohne `maxWidth` grün).
+    // DIE TRAGENDE ZEILE: ohne `maxWidth` bemäße sich der inline-flex-Knopf am Inhalt, das
+    // `overflow: hidden` klippte nie, und die Behauptungen dahinter wären grün durch Nichtstun.
     expect(knopf.style.maxWidth).toBe('100%');
 
     const span = screen.getByText(lang);

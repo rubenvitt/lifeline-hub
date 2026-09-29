@@ -3,16 +3,12 @@ import { useSearchParams } from 'react-router';
 import { parseRouteId } from './deeplinks';
 
 /**
- * Konsumiert einen Query-Param-Deeplink (`?<key>=<id>`) auf einer Listenseite (LFH-25):
- * parst die ID robust, wendet sie — sobald `bereit` (Daten geladen) — EINMAL über `anwenden`
- * an und räumt den Param danach aus der URL (apply-then-clean, `replace`).
- *
- * Das Aufräumen ist bewusst: ein dauerhaft in der URL stehender Selektions-Param würde die
- * Selektion „pinnen" (manuelles Abwählen ginge nicht) und Browser-Back/Reload würde ihn
- * erneut anwenden. `anwenden` ist absichtlich nicht in den Effekt-Deps — der Aufrufer gibt
- * i.d.R. eine Inline-Closure; die Ausführung wird über `searchParams`/`bereit` getaktet.
- * Existenz-/Sonderlogik (z. B. „nur selektieren, wenn die ID in der Liste vorkommt") gehört
- * in die `anwenden`-Closure.
+ * Konsumiert einen Query-Param-Deeplink (`?<key>=<id>`) auf einer Listenseite: parst die ID,
+ * wendet sie — sobald `bereit` — EINMAL über `anwenden` an und räumt den Param danach
+ * (apply-then-clean, `replace`). Ein stehender Param pinnte die Selektion und würde bei
+ * Back/Reload erneut angewandt.
+ * `anwenden` steht absichtlich nicht in den Effekt-Deps (meist eine Inline-Closure); getaktet
+ * wird über `searchParams`/`bereit`. Existenzprüfungen gehören in die `anwenden`-Closure.
  */
 export function useQueryParamSelektion(
   key: string,
@@ -25,10 +21,9 @@ export function useQueryParamSelektion(
     if (!bereit) return;
     const id = parseRouteId(searchParams.get(key) ?? undefined);
     if (id != null) anwenden(id);
-    // searchParams NICHT in-place mutieren, sondern klonen: die vom Router gelieferte
-    // Instanz ist über Render/Effekt hinweg geteilt — ein in-place delete ließe einen
-    // konkurrierenden Default-Effekt den Param bereits geräumt sehen und das Deeplink-Ziel
-    // wegdefaulten (Root-Cause aus LFH-150, Präzedenz-Fix in GefahrenPage.tsx). LFH-156.
+    // Klonen statt in-place mutieren: die Router-Instanz ist über Render/Effekt geteilt; ein
+    // in-place `delete` ließe einen konkurrierenden Default-Effekt den Param geräumt sehen und das
+    // Deeplink-Ziel wegdefaulten.
     const geraeumt = new URLSearchParams(searchParams);
     geraeumt.delete(key);
     setSearchParams(geraeumt, { replace: true });

@@ -2,13 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useQueryParamSelektion } from './useQueryParamSelektion';
 
-// LFH-156 (Root-Cause aus LFH-150): Der Hook darf die vom Router gelieferte
-// searchParams-Instanz nicht in-place räumen (delete) — sonst wird sie zur
-// StrictMode-Falle für künftige Konsumenten mit konkurrierendem Default-Effekt
-// (Präzedenz-Fix: GefahrenPage.tsx, ein Effekt + geteilte Instanz + Default-Zweig).
-// Da der Hook seine useSearchParams-Instanz kapselt, ist die Nicht-Mutation nur
-// prüfbar, indem wir ihm über den Router-Boundary eine kontrollierte Instanz
-// injizieren und danach direkt an DIESEM echten URLSearchParams-Objekt messen.
+// Der Hook darf die vom Router gelieferte searchParams-Instanz nicht in-place räumen, sonst
+// sähe ein konkurrierender Default-Effekt den Param schon geräumt. Prüfbar nur, indem über den
+// Router-Boundary eine kontrollierte Instanz injiziert und an ihr gemessen wird.
 const h = vi.hoisted(() => ({
   setSearchParams: vi.fn(),
   ref: { sp: new URLSearchParams() },
@@ -30,7 +26,6 @@ describe('useQueryParamSelektion – Nicht-Mutation (LFH-156)', () => {
     await waitFor(() => expect(angewendet).toEqual([5]));
 
     // … aber die vom Router gelieferte Instanz wurde NICHT in-place geräumt.
-    // Ohne den Klon-Fix stünde hier false, weil der Hook delete() direkt darauf aufriefe.
     expect(h.ref.sp.has('einheit')).toBe(true);
 
     // Das Aufräumen passiert stattdessen über setSearchParams mit einer NEUEN Instanz.

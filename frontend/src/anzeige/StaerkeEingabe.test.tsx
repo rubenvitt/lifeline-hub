@@ -69,9 +69,8 @@ describe('StaerkeEingabe', () => {
     screen.getAllByRole('spinbutton').forEach((f) => expect(f).toBeDisabled());
   });
 
-  // Bearbeiten-Pfad: antd füllt value erst NACH dem Mount via setFieldsValue. Der
-  // Spiegel-Zweig des Echo-Guards muss den externen value-Wechsel in die Felder übernehmen,
-  // sonst käme die Eingabemaske leer hoch und überschriebe die Soll-Stärke beim Speichern.
+  // Bearbeiten-Pfad: antd füllt value erst NACH dem Mount; der externe Wechsel muss in die Felder,
+  // sonst käme die Maske leer hoch und überschriebe die Soll-Stärke beim Speichern.
   it('externer value-Wechsel nach Mount spiegelt in die Felder', () => {
     const { rerender } = render(<StaerkeEingabe value={null} onChange={() => {}} />);
     expect(screen.getByLabelText('Führer')).toHaveValue('');
@@ -84,8 +83,8 @@ describe('StaerkeEingabe', () => {
     expect(screen.getByText('= 15')).toBeInTheDocument();
   });
 
-  // Form-Loop: onChange→value wird zurückgespeist. Das Echo darf die noch leeren Felder
-  // NICHT auf 0 ziehen, sonst kann der Nutzer nie nur ein Feld vorbelegen.
+  // Das Echo darf die noch leeren Felder NICHT auf 0 ziehen, sonst ließe sich nie nur ein Feld
+  // vorbelegen.
   it('Form-Loop: andere Felder bleiben nach dem ersten Eintrag leer', () => {
     function Wrapper() {
       const [v, setV] = useState<Staerke | null>(null);

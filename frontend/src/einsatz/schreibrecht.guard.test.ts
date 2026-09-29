@@ -1,18 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Guard (LFH-234): erzwingt, dass `einsatz/schreibrecht.ts` die EINE Quelle für die
- * Einsatz-Schreibrecht-/Rollen-Regel bleibt.
+ * Guard (LFH-234): `einsatz/schreibrecht.ts` bleibt die EINE Quelle für die
+ * Einsatz-Schreibrecht-/Rollen-Regel.
  *
- * Verbietet rohe `meine_rolle`-VERGLEICHE (`=== '…'` / `!== '…'`) außerhalb der Wahrheitsquelle.
- * Genau solche Inline-Vergleiche waren zuvor über ~29 Dateien in vier divergenten Varianten
- * kopiert (A Allowlist, B Beobachter-Negation, C Deny-list, D admin-augmentiert) — eine neue
- * Rolle hätte die UI inkonsistent gekippt. Neue Rollen-/Schreibrecht-Logik läuft ab jetzt durch
- * `darfImEinsatzSchreiben` / `darfEinsatzLeiten` / `istEinsatzLeitung` / `istBeobachter`.
+ * Verbietet rohe `meine_rolle`-VERGLEICHE (`=== '…'` / `!== '…'`) außerhalb der Wahrheitsquelle;
+ * Rollen-Logik läuft durch `darfImEinsatzSchreiben` / `darfEinsatzLeiten` / `istEinsatzLeitung` /
+ * `istBeobachter`, damit eine neue Rolle die UI nicht inkonsistent kippt.
  *
- * Bewusst NICHT gescannt: `system_rolle`-Vergleiche (20+ legitime einsatz-FREMDE
- * `system_rolle === 'admin'`-Gates in stammdaten/karten/admin) und reine Anzeigen ohne Vergleich
- * (`{einsatz.meine_rolle && <Tag>}`). Bekannte Grenze (wie beim queryKeys-Guard): ein aliasierter
+ * Bewusst NICHT gescannt: `system_rolle`-Vergleiche (einsatzfremde Admin-Gates) und reine
+ * Anzeigen ohne Vergleich (`{einsatz.meine_rolle && <Tag>}`). Bekannte Grenze: ein aliasierter
  * Vergleich (`const r = einsatz.meine_rolle; if (r === 'einsatzleitung')`) entgeht dem
  * zeilenbasierten Scan — neue Rollen-Logik muss bewusst durch den Helfer geführt werden.
  */

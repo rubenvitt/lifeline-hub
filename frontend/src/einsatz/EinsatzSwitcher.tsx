@@ -10,12 +10,9 @@ import { farbenDunkel } from '../theme/tokens';
 /**
  * Switcher im Einsatz-Header: aktive Einsätze + Rückwege.
  *
- * DER NAME KÜRZT, statt die Kopfzeile zu schieben (LFH-329 · B1/M12). Der
- * Restbreiten-Rahmen im `EinsatzLayout` allein reicht dafür nicht: der Name
- * sitzt in einem antd-Knopf, und der kürzt ohne eigenes `overflow` nicht. Der
- * volle Name bleibt am `title` lesbar — und er bleibt TEXTINHALT: verschöbe man
- * ihn in ein `aria-label`, kippte der zugängliche Name des Knopfs, an dem
- * mehrere Tests und die Kommandopalette hängen.
+ * DER NAME KÜRZT, statt die Kopfzeile zu schieben (LFH-329): ein antd-Knopf kürzt ohne eigenes
+ * `overflow` nicht. Der volle Name bleibt am `title` lesbar und bleibt TEXTINHALT — in einem
+ * `aria-label` kippte der zugängliche Name, an dem Tests und die Kommandopalette hängen.
  */
 export default function EinsatzSwitcher({ aktuellName }: { aktuellName: string }) {
   const navigate = useNavigate();
@@ -47,9 +44,7 @@ export default function EinsatzSwitcher({ aktuellName }: { aktuellName: string }
       <Button
         type="text"
         title={aktuellName}
-        // Farbe aus der NACHTrolle, nicht `#fff` und nicht der Modus-Token: die
-        // Kommandoleiste ist in beiden Modi dunkel (Neuentwurf). 13/500 in `text2` wie im
-        // Entwurf — der Name steht neben der Einsatznummer, er muss sie nicht überschreien.
+        // Farbe aus der NACHTrolle, nicht der Modus-Token: die Kommandoleiste ist in beiden Modi dunkel.
         style={{
           color: farbenDunkel.text2,
           fontWeight: 500,

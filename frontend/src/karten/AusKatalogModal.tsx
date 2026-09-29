@@ -12,10 +12,9 @@ import { invalidiereKarte } from './invalidiereKarte';
 import { globalKeys } from '../api/queryKeys';
 
 /**
- * Server-autoritativer Vorschlagskatalog: listet kuratierte Online-Styles, je
- * Eintrag „Hinzufügen" = POST. Bereits (per URL) vorhandene Einträge sind
- * ausgegraut, damit keine Dubletten entstehen. Bleibt offen, damit mehrere
- * Quellen nacheinander übernommen werden können.
+ * Server-autoritativer Vorschlagskatalog: je Eintrag „Hinzufügen" = POST. Bereits (per URL)
+ * vorhandene Einträge sind ausgegraut, damit keine Dubletten entstehen. Bleibt offen für
+ * mehrere Übernahmen nacheinander.
  */
 export default function AusKatalogModal({
   offen,
@@ -43,16 +42,15 @@ export default function AusKatalogModal({
         name: eintrag.name,
         url: eintrag.url,
         typ: eintrag.typ,
-        // LFH-265: `OnlineStyle.attribution` ist seit der Umstellung auf das generierte Schema
-        // `?: string | null` (absent statt present-null); der Eingabe-Body kennt nur `string | null`.
+        // `OnlineStyle.attribution` ist `?: string | null` (absent statt null); der Eingabe-Body kennt
+        // nur `string | null`.
         attribution: eintrag.attribution ?? null,
         sortier: naechsteSortier,
-        // Ein Eintrag mit Betreiberhinweis (LFH-616: Esri, Lizenzauflage) kommt INAKTIV an —
-        // sonst wäre er mit einem Klick die Grundlage aller, und der Hinweis stünde umsonst da.
+        // Ein Eintrag mit Betreiberhinweis (Esri, Lizenzauflage) kommt INAKTIV an — sonst wäre er mit
+        // einem Klick die Grundlage aller, und der Hinweis stünde umsonst da.
         aktiv: !eintrag.hinweis,
-        // LFH-190: Katalog-Quellen serverseitig proxen + cachen — ein Schlüssel bliebe so auf
-        // dem Server. Für OpenFreeMap/basemap.de/TopPlusOpen unbedenklich; ob der Cache bei
-        // Esri erlaubt ist, sagt der Hinweis am Eintrag (LFH-616).
+        // Katalog-Quellen serverseitig proxen und cachen; ein Schlüssel bleibt so auf dem Server. Ob
+        // der Cache bei Esri erlaubt ist, sagt der Hinweis am Eintrag.
         proxy: true,
       };
       return legeOnlineQuelleAn(body);

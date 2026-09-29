@@ -4,21 +4,17 @@ import type { Person } from '../api/types';
 import { koordinatenText, parseKoordinate } from './koordinate';
 
 /**
- * Bearbeiten-Formular der Personen-Detailseite ↔ PATCH (LFH-613). Rein, ohne Render prüfbar.
+ * Bearbeiten-Formular der Personen-Detailseite ↔ PATCH. Rein. Die Koordinate ist im Formular
+ * EIN Textfeld (`52.2691/9.1342`). Zwei Fallen:
  *
- * Die Koordinate steht im Formular als EIN Textfeld (`52.2691/9.1342`, Design D6). Zwei
- * Fallen, gegen die diese Datei gebaut ist:
+ *  1. **Stille Rundung.** Das Textfeld zeigt vier Nachkommastellen, eine per Kartenklick
+ *     gesetzte Koordinate hat mehr. Das Paar geht deshalb nur mit, wenn der TEXT sich
+ *     geändert hat — sonst verlöre eine Namenskorrektur die Genauigkeit des Fundorts.
+ *  2. **`null` ist für „vermisst seit" ein 400**, und `patchBody` macht aus jedem vorhandenen
+ *     `undefined` ein `null`. Der Key existiert also nur bei einem NEUEN Wert — und nur bei
+ *     Status `vermisst` (sonst 422).
  *
- *  1. **Stille Rundung.** Das Textfeld zeigt vier Nachkommastellen; eine per Kartenklick
- *     gesetzte Koordinate hat mehr. Schickte jedes Speichern die Koordinate aus dem
- *     Textfeld zurück, verlöre eine Namenskorrektur still die Genauigkeit des Fundorts.
- *     Deshalb geht das Paar nur mit, wenn der TEXT sich geändert hat.
- *  2. **`null` ist für „vermisst seit" ein 400** (Leeren ist nicht vorgesehen), und
- *     `aktualisierePerson` macht über `patchBody` aus jedem vorhandenen `undefined` ein
- *     `null`. Der Key darf also nur existieren, wenn ein NEUER Wert gesetzt wird — und nur
- *     bei Status `vermisst` (sonst 422).
- *
- * Eine geleerte Koordinate leert das Paar (`null`/`null` — beide leer ist gültig).
+ * Eine geleerte Koordinate leert das Paar (`null`/`null` ist gültig).
  */
 
 export type PersonBearbeitenWerte = Omit<PersonEingabe, 'antreff_lat' | 'antreff_lon'> & {
@@ -63,9 +59,8 @@ export function bearbeitenWerteAus(p: Quelle): PersonBearbeitenWerte {
 }
 
 /**
- * Formularwerte → PATCH-Daten, gemessen an den Werten beim ÖFFNEN (`anfang`, dieselben, die
- * {@link bearbeitenWerteAus} lieferte). `istVermisst` entscheidet, ob „vermisst seit"
- * überhaupt sendbar ist.
+ * Formularwerte → PATCH-Daten, gemessen an den Werten beim ÖFFNEN (`anfang`). `istVermisst`
+ * entscheidet, ob „vermisst seit" sendbar ist.
  */
 export function bearbeitenZuPatch(
   werte: PersonBearbeitenWerte,
@@ -82,8 +77,8 @@ export function bearbeitenZuPatch(
       daten.antreff_lon = null;
     } else {
       const k = parseKoordinate(text);
-      // Unbrauchbares erreicht diese Stelle nicht (Feldprüfung); falls doch, bleibt das
-      // Paar unangetastet statt halb oder falsch geschrieben.
+      // Unbrauchbares erreicht diese Stelle nicht (Feldprüfung); falls doch, bleibt das Paar
+      // unangetastet.
       if (k.ok) {
         daten.antreff_lat = k.lat;
         daten.antreff_lon = k.lon;
@@ -98,14 +93,9 @@ export function bearbeitenZuPatch(
 }
 
 /**
- * „Auf Lagekarte verorten" ist ein handgebautes Bedienziel (ein `<a>` erbt keine
- * Steuerhöhe, LFH-396): ZWEI Angaben nach LFH-365, `minHeight` aus der Dichtestufe plus
- * Polsterung. Rein und exportiert, damit die Zusicherung über zwei Stufen ohne Render
- * prüfbar ist.
- *
- * Die Farbe ist `bedienText`, nicht antds `colorLink` (LFH-650, gemessen in
- * `e2e/betroffene-kontrast.spec.ts`): der geerbte Linkton trug auf dem Seitengrund am Tag
- * 5,51 und nachts 4,82 — unter 7 bzw. 5 : 1.
+ * „Auf Lagekarte verorten" ist ein handgebautes Bedienziel (ein `<a>` erbt keine Steuerhöhe):
+ * `minHeight` aus der Dichtestufe plus Polsterung. Farbe `bedienText`, nicht antds
+ * `colorLink` — der Linkton hielt auf dem Seitengrund 7 : 1 (Tag) bzw. 5 : 1 (Nacht) nicht.
  */
 export function verortenLinkStil(
   token: { controlHeight: number; paddingSM: number },

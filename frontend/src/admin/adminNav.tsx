@@ -1,5 +1,4 @@
 import type { ReactElement } from 'react';
-// Alle Sektionen bringen ihren `AdminPage`-Rahmen selbst mit (LFH-346 · A3).
 import StichworteTab from '../stammdaten/StichworteTab';
 import FahrzeugeTab from '../stammdaten/FahrzeugeTab';
 import MaterialTab from '../stammdaten/MaterialTab';
@@ -18,19 +17,14 @@ import KartenOnlineSektion from '../karten/KartenOnlineSektion';
 import KartenOfflineSektion from '../karten/KartenOfflineSektion';
 
 /**
- * Admin-Nav-Registry (LFH-284): einzige Quelle für die Sidebar-`Menu`-Einträge UND die Routen
- * unter `/admin`. Sektions-Keys sind bewusst stabil (= alte Tab-/Segmented-Keys), damit
- * Bestands-Deep-Links weiterfunktionieren. Pfad-Builder statt inline-Template-Literals.
+ * Admin-Nav-Registry: einzige Quelle für die Sidebar-Einträge UND die Routen unter `/admin`.
+ * Sektions-Keys sind stabil, damit Deep-Links weiterfunktionieren.
  */
 
 export interface AdminSektion {
   key: string;
   label: string;
-  /**
-   * Ein ELEMENT, nicht `ReactNode`: jeder Eintrag hier ist eins, und nur so lässt sich die
-   * Sektion in einem Test rendern, ohne den Typ von Hand aufzuweiten (LFH-346 · A3).
-   * `ReactElement` ist Teilmenge von `ReactNode` — für `App.tsx` ändert sich nichts.
-   */
+  /** Ein ELEMENT, nicht `ReactNode`, damit sich die Sektion im Test rendern lässt. */
   element: ReactElement;
 }
 
@@ -46,17 +40,9 @@ export const adminGruppen: AdminGruppe[] = [
     label: 'Stammdaten',
     sektionen: [
       /**
-       * Die Stammdaten-Tabs wurden bis LFH-346 · A3 hier von `stammdatenSektion()` in
-       * `<AdminPage titel={label}>` gewickelt — und konnten deshalb weder den `aktionen`-
-       * noch den `hinweis`-Slot erreichen (Befund M46). Nur die Sektion weiß, WAS ihre
-       * Primäraktion ist und OB sie gerade gesperrt gehört; ein Wrapper von außen kann den
-       * Slot nicht füllen, und ein durchgereichter Context wäre ein neuer Mechanismus für
-       * einen Fall, den die Karten- und Einstellungssektionen daneben längst lösen.
-       *
-       * Der Preis ist eine Dopplung: der Titel steht in der Registry (`label`, fürs Menü)
-       * UND in der Sektion (`titel`, für den Kopf). Sie war bei den fünf selbstwickelnden
-       * Sektionen schon da, unbemerkt und ungeprüft — `adminNav.test.tsx` schließt sie jetzt
-       * für die elf Stammdaten-Sektionen mit einem Drift-Test.
+       * Jede Sektion bringt ihren `AdminPage`-Rahmen selbst mit: nur sie weiß, was ihre Primäraktion
+       * ist und ob sie gesperrt gehört. Der Preis ist, dass der Titel doppelt steht (`label` hier,
+       * `titel` in der Sektion); `adminNav.test.tsx` fängt Drift für die Stammdaten-Sektionen.
        */
       { key: 'stichworte', label: 'Einsatz-Stichworte', element: <StichworteTab /> },
       { key: 'fahrzeuge', label: 'Fahrzeuge', element: <FahrzeugeTab /> },
@@ -94,22 +80,16 @@ export const adminGruppen: AdminGruppe[] = [
 export const adminBenutzer = { key: 'benutzer', label: 'Benutzer' } as const;
 
 /**
- * Demo-Daten (LFH-690, design.md D13): zweiter Sonder-Eintrag neben {@link adminBenutzer}.
- *
- * Sichtbar nur für den System-Admin UND nur, wenn `GET /api/demo-daten` mit 200 antwortet
- * (`useDemoDatenStatus`). Deshalb KEIN Eintrag in {@link adminGruppen}: deren Sektionen sieht
- * jede Person mit Verwaltungsrecht, und ein Rollenprädikat an `AdminSektion` beträfe alle
- * sechzehn Sektionen für einen einzigen Fall. Die Seite schützt sich zusätzlich selbst.
+ * Demo-Daten: Sonder-Eintrag neben {@link adminBenutzer}, sichtbar nur für den System-Admin UND
+ * bei 200 von `GET /api/demo-daten`. Kein Eintrag in {@link adminGruppen}, deren Sektionen jede
+ * Person mit Verwaltungsrecht sieht. Die Seite schützt sich zusätzlich selbst.
  */
 export const adminDemoDaten = { key: 'demo-daten', label: 'Demo-Daten' } as const;
 
 /**
- * Aufbewahrung (LFH-23, design.md D8): dritter Sonder-Eintrag, sichtbar nur für den
- * System-Admin — die Archivakte gesperrter Einsätze ist ihm vorbehalten (Annahme A1), die
- * Führungskraft liest die Verwaltung, dieses Archiv aber nicht. Deshalb KEIN Eintrag in
- * {@link adminGruppen}, deren Sektionen jede Person mit Verwaltungsrecht sieht. Die Pfad-
- * Builder liegen hier und nicht in `routing/deeplinks.ts`, das nur Einsatz-Pfade trägt
- * (Präzedenz LFH-346 · C11).
+ * Aufbewahrung: Sonder-Eintrag nur für den System-Admin (die Führungskraft liest die
+ * Verwaltung, dieses Archiv nicht). Die Pfad-Builder liegen hier, weil `routing/deeplinks.ts`
+ * nur Einsatz-Pfade trägt.
  */
 export const adminAufbewahrung = { key: 'aufbewahrung', label: 'Aufbewahrung' } as const;
 

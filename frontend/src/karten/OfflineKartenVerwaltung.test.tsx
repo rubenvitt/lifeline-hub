@@ -28,7 +28,7 @@ const karte: OfflineKarte = {
   groesse: 44040192,
   sha256: 'abc',
   download_at: '2026-06-26 11:00:00',
-  // LFH-265: `update_verfuegbar` ist Pflichtfeld — das Backend berechnet es für jede Zeile.
+  // `update_verfuegbar` ist Pflichtfeld — das Backend berechnet es für jede Zeile.
   status: 'bereit',
   aktiv_basemap: false,
   sortier: 0,
@@ -69,8 +69,7 @@ function mockBasis(
     meHandler(benutzer),
     http.get('/api/karte/offline-karten', () => HttpResponse.json(karten)),
     http.get('/api/karte/offline-karten/katalog', () => HttpResponse.json(katalog)),
-    // Feature-Gate + Bau-UI-Endpunkte (LFH-203, B5) — standardmäßig aus, damit alle
-    // Bestandstests unverändert grün bleiben (die Config-Query feuert jetzt bei jedem Mount).
+    // Feature-Gate und Bau-UI-Endpunkte — per Vorgabe aus (die Config-Query feuert bei jedem Mount).
     http.get('/api/karte/config', () =>
       HttpResponse.json({
         online_styles: [],
@@ -99,10 +98,9 @@ describe('OfflineKartenVerwaltung', () => {
     expect(screen.getByText('© OpenStreetMap contributors (ODbL)')).toBeInTheDocument();
   });
 
-  // ── Ordnung der Katalogtabelle (LFH-330 · AP5) ──────────────────────────────────
-  // Geprüft wird durchweg die WIRKUNG auf die Zeilenmenge, nicht die Anwesenheit eines
-  // Props. Die stehende Kopfzeile schiebt eine verborgene Messzeile als erste Körperzeile
-  // ein — deshalb überall die Verengung auf `tr.ant-table-row`.
+  // ── Ordnung der Katalogtabelle ──────────────────────────────────────────────────
+  // Geprüft wird die WIRKUNG auf die Zeilenmenge. Die stehende Kopfzeile schiebt eine verborgene
+  // Messzeile als erste Körperzeile ein — deshalb die Verengung auf `tr.ant-table-row`.
 
   /** Kleiner als die Vorgabe (42,0 MB) und alphabetisch davor — beide Achsen sind messbar. */
   const kleineKarte: OfflineKarte = {
@@ -133,23 +131,18 @@ describe('OfflineKartenVerwaltung', () => {
         (z) => z.textContent,
       );
 
-    // Voreinstellung ist die gelieferte Reihenfolge (Backend: ORDER BY sortier, id) — die
-    // Vorgabe steht bewusst weder nach Größe noch alphabetisch, sonst wäre die Zusicherung
-    // stumpf und ein versehentliches `defaultSortOrder` bliebe unbemerkt.
+    // Voreinstellung ist die gelieferte Reihenfolge (Backend: ORDER BY sortier, id) — die Vorgabe
+    // steht bewusst weder nach Größe noch alphabetisch, sonst bliebe ein versehentliches
+    // `defaultSortOrder` unbemerkt.
     expect(namen()).toEqual([
       'Deutschland – Bremen',
       'Deutschland – Bayern',
       'Deutschland – Saarland',
     ]);
 
-    // Aufsteigend nach Bytes: 9,5 MB vor 42,0 MB. Über die formatierte Zeichenkette
-    // sortiert stünde „9.1 MB" hinter „42.0 MB" — genau das fängt dieser Klick.
-    //
-    // Die unbekannte Größe steht VORNE, nicht hinten: sie ist das Gegenteil einer großen
-    // Datei. Diese Zusicherung ist der einzige Ort, an dem die Ersatzzahl des Sorters
-    // überhaupt gemessen wird — sie unterscheidet `?? -1` allerdings NICHT von `?? 0`
-    // (beide liegen unter jeder echten Größe); sie fängt die Umkehrung (`?? Infinity` und
-    // Geschwister) und den Absturz auf `null`.
+    // Aufsteigend nach Bytes: 9,5 MB vor 42,0 MB (über die formatierte Zeichenkette stünde „9.1 MB"
+    // hinter „42.0 MB"). Die unbekannte Größe steht VORNE. Das fängt die Umkehrung
+    // (`?? Infinity`) und den Absturz auf `null`, unterscheidet aber `?? -1` nicht von `?? 0`.
     await userEvent.click(screen.getByRole('columnheader', { name: /Größe/ }));
     await waitFor(() =>
       expect(namen()).toEqual([
@@ -170,16 +163,14 @@ describe('OfflineKartenVerwaltung', () => {
     const zeilen = () => container.querySelectorAll('tr.ant-table-row');
     expect(zeilen()).toHaveLength(2);
 
-    // Erst den Griff belegen, dann klicken: sonst meldete die Probe (Filter entfernt) ein
-    // leeres Filtermenü statt den fehlenden Auslöser. „Status" ist die einzige Spalte mit
-    // Filter, der Auslöser ist damit eindeutig.
+    // Erst den Griff belegen, dann klicken: sonst meldete ein fehlender Filter ein leeres Menü
+    // statt den fehlenden Auslöser. „Status" ist die einzige Spalte mit Filter.
     const ausloeser = container.querySelector<HTMLElement>('.ant-table-filter-trigger');
     expect(ausloeser, 'die Statusspalte muss einen Filter tragen').not.toBeNull();
     await userEvent.click(ausloeser!);
 
-    // Das Filtermenü hängt in einem Portal an `document.body`, nicht im Container — und
-    // „bereit" steht zu diesem Zeitpunkt auch als Etikett in der ersten Zeile. Der Griff
-    // muss deshalb IM Menü erfolgen, sonst ist er mehrdeutig.
+    // Das Filtermenü hängt im Portal an `document.body`, und „bereit" steht auch als Etikett in der
+    // ersten Zeile — der Griff muss IM Menü erfolgen.
     const menue = await waitFor(() => {
       const m = document.querySelector<HTMLElement>('.ant-table-filter-dropdown');
       expect(m).not.toBeNull();
@@ -194,14 +185,11 @@ describe('OfflineKartenVerwaltung', () => {
 
   it('der Drahtwert der Statusspalte bleibt außerhalb der Freitextsuche', async () => {
     /**
-     * Die Kehrseite des fehlenden `dataIndex` an der Statusspalte, und der Grund, warum sie
-     * einen Filter trägt. Zwei Ausfälle hängen an dieser Zusicherung:
-     *
-     * - `dataIndex: 'status'` wieder gesetzt → der Drahtwert „laedt" landet im Suchkorpus.
-     *   Ein Wort, das niemand tippt, weil die Zelle „lädt" zeigt.
-     * - `dataIndex` weg, `render` aber nicht nachgezogen → das erste Render-Argument ist der
-     *   DATENSATZ statt des Status, `STATUS_TAG[…]` wird `undefined` und die Zeile stürzt ab.
-     *   Der laut scheiternde der beiden Fälle; die Kontrollsuche unten deckt ihn mit ab.
+     * Die Kehrseite des fehlenden `dataIndex` an der Statusspalte:
+     * - `dataIndex: 'status'` wieder gesetzt → der Drahtwert „laedt" landet im Suchkorpus, obwohl
+     *   die Zelle „lädt" zeigt.
+     * - `dataIndex` weg, `render` nicht nachgezogen → das erste Render-Argument ist der DATENSATZ,
+     *   `STATUS_TAG[…]` wird `undefined` und die Zeile stürzt ab.
      */
     mockBasis(admin, [karte, karteLaedt]);
     const { container } = render();
@@ -215,8 +203,7 @@ describe('OfflineKartenVerwaltung', () => {
     await userEvent.type(feld, 'laedt');
     await waitFor(() => expect(zeilen()).toHaveLength(0));
 
-    // Kontrolle: die Suche greift überhaupt — ohne sie wäre die Null oben auch mit einer
-    // kaputten Suche zu haben.
+    // Kontrolle: die Suche greift überhaupt — sonst wäre die Null oben auch mit kaputter Suche grün.
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Bayern');
     await waitFor(() => expect(zeilen()).toHaveLength(1));
@@ -227,9 +214,9 @@ describe('OfflineKartenVerwaltung', () => {
     render();
     await screen.findByText('Deutschland – Bremen');
     expect(screen.getByRole('button', { name: 'Region aufs Gerät bringen' })).toBeInTheDocument();
-    // Spezialfälle (Per-URL / lokale Datei) sind unter „Erweitert" demoted (LFH-206).
+    // Spezialfälle (Per-URL / lokale Datei) stehen unter „Erweitert".
     expect(screen.getByRole('button', { name: /Erweitert/ })).toBeInTheDocument();
-    // bereit → wird gemeinsam angezeigt (LFH-188, kein manuelles Aktivieren mehr).
+    // bereit → wird gemeinsam angezeigt (kein manuelles Aktivieren).
     expect(screen.getByText('wird angezeigt')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Löschen' })).toBeInTheDocument();
   });
@@ -372,8 +359,8 @@ describe('OfflineKartenVerwaltung', () => {
         status: 'bereit',
         geladen: 22020096,
         gesamt: 44040192,
-        // update_verfuegbar+katalog_url gesetzt, damit die Abwesenheit von „Neu laden" den laeuft-Guard
-        // der Aktionen-Spalte prüft (nicht bloß fehlende Update-Felder → sonst wäre die Assertion vakuum).
+        // `update_verfuegbar` und `katalog_url` gesetzt, damit die Abwesenheit von „Neu laden" wirklich
+        // den laeuft-Guard prüft und nicht bloß fehlende Update-Felder.
         update_verfuegbar: true,
         katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
       },
@@ -431,14 +418,9 @@ describe('OfflineKartenVerwaltung', () => {
   });
 
   /**
-   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
-   * formulierte jemand den Leertext um, wäre sie auch im Leerfall trivial grün. Erst die
-   * positive Hälfte darunter — gleiches Literal, gleiche Datei — macht daraus eine Aussage
-   * über die Zustandsweiche statt über die Schreibweise eines Strings.
-   *
-   * Meldung UND Detailzeile werden als exakte Literale gegriffen: hier wurde eine
-   * handgerollte Geschwister-Meldung auf das Primitiv umgestellt, und der Umbau ist nur dann
-   * kein Rückschritt, wenn beide Zeilen byte-gleich stehen bleiben.
+   * Partnerpaar: die negative Hälfte allein wäre bei umformuliertem Leertext auch im Leerfall
+   * grün; erst die positive Hälfte mit gleichem Literal macht daraus eine Aussage über die
+   * Zustandsweiche. Meldung und Detailzeile als exakte Literale.
    */
   it('zeigt eine Fehlermeldung statt stiller Leere, wenn die Liste nicht lädt', async () => {
     mockBasis(admin);
@@ -451,8 +433,7 @@ describe('OfflineKartenVerwaltung', () => {
     expect(
       await screen.findByText('Offline-Karten konnten nicht geladen werden'),
     ).toBeInTheDocument();
-    // Die Detailzeile stammt aus dem `{error}`-Body des Backends und ist genau die, die die
-    // abgelöste Handrolle zeigte. Ohne sie belegte der Test nur die Überschrift.
+    // Die Detailzeile stammt aus dem `{error}`-Body; ohne sie belegte der Test nur die Überschrift.
     expect(screen.getByText('Kartenregistry nicht erreichbar')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch keine Offline-Karten')).not.toBeInTheDocument();
@@ -467,9 +448,8 @@ describe('OfflineKartenVerwaltung', () => {
 
   it('„Erneut abrufen" holt die Liste wirklich neu', async () => {
     /**
-     * Gemessen wird die WIRKUNG, nicht die Anwesenheit des Knopfes: der zweite Abruf
-     * gelingt, die Tabelle steht. Ohne diese Hälfte wäre ein `onWiederholen={() => {}}`
-     * genauso grün wie die Verdrahtung auf `refetch`.
+     * Gemessen wird die WIRKUNG: der zweite Abruf gelingt, die Tabelle steht. Sonst wäre
+     * `onWiederholen={() => {}}` genauso grün.
      */
     let abrufe = 0;
     mockBasis(admin);
@@ -505,11 +485,8 @@ describe('OfflineKartenVerwaltung', () => {
 });
 
 /**
- * Freitext-Spalte begrenzen (LFH-346 · A4, Befund N13). Warum die Kappung an der ZELLE
- * sitzt und nicht an der Spalte, steht ausführlich und im Browser gemessen in
- * `OnlineQuellenVerwaltung.test.tsx` — kurz: `KatalogTabelle` fährt unter
- * `scroll={{ x: 'max-content' }}` mit `table-layout: auto`, und dort ist eine Spaltenbreite
- * wirkungslos.
+ * Freitext-Spalte begrenzen: die Kappung sitzt an der ZELLE, nicht an der Spalte (Begründung
+ * in `OnlineQuellenVerwaltung.test.tsx`).
  */
 describe('OfflineKartenVerwaltung — Freitext-Spalte (LFH-346 · A4)', () => {
   const langeLizenz = `© ${'OpenStreetMap contributors und weitere Quellen, '.repeat(5)}ODbL`;
@@ -530,7 +507,7 @@ describe('OfflineKartenVerwaltung — Freitext-Spalte (LFH-346 · A4)', () => {
   });
 });
 
-// ── Spaltenschalter mit Zähler (LFH-374, Kriterium 14) ──────────────────────────────
+// ── Spaltenschalter mit Zähler ──────────────────────────────────────────────────────
 describe('OfflineKartenVerwaltung · Spaltenschalter', () => {
   const kopf = (c: HTMLElement) =>
     Array.from(c.querySelectorAll('th.ant-table-cell')).map((z) => z.textContent);

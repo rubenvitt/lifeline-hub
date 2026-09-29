@@ -17,14 +17,14 @@ import {
 } from './queue';
 import { istOfflineTransient } from './fehler';
 
-/** Entscheidet, ob ein Fehler den Eintrag in der Queue belassen soll (transient → Retry)
- *  oder als endgültige fachliche Ablehnung gilt. Das ETB ist beweissicherndes Tagebuch —
- *  der teuerste Fehlermodus ist stiller Verlust, im Zweifel also behalten:
+/**
+ * Entscheidet, ob ein Fehler den Eintrag in der Queue belässt (transient → Retry) oder als
+ * fachliche Ablehnung gilt. Das ETB ist beweissicherndes Tagebuch — im Zweifel behalten:
  *  - `TypeError` = Netzwerkfehler (offline).
- *  - `ApiError` 401 (Session abgelaufen), 408 (Timeout), 429 (Rate-Limit) oder ≥500
- *    (Serverfehler, z. B. SQLITE_BUSY / durchgeschlagener CHECK) → transient.
+ *  - `ApiError` 401, 408, 429 oder ≥500 → transient.
  *  - 400/403/404/409/422 → fachliche Ablehnung → dequeuen.
- *  - alles andere (Programmier-/Parse-Fehler) → NICHT behalten (kein Offline-Fall). */
+ *  - alles andere (Programmier-/Parse-Fehler) → NICHT behalten.
+ */
 /** Exponentieller Backoff (ms) für den automatischen Retry transient gebliebener Einträge.
  *  Nach der letzten Stufe bleibt es beim Cap. */
 const BACKOFF_MS = [1000, 5000, 15000, 30000];
@@ -51,8 +51,8 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
   const flushtGerade = useRef(false);
   const backoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const backoffStufe = useRef(0);
-  // Ref auf die jeweils aktuelle flush-Funktion, damit der Backoff-Timer sie aufrufen kann,
-  // ohne eine Zyklus-Abhängigkeit flush → Backoff → flush im useCallback zu erzeugen.
+  // Ref auf die aktuelle flush-Funktion, damit der Backoff-Timer sie ohne Zyklus
+  // flush → Backoff → flush im useCallback aufrufen kann.
   const flushRef = useRef<() => Promise<void>>(async () => {});
 
   const ladeAusstehend = useCallback(async () => {
@@ -125,15 +125,13 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
         } catch (e) {
           if (!darfFortsetzen()) break;
           if (istOfflineTransient(e)) {
-            // 401: Session abgelaufen → die zentrale Sitzungswache (LFH-268) übernimmt den
-            // Re-Login. Die Queue wird NICHT geleert: die Einträge sind beweissicherndes
-            // Tagebuch und gehen nach dem Anmelden raus.
+            // 401 → die Sitzungswache übernimmt den Re-Login. Die Queue bleibt: die Einträge gehen nach
+            // dem Anmelden raus.
             if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
             transientOffen = true;
             break; // Reihenfolge wahren; Rest beim nächsten Durchlauf
           }
-          // Fachliche Ablehnung → aus der Queue nehmen, aber persistent als abgelehnt
-          // ablegen (nicht still in flüchtigem State verlieren).
+          // Fachliche Ablehnung → persistent als abgelehnt ablegen, nicht still verlieren.
           await queueAblehnen(benutzerId, a, fehlerText(e, 'Abgelehnt'));
         }
       }
@@ -159,9 +157,8 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
       }
     };
 
-    // Cross-Tab-Serialisierung: die IndexedDB-Queue ist origin-weit, mehrere Tabs feuern
-    // beim online-Event parallel. Web Locks stellt sicher, dass nur EIN Tab dieselbe Queue
-    // flusht (client_id ist der Idempotenz-Backstop; das Lock spart doppelte Sendeversuche).
+    // Cross-Tab-Serialisierung: die Queue ist origin-weit, mehrere Tabs feuern beim online-Event
+    // parallel. Web Locks lassen nur EINEN Tab flushen (client_id bleibt der Idempotenz-Backstop).
     const locks: LockManager | undefined = navigator.locks;
     if (locks) {
       await locks.request(`offline-flush-${einsatzId}`, durchlauf);
@@ -177,7 +174,6 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
     }
   }, [benutzerId, einsatzId, qc, ladeAusstehend, ladeAbgelehnt, scopeKey]);
 
-  // flushRef aktuell halten (Backoff-Timer nutzt sie).
   useEffect(() => {
     flushRef.current = flush;
   }, [flush]);
@@ -196,17 +192,15 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
     return () => window.removeEventListener('online', flush);
   }, [flush]);
 
-  // 'online'-Event feuert nur beim Übergang. Beim Mount (z.B. Reload online)
-  // einmal selbst flushen, damit Pending-Einträge nicht liegen bleiben.
+  // 'online' feuert nur beim Übergang; beim Mount einmal selbst flushen, damit nichts liegen bleibt.
   useEffect(() => {
     if (navigator.onLine) void flush();
   }, [flush]);
 
   const erfassen = useCallback(
     async (eintrag: NeuerEintrag) => {
-      // EINE stabile client_id vor dem Versuch minten und SOWOHL online senden ALS AUCH
-      // (bei transientem Fehler) einreihen — sonst erzeugt ein Timeout-nach-Commit beim
-      // Retry ein Duplikat mit neuer lfd_nr.
+      // EINE stabile client_id vor dem Versuch minten, für Online-Senden UND Einreihen — sonst
+      // erzeugt ein Timeout-nach-Commit beim Retry ein Duplikat mit neuer lfd_nr.
       const mitId: NeuerEintrag = {
         ...eintrag,
         client_id: eintrag.client_id ?? crypto.randomUUID(),

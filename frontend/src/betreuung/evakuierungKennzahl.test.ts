@@ -3,9 +3,8 @@ import type { Erhebung, Evakuierungsbezirk, Raeumungszustand } from '../api/type
 import { evakuierungKennzahl, istAktiverBezirk } from './evakuierungKennzahl';
 
 /**
- * Kennzahl „Evakuiert N · von M geplant" (LFH-639, spec.md Requirement „Kennzahl …",
- * design.md D9). Jedes Spec-Szenario steht hier als eigener Test; die Zahlen sind die der
- * Spec. Der Fall „Abruffehler" gehört dem Hook und steht in `useEvakuierungKennzahl.test.tsx`.
+ * Kennzahl „Evakuiert N · von M geplant": jedes Spec-Szenario als eigener Test. Der Fall
+ * „Abruffehler" gehört dem Hook (`useEvakuierungKennzahl.test.tsx`).
  */
 
 let naechsteId = 1;

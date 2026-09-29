@@ -27,9 +27,8 @@ interface FormWerte {
 }
 
 /**
- * Wiederholfelder einer Nachforderungs-Serie (LFH-343 · C8, Befund H52). Wer
- * nachfordert, fordert meist mehreres bei DERSELBEN Stelle nach; Art und
- * Bezeichnung wechseln und werden geleert.
+ * Wiederholfelder einer Serie: meist mehreres bei DERSELBEN Stelle; Art und Bezeichnung
+ * wechseln und werden geleert.
  */
 const UEBERNAHME: (keyof FormWerte & string)[] = [
   'adressatKategorie',
@@ -45,30 +44,24 @@ export default function NachforderungFormular({
 }: {
   senden: boolean;
   /**
-   * Absetzen. **Muss bei Ablehnung ablehnen** (`mutateAsync`, nicht `mutate`) —
-   * die Erfassungshülle lässt die Eingabe nur dann stehen, wenn sie den
-   * Fehlschlag sieht (LFH-332/B4).
+   * Absetzen. **Muss bei Ablehnung ablehnen** (`mutateAsync`) — nur dann lässt die
+   * Erfassungshülle die Eingabe stehen.
    */
   onAnlegen: (d: NeueNachforderung) => Promise<unknown>;
-  /** Umschließendes Paneel mit Titel rendern. `false` für Inline-Einbettung, wo der
-   *  Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
+  /** Umschließendes Paneel mit Titel rendern. `false`, wo der Container den Titel schon liefert. */
   card?: boolean;
   /**
-   * Vorbelegung aus einem Deeplink (LFH-634, D9 — „Nachfordern" aus der Verpflegung).
-   *
-   * Bewusst NICHT über `initialValues`: die Erfassungshülle setzt nach jedem Absetzen per
-   * `resetFields()` auf die Startwerte zurück, und dieses Formular bleibt danach offen
-   * (Serie). Als Startwert stünde dieselbe Nachforderung nach dem Absetzen sofort wieder
-   * vorbelegt da — einen Druck vor der Dublette. `setFieldsValue` beim Öffnen ist das
-   * Vorbelegen, das die Erfassungs-Norm vom Zurücksetzen ausnimmt; danach führt jeder
-   * Reset auf die leere Maske.
+   * Vorbelegung aus einem Deeplink („Nachfordern" aus der Verpflegung).
+   * Bewusst NICHT über `initialValues`: die Hülle setzt nach jedem Absetzen darauf zurück und
+   * das Formular bleibt offen — dieselbe Nachforderung stünde sofort wieder vorbelegt da, einen
+   * Druck vor der Dublette. `setFieldsValue` beim Öffnen ist Vorbelegen, kein Reset.
    */
   vorbelegung?: NachforderungVorbelegung | null;
 }) {
   const [form] = Form.useForm<FormWerte>();
 
-  // Läuft nach dem Einhängen des `<Form>` (Kind-Effekte vor Eltern-Effekten) und nur,
-  // wenn der Aufrufer eine NEUE Vorbelegung reicht — die Seite hält sie identitätsstabil.
+  // Läuft nach dem Einhängen des `<Form>` und nur bei einer NEUEN Vorbelegung (die Seite hält
+  // sie identitätsstabil).
   useEffect(() => {
     if (!vorbelegung) return;
     form.setFieldsValue({
@@ -79,7 +72,7 @@ export default function NachforderungFormular({
     });
   }, [form, vorbelegung]);
 
-  // Das `return` ist tragend: die Hülle wartet auf diese Zusage (LFH-332/B4).
+  // Das `return` ist tragend: die Hülle wartet auf diese Zusage.
   const absenden = (w: FormWerte) => {
     return onAnlegen({
       art: w.art.trim(),
@@ -105,8 +98,7 @@ export default function NachforderungFormular({
         begruendung: '',
       }}
       onErfassen={absenden}
-      // Das Inline-Formular schliesst sich nach dem Absetzen NICHT — Zuklappen ist
-      // ausdrückliche Nutzeraktion (LFH-332/B4, angewandt in LFH-343 · C8).
+      // Das Inline-Formular schließt nach dem Absetzen NICHT — Zuklappen ist ausdrückliche Nutzeraktion.
       onFertig={() => {}}
       laeuft={senden}
       erfassenText="Nachforderung absetzen"
@@ -162,9 +154,7 @@ export default function NachforderungFormular({
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item name="begruendung" label="Begründung / Lagebezug">
-            {/* Wächst bis vier Zeilen: eine Vorbelegung aus der Verpflegung (LFH-634) trägt
-                Bedarf, Ausgabe und fehlende Sonderkost — in einer festen Zeile war die Hälfte
-                davon nicht zu sehen. */}
+            {/* Wächst bis vier Zeilen: eine Vorbelegung aus der Verpflegung ist mehrzeilig. */}
             <TextArea autoSize={{ minRows: 1, maxRows: 4 }} />
           </Form.Item>
         </Col>

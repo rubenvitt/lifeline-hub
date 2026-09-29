@@ -223,8 +223,8 @@ describe('EtbZeitachse – der Eintrag', () => {
     );
   });
 
-  // LFH-621: der Gruppenkopf ist eine echte Überschrift (h2), und die Überschriften IM
-  // Eintrag hängen darunter — `#` wird h3, nicht mehr pauschal h4, `###` wird h5 statt h6.
+  // Der Gruppenkopf ist eine echte Überschrift (h2), und die Überschriften IM Eintrag hängen
+  // darunter — `#` wird h3, `###` h5 (LFH-621).
   it('gliedert Einträge unter dem Gruppenkopf (h2) — `#` im Eintrag wird h3', () => {
     renderZeitachse({
       eintraege: [
@@ -282,7 +282,7 @@ describe('EtbZeitachse – Aktionsmenü (LFH-365 · B5e)', () => {
       ...alle,
       onBerichtigen,
     });
-    // Kein Knopf „Berichtigen" in der Zeile — der direkte Weg ist WEG.
+    // Kein Knopf „Berichtigen" in der Zeile — der Weg läuft über das Aktionsmenü.
     expect(screen.queryByRole('button', { name: 'Berichtigen' })).toBeNull();
     const menue = await oeffneMenue(17);
     const eintraege = within(menue)
@@ -420,8 +420,8 @@ describe('EtbZeitachse – Sammelbanner', () => {
     const ausloeser = screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' });
     act(() => ausloeser.focus());
     setze(zeilenAus([neu, alt]));
-    // Ein Portal-Menü: `relatedTarget` in `.ant-dropdown` außerhalb der Wurzel. Geprüft
-    // am Handler selbst — jsdom schiebt den Fokus beim Öffnen nicht (LFH-339 · C4).
+    // Ein Portal-Menü: `relatedTarget` in `.ant-dropdown` außerhalb der Wurzel. Geprüft am
+    // Handler selbst — jsdom schiebt den Fokus beim Öffnen nicht.
     const portal = document.createElement('div');
     portal.className = 'ant-dropdown';
     const ziel = document.createElement('button');
@@ -449,9 +449,9 @@ describe('EtbZeitachse – Sammelbanner', () => {
   });
 
   /*
-   * Review 22.09.2026, Befund A: „Grundeintrag anzeigen" auf einen nicht geladenen
-   * Eintrag — der Fokus steht im Verweis, die Seite lädt ÄLTERE Seiten nach. Die kommen
-   * unten an und springen unter nichts; sie gehören sofort in die Achse, nicht ins Banner.
+   * „Grundeintrag anzeigen" auf einen nicht geladenen Eintrag: der Fokus steht im Verweis, die
+   * Seite lädt ÄLTERE Seiten nach. Die kommen unten an und gehören sofort in die Achse, nicht
+   * ins Banner.
    */
   it('sortiert nachgeladene ältere Einträge auch eingefroren sofort ein', () => {
     const berichtigung = eintrag({
@@ -471,7 +471,7 @@ describe('EtbZeitachse – Sammelbanner', () => {
   });
 
   /*
-   * Befund B: der eigene gepufferte Eintrag geht raus — `ausstehend-<queueId>` verschwindet,
+   * Der eigene gepufferte Eintrag geht raus — `ausstehend-<queueId>` verschwindet,
    * `eintrag-<dbId>` kommt mit neuem Schlüssel. Zurückgehalten wäre er nirgends zu sehen.
    */
   it('zeigt den eigenen gerade gesendeten Eintrag sofort, auch eingefroren', () => {
@@ -535,8 +535,8 @@ describe('EtbZeitachse – Anhänge (LFH-117)', () => {
   };
 
   it('zeigt die Anhänge in der Hinweiszeile, auch ohne jede Kopplung', () => {
-    // Falle aus LFH-636: die Anhänge dürfen nicht an `hatVerknuepfung` hängen — der Eintrag
-    // hier hat weder Befehl noch Lagebericht noch Auftrag noch Folgeauftrag.
+    // Die Anhänge dürfen nicht an `hatVerknuepfung` hängen — der Eintrag hier hat weder Befehl
+    // noch Lagebericht noch Auftrag noch Folgeauftrag.
     const { container } = renderZeitachse({ eintraege: [eintrag({ anhaenge: [foto] })] });
     const z = zeileVon(container, 'eintrag-1');
     const verweis = within(z).getByRole('link', {

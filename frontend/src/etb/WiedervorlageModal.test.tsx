@@ -161,9 +161,8 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
   it('die Struktur trägt die Enter-Zusicherung: kein antd-Fußzeilenknopf', () => {
     zeige();
     // Prüfbar ist die Struktur, aus der die Zusicherung folgt (Muster
-    // `components/Erfassung.test.tsx`): der Knopf liegt IM `<form>`, deshalb sendet
-    // die eingebaute Formularübermittlung des Browsers. Ein `onOk` am Modal legte ihn
-    // daneben, und Enter wäre tot.
+    // `components/Erfassung.test.tsx`): der Knopf liegt IM `<form>`, deshalb sendet die
+    // eingebaute Formularübermittlung des Browsers.
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
     const knopf = screen.getByRole('button', { name: 'Anlegen' });
     expect(knopf.closest('form')).not.toBeNull();

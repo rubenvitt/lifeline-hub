@@ -1,37 +1,22 @@
 /**
- * Die Kennzahl „Evakuiert N · von M geplant" (LFH-639, design.md D9) — reine Ableitung aus
- * den Bezirken der Übersicht (`GET …/betreuung`), nach dem Vorbild von
- * `pegel/pegelKennzahl.ts`.
+ * Die Kennzahl „Evakuiert N · von M geplant" — reine Ableitung aus den Bezirken der Übersicht
+ * (`GET …/betreuung`), für Modulseite, Modulzähler und Lage-Dashboard.
  *
- * EINE Quelle für drei Leser: die Modulseite, den Modulzähler (`useModulZaehler.ts`) und die
- * Zelle „Evakuiert" im Lage-Dashboard (LFH-607, über `useEvakuierungKennzahl`). Die Datei liegt
- * deshalb unter `betreuung/` und nicht unter einer Seite: eine Seite, die aus dem Verzeichnis
- * einer anderen importiert, wäre eine neue Querabhängigkeit.
+ * Das Prädikat {@link istAktiverBezirk} steht wortgleich im Backend als Auslöser der
+ * Lagekennzahl `evakuiert` (`lagekennzahl::ableiten`); wer es ändert, ändert beide.
  *
- * Das Prädikat von {@link istAktiverBezirk} steht wortgleich im Backend, als Auslöser der
- * Lagekennzahl `evakuiert` (`src/einsatz/repo.rs`, `lagekennzahl::ableiten`). Wer es hier
- * ändert, ändert es dort mit — sonst steht „Evakuiert" auf dem Platz und die Kennzahl daneben
- * ist leer.
- *
- * DIE FUNKTION BEKOMMT NUR DATEN. „Keine Kennzahl" (`null`) heißt: es gibt keine geplante
- * Evakuierung. Ein fehlgeschlagener Abruf ist etwas anderes und darf nie so aussehen — diese
- * Unterscheidung trägt der Aufrufer über den Query-Zustand (`useEvakuierungKennzahl`).
+ * Die Funktion bekommt NUR Daten: `null` heißt „keine geplante Evakuierung". Ein
+ * fehlgeschlagener Abruf darf nie so aussehen; das trennt `useEvakuierungKennzahl`.
  *
  * Festlegungen, jede in `evakuierungKennzahl.test.ts` gepinnt:
- *
- *  - **Maßgeblich sind die aktiven Bezirke** ({@link istAktiverBezirk}): nicht storniert und
- *    nicht `aufgehoben`. Ein `geraeumt`er Bezirk zählt weiter — er ist das Ergebnis, nicht
- *    sein Ende. Stornierte liefert die Übersicht nicht; gefiltert wird trotzdem, weil eine
- *    Mutationsantwort (`storniereBezirk`) mit `storniert_at` im Cache landen kann.
+ *  - **Maßgeblich sind die aktiven Bezirke**: nicht storniert und nicht `aufgehoben`. Ein
+ *    `geraeumt`er zählt weiter. Gefiltert wird auch Storniertes, weil eine Mutationsantwort mit
+ *    `storniert_at` im Cache landen kann.
  *  - **M** ist die Summe der Plangrößen ALLER aktiven Bezirke, auch derer ohne Meldung.
- *  - **N** ist die Summe der aktuellen Stände — ein Bezirk ohne Meldung geht NICHT als 0 ein,
- *    sondern zählt in `ohneMeldung`. Hat kein aktiver Bezirk eine Meldung, ist N `null`:
- *    „nichts gemeldet" ist nicht „niemand evakuiert" (dieselbe Unterscheidung wie die
- *    Kopfzahl im Backend, dort über `stellen_ohne_meldung`).
- *  - **N wird nicht auf M gedeckelt.** Mehr Evakuierte als geplant ist eine Aussage über die
- *    Plangröße, keine Rundungsfrage.
- *  - **geschätzt**, sobald eine beteiligte Plangröße ODER ein beteiligter Stand geschätzt
- *    ist. Nicht beteiligte (aufgehobene, stornierte) Bezirke färben nicht ab.
+ *  - **N** ist die Summe der aktuellen Stände; ein Bezirk ohne Meldung zählt in `ohneMeldung`,
+ *    nicht als 0. Ohne jede Meldung ist N `null`.
+ *  - **N wird nicht auf M gedeckelt.**
+ *  - **geschätzt**, sobald eine beteiligte Plangröße ODER ein beteiligter Stand geschätzt ist.
  */
 import type { Evakuierungsbezirk } from '../api/types';
 
@@ -57,8 +42,7 @@ export interface EvakuierungKennzahl {
 
 /**
  * Die EINE Definition von „aktiv" für Kennzahl und Modulzähler: nicht storniert und nicht
- * aufgehoben. Zwei Definitionen ließen den Zähler in der Navigation und die Kennzahl
- * auseinanderlaufen. Rein.
+ * aufgehoben. Rein.
  */
 export function istAktiverBezirk(
   b: Pick<Evakuierungsbezirk, 'raeumung' | 'storniert_at'>,

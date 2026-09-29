@@ -26,8 +26,7 @@ describe('zeigeRueckgaengig (LFH-343 · C8)', () => {
   it('steht länger als ein reiner Erfolgs-Toast — es ist eine Entscheidung, keine Kenntnisnahme', () => {
     const { api, open } = messageAttrappe();
     zeigeRueckgaengig(api, 'Erinnerung erledigt', vi.fn());
-    // Antds Vorgabe ist 3 s. Ein Rückweg, der abläuft, bevor man ihn gelesen hat,
-    // ist keiner.
+    // Antds Vorgabe ist 3 s; ein Rückweg, der vor dem Lesen abläuft, ist keiner.
     expect(open.mock.calls[0][0].duration).toBeGreaterThan(3);
   });
 

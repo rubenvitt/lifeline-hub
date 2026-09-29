@@ -23,7 +23,7 @@ function dayjsZuWire(d: dayjs.Dayjs): string {
 }
 
 interface MeldungFormWerte {
-  /** Strukturierter Absender (LFH-610): `einheit:<id>` bzw. `abschnitt:<id>`, leer = frei. */
+  /** Strukturierter Absender: `einheit:<id>` bzw. `abschnitt:<id>`, leer = frei. */
   von?: string;
   absender: string;
   empfaenger?: string;
@@ -52,16 +52,11 @@ const DEFAULTS: MeldungFormWerte = {
 };
 
 /**
- * Wiederholfelder einer Meldungs-Serie (LFH-332/B4). Am Funkgerät wechselt der
- * Wortlaut, nicht die Gegenstelle: Absender (samt Einheit/Abschnitt, LFH-610),
- * Meldeweg und Adressat bleiben über
- * mehrere Meldungen gleich. Alles andere — insbesondere `inhalt` und
- * `ereigniszeit` — wird geleert, weil ein stehengebliebener Wortlaut die
- * nächste Meldung verfälschen würde.
- *
- * `DEFAULTS` ist gleichzeitig `initialValues` UND Reset-Ziel; die Übernahme
- * läuft deshalb nicht über geänderte Defaults, sondern über das Re-Seeding der
- * Hülle (zurücksetzen, dann die gemerkten Felder wieder setzen).
+ * Wiederholfelder einer Meldungs-Serie: am Funkgerät wechselt der Wortlaut, nicht die
+ * Gegenstelle. Absender, Meldeweg und Adressat bleiben; `inhalt` und `ereigniszeit` werden
+ * geleert, weil ein stehengebliebener Wortlaut die nächste Meldung verfälschte.
+ * `DEFAULTS` ist `initialValues` UND Reset-Ziel; die Übernahme läuft über das Re-Seeding der
+ * Hülle, nicht über geänderte Defaults.
  */
 const UEBERNAHME: (keyof MeldungFormWerte & string)[] = [
   'von',
@@ -89,15 +84,13 @@ export default function MeldungFormular({
 }: {
   senden: boolean;
   /**
-   * Speichern. **Muss bei Ablehnung ablehnen** (`mutateAsync`, nicht `mutate`) —
-   * die Erfassungshülle lässt den Wortlaut nur dann stehen, wenn sie den
-   * Fehlschlag sieht (LFH-332/B4).
+   * Speichern. **Muss bei Ablehnung ablehnen** (`mutateAsync`) — nur dann lässt die
+   * Erfassungshülle den Wortlaut stehen.
    */
   onAnlegen: (d: NeueMeldung) => Promise<unknown>;
-  /** Umschließendes Paneel mit Titel rendern. `false` für Inline-Einbettung, wo der
-   *  Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
+  /** Umschließendes Paneel mit Titel rendern. `false`, wo der Container den Titel schon liefert. */
   card?: boolean;
-  /** Auswahl für den strukturierten Absender (LFH-610). Leer ⇒ das Feld entfällt. */
+  /** Auswahl für den strukturierten Absender. Leer ⇒ das Feld entfällt. */
   einheiten?: Einheit[];
   abschnitte?: Einsatzabschnitt[];
 }) {
@@ -106,8 +99,7 @@ export default function MeldungFormular({
   const prioritaet = Form.useWatch('prioritaet', form);
   const bestaetigungPflicht = Form.useWatch('bestaetigung_pflicht', form);
 
-  // Sofort (Art oder Priorität) ⇒ Bestätigungspflicht automatisch an (LFH-97). Der
-  // Nutzer kann sie danach manuell wieder abwählen.
+  // Sofort (Art oder Priorität) ⇒ Bestätigungspflicht automatisch an; abwählbar.
   const istSofort = meldungsart === 'sofortmeldung' || prioritaet === 'sofort';
   useEffect(() => {
     if (istSofort) form.setFieldValue('bestaetigung_pflicht', true);
@@ -122,16 +114,13 @@ export default function MeldungFormular({
     });
   };
 
-  /** Fast-Path: Lagemeldung an übergeordnete Führung (extern, LFH-87). */
+  /** Fast-Path: Lagemeldung an übergeordnete Führung (extern). */
   const lagemeldungVorbelegen = () => {
     form.setFieldsValue({ meldungsart: 'lagemeldung', richtung: 'extern' });
   };
 
-  // Das `return` ist tragend: die Erfassungshülle wartet auf diese Zusage und
-  // lässt die Felder stehen, wenn sie abgelehnt wird. Ein blosser Aufruf würde
-  // die Ablehnung an ihr vorbeilaufen lassen und den Wortlaut trotz Fehler-Toast
-  // leeren — genau der Fehler, den der Bestand (fire-and-forget + resetFields)
-  // hatte.
+  // Das `return` ist tragend: die Hülle wartet auf diese Zusage und lässt die Felder bei
+  // Ablehnung stehen.
   const absenden = (w: MeldungFormWerte) =>
     onAnlegen({
       ...vonZuBezug(w.von),
@@ -173,23 +162,16 @@ export default function MeldungFormular({
       form={form}
       initialValues={DEFAULTS}
       onErfassen={absenden}
-      // Das Inline-Formular schliesst sich nach dem Senden NICHT: Zuklappen ist
-      // ausdrückliche Nutzeraktion über den Kopf-Umschalter oder das Kreuz an
-      // der Card (LFH-332/B4). Deshalb ist „fertig" hier ein Nichts.
-      //
-      // Die beiden Speicher-Knöpfe unterscheiden sich damit NUR in der Übernahme:
-      // „Meldung erfassen" (auch der Enter-Weg) leert alles wie bisher,
-      // „Speichern und nächste" hält Absender/Meldeweg/Adressat fest. Das ist die
-      // Aufteilung der Hülle und keine Verschlechterung — der Bestand hat auf dem
-      // Enter-Weg ebenfalls vollständig zurückgesetzt.
+      // Das Inline-Formular schließt nach dem Senden NICHT — Zuklappen ist ausdrückliche
+      // Nutzeraktion. Die beiden Knöpfe unterscheiden sich nur in der Übernahme: „Meldung erfassen"
+      // (auch Enter) leert alles, „Speichern und nächste" hält Absender/Meldeweg/Adressat.
       onFertig={() => {}}
       laeuft={senden}
       erfassenText="Meldung erfassen"
       serie
       uebernahme={UEBERNAHME}
     >
-      {/* Fast-Path (LFH-112): im Formularkörper statt Card-extra, damit sie auch in der
-          Inline-Einbettung (card={false}) erhalten bleiben. */}
+      {/* Fast-Path im Formularkörper statt Card-extra, damit er auch bei `card={false}` erhalten bleibt. */}
       <Space style={{ marginBottom: 16 }} wrap>
         <Button danger icon={<ThunderboltOutlined />} onClick={sofortVorbelegen}>
           Sofortmeldung

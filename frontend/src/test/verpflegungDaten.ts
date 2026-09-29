@@ -25,7 +25,7 @@ export function ausgabe(over: Partial<VerpflegungAusgabe> & { id: number }): Ver
 /**
  * „Mittag“ 10:00–11:30 UTC (12:00–13:30 in Berlin), Bedarf 250 (180 Kräfte, 70 Betreute),
  * davon 3 vegan; ausgegeben 230 → Fehlmenge 20, vegan gedeckt. Die Deckungszahlen rechnet der
- * Server — die Testdaten tragen sie deshalb fertig, wie die Antwort.
+ * Server, die Testdaten tragen sie deshalb fertig.
  */
 export function zeitfenster(
   over: Partial<VerpflegungZeitfenster> & { id?: number } = {},

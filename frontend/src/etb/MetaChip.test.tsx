@@ -40,16 +40,11 @@ describe('MetaChip', () => {
   });
 
   /**
-   * Der Ersatz für das ~10-px-Kreuz (LFH-365 · B5e). Das `closeIcon` war die einzige
-   * tastaturerreichbare Bedienung am geschlossenen Chip — der Tag-Rumpf selbst trägt
-   * gemessen weder `role` noch `tabindex` —, und es war mit ~10 px weit unter jedem
-   * Trefflächenboden. Es weicht einem benannten Auslöser, der seine Höhe wie jedes
-   * andere Steuerelement vom `ConfigProvider` erbt.
+   * Der Ersatz für das ~10-px-Kreuz (LFH-365): ein benannter Auslöser, der seine Höhe vom
+   * `ConfigProvider` erbt — der Tag-Rumpf selbst trägt weder `role` noch `tabindex`.
    *
-   * Der Name trägt das FELD (`Aktionen zu Von`), nicht bloß „Aktionen": die Chip-Leiste
-   * zeigt mehrere Chips gleichzeitig (`Schnellerfassung.tsx:286`), und n gleichnamige
-   * Knöpfe sind per Rolle nicht unterscheidbar. Dieselbe Festlegung wie in LFH-364 für
-   * die Quittier-Knöpfe der Auftragskarte.
+   * Der Name trägt das FELD (`Aktionen zu Von`): die Chip-Leiste zeigt mehrere Chips, und n
+   * gleichnamige Knöpfe sind per Rolle nicht unterscheidbar (wie LFH-364).
    */
   it('geschlossen: das Aktionsmenü trägt das Feld im Namen', () => {
     renderMitProviders(
@@ -64,17 +59,15 @@ describe('MetaChip', () => {
       />,
     );
     expect(screen.getByRole('button', { name: 'Aktionen zu Von' })).toBeInTheDocument();
-    // Das alte Kreuz ist ERSETZT, nicht ergänzt: bliebe es stehen, wäre das 10-px-Ziel
-    // weiterhin die schnellste Bedienung und der Umbau folgenlos.
+    // Das alte Kreuz ist ERSETZT, nicht ergänzt: sonst bliebe das 10-px-Ziel die schnellste
+    // Bedienung.
     expect(screen.queryByLabelText('schließen')).not.toBeInTheDocument();
   });
 
   /**
-   * Die Erbin von „× ruft onRemove, nicht onEdit". Der Zusatz `onEdit` NICHT gerufen ist
-   * hier kein Beiwerk: das Menü-Overlay ist ein React-Kind des `<Tag onClick={onEdit}>`,
-   * und ein React-Synthetic-Event steigt durch den KOMPONENTEN-Baum auf — auch aus einem
-   * Portal heraus. Ohne Riegel entfernte ein Klick auf „Entfernen" das Feld und öffnete
-   * es im selben Zug wieder zum Bearbeiten.
+   * `onEdit` NICHT gerufen ist kein Beiwerk: das Menü-Overlay ist ein React-Kind des Chips, und
+   * ein Synthetic Event steigt durch den KOMPONENTEN-Baum auf — auch aus einem Portal heraus.
+   * Ohne Riegel entfernte „Entfernen" das Feld und öffnete es im selben Zug zum Bearbeiten.
    */
   it('Menü „Entfernen" ruft onRemove — und NICHT onEdit', async () => {
     const onRemove = vi.fn();
@@ -97,17 +90,10 @@ describe('MetaChip', () => {
   });
 
   /**
-   * Ein Fehlgriff darf nichts tun (Review-Nachtrag zu LFH-365). Das Menü-Overlay trägt
-   * rings um seine Einträge ein 4-px-Polsterband (`dropdownEdgeChildPadding` →
-   * `paddingXXS`, vom Projekt-Theme NICHT überschrieben, also in jeder Dichtestufe gleich
-   * schmal). Wer im Handschuh knapp neben „Entfernen" trifft, klickt darauf.
-   *
-   * Gemessen war das der teuerste Fehlklick des Umbaus: das Menü schloss OHNE die Aktion
-   * auszuführen (rc-dropdown ruft dort nur `setTriggerVisible(false)`), und weil das
-   * Overlay ein React-Kind des Chips ist, stieg das Synthetic Event weiter zum Chip auf
-   * und schaltete ihn in den Editor — der zieht per `autoFocus` den Fokus aus dem
-   * Inhaltsfeld. Der Erfasser wollte ein Feld entfernen und tippt stattdessen mitten in
-   * einen Editor.
+   * Ein Fehlgriff darf nichts tun. Das Menü-Overlay trägt rings um seine Einträge ein
+   * 4-px-Polsterband (`dropdownEdgeChildPadding` → `paddingXXS`, in jeder Dichtestufe gleich
+   * schmal). Ein Klick darauf schließt das Menü ohne Aktion, und stiege das Event zum Chip auf,
+   * schaltete es ihn in den Editor, der per `autoFocus` den Fokus aus dem Inhaltsfeld zieht.
    *
    * Ein Riegel am Menü-`onClick` fängt das nicht: der feuert nur für Einträge.
    */
@@ -150,12 +136,8 @@ describe('MetaChip', () => {
   });
 
   /**
-   * Der Maus-Schnellweg bleibt (Entscheidung in LFH-365): ein Klick auf den Chip-Rumpf
-   * öffnet den Editor. Das war bisher NICHT zugesichert — `onEdit` kam in dieser Datei
-   * nur als `not.toHaveBeenCalled()` vor, und `Schnellerfassung.test.tsx` übt allein den
-   * Weg über das Slash-Menü. Der Test ist deshalb ein Pin auf Bestandsverhalten, kein
-   * neues Verhalten: er ist sofort grün und hält den Weg fest, damit der Umbau ihn nicht
-   * stillschweigend mitnimmt. Mutationsprobe: `onClick` am `Tag` entfernen → rot.
+   * Der Maus-Schnellweg bleibt: ein Klick auf den Chip-Rumpf öffnet den Editor. Pin auf
+   * Bestandsverhalten, damit ein Umbau ihn nicht stillschweigend mitnimmt.
    */
   it('Klick auf den Chip-Rumpf bleibt der Schnellweg zum Bearbeiten', async () => {
     const onEdit = vi.fn();
@@ -239,10 +221,9 @@ describe('MetaChip', () => {
   });
 
   /**
-   * LFH-373: die Chip-Eingabe steht in der angepinnten Erfassungsleiste am Seitenfuß. Reacts
-   * `autoFocus` ruft `focus()` OHNE Optionen — und der native Fokus rollte die Seite: gemessen
-   * bei 390 px im Handschuh-Betrieb um 467 px, sobald „An" gesetzt wurde. Wer oben im
-   * Tagebuch las, verlor seine Stelle. Der Fokus kommt deshalb mit `preventScroll`.
+   * Die Chip-Eingabe steht in der angepinnten Erfassungsleiste am Seitenfuß. Reacts
+   * `autoFocus` ruft `focus()` OHNE Optionen, und der native Fokus rollte die Seite — wer oben
+   * im Tagebuch las, verlöre seine Stelle. Der Fokus kommt deshalb mit `preventScroll` (LFH-373).
    */
   it.each([
     ['von', ['ELW 1', 'Leitstelle']],

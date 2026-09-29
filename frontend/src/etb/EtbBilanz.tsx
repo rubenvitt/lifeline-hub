@@ -49,23 +49,21 @@ const MEHRZAHL: Record<EtbEintragAnzeige['typ'], string> = {
 };
 
 /**
- * Die Seitenleiste des Einsatztagebuchs (Neuentwurf S4): Bilanz nach Typ, jüngste
- * Berichtigungen, Zustand des Puffers.
+ * Die Seitenleiste des Einsatztagebuchs: Bilanz nach Typ, jüngste Berichtigungen, Zustand des
+ * Puffers.
  *
  * ── WARUM „BILANZ" UND NICHT „TAGESBILANZ" ─────────────────────────────────────────
  *
- * Der Entwurf zeigt „Tagesbilanz" mit Summen wie „218 Meldungen" — die sich dort aber zur
- * Gesamtzahl des Kopfs („412 Einträge") addieren, also gerade keinen Kalendertag zählen.
- * Seit LFH-612 zählt der Server exakt, und zwar über DENSELBEN Filter wie die Liste
- * (Entscheidung vom 22.09.2026): ohne Filter das ganze Tagebuch („Bilanz"), mit Filter
- * genau die Treffer („Bilanz im Filter"). Wer einen Tag sehen will, setzt den
- * Zeitraumfilter — eine feste Tagesgrenze bräuchte eine Zeitzone, die der Server nicht
- * kennt. Die Balken messen gegen die Gesamtzahl derselben Zählung.
+ * Die Summen des Entwurfs addieren sich zur Gesamtzahl des Kopfs, zählen also gerade keinen
+ * Kalendertag. Der Server zählt über DENSELBEN Filter wie die Liste (LFH-612): ohne Filter
+ * das ganze Tagebuch („Bilanz"), mit Filter genau die Treffer („Bilanz im Filter"). Einen Tag
+ * zeigt der Zeitraumfilter — eine feste Tagesgrenze bräuchte eine Zeitzone, die der Server
+ * nicht kennt. Die Balken messen gegen die Gesamtzahl derselben Zählung.
  *
  * Solange die Zählung lädt oder gescheitert ist, steht KEINE Zahl da: eine Zählung des
  * geladenen Fensters behauptete eine Vollständigkeit, die es nicht gibt.
  *
- * Die Berichtigungen darunter kommen weiter aus den geladenen Einträgen und sagen das.
+ * Die Berichtigungen darunter kommen aus den geladenen Einträgen und sagen das.
  */
 export default function EtbBilanz({
   einsatzId,

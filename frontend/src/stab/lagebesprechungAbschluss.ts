@@ -18,16 +18,14 @@ export interface AbschlussVorbelegung {
   abgehalten: Dayjs;
   /**
    * Der Termin, den die Maske beim Öffnen GESEHEN hat, als Wire-Wert — `null`, wenn der Stand
-   * keinen trug (`naechste_lagebesprechung_at` ist dann absent, nicht `null`). Basis für
-   * „fremd geändert" (Ruling 10).
+   * keinen trug (`naechste_lagebesprechung_at` ist dann absent). Basis für „fremd geändert".
    */
   terminWire: string | null;
 }
 
 /**
- * Vorbelegung (Nutzerentscheidung LFH-543): der bestehende Termin, wenn er in der Zukunft liegt,
- * sonst leer; der Zeitpunkt ist jetzt. Ein vergangener Termin wird nicht vorbelegt — er ist
- * gerade die Besprechung, die abgeschlossen wird.
+ * Vorbelegung: der bestehende Termin, wenn er in der Zukunft liegt, sonst leer; der Zeitpunkt
+ * ist jetzt. Ein vergangener Termin ist gerade die Besprechung, die abgeschlossen wird.
  */
 export function abschlussVorbelegung(
   terminWire: string | null | undefined,
@@ -47,9 +45,9 @@ function besprechungsZeitpunkt(abgehalten: Dayjs | null | undefined, jetzt: Dayj
 }
 
 /**
- * Bezug „ab wann liegt ein Termin in der Zukunft": der spätere von Zeitpunkt der Besprechung und
- * jetzt. Ein vorverlegter Zeitpunkt darf einen Termin nicht als künftig ausgeben, der schon
- * vorbei ist; ein nachträglich erfasster nicht einen, der vor der Besprechung liegt.
+ * Bezug „ab wann liegt ein Termin in der Zukunft": der spätere von Zeitpunkt und jetzt. Ein
+ * vorverlegter Zeitpunkt darf keinen vergangenen Termin als künftig ausgeben, ein nachträglich
+ * erfasster keinen, der vor der Besprechung liegt.
  */
 export function terminBezug(abgehalten: Dayjs | null | undefined, jetzt: Dayjs): Dayjs {
   const zeitpunkt = besprechungsZeitpunkt(abgehalten, jetzt);
@@ -57,9 +55,8 @@ export function terminBezug(abgehalten: Dayjs | null | undefined, jetzt: Dayjs):
 }
 
 /**
- * Clientseitiger Spiegel des 422 (`naechste_at ≤ abgehalten_at`): ein gesetzter Termin muss nach
- * dem Zeitpunkt der Besprechung liegen (leer = jetzt). Ein leeres Feld ist immer zulässig. Auf
- * Sekunden verglichen wie die Wire-Werte, die der Server vergleicht.
+ * Clientseitiger Spiegel des 422 (`naechste_at ≤ abgehalten_at`). Ein leeres Feld ist immer
+ * zulässig. Auf Sekunden verglichen wie die Wire-Werte am Server.
  */
 export function naechsteNachBesprechung(
   naechste: Dayjs | null | undefined,
@@ -71,30 +68,24 @@ export function naechsteNachBesprechung(
 }
 
 /**
- * Formwerte → POST-Body. `naechste_at` ist dreiwertig (`api/types.ts`, `LagebesprechungAbschlussBody`):
- * Schlüssel fehlt = Termin bleibt · `null` = löschen · Wert = setzen. Nie `''`: der löschte
- * serverseitig still.
+ * Formwerte → POST-Body. `naechste_at` ist dreiwertig: Schlüssel fehlt = Termin bleibt ·
+ * `null` = löschen · Wert = setzen. Nie `''`: der löschte serverseitig still.
  *
- * Grundsatz (Ruling 10): die Maske ändert oder löscht nur den Termin, den sie beim Öffnen
- * gesehen hat. `liveTerminWire` ist der Stand beim ABSENDEN — `stab` wird live invalidiert.
- * Die Regeln in dieser Reihenfolge, jede genau einmal:
+ * Grundsatz: die Maske ändert oder löscht nur den Termin, den sie beim Öffnen gesehen hat.
+ * `liveTerminWire` ist der Stand beim ABSENDEN. Die Regeln in dieser Reihenfolge:
  *
- * 1. **Bewusst gewählter Wert** (gesetzt und ≠ Vorbelegung) → der Wert. Er steht VOR der Frage
- *    „fremd geändert", weil er deren einzige Ausnahme ist: eine eigene Eingabe gewinnt, das 422
- *    prüft der Server. Ab hier ist das Feld leer oder unverändert.
+ * 1. **Bewusst gewählter Wert** (gesetzt und ≠ Vorbelegung) → der Wert; eine eigene Eingabe
+ *    gewinnt, das 422 prüft der Server.
  * 2. **Fremd geändert** (live ≠ gesehen) → Schlüssel fehlt. Ein leeres oder unverändertes Feld
- *    überschreibt keinen Termin, den jemand anderes inzwischen gesetzt oder gelöscht hat —
- *    auch kein bewusst geleertes. Diese Regel steht VOR 3–5: sonst löschte ein überholter,
- *    unverändert vorbelegter Termin den fremd gesetzten neuen.
- * 3. **Kein Termin beim Öffnen**, Feld leer → Schlüssel fehlt (serverseitig gleichbedeutend mit
- *    `null`, trifft aber keinen inzwischen gesetzten Wert).
+ *    überschreibt keinen fremd gesetzten oder gelöschten Termin. Steht VOR 3–5, sonst löschte
+ *    ein überholter Vorbelegungswert den fremd gesetzten neuen.
+ * 3. **Kein Termin beim Öffnen**, Feld leer → Schlüssel fehlt.
  * 4. **Vorbelegt und unverändert** → Schlüssel fehlt, solange der Termin noch nach
- *    {@link terminBezug} liegt; sonst `null` — ein überholter Termin wird gelöscht (Ruling 1).
- * 5. **Sonst** `null`: vergangener Termin beim Öffnen und Feld leer (Ruling 1), oder die
- *    Vorbelegung bewusst geleert bzw. „kein Termin" gewählt.
+ *    {@link terminBezug} liegt; sonst `null` (ein überholter Termin wird gelöscht).
+ * 5. **Sonst** `null`: vergangener Termin und Feld leer, oder bewusst geleert.
  *
- * `abgehalten_at` geht IMMER mit, leer als Zeitpunkt des Absendens. Nur dann lässt sich die
- * Antwort der eigenen Anfrage zuordnen (`eigeneLagebesprechung`).
+ * `abgehalten_at` geht IMMER mit (leer = Zeitpunkt des Absendens), sonst ließe sich die Antwort
+ * der eigenen Anfrage nicht zuordnen.
  */
 export function abschlussBody(
   werte: AbschlussFormWerte,
@@ -128,10 +119,9 @@ export function abschlussBody(
 
 /**
  * Die eigene Zeile aus der POST-Antwort — oder `undefined`.
- *
- * Die Route lädt die Antwort NACH dem Commit in einer zweiten Lesetransaktion
- * (`src/routes/stab.rs:248-264`). Schließt zeitgleich jemand anderes ab, trägt
- * `letzte_lagebesprechung` dessen Zeile; ein Deeplink darauf zeigte einen fremden Beleg.
+ * Die Route lädt die Antwort NACH dem Commit in einer zweiten Lesetransaktion; schließt
+ * zeitgleich jemand anderes ab, trägt `letzte_lagebesprechung` dessen Zeile, und ein Deeplink
+ * darauf zeigte einen fremden Beleg.
  */
 export function eigeneLagebesprechung(
   antwort: Stab,

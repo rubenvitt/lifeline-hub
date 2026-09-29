@@ -7,18 +7,11 @@ import { MELDUNG_STATUS, istAbgeschlossen } from '../kommunikation';
 import MeldungKarte from './MeldungKarte';
 
 /**
- * Lese-Vorschau einer Meldung in der Sprungpalette (LFH-664, Design Entscheidung 5).
+ * Lese-Vorschau einer Meldung in der Sprungpalette: DIE Karte der Meldungsseite. Ohne
+ * `darfSchreiben` und Callbacks rendert sie keine Aktion (die Riegel sitzen in der Ableitung).
+ * Der Verweis „↗ Auftrag" bleibt ein Link; die Palette schließt sich beim Klick selbst.
  *
- * Kein eigener Lese-Inhalt, sondern DIE Karte der Meldungsseite — gleicher Datensatz, gleiche
- * Gestalt. Ein Nur-Lesen-Modus der Karte ist nicht nötig: ohne `darfSchreiben` und ohne
- * Callbacks rendert sie keine Aktion (die Riegel sitzen in der Ableitung, nicht am Rendern),
- * und das belegt `MeldungVorschau.test.tsx` am schlimmsten Fall. Der Verweis „↗ Auftrag"
- * bleibt ein Link; die Palette schließt sich beim Klick darauf selbst (Entscheidung 8).
- *
- * Die `ansicht` folgt dem Datensatz, wie die Seite sie wählt (`MeldungenPage`): eine erledigte
- * Meldung steht dort in der Abgeschlossen-Ansicht und zeigt ihre Erledigt-Zeit — die Vorschau
- * zeigt nicht weniger als die Seite, die sie ankündigt.
- *
+ * Die `ansicht` folgt dem Datensatz wie auf der Seite (erledigt → Abgeschlossen-Ansicht).
  * Daten aus dem Listenfach der Palette ({@link datensatzAbfrage}), per `select` auf die `id`.
  */
 export default function MeldungVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {

@@ -55,7 +55,7 @@ class FakeEventSource {
 afterEach(() => {
   vi.unstubAllGlobals();
   FakeEventSource.instanzen = [];
-  // Die Melde-Sperre ist modulweit — ohne Reset bliebe der zweite 401-Test stumm (LFH-268).
+  // Die Melde-Sperre ist modulweit — ohne Reset bliebe der zweite 401-Test stumm.
   sitzungsMeldungZuruecksetzen();
 });
 
@@ -108,8 +108,8 @@ describe('useEinsatzLiveStream', () => {
         <Probe id={1} />
       </QueryClientProvider>,
     );
-    // F01/LFH-227: `personal` (Dispositionen) und `person` (betroffene Personen) sind
-    // getrennte Wire-Events — nur so kann das Backend die zwei Module getrennt gaten.
+    // `personal` (Dispositionen) und `person` (betroffene Personen) sind getrennte Wire-Events,
+    // damit das Backend die Module getrennt gaten kann.
     FakeEventSource.letzte?.emit('personal');
     await waitFor(() => {
       const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey[0]);
@@ -201,15 +201,12 @@ describe('useEinsatzLiveStream', () => {
     FakeEventSource.letzte?.emit('lagged');
     await waitFor(() => {
       const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
-      // Reconnect/Overflow ist die einzige verbleibende Absicherung, seit die dedizierten
-      // useTiereStream (LFH-75) / useSchaedenStream (LFH-206) entfernt wurden.
+      // Reconnect/Overflow ist die einzige Absicherung dieser Keys ohne eigenes Event.
       expect(calls).toContainEqual(['einsatz-tiere', 3]);
       expect(calls).toContainEqual(['einsatz-schaeden', 3]);
     });
   });
 
-  // LFH-206: pinnt, dass der konsolidierte Stream `einsatz-schaeden` live hält —
-  // Voraussetzung dafür, den dedizierten useSchaedenStream (2. EventSource) zu entfernen.
   it('invalidiert einsatz-schaeden bei schaden-Event (LFH-206)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
@@ -226,9 +223,8 @@ describe('useEinsatzLiveStream', () => {
     });
   });
 
-  // LFH-122: Der lagged-Vollabgleich (Reconnect/Overflow) deckt einen breiten Querschnitt
-  // ab (Union aller Event-Keys), löst aber BEWUSST keinen Sofort-Alarm aus — sonst Fehlalarm
-  // ohne neue Sofortmeldung. Pinnt beides vor dem Registry-Refactor.
+  // Der lagged-Vollabgleich invalidiert breit (Union aller Event-Keys), löst aber BEWUSST keinen
+  // Sofort-Alarm aus — sonst Fehlalarm ohne neue Sofortmeldung.
   it('invalidiert breit und feuert KEINEN window-Alarm bei lagged-Event (LFH-122)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
@@ -252,8 +248,6 @@ describe('useEinsatzLiveStream', () => {
     window.removeEventListener('lfh:sofortmeldung', alarm);
   });
 
-  // LFH-207: pinnt die load-bearing Invalidierungen, bevor die dedizierten Per-Domäne-Hooks
-  // (usePersonenStream/useUhsStream/useEtbStream, jeweils 2. EventSource) entfernt werden.
   it('invalidiert einsatz-uhs bei uhs-Event (LFH-207: ersetzt useUhsStream)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
@@ -454,7 +448,7 @@ describe('useEinsatzLiveStream', () => {
     window.removeEventListener('lfh:erinnerung-alarm', alarm);
   });
 
-  // F14/LFH-263: Reconnect-Resync + sichtbarer Fehlerpfad.
+  // Reconnect-Resync + sichtbarer Fehlerpfad.
   it('invalidiert beim ersten open NICHT und meldet Status open (skip-first, F14)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();

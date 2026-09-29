@@ -8,10 +8,7 @@ import { alsBackendZeit } from '../etb/filterZeit';
 import { rhythmusText } from './einstufung';
 
 /**
- * Die Erfassungsmasken der Ablösung (LFH-635), alle auf `ErfassungsModal` (Erfassungs-Norm
- * LFH-332): Absende-Knopf im `<form>`, Fokus im ersten Feld, Zurücksetzen auf jedem Weg
- * hinaus. Höchstens drei Felder je Dialog (Feldbudget LFH-19).
- *
+ * Die Erfassungsmasken der Ablösung, alle auf `ErfassungsModal`; höchstens drei Felder je Dialog.
  * Der Rhythmus wird in STUNDEN erfasst (0,5er-Schritte) und als Minuten gesendet — die Lage
  * spricht in „6-Stunden-Rhythmus", nicht in 360 Minuten.
  */

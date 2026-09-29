@@ -5,11 +5,7 @@ import { App as AntApp } from 'antd';
 import MeldungFormular, { vonZuBezug } from './MeldungFormular';
 import type { Einheit, Einsatzabschnitt } from '../api/types';
 
-/**
- * `onAnlegen` gibt seit LFH-332/B4 eine Zusage zurück — die Erfassungshülle
- * wartet darauf. Ein `vi.fn()` ohne Auflösung wäre `undefined` und damit ein
- * anderer Vertrag als der echte Aufrufer (`mutateAsync`).
- */
+/** `onAnlegen` gibt eine Zusage zurück, auf die die Erfassungshülle wartet — wie `mutateAsync`. */
 function anlegenMock() {
   return vi.fn<(d: unknown) => Promise<unknown>>().mockResolvedValue(undefined);
 }
@@ -84,7 +80,7 @@ describe('MeldungFormular', () => {
     );
   });
 
-  // --- LFH-332/B4: Serienerfassung, Wertübernahme, Fehlschlag ---
+  // --- Serienerfassung, Wertübernahme, Fehlschlag ---
 
   it('zählt die Serie und leert den Wortlaut nach „Speichern und nächste"', async () => {
     const onAnlegen = renderFormular();
@@ -103,8 +99,7 @@ describe('MeldungFormular', () => {
     await userEvent.click(screen.getByRole('combobox', { name: 'Meldeweg' }));
     await userEvent.click(await screen.findByText('Telefon'));
     await fuellePflichtfelder('RTW 2', 'Erste Meldung');
-    // Der Schalter steht per Vorgabe AUS (30.07.2026) — die Übernahme ist eine
-    // bewusste Wahl, kein Verhalten, in das man hineinläuft.
+    // „Werte behalten" steht per Vorgabe AUS.
     await userEvent.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
@@ -137,9 +132,7 @@ describe('MeldungFormular', () => {
   });
 
   it('lässt den Wortlaut stehen, wenn das Senden fehlschlägt', async () => {
-    // Der Bestand setzte synchron nach dem Aufruf zurück (fire-and-forget) — der
-    // Wortlaut war trotz Fehler-Toast weg. `onAnlegen` lehnt jetzt ab, die Hülle
-    // fängt die Ablehnung und leert nichts.
+    // `onAnlegen` lehnt ab, die Hülle leert nichts — der Wortlaut bleibt trotz Fehler stehen.
     const onAnlegen = anlegenMock().mockRejectedValue(new Error('Netz weg'));
     renderFormular(onAnlegen);
     await fuellePflichtfelder('RTW 2', 'Wichtiger Wortlaut');

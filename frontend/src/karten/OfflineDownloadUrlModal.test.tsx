@@ -7,11 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import OfflineDownloadUrlModal from './OfflineDownloadUrlModal';
 
-/**
- * LFH-346/A6 — die Offline-Download-Maske auf `ErfassungsModal`. Sie kennt nur den
- * Anlegen-Fall; der frühere `resetFields()`-Effekt beim Öffnen ist entfallen, weil
- * die Hülle auf allen vier Auswegen selbst zurücksetzt.
- */
+/** Die Offline-Download-Maske auf `ErfassungsModal`; sie kennt nur den Anlegen-Fall. */
 
 function handler(onSend: (body: unknown) => void = () => {}, status = 200) {
   server.use(
@@ -79,12 +75,9 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * LFH-376 — die Zusicherung, wegen der die Maske auf der Hülle steht (Befund H69
-   * aus LFH-332/B4): Enter in einem einzeiligen Feld sendet ab. Die Strukturprobe
-   * oben (Knopf im `<form>`) ist nur die Ursache; dieser Test belegt die Wirkung.
-   * Die Attribution ist Pflicht und muss vor dem Enter stehen; sie wird ZUERST
-   * getippt, weil der Absende-Weg nicht über sie laufen kann — sie ist eine
-   * Textarea, Enter bricht dort um. Abgesendet wird aus der URL.
+   * Enter in einem einzeiligen Feld sendet ab — die Wirkung, nicht nur die Struktur. Die
+   * Attribution (Pflicht, Textarea, Enter bricht dort um) wird deshalb ZUERST getippt; abgesendet
+   * wird aus der URL.
    */
   it('Enter im URL-Feld startet den Download', async () => {
     const gesendet = vi.fn();
@@ -107,10 +100,9 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Die Gegenprobe: in der Textarea bricht Enter um und sendet NICHT ab. Belegt wird
-   * das über den Knopf danach — genau EIN Request, und er trägt den Umbruch. Ein
-   * „nicht aufgerufen" direkt nach dem Tippen wäre zu früh gefragt: die Prüfung der
-   * Hülle läuft asynchron, ein Absenden durch Enter käme erst danach an.
+   * Gegenprobe: in der Textarea bricht Enter um. Belegt über den Knopf danach — genau EIN Request
+   * mit dem Umbruch; ein sofortiges „nicht aufgerufen" wäre zu früh gefragt, weil die Prüfung der
+   * Hülle asynchron läuft.
    */
   it('Enter in der Attribution bricht um und sendet nicht ab', async () => {
     const gesendet = vi.fn();
@@ -144,9 +136,8 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * `mutateAsync`, nicht `mutate`: bei Ablehnung muss die Zusage brechen — sonst
-   * leerte die Hülle die Felder und schlösse den Dialog, obwohl nie ein Download
-   * begonnen hat.
+   * `mutateAsync`: bei Ablehnung muss die Zusage brechen, sonst leerte die Hülle die Felder und
+   * schlösse den Dialog, obwohl kein Download begonnen hat.
    */
   it('behält bei einer Ablehnung den Wortlaut und lässt den Dialog offen', async () => {
     handler(() => {}, 422);

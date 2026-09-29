@@ -1,26 +1,19 @@
 /**
- * Merkt die zuletzt besuchten Module eines Einsatzes (LFH-337 · Befunde H12/M11).
+ * Merkt die zuletzt besuchten Module eines Einsatzes (LFH-337).
  *
- * JE EINSATZ, nicht global — anders als `navPersistenz.ts`, das bewusst browserweit
- * merkt, ob das Panel eingeklappt ist. Der Unterschied hat einen Grund: „Panel zu" ist
- * eine Vorliebe der Person, „zuletzt in Personen und ETB" ist eine Eigenschaft der Lage.
- * Ein Einsatzwechsel darf die Abkürzungen des vorigen Einsatzes nicht mitschleppen.
- * Präzedenz für den einsatzgebundenen Schlüssel: `pages/uhs/uhsAuswahl.ts`.
- *
- * Schreibweise des Schlüssels nach `lfh:nav:eingeklappt` (`navPersistenz.ts`) — die
- * Doppelpunkt-Form ist im Bestand die häufigere.
+ * JE EINSATZ, anders als `navPersistenz.ts`: „Panel zu" ist eine Vorliebe der Person,
+ * „zuletzt in Personen und ETB" eine Eigenschaft der Lage. Ein Einsatzwechsel darf die
+ * Abkürzungen des vorigen nicht mitschleppen.
  *
  * Jeder Zugriff liegt in `try`/`catch`: im Privatmodus wirft der Speicher, und eine
  * vergessene Abkürzung ist kein Grund, den Einsatz-Rahmen abstürzen zu lassen.
  *
- * Einziger LESER ist die Kommandopalette (Gruppe „Zuletzt besucht", `command-palette/
- * befehle.ts`). Die gleichnamige Gruppe im Modul-Panel ist entfernt (13.09.2026,
- * Begründung an `einsatz/ModulPanel.tsx`) — gefüllt wird der Speicher weiter von Panel,
- * Drawer und Palette.
+ * Einziger LESER ist die Kommandopalette (Gruppe „Zuletzt besucht"); gefüllt wird der
+ * Speicher von Panel, Drawer und Palette.
  */
 
-/** Höchstzahl gemerkter Module. Drei ist die Zahl aus dem Ticket: genug für einen
- *  Arbeitsrhythmus, kurz genug, dass die Zeile keine zweite Modulliste wird. */
+/** Höchstzahl gemerkter Module: genug für einen Arbeitsrhythmus, kurz genug, dass die Zeile
+    keine zweite Modulliste wird. */
 export const ZULETZT_MAX = 3;
 
 const schluessel = (einsatzId: number) => `lfh:nav:zuletzt:${einsatzId}`;
@@ -45,9 +38,8 @@ export function merkeModulBesuch(einsatzId: number, modulKey: string): void {
 /**
  * Liest die gemerkten Modulschlüssel, jüngstes zuerst.
  *
- * Die Formprüfung ist nicht Zierde: `JSON.parse` gelingt auch bei `42` oder `{"a":1}`,
- * und ein `.slice` darauf liefe als TypeError mitten im Render-Pfad der Navigation.
- * Fremder oder kaputter Inhalt gilt deshalb als „nichts gemerkt".
+ * `JSON.parse` gelingt auch bei `42` oder `{"a":1}`, und ein `.slice` darauf liefe als
+ * TypeError in den Render-Pfad der Navigation. Fremder Inhalt gilt deshalb als „nichts gemerkt".
  */
 export function leseZuletztModule(einsatzId: number): string[] {
   try {

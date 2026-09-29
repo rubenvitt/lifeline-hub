@@ -2,9 +2,11 @@ import { Space, Typography } from 'antd';
 import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import { OrtZeile } from './OrtZeile';
 
-/** Read-only-Anzeige einer Koordinate (formatbewusst) + additive Ort-Zeile (Peilung + Ortsname).
- *  Ohne `einsatzId` nur die Koordinate (kein Hook → kein QueryClient-Zwang). Für statische
- *  Werte feuert die Ort-Zeile sofort (debounceMs=0). */
+/**
+ * Read-only-Anzeige einer Koordinate (formatbewusst) plus Ort-Zeile (Peilung + Ortsname).
+ * Ohne `einsatzId` nur die Koordinate (kein Hook, kein QueryClient nötig). Für statische Werte
+ * feuert die Ort-Zeile sofort (debounceMs=0).
+ */
 export default function KoordinatenAnzeige({
   lat,
   lon,

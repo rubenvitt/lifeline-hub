@@ -40,36 +40,27 @@ import {
 } from './betreuungText';
 
 /**
- * Die Erfassungsmasken des Fachmoduls Betreuung (LFH-639), alle auf `ErfassungsModal`
- * (Erfassungs-Norm LFH-332): Absende-Knopf im `<form>`, Fokus im ersten Feld, Zurücksetzen auf
- * jedem Weg hinaus, `onErfassen` lehnt bei Ablehnung ab und die Felder bleiben stehen.
+ * Die Erfassungsmasken des Fachmoduls Betreuung, alle auf `ErfassungsModal`.
  *
- * FELDBUDGET (LFH-19): höchstens drei Felder sichtbar, der Rest unter „Weitere Angaben" in
- * einem `Collapse` mit `forceRender` — nur so kommen die eingeklappten Werte in `onFinish` an.
- * Bearbeitet wird alles, was der PATCH annimmt; eingeklappt heißt nicht unerreichbar.
+ * FELDBUDGET: höchstens drei Felder sichtbar, der Rest unter „Weitere Angaben" in einem
+ * `Collapse` mit `forceRender` (sonst fehlen die Werte in `onFinish`).
  *
- * ZEIT (design.md D2): ein Zeitpunkt geht über `alsBackendZeit` hinaus. Ein LEERES Feld heißt
- * „jetzt" und lässt den Schlüssel weg — der Server setzt die Zeit. `alsBackendZeit(dayjs())`
- * zu schicken hieße, die Client-Uhr zu vertrauen: geht sie über 60 s vor, antwortet der Server
- * für „jetzt" mit 400.
+ * ZEIT: ein LEERES Zeitfeld heißt „jetzt" und lässt den Schlüssel weg — der Server setzt die
+ * Zeit. `alsBackendZeit(dayjs())` hieße, der Client-Uhr zu vertrauen; geht sie über 60 s vor,
+ * antwortet der Server mit 400.
  *
- * PATCH (D5, Leerlauf-Riegel): die Masken schicken nur geänderte Schlüssel. `null` bedeutet
- * „leeren" und entsteht nur, wo vorher ein Wert stand — ein `null` auf ein leeres Feld wäre
- * dieselbe Aussage in einer Form, die der Leser nicht von einer Änderung unterscheiden kann.
+ * PATCH: nur geänderte Schlüssel. `null` bedeutet „leeren" und entsteht nur, wo vorher ein
+ * Wert stand.
  *
- * AKTUELLER STAND (LFH-681): die Bearbeiten-Dialoge bekommen den Datensatz so, wie er JETZT im
- * Cache steht — ein Live-Refetch kommt bei offenem Dialog an. Die Formularwerte frieren beim
- * Öffnen ein (`initialValues` greift nur beim Einhängen), der Vergleich läuft gegen beide:
- * - Räumung hat EIN Feld, und es ist die Absicht selbst → Vergleich gegen den aktuellen Stand.
- *   Gegen den Stand beim Öffnen ginge „zurück auf angeordnet" nach einem fremden Wechsel als
- *   leerer PATCH still verloren. Dazu folgt das UNBERÜHRTE Radio dem Live-Stand — sonst
- *   schriebe ein Speichern ohne Berührung den alten Zustand über den fremden zurück.
+ * AKTUELLER STAND: die Bearbeiten-Dialoge bekommen den Datensatz, wie er JETZT im Cache steht
+ * (Live-Refetch bei offenem Dialog); die Formularwerte frieren beim Öffnen ein.
+ * - Räumung hat EIN Feld, und es ist die Absicht → Vergleich gegen den aktuellen Stand, und das
+ *   UNBERÜHRTE Radio folgt dem Live-Stand. Sonst ginge „zurück auf angeordnet" nach einem
+ *   fremden Wechsel verloren, oder ein Speichern ohne Berührung schriebe den alten Zustand zurück.
  * - Die Mehrfeld-Dialoge vergleichen DREISEITIG (`…PatchDreiseitig`): ein Schlüssel geht nur
- *   raus, wenn die Person ihn geändert hat UND er vom aktuellen Stand abweicht. Gegen den
- *   aktuellen Stand allein trüge jedes unberührte Feld seinen alten Wert hinaus und
- *   überschriebe eine fremde Änderung still — es gibt keinen CAS, der das auffinge.
- * - Ob eine Leermeldung nötig ist, entscheidet die AKTUELLE Belegung; sonst fehlte der Haken
- *   an einer inzwischen belegten Stelle, und der Server antwortete mit 422.
+ *   raus, wenn die Person ihn geändert hat UND er vom aktuellen Stand abweicht — sonst
+ *   überschriebe ein unberührtes Feld eine fremde Änderung (es gibt keinen CAS).
+ * - Ob eine Leermeldung nötig ist, entscheidet die AKTUELLE Belegung (sonst 422).
  */
 
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
@@ -79,7 +70,7 @@ export interface AbschnittOption {
   label: string;
 }
 
-// ── Reine Abbildungen: hier wohnt die Drift, deshalb exportiert und direkt getestet ─────────
+// ── Reine Abbildungen: exportiert und direkt getestet ───────────────────────────────────
 
 /** Getrimmter Text oder `null` — ein Feld aus Leerzeichen ist leer. */
 function text(s: string | null | undefined): string | null {
@@ -143,9 +134,9 @@ export function bezirkAnlegenBody(w: BezirkWerte): EvakuierungsbezirkEingabe {
 }
 
 /**
- * Setzt `patch[k]`, wenn sich der Wert gegenüber `alt` ändert. `undefined` wird dabei zu `null`:
- * ein geleertes Auswahlfeld (`allowClear`) liefert `undefined`, und das fiele beim
- * Serialisieren still weg — der Abschnitt bliebe gesetzt, obwohl die Person ihn gelöst hat.
+ * Setzt `patch[k]`, wenn sich der Wert gegenüber `alt` ändert. `undefined` wird zu `null`: ein
+ * geleertes Auswahlfeld liefert `undefined`, das beim Serialisieren wegfiele — der Abschnitt
+ * bliebe gesetzt.
  */
 function wennGeaendert<P, K extends keyof P>(
   patch: P,
@@ -204,8 +195,7 @@ export function stellePatch(vorher: Betreuungsstelle, w: StelleWerte): Betreuung
 
 /**
  * Nur die Schlüssel, die in BEIDEN Diffs stehen: gegen den Stand beim Öffnen (die Person hat
- * geändert) und gegen den aktuellen (der Server trägt den Wert noch nicht). Die Werte sind in
- * beiden gleich — sie kommen aus denselben Formularwerten.
+ * geändert) und gegen den aktuellen (der Server trägt den Wert noch nicht).
  */
 function dreiseitig<P extends object>(eigeneAenderung: P, gegenAktuell: P): P {
   const patch = {} as P;
@@ -260,10 +250,8 @@ const zeitRegel = {
 };
 
 /**
- * Obergrenze je Personenzahl, gespiegelt aus `betreuung::MAX_PERSONEN` (LFH-680) — darüber
- * antwortet der Server 400. Als Regel, NICHT als `max` am `InputNumber`: das klemmt einen zu
- * großen Wert beim Verlassen still auf die Grenze, und eine Personenzahl darf sich nicht
- * ungesehen ändern.
+ * Obergrenze je Personenzahl, gespiegelt aus `betreuung::MAX_PERSONEN` (darüber 400). Als Regel,
+ * NICHT als `max` am `InputNumber`: das klemmte still auf die Grenze.
  */
 const MAX_PERSONEN = 1_000_000;
 
@@ -276,8 +264,7 @@ const hoechstensRegel = {
 function erhebungFeld(name: string, label: string) {
   return (
     <Form.Item name={name} label={label} rules={[{ required: true }]}>
-      {/* `name` ausdrücklich: zwei Radio-Gruppen ohne Namen gruppierte der Browser nativ zu
-          EINER (Memory `antd-radiogroup-name-kollision`). */}
+      {/* `name` ausdrücklich: zwei Radio-Gruppen ohne Namen gruppierte der Browser nativ zu EINER. */}
       <Radio.Group name={name} optionType="button" options={ERHEBUNG_OPTIONEN} />
     </Form.Item>
   );
@@ -367,8 +354,8 @@ export function BezirkAnlegenDialog({
       form={form}
       erfassenText="Anlegen"
       laeuft={laeuft}
-      // Eine Plangröße steht zu Beginn fast immer auf Melderegister oder Schätzung; wer
-      // gezählt hat, wählt um. Die Erhebung ist sichtbar, der Vorgabewert also nie still.
+      // Eine Plangröße ist zu Beginn meist geschätzt; die Erhebung ist sichtbar, der Vorgabewert also
+      // nie still.
       initialValues={{ plan_erhebung: 'geschaetzt' }}
       onErfassen={(w) => onErfassen(bezirkAnlegenBody(w))}
       onFertig={onSchliessen}
@@ -408,7 +395,7 @@ export function BezirkBearbeitenDialog({
   onErfassen,
   onSchliessen,
 }: DialogBasis & {
-  /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen (LFH-681). */
+  /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen. */
   bezirk: Evakuierungsbezirk;
   abschnitte: readonly AbschnittOption[];
   onErfassen: (patch: EvakuierungsbezirkPatch) => Promise<unknown>;
@@ -468,13 +455,11 @@ interface RaeumungWerte {
 }
 
 /**
- * Räumungszustand setzen. Umkehrbar (jeder Zustand ist wieder wählbar) — keine Rückfrage.
- *
- * LIVE (LFH-681): verglichen wird gegen den AKTUELLEN Zustand, und das Radio folgt ihm, solange
- * die Person es nicht berührt hat. Beides gehört zusammen: „unberührt" und „bewusst zurück auf
- * den angezeigten Zustand" sind sonst nicht zu unterscheiden — ein Klick auf das schon gewählte
- * Radio löst keinen Wechsel aus —, und ein gewohnheitsmäßiges Speichern drehte eine fremd
- * gemeldete Räumung samt ETB-Eintrag zurück. Eine eigene Wahl bleibt stehen (Riegel wie C7).
+ * Räumungszustand setzen. Umkehrbar — keine Rückfrage.
+ * Verglichen wird gegen den AKTUELLEN Zustand, und das Radio folgt ihm, solange es unberührt
+ * ist: ein Klick auf das schon gewählte Radio löst keinen Wechsel aus, und ein gewohnheitsmäßiges
+ * Speichern drehte sonst eine fremd gemeldete Räumung samt ETB-Eintrag zurück. Eine eigene
+ * Wahl bleibt stehen.
  */
 export function RaeumungDialog({
   bezirk,
@@ -483,7 +468,7 @@ export function RaeumungDialog({
   onErfassen,
   onSchliessen,
 }: DialogBasis & {
-  /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen (LFH-681). */
+  /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen. */
   bezirk: Evakuierungsbezirk;
   onErfassen: (patch: EvakuierungsbezirkPatch) => Promise<unknown>;
 }) {
@@ -634,17 +619,13 @@ const STATUS_FOLGE: readonly BetreuungsstelleStatus[] = [
 /**
  * Stelle bearbeiten — Status, Kapazität, Art sichtbar, der Rest eingeklappt.
  *
- * SCHLIESSEN EINER BELEGTEN STELLE (design.md D4): der Server verlangt Belegung 0, statt sie
- * zu erfinden. Der Dialog bietet deshalb die Leermeldung an — als ausdrückliches Häkchen,
- * nicht als stille Vorgabe: eine „0", die niemand gemeldet hat, wäre genau die erfundene
- * Zahl, die D4 verbietet. Erst die Meldung, dann der Status; zwei Aufrufe, zwei Tatsachen.
+ * Schließen einer BELEGTEN Stelle: der Server verlangt Belegung 0. Der Dialog bietet die
+ * Leermeldung als ausdrückliches Häkchen an, nicht als stille Vorgabe — eine ungemeldete „0"
+ * wäre eine erfundene Zahl. Erst die Meldung, dann der Status.
  *
- * Scheitert der zweite Aufruf, darf ein neuer Versuch die 0 NICHT noch einmal melden — sonst
- * stünde sie doppelt im Einsatztagebuch. Der Merker hält deshalb die Belegungsmeldung fest,
- * gegen die geleert wurde (LFH-681): bis der Refetch kommt, steht sie noch da, und ein zweiter
- * Klick überspringt die 0. Ein Merker für den ganzen Dialog reichte nicht mehr, seit die
- * Belegung live nachkommt — meldete danach jemand anderes wieder Personen, kündigte der Haken
- * „Belegung 0 melden" an, übersprang sie aber, und jeder Versuch endete im 422.
+ * Scheitert der zweite Aufruf, darf ein neuer Versuch die 0 nicht noch einmal melden (doppelt
+ * im ETB). Der Merker hält deshalb die Belegungsmeldung fest, gegen die geleert wurde: meldet
+ * danach jemand anderes wieder Personen, gilt der Haken neu.
  */
 export function StelleBearbeitenDialog({
   stelle,
@@ -655,7 +636,7 @@ export function StelleBearbeitenDialog({
   onLeermeldung,
   onSchliessen,
 }: DialogBasis & {
-  /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen (LFH-681). */
+  /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen. */
   stelle: Betreuungsstelle;
   abschnitte: readonly AbschnittOption[];
   onErfassen: (patch: BetreuungsstellePatch) => Promise<unknown>;
@@ -667,9 +648,8 @@ export function StelleBearbeitenDialog({
   const geleertGegen = useRef<number | null>(null);
   const status = Form.useWatch('status', form);
   const belegt = stelle.belegung?.belegt ?? 0;
-  // Nötig genau dann, wenn der PATCH das Schließen trägt (dreiseitig: selbst gewählt UND noch
-  // nicht auf dem Server) und die Stelle JETZT belegt ist. Ein unberührtes „geschlossen" einer
-  // fremd wiedereröffneten Stelle geht nicht hinaus und darf das Speichern nicht sperren.
+  // Nötig genau dann, wenn der PATCH das Schließen trägt (dreiseitig) und die Stelle JETZT belegt
+  // ist. Ein unberührtes „geschlossen" einer fremd wiedereröffneten Stelle sperrt nichts.
   const brauchtLeermeldung =
     status === 'geschlossen' &&
     beimOeffnen.status !== 'geschlossen' &&
@@ -818,9 +798,8 @@ export function BelegungMeldenDialog({
 // ── Stornieren ──────────────────────────────────────────────────────────────────────────
 
 /**
- * Stornieren ist UNUMKEHRBAR (Fehlanlage) und bekommt deshalb eine Rückfrage — als eigenes
- * `Modal` mit rotem Bestätigungsknopf (Bauform LFH-365: kein `Popconfirm` im Menü). Der
- * Aufrufer rendert EINEN Dialog außerhalb der Zeilen, nicht je Zeile einen.
+ * Stornieren ist UNUMKEHRBAR (Fehlanlage): Rückfrage als eigenes `Modal` mit rotem Knopf, kein
+ * `Popconfirm`. Der Aufrufer rendert EINEN Dialog außerhalb der Zeilen.
  */
 export function StornierenDialog({
   titel,

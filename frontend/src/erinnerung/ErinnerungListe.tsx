@@ -11,8 +11,7 @@ export interface ErinnerungListeProps {
   onQuittieren: (id: number) => void;
 }
 
-/** Kartenboard der Erinnerungen (LFH-112). Reicht alle Props an die einzelne
- *  ErinnerungKarte durch; Darstellung/Logik liegen vollständig in der Karte. */
+/** Kartenboard der Erinnerungen; Darstellung und Logik liegen in der Karte. */
 export default function ErinnerungListe({
   erinnerungen,
   ansicht = 'offen',

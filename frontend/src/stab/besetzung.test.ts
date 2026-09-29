@@ -99,9 +99,8 @@ describe('besetzungFormWerte', () => {
 });
 
 /**
- * Der Wertgleichheits-Riegel (Spec 10, Muster `BemerkungZelle`): ein unveränderter PUT schriebe
- * `gesetzt_at` neu und feuerte ein Live-Ereignis für nichts (`src/stab/repo.rs:474-498`).
- * Jede „keine"-Aussage steht neben einem Gegenfall, der sehr wohl sendet.
+ * Der Wertgleichheits-Riegel: ein unveränderter PUT schriebe `gesetzt_at` neu und feuerte ein
+ * Live-Ereignis für nichts. Jede „keine"-Aussage steht neben einem Gegenfall, der sendet.
  */
 describe('besetzungAktion', () => {
   it('leere Zeile, „nicht vergeben" bestätigt → keine Aktion', () => {
@@ -179,7 +178,7 @@ describe('besetzungRechteText', () => {
     expect(besetzungRechteText('aktiv')).toMatch(/Einsatzleitung und Führungspersonal/);
   });
 
-  /** Seit LFH-543 sperrt der Hinweis ZWEI Wege — Zeilenaktion und Kopfaktion. */
+  /** Der Hinweis sperrt ZWEI Wege — Zeilenaktion und Kopfaktion. */
   it('nennt beide gesperrten Wege', () => {
     expect(besetzungRechteText('aktiv')).toMatch(/Besetzung ändern/);
     expect(besetzungRechteText('aktiv')).toMatch(/Lagebesprechungen abschließen/);

@@ -11,8 +11,7 @@ export interface NachforderungListeProps {
   onAblehnen?: (id: number) => void;
 }
 
-/** Kartenboard der Nachforderungen (LFH-112). Reicht alle Props an die einzelne
- *  NachforderungKarte durch; Darstellung/Logik liegen vollständig in der Karte. */
+/** Kartenboard der Nachforderungen; Darstellung und Logik liegen in der Karte. */
 export default function NachforderungListe({
   nachforderungen,
   ansicht = 'offen',

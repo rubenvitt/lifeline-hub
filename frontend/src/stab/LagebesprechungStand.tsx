@@ -11,11 +11,7 @@ import { kuerzeEntschluss } from './lagebesprechungAbschluss';
 import { lagebesprechungZustand } from './lagebesprechungZustand';
 import { stabZeilenzielStil } from './zeilenziel';
 
-/**
- * „Jetzt" im 30-s-Takt. Kein geteilter Uhr-Hook im Repo (einziges `setInterval` außerhalb der
- * Tests ist der Autosave in `entwurf/useEntwurfVerlustschutz.ts`), und eine Anzeige braucht
- * keinen — nur `jetzt` ist State, die Rechnung bleibt rein.
- */
+/** „Jetzt" im 30-s-Takt; nur `jetzt` ist State, die Rechnung bleibt rein. */
 function useJetzt(taktMs: number): Dayjs {
   const [jetzt, setJetzt] = useState(() => dayjs());
   useEffect(() => {
@@ -26,15 +22,10 @@ function useJetzt(taktMs: number): Dayjs {
 }
 
 /**
- * Kopfblock der Sektion „Lagebesprechung" (Spec 10): Nächste · Letzte · Anzahl.
- *
- * Der Countdown tickt alle 30 s OHNE Toast und ohne Blinken (EEMUA-191-Budget): es ändert sich
- * nur der Wortlaut im `StatusTag`, die Tabelle wird nicht neu aufgebaut. Der Termin kommt aus
- * `StabAnzeige`, nicht aus dem Einsatzkopf — der steht im NICHT_LIVE-Fach (Spec Entsch. 11).
- *
- * Neuentwurf: `Datenraster` statt antds `Descriptions` — je Feld eine Augenbraue über dem
- * Wert, Nummern, Zeiten und die Anzahl in Mono. „Letzte" zieht über die volle Breite, weil sie
- * Nummer, Zeit, Entschluss und Link in einer Zeile trägt.
+ * Kopfblock der Sektion „Lagebesprechung": Nächste · Letzte · Anzahl.
+ * Der Countdown tickt alle 30 s OHNE Toast und ohne Blinken: nur der Wortlaut im `StatusTag`
+ * ändert sich. Der Termin kommt aus `StabAnzeige`, nicht aus dem (nicht live) Einsatzkopf.
+ * „Letzte" zieht über die volle Breite (Nummer, Zeit, Entschluss und Link).
  */
 export default function LagebesprechungStand({
   einsatzId,
@@ -71,7 +62,7 @@ export default function LagebesprechungStand({
               <ZeitAnzeige wert={letzte.abgehalten_at} />
             </span>
             <span title={letzte.entschluss}>{kuerzeEntschluss(letzte.entschluss)}</span>
-            {/* Handgebautes Bedienziel: ein `<a>` erbt keine Steuerhöhe (LFH-396). */}
+            {/* Handgebautes Bedienziel: ein `<a>` erbt keine Steuerhöhe. */}
             <Link
               to={etbPfad(einsatzId, { eintrag: letzte.etb_eintrag_id })}
               style={stabZeilenzielStil(token)}

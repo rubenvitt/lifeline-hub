@@ -1,24 +1,16 @@
 /**
- * 24-h-Verlauf eines Pegels als schlanke Linie (LFH-633, design.md D5).
- *
- * Eigenes SVG statt Diagramm-Bibliothek: eine Reihe, ≤ 96 Punkte, keine Achsen außer der
- * Zeitspanne — das trägt kein Paket im Bundle.
+ * 24-h-Verlauf eines Pegels als schlanke Linie; eigenes SVG, weil eine Reihe mit ≤ 96 Punkten
+ * kein Diagrammpaket rechtfertigt.
  *
  * Festlegungen, jede im Test gepinnt:
- *  - **Festes 24-h-Fenster, das am jüngsten Punkt endet.** Eine kürzere Reihe (etwa die alten
- *    3 h vor dem ersten 24-h-Abruf) steht am rechten Rand statt über die ganze Breite gedehnt
- *    — sonst sähe ein Anstieg über drei Stunden aus wie einer über einen Tag.
- *  - **Mindestspanne {@link MIN_SPANNE_CM}.** Ein Pegel, der um 1 cm schwankt, darf nicht die
- *    volle Höhe füllen: das läse sich wie ein Hochwasser.
- *  - **Die Farbe trägt keine Bedeutung.** Die Linie steht in der Textfarbe; ob der Pegel
- *    steigt, sagt das Wort in der Zeile daneben. Beschriftet sind nur Tiefst- und Höchstwert
- *    (Beschriftung selektiv, jeweils AUF der Höhe ihres Werts), die Zeitspanne und — falls
- *    gepflegt — die Prognose als gestrichelte Hilfslinie, direkt an der Linie beschriftet.
- *  - **Zugänglich als ein Bild mit Aussage** („Verlauf 24 h: 5,62 m bis 6,84 m, zuletzt
- *    steigend"); die sichtbaren Beschriftungen sind dafür `aria-hidden`, sonst läse ein
- *    Vorleser dieselben Zahlen zweimal. Der Zeiger zeigt den nächstgelegenen Messpunkt als
- *    Ablesung — sie ergänzt, sie ersetzt nichts: Tiefst-, Höchst- und aktueller Wert stehen
- *    auch ohne Zeiger da.
+ *  - **Festes 24-h-Fenster, das am jüngsten Punkt endet.** Eine kürzere Reihe steht rechts,
+ *    statt gedehnt — sonst sähe ein Anstieg über drei Stunden aus wie einer über einen Tag.
+ *  - **Mindestspanne {@link MIN_SPANNE_CM}:** 1 cm Schwankung darf nicht wie Hochwasser aussehen.
+ *  - **Die Farbe trägt keine Bedeutung**; die Richtung sagt das Wort daneben. Beschriftet sind
+ *    Tiefst- und Höchstwert (auf ihrer Höhe), die Zeitspanne und die Prognose als
+ *    gestrichelte Hilfslinie.
+ *  - **Zugänglich als ein Bild mit Aussage**; die sichtbaren Beschriftungen sind `aria-hidden`,
+ *    sonst läse ein Vorleser die Zahlen zweimal. Die Zeiger-Ablesung ergänzt nur.
  */
 import { useState, type PointerEvent } from 'react';
 import { formatUhrzeit, DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
@@ -99,11 +91,9 @@ export function verlaufsPfad(
 }
 
 /**
- * Höhe der Beschriftungen von Höchst- und Tiefstwert in viewBox-Einheiten (einschließlich
- * des Innenrands `rand`): AUF der Höhe ihres Werts, nicht an den Rändern des Felds — sonst
- * stünde bei einer Prognose weit über der Reihe „5,80 m" neben der Prognoselinie. Liegen
- * beide dichter als `abstand` beieinander (Mindestspanne, fast waagerechte Reihe), rücken sie
- * symmetrisch um ihre Mitte auseinander, damit sie sich nicht überdecken. Rein.
+ * Höhe der Beschriftungen von Höchst- und Tiefstwert in viewBox-Einheiten: auf der Höhe ihres
+ * Werts, nicht an den Feldrändern. Liegen beide dichter als `abstand`, rücken sie symmetrisch
+ * auseinander. Rein.
  */
 export function beschriftungsHoehen(
   g: Pick<VerlaufsGeometrie, 'minCm' | 'maxCm' | 'yFuer'>,
@@ -212,9 +202,7 @@ export default function Verlaufslinie({
                 strokeWidth={1}
                 strokeDasharray="4 3"
               />
-              {/* Direkt an der Hilfslinie beschriftet — eine Linie ohne Wert liest man sonst
-                  gegen die Beschriftung daneben ab. Liegt sie oben am Rand, steht der Text
-                  darunter statt außerhalb des Felds. */}
+              {/* Direkt an der Hilfslinie beschriftet; oben am Rand steht der Text darunter statt außerhalb. */}
               <text
                 x={2}
                 y={prognoseY < 12 ? prognoseY + 10 : prognoseY - 3}

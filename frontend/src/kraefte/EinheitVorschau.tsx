@@ -22,25 +22,17 @@ function mittelText(e: Einheit): string {
 }
 
 /**
- * Lese-Vorschau einer Einheit in der Sprungpalette (LFH-664).
+ * Lese-Vorschau einer Einheit in der Sprungpalette.
  *
  * DATEN: das Listenfach der Palette (`datensatzAbfrage.einheiten`) mit `select` auf die `id`.
- * Die Detailseite der Einheit ist ein Formular — es gibt keinen Lese-Inhalt zum Herauslösen,
- * das Bauteil ist neu.
  *
- * STATUS aus `einheitStatusAnzeige` (dieselbe Ableitung wie das Meldebild): FMS-Code und Wort
- * als Etikett („S2 · Frei auf Wache", Schreibweise der Handstatus-Zelle in
- * `KraefteuebersichtPage`); bei „gemischt" steht die Verteilung als Text darunter, statt einen
- * Status zu erfinden. Als `StatusTag`, nicht als `StatusChip`: ein HANDstatus trägt die
- * Mandantenfarbe seines Katalogeintrags (`status.farbe`, ungeprüfter Freitext), und die geht
- * wie bei Fahrzeug und Personal an `farbe` und erzwingt die Rand-Form (design.md §6). Ein aus
- * den Fahrzeugen abgeleiteter Status bleibt ohne Mandantenfarbe — wie im Meldebild.
+ * STATUS aus `einheitStatusAnzeige` wie im Meldebild: „S2 · Frei auf Wache"; bei „gemischt"
+ * steht die Verteilung darunter, statt einen Status zu erfinden. Als `StatusTag`, weil ein
+ * HANDstatus die Mandantenfarbe seines Katalogeintrags trägt, die die Rand-Form erzwingt.
  *
- * STÄRKE in der BOS-Schreibweise F/UF/M//Σ; die Soll-Stärke nur, wenn sie gesetzt ist
- * (dieselbe Regel wie im Seitenkopf von `EinheitDetailPage`: eine erfundene Soll-Stärke wäre
- * eine Behauptung). Die Stärke inklusive unterstellter Einheiten steht nur, wenn sie von der
- * eigenen abweicht — sonst stünde dieselbe Zahl zweimal da. Leere optionale Angaben fehlen
- * ganz; Funk/Erreichbarkeit erscheint nur, wenn es Funkdaten gibt.
+ * STÄRKE F/UF/M//Σ; die Soll-Stärke nur, wenn gesetzt. Die Stärke inklusive Unterstellter nur,
+ * wenn sie von der eigenen abweicht. Leere optionale Angaben fehlen ganz; Funk nur mit
+ * Funkdaten.
  */
 export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {
   const { token, rollen } = useRollen();
