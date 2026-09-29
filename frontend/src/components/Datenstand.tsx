@@ -6,13 +6,11 @@ interface DatenstandProps {
   /** TanStack-Query-Zeitstempel (`query.dataUpdatedAt`) in Millisekunden. */
   dataUpdatedAt?: number;
   /**
-   * Vor dem ersten Abruf die Breite freihalten statt nichts zu zeigen (LFH-373). Im
-   * Seitenkopf erschien „Stand hh:mm" sonst erst mit den Daten, brach auf 390 px in eine neue
-   * Zeile um und schob alles darunter 22–25 px nach unten — gemessen in
-   * `e2e/leisten-flaeche.spec.ts` („Laden ohne Sprung"). Die Uhrzeit ist fest `HH:mm` in Mono
-   * mit Tabellenziffern, ein gleich langer Platzhalter ist also gleich breit. Wirksam ist er nur
-   * unter `md`: ab dort blendet `EinsatzSeite.css` ihn aus, weil er in der Titelzeile von der
-   * spät eintreffenden Meta seitwärts geschoben würde.
+   * Vor dem ersten Abruf die Breite freihalten statt nichts zu zeigen (LFH-373): sonst erschiene
+   * „Stand hh:mm" erst mit den Daten, bräche auf 390 px um und schöbe alles darunter nach unten
+   * (`e2e/leisten-flaeche.spec.ts`, „Laden ohne Sprung"). `HH:mm` in Mono mit Tabellenziffern —
+   * ein gleich langer Platzhalter ist gleich breit. Wirksam nur unter `md`: ab dort blendet
+   * `EinsatzSeite.css` ihn aus, weil die spät eintreffende Meta ihn seitwärts schöbe.
    */
   platzHalten?: boolean;
 }
@@ -34,10 +32,8 @@ export function gemeinsamerDatenstand(...zeitstempel: Array<number | undefined>)
 }
 
 /**
- * Kompakte, wiederverwendbare Datenfrische-Anzeige für Seiten- und Sektionsköpfe.
- *
- * Seit dem Neuentwurf (21.09.2026) als Mono-Meta gesetzt (`schriftskala.meta`, 11 px): eine
- * Uhrzeit ist eine Zahl, und Zahlen laufen in Mono mit Tabellenziffern.
+ * Kompakte, wiederverwendbare Datenfrische-Anzeige für Seiten- und Sektionsköpfe, als Mono-Meta
+ * (`schriftskala.meta`, 11 px): eine Uhrzeit ist eine Zahl.
  */
 const STIL = {
   fontFamily: schrift[schriftskala.meta.familie],

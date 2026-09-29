@@ -187,9 +187,7 @@ pub async fn lagebesprechung_abschliessen(
     benutzer_id: i64,
     eingabe: &AbschlussEingabe,
 ) -> Result<(i64, i64), AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
 
     write_retry!(pool, |conn| {
         // 1. Server-autoritative, lückenlose Nummer je Einsatz.
@@ -405,9 +403,7 @@ pub async fn setzen(
     benutzer_id: i64,
     eingabe: &BesetzungEingabe,
 ) -> Result<(StabAnzeige, Option<i64>), AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
 
     let etb_id = write_retry!(pool, |conn| {
         // 0. Lebenszyklus-Riegel. Anders als bei der Lagebesprechung steht er hier GANZ VORN:
@@ -529,9 +525,7 @@ pub async fn entfernen(
     sachgebiet: Sachgebiet,
     benutzer_id: i64,
 ) -> Result<Option<i64>, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
 
     write_retry!(pool, |conn| {
         // Vor dem DELETE, damit auch der No-op-Pfad 409 antwortet statt eines irreführenden

@@ -5,83 +5,33 @@ pub mod sichtung_repo;
 pub mod verbleib_repo;
 pub mod verlaufsnotiz_repo;
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Administrative Status-Maschine einer Person (E‑1). E‑2 ergänzt die
-/// medizinische Sichtungskategorie SK I–IV als separates Attribut auf
-/// `betroffen` — diese Maschine bleibt unangetastet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum PersonStatus {
-    Erfasst,
-    Vermisst,
-    Betroffen,
-    Verstorben,
-    Abgemeldet,
+wire_enum! {
+    /// Administrative Status-Maschine einer Person (E‑1). E‑2 ergänzt die
+    /// medizinische Sichtungskategorie SK I–IV als separates Attribut auf
+    /// `betroffen` — diese Maschine bleibt unangetastet.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum PersonStatus {
+        Erfasst => "erfasst",
+        Vermisst => "vermisst",
+        Betroffen => "betroffen",
+        Verstorben => "verstorben",
+        Abgemeldet => "abgemeldet",
+    }
+    try_from = |s| format!("Ungültiger PersonStatus: {s}");
 }
 
-impl PersonStatus {
-    /// DB-/API-Stringrepräsentation. **Muss exakt dem CHECK-Constraint in
-    /// `migrations/0020_einsatz_person.sql` entsprechen.**
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            PersonStatus::Erfasst => "erfasst",
-            PersonStatus::Vermisst => "vermisst",
-            PersonStatus::Betroffen => "betroffen",
-            PersonStatus::Verstorben => "verstorben",
-            PersonStatus::Abgemeldet => "abgemeldet",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<PersonStatus> {
-        match s {
-            "erfasst" => Some(PersonStatus::Erfasst),
-            "vermisst" => Some(PersonStatus::Vermisst),
-            "betroffen" => Some(PersonStatus::Betroffen),
-            "verstorben" => Some(PersonStatus::Verstorben),
-            "abgemeldet" => Some(PersonStatus::Abgemeldet),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for PersonStatus {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        PersonStatus::parse(&s).ok_or_else(|| format!("Ungültiger PersonStatus: {s}"))
-    }
-}
-
-/// Optionale Geschlechtsangabe. `unbekannt` ist ein erstklassiger Wert.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Geschlecht {
-    Maennlich,
-    Weiblich,
-    Divers,
-    Unbekannt,
-}
-
-impl Geschlecht {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Geschlecht::Maennlich => "maennlich",
-            Geschlecht::Weiblich => "weiblich",
-            Geschlecht::Divers => "divers",
-            Geschlecht::Unbekannt => "unbekannt",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Geschlecht> {
-        match s {
-            "maennlich" => Some(Geschlecht::Maennlich),
-            "weiblich" => Some(Geschlecht::Weiblich),
-            "divers" => Some(Geschlecht::Divers),
-            "unbekannt" => Some(Geschlecht::Unbekannt),
-            _ => None,
-        }
+wire_enum! {
+    /// Optionale Geschlechtsangabe. `unbekannt` ist ein erstklassiger Wert.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Geschlecht {
+        Maennlich => "maennlich",
+        Weiblich => "weiblich",
+        Divers => "divers",
+        Unbekannt => "unbekannt",
     }
 }
 
@@ -113,44 +63,22 @@ where
     }
 }
 
-/// Medizinische Sichtungskategorie (Triage). String = CHECK-Constraint in
-/// `migrations/0023_person_sichtung.sql`. **`Tot` ist ein medizinisches Urteil
-/// und ändert den Admin-`PersonStatus` NICHT** (Annahme 4).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Sichtungskategorie {
-    Sk1,
-    Sk2,
-    Sk3,
-    Sk4,
-    Tot,
-    Unverletzt,
+wire_enum! {
+    /// Medizinische Sichtungskategorie (Triage). String = CHECK-Constraint in
+    /// `migrations/0023_person_sichtung.sql`. **`Tot` ist ein medizinisches Urteil
+    /// und ändert den Admin-`PersonStatus` NICHT** (Annahme 4).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Sichtungskategorie {
+        Sk1 => "sk1",
+        Sk2 => "sk2",
+        Sk3 => "sk3",
+        Sk4 => "sk4",
+        Tot => "tot",
+        Unverletzt => "unverletzt",
+    }
 }
 
 impl Sichtungskategorie {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Sichtungskategorie::Sk1 => "sk1",
-            Sichtungskategorie::Sk2 => "sk2",
-            Sichtungskategorie::Sk3 => "sk3",
-            Sichtungskategorie::Sk4 => "sk4",
-            Sichtungskategorie::Tot => "tot",
-            Sichtungskategorie::Unverletzt => "unverletzt",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Sichtungskategorie> {
-        match s {
-            "sk1" => Some(Sichtungskategorie::Sk1),
-            "sk2" => Some(Sichtungskategorie::Sk2),
-            "sk3" => Some(Sichtungskategorie::Sk3),
-            "sk4" => Some(Sichtungskategorie::Sk4),
-            "tot" => Some(Sichtungskategorie::Tot),
-            "unverletzt" => Some(Sichtungskategorie::Unverletzt),
-            _ => None,
-        }
-    }
-
     /// Pseudonyme ETB-Beschriftung (z. B. `SK II`, `tot`, `unverletzt`).
     pub fn etb_label(&self) -> &'static str {
         match self {
@@ -189,42 +117,22 @@ where
     }
 }
 
-/// Art eines Verbleib-Ereignisses. String = CHECK-Constraint in
-/// `migrations/0025_person_verbleib.sql`, erweitert um `notunterkunft` in
-/// `migrations/0112_person_verbleib_notunterkunft.sql` (LFH-613). `Verstorben` = Verbleib des
-/// Leichnams (NICHT der Admin-Status).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum VerbleibArt {
-    Transport,
-    Entlassung,
-    VorOrt,
-    Verstorben,
-    Notunterkunft,
+wire_enum! {
+    /// Art eines Verbleib-Ereignisses. String = CHECK-Constraint in
+    /// `migrations/0025_person_verbleib.sql`, erweitert um `notunterkunft` in
+    /// `migrations/0112_person_verbleib_notunterkunft.sql` (LFH-613). `Verstorben` = Verbleib des
+    /// Leichnams (NICHT der Admin-Status).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum VerbleibArt {
+        Transport => "transport",
+        Entlassung => "entlassung",
+        VorOrt => "vor_ort",
+        Verstorben => "verstorben",
+        Notunterkunft => "notunterkunft",
+    }
 }
 
 impl VerbleibArt {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            VerbleibArt::Transport => "transport",
-            VerbleibArt::Entlassung => "entlassung",
-            VerbleibArt::VorOrt => "vor_ort",
-            VerbleibArt::Verstorben => "verstorben",
-            VerbleibArt::Notunterkunft => "notunterkunft",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<VerbleibArt> {
-        match s {
-            "transport" => Some(VerbleibArt::Transport),
-            "entlassung" => Some(VerbleibArt::Entlassung),
-            "vor_ort" => Some(VerbleibArt::VorOrt),
-            "verstorben" => Some(VerbleibArt::Verstorben),
-            "notunterkunft" => Some(VerbleibArt::Notunterkunft),
-            _ => None,
-        }
-    }
-
     /// Kurzform fürs Cache-Feld `aktueller_verbleib` (z. B. `Transport → KH Mitte`).
     pub fn kurzform(&self, ziel: Option<&str>) -> String {
         match self {
@@ -262,28 +170,12 @@ impl VerbleibArt {
     }
 }
 
-/// Verbleib-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum VerbleibStatus {
-    Angemeldet,
-    Abtransportiert,
-}
-
-impl VerbleibStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            VerbleibStatus::Angemeldet => "angemeldet",
-            VerbleibStatus::Abtransportiert => "abtransportiert",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<VerbleibStatus> {
-        match s {
-            "angemeldet" => Some(VerbleibStatus::Angemeldet),
-            "abtransportiert" => Some(VerbleibStatus::Abtransportiert),
-            _ => None,
-        }
+wire_enum! {
+    /// Verbleib-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum VerbleibStatus {
+        Angemeldet => "angemeldet",
+        Abtransportiert => "abtransportiert",
     }
 }
 
@@ -337,40 +229,15 @@ where
     }
 }
 
-/// Abgleich-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AbgleichStatus {
-    Verdacht,
-    Bestaetigt,
-    Verworfen,
-}
-
-impl AbgleichStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            AbgleichStatus::Verdacht => "verdacht",
-            AbgleichStatus::Bestaetigt => "bestaetigt",
-            AbgleichStatus::Verworfen => "verworfen",
-        }
+wire_enum! {
+    /// Abgleich-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AbgleichStatus {
+        Verdacht => "verdacht",
+        Bestaetigt => "bestaetigt",
+        Verworfen => "verworfen",
     }
-
-    pub fn parse(s: &str) -> Option<AbgleichStatus> {
-        match s {
-            "verdacht" => Some(AbgleichStatus::Verdacht),
-            "bestaetigt" => Some(AbgleichStatus::Bestaetigt),
-            "verworfen" => Some(AbgleichStatus::Verworfen),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for AbgleichStatus {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        AbgleichStatus::parse(&s).ok_or_else(|| format!("Ungültiger AbgleichStatus: {s}"))
-    }
+    try_from = |s| format!("Ungültiger AbgleichStatus: {s}");
 }
 
 /// Ob ein Status-Übergang `von → nach` erlaubt ist. Unbekannte Werte und

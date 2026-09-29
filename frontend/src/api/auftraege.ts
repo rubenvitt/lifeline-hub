@@ -39,8 +39,8 @@ export function quittiereEmpfaenger(
 export function setzeVollzug(
   einsatzId: number,
   auftragId: number,
-  /** `'offen'` ist die Rücknahme von „In Bearbeitung" (LFH-343 · C8) und nur von
-   *  dort aus erlaubt — aus `vollzogen` antwortet der Server mit 422. */
+  /** `'offen'` ist die Rücknahme von „In Bearbeitung“ und nur von dort aus erlaubt; aus
+   *  `vollzogen` antwortet der Server mit 422. */
   status: 'offen' | 'in_arbeit' | 'vollzogen',
   vollzugsmeldung?: string,
 ): Promise<Auftrag> {

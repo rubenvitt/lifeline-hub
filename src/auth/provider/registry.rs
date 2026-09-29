@@ -5,6 +5,7 @@
 //! nur Override-Zustände (fehlt eine Zeile → Default „aktiviert"). Kein Reconcile nötig.
 use super::{AuthProviderAnzeige, AuthProviderTyp, ID_DEV, ID_OIDC, ID_PASSWORT, ID_WEBAUTHN};
 use crate::error::AppError;
+use crate::wire_enum::wire_enum;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -51,37 +52,22 @@ fn webauthn_konfiguriert() -> bool {
     *WEBAUTHN_KONFIGURIERT.get().unwrap_or(&false)
 }
 
-/// Interne, exhaustiv gematchte Wahrheitsquelle über alle Provider-Arten. Neue Provider zwingen
-/// den Compiler, `as_str`/`typ`/`anzeigename` UND `ALLE` zu pflegen — kein stiller Default mehr
-/// (früher fiel `typ(&str)` für Unbekanntes auf `Passwort`, was eine unbekannte ID als
-/// Passwort-Login gerendert hätte).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ProviderId {
-    Passwort,
-    Dev,
-    Oidc,
-    Webauthn,
+wire_enum! {
+    #[wire(ohne_serde)]
+    /// Interne, exhaustiv gematchte Wahrheitsquelle über alle Provider-Arten. Neue Provider
+    /// zwingen den Compiler, `typ`/`anzeigename` zu pflegen — kein stiller Default mehr
+    /// (früher fiel `typ(&str)` für Unbekanntes auf `Passwort`, was eine unbekannte ID als
+    /// Passwort-Login gerendert hätte).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum ProviderId {
+        Passwort => ID_PASSWORT,
+        Dev => ID_DEV,
+        Oidc => ID_OIDC,
+        Webauthn => ID_WEBAUTHN,
+    }
 }
 
 impl ProviderId {
-    /// Alle Varianten. Bei einer neuen Variante bricht die Array-Länge den Build → bewusster
-    /// Pflege-Anker (zusammen mit den exhaustiven `match`-Armen unten).
-    const ALLE: [ProviderId; 4] = [
-        ProviderId::Passwort,
-        ProviderId::Dev,
-        ProviderId::Oidc,
-        ProviderId::Webauthn,
-    ];
-
-    fn as_str(self) -> &'static str {
-        match self {
-            ProviderId::Passwort => ID_PASSWORT,
-            ProviderId::Dev => ID_DEV,
-            ProviderId::Oidc => ID_OIDC,
-            ProviderId::Webauthn => ID_WEBAUTHN,
-        }
-    }
-
     fn typ(self) -> AuthProviderTyp {
         match self {
             ProviderId::Passwort => AuthProviderTyp::Passwort,
@@ -98,10 +84,6 @@ impl ProviderId {
             ProviderId::Oidc => "PocketID",
             ProviderId::Webauthn => "Passkey",
         }
-    }
-
-    fn parse(id: &str) -> Option<ProviderId> {
-        ProviderId::ALLE.into_iter().find(|p| p.as_str() == id)
     }
 
     /// Ob sich ein Admin über diesen Provider verlässlich anmelden kann (Lockout-Schutz-MUST).

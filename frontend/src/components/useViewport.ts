@@ -4,45 +4,34 @@ import type { Breakpoint } from 'antd';
 
 /**
  * Viewport-Primitiv (LFH-329 · B1/H24) — **der einzige erlaubte Zugang** zu Breiten- und
- * Zeigerfragen im Produktivcode. Erzwungen von `useViewport.guard.test.ts`, nicht bloß
- * behauptet.
+ * Zeigerfragen im Produktivcode, erzwungen von `useViewport.guard.test.ts`.
  *
  * ── Die Schwellen kommen aus antd und werden NICHT gespiegelt ───────────────────────────
  * `md` = 768, `lg` = 992 (antd `theme/util/alias.js`). Eine zweite Wahrheit in
- * `theme/tokens.ts` würde still driften, und ein zusätzlicher Schlüssel in `flaeche` bräche
- * dessen `toEqual`-Pin auf exakt fünf Maße. Ein punktuelles Überschreiben von `screenMD`
- * am `ConfigProvider` ist außerdem verboten: antds `validateBreakpoints` WIRFT, wenn die
- * Min/Max-Nachbarn nicht widerspruchsfrei sind — das ist ein Laufzeitfehler, kein stiller
- * Rückfall.
+ * `theme/tokens.ts` driftete still. `screenMD` am `ConfigProvider` zu überschreiben ist
+ * verboten: antds `validateBreakpoints` WIRFT bei widersprüchlichen Nachbarn.
  *
  * ── `xs` ist ausgeschlossen ─────────────────────────────────────────────────────────────
- * antds Screen-Karte ist nicht gleichförmig „mindestens so breit": `xs` ist als einzige
- * Stufe eine `max-width`-Abfrage, alle anderen sind `min-width`. Bei 1024 px wäre
- * `screens.xs` falsch — `abBreite('xs')` läse sich also als „schmaler als xs" und damit als
- * die Umkehrung dessen, was der Name verspricht. {@link AbBreitePunkt} schließt die Stufe
- * aus, damit der falsche Aufruf schon am Typecheck scheitert. Dieselbe Warnung gilt für
- * die roh mitgelieferte {@link ViewportZustand.screens}-Karte.
+ * `xs` ist als einzige Stufe eine `max-width`-Abfrage; `abBreite('xs')` läse sich als Umkehrung
+ * dessen, was der Name verspricht. {@link AbBreitePunkt} schließt die Stufe am Typ aus. Dieselbe
+ * Warnung gilt für die roh mitgelieferte {@link ViewportZustand.screens}-Karte.
  *
  * ── Erst-Render ist BREIT, nicht schmal ─────────────────────────────────────────────────
- * `Grid.useBreakpoint()` liefert auf dem ersten Render `{}` und korrigiert erst im
- * `useLayoutEffect`. „Noch unbekannt" gilt hier deshalb als breit: der Primärkontext Fükw
- * bekommt den unkorrigierten Render, statt dass für einen Frame das Handy-Layout aufblitzt.
+ * `Grid.useBreakpoint()` liefert auf dem ersten Render `{}`. „Noch unbekannt" gilt als breit:
+ * der Primärkontext Fükw bekommt den unkorrigierten Render, statt dass für einen Frame das
+ * Handy-Layout aufblitzt.
  *
  * ── Zeigersignal: `(pointer: coarse)`, nicht `(any-pointer: coarse)` ────────────────────
- * `pointer` beschreibt den PRIMÄREN Zeiger. Konservativ gewählt: `any-pointer` schlüge auch
- * am Fükw-Laptop mit Touchscreen an und erzwänge dort dauerhaft größere Trefflächen. Der
- * Preis ist das 2-in-1-Führungstablet mit angesteckter Tastatur, das dann `fine` meldet.
- * Was aus dem Signal folgt, entscheidet B5: seit LFH-361 belegt es über
- * {@link zeigerIstGrob} die Dichtestufe vor, wenn noch keine Wahl gespeichert ist.
- * Der Preis oben ist damit real geworden — das 2-in-1 mit Tastatur startet kompakt und
- * muss von Hand umgeschaltet werden. Bewusst so: lieber eine Stufe zu eng anbieten als
- * einen Umschalter, der sich beim Neuladen selbst zurückdreht. Die Bauform — Abfrage einmal im
- * `useState`-Initialisierer lesen, Änderung über einen `change`-Zuhörer im Effekt — folgt
- * `theme/ThemeModeProvider.tsx`, das die Dunkelmodus-Frage genauso stellt.
+ * `pointer` beschreibt den PRIMÄREN Zeiger; `any-pointer` schlüge auch am Fükw-Laptop mit
+ * Touchscreen an. Das Signal belegt über {@link zeigerIstGrob} die Dichtestufe vor, wenn keine
+ * Wahl gespeichert ist (LFH-361). Preis: ein 2-in-1-Tablet mit Tastatur meldet `fine` und
+ * startet kompakt — lieber eine Stufe zu eng als ein Umschalter, der sich beim Neuladen
+ * zurückdreht. Bauform wie `theme/ThemeModeProvider.tsx`: Abfrage im
+ * `useState`-Initialisierer, Änderung über einen `change`-Zuhörer im Effekt.
  *
  * ── Neben, nicht statt der Container-Abfragen ───────────────────────────────────────────
- * Die Staffelung in `theme/sprache.css` (1100/700 px) bleibt bestehen: eine Container-Abfrage
- * misst die Fläche des INHALTS, dieser Hook den Viewport. Zwei Fragen, zwei Zahlen.
+ * Die Staffelung in `theme/sprache.css` (1100/700 px) misst die Fläche des INHALTS, dieser Hook
+ * den Viewport. Zwei Fragen, zwei Zahlen.
  */
 
 /** Zeigerabfrage für Berührungsbedienung. Bewusst der primäre Zeiger — siehe Dateikopf. */
@@ -77,18 +66,12 @@ export function abBreiteAus(screens: ScreensKarte, punkt: AbBreitePunkt): boolea
 }
 
 /**
- * Einmalige Momentaufnahme der Zeigerart, ohne Hook und ohne Zuhörer.
+ * Einmalige Momentaufnahme der Zeigerart, ohne Hook und ohne Zuhörer — für Aufrufer, die VOR
+ * dem ersten Render fragen: die Vorbelegung der Dichtestufe in `theme/ThemeModeProvider.tsx`
+ * (LFH-361 · B5a).
  *
- * Exportiert für Aufrufer, die die Frage VOR dem ersten Render stellen müssen
- * und deshalb keinen Hook nehmen können — heute genau einer: die Vorbelegung
- * der Dichtestufe in `theme/ThemeModeProvider.tsx` (LFH-361 · B5a), die im
- * `useState`-Initialisierer entschieden wird.
- *
- * Sie steht bewusst HIER und nicht dort: der Viewport-Guard verlangt, dass
- * Medienabfragen im Primitiv liegen, und `ThemeModeProvider.tsx` ist nur für
- * die Dunkelmodus-Frage freigestellt. Eine zweite, handgeschriebene
- * Zeigerabfrage dort liefe zwar durch die Datei-Freistellung, machte aber
- * deren Begründung unwahr — ohne dass ein Test rot würde.
+ * Sie steht HIER, weil der Viewport-Guard Medienabfragen im Primitiv verlangt und
+ * `ThemeModeProvider.tsx` nur für die Dunkelmodus-Frage freigestellt ist.
  *
  * Wer auf ÄNDERUNGEN reagieren muss, nimmt {@link useViewport}, nicht dies.
  */

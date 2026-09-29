@@ -20,6 +20,12 @@
 //! befriedigt worden (ungenutzte Importe sind hier nur eine Warnung, kein Fehler). Nebenbei
 //! löst das die Namenskollision `schaden::AbschlussGrund` vs. `tier::AbschlussGrund` ohne Alias.
 //!
+//! Seit `wire_enum!` (`src/wire_enum.rs`) lesen Serde-Rename, `as_str()` und `parse()` eines
+//! so gebauten Enums dasselbe Literal; Wire == `as_str()` gilt dort per Bau. Die Datei trägt
+//! deshalb vor allem die Vollständigkeit (beide Ebenen oben), die Literal-Pins in `enum_wire!`
+//! und den Vergleich für die handgeschriebenen Enums. Wo ein Enum schon per `enum_wire!`
+//! gegen Literale gepinnt ist, steht kein zweiter `enum_wire_as_str!`-Block mehr daneben.
+//!
 //! Werkzeugwahl (LFH-312): `macro_rules!` mit eingebettetem exhaustivem `match` — dep-frei,
 //! ohne Produktivcode-Änderung, gesamter Zwang in dieser einen Testdatei. `strum::EnumIter`
 //! wäre eine neue direkte Dependency (heute nur transitiv via `croner`) samt
@@ -556,15 +562,7 @@ fn stab_besetzung_art_wire() {
 /// `migrations/0116_einsatz_dokument.sql` — Drift endet sonst im Constraint-Sicherheitsnetz.
 #[test]
 fn dokument_kategorie_wire() {
-    enum_wire_as_str!(lifeline_hub::dokument::DokumentKategorie {
-        LagekartePlan,
-        Befehl,
-        Formular,
-        Foto,
-        Sonstiges,
-    });
-    // Zusätzlich gegen die Literale der CHECK-Liste und gegen `ALLE` (Anzeigereihenfolge
-    // UND Parse-Basis: eine dort vergessene Variante wäre per API nicht ablegbar).
+    // Gegen die Literale der CHECK-Liste und gegen `ALLE` (Anzeigereihenfolge).
     enum_wire!(lifeline_hub::dokument::DokumentKategorie {
         LagekartePlan => "lagekarte_plan",
         Befehl => "befehl",
@@ -618,15 +616,9 @@ fn abloesung_einstufung_wire() {
 }
 
 /// LFH-639: Betreuung. Die vier Enums tragen die DB-CHECK-Werte aus
-/// `migrations/0117_betreuung.sql`; zusätzlich gegen die Literale und gegen `ALLE`, weil
-/// `parse` die Werte einzeln aufzählt und eine dort vergessene Variante per API nicht
-/// setzbar wäre.
+/// `migrations/0117_betreuung.sql` und sind hier gegen die Literale gepinnt.
 #[test]
 fn betreuung_erhebung_wire() {
-    enum_wire_as_str!(lifeline_hub::betreuung::Erhebung {
-        Gezaehlt,
-        Geschaetzt,
-    });
     enum_wire!(lifeline_hub::betreuung::Erhebung {
         Gezaehlt => "gezaehlt",
         Geschaetzt => "geschaetzt",
@@ -635,12 +627,6 @@ fn betreuung_erhebung_wire() {
 
 #[test]
 fn betreuung_raeumungszustand_wire() {
-    enum_wire_as_str!(lifeline_hub::betreuung::Raeumungszustand {
-        Angeordnet,
-        Laeuft,
-        Geraeumt,
-        Aufgehoben,
-    });
     enum_wire!(lifeline_hub::betreuung::Raeumungszustand {
         Angeordnet => "angeordnet",
         Laeuft => "laeuft",
@@ -653,18 +639,9 @@ fn betreuung_raeumungszustand_wire() {
 /// Import-Kopf — ein geänderter Wire-Wert machte gespeicherte Berichte unlesbar.
 #[test]
 fn demo_bericht_enums_wire() {
-    enum_wire_as_str!(lifeline_hub::demo::DemoVorgang {
-        Importiert,
-        Entfernt,
-    });
     enum_wire!(lifeline_hub::demo::DemoVorgang {
         Importiert => "importiert",
         Entfernt => "entfernt",
-    });
-    enum_wire_as_str!(lifeline_hub::demo::DemoStammdatenArt {
-        Fahrzeug,
-        Personal,
-        Material,
     });
     enum_wire!(lifeline_hub::demo::DemoStammdatenArt {
         Fahrzeug => "fahrzeug",
@@ -675,12 +652,6 @@ fn demo_bericht_enums_wire() {
 
 #[test]
 fn betreuung_betreuungsstelle_art_wire() {
-    enum_wire_as_str!(lifeline_hub::betreuung::BetreuungsstelleArt {
-        Anlaufstelle,
-        Betreuungsstelle,
-        Betreuungsplatz,
-        Notunterkunft,
-    });
     enum_wire!(lifeline_hub::betreuung::BetreuungsstelleArt {
         Anlaufstelle => "anlaufstelle",
         Betreuungsstelle => "betreuungsstelle",
@@ -691,11 +662,6 @@ fn betreuung_betreuungsstelle_art_wire() {
 
 #[test]
 fn betreuung_betreuungsstelle_status_wire() {
-    enum_wire_as_str!(lifeline_hub::betreuung::BetreuungsstelleStatus {
-        Vorbereitet,
-        InBetrieb,
-        Geschlossen,
-    });
     enum_wire!(lifeline_hub::betreuung::BetreuungsstelleStatus {
         Vorbereitet => "vorbereitet",
         InBetrieb => "in_betrieb",
@@ -707,11 +673,10 @@ fn betreuung_betreuungsstelle_status_wire() {
 /// Wire-Event-Namen — die Emitter routen über `as_str()`, utoipa erzeugt daraus die
 /// FE-Union (`types.generated.ts`). Pinnt jede Variante gegen ihr load-bearing Wire-Literal
 /// (aus der Mapping-Tabelle kopiert, NICHT aus dem Variantennamen abgeleitet — sonst fällt ein
-/// falscher `rename` nicht auf) UND dass `serde` == `as_str()` (sonst driftet die generierte
-/// openapi-Union still vom echten Wire, den das FE exakt filtert).
+/// geändertes Literal nicht auf).
 ///
-/// Zusätzlich (LFH-312): jede Variante muss in `LiveEvent::ALLE` stehen — dem handgepflegten
-/// Slice, über das die SSE-Gate-Tests in `src/live/mod.rs` iterieren.
+/// Zusätzlich (LFH-312): jede Variante muss in `LiveEvent::ALLE` stehen — dem Slice, über das
+/// die SSE-Gate-Tests in `src/live/mod.rs` iterieren.
 #[test]
 fn live_event_wire() {
     enum_wire!(lifeline_hub::live::LiveEvent {
@@ -747,16 +712,6 @@ fn live_event_wire() {
         Sofortmeldung => "sofortmeldung",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);
-
-    // serde == as_str() für jede Variante. Über `ALLE` iteriert statt neu aufgezählt — der
-    // Block oben hat bereits belegt, dass `ALLE` genau alle Varianten enthält.
-    for ev in lifeline_hub::live::LiveEvent::ALLE {
-        assert_eq!(
-            serde_json::to_value(ev).unwrap(),
-            serde_json::json!(ev.as_str()),
-            "Serde-Wire != as_str() für {ev:?} — utoipa-Union würde still driften",
-        );
-    }
 }
 
 // ───────────────────────── Inventar-Guard (LFH-312) ─────────────────────────

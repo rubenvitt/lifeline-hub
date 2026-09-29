@@ -3,67 +3,41 @@ import type { InputRef } from 'antd';
 import { useId, useRef, useState } from 'react';
 
 /**
- * Schnellanlegen eines Ein-Feld-Katalogeintrags (LFH-332 · B4).
- *
- * **Das Problem, gemessen am 29.07.2026 (Befund M43).** Neun von neun
- * Stammdaten-Modalen schliessen nach dem Speichern. Wer 25 Qualifikationen
- * nachtraegt, klickt drei Mal je Eintrag — oeffnen, tippen, speichern —, also
- * 75 Mal fuer eine Liste, in der nur ein einziges Feld Pflicht ist.
- *
- * **Das Vorbild liegt im Repo**, nicht in einem Entwurf: `StichworteTab` traegt
- * seit jeher genau diese Zeile — Eingabefeld, Knopf, Reset im Erfolgsfall, kein
- * Dialog. Dieses Primitiv hebt das Muster aus der einen Datei heraus, damit die
- * vier Katalogtabs es teilen statt es zu kopieren.
+ * Schnellanlegen eines Ein-Feld-Katalogeintrags (LFH-332 · B4): Eingabefeld, Knopf, Reset im
+ * Erfolgsfall, kein Dialog — statt eines Modals, das nach jedem Eintrag schließt.
  *
  * ── ABGRENZUNG ZU `Erfassung.tsx` ──────────────────────────────────
  *
- * `ErfassungsFormular` traegt ein antd-`Form` mit mehreren `Form.Item`, einen
- * Serienzaehler und Wertuebernahme. Das ist die richtige Huelle fuer eine
- * Erfassungsmaske mit fuenf Feldern. Hier gibt es **ein** Feld; ein Formular
- * mit Validierungsschicht darum waere Aufbau ohne Ertrag. Die eine Regel, die
- * beide teilen, ist der Vertrag von `onAnlegen`: **es muss ablehnen, wenn das
- * Speichern fehlschlaegt** (`mutateAsync`, nicht `mutate`) — sonst leert dieses
- * Primitiv das Feld, obwohl der Eintrag nie ankam.
+ * Hier gibt es **ein** Feld; ein Formular mit Validierungsschicht wäre Aufbau ohne Ertrag. Beide
+ * teilen den Vertrag von `onAnlegen`: **es muss ablehnen, wenn das Speichern fehlschlägt**
+ * (`mutateAsync`, nicht `mutate`) — sonst leert das Primitiv das Feld, obwohl der Eintrag nie
+ * ankam.
  *
  * ── KEIN FORMULAR, UND DAS IST ABSICHT ─────────────────────────────
  *
- * Weder ein antd-`Form` noch ein natives `<form>`. Abgeschickt wird ueber
- * `onClick` und `onPressEnter`, **nicht** ueber `htmlType="submit"`. Grund: das
- * Primitiv steht dauerhaft auf der Seite und kann jederzeit in einem fremden
- * Formular landen (eine Einstellungsseite, ein Filterrahmen). Ein
- * verschachteltes Formular schickt beim Absenden das aeussere Formular nativ
- * mit ab und laedt die Seite neu — im Repo bereits einmal gemessen und als
- * Erinnerung festgehalten. Mit einem Klick-Ausloeser kann das nicht passieren.
+ * Weder antd-`Form` noch natives `<form>`; abgeschickt wird über `onClick` und `onPressEnter`,
+ * **nicht** über `htmlType="submit"`. Das Primitiv kann in einem fremden Formular landen, und
+ * ein verschachteltes Formular schickt beim Absenden das äußere nativ mit ab und lädt die Seite
+ * neu.
  *
  * ── DREI KLEINE ENTSCHEIDUNGEN ─────────────────────────────────────
  *
- * 1. Der Knopf wird bei leerem Feld **nicht abgeschaltet**, er tut dann nur
- *    nichts — wie im Vorbild. Ein ausgegrauter Primaerknopf ist auf einer sonst
- *    leeren Katalogseite die einzige sichtbare Handlung; ausgegraut sieht sie
- *    aus wie fehlendes Recht, nicht wie fehlender Text.
- *    **Genau deshalb ist `gesperrt` eine eigene Prop** (LFH-346, Nacharbeit zu
- *    Befund M45) und kein abgeleiteter Zustand: das Grau bedeutet hier nun
- *    tatsaechlich fehlendes Recht — und den Unterschied zum leeren Feld traegt
- *    nicht die Faerbung, sondern der `RechteHinweis` ueber der Zeile. Ohne diese
- *    Prop konnte eine Sektion die Zeile nur ganz VERSTECKEN, und ein fehlender
- *    Knopf ist von „diese Seite kann das gar nicht" nicht zu unterscheiden.
- * 2. Der Fokus kehrt **im naechsten Bild** ins Feld zurueck, nicht sofort —
- *    dieselbe Vorsichtsmassnahme wie in `Erfassung.tsx`, wo gemessen wurde, dass
- *    ein direkter `focus()` nach dem Speichern auf `<body>` landet. Ehrlich
- *    dazugesagt: HIER ist der direkte Aufruf in jsdom ebenfalls gruen (das Feld
- *    wird nicht neu montiert, nur neu gerendert) — die Verzoegerung deckt also
- *    einen Fall ab, den der Test nicht zeigen kann, und kostet nichts.
- * 3. Geleert wird **nur, wenn im Feld noch der abgeschickte Text steht.** Das
- *    Vorbild leert unbedingt (`setNeuerText('')` im `onSuccess`) und frisst
- *    damit die naechste Eingabe, wenn jemand weitertippt, waehrend der
- *    vorherige Datensatz noch unterwegs ist — genau der Minutentakt an
- *    Aufnahme/BHP/BTP, fuer den dieses Primitiv existiert.
+ * 1. Der Knopf wird bei leerem Feld **nicht abgeschaltet**, er tut dann nur nichts: ausgegraut
+ *    sähe die einzige sichtbare Handlung aus wie fehlendes Recht. **Deshalb ist `gesperrt` eine
+ *    eigene Prop** (LFH-346): das Grau bedeutet fehlendes Recht, und den Grund trägt der
+ *    `RechteHinweis` über der Zeile. Die Zeile bleibt sichtbar, statt zu verschwinden.
+ * 2. Der Fokus kehrt **im nächsten Bild** ins Feld zurück, dieselbe Vorsicht wie in
+ *    `Erfassung.tsx`, wo ein direkter `focus()` auf `<body>` landete. In jsdom ist der direkte
+ *    Aufruf hier ebenfalls grün; die Verzögerung kostet nichts.
+ * 3. Geleert wird **nur, wenn im Feld noch der abgeschickte Text steht** — sonst fräße das
+ *    Leeren die nächste Eingabe, wenn jemand weitertippt, während der vorige Datensatz noch
+ *    unterwegs ist.
  */
 
 interface SchnellAnlegenProps {
   /**
-   * Sichtbare Beschriftung ueber dem Feld — und zugleich sein zugaenglicher
-   * Name (echtes `<label for>`, kein Platzhalter als Ersatz).
+   * Sichtbare Beschriftung über dem Feld und zugleich sein zugänglicher Name (echtes
+   * `<label for>`, kein Platzhalter als Ersatz).
    */
   beschriftung: string;
   /** Beispieltext im leeren Feld. Ergaenzt die Beschriftung, ersetzt sie nicht. */
@@ -71,18 +45,15 @@ interface SchnellAnlegenProps {
   /** Beschriftung des Knopfes. Default `'Anlegen'`. */
   knopfText?: string;
   /**
-   * Anlegen. Bekommt den **beschnittenen** Text; wird bei leerer Eingabe nie
-   * gerufen. **Muss bei Ablehnung ablehnen** — sonst leert die Zeile das Feld,
-   * obwohl der Eintrag nie ankam. Die Fehlermeldung bleibt beim Aufrufer
-   * (`onError` der Mutation).
+   * Anlegen. Bekommt den **beschnittenen** Text; wird bei leerer Eingabe nie gerufen. **Muss bei
+   * Ablehnung ablehnen**, sonst leert die Zeile das Feld. Die Fehlermeldung bleibt beim Aufrufer.
    */
   onAnlegen: (text: string) => Promise<unknown>;
   /** Laeuft die Mutation? Setzt den Knopf auf Ladeanzeige. */
   laeuft?: boolean;
   /**
-   * Fehlt das Recht? Sperrt **Feld und Knopf** — die Zeile bleibt sichtbar, statt
-   * zu verschwinden (Kopf, 1.). Den Grund nennt der Aufrufer ueber seinen
-   * `RechteHinweis`; dieses Primitiv kennt ihn nicht und erfindet ihn nicht.
+   * Fehlt das Recht? Sperrt **Feld und Knopf** — die Zeile bleibt sichtbar (Kopf, 1.). Den Grund
+   * nennt der Aufrufer über seinen `RechteHinweis`.
    */
   gesperrt?: boolean;
 }
@@ -105,27 +76,19 @@ export default function SchnellAnlegen({
   const [text, setText] = useState('');
 
   async function anlegen() {
-    // Laeuft schon einer: kein zweiter. Dieser Riegel traegt BEIDE Wege — Knopf
-    // und Enter im Feld. Ob antd einen Klick auf einen ladenden Knopf ohnehin
-    // verwirft, ist damit gleichgueltig und wird hier nicht vorausgesetzt.
+    // Läuft schon einer: kein zweiter. Der Riegel trägt BEIDE Wege — Knopf und Enter im Feld.
     if (laeuft) return;
-    // Kein Recht: nichts anlegen. Der Riegel sitzt HIER und nicht am Knopf —
-    // ein gesperrter Knopf verwirft Klicks von selbst, aber `onPressEnter` haengt
-    // am Feld, und ein Tastendruck erreicht dessen React-Handler auch dann noch.
-    // Verlassen wird sich darauf nicht: dass antd/der Browser eine gesperrte
-    // Eingabe stumm schaltet, ist eine Annahme ueber die Bibliothek, dieser
-    // Riegel ist eine Zusicherung dieses Primitivs.
+    // Kein Recht: nichts anlegen. Der Riegel sitzt HIER und nicht am Knopf, weil `onPressEnter` am
+    // Feld hängt; dass eine gesperrte Eingabe stumm bleibt, wird nicht vorausgesetzt.
     if (gesperrt) return;
     const abgeschickt = text;
     const wert = abgeschickt.trim();
-    // Leer oder nur Leerzeichen: nichts tun. Kein Fehlerton — es ist kein
-    // Fehler, sondern eine Eingabe, die noch nicht angefangen hat.
+    // Leer oder nur Leerzeichen: nichts tun, kein Fehler.
     if (wert === '') return;
     try {
       await onAnlegen(wert);
     } catch {
-      // Abgelehnt: Text stehen lassen, damit die Eingabe nicht verloren geht.
-      // Gemeldet hat der Aufrufer bereits.
+      // Abgelehnt: Text stehen lassen. Gemeldet hat der Aufrufer bereits.
       return;
     }
     // Nur leeren, wenn niemand zwischenzeitlich weitergetippt hat (Kopf, 3.).

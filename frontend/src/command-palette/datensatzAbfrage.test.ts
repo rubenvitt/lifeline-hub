@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { datensatzAbfrage, etbNummerAbfrage, FRISCH_MS } from './datensatzAbfrage';
 
 /**
- * Die Abrufoptionen, die Palette UND Vorschau teilen (LFH-664). Die Schlüssel stehen hier als
- * LITERALE, nicht über `einsatzKeys` gebaut: sonst prüfte die Factory sich gegen sich selbst
- * (CLAUDE.md, Query-Key-Registry). Ein geänderter Schlüssel bricht nichts Sichtbares — er
- * trifft still ein anderes Fach, und die Vorschau lüde neu, statt den Stand der Trefferliste
- * zu zeigen.
+ * Die Abrufoptionen, die Palette UND Vorschau teilen. Die Schlüssel stehen als LITERALE da, sonst
+ * prüfte die Factory sich selbst; ein geänderter Schlüssel träfe still ein anderes Fach.
  */
 describe('datensatzAbfrage (LFH-664)', () => {
   it('liefert je Quelle genau das Bestandsfach der Palette', () => {

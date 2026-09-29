@@ -2,21 +2,13 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import StatusKatalogTab from './StatusKatalogTab';
+import { adminFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-26 10:00:00',
-};
-const nichtAdmin = { ...admin, system_rolle: 'keiner' };
+const admin = adminFixture();
+const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
 
 /**
  * Die Feldtypen stehen ausgeschrieben da, statt aus den Werten geschlossen zu werden:
@@ -45,14 +37,10 @@ const status: {
 
 function render(benutzer: typeof admin, statusListe: typeof status = status) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+    meHandler(benutzer),
     http.get('/api/fahrzeug-status', () => HttpResponse.json(statusListe)),
   );
-  return renderMitProviders(
-    <AuthProvider>
-      <StatusKatalogTab />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<StatusKatalogTab />);
 }
 
 describe('StatusKatalogTab', () => {
@@ -188,14 +176,10 @@ describe('StatusKatalogTab', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/fahrzeug-status', () => new HttpResponse(null, { status: 500 })),
     );
-    renderMitProviders(
-      <AuthProvider>
-        <StatusKatalogTab />
-      </AuthProvider>,
-    );
+    renderMitProviders(<StatusKatalogTab />);
 
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Kein Status')).not.toBeInTheDocument();

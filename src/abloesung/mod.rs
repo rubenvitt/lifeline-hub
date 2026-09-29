@@ -11,7 +11,8 @@
 //!
 //! Spec: `openspec/changes/lfh-635-fachmodul-abloesung/`
 
-use chrono::NaiveDateTime;
+use crate::wire_enum::wire_enum;
+use crate::zeit;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -24,122 +25,57 @@ pub const VORWARNUNG_MINUTEN: i64 = 30;
 /// Obergrenze eines Rhythmus: 7 Tage in Minuten (DB-CHECK in `0114_abloesung.sql`).
 pub const RHYTHMUS_MAX_MINUTEN: i64 = 10_080;
 
-/// Status einer Schicht. Wire == `as_str()`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AbloesungStatus {
-    /// Die Einheit ist im Einsatz, die Ablösung steht aus.
-    Laufend,
-    /// Die Ablösung ist vollzogen.
-    Abgeloest,
-}
-
-impl AbloesungStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            AbloesungStatus::Laufend => "laufend",
-            AbloesungStatus::Abgeloest => "abgeloest",
-        }
+wire_enum! {
+    /// Status einer Schicht. Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AbloesungStatus {
+        /// Die Einheit ist im Einsatz, die Ablösung steht aus.
+        Laufend => "laufend",
+        /// Die Ablösung ist vollzogen.
+        Abgeloest => "abgeloest",
     }
+    try_from = |s| format!("Ungültiger Ablösungsstatus: {s}");
+}
 
-    pub fn parse(s: &str) -> Option<AbloesungStatus> {
-        match s {
-            "laufend" => Some(AbloesungStatus::Laufend),
-            "abgeloest" => Some(AbloesungStatus::Abgeloest),
-            _ => None,
-        }
+wire_enum! {
+    /// Herkunft des Rhythmus einer Schicht. Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum RhythmusQuelle {
+        /// Folgt der Vorgabe des Abschnitts und wandert mit, wenn sie sich ändert.
+        Abschnitt => "abschnitt",
+        /// Eigener Wert der Schicht; eine Änderung der Abschnittsvorgabe lässt ihn stehen.
+        Einheit => "einheit",
     }
+    try_from = |s| format!("Ungültige Rhythmusquelle: {s}");
 }
 
-impl TryFrom<String> for AbloesungStatus {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        AbloesungStatus::parse(&s).ok_or_else(|| format!("Ungültiger Ablösungsstatus: {s}"))
+wire_enum! {
+    /// Einstufung einer laufenden Schicht gegen die aktuelle Zeit. Höchstens drei Stufen
+    /// (EEMUA 191/ISA-18.2: ≤ 3 Eskalationsstufen). Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Einstufung {
+        Planmaessig => "planmaessig",
+        /// Fälligkeit höchstens [`VORWARNUNG_MINUTEN`] entfernt.
+        Vorwarnung => "vorwarnung",
+        /// Fälligkeit erreicht oder überschritten.
+        Ueberfaellig => "ueberfaellig",
     }
-}
-
-/// Herkunft des Rhythmus einer Schicht. Wire == `as_str()`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum RhythmusQuelle {
-    /// Folgt der Vorgabe des Abschnitts und wandert mit, wenn sie sich ändert.
-    Abschnitt,
-    /// Eigener Wert der Schicht; eine Änderung der Abschnittsvorgabe lässt ihn stehen.
-    Einheit,
-}
-
-impl RhythmusQuelle {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            RhythmusQuelle::Abschnitt => "abschnitt",
-            RhythmusQuelle::Einheit => "einheit",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<RhythmusQuelle> {
-        match s {
-            "abschnitt" => Some(RhythmusQuelle::Abschnitt),
-            "einheit" => Some(RhythmusQuelle::Einheit),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for RhythmusQuelle {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        RhythmusQuelle::parse(&s).ok_or_else(|| format!("Ungültige Rhythmusquelle: {s}"))
-    }
-}
-
-/// Einstufung einer laufenden Schicht gegen die aktuelle Zeit. Höchstens drei Stufen
-/// (EEMUA 191/ISA-18.2: ≤ 3 Eskalationsstufen). Wire == `as_str()`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Einstufung {
-    Planmaessig,
-    /// Fälligkeit höchstens [`VORWARNUNG_MINUTEN`] entfernt.
-    Vorwarnung,
-    /// Fälligkeit erreicht oder überschritten.
-    Ueberfaellig,
-}
-
-impl Einstufung {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Einstufung::Planmaessig => "planmaessig",
-            Einstufung::Vorwarnung => "vorwarnung",
-            Einstufung::Ueberfaellig => "ueberfaellig",
-        }
-    }
-}
-
-/// Parst einen DB-Zeitstempel (`YYYY-MM-DD HH:MM:SS`, UTC).
-pub fn parse_zeit(s: &str) -> Option<NaiveDateTime> {
-    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok()
-}
-
-/// Formatiert einen Zeitpunkt im DB-Format.
-pub fn fmt_zeit(t: NaiveDateTime) -> String {
-    t.format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
 /// Fälligkeit = Beginn + Rhythmus. `None` bei unparsbarem Beginn.
 pub fn faelligkeit(beginn_at: &str, rhythmus_minuten: i64) -> Option<String> {
-    parse_zeit(beginn_at).map(|b| fmt_zeit(b + chrono::Duration::minutes(rhythmus_minuten)))
+    zeit::plus_minuten(beginn_at, rhythmus_minuten)
 }
 
 /// Zeitpunkt der Vorwarnung = Fälligkeit − [`VORWARNUNG_MINUTEN`].
 pub fn vorwarnzeit(faellig_at: &str) -> Option<String> {
-    parse_zeit(faellig_at).map(|f| fmt_zeit(f - chrono::Duration::minutes(VORWARNUNG_MINUTEN)))
+    zeit::plus_minuten(faellig_at, -VORWARNUNG_MINUTEN)
 }
 
 /// Einstufung einer laufenden Schicht (rein, deterministisch testbar). Eine unparsbare
 /// Fälligkeit gilt defensiv als überfällig: sie soll auffallen, nicht verschwinden.
 pub fn einstufung(faellig_at: &str, jetzt: &str) -> Einstufung {
-    match (parse_zeit(faellig_at), parse_zeit(jetzt)) {
+    match (zeit::parse(faellig_at), zeit::parse(jetzt)) {
         (Some(f), Some(j)) => {
             if f <= j {
                 Einstufung::Ueberfaellig

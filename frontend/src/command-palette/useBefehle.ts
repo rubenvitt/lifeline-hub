@@ -1,4 +1,3 @@
-// frontend/src/command-palette/useBefehle.ts
 import { useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -23,19 +22,12 @@ const OHNE_GEDAECHTNIS: BefehlsGedaechtnis = { ids: [], merke: () => {} };
 /**
  * Verdrahtet Auth/Theme/Router/Query mit der reinen baueBefehle-Funktion.
  *
- * Das Befehls-Gedächtnis kommt als PARAMETER herein und wird hier NICHT selbst geholt
- * (LFH-391 · Etappe D). Beides hat einen gemessenen Grund: der Schreibweg muss den Unmount
- * der Palette überleben, und der Lesestand muss beim Öffnen schon dastehen — beides kann
- * nur ein Träger oberhalb der Palette leisten. Die Herleitung steht an `useZuletztBefehle`.
- * Optional, weil `useBefehle` auch ausserhalb des Paletten-Rahmens gerendert wird.
+ * Das Befehls-Gedächtnis kommt als PARAMETER von einem Träger oberhalb der Palette (Herleitung
+ * an `useZuletztBefehle`); optional, weil `useBefehle` auch außerhalb der Palette rendert.
  *
- * `navigate` kommt ebenfalls von AUSSEN, und zwar PFLICHT (LFH-645): es ist das `gehZu` des
- * Paletten-Hosts, der als EINZIGE Stelle den neuen Tab öffnet — derselbe Weg, den
- * Datensätze und Koordinatensprung nehmen. Der Hook hatte sein eigenes `useNavigate` und
- * reichte nur den Pfad weiter (`(p) => navigate(p)`); Strg/⌘+↵ öffnete damit jede feste
- * Navigationszeile still im aktuellen Tab (Review-Befund, `useBefehle.test.tsx`). Ein
- * optionales `navigate` mit Router-Rückfall liefe in genau denselben Fehler zurück.
- * Identitätsstabil übergeben — es steht in der Dependency-Liste unten.
+ * `navigate` ist PFLICHT: es ist das `gehZu` des Paletten-Hosts, der als EINZIGE Stelle den neuen
+ * Tab öffnet. Ein eigenes `useNavigate` öffnete Strg/⌘+↵ still im aktuellen Tab. Identitätsstabil
+ * übergeben, es steht in der Dependency-Liste.
  */
 export function useBefehle(
   tastaturAktionen: TastaturAktionen | undefined,
@@ -49,12 +41,8 @@ export function useBefehle(
   const { pathname } = useLocation();
   const einsatzId = einsatzIdAusPfad(pathname);
   /**
-   * Die AKTUELLE ROUTE als Modulschlüssel (LFH-391 · C4, Arbeitspunkt 3). Der Pfad lag hier
-   * schon — es braucht keine neue Prop, nur die Zerlegung, und die kommt aus der Registry
-   * statt zum dritten Mal von Hand (`EinsatzLayout`, `ModulStub`).
-   *
-   * Ein PRIMITIV in der Dependency-Liste unten, kein Registry-Objekt: dessen Identität ist
-   * zwar stabil, aber `?.key` sagt genau das, worauf die Befehlsliste reagieren soll.
+   * Die AKTUELLE ROUTE als Modulschlüssel, zerlegt über die Registry. Ein Primitiv in der
+   * Dependency-Liste, kein Registry-Objekt.
    */
   const aktuellerModulKey = modulAusPfad(pathname)?.key ?? null;
 
@@ -75,17 +63,9 @@ export function useBefehle(
   const darfSchreibenImEinsatz = darfImEinsatzSchreiben(aktuellerEinsatz, benutzer);
 
   /**
-   * Der Speicher liegt in localStorage, nicht in React: gelesen wird deshalb bei JEDEM
-   * Render — ein memoisierter Lesevorgang zeigte nach einem Modulwechsel noch den
-   * vorigen Stand. Die Liste hat höchstens drei Einträge, die Kosten sind ein
-   * `JSON.parse` pro Render.
-   *
-   * Über das PRIMITIV memoisiert, nicht über das Array: `leseZuletztModule` liefert je
-   * Render ein frisches Array, das als Dependency die Memoisierung darunter wirkungslos
-   * machte. Die Zeichenkette ist bei gleichem Inhalt identisch, das abgeleitete Array
-   * damit identitätsstabil — und die Dependency-Liste bleibt vollständig, ohne
-   * `eslint-disable`. Genau das meint die Lint-Disziplin in CLAUDE.md mit „strukturell
-   * lösen, nicht die fehlende Dependency stumpf hineinzwingen".
+   * Der Speicher liegt in localStorage, nicht in React: gelesen wird bei JEDEM Render (höchstens
+   * drei Einträge). Memoisiert über die Zeichenkette statt das je Render frische Array, damit die
+   * Dependency-Liste vollständig bleibt, ohne `eslint-disable`.
    */
   const zuletztSchluessel = einsatzId == null ? '' : leseZuletztModule(einsatzId).join(',');
   const zuletztModulKeys = useMemo(
@@ -94,13 +74,8 @@ export function useBefehle(
   );
 
   /**
-   * Die Aufzeichnung hängt seit der Fix-Welle (Befund B4) am BEWUSSTEN Klick, nicht mehr
-   * am Routenwechsel — die Palette ist neben dem Modul-Panel und dem Navigations-Drawer
-   * der dritte solche Weg.
-   *
-   * `useCallback` über `einsatzId`, weil die Funktion in der Dependency-Liste des
-   * `useMemo` darunter steht: eine je Render frisch gebaute Funktion baute die
-   * Befehlsliste bei jedem Render neu. Und ANDERS BENANNT als der Import — ein
+   * Aufzeichnung am BEWUSSTEN Klick, nicht am Routenwechsel. `useCallback`, weil die Funktion in
+   * den Dependencies des `useMemo` darunter steht. Anders benannt als der Import: ein
    * `merkeModulBesuch`, das sich selbst beschattet, prüft der Typecheck nicht.
    */
   const merkeBesuch = useCallback(
@@ -133,12 +108,8 @@ export function useBefehle(
         tastaturAktionen,
         userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
       }),
-    // `setDichte` gehört hier hinein und ist dafür identitätsstabil (useCallback im
-    // Provider) — das aus `useDichte()` zurückgegebene Objekt dagegen NICHT: es ist
-    // je Aufruf frisch und würde die Liste bei jedem Render neu bauen.
-    // `gedaechtnis` als GANZES in der Dependency-Liste: das Objekt ist beim Aufrufer
-    // memoisiert (`useZuletztBefehle`), seine beiden Felder einzeln zu listen brächte
-    // nichts ausser einer zweiten Stelle, an der eines vergessen werden kann.
+    // `setDichte` ist identitätsstabil, das Objekt aus `useDichte()` NICHT (je Aufruf frisch).
+    // `gedaechtnis` als Ganzes: es ist beim Aufrufer memoisiert.
     [
       einsatzId,
       benutzer,

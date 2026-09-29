@@ -15,20 +15,15 @@ interface KennzahlZeileProps {
   /** Wert rechts. */
   wert: ReactNode;
   /**
-   * Wert in der Zahlenschrift mit `tabular-nums` setzen (Default: ja).
-   *
-   * `false` für Werte, die keine Zahl sind — die Warnstufe im `ZonenInspector` ist ein
-   * `<Tag>`, dem die Monospace-Zahlenschrift nicht gehört. antds `Tag` setzt selbst keine
-   * `font-family`, würde sie also erben.
+   * Wert in der Zahlenschrift mit `tabular-nums` setzen (Default: ja). `false` für Werte, die
+   * keine Zahl sind (etwa ein `<Tag>`, der die Schrift sonst erbte).
    */
   zahl?: boolean;
 }
 
 /**
- * Eine Label→Wert-Zeile im Kennzahlen-Raster.
- *
- * Exportiert, damit der `zusatz`-Slot Zeilen im **selben** Layout beisteuern kann, statt
- * die Seite zwei Raster mischen zu lassen (Plan Task 5).
+ * Eine Label→Wert-Zeile im Kennzahlen-Raster. Exportiert, damit der `zusatz`-Slot Zeilen im
+ * **selben** Layout beisteuern kann.
  */
 export function KennzahlZeile({ label, wert, zahl = true }: KennzahlZeileProps) {
   const { token } = theme.useToken();
@@ -62,21 +57,16 @@ export interface GeoKennzahlenProps {
 }
 
 /**
- * Fläche / Umfang / Länge einer Geometrie als Label→Wert-Zeilen (LFH-328/A2, Task 5).
+ * Fläche / Umfang / Länge einer Geometrie als Label→Wert-Zeilen (LFH-328/A2).
  *
- * Vereint die drei Bauweisen, die es vorher für dasselbe Tripel gab: zweimal ein
- * `Descriptions` mit punktueller Kleingröße (`Inspector`, `FachebenenInspector`) und einmal
- * ein rohes Flex-Raster (`ZonenInspector`). Gewonnen hat die **Flex-Variante** — sie trägt
- * den `zusatz`-Fall, und die punktuelle Kleingröße läuft gegen Gate 4 (die Dichte kommt aus
- * dem `ConfigProvider`, nicht aus verstreuten Größenangaben).
- *
- * Die Zahlen stehen in `schrift.zahl` mit `font-variant-numeric: tabular-nums`
- * (A0 Signatur-Element 3, „Zahlen als Instrument"): so stehen die Stellen untereinander.
+ * Ein Flex-Raster statt `Descriptions` mit punktueller Kleingröße: es trägt den `zusatz`-Fall,
+ * und die Dichte kommt aus dem `ConfigProvider`. Zahlen in `schrift.zahl` mit
+ * `font-variant-numeric: tabular-nums`, damit die Stellen untereinander stehen.
  *
  * **Formatiert wird über `pages/lagekarte/geo.ts`** (`formatFlaeche`/`formatLaenge`, Intl
  * de-DE, hart metrisch). Die Vereinheitlichung mit `anzeige/format.ts:formatDistanz`
- * (`toFixed`, respektiert das Einheitensystem) ist **verboten** — beide Formate sind
- * gepinnt, die Zusammenführung ist ein eigenes Ticket (Spec §3.2 / §5 Befund 2).
+ * (`toFixed`, respektiert das Einheitensystem) ist **verboten** — beide Formate sind gepinnt,
+ * die Zusammenführung ist ein eigenes Ticket.
  *
  * Ohne Kennzahlen und ohne Zusatz rendert die Komponente nichts.
  */

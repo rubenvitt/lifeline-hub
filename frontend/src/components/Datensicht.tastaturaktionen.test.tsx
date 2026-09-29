@@ -1,4 +1,3 @@
-// frontend/src/components/Datensicht.tastaturaktionen.test.tsx
 import { describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -17,15 +16,12 @@ import Datensicht, {
 /**
  * Was die Werkzeugzeile der {@link Datensicht} an die Kommandopalette meldet (LFH-391 · B4).
  *
- * EIGENE DATEI, zwei gemessene Gründe: `vi.mock` hoistet dateiweit, und `src/test/setup.ts`
- * fährt MSW mit `onUnhandledRequest: 'error'` — das echte `useBefehle` fordert beim Öffnen
- * `/api/einsaetze` an und bräche den Lauf. Ein dateiweiter Mock in der 1200 Zeilen langen
- * `Datensicht.test.tsx` wäre für deren übrige Aussagen ein Nebeneffekt ohne Anlass.
+ * EIGENE DATEI: `vi.mock` hoistet dateiweit, und `src/test/setup.ts` fährt MSW mit
+ * `onUnhandledRequest: 'error'` — das echte `useBefehle` fordert `/api/einsaetze` an. Ein
+ * dateiweiter Mock in `Datensicht.test.tsx` wäre dort ein Nebeneffekt ohne Anlass.
  *
- * Die Attrappe reicht die REGISTRIERTEN Ids durch und beschriftet bewusst mit der Id selbst:
- * gegriffen wird hier auf `#cmd-tastatur:<id>`, nicht auf den Wortlaut. Der Wortlaut kommt in
- * der Produktion aus `TASTATUR_AKTIONEN` und ist dort gepinnt (`befehle.test.ts`) — würde er
- * hier behauptet, belegte der Test die Beschriftung dieser Attrappe statt der Produktion.
+ * Die Attrappe beschriftet mit der Id selbst, gegriffen wird auf `#cmd-tastatur:<id>`: der
+ * Wortlaut kommt aus `TASTATUR_AKTIONEN` und ist in `befehle.test.ts` gepinnt.
  */
 vi.mock('../command-palette/useBefehle', () => ({
   useBefehle: (aktionen: TastaturAktionen = {}) =>
@@ -96,14 +92,12 @@ function rendere(
  * Öffnet die Palette aus der Werkzeugzeile heraus und wartet, bis sie steht.
  *
  * Der Fokus muss VOR `Strg+K` im Suchfeld liegen: nur dann enthält die Ebenenkette die
- * Werkzeug-Ebene, deren Aktionen die Palette anzeigt. Gewartet wird auf
- * `filter-zuruecksetzen` — die Aktion, die die Werkzeugzeile IMMER registriert. Sie ist die
- * Positivhälfte zu jeder „… ist NICHT gemeldet"-Aussage unten: ohne sie wäre ein `null` nur
- * der Beleg, dass die Palette gar nicht offen ist.
+ * Werkzeug-Ebene. Gewartet wird auf `filter-zuruecksetzen`, das die Werkzeugzeile IMMER
+ * registriert — die Positivhälfte zu jeder „… ist NICHT gemeldet"-Aussage unten.
  */
 async function oeffnePalette(u: ReturnType<typeof userEvent.setup>) {
-  // Geklickt statt `.focus()` gerufen: der Fokuseintritt schließt die Zeilenschleuse und
-  // löst damit ein `setState` aus — direkt gerufen liefe das ausserhalb von `act`.
+  // Geklickt statt `.focus()`: der Fokuseintritt löst ein `setState` aus, das direkt gerufen
+  // außerhalb von `act` liefe.
   await u.click(screen.getByRole('searchbox', { name: 'Suche in Fahrzeuge' }));
   await u.keyboard('{Control>}k{/Control}');
   await waitFor(() =>
@@ -137,17 +131,12 @@ describe('Datensicht · Tastaturaktionen der Werkzeugzeile', () => {
     await u.click(option!);
 
     /*
-     * GESCOPT auf das SICHTBARE Overlay: antd lässt die Portale geschlossener Dropdowns im
-     * Baum stehen (CLAUDE.md, LFH-366) — ein ungescoptes `getByRole('checkbox')` träfe auch
-     * einen stehengebliebenen Knoten. Die Umkehrung („vorher nicht da") ist als Gegenprobe
-     * wertlos, weil rc-dropdown lazy mountet und der Knopf hier nie geklickt wurde; die
-     * tragende Gegenaussage sind deshalb die beiden Fälle unten, in denen die Palette den
-     * Befehl gar nicht erst anbietet.
+     * GESCOPT auf das SICHTBARE Overlay: antd lässt die Portale geschlossener Dropdowns im Baum
+     * stehen. Die tragende Gegenaussage sind die beiden Fälle unten, in denen die Palette den Befehl
+     * gar nicht erst anbietet („vorher nicht da" wäre wertlos, rc-dropdown mountet lazy).
      *
-     * Zugesichert wird „das Menü ist OFFEN", nicht „der Fokus steht darin":
-     * `CommandPalette.fuehreAus` ruft `schliesse()` VOR `ausfuehren()`, und wie sich die
-     * Fokusrückgabe des Modals gegen das `autoFocus` des Dropdowns verhält, rechnet jsdom
-     * nicht — diese Frage trägt der e2e.
+     * Zugesichert wird „das Menü ist OFFEN", nicht „der Fokus steht darin": wie sich die
+     * Fokusrückgabe des Modals gegen das `autoFocus` des Dropdowns verhält, rechnet jsdom nicht.
      */
     const menue = await waitFor(() => {
       const m = document.querySelector<HTMLElement>(
@@ -163,9 +152,8 @@ describe('Datensicht · Tastaturaktionen der Werkzeugzeile', () => {
     const u = userEvent.setup();
     const { unmount } = renderBasis(rendere(ZWEI_SPALTEN, 'karte'));
     await oeffnePalette(u);
-    // Der Schalter wird im Kartenzweig gar nicht gerendert — ein Befehl darauf zeigte ins
-    // Leere. Dieselbe Wahrheit lesen Schalter und Registrierung aus `hatWaehlbareSpalten`
-    // bzw. `alsTabelle`, damit die Palette nicht behaupten kann, was die Zeile nicht hält.
+    // Im Kartenzweig gibt es keinen Schalter, ein Befehl darauf zeigte ins Leere. Schalter und
+    // Registrierung lesen dieselbe Wahrheit (`hatWaehlbareSpalten` bzw. `alsTabelle`).
     expect(document.getElementById('cmd-tastatur:spalten')).toBeNull();
     unmount();
 
@@ -184,16 +172,14 @@ function offenesSpaltenMenue(): HTMLElement | null {
 
 describe('Datensicht · Spaltenmenü über einen Zweigwechsel', () => {
   /**
-   * Regression der kontrollierten Offen-Achse aus B4 (LFH-391).
+   * Regression der kontrollierten Offen-Achse (LFH-391 · B4).
    *
-   * Der `SpaltenSchalter` steht nur im Tabellenzweig, und `form='auto'` hängt an
-   * `abBreite('md')`. Verschwindet er, feuert antd KEIN `onOpenChange(false)` — der
-   * unkontrollierte Zustand starb früher mit der Komponente, der kontrollierte überlebt
-   * sie. Ohne Rücksetzer mountet der Schalter beim Zurückziehen mit `open={true}` und das
-   * Overlay klappt unaufgefordert über den Inhalt.
+   * Verschwindet der `SpaltenSchalter`, feuert antd KEIN `onOpenChange(false)`, und der
+   * kontrollierte Zustand überlebt die Komponente. Ohne Rücksetzer klappte das Overlay beim
+   * Zurückkehren unaufgefordert auf.
    *
-   * Beide Bedingungen des Schalters werden geprüft, nicht nur die Breite: er fällt genauso
-   * weg, wenn `hatWaehlbareSpalten` falsch wird (Wechsel der Spaltengarnitur).
+   * Beide Bedingungen werden geprüft: die Breite (`abBreite('md')` bei `form='auto'`) und
+   * `hatWaehlbareSpalten` (Wechsel der Spaltengarnitur).
    */
   it.each([
     { breit: 1024, schmal: 390 },
@@ -208,8 +194,8 @@ describe('Datensicht · Spaltenmenü über einen Zweigwechsel', () => {
       await u.click(screen.getByRole('button', { name: 'Spalten — Fahrzeuge' }));
       await waitFor(() => expect(offenesSpaltenMenue()).not.toBeNull());
 
-      // Fensterwechsel ZUR LAUFZEIT: der Stub feuert das `change`-Ereignis, das antds
-      // Beobachter als einziges liest — eine bloß gesetzte Breite erreicht ihn nicht mehr.
+      // Fensterwechsel ZUR LAUFZEIT: der Stub feuert das `change`-Ereignis, das antds Beobachter als
+      // einziges liest.
       await act(async () => {
         expect(sendeBreitenAenderung(schmal)).toBeGreaterThan(0);
       });
@@ -230,8 +216,8 @@ describe('Datensicht · Spaltenmenü über einen Zweigwechsel', () => {
     await u.click(screen.getByRole('button', { name: 'Spalten — Fahrzeuge' }));
     await waitFor(() => expect(offenesSpaltenMenue()).not.toBeNull());
 
-    // Eine einzige Spalte ist nie wählbar (die erste trägt die Kennung) — der Schalter
-    // gibt `null` zurück, ohne dass antd das Schließen meldet.
+    // Eine einzige Spalte ist nie wählbar (sie trägt die Kennung); der Schalter gibt `null`
+    // zurück, ohne dass antd das Schließen meldet.
     rerender(rendere(EINE_SPALTE, 'tabelle'));
     expect(screen.queryByRole('button', { name: /^Spalten/ })).toBeNull();
 

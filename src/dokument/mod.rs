@@ -4,6 +4,7 @@
 //!
 //! Nur hochgeladene Dateien, keine Verweise auf Lageberichte/Befehle (Entscheidung E3).
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -12,41 +13,20 @@ pub mod repo;
 /// Höchstlänge des Titels (Zeichen, nach `trim`).
 pub const TITEL_MAX: usize = 200;
 
-/// Kategorie eines abgelegten Dokuments. Wire == `as_str()`; `ALLE` ist zugleich die
-/// Anzeigereihenfolge (Vertrag, nicht Dekoration).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum DokumentKategorie {
-    LagekartePlan,
-    Befehl,
-    Formular,
-    Foto,
-    Sonstiges,
+wire_enum! {
+    /// Kategorie eines abgelegten Dokuments. Wire == `as_str()`; `ALLE` ist zugleich die
+    /// Anzeigereihenfolge (Vertrag, nicht Dekoration).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum DokumentKategorie {
+        LagekartePlan => "lagekarte_plan",
+        Befehl => "befehl",
+        Formular => "formular",
+        Foto => "foto",
+        Sonstiges => "sonstiges",
+    }
 }
 
 impl DokumentKategorie {
-    pub const ALLE: [DokumentKategorie; 5] = [
-        DokumentKategorie::LagekartePlan,
-        DokumentKategorie::Befehl,
-        DokumentKategorie::Formular,
-        DokumentKategorie::Foto,
-        DokumentKategorie::Sonstiges,
-    ];
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            DokumentKategorie::LagekartePlan => "lagekarte_plan",
-            DokumentKategorie::Befehl => "befehl",
-            DokumentKategorie::Formular => "formular",
-            DokumentKategorie::Foto => "foto",
-            DokumentKategorie::Sonstiges => "sonstiges",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Self> {
-        Self::ALLE.into_iter().find(|k| k.as_str() == s)
-    }
-
     /// Anzeige-Label (ETB-Text). Das FE hält sein eigenes Label (`dokumente/kategorien.ts`).
     pub fn label(&self) -> &'static str {
         match self {

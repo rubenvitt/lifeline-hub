@@ -51,9 +51,7 @@ mod tests {
     use chrono::TimeZone;
 
     fn utc(s: &str) -> DateTime<Utc> {
-        Utc.from_utc_datetime(
-            &chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").unwrap(),
-        )
+        Utc.from_utc_datetime(&crate::zeit::parse(s).unwrap())
     }
 
     #[test]

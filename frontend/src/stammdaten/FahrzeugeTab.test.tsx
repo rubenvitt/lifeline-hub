@@ -2,21 +2,13 @@ import { http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import FahrzeugeTab from './FahrzeugeTab';
+import { adminFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-26 10:00:00',
-};
-const nichtAdmin = { ...admin, system_rolle: 'keiner' };
+const admin = adminFixture();
+const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
 
 const fahrzeug = {
   id: 1,
@@ -40,17 +32,13 @@ const fahrzeug = {
 // und ließe sie an der Mehrdeutigkeit scheitern statt an der Sache.
 function render(benutzer: typeof admin, fahrzeuge = [fahrzeug]) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+    meHandler(benutzer),
     http.get('/api/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
     http.get('/api/fahrzeug-vorschlaege', () =>
       HttpResponse.json({ fahrzeugtyp: ['LF 20'], traegerorganisation: [], standort: [] }),
     ),
   );
-  return renderMitProviders(
-    <AuthProvider>
-      <FahrzeugeTab />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<FahrzeugeTab />);
 }
 
 describe('FahrzeugeTab', () => {
@@ -229,17 +217,13 @@ describe('FahrzeugeTab', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/fahrzeuge', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/fahrzeug-vorschlaege', () =>
         HttpResponse.json({ fahrzeugtyp: [], traegerorganisation: [], standort: [] }),
       ),
     );
-    renderMitProviders(
-      <AuthProvider>
-        <FahrzeugeTab />
-      </AuthProvider>,
-    );
+    renderMitProviders(<FahrzeugeTab />);
 
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch keine Fahrzeuge')).not.toBeInTheDocument();

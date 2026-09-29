@@ -608,7 +608,7 @@ test.describe('Gate 1', () => {
     test(`Gate 1 · ${name} (${breite} px): keine tragende Route läuft waagerecht über`, async ({
       page,
     }) => {
-      // 15+ Routen je Breite, jede mit `goto` und `networkidle`.
+      // 15+ Routen je Breite, jede mit `goto` und Inhaltsanker.
       test.slow();
 
       const einsatzId = await gate1Vorbereiten(page);
@@ -625,10 +625,10 @@ test.describe('Gate 1', () => {
         // Erst wenn der Rahmen steht, ist die Messung aussagekräftig. `first()`, weil der
         // Verwaltungsbereich zwei Rahmen schachtelt.
         await expect(page.locator('.ant-layout-content').first()).toBeVisible();
-        await page.waitForLoadState('networkidle');
         // Reiter-Umschaltungen o. Ä. VOR dem Anker, sonst prüft er eine Fläche außerhalb des Baums.
         if (vorbereiten) await vorbereiten(page);
-        // Erst der Anker belegt, dass die GEMEINTE Seite steht (nach `networkidle`).
+        // Erst der Anker belegt, dass die GEMEINTE Seite steht; er ersetzt das Warten auf ein
+        // ruhiges Netz, das der SSE-Strom nie hergibt (LFH-385).
         await expect(
           anker(page),
           `${pfad} bei ${breite}px: die gemeinte Seite ist nicht gerendert`,

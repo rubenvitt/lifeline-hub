@@ -445,9 +445,14 @@ mod tests {
         let st = setup().await;
         let (sid, _) = schaden(&st.pool, st.einsatz, st.benutzer).await;
         let (id, _) = ablage(&st, sid, "dach.jpg", "image/jpeg").await.unwrap();
-        schaden_repo::storniere(&st.pool, st.einsatz, sid, st.benutzer)
-            .await
-            .unwrap();
+        schaden_repo::storniere_tx(
+            &mut *st.pool.acquire().await.unwrap(),
+            st.einsatz,
+            sid,
+            st.benutzer,
+        )
+        .await
+        .unwrap();
         let anhaenge = zaehle(
             &st.pool,
             "SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?",

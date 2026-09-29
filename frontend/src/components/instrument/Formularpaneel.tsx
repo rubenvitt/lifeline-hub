@@ -4,13 +4,10 @@ import Paneel, { type PaneelUeberschrift } from './Paneel';
 import { useRollen } from './rollenwerte';
 
 /**
- * Feldgruppe einer Formularseite im Neuentwurf: ein `Paneel` mit Augenbrauen-Kopf statt
- * einer Überschrift über losen Feldern. Die Gruppe ist eine Überschrift der Ebene 2 — der
- * Seitentitel im Kopf ist das `h1`, die Paneele gliedern direkt darunter.
- *
- * Seit 22.09.2026 ein Baustein (vorher lokal in `pages/einstellungen/`): die Stammdaten-
- * Formulare (Organisation, Fahrzeug- und Personal-Detail) nutzen dieselbe feste Kombination
- * (Kopf + optionale Beschreibung + gepolsterter Körper + Abstand nach unten).
+ * Feldgruppe einer Formularseite: ein `Paneel` mit Augenbrauen-Kopf statt einer Überschrift über
+ * losen Feldern. Die Gruppe ist eine Überschrift der Ebene 2 — der Seitentitel ist das `h1`.
+ * Genutzt von Einstellungen und Stammdaten-Formularen (Kopf + optionale Beschreibung +
+ * gepolsterter Körper + Abstand nach unten).
  *
  * Die Felder bleiben Kinder desselben `<Form>` — das Paneel ist reine Hülle. Die sticky
  * Speichern-Leiste steht DANACH im selben `<form>` (Enter sendet, Erfassungs-Norm B4).

@@ -22,14 +22,12 @@ interface SektionHeaderProps {
 }
 
 /**
- * Wiederkehrender Sektions-Titel für die Verwaltungs-Seiten (LFH-281). Zentralisiert die
- * sonst überall manuell gesetzten Typography-Margin-Resets; Abstände aus `theme.useToken()`.
+ * Wiederkehrender Sektions-Titel für die Verwaltungs-Seiten (LFH-281); Abstände aus
+ * `theme.useToken()`.
  *
- * Neuentwurf „Instrumententafel" (21.09.2026): der Titel ist eine AUGENBRAUE (10 px, 600,
- * Versalien, `schwach`) über einer Haarlinie `linie` — dieselbe Stimme wie der Paneelkopf.
- * Die Überschriftenebene folgt der Gliederung (22.09.2026, vorher fest `h5`): unter dem
- * `h1` des Seitentitels ist ein Abschnitt `h2`, in einem Paneel `h3` — ein festes `h5`
- * übersprang zwei Ebenen.
+ * Der Titel ist eine AUGENBRAUE (10 px, 600, Versalien, `schwach`) über einer Haarlinie `linie`
+ * — dieselbe Stimme wie der Paneelkopf. Die Überschriftenebene folgt der Gliederung: unter dem
+ * `h1` des Seitentitels ist ein Abschnitt `h2`, in einem Paneel `h3`.
  */
 export default function SektionHeader({
   titel,

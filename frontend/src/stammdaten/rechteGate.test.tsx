@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import StichworteTab from './StichworteTab';
@@ -15,6 +15,7 @@ import EtbBausteineTab from './EtbBausteineTab';
 import EinheitTypenTab from './EinheitTypenTab';
 import OrganisationTab from './OrganisationTab';
 import SprechgruppenTab from './SprechgruppenTab';
+import { adminFixture, benutzerFixture } from '../test/fixtures';
 
 /**
  * Sektionsübergreifender Rechte-Hinweis (LFH-346 · A2, Befund M45).
@@ -28,16 +29,12 @@ import SprechgruppenTab from './SprechgruppenTab';
  * Aussage ist „KEINE Sektion fehlt", und die lässt sich nur an der vollständigen Menge
  * treffen. Ein zwölfter Tab ohne Hinweis fiele hier auf, in elf Einzeltests nicht.
  */
-const nichtAdmin = {
+const nichtAdmin = benutzerFixture({
   id: 2,
   anzeigename: 'Führungskraft',
-  benutzername: 'fk',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrung',
-  aktiv: true,
-  erstellt_at: '2026-05-26 10:00:00',
-};
-const admin = { ...nichtAdmin, id: 1, anzeigename: 'Admin', system_rolle: 'admin' };
+  org_rolle: 'fuehrungskraft',
+});
+const admin = adminFixture({ org_rolle: 'fuehrungskraft' });
 
 /**
  * Alle Abrufe der elf Tabs mit leeren Katalogen. `onUnhandledRequest: 'error'`
@@ -46,7 +43,7 @@ const admin = { ...nichtAdmin, id: 1, anzeigename: 'Admin', system_rolle: 'admin
  */
 function handler(benutzer: typeof admin) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+    meHandler(benutzer),
     http.get('/api/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/fahrzeug-vorschlaege', () =>
       HttpResponse.json({ fahrzeugtyp: [], traegerorganisation: [], standort: [] }),

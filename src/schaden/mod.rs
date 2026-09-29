@@ -1,35 +1,18 @@
 pub mod anhang;
 pub mod repo;
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
 // ---------- Status ----------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum SchadenStatus {
-    Offen,
-    Uebergeben,
-    Abgeschlossen,
-}
-
-impl SchadenStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            SchadenStatus::Offen => "offen",
-            SchadenStatus::Uebergeben => "uebergeben",
-            SchadenStatus::Abgeschlossen => "abgeschlossen",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<SchadenStatus> {
-        match s {
-            "offen" => Some(SchadenStatus::Offen),
-            "uebergeben" => Some(SchadenStatus::Uebergeben),
-            "abgeschlossen" => Some(SchadenStatus::Abgeschlossen),
-            _ => None,
-        }
+wire_enum! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum SchadenStatus {
+        Offen => "offen",
+        Uebergeben => "uebergeben",
+        Abgeschlossen => "abgeschlossen",
     }
 }
 
@@ -62,39 +45,15 @@ where
 
 // ---------- Typ ----------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum SchadenTyp {
-    Sachschaden,
-    Verkehrshindernis,
-    Infrastruktur,
-    Umweltschaden,
-    Tierkadaver,
-    Sonstige,
-}
-
-impl SchadenTyp {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            SchadenTyp::Sachschaden => "sachschaden",
-            SchadenTyp::Verkehrshindernis => "verkehrshindernis",
-            SchadenTyp::Infrastruktur => "infrastruktur",
-            SchadenTyp::Umweltschaden => "umweltschaden",
-            SchadenTyp::Tierkadaver => "tierkadaver",
-            SchadenTyp::Sonstige => "sonstige",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<SchadenTyp> {
-        match s {
-            "sachschaden" => Some(SchadenTyp::Sachschaden),
-            "verkehrshindernis" => Some(SchadenTyp::Verkehrshindernis),
-            "infrastruktur" => Some(SchadenTyp::Infrastruktur),
-            "umweltschaden" => Some(SchadenTyp::Umweltschaden),
-            "tierkadaver" => Some(SchadenTyp::Tierkadaver),
-            "sonstige" => Some(SchadenTyp::Sonstige),
-            _ => None,
-        }
+wire_enum! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum SchadenTyp {
+        Sachschaden => "sachschaden",
+        Verkehrshindernis => "verkehrshindernis",
+        Infrastruktur => "infrastruktur",
+        Umweltschaden => "umweltschaden",
+        Tierkadaver => "tierkadaver",
+        Sonstige => "sonstige",
     }
 }
 
@@ -123,33 +82,13 @@ where
 
 // ---------- Ausmaß ----------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Ausmass {
-    Gering,
-    Mittel,
-    Gross,
-    Katastrophal,
-}
-
-impl Ausmass {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Ausmass::Gering => "gering",
-            Ausmass::Mittel => "mittel",
-            Ausmass::Gross => "gross",
-            Ausmass::Katastrophal => "katastrophal",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Ausmass> {
-        match s {
-            "gering" => Some(Ausmass::Gering),
-            "mittel" => Some(Ausmass::Mittel),
-            "gross" => Some(Ausmass::Gross),
-            "katastrophal" => Some(Ausmass::Katastrophal),
-            _ => None,
-        }
+wire_enum! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Ausmass {
+        Gering => "gering",
+        Mittel => "mittel",
+        Gross => "gross",
+        Katastrophal => "katastrophal",
     }
 }
 
@@ -178,31 +117,13 @@ where
 
 // ---------- Abschlussgrund ----------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[schema(as = SchadenAbschlussGrund)]
-#[serde(rename_all = "snake_case")]
-pub enum AbschlussGrund {
-    Behoben,
-    KeinHandlungsbedarf,
-    Abgewiesen,
-}
-
-impl AbschlussGrund {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            AbschlussGrund::Behoben => "behoben",
-            AbschlussGrund::KeinHandlungsbedarf => "kein_handlungsbedarf",
-            AbschlussGrund::Abgewiesen => "abgewiesen",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<AbschlussGrund> {
-        match s {
-            "behoben" => Some(AbschlussGrund::Behoben),
-            "kein_handlungsbedarf" => Some(AbschlussGrund::KeinHandlungsbedarf),
-            "abgewiesen" => Some(AbschlussGrund::Abgewiesen),
-            _ => None,
-        }
+wire_enum! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    #[schema(as = SchadenAbschlussGrund)]
+    pub enum AbschlussGrund {
+        Behoben => "behoben",
+        KeinHandlungsbedarf => "kein_handlungsbedarf",
+        Abgewiesen => "abgewiesen",
     }
 }
 

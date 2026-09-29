@@ -1,7 +1,7 @@
 import { delay, http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -11,9 +11,23 @@ import UeberblickPage from './UeberblickPage';
 
 dayjs.extend(utc);
 
-/** Fixtures relativ zur echten Uhr — die Seite tickt mit `dayjs()`. Wire: UTC ohne Zone. */
-const vor = (min: number) => dayjs.utc().subtract(min, 'minute').format('YYYY-MM-DD HH:mm:ss');
-const nach = (min: number) => dayjs.utc().add(min, 'minute').format('YYYY-MM-DD HH:mm:ss');
+/**
+ * Feste Uhr statt echter (LFH-772): die Seite rechnet mit `dayjs()` und zeigt Zeiten
+ * tagesbewusst („HH:mm" heute, „DD. HH:mm" sonst). Relativ zur echten Uhr lag `vor(20)`
+ * zwischen 00:00 und 00:20 am Vortag, und die Erwartung „nur HH:mm" war rot. Mittag UTC hält
+ * jede Fixture (−300 … +120 min) in UTC und Europe/Berlin am selben Tag wie „jetzt".
+ * Nur `Date` steht still (`toFake`): MSW, react-query und `findBy*` laufen auf echten Timern.
+ */
+const JETZT = new Date('2026-09-13T12:00:00Z');
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(JETZT);
+});
+afterEach(() => vi.useRealTimers());
+
+/** Fixtures relativ zu `JETZT` — dieselbe Uhr, mit der die Seite tickt. Wire: UTC ohne Zone. */
+const vor = (min: number) => dayjs.utc(JETZT).subtract(min, 'minute').format('YYYY-MM-DD HH:mm:ss');
+const nach = (min: number) => dayjs.utc(JETZT).add(min, 'minute').format('YYYY-MM-DD HH:mm:ss');
 
 const einsatz = {
   id: 1,

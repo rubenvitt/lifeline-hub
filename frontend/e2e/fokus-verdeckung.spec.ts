@@ -131,15 +131,14 @@ test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierte
   // Höhe bewusst verkürzt: die Bildlaufreserve ist die Vorbedingung dieses Nachweises.
   await page.setViewportSize({ width: 390, height: 400 });
   await page.goto('/admin/benutzer');
-  await page.waitForLoadState('networkidle');
 
   /**
    * MINDESTENS 9 Zeilen (8 gesät + Harness-Admin), nicht genau 9: die Benutzerliste ist
    * global und die Temp-DB lebt über den ganzen Lauf, jede Wiederholung sät acht weitere.
    * Gebraucht wird nur die Untergrenze, sie trägt die Bildlaufreserve.
    */
-  // `expect.poll` statt `count()`: `networkidle` kommt zu früh, wenn React die Liste erst
-  // nach dem Ruhefenster abruft (in CI mit „Received: 0" gesehen).
+  // `expect.poll` statt `count()`: die Liste steht erst nach ihrem Abruf (in CI mit
+  // „Received: 0" gesehen).
   await expect
     .poll(() => page.locator('tr.ant-table-row').count(), {
       message: 'Vorbedingung: mindestens 8 gesäte Zeilen + Harness-Admin',
@@ -216,7 +215,6 @@ test('Datensicht-Tabellenzweig: Tabulaturdurchlauf hinter Werkzeugzeile, Kopfzei
   // Höhe verkürzt für die Bildlaufreserve.
   await page.setViewportSize({ width: 1366, height: 520 });
   await page.goto(`/einsaetze/${einsatzId}/personal`);
-  await page.waitForLoadState('networkidle');
 
   // Belegt, dass hier wirklich der Tabellenzweig gemessen wird und nicht der Kartenzweig.
   await expect(page.locator('.ant-table')).toHaveCount(1);
@@ -950,6 +948,11 @@ test('Personenkarte (LFH-373): kein Fokusziel liegt unter den Kartenaufbauten', 
     expect(person.ok(), await person.text()).toBeTruthy();
   }
 
+  // Dichte ZUERST, dann die Ansicht (LFH-770): `?ansicht=karte` ist ein Auftrag, den die
+  // Personenseite anwendet und aus der URL räumt (apply-then-clean, `PersonenPage`). Das
+  // Neuladen in `stelleDichte` lüde sonst die GERÄUMTE Adresse — je nachdem, ob der Effekt vor
+  // dem `reload` lief, die Zeilenansicht ohne Karte, und das Canvas käme nie.
+  await stelleDichte(page, 'handschuh');
   const gemessen: string[] = [];
   for (const flaeche of [
     { width: 390, height: 844 },
@@ -958,7 +961,7 @@ test('Personenkarte (LFH-373): kein Fokusziel liegt unter den Kartenaufbauten', 
     const lauf = `${flaeche.width}×${flaeche.height}/handschuh`;
     await page.setViewportSize(flaeche);
     await page.goto(`/einsaetze/${einsatzId}/personen?ansicht=karte`);
-    await stelleDichte(page, 'handschuh');
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
     const karte = page.locator('[data-lfh="betroffene-karte"]');
     await expect(karte.locator('canvas.maplibregl-canvas')).toHaveCount(1, { timeout: 60_000 });
     const knoepfe = karte.locator('[data-lfh="karten-knoepfe"]');

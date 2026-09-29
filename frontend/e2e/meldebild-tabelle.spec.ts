@@ -101,7 +101,6 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
 
   await page.setViewportSize(HANDSCHIRM);
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
-  await page.waitForLoadState('networkidle');
 
   const bereich = page.getByRole('region', { name: 'Meldebild' });
   await expect(bereich).toHaveCount(1);
@@ -169,7 +168,6 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
   const symbolKompakt = `${vor.symbolBreite}×${vor.symbolHoehe}`;
   await page.evaluate(() => window.localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
   await page.reload();
-  await page.waitForLoadState('networkidle');
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
   await expect(page.getByText('Ohne Einheit', { exact: true })).toHaveCount(1);
   const handschuh = await symbolLage(page);
@@ -235,7 +233,6 @@ test('Druckpfad des Meldebilds: die Neutralisierer WIRKEN, und keine Spalte ragt
 
   await page.setViewportSize({ width: A4_DRUCKBREITE, height: 800 });
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
-  await page.waitForLoadState('networkidle');
   await expect(page.getByText('Ohne Einheit', { exact: true })).toHaveCount(1);
 
   // Aufklappen über das Symbol: erst die Mittelzeilen erzeugen mit ihren langen Namen den Überhang.

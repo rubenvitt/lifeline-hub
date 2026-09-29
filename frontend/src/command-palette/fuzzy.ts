@@ -1,4 +1,3 @@
-// frontend/src/command-palette/fuzzy.ts
 import Fuse from 'fuse.js';
 import {
   GRUPPEN_REIHENFOLGE,
@@ -13,51 +12,30 @@ export interface Treffer {
   befehl: Befehl;
   score: number;
   /**
-   * Vorgegebene Präfixstufe für Treffer, die NICHT durch Fuse gelaufen sind
-   * (LFH-391 · C1). Fehlt sie, rechnet {@link ordneTreffer} sie aus dem Label.
-   *
-   * Sie ist der Grund, warum das zentrale Akzeptanzkriterium des Tickets hält: ein
-   * Datensatz-Label trägt seine Modulherkunft vorn („Personen · R-042 · Müller"), und
-   * {@link praefixStufe} läse daraus bei der Suche '42' Stufe 3 — dieselbe Stufe wie
-   * Fuse-Rauschen, während ein Einsatz namens „Einsatz 42" auf Stufe 2 stünde und den
-   * exakten Nummerntreffer verdrängte. Der Erzeuger des Treffers weiss, WORAUF er
-   * getroffen hat; das Label weiss es nicht.
+   * Vorgegebene Präfixstufe für Treffer, die NICHT durch Fuse gelaufen sind; fehlt sie, rechnet
+   * {@link ordneTreffer} sie aus dem Label. Der Erzeuger weiß, WORAUF er getroffen hat: aus
+   * „Personen · R-042 · Müller“ läse {@link praefixStufe} bei '42' Stufe 3, und ein „Einsatz 42“
+   * auf Stufe 2 verdrängte den exakten Nummerntreffer.
    */
   stufe?: 0 | 1 | 2 | 3;
 }
 
 /**
- * Der Score eines Treffers, den Fuse NIE bewertet hat (LFH-391 · C1, Review-Befund).
+ * Der Score eines Treffers, den Fuse NIE bewertet hat. 1 ist STRIKT schlechter als jeder
+ * Fuse-Score („unbewertet verliert gegen bewertet“): fuse.js deckelt den Bitap-Score auf
+ * `threshold` (0,4) und potenziert ihn mit einem strikt positiven Exponenten, `0,4^x` bleibt
+ * unter 1. Mit `score: 0` verdrängten Datensätze auf gleicher Stufe jeden Befehl.
  *
- * Datensatz-Treffer trugen bisher `score: 0` — den bestmöglichen Wert für etwas, das gar
- * nicht bewertet worden ist. Auf gleicher Stufe verdrängten sie damit jeden Befehl: wer auf
- * einer Einsatzseite 'einheit' tippte, um zum MODUL Einheiten zu springen, fand den
- * Modulbefehl hinter fünf Einheiten-Datensätzen, und Enter öffnete einen Datensatz.
+ * Kein kleinerer Wert tut es: bei langem Label geht der Exponent gegen 0 und der Score gegen 1
+ * (`fuzzy.test.ts`, „kommt bei langem Label nahe an 1 heran“).
  *
- * 1 ist STRIKT schlechter als jeder Fuse-Score und damit die ehrliche Setzung „unbewertet
- * verliert gegen bewertet". Der Wert ist hergeleitet, nicht geraten: fuse.js deckelt den
- * Bitap-Score eines angenommenen Treffers auf `threshold` (hier 0,4) und potenziert ihn in
- * `computeScore` mit `weight * norm` — einem STRIKT positiven Exponenten. `0,4^x` bleibt für
- * jedes x > 0 unter 1, ein Gleichstand ist also ausgeschlossen und die Gruppenachse darunter
- * kommt gar nicht erst zum Zug.
- *
- * KEIN kleinerer Wert tut es: `norm` ist `1/sqrt(Tokenzahl)`, bei langem Feld geht der
- * Exponent gegen 0 und der Score damit gegen 1 — gemessen 0,973 bei einem 400-Wort-Label
- * (`fuzzy.test.ts`, „kommt bei langem Label nahe an 1 heran"). Ein Deckel bei 0,9 hätte den
- * Datensatz dort wieder vor den Befehl gestellt.
- *
- * Die STUFE bleibt davon unberührt und ist die erste Achse: ein Nummerntreffer steht auf
- * Stufe 0 und gewinnt weiterhin gegen jeden Fuzzy-Treffer, so schlecht sein Score auch ist.
+ * Die STUFE bleibt die erste Achse: ein Nummerntreffer auf Stufe 0 gewinnt weiter.
  */
 export const UNBEWERTET = 1;
 
 /**
- * Die Modi mit Präfixzeichen — die EINZIGE Quelle für Parser und Legende.
- *
- * `Object.keys` mit Verengung statt einer danebenstehenden Liste: der Record ist über
- * `PaletteModus` exhaustiv, ein Modus kann hier also nicht fehlen. Eine eigene
- * Reihenfolge-Konstante hätte genau die Lücke, die `GRUPPEN_REIHENFOLGE` einmal hatte —
- * ein Eintrag fehlt, nichts bricht, der Modus ist still unerreichbar.
+ * Die Modi mit Präfixzeichen, die EINZIGE Quelle für Parser und Legende. `Object.keys` über den
+ * exhaustiven Record statt einer eigenen Liste, in der ein Modus still fehlen könnte.
  */
 export function modiMitPraefix(): {
   modus: PaletteModus;
@@ -73,16 +51,10 @@ export function modiMitPraefix(): {
 }
 
 /**
- * Zerlegt die Eingabe in Modus und Restsuche (LFH-391 · A4).
+ * Zerlegt die Eingabe in Modus und Restsuche. GENAU EINE Aufrufstelle: `CommandPalette.tsx`.
  *
- * GENAU EINE Aufrufstelle: `CommandPalette.tsx`. Ein zweiter Parser wäre eine zweite
- * Wahrheit darüber, was „der Suchbegriff" ist — Etappe C bekommt das Paar gemeldet,
- * statt es noch einmal zu zerlegen.
- *
- * Zweimal getrimmt, aus zwei Gründen: aussen, damit ein führendes Leerzeichen das Präfix
- * nicht verdeckt; hinter dem Präfixzeichen, damit '> lage' und '>lage' dasselbe bedeuten.
- * Nur das ERSTE Zeichen ist Syntax — ein '>' weiter hinten bleibt Suchtext, sonst
- * zerschnitte es die Eingabe an einer Stelle, die niemand als Syntax gemeint hat.
+ * Zweimal getrimmt: außen, damit ein führendes Leerzeichen das Präfix nicht verdeckt; hinter
+ * dem Präfix, damit '> lage' und '>lage' dasselbe bedeuten. Nur das ERSTE Zeichen ist Syntax.
  */
 export function parsePraefix(suche: string): { modus: PaletteModus; rest: string } {
   const s = suche.trim();
@@ -92,10 +64,8 @@ export function parsePraefix(suche: string): { modus: PaletteModus; rest: string
 }
 
 /**
- * Der Modus ist ein reiner GRUPPENFILTER — er ordnet nichts um und bewertet nichts.
- *
- * Er läuft VOR `filtereBefehle`, nicht danach: Fuse würde sonst über Befehle bewerten, die
- * der Modus ohnehin verwirft, und der Rang der übrigen hinge an Treffern, die niemand sieht.
+ * Der Modus ist ein reiner GRUPPENFILTER. Er läuft VOR `filtereBefehle`, sonst bewertete Fuse
+ * Befehle, die der Modus verwirft.
  */
 export function filtereNachModus(befehle: Befehl[], modus: PaletteModus): Befehl[] {
   const gruppen = PALETTE_MODI[modus].gruppen;
@@ -104,28 +74,14 @@ export function filtereNachModus(befehle: Befehl[], modus: PaletteModus): Befehl
 }
 
 /**
- * Bei AKTIVER Suche entfallen die ORDNUNGSKOPIEN — `zuletzt` (LFH-391 · A3, Review-Befund)
- * und seit Etappe D auch `ausgefuehrt`.
+ * Bei AKTIVER Suche entfallen die ORDNUNGSKOPIEN (`zuletzt`, `ausgefuehrt`).
  *
- * Sie sind reine ORDNUNGSMITTEL für die leere Ansicht: `baueBefehle` filtert die
- * Zuletzt-Schleife und die Modul-Schleife über DIESELBE Funktion `istModulFreigegeben`,
- * jeder `zuletzt:`-Eintrag hat also zwingend einen `modul:`-Zwilling mit gleichem Label,
- * gleicher Ikone und gleichem Ziel; ein `ausgefuehrt:`-Eintrag ist per Konstruktion eine
- * Kopie seines Originals — er entsteht nur, wenn dieses Original in derselben Runde gebaut
- * wurde. Im Gruppenzweig trennen die Überschriften „Zuletzt", „Zuletzt ausgeführt" und
- * „Module" die Zwillinge — genau darauf beruht die im Bestand bewusst hingenommene
- * Dopplung (LFH-337 · H12).
+ * Jeder `zuletzt:`-Eintrag hat zwingend einen `modul:`-Zwilling mit gleichem Label, Ikone und
+ * Ziel, ein `ausgefuehrt:`-Eintrag ist eine Kopie seines Originals. Im Gruppenzweig trennen die
+ * Überschriften die Zwillinge; flach blieben zwei ununterscheidbare Zeilen („Lagekarte,
+ * Lagekarte“), für Vorlesende zweimal derselbe Name.
  *
- * Flach gerendert fällt diese Trennung weg, und es blieben zwei bis auf die DOM-`id`
- * ununterscheidbare Zeilen: wer zuletzt die Lagekarte offen hatte und „lage" tippt, sah
- * „Lagekarte, Lagekarte, Lagemeldungen" — für Vorlesende zweimal derselbe Name ohne
- * Hinweis, warum. Die Rangfolge leistet bei aktiver Suche ohnehin, wofür die Gruppen da
- * waren; sie hier wegzulassen nimmt der Liste nichts und ist deshalb der Dedup-Sonderregel
- * vorzuziehen.
- *
- * EINE Funktion für beide Gruppen, gesteuert über {@link GRUPPE_NUR_ORDNUNG}: eine zweite
- * Filterfunktion daneben wäre eine zweite Stelle, an der eine dritte Kopien-Gruppe vergessen
- * werden kann — und das Vergessen ist hier still (die Liste rendert, nur doppelt).
+ * EINE Funktion für beide Gruppen, gesteuert über {@link GRUPPE_NUR_ORDNUNG}.
  */
 export function ohneOrdnungsdubletten(befehle: Befehl[]): Befehl[] {
   return befehle.filter((b) => !GRUPPE_NUR_ORDNUNG[b.gruppe]);
@@ -133,11 +89,8 @@ export function ohneOrdnungsdubletten(befehle: Befehl[]): Befehl[] {
 
 /**
  * Substring- + Fuzzy-Filter über Label und Schlagworte; leere Suche → unverändert.
- *
- * `includeScore` ist in fuse.js per Vorgabe AUS — ohne die Option liefert `search` das Feld
- * gar nicht erst (`undefined`, nicht bloss ein ignorierter Wert). Der Score ist die zweite
- * Achse von {@link ordneTreffer}; ohne ihn ordnete allein die Gruppe, und gemessen stand
- * damit Rauschen vor dem genauen Treffer (siehe Kopfkommentar dort).
+ * `includeScore` ist in fuse.js per Vorgabe AUS; der Score ist die zweite Achse von
+ * {@link ordneTreffer}.
  */
 export function filtereBefehle(befehle: Befehl[], suche: string): Treffer[] {
   const s = suche.trim();
@@ -157,19 +110,12 @@ export function filtereBefehle(befehle: Befehl[], suche: string): Treffer[] {
 const WORTGRENZE = /[^\p{L}\p{N}]+/u;
 
 /**
- * Der Präfixbonus, den Fuse nicht liefert (LFH-391 · A3).
+ * Der Präfixbonus, den Fuse nicht liefert (mit `threshold: 0.4` und `ignoreLocation` bewertet
+ * Fuse einen Präfix nicht besonders). Stufen: 0 = das Label IST die Suche, 1 = das Label beginnt
+ * damit, 2 = ein Wort des Labels oder ein Schlagwort beginnt damit, 3 = nur Fuse.
  *
- * Mit `threshold: 0.4` und `ignoreLocation` bewertet Fuse einen Präfix nicht besonders —
- * das Akzeptanzkriterium „exakter Präfixtreffer vor unscharfem Treffer" ist mit Fuse allein
- * nicht erfüllbar. Die Stufen: 0 = das Label IST die Suche, 1 = das Label beginnt damit,
- * 2 = ein Wort des Labels oder ein Schlagwort beginnt damit, 3 = nur Fuse hat es gefunden.
- *
- * Verglichen wird KLEINGESCHRIEBEN. Im Suchfeld wird klein getippt, die Labels tragen
- * Grossbuchstaben — zeichengenau griffe im Normalbetrieb keine der drei Stufen, und der
- * ganze Bonus liefe leer, ohne dass ein Bestandstest es sähe (die sind ordnungsagnostisch).
- *
- * BLINDFLECK, bewusst: keine Diakritika-Faltung. 'einsaetze' gegen 'Einsätze' bleibt
- * Stufe 3 und trägt weiterhin allein Fuse.
+ * Verglichen wird KLEINGESCHRIEBEN, sonst griffe im Normalbetrieb keine Stufe. Blindfleck,
+ * bewusst: keine Diakritika-Faltung ('einsaetze' gegen 'Einsätze' bleibt Stufe 3).
  */
 export function praefixStufe(b: Befehl, suche: string): 0 | 1 | 2 | 3 {
   const s = suche.trim().toLocaleLowerCase();
@@ -181,16 +127,9 @@ export function praefixStufe(b: Befehl, suche: string): 0 | 1 | 2 | 3 {
 }
 
 /**
- * Dieselbe Stufenrechnung über einen NACKTEN Text (LFH-391 · C1).
- *
- * Herausgezogen, weil ein zweiter Aufrufer sie über etwas anderes als ein Befehlslabel
- * braucht: `datensaetze.ts` stuft einen Texttreffer über das BASISlabel ohne die
- * Modulherkunft davor. Zwei Kopien dieser vier Zeilen wären zwei Definitionen von
- * „beginnt damit" — genau die Sorte Drift, die niemandem auffällt, weil beide Seiten
- * plausibel aussehen.
- *
- * Ein Schlagwort erreicht hier bewusst nur Stufe 2 (siehe {@link praefixStufe}) und ist
- * deshalb NICHT Teil dieser Funktion: es ist Suchhilfe, nicht das, was man liest.
+ * Dieselbe Stufenrechnung über einen NACKTEN Text, für `datensaetze.ts` (Basislabel ohne
+ * Modulherkunft); zwei Kopien wären zwei Definitionen von „beginnt damit“. Schlagworte gehören
+ * nicht hierher, sie erreichen nur Stufe 2 (siehe {@link praefixStufe}).
  */
 export function textStufe(text: string, suche: string): 0 | 1 | 2 | 3 {
   const s = suche.trim().toLocaleLowerCase();
@@ -204,25 +143,15 @@ export function textStufe(text: string, suche: string): 0 | 1 | 2 | 3 {
 }
 
 /**
- * Die Rangfolge bei AKTIVER Suche (LFH-391 · A3) — flach, gruppenübergreifend.
+ * Die Rangfolge bei AKTIVER Suche, flach und gruppenübergreifend: nach Gruppen iteriert stand
+ * Fuse-Rauschen einer Schnellaktion vor dem genauen Modultreffer.
  *
- * Gemessen an fuse.js 7.5.0 mit dem Bestandskorpus und der Suche 'etb': Fuse bewertet
- * `modul:etb` mit 8.60e-9 und die Schnellaktion „Neue Person erfassen" mit 5.77e-1 (reines
- * Rauschen). Weil `CommandPalette` bis dahin ausschliesslich über `GRUPPEN_REIHENFOLGE`
- * iterierte und `schnellaktionen` vor `module` steht, stand das Rauschen VOR dem genauen
- * Treffer. Die Gruppenachse zerstörte die Score-Ordnung gruppenübergreifend.
+ * Der Schlüssel ist TOTAL: [Präfixstufe, Score, Gruppenrang, Eingabeindex]. Der Gruppenrang ist
+ * Tiebreak und hält bei Gleichwertigen die kuratierte Startordnung; der Eingabeindex macht die
+ * Ordnung unabhängig von der Stabilität von `sort`. Ein `Treffer.stufe` gewinnt gegen die
+ * Rechnung aus dem Label.
  *
- * Der Schlüssel ist TOTAL: [Präfixstufe, Score, Gruppenrang, Eingabeindex]. Der Gruppenrang
- * ist TIEBREAK, nicht Primärachse — bei gleichwertigen Treffern bleibt die kuratierte
- * Startordnung aus LFH-337 · M11 erhalten, statt von der Bewertung eingeebnet zu werden.
- * Der Eingabeindex darunter macht die Ordnung unabhängig von der Stabilität von `sort`.
- *
- * Bei LEERER Suche ruft die Produktion diese Funktion NICHT — dort rendert der Gruppenzweig
- * (die Zusicherung dafür hängt am Rendertest in `CommandPalette.test.tsx`, nicht hier: ein
- * `ordneTreffer(t, '')` wäre ein toter Pfad).
- *
- * Ein `Treffer.stufe` GEWINNT gegen die Rechnung aus dem Label (LFH-391 · C1) — siehe die
- * Begründung am Feld.
+ * Bei LEERER Suche ruft die Produktion diese Funktion nicht (dort rendert der Gruppenzweig).
  */
 export function ordneTreffer(treffer: Treffer[], suche: string): Befehl[] {
   return treffer

@@ -12,7 +12,7 @@ use crate::karte::registry::repo::{
 };
 use crate::karte::tile_cache;
 use crate::karte::typen::{BuildJob, RegionDto};
-use crate::routes::support::deserialize_optional_field;
+use crate::routes::support::{deserialize_optional_field, pflicht};
 use axum::body::Body;
 use axum::extract::{Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
@@ -683,20 +683,14 @@ fn validiere_online_patch(
 ) -> Result<OnlinePatchNormalisiert, AppError> {
     let name = match &body.name {
         Some(n) => {
-            let n = n.trim();
-            if n.is_empty() {
-                return Err(AppError::Validation("Name darf nicht leer sein".into()));
-            }
+            let n = pflicht(&n, "Name")?;
             Some(n.to_string())
         }
         None => None,
     };
     let url = match &body.url {
         Some(u) => {
-            let u = u.trim();
-            if u.is_empty() {
-                return Err(AppError::Validation("URL darf nicht leer sein".into()));
-            }
+            let u = pflicht(&u, "URL")?;
             Some(u.to_string())
         }
         None => None,
@@ -757,14 +751,8 @@ fn validiere_online_patch(
 /// Validiert + normalisiert einen Online-Quelle-Body zum **Anlegen**.
 /// Name/URL nicht leer (getrimmt), `typ ∈ {vektor,raster}`, **Attribution Pflicht** (Lizenzauflage).
 fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppError> {
-    let name = body.name.trim();
-    if name.is_empty() {
-        return Err(AppError::Validation("Name darf nicht leer sein".into()));
-    }
-    let url = body.url.trim();
-    if url.is_empty() {
-        return Err(AppError::Validation("URL darf nicht leer sein".into()));
-    }
+    let name = pflicht(&body.name, "Name")?;
+    let url = pflicht(&body.url, "URL")?;
     if body.typ != "vektor" && body.typ != "raster" {
         return Err(AppError::Validation(
             "Typ muss 'vektor' oder 'raster' sein".into(),
@@ -782,7 +770,7 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
     // (proxy=0) bleiben unverändert: der Browser lädt sie selbst, keine Server-seitige
     // Prüfung nötig.
     if proxy_effektiv {
-        pruefe_proxy_url(url)?;
+        pruefe_proxy_url(&url)?;
     }
     Ok(OnlineQuelleEingabe {
         name: name.to_string(),
@@ -1050,17 +1038,11 @@ pub async fn offline_registrieren(
     _admin: AdminUser,
     JsonBody(body): JsonBody<OfflineKarteBody>,
 ) -> Result<(StatusCode, Json<OfflineKarte>), AppError> {
-    let name = body.name.trim();
-    if name.is_empty() {
-        return Err(AppError::Validation("Name darf nicht leer sein".into()));
-    }
-    let pfad = body.pfad.trim();
-    if pfad.is_empty() {
-        return Err(AppError::Validation("Pfad darf nicht leer sein".into()));
-    }
+    let name = pflicht(&body.name, "Name")?;
+    let pfad = pflicht(&body.pfad, "Pfad")?;
     // Pfade müssen relativ zum verwalteten karten_dir sein. Absolute/Traversal-Pfade würden über
     // den unauthentifizierten Tile-Endpunkt beliebige Server-Dateien exponieren → ablehnen.
-    let pfad_geprueft = FsPath::new(pfad);
+    let pfad_geprueft = FsPath::new(&pfad);
     if pfad_geprueft.is_absolute()
         || pfad_geprueft
             .components()
@@ -1459,10 +1441,7 @@ pub async fn offline_download(
     _admin: AdminUser,
     JsonBody(body): JsonBody<OfflineDownloadBody>,
 ) -> Result<(StatusCode, Json<OfflineKarte>), AppError> {
-    let name = body.name.trim();
-    if name.is_empty() {
-        return Err(AppError::Validation("Name darf nicht leer sein".into()));
-    }
+    let name = pflicht(&body.name, "Name")?;
     // Attribution ist Pflicht (Lizenzauflage, offline sichtbar) — Parität zur Online-Quelle.
     let lizenz = body.lizenz.trim();
     if lizenz.is_empty() {
@@ -1641,10 +1620,7 @@ pub async fn offline_bauen(
     _admin: AdminUser,
     JsonBody(body): JsonBody<OfflineBauBody>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
-    let slug = body.slug.trim();
-    if slug.is_empty() {
-        return Err(AppError::Validation("slug darf nicht leer sein".into()));
-    }
+    let slug = pflicht(&body.slug, "slug")?;
     let (Some(url), Some(token)) = (
         state.karten_service_url.as_deref(),
         state.karten_service_token.as_deref(),

@@ -3,25 +3,17 @@ import { theme } from 'antd';
 import { form } from '../theme/tokens';
 
 /**
- * Stil der Kürzel-Marke — rein und exportiert nach dem Muster von `bedienzielStil`
- * (`pages/lagekarte/Sidebar.tsx`), damit die Zusicherung ohne Rendern prüfbar ist:
- * `test/utils.tsx` montiert ein nacktes `ConfigProvider` ohne unser Theme, eine
- * gerenderte Messung belegte also antd-Vorgaben statt der Rollen.
+ * Stil der Kürzel-Marke — rein und exportiert (Muster `bedienzielStil`), damit die Zusicherung
+ * ohne Rendern prüfbar ist: `test/utils.tsx` montiert ein nacktes `ConfigProvider`.
  *
- * Die Farbe kommt bewusst aus `currentColor` statt aus einer Farbrolle: dieselbe
- * Marke steht einmal auf dem dunklen Kopfzeilengrund (Such-Trigger, der dort
- * `--lfh-kopf-vordergrund` erbt) und einmal auf Containergrund in der Palette. Ein
- * fester Rollenwert wäre an genau einer der beiden Stellen unsichtbar — das ist
- * dieselbe Überlegung, die den Kopfzeilen-Knöpfen in `einsatz/EinsatzLayout.tsx`
- * ihre Vordergrundrolle gibt.
+ * Die Farbe kommt aus `currentColor` statt aus einer Farbrolle: dieselbe Marke steht auf dem
+ * dunklen Kopfzeilengrund (Such-Trigger, erbt `--lfh-kopf-vordergrund`) und auf Containergrund
+ * in der Palette. Ein fester Rollenwert wäre an einer der beiden Stellen unsichtbar.
  *
- * Radius 0 ist die Formensprache aus LFH-352 (`form.radiusMarke`), keine vergessene
- * Rundung — vorher trug die Palette hier einen handgeschriebenen Wert 6.
+ * Radius 0 ist die Formensprache (`form.radiusMarke`), keine vergessene Rundung.
  *
- * KEIN Bedienziel: ein `<kbd>` ist Satz, kein Ziel. Es bekommt deshalb bewusst
- * KEINEN `controlHeight`-Boden — der stünde in der Stufe `handschuh` bei 72 px
- * neben einer Zeile Text. Dieselbe Trennung, aus der `dichte.guard.test.ts` die
- * nicht-interaktiven Flächen (`Card`, `Descriptions`) heraushält.
+ * KEIN Bedienziel: ein `<kbd>` ist Satz, kein Ziel, und bekommt deshalb KEINEN
+ * `controlHeight`-Boden (der stünde in `handschuh` bei 72 px neben einer Zeile Text).
  */
 export function tastenkuerzelStil(token: {
   paddingXS: number;
@@ -44,11 +36,8 @@ export function tastenkuerzelStil(token: {
 type Props = HTMLAttributes<HTMLElement> & { children: ReactNode };
 
 /**
- * Sichtbare Tastenkürzel-Marke (`<kbd>`).
- *
- * Ohne sie fällt ein `<kbd>` auf die Browser-Vorgabe zurück: Systemschrift-Monospace,
- * kein Rahmen, kein Abstand zum Nachbartext — in der Kopfzeile stand deshalb
- * gemessen „Suchen⌘K" in einem Zug.
+ * Sichtbare Tastenkürzel-Marke (`<kbd>`). Ohne sie fällt ein `<kbd>` auf die Browser-Vorgabe
+ * zurück: Monospace, kein Rahmen, kein Abstand zum Nachbartext („Suchen⌘K" in einem Zug).
  */
 export default function Tastenkuerzel({ children, style, ...rest }: Props) {
   const { token } = theme.useToken();

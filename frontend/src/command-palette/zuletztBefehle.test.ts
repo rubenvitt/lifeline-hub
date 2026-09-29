@@ -1,4 +1,3 @@
-// frontend/src/command-palette/zuletztBefehle.test.ts
 import { describe, expect, it } from 'vitest';
 import {
   SCHLUESSEL_ZULETZT_BEFEHLE,
@@ -27,10 +26,8 @@ describe('leseZuletztBefehle — der Wert ist opaker Text, kein Vertrag', () => 
   });
 
   /**
-   * Der Wert ist serverseitig ein OPAKER Text (`benutzer_einstellungen.wert`) — es gibt keine
-   * CHECK-Constraint und keinen Typ darüber. Ein `.slice` auf `JSON.parse('42')` liefe als
-   * TypeError mitten im Bau der Befehlsliste; dieselbe Begründung wie in
-   * `einsatz/zuletztModule.ts`, nur dass die Quelle hier fremd ist statt nur alt.
+   * Der Wert ist serverseitig OPAKER Text ohne Typ; ein `.slice` auf `JSON.parse('42')` würfe mitten
+   * im Bau der Befehlsliste.
    */
   it('behandelt kaputten oder fremden Inhalt als „nichts gemerkt"', () => {
     expect(leseZuletztBefehle(stand('kein json'))).toEqual([]);
@@ -40,9 +37,8 @@ describe('leseZuletztBefehle — der Wert ist opaker Text, kein Vertrag', () => 
   });
 
   /**
-   * Eine Dublette im Serverstand ist keine Kosmetik: `baueBefehle` klont jede ID zu einer
-   * `ausgefuehrt:`-Zeile, zwei gleiche IDs ergäben zwei Knoten mit derselben `cmd-<id>` —
-   * genau die Mehrdeutigkeit von `aria-activedescendant`, gegen die die Präfixe existieren.
+   * Zwei gleiche IDs ergäben zwei Knoten mit derselben `cmd-<id>` und machten
+   * `aria-activedescendant` mehrdeutig.
    */
   it('entdoppelt und deckelt, weil der Serverwert von einem älteren Client stammen kann', () => {
     expect(leseZuletztBefehle(stand('["a","b","a"]'))).toEqual(['a', 'b']);
