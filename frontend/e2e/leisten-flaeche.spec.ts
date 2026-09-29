@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { beobachteShifts, bericht, ruheShifts, setzeShiftsZurueck } from './cls-kern';
+import { ADMIN, ADMIN_PW, wechsleZuRolle } from './rollen-kern';
 
 /**
  * Prüflisten-Zeile 12 der Bedien-Leitlinie — „kein Sprung, kein Flächenfraß" — für die
@@ -514,4 +515,229 @@ test('Fremdänderung (LFH-373): eine live eintreffende Bewertung verschiebt die 
     expect(messung.summe, `${lauf}: ${bericht(messung)}`).toBeLessThanOrEqual(CLS_GUT);
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/**
+ * LFH-435 — die ETB-Erfassungsleiste hat KEINEN Beobachter-Durchgang: ohne Schreibrecht
+ * rendert `EtbPage` sie gar nicht, es gibt keine Fläche zu deckeln. Den Nur-Lese-ETB misst
+ * Gate 1 (`gate1-ueberlauf.spec.ts`) auf Überlauf, mit der fehlenden Leiste als Vorbedingung.
+ */
+
+/**
+ * LFH-435, Nur-Lese-Zweig der Lagekarte: der Beobachter sieht die Zeitachse ohne „Stand
+ * sichern" (`SnapshotLeiste`, `darfSichern`) und die Leiste ohne „Zeichnen", Platzier- und
+ * Einsatzort-Aktionen (`Sidebar.tsx`, `darfSchreiben`). Das Band ist dadurch anders gebaut; es muss
+ * dieselben Zusagen halten wie beim Admin. Handschirm mit ausgeblendeter und eingeblendeter
+ * Leiste — nur eingeblendet sind die Leistenaktionen als abwesend prüfbar.
+ */
+test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und läuft nicht über (Beobachter)', async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Flaeche 435 Ost ${Date.now()}`);
+  // Gesät als Admin; der Beobachter darf keine Stände sichern.
+  for (const bezeichnung of ['Stand A', 'Stand B']) {
+    const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+      data: { bezeichnung },
+    });
+    expect(stand.ok(), await stand.text()).toBeTruthy();
+  }
+  await wechsleZuRolle(page, 'beobachter', String(einsatzId));
+  const SOLL = { kompakt: 30, komfortabel: 48, handschuh: 72 } as const;
+  const gemessen: string[] = [];
+  const verstoesse: string[] = [];
+
+  for (const lage of [
+    { name: 'Handschirm', width: 390, height: 844, leiste: false, deckel: true },
+    { name: 'Handschirm mit Leiste', width: 390, height: 844, leiste: true, deckel: false },
+  ]) {
+    await page.setViewportSize({ width: lage.width, height: lage.height });
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    await page.evaluate((offen) => {
+      localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0');
+      localStorage.removeItem('lfh:lagekarte:leiste-offen:ab-lg');
+      if (offen) localStorage.setItem('lfh:lagekarte:leiste-offen:unter-lg', '1');
+      else localStorage.removeItem('lfh:lagekarte:leiste-offen:unter-lg');
+    }, lage.leiste);
+    for (const dichte of DICHTEN) {
+      const lauf = `${lage.name}/${dichte}`;
+      await stelleDichte(page, dichte);
+      await expect(
+        page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas'),
+      ).toHaveCount(1, { timeout: 60_000 });
+      const band = page.locator('[data-lfh="zeitachse"]');
+      // Positiver Anker im Band zuerst, dann die Abwesenheit.
+      await expect(band.getByRole('button', { name: 'Abspielen' })).toBeVisible();
+      await expect(
+        band.getByRole('button', { name: /Stand sichern/ }),
+        `${lauf}: Vorbedingung: ohne Schreibrecht kein „Stand sichern"`,
+      ).toHaveCount(0);
+      await expect(band.getByLabel('Snapshot-Bezeichnung')).toHaveCount(0);
+      if (lage.leiste) {
+        const leiste = page.getByRole('complementary', { name: 'Kartenleiste' });
+        await expect(leiste).toBeVisible();
+        // Positiver Nachbar: ohne ihn wäre eine zugeklappte oder leere Leiste „aktionslos".
+        await expect(leiste.locator('section[data-paneel="verortet"]')).toBeVisible();
+        await expect(
+          leiste.locator('section[data-paneel="zeichnen"]'),
+          `${lauf}: Vorbedingung: ohne Schreibrecht kein Zeichnen-Paneel`,
+        ).toHaveCount(0);
+        // Der Admin trägt hier „Platzieren" am unverorteten Einsatzort.
+        await expect(
+          leiste.getByRole('button', { name: /^(Platzieren|Verschieben)$/ }),
+          `${lauf}: Vorbedingung: ohne Schreibrecht keine Platzier-Aktion`,
+        ).toHaveCount(0);
+      }
+      await schriftenGeladen(page);
+
+      const m = await page.evaluate(() => {
+        const b = document.querySelector('[data-lfh="zeitachse"]')!;
+        const r = b.getBoundingClientRect();
+        const k = document.querySelector('[data-lfh="kartenspalte"]')!.getBoundingClientRect();
+        const raus = Array.from(b.querySelectorAll('button, input, .ant-slider'))
+          .map((el) => el.getBoundingClientRect())
+          .filter((e) => e.width > 0 && (e.right > r.right + 0.5 || e.left < r.left - 0.5)).length;
+        return {
+          band: r.height,
+          karte: k.height,
+          raus,
+          inSpalte:
+            r.left >= k.left - 0.5 &&
+            r.right <= k.right + 0.5 &&
+            r.top >= k.top - 0.5 &&
+            r.bottom <= k.bottom + 0.5,
+          ueberlauf: b.scrollWidth - b.clientWidth,
+        };
+      });
+      const anteil = m.band / m.karte;
+      gemessen.push(
+        `${lauf}: ${Math.round(m.band)}/${Math.round(m.karte)} px = ${Math.round(anteil * 100)} %`,
+      );
+      expect(m.raus, `${lauf}: Knöpfe/Felder über den Bandrand`).toBe(0);
+      expect(m.ueberlauf, `${lauf}: das Band läuft waagerecht über`).toBeLessThanOrEqual(1);
+      expect(m.inSpalte, `${lauf}: das Band steht in der Kartenspalte`).toBe(true);
+      if (lage.deckel && anteil > DECKEL) {
+        verstoesse.push(
+          `${lauf}: Band ${Math.round(m.band)} px > ${DECKEL * 100} % von ${Math.round(m.karte)}`,
+        );
+      }
+      const abspielen = (await band.getByRole('button', { name: 'Abspielen' }).boundingBox())!;
+      expect(
+        Math.min(abspielen.width, abspielen.height),
+        `${lauf}: „Abspielen" ${abspielen.width}×${abspielen.height}, kurze Achse Soll ≥ ${SOLL[dichte]}`,
+      ).toBeGreaterThanOrEqual(SOLL[dichte] - 0.5);
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+  expect(verstoesse, 'Deckel verletzt').toEqual([]);
+});
+
+/**
+ * LFH-435, Nur-Lese-Zweig der Gefahrenmatrix: der Beobachter sieht über der Matrix den Hinweis
+ * „Nur Lesezugriff" (`GefahrenPage.tsx`) und gesperrte Zellen. Der Hinweis kommt beim Admin
+ * nicht vor — er darf die Matrix weder beim Laden noch bei einer live eintreffenden Bewertung
+ * verschieben und die Seite nicht verbreitern. Gemessen wie in den beiden Admin-Tests oben; die
+ * Fremdänderung schreibt ein Admin in einem EIGENEN Kontext, denn `page.request` ist nach dem
+ * Wechsel der Beobachter.
+ */
+test('Gefahrenmatrix (LFH-373): Hinweis über der Matrix — Laden ohne Sprung, Fremdänderung verschiebt nicht (Beobachter)', async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(300_000);
+  await beobachteShifts(page);
+  await anmelden(page);
+  const { id, gid } = await matrixEinsatz(page, `Flaeche 435 Matrix ${Date.now()}`);
+  await wechsleZuRolle(page, 'beobachter', String(id));
+  const schreiber = await browser.newContext();
+  try {
+    const login = await schreiber.request.post('/api/auth/login', {
+      data: { benutzername: ADMIN, passwort: ADMIN_PW },
+    });
+    expect(login.ok(), `Admin-Kontext: ${login.status()}`).toBeTruthy();
+
+    const gemessen: string[] = [];
+    const tabelle = page.locator('.gefahren-matrix');
+    const hinweis = page.getByRole('alert').filter({ hasText: /Nur Lesezugriff/ });
+    /** Anker und Vorbedingung, je Aufruf der Seite. */
+    const nurLesenSteht = async (lauf: string) => {
+      await expect(page.getByRole('button', { name: /^Bewertung / })).toHaveCount(58);
+      await expect(page.getByRole('heading', { name: /Sektor Sprung 1/ })).toBeVisible();
+      await expect(
+        hinweis,
+        `${lauf}: Vorbedingung: der Hinweis „Nur Lesezugriff" steht`,
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: /^Bewertung Atemgifte × Menschen/ }),
+        `${lauf}: Vorbedingung: die Zellen sind gesperrt`,
+      ).toBeDisabled();
+      const lage = await page.evaluate(() => {
+        const h = [...document.querySelectorAll('[role="alert"]')]
+          .find((el) => el.textContent?.includes('Nur Lesezugriff'))!
+          .getBoundingClientRect();
+        const t = document.querySelector('.gefahren-matrix')!.getBoundingClientRect();
+        return {
+          hinweisUnten: h.bottom,
+          matrixOben: t.top,
+          ueberlauf: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        };
+      });
+      expect(lage.hinweisUnten, `${lauf}: der Hinweis steht ÜBER der Matrix`).toBeLessThanOrEqual(
+        lage.matrixOben + 0.5,
+      );
+      expect(lage.ueberlauf, `${lauf}: die Seite läuft nicht waagerecht über`).toBeLessThanOrEqual(
+        1,
+      );
+    };
+
+    // ── Laden ohne Sprung (Handschirm), wie „Laden ohne Sprung" oben.
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const dichte of ['kompakt', 'handschuh'] as const) {
+      await page.goto(`/einsaetze/${id}/gefahren`);
+      await stelleDichte(page, dichte);
+      await nurLesenSteht(`Laden/${dichte}`);
+      await schriftenGeladen(page);
+      const messung = await ruheShifts(page);
+      const name = `Gefahrenmatrix/${dichte}`;
+      gemessen.push(`${name}: ${bericht(messung)}`);
+      expect(messung.summe, `${name}: ${bericht(messung)}`).toBeLessThanOrEqual(CLS_GUT);
+    }
+
+    // ── Fremdänderung, wie „Fremdänderung" oben.
+    for (const [flaeche, stufe] of [
+      [{ width: 390, height: 844 }, 'akut'],
+      [{ width: 1366, height: 768 }, 'hoch'],
+    ] as const) {
+      await page.setViewportSize(flaeche);
+      const lauf = `${flaeche.width}×${flaeche.height}`;
+      await page.goto(`/einsaetze/${id}/gefahren`);
+      await nurLesenSteht(lauf);
+      await schriftenGeladen(page);
+      await ruheShifts(page);
+      const vorher = (await tabelle.boundingBox())!;
+      await setzeShiftsZurueck(page);
+
+      const antwort = await schreiber.request.put(
+        `/api/einsaetze/${id}/gefahrengebiete/${gid}/matrix/bewertung`,
+        { data: { gefahrentyp: 'atemgifte', schutzobjekt: 'menschen', warnstufe: stufe } },
+      );
+      expect(antwort.ok(), await antwort.text()).toBeTruthy();
+      const zelle = page.locator('td', {
+        has: page.getByRole('button', { name: /^Bewertung Atemgifte × Menschen/ }),
+      });
+      await expect(zelle).toHaveAttribute('data-warnstufe', stufe);
+
+      const messung = await ruheShifts(page);
+      const nachher = (await tabelle.boundingBox())!;
+      gemessen.push(
+        `${lauf}: ${bericht(messung)}, Tabelle ${Math.round(vorher.y)} → ${Math.round(nachher.y)}`,
+      );
+      expect(nachher.y, `${lauf}: die Tabelle steht an derselben Stelle`).toBeCloseTo(vorher.y, 0);
+      expect(messung.summe, `${lauf}: ${bericht(messung)}`).toBeLessThanOrEqual(CLS_GUT);
+    }
+    test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+  } finally {
+    await schreiber.close();
+  }
 });
