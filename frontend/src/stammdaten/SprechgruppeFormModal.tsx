@@ -2,7 +2,7 @@ import { App, Form, Input } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import { aktualisiereSprechgruppe, legeSprechgruppeAn } from '../api/sprechgruppen';
 import type { Betriebsart, Sprechgruppe } from '../api/types';
@@ -53,7 +53,7 @@ export default function SprechgruppeFormModal({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.sprechgruppenAlle() });
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   return (

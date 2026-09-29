@@ -56,7 +56,7 @@ import {
   aktualisiereSchaden,
 } from '../api/einsatzSchaden';
 import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
-import { ApiError, istKonflikt } from '../api/client';
+import { istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { SK_META, STATUS_META, istPatient } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -91,6 +91,8 @@ import {
   verortenLinkStil,
   type PersonBearbeitenWerte,
 } from '../personen/personBearbeiten';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { registrierNummer } from '../anzeige/registrierNummer';
 
 const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
   hund: 'Hund',
@@ -167,12 +169,11 @@ export default function PersonenDetailPage() {
   const { benutzer } = useAuth();
 
   const qc = useQueryClient();
-  const { message, modal } = App.useApp();
+  const { modal } = App.useApp();
   const [editForm] = Form.useForm<PersonBearbeitenWerte>();
   const editSitzung = useEditSitzung<PersonBearbeitenWerte>(editForm);
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
@@ -634,12 +635,12 @@ export default function PersonenDetailPage() {
                     {a.status}
                   </Tag>
                   <Typography.Text>
-                    R-
-                    {String(
+                    {registrierNummer(
+                      'R',
                       a.vermisst_person_id === person.id
                         ? a.gefunden_person_id
                         : a.vermisst_person_id,
-                    ).padStart(3, '0')}
+                    )}
                   </Typography.Text>
                   {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
                     /* `size="middle"`: „Verwerfen" ist `danger` und stünde sonst bündig neben

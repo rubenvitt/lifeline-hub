@@ -10,7 +10,6 @@ import { parseRouteId, bereitstellungsraeumeListePfad } from '../../routing/deep
 import { ladeBr, setzeBrStatus, storniereBr, belegeBr } from '../../api/einsatzBereitstellungsraum';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
-import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { BrStatus, Einheit, EinsatzFahrzeug } from '../../api/types';
 import KraefteOhneBrSidebar from './KraefteOhneBrSidebar';
@@ -32,6 +31,7 @@ import BrSwitcher from './BrSwitcher';
 import { merkeLetztenBr } from './brAuswahl';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { summiereStaerke } from '../../anzeige/staerke';
+import { useFehlerMeldung } from '../../components/useFehlerMeldung';
 
 export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
@@ -78,8 +78,7 @@ export default function BrDetailPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   const statusMut = useMutation({
     mutationFn: (status: BrStatus) => setzeBrStatus(einsatzId, brId, status),

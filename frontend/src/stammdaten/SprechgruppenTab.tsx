@@ -7,7 +7,7 @@ import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { deaktiviereSprechgruppe, listeSprechgruppen } from '../api/sprechgruppen';
 import type { Sprechgruppe } from '../api/types';
 import SprechgruppeFormModal from './SprechgruppeFormModal';
@@ -30,7 +30,7 @@ export default function SprechgruppenTab() {
   const deaktivierenMutation = useMutation({
     mutationFn: (id: number) => deaktiviereSprechgruppe(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.sprechgruppenAlle() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e)),
   });
 
   const spalten: TableColumnsType<Sprechgruppe> = [

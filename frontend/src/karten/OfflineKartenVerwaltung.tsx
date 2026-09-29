@@ -5,7 +5,7 @@ import { DownOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { ladeKarteConfig } from '../api/karte';
 import {
   brecheOfflineDownloadAb,
@@ -99,12 +99,12 @@ export default function OfflineKartenVerwaltung() {
   const abbrechenMutation = useMutation({
     mutationFn: (id: number) => brecheOfflineDownloadAb(id),
     onSuccess: () => invalidiereKarte(qc),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Abbrechen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Abbrechen fehlgeschlagen')),
   });
   const loeschenMutation = useMutation({
     mutationFn: (id: number) => loescheOfflineKarte(id),
     onSuccess: () => invalidiereKarte(qc),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Löschen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Löschen fehlgeschlagen')),
   });
   // „Aktualisieren" = One-Click-Update: neueren Katalog-Stand laden; das Backend aktiviert die
   // neue Version nach Erfolg automatisch und entfernt die alte (ersetzt_karte_id). Der Katalog-Pin
@@ -125,8 +125,7 @@ export default function OfflineKartenVerwaltung() {
       invalidiereKarte(qc);
       message.success('Update lädt — wird nach Abschluss automatisch aktiviert');
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Aktualisieren fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Aktualisieren fehlgeschlagen')),
   });
   // „Neu laden" = In-Place-Hot-Swap (B3) der AKTIVEN Karte: Update in DIESELBE Zeile/Datei. Die
   // alte Datei bleibt bis zum atomaren Swap aktiv+ausgeliefert (downtime-frei, stabile id). Nur für
@@ -145,7 +144,7 @@ export default function OfflineKartenVerwaltung() {
         'Aktualisierung lädt — die Karte bleibt aktiv und wird nach Abschluss getauscht',
       );
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Neu laden fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Neu laden fehlgeschlagen')),
   });
 
   const spalten: KatalogSpalte<OfflineKarte>[] = [

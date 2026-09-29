@@ -1,4 +1,4 @@
-import { apiGet, apiSend, type ApiSendOptionen } from './client';
+import { apiGet, apiSend, type ApiSendOptionen, mitParametern } from './client';
 import type {
   LageMeldung,
   Meldung,
@@ -14,11 +14,12 @@ export interface MeldungFilter {
 }
 
 export function listeMeldungen(einsatzId: number, filter: MeldungFilter = {}): Promise<Meldung[]> {
-  const p = new URLSearchParams();
-  if (filter.status) p.set('status', filter.status);
-  if (filter.richtung) p.set('richtung', filter.richtung);
-  const q = p.toString() ? `?${p.toString()}` : '';
-  return apiGet<Meldung[]>(`/api/einsaetze/${einsatzId}/meldungen${q}`);
+  return apiGet<Meldung[]>(
+    mitParametern(`/api/einsaetze/${einsatzId}/meldungen`, {
+      status: filter.status,
+      richtung: filter.richtung,
+    }),
+  );
 }
 
 /** Letzte Rückmeldung je Einheit/Abschnitt samt Frist (LFH-610). Lesezugriff Meldungen. */
