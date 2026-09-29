@@ -304,6 +304,8 @@ export function erzeugeBildHandles(
       ecken = e;
       setzeBildGeometrie(map, bildId, e);
       positioniere();
+      // Eine neue Größe ändert den Platz für die Kanten; im Zug gilt die Regel aus `dragend`.
+      if (!ziehend) wendeModusAn();
     },
     setzeModus(m: GriffModus) {
       if (ziehend) {

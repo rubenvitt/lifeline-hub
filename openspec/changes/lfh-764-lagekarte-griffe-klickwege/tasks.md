@@ -13,8 +13,8 @@
 
 ## 3. Klick-Schiedsrichter (rein)
 
-- [ ] 3.1 `pages/lagekarte/klickziel.ts` mit `ordneKlickebene` und `entscheideKlickziel` per TDD (D4); die Fälle aus den `personenClusterTreffer`-Tests in `markerLayer.test.ts` wandern nach `klickziel.test.ts`, `personenClusterTreffer` entfällt. Tests für jede Rangstufe, Marker-nächstes-Merkmal, Trefferzone vs. Fachebenen-Punkt/-Bündel, Trefferzone vs. Fläche, zwei Flächen. Nachweis: Vitest grün, vorher rot.
-- [ ] 3.2 Guard-Test: jede Ebene aus `MARKER_KLICK_LAYER`, `SPIDER_KLICK_LAYER`, `PERSONEN_CLUSTER_KLICK_LAYER`, den Zonen-/Abschnittsebenen und `fachebeneClickLayerIds` aller Fachebenen-Definitionen wird eingeordnet (kein `null`). Nachweis: Test grün; mit einer absichtlich fehlenden Einordnung rot.
+- [x] 3.1 `pages/lagekarte/klickziel.ts` mit `ordneKlickebene` und `entscheideKlickziel` per TDD (D4); die Fälle aus den `personenClusterTreffer`-Tests in `markerLayer.test.ts` wandern nach `klickziel.test.ts`, `personenClusterTreffer` entfällt. Tests für jede Rangstufe, Marker-nächstes-Merkmal, Trefferzone vs. Fachebenen-Punkt/-Bündel, Trefferzone vs. Fläche, zwei Flächen. Nachweis: Vitest grün, vorher rot.
+- [x] 3.2 Guard-Test: jede Ebene aus `MARKER_KLICK_LAYER`, `SPIDER_KLICK_LAYER`, `PERSONEN_CLUSTER_KLICK_LAYER`, den Zonen-/Abschnittsebenen und `fachebeneClickLayerIds` aller Fachebenen-Definitionen wird eingeordnet (kein `null`). Nachweis: Test grün; mit einer absichtlich fehlenden Einordnung rot.
 
 ## 4. Schiedsrichter verdrahten
 

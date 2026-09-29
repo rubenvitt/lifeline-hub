@@ -10,7 +10,6 @@ import {
   CLUSTER_QUELLEN,
   clusterSchluessel,
   PERSONEN_CLUSTER_KLICK_LAYER,
-  personenClusterTreffer,
   MARKER_KLICK_LAYER,
   naechstesMerkmal,
   SPIDER_LEAVES_QUELLE,
@@ -589,64 +588,8 @@ describe('Eigene Cluster-Quelle der Betroffenen (LFH-648)', () => {
   });
 });
 
-describe('personenClusterTreffer (LFH-648)', () => {
-  const cluster = {
-    layer: { id: 'personen-cluster-kreis' },
-    properties: { cluster: true, cluster_id: 7, point_count: 3 },
-    geometry: { type: 'Point', coordinates: [11.5, 53.55] },
-  };
-  const einheit = {
-    layer: { id: 'marker-symbol' },
-    properties: { schluessel: 'einheit-1' },
-    geometry: { type: 'Point', coordinates: [11.5, 53.55] },
-  };
-
-  it('liefert den Personen-Cluster, wenn er das OBERSTE Feature am Klickpunkt ist', () => {
-    expect(personenClusterTreffer([cluster])).toEqual({
-      clusterId: 7,
-      center: [11.5, 53.55],
-      anzahl: 3,
-    });
-  });
-
-  it('ein Kräfte-Zeichen über dem Cluster gewinnt — der Klick gehört ihm, nicht dem Spider', () => {
-    // queryRenderedFeatures liefert von oben nach unten: das Zeichen liegt über dem Cluster.
-    expect(personenClusterTreffer([einheit, cluster])).toBeNull();
-  });
-
-  it('leerer Klick: kein Treffer', () => {
-    expect(personenClusterTreffer([])).toBeNull();
-  });
-
-  // Die unsichtbare Zone jedes Kräfte-/Objektmarkers liegt über den Personen-Clustern. Zählte sie
-  // als „oberstes Feature", nähme ein Marker im Umkreis von 24–36 px dem sichtbaren Cluster den
-  // Tipp weg — genau in den Berührungsstufen.
-  const zone = (id: string, schluessel: string) => ({
-    layer: { id },
-    properties: { schluessel, treffer: 72 },
-    geometry: { type: 'Point', coordinates: [11.5001, 53.5501] },
-  });
-
-  it('eine bloße Trefferzone über dem Cluster zählt nicht — der Cluster fächert auf', () => {
-    for (const id of ['marker-treffer', 'marker-einsatzort-treffer', 'spider-treffer']) {
-      expect(personenClusterTreffer([zone(id, 'einsatzort'), cluster]), id).toEqual({
-        clusterId: 7,
-        center: [11.5, 53.55],
-        anzahl: 3,
-      });
-    }
-  });
-
-  it('ein GEZEICHNETES Zeichen über dem Cluster gewinnt weiterhin, auch unter einer Zone', () => {
-    expect(
-      personenClusterTreffer([zone('marker-treffer', 'einheit-1'), einheit, cluster]),
-    ).toBeNull();
-  });
-
-  it('nur Zonen am Punkt, kein Cluster: kein Treffer', () => {
-    expect(personenClusterTreffer([zone('marker-treffer', 'einheit-1')])).toBeNull();
-  });
-});
+// `personenClusterTreffer` ist in `entscheideKlickziel` aufgegangen (LFH-764); seine Fälle stehen
+// in `klickziel.test.ts`.
 
 describe('naechstesMerkmal (Review LFH-650)', () => {
   // Projektion = Identität in Bildschirm-Pixeln, damit die Abstände lesbar bleiben.

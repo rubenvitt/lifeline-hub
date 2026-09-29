@@ -189,6 +189,19 @@ describe('erzeugeBildHandles — Griffwahl nach Platz (LFH-764)', () => {
     expect(scharf()).toEqual(Array(4).fill('bildgriff-eck'));
   });
 
+  it('entscheidet nach Ecken von außen neu (Refetch, numerische Eingabe)', () => {
+    const h = erzeugeBildHandles(karte as never, 1, ECKEN, vi.fn(), KONTEXT, 'groesse');
+    expect(scharf()).toEqual(eckUndKante);
+    // Halb so groß: 100 px bei `skala` 200.
+    h.setzeEcken([
+      [0, 0],
+      [0.5, 0],
+      [0.5, 0.5],
+      [0, 0.5],
+    ]);
+    expect(scharf()).toEqual(Array(4).fill('bildgriff-eck'));
+  });
+
   it('meldet den Kartenhörer beim Zerstören ab', () => {
     const h = erzeugeBildHandles(karte as never, 1, ECKEN, vi.fn(), KONTEXT, 'groesse');
     expect(karte.hoerer.get('move')?.size).toBe(1);

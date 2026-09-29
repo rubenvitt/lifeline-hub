@@ -25,8 +25,6 @@ import {
   MARKER_KLICK_LAYER,
   PERSONEN_CLUSTER_KLICK_LAYER,
   PERSONEN_CLUSTER_QUELLE,
-  personenClusterTreffer,
-  naechstesMerkmal,
   SPIDER_KLICK_LAYER,
   setzeSpiderDaten,
   type MarkerFeatureCollection,
@@ -66,6 +64,13 @@ import {
   entscheideFachebeneKlick,
   type FachebeneKlickZiel,
 } from './fachebenenLayer';
+import {
+  ABSCHNITT_KLICK_LAYER,
+  ZONEN_KLICK_LAYER,
+  entscheideKlickziel,
+  ordneKlickebene,
+  type Klickziel,
+} from './klickziel';
 import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './bildLayer';
 import { eckenInitialPixel, type Punkt } from './bildGeometrie';
 import { erzeugeBildHandles, type BildHandles } from './bildHandles';
@@ -243,19 +248,25 @@ export interface KartenHandle {
   nachNorden(): void;
 }
 
+const klickzielJeTipp = new WeakMap<Event, Klickziel<maplibregl.MapGeoJSONFeature> | null>();
+
 /**
- * Der Personen-Cluster, dem ein Klick gehört, oder `null`. Eine Abfrage für beide Klickwege
- * (Auffächern und Markerauswahl), sonst fächerte derselbe Tipp auf und öffnete einen Inspector.
+ * Wem ein Tipp gehört (LFH-764, `klickziel.ts`). Jeder Klick-Hörer der Karte fragt hier und handelt
+ * nur als Gewinner — sonst wählte derselbe Tipp Marker UND Zone aus, oder `easeTo` ins KRITIS-Bündel
+ * liefe gegen `flyTo` zum Marker daneben. Gefragt wird über ALLE vorhandenen Klickebenen, einmal je
+ * Tipp: die Hörer eines Tipps teilen über das Originalereignis dasselbe Urteil.
  */
-function personenClusterAm(map: maplibregl.Map, punkt: maplibregl.PointLike) {
-  const layers = [
-    ...MARKER_KLICK_LAYER,
-    ...SPIDER_KLICK_LAYER,
-    ...PERSONEN_CLUSTER_KLICK_LAYER,
-  ].filter((id) => map.getLayer(id));
-  return layers.length
-    ? personenClusterTreffer(map.queryRenderedFeatures(punkt, { layers }))
+function klickzielAm(map: maplibregl.Map, e: maplibregl.MapMouseEvent) {
+  const schon = klickzielJeTipp.get(e.originalEvent);
+  if (schon !== undefined) return schon;
+  const layers = map.getLayersOrder().filter((id) => ordneKlickebene(id) !== null);
+  const ziel = layers.length
+    ? entscheideKlickziel(map.queryRenderedFeatures(e.point, { layers }), e.point, (ll) =>
+        map.project(ll),
+      )
     : null;
+  klickzielJeTipp.set(e.originalEvent, ziel);
+  return ziel;
 }
 
 const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kartenflaeche(
@@ -710,17 +721,19 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     });
   }, [flaechen]);
 
-  // Klick auf eine Fläche → Inspector.
+  // Klick auf eine Fläche → Inspector, wenn der Tipp ihr gehört (`klickzielAm`).
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const handler = (e: maplibregl.MapLayerMouseEvent) => {
-      const id = e.features?.[0]?.properties?.id;
+      const ziel = klickzielAm(map, e);
+      if (ziel?.art !== 'abschnitt') return;
+      const id = ziel.merkmal.properties?.id;
       if (id != null) onFlaecheKlick?.(Number(id));
     };
-    map.on('click', 'abschnitte-fill', handler);
+    map.on('click', ABSCHNITT_KLICK_LAYER, handler);
     return () => {
-      map.off('click', 'abschnitte-fill', handler);
+      map.off('click', ABSCHNITT_KLICK_LAYER, handler);
     };
   }, [onFlaecheKlick]);
 
@@ -739,21 +752,21 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     });
   }, [zonen]);
 
-  // Klick auf eine Zone (Fläche ODER Linie) → Inspector.
+  // Klick auf eine Zone (Fläche ODER Linie) → Inspector, wenn der Tipp ihr gehört. Ein Hörer über
+  // alle drei Ebenen: je Ebene feuerte ein Tipp auf Fläche und Linie zweimal.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const handler = (e: maplibregl.MapLayerMouseEvent) => {
-      const id = e.features?.[0]?.properties?.id;
+      const ziel = klickzielAm(map, e);
+      if (ziel?.art !== 'zone') return;
+      const id = ziel.merkmal.properties?.id;
       if (id != null) onZoneKlick?.(Number(id));
     };
-    map.on('click', 'zonen-fill', handler);
-    map.on('click', 'zonen-line', handler);
-    map.on('click', 'zonen-line-gestrichelt', handler);
+    const ebenen = [...ZONEN_KLICK_LAYER];
+    map.on('click', ebenen, handler);
     return () => {
-      map.off('click', 'zonen-fill', handler);
-      map.off('click', 'zonen-line', handler);
-      map.off('click', 'zonen-line-gestrichelt', handler);
+      map.off('click', ebenen, handler);
     };
   }, [onZoneKlick]);
 
@@ -852,14 +865,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (!map) return;
     // Ein Handler über alle Klickebenen: je Ebene feuerte ein Tipp auf Kreis, Kurzzeichen und
     // Trefferzone `onMarkerKlick` bis zu dreimal, womöglich mit verschiedenen Schlüsseln. Gewählt
-    // wird das Merkmal, das dem Klickpunkt am nächsten liegt.
+    // wird, wenn der Tipp einem Marker gehört (`klickzielAm`) — nicht, wenn ein Personen-Cluster,
+    // ein Fachebenen-Punkt oder -Bündel am Punkt gezeichnet ist und nur die Trefferzone träfe.
     const klickMarker = (e: maplibregl.MapLayerMouseEvent) => {
-      // Gehört der Klick einem Personen-Cluster, fächert der Karten-Klick unten auf; hier wird
-      // nichts gewählt — sonst öffnete die unsichtbare Zone eines Zeichens daneben dessen
-      // Inspector.
-      if (personenClusterAm(map, e.point)) return;
-      const merkmal = naechstesMerkmal(e.features ?? [], e.point, (ll) => map.project(ll));
-      const schluessel = merkmal?.properties?.schluessel;
+      const ziel = klickzielAm(map, e);
+      if (ziel?.art !== 'marker') return;
+      const schluessel = ziel.merkmal.properties?.schluessel;
       if (typeof schluessel === 'string') onMarkerKlick?.(schluessel);
     };
     const enter = () => {
@@ -1009,9 +1020,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // Karten-Klick: ein Personen-Cluster (WebGL-Layer) fächert auf, wenn er das oberste Feature am
     // Punkt ist. Jeder andere Klick klappt ein.
     const klick = (e: maplibregl.MapMouseEvent) => {
-      const treffer = personenClusterAm(map, e.point);
-      if (treffer)
-        oeffne(PERSONEN_CLUSTER_QUELLE, treffer.clusterId, treffer.center, treffer.anzahl);
+      const ziel = klickzielAm(map, e);
+      if (ziel?.art === 'personenCluster')
+        oeffne(PERSONEN_CLUSTER_QUELLE, ziel.clusterId, ziel.center, ziel.anzahl);
       else schliesse();
     };
     const zeiger = (an: boolean) => () => {
@@ -1079,7 +1090,11 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       .map(({ id, fe }) => {
         const quelle = fe.def.key;
         const klick = (e: maplibregl.MapLayerMouseEvent) => {
-          const feature = e.features?.[0];
+          // Nur der Gewinner des Tipps handelt (`klickzielAm`): im Ring eines Markers zoomt ein
+          // Bündel hinein, ohne dass der Marker daneben zusätzlich gewählt wird.
+          const gewinner = klickzielAm(map, e);
+          if (gewinner?.art !== 'fachebene' || gewinner.merkmal.layer.id !== id) return;
+          const feature = gewinner.merkmal;
           const props = (feature?.properties ?? {}) as Record<string, unknown>;
           // Nur gebündelte Ebenen kennen Bündel und Sammelpunkte.
           const ziel: FachebeneKlickZiel = fe.def.buendeln
