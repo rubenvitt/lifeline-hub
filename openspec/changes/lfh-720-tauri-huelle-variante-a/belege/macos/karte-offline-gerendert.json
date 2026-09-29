@@ -1,0 +1,4 @@
+{
+  "ergebnis": "{\"loaded\":true,\"styleLoaded\":true,\"tiles\":true,\"zoom\":13,\"mitte\":{\"lng\":9.732,\"lat\":52.3759},\"quellen\":[\"basemap-1:vector:/api/karte/offline/1/tiles/{z}/{x}/{y}?v=20260928164018\"],\"layer\":24,\"glyphs\":\"/api/karte/offline/fonts/{fontstack}/{range}.pbf\",\"gerendert\":808,\"fehler\":[],\"gl\":\"WebGL2RenderingContext\"}",
+  "name": "k21"
+}
