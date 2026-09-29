@@ -34,6 +34,23 @@ describe('MarkerSuche (LFH-716)', () => {
     expect(screen.getByText(`${OBJEKTART.uhs} (2)`)).toBeInTheDocument();
   });
 
+  it('setzt je Gruppe eine Überschrift unter dem Paneelkopf (h2 → h3) und benennt die Liste (LFH-470)', () => {
+    zeige({
+      marker: [
+        marker('uhs', 1, 'BHP Nord'),
+        marker('schaden', 2, 'S-007'),
+        marker('uhs', 3, 'BHP Süd'),
+      ],
+    });
+    const koepfe = screen.getAllByRole('heading');
+    expect(koepfe.map((k) => k.textContent)).toEqual([
+      `${OBJEKTART.uhs} (2)`,
+      `${OBJEKTART.schaden} (1)`,
+    ]);
+    for (const kopf of koepfe) expect(kopf.tagName).toBe('H3');
+    expect(screen.getByRole('list', { name: `${OBJEKTART.uhs} (2)` })).toBeVisible();
+  });
+
   it('meldet den Schlüssel des angeklickten Eintrags', async () => {
     const props = zeige();
     await userEvent.click(screen.getByRole('button', { name: 'BHP Nord' }));

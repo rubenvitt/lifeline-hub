@@ -459,6 +459,8 @@ export default function MaterialPage() {
               schluessel: (m) => m.status,
               etikett: (w) => materialStatus[w as MaterialStatus]?.label ?? w,
               reihenfolge: STATUS_REIHENFOLGE,
+              // Die Gruppenköpfe stehen direkt unter dem Seitentitel (h1).
+              unterEbene: 1,
             }}
             karte={{
               art: 'plan',

@@ -82,8 +82,13 @@ export default function MarkerSuche({
           <Liste
             key={g.typ}
             size="small"
-            // Template-Literal, damit die Zeile EIN Textknoten bleibt.
-            header={`${g.label} (${zaehler(g.treffer.length)})`}
+            kopf={{
+              // Template-Literal, damit die Zeile EIN Textknoten bleibt.
+              inhalt: `${g.label} (${zaehler(g.treffer.length)})`,
+              // Einziger Einbauort ist das Paneel „Verortet" in `Sidebar`, dessen Kopf ein `<h2>`
+              // ist (`KlappPaneel`).
+              unterEbene: 2,
+            }}
             dataSource={g.treffer}
             rowKey={(m) => m.schluessel}
             style={{ marginBottom: token.marginXS }}

@@ -477,6 +477,8 @@ export default function PersonalPage() {
               schluessel: (ep) => kategorieVon(ep.status_kategorie),
               etikett: kategorieEtikett,
               reihenfolge: KATEGORIE_REIHENFOLGE,
+              // Die Gruppenköpfe stehen direkt unter dem Seitentitel (h1).
+              unterEbene: 1,
             }}
             zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
             karte={{

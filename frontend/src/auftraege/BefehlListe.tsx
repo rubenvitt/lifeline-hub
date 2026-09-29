@@ -121,6 +121,8 @@ export default function BefehlListe({
          bewusst auseinander. */}
       <Bereichskopf
         titel="Befehle"
+        // Ausdrücklich statt Vorgabe: die Gruppenköpfe der Datensicht rechnen mit dieser Ebene.
+        ueberschrift="h3"
         meta={`${befehle.length} Befehle · ${entwuerfe} im Entwurf`}
         dataUpdatedAt={befehleQuery.dataUpdatedAt}
         aktion={
@@ -153,6 +155,8 @@ export default function BefehlListe({
           schluessel: (b) => b.status,
           etikett: (w) => (w === 'entwurf' ? 'Entwürfe' : 'Freigegeben'),
           reihenfolge: ['entwurf', 'freigegeben'],
+          // Die Gruppenköpfe stehen unter dem `Bereichskopf` (`ueberschrift="h3"` oben).
+          unterEbene: 3,
         }}
         karte={{
           art: 'plan',

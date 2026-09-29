@@ -744,6 +744,8 @@ export default function PersonenPage() {
                   etikett: (sk) =>
                     sk === 'ohne' ? 'ohne Sichtung' : SK_META[sk as Sichtungskategorie].label,
                   reihenfolge: [...SICHTUNGSBILD_REIHE],
+                  // Die Gruppenköpfe stehen direkt unter dem Seitentitel (h1).
+                  unterEbene: 1,
                 }}
                 onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
                 zeilenKlasse={zeilenKlasse}
