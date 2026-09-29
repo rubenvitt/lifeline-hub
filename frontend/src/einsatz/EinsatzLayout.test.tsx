@@ -10,7 +10,7 @@ import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/k
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import EinsatzLayout, { einsatzKennung, navGriffMass } from './EinsatzLayout';
 import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
-import { dichten, farbenDunkel } from '../theme/tokens';
+import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { adminFixture } from '../test/fixtures';
 
@@ -124,6 +124,16 @@ describe('EinsatzLayout', () => {
     );
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
     expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument();
+  });
+
+  it('setzt den Kopfgrund aus rahmenFarben.grund, statt antds Header-Default zu erben (LFH-437)', async () => {
+    setup();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Hochwasser Nord/ })).toBeInTheDocument(),
+    );
+    // Gegenstück zu `AppLayout.test.tsx`: beide Kopfleisten tragen ihren Grund selbst, und
+    // `theme/rahmenKontrast.test.ts` rechnet jeden Text darauf gegen genau diesen Wert.
+    expect(screen.getByRole('banner')).toHaveStyle({ backgroundColor: rahmenFarben.grund });
   });
 
   /**
