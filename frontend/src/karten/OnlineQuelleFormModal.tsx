@@ -2,7 +2,7 @@ import { App, Collapse, Form, Input, InputNumber, Switch } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import type { OnlineStyleTyp } from '../api/karte';
 import {
@@ -109,7 +109,7 @@ export default function OnlineQuelleFormModal({
     onSuccess: () => {
       invalidiereKarte(qc);
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   return (

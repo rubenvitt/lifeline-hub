@@ -1,5 +1,5 @@
 import type { FahrzeugStatus, StatusKategorie } from './types';
-import { apiGet, apiSend } from './client';
+import { katalogApi } from './katalogApi';
 
 export interface StatusEingabe {
   label: string;
@@ -9,18 +9,9 @@ export interface StatusEingabe {
   sortier: number;
 }
 
-export function listeFahrzeugStatus(): Promise<FahrzeugStatus[]> {
-  return apiGet<FahrzeugStatus[]>('/api/fahrzeug-status');
-}
+const api = katalogApi<FahrzeugStatus, StatusEingabe>('/api/fahrzeug-status');
 
-export function legeStatusAn(daten: StatusEingabe): Promise<FahrzeugStatus> {
-  return apiSend<FahrzeugStatus>('/api/fahrzeug-status', 'POST', daten);
-}
-
-export function aktualisiereStatus(id: number, daten: StatusEingabe): Promise<FahrzeugStatus> {
-  return apiSend<FahrzeugStatus>(`/api/fahrzeug-status/${id}`, 'PATCH', daten);
-}
-
-export function deaktiviereStatus(id: number): Promise<void> {
-  return apiSend<void>(`/api/fahrzeug-status/${id}/deaktivieren`, 'POST');
-}
+export const listeFahrzeugStatus = api.liste;
+export const legeStatusAn = api.legeAn;
+export const aktualisiereStatus = api.aktualisiere;
+export const deaktiviereStatus = api.deaktiviere;

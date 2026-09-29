@@ -35,6 +35,7 @@ import type { Fahrzeug, Staerke } from '../api/types';
 import { fahrzeugListePfad } from './stammdatenDetail';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { Formularpaneel } from '../components/instrument';
+import { teilwortSuche } from '../components/teilwortSuche';
 
 interface FormWerte {
   funkrufname: string;
@@ -225,10 +226,7 @@ export default function FahrzeugDetailPage() {
                     options={vorschlaege.fahrzeugtyp.map((t) => ({ value: t }))}
                     allowClear
                     placeholder="z. B. LF 20, RTW"
-                    showSearch={{
-                      filterOption: (input, option) =>
-                        (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-                    }}
+                    showSearch={teilwortSuche}
                   />
                 </Form.Item>
               </Col>
@@ -238,10 +236,7 @@ export default function FahrzeugDetailPage() {
                     options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
                     allowClear
                     placeholder="z. B. Feuerwehr Musterstadt"
-                    showSearch={{
-                      filterOption: (input, option) =>
-                        (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-                    }}
+                    showSearch={teilwortSuche}
                   />
                 </Form.Item>
               </Col>
@@ -261,10 +256,7 @@ export default function FahrzeugDetailPage() {
                     options={vorschlaege.standort.map((t) => ({ value: t }))}
                     allowClear
                     placeholder="z. B. Wache Mitte"
-                    showSearch={{
-                      filterOption: (input, option) =>
-                        (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-                    }}
+                    showSearch={teilwortSuche}
                   />
                 </Form.Item>
               </Col>

@@ -30,7 +30,6 @@ import {
   loeseAbschnittAuf,
   type AbschnittEingabe,
 } from '../api/einsatzabschnitte';
-import { ApiError } from '../api/client';
 import type { AbschnittLagezustand, Einheit, Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
@@ -52,6 +51,7 @@ import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
 import AbschnittDaten from './einsatzabschnitte/AbschnittDaten';
 import StatusTag from '../components/StatusTag';
 import { abschnittLagezustand, einsatzStatus } from '../theme/statusFarben';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /** Auswahl des Lagezustands in Stufenfolge — Wortlaut aus dem Farbvertrag, nicht doppelt. */
 const LAGEZUSTAND_OPTIONEN = (['planmaessig', 'angespannt', 'kritisch'] as const).map((l) => ({
@@ -141,8 +141,7 @@ export default function EinsatzabschnittePage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   const abschnitte = useMemo(() => abschnitteQuery.data ?? [], [abschnitteQuery.data]);
   const aktuell = abschnitte.find((a) => a.id === gewaehlt) ?? null;

@@ -13,6 +13,7 @@ import type {
 } from './types';
 import { apiGet, apiSend, type ApiSendOptionen } from './client';
 import { patchBody } from './patchTriState';
+import { registrierNummer } from '../anzeige/registrierNummer';
 
 /** Felder, die beim Anlegen/Bearbeiten gesetzt werden können (alle optional). */
 export interface PersonEingabe {
@@ -121,7 +122,7 @@ export function ladePersonAudit(einsatzId: number, personId: number): Promise<Pe
 
 /** Registriernummer-Anzeige wie im Backend (R-042). */
 export function registrierAnzeige(nr: number): string {
-  return `R-${String(nr).padStart(3, '0')}`;
+  return registrierNummer('R', nr);
 }
 
 /** E‑2: Sichtung (Triage) erfassen. Hebt erfasst→betroffen serverseitig an. */

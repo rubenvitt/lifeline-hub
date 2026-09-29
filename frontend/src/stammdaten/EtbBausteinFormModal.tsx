@@ -2,7 +2,7 @@ import { App, Collapse, Form, Input, InputNumber, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import { aktualisiereBaustein, legeBausteinAn, type BausteinEingabe } from '../api/etbBaustein';
 import type { EtbBaustein, EtbTyp, MeldeWeg } from '../api/types';
@@ -65,7 +65,7 @@ export default function EtbBausteinFormModal({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.etbBausteine() });
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   return (
