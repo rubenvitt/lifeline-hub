@@ -19,6 +19,7 @@ import type {
   BetreuungsstelleStatus,
   Ausmass,
   BrStatus,
+  Dienststatus,
   EinsatzStatus,
   EtbTyp,
   MaterialStatus,
@@ -209,6 +210,17 @@ export const materialStatus: Record<MaterialStatus, StatusDarstellung> = {
   defekt: { rolle: 'alarm', label: 'defekt' },
   verbraucht: { rolle: 'alarm', label: 'verbraucht' },
   desinfektion_noetig: { rolle: 'achtung', label: 'Desinfektion nötig' },
+};
+
+/**
+ * Dienststatus eines Stammdatums (Fahrzeug, Personal, Material, LFH-476). `ausser_dienst` ist
+ * `neutral`, nicht `alarm`: bewusst aus dem Bestand genommen, keine Gefahr — wie
+ * `verfuegbarkeit.gesperrt`. `stammdaten/dienststatus.tsx` liest Wort und Rolle für alle drei
+ * Katalog-Tabs von hier, auch den Wortlaut der Filterwerte.
+ */
+export const dienststatus: Record<Dienststatus, StatusDarstellung> = {
+  in_dienst: { rolle: 'normal', label: 'in Dienst' },
+  ausser_dienst: { rolle: 'neutral', label: 'außer Dienst' },
 };
 
 /** Status eines Bereitstellungsraums. */

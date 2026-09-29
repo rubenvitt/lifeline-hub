@@ -362,7 +362,7 @@ anwendbar), „nicht geprüft" ist keins.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`pruefeVerlassen`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in
-  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 25 am 25.09.2026); jede weitere
+  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 26 am 29.09.2026); jede weitere
   Karte ist eine begründete Entscheidung (Beispiele: `odlStufe` in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`, `aufbewahrungZustand` in
   `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb

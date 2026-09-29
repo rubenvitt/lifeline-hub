@@ -47,6 +47,20 @@ describe('FahrzeugeTab', () => {
     expect(screen.getByText('0/1/8//9')).toBeInTheDocument();
   });
 
+  // LFH-476: Wort und Rolle kommen aus dem Vertrag (`theme/statusFarben.ts`, `dienststatus`),
+  // der Tab setzt keine Farbe selbst. Die Spalte teilen Fahrzeuge, Personal und Material.
+  it('zeigt den Dienststatus als Vertragsetikett', async () => {
+    const { container } = render(nichtAdmin, [
+      fahrzeug,
+      { ...fahrzeug, id: 2, funkrufname: 'Florian 2', dienststatus: 'ausser_dienst' },
+    ]);
+    await screen.findByText('Florian 1');
+    const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
+    const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
+    expect(within(erste).getByText('in Dienst')).toHaveAttribute('data-rolle', 'normal');
+    expect(within(zweite).getByText('außer Dienst')).toHaveAttribute('data-rolle', 'neutral');
+  });
+
   it('Admin sieht „Fahrzeug anlegen" und Aktionen', async () => {
     render(admin);
     await screen.findByText('Florian 1');
