@@ -4,9 +4,10 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useLocation } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { CommandPaletteProvider } from './CommandPaletteProvider';
+import { benutzerFixture } from '../test/fixtures';
 
 /**
  * DIE AKZEPTANZKRITERIEN DES TICKETS, an der verdrahteten Palette (LFH-391 · C3).
@@ -27,16 +28,7 @@ vi.mock('./useBefehle', () => ({ useBefehle: () => [] }));
 
 const EINSATZ = 1;
 
-const nutzer = {
-  id: 1,
-  anzeigename: 'EL',
-  benutzername: 'el',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-  aktiv: true,
-  erstellt_at: '',
-  totp_aktiviert: false,
-};
+const nutzer = benutzerFixture({ anzeigename: 'EL', org_rolle: 'fuehrungskraft' });
 const PERSON = {
   id: 7,
   einsatz_id: EINSATZ,
@@ -60,7 +52,7 @@ let overrides: Record<string, object>;
 beforeEach(() => {
   overrides = {};
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/:id/modul-overrides', () => HttpResponse.json(overrides)),
     http.get('/api/einsaetze/:id/personen', () => HttpResponse.json([PERSON])),
     http.get('/api/einsaetze/:id/schaeden', () => HttpResponse.json([SCHADEN])),

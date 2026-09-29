@@ -25,12 +25,9 @@ pub fn naechste_faelligkeit(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::NaiveDateTime;
 
     fn t(s: &str) -> DateTime<Utc> {
-        NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-            .unwrap()
-            .and_utc()
+        crate::zeit::parse_utc(s).unwrap()
     }
 
     #[test]

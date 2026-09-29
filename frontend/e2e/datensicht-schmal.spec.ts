@@ -149,7 +149,6 @@ test('Personalseite: bei 390 px Karten und kein Tabellenelement, bei 1366 px Tab
   // ── 390 px: KARTENZWEIG
   await page.setViewportSize(HANDSCHIRM);
   await page.goto(`/einsaetze/${einsatzId}/personal`);
-  await page.waitForLoadState('networkidle');
 
   const bereich = page.getByRole('region', { name: 'Personal im Einsatz' });
   await expect(bereich).toHaveCount(1);
@@ -176,7 +175,6 @@ test('Personalseite: bei 390 px Karten und kein Tabellenelement, bei 1366 px Tab
   // ── 1366 px: GEGENPROBE, TABELLENZWEIG
   await page.setViewportSize(FUEKW);
   await page.goto(`/einsaetze/${einsatzId}/personal`);
-  await page.waitForLoadState('networkidle');
   await expect(bereich).toHaveCount(1);
   await expect(bereich.getByText(KRAFT).first()).toBeVisible();
 
@@ -287,7 +285,11 @@ test('Spaltenschalter ist mit der Tastatur bedienbar — Eingabetaste schaltet d
   await seedeKraft(page, einsatzId);
 
   await page.goto(`/einsaetze/${einsatzId}/personal`);
-  await page.waitForLoadState('networkidle');
+  // Anker: die gesäte Zeile. Erst mit ihr steht die Tabelle, und der Zähler unten liest den
+  // Endstand.
+  await expect(
+    page.getByRole('region', { name: 'Personal im Einsatz' }).locator('tr.ant-table-row'),
+  ).toHaveCount(1);
 
   const werkzeuge = page.locator('[data-lfh="datensicht-werkzeuge"]');
   const schalter = werkzeuge.getByRole('button', { name: /^Spalten/ });

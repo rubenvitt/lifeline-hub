@@ -4,7 +4,7 @@ import { baueBefehle } from './befehle';
 import { modulRegistry } from '../einsatz/modulRegistry';
 import type { ModulEintrag } from '../einsatz/modulRegistry';
 import type { BefehlKontext } from './typen';
-import type { BenutzerAnzeige } from '../api/types';
+import { benutzerFixture } from '../test/fixtures';
 
 /**
  * Der Schnellaktions-Filter folgt der LESEACHSE (LFH-391 · A1b).
@@ -38,16 +38,7 @@ vi.mock('../einsatz/modulRegistry', async (importOriginal) => {
   };
 });
 
-const fuehrungskraft: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'EL',
-  benutzername: 'el',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-  aktiv: true,
-  erstellt_at: '',
-  totp_aktiviert: false,
-};
+const fuehrungskraft = benutzerFixture({ anzeigename: 'EL', org_rolle: 'fuehrungskraft' });
 
 /** Wie in `befehle.test.ts` — bewusst lokal gehalten: eine geteilte Fixture zöge diese
  *  Datei samt ihrem Registry-Stub in den Importgraph der anderen. */

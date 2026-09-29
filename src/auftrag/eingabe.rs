@@ -8,18 +8,14 @@ use crate::auftrag::{
     PRIO_NORMAL, RICHTUNG_INTERN,
 };
 use crate::error::AppError;
-use chrono::{Duration, NaiveDateTime};
+use crate::routes::support::pflicht;
+
 use serde::Deserialize;
 
 /// Normalisiert einen Eingabe-Zeitstempel auf 'YYYY-MM-DD HH:MM:SS' (UTC).
 fn parse_zeit(roh: &str) -> Result<String, AppError> {
-    let roh = roh.trim().replace('T', " ");
-    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"] {
-        if let Ok(n) = NaiveDateTime::parse_from_str(&roh, fmt) {
-            return Ok(n.format("%Y-%m-%d %H:%M:%S").to_string());
-        }
-    }
-    Err(AppError::Validation("Ungültiger Zeitpunkt".into()))
+    crate::zeit::normalisiere_eingabe(roh)
+        .ok_or_else(|| AppError::Validation("Ungültiger Zeitpunkt".into()))
 }
 
 fn trimme(o: &Option<String>) -> Option<&str> {
@@ -222,13 +218,7 @@ impl ValidierterAuftrag {
 /// Leitet aus Erteilzeit + Default-Minuten eine absolute Quittierfrist ab (DB-Format).
 /// Defensiv `None` statt Panik bei (theoretisch unmöglichem) Parse-Fehler.
 fn frist_aus_minuten(erteilt: &str, min: i64) -> Option<String> {
-    NaiveDateTime::parse_from_str(erteilt, "%Y-%m-%d %H:%M:%S")
-        .ok()
-        .map(|n| {
-            (n + Duration::minutes(min))
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string()
-        })
+    crate::zeit::plus_minuten(erteilt, min)
 }
 
 /// Validiert + normalisiert eine Auftrags-Eingabe: Auftragstext UND >=1 Empfänger
@@ -244,12 +234,7 @@ pub async fn validiere_neuen_auftrag(
     now: &str,
     default_quittierung_frist_min: Option<i64>,
 ) -> Result<ValidierterAuftrag, AppError> {
-    let text = req.auftrag_text.trim();
-    if text.is_empty() {
-        return Err(AppError::Validation(
-            "Auftragstext darf nicht leer sein".into(),
-        ));
-    }
+    let text = pflicht(&req.auftrag_text, "Auftragstext")?;
     if req.empfaenger.is_empty() {
         return Err(AppError::Validation(
             "Mindestens ein Empfänger ist erforderlich".into(),

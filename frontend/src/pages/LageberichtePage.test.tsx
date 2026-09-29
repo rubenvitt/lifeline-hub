@@ -4,51 +4,28 @@ import { Route, Routes, useNavigate } from 'react-router';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient } from '@tanstack/react-query';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import { AuthProvider } from '../auth/AuthContext';
 import LageberichtePage from './LageberichtePage';
 import LageberichtDetailPage from './LageberichtDetailPage';
-import type { EinsatzAnzeige, LageberichtAnzeige } from '../api/types';
+import type { LageberichtAnzeige } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { alsOrtszeit } from '../etb/filterZeit';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { adminFixture, einsatzFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
+const admin = adminFixture({
   anzeigename: 'A',
   benutzername: 'a',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-06-02 10:00:00',
-};
+});
 
-const einsatz: EinsatzAnzeige = {
+const einsatz = einsatzFixture({
   id: 7,
   bezeichnung: 'Hochwasser Nord',
-  stichwort: null,
-  status: 'aktiv',
   begonnen_at: '2026-06-02 09:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
   angelegt_at: '2026-06-02 09:00:00',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-  org_id: 1,
-  org_name: 'Orga',
-  meine_sachgebiete: [],
-  lagekennzahlen: [],
-};
+});
 
 const bericht: LageberichtAnzeige = {
   id: 11,
@@ -101,16 +78,14 @@ const KETTE: LageberichtAnzeige[] = [
 
 function setup(berichte: LageberichtAnzeige[] = [bericht]) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/lageberichte', () => HttpResponse.json(berichte)),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/lageberichte" element={<LageberichtePage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/lageberichte" element={<LageberichtePage />} />
+    </Routes>,
     { route: '/einsaetze/7/lageberichte' },
   );
 }
@@ -134,7 +109,7 @@ const lagebericht7Abschnitte: LageberichtAnzeige = {
 function setupDetail(lb: LageberichtAnzeige) {
   let stand = lb;
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get(`/api/einsaetze/7/lageberichte/${lb.id}`, () => HttpResponse.json(stand)),
     /*
@@ -153,11 +128,9 @@ function setupDetail(lb: LageberichtAnzeige) {
     }),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+    </Routes>,
     { route: `/einsaetze/7/lageberichte/${lb.id}` },
   );
 }
@@ -187,7 +160,7 @@ describe('LageberichtDetailPage', () => {
     let persistierte = lagebericht7Abschnitte.abschnitte.map((a) => ({ ...a }));
     let status = 'entwurf';
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/lageberichte/12', () =>
         HttpResponse.json({ ...lagebericht7Abschnitte, abschnitte: persistierte, status }),
@@ -214,11 +187,9 @@ describe('LageberichtDetailPage', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+      </Routes>,
       { route: '/einsaetze/7/lageberichte/12' },
     );
 
@@ -375,7 +346,7 @@ function setupLebend(start: LageberichtAnzeige) {
   let stand = start;
   const patches: Record<string, unknown>[] = [];
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get(`/api/einsaetze/7/lageberichte/${start.id}`, () => HttpResponse.json(stand)),
     http.patch(`/api/einsaetze/7/lageberichte/${start.id}`, async ({ request }) => {
@@ -384,11 +355,9 @@ function setupLebend(start: LageberichtAnzeige) {
     }),
   );
   const r = renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+    </Routes>,
     { route: `/einsaetze/7/lageberichte/${start.id}` },
   );
   return {
@@ -453,7 +422,7 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
       ],
     };
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/lageberichte/12', () => HttpResponse.json(lagebericht7Abschnitte)),
       http.get('/api/einsaetze/7/lageberichte/13', () => HttpResponse.json(zweiter)),
@@ -470,12 +439,12 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
       );
     }
     renderMitProviders(
-      <AuthProvider>
+      <>
         <Weiter />
         <Routes>
           <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
         </Routes>
-      </AuthProvider>,
+      </>,
       { route: '/einsaetze/7/lageberichte/12' },
     );
     await userEvent.type(await screen.findByLabelText('Auftrag'), 'offen');
@@ -600,7 +569,7 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
       titel: 'Zweiter Bericht',
     };
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/lageberichte/12', () => HttpResponse.json(teilweiseBefuellt)),
       http.get('/api/einsaetze/7/lageberichte/13', () => HttpResponse.json(zweiter)),
@@ -614,12 +583,12 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
       );
     }
     renderMitProviders(
-      <AuthProvider>
+      <>
         <Weiter />
         <Routes>
           <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
         </Routes>
-      </AuthProvider>,
+      </>,
       { route: '/einsaetze/7/lageberichte/12' },
     );
     // Von Hand einen ANDEREN Abschnitt wählen und die Vorschau einschalten.
@@ -644,7 +613,7 @@ describe('LageberichtDetailPage — Speicherfehler in der Seite (LFH-494)', () =
   function setupMitPatch(start: LageberichtAnzeige) {
     const zustand = { scheitert: true };
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get(`/api/einsaetze/7/lageberichte/${start.id}`, () => HttpResponse.json(start)),
       http.patch(`/api/einsaetze/7/lageberichte/${start.id}`, () =>
@@ -654,11 +623,9 @@ describe('LageberichtDetailPage — Speicherfehler in der Seite (LFH-494)', () =
       ),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+      </Routes>,
       { route: `/einsaetze/7/lageberichte/${start.id}` },
     );
     return zustand;
@@ -926,7 +893,7 @@ describe('LageberichtePage', () => {
  */
 function setupMitZone(berichte: LageberichtAnzeige[]) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/lageberichte', () => HttpResponse.json(berichte)),
     http.get('/api/einsaetze/7/einstellungen', () =>
@@ -942,13 +909,11 @@ function setupMitZone(berichte: LageberichtAnzeige[]) {
     org_defaults: { org_id: 1 },
   });
   return renderMitProviders(
-    <AuthProvider>
-      <EinsatzAnzeigeProvider einsatzId={7}>
-        <Routes>
-          <Route path="/einsaetze/:id/lageberichte" element={<LageberichtePage />} />
-        </Routes>
-      </EinsatzAnzeigeProvider>
-    </AuthProvider>,
+    <EinsatzAnzeigeProvider einsatzId={7}>
+      <Routes>
+        <Route path="/einsaetze/:id/lageberichte" element={<LageberichtePage />} />
+      </Routes>
+    </EinsatzAnzeigeProvider>,
     { route: '/einsaetze/7/lageberichte', client },
   );
 }

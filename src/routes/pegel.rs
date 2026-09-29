@@ -40,6 +40,7 @@ use crate::pegel::{
     abruf, trend, vorhersage, PegelAnzeige, PegelVerlauf, PegelVerlaufPunkt,
     PegelVorhersageAntwort, NAME_MAX, PEGEL_MAX,
 };
+use crate::routes::support::pflicht;
 
 #[derive(Debug, Deserialize)]
 pub struct PegelWahl {
@@ -75,17 +76,12 @@ fn validiere_prognose(p: &PrognoseEingabe) -> Result<(f64, String), AppError> {
             "hoechststand_cm muss zwischen {PROGNOSE_MIN_CM} und {PROGNOSE_MAX_CM} liegen"
         )));
     }
-    let zeit = p.zeitpunkt.trim();
-    if zeit.is_empty() {
-        return Err(AppError::Validation(
-            "zeitpunkt darf nicht leer sein".into(),
-        ));
-    }
+    let zeit = pflicht(&p.zeitpunkt, "zeitpunkt")?;
     // Auf ganze Zentimeter: die Quelle misst in ganzen cm, eine Prognose genauer als die
     // Messung wäre Scheingenauigkeit.
     Ok((
         p.hoechststand_cm.round(),
-        crate::etb::normalisiere_zeit(zeit)?,
+        crate::etb::normalisiere_zeit(&zeit)?,
     ))
 }
 
@@ -100,10 +96,7 @@ fn validiere(w: PegelWahl) -> Result<PegelEingabe, AppError> {
             "station_uuid '{roh}' ist keine UUID"
         )));
     }
-    let name = w.name.trim().to_string();
-    if name.is_empty() {
-        return Err(AppError::Validation("name darf nicht leer sein".into()));
-    }
+    let name = pflicht(&w.name, "name")?;
     if name.chars().count() > NAME_MAX {
         return Err(AppError::Validation(format!(
             "name darf höchstens {NAME_MAX} Zeichen lang sein"

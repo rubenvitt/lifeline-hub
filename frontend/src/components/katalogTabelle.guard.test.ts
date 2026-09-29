@@ -171,10 +171,26 @@ function treffer(text: string, muster: RegExp): number {
   return text.match(muster)?.length ?? 0;
 }
 
-const QUELLEN = KATALOGTABELLEN.map((pfad) => ({
-  pfad,
-  text: ohneKommentare(readFileSync(join(SRC, pfad), 'utf8')),
-}));
+/**
+ * Geteilte Bausteine der Kataloge: wer einen davon nutzt, trägt dessen Tabelle, Suche oder
+ * Spalten. Ihr Text wird deshalb an den des Katalogs angehängt; geprüft wird weiter je
+ * Katalog, und was kein Baustein mitbringt, muss im Katalog selbst stehen.
+ */
+const HUELLEN: [RegExp, string][] = [
+  [elementMuster('KatalogVerwaltung'), 'stammdaten/KatalogVerwaltung.tsx'],
+  // Status- und Aktionsspalte der Dienststatus-Kataloge (Fahrzeuge, Personal, Material).
+  [/\bdienststatusSpalten</g, 'stammdaten/dienststatus.tsx'],
+];
+
+function katalogText(pfad: string): string {
+  const eigen = ohneKommentare(readFileSync(join(SRC, pfad), 'utf8'));
+  const huellen = HUELLEN.filter(([marke]) => treffer(eigen, marke) > 0).map(([, huelle]) =>
+    ohneKommentare(readFileSync(join(SRC, huelle), 'utf8')),
+  );
+  return [eigen, ...huellen].join('\n');
+}
+
+const QUELLEN = KATALOGTABELLEN.map((pfad) => ({ pfad, text: katalogText(pfad) }));
 
 // ── Teil 3: die Ordnung der dreizehn Kataloge (LFH-330 · O) ───────────────────────
 

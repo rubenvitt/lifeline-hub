@@ -1,6 +1,7 @@
 pub mod repo;
 
 use crate::etb::EtbTyp;
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -35,36 +36,21 @@ pub const ETB_BAUSTEIN_STARTLISTE: [(&str, &str, &str, i64); 5] = [
     ),
 ];
 
-/// Erfassbarer Baustein-Typ — echtes Subset der 4 zulässigen etb_baustein-Typen
-/// (kein `system`, keine `berichtigung`). Macht die DB-CHECK-Grenze compile-fest.
-/// Bewusst OHNE Serialize/ToSchema: `EtbBaustein.typ` behält den `EtbTyp`-Anker
-/// (No-Op der OpenAPI-Union), BausteinTyp validiert nur den Request.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BausteinTyp {
-    Meldung,
-    Anordnung,
-    Lage,
-    Entscheidung,
-}
-impl BausteinTyp {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            BausteinTyp::Meldung => "meldung",
-            BausteinTyp::Anordnung => "anordnung",
-            BausteinTyp::Lage => "lage",
-            BausteinTyp::Entscheidung => "entscheidung",
-        }
-    }
-    pub fn parse(s: &str) -> Option<BausteinTyp> {
-        match s {
-            "meldung" => Some(BausteinTyp::Meldung),
-            "anordnung" => Some(BausteinTyp::Anordnung),
-            "lage" => Some(BausteinTyp::Lage),
-            "entscheidung" => Some(BausteinTyp::Entscheidung),
-            _ => None,
-        }
+wire_enum! {
+    #[wire(ohne_serde)]
+    /// Erfassbarer Baustein-Typ — echtes Subset der 4 zulässigen etb_baustein-Typen
+    /// (kein `system`, keine `berichtigung`). Macht die DB-CHECK-Grenze compile-fest.
+    /// Bewusst OHNE Serialize/ToSchema: `EtbBaustein.typ` behält den `EtbTyp`-Anker
+    /// (No-Op der OpenAPI-Union), BausteinTyp validiert nur den Request.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum BausteinTyp {
+        Meldung => "meldung",
+        Anordnung => "anordnung",
+        Lage => "lage",
+        Entscheidung => "entscheidung",
     }
 }
+impl BausteinTyp {}
 
 /// Öffentliche Sicht eines ETB-Baustein-Katalogeintrags. Die DB-Spalten `aktiv`,
 /// `erstellt_at` und `aktualisiert_at` werden bewusst nicht serialisiert.

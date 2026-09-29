@@ -10,6 +10,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { parseEtbFilter } from '../routing/deeplinks';
 import { etbNummerSchluessel, etbSuchSchluessel, useDatensaetze } from './useDatensaetze';
 import type { PaletteModus } from './typen';
+import { authWertFixture, benutzerFixture } from '../test/fixtures';
 
 /**
  * Die BESCHAFFUNGS-Aussagen des Datensatz-Finders (LFH-391 · C2).
@@ -31,22 +32,7 @@ import type { PaletteModus } from './typen';
  * schärfen. Die Rechteachse fährt hier über die Overrides, nicht über den Benutzer.
  */
 vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => ({
-    benutzer: {
-      id: 1,
-      anzeigename: 'EL',
-      benutzername: 'el',
-      system_rolle: 'keiner',
-      org_rolle: 'fuehrungskraft',
-      aktiv: true,
-      erstellt_at: '',
-      totp_aktiviert: false,
-    },
-    laedt: false,
-    login: vi.fn(),
-    logout: vi.fn(),
-    aktualisiere: vi.fn(),
-  }),
+  useAuth: () => authWertFixture(benutzerFixture({ org_rolle: 'fuehrungskraft' })),
 }));
 
 const EINSATZ = 1;

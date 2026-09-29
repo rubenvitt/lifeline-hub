@@ -6,7 +6,10 @@ use crate::etb_baustein::repo::{self, BausteinDaten, BausteinPatch};
 use crate::etb_baustein::{BausteinTyp, EtbBaustein};
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
-use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
+use crate::routes::support::{
+    deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pflicht_tri, trimme,
+    trimme_tri,
+};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -46,24 +49,14 @@ impl Normalisiert {
 }
 
 fn normalisiere(body: BausteinBody) -> Result<Normalisiert, AppError> {
-    let label = body.label.trim().to_string();
-    if label.is_empty() {
-        return Err(AppError::Validation("Label darf nicht leer sein".into()));
-    }
-    let inhalt = body.inhalt.trim().to_string();
-    if inhalt.is_empty() {
-        return Err(AppError::Validation("Inhalt darf nicht leer sein".into()));
-    }
+    let label = pflicht(&body.label, "Label")?;
+    let inhalt = pflicht(&body.inhalt, "Inhalt")?;
     // Typ muss erfassbar (kein 'system') und keine 'berichtigung' sein.
     let typ = BausteinTyp::parse(&body.typ)
         .ok_or_else(|| AppError::Validation("Ungültiger Baustein-Typ".into()))?;
 
     let meldeweg = trimme(body.meldeweg);
-    if let Some(w) = &meldeweg {
-        if MeldeWeg::parse(w).is_none() {
-            return Err(AppError::Validation("Ungültiger Meldeweg".into()));
-        }
-    }
+    parse_enum_opt(MeldeWeg::parse, meldeweg.as_deref(), "Ungültiger Meldeweg")?;
 
     Ok(Normalisiert {
         label,
@@ -115,27 +108,12 @@ impl PatchNormalisiert {
     }
 }
 
-/// Trimmt ein gesendetes Pflichtfeld und lehnt es leer ab (400, LFH-305-Konvention);
-/// ein absentes Feld ist schlicht kein Wunsch und passiert unangetastet.
-fn pflicht_tri(wert: Option<String>, feld: &str) -> Result<Option<String>, AppError> {
-    match wert {
-        Some(w) => {
-            let w = w.trim().to_string();
-            if w.is_empty() {
-                return Err(AppError::Validation(format!("{feld} darf nicht leer sein")));
-            }
-            Ok(Some(w))
-        }
-        None => Ok(None),
-    }
-}
-
 /// Prüft nur die **gesendeten** Felder. Die Enum-Prüfungen (`typ`, `meldeweg`) dürfen nicht
 /// auf den Absent-Zweig durchschlagen, sonst wäre jeder Teil-Patch abgelehnt. Bei `meldeweg`
 /// gilt zusätzlich: `Some(None)` ist der Leerwunsch und hat keinen Wert zu validieren.
 fn normalisiere_patch(body: PatchBaustein) -> Result<PatchNormalisiert, AppError> {
-    let label = pflicht_tri(body.label, "Label")?;
-    let inhalt = pflicht_tri(body.inhalt, "Inhalt")?;
+    let label = pflicht_tri(body.label.as_deref(), "Label")?;
+    let inhalt = pflicht_tri(body.inhalt.as_deref(), "Inhalt")?;
     // Typ muss erfassbar (kein 'system') und keine 'berichtigung' sein — nur wenn gesendet.
     let typ = match body.typ {
         Some(t) => Some(
@@ -149,9 +127,7 @@ fn normalisiere_patch(body: PatchBaustein) -> Result<PatchNormalisiert, AppError
 
     let meldeweg = trimme_tri(body.meldeweg);
     if let Some(Some(w)) = &meldeweg {
-        if MeldeWeg::parse(w).is_none() {
-            return Err(AppError::Validation("Ungültiger Meldeweg".into()));
-        }
+        parse_enum(MeldeWeg::parse, w, "Ungültiger Meldeweg")?;
     }
 
     Ok(PatchNormalisiert {

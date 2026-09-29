@@ -2,29 +2,20 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import { AuthProvider } from '../auth/AuthContext';
 import type { BauJob, OfflineKarte, OfflineKatalogEintrag } from '../api/offlineKarten';
 import OfflineKartenVerwaltung from './OfflineKartenVerwaltung';
+import { adminFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-06-26 10:00:00',
-};
-const fuehrungskraft = {
-  ...admin,
+const admin = adminFixture();
+const fuehrungskraft = adminFixture({
   id: 2,
   anzeigename: 'Eva',
   system_rolle: 'keiner',
   org_rolle: 'fuehrungskraft',
-};
+});
 
 const karte: OfflineKarte = {
   id: 1,
@@ -75,7 +66,7 @@ function mockBasis(
 ) {
   const { bauVerfuegbar = false, bauJobs = [] } = optionen;
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+    meHandler(benutzer),
     http.get('/api/karte/offline-karten', () => HttpResponse.json(karten)),
     http.get('/api/karte/offline-karten/katalog', () => HttpResponse.json(katalog)),
     // Feature-Gate + Bau-UI-Endpunkte (LFH-203, B5) — standardmäßig aus, damit alle
@@ -95,11 +86,7 @@ function mockBasis(
 }
 
 function render() {
-  return renderMitProviders(
-    <AuthProvider>
-      <OfflineKartenVerwaltung />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<OfflineKartenVerwaltung />);
 }
 
 describe('OfflineKartenVerwaltung', () => {

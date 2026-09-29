@@ -6,6 +6,7 @@ use crate::auth::{
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::routes::support::{parse_enum, pflicht};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -41,21 +42,21 @@ pub struct PatchBenutzer {
 /// Validiert einen System-Rollen-Wert (400 bei ungültig). Geteilt von `anlegen`/`bearbeiten`,
 /// damit die erlaubte Rollenmenge nur an einer Stelle definiert ist.
 fn pruefe_system_rolle(wert: &str) -> Result<(), AppError> {
-    if SystemRolle::parse(wert).is_none() {
-        return Err(AppError::Validation(
-            "system_rolle muss 'admin' oder 'keiner' sein".into(),
-        ));
-    }
+    parse_enum(
+        SystemRolle::parse,
+        wert,
+        "system_rolle muss 'admin' oder 'keiner' sein",
+    )?;
     Ok(())
 }
 
 /// Validiert einen Org-Rollen-Wert (400 bei ungültig). Geteilt von `anlegen`/`bearbeiten`.
 fn pruefe_org_rolle(wert: &str) -> Result<(), AppError> {
-    if OrgRolle::parse(wert).is_none() {
-        return Err(AppError::Validation(
-            "org_rolle muss 'fuehrungskraft' oder 'keine' sein".into(),
-        ));
-    }
+    parse_enum(
+        OrgRolle::parse,
+        wert,
+        "org_rolle muss 'fuehrungskraft' oder 'keine' sein",
+    )?;
     Ok(())
 }
 
@@ -81,16 +82,8 @@ pub async fn anlegen(
     AdminUser(admin): AdminUser,
     JsonBody(req): JsonBody<NeuerBenutzer>,
 ) -> Result<(StatusCode, Json<BenutzerAnzeige>), AppError> {
-    if req.benutzername.trim().is_empty() {
-        return Err(AppError::Validation(
-            "Benutzername darf nicht leer sein".into(),
-        ));
-    }
-    if req.anzeigename.trim().is_empty() {
-        return Err(AppError::Validation(
-            "Anzeigename darf nicht leer sein".into(),
-        ));
-    }
+    pflicht(&req.benutzername, "Benutzername")?;
+    pflicht(&req.anzeigename, "Anzeigename")?;
     if req.passwort.len() < PASSWORT_MIN_LEN {
         return Err(AppError::Validation(format!(
             "Passwort muss mindestens {PASSWORT_MIN_LEN} Zeichen haben"
@@ -254,12 +247,7 @@ pub async fn bearbeiten(
 
     // Zielwerte auflösen: mitgeschickt → validieren; sonst Bestandswert (partielle PATCH-Semantik).
     let anzeigename = match &req.anzeigename {
-        Some(n) if n.trim().is_empty() => {
-            return Err(AppError::Validation(
-                "Anzeigename darf nicht leer sein".into(),
-            ));
-        }
-        Some(n) => n.trim().to_string(),
+        Some(n) => pflicht(n, "Anzeigename")?,
         None => ziel.anzeigename.clone(),
     };
 

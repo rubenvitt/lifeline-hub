@@ -4,24 +4,16 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ReactNode } from 'react';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { globalKeys } from '../api/queryKeys';
 import { useZuletztBefehle } from './useZuletztBefehle';
 import { SCHLUESSEL_ZULETZT_BEFEHLE } from './zuletztBefehle';
-import type { BenutzerEinstellungen } from '../api/types';
+import type { BenutzerAnzeige, BenutzerEinstellungen } from '../api/types';
+import { benutzerFixture } from '../test/fixtures';
 
-const nutzer = {
-  id: 1,
-  anzeigename: 'EL',
-  benutzername: 'el',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-  aktiv: true,
-  erstellt_at: '',
-  totp_aktiviert: false,
-};
+const nutzer = benutzerFixture({ anzeigename: 'EL', org_rolle: 'fuehrungskraft' });
 
 /** Die zweite Schicht am selben Rechner — andere `id`, sonst gleich gebaut. */
 const nutzerB = { ...nutzer, id: 2, anzeigename: 'S2', benutzername: 's2' };
@@ -60,7 +52,7 @@ const flush = () =>
 /** Handler-Satz für den angemeldeten Fall. `serverStand` ist der Ausgangsinhalt des Fachs. */
 function handler(serverStand: BenutzerEinstellungen) {
   return [
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/benutzer-einstellungen', () => {
       gets += 1;
       return HttpResponse.json(serverStand);
@@ -221,10 +213,10 @@ describe('useZuletztBefehle', () => {
 describe('useZuletztBefehle · Schichtwechsel ohne Neuladen', () => {
   /** Handler-Satz mit zwei Fächern; die „Sitzung" wechselt mit dem Login-Aufruf. */
   function zweiSchichten() {
-    let sitzung = nutzer;
+    let sitzung: BenutzerAnzeige = nutzer;
     const faecher: Record<number, string[]> = { 1: ['nav:profil'], 2: ['koord:utm'] };
     return [
-      http.get('/api/auth/me', () => HttpResponse.json(sitzung)),
+      meHandler(sitzung),
       http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
       http.post('/api/auth/login', () => {
         sitzung = nutzerB;
@@ -306,7 +298,7 @@ describe('useZuletztBefehle · Schreiben vor dem ersten Lesen', () => {
       loese = r;
     });
     const handler = [
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/benutzer-einstellungen', async () => {
         gets += 1;
         await frei;
@@ -379,7 +371,7 @@ describe('useZuletztBefehle · Schreiben vor dem ersten Lesen', () => {
    *  gemerkten Befehle auf dem Server, und die kommen nicht wieder. */
   it('schreibt gar nicht, wenn der Bestand nicht zu laden ist', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/benutzer-einstellungen', () => {
         gets += 1;
         return HttpResponse.json({ error: 'kaputt' }, { status: 500 });

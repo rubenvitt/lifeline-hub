@@ -5,7 +5,7 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::personal::repo::{self, PersonalDaten, PersonalPatch};
 use crate::personal::{PersonalAnzeige, PersonalVorschlaege};
-use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
+use crate::routes::support::{deserialize_optional_field, parse_enum, pflicht, trimme, trimme_tri};
 use crate::staerke::StaerkePosition;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -56,15 +56,10 @@ impl Normalisiert {
 }
 
 fn normalisiere(body: PersonalBody) -> Result<Normalisiert, AppError> {
-    let name = body.name.trim().to_string();
-    if name.is_empty() {
-        return Err(AppError::Validation("Name darf nicht leer sein".into()));
-    }
+    let name = pflicht(&body.name, "Name")?;
     let staerke_position = match trimme(body.staerke_position) {
         Some(s) => {
-            if StaerkePosition::parse(&s).is_none() {
-                return Err(AppError::Validation("Ungültige Stärke-Position".into()));
-            }
+            parse_enum(StaerkePosition::parse, &s, "Ungültige Stärke-Position")?;
             Some(s)
         }
         None => None,
@@ -141,10 +136,7 @@ impl PatchNormalisiert {
 fn normalisiere_patch(body: PatchPersonal) -> Result<PatchNormalisiert, AppError> {
     let name = match body.name {
         Some(n) => {
-            let n = n.trim().to_string();
-            if n.is_empty() {
-                return Err(AppError::Validation("Name darf nicht leer sein".into()));
-            }
+            let n = pflicht(&n, "Name")?;
             Some(n)
         }
         None => None,
@@ -153,9 +145,7 @@ fn normalisiere_patch(body: PatchPersonal) -> Result<PatchNormalisiert, AppError
     // tatsächlich gesetzter Wert.
     let staerke_position = trimme_tri(body.staerke_position);
     if let Some(Some(s)) = &staerke_position {
-        if StaerkePosition::parse(s).is_none() {
-            return Err(AppError::Validation("Ungültige Stärke-Position".into()));
-        }
+        parse_enum(StaerkePosition::parse, s, "Ungültige Stärke-Position")?;
     }
     Ok(PatchNormalisiert {
         name,

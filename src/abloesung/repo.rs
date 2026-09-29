@@ -13,6 +13,7 @@ use super::{
     einstufung, faelligkeit, rhythmus_text, vorwarnzeit, AbloesungAnzeige, AbloesungStatus,
     AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, RhythmusQuelle,
 };
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::erinnerung::repo as erinnerung_repo;
 use crate::error::AppError;
 use crate::etb::repo::EintragDaten;
@@ -410,9 +411,7 @@ pub async fn beginnen(
     eingabe: &BeginnEingabe,
     jetzt: &str,
 ) -> Result<(AbloesungAnzeige, i64), AppError> {
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(pool, einsatz_id).await?;
     let (id, etb_id) = write_retry!(pool, |conn| {
         let (name, abschnitt_id) = einheit_tx(conn, einsatz_id, eingabe.einheit_id).await?;
         let abschnitt = match abschnitt_id {
@@ -472,9 +471,7 @@ pub async fn aendern(
     eingabe: &AenderungEingabe,
     jetzt: &str,
 ) -> Result<(AbloesungAnzeige, Option<i64>), AppError> {
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(pool, einsatz_id).await?;
     let etb_id = write_retry!(pool, |conn| {
         let roh = roh_tx(conn, einsatz_id, id).await?;
         if roh.status != AbloesungStatus::Laufend {
@@ -583,9 +580,7 @@ pub async fn vorgabe_setzen(
     rhythmus_minuten: Option<i64>,
     jetzt: &str,
 ) -> Result<Option<i64>, AppError> {
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(pool, einsatz_id).await?;
     write_retry!(pool, |conn| {
         let (abschnitt_name, vorher): (String, Option<i64>) = sqlx::query_as(
             "SELECT name, abloesung_rhythmus_minuten FROM einsatzabschnitt \
@@ -682,9 +677,7 @@ pub async fn vollziehen(
     abloesende_einheit_id: Option<i64>,
     jetzt: &str,
 ) -> Result<(AbloesungVollzugAnzeige, i64), AppError> {
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(pool, einsatz_id).await?;
     let (folge_id, etb_id) = write_retry!(pool, |conn| {
         let roh = roh_tx(conn, einsatz_id, id).await?;
         if roh.status != AbloesungStatus::Laufend {
@@ -791,9 +784,7 @@ pub async fn zuruecknehmen(
     benutzer_id: i64,
     jetzt: &str,
 ) -> Result<(AbloesungAnzeige, i64), AppError> {
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(pool, einsatz_id).await?;
     let etb_id = write_retry!(pool, |conn| {
         let roh = roh_tx(conn, einsatz_id, id).await?;
         if roh.status != AbloesungStatus::Abgeloest {

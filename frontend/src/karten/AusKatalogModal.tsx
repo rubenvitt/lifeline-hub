@@ -1,7 +1,7 @@
 import { Alert, App, Button, Modal, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import type { OnlineStyle } from '../api/karte';
 import {
   ladeOnlineQuellenKatalog,
@@ -63,7 +63,7 @@ export default function AusKatalogModal({
         eintrag.hinweis ? 'Quelle übernommen — inaktiv, bitte Hinweis prüfen' : 'Quelle übernommen',
       );
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Übernehmen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Übernehmen fehlgeschlagen')),
   });
 
   return (

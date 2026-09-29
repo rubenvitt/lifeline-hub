@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import ProfilPage from './ProfilPage';
 
 const { startRegistrationMock } = vi.hoisted(() => ({ startRegistrationMock: vi.fn() }));
@@ -30,7 +29,8 @@ function benutzerBody(totpAktiviert: boolean) {
   };
 }
 
-/** ProfilPage hängt an `useAuth()` — braucht `<AuthProvider>` und eine `/api/auth/me`-Antwort. */
+/** ProfilPage hängt an `useAuth()` — den `AuthProvider` hängt `renderMitProviders` ein, der
+ *  Benutzer kommt aus der `/api/auth/me`-Antwort. */
 function setup(totpAktiviert = false, providerListe: unknown[] = []) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzerBody(totpAktiviert))),
@@ -41,11 +41,7 @@ function setup(totpAktiviert = false, providerListe: unknown[] = []) {
       HttpResponse.json({ id: 1, name: 'DRK Musterstadt', tz_organisation: null }),
     ),
   );
-  return renderMitProviders(
-    <AuthProvider>
-      <ProfilPage />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<ProfilPage />);
 }
 
 /**

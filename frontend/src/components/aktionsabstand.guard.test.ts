@@ -53,15 +53,14 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
  * verrottet eine Ausnahmeliste, hier eine Soll-Liste.
  */
 const MIT_NACHBARSCHAFT = [
-  'stammdaten/EinheitTypenTab.tsx',
   'stammdaten/EtbBausteineTab.tsx',
-  'stammdaten/FahrzeugeTab.tsx',
-  'stammdaten/MaterialTab.tsx',
-  'stammdaten/PersonalStatusTab.tsx',
-  'stammdaten/PersonalTab.tsx',
-  'stammdaten/QualifikationenTab.tsx',
   'stammdaten/SprechgruppenTab.tsx',
-  'stammdaten/StatusKatalogTab.tsx',
+  // Die Aktionsspalte von Fahrzeugen, Personal und Material („Bearbeiten" neben
+  // „Außer Dienst") steht nur noch im gemeinsamen Baustein.
+  'stammdaten/dienststatus.tsx',
+  // Die Aktionsspalte von Qualifikationen, Einheitstypen, Personal- und Fahrzeug-Status
+  // steht nur noch hier, in der gemeinsamen Hülle.
+  'stammdaten/KatalogVerwaltung.tsx',
   'pages/BenutzerPage.tsx',
   // Mit LFH-339 · C4 von `EinheitenPage.tsx` hierher gezogen: die Reihe
   // Speichern + Auflösen(danger) sitzt jetzt in der sticky Aktionsleiste der eigenen

@@ -2,17 +2,12 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { EtbBaustein, EinsatzAnzeige } from '../api/types';
+import type { EtbBaustein } from '../api/types';
 import { renderMitProviders } from '../test/utils';
 import BausteinPlatzhalterModal from './BausteinPlatzhalterModal';
+import { einsatzFixture } from '../test/fixtures';
 
-const einsatz = {
-  id: 1,
-  bezeichnung: 'Test',
-  stichwort: null,
-  leitstellen_nr: null,
-  einsatzort: null,
-} as unknown as EinsatzAnzeige;
+const einsatz = einsatzFixture({ bezeichnung: 'Test' });
 
 function baustein(over: Partial<EtbBaustein> = {}): EtbBaustein {
   return {

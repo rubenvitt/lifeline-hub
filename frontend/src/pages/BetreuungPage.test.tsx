@@ -7,12 +7,12 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import BetreuungPage from './BetreuungPage';
 import { ladeEinsatz } from '../api/einsaetze';
 import { AuthProvider } from '../auth/AuthContext';
-import { http, HttpResponse } from 'msw';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import type { BetreuungUebersicht, Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
+import { benutzerFixture } from '../test/fixtures';
 
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
@@ -111,19 +111,7 @@ const MIT_DATEN: BetreuungUebersicht = {
 const BENUTZER_ID = 1;
 
 function renderPage(pfad = '/einsaetze/1/betreuung') {
-  server.use(
-    http.get('/api/auth/me', () =>
-      HttpResponse.json({
-        id: BENUTZER_ID,
-        anzeigename: 'Leitung',
-        benutzername: 'leitung',
-        system_rolle: 'keiner',
-        org_rolle: 'keine',
-        aktiv: true,
-        erstellt_at: '2026-09-23 08:00:00',
-      }),
-    ),
-  );
+  server.use(meHandler(benutzerFixture({ id: BENUTZER_ID, anzeigename: 'Leitung' })));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ergebnis = render(
     <QueryClientProvider client={client}>

@@ -258,36 +258,23 @@ pub async fn storniere(
     id: i64,
     geaendert_von: i64,
 ) -> Result<(), AppError> {
-    let belegt = aktive_belegungen(pool, id).await?;
+    let mut conn = pool.acquire().await?;
+    let belegt = aktive_belegungen_tx(&mut conn, id).await?;
     if belegt > 0 {
         return Err(AppError::Conflict(format!(
             "Storno nicht möglich — noch {belegt} Person(en) belegt"
         )));
     }
-    let ergebnis = sqlx::query(
-        "UPDATE uhs SET storniert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-            geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
-         WHERE id = ? AND einsatz_id = ? AND storniert_at IS NULL",
+    crate::storno::storniere(
+        &mut conn,
+        "uhs",
+        "einsatz_id",
+        einsatz_id,
+        id,
+        crate::storno::Vermerk::Geaendert(geaendert_von),
+        Some("UHS ist bereits storniert"),
     )
-    .bind(geaendert_von)
-    .bind(id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?;
-    if ergebnis.rows_affected() == 0 {
-        // Entweder nicht zum Einsatz oder bereits storniert. Differenzierung:
-        let existiert: Option<Option<String>> =
-            sqlx::query_scalar("SELECT storniert_at FROM uhs WHERE id = ? AND einsatz_id = ?")
-                .bind(id)
-                .bind(einsatz_id)
-                .fetch_optional(pool)
-                .await?;
-        return match existiert {
-            None => Err(AppError::NotFound),
-            Some(_) => Err(AppError::Conflict("UHS ist bereits storniert".into())),
-        };
-    }
-    Ok(())
+    .await
 }
 
 /// Anzahl aktuell belegter Personen (Inbox + echte Plätze) auf einer offenen
@@ -304,12 +291,6 @@ pub async fn aktive_belegungen_tx(
     .bind(uhs_id)
     .fetch_one(&mut *conn)
     .await?)
-}
-
-/// Pool-Wrapper (eigene Connection).
-pub async fn aktive_belegungen(pool: &SqlitePool, uhs_id: i64) -> Result<i64, AppError> {
-    let mut conn = pool.acquire().await?;
-    aktive_belegungen_tx(&mut conn, uhs_id).await
 }
 
 #[cfg(test)]
@@ -533,6 +514,11 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        assert_eq!(aktive_belegungen(&pool, u.id).await.unwrap(), 1);
+        assert_eq!(
+            aktive_belegungen_tx(&mut *pool.acquire().await.unwrap(), u.id)
+                .await
+                .unwrap(),
+            1
+        );
     }
 }

@@ -258,7 +258,8 @@ pub async fn aktualisiere(
 }
 
 /// Setzt den Status auf `uebergeben` INNERHALB einer offenen Transaktion (F06/LFH-244,
-/// Tier-A: atomar mit dem System-ETB-Eintrag). `NotFound`, falls nicht zum Einsatz.
+/// Tier-A: atomar mit dem System-ETB-Eintrag). Fremd → `NotFound`, schon storniert →
+/// `Conflict`.
 pub async fn uebergebe_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -283,25 +284,6 @@ pub async fn uebergebe_tx(
         return Err(AppError::NotFound);
     }
     Ok(())
-}
-
-/// Pool-Wrapper (eigene Tx).
-pub async fn uebergebe(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    schaden_id: i64,
-    uebergeben_an: &str,
-    geaendert_von: i64,
-) -> Result<(), AppError> {
-    let mut conn = pool.acquire().await?;
-    uebergebe_tx(
-        &mut conn,
-        einsatz_id,
-        schaden_id,
-        uebergeben_an,
-        geaendert_von,
-    )
-    .await
 }
 
 /// Schließt einen Schaden ab INNERHALB einer offenen Transaktion (F06/LFH-244, Tier-A:
@@ -352,62 +334,24 @@ pub async fn schliesse_ab_tx(
     Ok(())
 }
 
-/// Pool-Wrapper (eigene Tx).
-pub async fn schliesse_ab(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    schaden_id: i64,
-    abschluss_grund: &str,
-    notiz: Option<&str>,
-    geaendert_von: i64,
-) -> Result<(), AppError> {
-    let mut conn = pool.acquire().await?;
-    schliesse_ab_tx(
-        &mut conn,
-        einsatz_id,
-        schaden_id,
-        abschluss_grund,
-        notiz,
-        geaendert_von,
-    )
-    .await
-}
-
 /// Storniert einen Schaden (Soft-Delete) INNERHALB einer offenen Transaktion (F06/LFH-244,
-/// Tier-A: atomar mit dem System-ETB-Eintrag). `NotFound`, falls nicht zum Einsatz.
+/// Tier-A: atomar mit dem System-ETB-Eintrag). Fremd → `NotFound`, storniert → `Conflict`.
 pub async fn storniere_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     schaden_id: i64,
     storniert_von: i64,
 ) -> Result<(), AppError> {
-    let betroffen = sqlx::query(
-        "UPDATE einsatz_schaden SET storniert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-            storniert_von = ?, geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
-         WHERE id = ? AND einsatz_id = ?",
+    crate::storno::storniere(
+        conn,
+        "einsatz_schaden",
+        "einsatz_id",
+        einsatz_id,
+        schaden_id,
+        crate::storno::Vermerk::GeaendertUndStorniert(storniert_von),
+        Some("Schaden ist bereits storniert"),
     )
-    .bind(storniert_von)
-    .bind(storniert_von)
-    .bind(schaden_id)
-    .bind(einsatz_id)
-    .execute(&mut *conn)
-    .await?
-    .rows_affected();
-    if betroffen == 0 {
-        return Err(AppError::NotFound);
-    }
-    Ok(())
-}
-
-/// Pool-Wrapper (eigene Tx).
-pub async fn storniere(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    schaden_id: i64,
-    storniert_von: i64,
-) -> Result<(), AppError> {
-    let mut conn = pool.acquire().await?;
-    storniere_tx(&mut conn, einsatz_id, schaden_id, storniert_von).await
+    .await
 }
 
 /// Prüft, ob eine Einsatzkraft (einsatz_personal) zu diesem Einsatz gehört
@@ -486,7 +430,15 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         let s = anlegen(&pool, e, b, minimal()).await.unwrap();
-        uebergebe(&pool, e, s.id, "Stadtwerke", b).await.unwrap();
+        uebergebe_tx(
+            &mut *pool.acquire().await.unwrap(),
+            e,
+            s.id,
+            "Stadtwerke",
+            b,
+        )
+        .await
+        .unwrap();
         let neu = laden(&pool, e, s.id).await.unwrap();
         assert_eq!(neu.status, SchadenStatus::Uebergeben);
         assert_eq!(neu.uebergeben_an.as_deref(), Some("Stadtwerke"));
@@ -508,9 +460,16 @@ mod tests {
         )
         .await
         .unwrap();
-        schliesse_ab(&pool, e, s.id, "behoben", Some("vor Ort erledigt"), b)
-            .await
-            .unwrap();
+        schliesse_ab_tx(
+            &mut *pool.acquire().await.unwrap(),
+            e,
+            s.id,
+            "behoben",
+            Some("vor Ort erledigt"),
+            b,
+        )
+        .await
+        .unwrap();
         let neu = laden(&pool, e, s.id).await.unwrap();
         assert_eq!(neu.status, SchadenStatus::Abgeschlossen);
         assert_eq!(neu.abschluss_grund, Some(AbschlussGrund::Behoben));
@@ -527,7 +486,9 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         let s = anlegen(&pool, e, b, minimal()).await.unwrap();
-        storniere(&pool, e, s.id, b).await.unwrap();
+        storniere_tx(&mut *pool.acquire().await.unwrap(), e, s.id, b)
+            .await
+            .unwrap();
         let neu = laden(&pool, e, s.id).await.unwrap();
         assert!(neu.storniert_at.is_some());
         assert_eq!(neu.storniert_von, Some(b));
@@ -538,7 +499,9 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         let s = anlegen(&pool, e, b, minimal()).await.unwrap();
-        storniere(&pool, e, s.id, b).await.unwrap();
+        storniere_tx(&mut *pool.acquire().await.unwrap(), e, s.id, b)
+            .await
+            .unwrap();
         let ohne = liste(&pool, e, None, None, None, None, false)
             .await
             .unwrap();

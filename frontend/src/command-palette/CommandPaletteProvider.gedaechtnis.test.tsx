@@ -3,11 +3,12 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { globalKeys } from '../api/queryKeys';
 import { CommandPaletteProvider } from './CommandPaletteProvider';
 import { SCHLUESSEL_ZULETZT_BEFEHLE } from './zuletztBefehle';
+import { benutzerFixture } from '../test/fixtures';
 
 /**
  * DIE NAHT des Befehls-Gedächtnisses (LFH-391 · Etappe D).
@@ -21,23 +22,14 @@ import { SCHLUESSEL_ZULETZT_BEFEHLE } from './zuletztBefehle';
  * Injektion `zuletztBefehlIds`/`merkeBefehl` ist genau das, was geprüft werden soll.
  */
 
-const nutzer = {
-  id: 1,
-  anzeigename: 'EL',
-  benutzername: 'el',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-  aktiv: true,
-  erstellt_at: '',
-  totp_aktiviert: false,
-};
+const nutzer = benutzerFixture({ anzeigename: 'EL', org_rolle: 'fuehrungskraft' });
 
 let puts: { schluessel: string; wert: string }[];
 
 beforeEach(() => {
   puts = [];
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze', () => HttpResponse.json([])),
     http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
       const body = (await request.json()) as { wert: string };

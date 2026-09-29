@@ -12,6 +12,7 @@
 //!
 //! Spec: `openspec/changes/lfh-690-demo-daten-laufzeit-import/`
 
+use crate::wire_enum::wire_enum;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -79,39 +80,22 @@ pub struct DemoBerichtZeile {
     pub behalten: i64,
 }
 
-/// Vorgang, den ein Bericht beschreibt. Wire == `as_str()`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum DemoVorgang {
-    Importiert,
-    Entfernt,
-}
-
-impl DemoVorgang {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            DemoVorgang::Importiert => "importiert",
-            DemoVorgang::Entfernt => "entfernt",
-        }
+wire_enum! {
+    /// Vorgang, den ein Bericht beschreibt. Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+    pub enum DemoVorgang {
+        Importiert => "importiert",
+        Entfernt => "entfernt",
     }
 }
 
-/// Stammdatenart im Bericht. Wire == `as_str()`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum DemoStammdatenArt {
-    Fahrzeug,
-    Personal,
-    Material,
-}
-
-impl DemoStammdatenArt {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            DemoStammdatenArt::Fahrzeug => "fahrzeug",
-            DemoStammdatenArt::Personal => "personal",
-            DemoStammdatenArt::Material => "material",
-        }
+wire_enum! {
+    /// Stammdatenart im Bericht. Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+    pub enum DemoStammdatenArt {
+        Fahrzeug => "fahrzeug",
+        Personal => "personal",
+        Material => "material",
     }
 }
 

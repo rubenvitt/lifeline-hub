@@ -3,26 +3,15 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import TierePage from './TierePage';
 import type { Tier } from '../api/types';
+import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
-class FakeEventSource {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {
-    this.closed = true;
-  }
-}
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
   sessionStorage.clear();
@@ -31,36 +20,9 @@ afterEach(() => vi.unstubAllGlobals());
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
 // schreibrecht.test.ts ab.
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  benutzername: 'nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-29 10:00:00',
-};
-const einsatzAktiv = {
-  id: 1,
-  bezeichnung: 'Hochwasser',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '2026-05-29 08:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '2026-05-29 08:00:00',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-};
-const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
+const nutzer = benutzerFixture();
+const einsatzAktiv = einsatzFixture();
+const einsatzBeobachter = einsatzFixture({ meine_rolle: 'beobachter' });
 
 const tierBasis: Tier = {
   id: 10,
@@ -136,18 +98,16 @@ async function warteBisDialogWeg(timeout?: number) {
 
 function render(einsatzObj: typeof einsatzAktiv, tiere: Tier[]) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json(tiere)),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
-        <Route path="/einsaetze/:id/tiere/:tierId" element={<div>DETAIL-SEITE</div>} />
-        <Route path="/einsaetze/:id/personen" element={<div>Personen-Modul</div>} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
+      <Route path="/einsaetze/:id/tiere/:tierId" element={<div>DETAIL-SEITE</div>} />
+      <Route path="/einsaetze/:id/personen" element={<div>Personen-Modul</div>} />
+    </Routes>,
     { route: '/einsaetze/1/tiere' },
   );
 }
@@ -358,7 +318,7 @@ describe('TierePage', () => {
       antwortFreigeben = resolve;
     });
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/:einsatzId', ({ params }) => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
@@ -373,19 +333,17 @@ describe('TierePage', () => {
       }),
     );
     const { container } = renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route
-            path="/einsaetze/:id/tiere"
-            element={
-              <>
-                <EinsatzWechsel />
-                <TierePage />
-              </>
-            }
-          />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route
+          path="/einsaetze/:id/tiere"
+          element={
+            <>
+              <EinsatzWechsel />
+              <TierePage />
+            </>
+          }
+        />
+      </Routes>,
       { route: '/einsaetze/1/tiere' },
     );
 
@@ -610,7 +568,7 @@ describe('TierePage', () => {
     sessionStorage.setItem('lfh:erfassung:1:tier:antreff_ort', 'Tierlager A');
     sessionStorage.setItem('lfh:erfassung:2:tier:antreff_ort', 'Tierlager B');
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/:einsatzId', ({ params }) => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
@@ -618,19 +576,17 @@ describe('TierePage', () => {
       http.get('/api/einsaetze/:einsatzId/tiere', () => HttpResponse.json([])),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route
-            path="/einsaetze/:id/tiere"
-            element={
-              <>
-                <EinsatzWechsel />
-                <TierePage />
-              </>
-            }
-          />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route
+          path="/einsaetze/:id/tiere"
+          element={
+            <>
+              <EinsatzWechsel />
+              <TierePage />
+            </>
+          }
+        />
+      </Routes>,
       { route: '/einsaetze/1/tiere' },
     );
 
@@ -772,16 +728,14 @@ describe('TierePage', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/tiere', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
+      </Routes>,
       { route: '/einsaetze/1/tiere' },
     );
 

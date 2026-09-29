@@ -1,8 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_einsatzleitung, fordere_lesezugriff, fordere_schreibrecht_oder_admin,
-    ist_fristverkuerzung,
+use crate::einsatz::berechtigung::ist_fristverkuerzung;
+use crate::einsatz::kontext::{
+    EinsatzKontext, EinsatzLeitungszugriff, EinsatzLesezugriff, EinsatzVerwaltungszugriff,
 };
 use crate::einsatz::{
     einstellungen, modul, modul_override, repo, EinsatzAnzeige, EinsatzRolle, Einsatzart,
@@ -11,7 +11,7 @@ use crate::einsatz::{
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
-use crate::routes::support;
+use crate::routes::support::{self, pflicht};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -41,11 +41,7 @@ pub async fn anlegen(
     if !benutzer.darf_einsatz_anlegen() {
         return Err(AppError::Forbidden);
     }
-    if req.bezeichnung.trim().is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
+    pflicht(&req.bezeichnung, "Bezeichnung")?;
     let stichwort = req
         .stichwort
         .as_deref()
@@ -106,16 +102,13 @@ pub async fn liste(
 /// Mitgliedschaft) dürfen lesen; `meine_rolle` ist dann ggf. `null`.
 pub async fn detail(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
-    let einsatz = repo::laden(&state.pool, id).await?;
-    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    Ok(Json(einsatz.anzeige(
-        rolle.map(|r| r.as_str().to_string()),
-        repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
-        crate::stab::repo::sachgebiete_von(&state.pool, id, benutzer.id).await?,
+    let id = ctx.einsatz.id;
+    Ok(Json(ctx.einsatz.anzeige(
+        ctx.rolle.map(|r| r.as_str().to_string()),
+        repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
+        crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
     )))
 }
 
@@ -123,19 +116,15 @@ pub async fn detail(
 /// Nur Einsatzleitung, nur wenn der Einsatz aktuell aktiv ist.
 pub async fn abschliessen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(id): PfadParam<i64>,
+    ctx: EinsatzLeitungszugriff,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
-    let einsatz = repo::laden(&state.pool, id).await?;
-    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
-    fordere_einsatzleitung(rolle)?;
-    fordere_aktiv(&einsatz)?;
+    let id = ctx.einsatz.id;
 
-    let aktualisiert = repo::abschliessen(&state.pool, id, benutzer.id).await?;
+    let aktualisiert = repo::abschliessen(&state.pool, id, ctx.benutzer.id).await?;
     Ok(Json(aktualisiert.anzeige(
-        rolle.map(|r| r.as_str().to_string()),
-        repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
-        crate::stab::repo::sachgebiete_von(&state.pool, id, benutzer.id).await?,
+        ctx.rolle.map(|r| r.as_str().to_string()),
+        repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
+        crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
     )))
 }
 
@@ -156,15 +145,13 @@ pub struct FristSetzen {
 /// erst ab Einsatzabschluss (reaktive Lese-Sperre), nie auf aktive Einsätze.
 pub async fn aufbewahrungsfrist_setzen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(id): PfadParam<i64>,
+    ctx: EinsatzKontext,
     JsonBody(req): JsonBody<FristSetzen>,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
-    let einsatz = repo::laden(&state.pool, id).await?;
-    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
+    let id = ctx.einsatz.id;
     // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin.
-    if !benutzer.ist_admin() {
-        fordere_einsatzleitung(rolle)?;
+    if !ctx.benutzer.ist_admin() {
+        ctx.fordere_einsatzleitung()?;
     }
 
     // LFH-23 (design.md D6): an einem geschwärzten Einsatz oder nach Ende der Karenz gibt es
@@ -194,16 +181,19 @@ pub async fn aufbewahrungsfrist_setzen(
         None => None,
     };
 
-    let alt = einsatz.retention_bis.as_deref();
+    let alt = ctx.einsatz.retention_bis.as_deref();
     // Unverändert → kein UPDATE, kein Audit-Eintrag (kein Rauschen im ETB).
     if alt == neue_frist.as_deref() {
-        let anzeige = einsatz.anzeige(
-            rolle.map(|r| r.as_str().to_string()),
-            repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
-            crate::stab::repo::sachgebiete_von(&state.pool, id, benutzer.id).await?,
+        let anzeige = ctx.einsatz.anzeige(
+            ctx.rolle.map(|r| r.as_str().to_string()),
+            repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
+            crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
         );
         return Ok(Json(ohne_kopf_pii_wenn_gesperrt(
-            anzeige, &einsatz, &benutzer, rolle,
+            anzeige,
+            &ctx.einsatz,
+            &ctx.benutzer,
+            ctx.rolle,
         )));
     }
     if ist_fristverkuerzung(alt, neue_frist.as_deref()) && !req.bestaetigt {
@@ -218,18 +208,24 @@ pub async fn aufbewahrungsfrist_setzen(
         (Some(a), Some(neu)) => format!("Aufbewahrungsfrist geändert von {a} auf {neu}"),
     };
 
-    let aktualisiert =
-        repo::frist_setzen(&state.pool, id, benutzer.id, neue_frist.as_deref(), &audit).await?;
+    let aktualisiert = repo::frist_setzen(
+        &state.pool,
+        id,
+        ctx.benutzer.id,
+        neue_frist.as_deref(),
+        &audit,
+    )
+    .await?;
     let anzeige = aktualisiert.anzeige(
-        rolle.map(|r| r.as_str().to_string()),
-        repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
-        crate::stab::repo::sachgebiete_von(&state.pool, id, benutzer.id).await?,
+        ctx.rolle.map(|r| r.as_str().to_string()),
+        repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
+        crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
     );
     Ok(Json(ohne_kopf_pii_wenn_gesperrt(
         anzeige,
         &aktualisiert,
-        &benutzer,
-        rolle,
+        &ctx.benutzer,
+        ctx.rolle,
     )))
 }
 
@@ -297,17 +293,15 @@ pub struct EinstellungenUpdate {
 /// Lesezugriff gemäß DSGVO-Lese-Policy; existiert keine Zeile → Defaults.
 pub async fn einstellungen_laden(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff,
 ) -> Result<Json<EinstellungenMitOrgDefaults>, AppError> {
-    let einsatz = repo::laden(&state.pool, id).await?;
-    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let id = ctx.einsatz.id;
     let gespeichert = einstellungen::laden_oder_default(&state.pool, id).await?;
     let (etb_fr, meldung_fr, auftrag_fr) = freeze_flags(&state.pool, id).await?;
-    let org_defaults = crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id)
-        .await?
-        .anzeige_hinweis();
+    let org_defaults =
+        crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id)
+            .await?
+            .anzeige_hinweis();
     Ok(Json(EinstellungenMitOrgDefaults {
         einstellungen: gespeichert.anzeige_mit_freeze(etb_fr, meldung_fr, auftrag_fr),
         org_defaults,
@@ -339,14 +333,10 @@ async fn freeze_flags(
 /// Gate: Einsatz-Schreibrecht ODER System-Admin, plus aktiver Einsatz (Freeze → 409).
 pub async fn einstellungen_setzen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(id): PfadParam<i64>,
+    ctx: EinsatzVerwaltungszugriff,
     JsonBody(req): JsonBody<EinstellungenUpdate>,
 ) -> Result<Json<einstellungen::EinstellungenAnzeige>, AppError> {
-    let einsatz = repo::laden(&state.pool, id).await?;
-    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
-    fordere_schreibrecht_oder_admin(&benutzer, rolle)?;
-    fordere_aktiv(&einsatz)?; // Freeze bei Abschluss
+    let id = ctx.einsatz.id;
 
     let standard_modul = bereinige(req.standard_modul);
     let basemap_modus = bereinige(req.basemap_modus);
@@ -504,7 +494,7 @@ pub async fn einstellungen_setzen(
     let gespeichert = einstellungen::speichern(
         &state.pool,
         id,
-        benutzer.id,
+        ctx.benutzer.id,
         einstellungen::EinstellungenDaten {
             standard_modul: standard_modul.as_deref(),
             basemap_modus: basemap_modus.as_deref(),
@@ -540,12 +530,9 @@ pub async fn einstellungen_setzen(
 /// existieren keine Overrides, ist die Map leer (= alle Module sichtbar, frei).
 pub async fn modul_overrides_laden(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff,
 ) -> Result<Json<HashMap<String, modul_override::EinsatzModulOverride>>, AppError> {
-    let einsatz = repo::laden(&state.pool, id).await?;
-    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let id = ctx.einsatz.id;
     Ok(Json(modul_override::laden_alle(&state.pool, id).await?))
 }
 
@@ -563,17 +550,16 @@ pub struct ModulOverrideUpdate {
 /// (Selbst-Aussperr-Schutz) → 400. Ungültige `benoetigte_rolle` → 400.
 pub async fn modul_override_setzen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((id, modul_key)): PfadParam<(i64, String)>,
+    ctx: EinsatzKontext,
+    PfadParam((_eid, modul_key)): PfadParam<(i64, String)>,
     JsonBody(req): JsonBody<ModulOverrideUpdate>,
 ) -> Result<Json<modul_override::EinsatzModulOverride>, AppError> {
-    let einsatz = repo::laden(&state.pool, id).await?;
-    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
+    let id = ctx.einsatz.id;
     // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin.
-    if !benutzer.ist_admin() {
-        fordere_einsatzleitung(rolle)?;
+    if !ctx.benutzer.ist_admin() {
+        ctx.fordere_einsatzleitung()?;
     }
-    fordere_aktiv(&einsatz)?; // Freeze bei Abschluss
+    ctx.fordere_aktiv()?; // Freeze bei Abschluss
 
     if !modul::ist_gueltiger_modul_key(&modul_key) {
         return Err(AppError::Validation("Unbekannter Modul-Key".into()));
@@ -599,7 +585,7 @@ pub async fn modul_override_setzen(
         &modul_key,
         req.sichtbar,
         benoetigte_rolle.as_deref(),
-        benutzer.id,
+        ctx.benutzer.id,
     )
     .await?;
     Ok(Json(gespeichert))
@@ -616,12 +602,9 @@ pub struct MitgliedRolle {
 /// GET /api/einsaetze/{id}/mitglieder — Mitgliederliste; gemäß DSGVO-Lese-Policy.
 pub async fn mitglieder(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff,
 ) -> Result<Json<Vec<MitgliedAnzeige>>, AppError> {
-    let einsatz = repo::laden(&state.pool, id).await?; // 404, wenn der Einsatz nicht existiert
-    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let id = ctx.einsatz.id;
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
 }
 
@@ -630,14 +613,11 @@ pub async fn mitglieder(
 /// Schützt die letzte Einsatzleitung vor Herabstufung.
 pub async fn mitglied_setzen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((id, ziel_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLeitungszugriff,
+    PfadParam((_eid, ziel_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<MitgliedRolle>,
 ) -> Result<Json<Vec<MitgliedAnzeige>>, AppError> {
-    let einsatz = repo::laden(&state.pool, id).await?;
-    let meine = repo::rolle_von(&state.pool, id, benutzer.id).await?;
-    fordere_einsatzleitung(meine)?;
-    fordere_aktiv(&einsatz)?;
+    let id = ctx.einsatz.id;
 
     let neue_rolle = EinsatzRolle::parse(&req.einsatz_rolle)
         .ok_or_else(|| AppError::Validation("Ungültige einsatz_rolle".into()))?;
@@ -700,13 +680,10 @@ pub async fn mitglied_setzen(
 /// Schützt die letzte Einsatzleitung vor Entfernung.
 pub async fn mitglied_entfernen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((id, ziel_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLeitungszugriff,
+    PfadParam((_eid, ziel_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<Vec<MitgliedAnzeige>>, AppError> {
-    let einsatz = repo::laden(&state.pool, id).await?;
-    let meine = repo::rolle_von(&state.pool, id, benutzer.id).await?;
-    fordere_einsatzleitung(meine)?;
-    fordere_aktiv(&einsatz)?;
+    let id = ctx.einsatz.id;
 
     let ziel_rolle = repo::rolle_von(&state.pool, id, ziel_id)
         .await?
@@ -773,14 +750,10 @@ pub struct KopfdatenPatch {
 /// Feld absent = unverändert; `null`/`""` bei den optionalen Feldern = leeren.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(id): PfadParam<i64>,
+    ctx: EinsatzVerwaltungszugriff,
     JsonBody(req): JsonBody<KopfdatenPatch>,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
-    let einsatz = repo::laden(&state.pool, id).await?;
-    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
-    fordere_schreibrecht_oder_admin(&benutzer, rolle)?;
-    fordere_aktiv(&einsatz)?;
+    let id = ctx.einsatz.id;
 
     // 400, nicht stilles Ignorieren: ein alter Client hielte seine Änderung sonst für
     // gespeichert. 400 statt 422 — das Feld ist schon für sich unzulässig (LFH-267).
@@ -794,12 +767,7 @@ pub async fn aktualisieren(
     // jeder Teil-Patch abgelehnt. Vorhanden-aber-leer bleibt 400 (LFH-305).
     let bezeichnung = match req.bezeichnung {
         Some(b) => {
-            let b = b.trim().to_string();
-            if b.is_empty() {
-                return Err(AppError::Validation(
-                    "Bezeichnung darf nicht leer sein".into(),
-                ));
-            }
+            let b = pflicht(&b, "Bezeichnung")?;
             Some(b)
         }
         None => None,
@@ -850,8 +818,8 @@ pub async fn aktualisieren(
     .await?;
 
     Ok(Json(aktualisiert.anzeige(
-        rolle.map(|r| r.as_str().to_string()),
-        repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
-        crate::stab::repo::sachgebiete_von(&state.pool, id, benutzer.id).await?,
+        ctx.rolle.map(|r| r.as_str().to_string()),
+        repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
+        crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
     )))
 }
