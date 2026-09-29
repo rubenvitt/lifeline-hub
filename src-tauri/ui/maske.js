@@ -12,9 +12,11 @@
     feld.setAttribute('aria-invalid', text ? 'true' : 'false');
   };
 
+  // Die Sperre trägt ein Wort, nicht nur die blassere Fläche (LFH-434: Sperre ohne Farbe).
   const sperren = (gesperrt) => {
     verbinden.disabled = gesperrt;
     abbrechen.disabled = gesperrt;
+    verbinden.textContent = gesperrt ? 'Verbinde…' : 'Verbinden';
   };
 
   maske.addEventListener('submit', async (ereignis) => {

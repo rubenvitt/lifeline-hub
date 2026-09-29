@@ -2,7 +2,7 @@
 
 ## 1. Gerüst `src-tauri` im Workspace
 
-- [ ] 1.1 Vorher `cargo tree -p lifeline-hub -e normal --prefix none | sort -u` sichern. Danach
+- [x] 1.1 Vorher `cargo tree -p lifeline-hub -e normal --prefix none | sort -u` sichern. Danach
   `src-tauri/` anlegen:
   - Crate `lifeline-desktop` mit `tauri` 2.12 und den Plugins `deep-link`, `single-instance`
     (Feature `deep-link`), `updater`, `dialog`, `process`,
@@ -15,14 +15,14 @@
   - `cargo build -p lifeline-desktop` läuft grün.
   - `git status` nach dem Build ist sauber.
   - Der `cargo tree`-Vergleich für `lifeline-hub` zeigt keine geänderte Version.
-- [ ] 1.2 Icons per `cargo tauri icon frontend/public/pwa-512.png` erzeugen und committen.
+- [x] 1.2 Icons per `cargo tauri icon frontend/public/pwa-512.png` erzeugen und committen.
   Prüfen: `cargo tauri build --debug --bundles app` erzeugt ein startbares `.app` mit Icon.
-- [ ] 1.3 `src-tauri/Info.plist` mit `NSLocalNetworkUsageDescription` und `NSBonjourServices`.
+- [x] 1.3 `src-tauri/Info.plist` mit `NSLocalNetworkUsageDescription` und `NSBonjourServices`.
   Prüfen: `plutil -p` auf die `Info.plist` im gebauten Bundle zeigt beide Schlüssel.
 
 ## 2. Reine Entscheidungen (TDD)
 
-- [ ] 2.1 `adresse.rs`: `pruefe_adresse` test-first. Fälle:
+- [x] 2.1 `adresse.rs`: `pruefe_adresse` test-first. Fälle:
   - `https://elw.local:8443` gültig,
   - Leerraum wird getrimmt,
   - `http://…` abgelehnt mit einer Meldung, die https nennt,
@@ -31,14 +31,14 @@
 
   Prüfen: `cargo test -p lifeline-desktop adresse` grün. Die Mutationsprobe (https-Prüfung
   entfernt) macht ihn rot.
-- [ ] 2.2 `deeplink.rs`: `deute` und `entscheide` test-first. Fälle:
+- [x] 2.2 `deeplink.rs`: `deute` und `entscheide` test-first. Fälle:
   - ohne gespeicherte Adresse → `Vorbelegen`,
   - abweichend → `Bestaetigen`,
   - gleich (auch mit abschließendem `/`) → `Nichts`,
   - fremder Pfad, fehlendes `server` oder `http`-Ziel → `None`.
 
   Prüfen: `cargo test -p lifeline-desktop deeplink` grün, mit Mutationsprobe am Gleichheitsfall.
-- [ ] 2.3 `verbindung.rs`: Lesen und Schreiben test-first mit `tempfile`, dazu fehlende und
+- [x] 2.3 `verbindung.rs`: Lesen und Schreiben test-first mit `tempfile`, dazu fehlende und
   kaputte Datei → keine Adresse. Prüfen: `cargo test -p lifeline-desktop verbindung` grün.
 
 ## 3. Hülle verdrahten
@@ -52,7 +52,7 @@
   - `http://…` zeigt die https-Meldung,
   - „Verbinden“ lädt den Server,
   - ein Neustart lädt ihn ohne Maske.
-- [ ] 3.2 Laufzeit-Capability nur mit `drucken` für die Server-Origin, neu gesetzt bei jedem
+- [x] 3.2 Laufzeit-Capability nur mit `drucken` für die Server-Origin, neu gesetzt bei jedem
   Verbinden. Prüfen:
   - Von der Serverseite aus lehnt der Aufruf von `verbinden` über `__TAURI_INTERNALS__.invoke` ab.
   - `drucken` geht.
@@ -72,12 +72,12 @@
   - Auf der ETB-Druckseite öffnet „Drucken“ den macOS-Druckdialog, und die Druckansicht schaltet
     genau einmal um.
   - Ein minimiertes Fenster empfängt ein Live-Ereignis in Echtzeit (Beleg notieren).
-- [ ] 3.6 Downloads: `on_download` lässt das Vorgabeverhalten zu. Prüfen: Ein Anhang zweimal
+- [x] 3.6 Downloads: `on_download` lässt das Vorgabeverhalten zu. Prüfen: Ein Anhang zweimal
   laden ergibt zwei Dateien im Download-Ordner, die zweite mit Zählzusatz, Umlaute erhalten.
 
 ## 4. Updater
 
-- [ ] 4.1 Schlüsselpaar mit Passwort nach `~/.tauri/lifeline-desktop.key` erzeugen, den
+- [x] 4.1 Schlüsselpaar mit Passwort nach `~/.tauri/lifeline-desktop.key` erzeugen, den
   Pubkey und den Endpunkt `…/releases/latest/download/latest.json` in `tauri.conf.json`
   eintragen. Die Secrets setzt der Mensch (Befehle in der Abschlussmeldung). Prüfen: Kein
   privater Schlüssel im Repo (`git grep -n 'untrusted comment: rsign encrypted secret key'` leer).
@@ -100,7 +100,7 @@
 
 ## 5. Release-Pipeline
 
-- [ ] 5.1 `scripts/release/desktop-manifest.mjs` test-first mit
+- [x] 5.1 `scripts/release/desktop-manifest.mjs` test-first mit
   `scripts/release/desktop-manifest.test.mjs`. Fälle:
   - beide Plattformen,
   - eine fehlende Plattform,
@@ -121,7 +121,7 @@
   - der Kopfkommentar beschreibt die Desktop-Jobs,
   - nach dem Merge ein Dispatch-Lauf mit `desktop: true` auf dem jüngsten Alpha-Tag (Ergebnis in
     der Abschlussmeldung).
-- [ ] 5.3 `release.config.mjs`: `prepareCmd` um `cargo set-version -p lifeline-desktop`
+- [x] 5.3 `release.config.mjs`: `prepareCmd` um `cargo set-version -p lifeline-desktop`
   ergänzen, `src-tauri/Cargo.toml` zu den Assets. Prüfen: Der Lauf von `cargo set-version -p
   lifeline-desktop 9.9.9` in einer Wegwerf-Kopie ändert genau `src-tauri/Cargo.toml` und
   `Cargo.lock`.
@@ -130,7 +130,7 @@
 
 ## 6. Doku und Abschluss
 
-- [ ] 6.1 `docs/betrieb/desktop-app.md` schreiben:
+- [x] 6.1 `docs/betrieb/desktop-app.md` schreiben:
   - Installation macOS mit Gatekeeper-Erststart und Windows mit SmartScreen,
   - Erststart, Server wechseln, Deeplink-Vertrag `lifeline://verbinden?server=` für LFH-38,
   - Update-Verhalten, Schlüssel und Secrets einschließlich der Folge eines Verlusts,
@@ -138,7 +138,7 @@
 
   Verweis aus `docs/betrieb/packaging.md`. Prüfen: Die beschriebenen Befehle laufen wie
   geschrieben.
-- [ ] 6.2 CLAUDE.md: kurzer Abschnitt „Desktop-Hülle (LFH-721)“ mit den Trägern
+- [x] 6.2 CLAUDE.md: kurzer Abschnitt „Desktop-Hülle (LFH-721)“ mit den Trägern
   - `src-tauri`, keine Anwendungslogik,
   - Remote-Capability nur `drucken`,
   - Version über `release.config.mjs`,

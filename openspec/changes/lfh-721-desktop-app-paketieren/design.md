@@ -243,3 +243,64 @@ Keine Daten- und keine API-Migration.
 
 Rückweg: Die Desktop-Jobs lassen sich über die Ausgabe `desktop` abschalten, ohne die
 Server-Artefakte anzufassen.
+
+## Nachweise der Umsetzung (29.09.2026, macOS 27 Apple Silicon)
+
+Gemessen an einem Debug-Bundle (`cargo tauri build --debug --bundles app`, ad-hoc signiert) gegen
+eine eigene https-Prüfseite (mkcert, `localhost:9443`), die die IPC-Brücke anspricht und ihr
+Ergebnis per POST meldet. Die Seitenaufrufe stehen im Protokoll der Hülle
+(`~/Library/Logs/dev.rubeen.lifeline.desktop/`).
+
+| Punkt | Ergebnis | Beleg |
+|---|---|---|
+| Erststart ohne Adresse | Maske (`tauri://localhost`) | Protokoll „Seite geladen: tauri://localhost“ |
+| Neustart mit gespeicherter Adresse | lädt die Adresse ohne Maske | Protokoll „Seite geladen: https://localhost:9443/“ |
+| Deeplink ohne gespeicherte Adresse | Maske vorbelegt, nichts gespeichert | Protokoll `…/index.html`, keine `verbindung.json` |
+| Deeplink mit fremdem Pfad | verworfen | Protokoll „Deeplink verworfen: lifeline://trennen?…“ |
+| Einzelinstanz | eine Instanz nach Deeplink | `pgrep` = 1 |
+| Serverseite ruft `verbinden`/`abbrechen`/`vorbelegung` | abgelehnt („not allowed … allowed on: URL: local“) | Bericht der Prüfseite |
+| `window.print` auf der Serverseite | umgeleitet auf `drucken` | Bericht der Prüfseite |
+| Nativer Druck löst `beforeprint` aus | ja, ~200 ms nach dem Aufruf; `print()` kehrt sofort zurück | Bericht der Prüfseite (`print-aufruf` 112 ms, `beforeprint` 310 ms) |
+| Downloads | Download-Ordner, Umlaute erhalten, Dubletten „(1)“ … „(3)“ | `Prüfanhang-LFH-721-äöü*.txt` |
+| Update 1.0.0 → 1.0.1 (Testschlüssel, lokales `latest.json` aus `desktop-manifest.mjs`) | Angebot mit Version, nach „Aktualisieren“ Neustart als 1.0.1 — **mit ad-hoc-Signatur** | Zugriffsprotokoll des Endpunkts, `CFBundleShortVersionString` 1.0.1, Nutzer bestätigte den Klick |
+| Update-Prüfung ohne erreichbares Manifest | still, nur Protokoll | „Update-Prüfung nicht möglich …“ ohne Dialog |
+| Version der Hülle nach einem Release-Merge | Test `version_gleich_der_anwendungsversion` erkennt die Drift (alpha.51 ↔ alpha.53 beim Einmergen von `alpha`) | Angleich-Commit |
+
+**Lehre für Prüfseiten:** Ein klassisches Skript mit `const ipc` auf oberster Ebene bricht in
+der Hülle ab — die IPC-Brücke belegt `window.ipc`. Das Frontend lädt als Modul und ist nicht
+betroffen.
+
+## Prüfliste Akzeptanzkriterien (LFH-721)
+
+| Kriterium | Verdikt | Beleg / Zielticket |
+|---|---|---|
+| Ein `main`-Release erzeugt installierbare Pakete und ein Update-Manifest | **offen → nach dem Merge** | Matrix, Einsammeln und Manifest lokal mit Attrappen belegt (actionlint grün); der erste echte Lauf ist der Dispatch mit `desktop: true` nach dem Merge und dem Setzen der Secrets, Windows ist bis dahin unbelegt |
+| Eine installierte App aktualisiert sich auf das nächste Release | **erfüllt (macOS)**, Windows **offen → Dispatch-Lauf** | Nachweis oben; die Befürchtung aus LFH-722 (ohne Signierung praktisch unbenutzbar) trifft das Update selbst nicht, nur den Gatekeeper-Erststart |
+| `check-all.sh` bleibt die einzige Wahrheit | **erfüllt** | Manifest-Selbsttest in Schritt 8; die CI bekommt nur Umgebung (apt-Pakete), keinen eigenen Schritt |
+
+**Noch von Hand zu bestätigen** (an der Test-App vorbereitet, nicht automatisierbar ohne
+Bedienfreigabe): „Später“ läuft ohne Neustart weiter; ein manipuliertes Archiv wird abgelehnt
+(Fehlermeldung, Version bleibt); Menü „Server wechseln…“ mit Vorbelegung und „Abbrechen“;
+http-Meldung in der Maske; Bestätigungsdialog beim Deeplink auf eine andere Adresse; `afterprint`
+beim Schließen des Druckdialogs; ⌘C/⌘V in der Maske. Live-Ereignisse im minimierten Fenster sind
+nicht neu gemessen — die Einstellung (`background_throttling` aus) ist die aus LFH-720, Lauf 2.
+
+## Prüfliste Einsatztauglichkeit — Erststart-Maske (`src-tauri/ui/`)
+
+| #  | Verdikt | Beleg / Begründung |
+|----|---|---|
+| 1  | erfüllt | Feld und Knöpfe ≥ 48 px hoch, Knöpfe 12 px Abstand |
+| 2  | nicht anwendbar | Keine Zeilen/Listen; die Maske hat genau ein Feld und steht vor der Anwendung, deren Dichte-Token hier nicht gilt |
+| 3  | erfüllt | „Verbinden“ sperrt sofort und wechselt auf „Verbinde…“; die Prüfung läuft lokal in der Hülle |
+| 4  | nicht anwendbar | Keine kritische Aktion; der Serverwechsel per Deeplink hat seine zweite Handlung (Bestätigungsdialog) |
+| 5  | erfüllt | Dauerdunkle Fläche, deshalb Tag-Schwelle (LFH-434): Text 15,0/8,0 : 1, Fehlermeldung 7,18 : 1 (`rahmenFarben.alarm`), Primärknopf 10,2 : 1 auf `bedienText`, gesperrt 6,8 : 1; Rahmen 3,3 : 1, Fokusring 6,0 : 1 |
+| 6  | erfüllt | Fehler als Text am Feld (`role="alert"`, `aria-invalid`), nicht nur roter Rahmen |
+| 7  | erfüllt | Rot nur für den Fehler, Blau nur für Bedienung; Grund `#0c0e11` |
+| 8  | nicht anwendbar | Keine Warnung, die gedimmt werden könnte; der Regler gehört zur Anwendung |
+| 9  | erfüllt | Feld und Meldung mittig im Blickfeld |
+| 10 | nicht anwendbar | Keine Alarme |
+| 11 | erfüllt | Kein Blinken |
+| 12 | erfüllt | Die Meldungszeile hält ihre Höhe vorab (`min-height`), kein Sprung beim Fehler |
+| 13 | erfüllt | Nichts ist fixiert oder überlagert |
+| 14 | nicht anwendbar | Keine Tabelle |
+| 15 | erfüllt, soweit anwendbar | Label über dem Feld, Vorbelegung sichtbar und überschreibbar, Enter sendet (`<form>`), volle Tastaturbedienung; Serienerfassung und Sammelliste entfallen (ein Wert) |

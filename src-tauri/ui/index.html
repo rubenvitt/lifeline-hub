@@ -1,9 +1,11 @@
 <!doctype html>
 <!--
   Erststart-Maske der Desktop-Hülle (LFH-721, desktop-huelle). Die einzige lokale Seite der
-  Hülle; alles andere lädt vom Einsatzserver. Farben aus der Nachtpalette (frontend/src/theme/
-  tokens.ts, farbenDunkel), Radius 0. Die Adresse prüft die Hülle (src-tauri/src/adresse.rs) —
-  hier steht keine zweite Prüflogik, die Maske zeigt nur deren Meldung.
+  Hülle; alles andere lädt vom Einsatzserver. Die Maske ist in beiden Lichtlagen dunkel und hält
+  deshalb für Text die Tag-Schwelle 7 : 1 (LFH-434): Werte aus `rahmenFarben` in
+  frontend/src/theme/tokens.ts; der Primärknopf füllt mit `bedienText` (10,6 : 1), weil keine
+  Beschriftung auf `bedien` 7 : 1 erreicht. Radius 0. Die Adresse prüft die Hülle
+  (src-tauri/src/adresse.rs) — hier steht keine zweite Prüflogik, die Maske zeigt nur deren Meldung.
 -->
 <html lang="de">
   <head>
@@ -13,14 +15,16 @@
     <style>
       :root {
         color-scheme: dark;
-        --grund: #08090b;
-        --paneel: #0f1215;
-        --flaeche3: #16191d;
+        --grund: #0c0e11;
+        --paneel: #0c0e11;
+        --feld: #14171b;
+        --linie: #22262b;
         --text: #e8ebee;
-        --text2: #c6ccd2;
+        --text2: #a0a8b1;
         --rahmen: #626a73;
         --bedien: #4d94d6;
-        --alarm: #ff6b6b;
+        --bedien-text: #8ec2f0;
+        --alarm: #ff7070;
         --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
       }
       * { box-sizing: border-box; }
@@ -37,7 +41,7 @@
       form {
         width: min(520px, 100%);
         background: var(--paneel);
-        border: 1px solid var(--flaeche3);
+        border: 1px solid var(--linie);
         padding: 24px;
       }
       .augenbraue {
@@ -54,7 +58,7 @@
         width: 100%;
         min-height: 48px;
         padding: 0 12px;
-        background: var(--grund);
+        background: var(--feld);
         color: var(--text);
         border: 1px solid var(--rahmen);
         border-radius: 0;
@@ -73,9 +77,9 @@
         font-weight: 600;
         cursor: pointer;
       }
-      button[type='submit'] { background: var(--bedien); color: var(--grund); border: 1px solid var(--bedien); }
+      button[type='submit'] { background: var(--bedien-text); color: var(--grund); border: 1px solid var(--bedien-text); }
       button[type='button'] { background: transparent; color: var(--text); border: 1px solid var(--rahmen); }
-      button:disabled { opacity: 0.6; cursor: progress; }
+      button:disabled { opacity: 0.8; cursor: progress; }
       code { font-family: var(--mono); }
     </style>
     <script src="maske.js" defer></script>
