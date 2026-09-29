@@ -135,13 +135,17 @@ describe('baueBefehle — Schnellaktionen', () => {
       'aktion:schaeden',
       'aktion:stab',
       'aktion:dokumente',
+      'aktion:tiere',
+      'aktion:bereitstellungsraeume',
+      'aktion:einsatzabschnitte',
     ]);
   });
   /**
-   * Die Ziele stammen aus `routing/deeplinks.ts`: `/unfallhilfsstellen` zeigt auf eine Seite, die
-   * `?neu=1` nicht liest, die Schnellaktion braucht die Listenroute.
+   * Die Ziele stammen aus `routing/deeplinks.ts`: `/unfallhilfsstellen` und
+   * `/bereitstellungsraeume` zeigen auf Seiten, die `?neu=1` nicht lesen, die Schnellaktion
+   * braucht jeweils die Listenroute.
    */
-  it('baut die Schnellaktions-Ziele über die Deeplink-Registry (UHS auf die Listenroute)', () => {
+  it('baut die Schnellaktions-Ziele über die Deeplink-Registry (UHS und BR auf die Listenroute)', () => {
     const k = kontext();
     const b = baueBefehle(k);
     for (const [id, ziel] of [
@@ -151,6 +155,9 @@ describe('baueBefehle — Schnellaktionen', () => {
       ['aktion:schaeden', '/einsaetze/5/schaeden?neu=1'],
       ['aktion:stab', '/einsaetze/5/stab?neu=1'],
       ['aktion:dokumente', '/einsaetze/5/dokumente?neu=1'],
+      ['aktion:tiere', '/einsaetze/5/tiere?neu=1'],
+      ['aktion:bereitstellungsraeume', '/einsaetze/5/bereitstellungsraeume/liste?neu=1'],
+      ['aktion:einsatzabschnitte', '/einsaetze/5/einsatzabschnitte?neu=1'],
     ] as const) {
       b.find((x) => x.id === id)!.ausfuehren();
       expect(k.navigate).toHaveBeenCalledWith(ziel);

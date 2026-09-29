@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -235,6 +235,59 @@ describe('EinsatzabschnittePage', () => {
       { route: '/einsaetze/1/einsatzabschnitte?abschnitt=5' },
     );
     expect(await screen.findByText('Abschnitt: Nord')).toBeInTheDocument();
+  });
+
+  /**
+   * Schnellaktion der Sprungpalette (LFH-506): `?neu=1` öffnet den lokalen Entwurf, wie der Knopf.
+   * Als Paar: ohne den Parameter bleibt er zu.
+   */
+  describe('Schnellerfassung per ?neu=1', () => {
+    /** Macht den Query-String sichtbar — der Beleg, dass `?neu=1` verbraucht wurde. */
+    function SuchAnzeige() {
+      return <span data-testid="suche">{useLocation().search}</span>;
+    }
+    function rendereMit(route: string) {
+      return renderMitProviders(
+        <>
+          <Routes>
+            <Route path="/einsaetze/:id/einsatzabschnitte" element={<EinsatzabschnittePage />} />
+          </Routes>
+          <SuchAnzeige />
+        </>,
+        { route },
+      );
+    }
+
+    it('?neu=1 öffnet den Entwurf eines neuen Abschnitts und räumt den Parameter', async () => {
+      server.use(...handlers());
+      rendereMit('/einsaetze/1/einsatzabschnitte?neu=1');
+      expect(await screen.findByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
+      expect(screen.getByLabelText('Name')).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    });
+
+    it('ohne ?neu=1 bleibt der Entwurf zu', async () => {
+      server.use(...handlers());
+      rendereMit('/einsaetze/1/einsatzabschnitte');
+      await screen.findByText('Nord');
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+      expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+    });
+
+    it('?neu=1 öffnet den Entwurf NICHT für Beobachter', async () => {
+      server.use(...handlers('beobachter', 'aktiv'));
+      rendereMit('/einsaetze/1/einsatzabschnitte?neu=1');
+      // Synchronisationspunkt ist das Räumen des Parameters — erst danach hat der Effekt
+      // entschieden.
+      await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+      await screen.findByText('Nord');
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+      expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+    });
   });
 
   it('zeigt „Abschnitt anlegen" bei Schreibrecht', async () => {

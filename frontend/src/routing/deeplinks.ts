@@ -96,10 +96,19 @@ export function bereitstellungsraeumePfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'bereitstellungsraeume');
 }
 
-/** Tabellenansicht aller Bereitstellungsräume; der Modul-Index springt direkt in den zuletzt
-    gewählten BR (wie `unfallhilfsstellen/liste`). */
-export function bereitstellungsraeumeListePfad(einsatzId: number): string {
-  return `${einsatzModulPfad(einsatzId, 'bereitstellungsraeume')}/liste`;
+/**
+ * Tabellenansicht aller Bereitstellungsräume; der Modul-Index springt direkt in den zuletzt
+ * gewählten BR (wie `unfallhilfsstellen/liste`). `BereitstellungsraeumePage` liest `?neu=1` —
+ * die Schnellerfassung zeigt deshalb hierher, nicht auf {@link bereitstellungsraeumePfad}
+ * (`BereitstellungsraeumeDefault` liest den Parameter nicht, LFH-506).
+ */
+export function bereitstellungsraeumeListePfad(
+  einsatzId: number,
+  opts: { neu?: boolean } = {},
+): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'bereitstellungsraeume')}/liste`, {
+    neu: opts.neu ? 1 : undefined,
+  });
 }
 
 export function lageberichtePfad(einsatzId: number): string {
@@ -122,8 +131,9 @@ export function kraefteuebersichtPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'kraefteuebersicht');
 }
 
-export function tierePfad(einsatzId: number): string {
-  return einsatzModulPfad(einsatzId, 'tiere');
+/** Tier-Liste; `?neu=1` öffnet die Schnellerfassung (`TierePage`). */
+export function tierePfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'tiere'), { neu: opts.neu ? 1 : undefined });
 }
 
 export function einsatzdatenPfad(einsatzId: number): string {
@@ -394,11 +404,15 @@ export function parseFahrzeugeAnsicht(params: URLSearchParams): FahrzeugeAnsicht
     : undefined;
 }
 
+/** Einsatzabschnitte; `?abschnitt=` selektiert, `?neu=1` öffnet den Entwurf eines neuen. */
 export function einsatzabschnittePfad(
   einsatzId: number,
-  opts: { abschnitt?: number } = {},
+  opts: { abschnitt?: number; neu?: boolean } = {},
 ): string {
-  return mitQuery(einsatzModulPfad(einsatzId, 'einsatzabschnitte'), { abschnitt: opts.abschnitt });
+  return mitQuery(einsatzModulPfad(einsatzId, 'einsatzabschnitte'), {
+    abschnitt: opts.abschnitt,
+    neu: opts.neu ? 1 : undefined,
+  });
 }
 
 export function meldungenPfad(einsatzId: number, opts: { meldung?: number } = {}): string {
