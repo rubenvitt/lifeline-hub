@@ -124,6 +124,14 @@ export default defineConfig({
    * wandernde Tests mit Infrastruktur-Signaturen aus (goto-Timeout, ERR_CONNECTION_REFUSED),
    * nie an einer Zusicherung. Keine Toleranz an einer Zusicherung — es laufen nur weniger
    * gleichzeitig. Übersteuerbar: `PW_WORKERS=6 pnpm e2e` auf einer ruhigen Maschine.
+   *
+   * Der Deckel hilft nicht gegen FREMDE Last (LFH-398): arbeitet die Maschine nebenher, liefert
+   * die Suite keine belastbare Aussage. Dann kippt bis zur Hälfte der Tests in Timeouts,
+   * wandernd, bei vervielfachter Laufzeit. Das Fehlerbild führt in die Irre: der Seiten-Snapshot
+   * zeigt nur den Knopf der Query-Devtools, die Vite-Konsole scheiternde Auth-Prüfungen. Das
+   * sieht nach einem Render- oder Auth-Defekt aus, ist aber Last. Gegenprobe: die rote Datei
+   * allein fahren und die Lastmittel ansehen. Keine längere Frist — ein Test, der nur mit
+   * mehr Geduld grün wird, misst die Maschine.
    */
   workers: Number(process.env.PW_WORKERS ?? 3),
   /*
