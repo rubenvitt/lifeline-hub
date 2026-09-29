@@ -17,7 +17,9 @@ cd "$ROOT"
 # shellcheck source=lib/dev-env.sh
 . "$ROOT/scripts/lib/dev-env.sh"
 FE="$ROOT/frontend"
-PNPM="mise exec pnpm@11.10.0 -- pnpm"
+# Node UND pnpm aus `[tools]` in mise.toml (LFH-773); bis dahin pinnte dieser Aufruf nur pnpm
+# und nahm Node vom PATH.
+PNPM="mise exec -- pnpm"
 
 echo "==> [1/4] openapi.json aus dem Backend emittieren + gegen committete Version prüfen"
 # openapi_spec_aktuell schreibt frontend/src/api/openapi.json neu, wenn es vom Code abweicht,

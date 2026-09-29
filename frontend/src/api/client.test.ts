@@ -151,3 +151,19 @@ describe('apiUpload', () => {
     expect(timeout).toHaveBeenCalledWith(120_000);
   });
 });
+
+describe('ApiError — wer hat geantwortet? (LFH-723, Review Befund 4)', () => {
+  it('kennzeichnet eine Antwort mit dem {error}-Umschlag des eigenen Servers', async () => {
+    server.use(
+      http.get('/api/umschlag', () =>
+        HttpResponse.json({ error: 'Dienst vorübergehend ausgelastet' }, { status: 503 }),
+      ),
+      http.get('/api/gateway', () => new HttpResponse('<html>Bad Gateway</html>', { status: 502 })),
+    );
+    const eigen = await apiGet('/api/umschlag').catch((e: unknown) => e);
+    expect(eigen).toBeInstanceOf(ApiError);
+    expect((eigen as ApiError).vomAnwendungsserver).toBe(true);
+    const gateway = await apiGet('/api/gateway').catch((e: unknown) => e);
+    expect((gateway as ApiError).vomAnwendungsserver).toBe(false);
+  });
+});

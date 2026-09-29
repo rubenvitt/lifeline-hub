@@ -11,7 +11,7 @@ const OFFLINE_QUITTUNG_STORAGE_KEY = 'lfh:offline-quittung-signal';
 
 /** Absichtlich datenarmes Cross-Tab-Signal. Person, R-Nr., Name und client_id
  * bleiben ausschließlich in der benutzergebundenen IndexedDB-Quittung. */
-export interface OfflinePersonQuittungSignal {
+interface OfflinePersonQuittungSignal {
   typ: 'person-erfassungsquittung';
   benutzerId: number;
   einsatzId: number;

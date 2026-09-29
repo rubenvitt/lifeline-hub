@@ -21,7 +21,7 @@ export interface EinheitOption {
 }
 
 /** Stunden aus dem Feld → Minuten für das Backend; leer → `undefined`. */
-export function stundenAlsMinuten(stunden: number | null | undefined): number | undefined {
+function stundenAlsMinuten(stunden: number | null | undefined): number | undefined {
   if (stunden == null || Number.isNaN(stunden)) return undefined;
   return Math.round(stunden * 60);
 }
@@ -39,7 +39,7 @@ const rhythmusFeld = (extra: string, pflicht: boolean) => (
 
 // ── Schicht beginnen ──────────────────────────────────────────────────────────
 
-export interface BeginnWerte {
+interface BeginnWerte {
   einheit_id: number;
   beginn?: Dayjs | null;
   rhythmus_stunden?: number | null;
@@ -117,7 +117,7 @@ export function SchichtBeginnenDialog({
 
 // ── Vollzug ───────────────────────────────────────────────────────────────────
 
-export interface VollzugWerte {
+interface VollzugWerte {
   zeitpunkt?: Dayjs | null;
   abloesende_einheit_id?: number | null;
 }

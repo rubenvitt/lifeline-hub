@@ -15,7 +15,7 @@ export const BBOX_MIN_ZOOM = 10;
  * Schirm mehr als ein Grad. Das Frontend prüft selbst, statt eine Anfrage zu schicken, die mit 400
  * abgelehnt wird und die Ebene auf „offline" setzt.
  */
-export const ENERGIE_MAX_SPANNE_GRAD = 3;
+const ENERGIE_MAX_SPANNE_GRAD = 3;
 
 /**
  * Passt ein Ausschnitt `west,sued,ost,nord` in die Energie-Grenze? Rein und exportiert. Ein

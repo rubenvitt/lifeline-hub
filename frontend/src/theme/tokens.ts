@@ -310,7 +310,7 @@ export interface Abstandsraster {
  *  mit Einsatzhandschuh (72 px ≙ 19,05 mm, MIL-STD-1472F Fig. 12). */
 export type Dichte = 'kompakt' | 'komfortabel' | 'handschuh';
 
-export interface Dichtestufe {
+interface Dichtestufe {
   /** `controlHeight` — trägt die Treffläche für alle Steuerelemente auf einmal. */
   zeilenhoehe: number;
   /**
@@ -425,9 +425,9 @@ export const schrift = {
 } as const;
 
 /** Die Schriftfamilie einer Stufe — ein Schlüssel in {@link schrift}, kein Familienname. */
-export type Schriftfamilie = keyof typeof schrift;
+type Schriftfamilie = keyof typeof schrift;
 
-export interface Schriftstufe {
+interface Schriftstufe {
   /** px */
   groesse: number;
   gewicht: 400 | 500 | 600 | 700;
@@ -487,7 +487,7 @@ export function antdAlgorithmus(dunkel: boolean): MappingAlgorithm | MappingAlgo
 }
 
 /** Zweite Stufe des Nacht-Algorithmus: die Signalfarben tragen genau ihren Rollenwert. */
-export const seedTreu: MappingAlgorithm = (seed, abgeleitet) => ({
+const seedTreu: MappingAlgorithm = (seed, abgeleitet) => ({
   ...(abgeleitet ?? antdTheme.darkAlgorithm(seed)),
   colorPrimary: seed.colorPrimary,
   colorInfo: seed.colorInfo,
@@ -626,9 +626,3 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     motionDurationSlow: '150ms',
   };
 }
-
-/**
- * Modusunabhängiger Basis-Token.
- * @deprecated `ThemeModeProvider` leitet die Tokens je Modus über {@link antdToken} ab.
- */
-export const baseToken: ThemeConfig['token'] = antdToken(farbenHell);

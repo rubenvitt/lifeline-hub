@@ -30,7 +30,7 @@ const INTERAKTIVE_KINDELEMENTE = [
 ].join(', ');
 
 /** Aktiviert eine Button-semantische Auswahlzeile nur mit Enter oder Space. */
-export function aufTaste(aktion: () => void): KeyboardEventHandler<HTMLElement> {
+function aufTaste(aktion: () => void): KeyboardEventHandler<HTMLElement> {
   return (ereignis) => {
     if (ereignis.key !== 'Enter' && ereignis.key !== ' ') return;
     ereignis.preventDefault();

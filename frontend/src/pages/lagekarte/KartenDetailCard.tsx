@@ -3,7 +3,7 @@ import { TbX } from 'react-icons/tb';
 import type { ReactNode } from 'react';
 import { monoStil, useRollen } from '../../components/instrument';
 
-export interface KartenDetailCardProps {
+interface KartenDetailCardProps {
   /** Name des gewählten Objekts (bricht bei Bedarf um statt abzuschneiden). */
   titel: ReactNode;
   /** Objekt-/Quellenfarbe — Rahmen der Symbol-Kachel. */
@@ -19,7 +19,7 @@ export interface KartenDetailCardProps {
 }
 
 /** Kantenlänge der Symbol-Kachel (Neuentwurf S5). */
-export const KACHEL_KANTE = 38;
+const KACHEL_KANTE = 38;
 
 /**
  * Ein gewähltes Objekt im Paneel „Ausgewählt" der rechten Kartenleiste, im Fluss der Leiste (als

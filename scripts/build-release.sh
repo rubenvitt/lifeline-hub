@@ -53,7 +53,7 @@ cargo build --release ${TARGET:+--target "$TARGET"}
 
 # Cargo baut nicht zwingend nach ./target (globales build.target-dir) — den Pfad deshalb von
 # Cargo erfragen; das JSON liest Node (jq ist keine Projektvoraussetzung).
-TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | mise exec node@26.7.0 -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
+TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | mise exec -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
 
 # Mit --target schiebt Cargo eine Ebene ein (target/<triple>/release/), und Windows-Binaries
 # tragen .exe.

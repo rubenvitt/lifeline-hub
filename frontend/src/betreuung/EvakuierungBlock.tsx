@@ -77,9 +77,8 @@ const MENUE: readonly (MenueEintrag & { key: BezirkAktion })[] = [
 /**
  * Menü einer Bezirkskarte: „Auf Karte zeigen" zuerst, sobald der Bezirk eine Fläche hat — auch
  * OHNE Schreibrecht, denn ein Sprung ist Lesen. Die Handlungen folgen nur mit Schreibrecht.
- * Rein und exportiert.
  */
-export function bezirkMenue(
+function bezirkMenue(
   b: Pick<Evakuierungsbezirk, 'flaechen'>,
   darfSchreiben: boolean,
 ): readonly (MenueEintrag & { key: BezirkAktion })[] {

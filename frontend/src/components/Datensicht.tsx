@@ -30,7 +30,7 @@ import {
 
 // Zählung und Schalter wohnen in `SpaltenSchalter.tsx` (zweiter Träger: `KatalogTabelle`). Der
 // Weiterexport hält Bestandsimporte stabil; neue Aufrufer importieren direkt von dort.
-export { etikettVon, hatWaehlbareSpalten, sichtbareSpalten, SpaltenSchalter };
+export { etikettVon, hatWaehlbareSpalten, sichtbareSpalten };
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 
@@ -95,7 +95,7 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
  * `'tabelle'` immer Tabelle, für Vergleichsflächen (Meldebild, Kriterium 14).
  * `'karte'` immer Karte, für Module, die kartenbasiert gelesen werden (Befehle, Lageberichte).
  */
-export type Darstellungsform = 'auto' | 'tabelle' | 'karte';
+type Darstellungsform = 'auto' | 'tabelle' | 'karte';
 
 // ── Spaltenregister ──────────────────────────────────────────────────────────────────
 /**
@@ -284,7 +284,7 @@ export type Kartenplan<T, K extends string> =
 
 // ── Sortierung, Gruppierung, Baum, Zufluss ───────────────────────────────────────────
 /** `null` = Reihenfolge wie geliefert (Serverordnung unangetastet). */
-export type Sortierung<K extends string> = { spalte: K; richtung: 'auf' | 'ab' } | null;
+type Sortierung<K extends string> = { spalte: K; richtung: 'auf' | 'ab' } | null;
 
 /**
  * Gruppenachse; beide Zweige nutzen dieselben Schlüssel und Zähler, nicht dieselbe Form:
@@ -293,7 +293,7 @@ export type Sortierung<K extends string> = { spalte: K; richtung: 'auf' | 'ab' }
  *    Werkzeugzeile. Keine synthetischen Gruppenzeilen: Spaltenfixierung × Zellverbünde sind
  *    ungeprüft, und `KatalogTabelle` fixiert Spalte 0 immer.
  */
-export interface Gruppierung<T> {
+interface Gruppierung<T> {
   schluessel: (zeile: T) => string;
   etikett: (wert: string) => string;
   /** Feste Gruppenfolge; unbekannte Werte hängen in Antreffreihenfolge hinten an. */
@@ -304,7 +304,7 @@ export interface Gruppierung<T> {
  * Feldname, unter dem `T` Kinder DESSELBEN Typs trägt — sonst `never`. `-?` allein genügt
  * nicht: `T[K]` trägt bei optionalen Feldern weiter `| undefined`, deshalb `NonNullable`.
  */
-export type KinderFeld<T> = {
+type KinderFeld<T> = {
   [K in keyof T]-?: NonNullable<T[K]> extends readonly T[] ? K & string : never;
 }[keyof T];
 
@@ -318,7 +318,7 @@ export type KinderFeld<T> = {
  * `inhalt` wird erst beim Aufklappen gerendert. Der Zustand gehört der Sicht und überlebt den
  * Wechsel zwischen Karte und Tabelle.
  */
-export interface Aufklappbereich<T> {
+interface Aufklappbereich<T> {
   /** Sichtbares Etikett des Auslösers („Verlauf“). */
   etikett: string;
   /** Zugänglicher Name MIT Zeilenkennung („Verlauf zu Bezirk Uferstraße“). */
@@ -327,7 +327,7 @@ export interface Aufklappbereich<T> {
 }
 
 /** Rekursive Sicht. EIN Prop, damit Feldname und Aufklappzustand nicht getrennt setzbar sind. */
-export interface BaumSicht<T> {
+interface BaumSicht<T> {
   kinder: KinderFeld<T>;
   /** KONTROLLIERT — der Druckpfad der Kräfteübersicht setzt hier alle Schlüssel. */
   aufgeklappt: readonly Key[];
@@ -342,10 +342,10 @@ export interface BaumSicht<T> {
  *   („7 neue Einträge — anzeigen“).
  * `'sofort'`: kein Einfrieren, nur für Flächen ohne fokussierbare Zeileninhalte.
  */
-export type Zufluss = 'sammelbanner' | 'sofort';
+type Zufluss = 'sammelbanner' | 'sofort';
 
 // ── Props ────────────────────────────────────────────────────────────────────────────
-export interface DatensichtProps<T extends object, K extends string> {
+interface DatensichtProps<T extends object, K extends string> {
   /**
    * Zugängliche Bezeichnung: `aria-label` an einem `<section>` (ein nacktes `div` hat keine Rolle),
    * Präfix der DEV-Diagnosen und Beschriftung des Spaltenschalters.

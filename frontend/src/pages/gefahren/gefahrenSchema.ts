@@ -1,6 +1,6 @@
 import type { Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';
 
-export interface Katalogeintrag<T extends string> {
+interface Katalogeintrag<T extends string> {
   wert: T;
   label: string;
 }

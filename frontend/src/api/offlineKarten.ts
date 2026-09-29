@@ -24,10 +24,10 @@ export type OfflineKarte = S['OfflineKarteAntwort'];
  * `GET /offline-karten` liefert `OfflineKarteAntwort`; die schreibenden Endpunkte geben die bare
  * Zeile zurück, ein gemeinsamer Typ sagte ein Feld zu, das auf dem Wire fehlt.
  */
-export type OfflineKarteZeile = S['OfflineKarte'];
+type OfflineKarteZeile = S['OfflineKarte'];
 
 /** Body zum Starten eines Downloads (aus Katalog oder eigener URL). `lizenz` ist Pflicht. */
-export interface OfflineDownloadBody {
+interface OfflineDownloadBody {
   name: string;
   url: string;
   lizenz: string;
@@ -45,7 +45,7 @@ export interface OfflineDownloadBody {
  * Name/Lizenz bleiben; anders als `ersetzt_karte_id` (neue Zeile) bleibt die id stabil, und die
  * alte Datei wird bis zum atomaren Swap weiter ausgeliefert.
  */
-export interface OfflineNeuLadenBody {
+interface OfflineNeuLadenBody {
   url: string;
   /** Erwartete Größe (Bytes) — Plattenplatz-Vorabcheck. */
   groesse_erwartet?: number;
@@ -62,10 +62,6 @@ export function listeOfflineKarten(): Promise<OfflineKarte[]> {
 
 export function starteOfflineDownload(body: OfflineDownloadBody): Promise<OfflineKarteZeile> {
   return apiSend<OfflineKarteZeile>('/api/karte/offline-karten/download', 'POST', body);
-}
-
-export function aktiviereOfflineKarte(id: number): Promise<OfflineKarteZeile> {
-  return apiSend<OfflineKarteZeile>(`/api/karte/offline-karten/${id}/aktivieren`, 'POST');
 }
 
 /** In-Place-Hot-Swap: Update der aktiven Karte in dieselbe Zeile, downtime-frei. */
@@ -96,7 +92,7 @@ export function ladeOfflineKatalog(frisch = false): Promise<OfflineKatalogEintra
 export type VorhandeneKarte = S['VorhandeneKarte'];
 
 /** Body zum Registrieren einer bereits im karten_dir liegenden Karte (lokaler Import). */
-export interface RegistriereBody {
+interface RegistriereBody {
   name: string;
   pfad: string;
   lizenz: string;

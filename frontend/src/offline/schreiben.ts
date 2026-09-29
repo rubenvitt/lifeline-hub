@@ -17,7 +17,7 @@ import { alsBackendZeit } from '../etb/filterZeit';
 import { istOfflineTransient } from './fehler';
 import { schreibaktionEinreihen } from './queue';
 
-export type OfflineSchreibErgebnis<T> =
+type OfflineSchreibErgebnis<T> =
   { zustand: 'gesendet'; daten: T } | { zustand: 'vorgemerkt'; client_id: string };
 
 function clientId(vorgegeben?: string): string {
@@ -92,7 +92,7 @@ export async function erfasseMeldungOfflineFaehig(
 }
 
 /** Ziel einer Betreuungsmeldung; die Bezeichnung steht nur im Wiederherstellungs-Drawer. */
-export interface BetreuungsZiel {
+interface BetreuungsZiel {
   id: number;
   bezeichnung: string;
 }

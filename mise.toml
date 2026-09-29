@@ -1,4 +1,4 @@
-# mise.toml — versionierte Projekt-Tasks (gemerged mit dem gitignorierten mise.local.toml, das die
+# mise.toml — Werkzeugversionen und versionierte Projekt-Tasks (gemerged mit dem gitignorierten mise.local.toml, das die
 # .env-abhängigen Dev-Server-Tasks backend/frontend/karten-service trägt).
 #
 # `mise run clean` räumt nur billig regenerierbare Build-Artefakte; teure/destruktive Ziele sind
@@ -15,6 +15,22 @@
 # mise führt `depends` VOR dem `confirm` aus. Damit die Rückfrage wirklich sperrt, steckt die
 # Löschlogik in versteckten `_clean:*`-Workern, die per `run = [{ task = … }]` NACH dem confirm
 # laufen.
+
+# ── Werkzeugversionen: DIE EINE QUELLE (LFH-773) ───────────────────────────────────
+# Node und pnpm stehen NUR hier. Skripte rufen `mise exec -- …`, die Workflows
+# `jdx/mise-action` ohne `install_args` — beide lesen diesen Block. Was die Zahl sonst noch
+# tragen muss (packageManager, engines, Devcontainer), prüft scripts/check-toolversionen.sh
+# gegen diesen Block; eine harte `node@…`/`pnpm@…`-Zahl in scripts/ oder .github/ bricht dort.
+#
+# NODE IST EXAKT GEPINNT, sonst prüfte das Gate je Maschine etwas anderes. Die Nachbarn dieser
+# Version fallen aus: 22.x bricht `src/api/kartenbilder.test.ts` (@mswjs/interceptors ruft
+# `.stream()` auf einem Blob), 26.x-Releases teilen einen V8-Abbruch im Vite-Dev-Server
+# („Lazy deopt after a fast API call …"), dessen Abhilfe in `frontend/playwright.config.ts`
+# sitzt (`--no-turbo-fast-api-calls`). Wer die Zahl ändert, prüft Schritt 5 UND 7 von
+# check-all.sh. pnpm ist gepinnt, weil Prettier und der Lockfile-Stand daran hängen.
+[tools]
+node = "26.7.0"
+pnpm = "11.10.0"
 
 # ── Build-Artefakte (sicher, kein confirm — genau dafür ist der Task da) ────────────
 [tasks."clean"]

@@ -27,7 +27,7 @@ export interface BezugKurzinfo {
 }
 
 /** Deutsche Anzeigenamen der Bezugstypen. */
-export const BEZUG_TYP_LABEL: Record<BezugTyp, string> = {
+const BEZUG_TYP_LABEL: Record<BezugTyp, string> = {
   schaden: 'Schaden',
   uhs: 'UHS',
   person: 'Person',

@@ -18,11 +18,11 @@ import {
 import { KEIN_PEGEL, VERALTET, pegelZeile, prognoseOffen } from '../pegel/pegelKennzahl';
 import Verlaufslinie from './Verlaufslinie';
 
-export const VERLAUF_FEHLT = 'Verlauf nicht abrufbar';
-export const KEIN_VERLAUF = 'noch kein Verlauf';
+const VERLAUF_FEHLT = 'Verlauf nicht abrufbar';
+const KEIN_VERLAUF = 'noch kein Verlauf';
 /** Wortlaut des Leerzustands — bewusst NICHT „Pegel festlegen": das ist die Primäraktion im
     Seitenkopf, zwei gleichnamige Ziele sagten nicht, welches wohin führt. */
-export const ZU_DEN_EINSTELLUNGEN = 'Zu Einstellungen › Pegel';
+const ZU_DEN_EINSTELLUNGEN = 'Zu Einstellungen › Pegel';
 
 interface PegelPaneelProps {
   zustand: PaneelDatenzustand;

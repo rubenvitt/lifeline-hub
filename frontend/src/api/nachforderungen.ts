@@ -1,7 +1,7 @@
 import { apiGet, apiSend, mitParametern } from './client';
 import type { Nachforderung, NachforderungStatus, NeueNachforderung } from './types';
 
-export interface NachforderungFilter {
+interface NachforderungFilter {
   status?: string;
 }
 

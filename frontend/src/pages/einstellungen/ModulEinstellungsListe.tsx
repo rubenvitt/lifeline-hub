@@ -32,7 +32,7 @@ export function modulZeilenStil(token: {
 }
 
 /** Warum eine Zeile gesperrt ist — je Zeile genau EINER, auch wenn mehrere Quellen greifen. */
-export type ModulSperrGrund = 'modul' | 'rechte' | 'laeuft';
+type ModulSperrGrund = 'modul' | 'rechte' | 'laeuft';
 
 /**
  * Die drei Sperrquellen einer Zeile, getrennt statt in einem `disabled`-Ausdruck. Rein und
@@ -51,7 +51,7 @@ export function modulSperrGrund(zeile: {
 }
 
 /** Wortlaut eines Sperrgrunds: Kurzwort sichtbar, Begründung im Tooltip darüber. */
-export interface SperrWortlaut {
+interface SperrWortlaut {
   kurz: string;
   lang: string;
 }

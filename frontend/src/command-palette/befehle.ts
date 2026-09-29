@@ -36,6 +36,7 @@ import { GRUPPE_MERKBAR, sprungZu } from './typen';
 import type { Befehl, BefehlKontext, Oeffnung, TastaturAktionId } from './typen';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
+import { HELLIGKEIT_OPTIONEN } from '../theme/darstellungOptionen';
 import type { Koordinatenformat } from '../api/types';
 
 /** Kontext einer Moduloption: der volle Kategoriename. */
@@ -333,6 +334,17 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       icon: d.icon,
       schlagworte: ['dichte', 'treffflaeche', 'handschuh', 'tablet', 'bedienung'],
       ausfuehren: () => k.setDichte(d.stufe),
+    });
+  }
+  // Helligkeit (LFH-397): aus derselben Stufenliste wie das Benutzermenü, keine Handkopie.
+  for (const h of HELLIGKEIT_OPTIONEN) {
+    befehle.push({
+      id: `helligkeit:${h.wert}`,
+      gruppe: 'einstellungen',
+      label: `Helligkeit: ${h.titel}`,
+      icon: h.Icon,
+      schlagworte: ['helligkeit', 'dimmen', 'abdunkeln', 'nacht', 'bildschirm'],
+      ausfuehren: () => k.setHelligkeit(h.wert),
     });
   }
   for (const c of KOORD_BEFEHLE) {

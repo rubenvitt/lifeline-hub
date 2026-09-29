@@ -5,7 +5,7 @@ export function listeKanaele(einsatzId: number): Promise<ChatKanal[]> {
   return apiGet<ChatKanal[]>(`/api/einsaetze/${einsatzId}/chat/kanaele`);
 }
 
-export interface NeuerKanal {
+interface NeuerKanal {
   name: string;
   beschreibung?: string;
 }

@@ -220,7 +220,7 @@ export function Uhr() {
  * Die Zustände der SYNC-Anzeige. `ruhe` heißt „nichts zu melden UND keine Live-Verbindung
  * erwartet" — auf der Einsatzliste läuft kein SSE-Strom.
  */
-export type SyncZustand =
+type SyncZustand =
   'verbunden' | 'verbinde' | 'getrennt' | 'offline' | 'ausstehend' | 'abgelehnt' | 'ruhe';
 
 /**

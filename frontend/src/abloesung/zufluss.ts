@@ -53,7 +53,7 @@ export type Sortierschluessel<T> = (eintrag: T) => string;
 
 const FAELLIGKEIT: Sortierschluessel<Abloesung> = (s) => s.faellig_at;
 
-export interface Zuflussteilung<T = Abloesung> {
+interface Zuflussteilung<T = Abloesung> {
   /** Die gerenderte Liste, in der gezeigten (eingefrorenen) Folge, mit frischem Inhalt. */
   sichtbar: T[];
   /** Fremde Neuzugänge hinter dem Banner. */

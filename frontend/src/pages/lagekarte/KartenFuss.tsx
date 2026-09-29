@@ -5,7 +5,7 @@ import { UEBERLAGERUNG_RAND, kartenKnopfKante } from './KartenUeberlagerung';
 /** Abstand der Fußleiste zum Kartenrand und zwischen ihren Bändern (px). */
 export const FUSS_ABSTAND = 12;
 
-export type BandAusrichtung = 'voll' | 'mitte' | 'links';
+type BandAusrichtung = 'voll' | 'mitte' | 'links';
 
 /**
  * Stil eines Bandes im Fuß-Rahmen — rein und exportiert. `pointerEvents: 'auto'` ist die Gegenzeile

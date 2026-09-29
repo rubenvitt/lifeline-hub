@@ -6114,12 +6114,18 @@
       },
       "MeldungsZaehler": {
         "type": "object",
-        "description": "Meldungen: offen (Status ≠ erledigt), davon noch nicht gesichtet (Status „neu\").",
+        "description": "Meldungen: offen (Status ≠ erledigt), davon noch nicht gesichtet (Status „neu\"), und die\nMeldungen mit überfälliger Bestätigungspflicht.",
         "required": [
           "offen",
-          "ungesehen"
+          "ungesehen",
+          "bestaetigung_ueberfaellig"
         ],
         "properties": {
+          "bestaetigung_ueberfaellig": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Pflichtig, unbestätigt und Frist abgelaufen oder eskaliert — über ALLE Meldungen, nicht\nnur die offenen (LFH-397). Speist die Warnsperre des Helligkeitsreglers im Frontend."
+          },
           "offen": {
             "type": "integer",
             "format": "int64"

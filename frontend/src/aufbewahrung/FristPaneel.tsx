@@ -47,10 +47,10 @@ interface Rueckfrage {
 }
 
 /** Text des Rechte-Hinweises — eine Stelle für Paneel und Akte. */
-export const FRIST_RECHTE_TEXT =
+const FRIST_RECHTE_TEXT =
   'Nur die Einsatzleitung oder ein System-Admin darf die Aufbewahrungsfrist ändern — die Frist steht hier zum Nachlesen.';
 
-export interface FristAenderung {
+interface FristAenderung {
   /** Öffnet den Dialog „Frist ändern". */
   oeffnen: () => void;
   /** Hebt die Frist ohne Rückfrage auf (umkehrbar). */

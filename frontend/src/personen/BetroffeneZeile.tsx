@@ -31,7 +31,7 @@ import { loeseBefehl, loeseUhsAuf, parsePersonBefehl, type BefehlTeil } from './
  * und Koordinate im SELBEN POST).
  */
 
-export interface BetroffeneZeileProps {
+interface BetroffeneZeileProps {
   uhsListe: readonly Uhs[];
   /** Anlegen. **Muss bei Ablehnung ablehnen** (`mutateAsync`). */
   onErfassen: (eingabe: PersonAnlegenEingabe) => Promise<unknown>;

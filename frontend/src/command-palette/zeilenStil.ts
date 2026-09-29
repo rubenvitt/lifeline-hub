@@ -1,7 +1,7 @@
 import { form } from '../theme/tokens';
 
 /** Nur die Tokens, die die Zeile braucht — so ist die Funktion ohne Render prüfbar. */
-export interface ZeilenToken {
+interface ZeilenToken {
   controlHeight: number;
   paddingXS: number;
   paddingSM: number;
@@ -32,7 +32,7 @@ export function palettenZeilenStil(token: ZeilenToken) {
 }
 
 /** Nur die Tokens, die das Vorschau-Ziel braucht — prüfbar ohne Render. */
-export interface VorschauZielToken {
+interface VorschauZielToken {
   controlHeight: number;
   paddingXS: number;
   paddingSM: number;

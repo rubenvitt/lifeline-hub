@@ -9,7 +9,7 @@ import { useCallback, useState } from 'react';
  * Gemerkt wird je Breitenklasse (ab `lg` getrennt von darunter): ab `lg` steht die Leiste neben der
  * Karte, darunter unter ihr — ein Ausblenden am Fükw soll das Tablet nicht mit ausblenden.
  */
-export type LeistenKlasse = 'breit' | 'schmal';
+type LeistenKlasse = 'breit' | 'schmal';
 
 export const LEISTE_SPEICHER_SCHLUESSEL: Record<LeistenKlasse, string> = {
   breit: 'lfh:lagekarte:leiste-offen:ab-lg',

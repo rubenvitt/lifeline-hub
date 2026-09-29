@@ -24,7 +24,7 @@ export const PRIO_META: Record<KommPrio, { color: string; label: string }> = {
 };
 
 /** Reihenfolge der Prioritäten (dringlichste zuerst) = Schlüsselreihenfolge von PRIO_META. */
-export const PRIO_ORDNUNG = Object.keys(PRIO_META) as KommPrio[];
+const PRIO_ORDNUNG = Object.keys(PRIO_META) as KommPrio[];
 
 /** Sortier-Rang einer Priorität: sofort(0) < dringend(1) < normal(2); Unbekanntes zuletzt. */
 export function prioRang(prio: string): number {
@@ -40,10 +40,7 @@ export function prioRang(prio: string): number {
  * Erinnerung und angeforderte Nachforderung liegen ebenfalls auf `offen` und wären von einer
  * neuen Phase zu „neu" umklassifiziert worden. Die Marke gehört an den Status, nicht an die Achse.
  */
-export type StatusDeskriptor = Record<
-  string,
-  { label: string; phase: KommPhase; unbearbeitet?: true }
->;
+type StatusDeskriptor = Record<string, { label: string; phase: KommPhase; unbearbeitet?: true }>;
 
 /** AUFTRAG (AuftragBearbeitungsstatus). */
 export const AUFTRAG_STATUS: StatusDeskriptor = {

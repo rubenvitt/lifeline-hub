@@ -506,7 +506,7 @@ export function lagekartePfad(
 }
 
 /** Ein WGS84-Punkt, auf den die Lagekarte springen soll. */
-export interface Kartenzentrum {
+interface Kartenzentrum {
   lat: number;
   lon: number;
 }
@@ -536,7 +536,7 @@ export function parseKartenzentrum(wert: string | null | undefined): Kartenzentr
  * enger als der karteninterne `PlatzierenPunktTyp`. Wer erweitert, prüft
  * `pages/LagekartePage.tsx` mit.
  */
-export type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person' | 'betreuungsstelle';
+type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person' | 'betreuungsstelle';
 
 /** Exhaustiv: ein neuer Zieltyp bricht den Typcheck, statt im Parser still zu fehlen. */
 const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {

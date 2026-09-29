@@ -52,7 +52,7 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 const { Text } = Typography;
 
 /** Grund der fehlenden Schreibberechtigung als ganzer Satz. */
-export function abloesungRechteText(status: EinsatzStatus): string {
+function abloesungRechteText(status: EinsatzStatus): string {
   return status !== 'aktiv'
     ? 'Der Einsatz ist abgeschlossen — die Ablösungen sind nur noch lesbar.'
     : 'Nur Einsatzleitung und Führungspersonal können Schichten beginnen und Ablösungen vollziehen.';

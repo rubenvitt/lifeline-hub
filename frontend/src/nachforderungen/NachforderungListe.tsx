@@ -2,7 +2,7 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
 import NachforderungKarte from './NachforderungKarte';
 
-export interface NachforderungListeProps {
+interface NachforderungListeProps {
   nachforderungen: Nachforderung[];
   /** Steuert die Übergangs-Zeitstempel/Grund-Zeilen in der Abgeschlossen-Ansicht. */
   ansicht?: 'offen' | 'abgeschlossen';

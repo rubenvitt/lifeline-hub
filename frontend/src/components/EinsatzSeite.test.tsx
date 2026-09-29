@@ -136,6 +136,25 @@ describe('EinsatzSeite', () => {
     expect(screen.getByText('Stand 14:07')).toBeInTheDocument();
   });
 
+  // LFH-723: die Kennzeichnung „offline" folgt dem Online-Zustand des Browsers; keine Seite
+  // reicht dafür etwas durch.
+  it('kennzeichnet den Datenstand, solange der Browser offline ist', async () => {
+    const zeit = new Date(2026, 5, 10, 14, 32).getTime();
+    renderMitProviders(
+      <EinsatzSeite titel="Liste" dataUpdatedAt={zeit}>
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    expect(screen.getByText('Stand 14:32')).toBeInTheDocument();
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    window.dispatchEvent(new Event('offline'));
+    expect(await screen.findByText('Stand 14:32 · offline')).toBeInTheDocument();
+    onLine.mockReturnValue(true);
+    window.dispatchEvent(new Event('online'));
+    expect(await screen.findByText('Stand 14:32')).toBeInTheDocument();
+    onLine.mockRestore();
+  });
+
   // LFH-373: eine Seite mit Datenstand reicht vor dem ersten Abruf `0` durch, dann steht der
   // Platzhalter; eine Seite ohne Datenstand bekommt keinen. Meta und Stand sind EINE Gruppe mit
   // eigener Zeile unter `md`: die hält der Platzhalter, und eine spät eintreffende Meta wächst

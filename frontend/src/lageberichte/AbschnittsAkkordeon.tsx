@@ -45,7 +45,7 @@ export function mengeAusKette(
   return voll;
 }
 
-export interface AbschnittsAkkordeonProps {
+interface AbschnittsAkkordeonProps {
   abschnitte: readonly AbschnittDef[];
   /** Aus `befuellteAbschnitte` über `Form.useWatch`. */
   befuellt: ReadonlySet<string>;

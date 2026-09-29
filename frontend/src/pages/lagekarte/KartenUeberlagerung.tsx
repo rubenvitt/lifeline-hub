@@ -145,7 +145,7 @@ export function GrundlageLeiste({
 }
 
 /** Zeigerkoordinate im Format der Einsatz-Einstellungen (Mono 11, Fadenkreuz in `bedien`). */
-export function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
+function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
   const { token, rollen } = useRollen();
   const { formatKoordinate } = useAnzeigeKonventionen();
   const lage = useZeigerLage(quelle);
@@ -257,7 +257,7 @@ function Kartenknopf({
   );
 }
 
-export interface KartenUeberlagerungProps {
+interface KartenUeberlagerungProps {
   /** Wahl der Kartengrundlage (`GrundlageLeiste`); `null` = steht anderswo (Handschirm). */
   grundlage: ReactNode;
   zeigerQuelle: ZeigerQuelle;

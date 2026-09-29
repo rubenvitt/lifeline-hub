@@ -44,7 +44,7 @@ export function zuWerte(e: EtbEntwurf): EntwurfWerte {
   };
 }
 
-export type EntwurfPatch = Pick<
+type EntwurfPatch = Pick<
   EtbEntwurf,
   'inhalt' | 'typ' | 'von' | 'an' | 'meldeweg' | 'veranlassung' | 'ereigniszeit'
 >;

@@ -138,13 +138,13 @@ export const PERSONEN_CLUSTER_KLICK_LAYER = [
   'personen-cluster-kreis',
   'personen-cluster-zahl',
 ] as const;
-export type ClusterQuelle = (typeof CLUSTER_QUELLEN)[number];
+type ClusterQuelle = (typeof CLUSTER_QUELLEN)[number];
 /** Schlüssel eines Clusters über alle Quellen: `cluster_id` ist nur je Quelle eindeutig. */
 export function clusterSchluessel(quelle: ClusterQuelle, clusterId: number | string): string {
   return `${quelle}:${clusterId}`;
 }
 /** Die unsichtbaren Trefferzonen — Klickziel, aber keine Zeichnung. */
-export function istTrefferzone(layerId: string): boolean {
+function istTrefferzone(layerId: string): boolean {
   return layerId.endsWith('-treffer');
 }
 /**

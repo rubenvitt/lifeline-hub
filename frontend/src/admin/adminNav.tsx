@@ -21,14 +21,14 @@ import KartenOfflineSektion from '../karten/KartenOfflineSektion';
  * Sektions-Keys sind stabil, damit Deep-Links weiterfunktionieren.
  */
 
-export interface AdminSektion {
+interface AdminSektion {
   key: string;
   label: string;
   /** Ein ELEMENT, nicht `ReactNode`, damit sich die Sektion im Test rendern lässt. */
   element: ReactElement;
 }
 
-export interface AdminGruppe {
+interface AdminGruppe {
   key: string;
   label: string;
   sektionen: AdminSektion[];

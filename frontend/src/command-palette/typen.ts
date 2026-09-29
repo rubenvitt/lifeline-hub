@@ -7,6 +7,7 @@ import type {
 } from '../api/types';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
+import type { Helligkeit } from '../theme/helligkeit';
 // Nur-Typ-Import, deshalb kein Laufzeit-Zyklus, obwohl `datensaetze.ts` von hier zurück
 // importiert. Die Quellenmenge einer Abfrage ist dort zuhause, wo die Listen beschrieben sind.
 import type { DatensatzQuellen } from './datensaetze';
@@ -170,6 +171,8 @@ export interface BefehlKontext {
   navigate: (pfad: string, oeffnung?: Oeffnung) => void;
   setThemeModus: (m: ThemeModus) => void;
   setDichte: (d: Dichte) => void;
+  /** Setzt die gewählte Helligkeit (LFH-397); die Warnsperre gilt im Provider. */
+  setHelligkeit: (h: Helligkeit) => void;
   setKoordinaten: (f: Koordinatenformat) => void;
   logout: () => void;
   tastaturAktionen?: TastaturAktionen;
@@ -299,7 +302,7 @@ export type PaletteModus = 'alles' | 'aktionen' | 'etb' | 'kraefte';
  */
 export type DatensatzQuelle = keyof DatensatzQuellen;
 
-export interface ModusBeschreibung {
+interface ModusBeschreibung {
   /** Zeichen am Anfang der Eingabe; `null` für den Vorgabemodus, der ohne Präfix gilt. */
   praefix: string | null;
   /** Gruppen, auf die eingeschränkt wird; `null` = keine Einschränkung. */

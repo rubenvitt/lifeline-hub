@@ -60,7 +60,7 @@ export const KATEGORIE_WERTE: readonly {
 }[] = KATEGORIE_REIHENFOLGE.map((value) => ({ value, text: kategorieEtikett(value) }));
 
 /** Ein Zählfeld der Ampelzeile: Kurztext, Volltext, Zahl und optionale Dringlichkeitsstufe. */
-export interface AmpelFeld {
+interface AmpelFeld {
   /** Sichtbarer Kurztext — der zweite Kanal neben der Farbe. */
   etikett: string;
   /** Volltext für `title`. */

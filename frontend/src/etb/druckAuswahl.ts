@@ -3,7 +3,7 @@ import type { EtbTyp } from '../api/types';
 import { inZone, type AnzeigeKonventionen } from '../anzeige/format';
 import { alsOrtszeit } from './filterZeit';
 
-export interface AuswahlOptionen {
+interface AuswahlOptionen {
   /** Anzeigezone der Organisation bzw. des Einsatzes (`useAnzeigeKonventionen`). */
   konventionen: AnzeigeKonventionen;
   /** Typwort zu einem ETB-Typ („Meldung"), aus dem Statusvertrag. */

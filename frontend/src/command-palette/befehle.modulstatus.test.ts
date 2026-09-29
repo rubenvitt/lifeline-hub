@@ -38,6 +38,7 @@ function kontext(over: Partial<BefehlKontext> = {}): BefehlKontext {
     navigate: vi.fn(),
     setThemeModus: vi.fn(),
     setDichte: vi.fn(),
+    setHelligkeit: vi.fn(),
     setKoordinaten: vi.fn(),
     logout: vi.fn(),
     ...over,

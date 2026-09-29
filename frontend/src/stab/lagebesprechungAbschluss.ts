@@ -13,7 +13,7 @@ export interface AbschlussFormWerte {
 }
 
 /** Beim ÖFFNEN eingefroren — Vorbelegung der Felder und Vergleichsbasis für „unverändert". */
-export interface AbschlussVorbelegung {
+interface AbschlussVorbelegung {
   naechste: Dayjs | null;
   abgehalten: Dayjs;
   /**

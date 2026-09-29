@@ -3,15 +3,15 @@ import { useQuery } from '@tanstack/react-query';
 import { ladeOrganisation } from '../../api/organisation';
 import { globalKeys } from '../../api/queryKeys';
 
-export type DruckZustand = 'bereit' | 'laedt' | 'fehler';
+type DruckZustand = 'bereit' | 'laedt' | 'fehler';
 
 /**
  * Höchstwartezeit auf `decode()` des Logos. Ein Bildabruf, der nie antwortet, hielte den
  * Druckdialog sonst für immer zurück. Danach wird ohne Logo gedruckt, wie beim Dekodierfehler.
  */
-export const LOGO_FRIST_MS = 3_000;
+const LOGO_FRIST_MS = 3_000;
 
-export interface Drucken {
+interface Drucken {
   /** Fordert den Druckdialog an; er öffnet sich, sobald der Druckkopf vollständig ist. */
   drucken: () => void;
   zustand: DruckZustand;

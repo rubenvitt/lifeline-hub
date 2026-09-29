@@ -14,7 +14,7 @@ import {
 import { MELDEWEG_OPTIONEN } from '../../etb/schnellerfassungModell';
 
 /** Wie viele Einträge das Paneel zeigt (Entwurf S3). */
-export const STROM_ZEIGEN = 7;
+const STROM_ZEIGEN = 7;
 
 /**
  * Wie viele Einträge abgerufen werden — mehr als gezeigt, damit nach einer Welle neuer Einträge die
@@ -22,7 +22,7 @@ export const STROM_ZEIGEN = 7;
  */
 export const STROM_ABRUF = 30;
 
-export interface StromAuswahl {
+interface StromAuswahl {
   /** Die gezeigten Einträge, jüngster zuerst. */
   sichtbar: EtbEintragAnzeige[];
   /** Zurückgehaltene neue Einträge (lfd. Nr. über der Wassermarke). */

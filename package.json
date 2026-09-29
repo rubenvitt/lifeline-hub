@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "description": "Nur Werkzeug: semantic-release für den Release-Flow (LFH-522). Die Anwendung liegt in frontend/ (Node) und im Rust-Workspace (Cargo) — dieses Paket wird nie veröffentlicht und nie importiert.",
   "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": "26.7.0"
+  },
   "devDependencies": {
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/exec": "^7.1.0",
