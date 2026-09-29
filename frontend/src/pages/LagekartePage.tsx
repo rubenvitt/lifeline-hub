@@ -31,7 +31,7 @@ import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN } from './lagekarte/zonenStil';
 import Kartenflaeche, { type KartenHandle } from './lagekarte/Kartenflaeche';
 import type { GriffModus } from './lagekarte/bildGriffe';
-import Sidebar from './lagekarte/Sidebar';
+import Sidebar, { platzierObjekt } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
 import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
@@ -41,6 +41,7 @@ import { LEERER_ZEICHENSTAND, type ZeichenStand } from './lagekarte/zeichnen';
 import { escGehoertOverlay, escStufe, QUITTUNG_VERWORFEN } from './lagekarte/zeichnenEsc';
 import { EIGENPOSITION_SPERRGRUND, useEigenposition } from './lagekarte/useEigenposition';
 import MessSteuerung from './lagekarte/MessSteuerung';
+import PlatzierSteuerung, { type PlatzierModus } from './lagekarte/PlatzierSteuerung';
 import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
 import { SnapshotLeiste } from './lagekarte/SnapshotLeiste';
@@ -105,10 +106,6 @@ export default function LagekartePage() {
   const farben = useModusFarben();
   const { abBreite, istSchmal } = useViewport();
   const breit = abBreite('lg');
-  // Unter `lg` liegt die Leiste unter der Karte, ab `lg` rechts daneben. Auf jeder Breite lässt sie
-  // sich ausblenden, die Wahl bleibt je Breitenklasse gemerkt; Vorgabe und Vorrang in
-  // `lagekarte/leistenWahl.ts`.
-  const leistenWahl = useLeistenWahl(breit);
   /** Scharfe Griffsorte beim Bild-Einpassen. Vorgabe: Größe. */
   const [griffModus, setGriffModus] = useState<GriffModus>('groesse');
   // Zeigerkoordinate: die Karte meldet, nur die Anzeige rendert mit (siehe `mausPosition.ts`).
@@ -417,6 +414,11 @@ export default function LagekartePage() {
     fehler,
     erfolg,
   });
+
+  // Unter `lg` liegt die Leiste unter der Karte, ab `lg` rechts daneben. Auf jeder Breite lässt sie
+  // sich ausblenden, die Wahl bleibt je Breitenklasse gemerkt; Vorgabe und Vorrang in
+  // `lagekarte/leistenWahl.ts`. Der laufende Kartenmodus gibt unter `lg` die Karte frei (LFH-765).
+  const leistenWahl = useLeistenWahl(breit, exklusiverModusAktiv);
 
   const {
     bilder,
@@ -732,18 +734,20 @@ export default function LagekartePage() {
     ) : null;
 
   // Eine Auswahl holt die ausgeblendete Leiste zurück — sonst wählte man ein Objekt und sähe nichts
-  // davon. Ebenso ein Platzier-Modus: sein einziger „Abbrechen"-Knopf steht in der Leiste.
-  // Abgeleitet, nicht per Effekt: endet beides, gilt wieder die eigene Wahl.
-  const leisteErzwungen =
-    auswahlInhalt != null ||
-    platzierungZiel != null ||
-    bildPlatzierenId != null ||
-    zeichenPlatzieren != null;
+  // davon. Ab `lg` ebenso ein Leistenmodus (Platzieren, Taktisches Zeichen, Bild): dort steht seine
+  // Bedienung in der Leiste. Unter `lg` steht sie im Fuß-Band `PlatzierSteuerung`, und der laufende
+  // Modus gibt die Karte frei (LFH-765, Vorrang in `leisteSichtbar`). Abgeleitet, nicht per Effekt:
+  // endet der Modus, gilt wieder, was vorher galt.
+  const leistenModusAktiv =
+    platzierungZiel != null || bildPlatzierenId != null || zeichenPlatzieren != null;
+  const leisteErzwungen = auswahlInhalt != null || (breit && leistenModusAktiv);
   const leisteIstSichtbar = leisteSichtbar({
     gemerkt: leistenWahl.wahl,
     breit,
     istSchmal,
     erzwungen: leisteErzwungen,
+    modusAktiv: exklusiverModusAktiv,
+    imModus: leistenWahl.imModus,
   });
   const leisteSperrGrund =
     auswahlInhalt != null
@@ -751,15 +755,6 @@ export default function LagekartePage() {
       : leisteErzwungen
         ? 'Platzieren beenden, um die Leiste auszublenden'
         : null;
-  // Unter `lg` gibt die Wahl eines Zeichenwerkzeugs die Karte frei (Vorbild Navigations-Drawer):
-  // bei 390 px halbierte die offene Leiste die Karte, und der Fuß deckte den Rest. Nur für diese
-  // Sitzung (`verberge`, nicht `merke`): zwischen `md` und `lg` ist die Leiste per Vorgabe offen
-  // und soll dort nicht dauerhaft schließen. „Leiste einblenden" holt sie zurück. Beide Startwege
-  // räumen die Auswahl selbst, sonst hielte `auswahlInhalt` die Leiste offen.
-  const karteFreigeben = () => {
-    if (!breit) leistenWahl.verberge();
-  };
-
   // Die Kartengrundlage: ab `md` als Segmentleiste über der Karte. Auf dem Handschirm bräche sie
   // mit mehreren Online-Stilen mehrzeilig um und läge über Knopfblock und Karte — dort steht sie im
   // Paneel „Kartengrundlage" der Leiste.
@@ -808,7 +803,13 @@ export default function LagekartePage() {
           <Button
             aria-expanded={leisteIstSichtbar}
             aria-controls="lagekarte-leiste"
-            onClick={() => leistenWahl.merke(!leisteIstSichtbar)}
+            // Im Kartenmodus nur vorläufig (bis zum Modusende, nie gespeichert): ein kurzes
+            // Einblenden für Koordinate oder Mittelpunkt soll die Wahl nicht dauerhaft ändern.
+            onClick={() =>
+              exklusiverModusAktiv
+                ? leistenWahl.umschalteImModus(!leisteIstSichtbar)
+                : leistenWahl.merke(!leisteIstSichtbar)
+            }
             disabled={leisteSperrGrund != null}
             title={leisteSperrGrund ?? undefined}
           >
@@ -818,6 +819,33 @@ export default function LagekartePage() {
       )}
     </div>
   );
+
+  const platzierBild =
+    bildPlatzierenId != null ? bilder.find((b) => b.id === bildPlatzierenId) : undefined;
+  const platzierModus: PlatzierModus | null = platzierungZiel
+    ? {
+        art: 'platzieren',
+        objekt: platzierObjekt(platzierungZiel, nichtVerortetAlle),
+        onAbbrechen: onPlatzierenAbbrechen,
+      }
+    : zeichenPlatzieren
+      ? {
+          art: 'zeichen',
+          serie: zeichenSerie,
+          onSerieWechsel: setZeichenSerie,
+          anzahl: zeichenSerieAnzahl,
+          onAbbrechen: onZeichenPlatzierenAbbrechen,
+          onFertig: onZeichenPlatzierenFertig,
+        }
+      : bildPlatzierenId != null
+        ? {
+            art: 'bild',
+            name: platzierBild?.name ?? 'Bild',
+            griffModus,
+            onGriffModus: setGriffModus,
+            onFertig: onBildPlatzierenFertig,
+          }
+        : null;
 
   const karte = (
     <div
@@ -949,6 +977,9 @@ export default function LagekartePage() {
           serieAnzahl={zeichneAbschnittId != null ? undefined : zoneSerieAnzahl}
           onFertig={zeichneAbschnittId != null ? undefined : onZoneZeichnenFertig}
         />
+        {/* Unter `lg` trägt dieses Band die Bedienung der Leistenmodi — die Leiste ist im Modus zu
+            (LFH-765). Ab `lg` bleibt sie in der Leiste. */}
+        {!breit && <PlatzierSteuerung modus={platzierModus} />}
         <MessSteuerung
           form={messForm}
           quelle={messQuelle}
@@ -1032,14 +1063,8 @@ export default function LagekartePage() {
         platzierungZiel={platzierungZiel}
         onPlatzierenStart={onPlatzierenStart}
         onPlatzierenAbbrechen={onPlatzierenAbbrechen}
-        onAbschnittZeichnenStart={(id) => {
-          karteFreigeben();
-          onAbschnittZeichnenStart(id);
-        }}
-        onZoneZeichnenStart={(entwurf) => {
-          karteFreigeben();
-          onZoneZeichnenStart(entwurf);
-        }}
+        onAbschnittZeichnenStart={onAbschnittZeichnenStart}
+        onZoneZeichnenStart={onZoneZeichnenStart}
         zeichenPlatzieren={zeichenPlatzieren}
         onZeichenPlatzierenStart={onZeichenPlatzierenStart}
         onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}
@@ -1047,6 +1072,7 @@ export default function LagekartePage() {
         onZeichenSerieWechsel={setZeichenSerie}
         zeichenSerieAnzahl={zeichenSerieAnzahl}
         onZeichenPlatzierenFertig={onZeichenPlatzierenFertig}
+        modusBedienungImFuss={!breit}
         onKoordinateEingeben={onKoordinateEingeben}
         einsatzortVerortet={verortet.some((m) => m.typ === 'einsatzort')}
         onEinsatzortPlatzieren={onEinsatzortPlatzieren}
