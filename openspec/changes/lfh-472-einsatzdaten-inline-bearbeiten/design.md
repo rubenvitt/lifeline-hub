@@ -25,7 +25,7 @@
 - Koordinate und Bezeichnung inline (s. D1).
 - Das Vollformular auf Differenz-PATCH umstellen. Es sendet weiter alle Felder und kann damit
   eine gleichzeitige Zeilenänderung überschreiben; das ist der heutige Zustand und wird als
-  Nachzug erfasst (D4).
+  Nachzug erfasst (D4, LFH-839).
 - Live-Aktualisierung des Einsatzkopfes.
 - `BemerkungZelle` in Listen ersetzen.
 
@@ -101,7 +101,7 @@ neuen Wert sofort, Fokusrückgabe trifft den frischen Knopf), dann Invalidierung
 `einsatzKeys.einsatz(id)` und `globalKeys.einsaetze()` wie im Vollformular. Erfolgsmeldung
 `message.success('<Etikett> gespeichert')`, wie das Vollformular.
 
-Nachzug (eigenes Ticket): Vollformular sendet nur geänderte Felder.
+Nachzug LFH-839: Vollformular sendet nur geänderte Felder.
 
 ### D5 — Zeitwandlung
 
@@ -121,7 +121,7 @@ Primäraktion.
 
 ## Risks / Trade-offs
 
-- [Vollformular überschreibt gleichzeitige Zeilenänderung] → heutiger Zustand, Nachzug-Ticket
+- [Vollformular überschreibt gleichzeitige Zeilenänderung] → heutiger Zustand, Nachzug LFH-839
   für Differenz-PATCH.
 - [Stand anderer Personen erscheint erst nach Neuabruf, weil der Einsatzkopf nicht live ist]
   → heutiger Zustand; nach jeder Zeilenspeicherung wird neu geladen.
