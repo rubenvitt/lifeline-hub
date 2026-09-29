@@ -1,3 +1,9 @@
+## [1.0.0-alpha.55](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.54...v1.0.0-alpha.55) (2026-09-29)
+
+### Betrieb und Installation
+
+- **Anmeldung bleibt nach Neustart erhalten**: Nutzer müssen sich nicht mehr nach jedem Neustart der Anwendung erneut anmelden. Die Sitzung bleibt bis zu 7 Tage gültig, sofern sie nicht durch Abmelden, Kontosperrung oder Passwortwechsel widerrufen wird.
+
 ## [1.0.0-alpha.54](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.53...v1.0.0-alpha.54) (2026-09-29)
 
 ### Wichtige Änderungen
