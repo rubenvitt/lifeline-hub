@@ -18,7 +18,8 @@ set -euo pipefail
 # Bündel-Auswahl für die parallele CI. OHNE Argument läuft alles — der Weg vor dem Merge.
 #   --nur schnell    rustfmt, Lint, Typ-Drift, Advisories,
 #                    Selbsttests der Gate-Skripte,
-#                    Migrationsnummern gegen origin/alpha    (Sekunden bis ~1:20)
+#                    Migrationsnummern gegen origin/alpha,
+#                    Werkzeugversionen aus mise.toml         (Sekunden bis ~1:30)
 #   --nur rust       cargo test --workspace                  (~17 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
@@ -46,13 +47,10 @@ cd "$ROOT"
 . "$ROOT/scripts/lib/dev-env.sh"
 
 FE="$ROOT/frontend"
-# NODE IST GEPINNT WIE pnpm, sonst prüfte das Gate je Maschine etwas anderes. Die Nachbarn
-# dieser Version fallen aus: 22.x bricht `src/api/kartenbilder.test.ts` (@mswjs/interceptors
-# ruft `.stream()` auf einem Blob), 26.x-Releases teilen einen V8-Abbruch im Vite-Dev-Server
-# („Lazy deopt after a fast API call …"), dessen Abhilfe in `frontend/playwright.config.ts`
-# sitzt (`--no-turbo-fast-api-calls`). Wer die Zahl ändert, prüft Schritt 5 UND 7.
-PNPM="mise exec node@26.7.0 pnpm@11.10.0 -- pnpm"
-SCHRITTE=10
+# Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
+# Nachbarn der gepinnten Node-Version ausfallen. Hier steht bewusst KEINE Zahl.
+PNPM="mise exec -- pnpm"
+SCHRITTE=11
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
@@ -66,7 +64,7 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die zehn Schritte, je als Funktion ──────────────────────────────────────────────
+# ── Die elf Schritte, je als Funktion ──────────────────────────────────────────────
 # Funktionen, damit die CI sie auf mehreren Runnern einzeln ansprechen kann. Die Nummer in
 # der Ausgabe ist die Position im GESAMTgate, nicht im laufenden Teilstück.
 
@@ -153,7 +151,7 @@ schritt_7() {
   if [ -n "${PW_BINAER:-}" ]; then
     binaer="$PW_BINAER"
   else
-    target_dir="$(cargo metadata --format-version 1 --no-deps | mise exec node@26.7.0 -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
+    target_dir="$(cargo metadata --format-version 1 --no-deps | mise exec -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
     binaer="$target_dir/debug/lifeline-hub"
   fi
   if [ -x "$binaer" ]; then
@@ -192,7 +190,7 @@ schritt_8() {
   "$ROOT/scripts/release-ruhefenster.test.sh"
   # Dasselbe Werkzeug für die Release-Notizen: ein Fehlschlag fällt auf die konventionellen
   # Notizen zurück, CHANGELOG und GitHub-Release tragen denselben Text. Braucht nur Node.
-  mise exec node@26.7.0 -- node --test "$ROOT/scripts/release/ki-notizen.test.mjs"
+  mise exec -- node --test "$ROOT/scripts/release/ki-notizen.test.mjs"
 }
 
 schritt_9() {
@@ -219,16 +217,23 @@ schritt_10() {
   fi
 }
 
+schritt_11() {
+  echo "==> [11/$SCHRITTE] Node und pnpm aus einer Quelle: mise.toml [tools] (LFH-773)"
+  # Erst der Selbsttest, dann die Prüfung: der Guard irrt in beide Richtungen still.
+  "$ROOT/scripts/check-toolversionen.test.sh"
+  "$ROOT/scripts/check-toolversionen.sh"
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Schritte bekommen je einen eigenen Runner.
-BUENDEL_schnell="1 2 3 6 8 9 10"
+BUENDEL_schnell="1 2 3 6 8 9 10 11"
 BUENDEL_rust="4"
 BUENDEL_frontend="5"
 BUENDEL_e2e="7"
-BUENDEL_alle="1 2 3 4 5 6 7 8 9 10"
+BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11"
 
-# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die zehn Schritte, jeden einmal —
+# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die elf Schritte, jeden einmal —
 # sonst fiele beim Umsortieren still ein Schritt aus der CI.
 _summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e | sort -n | tr '\n' ' ')"
 _soll="$(printf '%s\n' $BUENDEL_alle | sort -n | tr '\n' ' ')"

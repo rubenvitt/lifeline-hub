@@ -18,10 +18,11 @@
   "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
 
   "features": {
-    // Node 26 + corepack (für pnpm). pnpm-Version steuert das packageManager-Feld
-    // in frontend/package.json (pnpm@11.0.9) via corepack im post-create.
+    // Node exakt wie `[tools]` in mise.toml (LFH-773; scripts/check-toolversionen.sh prüft
+    // den Gleichlauf). pnpm kommt über corepack im post-create aus dem packageManager-Feld
+    // von frontend/package.json.
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "26"
+      "version": "26.7.0"
     }
   },
 
