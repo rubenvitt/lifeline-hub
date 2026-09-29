@@ -114,7 +114,16 @@ async fn admin_route_schreibt_nur_unter_dem_erwarteten_benutzer() {
     let (admin, admin_id, zweiter) = zwei_benutzer(&app).await;
     let vorher = anzahl(&app, &admin, "/api/benutzer").await;
 
-    let body = r#"{"anzeigename":"Carla","benutzername":"carla","passwort":"carlapw12","org_rolle":"keine"}"#;
+    // Passwort aus dem Namen abgeleitet, wie `common::benutzer_anlegen`.
+    let name = "carla";
+    let body = serde_json::json!({
+        "anzeigename": "Carla",
+        "benutzername": name,
+        "passwort": format!("{name}pw123"),
+        "org_rolle": "keine",
+    })
+    .to_string();
+    let body = body.as_str();
     let (status, _) = anfrage_erwartet(
         &app,
         "POST",

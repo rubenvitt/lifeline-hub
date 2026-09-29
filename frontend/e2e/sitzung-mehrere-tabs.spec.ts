@@ -19,7 +19,8 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 const ADMIN = 'admin';
 const ADMIN_PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
-const B_PW = 'e2e-tabs-pw-123';
+/** Wegwerf-Passwort des zweiten Benutzers, aus seinem Namen abgeleitet (wie `aufbewahrung.spec.ts`). */
+const passwortVon = (name: string) => `${name}-pw`;
 
 async function anmelden(page: Page, benutzername: string, passwort: string) {
   await page.goto('/login');
@@ -32,18 +33,18 @@ async function anmelden(page: Page, benutzername: string, passwort: string) {
 /** Legt (als angemeldeter Admin des Kontexts) einen zweiten Benutzer an. */
 async function zweitenBenutzerAnlegen(
   ctx: BrowserContext,
-): Promise<{ name: string; anzeige: string }> {
+): Promise<{ name: string; anzeige: string; passwort: string }> {
   const lauf = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const name = `e2e-tabs-${lauf}`;
   const anzeige = `Tab Zwei ${lauf}`;
   const antwort = await ctx.request.post('/api/benutzer', {
-    data: { anzeigename: anzeige, benutzername: name, passwort: B_PW },
+    data: { anzeigename: anzeige, benutzername: name, passwort: passwortVon(name) },
   });
   expect(
     antwort.ok(),
     `Benutzer anlegen: ${antwort.status()} ${await antwort.text()}`,
   ).toBeTruthy();
-  return { name, anzeige };
+  return { name, anzeige, passwort: passwortVon(name) };
 }
 
 async function einsatzAnlegen(ctx: BrowserContext): Promise<number> {
@@ -77,7 +78,7 @@ test('(a) schneller Wechsel A→B in Tab 2: Tab 1 zeigt den Konflikt ohne Neulad
   await expect(tab1.getByPlaceholder('Inhalt …')).toBeVisible();
 
   // Tab 2 wechselt, ohne sich vorher abzumelden: Anmeldeseite öffnen, als B anmelden.
-  await anmelden(tab2, b.name, B_PW);
+  await anmelden(tab2, b.name, b.passwort);
 
   const dialog = konfliktDialog(tab1);
   await expect(dialog).toBeVisible();
@@ -109,7 +110,7 @@ test('(b) gleichzeitige Mutation aus dem veralteten Tab: 412, kein Eintrag, B bl
   // B meldet sich an der App vorbei an: das Cookie des Kontexts gehört jetzt B, aber kein
   // App-Code lief — Tab 1 hat keine Meldung bekommen und zeigt weiter den Admin.
   const login = await ctx.request.post('/api/auth/login', {
-    data: { benutzername: b.name, passwort: B_PW },
+    data: { benutzername: b.name, passwort: b.passwort },
   });
   expect(login.ok()).toBeTruthy();
   await expect(konfliktDialog(tab1)).toHaveCount(0);
