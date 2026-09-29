@@ -2,36 +2,24 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import StichworteTab from './StichworteTab';
+import { adminFixture } from '../test/fixtures';
 
 // Deckt das Admin-Gating der Stichwort-Sektion ab.
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
-const nichtAdmin = { ...admin, system_rolle: 'keiner' };
+const admin = adminFixture();
+const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
 
 // Voreinstellung bleibt EINE Zeile: die Prüfungen unten greifen „Löschen" per `getByRole`
 // (Einzahl), eine zweite Zeile machte sie mehrdeutig.
 function renderTab(benutzer: typeof admin, vorschlaege = [{ id: 1, text: 'H1' }]) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+    meHandler(benutzer),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
   );
-  return renderMitProviders(
-    <AuthProvider>
-      <StichworteTab />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<StichworteTab />);
 }
 
 describe('StichworteTab', () => {
@@ -185,14 +173,10 @@ describe('StichworteTab', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/stichwort-vorschlaege', () => new HttpResponse(null, { status: 500 })),
     );
-    renderMitProviders(
-      <AuthProvider>
-        <StichworteTab />
-      </AuthProvider>,
-    );
+    renderMitProviders(<StichworteTab />);
 
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch keine Stichworte')).not.toBeInTheDocument();

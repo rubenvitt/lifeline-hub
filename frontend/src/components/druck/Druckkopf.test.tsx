@@ -1,30 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { server } from '../../test/server';
+import { meHandler, server } from '../../test/server';
 import { neuerQueryClient, renderMitProviders } from '../../test/utils';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../../api/queryKeys';
 import Druckkopf from './Druckkopf';
+import { adminFixture } from '../../test/fixtures';
 
 /**
  * Der gemeinsame Druckkopf (LFH-22, design.md D2). Er macht ein Blatt ohne Bildschirm
  * zuordenbar: Organisation, Dokument, Einsatz, Stand/Auswahl, druckende Person, Druckzeitpunkt.
  */
 
-const BENUTZER = {
-  id: 1,
-  anzeigename: 'Erika Einsatzleiterin',
-  benutzername: 'erika',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const BENUTZER = adminFixture({ anzeigename: 'Erika Einsatzleiterin' });
 
 function mitOrganisation(name = 'DRK Kreisverband Musterstadt') {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(BENUTZER)),
+    meHandler(BENUTZER),
     http.get('/api/organisation', () => HttpResponse.json({ id: 1, name, tz_organisation: null })),
   );
 }

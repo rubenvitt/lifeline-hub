@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import FahrzeugeTab from '../stammdaten/FahrzeugeTab';
 import {
@@ -17,6 +17,7 @@ import {
   defaultAdminPfad,
   ersteSektionPfad,
 } from './adminNav';
+import { adminFixture } from '../test/fixtures';
 
 describe('adminNav — Pfad-Builder', () => {
   it('baut Sektions- und Benutzer-Pfade', () => {
@@ -78,15 +79,7 @@ describe('adminNav — Registry', () => {
  * Gescopt auf die elf Stammdaten-Sektionen; alle sechzehn zögen die Queries der Karten- und
  * Einstellungssektionen herein und färbten den Test aus Mock-Gründen rot.
  */
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-26 10:00:00',
-};
+const admin = adminFixture();
 
 /**
  * Alle Abrufe der elf Tabs — Pflicht, weil `onUnhandledRequest: 'error'` eine fehlende Route
@@ -94,7 +87,7 @@ const admin = {
  */
 function stammdatenHandler() {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/fahrzeug-vorschlaege', () =>
       HttpResponse.json({ fahrzeugtyp: [], traegerorganisation: [], standort: [] }),

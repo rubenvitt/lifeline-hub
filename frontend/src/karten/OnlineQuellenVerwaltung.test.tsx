@@ -2,30 +2,21 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import { AuthProvider } from '../auth/AuthContext';
 import type { OnlineQuelle } from '../api/onlineQuellen';
 import OnlineQuellenVerwaltung from './OnlineQuellenVerwaltung';
+import { adminFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-06-26 10:00:00',
-};
+const admin = adminFixture();
 // AdminLayout lässt admin ODER fuehrungskraft auf die Seite; nur admin darf schreiben.
-const fuehrungskraft = {
-  ...admin,
+const fuehrungskraft = adminFixture({
   id: 2,
   anzeigename: 'Eva',
   system_rolle: 'keiner',
   org_rolle: 'fuehrungskraft',
-};
+});
 
 const quelle: OnlineQuelle = {
   id: 1,
@@ -47,18 +38,14 @@ const katalogEintrag = {
 
 function mockBasis(benutzer: typeof admin, quellen: OnlineQuelle[] = [quelle]) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+    meHandler(benutzer),
     http.get('/api/karte/online-quellen', () => HttpResponse.json(quellen)),
     http.get('/api/karte/online-quellen/katalog', () => HttpResponse.json([katalogEintrag])),
   );
 }
 
 function render() {
-  return renderMitProviders(
-    <AuthProvider>
-      <OnlineQuellenVerwaltung />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<OnlineQuellenVerwaltung />);
 }
 
 describe('OnlineQuellenVerwaltung', () => {
@@ -187,7 +174,7 @@ describe('OnlineQuellenVerwaltung', () => {
    */
   it('zeigt eine Fehlermeldung statt stiller Leere, wenn die Liste nicht lädt', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/karte/online-quellen', () =>
         HttpResponse.json({ error: 'Kartenregistry nicht erreichbar' }, { status: 500 }),
       ),
@@ -217,7 +204,7 @@ describe('OnlineQuellenVerwaltung', () => {
      */
     let abrufe = 0;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/karte/online-quellen', () => {
         abrufe += 1;
         return abrufe === 1

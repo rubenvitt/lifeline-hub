@@ -3,15 +3,15 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
-import { AuthProvider } from '../auth/AuthContext';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import EinsatzLayout, { einsatzKennung } from './EinsatzLayout';
 import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
 import { farbenDunkel } from '../theme/tokens';
+import { adminFixture } from '../test/fixtures';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
 
@@ -21,15 +21,7 @@ vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
  */
 const EINGEKLAPPT = 'lfh:nav:eingeklappt';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Chef',
-  benutzername: 'chef',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const admin = adminFixture({ anzeigename: 'Chef' });
 const einsatz = {
   id: 7,
   bezeichnung: 'Hochwasser Nord',
@@ -71,7 +63,7 @@ function setup(
   route: string = '/einsaetze/7/etb',
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(aktuellerBenutzer)),
+    meHandler(aktuellerBenutzer),
     http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
     http.get('/api/einsaetze/7', () =>
       fehler.einsatz ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(einsatz),
@@ -82,47 +74,43 @@ function setup(
     http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <CommandPaletteProvider>
-        <Routes>
-          <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
-            <Route path="etb" element={<div>ETB-Inhalt</div>} />
-            {/* Zweites Ziel in einer ANDEREN Kategorie: nur so lässt sich belegen, dass ein Modulklick im
-               Drawer navigiert und ihn schließt. */}
-            <Route path="lagekarte" element={<div>Lagekarte-Inhalt</div>} />
-            {/* Erstes freigegebenes Modul der Kategorie 'lage': der Rail-Klick auf eine fremde Kategorie
-               navigiert dorthin; ohne diese Route bliebe der Rahmen leer. */}
-            <Route path="lage-dashboard" element={<div>Dashboard-Inhalt</div>} />
-            {/* Zweites Ziel INNERHALB von 'erfassung': 'personen' ist dort nicht das erste Modul ('etb') —
-               nur so sagt die Pfad-Sonde beim Selbstklick-Test etwas aus. */}
-            <Route path="personen" element={<div>Personen-Inhalt</div>} />
-          </Route>
-        </Routes>
-        <PfadAnzeige />
-      </CommandPaletteProvider>
-    </AuthProvider>,
+    <CommandPaletteProvider>
+      <Routes>
+        <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+          <Route path="etb" element={<div>ETB-Inhalt</div>} />
+          {/* Zweites Ziel in einer ANDEREN Kategorie: nur so lässt sich belegen, dass ein Modulklick im
+              Drawer navigiert und ihn schließt. */}
+          <Route path="lagekarte" element={<div>Lagekarte-Inhalt</div>} />
+          {/* Erstes freigegebenes Modul der Kategorie 'lage': der Rail-Klick auf eine fremde Kategorie
+              navigiert dorthin; ohne diese Route bliebe der Rahmen leer. */}
+          <Route path="lage-dashboard" element={<div>Dashboard-Inhalt</div>} />
+          {/* Zweites Ziel INNERHALB von 'erfassung': 'personen' ist dort nicht das erste Modul ('etb') —
+              nur so sagt die Pfad-Sonde beim Selbstklick-Test etwas aus. */}
+          <Route path="personen" element={<div>Personen-Inhalt</div>} />
+        </Route>
+      </Routes>
+      <PfadAnzeige />
+    </CommandPaletteProvider>,
     { route },
   );
 }
 
 function setupRoute(route: string, childPath: string) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/modul-overrides', () => HttpResponse.json({})),
     http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <CommandPaletteProvider>
-        <Routes>
-          <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
-            <Route path={childPath} element={<div>Outlet-Inhalt</div>} />
-          </Route>
-        </Routes>
-      </CommandPaletteProvider>
-    </AuthProvider>,
+    <CommandPaletteProvider>
+      <Routes>
+        <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+          <Route path={childPath} element={<div>Outlet-Inhalt</div>} />
+        </Route>
+      </Routes>
+    </CommandPaletteProvider>,
     { route },
   );
 }
@@ -350,7 +338,7 @@ describe('EinsatzLayout', () => {
     // trägt der Trigger die Funktion, darunter nur die Initialen.
     setzeViewportBreite(1440);
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz, meine_sachgebiete: ['s4'], meine_funktion: 'S2/S3' }),
@@ -359,15 +347,13 @@ describe('EinsatzLayout', () => {
       http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
     );
     renderMitProviders(
-      <AuthProvider>
-        <CommandPaletteProvider>
-          <Routes>
-            <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
-              <Route path="etb" element={<div>ETB-Inhalt</div>} />
-            </Route>
-          </Routes>
-        </CommandPaletteProvider>
-      </AuthProvider>,
+      <CommandPaletteProvider>
+        <Routes>
+          <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+            <Route path="etb" element={<div>ETB-Inhalt</div>} />
+          </Route>
+        </Routes>
+      </CommandPaletteProvider>,
       { route: '/einsaetze/7/etb' },
     );
     const menu = await screen.findByRole('button', { name: 'Benutzermenü' });

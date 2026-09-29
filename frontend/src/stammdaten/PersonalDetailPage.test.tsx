@@ -3,27 +3,20 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import PersonalDetailPage from './PersonalDetailPage';
 import PersonalTab from './PersonalTab';
 import { personalDetailPfad } from './stammdatenDetail';
+import { adminFixture } from '../test/fixtures';
 
 /**
  * Die Personal-Detailroute (LFH-346). Gegenstück zu `FahrzeugDetailPage.test.tsx`; dieselben
  * vier Aussagen, an der Personal-Feldmenge gemessen.
  */
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-26 10:00:00',
-};
-const nichtAdmin = { ...admin, system_rolle: 'keiner' };
+const admin = adminFixture();
+const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
 
 const person = {
   id: 5,
@@ -54,7 +47,7 @@ function handler(
   onPatch: (b: unknown) => void = () => {},
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+    meHandler(benutzer),
     http.get('/api/personal', () => HttpResponse.json(personal)),
     http.get('/api/personal-vorschlaege', () =>
       HttpResponse.json({ traegerorganisation: ['DRK Musterstadt'] }),

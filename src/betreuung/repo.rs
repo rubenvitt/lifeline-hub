@@ -23,6 +23,7 @@ use super::{
 use crate::error::AppError;
 use crate::etb::repo::EintragDaten;
 use crate::etb::{TYP_BERICHTIGUNG, TYP_ENTSCHEIDUNG, TYP_MELDUNG, TYP_SYSTEM};
+use crate::routes::support::{pflicht, pruefe_koordinate};
 
 /// Eingabe „Bezirk anlegen“. Die Route hat JSON und Enums gelesen; Bezeichnung, Plangröße
 /// und Freitexte prüft und normalisiert das Repo.
@@ -553,16 +554,6 @@ pub async fn belegung_verlauf(
 
 // ── Feldprüfungen (400) ─────────────────────────────────────────────────────────────────────
 
-fn bezeichnung_pruefen(s: &str) -> Result<String, AppError> {
-    let t = s.trim();
-    if t.is_empty() {
-        return Err(AppError::Validation(
-            "bezeichnung darf nicht leer sein".into(),
-        ));
-    }
-    Ok(t.to_string())
-}
-
 /// Optionaler Freitext: getrimmt, leer = nicht gesetzt.
 fn text_opt(s: Option<&str>) -> Option<String> {
     s.map(str::trim)
@@ -586,28 +577,6 @@ fn hoechstens(feld: &str, n: i64) -> Result<(), AppError> {
             "{feld} darf höchstens {} sein, war {n}",
             super::MAX_PERSONEN
         )));
-    }
-    Ok(())
-}
-
-/// Koordinate als Paar: beide gesetzt oder beide leer, Breite −90…90, Länge −180…180.
-/// Wortlaut wie an der UHS (`routes/einsatz_uhs.rs`), damit alle Verortungswege gleich
-/// antworten.
-fn koordinate_pruefen(lat: Option<f64>, lon: Option<f64>) -> Result<(), AppError> {
-    if lat.is_some() != lon.is_some() {
-        return Err(AppError::UnprocessableEntity(
-            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
-        ));
-    }
-    if lat.is_some_and(|la| !(-90.0..=90.0).contains(&la)) {
-        return Err(AppError::UnprocessableEntity(
-            "lat muss zwischen -90 und 90 liegen".into(),
-        ));
-    }
-    if lon.is_some_and(|lo| !(-180.0..=180.0).contains(&lo)) {
-        return Err(AppError::UnprocessableEntity(
-            "lon muss zwischen -180 und 180 liegen".into(),
-        ));
     }
     Ok(())
 }
@@ -636,10 +605,9 @@ fn anzahl_pruefen(feld: &str, n: i64) -> Result<(), AppError> {
 /// „aktuell“-Abfrage trägt. Als Rundreise, weil chrono beim Parsen ungepolsterte Felder
 /// annimmt: `2026-9-3 1:02:03` wäre lesbar, sortierte als Text aber hinter `2026-09-23 …`.
 fn zeitpunkt_pruefen(s: &str) -> Result<(), AppError> {
-    const FORMAT: &str = "%Y-%m-%d %H:%M:%S";
-    match chrono::NaiveDateTime::parse_from_str(s, FORMAT) {
-        Ok(t) if t.format(FORMAT).to_string() == s => Ok(()),
-        _ => Err(AppError::Validation(format!(
+    match crate::zeit::parse_streng(s) {
+        Some(_) => Ok(()),
+        None => Err(AppError::Validation(format!(
             "Ungültiger Zeitpunkt '{s}' (erwartet: YYYY-MM-DD HH:MM:SS, UTC)"
         ))),
     }
@@ -894,7 +862,7 @@ pub async fn bezirk_anlegen_tx(
     startwert: i64,
     eingabe: &BezirkEingabe,
 ) -> Result<Geschrieben, AppError> {
-    let bezeichnung = bezeichnung_pruefen(&eingabe.bezeichnung)?;
+    let bezeichnung = pflicht(&eingabe.bezeichnung, "bezeichnung")?;
     plan_pruefen(eingabe.plan_personen)?;
     abschnitt_pruefen_tx(conn, einsatz_id, eingabe.abschnitt_id).await?;
     bezeichnung_frei_tx(conn, Objekt::Bezirk, einsatz_id, &bezeichnung, None).await?;
@@ -946,7 +914,7 @@ pub async fn bezirk_aendern_tx(
     bezirk_lebt(&roh)?;
 
     let bezeichnung = match &eingabe.bezeichnung {
-        Some(b) => bezeichnung_pruefen(b)?,
+        Some(b) => pflicht(b, "bezeichnung")?,
         None => roh.bezeichnung.clone(),
     };
     let abschnitt_id = eingabe.abschnitt_id.unwrap_or(roh.abschnitt_id);
@@ -1306,7 +1274,7 @@ pub async fn stelle_anlegen_tx(
     startwert: i64,
     eingabe: &StelleEingabe,
 ) -> Result<Geschrieben, AppError> {
-    let bezeichnung = bezeichnung_pruefen(&eingabe.bezeichnung)?;
+    let bezeichnung = pflicht(&eingabe.bezeichnung, "bezeichnung")?;
     kapazitaet_pruefen(eingabe.kapazitaet_personen)?;
     abschnitt_pruefen_tx(conn, einsatz_id, eingabe.abschnitt_id).await?;
     bezeichnung_frei_tx(conn, Objekt::Stelle, einsatz_id, &bezeichnung, None).await?;
@@ -1356,7 +1324,7 @@ pub async fn stelle_aendern_tx(
     stelle_lebt(&roh)?;
 
     let bezeichnung = match &eingabe.bezeichnung {
-        Some(b) => bezeichnung_pruefen(b)?,
+        Some(b) => pflicht(b, "bezeichnung")?,
         None => roh.bezeichnung.clone(),
     };
     let art = eingabe.art.unwrap_or(roh.art);
@@ -1380,7 +1348,7 @@ pub async fn stelle_aendern_tx(
     // Abweichung von der 400-Linie des Moduls).
     let lat = eingabe.lat.unwrap_or(roh.lat);
     let lon = eingabe.lon.unwrap_or(roh.lon);
-    koordinate_pruefen(lat, lon)?;
+    pruefe_koordinate(lat, lon, "lat", "lon")?;
 
     let stammdaten = etb_text::StelleStammdaten {
         bezeichnung_vorher: (bezeichnung != roh.bezeichnung).then_some(roh.bezeichnung.as_str()),

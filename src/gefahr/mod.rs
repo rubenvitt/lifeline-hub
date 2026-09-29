@@ -1,147 +1,54 @@
 pub mod repo;
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Gefahrentyp (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `gefahrentyp`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Gefahrentyp {
-    Atemgifte,
-    Angstreaktion,
-    Ausbreitung,
-    AtomareStrahlung,
-    ChemischeStoffe,
-    ErkrankungVerletzung,
-    Explosion,
-    Elektrizitaet,
-    Einsturz,
-    Absturz,
-    Brand,
-    Durchbruch,
-    Ertrinken,
+wire_enum! {
+    /// Gefahrentyp (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `gefahrentyp`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Gefahrentyp {
+        Atemgifte => "atemgifte",
+        Angstreaktion => "angstreaktion",
+        Ausbreitung => "ausbreitung",
+        AtomareStrahlung => "atomare_strahlung",
+        ChemischeStoffe => "chemische_stoffe",
+        ErkrankungVerletzung => "erkrankung_verletzung",
+        Explosion => "explosion",
+        Elektrizitaet => "elektrizitaet",
+        Einsturz => "einsturz",
+        Absturz => "absturz",
+        Brand => "brand",
+        Durchbruch => "durchbruch",
+        Ertrinken => "ertrinken",
+    }
+    try_from = |s| format!("Ungültiger Gefahrentyp: {s}");
 }
 
-impl Gefahrentyp {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Gefahrentyp::Atemgifte => "atemgifte",
-            Gefahrentyp::Angstreaktion => "angstreaktion",
-            Gefahrentyp::Ausbreitung => "ausbreitung",
-            Gefahrentyp::AtomareStrahlung => "atomare_strahlung",
-            Gefahrentyp::ChemischeStoffe => "chemische_stoffe",
-            Gefahrentyp::ErkrankungVerletzung => "erkrankung_verletzung",
-            Gefahrentyp::Explosion => "explosion",
-            Gefahrentyp::Elektrizitaet => "elektrizitaet",
-            Gefahrentyp::Einsturz => "einsturz",
-            Gefahrentyp::Absturz => "absturz",
-            Gefahrentyp::Brand => "brand",
-            Gefahrentyp::Durchbruch => "durchbruch",
-            Gefahrentyp::Ertrinken => "ertrinken",
-        }
+wire_enum! {
+    /// Schutzobjekt (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `schutzobjekt`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Schutzobjekt {
+        Menschen => "menschen",
+        Tiere => "tiere",
+        Umwelt => "umwelt",
+        Sachwerte => "sachwerte",
+        Einsatzkraefte => "einsatzkraefte",
     }
-    pub fn parse(s: &str) -> Option<Gefahrentyp> {
-        match s {
-            "atemgifte" => Some(Gefahrentyp::Atemgifte),
-            "angstreaktion" => Some(Gefahrentyp::Angstreaktion),
-            "ausbreitung" => Some(Gefahrentyp::Ausbreitung),
-            "atomare_strahlung" => Some(Gefahrentyp::AtomareStrahlung),
-            "chemische_stoffe" => Some(Gefahrentyp::ChemischeStoffe),
-            "erkrankung_verletzung" => Some(Gefahrentyp::ErkrankungVerletzung),
-            "explosion" => Some(Gefahrentyp::Explosion),
-            "elektrizitaet" => Some(Gefahrentyp::Elektrizitaet),
-            "einsturz" => Some(Gefahrentyp::Einsturz),
-            "absturz" => Some(Gefahrentyp::Absturz),
-            "brand" => Some(Gefahrentyp::Brand),
-            "durchbruch" => Some(Gefahrentyp::Durchbruch),
-            "ertrinken" => Some(Gefahrentyp::Ertrinken),
-            _ => None,
-        }
-    }
-}
-impl TryFrom<String> for Gefahrentyp {
-    type Error = String;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Gefahrentyp::parse(&s).ok_or_else(|| format!("Ungültiger Gefahrentyp: {s}"))
-    }
+    try_from = |s| format!("Ungültiges Schutzobjekt: {s}");
 }
 
-/// Schutzobjekt (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `schutzobjekt`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Schutzobjekt {
-    Menschen,
-    Tiere,
-    Umwelt,
-    Sachwerte,
-    Einsatzkraefte,
-}
-
-impl Schutzobjekt {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Schutzobjekt::Menschen => "menschen",
-            Schutzobjekt::Tiere => "tiere",
-            Schutzobjekt::Umwelt => "umwelt",
-            Schutzobjekt::Sachwerte => "sachwerte",
-            Schutzobjekt::Einsatzkraefte => "einsatzkraefte",
-        }
+wire_enum! {
+    /// Warnstufe (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `warnstufe`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Warnstufe {
+        Keine => "keine",
+        Niedrig => "niedrig",
+        Mittel => "mittel",
+        Hoch => "hoch",
+        Akut => "akut",
     }
-    pub fn parse(s: &str) -> Option<Schutzobjekt> {
-        match s {
-            "menschen" => Some(Schutzobjekt::Menschen),
-            "tiere" => Some(Schutzobjekt::Tiere),
-            "umwelt" => Some(Schutzobjekt::Umwelt),
-            "sachwerte" => Some(Schutzobjekt::Sachwerte),
-            "einsatzkraefte" => Some(Schutzobjekt::Einsatzkraefte),
-            _ => None,
-        }
-    }
-}
-impl TryFrom<String> for Schutzobjekt {
-    type Error = String;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Schutzobjekt::parse(&s).ok_or_else(|| format!("Ungültiges Schutzobjekt: {s}"))
-    }
-}
-
-/// Warnstufe (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `warnstufe`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Warnstufe {
-    Keine,
-    Niedrig,
-    Mittel,
-    Hoch,
-    Akut,
-}
-
-impl Warnstufe {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Warnstufe::Keine => "keine",
-            Warnstufe::Niedrig => "niedrig",
-            Warnstufe::Mittel => "mittel",
-            Warnstufe::Hoch => "hoch",
-            Warnstufe::Akut => "akut",
-        }
-    }
-    pub fn parse(s: &str) -> Option<Warnstufe> {
-        match s {
-            "keine" => Some(Warnstufe::Keine),
-            "niedrig" => Some(Warnstufe::Niedrig),
-            "mittel" => Some(Warnstufe::Mittel),
-            "hoch" => Some(Warnstufe::Hoch),
-            "akut" => Some(Warnstufe::Akut),
-            _ => None,
-        }
-    }
-}
-impl TryFrom<String> for Warnstufe {
-    type Error = String;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Warnstufe::parse(&s).ok_or_else(|| format!("Ungültige Warnstufe: {s}"))
-    }
+    try_from = |s| format!("Ungültige Warnstufe: {s}");
 }
 
 /// Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit

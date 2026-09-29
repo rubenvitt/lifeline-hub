@@ -5,10 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import type { NeuerEintrag } from '../api/etb';
 import { ladeEtbAnhangHoch } from '../api/etb';
-import type { Anhang, EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige } from '../api/types';
+import type { Anhang, EtbBaustein, EtbEintragAnzeige } from '../api/types';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import Schnellerfassung from './Schnellerfassung';
+import { einsatzFixture } from '../test/fixtures';
 
 /**
  * Der Bedienweg „Anhang" der ETB-Schnellerfassung (LFH-117, design.md D9). Der Upload ist
@@ -31,13 +32,7 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks());
 
-const einsatz = {
-  id: 7,
-  bezeichnung: 'Test',
-  stichwort: null,
-  leitstellen_nr: null,
-  einsatzort: null,
-} as unknown as EinsatzAnzeige;
+const einsatz = einsatzFixture({ id: 7, bezeichnung: 'Test' });
 
 function props(over: Partial<React.ComponentProps<typeof Schnellerfassung>> = {}) {
   return {

@@ -3,10 +3,11 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Betreuungsstelle, ModulOverrides } from '../api/types';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
 import VerbleibErfassung from './VerbleibErfassung';
+import { benutzerFixture } from '../test/fixtures';
 
 /**
  * Verbleib-Dialog auf der Hülle. Die reinen Kerne prüft `verbleibErfassungKern.test.ts`; hier
@@ -47,15 +48,7 @@ beforeEach(() => {
       { status: 201 },
     );
   server.use(
-    http.get('/api/auth/me', () =>
-      HttpResponse.json({
-        id: 1,
-        anzeigename: 'F',
-        benutzername: 'f',
-        system_rolle: 'keiner',
-        org_rolle: 'fuehrungskraft',
-      }),
-    ),
+    meHandler(benutzerFixture({ anzeigename: 'F', org_rolle: 'fuehrungskraft' })),
     http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json(overrides)),
     http.get('/api/einsaetze/1/betreuung', () => {
       betreuungAbrufe += 1;

@@ -1,39 +1,29 @@
-import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import { AuthProvider } from '../auth/AuthContext';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { farbenDunkel } from '../theme/tokens';
 import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
 import AppLayout from './AppLayout';
+import { adminFixture } from '../test/fixtures';
+import type { BenutzerAnzeige } from '../api/types';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Chef',
-  benutzername: 'chef',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const admin = adminFixture({ anzeigename: 'Chef' });
 
-function setup(me: Record<string, unknown>) {
-  server.use(http.get('/api/auth/me', () => HttpResponse.json(me)));
+function setup(me: BenutzerAnzeige) {
+  server.use(meHandler(me));
   return renderMitProviders(
-    <AuthProvider>
-      <CommandPaletteProvider>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<div>Inhalt</div>} />
-          </Route>
-        </Routes>
-      </CommandPaletteProvider>
-    </AuthProvider>,
+    <CommandPaletteProvider>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<div>Inhalt</div>} />
+        </Route>
+      </Routes>
+    </CommandPaletteProvider>,
   );
 }
 
@@ -191,20 +181,7 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
   });
 
   it('zeigt für Berechtigte den freien Link ohne Sperrhinweis', async () => {
-    server.use(
-      http.get('/api/auth/me', () =>
-        HttpResponse.json({
-          id: 1,
-          anzeigename: 'A',
-          benutzername: 'a',
-          system_rolle: 'admin',
-          org_rolle: 'keine',
-          aktiv: true,
-          erstellt_at: '2026-05-23 10:00:00',
-          totp_aktiviert: false,
-        }),
-      ),
-    );
+    server.use(meHandler(adminFixture({ anzeigename: 'A' })));
     renderMitProviders(
       <CommandPaletteProvider>
         <AppLayout />

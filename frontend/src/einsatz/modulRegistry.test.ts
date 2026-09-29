@@ -16,17 +16,9 @@ import {
   type ModulEintrag,
 } from './modulRegistry';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import { adminFixture } from '../test/fixtures';
 
-const admin: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'A',
-  benutzername: 'a',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-  totp_aktiviert: false,
-};
+const admin = adminFixture({ anzeigename: 'A', benutzername: 'a' });
 const ohne: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'keine' };
 const fk: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };
 

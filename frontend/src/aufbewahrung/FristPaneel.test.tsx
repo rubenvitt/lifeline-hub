@@ -4,10 +4,12 @@ import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
 import FristPaneel from './FristPaneel';
+import { adminFixture, benutzerFixture } from '../test/fixtures';
+import type { BenutzerAnzeige } from '../api/types';
 
 dayjs.extend(customParseFormat);
 
@@ -16,8 +18,8 @@ dayjs.extend(customParseFormat);
  * `bestaetigt: true`, Abbrechen sendet nichts, ohne Recht gesperrt mit Grund.
  */
 
-const ME_ADMIN = { id: 1, anzeigename: 'Admin', system_rolle: 'admin', org_rolle: 'keine' };
-const ME_HELFER = { id: 2, anzeigename: 'Helfer', system_rolle: 'keiner', org_rolle: 'keine' };
+const ME_ADMIN = adminFixture();
+const ME_HELFER = benutzerFixture({ id: 2, anzeigename: 'Helfer' });
 
 let gesendet: Record<string, unknown>[];
 let antwort: () => Response;
@@ -34,14 +36,14 @@ beforeEach(() => {
 });
 
 function zeige(
-  me: Record<string, unknown>,
+  me: BenutzerAnzeige,
   einsatz: {
     status: 'aktiv' | 'abgeschlossen';
     meine_rolle?: string | null;
     retention_bis?: string | null;
   },
 ) {
-  server.use(http.get('/api/auth/me', () => HttpResponse.json(me)));
+  server.use(meHandler(me));
   return renderMitProviders(
     <FristPaneel
       einsatzId={1}
@@ -176,7 +178,7 @@ describe('FristPaneel', () => {
   it('befüllt den Dialog bei jedem Öffnen mit der AKTUELLEN Frist', async () => {
     // Die Formularinstanz lebt im Hook; überlebte `initialValues` einer früheren Öffnung, nähme
     // ein Absenden eine bestätigte Verkürzung still zurück.
-    server.use(http.get('/api/auth/me', () => HttpResponse.json(ME_ADMIN)));
+    server.use(meHandler(ME_ADMIN));
     const einsatz = (retention_bis: string) =>
       ({ status: 'abgeschlossen', meine_rolle: null, retention_bis }) as never;
     const { rerender } = renderMitProviders(

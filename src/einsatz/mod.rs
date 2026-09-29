@@ -14,133 +14,63 @@ pub mod schwaerzung_registry;
 pub mod zaehler;
 
 use crate::stab::Sachgebiet;
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
 /// Einsatz-Rolle: voller Zugriff + Einsatz-Administration (anlegen/abschließen/Personen).
-pub const EINSATZ_ROLLE_LEITUNG: &str = "einsatzleitung";
+pub const EINSATZ_ROLLE_LEITUNG: &str = EinsatzRolle::Einsatzleitung.as_str();
 /// Einsatz-Rolle: voller Lese-/Schreibzugriff im Einsatz, keine Administration.
-pub const EINSATZ_ROLLE_FUEHRUNG: &str = "fuehrungspersonal";
+pub const EINSATZ_ROLLE_FUEHRUNG: &str = EinsatzRolle::Fuehrungspersonal.as_str();
 /// Einsatz-Rolle: nur lesend.
-pub const EINSATZ_ROLLE_BEOBACHTER: &str = "beobachter";
+pub const EINSATZ_ROLLE_BEOBACHTER: &str = EinsatzRolle::Beobachter.as_str();
 
 /// Status eines aktiven Einsatzes.
-pub const STATUS_AKTIV: &str = "aktiv";
+pub const STATUS_AKTIV: &str = EinsatzStatus::Aktiv.as_str();
 /// Status eines abgeschlossenen (read-only) Einsatzes.
-pub const STATUS_ABGESCHLOSSEN: &str = "abgeschlossen";
+pub const STATUS_ABGESCHLOSSEN: &str = EinsatzStatus::Abgeschlossen.as_str();
 
 /// Grobklasse eines Einsatzes (DB-Spalte `einsatzart`, CHECK-validiert).
-pub const EINSATZART_REALEINSATZ: &str = "realeinsatz";
-pub const EINSATZART_UEBUNG: &str = "uebung";
-pub const EINSATZART_SANITAETSDIENST: &str = "sanitaetsdienst";
-pub const EINSATZART_BEREITSTELLUNG: &str = "bereitstellung";
+pub const EINSATZART_REALEINSATZ: &str = Einsatzart::Realeinsatz.as_str();
+pub const EINSATZART_UEBUNG: &str = Einsatzart::Uebung.as_str();
+pub const EINSATZART_SANITAETSDIENST: &str = Einsatzart::Sanitaetsdienst.as_str();
+pub const EINSATZART_BEREITSTELLUNG: &str = Einsatzart::Bereitstellung.as_str();
 
-/// Einsatz-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EinsatzStatus {
-    Aktiv,
-    Abgeschlossen,
+wire_enum! {
+    /// Einsatz-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum EinsatzStatus {
+        Aktiv => "aktiv",
+        Abgeschlossen => "abgeschlossen",
+    }
+    try_from = |s| format!("Ungültiger EinsatzStatus: {s}");
 }
 
-impl EinsatzStatus {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            EinsatzStatus::Aktiv => STATUS_AKTIV,
-            EinsatzStatus::Abgeschlossen => STATUS_ABGESCHLOSSEN,
-        }
+wire_enum! {
+    /// Einsatzart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `einsatzart`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Einsatzart {
+        Realeinsatz => "realeinsatz",
+        Uebung => "uebung",
+        Sanitaetsdienst => "sanitaetsdienst",
+        Bereitstellung => "bereitstellung",
     }
-
-    /// Parst einen gespeicherten/übergebenen Statuswert; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<EinsatzStatus> {
-        match s {
-            STATUS_AKTIV => Some(EinsatzStatus::Aktiv),
-            STATUS_ABGESCHLOSSEN => Some(EinsatzStatus::Abgeschlossen),
-            _ => None,
-        }
-    }
+    try_from = |s| format!("Ungültige Einsatzart: {s}");
 }
 
-impl TryFrom<String> for EinsatzStatus {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        EinsatzStatus::parse(&s).ok_or_else(|| format!("Ungültiger EinsatzStatus: {s}"))
+wire_enum! {
+    /// Rolle einer Person innerhalb eines konkreten Einsatzes.
+    /// Wird als TEXT in der DB gespeichert und manuell konvertiert (kein sqlx-Enum-Decode).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum EinsatzRolle {
+        Einsatzleitung => "einsatzleitung",
+        Fuehrungspersonal => "fuehrungspersonal",
+        Beobachter => "beobachter",
     }
-}
-
-/// Einsatzart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `einsatzart`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Einsatzart {
-    Realeinsatz,
-    Uebung,
-    Sanitaetsdienst,
-    Bereitstellung,
-}
-
-impl Einsatzart {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Einsatzart::Realeinsatz => EINSATZART_REALEINSATZ,
-            Einsatzart::Uebung => EINSATZART_UEBUNG,
-            Einsatzart::Sanitaetsdienst => EINSATZART_SANITAETSDIENST,
-            Einsatzart::Bereitstellung => EINSATZART_BEREITSTELLUNG,
-        }
-    }
-
-    /// Parst eine gespeicherte/übergebene Einsatzart; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<Einsatzart> {
-        match s {
-            EINSATZART_REALEINSATZ => Some(Einsatzart::Realeinsatz),
-            EINSATZART_UEBUNG => Some(Einsatzart::Uebung),
-            EINSATZART_SANITAETSDIENST => Some(Einsatzart::Sanitaetsdienst),
-            EINSATZART_BEREITSTELLUNG => Some(Einsatzart::Bereitstellung),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for Einsatzart {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Einsatzart::parse(&s).ok_or_else(|| format!("Ungültige Einsatzart: {s}"))
-    }
-}
-
-/// Rolle einer Person innerhalb eines konkreten Einsatzes.
-/// Wird als TEXT in der DB gespeichert und manuell konvertiert (kein sqlx-Enum-Decode).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EinsatzRolle {
-    Einsatzleitung,
-    Fuehrungspersonal,
-    Beobachter,
+    try_from = |s| format!("Ungültige EinsatzRolle: {s}");
 }
 
 impl EinsatzRolle {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            EinsatzRolle::Einsatzleitung => EINSATZ_ROLLE_LEITUNG,
-            EinsatzRolle::Fuehrungspersonal => EINSATZ_ROLLE_FUEHRUNG,
-            EinsatzRolle::Beobachter => EINSATZ_ROLLE_BEOBACHTER,
-        }
-    }
-
-    /// Parst einen gespeicherten/übergebenen Rollenstring; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<EinsatzRolle> {
-        match s {
-            EINSATZ_ROLLE_LEITUNG => Some(EinsatzRolle::Einsatzleitung),
-            EINSATZ_ROLLE_FUEHRUNG => Some(EinsatzRolle::Fuehrungspersonal),
-            EINSATZ_ROLLE_BEOBACHTER => Some(EinsatzRolle::Beobachter),
-            _ => None,
-        }
-    }
-
     /// Ob diese Rolle die Einsatzleitung ist (einzige Rolle mit Einsatz-Administration).
     pub fn ist_einsatzleitung(&self) -> bool {
         matches!(self, EinsatzRolle::Einsatzleitung)
@@ -153,14 +83,6 @@ impl EinsatzRolle {
             self,
             EinsatzRolle::Einsatzleitung | EinsatzRolle::Fuehrungspersonal
         )
-    }
-}
-
-impl TryFrom<String> for EinsatzRolle {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        EinsatzRolle::parse(&s).ok_or_else(|| format!("Ungültige EinsatzRolle: {s}"))
     }
 }
 

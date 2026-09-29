@@ -1,5 +1,11 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
+import type { BenutzerAnzeige } from '../api/types';
+
+/** `/api/auth/me` mit einem angemeldeten Benutzer — für `server.use(...)`. */
+export function meHandler(benutzer: BenutzerAnzeige) {
+  return http.get('/api/auth/me', () => HttpResponse.json(benutzer));
+}
 
 /**
  * Geteilte MSW-Server-Instanz; Handler werden pro Test via server.use() gesetzt.

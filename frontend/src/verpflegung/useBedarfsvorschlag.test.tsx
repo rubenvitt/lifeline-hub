@@ -7,29 +7,16 @@ import type { ReactNode } from 'react';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { erzeugeQueryClient } from '../api/queryClient';
-import type {
-  BelegungKopfzahl,
-  BenutzerAnzeige,
-  EinsatzPersonal,
-  ModulOverrides,
-} from '../api/types';
+import type { BelegungKopfzahl, EinsatzPersonal, ModulOverrides } from '../api/types';
 import { useBedarfsvorschlag, type BedarfsvorschlagArgs } from './useBedarfsvorschlag';
+import { benutzerFixture } from '../test/fixtures';
 
 /**
  * Bedarfsvorschläge, geprüft am Draht: was angefragt wird (Aufrufzähler), was vorbelegt wird und
  * was als Hinweis dasteht.
  */
 
-const benutzer: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'E',
-  benutzername: 'e',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-09-24 08:00:00',
-  totp_aktiviert: false,
-};
+const benutzer = benutzerFixture({ anzeigename: 'E' });
 
 const P_PERSONAL = '/api/einsaetze/7/personal';
 const P_KOPFZAHL = '/api/einsaetze/7/betreuung/belegung';

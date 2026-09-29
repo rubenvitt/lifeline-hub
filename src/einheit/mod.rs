@@ -5,6 +5,7 @@ pub mod typ_repo;
 use crate::katalog::StatusKategorie;
 use crate::sprechgruppe::SprechgruppeAnzeige;
 use crate::staerke::Staerke;
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -74,29 +75,19 @@ pub struct StatusWert {
     pub sortier: i64,
 }
 
-/// Woher der Status einer Einheit kommt (LFH-609). Wire == `as_str()`.
-///
-/// Mit Fahrzeugen ist der Status ABGELEITET: tragen alle denselben, gilt er
-/// (`Fahrzeuge`), sonst ist die Einheit `Gemischt`. Ohne Fahrzeug gilt der von Hand
-/// gesetzte Status (`Hand`) als Rückfall. `Ohne` heißt: es gibt keinen — weder Hand
-/// noch einen Fahrzeugstatus.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EinheitStatusQuelle {
-    Fahrzeuge,
-    Gemischt,
-    Hand,
-    Ohne,
-}
-
-impl EinheitStatusQuelle {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            EinheitStatusQuelle::Fahrzeuge => "fahrzeuge",
-            EinheitStatusQuelle::Gemischt => "gemischt",
-            EinheitStatusQuelle::Hand => "hand",
-            EinheitStatusQuelle::Ohne => "ohne",
-        }
+wire_enum! {
+    /// Woher der Status einer Einheit kommt (LFH-609). Wire == `as_str()`.
+    ///
+    /// Mit Fahrzeugen ist der Status ABGELEITET: tragen alle denselben, gilt er
+    /// (`Fahrzeuge`), sonst ist die Einheit `Gemischt`. Ohne Fahrzeug gilt der von Hand
+    /// gesetzte Status (`Hand`) als Rückfall. `Ohne` heißt: es gibt keinen — weder Hand
+    /// noch einen Fahrzeugstatus.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum EinheitStatusQuelle {
+        Fahrzeuge => "fahrzeuge",
+        Gemischt => "gemischt",
+        Hand => "hand",
+        Ohne => "ohne",
     }
 }
 

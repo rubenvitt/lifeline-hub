@@ -2,21 +2,13 @@ import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import EtbBausteineTab from './EtbBausteineTab';
+import { adminFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-06-02 10:00:00',
-};
-const nichtAdmin = { ...admin, system_rolle: 'keiner' };
+const admin = adminFixture();
+const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
 
 const bausteine = [
   {
@@ -72,14 +64,10 @@ async function menueEintrag(text: string): Promise<HTMLElement> {
 
 function render(benutzer: typeof admin, liste: unknown[] = bausteine) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+    meHandler(benutzer),
     http.get('/api/etb-bausteine', () => HttpResponse.json(liste)),
   );
-  return renderMitProviders(
-    <AuthProvider>
-      <EtbBausteineTab />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<EtbBausteineTab />);
 }
 
 describe('EtbBausteineTab', () => {
@@ -149,14 +137,10 @@ describe('EtbBausteineTab', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/etb-bausteine', () => new HttpResponse(null, { status: 500 })),
     );
-    renderMitProviders(
-      <AuthProvider>
-        <EtbBausteineTab />
-      </AuthProvider>,
-    );
+    renderMitProviders(<EtbBausteineTab />);
 
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Keine Bausteine')).not.toBeInTheDocument();

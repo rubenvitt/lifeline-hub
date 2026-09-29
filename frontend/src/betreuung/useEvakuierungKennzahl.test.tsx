@@ -6,8 +6,9 @@ import type { ReactNode } from 'react';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BenutzerAnzeige, BetreuungUebersicht, ModulOverrides } from '../api/types';
+import type { BetreuungUebersicht, ModulOverrides } from '../api/types';
 import { useEvakuierungKennzahl } from './useEvakuierungKennzahl';
+import { benutzerFixture } from '../test/fixtures';
 
 /**
  * Der Hook zur Kennzahl — der Query-Zustand, den die reine Funktion nicht sieht: „kein Bezirk"
@@ -15,16 +16,7 @@ import { useEvakuierungKennzahl } from './useEvakuierungKennzahl';
  * MSW statt `vi.mock`: nur der Handler-Zähler macht „kein Request" prüfbar.
  */
 
-const benutzer: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'E',
-  benutzername: 'e',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-09-23 08:00:00',
-  totp_aktiviert: false,
-};
+const benutzer = benutzerFixture({ anzeigename: 'E' });
 
 const PFAD = '/api/einsaetze/7/betreuung';
 

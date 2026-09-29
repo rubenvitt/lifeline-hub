@@ -73,14 +73,6 @@ pub fn ist_gueltige_benoetigte_rolle(rolle: &str) -> bool {
     BENOETIGTE_ROLLEN.contains(&rolle)
 }
 
-/// Registry-Default der benötigten Rolle eines Moduls. Heute hat KEIN Modul einen
-/// Default (alle frei → `None`); die Funktion existiert, damit der Guard die
-/// Präzedenz „Override sonst Registry-Default" explizit verdrahtet und ein künftiger
-/// Default hier einen Platz hat (LFH-129).
-pub fn registry_benoetigte_rolle(_key: &str) -> Option<&'static str> {
-    None
-}
-
 /// Compile-time-Marker (LFH-230): bindet einen Einsatz-Gate-Extractor an einen
 /// Modul-Key — oder an KEIN Modul-Gate ([`OhneModul`]). Der Extractor liest `KEY`
 /// und erzwingt `fordere_modul_zugriff` genau dann, wenn `Some`.
@@ -127,6 +119,20 @@ modul_marker! {
     Verpflegung => "verpflegung",
     WetterPegel => "wetter-pegel",
     Schaeden => "schaeden",
+    Tiere => "tiere",
+    Bereitstellungsraeume => "bereitstellungsraeume",
+    Fahrzeuge => "fahrzeuge",
+    Personal => "personal",
+    Material => "material",
+    Unfallhilfsstellen => "unfallhilfsstellen",
+    Gefahrenzonen => "gefahrenzonen",
+    Einsatzabschnitte => "einsatzabschnitte",
+    Personen => "personen",
+    Einheiten => "einheiten",
+    Chat => "chat",
+    Etb => "etb",
+    Erinnerungen => "erinnerungen",
+    Nachforderungen => "nachforderungen",
 }
 
 /// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
@@ -143,10 +149,39 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
     ("/api/einsaetze/{id}/betreuung", Some("betreuung")),
     ("/api/einsaetze/{id}/verpflegung", Some("verpflegung")),
-    // Schäden (LFH-21): heute prüft der Guard hier nur die Anhang-Routen
-    // (`routes::schaden_anhang`); die übrigen Schadensrouten sind noch DEFERRED, für sie ist
-    // der Präfix bei ihrer Migration ohnehin der richtige.
     ("/api/einsaetze/{id}/schaeden", Some("schaeden")),
+    ("/api/einsaetze/{id}/tiere", Some("tiere")),
+    (
+        "/api/einsaetze/{id}/bereitstellungsraeume",
+        Some("bereitstellungsraeume"),
+    ),
+    ("/api/einsaetze/{id}/fahrzeuge", Some("fahrzeuge")),
+    ("/api/einsaetze/{id}/personal", Some("personal")),
+    ("/api/einsaetze/{id}/material", Some("material")),
+    ("/api/einsaetze/{id}/uhs", Some("unfallhilfsstellen")),
+    // Die UHS-Belegung einer Person hängt am UHS-Modul, nicht an den Personen.
+    (
+        "/api/einsaetze/{id}/personen/{pid}/uhs-belegung",
+        Some("unfallhilfsstellen"),
+    ),
+    ("/api/einsaetze/{id}/personen", Some("personen")),
+    ("/api/einsaetze/{id}/einheiten", Some("einheiten")),
+    ("/api/einsaetze/{id}/chat", Some("chat")),
+    ("/api/einsaetze/{id}/etb", Some("etb")),
+    ("/api/einsaetze/{id}/erinnerungen", Some("erinnerungen")),
+    (
+        "/api/einsaetze/{id}/nachforderungen",
+        Some("nachforderungen"),
+    ),
+    // Sprechgruppen und Ort-Vorschau gehören keinem Modul (wie die Einsatz-Kopfdaten).
+    ("/api/einsaetze/{id}/sprechgruppen", None),
+    ("/api/einsaetze/{id}/ort-vorschau", None),
+    ("/api/einsaetze/{id}/gefahrengebiete", Some("gefahrenzonen")),
+    ("/api/einsaetze/{id}/abschnitte", Some("einsatzabschnitte")),
+    ("/api/einsaetze/{id}/zonen", Some("lagekarte")),
+    ("/api/einsaetze/{id}/freie-zeichen", Some("lagekarte")),
+    // Hintergrundbilder und Führungskräfte-Positionen leben auf der Lagekarte.
+    ("/api/einsaetze/{id}/karte", Some("lagekarte")),
     // Wetter & Pegel (LFH-633): nur der Wetter-Endpunkt ist am Modul gegatet. Der
     // Pegelverlauf liegt unter dem modul-losen Pegel-Präfix unten.
     ("/api/einsaetze/{id}/wetter", Some("wetter-pegel")),
@@ -164,7 +199,21 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // wirken als Filter über die Felder der Antwort — ein nicht erlaubtes Modul fehlt —,
     // nicht als Türsteher der Route.
     ("/api/einsaetze/{id}/modul-zaehler", None),
+    // Kopfdaten, Abschluss, Frist, Einstellungen, Modul-Overrides und Mitglieder
+    // (`routes::einsatz`): modul-los. Die Wurzel selbst trifft nur exakt, siehe
+    // [`EINSATZ_WURZEL`].
+    (EINSATZ_WURZEL, None),
+    ("/api/einsaetze/{id}/abschliessen", None),
+    ("/api/einsaetze/{id}/aufbewahrungsfrist", None),
+    ("/api/einsaetze/{id}/einstellungen", None),
+    ("/api/einsaetze/{id}/modul-overrides", None),
+    ("/api/einsaetze/{id}/mitglieder", None),
 ];
+
+/// Der Einsatz selbst (`GET`/`PATCH /api/einsaetze/{id}`). In [`key_fuer_pfad`] trifft dieser
+/// Eintrag nur exakt: als Präfix registrierte er jede künftige Sub-Route als modul-los, und der
+/// Guard meldete einen vergessenen [`PFAD_KEY`]-Eintrag nicht mehr.
+const EINSATZ_WURZEL: &str = "/api/einsaetze/{id}";
 
 /// Längster-Präfix-Match über [`PFAD_KEY`]. Äußeres `None` = Pfad nicht registriert;
 /// `Some(inner)` = registriert (inner `None` = modul-lose Route). Segment-grenzen-sicher:
@@ -175,9 +224,10 @@ pub fn key_fuer_pfad(pfad: &str) -> Option<Option<&'static str>> {
         .iter()
         .filter(|(prefix, _)| {
             pfad == *prefix
-                || pfad
-                    .strip_prefix(*prefix)
-                    .is_some_and(|rest| rest.starts_with('/'))
+                || (*prefix != EINSATZ_WURZEL
+                    && pfad
+                        .strip_prefix(*prefix)
+                        .is_some_and(|rest| rest.starts_with('/')))
         })
         .max_by_key(|(prefix, _)| prefix.len())
         .map(|(_, key)| *key)
@@ -301,8 +351,19 @@ mod tests {
             key_fuer_pfad("/api/einsaetze/{id}/pegel/verlauf"),
             Some(None)
         );
-        // Noch DEFERRED / nicht registriert.
-        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/personen"), None);
+        // Nicht registriert.
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/unbekannt"), None);
+    }
+
+    #[test]
+    fn einsatz_wurzel_trifft_nur_exakt() {
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}"), Some(None));
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/mitglieder/{benutzer_id}"),
+            Some(None)
+        );
+        // Eine unregistrierte Sub-Route erbt die Wurzel NICHT.
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/unbekannt"), None);
     }
 
     #[test]

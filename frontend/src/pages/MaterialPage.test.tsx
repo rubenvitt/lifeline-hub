@@ -3,43 +3,16 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import { AuthProvider } from '../auth/AuthContext';
 import MaterialPage from './MaterialPage';
 import { einsatzKeys } from '../api/queryKeys';
+import { adminFixture, einsatzFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-27 10:00:00',
-};
+const admin = adminFixture();
 
-const einsatzAktiv = {
-  id: 1,
-  bezeichnung: 'Hochwasser',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '2026-05-27 08:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '2026-05-27 08:00:00',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-};
+const einsatzAktiv = einsatzFixture();
 
 const em = {
   id: 10,
@@ -60,7 +33,7 @@ const em = {
 
 function render(einsatzObj: typeof einsatzAktiv, materialListe: (typeof em)[]) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json(materialListe)),
     http.get('/api/material', () => HttpResponse.json([])),
@@ -70,11 +43,9 @@ function render(einsatzObj: typeof einsatzAktiv, materialListe: (typeof em)[]) {
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
+    </Routes>,
     { route: '/einsaetze/1/material' },
   );
 }
@@ -346,7 +317,7 @@ describe('MaterialPage', () => {
  */
 describe('MaterialPage · Datenzustände', () => {
   const gruenerBoden = () => [
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
     http.get('/api/material', () => HttpResponse.json([])),
@@ -360,11 +331,9 @@ describe('MaterialPage · Datenzustände', () => {
     // Abweichung VORN: der erste passende Handler gewinnt.
     server.use(...abweichungen, ...gruenerBoden());
     return renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
+      </Routes>,
       { route: '/einsaetze/1/material' },
     );
   }

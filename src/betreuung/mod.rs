@@ -16,6 +16,7 @@
 //!
 //! Spec: `openspec/changes/lfh-639-fachmodul-betreuung/`
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -24,32 +25,17 @@ use crate::etb::{TYP_ENTSCHEIDUNG, TYP_MELDUNG};
 
 pub mod repo;
 
-/// Erhebungsart einer Zahl (Plangröße oder Stand). Wire == `as_str()`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Erhebung {
-    Gezaehlt,
-    Geschaetzt,
+wire_enum! {
+    /// Erhebungsart einer Zahl (Plangröße oder Stand). Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Erhebung {
+        Gezaehlt => "gezaehlt",
+        Geschaetzt => "geschaetzt",
+    }
+    try_from = |s| format!("Unbekannte Erhebungsart '{s}' (erlaubt: gezaehlt, geschaetzt)");
 }
 
 impl Erhebung {
-    pub const ALLE: [Erhebung; 2] = [Erhebung::Gezaehlt, Erhebung::Geschaetzt];
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Erhebung::Gezaehlt => "gezaehlt",
-            Erhebung::Geschaetzt => "geschaetzt",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Erhebung> {
-        match s {
-            "gezaehlt" => Some(Erhebung::Gezaehlt),
-            "geschaetzt" => Some(Erhebung::Geschaetzt),
-            _ => None,
-        }
-    }
-
     /// Wortlaut im ETB.
     pub fn label(&self) -> &'static str {
         match self {
@@ -59,54 +45,25 @@ impl Erhebung {
     }
 }
 
-impl TryFrom<String> for Erhebung {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Erhebung::parse(&s)
-            .ok_or_else(|| format!("Unbekannte Erhebungsart '{s}' (erlaubt: gezaehlt, geschaetzt)"))
+wire_enum! {
+    /// Räumungszustand eines Evakuierungsbezirks. Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Raeumungszustand {
+        /// Evakuierung angeordnet, Räumung noch nicht begonnen (Vorgabe).
+        Angeordnet => "angeordnet",
+        Laeuft => "laeuft",
+        Geraeumt => "geraeumt",
+        /// Anordnung aufgehoben; der Bezirk zählt in keiner Kennzahl mehr.
+        Aufgehoben => "aufgehoben",
     }
-}
-
-/// Räumungszustand eines Evakuierungsbezirks. Wire == `as_str()`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Raeumungszustand {
-    /// Evakuierung angeordnet, Räumung noch nicht begonnen (Vorgabe).
-    Angeordnet,
-    Laeuft,
-    Geraeumt,
-    /// Anordnung aufgehoben; der Bezirk zählt in keiner Kennzahl mehr.
-    Aufgehoben,
+    try_from = |s| {
+        format!(
+            "Unbekannter Räumungszustand '{s}' (erlaubt: angeordnet, laeuft, geraeumt, aufgehoben)"
+        )
+    };
 }
 
 impl Raeumungszustand {
-    pub const ALLE: [Raeumungszustand; 4] = [
-        Raeumungszustand::Angeordnet,
-        Raeumungszustand::Laeuft,
-        Raeumungszustand::Geraeumt,
-        Raeumungszustand::Aufgehoben,
-    ];
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Raeumungszustand::Angeordnet => "angeordnet",
-            Raeumungszustand::Laeuft => "laeuft",
-            Raeumungszustand::Geraeumt => "geraeumt",
-            Raeumungszustand::Aufgehoben => "aufgehoben",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Raeumungszustand> {
-        match s {
-            "angeordnet" => Some(Raeumungszustand::Angeordnet),
-            "laeuft" => Some(Raeumungszustand::Laeuft),
-            "geraeumt" => Some(Raeumungszustand::Geraeumt),
-            "aufgehoben" => Some(Raeumungszustand::Aufgehoben),
-            _ => None,
-        }
-    }
-
     pub fn label(&self) -> &'static str {
         match self {
             Raeumungszustand::Angeordnet => "angeordnet",
@@ -126,56 +83,24 @@ impl Raeumungszustand {
     }
 }
 
-impl TryFrom<String> for Raeumungszustand {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Raeumungszustand::parse(&s).ok_or_else(|| {
-            format!(
-                "Unbekannter Räumungszustand '{s}' (erlaubt: angeordnet, laeuft, geraeumt, aufgehoben)"
-            )
-        })
+wire_enum! {
+    /// Einrichtungsstufe einer Betreuungsstelle (DRK-Glossar Betreuungsdienst). Eine Kategorie,
+    /// kein Zustand — sie bekommt keine Statusfarbe (D8). Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BetreuungsstelleArt {
+        Anlaufstelle => "anlaufstelle",
+        Betreuungsstelle => "betreuungsstelle",
+        Betreuungsplatz => "betreuungsplatz",
+        Notunterkunft => "notunterkunft",
     }
-}
-
-/// Einrichtungsstufe einer Betreuungsstelle (DRK-Glossar Betreuungsdienst). Eine Kategorie,
-/// kein Zustand — sie bekommt keine Statusfarbe (D8). Wire == `as_str()`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum BetreuungsstelleArt {
-    Anlaufstelle,
-    Betreuungsstelle,
-    Betreuungsplatz,
-    Notunterkunft,
+    try_from = |s| {
+        format!(
+            "Unbekannte Art '{s}' (erlaubt: anlaufstelle, betreuungsstelle, betreuungsplatz, notunterkunft)"
+        )
+    };
 }
 
 impl BetreuungsstelleArt {
-    pub const ALLE: [BetreuungsstelleArt; 4] = [
-        BetreuungsstelleArt::Anlaufstelle,
-        BetreuungsstelleArt::Betreuungsstelle,
-        BetreuungsstelleArt::Betreuungsplatz,
-        BetreuungsstelleArt::Notunterkunft,
-    ];
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            BetreuungsstelleArt::Anlaufstelle => "anlaufstelle",
-            BetreuungsstelleArt::Betreuungsstelle => "betreuungsstelle",
-            BetreuungsstelleArt::Betreuungsplatz => "betreuungsplatz",
-            BetreuungsstelleArt::Notunterkunft => "notunterkunft",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<BetreuungsstelleArt> {
-        match s {
-            "anlaufstelle" => Some(BetreuungsstelleArt::Anlaufstelle),
-            "betreuungsstelle" => Some(BetreuungsstelleArt::Betreuungsstelle),
-            "betreuungsplatz" => Some(BetreuungsstelleArt::Betreuungsplatz),
-            "notunterkunft" => Some(BetreuungsstelleArt::Notunterkunft),
-            _ => None,
-        }
-    }
-
     pub fn label(&self) -> &'static str {
         match self {
             BetreuungsstelleArt::Anlaufstelle => "Anlaufstelle",
@@ -186,67 +111,26 @@ impl BetreuungsstelleArt {
     }
 }
 
-impl TryFrom<String> for BetreuungsstelleArt {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        BetreuungsstelleArt::parse(&s).ok_or_else(|| {
-            format!(
-                "Unbekannte Art '{s}' (erlaubt: anlaufstelle, betreuungsstelle, betreuungsplatz, notunterkunft)"
-            )
-        })
+wire_enum! {
+    /// Betriebsstatus einer Betreuungsstelle. `geschlossen` ist umkehrbar (D4). Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BetreuungsstelleStatus {
+        Vorbereitet => "vorbereitet",
+        InBetrieb => "in_betrieb",
+        Geschlossen => "geschlossen",
     }
-}
-
-/// Betriebsstatus einer Betreuungsstelle. `geschlossen` ist umkehrbar (D4). Wire == `as_str()`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum BetreuungsstelleStatus {
-    Vorbereitet,
-    InBetrieb,
-    Geschlossen,
+    try_from = |s| {
+        format!("Unbekannter Status '{s}' (erlaubt: vorbereitet, in_betrieb, geschlossen)")
+    };
 }
 
 impl BetreuungsstelleStatus {
-    pub const ALLE: [BetreuungsstelleStatus; 3] = [
-        BetreuungsstelleStatus::Vorbereitet,
-        BetreuungsstelleStatus::InBetrieb,
-        BetreuungsstelleStatus::Geschlossen,
-    ];
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            BetreuungsstelleStatus::Vorbereitet => "vorbereitet",
-            BetreuungsstelleStatus::InBetrieb => "in_betrieb",
-            BetreuungsstelleStatus::Geschlossen => "geschlossen",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<BetreuungsstelleStatus> {
-        match s {
-            "vorbereitet" => Some(BetreuungsstelleStatus::Vorbereitet),
-            "in_betrieb" => Some(BetreuungsstelleStatus::InBetrieb),
-            "geschlossen" => Some(BetreuungsstelleStatus::Geschlossen),
-            _ => None,
-        }
-    }
-
     pub fn label(&self) -> &'static str {
         match self {
             BetreuungsstelleStatus::Vorbereitet => "vorbereitet",
             BetreuungsstelleStatus::InBetrieb => "in Betrieb",
             BetreuungsstelleStatus::Geschlossen => "geschlossen",
         }
-    }
-}
-
-impl TryFrom<String> for BetreuungsstelleStatus {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        BetreuungsstelleStatus::parse(&s).ok_or_else(|| {
-            format!("Unbekannter Status '{s}' (erlaubt: vorbereitet, in_betrieb, geschlossen)")
-        })
     }
 }
 

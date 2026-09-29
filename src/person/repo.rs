@@ -369,28 +369,23 @@ pub async fn setze_status(
 }
 
 /// Soft-Delete (Fehleingabe): setzt `storniert_at`. Bleibt referenzierbar (Audit).
-/// `NotFound`, falls nicht zum Einsatz.
+/// Fremd → `NotFound`, schon storniert → `Conflict`.
 pub async fn storniere(
     pool: &SqlitePool,
     einsatz_id: i64,
     person_id: i64,
     geaendert_von: i64,
 ) -> Result<(), AppError> {
-    let betroffen = sqlx::query(
-        "UPDATE einsatz_person SET storniert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-            geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
-         WHERE id = ? AND einsatz_id = ?",
+    crate::storno::storniere(
+        &mut *pool.acquire().await?,
+        "einsatz_person",
+        "einsatz_id",
+        einsatz_id,
+        person_id,
+        crate::storno::Vermerk::Geaendert(geaendert_von),
+        Some("Person ist bereits storniert"),
     )
-    .bind(geaendert_von)
-    .bind(person_id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?
-    .rows_affected();
-    if betroffen == 0 {
-        return Err(AppError::NotFound);
-    }
-    Ok(())
+    .await
 }
 
 /// „davon namentlich“ je Betreuungsstelle (LFH-674, design.md D4): Zahl der nicht
@@ -464,6 +459,30 @@ mod tests {
             antreff_lon: None,
             vermisst_seit: None,
         }
+    }
+
+    /// Zwei gleichzeitige Stornos derselben Person: genau einer setzt `storniert_at`, der
+    /// andere bekommt 409 — die Bedingung sitzt im UPDATE, nicht in einer Vorabprüfung.
+    #[tokio::test]
+    async fn gleichzeitiger_doppel_storno_gewinnt_genau_einmal() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (b, e) = setup(&pool).await;
+        let p = anlegen(&pool, e, b, leere_daten()).await.unwrap();
+
+        let (erst, zweit) =
+            tokio::join!(storniere(&pool, e, p.id, b), storniere(&pool, e, p.id, b));
+        let ergebnisse = [erst, zweit];
+        assert_eq!(ergebnisse.iter().filter(|r| r.is_ok()).count(), 1);
+        assert!(ergebnisse.iter().any(|r| matches!(
+            r,
+            Err(AppError::Conflict(m)) if m == "Person ist bereits storniert"
+        )));
+
+        let err = storniere(&pool, e + 1, p.id, b).await.unwrap_err();
+        assert!(
+            matches!(err, AppError::NotFound),
+            "fremder Einsatz: {err:?}"
+        );
     }
 
     #[tokio::test]
