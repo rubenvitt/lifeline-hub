@@ -131,15 +131,14 @@ test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierte
   // Höhe bewusst verkürzt: die Bildlaufreserve ist die Vorbedingung dieses Nachweises.
   await page.setViewportSize({ width: 390, height: 400 });
   await page.goto('/admin/benutzer');
-  await page.waitForLoadState('networkidle');
 
   /**
    * MINDESTENS 9 Zeilen (8 gesät + Harness-Admin), nicht genau 9: die Benutzerliste ist
    * global und die Temp-DB lebt über den ganzen Lauf, jede Wiederholung sät acht weitere.
    * Gebraucht wird nur die Untergrenze, sie trägt die Bildlaufreserve.
    */
-  // `expect.poll` statt `count()`: `networkidle` kommt zu früh, wenn React die Liste erst
-  // nach dem Ruhefenster abruft (in CI mit „Received: 0" gesehen).
+  // `expect.poll` statt `count()`: die Liste steht erst nach ihrem Abruf (in CI mit
+  // „Received: 0" gesehen).
   await expect
     .poll(() => page.locator('tr.ant-table-row').count(), {
       message: 'Vorbedingung: mindestens 8 gesäte Zeilen + Harness-Admin',
@@ -216,7 +215,6 @@ test('Datensicht-Tabellenzweig: Tabulaturdurchlauf hinter Werkzeugzeile, Kopfzei
   // Höhe verkürzt für die Bildlaufreserve.
   await page.setViewportSize({ width: 1366, height: 520 });
   await page.goto(`/einsaetze/${einsatzId}/personal`);
-  await page.waitForLoadState('networkidle');
 
   // Belegt, dass hier wirklich der Tabellenzweig gemessen wird und nicht der Kartenzweig.
   await expect(page.locator('.ant-table')).toHaveCount(1);
