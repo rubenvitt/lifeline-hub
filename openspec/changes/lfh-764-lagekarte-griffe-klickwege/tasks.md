@@ -9,7 +9,7 @@
 
 - [x] 2.1 `bildHandles.ts`: `wendeModusAn` über `scharfeGriffe` mit `map.project`-Positionen; `move`-Hörer und Neuentscheidung nach `dragend`, nichts während `ziehend`, DOM nur bei Mengenwechsel, Abmelden in `zerstoeren` (D2). Nachweis: `bildHandles.test.ts` um Fälle „kein Abziehen im Zug", „`dragend` entscheidet neu", „`move` entscheidet neu", „Hörer nach `zerstoeren` weg" erweitert, grün.
 - [x] 2.2 Rückruf `onGriffStand` durch `bildHandles` → `Kartenflaeche` (Prop, über Ref) → `LagekartePage` (State) → `Sidebar` (Hinweis) (D3). Nachweis: `Sidebar.test.tsx` zeigt den Kanten-Hinweis bei `kantenAusgeblendet`; `pnpm lint` und `tsc` grün.
-- [ ] 2.3 e2e in `e2e/lagekarte-touch.spec.ts`: Kartenbild per API anlegen und platzieren, auf rund 120 px zoomen, je Dichte (kompakt, handschuh) und gedreht die Bounding-Boxen aller angehängten `[data-lfh^="bildgriff-"]` paarweise überlappungsfrei; kompakt mit, handschuh ohne Kanten; Hinweistext passt. Nachweis: Spec grün, Mutationsprobe (Kantenregel aus → rot) im Commit-Text festgehalten.
+- [x] 2.3 e2e in `e2e/lagekarte-touch.spec.ts`: Kartenbild per API anlegen und platzieren, auf rund 120 px zoomen, je Dichte (kompakt, handschuh) und gedreht die Bounding-Boxen aller angehängten `[data-lfh^="bildgriff-"]` paarweise überlappungsfrei; kompakt mit, handschuh ohne Kanten; Hinweistext passt. Nachweis: Spec grün, Mutationsprobe (Kantenregel aus → rot) im Commit-Text festgehalten.
 
 ## 3. Klick-Schiedsrichter (rein)
 
@@ -18,10 +18,10 @@
 
 ## 4. Schiedsrichter verdrahten
 
-- [ ] 4.1 `Kartenflaeche.tsx`: `klickzielAm(map, e)` mit `WeakMap`-Cache am `originalEvent` über alle vorhandenen Klickebenen; Marker-, Zonen-, Abschnitts-, Fachebenen- und Personen-Cluster-Hörer handeln nur als Gewinner; `personenClusterAm` ersetzt. Nachweis: bestehende e2e `lagekarte-touch.spec.ts` (Einzelzeichen, Cluster, Spider) und `lagekarte-smoke.spec.ts` grün; Vitest und Lint grün.
-- [ ] 4.2 e2e KRITIS-Bündel im Ring: Fachebenen-Endpunkt per `page.route` stubben (Traube neben einem Marker), KRITIS sichtbar, Tipp auf den Bündelpunkt innerhalb der Trefferzone hinter `elementFromPoint`-Wache → `getZoom` steigt, kein Marker-Inspector. Dazu Tipp auf ein Markerzeichen in einer Zone → nur Marker-Inspector. Nachweis: grün; Mutationsprobe (Fachebenen-Zweig des Schiedsrichters aus → rot) im Commit-Text festgehalten.
+- [x] 4.1 `Kartenflaeche.tsx`: `klickzielAm(map, e)` mit `WeakMap`-Cache am `originalEvent` über alle vorhandenen Klickebenen; Marker-, Zonen-, Abschnitts-, Fachebenen- und Personen-Cluster-Hörer handeln nur als Gewinner; `personenClusterAm` ersetzt. Nachweis: bestehende e2e `lagekarte-touch.spec.ts` (Einzelzeichen, Cluster, Spider) und `lagekarte-smoke.spec.ts` grün; Vitest und Lint grün.
+- [x] 4.2 e2e KRITIS-Bündel im Ring: Fachebenen-Endpunkt per `page.route` stubben (Traube neben einem Marker), KRITIS sichtbar, Tipp auf den Bündelpunkt innerhalb der Trefferzone hinter `elementFromPoint`-Wache → `getZoom` steigt, kein Marker-Inspector. Dazu Tipp auf ein Markerzeichen in einer Zone → nur Marker-Inspector. Nachweis: grün; Mutationsprobe (Fachebenen-Zweig des Schiedsrichters aus → rot) im Commit-Text festgehalten.
 
 ## 5. Dokumentation und Abschluss
 
-- [ ] 5.1 CLAUDE.md, Abschnitt „Lagekarte": Eintrag zu Griffregel und Klick-Schiedsrichter mit Verweis auf dieses Design; `data-lfh`-/Prüfspur-Pfade prüfen. Nachweis: Eintrag vorhanden, Pfade existieren.
+- [x] 5.1 CLAUDE.md, Abschnitt „Lagekarte": Eintrag zu Griffregel und Klick-Schiedsrichter mit Verweis auf dieses Design; `data-lfh`-/Prüfspur-Pfade prüfen. Nachweis: Eintrag vorhanden, Pfade existieren.
 - [ ] 5.2 Gesamtlauf `./scripts/check-all.sh` (eigenes `CARGO_TARGET_DIR`), Ergebnis je Schritt festhalten. Nachweis: alle Schritte grün oder Abweichung begründet.

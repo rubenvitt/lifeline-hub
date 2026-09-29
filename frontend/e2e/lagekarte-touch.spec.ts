@@ -551,3 +551,267 @@ for (const viewport of [
     });
   });
 }
+
+// ── LFH-764: Griffe ohne Überlappung, ein Tipp gehört genau einem Ziel ─────────────────────────
+//
+// Führungs-Tablet (1024 px): die Leiste steht neben der Karte, Bilder und Fachebenen sind
+// erreichbar. Die Dichte kommt aus dem gespeicherten Wert, die Wache prüft, dass sie ankam.
+
+const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+interface KarteLfh764 {
+  project(ll: [number, number]): { x: number; y: number };
+  unproject(p: [number, number]): { lng: number; lat: number };
+  queryRenderedFeatures(p: [number, number]): { layer: { id: string } }[];
+}
+
+/**
+ * Ecken eines am Schirm quadratischen Bildes um `mitte` (halbe Seite `halb` in Grad Breite), um
+ * `grad` gedreht; Reihenfolge wie `eckenAusBounds` (NW, NO, SO, SW). In Web-Mercator ist ein Grad
+ * Länge am Schirm `cos(Breite)` Grad Breite lang.
+ */
+function quadratEcken(mitte: [number, number], halb: number, grad: number): [number, number][] {
+  const k = Math.cos((mitte[1] * Math.PI) / 180);
+  const r = (grad * Math.PI) / 180;
+  return [
+    [-1, 1],
+    [1, 1],
+    [1, -1],
+    [-1, -1],
+  ].map(([x, y]) => {
+    const dx = (x * Math.cos(r) - y * Math.sin(r)) * halb;
+    const dy = (x * Math.sin(r) + y * Math.cos(r)) * halb;
+    return [mitte[0] + dx / k, mitte[1] + dy] as [number, number];
+  });
+}
+
+async function paneelAuf(page: Page, kennung: string) {
+  const kopf = page.locator(`section[data-paneel="${kennung}"] button[aria-expanded]`).first();
+  if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
+  await expect(kopf).toHaveAttribute('aria-expanded', 'true');
+}
+
+test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
+  test.use({ hasTouch: true, viewport: { width: 1024, height: 768 } });
+
+  for (const dichte of ['kompakt', 'handschuh'] as const) {
+    test(`Bildgriffe überlappen sich nicht, Stufe ${dichte}`, async ({ page }) => {
+      test.setTimeout(180_000);
+      const seitenFehler: Error[] = [];
+      page.on('pageerror', (f) => seitenFehler.push(f));
+      await page.addInitScript(
+        ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
+        [DICHTE_SCHLUESSEL, dichte] as const,
+      );
+      await anmelden(page);
+      const einsatzId = await post(page, '/api/einsaetze', {
+        bezeichnung: `E2E Griffprobe ${Date.now()}`,
+      });
+      // Zwei Bilder gleicher Größe: achsenparallel und um 45° gedreht.
+      const faelle = [0, 45].map((grad) => ({
+        grad,
+        name: `Plan ${grad} Grad`,
+        ecken: quadratEcken(MITTE, 0.0005, grad),
+      }));
+      for (const f of faelle) {
+        const antwort = await page.request.post(
+          `/api/einsaetze/${einsatzId}/karte/hintergrundbilder`,
+          {
+            multipart: {
+              datei: { name: 'plan.png', mimeType: 'image/png', buffer: PNG },
+              ecken: JSON.stringify(f.ecken),
+              name: f.name,
+            },
+          },
+        );
+        expect(antwort.ok(), `Bild ${f.name}: ${await antwort.text()}`).toBeTruthy();
+      }
+
+      await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+      await ruhe(page);
+      // Auf rund 120 px Kantenlänge zoomen: aus der bei Zoom 16 gemessenen Breite.
+      await springe(page, MITTE, 16);
+      const breite16 = await page.evaluate(([a, b]) => {
+        const k = (window as unknown as { __lfhKarte: KarteLfh764 }).__lfhKarte;
+        return Math.hypot(k.project(b).x - k.project(a).x, k.project(b).y - k.project(a).y);
+      }, faelle[0].ecken);
+      await springe(page, MITTE, 16 + Math.log2(120 / breite16));
+      await paneelAuf(page, 'bilder');
+
+      for (const f of faelle) {
+        await page.getByRole('button', { name: `Aktionen zu ${f.name}` }).click();
+        // Das Menü des vorigen Bildes kann noch ausblenden: nur das offene Dropdown zählt.
+        await page
+          .locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')
+          .getByRole('menuitem', { name: 'Auf der Karte platzieren' })
+          .click();
+        const griffe = page.locator('[data-lfh^="bildgriff-"]');
+        await expect(page.locator('[data-lfh="bildgriff-eck"]')).toHaveCount(4);
+
+        const kante = await page.evaluate(([a, b]) => {
+          const k = (window as unknown as { __lfhKarte: KarteLfh764 }).__lfhKarte;
+          return Math.hypot(k.project(b).x - k.project(a).x, k.project(b).y - k.project(a).y);
+        }, f.ecken);
+        expect(kante, `${f.name}: Bildkante am Schirm`).toBeGreaterThan(100);
+        expect(kante, `${f.name}: Bildkante am Schirm`).toBeLessThan(150);
+
+        const boxen = await griffe.evaluateAll((els) =>
+          els.map((el) => {
+            const r = el.getBoundingClientRect();
+            return {
+              art: (el as HTMLElement).dataset.lfh!,
+              x: r.x,
+              y: r.y,
+              b: r.width,
+              h: r.height,
+            };
+          }),
+        );
+        const ueberlappend: string[] = [];
+        for (let i = 0; i < boxen.length; i++)
+          for (let j = i + 1; j < boxen.length; j++) {
+            const [p, q] = [boxen[i], boxen[j]];
+            const dx = Math.min(p.x + p.b, q.x + q.b) - Math.max(p.x, q.x);
+            const dy = Math.min(p.y + p.h, q.y + q.h) - Math.max(p.y, q.y);
+            if (dx > 0.5 && dy > 0.5) ueberlappend.push(`${p.art}/${q.art}`);
+          }
+        expect(ueberlappend, `${f.name}, ${dichte}: überlappende scharfe Griffe`).toEqual([]);
+
+        // Kompakt (Kante 44) lässt achsenparallel alle Kanten zu; gedreht liegen Kantenmitte und
+        // Ecke je 42 px auseinander, in Handschuh (72) ohnehin zu nah.
+        const mitKanten = dichte === 'kompakt' && f.grad === 0;
+        await expect(page.locator('[data-lfh="bildgriff-kante"]')).toHaveCount(mitKanten ? 4 : 0);
+        await expect(page.locator('[data-lfh="bildgriff-hinweis"]')).toContainText(
+          mitKanten ? 'Kanten = frei strecken' : 'heranzoomen',
+        );
+
+        await page.getByRole('button', { name: /^Fertig$/ }).click();
+        await expect(griffe).toHaveCount(0);
+      }
+      expect(seitenFehler.map((f) => f.message)).toEqual([]);
+    });
+  }
+
+  test('Tipp auf ein KRITIS-Bündel im Ring eines Markers zoomt hinein, ohne den Marker zu wählen', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    const seitenFehler: Error[] = [];
+    page.on('pageerror', (f) => seitenFehler.push(f));
+    // Handschuh: Trefferzone 72 px, Ring bis 36 px um den Markerpunkt.
+    await page.addInitScript(
+      ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
+      [DICHTE_SCHLUESSEL, 'handschuh'] as const,
+    );
+    // Hermetisch: die KRITIS-Ebene liefert vier Objekte an EINER Stelle — ein Bündel.
+    let buendelOrt: [number, number] | null = null;
+    await page.route('**/api/karte/fachebenen/kritis**', (route) =>
+      route.fulfill({
+        json: {
+          quelle: 'kritis',
+          status: 'ok',
+          attribution: '© OpenStreetMap-Mitwirkende',
+          features: {
+            type: 'FeatureCollection',
+            features: buendelOrt
+              ? [0, 1, 2, 3].map((i) => ({
+                  type: 'Feature',
+                  geometry: {
+                    type: 'Point',
+                    coordinates: [buendelOrt![0] + i * 1e-7, buendelOrt![1]],
+                  },
+                  properties: { name: `Objekt ${i}`, kategorie: 'krankenhaus' },
+                }))
+              : [],
+          },
+        },
+      }),
+    );
+    await anmelden(page);
+    const einsatzId = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E Klickziel ${Date.now()}`,
+    });
+    await einheitAn(page, einsatzId, 'Pumpe Ost', EINZEL);
+    // Eine Zone um das Zeichen: ein Tipp aufs Zeichen gehört dem Marker, nicht der Zone.
+    const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
+      data: {
+        typ: 'gefahrengebiet',
+        geometrie_typ: 'Polygon',
+        geometrie: JSON.stringify({
+          type: 'Polygon',
+          coordinates: [
+            [
+              [EINZEL[0] - 0.01, EINZEL[1] - 0.005],
+              [EINZEL[0] + 0.01, EINZEL[1] - 0.005],
+              [EINZEL[0] + 0.01, EINZEL[1] + 0.005],
+              [EINZEL[0] - 0.01, EINZEL[1] + 0.005],
+              [EINZEL[0] - 0.01, EINZEL[1] - 0.005],
+            ],
+          ],
+        }),
+        label: 'Sperrzone Probe',
+      },
+    });
+    expect(zone.ok(), await zone.text()).toBeTruthy();
+
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+    await ruhe(page);
+    // Zoom 13: KRITIS bündelt bis `clusterMaxZoom` 14.
+    await springe(page, EINZEL, 13);
+    // 30 px westlich des Zeichens: im Ring (36 px), außerhalb des gezeichneten Zeichens; östlich
+    // liegt die Namensplakette, und die ist ein gezeichnetes Klickziel des Markers.
+    buendelOrt = await page.evaluate((ll) => {
+      const k = (window as unknown as { __lfhKarte: KarteLfh764 }).__lfhKarte;
+      const p = k.project(ll);
+      const o = k.unproject([p.x - 30, p.y]);
+      return [o.lng, o.lat] as [number, number];
+    }, EINZEL);
+
+    await paneelAuf(page, 'fachebenen');
+    await page.getByRole('switch', { name: 'KRITIS / sensible Objekte' }).click();
+
+    // Vorbedingung am Tipppunkt: Bündel UND Trefferzone des Markers, aber kein gezeichnetes
+    // Markerzeichen — sonst prüfte der Test nicht den Ring.
+    const layerAm = () =>
+      page.evaluate((ll) => {
+        const k = (window as unknown as { __lfhKarte: KarteLfh764 }).__lfhKarte;
+        const p = k.project(ll);
+        return k.queryRenderedFeatures([p.x, p.y]).map((f) => f.layer.id);
+      }, buendelOrt!);
+    await expect
+      .poll(layerAm, { timeout: 20_000, message: 'KRITIS-Bündel erscheint im Ring des Markers' })
+      .toEqual(expect.arrayContaining(['fachebene-kritis-buendel', 'marker-treffer']));
+    const amPunkt = await layerAm();
+    expect(
+      amPunkt.filter((id) => /^(marker|spider|personen)-/.test(id) && !id.endsWith('-treffer')),
+      `am Tipppunkt nur die Trefferzone des Markers: ${amPunkt.join(', ')}`,
+    ).toEqual([]);
+
+    const vorher = (await stand(page)).zoom;
+    const tipp = await aufSchirm(page, buendelOrt!);
+    await aufKarte(page, [tipp], 'KRITIS-Bündel im Ring');
+    await tippe(page, tipp);
+    await expect
+      .poll(async () => (await stand(page)).zoom, { message: 'Tipp aufs Bündel zoomt hinein' })
+      .toBeGreaterThan(vorher + 0.5);
+    await ruhe(page);
+    await expect(page.locator('[data-lfh="auswahl"]')).toHaveCount(0);
+
+    // Gegenprobe: das Zeichen selbst ist anwählbar, und zwar nur der Marker, nicht die Zone
+    // darunter.
+    await springe(page, EINZEL, 13);
+    const zeichen = await aufSchirm(page, EINZEL);
+    await aufKarte(page, [zeichen], 'Markerzeichen in der Zone');
+    await page.waitForTimeout(600); // kein Doppeltipp-Zoom mit dem Tipp davor
+    await tippe(page, zeichen);
+    const auswahl = page.locator('[data-lfh="auswahl"] h3');
+    await expect(auswahl).toHaveText(['Pumpe Ost']);
+    expect(seitenFehler.map((f) => f.message)).toEqual([]);
+  });
+});

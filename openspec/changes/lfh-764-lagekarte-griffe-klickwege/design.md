@@ -62,7 +62,8 @@ Kante** überlappt.
 ### D2 — Neuentscheidung an Kartenbewegung und `dragend`, nie im Zug
 
 `bildHandles` meldet einen Hörer auf `map.on('move')` an (deckt Zoom, Drehung, Verschieben) und
-entscheidet nach jedem `dragend` neu. Läuft ein Zug (`ziehend`), wird nichts an- oder abgehängt.
+entscheidet nach jedem `dragend` neu, ebenso nach `setzeEcken` (Refetch, numerische Eingabe; beim
+Umsetzen ergänzt). Läuft ein Zug (`ziehend`), wird nichts an- oder abgehängt.
 Abgehängt oder angehängt wird nur, wenn sich die Menge ändert, damit `move` pro Frame nichts am
 DOM tut. `zerstoeren()` meldet den Hörer ab. Positionen kommen aus `map.project` der Griff-`LngLat`,
 also aus derselben Quelle wie die Marker.

@@ -192,10 +192,15 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   rundet vorsichtshalber auf `keine`/Alarm); „keine" = keine Stufe gesetzt. Kollision des
   `zonen-label` ist nicht abgesichert (eigene Entscheidung).
 - **Trefferzone `controlHeight`** an jedem Marker (`KarteMarker.trefferDurchmesser`,
-  `marker-einsatzort-treffer`); Personen zusätzlich 2 px schwarze Außenkante; Zone schlägt keinen
-  Personen-Cluster (`istTrefferzone`, `personenClusterAm`). Bild-Ziehgriffe
+  `marker-einsatzort-treffer`); Personen zusätzlich 2 px schwarze Außenkante. Bild-Ziehgriffe
   (`pages/lagekarte/bildGriffe.ts`) in `max(controlHeight, 44)`, je Modus scharf, Moduswechsel
-  wartet auf `dragend`.
+  wartet auf `dragend`; in „Größe" Ecken immer, eine Kante nur ohne Überlappung mit Ecke oder
+  Kante (`scharfeGriffe`, neu bei `move`/`dragend`/`setzeEcken`, nie im Zug; LFH-764).
+- **Ein Tipp gehört genau einem Ziel** (LFH-764,
+  `openspec/changes/lfh-764-lagekarte-griffe-klickwege/design.md`): jeder Karten-Klickhörer fragt
+  `klickzielAm` (`Kartenflaeche.tsx`, ein Urteil je Originalereignis) → `entscheideKlickziel`
+  (`pages/lagekarte/klickziel.ts`): gezeichnetes Punktziel > Trefferzone > Fläche. Eine neue
+  Klickebene braucht eine Rolle in `ordneKlickebene` (Guard in `klickziel.test.ts`).
 - **Betreuung auf der Karte** (LFH-673, `openspec/changes/lfh-673-betreuung-auf-der-lagekarte/design.md`):
   Marker-Ebene wie UHS (`alleVerortet`, `?platzieren=betreuungsstelle:<id>`), Sperre an der
   **Datenquelle** (`pages/lagekarte/betreuungEbene.ts`);
