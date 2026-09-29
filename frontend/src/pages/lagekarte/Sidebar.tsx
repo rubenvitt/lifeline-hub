@@ -641,7 +641,8 @@ export default function Sidebar(props: SidebarProps) {
           }}
         >
           <Typography.Text type="secondary">
-            Klick auf die Karte setzt die Koordinate. (Abbrechen beendet.)
+            Klick auf die Karte setzt die Koordinate.{' '}
+            {props.modusBedienungImFuss ? '(Beenden über der Karte.)' : '(Abbrechen beendet.)'}
           </Typography.Text>
           <div style={{ marginTop: token.marginXS }}>
             <KoordinatenEingabe

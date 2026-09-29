@@ -72,7 +72,11 @@ Beim nächsten Modus startet die Leiste wieder geschlossen.
 Koordinateneingabe bei 390 px dauerhaft „offen“ speichern. Das widerspricht der Entscheidung
 „vorheriger Zustand“. Verworfen.
 
-*Folge:* `zeige()` („Zeichenwerkzeuge“ über der Karte) setzt weiterhin `vorlaeufig = true`. Nach
+*Stift im Modus:* Unter `lg` ruft „Zeichenwerkzeuge“ während eines Modus `umschalteImModus(true)`
+statt `zeige()` auf. `zeige()` bliebe dort wirkungslos (Regel 2) und öffnete die Leiste erst nach dem
+Modus — gegen „vorheriger Zustand“ (Review-Befund).
+
+*Folge:* `zeige()` („Zeichenwerkzeuge“ über der Karte) setzt außerhalb eines Modus weiterhin `vorlaeufig = true`. Nach
 einer so gestarteten Zeichnung ist die Leiste bei 390 px wieder offen, denn das war ihr Zustand
 unmittelbar vor dem Modus. Das ist gewollt: Man landet zurück im Paneel „Zeichnen“.
 
@@ -169,6 +173,6 @@ Knopfblock ab `lg` ist davon nicht betroffen.
 | 10 | Alarmbudget | nicht anwendbar: keine Alarme |
 | 11 | Warnverhalten | nicht anwendbar: keine Warnungen, kein Blinken |
 | 12 | Kein Sprung unter dem Cursor | erfüllt: Leiste und Band wechseln nur auf eine Nutzerhandlung (Modusstart oder -ende), nie auf Live-Daten |
-| 13 | Fokus nie verdeckt | erfüllt: Das Band liegt im Fuß-Fluss (kein Overlay über Bändern); die bestehenden `fokus-verdeckung`-Nachweise laufen mit |
+| 13 | Fokus nie verdeckt | offen → Folgeticket: Das Band liegt im Fuß-Fluss wie Zeichnen- und Mess-Steuerung, aber kein Fokus-Nachweis betritt unter `lg` einen Kartenmodus (gilt für alle Fuß-Bänder) |
 | 14 | Tabellenseite vollständig | nicht anwendbar: keine Tabelle |
 | 15 | Erfassungsmaske vollständig | nicht anwendbar: keine Erfassungsmaske; die Koordinateneingabe bleibt unverändert in der Leiste |

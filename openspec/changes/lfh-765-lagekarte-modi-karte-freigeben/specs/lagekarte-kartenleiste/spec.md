@@ -21,7 +21,7 @@ bisherige Verhalten unverändert.
 - **THEN** schließt die Leiste, der Kopf bietet „Leiste einblenden“, und ein Tipp auf die freie Karte verortet die Einheit an dieser Stelle
 
 #### Scenario: Verortungsauftrag per Adresse
-- **WHEN** die Lagekarte bei 390 px mit `?platzieren=einheit:<id>` geöffnet wird
+- **WHEN** die Lagekarte bei 390 px mit `?platzieren=schaden:<id>` geöffnet wird
 - **THEN** ist die Leiste geschlossen, und die Bedienung des Platzierens steht über der Karte
 
 #### Scenario: Messen gibt die Karte frei

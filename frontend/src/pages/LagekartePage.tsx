@@ -928,7 +928,10 @@ export default function LagekartePage() {
         onZeichnen={
           darfSchreiben
             ? () => {
-                leistenWahl.zeige();
+                // Unter `lg` im Kartenmodus gilt nur die Wahl für den Modus: `zeige()` bliebe dort
+                // wirkungslos und öffnete die Leiste erst nach dem Modus (LFH-765).
+                if (!breit && exklusiverModusAktiv) leistenWahl.umschalteImModus(true);
+                else leistenWahl.zeige();
                 setZeichnenAnfrage((n) => n + 1);
               }
             : undefined
