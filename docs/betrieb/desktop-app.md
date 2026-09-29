@@ -106,17 +106,19 @@ installierte App.
 | `TAURI_SIGNING_PRIVATE_KEY` | privater Schlüssel (Inhalt der Datei) |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | sein Passwort |
 
-Gesetzt werden sie aus der lokalen Ablage, ohne dass der Schlüssel im Terminal erscheint:
+**Ablage:** 1Password, Tresor „Dev“, Eintrag „Lifeline Hub – Tauri-Updater-Signaturschlüssel“
+(Passwort im Feld `password`, privater und öffentlicher Schlüssel als Dateien). Die Secrets sind
+gesetzt (29.09.2026). Neu setzen, ohne dass ein Wert im Terminal erscheint:
 
 ```bash
-gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/lifeline-desktop.key
+op read "op://Dev/Lifeline Hub – Tauri-Updater-Signaturschlüssel/privater Schlüssel" | gh secret set TAURI_SIGNING_PRIVATE_KEY
 ```
 
 ```bash
-gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD < ~/.tauri/lifeline-desktop.key.passwort
+op read --no-newline "op://Dev/Lifeline Hub – Tauri-Updater-Signaturschlüssel/password" | gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD
 ```
 
-**Den Schlüssel und das Passwort im Passwortmanager sichern.** Geht der private Schlüssel
+**Der 1Password-Eintrag ist die Sicherung.** Geht der private Schlüssel
 verloren, nimmt keine installierte App mehr ein Update an. Dann hilft nur ein neues
 Schlüsselpaar (`cargo tauri signer generate`), der neue öffentliche Schlüssel in
 `tauri.conf.json` und eine **einmalige Neuinstallation von Hand** auf jedem Gerät. Fehlt das
