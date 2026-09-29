@@ -1,7 +1,7 @@
 /**
  * Die Helligkeitsachse und ihre Warnsperre (LFH-397, Kriterium 8 der Prüfliste
  * Einsatztauglichkeit: „1 Regler, 1 Sperre", MIL 5.2.2.1.9, 5.2.4.2.2.3).
- * Herleitung: `openspec/changes/lfh-397-helligkeitsregler-warnsperre/design.md`.
+ * Herleitung: `openspec/changes/archive/2026-09-29-lfh-397-helligkeitsregler-warnsperre/design.md`.
  *
  * EIN REGLER: Helligkeit, kein getrennter Kontrast. Den Kontrast trägt die Palette
  * (Kriterium 5); die Abdunklung senkt ihn — genau das begrenzt die Sperre.

@@ -285,19 +285,19 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
   getrennt: {
     wort: 'GETRENNT',
     satz: () => 'Live-Verbindung unterbrochen — die Anzeige kann veraltet sein',
-    farbe: farbenDunkel.alarm,
+    farbe: rahmenFarben.alarm,
     getrennt: true,
   },
   offline: {
     wort: 'OFFLINE',
     satz: () => 'Offline — keine Verbindung zum Server',
-    farbe: farbenDunkel.alarm,
+    farbe: rahmenFarben.alarm,
     getrennt: true,
   },
   abgelehnt: {
     wort: 'PRÜFEN',
     satz: (q) => `${q.abgelehnt} Offline-Aktionen abgelehnt — bitte prüfen`,
-    farbe: farbenDunkel.alarm,
+    farbe: rahmenFarben.alarm,
     getrennt: false,
   },
 };

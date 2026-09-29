@@ -9,7 +9,7 @@
 //! ein verpasster Scheduler-Tick darf sie nicht verfälschen. Der Erinnerungs-Scheduler liefert
 //! nur den einmaligen Hinweis (Vorwarnung 30 min vorher, Fälligkeit).
 //!
-//! Spec: `openspec/changes/lfh-635-fachmodul-abloesung/`
+//! Spec: `openspec/changes/archive/2026-09-29-lfh-635-fachmodul-abloesung/`
 
 use crate::wire_enum::wire_enum;
 use crate::zeit;

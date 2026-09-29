@@ -125,13 +125,24 @@ export default defineConfig({
    * nie an einer Zusicherung. Keine Toleranz an einer Zusicherung — es laufen nur weniger
    * gleichzeitig. Übersteuerbar: `PW_WORKERS=6 pnpm e2e` auf einer ruhigen Maschine.
    *
-   * Der Deckel hilft nicht gegen FREMDE Last (LFH-398): arbeitet die Maschine nebenher, liefert
-   * die Suite keine belastbare Aussage. Dann kippt bis zur Hälfte der Tests in Timeouts,
-   * wandernd, bei vervielfachter Laufzeit. Das Fehlerbild führt in die Irre: der Seiten-Snapshot
-   * zeigt nur den Knopf der Query-Devtools, weil die App ihre ersten Abrufe (Sitzung, Einsatz)
-   * nicht rechtzeitig bekam. Das sieht nach einem Render- oder Auth-Defekt aus, ist aber Last.
-   * Gegenprobe: die rote Datei allein fahren und den Load Average ansehen. Keine längere Frist —
-   * ein Test, der nur mit mehr Geduld grün wird, misst die Maschine.
+   * Der Deckel schützt nur vor der eigenen Last. Auf einer Maschine, die nebenher anderes
+   * rechnet (Parallel-Session, Subagent, zweites Gate), liefert die Suite KEINE belastbare
+   * Aussage (LFH-398). Gemessen am 29.09.2026 unter Load 40–150 auf 16 Kernen: 14 bzw. 16
+   * rote Tests in zwei Läufen, jeweils andere, in 23–26 min statt ~18 min. So sieht das aus,
+   * und es sieht nach einem kaputten Frontend aus:
+   *   - die Fehler sind überwiegend das Test-Budget („Test timeout of … exceeded" an `goto`,
+   *     `fill`, `mouse.move`), dazu `Protocol error … session closed` und
+   *     `net::ERR_ABORTED; maybe frame was detached?`;
+   *   - die Fehlermenge wandert zwischen Läufen, die Laufzeit liegt weit über der üblichen;
+   *   - in der ersten Messung zu LFH-398 zusätzlich: Seiten-Snapshot nur mit dem Knopf „Open
+   *     Tanstack query devtools", in der Vite-Ausgabe `Auth-Prüfung fehlgeschlagen NetzFehler:
+   *     Keine Verbindung`.
+   * Zeigt sich dieses Bild, zuerst die Last prüfen (`uptime`), nicht die Ursache im Code
+   * suchen, und auf freier Maschine wiederholen. Eine Zusicherung, die über Läufe gleich rot
+   * bleibt, ist dagegen kein Lastrauschen, sondern ein eigener Befund (in beiden Läufen:
+   * `kopfzeile-schmal.spec.ts`, LFH-809). Keine Testfrist erhöhen, um Lastfehler zu
+   * übertünchen: ein Test, der nur mit mehr Geduld grün wird, misst die Maschine, nicht die
+   * Software.
    */
   workers: Number(process.env.PW_WORKERS ?? 3),
   /*

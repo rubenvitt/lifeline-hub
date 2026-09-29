@@ -385,6 +385,11 @@ ausgefüllte Prüfliste gilt nicht als fertig** — jede der 15 Zeilen trägt ei
   Alarmierung: je 1 zusätzliche Bestätigung (MIL 5.4.6.6).
 - [ ] **5 · Kontrast in beiden Modi** — Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1, nie < 4,5 : 1
   (MIL 5.2.4.2.2.2; WCAG 1.4.6/1.4.3); Zustände, Rahmen, Fokusring ≥ 3 : 1 (WCAG 1.4.11).
+  *Nachtrag 29.09.2026 (LFH-434):* Die Schwelle folgt dem Umgebungslicht, nicht dem Farbtoken.
+  Eine Fläche, die in beiden App-Modi dunkel bleibt (Kopfleiste, Rail), wird auch bei Tageslicht
+  gelesen und hält für Text die Tag-Schwelle ≥ 7 : 1. Gesperrte Einträge halten den
+  Boden ≥ 4,5 : 1 und tragen die Sperre zusätzlich ohne Farbe. Maßgeblich ist die Regel in
+  `CLAUDE.md` („Farbe und Zeichen“).
 - [ ] **6 · Kein Status allein über Farbe** — jede Statusfarbe zusätzlich mit Text, Symbol oder
   Form, 0 Ausnahmen (WCAG 1.4.1 Level A; MIL 5.4.6.8; 1 von 12 Männern, NEI).
 - [ ] **7 · Eine Farbe = eine Bedeutung** — Palette auf Doppelbelegung geprüft, gesättigte Farbe

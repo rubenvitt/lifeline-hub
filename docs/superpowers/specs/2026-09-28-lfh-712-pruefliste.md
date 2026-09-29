@@ -2,7 +2,7 @@
 
 Gate 7 der Bedien-Leitlinie (`2026-07-25-bedien-leitlinie-einsatzkontexte.md`, Festlegung 7)
 verlangt diese Liste an jeder umgebauten Seite. Planung und Specs liegen in
-`openspec/changes/lfh-712-lagekarte-zeichnen-korrigierbar/`.
+`openspec/changes/archive/2026-09-29-lfh-712-lagekarte-zeichnen-korrigierbar/`.
 
 ## Geltungsbereich
 

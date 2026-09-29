@@ -43,7 +43,7 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
    `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`). Der erwartete
    Höchststand seit LFH-628 (Zusatz in der Kennzahl, Marke im Überblick). „Evakuiert N · von
    M geplant“ steht seit LFH-607 auf Lageplatz B, sobald ein Evakuierungsbezirk angeordnet ist
-   (Datenquelle LFH-639, Change `openspec/changes/lfh-607-kennzahl-evakuiert/`). Bekannte
+   (Datenquelle LFH-639, Change `openspec/changes/archive/2026-09-29-lfh-607-kennzahl-evakuiert/`). Bekannte
    Lücken: Fortschritt je Abschnitt, Abschnittsfarbe, FMS-Status/„Seit“/Rückmeldung je Einheit,
    „keine Rückmeldung“, ETB-Lesemarke „seit Ihrer letzten Sichtung“, ETB-Gesamtzahl und
    Tagesbilanz-Summen (serverseitig), Folgeauftrag-Verweis am ETB-Eintrag (geschlossen

@@ -1,5 +1,6 @@
 import { Layout, Tag, Typography, theme } from 'antd';
 import type { CSSProperties } from 'react';
+import { TbLock } from 'react-icons/tb';
 import { Link, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
@@ -62,10 +63,10 @@ function GlobalLink({
     return (
       <Typography.Text
         style={{
-          // `farbenDunkel.schwach` hält gegen den Kopfzeilengrund WCAG 1.4.3 und bleibt deutlich
-          // schwächer als der weiße Aktiv-Link — die Sperre bleibt ablesbar. `farbenDunkel`, nicht der
-          // modusabhängige Token: die Kopfzeile ist in BEIDEN Modi dunkel.
-          color: farbenDunkel.schwach,
+          // `rahmenFarben.gesperrt` hält den Boden 4,5 : 1 und bleibt sichtbar schwächer als der
+          // freie Link (`gedaempft`). Die Tag-Schwelle gilt für bedienbaren Text, nicht für
+          // Gesperrtes (LFH-434); deshalb steht das Schloss daneben.
+          color: rahmenFarben.gesperrt,
           fontSize: 12,
           cursor: 'not-allowed',
           display: 'inline-flex',
@@ -74,6 +75,11 @@ function GlobalLink({
           flexShrink: 0,
         }}
       >
+        {/* Die Sperre trägt auf JEDER Breite ein Zeichen ohne Farbe (LFH-434, WCAG 1.4.1):
+            `cursor: not-allowed` sieht auf Touch niemand, und der Tag steht erst ab `lg`. */}
+        <span aria-hidden="true" data-lfh="sperr-schloss" style={{ display: 'inline-flex' }}>
+          <TbLock size={13} />
+        </span>
         {label}
         {/* Der Grund steht als TEXT da, nicht nur im `title`: auf dem Führungs-Tablet gibt es kein
             Hover. Eigene Farben, weil ein heller Standard-Tag auf dem dunklen Kopfzeilengrund den

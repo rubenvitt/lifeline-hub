@@ -5,7 +5,7 @@ import { OBJEKTART } from './leistenDaten';
 
 /**
  * Objektsuche der Kartenleiste (Herleitung:
- * `openspec/changes/lfh-716-lagekarte-markersuche-zeichenpicker/design.md`). Rein, damit die
+ * `openspec/changes/archive/2026-09-29-lfh-716-lagekarte-markersuche-zeichenpicker/design.md`). Rein, damit die
  * Modulsperre ohne Rendern als Paar prüfbar ist.
  */
 

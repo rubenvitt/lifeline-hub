@@ -3,7 +3,7 @@
 Angelegt an die neue **ETB-Druckansicht** (`/einsaetze/:id/etb/druck`, `pages/EtbDruckPage.tsx`,
 `etb/EtbDruckTabelle.tsx`) und an die umgebauten Druckansichten **Lagebericht**
 (`pages/LageberichtDetailPage.tsx`), **Befehl** (`pages/BefehlDetailPage.tsx`) und **Meldebild**
-(`pages/KraefteuebersichtPage.tsx`). Grundlage: Change `openspec/changes/lfh-22-druck-export/`
+(`pages/KraefteuebersichtPage.tsx`). Grundlage: Change `openspec/changes/archive/2026-09-29-lfh-22-druck-export/`
 (design.md D1–D10), Kriterien aus `docs/superpowers/specs/2026-07-25-bedien-leitlinie-einsatzkontexte.md`
 (Festlegung 7).
 
