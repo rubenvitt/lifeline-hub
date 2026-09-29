@@ -5,6 +5,7 @@ import { Formularpaneel } from '../../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import ModulEinstellungsListe from './ModulEinstellungsListe';
+import { quittiereModulGespeichert } from './modulQuittung';
 import { ladeModulOverrides, setzeModulOverride } from '../../api/einsaetze';
 import { ladeOrgModulEinstellungen } from '../../api/orgEinstellungen';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
@@ -62,7 +63,7 @@ export default function EinsatzModule() {
       setzeModulOverride(einsatzId, vars.modulKey, vars.update),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: einsatzKeys.modulOverrides(einsatzId) });
-      message.success('Modul-Einstellung gespeichert');
+      quittiereModulGespeichert(message, 'Modul-Einstellung gespeichert');
     },
   });
 

@@ -2,6 +2,7 @@ import { App, Button, Form, Input, InputNumber, Switch, theme } from 'antd';
 import { useEffect, useState } from 'react';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import ModulEinstellungsListe from './ModulEinstellungsListe';
+import { quittiereModulGespeichert } from './modulQuittung';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ladeOrgEinstellungen,
@@ -72,7 +73,7 @@ export default function EinsatzDefaults() {
       setzeOrgModulEinstellung(vars.modulKey, vars.rolle),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() });
-      message.success('Modul-Default gespeichert');
+      quittiereModulGespeichert(message, 'Modul-Default gespeichert');
     },
   });
 
