@@ -35,7 +35,7 @@ erreichbar, obwohl die Route sie annimmt. LFH-639 hat diese Lücke als Risiko be
 
 ### Modified Capabilities
 - keine. Die Anforderungen an Meldung und Rücknahme aus LFH-639
-  (`openspec/changes/lfh-639-fachmodul-betreuung/specs/betreuung-evakuierung/spec.md`)
+  (`openspec/changes/archive/2026-09-29-lfh-639-fachmodul-betreuung/specs/betreuung-evakuierung/spec.md`)
   bleiben unverändert. Diese Änderung macht sie nur über die Oberfläche erreichbar.
 
 ## Impact

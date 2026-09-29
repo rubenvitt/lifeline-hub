@@ -265,7 +265,7 @@ Der Abdeckungstest wächst von 20 auf 21 und nimmt den Eintrag in die Literal-Li
 
 ### D7 Modul-Gerüst und Wege
 
-Das Gerüst folgt dem Muster LFH-635 (`openspec/changes/lfh-635-fachmodul-abloesung/tasks.md`):
+Das Gerüst folgt dem Muster LFH-635 (`openspec/changes/archive/2026-09-29-lfh-635-fachmodul-abloesung/tasks.md`):
 
 - **Backend:**
   - `MODUL_KEYS` wächst von 28 auf 29, `wetter-pegel` steht im Lage-Block hinter

@@ -35,7 +35,7 @@ und die Mechanik dafür steht schon.
 
 ### New Capabilities
 
-Keine. Die Fähigkeit `sprungpalette` bringt LFH-645 (`openspec/changes/lfh-645-palette-vorschau-neuer-tab/`)
+Keine. Die Fähigkeit `sprungpalette` bringt LFH-645 (`openspec/changes/archive/2026-09-29-lfh-645-palette-vorschau-neuer-tab/`)
 mit. Sie ist noch nicht nach `openspec/specs/` übernommen.
 
 ### Modified Capabilities

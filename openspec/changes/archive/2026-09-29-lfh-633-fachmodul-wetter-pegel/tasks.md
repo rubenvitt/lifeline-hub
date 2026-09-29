@@ -2,7 +2,7 @@
 
 Jede Aufgabe entsteht test-first (`superpowers:test-driven-development`): erst der rote Test,
 dann der Code. Die Berührpunkte eines neuen Moduls folgen dem Muster LFH-635
-(`openspec/changes/lfh-635-fachmodul-abloesung/tasks.md`). Kein Test geht ins Netz: Bright
+(`openspec/changes/archive/2026-09-29-lfh-635-fachmodul-abloesung/tasks.md`). Kein Test geht ins Netz: Bright
 Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs gelenkt.
 
 ## 1. Backend: Pegelverlauf

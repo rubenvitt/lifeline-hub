@@ -77,7 +77,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Kräfteübersicht — **Schlüssel und Route bleiben `kraefteuebersicht`**.
 - **Keine erfundenen Daten:** was ohne Datenquelle ist, wird weggelassen (Epic LFH-606…617),
   trägt sein Ticket im Code-Kommentar und wird als **Abwesenheit** getestet. Eingelöst:
-  Evakuiert (LFH-607, `openspec/changes/lfh-607-kennzahl-evakuiert/`), Pegel auf Platz 1
+  Evakuiert (LFH-607, `openspec/changes/archive/2026-09-29-lfh-607-kennzahl-evakuiert/`), Pegel auf Platz 1
   (LFH-606), Rückmeldung (LFH-610), ETB-Zählung (LFH-612).
 - **Kennzahlenband** (LFH-640): immer sechs Plätze (vier Kern, zwei Lage), jede Kennzahl ein
   Heimatplatz; Lageplätze nur per Entscheidung am Einsatz (`EinsatzAnzeige.lagekennzahlen`), nie
@@ -196,13 +196,13 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   Personen-Cluster (`istTrefferzone`, `personenClusterAm`). Bild-Ziehgriffe
   (`pages/lagekarte/bildGriffe.ts`) in `max(controlHeight, 44)`, je Modus scharf, Moduswechsel
   wartet auf `dragend`.
-- **Betreuung auf der Karte** (LFH-673, `openspec/changes/lfh-673-betreuung-auf-der-lagekarte/design.md`):
+- **Betreuung auf der Karte** (LFH-673, `openspec/changes/archive/2026-09-29-lfh-673-betreuung-auf-der-lagekarte/design.md`):
   Marker-Ebene wie UHS (`alleVerortet`, `?platzieren=betreuungsstelle:<id>`), Sperre an der
   **Datenquelle** (`pages/lagekarte/betreuungEbene.ts`);
   Ort-Vorschau kennt keine Stellen (`src/geocoding/marker.rs`); Verortung ohne ETB, live über
   `Geschrieben::still_geaendert`; Zonentyp `evakuierungsbezirk` (`lage_zone.evakuierungsbezirk_id`).
 - **Objektsuche/Zeichenwahl** (LFH-716,
-  `openspec/changes/lfh-716-lagekarte-markersuche-zeichenpicker/design.md`): `MarkerSuche` über
+  `openspec/changes/archive/2026-09-29-lfh-716-lagekarte-markersuche-zeichenpicker/design.md`): `MarkerSuche` über
   `suchbareMarker`
   (`pages/lagekarte/objektsuche.ts`) prüft Modulsperre **je Typ**; Enter sendet über `onAbsenden`
   mit Spec; `FreiesZeichenInspector` entprellt (600 ms) mit eigenem Merker, Bezeichnung
@@ -229,19 +229,19 @@ nie `aria-current`, Ziel im zugänglichen Namen, Pfad aus `routing/deeplinks.ts`
 
 **Betreuung und Verpflegung**
 - **Verbleib → Betreuungsstelle** (LFH-674,
-  `openspec/changes/lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`): nur die Kennung
+  `openspec/changes/archive/2026-09-29-lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`): nur die Kennung
   (`person_verbleib.betreuungsstelle_id`, Cache
   `einsatz_person.aktuelle_verbleib_betreuungsstelle_id`), den Namen belegt der Client vor; der Server kopiert
   keinen Stellennamen (Ziel, Kurzform, ETB). Prüfkette 422 → 403 (vor jedem Lesen) → 404 → 409.
   „davon namentlich n" rechnet `…/betreuung`, nicht `repo::uebersicht`; ohne Personenrecht fehlt
   es. Live über `EINSATZ_STREAM_EVENTS.person → betreuung`. `betreuungsstelle` ist kein Leaf
   (Rebuild braucht den FK-Schalter).
-- **Meldeverlauf** (LFH-676, `openspec/changes/lfh-676-betreuung-meldeverlauf/design.md`):
+- **Meldeverlauf** (LFH-676, `openspec/changes/archive/2026-09-29-lfh-676-betreuung-meldeverlauf/design.md`):
   Reihenfolge `juengste_meldung!`/`meldereihenfolge!` (`src/betreuung/repo.rs`); `aktuell` nur aus
   dem Zeiger am Objekt; fremdes Objekt 404 vor dem Lesen; nachgetragen ≥ 60 s
   (`istNachgetragen`); Rücknahme unumkehrbar mit Rückfrage (`betreuung/MeldeVerlauf.tsx`);
   Aufklappen über `Datensicht.aufklappen` (`aufklappzeile` fällt mit LFH-697).
-- **Meldungen offline** (LFH-675, `openspec/changes/lfh-675-betreuung-meldungen-offline/design.md`):
+- **Meldungen offline** (LFH-675, `openspec/changes/archive/2026-09-29-lfh-675-betreuung-meldungen-offline/design.md`):
   `offline/schreiben.ts` (`stand`/`belegung`) mit `client_id`; Replay-Lookup **vor** jeder
   Zustandsprüfung (auch nach Einsatzende, `EinsatzSchreibfreigabe`); Erfassungszeit nur an der vorgemerkten Kopie, online die Serveruhr.
 - **Verpflegung** (LFH-634, `pages/VerpflegungPage.tsx`, `src/verpflegung/`): eigene Zeitfenster;
@@ -360,7 +360,7 @@ anwendbar), „nicht geprüft" ist keins.
   `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 25 am 25.09.2026); jede weitere
   Karte ist eine begründete Entscheidung (Beispiele: `odlStufe` in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`, `aufbewahrungZustand` in
-  `openspec/changes/lfh-23-retention-rest/design.md` D4). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
+  `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
   der Datei, kein `<Tag color={…}>` auf Vertrags-Enums (dafür `components/StatusTag.tsx`).
 
 **Farbe und Zeichen**
@@ -369,7 +369,7 @@ anwendbar), „nicht geprüft" ist keins.
   Flächen (`warnstufeFlaeche`/`flaechenFarbe`) sind die dritte Darstellungssorte; eine vierte wird
   in `statusFarben.ts` benannt, nicht in `pages/`.
 - **Helligkeit: ein Regler, eine Sperre** (LFH-397, Kriterium 8,
-  `openspec/changes/lfh-397-helligkeitsregler-warnsperre/design.md`): dritte Achse im
+  `openspec/changes/archive/2026-09-29-lfh-397-helligkeitsregler-warnsperre/design.md`): dritte Achse im
   `ThemeModeProvider` (`useHelligkeit`, Stufen 100/80/60/40/20, `lifeline-hub.helligkeit`,
   **gespiegelt in `index.html`**), wirkt nur über die Deckschicht `html::after` in `rollen.css`
   (`--lfh-abdunkelung`, `@media screen`), nie über Paletten. Bei aktiver Warnung
@@ -512,7 +512,7 @@ anwendbar), „nicht geprüft" ist keins.
 ## Frontend — Druck (LFH-71/LFH-22)
 
 **Gedruckt wird über den Browser, nie auf dem Server** (Herleitung
-`openspec/changes/lfh-22-druck-export/design.md`, Grundsatz aus
+`openspec/changes/archive/2026-09-29-lfh-22-druck-export/design.md`, Grundsatz aus
 `docs/superpowers/specs/2026-06-02-lage-lageberichte-design.md`).
 - **Eine Druckwurzel je Seite** (`data-lfh="druckwurzel"`); Mechanik nur in `druck/druck.css`
   (global in `main.tsx`, nur unter `@media print`; `@page` ist die gepinnte Ausnahme; Rest `display: none`, **nie** `visibility: hidden` + `position: absolute`). `*Print.css` tragen
@@ -693,12 +693,12 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
 - **Falle: sqlx spielt eine kleinere, noch nicht eingespielte Migration still nach**
   (`db::tests::sqlx_spielt_eingeschobene_kleinere_version_still_nach`).
 - **Migrationen entstehen nur über `alpha`**; Freigaben als Merge-Commit, nicht Squash.
-  Herleitung: `openspec/changes/lfh-658-migrationsnummern-vor-dem-merge/design.md`.
+  Herleitung: `openspec/changes/archive/2026-09-29-lfh-658-migrationsnummern-vor-dem-merge/design.md`.
 
 ## Backend — Demo-Daten zur Laufzeit (LFH-690)
 
 `src/demo/`, `src/routes/demo_daten.rs`; Schalter `--demo-daten`/`LIFELINE_DEMO_DATEN=true`
-(Vorgabe aus). Herleitung: `openspec/changes/lfh-690-demo-daten-laufzeit-import/`.
+(Vorgabe aus). Herleitung: `openspec/changes/archive/2026-09-29-lfh-690-demo-daten-laufzeit-import/`.
 - 404 ohne Schalter kommt aus der Registrierung (`RouterOptionen { demo_daten }`,
   `build_router_mit`); das Frontend liest nur `GET /api/demo-daten` (`admin/useDemoDaten.ts`).
 - **Import ist eine Transaktion nur über `…_tx(conn)`-Funktionen** (eine Pool-Funktion unter
@@ -712,7 +712,7 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
 
 ## Backend — Aufbewahrung (LFH-23)
 
-Herleitung: `openspec/changes/lfh-23-retention-rest/design.md`.
+Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md`.
 - **Totalsperre bleibt** (`einsatz::berechtigung::darf_lesen`, auch für den System-Admin); das
   Archiv liest nur `/api/aufbewahrung` (`routes/aufbewahrung.rs`), Guard
   `archiv_namensraum_nur_lesend_und_admin` (`tests/aufbewahrung.rs`) — neue Routen dort
@@ -746,7 +746,7 @@ cfg-Varianten (`unix:` nur unter `#[cfg(unix)]`; Windows → `ScannerNichtErreic
 
 ## Sitzung über mehrere Tabs (LFH-387)
 
-Herleitung: `openspec/changes/lfh-387-auth-zustand-tabuebergreifend/design.md`. Das Cookie gilt
+Herleitung: `openspec/changes/archive/2026-09-29-lfh-387-auth-zustand-tabuebergreifend/design.md`. Das Cookie gilt
 originweit, der Benutzer steht pro Tab — **der Server ist die Wahrheit, der Kanal nur Komfort.**
 - Jede schreibende Anfrage trägt `X-Erwarteter-Benutzer-Id` (`apiSend`/`apiUpload`,
   `setzeErwartetenBenutzer` synchron mit `benutzer` im `AuthProvider`); `CurrentUser` lehnt eine

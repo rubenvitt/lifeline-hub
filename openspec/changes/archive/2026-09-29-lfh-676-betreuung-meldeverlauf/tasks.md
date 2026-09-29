@@ -32,7 +32,7 @@
 
 ## 6. Abschluss
 
-- [x] 6.1 Prüfliste Einsatztauglichkeit (15 Kriterien) für die geänderte Betreuungsseite als `openspec/changes/lfh-676-betreuung-meldeverlauf/pruefliste.md`, jede Zeile mit Verdikt; Kriterium 12 mit der Begründung aus design.md „Risks“
+- [x] 6.1 Prüfliste Einsatztauglichkeit (15 Kriterien) für die geänderte Betreuungsseite als `openspec/changes/archive/2026-09-29-lfh-676-betreuung-meldeverlauf/pruefliste.md`, jede Zeile mit Verdikt; Kriterium 12 mit der Begründung aus design.md „Risks“
 - [x] 6.2 Nachzug auf dem Entwicklungsboard anlegen (Skill `clickup-task-anlegen`): `FahrzeugePage` auf `aufklappen` umstellen und `aufklappzeile` streichen; Ticketnummer im Dateikopf von `Datensicht.tsx` und in design.md D3 nachtragen
 - [x] 6.3 CLAUDE.md: Absatz zum Betreuungsverlauf (Lesen über die Reihe, `aktuell` aus dem Zeiger, Nachtragung = ETB-Schwelle, Rückfrage mit Grund im Dialog, `aufklappen` als Aufklappweg der `Datensicht`)
 - [ ] 6.4 `./scripts/check-all.sh` vollständig grün

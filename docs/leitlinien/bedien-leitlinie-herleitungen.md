@@ -38,7 +38,7 @@ aufgelösten Tokens die Knopfzeile nur in `kompakt` (24 px sind dort der Gate-3-
 in `controlHeight`). „Alles ins Dropdown“ scheiterte nur, solange der Auslöser ein Knopf **in** der
 Karte war. Die `OFFEN`-Zeile bleibt, weil der Guard Quelltext zählt und keine Dichte kennt;
 Kartengröße und gespeicherte Layouts sind unberührt. Herleitung:
-`openspec/changes/lfh-359-uhs-platzkarte-beruehrungsstufen/design.md`. Der Guard scannt **JSX-Tags mit
+`openspec/changes/archive/2026-09-29-lfh-359-uhs-platzkarte-beruehrungsstufen/design.md`. Der Guard scannt **JSX-Tags mit
 Klammertiefe, nicht per Regex**: `<Button\b[^>]*size="small"` ist mehrzeiligen Elementen blind
 (gemessen 61 statt 82) und verliert einen Treffer schon, wenn eine Pfeilfunktion vor der Prop
 steht — ein Gate, das einen Zeilenumbruch für Fortschritt hält. Was er **nicht** sieht, steht in

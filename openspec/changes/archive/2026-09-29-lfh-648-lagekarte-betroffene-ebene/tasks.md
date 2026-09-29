@@ -122,7 +122,7 @@ dann der Code. Pfade relativ zu `frontend/src/`.
 - [x] 9.1 Prüfliste Einsatztauglichkeit (15 Kriterien,
   `docs/superpowers/specs/2026-07-25-bedien-leitlinie-einsatzkontexte.md`) für die
   geänderte Lagekarten-Leiste ausfüllen und im Change ablegen
-  (`openspec/changes/lfh-648-lagekarte-betroffene-ebene/pruefliste.md`). Jede Zeile trägt
+  (`openspec/changes/archive/2026-09-29-lfh-648-lagekarte-betroffene-ebene/pruefliste.md`). Jede Zeile trägt
   ein Verdikt. Verifikation: Datei vorhanden, keine Zeile „nicht geprüft“.
 - [x] 9.2 Folgetickets per `clickup-task-anlegen`: (a) Org-Default-Drift im Client-Gate
   (`istModulGesperrt` kennt keine Org-Defaults), (b) der Platzier-Auftrag

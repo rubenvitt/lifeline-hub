@@ -46,7 +46,7 @@ _keine_
 
 - `betreuung-evakuierung`: Neue Anforderung „Offline-Erfassung von Stand- und
   Belegungsmeldungen“ (Idempotenz über `client_id`, Replay vor Zustandsprüfungen, Queue im
-  Client). Die Capability liegt noch als Delta in `openspec/changes/lfh-639-fachmodul-betreuung/`
+  Client). Die Capability liegt noch als Delta in `openspec/changes/archive/2026-09-29-lfh-639-fachmodul-betreuung/`
   und ist nicht nach `openspec/specs/` synchronisiert. Diese Änderung ergänzt sie deshalb um
   eine ADDED-Anforderung.
 
