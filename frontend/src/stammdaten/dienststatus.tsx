@@ -1,4 +1,4 @@
-import { Button, Popconfirm, Space, type TableColumnsType } from 'antd';
+import { Button, Space, type TableColumnsType } from 'antd';
 import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { StatusChip } from '../components/instrument';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
@@ -75,19 +75,27 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
             <Button disabled={laeuft} onClick={() => onBearbeiten(t)}>
               Bearbeiten
             </Button>
+            {/* KEINE Rückfrage vor „Außer Dienst" (LFH-477, Linie aus LFH-363/378): die Aktion
+                ist umkehrbar. Der Server setzt nur die Spalte `dienststatus`, keine Disposition
+                wird gelöst oder gelöscht; bestehende Einsatzzuordnungen zeigen solange ihren
+                Snapshot und nach „Wieder in Dienst" wieder die Stammdaten. Neu disponieren
+                lässt sich der Eintrag in der Zeit nicht. Der Rückweg steht im Gegenzweig
+                derselben Zelle. Seine Bedingung (409, wenn Funkrufname, Personal- oder
+                Bestandsnummer inzwischen aktiv neu vergeben ist) entsteht erst durch eine
+                eigene, spätere Anlage — nie durch einen Fehlklick hier. Deshalb `danger` und
+                Abstand (`size="middle"`), aber keine Reibung. Gilt für Fahrzeuge, Personal und
+                Material zugleich: alle drei Tabs rendern diese eine Spalte. */}
             {t.dienststatus === 'in_dienst' ? (
-              <Popconfirm
-                title="Außer Dienst stellen?"
+              <Button
+                danger
+                loading={laeuft}
                 disabled={laeuft}
-                okButtonProps={{ danger: true }}
-                onConfirm={() => {
+                onClick={() => {
                   if (!laeuft) mutation.mutate({ id: t.id, inDienst: false });
                 }}
               >
-                <Button danger loading={laeuft} disabled={laeuft}>
-                  Außer Dienst
-                </Button>
-              </Popconfirm>
+                Außer Dienst
+              </Button>
             ) : (
               <Button
                 loading={laeuft}
