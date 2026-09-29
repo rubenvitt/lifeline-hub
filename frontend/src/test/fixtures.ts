@@ -63,5 +63,13 @@ export function adminFixture(overrides: Partial<BenutzerAnzeige> = {}): Benutzer
 
 /** Rückgabe eines gemockten `useAuth` mit festem Benutzer und Stub-Aktionen. */
 export function authWertFixture(benutzer: BenutzerAnzeige | null): ReturnType<typeof useAuth> {
-  return { benutzer, laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn() };
+  return {
+    benutzer,
+    laedt: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    aktualisiere: vi.fn(),
+    abmeldenLokal: vi.fn(),
+    konflikt: null,
+  };
 }

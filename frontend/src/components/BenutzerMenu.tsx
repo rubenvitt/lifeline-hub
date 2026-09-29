@@ -85,8 +85,9 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
   if (!benutzer) return null;
 
   async function abmelden() {
-    await logout();
-    navigate('/login', { replace: true });
+    // `false`: die Sitzung gehört inzwischen einem anderen Benutzer (412, LFH-387) — der Server
+    // hat sie nicht beendet, dieser Tab bleibt stehen und zeigt den Benutzerkonflikt.
+    if (await logout()) navigate('/login', { replace: true });
   }
 
   const rollenTags = [];

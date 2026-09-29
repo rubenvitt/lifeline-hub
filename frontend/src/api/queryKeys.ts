@@ -459,7 +459,7 @@ export const GLOBAL_KEYS = {
   fachebene: 'fachebene',
 } as const;
 
-/** Werte von {@link GLOBAL_KEYS} — modul-lokal, nur für {@link LAGEBILD_OFFLINE}. */
+/** Ein globaler Key; nur die Lagebild-Allowlist unten braucht den Typ (LFH-723). */
 type GlobalKey = (typeof GLOBAL_KEYS)[keyof typeof GLOBAL_KEYS];
 
 /**
