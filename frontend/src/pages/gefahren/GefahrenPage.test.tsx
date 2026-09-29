@@ -92,21 +92,15 @@ describe('GefahrenPage', () => {
   });
 
   /**
-   * Leerzustand (LFH-331 · B3). Der Ort der Handlung liegt woanders: ein
-   * Gefahrengebiet entsteht durch Zeichnen auf der Lagekarte. Deshalb trägt der
-   * Leerzustand hier — anders als die reinen Karten-Listen — eine Primäraktion, und
-   * ihr Ziel kommt aus `routing/deeplinks.ts` (`lagekartePfad`), nicht als
-   * Vorlagentext von Hand.
-   *
-   * Die Knoten-Zusicherung ist die tragende: die Textzeile war vor dem Umbau grün.
+   * Leerzustand: ein Gefahrengebiet entsteht durch Zeichnen auf der Lagekarte, deshalb trägt er
+   * eine Primäraktion dorthin (Ziel aus `lagekartePfad`).
    */
   it('zeigt Leerzustand ohne Gefahrengebiete — mit dem Weg zur Lagekarte', async () => {
     server.use(...handlers([]));
     const { container } = renderMitProviders(
       <Routes>
         <Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} />
-        {/* Zielsonde: belegt, dass der Knopf wirklich auf der Lagekarten-Route landet.
-            Ein Vergleich auf den String allein prüfte den Builder gegen sich selbst. */}
+        {/* Zielsonde: der Knopf landet wirklich auf der Lagekarten-Route. */}
         <Route path="/einsaetze/:id/lagekarte" element={<div>Kartenfläche</div>} />
       </Routes>,
       { route: '/einsaetze/1/gefahren' },
@@ -125,14 +119,10 @@ describe('GefahrenPage', () => {
     server.use(...handlers());
     renderPage();
     const tag = await screen.findByText('hoch');
-    // Der PASTELLWERT ist die Signatur des Fehlgriffs: `warnstufeFarbe('hoch')` = '#ffa39e'
-    // landete als `color=` am `<Tag>`. Der Hex-String selbst steht NICHT im `style` — antd
-    // rechnet ihn beim Rendern in `rgb(...)` um (per Mutationsprobe gemessen:
-    // `color: rgb(255, 163, 158)` bei `#ffa39e`) und trägt ihn als TEXTFARBE, nicht als
-    // Hintergrund; die Hintergrundfläche ist ein daraus abgeleiteter Tint. Geprüft wird
-    // deshalb die ABWESENHEIT des umgerechneten Werts, nicht der neue Wert — den positiv zu
-    // pinnen prüfte antds Vorgaben, weil `test/utils.tsx` ein nacktes `ConfigProvider`
-    // rendert (dieselbe Falle wie bei Höhen).
+    // Signatur des Fehlgriffs: `warnstufeFarbe('hoch')` = '#ffa39e' als `color=` am `<Tag>`. antd
+    // rechnet den Hex-Wert in `rgb(...)` um und trägt ihn als Textfarbe — geprüft wird deshalb die
+    // Abwesenheit des umgerechneten Werts. Den neuen Wert positiv zu pinnen prüfte nur antds
+    // Vorgaben (nacktes `ConfigProvider` in `test/utils.tsx`).
     expect(tag.closest('.ant-tag')!.getAttribute('style') ?? '').not.toContain(
       'rgb(255, 163, 158)',
     );
@@ -206,8 +196,7 @@ describe('GefahrenPage', () => {
       hoechste_warnstufe: 'mittel',
     };
     const client = neuerQueryClient();
-    // Wie nach Navigation von der Lagekarte: einsatz + gefahrengebiete sind bereits gecached
-    // (gebieteQuery.isSuccess ist beim ersten Render true).
+    // Wie nach Navigation von der Lagekarte: einsatz + gefahrengebiete sind bereits im Cache.
     client.setQueryData(['einsatz', 1], einsatz);
     client.setQueryData(['gefahrengebiete', 1], [nord, sued]);
     server.use(
@@ -216,8 +205,8 @@ describe('GefahrenPage', () => {
       http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => HttpResponse.json([])),
     );
-    // StrictMode wie in der echten App (main.tsx): Effekte laufen doppelt — deckt das
-    // Race zwischen Default-auf-erstes-Gebiet und Deeplink-Selektion auf.
+    // StrictMode wie in `main.tsx`: Effekte laufen doppelt — deckt das Race zwischen Default aufs
+    // erste Gebiet und Deeplink-Selektion auf.
     renderMitProviders(
       <StrictMode>
         <Routes>
@@ -226,7 +215,7 @@ describe('GefahrenPage', () => {
       </StrictMode>,
       { route: '/einsaetze/1/gefahren?gefahrengebiet=8', client },
     );
-    // FINALE Auswahl: der editierbare Titel (h5) zeigt NUR das gewählte Gebiet.
+    // Finale Auswahl: der editierbare Titel zeigt nur das gewählte Gebiet.
     const titel = await screen.findByRole('heading', { level: 3 });
     expect(titel).toHaveTextContent('Süd'); // NICHT 'Nord' (= Default aufs erste Gebiet)
   });
@@ -250,20 +239,17 @@ describe('GefahrenPage', () => {
       }),
     );
     renderPage();
-    // Seit LFH-368/B5h trägt die Zelle EINEN Auslöser statt eines Mini-Selects; der
-    // zugängliche Name nennt Zeile, Spalte und die aktuelle Stufe.
+    // Die Zelle trägt einen Auslöser; sein Name nennt Zeile, Spalte und aktuelle Stufe.
     await userEvent.click(
       await screen.findByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
     );
-    // Der Eintrag wird über das OFFENE Menü gegriffen — antd lässt die Portale
-    // geschlossener Dropdowns im Baum stehen (Muster aus `etb/EtbZeitachse.test.tsx`).
+    // Über das offene Menü greifen — antd lässt Portale geschlossener Dropdowns stehen.
     const menue = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     );
     if (!menue) throw new Error('kein offenes Menü im Baum');
     await userEvent.click(within(menue).getByRole('menuitem', { name: /hoch/i }));
-    // Auf den PUT selbst warten: es gibt keinen Select-Neuzeichnung mehr, auf die
-    // sich ein Textsucher stützen könnte.
+    // Auf den PUT selbst warten, es gibt keine Neuzeichnung, auf die ein Textsucher warten könnte.
     await waitFor(() =>
       expect(put).toMatchObject({
         gefahrentyp: 'brand',
@@ -297,17 +283,14 @@ describe('GefahrenPage', () => {
     const input = await screen.findByRole('textbox');
     await userEvent.clear(input);
     await userEvent.type(input, 'Süd');
-    // Das Edit-Feld ist ein <textarea>; Enter fügt sonst nur einen Umbruch ein.
-    // Bestätigung robust über Enter-keyDown + Blur (löst editable.onChange aus).
+    // Das Edit-Feld ist ein <textarea>; bestätigt wird über Enter-keyDown + Blur.
     fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
     fireEvent.blur(input);
     await waitFor(() => expect(patch).toEqual({ label: 'Süd' }));
   });
 
-  // Task 4 (LFH-368): unter `lg` stapeln Gebietsliste und Matrix, statt sich nebeneinander
-  // zu quetschen. Die Behauptung ist die Flex-RICHTUNG, nicht eine Pixelbreite — jsdom
-  // rechnet kein Layout. Beide Fälle zusammen sind die Behauptung: nur „column bei 800"
-  // wäre auch erfüllt, wenn die Richtung fest auf `column` stünde.
+  // Unter `lg` stapeln Gebietsliste und Matrix. Geprüft wird die Flex-Richtung (jsdom rechnet kein
+  // Layout), und zwar beide Fälle — „column bei 800" allein wäre auch bei fester Richtung erfüllt.
   it('stapelt Gebietsliste und Matrix unter lg, statt sie nebeneinander zu quetschen', async () => {
     server.use(...handlers());
     setzeViewportBreite(800); // < lg (992)
@@ -329,16 +312,9 @@ describe('GefahrenPage', () => {
   });
 
   /**
-   * Die Gebietszeile ist ein handgebautes Bedienziel und muss den Boden selbst tragen
-   * (Abschluss-Review zu LFH-368, Konvention aus LFH-365). Die reine Funktion prüft die
-   * WERTE, dieser Fall prüft, dass sie überhaupt am `<div onClick>` ankommen — genau die
-   * Regression, die `Liste.tsx:171-175` benennt („kein Test sähe es"), wenn dort jemand den
-   * `...style`-Spread nach vorn zöge.
-   *
-   * Geprüft wird die ANWESENHEIT und die REIHENFOLGE der Angaben im Inline-Style, kein Wert:
-   * `test/utils.tsx` montiert ein nacktes `ConfigProvider` ohne unser Theme, jede Zahl hier
-   * belegte antd-Vorgaben statt der Staffel (gemessen: `min-height: 32px; padding: 12px 16px`
-   * — antds Voreinstellungen, nicht 30/48/72).
+   * Die Gebietszeile ist ein handgebautes Bedienziel. Die reine Funktion prüft die Werte, dieser
+   * Fall, dass sie am `<div onClick>` ankommen. Geprüft werden Anwesenheit und Reihenfolge der
+   * Angaben, kein Wert: das nackte `ConfigProvider` liefert nur antd-Vorgaben.
    */
   it('legt den Trefflächenboden wirklich auf die klickbare Gebietszeile', async () => {
     server.use(...handlers());
@@ -348,23 +324,15 @@ describe('GefahrenPage', () => {
     if (!zeile) throw new Error('keine Listenzeile im Baum');
     const stil = zeile.getAttribute('style') ?? '';
     expect(stil).toContain('min-height');
-    // Die zweite Hälfte der Konvention: die Kurzform `padding` muss NACH den Längsformen
-    // `padding-block`/`padding-inline` der Liste stehen, sonst gewinnen deren kleinere Werte
-    // und die Polsterung fällt still weg. Genau diese Reihenfolge sichert der Spread in
-    // `Liste.tsx:171-175` zu — eine Zusicherung, die es dort selbst nicht gibt.
+    // Die Kurzform `padding` muss nach `padding-block`/`padding-inline` der Liste stehen, sonst
+    // gewinnen deren kleinere Werte (Spread in `Liste.tsx`).
     expect(stil.indexOf('padding:')).toBeGreaterThan(stil.indexOf('padding-block'));
   });
 });
 
 /**
- * Trefflächenboden der Gebietszeile — die Werte (Abschluss-Review zu LFH-368 · B5h).
- *
- * Schablone: `pages/lagekarte/Sidebar.test.tsx:602-637`. Geprüft wird die REINE FUNKTION gegen
- * die Dichtestufen aus `theme/tokens.ts`, nicht ein gerendertes Pixel — jsdom rechnet kein
- * Layout, und ein gerenderter Wert käme aus dem nackten `ConfigProvider` von `test/utils.tsx`.
- *
- * Die Böden stehen als LITERALE da. Aus dem Token zurückgelesen prüften sie den Token gegen sich
- * selbst und blieben grün, egal welche Zahl dort steht.
+ * Trefflächenboden der Gebietszeile — die reine Funktion gegen die Dichtestufen. Die Böden stehen
+ * als Literale da; aus dem Token zurückgelesen prüften sie den Token gegen sich selbst.
  */
 describe('GefahrenPage: Bedienziel-Boden der Gebietsliste', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({
@@ -380,9 +348,8 @@ describe('GefahrenPage: Bedienziel-Boden der Gebietsliste', () => {
   });
 
   /**
-   * Die eigentliche Aussage: der Wert ZIEHT MIT. Ein dichteblindes `minHeight: 72` bestünde alle
-   * drei Böden oben und fällt allein hier — deshalb stehen beide Fälle da, einer allein belegte
-   * nichts.
+   * Der Wert zieht mit: ein dichteblindes `minHeight: 72` bestünde die drei Böden oben und fällt
+   * nur hier.
    */
   it('wächst über die Dichtestufen, statt auf einer Stufe zu kleben', () => {
     const hoehen = (['kompakt', 'komfortabel', 'handschuh'] as const).map(
@@ -393,9 +360,8 @@ describe('GefahrenPage: Bedienziel-Boden der Gebietsliste', () => {
   });
 
   /**
-   * ZWEI Angaben, nicht eine: die Polsterung allein trüge den Boden nicht (grob 54 px im
-   * Handschuh-Betrieb gegen die geforderten 72), muss aber da sein und ebenfalls mitziehen —
-   * sonst klebt der Text an der Kante. Auch hier LITERALE.
+   * Zwei Angaben: die Polsterung allein trüge den Boden nicht, muss aber mitziehen, sonst klebt der
+   * Text an der Kante.
    */
   it('trägt neben der Höhe eine mitziehende Polsterung', () => {
     expect(gebietszeileStil(tokenFuer('kompakt')).padding).toBe('7px 11px');

@@ -12,15 +12,9 @@ import { setzeViewportBreite } from '../../test/viewport';
 import type { BrDetail, EinsatzAnzeige, Einheit, EinsatzFahrzeug } from '../../api/types';
 import { einsatzFixture } from '../../test/fixtures';
 
-// Kind-Komponente stubben (Präzedenz `UhsDetailPage.test.tsx:21`): `BrSwitcher` feuert eine
-// eigene `listeBr`-Query (`GET .../bereitstellungsraeume`, ohne Trailing-ID), für die diese
-// Datei keinen MSW-Handler registriert. `test/setup.ts` läuft mit `onUnhandledRequest: 'error'`
-// — ohne den Mock hing das Grün bislang am Abort-Timing der Query beim Unmount (`gcTime: 0`),
-// nicht an einem echten Handler. Diese Datei testet die Seiten-Komposition (Kräfte/Sidebar/
-// Schreibschutz), nicht den Switcher-Datenfluss.
+// `BrSwitcher` feuert eine eigene `listeBr`-Query ohne MSW-Handler (`onUnhandledRequest: 'error'`);
+// diese Datei testet die Seiten-Komposition, nicht den Switcher.
 vi.mock('./BrSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
-
-// -------- Fixture-Builder --------
 
 function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
   return einsatzFixture({ bezeichnung: 'Test-Einsatz', meine_rolle: 'fuehrungspersonal', ...over });
@@ -106,8 +100,6 @@ function einheit(over: Partial<Einheit> = {}): Einheit {
   };
 }
 
-// -------- Render-Hilfe --------
-
 function renderBrDetail(brId = 1) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   render(
@@ -145,8 +137,6 @@ function renderBrBei(route: string) {
     </QueryClientProvider>,
   );
 }
-
-// -------- Tests --------
 
 describe('BrDetailPage — Deeplink-Robustheit (LFH-25)', () => {
   it('leitet bei ungültiger BR-ID auf die Liste um', async () => {
@@ -186,10 +176,8 @@ describe('BrDetailPage – bereitgestellte Einheiten + Austritt (LFH-14)', () =>
 
     renderBrDetail();
 
-    // Einheit sichtbar
     expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
 
-    // entfernen-Button klicken
     const btn = screen.getByRole('button', { name: 'entfernen' });
     await userEvent.click(btn);
 
@@ -231,10 +219,8 @@ describe('BrDetailPage – Sidebar zuweisen (LFH-14)', () => {
 
     renderBrDetail();
 
-    // Fahrzeug in Sidebar sichtbar
     expect(await screen.findByText('Florian 1')).toBeInTheDocument();
 
-    // zuweisen-Button klicken
     const btn = screen.getByRole('button', { name: 'zuweisen' });
     await userEvent.click(btn);
 
@@ -376,9 +362,8 @@ describe('BrDetailPage — Typ, Stärke, Summenzeile (LFH-347 · M58a)', () => {
 
 describe('BrDetailPage — unvollständige Stärke bei fehlenden Einheiten (Final-Review Befund A)', () => {
   it('zeigt „—" statt einer zu kleinen Zahl, wenn eine bereitgestellte Einheit in der Einheitenliste fehlt', async () => {
-    // BR trägt zwei Einheiten, die Einheiten-Query liefert nur eine davon zurück
-    // (Teilausfall/Cache-Lücke) — die Summenzeile darf keine vollständig aussehende,
-    // in Wahrheit zu kleine Zahl zeigen.
+    // Die Einheiten-Query liefert nur eine der zwei Einheiten (Teilausfall) — die Summenzeile darf
+    // keine vollständig aussehende, zu kleine Zahl zeigen.
     const zug = einheit({
       id: 10,
       name: 'Zug 1',
@@ -432,11 +417,8 @@ describe('BrDetailPage — unvollständige Stärke bei fehlenden Einheiten (Fina
   });
 });
 
-// Task 4 (LFH-341 · H40): unter `md` nimmt die „Kräfte ohne BR"-Spalte die feste 240-px-Breite
-// und stellt sich mit dem Hauptbereich gestapelt statt gequetscht dar — dieselbe Form wie
-// Gefahrengebietsliste und Gliederungsbaum. Geprüft wird der Inline-Style der Karte selbst
-// (`kraefte-ohne-br`), nicht der tragende Flex-Container: nur der Karten-Style zeigt, ob die
-// feste Breite tatsächlich WEG ist, nicht bloß, dass der Rahmen umbricht.
+// Unter `md` nimmt die „Kräfte ohne BR"-Spalte volle Breite und stapelt. Geprüft wird der Style der
+// Karte selbst: nur er zeigt, dass die feste Breite weg ist, nicht bloß, dass der Rahmen umbricht.
 describe('BrDetailPage — Kräfte-Spalte bricht unter md um (LFH-341)', () => {
   it('nimmt der Kräfte-Spalte unter md die feste Breite', async () => {
     const br = brDetail({ einheiten: [], fahrzeuge: [] });
@@ -453,8 +435,7 @@ describe('BrDetailPage — Kräfte-Spalte bricht unter md um (LFH-341)', () => {
 
     const spalte = await screen.findByTestId('kraefte-ohne-br');
     expect(spalte.style.width).not.toBe('240px');
-    // Ohne diese Weiche quetschte der Flex-Container die 100%-Karte weiterhin in eine
-    // Spalte, obwohl ihre feste Breite schon weg ist — deshalb auch der Container selbst.
+    // Auch der Container selbst: sonst quetschte er die 100%-Karte weiter in eine Spalte.
     expect(screen.getByTestId('br-detail-rahmen').style.flexDirection).toBe('column');
   });
 

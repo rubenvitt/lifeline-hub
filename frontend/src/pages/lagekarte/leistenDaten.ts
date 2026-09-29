@@ -31,17 +31,17 @@ import { BETREUUNG_SPERRGRUND, type BetreuungZugriff } from './betreuungEbene';
 import { ART_LABEL, personenZahl } from '../../betreuung/betreuungText';
 
 /**
- * Reine Ableitungen der rechten Kartenleiste (Neuentwurf S5 „Karte führt, Daten folgen").
- *
- * Getrennt von `Sidebar.tsx`, damit Zähler, Datenraster und Kartengrundlage ohne Rendern
- * prüfbar sind. Der Basename kollidiert mit keiner `.tsx` (CLAUDE.md, `direkteinstiegKern`).
+ * Reine Ableitungen der rechten Kartenleiste — getrennt von `Sidebar.tsx`, damit Zähler,
+ * Datenraster und Kartengrundlage ohne Rendern prüfbar sind.
  */
 
 // ── Ebenen ─────────────────────────────────────────────────────────────────────────────
 
-/** Reihenfolge und Wortlaut der Ebenen-Zeilen — die zehn Schalter von vor LFH-648, dazu
- *  „Betreuungsstellen" (LFH-673) neben der UHS und „Betroffene" (LFH-648) am Ende. Beide
- *  tragen eine Zugriffsgrenze; „Betroffene" ist die einzige Ebene mit Vorgabe aus. */
+/**
+ * Reihenfolge und Wortlaut der Ebenen-Zeilen, mit „Betreuungsstellen" neben der UHS und
+ * „Betroffene" am Ende. Beide tragen eine Zugriffsgrenze; „Betroffene" ist die einzige Ebene mit
+ * Vorgabe aus.
+ */
 export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
   { key: 'einsatzort', name: 'Einsatzort' },
   { key: 'einheit', name: 'Einheiten' },
@@ -58,11 +58,9 @@ export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
 ];
 
 /**
- * Signaturfarbe je Ebene für das 14-px-Farbfeld — aus den Rollen, nicht aus einer eigenen
- * Palette. Wo die Karte eine Rollenfarbe zeichnet (Einsatzort `marke`, UHS `bedien`), ist es
- * dieselbe; wo sie eine Kartensignatur ohne Rolle trägt (Abschnitte, Lagemeldungen,
- * DV-102-Zeichen), steht die nächste Rolle — das Feld ist ein Wiedererkennungszeichen, keine
- * Legende der Marker-Tinte. Der zweite Kanal ist der Name der Zeile.
+ * Signaturfarbe je Ebene für das 14-px-Farbfeld, aus den Rollen. Wo die Karte eine Rollenfarbe
+ * zeichnet (Einsatzort `marke`, UHS `bedien`), ist es dieselbe; sonst die nächste Rolle — das Feld
+ * ist ein Wiedererkennungszeichen, keine Legende. Der zweite Kanal ist der Name der Zeile.
  */
 export function ebenenFarbe(key: keyof LayerSichtbar, rollen: Farbrollen): string {
   switch (key) {
@@ -77,9 +75,8 @@ export function ebenenFarbe(key: keyof LayerSichtbar, rollen: Farbrollen): strin
       return rollen.achtung;
     case 'freies_zeichen':
       return rollen.gedaempft;
-    // Betroffene (LFH-648): die Marker tragen Sichtungsfarben, die ein einzelnes Farbfeld
-    // nicht erklären kann — das tut die Sichtungslegende. Hier steht deshalb eine
-    // neutrale Textstufe, und ausdrücklich NICHT der Default: Blau ist Bedienung.
+    // Die Personen-Marker tragen Sichtungsfarben, die ein Farbfeld nicht erklären kann (das tut die
+    // Sichtungslegende). Deshalb eine neutrale Textstufe, nicht der Default: Blau ist Bedienung.
     case 'person':
       return rollen.text2;
     default:
@@ -94,22 +91,25 @@ export interface EbenenZeile {
    *  `null` an einer gesperrten Zeile: dort steht der Grund, und eine Zahl verriete die Menge. */
   anzahl: number | '—' | null;
   sichtbar: boolean;
-  /** Gesetzt = die Zeile ist nicht schaltbar und sagt, warum (LFH-648, nur „Betroffene"). */
+  /** Gesetzt = die Zeile ist nicht schaltbar und sagt, warum (nur „Betroffene"). */
   sperrgrund?: string;
 }
 
-/** Zugriffsangabe der Ebene „Betroffene" (LFH-648) — ihre Marker laufen getrennt von
- *  `alleVerortet`, die Zahl kommt deshalb von außen. */
+/**
+ * Zugriffsangabe der Ebene „Betroffene" — ihre Marker laufen getrennt von `alleVerortet`, die Zahl
+ * kommt deshalb von außen.
+ */
 export interface PersonenEbenenAngabe {
   zugriff: PersonenZugriff;
   anzahl: number;
-  /** Die Personenliste scheiterte: „—" an DIESER Zeile. Die übrigen zählen weiter — ihre
-   *  Quellen sind nicht betroffen. */
+  /** Die Personenliste scheiterte: „—" an dieser Zeile, die übrigen zählen weiter. */
   fehler?: boolean;
 }
 
-/** Zugriffsangabe der Ebene „Betreuungsstellen" (LFH-673). Die Marker stehen in
- *  `alleVerortet` wie die UHS — gezählt wird dort; von außen kommt nur die Grenze. */
+/**
+ * Zugriffsangabe der Ebene „Betreuungsstellen". Die Marker stehen in `alleVerortet` wie die UHS;
+ * von außen kommt nur die Grenze.
+ */
 export interface BetreuungEbenenAngabe {
   zugriff: BetreuungZugriff;
 }
@@ -117,13 +117,11 @@ export interface BetreuungEbenenAngabe {
 /**
  * Die Zeilen des Paneels „Ebenen".
  *
- * `zonenAnzahl` ist die UNGEGATTERTE Zonenliste (`useLagekarteDaten().zonen`), nicht
- * `zonenFeatures` — die sind an den Zonen-Schalter gebunden, eine abgeschaltete Ebene
- * zeigte sonst „0" für Zonen, die es gibt. Die übrigen Zählungen kommen aus `alleVerortet`,
- * das jeden verorteten Marker mit seinem Ebenen-`typ` trägt (Abschnitte über ihre Fläche).
+ * `zonenAnzahl` ist die ungegatterte Zonenliste (`useLagekarteDaten().zonen`), nicht
+ * `zonenFeatures` — die hängen am Zonen-Schalter, eine abgeschaltete Ebene zeigte sonst „0". Die
+ * übrigen Zählungen kommen aus `alleVerortet` (jeder verortete Marker mit seinem Ebenen-`typ`).
  *
- * Im Fehlerfall steht „—" statt einer Zahl: „UHS 0" ist eine Aussage über die Lage, und die
- * hat bei gescheitertem Abruf niemand geprüft (dieselbe Regel wie bisher an „Verortet").
+ * Im Fehlerfall steht „—" statt einer Zahl: „UHS 0" wäre eine ungeprüfte Aussage über die Lage.
  */
 export function ebenenZeilen(
   verortet: readonly Pick<KarteMarker, 'typ'>[],
@@ -137,8 +135,8 @@ export function ebenenZeilen(
   for (const m of verortet) zaehlung.set(m.typ, (zaehlung.get(m.typ) ?? 0) + 1);
   return EBENEN.flatMap(({ key, name }): EbenenZeile[] => {
     if (key === 'person') return personenZeile(name, layer.person, quellenFehler, personen);
-    // Dieselbe Regel wie „Betroffene": ausgeblendet → keine Zeile, gesperrt → Grund statt
-    // Zahl, nie „an". Die Zahl kommt hier aus `alleVerortet`, wie bei der UHS.
+    // Wie „Betroffene": ausgeblendet → keine Zeile, gesperrt → Grund statt Zahl, nie „an". Die Zahl
+    // kommt aus `alleVerortet`.
     if (key === 'betreuungsstelle') {
       if (betreuung.zugriff === 'ausgeblendet') return [];
       if (betreuung.zugriff === 'gesperrt') {
@@ -151,11 +149,9 @@ export function ebenenZeilen(
 }
 
 /**
- * Die Zeile „Betroffene" folgt der Einsatz-Navigation (`einsatz/ModulPanel.tsx`): ein im
- * Einsatz ausgeblendetes Modul erscheint gar nicht, ein gesperrtes steht gesperrt da — mit
- * Grund und ohne Zahl (CLAUDE.md: fehlende Berechtigung wird erklärt, nicht stumm
- * weggeschaltet; die Zahl wäre die Menge, die der Benutzer nicht sehen darf). Eine gesperrte
- * Zeile ist nie „an", auch wenn die geteilte Ansicht den Schalter trägt.
+ * Die Zeile „Betroffene" folgt der Einsatz-Navigation (`einsatz/ModulPanel.tsx`): ein
+ * ausgeblendetes Modul erscheint nicht, ein gesperrtes steht gesperrt da — mit Grund, ohne Zahl
+ * (die wäre die Menge, die der Benutzer nicht sehen darf). Eine gesperrte Zeile ist nie „an".
  */
 function personenZeile(
   name: string,
@@ -183,7 +179,7 @@ export function verortetAnzahl(verortet: readonly Pick<KarteMarker, 'typ'>[]): n
   return verortet.filter((m) => m.typ !== 'einsatzort').length;
 }
 
-// ── Ausgewählt ────────────────────────────────────────────────────────────────────────
+// ── Ausgewählt ──
 
 export interface AuswahlRoh {
   einheiten: readonly Einheit[];
@@ -192,12 +188,12 @@ export interface AuswahlRoh {
   uhs: readonly Uhs[];
   schaeden: readonly Schaden[];
   abschnitte: readonly Einsatzabschnitt[];
-  /** Betreuungsstellen (LFH-673) — leer ohne Modulrecht. */
+  /** Betreuungsstellen — leer ohne Modulrecht. */
   betreuungsstellen: readonly Betreuungsstelle[];
   /**
-   * Letzte Rückmeldung je Einheit (LFH-610). Optional und bewusst ohne Leerwert: fehlt sie
-   * (lädt, 403 ohne Leserecht auf „Meldungen", Fehler, Historien-Modus), zeigt das Paneel
-   * den Block „Letzte Meldung" gar nicht — eine leere Menge hieße dagegen „nie gemeldet".
+   * Letzte Rückmeldung je Einheit. Optional und bewusst ohne Leerwert: fehlt sie (lädt, 403,
+   * Fehler, Historien-Modus), zeigt das Paneel den Block gar nicht — eine leere Menge hieße „nie
+   * gemeldet".
    */
   rueckmeldungen?: Rueckmeldungen;
 }
@@ -231,7 +227,7 @@ export const OBJEKTART: Record<MarkerTyp, string> = {
   einsatzort: 'Einsatzort',
   lagemeldung: 'Lagemeldung',
   freies_zeichen: 'Taktisches Zeichen',
-  // Nur auf der Betroffenen-Karte (LFH-613); die Lagekarte führt Personen nicht als Ebene.
+  // Objektart-Wort für Personen-Marker.
   person: 'Person',
   betreuungsstelle: 'Betreuungsstelle',
 };
@@ -263,7 +259,7 @@ export function auswahlUnterzeile(marker: KarteMarker, roh: AuswahlRoh): string 
         const u = roh.uhs.find((x) => x.id === marker.id);
         return u ? uhsTyp[u.typ]?.label : undefined;
       }
-      // Die Einrichtungsstufe — das Zeichen ist für alle vier dasselbe (design.md D8).
+      // Die Einrichtungsstufe — das Zeichen ist für alle vier dasselbe.
       case 'betreuungsstelle': {
         const s = roh.betreuungsstellen.find((x) => x.id === marker.id);
         return s ? ART_LABEL[s.art] : undefined;
@@ -276,12 +272,10 @@ export function auswahlUnterzeile(marker: KarteMarker, roh: AuswahlRoh): string 
 }
 
 /**
- * Das Datenraster des Paneels „Ausgewählt" — nur Felder, die eine Datenquelle haben.
- *
- * Status und „Seit" einer EINHEIT und „Seit" eines Fahrzeugs kommen seit LFH-609 aus dem
- * DTO: der Einheitenstatus ist aus den Fahrzeugen abgeleitet (gemeinsam oder „gemischt")
- * oder von Hand gesetzt; ein unbekannter Zeitpunkt bleibt „—". „Letzte Meldung" (LFH-610)
- * steht nicht im Raster, sondern als eigener Block darunter — {@link letzteMeldungBlock}.
+ * Das Datenraster des Paneels „Ausgewählt" — nur Felder mit Datenquelle. Status und „Seit" einer
+ * Einheit und „Seit" eines Fahrzeugs kommen aus dem DTO (der Einheitenstatus ist aus den Fahrzeugen
+ * abgeleitet oder von Hand gesetzt); ein unbekannter Zeitpunkt bleibt „—". „Letzte Meldung" steht
+ * als eigener Block darunter ({@link letzteMeldungBlock}).
  *
  * `zeit` formatiert einen UTC-Zeitstempel nach den Anzeigekonventionen des Einsatzes.
  */
@@ -404,11 +398,9 @@ export interface LetzteMeldungBlock {
 }
 
 /**
- * Block „Letzte Meldung" einer ausgewählten EINHEIT (Neuentwurf S5, LFH-610): die jüngste an
- * die Einheit gebundene Meldung, gleich welcher Meldungsart. `null` — und damit KEIN Block —,
- * wenn der Marker keine Einheit ist, die Rückmeldungen nicht vorliegen oder die Einheit noch
- * nie gemeldet hat. Ein Platzhalter wie „—" stünde im Paneel als Aussage, die für die ersten
- * beiden Fälle nicht belegt ist; der dritte zeigt sich im Meldebild (S6), nicht hier.
+ * Block „Letzte Meldung" einer ausgewählten Einheit: die jüngste an sie gebundene Meldung. `null` —
+ * und damit kein Block —, wenn der Marker keine Einheit ist, die Rückmeldungen nicht vorliegen oder
+ * die Einheit nie gemeldet hat. Ein „—" wäre für die ersten beiden Fälle eine unbelegte Aussage.
  */
 export function letzteMeldungBlock(
   marker: Pick<KarteMarker, 'typ' | 'id'>,
@@ -421,7 +413,7 @@ export function letzteMeldungBlock(
   return { text: r.inhalt, meta: `${zeit(r.ereigniszeit)} · ${MELDEWEG_WORT[r.meldeweg]}` };
 }
 
-// ── Kartengrundlage ───────────────────────────────────────────────────────────────────
+// ── Kartengrundlage ──
 
 /** Wert eines Segments: `online:<Stilname>` · `offline` · `blind`. */
 export type GrundlageWert = string;
@@ -434,15 +426,11 @@ export interface GrundlageOption {
 }
 
 /**
- * Die Segmente der Kartengrundlage — was es gibt, sonst nichts.
- *
- * Je Online-Stil aus `config.online_styles` ein Segment (die Stilnamen sind die Wahl, die
- * vorher im Unter-Select stand); ist keiner konfiguriert, steht EIN gesperrtes „Online" da.
- * „Lage / Gelände / Satellit" aus dem Entwurf S5 sind deshalb KEINE festen Rollen, sondern
- * die Namen der übernommenen Quellen (LFH-616): der Katalog bietet „TopPlusOpen" als Gelände
- * und „Satellit (Esri)" als Luftbild an, Offline hat kein Luftbild.
- * Offline ist gesperrt, wenn es nicht verfügbar ist. Gesperrt statt ausgeblendet: dass eine
- * Grundlage fehlt, ist eine Aussage über die Installation, die die Einsatzkraft braucht.
+ * Die Segmente der Kartengrundlage — was es gibt, sonst nichts. Je Online-Stil aus
+ * `config.online_styles` ein Segment; ohne konfigurierten Stil ein gesperrtes „Online". Die
+ * Stilnamen sind die Namen der Quellen, keine festen Rollen. Offline ist gesperrt, wenn es nicht
+ * verfügbar ist — gesperrt statt ausgeblendet, weil eine fehlende Grundlage eine Aussage über die
+ * Installation ist.
  */
 export function grundlageOptionen(
   onlineStyles: readonly OnlineStyle[],

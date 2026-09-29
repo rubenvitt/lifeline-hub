@@ -448,9 +448,8 @@ describe('abschnittZeilen', () => {
     expect(nord.einheiten).toBe(3);
     expect(nord.unterabschnitte).toBe(1);
     expect(nord.staerkeText).toBe('1/0/2//3');
-    // LFH-609: gezählt werden EINHEITEN nach der Kategorie ihres Status (auch „gemischt"
-    // mit gemeinsamer Kategorie), nicht mehr die Mittel — die Fahrzeuge und das Personal
-    // oben ergäben 1/2/2.
+    // Gezählt werden Einheiten nach der Kategorie ihres Status (auch „gemischt" mit gemeinsamer
+    // Kategorie), nicht die Mittel — die ergäben 1/2/2.
     expect(nord.einheitenStatus).toEqual({ bereit: 1, gebunden: 1, ausfall: 1, ohne: 0 });
     const sued = zeilen.find((z) => z.abschnittId === 2)!;
     expect(sued.einheitenStatus).toEqual({ bereit: 0, gebunden: 0, ausfall: 0, ohne: 1 });

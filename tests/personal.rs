@@ -221,10 +221,9 @@ async fn person_mit_qualifikationen(app: &axum::Router, admin: &str) -> (i64, i6
     (json["id"].as_i64().unwrap(), q1, q2)
 }
 
-/// **Der wichtigste Test des Tickets.** `qualifikation_ids` trug im alten Vollersatz-Body
-/// ein `#[serde(default)] Vec<i64>` — jeder PATCH ohne das Feld (z. B. das Ändern der
-/// Telefonnummer) löschte ALLE Qualifikationszuordnungen der Person. Fällt gegen HEAD
-/// hart durch.
+/// **Der wichtigste Test des Teil-PATCH:** ein Vollersatz-Body mit `#[serde(default)]
+/// Vec<i64>` für `qualifikation_ids` löschte bei jedem PATCH ohne das Feld (z. B. beim Ändern
+/// der Telefonnummer) ALLE Qualifikationszuordnungen der Person.
 #[tokio::test]
 async fn patch_ohne_qualifikation_ids_behaelt_qualifikationen() {
     let app = setup().await;
@@ -298,8 +297,8 @@ async fn patch_qualifikation_ids_ersetzt_die_menge_vollstaendig() {
     assert_eq!(quals[0]["id"], q1);
 }
 
-/// Nicht gesendete Stammfelder bleiben stehen — unter dem alten Vollersatz wurde jedes
-/// fehlende Feld zu `None` und nullte seine Spalte.
+/// Nicht gesendete Stammfelder bleiben stehen — ein Vollersatz machte jedes fehlende Feld zu
+/// `None` und nullte seine Spalte.
 #[tokio::test]
 async fn patch_ohne_telefon_laesst_nachbarfelder_stehen() {
     let app = setup().await;

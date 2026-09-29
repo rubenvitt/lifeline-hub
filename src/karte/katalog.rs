@@ -1,27 +1,24 @@
-//! Hybrid-Offline-Katalog (LFH-199): compiled-in Default ∪ optionales, best-effort geholtes
-//! Remote-Manifest (gepinnte Mirror-URL). Der Fetch ist best-effort und darf den Katalog nie
-//! brechen — bei jedem Fehler bleibt es beim compiled-in Default (bzw. dem letzten Cache-Stand).
+//! Hybrid-Offline-Katalog (LFH-199): einkompilierter Default ∪ optionales, best-effort geholtes
+//! Remote-Manifest (gepinnte Mirror-URL). Bei jedem Fehler bleibt es beim Default bzw. dem
+//! letzten Cache-Stand.
 //!
-//! Der Cache ist prozessweit (ein Katalog pro App, kein Request-/Einsatz-Bezug) — analog zum
-//! prozessweiten Reader-Cache in `mbtiles`. Bewusst KEIN AppState-Feld (spart das Durchreichen
-//! durch alle Handler/Test-Konstruktionen).
+//! Der Cache ist prozessweit (ein Katalog je App), kein AppState-Feld.
 use crate::config::{
     default_offline_katalog, eintrag_ist_lieferbar, merge_offline_katalog, OfflineKatalogEintrag,
 };
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::{Duration, Instant};
 
-/// Gepinnte Manifest-URL am Eigen-Mirror (LFH-183). Platzhalter bis zum ersten Release —
-/// bis dahin schlägt der Fetch sauber fehl → compiled-in Fallback.
+/// Gepinnte Manifest-URL am Eigen-Mirror. Bis zum ersten Release ein Platzhalter; der Fetch
+/// schlägt dann sauber fehl → einkompilierter Fallback.
 pub const OFFLINE_KATALOG_MANIFEST_URL: &str =
     "https://TODO-karten-build-release/offline-katalog-manifest.json";
 
-/// TTL des Manifest-Caches: der Katalog ändert selten, also nicht bei jedem Request neu fetchen
-/// (auch ein fehlgeschlagener Fetch pausiert für diese Dauer → kein Hämmern eines toten Mirrors).
+/// TTL des Manifest-Caches; auch ein fehlgeschlagener Fetch pausiert so lange (kein Hämmern auf
+/// einen toten Mirror).
 const CACHE_TTL: Duration = Duration::from_secs(300);
 
-/// Obergrenze für das Manifest (ein kuratierter ~5–20-Einträge-Katalog ist wenige KB groß) —
-/// verhindert, dass ein unerwartet riesiger Body den Handler-Speicher belastet.
+/// Obergrenze für das Manifest (ein kuratierter Katalog hat wenige KB).
 const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
 
 /// Zuletzt erfolgreich geholtes Remote-Manifest (in-memory). `None` = noch nichts geholt.
@@ -30,33 +27,30 @@ pub type KatalogCache = Arc<RwLock<Option<Vec<OfflineKatalogEintrag>>>>;
 /// Prozessweiter Manifest-Cache.
 static KATALOG_CACHE: LazyLock<KatalogCache> = LazyLock::new(Default::default);
 
-/// Zeitpunkt des letzten Fetch-Versuchs (Erfolg ODER Fehler) — steuert das TTL-Gate.
+/// Zeitpunkt des letzten Fetch-Versuchs (Erfolg oder Fehler); steuert das TTL-Gate.
 static LETZTER_FETCH: LazyLock<RwLock<Option<Instant>>> = LazyLock::new(|| RwLock::new(None));
 
-/// Synchroner Merge des compiled-in Katalogs mit einem gegebenen Cache (ohne Netz) — testbar mit
-/// einem lokalen Cache, ohne den prozessweiten Zustand anzufassen.
+/// Merge des einkompilierten Katalogs mit einem gegebenen Cache, ohne Netz und ohne den
+/// prozessweiten Zustand.
 pub fn merge_mit_cache(cache: &KatalogCache) -> Vec<OfflineKatalogEintrag> {
     let remote = cache.read().unwrap().clone();
     merge_offline_katalog(default_offline_katalog(), remote)
 }
 
-/// compiled-in ∪ prozessweiter Cache (ohne Netz) — für `offline_liste`s Update-Check.
+/// Einkompiliert ∪ prozessweiter Cache (ohne Netz), für den Update-Check in `offline_liste`.
 pub fn katalog_aus_cache() -> Vec<OfflineKatalogEintrag> {
     merge_mit_cache(&KATALOG_CACHE)
 }
 
-/// Effektiver Katalog: TTL-gebändigter best-effort Manifest-Fetch (aktualisiert den prozessweiten
-/// Cache bei Erfolg), dann Merge. Jeder Fehler (offline, Statusfehler, Parse) wird verschluckt →
-/// Cache/compiled-in bleibt. Für den `offline_katalog`-Handler. `client` muss ein kurz getimeboxter
-/// Client sein (kleiner JSON-Abruf, kein GB-Download) — sonst kann ein langsamer Mirror den Handler
-/// blockieren.
+/// Effektiver Katalog: TTL-gebändigter best-effort Manifest-Fetch, dann Merge. Jeder Fehler
+/// wird verschluckt. `client` muss kurz getimeboxt sein, sonst blockiert ein langsamer Mirror
+/// den Handler.
 pub async fn effektiver_katalog(client: &reqwest::Client) -> Vec<OfflineKatalogEintrag> {
     effektiver_katalog_intern(client, false).await
 }
 
-/// Wie `effektiver_katalog`, aber erzwingt einen Manifest-Fetch (umgeht das TTL-Gate). Für den
-/// „Bauen & laden"-Fluss (LFH-206): direkt nach einem fertigen Region-Bau muss der frisch
-/// publizierte Katalog-Eintrag sofort sichtbar sein, ohne die ~5-min-Cache-TTL abzuwarten.
+/// Wie `effektiver_katalog`, aber mit erzwungenem Fetch: nach einem Region-Bau muss der frisch
+/// publizierte Eintrag sofort sichtbar sein.
 pub async fn effektiver_katalog_frisch(client: &reqwest::Client) -> Vec<OfflineKatalogEintrag> {
     effektiver_katalog_intern(client, true).await
 }
@@ -69,19 +63,18 @@ async fn effektiver_katalog_intern(
         if let Some(remote) = hole_manifest(client).await {
             *KATALOG_CACHE.write().unwrap() = Some(remote);
         }
-        // Auch bei Fehlschlag den Zeitstempel setzen → toten Mirror nicht bei jedem Request pingen.
+        // Auch bei Fehlschlag den Zeitstempel setzen, damit ein toter Mirror nicht je Request
+        // gepingt
+        // wird.
         *LETZTER_FETCH.write().unwrap() = Some(Instant::now());
     }
-    // Download-Katalog: nur tatsächlich LIEFERBARE Einträge (Pin + echte URL). Ungebaute compiled-in
-    // Platzhalter (TODO-URL, kein Pin) erscheinen NICHT als ladbar — gebaut wird über „Region neu
-    // bauen", danach taucht die Region übers Manifest auf. Der Update-Check (`offline_liste`) filtert
-    // EBENFALLS auf lieferbare Einträge (`finde_update_eintrag`), damit kein Platzhalter als „Update"
-    // angeboten wird und „Aktualisieren" nicht auf eine nicht-ladbare TODO-URL läuft (LFH-206).
+    // Nur LIEFERBARE Einträge (Pin + echte URL); einkompilierte Platzhalter erscheinen nicht als
+    // ladbar. Der Update-Check filtert ebenso (`finde_update_eintrag`), damit „Aktualisieren“ nie
+    // auf eine TODO-URL läuft.
     nur_lieferbare(katalog_aus_cache())
 }
 
-/// Filtert einen Katalog auf tatsächlich lieferbare Einträge (Pin + echte URL) — für den
-/// Download-Katalog, damit ungebaute Platzhalter nicht als ladbar angeboten werden.
+/// Filtert auf lieferbare Einträge (Pin + echte URL).
 fn nur_lieferbare(katalog: Vec<OfflineKatalogEintrag>) -> Vec<OfflineKatalogEintrag> {
     katalog.into_iter().filter(eintrag_ist_lieferbar).collect()
 }
@@ -94,14 +87,10 @@ fn fetch_faellig() -> bool {
     }
 }
 
-/// Effektive Manifest-URL: der Ops-/Dev-Override `--offline-katalog-manifest-url` /
-/// `LIFELINE_OFFLINE_KATALOG_MANIFEST_URL` falls gesetzt und nicht leer, sonst der
-/// compiled-in Pin (LFH-199-Trust). Nimmt Ops/lokalem Dev die Rebuild-Reibung —
-/// Manifest-URL setzen statt den const ändern + Backend neu bauen (LFH-204-Gap).
-///
-/// Seit LFH-239/F18 aus der beim Start gesetzten [`crate::karte::KarteConfig`] statt bei
-/// jedem Aufruf aus dem Prozess-Env — der Override verbiegt die Quelle, der das System
-/// vertraut, und gehört deshalb sichtbar in `--help` und ins Startup-Log.
+/// Effektive Manifest-URL: der Override `--offline-katalog-manifest-url` /
+/// `LIFELINE_OFFLINE_KATALOG_MANIFEST_URL`, falls gesetzt und nicht leer, sonst der
+/// einkompilierte Pin. Gelesen aus der beim Start gesetzten [`crate::karte::KarteConfig`] —
+/// der Override verbiegt eine vertraute Quelle und gehört sichtbar in `--help` und ins Log.
 fn manifest_url() -> String {
     resolve_manifest_url(
         crate::karte::karte_config()
@@ -110,7 +99,7 @@ fn manifest_url() -> String {
     )
 }
 
-/// Reine Auswahl-Logik (env-frei testbar): ein nicht-leerer Override gewinnt, sonst der const-Default.
+/// Auswahl-Logik, env-frei testbar: ein nicht leerer Override gewinnt.
 fn resolve_manifest_url(override_env: Option<String>) -> String {
     match override_env {
         Some(u) if !u.trim().is_empty() => u,
@@ -123,7 +112,7 @@ async fn hole_manifest(client: &reqwest::Client) -> Option<Vec<OfflineKatalogEin
     if !resp.status().is_success() {
         return None;
     }
-    // Größen-Guard: ein plausibler Katalog ist winzig; ein riesiger Body wäre ein Fehler/Angriff.
+    // Größen-Guard: ein riesiger Body wäre ein Fehler oder Angriff.
     if resp
         .content_length()
         .is_some_and(|n| n > MAX_MANIFEST_BYTES)
@@ -137,7 +126,7 @@ async fn hole_manifest(client: &reqwest::Client) -> Option<Vec<OfflineKatalogEin
 mod tests {
     use super::*;
 
-    // Tests nutzen LOKALE Caches (nicht den prozessweiten static), damit sie isoliert bleiben.
+    // Tests nutzen lokale Caches statt des prozessweiten, damit sie isoliert bleiben.
     #[test]
     fn merge_ohne_cache_ist_compiled_in() {
         let cache: KatalogCache = Default::default();
@@ -149,7 +138,7 @@ mod tests {
 
     #[test]
     fn nur_lieferbare_filtert_ungebaute_platzhalter() {
-        // compiled-in sind unlieferbare TODO-Platzhalter (kein Pin) → aus dem Download-Katalog gefiltert.
+        // Einkompilierte Einträge sind Platzhalter ohne Pin und werden gefiltert.
         assert!(nur_lieferbare(default_offline_katalog()).is_empty());
         // Ein gebauter/gepinnter Eintrag (echte URL + sha256) bleibt.
         let gebaut = OfflineKatalogEintrag {

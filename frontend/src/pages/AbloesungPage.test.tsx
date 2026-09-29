@@ -172,8 +172,8 @@ describe('AbloesungPage (LFH-635)', () => {
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Ablösung vollziehen' }));
     const dialog = await screen.findByRole('dialog');
-    // Struktur, aus der „Enter sendet" folgt (Erfassungs-Norm B4): Knopf im <form>, kein
-    // antd-Fuß. Ein Select-Feld nimmt Enter selbst — die Zusicherung ist die Struktur.
+    // Struktur, aus der „Enter sendet" folgt: Knopf im <form>, kein antd-Fuß. Ein Select-Feld nimmt
+    // Enter selbst — die Zusicherung ist die Struktur.
     const knopf = within(dialog).getByRole('button', { name: 'Vollziehen' });
     expect(knopf.closest('form')).not.toBeNull();
     expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
@@ -236,13 +236,13 @@ describe('AbloesungPage (LFH-635)', () => {
     await waitFor(() => expect(setzeAbloesungVorgabe).toHaveBeenLastCalledWith(1, 7, null));
   });
 
-  // ── LFH-647: fremde Neuzugänge per Sammelbanner, Prüfliste Kriterium 12 ──────────────
+  // ── Fremde Neuzugänge per Sammelbanner (LFH-647) ──
   describe('Live-Zufluss (LFH-647)', () => {
     const eins = () => schicht({ id: 1, faellig_at: inMinuten(-12) });
     const zwei = () => schicht({ id: 2, faellig_at: inMinuten(20) });
     const drei = () => schicht({ id: 3, faellig_at: inMinuten(240), rhythmus_quelle: 'einheit' });
-    // Die fremde Schicht ist die überfälligste — die Server-Ordnung stellt sie OBEN hin.
-    // Landete sie unten, verschöbe sich auch ohne Schleuse nichts, und der Test bewiese nichts.
+    // Die fremde Schicht ist die überfälligste und steht oben; landete sie unten, verschöbe sich
+    // auch ohne Schleuse nichts.
     const fremd = () =>
       schicht({ id: 9, einheit_id: 19, einheit_name: 'Florian 9', faellig_at: inMinuten(-40) });
 
@@ -261,7 +261,7 @@ describe('AbloesungPage (LFH-635)', () => {
         'Schicht Florian 2',
         'Schicht Florian 3',
       ]);
-      // Die Zahlen lügen nicht: der Kopf zählt die zurückgehaltene mit, nur die Karte wartet.
+      // Der Kopf zählt die zurückgehaltene mit, nur die Karte wartet.
       expect(screen.getByText('4 laufend · 3 fällig')).toBeInTheDocument();
 
       await userEvent.click(
@@ -365,8 +365,8 @@ describe('AbloesungPage (LFH-635)', () => {
     });
 
     it('das Banner steht in der Segmentzeile, die immer gerendert wird', async () => {
-      // Nimmt das Banner beim Erscheinen eine eigene Zeile, schiebt es genau die Karten weg,
-      // die es schützen soll. Die Zeile existiert vorher schon; die Höhe misst e2e.
+      // Nähme das Banner eine eigene Zeile, schöbe es die Karten weg, die es schützen soll. Die
+      // Höhe misst e2e.
       const { client } = renderPage();
       await screen.findAllByRole('article');
       const zeile = document.querySelector('[data-lfh="abloesung-werkzeugzeile"]');
@@ -377,10 +377,10 @@ describe('AbloesungPage (LFH-635)', () => {
       expect(sammelbanner()!.parentElement).toBe(zeile);
     });
 
-    // ── LFH-660: eine fremde Änderung von Rhythmus/Beginn ordnet nicht unter dem Cursor um ──
+    // ── Eine fremde Änderung von Rhythmus/Beginn ordnet nicht unter dem Cursor um (LFH-660) ──
     // Gezeigt: 1 überfällig, 4 planmäßig (2 h, eigener Rhythmus), 3 planmäßig (4 h, folgt der
-    // Vorgabe). Fremd wird 3 auf „seit 30 min überfällig" gezogen — die Server-Ordnung
-    // stellte sie über 4.
+    // Vorgabe). Fremd wird 3 auf „seit 30 min überfällig" gezogen — die Server-Ordnung stellte sie
+    // über 4.
     const vier = (m = 120) =>
       schicht({ id: 4, faellig_at: inMinuten(m), rhythmus_quelle: 'einheit' });
     const dreiVorgezogen = () =>
@@ -405,7 +405,7 @@ describe('AbloesungPage (LFH-635)', () => {
       await client.invalidateQueries();
 
       await waitFor(() => expect(sammelbanner()).not.toBeNull());
-      // Kriterium 9: die fällige Karte, die unter einer planmäßigen gehalten wird, wird genannt.
+      // Die fällige Karte, die unter einer planmäßigen gehalten wird, wird genannt.
       expect(sammelbanner()).toHaveTextContent(
         'Reihenfolge geändert, 1 fällige Schicht steht weiter unten',
       );
@@ -436,9 +436,9 @@ describe('AbloesungPage (LFH-635)', () => {
       laufendLiefert([eins(), vier(), drei()]);
       const { client } = renderPage();
       await screen.findAllByRole('article');
-      // 149,5 statt 150 (LFH-740): `abstandText` rundet ab, und `inMinuten` schneidet auf
-      // Sekunden. Fielen Anlage und Rendern in dieselbe Millisekunde, stünden genau 150 min
-      // da („in 2 h 30 min“), und die Erwartung unten liefe in den Timeout.
+      // 149,5 statt 150: `abstandText` rundet ab, `inMinuten` schneidet auf Sekunden. Fielen Anlage
+      // und Rendern in dieselbe Millisekunde, stünde „in 2 h 30 min" da, und die Erwartung liefe in
+      // den Timeout.
       laufendLiefert([eins(), schicht({ id: 4, faellig_at: inMinuten(149.5) }), drei()]);
       await client.invalidateQueries();
       await waitFor(() =>
@@ -486,9 +486,9 @@ describe('AbloesungPage (LFH-635)', () => {
     });
 
     it('die eigene Vorgabe ordnet nur die Schichten ein, die ihr folgen — eine fremd umgeordnete mit eigenem Rhythmus bleibt', async () => {
-      // Der Server schreibt bei einer Vorgabe nur Schichten mit `rhythmus_quelle = 'abschnitt'`
-      // um (`abloesung/repo.rs::vorgabe_setzen`). 4 hat einen eigenen Rhythmus und wurde FREMD
-      // vorgezogen; die eigene Vorgabe darf sie nicht mit auftauen.
+      // Der Server schreibt bei einer Vorgabe nur Schichten mit `rhythmus_quelle = 'abschnitt'` um.
+      // 4 hat einen eigenen Rhythmus und wurde fremd vorgezogen; die eigene Vorgabe darf sie nicht
+      // mit auftauen.
       laufendLiefert([eins(), vier(), drei()]);
       const { client } = renderPage();
       await screen.findAllByRole('article');

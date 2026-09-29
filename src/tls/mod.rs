@@ -31,8 +31,8 @@ pub trait MkcertSeam {
     fn verfuegbar(&self) -> bool;
 }
 
-/// Wählt die Cert-Quelle in Präzedenz. BYO nur, wenn BEIDE Pfade gesetzt sind
-/// (Teil-Konfig behandelt der Aufrufer als fail-fast, s. Task 5/6).
+/// Wählt die Cert-Quelle in Präzedenz. BYO nur, wenn BEIDE Pfade gesetzt sind (Teil-Konfig
+/// behandelt der Aufrufer als fail-fast).
 pub fn plane_cert(
     tls_cert: Option<&str>,
     tls_key: Option<&str>,
@@ -71,9 +71,9 @@ pub fn rcgen_pem(sans: &[String]) -> Result<(String, String), AppError> {
     Ok((cert.pem(), signing_key.serialize_pem()))
 }
 
-/// Cache gültig, wenn beide Dateien existieren und nicht leer sind.
-/// (Ablauf-Prüfung bewusst weggelassen: rcgen-Certs laufen bis 4096; BYO/mkcert
-/// verwaltet der Operator. Re-Erzeugung erzwingt man durch Löschen der Cache-Dateien.)
+/// Cache gültig, wenn beide Dateien existieren und nicht leer sind. Ohne Ablaufprüfung: rcgen
+/// läuft bis 4096, BYO/mkcert verwaltet der Operator; neu erzeugt wird durch Löschen der
+/// Cache-Dateien.
 pub fn cache_gueltig(cert: &Path, key: &Path) -> bool {
     let nichtleer = |p: &Path| std::fs::metadata(p).map(|m| m.len() > 0).unwrap_or(false);
     nichtleer(cert) && nichtleer(key)
@@ -101,11 +101,9 @@ fn schreibe_sans_sidecar(cache_cert: &Path, sans: &[String]) -> Result<(), AppEr
         .map_err(|e| AppError::Internal(e.to_string()))
 }
 
-/// Cache ist nur dann PASSEND (und darf ohne Neuerzeugung weiterverwendet werden),
-/// wenn cert+key vorhanden/nicht-leer sind UND die Sidecar-SANs exakt dem aktuell
-/// erwarteten SAN-Set entsprechen. Fehlende Sidecar oder Mismatch → false (konservativ,
-/// erzwingt Neuerzeugung) — schützt davor, ein Cache-Cert ohne einen neu hinzugekommenen
-/// SAN (z.B. `--tls-hostname` für WebAuthn) still weiterzuservieren.
+/// Cache ist nur PASSEND, wenn cert und key vorhanden und nicht leer sind UND die Sidecar-SANs
+/// exakt dem erwarteten SAN-Set entsprechen. Sonst Neuerzeugung — damit ein Cache-Cert ohne
+/// einen neuen SAN (z. B. `--tls-hostname` für WebAuthn) nicht still weiterläuft.
 pub fn cache_passend(cache_cert: &Path, cache_key: &Path, erwartete_sans: &[String]) -> bool {
     if !cache_gueltig(cache_cert, cache_key) {
         return false;
@@ -403,10 +401,9 @@ mod tests {
         assert_eq!(args.last().unwrap(), "elw.local");
     }
 
-    /// Socket-freier Serve-Pfad-Test: rcgen-PEM → Datei-Roundtrip → rustls-Ladbarkeit.
-    /// Deckt zugleich den Rust-0.23-CryptoProvider-Auto-Default ab (GENAU EIN kompiliertes
-    /// Provider-Feature) — ein künftiger Dep-Drift mit zwei Providern würde hier statt erst
-    /// beim echten `--tls`-Serve auffallen. Öffnet keinen Port/Socket.
+    /// Socket-freier Test: rcgen-PEM → Datei → rustls-Ladbarkeit. Deckt zugleich die automatische
+    /// Wahl des CryptoProviders bei genau einem kompiliertem Provider-Feature ab; ein zweiter
+    /// Provider im Abhängigkeitsbaum fiele hier auf statt erst beim `--tls`-Start.
     #[tokio::test]
     async fn rcgen_pem_ist_per_rustls_ladbar() {
         let (cert_pem, key_pem) = super::rcgen_pem(&["localhost".to_string()]).unwrap();

@@ -73,10 +73,9 @@ describe('Anmeldeverfahren', () => {
     ).toBeDisabled();
   });
 
-  // Die Ablehnung steht seit LFH-345/C10 an der SEITE, nicht in der Toast-Queue (H14):
-  // sie verfiel sonst nach ~3 s, waehrend der Schalter zurueckgesprungen war und niemand
-  // mehr sagen konnte, warum. Geprueft wird die Abwesenheit des Message-Containers — genau
-  // die dreht ein zurueckgebautes `message.error` wieder um.
+  // Die Ablehnung steht an der Seite, nicht in der Toast-Queue — ein Toast verfiele nach ~3 s,
+  // während der Schalter längst zurückgesprungen ist. Geprüft wird die Abwesenheit des
+  // Message-Containers.
   it('haelt die Ablehnung an der Seite fest, statt sie als Toast verfallen zu lassen', async () => {
     const meldung = 'Der letzte admin-taugliche Login-Weg kann nicht deaktiviert werden';
     vi.mocked(providerSchalten).mockRejectedValue(new ApiError(409, meldung));
@@ -106,13 +105,8 @@ describe('Anmeldeverfahren', () => {
   });
 
   /**
-   * Die Marke WANDERT — sie sammelt sich nicht an.
-   *
-   * Quelle ist `mutation.variables`, also die Zeile der ZULETZT gescheiterten Mutation. Eine
-   * Umsetzung, die den gescheiterten Key in einem eigenen State sammelte, stünde nach zwei
-   * Fehlschlägen mit zwei Marken da — und keine der beiden sagte mehr, was gerade
-   * schiefgegangen ist. Der Test davor (eine Zeile, ein Fehlschlag) kann das nicht von der
-   * richtigen Umsetzung unterscheiden.
+   * Die Marke wandert, sie sammelt sich nicht an: Quelle ist `mutation.variables`, also die zuletzt
+   * gescheiterte Zeile. Ein eigener Sammel-State stünde nach zwei Fehlschlägen mit zwei Marken da.
    */
   it('traegt nach einem zweiten Fehlschlag die Marke an der ZWEITEN Zeile — und nur dort', async () => {
     vi.mocked(providerSchalten).mockRejectedValue(new ApiError(409, 'Letzter Login-Weg'));
@@ -136,8 +130,7 @@ describe('Anmeldeverfahren', () => {
     });
   });
 
-  // Die Gegenrichtung: ein ERFOLG anderswo raeumt die Marke ab. `isError` faellt dabei, die
-  // Marke haengt also nicht an einem Zustand, den nur ein weiterer Fehler zuruecksetzen koennte.
+  // Gegenrichtung: ein Erfolg anderswo räumt die Marke ab (`isError` fällt).
   it('raeumt die Marke, sobald irgendeine Zeile erfolgreich schaltet', async () => {
     vi.mocked(providerSchalten).mockRejectedValueOnce(new ApiError(409, 'Letzter Login-Weg'));
 
@@ -179,16 +172,9 @@ describe('Anmeldeverfahren', () => {
   });
 });
 
-/**
- * Der Sperrgrund steht SICHTBAR (LFH-370 · B5j, Befund M17).
- *
- * Vorher hing er allein im Tooltip eines Wrapper-`<span>` — auf dem Führungs-Tablet gibt
- * es kein Hover, der Grund war dort gar nicht erreichbar. Und er deckte nur EINEN der drei
- * Sperrfälle ab: eine Führungskraft sah alles ausgegraut, ohne jede Begründung.
- */
+/** Der Sperrgrund steht sichtbar, nicht nur im Tooltip — auf dem Tablet gibt es kein Hover. */
 describe('Anmeldeverfahren · Sperrgrund und Zeilenziel (LFH-370)', () => {
-  // Eigenes `beforeEach`: das des ersten `describe` greift hier nicht, und ohne dieses
-  // sickerte der Führungskraft-Mock aus dem ersten Fall in die folgenden.
+  // Eigenes `beforeEach`: sonst sickerte der Führungskraft-Mock aus dem ersten Fall durch.
   beforeEach(() => {
     alsAdmin();
     vi.mocked(providerListeAdmin).mockResolvedValue(PROVIDER_LISTE.map((p) => ({ ...p })) as never);
@@ -204,7 +190,7 @@ describe('Anmeldeverfahren · Sperrgrund und Zeilenziel (LFH-370)', () => {
 
     renderMitProviders(<Anmeldeverfahren />);
     await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' });
-    // JEDE Zeile traegt ihn — genau die Luecke, die der Tooltip nur fuer Passwort schloss.
+    // Jede Zeile trägt ihn.
     expect(screen.getAllByText('nur Admins').length).toBeGreaterThan(1);
   });
 
@@ -225,7 +211,7 @@ describe('Anmeldeverfahren · Sperrgrund und Zeilenziel (LFH-370)', () => {
     expect(label, 'die bedienbare Zeile traegt ein Label').not.toBeNull();
     expect(label).toHaveTextContent('PocketID');
 
-    // Gesperrt: KEIN Label — eine Aufforderung ins Leere waere schlimmer als keine.
+    // Gesperrt: kein Label — eine Aufforderung ins Leere wäre schlimmer als keine.
     expect(container.querySelector(`label[for="${passwort.id}"]`)).toBeNull();
   });
 
@@ -234,20 +220,18 @@ describe('Anmeldeverfahren · Sperrgrund und Zeilenziel (LFH-370)', () => {
     const oidc = await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' });
     expect(oidc).toBeChecked();
 
-    // Die Mocks dieser Datei werden nie geleert, die Aufrufe summieren sich sonst ueber
-    // alle Tests — und „genau einmal" waere nicht pruefbar.
+    // Die Mocks dieser Datei werden nie geleert; ohne `mockClear` wäre „genau einmal" nicht
+    // prüfbar.
     vi.mocked(providerSchalten).mockClear();
     await userEvent.click(screen.getByText('PocketID'));
 
     await waitFor(() => expect(providerSchalten).toHaveBeenCalledWith('oidc', false));
-    // Die zweite Haelfte: ein Label-Klick, der zweimal schaltete, kaeme sofort wieder
-    // zurueck — und der Bediener saehe gar nichts.
+    // Ein Label-Klick, der zweimal schaltete, käme sofort wieder zurück.
     expect(vi.mocked(providerSchalten).mock.calls).toHaveLength(1);
   });
 
   it('das aria-label schlaegt weiterhin das neue label', async () => {
-    // Die Falle fuer spaeter: wer das `aria-label` als "doppelt" entfernt, bekommt STILL
-    // einen anderen Accessible Name — 'PocketID' statt 'Anmeldeverfahren: PocketID'.
+    // Wer das `aria-label` als „doppelt" entfernt, bekommt still einen anderen Accessible Name.
     renderMitProviders(<Anmeldeverfahren />);
     expect(
       await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }),
@@ -256,8 +240,7 @@ describe('Anmeldeverfahren · Sperrgrund und Zeilenziel (LFH-370)', () => {
 });
 
 /**
- * Das Zeilenziel ohne Render — `test/utils.tsx:31` montiert ein nacktes `ConfigProvider`,
- * jsdom rechnet kein Layout. Böden als LITERALE, nicht aus `dichten` zurückgelesen.
+ * Das Zeilenziel ohne Render (nacktes `ConfigProvider`, kein Layout in jsdom). Böden als Literale.
  */
 describe('Anmeldeverfahren · Dichte', () => {
   const tokenFuer = (d: keyof typeof dichten) => ({
@@ -273,7 +256,7 @@ describe('Anmeldeverfahren · Dichte', () => {
   });
 
   it('traegt die ZWEITE Angabe daneben', () => {
-    // Polsterung allein traegt den Boden nicht, minHeight allein klebt den Text an die Kante.
+    // Polsterung allein trägt den Boden nicht, minHeight allein klebt den Text an die Kante.
     expect(zeilenzielStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
     expect(zeilenzielStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
   });

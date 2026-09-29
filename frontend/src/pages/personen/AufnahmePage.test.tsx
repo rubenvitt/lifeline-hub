@@ -12,15 +12,9 @@ import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
 import { FakeEventSource } from '../../test/eventSource';
 
 /**
- * Die Vollseiten-Aufnahme (LFH-340 · C5).
- *
- * Sie zeigt dieselbe Feldgruppe wie das Schnellerfassungs-Modal — was diese Datei prüft, ist
- * deshalb nicht die Maske (das tut `personen/AufnahmeFelder.test.tsx`), sondern was nur hier
- * gilt: die Route existiert, sie erfasst in Serie ohne den Ort zu verlassen, und die
- * Quittung bleibt stehen.
- *
- * LFH-458: Der UHS-Auftrag geht im Anlege-Request mit. Alle Schreibrequests
- * werden über MSW gezählt, einschließlich versehentlicher Folge-Requests.
+ * Vollseiten-Aufnahme. Die Maske selbst prüft `personen/AufnahmeFelder.test.tsx`; hier geht es um
+ * das, was nur die Route kann: Serie ohne Ortswechsel, stehende Quittung, UHS-Auftrag im
+ * Anlege-Request. Alle Schreibrequests werden über MSW gezählt, auch versehentliche Folge-Requests.
  */
 const schreibrequests: string[] = [];
 function merkeRequest({ request }: { request: Request }) {
@@ -67,10 +61,10 @@ const angelegt = {
   storniert_at: null,
 };
 
-/** Macht den aktuellen Pfad+Query im DOM sichtbar (Muster aus `UhsDetailPage.test.tsx`s
- *  `LocationProbe`) — die Marker-Route unten matcht JEDE `:uhsId`, „kehrt zur beauftragenden
- *  UHS zurück" bliebe also grün, wenn `onFertig` auf die FALSCHE UHS navigierte. Nur die
- *  Adresse selbst ist die belastbare Zusicherung. */
+/**
+ * Macht Pfad+Query im DOM sichtbar: die Marker-Route unten matcht jede `:uhsId`, nur die Adresse
+ * belegt, dass `onFertig` zur richtigen UHS navigiert.
+ */
 function LocationProbe() {
   const loc = useLocation();
   return (
@@ -102,8 +96,7 @@ function render(
       <Routes>
         <Route path="/einsaetze/:id/personen" element={<div>PERSONENLISTE</div>} />
         <Route path="/einsaetze/:id/personen/aufnahme" element={<AufnahmePage />} />
-        {/* Rückweg des UHS-Auftrags (LFH-341 · C6) — Marker statt echter UhsDetailPage,
-            dieselbe Bauform wie „PERSONENLISTE" oben. */}
+        {/* Rückweg des UHS-Auftrags — Marker statt echter UhsDetailPage. */}
         <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<div>UHS-DETAIL</div>} />
       </Routes>
     </>,
@@ -144,8 +137,7 @@ describe('AufnahmePage', () => {
 
     expect(await screen.findByText('Erfasst als R-047 · SK II')).toBeInTheDocument();
     expect(gesendet.sichtung).toBe('sk2');
-    // DER ORT BLEIBT: das ist der Unterschied zum Primär-Knopf, und ohne diese Zeile wäre
-    // der Fall auch grün, wenn die Seite in die Liste gesprungen wäre.
+    // Der Ort bleibt — ohne diese Zeile wäre der Fall auch bei einem Sprung in die Liste grün.
     expect(screen.queryByText('PERSONENLISTE')).not.toBeInTheDocument();
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
   });
@@ -206,13 +198,9 @@ describe('AufnahmePage', () => {
   });
 
   /**
-   * Der sitzungsweite Antreffort gilt an BEIDEN Mounts (im Review gefunden, LFH-340 · C5).
-   * `uebernahme={['antreff_ort']}` deckt nur innerhalb eines Laufs ab — wer die Route
-   * verlässt und zurückkommt, fand das Feld vorher leer, während derselbe Weg über das
-   * Modal vorbelegt hätte. Ausgerechnet hier, wo der Serienbetrieb der Normalfall ist.
-   *
-   * Beide Richtungen, weil eine allein nichts belegt: Schreiben ohne Lesen wäre unsichtbar,
-   * Lesen ohne Schreiben käme nie an einen Wert.
+   * Der sitzungsweite Antreffort gilt auch hier, nicht nur im Modal (`uebernahme` deckt nur einen
+   * Lauf ab). Beide Richtungen, weil Schreiben ohne Lesen unsichtbar und Lesen ohne Schreiben leer
+   * bliebe.
    */
   it('merkt den Antreffort für die Sitzung und setzt ihn beim Wiederkommen ein', async () => {
     render(einsatzAktiv, [
@@ -242,10 +230,8 @@ describe('AufnahmePage', () => {
 
 describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
   it('zeigt im Breadcrumb den Weg zur beauftragenden UHS statt zu Personen', async () => {
-    // Brief wörtlich: „Die Seitenbeschreibung UND der Breadcrumb sollen den Auftrag
-    // zeigen, sonst weiß niemand, wohin der Patient läuft." Der UHS-NAME wird hier bewusst
-    // nicht geprüft (die Seite lädt ihn nicht extra) — die Rückverlinkung selbst ist die
-    // Zusicherung.
+    // Seitenbeschreibung und Breadcrumb zeigen den Auftrag; der UHS-Name wird bewusst nicht
+    // geladen, die Rückverlinkung ist die Zusicherung.
     render(einsatzAktiv, [], '/einsaetze/1/personen/aufnahme?uhs=7');
     await screen.findByRole('radiogroup');
 
@@ -384,8 +370,6 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText('UHS-DETAIL')).toBeInTheDocument();
-    // Nicht nur „irgendeine" UHS-Route (die Marker-Route matcht jede `:uhsId`) — genau die
-    // beauftragende.
     expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/7');
   });
 });

@@ -1,4 +1,4 @@
-//! Archiv-Namensraum der Aufbewahrung (LFH-23, design.md D2).
+//! Archiv-Namensraum der Aufbewahrung (LFH-23).
 //!
 //! | Methode | Pfad | Zweck |
 //! |---|---|---|
@@ -7,10 +7,9 @@
 //! | GET  | `/api/aufbewahrung/einsaetze/{id}/etb` | Archiv-ETB (`typ`, `before_lfd_nr`, `limit`) |
 //! | POST | `/api/aufbewahrung/einsaetze/{id}/wiederherstellen` | Wiederherstellen |
 //!
-//! **Die Lesesperre der regulären Einsatz-Routen bleibt unberührt** — dieser Namensraum
-//! steht daneben, statt eine Ausnahme in `darf_lesen` zu öffnen, die alle regulären Routen
-//! (Personen mit Namen, Anhänge, Export) wieder freigäbe. Jeder Handler nimmt `AdminUser`,
-//! und bis auf das Wiederherstellen ist jeder ein GET. Beides hält der Struktur-Guard
+//! **Die Lesesperre der regulären Einsatz-Routen bleibt unberührt** — eine Ausnahme in
+//! `darf_lesen` gäbe Personen mit Namen, Anhänge und Export wieder frei. Jeder Handler nimmt
+//! `AdminUser`, und bis auf das Wiederherstellen ist jeder ein GET; beides hält
 //! `archiv_namensraum_nur_lesend_und_admin` in `tests/aufbewahrung.rs` fest.
 
 use crate::app::AppState;
@@ -113,9 +112,8 @@ pub async fn etb(
 
 #[derive(Debug, Deserialize)]
 pub struct Wiederherstellen {
-    /// Neue Aufbewahrungsfrist — **Pflichtfeld**: ein Zeitpunkt in der Zukunft oder
-    /// ausdrücklich `null` für unbegrenzt. Fehlt das Feld, ist das 400: ohne neue Frist
-    /// merkte der nächste Purge-Lauf den Einsatz sofort wieder vor.
+    /// Neue Aufbewahrungsfrist — **Pflichtfeld**: Zeitpunkt in der Zukunft oder ausdrücklich `null`
+    /// für unbegrenzt. Fehlt es (400), merkte der nächste Purge-Lauf den Einsatz sofort wieder vor.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub retention_bis: Option<Option<String>>,
 }

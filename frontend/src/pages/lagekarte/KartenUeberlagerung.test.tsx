@@ -126,6 +126,75 @@ describe('KartenUeberlagerung — Knopfblock', () => {
   });
 });
 
+describe('KartenUeberlagerung — Eigenposition (LFH-712)', () => {
+  const GRUND = 'Standort nur über eine sichere Verbindung (https) verfügbar.';
+
+  it('ohne Prop gibt es keinen Knopf (BetroffeneKarte)', () => {
+    renderMitProviders(<KartenUeberlagerung {...basis()} />);
+    expect(screen.queryByRole('button', { name: 'Eigenposition' })).not.toBeInTheDocument();
+  });
+
+  it('ist ein Umschalter: Klick meldet, aria-pressed folgt dem Zustand', () => {
+    const onUmschalten = vi.fn();
+    const { rerender } = renderMitProviders(
+      <KartenUeberlagerung
+        {...basis({ eigenposition: { an: false, sperrGrund: null, onUmschalten } })}
+      />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Eigenposition' });
+    expect(knopf).toHaveAttribute('aria-pressed', 'false');
+    expect(knopf).not.toHaveAttribute('aria-disabled');
+    fireEvent.click(knopf);
+    expect(onUmschalten).toHaveBeenCalledTimes(1);
+    rerender(
+      <KartenUeberlagerung
+        {...basis({ eigenposition: { an: true, sperrGrund: null, onUmschalten } })}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Eigenposition' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('gesperrt: aria-disabled statt disabled, Klick zeigt den Grund als Text und schaltet nicht', async () => {
+    const onUmschalten = vi.fn();
+    renderMitProviders(
+      <KartenUeberlagerung
+        {...basis({ eigenposition: { an: false, sperrGrund: GRUND, onUmschalten } })}
+      />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Eigenposition' });
+    // Ein echtes `disabled` nähme den Klick — und damit auf Touch den einzigen Weg zum Text.
+    expect(knopf).not.toBeDisabled();
+    expect(knopf).toHaveAttribute('aria-disabled', 'true');
+    // Für Vorlesende steht der Grund schon ohne Antippen am Knopf.
+    const beschreibung = document.getElementById(knopf.getAttribute('aria-describedby') ?? '');
+    expect(beschreibung).toHaveTextContent(GRUND);
+
+    // Sichtbar gesperrt: Farbe und Zeiger trägt `.lfh-kartenknopf[aria-disabled]`; ein Inline-Wert
+    // schlüge die Regel.
+    expect(knopf.style.color).toBe('');
+    expect(knopf.style.cursor).toBe('');
+    expect(knopf).toHaveAccessibleDescription(GRUND);
+
+    fireEvent.click(knopf);
+    expect(onUmschalten).not.toHaveBeenCalled();
+    const sichtbar = await screen.findByRole('tooltip');
+    expect(sichtbar).toHaveTextContent(GRUND);
+  });
+
+  it('trägt kein eigenes Bild-Element mit englischem Namen', () => {
+    renderMitProviders(
+      <KartenUeberlagerung
+        {...basis({ eigenposition: { an: false, sperrGrund: null, onUmschalten: vi.fn() } })}
+      />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Eigenposition' });
+    expect(knopf.querySelector('[role="img"]')).toBeNull();
+  });
+});
+
 describe('KartenUeberlagerung — Zeigerkoordinate', () => {
   it('zeigt „—" ohne Zeiger und die Koordinate im Format der Einstellungen', () => {
     const q = erzeugeZeigerQuelle();

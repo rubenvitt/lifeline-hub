@@ -250,7 +250,7 @@ pub struct ArchivEtbFilter {
 }
 
 /// Archiv-ETB im Wortlaut, neueste zuerst. Eine eigene, schmale Abfrage statt
-/// `etb::repo::abfrage`, dessen Rückgabetyp mit neuen Modulen wächst (design.md D3).
+/// `etb::repo::abfrage`, dessen Rückgabetyp mit neuen Modulen wächst.
 pub async fn etb(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -296,8 +296,7 @@ pub async fn etb(
 }
 
 /// `(geloescht_at, geschwaerzt_at)` eines Einsatzes — ein schmaler Abruf, damit
-/// `einsatz::Einsatz` und seine Test-Literale kein neues Feld brauchen (design.md D6).
-/// Unbekannter Einsatz → 404.
+/// `einsatz::Einsatz` kein neues Feld braucht. Unbekannter Einsatz → 404.
 pub async fn tombstones(
     pool: &SqlitePool,
     einsatz_id: i64,

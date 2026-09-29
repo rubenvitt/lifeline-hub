@@ -26,19 +26,17 @@ function umfang(anzahl: number): string {
 
 /**
  * ETB-Druckansicht (LFH-22, design.md D5): das Einsatztagebuch für Papier und PDF über den
- * Druckdialog des Browsers — kein Server-PDF.
+ * Druckdialog des Browsers.
  *
- * VOLLSTÄNDIG ODER GAR NICHT: Die Seite lädt ALLE Einträge der Auswahl
- * (`etb/druckAbruf.ts`, Cursor-Schleife über die bestehende Liste — dieselben Gates,
- * derselbe Filter wie am Bildschirm). Solange nicht alles da ist oder wenn ein Teilabruf
- * scheitert, ist „Drucken" gesperrt. Ein Teilausdruck wäre eine falsche Beweisunterlage.
+ * Vollständig oder gar nicht: die Seite lädt alle Einträge der Auswahl (`etb/druckAbruf.ts`,
+ * Cursor-Schleife über die bestehende Liste — dieselben Gates, derselbe Filter). Solange nicht
+ * alles da ist oder ein Teilabruf scheitert, ist „Drucken" gesperrt; ein Teilausdruck wäre eine
+ * falsche Beweisunterlage.
  *
- * SCHNAPPSCHUSS: Der Stand ist der des Ladens (`einsatzKeys.etbDruck` ist nicht live, kein
- * Nachladen bei Fokus). Neue Einträge schiebt niemand still dazu; „Neu laden" holt sie.
+ * Schnappschuss: `einsatzKeys.etbDruck` ist nicht live; „Neu laden" holt neue Einträge.
  *
- * Der Filter kommt aus der Adresse (`parseEtbFilter`), ein unbekannter Wert fällt dort GANZ
- * weg und steht dann auch nicht im Kopf. Die Sperre setzt der Server durch: ein 403 der
- * Liste heißt „kein Zugriff", ohne Druckknopf.
+ * Der Filter kommt aus der Adresse (`parseEtbFilter`), ein unbekannter Wert fällt ganz weg. Ein 403
+ * der Liste heißt „kein Zugriff", ohne Druckknopf.
  */
 export default function EtbDruckPage() {
   const { id } = useParams();
@@ -47,7 +45,7 @@ export default function EtbDruckPage() {
   const { token } = theme.useToken();
   const { konventionen } = useAnzeigeKonventionen();
   const [searchParams] = useSearchParams();
-  // Über den STRING memoisiert, nicht über die Instanz (Begründung in `EtbPage`).
+  // Über den String memoisiert, nicht über die Instanz (Begründung in `EtbPage`).
   const filterText = searchParams.toString();
   const filter = useMemo(() => parseEtbFilter(new URLSearchParams(filterText)), [filterText]);
   const [geladen, setGeladen] = useState(0);
@@ -56,8 +54,8 @@ export default function EtbDruckPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  // Nur für den Namen einer gefilterten Einheit. Ohne Modulzugang (403) bleibt der Name
-  // weg — der Kopf sagt dann „eine Einheit (Name nicht verfügbar)", nie die Kennung.
+  // Nur für den Namen einer gefilterten Einheit. Ohne Modulzugang (403) sagt der Kopf „eine Einheit
+  // (Name nicht verfügbar)", nie die Kennung.
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
@@ -70,14 +68,13 @@ export default function EtbDruckPage() {
       setGeladen(0);
       return ladeEtbVollstaendig(einsatzId, filter, { onFortschritt: setGeladen });
     },
-    // Ein Druckbeleg ist ein Schnappschuss (NICHT_LIVE_KEYS): kein stilles Nachladen einer
-    // OFFENEN Ansicht.
+    // Ein Druckbeleg ist ein Schnappschuss: kein stilles Nachladen einer offenen Ansicht.
     staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    // Aber beim ÖFFNEN der Stand von jetzt: ohne diese Zeile lieferte ein erneuter Besuch
-    // innerhalb der Cache-Frist (5 min) den Schnappschuss des letzten Besuchs, sofort
-    // druckbar (Review Welle B). Während des Ladens sperrt `isFetching` den Knopf.
+    // Beim Öffnen aber der Stand von jetzt: sonst lieferte ein erneuter Besuch innerhalb der
+    // Cache-Frist den Schnappschuss des letzten Besuchs. Während des Ladens sperrt `isFetching` den
+    // Knopf.
     refetchOnMount: 'always',
     // Ein gescheiterter Abruf wird nicht still wiederholt — die Person entscheidet.
     retry: false,
@@ -138,8 +135,7 @@ export default function EtbDruckPage() {
           {!keinZugriff && (
             <DruckKnopf
               typ="primary"
-              // Gesperrt, bis ALLES da ist — auch der Einheitenname für den Kopf, sonst
-              // stünde „Name nicht verfügbar" auf einem Blatt, dessen Name gleich käme.
+              // Gesperrt, bis alles da ist — auch der Einheitenname für den Kopf.
               gesperrt={
                 !druckQuery.isSuccess ||
                 druckQuery.isFetching ||

@@ -18,21 +18,14 @@ import { Formularpaneel } from '../../components/instrument';
 import FristPaneel from '../../aufbewahrung/FristPaneel';
 
 /**
- * Sektion `…/einstellungen/aufbewahrung` (LFH-345 · C10) — die Aufbewahrungs-Dauer.
+ * Sektion `…/einstellungen/aufbewahrung` — die Aufbewahrungs-Dauer. Ein Feld, siebzehn mitfahrende:
+ * ohne `zuUpdate` löschte ein Speichern hier Nummernkreise, Anzeige-Konventionen und
+ * Karten-Defaults mit.
  *
- * **Ein Feld, siebzehn mitfahrende.** Das ist die Sektion, an der der Vollersatz-PUT am
- * teuersten schiefgeht: wer hier speichert, will eine Zahl ändern und würde ohne
- * `zuUpdate` die Nummernkreise, die Anzeige-Konventionen und die Karten-Defaults desselben
- * Einsatzes mitlöschen. Der volle Payload-Vergleich in `EinsatzAufbewahrung.test.tsx` ist
- * deshalb hier und nicht in einer der größeren Sektionen.
- *
- * Einspaltig — zwei Spalten für ein Feld wären Zierde.
- *
- * **Die Frist steht daneben, nicht darin (LFH-23).** Die Dauer ist eine Einstellung und friert
- * mit dem Abschluss ein; die Frist ist ein Zeitpunkt am Einsatz, den Einsatzleitung und
- * System-Admin auch danach setzen, verlängern und aufheben. Deshalb steht `FristPaneel` ÜBER
- * und AUSSERHALB des Vollersatz-`<Form>`: ein Frist-PUT trägt keinen Einstellungs-Payload, und
- * das `disabled` des Formulars sperrt die Frist-Aktion nicht mit.
+ * Die Frist steht daneben, nicht darin: die Dauer ist eine Einstellung und friert mit dem Abschluss
+ * ein, die Frist ist ein Zeitpunkt am Einsatz, den Einsatzleitung und System-Admin auch danach
+ * setzen. `FristPaneel` steht deshalb außerhalb des Vollersatz-`<Form>` — sein PUT trägt keinen
+ * Einstellungs-Payload, und `disabled` des Formulars sperrt es nicht mit.
  */
 export default function EinsatzAufbewahrung() {
   const { id } = useParams();
@@ -43,7 +36,7 @@ export default function EinsatzAufbewahrung() {
   const { token } = theme.useToken();
   const daten = useEinstellungenDaten(einsatzId);
 
-  // KEIN `onError`-Toast (H14) — der Fehler steht als Alert über dem Formular.
+  // Kein `onError`-Toast — der Fehler steht als Alert über dem Formular.
   const speichern = useMutation({
     mutationFn: (werte: FormWerteAufbewahrung) =>
       speichereEinstellungen(einsatzId, {

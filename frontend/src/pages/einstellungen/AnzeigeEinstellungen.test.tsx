@@ -66,7 +66,7 @@ describe('AnzeigeEinstellungen', () => {
         etb_nummer_praefix: 'EB-',
         meldung_nummer_praefix: 'M-',
         auftrag_nummer_praefix: 'A-',
-        // LFH-617: ein Anzeige-Save darf das Einsatznummer-Präfix nicht nullen.
+        // Ein Anzeige-Save darf das Einsatznummer-Präfix nicht nullen.
         einsatz_nummer_praefix: 'WF-',
         meldung_bestaetigung_frist_min: 30,
         auftrag_quittierung_frist_min: 45,
@@ -94,7 +94,7 @@ describe('AnzeigeEinstellungen', () => {
     );
   });
 
-  // Der Knopf VERSCHWINDET seit LFH-345/C10 nicht mehr — er steht gesperrt da, mit Grund (M16).
+  // Der Knopf steht gesperrt da, mit Grund — er verschwindet nicht.
   it('ist read-only für Nicht-Admins (fuehrungskraft): Speichern-Button gesperrt, Feld disabled', async () => {
     vi.mocked(useAuth).mockReturnValue(
       authWertFixture(benutzerFixture({ id: 2, org_rolle: 'fuehrungskraft', anzeigename: 'FK' })),
@@ -109,10 +109,8 @@ describe('AnzeigeEinstellungen', () => {
 });
 
 /**
- * Persistenter Speicherfehler und erklärte Berechtigung (LFH-345 · C10, Befunde H14/M16).
- * Warum die vom AK verlangte Fake-Timer-Form hier fehlt, steht ausführlich (und
- * mutationsgeprüft) im Kopfkommentar von `EinsatzDefaults.test.tsx` — kurz: sie kann in
- * dieser Umgebung nicht rot werden.
+ * Persistenter Speicherfehler und erklärte Berechtigung. Warum hier kein Fake-Timer-Vorlauf steht,
+ * steht im Kopfkommentar von `EinsatzDefaults.test.tsx`.
  */
 describe('AnzeigeEinstellungen · Speicherfehler und Berechtigung (LFH-345)', () => {
   beforeEach(() => {

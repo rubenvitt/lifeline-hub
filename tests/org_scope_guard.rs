@@ -2,10 +2,9 @@
 //!
 //! `SELECT id FROM organisation ORDER BY id LIMIT 1` liest nicht *die* Organisation,
 //! sondern die mit der kleinsten Id. Bei genau einer Organisation ist das unauffällig
-//! richtig — genau deshalb hat sich das Muster über vier Stellen ausgebreitet und wäre
-//! beim Anlegen einer zweiten Organisation überall gleichzeitig still falsch geworden:
-//! Einsätze in der falschen Org, Benutzer in der falschen Org, SSO-Konten in der falschen
-//! Org, Org-Stammdaten der fremden Org.
+//! richtig — und wird beim Anlegen einer zweiten Organisation überall gleichzeitig still
+//! falsch: Einsätze, Benutzer und SSO-Konten in der falschen Org, Org-Stammdaten der fremden
+//! Org.
 //!
 //! Der Guard verbietet das Muster in produktivem Code. Die Organisation eines Objekts
 //! leitet sich aus dem handelnden Benutzer ab (`benutzer.org_id`) oder aus dem Objekt,

@@ -47,7 +47,7 @@ vi.mock('../api/meldungen', () => ({
   bestaetigeMeldung: (...a: unknown[]) => bestaetigeMeldung(...a),
   erteileAuftragAusMeldung: (...a: unknown[]) => erteileAuftragAusMeldung(...a),
 }));
-// Auftrags-Ziele (LFH-113): MeldungenPage lädt sie für das Meldung→Auftrag-Formular.
+// Auftrags-Ziele: MeldungenPage lädt sie für das Meldung→Auftrag-Formular.
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn().mockResolvedValue([]) }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn().mockResolvedValue([]) }));
 
@@ -87,11 +87,11 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
 });
 
 /**
- * Greift das GEÖFFNETE Dropdown-Portal der Aktionsbündelung (LFH-372/B5k). antd lässt die
- * Portale geschlossener Dropdowns im Baum stehen, und ein verlassendes Portal bekommt in
- * jsdom nie `hidden` — deshalb zusätzlich über `pointerEvents` filtern und genau einen
- * Treffer verlangen. Bewusste Kopie aus `meldungen/MeldungKarte.test.tsx`: ein Import aus
- * einer fremden `.test.tsx` zöge deren ganze Suite in jeden Lauf dieser hier.
+ * Greift das geöffnete Dropdown-Portal der Aktionsbündelung. antd lässt die Portale geschlossener
+ * Dropdowns im Baum stehen, und ein verlassendes Portal bekommt in jsdom nie `hidden` — deshalb
+ * über `pointerEvents` filtern und genau einen Treffer verlangen. Bewusste Kopie aus
+ * `meldungen/MeldungKarte.test.tsx`: ein Import aus einer fremden `.test.tsx` zöge deren Suite in
+ * jeden Lauf dieser hier.
  */
 async function oeffneAktionsmenue(lfdNr = 1): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Meldung ${lfdNr}` }));
@@ -150,11 +150,11 @@ describe('MeldungenPage', () => {
     legeMeldungAn.mockResolvedValue(meldung());
     renderPage();
     await screen.findByText('Florian Nord 1');
-    // Inline-Formular (LFH-112): erst per Kopf-Button aufklappen (Icon → Name „plus …").
+    // Inline-Formular: erst per Kopf-Knopf aufklappen (Icon → Name „plus …").
     await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Eingetroffen');
-    // Kopf-Button heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
+    // Der Kopf-Knopf heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() =>
       expect(legeMeldungAn).toHaveBeenCalledWith(
@@ -212,8 +212,8 @@ describe('MeldungenPage', () => {
   });
 
   it('zeigt eine erledigte Meldung im Abgeschlossen-View mit Erledigt-Zeitpunkt und Quittungs-Read-back', async () => {
-    // LFH-113: Abgeschlossen zeigt den echten Erledigt-Zeitpunkt (erledigt_at) als
-    // Read-back; die Quittungs-Achse (bestaetigt_at) bleibt daneben bestehen.
+    // Abgeschlossen zeigt den Erledigt-Zeitpunkt (erledigt_at); die Quittungs-Achse (bestaetigt_at)
+    // bleibt daneben bestehen.
     listeMeldungen.mockResolvedValue([
       meldung({
         id: 2,
@@ -249,9 +249,8 @@ describe('MeldungenPage', () => {
   });
 
   it('hält beim Filterwechsel die vorherige Liste samt Zählern, bis die neue da ist (LFH-351)', async () => {
-    // Beim ERSTEN Wechsel auf einen Richtungsfilter ist der neue Key kalt; ohne
-    // `placeholderData` zeigte die Seite für die Dauer des Requests „Keine Meldungen" und
-    // „0 offen" — obwohl offene Meldungen existieren.
+    // Beim ersten Wechsel auf einen Richtungsfilter ist der neue Key kalt; ohne `placeholderData`
+    // zeigte die Seite für die Dauer des Requests „Keine Meldungen" und „0 offen".
     let antworte: (m: Meldung[]) => void = () => {};
     listeMeldungen.mockImplementation((_id: number, f: { richtung?: string }) =>
       f.richtung === 'extern'
@@ -291,14 +290,14 @@ describe('MeldungenPage', () => {
     expect(screen.queryByRole('button', { name: 'Meldung erfassen' })).not.toBeInTheDocument();
   });
 
-  // --- LFH-94: Sichten/Status/Beobachter ---
+  // --- Sichten/Status/Beobachter ---
 
   it('sichtet eine neue Meldung', async () => {
     setzeMeldungStatus.mockResolvedValue(meldung({ status: 'gesichtet' }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    // „Sichten" ist die eine Vorwärtsbewegung einer neuen Meldung und steht als sichtbarer
-    // Knopf; die Rückfrage ist mit LFH-372/B5k entfallen (der Schritt ist umkehrbar).
+    // „Sichten" ist die Vorwärtsbewegung einer neuen Meldung und steht als sichtbarer Knopf, ohne
+    // Rückfrage (der Schritt ist umkehrbar).
     await userEvent.click(screen.getByRole('button', { name: 'Sichten' }));
     await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'gesichtet'));
   });
@@ -307,8 +306,8 @@ describe('MeldungenPage', () => {
     setzeMeldungStatus.mockResolvedValue(meldung({ status: 'erledigt' }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    // Die Fixture-Meldung ist `neu` → „Erledigt" ist der Sprung und liegt im Menü. Die
-    // Rückfrage ist dort ein Dialog, kein Popconfirm (LFH-366).
+    // Die Meldung ist `neu` → „Erledigt" ist der Sprung und liegt im Menü. Die Rückfrage dort ist
+    // ein Dialog, kein Popconfirm.
     const menue = await oeffneAktionsmenue();
     await userEvent.click(within(menue).getByRole('menuitem', { name: /Erledigt/ }));
     const dialog = await screen.findByRole('dialog');
@@ -326,13 +325,12 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     expect(screen.queryByRole('button', { name: 'Sichten' })).not.toBeInTheDocument();
-    // Ohne Schreibrecht gibt es GAR KEINEN Trigger — das ist hier die ehrliche Aussage.
-    // „der Menüeintrag fehlt" wäre schwächer: ein Menü, das nie existiert, hat trivial
-    // keinen Eintrag (LFH-372/B5k).
+    // Ohne Schreibrecht gibt es gar keinen Auslöser. „Der Menüeintrag fehlt" wäre schwächer: ein
+    // Menü, das nie existiert, hat trivial keinen Eintrag.
     expect(screen.queryByRole('button', { name: /Aktionen zu Meldung/ })).not.toBeInTheDocument();
   });
 
-  // --- LFH-95: Lage-Übergabe ---
+  // --- Lage-Übergabe ---
 
   it('übergibt eine Meldung an die Lage (ohne Verortung)', async () => {
     markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
@@ -358,8 +356,8 @@ describe('MeldungenPage', () => {
     await userEvent.click(
       within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /An Lage übergeben/ }),
     );
-    // Seit der formatbewussten Eingabe (KoordinatenEingabe) ein einzelnes Feld:
-    // im WGS84-Default wird "lat, lon" getippt.
+    // Die formatbewusste Eingabe (KoordinatenEingabe) ist ein Feld: im WGS84-Default wird "lat,
+    // lon" getippt.
     await userEvent.type(await screen.findByPlaceholderText('Koordinate eingeben'), '50.1, 8.6');
     await userEvent.click(screen.getByRole('button', { name: 'Übergeben' }));
     await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(1));
@@ -374,10 +372,9 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     expect(screen.getByText('Lagerelevant ✓')).toBeInTheDocument();
-    // Die Aktion muss IM GEÖFFNETEN MENÜ fehlen. Ein `queryByRole('menuitem')` vor dem
-    // ersten Öffnen ist immer `null` — rc-dropdown mountet lazy —, die Aussage wäre nach
-    // der Bündelung also trivial grün (LFH-372/B5k). Dass andere Einträge dastehen,
-    // belegt zugleich, dass das Menü überhaupt aufging.
+    // Die Aktion muss im geöffneten Menü fehlen. Vor dem ersten Öffnen ist
+    // `queryByRole('menuitem')` immer `null` (rc-dropdown mountet lazy). Dass andere Einträge
+    // dastehen, belegt, dass das Menü aufging.
     const menue = await oeffneAktionsmenue();
     expect(within(menue).getAllByRole('menuitem').length).toBeGreaterThan(0);
     expect(
@@ -391,13 +388,14 @@ describe('MeldungenPage', () => {
     );
     renderPage();
     await screen.findByText('Florian Nord 1');
-    // antd Select über combobox-Rolle+Name öffnen, dann echten Options-Knoten klicken (Commit über onChange).
+    // antd Select über combobox-Rolle+Name öffnen, dann den echten Options-Knoten klicken (Commit
+    // über onChange).
     await userEvent.click(screen.getByRole('combobox', { name: 'Bearbeiter für Meldung 1' }));
     await userEvent.click(await screen.findByText('Sani Schmidt'));
     await waitFor(() => expect(weiseBearbeiterZu).toHaveBeenCalledWith(1, 1, 2));
   });
 
-  // --- LFH-97: Sofortmeldung bestätigungspflichtig ---
+  // --- Sofortmeldung bestätigungspflichtig ---
 
   it('zeigt überfällige Sofortmeldung hervorgehoben und bestätigt sie', async () => {
     listeMeldungen.mockResolvedValue([
@@ -447,17 +445,17 @@ describe('MeldungenPage', () => {
     ]);
     renderPage();
     await screen.findByText('Florian Nord 1');
-    // Bestätigt → orthogonale Quittungs-Achse (QuittungIndikator) statt Status-Badge.
+    // Bestätigt → Quittungs-Achse (QuittungIndikator) statt Status-Badge.
     expect(screen.getByText(/✓ Quittiert/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bestätigen' })).not.toBeInTheDocument();
-    // „Bestätigen" ist nach LFH-372/B5k ein sichtbarer Knopf und gehört in KEIN Menü —
-    // die zweite Hälfte belegt, dass die Aktion nicht bloss dorthin gewandert ist.
+    // „Bestätigen" ist ein sichtbarer Knopf und gehört in kein Menü — die zweite Hälfte belegt,
+    // dass die Aktion nicht bloß dorthin gewandert ist.
     expect(
       within(await oeffneAktionsmenue()).queryByRole('menuitem', { name: /Bestätigen/ }),
     ).not.toBeInTheDocument();
   });
 
-  // --- LFH-113: Meldung→Auftrag ---
+  // --- Meldung→Auftrag ---
 
   it('erteilt aus einer Meldung einen Auftrag, vorbefüllt mit Absender + Inhalt', async () => {
     erteileAuftragAusMeldung.mockResolvedValue(meldung({ auftrag_id: 42 }));
@@ -488,11 +486,11 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     const backlink = screen.getByRole('link', { name: /Auftrag/ });
-    // F36/LFH-257: Backlink selektiert den ausgelösten Auftrag (?auftrag=) statt nur die Liste.
+    // Der Backlink selektiert den ausgelösten Auftrag (?auftrag=) statt nur die Liste.
     expect(backlink).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=42');
     expect(screen.queryByRole('button', { name: 'Auftrag erteilen' })).not.toBeInTheDocument();
-    // Und auch nicht im Menü — sonst prüfte die Aussage nach der Bündelung nur noch den
-    // Kartenkörper, in dem die Aktion ohnehin nie mehr steht (LFH-372/B5k).
+    // Und auch nicht im Menü — sonst prüfte die Aussage nur den Kartenkörper, in dem die Aktion
+    // ohnehin nicht steht.
     const menue = await oeffneAktionsmenue();
     expect(within(menue).getAllByRole('menuitem').length).toBeGreaterThan(0);
     expect(
@@ -504,12 +502,12 @@ describe('MeldungenPage', () => {
     legeMeldungAn.mockResolvedValue(meldung());
     renderPage();
     await screen.findByText('Florian Nord 1');
-    // Inline-Formular (LFH-112): erst aufklappen (Icon → Name „plus …"), dann Fast-Path + Submit.
+    // Inline-Formular: erst aufklappen (Icon → Name „plus …"), dann Fast-Path + Submit.
     await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.click(screen.getByRole('button', { name: /Sofortmeldung/ }));
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'MANV');
-    // Kopf-Button heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
+    // Der Kopf-Knopf heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() =>
       expect(legeMeldungAn).toHaveBeenCalledWith(
@@ -524,7 +522,7 @@ describe('MeldungenPage', () => {
     );
   });
 
-  // --- LFH-332/B4: Serienerfassung im Inline-Formular ---
+  // --- Serienerfassung im Inline-Formular ---
 
   /** Formular aufklappen und eine vollständige Meldung eintippen. */
   async function oeffneUndFuelle(inhalt = 'Eingetroffen') {
@@ -538,22 +536,21 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     await oeffneUndFuelle();
-    // Der Schalter steht per Vorgabe AUS (30.07.2026); der Absender unten belegt die
-    // Übernahme nur, wenn er hier eingeschaltet wurde.
+    // Der Schalter steht per Vorgabe aus; der Absender unten belegt die Übernahme nur, wenn er hier
+    // eingeschaltet wurde.
     await userEvent.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(1));
 
-    // Das Formular steht noch — früher klappte onSuccess es per setFormOffen(false) zu,
-    // und der conditional Render der Card unmountete es dabei.
+    // Das Formular steht nach dem Senden noch; ein Zuklappen unmountete es samt Zähler und
+    // Wertübernahme.
     expect(screen.getByLabelText('Inhalt / Wortlaut')).toBeInTheDocument();
-    // Zähler und Wertübernahme leben IM Formular: nur sie belegen, dass es nicht
-    // bloss neu montiert wurde. Der Nachlade-Lauf nach invalidiere() darf sie nicht kippen.
+    // Zähler und Wertübernahme leben im Formular: nur sie belegen, dass es nicht bloß neu montiert
+    // wurde. Der Nachlade-Lauf nach invalidiere() darf sie nicht kippen.
     expect(await screen.findByText(/Erfasst: 1/)).toBeInTheDocument();
     expect(screen.getByLabelText('Absender')).toHaveValue('RTW 2');
-    // Die Umschaltung ist auch in der Einbettung ohne eigene Card sichtbar
-    // (`card={false}` ist der einzige Produktivpfad — die Formular-Tests rendern
-    // die Default-Card).
+    // Die Umschaltung ist auch in der Einbettung ohne eigene Card sichtbar (`card={false}` ist der
+    // einzige Produktivpfad; die Formular-Tests rendern die Default-Card).
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).toBeInTheDocument();
   });
 
@@ -565,8 +562,8 @@ describe('MeldungenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Inhalt / Wortlaut')).toBeInTheDocument();
-    // Das Kreuz an der Card trägt als einziges ein aria-label — der Kopf-Umschalter
-    // heisst gleich, hat seinen Namen aber aus dem Text.
+    // Das Kreuz an der Card trägt als einziges ein aria-label — der Kopf-Umschalter heißt gleich,
+    // hat seinen Namen aber aus dem Text.
     await userEvent.click(screen.getByLabelText('Formular schließen'));
     await waitFor(() =>
       expect(screen.queryByLabelText('Inhalt / Wortlaut')).not.toBeInTheDocument(),
@@ -584,7 +581,7 @@ describe('MeldungenPage', () => {
     expect(screen.getByLabelText('Absender')).toHaveValue('RTW 2');
   });
 
-  // --- LFH-153: Deeplink-Selektion ?meldung= ---
+  // --- Deeplink-Selektion ?meldung= ---
 
   it('?meldung=<id> hebt die Ziel-Meldung hervor und räumt den Param', async () => {
     listeMeldungen.mockResolvedValue([
@@ -627,10 +624,9 @@ describe('MeldungenPage', () => {
   });
 
   /**
-   * Befund H47 (LFH-343 · C8). Die Seite war bewusst flach („keine
-   * Fälligkeits-Gruppierung, flache Liste mit Badges"); der Gruppenkopf ändert das,
-   * weil die erste Frage der Triage „was hat noch niemand angefasst" lautet und
-   * nicht „was ist am dringendsten". Innerhalb jeder Gruppe bleibt die alte Ordnung.
+   * Die neuen Meldungen stehen unter eigenem Kopf: die erste Frage der Triage ist „was hat noch
+   * niemand angefasst", nicht „was ist am dringendsten". Innerhalb jeder Gruppe bleibt die
+   * bisherige Ordnung.
    */
   it('stellt die neuen Meldungen unter einen eigenen Kopf mit korrekter Zahl', async () => {
     listeMeldungen.mockResolvedValue([
@@ -638,8 +634,7 @@ describe('MeldungenPage', () => {
       meldung({ id: 2, lfd_nr: 2, status: 'neu', inhalt: 'Zweite neue' }),
       meldung({ id: 3, lfd_nr: 3, status: 'gesichtet', inhalt: 'Bereits gesichtet' }),
       meldung({ id: 4, lfd_nr: 4, status: 'in_bearbeitung', inhalt: 'Läuft schon' }),
-      // Die erledigte liegt in der Abgeschlossen-Ansicht und darf in keinem der
-      // beiden Köpfe mitzählen.
+      // Die erledigte liegt in der Abgeschlossen-Ansicht und zählt in keinem der beiden Köpfe mit.
       meldung({ id: 5, lfd_nr: 5, status: 'erledigt', ist_offen: false, inhalt: 'Fertig' }),
     ]);
     renderPage();
@@ -655,14 +650,13 @@ describe('MeldungenPage', () => {
     await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'gesichtet'));
 
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
-    // Zurück auf den Stand VOR dem Klick, nicht auf einen erratenen Anfang.
+    // Zurück auf den Stand vor dem Klick, nicht auf einen erratenen Anfang.
     await waitFor(() => expect(setzeMeldungStatus).toHaveBeenLastCalledWith(1, 1, 'neu'));
   });
 
   /**
-   * Befund H50, zweiter Teil: der Weg Meldung → Auftrag → erledigt kostete sechs
-   * Klicks, weil die Quellmeldung nach dem Auftrag unverändert auf „neu" stand.
-   * Wer aus einer Meldung einen Auftrag erteilt, HAT sie bearbeitet.
+   * Wer aus einer Meldung einen Auftrag erteilt, hat sie bearbeitet: die Quellmeldung geht auf „In
+   * Bearbeitung".
    */
   it('setzt die Quellmeldung auf „In Bearbeitung", wenn aus ihr ein Auftrag wird', async () => {
     erteileAuftragAusMeldung.mockResolvedValue({ id: 5 });
@@ -693,8 +687,8 @@ describe('MeldungenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
 
     await waitFor(() => expect(erteileAuftragAusMeldung).toHaveBeenCalled());
-    // Ohne diesen Riegel schriebe die Seite denselben Status noch einmal — ein
-    // PATCH samt Invalidierung und Live-Ereignis für nichts.
+    // Ohne diesen Riegel schriebe die Seite denselben Status noch einmal — ein PATCH samt
+    // Invalidierung und Live-Ereignis für nichts.
     expect(setzeMeldungStatus).not.toHaveBeenCalled();
   });
 

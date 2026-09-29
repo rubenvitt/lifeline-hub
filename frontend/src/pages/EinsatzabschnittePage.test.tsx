@@ -150,10 +150,9 @@ describe('EinsatzabschnittePage', () => {
   });
 
   /**
-   * AK1 (LFH-347 · H37). Zwei Zeilen, zwei Bedeutungen: die Bestandszeile „Stärke (F/UF/M//Σ)"
-   * zählt weiter NUR die direkt zugeordneten Einheiten — sie wechselt nicht still die
-   * Bedeutung —, die neue Zeile summiert über die Unterabschnitte. Beide Labels sind im DOM
-   * verschieden, und die Zahlen belegen die Trennung: Süd hängt unter Nord und trägt 0/1/1.
+   * Zwei Zeilen, zwei Bedeutungen: „Stärke (F/UF/M//Σ)" zählt nur die direkt zugeordneten
+   * Einheiten, die zweite Zeile summiert über die Unterabschnitte. Süd hängt unter Nord und trägt
+   * 0/1/1.
    */
   it('zeigt die eigene Stärke und die inkl. Unterabschnitte getrennt beschriftet', async () => {
     server.use(
@@ -215,7 +214,7 @@ describe('EinsatzabschnittePage', () => {
     renderPage();
     await userEvent.click(await screen.findByText('Nord'));
 
-    // Seit LFH-664 ein Datenraster statt `Descriptions`: die Zeile ist das Datenfeld.
+    // Datenraster statt `Descriptions`: die Zeile ist das Datenfeld.
     const eigene = screen
       .getByText('Stärke (F/UF/M//Σ)')
       .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
@@ -388,7 +387,7 @@ describe('EinsatzabschnittePage', () => {
     });
   });
 
-  // LFH-107: „Überblick zuerst" — Detailbereich ist Lese-Ansicht, Bearbeiten ist ein eigener Modus.
+  // „Überblick zuerst": der Detailbereich ist Lese-Ansicht, Bearbeiten ist ein eigener Modus.
   it('zeigt beim Öffnen die Lese-Ansicht (Kerninfos) ohne Formular-Inputs', async () => {
     server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
     renderPage();
@@ -420,15 +419,11 @@ describe('EinsatzabschnittePage', () => {
   });
 
   /**
-   * AK4-Partnerpaar (LFH-331 · B3). `EinsatzabschnittePage` ist Pflichtstelle.
+   * Partnerpaar: die negative Hälfte allein belegte nichts; erst die positive Hälfte mit demselben
+   * Literal macht daraus eine Aussage über die Zustandsweiche.
    *
-   * Die negative Hälfte allein belegte nichts — hätte der Umbau den Leertext neu
-   * formuliert, wäre sie auch im Leerfall trivial grün. Erst die positive Hälfte
-   * darunter, mit demselben Literal in derselben Datei, macht daraus eine Aussage
-   * über die Zustandsweiche statt über die Schreibweise eines Strings.
-   *
-   * Der 500er-Handler steht VOR `handlers()`: `server.use` stellt Laufzeit-Handler
-   * nach vorn und der erste Treffer gewinnt — hinten angehängt bliebe er wirkungslos.
+   * Der 500er-Handler steht vor `handlers()`: `server.use` stellt Laufzeit-Handler nach vorn und
+   * der erste Treffer gewinnt.
    */
   it('zeigt bei gescheitertem Abschnitts-Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
@@ -448,13 +443,10 @@ describe('EinsatzabschnittePage', () => {
   });
 
   /**
-   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
-   * nicht `isStale`.
-   *
-   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
-   * Aktualisierung. Vor dem Umbau verschwand der Baum an dieser Stelle — die Einsatzkraft
-   * verlor die Gliederung, die sie eben noch vor sich hatte, und mit ihr die Auswahl, über
-   * die alles Weitere dieser Seite läuft.
+   * Veralteter Stand = `isError` mit Zeilen im Zwischenspeicher — nicht `isFetching`, nicht
+   * `isStale`. Der Ablauf ist der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung. Der Baum darf nicht verschwinden, sonst verlöre die Einsatzkraft Gliederung und
+   * Auswahl.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Abschnitten im Cache scheitert', async () => {
     server.use(...handlers());
@@ -469,16 +461,14 @@ describe('EinsatzabschnittePage', () => {
     expect(
       await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
     ).toBeInTheDocument();
-    // Der Baum aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt ihn NICHT.
+    // Der Baum aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt ihn nicht.
     expect(screen.getByText('Nord')).toBeInTheDocument();
     expect(screen.queryByText('Abschnitte konnten nicht geladen werden')).not.toBeInTheDocument();
   });
 
   /**
-   * Die Primäraktion des Leerzustands trägt denselben Wortlaut wie der Kopfknopf —
-   * eine zweite Schreibweise für dieselbe Geste wäre genau der Befund, den B3 behebt.
-   * Eindeutig wird der Griff über `within(...)` auf die Gliederungs-Karte, nicht über
-   * einen abweichenden String.
+   * Die Primäraktion des Leerzustands trägt denselben Wortlaut wie der Kopfknopf; eindeutig wird
+   * der Griff über `within(...)` auf die Gliederungs-Karte.
    */
   it('bietet im leeren Baum genau eine Primäraktion, und die öffnet einen Entwurf', async () => {
     server.use(...handlers('einsatzleitung', 'aktiv', []));
@@ -497,9 +487,7 @@ describe('EinsatzabschnittePage', () => {
   });
 
   /**
-   * M55 (LFH-347 · C12). Vorher schrieb der Klick sofort `POST …/abschnitte` mit dem Namen
-   * „Neuer Abschnitt" — samt ETB-Eintrag —, und Abbrechen ließ den Datensatz stehen.
-   * Jetzt entsteht er erst beim Speichern; Abbrechen hinterlässt nichts, auch keine
+   * Der Datensatz entsteht erst beim Speichern; Abbrechen hinterlässt nichts, auch keine
    * Invalidierung des Tagebuchs.
    */
   it('legt beim Öffnen und Abbrechen des Entwurfs nichts an — 0 POST, 0 ETB-Invalidierung', async () => {
@@ -567,20 +555,15 @@ describe('EinsatzabschnittePage', () => {
   });
 
   /**
-   * Review-Fund (LFH-347 · Fix-Runde 1). Der Kopfknopf „Abschnitt anlegen" ist klickbar,
-   * bevor `abschnitteQuery` aufgelöst ist. Löst der Cross-Modul-Deeplink (`?abschnitt=<id>`)
-   * danach `setGewaehlt` aus, während der Entwurf noch offen steht, muss er ihn verwerfen —
-   * wie `Tree onSelect` es bereits tut. Ohne den Fix bleibt `entwurf=true` bei gesetztem
-   * `gewaehlt` stehen, und `speichern` nähme beim nächsten „Speichern" wegen `!entwurf ===
-   * false` fälschlich den POST-Zweig für einen längst bestehenden Abschnitt.
+   * Der Kopfknopf „Abschnitt anlegen" ist klickbar, bevor `abschnitteQuery` aufgelöst ist. Setzt
+   * der Deeplink (`?abschnitt=<id>`) danach `gewaehlt`, muss er den offenen Entwurf verwerfen wie
+   * `Tree onSelect`. Sonst nähme `speichern` wegen `!entwurf === false` fälschlich den POST-Zweig
+   * für einen bestehenden Abschnitt.
    */
   it('verwirft den Entwurf, wenn der Deeplink nach dem Öffnen einen Abschnitt selektiert', async () => {
-    // Die Reihenfolge IST hier die Zusicherung: erst der Klick auf „Abschnitt anlegen",
-    // danach die aufgelöste Query. Ein `setTimeout(50)` hat das früher nur WAHRSCHEINLICH
-    // gemacht und hing damit an der Geschwindigkeit des Rechners — auf einem CI-Runner mit
-    // zwei Kernen brauchen `findByRole` und `userEvent.click` länger als die Frist, die
-    // Query war dann vor dem Klick da und der Test wurde rot (gemessen, LFH-522). Ein von
-    // Hand freigegebenes Promise macht dieselbe Aussage unabhängig von der Wanduhr.
+    // Die Reihenfolge ist die Zusicherung: erst der Klick, dann die aufgelöste Query. Ein von Hand
+    // freigegebenes Promise macht das unabhängig von der Wanduhr; ein `setTimeout` hinge an der
+    // Geschwindigkeit des Rechners.
     let queryFreigeben!: () => void;
     const queryGesperrt = new Promise<void>((aufloesen) => {
       queryFreigeben = aufloesen;
@@ -611,18 +594,16 @@ describe('EinsatzabschnittePage', () => {
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
-    // Erst JETZT antwortet die Abschnitts-Query — der Entwurf steht also nachweislich schon,
-    // wenn der Deeplink `?abschnitt=5` greift. Genau diese Lage prüft der Test.
+    // Erst jetzt antwortet die Abschnitts-Query — der Entwurf steht also schon, wenn der Deeplink
+    // greift.
     queryFreigeben();
     expect(await screen.findByText('Abschnitt: Nord')).toBeInTheDocument();
     expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
   });
 
   /**
-   * Der zweite Leer-Knoten der Seite ist KEIN Leerzustand, sondern eine Aufforderung
-   * bei fehlender Auswahl: die Menge ist gefüllt, es fehlt nur die Wahl. Deshalb
-   * ausdrücklich ohne Primäraktion — ein Knopf hier führte aus einer Lage heraus, die
-   * gar kein Problem ist.
+   * Der zweite Leer-Knoten ist kein Leerzustand, sondern eine Aufforderung bei fehlender Auswahl:
+   * die Menge ist gefüllt, es fehlt nur die Wahl. Deshalb ohne Primäraktion.
    */
   it('fordert bei fehlender Auswahl zur Wahl auf — ohne Aktion', async () => {
     server.use(...handlers());
@@ -645,10 +626,9 @@ describe('EinsatzabschnittePage', () => {
     expect(screen.queryByTestId('funk-erreichbarkeit')).not.toBeInTheDocument();
   });
 
-  // Task 4 (LFH-341 · H40): unter `md` stapeln Gliederung und Detail, statt die 360-px-Karte
-  // neben den Inhalt zu quetschen. Wie bei `GefahrenPage` (dort `lg`) ist die Behauptung die
-  // Flex-RICHTUNG, nicht eine Pixelbreite — jsdom rechnet kein Layout. Beide Fälle zusammen
-  // sind die Behauptung: nur „column bei 600" wäre auch bei fest verdrahtetem `column` erfüllt.
+  // Unter `md` stapeln Gliederung und Detail. Behauptet wird die Flex-Richtung, nicht eine
+  // Pixelbreite — jsdom rechnet kein Layout. Beide Fälle zusammen: nur „column bei 600" wäre auch
+  // bei fest verdrahtetem `column` erfüllt.
   it('stellt Gliederung und Detail ab md nebeneinander', async () => {
     server.use(...handlers());
     setzeViewportBreite(1024);

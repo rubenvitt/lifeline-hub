@@ -68,14 +68,9 @@ const eintrag = {
 };
 
 /**
- * Wählt eine Zeilenaktion der ETB-Tabelle (LFH-365 · B5e).
- *
- * Die drei Aktionen liegen seit dem Bündel in einem Menü statt in einer Knopfreihe: erst
- * den Auslöser, dann den Eintrag — und die Rolle wechselt dabei von `button` zu
- * `menuitem`, gleicher Wortlaut rettet einen alten Griff also nicht.
- *
- * Der Eintrag wird über das GEÖFFNETE Menü geholt, nicht per freiem `findByRole`: antd
- * lässt die Portale geschlossener Dropdowns im Baum stehen (`Datensicht.test.tsx:926-931`).
+ * Wählt eine Zeilenaktion der ETB-Zeitachse: erst den Menü-Auslöser, dann den Eintrag (Rolle
+ * `menuitem`). Der Eintrag wird über das geöffnete Menü geholt: antd lässt die Portale
+ * geschlossener Dropdowns im Baum stehen.
  */
 async function waehleZeilenaktion(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(await screen.findByRole('button', { name: /^Aktionen zu Eintrag/ }));
@@ -87,9 +82,8 @@ async function waehleZeilenaktion(user: ReturnType<typeof userEvent.setup>, name
 }
 
 /**
- * Serverzählung (LFH-612) für den Kopf und die Bilanz. Die Zahl ist bewusst vom geladenen
- * Fenster UNABHÄNGIG — genau das ist die Zusicherung: der Kopf zeigt, was der Server zählt,
- * nicht was die Seite geladen hat.
+ * Serverzählung für Kopf und Bilanz, bewusst unabhängig vom geladenen Fenster: der Kopf zeigt, was
+ * der Server zählt.
  */
 function zaehlung(jeTyp: Partial<Record<EtbEintragAnzeige['typ'], number>>) {
   const je_typ = {
@@ -122,14 +116,14 @@ function setupMSW() {
     // (Absender/Empfänger-Vorschläge). Leere Listen genügen für diesen Test.
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
-    // Auftrags-Ziele für das ETB→Auftrag-Formular (LFH-112).
+    // Auftrags-Ziele für das ETB→Auftrag-Formular.
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
   );
 }
 
 function setup(route = '/einsaetze/7/etb', zusatz: RequestHandler[] = []) {
   setupMSW();
-  // NACH den Vorgaben: `server.use` stellt voran, der zuletzt gesetzte Handler gewinnt.
+  // Nach den Vorgaben: `server.use` stellt voran, der zuletzt gesetzte Handler gewinnt.
   server.use(...zusatz);
   return renderMitProviders(
     <>
@@ -300,22 +294,20 @@ describe('EtbPage', () => {
 
   it('zeigt Seitentitel, Einsatz im Ortspfad, Einträge und die Serverzahl im Kopf', async () => {
     setup();
-    // Seit dem Neuentwurf (S4) trägt der Seitenkopf den MODULtitel; der Einsatz steht im
-    // Ortspfad davor (und im Rahmen der App, der hier nicht mitgerendert wird).
+    // Der Seitenkopf trägt den Modultitel; der Einsatz steht im Ortspfad davor.
     expect(await screen.findByRole('heading', { name: 'Einsatztagebuch' })).toBeInTheDocument();
     expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument();
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
-    // Kein Filter: der Kopf nennt die Gesamtzahl der Serverzählung (LFH-612).
+    // Kein Filter: der Kopf nennt die Gesamtzahl der Serverzählung.
     const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
     await waitFor(() => expect(kopf).toHaveTextContent('1 Eintrag'));
     expect(kopf).not.toHaveTextContent('geladen');
   });
 
   it('startet mit ausgeschaltetem „Werte behalten"', async () => {
-    // Der Zustand liegt in EtbPage (nicht in EtbEntwurfsTabs, s. Kommentar dort), also
-    // hält NUR dieser Test die Vorgabe. Die Tabs-Tests reichen ihn als Prop herein und
-    // wären auch bei umgelegtem Vorgabewert grün.
+    // Der Zustand liegt in EtbPage, also hält nur dieser Test die Vorgabe; die Tabs-Tests reichen
+    // ihn als Prop herein.
     setup();
     expect(await screen.findByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
@@ -333,8 +325,8 @@ describe('EtbPage', () => {
         const { container } = setup('/einsaetze/7/etb?eintrag=1');
         await screen.findByText('Erste Meldung');
         await waitFor(() =>
-          // Seit dem Neuentwurf gibt es auf KEINER Breite mehr einen `data-row-key`: die
-          // Zeitachse trägt die Kartenmarke, an der `scrolleZurZeile` springt.
+          // Die Zeitachse trägt die Kartenmarke, an der `scrolleZurZeile` springt (kein
+          // `data-row-key`).
           expect(container.querySelector('[data-zeile="eintrag-1"]')).toHaveClass(
             'zeile-hervorgehoben',
           ),
@@ -387,7 +379,7 @@ describe('EtbPage', () => {
         'zeile-hervorgehoben',
       ),
     );
-    // Der Kopf nennt die Serverzahl, nicht die 101 geladenen Einträge (LFH-612).
+    // Der Kopf nennt die Serverzahl, nicht die 101 geladenen Einträge.
     await waitFor(() =>
       expect(document.querySelector('[data-lfh="seitenkopf"]')).toHaveTextContent('412 Einträge'),
     );
@@ -439,15 +431,12 @@ describe('EtbPage', () => {
     await waehleZeilenaktion(user, 'Auftrag erteilen');
     // Auftragstext ist aus dem Eintragstext vorbefüllt.
     expect(await screen.findByDisplayValue('Erste Meldung')).toBeInTheDocument();
-    // Einen Funktions-Empfänger ergänzen (Pflicht: >=1 Empfänger). Seit
-    // LFH-343 · C8 tragen strukturierte Ziele und freie Funktionstexte EIN Feld.
+    // Einen Funktions-Empfänger ergänzen (Pflicht: ≥ 1). Strukturierte Ziele und freie
+    // Funktionstexte teilen ein Feld.
     await user.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
     /*
-     * Der Modal-Submit ist jetzt der EINZIGE Knopf dieses Namens. Vorher gab es zwei
-     * gleichnamige (Zeilen-Auslöser + Submit) und dieser Griff nahm den letzten; seit
-     * LFH-365 heißt der Zeilen-Auslöser „Aktionen zu Eintrag <lfd_nr>" und die
-     * Mehrdeutigkeit ist weg. Der Menü-Eintrag trägt die Rolle `menuitem`, kollidiert
-     * also auch dann nicht, wenn antd sein Portal geschlossen im Baum stehen lässt.
+     * Der Modal-Submit ist der einzige Knopf dieses Namens: der Zeilen-Auslöser heißt „Aktionen zu
+     * Eintrag <lfd_nr>", und der Menü-Eintrag trägt die Rolle `menuitem`.
      */
     await user.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
 
@@ -476,9 +465,9 @@ describe('EtbPage', () => {
   });
 
   it('entfernt den Entwurf auch bei Offline-Enqueue (Netzwerkfehler → eingereiht statt abgelehnt)', async () => {
-    // erfasseEtb wirft bei Netzwerkfehler einen TypeError → useEtbErfassung reiht offline ein
-    // und RESOLVED (kein throw). Der Entwurf muss trotzdem entfernt werden (Spec: weg, sobald
-    // erfassen ohne Exception zurückkehrt — Server-Erfolg ODER offline eingereiht).
+    // erfasseEtb wirft bei Netzwerkfehler einen TypeError → useEtbErfassung reiht offline ein und
+    // löst auf (kein throw). Der Entwurf muss trotzdem entfernt werden: weg, sobald erfassen ohne
+    // Exception zurückkehrt.
     server.use(http.post('/api/einsaetze/7/etb', () => HttpResponse.error()));
     setup();
     const user = userEvent.setup();
@@ -519,13 +508,12 @@ describe('EtbPage', () => {
 });
 
 /**
- * Der Zustandsraum des Tagebuchs ist vierteilig: laden / Fehler / leer-ohne-Filter /
- * leer-mit-Filter (LFH-331 · B3, Spec §5 Bündel 7).
+ * Der Zustandsraum des Tagebuchs ist vierteilig: laden / Fehler / leer ohne Filter / leer mit
+ * Filter.
  *
- * Die Zusicherungen „Leertitel NICHT im DOM" unten sind Regressionsklammern; ihre
- * Beweiskraft liegt im Zeitachsen-Test (`etb/EtbZeitachse.test.tsx`), wo die Zeitachse in
- * allen drei Fällen montiert bleibt. Hier steht die Partnerhälfte mit byte-gleichem Literal
- * (Spec §3/F2).
+ * Die Zusicherungen „Leertitel nicht im DOM" sind Regressionsklammern; ihre Beweiskraft liegt in
+ * `etb/EtbZeitachse.test.tsx`, wo die Zeitachse in allen drei Fällen montiert bleibt. Hier steht
+ * die Partnerhälfte mit gleichem Literal.
  */
 describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
   const LEER_TITEL = 'Noch keine Einträge.';
@@ -591,8 +579,8 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
       http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
     ]);
     expect(await screen.findByText(LEER_TITEL)).toBeInTheDocument();
-    // Die Erfassungsleiste wird für Lesende gar nicht gerendert — ein Fokussprung dorthin
-    // zeigte auf einen Knoten, den es nicht gibt.
+    // Die Erfassungsleiste wird für Lesende gar nicht gerendert — ein Fokussprung zeigte auf einen
+    // Knoten, den es nicht gibt.
     expect(document.querySelector('.etb-erfassung-sticky')).toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Ersten Eintrag erfassen' }),
@@ -614,8 +602,8 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
 
-    // DIE unterscheidende Zusicherung: ein Reset, der nur den Seitenzustand räumt, ließe
-    // die sichtbare Eingabe stehen — und der nächste Tastendruck mischte sie wieder ein.
+    // Die unterscheidende Zusicherung: ein Reset, der nur den Seitenzustand räumt, ließe die
+    // sichtbare Eingabe stehen.
     expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('');
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
   });
@@ -643,8 +631,8 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     await waitFor(() => expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue(''));
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
 
-    // Der Reset remountet die unkontrollierte Filterleiste. Die Registry darf die damit
-    // veraltete aktive Ebene nicht für ein Folgeereignis außerhalb der Root wiederverwenden.
+    // Der Reset remountet die unkontrollierte Filterleiste. Die Registry darf die veraltete aktive
+    // Ebene nicht für ein Folgeereignis außerhalb der Root wiederverwenden.
     const neueSuche = screen.getByPlaceholderText('Volltextsuche');
     expect(neueSuche).not.toBe(suche);
     const ausserhalb = new KeyboardEvent('keydown', {
@@ -684,10 +672,7 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     expect(suche).toHaveValue('zzz');
   });
 
-  /**
-   * Der Filter steht in der URL (LFH-342 · C7, Befund M80). Vorher lag er allein im
-   * Seitenzustand: ein Reload warf ihn weg, teilen ließ er sich nicht.
-   */
+  /** Der Filter steht in der URL: er überlebt einen Reload und ist teilbar. */
   describe('Filter in der URL', () => {
     it('liest einen Filter beim Kaltstart aus der URL — Abruf UND sichtbare Leiste', async () => {
       const abrufe: string[] = [];
@@ -704,11 +689,11 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
       await screen.findByText('Erste Meldung');
       // Der Abruf trägt den Filter — ohne das wäre die Leiste bloß Zierde.
       expect(abrufe.some((a) => a.includes('q=brand') && a.includes('typ=meldung'))).toBe(true);
-      // Und die Leiste zeigt ihn. Beide Hälften: ein Filter, der nur im Query-Key
-      // steht, ist von außen nicht als gesetzt erkennbar.
+      // Und die Leiste zeigt ihn — ein Filter nur im Query-Key wäre von außen nicht als gesetzt
+      // erkennbar.
       expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('brand');
-      // Der Typ steht seit dem Neuentwurf in der Segmentleiste des Seitenkopfs — das
-      // gewählte Segment wird aus der URL GELESEN.
+      // Der Typ steht in der Segmentleiste des Seitenkopfs; das gewählte Segment wird aus der URL
+      // gelesen.
       const segmente = screen.getByRole('radiogroup', { name: 'Einträge nach Typ filtern' });
       expect(within(segmente).getByRole('radio', { name: 'Meldung' })).toHaveAttribute(
         'aria-checked',
@@ -742,8 +727,8 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
       );
       await userEvent.click(await screen.findByRole('button', { name: 'Filter zurücksetzen' }));
       await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
-      // Die Leiste wird dabei neu aufgesetzt — die Gegenaussage zum Batching-Fall:
-      // ein Remount in DERSELBEN Runde schriebe den alten Begriff zurück ins Feld.
+      // Die Leiste wird dabei neu aufgesetzt — ein Remount in derselben Runde schriebe den alten
+      // Begriff zurück ins Feld.
       expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('');
     });
 
@@ -764,8 +749,7 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
         expect(screen.getByTestId('ort-suche')).not.toHaveTextContent('eintrag='),
       );
       expect(screen.getByTestId('ort-suche')).toHaveTextContent('typ=meldung');
-      // Und `eintrag` ist nie in den Abruf geraten — es ist eine Sprungmarke,
-      // kein Filter.
+      // Und `eintrag` ist nie in den Abruf geraten — eine Sprungmarke, kein Filter.
       expect(abrufe.every((a) => !a.includes('eintrag='))).toBe(true);
     });
   });
@@ -826,9 +810,9 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
 
   it('ein Nachläufer der Suchfrist verliert den eben gewählten Typ nicht', async () => {
     /*
-     * Die Wettlauf-Stelle über die Komponentengrenze: Suche entprellt (300 ms) in der
-     * Leiste, Typ sofort im Seitenkopf. Meldete die Leiste ihre ganze Kopie, schriebe der
-     * Nachläufer die URL ohne Typ zurück.
+     * Wettlauf über die Komponentengrenze: Suche entprellt (300 ms) in der Leiste, Typ sofort im
+     * Seitenkopf. Meldete die Leiste ihre ganze Kopie, schriebe der Nachläufer die URL ohne Typ
+     * zurück.
      */
     setupMSW();
     renderMitProviders(
@@ -845,10 +829,10 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     fireEvent.change(suche, { target: { value: 'pegel' } });
     // Innerhalb der Frist das Segment wählen …
     fireEvent.click(screen.getByRole('radio', { name: 'Lage' }));
-    // … und nach Ablauf stehen BEIDE in der URL.
+    // … und nach Ablauf stehen beide in der URL.
     await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent('q=pegel'));
     expect(screen.getByTestId('ort-suche')).toHaveTextContent('typ=lage');
-    // Der Segmentklick hat die Leiste NICHT neu aufgesetzt: das Feld ist dasselbe.
+    // Der Segmentklick hat die Leiste nicht neu aufgesetzt: das Feld ist dasselbe.
     expect(screen.getByPlaceholderText('Volltextsuche')).toBe(suche);
   });
 
@@ -868,12 +852,12 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     await screen.findByText('Erste Meldung');
     const leiste = document.querySelector('.etb-erfassung-sticky')!;
     const zeitachse = document.querySelector('[data-lfh="etb-zeitachse"]')!;
-    // DOCUMENT_POSITION_FOLLOWING: die Leiste steht im Baum HINTER der Zeitachse.
+    // DOCUMENT_POSITION_FOLLOWING: die Leiste steht im Baum hinter der Zeitachse.
     expect(
       zeitachse.compareDocumentPosition(leiste) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    // Die Hülle der Schnellerfassung trägt den Typ als Befehl im Präfix (nach dem Laden
-    // der Entwürfe).
+    // Die Hülle der Schnellerfassung trägt den Typ als Befehl im Präfix (nach dem Laden der
+    // Entwürfe).
     await waitFor(() =>
       expect(leiste.querySelector('[data-lfh="schnellerfassung-praefix"]')).toHaveTextContent(
         '/meldung',
@@ -911,10 +895,9 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
   });
 
   /**
-   * LFH-373 (Review): die Erfassung hängt auf JEDER Breite an derselben Stelle im Baum — als
-   * `fuss` der Seitenwurzel. Hing sie ab `xl` in der Zeitachsenspalte und darunter im Fuß, riss
-   * ein Wechsel über `xl` (Tablet drehen, Fenster ziehen) sie aus und hängte sie neu ein; der Text
-   * einer laufenden Berichtigung lebt nur im Zustand und war ohne Rückfrage weg.
+   * Die Erfassung hängt auf jeder Breite an derselben Stelle im Baum — als `fuss` der Seitenwurzel.
+   * Hinge sie je nach Breite woanders, hängte ein Wechsel über `xl` (Tablet drehen) sie neu ein,
+   * und der Text einer laufenden Berichtigung wäre ohne Rückfrage weg.
    */
   it('behält die Erfassung beim Wechsel über xl — derselbe Knoten, derselbe Text', async () => {
     setzeViewportBreite(1366);
@@ -931,10 +914,9 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
   });
 
   /**
-   * LFH-373 (gemessen, `e2e/leisten-flaeche.spec.ts` „Laden ohne Sprung"): unter `xl` steht die
-   * Bilanz UNTER der Zeitachse. Stand sie schon da, während die Liste noch lud, schoben die
-   * eintreffenden Zeilen sie um mehr als ihre Höhe nach unten (CLS 0,22 bei 390 px). Sie
-   * erscheint deshalb erst, wenn die Liste steht — ab `xl` steht sie daneben und darf sofort.
+   * Unter `xl` steht die Bilanz unter der Zeitachse. Stünde sie schon während des Ladens da,
+   * schöben die eintreffenden Zeilen sie weg (CLS). Sie erscheint deshalb erst, wenn die Liste
+   * steht; ab `xl` steht sie daneben und darf sofort.
    */
   it('zeigt die Bilanz unter xl erst, wenn die Liste steht', async () => {
     setzeViewportBreite(800);
@@ -956,10 +938,9 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
   });
 
   /**
-   * Die Sperre gilt dem ERSTEN Laden, nicht jedem (LFH-373, Review): der Filter steckt im
-   * Query-Schlüssel, jeder neue Filter ist also wieder `isLoading`. Hinge die Bilanz daran,
-   * verschwände sie unter `xl` bei jedem Typklick und jedem Suchwort — und beim Wiederverbinden
-   * nach einem Offline-Start genau in dem Moment, in dem der Puffer gesendet wird.
+   * Die Sperre gilt dem ersten Laden, nicht jedem: der Filter steckt im Query-Schlüssel, jeder neue
+   * Filter ist wieder `isLoading`. Hinge die Bilanz daran, verschwände sie unter `xl` bei jedem
+   * Typklick und beim Wiederverbinden nach einem Offline-Start.
    */
   it('behält die Bilanz unter xl beim Filterwechsel, während die neue Liste lädt', async () => {
     setzeViewportBreite(800);
@@ -1007,7 +988,7 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     ]);
     await screen.findByText('Erste Meldung');
     const leiste = screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' });
-    // Geladen ist EIN Eintrag; die Bilanz zählt trotzdem das ganze Tagebuch.
+    // Geladen ist ein Eintrag; die Bilanz zählt trotzdem das ganze Tagebuch.
     await waitFor(() =>
       expect(leiste.querySelector('[data-typ="meldung"]')).toHaveTextContent('218'),
     );
@@ -1058,8 +1039,8 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     expect(await within(leiste).findByText('Zählung nicht verfügbar.')).toBeInTheDocument();
     const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
     expect(kopf).not.toHaveTextContent(/\d+ (Einträge|Eintrag|Treffer)/);
-    // `findBy`: die Erfassung steht erst, wenn die Entwürfe aus der IndexedDB geladen sind —
-    // unter Last kam die Zählung früher an, und ein `getBy` fand das Feld noch nicht.
+    // `findBy`: die Erfassung steht erst, wenn die Entwürfe aus der IndexedDB geladen sind; die
+    // Zählung kann früher ankommen.
     expect(await screen.findByPlaceholderText(/Inhalt/)).toBeEnabled();
   });
 
@@ -1117,8 +1098,8 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     await screen.findByText('Erste Meldung');
     await screen.findByPlaceholderText(/Inhalt/);
     await user.upload(dateiEingabe(), new File(['x'], 'foto-b.jpg', { type: 'image/jpeg' }));
-    // Ein Entwurf ohne Text läge sonst nur im Speicher: nach dem Abbrechen käme ein neuer mit
-    // neuer id, und die Dateien hingen an keinem Reiter mehr.
+    // Ein Entwurf ohne Text läge sonst nur im Speicher: nach dem Abbrechen käme ein neuer mit neuer
+    // id, und die Dateien hingen an keinem Reiter mehr.
     await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(1));
 
     await waehleZeilenaktion(user, 'Berichtigen');
@@ -1132,9 +1113,9 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
   });
 
   /**
-   * Review C1 (WICHTIG 1): ein Eintrag der Offline-Queue, dessen client_id schon für einen
-   * ANDEREN Eintrag steht, landet mit dem Wortlaut des Servers unter „abgelehnt". „Erneut
-   * senden" nimmt einen neuen Schlüssel — mit dem alten liefe er in denselben 409.
+   * Ein Queue-Eintrag, dessen client_id schon für einen anderen Eintrag steht, landet mit dem
+   * Wortlaut des Servers unter „abgelehnt". „Erneut senden" nimmt einen neuen Schlüssel — mit dem
+   * alten liefe er in denselben 409.
    */
   it('ein client_id-Konflikt der Queue steht unter „abgelehnt"; „Erneut senden" nimmt einen neuen Schlüssel', async () => {
     const konflikt =
@@ -1197,12 +1178,11 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
 });
 
 /**
- * ── EINSTIEG IN DEN DRUCK (LFH-22, design.md D5) ─────────────────────────────────
+ * ── Einstieg in den Druck (LFH-22) ──
  *
- * „Drucken / als PDF" im Kopf ÖFFNET die Druckansicht und sendet nichts ab — deshalb gehört
- * es in den Kopf-Slot (LFH-346 · C11) und ist ein Link mit Knopfgestalt (Strg+Klick öffnet
- * einen neuen Tab). Er nimmt den AKTIVEN Filter mit, sonst druckte die Person eine andere
- * Auswahl als die, die sie gerade sieht.
+ * „Drucken / als PDF" öffnet die Druckansicht und sendet nichts ab — deshalb im Kopf-Slot, als Link
+ * mit Knopfgestalt (Strg+Klick öffnet einen Tab). Er nimmt den aktiven Filter mit, sonst druckte
+ * die Person eine andere Auswahl als die sichtbare.
  */
 describe('EtbPage — Einstieg in den Druck (LFH-22)', () => {
   it('verlinkt im Kopf auf die Druckansicht mit dem aktiven Filter', async () => {

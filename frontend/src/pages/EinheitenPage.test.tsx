@@ -81,10 +81,9 @@ function handlers(
 
 describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
   /**
-   * Der Knopf schrieb SOFORT einen Datensatz namens „Neue Einheit" in die Datenbank —
-   * vor jeder Eingabe. Wer ihn versehentlich traf oder es sich anders überlegte, hinterließ
-   * eine Platzhalter-Einheit in der Gliederung, und die stand danach in jedem Baum, jeder
-   * Auswahlliste und jeder Stärkeaggregation.
+   * „Einheit bilden" schreibt erst beim Absenden: ein Datensatz vor jeder Eingabe hinterließe bei
+   * einem Fehlklick eine Platzhalter-Einheit in jedem Baum, jeder Auswahlliste und jeder
+   * Stärkeaggregation.
    */
   function bildenHandler() {
     const angelegt: unknown[] = [];
@@ -131,15 +130,12 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
 
     /**
-     * KEINE Zusicherung über das Verschwinden des Dialogs. GEMESSEN: antd hält den Knoten
-     * samt `.ant-modal-wrap` für seine Schliessanimation im Baum, und die läuft in jsdom
-     * nie ab — weder `queryByRole('dialog') === null` noch `not.toBeVisible()` wird je
-     * wahr. Beides wäre ein dauerhaft roter Test, der nichts über das Verhalten sagt.
+     * Keine Zusicherung über das Verschwinden des Dialogs: antd hält den Knoten samt
+     * `.ant-modal-wrap` für seine Schließanimation im Baum, und die läuft in jsdom nie ab.
      *
-     * Geprüft werden stattdessen die zwei Aussagen, die zählen und messbar sind: es ist
-     * nichts angelegt worden, und der verworfene Wortlaut ist beim nächsten Öffnen weg
-     * (Reset auf JEDEM Ausweg, Erfassungs-Norm aus LFH-332 · B4). Die zweite ist die
-     * schärfere — ein stehengebliebener Name legte beim nächsten Mal eine Dublette an.
+     * Geprüft werden die zwei messbaren Aussagen: nichts ist angelegt, und der verworfene Wortlaut
+     * ist beim nächsten Öffnen weg (Reset auf jedem Ausweg). Die zweite ist die schärfere — ein
+     * stehengebliebener Name legte beim nächsten Mal eine Dublette an.
      */
     expect(angelegt).toHaveLength(0);
 
@@ -168,8 +164,8 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
   });
 
   it('ohne Namen wird nicht abgesendet', async () => {
-    // Die Gegenprobe zum Test darüber: ohne sie wäre „legt erst beim Absenden an" auch
-    // dann grün, wenn der Dialog jede leere Eingabe durchreichte.
+    // Gegenprobe: ohne sie wäre „legt erst beim Absenden an" auch grün, wenn der Dialog jede leere
+    // Eingabe durchreichte.
     const { angelegt, handler } = bildenHandler();
     server.use(...handlers(), handler);
     renderMitProviders(
@@ -182,8 +178,8 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Bilden' }));
     // Über die Fehlerklasse, nicht über `role="alert"`: antds Form-Erklärung trägt
-    // `.ant-form-item-explain-error` und keine ARIA-Rolle (gemessen). Die eigentliche
-    // Aussage ist die Zeile darunter — der Klick hat nichts angelegt.
+    // `.ant-form-item-explain-error` und keine ARIA-Rolle. Die eigentliche Aussage ist die Zeile
+    // darunter — der Klick hat nichts angelegt.
     await waitFor(() =>
       expect(dialog.querySelector('.ant-form-item-explain-error')).not.toBeNull(),
     );
@@ -193,12 +189,8 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
 
 describe('EinheitenPage', () => {
   /**
-   * Der Weg zur aggregierenden Kräfteübersicht (LFH-338 · C3, Befund H21).
-   *
-   * Die Übersicht war von KEINER der vier Kräfte-Modulseiten verlinkt — die Verdichtung,
-   * für die es eine eigene Seite gibt, war von der Pflegefläche aus unsichtbar. Geprüft
-   * wird das `href` und nicht bloß die Existenz eines Links: ein Inline-Pfad neben dem
-   * Builder wäre sonst von ihm nicht zu unterscheiden.
+   * Der Weg zum Meldebild von der Pflegefläche. Geprüft wird das `href`, nicht bloß die Existenz
+   * eines Links: ein Inline-Pfad neben dem Builder wäre sonst nicht zu unterscheiden.
    */
   it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
     server.use(...handlers());
@@ -229,10 +221,9 @@ describe('EinheitenPage', () => {
 
   it('weist den Stand der Gliederung aus', async () => {
     /**
-     * Die Seite trägt seit LFH-339 · C4 nur noch die Gliederung — die Zusicherung über den
-     * ÄLTESTEN Stand mehrerer Bestände ist mit der Detailansicht auf
-     * `EinheitDetailPage.test.tsx` gezogen. Hier gibt es genau eine dargestellte Quelle,
-     * und ihr Stand ist der angezeigte.
+     * Die Seite trägt nur die Gliederung; die Zusicherung über den ältesten Stand mehrerer Bestände
+     * steht in `EinheitDetailPage.test.tsx`. Hier gibt es eine dargestellte Quelle, ihr Stand ist
+     * der angezeigte.
      */
     server.use(...handlers());
     const client = neuerQueryClient();
@@ -255,9 +246,8 @@ describe('EinheitenPage', () => {
 
   it('leitet den Bestands-Deeplink ?einheit=<id> auf die Item-Route weiter', async () => {
     /**
-     * Der Query-Param war das Muster für Module OHNE Detailansicht (LFH-25). Seit C4 hat
-     * die Einheit eine — andere Module verlinken aber weiter mit `?einheit=`, deshalb wird
-     * der Param übersetzt statt fallengelassen.
+     * Andere Module verlinken weiter mit `?einheit=`; der Param wird auf die Detailroute übersetzt
+     * statt fallengelassen.
      */
     server.use(...handlers());
     renderMitProviders(
@@ -271,9 +261,8 @@ describe('EinheitenPage', () => {
   });
 
   it('eine unbekannte Kennung in ?einheit= bleibt auf der Gliederung', async () => {
-    // Die Gegenprobe: ohne sie wäre die Weiterleitung auch dann grün, wenn sie JEDE Zahl
-    // in eine Detailroute übersetzte — und die Detailseite zeigte dann einen Leerzustand,
-    // wo eine Gliederung stehen sollte.
+    // Gegenprobe: ohne sie wäre die Weiterleitung auch grün, wenn sie jede Zahl in eine Detailroute
+    // übersetzte — die dann einen Leerzustand zeigte.
     server.use(...handlers());
     renderMitProviders(
       <Routes>
@@ -313,21 +302,13 @@ describe('EinheitenPage', () => {
 });
 
 /**
- * Datenzustände der Einheitenseite (LFH-331 · B3).
- *
- * Die Gliederungs-Karte trug bislang eine **Zwei**-Zustands-Weiche (`einheiten.length === 0`)
- * für einen **Drei**-Zustands-Raum: dieselbe Aussage „Noch keine Einheiten" stand während
- * des Ladens, im Fehlerfall und bei tatsächlich leerer Gliederung. Zwei der drei Male war
- * sie falsch.
- *
- * Die rechte Karte ist davon zu trennen: „Wähle eine Einheit im Baum" ist keine leere
- * Menge, sondern eine **Aufforderung bei fehlender Auswahl** — sie bekommt bewusst keine
- * Primäraktion, weil die Handlung im Baum liegt.
+ * Datenzustände der Einheitenseite (LFH-331): laden, Fehler und leer werden unterschieden — „Noch
+ * keine Einheiten" darf nur bei tatsächlich leerer Gliederung stehen.
  */
 describe('EinheitenPage · Datenzustände', () => {
   function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
-    // Abweichung VORN: `server.use` reiht in Übergabereihenfolge ein, der erste Treffer
-    // gewinnt — andersherum schluckte der grüne Boden jede Abweichung.
+    // Abweichung vorn: `server.use` reiht in Übergabereihenfolge ein, der erste Treffer gewinnt —
+    // andersherum schluckte der grüne Boden jede Abweichung.
     server.use(...abweichungen, ...handlers());
     return renderMitProviders(
       <Routes>
@@ -356,11 +337,9 @@ describe('EinheitenPage · Datenzustände', () => {
     expect(await screen.findByText('Noch keine Einheiten')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
     /**
-     * Der Knopf heißt BYTE-GLEICH wie der im Seitenkopf — es ist dieselbe Handlung.
-     * Gezählt wird deshalb innerhalb des GLIEDERUNGS-PANEELS, nicht auf der Seite. Das ist zugleich die
-     * schärfere Aussage: „genau eine Primäraktion" hält hier nur, weil `SeitenLeer` null
-     * eigene Knöpfe beisteuert; ein Primitiv mit eingebautem Knopf machte die Zahl
-     * mehrdeutig.
+     * Der Knopf heißt genau wie der im Seitenkopf — es ist dieselbe Handlung. Gezählt wird deshalb
+     * im Gliederungs-Paneel. „Genau eine Primäraktion" hält hier nur, weil `SeitenLeer` keine
+     * eigenen Knöpfe beisteuert.
      */
     const karte = [...container.querySelectorAll<HTMLElement>('[data-lfh="paneel"]')].find((k) =>
       k.textContent?.includes('Noch keine Einheiten'),
@@ -371,13 +350,10 @@ describe('EinheitenPage · Datenzustände', () => {
   });
 
   /**
-   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
-   * nicht `isStale`.
-   *
-   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
-   * Aktualisierung. Vor dem Umbau verschwand der Baum an dieser Stelle — die Einsatzkraft
-   * verlor die Gliederung, die sie eben noch vor sich hatte, und mit ihr die Auswahl, über
-   * die alles Weitere dieser Seite läuft.
+   * Veralteter Stand = `isError` mit Zeilen im Zwischenspeicher — nicht `isFetching`, nicht
+   * `isStale`. Der Ablauf ist der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung. Der Baum darf dabei nicht verschwinden, sonst verlöre die Einsatzkraft die
+   * Gliederung und die Auswahl.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Einheiten im Cache scheitert', async () => {
     const { client } = zeige();
@@ -391,18 +367,15 @@ describe('EinheitenPage · Datenzustände', () => {
     expect(
       await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
     ).toBeInTheDocument();
-    // Der Baum aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt ihn NICHT.
+    // Der Baum aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt ihn nicht.
     expect(screen.getByText('1. Zug')).toBeInTheDocument();
     expect(screen.queryByText('Gliederung konnte nicht geladen werden')).not.toBeInTheDocument();
   });
 
   /**
-   * Die stärkste Zusicherung des Bündels — und die einzige, die den LADE-Zweig des
-   * Drei-Zustands-Bugs belegt.
-   *
-   * Sie hängt daran, dass NUR die Einheiten-Abfrage verzögert wird: der Einsatz ist dann
-   * schon da, die Karte also montiert. Ohne diese Trennung wäre die Aussage trivial wahr,
-   * weil der Seitenrahmen während `einsatzQuery` gar nichts von der Gliederung rendert.
+   * Belegt den Lade-Zweig. Nur die Einheiten-Abfrage wird verzögert: der Einsatz ist schon da, die
+   * Karte montiert. Sonst wäre die Aussage trivial wahr, weil der Seitenrahmen während
+   * `einsatzQuery` nichts von der Gliederung rendert.
    */
   it('WÄHREND des Ladens behauptet nichts, dass keine Einheiten da sind', async () => {
     zeige(
@@ -417,7 +390,3 @@ describe('EinheitenPage · Datenzustände', () => {
     expect(await screen.findByText('Noch keine Einheiten')).toBeInTheDocument();
   });
 });
-
-// Der Helfer `oeffneEinheitenAuswahl` ist mit den Zuordnungs-Tests auf
-// `EinheitDetailPage.test.tsx` gezogen (LFH-339 · C4) — diese Seite trägt kein
-// Auswahlfeld mehr, das über einen Platzhalter zu greifen wäre.

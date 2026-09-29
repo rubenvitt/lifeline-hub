@@ -173,17 +173,16 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// Mitgeschnitten am 23.09.2026 (`/alerts?lat=53.55&lon=8.58`, Bremerhaven): die zwei
-    /// ersten Warnungen sind echt, dazu ergänzt je eine Warnung `severe`, `extreme` (ohne
-    /// `expires`, ohne Beschreibung), mit unbekannter Stufe, der Kategorie `health` und eine
-    /// abgelaufene.
+    /// Aufgezeichnete Antwort von `/alerts?lat=53.55&lon=8.58` (Bremerhaven): die zwei ersten
+    /// Warnungen sind echt, dazu ergänzt je eine Warnung `severe`, `extreme` (ohne `expires`, ohne
+    /// Beschreibung), mit unbekannter Stufe, der Kategorie `health` und eine abgelaufene.
     fn alerts() -> Value {
         serde_json::from_str(include_str!("testdaten/alerts.json")).unwrap()
     }
 
-    /// Mitgeschnitten am 23.09.2026 (`/weather?lat=53.08&lon=8.80`, Bremen, 25 Stunden ab
-    /// 12:00Z). Ergänzt: eine SYNOP-Quelle VOR der MOSMIX-Station (die Station kommt aus
-    /// `source_id`, nicht aus der Reihenfolge) und `null` an einzelnen Werten der Stunden 2–4.
+    /// Aufgezeichnete Antwort von `/weather?lat=53.08&lon=8.80` (Bremen, 25 Stunden ab 12:00Z).
+    /// Ergänzt: eine SYNOP-Quelle VOR der MOSMIX-Station (die Station kommt aus `source_id`, nicht
+    /// aus der Reihenfolge) und `null` an einzelnen Werten der Stunden 2–4.
     fn weather() -> Value {
         serde_json::from_str(include_str!("testdaten/weather.json")).unwrap()
     }

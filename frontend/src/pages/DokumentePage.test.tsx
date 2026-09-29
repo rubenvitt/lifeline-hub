@@ -171,10 +171,9 @@ describe('DokumentePage', () => {
 
   it('?neu=1 öffnet den Dialog NICHT für Beobachter', async () => {
     rendere(einsatzBeobachter, [], { route: '/einsaetze/1/dokumente?neu=1' });
-    // Synchronisationspunkt ist das Räumen des Parameters — erst danach hat der Effekt
-    // entschieden. Ein Warten auf den Leertext allein reichte nicht: gemessen hängt ein
-    // (fälschlich) geöffneter Dialog erst NACH dem Leertext ein, die Negativaussage wäre
-    // trivial grün geblieben.
+    // Synchronisationspunkt ist das Räumen des Parameters — erst danach hat der Effekt entschieden.
+    // Auf den Leertext zu warten reichte nicht: ein fälschlich geöffneter Dialog hängt erst danach
+    // ein.
     await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));

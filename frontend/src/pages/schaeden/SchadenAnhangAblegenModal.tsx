@@ -20,15 +20,12 @@ interface AblageFormular {
 }
 
 /**
- * Ablegen-Dialog der Schaden-Anhänge (LFH-21) auf der Erfassungs-Hülle (LFH-332 · B4).
+ * Ablegen-Dialog der Schaden-Anhänge auf der Erfassungs-Hülle. Ein Feld, eine Datei je Ablage —
+ * mehrere Fotos über den Serienmodus, jedes mit eigenem ETB-Nachweis (pseudonym: nur
+ * Registriernummer und Art).
  *
- * EIN Feld: die Datei. Eine Datei je Ablage (design.md D5) — mehrere Fotos entstehen über den
- * Serienmodus („Speichern und nächste“), jedes mit eigenem ETB-Nachweis. Keine Titel-,
- * Kategorie- oder Freitextfelder: der Nachweis im ETB ist pseudonym und nennt nur
- * Registriernummer und Art.
- *
- * `mutateAsync`: eine Ablehnung (Dateityp → 400, Storno → 409) lässt die Auswahl stehen; der
- * Grund steht als `SpeicherFehler` IM Dialog (LFH-345 · H14), nicht nur im Toast.
+ * `mutateAsync`: eine Ablehnung (400, 409) lässt die Auswahl stehen, der Grund steht als
+ * `SpeicherFehler` im Dialog.
  */
 export default function SchadenAnhangAblegenModal({
   einsatzId,

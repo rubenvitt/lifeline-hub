@@ -4,15 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Der Entwurfs-Ausdruck des Befehls (LFH-350, Befund M86) — Schwesterdatei zu
- * `lageberichtPrint.test.ts`, mit einem entscheidenden Unterschied: `BefehlDetailPage`
- * verdrahtet `layout="split"` fest und reiht die Abschnitte als schlichte
- * `Form.Item`-Liste ohne `Collapse`. Die Toggle- und die Akkordeon-Regel des
- * Lageberichts träfen hier nichts; die letzte Behauptung unten pinnt genau diese
- * Voraussetzung, damit die Lücke auffliegt, sobald jemand sie verschiebt.
+ * Der Entwurfs-Ausdruck des Befehls (LFH-350, M86) — Schwesterdatei zu `lageberichtPrint.test.ts`
+ * mit einem Unterschied: `BefehlDetailPage` verdrahtet `layout="split"` fest und reiht die
+ * Abschnitte ohne `Collapse`. Die Toggle- und Akkordeon-Regeln des Lageberichts träfen hier nichts;
+ * die letzte Behauptung unten pinnt diese Voraussetzung.
  *
- * Geprüft wird die CSS-QUELLE (Bauform `LoginPage.animation.test.ts`): jsdom rechnet
- * kein Layout, lädt diese Datei nicht und kennt kein `@media print`.
+ * Geprüft wird die CSS-Quelle: jsdom lädt diese Datei nicht und kennt kein `@media print`.
  */
 const DATEI = 'befehlPrint.css';
 const SEITE = 'BefehlDetailPage.tsx';
@@ -138,11 +135,9 @@ describe('befehlPrint.css — Seitenkopf', () => {
 });
 
 describe('befehlPrint.css — die Mechanik liegt in `druck/druck.css` (LFH-71)', () => {
-  // Die GEGENAUSSAGE zum alten Muster: `body * { visibility: hidden }` plus ein absolut
-  // positionierter Druckbereich druckte in Firefox und Safari nur die erste Seite, und jeder
-  // unsichtbare Knoten belegte weiter Platz. Ausblenden, Fluss, Papierfarben und Umbruch
-  // regelt jetzt EINE Datei für alle Druckstücke; eine zweite Fassung hier liefe still
-  // auseinander.
+  // Gegenaussage zum alten Muster: `body * { visibility: hidden }` plus absolut positionierter
+  // Druckbereich druckte in Firefox und Safari nur die erste Seite. Die Mechanik steht in einer
+  // Datei für alle Druckstücke; eine zweite Fassung hier liefe still auseinander.
   it('blendet nichts per visibility aus', () => {
     expect(css).not.toMatch(/visibility\s*:/);
   });

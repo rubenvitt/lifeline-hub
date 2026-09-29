@@ -1,25 +1,20 @@
-//! Retain-Projektion der Archivakte (LFH-23, design.md D3).
+//! Retain-Projektion der Archivakte (LFH-23).
 //!
-//! Die Archivakte zeigt einem System-Admin das pseudonyme Skelett eines gesperrten oder
-//! geschwärzten Einsatzes. Welche Spalten dabei gelesen werden, steht **ausschließlich**
-//! hier — die SELECTs in `repo.rs` entstehen aus genau diesen Konstanten. Der Guard
-//! [`tests::jede_archivspalte_ist_retain`] prüft jede Spalte über
-//! [`klassifikation_von`](crate::einsatz::schwaerzung_registry::klassifikation_von) auf
-//! `Retain`. Eine Scrub-Spalte oder ein Name, den die Registry nicht kennt, macht ihn rot.
-//! Weil Liste und SELECT dieselbe Konstante sind, können sie nicht auseinanderlaufen, und
-//! die Akte liefert vor und nach der Schwärzung dieselben Felder.
+//! Welche Spalten die Archivakte liest, steht **ausschließlich** hier; die SELECTs in `repo.rs`
+//! entstehen aus diesen Konstanten. Der Guard [`tests::jede_archivspalte_ist_retain`] prüft jede
+//! Spalte über [`klassifikation_von`](crate::einsatz::schwaerzung_registry::klassifikation_von)
+//! auf `Retain`. So kann die Liste nicht vom SELECT abweichen, und die Akte trägt vor und nach
+//! der Schwärzung dieselben Felder.
 //!
-//! Die Auswahl ist bewusst **kleiner** als alles, was Retain ist: Tier-Rufname und
-//! -beschreibung (G_TIER) und die Schadenskoordinate (G_GEO) fehlen, ebenso die
-//! Rückverweise des ETB auf Aufträge, Befehle, Lageberichte, Meldungen und
-//! Nachforderungen, deren Ziele im Archiv nicht lesbar sind. Datensparsamkeit geht vor.
+//! Die Auswahl ist bewusst **kleiner** als alles Retain (Datensparsamkeit): Tier-Rufname und
+//! -beschreibung, die Schadenskoordinate und die ETB-Rückverweise auf im Archiv nicht lesbare
+//! Ziele fehlen.
 //!
-//! **Einzige Ausnahme außerhalb der Registry** ist [`ETB_ERFASSER_JOIN`]: der Anzeigename
-//! des Erfassers aus `benutzer`, einer Stammdatentabelle der Organisation, die nicht
-//! einsatzbezogen ist und nicht geschwärzt wird.
+//! **Einzige Ausnahme außerhalb der Registry** ist [`ETB_ERFASSER_JOIN`]: der Anzeigename des
+//! Erfassers aus der nicht einsatzbezogenen Stammdatentabelle `benutzer`.
 //!
-//! Spaltennamen sind compile-time-Konstanten (nie User-Input), `AssertSqlSafe` in
-//! `repo.rs` ist deshalb injektionssicher; Werte werden gebunden.
+//! Spaltennamen sind compile-time-Konstanten, `AssertSqlSafe` in `repo.rs` ist deshalb
+//! injektionssicher; Werte werden gebunden.
 
 /// Eine Quelle der Archivakte: Tabelle plus die gelesenen Spalten.
 #[derive(Debug, Clone, Copy)]

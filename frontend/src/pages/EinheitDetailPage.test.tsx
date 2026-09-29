@@ -9,12 +9,8 @@ import EinheitDetailPage from './EinheitDetailPage';
 import { einsatzFixture } from '../test/fixtures';
 
 /**
- * Detailansicht einer Einheit (LFH-339 · C4, Befund M26).
- *
- * Die hier geprüften Zusicherungen lagen bis C4 in `EinheitenPage.test.tsx` — sie sind mit
- * dem Code umgezogen, nicht neu erfunden: Sprechgruppen-Picker, Funkdaten im PATCH,
- * Typkatalog-Ausfall im Feld und der Zuordnungs-Pool mit seiner Fehlerunterscheidung.
- * Dazu kommen die Aussagen, die es vorher nicht geben KONNTE, weil es keine Route gab.
+ * Detailansicht einer Einheit: Sprechgruppen-Picker, Funkdaten im PATCH, Typkatalog-Ausfall im
+ * Feld, der Zuordnungs-Pool mit seiner Fehlerunterscheidung und die Route selbst.
  */
 
 const tmoSprechgruppe = {
@@ -95,9 +91,9 @@ function rendere(route = '/einsaetze/1/einheiten/10') {
 }
 
 /**
- * Wie `rendere`, aber mit Abweichungen VORN: `server.use` reiht in Übergabereihenfolge
- * ein und der erste Treffer gewinnt — andersherum schluckt der grüne Boden aus
- * {@link handlers} jede Abweichung, und ein Fehlerfall-Test wäre still grün.
+ * Wie `rendere`, aber mit Abweichungen vorn: `server.use` reiht in Übergabereihenfolge ein und der
+ * erste Treffer gewinnt — andersherum schluckte der grüne Boden aus {@link handlers} jede
+ * Abweichung.
  */
 function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
   server.use(...abweichungen, ...handlers());
@@ -110,11 +106,9 @@ function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
 }
 
 /**
- * Öffnet ein antd-`Select` über seinen Platzhalter.
- *
- * Nicht per `getByText(platzhalter)` + Klick: der Platzhalter-Knoten trägt
- * `pointer-events: none`, und `userEvent` verweigert dort die Interaktion. Gegriffen wird
- * die `combobox`-Rolle innerhalb des Feldes (Muster aus `EinheitenPage.test.tsx`).
+ * Öffnet ein antd-`Select` über seinen Platzhalter. Nicht per `getByText(platzhalter)` + Klick: der
+ * Platzhalter-Knoten trägt `pointer-events: none`, und `userEvent` verweigert dort die Interaktion.
+ * Gegriffen wird die `combobox`-Rolle innerhalb des Feldes.
  */
 async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
   const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
@@ -133,8 +127,8 @@ describe('EinheitDetailPage · die Route selbst', () => {
   });
 
   it('eine unbekannte Einheiten-Kennung meldet das und führt zurück, statt einen Ausfall zu behaupten', async () => {
-    // Die Liste kommt an, die Einheit ist nicht darin — ein anderer Fall als „Abruf
-    // gescheitert", und er bekommt deshalb einen eigenen Wortlaut samt Weg zurück.
+    // Die Liste kommt an, die Einheit ist nicht darin — ein anderer Fall als „Abruf gescheitert",
+    // mit eigenem Wortlaut samt Weg zurück.
     server.use(...handlers());
     rendere('/einsaetze/1/einheiten/999');
     expect(await screen.findByText(/gibt es nicht \(mehr\)/)).toBeInTheDocument();
@@ -142,7 +136,7 @@ describe('EinheitDetailPage · die Route selbst', () => {
   });
 
   it('trägt das Stärke-Etikett in BOS-Fachsprache', async () => {
-    // Befund N6: das frühere Etikett trug einen Programmierbegriff für „überschreiben".
+    // Das Etikett trägt keinen Programmierbegriff für „überschreiben".
     server.use(...handlers());
     rendere();
     expect(await screen.findByText('Soll-Stärke (F/UF/M)')).toBeInTheDocument();
@@ -152,12 +146,11 @@ describe('EinheitDetailPage · die Route selbst', () => {
 describe('EinheitDetailPage · die Entwirrung (Befund M26)', () => {
   it('die Zuordnungen liegen AUSSERHALB des Formulars, der Speichern-Knopf darin', async () => {
     /**
-     * Der Kern des Befunds. Die drei Zuordnungen wirken SOFORT — jeder Klick schreibt.
-     * Sie standen trotzdem innerhalb des `<Form>`, unter einem Speichern-Knopf, der sie
-     * nicht betrifft: zweierlei Bedienlogik unter einer Überschrift.
+     * Die drei Zuordnungen wirken sofort — jeder Klick schreibt — und stehen deshalb nicht unter
+     * dem Speichern-Knopf des Formulars.
      *
-     * Beide Hälften geprüft: die Zuordnung ist DRAUSSEN und der Speichern-Knopf DRIN. Die
-     * erste allein wäre auch grün, wenn gar kein Formular mehr da wäre.
+     * Beide Hälften: die Zuordnung ist draußen und der Speichern-Knopf drin. Die erste allein wäre
+     * auch ohne Formular grün.
      */
     server.use(...handlers());
     rendere();
@@ -169,8 +162,7 @@ describe('EinheitDetailPage · die Entwirrung (Befund M26)', () => {
   });
 
   it('jede Zuordnungssektion sagt, dass sie sofort wirkt', async () => {
-    // Die Trennung allein durch Position bliebe eine Vermutung — sie steht zusätzlich in
-    // Worten, und zwar an allen dreien.
+    // Die Trennung steht zusätzlich in Worten, an allen dreien.
     server.use(...handlers());
     rendere();
     await screen.findByRole('heading', { name: 'Personal', level: 2 });
@@ -190,7 +182,7 @@ describe('EinheitDetailPage · Funk und Kopfdaten (umgezogen aus EinheitenPage)'
     expect((await screen.findAllByText('412_F_DRK')).length).toBeGreaterThanOrEqual(1);
   });
 
-  // LFH-108: Funk-/Kommunikationsdaten auch an der Einheit pflegbar + sichtbar.
+  // Funk-/Kommunikationsdaten auch an der Einheit pflegbar und sichtbar.
   it('zeigt und sendet Kommunikationsmittel + Erreichbarkeit', async () => {
     let patchBody: Record<string, unknown> | null = null;
     server.use(
@@ -213,12 +205,12 @@ describe('EinheitDetailPage · Funk und Kopfdaten (umgezogen aus EinheitenPage)'
     });
   });
 
-  // LFH-614: eigener Funkrufname der Einheit — vorbelegt aus dem Serverstand, geändert
-  // gesendet, geleert als `null` (nicht als Leerstring, nicht weggelassen).
+  // Eigener Funkrufname der Einheit: vorbelegt aus dem Serverstand, geändert gesendet, geleert als
+  // `null` (nicht Leerstring, nicht weggelassen).
   it('belegt den Funkrufnamen vor, sendet Änderung und Leeren', async () => {
     const bodies: Record<string, unknown>[] = [];
-    // Der Serverstand folgt dem PATCH: die Invalidierung nach dem Speichern lädt neu und
-    // setzt das Formular darauf — ein fester Stand schriebe den alten Wert zurück.
+    // Der Serverstand folgt dem PATCH: die Invalidierung lädt neu und setzt das Formular darauf —
+    // ein fester Stand schriebe den alten Wert zurück.
     let stand: Record<string, unknown> = { ...einheiten[0], funkrufname: 'Heros 3/1' };
     server.use(
       http.get('/api/einsaetze/1/einheiten', () =>
@@ -279,8 +271,8 @@ describe('EinheitDetailPage · Datenzustände (umgezogen aus EinheitenPage)', ()
   });
 
   it('Partnerhälfte: mit Typkatalog steht die Auswahl statt der Meldung', async () => {
-    // Ohne die Gegenprobe belegt der Test darüber nichts — ein Feld, das IMMER meldet,
-    // wäre dort ebenfalls grün.
+    // Ohne die Gegenprobe belegt der Test darüber nichts — ein Feld, das immer meldet, wäre dort
+    // ebenfalls grün.
     zeige();
     await screen.findByRole('heading', { name: '1. Zug', level: 1 });
     await userEvent.click(await screen.findByLabelText('Typ'));
@@ -290,9 +282,8 @@ describe('EinheitDetailPage · Datenzustände (umgezogen aus EinheitenPage)', ()
 
   it('gescheiterte Personalliste: der Zuordnungs-Pool nennt den Ausfall', async () => {
     /**
-     * LFH-331 · B3: scheitert der Abruf, filtert der Frei-Pool auf die leere Menge, und
-     * das Auswahlfeld behauptete „Keine freien Personen" — eine Aussage über den Bestand,
-     * die niemand geprüft hat.
+     * Scheitert der Abruf, filterte der Frei-Pool auf die leere Menge, und das Auswahlfeld
+     * behauptete „Keine freien Personen" — eine ungeprüfte Aussage über den Bestand.
      */
     const { container } = zeige(
       http.get('/api/einsaetze/1/personal', () => new HttpResponse(null, { status: 500 })),
@@ -323,8 +314,8 @@ describe('EinheitDetailPage · Datenzustände (umgezogen aus EinheitenPage)', ()
 
 describe('EinheitDetailPage · Auflösen', () => {
   it('führt nach dem Auflösen zurück zur Gliederung', async () => {
-    // Die Route zeigt danach auf eine Einheit, die es nicht mehr gibt — dort zu bleiben
-    // hiesse, den Leerzustand als Ergebnis einer erfolgreichen Handlung zu zeigen.
+    // Die Route zeigt danach auf eine Einheit, die es nicht mehr gibt — dort zu bleiben hieße, den
+    // Leerzustand als Ergebnis einer erfolgreichen Handlung zu zeigen.
     let geloest = false;
     server.use(
       ...handlers(),

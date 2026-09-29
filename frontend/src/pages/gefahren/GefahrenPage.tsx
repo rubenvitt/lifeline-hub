@@ -27,33 +27,17 @@ import EinsatzSeite from '../../components/EinsatzSeite';
 import { Paneel } from '../../components/instrument';
 
 /**
- * Trefflächenboden der Gebietszeile (Abschluss-Review zu LFH-368 · B5h, Konvention aus
- * LFH-365).
+ * Trefflächenboden der Gebietszeile. Sie ist ein handgebautes Bedienziel (`ListenEintrag` legt
+ * `onClick` auf ein nacktes `<div>`), ihre Höhe käme sonst nur aus der Polsterung der kleinen Liste
+ * — im Handschuh-Betrieb grob 36 px statt 72. Deshalb zwei Angaben: `minHeight` aus `controlHeight`
+ * plus Polsterung (ohne die klebte der Text an der Kante).
  *
- * Die Zeile ist ein HANDGEBAUTES Bedienziel: `ListenEintrag` legt sein `onClick` auf ein
- * nacktes `<div>` (`components/Liste.tsx:160-180`), und dessen Höhe entstand hier allein aus
- * der Polsterung der `<Liste size="small">` — `paddingBlock = token.paddingXS`, also 3 / 5 / 7 px.
- * Gerechnet kommt die Zeile damit im Handschuh-Betrieb auf grob 36 px gegen die geforderten 72.
- * Deshalb ZWEI Angaben und nicht eine: `minHeight` aus `controlHeight` (30 / 48 / 72) PLUS die
- * Polsterung. Die Polsterung allein trüge den Boden ebenfalls nicht (grob 54 px), sie muss aber
- * da sein, sonst klebt der Text an der Kante.
+ * Aufgelöste Tokens, nie `var(--lfh-*)` (Arbeitsteilung in `theme/rollen.css`). Schablone ist
+ * `bedienzielStil` in `pages/lagekarte/Sidebar.tsx`, importiert wird bewusst nichts.
+ * `display`/`alignItems` setzt `ListenEintrag` selbst. Rein und exportiert, damit die Zusicherung
+ * ohne Render prüfbar ist.
  *
- * Aufgelöste Tokens, nie `var(--lfh-*)`: die Arbeitsteilung steht in `theme/rollen.css`
- * („ZWEI QUELLEN, EINE WAHRHEIT") — handgeschriebenes CSS liest die Custom Properties, TSX liest
- * `theme.useToken()`.
- *
- * Schablone ist `bedienzielStil` in `pages/lagekarte/Sidebar.tsx`; **importiert wird von dort
- * nichts** — ein `pages/gefahren` → `pages/lagekarte`-Import wäre schlimmer als diese drei
- * Zeilen. `display`/`alignItems` stehen anders als dort nicht drin: `ListenEintrag` setzt beide
- * selbst, und eine Wiederholung sähe aus wie eine Absicht, die sie nicht ist.
- *
- * Rein und exportiert, damit die Zusicherung über zwei Dichtestufen prüfbar ist, OHNE zu rendern:
- * `test/utils.tsx` montiert ein nacktes `ConfigProvider` ohne unser Theme, ein gerenderter Wert
- * belegte also antd-Vorgaben statt der Staffel — und jsdom rechnet ohnehin kein Layout.
- *
- * **Was hier NICHT gelöst wird:** die Tastaturbedienbarkeit. Das `<div onClick>` hat weder `role`
- * noch `tabIndex` noch `onKeyDown`; die klickbare Zeile als Ganzes ist B7 (LFH-335) zugeordnet.
- * Der Boden hier ist die Trefffläche, nicht der ganze Zugang.
+ * Nicht gelöst: Tastaturbedienbarkeit des `<div onClick>` (LFH-335).
  */
 export function gebietszeileStil(token: {
   controlHeight: number;
@@ -90,11 +74,9 @@ export default function GefahrenPage() {
 
   // Stabile Referenz → der Auswahl-Effekt läuft nicht bei jedem Render neu.
   const gebiete = useMemo(() => gebieteQuery.data ?? [], [gebieteQuery.data]);
-  // Auswahl in EINEM Effekt (kein Race → StrictMode-fest, LFH-150): das Deeplink-Ziel
-  // ?gefahrengebiet=<id> (z. B. von der Lagekarte) hat Vorrang vor dem Default aufs erste
-  // Gebiet; nach dem Anwenden wird der Param geräumt (apply-then-clean), damit eine spätere
-  // manuelle Auswahl nicht wieder überschrieben wird. Sonst: erstes Gebiet defaulten bzw.
-  // korrigieren, wenn das gewählte verschwindet.
+  // Auswahl in einem Effekt, damit StrictMode-fest: das Deeplink-Ziel `?gefahrengebiet=<id>` hat
+  // Vorrang vor dem Default aufs erste Gebiet und wird danach geräumt (apply-then-clean). Sonst
+  // erstes Gebiet defaulten bzw. korrigieren, wenn das gewählte verschwindet.
   useEffect(() => {
     if (!gebieteQuery.isSuccess) return;
     if (gebiete.length === 0) {
@@ -104,8 +86,8 @@ export default function GefahrenPage() {
     const ziel = parseRouteId(searchParams.get('gefahrengebiet') ?? undefined);
     if (ziel != null && gebiete.some((g) => g.id === ziel)) {
       setGewaehlt(ziel);
-      // searchParams NICHT in-place mutieren (.delete) — sonst sähe der zweite
-      // StrictMode-Durchlauf das Ziel nicht mehr und defaultete aufs erste Gebiet.
+      // searchParams nicht in-place mutieren — sonst sähe der zweite StrictMode-Durchlauf das Ziel
+      // nicht mehr.
       const naechste = new URLSearchParams(searchParams);
       naechste.delete('gefahrengebiet');
       setSearchParams(naechste, { replace: true });
@@ -115,7 +97,7 @@ export default function GefahrenPage() {
   }, [gebieteQuery.isSuccess, gebiete, gewaehlt, searchParams, setSearchParams]);
 
   const matrixQuery = useQuery({
-    // Dieselben Optionen wie die Gefahrengebiet-Vorschau der Sprungpalette (LFH-664).
+    // Dieselben Optionen wie die Gefahrengebiet-Vorschau der Sprungpalette.
     ...gefahrenMatrixAbfrage(einsatzId, gewaehlt),
     enabled: gewaehlt != null,
   });
@@ -148,8 +130,7 @@ export default function GefahrenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  // Seitenkopf des Neuentwurfs für ALLE Zweige unterhalb des Einsatzes (Laden der Gebiete,
-  // Fehler, leer, Matrix) — der Kopf trägt Titel, Menge und Datenstand, nicht der Inhalt.
+  // Seitenkopf für alle Zweige unterhalb des Einsatzes (Laden, Fehler, leer, Matrix).
   const seite = (inhalt: ReactNode, dataUpdatedAt?: number) => (
     <EinsatzSeite
       titel="Gefahrenmatrix"
@@ -183,13 +164,8 @@ export default function GefahrenPage() {
 
   if (gebiete.length === 0) {
     /**
-     * Der Ort der Handlung liegt woanders (LFH-331 · B3): ein Gefahrengebiet entsteht
-     * durch Zeichnen auf der Lagekarte, nicht auf dieser Seite. Deshalb trägt dieser
-     * Leerzustand — anders als die reinen Kartenlisten — eine Primäraktion, und ihr Ziel
-     * kommt aus `routing/deeplinks.ts`, nicht als Vorlagentext von Hand.
-     *
-     * Der Wortlaut ist derselbe wie vorher, nur auf Aussage und Hinweis aufgeteilt; die
-     * Aufforderung „zeichnen" gehört jetzt an den Knopf, der auch dorthin führt.
+     * Ein Gefahrengebiet entsteht durch Zeichnen auf der Lagekarte — deshalb trägt dieser
+     * Leerzustand eine Primäraktion dorthin (Ziel aus `routing/deeplinks.ts`).
      */
     return seite(
       <div style={{ marginTop: 64, textAlign: 'center' }}>
@@ -210,17 +186,10 @@ export default function GefahrenPage() {
       data-gefahren-rahmen
       style={{
         display: 'flex',
-        // Unter `lg` stapeln — dieselbe Schwelle, an der der Einsatzrahmen seine
-        // Navigation in den Drawer legt (`EinsatzLayout.tsx`). KEIN zweites Layout für
-        // die Matrix selbst: sie bleibt eine Tabelle und trägt auf schmalem Schirm
-        // waagerechten Bildlauf (`scroll={{ x: 'max-content' }}`), statt in Karten je
-        // Gefahrentyp aufgelöst zu werden — das zerstörte genau die Eigenschaft, für die
-        // es die Matrix gibt (Muster über beide Achsen auf einen Blick), und ein
-        // Collapse je Gefahrentyp wäre eine zweite Bedienform für dieselbe Sache.
-        // Hier stand einmal eine Breite („~380 px"); sie war falsch gerechnet und ist
-        // ersatzlos weg — die Entscheidung hängt nicht an ihr. Sie steht unabhängig
-        // begründet in der Prüfliste, Kriterium **14** („Tabellenseite vollständig"):
-        // `docs/superpowers/specs/2026-07-30-gefahrenmatrix-pruefliste.md`.
+        // Unter `lg` stapeln — dieselbe Schwelle wie die Drawer-Navigation in `EinsatzLayout.tsx`.
+        // Die Matrix bleibt auch schmal eine Tabelle mit waagerechtem Bildlauf: Karten je
+        // Gefahrentyp zerstörten den Überblick über beide Achsen. Begründung: Prüfliste Kriterium
+        // 14 (`docs/superpowers/specs/2026-07-30-gefahrenmatrix-pruefliste.md`).
         flexDirection: breit ? 'row' : 'column',
         gap: token.margin,
         alignItems: breit ? 'flex-start' : 'stretch',
@@ -238,27 +207,17 @@ export default function GefahrenPage() {
             <ListenEintrag
               onClick={() => setGewaehlt(g.id)}
               style={{
-                // Trefflächenboden ZUERST, die Färbung danach — beides landet über EIN `style`
-                // im Aufrufer, und `ListenEintrag` spreizt es bewusst zuletzt
-                // (`Liste.tsx:171-175`), damit die Kurzform `padding` gegen die Längsformen der
-                // Liste gewinnt. Zöge jemand den Spread dort nach vorn, fiele genau die
-                // Polsterungshälfte der „ZWEI Angaben"-Konvention still weg.
+                // Trefflächenboden zuerst, die Färbung danach — `ListenEintrag` spreizt `style`
+                // zuletzt, damit `padding` gegen die Längsformen der Liste gewinnt.
                 ...gebietszeileStil(token),
-                // Die Rolle `bedien`, nicht antds Default-Blau: `rgba(22,119,255,0.08)`
-                // stand hier hartkodiert und blieb im Nachtmodus derselbe helle Schleier
-                // auf dunklem Grund (LFH-368). `colorPrimaryBg` leitet antd aus
-                // `colorPrimary` ab — also aus unserer Rolle, in beiden Modi.
+                // `colorPrimaryBg` leitet antd aus unserer Rolle `colorPrimary` ab — hält in beiden
+                // Modi.
                 background: g.id === gewaehlt ? token.colorPrimaryBg : undefined,
               }}
             >
               <Space>
-                {/* Etikett, nicht Fläche: `warnstufeKarte` liefert die Rolle. Vorher stand hier
-                  `warnstufeFarbe` — dieselbe Sortenverwechslung, die LFH-328 in
-                  `ZonenInspector.tsx` behoben hat —, danach ein `rollenFarbe`-Wert an antds
-                  `color`-Prop. Auch das ist falsch und seit LFH-358 vom Guard erfasst: antd 6
-                  rechnet für einen Nicht-Preset ein STATISCHES Farbpaar aus der Zeichenkette
-                  (`StatusTag.tsx` zitiert die Stelle), der Modus erreicht es also nicht mehr,
-                  und der Wortlaut steht als Fläche statt als Rand. `StatusTag` löst beides. */}
+                {/* Etikett über `StatusTag`, nicht `color`-Prop: für einen Nicht-Preset rechnet
+                    antd ein statisches Farbpaar, der Modus erreichte es nicht. */}
                 <StatusTag darstellung={warnstufeKarte[g.hoechste_warnstufe]} />
                 <span>{gefahrengebietName(g.label, g.id)}</span>
                 <Typography.Text type="secondary">({g.zonen_ids.length})</Typography.Text>
@@ -299,9 +258,7 @@ export default function GefahrenPage() {
               {gefahrengebietName(aktuell.label, aktuell.id)}
             </Typography.Title>
             {/* Reverse-Deeplink zur Lagekarte (LFH-155): selektiert das Gebiet + fliegt es an. */}
-            {/* Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider (30/48/72,
-                LFH-362). Ein `size="small"` nagelte sie hier auf die kompakte Stufe
-                fest — auch im Handschuh-Betrieb, wo derselbe Knopf 72 px braucht. */}
+            {/* Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider. */}
             <Link to={lagekartePfad(einsatzId, { gefahrengebiet: aktuell.id })}>
               <Button>Auf Karte zeigen</Button>
             </Link>
@@ -321,19 +278,17 @@ export default function GefahrenPage() {
           <GefahrenMatrix
             matrix={matrixQuery.data ?? []}
             darfSchreiben={darfSchreiben}
-            // Nur die Zelle des laufenden PUT sperren. `variables` kommt von TanStack
-            // Query und ist genau die Eingabe der laufenden Mutation — kein
-            // Parallel-State, der auseinanderlaufen kann.
+            // Nur die Zelle des laufenden PUT sperren; `variables` ist genau die Eingabe der
+            // laufenden Mutation, kein Parallel-State.
             laufendeZelle={
               setzen.isPending && setzen.variables
                 ? zellSchluessel(setzen.variables.gefahrentyp, setzen.variables.schutzobjekt)
                 : null
             }
             onSetzen={(d) => setzen.mutate(d)}
-            // `mutateAsync`: der Detail-Dialog braucht die Ablehnung, sonst leert die
-            // Erfassungshülle den getippten Wortlaut trotz 422. Den Toast macht weiterhin
-            // `onError: fehler`; die abgelehnte Zusage fängt `abschicken` in der Hülle
-            // (`Erfassung.tsx`, `catch {}`) — also keine unbehandelte Ablehnung.
+            // `mutateAsync`: der Detail-Dialog braucht die Ablehnung, sonst leert die Hülle den
+            // Wortlaut trotz 422. Den Toast macht `onError`, die Ablehnung fängt `abschicken` in
+            // der Hülle.
             onDetailsSpeichern={(d) => setzen.mutateAsync(d)}
           />
         )}

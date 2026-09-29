@@ -17,8 +17,7 @@ import { hochwasserRadius } from './hochwasserStil';
 import { luftqualitaetRadius } from './luftqualitaetStil';
 import { odlRadius } from './odlStil';
 
-// Fixtures via vi.hoisted, damit sowohl die (hochgezogene) vi.mock-Factory als auch
-// die Assertions dieselben Feature-Sammlungen sehen.
+// Fixtures via vi.hoisted, damit die vi.mock-Factory und die Assertions dieselben Sammlungen sehen.
 const fx = vi.hoisted(() => {
   const fc = (coords: number[][]): FeatureCollection => ({
     type: 'FeatureCollection',
@@ -44,7 +43,7 @@ const fx = vi.hoisted(() => {
       },
     ],
   };
-  // VIER Stationen: die Menge unterscheidet auch diese Ebene von jeder anderen Fixture.
+  // Vier Stationen: die Menge unterscheidet auch diese Ebene von jeder anderen Fixture.
   const luftqualitaet: FeatureCollection = {
     type: 'FeatureCollection',
     features: (
@@ -60,8 +59,8 @@ const fx = vi.hoisted(() => {
       properties: { titel: `Station ${klasse}`, klasse },
     })),
   };
-  // VIER Sonden — keine andere Fixture hat vier Features, ein vertauschter `combine`-Index
-  // fiele an der Menge auf. Eine davon stark erhöht, eine ohne Messung.
+  // Vier Sonden — ein vertauschter `combine`-Index fiele an der Menge auf. Eine stark erhöht, eine
+  // ohne Messung.
   const odl: FeatureCollection = {
     type: 'FeatureCollection',
     features: [
@@ -85,16 +84,14 @@ const fx = vi.hoisted(() => {
     kritisA: fc([[10, 51]]),
     kritisB: fc([[11, 52]]),
     hochwasser,
-    // Bewusst DREI Punkte: die Menge unterscheidet die Autobahn-Ebene von jeder anderen
-    // Fixture — ein vertauschter `combine`-Index fiele sonst nicht auf.
+    // Drei Punkte: die Menge unterscheidet die Autobahn-Ebene von jeder anderen Fixture.
     autobahn: fc([
       [6.86, 50.98],
       [7.67, 51.57],
       [6.96, 49.27],
     ]),
-    // Energie (LFH-81): VIER Punkte im ersten, ein weiterer im zweiten Ausschnitt — die
-    // Mengen unterscheiden sich von jeder anderen Fixture (KRITIS 1, Autobahn 3), ein
-    // vertauschter `combine`-Index fiele also auf.
+    // Energie: vier Punkte im ersten, ein weiterer im zweiten Ausschnitt — Mengen, die keine andere
+    // Fixture hat.
     energieA: fc([
       [7.05, 51.6],
       [7.21, 51.53],
@@ -102,7 +99,7 @@ const fx = vi.hoisted(() => {
       [7.3, 51.5],
     ]),
     energieB: fc([[7.4, 51.45]]),
-    // Quellennennung (LFH-81): ein Ausschnitt mit MaStR-Anteil, einer mit reinem OSM.
+    // Quellennennung: ein Ausschnitt mit MaStR-Anteil, einer mit reinem OSM.
     energieMastr: {
       type: 'FeatureCollection',
       features: [
@@ -222,8 +219,8 @@ function wrapper() {
   );
 }
 
-// Sichtbarkeit ist seit LFH-319 externer State (useKartenAnsicht); im Test hält ihn ein
-// kontrollierter useState, damit onFachebeneToggle → setFachebenenSichtbar den Hook re-rendert.
+// Die Sichtbarkeit ist externer State (useKartenAnsicht); im Test hält ihn ein kontrollierter
+// useState, damit onFachebeneToggle den Hook re-rendert.
 function rendere() {
   return renderHook(
     () => {
@@ -235,8 +232,8 @@ function rendere() {
 }
 
 describe('useFachebenen', () => {
-  // Der Luftqualitäts-Status ist modulweit veränderlich; ein vorzeitig scheiternder Test darf
-  // `offline` nicht an den nächsten weitergeben.
+  // Der Luftqualitäts-Status ist modulweit veränderlich; ein scheiternder Test darf `offline` nicht
+  // weitergeben.
   afterEach(() => {
     fx.lqStatus = 'ok';
   });
@@ -250,8 +247,8 @@ describe('useFachebenen', () => {
   it('aktiviert nina → Layer-Daten, Status und Attribution aus der Query', async () => {
     const { result } = rendere();
     act(() => result.current.onFachebeneToggle('nina', true));
-    // Auf die geladenen Daten warten, nicht bloß auf die Sichtbarkeit (sonst Race: der
-    // Layer erscheint mit leerer FeatureCollection, bevor die Query aufgelöst ist).
+    // Auf die geladenen Daten warten, nicht bloß auf die Sichtbarkeit — der Layer erscheint erst
+    // mit leerer FeatureCollection.
     await waitFor(() =>
       expect(
         result.current.aktiveFachebenen.find((f) => f.def.key === 'nina')?.daten.features,
@@ -273,8 +270,8 @@ describe('useFachebenen', () => {
     );
     act(() => result.current.setViewportBbox('bbox2'));
     // Der Server liefert je Ausschnitt den vollständigen Bestand bzw. dessen Sammelpunkte.
-    // Akkumulierte die Ebene weiter, lägen nach dem Herauszoomen Einzelobjekte UND die
-    // Sammelpunkte derselben Gegend übereinander — und die Bündelzahl zählte doppelt.
+    // Akkumulierte die Ebene, lägen nach dem Herauszoomen Einzelobjekte und Sammelpunkte derselben
+    // Gegend übereinander und die Bündelzahl zählte doppelt.
     await waitFor(() =>
       expect(kritis()?.daten.features[0]?.geometry?.coordinates).toEqual([11, 52]),
     );
@@ -332,7 +329,7 @@ describe('useFachebenen', () => {
       act(() => result.current.setViewportBbox('bbox1'));
       await waitFor(() => expect(result.current.fachebenenStatus.kritis).toBe('offline'));
       const nachErstemRuf = rufe;
-      // Ohne Kartenbewegung: der erste Bestand muss trotzdem erscheinen (Spec „Erster Start").
+      // Ohne Kartenbewegung muss der erste Bestand trotzdem erscheinen.
       await act(() => vi.advanceTimersByTimeAsync(FACHEBENEN.kritis.aufwaermPollMs! + 1_000));
       expect(rufe).toBeGreaterThan(nachErstemRuf);
     } finally {
@@ -370,8 +367,8 @@ describe('useFachebenen', () => {
     );
     const vorher = result.current.aktiveFachebenen;
     rerender();
-    // replaceEqualDeep in query-core → identische Referenz bei unveränderten Daten,
-    // sonst würde der Kartenflaeche-fachebenen-Effekt pro Frame neu feuern.
+    // replaceEqualDeep → identische Referenz bei unveränderten Daten, sonst feuerte der
+    // Fachebenen-Effekt der Kartenflaeche pro Frame.
     expect(result.current.aktiveFachebenen).toBe(vorher);
   });
 
@@ -386,8 +383,8 @@ describe('useFachebenen', () => {
     const features = result.current.aktiveFachebenen.find((f) => f.def.key === 'hochwasser')!.daten
       .features;
     const [alarm, ruhig] = features;
-    // Ohne diesen Schritt kämen die Rohdaten durch und die Karte zeichnete 2000 gleich
-    // große Punkte in der Ebenenfarbe — die Meldeklasse wäre unsichtbar.
+    // Ohne Einfärbung zeichnete die Karte gleich große Punkte in der Ebenenfarbe — die Meldeklasse
+    // wäre unsichtbar.
     expect(alarm.properties.radius).toBe(hochwasserRadius('gross'));
     expect(ruhig.properties.radius).toBe(hochwasserRadius('kein_hochwasser'));
     expect(alarm.properties.farbe).not.toBe(ruhig.properties.farbe);
@@ -415,9 +412,8 @@ describe('useFachebenen', () => {
     expect(stark.properties.farbe).not.toBe(normal.properties.farbe);
     expect(stark.properties.titel).toBe('Chemnitz');
     expect(result.current.fachebenenStatus.odl).toBe('ok');
-    // Spec „Quellennennung".
-    // Das Ergebnis ist ein ARRAY ganzer Attributionstexte — `toContain` auf dem Array prüfte
-    // Gleichheit eines Elements, nicht einen Teilstring. Deshalb über den verbundenen Text.
+    // Das Ergebnis ist ein Array ganzer Attributionstexte — `toContain` prüfte Gleichheit eines
+    // Elements, deshalb über den verbundenen Text.
     expect(result.current.fachebenenAttribution.join(' | ')).toContain(
       'Bundesamt für Strahlenschutz (BfS)',
     );
@@ -436,8 +432,7 @@ describe('useFachebenen', () => {
     const { result } = rendere();
     act(() => result.current.onFachebeneToggle('odl', true));
     await waitFor(() => expect(result.current.fachebenenStatus.odl).toBe('offline'));
-    // Über den verbundenen Text: auf dem Array wäre `not.toContain('Strahlenschutz')` IMMER
-    // grün, weil kein Element exakt so lautet — ein Test, der nicht rot werden kann.
+    // Über den verbundenen Text: auf dem Array wäre `not.toContain('Strahlenschutz')` immer grün.
     expect(result.current.fachebenenAttribution.join(' | ')).not.toContain('Strahlenschutz');
   });
 
@@ -463,9 +458,8 @@ describe('useFachebenen', () => {
         result.current.aktiveFachebenen.find((f) => f.def.key === 'autobahn')?.daten.features,
       ).toHaveLength(3),
     );
-    // Die Zuordnung Query→Ebene läuft in `combine` über POSITIONEN. Ein verschobener Index
-    // wäre kein Fehler, sondern eine stille Verwechslung: die Ebene zeigte fremde Daten.
-    // Deshalb gegen die konkrete Koordinate prüfen, nicht bloß gegen die Anzahl.
+    // Die Zuordnung Query→Ebene läuft in `combine` über Positionen; ein verschobener Index wäre
+    // eine stille Verwechslung. Deshalb gegen die Koordinate prüfen, nicht bloß gegen die Anzahl.
     const ab = result.current.aktiveFachebenen.find((f) => f.def.key === 'autobahn');
     expect(ab?.daten.features[0].geometry?.coordinates).toEqual([6.86, 50.98]);
     expect(result.current.fachebenenStatus.autobahn).toBe('ok');
@@ -496,8 +490,8 @@ describe('useFachebenen', () => {
   });
 
   it('verschiebt mit der siebten Query keine Bestandsebene (LFH-79)', async () => {
-    // `combine` greift positionsweise ab. Stünde die neue Query nicht am ENDE des Tupels,
-    // trügen Autobahn oder KRITIS still die Daten einer Nachbarebene.
+    // `combine` greift positionsweise ab: stünde die neue Query nicht am Ende des Tupels, trügen
+    // Autobahn oder KRITIS still die Daten einer Nachbarebene.
     fx.lqStatus = 'ok';
     const { result } = rendere();
     act(() => {
@@ -537,8 +531,7 @@ describe('useFachebenen', () => {
   it('autobahn braucht keine bbox — sie lädt schon durch das Einschalten (LFH-80)', async () => {
     const { result } = rendere();
     act(() => result.current.onFachebeneToggle('autobahn', true));
-    // Gegenstück zu KRITIS, das ohne `setViewportBbox` dauerhaft leer bliebe. Geriete die
-    // Autobahn-Ebene in den bbox-Zweig, stünde hier 0 statt 3.
+    // Gegenstück zu KRITIS: geriete die Autobahn-Ebene in den bbox-Zweig, stünde hier 0 statt 3.
     await waitFor(() =>
       expect(
         result.current.aktiveFachebenen.find((f) => f.def.key === 'autobahn')?.daten.features,
@@ -568,11 +561,9 @@ describe('useFachebenen', () => {
       await waitFor(() => expect(result.current.fachebenenStatus.autobahn).toBe('offline'));
       const nachFehlschlag = rufe;
 
-      // Die tragende Aussage: react-query HÄLT nach einem gescheiterten Refetch die
-      // vorigen `data` — ohne `isError` in der Takt-Ableitung stünde dort weiter `ok`,
-      // die Ebene bliebe auf 600 s und zeigte zehn Minuten lang nichts, obwohl das
-      // Backend längst wieder da wäre. Hier muss innerhalb des Aufwärm-Takts ein
-      // weiterer Versuch laufen.
+      // Die tragende Aussage: react-query hält nach einem gescheiterten Refetch die vorigen `data`.
+      // Ohne `isError` in der Takt-Ableitung bliebe die Ebene auf 600 s und zeigte zehn Minuten
+      // nichts, obwohl das Backend längst wieder da wäre.
       await act(() => vi.advanceTimersByTimeAsync(FACHEBENEN.autobahn.aufwaermPollMs! + 1_000));
       expect(rufe).toBeGreaterThan(nachFehlschlag);
     } finally {
@@ -582,10 +573,8 @@ describe('useFachebenen', () => {
   });
 
   it('meldet für KRITIS in keiner Zoomstufe einen Zoom-Hinweis (LFH-83)', () => {
-    // KRITIS fragt seit LFH-83 in JEDER Zoomstufe den Extrakt-Bestand (gebündelt ab 5000
-    // Objekten) — anders als vor LFH-81/83, als dieselbe `BBOX_MIN_ZOOM`-Schwelle noch für
-    // alle bbox-abhängigen Ebenen galt. Die Schwelle gilt seither nur für Ebenen mit eigenem
-    // `minZoom` in der Registry, und KRITIS trägt keinen.
+    // KRITIS fragt in jeder Zoomstufe den Extrakt-Bestand (gebündelt ab 5000 Objekten); die
+    // `BBOX_MIN_ZOOM`-Schwelle gilt nur für Ebenen mit eigenem `minZoom`, KRITIS trägt keinen.
     const { result } = rendere();
     act(() => result.current.onFachebeneToggle('kritis', true));
     act(() => result.current.setKartenZoom(5));
@@ -634,14 +623,14 @@ describe('useFachebenen', () => {
     expect(result.current.fachebenenAttribution).toContain('© OpenStreetMap-Beitragende (ODbL)');
 
     act(() => result.current.setViewportBbox('bbox2'));
-    // Der neue Ausschnitt kommt dazu, der alte bleibt stehen (Energie akkumuliert — anders
-    // als KRITIS, dessen bbox-Antwort das Bild ersetzt, s. o.).
+    // Der neue Ausschnitt kommt dazu, der alte bleibt stehen — Energie akkumuliert, anders als
+    // KRITIS.
     await waitFor(() =>
       expect(
         result.current.aktiveFachebenen.find((f) => f.def.key === 'energie')?.daten.features,
       ).toHaveLength(5),
     );
-    // KRITIS ist aus und wurde nie abgefragt — der Ausschnitt gehört nicht mehr KRITIS allein.
+    // KRITIS ist aus und wurde nie abgefragt — der Ausschnitt gehört nicht KRITIS allein.
     expect(lade.mock.calls.filter(([q]) => q === 'kritis')).toHaveLength(0);
   });
 
@@ -664,9 +653,8 @@ describe('useFachebenen', () => {
   });
 
   it('fragt die Energieanlagen unter dem Mindest-Zoom nicht ab, auch mit bbox (LFH-81)', async () => {
-    // Seit LFH-83 meldet die Karte den Ausschnitt in JEDER Zoomstufe (KRITIS braucht ihn
-    // dort). Die Energie-Ebene fragt Overpass live und braucht deshalb weiterhin ihren
-    // eigenen Mindest-Zoom — das Gate sitzt im Hook, nicht mehr an der Karte.
+    // Die Karte meldet den Ausschnitt in jeder Zoomstufe (KRITIS braucht ihn dort). Energie fragt
+    // Overpass live und braucht ihren eigenen Mindest-Zoom — das Gate sitzt im Hook.
     const lade = vi.mocked(ladeFachebene);
     lade.mockClear();
     const { result } = rendere();
@@ -685,8 +673,8 @@ describe('useFachebenen', () => {
   });
 
   it('fragt Energie auf breitem Schirm ab Zoom 10 ab, bremst aber einen zu großen Ausschnitt (LFH-81)', async () => {
-    // Bei Zoom 10 ist ein Grad rund 1456 px breit — ab etwa 1920 px Bildschirm war der
-    // Ausschnitt größer als die frühere 1°-Grenze, und die Ebene stand leer auf „offline".
+    // Bei Zoom 10 ist ein Grad rund 1456 px breit — ab etwa 1920 px Bildschirm war der Ausschnitt
+    // größer als eine 1°-Grenze, und die Ebene stand leer auf „offline".
     const lade = vi.mocked(ladeFachebene);
     lade.mockClear();
     const { result } = rendere();
@@ -737,7 +725,7 @@ describe('useFachebenen', () => {
     act(() => result.current.setViewportBbox('bbox-mastr'));
     await waitFor(() => expect(result.current.fachebenenAttribution.join(' · ')).toContain(MASTR));
 
-    // Die letzte Antwort nennt nur noch OSM — gezeichnet werden aber weiter die gesammelten
+    // Die letzte Antwort nennt nur OSM — gezeichnet werden aber weiter die gesammelten
     // MaStR-Punkte, und die tragen die Lizenzpflicht mit.
     act(() => result.current.setViewportBbox('bbox-osm'));
     await waitFor(() =>

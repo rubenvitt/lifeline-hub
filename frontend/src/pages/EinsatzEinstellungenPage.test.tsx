@@ -5,12 +5,9 @@ import { renderMitProviders } from '../test/utils';
 import EinsatzEinstellungenPage from './EinsatzEinstellungenPage';
 
 /**
- * Layout-Tests der Sektions-Zerlegung (LFH-345 · C10, H15/M15).
- *
- * Die fachlichen Bestandstests dieser Seite sind NICHT verschwunden — sie sind auf die vier
- * Sektionsdateien gezogen (`einstellungen/EinsatzAllgemein.test.tsx`, `…Verhalten…`,
- * `…Aufbewahrung…`, `…Module…`) und dort unverändert gültig. Hier bleibt nur, was das Layout
- * selbst zusichert: das Tab-Band, der Sektionswechsel und der eingefrorene Einsatz.
+ * Layout-Tests der Sektions-Zerlegung. Die fachlichen Tests liegen in den vier Sektionsdateien
+ * (`einstellungen/EinsatzAllgemein.test.tsx`, `…Verhalten…`, `…Aufbewahrung…`, `…Module…`); hier
+ * bleibt, was das Layout zusichert: Tab-Band, Sektionswechsel, eingefrorener Einsatz.
  */
 
 vi.mock('../auth/AuthContext', () => ({
@@ -92,8 +89,8 @@ describe('EinsatzEinstellungenPage (Sektions-Layout)', () => {
   });
 
   it('markiert die Sektion aus der URL, nicht einen eigenen Nav-Zustand', async () => {
-    // Der aktive Reiter folgt dem Pfad — sonst zeigte ein Deeplink auf „Module" das Band
-    // mit „Allgemein" markiert, und der Bedienende hielte den Link für kaputt.
+    // Der aktive Reiter folgt dem Pfad — sonst zeigte ein Deeplink auf „Module" das Band mit
+    // „Allgemein" markiert.
     rendern('/einsaetze/1/einstellungen/aufbewahrung');
 
     expect(
@@ -124,9 +121,8 @@ describe('EinsatzEinstellungenPage (Sektions-Layout)', () => {
   });
 
   it('laesst den Kopf-Aktionen-Slot leer — der Speichern-Knopf liegt im Formular', async () => {
-    // Die Speichern-Leiste ist seit C10 sticky am unteren Rand IM `<form>` (Erfassungs-Norm
-    // B4/LFH-332: nur so sendet Enter ab). Ein Knopf im Kopf-Slot wäre der alte Zustand —
-    // geprüft wird die Marke, die `EinsatzSeite` für genau diesen Zuschnitt setzt.
+    // Die Speichern-Leiste steht sticky im `<form>` (nur so sendet Enter ab), nicht im Kopf-Slot.
+    // Geprüft wird die Marke, die `EinsatzSeite` für diesen Zuschnitt setzt.
     const { container } = rendern();
 
     await screen.findByRole('tab', { name: 'Allgemein' });

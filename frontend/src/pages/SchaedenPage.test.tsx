@@ -16,8 +16,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-// Normaler Benutzer (kein System-Admin): so prüft der Beobachter-Test die EINSATZ-Rolle,
-// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+// Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
+// schreibrecht.test.ts ab.
 const nutzer = benutzerFixture({ org_rolle: 'fuehrungskraft' });
 const einsatzAktiv = {
   id: 1,
@@ -143,8 +143,10 @@ function renderSchaedenPageMitEinsatz(einsatzObj: object, route: string) {
   );
 }
 
-/** antd-Dropdown-Option im Portal anhand des Anzeige-Labels treffen (Tabellenzellen
- *  tragen denselben Text → über `.ant-select-item-option` abgrenzen). */
+/**
+ * antd-Dropdown-Option im Portal anhand des Labels treffen (Tabellenzellen tragen denselben Text →
+ * über `.ant-select-item-option` abgrenzen).
+ */
 async function waehleOption(label: string) {
   const option = (await screen.findAllByText(label)).find((el) =>
     el.closest('.ant-select-item-option'),
@@ -153,22 +155,19 @@ async function waehleOption(label: string) {
   await userEvent.click(option!);
 }
 
-/** Modal-Dialog isolieren (auf der List-only-Seite gibt es nur die Schnellerfassung). */
+/** Modal-Dialog isolieren (auf der Listenseite gibt es nur die Schnellerfassung). */
 async function modalDialog() {
   return (await screen.findAllByRole('dialog'))[0];
 }
 
 /**
- * Wartet, bis die Dialogfelder aus dem Baum verschwunden sind — die Sonde für „geschlossen"
- * (die Hülle rendert mit `destroyOnHidden`).
+ * Wartet, bis die Dialogfelder aus dem Baum verschwunden sind — die Sonde für „geschlossen" (die
+ * Hülle rendert mit `destroyOnHidden`).
  *
- * Der Anstoß in der Schleife ist nötig, nicht dekorativ: antd fährt den Dialog mit einer
- * Schließbewegung aus, und jsdom feuert dafür von sich aus kein Ende-Ereignis. Ohne das
- * Ereignis bleibt das Modal für immer in `ant-zoom-leave-active` stehen (gemessen), die Felder
- * werden nie abgeräumt — ein `not.toBeInTheDocument` liefe in den Timeout, obwohl die Anwendung
- * korrekt schließt. Gemessen beendet `transitionend` die Bewegung, `animationend` NICHT (trotz
- * des `ant-zoom`-Klassennamens); beide zu feuern kostet nichts und überlebt einen Wechsel.
- * Geprüft wird am Ende nur Verhalten — die Felder sind weg —, kein Klassenname.
+ * Der Anstoß in der Schleife ist nötig: jsdom feuert für die Schließbewegung kein Ende-Ereignis,
+ * das Modal bliebe in `ant-zoom-leave-active` stehen. `transitionend` beendet die Bewegung,
+ * `animationend` nicht (trotz des Klassennamens); beide zu feuern kostet nichts. Geprüft wird nur
+ * Verhalten — die Felder sind weg.
  */
 async function warteBisDialogWeg() {
   await vi.waitFor(() => {
@@ -177,10 +176,9 @@ async function warteBisDialogWeg() {
       fireEvent.transitionEnd(modal);
       fireEvent.animationEnd(modal);
     }
-    // ÜBER DIE ROLLE, nicht über `queryByLabelText('Ort')` (LFH-340 · C5): seit die Liste
-    // über `Datensicht` läuft, trägt auch die Spalte „Ort" diesen zugänglichen Namen — der
-    // Kopfzellen-Knoten stünde dann für immer im Dokument und die Warteschleife liefe in
-    // den Timeout, obwohl der Dialog längst zu ist. Ein `<th>` ist keine `textbox`.
+    // Über die Rolle, nicht über `queryByLabelText('Ort')`: auch die Spalte „Ort" trägt diesen
+    // zugänglichen Namen, und die Warteschleife liefe in den Timeout. Ein `<th>` ist keine
+    // `textbox`.
     expect(screen.queryByRole('textbox', { name: 'Ort' })).not.toBeInTheDocument();
   });
 }
@@ -197,27 +195,23 @@ async function fuelleSchaden(dialog: HTMLElement, typ: string, ausmass: string, 
 async function oeffneWeitereAngaben(dialog: HTMLElement) {
   const schalter = within(dialog).getByRole('button', { name: /Weitere Angaben/ });
   if (schalter.getAttribute('aria-expanded') === 'false') await userEvent.click(schalter);
-  // Wie im Material-Feldbudget: jsdom beendet die opacity-Animation nicht selbst.
-  // Die Rolle prüft, dass der Inhalt nicht mehr aus dem Zugänglichkeitsbaum verborgen ist.
+  // jsdom beendet die opacity-Animation nicht selbst. Die Rolle prüft, dass der Inhalt nicht mehr
+  // aus dem Zugänglichkeitsbaum verborgen ist.
   await within(dialog).findByRole('textbox', { name: 'Koordinate' });
 }
 
 describe('SchaedenPage', () => {
   /**
-   * LFH-340 · C5. Die Schadensseite war die einzige der drei Betroffenen-Listen, die den
-   * Seitenrahmen von Hand baute (eigenes `padding: 16` auf die 24 px des Layouts,
-   * `Title level={4}` ohne Breadcrumb, ohne Einsatz-Status, ohne Schreibrecht-Hinweis).
-   * Geprüft wird deshalb nicht „ein Kopf ist da", sondern dass er aus `EinsatzSeite` kommt:
-   * Breadcrumb UND Status-Tag UND die Abwesenheit eines zweiten Überschriftenknotens.
+   * Der Kopf kommt aus `EinsatzSeite`, nicht aus einem handgebauten Rahmen: Breadcrumb und
+   * Status-Tag und kein zweiter Überschriftenknoten.
    */
   it('trägt den gemeinsamen Modulkopf: Breadcrumb, Einsatz-Status, eine Überschrift', async () => {
     render(einsatzAktiv, [basisSchaden()]);
     expect(await screen.findByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: /Schäden/ })).toBeInTheDocument();
     expect(screen.getAllByRole('heading')).toHaveLength(1);
-    // „Aktiv", nicht „aktiv": der Kopf zeigt seit LFH-358 die BESCHRIFTUNG aus dem
-    // Statusfarb-Vertrag über `StatusTag`, nicht mehr den rohen Wire-Wert in einem
-    // handgemalten `<Tag color="green">`.
+    // „Aktiv", nicht „aktiv": der Kopf zeigt die Beschriftung aus dem Statusfarb-Vertrag über
+    // `StatusTag`, nicht den Wire-Wert.
     expect(screen.getByText('Aktiv')).toBeInTheDocument();
   });
 
@@ -227,8 +221,7 @@ describe('SchaedenPage', () => {
   });
 
   /**
-   * Die Liste läuft über `Datensicht` statt über eine handgebaute `KatalogTabelle`. Beleg
-   * sind die drei Dinge, die das Primitiv mitbringt und der Handbau nicht hatte: die
+   * Die Liste läuft über `Datensicht`. Beleg sind die drei Dinge, die das Primitiv mitbringt: die
    * „seit"-Spalte, das Suchfeld und der Spaltenschalter.
    */
   it('rendert die Liste über das Datensicht-Primitiv mit „seit"-Spalte und Suche', async () => {
@@ -247,13 +240,13 @@ describe('SchaedenPage', () => {
     await screen.findByText('S-001');
     await userEvent.type(screen.getByPlaceholderText('S-Nr., Ort, Beschreibung'), 'Ölspur');
     expect(await screen.findByText('S-002')).toBeInTheDocument();
-    // Die Gegenhälfte: ohne sie wäre der Fall auch grün, wenn die Suche gar nichts filterte.
+    // Die Gegenhälfte: ohne sie wäre der Fall auch grün, wenn die Suche nichts filterte.
     expect(screen.queryByText('S-001')).not.toBeInTheDocument();
   });
 
   /**
-   * Verortungsstand (LFH-340 · C5, Befund M39). Beide Hälften sind Pflicht: eine Aussage
-   * allein wäre auch grün, wenn die Spalte in jeder Zeile dasselbe zeigte.
+   * Verortungsstand. Beide Hälften: eine Aussage allein wäre auch grün, wenn die Spalte in jeder
+   * Zeile dasselbe zeigte.
    */
   it('zeigt in der Liste, ob ein Schaden verortet ist', async () => {
     render(einsatzAktiv, [
@@ -274,8 +267,8 @@ describe('SchaedenPage', () => {
       server.use(
         http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
           gesendet = (await request.json()) as Record<string, unknown>;
-          // Nur das tatsächlich versandte Paar kommt beim nächsten Listen-GET zurück.
-          // Eine feste verortete Response würde einen vergessenen Request-Wert verdecken.
+          // Nur das versandte Paar kommt beim nächsten Listen-GET zurück; eine feste verortete
+          // Antwort verdeckte einen vergessenen Request-Wert.
           const angelegt = basisSchaden({
             typ: gesendet.typ,
             ausmass: gesendet.ausmass,
@@ -341,8 +334,8 @@ describe('SchaedenPage', () => {
       .closest('.ant-collapse-panel')!;
     await userEvent.click(weitereAngaben);
     await vi.waitFor(() => {
-      // Wie beim Dialog-Ende: jsdom liefert keinen CSS-Übergang. Collapse akzeptiert
-      // nur das Ende der Höhenanimation; danach muss der Inhalt tatsächlich verborgen sein.
+      // jsdom liefert keinen CSS-Übergang. Collapse akzeptiert nur das Ende der Höhenanimation;
+      // danach muss der Inhalt verborgen sein.
       const ende = new window.Event('transitionend', { bubbles: true });
       Object.defineProperty(ende, 'propertyName', { value: 'height' });
       fireEvent(panel, ende);
@@ -421,15 +414,13 @@ describe('SchaedenPage', () => {
   });
 
   /**
-   * SERIENMODUS (LFH-332 · B4) — Partnerpaar mit dem Fall darunter.
+   * Serienmodus — Partnerpaar mit dem Fall darunter. „Der Dialog bleibt offen" allein wäre auch
+   * grün, wenn sich der Dialog nie schlösse; erst der zweite Fall mit derselben Sonde macht daraus
+   * eine Aussage über die Verzweigung.
    *
-   * „Der Dialog bleibt offen" allein belegte nichts: der Fall wäre genauso grün, wenn sich der
-   * Dialog ÜBERHAUPT NIE schlösse. Erst der zweite Fall mit derselben Sonde macht daraus eine
-   * Aussage über die Verzweigung Serien-Speichern ↔ Einzel-Erfassen.
-   *
-   * Sonde ist das Ortsfeld, nicht die Dialog-Rolle: die Hülle rendert mit `destroyOnHidden`,
-   * die Felder sind also genau so lange im Baum, wie der Dialog offen ist — während der
-   * Modal-Rahmen selbst über seine Schließ-Animation hinweg stehen bleibt.
+   * Sonde ist das Ortsfeld, nicht die Dialog-Rolle: mit `destroyOnHidden` stehen die Felder genau
+   * so lange im Baum, wie der Dialog offen ist, der Modal-Rahmen dagegen über seine
+   * Schließ-Animation hinweg.
    */
   it('„Speichern und nächste" lässt den Dialog offen und behält den Ort', async () => {
     const koerper: Record<string, unknown>[] = [];
@@ -442,7 +433,7 @@ describe('SchaedenPage', () => {
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     const dialog = await modalDialog();
-    // Der Schalter steht per Vorgabe AUS (30.07.2026) — ohne ihn gäbe es keine Übernahme.
+    // Der Schalter steht per Vorgabe aus — ohne ihn gäbe es keine Übernahme.
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
     await fuelleSchaden(dialog, 'Umweltschaden', 'groß', 'Hauptstr. 17');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
@@ -453,20 +444,18 @@ describe('SchaedenPage', () => {
     );
     // Der Datensatz ist angekommen (Zähler der Hülle) …
     expect(await screen.findByText('Erfasst: 1')).toBeInTheDocument();
-    // … der Dialog steht weiter offen, und der Ort hat das Speichern überlebt (Wertübernahme).
-    // Über die Rolle: „Ort" ist seit dem Umbau auf `Datensicht` auch ein Spaltenkopf,
-    // `getByLabelText` fände zwei Knoten (dieselbe Kollision wie in `warteBisDialogWeg`).
+    // … der Dialog steht offen, und der Ort hat das Speichern überlebt (Wertübernahme). Über die
+    // Rolle: „Ort" ist auch ein Spaltenkopf.
     expect(screen.getByRole('textbox', { name: 'Ort' })).toHaveValue('Hauptstr. 17');
   });
 
   /**
-   * „Geschädigt" liegt außerhalb des Form-Stores im lokalen State — die Hülle leert beim
-   * Serien-Speichern das Formular, diesen Wert kann sie nicht kennen. Läge der Reset nur an
-   * `onFertig` (das beim Serien-Speichern NIE läuft), wanderte die Zuordnung des ersten
-   * Schadens still auf den zweiten: ein falscher Datensatz, keine Kosmetik.
+   * „Geschädigt" liegt außerhalb des Form-Stores im lokalen State — die Hülle kennt den Wert nicht.
+   * Läge der Reset nur an `onFertig` (das beim Serien-Speichern nie läuft), wanderte die Zuordnung
+   * des ersten Schadens still auf den zweiten.
    *
-   * Geprüft werden BEIDE Absendungen. Nur `koerper[1] === null` wäre auch grün, wenn die
-   * Zuordnung nie angekommen wäre — erst die 42 in `koerper[0]` macht daraus „geleert".
+   * Beide Absendungen: nur `koerper[1] === null` wäre auch grün, wenn die Zuordnung nie angekommen
+   * wäre — erst die 42 in `koerper[0]` macht daraus „geleert".
    */
   it('Serien-Speichern trägt Geschädigten und Koordinate NICHT in den nächsten Schaden', async () => {
     const koerper: Record<string, unknown>[] = [];
@@ -479,9 +468,8 @@ describe('SchaedenPage', () => {
     render(einsatzAktiv, [], [einePerson], [eineEinsatzkraft]);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     const dialog = await modalDialog();
-    // „Werte behalten" AN: der Test prüft am Ende, dass der Ort mitwandert (Übernahme)
-    // und der Geschädigte NICHT (lokaler State, den die Hülle nicht kennt). Ohne den
-    // Schalter fiele die erste Hälfte weg und die zweite bewiese nichts mehr.
+    // „Werte behalten" an: der Ort wandert mit (Übernahme), der Geschädigte nicht (lokaler State).
+    // Ohne den Schalter bewiese die zweite Hälfte nichts.
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
     await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
     await oeffneWeitereAngaben(dialog);
@@ -830,9 +818,8 @@ describe('SchaedenPage', () => {
   });
 
   /**
-   * Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts — sie wäre
-   * auch grün, wenn der Umbau den Leertext bloß umformuliert hätte. Erst der Fall darunter
-   * mit demselben Literal macht sie zu einer Aussage über die Zustandsweiche.
+   * Partnerpaar: die negative Hälfte allein belegte nichts; erst der Fall darunter mit demselben
+   * Literal macht sie zu einer Aussage über die Zustandsweiche.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
@@ -862,10 +849,10 @@ describe('SchaedenPage', () => {
   });
 
   /**
-   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
-   * nicht `isStale`. Der Ablauf ist der echte: geglückter Abruf, dann gescheiterte
-   * Aktualisierung. Ein bloß vorbefüllter Zwischenspeicher ließe offen, ob TanStack nach
-   * einem HINTERGRUND-Fehlschlag überhaupt auf `error` stellt statt auf `success` zu bleiben.
+   * Veralteter Stand = `isError` mit Zeilen im Zwischenspeicher — nicht `isFetching`, nicht
+   * `isStale`. Der Ablauf ist der echte: geglückter Abruf, dann gescheiterte Aktualisierung; ein
+   * vorbefüllter Cache ließe offen, ob TanStack nach einem Hintergrund-Fehlschlag auf `error`
+   * stellt.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
     const { client } = render(einsatzAktiv, [basisSchaden()]);
@@ -879,7 +866,7 @@ describe('SchaedenPage', () => {
     expect(
       await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
     ).toBeInTheDocument();
-    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
+    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('S-001')).toBeInTheDocument();
     expect(screen.queryByText('Schäden konnten nicht geladen werden')).not.toBeInTheDocument();
   });

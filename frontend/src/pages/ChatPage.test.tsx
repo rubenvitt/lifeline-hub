@@ -11,8 +11,8 @@ import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 
 afterEach(() => vi.restoreAllMocks());
 
-// Normaler Benutzer (kein System-Admin): die Rollen-Tests prüfen die EINSATZ-Rolle,
-// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+// Normaler Benutzer (kein System-Admin): die Rollen-Tests prüfen die Einsatz-Rolle; admin-global
+// deckt schreibrecht.test.ts ab.
 const nutzer = benutzerFixture({ anzeigename: 'A' });
 
 const einsatz = einsatzFixture({ id: 7, bezeichnung: 'Hochwasser Nord' });
@@ -99,8 +99,8 @@ describe('ChatPage', () => {
     await waitFor(() => expect(markiert).toBeGreaterThan(0));
   });
 
-  // LFH-612: Das Lesen erzeugt kein Live-Ereignis; ohne eigene Invalidierung stünde der
-  // Chat-Zähler im Navigationsrahmen bis zum nächsten fremden Ereignis auf dem alten Wert.
+  // Das Lesen erzeugt kein Live-Ereignis; ohne eigene Invalidierung stünde der Chat-Zähler bis zum
+  // nächsten fremden Ereignis auf dem alten Wert.
   it('zieht nach dem Lesen den Modulzähler nach', async () => {
     const { client } = setup(1);
     const invalidiert = vi.spyOn(client, 'invalidateQueries');
@@ -275,9 +275,8 @@ describe('ChatPage', () => {
 
     await waitFor(() => expect(bearbeitet).not.toBeNull());
     expect(bearbeitet!.inhalt).toBe('Lage korrigiert');
-    // jsdom 29 spiegelt den getippten Textarea-Wert in den textContent; die noch
-    // mountete Edit-Textarea würde sonst zusätzlich matchen. Wir prüfen den gerenderten
-    // Nachrichtentext, nicht den Formularwert → Formularfelder ignorieren.
+    // jsdom spiegelt den getippten Textarea-Wert in den textContent; die noch montierte
+    // Edit-Textarea würde sonst mitmatchen. Geprüft wird der gerenderte Nachrichtentext.
     expect(
       await screen.findByText('Lage korrigiert', { ignore: 'script, style, textarea' }),
     ).toBeInTheDocument();

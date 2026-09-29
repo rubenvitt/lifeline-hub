@@ -8,15 +8,12 @@ import { abschnittLagezustand } from '../../theme/statusFarben';
 import type { AbschnittStaerken } from './abschnittStaerke';
 
 /**
- * Die Angaben eines Einsatzabschnitts zum Lesen — EIN Bauteil für den Lesezweig der
- * Abschnittsseite und die Vorschau der Sprungpalette (LFH-664). Ohne Knöpfe: Bearbeiten und
- * Auflösen bleiben der Seite vorbehalten.
+ * Die Angaben eines Einsatzabschnitts zum Lesen — ein Bauteil für den Lesezweig der Abschnittsseite
+ * und die Vorschau der Sprungpalette, ohne Knöpfe.
  *
- * Die Stärke rechnet der Aufrufer (`abschnittStaerken`), weil sie die Einheitenliste und den
- * ganzen Abschnittsbaum braucht, die das Bauteil nicht kennen soll. Fehlt sie noch (Liste lädt)
- * oder ist sie nicht abrufbar, setzt der Aufrufer `staerken` auf `undefined` und sagt den Grund
- * über `staerkenErsatz` — „—" hieße sonst „keine Einheit zugeordnet", und das wäre eine Aussage,
- * die niemand gemessen hat.
+ * Die Stärke rechnet der Aufrufer (`abschnittStaerken`), weil sie Einheitenliste und Abschnittsbaum
+ * braucht. Fehlt sie, kommt `staerken` als `undefined` plus Grund in `staerkenErsatz` — „—" hieße
+ * „keine Einheit zugeordnet", und das wäre ungeprüft.
  */
 export default function AbschnittDaten({
   abschnitt: a,
@@ -34,8 +31,8 @@ export default function AbschnittDaten({
     <Datenraster spalten={spalten} beschriftung="Abschnittsdaten">
       {a.kurzbezeichnung && <Datenfeld label="Kurzbezeichnung">{a.kurzbezeichnung}</Datenfeld>}
       <Datenfeld label="Abschnittsleiter">{a.leiter_name ?? '—'}</Datenfeld>
-      {/* Die fehlende Beurteilung steht als WORT da, nicht als leere Zelle: sonst ist „noch
-          nicht beurteilt“ von „vergessen anzuzeigen“ nicht zu trennen. */}
+      {/* Fehlende Beurteilung als Wort, nicht als leere Zelle: sonst ist „nicht beurteilt“ von
+          „vergessen anzuzeigen“ nicht zu trennen. */}
       <Datenfeld label="Lagezustand">
         {a.lagezustand ? (
           <StatusTag darstellung={abschnittLagezustand[a.lagezustand]} darstellungsart="rand" />
@@ -43,9 +40,8 @@ export default function AbschnittDaten({
           <span style={{ color: rollen.gedaempft }}>nicht beurteilt</span>
         )}
       </Datenfeld>
-      {/* Fortschritt VOR dem Abschnittsauftrag, anders als im früheren `Descriptions` (eine
-          Spalte): der Auftrag ist ein breites Feld, zwischen Lagezustand und Fortschritt
-          risse er ein Loch in die zweispaltige Zeile. Bewusste Umstellung (LFH-664). */}
+      {/* Fortschritt vor dem Abschnittsauftrag: das breite Auftragsfeld risse sonst ein Loch in
+          die zweispaltige Zeile. */}
       <Datenfeld label="Fortschritt" mono={a.fortschritt != null}>
         {a.fortschritt != null ? (
           `${a.fortschritt} %`

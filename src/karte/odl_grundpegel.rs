@@ -1,7 +1,5 @@
-//! Standort-Grundpegel je ODL-Sonde und die relative Bewertung darauf (LFH-598).
-//!
-//! Alles hier ist rein und ohne Netz prüfbar; Abruf und Ablage stehen in
-//! `karte::quellen` (`fetch_odl`). Herleitung, Messungen und verworfene Wege:
+//! Standort-Grundpegel je ODL-Sonde und die relative Bewertung darauf (LFH-598). Rein und ohne
+//! Netz prüfbar; Abruf und Ablage stehen in `karte::quellen` (`fetch_odl`). Herleitung:
 //! `openspec/changes/lfh-598-odl-standort-grundpegel/design.md`.
 
 use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
@@ -27,31 +25,28 @@ pub const CACHE_SCHLUESSEL: &str = "odl:grundpegel";
 
 /// Unter dieser Zahl Stundenwerte gibt es keinen Grundpegel (≈ fünf von sieben Tagen).
 pub const MINDESTZAHL: usize = 20;
-/// Faktor-Schwellen (Projekt-Einteilung, inklusiv nach unten wie die Bänder aus LFH-78).
-/// 3 × ist der vom BfS genannte Faktor, hier standortbezogen gemeint — wie beim BfS.
+/// Faktor-Schwellen (Projekt-Einteilung, inklusiv nach unten). 3 × ist der BfS-Faktor, hier wie
+/// dort standortbezogen.
 pub const FAKTOR_ERHOEHT: f64 = 1.5;
 pub const FAKTOR_STARK: f64 = 3.0;
-/// Sperrklinke: eine Neuberechnung, die den Grundpegel um diesen Faktor oder mehr anhebt,
-/// wird verworfen. Dieselbe Schwelle wie `erhoeht` — ein Anstieg, der eine Sonde auffällig
-/// machte, ist in einer Lage genau das, was nicht in den Maßstab wandern darf.
+/// Sperrklinke: eine Neuberechnung, die den Grundpegel um diesen Faktor oder mehr anhebt, wird
+/// verworfen — ein Anstieg in einer Lage darf nicht in den Maßstab wandern.
 pub const SPERRKLINKE: f64 = FAKTOR_ERHOEHT;
-/// So lange hält die Sperrklinke einen Grundpegel über seinen Stand hinaus. Ohne Grenze
-/// hielte sie ihn für immer (der Eintrag wird täglich neu geschrieben und altert nie) — ein
-/// Sondentausch mit +50 % Empfindlichkeit stünde dann dauerhaft auf `erhoeht`. Vierzehn Tage
-/// decken eine mehrtägige Lage reichlich ab; dauert eine Lage länger, wandert der Maßstab ab
-/// dann mit, und der Stand im Inspector zeigt, seit wann er gilt.
+/// So lange hält die Sperrklinke einen Grundpegel über seinen Stand hinaus. Ohne Grenze hielte
+/// sie ihn für immer, und ein Sondentausch mit höherer Empfindlichkeit stünde dauerhaft auf
+/// `erhoeht`.
 pub const SPERRKLINKE_HOECHSTALTER_TAGE: i64 = 14;
 
 const EINHEIT: &str = "µSv/h";
 const GLEITKOMMA_TOLERANZ: f64 = 1e-9;
-/// Zeitpunkte der Stichprobe: 6-h-Raster, höchstens 28, innerhalb der sieben Tage, die die
-/// Quelle vorhält (gemessen ~167 h).
+/// Zeitpunkte der Stichprobe: 6-h-Raster, höchstens 28, innerhalb der ~167 h, die die Quelle
+/// vorhält.
 const RASTER_STUNDEN: i64 = 6;
 const STICHPROBEN: i64 = 28;
 const FENSTER_STUNDEN: i64 = 7 * 24;
 
-/// ISO-8601 UTC mit `Z`, sekundengenau. Von Hand, weil `chrono` hier ohne `alloc`-Formatierer
-/// gebaut ist.
+/// ISO-8601 UTC mit `Z`, sekundengenau; von Hand, weil `chrono` ohne `alloc`-Formatierer gebaut
+/// ist.
 pub fn iso_utc(t: DateTime<Utc>) -> String {
     format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
@@ -64,10 +59,9 @@ pub fn iso_utc(t: DateTime<Utc>) -> String {
     )
 }
 
-/// Stichproben-Zeitpunkte (`end_measure`) für den Abruf, jüngster zuerst.
-///
-/// Start ist die letzte volle Rasterstunde an oder vor `jetzt − 1 h`: der Stundenwert der gerade
-/// abgelaufenen Stunde ist gemessen noch nicht für alle Sonden veröffentlicht.
+/// Stichproben-Zeitpunkte (`end_measure`), jüngster zuerst. Start ist die letzte volle
+/// Rasterstunde an oder vor `jetzt − 1 h`, weil der Wert der gerade abgelaufenen Stunde noch
+/// nicht für alle Sonden veröffentlicht ist.
 pub fn zeitpunkte(jetzt: DateTime<Utc>) -> Vec<DateTime<Utc>> {
     let basis = jetzt - Duration::hours(1);
     let stunde = basis.hour() as i64;
@@ -103,12 +97,9 @@ fn unteres_quartil(werte: &mut [f64]) -> Option<f64> {
     Some(werte[rang.max(1) - 1])
 }
 
-/// Rohe Zeitreihen-Antwort → Grundpegel je Sonde als `(pegel, n)`.
-///
-/// Gezählt werden nur Zahlwerte unter `µSv/h`; fehlt `unit`, gilt wie in
-/// `normalisiere_odl` µSv/h als dokumentierte Einheit. Sonden mit weniger als
-/// [`MINDESTZAHL`] Werten und Pegel ≤ 0 fallen weg: durch null lässt sich kein Faktor
-/// bilden, und ein Grundpegel aus drei Tagen ist keiner.
+/// Rohe Zeitreihen-Antwort → Grundpegel je Sonde als `(pegel, n)`. Gezählt werden Zahlwerte in
+/// µSv/h (ohne `unit` gilt µSv/h). Unter [`MINDESTZAHL`] Werten oder mit Pegel ≤ 0 entfällt die
+/// Sonde — durch null lässt sich kein Faktor bilden.
 pub fn berechne(roh: &Value) -> BTreeMap<String, (f64, usize)> {
     let mut je_sonde: BTreeMap<String, Vec<f64>> = BTreeMap::new();
     for f in roh
@@ -153,27 +144,22 @@ pub fn berechne(roh: &Value) -> BTreeMap<String, (f64, usize)> {
 
 /// Neue Berechnung gegen den gespeicherten Stand abgleichen (Sperrklinke).
 ///
-/// Steigt eine Sonde um [`SPERRKLINKE`] oder mehr, bleibt ihr alter Eintrag samt `stand`
-/// stehen — höchstens [`SPERRKLINKE_HOECHSTALTER_TAGE`] über diesen Stand hinaus. Sinken und
-/// leichtes Steigen werden übernommen; ein schleichender Anstieg knapp unter 1,5 × je Tag
-/// kommt also durch, das Quartil bremst ihn nur. Eine Sonde, die in der neuen Berechnung
-/// fehlt (zu wenige Werte), fällt heraus — sie wird dann absolut bewertet, wie es die Spec
-/// für „zu wenig Historie" verlangt.
+/// Steigt eine Sonde um [`SPERRKLINKE`] oder mehr, bleibt der alte Eintrag samt `stand` stehen,
+/// höchstens [`SPERRKLINKE_HOECHSTALTER_TAGE`] lang. Sinken und leichtes Steigen werden
+/// übernommen. Eine Sonde ohne neue Berechnung fällt heraus und wird absolut bewertet.
 pub fn uebernimm(
     neu: BTreeMap<String, (f64, usize)>,
     alt: &GrundpegelKarte,
     jetzt: DateTime<Utc>,
 ) -> GrundpegelKarte {
     let stand = iso_utc(jetzt);
-    // `stand` hat festes Format (`iso_utc`), der Vergleich als Zeichenkette ist also einer
-    // der Zeitpunkte.
+    // `stand` hat festes Format (`iso_utc`), der String-Vergleich ist ein Zeitvergleich.
     let haltbar_ab = iso_utc(jetzt - Duration::days(SPERRKLINKE_HOECHSTALTER_TAGE));
     neu.into_iter()
         .map(|(k, (pegel, n))| {
             let eintrag = match alt.get(&k) {
-                // Toleranz statt blankem `>=`: 1,5 × 0,1 ergibt 0,150…02, und genau 0,15 soll
-                // laut Spec („das 1,5-Fache oder mehr") verworfen werden. Die Quelle liefert
-                // drei Nachkommastellen, 1e-9 verschiebt also keinen echten Wert.
+                // Toleranz statt `>=`: 1,5 × 0,1 ergibt 0,150…02, und genau 0,15 soll verworfen
+                // werden.
                 Some(a)
                     if pegel >= SPERRKLINKE * a.pegel - GLEITKOMMA_TOLERANZ
                         && a.stand > haltbar_ab =>
@@ -191,14 +177,10 @@ pub fn uebernimm(
         .collect()
 }
 
-/// Rohe Zeitreihe + gespeicherter Stand → zu schreibende Karte, oder `None`, wenn NICHTS
-/// geschrieben werden darf. Der reine Kern der täglichen Erneuerung.
-///
-/// `None` bei einer Antwort ohne `features`-Liste (Formatbruch), bei einer, die keinen
-/// einzigen Pegel trägt (leere Liste, gekürzte Aufbewahrung), und bei einer, die weniger als
-/// die HÄLFTE der bisher bekannten Sonden trägt (etwa ein serverseitiges Feature-Limit). In
-/// allen drei Fällen löschte ein Schreiben den gespeicherten Grundpegel samt Sperrklinke,
-/// statt ihn stehen zu lassen.
+/// Rohe Zeitreihe + gespeicherter Stand → zu schreibende Karte, oder `None`, wenn nichts
+/// geschrieben werden darf: ohne `features`-Liste, ohne einen einzigen Pegel oder mit weniger
+/// als der Hälfte der bekannten Sonden (etwa ein Feature-Limit). Sonst löschte das Schreiben
+/// den gespeicherten Grundpegel samt Sperrklinke.
 pub fn neue_karte(
     roh: &Value,
     alt: &GrundpegelKarte,
@@ -212,10 +194,8 @@ pub fn neue_karte(
     Some(uebernimm(neu, alt, jetzt))
 }
 
-/// Stufe aus Messwert und Grundpegel; die Grenze gehört zur unteren Stufe. Verglichen wird
-/// über die Multiplikation plus [`GLEITKOMMA_TOLERANZ`], nicht über den Quotienten:
-/// 0,3 ÷ 0,1 ergibt 2,999…, und ohne Toleranz hinge es am Rundungszufall des Produkts, ob
-/// „genau 3 ×" zur unteren Stufe fällt.
+/// Stufe aus Messwert und Grundpegel; die Grenze gehört zur unteren Stufe. Verglichen wird per
+/// Multiplikation plus [`GLEITKOMMA_TOLERANZ`], nicht per Quotient (0,3 ÷ 0,1 = 2,999…).
 fn relative_stufe(wert: f64, pegel: f64) -> &'static str {
     if wert <= FAKTOR_ERHOEHT * pegel + GLEITKOMMA_TOLERANZ {
         "normal"
@@ -226,13 +206,13 @@ fn relative_stufe(wert: f64, pegel: f64) -> &'static str {
     }
 }
 
-/// Bewertung bei Auslieferung: überschreibt `stufe` für jede Sonde mit Messwert in µSv/h und
+/// Bewertung bei Auslieferung: überschreibt `stufe` für jede Sonde mit µSv/h-Wert und
 /// Grundpegel und setzt `bewertung`, `grundpegel`, `faktor`, `grundpegel_stand`. Alle übrigen
-/// behalten ihre absolute Stufe aus `normalisiere_odl` und bekommen `bewertung: "absolut"` —
-/// OHNE die drei Felder (fehlend statt `null`, Norm ab LFH-265).
+/// behalten die absolute Stufe mit `bewertung: "absolut"` und ohne die drei Felder (fehlend
+/// statt `null`).
 ///
-/// Die Wörter `standort`/`absolut` sind Wire-Vertrag zu `frontend/src/api/fachebenen.ts`
-/// (`OdlBewertung`) und dort wie hier gepinnt.
+/// `standort`/`absolut` sind Wire-Vertrag zu `OdlBewertung` in `frontend/src/api/fachebenen.ts`,
+/// dort wie hier gepinnt.
 pub fn bewerte(features: &mut Value, karte: &GrundpegelKarte) {
     let Some(liste) = features.get_mut("features").and_then(|f| f.as_array_mut()) else {
         return;
@@ -271,9 +251,8 @@ mod tests {
     use chrono::TimeZone;
     use serde_json::json;
 
-    /// Echte Werte aus `odlinfo_timeseries_odl_1h` (abgerufen 21.09.2026, 27 Zeitpunkte im
-    /// 6-h-Raster, `propertyName=id,end_measure,value`): Flensburg mit allen 27 Werten und
-    /// Vahlberg — eine der 17 Sonden mit weniger als 20 Werten in dieser Stichprobe.
+    /// Echte Werte aus `odlinfo_timeseries_odl_1h` (6-h-Raster): Flensburg mit allen 27 Werten und
+    /// Vahlberg mit weniger als 20.
     const FLENSBURG: [f64; 27] = [
         0.089, 0.089, 0.088, 0.089, 0.089, 0.092, 0.091, 0.089, 0.088, 0.091, 0.091, 0.106, 0.088,
         0.089, 0.087, 0.09, 0.089, 0.094, 0.097, 0.092, 0.088, 0.09, 0.085, 0.087, 0.087, 0.086,
@@ -324,8 +303,8 @@ mod tests {
 
     #[test]
     fn quartil_statt_median_widersteht_mehrtaegiger_erhoehung() {
-        // 18 von 27 Werten verdreifacht (≈ 4,5 Tage Lage): der Median stünde auf 0,3, das
-        // untere Quartil bleibt beim Grundpegel.
+        // 18 von 27 Werten verdreifacht: der Median stünde auf 0,3, das untere Quartil bleibt beim
+        // Grundpegel.
         let mut w = vec![0.1; 9];
         w.extend([0.3; 18]);
         assert_eq!(berechne(&roh(reihe("A", &w)))["A"].0, 0.1);
@@ -553,8 +532,8 @@ mod tests {
         assert_eq!(bewertet(0.3, 0.1)["stufe"], "erhoeht", "genau 3 ×");
         assert_eq!(bewertet(0.151, 0.1)["stufe"], "erhoeht");
         assert_eq!(bewertet(0.301, 0.1)["stufe"], "stark_erhoeht");
-        // Hier rundet das PRODUKT nach unten (1,5 × 0,072 = 0,10799…, 3 × 0,071 = 0,21299…):
-        // ohne Toleranz fiele „genau 1,5 ×" bzw. „genau 3 ×" in die obere Stufe.
+        // Hier rundet das Produkt nach unten; ohne Toleranz fiele „genau 1,5 ×“ bzw. „genau 3 ×“ in
+        // die obere Stufe.
         assert_eq!(
             bewertet(0.108, 0.072)["stufe"],
             "normal",
@@ -600,7 +579,7 @@ mod tests {
             // Wire-Pin.
             assert_eq!(p["bewertung"], "absolut", "Feature {i}");
             assert_eq!(p["stufe"], stufe, "Feature {i}");
-            // Presence statt `== Null` (CLAUDE.md, Typ-Codegen-Testfalle).
+            // Presence statt `== Null`.
             for feld in ["grundpegel", "faktor", "grundpegel_stand"] {
                 assert!(!p.contains_key(feld), "Feature {i}: {feld} muss fehlen");
             }

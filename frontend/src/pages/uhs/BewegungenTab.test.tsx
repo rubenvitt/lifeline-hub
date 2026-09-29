@@ -39,19 +39,16 @@ describe('BewegungenTab (LFH-25)', () => {
     server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])));
     renderMitProviders(<BewegungenTab uhs={uhs} />, { route: '/einsaetze/1/unfallhilfsstellen/3' });
     /**
-     * Auf die Personenzelle VERENGT, nicht dokumentweit: seit LFH-330 steht über der Sicht
-     * eine stets gerenderte Werkzeugzeile, und ein unskopiertes `queryByRole('link')` würde
-     * an alles koppeln, was künftig dort landet. Gemessen bliebe es heute grün — antds
-     * Blätterung rendert Seitenzahlen als Anker OHNE `href` und hat damit keine
-     * `link`-Rolle —, aber aus einem Grund, der nichts mit der Aussage zu tun hat.
+     * Auf die Personenzelle verengt: über der Sicht steht eine Werkzeugzeile, ein dokumentweites
+     * `queryByRole('link')` koppelte an alles, was dort landet.
      */
     const personZelle = await screen.findByText('#10');
     expect(personZelle.closest('a')).toBeNull();
     expect(screen.queryByRole('link', { name: /R-\d{3}/ })).not.toBeInTheDocument();
   });
 
-  // Neuentwurf (LFH-621): Zeiten laufen Mono mit `tabular-nums`. Umhüllt wird an der
-  // Aufrufstelle, `ZeitAnzeige` rendert bewusst ein Fragment.
+  // Zeiten laufen Mono mit `tabular-nums`; umhüllt wird an der Aufrufstelle, weil `ZeitAnzeige` ein
+  // Fragment rendert.
   it('setzt die Zeit in die Zahlenschrift', async () => {
     server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])));
     renderMitProviders(<BewegungenTab uhs={uhs} />, { route: '/einsaetze/1/unfallhilfsstellen/3' });
@@ -62,11 +59,8 @@ describe('BewegungenTab (LFH-25)', () => {
 });
 
 /**
- * Zweite Fixture, ABSICHTLICH verdreht (2, 3, 1 nach Zeit: Mitte, neueste, älteste).
- *
- * Das Backend liefert `ORDER BY zeitpunkt_at DESC, id DESC` (`src/uhs/belegung_repo.rs`),
- * und `daten` ist genau diese Antwort. Ein Test mit absteigend sortierter Fixture wäre
- * deshalb MIT UND OHNE `sortWert` grün und belegte nichts.
+ * Zweite Fixture, absichtlich verdreht (2, 3, 1). Das Backend liefert `ORDER BY zeitpunkt_at DESC,
+ * id DESC`; mit absteigender Fixture wäre der Test mit und ohne `sortWert` grün.
  */
 const uhsDreiZeilen = {
   einsatz_id: 1,
@@ -112,9 +106,8 @@ async function rendereDrei() {
     route: '/einsaetze/1/unfallhilfsstellen/3',
   });
   /**
-   * Das Warten ist tragend, nicht Vorsicht: `suchText`/`render` liefern `#10`, solange die
-   * Personenabfrage läuft, und `R-007 · Müller` erst danach. Wer vor dem Auflösen tippt
-   * oder filtert, prüft gegen den falschen Text.
+   * Das Warten ist tragend: `suchText`/`render` liefern `#10`, solange die Personenabfrage läuft,
+   * und `R-007 · Müller` erst danach.
    */
   await screen.findByRole('link', { name: /Müller/ });
   return gerendert;
@@ -127,8 +120,7 @@ function suchfeld(): HTMLElement {
 
 /** Die Zeilenmenge des Tabellenzweigs, in Anzeigereihenfolge. */
 function zeilenSchluessel(container: HTMLElement): (string | null)[] {
-  // `tr.ant-table-row`, nicht `tr`: `sticky` schiebt eine verborgene Messzeile als erste
-  // Körperzeile ein (dokumentiert in `components/KatalogTabelle.tsx`).
+  // `tr.ant-table-row`, nicht `tr`: `sticky` schiebt eine verborgene Messzeile ein.
   return [...container.querySelectorAll('tr.ant-table-row')].map((r) =>
     r.getAttribute('data-row-key'),
   );
@@ -136,16 +128,12 @@ function zeilenSchluessel(container: HTMLElement): (string | null)[] {
 
 describe('BewegungenTab · Datensicht (LFH-330)', () => {
   /**
-   * FALLE (F9): `zufluss` bleibt ungesetzt, also `'sammelbanner'` — die Zeilenschleuse
-   * friert Menge und Reihenfolge ein, sobald der Fokus INNERHALB der Sicht liegt. Für die
-   * Tests hier harmlos (`daten` kommt aus dem Prop und wechselt nie mitten im Test), aber
-   * wer künftig ins Suchfeld tippt UND danach `uhs.belegungen` austauscht, sieht
-   * eingefrorene Zeilen und liest das als Filterfehler.
+   * Falle: `zufluss` bleibt `'sammelbanner'` — die Zeilenschleuse friert die Zeilen ein, sobald der
+   * Fokus in der Sicht liegt. Wer ins Suchfeld tippt und danach `uhs.belegungen` austauscht, sieht
+   * eingefrorene Zeilen.
    */
   it('unter md steht die Kartenform im Baum, nicht die Tabelle', async () => {
-    // `setzeViewportBreite` VOR dem Render (F3): antds Beobachter ruft seinen Zuhörer beim
-    // Abonnieren synchron auf und liest nur `matches` — nachträglich gesetzt erreicht ihn
-    // die Breite nie, und der Test prüfte bei 1024 px das Gegenteil seiner Aussage.
+    // `setzeViewportBreite` vor dem Render: antds Beobachter liest `matches` nur beim Abonnieren.
     setzeViewportBreite(390);
     server.use(
       http.get('/api/einsaetze/1/personen', () =>
@@ -154,15 +142,15 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
     );
     renderMitProviders(<BewegungenTab uhs={uhs} />, { route: '/einsaetze/1/unfallhilfsstellen/3' });
 
-    // Der Personen-Link muss in BEIDEN Zweigen erhalten bleiben: „0 columnheader" allein
-    // wäre auch von einer Komponente erfüllt, die gar nichts rendert.
+    // Der Personen-Link muss in beiden Zweigen bleiben: „0 columnheader" allein erfüllte auch eine
+    // leere Komponente.
     expect(await screen.findByRole('link', { name: /Müller/ })).toBeInTheDocument();
     expect(screen.queryAllByRole('columnheader')).toHaveLength(0);
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
   });
 
   it('am Fükw-Schirm steht die Tabelle im Baum (Gegenprobe)', async () => {
-    // 1024 = VIEWPORT_STANDARD, bewusst NICHT gesetzt — das belegt den Default.
+    // 1024 = VIEWPORT_STANDARD, bewusst nicht gesetzt — das belegt den Default.
     server.use(
       http.get('/api/einsaetze/1/personen', () =>
         HttpResponse.json([{ id: 10, registrier_nr: 7, name: 'Müller' }]),
@@ -183,10 +171,8 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
     await userEvent.click(await screen.findByTitle('Austritt'));
 
     /**
-     * Gemessen wird ausschließlich die Zeilenmenge (F7). Ein `getByText('Austritt')` wäre
-     * schon vom Auswahl-Etikett des Filters erfüllt, und ein `trifft`, das immer `true`
-     * liefert, käme daran vorbei — die Mutationsprobe (`trifft: () => true`) fällt nur über
-     * die Zeilen und ihre Personen-Links.
+     * Gemessen wird nur die Zeilenmenge: `getByText('Austritt')` erfüllte schon das Etikett des
+     * Filters, und ein `trifft: () => true` fiele nur über die Zeilen auf.
      */
     expect(zeilenSchluessel(container)).toEqual(['3']);
     expect(screen.getByRole('link', { name: /Weber/ })).toBeInTheDocument();
@@ -196,8 +182,7 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
 
   it('zeigt die neueste Bewegung zuerst, auch wenn die Quelle unsortiert liefert', async () => {
     const { container } = await rendereDrei();
-    // Die Fixture liefert 2, 3, 1 — die Reihenfolge kommt also aus dem Primitiv, nicht
-    // aus dem Server (F4: mit absteigender Fixture wäre der Test nicht fehlschlagbar).
+    // Die Fixture liefert 2, 3, 1 — die Reihenfolge kommt aus dem Primitiv, nicht vom Server.
     expect(zeilenSchluessel(container)).toEqual(['3', '2', '1']);
   });
 
@@ -206,10 +191,8 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
     const kopf = screen.getByRole('columnheader', { name: /Zeit/ });
 
     /**
-     * Antds Zyklus ist aufsteigend → absteigend → GAR NICHT, und die Sicht startet auf
-     * absteigend. Der erste Klick landet deshalb auf der dritten Stufe: keine Sortierung,
-     * also die Lieferreihenfolge (hier gemessen, weil sonst niemand merkt, wenn das
-     * Löschen der Sortierung verloren geht — antd meldet dabei `columnKey: undefined`).
+     * Antds Zyklus ist auf → ab → keine, die Sicht startet auf ab. Der erste Klick landet also bei
+     * „keine Sortierung", der Lieferreihenfolge (antd meldet dabei `columnKey: undefined`).
      */
     await userEvent.click(kopf);
     expect(zeilenSchluessel(container)).toEqual(['2', '3', '1']);
@@ -227,9 +210,8 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
 
   it('sucht NICHT in der Notiz — der Suchraum ist festgelegt, nicht zufällig', async () => {
     /**
-     * Der wertvollere der beiden Suchtests: ohne ihn wäre eine „alles durchsuchen"-Fassung
-     * ebenso grün, und der Auftrag „Suche auf Person/Registriernummer" bliebe unbelegt.
-     * Zeile 3 trägt `notiz: 'Transportziel Klinik'`, ist über 'Klinik' aber nicht findbar.
+     * Ohne diesen Test wäre eine „alles durchsuchen"-Fassung ebenso grün. Zeile 3 trägt `notiz:
+     * 'Transportziel Klinik'`, ist über 'Klinik' aber nicht findbar.
      */
     const { container } = await rendereDrei();
     await userEvent.type(suchfeld(), 'Klinik');
@@ -238,8 +220,7 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
   });
 
   it('findet eine nicht aufgelöste Person unter ihrem angezeigten #id', async () => {
-    // Gesucht wird, was ANGEZEIGT wird: `render` und `suchText` teilen `personEtikett`.
-    // Eine #10-Zeile ist deshalb über '#10' findbar und über 'R-007' nicht.
+    // Gesucht wird, was angezeigt wird: `render` und `suchText` teilen `personEtikett`.
     server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])));
     const { container } = renderMitProviders(<BewegungenTab uhs={uhs} />, {
       route: '/einsaetze/1/unfallhilfsstellen/3',
@@ -256,11 +237,8 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
 
   it('trägt keinen Spaltenschalter — keine der fünf Spalten ist abwählbar', async () => {
     /**
-     * §6 der API-Festlegung nennt eine „Schwelle" (5 Spalten liegen darunter), die es im
-     * gelieferten Primitiv nicht gibt: der Schalter verschwindet dort, wenn KEINE Spalte
-     * abwählbar ist. Genau das ist hier die Aussage — und sie ist auch die richtige: ohne
-     * `abBreite` an irgendeiner Spalte wäre der Zähler des Schalters immer 0, und ein
-     * Bedienelement für eine Entscheidung, die niemand treffen muss, ist Rauschen.
+     * Kein Spaltenschalter, wenn keine Spalte abwählbar ist — ohne `abBreite` wäre sein Zähler
+     * immer 0, ein Bedienelement ohne Entscheidung.
      */
     await rendereDrei();
     expect(screen.queryByRole('button', { name: /Spalten/ })).not.toBeInTheDocument();
@@ -268,9 +246,8 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
 
   it('die Karte trägt alle fünf Spalten: Person als Titel, Art als Etikett, drei Felder', async () => {
     /**
-     * PIN, kein TDD-Schritt: die Slots waren mit der Migration da. Er hält fest, dass keine
-     * der fünf Spalten unter `md` verschwindet — Titel (Person), Statusetikett (Art) und
-     * drei Sekundärfelder (Zeit, Platz, Notiz) schöpfen zusammen das ganze Register aus.
+     * Pin: keine der fünf Spalten verschwindet unter `md` (Titel, Statusetikett, drei
+     * Sekundärfelder).
      */
     setzeViewportBreite(390);
     server.use(
@@ -283,7 +260,7 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
     });
     await screen.findByRole('link', { name: /Müller/ });
 
-    // Zweiter Kanal zur Farbe: das Etikett trägt Text (`label` ist am Vertragstyp Pflicht).
+    // Zweiter Kanal zur Farbe: das Etikett trägt Text.
     expect(screen.getByText('Eintritt')).toBeInTheDocument();
     const felder = [...container.querySelectorAll('[data-lfh="datensicht-feld"]')].map(
       (f) => f.textContent,
@@ -295,8 +272,7 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
   });
 
   it('die Werkzeugzeile steht auch ohne Daten im Baum', async () => {
-    // Zusicherung 5 / Lehre aus der Sticky-Reserve (B1): eine Zeile, die erst beim
-    // Eintreffen der ersten Bewegung erschiene, verschöbe Inhalt — CLS ≤ 0,1.
+    // Eine Zeile, die erst mit der ersten Bewegung erschiene, verschöbe Inhalt (CLS ≤ 0,1).
     server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])));
     const uhsOhneBewegungen = { ...uhs, belegungen: [] } as unknown as UhsDetail;
     renderMitProviders(<BewegungenTab uhs={uhsOhneBewegungen} />, {

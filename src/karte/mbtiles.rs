@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 /// Öffnet eine `.mbtiles`-Datei als read-only-Pool (immutable: keine Sperren, kein WAL-Write).
-/// `.filename(pfad)` statt einer `sqlite://`-URI aus `format!` — sonst müssten Sonderzeichen/
-/// Leerzeichen im Pfad URI-escaped werden (gleiche API wie der Test-Fixture-Helper).
+/// `.filename(pfad)` statt einer `sqlite://`-URI, sonst müssten Sonderzeichen im Pfad escaped
+/// werden.
 pub async fn oeffne_readonly(pfad: &Path) -> Result<sqlx::SqlitePool, sqlx::Error> {
     use sqlx::sqlite::SqliteConnectOptions;
     let opts = SqliteConnectOptions::new()
@@ -37,9 +37,8 @@ pub async fn lies_tile(
     Ok(row.map(|(d,)| d))
 }
 
-/// Prozessweiter read-only-Pool der AKTIVEN Offline-MBTiles (genau eine aktive Basemap). Per Pfad
-/// gekeyt; bei Karten-Swap (anderer Pfad) wird neu geöffnet. tokio-RwLock, damit der Guard
-/// Send-sicher über das await beim Öffnen gehalten werden darf (std-RwLock → !Send, s. axum).
+/// Prozessweiter read-only-Pool der aktiven Offline-MBTiles, per Pfad gekeyt; ein Kartenwechsel
+/// öffnet neu. tokio-RwLock, weil der Guard über das `await` beim Öffnen gehalten wird.
 static READER: LazyLock<tokio::sync::RwLock<Option<(PathBuf, sqlx::SqlitePool)>>> =
     LazyLock::new(|| tokio::sync::RwLock::new(None));
 
@@ -58,8 +57,8 @@ pub async fn reader_fuer(pfad: &Path) -> Result<sqlx::SqlitePool, sqlx::Error> {
     Ok(neu)
 }
 
-/// Verwirft den gecachten Reader-Pool (nach Löschen/Ersetzen der aktiven Karte aufrufen —
-/// sonst würde bei rowid-/Pfad-Wiederverwendung die alte Datei weiterserviert).
+/// Verwirft den gecachten Reader-Pool. Nach Löschen/Ersetzen der aktiven Karte aufrufen, sonst
+/// wird bei wiederverwendetem Pfad die alte Datei weiterserviert.
 pub async fn invalidate_reader() {
     *READER.write().await = None;
 }
@@ -99,8 +98,7 @@ mod tests {
     }
 
     /// Schreibt eine Datei-MBTiles mit genau einer Kachel bei TMS (z=1, col=0, row=1) = XYZ
-    /// (z=1,x=0,y=0) und `daten` als Inhalt. Eigener SCHREIBBARER Pool (Produktionscode liest
-    /// nur read-only); die Datei darf noch nicht existieren (`create_if_missing`).
+    /// (z=1,x=0,y=0). Eigener schreibbarer Pool; die Datei darf noch nicht existieren.
     async fn schreibe_datei_fixture(pfad: &Path, daten: &[u8]) {
         let opts = SqlitePoolOptions::new().connect_with(
             sqlx::sqlite::SqliteConnectOptions::new()
@@ -122,11 +120,9 @@ mod tests {
         pool.close().await;
     }
 
-    // Beweist: (1) reader_fuer cacht per Pfad (gleicher Pfad, überschriebene Datei liefert noch
-    // den alten Inhalt), (2) invalidate_reader() verwirft den Cache und der nächste reader_fuer
-    // sieht den neuen Inhalt. Reproduziert den LFH-195-Bug: Karte löschen + neu herunterladen
-    // vergibt denselben Pfad (`karte-{id}.mbtiles`, rowid-Wiederverwendung ohne AUTOINCREMENT)
-    // bei neuer Inode — ohne Invalidierung würde der alte FD weiterserviert.
+    // `reader_fuer` cacht per Pfad, `invalidate_reader()` verwirft den Cache (LFH-195): Löschen und
+    // Neu-Download vergeben denselben Pfad bei neuer Inode, ohne Invalidierung würde der alte FD
+    // weiterserviert.
     #[tokio::test]
     async fn invalidate_reader_verwirft_gecachten_pool() {
         let dir = tempfile::tempdir().unwrap();

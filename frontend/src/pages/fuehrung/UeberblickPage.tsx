@@ -78,44 +78,24 @@ import {
 import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
 
 /**
- * Führung · Überblick — die Startseite eines Einsatzes (Neuentwurf „Instrumententafel",
- * Screen S2, Entscheidung 3 des Auftraggebers). Die Bedeutung jeder Zahl steht in
+ * Führung · Überblick — die Startseite eines Einsatzes. Die Bedeutung jeder Zahl steht in
  * `ueberblickDaten.ts`; hier wird nur verdrahtet und angeordnet.
  *
- * DATENZUSTÄNDE JE BLOCK, nicht einer für die Seite (Muster Lage-Dashboard, LFH-331 · B3):
- * jede Kennzahl und jedes Paneel hängt an SEINEN Queries und unterscheidet lädt / Fehler /
- * leer sichtbar. Fällt die Gefahrenmatrix aus, bleibt die Betroffenenzahl lesbar.
+ * Datenzustände je Block, nicht einer für die Seite: jede Kennzahl und jedes Paneel hängt an seinen
+ * Queries und unterscheidet lädt / Fehler / leer. Alle Queries laufen über `einsatzKeys` (live);
+ * die Reihenfolgen sind per id-Tiebreak vollständig bestimmt, ein Refetch ordnet nichts um.
  *
- * LIVE: alle Queries laufen über `einsatzKeys` und werden vom Einsatz-Stream invalidiert
- * (`EINSATZ_STREAM_EVENTS`). Die Reihenfolgen sind vollständig bestimmt (Tiebreak über
- * id), ein Refetch ordnet also nichts um, was sich nicht geändert hat.
+ * Pegel-Notiz an der Warnstufe (aus `pegel/pegelKennzahl.ts`): ohne festgelegten Pegel keine Notiz,
+ * bei Ausfall „Pegel: Stand unbekannt". Der Pegel-Abruf bestimmt nicht den Zustand der Kennzahl —
+ * sie gehört der Warnstufe. Ebenso nimmt ein gescheiterter Pegel-Abruf im Markenpaneel nur die
+ * Prognose-Marke weg.
  *
- * PEGEL-NOTIZ AN DER WARNSTUFE (LFH-606, Entscheidung 4 des Auftraggebers vom 22.09.2026):
- * seit es die maßgeblichen Pegel des Einsatzes gibt, trägt die Warnstufen-Kennzahl wieder
- * „Pegel 6,84 m steigend" — aus derselben Ableitung wie das Lage-Dashboard
- * (`pegel/pegelKennzahl.ts`). Ohne festgelegten Pegel keine Pegel-Notiz, bei Ausfall oder
- * gescheitertem Abruf „Pegel: Stand unbekannt". Der Pegel-Abruf bestimmt NICHT den Zustand
- * der Kennzahl: sie gehört der Warnstufe, ein toter Pegel-Abruf macht die Warnstufe nicht
- * unlesbar.
+ * Letzte Rückmeldung je Abschnitt: die Quelle hängt am Leserecht auf „Meldungen" und läuft deshalb
+ * nicht durch `zustandVon` — ein 403 ist für Rollen ohne das Modul der Normalfall. Solange sie lädt
+ * oder scheitert, zeigt die Zeile dazu nichts.
  *
- * LETZTE RÜCKMELDUNG JE ABSCHNITT (LFH-610): jüngste Meldung im Teilbaum, direkt an einen
- * Abschnitt oder an eine seiner Einheiten gebunden. Die Quelle hängt am Leserecht auf
- * „Meldungen" und läuft deshalb NICHT durch `zustandVon`: ein 403 ist für Rollen ohne das
- * Modul der Normalfall und darf das Abschnittspaneel nicht auf „Stand unbekannt" stellen.
- * Solange sie lädt oder scheitert, trägt die Zeile dazu schlicht nichts. Keine Fristfarbe:
- * der Überblick zählt Rückmeldungen nicht aus, das tut das Meldebild (S6).
- *
- * PEGEL-PROGNOSE ALS MARKE (LFH-628): ein offener erwarteter Höchststand steht unter den
- * nächsten Marken („Erwarteter Höchststand Pegel Weser: 7,10 m") und führt zur
- * Einstellungssektion, wo er gepflegt wird. Verstrichen fällt er heraus (`naechsteMarken`).
- * Auch hier bestimmt der Pegel-Abruf NICHT den Zustand des Paneels: ein gescheiterter
- * Abruf nimmt nur die Prognose-Marke weg, die Fristen der übrigen Quellen bleiben lesbar.
- *
- * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): nichts mehr aus den
- * Datenlücken des Entwurfs. Das Raster bereit · gebunden · Ausfall zählt seit LFH-609 die
- * Einheiten nach ihrem Status; Lagezustand, Kürzel, fester Auftrag und Fortschritt je
- * Abschnitt kommen seit LFH-608 aus dem Abschnitt selbst — und bleiben weg, solange sie
- * dort nicht gepflegt sind.
+ * Keine erfundenen Daten: Lagezustand, Kürzel, fester Auftrag und Fortschritt kommen aus dem
+ * Abschnitt selbst und fehlen, solange sie dort nicht gepflegt sind.
  */
 
 /** Der Entscheidungsabruf: nur Typ „Entscheidung", ein Deckel, der die letzte Stunde
@@ -126,8 +106,9 @@ const AUFTRAEGE_MAX = 8;
 
 type Zustand = KennzahlZustand;
 
-/** Fehler schlägt Laden (Lage-Dashboard): eine halb geladene Fläche mit totem Teil darf
- *  nicht vollständig aussehen. */
+/**
+ * Fehler schlägt Laden: eine halb geladene Fläche mit totem Teil darf nicht vollständig aussehen.
+ */
 function zustandVon(...queries: UseQueryResult<unknown>[]): Zustand {
   if (queries.some((q) => q.isError)) return 'fehler';
   if (queries.some((q) => q.isLoading)) return 'laden';
@@ -154,9 +135,8 @@ function Ikone({ children }: { children: ReactNode }) {
 }
 
 /**
- * Lade-, Fehler- und Leerzustand eines Paneels — drei verschiedene Erscheinungen.
- * `leer` ist nur im Zustand `daten` gemeint: „nichts vorhanden" ist ein Befund, „lädt"
- * und „Stand unbekannt" sind keiner.
+ * Lade-, Fehler- und Leerzustand eines Paneels. `leer` gilt nur im Zustand `daten`: „lädt" und
+ * „Stand unbekannt" sind kein Befund.
  */
 function Zustandsfeld({
   zustand,
@@ -261,17 +241,16 @@ export default function UeberblickPage() {
     queryKey: einsatzKeys.erinnerungen(einsatzId),
     queryFn: () => listeErinnerungen(einsatzId, false),
   });
-  // LFH-635: Ablösungsmarken nur, wenn das Modul für diese Person sichtbar und frei ist —
-  // sonst gäbe es ein 403 und einen Seitenkanal über ausgeblendete Daten (dieselbe Prüfung
-  // wie beim Modulzähler, `darfZaehlerZeigen`).
+  // Ablösungsmarken nur, wenn das Modul sichtbar und frei ist — sonst 403 und ein Seitenkanal über
+  // ausgeblendete Daten (dieselbe Prüfung wie `darfZaehlerZeigen`).
   const overridesQ = useQuery({
     queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId),
   });
   const abloesungSichtbar =
     overridesQ.isSuccess && darfZaehlerZeigen('abloesung', benutzer, overridesQ.data);
-  // LFH-633: die Marke „Erwarteter Höchststand" führt auf „Wetter & Pegel", wenn das Modul
-  // frei ist, sonst auf die Pflege (`pegelZielPfad`).
+  // „Erwarteter Höchststand" führt auf „Wetter & Pegel", wenn das Modul frei ist, sonst auf die
+  // Pflege (`pegelZielPfad`).
   const wetterPegelFrei =
     overridesQ.isSuccess && istKeyFreigegeben('wetter-pegel', benutzer, overridesQ.data);
   const abloesungenQ = useQuery({
@@ -291,9 +270,8 @@ export default function UeberblickPage() {
 
   const einsatz = einsatzQ.data;
   /*
-   * Die Schreibwege der Seite (Eintrag, Leer-Aktionen) hängen am Einsatz-Schreibrecht wie
-   * auf den Nachbarseiten. Solange der Einsatz lädt, ist das Recht unbekannt — gesperrt,
-   * aber ohne Hinweis: ein Grund, der beim Laden aufblitzt, wäre eine falsche Aussage.
+   * Schreibwege hängen am Einsatz-Schreibrecht. Solange der Einsatz lädt: gesperrt, aber ohne
+   * Hinweis — ein beim Laden aufblitzender Grund wäre falsch.
    */
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
   const personen = personenQ.data;
@@ -306,8 +284,8 @@ export default function UeberblickPage() {
   const auftraege = auftraegeQ.data;
   const erinnerungen = erinnerungenQ.data;
   const etb = etbQ.data;
-  // Nur ein erfolgreicher Abruf zählt — ein stehengebliebener Stand nach einem Fehler
-  // (react-query behält `data`) wäre sonst eine stille Aussage über veraltete Daten.
+  // Nur ein erfolgreicher Abruf zählt: react-query behält `data` nach einem Fehler, das wäre eine
+  // stille Aussage über veraltete Daten.
   const rueckmeldungen = rueckmeldungenQ.isError ? undefined : rueckmeldungenQ.data;
 
   const betroffene = useMemo(() => betroffeneKennzahl(personen ?? [], jetzt), [personen, jetzt]);
@@ -421,8 +399,8 @@ export default function UeberblickPage() {
         />
       }
       dataUpdatedAt={einsatzQ.dataUpdatedAt}
-      // Bedingt übergeben (Muster `StabPage`): ein JSX-Element ist immer truthy und
-      // hinterließe mit Schreibrecht ein leeres `div` mit Außenabstand.
+      // Bedingt übergeben: ein JSX-Element ist immer truthy und hinterließe ein leeres `div` mit
+      // Außenabstand.
       hinweis={
         einsatz != null &&
         !darfSchreiben && <RechteHinweis sichtbar text={ueberblickRechteText(einsatz.status)} />
@@ -439,7 +417,7 @@ export default function UeberblickPage() {
           >
             Lagebericht
           </Button>
-          {/* Gesperrt statt versteckt (C10/M16): der Hinweis darüber nennt den Grund. */}
+          {/* Gesperrt statt versteckt: der Hinweis darüber nennt den Grund. */}
           <Button
             type="primary"
             disabled={!darfSchreiben}
@@ -687,8 +665,8 @@ export default function UeberblickPage() {
               >
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                   {entscheidungen.eintraege.map((e) => {
-                    // Aus dem ETB-Eintrag selbst (LFH-636), nicht aus der Auftragsliste —
-                    // die bekommt nicht, wer das Aufträge-Modul gesperrt hat.
+                    // Aus dem ETB-Eintrag selbst, nicht aus der Auftragsliste — die bekommt nicht,
+                    // wer das Aufträge-Modul gesperrt hat.
                     const folgeWort = folgeText(e.folgeauftraege.length);
                     return (
                       <Zeitachseneintrag
@@ -803,10 +781,11 @@ const NUR_VORLESER: CSSProperties = {
   border: 0,
 };
 
-/** Eine Abschnittszeile: Lagekante · Name/Kürzel/Leiter/Einheiten/Lagezustand · fester
- *  Auftrag mit Fortschritt (sonst jüngster offener Auftrag) und letzte Rückmeldung (LFH-610)
- *  · Stärke und Einheiten je Statuskategorie (LFH-609). Die ganze Zeile ist der Link auf
- *  den Abschnitt. */
+/**
+ * Eine Abschnittszeile: Lagekante · Name/Kürzel/Leiter/Einheiten/Lagezustand · fester Auftrag mit
+ * Fortschritt (sonst jüngster offener Auftrag) und letzte Rückmeldung · Stärke und Einheiten je
+ * Statuskategorie. Die ganze Zeile ist der Link auf den Abschnitt.
+ */
 function AbschnittEintrag({
   zeile,
   ziel,
@@ -824,8 +803,7 @@ function AbschnittEintrag({
   const rueck = zeile.letzteRueckmeldung;
   const lage = zeile.lagezustand ? abschnittLagezustand[zeile.lagezustand] : null;
   const leitung = [zeile.kurzbezeichnung, zeile.leiter].filter(Boolean).join(' · ');
-  // Unterzeile: die Zählung, und wenn der feste Auftrag den Platz hat, der offene
-  // Einzelauftrag dahinter — er wird kleiner, nicht unsichtbar.
+  // Unterzeile: die Zählung, und hat der feste Auftrag Platz, der offene Einzelauftrag dahinter.
   const unterzeile = [
     auftragsbilanz.gesamt > 0
       ? `${auftragsbilanz.erledigt}/${auftragsbilanz.gesamt} Aufträge erledigt`
@@ -842,9 +820,8 @@ function AbschnittEintrag({
       data-lfh="ueberblick-abschnitt"
       style={{ ...zeilenzielStil(rollen, token), flexWrap: 'wrap', paddingBlock: token.padding }}
     >
-      {/* Die Lagekante: Farbe NUR als Rand (Bedien-Leitlinie), das Stufenwort steht im
-          StatusTag daneben. Ohne Beurteilung bleibt sie durchsichtig — eine graue Kante
-          sähe aus wie eine Stufe „neutral", die es nicht gibt. */}
+      {/* Lagekante: Farbe nur als Rand, das Wort steht im StatusTag daneben. Ohne Beurteilung
+          durchsichtig — eine graue Kante sähe aus wie eine Stufe „neutral". */}
       <span
         aria-hidden
         data-lfh="abschnitt-lagekante"
@@ -869,9 +846,9 @@ function AbschnittEintrag({
         {(lage || zeile.unterLage) && (
           <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
             {lage && <StatusTag darstellung={lage} darstellungsart="rand" />}
-            {/* Ein schlechter beurteilter Unterabschnitt bekommt DIESELBE Form wie der
-                eigene Zustand (Rollenrand + Wort), nicht bloß gedämpften Text — sonst stünde
-                „UA kritisch“ leiser da als ein grünes „planmäßig“ (LFH-608, Review). */}
+            {/* Ein schlechter beurteilter Unterabschnitt bekommt dieselbe Form wie der eigene
+                Zustand (Rollenrand + Wort), sonst stünde „UA kritisch“ leiser da als ein grünes
+                „planmäßig“. */}
             {zeile.unterLage && (
               <StatusTag
                 darstellung={{
@@ -929,9 +906,8 @@ function AbschnittEintrag({
           </span>
         )}
         {unterzeile && <span style={{ ...monoStil(10), color: rollen.schwach }}>{unterzeile}</span>}
-        {/* Nur wenn die Rückmeldungen feststehen (LFH-610) — sonst gar nichts, auch kein
-            Strich. Der verborgene Vorsatz gibt der Zeit im Linknamen ihre Bedeutung; ohne
-            ihn läse ein Vorleser eine nackte Uhrzeit neben dem Auftrag. */}
+        {/* Nur wenn die Rückmeldungen feststehen, sonst gar nichts. Der verborgene Vorsatz gibt
+            der Zeit im Linknamen ihre Bedeutung. */}
         {zeile.rueckmeldungBekannt && (
           <span
             data-lfh="abschnitt-rueckmeldung"
@@ -975,8 +951,8 @@ function AbschnittEintrag({
       >
         <span style={monoStil(15)}>{zeile.staerkeText}</span>
         <Augenbraue>F/UF/M//Ges</Augenbraue>
-        {/* Kein `aria-label` am Raster: im Link bildet sich der Name aus dem Inhalt, und ein
-            Label ersetzte die Wörter der Zellen („1 bereit …") — der zweite Kanal ginge verloren. */}
+        {/* Kein `aria-label` am Raster: im Link bildet sich der Name aus dem Inhalt, ein Label
+            ersetzte die Wörter der Zellen. */}
         <span
           style={{
             display: 'grid',

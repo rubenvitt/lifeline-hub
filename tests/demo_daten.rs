@@ -1,9 +1,6 @@
 //! LFH-690: Demo-Daten zur Laufzeit — Freischaltung und Rechte der Endpunkte, die Routen für
 //! Status, Import, Neu-Import und Entfernen samt `lagged`, „DB wie vorher“ und die Messung der
 //! Dauer, alles über HTTP.
-//!
-//! Spec: `openspec/changes/lfh-690-demo-daten-laufzeit-import/specs/demo-daten/spec.md`;
-//! Herleitung in `design.md` D1–D3, D7, D11 und D12.
 
 mod common;
 
@@ -136,9 +133,9 @@ async fn mit_freischaltung_admin_status_nicht_importiert() {
     assert!(!o.contains_key("bericht"), "bericht muss ABSENT sein: {v}");
 }
 
-/// Mit Freischaltung: die schreibenden Endpunkte tragen die echten Codes aus D3. Ohne
-/// aktiven Import ist Entfernen 409, Import 201 und Neu-Import 200; der Rumpf ist in jedem
-/// Fall der Status im Envelope-freien DTO, beim Fehler der `{error}`-Envelope.
+/// Mit Freischaltung: die schreibenden Endpunkte tragen die echten Codes. Ohne aktiven Import
+/// ist Entfernen 409, Import 201 und Neu-Import 200; der Rumpf ist in jedem Fall der Status im
+/// Envelope-freien DTO, beim Fehler der `{error}`-Envelope.
 #[tokio::test]
 async fn mit_freischaltung_schreibende_endpunkte_tragen_die_codes_aus_d3() {
     let (app, _pool) = common::setup_mit_optionen(RouterOptionen { demo_daten: true }).await;
@@ -170,12 +167,11 @@ async fn build_router_ohne_optionen_hat_keinen_demo_pfad() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
-/// Importiert direkt über `importieren_tx` gegen den Pool des Test-States, ohne die HTTP-Route:
-/// der Lesetest braucht einen Router ohne Demo-Freischaltung nicht anders als mit ihr, und so
-/// hängt er nicht an den Routen. `write_retry!` ist außerhalb des Crates nicht nutzbar (seine
-/// Helfer in `tx` sind crate-privat); `BEGIN IMMEDIATE` plus Commit ist derselbe
-/// Transaktionsmodus ohne Retry, und in diesem Test schreibt niemand nebenher. `jetzt` ist die echte Uhr, damit die
-/// Lese-Endpunkte „überfällig“ gegen ihre eigene Zeit rechnen.
+/// Importiert direkt über `importieren_tx` gegen den Pool des Test-States, ohne die HTTP-Route,
+/// damit der Lesetest nicht an den Routen hängt. `write_retry!` ist außerhalb des Crates nicht
+/// nutzbar (seine Helfer in `tx` sind crate-privat); `BEGIN IMMEDIATE` plus Commit ist derselbe
+/// Transaktionsmodus ohne Retry, und in diesem Test schreibt niemand nebenher. `jetzt` ist die
+/// echte Uhr, damit die Lese-Endpunkte „überfällig“ gegen ihre eigene Zeit rechnen.
 async fn demo_importieren(pool: &sqlx::SqlitePool) -> (i64, chrono::NaiveDateTime) {
     let (org, admin_id): (i64, i64) =
         sqlx::query_as("SELECT org_id, id FROM benutzer WHERE benutzername = 'admin'")
@@ -192,11 +188,10 @@ async fn demo_importieren(pool: &sqlx::SqlitePool) -> (i64, chrono::NaiveDateTim
 }
 
 /// Liste eines Lese-Endpunkts des Demo-Einsatzes, als der importierende Admin über den echten
-/// GET-Endpunkt gelesen. Belegt wird, dass das Modul Daten trägt und wie viele: Status 200 und
-/// eine Liste, deren Länge der Aufrufer gegen das Drehbuch prüft. Die Sichtbarkeit für andere
-/// Rollen belegt das nicht: Der System-Admin kommt am Modul-Guard immer vorbei
-/// (`einsatz::berechtigung::fordere_modul_zugriff`, Admin-Mindest-Guard). Ein ausgeblendetes
-/// Modul liefert ihm also kein 403 (gemessen per Mutationsprobe, design.md Nachtrag Block 4.3).
+/// GET-Endpunkt gelesen. Belegt wird, dass das Modul Daten trägt und wie viele. Die Sichtbarkeit
+/// für andere Rollen belegt das nicht: der System-Admin kommt am Modul-Guard immer vorbei
+/// (`einsatz::berechtigung::fordere_modul_zugriff`), ein ausgeblendetes Modul liefert ihm also
+/// kein 403.
 async fn liste(app: &axum::Router, cookie: &str, einsatz: i64, pfad: &str) -> Vec<Value> {
     let (status, v) = common::anfrage(
         app,
@@ -212,10 +207,10 @@ async fn liste(app: &axum::Router, cookie: &str, einsatz: i64, pfad: &str) -> Ve
         .clone()
 }
 
-/// LFH-690 Task 4.3: nach dem Import trägt jedes Modul des Demo-Einsatzes Datensätze, gelesen
-/// über die echten GET-Endpunkte als der importierende Admin. Dazu die Spec-Szenarien
-/// „Überblick zeigt die Lage“ (Übung in der Einsatzliste, Lagekennzahl `evakuiert`, keine
-/// `pegel`), „Sichtung nach BBK“ und „Einzige Mitgliedschaft“ über die API.
+/// Nach dem Import trägt jedes Modul des Demo-Einsatzes Datensätze, gelesen über die echten
+/// GET-Endpunkte als der importierende Admin. Dazu die Szenarien „Überblick zeigt die Lage“
+/// (Übung in der Einsatzliste, Lagekennzahl `evakuiert`, keine `pegel`), „Sichtung nach BBK“
+/// und „Einzige Mitgliedschaft“ über die API.
 #[tokio::test]
 async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     let (app, pool) = common::setup_mit_pool().await;
@@ -321,7 +316,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Routen, Neu-Import, Live (Task 5.1, design.md D3, D7, D11)
+// Routen, Neu-Import, Live
 // ---------------------------------------------------------------------------------------------
 
 const AN: RouterOptionen = RouterOptionen { demo_daten: true };
@@ -332,7 +327,7 @@ async fn demo(app: &axum::Router, cookie: &str, methode: &str, pfad: &str) -> (S
 }
 
 /// Der Status über GET. Jede Schreibantwort muss ihm gleichen: sie trägt den neuen Stand, damit
-/// das Frontend ohne zweiten Abruf weiß, wo es steht (D3).
+/// das Frontend ohne zweiten Abruf weiß, wo es steht.
 async fn status_lesen(app: &axum::Router, cookie: &str) -> Value {
     let (status, v) = demo(app, cookie, "GET", "/api/demo-daten").await;
     assert_eq!(status, StatusCode::OK, "{v}");
@@ -380,10 +375,10 @@ async fn naechste(
         .and_then(|r| r.ok())
 }
 
-/// Spec „Status der Demo-Daten“ (beide Szenarien) und die 409-Paare aus D3: vorher „nicht
-/// importiert“ ohne Bericht, nach dem Import Kopf und Bericht mit „angelegt“, ein zweiter Import
-/// ist 409, nach dem Entfernen „nicht importiert“ mit dem Bericht des Entfernens, ein zweites
-/// Entfernen ist 409. Jede Schreibantwort gleicht dem GET danach, und ein 409 ändert nichts.
+/// Status und 409-Paare: vorher „nicht importiert“ ohne Bericht, nach dem Import Kopf und
+/// Bericht mit „angelegt“, ein zweiter Import ist 409, nach dem Entfernen „nicht importiert“ mit
+/// dem Bericht des Entfernens, ein zweites Entfernen ist 409. Jede Schreibantwort gleicht dem
+/// GET danach, und ein 409 ändert nichts.
 #[tokio::test]
 async fn status_vorher_nachher_und_409_paare() {
     let (app, pool) = common::setup_mit_optionen(AN).await;
@@ -442,9 +437,9 @@ async fn status_vorher_nachher_und_409_paare() {
     assert_eq!(status_lesen(&app, &admin).await, entfernt);
 }
 
-/// Spec „Neu importieren“, Scenario „Import, Entfernen, Import gegen das aktuelle Schema“:
-/// gegen die voll migrierte Test-DB gelingen alle drei Schritte über HTTP, und der zweite
-/// Import meldet dieselben Zahlen wie der erste. `zeitpunkt` folgt der Uhr und bleibt außen vor.
+/// Import, Entfernen, Import gegen das aktuelle Schema: gegen die voll migrierte Test-DB
+/// gelingen alle drei Schritte über HTTP, und der zweite Import meldet dieselben Zahlen wie der
+/// erste. `zeitpunkt` folgt der Uhr und bleibt außen vor.
 #[tokio::test]
 async fn import_entfernen_import_meldet_dieselben_zahlen() {
     let (app, pool) = common::setup_mit_optionen(AN).await;
@@ -466,8 +461,7 @@ async fn import_entfernen_import_meldet_dieselben_zahlen() {
     assert_eq!(aktive_koepfe(&pool, org).await, 1);
 }
 
-/// Spec „Neu importieren“, Scenario „Neu importieren ersetzt den Stand“, und „Invalidierung
-/// nach Import und Entfernen“: danach besteht genau ein aktiver Import mit einem neuen
+/// Neu importieren ersetzt den Stand: danach besteht genau ein aktiver Import mit einem neuen
 /// Demo-Einsatz, der alte existiert nicht mehr (auch nicht über die API), und ein vorher
 /// abonnierter Live-Strom des alten Einsatzes erhält `lagged`.
 #[tokio::test]
@@ -501,8 +495,8 @@ async fn neu_import_ersetzt_den_einsatz_und_sendet_lagged() {
     assert!(naechste(&mut rx).await.is_none(), "genau ein Signal");
 }
 
-/// Spec „Neu importieren“: ohne aktiven Import läuft der Vorgang wie ein erstmaliger Import
-/// (200 statt 201, weil `/neu` keinen neuen Kopf „erzeugt“, sondern den Stand setzt, D3).
+/// Ohne aktiven Import läuft „Neu importieren“ wie ein erstmaliger Import (200 statt 201, weil
+/// `/neu` keinen neuen Kopf „erzeugt“, sondern den Stand setzt).
 #[tokio::test]
 async fn neu_import_ohne_aktiven_import_importiert() {
     let (app, pool) = common::setup_mit_optionen(AN).await;
@@ -584,12 +578,12 @@ async fn demo_stand(pool: &sqlx::SqlitePool) -> Vec<(String, Vec<String>)> {
     stand
 }
 
-/// Spec „Neu importieren“: scheitert der Import, bleibt der bisherige Demo-Stand erhalten
-/// (D11, ein `write_retry!` um Entfernen und Import). Der Fehler kommt spät im Drehbuch aus
-/// einem Trigger auf `lagebericht` — nach dem Entfernen und nach Einsatz, Kopf und Stammdaten
-/// des neuen Imports. Der Trigger ist ein normaler (kein TEMP-)Trigger, weil er für jede
-/// Verbindung des Pools gelten muss; der Test legt ihn erst nach dem ersten Import an und
-/// entfernt ihn danach. Die Gegenprobe ohne Trigger zeigt, dass er die Ursache war.
+/// Scheitert der Neu-Import, bleibt der bisherige Demo-Stand erhalten (ein `write_retry!` um
+/// Entfernen und Import). Der Fehler kommt spät im Drehbuch aus einem Trigger auf `lagebericht`
+/// — nach dem Entfernen und nach Einsatz, Kopf und Stammdaten des neuen Imports. Der Trigger ist
+/// ein normaler (kein TEMP-)Trigger, weil er für jede Verbindung des Pools gelten muss; der Test
+/// legt ihn erst nach dem ersten Import an und entfernt ihn danach. Die Gegenprobe ohne Trigger
+/// zeigt, dass er die Ursache war.
 #[tokio::test]
 async fn neu_import_mit_importfehler_laesst_den_alten_stand_stehen() {
     let (app, pool, live) = common::setup_mit_optionen_und_live(AN).await;
@@ -609,8 +603,8 @@ async fn neu_import_mit_importfehler_laesst_den_alten_stand_stehen() {
     let vorher = demo_stand(&pool).await;
 
     let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/neu").await;
-    // Der Trigger-Abbruch ist kein fachlicher Fall aus D3, sondern ein unerwarteter
-    // DB-Fehler: 500 mit Envelope (gemessen). Tragend ist der unveränderte Stand darunter.
+    // Der Trigger-Abbruch ist kein fachlicher Fall, sondern ein unerwarteter DB-Fehler: 500 mit
+    // Envelope. Tragend ist der unveränderte Stand darunter.
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{v}");
     assert!(v["error"].is_string(), "{v}");
 
@@ -710,10 +704,9 @@ async fn zweite_org_mit_admin(app: &axum::Router, pool: &sqlx::SqlitePool) -> (i
     (org, cookie)
 }
 
-/// Spec „Nur der System-Admin, nur die eigene Organisation“, Scenario „Zwei Organisationen“:
-/// Status, Import und Entfernen beziehen sich immer auf die Org des Admins. B importiert,
-/// während A schon importiert hat; der Einsatz entsteht in B, jeder Status zeigt nur den
-/// eigenen Import, und Entfernen durch B lässt A samt Live-Kanal unberührt.
+/// Zwei Organisationen: Status, Import und Entfernen beziehen sich immer auf die Org des Admins.
+/// B importiert, während A schon importiert hat; der Einsatz entsteht in B, jeder Status zeigt
+/// nur den eigenen Import, und Entfernen durch B lässt A samt Live-Kanal unberührt.
 #[tokio::test]
 async fn zwei_organisationen_bleiben_getrennt() {
     let (app, pool, live) = common::setup_mit_optionen_und_live(AN).await;
@@ -806,10 +799,9 @@ async fn zwei_organisationen_bleiben_getrennt() {
     );
 }
 
-/// Spec „Invalidierung nach Import und Entfernen“, Scenario „Offener Tab beim Entfernen“: ein
-/// vor dem Entfernen abonnierter Live-Strom des Demo-Einsatzes erhält das
-/// Resynchronisations-Signal, das vorhandene Kontrollereignis `lagged` (D7). Ein Strom eines
-/// anderen Einsatzes bekommt nichts.
+/// Offener Tab beim Entfernen: ein vorher abonnierter Live-Strom des Demo-Einsatzes erhält das
+/// Resynchronisations-Signal, das vorhandene Kontrollereignis `lagged`. Ein Strom eines anderen
+/// Einsatzes bekommt nichts.
 #[tokio::test]
 async fn entfernen_sendet_lagged_an_den_kanal_des_demo_einsatzes() {
     let (app, _pool, live) = common::setup_mit_optionen_und_live(AN).await;
@@ -831,9 +823,9 @@ async fn entfernen_sendet_lagged_an_den_kanal_des_demo_einsatzes() {
     assert!(naechste(&mut rx_nachbar).await.is_none());
 }
 
-/// Spec „Keine Wiederverwendung der Einsatz-ID“, Scenario „Echter Einsatz nach dem Entfernen“:
-/// der Demo-Einsatz ist der jüngste (frische DB, kein anderer Einsatz), wird entfernt, und der
-/// danach über `POST /api/einsaetze` angelegte echte Einsatz liegt über seiner ID.
+/// Keine Wiederverwendung der Einsatz-ID: der Demo-Einsatz ist der jüngste (frische DB, kein
+/// anderer Einsatz), wird entfernt, und der danach über `POST /api/einsaetze` angelegte echte
+/// Einsatz liegt über seiner ID.
 #[tokio::test]
 async fn echter_einsatz_nach_dem_entfernen_hat_eine_groessere_id() {
     let (app, pool) = common::setup_mit_optionen(AN).await;
@@ -860,14 +852,14 @@ async fn echter_einsatz_nach_dem_entfernen_hat_eine_groessere_id() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// „DB wie vorher“ (Task 5.2, design.md D12)
+// „DB wie vorher“
 // ---------------------------------------------------------------------------------------------
 
 /// Tabellen, die der Vergleich bewusst auslässt, als Präfix (`sqlite_*`, `etb_eintrag_fts*`)
-/// oder als Name. Begründung je Eintrag in D12 und Spec „Demo-Daten entfernen“:
-/// SQLite-Verwaltung (auch `sqlite_sequence`), Migrationsbuch, die Schattentabellen der
-/// Volltextsuche, Sitzungen und Anmeldeprotokoll, Benutzereinstellungen und der Kopf als
-/// Historie. Das Präfix wird in Rust geprüft, nicht per `LIKE`: dort wäre `_` ein Platzhalter.
+/// oder als Name: SQLite-Verwaltung (auch `sqlite_sequence`), Migrationsbuch, die
+/// Schattentabellen der Volltextsuche, Sitzungen und Anmeldeprotokoll, Benutzereinstellungen
+/// und der Kopf als Historie. Das Präfix wird in Rust geprüft, nicht per `LIKE`: dort wäre `_`
+/// ein Platzhalter.
 const AUSNAHME_PRAEFIXE: &[&str] = &["sqlite_", "etb_eintrag_fts"];
 const AUSNAHMEN: &[&str] = &[
     "_sqlx_migrations",
@@ -878,7 +870,7 @@ const AUSNAHMEN: &[&str] = &[
 ];
 
 /// Das Bild aller Nutzdatentabellen: die Tabellenliste aus dem Schema **entdeckt**, nicht
-/// aufgezählt (D12), damit eine künftige Tabelle ohne Nachtrag mitgeprüft wird.
+/// aufgezählt, damit eine künftige Tabelle ohne Nachtrag mitgeprüft wird.
 async fn db_bild(pool: &sqlx::SqlitePool) -> Vec<(String, Vec<String>)> {
     let tabellen: Vec<String> =
         sqlx::query_scalar("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -967,12 +959,9 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
     .await;
 }
 
-/// Spec „Demo-Daten entfernen“, Scenario „Stand vor dem Import“ (D12): nach Import und
-/// Entfernen tragen alle Nutzdatentabellen dieselben Zeilen wie vorher. Der Stand „vorher“
-/// entsteht nach Anmeldung und Aufbau; zwischen den Bildern laufen nur die zwei Demo-Aufrufe.
-///
-/// Mutationsprobe (nicht committet, Report Block 5): `LOESCHWEGE` in `src/demo/entfernen.rs`
-/// ohne den Material-Schritt → der Test wird rot und nennt `demo_herkunft` und `material`.
+/// Stand vor dem Import: nach Import und Entfernen tragen alle Nutzdatentabellen dieselben
+/// Zeilen wie vorher. Der Stand „vorher“ entsteht nach Anmeldung und Aufbau; zwischen den
+/// Bildern laufen nur die zwei Demo-Aufrufe.
 #[tokio::test]
 async fn import_entfernen_stellt_den_stand_wieder_her() {
     let (app, pool) = common::setup_mit_optionen(AN).await;
@@ -1021,7 +1010,7 @@ async fn import_entfernen_stellt_den_stand_wieder_her() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Dauer von Import und Neu-Import (Task 5.3, design.md D11(c))
+// Dauer von Import und Neu-Import
 // ---------------------------------------------------------------------------------------------
 
 const MESSLAEUFE: usize = 9;
@@ -1033,7 +1022,7 @@ fn median_ms(mut werte: Vec<std::time::Duration>) -> f64 {
 
 /// Misst je [`MESSLAEUFE`] Läufe `POST /api/demo-daten` (auf leerem Stand) und
 /// `POST /api/demo-daten/neu` (auf aktivem Import) über HTTP, samt Routing und Auth. Die Dauer
-/// von `/neu` ist die obere Schranke dafür, wie lange der Vorgang die Schreibsperre hält (D11).
+/// von `/neu` ist die obere Schranke dafür, wie lange der Vorgang die Schreibsperre hält.
 async fn messen(app: &axum::Router, admin: &str) -> (f64, f64) {
     let mut import = Vec::new();
     for _ in 0..MESSLAEUFE {
@@ -1060,7 +1049,6 @@ async fn messen(app: &axum::Router, admin: &str) -> (f64, f64) {
 /// Aufruf: `cargo test --test demo_daten dauer_import_und_neu_import -- --ignored --nocapture`
 /// (`--release` für Produktionsnähe). Gemessen gegen den In-Memory-Test-Pool (eine Verbindung,
 /// kein WAL) und gegen `db::test_pool_datei()` (Datei, WAL, fünf Verbindungen).
-/// Ergebnis: design.md, „Open Questions“, Ergebnis (c).
 #[tokio::test]
 #[ignore = "Messung für design.md D11(c), kein Gate"]
 async fn dauer_import_und_neu_import() {

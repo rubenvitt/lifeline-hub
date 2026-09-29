@@ -1,15 +1,13 @@
-//! Kanonischer Live-Feed eines Einsatzes (F01/LFH-227).
+//! Kanonischer Live-Feed eines Einsatzes (LFH-227).
 //!
-//! Ersetzt die 9 modul-benannten `…/stream`-Routen, die alle denselben Broadcast-Kanal
-//! verbatim weiterleiteten: wer irgendeine davon öffnen durfte, las jedes Event mit —
-//! inklusive ETB- und Chat-Volltexten. Statt neun Türen mit je einem Modul-Schloss gibt
-//! es hier EINE Tür (Lesezugriff auf den Einsatz) und einen **Post-Filter pro Event**.
+//! EINE Tür (Lesezugriff auf den Einsatz) und ein **Filter je Event** nach den erlaubten
+//! Modulen — sonst läse, wer irgendeinen Stream öffnen darf, jedes Event mit, inkl. ETB- und
+//! Chat-Volltexten.
 //!
-//! **Revokation = Snapshot.** Die erlaubten Module werden EINMAL beim Verbindungsaufbau
-//! berechnet; ein Rechteentzug wirkt auf eine offene Verbindung erst beim Reconnect.
-//! Das ist bewusst: der Restfenster-Leak ist reine METADATA (alle Payloads sind ID-only),
-//! während der Content-Pfad — der ungecachte GET — sofort 403t. Die Alternative wäre ein
-//! DB-Read pro Event, der bei Erfassungs-Bursts die Kosten des Live-Kanals vervielfachte.
+//! **Revokation = Snapshot:** die erlaubten Module werden einmal beim Verbindungsaufbau
+//! berechnet; ein Rechteentzug wirkt erst beim Reconnect. Das Restfenster verrät nur Metadaten
+//! (alle Payloads tragen nur IDs), der Inhalts-GET antwortet sofort 403. Ein DB-Read je Event
+//! vervielfachte die Kosten bei Erfassungs-Bursts.
 
 use crate::app::AppState;
 use crate::einsatz::berechtigung::erlaubte_module;
@@ -23,11 +21,9 @@ use tokio_stream::{Stream, StreamExt};
 
 /// GET /api/einsaetze/{id}/live — der Live-Feed des Einsatzes.
 ///
-/// `EinsatzLesezugriff<OhneModul>` (LFH-230) erzwingt strukturell Org-Floor +
-/// Lesezugriff (deckt Org-Grenze, Soft-Delete, Retention und Nachlauffrist ab) und
-/// **kein** Modul-Gate: die Route gehört keinem Modul. Ein Modul-Gate hier wäre wieder
-/// die eine Tür, an der alle anderen Module vorbeikämen — die Modul-Ebene wirkt
-/// stattdessen als Event-Filter weiter unten.
+/// `EinsatzLesezugriff<OhneModul>` erzwingt Org-Floor und Lesezugriff (Org-Grenze, Soft-Delete,
+/// Retention, Nachlauffrist) und **kein** Modul-Gate: die Route gehört keinem Modul, die
+/// Modul-Ebene wirkt als Event-Filter.
 pub async fn stream(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
@@ -37,19 +33,18 @@ pub async fn stream(
     let erlaubt =
         erlaubte_module(&state.pool, einsatz_id, ctx.einsatz.org_id, &ctx.benutzer).await?;
 
-    // Reconnect-Resync (F14/LFH-263): schickt der Browser beim Auto-Reconnect eine
-    // `Last-Event-ID`, liefert der LiveHub die seither verpassten Nachrichten nach
-    // (bzw. ein `lagged` bei Ring-Overflow/Neustart). Der Filter greift auf beiden Wegen.
+    // Reconnect-Resync: mit `Last-Event-ID` liefert der LiveHub die verpassten Nachrichten nach
+    // (bzw. `lagged` bei Ring-Overflow/Neustart). Der Filter greift auf beiden Wegen.
     let seit = crate::routes::support::last_event_id(&headers);
     let (replay, rx) = state.live.abonniere_mit_replay(einsatz_id, seit);
     let stream = crate::routes::support::sse_stream_mit_replay(replay, rx, move |ev| {
         ev.sichtbar_fuer(&erlaubt)
     });
 
-    // Sofort ein erstes Byte (LFH-624). Ein Proxy, der die Header erst mit dem ersten
-    // Body-Byte weitergibt — gemessen der Vite-Dev-Proxy —, hielt sie sonst bis zum ersten
-    // Keep-Alive zurück (15 s), und `EventSource.onopen` feuert erst mit den Headern. Ein
-    // Kommentar trägt kein `id:` und lässt die `Last-Event-ID` des Resyncs unberührt.
+    // Sofort ein erstes Byte: ein Proxy, der die Header erst mit dem ersten Body-Byte weitergibt
+    // (etwa der Vite-Dev-Proxy), hielte sie sonst bis zum ersten Keep-Alive zurück, und
+    // `EventSource.onopen` feuerte erst dann. Ein Kommentar trägt kein `id:` und lässt die
+    // `Last-Event-ID` unberührt.
     let verbunden = tokio_stream::once(Ok(Event::default().comment("verbunden")));
 
     Ok(Sse::new(verbunden.chain(stream)).keep_alive(KeepAlive::default()))

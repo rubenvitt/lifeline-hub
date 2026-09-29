@@ -9,33 +9,15 @@ import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProv
 import MaterialTab from './MaterialTab';
 
 /**
- * Belege zu LFH-378 · B5l — der Materialreiter der UHS.
+ * Der Materialreiter der UHS auf der Erfassungshülle. Geprüft werden:
  *
- * Die Datei hatte bis hierher KEINE Testdatei; der Umbau der Erfassungsmaske auf
- * `ErfassungsModal` (LFH-332/B4) wäre ohne sie unbelegt. Geprüft werden genau die
- * zwei Zusicherungen, die der handgebaute `<Modal onOk>` davor NICHT trug:
- *
- *   1. **Der Absende-Knopf liegt im `<form>`.** Vorher hing er als `onOk` am Modal, also
- *      als DOM-Geschwister ausserhalb des Formulars.
- *
- *      **Was hier NICHT geprüft wird und warum — gemessen am 31.07.2026.** Das Ticket
- *      verlangte „Enter im Auswahlfeld sendet ab". Mit einem antd-`Select` als Feld ist
- *      das unerreichbar, und zwar nicht wegen der Hülle: `@rc-component/select`
- *      (`BaseSelect/index.js:246`) ruft bei JEDEM Enter `event.preventDefault()`, solange
- *      der Modus nicht `combobox` ist — kommentiert mit „Do not submit form when type in
- *      the input" — und öffnet stattdessen die Liste. Die eingebaute Formularübermittlung
- *      des Browsers erreicht die Taste damit nie. Ein `Select` ist für Enter also
- *      ausgenommen wie eine `Input.TextArea`; die Zusicherung der Hülle greift für
- *      `Input`/`InputNumber`/`DatePicker`. Belegt wird deshalb die STRUKTUR, aus der die
- *      Zusicherung folgt — dieselbe Abfrage, die `Erfassung.test.tsx` an der Hülle führt.
- *   2. **Escape setzt zurück.** Dieser Beleg war schon VOR dem Umbau grün, und das
- *      gehört hierher statt in eine Erfolgsmeldung: das Ticket schrieb, der Bestand
- *      decke „nur zwei der vier Auswege", aber antds `Modal` ruft `onCancel` für ALLE
- *      vier (Knopf, Schliesskreuz, Escape, Maskenklick) — und der Bestand leerte dort
- *      seinen `useState`. Der gemessene Reset-Fehler aus LFH-332 traf Masken mit einem
- *      `Form`-Speicher, der das Abhängen der Kinder überlebt; einen solchen bekommt
- *      diese Maske durch den Umbau ERST. Der Test ist deshalb kein Fix-Beleg, sondern
- *      der Riegel dagegen, dass der Umbau eine Lücke einbaut, die vorher nicht da war.
+ * 1. Der Absende-Knopf liegt im `<form>`. „Enter im Auswahlfeld sendet ab" ist mit einem
+ *    antd-`Select` unerreichbar: rc-select ruft bei jedem Enter `preventDefault()` (außer im Modus
+ *    `combobox`) und öffnet die Liste. Belegt wird deshalb die Struktur, aus der die Zusicherung
+ *    folgt — dieselbe Abfrage wie `Erfassung.test.tsx`.
+ * 2. Escape setzt zurück. Das war schon vor der Hülle so (antds `Modal` ruft `onCancel` für alle
+ *    vier Auswege); der Test ist der Riegel dagegen, dass der `Form`-Speicher der Hülle eine Lücke
+ *    einbaut, die vorher nicht da war.
  */
 
 const uhs = { id: 3, einsatz_id: 1, plaetze: [], belegungen: [] } as unknown as UhsDetail;
@@ -84,15 +66,14 @@ interface Patch {
 }
 
 /**
- * Rendert den Reiter und gibt die aufgezeichneten PATCHes zurück. Kein `vi.fn()` als
- * Mutation: geprüft wird der Weg bis zum Request, nicht der Aufruf eines Doubles.
+ * Rendert den Reiter und gibt die aufgezeichneten PATCHes zurück — geprüft wird der Weg bis zum
+ * Request, nicht der Aufruf eines Doubles.
  */
 function render(
   material: EinsatzMaterial[],
   schreibgeschuetzt = false,
-  // Hält den PATCH offen, bis der Test ihn freigibt. Nur so ist der Zustand WÄHREND des
-  // Requests beobachtbar — ohne das antwortet MSW, bevor ein zweiter Klick möglich wäre,
-  // und der Riegel gegen das Doppel-Absenden wäre nicht prüfbar.
+  // Hält den PATCH offen, bis der Test ihn freigibt — sonst antwortet MSW vor einem zweiten Klick,
+  // und der Riegel gegen Doppel-Absenden wäre nicht prüfbar.
   anhalten?: { freigeben: () => void; versprechen: Promise<void> },
 ) {
   const patches: Patch[] = [];
@@ -126,11 +107,8 @@ async function oeffnenUndWaehlen(user: ReturnType<typeof userEvent.setup>, label
 
 describe('MaterialTab · Erfassungsmaske „Material zuordnen" (LFH-378)', () => {
   /**
-   * DIE Zusicherung des Umbaus, und die einzige, die strukturell prüfbar ist (Begründung
-   * im Dateikopf). Beide Hälften zusammen sind die Aussage: KEINE antd-Fusszeile — läge
-   * der Knopf in `footer`, stünde er als DOM-Geschwister ausserhalb des `<form>` — UND
-   * der Knopf hat tatsächlich ein `form` als Vorfahr. Die Mutationsprobe: dreht man auf
-   * `<Modal onOk okText="Zuordnen">` zurück, fallen beide Abfragen.
+   * Die strukturell prüfbare Zusicherung (siehe Dateikopf): keine antd-Fußzeile und der Knopf hat
+   * ein `form` als Vorfahr.
    */
   it('trägt keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
     const user = userEvent.setup();
@@ -143,9 +121,7 @@ describe('MaterialTab · Erfassungsmaske „Material zuordnen" (LFH-378)', () =>
   });
 
   /**
-   * Der Weg, den der Betrieb nimmt: auswählen, „Zuordnen". Belegt, dass der Umbau die
-   * Mutation noch erreicht — der Knopf ist jetzt ein `htmlType="submit"` im Formular und
-   * läuft über `onFinish`, nicht mehr über `onOk`.
+   * Der Knopf ist ein `htmlType="submit"` im Formular und erreicht die Mutation über `onFinish`.
    */
   it('ordnet das gewählte Material dieser UHS zu', async () => {
     const user = userEvent.setup();
@@ -159,9 +135,8 @@ describe('MaterialTab · Erfassungsmaske „Material zuordnen" (LFH-378)', () =>
   });
 
   /**
-   * Der alte Dialog verhinderte das Absenden ohne Auswahl über einen DEAKTIVIERTEN Knopf
-   * — ein Knopf, der nicht sagt, warum er nicht geht. Jetzt trägt das Feld die Pflicht:
-   * der Knopf ist bedienbar, die Prüfung meldet sich, und es geht KEIN Request raus.
+   * Ohne Auswahl: der Knopf ist bedienbar, die Pflichtprüfung meldet sich, und es geht kein Request
+   * raus.
    */
   it('sendet ohne Auswahl nicht ab, sondern meldet die Pflicht', async () => {
     const user = userEvent.setup();
@@ -176,12 +151,9 @@ describe('MaterialTab · Erfassungsmaske „Material zuordnen" (LFH-378)', () =>
   });
 
   /**
-   * Der Reset-Beleg läuft über ESCAPE, nicht über den Abbrechen-Knopf — der Knopf-Weg
-   * geht durch `ErfassungsFormular.abbrechen()`, Escape durch den `schliessen`-Umschlag
-   * in `ErfassungsModal`. Nur der zweite ist die Stelle, an der ein Formularspeicher
-   * überleben könnte: `destroyOnHidden` hängt die Kinder ab, der Store von rc-field-form
-   * bleibt (`preserve` ist per Vorgabe an) und gewinnt beim nächsten Öffnen gegen
-   * `initialValues`. Zum Status „grün auch vor dem Umbau" siehe Dateikopf.
+   * Der Reset-Beleg läuft über Escape (den `schliessen`-Umschlag in `ErfassungsModal`), nicht über
+   * den Knopf: nur dort könnte der Store von rc-field-form das Abhängen der Kinder überleben
+   * (`preserve` ist an) und beim nächsten Öffnen gegen `initialValues` gewinnen.
    */
   it('nach Escape ist beim Wiederöffnen nichts stehengeblieben', async () => {
     const user = userEvent.setup();
@@ -191,25 +163,21 @@ describe('MaterialTab · Erfassungsmaske „Material zuordnen" (LFH-378)', () =>
 
     await user.keyboard('{Escape}');
 
-    // NICHT auf „Dialog verschwunden" warten: antds Zoom-Animation läuft in jsdom nie zu
-    // Ende, der Knoten bleibt mit `ant-zoom-leave` stehen. Geprüft wird stattdessen der
-    // INHALT beim Wiederöffnen — das ist ohnehin die Aussage (Muster: Grundriss.test.tsx).
+    // Nicht auf „Dialog verschwunden" warten: antds Zoom-Animation läuft in jsdom nie zu Ende.
+    // Geprüft wird der Inhalt beim Wiederöffnen.
     await user.click(screen.getByRole('button', { name: 'Material zuordnen' }));
     const wieder = await screen.findByRole('dialog');
     await within(wieder).findByRole('combobox');
-    // antd v6 trägt den gewählten Eintrag als `title` am Select-Inhalt; das Eingabefeld der
-    // Combobox ist immer leer, eine Wert-Abfrage darauf wäre trivial grün. Die Optionsliste
-    // hängt im Portal AUSSERHALB des Dialogs — `within` trennt beides sauber.
+    // antd v6 trägt den gewählten Eintrag als `title` am Select-Inhalt; das Eingabefeld ist immer
+    // leer. Die Optionsliste hängt im Portal außerhalb des Dialogs — `within` trennt beides.
     expect(within(wieder).queryByTitle('Wolldecke (Betreuung) — 50×')).not.toBeInTheDocument();
   });
 });
 
 describe('MaterialTab · „Lösen" ist umkehrbar (LFH-378, Trennlinie aus LFH-363)', () => {
   /**
-   * „Eine gelöste Zuordnung" steht in CLAUDE.md wörtlich als Beispiel für UMKEHRBAR:
-   * Abstand und `danger`, aber keine zusätzliche Reibung. Die Aktion setzt `uhs_id:
-   * null` und ist über „Material zuordnen" direkt darüber wiederherstellbar. Der Klick
-   * muss deshalb SOFORT patchen — steht eine Rückfrage davor, bleibt `patches` leer.
+   * Eine gelöste Zuordnung ist umkehrbar (über „Material zuordnen" darüber): der Klick patcht
+   * sofort, ohne Rückfrage.
    */
   it('löst ohne Rückfrage — ein Klick, ein PATCH', async () => {
     const user = userEvent.setup();
@@ -224,12 +192,9 @@ describe('MaterialTab · „Lösen" ist umkehrbar (LFH-378, Trennlinie aus LFH-3
   });
 
   /**
-   * Die Kehrseite der entfernten Rückfrage: sie war zugleich das Einzige, was einen
-   * zweiten Klick abgefangen hat. Ohne Riegel setzt jeder weitere Klick einen weiteren
-   * PATCH ab — fachlich idempotent (`uhs_id: null` bleibt `null`), aber es kostet je Klick
-   * eine Invalidierung, ein Live-Ereignis und eine zweite Erfolgsmeldung für eine Aktion,
-   * die einmal stattgefunden hat. Der Riegel ist ein `loading` je ZEILE: `loesenMut` ist
-   * eine Mutation für alle Zeilen, ein pauschales `isPending` legte die ganze Spalte lahm.
+   * Ohne Rückfrage fängt ein `loading` je Zeile den zweiten Klick ab — sonst kostete jeder Klick
+   * einen PATCH samt Invalidierung, Live-Ereignis und Erfolgsmeldung. Je Zeile, weil `loesenMut`
+   * alle Zeilen bedient.
    */
   it('nimmt keinen zweiten Klick an, solange der PATCH läuft', async () => {
     const user = userEvent.setup();
@@ -249,8 +214,7 @@ describe('MaterialTab · „Lösen" ist umkehrbar (LFH-378, Trennlinie aus LFH-3
     await user.click(ersteZeile);
 
     expect(patches).toHaveLength(1);
-    // Und der Riegel liegt an DIESER Zeile, nicht an der Spalte — sonst wäre „ein
-    // laufender Request sperrt alles" nicht von „der Riegel wirkt" zu unterscheiden.
+    // Der Riegel liegt an dieser Zeile, nicht an der Spalte.
     expect(zweiteZeile).toBeEnabled();
 
     freigeben();
@@ -266,13 +230,11 @@ describe('MaterialTab · „Lösen" ist umkehrbar (LFH-378, Trennlinie aus LFH-3
 });
 
 /**
- * Statusspalte (LFH-341 · C6). Der Wire-Wert (`desinfektion_noetig`) ist kein
- * Bildschirmtext — Farbe und Beschriftung kommen aus `theme/statusFarben.ts`
- * (`materialStatus`), derselben Quelle, aus der `MaterialPage` liest.
+ * Statusspalte: Farbe und Beschriftung kommen aus `theme/statusFarben.ts` (`materialStatus`), wie
+ * in `MaterialPage`.
  */
 describe('MaterialTab · Statusspalte (LFH-341 · C6)', () => {
-  // Neuentwurf (LFH-621): die Menge ist eine Zahl und läuft Mono mit `tabular-nums`,
-  // die Bezeichnung bleibt Satzschrift.
+  // Die Menge läuft Mono mit `tabular-nums`, die Bezeichnung bleibt Satzschrift.
   it('setzt die Menge in die Zahlenschrift, die Bezeichnung nicht', async () => {
     render([verortet]);
     const menge = await screen.findByText('2');
@@ -305,8 +267,8 @@ describe('MaterialTab · Statusspalte (LFH-341 · C6)', () => {
       })),
     );
 
-    // Gegen die ZELLEN, nicht gegen den ganzen Baum: ein Unterstrich in einer
-    // Bezeichnung oder einem Testid wäre kein Befund und färbte den Test grundlos rot.
+    // Gegen die Zellen, nicht den ganzen Baum: ein Unterstrich in einer Bezeichnung wäre kein
+    // Befund.
     const zellen = await screen.findAllByTestId('material-status-zelle');
     expect(zellen.length).toBeGreaterThan(0);
     for (const zelle of zellen) expect(zelle.textContent).not.toMatch(/_/);

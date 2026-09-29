@@ -99,7 +99,7 @@ async fn admin_legt_benutzer_an_und_listet() {
 
 #[tokio::test]
 async fn admin_benutzerliste_enthaelt_totp_aktiviert() {
-    // MFA-Status in der Admin-Benutzerliste (LFH-43, Increment 5, Task 6).
+    // MFA-Status in der Admin-Benutzerliste (LFH-43).
     let app = setup().await;
     let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
 
@@ -278,12 +278,12 @@ async fn ungueltige_org_rolle_ist_400() {
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
-// ===== Admin-TOTP-Reset: POST /api/benutzer/{id}/totp/reset (LFH-43, Increment 5, Task 6) =====
+// ===== Admin-TOTP-Reset: POST /api/benutzer/{id}/totp/reset (LFH-43) =====
 
 /// Aktiviert TOTP für den durch `cookie` authentifizierten Nutzer über den echten Enroll-Flow
-/// (`/api/auth/totp/enroll/start` + `/finish`, LFH-43 Task 4) — funktioniert für JEDEN
-/// angemeldeten Nutzer (nicht nur Admins), da beide Endpunkte `CurrentUser`-gegated sind.
-/// Liefert die zehn Klartext-Recovery-Codes.
+/// (`/api/auth/totp/enroll/start` + `/finish`) — funktioniert für JEDEN angemeldeten Nutzer
+/// (nicht nur Admins), da beide Endpunkte `CurrentUser`-gegated sind. Liefert die zehn
+/// Klartext-Recovery-Codes.
 async fn totp_aktivieren(app: &axum::Router, cookie: &str) -> Vec<String> {
     let (status, json) = anfrage(app, "POST", "/api/auth/totp/enroll/start", cookie, None).await;
     assert_eq!(status, StatusCode::OK);

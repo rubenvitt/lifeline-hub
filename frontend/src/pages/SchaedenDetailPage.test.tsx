@@ -13,8 +13,8 @@ import { FakeEventSource } from '../test/eventSource';
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
-// Normaler Benutzer (kein System-Admin): so prüft der Beobachter-Test die EINSATZ-Rolle,
-// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+// Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
+// schreibrecht.test.ts ab.
 const nutzer = benutzerFixture({ org_rolle: 'fuehrungskraft' });
 const einsatzAktiv = {
   id: 1,
@@ -105,17 +105,16 @@ describe('SchaedenDetailPage — Stammdaten', () => {
   });
 
   /**
-   * Verortung (LFH-340 · C5, Befund M39). Beide Zweige, weil einer allein nichts belegte:
-   * „der Link steht da" wäre auch bei verorteten Schäden wahr, wenn der Zweig fehlte.
+   * Verortung. Beide Zweige: „der Link steht da" wäre auch bei verorteten Schäden wahr, wenn der
+   * Zweig fehlte.
    */
   it('schickt einen unverorteten Schaden mit einem Auftrag auf die Karte', async () => {
     render(einsatzAktiv, basisSchaden({ lat: null, lon: null }));
     await screen.findByRole('heading', { name: /Schaden S-001/ });
     expect(screen.getByText('nicht verortet')).toBeInTheDocument();
-    // `%3A` statt `:` seit LFH-342: `mitQuery` kodiert seine Werte, seit der
-    // ETB-Volltextfilter Freitext durchreicht. Der Aufrufer liest über
-    // `searchParams.get()` und bekommt den Doppelpunkt zurück — der Round-Trip ist in
-    // `routing/deeplinks.test.ts` gepinnt.
+    // `%3A` statt `:`: `mitQuery` kodiert seine Werte. Der Aufrufer liest über `searchParams.get()`
+    // und bekommt den Doppelpunkt zurück — der Round-Trip ist in `routing/deeplinks.test.ts`
+    // gepinnt.
     expect(screen.getByRole('link', { name: 'Auf Karte verorten' })).toHaveAttribute(
       'href',
       '/einsaetze/1/lagekarte?platzieren=schaden%3A10',
@@ -130,8 +129,8 @@ describe('SchaedenDetailPage — Stammdaten', () => {
   });
 
   it('bietet Beobachtern keinen Verortungs-Auftrag an', async () => {
-    // Der Auftrag endet in einem PATCH — ohne Schreibrecht führte der Link in einen 403,
-    // nachdem jemand bereits auf die Karte geklickt hat.
+    // Der Auftrag endet in einem PATCH — ohne Schreibrecht führte der Link nach dem Kartenklick in
+    // einen 403.
     render(einsatzBeobachter, basisSchaden({ lat: null, lon: null }));
     await screen.findByRole('heading', { name: /Schaden S-001/ });
     expect(screen.getByText('nicht verortet')).toBeInTheDocument();
@@ -171,10 +170,10 @@ describe('SchaedenDetailPage — Stammdaten', () => {
   });
 
   it('hält die Baseline fest, wenn die Detail-Query bei offener Maske refetcht (LFH-303)', async () => {
-    // Auslöser im Betrieb: Fensterwechsel bei `staleTime` 10 s und TanStacks Vorgabe
-    // `refetchOnWindowFocus: true`. Der Hintergrund-Refetch legt den FREMDEN, neueren
-    // Stand in den Cache; ginge der als Baseline raus, verglich der Server ihn mit sich
-    // selbst und die fremde Änderung wäre still überschrieben (LFH-241/F10 ausgehebelt).
+    // Auslöser im Betrieb: Fensterwechsel bei `staleTime` 10 s und `refetchOnWindowFocus: true`.
+    // Der Hintergrund-Refetch legt den fremden, neueren Stand in den Cache; ginge der als Baseline
+    // raus, verglich der Server ihn mit sich selbst und die fremde Änderung wäre still
+    // überschrieben.
     let stand: Record<string, unknown> = basisSchaden();
     let body: Record<string, unknown> | null = null;
     const { client } = render(einsatzAktiv, basisSchaden(), [
@@ -223,8 +222,8 @@ describe('SchaedenDetailPage — Stammdaten', () => {
   });
 
   it('ein zweiter 409 auf den Overwrite zeigt die Servermeldung statt erneut den Dialog', async () => {
-    // Die Schaden-Route kennt einen zweiten 409 (Storno-Guard vor der CAS), den der Overwrite
-    // nicht umgehen kann. Ohne den `!v.overwrite`-Zweig wäre „Überschreiben" ein toter Button.
+    // Die Schaden-Route kennt einen zweiten 409 (Storno-Guard vor der CAS), den der Overwrite nicht
+    // umgehen kann. Ohne den `!v.overwrite`-Zweig wäre „Überschreiben" ein toter Knopf.
     const koerper: Array<Record<string, unknown>> = [];
     render(einsatzAktiv, basisSchaden(), [
       http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
@@ -239,9 +238,8 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
     await vi.waitFor(() => expect(koerper).toHaveLength(2));
-    // Die echte Servermeldung erscheint — das belegt, dass der else-Zweig (`fehler`) lief und
-    // NICHT erneut der Konfliktdialog. Ohne den `!v.overwrite`-Zweig ginge stattdessen ein
-    // zweiter Dialog auf und diese Meldung käme nie.
+    // Die Servermeldung erscheint — der else-Zweig (`fehler`) lief, nicht erneut der
+    // Konfliktdialog.
     expect(
       await screen.findByText('Stornierter Schaden kann nicht geändert werden'),
     ).toBeInTheDocument();

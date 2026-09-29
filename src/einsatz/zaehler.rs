@@ -1,21 +1,16 @@
-//! Modulzähler des Einsatz-Navigationsrahmens (LFH-612, Neuentwurf Shell `module[].zahl`).
+//! Modulzähler des Einsatz-Navigationsrahmens (LFH-612).
 //!
-//! **Welche Zahl, entscheidet diese Datei — und nur für belegte Module.** Der Entwurf zeigt
-//! Zahlen an vielen Modulen, definiert aber keine. Gezählt wird nur, wo die Bedeutung aus
-//! dem Entwurf herleitbar ist (Entscheidung vom 22.09.2026): die Gesamtmengen von ETB,
-//! Betroffenen, Einheiten und Einsatzabschnitten, dazu die Handlungsmengen der vier
-//! Kommunikationsmodule mit ihrer bisherigen Bedeutung. Ein weiteres Modul braucht eine
-//! eigene Entscheidung, keine naheliegende Zahl.
+//! Gezählt wird nur, wo die Bedeutung belegt ist: die Gesamtmengen von ETB, Betroffenen,
+//! Einheiten und Einsatzabschnitten sowie die Handlungsmengen der vier Kommunikationsmodule. Ein
+//! weiteres Modul braucht eine eigene Entscheidung.
 //!
-//! **Fehlt ≠ 0.** Jedes Feld ist optional und fehlt, wenn der Benutzer das Modul nicht sehen
-//! darf ([`crate::einsatz::berechtigung::erlaubte_module`]). Eine 0 wäre eine Auskunft über
-//! ein Modul, dessen Liste er mit 403 abgewiesen bekäme.
+//! **Fehlt ≠ 0.** Jedes Feld fehlt, wenn der Benutzer das Modul nicht sehen darf
+//! ([`crate::einsatz::berechtigung::erlaubte_module`]); eine 0 wäre eine Auskunft über ein
+//! Modul, dessen Liste er mit 403 abgewiesen bekäme.
 //!
 //! **Die Kommunikationszähler zählen über die Listenfunktionen**, nicht über ein eigenes
 //! `COUNT`: `ist_offen`, `ist_ueberfaellig`, `ist_faellig` und `ungelesen_anzahl` rechnet der
-//! Server dort je Zeile. Ein zweites Prädikat wäre eine zweite Definition, die bei der
-//! nächsten Änderung still abwiche. Die Listen sind je Einsatz klein, und der Browser lud
-//! sie vorher für denselben Zweck vollständig.
+//! Server dort je Zeile, und ein zweites Prädikat wiche bei der nächsten Änderung still ab.
 
 use crate::auth::Benutzer;
 use crate::erinnerung::STATUS_OFFEN as ERINNERUNG_OFFEN;
@@ -172,9 +167,8 @@ pub async fn berechne(
         });
     }
     if erlaubt.contains("chat") {
-        // Rein lesend (ohne das Anlegen des Standardkanals, das `liste_kanaele` vorweg tut):
-        // dieser Abruf läuft bei jedem gezählten Live-Ereignis und darf keine Schreibsperre
-        // nehmen.
+        // Rein lesend, ohne das Anlegen des Standardkanals: dieser Abruf läuft bei jedem gezählten
+        // Live-Ereignis und darf keine Schreibsperre nehmen.
         let kanaele = crate::chat::repo::kanaele_lesen(pool, einsatz_id, benutzer.id).await?;
         z.chat = Some(ChatZaehler {
             ungelesen: kanaele.iter().map(|k| k.ungelesen_anzahl).sum(),

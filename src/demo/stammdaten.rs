@@ -1,20 +1,19 @@
-//! Stammdaten-Teil des Demo-Imports (LFH-690, design.md D8).
+//! Stammdaten-Teil des Demo-Imports (LFH-690).
 //!
-//! **Konfliktregel.** Abgeglichen wird in der Organisation des Admins und nur gegen
-//! `dienststatus = 'in_dienst'`, also dasselbe Prädikat wie die partiellen UNIQUE-Indizes und
-//! die Disposition. Kennung ist beim Fahrzeug der Funkrufname, beim Personal die
-//! Personalnummer (nie der Name) und beim Material die Bestandsnummer.
+//! **Konfliktregel:** abgeglichen wird in der Org des Admins und nur gegen
+//! `dienststatus = 'in_dienst'` (dasselbe Prädikat wie die partiellen UNIQUE-Indizes und die
+//! Disposition). Kennung ist beim Fahrzeug der Funkrufname, beim Personal die Personalnummer
+//! (nie der Name), beim Material die Bestandsnummer.
 //!
-//! - **Treffer:** mitbenutzen, unverändert, **ohne** Marke. Das Entfernen lässt die Zeile
-//!   damit in Ruhe.
-//! - **Kein Treffer:** über die `anlegen_tx` des Fach-Repos anlegen und in `demo_herkunft`
-//!   dem Import-Kopf zuordnen. Ein außer Dienst gestellter Namensvetter wird nicht
-//!   mitbenutzt (die Disposition verlangt `in_dienst`) und bleibt unverändert.
+//! - **Treffer:** mitbenutzen, unverändert, **ohne** Marke — das Entfernen lässt die Zeile in
+//!   Ruhe.
+//! - **Kein Treffer:** über `anlegen_tx` des Fach-Repos anlegen und in `demo_herkunft` dem
+//!   Import-Kopf zuordnen. Ein außer Dienst gestellter Namensvetter bleibt unverändert.
 //!
-//! `personal.benutzer_id` setzt der Import nie: `idx_personal_benutzer` ist eindeutig, und
-//! der Admin kann schon verknüpft sein. Kataloge werden nur gelesen ([`super::katalog`]).
+//! `personal.benutzer_id` setzt der Import nie: `idx_personal_benutzer` ist eindeutig, und der
+//! Admin kann schon verknüpft sein. Kataloge werden nur gelesen ([`super::katalog`]).
 //!
-//! Die Funktion committet nicht; der Aufrufer (`importieren_tx`) fährt sie in `write_retry!`.
+//! Die Funktion committet nicht; `importieren_tx` fährt sie in `write_retry!`.
 
 use std::collections::BTreeMap;
 
@@ -74,13 +73,12 @@ fn nachschlagen(
     })
 }
 
-/// Legt die Stammdaten des Szenarios in der Organisation an oder benutzt vorhandene mit
-/// (design.md D8) und markiert jede neu angelegte Zeile mit `import_id`.
+/// Legt die Stammdaten des Szenarios an oder benutzt vorhandene mit und markiert jede neu
+/// angelegte Zeile mit `import_id`.
 ///
 /// `import_id` muss der aktive Kopf von `org_id` sein, sonst `Internal`: eine Marke an einem
-/// fremden Kopf ließe das Entfernen dieses Kopfes die Zeilen nie finden.
-///
-/// Fehlt ein Katalogeintrag, antwortet die Funktion mit 422, **bevor** sie schreibt.
+/// fremden Kopf fände das Entfernen nie. Fehlt ein Katalogeintrag, antwortet die Funktion mit
+/// 422, **bevor** sie schreibt.
 pub async fn stammdaten_importieren_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -167,7 +165,7 @@ pub async fn stammdaten_importieren_tx(
                     .collect::<Result<Vec<i64>, AppError>>()?;
                 let daten = PersonalDaten {
                     name: vorlage.name,
-                    // Nie eine Zuordnung zum Benutzerkonto (design.md D8).
+                    // Nie eine Zuordnung zum Benutzerkonto.
                     benutzer_id: None,
                     personalnummer: Some(vorlage.personalnummer),
                     traegerorganisation: None,

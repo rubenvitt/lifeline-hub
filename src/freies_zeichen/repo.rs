@@ -15,16 +15,14 @@ pub struct ZeichenNeu<'a> {
     pub funktion: Option<&'a str>,
     pub farbe: Option<&'a str>,
     pub label: Option<&'a str>,
-    /// Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.
+    /// Ansichts-Zugehörigkeit: `None` = auf allen Ansichten sichtbar.
     pub ansicht_id: Option<i64>,
     pub erstellt_von: i64,
 }
 
-/// Teil-Patch eines freien Zeichens (LFH-306, Tri-State): die äußere `Option` sagt
-/// „im Patch enthalten?" — `None` lässt die Spalte unverändert. Bei den nullable
-/// Overlay-Spalten trägt der Wert selbst noch eine `Option`: `Some(None)` setzt sie auf NULL.
-/// `grundzeichen` ist NOT NULL und daher nur einfach optional (absent = unverändert).
-/// lat/lon sind NICHT verschiebbar (v1) und daher NICHT Teil des Updates.
+/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“; bei nullable Overlay-Spalten setzt
+/// `Some(None)` NULL. `grundzeichen` ist NOT NULL und nur einfach optional. lat/lon sind nicht
+/// verschiebbar und fehlen hier.
 #[derive(Debug, Default)]
 pub struct ZeichenPatch<'a> {
     pub grundzeichen: Option<&'a str>,
@@ -35,8 +33,8 @@ pub struct ZeichenPatch<'a> {
     pub funktion: Option<Option<&'a str>>,
     pub farbe: Option<Option<&'a str>>,
     pub label: Option<Option<&'a str>>,
-    /// Verschieben/Freigeben (LFH-320): `None` = unverändert, `Some(None)` = auf alle
-    /// Ansichten (NULL), `Some(Some(x))` = auf Ansicht x.
+    /// Verschieben/Freigeben: `None` = unverändert, `Some(None)` = auf alle Ansichten (NULL),
+    /// `Some(Some(x))` = auf Ansicht x.
     pub ansicht_id: Option<Option<i64>>,
 }
 
@@ -86,9 +84,8 @@ fn zu_anzeige(r: Row) -> FreiesZeichenAnzeige {
     }
 }
 
-/// Alle freien Zeichen eines Einsatzes, älteste zuerst. `ansicht = Some(x)` filtert auf die
-/// Zeichen der Ansicht x PLUS die ansichtslosen (`ansicht_id IS NULL`, auf allen Ansichten);
-/// `None` liefert wie bisher alles (LFH-320).
+/// Alle freien Zeichen eines Einsatzes, älteste zuerst. `ansicht = Some(x)` liefert die Zeichen
+/// der Ansicht x PLUS die ansichtslosen; `None` liefert alles.
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -155,15 +152,13 @@ pub async fn anlegen(
     laden(pool, einsatz_id, id).await
 }
 
-/// Teil-Patch der TZ-Overlays + label + grundzeichen (LFH-306); `geaendert_at` wird immer
-/// nachgezogen. lat/lon bleiben UNVERÄNDERT (kein Verschieben in v1). `NotFound`, falls
-/// fremd/unbekannt.
+/// Teil-Patch der TZ-Overlays, `label` und `grundzeichen`; `geaendert_at` wird immer
+/// nachgezogen, lat/lon bleiben. `NotFound`, falls fremd/unbekannt.
 ///
-/// Flag/Wert-Paare statt Vollersatz: erst so lässt ein `{"label":"X"}`-Patch die sieben
-/// Overlays stehen, statt sie stillschweigend zu nullen — und `null` bleibt trotzdem als
-/// Leerwunsch verfügbar. Die Parameter sind nummeriert, weil eine um eine Position
-/// verschobene Bind-Kette die gleichtypigen Nachbarspalten (`organisation`↔`fachaufgabe`)
-/// STILL vertauschen würde — abgesichert von `patche_setzt_jede_spalte_an_ihren_platz`.
+/// Flag/Wert-Paare statt Vollersatz: ein `{"label":"X"}`-Patch lässt die Overlays stehen, und
+/// `null` bleibt als Leerwunsch verfügbar. Nummerierte Parameter, damit eine verschobene
+/// Bind-Kette `organisation`↔`fachaufgabe` nicht still vertauscht
+/// (`patche_setzt_jede_spalte_an_ihren_platz`).
 pub async fn patche(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -304,9 +299,8 @@ mod tests {
         ));
     }
 
-    /// Migriert von `aktualisiere_whole_spec_haelt_lat_lon` (LFH-306): ein **Vollbody**
-    /// (jedes Feld gesendet, die Leerwünsche explizit als `Some(None)`) verhält sich
-    /// weiterhin exakt wie der frühere Vollersatz — und lat/lon bleiben unberührt.
+    /// Ein Vollbody (jedes Feld gesendet, Leerwünsche als `Some(None)`) verhält sich wie ein
+    /// Vollersatz, und lat/lon bleiben unberührt.
     #[tokio::test]
     async fn patche_whole_spec_haelt_lat_lon() {
         let pool = crate::db::test_pool().await;
@@ -347,10 +341,8 @@ mod tests {
         assert_eq!(geladen, n);
     }
 
-    /// Bind-Reihenfolge der Flag/Wert-Kette: alle acht Spalten in EINEM Patch auf distinkte
-    /// Werte setzen und einzeln prüfen. Eine um eine Position verschobene Kette würde die
-    /// gleichtypigen Nachbarn (`organisation`↔`fachaufgabe`↔`symbol`…) still vertauschen —
-    /// ohne Compile- und ohne Laufzeitfehler.
+    /// Bind-Reihenfolge: alle acht Spalten in EINEM Patch auf distinkte Werte setzen und einzeln
+    /// prüfen.
     #[tokio::test]
     async fn patche_setzt_jede_spalte_an_ihren_platz() {
         let pool = crate::db::test_pool().await;
@@ -384,8 +376,8 @@ mod tests {
         assert_eq!(n.label.as_deref(), Some("B"));
     }
 
-    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an. Der
-    /// `Default`-Patch (alle Felder absent) darf die Zeile Byte für Byte so lassen.
+    /// Ein Patch fasst NUR die gesendeten Spalten an; der `Default`-Patch lässt die Zeile
+    /// unverändert.
     #[tokio::test]
     async fn patche_laesst_nicht_gesendete_spalten_stehen() {
         let pool = crate::db::test_pool().await;
@@ -422,8 +414,7 @@ mod tests {
         assert_eq!(unveraendert.organisation.as_deref(), Some("feuerwehr"));
     }
 
-    /// `Some(None)` ist der Leerwunsch und muss von „absent" unterscheidbar sein —
-    /// grenzt gegen `patche_laesst_nicht_gesendete_spalten_stehen` ab.
+    /// `Some(None)` ist der Leerwunsch und von „absent“ unterscheidbar.
     #[tokio::test]
     async fn patche_organisation_none_loescht_nur_diese_spalte() {
         let pool = crate::db::test_pool().await;
@@ -449,8 +440,7 @@ mod tests {
         assert_eq!(n.farbe.as_deref(), Some("#ff0000"), "Nachbarfeld unberührt");
     }
 
-    /// Mandantenzusage (migriert von `aktualisiere_fremder_einsatz_ist_notfound`): ein
-    /// Zeichen über einen fremden Einsatz zu patchen bleibt `NotFound`.
+    /// Ein Zeichen über einen fremden Einsatz zu patchen bleibt `NotFound`.
     #[tokio::test]
     async fn patche_fremder_einsatz_ist_notfound() {
         let pool = crate::db::test_pool().await;

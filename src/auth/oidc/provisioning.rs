@@ -1,8 +1,6 @@
-//! Pure Claims→Benutzer-Provisioning (LFH-41, Increment 3): least-privilege
-//! JIT-Anlage bei erstem OIDC-Login. Matching AUSSCHLIESSLICH über
-//! `(oidc_issuer, oidc_subject)` — niemals per E-Mail-/Benutzername-Auto-Link
-//! an ein bestehendes lokales Konto (Global-Constraint „Kein E-Mail-Auto-Link",
-//! siehe Plan `2026-07-14-auth-provider-increment-3-oidc-sso.md`).
+//! Claims→Benutzer-Provisioning (LFH-41): least-privilege JIT-Anlage beim ersten OIDC-Login.
+//! Matching AUSSCHLIESSLICH über `(oidc_issuer, oidc_subject)` — nie per E-Mail oder
+//! Benutzername an ein bestehendes lokales Konto.
 
 use crate::auth::{Benutzer, ORG_ROLLE_KEINE, PASSWORT_HASH_SSO_ONLY, ROLLE_KEINER};
 use crate::error::AppError;
@@ -18,12 +16,9 @@ pub struct OidcClaims {
     pub name: Option<String>,
 }
 
-/// Leitet einen Benutzername-Kandidaten aus den Claims ab — **pur**: kein DB-Zugriff.
-/// Basis ist `preferred_username` (falls gesetzt und nicht-leer), sonst `subject`;
-/// wird auf ein benutzername-taugliches Zeichen-Set normalisiert. Bei Kollision
-/// (geprüft über `kollision`, typischerweise ein Lookup gegen bereits vergebene
-/// `benutzer.benutzername`) wird deterministisch `-2`, `-3`, … angehängt, bis das
-/// Prädikat `false` liefert.
+/// Leitet einen Benutzernamen-Kandidaten aus den Claims ab (pur, ohne DB): `preferred_username`
+/// falls nicht leer, sonst `subject`, normalisiert. Solange `kollision` zutrifft, wird
+/// deterministisch `-2`, `-3`, … angehängt.
 pub fn plane_benutzername(claims: &OidcClaims, kollision: impl Fn(&str) -> bool) -> String {
     let rohname = claims
         .preferred_username
@@ -48,9 +43,8 @@ pub fn plane_benutzername(claims: &OidcClaims, kollision: impl Fn(&str) -> bool)
     }
 }
 
-/// Normalisiert eine rohe Zeichenkette auf ein reasonables Benutzername-Format:
-/// klein geschrieben, nur `[a-z0-9._-]`, Mehrfach-Trennzeichen zusammengefasst,
-/// Rand-Trennzeichen entfernt. Ein leeres Ergebnis fällt auf `"benutzer"` zurück.
+/// Normalisiert auf `[a-z0-9._-]`, fasst Mehrfach-Trennzeichen zusammen und entfernt sie am
+/// Rand. Ein leeres Ergebnis wird zu `"benutzer"`.
 fn sanitisiere_benutzername(roh: &str) -> String {
     let normalisiert: String = roh
         .trim()
@@ -86,10 +80,8 @@ fn sanitisiere_benutzername(roh: &str) -> String {
     }
 }
 
-/// Leitet den Anzeigenamen aus den Claims ab — **pur**, kein DB-Zugriff. Kandidaten in der
-/// Reihenfolge `name` → `preferred_username` → `subject`; jeder wird getrimmt und nur genommen,
-/// wenn er nach dem Trimmen nicht leer ist (analog zu `plane_benutzername`s `preferred_username`-
-/// Behandlung). `subject` ist immer nicht-leer (OIDC-Pflichtclaim), daher terminiert die Kette.
+/// Leitet den Anzeigenamen ab (pur): `name` → `preferred_username` → `subject`, jeweils der
+/// erste nach dem Trimmen nicht leere Wert. `subject` ist OIDC-Pflichtclaim.
 pub fn plane_anzeigename(claims: &OidcClaims) -> String {
     [claims.name.as_deref(), claims.preferred_username.as_deref()]
         .into_iter()
@@ -100,12 +92,10 @@ pub fn plane_anzeigename(claims: &OidcClaims) -> String {
         .to_string()
 }
 
-/// Findet den Benutzer zu `(claims.issuer, claims.subject)` oder provisioniert bei
-/// erstem Login ein NEUES least-privilege-Konto (`system_rolle = keiner`,
-/// `org_rolle = keine`, Sentinel-Passworthash `PASSWORT_HASH_SSO_ONLY`). Matching ist
-/// AUSSCHLIESSLICH über `(oidc_issuer, oidc_subject)` — ein bestehendes lokales Konto
-/// mit gleichem Benutzernamen aber ohne SSO-Bindung wird NIE automatisch verlinkt;
-/// `plane_benutzername` weicht bei Kollision stattdessen auf einen gesuffixten Namen aus.
+/// Findet den Benutzer zu `(issuer, subject)` oder legt beim ersten Login ein least-privilege-
+/// Konto an (`system_rolle = keiner`, `org_rolle = keine`, Sentinel-Passworthash). Ein lokales
+/// Konto gleichen Namens ohne SSO-Bindung wird nie verlinkt; der neue Name bekommt dann ein
+/// Suffix.
 pub async fn finde_oder_provisioniere(
     pool: &SqlitePool,
     claims: &OidcClaims,
@@ -122,19 +112,10 @@ pub async fn finde_oder_provisioniere(
         return Ok(vorhanden);
     }
 
-    // Ziel-Organisation des JIT-Provisionings (F05/LFH-232).
-    //
-    // Dieser Pfad ist der einzige, der ein Konto OHNE Admin-Zutun anlegt: er feuert beim
-    // ersten SSO-Login jedes Nutzers, den der IdP authentifiziert. Vorher stand hier
-    // `ORDER BY id LIMIT 1` — bei zwei Organisationen an einem gemeinsamen IdP (der
-    // Normalfall) wäre jeder Erstlogin still in Org 1 gelandet: der Fremde bekäme ein
-    // legitimes Org-1-Konto (und damit deren Stammdaten-Lesezugriff), während ein echtes
-    // Org-2-Mitglied nie in Org 2 ankäme.
-    //
-    // Die richtige Lösung ist ein Mapping Issuer/Claim → Organisation. Solange es das
-    // nicht gibt, ist die Zuordnung bei mehreren Organisationen schlicht nicht bestimmbar
-    // — dann wird **fail-closed** abgelehnt statt geraten. Bei genau einer Organisation
-    // ist die Zuordnung eindeutig und das Verhalten unverändert.
+    // Ziel-Organisation (LFH-232). Dieser Pfad legt Konten ohne Admin-Zutun an. Ohne Mapping
+    // Issuer → Organisation ist die Zuordnung bei mehreren Organisationen nicht bestimmbar und wird
+    // **fail-closed** abgelehnt; sonst landete jeder Erstlogin still in der Org mit der kleinsten
+    // Id.
     let organisationen: Vec<i64> = sqlx::query_scalar("SELECT id FROM organisation ORDER BY id")
         .fetch_all(pool)
         .await?;
@@ -152,8 +133,7 @@ pub async fn finde_oder_provisioniere(
         }
     };
 
-    // Kollisions-Grundlage einmalig laden statt pro Kandidat async gegen die DB zu
-    // fragen — `plane_benutzername` selbst bleibt dadurch pur/synchron.
+    // Vergebene Namen einmal laden, damit `plane_benutzername` pur bleibt.
     let vergebene_namen: HashSet<String> =
         sqlx::query_scalar::<_, String>("SELECT benutzername FROM benutzer")
             .fetch_all(pool)
@@ -182,17 +162,15 @@ pub async fn finde_oder_provisioniere(
     .await;
 
     match insert_ergebnis {
-        // Normalfall: wir haben das Konto angelegt. Re-SELECT per (issuer, subject) — NICHT per
-        // last_insert_rowid (siehe oben).
+        // Re-SELECT per (issuer, subject), nicht per `last_insert_rowid`.
         Ok(_) => select_by_oidc(pool, &claims.issuer, &claims.subject)
             .await?
             .ok_or_else(|| {
                 AppError::Internal("Angelegtes SSO-Konto nicht wiederauffindbar".into())
             }),
-        // Race-Recover: ein paralleler First-Login hat dasselbe (issuer, subject) — oder denselben
-        // benutzernamen — zuerst eingefügt. Bei JEDEM Unique-Fehler den (issuer, subject)-SELECT
-        // wiederholen: findet er die Zeile des Race-Gewinners, ist der Login gültig; sonst war es
-        // eine echte, fremde benutzername-Kollision → Fehler propagieren.
+        // Race-Recover: ein paralleler Erstlogin war schneller. Bei jedem Unique-Fehler den
+        // (issuer, subject)-SELECT wiederholen; findet er nichts, war es eine echte fremde
+        // Namenskollision.
         Err(err) if ist_unique_verletzung(&err) => {
             match select_by_oidc(pool, &claims.issuer, &claims.subject).await? {
                 Some(vorhanden) => Ok(vorhanden),
@@ -203,8 +181,8 @@ pub async fn finde_oder_provisioniere(
     }
 }
 
-/// Re-SELECT-Helfer für den (issuer, subject)-Schlüssel — nach INSERT (statt last_insert_rowid,
-/// das nach einem geschluckten Konflikt eine fremde rowid liefern würde) und im Race-Recover.
+/// Lädt den Benutzer per (issuer, subject). `last_insert_rowid` lieferte nach einem geschluckten
+/// Konflikt eine fremde rowid.
 async fn select_by_oidc(
     pool: &SqlitePool,
     issuer: &str,

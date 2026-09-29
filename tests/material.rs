@@ -195,9 +195,8 @@ async fn material_voll(app: &axum::Router, admin: &str, bezeichnung: &str) -> i6
 
 /// **Der unterscheidende Test.** Zusammen mit `patch_standort_null_loescht` bildet er das
 /// Paar, das den Tri-State beweist: HIER sind die Zusatzfelder nicht im Body und müssen
-/// stehen bleiben, DORT steht `null` im Body und muss löschen. Unter dem alten
-/// Vollersatz-Verhalten war beides ununterscheidbar — jedes fehlende Feld wurde zu `None`
-/// und nullte seine Spalte.
+/// stehen bleiben, DORT steht `null` im Body und muss löschen. Ein Vollersatz könnte beides
+/// nicht unterscheiden — jedes fehlende Feld würde zu `None` und nullte seine Spalte.
 #[tokio::test]
 async fn patch_ohne_standort_laesst_standort_stehen() {
     let app = setup().await;

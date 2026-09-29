@@ -108,8 +108,8 @@ describe('LoginPage', () => {
     );
     renderMitProviders(<LoginPage />);
 
-    // Formular ist initial sichtbar (provider.length === 0, bevor der Effect greift) und
-    // verschwindet erst, nachdem die Provider-Liste geladen ist.
+    // Das Formular ist initial sichtbar (provider.length === 0, bevor der Effect greift) und
+    // verschwindet erst nach geladener Provider-Liste.
     await waitFor(() => expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument());
   });
 
@@ -125,16 +125,14 @@ describe('LoginPage', () => {
     );
     renderMitProviders(<LoginPage />);
 
-    // provider.length === 1 (der Safe-Default-Zweig via leerem Array kann hier nicht greifen):
-    // nur `&& p.aktiviert` verhindert das Rendern. Fiele diese Bedingung weg, bliebe das
-    // Passwort-Feld sichtbar, weil der `typ === 'passwort'`-Filter allein noch träfe.
+    // provider.length === 1 (der Safe-Default über leeres Array greift nicht): nur `&& p.aktiviert`
+    // verhindert das Rendern. Fiele es weg, bliebe das Passwort-Feld sichtbar.
     await waitFor(() => expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument());
   });
 
   describe('OIDC-Redirect-Button (LFH-41)', () => {
-    // jsdom erlaubt kein Redefine von `window.location.assign` (nicht konfigurierbar);
-    // stattdessen `location` komplett durch eine Kopie mit gemocktem `assign` ersetzen
-    // und nach dem Test zurückbauen.
+    // jsdom erlaubt kein Redefine von `window.location.assign`; `location` wird durch eine Kopie
+    // mit gemocktem `assign` ersetzt und nach dem Test zurückgebaut.
     const ursprünglicheLocation = window.location;
 
     afterEach(() => {
@@ -206,9 +204,10 @@ describe('LoginPage', () => {
       { id: 'webauthn', typ: 'webauthn', anzeigename: 'Passkey', aktiviert: true },
     ];
 
-    /** `window.isSecureContext` ist in jsdom nicht zuverlässig über Node-/jsdom-Versionen
-     *  hinweg (Memory: Vitest-4/jsdom-29 Test-Gotchas) — explizit setzen und per Assertion
-     *  verifizieren, dass es auch wirklich griffen hat. */
+    /**
+     * `window.isSecureContext` ist in jsdom nicht verlässlich — explizit setzen und per Assertion
+     * prüfen, dass es gegriffen hat.
+     */
     function setzeSecureContext(wert: boolean) {
       Object.defineProperty(window, 'isSecureContext', { configurable: true, value: wert });
       expect(window.isSecureContext).toBe(wert);
@@ -230,13 +229,9 @@ describe('LoginPage', () => {
     it('rendert „Mit Passkey anmelden" bei Secure Context + aktivem webauthn-Provider und durchläuft discoverable/start → get → discoverable/finish → aktualisiere() OHNE Benutzername', async () => {
       setzeSecureContext(true);
       const reihenfolge: string[] = [];
-      // `/api/auth/me` liefert durchgehend den angemeldeten Benutzer — deckt sowohl den
-      // initialen AuthProvider-Mount-Check als auch den `aktualisiere()`-Aufruf NACH
-      // `auth/finish` ab (LoginPage selbst liest `benutzer` aus dem Context nicht, daher
-      // unschädlich für den initialen Render). Mitgezählt via `reihenfolge.push('me')`, um
-      // unten zu verifizieren, dass `aktualisiere()` (und nicht nur der Mount-Check) wirklich
-      // feuert — sonst würde diese Assertion selbst bei entferntem `aktualisiere()`-Aufruf grün
-      // bleiben.
+      // `/api/auth/me` liefert durchgehend den angemeldeten Benutzer — für den Mount-Check und den
+      // `aktualisiere()`-Aufruf nach `auth/finish`. Mitgezählt (`reihenfolge.push('me')`), um zu
+      // belegen, dass `aktualisiere()` wirklich feuert, nicht nur der Mount-Check.
       server.use(
         http.get('/api/auth/me', () => {
           reihenfolge.push('me');
@@ -286,19 +281,16 @@ describe('LoginPage', () => {
 
       renderMitProviders(<LoginPage />);
 
-      // KEIN Benutzername: usernameless Login (LFH-313). Der Passkey-Button erscheint erst, wenn
-      // die Provider-Liste geladen ist (webauthn aktiv) → `findByRole` wartet darauf.
+      // Kein Benutzername: usernameless Login. Der Passkey-Knopf erscheint erst mit geladener
+      // Provider-Liste (webauthn aktiv) → `findByRole` wartet.
       const knopf = await screen.findByRole('button', { name: 'Mit Passkey anmelden' });
-      // Kern-UI-Änderung von LFH-313: im reinen Passkey-Setup (nur webauthn aktiv, kein Passwort)
-      // gibt es KEIN Benutzername-Feld mehr (es hängt an `passwortAktiv`). Sichert das
-      // `passwortAktiv &&`-Gate gegen versehentliches Entfernen (sonst bliebe ein leeres,
-      // sinnloses Feld übrig). Erst NACH dem `findByRole` prüfen — dann ist die Provider-Liste
-      // geladen und `passwortAktiv` ist false (davor, während provider=[], wäre das Feld noch da).
+      // Im reinen Passkey-Setup gibt es kein Benutzername-Feld (es hängt an `passwortAktiv`). Erst
+      // nach dem `findByRole` prüfen — vorher, bei provider=[], stünde das Feld noch da.
       expect(screen.queryByLabelText('Benutzername')).not.toBeInTheDocument();
       await userEvent.click(knopf);
 
-      // Reihenfolge OHNE die 'me'-Aufrufe: start (discoverable/start) → get
-      // (navigator.credentials.get via startAuthentication) → finish (discoverable/finish).
+      // Reihenfolge ohne die 'me'-Aufrufe: start (discoverable/start) → get
+      // (navigator.credentials.get) → finish (discoverable/finish).
       await waitFor(() =>
         expect(reihenfolge.filter((schritt) => schritt !== 'me')).toEqual([
           'start',
@@ -309,15 +301,13 @@ describe('LoginPage', () => {
       expect(startAuthenticationMock).toHaveBeenCalledWith({
         optionsJSON: expect.objectContaining({ challenge: 'Y2hhbGxlbmdl' }),
       });
-      // `/api/auth/me` MUSS mindestens zweimal aufgerufen worden sein: einmal beim
-      // AuthProvider-Mount-Check, einmal durch `aktualisiere()` NACH `auth/finish` — sonst
-      // wäre die Session zwar gesetzt, der Context aber nicht nachgezogen (genau der
-      // Unterschied zum Passwort-Pfad, wo `login()` den Benutzer direkt zurückliefert).
+      // `/api/auth/me` mindestens zweimal: beim Mount-Check und durch `aktualisiere()` nach
+      // `auth/finish` — sonst wäre die Session gesetzt, der Context aber nicht nachgezogen (anders
+      // als beim Passwort-Pfad, wo `login()` den Benutzer liefert).
       await waitFor(() =>
         expect(reihenfolge.filter((schritt) => schritt === 'me').length).toBeGreaterThanOrEqual(2),
       );
-      // Erfolgspfad bis zum Ende durchlaufen (kein Absturz in den catch-Zweig bei
-      // `aktualisiere()`) — sonst bliebe hier die Fehlermeldung stehen.
+      // Erfolgspfad bis zum Ende (kein Absturz in den catch-Zweig bei `aktualisiere()`).
       expect(screen.queryByText('Passkey-Anmeldung fehlgeschlagen')).not.toBeInTheDocument();
     });
 
@@ -342,14 +332,14 @@ describe('LoginPage', () => {
           }),
         ),
       );
-      // Ceremony „hängt" absichtlich (Promise bleibt offen) → der Ladezustand ist stabil
-      // beobachtbar, ohne auf Timing zu wetten.
+      // Die Ceremony hängt absichtlich (Promise bleibt offen) → der Ladezustand ist stabil
+      // beobachtbar.
       startAuthenticationMock.mockImplementation(() => new Promise(() => {}));
 
       renderMitProviders(<LoginPage />);
 
-      // usernameless (LFH-313): kein Benutzername nötig. Beide Provider aktiv → „Anmelden"
-      // (Passwort) und Passkey-Button sind da; nur der Passkey-Button darf während der Ceremony laden.
+      // Kein Benutzername nötig. Beide Provider aktiv → „Anmelden" und Passkey-Knopf sind da; nur
+      // der Passkey-Knopf darf während der Ceremony laden.
       const passkeyKnopf = await screen.findByRole('button', { name: 'Mit Passkey anmelden' });
       await userEvent.click(passkeyKnopf);
 
@@ -422,8 +412,8 @@ describe('LoginPage', () => {
       server.use(
         http.post('/api/auth/login', () => {
           reihenfolge.push('login');
-          // Untagged Union (LFH-43): TOTP-Nutzer bekommt die schmale Form statt eines
-          // Benutzers — KEINE Session an dieser Stelle.
+          // Untagged Union: ein TOTP-Nutzer bekommt die schmale Form statt eines Benutzers — keine
+          // Session an dieser Stelle.
           return HttpResponse.json({ mfa_erforderlich: 'totp' });
         }),
         http.post('/api/auth/totp/finish', () => {
@@ -438,27 +428,25 @@ describe('LoginPage', () => {
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
-      // Erste Stufe (Passwort) weicht der Code-Eingabe — kein Passwortfeld mehr sichtbar.
+      // Die erste Stufe (Passwort) weicht der Code-Eingabe.
       const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
       expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument();
 
-      // KEIN Klick auf „Anmelden" mehr: seit LFH-345 · C10 (M20) sendet die sechste Ziffer
-      // selbst ab. Der Knopf bleibt als Rückfallweg und wird unten eigens geprüft.
+      // Kein Klick auf „Anmelden": die sechste Ziffer sendet selbst ab. Der Knopf bleibt als
+      // Rückfallweg und wird unten eigens geprüft.
       await userEvent.type(codeFeld, '123456');
 
-      // Reihenfolge OHNE die 'me'-Aufrufe: login (mfa_erforderlich) → totpFinish. `aktualisiere()`
-      // nach `totpFinish` löst einen weiteren 'me'-Aufruf aus (analog Passkey-Pfad) — die
-      // Herausfilterung hier macht die Assertion robust gegen dessen genaue Anzahl/Timing.
+      // Reihenfolge ohne die 'me'-Aufrufe: login (mfa_erforderlich) → totpFinish. `aktualisiere()`
+      // löst einen weiteren 'me'-Aufruf aus; das Herausfiltern macht die Assertion robust gegen
+      // dessen Anzahl.
       await waitFor(() =>
         expect(reihenfolge.filter((schritt) => schritt !== 'me')).toEqual(['login', 'totpFinish']),
       );
-      // Erfolgspfad bis zum Ende durchlaufen (kein Absturz in den catch-Zweig) — sonst bliebe
-      // hier die Fehlermeldung stehen.
+      // Erfolgspfad bis zum Ende (kein Absturz in den catch-Zweig).
       expect(screen.queryByText('Code ungültig')).not.toBeInTheDocument();
     });
 
-    // Der Rückfallweg (LFH-345 · C10, M20): ein unvollständiger Code geht weiterhin über
-    // den Knopf raus. Ohne diese Aussage wäre „der Knopf ist weg" nicht auszuschließen.
+    // Der Rückfallweg: ein unvollständiger Code geht weiterhin über den Knopf raus.
     it('sendet einen unvollstaendigen Code weiterhin ueber den Anmelden-Knopf', async () => {
       const gesendet: string[] = [];
       server.use(
@@ -485,8 +473,8 @@ describe('LoginPage', () => {
       await waitFor(() => expect(gesendet).toEqual(['12345']));
     });
 
-    // Ein TOTP-Code ist serverseitig genau einmal gueltig: der zweite Aufruf meldete
-    // „Code ungueltig" fuer einen Code, der gerade funktioniert hat.
+    // Ein TOTP-Code ist serverseitig genau einmal gültig: ein zweiter Aufruf meldete „Code
+    // ungültig" für einen Code, der gerade funktioniert hat.
     it('schickt den Code auch dann nur EINMAL, wenn nach der sechsten Ziffer noch geklickt wird', async () => {
       let aufrufe = 0;
       server.use(
@@ -495,15 +483,9 @@ describe('LoginPage', () => {
         http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })),
         http.post('/api/auth/totp/finish', async () => {
           aufrufe += 1;
-          // Verzoegert, damit der Klick den LAUFENDEN Absendevorgang trifft — ein sofort
-          // aufloesender Handler liesse den Riegel schon wieder gefallen sein.
-          //
-          // 50 ms reichten dafuer NICHT auf fremder Hardware (gemessen, LFH-522): unter der
-          // Coverage-Instrumentierung auf zwei CI-Kernen braucht `userEvent.click` laenger
-          // als die Frist, der erste Vorgang war dann fertig, der Klick loeste einen zweiten
-          // Aufruf aus — `expected 2 to be 1`, ohne dass sich Code geaendert haette. Die
-          // Frist ist deshalb grosszuegig; sie kostet nichts, weil der Test ohnehin auf den
-          // Absendevorgang wartet.
+          // Verzögert, damit der Klick den laufenden Absendevorgang trifft. Die Frist ist
+          // großzügig, weil `userEvent.click` auf langsamer Hardware (Coverage, zwei CI-Kerne)
+          // länger braucht; sie kostet nichts, der Test wartet ohnehin auf den Absendevorgang.
           await new Promise((r) => setTimeout(r, 2000));
           return HttpResponse.json(adminBody);
         }),
@@ -517,19 +499,13 @@ describe('LoginPage', () => {
 
       const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
       await userEvent.type(codeFeld, '123456');
-      // `getByRole` statt eines bedingten Klicks: verschwaende der Knopf je, degenerierte der
-      // Test stillschweigend zu „ein Aufruf" und belegte den Riegel nicht mehr. Dass der Klick
-      // real durchgeht, zeigt die gemessene Ausgangslage ['login','totpFinish','totpFinish'].
+      // `getByRole` statt eines bedingten Klicks: verschwände der Knopf, degenerierte der Test
+      // still zu „ein Aufruf".
       //
-      // DER NAME IST HIER EIN TEILSTRING, und das ist der Punkt des Tests: die
-      // sechste Ziffer sendet selbst ab, der Knopf steht also gerade auf
-      // `loading` — und antd haengt dem Ladeicon ein eigenes `aria-label`
-      // („loading") an, das in den zugaenglichen Namen einfliesst. Gemessen
-      // heisst der Knopf in diesem Moment „loading Anmelden". Ein exakter Name
-      // trifft ihn nur, solange der Ladezustand noch nicht gerendert ist — der
-      // Test gewann dieses Rennen mal und verlor es mal (wandernder Fehlschlag
-      // im Sammel-Gate, 346 ms, kein Timeout). Dieselbe antd-Falle, die
-      // CLAUDE.md fuer Menueeintraege beschreibt.
+      // Der Name ist ein Teilstring: die sechste Ziffer sendet selbst ab, der Knopf steht gerade
+      // auf `loading`, und antd hängt dem Ladeicon ein eigenes `aria-label` („loading") an — der
+      // Knopf heißt in diesem Moment „loading Anmelden". Ein exakter Name träfe ihn nur, solange
+      // der Ladezustand noch nicht gerendert ist.
       await userEvent.click(screen.getByRole('button', { name: /Anmelden/ }));
 
       await waitFor(() => expect(aufrufe).toBeGreaterThan(0));

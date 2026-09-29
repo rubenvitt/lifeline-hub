@@ -17,7 +17,7 @@ function einsatz(overrides: Partial<EinsatzAnzeige> = {}) {
   return einsatzFixture({ id: 7, ...overrides });
 }
 
-// LFH-139: Struktur-Listen für die Auflösung einheit_id/fahrzeug_id → Klartext-Label.
+// Struktur-Listen für die Auflösung einheit_id/fahrzeug_id → Klartext-Label.
 const einheiten = [
   {
     id: 3,
@@ -87,9 +87,9 @@ function render(einsatzObj: ReturnType<typeof einsatz>, personalDaten: unknown[]
 }
 
 /**
- * Öffnet das Statusmenü einer Zeile und liefert das GEÖFFNETE Menü-Portal. antd lässt die
- * Portale geschlossener Dropdowns im Baum stehen, und ein verlassendes Portal bekommt in
- * jsdom nie `hidden` — deshalb zusätzlich über `pointerEvents` filtern.
+ * Öffnet das Statusmenü einer Zeile und liefert das geöffnete Menü-Portal. antd lässt die Portale
+ * geschlossener Dropdowns im Baum stehen, und ein verlassendes Portal bekommt in jsdom nie `hidden`
+ * — deshalb über `pointerEvents` filtern.
  */
 async function oeffneStatusmenue(zeile: HTMLElement, name: string): Promise<HTMLElement> {
   await userEvent.click(within(zeile).getByRole('button', { name: `Status von ${name} ändern` }));
@@ -105,11 +105,9 @@ async function oeffneStatusmenue(zeile: HTMLElement, name: string): Promise<HTML
 describe('PersonalPage', () => {
   it('bedient den Status am Etikett, nicht über eines von zwei Auswahlfeldern der Zeile', async () => {
     /**
-     * Befund H19 an der Personalseite. Hier war der Mangel schärfer als bei den Fahrzeugen:
-     * die Zeile trägt ZWEI Auswahlfelder (Stärke-Position und Status), und im Bestandstest
-     * musste der richtige über `getAllByRole('combobox')[length-1]` gegriffen werden — eine
-     * Positionsabhängigkeit, die beim Umsortieren der Spalten still das falsche Feld
-     * getroffen hätte. Übrig bleibt genau ein `combobox`: die Position.
+     * Die Zeile trägt genau ein `combobox`, die Stärke-Position; der Status ist ein Auslöser mit
+     * Namen. Ein Positionsindex über mehrere Auswahlfelder träfe beim Umsortieren still das
+     * falsche.
      */
     const { container } = render(einsatz());
     await screen.findByText('Thomas Müller');
@@ -122,12 +120,8 @@ describe('PersonalPage', () => {
   });
 
   /**
-   * Der Weg zur aggregierenden Kräfteübersicht (LFH-338 · C3, Befund H21).
-   *
-   * Die Übersicht war von KEINER der vier Kräfte-Modulseiten verlinkt — die Verdichtung,
-   * für die es eine eigene Seite gibt, war von der Pflegefläche aus unsichtbar. Geprüft
-   * wird das `href` und nicht bloß die Existenz eines Links: ein Inline-Pfad neben dem
-   * Builder wäre sonst von ihm nicht zu unterscheiden.
+   * Der Weg zum Meldebild von der Pflegefläche. Geprüft wird das `href`: ein Inline-Pfad neben dem
+   * Builder wäre sonst nicht zu unterscheiden.
    */
   it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
     render(einsatz());
@@ -157,9 +151,7 @@ describe('PersonalPage', () => {
     await screen.findByText('Thomas Müller');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
 
-    // Vorher musste der Statuswechsel über `getAllByRole('combobox')[length-1]` gegriffen
-    // werden — die Zeile trägt noch ein zweites Auswahlfeld für die Stärke-Position. Der
-    // Auslöser ist jetzt über seinen Namen eindeutig (LFH-339 · C4).
+    // Der Auslöser ist über seinen Namen eindeutig, auch neben dem Auswahlfeld der Stärke-Position.
     const menue = await oeffneStatusmenue(zeile, 'Thomas Müller');
     await userEvent.click(within(menue).getByRole('menuitem', { name: /einsatzbereit/ }));
 
@@ -168,7 +160,7 @@ describe('PersonalPage', () => {
         3,
       );
     });
-    // Der neue Wert steht VOR der Server-Antwort in der ANSICHT, nicht bloß im Cache.
+    // Der neue Wert steht vor der Server-Antwort in der Ansicht, nicht bloß im Cache.
     expect(zeile.textContent).toContain('einsatzbereit');
     expect(within(zeile).getByRole('button', { name: /Status von Thomas Müller/ })).toBeDisabled();
     expect(
@@ -236,14 +228,11 @@ describe('PersonalPage', () => {
 
   it('auch im KARTENZWEIG trägt der Deeplink seine Hervorhebung — und springt zum Ziel', async () => {
     /**
-     * Unter `md` rendert `Datensicht` Karten. Das `data-row-key` der Tabelle gibt es dort
-     * nicht: die Hervorhebung landete auf einem Knoten ohne Regel, und der Sprung suchte
-     * einen Selektor, den kein Knoten trug — beides still, ausgerechnet auf dem Gerät mit
-     * der kleinsten Übersicht.
+     * Unter `md` rendert `Datensicht` Karten, ohne das `data-row-key` der Tabelle: Hervorhebung und
+     * Sprung müssen an der Karte hängen.
      *
-     * Die CSS-Regel selbst kann hier nicht fallen (`vite.config.ts` fährt `css: false`,
-     * jsdom rechnet kein Layout). Geprüft wird, was prüfbar ist: die Klasse sitzt auf der
-     * KARTE, und der Sprung findet sein Ziel.
+     * Die CSS-Regel selbst kann hier nicht fallen (`css: false`, jsdom rechnet kein Layout).
+     * Geprüft wird: die Klasse sitzt auf der Karte, und der Sprung findet sein Ziel.
      */
     setzeViewportBreite(390);
     const gerufen: Element[] = [];
@@ -309,8 +298,8 @@ describe('PersonalPage', () => {
     expect(screen.getByText(/abgeschlossen — nur Ansicht/)).toBeInTheDocument();
   });
 
-  // LFH-4 P1: Position-Select ist leerbar; Clear muss explizit null senden (nicht absent),
-  // sonst verschluckt JSON.stringify das Feld und das Backend behält den Altwert.
+  // Der Position-Select ist leerbar; Clear muss explizit null senden (nicht absent), sonst
+  // verschluckt JSON.stringify das Feld und das Backend behält den Altwert.
   it('Position leeren sendet explizit null', async () => {
     let patchBody: unknown = 'NICHT_AUFGERUFEN';
     server.use(
@@ -323,13 +312,9 @@ describe('PersonalPage', () => {
     await screen.findByText('Thomas Müller');
 
     /**
-     * AUF DIE ZEILE GESCOPET, seit die Werkzeugzeile von `Datensicht` eigene Felder trägt.
-     * Der Selektor greift den ERSTEN Treffer in Dokumentordnung, und die Werkzeugzeile
-     * steht davor. Gemessen bricht es heute noch nicht: ein leerer Filter-`Select` rendert
-     * gar keinen Löschknoten (`useAllowClear` verlangt einen gewählten Wert), und die
-     * Freitextsuche ist ein nacktes `input type="search"` ohne antd-Löscher. Der Test wäre
-     * also grün geblieben, BIS irgendwann ein Filter einen Wert hält — genau die Sorte
-     * Test, die aufhört zu prüfen, ohne rot zu werden. Deshalb scopen statt abwarten.
+     * Auf die Zeile gescopt: die Werkzeugzeile von `Datensicht` steht in Dokumentordnung davor und
+     * kann eigene Löschknöpfe tragen, sobald ein Filter einen Wert hält. Ungescopt hörte der Test
+     * dann auf zu prüfen, ohne rot zu werden.
      */
     const clear = container.querySelector('[data-row-key="10"] .ant-select-clear');
     expect(clear, 'Position-Select muss allowClear haben').not.toBeNull();
@@ -339,8 +324,8 @@ describe('PersonalPage', () => {
     await waitFor(() => expect(patchBody).toEqual({ staerke_position: null }));
   });
 
-  // LFH-139: Gegenrichtung zur Fahrzeugseite — je Kraft das zugeordnete Fahrzeug
-  // (Funkrufname/Kennzeichen) + die Einheit, jeweils als Deeplink zur Modulseite.
+  // Gegenrichtung zur Fahrzeugseite: je Kraft das zugeordnete Fahrzeug (Funkrufname/Kennzeichen) +
+  // die Einheit, jeweils als Deeplink zur Modulseite.
   it('zeigt zugeordnetes Fahrzeug (Funkrufname/Kennzeichen) und Einheit je Kraft, verlinkt (LFH-139)', async () => {
     render(einsatz());
     await screen.findByText('Thomas Müller');
@@ -380,21 +365,18 @@ describe('PersonalPage', () => {
     // Auf die Zeile der unzugeordneten Kraft scopen (robust gegen andere Zeilen/Kopf).
     const zeile = container.querySelector('[data-row-key="11"]') as HTMLElement;
     expect(zeile).not.toBeNull();
-    // Keine Fahrzeug-/Einheit-Deeplinks in dieser Zeile — und GENAU deshalb trägt
-    // `karte.titel` kein `ziel`: das würde die Namenszelle in beiden Zweigen zu einem Link
-    // machen und diese Aussage lautlos umdrehen, obwohl `personalPfad` auf DIESE Seite zeigt.
+    // Keine Fahrzeug-/Einheit-Deeplinks in dieser Zeile — und deshalb trägt `karte.titel` kein
+    // `ziel`: das machte die Namenszelle zum Link und drehte diese Aussage still um.
     expect(within(zeile).queryByRole('link')).toBeNull();
     /**
-     * ... und beide Spalten zeigen den „—"-Platzhalter. GEZIELT je Zelle statt
-     * `getAllByText('—')).toHaveLength(2)`: der Zähler stimmt rechnerisch auch nach dem
-     * Umbau, pinnt aber eine Platzhalterzahl statt einer Aussage — er bliebe grün, wenn
-     * der Strich in zwei ganz anderen Spalten stünde.
+     * ... und beide Spalten zeigen den „—"-Platzhalter, gezielt je Zelle: ein Zähler
+     * `getAllByText('—')` bliebe grün, wenn der Strich in zwei anderen Spalten stünde.
      */
     expect(zelleNachKopf(container, zeile, 'Fahrzeug').textContent).toBe('—');
     expect(zelleNachKopf(container, zeile, 'Einheit').textContent).toBe('—');
   });
 
-  // ── Datensicht (LFH-330 · B2) ───────────────────────────────────────────────────
+  // ── Datensicht ──
 
   const epGebunden = disponiert[0];
   const epVerfuegbar = {
@@ -413,15 +395,12 @@ describe('PersonalPage', () => {
 
   it('eingeschaltete Bemerkungsspalte trägt bei leerem Wert einen benannten Auslöser', async () => {
     /**
-     * Befund M21 (LFH-369 · B5i) an der Personalseite. Zwei Hälften, denn nur zusammen sind
-     * sie widerlegbar: die Spalte ist per Voreinstellung ABGEWÄHLT (`PersonalPage.tsx:436`),
-     * also gibt es vorher keinen Auslöser — eine reine „ist da"-Prüfung hätte auch bei einem
-     * Platzhalter bestanden, der irgendwo sonst auf der Seite steht.
+     * Leeres Bemerkungsfeld an der Personalseite. Zwei Hälften: die Spalte ist per Voreinstellung
+     * abgewählt, also gibt es vorher keinen Auslöser — eine reine „ist da"-Prüfung bestünde auch
+     * bei einem Platzhalter irgendwo sonst.
      *
-     * Die Voreinstellung selbst bleibt UNANGETASTET: der sichtbare Platzhalter macht die
-     * Spalte breiter, aber das ändert die B2-Entscheidung nicht (schreibtragende Spalten
-     * bekommen kein `abBreite`, sie weichen nur über die Voreinstellung — und diese Spalte
-     * weicht dort weiterhin). Der Zähler stimmt vorher wie nachher.
+     * Die Voreinstellung bleibt: schreibtragende Spalten bekommen kein `abBreite`, sie weichen nur
+     * über die Voreinstellung. Der Zähler stimmt vorher wie nachher.
      */
     const { container } = render(einsatz());
     await screen.findByText('Thomas Müller');
@@ -442,16 +421,15 @@ describe('PersonalPage', () => {
   it('der Spaltenschalter meldet die ausgeblendete Bemerkungsspalte als TEXT', async () => {
     /**
      * Kein Zähl-Abzeichen: ein antd-`Badge` mit `count` und ohne `color` rendert auf
-     * `token.colorError` — Rot für einen Spaltenzähler bricht „Rot bedient nichts" und
-     * Kriterium 7. Der Zähler steht deshalb im ZUGÄNGLICHEN NAMEN des Knopfes.
+     * `token.colorError` — Rot für einen Spaltenzähler bricht „Rot bedient nichts". Der Zähler
+     * steht im zugänglichen Namen des Knopfes.
      */
     render(einsatz());
     await screen.findByText('Thomas Müller');
     expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Bemerkung' })).toBeNull();
-    // Position ist SCHREIBTRAGEND und bleibt deshalb sichtbar — sie bekommt kein
-    // `abBreite`, weil das Führungs-Tablet (1024–1280 px) sie sonst genau dort verlöre,
-    // wo sie gebraucht wird, und es keine Detailroute als Ausweichort gibt.
+    // Position ist schreibtragend und bleibt sichtbar — ohne `abBreite`, weil das Führungs-Tablet
+    // (1024–1280 px) sie sonst genau dort verlöre, und es keine Detailroute als Ausweichort gibt.
     expect(screen.getByRole('columnheader', { name: 'Position' })).toBeInTheDocument();
   });
 
@@ -460,16 +438,15 @@ describe('PersonalPage', () => {
     await screen.findByText('Thomas Müller');
     expect(screen.getByText('verfügbar · 1')).toBeInTheDocument();
     expect(screen.getByText('gebunden · 1')).toBeInTheDocument();
-    // Die Gruppenachse führt: verfügbar (Zora) steht VOR gebunden (Thomas) — das ist
-    // WEDER die Serverordnung noch die Namensordnung.
+    // Die Gruppenachse führt: verfügbar (Zora) steht vor gebunden (Thomas) — weder Server- noch
+    // Namensordnung.
     expect(zeilenFolge(container)).toEqual(['12', '10']);
   });
 
   it('ein Statuswechsel unter dem Cursor verschiebt die Zeile NICHT (Kriterium 12)', async () => {
     /**
-     * Diese Seite trägt ZWEI Auswahlfelder in der Zeile (Position und Status). Geprüft wird
-     * mit dem Fokus im POSITIONS-Feld: die Schleuse darf nicht davon abhängen, welches
-     * Element der Zeile den Fokus hält, sondern nur davon, dass er in der Sicht liegt.
+     * Zwei Auswahlfelder in der Zeile (Position und Status). Geprüft mit dem Fokus im
+     * Positions-Feld: die Schleuse hängt nur daran, dass der Fokus in der Sicht liegt.
      */
     const { container, client } = render(einsatz(), [epGebunden, epVerfuegbar]);
     await screen.findByText('Thomas Müller');
@@ -514,8 +491,8 @@ describe('PersonalPage', () => {
       expect(await screen.findByText('Thomas Müller')).toBeInTheDocument();
       expect(container.querySelector('.ant-table')).toBeNull();
       expect(container.querySelectorAll('[data-lfh="datensicht-karte"]')).toHaveLength(1);
-      // Der Statusslot trägt ein Etikett MIT Text, nicht das Auswahlfeld der Spalte —
-      // ein `minWidth: 150`-Select drückte eine 390-px-Karte breit.
+      // Der Statusslot trägt ein Etikett mit Text, nicht das Auswahlfeld der Spalte — ein Select
+      // mit Mindestbreite drückte eine 390-px-Karte breit.
       const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
       expect(within(karte).getByText('alarmiert')).toBeInTheDocument();
       expect(karte.querySelector('.ant-select')).toBeNull();
@@ -531,8 +508,8 @@ describe('PersonalPage', () => {
 });
 
 /**
- * Die Zelle einer Zeile über den SPALTENKOPF, nicht über einen Positionsindex: eine neue
- * oder ausgeblendete Spalte verschöbe jeden gezählten Index lautlos.
+ * Die Zelle einer Zeile über den Spaltenkopf, nicht über einen Positionsindex: eine neue oder
+ * ausgeblendete Spalte verschöbe jeden Index lautlos.
  */
 function zelleNachKopf(container: HTMLElement, zeile: HTMLElement, kopf: string): HTMLElement {
   const koepfe = [...container.querySelectorAll('th.ant-table-cell')].map((th) => th.textContent);
@@ -547,16 +524,12 @@ function zelleNachKopf(container: HTMLElement, zeile: HTMLElement, kopf: string)
 }
 
 /**
- * Datenzustände der Personalseite (LFH-331 · B3).
+ * Datenzustände der Personalseite. Drei Quellen fallen unabhängig aus: die **Dispositionsliste**
+ * (tauscht die Datensicht gegen die Fehlermeldung), der **Statuskatalog** (Banner über der Tabelle)
+ * und der **Stamm-Pool** (Ausfall im Auswahlfeld statt „Keine freien Personen").
  *
- * Drei Quellen fallen hier unabhängig aus: die **Dispositionsliste** (tauscht die
- * Datensicht gegen die Fehlermeldung), der **Statuskatalog** (Banner über der Tabelle —
- * ohne ihn ist kein Statuswechsel möglich) und der **Stamm-Pool** (der Ausfall steht im
- * Auswahlfeld statt eines stumm leeren „Keine freien Personen").
- *
- * Je Zusicherung „X nicht im DOM" steht die Partnerzusicherung „X IST im DOM" mit
- * BYTE-GLEICHEM Literal daneben; und je Fall scheitert GENAU EINE Query, damit „Erneut
- * abrufen" eindeutig bleibt.
+ * Je Zusicherung „X nicht im DOM" steht die Partnerzusicherung „X ist im DOM" mit gleichem Literal;
+ * je Fall scheitert genau eine Query, damit „Erneut abrufen" eindeutig bleibt.
  */
 describe('PersonalPage · Datenzustände', () => {
   const gruenerBoden = () => [
@@ -574,8 +547,7 @@ describe('PersonalPage · Datenzustände', () => {
   ];
 
   function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
-    // Abweichung VORN: `server.use` reiht in Übergabereihenfolge ein, der erste Treffer
-    // gewinnt — andersherum schluckte der grüne Boden jede Abweichung.
+    // Abweichung vorn: `server.use` reiht in Übergabereihenfolge ein, der erste Treffer gewinnt.
     server.use(...abweichungen, ...gruenerBoden());
     return renderMitProviders(
       <Routes>
@@ -598,16 +570,12 @@ describe('PersonalPage · Datenzustände', () => {
   });
 
   /**
-   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
-   * nicht `isStale`.
+   * Veralteter Stand = `isError` mit Zeilen im Zwischenspeicher — nicht `isFetching`, nicht
+   * `isStale`. Der Ablauf ist der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung; die Zeilen müssen stehen bleiben.
    *
-   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
-   * Aktualisierung. Vor dem Umbau verdrängte der Fehler die Zeilen — die Einsatzkraft verlor
-   * eine Disposition, die sie eben noch gelesen hatte.
-   *
-   * Assertiert wird der Banner-TEXT, nicht der Knopf „Erneut abrufen": den tragen
-   * `SeitenStandVeraltet`, `SeitenFehler` UND das Statuskatalog-Banner. Über den Knopf
-   * gemessen wäre die Zusicherung mehrdeutig und im schlimmsten Fall trivial grün.
+   * Assertiert wird der Banner-Text, nicht der Knopf „Erneut abrufen": den tragen
+   * `SeitenStandVeraltet`, `SeitenFehler` und das Statuskatalog-Banner.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
     const { client } = zeige(
@@ -623,7 +591,7 @@ describe('PersonalPage · Datenzustände', () => {
     expect(
       await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
     ).toBeInTheDocument();
-    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
+    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('Thomas Müller')).toBeInTheDocument();
     expect(
       screen.queryByText('Disponiertes Personal konnte nicht geladen werden'),
@@ -671,18 +639,14 @@ describe('PersonalPage · Datenzustände', () => {
 });
 
 /**
- * Ad-hoc-Disposition als Schnellerfassung (LFH-332/B4).
- *
- * An der Bereitstellung wird eine Helferkette am Stück aufgenommen — genau der Fall,
- * für den `ErfassungsModal` den Serienmodus hat. Geprüft wird, was an DIESER Maske
- * verdrahtet ist: Fokus, Enter, Serie, Wertübernahme. Die Hülle selbst ist in
- * `components/Erfassung.test.tsx` bewiesen und wird hier nicht nachgespielt.
+ * Ad-hoc-Disposition als Schnellerfassung. An der Bereitstellung wird eine Helferkette am Stück
+ * aufgenommen — der Fall für den Serienmodus. Geprüft wird, was an dieser Maske verdrahtet ist:
+ * Fokus, Enter, Serie, Wertübernahme. Die Hülle prüft `components/Erfassung.test.tsx`.
  */
 describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
   /**
-   * Immer im Dialog greifen, nie global: die Tabelle dahinter trägt eine sortierbare
-   * Spalte „Name" mit `aria-label` — ein `getByLabelText('Name')` auf `screen` findet
-   * zwei Knoten und bricht ab (gemessen).
+   * Immer im Dialog greifen: die Tabelle dahinter trägt eine sortierbare Spalte „Name" mit
+   * `aria-label`, ein `getByLabelText('Name')` auf `screen` fände zwei Knoten.
    */
   const imDialog = () => within(screen.getByRole('dialog'));
 
@@ -714,36 +678,33 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({ adhoc: { name: 'Dr. Schmidt' } });
     /**
-     * GEMESSEN: `queryByRole('dialog')).toBeNull()` wäre hier NIE grün. jsdom feuert kein
-     * `transitionend`/`animationend`, rc-motion setzt hier keine Frist, und antds Modal
-     * räumt seinen Knoten erst am Ende der Zoom-Bewegung ab — `destroyOnHidden` greift
-     * also nie, die Felder bleiben stehen. Beobachtbar ist der Verlassen-Zustand, und
-     * der belegt genau das, was zu belegen ist: `onFertig` hat geschlossen. (Der
-     * Serienlauf tut das nicht — siehe den Test darunter, der die Gegenprobe ist.)
+     * `queryByRole('dialog')).toBeNull()` wäre nie grün: jsdom feuert kein
+     * `transitionend`/`animationend`, und antds Modal räumt seinen Knoten erst am Ende der
+     * Zoom-Bewegung ab. Beobachtbar ist der Verlassen-Zustand — er belegt, dass `onFertig`
+     * geschlossen hat. (Der Serienlauf tut das nicht, siehe Gegenprobe darunter.)
      */
     await waitFor(() => expect(screen.getByRole('dialog')).toHaveClass('ant-zoom-leave'));
   });
 
   it('„Speichern und nächste" hält den Dialog offen, zählt mit und behält die Wiederholfelder', async () => {
     /**
-     * Die eigentliche Zeitersparnis an der Bereitstellung: Trägerorganisation und
-     * Stärke-Position gehören zur KETTE, nicht zur Person — sie überleben das
-     * Speichern, der Name nicht. Zusammen mit dem zurückkehrenden Fokus ist der
-     * zweite Datensatz damit reine Namenseingabe.
+     * Trägerorganisation und Stärke-Position gehören zur Kette, nicht zur Person — sie überleben
+     * das Speichern, der Name nicht. Mit dem zurückkehrenden Fokus ist der zweite Datensatz reine
+     * Namenseingabe.
      */
     const gesendet = await oeffneAdhoc();
     const nutzer = userEvent.setup();
 
-    // Der Schalter steht per Vorgabe AUS (30.07.2026) — ohne ihn gäbe es keine Übernahme.
+    // Der Schalter steht per Vorgabe aus — ohne ihn gäbe es keine Übernahme.
     await nutzer.click(imDialog().getByRole('checkbox', { name: 'Werte behalten' }));
     await nutzer.type(imDialog().getByLabelText('Name'), 'Dr. Schmidt');
     await nutzer.type(imDialog().getByLabelText('Trägerorganisation'), 'KV Musterstadt');
-    // Die zweite Übernahme läuft NICHT über ein `<input>`, sondern über `components/Select` —
-    // dass `setFieldsValue` auch dort wieder greift, ist der eigentliche Prüfpunkt.
-    // Der Dialog trägt genau eine Combobox (Stärke-Position), deshalb ist sie eindeutig.
+    // Die zweite Übernahme läuft über `components/Select`, nicht über ein `<input>` — dass
+    // `setFieldsValue` dort greift, ist der Prüfpunkt. Der Dialog trägt genau eine Combobox
+    // (Stärke-Position).
     await nutzer.click(imDialog().getByRole('combobox'));
-    // Der klickbare Eintrag ist `.ant-select-item-option-content`; der `role="option"`-Knoten
-    // ist nur das a11y-Spiegelelement und reagiert nicht auf Klicks (Repo-Muster, MetaChip).
+    // Klickbar ist `.ant-select-item-option-content`; der `role="option"`-Knoten ist nur das
+    // a11y-Spiegelelement und reagiert nicht auf Klicks.
     await nutzer.click(
       await screen.findByText(
         (_, el) =>
@@ -772,9 +733,8 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
     expect(imDialog().getByLabelText('Name')).toHaveValue('');
     await waitFor(() => expect(document.activeElement).toBe(imDialog().getByLabelText('Name')));
 
-    // Der zweite Datensatz ist damit reine Namenseingabe — Enter genügt. Der abgesetzte
-    // Rumpf ist der stärkere Beleg als jede DOM-Prüfung: BEIDE Wiederholfelder sind noch
-    // dabei, obwohl dazwischen zurückgesetzt wurde.
+    // Der zweite Datensatz ist reine Namenseingabe — Enter genügt. Der abgesetzte Rumpf ist der
+    // stärkere Beleg: beide Wiederholfelder sind dabei, obwohl dazwischen zurückgesetzt wurde.
     await nutzer.type(imDialog().getByLabelText('Name'), 'Frau Meier{Enter}');
     await waitFor(() => expect(gesendet).toHaveLength(2));
     expect(gesendet[1]).toMatchObject({
@@ -787,8 +747,7 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
   });
 
   it('ein abgelehntes Speichern lässt den Wortlaut stehen', async () => {
-    // Ohne `mutateAsync` würde die Hülle die Felder leeren, obwohl nichts ankam —
-    // an der Bereitstellung heisst das: der Erfasser tippt alles noch einmal.
+    // Ohne `mutateAsync` leerte die Hülle die Felder, obwohl nichts ankam.
     render(einsatz());
     server.use(
       http.post('/api/einsaetze/7/personal', () =>
@@ -801,17 +760,16 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
     await userEvent.type(imDialog().getByLabelText('Name'), 'Dr. Schmidt{Enter}');
 
     await screen.findByText('Name bereits disponiert');
-    // Gegenprobe zum Test oben: KEIN Verlassen-Zustand — der Dialog steht.
+    // Gegenprobe zum Test oben: kein Verlassen-Zustand — der Dialog steht.
     expect(screen.getByRole('dialog')).not.toHaveClass('ant-zoom-leave');
     expect(imDialog().getByLabelText('Name')).toHaveValue('Dr. Schmidt');
   });
 });
 
 /**
- * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den
- * Platzhalter selbst: dessen Knoten trägt `pointer-events: none` und `userEvent` bricht
- * dort ab (gemessen). Gegriffen wird die Combobox — der Knoten, den auch die Tastatur
- * fokussiert.
+ * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den Platzhalter:
+ * dessen Knoten trägt `pointer-events: none`. Gegriffen wird die Combobox — der Knoten, den auch
+ * die Tastatur fokussiert.
  */
 async function oeffnePersonalAuswahl(container: HTMLElement, platzhalter: string) {
   const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>

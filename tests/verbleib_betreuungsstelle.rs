@@ -1,7 +1,7 @@
 //! Integrationstests zu LFH-674: ein Verbleib „Notunterkunft“ verweist auf eine
-//! Betreuungsstelle. Geprüft wird, was erst die Routen leisten: die Prüfkette aus design.md D2
-//! (422 → 403 → 404 → 409, geschlossen erlaubt), „davon namentlich“ nur für Lesende mit
-//! Personenrecht, und die Gegenprobe, dass die Zahl in keine Mengenaussage eingeht.
+//! Betreuungsstelle. Geprüft wird, was erst die Routen leisten: die Prüfkette (422 → 403 → 404
+//! → 409, geschlossen erlaubt), „davon namentlich“ nur für Lesende mit Personenrecht, und die
+//! Gegenprobe, dass die Zahl in keine Mengenaussage eingeht.
 //!
 //! Den Cache und die Zählung selbst prüfen `person::verbleib_repo` und `person::repo`.
 
@@ -116,7 +116,7 @@ async fn system_etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Strin
         .collect()
 }
 
-// ---------- Schreibweg (design.md D2) ----------
+// ---------- Schreibweg ----------
 
 #[tokio::test]
 async fn notunterkunft_mit_stelle_setzt_verweis_im_ereignis_und_im_cache() {
@@ -321,7 +321,7 @@ async fn ohne_betreuungsrecht_ist_verweis_403_auch_fuer_unbekannte_stelle() {
     );
 }
 
-// ---------- „davon namentlich“ (design.md D4) ----------
+// ---------- „davon namentlich“ ----------
 
 /// Zwei Personen mit Stelle, Belegung 40 gemeldet: die Übersicht nennt 2 namentlich — die
 /// Mengenaussagen (Belegung, Kopfzahl) bleiben 40.

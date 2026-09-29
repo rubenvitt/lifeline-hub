@@ -404,8 +404,8 @@ async fn negative_kostform_ist_400_an_ausgabe_und_aenderung() {
     assert_eq!(status(aendern(&w, id, a).await), StatusCode::BAD_REQUEST);
 }
 
-/// Task 1.1: beide Teilmengen-CHECKs der DB greifen, auch ohne Precheck — und kommen über
-/// LFH-245 als 422 heraus.
+/// Beide Teilmengen-CHECKs der DB greifen auch ohne Precheck und kommen über das
+/// Constraint-Netz als 422 heraus.
 #[tokio::test]
 async fn db_checks_der_teilmenge_greifen() {
     let w = welt().await;

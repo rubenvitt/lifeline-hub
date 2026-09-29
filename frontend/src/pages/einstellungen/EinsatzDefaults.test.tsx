@@ -86,8 +86,8 @@ describe('EinsatzDefaults', () => {
   });
 
   it('invalidiert nach dem Speichern die Rückmeldungen aller Einsätze, sonst nichts (LFH-610)', async () => {
-    // `new QueryClient()` statt `neuerQueryClient()`: dessen gcTime 0 räumte die
-    // unbeobachteten Einträge beim ersten await weg, die Aussage würde trivial.
+    // `new QueryClient()` statt `neuerQueryClient()`: dessen gcTime 0 räumte die unbeobachteten
+    // Einträge beim ersten await weg.
     const client = new QueryClient();
     // Literale Keys, nicht die Factory — sonst prüfte der Test die Factory gegen sich selbst.
     client.setQueryData(['einsatz-meldungen', 7, 'rueckmeldungen'], { frist_min: 60 });
@@ -152,8 +152,8 @@ describe('EinsatzDefaults', () => {
   });
 
   it('deaktiviert nicht-ausblendbare Modul-Selects auch als Admin', async () => {
-    // 'einsatzdaten' und 'einsatz-einstellungen' sind NICHT_AUSBLENDBAR — der Rollen-Default-
-    // Select bleibt für Admins deaktiviert; ein ausblendbares Modul (ETB) ist editierbar.
+    // 'einsatzdaten' und 'einsatz-einstellungen' sind NICHT_AUSBLENDBAR — ihr Rollen-Select bleibt
+    // gesperrt; ein ausblendbares Modul (ETB) ist editierbar.
     renderMitProviders(<EinsatzDefaults />);
 
     expect(
@@ -163,9 +163,8 @@ describe('EinsatzDefaults', () => {
     expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' })).not.toBeDisabled();
   });
 
-  // Der Knopf VERSCHWINDET seit LFH-345/C10 nicht mehr — er steht gesperrt da, und der
-  // Grund steht daneben (M16). Ein fehlender Knopf ist von „diese Seite kann das nicht"
-  // nicht zu unterscheiden.
+  // Der Knopf steht gesperrt da, mit Grund daneben — ein fehlender Knopf ist von „diese Seite kann
+  // das nicht" nicht zu unterscheiden.
   it('ist read-only für Nicht-Admins (fuehrungskraft): Speichern-Button gesperrt, Felder disabled', async () => {
     vi.mocked(useAuth).mockReturnValue(
       authWertFixture(benutzerFixture({ id: 2, org_rolle: 'fuehrungskraft', anzeigename: 'FK' })),
@@ -176,7 +175,7 @@ describe('EinsatzDefaults', () => {
     await screen.findByText('Aufbewahrung');
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
     expect(screen.getByLabelText('Aufbewahrungs-Dauer (Tage)')).toBeDisabled();
-    // LFH-383: die gesperrte Modulzeile nennt ihren Grund selbst, nicht nur der Seitenkopf.
+    // Die gesperrte Modulzeile nennt ihren Grund selbst, nicht nur der Seitenkopf.
     const zeile = screen
       .getByRole('combobox', { name: 'Benötigte Rolle: ETB' })
       .closest('[data-modul-zeile]') as HTMLElement;
@@ -185,25 +184,14 @@ describe('EinsatzDefaults', () => {
 });
 
 /**
- * Persistenter Speicherfehler und erklärte Berechtigung (LFH-345 · C10, Befunde H14/M16).
+ * Persistenter Speicherfehler und erklärte Berechtigung.
  *
- * ── Warum hier KEIN Fake-Timer-Vorlauf steht (gemessen 24.08.2026) ──────────────
- * Das AK verlangt „nach Vorlauf der Toast-Dauer (Fake-Timer) noch im DOM". Diese Aussage
- * ist in dieser Umgebung NICHT prüfbar, und zwar in beiden Bauformen:
- *
- *  1. Fake-Timer NACH dem Klick aktiviert — antds Message-Timer läuft dann längst mit
- *     echten Timern, `advanceTimersByTime` erreicht ihn nicht. Alle drei Seiten waren so
- *     grün, bevor eine Zeile Produktivcode existierte.
- *  2. Fake-Timer ab dem Rendern, mit `shouldAdvanceTime` (ohne das bleibt die Seite im
- *     Ladeskelett stehen und der Knopf existiert nie) — auch dann bleibt der Toast beim
- *     Vorlauf einfach stehen. Per Mutationsprobe belegt: mit zurückgedrehtem
- *     `message.error` statt des Alerts blieb genau dieser Test GRÜN, während die beiden
- *     Aussagen unten rot wurden.
- *
- * Ein Test, der nicht rot werden kann, behauptet eine Deckung, die er nicht hat. Die
- * Zusicherung tragen deshalb zwei andere: die Meldung steht außerhalb von antds
- * Message-Container (also ist sie kein Toast und hat keine Queue-Lebensdauer), und sie
- * verschwindet erst beim nächsten Absenden. Beide sind mutationsgeprüft.
+ * Warum hier kein Fake-Timer-Vorlauf steht: „nach Vorlauf der Toast-Dauer noch im DOM" ist in
+ * dieser Umgebung nicht prüfbar. Nach dem Klick aktivierte Fake-Timer erreichen antds laufenden
+ * Message-Timer nicht; mit `shouldAdvanceTime` ab dem Rendern bleibt der Toast beim Vorlauf
+ * trotzdem stehen — ein zurückgedrehtes `message.error` bliebe grün. Die Zusicherung tragen deshalb
+ * zwei andere Aussagen: die Meldung steht außerhalb von antds Message-Container, und sie
+ * verschwindet erst beim nächsten Absenden.
  */
 describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
   beforeEach(() => {
@@ -222,7 +210,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
     expect(treffer.closest('.ant-message')).toBeNull();
   });
 
-  // Die zweite Haelfte: ein Alert, der NIE geht, ist so falsch wie einer, der zu frueh geht.
+  // Ein Alert, der nie geht, ist so falsch wie einer, der zu früh geht.
   it('raeumt den Fehler beim naechsten Absenden weg', async () => {
     vi.mocked(speichereOrgEinstellungen)
       .mockRejectedValueOnce(new ApiError(422, 'Startwert zu groß'))
@@ -249,13 +237,9 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
   });
 
   /**
-   * Zwei Vorgänge, zwei Orte — der Seitenkopf trägt den Formular-Fehler, die Liste ihren
-   * eigenen.
-   *
-   * Vorher waren beide mit `??` im Kopf verkettet. Erreichbarer Zustand: das Formular
-   * scheitert, danach scheitert eine Modulzeile — dann trug die Zeile ihren roten Rand,
-   * während der Text im Kopf einen ANDEREN Vorgang beschrieb und bis zum nächsten
-   * Formular-Absenden stehenblieb. Der zweite Kanal zeigte damit auf die falsche Sache.
+   * Zwei Vorgänge, zwei Orte: der Seitenkopf trägt den Formular-Fehler, die Liste ihren eigenen.
+   * Mit `??` verkettet beschriebe der Kopftext sonst einen anderen Vorgang als die rot markierte
+   * Zeile.
    */
   it('haelt Formular- und Modulfehler auseinander', async () => {
     vi.mocked(speichereOrgEinstellungen).mockRejectedValue(new ApiError(422, 'Startwert zu groß'));
@@ -269,7 +253,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
     fireEvent.mouseDown(etb);
     fireEvent.click(await screen.findByText('Admin'));
 
-    // BEIDE stehen — und zwar nebeneinander, nicht einer statt des anderen.
+    // Beide stehen, nebeneinander.
     expect(await screen.findByText('Modul gesperrt')).toBeInTheDocument();
     expect(screen.getByText('Startwert zu groß')).toBeInTheDocument();
   });
@@ -284,12 +268,8 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
 });
 
 /**
- * Speicherleiste im Fuß und Verlassen-Guard (LFH-346 · A9, Befund M49).
- *
- * Der Speichern-Knopf lag im Kopf-Slot von `AdminPage` — also als DOM-Geschwister
- * AUSSERHALB des `<form>`, wo er nichts übermitteln kann (Erfassungs-Norm B4/LFH-332).
- * Und eine Seite mit sechs ausgefüllten Feldern liess sich verlassen, ohne dass irgendetwas
- * darauf hinwies.
+ * Speicherleiste im Fuß und Verlassen-Guard: der Knopf liegt im `<form>` (im Kopf-Slot könnte er
+ * nichts übermitteln), und eine ausgefüllte, ungespeicherte Seite warnt beim Verlassen.
  */
 describe('EinsatzDefaults · Speicherleiste und Verlassen-Guard (LFH-346)', () => {
   beforeEach(() => {
@@ -304,17 +284,14 @@ describe('EinsatzDefaults · Speicherleiste und Verlassen-Guard (LFH-346)', () =
     renderMitProviders(<EinsatzDefaults />);
 
     const knopf = await screen.findByRole('button', { name: 'Speichern' });
-    // Nur im `<form>` traegt er `htmlType="submit"`, und nur dann sendet Enter. Geprueft
-    // wird die STRUKTUR, aus der die Zusicherung folgt — ein Tastendruck ist bei einer
-    // Maske mit `Select`/`InputNumber` kein belastbarer Beleg (LFH-378).
+    // Nur im `<form>` sendet Enter. Geprüft wird die Struktur — ein Tastendruck ist bei
+    // `Select`/`InputNumber` kein belastbarer Beleg.
     expect(knopf.closest('form')).not.toBeNull();
     expect(knopf).toHaveAttribute('type', 'submit');
   });
 
   /**
-   * Das Verhalten, nicht ein `addEventListener`-Spy: der haenge sonst daran, dass sonst
-   * niemand im Baum je dasselbe Ereignis registriert — eine Zusicherung ueber fremden Code,
-   * die beim naechsten Hook still bricht.
+   * Geprüft wird das Verhalten, kein `addEventListener`-Spy — der hinge an fremdem Code im Baum.
    */
   function beforeUnloadGefeuert(): boolean {
     const e = new Event('beforeunload', { cancelable: true });
@@ -334,11 +311,9 @@ describe('EinsatzDefaults · Speicherleiste und Verlassen-Guard (LFH-346)', () =
   });
 
   /**
-   * Die dritte Aussage ist die, die den eigenen `useState` von `form.isFieldsTouched()`
-   * unterscheidet: antd setzt sein Flag beim Speichern NICHT zurueck (gemessen in
-   * LFH-342/C7). Ohne diese Zeile waere ein Merker, der einmal auf `true` faellt und dort
-   * bleibt, ebenfalls gruen — und die Seite warnte nach dem Speichern weiter vor einer
-   * Fassung, die es nicht mehr gibt.
+   * Unterscheidet den eigenen `useState` von `form.isFieldsTouched()`: antd setzt sein Flag beim
+   * Speichern nicht zurück, die Seite warnte sonst weiter vor einer Fassung, die es nicht mehr
+   * gibt.
    */
   it('schweigt wieder, sobald gespeichert ist', async () => {
     renderMitProviders(<EinsatzDefaults />);
@@ -355,8 +330,7 @@ describe('EinsatzDefaults · Speicherleiste und Verlassen-Guard (LFH-346)', () =
   it('gruppiert die Modul-Rollen-Defaults und filtert sie (M48, Durchgriff der Liste)', async () => {
     renderMitProviders(<EinsatzDefaults />);
 
-    // Ueber Rollen abgefragt, nicht ueber `getByText('Einstellungen')`: „Einstellungen" ist
-    // zugleich Kategorie-Label UND Modul-Label (`einsatz-einstellungen`).
+    // Über Rollen abgefragt: „Einstellungen" ist zugleich Kategorie- und Modul-Label.
     expect(await screen.findByRole('heading', { name: 'Kommunikation' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Modul filtern'), { target: { value: 'chat' } });

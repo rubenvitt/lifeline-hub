@@ -14,14 +14,14 @@ import { FakeEventSource } from '../test/eventSource';
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
-// Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
-// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+// Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
+// schreibrecht.test.ts ab.
 const nutzer = benutzerFixture();
 const einsatzAktiv = einsatzFixture();
 const einsatzBeobachter = einsatzFixture({ meine_rolle: 'beobachter' });
 
-// Quelle der Halter-Combobox (lädt beim Öffnen des Edit-Formulars). Minimalobjekt — der
-// HalterPicker liest nur id/registrier_nr/name/vorname.
+// Quelle der Halter-Combobox (lädt beim Öffnen des Edit-Formulars). Der HalterPicker liest nur
+// id/registrier_nr/name/vorname.
 const einePerson = {
   id: 5,
   einsatz_id: 1,
@@ -71,7 +71,7 @@ function render(
     http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(tier)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([einePerson])),
   );
-  // extra-Handler separat prependen, damit sie Vorrang vor den Default-Handlern haben.
+  // extra-Handler separat voranstellen, damit sie Vorrang vor den Defaults haben.
   if (extra.length > 0) server.use(...extra);
   return renderMitProviders(
     <Routes>
@@ -92,8 +92,8 @@ describe('TiereDetailPage — Stammdaten', () => {
   });
 
   it('Einsatzleitung kann bearbeiten und speichern (ohne Halter → beide null)', async () => {
-    // Edit-Modus öffnen, das mit den Bestandswerten vorbefüllte Formular direkt speichern
-    // und den PATCH-Aufruf verifizieren (kein getByLabelText — antd bindet label/htmlFor nicht zuverlässig).
+    // Edit-Modus öffnen, das vorbefüllte Formular direkt speichern und den PATCH prüfen (kein
+    // getByLabelText — antd bindet label/htmlFor nicht zuverlässig).
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } | null = null;
     render(einsatzAktiv, tierBasis, [
       http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
@@ -123,11 +123,10 @@ describe('TiereDetailPage — Stammdaten', () => {
   });
 
   it('hält die Baseline fest, wenn die Detail-Query bei offener Maske refetcht (LFH-303)', async () => {
-    // Der Auslöser im Betrieb ist ein Fensterwechsel: `staleTime` ist 10 s, TanStacks
-    // `refetchOnWindowFocus` steht auf der Vorgabe `true`. Kommt der Bearbeiter zurück,
-    // refetcht die Detail-Query im Hintergrund und der FREMDE, neuere Stand steht im
-    // Cache. Ginge der als Baseline raus, verglich der Server ihn mit sich selbst — die
-    // CAS-Prüfung passte, und die fremde Änderung wäre still überschrieben.
+    // Auslöser im Betrieb: Fensterwechsel bei `staleTime` 10 s und `refetchOnWindowFocus: true`.
+    // Der Hintergrund-Refetch legt den fremden, neueren Stand in den Cache; ginge der als Baseline
+    // raus, verglich der Server ihn mit sich selbst und die fremde Änderung wäre still
+    // überschrieben.
     let stand: Tier = tierBasis;
     let body: Record<string, unknown> | null = null;
     const { client } = render(einsatzAktiv, tierBasis, [
@@ -176,9 +175,8 @@ describe('TiereDetailPage — Stammdaten', () => {
   });
 
   it('ein zweiter 409 auf den Overwrite zeigt die Servermeldung statt erneut den Dialog', async () => {
-    // Die Tier-Route kennt einen zweiten 409 (Storno-Guard vor der CAS), den der Overwrite
-    // nicht umgehen kann. Ohne den `!v.overwrite`-Zweig wäre „Überschreiben" ein toter Button:
-    // derselbe Dialog ginge endlos wieder auf.
+    // Die Tier-Route kennt einen zweiten 409 (Storno-Guard vor der CAS), den der Overwrite nicht
+    // umgeht. Ohne den `!v.overwrite`-Zweig ginge derselbe Dialog endlos wieder auf.
     const koerper: Array<Record<string, unknown>> = [];
     render(einsatzAktiv, tierBasis, [
       http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
@@ -193,9 +191,8 @@ describe('TiereDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
     await vi.waitFor(() => expect(koerper).toHaveLength(2));
-    // Die echte Servermeldung erscheint — das belegt, dass der else-Zweig (`fehler`) lief und
-    // NICHT erneut der Konfliktdialog. Ohne den `!v.overwrite`-Zweig ginge stattdessen ein
-    // zweiter Dialog auf und diese Meldung käme nie.
+    // Die Servermeldung erscheint — der else-Zweig (`fehler`) lief, nicht erneut der
+    // Konfliktdialog.
     expect(
       await screen.findByText('Storniertes Tier kann nicht geändert werden'),
     ).toBeInTheDocument();

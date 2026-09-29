@@ -25,8 +25,10 @@ import { globalKeys } from '../../api/queryKeys';
 
 type Feature = FeatureCollection['features'][number];
 
-/** Obergrenze der Energie-Sammlung gegen unbegrenztes Wachstum (älteste zuerst raus). Der
- *  Rauschfilter lässt nur Großanlagen durch (design.md, Entscheidung 6), 2000 reicht weit. */
+/**
+ * Obergrenze der Energie-Sammlung (älteste zuerst raus). Der Rauschfilter lässt nur Großanlagen
+ * durch, 2000 reicht weit.
+ */
 const ENERGIE_AKKU_MAX = 2000;
 
 const leereFc = (): FeatureCollection => ({ type: 'FeatureCollection', features: [] });
@@ -38,78 +40,65 @@ interface FachebenenArgs {
 }
 
 /**
- * Fachebenen-Leg der Lagekarte: die externen Daten-Queries (eine je Fachebene) und ihre Ableitungen.
- * Die Sichtbarkeit hält seit LFH-319 `useKartenAnsicht` (geteilte Ansicht) — dieser Hook
- * bekommt sie als Prop und bietet nur den Toggle; kein eigener State/keine Persistenz.
+ * Fachebenen-Leg der Lagekarte: die externen Daten-Queries (eine je Fachebene) und ihre
+ * Ableitungen. Die Sichtbarkeit hält `useKartenAnsicht` (geteilte Ansicht); dieser Hook bietet
+ * nur den Toggle, ohne eigenen State und ohne Persistenz.
  *
- * Die Queries mit festem Schlüssel laufen als EIN `useQueries` mit `combine`: react-query memoisiert das
- * kombinierte Ergebnis (structural sharing via replaceEqualDeep), sodass die Ableitungen
- * (aktiveFachebenen/status/laedt/attribution) OHNE manuelle Dep-Listen und OHNE
- * `eslint-disable react-hooks/exhaustive-deps` stabil bleiben — das inline gebaute,
- * pro Render instabile `fachebenenQueries`-Record (und die vier Disables) entfällt damit.
+ * Die Queries mit festem Schlüssel laufen als ein `useQueries` mit `combine`: react-query
+ * memoisiert das Ergebnis (replaceEqualDeep), die Ableitungen bleiben ohne manuelle Dep-Listen
+ * stabil.
  *
- * KRITIS und Energie laufen daneben je als eigenes `useQuery` (LFH-83, LFH-81): ihr Schlüssel
- * wandert mit der bbox, und `useQueries` legt je neuem Schlüssel einen NEUEN Observer an
- * (`QueriesObserver#findMatchingObservers` matcht per `queryHash`) — `keepPreviousData`
- * hat dort nichts, woran es festhalten könnte, und die Ebene blinkte bei jedem Pannen leer.
- * Gemessen am Test „hält beim bbox-Wechsel die bisherigen KRITIS-Daten"; vorher verdeckte
- * die Akkumulation diese Lücke. `combine` liest das Ergebnis über die Closure.
+ * KRITIS und Energie laufen je als eigenes `useQuery`: ihr Schlüssel wandert mit der bbox, und
+ * `useQueries` legt je neuem Schlüssel einen neuen Observer an — `keepPreviousData` hätte nichts,
+ * woran es festhält, und die Ebene blinkte bei jedem Pannen leer. `combine` liest das Ergebnis
+ * über die Closure.
  */
 export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: FachebenenArgs) {
-  // Hochwasser-, ODL- und Luftqualitätsebene färben je Punkt nach ihrer Stufe und brauchen den aufgelösten
-  // Modus-Token — die Kartenstil-Module haben den bewusst nicht (LFH-328/A2), also wird er
-  // hier gelesen und in die Features gebacken.
+  // Hochwasser, ODL und Luftqualität färben je Punkt nach Stufe und brauchen den aufgelösten
+  // Modus-Token; die Kartenstil-Module haben ihn bewusst nicht, also wird er hier in die Features
+  // gebacken.
   const { token } = theme.useToken();
-  // EIN Ausschnitt für alle bbox-abhängigen Ebenen (LFH-81): die Karte hat nur einen
-  // Viewport, zwei getrennte States könnten nur auseinanderlaufen.
+  // Ein Ausschnitt für alle bbox-abhängigen Ebenen: die Karte hat nur einen Viewport.
   const [viewportBbox, setViewportBbox] = useState<string | null>(null);
   // Zuletzt gesehener Status der Autobahn-Ebene — steuert ihren Poll-Takt (Aufwärmphase).
   const [autobahnStatus, setAutobahnStatus] = useState<FachebeneStatus | undefined>(undefined);
   // Aktuelles Karten-Zoom-Level — steuert den „näher heranzoomen"-Hinweis der bbox-Ebenen.
   const [kartenZoom, setKartenZoom] = useState<number | null>(null);
 
-  // Energie akkumuliert: einmal geladene Anlagen bleiben sichtbar (auch beim Rauszoomen oder
-  // Wechsel des Gebiets), statt bei jedem Fetch ersetzt zu werden — anders als KRITIS liefert
-  // ihr bbox-Fetch nur den Ausschnitt, keinen vollständigen Bestand (s. o.). Dedup über die
-  // Koordinate, neuere Fassung gewinnt und löst absorbierte MaStR-Einzelpunkte ab
-  // (`mergeEnergieFeatures`, LFH-81).
+  // Energie akkumuliert: einmal geladene Anlagen bleiben sichtbar, weil ihr bbox-Fetch nur den
+  // Ausschnitt liefert, keinen vollständigen Bestand. Dedup über die Koordinate, neuere Fassung
+  // gewinnt (`mergeEnergieFeatures`).
   const energieSammlungRef = useRef(new Map<string, Feature>());
   const [energieAkku, setEnergieAkku] = useState<FeatureCollection>(leereFc());
-  // Braucht Energie ihren Mindest-Zoom UND passt der (einzige, geteilte) Ausschnitt in ihre
-  // Grenze? Ihr Backend fragt anders als KRITIS weiterhin live Overpass, lehnt große
-  // Ausschnitte ab (`pruefe_energie_bbox`, LFH-81) und ist unter dem Mindest-Zoom erst gar
-  // nicht gemeint (`Kartenflaeche` meldet den Ausschnitt zwar erst ab `BBOX_MIN_ZOOM`, ein im
-  // Test direkt gesetzter `viewportBbox` unterhalb dessen bliebe ohne diesen Riegel aber
-  // aktiv) — ohne beides ginge auf breiten Schirmen oder bei zu niedrigem Zoom eine Anfrage
-  // raus, die das Backend mit 400 quittiert oder die Ebene fälschlich auf „offline" zeigt.
+  // Energie fragt live Overpass, lehnt große Ausschnitte ab (`pruefe_energie_bbox`) und ist unter
+  // dem Mindest-Zoom nicht gemeint. Ohne beide Riegel ginge eine Anfrage raus, die das Backend mit
+  // 400 quittiert oder die die Ebene fälschlich auf „offline" zeigt.
   const energieMinZoom = FACHEBENEN.energie.minZoom;
   const energieZoomReicht =
     energieMinZoom === undefined || (kartenZoom !== null && kartenZoom >= energieMinZoom);
-  // Nur relevant, wenn überhaupt ein Ausschnitt existiert — ohne Ausschnitt ist „zu groß"
-  // keine sinnvolle Aussage, dort entscheidet für den Zoom-Hinweis allein der Zoom (s. u.).
+  // Ohne Ausschnitt ist „zu groß" keine Aussage; dort entscheidet für den Zoom-Hinweis allein der
+  // Zoom.
   const energieBboxZuGross = viewportBbox !== null && !energieAusschnittPasst(viewportBbox);
   const energiePasst = energieZoomReicht && viewportBbox !== null && !energieBboxZuGross;
-  // In Energie-Antworten gesehene Nennungsteile (LFH-81). Gezeigt wird davon, was die
-  // gesammelten Punkte tragen (`energieNennung`) — nicht die Nennung der letzten Antwort.
+  // In Energie-Antworten gesehene Nennungsteile. Gezeigt wird, was die gesammelten Punkte tragen
+  // (`energieNennung`), nicht die Nennung der letzten Antwort.
   const [energieTeile, setEnergieTeile] = useState<string[]>([]);
 
   const kritis = useQuery({
     queryKey: globalKeys.fachebeneKritis(viewportBbox),
     queryFn: () => ladeFachebene('kritis', viewportBbox!),
     enabled: fachebenenSichtbar.kritis && !!viewportBbox,
-    // Beim Wechsel der Raster-bbox die bisherigen KRITIS-Objekte sichtbar lassen (kein
-    // Leer-Blinken). Die Antwort ERSETZT das Bild (LFH-83) — der Server liefert je
-    // Ausschnitt den vollständigen Bestand oder dessen Sammelpunkte; akkumuliert lägen
-    // Einzelobjekte und Sammelpunkte derselben Gegend übereinander. Der Bestand wird
-    // wöchentlich erneuert → lange als frisch behandeln (6 h).
+    // Beim bbox-Wechsel die bisherigen KRITIS-Objekte stehen lassen (kein Leer-Blinken). Die
+    // Antwort ersetzt das Bild: der Server liefert je Ausschnitt den vollständigen Bestand oder
+    // dessen Sammelpunkte, akkumuliert lägen beide übereinander. Der Bestand wird wöchentlich
+    // erneuert, daher 6 h frisch.
     placeholderData: keepPreviousData,
     staleTime: 6 * 60 * 60_000,
     gcTime: 6 * 60 * 60_000,
-    // Mit Bestand 0 (kein Timer), in der Aufwärmphase des ersten Imports der kurze Takt —
-    // sonst erschiene der Bestand erst beim nächsten Pannen. Hier geht die Callback-Form:
-    // die Typinferenz-Falle (siehe `autobahn` unten) betrifft nur das `useQueries`-Tupel.
-    // `error` zählt als offline, weil react-query nach einem gescheiterten Abruf die
-    // vorigen `data` hält.
+    // Mit Bestand kein Timer, in der Aufwärmphase des ersten Imports der kurze Takt. Die
+    // Callback-Form geht hier; die Typinferenz-Falle (siehe `autobahn` unten) betrifft nur das
+    // `useQueries`-Tupel. `error` zählt als offline, weil react-query nach einem gescheiterten
+    // Abruf die vorigen `data` hält.
     refetchInterval: (q) =>
       fachebeneTakt('kritis', q.state.status === 'error' ? 'offline' : q.state.data?.status),
   });
@@ -117,26 +106,20 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   const energie = useQuery({
     queryKey: globalKeys.fachebeneEnergie(viewportBbox),
     queryFn: () => ladeFachebene('energie', viewportBbox!),
-    // `energiePasst` hält eine Anfrage über einen zu großen Ausschnitt zurück, statt sie ans
-    // Backend zu schicken, das dort ohnehin 400 antwortete (s. o.).
+    // Hält eine Anfrage über einen zu großen Ausschnitt zurück (das Backend antwortete 400).
     enabled: fachebenenSichtbar.energie && !!viewportBbox && energiePasst,
-    // Anders als KRITIS liefert der Energie-Fetch nur den Ausschnitt (OSM live je bbox,
-    // MaStR bundesweit gecacht) — client-seitige Akkumulation (`energieAkku` unten) hält die
-    // schon gesehenen Anlagen sichtbar. `staleTime` aber bewusst KURZ, anders als KRITIS: ein
-    // kalter Abruf antwortet nach höchstens 10 s mit dem Teil, der schon da ist, und holt den
-    // Rest im Hintergrund (`fetch_energie`). Mit 6 h bliebe genau diese unvollständige
-    // Antwort für die Rasterzelle stehen, bis jemand weit genug schwenkt. Ein erneuter Abruf
-    // trifft serverseitig den Cache und kostet Millisekunden.
+    // Der Energie-Fetch liefert nur den Ausschnitt; `energieAkku` hält Gesehenes sichtbar.
+    // `staleTime` bewusst kurz: ein kalter Abruf antwortet nach höchstens 10 s mit dem Teil, der
+    // schon da ist, und holt den Rest im Hintergrund (`fetch_energie`). Mit 6 h bliebe diese
+    // unvollständige Antwort stehen. Ein erneuter Abruf trifft den Server-Cache.
     placeholderData: keepPreviousData,
     staleTime: 2 * 60_000,
     gcTime: 6 * 60 * 60_000,
   });
 
-  // Sieben Fachebenen-Queries als EIN useQueries + combine. Reihenfolge: nina, dwd,
-  // pegelonline, hochwasser, odl, autobahn, luftqualitaet — fachebeneKeys() ohne kritis und
-  // energie (beide oben als eigenes useQuery, s. o.), und NICHT in Panel-Reihenfolge. `byKey`
-  // unten hängt an DIESER Reihenfolge und greift sie positionsweise ab; ein verschobener
-  // Index ist kein Fehler, sondern eine stille Verwechslung.
+  // Sieben Fachebenen-Queries als ein `useQueries` + `combine`, in der Reihenfolge von
+  // `fachebeneKeys()` ohne kritis und energie (nicht Panel-Reihenfolge). `byKey` greift
+  // positionsweise ab: ein verschobener Index ist eine stille Verwechslung, kein Fehler.
   const kombiniert = useQueries({
     queries: [
       {
@@ -173,20 +156,16 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         queryKey: globalKeys.fachebene('autobahn'),
         queryFn: () => ladeFachebene('autobahn'),
         enabled: fachebenenSichtbar.autobahn,
-        // Takt hängt am zuletzt gesehenen Status: der erste Lauf der Ebene hängt
-        // serverseitig an keinem Request (er dauert ~25 s und liefe sonst in die
-        // 15-s-Schranke von `apiGet`). Bis er durch ist, meldet die Ebene `offline` — mit
-        // dem regulären 600-s-Takt sähe der Bediener zehn Minuten lang nichts, obwohl die
-        // Daten nach ~30 s bereitstehen.
+        // Takt hängt am zuletzt gesehenen Status: der erste Lauf der Ebene dauert serverseitig ~25
+        // s und hängt an keinem Request. Bis dahin meldet sie `offline`; mit dem regulären
+        // 600-s-Takt sähe man zehn Minuten nichts.
         //
-        // Bewusst über einen State statt über die Callback-Form von `refetchInterval`: die
-        // Callback-Form lässt die Typinferenz dieses `useQueries`-Tupels kollabieren (alle
-        // Einträge werden zu `UseQueryResult<unknown>`, und `combine` verliert seine
-        // Typen). Gemessen, nicht vermutet — der Versuch steht im Verlauf dieses Tickets.
+        // State statt Callback-Form von `refetchInterval`: die Callback-Form lässt die Typinferenz
+        // dieses `useQueries`-Tupels kollabieren (alles `UseQueryResult<unknown>`, `combine`
+        // verliert seine Typen).
         refetchInterval: fachebeneTakt('autobahn', autobahnStatus),
       },
-      // LETZTER Eintrag, bewusst am ENDE (LFH-79): `byKey` greift positionsweise ab, eine
-      // Query mitten im Tupel verschöbe die Nachbarn still auf fremde Daten.
+      // Letzter Eintrag, bewusst am Ende: `byKey` greift positionsweise ab.
       {
         queryKey: globalKeys.fachebene('luftqualitaet'),
         queryFn: () => ladeFachebene('luftqualitaet'),
@@ -211,9 +190,8 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
       const aktiveFachebenen: AktiveFachebene[] = fachebeneKeys()
         .filter((k) => fachebenenSichtbar[k])
         .map((k) => {
-          // Energie aus ihrer akkumulierten Sammlung (s. o.); Hochwasser, ODL und
-          // Luftqualität mit eingebackener Farbe und Punktgröße je Stufe; übrige Quellen
-          // (auch KRITIS, LFH-83) direkt aus der Query.
+          // Energie aus ihrer Sammlung; Hochwasser, ODL und Luftqualität mit eingebackener Farbe
+          // und Punktgröße; übrige Quellen direkt aus der Query.
           const roh = byKey[k].data?.features ?? leerFc;
           const daten =
             k === 'energie'
@@ -240,10 +218,8 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
       const fachebenenAttribution = fachebeneKeys()
         .map((k) => {
           if (!fachebenenSichtbar[k]) return '';
-          // Energie nennt, was gezeichnet wird: die akkumulierte Sammlung kann Punkte aus
-          // früheren Ausschnitten tragen, deren Quelle die letzte Antwort nicht mehr nennt
-          // (LFH-81). Deshalb auch unabhängig vom Status — gesammelte Punkte stehen auch
-          // bei `offline` auf der Karte.
+          // Energie nennt, was gezeichnet wird: die Sammlung kann Punkte aus früheren Ausschnitten
+          // tragen. Deshalb auch unabhängig vom Status.
           if (k === 'energie')
             return energieNennung(energieTeile, energieAkku.features).join(NENNUNG_TRENNER);
           const d = byKey[k].data;
@@ -258,17 +234,15 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         fachebenenAttribution,
         // Rohdaten für die Energie-Akkumulation (der Akku selbst geht via `energieAkku` ein).
         energieRoh: byKey.energie.data?.features,
-        // Nennungsteile der aktuellen Energie-Antwort (nur bei online-Status, nie leer) — die
-        // Sammlung der GESEHENEN Teile (`energieTeile`) füllt sich daraus, s. u.
+        // Nennungsteile der aktuellen Energie-Antwort (nur bei online, nie leer); `energieTeile`
+        // sammelt daraus.
         energieAttributionRoh:
           byKey.energie.data && byKey.energie.data.status !== 'offline'
             ? byKey.energie.data.attribution
             : undefined,
-        // Status der Autobahn-Ebene für den Aufwärm-Takt (siehe `refetchInterval` oben).
-        // `isError` gehört dazu wie in der Statuszeile darüber: react-query HÄLT bei einem
-        // gescheiterten Refetch die vorigen `data` — ohne den Zweig meldete die Ableitung
-        // weiter `ok`, während die Ebene oben schon `offline` anzeigt, und der Takt bliebe
-        // zehn Minuten lang der reguläre statt des Aufwärm-Takts.
+        // Status für den Aufwärm-Takt. `isError` gehört dazu: react-query hält bei gescheitertem
+        // Refetch die vorigen `data`, sonst bliebe der Takt der reguläre, während die Ebene schon
+        // `offline` zeigt.
         autobahnStatusRoh: byKey.autobahn.isError ? 'offline' : byKey.autobahn.data?.status,
       };
     },
@@ -284,9 +258,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     setEnergieAkku({ type: 'FeatureCollection', features: [...sammlung.values()] });
   }, [kombiniert.energieRoh]);
 
-  // Nennungsteile der Energie-Antworten sammeln sich über die Zeit — gezeigt wird, was die
-  // akkumulierten Punkte tatsächlich tragen (`energieNennung`), nicht die letzte Antwort
-  // allein (LFH-81).
+  // Nennungsteile sammeln sich über die Zeit; gezeigt wird, was die gesammelten Punkte tragen.
   useEffect(() => {
     const attribution = kombiniert.energieAttributionRoh;
     if (!attribution) return;
@@ -306,9 +278,8 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     setAutobahnStatus(kombiniert.autobahnStatusRoh);
   }, [kombiniert.autobahnStatusRoh]);
 
-  // „Zu weit herausgezoomt" bzw. „Ausschnitt zu groß" je Quelle (LFH-81): geprüft nur für
-  // sichtbare Ebenen, die eine `minZoom`-Schwelle tragen — heute allein Energie, denn KRITIS
-  // fragt seit LFH-83 in jeder Zoomstufe (s. o.). Die Sidebar liest es für jede bbox-Ebene gleich.
+  // „Zu weit herausgezoomt" bzw. „Ausschnitt zu groß" je Quelle, nur für sichtbare Ebenen mit
+  // `minZoom` (heute allein Energie). Die Sidebar liest es für jede bbox-Ebene gleich.
   const zoomZuKlein: Partial<Record<FachebeneQuelle, boolean>> = {};
   for (const k of fachebeneKeys()) {
     const minZoom = FACHEBENEN[k].minZoom;

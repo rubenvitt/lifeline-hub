@@ -2,18 +2,16 @@ import type { CSSProperties } from 'react';
 import type { Farbrollen } from '../../theme/tokens';
 
 /**
- * Stile des Führungsüberblicks — rein und exportiert (Muster `bedienzielStil`), damit die
- * Zusicherungen ohne Render prüfbar sind.
+ * Stile des Führungsüberblicks — rein und exportiert, damit die Zusicherungen ohne Render prüfbar
+ * sind.
  */
 
 /** Breite des Seitenfelds „Nächste Marken" (Entwurf S2: 280 px). */
 export const MARKEN_BREITE = 280;
 
 /**
- * Eine ganze Paneelzeile als Link — ein HANDGEBAUTES Bedienziel, also die ZWEI Angaben
- * aus LFH-365: `minHeight: token.controlHeight` plus Polsterung aus der Staffel. Die
- * Polsterung allein trüge den Handschuh-Boden (72 px) nicht. Trenner `flaeche3` wie
- * `paneelZeileStil`.
+ * Eine Paneelzeile als Link — ein handgebautes Bedienziel, also `minHeight: token.controlHeight`
+ * plus Polsterung aus der Staffel; die Polsterung allein trüge den Handschuh-Boden nicht.
  */
 export function zeilenzielStil(
   rollen: Pick<Farbrollen, 'text' | 'flaeche3'>,
@@ -34,9 +32,8 @@ export function zeilenzielStil(
 }
 
 /**
- * Raster der Seite: zwei Spalten 1.35fr / 1fr ab `lg`, darunter alles gestapelt. Die
- * Schwelle liest der Aufrufer aus `useViewport` — eine reine Funktion, die selbst einen
- * Hook ruft, wäre kein Prüfobjekt mehr.
+ * Raster: zwei Spalten 1.35fr / 1fr ab `lg`, darunter gestapelt. Die Schwelle liest der Aufrufer
+ * aus `useViewport`, damit die Funktion rein bleibt.
  */
 export function rasterStil(breit: boolean, abstand: number): CSSProperties {
   return {

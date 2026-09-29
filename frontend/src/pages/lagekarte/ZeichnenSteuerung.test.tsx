@@ -72,18 +72,15 @@ describe('ZeichnenSteuerung', () => {
     setup({ phase: 'bestaetigen', speichernLaeuft: true });
     // antd Button loading rendert eine Spinner-Struktur; Button bleibt im DOM.
     expect(screen.getByRole('button', { name: /Speichern/ })).toHaveClass('ant-btn-loading');
-    // M-B (Review-Fix): Verwerfen darf während des Speicherns nicht klickbar sein.
+    // Verwerfen darf während des Speicherns nicht klickbar sein.
     expect(screen.getByRole('button', { name: 'Verwerfen' })).toBeDisabled();
   });
 });
 
 /**
- * Serienmodus (LFH-332/M76). Der Zonen-Modus brach nach jedem gespeicherten Objekt ab.
- *
- * Die Komponente trägt hier zwei Zustände, die beide belegt sein müssen: der Schalter
- * existiert NUR, wenn ein `onSerieWechsel` gereicht wird (Abschnitt-Zeichnen bekommt keinen —
- * die vier Fälle oben laufen deshalb unverändert), und die Beschriftung des Beenden-Knopfes
- * hängt daran, ob die Serie schon etwas gespeichert hat.
+ * Serienmodus: der Schalter existiert nur mit `onSerieWechsel` (das Abschnitt-Zeichnen bekommt
+ * keinen), und die Beschriftung des Beenden-Knopfes hängt daran, ob die Serie schon etwas
+ * gespeichert hat.
  */
 describe('ZeichnenSteuerung — Serienmodus (LFH-332)', () => {
   it('ohne onSerieWechsel (Abschnitt) gibt es keinen Schalter', () => {
@@ -143,14 +140,94 @@ describe('ZeichnenSteuerung — Platz im KartenFuss (LFH-355)', () => {
       </App>,
     );
     const karte = container.querySelector('.ant-card') as HTMLElement;
-    // Die tragende Aussage ist die ABWESENHEIT: mit `position: absolute` läge die Karte
-    // wieder aus dem Fluss und die später gerenderte SnapshotLeiste verdeckte ihre Knöpfe
-    // (gemessen als Playwright-Timeout „intercepts pointer events", während `toBeVisible()`
-    // grün blieb). Ein niedriger `zIndex` liesse sich vortäuschen, ein fehlendes
-    // `position` nicht.
+    // Die tragende Aussage ist die Abwesenheit: mit `position: absolute` läge die Karte aus dem
+    // Fluss, und die SnapshotLeiste verdeckte ihre Knöpfe. Ein fehlendes `position` lässt sich
+    // nicht vortäuschen.
     expect(karte.style.position).toBe('');
     expect(karte.style.zIndex).toBe('');
     expect(karte.style.alignSelf).toBe('center');
     expect(karte.style.pointerEvents).toBe('auto');
+  });
+});
+
+/**
+ * Korrigierbares Zeichnen: Knopf und Zähler gibt es nur in der Zeichenphase — nach dem Abschluss
+ * ist „Verwerfen" der Weg zurück.
+ */
+describe('ZeichnenSteuerung — Letzten Punkt zurück und Zähler (LFH-712)', () => {
+  it('ohne zurücknehmbaren Punkt gesperrt, mit Punkt frei — als Paar', async () => {
+    const onPunktZurueck = vi.fn();
+    const { unmount } = render(
+      <App>
+        <ZeichnenSteuerung
+          aktiv
+          titel="x"
+          phase="zeichnen"
+          punkte={0}
+          punktZurueckMoeglich={false}
+          onPunktZurueck={onPunktZurueck}
+          onAbschliessen={vi.fn()}
+          onAbbrechen={vi.fn()}
+          onSpeichern={vi.fn()}
+          onVerwerfen={vi.fn()}
+        />
+      </App>,
+    );
+    const gesperrt = screen.getByRole('button', { name: 'Letzten Punkt zurück' });
+    expect(gesperrt).toBeDisabled();
+    await userEvent.click(gesperrt);
+    expect(onPunktZurueck).not.toHaveBeenCalled();
+    unmount();
+
+    setup({ punkte: 1, punktZurueckMoeglich: true, onPunktZurueck });
+    const frei = screen.getByRole('button', { name: 'Letzten Punkt zurück' });
+    expect(frei).toBeEnabled();
+    await userEvent.click(frei);
+    expect(onPunktZurueck).toHaveBeenCalledTimes(1);
+  });
+
+  it('zeigt die Zahl der gesetzten Punkte, Einzahl eigens', () => {
+    const { unmount } = render(
+      <App>
+        <ZeichnenSteuerung
+          aktiv
+          titel="x"
+          phase="zeichnen"
+          punkte={1}
+          onAbschliessen={vi.fn()}
+          onAbbrechen={vi.fn()}
+          onSpeichern={vi.fn()}
+          onVerwerfen={vi.fn()}
+        />
+      </App>,
+    );
+    expect(screen.getByText('1 Punkt')).toBeInTheDocument();
+    unmount();
+    setup({ punkte: 2 });
+    expect(screen.getByText('2 Punkte')).toBeInTheDocument();
+  });
+
+  it('Bestätigungsphase: weder Zurück-Knopf noch Zähler', () => {
+    setup({ phase: 'bestaetigen', punkte: 3, punktZurueckMoeglich: true, onPunktZurueck: vi.fn() });
+    expect(screen.queryByRole('button', { name: 'Letzten Punkt zurück' })).not.toBeInTheDocument();
+    expect(screen.queryByText('3 Punkte')).not.toBeInTheDocument();
+  });
+
+  it('nennt beide Esc-Stufen genau einmal, als Hinweis — nicht im Knopf', () => {
+    setup({ punkte: 0, punktZurueckMoeglich: false, onPunktZurueck: vi.fn() });
+    const hinweis = 'Esc verwirft die Zeichnung, ein zweites Esc beendet das Zeichnen.';
+    expect(screen.getAllByText(hinweis)).toHaveLength(1);
+    // Nur mit feinem Zeiger sichtbar (Regel in `lagekarte.css`): Touch hat keine Esc-Taste.
+    expect(screen.getByText(hinweis)).toHaveClass('lfh-nur-feiner-zeiger');
+    for (const knopf of screen.getAllByRole('button')) {
+      expect(knopf.textContent ?? '').not.toContain('Esc');
+    }
+  });
+
+  it('nennt die Esc-Stufen auch in der Bestätigungsphase', () => {
+    setup({ phase: 'bestaetigen' });
+    expect(
+      screen.getByText('Esc verwirft die Zeichnung, ein zweites Esc beendet das Zeichnen.'),
+    ).toBeInTheDocument();
   });
 });

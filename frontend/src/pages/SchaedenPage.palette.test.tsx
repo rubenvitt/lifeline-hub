@@ -1,4 +1,3 @@
-// frontend/src/pages/SchaedenPage.palette.test.tsx
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -13,22 +12,17 @@ import { benutzerFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 
 /**
- * „Neue Zeile" an einer echten Modulseite (LFH-391 · B5) — und vor allem: mit demselben
- * Rechte-Riegel wie der Knopf daneben.
+ * „Neue Zeile" an einer echten Modulseite — mit demselben Rechte-Riegel wie der Knopf daneben.
  *
- * DAS IST DIE TRAGENDE AUSSAGE DER DATEI. Die Palette ist ein ZWEITER Bedienweg auf
- * dieselbe Aktion, und genau solche zweiten Wege haben im Repo schon Rechte verloren
- * (CLAUDE.md, LFH-372: „das Vorhandensein des Callbacks ist KEIN Rechtebeleg"). Der
- * Bestandstest „versteckt Schreib-Buttons für Beobachter" (`SchaedenPage.test.tsx`) deckt
- * nur den Knopf ab; er bliebe grün, während die Palette dem Beobachter die Erfassung
- * anböte.
+ * Das ist die tragende Aussage der Datei: die Palette ist ein zweiter Bedienweg auf dieselbe
+ * Aktion, und das Vorhandensein des Callbacks ist kein Rechtebeleg. Der Test „versteckt
+ * Schreib-Buttons für Beobachter" (`SchaedenPage.test.tsx`) deckt nur den Knopf ab.
  *
- * EIGENE DATEI, zwei gemessene Gründe: `vi.mock` hoistet dateiweit, und `src/test/setup.ts`
- * fährt MSW mit `onUnhandledRequest: 'error'` — das echte `useBefehle` fordert beim Öffnen
- * `/api/einsaetze` an und bräche den Lauf.
+ * Eigene Datei: `vi.mock` hoistet dateiweit, und `src/test/setup.ts` fährt MSW mit
+ * `onUnhandledRequest: 'error'` — das echte `useBefehle` fordert beim Öffnen `/api/einsaetze` an.
  *
- * Gegriffen wird auf `#cmd-tastatur:<id>`, nicht auf den Wortlaut: der kommt in der
- * Produktion aus `TASTATUR_AKTIONEN` und ist dort gepinnt (`befehle.test.ts`).
+ * Gegriffen wird auf `#cmd-tastatur:<id>`, nicht auf den Wortlaut: der kommt aus
+ * `TASTATUR_AKTIONEN` und ist dort gepinnt (`befehle.test.ts`).
  */
 vi.mock('../command-palette/useBefehle', () => ({
   useBefehle: (aktionen: TastaturAktionen = {}) =>
@@ -107,12 +101,10 @@ function render(einsatzObj: object) {
 }
 
 /**
- * Öffnet die Palette mit dem Fokus im Suchfeld der `Datensicht`.
- *
- * Damit steht die KETTE aus B1 im Spiel und nicht bloss eine Ebene: tief die Werkzeugzeile
- * („Filter zurücksetzen"), flach die Seite („Neue Zeile"). `filter-zuruecksetzen` ist
- * zugleich die Positivhälfte jeder „… ist NICHT gemeldet"-Aussage unten — ohne sie wäre ein
- * `null` nur der Beleg, dass die Palette gar nicht offen ist.
+ * Öffnet die Palette mit dem Fokus im Suchfeld der `Datensicht`, damit die Kette aus Werkzeugzeile
+ * („Filter zurücksetzen") und Seite („Neue Zeile") im Spiel ist. `filter-zuruecksetzen` ist die
+ * Positivhälfte jeder „… ist nicht gemeldet"-Aussage — ohne sie belegte ein `null` nur eine
+ * geschlossene Palette.
  */
 async function oeffnePalette(u: ReturnType<typeof userEvent.setup>) {
   await u.click(await screen.findByRole('searchbox', { name: 'Suche in Schäden im Einsatz' }));
@@ -133,8 +125,7 @@ describe('SchaedenPage · „Neue Zeile" in der Kommandopalette', () => {
     expect(option).not.toBeNull();
 
     await u.click(option!);
-    // Dieselbe Wirkung wie der Knopf daneben — die Palette ruft den echten Callback der
-    // Seite, nicht bloss irgendeinen registrierten.
+    // Dieselbe Wirkung wie der Knopf daneben — die Palette ruft den echten Callback der Seite.
     expect(await screen.findByText('Schaden erfassen')).toBeInTheDocument();
   });
 
