@@ -293,8 +293,13 @@ betroffen.
 | Kriterium | Verdikt | Beleg / Zielticket |
 |---|---|---|
 | Ein `main`-Release erzeugt installierbare Pakete und ein Update-Manifest | **offen → nach dem Merge** | Matrix, Einsammeln und Manifest lokal mit Attrappen belegt (actionlint grün); der erste echte Lauf ist der Dispatch mit `desktop: true` nach dem Merge und dem Setzen der Secrets, Windows ist bis dahin unbelegt |
-| Eine installierte App aktualisiert sich auf das nächste Release | **erfüllt (macOS)**, Windows **offen → Dispatch-Lauf** | Nachweis oben; die Befürchtung aus LFH-722 (ohne Signierung praktisch unbenutzbar) trifft das Update selbst nicht, nur den Gatekeeper-Erststart |
+| Eine installierte App aktualisiert sich auf das nächste Release | **offen** — macOS belegt nur für den Ablauf VOR dem Zwei-Schritt-Umbau (Review), Windows **offen → Dispatch-Lauf** | Nachweis oben mit `download_and_install` in einem Schritt; der heutige Ablauf (`download` → Neustart-Frage → `install`) ist neu zu belegen. Die Befürchtung aus LFH-722 (ohne Signierung praktisch unbenutzbar) traf das Update selbst nicht, nur den Gatekeeper-Erststart |
 | `check-all.sh` bleibt die einzige Wahrheit | **erfüllt** | Manifest-Selbsttest in Schritt 8; die CI bekommt nur Umgebung (apt-Pakete), keinen eigenen Schritt |
+
+**Gate-Lauf 29.09.2026:** Schritt 4 nach der Trennung grün (Server 1910 Tests, Hülle 24); die
+fünf roten Vitest-Dateien des Volllaufs liefen einzeln grün (Zeitüberschreitungen unter Last,
+Frontend unverändert gegenüber `alpha`); e2e 345 grün, `e2e/kraefte-kontrast.spec.ts:140` lokal
+3 von 4 Läufen rot (Mandantenpunkt mit Breite 0) — **Ursache offen**, der e2e-Lauf am PR entscheidet.
 
 **Noch von Hand zu bestätigen** (an der Test-App vorbereitet, nicht automatisierbar ohne
 Bedienfreigabe): „Später“ läuft ohne Neustart weiter; ein manipuliertes Archiv wird abgelehnt
