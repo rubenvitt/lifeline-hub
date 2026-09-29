@@ -11,7 +11,7 @@ url = "2"
 # OPTIONAL und NICHT im Default, damit ein standalone `-p karten-service`-Build utoipa nicht
 # mitzieht. Achtung: bei einer Workspace-Invocation (`cargo test --workspace`) vereinheitlicht
 # Cargo die Features der gemeinsamen Abhängigkeit — die Isolation gilt nur standalone.
-utoipa = { version = "5", optional = true }
+utoipa = { version = "6", optional = true }
 
 [features]
 schema = ["dep:utoipa"]

@@ -45,7 +45,7 @@ export interface components {
             einheit_name: string;
             /** Format: int64 */
             einsatz_id: number;
-            einstufung?: null | components["schemas"]["Einstufung"];
+            einstufung?: components["schemas"]["Einstufung"] | null;
             faellig_at: string;
             /**
              * Format: int64
@@ -83,7 +83,7 @@ export interface components {
          */
         AbloesungVollzugAnzeige: {
             abgeloest: components["schemas"]["AbloesungAnzeige"];
-            folgeschicht?: null | components["schemas"]["AbloesungAnzeige"];
+            folgeschicht?: components["schemas"]["AbloesungAnzeige"] | null;
         };
         /** @description Rhythmus-Vorgabe eines Einsatzabschnitts. */
         AbloesungVorgabeAnzeige: {
@@ -169,7 +169,7 @@ export interface components {
             inhalt: string;
             /** Format: int64 */
             lfd_nr: number;
-            meldeweg?: null | components["schemas"]["MeldeWeg"];
+            meldeweg?: components["schemas"]["MeldeWeg"] | null;
             received_at: string;
             typ: components["schemas"]["EtbTyp"];
             veranlassung?: string | null;
@@ -194,9 +194,9 @@ export interface components {
         };
         /** @description Registereintrag einer Person — Registriernummer und Kategorien, kein Name, kein Ort. */
         ArchivPersonAnzeige: {
-            aktuelle_sichtung?: null | components["schemas"]["Sichtungskategorie"];
-            aktuelle_verbleib_art?: null | components["schemas"]["VerbleibArt"];
-            aktueller_verbleib_status?: null | components["schemas"]["VerbleibStatus"];
+            aktuelle_sichtung?: components["schemas"]["Sichtungskategorie"] | null;
+            aktuelle_verbleib_art?: components["schemas"]["VerbleibArt"] | null;
+            aktueller_verbleib_status?: components["schemas"]["VerbleibStatus"] | null;
             erfasst_at: string;
             /** @description Anzeigeform, z. B. `R-042`. */
             registrier_anzeige: string;
@@ -207,7 +207,7 @@ export interface components {
         };
         /** @description Registereintrag eines Schadens — Registriernummer, Typ, Ausmaß, Status. */
         ArchivSchadenAnzeige: {
-            abschluss_grund?: null | components["schemas"]["SchadenAbschlussGrund"];
+            abschluss_grund?: components["schemas"]["SchadenAbschlussGrund"] | null;
             ausmass: components["schemas"]["Ausmass"];
             erfasst_at: string;
             /** @description Anzeigeform, z. B. `S-003`. */
@@ -220,7 +220,7 @@ export interface components {
         };
         /** @description Registereintrag eines Tiers — Registriernummer, Tierart, Status. */
         ArchivTierAnzeige: {
-            abschluss_grund?: null | components["schemas"]["AbschlussGrund"];
+            abschluss_grund?: components["schemas"]["AbschlussGrund"] | null;
             erfasst_at: string;
             /** @description Anzeigeform, z. B. `T-007`. */
             registrier_anzeige: string;
@@ -333,7 +333,7 @@ export interface components {
             einheit_id?: number | null;
             empfaenger_typ: components["schemas"]["EmpfaengerTyp"];
             extern_bezeichnung?: string | null;
-            extern_kategorie?: null | components["schemas"]["AdressatKategorie"];
+            extern_kategorie?: components["schemas"]["AdressatKategorie"] | null;
             /** Format: int64 */
             fahrzeug_id?: number | null;
             funktion_text?: string | null;
@@ -614,7 +614,7 @@ export interface components {
             abschnitt_name?: string | null;
             angelegt_at: string;
             art: components["schemas"]["BetreuungsstelleArt"];
-            belegung?: null | components["schemas"]["BelegungsmeldungAnzeige"];
+            belegung?: components["schemas"]["BelegungsmeldungAnzeige"] | null;
             bezeichnung: string;
             /** Format: int64 */
             einsatz_id: number;
@@ -754,8 +754,13 @@ export interface components {
             id: number;
             slug: string;
             /**
-             * @description Inline statt `$ref`: [`JobStatus`] ist datentragend und bewusst kein registriertes
-             *     Component-Schema — utoipa bettet die Union direkt hier ein.
+             * @description Adjacently-tagged Status eines karten-service-Build-Jobs (LFH-323, verschoben aus
+             *     `karten-service/src/jobs.rs`). Wire: `{"status":"building"}` bzw. `{"status":"failed","fehler":"…"}`.
+             *     `karten-service` serialisiert ihn, `lifeline-hub` deserialisiert die Proxy-Antwort und exponiert
+             *     ihn (eingebettet in [`BuildJob`]) durch den Typ-Codegen. `Failed(String)` macht ihn
+             *     **datentragend** — deshalb bewusst NICHT in `tests/enum_wire_kontrakt.rs` gepinnt (dessen Makros
+             *     verlangen feldlose Enums) und in [`BuildJob`] `inline` statt als eigenes Component-Schema
+             *     registriert; die Wire-Treue sichert stattdessen der Round-Trip-Test unten.
              */
             status: {
                 /** @enum {string} */
@@ -816,7 +821,7 @@ export interface components {
             bearbeitet_at?: string | null;
             /** Format: int64 */
             bezug_id?: number | null;
-            bezug_typ?: null | components["schemas"]["BezugTyp"];
+            bezug_typ?: components["schemas"]["BezugTyp"] | null;
             /** Format: int64 */
             einsatz_id: number;
             erstellt_at: string;
@@ -870,8 +875,8 @@ export interface components {
         };
         /** @description Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte. */
         DemoDatenStatus: {
-            bericht?: null | components["schemas"]["DemoBericht"];
-            import?: null | components["schemas"]["DemoImportKopf"];
+            bericht?: components["schemas"]["DemoBericht"] | null;
+            import?: components["schemas"]["DemoImportKopf"] | null;
             /** @description Ob für die Organisation ein aktiver Import besteht. */
             importiert: boolean;
         };
@@ -977,7 +982,7 @@ export interface components {
             material_mitglieder: components["schemas"]["EinheitMitgliedMaterial"][];
             name: string;
             personal_mitglieder: components["schemas"]["EinheitMitgliedPerson"][];
-            soll?: null | components["schemas"]["Staerke"];
+            soll?: components["schemas"]["Staerke"] | null;
             /** Format: int64 */
             sortier: number;
             sprechgruppen: components["schemas"]["SprechgruppeAnzeige"][];
@@ -1000,7 +1005,7 @@ export interface components {
             ef_id: number;
             fahrzeugtyp?: string | null;
             funkrufname: string;
-            status?: null | components["schemas"]["StatusWert"];
+            status?: components["schemas"]["StatusWert"] | null;
             /** @description Zeitpunkt des letzten Statuswechsels (UTC); `None` = unbekannt. */
             status_seit?: string | null;
         };
@@ -1028,14 +1033,14 @@ export interface components {
             /** @description `true`, wenn diese Person als Führer der Einheit eingetragen ist. */
             ist_fuehrer: boolean;
             name: string;
-            staerke_position?: null | components["schemas"]["StaerkePosition"];
+            staerke_position?: components["schemas"]["StaerkePosition"] | null;
         };
         /**
          * @description Status einer Einheit mit „Seit“ (LFH-609). Die Regel steht an
          *     [`repo::leite_status_ab`].
          */
         EinheitStatus: {
-            kategorie?: null | components["schemas"]["StatusKategorie"];
+            kategorie?: components["schemas"]["StatusKategorie"] | null;
             quelle: components["schemas"]["EinheitStatusQuelle"];
             /**
              * @description Seit wann (UTC). `Fahrzeuge`: der jüngste Wechsel, also seit wann ALLE Fahrzeuge in
@@ -1043,7 +1048,7 @@ export interface components {
              *     der Zeitpunkt des Setzens. Bei `Gemischt`/`Ohne` immer `None`.
              */
             seit?: string | null;
-            status?: null | components["schemas"]["StatusWert"];
+            status?: components["schemas"]["StatusWert"] | null;
             /** @description Nur bei `Gemischt`: Fahrzeuge je Status, in Katalogreihenfolge, „ohne“ zuletzt. */
             verteilung: components["schemas"]["StatusAnteil"][];
         };
@@ -1065,7 +1070,7 @@ export interface components {
             /** Format: int64 */
             id: number;
             label: string;
-            soll?: null | components["schemas"]["Staerke"];
+            soll?: components["schemas"]["Staerke"] | null;
             /** Format: int64 */
             sortier: number;
         };
@@ -1114,7 +1119,7 @@ export interface components {
              *     und `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt.
              */
             meine_funktion?: string | null;
-            meine_rolle?: null | components["schemas"]["EinsatzRolle"];
+            meine_rolle?: components["schemas"]["EinsatzRolle"] | null;
             /**
              * @description Sachgebiete, die der mit dem abfragenden Benutzer verknüpfte Personaldatensatz in
              *     diesem Einsatz besetzt (LFH-46). Transitiv über `personal.benutzer_id`.
@@ -1176,11 +1181,11 @@ export interface components {
             /** Format: double */
             lon?: number | null;
             opta?: string | null;
-            soll_besatzung?: null | components["schemas"]["Staerke"];
+            soll_besatzung?: components["schemas"]["Staerke"] | null;
             status_farbe?: string | null;
             /** Format: int64 */
             status_id?: number | null;
-            status_kategorie?: null | components["schemas"]["StatusKategorie"];
+            status_kategorie?: components["schemas"]["StatusKategorie"] | null;
             status_label?: string | null;
             /**
              * @description Zeitpunkt des letzten Statuswechsels (UTC, LFH-609). `None` bei Dispositionen aus
@@ -1277,11 +1282,11 @@ export interface components {
              * @description `None` = Ad-hoc-externe Person (kein Stamm-Bezug).
              */
             personal_id?: number | null;
-            staerke_position?: null | components["schemas"]["StaerkePosition"];
+            staerke_position?: components["schemas"]["StaerkePosition"] | null;
             status_farbe?: string | null;
             /** Format: int64 */
             status_id?: number | null;
-            status_kategorie?: null | components["schemas"]["StatusKategorie"];
+            status_kategorie?: components["schemas"]["StatusKategorie"] | null;
             status_label?: string | null;
             traegerorganisation?: string | null;
         };
@@ -1321,7 +1326,7 @@ export interface components {
             kommunikationsmittel?: string | null;
             /** @description Kurzbezeichnung/Rufname im Einsatz, z. B. „EA-N" (LFH-608); je Einsatz eindeutig. */
             kurzbezeichnung?: string | null;
-            lagezustand?: null | components["schemas"]["AbschnittLagezustand"];
+            lagezustand?: components["schemas"]["AbschnittLagezustand"] | null;
             /** Format: int64 */
             leiter_id?: number | null;
             /** @description Name der disponierten Leiter-Person (aufgelöst), falls gesetzt. */
@@ -1355,8 +1360,8 @@ export interface components {
             auftrag_quittierung_frist_min?: number | null;
             /** Format: int64 */
             auto_etb_eintraege?: number | null;
-            basemap_modus?: null | components["schemas"]["BasemapModus"];
-            einheiten?: null | components["schemas"]["EinheitenSystem"];
+            basemap_modus?: components["schemas"]["BasemapModus"] | null;
+            einheiten?: components["schemas"]["EinheitenSystem"] | null;
             /** Format: int64 */
             einsatz_id: number;
             /**
@@ -1373,7 +1378,7 @@ export interface components {
             geaendert_von?: number | null;
             /** Format: double */
             karten_zoom_start?: number | null;
-            koordinatenformat?: null | components["schemas"]["Koordinatenformat"];
+            koordinatenformat?: components["schemas"]["Koordinatenformat"] | null;
             /** Format: int64 */
             meldung_bestaetigung_frist_min?: number | null;
             meldung_nummer_eingefroren: boolean;
@@ -1391,7 +1396,7 @@ export interface components {
              */
             rueckmeldung_frist_min?: number | null;
             standard_modul?: string | null;
-            zeitformat?: null | components["schemas"]["Zeitformat"];
+            zeitformat?: components["schemas"]["Zeitformat"] | null;
             zeitzone?: string | null;
         };
         /**
@@ -1480,7 +1485,7 @@ export interface components {
             id: number;
             inhalt: string;
             label: string;
-            meldeweg?: null | components["schemas"]["MeldeWeg"];
+            meldeweg?: components["schemas"]["MeldeWeg"] | null;
             /** Format: int64 */
             sortier: number;
             typ: components["schemas"]["EtbTyp"];
@@ -1539,7 +1544,7 @@ export interface components {
             lagebericht_id?: number | null;
             /** Format: int64 */
             lfd_nr: number;
-            meldeweg?: null | components["schemas"]["MeldeWeg"];
+            meldeweg?: components["schemas"]["MeldeWeg"] | null;
             received_at: string;
             typ: components["schemas"]["EtbTyp"];
             veranlassung?: string | null;
@@ -1627,7 +1632,7 @@ export interface components {
             plan_personen: number;
             raeumung: components["schemas"]["Raeumungszustand"];
             sammelstelle?: string | null;
-            stand?: null | components["schemas"]["EvakuierungsstandAnzeige"];
+            stand?: components["schemas"]["EvakuierungsstandAnzeige"] | null;
             storniert_at?: string | null;
         };
         /** @description Die aktuelle Standmeldung eines Bezirks. */
@@ -1671,7 +1676,7 @@ export interface components {
             kennzeichen?: string | null;
             opta?: string | null;
             sondersignal: boolean;
-            staerke?: null | components["schemas"]["Staerke"];
+            staerke?: components["schemas"]["Staerke"] | null;
             standort?: string | null;
             traegerorganisation?: string | null;
             /** Format: int64 */
@@ -1806,7 +1811,7 @@ export interface components {
          *     `properties` sind flache Skalar-Properties (MapLibre stringifiziert Verschachteltes).
          */
         GeoJsonFeature: {
-            geometry?: null | components["schemas"]["GeoJsonGeometrie"];
+            geometry?: components["schemas"]["GeoJsonGeometrie"] | null;
             properties: {
                 [key: string]: unknown;
             };
@@ -1872,7 +1877,7 @@ export interface components {
             karten_bau_verfuegbar: boolean;
             /** @description Pflicht-Attribution der ersten sichtbaren Region (Kompat). `None`, wenn keine Region bereit. */
             offline_attribution?: string | null;
-            offline_format?: null | components["schemas"]["OnlineStyleTyp"];
+            offline_format?: components["schemas"]["OnlineStyleTyp"] | null;
             /**
              * @description Alle gemeinsam anzuzeigenden Offline-Regionen (LFH-188): die Offline-Karte ist die
              *     VEREINIGUNG aller bereiten Regionen, je Region eine eigene Vector-Source. Leere Liste =
@@ -1896,7 +1901,7 @@ export interface components {
          *     bleibt (Norm ab LFH-265). `layer_sichtbar`/`fachebenen_sichtbar` sind opake JSON.
          */
         KartenAnsichtAnzeige: {
-            basemap_modus?: null | components["schemas"]["BasemapModus"];
+            basemap_modus?: components["schemas"]["BasemapModus"] | null;
             /** Format: int64 */
             einsatz_id: number;
             erstellt_at: string;
@@ -1909,7 +1914,7 @@ export interface components {
             /** Format: int64 */
             id: number;
             ist_standard: boolean;
-            karten_theme?: null | components["schemas"]["KartenTheme"];
+            karten_theme?: components["schemas"]["KartenTheme"] | null;
             layer_sichtbar?: unknown;
             name: string;
             online_stil?: string | null;
@@ -2272,14 +2277,14 @@ export interface components {
          *     (`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt".
          */
         ModulZaehlerAnzeige: {
-            auftraege?: null | components["schemas"]["AuftragsZaehler"];
-            chat?: null | components["schemas"]["ChatZaehler"];
-            einheiten?: null | components["schemas"]["MengenZaehler"];
-            einsatzabschnitte?: null | components["schemas"]["MengenZaehler"];
-            erinnerungen?: null | components["schemas"]["ErinnerungsZaehler"];
-            etb?: null | components["schemas"]["MengenZaehler"];
-            meldungen?: null | components["schemas"]["MeldungsZaehler"];
-            personen?: null | components["schemas"]["MengenZaehler"];
+            auftraege?: components["schemas"]["AuftragsZaehler"] | null;
+            chat?: components["schemas"]["ChatZaehler"] | null;
+            einheiten?: components["schemas"]["MengenZaehler"] | null;
+            einsatzabschnitte?: components["schemas"]["MengenZaehler"] | null;
+            erinnerungen?: components["schemas"]["ErinnerungsZaehler"] | null;
+            etb?: components["schemas"]["MengenZaehler"] | null;
+            meldungen?: components["schemas"]["MeldungsZaehler"] | null;
+            personen?: components["schemas"]["MengenZaehler"] | null;
         };
         /**
          * @description Anzeige einer Nachforderung inkl. Ersteller-Name (JOIN) und abgeleitetem `ist_offen`
@@ -2512,14 +2517,14 @@ export interface components {
             auftrag_quittierung_frist_min?: number | null;
             /** Format: int64 */
             auto_etb_eintraege?: number | null;
-            einheiten?: null | components["schemas"]["EinheitenSystem"];
+            einheiten?: components["schemas"]["EinheitenSystem"] | null;
             einsatz_nummer_praefix?: string | null;
             etb_nummer_praefix?: string | null;
             geaendert_at?: string | null;
             /** Format: int64 */
             geaendert_von?: number | null;
             geocoder_url?: string | null;
-            koordinatenformat?: null | components["schemas"]["Koordinatenformat"];
+            koordinatenformat?: components["schemas"]["Koordinatenformat"] | null;
             /** Format: int64 */
             meldung_bestaetigung_frist_min?: number | null;
             meldung_nummer_praefix?: string | null;
@@ -2532,7 +2537,7 @@ export interface components {
              * @description Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
              */
             rueckmeldung_frist_min?: number | null;
-            zeitformat?: null | components["schemas"]["Zeitformat"];
+            zeitformat?: components["schemas"]["Zeitformat"] | null;
             zeitzone?: string | null;
         };
         /**
@@ -2545,9 +2550,9 @@ export interface components {
             auftrag_quittierung_frist_min?: number | null;
             /** Format: int64 */
             auto_etb_eintraege?: number | null;
-            einheiten?: null | components["schemas"]["EinheitenSystem"];
+            einheiten?: components["schemas"]["EinheitenSystem"] | null;
             etb_nummer_praefix?: string | null;
-            koordinatenformat?: null | components["schemas"]["Koordinatenformat"];
+            koordinatenformat?: components["schemas"]["Koordinatenformat"] | null;
             /** Format: int64 */
             meldung_bestaetigung_frist_min?: number | null;
             meldung_nummer_praefix?: string | null;
@@ -2560,7 +2565,7 @@ export interface components {
              * @description Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
              */
             rueckmeldung_frist_min?: number | null;
-            zeitformat?: null | components["schemas"]["Zeitformat"];
+            zeitformat?: components["schemas"]["Zeitformat"] | null;
             zeitzone?: string | null;
         };
         /** @description Metadaten des Logos ohne Bytes — hängen als `logo` an der `OrganisationAnzeige`. */
@@ -2581,7 +2586,7 @@ export interface components {
         OrganisationAnzeige: {
             /** Format: int64 */
             id: number;
-            logo?: null | components["schemas"]["OrgLogoAnzeige"];
+            logo?: components["schemas"]["OrgLogoAnzeige"] | null;
             name: string;
             tz_organisation?: string | null;
         };
@@ -2593,17 +2598,17 @@ export interface components {
          */
         OrtVorschauAntwort: {
             ortsname?: string | null;
-            peilung?: null | components["schemas"]["PeilungAntwort"];
+            peilung?: components["schemas"]["PeilungAntwort"] | null;
         };
         /** @description Ein festgelegter Pegel eines Einsatzes. */
         PegelAnzeige: {
             gewaesser?: string | null;
             /** Format: int64 */
             id: number;
-            messung?: null | components["schemas"]["PegelMessung"];
+            messung?: components["schemas"]["PegelMessung"] | null;
             /** @description Stationsname zum Zeitpunkt des Festlegens (Snapshot). */
             name: string;
-            prognose?: null | components["schemas"]["PegelPrognose"];
+            prognose?: components["schemas"]["PegelPrognose"] | null;
             /**
              * Format: int64
              * @description Position in der Liste, ab 0; der erste Eintrag ist der Leitpegel.
@@ -2708,7 +2713,7 @@ export interface components {
          *     führt — das ist kein Fehler, sondern der Normalfall für die meisten Stationen.
          */
         PegelVorhersageAntwort: {
-            vorhersage?: null | components["schemas"]["PegelVorhersage"];
+            vorhersage?: components["schemas"]["PegelVorhersage"] | null;
         };
         PeilungAntwort: {
             bezug_label: string;
@@ -2722,11 +2727,11 @@ export interface components {
          *     kein Snapshot wie bei Material.
          */
         PersonAnzeige: {
-            aktuelle_sichtung?: null | components["schemas"]["Sichtungskategorie"];
+            aktuelle_sichtung?: components["schemas"]["Sichtungskategorie"] | null;
             aktuelle_sichtung_at?: string | null;
             /** Format: int64 */
             aktuelle_uhs_id?: number | null;
-            aktuelle_verbleib_art?: null | components["schemas"]["VerbleibArt"];
+            aktuelle_verbleib_art?: components["schemas"]["VerbleibArt"] | null;
             /**
              * Format: int64
              * @description Betreuungsstelle des jüngsten Verbleibs (LFH-674), nur bei `notunterkunft` gesetzt.
@@ -2735,7 +2740,7 @@ export interface components {
             /** Format: int64 */
             aktueller_platz_id?: number | null;
             aktueller_verbleib?: string | null;
-            aktueller_verbleib_status?: null | components["schemas"]["VerbleibStatus"];
+            aktueller_verbleib_status?: components["schemas"]["VerbleibStatus"] | null;
             aktuelles_verbleib_ziel?: string | null;
             /** Format: int64 */
             alter_geschaetzt?: number | null;
@@ -2756,7 +2761,7 @@ export interface components {
             /** Format: int64 */
             geaendert_von: number;
             geburtsdatum?: string | null;
-            geschlecht?: null | components["schemas"]["Geschlecht"];
+            geschlecht?: components["schemas"]["Geschlecht"] | null;
             herkunft_adresse?: string | null;
             /** Format: int64 */
             id: number;
@@ -2805,7 +2810,7 @@ export interface components {
             name: string;
             personalnummer?: string | null;
             qualifikationen: components["schemas"]["QualifikationRef"][];
-            staerke_position?: null | components["schemas"]["StaerkePosition"];
+            staerke_position?: components["schemas"]["StaerkePosition"] | null;
             telefon?: string | null;
             traegerorganisation?: string | null;
         };
@@ -2955,7 +2960,7 @@ export interface components {
         };
         SchadenAnzeige: {
             abschluss_at?: string | null;
-            abschluss_grund?: null | components["schemas"]["SchadenAbschlussGrund"];
+            abschluss_grund?: components["schemas"]["SchadenAbschlussGrund"] | null;
             ausmass: components["schemas"]["Ausmass"];
             beschreibung: string;
             /** Format: int64 */
@@ -3077,7 +3082,7 @@ export interface components {
             /** Format: int64 */
             anzahl_lagebesprechungen: number;
             besetzung: components["schemas"]["StabsfunktionAnzeige"][];
-            letzte_lagebesprechung?: null | components["schemas"]["LagebesprechungAnzeige"];
+            letzte_lagebesprechung?: components["schemas"]["LagebesprechungAnzeige"] | null;
             naechste_lagebesprechung_at?: string | null;
         };
         /**
@@ -3148,7 +3153,7 @@ export interface components {
         StatusAnteil: {
             /** Format: int32 */
             anzahl: number;
-            status?: null | components["schemas"]["StatusWert"];
+            status?: components["schemas"]["StatusWert"] | null;
         };
         /**
          * @description Status-Kategorie eines Katalog-Eintrags (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -3208,7 +3213,7 @@ export interface components {
          *     `R-nnn` bzw. "Halter (storniert): R-nnn" ohne Zweit-Request.
          */
         TierAnzeige: {
-            abschluss_grund?: null | components["schemas"]["AbschlussGrund"];
+            abschluss_grund?: components["schemas"]["AbschlussGrund"] | null;
             abschluss_ziel?: string | null;
             /** Format: int64 */
             alter_geschaetzt?: number | null;
@@ -3222,7 +3227,7 @@ export interface components {
             geaendert_at: string;
             /** Format: int64 */
             geaendert_von: number;
-            geschlecht?: null | components["schemas"]["TierGeschlecht"];
+            geschlecht?: components["schemas"]["TierGeschlecht"] | null;
             groesse_gewicht?: string | null;
             halter_kontakt?: string | null;
             /** Format: int64 */
@@ -3336,7 +3341,7 @@ export interface components {
             notiz?: string | null;
             /** Format: int64 */
             person_id: number;
-            status?: null | components["schemas"]["VerbleibStatus"];
+            status?: components["schemas"]["VerbleibStatus"] | null;
             transportmittel?: string | null;
             zeitpunkt_at: string;
             ziel?: string | null;
@@ -3382,7 +3387,7 @@ export interface components {
         Warnstufe: "keine" | "niedrig" | "mittel" | "hoch" | "akut";
         /** @description Antwort von `GET /api/einsaetze/{id}/wetter`. */
         WetterAnzeige: {
-            ort?: null | components["schemas"]["WetterOrt"];
+            ort?: components["schemas"]["WetterOrt"] | null;
             vorhersage: components["schemas"]["WetterVorhersageTeil"];
             warnungen: components["schemas"]["WetterWarnungen"];
         };
@@ -3456,7 +3461,7 @@ export interface components {
         WetterVorhersageTeil: {
             /** @description Zeitpunkt des letzten erfolgreichen Abrufs, RFC 3339 in UTC. Nur bei `ok`. */
             abgerufen_at?: string | null;
-            daten?: null | components["schemas"]["WetterVorhersage"];
+            daten?: components["schemas"]["WetterVorhersage"] | null;
             zustand: components["schemas"]["WetterTeilZustand"];
         };
         /**
