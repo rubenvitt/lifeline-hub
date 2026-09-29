@@ -30,7 +30,11 @@ export function downloadAnkerStil(token: {
 }
 
 interface Props {
-  /** Download-Adresse — immer die modul-gegatete Route, nie `/anhaenge/{aid}` des Einsatzes. */
+  /**
+   * Download-Adresse — immer die modul-gegatete Route, nie `/anhaenge/{aid}` des Einsatzes.
+   * Einzige Ausnahme ist der Chat (n:m, kein Eintrag in `MODUL_LINKER`): seine Anhänge laden
+   * über die generische Route, die sie an lebenden Nachrichten freigibt (`routes/anhang.rs`).
+   */
   href: string;
   /** Name für das `download`-Attribut und sichtbarer Text, wenn `text` fehlt. */
   dateiname: string;
@@ -48,7 +52,7 @@ interface Props {
 }
 
 /**
- * Nativer Download-Verweis (`<a href download>`), geteilt von Dokumentenablage und
+ * Nativer Download-Verweis (`<a href download>`), geteilt von Dokumentenablage, Chat und
  * Schaden-Anhängen (LFH-21). Kein Knopf mit `fetch`: der Browser lädt selbst, mit
  * Sitzungs-Cookie, ETag und eigenem Fortschritt.
  */

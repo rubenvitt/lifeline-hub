@@ -727,6 +727,11 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   Command steht im `AppManifest` von `build.rs`, sonst wäre er für jede Seite offen.
 - Adresse, Deeplink (`lifeline://verbinden?server=`, Vertrag für LFH-38) und Speicherung sind
   reine, getestete Funktionen (`adresse.rs`, `deeplink.rs`, `verbindung.rs`).
+- **Neue Fenster und Links** (LFH-782) entscheidet `links.rs` rein, den Server liest es bei
+  jedem Aufruf frisch: eigene Origin → Nebenfenster (`neben-*`, gleicher Fensterbau
+  `baue_fenster`, Druckfreigabe per Muster), `/api/` → Download, **außer `/api/auth/`** (OIDC
+  läuft im Fenster), fremde `http(s)`/`mailto`/`tel` → System (`tauri_plugin_opener::open_url`,
+  Plugin nicht registriert). Fremde Navigation im Fenster bleibt erlaubt (Anbieter).
 - **Version: eine Quelle** in `[workspace.package]` der Wurzel, Server und Hülle erben
   (`version.workspace = true`), `tauri.conf.json` trägt keine; `prepareCmd` setzt sie über
   `-p lifeline-hub`. Kein eigenes Versionsfeld in `src-tauri` (driftet beim alpha-Merge; Test
