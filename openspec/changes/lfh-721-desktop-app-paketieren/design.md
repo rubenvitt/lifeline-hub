@@ -19,7 +19,8 @@
     **stabile** Release, weil GitHub Vorabversionen dabei auslässt.
 - Gates: `scripts/check-all.sh` ist die einzige Wahrheit. Die CI ruft es in Bündeln auf und
   richtet vorher nur die Umgebung ein (Toolchain, `nasm`). `cargo test --workspace` (Schritt 4)
-  und `cargo llvm-cov --workspace` (`coverage.yml`) übersetzen jedes Workspace-Mitglied.
+  und `cargo llvm-cov --workspace` (`coverage.yml`) übersetzen jedes Workspace-Mitglied — und
+  vereinigen dabei die Features aller Mitglieder (siehe D1, Nachtrag).
 - `cargo audit` mit dem Tauri-Baum (Probe am 29.09.2026) bleibt grün: nur die Warnungen
   RUSTSEC-2024-0370 (`unmaintained`) und RUSTSEC-2024-0429 (`unsound`), beide ohne Abbruch.
 
@@ -55,6 +56,17 @@ also unberührt. Schritt 4 übersetzt die Hülle mit. Deshalb bekommen der Rust-
 libjavascriptcoregtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev` in denselben
 `apt-get`-Aufruf wie `nasm`. Das ist Umgebung wie `nasm`, kein Gate-Schritt neben
 `check-all.sh`.
+
+**Nachtrag (Gate-Lauf 29.09.2026):** In einem `cargo test --workspace` vereinigt Cargo die
+Features von Server und Hülle. `tauri-plugin-updater` schaltet an rustls `ring` ein, der Server
+nutzt `aws-lc-rs` — mit beiden kann rustls keinen Standard-Provider mehr wählen, und der
+Stolperdraht `tls::tests::rcgen_pem_ist_per_rustls_ladbar` bricht (so gewollt). Das ausgelieferte
+Server-Binary (`build-release.sh`, nur das Wurzelpaket) ist nicht betroffen. Deshalb testet
+Schritt 4 getrennt: `cargo test --workspace --exclude lifeline-desktop`, dann
+`cargo test -p lifeline-desktop`; `coverage.yml` misst ohne Hülle und braucht die GTK-Pakete
+nicht. *Verworfen:* den Updater auf `native-tls` stellen (schaltete im Workspace-Lauf reqwest
+des Servers auf NativeTls — Test und Produktion liefen auseinander) und den Provider im Server
+fest installieren (ändert Server-Code für eine Test-Eigenheit und entschärft den Stolperdraht).
 
 *Alternativen:*
 - `exclude` mit eigenem Lockfile: widerspricht dem Ticket, und `cargo audit` sähe den Baum

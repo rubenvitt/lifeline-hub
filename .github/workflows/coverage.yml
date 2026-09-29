@@ -55,13 +55,8 @@ jobs:
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
           df -h /
 
-      # Die GTK-/WebKit-Pakete braucht die Desktop-Hülle (src-tauri, LFH-721): `cargo llvm-cov
-      # --workspace` übersetzt sie mit. Umgebung wie nasm, kein Schritt neben check-all.sh.
       - name: System-Werkzeuge für die nativen Crates
-        run: >-
-          sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
-          libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
-          librsvg2-dev libayatana-appindicator3-dev
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
 
       - name: Rust-Toolchain (stable + llvm-tools)
         run: |
@@ -95,7 +90,9 @@ jobs:
       # Dieselbe Env-Hygiene wie im Sammel-Gate: der Runner setzt zwar keine
       # LIFELINE_*-Variablen, aber der Aufruf soll dem lokalen gleichen.
       - name: Rust-Coverage
-        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+        # Ohne die Desktop-Hülle: sie vereinigte ihre Features mit denen des Servers (Begründung in
+        # scripts/check-all.sh, Schritt 4), und gemessen wird die Server-Abdeckung.
+        run: cargo llvm-cov --workspace --exclude lifeline-desktop --lcov --output-path lcov.info
 
       # Die Instrumentierung macht die Suite auf zwei vCPU so langsam, dass der
       # Vorgabe-Timeout von 10 s nicht reicht — mehr Zeit und weniger Parallelität statt

@@ -125,8 +125,9 @@
   ergänzen, `src-tauri/Cargo.toml` zu den Assets. Prüfen: Der Lauf von `cargo set-version -p
   lifeline-desktop 9.9.9` in einer Wegwerf-Kopie ändert genau `src-tauri/Cargo.toml` und
   `Cargo.lock`.
-- [ ] 5.4 `ci.yml` (Rust-Job) und `coverage.yml`: die webkit2gtk-/GTK-Pakete in den
-  vorhandenen `apt-get`-Aufruf aufnehmen. Prüfen: Der PR-Lauf von `check-all --nur rust` ist grün.
+- [ ] 5.4 `ci.yml` (Rust-Job): die webkit2gtk-/GTK-Pakete in den vorhandenen `apt-get`-Aufruf
+  aufnehmen; Schritt 4 von `check-all.sh` testet Server und Hülle getrennt, `coverage.yml` misst
+  ohne Hülle (D1, Nachtrag). Prüfen: Der PR-Lauf von `check-all --nur rust` ist grün.
 
 ## 6. Doku und Abschluss
 

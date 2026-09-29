@@ -21,7 +21,7 @@ set -euo pipefail
 #                    Selbsttests der Gate-Skripte,
 #                    Migrationsnummern gegen origin/alpha,
 #                    Werkzeugversionen aus mise.toml         (Sekunden bis ~1:30)
-#   --nur rust       cargo test --workspace                  (~17 min)
+#   --nur rust       cargo test (Workspace, Hülle getrennt)   (~17 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
 # Unabhängig vom Bündel:
@@ -92,8 +92,13 @@ schritt_3() {
 }
 
 schritt_4() {
-  echo "==> [4/$SCHRITTE] Rust-Suite (Workspace)"
-  ohne_dev_env cargo test --workspace
+  echo "==> [4/$SCHRITTE] Rust-Suite (Workspace, Desktop-Hülle getrennt)"
+  # Getrennt, nicht `--workspace` in einem Zug: Cargo vereinigte sonst die Features von Server
+  # und Hülle (LFH-721) — der Server würde mit einem Feature-Satz getestet, den sein Binary nie
+  # hat (u. a. zwei rustls-Provider, woran `tls::tests::rcgen_pem_ist_per_rustls_ladbar` als
+  # Stolperdraht absichtlich bricht). Jedes Produkt läuft mit seinem eigenen Feature-Satz.
+  ohne_dev_env cargo test --workspace --exclude lifeline-desktop
+  ohne_dev_env cargo test -p lifeline-desktop
 }
 
 schritt_5() {

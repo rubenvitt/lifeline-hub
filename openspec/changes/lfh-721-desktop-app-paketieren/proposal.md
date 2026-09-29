@@ -36,8 +36,9 @@ diese Auflagen in dieselbe erste Auslieferung.
   `latest.json` und hängt es ans Release. Der Updater liest es über
   `…/releases/latest/download/latest.json`.
 - `release.config.mjs` führt die Version der Desktop-Crate mit der Anwendungsversion.
-- CI: Die Linux-Runner für `cargo test --workspace` und `cargo llvm-cov --workspace` bekommen
-  die webkit2gtk-/GTK-Systempakete. `check-all.sh` bleibt die einzige Wahrheit. Der Selbsttest
+- CI: Der Linux-Runner des Rust-Jobs bekommt die webkit2gtk-/GTK-Systempakete. Schritt 4 testet
+  Server und Hülle getrennt, damit Cargo ihre Features nicht vereinigt; die Coverage misst ohne
+  Hülle. `check-all.sh` bleibt die einzige Wahrheit. Der Selbsttest
   des Manifest-Skripts läuft in Schritt 8.
 
 ## Capabilities

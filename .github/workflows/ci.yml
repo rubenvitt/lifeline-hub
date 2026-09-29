@@ -126,8 +126,8 @@ jobs:
           fi
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
           df -h /
-      # Die GTK-/WebKit-Pakete braucht die Desktop-Hülle (src-tauri, LFH-721): `cargo test
-      # --workspace` übersetzt sie mit. Umgebung wie nasm, kein Schritt neben check-all.sh.
+      # Die GTK-/WebKit-Pakete braucht die Desktop-Hülle (src-tauri, LFH-721): Schritt 4 testet
+      # sie mit (`cargo test -p lifeline-desktop`). Umgebung wie nasm, kein Schritt neben check-all.sh.
       - name: System-Werkzeuge für die nativen Crates
         run: >-
           sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm

@@ -627,7 +627,7 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
 ## Qualitäts-Gates — ein Kommando (LFH-235/F17)
 
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
-`check-typ-codegen.sh` → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e` →
+`check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
 `check-migrationen.sh` → `check-all.test.sh` → `check-toolversionen.sh`.
 - **Das Skript ist die Wahrheit**; `.github/workflows/ci.yml` ruft es unverändert. Neue Schritte
@@ -685,8 +685,10 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   `scripts/release/desktop-manifest.mjs`, Selbsttest in Schritt 8. Der Updater-Schlüssel liegt
   außerhalb des Repos (Secrets `TAURI_SIGNING_PRIVATE_KEY[_PASSWORD]`), der Pubkey in
   `tauri.conf.json`.
-- `cargo test --workspace` übersetzt die Hülle: Linux-Runner brauchen die GTK-/WebKit-Pakete
-  (`ci.yml` Rust-Job, `coverage.yml`).
+- **Schritt 4 testet Server und Hülle getrennt** (`--workspace --exclude lifeline-desktop`, dann
+  `-p lifeline-desktop`): in einem Zug vereinigte Cargo die Features, der Server liefe mit zwei
+  rustls-Providern (Stolperdraht `tls::tests::rcgen_pem_ist_per_rustls_ladbar`). Linux-Runner
+  des Rust-Jobs brauchen die GTK-/WebKit-Pakete (`ci.yml`); `coverage.yml` misst ohne Hülle.
 
 ## Backend↔Frontend — Typ-Codegen (LFH-120)
 
