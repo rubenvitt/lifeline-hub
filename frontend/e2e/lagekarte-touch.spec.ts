@@ -15,8 +15,9 @@ import { expect, test, type CDPSession, type Page } from '@playwright/test';
 //  - Die Lagekarte bleibt Draufsicht (`touchPitch: false` + `maxPitch: 0`). MapLibre kippt nur,
 //    wenn die Finger NEBENEINANDER liegen und sich gemeinsam nach OBEN bewegen; ein Zug nach
 //    unten sähe auch ohne Abschaltung ungekippt aus — deshalb die Positivkontrolle.
-//  - Unter `lg` schließt die Werkzeugwahl die Leiste, und der Fuß endet an der Karte — sonst
-//    bliebe bei 390 px im Zeichenmodus keine Karte zum Tippen.
+//  - Unter `lg` schließt jeder laufende Kartenmodus die Leiste, und der Fuß endet an der Karte —
+//    sonst bliebe bei 390 px im Zeichenmodus keine Karte zum Tippen. Nach dem Modus hat die Leiste
+//    wieder ihren vorherigen Zustand (LFH-765, eigener Block unten bei 390 und 768 px).
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -30,6 +31,7 @@ interface MapHaken {
   getBearing(): number;
   getPitch(): number;
   project(ll: [number, number]): { x: number; y: number };
+  unproject(p: [number, number]): { lng: number; lat: number };
   getCanvas(): HTMLCanvasElement;
   querySourceFeatures(quelle: string): { properties: Record<string, unknown> | null }[];
 }
@@ -558,10 +560,7 @@ for (const viewport of [
 // erreichbar. Die Dichte kommt aus dem gespeicherten Wert, die Wache prüft, dass sie ankam.
 
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
-const PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-  'base64',
-);
+// `PNG` (1 × 1) steht beim LFH-765-Block unten.
 
 interface KarteLfh764 {
   project(ll: [number, number]): { x: number; y: number };
@@ -834,3 +833,296 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
     expect(seitenFehler.map((f) => f.message)).toEqual([]);
   });
 });
+
+// ── LFH-765: Jeder Kartenmodus gibt unter `lg` die Karte frei ────────────────────────────────────
+//
+// Eigener Block bei 390 und 768 px, damit die Gesten oben nicht ein drittes Mal laufen. Bei 768 px
+// ist die Leiste per Vorgabe offen, dort belegt der Block die Wiederherstellung nach dem Modus. Jede
+// Bedienung wird GETIPPT, jede Wirkung am Serverstand oder am Messwert gelesen.
+
+/** Unverortete Einheiten: sechs, damit „Nicht verortet" sein Suchfeld auch nach einem Treffer hält. */
+const RESERVE = ['Reserve 1', 'Reserve 2', 'Reserve 3', 'Reserve 4', 'Reserve 5', 'Reserve 6'];
+const BILDNAME = 'Lageplan Fingerprobe';
+/** 1 × 1-PNG, wie in `lagekarte-leiste-dichte.spec.ts`. */
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
+/** Bild um die MITTE: bei Zoom 14 rund 90 × 100 px, die Griffe liegen nicht übereinander. */
+const BILD_ECKEN: [number, number][] = [
+  [MITTE[0] - 0.004, MITTE[1] + 0.0025],
+  [MITTE[0] + 0.004, MITTE[1] + 0.0025],
+  [MITTE[0] + 0.004, MITTE[1] - 0.0025],
+  [MITTE[0] - 0.004, MITTE[1] - 0.0025],
+];
+
+interface Modussaat {
+  einsatzId: number;
+  reserve: Record<string, number>;
+  schadenId: number;
+  bildId: number;
+}
+
+async function einsatzFuerModi(page: Page): Promise<Modussaat> {
+  const einsatzId = await einsatzMitLage(page);
+  const reserve: Record<string, number> = {};
+  for (const name of RESERVE)
+    reserve[name] = await post(page, `/api/einsaetze/${einsatzId}/einheiten`, { name });
+  const schadenId = await post(page, `/api/einsaetze/${einsatzId}/schaeden`, {
+    typ: 'sachschaden',
+    ausmass: 'gering',
+    ort: 'Fingerprobe Keller',
+  });
+  const bild = await page.request.post(`/api/einsaetze/${einsatzId}/karte/hintergrundbilder`, {
+    multipart: {
+      datei: { name: 'plan.png', mimeType: 'image/png', buffer: PNG },
+      ecken: JSON.stringify(BILD_ECKEN),
+      name: BILDNAME,
+    },
+  });
+  expect(bild.ok(), `Seeding Bild: ${bild.status()} ${await bild.text()}`).toBeTruthy();
+  const bildId = ((await bild.json()) as { id: number }).id;
+  return { einsatzId, reserve, schadenId, bildId };
+}
+
+/** Die Leiste ist zu: aus dem Baum genommen (`hidden`), und der Kopf bietet das Einblenden an. */
+async function leisteZu(page: Page) {
+  await expect(page.locator('#lagekarte-leiste')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Leiste einblenden' })).toBeVisible();
+}
+
+async function leisteOffen(page: Page) {
+  await expect(page.locator('#lagekarte-leiste')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Leiste ausblenden' })).toBeVisible();
+}
+
+/** Zeitachse ausklappen — erst dann stapeln die Bänder gegeneinander. */
+async function zeitachseAus(page: Page) {
+  await page.getByRole('button', { name: 'Zeitachse einblenden' }).tap();
+  await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
+}
+
+/** Tipp in die Mitte der freien Karte, hinter der Trefferwache. */
+async function tippeFrei(page: Page, wo: string): Promise<Punkt> {
+  const m = await kartenMitte(page);
+  await aufKarte(page, [m], wo);
+  await tippe(page, m);
+  return m;
+}
+
+const band = (page: Page) => page.locator('[data-lfh="platzier-steuerung"]');
+
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 768, height: 1024 },
+]) {
+  test.describe(`Kartenmodi geben bei ${viewport.width} px die Karte frei (LFH-765)`, () => {
+    test.use({ hasTouch: true, viewport });
+    /** Bei 768 px ist die Leiste per Vorgabe offen, bei 390 px zu. */
+    const vorgabeOffen = viewport.width >= 768;
+
+    let saat: Modussaat;
+    const seitenFehler: Error[] = [];
+
+    test.beforeEach(async ({ page }) => {
+      test.setTimeout(150_000);
+      seitenFehler.length = 0;
+      page.on('pageerror', (f) => seitenFehler.push(f));
+      await anmelden(page);
+      saat = await einsatzFuerModi(page);
+    });
+
+    test.afterEach(() => {
+      expect(seitenFehler.map((f) => f.message)).toEqual([]);
+    });
+
+    async function oeffneKarte(page: Page, query = '') {
+      await page.goto(`/einsaetze/${saat.einsatzId}/lagekarte${query}`);
+      await ruhe(page);
+      await springe(page, MITTE, ZOOM);
+      await zeitachseAus(page);
+    }
+
+    test('Platzieren aus „Nicht verortet": Tipp verortet, danach Leiste samt Suche zurück', async ({
+      page,
+    }) => {
+      await oeffneKarte(page);
+      if (!vorgabeOffen) await page.getByRole('button', { name: 'Leiste einblenden' }).tap();
+      await leisteOffen(page);
+      const suche = page.getByRole('textbox', { name: 'Nicht verortete Objekte durchsuchen' });
+      await suche.fill('Reserve 3');
+      await page
+        .locator('[data-paneel="nichtVerortet"]')
+        .getByRole('button', { name: 'Platzieren' })
+        .tap();
+
+      // Die Leiste weicht, die Bedienung steht über der Karte.
+      await leisteZu(page);
+      await expect(band(page)).toContainText('Platzieren · Einheit: Reserve 3');
+
+      // Während des Modus lässt sich die Leiste zurückholen — ohne zweites „Abbrechen".
+      await page.getByRole('button', { name: 'Leiste einblenden' }).tap();
+      await leisteOffen(page);
+      await expect(page.getByText('wird platziert')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Abbrechen' })).toHaveCount(1);
+      await page.getByRole('button', { name: 'Leiste ausblenden' }).tap();
+      await leisteZu(page);
+
+      await tippeFrei(page, 'Platzieren');
+      await expect
+        .poll(
+          async () => {
+            const einheiten = (await (
+              await page.request.get(`/api/einsaetze/${saat.einsatzId}/einheiten`)
+            ).json()) as { id: number; lat: number | null }[];
+            return einheiten.find((e) => e.id === saat.reserve['Reserve 3'])?.lat ?? null;
+          },
+          { message: 'Reserve 3 ist verortet' },
+        )
+        .not.toBeNull();
+
+      // Modusende: vorheriger Zustand — offen, und der Suchbegriff steht noch.
+      await expect(band(page)).toHaveCount(0);
+      await leisteOffen(page);
+      await expect(suche).toHaveValue('Reserve 3');
+    });
+
+    test('Verortungsauftrag per Adresse: Leiste zu, „Abbrechen" im Band beendet', async ({
+      page,
+    }) => {
+      await oeffneKarte(page, `?platzieren=schaden:${saat.schadenId}`);
+      await leisteZu(page);
+      await expect(band(page)).toContainText('Platzieren · Schaden');
+      await band(page).getByRole('button', { name: 'Abbrechen' }).tap();
+      await expect(band(page)).toHaveCount(0);
+      if (vorgabeOffen) await leisteOffen(page);
+      else await leisteZu(page);
+    });
+
+    test('Taktisches Zeichen: Tipp setzt, „Fertig" im Band beendet', async ({ page }) => {
+      await oeffneKarte(page);
+      await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).tap();
+      const zeichnenPaneel = page.locator('[data-paneel="zeichnen"]');
+      await zeichnenPaneel.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).tap();
+      // Im Paneel: „Nicht verortet" trägt eigene „Platzieren"-Knöpfe.
+      await zeichnenPaneel.getByRole('button', { name: 'Platzieren', exact: true }).tap();
+
+      await leisteZu(page);
+      await expect(band(page)).toContainText('Taktisches Zeichen');
+      await tippeFrei(page, 'Taktisches Zeichen');
+      await expect
+        .poll(
+          async () =>
+            (
+              (await (
+                await page.request.get(`/api/einsaetze/${saat.einsatzId}/freie-zeichen`)
+              ).json()) as unknown[]
+            ).length,
+          { message: 'Freies Zeichen ist gespeichert' },
+        )
+        .toBe(1);
+      // Serie ist Vorgabe: der Modus bleibt, bis „Fertig" getippt wird.
+      await expect(band(page)).toContainText('1 platziert');
+      await band(page).getByRole('button', { name: 'Fertig' }).tap();
+      await expect(band(page)).toHaveCount(0);
+      // „Zeichenwerkzeuge" hatte die Leiste geöffnet — das war der Zustand vor dem Modus.
+      await leisteOffen(page);
+    });
+
+    test('Bild einpassen: Griff liegt frei, ein Zug verschiebt das Bild', async ({ page }) => {
+      await page.evaluate(() =>
+        localStorage.setItem('lfh:lagekarte:paneele', JSON.stringify({ bilder: true })),
+      );
+      await oeffneKarte(page);
+      if (!vorgabeOffen) await page.getByRole('button', { name: 'Leiste einblenden' }).tap();
+      await page.getByRole('button', { name: `Aktionen zu ${BILDNAME}` }).tap();
+      await page.getByRole('menuitem', { name: 'Auf der Karte platzieren' }).tap();
+
+      await leisteZu(page);
+      await expect(band(page)).toContainText(`Bild einpassen · ${BILDNAME}`);
+      await band(page).getByRole('radio', { name: 'Verschieben' }).tap();
+
+      // Das Bild in die freie Kartenmitte rücken — über dem Fuß, nicht darunter.
+      const frei = await kartenMitte(page);
+      await page.evaluate(
+        ({ p, ziel }) => {
+          const k = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+          const r = k.getCanvas().getBoundingClientRect();
+          const dort = k.unproject([p.x - r.left, p.y - r.top]);
+          const c = k.getCenter();
+          k.jumpTo({
+            center: [c.lng + ziel[0] - dort.lng, c.lat + ziel[1] - dort.lat],
+            zoom: k.getZoom(),
+          });
+        },
+        { p: frei, ziel: MITTE },
+      );
+      await ruhe(page);
+
+      const griff = page.locator('[data-lfh="bildgriff-mitte"]');
+      await expect(griff).toHaveCount(1);
+      const box = (await griff.boundingBox())!;
+      const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      const unterFinger = await page.evaluate(
+        (p) =>
+          (document.elementFromPoint(p.x, p.y) as HTMLElement | null)?.closest<HTMLElement>(
+            '[data-lfh^="bildgriff"]',
+          )?.dataset.lfh ?? 'anderes',
+        start,
+      );
+      expect(unterFinger, 'Griff „Mitte" liegt frei').toBe('bildgriff-mitte');
+
+      const vorher = await bildEcken(page, saat);
+      const cdp = await page.context().newCDPSession(page);
+      await geste(
+        page,
+        cdp,
+        [linie(start, { x: start.x + 40, y: start.y - 30 })],
+        'Bild ziehen',
+        12,
+        false,
+      );
+      await expect
+        .poll(async () => bildEcken(page, saat), { message: 'Bildlage ist gespeichert' })
+        .not.toBe(vorher);
+
+      await band(page).getByRole('button', { name: 'Fertig' }).tap();
+      await expect(band(page)).toHaveCount(0);
+      await leisteOffen(page);
+    });
+
+    test('Messen über den Kartenknopf: zwei Tipps messen, „Beenden" gibt die Leiste zurück', async ({
+      page,
+    }) => {
+      await oeffneKarte(page);
+      if (vorgabeOffen) await leisteOffen(page);
+      else await leisteZu(page);
+      await page.getByRole('button', { name: 'Messen' }).tap();
+      await leisteZu(page);
+
+      const m = await kartenMitte(page);
+      const punkte = [
+        { x: m.x - 40, y: m.y },
+        { x: m.x + 40, y: m.y },
+      ];
+      await aufKarte(page, punkte, 'Messen');
+      for (const p of punkte) {
+        await tippe(page, p);
+        await page.waitForTimeout(600);
+      }
+      await expect(page.locator('[data-lfh="messwert"]')).toContainText(/\d.*\s(m|km)\b/);
+
+      await page.getByRole('button', { name: 'Beenden' }).tap();
+      await expect(page.locator('[data-lfh="mess-steuerung"]')).toHaveCount(0);
+      if (vorgabeOffen) await leisteOffen(page);
+      else await leisteZu(page);
+    });
+  });
+}
+
+async function bildEcken(page: Page, saat: Modussaat): Promise<string> {
+  const bilder = (await (
+    await page.request.get(`/api/einsaetze/${saat.einsatzId}/karte/hintergrundbilder`)
+  ).json()) as { id: number; ecken_json: string }[];
+  return bilder.find((b) => b.id === saat.bildId)?.ecken_json ?? '';
+}

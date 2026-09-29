@@ -10,6 +10,7 @@ import Sidebar, {
   loeschDialogBild,
   namensteilStil,
   NICHT_VERORTET_SUCHE_AB,
+  platzierObjekt,
 } from './Sidebar';
 import type { NichtVerortet } from './marker';
 import type { SidebarProps } from './Sidebar';
@@ -1334,5 +1335,108 @@ describe('filtereNichtVerortet (LFH-360)', () => {
     expect(ids(filtereNichtVerortet(liste, 'elw', { typ: 'einheit', id: 3 }))).toEqual([1, 3]);
     // Gleiche id, anderer Typ: kein Treffer — die Kennung ist das Paar.
     expect(ids(filtereNichtVerortet(liste, 'elw', { typ: 'uhs', id: 3 }))).toEqual([1]);
+  });
+});
+
+/**
+ * Unter `lg` trägt das Fuß-Band `PlatzierSteuerung` die Bedienung der Leistenmodi (LFH-765). Die
+ * Leiste zeigt dann an deren Stelle nur einen Hinweis — je Breite genau ein Knopf je Handlung. Jedes
+ * „fehlt" hier hat seine Gegenprobe oben in den Bestandstests (ohne Prop stehen die Knöpfe).
+ */
+describe('Sidebar: Modusbedienung im Kartenfuß (LFH-765)', () => {
+  const einheit: NichtVerortet = { typ: 'einheit', id: 4, label: 'Pumpe Ost' };
+
+  it('Platzieren aus „Nicht verortet": „wird platziert" statt „Abbrechen"', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        nichtVerortet={[einheit]}
+        platzierungZiel={{ typ: 'einheit', id: 4 }}
+        modusBedienungImFuss
+      />,
+    );
+    expect(screen.getByText('wird platziert')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
+    // Die Koordinateneingabe bleibt Leisteninhalt.
+    expect(screen.getByRole('button', { name: 'Übernehmen' })).toBeInTheDocument();
+  });
+
+  it('Gegenprobe ohne Prop: dieselbe Zeile trägt „Abbrechen"', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        nichtVerortet={[einheit]}
+        platzierungZiel={{ typ: 'einheit', id: 4 }}
+      />,
+    );
+    expect(screen.queryByText('wird platziert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
+  });
+
+  it('Einsatzort: „wird platziert" statt „Abbrechen"', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        platzierungZiel={{ typ: 'einsatzort', id: 0 }}
+        modusBedienungImFuss
+      />,
+    );
+    expect(screen.getByText('wird platziert')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
+  });
+
+  it('Taktisches Zeichen: Hinweis statt Schalter, Zähler und Beenden', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        zeichenPlatzieren={{ grundzeichen: 'taktische-formation' }}
+        zeichenSerie
+        zeichenSerieAnzahl={2}
+        modusBedienungImFuss
+      />,
+    );
+    expect(screen.getByText('Bedienung über der Karte.')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Weitere platzieren' })).not.toBeInTheDocument();
+    expect(screen.queryByText('2 platziert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Fertig' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
+  });
+
+  it('Bild: ohne Griffwahl und „Fertig", die Mittelpunkt-Eingabe bleibt', () => {
+    paneeleOffen();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[bildLageplan]}
+        bildPlatzierenId={1}
+        bildPlatzierZentrum={{ lat: 50, lon: 9 }}
+        modusBedienungImFuss
+      />,
+    );
+    expect(
+      screen.queryByRole('radiogroup', { name: 'Griffe auf der Karte' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Fertig$/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mittelpunkt setzen/i })).toBeInTheDocument();
+    expect(screen.getByText('Bedienung über der Karte.')).toBeInTheDocument();
+  });
+});
+
+describe('platzierObjekt (LFH-765)', () => {
+  const liste: NichtVerortet[] = [{ typ: 'einheit', id: 4, label: 'Pumpe Ost' }];
+
+  it('nennt Typ und Namen wie die Zeile in „Nicht verortet"', () => {
+    expect(platzierObjekt({ typ: 'einheit', id: 4 }, liste)).toBe('Einheit: Pumpe Ost');
+  });
+
+  it('fällt ohne Eintrag auf den Typnamen zurück', () => {
+    expect(platzierObjekt({ typ: 'uhs', id: 9 }, liste)).toBe('UHS');
+    expect(platzierObjekt({ typ: 'person', id: 3 }, liste)).toBe('Betroffene Person');
+    expect(platzierObjekt({ typ: 'einsatzort', id: 0 }, liste)).toBe('Einsatzort');
   });
 });

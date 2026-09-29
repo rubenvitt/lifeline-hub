@@ -240,6 +240,54 @@ async fn providers_admin_zeigt_deaktivierte_public_verbirgt_sie() {
     assert_eq!(oidc["aktiviert"], false);
 }
 
+/// Die Anmeldeverfahren-Sektion sagt der Org-Führungskraft eine Nur-Lese-Ansicht zu
+/// (`Anmeldeverfahren.tsx`). Lesen folgt deshalb `darf_admin_bereich`, Schalten bleibt
+/// Admin-only. Gefunden vom Führungskraft-Durchgang in `e2e/trefflaeche-tablet.spec.ts`
+/// (LFH-435): vorher 403, die Seite zeigte „nicht ladbar".
+#[tokio::test]
+async fn providers_admin_lesen_fuehrungskraft_ja_ohne_rolle_nein_schalten_nur_admin() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    for body in [
+        r#"{"anzeigename":"Frieda Führung","benutzername":"frieda","passwort":"friedapw1","org_rolle":"fuehrungskraft"}"#,
+        r#"{"anzeigename":"Otto Ohne","benutzername":"otto","passwort":"ottopw123"}"#,
+    ] {
+        let (status, _) = anfrage(&app, "POST", "/api/benutzer", &admin, Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED);
+    }
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let otto = login_cookie(&app, "otto", "ottopw123").await;
+
+    let (status, json) = anfrage(&app, "GET", "/api/auth/providers/admin", &frieda, None).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "Führungskraft liest die volle Liste"
+    );
+    assert!(json
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|p| p["id"] == "passwort"));
+
+    let (status, _) = anfrage(&app, "GET", "/api/auth/providers/admin", &otto, None).await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "ohne Org-Rolle kein Admin-Bereich"
+    );
+
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        "/api/auth/providers/passwort",
+        &frieda,
+        Some(r#"{"aktiviert":false}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "Schalten bleibt Admin-only");
+}
+
 #[tokio::test]
 async fn toggle_ohne_admin_session_ist_401() {
     let app = setup().await;

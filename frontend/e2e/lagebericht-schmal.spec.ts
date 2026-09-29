@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Lagebericht am Fükw-Maß und am schmalen Schirm: Seitenhöhe der Detailseite und
@@ -146,3 +147,68 @@ for (const pfad of ['lageberichte', 'lagemeldungen'] as const) {
     );
   });
 }
+
+/**
+ * LFH-435 · Zweig: Beobachter (kein Schreibrecht). Die Liste verliert „Neuer Bericht"
+ * (`LageberichtePage.tsx`, `aktionen` nur mit `darfSchreiben`); die Detailseite rendert statt
+ * des Formulars mit acht Editoren den Lesezweig (`LageberichtDetailPage.tsx`, Paneel
+ * „Berichtstext"). Gemessen wird wie im Admin-Geschwister: Liste ohne Querlauf bei 390 px,
+ * Detail unter `MAX_HOEHE` bei 1366 px.
+ *
+ * Eigener Einsatz statt des geteilten: das Eintragen eines Mitglieds soll die Admin-Tests
+ * dieser Datei nicht berühren.
+ */
+test('Lageberichte: Liste ohne Querlauf und Detail unter der Höhengrenze (Beobachter)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const eigenerEinsatz = await einsatzAnlegen(page, `E2E Lagebericht lesend ${Date.now()}`);
+  const eigenerBericht = await lageberichtAnlegen(page, eigenerEinsatz);
+  await wechsleZuRolle(page, 'beobachter', eigenerEinsatz);
+
+  // ── LISTE, 390 px
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/einsaetze/${eigenerEinsatz}/lageberichte`);
+  await expect(page.getByRole('heading', { level: 1, name: 'Lageberichte' })).toBeVisible();
+  await expect(page.getByText('Lagevortrag zur Entscheidung 1000')).toBeVisible();
+  // ── VORBEDINGUNG: der Nur-Lese-Zweig steht. Das `aria-label` ist gesetzt (siehe Seite),
+  // der Name also belastbar.
+  await expect(
+    page.getByRole('button', { name: 'Neuer Bericht' }),
+    'Vorbedingung: ohne Schreibrecht kein „Neuer Bericht"',
+  ).toHaveCount(0);
+  const mass = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    klient: document.documentElement.clientWidth,
+  }));
+  expect(
+    mass.scroll,
+    'lageberichte (Beobachter): Body breiter als der Viewport',
+  ).toBeLessThanOrEqual(mass.klient + 1);
+
+  // ── DETAIL, 1366 px
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto(`/einsaetze/${eigenerEinsatz}/lageberichte/${eigenerBericht}`);
+  // Positiver Anker des Lesezweigs — der Admin-Anker `Auftrag` ist ein Formularfeld.
+  await expect(page.getByRole('heading', { name: 'Berichtstext' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /Drucken/ }).first(),
+    'Vorbedingung: der Druckknopf bleibt — der Kopf ist gerendert',
+  ).toBeVisible();
+  await expect(
+    page.getByLabel('Auftrag'),
+    'Vorbedingung: ohne Schreibrecht kein Editor',
+  ).toHaveCount(0);
+  for (const name of ['Entwurf speichern', 'Freigeben']) {
+    await expect(
+      page.getByRole('button', { name }),
+      `Vorbedingung: ohne Schreibrecht kein „${name}"`,
+    ).toHaveCount(0);
+  }
+  const hoehe = await stabileHoehe(page);
+  test.info().annotations.push({
+    type: 'gemessen',
+    description: `body.scrollHeight = ${hoehe} px bei 1366×768 (Beobachter), Einsatz ${eigenerEinsatz}, Bericht ${eigenerBericht}`,
+  });
+  expect(hoehe).toBeLessThanOrEqual(MAX_HOEHE);
+});

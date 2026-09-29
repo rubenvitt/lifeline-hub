@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Trefflächen-Nachweis am Führungs-Tablet: Modulzeilen im INLINE-Rahmen, Kategorie-Ziele der
@@ -336,6 +337,168 @@ for (const { dichte, soll } of STAFFEL) {
     test.info().annotations.push({
       type: 'messwert',
       description: `Kippschalter in ${dichte}: ${breite}px breit`,
+    });
+  });
+}
+
+/**
+ * LFH-435 · Zweig „Beobachter" (weder Verwaltungs- noch Schreibrecht) auf der Personalseite.
+ *
+ * Rollenabhängig ist hier nur (c): ohne Schreibrecht entfallen die Aktionsspalte mit
+ * „Entfernen" samt Bestätigungsblase und die Kopfaktionen (`PersonalPage.tsx`,
+ * `darfSchreiben`). Diese Ziele sind VERSTECKT, also als abwesend zugesichert statt still aus
+ * der Messmenge gefallen. Was dem Beobachter bleibt, sind Modulzeilen und Kategorie-Ziele —
+ * sie werden in der Stufe gemessen, damit die Messmenge nie leer ist.
+ *
+ * Nicht gespiegelt: der Hochkant-Durchgang (Hamburger, Akkordeon, Drawer-Schließer). Der
+ * Navigationsrahmen kennt ohne Modul-Override keine Rolle (`istModulGesperrt` greift nur mit
+ * `benoetigte_rolle`), sein Zustand ist für den Beobachter derselbe wie für den Admin.
+ */
+for (const { dichte, soll } of STAFFEL) {
+  test(`Führungs-Tablet, Stufe ${dichte}: Modulzeilen halten ${soll} px, versteckte Zeilenaktionen fehlen (Beobachter)`, async ({
+    page,
+  }) => {
+    // Gesät wird als Admin, erst dann wechselt die Sitzung im selben Kontext.
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `Trefflaeche Beobachter ${dichte} ${Date.now()}`);
+    await seedeKraft(page, einsatzId);
+    await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+    await page.setViewportSize(TABLET);
+    await page.goto(`/einsaetze/${einsatzId}/personal`);
+    if (dichte === 'handschuh') {
+      await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+        DICHTE_SCHLUESSEL,
+        dichte,
+      ] as const);
+      await page.reload();
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+
+    await drawerIstNichtImBaum(page);
+
+    // ── VORBEDINGUNG: der Nur-Lese-Zweig steht. Erst der Inhaltsanker, sonst wäre „fehlt"
+    //    auch im Ladezustand wahr.
+    const zeile = page.locator('tr.ant-table-row');
+    await expect(zeile, 'genau die eine geseedete Kraft').toHaveCount(1);
+    await expect(zeile.getByText(KRAFT)).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Entfernen', exact: true }),
+      'Vorbedingung: ohne Schreibrecht keine Zeilenaktion „Entfernen" — sonst misst der Test den Admin-Zweig',
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Ad-hoc-Person', exact: true }),
+      'Vorbedingung: ohne Schreibrecht keine Kopfaktion',
+    ).toHaveCount(0);
+    await expect(page.locator('.ant-popconfirm'), 'keine Bestätigungsblase im Baum').toHaveCount(0);
+
+    // ── Was bleibt, hält die Stufe: Modulzeilen und Kategorie-Ziele.
+    const panel = page.locator('[data-lfh="modul-panel"]');
+    await expect(panel, 'der inline-Rahmen steht bei 1024 px').toHaveCount(1);
+    for (const modul of ['Einheiten', 'Personal', 'Fahrzeuge', 'Material']) {
+      const knopf = panel.getByRole('button', { name: modul, exact: true });
+      // Ohne Override ist kein Modul für den Beobachter gesperrt; ein gesperrtes Ziel wäre ein
+      // anderer Zweig als der gemessene.
+      await expect(knopf, `Modulzeile „${modul}" ist bedienbar`).toBeEnabled();
+      await haeltTreffflaeche(knopf, soll, `Modulzeile „${modul}" (Beobachter)`);
+    }
+    const rail = page.getByRole('navigation', { name: 'Kategorien' });
+    for (const kategorie of ['Führung', 'Lage']) {
+      const breite = await haeltTreffflaeche(
+        rail.getByRole('button', { name: kategorie, exact: true }),
+        soll,
+        `Kategorie-Ziel „${kategorie}" (Beobachter)`,
+      );
+      expect(
+        breite,
+        `Kategorie-Ziel „${kategorie}" (gemessen ${breite}px breit, Soll ≥ ${soll})`,
+      ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
+    }
+  });
+}
+
+/**
+ * LFH-435 · Zweig „Org-Führungskraft" auf den Anmeldeverfahren: sie kommt in die Verwaltung,
+ * ist aber kein System-Admin. Jede Zeile trägt dann den Sperrgrund „nur Admins" neben dem
+ * gesperrten Kippschalter (`Anmeldeverfahren.tsx`) — der Zweig ist breiter als der des Admins,
+ * der nur an „Passwort" einen Grund trägt.
+ *
+ * Gemessen je Zeile: kein waagerechter Überlauf (`scrollWidth` ≤ `clientWidth`), der
+ * Kippschalter hält die Stufe auf beiden Achsen. Die Liste lädt über
+ * `GET /api/auth/providers/admin`; steht statt der Zeilen „Anmeldeverfahren nicht ladbar", ist
+ * der Zweig gar nicht erreicht — das meldet die Vorbedingung, nicht die Messung.
+ */
+for (const { dichte, soll } of STAFFEL) {
+  test(`Führungs-Tablet, Stufe ${dichte}: jede Anmeldeverfahren-Zeile trägt ihren Sperrgrund und hält ${soll} px (Führungskraft)`, async ({
+    page,
+  }) => {
+    await anmelden(page);
+    await wechsleZuRolle(page, 'fuehrungskraft');
+
+    await page.setViewportSize(TABLET);
+    await page.goto('/admin/einstellungen/anmeldung');
+    if (dichte === 'handschuh') {
+      await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+        DICHTE_SCHLUESSEL,
+        dichte,
+      ] as const);
+      await page.reload();
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+
+    // ── VORBEDINGUNGEN: der gesperrte Zweig steht.
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'dürfen Anmeldeverfahren umschalten' }),
+      'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
+    ).toBeVisible();
+    const zeilen = page.locator('[data-provider-zeile]');
+    const ladefehler = page.getByText('Anmeldeverfahren nicht ladbar');
+    // Erst warten, bis die Liste ODER ihr Fehler steht — „kein Fehler" allein wäre im
+    // Ladezustand wahr.
+    await expect(zeilen.first().or(ladefehler)).toBeVisible();
+    await expect(
+      ladefehler,
+      'Vorbedingung: die Provider-Liste lädt für die Führungskraft — ohne Zeilen gibt es keinen Sperrgrund zu messen',
+    ).toHaveCount(0);
+    const anzahl = await zeilen.count();
+    expect(anzahl, 'mindestens eine Anmeldeverfahren-Zeile').toBeGreaterThanOrEqual(1);
+
+    for (let i = 0; i < anzahl; i += 1) {
+      const zeile = zeilen.nth(i);
+      const kennung = await zeile.getAttribute('data-provider-zeile');
+      await expect(
+        zeile.getByText('nur Admins', { exact: true }),
+        `Vorbedingung: Zeile „${kennung}" nennt ihren Sperrgrund sichtbar`,
+      ).toBeVisible();
+      const schalter = zeile.getByRole('switch');
+      await expect(
+        schalter,
+        `Kippschalter „${kennung}" ist gesperrt, nicht versteckt`,
+      ).toBeDisabled();
+
+      const masse = await zeile.evaluate((el) => ({
+        scroll: el.scrollWidth,
+        klient: el.clientWidth,
+      }));
+      expect(
+        masse.scroll,
+        `Zeile „${kennung}" läuft waagerecht über (scrollWidth ${masse.scroll}, clientWidth ${masse.klient})`,
+      ).toBeLessThanOrEqual(masse.klient);
+
+      // Gesperrt ändert an der Geometrie nichts: auch hier hält der Schalter die Stufe.
+      const breite = await haeltTreffflaeche(
+        schalter,
+        soll,
+        `Kippschalter „${kennung}" (gesperrt)`,
+      );
+      expect(
+        breite,
+        `Kippschalter „${kennung}" (gemessen ${breite}px breit, Soll ≥ ${2 * soll})`,
+      ).toBeGreaterThanOrEqual(2 * soll - SUBPIXEL);
+    }
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `Führungskraft in ${dichte}: ${anzahl} Zeilen mit Sperrgrund gemessen`,
     });
   });
 }
