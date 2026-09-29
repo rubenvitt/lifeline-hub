@@ -9,8 +9,8 @@ import type { EtbBaustein } from '../api/types';
 import EtbBausteinFormModal from './EtbBausteinFormModal';
 
 /**
- * LFH-346/A6 — die Baustein-Maske auf `ErfassungsModal`. Kein Serienmodus: Bausteine
- * sind Vorlagen, die einmal gepflegt und danach eingesetzt werden.
+ * Die Baustein-Maske auf `ErfassungsModal` (LFH-346). Kein Serienmodus: Bausteine sind
+ * Vorlagen, die einmal gepflegt und danach eingesetzt werden.
  */
 
 const baustein: EtbBaustein = {
@@ -66,10 +66,9 @@ describe('EtbBausteinFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Die Vorgabewerte des früheren Anlegen-Zweigs (`typ: 'meldung'`, `sortier: 0`) stehen
-   * jetzt als `initialValues` an der Hülle — von dort holt sie jedes `resetFields`
-   * wieder. Der Beleg ist der Weg über einen bearbeiteten Datensatz: ohne
-   * `initialValues` stünde hier die Sortierung 7 des Bausteins.
+   * Die Vorgabewerte (`typ: 'meldung'`, `sortier: 0`) stehen als `initialValues` an der Hülle —
+   * von dort holt sie jedes `resetFields` wieder. Beleg ist der Weg über einen bearbeiteten
+   * Datensatz: ohne `initialValues` stünde hier dessen Sortierung 7.
    */
   it('nach dem Bearbeiten startet das nächste Anlegen mit den Vorgabewerten', async () => {
     handler();
@@ -77,8 +76,8 @@ describe('EtbBausteinFormModal — Hülle (LFH-346/A6)', () => {
     renderMitProviders(<Harness bestand={baustein} />);
     expect(await screen.findByLabelText('Label')).toHaveValue('Lage unverändert');
     expect(screen.getByLabelText('Typ').closest('.ant-select')).toHaveTextContent('Lage');
-    // Die Sortierung liegt seit LFH-346 · A8 unter „Weitere Angaben"; die Vorbelegung
-    // muss sie trotzdem erreichen, obwohl das Feld beim Öffnen noch nicht montiert ist.
+    // Die Sortierung liegt unter „Weitere Angaben"; die Vorbelegung muss sie erreichen, obwohl
+    // das Feld beim Öffnen noch nicht montiert ist.
     await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     expect(await screen.findByLabelText('Sortierung')).toHaveValue('7');
 
@@ -97,14 +96,13 @@ describe('EtbBausteinFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * LFH-346 · A8, Befund N20. Die tragende Prüfung des Collapse-Umbaus — nicht die
-   * Zählung darunter: beide Hälften der Zählung stünden grün, während jedes Speichern
-   * drei Felder still leert.
+   * Die tragende Prüfung des Collapse-Umbaus (LFH-346): die Zählung darunter stünde grün,
+   * während jedes Speichern drei Felder still leert.
    *
-   * `BausteinEingabe` ist Vollersatz. Ohne `forceRender` sind Meldeweg, Veranlassung
-   * und Sortierung nicht montiert, und `onFinish` liefert nur montierte Felder — ein
-   * `onErfassen`, das seine Werte von dort nimmt, schickte `meldeweg: null` und
-   * `sortier: 0` an einen Baustein, an dem niemand etwas davon angefasst hat.
+   * `BausteinEingabe` ist Vollersatz. Ohne `forceRender` sind Meldeweg, Veranlassung und
+   * Sortierung nicht montiert, und `onFinish` liefert nur montierte Felder — ein `onErfassen`
+   * von dort schickte `meldeweg: null` und `sortier: 0` an einen Baustein, an dem niemand etwas
+   * davon angefasst hat.
    */
   it('behält Meldeweg, Veranlassung und Sortierung, wenn niemand aufklappt', async () => {
     let rumpf: Record<string, unknown> | null = null;
@@ -160,11 +158,10 @@ describe('EtbBausteinFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Das Feldbudget (LFH-346 · A8): drei sichtbare Felder statt sechs.
+   * Das Feldbudget (LFH-346): drei sichtbare Felder statt sechs.
    *
-   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — der Typ ist ein
-   * `Select` und fehlte in der Rollenzählung. Die zweite Hälfte ist Pflicht:
-   * „höchstens drei" allein erfüllte auch ein Dialog ganz ohne Felder.
+   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — der Typ ist ein `Select`.
+   * Die zweite Hälfte ist Pflicht: „höchstens drei" erfüllte auch ein Dialog ohne Felder.
    */
   it('zeigt drei Felder und deckt drei weitere erst beim Aufklappen auf', async () => {
     handler();

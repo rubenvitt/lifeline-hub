@@ -1,13 +1,9 @@
 /**
- * Paneel „Pegel" der Modulseite „Wetter & Pegel" (LFH-633).
+ * Paneel „Pegel" der Modulseite „Wetter & Pegel".
  *
- * FORM: eine LISTE, keine Tabelle — 1 bis 5 Stationen, die Frage ist „was ist mit diesem
- * Pegel?", nicht „welcher ist der richtige?" (LFH-330/B2). Je Zeile: Name und Gewässer, Wert
- * in Mono, Trend als Wort, Stand, Prognose — alles aus {@link pegelZeile}, damit Dashboard,
- * Überblick und diese Seite dieselben Schwellen lesen — und rechts der 24-h-Verlauf.
- *
- * Der Verlauf ist eine eigene Abfrage. Fällt NUR sie aus, bleiben die Werte stehen und die
- * Zeile sagt „Verlauf nicht abrufbar" — sonst risse die Linie den Messwert mit.
+ * Eine LISTE, keine Tabelle: 1 bis 5 Stationen, gelesen statt verglichen. Die Werte kommen aus
+ * {@link pegelZeile}, damit Dashboard, Überblick und diese Seite dieselben Schwellen lesen.
+ * Der Verlauf ist eine eigene Abfrage; fällt nur sie aus, bleiben die Werte stehen.
  */
 import type { PegelAnzeige, PegelVerlauf } from '../api/types';
 import type { AnzeigeKonventionen } from '../anzeige/format';
@@ -25,7 +21,7 @@ import Verlaufslinie from './Verlaufslinie';
 export const VERLAUF_FEHLT = 'Verlauf nicht abrufbar';
 export const KEIN_VERLAUF = 'noch kein Verlauf';
 /** Wortlaut des Leerzustands — bewusst NICHT „Pegel festlegen": das ist die Primäraktion im
- *  Seitenkopf, und zwei gleichnamige Ziele auf einer Seite sagen nicht, welches wohin führt. */
+    Seitenkopf, zwei gleichnamige Ziele sagten nicht, welches wohin führt. */
 export const ZU_DEN_EINSTELLUNGEN = 'Zu Einstellungen › Pegel';
 
 interface PegelPaneelProps {
@@ -82,8 +78,7 @@ export default function PegelPaneel({
                   paddingBlock: token.paddingSM,
                   paddingInline: token.padding,
                   borderBlockEnd: `1px solid ${rollen.flaeche3}`,
-                  // Zweiter Kanal zum Wort „veraltet"/„Stand unbekannt": die Kante in der
-                  // Rollenfarbe, wie an der Kennzahl (Kennzahl.tsx, KANTE).
+                  // Zweiter Kanal zum Wort „veraltet"/„Stand unbekannt": die Kante in der Rollenfarbe.
                   boxShadow: z.ton === 'achtung' ? `inset 3px 0 0 ${rollen.achtung}` : undefined,
                 }}
               >

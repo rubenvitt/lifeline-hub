@@ -18,16 +18,13 @@ import SprechgruppenTab from './SprechgruppenTab';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 
 /**
- * Sektionsübergreifender Rechte-Hinweis (LFH-346 · A2, Befund M45).
+ * Sektionsübergreifender Rechte-Hinweis (LFH-346, Befund M45): wer ohne Admin-Rolle eine
+ * Stammdaten-Sektion öffnet, erfährt den Grund, statt eine Tabelle ohne Handlungsmöglichkeit
+ * zu sehen.
  *
- * Zehn Tabs trugen dasselbe `istAdmin`-Gate und VERSTECKTEN damit Primäraktion und
- * Aktionsspalte; `OrganisationTab` hatte gar keins. Wer ohne Admin-Rolle auf eine dieser
- * Seiten kam, sah eine Tabelle ohne Handlungsmöglichkeit und keinen Grund dafür — vier
- * Ausprägungen von „nur lesen" gezählt, drei davon stumm.
- *
- * Der Test steht bewusst QUER zu den elf Dateien und nicht elfmal einzeln in ihnen: die
- * Aussage ist „KEINE Sektion fehlt", und die lässt sich nur an der vollständigen Menge
- * treffen. Ein zwölfter Tab ohne Hinweis fiele hier auf, in elf Einzeltests nicht.
+ * Der Test steht bewusst QUER zu den elf Dateien: die Aussage ist „KEINE Sektion fehlt", und
+ * die lässt sich nur an der vollständigen Menge treffen. Ein zwölfter Tab ohne Hinweis fiele
+ * hier auf, in elf Einzeltests nicht.
  */
 const nichtAdmin = benutzerFixture({
   id: 2,
@@ -98,12 +95,9 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
   });
 
   /**
-   * Die zweite Hälfte derselben Regel (LFH-346, Nacharbeit zu Befund M45) — und die, die
-   * hier gefehlt hat: gepinnt war nur der HINWEISTEXT, nicht die BEHANDLUNG der
-   * Primäraktion. Fünf der elf Sektionen versteckten sie deshalb weiter, ohne dass etwas
-   * rot wurde, während CLAUDE.md „steht gesperrt" für alle elf behauptete. Ein zwölfter
-   * Tab, der wieder versteckt, fällt jetzt hier auf: `getByRole` wirft, wenn der Knopf
-   * fehlt, `toBeDisabled` schlägt fehl, wenn er offen steht.
+   * Die zweite Hälfte derselben Regel: nicht nur der HINWEISTEXT, auch die BEHANDLUNG der
+   * Primäraktion ist gepinnt. Ein Tab, der sie versteckt, fällt hier auf: `getByRole` wirft,
+   * wenn der Knopf fehlt, `toBeDisabled` schlägt fehl, wenn er offen steht.
    */
   it.each(SEKTIONEN)(
     '$name zeigt die Primäraktion GESPERRT statt versteckt',
@@ -112,10 +106,9 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
       renderMitProviders(<Komp />);
       // `findBy`, weil das Recht aus `auth/me` eine Runde nach dem ersten Anstrich eintrifft.
       await screen.findByText(STAMMDATEN_RECHTE_TEXT);
-      // Symmetrisch zur Admin-Hälfte gewartet. Der Hinweis steht im `hinweis`-Slot, fünf der
-      // elf Primäraktionen aber im INHALT — auf den Hinweis zu warten sichert für die also
-      // strenggenommen nichts zu. `waitFor` maskiert dabei nichts: ein Knopf, der nie
-      // gesperrt wird, läuft in die Zeitüberschreitung statt grün zu werden.
+      // Symmetrisch zur Admin-Hälfte gewartet. Der Hinweis steht im `hinweis`-Slot, fünf der elf
+      // Primäraktionen aber im INHALT — auf den Hinweis zu warten sichert für die nichts zu.
+      // `waitFor` maskiert nichts: ein Knopf, der nie gesperrt wird, läuft in die Zeitüberschreitung.
       await waitFor(() => expect(screen.getByRole('button', { name: aktion })).toBeDisabled());
     },
   );

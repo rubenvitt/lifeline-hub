@@ -10,10 +10,8 @@ import VerbleibErfassung from './VerbleibErfassung';
 import { benutzerFixture } from '../test/fixtures';
 
 /**
- * Verbleib-Dialog auf der Erfassungs-Hülle (LFH-674, design.md D6). Die Pure-Kerne
- * (Felder je Art, Vorbelegung, Body) prüft `verbleibErfassungKern.test.ts`; hier geht es um das,
- * was erst das Rendern zeigt: Struktur der Hülle, Feldbudget, die Datenquellen-Grenze zur
- * Betreuung und den tatsächlich gesendeten Body.
+ * Verbleib-Dialog auf der Hülle. Die reinen Kerne prüft `verbleibErfassungKern.test.ts`; hier
+ * geht es um Struktur, Feldbudget, die Grenze zur Betreuung und den gesendeten Body.
  */
 
 const stelle = (teil: Partial<Betreuungsstelle> & { id: number; bezeichnung: string }) =>
@@ -169,10 +167,9 @@ describe('VerbleibErfassung — Betreuungsstelle (LFH-674)', () => {
   });
 
   /**
-   * Widerlegbar gemacht (Review): Solange die Overrides NICHT geladen sind, fehlt die Auswahl
-   * ohnehin (Rechte offen = „ausgeblendet"). Die Abwesenheit sagt also erst etwas, wenn die
-   * Overrides nachweislich im Cache stehen — und der Gegenfall mit freiem Modul zeigt, dass
-   * dieselbe Stelle des Tests die Auswahl sonst findet.
+   * Solange die Overrides nicht geladen sind, fehlt die Auswahl ohnehin; die Abwesenheit sagt
+   * erst etwas, wenn sie nachweislich im Cache stehen — der Gegenfall mit freiem Modul zeigt,
+   * dass der Test die Auswahl sonst findet.
    */
   it.each([
     ['frei', {}, true],
@@ -205,8 +202,8 @@ describe('VerbleibErfassung — Betreuungsstelle (LFH-674)', () => {
   );
 
   /**
-   * Das 403 wird angehalten: vorher steht die Auswahl (Client sagt „frei"), danach ist sie
-   * weg — ohne Fehlermeldung. Ohne das Anhalten wäre „fehlt" schon vor der Antwort wahr.
+   * Das 403 wird angehalten: vorher steht die Auswahl, danach ist sie weg — ohne Fehlermeldung.
+   * Ohne das Anhalten wäre „fehlt" schon vor der Antwort wahr.
    */
   it('ein 403 der Betreuung nimmt die Auswahl weg, ohne Fehler zu melden', async () => {
     const user = userEvent.setup();

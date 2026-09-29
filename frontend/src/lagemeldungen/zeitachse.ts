@@ -2,14 +2,11 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzeige/format';
 
 /**
- * Zeitachse der Lagemeldungen (LFH-348 · C13, Befund M85): Tagesgruppen und Zeitfenster —
- * rein, ohne React, damit die Tagesgrenze ohne Render prüfbar ist.
+ * Zeitachse der Lagemeldungen: Tagesgruppen und Zeitfenster, rein und ohne React.
  *
- * Der Wire-String ist UTC OHNE Zonenkennung; `dayjs(s)` läse ihn als Ortszeit und
- * verschöbe die Tagesgrenze um den Zonenversatz (dieselbe Falle wie in `etb/filterZeit.ts`).
- * Deshalb läuft alles über `inZone` aus `anzeige/format.ts` — dieselbe Zone, in der
- * `ZeitAnzeige` daneben die Uhrzeit rendert; sonst stünde ein 00:30-Eintrag unter dem
- * falschen Tageskopf.
+ * Der Wire-String ist UTC OHNE Zonenkennung; `dayjs(s)` läse ihn als Ortszeit und verschöbe
+ * die Tagesgrenze. Deshalb läuft alles über `inZone` — dieselbe Zone, in der `ZeitAnzeige`
+ * die Uhrzeit rendert.
  */
 
 export type Zeitfenster = 'stunde' | 'vierStunden' | 'heute';
@@ -42,11 +39,9 @@ export function jetztInZone(
 }
 
 /**
- * Gruppenetikett: „Heute" / „Gestern" / `DD.MM.YYYY`. Nimmt die KONVENTIONEN, nicht ein
- * `jetzt` — damit der Aufrufer die Zone nicht vergessen kann (Review LFH-348: der einzige
- * Produktivaufrufer reichte kein `jetzt` durch, „Heute" fiel bei abweichender Anzeigezone
- * auf den falschen Tageskopf). Der Schlüssel `YYYY-MM-DD` ist zonenlos; verglichen wird er
- * mit dem heutigen Schlüssel derselben Zone, nicht mit einem Zeitpunkt.
+ * Gruppenetikett: „Heute" / „Gestern" / `DD.MM.YYYY`. Nimmt die KONVENTIONEN statt eines
+ * `jetzt`, damit der Aufrufer die Zone nicht vergessen kann; verglichen wird mit dem heutigen
+ * Schlüssel derselben Zone.
  */
 export function tagesEtikett(
   schluessel: string,
@@ -133,12 +128,8 @@ export interface Tagesgruppe<T> {
 }
 
 /**
- * Tagesgruppen, jüngster Tag zuerst und innerhalb des Tages jüngster Eintrag zuerst — die
- * Zeitachse wird von oben gelesen („was ist zuletzt passiert?"). Die Reihenfolge kommt aus
- * den Daten, nicht aus der Serverliste: die liefert aufsteigend.
- *
- * Sortiert wird über den Wire-String: `YYYY-MM-DD HH:mm:ss` ist als Text chronologisch, und
- * ein Umweg über `inZone` änderte an der Ordnung nichts (die Zone verschiebt alle gleich).
+ * Tagesgruppen, jüngster Tag und jüngster Eintrag zuerst (der Server liefert aufsteigend).
+ * Sortiert wird über den Wire-String: `YYYY-MM-DD HH:mm:ss` ist als Text chronologisch.
  */
 export function gruppiereNachTag<T extends LageEintragKern>(
   eintraege: readonly T[],

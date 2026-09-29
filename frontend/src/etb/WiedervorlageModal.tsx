@@ -28,37 +28,27 @@ interface FormWerte {
 }
 
 /**
- * Vorgabe der Fälligkeit (LFH-342 · C7, Befund N22).
- *
- * Der Bestand stand auf `dayjs()` — dem einzigen Wert, den niemand meint: eine
- * Wiedervorlage auf „jetzt" ist im Moment des Anlegens schon fällig. Dreißig Minuten
- * sind die Vorgabe, die Reihe darüber deckt den Rest des üblichen Bandes ab.
+ * Vorgabe der Fälligkeit: `dayjs()` meint niemand, eine Wiedervorlage auf „jetzt" ist beim
+ * Anlegen schon fällig. Die Schnellwahl darüber deckt den Rest des üblichen Bandes ab.
  */
 const VORGABE_MINUTEN = 30;
 
 /**
- * Schnellwahl der Fälligkeit. Bewusst echte antd-`Button` ohne `size`: so erben sie
- * `controlHeight` aus der Dichte-Staffel (30 / 48 / 72 px). Ein gestyltes
- * `<span onClick>` schuldete stattdessen die zwei Angaben aus LFH-365 samt eigener
- * Dichte-Zusicherung — für etwas, das ein Knopf ohnehin mitbringt.
+ * Schnellwahl der Fälligkeit. Echte antd-`Button` ohne `size`: so erben sie `controlHeight`
+ * aus der Dichte-Staffel, ein gestyltes `<span onClick>` schuldete die zwei Angaben aus LFH-365.
  *
- * LFH-463 ergänzt unten den expliziten Einsatztermin, sofern er bekannt und zukünftig ist.
- * Er ist ein absoluter Zeitpunkt; die vier relativen Vorbelegungen bleiben unverändert.
+ * Unten steht zusätzlich der Einsatztermin, sofern er bekannt und zukünftig ist (LFH-463) —
+ * ein absoluter Zeitpunkt neben den vier relativen Vorbelegungen.
  */
-// Die Tabelle ist seit LFH-543 geteilt (`components/terminSchnellwahl.ts`); die Wiedervorlage
-// nimmt alle vier Einträge und rechnet weiterhin ab jetzt.
+// Die Tabelle ist geteilt (`components/terminSchnellwahl.ts`); die Wiedervorlage nimmt alle
+// vier Einträge und rechnet ab jetzt.
 const SCHNELLWAHL = SCHNELLWAHL_TERMIN;
 
 /**
  * Legt aus einem ETB-Eintrag eine terminierte Erinnerung/Wiedervorlage an (LFH-106).
  * Hält den Bezug auf den Quell-Eintrag fest (bezug_typ='etb'/bezug_id); die
- * Erinnerungsliste verweist darüber zurück.
- *
- * Läuft seit LFH-342 über `components/Erfassung.tsx` statt über ein handgebautes
- * `<Modal onOk>` + `<Form>`: der Absende-Knopf liegt damit IM Formular, Enter sendet über
- * die eingebaute Übermittlung des Browsers, und zurückgesetzt wird auf allen vier
- * Auswegen. Die Maske wurde für N22 ohnehin angefasst — und die Erfassungs-Norm gilt
- * genau dann (LFH-332 · B4).
+ * Erinnerungsliste verweist darüber zurück. Läuft über `components/Erfassung.tsx`
+ * (Erfassungs-Norm).
  */
 export default function WiedervorlageModal({
   einsatzId,
@@ -115,8 +105,8 @@ export default function WiedervorlageModal({
       form={form}
       erfassenText="Anlegen"
       laeuft={mutation.isPending}
-      // `mutateAsync`, nicht `mutate`: bei Ablehnung muss die Zusage brechen, sonst
-      // räumt die Hülle die Felder trotz Fehler-Toast (Norm aus LFH-332 · B4).
+      // `mutateAsync`, nicht `mutate`: bei Ablehnung muss die Zusage brechen, sonst räumt die Hülle
+      // die Felder trotz Fehler-Toast.
       onErfassen={(werte) => mutation.mutateAsync(werte)}
       onFertig={onClose}
       onAbbrechen={onClose}

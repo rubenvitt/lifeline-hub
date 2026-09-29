@@ -62,8 +62,7 @@ describe('AuthContext', () => {
   it('meldet lokal ab, auch wenn der Server-Logout scheitert (LFH-268)', async () => {
     server.use(
       meHandler(adminBody),
-      // session::loeschen propagiert seinen AppError (src/routes/auth.rs:226) — ein
-      // SQLITE_BUSY unter Last reicht für einen 5xx.
+      // `session::loeschen` propagiert seinen Fehler — ein SQLITE_BUSY unter Last reicht für einen 5xx.
       http.post('/api/auth/logout', () =>
         HttpResponse.json({ error: 'Datenbank belegt' }, { status: 500 }),
       ),

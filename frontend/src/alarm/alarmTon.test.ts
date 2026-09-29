@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// `alarmTon` cacht den AudioContext modulweit (bewusst — Browser deckeln gleichzeitig lebende
-// AudioContexts, siehe alarmTon.ts). Damit jeder Test seinen EIGENEN AudioContext-Mock sieht
-// (statt den vom Vortest gecachten wiederzuverwenden), Modul-Registry + Import je Test frisch.
+// `alarmTon` cacht den AudioContext modulweit; damit jeder Test seinen eigenen Mock sieht,
+// werden Modul-Registry und Import je Test frisch geladen.
 let setzeAlarmMute: typeof import('./alarmTon').setzeAlarmMute;
 let spieleAlarmTon: typeof import('./alarmTon').spieleAlarmTon;
 let pruefeAlarmTonBereitschaft: typeof import('./alarmTon').pruefeAlarmTonBereitschaft;

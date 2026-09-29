@@ -16,9 +16,9 @@ export function OrtZeile({
   koord: LatLon;
   exclude?: string;
   debounceMs?: number;
-  /** Kürzt die Zeile auf so viele Zeilen; der volle Wortlaut bleibt als Tooltip erreichbar.
-   *  Opt-in, weil nur schmale Flächen sie brauchen — eine rückwärts aufgelöste Adresse
-   *  läuft dort über ein halbes Dutzend Zeilen. */
+  /**
+   * Kürzt auf so viele Zeilen; der volle Wortlaut bleibt als Tooltip. Opt-in für schmale Flächen.
+   */
   maxZeilen?: number;
 }) {
   const { formatDistanz } = useAnzeigeKonventionen();
@@ -42,10 +42,8 @@ export function OrtZeile({
   if (teile.length === 0) return null;
 
   const text = teile.join(' · ');
-  // `Paragraph`, nicht `Text`: antd 6 schneidet `rows` aus dem Ellipsis-Typ von `Text`
-  // heraus (`typography/Text.d.ts`), mehrzeilige Kürzung trägt nur der Block. Der
-  // Vorgabe-Abstand darunter muss dann weg — die Zeile steht in einem `Space`, der den
-  // Abstand schon setzt.
+  // `Paragraph`, nicht `Text`: antd 6 kennt `rows` nur am Block. Der Vorgabe-Abstand muss weg,
+  // den setzt der umgebende `Space`.
   if (maxZeilen != null) {
     return (
       <Typography.Paragraph

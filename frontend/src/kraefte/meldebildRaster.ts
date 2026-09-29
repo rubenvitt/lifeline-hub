@@ -25,34 +25,22 @@ import { verdichte, type StaerkeSumme, type Rohdaten } from './kraeftebild';
 import { KATEGORIE_REIHENFOLGE, OHNE_STATUS, type KategorieOderOhne } from './statusAchse';
 
 /**
- * Das Meldebild als STATUSRASTER (Neuentwurf S6, 21.09.2026) — reine Ableitungen.
+ * Das Meldebild als STATUSRASTER — reine Ableitungen.
  *
- * ── WAS DIE FRAGE IST ───────────────────────────────────────────────────────────
+ * Die Frage ist „Wie steht jede Einheit da?": eine Zeile je Einheit, verglichen über Abschnitt,
+ * Stärke, Status und Auftrag. Die Mittel (Fahrzeuge, Personal, Material) hängen als
+ * aufklappbare Kinder an ihrer Einheit; der Abschnitt ist eine SPALTE, keine Baumebene, damit
+ * Einheiten verschiedener Abschnitte untereinander stehen.
  *
- * „Wie steht jede Einheit da?" — eine Zeile je Einheit, verglichen über Abschnitt, Stärke,
- * Status und Auftrag. Die Mittel (Fahrzeuge, Personal, Material) sind DETAIL und hängen als
- * aufklappbare Kinder an ihrer Einheit. Der Abschnitt ist deshalb eine SPALTE und keine
- * Baumebene mehr: der alte Baum Abschnitt → Einheit → Mittel hat die Einheiten zwei Ebenen
- * tief vergraben, und zwei Einheiten verschiedener Abschnitte standen nie untereinander.
+ * KEINE KRAFT DARF VERSCHWINDEN: jede Einheit ist eine eigene Zeile, auch Untereinheiten, mit
+ * EIGENEN Mitteln und EIGENER Stärke — kumuliert wird nichts, sonst zählte eine Kraft doppelt
+ * und „Stärke" summierte sich nicht auf den Seitenkopf. Mittel ohne `einheit_id` sammelt die
+ * Zeile „Ohne Einheit". Der Test „jede Kraft genau einmal" pinnt beides.
  *
- * ── KEINE KRAFT DARF VERSCHWINDEN ───────────────────────────────────────────────
- *
- * Jede Einheit ist eine eigene Zeile — auch Untereinheiten, und zwar mit ihren EIGENEN
- * Mitteln und ihrer EIGENEN Stärke. Kumuliert wird hier nichts: sonst zählte eine Kraft
- * einer Untereinheit in zwei Zeilen, und die Spalte „Stärke" summierte sich nicht mehr auf
- * den Seitenkopf. Mittel ohne `einheit_id` sammelt die Zeile „Ohne Einheit" — die Brücke
- * aus `baueKraeftebild` (Catch-all), in der flachen Welt. Der Test
- * „jede Kraft genau einmal" pinnt beides.
- *
- * ── STATUSTON NUR AUS DER KATEGORIE ─────────────────────────────────────────────
- *
- * Der Entwurf färbt „am Einsatzort" blau (`bedien`). Das wird hier NICHT übernommen: der
- * FMS-Katalog ist mandantengepflegt, `fms_anker` ist nullable und laut Bedien-Leitlinie
- * Sortier-Anker, nicht tragende Bedienform. Eine Abbildung Anker → Rolle wäre eine harte
- * Tabelle über fremde Daten, und derselbe Status stünde auf der Fahrzeugseite (die über
- * `statusKategorie` färbt) gelb und hier blau — zwei Farbbehandlungen desselben Werts. Der
- * Ton kommt deshalb aus dem einen Vertrag: verfügbar `normal`, gebunden `achtung`, nicht
- * verfügbar `alarm`. `S<fms_anker>` ist reine Beschriftung.
+ * STATUSTON NUR AUS DER KATEGORIE: der FMS-Katalog ist mandantengepflegt und `fms_anker`
+ * nullable; eine Abbildung Anker → Rolle wäre eine harte Tabelle über fremde Daten und färbte
+ * denselben Status hier anders als auf der Fahrzeugseite. Verfügbar `normal`, gebunden
+ * `achtung`, nicht verfügbar `alarm`; `S<fms_anker>` ist reine Beschriftung.
  */
 
 export type RasterArt = 'einheit' | 'fahrzeug' | 'person' | 'material';
@@ -102,17 +90,17 @@ export interface RasterZeile {
   abschnitt: string | null;
   staerke: StaerkeSumme | null;
   verteilung: MittelVerteilung | null;
-  /** Mittel: ihr Einzelstatus. Einheit: ihr Status als Anzeige (LFH-609). */
+  /** Mittel: ihr Einzelstatus. Einheit: ihr Status als Anzeige. */
   status: MittelStatus | EinheitStatusAnzeige | null;
   /**
-   * Status der EINHEIT (LFH-609) — abgeleitet aus ihren Fahrzeugen oder von Hand; nur
-   * Einheitenzeilen, `null` für „Ohne Einheit“ und Mittel. Der Serverstand, nicht aus den
-   * gefilterten Listen gerechnet: sonst wechselte der Status einer Einheit mit dem Filter.
+   * Status der EINHEIT — aus ihren Fahrzeugen abgeleitet oder von Hand; `null` für „Ohne
+   * Einheit“ und Mittel. Der Serverstand, nicht aus gefilterten Listen gerechnet, sonst wechselte
+   * er mit dem Filter.
    */
   einheitStatus: EinheitStatus | null;
   /**
-   * Die Einheit hat kein Fahrzeug und führt ihren Status deshalb von Hand (LFH-609). Mit
-   * Fahrzeugen lehnt der Server einen Handstatus ab (422) — dort gibt es keinen Auslöser.
+   * Die Einheit hat kein Fahrzeug und führt ihren Status von Hand. Mit Fahrzeugen lehnt der
+   * Server einen Handstatus ab (422) — dort gibt es keinen Auslöser.
    */
   handStatus: boolean;
   /** „Seit“ (UTC) — Einheit: aus `einheitStatus.seit`, Fahrzeug: `status_seit`. */
@@ -132,9 +120,8 @@ function tonAusKategorie(k: StatusKategorie | null | undefined): StatusTon {
 }
 
 /**
- * Der Katalogtext trägt die FMS-Ziffer oft selbst („4 – Am Einsatzort"). Steht davor
- * genau der Anker, fällt das Präfix weg — sonst läse der Chip „S4 4 – Am Einsatzort".
- * Ein anderer Text bleibt unangetastet.
+ * Der Katalogtext trägt die FMS-Ziffer oft selbst („4 – Am Einsatzort"). Steht davor genau
+ * der Anker, fällt das Präfix weg, sonst läse der Chip „S4 4 – Am Einsatzort".
  */
 export function fmsWort(label: string, anker: number | null | undefined): string {
   if (anker == null) return label;
@@ -180,9 +167,9 @@ export interface EinheitStatusAnzeige extends MittelStatus {
 }
 
 /**
- * Der Einheitenstatus als Anzeige (LFH-609). `gemischt` erfindet keinen Status: das Wort
- * sagt „gemischt“, die Verteilung steht daneben, und der Ton kommt nur aus einer
- * GEMEINSAMEN Kategorie (S3 + S4 → gebunden), sonst bleibt er neutral.
+ * Der Einheitenstatus als Anzeige. `gemischt` erfindet keinen Status: das Wort sagt „gemischt“,
+ * die Verteilung steht daneben, und der Ton kommt nur aus einer GEMEINSAMEN Kategorie
+ * (S3 + S4 → gebunden), sonst neutral.
  */
 export function einheitStatusAnzeige(s: EinheitStatus): EinheitStatusAnzeige {
   if ((s.quelle === 'fahrzeuge' || s.quelle === 'hand') && s.status) {
@@ -216,10 +203,9 @@ function materialZustand(em: EinsatzMaterial): MittelStatus {
 // ── Auftragszuordnung ─────────────────────────────────────────────────────────
 
 /**
- * Jüngster OFFENER Auftrag je Einheit — offen heißt `offen` oder `in_arbeit`; vollzogene
- * und abgenommene Aufträge beschreiben nicht mehr, was die Einheit gerade tut. Zugeordnet
- * über `empfaenger[].einheit_id`; ein Auftrag an mehrere Einheiten zählt bei jeder.
- * „Jüngst" nach `erteilt_at`, bei Gleichstand die höhere `id` (später angelegt).
+ * Jüngster OFFENER Auftrag je Einheit (`offen` oder `in_arbeit`) über
+ * `empfaenger[].einheit_id`; ein Auftrag an mehrere Einheiten zählt bei jeder. „Jüngst" nach
+ * `erteilt_at`, bei Gleichstand die höhere `id`.
  */
 export function offeneAuftraegeJeEinheit(auftraege: readonly Auftrag[]): Map<number, AuftragKurz> {
   const beste = new Map<number, Auftrag>();
@@ -253,13 +239,9 @@ export function offeneAuftraegeJeEinheit(auftraege: readonly Auftrag[]): Map<num
 // ── Funkrufname ───────────────────────────────────────────────────────────────
 
 /**
- * Der Funkrufname einer Einheit. Zuerst der gepflegte eigene Rufname (`Einheit.funkrufname`,
- * LFH-614). Fehlt er, NUR der eindeutige: genau ein Fahrzeug in der Einheit. Bei null oder
- * mehreren Fahrzeugen gibt es dann keinen Rufnamen der EINHEIT; ihn zu raten (erstes
- * Fahrzeug, Führungsfahrzeug) wäre eine erfundene Angabe.
- *
- * Gelesen aus `Einheit.fahrzeug_mitglieder` (Serverstand), NICHT aus der gefilterten
- * Fahrzeugliste: sonst wechselte der Rufname einer Einheit mit dem Statusfilter.
+ * Der Funkrufname einer Einheit: der gepflegte eigene, sonst NUR der eindeutige (genau ein
+ * Fahrzeug in der Einheit) — ihn zu raten wäre eine erfundene Angabe. Aus
+ * `Einheit.fahrzeug_mitglieder` (Serverstand), nicht aus der gefilterten Liste.
  */
 export function einheitFunkrufname(einheit: {
   funkrufname?: string | null;
@@ -343,9 +325,8 @@ function mittelZeilen(
 }
 
 /**
- * Reihenfolge der Abschnitte: Tiefensuche über `ueber_abschnitt_id`, Eltern vor Kindern,
- * sonst in Eingabereihenfolge (der Server liefert nach `sortier`). Ein Abschnitt, dessen
- * Elternteil fehlt, wird Wurzel — wie in `baueKraeftebild`.
+ * Reihenfolge der Abschnitte: Tiefensuche über `ueber_abschnitt_id`, Eltern vor Kindern, sonst
+ * Eingabereihenfolge. Ein Abschnitt ohne vorhandenes Elternteil wird Wurzel.
  */
 function abschnittRang(abschnitte: readonly Einsatzabschnitt[]): Map<number, number> {
   const ids = new Set(abschnitte.map((a) => a.id));
@@ -397,7 +378,7 @@ export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
     }
   }
 
-  // Abschnitt einer Einheit: der eigene, sonst der geerbte (v1-Annahme aus `filtereKraefte`).
+  // Abschnitt einer Einheit: der eigene, sonst der geerbte.
   const abschnittVon = (x: Einheit): number | null => {
     let cur: Einheit | undefined = x;
     const gesehen = new Set<number>();
@@ -486,9 +467,9 @@ export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
 }
 
 /**
- * Eine Einheiten-Zeile mit Ausfall ist eine Problemzeile (Tönung + Zahl als zweiter Kanal)
- * — ein Ausfall unter ihren Mitteln ODER ein Einheitenstatus der Kategorie „nicht
- * verfügbar“ (LFH-609: eine Einheit ohne Fahrzeug meldet S6 nur über den Handstatus).
+ * Eine Einheiten-Zeile mit Ausfall ist eine Problemzeile (Tönung + Zahl): ein Ausfall unter
+ * ihren Mitteln ODER ein Einheitenstatus „nicht verfügbar“ (eine Einheit ohne Fahrzeug meldet
+ * S6 nur über den Handstatus).
  */
 export function istProblemZeile(z: RasterZeile): boolean {
   return (z.verteilung?.ausfall ?? 0) > 0 || z.einheitStatus?.kategorie === 'nicht_verfuegbar';
@@ -516,7 +497,7 @@ export interface BandZelle {
 /** Code einer Einheitenzelle ohne FMS-Anker — die Art statt einer erfundenen Ziffer. */
 const EINHEIT_KURZ = 'Einh.';
 
-// ── Rückmeldung je Einheit (LFH-610) ──────────────────────────────────────────
+// ── Rückmeldung je Einheit ────────────────────────────────────────────────────
 
 /** Rückmeldung einer Einheitenzeile: der Zustand und — falls vorhanden — die letzte Meldung. */
 export interface RueckmeldungAnzeige {
@@ -530,13 +511,11 @@ function istEchteEinheit(z: RasterZeile): z is RasterZeile & { einheitId: number
 }
 
 /**
- * Rückmeldung einer Rasterzeile zum Zeitpunkt `jetzt` — `null` für jede Zeile, die keine
- * echte Einheit ist (Mittel, „Ohne Einheit"). Bewusst NICHT in `baueMeldebildRaster`: der
- * Zustand hängt an der Seitenuhr, und ein 30-s-Takt soll nicht den ganzen Baum neu bauen.
- *
- * `je` ist die Nachschlagetabelle aus `rueckmeldungJeEinheit` — und darf nur übergeben
- * werden, wenn die Daten WIRKLICH da sind. Eine leere Tabelle heißt „niemand hat je
- * zurückgemeldet"; wer sie beim Laden oder bei 403 übergibt, färbt jede Einheit rot.
+ * Rückmeldung einer Rasterzeile zum Zeitpunkt `jetzt` — `null` für Mittel und „Ohne Einheit".
+ * Nicht in `baueMeldebildRaster`: der Zustand hängt an der Seitenuhr, ein 30-s-Takt soll nicht
+ * den ganzen Baum neu bauen.
+ * `je` darf nur übergeben werden, wenn die Daten WIRKLICH da sind: eine leere Tabelle heißt
+ * „niemand hat je zurückgemeldet" und färbte beim Laden oder bei 403 jede Einheit rot.
  */
 export function rueckmeldungDerZeile(
   z: RasterZeile,
@@ -554,14 +533,9 @@ export function istRueckmeldungProblem(r: RueckmeldungAnzeige | null | undefined
 }
 
 /**
- * Die Kachel „keine Rückmeldung" (Neuentwurf S6): Einheiten, von denen noch NIE eine
- * Rückmeldung kam. Überfällige zählen NICHT mit (Entscheidung des Auftraggebers,
- * 22.09.2026) — sie haben zurückgemeldet, nur zu lange her; das zeigt ihre Zeile.
- *
- * Gezählt über die GEFILTERTEN Rasterzeilen, wie die übrigen Bandzellen über die gefilterten
- * Rohlisten: sonst stünde neben einem Abschnittsausschnitt eine Zahl über den ganzen Einsatz.
- * Bei 0 entfällt die Kachel — die Bandzellen führen nur belegte Eimer, und eine rote Null
- * meldete das Gegenteil dessen, was sie heißt.
+ * Die Kachel „keine Rückmeldung": Einheiten, von denen NIE eine Rückmeldung kam; überfällige
+ * zählen nicht (das zeigt ihre Zeile). Gezählt über die GEFILTERTEN Zeilen wie die übrigen
+ * Bandzellen. Bei 0 entfällt die Kachel — eine rote Null meldete das Gegenteil.
  */
 export function keineRueckmeldungZelle(
   zeilen: readonly RasterZeile[],
@@ -580,16 +554,11 @@ export function keineRueckmeldungZelle(
 }
 
 /**
- * Einheiten je Status (Entwurf S6 `statusStufen`, LFH-609) — eine Zelle je Katalogstatus
- * mit mindestens einer Einheit, in `sortier`-Folge; Fahrzeug- und Handstatus zählen
- * gleich, es ist derselbe FMS-Katalog. Danach „gemischt“ und „ohne Status“, wenn belegt —
- * jede Einheit genau einmal, damit sich das Band auf die Einheitenzahl summiert.
- *
- * „ohne Status“ ist ECHTE Datenlage — eine Einheit, der noch niemand einen Status gegeben
- * hat — und NICHT die Kachel „keine Rückmeldung“ des Entwurfs: die zählt Einheiten, von
- * denen nie eine Rückmeldung kam (`keineRueckmeldungZelle`, LFH-610), und steht in einer
- * eigenen Gruppe — in diesem Band stünde sie doppelt, das sich auf die Einheitenzahl
- * summieren muss.
+ * Einheiten je Status — eine Zelle je Katalogstatus mit mindestens einer Einheit, in
+ * `sortier`-Folge; Fahrzeug- und Handstatus zählen gleich. Danach „gemischt“ und „ohne
+ * Status“, wenn belegt — jede Einheit genau einmal, damit das Band sich auf die Einheitenzahl
+ * summiert. „ohne Status“ ist echte Datenlage und NICHT die Kachel „keine Rückmeldung“
+ * (eigene Gruppe, sonst stünde sie doppelt).
  */
 export function einheitBand(einheiten: readonly Einheit[]): BandZelle[] {
   const je = new Map<number, { wert: StatusWert; anzahl: number }>();

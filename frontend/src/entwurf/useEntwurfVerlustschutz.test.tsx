@@ -16,18 +16,12 @@ interface TraegerProps {
 }
 
 /**
- * Minimaler Träger: ein Feld, ein Serverstand, den der Test von aussen nachschiebt.
+ * Minimaler Träger: ein Feld, ein Serverstand, den der Test von außen nachschiebt.
  *
- * Der Knopf liegt AUSSERHALB des `<Form>` und ruft `form.submit()` — genau wie in beiden
- * echten Seiten, wo er im Kopf-`Space` bzw. in der verankerten Aktionsleiste steht und
- * deshalb kein Übermittlungsknopf sein KANN (LFH-465, LFH-346 · C11). Ihn hier ins Formular
- * zu setzen wäre bequemer und würde die Lage verfälschen: sein eigener Fokusverlust löste
- * dann den Blur-Autosave des Formulars mit aus, den es in der Seite nicht gibt.
- *
- * Daraus entstand der Doppel-PATCH aus LFH-495: der Klick nimmt dem FELD zuerst den Fokus,
- * `onBlur` startet den Autosave, und erst danach kommt `click` mit `form.submit()`. Die
- * Zähler stehen im Bild, damit „der Aufrufer hat GENAU EINE Quittung bekommen" ohne
- * Mock-Zugriff prüfbar ist.
+ * Der Knopf liegt AUSSERHALB des `<Form>` und ruft `form.submit()` wie in beiden Seiten; im
+ * Formular löste sein Fokusverlust einen Blur-Autosave aus, den es in der Seite nicht gibt. Ein
+ * Klick nimmt dem FELD zuerst den Fokus (Blur-Autosave), dann kommt `form.submit()` — die
+ * Zähler im Bild prüfen „genau eine Quittung" ohne Mock-Zugriff.
  */
 function Traeger({ daten, speichern, istEntwurf = true }: TraegerProps) {
   const [form] = Form.useForm<Daten>();
@@ -91,10 +85,8 @@ function Huelle({
 const speichernKnopf = () => screen.getByRole('button', { name: 'Entwurf speichern' });
 
 /**
- * Die Seitentests (`BefehlDetailPage.test.tsx`, `LageberichtePage.test.tsx`) prüfen den
- * Hook im Zusammenspiel mit Query und Mutation. Hier steht die reine Mechanik — ohne
- * Server, ohne Router —, damit ein Fehler im Hook auf den Hook zeigt und nicht auf eine
- * der beiden Seiten.
+ * Die reine Mechanik ohne Server und Router, damit ein Fehler im Hook auf den Hook zeigt; das
+ * Zusammenspiel prüfen die Seitentests.
  */
 describe('useEntwurfVerlustschutz', () => {
   it('überschreibt ein berührtes Formular NICHT mit einem fremden Serverstand', async () => {
@@ -103,17 +95,15 @@ describe('useEntwurfVerlustschutz', () => {
     expect(feld).toHaveValue('Server 1');
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Meine Fassung');
-    // `fireEvent`, nicht `userEvent`: ein echter Klick blurrte das Feld, der Blur-Autosave
-    // speicherte und räumte den Merker — die fremde Änderung träfe dann ein SAUBERES
-    // Formular, und der Test prüfte den Riegel gar nicht (gemessen).
+    // `fireEvent`, nicht `userEvent`: ein echter Klick blurrte das Feld, der Autosave räumte den
+    // Merker, und der Test prüfte den Riegel gar nicht.
     fireEvent.click(screen.getByText('fremd'));
     expect(screen.getByLabelText('Titel')).toHaveValue('Meine Fassung');
     expect(screen.getByText('offen')).toBeInTheDocument();
   });
 
   it('übernimmt den Serverstand, solange nichts berührt wurde (Gegenaussage)', async () => {
-    // Ein Riegel, der IMMER hält, machte die Seite still veraltet — und wäre mit dem
-    // Test darüber allein nicht von einem richtigen zu unterscheiden.
+    // Ein Riegel, der IMMER hält, machte die Seite still veraltet.
     render(<Huelle />);
     fireEvent.click(screen.getByText('fremd'));
     expect(screen.getByLabelText('Titel')).toHaveValue('Server 2');
@@ -133,8 +123,8 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('lässt den Merker stehen, wenn während des laufenden Autosave weitergetippt wurde', async () => {
-    // Das Verlustfenster im Verlustschutz (Review LFH-348): der PATCH trägt S1, im Formular
-    // steht S2 — eine Quittung für S1 darf nicht „alles gespeichert" bedeuten.
+    // Verlustfenster: der PATCH trägt S1, im Formular steht S2 — eine Quittung für S1 darf nicht
+    // „alles gespeichert" bedeuten.
     let aufloesen: () => void = () => {};
     const speichern = vi.fn(
       () =>
@@ -157,8 +147,7 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('hält den Grund eines gescheiterten Autosave als Zustand und lässt den Merker stehen', async () => {
-    // LFH-494: der Grund war bis dahin ein `message.error`-Toast und nach ~3 s weg —
-    // sichtbar blieb nur „ungespeicherte Änderungen", also das WAS ohne das WARUM.
+    // Sichtbar muss das WARUM sein, nicht nur „ungespeicherte Änderungen".
     const speichern = vi.fn().mockRejectedValue(new Error('503 Dienst nicht erreichbar'));
     render(<Huelle speichern={speichern} />);
     await userEvent.type(screen.getByLabelText('Titel'), 'x');
@@ -184,10 +173,8 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('lässt den Grund während des nächsten Versuchs stehen, statt ihn blinken zu lassen', async () => {
-    // Die scharfe Abgrenzung zu react-querys `pending`-Semantik (C10): dort räumt der
-    // Übergang nach `pending`. Hier wiederholt eine 30-s-Frist von selbst — beim Start zu
-    // räumen liesse den Alert bei stehendem 503 im Takt verschwinden und wiederkommen
-    // („Kein Blinken auf lesbarem Text", CLAUDE.md).
+    // Anders als bei react-querys `pending`: hier wiederholt eine 30-s-Frist von selbst. Beim Start
+    // zu räumen ließe den Alert bei stehendem 503 im Takt verschwinden und wiederkommen.
     let haengenAufloesen: () => void = () => {};
     const speichern = vi
       .fn()
@@ -217,9 +204,8 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('räumt den Grund auch, wenn während des gelungenen Speicherns weitergetippt wurde', async () => {
-    // Die Quittungs-Closure hat ZWEI Zweige: nur der unveränderte quittiert vollständig.
-    // Der Server hat aber in BEIDEN erfolgreich gespeichert — räumte nur der eine, bliebe
-    // nach einem von einem Tastenanschlag überholten Speichern ein veralteter Grund stehen.
+    // Die Quittung hat ZWEI Zweige, nur der unveränderte quittiert vollständig; gespeichert hat der
+    // Server aber in beiden — räumte nur einer, bliebe ein veralteter Grund stehen.
     let haengenAufloesen: () => void = () => {};
     const speichern = vi
       .fn()
@@ -250,8 +236,8 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('behandelt einen abgebrochenen Auftrag NICHT als Speicherfehler', async () => {
-    // `BefehlDetailPage` bricht die Speicherfolge beim Verlassen des Editors mit einem
-    // `AbortError` ab (`aktiv.current`). Das ist kein Zustand, den jemand lesen soll.
+    // `BefehlDetailPage` bricht die Speicherfolge beim Verlassen mit `AbortError` ab — kein Zustand,
+    // den jemand lesen soll.
     const speichern = vi.fn().mockRejectedValue(new DOMException('Editor verlassen', 'AbortError'));
     render(<Huelle speichern={speichern} />);
     await userEvent.type(screen.getByLabelText('Titel'), 'x');
@@ -262,10 +248,8 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('legt den Grund eines gescheiterten EXPLIZITEN Speicherns in denselben Zustand', async () => {
-    // Der Knopf und der Freigabe-Vorlauf laufen seit LFH-495 durch `speichereJetzt` und
-    // melden damit in DENSELBEN Zustand wie der Autosave — die Seite zeigt nicht zwei
-    // Fehlerquellen nebeneinander. Bis dahin setzten die Seiten den Grund über ein
-    // öffentliches `meldeSpeicherfehler` selbst; genau diese zweite Pforte ist weg.
+    // Knopf und Freigabe-Vorlauf laufen durch `speichereJetzt` und melden in DENSELBEN Zustand wie
+    // der Autosave; die Seite zeigt nicht zwei Fehlerquellen.
     const speichern = vi.fn().mockRejectedValue(new Error('422 Titel fehlt'));
     render(<Huelle speichern={speichern} />);
     await userEvent.type(screen.getByLabelText('Titel'), 'x');
@@ -278,8 +262,7 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('schickt beim Klick auf „Entwurf speichern" EINEN PATCH, nicht zwei (LFH-495)', async () => {
-    // Der Klick ist zwei Ereignisse: Blur (Autosave) und danach Submit. Beide trugen
-    // denselben Inhalt — zwei PATCH, zwei SSE-Ereignisse, zwei Invalidierungen.
+    // Ein Klick ist zwei Ereignisse: Blur (Autosave) und Submit — beide mit demselben Inhalt.
     const speichern = vi.fn().mockResolvedValue(undefined);
     render(<Huelle speichern={speichern} />);
     await userEvent.type(screen.getByLabelText('Titel'), 'x');
@@ -290,9 +273,8 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('hängt das explizite Speichern an einen LAUFENDEN Autosave an, statt zu doppeln', async () => {
-    // Die scharfe Fassung der Aussage darüber, unabhängig davon, wie jsdom Blur und Klick
-    // eines Knopfdrucks anordnet: der Autosave hängt nachweislich noch, wenn der explizite
-    // Pfad losgeht — er darf dann keinen zweiten PATCH schicken, aber trotzdem quittieren.
+    // Unabhängig davon, wie jsdom Blur und Klick anordnet: der Autosave hängt noch, wenn der
+    // explizite Pfad losgeht — kein zweiter PATCH, aber trotzdem eine Quittung.
     let aufloesen: () => void = () => {};
     const speichern = vi.fn(
       () =>
@@ -321,9 +303,8 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('schickt einen EIGENEN PATCH, wenn seit dem laufenden Speichern getippt wurde (Gegenaussage)', async () => {
-    // Ein Anhängen bei UNGLEICHEM Stand wäre eine Quittung über S1, während im Formular S2
-    // steht — genau das Verlustfenster, das der Änderungszähler zuhält. Ohne diese Hälfte
-    // wäre ein Riegel, der immer anhängt, vom richtigen nicht zu unterscheiden.
+    // Ein Anhängen bei UNGLEICHEM Stand wäre eine Quittung über S1, während S2 im Formular steht;
+    // ohne diese Hälfte wäre ein immer anhängender Riegel vom richtigen nicht zu unterscheiden.
     let aufloesen: () => void = () => {};
     const speichern = vi.fn(
       () =>
@@ -347,10 +328,8 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('gibt den Riegel nur an den Auftrag zurück, der ihn HÄLT', async () => {
-    // Bei ungleichem Stand laufen zwei Speicherungen gleichzeitig (Zweig (c)). Kommt die
-    // ERSTE zurück, während die zweite noch unterwegs ist, darf sie den Riegel nicht
-    // öffnen — sonst schickte der nächste Blur einen dritten PATCH neben die laufende
-    // zweite, und die Reihenfolge der Schnappschüsse auf dem Server wäre offen.
+    // Bei ungleichem Stand laufen zwei Speicherungen gleichzeitig. Kommt die ERSTE zurück, darf sie
+    // den Riegel nicht öffnen, sonst schickte der nächste Blur einen dritten PATCH neben die zweite.
     const aufloeser: Array<() => void> = [];
     const speichern = vi.fn(
       () =>
@@ -375,8 +354,8 @@ describe('useEntwurfVerlustschutz', () => {
     });
     expect(screen.getByText('speichert')).toBeInTheDocument();
 
-    // Ein weiterer Blur mit UNVERÄNDERTEM Stand: Auftrag 2 trägt diesen Inhalt schon, es
-    // gibt also nichts zu schicken — es sei denn, Auftrag 1 hätte den Riegel geöffnet.
+    // Ein Blur mit UNVERÄNDERTEM Stand: Auftrag 2 trägt den Inhalt schon — es sei denn, Auftrag 1
+    // hätte den Riegel geöffnet.
     await userEvent.click(feld);
     await userEvent.tab();
     await act(async () => {});
@@ -388,14 +367,14 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('speichert nach Ablauf der 30-s-Frist, auch ohne das Feld zu verlassen', async () => {
-    // Die Frist war bis LFH-495 ungetestet — ein `setInterval`, das nie abläuft (instabile
-    // Effekt-Deps, s. Hook-Kommentar), wäre von einem laufenden nicht zu unterscheiden.
+    // Ein `setInterval`, das nie abläuft (instabile Effekt-Deps), wäre sonst von einem laufenden
+    // nicht zu unterscheiden.
     vi.useFakeTimers();
     try {
       const speichern = vi.fn().mockResolvedValue(undefined);
       render(<Huelle speichern={speichern} />);
-      // `userEvent.type` kommt unter Fake-Timern nicht voran (CLAUDE.md, ETB-Filter):
-      // getippt wird über `fireEvent.change`, gewartet über `advanceTimersByTime`.
+      // `userEvent.type` kommt unter Fake-Timern nicht voran: getippt wird über `fireEvent.change`,
+      // gewartet über `advanceTimersByTime`.
       fireEvent.change(screen.getByLabelText('Titel'), { target: { value: 'S1' } });
       expect(speichern).not.toHaveBeenCalled();
       // Die FRIST ist die Aussage, nicht „irgendwann": eine Millisekunde davor noch nichts.
@@ -414,8 +393,8 @@ describe('useEntwurfVerlustschutz', () => {
   });
 
   it('lässt die Uhr am FREIGEGEBENEN Stand stehen (Gegenaussage zur Frist)', async () => {
-    // `istEntwurf: false` — ein freigegebener Bericht ist unveränderlich, ein PATCH im
-    // 30-s-Takt darauf wäre ein Schreibversuch auf eine abgeschlossene Unterlage.
+    // `istEntwurf: false` — ein freigegebener Bericht ist unveränderlich, ein PATCH im 30-s-Takt
+    // wäre ein Schreibversuch auf eine abgeschlossene Unterlage.
     vi.useFakeTimers();
     try {
       const speichern = vi.fn().mockResolvedValue(undefined);

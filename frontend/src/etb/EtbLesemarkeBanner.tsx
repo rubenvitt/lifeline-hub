@@ -9,29 +9,26 @@ import { lesemarkeText } from './lesemarkeModell';
 
 /**
  * „14 neue Einträge seit Ihrer letzten Sichtung um 13:04 · alle als gesichtet markieren"
- * (LFH-611, Neuentwurf S4).
+ * (LFH-611).
  *
  * ── ZWEI BANNER, ZWEI FRAGEN ──────────────────────────────────────────────────────────
  *
- * Das Sammelbanner der Zeitachse (`EtbZeitachse`) sagt „während Sie hier im Tagebuch
- * waren, kam etwas an" — flüchtig, solange der Fokus drin liegt. Dieses hier sagt „seit Sie
- * das Tagebuch zuletzt als gesichtet markiert haben" — persistent, je Benutzer und Einsatz,
- * serverseitig. Es steht IM FLUSS über der Zeitachse wie im Entwurf, das andere liegt als
- * Überlagerung auf ihr; beide stehen nie am selben Platz.
+ * Das Sammelbanner der Zeitachse sagt „während Sie hier waren, kam etwas an" — flüchtig,
+ * solange der Fokus drin liegt. Dieses sagt „seit Sie zuletzt als gesichtet markiert haben"
+ * — persistent, je Benutzer und Einsatz, serverseitig. Es steht IM FLUSS über der Zeitachse,
+ * das andere liegt als Überlagerung auf ihr.
  *
  * ── DIE MARKE RÜCKT NUR AUF KLICK ─────────────────────────────────────────────────────
  *
- * Öffnen oder Blättern verschiebt sie nicht: der Entwurf trägt die Aktion ausdrücklich, und
- * ein Banner, das sich beim Ansehen selbst löscht, sagte beim nächsten Besuch nichts mehr.
- * Zurückgeschickt wird `hoechste_lfd_nr` der gezeigten Antwort, nicht „alles bis jetzt" —
- * ein Eintrag, der zwischen Anzeige und Klick eintraf, war nicht angesagt und bleibt neu.
+ * Öffnen oder Blättern verschiebt sie nicht: ein Banner, das sich beim Ansehen selbst löscht,
+ * sagte beim nächsten Besuch nichts mehr. Zurückgeschickt wird `hoechste_lfd_nr` der gezeigten
+ * Antwort, nicht „alles bis jetzt" — ein Eintrag, der zwischen Anzeige und Klick eintraf, war
+ * nicht angesagt und bleibt neu.
  *
  * Live: der Key hängt unter dem ETB-Prefix, jedes `etb`-Ereignis zieht die Zahl nach.
  *
- * Laden und Fehler schweigen. Das Banner ist ein Hinweis über der Liste, keine Datenquelle
- * der Liste; deren eigener Fehlerzustand steht darüber. Ein fehlgeschlagenes MARKIEREN
- * dagegen meldet sich — das Banner bliebe sonst stumm stehen, und der Klick sähe wirkungslos
- * aus.
+ * Laden und Fehler schweigen: das Banner ist ein Hinweis, keine Datenquelle der Liste. Ein
+ * fehlgeschlagenes MARKIEREN meldet sich dagegen — sonst sähe der Klick wirkungslos aus.
  */
 export default function EtbLesemarkeBanner({ einsatzId }: { einsatzId: number }) {
   const { konventionen } = useAnzeigeKonventionen();
@@ -46,13 +43,10 @@ export default function EtbLesemarkeBanner({ einsatzId }: { einsatzId: number })
   const markieren = useMutation({
     mutationFn: (bisLfdNr: number) => setzeEtbLesemarke(einsatzId, bisLfdNr),
     /*
-     * Ein Abruf, der VOR dem Markieren losging (etwa durch ein `etb`-Ereignis kurz vor dem
-     * Klick), läse die alte Marke und käme nach der Antwort an — `setQueryData` bricht ihn
-     * nicht ab, er überschriebe den neuen Stand, und das Banner stünde wieder da. Deshalb
-     * erst abbrechen, und nach dem Setzen frisch lesen: sonst fehlte der Eintrag, dessen
-     * Ereignis den abgebrochenen Abruf ausgelöst hatte, bis zum nächsten Ereignis.
-     * Gemessen: jede der beiden Angaben schließt das Fenster schon allein (das Nachlesen
-     * bricht einen laufenden Abruf ebenfalls ab); der Test wird erst rot, wenn beide fehlen.
+     * Ein Abruf, der VOR dem Markieren losging, läse die alte Marke und käme nach der Antwort an
+     * — `setQueryData` bricht ihn nicht ab, er überschriebe den neuen Stand. Deshalb erst
+     * abbrechen und nach dem Setzen frisch lesen: sonst fehlte der Eintrag, dessen Ereignis den
+     * abgebrochenen Abruf ausgelöst hatte, bis zum nächsten Ereignis.
      */
     onMutate: () => qc.cancelQueries({ queryKey: einsatzKeys.etbLesemarke(einsatzId) }),
     onSuccess: (neu) => qc.setQueryData(einsatzKeys.etbLesemarke(einsatzId), neu),

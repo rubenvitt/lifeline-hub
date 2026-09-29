@@ -12,14 +12,10 @@ import utc from 'dayjs/plugin/utc';
 
 dayjs.extend(utc);
 
-// RTL wartet in findBy*/waitFor per Default nur 1 s — während vite.config.ts dem Test
-// 10 s zugesteht (testTimeout). Diese Schere ist der Grund, aus dem ein bloß langsamer
-// Mount als „Unable to find an element" erscheint statt als Timeout: unter Last (volle
-// Suite mit Datei-Parallelität, parallele cargo-Builds) überschreitet der erste Render
-// einer Seite die Sekunde, und der Test scheitert an der Wartezeit, nicht an der Sache
-// (LFH-308). 5 s bleiben bewusst unter testTimeout, damit ein echter Fehlschlag weiter
-// die lesbare RTL-Meldung mit DOM-Dump liefert und nicht im Vitest-Timeout verschwindet.
-// Der grüne Pfad wird dadurch nicht langsamer — gewartet wird nur, bis das Element da ist.
+// RTL wartet in findBy*/waitFor per Default nur 1 s, Vitest gesteht 10 s zu. Unter Last
+// überschreitet ein erster Render die Sekunde, und der Test scheiterte an der Wartezeit statt
+// an der Sache. 5 s bleiben unter testTimeout, damit ein echter Fehlschlag weiter die lesbare
+// RTL-Meldung mit DOM-Dump liefert.
 configure({ asyncUtilTimeout: 5000 });
 
 // Signalisiert React, dass wir in einer act-fähigen Umgebung testen — entfernt die
@@ -28,8 +24,7 @@ configure({ asyncUtilTimeout: 5000 });
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-// jsdom unter Node 26 liefert kein window.localStorage — minimaler In-Memory-Polyfill,
-// damit Komponenten/Hilfen mit Persistenz (z. B. zuletzt gewählte Karte/UHS) testbar sind.
+// jsdom unter Node 26 liefert kein window.localStorage — minimaler In-Memory-Polyfill.
 if (typeof globalThis.localStorage === 'undefined') {
   const store = new Map<string, string>();
   const localStoragePolyfill: Storage = {
@@ -58,9 +53,8 @@ if (typeof globalThis.localStorage === 'undefined') {
   });
 }
 
-// antd 6 nutzt rc-resize-observer flächendeckend (Table, Space, Tabs …) — jsdom kennt
-// ResizeObserver nicht, sonst wirft jeder Render ReferenceError und reißt die Suite ab.
-// No-op reicht: Tests prüfen Inhalt/Verhalten, keine gemessenen Größen.
+// antd 6 nutzt rc-resize-observer flächendeckend; jsdom kennt ResizeObserver nicht. No-op
+// reicht: Tests prüfen keine gemessenen Größen.
 if (typeof globalThis.ResizeObserver === 'undefined') {
   class ResizeObserverStub {
     observe() {}
@@ -70,23 +64,17 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
 }
 
-// antds Breakpoint-Beobachter braucht die Medienabfrage-API, die jsdom nicht mitbringt.
-// Der Stub liegt als eigenes Modul in ./viewport (Muster ./server) und ist BREITENBEWUSST:
-// er wertet min-/max-width gegen eine steuerbare Breite aus, Default 1024 px. Der frühere
-// Stub hier lieferte für jede Abfrage `matches: false` und machte damit jede Behauptung
-// über responsives Verhalten zur Attrappe. Details und Setter: ./viewport.
+// antds Breakpoint-Beobachter braucht `matchMedia`. Der Stub in ./viewport ist
+// BREITENBEWUSST (min-/max-width gegen eine steuerbare Breite, Default 1024 px).
 installiereMatchMedia();
 
-// antd 6 hängt an jedes Bedienelement `css-var-root` samt 464 `--ant-*`-Variablen, und
-// jsdoms `getComputedStyle` zahlt je Element für jede davon — auch aus dem Cache. Ein
-// `getByRole` auf der Lagekarte kostete so 2,4–2,6 s (LFH-623). Der Filter streicht nur die
-// Variablen-DEKLARATIONEN aus antds eingehängten Stilen; jsdom löst `var()` ohnehin nicht
-// auf, an keiner berechneten Standard-Eigenschaft ändert sich etwas. Details: ./antdCssVariablen
+// Streicht antds `--ant-*`-Deklarationen aus den eingehängten Stilen, weil jsdoms
+// `getComputedStyle` je Variable zahlt. Details: ./antdCssVariablen
 installiereCssVariablenFilter();
 
-// Web-Storage-Polyfill: jsdom liefert hier kein localStorage, und Node 26 stellt sein
-// experimentelles globales localStorage ohne `--localstorage-file` als undefined bereit
-// (→ überschattet jsdom). Guard: nur setzen, wenn nichts Brauchbares vorhanden ist.
+// Web-Storage-Polyfill: Node 26 stellt sein experimentelles globales localStorage ohne
+// `--localstorage-file` als undefined bereit und überschattet jsdom. Nur setzen, wenn nichts
+// Brauchbares da ist.
 if (globalThis.localStorage == null) {
   class InMemoryStorage implements Storage {
     private map = new Map<string, string>();
@@ -139,26 +127,18 @@ afterEach(() => {
 afterAll(() => server.close());
 
 // Echte Uhr, beim Laden gesichert: eine Datei, die Fake-Timer aktiv zurücklässt, darf den
-// Drain unten nicht endlos hängen lassen.
+// Drain unten nicht hängen lassen.
 const echterSetTimeout = globalThis.setTimeout;
 
-// Timer-Drain vor dem Abbau der jsdom-Umgebung (PR #55, antd 6.5.2 → 6.6.3).
-// antds `form/hooks/useDebounce` (ErrorList jedes `Form.Item`) läuft seit 6.6 über
-// `useDelayState` aus @rc-component/util und setzt bei leerem Fehler-Array einen
-// 10-ms-`setTimeout` — OHNE Abräumen beim Unmount (6.5.2 hatte `clearTimeout` im
-// Effekt-Cleanup). `cleanup()` hängt die Komponente ab, der Node-Timer bleibt. Endet eine
-// Datei in diesen 10 ms, feuert er nach dem Environment-Teardown; das `setState` auf den
-// abgehängten Fiber erreicht react-doms `resolveUpdatePriority`, das `window.event` liest →
-// „ReferenceError: window is not defined" als Unhandled Error, Vitest exitet 1 bei grünen
-// Tests. react-dom ist daran unbeteiligt: die Stelle ist in 19.2.8 und 19.3.0 identisch.
-// Nur Timer am DATEIENDE können den Teardown überleben — frühere laufen im nächsten Test ab
-// —, deshalb einmal je Datei statt je Test. Node löst Timer nach Fälligkeit aus: alles, was
-// vor diesem Drain mit ≤ 10 ms geplant wurde, feuert garantiert vorher, auch unter Last.
+// Timer-Drain vor dem Abbau der jsdom-Umgebung: antds `useDebounce` (ErrorList jedes
+// `Form.Item`) setzt einen 10-ms-`setTimeout` ohne Abräumen beim Unmount. Endet eine Datei in
+// diesen 10 ms, feuert er nach dem Teardown, react-dom liest `window.event` → „window is not
+// defined" als Unhandled Error, und Vitest exitet 1 bei grünen Tests. Nur Timer am DATEIENDE
+// überleben den Teardown, deshalb einmal je Datei. Node löst Timer nach Fälligkeit aus.
 afterAll(() => new Promise<void>((fertig) => echterSetTimeout(fertig, 25)));
 
-// jsdom kennt keine EventSource — No-op-Stub verhindert ReferenceError in Seiten-Tests, die
-// useEinsatzLiveStream mounten. beforeEach stellt den Stub nach vi.unstubAllGlobals() (z. B. in
-// den useEinsatzLiveStream-Tests, die eine FakeEventSource stubben) wieder her.
+// jsdom kennt keine EventSource — No-op-Stub für Seiten, die useEinsatzLiveStream mounten.
+// beforeEach stellt ihn nach `vi.unstubAllGlobals()` wieder her.
 beforeEach(() => {
   if (typeof globalThis.EventSource === 'undefined') {
     vi.stubGlobal(

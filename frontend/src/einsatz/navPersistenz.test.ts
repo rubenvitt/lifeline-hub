@@ -2,20 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
 
 /**
- * Der Schlüssel wird gegen ein HANDGESCHRIEBENES Literal geprüft, nicht gegen
- * eine importierte Konstante — sonst prüfte der Test die Konstante gegen sich
- * selbst und bliebe auch bei umbenanntem Schlüssel grün, während der gemerkte
- * Zustand des Benutzers still verlorenginge (dieselbe Falle wie beim
- * Byte-Pin der Wire-Strings in `api/queryKeys`).
+ * Der Schlüssel wird gegen ein HANDGESCHRIEBENES Literal geprüft, sonst prüfte der Test die
+ * Konstante gegen sich selbst und ein umbenannter Schlüssel verlöre still den gemerkten Zustand.
  */
 const SCHLUESSEL = 'lfh:nav:eingeklappt';
 
 /**
- * Führt `fn` mit einem Speicher aus, der bei JEDEM Zugriff wirft — der
- * Privatmodus-Fall. Bewusst per `defineProperty` und nicht per `vi.spyOn`:
- * `localStorage` ist in dieser Suite je nach Node-/jsdom-Stand mal ein echtes
- * `Storage`, mal der In-Memory-Ersatz aus `test/setup.ts`; ein Spy auf
- * `Storage.prototype` träfe den Ersatz gar nicht und der Test wäre still grün.
+ * Führt `fn` mit einem Speicher aus, der bei JEDEM Zugriff wirft (Privatmodus). Per
+ * `defineProperty`, nicht `vi.spyOn`: `localStorage` ist je nach Node-/jsdom-Stand ein echtes
+ * `Storage` oder der Ersatz aus `test/setup.ts`, und ein Spy auf `Storage.prototype` träfe den
+ * Ersatz nicht.
  */
 function mitWerfendemSpeicher(fn: () => void): void {
   const vorher = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');

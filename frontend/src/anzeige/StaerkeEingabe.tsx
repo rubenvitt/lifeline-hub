@@ -11,9 +11,8 @@ interface Props {
 }
 
 /**
- * Koerziert die drei Felder zur Stärke: ist mindestens eines gesetzt, zählen leere als 0
- * (vollständige Stärke); sind alle leer, gibt es keine Stärke (`null`). Entspricht der
- * Backend-Regel `Staerke::aus_optionen` ("alle drei oder keiner").
+ * Koerziert die drei Felder zur Stärke: ist mindestens eines gesetzt, zählen leere als 0; sind
+ * alle leer, `null` — wie `Staerke::aus_optionen` im Backend („alle drei oder keiner").
  */
 function koerziere(f: Feld, uf: Feld, m: Feld): Staerke | null {
   if (f == null && uf == null && m == null) return null;
@@ -30,13 +29,12 @@ function gleich(a: Staerke | null, b: Staerke | null): boolean {
 const SPALTE: React.CSSProperties = { display: 'inline-flex', flexDirection: 'column' };
 
 /**
- * Kontrollierte Eingabe einer taktischen Stärke (F/UF/M) mit Live-Gesamtanzeige. In antd-Forms
- * als `<Form.Item name="…"><StaerkeEingabe /></Form.Item>` einhängbar (value/onChange).
+ * Kontrollierte Eingabe einer taktischen Stärke (F/UF/M) mit Live-Gesamtanzeige, einhängbar als
+ * `<Form.Item name="…"><StaerkeEingabe /></Form.Item>`.
  *
- * Die Regel "alle drei oder keiner" wird über {@link koerziere} im onChange durchgesetzt; die
- * einzelnen Felder bleiben während der Eingabe frei leerbar. Der Echo-Guard im useEffect
- * verhindert, dass die value-Rückspeisung (das eigene onChange-Echo) die noch leeren Felder
- * auf 0 zieht — nur eine wirklich externe value-Änderung wird in die Felder gespiegelt.
+ * Die Felder bleiben während der Eingabe frei leerbar; {@link koerziere} setzt die Regel im
+ * onChange durch. Der Echo-Guard im useEffect spiegelt nur eine wirklich externe
+ * value-Änderung in die Felder, nicht das eigene onChange-Echo.
  */
 export default function StaerkeEingabe({ value, onChange, disabled }: Props) {
   const { token } = theme.useToken();

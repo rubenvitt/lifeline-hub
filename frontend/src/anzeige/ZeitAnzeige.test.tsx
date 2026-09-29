@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import ZeitAnzeige from './ZeitAnzeige';
 
-// Ohne Provider greift der Default-Kontext (Lokalzeit). Wir prüfen das Format-Schema
-// je Variante über einen stabilen Wire-String; die konkrete Uhrzeit hängt an der
-// Runner-Zeitzone, daher Muster statt Fixwert.
+// Ohne Provider gilt Lokalzeit; die konkrete Uhrzeit hängt an der Runner-Zone, daher Muster
+// statt Fixwert.
 describe('ZeitAnzeige', () => {
   const wire = '2026-07-16 12:30:00';
 

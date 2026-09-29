@@ -1,0 +1,26 @@
+Ereignistypen: ['etb']
+takt  1 A-okklusion-aus          Latenz_ms=181589
+takt  2 A-okklusion-aus          Latenz_ms=151537
+takt  3 A-okklusion-aus          Latenz_ms=121468
+takt  4 A-okklusion-aus          Latenz_ms=91401
+takt  5 A-okklusion-aus          Latenz_ms=61333
+takt  6 A-okklusion-aus          Latenz_ms=31277
+takt  7 B-minimiert              Latenz_ms=1210
+takt  8 B-minimiert              Latenz_ms=440259
+takt  9 B-minimiert              Latenz_ms=410184
+takt 10 B-minimiert              Latenz_ms=370163
+takt 11 B-minimiert              Latenz_ms=340096
+takt 12 B-minimiert              Latenz_ms=310029
+takt 13 B-minimiert              Latenz_ms=279972
+takt 14 B-minimiert              Latenz_ms=249916
+takt 15 C-verdeckt-gedrosselt    Latenz_ms=217130
+takt 16 C-verdeckt-gedrosselt    Latenz_ms=186857
+takt 17 C-verdeckt-gedrosselt    Latenz_ms=153084
+takt 18 C-verdeckt-gedrosselt    Latenz_ms=102918
+takt 19 C-verdeckt-gedrosselt    Latenz_ms=52374
+takt 20 C-verdeckt-gedrosselt    Latenz_ms=22317
+takt 21 C-verdeckt-gedrosselt    Latenz_ms=None
+takt 22 ende                     Latenz_ms=None
+16:26:15 C-verdeckt-gedrosselt sse-fehler  0
+ticks B-minimiert n= 1 min/median/max 204198 204198 204198
+ticks C-verdeckt-gedrosselt n= 1 min/median/max 478099 478099 478099

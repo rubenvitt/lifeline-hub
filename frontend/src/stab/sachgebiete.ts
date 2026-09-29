@@ -1,19 +1,14 @@
 import type { Sachgebiet } from '../api/types';
 
 /**
- * Die sechs Sachgebiete als feste Zeilen (Spec LFH-46, Entscheidung 2 und Abschnitt 2.2).
+ * Die sechs Sachgebiete als feste Zeilen.
  *
- * S1–S6 sind im Produkt AUFGABENZUORDNUNGEN, keine Arbeitsplätze: eine Zeile je Sachgebiet,
- * ein Kurztext als Merkhilfe („Anregung, Erinnerung und Unterstützung", FwDV 100 Anlage 2,
- * S. 54) und Deeplinks in die Module, in denen gearbeitet wird.
- *
- * `label` ist wortgleich mit `Sachgebiet::label` in `src/stab/mod.rs` — der System-ETB-Eintrag
- * trägt dieselbe Bezeichnung, und Zeile und Führungsnachweis dürfen nicht auseinanderlaufen.
- * `aufgaben` ist gekürzt, nicht zitiert; die Seite verweist auf den Wortlaut.
- *
- * `werkzeuge` sind Registry-SCHLÜSSEL, nicht Pfade: die Freigabe (Status, Override, Rolle)
- * entscheidet `stab/werkzeuge.ts` zur Laufzeit. Höchstens drei je Zeile, damit die Zeile
- * im Fükw (≈ 1022 px Content) nicht umbricht.
+ * S1–S6 sind AUFGABENZUORDNUNGEN, keine Arbeitsplätze: eine Zeile je Sachgebiet, ein Kurztext
+ * als Merkhilfe (FwDV 100 Anlage 2) und Deeplinks in die Arbeitsmodule.
+ * `label` ist wortgleich mit `Sachgebiet::label` in `src/stab/mod.rs`, damit Zeile und
+ * Führungsnachweis nicht auseinanderlaufen. `aufgaben` ist gekürzt, nicht zitiert.
+ * `werkzeuge` sind Registry-SCHLÜSSEL; die Freigabe entscheidet `stab/werkzeuge.ts` zur
+ * Laufzeit. Höchstens drei je Zeile, damit sie im Fükw nicht umbricht.
  */
 export interface SachgebietEintrag {
   sachgebiet: Sachgebiet;
@@ -58,8 +53,8 @@ export const SACHGEBIETE: readonly SachgebietEintrag[] = [
     label: 'Versorgung',
     aufgaben: 'Einsatzmittel und Verbrauchsgüter anfordern, Verpflegung und Materialerhaltung',
     seite: 58,
-    // Verpflegung statt Fahrzeuge (LFH-634): die Zeile trägt höchstens drei Werkzeuge, und
-    // die Verpflegung ist wörtlich Aufgabe von S4 („Verpflegung und Materialerhaltung").
+    // Verpflegung statt Fahrzeuge: höchstens drei Werkzeuge, und die Verpflegung ist wörtlich
+    // Aufgabe von S4 („Verpflegung und Materialerhaltung").
     werkzeuge: ['nachforderungen', 'verpflegung', 'material'],
   },
   {

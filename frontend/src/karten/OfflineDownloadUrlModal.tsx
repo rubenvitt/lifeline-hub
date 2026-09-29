@@ -12,13 +12,9 @@ interface FormWerte {
 }
 
 /**
- * Schlanke Schnellerfassung für einen Offline-Download per eigener URL (CLAUDE.md-Leitlinie:
- * kurzes Formular ≤~3 Felder → Modal). Für selbst gebaute/gehostete MBTiles-Extrakte. `lizenz`
- * ist Pflicht (Server erzwingt es; offline sichtbar). v1: Shortbread-Schema fest.
- *
- * Der frühere `resetFields()`-Effekt beim Öffnen ist weg (LFH-346/A6): `ErfassungsModal`
- * setzt auf allen vier Auswegen selbst zurück, ein zweiter Reset verdeckte nur, ob die
- * Hülle ihre Zusicherung einlöst.
+ * Schnellerfassung für einen Offline-Download per eigener URL (selbst gebaute/gehostete
+ * MBTiles-Extrakte). `lizenz` ist Pflicht (Server erzwingt es; offline sichtbar). v1:
+ * Shortbread-Schema fest. Zurückgesetzt wird von `ErfassungsModal` auf allen Auswegen.
  */
 export default function OfflineDownloadUrlModal({
   offen,
@@ -39,8 +35,8 @@ export default function OfflineDownloadUrlModal({
         lizenz: werte.lizenz.trim(),
         kachel_schema: 'shortbread',
       }),
-    // Kein `onClose()` mehr: das Schliessen macht `onFertig`. Die Erfolgsmeldung bleibt —
-    // sie ist die Quittung für einen Vorgang, der im Hintergrund weiterläuft.
+    // Das Schließen macht `onFertig`. Die Erfolgsmeldung quittiert einen Vorgang, der im
+    // Hintergrund weiterläuft.
     onSuccess: () => {
       invalidiereKarte(qc);
       message.success('Download gestartet');
@@ -55,7 +51,7 @@ export default function OfflineDownloadUrlModal({
       form={form}
       erfassenText="Download starten"
       laeuft={mutation.isPending}
-      // `mutateAsync`: bei Ablehnung muss die Zusage brechen (LFH-332).
+      // `mutateAsync`: bei Ablehnung muss die Zusage brechen.
       onErfassen={(w) => mutation.mutateAsync(w)}
       onFertig={onClose}
       onAbbrechen={onClose}

@@ -121,8 +121,7 @@ describe('betreuungText (LFH-639)', () => {
   });
 
   it('Kennzahltext ohne Meldung: eine geschätzte Plangröße bleibt gekennzeichnet (≈ an M)', () => {
-    // Spec „Kennzahl": ist eine beteiligte Plangröße geschätzt, MUST die Kennzahl als
-    // geschätzt gekennzeichnet sein — auch solange noch kein Stand gemeldet ist.
+    // Ist eine beteiligte Plangröße geschätzt, trägt die Kennzahl ≈ — auch ohne gemeldeten Stand.
     expect(
       kennzahlText({
         evakuiert: null,
@@ -135,8 +134,7 @@ describe('betreuungText (LFH-639)', () => {
   });
 
   it('Kennzahltext „nur Plan geschätzt": der Vorgabeweg des Anlegen-Dialogs, noch ohne Stand', () => {
-    // Zusammengesetzt statt als Flag: nur so ist „nur die Plangröße ist geschätzt" überhaupt
-    // ausdrückbar — genau der Fall aus dem Review (BezirkAnlegenDialog belegt `geschaetzt` vor).
+    // Zusammengesetzt statt als Flag: nur so ist „nur die Plangröße ist geschätzt" ausdrückbar.
     const k = evakuierungKennzahl([
       {
         raeumung: 'angeordnet',
@@ -160,8 +158,8 @@ describe('betreuungText (LFH-639)', () => {
     expect(kennzahlText(gezaehlt)).toBe(`keine Meldung · von 1${T}850 geplant · 1 ohne Meldung`);
   });
 
-  // LFH-607: Dashboard-Zelle und Blockkopf lesen EINE Formatierung. Die Zelle zeigt N als Wert
-  // und den Rest als Notiz; ohne Meldung ist N `null` (die Zelle setzt „—", nie 0).
+  // Dashboard-Zelle und Blockkopf lesen EINE Formatierung. Die Zelle zeigt N als Wert und den
+  // Rest als Notiz; ohne Meldung ist N `null` (die Zelle setzt „—", nie 0).
   describe('kennzahlTeile (LFH-607)', () => {
     it('gezählt: N als Wert, „von M geplant" als Notiz', () => {
       expect(

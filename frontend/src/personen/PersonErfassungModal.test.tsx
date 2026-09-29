@@ -5,14 +5,8 @@ import { renderMitProviders } from '../test/utils';
 import PersonErfassungModal, { type ErfassungsModus } from './PersonErfassungModal';
 
 /**
- * Unit-Netz für die Personen-Schnellerfassung (LFH-332 · B4).
- *
- * Diese Maske hatte bis hierher KEINEN Unit-Test — der Absendeweg hing allein an der
- * e2e-Suite. Geprüft wird deshalb genau das, was die Hülle für diese Maske zusichert
- * (Fokus, Enter, Serienlauf) plus das, was nur diese Maske entscheidet: das Feldbudget.
- *
- * Was hier NICHT geprüft wird: Höhen, Trefflächen, Abstände. `renderMitProviders` hängt ein
- * nacktes `ConfigProvider` ohne Theme ein — eine Behauptung über Pixel bewiese hier nichts.
+ * Unit-Netz für die Personen-Schnellerfassung: was die Hülle zusichert (Fokus, Enter,
+ * Serienlauf) plus das Feldbudget. Keine Pixel — `renderMitProviders` hat kein Theme.
  */
 
 /** Modal mit Standard-Zusagen; einzelne Rückrufe überschreibbar. */
@@ -36,13 +30,9 @@ function zeige(opts: { modus?: ErfassungsModus; onErfassen?: Mock; einsatzId?: n
 beforeEach(() => sessionStorage.clear());
 
 /**
- * Anzahl der Formularfelder IM BAUM.
- *
- * Bewusst über die Anwesenheit von `.ant-form-item` und NICHT über gerechnete Sichtbarkeit:
- * `renderMitProviders` liefert kein Theme, und eine Zählung, die an `display: none` aus antds
- * Laufzeit-CSS hängt, prüfte am Ende, ob jsdom das Stylesheet angewandt hat. Anwesenheit im
- * Baum ist hier die schärfere Aussage — sie ist nur wahr, wenn die Zusatzfelder wirklich erst
- * beim Aufklappen entstehen (kein `forceRender`, siehe Dateikopf der Komponente).
+ * Anzahl der Formularfelder IM BAUM — über `.ant-form-item`, nicht über gerechnete
+ * Sichtbarkeit (ohne Theme prüfte das nur, ob jsdom das Stylesheet anwendet). Nur wahr, wenn die
+ * Zusatzfelder wirklich erst beim Aufklappen entstehen.
  */
 function feldZahl(): number {
   return screen.getByRole('dialog').querySelectorAll('.ant-form-item').length;
@@ -52,11 +42,8 @@ describe('PersonErfassungModal — Tastaturweg', () => {
   it('setzt den Fokus beim Öffnen auf das erste Feld', async () => {
     zeige();
     /**
-     * Seit LFH-340 · C5 ist das erste Feld die Sichtungskategorie, und der Fokus landet auf
-     * ihrer ERSTEN Auswahlfläche. Das ist keine Auslegung, sondern die Mechanik der Hülle:
-     * `fokussiereErstesFeld` greift das erste `input` im Baum (`components/Erfassung.tsx`),
-     * und antds `Radio.Button` rendert je Fläche ein echtes `<input type="radio">`.
-     * Vorher stand hier das Suchfeld der Geschlechts-Combobox.
+     * Das erste Feld ist die Sichtung, der Fokus landet auf ihrer ERSTEN Fläche: die Hülle greift
+     * das erste `input`, und `Radio.Button` rendert je Fläche ein echtes `<input type="radio">`.
      */
     const flaechen = within(screen.getByRole('radiogroup')).getAllByRole('radio');
     await waitFor(() => expect(document.activeElement).toBe(flaechen[0]));
@@ -66,8 +53,7 @@ describe('PersonErfassungModal — Tastaturweg', () => {
     const { onErfassen } = zeige();
     const nutzer = userEvent.setup();
 
-    // Letztes SICHTBARES Eingabefeld ist seit C5 der Antreffort — der Name ist unter
-    // „Weitere Angaben" gewandert.
+    // Letztes SICHTBARES Eingabefeld ist der Antreffort.
     await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd{Enter}');
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
@@ -78,8 +64,7 @@ describe('PersonErfassungModal — Tastaturweg', () => {
     const { onErfassen } = zeige();
     const nutzer = userEvent.setup();
 
-    // Geklickt wird der WRAPPER, nicht das `input`: antd blendet die Radio-Eingabe mit
-    // `pointer-events: none` aus, sichtbar und klickbar ist das umgebende `<label>`.
+    // Geklickt wird der WRAPPER: antd blendet die Radio-Eingabe mit `pointer-events: none` aus.
     const skZwei = within(screen.getByRole('radiogroup')).getAllByRole('radio')[1];
     await nutzer.click(skZwei.closest('label')!);
     await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
@@ -108,9 +93,8 @@ describe('PersonErfassungModal — Serienmodus', () => {
   });
 
   it('der Antreffort überlebt das Serien-Speichern (Kontext-Default)', async () => {
-    // `uebernahme={['antreff_ort']}`: an einer Sammelstelle kommen zehn Personen vom
-    // selben Ort. Der Beleg ist das Nebeneinander — Name leer, Antreffort steht.
-    // Der Schalter steht per Vorgabe AUS (30.07.2026) und wird hier eingeschaltet.
+    // `uebernahme={['antreff_ort']}`: an einer Sammelstelle kommen viele Personen vom selben Ort.
+    // „Werte behalten" steht per Vorgabe aus und wird hier eingeschaltet.
     zeige();
     const nutzer = userEvent.setup();
 
@@ -142,8 +126,7 @@ describe('PersonErfassungModal — Feldbudget', () => {
     const nutzer = userEvent.setup();
 
     expect(feldZahl()).toBeLessThanOrEqual(4);
-    // Seit LFH-340 · C5 steht die Sichtungskategorie im Budget, und der Name ist dafür unter
-    // „Weitere Angaben" gewandert — an der Aufnahme wird zuerst die Kategorie vergeben.
+    // Die Sichtung steht im sichtbaren Budget, der Name unter „Weitere Angaben".
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
     expect(screen.getByLabelText('Geschlecht')).toBeInTheDocument();
     expect(screen.getByLabelText('Geschätztes Alter (Jahre)')).toBeInTheDocument();
@@ -151,8 +134,7 @@ describe('PersonErfassungModal — Feldbudget', () => {
     expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Vorname')).not.toBeInTheDocument();
 
-    // Die zweite Hälfte: ohne sie wäre „höchstens vier" auch dann wahr, wenn es die
-    // Zusatzfelder überhaupt nicht mehr gäbe.
+    // Ohne die zweite Hälfte wäre „höchstens vier" auch wahr, wenn es die Zusatzfelder nicht gäbe.
     await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
 
     await waitFor(() => expect(screen.getByLabelText('Vorname')).toBeInTheDocument());
@@ -184,23 +166,20 @@ describe('PersonErfassungModal — Feldbudget', () => {
   });
 
   it('ein eingeklappt zurückgelassener Wert geht beim Absenden trotzdem mit', async () => {
-    // DER BELEG FÜR DIE ENTSCHEIDUNG GEGEN `forceRender` (siehe Dateikopf der Komponente).
-    // Die einzige Lage, in der ein Zusatzfeld überhaupt einen Wert tragen kann, ist: aufgeklappt,
-    // getippt, wieder zugeklappt. Genau die wird hier gefahren. Bliebe der Wert dabei liegen,
-    // wäre `forceRender` (und eine sichtbarkeitsgerechnete Feldzählung) unvermeidlich.
+    // Der Beleg gegen `forceRender`: ein Zusatzfeld trägt nur einen Wert, wenn es aufgeklappt,
+    // getippt und wieder zugeklappt wurde — genau das wird hier gefahren.
     const { onErfassen } = zeige();
     const nutzer = userEvent.setup();
 
     const kopf = screen.getByRole('button', { name: /Weitere Angaben/ });
     await nutzer.click(kopf);
     await waitFor(() => expect(screen.getByLabelText('Vorname')).toBeInTheDocument());
-    // Beide Felder liegen seit LFH-340 · C5 eingeklappt — der Name ist mit der
-    // Sichtungskategorie aus dem sichtbaren Budget gewichen.
+    // Beide Felder liegen eingeklappt.
     await nutzer.type(screen.getByLabelText('Name'), 'Mustermann');
     await nutzer.type(screen.getByLabelText('Vorname'), 'Max');
     await nutzer.click(kopf);
     // Ohne diese Zeile bewiese der Fall nichts: wäre der zweite Klick wirkungslos, stünde der
-    // Bereich noch offen und „der Wert geht mit" wäre der triviale Normalfall.
+    // Bereich offen und „der Wert geht mit" wäre trivial.
     await waitFor(() => expect(kopf).toHaveAttribute('aria-expanded', 'false'));
 
     await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd{Enter}');

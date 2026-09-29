@@ -15,13 +15,13 @@ export interface BesetzungFormWerte {
   art: BesetzungWahl;
   /**
    * `EinsatzPersonal.id` (= `einsatz_personal.id`), nicht `EinsatzPersonal.personal_id`.
-   * `null` nach einer abgebrochenen Ad-hoc-Anlage (Ruling 4/8) — `required` weist es ab.
+   * `null` nach einer abgebrochenen Ad-hoc-Anlage — `required` weist es ab.
    */
   personal_id?: number | null;
   bezeichnung?: string;
 }
 
-/** Entscheidung 3 der Spec. „Nicht vergeben" steht auf ALLEN sechs Zeilen zur Wahl. */
+/** „Nicht vergeben" steht auf ALLEN sechs Zeilen zur Wahl. */
 export const BESETZUNG_OPTIONEN: readonly { value: BesetzungWahl; label: string }[] = [
   { value: 'nicht_vergeben', label: 'nicht vergeben' },
   { value: 'einsatzleitung', label: 'bei der Einsatzleitung' },
@@ -38,8 +38,8 @@ export function zeileFuer(
 }
 
 /**
- * Besetzung als `StatusTag`-Darstellung. Durchweg `neutral`: „nicht vergeben" ist im Fükw der
- * Stufe B der Normalfall, keine Alarmfarbe (Entscheidung 3) — das Wort trägt die Aussage.
+ * Besetzung als `StatusTag`-Darstellung, durchweg `neutral`: „nicht vergeben" ist im Fükw der
+ * Normalfall, keine Alarmfarbe — das Wort trägt die Aussage.
  */
 export function besetzungDarstellung(zeile: Stabsfunktion | undefined): StatusDarstellung {
   if (!zeile) return { rolle: 'neutral', label: 'nicht vergeben' };
@@ -60,7 +60,7 @@ export function besetzungDarstellung(zeile: Stabsfunktion | undefined): StatusDa
   }
 }
 
-/** Vorbelegung der Maske mit dem AKTUELLEN Zustand (Spec 10). */
+/** Vorbelegung der Maske mit dem AKTUELLEN Zustand. */
 export function besetzungFormWerte(zeile: Stabsfunktion | undefined): BesetzungFormWerte {
   if (!zeile) return { art: 'nicht_vergeben' };
   switch (zeile.besetzung_art) {
@@ -81,12 +81,10 @@ export type BesetzungAktion =
 
 /**
  * Was die Maske beim Übernehmen schickt — mit Wertgleichheits-Riegel.
- *
- * Unverändert → `keine` (kein Request): ein PUT mit gleichem Wert schriebe `gesetzt_at` neu
- * und feuerte ein Live-Ereignis, ein DELETE auf eine leere Zeile ist zwar 204, aber ein
- * Request für nichts. Geschickt wird NUR das Feld, das die Art verlangt — überzählige Felder
- * beantwortet das Backend mit 422, und die Maske lässt Werte eines vorher gewählten Zweigs im
- * Formularspeicher stehen.
+ * Unverändert → `keine` (kein Request): ein PUT mit gleichem Wert schriebe `gesetzt_at` neu,
+ * ein DELETE auf eine leere Zeile wäre ein Request für nichts. Geschickt wird NUR das Feld, das
+ * die Art verlangt — überzählige Felder beantwortet das Backend mit 422, und der
+ * Formularspeicher hält Werte eines vorher gewählten Zweigs.
  */
 export function besetzungAktion(
   zeile: Stabsfunktion | undefined,
@@ -113,8 +111,8 @@ export function besetzungAktion(
     case 'einsatzleitung':
       return { typ: 'setzen', daten: { besetzung_art: 'einsatzleitung' } };
     case 'personal':
-      // Ohne gewählte Person gibt es nichts zu setzen; `required` hält diesen Zweig in der
-      // Maske ohnehin fern. `BesetzungBody.personal_id` bleibt eine Zahl, kein `null`.
+      // Ohne gewählte Person gibt es nichts zu setzen (`required` hält den Zweig fern);
+      // `BesetzungBody.personal_id` bleibt eine Zahl.
       return werte.personal_id != null
         ? { typ: 'setzen', daten: { besetzung_art: 'personal', personal_id: werte.personal_id } }
         : { typ: 'keine' };
@@ -125,8 +123,8 @@ export function besetzungAktion(
 }
 
 /**
- * Grund der fehlenden Schreibberechtigung als ganzer Satz (CLAUDE.md, LFH-345 · C10/M16).
- * Nennt seit LFH-543 beide gesperrten Wege der Seite: Besetzung und Lagebesprechung.
+ * Grund der fehlenden Schreibberechtigung als ganzer Satz; nennt beide gesperrten Wege
+ * (Besetzung und Lagebesprechung).
  */
 export function besetzungRechteText(einsatzStatus: EinsatzStatus): string {
   return einsatzStatus !== 'aktiv'

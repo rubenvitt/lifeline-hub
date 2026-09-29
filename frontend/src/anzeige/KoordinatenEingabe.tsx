@@ -43,9 +43,9 @@ export default function KoordinatenEingabe({
   const [fehler, setFehler] = useState(false);
   const [fokus, setFokus] = useState(false);
 
-  // Aus der Wahrheit reformatieren bei EXTERNER Änderung (Laden, Kartenklick, Systemwechsel).
-  // NICHT während aktivem Tippen — sonst überschreibt der Effekt die laufende Eingabe und der
-  // Cursor springt (das passiert nur in der Form, wo onChange→value zurückgespeist wird).
+  // Aus der Wahrheit reformatieren bei EXTERNER Änderung (Laden, Kartenklick, Systemwechsel),
+  // NICHT während des Tippens — sonst überschreibt die Rückspeisung der Form die laufende
+  // Eingabe und der Cursor springt.
   useEffect(() => {
     if (fokus) return;
     setText(value ? formatiere(value.lat, value.lon, system) : '');

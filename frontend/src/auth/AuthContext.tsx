@@ -18,11 +18,11 @@ import {
   meldeServerErreichbar,
 } from '../offline/verbindung';
 
-/** Ergebnis von `login()` (LFH-43, Increment 5): unterscheidet den Sofort-Erfolg (Session
- *  bereits gesetzt, `benutzer` im Context übernommen) vom TOTP-Zweitfaktor-Fall
- *  (`mfa_erforderlich`, s. `authApi.login`-Doc) — die aufrufende Seite (`LoginPage`) schaltet im
- *  letzteren Fall auf die Code-Eingabe um, statt direkt zu navigieren. `benutzer` bleibt in
- *  diesem Fall bewusst `null`: es gibt noch keine Session. */
+/**
+ * Ergebnis von `login()`: Sofort-Erfolg oder TOTP-Zweitfaktor (`mfa_erforderlich`), bei dem
+ * `LoginPage` auf die Code-Eingabe umschaltet. `benutzer` bleibt dann `null`: es gibt noch
+ * keine Session.
+ */
 export type LoginErgebnis = { status: 'ok' } | { status: 'mfa_erforderlich' };
 
 interface AuthWert {
@@ -30,11 +30,10 @@ interface AuthWert {
   laedt: boolean;
   login: (benutzername: string, passwort: string) => Promise<LoginErgebnis>;
   logout: () => Promise<void>;
-  /** Lädt `/api/auth/me` neu und übernimmt den Benutzer in den Context — für Login-Wege,
-   *  die (anders als `login()`) die Session ohne einen Aufruf von `authApi.login`
-   *  etablieren, z.B. den WebAuthn-Passkey-Login (LFH-275) oder den zweiten Schritt des
-   *  TOTP-Logins (`totpFinish`, LFH-43): `auth/finish`/`totp/finish` setzen das Session-Cookie
-   *  server­seitig, der Client muss den Benutzer danach selbst nachladen. */
+  /**
+   * Lädt `/api/auth/me` neu und übernimmt den Benutzer — für Login-Wege, die die Session
+   * serverseitig ohne `authApi.login` setzen (Passkey, `totpFinish`).
+   */
   aktualisiere: () => Promise<void>;
 }
 
@@ -117,34 +116,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (benutzername: string, passwort: string): Promise<LoginErgebnis> => {
       const antwort = await authApi.login(benutzername, passwort);
-      // Untagged Union (s. `authApi.login`-Doc): der MFA-Zweig ist am `mfa_erforderlich`-Feld
-      // erkennbar, das die bare `BenutzerAnzeige` nie trägt. KEIN `setBenutzer` in diesem Fall —
-      // es gibt noch keine Session.
+      // Untagged Union: der MFA-Zweig ist am Feld `mfa_erforderlich` erkennbar. KEIN `setBenutzer`
+      // — es gibt noch keine Session.
       if ('mfa_erforderlich' in antwort) {
         return { status: 'mfa_erforderlich' };
       }
       // Eine andere Person als die vorherige räumt deren Lagebild, bevor der Benutzer wechselt.
       await lagebildAnmelden(queryClient, antwort);
       setBenutzer(antwort);
-      // Neue gültige Sitzung → die Melde-Sperre aus `meldeSitzungAbgelaufen` lösen, damit ein
-      // SPÄTERER Ablauf in derselben Browser-Sitzung wieder gemeldet wird (LFH-268).
+      // Neue gültige Sitzung → Melde-Sperre lösen, damit ein späterer Ablauf wieder gemeldet wird.
       sitzungsMeldungZuruecksetzen();
       return { status: 'ok' };
     },
     [queryClient],
   );
 
-  /** Meldet ab und wirft dabei **nie** — die lokale Abmeldung darf nicht am Serverruf hängen.
-   *
-   *  `session::loeschen` propagiert seinen Fehler (`src/routes/auth.rs:226`), ein Netzabriss
-   *  wirft ohnehin. Bliebe `benutzer` in dem Fall gesetzt, wäre der Nutzer sichtbar
-   *  „angemeldet" bei toter Session: `RequireAuth` ließe geschützte Routen passieren, und die
-   *  Sitzungswache (LFH-268) meldete wegen ihrer Wiederhol-Sperre keinen weiteren Ablauf mehr
-   *  — die App stünde still und ohne Re-Login-Angebot da. Serverseitig läuft die Session
-   *  regulär ab; lokal abgemeldet zu sein ist in jedem Fall der sicherere Zustand.
-   *
-   *  Das Lagebild (LFH-723) wird im selben `finally` gelöscht, Speicher UND Platte — auch der
-   *  Sitzungsablauf (401 → Sitzungswache) läuft hier durch. */
+  /**
+   * Meldet ab und wirft **nie** — die lokale Abmeldung darf nicht am Serverruf hängen.
+   * Bliebe `benutzer` nach einem Fehler gesetzt, ließe `RequireAuth` geschützte Routen passieren,
+   * und die Sitzungswache meldete wegen ihrer Sperre keinen Ablauf mehr. Lokal abgemeldet zu sein
+   * ist in jedem Fall der sicherere Zustand. Im selben `finally` wird das Lagebild (LFH-723)
+   * gelöscht, Speicher UND Platte; auch der Sitzungsablauf (401 → Sitzungswache) läuft hier durch.
+   */
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -160,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const b = await authApi.me();
     await lagebildAnmelden(queryClient, b);
     setBenutzer(b);
-    // Wie in `login`: Passkey- und TOTP-Login etablieren die Sitzung hierüber (LFH-268).
+    // Wie in `login`: Passkey- und TOTP-Login etablieren die Sitzung hierüber.
     sitzungsMeldungZuruecksetzen();
   }, [queryClient]);
 
@@ -179,17 +172,11 @@ export function useAuth(): AuthWert {
 }
 
 /**
- * Wie {@link useAuth}, aber ohne Provider `null` statt einer Ausnahme (LFH-391 · Etappe D).
+ * Wie {@link useAuth}, aber ohne Provider `null` statt einer Ausnahme.
  *
- * Für querschnittliche Rahmen, die bewusst OHNE App-Provider gerendert werden dürfen —
- * dieselbe Nachsicht, die `useTastaturEbene` gegenüber dem Paletten-Context übt. Der
- * konkrete Anlass ist gemessen: `CommandPaletteProvider` fragt seit dem Befehls-Gedächtnis
- * nach dem angemeldeten Benutzer, und mindestens eine Bestands-Testfläche
- * (`pages/UnfallhilfsstellenPage.test.tsx`, Drawer-Escape) mountet ihn ohne `AuthProvider`.
- *
- * NICHT als bequemere Variante von `useAuth` gedacht: wer den Benutzer BRAUCHT, soll die
- * Ausnahme bekommen. Diese hier ist für Stellen, an denen „kein Provider" eine zulässige
- * Betriebsart ist und still zu „nicht angemeldet" führt.
+ * Für Rahmen, die zulässig OHNE `AuthProvider` gerendert werden (etwa `CommandPaletteProvider`
+ * in Testflächen); „kein Provider" heißt dann still „nicht angemeldet". Wer den Benutzer
+ * BRAUCHT, nimmt `useAuth`.
  */
 export function useAuthOptional(): AuthWert | null {
   return useContext(AuthContext);

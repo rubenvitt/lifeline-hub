@@ -23,9 +23,8 @@ describe('zuletztModule', () => {
   });
 
   it('zählt einen erneuten Besuch nicht doppelt, sondern hebt ihn nach vorn', () => {
-    // Ohne die Dubletten-Entfernung füllte ein Hin-und-Her zwischen zwei Modulen die
-    // Liste mit demselben Eintrag und verdrängte den dritten — die „Zuletzt"-Zeile
-    // zeigte dann zwei Kopien statt drei Zielen.
+    // Ohne die Dubletten-Entfernung füllte ein Hin-und-Her zwischen zwei Modulen die Liste mit
+    // demselben Eintrag und verdrängte den dritten.
     merkeModulBesuch(1, 'etb');
     merkeModulBesuch(1, 'personen');
     merkeModulBesuch(1, 'etb');

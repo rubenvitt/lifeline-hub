@@ -3,15 +3,9 @@ import Datenstand from '../components/Datenstand';
 import { Augenbraue, monoStil, useRollen } from '../components/instrument';
 
 /**
- * Kopf eines Inhaltsbereichs UNTER dem Seitenkopf (Neuentwurf „Instrumententafel") —
- * etwa der Reiter „Aufträge" bzw. „Befehle" auf der Seite Aufträge/Befehle. Der Seitenkopf
- * (`EinsatzSeite`) trägt Titel und Primäraktion der SEITE; ein Reiter, der seine eigene
- * Menge und seine eigene Anlegen-Aktion hat, bekommt diese schmale Zeile statt eines
- * zweiten großen Titelblocks: Augenbraue als echte Überschrift, Mengen in Mono, Datenstand,
- * rechts die Aktion.
- *
- * Die Überschrift bleibt eine Überschrift (Vorgabe `h3` — unter dem `h4`-Seitentitel des
- * Rahmens liegt sie in der Gliederung der Reiter, wie vorher `Typography.Title level={3}`).
+ * Kopf eines Inhaltsbereichs UNTER dem Seitenkopf, etwa ein Reiter mit eigener Menge und
+ * eigener Anlegen-Aktion: Augenbraue als echte Überschrift (Vorgabe `h3`), Mengen in Mono,
+ * Datenstand, rechts die Aktion — statt eines zweiten großen Titelblocks.
  */
 export default function Bereichskopf({
   titel,

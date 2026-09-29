@@ -16,12 +16,9 @@ import { adminFixture, benutzerFixture } from '../test/fixtures';
 import type { BenutzerAnzeige } from '../api/types';
 
 /**
- * Verwaltungssektion „Demo-Daten“ (LFH-690, Task 6.2; Spec „Verwaltungssektion Demo-Daten“,
- * design.md D2/D13).
- *
- * Die Zeitangaben setzen `TZ=Europe/Berlin` voraus (`scripts/check-all.sh` erzwingt sie):
- * 08:00 UTC ist dann 10:00 Ortszeit, und nur so trennt die Erwartung `dayjs.utc(s)` von
- * `dayjs(s)` — in UTC gerechnet stünde beides auf 08:00.
+ * Verwaltungssektion „Demo-Daten“.
+ * Die Zeitangaben setzen `TZ=Europe/Berlin` voraus (`scripts/check-all.sh` erzwingt sie): nur
+ * so trennt die Erwartung `dayjs.utc(s)` von `dayjs(s)`.
  */
 
 const admin = adminFixture({ anzeigename: 'Chef' });
@@ -76,8 +73,7 @@ interface Zaehler {
 
 /**
  * Ein kleiner Server mit Zustand: jeder Schreibvorgang setzt den Stand, den das nächste GET
- * liefert — so wie das Backend, dessen Schreibantwort dem GET danach gleicht (block-5-report).
- * `'aus'` ist der Zustand ohne `--demo-daten`: 404 auf allem.
+ * liefert, wie im Backend. `'aus'` ist der Zustand ohne `--demo-daten`: 404 auf allem.
  */
 function demoServer(start: DemoDatenStatus | 'aus'): Zaehler {
   const z: Zaehler = { get: 0, post: 0, neu: 0, delete: 0 };
@@ -126,7 +122,7 @@ function setup(me: BenutzerAnzeige, route = adminDemoDatenPfad(), client?: Query
   );
 }
 
-/** Siehe `pages/LageberichtDetailPage.test.tsx` — gezählt wird die Message-Queue selbst. */
+/** Gezählt wird die Message-Queue selbst. */
 function toastsMit(wortlaut: string) {
   return [...document.querySelectorAll<HTMLElement>('.ant-message')].filter((n) =>
     n.textContent?.includes(wortlaut),
@@ -155,8 +151,7 @@ describe('DemoDatenPage — Menüeintrag (D13)', () => {
   it('System-Admin + 404: kein Eintrag, und kein Fehlerbild', async () => {
     const z = demoServer('aus');
     setup(admin, '/admin/stammdaten/fahrzeuge');
-    // Ankerpunkt: die Abfrage IST gelaufen — ohne ihn wäre die Abwesenheit auch dann grün,
-    // wenn der Hook nie feuert.
+    // Die Abfrage IST gelaufen — sonst wäre die Abwesenheit auch grün, wenn der Hook nie feuert.
     await waitFor(() => expect(z.get).toBe(1));
     await screen.findByText('PFAD:/admin/stammdaten/fahrzeuge');
     expect(screen.getByRole('menuitem', { name: 'Benutzer' })).toBeInTheDocument();
@@ -219,11 +214,7 @@ describe('DemoDatenPage — Status-Abfrage scheitert (Spec „Status-Abfrage sch
     await waitFor(() => expect(gets).toBe(2));
   });
 
-  /**
-   * Das Spec-Szenario nennt „500 oder Netzfehler“ (Branch-Review F5). Ein Netzfehler kommt
-   * nicht als `ApiError` mit Status an, sondern ohne Antwort — gerade dieser Weg darf nicht
-   * wie ein 404 aussehen und auf die Einsatzliste umleiten.
-   */
+  /** Ein Netzfehler kommt ohne Antwort an und darf nicht wie ein 404 aussehen und umleiten. */
   it('Netzfehler: Fehlerbild mit „Erneut abrufen“, keine Aktion, keine Umleitung, kein Menüeintrag', async () => {
     let gets = 0;
     server.use(
@@ -251,9 +242,8 @@ describe('DemoDatenPage — Status-Abfrage scheitert (Spec „Status-Abfrage sch
   });
 
   it('500: das Menü zeigt keinen Eintrag und kein Fehlerbild', async () => {
-    // Entscheidung: der Eintrag hängt an „freigeschaltet“ = Status 200. Bei 500 ist das
-    // unbekannt, der Eintrag fehlt also — wie bei 404. Die Sektion selbst bleibt über den
-    // Deeplink erreichbar und zeigt dort das Fehlerbild (Test darüber).
+    // Der Eintrag hängt an Status 200. Bei 500 fehlt er wie bei 404; die Sektion bleibt per
+    // Deeplink erreichbar und zeigt dort das Fehlerbild.
     let gets = 0;
     server.use(
       http.get('/api/demo-daten', () => {
@@ -430,9 +420,8 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
   });
 
   it('409: der Stand wird neu geladen, der Alert bleibt stehen', async () => {
-    // Ein 409 heißt: jemand anderes hat den Stand schon geändert (zweiter Tab, zweiter
-    // Admin). Ohne Neuladen böte die Seite weiter genau den Vorgang an, der gerade
-    // gescheitert ist, und ein zweiter Klick liefe in denselben 409.
+    // Ein 409 heißt: jemand anderes hat den Stand geändert. Ohne Neuladen böte die Seite weiter
+    // den gescheiterten Vorgang an.
     const z = demoServer(IMPORTIERT);
     let deletes = 0;
     server.use(
@@ -493,10 +482,8 @@ describe('DemoDatenPage — Netzfehler beim Vorgang', () => {
 });
 
 /**
- * Branch-Review F4 (LFH-690): nicht nur ein 409 lässt den Stand der Seite veralten. `apiSend`
- * bricht nach 15 s ab, der Server kann unter Konkurrenz länger brauchen und trotzdem
- * committen — nach einem Netzfehler kann der Vorgang also durchgegangen sein. Nach JEDEM
- * Fehler wird deshalb der Stand neu geladen, und mit ihm die übrigen D13-Fächer.
+ * Nicht nur ein 409 lässt den Stand veralten: `apiSend` bricht nach 15 s ab, der Server kann
+ * trotzdem committen. Nach JEDEM Fehler wird der Stand neu geladen, samt der übrigen Fächer.
  */
 describe('DemoDatenPage — nach jedem Fehler wird neu geladen (D13)', () => {
   function clientMit(keys: (readonly unknown[])[]) {
@@ -572,9 +559,8 @@ describe('DemoDatenPage — Riegel gegen doppeltes Senden', () => {
     );
     setup(admin);
     const knopf = await screen.findByRole('button', { name: 'Importieren' });
-    // Zwei synchrone Klicks: react-query meldet `pending` erst im nächsten Takt, antds
-    // `loading` sperrt den zweiten Klick also NICHT. Trägt nur der Riegel in der
-    // Absende-Funktion.
+    // Zwei synchrone Klicks: react-query meldet `pending` erst im nächsten Takt, antds `loading`
+    // sperrt den zweiten nicht. Trägt nur der Riegel in der Absende-Funktion.
     fireEvent.click(knopf);
     fireEvent.click(knopf);
     await waitFor(() => expect(posts).toBe(1));
@@ -619,9 +605,8 @@ describe('DemoDatenPage — laufender Vorgang sperrt beide Knöpfe sichtbar', ()
 
 describe('DemoDatenPage — Invalidierung nach dem Vorgang (D13)', () => {
   /**
-   * Eigener Client mit `gcTime: Infinity`: `neuerQueryClient()` räumt unbeobachtete Einträge
-   * beim ersten `await` weg (CLAUDE.md, Query-Key-Registry), und `isInvalidated` wäre dann
-   * an einem Eintrag geprüft, den es nicht mehr gibt.
+   * Eigener Client mit `gcTime: Infinity`: `neuerQueryClient()` räumt unbeobachtete Einträge beim
+   * ersten `await` weg, `isInvalidated` prüfte sonst einen Eintrag, den es nicht mehr gibt.
    */
   function clientMitFaechern() {
     const client = erzeugeQueryClient({

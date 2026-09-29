@@ -3,28 +3,25 @@ import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from './AuthContext';
 import { SITZUNG_ABGELAUFEN } from './sitzungsEvent';
 
-/** Einziger Empfänger von {@link SITZUNG_ABGELAUFEN} (LFH-268/F24). Gehört ins persistente Root-Layout (`App`/`SitzungsLayout`) innerhalb von
- *  `AntApp`, Data Router und `AuthProvider` — die
- *  Vorgänger-Brücke saß in `EinsatzLayout` und ließ damit `/admin`, `/profil`, die Stammdaten
- *  und die Einsatzliste ohne jede 401-Behandlung. */
+/**
+ * Einziger Empfänger von {@link SITZUNG_ABGELAUFEN}. Gehört ins persistente Root-Layout
+ * innerhalb von `AntApp`, Data Router und `AuthProvider`, damit jede Route eine
+ * 401-Behandlung hat.
+ */
 export function useSitzungsWache(): void {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const { pathname, search, hash } = useLocation();
 
   useEffect(() => {
-    // Auf der Login-Seite selbst gäbe es nichts umzuleiten — und der Rückkehr-Pfad wäre
-    // `/login`, was nach dem Anmelden auf sich selbst zeigte.
+    // Auf der Login-Seite gibt es nichts umzuleiten; der Rückkehr-Pfad zeigte auf sich selbst.
     if (pathname === '/login') return;
 
     const beiAblauf = () => {
-      // Vollständige Rückkehr-URL: `pathname` allein verliert die Deeplink-Selektion des
-      // Query-Param-Musters (`?einheit=`, `?meldung=`, ETB `?eintrag=` — s. CLAUDE.md).
+      // Vollständige Rückkehr-URL: `pathname` allein verlöre die Deeplink-Selektion (`?eintrag=` …).
       const von = `${pathname}${search}${hash}`;
-      // `AuthContext.logout` wirft heute nicht mehr (räumt im `finally`). Das `catch` hält
-      // die Umleitung trotzdem unabhängig davon: an einem sicherheitsrelevanten Seam soll
-      // eine gebrochene Zusage keine unbehandelte Rejection und keinen hängenden Nutzer
-      // erzeugen.
+      // `logout` wirft nicht, das `catch` hält die Umleitung trotzdem davon unabhängig: an diesem
+      // Seam soll keine unbehandelte Rejection und kein hängender Nutzer entstehen.
       void logout()
         .catch(() => {})
         .finally(() => navigate('/login', { replace: true, state: { von } }));

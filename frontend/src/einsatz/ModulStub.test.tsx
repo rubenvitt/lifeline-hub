@@ -9,14 +9,8 @@ import ModulStub from './ModulStub';
 import type { ModulEintrag } from './modulRegistry';
 
 /**
- * LFH-541: Der Stub wird gegen eine EIGENE Fixture geprüft, nicht mehr gegen den
- * `stab`-Eintrag der echten Registry.
- *
- * `stab` war bis LFH-46 das einzige `wip`-Modul und diente dieser Datei als Stellvertreter.
- * Mit seiner Freischaltung (ST4) gibt es im Bestand keines mehr — ein Test, der am letzten
- * unfertigen Modul hängt, prüft ab dann entweder nichts oder die falsche Sache. Die Fixture
- * ist zugleich ehrlicher: `ModulStub` nimmt sein Modul als **Prop**, die Registry ist für
- * seine Darstellung gar nicht beteiligt.
+ * Der Stub wird gegen eine EIGENE Fixture geprüft: `ModulStub` nimmt sein Modul als Prop,
+ * die Registry ist an seiner Darstellung nicht beteiligt (LFH-541).
  */
 const wipModul: ModulEintrag = {
   key: 'wip-probe',
@@ -77,18 +71,13 @@ describe('ModulStub', () => {
 
   /**
    * Ein Standardmodul, das sich NICHT auf eine bedienbare Route auflösen lässt, darf den
-   * Rückweg nicht in die Sackgasse schicken, aus der er herausführen soll.
+   * Rückweg nicht in eine Sackgasse schicken.
    *
-   * Hier wird bewusst NICHTS gemockt: `wip-probe` ist für die echte Registry ein unbekannter
-   * Schlüssel, und `aufloeseStandardModul` fällt dafür auf dieselbe Kante wie für ein
-   * bekanntes, unfertiges Modul. Ein Registry-Stub wäre hier gemessen WIRKUNGSLOS —
-   * `aufloeseStandardModul` liest seinen Register als Default-Argument aus dem eigenen
-   * Modul-Scope, und `ModulStub` übergibt keinen; ein `vi.mock` des Registry-Exports
-   * erreicht diesen Default nicht.
-   *
-   * Die Statusachse selbst („bekannt, aber nicht fertig") prüft deshalb
-   * `modulRegistry.test.ts` — dort nimmt die Funktion den Register als Argument, samt
-   * Gegenprobe auf ein fertiges Modul.
+   * Bewusst NICHTS gemockt: `wip-probe` ist für die echte Registry unbekannt und fällt auf
+   * dieselbe Kante wie ein unfertiges Modul. Ein Registry-Mock wäre wirkungslos:
+   * `aufloeseStandardModul` liest den Register als Default-Argument aus dem eigenen Modul-Scope,
+   * und `vi.mock` erreicht diesen Default nicht. Die Statusachse selbst prüft
+   * `modulRegistry.test.ts`, dort mit dem Register als Argument.
    */
   it('fällt bei nicht auflösbarem Standardmodul auf den Überblick zurück (LFH-328, Neuentwurf)', async () => {
     server.use(

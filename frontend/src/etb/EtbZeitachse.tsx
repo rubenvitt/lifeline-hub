@@ -60,8 +60,8 @@ interface Props {
   /** Wenn gesetzt, bietet jeder Eintrag „Berichtigen" an (nicht an einer Berichtigung). */
   onBerichtigen?: (eintrag: EtbEintragAnzeige) => void;
   /**
-   * Grund, aus dem „Berichtigen" gerade gesperrt ist (LFH-117, Review C1: ein Entwurf sendet
-   * noch). Der Punkt bleibt sichtbar und nennt den Grund — ein fehlender Punkt sagte nicht, warum.
+   * Grund, aus dem „Berichtigen" gerade gesperrt ist (ein Entwurf sendet noch). Der Punkt
+   * bleibt sichtbar und nennt den Grund — ein fehlender Punkt sagte nicht, warum.
    */
   berichtigenGesperrt?: string;
   /** Wenn gesetzt, bietet jeder Eintrag „Wiedervorlage" an (ETB→Erinnerung, LFH-106). */
@@ -116,39 +116,30 @@ function hinweisZeile(teile: ReactNode[], luft: number): ReactNode {
 }
 
 /**
- * Das Einsatztagebuch als ZEITACHSE auf allen Breiten (Neuentwurf S4, Entscheidung 3 des
- * Auftraggebers, 21.09.2026).
+ * Das Einsatztagebuch als ZEITACHSE auf allen Breiten (Neuentwurf S4).
  *
- * ── WARUM KEINE `Datensicht` MEHR ────────────────────────────────────────────────────
+ * ── WARUM KEINE `Datensicht` ─────────────────────────────────────────────────────────
  *
- * Seit LFH-342 · C7 lief die Chronologie über `Datensicht` — Tabelle ab `xl` (LFH-464, ein
- * eigener Umbruchpunkt, den das Primitiv seither nicht mehr kennt), darunter ein
- * Karten-EIGENBAU, der erste und einzige Eintrag in `KARTEN_EIGENBAU`. Beides war die Antwort auf die Frage „welche Form trägt ein
- * Tagebuch?", und die Antwort des Neuentwurfs ist eindeutiger als die der Vorgänger: ein
- * Tagebuch wird GELESEN, in Zeitfolge, auf jedem Schirm. Es gibt keine Sortierung, keinen
- * Spaltenfilter, keine Spaltenauswahl — die Ordnung ist die Zeit und serverseitig
- * festgelegt. Was `Datensicht` darüber hinaus trug (Stundengruppen, Zeilenschleuse,
- * Sammelbanner, Lade-/Leerweiche), steht jetzt als reine Funktion in `zeitachseModell.ts`
- * und ist dort ohne Render geprüft. Damit ist die Datei aus dem Konsumenteninventar
- * gefallen, und `KARTEN_EIGENBAU` ist wieder leer — wie am Tag 1 des Guards.
+ * Ein Tagebuch wird GELESEN, in Zeitfolge, auf jedem Schirm. Es gibt keine Sortierung, keinen
+ * Spaltenfilter, keine Spaltenauswahl — die Ordnung ist die Zeit und serverseitig festgelegt.
+ * Stundengruppen, Zeilenschleuse, Sammelbanner und Lade-/Leerweiche stehen als reine
+ * Funktionen in `zeitachseModell.ts` und sind dort ohne Render geprüft.
  *
  * ── WAS JEDE ZEILE SELBST TRÄGT ──────────────────────────────────────────────────────
  *
  * `data-lfh="datensicht-karte"` und die Zeilenklasse ({@link HERVORGEHOBEN}): daran findet
  * `scrolleZurZeile` die Zeile, und daran hängt die Hervorhebung des Deeplinks `?eintrag=`
- * (`index.css`, e2e `palette-datensaetze`). Der Markenname stammt aus der Datensicht; er
- * bleibt, weil das Primitiv ihn für den Sprung abfragt und ein zweiter Selektor dort eine
- * zweite Wahrheit wäre.
+ * (`index.css`, e2e `palette-datensaetze`). Der Markenname stammt aus der Datensicht; ein
+ * zweiter Selektor wäre eine zweite Wahrheit.
  *
  * ── LIVE-ZUFLUSS SPRINGT NICHT UNTER DEM CURSOR ─────────────────────────────────────
  *
  * Solange der Fokus in der Zeitachse liegt (Aktionsmenü, Verweis), ist die Menge der
- * gesendeten Einträge eingefroren; NEUES fremder Erfasser (über der Wassermarke, s.
- * `teileZufluss`) wird als Sammelbanner gezählt und erst auf „anzeigen" eingefügt —
- * nachgeladene ältere und eigene Einträge stehen sofort, ein Sprung taut auf (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5). Das Banner liegt als
- * Überlagerung über der Liste, nicht in ihrem Fluss — ein Banner, das beim Eintreffen
- * Platz nähme, schöbe genau die Zeilen weg, die es schützen soll. Gepufferte Einträge
- * stehen immer: sie sind die eigenen.
+ * gesendeten Einträge eingefroren; NEUES fremder Erfasser (s. `teileZufluss`) wird als
+ * Sammelbanner gezählt und erst auf „anzeigen" eingefügt — nachgeladene ältere und eigene
+ * Einträge stehen sofort, ein Sprung taut auf (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5).
+ * Das Banner liegt als Überlagerung über der Liste, nicht in ihrem Fluss — sonst schöbe es
+ * genau die Zeilen weg, die es schützen soll. Gepufferte Einträge stehen immer.
  */
 export default function EtbZeitachse({
   zeilen,
@@ -199,8 +190,8 @@ export default function EtbZeitachse({
   const verlassen = useCallback((e: FocusEvent<HTMLDivElement>) => {
     const ziel = e.relatedTarget as Node | null;
     if (ziel != null && wurzel.current?.contains(ziel)) return;
-    // Ein Menü im Portal ist kein Verlassen (LFH-339 · C4): antds `autoFocus` schiebt den
-    // Fokus an `document.body`, und die Zeile unter dem offenen Menü soll stehen bleiben.
+    // Ein Menü im Portal ist kein Verlassen: antds `autoFocus` schiebt den Fokus an
+    // `document.body`, und die Zeile unter dem offenen Menü soll stehen bleiben.
     if (ziel instanceof Element && ziel.closest('.ant-dropdown')) return;
     setGefroren(null);
   }, []);
@@ -251,7 +242,7 @@ export default function EtbZeitachse({
         }}
       >
         {/* Der Name trägt die laufende Nummer: n gleichnamige Knöpfe wären per Rolle nicht
-            auseinanderzuhalten (LFH-364). Kein `size` — die Höhe kommt aus `controlHeight`. */}
+           auseinanderzuhalten. Kein `size` — die Höhe kommt aus `controlHeight`. */}
         <Button
           type="text"
           aria-label={`Aktionen zu Eintrag ${e.lfd_nr}`}
@@ -278,13 +269,12 @@ export default function EtbZeitachse({
           </span>
         ),
         /*
-         * Der Verweis ist blau, nicht rot, obwohl der Entwurf ihn in `alarm` zeichnet:
-         * Rot bedient nichts (LFH-315, Entscheidung 2 lässt die Regel ausdrücklich stehen).
-         * Das Signal „Berichtigung" tragen Kante, Typwort und Zeilentönung.
+         * Der Verweis ist blau, nicht rot wie im Entwurf: Rot bedient nichts. Das Signal
+         * „Berichtigung" tragen Kante, Typwort und Zeilentönung.
          *
-         * Der Sprung führt über `?eintrag=` OHNE den aktiven Filter: der Grundeintrag passt
-         * selten zu dem Filter, unter dem man seine Berichtigung gefunden hat, und die Seite
-         * lädt ältere Seiten nach, bis er da ist (LFH-25).
+         * Der Sprung führt über `?eintrag=` OHNE den aktiven Filter: der Grundeintrag passt selten zu
+         * dem Filter, unter dem man seine Berichtigung fand, und die Seite lädt ältere Seiten nach,
+         * bis er da ist (LFH-25).
          */
         grund && (
           <span key="grund">
@@ -301,8 +291,8 @@ export default function EtbZeitachse({
           </Link>
         )),
         hatVerknuepfung(e) && <EtbBacklinkBadges key="rueck" eintrag={e} einsatzId={einsatzId} />,
-        // Anhänge (LFH-117) sind KEINE Kopplung: eigene Bedingung, nicht über
-        // `hatVerknuepfung` — die steuert die Rückverweise (Falle aus LFH-636).
+        // Anhänge sind KEINE Kopplung: eigene Bedingung, nicht über `hatVerknuepfung` — die steuert
+        // die Rückverweise.
         e.anhaenge.length > 0 && <EtbAnhaenge key="anhaenge" eintrag={e} einsatzId={einsatzId} />,
       ],
       token.marginXS,
@@ -311,8 +301,8 @@ export default function EtbZeitachse({
 
   function zeile(z: EtbZeile): ReactNode {
     const hervorgehoben = z.art === 'eintrag' && z.eintrag.id === highlightId;
-    // Die `etb-*`-Klassen tragen keine Regel mehr (die Tönung macht der Baustein über
-    // `toenung`); sie bleiben als Sortenmarke für Tests und Sichtprüfung im DOM.
+    // Die `etb-*`-Klassen tragen keine Regel (die Tönung macht der Baustein über `toenung`); sie
+    // bleiben als Sortenmarke für Tests und Sichtprüfung im DOM.
     const klassen = [
       z.art === 'eintrag' && z.eintrag.typ === 'berichtigung' ? 'etb-berichtigung' : '',
       z.art === 'ausstehend' ? 'etb-ausstehend' : '',
@@ -340,10 +330,9 @@ export default function EtbZeitachse({
           key={z.schluessel}
           {...gemeinsam}
           zeit={formatUhrzeit(p.erstellt_at, konventionen)}
-          // Keine Nummer, und das ist die Aussage: die vergibt erst der Server. Der
-          // Sendezustand steht als Chip in der Meta-Zeile, NICHT in der Nummernspalte —
-          // die ist inhaltsbreit, und ein `nowrap`-Chip dort machte die Zeitspalte
-          // dieser einen Zeile dreimal so breit wie die der Nachbarn.
+          // Keine Nummer, und das ist die Aussage: die vergibt erst der Server. Der Sendezustand steht
+          // als Chip in der Meta-Zeile, NICHT in der inhaltsbreiten Nummernspalte — dort machte ein
+          // `nowrap`-Chip die Zeitspalte dieser Zeile breiter als die der Nachbarn.
           typ={p.eintrag.typ}
           typwort={etbTyp[p.eintrag.typ].label}
           meta={
@@ -369,8 +358,8 @@ export default function EtbZeitachse({
               z.art === 'abgelehnt'
                 ? `Vom Server abgelehnt: ${z.puffer.grund}`
                 : 'Wird gesendet, sobald wieder Verbindung besteht.',
-              // Die Dateien liegen schon auf dem Server und gehen per `anhang_ids` mit
-              // (LFH-117, design.md D10) — die Zahl macht sichtbar, DASS sie mitgehen.
+              // Die Dateien liegen schon auf dem Server und gehen per `anhang_ids` mit — die Zahl macht
+              // sichtbar, DASS sie mitgehen.
               anhangZahl(p.eintrag.anhang_ids),
             ],
             token.marginXS,
@@ -408,9 +397,9 @@ export default function EtbZeitachse({
   }
 
   /**
-   * Laden und Fehler behaupten nichts über die Menge (LFH-331 · B3): ohne die Weiche
-   * blitzte „Noch keine Einträge." hinter dem Ladebalken auf. Im Fehlerfall bleibt die
-   * Liste montiert — bereits geladene Einträge bleiben lesbar (Spec-Festlegung D4).
+   * Laden und Fehler behaupten nichts über die Menge (LFH-331): sonst blitzte „Noch keine
+   * Einträge." hinter dem Ladebalken auf. Im Fehlerfall bleibt die Liste montiert, bereits
+   * geladene Einträge bleiben lesbar.
    */
   let inhalt: ReactNode;
   if (sichtbar.length === 0) {
@@ -446,8 +435,7 @@ export default function EtbZeitachse({
   return (
     <div
       ref={wurzel}
-      // Eine benannte Region: Vorleser springen hinein, und die e2e-Messungen greifen
-      // die Sicht darüber (vorher lieferte die Datensicht diese Region).
+      // Eine benannte Region: Vorleser springen hinein, und die e2e-Messungen greifen die Sicht darüber.
       role="region"
       aria-label="Einsatztagebuch"
       data-lfh="etb-zeitachse"
