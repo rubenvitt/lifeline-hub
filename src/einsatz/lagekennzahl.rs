@@ -9,32 +9,24 @@
 //! den Fachabfragen: der Einsatz ist die Abfrage, die als erste da ist, und die Belegung der
 //! Plätze darf beim Laden nicht wechseln.
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Eine aktive lagebezogene Kennzahl. Wire == `as_str()`.
-///
-/// Die Plätze und Füllkennzahlen stehen im Frontend (`pages/lage-dashboard/lagebild.ts`);
-/// hier steht nur, welche Auslöser gesetzt sind. Die Reihenfolge der Varianten ist die
-/// Reihenfolge der Ausgabe von [`ableiten`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Lagekennzahl {
-    /// Mindestens ein maßgeblicher Pegel ist festgelegt (`einsatz_pegel`, LFH-606).
-    Pegel,
-    /// Mindestens ein aktiver Evakuierungsbezirk (LFH-607): nicht storniert, Räumung nicht
-    /// `aufgehoben`. Das Anlegen eines Bezirks IST die Anordnung samt Plangröße (CHECK
-    /// `plan_personen >= 1`); Aufheben oder Stornieren des letzten nimmt sie zurück.
-    Evakuiert,
-}
-
-impl Lagekennzahl {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Lagekennzahl::Pegel => "pegel",
-            Lagekennzahl::Evakuiert => "evakuiert",
-        }
+wire_enum! {
+    /// Eine aktive lagebezogene Kennzahl. Wire == `as_str()`.
+    ///
+    /// Die Plätze und Füllkennzahlen stehen im Frontend (`pages/lage-dashboard/lagebild.ts`);
+    /// hier steht nur, welche Auslöser gesetzt sind. Die Reihenfolge der Varianten ist die
+    /// Reihenfolge der Ausgabe von [`ableiten`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
+    pub enum Lagekennzahl {
+        /// Mindestens ein maßgeblicher Pegel ist festgelegt (`einsatz_pegel`, LFH-606).
+        Pegel => "pegel",
+        /// Mindestens ein aktiver Evakuierungsbezirk (LFH-607): nicht storniert, Räumung nicht
+        /// `aufgehoben`. Das Anlegen eines Bezirks IST die Anordnung samt Plangröße (CHECK
+        /// `plan_personen >= 1`); Aufheben oder Stornieren des letzten nimmt sie zurück.
+        Evakuiert => "evakuiert",
     }
 }
 

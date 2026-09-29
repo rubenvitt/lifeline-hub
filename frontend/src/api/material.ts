@@ -1,5 +1,6 @@
 import type { Material } from './types';
 import { apiGet, apiSend } from './client';
+import { setzeDienststatusUnter } from './katalogApi';
 
 /** Editierbare Stammfelder (Anlegen + Vollersatz-PATCH). */
 export interface MaterialEingabe {
@@ -30,6 +31,5 @@ export function aktualisiereMaterial(id: number, daten: MaterialEingabe): Promis
 }
 
 export function setzeDienststatus(id: number, inDienst: boolean): Promise<Material> {
-  const pfad = inDienst ? 'in-dienst' : 'ausser-dienst';
-  return apiSend<Material>(`/api/material/${id}/${pfad}`, 'POST');
+  return setzeDienststatusUnter<Material>('/api/material', id, inDienst);
 }

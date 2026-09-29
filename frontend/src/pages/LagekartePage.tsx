@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { Alert, App, Button, Typography } from 'antd';
-import { ApiError } from '../api/client';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import FensterRahmen from '../components/FensterRahmen';
 import { seitenkopfStil, seitenMetaStil, seitentitelStil } from '../components/EinsatzSeite';
@@ -57,6 +56,7 @@ import {
 } from './lagekarte/leistenDaten';
 import { useLageSnapshots } from './lagekarte/useLageSnapshots';
 import type { Standquelle } from './lagekarte/snapshotDaten';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
  * So viele Quellen werden namentlich genannt, bevor der Rest zur Zahl wird. Beim Totalausfall
@@ -247,12 +247,8 @@ export default function LagekartePage() {
     effektiv,
   });
 
-  // Stabiler Fehler-Handler (message aus App.useApp ist stabil) → als ehrliche Dep in Effekten
-  // nutzbar, ohne sie neu auszulösen.
-  const fehler = useCallback(
-    (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
-    [message],
-  );
+  // Stabiler Fehler-Handler → als ehrliche Dep in Effekten nutzbar, ohne sie neu auszulösen.
+  const fehler = useFehlerMeldung();
   const erfolg = useCallback(
     (text: string) => {
       message.success(text);

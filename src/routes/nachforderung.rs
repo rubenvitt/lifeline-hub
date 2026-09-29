@@ -1,46 +1,31 @@
 use crate::app::AppState;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Nachforderungen;
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "nachforderungen";
-use crate::error::AppError;
 use crate::nachforderung::{repo, NachforderungAnzeige, PRIO_NORMAL, STATUS_ABGELEHNT};
+use crate::routes::support::pflicht;
+use crate::zeit::jetzt;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::{NaiveDateTime, Utc};
-use serde::Deserialize;
 
-/// Kanonischer Zeitstempel „jetzt" (UTC) im DB-Format.
-fn jetzt() -> String {
-    Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
-}
+use serde::Deserialize;
 
 /// SSE-Notify: Nachforderungen des Einsatzes haben sich geändert (Tag `nachforderung`,
 /// auf der EINEN bestehenden /etb/stream-Verbindung).
 fn sse(state: &AppState, einsatz_id: i64) {
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Nachforderung,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Nachforderung);
 }
 
 /// Normalisiert einen Eingabe-Zeitstempel auf 'YYYY-MM-DD HH:MM:SS' (UTC).
 fn parse_zeit(roh: &str) -> Result<String, AppError> {
-    let roh = roh.trim().replace('T', " ");
-    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"] {
-        if let Ok(n) = NaiveDateTime::parse_from_str(&roh, fmt) {
-            return Ok(n.format("%Y-%m-%d %H:%M:%S").to_string());
-        }
-    }
-    Err(AppError::Validation("Ungültiger Zeitpunkt".into()))
+    crate::zeit::normalisiere_eingabe(roh)
+        .ok_or_else(|| AppError::Validation("Ungültiger Zeitpunkt".into()))
 }
 
 fn trimme(o: &Option<String>) -> Option<&str> {
@@ -55,21 +40,10 @@ pub struct ListeParams {
 /// GET /api/einsaetze/{id}/nachforderungen — listen (Lesezugriff, auch Beobachter).
 pub async fn liste(
     State(state): State<AppState>,
-    crate::auth::session::CurrentUser(benutzer): crate::auth::session::CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Nachforderungen>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<NachforderungAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     let status = params
         .status
         .as_deref()
@@ -99,33 +73,12 @@ pub struct NeueNachforderung {
 /// POST /api/einsaetze/{id}/nachforderungen — Nachforderung absetzen (Schreibrecht + aktiv).
 pub async fn anlegen(
     State(state): State<AppState>,
-    crate::auth::session::CurrentUser(benutzer): crate::auth::session::CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Nachforderungen>,
     JsonBody(req): JsonBody<NeueNachforderung>,
 ) -> Result<(StatusCode, Json<NachforderungAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
-    let art = req.art.trim();
-    let bezeichnung = req.bezeichnung.trim();
-    if art.is_empty() {
-        return Err(AppError::Validation("Art darf nicht leer sein".into()));
-    }
-    if bezeichnung.is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
+    let einsatz_id = ctx.einsatz.id;
+    let art = pflicht(&req.art, "Art")?;
+    let bezeichnung = pflicht(&req.bezeichnung, "Bezeichnung")?;
     if let Some(a) = req.anzahl {
         if a < 1 {
             return Err(AppError::Validation("Anzahl muss mindestens 1 sein".into()));
@@ -152,10 +105,10 @@ pub async fn anlegen(
     let n = repo::anlegen(
         &state.pool,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         repo::NachforderungDaten {
-            art,
-            bezeichnung,
+            art: &art,
+            bezeichnung: &bezeichnung,
             anzahl: req.anzahl,
             adressat_kategorie: adressat,
             adressat_bezeichnung: trimme(&req.adressat_bezeichnung),
@@ -174,25 +127,13 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(n)))
 }
 
-/// Gemeinsamer Vorlauf für Nachforderungs-Aktionen: Gates + Cross-Einsatz-Schutz.
+/// Gemeinsamer Vorlauf für Nachforderungs-Aktionen: Cross-Einsatz-Schutz (die Gates laufen
+/// im Extractor).
 async fn fordere_bearbeitbar(
     state: &AppState,
-    benutzer: &crate::auth::Benutzer,
     einsatz_id: i64,
     nachforderung_id: i64,
 ) -> Result<(), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
     if !repo::gehoert_zu_einsatz(&state.pool, nachforderung_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
@@ -207,11 +148,12 @@ pub struct StatusReq {
 /// POST /api/einsaetze/{id}/nachforderungen/{nid}/status — Bedarfs-Status weiterschalten.
 pub async fn status(
     State(state): State<AppState>,
-    crate::auth::session::CurrentUser(benutzer): crate::auth::session::CurrentUser,
-    PfadParam((einsatz_id, nachforderung_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Nachforderungen>,
+    PfadParam((_eid, nachforderung_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<StatusReq>,
 ) -> Result<Json<NachforderungAnzeige>, AppError> {
-    fordere_bearbeitbar(&state, &benutzer, einsatz_id, nachforderung_id).await?;
+    let einsatz_id = ctx.einsatz.id;
+    fordere_bearbeitbar(&state, einsatz_id, nachforderung_id).await?;
     let neu = req.status.trim();
     // Ablehnung hat einen eigenen Pfad (mit Grund) — hier sauber abweisen statt im Repo auf 400 zu fallen.
     if neu == STATUS_ABGELEHNT {
@@ -253,11 +195,12 @@ pub struct AblehnenReq {
 /// POST /api/einsaetze/{id}/nachforderungen/{nid}/ablehnen — Abzweig „abgelehnt".
 pub async fn ablehnen(
     State(state): State<AppState>,
-    crate::auth::session::CurrentUser(benutzer): crate::auth::session::CurrentUser,
-    PfadParam((einsatz_id, nachforderung_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Nachforderungen>,
+    PfadParam((_eid, nachforderung_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<AblehnenReq>,
 ) -> Result<Json<NachforderungAnzeige>, AppError> {
-    fordere_bearbeitbar(&state, &benutzer, einsatz_id, nachforderung_id).await?;
+    let einsatz_id = ctx.einsatz.id;
+    fordere_bearbeitbar(&state, einsatz_id, nachforderung_id).await?;
     let aktuell = repo::laden(&state.pool, nachforderung_id).await?;
     if !crate::nachforderung::uebergang_erlaubt(aktuell.status.as_str(), STATUS_ABGELEHNT) {
         return Err(AppError::UnprocessableEntity(

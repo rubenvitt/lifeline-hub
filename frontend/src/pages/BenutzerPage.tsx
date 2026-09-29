@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router';
 import type { BenutzerAnzeige, OrgRolle, SystemRolle } from '../api/types';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import {
   bearbeiteBenutzer,
   deaktiviereBenutzer,
@@ -55,14 +55,13 @@ export default function BenutzerPage() {
     mutationFn: (b: NeuerBenutzer) => legeBenutzerAn(b),
     // Nur invalidieren: das Schließen macht `onFertig`, das Leeren die Hülle.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Anlegen fehlgeschlagen')),
   });
 
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereBenutzer(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Deaktivieren fehlgeschlagen')),
   });
 
   const bearbeiten = useMutation({
@@ -71,7 +70,7 @@ export default function BenutzerPage() {
     // Diese Mutation trägt zwei Wege, den Bearbeiten-Dialog und „Reaktivieren" in der Zeile. Das
     // Schließen des Dialogs macht deshalb `onFertig` an der Hülle, nicht dieser Erfolgszweig.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   /**

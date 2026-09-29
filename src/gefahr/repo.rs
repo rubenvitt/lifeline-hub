@@ -120,16 +120,6 @@ pub async fn upsert_bewertung_tx(
     laden_tx(conn, id).await
 }
 
-/// Pool-Wrapper: UPSERT in eigener Tx und Anzeige laden.
-pub async fn upsert_bewertung(
-    pool: &SqlitePool,
-    gefahrengebiet_id: i64,
-    daten: BewertungDaten<'_>,
-) -> Result<GefahrBewertungAnzeige, AppError> {
-    let mut conn = pool.acquire().await?;
-    upsert_bewertung_tx(&mut conn, gefahrengebiet_id, daten).await
-}
-
 /// Lädt eine Zelle per id auf einer offenen Connection/Transaktion (für die Anzeige
 /// nach Upsert — In-Tx-Reload).
 async fn laden_tx(
@@ -322,16 +312,24 @@ mod tests {
         let (gid, bid) = setup(&pool).await;
         assert!(liste(&pool, gid).await.unwrap().is_empty());
 
-        let z = upsert_bewertung(&pool, gid, daten("brand", "menschen", "hoch", bid))
-            .await
-            .unwrap();
+        let z = upsert_bewertung_tx(
+            &mut *pool.acquire().await.unwrap(),
+            gid,
+            daten("brand", "menschen", "hoch", bid),
+        )
+        .await
+        .unwrap();
         assert_eq!(z.warnstufe, Warnstufe::Hoch);
         assert_eq!(z.gefahrengebiet_id, gid);
         assert_eq!(liste(&pool, gid).await.unwrap().len(), 1);
 
-        let z2 = upsert_bewertung(&pool, gid, daten("brand", "menschen", "akut", bid))
-            .await
-            .unwrap();
+        let z2 = upsert_bewertung_tx(
+            &mut *pool.acquire().await.unwrap(),
+            gid,
+            daten("brand", "menschen", "akut", bid),
+        )
+        .await
+        .unwrap();
         assert_eq!(z2.id, z.id);
         assert_eq!(z2.warnstufe, Warnstufe::Akut);
         assert_eq!(liste(&pool, gid).await.unwrap().len(), 1);
@@ -341,12 +339,20 @@ mod tests {
     async fn warnstufe_keine_ist_kein_phantom() {
         let pool = crate::db::test_pool().await;
         let (gid, bid) = setup(&pool).await;
-        upsert_bewertung(&pool, gid, daten("brand", "menschen", "hoch", bid))
-            .await
-            .unwrap();
-        upsert_bewertung(&pool, gid, daten("brand", "menschen", "keine", bid))
-            .await
-            .unwrap();
+        upsert_bewertung_tx(
+            &mut *pool.acquire().await.unwrap(),
+            gid,
+            daten("brand", "menschen", "hoch", bid),
+        )
+        .await
+        .unwrap();
+        upsert_bewertung_tx(
+            &mut *pool.acquire().await.unwrap(),
+            gid,
+            daten("brand", "menschen", "keine", bid),
+        )
+        .await
+        .unwrap();
         assert!(liste(&pool, gid).await.unwrap().is_empty());
     }
 
@@ -365,12 +371,20 @@ mod tests {
         assert_eq!(leer.len(), 1);
         assert_eq!(leer[0].hoechste_warnstufe, Warnstufe::Keine);
 
-        upsert_bewertung(&pool, gid, daten("brand", "menschen", "mittel", bid))
-            .await
-            .unwrap();
-        upsert_bewertung(&pool, gid, daten("explosion", "sachwerte", "akut", bid))
-            .await
-            .unwrap();
+        upsert_bewertung_tx(
+            &mut *pool.acquire().await.unwrap(),
+            gid,
+            daten("brand", "menschen", "mittel", bid),
+        )
+        .await
+        .unwrap();
+        upsert_bewertung_tx(
+            &mut *pool.acquire().await.unwrap(),
+            gid,
+            daten("explosion", "sachwerte", "akut", bid),
+        )
+        .await
+        .unwrap();
         let voll = gebiete_liste(&pool, eid).await.unwrap();
         assert_eq!(
             voll[0].hoechste_warnstufe,
@@ -388,9 +402,13 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        upsert_bewertung(&pool, gid, daten("brand", "menschen", "hoch", bid))
-            .await
-            .unwrap();
+        upsert_bewertung_tx(
+            &mut *pool.acquire().await.unwrap(),
+            gid,
+            daten("brand", "menschen", "hoch", bid),
+        )
+        .await
+        .unwrap();
         // Keine Zone zeigt auf das Gebiet → aufräumen entfernt es (und die Matrix).
         gebiet_aufraeumen_wenn_leer(&pool, gid).await.unwrap();
         assert!(gebiete_liste(&pool, eid).await.unwrap().is_empty());

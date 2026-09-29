@@ -1,17 +1,13 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_einsatzleitung, fordere_lesezugriff, fordere_modul_zugriff_laden,
-    fordere_schreibrecht,
+use crate::einsatz::einstellungen::etb_startwert;
+use crate::einsatz::kontext::{
+    EinsatzLeitungszugriff, EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff,
 };
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::modul::Personen;
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "personen";
-use crate::error::AppError;
 use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::audit_repo::ZugriffAnzeige;
 use crate::person::sichtung_repo::SichtungAnzeige;
@@ -22,7 +18,10 @@ use crate::person::{
     darf_uebergehen, registrier_anzeige, repo, AbgleichStatus, Geschlecht, PersonAnzeige,
     PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus,
 };
-use crate::routes::support::{trimme, trimme_tri};
+use crate::routes::support::{
+    deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pruefe_koordinate, trimme,
+    trimme_tri,
+};
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -45,11 +44,10 @@ pub struct PersonDetail {
 
 /// Broadcastet ein dediziertes `person`-SSE-Event OHNE sensible Payload
 /// (nur einsatz_id + person_id); Clients refetchen die Liste.
-fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": person_id }).to_string();
+pub(super) fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Person, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Person, "person_id", person_id);
 }
 
 /// Emittiert die SSE-Events eines UHS-Auto-Austritts (LFH-124): der pool-basierte
@@ -58,38 +56,17 @@ fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
 /// (`Some(effekt)`) aufrufen.
 fn sse_auto_austritt(state: &AppState, einsatz_id: i64, effekt: &crate::uhs::AutoAustrittEffekt) {
     state.live.publiziere(einsatz_id, effekt.etb_eintrag.id);
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Uhs,
-        serde_json::json!({ "einsatz_id": einsatz_id, "uhs_id": effekt.uhs_id }).to_string(),
-    );
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Person,
-        serde_json::json!({ "einsatz_id": einsatz_id, "person_id": effekt.person_id }).to_string(),
-    );
-}
-
-/// Validiert ein optionales Geschlecht; `Validation`, falls gesetzt und unbekannt.
-///
-/// Prüft einen zu SETZENDEN Geschlechtswert. `None` heißt „kein Wert wird gesetzt" und ist
-/// immer zulässig — beim PATCH deckt das sowohl das absente Feld als auch den Leerwunsch
-/// (`null`/`""`) ab. Der Aufrufer flacht das Tri-State entsprechend ab.
-fn pruefe_geschlecht(g: Option<&str>) -> Result<(), AppError> {
-    if let Some(g) = g {
-        if Geschlecht::parse(g).is_none() {
-            return Err(AppError::Validation("Unbekanntes Geschlecht".into()));
-        }
-    }
-    Ok(())
+    state
+        .live
+        .publiziere_objekt(einsatz_id, LiveEvent::Uhs, "uhs_id", effekt.uhs_id);
+    state
+        .live
+        .publiziere_objekt(einsatz_id, LiveEvent::Person, "person_id", effekt.person_id);
 }
 
 /// Toleranz für „vermisst seit" in der Zukunft (design.md D4): fängt eine vorgehende
 /// Geräteuhr ab. Ohne sie verwürfe die Offline-Queue eine Erfassung mit 400.
 const VERMISST_SEIT_TOLERANZ: chrono::Duration = chrono::Duration::minutes(5);
-
-/// Wire-Format aller Zeitstempel: UTC ohne Zonenkennung.
-const ZEIT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 fn jetzt_utc() -> chrono::NaiveDateTime {
     chrono::Utc::now().naive_utc()
@@ -102,41 +79,15 @@ fn jetzt_utc() -> chrono::NaiveDateTime {
 /// unbrauchbarer Wert ist schon für sich unbrauchbar (LFH-267). Ein Body mit kaputtem
 /// Zeitpunkt UND falschem Status ist deshalb 400, nicht 422.
 fn pruefe_vermisst_seit(roh: &str, jetzt: chrono::NaiveDateTime) -> Result<String, AppError> {
-    let zeitpunkt =
-        chrono::NaiveDateTime::parse_from_str(roh.trim(), ZEIT_FORMAT).map_err(|_| {
-            AppError::Validation(
-                "vermisst_seit muss das Format JJJJ-MM-TT hh:mm:ss (UTC) haben".into(),
-            )
-        })?;
+    let zeitpunkt = crate::zeit::parse(roh.trim()).ok_or_else(|| {
+        AppError::Validation("vermisst_seit muss das Format JJJJ-MM-TT hh:mm:ss (UTC) haben".into())
+    })?;
     if zeitpunkt > jetzt + VERMISST_SEIT_TOLERANZ {
         return Err(AppError::Validation(
             "vermisst_seit darf nicht in der Zukunft liegen".into(),
         ));
     }
-    Ok(zeitpunkt.format(ZEIT_FORMAT).to_string())
-}
-
-/// Fundort-Koordinate als Paar im gültigen Wertebereich (LFH-613). Beim PATCH ist mit dem
-/// EFFEKTIVEN Zustand nach der Änderung aufzurufen, nicht mit dem Body allein — sonst ließe
-/// `{"antreff_lon": null}` gegen einen Bestand mit Koordinate eine halbe stehen. 422 wie
-/// `einsatz_uhs.rs` (Feld-Kombination bzw. Wertebereich).
-fn pruefe_koordinate(lat: Option<f64>, lon: Option<f64>) -> Result<(), AppError> {
-    if lat.is_some() != lon.is_some() {
-        return Err(AppError::UnprocessableEntity(
-            "antreff_lat und antreff_lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
-        ));
-    }
-    if lat.is_some_and(|la| !(-90.0..=90.0).contains(&la)) {
-        return Err(AppError::UnprocessableEntity(
-            "antreff_lat muss zwischen -90 und 90 liegen".into(),
-        ));
-    }
-    if lon.is_some_and(|lo| !(-180.0..=180.0).contains(&lo)) {
-        return Err(AppError::UnprocessableEntity(
-            "antreff_lon muss zwischen -180 und 180 liegen".into(),
-        ));
-    }
-    Ok(())
+    Ok(crate::zeit::formatiere(zeitpunkt))
 }
 
 #[derive(Debug, Deserialize)]
@@ -147,27 +98,15 @@ pub struct ListeParams {
 /// GET /api/einsaetze/{id}/personen — Liste (optional `?status=`). NICHT auditiert.
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Personen>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<PersonAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
-    if let Some(s) = &params.status {
-        if PersonStatus::parse(s).is_none() {
-            return Err(AppError::Validation("Unbekannter Status im Filter".into()));
-        }
-    }
+    let einsatz_id = ctx.einsatz.id;
+    parse_enum_opt(
+        PersonStatus::parse,
+        params.status.as_deref(),
+        "Unbekannter Status im Filter",
+    )?;
     Ok(Json(
         repo::liste(&state.pool, einsatz_id, params.status.as_deref()).await?,
     ))
@@ -215,33 +154,16 @@ pub struct AnlegenBody {
 /// Schreibberechtigt + aktiver Einsatz. Schreibt pseudonymen ETB-Eintrag + SSE.
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibfreigabe<Personen>,
     headers: HeaderMap,
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<PersonAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     if body.uhs_id.is_some() {
-        fordere_modul_zugriff_laden(
-            &state.pool,
-            einsatz_id,
-            einsatz.org_id,
-            "unfallhilfsstellen",
-            &benutzer,
-        )
-        .await?;
+        ctx.fordere_modul_zugriff(&state.pool, "unfallhilfsstellen")
+            .await?;
     }
-    crate::routes::support::fordere_offline_queue_benutzer(&headers, benutzer.id)?;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
 
     // Bereits committete Offline-Aktion nach Auth-/Schreib-/Modul-Gates, aber vor dem
     // Aktiv-Gate erkennen. Die Einsatz-ID ist Teil des Lookups (kein Cross-Einsatz-Replay).
@@ -256,8 +178,12 @@ pub async fn anlegen(
             return Ok((StatusCode::CREATED, Json(person)));
         }
     }
-    fordere_aktiv(&einsatz)?;
-    pruefe_geschlecht(body.geschlecht.as_deref())?;
+    ctx.fordere_aktiv()?;
+    parse_enum_opt(
+        Geschlecht::parse,
+        body.geschlecht.as_deref(),
+        "Unbekanntes Geschlecht",
+    )?;
 
     let status = body
         .status
@@ -321,11 +247,16 @@ pub async fn anlegen(
     // hierher (Lookup oben) bzw. schreibt in der Tx nichts neu (`war_neu`).
     let vermisst_seit = match status_enum {
         PersonStatus::Vermisst => {
-            Some(vermisst_seit_angabe.unwrap_or_else(|| jetzt.format(ZEIT_FORMAT).to_string()))
+            Some(vermisst_seit_angabe.unwrap_or_else(|| crate::zeit::formatiere(jetzt)))
         }
         _ => None,
     };
-    pruefe_koordinate(body.antreff_lat, body.antreff_lon)?;
+    pruefe_koordinate(
+        body.antreff_lat,
+        body.antreff_lon,
+        "antreff_lat",
+        "antreff_lon",
+    )?;
     let zustand = trimme(body.zustand);
 
     let name = trimme(body.name);
@@ -339,14 +270,12 @@ pub async fn anlegen(
     // F06/LFH-244 Tier-A: Domänen-Write (INSERT) + System-ETB-Eintrag atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
     // (Reg.-Nr.) UND Response. SSE erst nach dem Commit.
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let (person, war_neu, uhs_etb_id) = crate::write_retry!(&state.pool, |conn| {
         let (id, reg, war_neu) = repo::anlegen_tx_mit_optionen(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             status_enum.as_str(),
             client_id.as_deref(),
             repo::NeueDaten {
@@ -372,7 +301,8 @@ pub async fn anlegen(
             // Repo liefert sie in beiden Zweigen mit. Ein `laden_tx` an dieser Stelle wäre
             // ein zweiter Roundtrip für einen Wert, der schon dasteht.
             let text = crate::person::etb_text_erfasst(reg);
-            crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
 
             /*
              * Erst-Sichtung NUR bei einer wirklich neuen Person: bei einem Offline-Replay
@@ -396,14 +326,14 @@ pub async fn anlegen(
                     id,
                     k.as_str(),
                     None,
-                    benutzer.id,
+                    ctx.benutzer.id,
                     // Anheben nur aus `erfasst` — eine bereits als betroffen angelegte
                     // Person bekäme sonst einen zweiten Statuswechsel ohne Anlass.
                     matches!(status_enum, PersonStatus::Erfasst),
                 )
                 .await?;
                 let text = crate::person::etb_text_sichtung(reg, k);
-                crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text)
+                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
                     .await?;
             }
             if let Some(uhs_id) = body.uhs_id {
@@ -414,14 +344,20 @@ pub async fn anlegen(
                     uhs_id,
                     None,
                     None,
-                    benutzer.id,
+                    ctx.benutzer.id,
                 )
                 .await?;
                 let uhs = crate::uhs::repo::laden_tx(conn, einsatz_id, uhs_id).await?;
                 let text = crate::person::etb_text_uhs_aufnahme(reg, &uhs.bezeichnung);
                 uhs_etb_id = Some(
-                    crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text)
-                        .await?,
+                    crate::etb::system_audit_tx(
+                        conn,
+                        einsatz_id,
+                        ctx.benutzer.id,
+                        startwert,
+                        &text,
+                    )
+                    .await?,
                 );
             }
         }
@@ -434,11 +370,9 @@ pub async fn anlegen(
     if war_neu {
         sse_person(&state, einsatz_id, person.id);
         if let Some(uhs_id) = body.uhs_id {
-            state.live.publiziere_event(
-                einsatz_id,
-                LiveEvent::Uhs,
-                serde_json::json!({ "einsatz_id": einsatz_id, "uhs_id": uhs_id }).to_string(),
-            );
+            state
+                .live
+                .publiziere_objekt(einsatz_id, LiveEvent::Uhs, "uhs_id", uhs_id);
         }
         if let Some(etb_id) = uhs_etb_id {
             state.live.publiziere(einsatz_id, etb_id);
@@ -453,27 +387,16 @@ pub async fn anlegen(
 /// zusätzliches Audit — der eine Audit-Eintrag steht für die gesamte Öffnung.
 pub async fn detail(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLesezugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<PersonDetail>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
+    let einsatz_id = ctx.einsatz.id;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
     audit_repo::anlegen(
         &state.pool,
         einsatz_id,
         Some(person_id),
-        benutzer.id,
+        ctx.benutzer.id,
         "detail",
     )
     .await?;
@@ -496,74 +419,35 @@ pub async fn detail(
 pub struct PatchBody {
     // Tri-State (LFH-266/F12): Feld absent = unverändert, `null` = leeren, Wert = setzen.
     // Alle neun Spalten sind nullable, das Leeren ist fachlich vorgesehen (DSGVO-Berichtigung).
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub name: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub vorname: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub geschlecht: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub geburtsdatum: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub alter_geschaetzt: Option<Option<i64>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub herkunft_adresse: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub antreff_ort: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub melder_kontakt: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
     /// LFH-613: Zustand (Tri-State; `null`/`""` leert).
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub zustand: Option<Option<String>>,
     /// LFH-613: Fundort-Koordinate (Tri-State je Wert, Paarregel gegen den Effektivzustand).
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub antreff_lat: Option<Option<f64>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub antreff_lon: Option<Option<f64>>,
     /// LFH-613: „vermisst seit" korrigieren — nur bei Status vermisst (422), `null` ist 400:
     /// Leeren nähme der Dashboard-Zählung die Grundlage (design.md D4).
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub vermisst_seit: Option<Option<String>>,
     /// Optimistisches Lock (LFH-241/F10): der beim Laden gelesene `geaendert_at`-Stand.
     /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
@@ -576,30 +460,21 @@ pub struct PatchBody {
 /// besondere Kategorie; aktueller Datensatz genügt).
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<PersonAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+    let einsatz_id = ctx.einsatz.id;
     // Bleibt bewusst VOR der Normalisierung und vor allen weiteren Prüfungen — die
     // Fehler-Präzedenz gegenüber Storno/Zustandsfehlern hängt an dieser Position.
     // Normalisiert wird deshalb nur für diese eine Prüfung inline; ein leerer Wert ist
     // ein Leerwunsch, kein „unbekanntes Geschlecht" (das lieferte vorher 400).
-    pruefe_geschlecht(
+    parse_enum_opt(
+        Geschlecht::parse,
         body.geschlecht
             .as_ref()
             .and_then(|opt| opt.as_deref().map(str::trim).filter(|s| !s.is_empty())),
+        "Unbekanntes Geschlecht",
     )?;
 
     let name = trimme_tri(body.name);
@@ -631,7 +506,7 @@ pub async fn aktualisieren(
         let vorher = repo::laden(&state.pool, einsatz_id, person_id).await?;
         let eff_lat = body.antreff_lat.unwrap_or(vorher.antreff_lat);
         let eff_lon = body.antreff_lon.unwrap_or(vorher.antreff_lon);
-        pruefe_koordinate(eff_lat, eff_lon)?;
+        pruefe_koordinate(eff_lat, eff_lon, "antreff_lat", "antreff_lon")?;
         if vermisst_seit.is_some() && vorher.status != PersonStatus::Vermisst {
             return Err(AppError::UnprocessableEntity(
                 "vermisst_seit ist nur bei einer vermissten Person änderbar".into(),
@@ -643,7 +518,7 @@ pub async fn aktualisieren(
         &state.pool,
         einsatz_id,
         person_id,
-        benutzer.id,
+        ctx.benutzer.id,
         body.basis_geaendert_at.as_deref(),
         repo::PatchDaten {
             name: name.as_ref().map(|o| o.as_deref()),
@@ -676,26 +551,12 @@ pub struct StatusBody {
 /// pseudonyme ETB-Spur + SSE.
 pub async fn status_wechsel(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<StatusBody>,
 ) -> Result<Json<PersonAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
-    if PersonStatus::parse(&body.status).is_none() {
-        return Err(AppError::Validation("Unbekannter Status".into()));
-    }
+    let einsatz_id = ctx.einsatz.id;
+    parse_enum(PersonStatus::parse, &body.status, "Unbekannter Status")?;
     let vorher = repo::laden(&state.pool, einsatz_id, person_id).await?;
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -714,7 +575,7 @@ pub async fn status_wechsel(
         einsatz_id,
         person_id,
         &body.status,
-        benutzer.id,
+        ctx.benutzer.id,
     )
     .await?;
 
@@ -722,7 +583,7 @@ pub async fn status_wechsel(
     if matches!(body.status.as_str(), "verstorben" | "abgemeldet") {
         let anlass = format!("durch Status-Wechsel zu {}", body.status);
         if let Some(effekt) =
-            crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, benutzer.id)
+            crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, ctx.benutzer.id)
                 .await?
         {
             sse_auto_austritt(&state, einsatz_id, &effekt);
@@ -732,7 +593,7 @@ pub async fn status_wechsel(
     super::etb_system_degradiert(
         &state,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         &format!(
             "Person {}: {} → {}",
             registrier_anzeige(vorher.registrier_nr),
@@ -740,7 +601,7 @@ pub async fn status_wechsel(
             body.status
         ),
     )
-    .await?;
+    .await;
     sse_person(&state, einsatz_id, person_id);
     Ok(Json(repo::laden(&state.pool, einsatz_id, person_id).await?))
 }
@@ -749,34 +610,19 @@ pub async fn status_wechsel(
 /// Schreibberechtigt + aktiver Einsatz. Schreibt pseudonyme ETB-Spur + SSE.
 pub async fn stornieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
-    if person.storniert_at.is_some() {
-        return Err(AppError::Conflict("Person ist bereits storniert".into()));
-    }
-    repo::storniere(&state.pool, einsatz_id, person_id, benutzer.id).await?;
+    repo::storniere(&state.pool, einsatz_id, person_id, ctx.benutzer.id).await?;
     // E‑3: Storno → UHS-Auto-Austritt + Reservierungs-Cleanup (Repo schreibt nur ETB, wenn Austritt nötig).
     if let Some(effekt) = crate::uhs::auto_austritt(
         &state.pool,
         einsatz_id,
         person_id,
         "durch Storno der Person",
-        benutzer.id,
+        ctx.benutzer.id,
     )
     .await?
     {
@@ -785,13 +631,13 @@ pub async fn stornieren(
     super::etb_system_degradiert(
         &state,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         &format!(
             "Person {} storniert",
             registrier_anzeige(person.registrier_nr)
         ),
     )
-    .await?;
+    .await;
     sse_person(&state, einsatz_id, person_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -808,23 +654,11 @@ pub struct SichtungBody {
 /// den Admin-Status NICHT (Annahme 4). Pseudonyme ETB-Spur + SSE.
 pub async fn sichten(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<SichtungBody>,
 ) -> Result<(StatusCode, Json<SichtungAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let kategorie = Sichtungskategorie::parse(&body.kategorie)
         .ok_or_else(|| AppError::Validation("Unbekannte Sichtungskategorie".into()))?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
@@ -850,9 +684,7 @@ pub async fn sichten(
     // + System-ETB-Eintrag atomar in EINER Tx (BEGIN IMMEDIATE + Retry). Der ETB-Text ist aus
     // dem VOR der Tx geladenen `person`-Vorzustand + `kategorie` berechenbar. SSE nach dem Commit.
     let text = crate::person::etb_text_sichtung(person.registrier_nr, kategorie);
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let sichtung = crate::write_retry!(&state.pool, |conn| {
         let sichtung = sichtung_repo::erfassen_tx(
             conn,
@@ -860,11 +692,11 @@ pub async fn sichten(
             person_id,
             kategorie.as_str(),
             notiz.as_deref(),
-            benutzer.id,
+            ctx.benutzer.id,
             hebe_auf_betroffen,
         )
         .await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(sichtung)
     })?;
     sse_person(&state, einsatz_id, person_id);
@@ -875,21 +707,11 @@ pub async fn sichten(
 /// Nur Einsatzleitung. Selbst NICHT auditiert (kein detail-Eintrag).
 pub async fn audit(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLesezugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<Vec<ZugriffAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_einsatzleitung(rolle)?;
+    let einsatz_id = ctx.einsatz.id;
+    ctx.fordere_einsatzleitung()?;
     // Existenz der Person sicherstellen (404 statt leerer Liste bei Tippfehler).
     repo::laden(&state.pool, einsatz_id, person_id).await?;
     Ok(Json(
@@ -913,23 +735,11 @@ fn csv_feld(s: &str) -> String {
 /// Personen. **Schreibt einen `export`-Audit-Eintrag** (person_id = NULL).
 pub async fn export(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Personen>,
 ) -> Result<Response, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
+    let einsatz_id = ctx.einsatz.id;
     let personen = repo::liste(&state.pool, einsatz_id, None).await?;
-    audit_repo::anlegen(&state.pool, einsatz_id, None, benutzer.id, "export").await?;
+    audit_repo::anlegen(&state.pool, einsatz_id, None, ctx.benutzer.id, "export").await?;
 
     let mut csv =
         String::from("registrier_nr;status;sichtung;name;vorname;geschlecht;alter;antreff_ort\n");
@@ -980,43 +790,28 @@ pub struct VerbleibBody {
 /// Stellennamen in Ziel, Kurzform oder ETB.
 pub async fn verbleib(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<VerbleibBody>,
 ) -> Result<(StatusCode, Json<VerbleibAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let art = VerbleibArt::parse(&body.art)
         .ok_or_else(|| AppError::Validation("Unbekannte Verbleib-Art".into()))?;
-    if let Some(s) = &body.status {
-        if VerbleibStatus::parse(s).is_none() {
-            return Err(AppError::Validation("Unbekannter Verbleib-Status".into()));
-        }
-    }
+    parse_enum_opt(
+        VerbleibStatus::parse,
+        body.status.as_deref(),
+        "Unbekannter Verbleib-Status",
+    )?;
     if let Some(stelle_id) = body.betreuungsstelle_id {
         if art != VerbleibArt::Notunterkunft {
             return Err(AppError::UnprocessableEntity(
                 "Eine Betreuungsstelle gibt es nur beim Verbleib Notunterkunft".into(),
             ));
         }
-        fordere_modul_zugriff_laden(
+        ctx.fordere_modul_zugriff(
             &state.pool,
-            einsatz_id,
-            einsatz.org_id,
             <crate::einsatz::modul::Betreuung as crate::einsatz::modul::ModulMarker>::KEY
                 .expect("Betreuung ist an ein Modul gebunden"),
-            &benutzer,
         )
         .await?;
         let stelle =
@@ -1051,7 +846,7 @@ pub async fn verbleib(
             betreuungsstelle_id: body.betreuungsstelle_id,
         },
         &kurzform,
-        benutzer.id,
+        ctx.benutzer.id,
     )
     .await?;
 
@@ -1063,7 +858,7 @@ pub async fn verbleib(
     ) {
         let anlass = format!("durch Verbleib {}", art.as_str());
         if let Some(effekt) =
-            crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, benutzer.id)
+            crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, ctx.benutzer.id)
                 .await?
         {
             sse_auto_austritt(&state, einsatz_id, &effekt);
@@ -1073,14 +868,14 @@ pub async fn verbleib(
     super::etb_system_degradiert(
         &state,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         &format!(
             "Person {}: {}",
             registrier_anzeige(person.registrier_nr),
             art.etb_sachverhalt(ziel.as_deref())
         ),
     )
-    .await?;
+    .await;
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(verbleib)))
 }
@@ -1094,29 +889,12 @@ pub struct NotizBody {
 /// Schreibberechtigt + aktiv. **KEIN ETB-Eintrag** (besondere Kategorie). SSE.
 pub async fn notiz(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<NotizBody>,
 ) -> Result<(StatusCode, Json<NotizAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
-    let text = body.text.trim();
-    if text.is_empty() {
-        return Err(AppError::Validation(
-            "Notiztext darf nicht leer sein".into(),
-        ));
-    }
+    let einsatz_id = ctx.einsatz.id;
+    let text = pflicht(&body.text, "Notiztext")?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
     if person.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -1124,7 +902,8 @@ pub async fn notiz(
         ));
     }
     let notiz =
-        verlaufsnotiz_repo::anlegen(&state.pool, einsatz_id, person_id, text, benutzer.id).await?;
+        verlaufsnotiz_repo::anlegen(&state.pool, einsatz_id, person_id, &text, ctx.benutzer.id)
+            .await?;
     // BEWUSST kein super::etb_system_degradiert(): besondere Kategorie gehört NICHT in den ETB.
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(notiz)))
@@ -1139,23 +918,11 @@ pub struct AbgleichBody {
 /// `pid` = vermisste Person. Schreibberechtigt + aktiver Einsatz. KEIN ETB; SSE für beide Personen.
 pub async fn abgleich_anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<AbgleichBody>,
 ) -> Result<(StatusCode, Json<AbgleichAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if body.gefunden_person_id == person_id {
         return Err(AppError::Validation(
             "Vermisste und gefundene Person müssen verschieden sein".into(),
@@ -1182,7 +949,7 @@ pub async fn abgleich_anlegen(
         einsatz_id,
         person_id,
         body.gefunden_person_id,
-        benutzer.id,
+        ctx.benutzer.id,
     )
     .await?;
     sse_person(&state, einsatz_id, person_id);
@@ -1202,23 +969,11 @@ pub struct EntscheidungBody {
 /// ETB-Spur. SSE für beide beteiligten Personen.
 pub async fn abgleich_entscheiden(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, person_id, abgleich_id)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzLeitungszugriff<Personen>,
+    PfadParam((_eid, person_id, abgleich_id)): PfadParam<(i64, i64, i64)>,
     JsonBody(body): JsonBody<EntscheidungBody>,
 ) -> Result<Json<AbgleichAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_einsatzleitung(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if !matches!(
         AbgleichStatus::parse(&body.entscheidung),
         Some(AbgleichStatus::Bestaetigt | AbgleichStatus::Verworfen)
@@ -1242,7 +997,7 @@ pub async fn abgleich_entscheiden(
         einsatz_id,
         abgleich_id,
         &body.entscheidung,
-        benutzer.id,
+        ctx.benutzer.id,
     )
     .await?;
 
@@ -1252,14 +1007,14 @@ pub async fn abgleich_entscheiden(
         super::etb_system_degradiert(
             &state,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             &format!(
                 "Vermisstmeldung {} aufgeklärt — identisch mit {}",
                 registrier_anzeige(vermisst.registrier_nr),
                 registrier_anzeige(gefunden.registrier_nr)
             ),
         )
-        .await?;
+        .await;
     }
     sse_person(&state, einsatz_id, abgleich.vermisst_person_id);
     sse_person(&state, einsatz_id, abgleich.gefunden_person_id);

@@ -1,18 +1,15 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::einstellungen::etb_startwert;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Tiere;
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "tiere";
-use crate::error::AppError;
 use crate::person::repo as person_repo; // Org-Isolation der Halter-FK (404 bei fremder Person)
-use crate::routes::support::{trimme, trimme_tri};
+use crate::routes::support::{
+    deserialize_optional_field, parse_enum, parse_enum_opt, trimme, trimme_tri,
+};
 use crate::tier::{
     darf_uebergehen, registrier_anzeige, repo as tier_repo, AbschlussGrund, Spezies, TierAnzeige,
     TierGeschlecht, TierStatus,
@@ -28,23 +25,9 @@ use serde::Deserialize;
 /// Dediziertes `tier`-SSE-Event OHNE sensible Payload (nur einsatz_id + tier_id);
 /// Clients refetchen.
 fn sse_tier(state: &AppState, einsatz_id: i64, tier_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "tier_id": tier_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Tier, data);
-}
-
-/// Validiert optionales Tier-Geschlecht; `Validation`, falls gesetzt und unbekannt.
-/// Prüft einen zu SETZENDEN Geschlechtswert. `None` heißt „kein Wert wird gesetzt" und ist
-/// immer zulässig — beim PATCH deckt das sowohl das absente Feld als auch den Leerwunsch
-/// (`null`/`""`) ab. Der Aufrufer flacht das Tri-State entsprechend ab.
-fn pruefe_geschlecht(g: Option<&str>) -> Result<(), AppError> {
-    if let Some(g) = g {
-        if TierGeschlecht::parse(g).is_none() {
-            return Err(AppError::Validation("Unbekanntes Geschlecht".into()));
-        }
-    }
-    Ok(())
+        .publiziere_objekt(einsatz_id, LiveEvent::Tier, "tier_id", tier_id);
 }
 
 // ============================== Routen ==============================
@@ -59,32 +42,20 @@ pub struct ListeParams {
 /// GET /api/einsaetze/{id}/tiere — Liste (Filter `?status=`, `?spezies=`, `?halter_person_id=`).
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Tiere>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<TierAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
-    if let Some(s) = &params.status {
-        if TierStatus::parse(s).is_none() {
-            return Err(AppError::Validation("Unbekannter Status im Filter".into()));
-        }
-    }
-    if let Some(s) = &params.spezies {
-        if Spezies::parse(s).is_none() {
-            return Err(AppError::Validation("Unbekannte Spezies im Filter".into()));
-        }
-    }
+    let einsatz_id = ctx.einsatz.id;
+    parse_enum_opt(
+        TierStatus::parse,
+        params.status.as_deref(),
+        "Unbekannter Status im Filter",
+    )?;
+    parse_enum_opt(
+        Spezies::parse,
+        params.spezies.as_deref(),
+        "Unbekannte Spezies im Filter",
+    )?;
     Ok(Json(
         tier_repo::liste(
             &state.pool,
@@ -119,29 +90,16 @@ pub struct AnlegenBody {
 /// (`abgeschlossen` → 422). Halter-Exklusivität → 422. Pseudonyme ETB-Spur + SSE.
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Tiere>,
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<TierAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     // Spezies (Pflicht) prüfen.
-    if Spezies::parse(&body.spezies).is_none() {
-        return Err(AppError::Validation(
-            "Unbekannte oder fehlende Spezies".into(),
-        ));
-    }
+    parse_enum(
+        Spezies::parse,
+        &body.spezies,
+        "Unbekannte oder fehlende Spezies",
+    )?;
     // Status: Default aktiv; nur aktiv|vermisst erlaubt.
     let status = body.status.as_deref().unwrap_or("aktiv");
     if !matches!(status, "aktiv" | "vermisst") {
@@ -149,7 +107,11 @@ pub async fn anlegen(
             "Beim Anlegen ist nur Status 'aktiv' oder 'vermisst' erlaubt".into(),
         ));
     }
-    pruefe_geschlecht(body.geschlecht.as_deref())?;
+    parse_enum_opt(
+        TierGeschlecht::parse,
+        body.geschlecht.as_deref(),
+        "Unbekanntes Geschlecht",
+    )?;
     // Halter-Exklusivität (zweite Verteidigungslinie zum DB-CHECK).
     if body.halter_person_id.is_some() && trimme(body.halter_kontakt.clone()).is_some() {
         return Err(AppError::UnprocessableEntity(
@@ -174,14 +136,12 @@ pub async fn anlegen(
     // F06/LFH-244 Tier-A: Domänen-Write + System-ETB-Eintrag atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
     // (Reg.-Nr. + Spezies) UND Response. SSE erst nach dem Commit.
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let tier = crate::write_retry!(&state.pool, |conn| {
         let (id, _reg) = tier_repo::anlegen_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             status,
             tier_repo::NeueDaten {
                 spezies: &body.spezies,
@@ -215,7 +175,7 @@ pub async fn anlegen(
                 spezies_label
             )
         };
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(tier)
     })?;
     sse_tier(&state, einsatz_id, tier.id);
@@ -225,20 +185,10 @@ pub async fn anlegen(
 /// GET /api/einsaetze/{id}/tiere/{tid} — Detail (voller Datensatz). NICHT auditiert.
 pub async fn detail(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, tier_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLesezugriff<Tiere>,
+    PfadParam((_eid, tier_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<TierAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
         tier_repo::laden(&state.pool, einsatz_id, tier_id).await?,
     ))
@@ -248,61 +198,28 @@ pub async fn detail(
 pub struct PatchBody {
     // Tri-State (LFH-266/F12): Feld absent = unverändert, `null` = leeren, Wert = setzen.
     // Die Halter-Felder weiter unten waren schon vorher tri-state und bleiben unberührt.
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub rasse_beschreibung: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub rufname: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub geschlecht: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub alter_geschaetzt: Option<Option<i64>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub farbe_beschreibung: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub kennzeichnung: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub groesse_gewicht: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub antreff_ort: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
     /// `Some(null)` = explizit löschen; absent = unverändert.
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub halter_person_id: Option<Option<i64>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub halter_kontakt: Option<Option<String>>,
     /// Optimistisches Lock (LFH-299/F10): der beim Laden gelesene `geaendert_at`-Stand.
     /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
@@ -316,26 +233,17 @@ pub struct PatchBody {
 /// (Stammfelder sind nicht lagerelevant; vgl. E‑1-PATCH). SSE.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, tier_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Tiere>,
+    PfadParam((_eid, tier_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<TierAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-    pruefe_geschlecht(
+    let einsatz_id = ctx.einsatz.id;
+    parse_enum_opt(
+        TierGeschlecht::parse,
         body.geschlecht
             .as_ref()
             .and_then(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
+        "Unbekanntes Geschlecht",
     )?;
 
     let vorher = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
@@ -383,7 +291,7 @@ pub async fn aktualisieren(
         &state.pool,
         einsatz_id,
         tier_id,
-        benutzer.id,
+        ctx.benutzer.id,
         body.basis_geaendert_at.as_deref(),
         tier_repo::PatchDaten {
             rasse_beschreibung: rasse.as_ref().map(|o| o.as_deref()),
@@ -418,26 +326,12 @@ pub struct StatusBody {
 /// storniert → 409. Pseudonyme ETB-Spur + SSE.
 pub async fn status_wechsel(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, tier_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Tiere>,
+    PfadParam((_eid, tier_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<StatusBody>,
 ) -> Result<Json<TierAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
-    if TierStatus::parse(&body.status).is_none() {
-        return Err(AppError::Validation("Unbekannter Status".into()));
-    }
+    let einsatz_id = ctx.einsatz.id;
+    parse_enum(TierStatus::parse, &body.status, "Unbekannter Status")?;
     let vorher = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -492,9 +386,7 @@ pub async fn status_wechsel(
         _ => format!("Tier {r}: {} → {}", vorher.status.as_str(), body.status),
     };
     // F06/LFH-244 Tier-A: Status-UPDATE + System-ETB-Eintrag atomar in EINER Tx.
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         tier_repo::setze_status_tx(
             conn,
@@ -503,10 +395,10 @@ pub async fn status_wechsel(
             &body.status,
             grund.as_deref(),
             ziel.as_deref(),
-            benutzer.id,
+            ctx.benutzer.id,
         )
         .await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(())
     })?;
     sse_tier(&state, einsatz_id, tier_id);
@@ -519,34 +411,17 @@ pub async fn status_wechsel(
 /// Bereits storniert → 409. Pseudonyme ETB-Spur + SSE.
 pub async fn stornieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, tier_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Tiere>,
+    PfadParam((_eid, tier_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let tier = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
-    if tier.storniert_at.is_some() {
-        return Err(AppError::Conflict("Tier ist bereits storniert".into()));
-    }
     // F06/LFH-244 Tier-A: Storno-UPDATE + System-ETB-Eintrag atomar in EINER Tx.
     let text = format!("Tier {} storniert", registrier_anzeige(tier.registrier_nr));
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
-        tier_repo::storniere_tx(conn, einsatz_id, tier_id, benutzer.id).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        tier_repo::storniere_tx(conn, einsatz_id, tier_id, ctx.benutzer.id).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(())
     })?;
     sse_tier(&state, einsatz_id, tier_id);
@@ -568,21 +443,9 @@ fn csv_feld(s: &str) -> String {
 /// NICHT auditiert (Tiere sind keine besondere Kategorie).
 pub async fn export(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Tiere>,
 ) -> Result<Response, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
+    let einsatz_id = ctx.einsatz.id;
     let tiere = tier_repo::liste(&state.pool, einsatz_id, None, None, None).await?;
     let mut csv =
         String::from("registrier_nr;status;spezies;rufname;rasse;geschlecht;alter;antreff_ort\n");

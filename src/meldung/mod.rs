@@ -4,6 +4,7 @@
 //! (`MeldeWeg`-Vokabular, LFH-84) und spiegelt das Aufträge-Template (LFH-52).
 pub mod repo;
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -13,9 +14,9 @@ pub use crate::kommunikation::MeldeWeg;
 use crate::kommunikation::{Prioritaet, Richtung};
 
 /// Priorität/Dringlichkeit (TEXT in der DB, im Code validiert).
-pub const PRIO_SOFORT: &str = "sofort";
-pub const PRIO_DRINGEND: &str = "dringend";
-pub const PRIO_NORMAL: &str = "normal";
+pub const PRIO_SOFORT: &str = Prioritaet::Sofort.as_str();
+pub const PRIO_DRINGEND: &str = Prioritaet::Dringend.as_str();
+pub const PRIO_NORMAL: &str = Prioritaet::Normal.as_str();
 
 /// Default-Bestätigungsfrist (Minuten ab Eingang) für bestätigungspflichtige
 /// Sofortmeldungen (LFH-97), wenn der Absetzer kein Override angibt.
@@ -27,138 +28,65 @@ pub const BESTAETIGUNG_FRIST_DEFAULT_MIN: i64 = 5;
 pub const RUECKMELDUNG_FRIST_DEFAULT_MIN: i64 = 60;
 
 /// Meldungsart (Nachrichtenvordruck-Klassifikation).
-pub const ART_LAGEMELDUNG: &str = "lagemeldung";
-pub const ART_SOFORTMELDUNG: &str = "sofortmeldung";
-pub const ART_RUECKMELDUNG: &str = "rueckmeldung";
-pub const ART_VOLLZUGSMELDUNG: &str = "vollzugsmeldung";
-pub const ART_ANFRAGE: &str = "anfrage";
-pub const ART_SONSTIGE: &str = "sonstige";
+pub const ART_LAGEMELDUNG: &str = Meldungsart::Lagemeldung.as_str();
+pub const ART_SOFORTMELDUNG: &str = Meldungsart::Sofortmeldung.as_str();
+pub const ART_RUECKMELDUNG: &str = Meldungsart::Rueckmeldung.as_str();
+pub const ART_VOLLZUGSMELDUNG: &str = Meldungsart::Vollzugsmeldung.as_str();
+pub const ART_ANFRAGE: &str = Meldungsart::Anfrage.as_str();
+pub const ART_SONSTIGE: &str = Meldungsart::Sonstige.as_str();
 
-/// Triage-Status einer Meldung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum MeldungStatus {
-    Neu,
-    Gesichtet,
-    InBearbeitung,
-    Erledigt,
+wire_enum! {
+    /// Triage-Status einer Meldung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum MeldungStatus {
+        Neu => "neu",
+        Gesichtet => "gesichtet",
+        InBearbeitung => "in_bearbeitung",
+        Erledigt => "erledigt",
+    }
+    try_from = |s| format!("Ungültiger MeldungStatus: {s}");
 }
 
-impl MeldungStatus {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            MeldungStatus::Neu => STATUS_NEU,
-            MeldungStatus::Gesichtet => STATUS_GESICHTET,
-            MeldungStatus::InBearbeitung => STATUS_IN_BEARBEITUNG,
-            MeldungStatus::Erledigt => STATUS_ERLEDIGT,
-        }
+wire_enum! {
+    /// Meldungsart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `meldungsart`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Meldungsart {
+        Lagemeldung => "lagemeldung",
+        Sofortmeldung => "sofortmeldung",
+        Rueckmeldung => "rueckmeldung",
+        Vollzugsmeldung => "vollzugsmeldung",
+        Anfrage => "anfrage",
+        Sonstige => "sonstige",
     }
-
-    /// Parst einen gespeicherten/übergebenen Triage-Status; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<MeldungStatus> {
-        match s {
-            STATUS_NEU => Some(MeldungStatus::Neu),
-            STATUS_GESICHTET => Some(MeldungStatus::Gesichtet),
-            STATUS_IN_BEARBEITUNG => Some(MeldungStatus::InBearbeitung),
-            STATUS_ERLEDIGT => Some(MeldungStatus::Erledigt),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for MeldungStatus {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        MeldungStatus::parse(&s).ok_or_else(|| format!("Ungültiger MeldungStatus: {s}"))
-    }
-}
-
-/// Meldungsart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `meldungsart`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Meldungsart {
-    Lagemeldung,
-    Sofortmeldung,
-    Rueckmeldung,
-    Vollzugsmeldung,
-    Anfrage,
-    Sonstige,
-}
-
-impl Meldungsart {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Meldungsart::Lagemeldung => ART_LAGEMELDUNG,
-            Meldungsart::Sofortmeldung => ART_SOFORTMELDUNG,
-            Meldungsart::Rueckmeldung => ART_RUECKMELDUNG,
-            Meldungsart::Vollzugsmeldung => ART_VOLLZUGSMELDUNG,
-            Meldungsart::Anfrage => ART_ANFRAGE,
-            Meldungsart::Sonstige => ART_SONSTIGE,
-        }
-    }
-
-    /// Parst eine gespeicherte/übergebene Meldungsart; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<Meldungsart> {
-        match s {
-            ART_LAGEMELDUNG => Some(Meldungsart::Lagemeldung),
-            ART_SOFORTMELDUNG => Some(Meldungsart::Sofortmeldung),
-            ART_RUECKMELDUNG => Some(Meldungsart::Rueckmeldung),
-            ART_VOLLZUGSMELDUNG => Some(Meldungsart::Vollzugsmeldung),
-            ART_ANFRAGE => Some(Meldungsart::Anfrage),
-            ART_SONSTIGE => Some(Meldungsart::Sonstige),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for Meldungsart {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Meldungsart::parse(&s).ok_or_else(|| format!("Ungültige Meldungsart: {s}"))
-    }
+    try_from = |s| format!("Ungültige Meldungsart: {s}");
 }
 
 /// Triage-Status (linearer Workflow). Bewusst KEIN kommunikation_status:
 /// dessen zwei unabhängige Achsen (Quittung / Vollzug-3-Zustände) bilden einen
 /// linearen 4-Zustands-Fluss nicht ab — „gesichtet" hat dort keinen Slot.
-pub const STATUS_NEU: &str = "neu";
-pub const STATUS_GESICHTET: &str = "gesichtet";
-pub const STATUS_IN_BEARBEITUNG: &str = "in_bearbeitung";
-pub const STATUS_ERLEDIGT: &str = "erledigt";
+pub const STATUS_NEU: &str = MeldungStatus::Neu.as_str();
+pub const STATUS_GESICHTET: &str = MeldungStatus::Gesichtet.as_str();
+pub const STATUS_IN_BEARBEITUNG: &str = MeldungStatus::InBearbeitung.as_str();
+pub const STATUS_ERLEDIGT: &str = MeldungStatus::Erledigt.as_str();
 
 pub fn prioritaet_gueltig(p: &str) -> bool {
-    matches!(p, PRIO_SOFORT | PRIO_DRINGEND | PRIO_NORMAL)
+    Prioritaet::parse(p).is_some()
 }
 
 pub fn meldungsart_gueltig(a: &str) -> bool {
-    matches!(
-        a,
-        ART_LAGEMELDUNG
-            | ART_SOFORTMELDUNG
-            | ART_RUECKMELDUNG
-            | ART_VOLLZUGSMELDUNG
-            | ART_ANFRAGE
-            | ART_SONSTIGE
-    )
+    Meldungsart::parse(a).is_some()
 }
 
 pub fn status_gueltig(s: &str) -> bool {
-    matches!(
-        s,
-        STATUS_NEU | STATUS_GESICHTET | STATUS_IN_BEARBEITUNG | STATUS_ERLEDIGT
-    )
+    MeldungStatus::parse(s).is_some()
 }
 
 /// Richtungskennzeichnung intern/extern (LFH-87, TEXT in der DB, im Code validiert).
-pub const RICHTUNG_INTERN: &str = "intern";
-pub const RICHTUNG_EXTERN: &str = "extern";
+pub const RICHTUNG_INTERN: &str = Richtung::Intern.as_str();
+pub const RICHTUNG_EXTERN: &str = Richtung::Extern.as_str();
 
 pub fn richtung_gueltig(r: &str) -> bool {
-    matches!(r, RICHTUNG_INTERN | RICHTUNG_EXTERN)
+    Richtung::parse(r).is_some()
 }
 
 /// Anzeige einer Meldung inkl. abgeleiteter Felder (Bearbeitername per JOIN,
