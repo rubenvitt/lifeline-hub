@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Das `Datensicht`-Primitiv am schmalen Schirm — gemessene Wirkung der Weiche (dass sie
@@ -188,6 +189,95 @@ test('Personalseite: bei 390 px Karten und kein Tabellenelement, bei 1366 px Tab
     page.locator('[data-lfh="datensicht-werkzeuge"]').getByRole('button', { name: /^Spalten/ }),
     'im Tabellenzweig steht der Spaltenschalter',
   ).toHaveCount(1);
+});
+
+/**
+ * LFH-435 · Zweig: Beobachter (kein Schreibrecht) auf der Personalseite. Ohne Schreibrecht
+ * verliert die Karte Statusauslöser und „Entfernen", die Tabelle die Aktionsspalte, und die
+ * Position steht als Text statt als `Select` mit `minWidth: 130` (`PersonalPage.tsx`, Spalte
+ * `position`). Gemessen wird dieselbe Weiche wie oben, dazu der waagerechte Überlauf beider
+ * Zweige — der Nur-Lese-Zweig ist anders gebaut und wurde nie gemessen.
+ *
+ * Die Kraft trägt eine Position, damit die Zelle Text statt „—" zeigt: die Admin-Zeile zeigt
+ * denselben Wortlaut als gewählten Wert im `Select`, deshalb sichert der Test zusätzlich die
+ * ABWESENHEIT jeder Auswahl in der Zeile zu.
+ */
+test('Personalseite: Weiche und kein Querlauf auch im Nur-Lese-Zweig (Beobachter)', async ({
+  page,
+}) => {
+  // Zusätzliche Anmeldung und zwei Messungen mehr als der Admin-Geschwister.
+  test.slow();
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Datensicht lesend ${Date.now()}`);
+  await anlegen(
+    page,
+    einsatzId,
+    'personal',
+    {
+      adhoc: {
+        name: KRAFT,
+        funktion: 'Abschnittsleitung Technische Hilfeleistung',
+        traegerorganisation: 'Freiwillige Feuerwehr Musterstadt-Nordwest',
+        staerke_position: 'unterfuehrer',
+      },
+    },
+    'Personal mit Position',
+  );
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const bereich = page.getByRole('region', { name: 'Personal im Einsatz' });
+  const statusAusloeser = page.getByRole('button', { name: `Status von ${KRAFT} ändern` });
+  const querlauf = () =>
+    page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+
+  // ── 390 px: KARTENZWEIG
+  await page.setViewportSize(HANDSCHIRM);
+  await page.goto(`/einsaetze/${einsatzId}/personal`);
+  await expect(bereich.getByText(KRAFT)).toHaveCount(1);
+  const karte = page.locator('[data-lfh="datensicht-karte"]');
+  await expect(karte, 'bei 390 px steht genau eine Karte je Datensatz').toHaveCount(1);
+  await expect(page.locator('.ant-table'), 'bei 390 px darf keine Tabelle stehen').toHaveCount(0);
+  // ── VORBEDINGUNGEN: der Nur-Lese-Zweig steht.
+  await expect(statusAusloeser, 'Vorbedingung: ohne Schreibrecht kein Statusauslöser').toHaveCount(
+    0,
+  );
+  // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entfernen".
+  await expect(
+    karte.getByRole('button'),
+    'Vorbedingung: die Karte trägt ohne Schreibrecht kein Bedienziel',
+  ).toHaveCount(0);
+  await expect
+    .poll(querlauf, { message: 'Personal (390 px, Beobachter) läuft waagerecht über' })
+    .toBeLessThanOrEqual(SUBPIXEL);
+
+  // ── 1366 px: GEGENPROBE, TABELLENZWEIG
+  await page.setViewportSize(FUEKW);
+  await page.goto(`/einsaetze/${einsatzId}/personal`);
+  const zeile = page.locator('tr.ant-table-row');
+  await expect(zeile, 'bei 1366 px steht genau eine Tabellenzeile').toHaveCount(1);
+  await expect(zeile.getByText(KRAFT)).toBeVisible();
+  await expect(page.locator('[data-lfh="datensicht-karte"]')).toHaveCount(0);
+  // ── VORBEDINGUNGEN: Position als Text, keine Auswahl, keine Aktionsspalte.
+  await expect(
+    zeile.getByText('Unterführer', { exact: true }),
+    'Vorbedingung: die Position steht als Text in der Zeile',
+  ).toBeVisible();
+  await expect(
+    zeile.getByRole('combobox'),
+    'Vorbedingung: ohne Schreibrecht keine Positions-Auswahl in der Zeile',
+  ).toHaveCount(0);
+  await expect(statusAusloeser, 'Vorbedingung: ohne Schreibrecht kein Statusauslöser').toHaveCount(
+    0,
+  );
+  await expect(
+    page.locator('th.ant-table-cell').filter({ hasText: 'Aktionen' }),
+    'Vorbedingung: ohne Schreibrecht keine Aktionsspalte',
+  ).toHaveCount(0);
+  await expect
+    .poll(querlauf, { message: 'Personal (1366 px, Beobachter) läuft waagerecht über' })
+    .toBeLessThanOrEqual(SUBPIXEL);
 });
 
 test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — Aktionsknopf, Spaltenschalter, Titel-Link', async ({
