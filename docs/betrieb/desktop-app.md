@@ -144,7 +144,8 @@ trotzdem.
   ein Chat-Anhang) öffnet heute nichts.
 - **Anmeldung über einen Neustart:** LFH-779/780. Nach jedem Neustart der App ist eine neue
   Anmeldung nötig.
-- **Passkey auf macOS:** LFH-783. Im Mac-Fenster geht die Anmeldung per Passwort und OIDC,
-  nicht per Passkey.
+- **Passkey auf macOS:** entschieden in LFH-783 (gestaffelt). Im Mac-Fenster geht die Anmeldung
+  per Passwort und OIDC, nicht per Passkey; das Ausblenden des Passkeys in der Mac-Hülle folgt mit
+  LFH-817, die Anmeldung im Systembrowser mit LFH-818.
 - **Linux:** Die Hülle wird dort übersetzt (Tests), aber nicht ausgeliefert.
 - **App-Symbol:** Es ist aus dem Favicon abgeleitet, einem Platzhalter.

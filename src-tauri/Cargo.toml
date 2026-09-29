@@ -6,7 +6,7 @@
 # prepareCmd); tauri.conf.json trägt bewusst keine eigene.
 [package]
 name = "lifeline-desktop"
-version = "1.0.0-alpha.53"
+version = "1.0.0-alpha.55"
 edition = "2021"
 publish = false
 
