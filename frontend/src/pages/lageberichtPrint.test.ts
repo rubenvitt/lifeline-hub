@@ -4,27 +4,27 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Der Entwurfs-Ausdruck des Lageberichts (LFH-350, Befund M86).
+ * Der Entwurfs-Ausdruck des Lageberichts (LFH-350, M86).
  *
- * Im Status `entwurf` rendert `LageberichtDetailPage` je Abschnitt einen
- * `MarkdownEditor` INNERHALB von `.lagebericht-print-root`. Ohne Druckregeln kam der
- * Abschnitt im `split`-Layout doppelt aufs Papier (Roh-Markdown neben gerendertem
- * Text) — und, am 28.08.2026 mitgemessen, im Akkordeon überhaupt nur EINMAL: die
- * sieben zugeklappten Abschnitte stehen zwar per `forceRender` im DOM, sind aber
- * ausgeblendet.
+ * Im Status `entwurf` rendert `LageberichtDetailPage` je Abschnitt einen `MarkdownEditor` innerhalb
+ * von `.lagebericht-print-root`. Ohne Druckregeln kam der Abschnitt im `split`-Layout doppelt aufs
+ * Papier (Roh-Markdown neben gerendertem Text), im Akkordeon nur der eine offene: die zugeklappten
+ * stehen per `forceRender` im DOM, sind aber ausgeblendet.
  *
- * Geprüft wird die CSS-QUELLE, nicht ein gerechneter Stil — Bauform von
- * `LoginPage.animation.test.ts`: jsdom rechnet kein Layout, lädt diese Datei gar nicht
- * und kennt kein `@media print`. Der Text ist die Wahrheit, die im Browser ankommt.
+ * Geprüft wird die CSS-Quelle: jsdom lädt diese Datei nicht und kennt kein `@media print`.
  */
 const DATEI = 'lageberichtPrint.css';
 const SEITE = 'LageberichtDetailPage.tsx';
 const roh = readFileSync(join(dirname(fileURLToPath(import.meta.url)), DATEI), 'utf8');
-/** Kommentare tragen hier Klassennamen und Selektorbruchstücke — sie würden jede
- *  Selektor-Behauptung unten trivial grün färben. */
+/**
+ * Kommentare tragen Klassennamen und Selektorbruchstücke — sie färbten jede Selektor-Behauptung
+ * trivial grün.
+ */
 const css = roh.replace(/\/\*[\s\S]*?\*\//g, '');
 
-/** Klammerbalancierte Grenzen des `@media print`-Blocks: `[erste geschweifte, zugehoerige schliessende]`. */
+/**
+ * Klammerbalancierte Grenzen des `@media print`-Blocks: `[erste öffnende, zugehörige schließende]`.
+ */
 function grenzen(): [number, number] {
   const start = css.indexOf('@media print');
   expect(start, '@media print nicht gefunden').toBeGreaterThanOrEqual(0);
@@ -78,8 +78,8 @@ function eingabeRegeln(): Regel[] {
 
 describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
   it('haelt jede Regel im @media print — der Bildschirm bleibt unberuehrt', () => {
-    // Die schärfere Hälfte: eine Regel, die aus dem Block herausrutscht, versteckt das
-    // Eingabefeld auch beim Schreiben. Der Block umfasst die ganze Datei.
+    // Die schärfere Hälfte: eine Regel außerhalb des Blocks versteckte das Eingabefeld auch beim
+    // Schreiben. Der Block umfasst die ganze Datei.
     expect(css.trim().startsWith('@media print')).toBe(true);
     expect(css.slice(grenzen()[1] + 1).trim()).toBe('');
   });
@@ -107,12 +107,10 @@ describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
   });
 
   it('versteckt die Eingabe nur dort, wo eine gerenderte Fassung danebensteht', () => {
-    // Die Gegenaussage zur Regel darüber: im `toggle`-Layout (der VORGABE der Seite) ist das
-    // Textfeld nicht in `.markdown-editor__eingabe` gewickelt. Seit Review Welle B steht dort
-    // IMMER eine gerenderte Fassung daneben — bei offener Vorschau die Vorschau, sonst die
-    // Druckfassung (`druckfassung` am Editor, `MarkdownEditor.test.tsx`). Jede versteckende
-    // Regel ist deshalb an `split` oder `toggle` gebunden, und die Seite MUSS die
-    // Druckfassung anfordern — sonst druckte ein Toggle-Abschnitt leer.
+    // Gegenaussage: im `toggle`-Layout (Vorgabe der Seite) ist das Textfeld nicht in
+    // `.markdown-editor__eingabe` gewickelt, daneben steht immer eine gerenderte Fassung (Vorschau
+    // oder `druckfassung`). Jede versteckende Regel ist an `split` oder `toggle` gebunden, und die
+    // Seite muss die Druckfassung anfordern — sonst druckte ein Toggle-Abschnitt leer.
     for (const r of eingabeRegeln().filter(versteckt)) {
       expect(
         r.selektor.includes('.markdown-editor--split') ||
@@ -133,9 +131,8 @@ describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
   });
 
   /**
-   * Review Welle B (LFH-71): die frühere Regel nahm das Textfeld nur bei OFFENER Vorschau
-   * weg (`:has(.markdown-editor__vorschau)`). In der Vorgabe — Vorschau zu — kam die
-   * `<textarea>` aufs Papier: Rohtext, Bildschirmhöhe, langer Text abgeschnitten.
+   * Das Textfeld geht im toggle-Layout immer weg, nicht nur bei offener Vorschau — sonst kam die
+   * `<textarea>` mit Rohtext und abgeschnittenem Inhalt aufs Papier.
    */
   it('nimmt dem toggle-Layout das Textfeld immer und zeigt die Druckfassung', () => {
     const textfeld = regeln().filter(
@@ -155,9 +152,8 @@ describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
   });
 
   it('druckt auch die zugeklappten Akkordeon-Abschnitte', () => {
-    // Gemessen am 28.08.2026: ein nie geöffneter Abschnitt trägt ein INLINE
-    // `display:none` von rc-motion, ein wieder zugeklappter die Klasse
-    // `ant-collapse-panel-hidden`; gemeinsam ist beiden `-panel-inactive`.
+    // Ein nie geöffneter Abschnitt trägt ein inline `display:none` von rc-motion, ein wieder
+    // zugeklappter die Klasse `ant-collapse-panel-hidden`; gemeinsam ist beiden `-panel-inactive`.
     const treffer = regeln().filter((r) => r.selektor.includes('.ant-collapse-panel-inactive'));
     expect(treffer, 'ohne diese Regel druckt der Entwurf einen von acht Abschnitten').toHaveLength(
       1,
@@ -196,11 +192,9 @@ describe('lageberichtPrint.css — Seitenkopf', () => {
 });
 
 describe('lageberichtPrint.css — die Mechanik liegt in `druck/druck.css` (LFH-71)', () => {
-  // Die GEGENAUSSAGE zum alten Muster: `body * { visibility: hidden }` plus ein absolut
-  // positionierter Druckbereich druckte in Firefox und Safari nur die erste Seite, und jeder
-  // unsichtbare Knoten belegte weiter Platz. Ausblenden, Fluss, Papierfarben und Umbruch
-  // regelt jetzt EINE Datei für alle Druckstücke; eine zweite Fassung hier liefe still
-  // auseinander.
+  // Gegenaussage zum alten Muster: `body * { visibility: hidden }` plus absolut positionierter
+  // Druckbereich druckte in Firefox und Safari nur die erste Seite. Die Mechanik steht in einer
+  // Datei für alle Druckstücke; eine zweite Fassung hier liefe still auseinander.
   it('blendet nichts per visibility aus', () => {
     expect(css).not.toMatch(/visibility\s*:/);
   });

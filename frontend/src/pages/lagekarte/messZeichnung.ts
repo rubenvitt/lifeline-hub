@@ -17,20 +17,16 @@ export interface MessZeichnung {
 }
 
 /**
- * Zeichnung fürs Messwerkzeug (LFH-616) — eigener terra-draw-Controller neben den beiden aus
- * `zeichnen.ts`, aus zwei Gründen, die dort nicht passen:
+ * Zeichnung fürs Messwerkzeug — ein eigener terra-draw-Controller neben den beiden aus
+ * `zeichnen.ts`:
+ * 1. Der Wert läuft mit: Messen meldet bei jeder Änderung (`change`), samt Vorschaupunkt unter dem
+ *    Zeiger — die Strecke bis zum Zeiger ist die Frage beim Messen.
+ * 2. Es steht höchstens eine Messung da: terra-draw bleibt nach dem Abschluss im Modus, und die
+ *    abgeschlossene Figur wird beim nächsten Klick entfernt statt gestapelt. Gespeichert wird
+ *    nichts.
  *
- * 1. **Der Wert läuft mit.** Zeichnen meldet erst beim Abschluss, Messen bei JEDER Änderung
- *    (`change`) — samt dem beweglichen Vorschaupunkt unter dem Zeiger. Genau das ist hier
- *    gewollt: die Strecke bis zum Zeiger ist die Frage, die man beim Messen stellt.
- * 2. **Es steht höchstens EINE Messung da.** terra-draw bleibt nach dem Abschluss im Modus,
- *    der nächste Klick beginnt eine neue Figur. Die abgeschlossene wird dann entfernt, statt
- *    sich zu stapeln — eine Messung ist ein Blick, kein Lagebild-Objekt, und nichts davon
- *    wird gespeichert.
- *
- * terra-draw verwaltet seine Layer selbst über den Adapter, legt sie nach `setStyle` aber
- * NICHT neu an. Den Kartenwechsel fängt deshalb `Kartenflaeche` ab (Style-Effekt): Messung
- * räumen, Stil setzen, nach `style.load` neu beginnen.
+ * terra-draw legt seine Layer nach `setStyle` nicht neu an; den Kartenwechsel fängt `Kartenflaeche`
+ * ab (Messung räumen, Stil setzen, nach `style.load` neu beginnen).
  */
 export function createMessung(
   map: MapLibreMap,
@@ -64,9 +60,8 @@ export function createMessung(
 
   draw.on('change', (ids, typ) => {
     if (raeumt || !aktiv) return;
-    // terra-draw legt neben der Figur eigene Hilfspunkte an (Schließ- und Stützpunkte, Typ
-    // `Point`) und meldet sie ebenfalls als `create`. Laufende Messung ist nur die Figur der
-    // gewählten Form — ein Hilfspunkt als „laufend" ließe den Wert auf „—" stehen.
+    // terra-draw meldet neben der Figur eigene Hilfspunkte (Typ `Point`) als `create`. Laufend ist
+    // nur die Figur der gewählten Form — ein Hilfspunkt ließe den Wert auf „—" stehen.
     const figur =
       typ === 'create' ? ids.find((id) => geometrie(id)?.type === GEOMETRIE[form]) : undefined;
     if (figur != null) {
@@ -80,9 +75,9 @@ export function createMessung(
     }
     if (laufend == null || !ids.includes(laufend)) return;
     if (typ === 'delete') {
-      // Der Entwurf verschwindet ohne unser Zutun (terra-draw bricht ab). Über Escape kommt
-      // das in der Seite nicht vor — deren Fenster-Handler beendet schon beim `keydown` den
-      // ganzen Modus, terra-draw reagiert erst auf `keyup`.
+      // Der Entwurf verschwindet ohne unser Zutun (terra-draw bricht ab). Über Escape kommt das
+      // nicht vor — der Fenster-Handler der Seite beendet den Modus schon beim `keydown`,
+      // terra-draw reagiert erst auf `keyup`.
       laufend = null;
       onMessung(null, false);
       return;
@@ -128,8 +123,8 @@ export function createMessung(
     },
     abschliessen: () => {
       if (!aktiv || laufend == null) return false;
-      // Der laufende Entwurf enthält den Vorschaupunkt unter dem Zeiger; auf dem Touchschirm
-      // gibt es keinen, dort liegt er auf dem letzten Punkt und zählt nicht doppelt.
+      // Der laufende Entwurf enthält den Vorschaupunkt; auf dem Touchschirm liegt er auf dem
+      // letzten Punkt und zählt nicht doppelt.
       if (punkteZahl(geometrie(laufend)) < (form === 'strecke' ? 2 : 3)) return false;
       // Keine öffentliche finish()-API — dieselbe Geste wie in `zeichnen.ts`.
       canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));

@@ -1,21 +1,10 @@
 import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../../api/types';
 
 /**
- * Auswahllisten der Einstellungsseiten (LFH-328 · A2).
- *
- * Zusammengezogen aus `EinsatzEinstellungenPage` und `einstellungen/AnzeigeEinstellungen`,
- * wo sie **byte-identisch** doppelt standen — es gab keine subtile Wertabweichung, die
- * beim Zusammenziehen hätte verlorengehen können.
- *
- * **Was hier bewusst NICHT hinwandert:** der Platzhalter der Selects. Die Einsatzseite
- * sagt „(Standard)", die Org-Seite „(Fallback)" — die eine ERBT von der Organisation,
- * die andere IST die Organisationsebene. Der Platzhalter bleibt deshalb an der
- * Aufrufstelle.
- *
- * **Dritte Kopie, absichtlich stehengelassen:** `command-palette/befehle.ts`
- * (`KOORD_BEFEHLE`) trägt dieselben fünf Koordinatenwerte mit anderen Labels
- * („WGS84 (Dezimalgrad)" statt „WGS84 dezimal"). Die sind für den Palettenkontext
- * geschrieben; die Zusammenführung ist als eigener Befund erfasst (Spec §5).
+ * Auswahllisten der Einstellungsseiten. Der Platzhalter der Selects bleibt an der Aufrufstelle: die
+ * Einsatzseite sagt „(Standard)", die Org-Seite „(Fallback)" — die eine erbt von der Organisation,
+ * die andere ist sie. `command-palette/befehle.ts` (`KOORD_BEFEHLE`) trägt dieselben
+ * Koordinatenwerte mit eigenen Labels für den Palettenkontext.
  */
 
 /** Benötigte Rolle eines Moduls; '' = frei (für alle sichtbaren). */

@@ -105,7 +105,7 @@ describe('NachforderungenPage', () => {
     legeNachforderungAn.mockResolvedValue(nf());
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    // Formular liegt jetzt hinter dem Kopf-Toggle (LFH-112) → erst aufklappen.
+    // Das Formular liegt hinter dem Kopf-Toggle → erst aufklappen.
     await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
     await userEvent.type(screen.getByLabelText('Art'), 'SEG');
     await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Eine SEG');
@@ -123,10 +123,8 @@ describe('NachforderungenPage', () => {
   });
 
   /**
-   * Vorher öffnete der Knopf einen `Popconfirm`, und erst dessen „Bestätigen"
-   * schaltete. Seit LFH-343 · C8 schaltet der erste Klick — der Rückweg steht im
-   * Rückgängig-Toast, und `uebergang_erlaubt` nimmt seit derselben Änderung die
-   * Rücknahme um eine Stufe an.
+   * Der erste Klick schaltet ohne Rückfrage; der Rückweg steht im Rückgängig-Toast
+   * (`uebergang_erlaubt` nimmt die Rücknahme um eine Stufe an).
    */
   it('schaltet den Status mit EINEM Klick linear weiter', async () => {
     setzeNachforderungStatus.mockResolvedValue(nf({ status: 'zugesagt' }));
@@ -145,7 +143,7 @@ describe('NachforderungenPage', () => {
     await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledTimes(1));
 
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
-    // Zurück auf den Zustand VOR dem Klick — nicht auf den Anfang der Kette.
+    // Zurück auf den Zustand vor dem Klick — nicht auf den Anfang der Kette.
     await waitFor(() =>
       expect(setzeNachforderungStatus).toHaveBeenLastCalledWith(1, 1, 'angefordert'),
     );
@@ -157,8 +155,7 @@ describe('NachforderungenPage', () => {
     await screen.findByText('2 RTW zur Verstärkung');
     // Listen-Aktion „Ablehnen" (link-button) öffnet das Modal.
     await userEvent.click(screen.getByRole('button', { name: 'Ablehnen' }));
-    // Dialog öffnet: Grund erfassen und bestätigen. „Ablehnen" existiert nun
-    // doppelt (Listen-Aktion + Modal-OK) → im Dialog scopen.
+    // „Ablehnen" existiert doppelt (Listen-Aktion + Modal-OK) → im Dialog scopen.
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Ablehnungsgrund'), 'keine Reserven');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ablehnen' }));
@@ -166,7 +163,7 @@ describe('NachforderungenPage', () => {
   });
 
   it('trennt Offen und Abgeschlossen clientseitig', async () => {
-    // Eine offene + eine eingetroffene Nachforderung in EINER Antwort (kein Status-Filter mehr).
+    // Eine offene + eine eingetroffene Nachforderung in einer Antwort (kein Status-Filter).
     listeNachforderungen.mockResolvedValue([
       nf({ id: 1, bezeichnung: '2 RTW zur Verstärkung', status: 'angefordert', ist_offen: true }),
       nf({
@@ -239,7 +236,7 @@ describe('NachforderungenPage', () => {
     });
 
     it('eine unbrauchbare Vorbelegung wird ganz verworfen, die Erfassung öffnet leer', async () => {
-      // Art ist brauchbar, die Anzahl nicht — die Art darf trotzdem NICHT übernommen werden.
+      // Art ist brauchbar, die Anzahl nicht — die Art darf trotzdem nicht übernommen werden.
       renderPage(deeplink.replace('anzahl=20', 'anzahl=0'));
       expect(await screen.findByLabelText('Art')).toHaveValue('');
       expect(screen.getByLabelText('Bezeichnung')).toHaveValue('');

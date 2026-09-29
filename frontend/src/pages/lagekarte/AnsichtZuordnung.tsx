@@ -16,9 +16,8 @@ interface AnsichtZuordnungProps {
 const ALLE = 0;
 
 /**
- * Ansichts-Zuordnung eines Karten-Objekts (B/LFH-320): „Auf allen Ansichten zeigen" (NULL)
- * oder auf eine konkrete Ansicht verschieben. Bei nur einer Ansicht entfällt die Zuordnung
- * (nichts zu wählen). Geteilt von Zonen-/Zeichen-/Bild-Inspektor.
+ * Ansichts-Zuordnung eines Karten-Objekts: „Auf allen Ansichten zeigen" (NULL) oder eine konkrete
+ * Ansicht. Bei nur einer Ansicht entfällt sie. Geteilt von Zonen-/Zeichen-/Bild-Inspektor.
  */
 export default function AnsichtZuordnung({
   ansichten,
@@ -27,13 +26,12 @@ export default function AnsichtZuordnung({
   onChange,
 }: AnsichtZuordnungProps) {
   const { token } = theme.useToken();
-  // Drei Aufrufstellen, die nebeneinander stehen können → id je Instanz, kein Literal.
+  // Mehrere Aufrufstellen können nebeneinander stehen → id je Instanz.
   const id = useId();
   if (ansichten.length <= 1) return null;
   return (
     <div style={{ marginTop: token.marginXS }}>
-      {/* Kein `aria-label` mehr: das FeldLabel trägt den Namen; der sichtbare Text
-          („Sichtbar auf") ist damit zugleich der Accessible Name (LFH-328/A2). */}
+      {/* Das FeldLabel trägt den Namen; „Sichtbar auf" ist zugleich der Accessible Name. */}
       <FeldLabel text="Sichtbar auf" htmlFor={id}>
         <Select<number>
           id={id}

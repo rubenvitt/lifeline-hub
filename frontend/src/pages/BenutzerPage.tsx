@@ -53,9 +53,7 @@ export default function BenutzerPage() {
 
   const anlegen = useMutation({
     mutationFn: (b: NeuerBenutzer) => legeBenutzerAn(b),
-    // Nur noch invalidieren: das Schliessen macht `onFertig`, das Leeren die Hülle
-    // (LFH-346 · A6). Ein `resetFields()` hier wäre der zweite Mechanismus für
-    // dieselbe Sache und verdeckte, ob die Hülle ihre Zusicherung einlöst.
+    // Nur invalidieren: das Schließen macht `onFertig`, das Leeren die Hülle.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
@@ -70,20 +68,16 @@ export default function BenutzerPage() {
   const bearbeiten = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: PatchBenutzer }) =>
       bearbeiteBenutzer(id, patch),
-    // Diese Mutation trägt ZWEI Wege: den Bearbeiten-Dialog und „Reaktivieren" in der
-    // Zeile. Das Schliessen des Dialogs macht deshalb `onFertig` an der Hülle, nicht
-    // dieser Erfolgszweig — der lief bisher auch nach einem Reaktivieren mit.
+    // Diese Mutation trägt zwei Wege, den Bearbeiten-Dialog und „Reaktivieren" in der Zeile. Das
+    // Schließen des Dialogs macht deshalb `onFertig` an der Hülle, nicht dieser Erfolgszweig.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   /**
-   * VORBELEGUNG, kein `key` (LFH-346 · A6). Bis hierher hängte dieser Dialog über
-   * `key={zuBearbeiten.id}` am `<Form>` einen frischen Baum ein, damit der zweite
-   * Datensatz nicht die Werte des ersten erbt. Die Hülle löst dasselbe Problem
-   * selbst — sie setzt auf allen vier Auswegen zurück —, und zwei Mechanismen für
-   * eine Sache sind einer zu viel. Geblieben ist die Vorbelegung, dieselbe Bauform
-   * wie in `PersonalFormModal` und den vier Stammdaten-Tabs.
+   * Vorbelegung, kein `key`: die Hülle setzt auf allen vier Auswegen zurück, der zweite Datensatz
+   * erbt nicht die Werte des ersten. Dieselbe Bauform wie in `PersonalFormModal` und den
+   * Stammdaten-Tabs.
    */
   useEffect(() => {
     if (!zuBearbeiten) return;
@@ -103,26 +97,24 @@ export default function BenutzerPage() {
       title: 'Name',
       dataIndex: 'anzeigename',
       key: 'anzeigename',
-      // Leitspalte: am Anzeigenamen sucht ein Mensch das Konto. Ein Angebot, keine neue
-      // Voreinstellung — `routes/benutzer.rs` liefert ORDER BY id, also die Anlage-Reihenfolge;
-      // die ist keine fachliche Ordnung, aber sie umzustellen ist nicht Teil dieses Umbaus.
+      // Leitspalte: am Anzeigenamen sucht ein Mensch das Konto. Ein Angebot, keine Voreinstellung —
+      // `routes/benutzer.rs` liefert ORDER BY id.
       sorter: (a, b) => a.anzeigename.localeCompare(b.anzeigename, 'de'),
     },
-    // Die Suche liest den ROHWERT der Spalte, nicht das Gerenderte: das führende „@" ist reine
-    // Darstellung, gesucht wird „eva", nicht „@eva".
+    // Die Suche liest den Rohwert der Spalte: das führende „@" ist Darstellung, gesucht wird „eva".
     {
       title: 'Benutzername',
       dataIndex: 'benutzername',
       key: 'benutzername',
-      // Kennung in Mono (Neuentwurf: Kennungen immer Mono).
+      // Kennung in Mono.
       render: (t) => <span style={monoStil(13)}>@{t}</span>,
     },
     {
       title: 'Rollen',
       key: 'rollen',
       render: (_, b) => (
-        // Rollen sind Zuordnungen, keine Zustände: neutrale Chips, das Wort trägt die Aussage.
-        // Gold/Blau des Bestands dichteten ihnen eine Statusbedeutung an (Blau = Bedienung).
+        // Rollen sind Zuordnungen, keine Zustände: neutrale Chips, das Wort trägt die Aussage (Blau
+        // hieße Bedienung).
         <Space size={4} wrap>
           {b.system_rolle === 'admin' && <StatusChip ton="neutral" wort="Admin" />}
           {b.org_rolle === 'fuehrungskraft' && <StatusChip ton="neutral" wort="Führungskraft" />}
@@ -135,9 +127,9 @@ export default function BenutzerPage() {
     {
       title: 'Status',
       key: 'status',
-      // Bewusst OHNE `dataIndex`: `onFilter` bekommt den ganzen Datensatz, und ohne Datenbezug
-      // fällt das Feld nicht in den Suchkorpus des Primitivs — sonst träfe die Freitextsuche
-      // nach „true"/„false" jede aktive bzw. deaktivierte Zeile.
+      // Bewusst ohne `dataIndex`: `onFilter` bekommt den ganzen Datensatz, und ohne Datenbezug
+      // fällt das Feld nicht in den Suchkorpus — sonst träfe die Suche nach „true"/„false" jede
+      // aktive bzw. deaktivierte Zeile.
       filters: [
         { text: 'aktiv', value: true },
         { text: 'deaktiviert', value: false },
@@ -164,10 +156,8 @@ export default function BenutzerPage() {
               okButtonProps={{ danger: true }}
               onConfirm={() => deaktivieren.mutate(b.id)}
             >
-              {/* Zeilengescopte Ladeanzeige (LFH-346 · A1). Vorher trug „Deaktivieren"
-                  ÜBERHAUPT keine — anders als „Reaktivieren" daneben —, ein Klick blieb
-                  also ohne jede Rückmeldung und lud zum zweiten ein. `variables` ist hier
-                  die nackte id. */}
+              {/* Zeilengescopte Ladeanzeige: ohne Rückmeldung lädt der Klick zum zweiten ein.
+                  `variables` ist die nackte id. */}
               <Button danger loading={deaktivieren.isPending && deaktivieren.variables === b.id}>
                 Deaktivieren
               </Button>
@@ -195,11 +185,10 @@ export default function BenutzerPage() {
         </Button>
       }
     >
-      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
-          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
-          der beiden Formen. Ohne diese Weiche behauptet „Noch keine Benutzer" auch dann
-          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Fehler tauscht die Tabelle aus, statt durch sie gereicht zu werden: `Datensicht`
+          führt den Kartenzweig an `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne
+          diese Weiche behauptete „Noch keine Benutzer" einen leeren Katalog, wenn bloß die
+          Verbindung abgerissen ist. */}
       {benutzerQuery.isError ? (
         <SeitenFehler
           text="Benutzer konnten nicht geladen werden"
@@ -217,19 +206,13 @@ export default function BenutzerPage() {
         />
       )}
 
-      {/* Auf der Hülle seit LFH-346 · A6: der Absende-Knopf liegt damit IM `<form>`,
-          also sendet Enter ab (Befund H69) — vorher stand er in antds Fusszeile und
-          war ein DOM-Geschwister ausserhalb. KEIN `serie`: ein Benutzerkonto legt man
-          nicht im Minutentakt an. Das `autoFocus` am ersten Feld ist weg — den Fokus
-          setzt die Hülle, und zwei Quellen dafür sind eine zu viel.
+      {/* Auf der Hülle: der Absende-Knopf liegt im `<form>`, Enter sendet ab. Kein `serie` —
+          ein Benutzerkonto legt man nicht im Minutentakt an. Den Fokus setzt die Hülle.
 
-          FELDBUDGET seit A8 (Befund N20): drei sichtbare Felder, zwei eingeklappt.
-          Sichtbar bleiben die Pflichtwerte Anzeigename, Benutzername und Passwort;
-          die beiden Rollen tragen mit `keiner`/`keine` einen brauchbaren Vorgabewert
-          und sind damit die einzigen zwei Felder, die eingeklappt sein DÜRFEN
-          (LFH-343 · H49) — die schwächste Rolle ist beim Anlegen zugleich die
-          richtige Vorgabe. Der Bearbeiten-Dialog darunter hat drei Felder und bleibt
-          unverändert. */}
+          Feldbudget: drei sichtbare Felder (die Pflichtwerte Anzeigename, Benutzername,
+          Passwort), zwei eingeklappt. Die Rollen tragen mit `keiner`/`keine` einen brauchbaren
+          Vorgabewert und dürfen deshalb eingeklappt sein — die schwächste Rolle ist beim
+          Anlegen die richtige Vorgabe. */}
       <ErfassungsModal<NeuerBenutzer>
         offen={offen}
         titel="Neuen Benutzer anlegen"
@@ -237,19 +220,17 @@ export default function BenutzerPage() {
         erfassenText="Anlegen"
         laeuft={anlegen.isPending}
         initialValues={{ system_rolle: 'keiner', org_rolle: 'keine' }}
-        // `mutateAsync`, nicht `mutate`: bei Ablehnung MUSS die Zusage brechen,
-        // sonst leert die Hülle die Felder, obwohl das Konto nie angelegt wurde.
+        // `mutateAsync`, nicht `mutate`: bei Ablehnung muss die Zusage brechen, sonst leert die
+        // Hülle die Felder, obwohl das Konto nie angelegt wurde.
         //
-        // Der Formularspeicher statt der `onFinish`-Werte (LFH-346 · A8): ohne
-        // `forceRender` sind die beiden Rollen-Selects nicht montiert, und `onFinish`
-        // liefert nur montierte Felder. Ohne diesen Griff fehlten `system_rolle` und
-        // `org_rolle` im Rumpf, sobald niemand aufklappt — beide sind im DTO optional,
-        // der Server setzte also SEINE Vorgabe statt der hier sichtbar zugesagten.
-        // `getFieldsValue(true)` liest den Speicher ganz aus; dort stehen die
-        // `initialValues` und, nach einem Aufklappen, die getroffene Wahl.
+        // Der Formularspeicher statt der `onFinish`-Werte: ohne `forceRender` sind die
+        // Rollen-Selects nicht montiert, und `onFinish` liefert nur montierte Felder.
+        // `system_rolle` und `org_rolle` fehlten sonst im Rumpf, und der Server setzte seine
+        // Vorgabe statt der hier zugesagten. `getFieldsValue(true)` liest den ganzen Speicher:
+        // `initialValues` und, nach Aufklappen, die Wahl.
         //
-        // Beachten: der Aufruf ist bei antd `any`-typisiert — die Feldnamen prüft
-        // nicht er, sondern der Parametertyp von `mutationFn`.
+        // Der Aufruf ist bei antd `any`-typisiert — die Feldnamen prüft der Parametertyp von
+        // `mutationFn`.
         onErfassen={() => anlegen.mutateAsync(form.getFieldsValue(true))}
         onFertig={() => setOffen(false)}
         onAbbrechen={() => setOffen(false)}
@@ -275,9 +256,9 @@ export default function BenutzerPage() {
         >
           <Input.Password autoComplete="new-password" />
         </Form.Item>
-        {/* Bewusst OHNE `forceRender` (wie `AuftragFormular`): nur wenn die
-            eingeklappten Felder gar nicht im DOM stehen, ist „im Ausgangszustand drei
-            Felder" prüfbar. Begründung und Gegenmittel am `onErfassen` oben. */}
+        {/* Bewusst ohne `forceRender` (wie `AuftragFormular`): nur wenn die eingeklappten
+            Felder nicht im DOM stehen, ist „drei Felder" prüfbar. Gegenmittel am `onErfassen`
+            oben. */}
         <Collapse
           ghost
           style={{ marginInline: -8 }}
@@ -300,18 +281,17 @@ export default function BenutzerPage() {
         />
       </ErfassungsModal>
 
-      {/* Der Dialog steht jetzt UNBEDINGT im Baum (`offen` statt `{zuBearbeiten && …}`):
-          `destroyOnHidden` an der Hülle hängt die Felder beim Schliessen ohnehin ab, und
-          während der Schliessanimation ist `zuBearbeiten` schon `null` — jeder Lesezugriff
-          hier optional. */}
+      {/* Der Dialog steht unbedingt im Baum (`offen` statt `{zuBearbeiten && …}`):
+          `destroyOnHidden` hängt die Felder beim Schließen ohnehin ab, und während der
+          Schließanimation ist `zuBearbeiten` schon `null` — jeder Lesezugriff hier optional. */}
       <ErfassungsModal<BearbeitenWerte>
         offen={zuBearbeiten !== null}
         titel="Benutzer bearbeiten"
         form={editForm}
         erfassenText="Speichern"
         laeuft={bearbeiten.isPending && bearbeiten.variables?.id === zuBearbeiten?.id}
-        // Der Wurf im Leerfall statt eines stillen `return`: ein aufgelöstes Versprechen
-        // läse die Hülle als Erfolg und schlösse den Dialog, ohne dass etwas gesendet wurde.
+        // Werfen statt stillem `return`: ein aufgelöstes Versprechen läse die Hülle als Erfolg und
+        // schlösse den Dialog, ohne dass etwas gesendet wurde.
         onErfassen={async (w) => {
           if (!zuBearbeiten) throw new Error('Kein Benutzer zum Bearbeiten');
           await bearbeiten.mutateAsync({ id: zuBearbeiten.id, patch: w });

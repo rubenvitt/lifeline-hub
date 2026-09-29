@@ -9,23 +9,13 @@ import type {
 } from '../../api/types';
 
 /**
- * Geteilte Form-Logik der vier Einsatz-Einstellungs-Sektionen (LFH-345 · C10, H15/M15).
+ * Geteilte Form-Logik der vier Einsatz-Einstellungs-Sektionen — Gegenstück zu
+ * `orgEinstellungenForm.ts`.
  *
- * **KRITISCH:** `PUT /api/einsaetze/{id}/einstellungen` ist Vollersatz (kein PATCH). Jede
- * Sektion speichert darum den VOLLEN Payload:
- * `{ ...zuUpdate(geladeneDaten), ...normalisiere<Sektion>(form) }`. `zuUpdate` liefert die
- * Basis aus dem geladenen Zustand, der Sektions-Normalizer überschreibt nur seine eigenen
- * Felder — so nullt ein Speichern in „Aufbewahrung" nie die Nummernkreise.
- *
- * Das ist wörtlich der Vertrag, den die Org-Ebene seit LFH-281 mit `orgEinstellungenForm.ts`
- * löst; dieses Modul ist dessen Gegenstück, keine Erfindung. **Nicht** von dort kopieren
- * lässt sich `auto_etb_eintraege`: die Org-Ebene ist zweiwertig und rechnet `!== 0`, die
- * Einsatz-Ebene ist DREIwertig (siehe {@link zuUpdate}).
- *
- * Warum ein eigenes Modul statt Logik in den vier Seiten: der Fehlerfall ist stumm. Ein
- * vergessenes Feld erzeugt keinen roten Test und kein Fehlerbild — der Datensatz verliert
- * es beim nächsten Speichern einer fremden Sektion, und niemand sieht es, bis eine Nummer
- * falsch vergeben wird. Prüfbar ist das nur an EINER Stelle, und die ist hier.
+ * KRITISCH: `PUT /api/einsaetze/{id}/einstellungen` ist Vollersatz. Jede Sektion speichert `{
+ * ...zuUpdate(geladeneDaten), ...normalisiere<Sektion>(form) }`, sonst nullte ein Speichern in
+ * „Aufbewahrung" die Nummernkreise. Der Fehlerfall ist stumm — kein roter Test, kein Fehlerbild —,
+ * deshalb liegt die Logik an einer prüfbaren Stelle.
  */
 
 /** Sektion „Allgemein": Einstieg + Anzeige-Konventionen (5 Felder). */
@@ -60,25 +50,20 @@ export interface FormWerteAufbewahrung {
 /**
  * Voller Update-Payload aus dem geladenen Zustand — Basis für den Vollersatz-Merge-Save.
  *
- * **Die Karten-Defaults sind der Grund, warum diese Funktion mehr Felder trägt, als in den
- * vier Sektionen sichtbar sind.** `basemap_modus`, `karten_zoom_start` und
- * `fachebenen_sichtbar` leben seit LFH-319 auf der Lagekarte („Für den Einsatz speichern")
- * und sind aus diesem Formular entfernt. Die Spalten bleiben als Saat der Standardansicht —
- * deshalb MUSS ihr Bestandswert hier mitfahren, sonst nullt der Vollersatz-UPSERT-PUT sie
- * beim nächsten Save einer beliebigen Sektion.
+ * Er trägt mehr Felder, als die Sektionen zeigen: `basemap_modus`, `karten_zoom_start` und
+ * `fachebenen_sichtbar` leben auf der Lagekarte, ihr Bestandswert muss aber mitfahren, sonst nullt
+ * der PUT sie.
  *
- * **`auto_etb_eintraege` ist dreiwertig**, anders als auf der Org-Ebene: `null` heißt „erbt
- * den Org-Standard", `0` heißt „Aus", alles andere „An". Die Org-Zeile (`!== 0`) hierher zu
- * kopieren verwandelte ein geerbtes „erbt Org" beim Speichern einer fremden Sektion still
- * in ein explizites „An".
+ * `auto_etb_eintraege` ist dreiwertig (null = erbt Org, 0 = Aus, sonst An) — die zweiwertige
+ * Org-Formel `!== 0` machte aus „erbt Org" still ein „An".
  */
 export function zuUpdate(e: EinsatzEinstellungen): EinstellungenUpdate {
   return {
     standard_modul: e.standard_modul ?? null,
     basemap_modus: e.basemap_modus ?? null,
     karten_zoom_start: e.karten_zoom_start ?? null,
-    // Das Backend serialisiert die Fachebenen untypisiert (`unknown`), die Formgebung ist
-    // FE-lokal — siehe `FachebenenSichtbar` in `api/types.ts`.
+    // Das Backend serialisiert die Fachebenen untypisiert, die Formgebung ist FE-lokal
+    // (`FachebenenSichtbar` in `api/types.ts`).
     fachebenen_sichtbar: (e.fachebenen_sichtbar as FachebenenSichtbar | null) ?? null,
     zeitzone: e.zeitzone ?? null,
     zeitformat: e.zeitformat ?? null,
@@ -153,10 +138,8 @@ export function normalisiereAufbewahrung(
 }
 
 /**
- * Initial-Form-Werte je Sektion aus dem geladenen Zustand.
- *
- * `null → undefined` ist nicht kosmetisch: antd zeigt seinen Platzhalter nur bei
- * `undefined`; ein `null` im Formularwert stellt ein leeres, aber „gesetztes" Feld dar.
+ * Initial-Form-Werte je Sektion aus dem geladenen Zustand. `null → undefined`, weil antd seinen
+ * Platzhalter nur bei `undefined` zeigt.
  */
 export function initialAllgemein(e: EinsatzEinstellungen): FormWerteAllgemein {
   return {
@@ -188,11 +171,7 @@ export function initialAufbewahrung(e: EinsatzEinstellungen): FormWerteAufbewahr
   return { retention_dauer_tage: e.retention_dauer_tage ?? undefined };
 }
 
-// ── Geteilte Darstellungs-Helfer der vier Sektionen ──────────────────────────
-//
-// Sie stehen hier und nicht in einer fünften Datei, weil sie dieselbe Frage beantworten wie
-// der Rest des Moduls: WIE trägt eine Sektion einen Wert, den sie mit den anderen teilt.
-// Alle drei sind rein und ohne React — prüfbar ohne Render (Muster `bedienzielStil`).
+// ── Geteilte Darstellungs-Helfer der vier Sektionen (rein, ohne React) ──
 
 /** „Standard (Org): X", wenn ein Org-Default gesetzt ist; sonst nichts. */
 export function orgHinweisWert(
@@ -220,14 +199,9 @@ export function orgHinweisAutoEtb(wert: number | null | undefined): string | und
 }
 
 /**
- * Feldraster einer Sektion — REIN und exportiert, damit die Ungleichheit über beide Breiten
- * ohne Render prüfbar ist (Muster `bedienzielStil` aus LFH-365; jsdom rechnet kein Layout,
- * und `Grid.useBreakpoint()` liefert dort auf dem ersten Render ohnehin „breit").
- *
- * Zwei Spalten trägt allein die Sektion „Verhalten" mit ihren neun Feldern; „Allgemein" (5)
- * und „Aufbewahrung" (1) bleiben einspaltig — zwei Spalten für ein Feld wären Zierde. Die
- * Schwelle `lg` liest der Aufrufer aus `useViewport`, nicht diese Funktion: eine reine
- * Stilfunktion, die selbst einen Hook ruft, wäre kein Prüfobjekt mehr.
+ * Feldraster einer Sektion — rein und exportiert, damit beide Breiten ohne Render prüfbar sind.
+ * Zwei Spalten trägt nur „Verhalten" (neun Felder). Die Schwelle `lg` liest der Aufrufer aus
+ * `useViewport`.
  */
 export function feldrasterStil(zweispaltig: boolean, spaltenabstand: number): CSSProperties {
   return {

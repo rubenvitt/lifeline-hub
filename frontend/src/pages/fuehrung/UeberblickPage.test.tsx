@@ -90,7 +90,7 @@ const volleDaten = {
       abschnitt_id: 5,
       ueber_einheit_id: null,
       soll: null,
-      // Abgeleitet aus dem ausgefallenen Fahrzeug unten (LFH-609).
+      // Abgeleitet aus dem ausgefallenen Fahrzeug unten.
       status: { quelle: 'fahrzeuge', kategorie: 'nicht_verfuegbar', verteilung: [] },
     },
   ],
@@ -147,20 +147,19 @@ const volleDaten = {
       inhalt: 'Turnhalle Ost wird Notunterkunft.',
       erfasser_id: 1,
       erfasser_name: 'Brandt',
-      // Die Zahl kommt aus dem ETB-Eintrag (LFH-636), nicht aus der Auftragsliste: die
-      // Aufträge 23/24 oben tragen bewusst KEINEN `quell_etb_eintrag_id`, sonst stimmten
-      // beide Quellen überein und der Test könnte die alte Ableitung nicht fangen.
+      // Die Zahl kommt aus dem ETB-Eintrag, nicht aus der Auftragsliste: die Aufträge 23/24 tragen
+      // bewusst keinen `quell_etb_eintrag_id`, sonst stimmten beide Quellen überein.
       folgeauftraege: [
         { id: 23, lfd_nr: 3 },
         { id: 24, lfd_nr: 4 },
       ],
     },
   ],
-  /** Maßgebliche Pegel (LFH-606) — im Grundbestand keiner festgelegt. */
+  /** Maßgebliche Pegel — im Grundbestand keiner festgelegt. */
   pegel: [] as unknown[],
 };
 
-/** Rückmeldungen (LFH-610) sind optional: ohne Angabe liefert der Server eine leere Menge. */
+/** Rückmeldungen sind optional: ohne Angabe liefert der Server eine leere Menge. */
 type Daten = typeof volleDaten & { rueckmeldungen?: object };
 const KEINE_RUECKMELDUNGEN = { frist_min: 60, einheiten: [], abschnitte: [] };
 
@@ -193,7 +192,7 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
       json(d.rueckmeldungen ?? KEINE_RUECKMELDUNGEN),
     ),
     http.get('/api/einsaetze/1/pegel', json(d.pegel ?? [])),
-    // LFH-635: Modul-Overrides (für die Sichtbarkeit der Ablösung) und laufende Schichten.
+    // Modul-Overrides (Sichtbarkeit der Ablösung) und laufende Schichten.
     http.get('/api/einsaetze/1/modul-overrides', json({})),
     http.get('/api/einsaetze/1/abloesungen', json([])),
     http.get('/api/einsaetze/1/etb', ({ request }) => {
@@ -266,8 +265,7 @@ describe('UeberblickPage', () => {
     const b = within(band());
     expect(links[0]).toHaveTextContent('3');
     expect(b.getByText('F/UF/M//Σ 1/0/1//2')).toBeInTheDocument();
-    // Warnstufe: das Wort ist der zweite Kanal. Ohne festgelegten Pegel keine Pegel-Notiz —
-    // die Gegenaussage zum Fall „mit Pegel" unten (LFH-606).
+    // Warnstufe: das Wort ist der zweite Kanal. Ohne festgelegten Pegel keine Pegel-Notiz.
     expect(links[2]).toHaveTextContent('hoch');
     expect(links[2]).toHaveTextContent('1 Gefahrengebiet mit Warnstufe');
     expect(links[2]).not.toHaveTextContent(/Pegel/);
@@ -320,13 +318,11 @@ describe('UeberblickPage', () => {
     expect(zeile).toHaveTextContent('1 Einheit');
     expect(zeile).toHaveTextContent('1/0/1//2');
     expect(zeile).toHaveTextContent('Trupps verlegen');
-    // Der zweite Kanal der Zellen muss im Linknamen ankommen, nicht nur optisch.
-    // LFH-609: gezählt wird die EINHEIT nach ihrem Status (Ausfall), nicht mehr ihre Mittel
-    // (Personal A bereit, B gebunden, Fahrzeug Ausfall ergäbe 1/1/1).
+    // Der zweite Kanal der Zellen muss im Linknamen ankommen. Gezählt wird die Einheit nach ihrem
+    // Status, nicht ihre Mittel (die ergäben 1/1/1).
     expect(zeile).toHaveAccessibleName(/0\s*bereit/);
     expect(zeile).toHaveAccessibleName(/0\s*gebunden/);
     expect(zeile).toHaveAccessibleName(/1\s*Ausfall/);
-    // Je Zelle das Wort für Vorleser.
     const zellen = zeile.querySelectorAll('[data-lfh="status-zelle"]');
     expect(Array.from(zellen).map((z) => z.getAttribute('title'))).toEqual([
       'bereit',
@@ -703,9 +699,8 @@ describe('UeberblickPage', () => {
   });
 
   /*
-   * Review 22.09.2026: die Schreibwege der Seite trugen keinen Rechte-Riegel. Getestet als
-   * PAAR — mit Recht stehen die Leer-Aktionen (oben: „Eintrag erfassen"), ohne Recht fehlen
-   * sie, und die Primäraktion steht gesperrt mit Grund (C10/M16, C11/M45).
+   * Schreibwege mit Rechte-Riegel, als Paar: mit Recht stehen die Leer-Aktionen, ohne Recht fehlen
+   * sie und die Primäraktion steht gesperrt mit Grund.
    */
   const leereDaten = {
     personen: [],
@@ -782,8 +777,7 @@ describe('UeberblickPage', () => {
     expect(auftragsZahl).toHaveTextContent('?');
     // Die Betroffenenzahl hängt an ihrer eigenen Quelle und bleibt lesbar.
     expect(within(band()).getByRole('link', { name: /Betroffene/ })).toHaveTextContent('3');
-    // Die Folgeaufträge hängen seit LFH-636 am ETB-Eintrag, nicht an der Auftragsliste:
-    // die Zahl bleibt stehen, und der frühere Ausfallhinweis ist weg.
+    // Die Folgeaufträge hängen am ETB-Eintrag, nicht an der Auftragsliste: die Zahl bleibt stehen.
     const entscheidungen = await waitFor(() => paneel('Entscheidungen der letzten Stunde'));
     expect(await within(entscheidungen).findByText('2 Aufträge')).toBeInTheDocument();
     expect(screen.queryByText(/Folgeaufträge werden nicht gezählt/)).toBeNull();

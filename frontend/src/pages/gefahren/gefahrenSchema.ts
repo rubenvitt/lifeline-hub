@@ -41,14 +41,9 @@ export const WARNSTUFEN: Katalogeintrag<Warnstufe>[] = [
 ];
 
 /**
- * Ungültige Paare (verbatim aus bluelight-hub) → die Zelle trägt „n. a." als **Text** und gar
- * keinen Auslöser.
- *
- * „Ausgegraut/nicht editierbar" stand hier bis zum Umbau und beschreibt das Gegenteil dessen,
- * was `GefahrenMatrix.tsx` seither tut — aus zwei Gründen: eine blasse Fläche ohne Wort ist von
- * „noch nicht bewertet" nicht zu unterscheiden (WCAG 1.4.1, zweiter Kanal), und ein
- * deaktivierter Knopf gäbe vor, es gäbe hier eine Entscheidung. Die Weiche steht an `render`
- * in `GefahrenMatrix.tsx`, das Verdikt in Kriterium 6 der Prüfliste.
+ * Ungültige Paare (verbatim aus bluelight-hub) → die Zelle trägt „n. a." als Text und keinen
+ * Auslöser: eine blasse Fläche ohne Wort wäre von „noch nicht bewertet" nicht zu unterscheiden
+ * (WCAG 1.4.1), ein deaktivierter Knopf gäbe eine Entscheidung vor.
  */
 export function kombinationGueltig(typ: Gefahrentyp, objekt: Schutzobjekt): boolean {
   if (objekt === 'sachwerte') {

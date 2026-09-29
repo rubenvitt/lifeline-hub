@@ -221,12 +221,9 @@ describe('UnfallhilfsstellenPage', () => {
   });
 
   /**
-   * AK4-Regressionsklammer (LFH-331 · B3) zur Ebenen-Trennung D3: die Listen-Query
-   * entscheidet an der Stelle der Liste, nicht im Seitenguard. Vor dem Umbau kam die
-   * Seite bei gescheitertem UHS-Abruf ohne jede Aussage heraus.
-   *
-   * Der Leertext ist byte-gleich der aus `UnfallhilfsstellenDefault` — eine zweite
-   * Formulierung für dieselbe Tatsache wäre der Befund, den B3 behebt.
+   * Regressionsklammer zur Ebenen-Trennung: die Listen-Query entscheidet an der Stelle der Liste,
+   * nicht im Seitenguard. Der Leertext ist gleich dem aus `UnfallhilfsstellenDefault` — eine zweite
+   * Formulierung für dieselbe Tatsache wäre ein Befund.
    */
   it('zeigt bei gescheitertem UHS-Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
@@ -239,15 +236,14 @@ describe('UnfallhilfsstellenPage', () => {
   });
 
   /**
-   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
-   * nicht `isStale`.
+   * Veralteter Stand = `isError` mit Zeilen im Zwischenspeicher — nicht `isFetching`, nicht
+   * `isStale`.
    *
-   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
-   * Aktualisierung. Ein bloß vorbefüllter Zwischenspeicher belegte den Produktionsweg nicht —
-   * dort steht hinter den Zeilen immer ein erfolgreicher Abruf.
+   * Der Ablauf ist der echte: erst ein geglückter Abruf, dann eine gescheiterte Aktualisierung — im
+   * Betrieb steht hinter den Zeilen immer ein erfolgreicher Abruf.
    *
-   * Gemessen wird an der UNGEFILTERTEN Menge; nur so kippt die Seite nicht in den
-   * Fehlerzweig, sobald eine engere Sicht zufällig 0 Treffer hat.
+   * Gemessen an der ungefilterten Menge; sonst kippte die Seite in den Fehlerzweig, sobald eine
+   * engere Sicht 0 Treffer hat.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
     server.use(
@@ -263,7 +259,7 @@ describe('UnfallhilfsstellenPage', () => {
     expect(
       await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
     ).toBeInTheDocument();
-    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
+    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('BHP 50')).toBeInTheDocument();
     expect(
       screen.queryByText('Unfallhilfsstellen konnten nicht geladen werden'),
@@ -278,7 +274,7 @@ describe('UnfallhilfsstellenPage', () => {
     renderPage();
     expect(await screen.findByText('Noch keine Unfallhilfsstellen erfasst')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
-    // Leerzustand mit Weg hinaus (Neuentwurf): die Anlage öffnet denselben Drawer wie „Neu".
+    // Leerzustand mit Weg hinaus: die Anlage öffnet denselben Drawer wie „Neu".
     await userEvent.click(
       await screen.findByRole('button', { name: 'Erste Unfallhilfsstelle anlegen' }),
     );
@@ -441,8 +437,8 @@ describe('Grundriss DnD', () => {
     );
     renderPage();
     await userEvent.click(await screen.findByText('BHP 50'));
-    // Grundriss ist jetzt immer sichtbar (keine Tabs mehr) — die Mittelspalte trägt
-    // den Titel „Unfallhilfsstelle" und zeigt die angelegten Plätze direkt.
+    // Der Grundriss ist immer sichtbar (keine Tabs) — die Mittelspalte trägt den Titel
+    // „Unfallhilfsstelle" und zeigt die angelegten Plätze.
     expect(await screen.findByText('Unfallhilfsstelle')).toBeInTheDocument();
     expect(await screen.findByText('Bett 3')).toBeInTheDocument();
   });

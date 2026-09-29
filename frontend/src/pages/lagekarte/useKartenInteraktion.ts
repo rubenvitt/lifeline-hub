@@ -51,16 +51,11 @@ type ZoneEntwurf = { typ: ZoneTyp; modus: ZeichenModus; farbe?: string };
 type ZoneBestaetigung = ZoneEntwurf & { geometrie: GeoJsonGeometry };
 
 /**
- * Der aktive Interaktionsmodus der Lagekarte (LFH-243/F15). Die wechselseitige
- * Exklusivität ist hier keine Absprache zwischen Handlern mehr, sondern folgt aus dem
- * Datentyp: es gibt genau EIN Modus-Feld, ein neuer Modus ersetzt den alten. Zuvor waren
- * es sechs separate useState, deren Exklusivität jeder Start-Handler von Hand per
- * Reset-Kaskade erzwingen musste — mit asymmetrischen Subsets, wodurch z. B. ein offenes
- * Bild-Platzieren neben einem frisch gestarteten Marker-Platzieren scharf blieb
- * (Bug-Klasse LFH-145).
+ * Der aktive Interaktionsmodus der Lagekarte. Die wechselseitige Exklusivität folgt aus dem
+ * Datentyp: es gibt genau ein Modus-Feld, ein neuer Modus ersetzt den alten.
  *
- * `zone` trägt ihre Bestätigungs-Phase als Sub-Zustand: der Entwurf bleibt sichtbar,
- * bis explizit gespeichert oder verworfen wird (LFH-145).
+ * `zone` trägt ihre Bestätigungs-Phase als Sub-Zustand: der Entwurf bleibt sichtbar, bis
+ * gespeichert oder verworfen wird.
  */
 type KartenModus =
   | { art: 'idle' }
@@ -70,9 +65,8 @@ type KartenModus =
   | { art: 'bild'; id: number }
   | { art: 'zeichen'; spec: FreiesZeichenUpdate }
   /**
-   * Messen (LFH-616) ist ein exklusiver Modus wie die anderen: es zeichnet auf der Karte, und
-   * ein Klick darf dabei weder ein Panel öffnen noch etwas verorten. Anders als die übrigen
-   * braucht es KEIN Schreibrecht — gemessen wird nur, gespeichert nichts.
+   * Messen ist exklusiv wie die anderen Modi (ein Klick darf weder ein Panel öffnen noch verorten),
+   * braucht aber kein Schreibrecht: gespeichert wird nichts.
    */
   | { art: 'messen'; form: MessForm };
 
@@ -95,11 +89,9 @@ type FachebeneAuswahl = {
 };
 
 /**
- * Die aktive Panel-Selektion der Lagekarte (LFH-243/F15). Wie beim Modus ist die
- * Exklusivität hier ein Datentyp, kein Handler-Vertrag: LagekartePage rendert jeden
- * Inspektor unabhängig (kein `else`), sodass zwei gleichzeitig gesetzte Auswahl-States
- * zwei Panels ergäben — was onFlaecheKlick auslöste, weil es zoneAuswahl nicht räumte.
- * `objekt` deckt Marker UND Abschnitt (beide über den `auswahl`-String).
+ * Die aktive Panel-Selektion. Auch hier ist die Exklusivität ein Datentyp: LagekartePage rendert
+ * jeden Inspektor unabhängig (kein `else`), zwei gesetzte Auswahl-States ergäben zwei Panels.
+ * `objekt` deckt Marker und Abschnitt (beide über den `auswahl`-String).
  */
 type KartenSelektion =
   | { art: 'keine' }
@@ -122,7 +114,7 @@ function modusReducer(state: KartenModus, a: ModusAktion): KartenModus {
     case 'zone':
       return { art: 'zone', entwurf: a.entwurf, bestaetigung: null, speichern: false };
     case 'zoneGezeichnet':
-      // Nicht sofort persistieren: erst Bestätigung, Entwurf bleibt sichtbar (LFH-145).
+      // Nicht sofort persistieren: erst Bestätigung, der Entwurf bleibt sichtbar.
       return state.art === 'zone'
         ? { ...state, bestaetigung: { ...state.entwurf, geometrie: a.geometrie } }
         : state;
@@ -137,10 +129,12 @@ interface KartenInteraktionArgs {
   einsatzId: number;
   einsatz: EinsatzAnzeige | undefined;
   darfSchreiben: boolean;
-  /** Alle anwählbaren Marker: `alleVerortet` plus — bei sichtbarer Ebene — die Betroffenen
-   *  (LFH-648), die bewusst NICHT in `alleVerortet` stehen. */
+  /**
+   * Alle anwählbaren Marker: `alleVerortet` plus, bei sichtbarer Ebene, die Betroffenen, die
+   * bewusst nicht in `alleVerortet` stehen.
+   */
   waehlbar: KarteMarker[];
-  /** Aktive Ansicht (B/LFH-320): neu angelegte Objekte werden auf ihr gestempelt. */
+  /** Aktive Ansicht: neu angelegte Objekte werden auf ihr gestempelt. */
   aktiveAnsichtId?: number;
   /** Stabiler Fehler-Handler (useCallback über App.useApp-message). */
   fehler: (e: unknown) => void;
@@ -149,11 +143,9 @@ interface KartenInteraktionArgs {
 }
 
 /**
- * Interaktions-Leg der Lagekarte: die mutually-exclusive Interaktions-Modi (Platzieren /
- * Abschnitt- & Zonen-Zeichnen / Bild-Platzieren / Selektion) als FSM samt allen Start-/
- * Reset-Handlern, plus die Verortungs- und Zonen-CRUD-Mutationen. Jede Start-Aktion setzt/
- * resettet exakt dieselben States wie zuvor inline auf der Page (LFH-145: sonst bleibt ein
- * Zonen-Entwurf als Orphan liegen — von jsdom-Tests nicht gefangen).
+ * Interaktions-Leg der Lagekarte: die exklusiven Modi (Platzieren, Abschnitt- und Zonen-Zeichnen,
+ * Bild-Platzieren, Messen, Selektion) als FSM samt Start-/Reset-Handlern, dazu die Verortungs- und
+ * Zonen-CRUD-Mutationen.
  */
 export function useKartenInteraktion({
   einsatzId,
@@ -168,53 +160,44 @@ export function useKartenInteraktion({
 
   const [modus, dispatch] = useReducer(modusReducer, { art: 'idle' } as KartenModus);
 
-  // Monoton steigend bei jedem Zonen-Zeichnen-Start (LFH-145 M-A): erzwingt ein Re-Fire
-  // des Kartenflaeche-Zonen-Effekts auch bei gleich bleibendem Modus (z. B. Zone→Zone mit
-  // Gefahrengebiet→Absperrbereich, beides Polygon), damit starten() einen offenen,
-  // unbestätigten Entwurf verwirft statt ihn beim nächsten Zeichnen als Orphan liegen zu lassen.
-  // Bewusst NICHT im Modus: der Zähler muss über Modus-Wechsel hinweg monoton bleiben.
+  // Steigt bei jedem Zonen-Zeichnen-Start und erzwingt ein Re-Fire des Zonen-Effekts in
+  // Kartenflaeche auch bei gleichem Modus (z. B. Polygon → Polygon), damit starten() einen offenen,
+  // unbestätigten Entwurf verwirft statt ihn als Orphan liegen zu lassen. Bewusst nicht im Modus:
+  // der Zähler muss über Moduswechsel monoton bleiben.
   const [zoneZeichnenNonce, setZoneZeichnenNonce] = useState(0);
-  // Serienmodus (LFH-332/M76). Beide Platzier-Modi brachen bisher nach JEDEM gesetzten
-  // Objekt ab — für das zweite gleichartige Zeichen kostete das drei Klicks Umweg
-  // (Karte → Sidebar → Picker → Platzieren). Vorgabe AN, weil das Setzen einer Folge der
-  // Normalfall ist; beendet wird der Modus dann explizit über „Fertig" (Vorbild:
-  // onBildPlatzierenFertig). Die Zähler tragen zwei Dinge: die Anzeige „n platziert" und
-  // die Beschriftung des Abbruch-Knopfes — solange nichts gesetzt ist, heißt Beenden
-  // „Abbrechen"; ab dem ersten gespeicherten Objekt ist es „Fertig", denn abbrechen lässt
-  // sich das Gespeicherte nicht mehr.
+  // Serienmodus: der Platzier-Modus bleibt nach jedem gesetzten Objekt stehen (Vorgabe an, eine
+  // Folge ist der Normalfall) und endet über „Fertig". Die Zähler tragen die Anzeige „n platziert"
+  // und die Beschriftung des Abbruch-Knopfs: ohne gespeichertes Objekt „Abbrechen", danach
+  // „Fertig", denn Gespeichertes lässt sich nicht abbrechen.
   const [zeichenSerie, setZeichenSerie] = useState(true);
   const [zeichenSerieAnzahl, setZeichenSerieAnzahl] = useState(0);
   const [zoneSerie, setZoneSerie] = useState(true);
   const [zoneSerieAnzahl, setZoneSerieAnzahl] = useState(0);
-  // Läuft das Speichern einer Abschnittsfläche? Esc bleibt dann wirkungslos (LFH-712) — wie
-  // beim Zonen-Speichern, dessen Marke im Modus steht (`speichern`).
+  // Läuft das Speichern einer Abschnittsfläche? Esc bleibt dann wirkungslos, wie beim
+  // Zonen-Speichern (Marke `speichern` im Modus).
   const [abschnittSpeichern, setAbschnittSpeichern] = useState(false);
 
-  // Spiegel von `modus` und `zoneSerie` fuer die asynchrone Aufloesung des
-  // Zonen-Speicherns. Die Zuweisung steht bewusst im Renderrumpf und nicht in
-  // einem Effekt: ein Effekt liefe erst NACH dem Commit, und genau dazwischen
-  // kann die Promise aufloesen — der Spiegel zeigte dann den vorletzten Stand.
-  // Refs statt der Closure-Werte, weil die Kette mit den Werten vom Klickzeitpunkt
-  // rechnete: ein waehrend des Speicherns umgelegter Schalter verpuffte, obwohl
-  // die Steuerung ihn als „letzte Gelegenheit zu widerrufen" beschreibt.
+  // Spiegel von `modus` und `zoneSerie` für die asynchrone Auflösung des Zonen-Speicherns. Die
+  // Zuweisung steht im Renderrumpf, nicht in einem Effekt: der liefe erst nach dem Commit, und
+  // dazwischen kann die Promise auflösen. Refs statt Closure-Werten, damit ein während des
+  // Speicherns umgelegter Schalter noch wirkt.
   const modusRef = useRef(modus);
   modusRef.current = modus;
   const zoneSerieRef = useRef(zoneSerie);
   zoneSerieRef.current = zoneSerie;
-  // Panel-Selektion als eine Union (s. KartenSelektion). Die drei bisherigen Setter bleiben
-  // als API erhalten, sind aber Wrapper über EIN Feld: ein Setzen verdrängt jede andere
-  // Selektion, null räumt (das gerade offene Panel ist per Konstruktion das einzige).
+  // Panel-Selektion als eine Union (s. KartenSelektion). Die drei Setter sind Wrapper über ein
+  // Feld: ein Setzen verdrängt jede andere Selektion, null räumt.
   const [selektion, setSelektion] = useState<KartenSelektion>({ art: 'keine' });
   const [flyToZiel, setFlyToZiel] = useState<{ lng: number; lat: number } | null>(null);
   const verortenLaeuft = useRef(false);
 
   const auswahl = selektion.art === 'objekt' ? selektion.schluessel : null;
   const zoneAuswahl = selektion.art === 'zone' ? selektion.id : null;
-  // Angeklicktes Fachebenen-Objekt (externe Daten) → Detail-Panel. geometrie = volle,
-  // un-geclippte Geometrie aus der geladenen FeatureCollection (LFH-146, Fläche/Umfang).
+  // Angeklicktes Fachebenen-Objekt → Detail-Panel. `geometrie` ist die volle, ungeclippte Geometrie
+  // aus der FeatureCollection (Fläche/Umfang).
   const fachebeneAuswahl = selektion.art === 'fachebene' ? selektion.wert : null;
-  // Stabile Identität (useCallback): diese Setter stehen in Effekt-Deps von LagekartePage
-  // (Reverse-Deeplink LFH-155). setSelektion ist selbst stabil, daher leere Deps.
+  // Stabile Identität: diese Setter stehen in Effekt-Deps von LagekartePage (Reverse-Deeplink).
+  // setSelektion ist stabil, daher leere Deps.
   const setAuswahl = useCallback(
     (s: string | null) =>
       setSelektion(s != null ? { art: 'objekt', schluessel: s } : { art: 'keine' }),
@@ -230,8 +213,8 @@ export function useKartenInteraktion({
     [],
   );
 
-  // Aus dem Modus abgeleitet — die Hook-API bleibt unverändert, aber die Werte können
-  // konstruktionsbedingt nicht mehr gleichzeitig gesetzt sein.
+  // Aus dem Modus abgeleitet — die Werte können konstruktionsbedingt nicht gleichzeitig gesetzt
+  // sein.
   const platzierungZiel = modus.art === 'platzieren' ? modus.ziel : null;
   const zeichneAbschnittId = modus.art === 'abschnitt' ? modus.id : null;
   const zoneEntwurf = modus.art === 'zone' ? modus.entwurf : null;
@@ -241,9 +224,8 @@ export function useKartenInteraktion({
   const zeichenPlatzieren = modus.art === 'zeichen' ? modus.spec : null;
   const messForm = modus.art === 'messen' ? modus.form : null;
 
-  // Ein wechselseitig-exklusiver Interaktionsmodus ist aktiv. Während dessen darf ein
-  // Karten-Klick auf ein bestehendes Objekt kein Auswahl-Panel öffnen (LFH-208: sonst
-  // Doppel-Panel neben der ZeichnenSteuerung).
+  // Während eines exklusiven Modus darf ein Karten-Klick auf ein Objekt kein Auswahl-Panel öffnen
+  // (sonst Doppel-Panel neben der ZeichnenSteuerung).
   const exklusiverModusAktiv = modus.art !== 'idle';
 
   // Verorten je nach Ziel-Typ (UHS/Schaden live; Einsatzort über Kopf-PATCH, dann invalidieren).
@@ -261,21 +243,21 @@ export function useKartenInteraktion({
       } else if (platzierungZiel.typ === 'fuehrung') {
         await verortePerson(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
       } else if (platzierungZiel.typ === 'person') {
-        // Betroffene (LFH-613): NUR die zwei Koordinatenfelder — `patchBody` liest vorhandene
-        // Keys, jeder weitere wäre ein „leeren". `verortePerson` oben ist das PERSONAL.
+        // Betroffene: nur die zwei Koordinatenfelder — `patchBody` liest vorhandene Keys, jeder
+        // weitere wäre ein „leeren". `verortePerson` oben ist das Personal.
         await aktualisierePerson(einsatzId, platzierungZiel.id, {
           antreff_lat: p.lat,
           antreff_lon: p.lon,
         });
       } else if (platzierungZiel.typ === 'betreuungsstelle') {
-        // Betreuungsstelle (LFH-673): NUR das Koordinatenpaar — der PATCH ist tri-state, ein
-        // fehlender Schlüssel bleibt unverändert.
+        // Betreuungsstelle: nur das Koordinatenpaar; der PATCH ist tri-state, ein fehlender
+        // Schlüssel bleibt unverändert.
         await aendereStelle(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
       } else if (platzierungZiel.typ === 'einsatzort' && einsatz) {
         await aktualisiereEinsatz(einsatzId, kopfMitKoordinate(einsatz, p.lat, p.lon));
       }
-      // Das Ziel reist als Ergebnis zu `onSuccess`: dort steht fest, WEM der PATCH galt,
-      // unabhängig davon, was der Modus bis dahin tut.
+      // Das Ziel reist als Ergebnis zu `onSuccess`: dort steht fest, wem der PATCH galt, unabhängig
+      // vom inzwischen laufenden Modus.
       return platzierungZiel;
     },
     onSuccess: (ziel) => {
@@ -301,7 +283,7 @@ export function useKartenInteraktion({
     },
   });
 
-  // Freies Zeichen am Klickpunkt anlegen (LFH-170); Spec kommt aus dem Platzier-Modus.
+  // Freies Zeichen am Klickpunkt anlegen; die Spec kommt aus dem Platzier-Modus.
   const legeZeichenMutation = useMutation({
     mutationFn: async (p: { lat: number; lon: number }) => {
       if (!zeichenPlatzieren) return null;
@@ -315,15 +297,13 @@ export function useKartenInteraktion({
     },
     onSuccess: (gesendet) => {
       erfolg('Taktisches Zeichen angelegt');
-      // „Zuletzt verwendet" (LFH-716, D5): erst hier, nach dem gespeicherten Zeichen — nicht
-      // beim Wählen im Picker, sonst stünden Zwischenstände statt benutzter Zeichen in der Leiste.
-      // Gemerkt wird, was GESENDET wurde: wer vor der Antwort „Fertig" drückt, hat den Modus
-      // schon geleert (Review M5).
+      // „Zuletzt verwendet" erst nach dem gespeicherten Zeichen, nicht beim Wählen im Picker, sonst
+      // stünden Zwischenstände in der Leiste. Gemerkt wird, was gesendet wurde: wer vor der Antwort
+      // „Fertig" drückt, hat den Modus schon geleert.
       if (gesendet) merkeZuletztVerwendet(gesendet);
       qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
-      // Serienmodus (LFH-332/M76): der Platzier-Modus überlebt den POST, der Entwurf in der
-      // Sidebar ohnehin (er wird dort nie zurückgesetzt). Beendet wird nur noch über
-      // „Fertig"/„Abbrechen" — oder, bei ausgeschalteter Serie, wie bisher hier.
+      // Serienmodus: der Platzier-Modus überlebt den POST; beendet wird er über
+      // „Fertig"/„Abbrechen" oder, bei ausgeschalteter Serie, hier.
       if (zeichenSerie) setZeichenSerieAnzahl((n) => n + 1);
       else dispatch({ t: 'beenden', arten: ['zeichen'] });
     },
@@ -340,16 +320,16 @@ export function useKartenInteraktion({
     if (!darfSchreiben) return;
     // Platzieren XOR Verorten — beides sind exklusive Modi, nie gleichzeitig aktiv.
     if (zeichenPlatzieren) {
-      // isPending-Guard: ein zweiter (Doppel-)Klick während des laufenden POST würde ein
-      // Duplikat anlegen (legeFreiesZeichenAn ist nicht idempotent). zeichenPlatzieren wird
-      // erst in onSuccess geleert, daher hier gegen die pendende Mutation gaten.
+      // isPending-Guard: ein Doppelklick während des POST legte ein Duplikat an
+      // (legeFreiesZeichenAn ist nicht idempotent); zeichenPlatzieren wird erst in onSuccess
+      // geleert.
       if (!legeZeichenMutation.isPending)
         legeZeichenMutation.mutate({ lat: lngLat.lat, lon: lngLat.lng });
       return;
     }
-    // Mutation-State erreicht den naechsten Render asynchron. Der Ref schliesst deshalb
-    // auch zwei Klicks im selben Renderfenster aus; sonst entscheidet die Serverreihenfolge
-    // statt der zuletzt sichtbaren Nutzeraktion ueber die Position.
+    // Mutation-State erreicht den nächsten Render asynchron. Der Ref schließt auch zwei Klicks im
+    // selben Renderfenster aus; sonst entschiede die Serverreihenfolge statt der zuletzt sichtbaren
+    // Nutzeraktion über die Position.
     verorten(lngLat.lat, lngLat.lng);
   }
 
@@ -360,10 +340,10 @@ export function useKartenInteraktion({
   }
 
   /**
-   * Nimmt einem Objekt seine Kartenverortung. Jeder Zweig liefert nur seinen Aufruf und die
-   * Fächer, die danach frisch sein müssen; Quittung, Invalidierung und Fehler laufen in EINER
-   * Kette (LFH-710), damit kein Zweig die Rückmeldung vergisst. Die Rückfrage für den
-   * unumkehrbaren Fall (Abschnittsfläche) stellt der Inspector, nicht dieser Hook.
+   * Nimmt einem Objekt seine Kartenverortung. Jeder Zweig liefert nur seinen Aufruf und die Fächer,
+   * die danach frisch sein müssen; Quittung, Invalidierung und Fehler laufen in einer Kette, damit
+   * kein Zweig die Rückmeldung vergisst. Die Rückfrage für den unumkehrbaren Fall
+   * (Abschnittsfläche) stellt der Inspector.
    */
   function loescheVerortung(marker: KarteMarker) {
     const vorgang = verortungLoeschenVorgang(marker);
@@ -413,16 +393,15 @@ export function useKartenInteraktion({
           faecher: [einsatzKeys.abschnitte(einsatzId)],
         };
       case 'betreuungsstelle':
-        // LFH-673: nur das Paar; die Stelle bleibt, nur ihr Kartenpunkt geht. Umkehrbar über
-        // „Auf Karte verorten" der Betreuungsseite, deshalb ohne Rückfrage (LFH-363).
+        // Nur das Paar; die Stelle bleibt, nur ihr Kartenpunkt geht. Umkehrbar über „Auf Karte
+        // verorten" der Betreuungsseite, deshalb ohne Rückfrage.
         return {
           aufruf: aendereStelle(einsatzId, marker.id, { lat: null, lon: null }),
           faecher: [einsatzKeys.betreuung(einsatzId)],
         };
       case 'person':
-        // Betroffene (LFH-648): NUR die zwei Koordinatenfelder, wie im Platzier-Zweig — die
-        // Person bleibt bestehen, nur ihr Fundort-Punkt geht. Umkehrbar über „Auf Lagekarte
-        // verorten" der Detailseite, deshalb ohne Rückfrage (CLAUDE.md, LFH-363).
+        // Betroffene: nur die zwei Koordinatenfelder wie im Platzier-Zweig; die Person bleibt, nur
+        // ihr Fundort-Punkt geht. Umkehrbar über „Auf Lagekarte verorten", deshalb ohne Rückfrage.
         return {
           aufruf: aktualisierePerson(einsatzId, marker.id, {
             antreff_lat: null,
@@ -435,7 +414,7 @@ export function useKartenInteraktion({
     }
   }
 
-  /** Symbol-Override eines taktischen Markers; quittiert erst nach Erfolg (LFH-710). */
+  /** Symbol-Override eines taktischen Markers; quittiert erst nach Erfolg. */
   function aendereSymbol(
     marker: KarteMarker,
     patch: { tz_fachaufgabe?: string | null; tz_organisation?: string | null },
@@ -472,7 +451,7 @@ export function useKartenInteraktion({
       .catch(fehler);
   }
 
-  // Bestätigungs-Phase persistieren (LFH-145): erst hier, nicht schon bei onZoneGezeichnet.
+  // Bestätigungs-Phase persistieren: erst hier, nicht schon bei onZoneGezeichnet.
   const bestaetigungSpeichern = () => {
     if (!zoneBestaetigung) return;
     const zu = zoneBestaetigung;
@@ -486,14 +465,10 @@ export function useKartenInteraktion({
     })
       .then(() => {
         erfolg('Zone angelegt');
-        // BEIDE Fächer, wie im Änder- und im Löschpfad weiter unten: das Anlegen einer
-        // `gefahrengebiet`-Zone legt serverseitig eine neue Gruppe an
-        // (`lage_zone/repo.rs:anlegen_tx` → `gebiet_anlegen`). Ohne die zweite Invalidierung
-        // trägt die frische Zone eine `gefahrengebiet_id`, die die veraltete Gebiets-Liste
-        // nicht kennt — der Nachschlag geht ins Leere und die Karte beschriftet sie
-        // „Stufe unbekannt", bis ein fremder Refetch kommt. Der SSE-Fan-out räumt beides
-        // ab (`lage_zone` → zonen + gefahrengebiete); die Lücke trägt also nur, solange der
-        // Live-Strom hängt — genau dann, wenn niemand sie sich erklären kann.
+        // Beide Fächer: das Anlegen einer `gefahrengebiet`-Zone legt serverseitig eine neue Gruppe
+        // an. Ohne die zweite Invalidierung kennt die veraltete Gebiets-Liste die
+        // `gefahrengebiet_id` der frischen Zone nicht, und die Karte beschriftet „Stufe unbekannt",
+        // bis ein fremder Refetch kommt (sichtbar nur bei hängendem Live-Strom).
         return Promise.all([
           qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }),
           qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) }),
@@ -504,33 +479,19 @@ export function useKartenInteraktion({
         return false;
       })
       .then((erfolg) => {
-        // Serienmodus (LFH-332/M76): nach erfolgreichem Speichern denselben Zonen-Typ erneut
-        // scharf schalten statt den Modus zu beenden.
+        // Serienmodus: nach erfolgreichem Speichern denselben Zonen-Typ erneut scharf schalten. Der
+        // Nonce muss steigen: der Zonen-Effekt in `Kartenflaeche` hängt an [zoneZeichnen,
+        // zoneZeichnenNonce], und `zoneZeichnen` bleibt bei Zone→Zone gleich. Ohne ihn liefe
+        // `starten()` nicht — weder `draw.clear()` (sonst doppelte Kontur) noch `setMode()` (sonst
+        // toter Zeichenmodus). Nur bei Erfolg: ein Neustart nach Fehlschlag verwürfe die
+        // ungespeicherte Geometrie still.
         //
-        // Der Nonce MUSS dabei steigen. Der Zonen-Effekt in `Kartenflaeche` hängt an
-        // [zoneZeichnen, zoneZeichnenNonce]; `zoneZeichnen` ist der Zeichen-MODUS und bleibt
-        // bei Zone→Zone gleich. Ohne den Nonce feuerte der Effekt also nicht neu, `starten()`
-        // liefe nicht — und damit weder das `draw.clear()`, das die gerade gespeicherte
-        // Geometrie vom Zeichen-Layer räumt (sonst doppelte Kontur neben der frisch
-        // invalidierten Zonen-Query), noch das `setMode()`, ohne das der Zeichenmodus tot
-        // bliebe. Genau dafür existiert der Zähler (s. Deklaration oben).
-        //
-        // Nur bei ERFOLG: schlägt der POST fehl, endet der Modus wie bisher — ein Neustart
-        // würde die nicht gespeicherte Geometrie stillschweigend verwerfen und so aussehen,
-        // als sei nichts passiert.
-        // ERST die Frage, ob dieser Zug ueberhaupt noch der laufende ist. Die Kette
-        // wartet nicht nur auf den POST, sondern auch auf `invalidateQueries` — in
-        // dieser Zeit bleibt die ganze Sidebar bedienbar. Wer waehrenddessen eine
-        // andere Zone, ein taktisches Zeichen oder ein Bild startet, bekaeme sonst
-        // seinen Modus still ueberschrieben und zeichnete im falschen Zonentyp
-        // weiter, waehrend die Steuerung „1 gespeichert" behauptet. Der Reducer-Fall
-        // 'zone' ist bedingungslos und kann das nicht abfangen — anders als
-        // 'beenden', das ueber `arten` gatet; genau deshalb war die alte
-        // Auto-Beenden-Zeile rennsicher und die neue Serien-Zeile ist es nicht.
-        //
-        // `speichern` ist die Marke dieses Zuges: 'zoneSpeichernStart' setzt sie,
-        // und JEDER andere Modusstart loescht sie (der Fall 'zone' setzt sie auf
-        // false zurueck, jeder andere Fall verlaesst die Zonen-Form ganz).
+        // Zuerst die Frage, ob dieser Zug noch der laufende ist. Die Kette wartet auf POST und
+        // `invalidateQueries`, die Sidebar bleibt dabei bedienbar; wer inzwischen einen anderen
+        // Modus startet, bekäme ihn sonst still überschrieben. Der Reducer-Fall 'zone' ist
+        // bedingungslos und kann das nicht abfangen, anders als 'beenden' mit `arten`. `speichern`
+        // ist die Marke dieses Zuges: 'zoneSpeichernStart' setzt sie, jeder andere Modusstart
+        // löscht sie.
         const nochUnserZug = modusRef.current.art === 'zone' && modusRef.current.speichern;
         if (!nochUnserZug) return;
         if (erfolg && zoneSerieRef.current) {
@@ -545,11 +506,10 @@ export function useKartenInteraktion({
   };
   // Verwirft den Entwurf (stoppen() → clear()).
   const bestaetigungVerwerfen = () => dispatch({ t: 'beenden', arten: ['zone'] });
-  // Erste Esc-Stufe in der Bestätigungsphase (LFH-712): die fertige, ungespeicherte Figur geht
-  // weg, der Modus bleibt — derselbe Weg wie der Serienpfad nach dem Speichern (Fall `zone` +
-  // Nonce, damit die Karte `starten()` ruft und die Figur räumt). Der Serienzähler bleibt: die
-  // schon gespeicherten Zonen sind nicht zurückgenommen. Während des Speicherns wirkungslos —
-  // die Promise-Kette oben erkennt ihren Zug an `speichern` und liefe sonst ins Leere.
+  // Erste Esc-Stufe in der Bestätigungsphase (LFH-712): die ungespeicherte Figur geht, der Modus
+  // bleibt — derselbe Weg wie der Serienpfad (Fall `zone` + Nonce, damit die Karte `starten()`
+  // ruft). Der Serienzähler bleibt. Während des Speicherns wirkungslos, weil die Promise-Kette
+  // ihren Zug an `speichern` erkennt.
   const onBestaetigungZurueck = () => {
     const m = modusRef.current;
     if (m.art !== 'zone' || m.bestaetigung == null || m.speichern) return;
@@ -557,19 +517,13 @@ export function useKartenInteraktion({
     setZoneZeichnenNonce((n) => n + 1);
   };
 
-  // --- Start-/Reset-Handler (mutually-exclusive Modi) -------------------------
-  // Ein Start setzt nur noch SEINEN Modus — der Reducer verdrängt jeden anderen. Die
-  // früheren Reset-Kaskaden (je Handler ein anderes, unvollständiges Subset) entfallen.
+  // --- Start-/Reset-Handler (exklusive Modi) ---
+  // Ein Start setzt nur seinen Modus, der Reducer verdrängt jeden anderen.
   /**
-   * `useCallback` aus demselben Grund wie bei `setAuswahl`/`setZoneAuswahl` oben — und seit
-   * LFH-340 · C5 mit einem zweiten, gemessenen: dieser Handler steht in den Deps eines
-   * Effekts von `LagekartePage` (Platzier-Deeplink `?platzieren=<typ>:<id>`).
-   *
-   * Ohne stabile Identität lief dieser Effekt bei JEDEM Render neu. Da er selbst rendert
-   * (Modus setzen) und danach die URL räumt, drehte sich das: Effekt → Render → Effekt mit
-   * noch nicht aktualisiertem `searchParams` → erneutes Räumen … Der Parameter blieb dabei
-   * in der URL stehen, und der Test lief in seinen Timeout statt in eine Zusicherung.
-   * `dispatch` und `setAuswahl` sind beide stabil, die leeren Deps sind also vollständig.
+   * `useCallback`, weil der Handler in den Deps eines Effekts von `LagekartePage` steht
+   * (Platzier-Deeplink `?platzieren=<typ>:<id>`). Ohne stabile Identität lief der Effekt bei jedem
+   * Render neu, und weil er selbst rendert und die URL räumt, drehte er sich mit noch veraltetem
+   * `searchParams` im Kreis. `dispatch` und `setAuswahl` sind stabil, die leeren Deps vollständig.
    */
   const onPlatzierenStart = useCallback(
     (z: { typ: PlatzierenPunktTyp; id: number }) => {
@@ -586,11 +540,11 @@ export function useKartenInteraktion({
   const onZoneZeichnenStart = (entwurf: ZoneEntwurf) => {
     dispatch({ t: 'zone', entwurf });
     setZoneZeichnenNonce((n) => n + 1);
-    setZoneSerieAnzahl(0); // neue Serie (LFH-332)
+    setZoneSerieAnzahl(0);
     setZoneAuswahl(null);
     setAuswahl(null);
   };
-  /** Beendet eine laufende Zonen-Serie (LFH-332) — Vorbild: onBildPlatzierenFertig. */
+  /** Beendet eine laufende Zonen-Serie — Vorbild: onBildPlatzierenFertig. */
   const onZoneZeichnenFertig = () => dispatch({ t: 'beenden', arten: ['zone'] });
   const onKoordinateEingeben = (lat: number, lon: number) => {
     if (darfSchreiben) verorten(lat, lon);
@@ -599,14 +553,14 @@ export function useKartenInteraktion({
     dispatch({ t: 'platzieren', ziel: { typ: 'einsatzort', id: 0 } });
     setAuswahl(null);
   };
-  // Freies-Zeichen-Platzieren starten/abbrechen (LFH-170).
+  // Freies-Zeichen-Platzieren starten/abbrechen.
   const onZeichenPlatzierenStart = (spec: FreiesZeichenUpdate) => {
     dispatch({ t: 'zeichen', spec });
-    setZeichenSerieAnzahl(0); // neue Serie (LFH-332)
+    setZeichenSerieAnzahl(0);
     setAuswahl(null);
   };
   const onZeichenPlatzierenAbbrechen = () => dispatch({ t: 'beenden', arten: ['zeichen'] });
-  /** Beendet eine laufende Zeichen-Serie (LFH-332) — Vorbild: onBildPlatzierenFertig. */
+  /** Beendet eine laufende Zeichen-Serie — Vorbild: onBildPlatzierenFertig. */
   const onZeichenPlatzierenFertig = () => dispatch({ t: 'beenden', arten: ['zeichen'] });
   const onBildPlatzieren = (id: number) => {
     dispatch({ t: 'bild', id });
@@ -619,13 +573,12 @@ export function useKartenInteraktion({
     setAuswahl(null);
   };
   /**
-   * Beendet NUR das Messen. `useCallback`, weil ein Escape-Effekt der Seite daran hängt —
-   * `dispatch` ist stabil, die leeren Deps sind vollständig.
+   * Beendet nur das Messen. `useCallback`, weil ein Escape-Effekt der Seite daran hängt; `dispatch`
+   * ist stabil.
    */
   const onMessenBeenden = useCallback(() => dispatch({ t: 'beenden', arten: ['messen'] }), []);
 
-  // Abschnittsfläche zeichnen fertig → persistieren, quittieren (LFH-710), dann Zeichenmodus
-  // beenden.
+  // Abschnittsfläche fertig → persistieren, quittieren, dann Zeichenmodus beenden.
   const onFlaecheGezeichnet = (poly: GeoJsonPolygon) => {
     setAbschnittSpeichern(true);
     zeichneAbschnitt(einsatzId, zeichneAbschnittId!, { flaeche_geojson: JSON.stringify(poly) })
@@ -640,11 +593,11 @@ export function useKartenInteraktion({
       });
   };
   const onFlaecheKlick = (fid: number) => {
-    if (exklusiverModusAktiv) return; // LFH-208: kein Panel während eines exklusiven Modus
+    if (exklusiverModusAktiv) return; // kein Panel während eines exklusiven Modus
     setSelektion({ art: 'objekt', schluessel: `abschnitt-${fid}` });
   };
   const onZoneKlick = (id: number) => {
-    if (exklusiverModusAktiv) return; // LFH-208: kein Panel während eines exklusiven Modus
+    if (exklusiverModusAktiv) return; // kein Panel während eines exklusiven Modus
     setSelektion({ art: 'zone', id });
   };
   const onZoneGezeichnet = (g: GeoJsonGeometry) => dispatch({ t: 'zoneGezeichnet', geometrie: g });
@@ -653,7 +606,7 @@ export function useKartenInteraktion({
     quelle: FachebeneQuelle,
     geometrie?: { type: string; coordinates: unknown } | null,
   ) => {
-    if (exklusiverModusAktiv) return; // LFH-208: kein Panel während eines exklusiven Modus (vorher nur Platzieren)
+    if (exklusiverModusAktiv) return; // kein Panel während eines exklusiven Modus
     setSelektion({ art: 'fachebene', wert: { quelle, properties, geometrie } });
   };
   // ZeichnenSteuerung „Abbrechen" (Phase zeichnen): Entwurf + Abschnitt-Zeichnen verwerfen.
@@ -670,8 +623,8 @@ export function useKartenInteraktion({
       ]);
     } catch (e) {
       fehler(e);
-      // Der Inspector braucht die Ablehnung, damit „speichert …" nicht faelschlich in
-      // „gespeichert" umspringt. Die sichtbare Fehlermeldung kommt weiterhin zentral.
+      // Der Inspector braucht die Ablehnung, damit „speichert …" nicht fälschlich in „gespeichert"
+      // umspringt. Die sichtbare Fehlermeldung kommt weiterhin zentral.
       throw e;
     }
   };
@@ -685,8 +638,8 @@ export function useKartenInteraktion({
       })
       .catch(fehler);
 
-  // Freies-Zeichen-Inspector-CRUD (LFH-170). Whole-Spec-Update (lat/lon unverändert).
-  // Jede der drei quittiert erst nach erfolgreicher Antwort (LFH-710), wie `zoneAendern`.
+  // Freies-Zeichen-Inspector-CRUD, Whole-Spec-Update (lat/lon unverändert). Jede quittiert erst
+  // nach erfolgreicher Antwort.
   const zeichenAendern = (id: number, spec: FreiesZeichenUpdate) =>
     aktualisiereFreiesZeichen(einsatzId, id, spec)
       .then(() => {
@@ -694,7 +647,7 @@ export function useKartenInteraktion({
         return qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
       })
       .catch(fehler);
-  // Verschieben auf eine andere Ansicht bzw. auf alle (`null`) — Teil-Patch (B/LFH-320).
+  // Verschieben auf eine andere Ansicht bzw. auf alle (`null`) — Teil-Patch.
   const zeichenVerschieben = (id: number, ansichtId: number | null) =>
     verschiebeFreiesZeichen(einsatzId, id, ansichtId)
       .then(() => {
@@ -727,7 +680,7 @@ export function useKartenInteraktion({
     zeichenPlatzieren,
     messForm,
     exklusiverModusAktiv,
-    // Serienmodus (LFH-332/M76).
+    // Serienmodus.
     zeichenSerie,
     setZeichenSerie,
     zeichenSerieAnzahl,
@@ -739,7 +692,7 @@ export function useKartenInteraktion({
     setAuswahl,
     setZoneAuswahl,
     setFachebeneAuswahl,
-    setFlyToZiel, // Reverse-Deeplink (LFH-155): Zone anfliegen
+    setFlyToZiel, // Reverse-Deeplink: Zone anfliegen
 
     // Handler.
     onKarteKlick,

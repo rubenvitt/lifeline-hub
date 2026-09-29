@@ -66,9 +66,8 @@ function renderLeiste(liste: Snap[], props: Record<string, unknown>) {
   );
 }
 
-// Die Leiste startet ohne gemerkte Wahl erst ab `xl` ausgeklappt (Nacharbeit 22.09.2026);
-// die Bestandstests prüfen die ausgeklappte Leiste und laufen deshalb bei 1440 px. Die
-// Breitenregel selbst prüfen die eigenen Tests unten.
+// Ohne gemerkte Wahl startet die Leiste erst ab `xl` ausgeklappt; die Bestandstests prüfen die
+// ausgeklappte Leiste und laufen deshalb bei 1440 px. Die Breitenregel prüfen die Tests unten.
 beforeEach(() => setzeViewportBreite(1440));
 
 describe('SnapshotLeiste', () => {
@@ -133,7 +132,7 @@ describe('SnapshotLeiste', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abspielen' }));
     expect(onWaehle).toHaveBeenCalledWith(10);
 
-    // LagekartePage würde ?snapshot=10 setzen → Rerender mit aktivem Stand 10 (spielt bleibt an).
+    // LagekartePage setzte ?snapshot=10 → Rerender mit aktivem Stand 10 (spielt bleibt an).
     rerender(
       <SnapshotLeiste
         einsatzId={5}
@@ -171,8 +170,8 @@ describe('SnapshotLeiste', () => {
     await vi.advanceTimersByTimeAsync(ANZEIGE_MS);
     expect(onWaehle).toHaveBeenLastCalledWith(20);
 
-    // Am LETZTEN Stand angekommen (spielt bleibt an) → terminaler Zweig: kein weiterer Schritt,
-    // Wiedergabe stoppt. Ohne den next>=length-Guard würfe chrono[2] hier (Out-of-Bounds).
+    // Am letzten Stand (spielt bleibt an) → kein weiterer Schritt, die Wiedergabe stoppt. Ohne den
+    // next>=length-Guard würfe chrono[2] hier.
     onWaehle.mockClear();
     rerender(
       <SnapshotLeiste
@@ -284,8 +283,7 @@ describe('SnapshotLeiste — Platz im KartenFuss (LFH-355)', () => {
     expect(reihe.querySelectorAll('button').length).toBe(2);
     expect(reihe.style.minWidth).toBe('0px');
     expect(reihe.style.overflowX).toBe('auto');
-    // 120 statt 160 (LFH-373, in der CI gemessen): unter den Linux-Schriften lag die erste Reihe
-    // bei 1440 px mit 160 px Basis 3 px über dem Band, und der Einklapp-Pfeil rutschte allein in
+    // 120 statt 160: unter Linux-Schriften rutschte der Einklapp-Pfeil bei 1440 px sonst allein in
     // eine dritte Reihe. Die Stand-Reihe rollt ohnehin — die Basis ist nur ihre Umbruchschwelle.
     expect(standLeisteStil.flex).toBe('1 1 120px');
   });
@@ -318,11 +316,9 @@ describe('SnapshotLeiste — Platz im KartenFuss (LFH-355)', () => {
 
 describe('SnapshotLeiste — Umbruch statt Überlauf (LFH-373)', () => {
   /**
-   * Seit der Fuß vor der Knopfspalte endet (LFH-373, `KartenFuss.fussStil`), ist das Band
-   * schmaler. Gemessen: das Bezeichnungsfeld mit FESTEN 180 px ragte bei 390 px im
-   * Handschuh-Betrieb aus dem Band heraus und fing die Klicks auf die Kartenknöpfe ab; der
-   * Abspielknopf schrumpfte als Flex-Kind auf 16 px. Geprüft wird die Struktur, aus der die
-   * Zusicherung folgt; die Pixel misst `e2e/leisten-flaeche.spec.ts`.
+   * Seit der Fuß vor der Knopfspalte endet, ist das Band schmaler: ein Bezeichnungsfeld mit festen
+   * 180 px ragte bei 390 px aus dem Band und fing Klicks auf die Kartenknöpfe ab. Geprüft wird die
+   * Struktur; die Pixel misst `e2e/leisten-flaeche.spec.ts`.
    */
   it('das Bezeichnungsfeld darf schrumpfen und hat keine feste Breite mehr', () => {
     expect(sichernFeldStil.width).toBeUndefined();

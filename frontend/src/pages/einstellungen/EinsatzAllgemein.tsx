@@ -26,14 +26,12 @@ import {
 import { speicherLeisteStil } from '../../components/speicherLeiste';
 
 /**
- * Sektion `…/einstellungen/allgemein` (LFH-345 · C10) — Einstieg + Anzeige-Konventionen.
+ * Sektion `…/einstellungen/allgemein` — Einstieg + Anzeige-Konventionen. Fünf Felder, deshalb
+ * einspaltig.
  *
- * Fünf Felder, deshalb **einspaltig**: zwei Spalten sind ab neun Feldern eine Hilfe
- * (Sektion „Verhalten"), darunter ziehen sie den Blick nur auseinander.
- *
- * Der Speichern-Knopf schickt den **vollen** Payload — `zuUpdate` liefert die Basis aus dem
- * geladenen Stand, `normalisiereAllgemein` überschreibt nur die fünf eigenen Felder. Ohne
- * das nullte ein Speichern hier die Nummernkreise und die Aufbewahrungsfrist.
+ * Der Speichern-Knopf schickt den vollen Payload: `zuUpdate` liefert die Basis aus dem geladenen
+ * Stand, `normalisiereAllgemein` überschreibt nur die eigenen Felder. Ohne das nullte ein Speichern
+ * hier Nummernkreise und Aufbewahrungsfrist.
  */
 export default function EinsatzAllgemein() {
   const { id } = useParams();
@@ -44,9 +42,8 @@ export default function EinsatzAllgemein() {
   const { token } = theme.useToken();
   const daten = useEinstellungenDaten(einsatzId);
 
-  // KEIN `onError`-Toast (H14): der Fehler haengt an `mutation.error` und steht als Alert
-  // ueber dem Formular, bis der naechste Versuch laeuft. Der ERFOLG bleibt beim Toast — er
-  // quittiert eine abgeschlossene Handlung und braucht keinen Platz auf der Seite.
+  // Kein `onError`-Toast: der Fehler steht als Alert über dem Formular, bis der nächste Versuch
+  // läuft. Der Erfolg bleibt beim Toast.
   const speichern = useMutation({
     mutationFn: (werte: FormWerteAllgemein) =>
       speichereEinstellungen(einsatzId, {
@@ -60,9 +57,8 @@ export default function EinsatzAllgemein() {
   });
 
   if (daten.laedt) return <SeitenSkeleton />;
-  // Der Riegel gehoert in JEDE Sektion, nicht nur ins Layout: `Form initialValues` wird genau
-  // einmal beim Mount gelesen. Eine ohne Daten montierte Sektion zeigte ein leeres Formular,
-  // und der naechste Speichern-Klick schickte einen Vollersatz-PUT aus lauter null.
+  // Der Riegel gehört in jede Sektion: `Form initialValues` wird nur beim Mount gelesen. Ohne Daten
+  // montiert, schickte der nächste Speichern-Klick einen Vollersatz-PUT aus lauter null.
   if (!daten.einstellungen) {
     return (
       <SeitenFehler
@@ -73,8 +69,7 @@ export default function EinsatzAllgemein() {
   }
 
   const orgDefaults = daten.einstellungen.org_defaults;
-  // Nur fertige Module sind als Default-Modul waehlbar (Pre-Mortem: kein Sprung auf
-  // geplante/WIP-Module).
+  // Nur fertige Module sind als Default-Modul wählbar.
   const standardModulOptionen = modulRegistry
     .filter((m) => m.status === 'fertig')
     .map((m) => ({ value: m.key, label: m.label }));
@@ -83,8 +78,8 @@ export default function EinsatzAllgemein() {
     <>
       <SeitenHinweise
         fehler={speichern.error}
-        // Nur bei fehlender ROLLE. Ist der Einsatz abgeschlossen, sagt das der Alert im
-        // Seitenkopf — zwei Erklaerungen fuer dieselbe Sperre waeren eine zu viel.
+        // Nur bei fehlender Rolle. Einen abgeschlossenen Einsatz nennt schon der Alert im
+        // Seitenkopf.
         rechteFehlt={daten.istAktiv && !daten.darfBearbeiten}
         rechteText={RECHTE_TEXT}
       />

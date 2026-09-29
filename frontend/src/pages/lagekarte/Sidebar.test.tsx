@@ -29,9 +29,8 @@ const basisProps: SidebarProps = {
   zeichenPlatzieren: null,
   onZeichenPlatzierenStart: vi.fn(),
   onZeichenPlatzierenAbbrechen: vi.fn(),
-  // Serienmodus (LFH-332): der Zähler steht hier auf 0 — die Basis ist der Zustand VOR dem
-  // ersten gesetzten Zeichen, in dem Beenden noch „Abbrechen" heißt. Den Gegenzustand baut
-  // der eigene Block unten explizit auf.
+  // Serienmodus: der Zähler steht auf 0, der Zustand vor dem ersten Zeichen, in dem Beenden noch
+  // „Abbrechen" heißt. Den Gegenzustand baut der eigene Block unten auf.
   zeichenSerie: true,
   onZeichenSerieWechsel: vi.fn(),
   zeichenSerieAnzahl: 0,
@@ -64,10 +63,8 @@ const basisProps: SidebarProps = {
   ansichtDirty: false,
   ansichtSpeichert: false,
   onAnsichtSpeichern: vi.fn(),
-  // BEWUSST ausgeschrieben statt `defaultFachebenenSichtbar()`: eine neue Fachebene soll
-  // hier den Typcheck brechen und damit jemanden zwingen, die Sidebar anzusehen. (LFH-80
-  // ist genau so aufgelaufen — der Import von `defaultFachebenenSichtbar` ist deshalb
-  // wieder weg.)
+  // Bewusst ausgeschrieben statt `defaultFachebenenSichtbar()`: eine neue Fachebene soll hier den
+  // Typcheck brechen und so zum Blick auf die Sidebar zwingen.
   fachebenenSichtbar: {
     nina: false,
     dwd: false,
@@ -81,7 +78,6 @@ const basisProps: SidebarProps = {
   },
   onFachebeneToggle: vi.fn(),
   fachebenenStatus: {},
-  // Neue Bild-Props
   bilder: [],
   onBildUpload: vi.fn(),
   onBildToggle: vi.fn(),
@@ -108,9 +104,8 @@ const basisProps: SidebarProps = {
 };
 
 /**
- * Die Leiste klappt Bild-Hintergründe, Fachebenen und Kartengrundlage zu Beginn ZU
- * (`PANEEL_VORGABE`, Neuentwurf S5). Die Blöcke hier prüfen deren INHALT; dass die Paneele
- * zu sind und sich öffnen lassen, belegt der eigene Block „Sidebar: Paneele" weiter unten.
+ * Bild-Hintergründe, Fachebenen und Kartengrundlage starten zugeklappt (`PANEEL_VORGABE`). Die
+ * Blöcke hier prüfen deren Inhalt; Zuklappen und Öffnen belegt „Sidebar: Paneele" unten.
  */
 function paneeleOffen() {
   localStorage.setItem(
@@ -176,23 +171,12 @@ describe('Sidebar Bild-Hintergründe', () => {
   });
 
   /**
-   * Bild-Aktionen: gebündelt statt aufgereiht (LFH-366 · B5f).
+   * Bild-Aktionen: gebündelt statt aufgereiht. Die beiden Fälle sind ein Paar: erst die Gegenprobe
+   * (mit Schreibrecht ist der direkte Knopf weg und ein Auslöser da) macht die Bündelung prüfbar.
    *
-   * Die beiden Fälle sind ein PAAR und nur zusammen eine Aussage. Der Zentrieren-Test allein
-   * belegt bloß, dass es den Knopf irgendwo gibt — er bliebe auch grün, wenn die Bündelung gar
-   * nicht griffe oder ein zweiter Zentrieren-Knopf danebenstünde. Erst die Gegenprobe („mit
-   * Schreibrecht ist der direkte Knopf WEG und ein Auslöser da") macht die Bündelung prüfbar.
-   *
-   * Der Zugriff aufs Menü läuft über das OFFENE Portal: antd lässt die Portale geschlossener
-   * Dropdowns im Baum stehen, und hier liegt je Bild eines herum (CLAUDE.md, gemessene Falle
-   * aus LFH-365).
-   *
-   * Die Einträge werden per TEILSTRING gegriffen, nicht per exaktem Namen: antds Icons tragen
-   * ein eigenes `aria-label` (`role="img"`), das in den zugänglichen Namen des `menuitem`
-   * einfließt — der heißt gemessen „delete Bild entfernen …", nicht „Bild entfernen …". Das ist
-   * das Verhalten im ganzen Bestand (`AnsichtSwitcher`, `OfflineKartenVerwaltung`) und wird hier
-   * nicht einseitig geändert. Die Beschriftung selbst prüft der `textContent`-Vergleich unten
-   * exakt.
+   * Zugriff über das offene Portal — antd lässt die Portale geschlossener Dropdowns stehen.
+   * Einträge per Teilstring: antds Icons tragen ein eigenes `aria-label`, der Name des `menuitem`
+   * heißt „delete Bild entfernen …". Die Beschriftung prüft der `textContent`-Vergleich exakt.
    */
   async function oeffneBildMenue(name: string | RegExp): Promise<HTMLElement> {
     await userEvent.click(screen.getByRole('button', { name }));
@@ -221,7 +205,7 @@ describe('Sidebar Bild-Hintergründe', () => {
 
   it('mit Schreibrecht liegen alle drei Aktionen im Menü — und nicht mehr in der Icon-Reihe', async () => {
     renderMitProviders(<Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} />);
-    // Der direkte Zentrieren-Knopf ist weg: sonst wäre die Bündelung nur eine Ergänzung.
+    // Der direkte Zentrieren-Knopf ist weg — sonst wäre die Bündelung nur eine Ergänzung.
     expect(screen.queryByRole('button', { name: /Lageplan zentrieren/i })).not.toBeInTheDocument();
     const menue = await oeffneBildMenue('Aktionen zu Lageplan');
     expect(
@@ -232,9 +216,8 @@ describe('Sidebar Bild-Hintergründe', () => {
   });
 
   /**
-   * AK2, erste Hälfte: die räumliche Trennung zwischen destruktiver und harmloser Aktion. Im
-   * Menü ist sie der Trenner — geprüft wird nicht bloß, DASS einer da ist, sondern dass er vor
-   * dem Entfernen sitzt. Ein Trenner an beliebiger Stelle trennte nichts.
+   * Die Trennung zwischen destruktiver und harmloser Aktion ist im Menü der Trenner — geprüft wird,
+   * dass er unmittelbar vor dem Entfernen sitzt.
    */
   it('der Trenner steht unmittelbar vor „Bild entfernen"', async () => {
     renderMitProviders(<Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} />);
@@ -272,12 +255,8 @@ describe('Sidebar Bild-Hintergründe', () => {
   });
 
   /**
-   * AK2, zweite Hälfte: das Entfernen wird bestätigt, und der Bestätigungsknopf ist rot. Ohne
-   * die Farb-Zusicherung bestätigte man das Löschen mit einem blauen Knopf — genau der Fall,
-   * den LFH-363 als eigene Festlegung aufgeschrieben hat.
-   *
-   * Der Aufruf darf ERST nach der Bestätigung kommen; die Zwischenprüfung ist deshalb kein
-   * Beiwerk, sondern der Unterschied zwischen „fragt nach" und „fragt zum Schein".
+   * Das Entfernen wird bestätigt, und der Bestätigungsknopf ist rot. Der Aufruf darf erst nach der
+   * Bestätigung kommen — die Zwischenprüfung unterscheidet „fragt nach" von „fragt zum Schein".
    */
   it('Entfernen fragt nach und bestätigt mit einem roten Knopf', async () => {
     const onBildLoeschen = vi.fn();
@@ -364,7 +343,7 @@ describe('Sidebar Bild-Hintergründe', () => {
         onBildPlatzierenFertig={onBildPlatzierenFertig}
       />,
     );
-    // Hinweistext + „Mittelpunkt setzen" (zunächst disabled, kein Entwurf) erscheinen nur im Platzier-Modus.
+    // Hinweistext + „Mittelpunkt setzen" (ohne Entwurf gesperrt) erscheinen nur im Platzier-Modus.
     expect(screen.getByText(/frei strecken/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Mittelpunkt setzen/i })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: /^Fertig$/i }));
@@ -389,8 +368,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     fireEvent.click(within(gruppe).getByRole('radio', { name: 'Drehen' }));
     expect(onGriffModus).toHaveBeenCalledWith('drehen');
 
-    // Der Hinweis folgt dem Modus — sonst wäre der Umschalter von „wirkungslos" nicht zu
-    // unterscheiden: der Text behauptete weiter, man könne an den Ecken ziehen.
+    // Der Hinweis folgt dem Modus — sonst behauptete er weiter, man könne an den Ecken ziehen.
     rerender(<Sidebar {...props} griffModus="drehen" />);
     expect(screen.getByText(/zum Drehen/i)).toBeInTheDocument();
     expect(screen.queryByText(/frei strecken/i)).toBeNull();
@@ -432,7 +410,7 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('schaltet den „Taktische Zeichen"-Ebenen-Toggle (LFH-170)', () => {
     const onLayerToggle = vi.fn();
     renderMitProviders(<Sidebar {...basisProps} onLayerToggle={onLayerToggle} />);
-    // Die Ebenen-Zeile ist selbst der Schalter (Neuentwurf S5): Farbfeld · Name · Anzahl.
+    // Die Ebenen-Zeile ist selbst der Schalter: Farbfeld · Name · Anzahl.
     const toggle = screen.getByRole('switch', { name: 'Taktische Zeichen' });
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     fireEvent.click(toggle);
@@ -441,8 +419,7 @@ describe('Sidebar Bild-Hintergründe', () => {
 
   it('nennt den Geltungsbereich der Autobahn-Ebene als sichtbare Zeile (LFH-80)', () => {
     renderMitProviders(<Sidebar {...basisProps} />);
-    // AK „Limitation (nur BAB) im UI transparent": der Satz steht DA, nicht erst beim Hovern —
-    // auf einem Führungs-Tablet gäbe es kein Hovern.
+    // Die Einschränkung „nur BAB" steht sichtbar da, nicht erst beim Hovern (Tablet).
     expect(screen.getByText(/nur Bundesautobahnen/i)).toBeVisible();
     // Gegenaussage: keine der Bestandsebenen behauptet plötzlich eine Einschränkung.
     expect(screen.getByText('Autobahn-Lage (BAB)')).toBeInTheDocument();
@@ -452,7 +429,7 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('schaltet die Autobahn-Ebene über ihren eigenen Schalter (LFH-80)', () => {
     const onFachebeneToggle = vi.fn();
     renderMitProviders(<Sidebar {...basisProps} onFachebeneToggle={onFachebeneToggle} />);
-    // Über den Namen am Schalter selbst (LFH-380) — nicht über die antd-Hülle der Zeile.
+    // Über den Namen am Schalter selbst, nicht über die antd-Hülle der Zeile.
     fireEvent.click(screen.getByRole('switch', { name: 'Autobahn-Lage (BAB)' }));
     expect(onFachebeneToggle).toHaveBeenCalledWith('autobahn', true);
   });
@@ -498,7 +475,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     renderMitProviders(
       <Sidebar {...basisProps} onZeichenPlatzierenStart={onZeichenPlatzierenStart} />,
     );
-    // Picker ist zunächst geschlossen (kein Dauer-Combobox in der Sidebar).
+    // Der Picker ist zunächst geschlossen (kein Dauer-Combobox in der Leiste).
     expect(screen.queryByLabelText('Grundzeichen')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }));
     // Jetzt ist der Picker offen …
@@ -521,7 +498,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     );
     kachel.focus();
     fireEvent.keyDown(kachel, { key: 'Enter' });
-    // Die Spec der Enter-Kachel, nicht der Entwurf von vorher (taktische-formation).
+    // Die Spec der Enter-Kachel, nicht der Entwurf von vorher.
     expect(onZeichenPlatzierenStart).toHaveBeenCalledWith(
       expect.objectContaining({ grundzeichen: 'person' }),
     );
@@ -543,9 +520,8 @@ describe('Sidebar Bild-Hintergründe', () => {
   });
 
   /**
-   * Serienmodus (LFH-332/M76). Die beiden Fälle sind ein Paar: erst nachdem gezeigt ist,
-   * dass VOR dem ersten Zeichen „Abbrechen" steht (Fall oben, `zeichenSerieAnzahl: 0`),
-   * sagt das Auftauchen von „Fertig" etwas aus. Sonst wäre es nur ein Knopf, der da ist.
+   * Serienmodus: ein Paar mit dem Fall oben — erst nachdem vor dem ersten Zeichen „Abbrechen"
+   * steht, sagt das Auftauchen von „Fertig" etwas aus.
    */
   it('Serienmodus: Schalter „Weitere platzieren" meldet das Umlegen (LFH-332)', () => {
     const onZeichenSerieWechsel = vi.fn();
@@ -575,7 +551,7 @@ describe('Sidebar Bild-Hintergründe', () => {
       />,
     );
     expect(screen.getByText('2 platziert')).toBeInTheDocument();
-    // „Abbrechen" wäre hier die Unwahrheit: die zwei gesetzten Zeichen bleiben stehen.
+    // „Abbrechen" wäre hier falsch: die zwei gesetzten Zeichen bleiben stehen.
     expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Fertig' }));
     expect(onZeichenPlatzierenFertig).toHaveBeenCalled();
@@ -593,8 +569,8 @@ describe('Sidebar Bild-Hintergründe', () => {
     );
     // antd Typography editable: Edit-Auslöser hat aria-label „Umbenennen".
     fireEvent.click(screen.getByRole('button', { name: /Umbenennen/i }));
-    // Seit LFH-716 steht in der Leiste auch das (benannte) Suchfeld; das Bearbeitungsfeld ist
-    // das namenlose Textfeld. `getByDisplayValue` trifft zusätzlich antds Messkopie.
+    // In der Leiste steht auch das benannte Suchfeld; das Bearbeitungsfeld ist das namenlose
+    // Textfeld. `getByDisplayValue` träfe zusätzlich antds Messkopie.
     const input = screen.getByRole('textbox', { name: '' });
     fireEvent.change(input, { target: { value: 'Objektskizze' } });
     fireEvent.blur(input); // antd Editable committet bei Blur (und Enter-keyUp)
@@ -603,11 +579,9 @@ describe('Sidebar Bild-Hintergründe', () => {
 });
 
 /**
- * Fehler-Slots je Sektion (LFH-331 · B3).
- *
- * Jedes Paar hier ist eine AK4-Klammer: die „nicht im DOM"-Hälfte allein belegte nichts,
- * weil der Text im selben Umbau entstanden ist. Erst die Partnerhälfte mit dem BYTE-GLEICHEN
- * Literal macht daraus eine Aussage über die Zustandsweiche.
+ * Fehler-Slots je Sektion. Jedes Paar hier klammert: die „nicht im DOM"-Hälfte allein belegte
+ * nichts, erst die Partnerhälfte mit dem byte-gleichen Literal macht eine Aussage über die
+ * Zustandsweiche.
  */
 describe('Sidebar Fehler-Slots', () => {
   const slot = { text: 'Objektlisten konnten nicht geladen werden', onWiederholen: vi.fn() };
@@ -617,8 +591,8 @@ describe('Sidebar Fehler-Slots', () => {
       <Sidebar {...basisProps} nichtVerortet={[]} sektionFehler={{ nichtVerortet: slot }} />,
     );
     expect(screen.getByText('Objektlisten konnten nicht geladen werden')).toBeInTheDocument();
-    // Der Kern der Sache: „Alles verortet" ist eine ERFOLGS-Aussage. Sie darf nicht stehen,
-    // wenn niemand weiß, ob überhaupt etwas geladen wurde.
+    // „Alles verortet" ist eine Erfolgsaussage und darf nicht stehen, wenn niemand weiß, ob
+    // überhaupt etwas geladen wurde.
     expect(screen.queryByText('Alles verortet')).not.toBeInTheDocument();
   });
 
@@ -626,24 +600,14 @@ describe('Sidebar Fehler-Slots', () => {
     const { container } = renderMitProviders(<Sidebar {...basisProps} nichtVerortet={[]} />);
     expect(screen.getByText('Alles verortet')).toBeInTheDocument();
     expect(screen.queryByText('Objektlisten konnten nicht geladen werden')).not.toBeInTheDocument();
-    /**
-     * Getauscht ist der Knoten, nicht der Wortlaut (LFH-331 · B3). „Alles verortet" ist
-     * ein ERFOLGS-, kein Leerzustand: er bekommt deshalb keine Primäraktion — es gibt
-     * nichts anzulegen, wenn alles verortet ist.
-     */
+    /** „Alles verortet" ist ein Erfolgs-, kein Leerzustand: er bekommt keine Primäraktion. */
     expect(container.querySelector('.ant-empty')).toBeNull();
   });
 
   /**
-   * Der Kern von D3/D5: **ein Fehler ersetzt Inhalt nur, wenn es keinen Inhalt gibt.**
-   *
-   * Die Zeilen unter „Nicht verortet" tragen die EINZIGE Bedienung zum Verorten
-   * („Platzieren" / „Fläche zeichnen"). Fällt eine der elf Lagebild-Quellen aus, während
-   * die übrigen zehn Zeilen im Zwischenspeicher stehen, nähme ein Vollersatz der Sektion
-   * der Einsatzkraft die Fähigkeit weg, ein Objekt zu verorten — wegen eines Fehlers, der
-   * dieses Objekt gar nicht betrifft.
-   *
-   * Deshalb steht der Fehler hier als D5-Banner ÜBER den Zeilen, nicht an ihrer Stelle.
+   * Ein Fehler ersetzt Inhalt nur, wenn es keinen Inhalt gibt. Die Zeilen unter „Nicht verortet"
+   * tragen die einzige Bedienung zum Verorten; fällt eine Lagebild-Quelle aus, während die übrigen
+   * Zeilen im Zwischenspeicher stehen, steht der Fehler als Banner darüber, nicht an ihrer Stelle.
    */
   it('„Nicht verortet": mit Zeilen im Zwischenspeicher bleibt die Liste samt Bedienung stehen', () => {
     const onPlatzierenStart = vi.fn();
@@ -683,8 +647,8 @@ describe('Sidebar Fehler-Slots', () => {
     );
     const platzieren = screen.getAllByRole('button', { name: 'Platzieren' });
     const zeichnen = screen.getByRole('button', { name: 'Fläche zeichnen' });
-    // Positivkontrolle: die Knöpfe stehen und wirken — sonst wäre die Abwesenheit unten
-    // auch dann grün, wenn die Zeilen gar nicht mehr gerendert würden.
+    // Positivkontrolle: die Knöpfe stehen und wirken — sonst wäre die Abwesenheit unten auch grün,
+    // wenn die Zeilen gar nicht gerendert würden.
     expect(platzieren).toHaveLength(2);
     fireEvent.click(platzieren[1]);
     expect(onPlatzierenStart).toHaveBeenCalledWith({ typ: 'schaden', id: 2 });
@@ -711,8 +675,7 @@ describe('Sidebar Fehler-Slots', () => {
       />,
     );
     expect(screen.getByText('Bild-Hintergründe konnten nicht geladen werden')).toBeInTheDocument();
-    // Der Upload hängt nicht an der Leseliste — ihn mit auszublenden nähme eine Fähigkeit weg,
-    // die intakt ist.
+    // Der Upload hängt nicht an der Leseliste und bleibt bedienbar.
     expect(screen.getByText(/Bild hochladen/i)).toBeInTheDocument();
   });
 
@@ -726,10 +689,8 @@ describe('Sidebar Fehler-Slots', () => {
   });
 
   /**
-   * Dieselbe Regel an der zweiten Stelle — hier mit einer eigenen Schärfe: die Bild-Overlays
-   * liegen weiterhin sichtbar auf der KARTE. Verschwindet nur ihre Bedienleiste, bleibt das
-   * Bild liegen und lässt sich nicht mehr abschalten — der Fehler nähme die Fähigkeit weg,
-   * seine eigene Folge zu beheben.
+   * Dieselbe Regel für die Bilder, mit eigener Schärfe: die Overlays liegen weiter auf der Karte.
+   * Verschwände nur ihre Bedienleiste, ließe sich ein Bild nicht mehr abschalten.
    */
   it('„Bild-Hintergründe": mit Bildern im Zwischenspeicher bleibt die Liste bedienbar', () => {
     const onBildToggle = vi.fn();
@@ -754,8 +715,8 @@ describe('Sidebar Fehler-Slots', () => {
   });
 
   it('Ansichts-Switcher: Fehler-Slot statt eines stumm leeren Kopfes', () => {
-    // `AnsichtSwitcher` liefert bei leerer Liste `null` — ein gescheiterter Abruf ist heute
-    // von „noch nicht geladen" nicht zu unterscheiden und damit unsichtbar.
+    // `AnsichtSwitcher` liefert bei leerer Liste `null` — ohne Fehler-Slot wäre ein gescheiterter
+    // Abruf unsichtbar.
     renderMitProviders(
       <Sidebar
         {...basisProps}
@@ -779,9 +740,8 @@ describe('Sidebar Fehler-Slots', () => {
   });
 
   /**
-   * Die Karte „Verortet" bekommt bewusst KEINEN eigenen Fehlerkasten (siehe
-   * `SidebarSektionFehler`), aber ihre Zahlen dürfen trotzdem nicht lügen: eine Zahl ist im
-   * Fehlerfall eine Behauptung über die Lage, die niemand geprüft hat.
+   * „Verortet" hat keinen eigenen Fehlerkasten, aber seine Zahlen dürfen nicht lügen: im Fehlerfall
+   * wären sie eine ungeprüfte Behauptung über die Lage.
    */
   const uhsNord = {
     schluessel: 'uhs-7',
@@ -864,15 +824,9 @@ describe('Sidebar Fehler-Slots', () => {
 });
 
 /**
- * Trefflächenboden der handgebauten Bedienziele (LFH-366 · B5f).
- *
- * Geprüft wird der INLINE-STYLE, nicht ein Pixel: jsdom rechnet kein Layout, und
- * `test/utils.tsx` montiert ein nacktes `ConfigProvider` OHNE unser Theme — eine gerenderte
- * Höhe belegte antd-Vorgaben, nicht die Staffel. Deshalb die reine Funktion gegen die
- * Dichtestufen aus `theme/tokens.ts`.
- *
- * Die Böden stehen als LITERALE da. Aus dem Token zurückgelesen prüften sie den Token gegen
- * sich selbst und blieben grün, egal welche Zahl dort steht.
+ * Trefflächenboden der handgebauten Bedienziele. Geprüft wird die reine Funktion gegen die
+ * Dichtestufen (nacktes `ConfigProvider` in `test/utils.tsx`, kein Layout in jsdom). Die Böden
+ * stehen als Literale da, sonst prüfte der Token sich selbst.
  */
 describe('Sidebar: Bedienziel-Boden der klickbaren Listeneinträge', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({
@@ -888,9 +842,8 @@ describe('Sidebar: Bedienziel-Boden der klickbaren Listeneinträge', () => {
   });
 
   /**
-   * Die eigentliche Aussage: der Wert ZIEHT MIT. Ein festgenagelter Stil bestünde die
-   * Literal-Prüfung oben nicht, ein aus einer Konstante gelesener aber schon — die Ungleichheit
-   * über die Stufen ist das, was eine Verwechslung der Quelle auffliegen ließe.
+   * Der Wert zieht mit — erst die Ungleichheit über die Stufen ließe eine falsche Quelle
+   * auffliegen.
    */
   it('wächst über die Dichtestufen, statt auf einer Stufe zu kleben', () => {
     const hoehen = (['kompakt', 'komfortabel', 'handschuh'] as const).map(
@@ -901,9 +854,8 @@ describe('Sidebar: Bedienziel-Boden der klickbaren Listeneinträge', () => {
   });
 
   /**
-   * ZWEI Angaben, nicht eine (Konvention aus LFH-365): die Polsterung allein trägt den Boden
-   * nicht — sie kommt im Handschuh-Betrieb auf grob 54 px gegen die geforderten 72. Sie muss
-   * trotzdem da sein und ebenfalls mitziehen, sonst klebt der Text an der Kante.
+   * Zwei Angaben: die Polsterung allein trägt den Boden nicht (Handschuh grob 54 statt 72 px), muss
+   * aber mitziehen, sonst klebt der Text an der Kante.
    */
   it('trägt neben der Höhe eine mitziehende Polsterung', () => {
     expect(bedienzielStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
@@ -912,11 +864,9 @@ describe('Sidebar: Bedienziel-Boden der klickbaren Listeneinträge', () => {
 });
 
 /**
- * Schalterzeilen der Leiste dürfen umbrechen (LFH-380).
- *
- * Der Kippschalter ist im Handschuh 144 px breit, die Leiste 300 px. Ob der Umbruch GREIFT,
- * misst `e2e/lagekarte-leiste-dichte.spec.ts` (jsdom rechnet kein Layout). Hier stehen die
- * zwei Voraussetzungen, ohne die er nie greifen könnte — beide als Literale.
+ * Schalterzeilen dürfen umbrechen: der Kippschalter ist im Handschuh 144 px breit, die Leiste 300
+ * px. Ob der Umbruch greift, misst `e2e/lagekarte-leiste-dichte.spec.ts`; hier stehen seine zwei
+ * Voraussetzungen als Literale.
  */
 describe('Sidebar: Umbruchregel der Schalterzeilen (LFH-380)', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({
@@ -937,17 +887,12 @@ describe('Sidebar: Umbruchregel der Schalterzeilen (LFH-380)', () => {
 });
 
 /**
- * Nebenläufigkeit an der Löschbestätigung (Review-Fund G2 zu LFH-366).
+ * Nebenläufigkeit an der Löschbestätigung: die Bildliste kommt live und kann sich ändern, während
+ * die Rückfrage offen steht. Hing der Dialog an `loeschBildId != null`, blieb er stehen, mit leerem
+ * Titel und einem DELETE auf ein verschwundenes Objekt.
  *
- * Die Bildliste kommt über den SSE-Fan-out und kann sich ändern, WÄHREND die Rückfrage
- * offensteht — ein zweiter Bediener entfernt dasselbe Bild. Hing die Sichtbarkeit des Dialogs
- * an `loeschBildId != null`, blieb er stehen, sein Titel fiel auf `Bild „" entfernen?` zurück,
- * und „Entfernen" bot ein DELETE auf ein Objekt an, das es nicht mehr gab.
- *
- * Geprüft wird die REINE FUNKTION, nicht das gerenderte Modal — die Begründung steht bei
- * `loeschDialogBild`: antd löst die Schliess-Animation über `transitionend` auf, das in jsdom
- * nie feuert, also bliebe der Knopf gemessen im Baum und die naheliegende DOM-Zusicherung wäre
- * rot, obwohl die Härtung greift.
+ * Geprüft wird die reine Funktion: antd schließt ein Modal über `transitionend`, das in jsdom nie
+ * feuert — die DOM-Zusicherung wäre rot, obwohl die Härtung greift.
  */
 describe('Sidebar: die Löschbestätigung überlebt ihr Bild nicht', () => {
   const bilder = [
@@ -961,7 +906,7 @@ describe('Sidebar: die Löschbestätigung überlebt ihr Bild nicht', () => {
 
   it('liefert null, sobald das Bild aus der Liste fällt', () => {
     expect(loeschDialogBild(bilder, 1)).not.toBeNull();
-    // Derselbe Zustand nach einem SSE-Update, das genau dieses Bild entfernt hat:
+    // Derselbe Zustand nach einem Live-Update, das genau dieses Bild entfernt hat:
     expect(
       loeschDialogBild(
         bilder.filter((b) => b.id !== 1),
@@ -976,8 +921,8 @@ describe('Sidebar: die Löschbestätigung überlebt ihr Bild nicht', () => {
 });
 
 /**
- * Neuentwurf S5 — die rechte Leiste: Ebenen (Farbfeld · Name · Anzahl, Klick schaltet),
- * Ausgewählt, und die einklappbaren Paneele für alles, was die alte Leiste trug.
+ * Die rechte Leiste: Ebenen (Farbfeld · Name · Anzahl, Klick schaltet), Ausgewählt, und die
+ * einklappbaren Paneele.
  */
 describe('Sidebar: Paneel „Ebenen"', () => {
   const uhs = (id: number) => ({
@@ -1013,7 +958,7 @@ describe('Sidebar: Paneel „Ebenen"', () => {
     expect(screen.getByRole('switch', { name: 'UHS' })).not.toHaveTextContent('1');
   });
 
-  // Ebene „Betroffene" (LFH-648) — die Zeile folgt dem Zugriff, gepaart gegen die Vorgabe.
+  // Ebene „Betroffene" — die Zeile folgt dem Zugriff, gepaart gegen die Vorgabe.
   it('„Betroffene" frei: elfte schaltbare Zeile mit Anzahl; ohne Angabe bleibt es bei zehn', () => {
     const { unmount } = renderMitProviders(<Sidebar {...basisProps} />);
     const gruppe = () => screen.getByRole('group', { name: 'Ebenen ein- und ausblenden' });
@@ -1097,15 +1042,14 @@ describe('Sidebar: Paneel „Ebenen"', () => {
     expect(schaden).toHaveAttribute('aria-checked', 'false');
     fireEvent.click(schaden);
     expect(onLayerToggle).toHaveBeenCalledWith('schaden', true);
-    // Aus: Farbfeld leer. An: gefüllt. Der Zweitkanal ist sichtbar, nicht nur vorgelesen.
+    // Aus: Farbfeld leer, an: gefüllt — der zweite Kanal ist sichtbar.
     const feldAus = schaden.querySelector('[data-lfh="ebenen-farbfeld"]') as HTMLElement;
     const feldAn = screen
       .getByRole('switch', { name: 'UHS' })
       .querySelector('[data-lfh="ebenen-farbfeld"]') as HTMLElement;
     expect(feldAus.style.background).toBe('transparent');
-    // Die Füllung „an" ist ein `color-mix(…)`, den jsdom nicht kennt und still verwirft —
-    // eine Aussage darauf wäre trivial grün. Der Rahmen dagegen trägt in jsdom: an in der
-    // Ebenenfarbe, aus in der Steuerrahmen-Rolle.
+    // Die Füllung „an" ist ein `color-mix(…)`, den jsdom still verwirft. Der Rahmen trägt in jsdom:
+    // an in der Ebenenfarbe, aus in der Steuerrahmen-Rolle.
     expect(feldAn.style.borderColor).not.toBe('');
     expect(feldAn.style.borderColor).not.toBe(feldAus.style.borderColor);
   });
@@ -1196,9 +1140,8 @@ describe('Sidebar: einklappbare Paneele', () => {
 });
 
 /**
- * Suchfeld über „Nicht verortet" (LFH-360). Die Liste ist in einer realen Lage mit vielen
- * frisch eingerückten Einheiten lang, die Leiste aber nur 300 px breit — ab fünf Einträgen
- * findet die Einsatzkraft ihr Objekt schneller über den Namen als über das Scrollen.
+ * Suchfeld über „Nicht verortet": in einer realen Lage ist die Liste lang, die Leiste nur 300 px
+ * breit — ab fünf Einträgen ist Tippen schneller als Scrollen.
  */
 describe('Sidebar „Nicht verortet": Suche (LFH-360)', () => {
   const fuenf: NichtVerortet[] = [
@@ -1252,9 +1195,8 @@ describe('Sidebar „Nicht verortet": Suche (LFH-360)', () => {
   });
 
   /**
-   * Eine Live-Region meldet nur Änderungen an Inhalt, der schon DA war — erschiene sie erst
-   * mit dem ersten Treffer, hörte ein Vorleser den ersten Stand nicht (dieselbe Regel wie die
-   * Leerzustands-Region der Sprungpalette, Review-Befund 7 dort).
+   * Eine Live-Region meldet nur Änderungen an Inhalt, der schon da war — erschiene sie erst mit dem
+   * ersten Treffer, hörte ein Vorleser den ersten Stand nicht.
    */
   it('die Trefferzeile steht mit dem Feld, ohne Suchbegriff leer', () => {
     renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
@@ -1284,7 +1226,7 @@ describe('Sidebar „Nicht verortet": Suche (LFH-360)', () => {
     expect(screen.queryByText('UHS: UHS Nord')).not.toBeInTheDocument();
 
     // Das Fahrzeug ist verortet — vier bleiben, das Feld geht. Ohne Reset verschluckte ein
-    // unsichtbarer Filter jetzt alle vier Einträge.
+    // unsichtbarer Filter alle vier.
     const vier = fuenf.filter((o) => o.typ !== 'fahrzeug');
     rerender(<Sidebar {...basisProps} nichtVerortet={vier} />);
     expect(feld()).not.toBeInTheDocument();

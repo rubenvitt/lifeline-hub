@@ -26,8 +26,8 @@ class FakeEventSource {
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
-// Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
-// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+// Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
+// schreibrecht.test.ts ab.
 const nutzer = {
   id: 1,
   anzeigename: 'Nutzer',
@@ -104,7 +104,7 @@ function render(
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personen/10/audit', () => HttpResponse.json([])),
   );
-  // extra-Handler separat prependen, damit sie Vorrang vor den Default-Handlern haben.
+  // extra-Handler separat voranstellen, damit sie Vorrang vor den Defaults haben.
   if (extra.length > 0) server.use(...extra);
   const client = cacheBehalten
     ? erzeugeQueryClient({
@@ -166,11 +166,8 @@ describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
 });
 
 /**
- * Ladehoheit (LFH-340 · C5, Befund M40).
- *
- * Die Seite setzte beim Öffnen sechs Abfragen ab — Einsatz, Detail, zugeordnete Tiere,
- * zugeordnete Schäden, UHS-Liste und Zugriffs-Audit —, um eine nachgetragene Sichtung zu
- * ermöglichen. Fünf davon speisen Blöcke, die erst nach dem Aufklappen etwas anzeigen.
+ * Ladehoheit: beim Öffnen laufen nur Einsatz und Detail; Tiere, Schäden, UHS-Liste und
+ * Zugriffs-Audit speisen Blöcke, die erst nach dem Aufklappen etwas anzeigen.
  */
 describe('PersonenDetailPage — Ladehoheit', () => {
   /** Pfade der abgesetzten Einsatz-Abfragen, in Reihenfolge. `/auth/me` zählt nicht mit. */
@@ -196,8 +193,7 @@ describe('PersonenDetailPage — Ladehoheit', () => {
   });
 
   /**
-   * Die zweite Hälfte, und ohne sie belegte die erste nichts: „höchstens zwei" wäre auch
-   * grün, wenn die Zuordnungen gar nicht mehr lüden.
+   * Die zweite Hälfte: „höchstens zwei" wäre auch grün, wenn die Zuordnungen gar nicht mehr lüden.
    */
   it('lädt die Zuordnungen erst beim Aufklappen', async () => {
     const { pfade, loesen } = zaehleAbfragen();
@@ -233,19 +229,11 @@ describe('PersonenDetailPage — Ladehoheit', () => {
   });
 });
 
+/** Kopfleiste: genau eine Primäraktion, alles Weitere im Menü. */
 /**
- * Kopfleiste (LFH-340 · C5, Befund M37).
- *
- * Der Kopf trug sieben gleichrangige Knöpfe — bis zu vier Statuswechsel, Bearbeiten,
- * Stornieren und ein „Zurück zur Liste" neben dem Breadcrumb — und **keine** Primäraktion.
- * Es gab also nichts, was sagte, was hier zu tun ist.
- */
-/**
- * Das Menü der Kopfleiste öffnen und den Eintragsknoten des GEÖFFNETEN Portals liefern.
- *
- * `.ant-dropdown:not(.ant-dropdown-hidden)` ist Pflicht, nicht Zierde: antd lässt die
- * Portale geschlossener Dropdowns im Baum stehen, ein blankes `[role="menu"]` fände also
- * auch abgeräumte Menüs.
+ * Das Menü der Kopfleiste öffnen und den Eintragsknoten des geöffneten Portals liefern.
+ * `.ant-dropdown:not(.ant-dropdown-hidden)` ist Pflicht: antd lässt die Portale geschlossener
+ * Dropdowns im Baum stehen.
  */
 async function oeffneKopfmenue(): Promise<HTMLElement> {
   await userEvent.click(await screen.findByRole('button', { name: /Weitere Aktionen/ }));
@@ -261,9 +249,8 @@ async function ausMenue(name: RegExp) {
 }
 
 /**
- * Den Zuordnungs-Abschnitt aufklappen. Seit LFH-340 · C5 (Befund M40) liegen Tiere, Schäden
- * und UHS-Verortung eingeklappt und laden erst dann — jeder Test, der einen dieser Blöcke
- * greift, muss ihn vorher öffnen. Ohne `forceRender` sind sie vorher gar nicht im Baum.
+ * Den Zuordnungs-Abschnitt aufklappen: Tiere, Schäden und UHS-Verortung liegen eingeklappt und
+ * laden erst dann. Ohne `forceRender` sind sie vorher nicht im Baum.
  */
 async function klappeZuordnungenAuf() {
   await screen.findByRole('heading', { name: /Person R-001/ });
@@ -272,9 +259,8 @@ async function klappeZuordnungenAuf() {
 
 describe('PersonenDetailPage — Kopfleiste', () => {
   /**
-   * Die Primärknöpfe IM KOPF — über die Marke des Primitivs eingegrenzt, nicht global
-   * gezählt. Global wäre die Aussage falsch: der Verlauf trägt ein Notiz-Formular, dessen
-   * Absende-Knopf zu Recht primär ist und mit der Kopfleiste nichts zu tun hat.
+   * Die Primärknöpfe im Kopf — über die Marke des Primitivs eingegrenzt, nicht global: der Verlauf
+   * trägt ein Notiz-Formular, dessen Absende-Knopf zu Recht primär ist.
    */
   function kopfPrimaeraktionen(): HTMLElement[] {
     const kopf = document.querySelector('[data-lfh="seitenkopf-aktionen"]');
@@ -304,12 +290,11 @@ describe('PersonenDetailPage — Kopfleiste', () => {
   it('bündelt die Statuswechsel im Menü und lässt „Zurück zur Liste" weg', async () => {
     render(einsatzAktiv, detail);
     await screen.findByRole('heading', { name: /Person R-001/ });
-    // Der Breadcrumb trägt den Rückweg — ein zweiter Knopf daneben ist eine Aktion ohne Anlass.
+    // Der Breadcrumb trägt den Rückweg — ein zweiter Knopf daneben wäre eine Aktion ohne Anlass.
     expect(screen.queryByRole('button', { name: 'Zurück zur Liste' })).not.toBeInTheDocument();
     /**
-     * Die belastbare Negativaussage ist „KEIN direkter Knopf", nicht „kein Eintrag":
-     * rc-dropdown mountet sein Portal lazy, ein `queryByRole('menuitem')` vor dem ersten
-     * Öffnen ist immer `null` und färbte einen reinen Rollentausch trivial grün.
+     * Die belastbare Negativaussage ist „kein direkter Knopf", nicht „kein Eintrag": rc-dropdown
+     * mountet sein Portal lazy, `queryByRole('menuitem')` vor dem ersten Öffnen ist immer `null`.
      */
     expect(screen.queryByRole('button', { name: '→ vermisst' })).not.toBeInTheDocument();
     const menue = await oeffneKopfmenue();
@@ -318,10 +303,9 @@ describe('PersonenDetailPage — Kopfleiste', () => {
   });
 
   /**
-   * Der Abstand zwischen „Rot" und dem Rest (LFH-363). `aktionsabstand.guard.test.ts` kann
-   * das hier NICHT prüfen: sein Scanner matcht `<Button` mit `danger` im Tag und sieht einen
-   * `danger`-MENÜEINTRAG nicht. Die Datei gehört deshalb in keine seiner beiden Listen —
-   * geprüft wird stattdessen genau hier, dass das Löschen hinter einem Trenner steht.
+   * Der Abstand zwischen „Rot" und dem Rest: `aktionsabstand.guard.test.ts` sieht einen
+   * `danger`-Menüeintrag nicht (sein Scanner matcht `<Button` mit `danger`). Geprüft wird hier,
+   * dass das Löschen hinter einem Trenner steht.
    */
   it('trennt „Stornieren" durch einen Menü-Trenner vom Rest', async () => {
     render(einsatzAktiv, detail);
@@ -366,7 +350,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
     await userEvent.click(within(menue).getByRole('menuitem', { name: /verstorben/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent(/verstorben/i);
-    // Die tragende Hälfte: bis zur Bestätigung ist NICHTS passiert.
+    // Die tragende Hälfte: bis zur Bestätigung ist nichts passiert.
     expect(gerufen.status).toBeUndefined();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Status setzen' }));
     await vi.waitFor(() => expect(gerufen.status).toBe('verstorben'));
@@ -400,8 +384,8 @@ describe('PersonenDetailPage — med. Verlauf', () => {
         );
       }),
     ]);
-    // Seit LFH-340 · C5 ist das die PRIMÄRAKTION des Kopfes, und sie heißt bei einer
-    // ungesichteten Person „Sichten" — „Re-Sichten" wäre für die erste Sichtung falsch.
+    // Die Primäraktion des Kopfes heißt bei einer ungesichteten Person „Sichten" — „Re-Sichten"
+    // wäre für die erste Sichtung falsch.
     await userEvent.click(await screen.findByRole('button', { name: 'Sichten' }));
     await userEvent.click(await screen.findByRole('combobox', { name: /Kategorie/ }));
     await userEvent.click(await screen.findByText('SK II'));
@@ -506,7 +490,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), [mitVerlauf, anderePerson]);
     });
 
-    // Statuswechsel liegen seit LFH-340 · C5 im Kopfmenü, nicht als eigener Knopf.
+    // Statuswechsel liegen im Kopfmenü, nicht als eigener Knopf.
     await ausMenue(/vermisst/);
     await vi.waitFor(() => {
       const optimistisch = client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10));
@@ -592,7 +576,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), [detail]);
     });
 
-    // Statuswechsel liegen seit LFH-340 · C5 im Kopfmenü, nicht als eigener Knopf.
+    // Statuswechsel liegen im Kopfmenü, nicht als eigener Knopf.
     await ausMenue(/vermisst/);
     await vi.waitFor(() => {
       expect(client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10))?.status).toBe('vermisst');
@@ -646,9 +630,8 @@ describe('PersonenDetailPage — Stammdaten', () => {
   });
 
   it('Einsatzleitung kann bearbeiten und speichern', async () => {
-    // Robust: kein getByLabelText (antd Form bindet label/htmlFor nicht zuverlässig).
-    // Edit-Modus öffnen, das mit initialValues={p} vorbefüllte Formular direkt speichern
-    // und den PATCH-Aufruf verifizieren.
+    // Kein getByLabelText (antd Form bindet label/htmlFor nicht zuverlässig): Edit-Modus öffnen,
+    // das mit initialValues={p} vorbefüllte Formular direkt speichern und den PATCH prüfen.
     let gesendet = false;
     render(einsatzAktiv, detail, [
       http.patch('/api/einsaetze/1/personen/10', async () => {
@@ -711,16 +694,16 @@ describe('PersonenDetailPage — Stammdaten', () => {
     // Konfliktdialog erscheint statt eines stillen Overwrites.
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
     await vi.waitFor(() => expect(koerper).toHaveLength(2));
-    // Erster Request trug den beim Laden gelesenen Stand; der Overwrite bewusst nicht.
+    // Der erste Request trug den beim Öffnen gelesenen Stand; der Overwrite bewusst nicht.
     expect(koerper[0].basis_geaendert_at).toBe('2026-05-27 09:00:00');
     expect(koerper[1].basis_geaendert_at).toBeUndefined();
   });
 
   it('ein zweiter 409 auf den Overwrite zeigt die Servermeldung statt erneut den Dialog (LFH-351)', async () => {
     // Die Personen-Route kennt einen zweiten 409, der kein CAS-Konflikt ist: `fordere_aktiv`
-    // („Einsatz ist abgeschlossen und schreibgeschützt") greift VOR der CAS-Prüfung und lässt
-    // sich per `overwrite` nicht umgehen. Ohne den `!v.overwrite`-Zweig öffnete jeder
-    // Overwrite denselben Dialog erneut — die echte Servermeldung käme nie.
+    // („Einsatz ist abgeschlossen und schreibgeschützt") greift vor der CAS-Prüfung und lässt sich
+    // per `overwrite` nicht umgehen. Ohne den `!v.overwrite`-Zweig öffnete jeder Overwrite
+    // denselben Dialog erneut.
     const koerper: Array<Record<string, unknown>> = [];
     render(einsatzAktiv, detail, [
       http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
@@ -735,8 +718,8 @@ describe('PersonenDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
     await vi.waitFor(() => expect(koerper).toHaveLength(2));
-    // Die Servermeldung belegt den else-Zweig (`fehler`); ein zweiter Dialog wäre das Rennen
-    // aus H65, dessen einziger Ausweg „Neu laden" ist.
+    // Die Servermeldung belegt den else-Zweig (`fehler`); ein zweiter Dialog wäre eine Schleife,
+    // deren einziger Ausweg „Neu laden" ist.
     expect(
       await screen.findByText('Einsatz ist abgeschlossen und schreibgeschützt'),
     ).toBeInTheDocument();
@@ -831,7 +814,7 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
     expect(await screen.findByText(/Zugeordnete Tiere/i)).toBeInTheDocument();
     expect(await screen.findByText(/T-007/)).toBeInTheDocument();
     expect(screen.getByText(/Rex/)).toBeInTheDocument();
-    // Klick auf den Tier-Tag deeplinkt auf die Tier-Detail-Vollseite (LFH-147), nicht mehr auf die Liste.
+    // Klick auf den Tier-Tag deeplinkt auf die Tier-Detail-Vollseite, nicht auf die Liste.
     await userEvent.click(screen.getByText(/Rex/));
     expect(await screen.findByText('TIERE-DETAIL')).toBeInTheDocument();
   });
@@ -912,9 +895,9 @@ describe('PersonenDetailPage — Robustheit', () => {
   });
 });
 
-// LFH-152: Gegenrichtung zum UHS-Grundriss — Person von ihrer Detailseite aus einer
-// UHS/einem Platz zuweisen (eintritt/wechsel), austragen (austritt); art spiegelt die
-// belegMut-Logik des Grundrisses (aktuelle_uhs_id ? 'wechsel' : 'eintritt').
+// Gegenrichtung zum UHS-Grundriss: Person von ihrer Detailseite aus einer UHS/einem Platz zuweisen
+// (eintritt/wechsel) und austragen (austritt); art spiegelt die belegMut-Logik des Grundrisses
+// (aktuelle_uhs_id ? 'wechsel' : 'eintritt').
 const uhsListe = [
   {
     id: 5,
@@ -1072,9 +1055,9 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
   });
 });
 
-// LFH-151: Von der Personen-Seite aus Tiere (Halter) / Schäden (Geschädigte) zuweisen + lösen.
-// Der Picker bietet nur FREIE Ziele (kein Halter/Geschädigter, nicht storniert/abgeschlossen);
-// Zuweisen setzt die FK + leert die konkurrierenden XOR-Slots im selben PATCH (PATCH-XOR).
+// Von der Personen-Seite aus Tiere (Halter) / Schäden (Geschädigte) zuweisen und lösen. Der Picker
+// bietet nur freie Ziele; Zuweisen setzt die FK und leert die konkurrierenden XOR-Slots im selben
+// PATCH.
 const freiesTier = {
   id: 40,
   einsatz_id: 1,
@@ -1418,7 +1401,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     expect(screen.getByLabelText('vermisst seit')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await vi.waitFor(() => expect(koerper).toHaveLength(1));
-    // Unverändert: KEIN Key — auch kein `null`, das wäre ein 400.
+    // Unverändert: kein Key — auch kein `null`, das wäre ein 400.
     expect(koerper[0]).not.toHaveProperty('vermisst_seit');
   });
 });

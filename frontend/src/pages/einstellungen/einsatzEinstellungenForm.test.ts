@@ -15,13 +15,9 @@ import {
 import type { EinsatzEinstellungen } from '../../api/types';
 
 /**
- * Fixture mit AUSSCHLIESSLICH unterscheidbaren Nicht-null-Werten.
- *
- * Das ist keine Bequemlichkeit, sondern die Bedingung dafür, dass der `toEqual` unten
- * überhaupt etwas aussagt: `expect({a:1}).toEqual({a:1, b:undefined})` ist in Vitest grün,
- * ein fehlender Schlüssel liest sich also wie `undefined`. Eine Fixture aus lauter `null`
- * (wie `VERHALTEN_DEFAULTS` im Bestandstest der Seite) macht denselben Vergleich grün,
- * obwohl drei Felder unterwegs verloren gingen — genau der Fehler, den dieser Test fangen soll.
+ * Fixture mit ausschließlich unterscheidbaren Nicht-null-Werten: `expect({a:1}).toEqual({a:1,
+ * b:undefined})` ist in Vitest grün — mit lauter `null` bliebe der Vergleich auch bei verlorenen
+ * Feldern grün.
  */
 const VOLL = {
   einsatz_id: 1,
@@ -78,9 +74,8 @@ describe('zuUpdate', () => {
   });
 
   it('haelt die Karten-Defaults fest (LFH-319) — der Vollersatz-PUT nullt sie sonst', () => {
-    // Namentlich, weil diese drei Felder als EINZIGE in keiner Sektion sichtbar sind: sie
-    // leben seit LFH-319 auf der Lagekarte. Ein Leser, der die Sektionen durchgeht, findet
-    // keinen Grund für sie — der Test ist der Grund.
+    // Namentlich, weil diese drei Felder in keiner Sektion sichtbar sind (sie leben auf der
+    // Lagekarte) — der Test ist der Grund, warum sie mitfahren.
     const u = zuUpdate(VOLL);
     expect(u.basemap_modus).toBe('offline');
     expect(u.karten_zoom_start).toBe(12);
@@ -93,10 +88,8 @@ describe('zuUpdate', () => {
   });
 
   it('haelt „erbt Org-Standard" fuer auto_etb als null fest, nicht als true', () => {
-    // Die Einsatz-Ebene ist DREIwertig (null = erbt Org, 0 = Aus, sonst An); die Org-Ebene
-    // ist zweiwertig und rechnet `!== 0`, was null zu `true` machte. Wer die Org-Zeile
-    // hierher kopiert, verwandelt ein „erbt Org" beim Speichern einer FREMDEN Sektion still
-    // in ein explizites „An" — ohne Fehlerbild.
+    // Die Einsatz-Ebene ist dreiwertig (null = erbt Org, 0 = Aus, sonst An). Die Org-Formel `!== 0`
+    // machte aus „erbt Org" beim Speichern einer fremden Sektion still ein „An".
     const erbt = { ...VOLL, auto_etb_eintraege: null } as unknown as EinsatzEinstellungen;
     expect(zuUpdate(erbt).auto_etb_eintraege).toBeNull();
     expect(
@@ -124,9 +117,8 @@ describe('zuUpdate', () => {
 
 describe('Vollersatz-Merge ueber die Sektionsgrenze', () => {
   it('laesst die fremden Sektionen als Bestandswert mitfahren', () => {
-    // Der eigentliche Vertrag dieses Moduls: eine Sektion schickt IHRE Felder, alle anderen
-    // fahren aus dem geladenen Stand mit. Ohne das nullt ein Speichern in „Aufbewahrung"
-    // die Nummernkreise — stumm, ohne roten Test und ohne Fehlerbild.
+    // Der Vertrag des Moduls: eine Sektion schickt ihre Felder, alle anderen fahren aus dem
+    // geladenen Stand mit.
     const payload = {
       ...zuUpdate(VOLL),
       ...normalisiereAufbewahrung({ retention_dauer_tage: 365 }),
@@ -250,8 +242,7 @@ describe('initial* (Umkehr fuer die Formularvorbelegung)', () => {
 
 describe('feldrasterStil', () => {
   it('schaltet erst auf zwei Spalten um — die Ungleichheit ist die Aussage', () => {
-    // Ein dichte-/breitenblinder Festwert faellt nur ueber den Vergleich beider Zustaende
-    // auf; „ist ein Grid" allein waere in beiden Faellen wahr.
+    // Ein breitenblinder Festwert fällt nur über den Vergleich beider Zustände auf.
     expect(feldrasterStil(false, 16).gridTemplateColumns).toBe('1fr');
     expect(feldrasterStil(true, 16).gridTemplateColumns).toBe('1fr 1fr');
     expect(feldrasterStil(true, 16).columnGap).toBe(16);

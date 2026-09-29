@@ -14,9 +14,9 @@ export type ZeichenModus = 'polygon' | 'linie';
 const MODUS_NAME: Record<ZeichenModus, string> = { polygon: 'polygon', linie: 'linestring' };
 
 /**
- * Stand der laufenden Figur (LFH-712). EIN Wert, aus dem „Abschließen", „Letzten Punkt zurück"
- * und der Punktzähler der Steuerung gelesen werden — zwei getrennte Meldewege für denselben
- * Zustand wären genau die Stelle, an der Zähler und Knopf auseinanderliefen.
+ * Stand der laufenden Figur. Ein Wert, aus dem „Abschließen", „Letzten Punkt zurück" und der
+ * Punktzähler gelesen werden — zwei Meldewege für denselben Zustand ließen Zähler und Knopf
+ * auseinanderlaufen.
  */
 export interface ZeichenStand {
   /** Fest gesetzte Punkte der laufenden Figur, wie terra-draw sie hält. */
@@ -38,8 +38,8 @@ export interface Zeichnung {
   /** Zuletzt gesetzten Punkt zurücknehmen; false, wenn es nichts zurückzunehmen gibt. */
   punktZurueck: () => boolean;
   /**
-   * Angefangene Figur verwerfen und im selben Modus weiterzeichnen (erste Esc-Stufe, LFH-712).
-   * Außerhalb des Zeichnens wirkungslos.
+   * Angefangene Figur verwerfen und im selben Modus weiterzeichnen (erste Esc-Stufe). Außerhalb des
+   * Zeichnens wirkungslos.
    */
   verwerfen: () => void;
 }
@@ -53,34 +53,28 @@ export function createZeichnung(
   onFertig: (geometrie: GeoJsonGeometry) => void,
   onStandAendern: (stand: ZeichenStand) => void = () => {},
   /**
-   * Präfix der Sources/Layer, die der Adapter auf der Karte anlegt. Auf EINER Karte leben
-   * drei terra-draw-Instanzen (Abschnitt, Zone, Messen); mit dem gemeinsamen Vorgabe-Präfix
-   * „td" legte die zweite `td-polygon` an, solange die erste es noch hielt, und MapLibre warf
-   * „Source … already exists" (gemessen im Browser, Review LFH-616). Jede Instanz trägt
-   * deshalb ihren eigenen.
+   * Präfix der Sources/Layer, die der Adapter anlegt. Auf einer Karte leben drei
+   * terra-draw-Instanzen (Abschnitt, Zone, Messen); mit gemeinsamem Präfix legte die zweite
+   * `td-polygon` an, solange die erste es hielt, und MapLibre warf „Source … already exists". Jede
+   * Instanz trägt deshalb ihren eigenen.
    */
   praefix = 'td-zeichnen',
 ): Zeichnung {
-  // Esc gehört der Seite, nicht terra-draw (LFH-712, design.md D2): genau EIN Ort entscheidet,
-  // was die Taste beim Zeichnen tut. terra-draw bricht per Vorgabe auf `keyup` am Canvas ab,
-  // also nur mit Fokus auf der Karte und dann still. Gemessen: der `keydown`-Zuhörer der Seite
-  // verwirft ohnehin zuerst, die Zweistufigkeit hängt NICHT an dieser Option — sie verhindert,
-  // dass terra-draw verwirft, wo die Seite die Taste bewusst liegen lässt. `finish` bleibt
-  // Enter: `abschliessen()` löst den Abschluss über genau diese Taste aus.
-  // (`messZeichnung.ts` behält das terra-draw-Esc bewusst — dort endet ein Blick, kein Entwurf.)
+  // Esc gehört der Seite, nicht terra-draw (LFH-712): genau ein Ort entscheidet, was die Taste beim
+  // Zeichnen tut. terra-draw bricht per Vorgabe auf `keyup` am Canvas ab, also nur mit Fokus auf
+  // der Karte und still; die Option verhindert, dass es verwirft, wo die Seite die Taste bewusst
+  // liegen lässt. `finish` bleibt Enter: `abschliessen()` löst den Abschluss über diese Taste aus.
+  // (`messZeichnung.ts` behält das terra-draw-Esc: dort endet ein Blick, kein Entwurf.)
   const keyEvents = { cancel: null, finish: 'Enter' };
-  // Hinweis: terra-draw-maplibre-gl-adapter@1.x nimmt KEIN `lib` — er importiert maplibre-gl gar
-  // nicht, sondern duck-typed gegen die übergebene Map-Instanz (sein einziger maplibre-Import ist
-  // type-only, und er fasst das Event-System der Map nie an; seine Listener hängen am Canvas-DOM).
-  // Daher der lose Peer-Range `>=4`, daher kein Dual-Instance-Risiko — und daher überstand er den
-  // Sprung auf maplibre 6 unverändert.
+  // terra-draw-maplibre-gl-adapter@1.x nimmt kein `lib`: er duck-typed gegen die übergebene
+  // Map-Instanz (sein maplibre-Import ist type-only, seine Listener hängen am Canvas-DOM). Daher
+  // der lose Peer-Range `>=4` und kein Dual-Instance-Risiko.
   const draw = new TerraDraw({
     adapter: new TerraDrawMapLibreGLAdapter({ map, prefixId: praefix }),
     modes: [new TerraDrawPolygonMode({ keyEvents }), new TerraDrawLineStringMode({ keyEvents })],
-    // Ohne `modeLevel` legt TerraDraw seinen Undo-Koordinator gar nicht erst an und `undo()`
-    // liefert KONSTANT false (LFH-344, im Bundle gemessen). „Letzten Punkt zurück" wäre tot,
-    // ohne dass irgendetwas rot würde — deshalb prüft der Test die Option am Konstruktor.
-    // `keyboardShortcuts` bleibt weg: Strg/⌘+Z ist nicht Teil von LFH-712, der Knopf ist der Weg.
+    // Ohne `modeLevel` legt TerraDraw keinen Undo-Koordinator an, und `undo()` liefert konstant
+    // false — „Letzten Punkt zurück" wäre still tot, deshalb prüft der Test die Option am
+    // Konstruktor. `keyboardShortcuts` bleibt weg: der Knopf ist der Weg.
     undoRedo: { modeLevel: new TerraDrawModeUndoRedo() },
   });
   const canvas = map.getCanvas();
@@ -106,13 +100,11 @@ export function createZeichnung(
     onStandAendern(stand);
   };
 
-  // Die Punktzahl kommt aus terra-draw selbst (LFH-712, Review): jeder fest gesetzte Punkt
-  // liegt auf dem Undo-Stapel des Modus, und `history` meldet dessen Größe — auch beim
-  // Zurücknehmen. Bis dahin zählte der Adapter DOM-Klicks. Die laufen aber an terra-draw
-  // vorbei: terra-draw setzt auf `pointerup` mit eigenen Ziehschwellen, MapLibre unterdrückt den
-  // Klick ab 3 px Bewegung. Ein Mikro-Ziehen am Tablet ergab so „1 Punkt" für eine leere Figur,
-  // und „Letzten Punkt zurück" stand frei, ohne etwas zu tun. Der Snapshot taugt als Quelle
-  // nicht: er enthält während des Zeichnens den beweglichen Vorschaupunkt.
+  // Die Punktzahl kommt aus terra-draw selbst: jeder fest gesetzte Punkt liegt auf dem Undo-Stapel
+  // des Modus, `history` meldet dessen Größe, auch beim Zurücknehmen. DOM-Klicks taugen nicht:
+  // terra-draw setzt auf `pointerup` mit eigenen Ziehschwellen, MapLibre unterdrückt den Klick ab 3
+  // px — ein Mikro-Ziehen ergab „1 Punkt" für eine leere Figur. Der Snapshot taugt auch nicht: er
+  // enthält den beweglichen Vorschaupunkt.
   draw.on('history', (e) => {
     if (!aktiv || e.stack !== 'mode') return;
     punkte = e.undoSize;
@@ -137,9 +129,8 @@ export function createZeichnung(
     } else if (f && f.geometry.type === 'LineString') {
       onFertig({ type: 'LineString', coordinates: f.geometry.coordinates as number[][] });
     }
-    // Kein sofortiges removeFeatures mehr: der abgeschlossene Entwurf bleibt sichtbar, bis
-    // die App das Zeichnen beendet (`stoppen()` räumt via `draw.clear()` auf) — nötig, damit
-    // die Speicher-Bestätigung die Geometrie zeigt (LFH-145).
+    // Der abgeschlossene Entwurf bleibt sichtbar, bis die App das Zeichnen beendet (`stoppen()`
+    // räumt via `draw.clear()`), damit die Speicher-Bestätigung die Geometrie zeigt.
   });
   return {
     starten: (modus) => {
@@ -167,24 +158,23 @@ export function createZeichnung(
     },
     abschliessen: () => {
       if (!aktiv || punkte < mindestPunkte()) return false;
-      // terra-draw hat keine öffentliche finish()-API. Der native Abschluss läuft über die
-      // Finish-Taste (default 'Enter'); terra-draw registriert seine Key-Listener auf dem
-      // Karten-Canvas. Der Event-Zähler belegt zusätzlich, ob die synchrone Geste wirklich
-      // ein finish-Event erzeugt hat.
+      // terra-draw hat keine öffentliche finish()-API; der Abschluss läuft über die Finish-Taste
+      // (Enter), deren Listener am Karten-Canvas hängen. Der Event-Zähler belegt, ob die synchrone
+      // Geste wirklich ein finish-Event erzeugt hat.
       const vorher = fertigZaehler;
       canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       canvas.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
       return fertigZaehler > vorher;
     },
     punktZurueck: () => {
-      // `undo()` WIRFT bei gestopptem TerraDraw ("Terra Draw is not enabled"), statt false zu
-      // liefern (LFH-344, im Bundle gemessen) — deshalb der `enabled`-Riegel davor. Ohne
-      // eigenen Punkt wird terra-draw gar nicht erst gefragt.
+      // `undo()` wirft bei gestopptem TerraDraw ("Terra Draw is not enabled"), statt false zu
+      // liefern — deshalb der `enabled`-Riegel. Ohne eigenen Punkt wird terra-draw gar nicht
+      // gefragt.
       if (!aktiv || !draw.enabled || punkte === 0) return false;
       const vorher = punkte;
       if (!draw.undo()) return false;
-      // `history` meldet den neuen Stand in der Regel synchron aus `undo()` heraus. Bleibt die
-      // Meldung aus, wird hier nachgezogen, damit der Knopf nicht auf dem alten Stand stehen bleibt.
+      // `history` meldet den neuen Stand meist synchron aus `undo()`. Bleibt die Meldung aus, wird
+      // nachgezogen, damit der Knopf nicht auf dem alten Stand stehen bleibt.
       if (punkte === vorher) punkte = vorher - 1;
       melde();
       return true;

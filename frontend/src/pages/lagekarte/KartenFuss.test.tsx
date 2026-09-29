@@ -3,10 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { KartenFuss, bandStil, fussStil, FUSS_ABSTAND } from './KartenFuss';
 
 /**
- * LFH-355. Geprüft wird die STRUKTUR, aus der die Zusicherung folgt — nicht ein Pixel:
- * jsdom rechnet kein Layout, eine Messung wäre hier nicht widerlegbar. Dass sich die
- * Bänder im Browser tatsächlich nicht überlagern (auch bei 390 px), misst
- * `e2e/lagekarte-smoke.spec.ts` mit echten Bounding-Boxen.
+ * Geprüft wird die Struktur, aus der die Zusicherung folgt, nicht ein Pixel. Dass sich die Bänder
+ * im Browser nicht überlagern, misst `e2e/lagekarte-smoke.spec.ts`.
  */
 describe('KartenFuss — Rahmen', () => {
   it('stapelt seine Bänder als Spalte am unteren Kartenrand', () => {
@@ -20,11 +18,8 @@ describe('KartenFuss — Rahmen', () => {
   });
 
   /**
-   * LFH-373: der Fuß endet rechts VOR der Knopfspalte. Gemessen vor dem Fix: bei 390 px im
-   * Handschuh-Betrieb lagen drei Kartenknöpfe vollständig unter dem Zeitachsenband. Die Zahl
-   * ist Rand des Knopfblocks + Kante + Abstand; als Literale, damit die Zusicherung nicht die
-   * Rechnung gegen sich selbst prüft. Ob sich die beiden im Browser wirklich nicht
-   * überschneiden, misst `e2e/fokus-verdeckung.spec.ts` (Lagekarte).
+   * Der Fuß endet rechts vor der Knopfspalte. Die Zahl ist Rand des Knopfblocks + Kante + Abstand,
+   * als Literal. Die Überschneidung im Browser misst `e2e/fokus-verdeckung.spec.ts`.
    */
   it.each([
     [32, 56],
@@ -38,10 +33,8 @@ describe('KartenFuss — Rahmen', () => {
   );
 
   /**
-   * LFH-713: oben endet der Fuß an der Karte. Unten verankert und ohne Obergrenze ragte er bei
-   * 390 px (offene Leiste, Zeichen-Steuerung, ausgeklappte Zeitachse) 50 px in den Seitenkopf.
-   * Dass er im Browser wirklich in der Karte bleibt und per Finger rollt, misst
-   * `e2e/lagekarte-touch.spec.ts`.
+   * Oben endet der Fuß an der Karte; unten verankert ohne Obergrenze ragte er in den Seitenkopf.
+   * Das Rollen per Finger misst `e2e/lagekarte-touch.spec.ts`.
    */
   it('reicht bis zur Oberkante der Karte, stapelt nach unten und schneidet nichts ab', () => {
     const stil = fussStil(32);
@@ -59,7 +52,7 @@ describe('KartenFuss — Rahmen', () => {
   });
 
   it('lässt die Karte darunter bedienbar — der Rahmen selbst nimmt keine Zeiger an', () => {
-    // Die Gegenzeile dazu steht in `bandStil`: ohne sie wäre jedes Band sichtbar und tot.
+    // Die Gegenzeile steht in `bandStil`: ohne sie wäre jedes Band sichtbar und tot.
     expect(fussStil(32).pointerEvents).toBe('none');
   });
 
@@ -96,8 +89,8 @@ describe('KartenFuss — bandStil', () => {
   });
 
   it('positioniert NICHT selbst — das ist die ganze Aussage von LFH-355', () => {
-    // Ein Band, das wieder `position: absolute` mitbrächte, wäre aus dem Fluss und könnte
-    // das Nachbarband erneut verdecken. Der Stil darf diese Tür nicht selbst aufmachen.
+    // Ein Band mit `position: absolute` wäre aus dem Fluss und könnte das Nachbarband wieder
+    // verdecken.
     for (const a of ['voll', 'mitte', 'links'] as const) {
       expect(bandStil(a).position).toBeUndefined();
       expect(bandStil(a).zIndex).toBeUndefined();

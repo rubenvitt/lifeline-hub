@@ -72,9 +72,8 @@ describe('SchadenVorschau (LFH-664)', () => {
   });
 
   /**
-   * Warmes Fach → kein Abruf. Der Schaden trägt eine Koordinate: auf der Seite hinge daran die
-   * Ort-Zeile mit eigenem Serverabruf. Die Vorschau lässt sie weg — ein Abruf dorthin liefe
-   * hier ohne Handler in `onUnhandledRequest: 'error'` und färbte den Test rot.
+   * Warmes Fach → kein Abruf. Die Koordinate löste auf der Seite die Ort-Zeile mit eigenem Abruf
+   * aus; die Vorschau lässt sie weg, sonst liefe der Abruf hier in `onUnhandledRequest: 'error'`.
    */
   it('liest den geladenen Stand ohne Abruf, auch mit Koordinate', async () => {
     const abrufe = liefereListe([]);

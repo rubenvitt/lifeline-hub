@@ -11,10 +11,9 @@ import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import EtbDruckPage from './EtbDruckPage';
 
 /**
- * ETB-Druckansicht (LFH-22, design.md D5): die Papierform des Einsatztagebuchs. Geprüft
- * werden die Zusicherungen, die ein Ausdruck als Beweisunterlage tragen muss —
- * Vollständigkeit, Ordnung nach Nummer, Nachträge, Berichtigungen in beiden Richtungen,
- * Zeiten in der Org-Zone — und dass ein unvollständiger Stand nicht druckbar ist.
+ * ETB-Druckansicht (LFH-22, design.md D5): die Zusicherungen einer Beweisunterlage —
+ * Vollständigkeit, Ordnung nach Nummer, Nachträge, Berichtigungen in beiden Richtungen, Zeiten in
+ * der Org-Zone — und dass ein unvollständiger Stand nicht druckbar ist.
  */
 
 const EINSATZ = {
@@ -63,9 +62,9 @@ function tagebuch(alle: ReturnType<typeof eintrag>[]) {
 }
 
 /**
- * Anzeigezone der Tests: Asia/Tokyo, bewusst NICHT die Gate-Zone. `check-all.sh` und die CI
- * setzen `TZ=Europe/Berlin`; mit Berlin als Org-Zone wäre jede Zeitaussage auch dann grün,
- * wenn die Seite die Org-Zone verlöre und in Maschinenzeit formatierte (Review Welle B).
+ * Anzeigezone der Tests: Asia/Tokyo, bewusst nicht die Gate-Zone. `check-all.sh` und die CI setzen
+ * `TZ=Europe/Berlin`; mit Berlin als Org-Zone wäre jede Zeitaussage auch grün, wenn die Seite in
+ * Maschinenzeit formatierte.
  */
 const ZONE = 'Asia/Tokyo';
 
@@ -185,9 +184,8 @@ describe('EtbDruckPage', () => {
   });
 
   /**
-   * Spec „Unbrauchbarer Filter in der Adresse": ein unbekannter Typ fällt GANZ weg — er wird
-   * weder an den Server gereicht noch im Kopf als Auswahl genannt. Auf Seitenebene belegt,
-   * nicht am Parser (der Parser-Fall steht in `deeplinks.test.ts` bei `parseEtbFilter`).
+   * Ein unbekannter Typ in der Adresse fällt ganz weg — weder an den Server noch im Kopf. Auf
+   * Seitenebene belegt; den Parser-Fall prüft `deeplinks.test.ts`.
    */
   it('verwirft einen unbekannten Typ aus der Adresse: kein `typ` am Server, „vollständiges Tagebuch" im Kopf', async () => {
     const typen: (string | null)[] = [];
@@ -210,12 +208,12 @@ describe('EtbDruckPage', () => {
   });
 
   /**
-   * Wer die Druckansicht verlässt und innerhalb der Cache-Frist (5 min) wieder öffnet,
-   * bekommt den AKTUELLEN Stand, nicht den Schnappschuss des letzten Besuchs. Schnappschuss
-   * heißt: keine stille Ergänzung einer OFFENEN Ansicht — nicht: alte Daten beim Öffnen.
+   * Wer die Druckansicht innerhalb der Cache-Frist wieder öffnet, bekommt den aktuellen Stand.
+   * Schnappschuss heißt: keine stille Ergänzung einer offenen Ansicht, nicht: alte Daten beim
+   * Öffnen.
    *
-   * NICHT mit `neuerQueryClient()`: dessen `gcTime: 0` räumt den Eintrag beim Verlassen
-   * weg, und der Test wäre auch ohne den Fix grün. Hier gilt die Vorgabe des Betriebs.
+   * Nicht mit `neuerQueryClient()`: dessen `gcTime: 0` räumt den Eintrag beim Verlassen weg, und
+   * der Test wäre trivial grün.
    */
   it('lädt beim erneuten Öffnen neu, statt den Stand des letzten Besuchs zu zeigen', async () => {
     const alle = [eintrag(1), eintrag(2)];
