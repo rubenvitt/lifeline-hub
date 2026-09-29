@@ -2240,8 +2240,17 @@ export interface components {
          * @enum {string}
          */
         MeldungStatus: "neu" | "gesichtet" | "in_bearbeitung" | "erledigt";
-        /** @description Meldungen: offen (Status ≠ erledigt), davon noch nicht gesichtet (Status „neu"). */
+        /**
+         * @description Meldungen: offen (Status ≠ erledigt), davon noch nicht gesichtet (Status „neu"), und die
+         *     Meldungen mit überfälliger Bestätigungspflicht.
+         */
         MeldungsZaehler: {
+            /**
+             * Format: int64
+             * @description Pflichtig, unbestätigt und Frist abgelaufen oder eskaliert — über ALLE Meldungen, nicht
+             *     nur die offenen (LFH-397). Speist die Warnsperre des Helligkeitsreglers im Frontend.
+             */
+            bestaetigung_ueberfaellig: number;
             /** Format: int64 */
             offen: number;
             /** Format: int64 */

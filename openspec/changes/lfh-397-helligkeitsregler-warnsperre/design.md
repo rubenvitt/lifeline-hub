@@ -50,7 +50,7 @@ Zum Warum siehe proposal.md. Auf `alpha` gibt es drei Anknüpfungspunkte.
 - Keine automatische Helligkeit nach Tageszeit oder Umgebungslicht. Dafür gibt es keinen
   verlässlichen Sensor im Browser, und eine Heuristik würde die Wahl überstimmen (LFH-361).
 - Keine DWD-Unwetterwarnung als Auslöser. Sie wird nur auf `WetterPegelPage` alle 5 min
-  abgefragt und hat kein Stream-Ereignis → Folgeticket (s. „Offene Punkte“).
+  abgefragt und hat kein Stream-Ereignis → Folgeticket LFH-774.
 - Keine Warnsperre außerhalb eines Einsatzes (Einsatzauswahl, Verwaltung). Dort gibt es keine
   Einsatzwarnung.
 
@@ -191,10 +191,10 @@ Dateien, wie beim Farbschema.
 - **WCAG-Boden ist konservativ:** 80 % sind im dunklen Raum mehr, als nötig wäre. Die
   Alternative wäre ein gesetzter Wert ohne Messgrundlage.
 
-## Offene Punkte (Checkpoint)
+## Entscheidungen am Checkpoint (29.09.2026)
 
-1. **Boden bei Warnung:** 80 % (abgeleitet, Empfehlung), 100 % (Warnung hebt ganz auf) oder
-   60 % (Tag 4,28 : 1, Nacht 3,07 : 1, bricht Kriterium 5).
-2. **Stufen:** 100 · 80 · 60 · 40 · 20 % (Empfehlung) oder feiner (z. B. 10er-Schritte).
-3. **Umfang „aktive Warnung“:** (a) Warnstufe + (b) Bestätigungspflicht (Empfehlung). Dazu
-   optional (c) DWD schwer/extrem als Folgeticket oder schon jetzt.
+Freigegeben wie vorgeschlagen:
+1. **Boden bei Warnung 80 %** (abgeleitet über Kriterium 5).
+2. **Stufen 100 · 80 · 60 · 40 · 20 %.**
+3. **„Aktive Warnung“ = (a) Warnstufe + (b) Bestätigungspflicht.** DWD schwer/extrem kommt als
+   Folgeticket (LFH-774).

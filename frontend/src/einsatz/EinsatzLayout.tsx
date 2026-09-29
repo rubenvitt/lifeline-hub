@@ -46,6 +46,8 @@ import { einsatzModulPfad } from '../routing/deeplinks';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { useModulZaehler } from './useModulZaehler';
+import { useAktiveWarnung } from './useAktiveWarnung';
+import { useWarnsperre } from '../theme/ThemeModeProvider';
 
 const { Header, Content } = Layout;
 
@@ -207,6 +209,10 @@ export default function EinsatzLayout() {
   });
   const modulOverrides = modulOverridesQuery.data;
   const modulZaehler = useModulZaehler({ einsatzId, benutzer, overrides: modulOverrides });
+  // Warnsperre des Helligkeitsreglers (LFH-397): nur dieser Rahmen steht für den ganzen
+  // Einsatz, deshalb meldet er die Warnung. Verlässt man den Einsatz, baut er ab und nimmt
+  // die Sperre mit — in der Einsatzauswahl gibt es keine Einsatzwarnung.
+  useWarnsperre(useAktiveWarnung({ einsatzId, benutzer, overrides: modulOverrides }));
 
   /**
    * FRÜHER AUSSTIEG, VOR dem Haupt-JSX — nicht als Meldung innerhalb der Schale

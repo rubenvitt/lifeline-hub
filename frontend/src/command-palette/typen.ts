@@ -8,6 +8,7 @@ import type {
 } from '../api/types';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
+import type { Helligkeit } from '../theme/helligkeit';
 // NUR-TYP-IMPORT, und nur deshalb unbedenklich: `datensaetze.ts` importiert von hier
 // zurück (`Befehl`). Ein `import type` wird beim Übersetzen restlos entfernt — es entsteht
 // kein Modulzyklus zur Laufzeit. Die Ableitung geht bewusst in DIESE Richtung: die
@@ -215,6 +216,8 @@ export interface BefehlKontext {
   navigate: (pfad: string, oeffnung?: Oeffnung) => void;
   setThemeModus: (m: ThemeModus) => void;
   setDichte: (d: Dichte) => void;
+  /** Setzt die gewählte Helligkeit (LFH-397); die Warnsperre gilt im Provider. */
+  setHelligkeit: (h: Helligkeit) => void;
   setKoordinaten: (f: Koordinatenformat) => void;
   logout: () => void;
   tastaturAktionen?: TastaturAktionen;

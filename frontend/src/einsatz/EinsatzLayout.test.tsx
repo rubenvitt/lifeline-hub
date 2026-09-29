@@ -12,6 +12,7 @@ import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvide
 import EinsatzLayout, { einsatzKennung } from './EinsatzLayout';
 import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
 import { farbenDunkel } from '../theme/tokens';
+import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
 
@@ -751,3 +752,62 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+/**
+ * Die Warnsperre des Helligkeitsreglers am Rahmen (LFH-397, design.md D3): nur das Layout
+ * steht für den ganzen Einsatz, deshalb meldet ES die Warnung. Gemessen am Austritt
+ * (`data-helligkeit` am <html>), mit echtem `ThemeModeProvider` — der Test-Wrapper hängt
+ * keinen auf, und ohne ihn liefe `useWarnsperre` ins Leere.
+ */
+describe('Warnsperre des Helligkeitsreglers (LFH-397)', () => {
+  afterEach(() => {
+    localStorage.removeItem('lifeline-hub.helligkeit');
+    delete document.documentElement.dataset.helligkeit;
+  });
+
+  function mitWarnstufe(stufe: string) {
+    localStorage.setItem('lifeline-hub.helligkeit', '40');
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/modul-overrides', () => HttpResponse.json({})),
+      http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
+      http.get('/api/einsaetze/7/gefahrengebiete', () =>
+        HttpResponse.json([
+          { id: 1, einsatz_id: 7, hoechste_warnstufe: stufe, label: 'Deich', zonen_ids: [] },
+        ]),
+      ),
+    );
+    return renderMitProviders(
+      <ThemeModeProvider>
+        <AuthProvider>
+          <CommandPaletteProvider>
+            <Routes>
+              <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+                <Route path="etb" element={<div>ETB-Inhalt</div>} />
+              </Route>
+              <Route path="/einsaetze" element={<div>Einsatzauswahl</div>} />
+            </Routes>
+          </CommandPaletteProvider>
+        </AuthProvider>
+      </ThemeModeProvider>,
+      { route: '/einsaetze/7/etb' },
+    );
+  }
+
+  it('Gefahrengebiet „akut": Wahl 40 %, wirksam der Boden 80 %', async () => {
+    mitWarnstufe('akut');
+    await screen.findByText('ETB-Inhalt');
+    await waitFor(() => expect(document.documentElement.dataset.helligkeit).toBe('80'));
+    expect(localStorage.getItem('lifeline-hub.helligkeit')).toBe('40');
+  });
+
+  it('Gefahrengebiet „mittel": keine Sperre, die Wahl 40 % wirkt', async () => {
+    mitWarnstufe('mittel');
+    await screen.findByText('ETB-Inhalt');
+    // Einen Takt über den Abruf hinaus warten — ein vorzeitiges „40" belegte nichts.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(document.documentElement.dataset.helligkeit).toBe('40');
+  });
+});

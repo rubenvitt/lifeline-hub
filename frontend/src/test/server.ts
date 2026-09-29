@@ -42,6 +42,13 @@ export const server = setupServer(
    */
   http.get('/api/einsaetze/:einsatzId/modul-zaehler', () => HttpResponse.json({})),
   /**
+   * Gefahrengebiete — leere Liste als Default (LFH-397). Der Rahmen fragt sie für die
+   * Warnsperre des Helligkeitsreglers beim Mount ab (`einsatz/useAktiveWarnung.ts`); `[]`
+   * ist ein echter Serverzustand (kein Gebiet, keine Warnung). Tests mit Gebieten
+   * überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/gefahrengebiete', () => HttpResponse.json([])),
+  /**
    * Stammdaten der eigenen Organisation (LFH-22) — ohne Logo als Default. Der Druckkopf
    * (`components/druck/Druckkopf.tsx`) fragt sie beim Mount ab, und er steht auf Befehl,
    * Lagebericht, Meldebild und ETB-Druck; jede dieser Testflächen müsste den Handler sonst
