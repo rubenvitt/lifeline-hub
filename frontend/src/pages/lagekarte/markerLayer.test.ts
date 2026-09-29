@@ -53,8 +53,15 @@ describe('baueMarkerFc', () => {
         statusFarbe: '#00ff00',
       }),
     ]);
-    expect(fc.features[0].properties.icon?.startsWith('tz|')).toBe(true);
+    expect(fc.features[0].properties.icon?.startsWith('ez|')).toBe(true);
     expect(fc.features[0].properties.statusFarbe).toBe('#00ff00');
+  });
+
+  it('setzt für freie Zeichen den Bildschlüssel des Altpakets (bis LFH-836)', () => {
+    const fc = baueMarkerFc([
+      mk({ schluessel: 'freies_zeichen-1', typ: 'freies_zeichen', tz: { grundzeichen: 'person' } }),
+    ]);
+    expect(fc.features[0].properties.icon?.startsWith('tz|')).toBe(true);
   });
 
   it('lässt icon bei Lagemeldung (kein tz) weg → wird als Kreis gerendert', () => {
@@ -91,7 +98,7 @@ describe('baueEinsatzortFc', () => {
       mk({ schluessel: 'uhs-5' }),
     ]);
     expect(fc.features.map((f) => f.properties.schluessel)).toEqual(['einsatzort']);
-    expect(fc.features[0].properties.icon?.startsWith('tz|')).toBe(true);
+    expect(fc.features[0].properties.icon?.startsWith('ez|')).toBe(true);
   });
 
   it('ist leer, wenn kein Einsatzort verortet ist', () => {

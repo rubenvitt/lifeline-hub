@@ -24,9 +24,9 @@
 
 ## 3. Lagekarte
 
-- [ ] 3.1 `markerIcons.ts`: `markerIconKey(mk)` nach D5. Tests: freies Zeichen → `tz|…`, Fachobjekt → `ez|…`, gleiche wirksame Spec → gleicher Schlüssel, ohne `tz` → `undefined`. `markerLayer.ts` nutzt `markerIconKey`, `markerLayer.test.ts` ist grün.
+- [x] 3.1 `markerIcons.ts`: `markerIconKey(mk)` nach D5. Tests: freies Zeichen → `tz|…`, Fachobjekt → `ez|…`, gleiche wirksame Spec → gleicher Schlüssel, ohne `tz` → `undefined`. `markerLayer.ts` nutzt `markerIconKey`, `markerLayer.test.ts` ist grün.
 - [ ] 3.2 `Kartenflaeche.tsx`: Registry `{art:'ez', drawing} | {art:'tz', tz}`. Der `ez|`-Zweig im `styleimagemissing` läuft über `addSymbolImage` (size 34, `pixelRatio = max(1, ceil(devicePixelRatio))`, `hasImage`-Guard, `try/catch`). Der `tz|`-Zweig bleibt unverändert. Belegt über den e2e aus 3.4.
-- [ ] 3.3 `Inspector.tsx`: Die Kachel zeigt für Fachobjekte die Data-URL aus `renderSvg`, für freie Zeichen den bisherigen Weg. In `Inspector.test.tsx` ist die Kachel `img` für eine Einheit vorhanden, und ein nicht darstellbares Zeichen bringt den Inspector nicht zum Absturz.
+- [x] 3.3 `Inspector.tsx`: Die Kachel zeigt für Fachobjekte die Data-URL aus `renderSvg`, für freie Zeichen den bisherigen Weg. In `Inspector.test.tsx` ist die Kachel `img` für eine Einheit vorhanden, und ein nicht darstellbares Zeichen bringt den Inspector nicht zum Absturz.
 - [ ] 3.4 e2e `lagekarte-smoke.spec.ts` erweitern: Nach dem Laden trägt die Karte ein Bild mit Präfix `ez|`, und `__lfhKarte.getImage(id)` hat die Breite `34 × ceil(devicePixelRatio)`. Nach einem Grundkartenwechsel ist das Bild wieder da. Grün lokal. `gate3-trefflaeche.spec.ts` (UHS-Marker) ist grün.
 
 ## 4. Meldebild
