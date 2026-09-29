@@ -1,5 +1,6 @@
 import type { Personal, PersonalVorschlaege, StaerkePosition } from './types';
 import { apiGet, apiSend } from './client';
+import { setzeDienststatusUnter } from './katalogApi';
 
 /** Deutsche Labels der taktischen Stärke-Position (zentral, LFH-4). */
 export const POSITION_LABELS: Record<StaerkePosition, string> = {
@@ -55,6 +56,5 @@ export function aktualisierePerson(id: number, daten: PersonalPatch): Promise<Pe
 }
 
 export function setzeDienststatus(id: number, inDienst: boolean): Promise<Personal> {
-  const pfad = inDienst ? 'in-dienst' : 'ausser-dienst';
-  return apiSend<Personal>(`/api/personal/${id}/${pfad}`, 'POST');
+  return setzeDienststatusUnter<Personal>('/api/personal', id, inDienst);
 }

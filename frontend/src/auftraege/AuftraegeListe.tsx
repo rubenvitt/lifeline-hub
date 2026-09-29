@@ -3,7 +3,6 @@ import { Select } from '../components/Select';
 import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
@@ -32,6 +31,7 @@ import AuftragFormular from './AuftragFormular';
 import VollzugMeldenModal from './VollzugMeldenModal';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /** Offene Aufträge: nach Prio (sofort→dringend→normal), dann Frist (früheste zuerst). */
 function vergleicheOffen(a: Auftrag, b: Auftrag): number {
@@ -101,8 +101,7 @@ export default function AuftraegeListe({
   // Inline-Anlegen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Modal.
   const [formOffen, setFormOffen] = useState(false);
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
 
   // LFH-343/C8: kein `setFormOffen(false)` mehr. Das Inline-Formular bleibt nach

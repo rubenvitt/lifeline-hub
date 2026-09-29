@@ -1,5 +1,6 @@
 import type { Fahrzeug, FahrzeugVorschlaege } from './types';
 import { apiGet, apiSend } from './client';
+import { setzeDienststatusUnter } from './katalogApi';
 
 /**
  * Die VOLLE Menge editierbarer Stammfelder — was `FahrzeugDetailPage` in einem Formular
@@ -53,6 +54,5 @@ export function aktualisiereFahrzeug(id: number, daten: FahrzeugPatch): Promise<
 }
 
 export function setzeDienststatus(id: number, inDienst: boolean): Promise<Fahrzeug> {
-  const pfad = inDienst ? 'in-dienst' : 'ausser-dienst';
-  return apiSend<Fahrzeug>(`/api/fahrzeuge/${id}/${pfad}`, 'POST');
+  return setzeDienststatusUnter<Fahrzeug>('/api/fahrzeuge', id, inDienst);
 }

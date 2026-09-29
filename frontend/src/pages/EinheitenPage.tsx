@@ -29,7 +29,6 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { listeEinheitTypen } from '../api/einheitTypen';
 import { bildeEinheit, listeEinheiten } from '../api/einheiten';
-import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { Einheit } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
@@ -38,6 +37,7 @@ import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { ErfassungsModal } from '../components/Erfassung';
 import StatusTag from '../components/StatusTag';
 import { einsatzStatus } from '../theme/statusFarben';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
  * Gliederung der Einheiten eines Einsatzes. Die Detailansicht liegt auf eigener Route
@@ -141,8 +141,7 @@ export default function EinheitenPage() {
   const [searchParams] = useSearchParams();
   const deeplinkZiel = parseRouteId(searchParams.get('einheit') ?? undefined);
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   /**
    * „Einheit bilden" fragt zuerst: ein sofort geschriebener Platzhalter stünde nach einem Fehlklick

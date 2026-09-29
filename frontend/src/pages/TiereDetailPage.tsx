@@ -32,12 +32,14 @@ import {
   tierRegistrierAnzeige,
   type TierPatch,
 } from '../api/einsatzTier';
-import { ApiError, istKonflikt } from '../api/client';
+import { istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { parseRouteId, personDetailPfad, tierePfad } from '../routing/deeplinks';
 import type { AbschlussGrund, Tier, TierStatus } from '../api/types';
 import HalterPicker, { type HalterWert } from '../personen/HalterPicker';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { registrierNummer } from '../anzeige/registrierNummer';
 
 /**
  * Formularwerte der Bearbeiten-Maske: der Patch plus die zusammengesetzte Halter-Auswahl, die erst
@@ -62,7 +64,7 @@ function naechsteStatus(aktuell: TierStatus): TierStatus[] {
 /** Halter-Kurzanzeige. */
 function halterAnzeige(t: Tier): React.ReactNode {
   if (t.halter_registrier_nr != null) {
-    const label = `R-${String(t.halter_registrier_nr).padStart(3, '0')}`;
+    const label = registrierNummer('R', t.halter_registrier_nr);
     return t.halter_storniert_at ? (
       <Typography.Text type="secondary">Halter (storniert): {label}</Typography.Text>
     ) : (
@@ -82,7 +84,7 @@ export default function TiereDetailPage() {
   const navigate = useNavigate();
 
   const qc = useQueryClient();
-  const { message, modal } = App.useApp();
+  const { modal } = App.useApp();
   const [editForm] = Form.useForm<TierFormWerte>();
   const editSitzung = useEditSitzung<TierFormWerte>(editForm);
   // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen" verengt:
@@ -96,8 +98,7 @@ export default function TiereDetailPage() {
     abschluss_ziel?: string;
   }>();
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.tiere(einsatzId) });
@@ -354,7 +355,7 @@ export default function TiereDetailPage() {
                             refId: t.halter_person_id,
                             label:
                               t.halter_registrier_nr != null
-                                ? `R-${String(t.halter_registrier_nr).padStart(3, '0')}`
+                                ? registrierNummer('R', t.halter_registrier_nr)
                                 : 'Halter',
                           }
                         : t.halter_kontakt

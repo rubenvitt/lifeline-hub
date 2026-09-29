@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, mitParametern } from './client';
 import type { Auftrag, NeuerAuftrag } from './types';
 
 export interface AuftragFilter {
@@ -9,13 +9,14 @@ export interface AuftragFilter {
 }
 
 export function listeAuftraege(einsatzId: number, filter: AuftragFilter = {}): Promise<Auftrag[]> {
-  const p = new URLSearchParams();
-  if (filter.status) p.set('status', filter.status);
-  if (filter.richtung) p.set('richtung', filter.richtung);
-  if (filter.abschnittId != null) p.set('abschnitt_id', String(filter.abschnittId));
-  if (filter.einheitId != null) p.set('einheit_id', String(filter.einheitId));
-  const q = p.toString() ? `?${p.toString()}` : '';
-  return apiGet<Auftrag[]>(`/api/einsaetze/${einsatzId}/auftraege${q}`);
+  return apiGet<Auftrag[]>(
+    mitParametern(`/api/einsaetze/${einsatzId}/auftraege`, {
+      status: filter.status,
+      richtung: filter.richtung,
+      abschnitt_id: filter.abschnittId,
+      einheit_id: filter.einheitId,
+    }),
+  );
 }
 
 export function legeAuftragAn(einsatzId: number, daten: NeuerAuftrag): Promise<Auftrag> {

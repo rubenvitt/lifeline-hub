@@ -43,15 +43,14 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
  * grün (Gegenstück zur „toten Schuld-Ausnahme" in `dichte.guard.test.ts`).
  */
 const MIT_NACHBARSCHAFT = [
-  'stammdaten/EinheitTypenTab.tsx',
   'stammdaten/EtbBausteineTab.tsx',
-  'stammdaten/FahrzeugeTab.tsx',
-  'stammdaten/MaterialTab.tsx',
-  'stammdaten/PersonalStatusTab.tsx',
-  'stammdaten/PersonalTab.tsx',
-  'stammdaten/QualifikationenTab.tsx',
   'stammdaten/SprechgruppenTab.tsx',
-  'stammdaten/StatusKatalogTab.tsx',
+  // Die Aktionsspalte von Fahrzeugen, Personal und Material („Bearbeiten" neben
+  // „Außer Dienst") steht nur noch im gemeinsamen Baustein.
+  'stammdaten/dienststatus.tsx',
+  // Die Aktionsspalte von Qualifikationen, Einheitstypen, Personal- und Fahrzeug-Status
+  // steht nur noch hier, in der gemeinsamen Hülle.
+  'stammdaten/KatalogVerwaltung.tsx',
   'pages/BenutzerPage.tsx',
   // Reihe Speichern + Auflösen(danger) in der sticky Aktionsleiste der Detailroute.
   'pages/EinheitDetailPage.tsx',

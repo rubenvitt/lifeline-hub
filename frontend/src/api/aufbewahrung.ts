@@ -7,7 +7,7 @@ import type {
   FristSetzenBody,
   WiederherstellenBody,
 } from './types';
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, mitParametern } from './client';
 
 /**
  * Aufbewahrung abgeschlossener Einsätze (LFH-23).
@@ -43,12 +43,13 @@ export function ladeArchivEtb(
   einsatzId: number,
   filter: ArchivEtbFilter = {},
 ): Promise<ArchivEtbEintrag[]> {
-  const q = new URLSearchParams();
-  if (filter.typ) q.set('typ', filter.typ);
-  if (filter.beforeLfdNr != null) q.set('before_lfd_nr', String(filter.beforeLfdNr));
-  if (filter.limit != null) q.set('limit', String(filter.limit));
-  const s = q.toString();
-  return apiGet<ArchivEtbEintrag[]>(`${BASIS}/einsaetze/${einsatzId}/etb${s ? `?${s}` : ''}`);
+  return apiGet<ArchivEtbEintrag[]>(
+    mitParametern(`${BASIS}/einsaetze/${einsatzId}/etb`, {
+      typ: filter.typ,
+      before_lfd_nr: filter.beforeLfdNr,
+      limit: filter.limit,
+    }),
+  );
 }
 
 /** `POST …/wiederherstellen` — Vormerkung aufheben, neue Frist setzen (Pflicht). */
