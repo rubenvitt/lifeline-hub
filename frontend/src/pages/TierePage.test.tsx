@@ -29,8 +29,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-// Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
-// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+// Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
+// schreibrecht.test.ts ab.
 const nutzer = {
   id: 1,
   anzeigename: 'Nutzer',
@@ -99,29 +99,24 @@ const tierVermisst: Tier = {
 };
 
 /**
- * Zeilenfolge der T-Nummern in Dokumentordnung. Die FOLGE ist die belastbare Behauptung —
- * ein gerenderter Zeitstring hinge an der Zeitzone des Testrechners, weil
- * `renderMitProviders` keinen `EinsatzAnzeigeProvider` einhängt.
+ * Zeilenfolge der T-Nummern in Dokumentordnung. Die Folge ist die belastbare Behauptung — ein
+ * Zeitstring hinge an der Zeitzone des Testrechners (kein `EinsatzAnzeigeProvider`).
  */
 function regFolge(): string[] {
   return screen.getAllByText(/^T-\d{3}$/).map((e) => e.textContent ?? '');
 }
 
 /**
- * Wartet, bis der Erfassungsdialog wirklich aus dem Baum ist — inklusive des Anstosses, den
- * die Schliess-Bewegung in jsdom braucht.
+ * Wartet, bis der Erfassungsdialog aus dem Baum ist — samt dem Anstoß, den die Schließbewegung in
+ * jsdom braucht.
  *
- * GEMESSEN, und die Reihenfolge der Befunde ist der Grund für die zwei Ereignisnamen:
- * antds Modal geht beim Schliessen in `ant-zoom-leave` und bleibt dort für immer stehen —
- * jsdom hat keine Layout-Engine, die ein Animationsende meldet, und rc-motion setzt hier
- * keine Frist. `destroyOnHidden` greift erst NACH der Bewegung, die Felder bleiben also im
- * Baum, und `queryByRole('dialog')` findet den Dialog weiter (kein `display: none`).
+ * antds Modal geht beim Schließen in `ant-zoom-leave` und bleibt dort stehen: jsdom meldet kein
+ * Animationsende, und `destroyOnHidden` greift erst nach der Bewegung.
  *
- * `fireEvent.animationEnd(...)` reicht dafür NICHT — das schickt „animationend", rc-motion
- * hört aber auf den Namen, den es aus den Stil-Eigenschaften des Browsers ableitet
- * (`getVendorPrefixedEventName`), und jsdoms `CSSStyleDeclaration` kennt `WebkitAnimation`,
- * nicht `animation`: in dieser Umgebung heisst das Ereignis „webkitAnimationEnd". Beide
- * Namen zu schicken hält den Helfer über einen jsdom-Wechsel hinweg heil.
+ * `fireEvent.animationEnd(...)` reicht nicht: rc-motion hört auf den Namen, den es aus den
+ * Stil-Eigenschaften ableitet (`getVendorPrefixedEventName`), und jsdoms `CSSStyleDeclaration`
+ * kennt `WebkitAnimation`, nicht `animation` — hier heißt das Ereignis „webkitAnimationEnd". Beide
+ * Namen zu schicken hält den Helfer über einen jsdom-Wechsel heil.
  */
 async function warteBisDialogWeg(timeout?: number) {
   await waitFor(
@@ -131,8 +126,8 @@ async function warteBisDialogWeg(timeout?: number) {
         fireEvent.animationEnd(modal);
         modal.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
       }
-      // Am FELD gemessen, nicht an der Dialogrolle: `destroyOnHidden` ist die Zusicherung,
-      // dass ein geschlossener Dialog keine Felder stehen lässt.
+      // Am Feld gemessen, nicht an der Dialogrolle: `destroyOnHidden` ist die Zusicherung, dass ein
+      // geschlossener Dialog keine Felder stehen lässt.
       expect(screen.queryByLabelText('Rufname')).not.toBeInTheDocument();
     },
     timeout != null ? { timeout } : undefined,
@@ -181,19 +176,16 @@ describe('TierePage', () => {
 
   it('nimmt den Suchbegriff nicht in den nächsten Reiter mit', async () => {
     /**
-     * VIER Reiter auf EINER `Datensicht` — bei konstantem `key` reicht React beim
-     * Reiterwechsel dieselbe Instanz weiter, und `suchbegriff` lebt IN der Sicht: der Begriff
-     * aus „Vermisst" filtert danach die Menge von „Alle".
+     * Vier Reiter auf einer `Datensicht` — bei konstantem `key` reichte React dieselbe Instanz
+     * weiter, und `suchbegriff` lebt in der Sicht: der Begriff aus „Vermisst" filterte die Menge
+     * von „Alle".
      *
-     * Drei Schritte, weil der letzte allein nichts belegte: eine Behauptung über das leere
-     * Feld bliebe auch grün, wenn die Suche gar nicht filterte (etwa ohne `suchText` an der
-     * Rufnamen-Spalte). Schritt 1 zeigt erst, dass der Begriff beißt; Schritt 3 nennt den
-     * Schaden beim Namen — eine fremde Menge auf einen fremden Begriff gefiltert.
+     * Drei Schritte: Schritt 1 zeigt, dass der Begriff wirkt (sonst bliebe „das Feld ist leer" auch
+     * ohne filternde Suche grün); Schritt 3 prüft die fremde Menge.
      *
-     * FIXTUREN BEWUSST QUER: `suchText` greift auf Reg.-Nr., Rufname, Rasse UND Halter zu.
-     * Träfe der Begriff die Zielzeile über irgendeines dieser Felder, stünde sie nach dem
-     * Wechsel sichtbar da, WEIL sie passt — und nicht, weil das Feld geleert wurde. „Mimi"
-     * trifft deshalb genau eine der drei Zeilen, und alle drei tragen eine eigene Rasse.
+     * Die Fixturen liegen quer: `suchText` greift auf Reg.-Nr., Rufname, Rasse und Halter zu. Träfe
+     * der Begriff die Zielzeile über eines dieser Felder, stünde sie da, weil sie passt, nicht weil
+     * das Feld geleert wurde. „Mimi" trifft genau eine Zeile, und alle tragen eine eigene Rasse.
      */
     const mimi: Tier = {
       ...tierBasis,
@@ -244,12 +236,10 @@ describe('TierePage', () => {
       { ...tierBasis, id: 12, registrier_nr: 3, spezies: 'katze', rufname: 'Felix' },
     ]);
     await screen.findByText('Rex');
-    // Namensfilter, nicht „die einzige Combobox der Seite": die Werkzeugzeile von
-    // `Datensicht` kann ein zweites Combobox-artiges Element mitbringen (Spaltenschalter,
-    // Spaltenfilter). Ohne den Namen bräche diese Zeile aus einem Grund, der mit Tieren
-    // nichts zu tun hat.
+    // Nach Namen, nicht „die einzige Combobox der Seite": die Werkzeugzeile von `Datensicht` kann
+    // ein zweites combobox-artiges Element mitbringen.
     await userEvent.click(screen.getByRole('combobox', { name: 'Spezies' }));
-    // Tabellenzelle und Dropdown-Option tragen beide "Katze" → auf die Option im Dropdown zielen.
+    // Tabellenzelle und Dropdown-Option tragen beide "Katze" → auf die Option zielen.
     const katzeOption = (await screen.findAllByText('Katze')).find((el) =>
       el.closest('.ant-select-item-option'),
     );
@@ -260,9 +250,8 @@ describe('TierePage', () => {
   });
 
   /**
-   * LFH-340 · C5, wortgleich zu `PersonenPage.test.tsx`: der Kopf kam aus einem
-   * handgebauten Block statt aus `EinsatzSeite`. Die zweite Zeile ist die tragende —
-   * „level 1 da" allein wäre auch grün, wenn der Handbau daneben stehen bliebe.
+   * Der Kopf kommt aus `EinsatzSeite`, wie in `PersonenPage.test.tsx`. Die zweite Zeile ist die
+   * tragende: „level 1 da" allein wäre auch mit Handbau daneben grün.
    */
   it('trägt den gemeinsamen Modulkopf statt einer handgebauten Titelzeile', async () => {
     render(einsatzAktiv, []);
@@ -325,8 +314,8 @@ describe('TierePage', () => {
     const { container, client } = render(einsatzAktiv, []);
     await waitFor(() => expect(client.getQueryState(einsatzKeys.tiere(1))?.status).toBe('success'));
     let veralteteRefetches = 0;
-    // Replikations-/Refetch-Lücke simulieren: direkt nach dem POST kennt der GET das neue
-    // Tier noch nicht. Die Antwortzeile muss trotzdem stehen bleiben.
+    // Replikations-/Refetch-Lücke: direkt nach dem POST kennt der GET das neue Tier noch nicht. Die
+    // Antwortzeile muss trotzdem stehen bleiben.
     server.use(
       http.get('/api/einsaetze/1/tiere', () => {
         veralteteRefetches += 1;
@@ -416,18 +405,16 @@ describe('TierePage', () => {
   });
 
   /**
-   * SCHNELLERFASSUNG auf der Erfassungshülle (LFH-332 · B4). Die drei Fälle prüfen die
-   * VERDRAHTUNG dieser Seite, nicht die Hülle: dass das erste Feld dieser Maske den Fokus
-   * bekommt, dass Enter den Wortlaut MIT dem aus dem Modus abgeleiteten Status schickt, und
-   * dass der Serienlauf die zwei Übernahmefelder dieser Maske mitnimmt. Das allgemeine
-   * Verhalten der Hülle steht in `components/Erfassung.test.tsx`.
+   * Schnellerfassung auf der Erfassungshülle. Geprüft wird die Verdrahtung dieser Seite: das erste
+   * Feld bekommt den Fokus, Enter schickt den Wortlaut mit dem aus dem Modus abgeleiteten Status,
+   * und der Serienlauf nimmt die zwei Übernahmefelder mit. Die Hülle prüft
+   * `components/Erfassung.test.tsx`.
    */
   it('setzt den Fokus beim Öffnen ins erste Feld der Maske', async () => {
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     const dialog = await screen.findByRole('dialog');
-    // IM Dialog gesucht: die zweite Combobox der Seite ist der Spezies-Filter der
-    // Werkzeugzeile, und der steht ausserhalb.
+    // Im Dialog gesucht: die zweite Combobox der Seite ist der Spezies-Filter der Werkzeugzeile.
     await waitFor(() => expect(within(dialog).getByRole('combobox')).toHaveFocus());
   });
 
@@ -443,14 +430,14 @@ describe('TierePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     await screen.findByRole('dialog');
 
-    // KEIN Klick auf „Erfassen": nur die Enter-Taste im Feld belegt, dass der Absende-Knopf
-    // im Formular liegt. Über `onOk` am Modal blieb Enter wirkungslos.
+    // Kein Klick auf „Erfassen": nur die Enter-Taste im Feld belegt, dass der Absende-Knopf im
+    // Formular liegt.
     await userEvent.type(screen.getByLabelText('Rufname'), 'Mimi{Enter}');
 
     await waitFor(() => expect(body.rufname).toBe('Mimi'));
-    // Die Ableitung aus dem Modus hat den Umbau überlebt.
+    // Die Ableitung aus dem Modus bleibt.
     expect(body.status).toBe('vermisst');
-    // Einzel-Erfassen schliesst — das macht `onFertig`, nicht mehr `onSuccess`.
+    // Einzel-Erfassen schließt — über `onFertig`.
     await warteBisDialogWeg();
   });
 
@@ -472,10 +459,10 @@ describe('TierePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     const dialog = await screen.findByRole('dialog');
 
-    // Der Schalter steht per Vorgabe AUS (30.07.2026) — ohne ihn gäbe es keine Übernahme.
+    // Der Schalter steht per Vorgabe aus — ohne ihn gäbe es keine Übernahme.
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
-    // Spezies WEG vom Startwert 'hund' stellen — sonst wäre 'hund' nach dem Zurücksetzen
-    // auch ohne Übernahme wieder da, und der zweite Wortlaut bewiese nichts.
+    // Spezies weg vom Startwert 'hund' stellen — sonst wäre 'hund' nach dem Zurücksetzen auch ohne
+    // Übernahme wieder da.
     await userEvent.click(within(dialog).getByRole('combobox'));
     const katze = (await screen.findAllByText('Katze')).find((el) =>
       el.closest('.ant-select-item-option'),
@@ -492,17 +479,13 @@ describe('TierePage', () => {
     );
 
     /**
-     * Der Dialog bleibt stehen — und die Gegenprobe steckt IM Anstoss.
+     * Der Dialog bleibt stehen — und die Gegenprobe steckt im Anstoß. `getByRole('dialog')` allein
+     * unterschiede die Fälle nicht: ein sich schließender antd-Dialog steht in jsdom genauso im
+     * Baum, weil die Schließbewegung ohne Anstoß nie endet. Auch der Zähler trennt nicht: die Hülle
+     * zählt hoch, bevor sie sich für einen Weg entscheidet.
      *
-     * `getByRole('dialog')` allein unterschiede die beiden Fälle NICHT: ein sich
-     * schliessender antd-Dialog steht in jsdom genauso im Baum (kein `display: none`,
-     * Felder noch da), weil die Schliess-Bewegung ohne Anstoss nie endet — gemessen beim
-     * Bau von `warteBisDialogWeg`. Auch der Zähler trennt nicht: die Hülle zählt hoch,
-     * bevor sie sich für einen der beiden Wege entscheidet.
-     *
-     * Der Anstoss trennt sie: derselbe Helfer, der den Einzel-Weg beim Verschwinden
-     * beobachtet, läuft hier in seine Wartezeit — die Bewegung, die er beenden könnte, gibt
-     * es nicht. Auf dem Einzel-Weg ginge er durch.
+     * Derselbe Helfer, der den Einzel-Weg beim Verschwinden beobachtet, läuft hier in seine
+     * Wartezeit — die Bewegung, die er beenden könnte, gibt es nicht.
      */
     await expect(warteBisDialogWeg(400)).rejects.toThrow();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -512,13 +495,13 @@ describe('TierePage', () => {
     await waitFor(() => expect(screen.getByLabelText('Rufname')).toHaveValue(''));
     expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Nord');
 
-    // Zweiter Satz: die Übernahme steht auch im WORTLAUT, nicht bloß im Feld.
+    // Zweiter Satz: die Übernahme steht auch im Wortlaut, nicht bloß im Feld.
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(wortlaute).toHaveLength(2));
     expect(wortlaute[1].spezies).toBe('katze');
     expect(wortlaute[1].antreff_ort).toBe('Sammelstelle Nord');
     expect(wortlaute[1].status).toBe('aktiv');
-    // Das Einzelfeld ist NICHT mitgewandert — sonst stünde der vorige Satz zweimal in der Liste.
+    // Das Einzelfeld ist nicht mitgewandert — sonst stünde der vorige Satz zweimal in der Liste.
     expect(wortlaute[1].rufname ?? '').toBe('');
   });
 
@@ -678,7 +661,7 @@ describe('TierePage', () => {
   it('navigiert beim Klick auf eine Zeile zur Detail-Vollseite', async () => {
     render(einsatzAktiv, [tierBasis]);
     await userEvent.click((await screen.findAllByText('Rex'))[0]);
-    // Drawer entfernt (LFH-147) → Zeilen-Klick navigiert auf /tiere/:tierId.
+    // Zeilen-Klick navigiert auf /tiere/:tierId.
     expect(await screen.findByText('DETAIL-SEITE')).toBeInTheDocument();
   });
 
@@ -692,10 +675,8 @@ describe('TierePage', () => {
   });
 
   it('sortiert die Liste selbst, statt die Lieferreihenfolge zu übernehmen', async () => {
-    // AUFSTEIGEND geliefert, obwohl das Backend `ORDER BY t.registrier_nr DESC` fährt
-    // (`src/tier/repo.rs`): nur so beweist die absteigende Zeilenfolge, dass die Umkehrung
-    // im Client passiert. In Backend-Reihenfolge geliefert könnte dieser Test nicht
-    // fehlschlagen.
+    // Aufsteigend geliefert, obwohl das Backend `ORDER BY t.registrier_nr DESC` fährt: nur so
+    // beweist die absteigende Folge, dass die Umkehrung im Client passiert.
     const drei = [
       tierBasis,
       { ...tierBasis, id: 21, registrier_nr: 2, rufname: 'Bello' },
@@ -708,19 +689,16 @@ describe('TierePage', () => {
 
   it('zeigt „seit" aus dem Erfassungszeitpunkt und sortiert danach', async () => {
     /**
-     * Für Tiere gibt es KEINE Dringlichkeitssortierung: `TierAnzeige` trägt weder
-     * Sichtungskategorie noch Sichtungszeitpunkt (verifiziert am generierten Typ, die
-     * Rust-Doku nennt das Modul „bewusst schlank"). „seit" kommt deshalb aus `erfasst_at`;
-     * `geaendert_at` wäre falsch, weil es bei jeder Notiz weiterläuft.
+     * Für Tiere gibt es keine Dringlichkeitssortierung: `TierAnzeige` trägt weder
+     * Sichtungskategorie noch -zeitpunkt. „seit" kommt aus `erfasst_at`; `geaendert_at` liefe bei
+     * jeder Notiz weiter.
      *
-     * Der Klick auf den Spaltenkopf ist die tragende Hälfte. Gemessen: eine Prüfung, die nur
-     * Kopf und Zellmuster sieht, blieb grün, als der `sortWert` der Spalte entfiel UND als
-     * der Kopf umbenannt wurde — sie belegte also weder Sortierbarkeit noch Beschriftung.
+     * Der Klick auf den Spaltenkopf ist die tragende Hälfte: eine Prüfung, die nur Kopf und
+     * Zellmuster sieht, bliebe grün, wenn der `sortWert` fehlte oder der Kopf umbenannt würde.
      *
-     * Die Zeitstempel liegen ABSICHTLICH quer zur Registriernummer, sonst wäre die
-     * Zeitsortierung von der Nummernsortierung nicht zu unterscheiden. Und sie sind
-     * verschieden: alle Bestandsfixtures teilen `erfasst_at`, eine Behauptung darüber wäre
-     * dort eine Attrappe.
+     * Die Zeitstempel liegen absichtlich quer zur Registriernummer (sonst wäre Zeit- von
+     * Nummernsortierung nicht zu unterscheiden) und sind verschieden (die Bestandsfixtures teilen
+     * `erfasst_at`).
      */
     const drei = [
       { ...tierBasis, id: 30, registrier_nr: 1, rufname: 'Alt', erfasst_at: '2026-05-29 07:00:00' },
@@ -735,14 +713,14 @@ describe('TierePage', () => {
     ];
     render(einsatzAktiv, drei);
     await vi.waitFor(() => expect(regFolge()).toHaveLength(3));
-    // Muster statt Fixwert: ohne `EinsatzAnzeigeProvider` rendert die Zeit in der Zeitzone
-    // des Testrechners.
+    // Muster statt Fixwert: ohne `EinsatzAnzeigeProvider` rendert die Zeit in der Zeitzone des
+    // Testrechners.
     const dtg = screen
       .getAllByText(/^\d{6}(JAN|FEB|MÄR|APR|MAI|JUN|JUL|AUG|SEP|OKT|NOV|DEZ)2026$/)
       .map((e) => e.textContent);
     expect(dtg).toHaveLength(3);
-    // DREI VERSCHIEDENE Werte. Gemessen als Lücke: die Fixtures teilen `geaendert_at`, also
-    // blieb ein `render` auf dem falschen Feld grün, solange nur das Format geprüft wurde.
+    // Drei verschiedene Werte: die Fixtures teilen `geaendert_at`, ein `render` auf dem falschen
+    // Feld bliebe sonst grün.
     expect(new Set(dtg).size).toBe(3);
     // Vorgabe ist die Nummer, absteigend …
     expect(regFolge()).toEqual(['T-003', 'T-002', 'T-001']);
@@ -753,20 +731,18 @@ describe('TierePage', () => {
 
   it('trägt „seit" auch in den Kartenzweig bei 390 px', async () => {
     /**
-     * Ohne diesen Fall belegte das Bündel die Zeitachse NUR für die Tabelle. Unter `md`
-     * rendert `Datensicht` genau einen anderen Zweig, und dort kommt die Zeit aus dem
-     * `sekundaer`-Tupel des Kartenplans — ein dort fehlender Slot wäre in jeder
-     * Tabellenprüfung unsichtbar.
+     * Unter `md` rendert `Datensicht` den Kartenzweig, und die Zeit kommt dort aus dem
+     * `sekundaer`-Tupel — ein fehlender Slot wäre in jeder Tabellenprüfung unsichtbar.
      *
-     * Die Breite VOR dem Rendern setzen: antds Beobachter ruft seinen Zuhörer beim
-     * Abonnieren synchron auf und liest dabei nur den Trefferstand.
+     * Die Breite vor dem Rendern setzen: antds Beobachter ruft seinen Zuhörer beim Abonnieren
+     * synchron auf.
      */
     setzeViewportBreite(390);
     const schmal = render(einsatzAktiv, [tierBasis]);
     await screen.findByRole('region', { name: 'Tiere im Einsatz' });
-    // Genau EIN Zweig im Baum — sonst wäre die Aussage darüber, welcher gilt, wertlos.
+    // Genau ein Zweig im Baum — sonst wäre die Aussage, welcher gilt, wertlos.
     expect(schmal.container.querySelector('.ant-table')).toBeNull();
-    // Etikett UND Wert: das Etikett ist der zweite Kanal der Karte.
+    // Etikett und Wert: das Etikett ist der zweite Kanal der Karte.
     expect(screen.getByText('seit')).toBeInTheDocument();
     expect(
       screen.getByText(/^\d{6}(JAN|FEB|MÄR|APR|MAI|JUN|JUL|AUG|SEP|OKT|NOV|DEZ)2026$/),
@@ -790,9 +766,9 @@ describe('TierePage', () => {
   });
 
   /**
-   * Partnerpaar zu AK4 (LFH-331 · B3): die negative Hälfte allein wäre auch dann grün, wenn
-   * der Umbau den Leertext bloß umformuliert hätte. Erst der Fall darunter — gleiches
-   * Literal, gleiche Datei — macht daraus eine Aussage über die Zustandsweiche.
+   * Partnerpaar: die negative Hälfte allein wäre auch grün, wenn der Leertext bloß umformuliert
+   * wäre; erst der Fall darunter mit gleichem Literal macht daraus eine Aussage über die
+   * Zustandsweiche.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
@@ -822,10 +798,10 @@ describe('TierePage', () => {
   });
 
   /**
-   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
-   * nicht `isStale`. Der Ablauf ist der echte: geglückter Abruf, dann gescheiterte
-   * Aktualisierung. Ein bloß vorbefüllter Zwischenspeicher ließe offen, ob TanStack nach
-   * einem HINTERGRUND-Fehlschlag überhaupt auf `error` stellt statt auf `success` zu bleiben.
+   * Veralteter Stand = `isError` mit Zeilen im Zwischenspeicher — nicht `isFetching`, nicht
+   * `isStale`. Der Ablauf ist der echte: geglückter Abruf, dann gescheiterte Aktualisierung; ein
+   * vorbefüllter Cache ließe offen, ob TanStack nach einem Hintergrund-Fehlschlag auf `error`
+   * stellt.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
     const { client } = render(einsatzAktiv, [tierBasis]);
@@ -837,7 +813,7 @@ describe('TierePage', () => {
     expect(
       await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
     ).toBeInTheDocument();
-    // Die Zeilen aus dem Zwischenspeicher bleiben stehen — der Fehler verdrängt sie NICHT.
+    // Die Zeilen aus dem Zwischenspeicher bleiben stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('T-001')).toBeInTheDocument();
     expect(screen.queryByText('Tiere konnten nicht geladen werden')).not.toBeInTheDocument();
   });

@@ -29,15 +29,13 @@ export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
   const navigate = useNavigate();
-  // Material/Bewegungen als Segmentleiste im Reiter-Modus (Neuentwurf: Radius 0, Fugenraster
-  // statt antds Unterstrich-Reitern). Nur das aktive Feld ist gebaut — wie vorher bei `Tabs`.
+  // Material/Bewegungen als Segmentleiste; nur das aktive Feld ist gebaut.
   const [reiter, setReiter] = useState<'material' | 'bewegungen'>('material');
   const reiterFeld = useId();
   const { benutzer } = useAuth();
   const uhsId = Number(uhsIdParam);
   const idGueltig = parseRouteId(uhsIdParam) != null;
   const listenPfad = unfallhilfsstellenListePfad(einsatzId);
-  // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207).
 
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -52,8 +50,7 @@ export default function UhsDetailPage() {
     enabled: idGueltig,
   });
 
-  // Diese UHS als „zuletzt ausgewählt" merken — der Default-Einstieg landet beim
-  // nächsten Mal wieder hier.
+  // Diese UHS als „zuletzt ausgewählt" merken — der Default-Einstieg landet wieder hier.
   useEffect(() => {
     if (detailQuery.isSuccess) merkeLetzteUhs(einsatzId, uhsId);
   }, [einsatzId, uhsId, detailQuery.isSuccess]);
@@ -83,7 +80,7 @@ export default function UhsDetailPage() {
     onError: fehler,
   });
 
-  // Deeplink-Robustheit (LFH-25): ungültige UHS-ID → zurück zur UHS-Liste (nach allen Hooks).
+  // Ungültige UHS-ID → zurück zur Liste (nach allen Hooks).
   if (!idGueltig) {
     return <Navigate to={listenPfad} replace />;
   }
@@ -105,16 +102,13 @@ export default function UhsDetailPage() {
   const uhs = detailQuery.data;
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatz, benutzer);
 
-  // Typ und Standort sind Kopf-Meta (Neuentwurf: „Titel 14/600 + Mono-Meta"); der Typ ist
-  // eine Kategorie und trägt im Vertrag durchgängig `neutral` — hier zählt nur seine
-  // Beschriftung aus `uhsTyp` (LFH-328/A2, dritter Konsument seit LFH-341 · M54). Die
-  // Notiz ist Freitext und bleibt Beschreibungszeile unter dem Kopf.
+  // Typ und Standort sind Kopf-Meta; der Typ ist eine Kategorie (im Vertrag `neutral`), es zählt
+  // nur seine Beschriftung aus `uhsTyp`. Die Notiz ist Freitext und bleibt Beschreibungszeile.
   const meta = [uhsTyp[uhs.typ].label, uhs.standort ?? 'ohne Standort'].join(' · ');
 
   return (
     <EinsatzSeite
-      /* Der Titel trägt den Umschalter, nicht bloß den Namen: die UHS-Detailseite ist der
-         Ort, an dem zwischen mehreren Hilfsstellen gewechselt wird (LFH-25). */
+      /* Der Titel trägt den Umschalter: hier wird zwischen Hilfsstellen gewechselt. */
       titel={
         <Space>
           <UhsSwitcher einsatzId={einsatzId} aktuelleUhs={uhs} />
@@ -123,10 +117,7 @@ export default function UhsDetailPage() {
       }
       meta={meta}
       beschreibung={uhs.notiz ? `Notiz: ${uhs.notiz}` : undefined}
-      /* Betriebs-Feedback im Kopf (B6-Muster): die beiden Reiter tragen es seit B2, die
-         Seite selbst nicht — ausgerechnet dort, wo der Grundriss live mitläuft. Das
-         Primitiv rendert den Indikator; eine eigene `<Datenstand>`-Zeile daneben wäre die
-         zweite Bauform für dieselbe Sache. */
+      /* Datenstand im Kopf über das Primitiv — der Grundriss läuft live mit. */
       dataUpdatedAt={detailQuery.dataUpdatedAt}
       breadcrumb={
         <Breadcrumb
@@ -140,14 +131,11 @@ export default function UhsDetailPage() {
       }
       aktionen={
         <Space wrap size="middle">
-          {/* Die Zustände schliessen sich aus — aber das ist ab jetzt nicht mehr
-              handgezählt: die Dev-Warnung des Primitivs zählt die Primäraktionen in
-              diesem Slot, und der Test daneben prüft beide Zustände. */}
+          {/* Die Zustände schließen sich aus; die Dev-Warnung des Primitivs zählt die
+              Primäraktionen, der Test prüft beide Zustände. */}
           {!schreibgeschuetzt && uhs.status === 'aktiv' && (
-            /* Die Aufnahme ohne Modulwechsel (LFH-341 · H38). Nur im Betrieb: eine geplante
-               UHS nimmt niemanden auf, und dort steht „In Betrieb nehmen" als Primäraktion.
-               Die beiden schliessen sich damit aus — nicht mehr handgezählt, sondern von der
-               Dev-Warnung des Seitenkopfs (Task 2) und ihrem Test gedeckt. */
+            /* Aufnahme ohne Modulwechsel, nur im Betrieb: eine geplante UHS nimmt niemanden auf,
+               dort steht „In Betrieb nehmen" als Primäraktion. */
             <Button
               type="primary"
               icon={<UserAddOutlined aria-hidden />}
@@ -187,15 +175,14 @@ export default function UhsDetailPage() {
         </Space>
       }
       fensterInhalt={{
-        // Die bisherige Mindest-Arbeitsfläche bleibt: unter einem langen Kopf
-        // scrollt die Seite weiter, statt Grundriss und Reiter zu überlagern.
-        // 380px beschreibt die Fläche, nicht eine geschätzte Kopfhöhe.
+        // Mindest-Arbeitsfläche: unter einem langen Kopf scrollt die Seite, statt Grundriss und
+        // Reiter zu überlagern. 380 px beschreiben die Fläche, keine Kopfhöhe.
         mindestHoehe: 380,
         inhalt: <Grundriss einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />,
       }}
     >
-      {/* Der Seitenkopf teilt die echte Resthöhe mit dem Grundriss (LFH-459).
-          Material/Bewegungen folgen weiterhin im Seitenfluss (LFH-149). */}
+      {/* Der Seitenkopf teilt die Resthöhe mit dem Grundriss; Material/Bewegungen folgen im
+          Seitenfluss. */}
       <Segmentleiste
         rolle="tablist"
         beschriftung="Material und Bewegungen"

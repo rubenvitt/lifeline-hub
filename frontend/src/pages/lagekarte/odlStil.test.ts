@@ -26,8 +26,8 @@ function fc(stufen: (string | undefined)[]): FeatureCollection {
 
 describe('odlRadius', () => {
   it('wächst über die vier Stufen streng monoton', () => {
-    // Der Durchmesser ist der zweite Kanal neben der Rolle (WCAG 1.4.1): ein Kreis trägt
-    // keine Beschriftung, und eine erhöhte Sonde muss zwischen ~1 600 normalen heraustreten.
+    // Der Durchmesser ist der zweite Kanal (ein Kreis trägt keine Beschriftung), und eine erhöhte
+    // Sonde muss zwischen ~1 600 normalen heraustreten.
     expect(odlRadius('keine_messung')).toBeLessThan(odlRadius('normal'));
     expect(odlRadius('normal')).toBeLessThan(odlRadius('erhoeht'));
     expect(odlRadius('erhoeht')).toBeLessThan(odlRadius('stark_erhoeht'));
@@ -79,7 +79,7 @@ describe('odlDarstellung', () => {
 
 describe('odlGrundlage (LFH-598)', () => {
   it('liest `standort` samt Grundpegel, Faktor und Stand', () => {
-    // LITERAL: das Wort ist gegenüber `karte::odl_grundpegel::tests` gepinnt.
+    // Literal: das Wort ist gegenüber `karte::odl_grundpegel::tests` gepinnt.
     expect(
       odlGrundlage({
         bewertung: 'standort',

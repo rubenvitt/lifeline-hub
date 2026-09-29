@@ -1,9 +1,8 @@
 //! Befehle — Backend-Integrationstests.
 //!
-//! Angelegt mit LFH-305: der PATCH-Handler prüft die Abschnitts-Schlüssel gegen die feste
-//! Schlüsselmenge der Vorlage — enum-artig, also 400 nach der Statuscode-Konvention. Diese
-//! Stelle war bis dahin vollständig ungetestet, es gab gar keine `tests/befehl*.rs`.
-//! Harness 1:1 aus tests/lagebericht.rs, dessen Handler baugleich ist.
+//! Der PATCH-Handler prüft die Abschnitts-Schlüssel gegen die feste Schlüsselmenge der
+//! Vorlage — enum-artig, also 400 nach der Statuscode-Konvention (LFH-305). Harness 1:1 aus
+//! tests/lagebericht.rs, dessen Handler baugleich ist.
 
 use axum::http::StatusCode;
 
@@ -58,9 +57,9 @@ async fn patch_unbekannter_abschnitts_schluessel_ist_400() {
     assert_eq!(status, StatusCode::OK, "Positiv-Zweig: {antwort:?}");
 }
 
-/// Charakterisierung der Freigabe (LFH-690): Antwort, ETB-Snapshot und die beiden
-/// 422-Wortlaute sind byte-genau gepinnt. Der Handler rendert seit LFH-690 über
-/// `befehl::repo::freigeben_tx` auf der Verbindung; der Snapshot muss dabei derselbe bleiben.
+/// Charakterisierung der Freigabe: Antwort, ETB-Snapshot und die beiden 422-Wortlaute sind
+/// byte-genau gepinnt. Der Handler rendert über `befehl::repo::freigeben_tx` auf der
+/// Verbindung; der Snapshot muss dabei derselbe bleiben.
 #[tokio::test]
 async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     let app = setup().await;

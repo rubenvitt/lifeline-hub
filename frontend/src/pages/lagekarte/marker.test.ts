@@ -21,9 +21,7 @@ import type {
   Uhs,
 } from '../../api/types';
 
-/** `baueMarker` ist reine Ableitung ohne Render — der Token kommt deshalb direkt aus antd.
- *  Welcher Token es ist, ist egal: Erwartung und Code lesen denselben, geprüft wird die
- *  ROLLE, nicht der Wert. */
+/** `baueMarker` ist reine Ableitung — geprüft wird die Rolle, nicht der Tokenwert. */
 const token = theme.getDesignToken();
 
 function uhs(partial: Partial<Uhs>): Uhs {
@@ -153,10 +151,9 @@ describe('baueMarker', () => {
     expect(byKey('schaden-9')?.tz).toEqual({ grundzeichen: 'gefahr', farbe: '#faad14' });
   });
 
-  // LFH-328/A2, Spec §1.2: der Einsatzort ist der Ankerpunkt des EIGENEN Einsatzes (Marke),
-  // kein Gefahrenobjekt — auf `alarm` gezogen trüge dieselbe Farbe Gefahrengebiet UND
-  // Ortssignatur. Der Gate-5-Hexscan sieht nur, DASS kein Literal mehr dasteht, nicht WELCHE
-  // Rolle gewählt wurde; deshalb steht die Zuordnung hier.
+  // Der Einsatzort ist der Ankerpunkt des eigenen Einsatzes (Marke), kein Gefahrenobjekt — mit
+  // `alarm` trüge dieselbe Farbe Gefahrengebiet und Ortssignatur. Der Gate-5-Hexscan sieht nur,
+  // dass kein Literal dasteht, nicht welche Rolle; deshalb steht die Zuordnung hier.
   it('färbt Einsatzort mit der Marken- und UHS mit der Bedienrolle (nicht Alarm)', () => {
     const einsatz = { einsatzort: 'ELW', einsatzort_lat: 50, einsatzort_lon: 8 } as EinsatzAnzeige;
     const { verortet } = baueMarker(einsatz, [uhs({ id: 5, lat: 50.1, lon: 8.1 })], [], token);
@@ -165,7 +162,6 @@ describe('baueMarker', () => {
     expect(byKey('einsatzort')?.farbe).toBe(rollenFarbe('marke', token));
     expect(byKey('einsatzort')?.farbe).not.toBe(rollenFarbe('alarm', token));
     expect(byKey('uhs-5')?.farbe).toBe(rollenFarbe('bedien', token));
-    // Vorher stand hier `#1677ff` — antd-v5-Default-Blau, nicht der A0-Bedienwert.
     expect(byKey('uhs-5')?.farbe).not.toBe(rollenFarbe('marke', token));
   });
 });
@@ -450,13 +446,8 @@ describe('baueFreieZeichenMarker', () => {
 });
 
 /**
- * Trefferzone der Kräfte- und Objektmarker (LFH-711, Nachzug zu LFH-650).
- *
- * Bis hierher trugen nur die Betroffenen eine unsichtbare Trefferzone; auf der Lagekarte war
- * die Trefffläche das gezeichnete Zeichen (≤ 34 px, zoomabhängig) bzw. der Kreis einer
- * Lagemeldung (22 px). Jetzt setzt JEDER Builder der Lagekarte `trefferDurchmesser` aus
- * `controlHeight` — die Staffel aus dem echten Dichte-Helfer (`antdToken`), die Böden als
- * Literale: ein Token, der seine Erwartung selbst mitbringt, prüfte nur sich selbst.
+ * Trefferzone der Kräfte- und Objektmarker: jeder Builder der Lagekarte setzt `trefferDurchmesser`
+ * aus `controlHeight`. Staffel aus dem echten Dichte-Helfer (`antdToken`), die Böden als Literale.
  */
 describe('Trefferzone je Dichtestufe (LFH-711)', () => {
   const STUFEN = [
@@ -517,7 +508,7 @@ describe('Trefferzone je Dichtestufe (LFH-711)', () => {
   }
 
   it('deckt jede Markersorte der Lagekarte ab (außer den Betroffenen, die LFH-650 trägt)', () => {
-    // Selbstprobe der Stichprobe: fehlt hier eine Sorte, prüfte der nächste Test sie nicht.
+    // Selbstprobe: fehlt hier eine Sorte, prüfte der nächste Test sie nicht.
     const typen = new Set(alleLagekartenMarker(tokenFuer('kompakt')).map((m) => m.typ));
     expect([...typen].sort()).toEqual(
       [
@@ -544,8 +535,7 @@ describe('Trefferzone je Dichtestufe (LFH-711)', () => {
   }
 
   it('die Stufe schlägt durch: kompakt ist streng kleiner als handschuh', () => {
-    // Gegenprobe: eine feste Zahl in den Buildern bestünde beide Böden nicht, aber ein
-    // Boden allein belegte nicht, dass die Zone überhaupt der Stufe folgt.
+    // Gegenprobe: ein Boden allein belegte nicht, dass die Zone der Stufe folgt.
     const k = alleLagekartenMarker(tokenFuer('kompakt'))[0].trefferDurchmesser!;
     const h = alleLagekartenMarker(tokenFuer('handschuh'))[0].trefferDurchmesser!;
     expect(k).toBeLessThan(h);

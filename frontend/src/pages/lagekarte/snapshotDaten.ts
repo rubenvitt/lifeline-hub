@@ -16,15 +16,19 @@ import type {
 } from '../../api/types';
 import type { Hintergrundbild } from '../../api/kartenbilder';
 
-/** Woraus die Lagekarte ihre Objekte zieht (LFH-321, Inkrement C): der Live-Zustand oder ein
- *  eingefrorener Snapshot (Historien-Modus, schreibgeschützt). */
+/**
+ * Woraus die Lagekarte ihre Objekte zieht: der Live-Zustand oder ein eingefrorener Snapshot
+ * (Historien-Modus, schreibgeschützt).
+ */
 export type Standquelle = { typ: 'live' } | { typ: 'snapshot'; id: number };
 
-/** FE-lokale, getypte Sicht auf das eingefrorene `daten`-Dokument eines Lage-Snapshots.
- *  Das Backend legt rohe `*Anzeige`-DTO-Listen ab (`schema_version = 1`); im generierten Typ ist
- *  `daten` `unknown`, deshalb dieser Cast-Anker. Felder spiegeln `src/lage_snapshot/repo.rs`
- *  (`SnapshotDaten`). `org_default`/`gefahrengebiete[].hoechste_warnstufe` sind mit-eingefroren —
- *  im Snapshot-Modus MÜSSEN sie von hier gespeist werden, nicht aus Live-Queries. */
+/**
+ * FE-lokale, getypte Sicht auf das eingefrorene `daten`-Dokument eines Lage-Snapshots. Das Backend
+ * legt rohe `*Anzeige`-DTO-Listen ab (`schema_version = 1`); im generierten Typ ist `daten`
+ * `unknown`, deshalb dieser Cast-Anker. Die Felder spiegeln `SnapshotDaten` in
+ * `src/lage_snapshot/repo.rs`. `org_default` und `gefahrengebiete[].hoechste_warnstufe` sind mit
+ * eingefroren — im Snapshot-Modus müssen sie von hier kommen, nicht aus Live-Queries.
+ */
 export interface SnapshotDaten {
   version: number;
   stand_at: string;
@@ -42,11 +46,14 @@ export interface SnapshotDaten {
   gefahrengebiete: Gefahrengebiet[];
   lagemeldungen: LageMeldung[];
   bilder: Hintergrundbild[];
-  /** Betreuungsstellen (LFH-673). Optional: ältere Snapshots tragen das Feld nicht, und der
-   *  Server lässt es für Personen ohne Modul „Betreuung" weg — beides heißt „keine", nicht
-   *  Fehler. */
+  /**
+   * Betreuungsstellen. Optional: ältere Snapshots tragen das Feld nicht, und der Server lässt es
+   * für Personen ohne Modul „Betreuung" weg — beides heißt „keine", nicht Fehler.
+   */
   betreuungsstellen?: Betreuungsstelle[];
-  /** Evakuierungsbezirke (LFH-673) für Beschriftung und Inspector der Bezirksflächen —
-   *  optional aus denselben Gründen wie `betreuungsstellen`. */
+  /**
+   * Evakuierungsbezirke für Beschriftung und Inspector der Bezirksflächen — optional wie
+   * `betreuungsstellen`.
+   */
   evakuierungsbezirke?: Evakuierungsbezirk[];
 }

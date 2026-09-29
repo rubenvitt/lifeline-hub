@@ -1,9 +1,6 @@
 /**
- * Reiner Kern des Prognose-Dialogs (LFH-628) — Formularwerte ↔ Draht.
- *
- * Eigener Basename statt `PegelPrognose.ts` neben `PegelPrognoseModal.tsx`: die
- * Kollisionsregel aus CLAUDE.md (`direkteinstiegKern`) gilt für jedes Paar aus Komponente
- * und reinem Kern.
+ * Reiner Kern des Prognose-Dialogs — Formularwerte ↔ Draht. Basename bewusst nicht
+ * `PegelPrognose.ts` (Kollisionsregel `direkteinstiegKern`).
  */
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -47,16 +44,16 @@ export function vorhersageAlsWerte(v: PegelVorhersage): PrognoseFormWerte {
 }
 
 /**
- * Body, der eine gelöschte Prognose wiederherstellt (Rückgängig). Die Wire-Zeit geht
- * unverändert zurück: das Backend nimmt das SQLite-Format ebenso an wie ISO-8601. Rein.
+ * Body, der eine gelöschte Prognose wiederherstellt (Rückgängig). Die Wire-Zeit geht unverändert
+ * zurück: das Backend nimmt SQLite-Format wie ISO-8601. Rein.
  */
 export function wiederherstellBody(p: PegelPrognose): PrognoseEingabe {
   return { hoechststand_cm: p.hoechststand_cm, zeitpunkt: p.zeitpunkt };
 }
 
 /**
- * „PEGELONLINE-Vorhersage, gerechnet 07:00: höchster Wert 7,10 m um 18:00" — bei einem Wert
- * aus dem Abschätzungs-Teil der Reihe mit Zusatz, die Quelle unterscheidet beides. Rein.
+ * „PEGELONLINE-Vorhersage, gerechnet 07:00: höchster Wert 7,10 m um 18:00" — ein Wert aus dem
+ * Abschätzungs-Teil der Reihe bekommt einen Zusatz. Rein.
  */
 export function vorhersageSatz(
   v: PegelVorhersage,

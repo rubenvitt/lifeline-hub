@@ -1,4 +1,4 @@
-//! Integrationstests für GET/PUT /api/benutzer-einstellungen (LFH-391 · Etappe D).
+//! Integrationstests für GET/PUT /api/benutzer-einstellungen (LFH-391).
 //!
 //! Der Speicher ist ein Schlüssel/Wert-Fach **je Benutzer** — kein Org-, kein Einsatzbezug.
 //! Getestet wird deshalb vor allem, was ihn von einer globalen Tabelle unterscheidet:
@@ -105,8 +105,8 @@ async fn vorgabe_ist_leer_und_ohne_zeitstempel() {
         serde_json::json!({}),
         "ohne gespeicherte Präferenz ist die Map leer"
     );
-    // Norm (CLAUDE.md): `Option<T>` im Response-DTO wird bei `None` WEGGELASSEN, nicht
-    // als `null` geschickt — sonst kann der Client `absent` und `null` nicht trennen.
+    // `Option<T>` im Response-DTO wird bei `None` WEGGELASSEN, nicht als `null` geschickt —
+    // sonst kann der Client `absent` und `null` nicht trennen.
     assert!(
         !hat_key(&json, "geaendert_at"),
         "geaendert_at muss fehlen, solange nichts gespeichert ist — war: {json}"

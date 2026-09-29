@@ -25,7 +25,7 @@ export default function UnfallhilfsstellenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
-  // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207).
+  // Live-Updates über useEinsatzLiveStream im EinsatzLayout.
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -41,7 +41,7 @@ export default function UnfallhilfsstellenPage() {
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  // Schnellaktion: ?neu=1 öffnet den Anlegen-Drawer, sobald die Rechte feststehen (LFH-11).
+  // Schnellaktion: ?neu=1 öffnet den Anlegen-Drawer, sobald die Rechte feststehen.
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading) return;
@@ -65,14 +65,13 @@ export default function UnfallhilfsstellenPage() {
     { title: 'Standort', dataIndex: 'standort', render: (s: string | null) => s ?? '—' },
   ];
 
-  // ZWEI EBENEN, getrennt gehalten (LFH-331 · B3, D3):
+  // Zwei Ebenen, getrennt gehalten:
   //
-  // SEITENZUSTAND — nur `einsatzQuery`. Breadcrumb und Schreibrecht hängen an ihr, ohne sie
-  // gibt es keinen Rahmen; nur sie rechtfertigt einen Frühausstieg.
+  // Seitenzustand — nur `einsatzQuery`. Breadcrumb und Schreibrecht hängen an ihr; nur sie
+  // rechtfertigt einen Frühausstieg.
   //
-  // LISTENZUSTAND — `uhsQuery`. Sie entschied hier früher mit über die ganze Seite: bis ihre
-  // Antwort da war, stand alles im Ladebild, und scheiterte sie, blieb es dabei. Ihr Zustand
-  // gehört an die Stelle der Liste (unten), nicht in diesen Guard.
+  // Listenzustand — `uhsQuery`. Ihr Zustand gehört an die Stelle der Liste (unten), nicht in diesen
+  // Guard: sonst stünde die ganze Seite im Ladebild oder Fehler.
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.error) {
     return (
@@ -87,17 +86,13 @@ export default function UnfallhilfsstellenPage() {
   const alle = uhsQuery.data ?? [];
 
   /**
-   * ZWEI LAGEN, ZWEI ANTWORTEN (D3) — der Fehler allein reicht als Bedingung NICHT.
+   * Zwei Lagen, zwei Antworten — der Fehler allein reicht als Bedingung nicht. Ohne Zeilen im
+   * Zwischenspeicher tritt der Fehler an die Stelle der Tabelle, sonst behauptete „Noch keine
+   * Unfallhilfsstellen erfasst" eine leere Lage. Mit Zeilen bleiben sie stehen und bekommen ein
+   * Banner: echt, nur womöglich alt.
    *
-   * Ohne Zeilen im Zwischenspeicher tritt der Fehler an die Stelle der Tabelle, sonst
-   * behauptet „Noch keine Unfallhilfsstellen erfasst" eine leere Lage, wo bloß der Abruf
-   * scheiterte. MIT Zeilen bleiben sie stehen und bekommen ein Banner: sie sind echt, nur
-   * womöglich alt. Ein Fehler, der die Zeilen wegräumt, nähme der Einsatzkraft Daten, die
-   * sie eben noch hatte — das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
-   *
-   * Gemessen an der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`): an einer
-   * engeren Sicht gemessen kippte die Seite bei jedem Filter mit null Treffern in den
-   * Fehlerzweig.
+   * Gemessen an der ungefilterten Menge (Muster `TierePage`/`SchaedenPage`): an einer engeren Sicht
+   * gemessen kippte die Seite bei jedem Filter mit null Treffern in den Fehlerzweig.
    */
   const listeGescheitert = uhsQuery.isError && alle.length === 0;
   const standVeraltet = uhsQuery.isError && alle.length > 0;
@@ -121,15 +116,13 @@ export default function UnfallhilfsstellenPage() {
           Neu
         </Button>
       }
-      // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette, LFH-391 · B5)
-      // — mit DEMSELBEN Rechte-Riegel wie der Knopf darüber (dort `disabled`).
+      // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette) — mit demselben
+      // Rechte-Riegel wie der Knopf (dort `disabled`).
       neueZeile={schreibgeschuetzt ? undefined : () => setAnlegen(true)}
     >
-      {/* Der Fehler TAUSCHT die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (D3): `Datensicht` führt den Kartenzweig an `Liste`, und deren Vertrag kennt
-          keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer der
-          beiden Formen. Der Leertext ist byte-gleich dem aus `UnfallhilfsstellenDefault`:
-          zwei Formulierungen für dieselbe Tatsache wären der Befund, den B3 behebt. */}
+      {/* Der Fehler tauscht die Tabelle aus: `Datensicht` führt den Kartenzweig an `Liste`,
+          deren Vertrag keinen Fehlerbegriff kennt. Der Leertext ist gleich dem aus
+          `UnfallhilfsstellenDefault`. */}
       {listeGescheitert ? (
         <SeitenFehler
           text="Unfallhilfsstellen konnten nicht geladen werden"
@@ -137,8 +130,8 @@ export default function UnfallhilfsstellenPage() {
           onWiederholen={() => void uhsQuery.refetch()}
         />
       ) : uhsQuery.isSuccess && alle.length === 0 ? (
-        // Leerzustand MIT Weg hinaus (Neuentwurf, LFH-331 · B3): dieselbe Anlage wie im Kopf,
-        // mit demselben Rechte-Riegel. Ohne Schreibrecht bleibt es bei der Aussage.
+        // Leerzustand mit Weg hinaus: dieselbe Anlage wie im Kopf, mit demselben Rechte-Riegel.
+        // Ohne Schreibrecht bleibt es bei der Aussage.
         <SeitenLeer
           titel="Noch keine Unfallhilfsstellen erfasst"
           aktion={

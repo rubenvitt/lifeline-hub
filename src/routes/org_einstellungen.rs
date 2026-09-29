@@ -1,4 +1,4 @@
-//! HTTP-Routen für die org-weiten Einstellungen (admin-einstellungen, Task 4 + 5).
+//! HTTP-Routen für die org-weiten Einstellungen.
 //!
 //! GET  /api/org-einstellungen — Lesen: system_rolle=admin ODER org_rolle=fuehrungskraft.
 //! PUT  /api/org-einstellungen — Schreiben: nur system_rolle=admin (sonst 403).
@@ -6,7 +6,7 @@
 //! GET  /api/org-modul-einstellungen — Lesen: admin ODER fuehrungskraft.
 //! PUT  /api/org-modul-einstellungen/:modul_key — Schreiben: nur system_rolle=admin (sonst 403).
 //!
-//! `org_id` stammt stets aus dem eingeloggten Benutzer; nie aus dem Body (Org-Isolation).
+//! `org_id` stammt stets aus dem eingeloggten Benutzer, nie aus dem Body (Org-Isolation).
 
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
@@ -41,16 +41,16 @@ pub struct OrgEinstellungenUpdate {
     pub etb_nummer_praefix: Option<String>,
     pub meldung_nummer_praefix: Option<String>,
     pub auftrag_nummer_praefix: Option<String>,
-    /// Präfix der Einsatznummer (LFH-617) — wird beim Anlegen in die Nummer eingefroren.
+    /// Präfix der Einsatznummer — wird beim Anlegen in die Nummer eingefroren.
     pub einsatz_nummer_praefix: Option<String>,
     // Default-Fristen.
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
     pub rueckmeldung_frist_min: Option<i64>,
-    /// Auto-ETB-Dual-Publish: `false` schaltet ab (gespeichert als 0), `true`/fehlend = an.
-    /// Identisch mit `EinstellungenUpdate.auto_etb_eintraege` — bool auf Draht, i64 intern.
+    /// Auto-ETB: `false` schaltet ab (gespeichert als 0), `true`/fehlend = an. Wie
+    /// `EinstellungenUpdate.auto_etb_eintraege`: bool auf dem Draht, i64 intern.
     pub auto_etb_eintraege: Option<bool>,
-    /// Geocoder-Basis-URL (nur http/https); serverseitig für Ort-Vorschau (Task 9).
+    /// Geocoder-Basis-URL (nur http/https) für die Ort-Vorschau.
     pub geocoder_url: Option<String>,
 }
 
@@ -186,7 +186,7 @@ fn bereinige(feld: Option<String>) -> Option<String> {
     feld.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
-// ── Modul-Rollen-Defaults (Task 5) ──────────────────────────────────────────
+// ── Modul-Rollen-Defaults ──────────────────────────────────────────────────
 
 /// PUT-Body für einen Modul-Rollen-Default.
 #[derive(Debug, serde::Deserialize)]

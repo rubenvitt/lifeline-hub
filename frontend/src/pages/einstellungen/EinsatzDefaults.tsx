@@ -27,10 +27,12 @@ const RECHTE_TEXT =
   'Nur Benutzer mit der Systemrolle „Admin“ dürfen die Org-Defaults ändern — die Werte stehen hier zum Nachlesen.';
 
 /**
- * Admin-Sektion `/admin/einstellungen/einsatz` — Aufbewahrung, Nummernkreise, Fristen,
- * Auto-ETB + Modul-Rollen-Default. Edit nur system_rolle=admin. PUT ist Vollersatz → beim
- * Speichern wird der volle Payload aus geladenen Daten + eigenen Feldern gemerged. Die
- * Modul-Rollen-Selects speichern sofort (eigene Mutation, kein Form-Feld).
+ * Admin-Sektion `/admin/einstellungen/einsatz` — Aufbewahrung, Nummernkreise, Fristen, Auto-ETB +
+ * Modul-Rollen-Default. Bearbeiten nur `system_rolle=admin`. Der PUT ist Vollersatz (Payload aus
+ * geladenen Daten + eigenen Feldern). Die Modul-Rollen-Selects speichern sofort (eigene Mutation).
+ *
+ * Die ungespeicherte Fassung ist ein eigener State, nicht `form.isFieldsTouched()`: antd setzt das
+ * Flag beim Speichern nicht zurück.
  */
 export default function EinsatzDefaults() {
   const { benutzer } = useAuth();
@@ -51,15 +53,14 @@ export default function EinsatzDefaults() {
     queryFn: ladeOrgModulEinstellungen,
   });
 
-  // KEIN `onError`-Toast mehr (LFH-345 · C10, H14): der Fehler hängt an `mutation.error` und
-  // wird als `<SpeicherFehler>` gerendert. Ein Toast verfällt nach ~3 s, das ausgefüllte
-  // Formular stand danach unverändert da und wirkte gespeichert.
+  // Kein `onError`-Toast: der Fehler steht als `<SpeicherFehler>` da. Ein Toast verfiele, und das
+  // ausgefüllte Formular wirkte gespeichert.
   const speichernMutation = useMutation({
     mutationFn: (felder: Parameters<typeof speichereOrgEinstellungen>[0]) =>
       speichereOrgEinstellungen(felder),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.orgEinstellungen() });
-      // Die Org-Rückmeldefrist steckt im `faellig_at` jedes Einsatzes ohne eigene (LFH-610).
+      // Die Org-Rückmeldefrist steckt im `faellig_at` jedes Einsatzes ohne eigene.
       qc.invalidateQueries({ predicate: (q) => istRueckmeldungenKey(q.queryKey) });
       setHatFassung(false);
       message.success('Einstellungen gespeichert');
@@ -75,12 +76,11 @@ export default function EinsatzDefaults() {
     },
   });
 
-  // Ungespeicherte Fassung: eigener State (siehe Kopfkommentar), gesetzt bei jeder
-  // Feldänderung, zurückgesetzt beim erfolgreichen Speichern.
+  // Ungespeicherte Fassung (siehe Dateikopf): gesetzt bei jeder Feldänderung, zurückgesetzt beim
+  // erfolgreichen Speichern.
   useEffect(() => {
     if (!hatFassung) return;
-    // `preventDefault()` allein ist der heutige Weg — eine eigene Rückfrage zeigt der
-    // Browser nicht mehr an, `returnValue` ist überall abgekündigt.
+    // `preventDefault()` allein ist der heutige Weg — `returnValue` ist abgekündigt.
     const handler = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
@@ -103,7 +103,6 @@ export default function EinsatzDefaults() {
   const orgModul = modulQuery.data ?? {};
 
   function speichern(werte: FormWerteEinsatz) {
-    // Vollersatz-PUT: Basis aus geladenen Daten, Einsatz-Default-Felder überschreiben.
     speichernMutation.mutate({ ...zuUpdate(einstellungen), ...normalisiereEinsatz(werte) });
   }
 
@@ -113,11 +112,9 @@ export default function EinsatzDefaults() {
       breite="schmal"
       beschreibung="Org-weite Defaults für neue Einsätze. Einsatzspezifische Einstellungen überschreiben diese Werte."
       hinweis={
-        // NUR der Formular-Fehler. Die Modul-Liste speichert je Zeile sofort und trägt ihre
-        // Ablehnung deshalb bei sich (unten) — die beiden mit `??` zu verketten erzeugte
-        // einen erreichbaren Zustand, in dem der Text hier den einen Vorgang beschreibt,
-        // während der rote Zeilenrand unten den anderen markiert. Zwei Fehler, ein Kopf:
-        // dann sagt keiner mehr, was gerade schiefgegangen ist.
+        // Nur der Formular-Fehler. Die Modul-Liste speichert je Zeile sofort und trägt ihre
+        // Ablehnung selbst (unten) — zwei Vorgänge in einem Kasten sagen nicht mehr, was
+        // schiefging.
         <SeitenHinweise
           fehler={speichernMutation.error}
           rechteFehlt={!istAdmin}
@@ -231,9 +228,7 @@ export default function EinsatzDefaults() {
           </Form.Item>
         </Formularpaneel>
 
-        {/* Der Knopf VERSCHWINDET ohne Recht nicht (LFH-345 · C10, M16) — er steht gesperrt
-            da, und der Grund steht als `RechteHinweis` im Kopf. Ein fehlender Knopf ist von
-            „diese Seite kann das gar nicht" nicht zu unterscheiden. */}
+        {/* Ohne Recht steht der Knopf gesperrt da, der Grund als `RechteHinweis` im Kopf. */}
         <div style={speicherLeisteStil(token)}>
           <Button
             type="primary"
@@ -246,16 +241,14 @@ export default function EinsatzDefaults() {
         </div>
       </Form>
 
-      {/* ── Modul-Rollen-Default (Sofort-Speichern, kein Form-Feld) ──────── */}
+      {/* ── Modul-Rollen-Default (Sofort-Speichern, kein Form-Feld) ── */}
       <div style={{ marginTop: token.marginXL }}>
         <Formularpaneel
           titel="Modul-Rollen-Default"
           beschreibung="Org-weiter Default für die benötigte Rolle je Modul. Kann pro Einsatz überschrieben werden. Änderungen werden sofort gespeichert."
         >
-          {/* Die Ablehnung der Liste steht BEI der Liste, nicht im Seitenkopf: der Kopf trägt den
-          Formular-Fehler, und zwei Vorgänge in einem Kasten sagen nicht mehr, welcher gemeint
-          ist. Zusammen mit der Zeilenmarke (`fehlerKey`) ergibt das beide Kanäle am selben
-          Ort — Text und Rand zeigen auf dieselbe Zeile. */}
+          {/* Die Ablehnung der Liste steht bei der Liste, nicht im Seitenkopf; mit der
+              Zeilenmarke (`fehlerKey`) zeigen Text und Rand auf dieselbe Zeile. */}
           <div style={{ marginBottom: token.marginSM }}>
             <SpeicherFehler fehler={modulMutation.error} />
           </div>
@@ -271,9 +264,8 @@ export default function EinsatzDefaults() {
             }
             darfVerwalten={istAdmin}
             rechteGrund={{ kurz: 'nur Admins', lang: RECHTE_TEXT }}
-            // Nur die schreibende Zeile ist gesperrt (H15) und nur die gescheiterte markiert
-            // (H14). `variables` traegt die Zeile, die react-query gerade bearbeitet — bzw. die
-            // zuletzt gescheiterte, solange `error` steht.
+            // Nur die schreibende Zeile ist gesperrt, nur die gescheiterte markiert. `variables`
+            // trägt die laufende bzw. zuletzt gescheiterte Zeile.
             laeuftKey={modulMutation.isPending ? modulMutation.variables.modulKey : null}
             fehlerKey={modulMutation.isError ? modulMutation.variables.modulKey : null}
           />

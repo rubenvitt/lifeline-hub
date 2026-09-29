@@ -24,15 +24,16 @@ function render(wert: FreiesZeichenUpdate, extra: Partial<FreiesZeichenPickerPro
   return { onChange, onAbsenden, ...ergebnis };
 }
 
-// getByLabelText kann bei antd-Selects mehrfach matchen → über Anzahl testen (robust).
+// antd-Selects können bei getByLabelText mehrfach matchen → über die Anzahl testen.
 const sichtbar = (label: string) => screen.queryAllByLabelText(label).length > 0;
 
-/** Kachel-Abfragen laufen IMMER innerhalb ihres Rasters. Grundzeichen- und Symbolkatalog
- *  teilen sich Namen („Person", „Hubschrauber") — eine ungebundene Abfrage fände zwei. */
+/** Kachel-Abfragen immer innerhalb ihres Rasters: Grundzeichen- und Symbolkatalog teilen Namen. */
 const raster = (name: string) => within(screen.getByRole('radiogroup', { name }));
 
-/** Eingabefelder, getrennt nach „steht offen da" und „liegt hinter Details" — über
- *  DOM-Container, NICHT über `toBeVisible` (jsdom rechnet kein Layout). */
+/**
+ * Eingabefelder, getrennt nach „offen" und „hinter Details" — über DOM-Container, nicht
+ * `toBeVisible` (jsdom rechnet kein Layout).
+ */
 function felder() {
   const wurzel = document.querySelector('[data-lfh="zeichen-picker"]')!;
   const details = wurzel.querySelector('[data-lfh="zeichen-details"]');
@@ -47,8 +48,8 @@ function felder() {
 describe('FreiesZeichenPicker — Grundzeichen als Bild-Raster', () => {
   it('zeigt den vollen Katalog als Kacheln, ohne dass etwas geöffnet werden muss', () => {
     render({ grundzeichen: 'taktische-formation' });
-    // „Kein Grundzeichen" und „Stelle, Einrichtung" liegen NICHT im kuratierten
-    // Objekttyp-Set → sie belegen den vollen Katalog.
+    // „Kein Grundzeichen" und „Stelle, Einrichtung" liegen nicht im kuratierten Objekttyp-Set → sie
+    // belegen den vollen Katalog.
     const gz = raster('Grundzeichen');
     expect(gz.getByRole('radio', { name: 'Kein Grundzeichen' })).toBeInTheDocument();
     expect(gz.getByRole('radio', { name: 'Stelle, Einrichtung' })).toBeInTheDocument();
@@ -101,7 +102,7 @@ describe('FreiesZeichenPicker — Grundzeichen als Bild-Raster', () => {
       target: { value: 'hubschr' },
     });
     expect(raster('Grundzeichen').getByRole('radio', { name: 'Hubschrauber' })).toBeInTheDocument();
-    // Gegenaussage: was nicht passt, ist WEG — sonst filtert er nichts.
+    // Gegenaussage: was nicht passt, ist weg — sonst filtert er nichts.
     expect(raster('Grundzeichen').queryByRole('radio', { name: 'Person' })).toBeNull();
   });
 
@@ -203,8 +204,8 @@ describe('FreiesZeichenPicker — Feldbudget: Sekundäres hinter „Details"', (
     render({ grundzeichen: 'person' });
     const { offen, imDetail, alle } = felder();
     expect(offen).toHaveLength(2);
-    // Zweite Hälfte: die Felder sind WEGGERÄUMT, nicht abwesend — ohne `forceRender` wäre
-    // die erste Aussage trivial erfüllt.
+    // Die Felder sind weggeräumt, nicht abwesend — ohne `forceRender` wäre die erste Aussage
+    // trivial.
     expect(imDetail.length).toBeGreaterThanOrEqual(5);
     expect(alle.length).toBeGreaterThan(offen.length);
   });
@@ -244,8 +245,8 @@ describe('FreiesZeichenPicker — Enter platziert (LFH-716, D4)', () => {
   });
 
   it('Enter mit echter Tastatur auf einer Kachel: genau EIN onChange und EIN Absenden', async () => {
-    // `fireEvent.keyDown` erzeugt keinen synthetischen Klick; erst die echte Tastenfolge
-    // zeigt, ob der Browser auf dem `<button>` zusätzlich klickt (Review LFH-716, I3).
+    // `fireEvent.keyDown` erzeugt keinen synthetischen Klick; erst die echte Tastenfolge zeigt, ob
+    // der Browser auf dem `<button>` zusätzlich klickt.
     const user = userEvent.setup();
     const { onAbsenden, onChange } = render({ grundzeichen: 'taktische-formation' });
     raster('Grundzeichen').getByRole('radio', { name: 'Person' }).focus();

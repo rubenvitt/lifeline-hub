@@ -3,25 +3,16 @@ import { hochwasserKlasse, rollenFarbe, type StatusDarstellung } from '../../the
 import type { FeatureCollection, HochwasserKlasse } from '../../api/fachebenen';
 
 /**
- * Darstellung der LHP-Hochwasserebene (LFH-77): Rollenfarbe und Punktdurchmesser je
- * Pegelklasse, in die Feature-Properties eingebacken.
+ * Darstellung der LHP-Hochwasserebene: Rollenfarbe und Punktdurchmesser je Pegelklasse, in die
+ * Feature-Properties eingebacken — die Farbe kommt aus dem aufgelösten Token, und die
+ * Kartenstil-Module haben keinen `useToken()`-Zugang (siehe Kopf von `marker.ts`).
+ * `useLagekarteDaten` kennt den Modus und schreibt den fertigen Wert, der Layer liest ihn per
+ * `['get', …]`.
  *
- * WARUM EINGEBACKEN und nicht als MapLibre-Ausdruck über `klasse`: die Farbe kommt aus
- * dem aufgelösten antd-Token (Hell/Dunkel), und die Kartenstil-Module haben bewusst
- * keinen `useToken()`-Zugang (LFH-328/A2, siehe Kopf von `marker.ts`). Dieselbe
- * Arbeitsteilung wie bei den Zonen: `useLagekarteDaten` kennt den Modus und schreibt den
- * fertigen Wert ins Feature, der Layer liest ihn per `['get', …]`.
- *
- * DER RADIUS IST NICHT SCHMUCK. Ein Kreis trägt keine Beschriftung; ohne ihn
- * unterschiede die Ebene ihre sieben Klassen allein über drei Rollenfarben (WCAG 1.4.1).
- *
- * Die GROBE Trennung — gemeldetes Hochwasser sticht heraus, ein stummer Pegel bleibt ein
- * kleiner Punkt — ist die Lesart des Portals (`js/lage-basics.js:getRadiusPegel` vergibt
- * bei Zoom ≥ 8: unklassifiziert 4, `-1`/`0` 6, Klassen 1–4 einheitlich 7). Die feine
- * Staffelung innerhalb der vier Meldeklassen ist es NICHT — sie ist hier hinzugefügt,
- * weil `hochwasserKlasse` vier Klassen auf zwei Rollenfarben legt und der Radius die
- * Auflösung zurückholt, die die Farbe verliert. Wer sie wieder einebnet, nimmt der Karte
- * den Unterschied zwischen `klein` und `mittel` bzw. `gross` und `sehr_gross` ganz.
+ * Der Radius ist kein Schmuck: ein Kreis trägt keine Beschriftung, ohne ihn unterschiede die Ebene
+ * sieben Klassen über drei Rollenfarben (WCAG 1.4.1). Die grobe Trennung (gemeldet sticht heraus)
+ * folgt dem Portal (`js/lage-basics.js:getRadiusPegel`); die feine Staffel innerhalb der vier
+ * Meldeklassen ist hinzugefügt, weil `hochwasserKlasse` sie auf zwei Farben legt.
  */
 const RADIUS: Record<HochwasserKlasse, number> = {
   keine_daten: 3,
@@ -34,18 +25,14 @@ const RADIUS: Record<HochwasserKlasse, number> = {
 };
 
 /**
- * Unbekannter/fehlender Wert → „keine Daten": die Ebene erfindet keine Meldeklasse.
- *
- * Dieser Rückfall ist STILL — eine Wire-Drift ergäbe eine flächendeckend graue Ebene,
- * ohne dass etwas rot wird. Er darf das sein, weil ein *geändertes* Wort auf keiner der
- * beiden Seiten unbemerkt bleibt: Rust pinnt seine Literale in
- * `karte::normalisierung::hochwasser_tests::bildet_die_hochwasserklassen_ab`, das
- * Frontend seine in `theme/statusFarben.test.ts`. Ungedeckt bleibt allein eine NEUE
- * Klasse, die nur eine Seite bekommt — wer eine einführt, fasst beide Pins an.
+ * Unbekannter/fehlender Wert → „keine Daten": die Ebene erfindet keine Meldeklasse. Der Rückfall
+ * ist still, aber ein geändertes Wort bleibt nicht unbemerkt: Rust pinnt seine Literale in
+ * `karte::normalisierung::hochwasser_tests::bildet_die_hochwasserklassen_ab`, das Frontend in
+ * `theme/statusFarben.test.ts`. Wer eine neue Klasse einführt, fasst beide Pins an.
  */
 function alsKlasse(roh: unknown): HochwasserKlasse {
-  // Eigene Schlüssel, nicht `in`: das sähe auch `constructor`/`toString` aus der
-  // Prototypkette. `Object.hasOwn` scheidet wegen `lib: ES2020` aus.
+  // Eigene Schlüssel, nicht `in` (sähe die Prototypkette). `Object.hasOwn` scheidet wegen `lib:
+  // ES2020` aus.
   return typeof roh === 'string' && Object.prototype.hasOwnProperty.call(hochwasserKlasse, roh)
     ? (roh as HochwasserKlasse)
     : 'keine_daten';

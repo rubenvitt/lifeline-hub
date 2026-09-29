@@ -24,8 +24,8 @@ import { Formularpaneel } from '../../components/instrument';
 
 /**
  * Admin-Sektion `/admin/einstellungen/anzeige` — org-weite Darstellungs-Defaults + Geocoder.
- * Edit nur system_rolle=admin; Führungskräfte sehen read-only. PUT ist Vollersatz → beim
- * Speichern wird der volle Payload aus geladenen Daten + eigenen Feldern gemerged.
+ * Bearbeiten nur `system_rolle=admin`. Der PUT ist Vollersatz: der Payload wird aus geladenen Daten
+ * + eigenen Feldern gemerged.
  */
 export default function AnzeigeEinstellungen() {
   const { benutzer } = useAuth();
@@ -41,12 +41,12 @@ export default function AnzeigeEinstellungen() {
   });
 
   const speichernMutation = useMutation({
-    // Arrow-Wrapper: react-query ruft mutationFn mit (variables, context) — den Kontext
-    // nicht an speichereOrgEinstellungen durchreichen (sonst 2. Arg im PUT-Wrapper).
+    // Arrow-Wrapper: react-query ruft mutationFn mit (variables, context) — der Kontext darf nicht
+    // als
+    // 2. Argument im PUT-Wrapper landen.
     mutationFn: (felder: Parameters<typeof speichereOrgEinstellungen>[0]) =>
       speichereOrgEinstellungen(felder),
-    // KEIN `onError`-Toast mehr (LFH-345 · C10, H14): der Fehler hängt an `mutation.error`
-    // und steht als `<SeitenHinweise>` über dem Formular. Ein Toast verfällt nach ~3 s.
+    // Kein `onError`-Toast: der Fehler steht als `<SeitenHinweise>` über dem Formular.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.orgEinstellungen() });
       message.success('Einstellungen gespeichert');
@@ -86,10 +86,9 @@ export default function AnzeigeEinstellungen() {
         />
       }
     >
-      {/* Der Speichern-Knopf liegt seit dem Neuentwurf IM `<form>` (sticky Leiste unten,
-          `htmlType="submit"`) statt im Kopf-Slot: der Kopf trägt, was ÖFFNET, nie was
-          ABSENDET (LFH-346 · C11) — und nur im `<form>` sendet Enter ab (Erfassungs-Norm B4).
-          Der Knopf VERSCHWINDET ohne Recht nicht (LFH-345 · C10, M16) — gesperrt mit Grund. */}
+      {/* Der Speichern-Knopf liegt im `<form>` (sticky Leiste unten, `htmlType="submit"`), nicht
+          im Kopf-Slot: nur im `<form>` sendet Enter ab. Ohne Recht steht er gesperrt da, mit
+          Grund. */}
       <Form<FormWerteAnzeige>
         form={form}
         layout="vertical"

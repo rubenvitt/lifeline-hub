@@ -1,4 +1,4 @@
-//! OIDC/SSO-Login-Smoke gegen ein echtes PocketID (LFH-41, Increment 3). `#[ignore]`: braucht
+//! OIDC/SSO-Login-Smoke gegen ein echtes PocketID (LFH-41). `#[ignore]`: braucht
 //! einen laufenden PocketID-Server + einen laufenden `lifeline-hub`-Prozess + einen Browser —
 //! nicht Teil der Unit-Suite (kein Netz, kein Redirect-Flow in `cargo test`).
 //!

@@ -37,10 +37,9 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     let pool = db::connect(&config.db_path).await?;
     db::migrate(&pool).await?;
 
-    // bootstrap_admin läuft ZUERST: legt auf leerer DB Organisation, Admin-Konto und
-    // die Default-Kataloge (Fahrzeug-Status, Einsatzstichworte) an. Muss vor dev_seed
-    // laufen, damit die Kataloge auch im dev-seeds-Modus geseedet werden (sonst
-    // hätten bereits Benutzer existiert und bootstrap_admin wäre ein No-Op).
+    // `bootstrap_admin` läuft ZUERST: es legt auf leerer DB Organisation, Admin und
+    // Default-Kataloge an. Nach `dev_seed` gäbe es schon Benutzer, und der Bootstrap wäre ein
+    // No-op ohne Kataloge.
     let ergebnis = lifeline_hub::auth::bootstrap::bootstrap_admin(
         &pool,
         &config.org_name,
@@ -50,8 +49,8 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     .await?;
     if ergebnis.admin_angelegt {
         tracing::info!("Admin-Konto '{}' angelegt", config.admin_user);
-        // Im dev-seeds-Build setzt dev_seed das Admin-Passwort gleich auf das
-        // bekannte Dev-Passwort zurück → ein generiertes Passwort nicht bewerben.
+        // Im dev-seeds-Build setzt `dev_seed` das Admin-Passwort auf das Dev-Passwort zurück — ein
+        // generiertes Passwort also nicht bewerben.
         #[cfg(not(feature = "dev-seeds"))]
         if let Some(pw) = &ergebnis.generiertes_passwort {
             tracing::warn!(
@@ -60,9 +59,8 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         }
     }
 
-    // Dev-only: reproduzierbare Testdaten seeden, NACH bootstrap_admin. dev_seed setzt
-    // die Seed-Benutzer (inkl. des von bootstrap angelegten Admins) per Upsert auf das
-    // bekannte Dev-Passwort, damit der /api/dev/users-Login-Picker funktioniert.
+    // Dev-only, nach `bootstrap_admin`: setzt die Seed-Benutzer (inkl. Admin) auf das bekannte
+    // Dev-Passwort für den Login-Picker.
     #[cfg(feature = "dev-seeds")]
     {
         lifeline_hub::dev::seed::dev_seed(&pool).await?;
@@ -71,16 +69,15 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         );
     }
 
-    // Offline-Karten-Verzeichnis aus dem DB-Pfad ableiten (keine eigene ENV/CLI-Option, LFH-179)
-    // und beim Start anlegen — die Tile-Auslieferung löst relative Pfade dagegen auf.
+    // Offline-Karten-Verzeichnis aus dem DB-Pfad ableiten und anlegen; die Tile-Auslieferung löst
+    // relative Pfade dagegen auf.
     let karten_dir = lifeline_hub::config::default_karten_dir(&config.db_path);
     std::fs::create_dir_all(&karten_dir)?;
-    // Optionale eingebettete Welt-Übersicht (LFH-207) einmalig nach karten_dir extrahieren, BEVOR
-    // Tiles ausgeliefert werden. Graceful: ohne eingebettetes Asset ein No-op.
+    // Eingebettete Welt-Übersicht einmalig extrahieren, bevor Tiles ausgeliefert werden; ohne Asset
+    // ein No-op.
     lifeline_hub::karte::assets::extrahiere_welt_uebersicht(&karten_dir);
 
-    // Crash-Recovery (LFH-181): hängende 'laedt'-Downloads auf 'fehler' setzen und verwaiste
-    // .part-Dateien löschen — gespawnte Download-Tasks überleben keinen Neustart.
+    // Crash-Recovery: hängende Downloads auf 'fehler' setzen und `.part`-Dateien löschen.
     match lifeline_hub::karte::registry::repo::reset_haengende_downloads(&pool).await {
         Ok(ids) => {
             for id in ids {
@@ -93,9 +90,9 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     let live = LiveHub::new();
     // Zeitbasierte Erinnerungen: Hintergrund-Scheduler starten (nur im Server-Lauf).
     lifeline_hub::erinnerung::scheduler::starte_scheduler(pool.clone(), live.clone());
-    // Aufbewahrung & Archiv (LFH-135): Purge-Scheduler (Soft-Delete + PII-Schwärzung).
+    // Purge-Scheduler (Soft-Delete + PII-Schwärzung).
     lifeline_hub::einsatz::purge_scheduler::starte_purge_scheduler(pool.clone());
-    // Automatische Sicherungen (LFH-251/F31) — No-op ohne --backup-verzeichnis.
+    // Automatische Sicherungen; No-op ohne `--backup-verzeichnis`.
     lifeline_hub::backup::scheduler::starte_backup_scheduler(
         pool.clone(),
         lifeline_hub::backup::scheduler::BackupConfig {
@@ -108,8 +105,8 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         },
     );
 
-    // AV-Scan-Konfiguration (LFH-114) prozessweit setzen (bewusst NICHT in AppState,
-    // um die vielen inline AppState-Konstruktionen nicht zu brechen).
+    // AV-Scan-Konfiguration prozessweit setzen (nicht in `AppState`, wegen der
+    // Test-Konstruktionen).
     if config.clamav_addr.is_some() && !cfg!(feature = "clamav") {
         tracing::warn!(
             "LIFELINE_CLAMAV_ADDR ist gesetzt, aber die Binary wurde mit `--no-default-features` \
@@ -124,8 +121,8 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         timeout: std::time::Duration::from_secs(config.clamav_timeout_secs),
     });
 
-    // Karten-Schalter (LFH-239/F18) prozessweit setzen — beide schwächen bzw. verbiegen
-    // eine Vertrauensgrenze und liefen vorher unsichtbar per std::env::var mit.
+    // Karten-Schalter prozessweit setzen; beide schwächen bzw. verbiegen eine Vertrauensgrenze und
+    // gehören deshalb ins Log.
     if config.download_allow_loopback {
         tracing::warn!(
             "SSRF-Schutz ist abgeschwächt: --download-allow-loopback \
@@ -146,8 +143,8 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         offline_katalog_manifest_url: config.offline_katalog_manifest_url.clone(),
     });
 
-    // KRITIS-Fachebene aus dem Deutschland-OSM-Extrakt (LFH-83). Default-an; nach
-    // `init_karte_config`, weil die URL-Prüfung den Loopback-Schalter von dort liest.
+    // KRITIS-Import; nach `init_karte_config`, weil die URL-Prüfung den Loopback-Schalter von dort
+    // liest.
     lifeline_hub::karte::kritis::scheduler::starte(
         karten_dir.clone(),
         lifeline_hub::karte::kritis::scheduler::KritisExtraktConfig {
@@ -159,35 +156,23 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         },
     );
 
-    // OIDC-Konfiguriertheit (LFH-41, Increment 3 SSO-Fundament) prozessweit setzen —
-    // reine Config-Ableitung, KEIN Netzzugriff (Discovery ist Lazy: erst bei erster
-    // OIDC-Nutzung, dann gecacht). Alle vier Settings (inkl. `oidc_redirect_url`) sind
-    // Teil der Bedingung — `oidc_client()` (auth::oidc::mod) verlangt `redirect_url`
-    // zwingend; ohne sie würde der Login serverseitig ohnehin fail-closed abbrechen.
-    // Der Provider soll also nur dann gelistet/aktiv sein (und der Login-Button nur
-    // dann erscheinen), wenn ein Login tatsächlich gelingen kann — sonst wäre der
-    // Button ein Footgun, der erst beim Klick als Fehlkonfiguration auffällt.
+    // OIDC-Konfiguriertheit setzen — reine Config-Ableitung ohne Netz (Discovery ist lazy). Alle
+    // vier Werte inkl. `oidc_redirect_url` gehören zur Bedingung, weil `oidc_client()` die
+    // Redirect-URL verlangt: der Provider soll nur gelistet sein, wenn ein Login gelingen kann.
     lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(
         config.oidc_issuer.is_some()
             && config.oidc_client_id.is_some()
             && config.oidc_client_secret.is_some()
             && config.oidc_redirect_url.is_some(),
     );
-    // Resolved OIDC-Einstellungen prozessweit ablegen (siehe `auth::oidc::OidcSettings`-Doc):
-    // `oidc_client` bleibt unit-testbar mit einer expliziten `&OidcSettings`-Referenz, der
-    // `oidc_start`-Handler (Task 5) liest sie über `auth::oidc::oidc_settings()`.
+    // OIDC-Einstellungen prozessweit ablegen (s. `auth::oidc::OidcSettings`).
     lifeline_hub::auth::oidc::init_oidc_settings(lifeline_hub::auth::oidc::OidcSettings::from(
         &config,
     ));
 
-    // WebAuthn/Passkeys (LFH-275, Increment 4): EAGER Boot-Bau + Boot-Validierung — anders als
-    // OIDC (reine Config-Ableitung + Lazy Discovery) versucht WebAuthn den vollen
-    // `WebauthnBuilder::new(rp_id, &origin)?.build()?` bereits jetzt. Nur bei `Ok` wird der
-    // Provider gelistet UND das gebaute `Webauthn` prozessweit gehalten (`set_webauthn`) —
-    // spätere Ceremony-Endpoints (Task 5/6) greifen darauf zu. Bei `Err`/fehlender Config bleibt
-    // der Provider ungelistet (kein Fake-Button, der erst beim Klick als Fehlkonfiguration
-    // auffällt — derselbe Footgun-Fix wie beim OIDC-`redirect_url`). Keine Netzwerknutzung: der
-    // Bau ist reine lokale Config-/URL-Validierung.
+    // WebAuthn: eager Bau und Validierung schon beim Start (lokal, ohne Netz). Nur bei `Ok` wird
+    // der Provider gelistet und das `Webauthn` gehalten; sonst bleibt er ungelistet, statt einen
+    // Knopf zu zeigen, der erst beim Klick scheitert.
     if let (Some(rp_id), Some(rp_origin)) = (&config.webauthn_rp_id, &config.webauthn_rp_origin) {
         match lifeline_hub::auth::webauthn::baue(rp_id, rp_origin) {
             Ok(webauthn) => {
@@ -204,8 +189,8 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         }
     }
 
-    // Demo-Daten (LFH-690): der Schalter reist als Router-Option, die Routen existieren nur
-    // mit ihm. Er öffnet einen harten Löschweg, deshalb steht er sichtbar im Log.
+    // Demo-Daten: der Schalter reist als Router-Option. Er öffnet einen harten Löschweg und steht
+    // deshalb im Log.
     if config.demo_daten {
         tracing::warn!(
             "Demo-Daten sind freigeschaltet: --demo-daten (LIFELINE_DEMO_DATEN) ist AKTIV — \
@@ -234,9 +219,9 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     );
 
     if config.tls {
-        // CryptoProvider: rustls 0.23 nutzt bei GENAU EINEM kompilierten Provider-Feature dessen
-        // Default automatisch — meist KEIN manueller install_default() nötig. Hier bewusst KEINE
-        // hartkodierte Provider-Zeile (siehe Step 2 „CryptoProvider-Fall" für den Ernstfall).
+        // rustls 0.23 wählt bei genau einem kompilierten Provider-Feature dessen Default
+        // automatisch;
+        // deshalb keine hartkodierte Provider-Zeile.
 
         // SANs: localhost + Bind-IP + optionaler Hostname.
         let bind_ip = config
@@ -269,41 +254,37 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
 
         lifeline_hub::auth::session::set_cookie_secure(true);
 
-        // Achtung: anders als der HTTP-Pfad (`TcpListener::bind` = ToSocketAddrs, löst Hostnamen)
-        // erwartet axum-server eine `SocketAddr`. `--bind <hostname>:<port>` funktioniert daher NUR
-        // im HTTP-Modus; unter `--tls` muss `--bind` IP:Port sein (Default 127.0.0.1:8080 ist ok).
+        // Anders als `TcpListener::bind` erwartet axum-server eine `SocketAddr`: unter `--tls` muss
+        // `--bind` IP:Port sein (Hostnamen gehen nur im HTTP-Modus).
         let addr: std::net::SocketAddr = config.bind.parse().map_err(|e| {
             anyhow::anyhow!("--bind muss unter --tls IP:Port sein (kein Hostname): {e}")
         })?;
         tracing::info!("Server (HTTPS) lauscht auf {}", addr);
 
         let handle = graceful_handle();
-        // LFH-231/G10: Slow-Loris-Schutz. Der innere Akzeptor läuft VOR dem TLS-Handshake,
-        // das Verbindungs-Permit deckt ihn also mit ab.
+        // Slow-Loris-Schutz (LFH-231). Der innere Akzeptor läuft vor dem TLS-Handshake, das
+        // Verbindungs-Permit deckt ihn mit ab.
         let mut server = axum_server::bind_rustls(addr, tls_config)
             .map(|a| a.acceptor(verbindung::SemaphorAkzeptor::default()));
         verbindung::zeitschranken_setzen(&mut server, verbindung::Fristen::default());
-        // with_connect_info (LFH-249/F30): ohne das ist die Peer-Adresse im Handler nicht
-        // verfügbar — die Auth-Audit-Spur hätte dauerhaft eine leere Quell-IP und das
-        // Rate-Limit könnte gar nicht greifen. Muss auf BEIDEN serve-Pfaden stehen, sonst
-        // hängt das Verhalten daran, ob TLS aktiv ist.
+        // `with_connect_info`: ohne ist die Peer-Adresse im Handler nicht verfügbar — Audit-Spur
+        // ohne
+        // Quell-IP, Rate-Limit wirkungslos. Muss auf BEIDEN Serve-Pfaden stehen.
         server
             .handle(handle)
             .serve(app.into_make_service_with_connect_info::<std::net::SocketAddr>())
             .await?;
     } else {
-        // LFH-231/G10: `axum::serve` exponiert die hyper-Server-Parameter nicht — es baut den
-        // Builder pro Verbindung intern und gibt keinen Hook darauf. Ohne Header-Lese-Timeout
-        // bliebe der HTTP-Pfad gegen Slow Loris ungeschützt. Deshalb läuft er über denselben
-        // `axum-server` wie der TLS-Pfad; die Hostnamen-Auflösung des Binds bleibt erhalten,
-        // weil weiterhin `tokio::net::TcpListener::bind` (ToSocketAddrs) bindet und der
-        // Listener nur übergeben wird. `set_nonblocking` erledigt axum-server selbst.
+        // `axum::serve` gibt keinen Zugriff auf die hyper-Parameter; ohne Header-Lese-Timeout wäre
+        // der
+        // HTTP-Pfad gegen Slow Loris ungeschützt. Deshalb läuft er über `axum-server` wie der
+        // TLS-Pfad. Gebunden wird weiter über `TcpListener::bind`, damit Hostnamen aufgelöst
+        // werden.
         let listener = tokio::net::TcpListener::bind(&config.bind).await?;
         tracing::info!("Server lauscht auf {}", config.bind);
 
         let handle = graceful_handle();
-        // `from_tcp` gibt seit axum-server 0.8 ein `io::Result` zurück (der Listener wird
-        // intern nach tokio konvertiert, was fehlschlagen kann) — vorher war es der Server.
+        // `from_tcp` liefert ein `io::Result` (die Konvertierung nach tokio kann scheitern).
         let mut server = axum_server::from_tcp(listener.into_std()?)?
             .acceptor(verbindung::SemaphorAkzeptor::default());
         verbindung::zeitschranken_setzen(&mut server, verbindung::Fristen::default());
@@ -316,11 +297,9 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Subkommando `sqlite-version`: die einkompilierte SQLite-Version ausgeben (LFH-233/G02).
-///
-/// Fragt die tatsächlich geladene Bibliothek (In-Memory-DB), statt eine gepflegte Konstante
-/// auszugeben — im Advisory-Fall zählt, was wirklich im Binary steckt. `build-release.sh`
-/// legt die Ausgabe neben den SBOM.
+/// Subkommando `sqlite-version`: die einkompilierte SQLite-Version ausgeben (LFH-233). Fragt die
+/// tatsächlich geladene Bibliothek statt einer Konstante. `build-release.sh` legt die Ausgabe
+/// neben den SBOM.
 async fn cmd_sqlite_version() -> anyhow::Result<()> {
     let pool = sqlx::SqlitePool::connect("sqlite::memory:").await?;
     let version: String = sqlx::query_scalar("SELECT sqlite_version()")
@@ -365,16 +344,9 @@ async fn cmd_restore(
     Ok(())
 }
 
-/// Liefert ein `Handle`, das beim Shutdown-Signal den Graceful Shutdown auslöst.
-///
-/// Seit LFH-231/G10 laufen BEIDE Serve-Pfade über `axum-server` (nur dort ist der
-/// hyper-Builder für das Header-Lese-Timeout erreichbar). Der HTTP-Pfad nutzte vorher
-/// `axum::serve(..).with_graceful_shutdown(..)`, das unbegrenzt auf offene Verbindungen
-/// wartet; hier gilt nun dieselbe 10-Sekunden-Frist wie im TLS-Pfad — sinnvoll, weil eine
-/// SSE-Verbindung sonst den Shutdown beliebig lange offen hielte.
-/// Der Adress-Parameter ist seit axum-server 0.8 nötig (`Handle<A: Address>`, weil das Handle
-/// jetzt auch Unix-Sockets tragen kann). Beide Serve-Pfade hier binden auf IP, deshalb
-/// `SocketAddr`.
+/// `Handle` für den Graceful Shutdown mit 10-Sekunden-Frist für beide Serve-Pfade — eine
+/// SSE-Verbindung hielte den Shutdown sonst beliebig offen. `SocketAddr`, weil beide Pfade auf
+/// IP binden (`Handle<A: Address>` kann auch Unix-Sockets tragen).
 fn graceful_handle() -> axum_server::Handle<std::net::SocketAddr> {
     let handle = axum_server::Handle::new();
     let h2 = handle.clone();

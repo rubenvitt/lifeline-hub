@@ -1,36 +1,18 @@
-//! Passkey-Persistenz (LFH-275, Increment 4): der komplette, opak serialisierte `Passkey`
-//! (serde/JSON, `webauthn_rs::prelude::Passkey`) ist die **Quelle der Wahrheit** in
-//! `webauthn_credential.passkey_json`. `credential_id` bleibt in ihrer eigenen `BLOB
-//! UNIQUE`-Spalte (aus `passkey.cred_id()` extrahiert) für Lookup/UNIQUE-Erzwingung/
-//! `exclude_credentials` — sie ist eine reine Indexspalte, kein zweiter Datenspeicher.
+//! Passkey-Persistenz (LFH-275): der opak als JSON serialisierte `Passkey` in
+//! `webauthn_credential.passkey_json` ist die Quelle der Wahrheit. `credential_id` ist nur
+//! Indexspalte (Lookup, UNIQUE, `exclude_credentials`).
 //!
-//! **Inc-1-Altspalten `public_key`/`sign_count` (Plan-MUST: „NICHT missbrauchen"):** die
-//! Increment-1-Migration (0083) legte die Tabelle mit `public_key BLOB NOT NULL` (kein
-//! Default) und `sign_count INTEGER NOT NULL DEFAULT 0` an — geplant für eine spätere
-//! feldweise Persistenz, die mit der opaken Blob-Strategie (Increment 4) obsolet wurde.
-//! `Passkey` (webauthn-rs 0.5) exponiert weder den öffentlichen Schlüssel noch den Counter
-//! über eine öffentliche API (nur `cred_id()`/`cred_algorithm()`/`get_public_key() ->
-//! &COSEKey`, kein Rohbyte-Extraktor; der Counter ist komplett privat) — sie ließen sich nur
-//! über den „danger-credential-internals"-Featureflag „ehrlich" auslesen, was das ganze
-//! Opak-Storage-Konzept in Produktionscode unterlaufen würde. Statt einer IRREFÜHRENDEN
-//! Platzhalter-Befüllung (z. B. `credential_id` nochmal in `public_key` kopieren) bleibt
-//! `sign_count` schlicht bei ihrem `DEFAULT 0` (kein produktionsseitiger INSERT-Wert nötig)
-//! und `public_key` bekommt einen **expliziten leeren Blob** — unmissverständlich „nicht
-//! befüllt", keine vorgetäuschten echten Schlüsseldaten. Eine additive Migration, die beide
-//! Spalten nullable macht, wäre die sauberere Langfrist-Lösung, ist für zwei tote Spalten
-//! aber nicht in diesem Task ausgerollt (siehe Task-3-Report).
+//! Die Altspalten `public_key`/`sign_count` werden nicht befüllt: `Passkey` legt Schlüssel und
+//! Counter nicht offen (nur über das Feature `danger-credential-internals`, das die opake
+//! Speicherung unterliefe). `sign_count` bleibt beim `DEFAULT 0`, `public_key` bekommt einen
+//! expliziten leeren Blob statt vorgetäuschter Schlüsseldaten.
 
 use crate::error::AppError;
 use sqlx::SqlitePool;
 use webauthn_rs::prelude::Passkey;
 
-/// Speichert einen frisch registrierten Passkey für `benutzer_id`. `credential_id` wird aus
-/// `passkey.cred_id()` extrahiert (eigene Spalte, s. Moduldoc), der komplette Passkey landet
-/// opak als JSON in `passkey_json`.
-///
-/// Ein Passkey mit bereits vorhandener `credential_id` (UNIQUE-Verletzung) liefert
-/// `AppError::Conflict` (409) statt eines 500ers — derselbe Credential kann nicht zweimal
-/// registriert werden (das wäre ohnehin ein Client-/Ceremony-Bug, kein Serverfehler).
+/// Speichert einen frisch registrierten Passkey. Eine schon vorhandene `credential_id` liefert
+/// `AppError::Conflict` (409) statt 500.
 pub async fn speichere_passkey(
     pool: &SqlitePool,
     benutzer_id: i64,
@@ -46,9 +28,8 @@ pub async fn speichere_passkey(
     )
     .bind(benutzer_id)
     .bind(credential_id)
-    // Inc-1-Altspalte, seit der opaken Blob-Strategie (Increment 4) unbenutzt — expliziter
-    // leerer Blob statt vorgetäuschter echter Schlüsseldaten (s. Moduldoc). `sign_count`
-    // bleibt unbenannt und fällt auf ihr `DEFAULT 0` zurück.
+    // Altspalte: leerer Blob statt vorgetäuschter Schlüsseldaten (s. Modul-Doku); `sign_count`
+    // fällt auf `DEFAULT 0`.
     .bind(Vec::<u8>::new())
     .bind(&passkey_json)
     .execute(pool)
@@ -63,9 +44,8 @@ pub async fn speichere_passkey(
     }
 }
 
-/// Lädt alle Passkeys von `benutzer_id`, deserialisiert aus `passkey_json`. Wird u.a. für
-/// `exclude_credentials` bei der Registrierung und für `webauthn.start_passkey_authentication`
-/// beim Login gebraucht.
+/// Lädt alle Passkeys von `benutzer_id` (für `exclude_credentials` und
+/// `start_passkey_authentication`).
 pub async fn passkeys_fuer_benutzer(
     pool: &SqlitePool,
     benutzer_id: i64,
@@ -110,14 +90,11 @@ pub async fn passkey_je_credential_id(
         .transpose()
 }
 
-/// Schreibt den (vom Aufrufer bereits via `Passkey::update_credential` aktualisierten) Passkey
-/// zurück — Counter-Rückschreiben nach jeder erfolgreichen Authentisierung (Plan-MUST:
-/// Clone-Detection ist nur so stark wie der zurückgeschriebene Counter). Re-serialisiert den
-/// kompletten Passkey und ersetzt `passkey_json` anhand der (unveränderlichen) `credential_id`.
+/// Schreibt den per `Passkey::update_credential` fortgeschriebenen Passkey zurück — die
+/// Clone-Erkennung ist nur so stark wie der zurückgeschriebene Counter.
 ///
-/// Liefert `NotFound`, falls die `credential_id` zwischenzeitlich verschwunden ist (z. B.
-/// nebenläufig gelöschter Passkey) — ein stiller No-op-Erfolg würde das Counter-Rückschreiben
-/// nur vortäuschen.
+/// `NotFound`, wenn die `credential_id` inzwischen fehlt; ein stiller Erfolg würde das
+/// Rückschreiben nur vortäuschen.
 pub async fn aktualisiere_counter(pool: &SqlitePool, passkey: &Passkey) -> Result<(), AppError> {
     let credential_id: &[u8] = passkey.cred_id().as_ref();
     let passkey_json = serde_json::to_string(passkey)
@@ -145,13 +122,9 @@ mod tests {
         ParsedAttestation, RegisteredExtensions, UserVerificationPolicy,
     };
 
-    /// Baut einen ECHTEN `Passkey`-Wert (keine gefälschte Zeichenkette) über den von
-    /// webauthn-rs selbst bereitgestellten Escape-Hatch `danger-credential-internals`
-    /// (nur `[dev-dependencies]`, s. Cargo.toml-Kommentar): eine synthetische `Credential`
-    /// (alle Felder öffentlich) wird per `Passkey::from` konvertiert — echte Typ-Instanz,
-    /// durchläuft den echten serde-Pfad. Kryptografisch nicht gültig (keine echte
-    /// Attestation/Signatur) — für die reine Storage-Schicht irrelevant, die Passkeys nie
-    /// kryptografisch verifiziert, nur (de)serialisiert.
+    /// Echter `Passkey` über `danger-credential-internals` (nur `[dev-dependencies]`): eine
+    /// synthetische `Credential` per `Passkey::from`. Kryptografisch ungültig, für die reine
+    /// Storage-Schicht irrelevant.
     fn test_passkey(cred_id: &[u8], counter: u32) -> Passkey {
         let cred = Credential {
             cred_id: cred_id.to_vec().into(),
@@ -196,11 +169,8 @@ mod tests {
         pool
     }
 
-    /// `Passkey`s `PartialEq` vergleicht NUR `cred_id` (s. webauthn-rs interface.rs) — ein
-    /// `assert_eq!` auf zwei `Passkey`-Werten würde daher selbst bei unterschiedlichem
-    /// Counter/Inhalt grün bleiben. Für einen echten Roundtrip-/Änderungsvergleich wird
-    /// stattdessen die serialisierte JSON-Repräsentation verglichen (wie im Plan gefordert:
-    /// „serde-Vergleich der JSON").
+    /// `Passkey`s `PartialEq` vergleicht nur `cred_id`; verglichen wird deshalb die
+    /// JSON-Repräsentation.
     fn als_json(passkey: &Passkey) -> serde_json::Value {
         serde_json::to_value(passkey).expect("Passkey muss serialisierbar sein")
     }
@@ -279,10 +249,9 @@ mod tests {
             .await
             .unwrap();
 
-        // Simuliert, was der Aufrufer (Task 6: Login-Handler) nach einer erfolgreichen
-        // Authentisierung tut: den Passkey lokal mit einem höheren Counter fortschreiben
-        // (real via `Passkey::update_credential`), BEVOR aktualisiere_counter den
-        // re-serialisierten Wert persistiert. Gleiche credential_id, anderer Counter.
+        // Wie der Login-Handler nach erfolgreicher Authentisierung: gleiche `credential_id`,
+        // höherer
+        // Counter.
         let aktualisierter_passkey = test_passkey(b"cred-counter", 7);
 
         aktualisiere_counter(&pool, &aktualisierter_passkey)

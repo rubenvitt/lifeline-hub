@@ -1,43 +1,28 @@
-//! Schreib-Transaktions-Disziplin (F09/LFH-240): `BEGIN IMMEDIATE` + zentrale
-//! Busy-Retry-Schicht für den SQLite/WAL-Mehrplatzbetrieb.
+//! Schreib-Transaktions-Disziplin (LFH-240): `BEGIN IMMEDIATE` + zentrale Busy-Retry-Schicht
+//! für SQLite/WAL.
 //!
-//! Hintergrund: Der Pool erlaubt mehrere Verbindungen für Lesen UND Schreiben. Eine
-//! schreibende Transaktion, die zuerst liest (read-then-write), nimmt per deferred
-//! `BEGIN` einen Read-Snapshot; ihr erster Write ist dann ein Lock-Upgrade, das SQLite
-//! bei gehaltenem fremdem Writer SOFORT mit `SQLITE_BUSY` abweist — der `busy_timeout`
-//! kann beim Upgrade prinzipbedingt nicht warten (sqlx-sqlite `options/mod.rs:181`).
-//! `BEGIN IMMEDIATE` holt den Write-Lock vorab (am BEGIN, wo der `busy_timeout` warten
-//! darf) und schließt das Upgrade-Fenster; die Retry-Schicht fängt den Rest (Contention
-//! jenseits des Timeouts, `BUSY_SNAPSHOT`) und terminiert nach [`MAX_VERSUCHE`] fachlich
-//! (503 via `AppError`) statt als undurchsichtigen 500.
+//! Eine schreibende Transaktion, die zuerst liest, nimmt per deferred `BEGIN` einen
+//! Read-Snapshot; ihr erster Write ist ein Lock-Upgrade, das SQLite bei gehaltenem fremdem
+//! Writer SOFORT mit `SQLITE_BUSY` abweist — der `busy_timeout` wartet beim Upgrade nicht.
+//! `BEGIN IMMEDIATE` holt den Write-Lock am BEGIN, wo der Timeout wartet; die Retry-Schicht
+//! fängt den Rest und endet nach [`MAX_VERSUCHE`] mit 503 statt 500.
 //!
-//! Genutzt wird das Makro [`write_retry!`] — es expandiert INLINE in die aufrufende
-//! `async fn` (kein Closure/Fn-Trait, damit keine HRTB-Send-/Lifetime-Fallen bei
-//! captureten Referenzen wie `notiz: &str`).
+//! [`write_retry!`] expandiert inline in die aufrufende `async fn` (kein Closure), damit keine
+//! HRTB-Send-/Lifetime-Fallen bei geborgten Referenzen entstehen.
 //!
-//! **Reinheits-Kontrakt:** Der Transaktions-Body darf ausschließlich DB-Arbeit tun.
-//! KEINE nicht-idempotenten Seiteneffekte (SSE-Publish, Zähler, Channel-Sends) im Body
-//! — die liefen beim Retry doppelt. SSE/Broadcast bleibt (wie im ganzen Projekt, LFH-124)
-//! NACH dem Commit in der Route-Schicht.
+//! **Reinheits-Kontrakt:** der Body darf nur DB-Arbeit tun. Keine nicht-idempotenten
+//! Seiteneffekte (SSE-Publish, Zähler, Channel-Sends) — die liefen beim Retry doppelt.
+//! SSE/Broadcast bleibt nach dem Commit in der Route-Schicht.
 
 use std::time::Duration;
 
-/// Höchstzahl der Versuche einer schreibenden Transaktion bei `SQLITE_BUSY`.
-///
-/// Deckelt zugleich die Worst-Case-Latenz (LFH-302): jeder Versuch kann am `BEGIN IMMEDIATE`
-/// bis zum `busy_timeout` (5 s, `db.rs`) warten, bevor er `SQLITE_BUSY` liefert. Hält ein
-/// fremder Writer den WAL-Write-Lock durchgehend länger als das Timeout (anomale
-/// Massen-Operation), hängt ein konkurrierender Handler also bis zu `MAX_VERSUCHE × 5 s`,
-/// bevor er 503 liefert — axum hat kein Default-Request-Timeout, das ihn früher kappen würde.
-/// 4 Versuche halten den Worst Case bei ~20 s und kosten im Normalbetrieb nichts: dort löst
-/// sich Contention im Millisekundenbereich am BEGIN, mehr als ein bis zwei Versuche kommen
-/// praktisch nicht vor.
+/// Höchstzahl der Versuche bei `SQLITE_BUSY`. Deckelt zugleich die Worst-Case-Latenz: jeder
+/// Versuch kann am `BEGIN IMMEDIATE` bis zum `busy_timeout` (5 s) warten, ein Handler hängt also
+/// bis zu ~20 s. Im Normalbetrieb löst sich Contention in Millisekunden.
 pub(crate) const MAX_VERSUCHE: u32 = 4;
 
-/// `true`, wenn der Fehler aus der `SQLITE_BUSY`-Familie stammt (Primärcode 5:
-/// BUSY, BUSY_SNAPSHOT=517, BUSY_RECOVERY=261, BUSY_TIMEOUT=773). sqlx-sqlite liefert
-/// via [`sqlx::error::DatabaseError::code`] den *extended* Result-Code als Dezimalstring,
-/// daher `(code & 0xFF) == 5`.
+/// `true` für die `SQLITE_BUSY`-Familie (Primärcode 5: BUSY, BUSY_SNAPSHOT, BUSY_RECOVERY,
+/// BUSY_TIMEOUT). sqlx liefert den *extended* Code als Dezimalstring, daher `(code & 0xFF) == 5`.
 pub(crate) fn ist_busy(err: &sqlx::Error) -> bool {
     let sqlx::Error::Database(db) = err else {
         return false;
@@ -47,20 +32,19 @@ pub(crate) fn ist_busy(err: &sqlx::Error) -> bool {
         .is_some_and(|code| (code & 0xFF) == 5)
 }
 
-/// Kurzer linearer Backoff (2 ms je Versuch, gedeckelt). Der SQLite-Writer-Konflikt löst
-/// sich im Millisekundenbereich — wir wollen den Request-Handler nicht lange hängen lassen.
+/// Kurzer linearer Backoff (2 ms je Versuch, gedeckelt); der Writer-Konflikt löst sich in
+/// Millisekunden.
 pub(crate) async fn backoff(versuch: u32) {
     let ms = u64::from(versuch).saturating_mul(2).min(20);
     tokio::time::sleep(Duration::from_millis(ms)).await;
 }
 
-/// Führt einen schreibenden Transaktions-Body mit `BEGIN IMMEDIATE` aus und wiederholt die
-/// GANZE Transaktion (BEGIN … COMMIT) bei `SQLITE_BUSY` bis zu [`MAX_VERSUCHE`]-mal.
+/// Führt einen schreibenden Transaktions-Body mit `BEGIN IMMEDIATE` aus und wiederholt die GANZE
+/// Transaktion bei `SQLITE_BUSY` bis zu [`MAX_VERSUCHE`]-mal.
 ///
-/// Der Body erhält die offene Transaktion als `&mut SqliteConnection` (Name via `|conn|`)
-/// und endet mit `Ok(wert)`; `?` im Body terminiert nur die Transaktion, nicht die
-/// aufrufende Funktion. Der Ausdruck evaluiert zu `Result<wert, AppError>`. Reinheits-
-/// Kontrakt beachten (siehe Modul-Doku): keine Seiteneffekte im Body.
+/// Der Body erhält die Transaktion als `&mut SqliteConnection` (`|conn|`) und endet mit
+/// `Ok(wert)`; `?` im Body beendet nur die Transaktion. Der Ausdruck ergibt
+/// `Result<wert, AppError>`. Reinheits-Kontrakt beachten (s. Modul-Doku).
 ///
 /// ```ignore
 /// let id = write_retry!(pool, |conn| {
@@ -106,9 +90,9 @@ macro_rules! write_retry {
                         break ::std::result::Result::Err(::std::convert::From::from(__e));
                     }
                 },
-                // Fehler im Body: unter BEGIN IMMEDIATE hält die Tx den Write-Lock ab BEGIN,
-                // in-Tx-Statements können also nicht BUSYen (BUSY nur an BEGIN/COMMIT, dort
-                // behandelt). Propagieren statt erneut versuchen; __tx fällt aus dem Scope → ROLLBACK.
+                // Fehler im Body: unter BEGIN IMMEDIATE können in-Tx-Statements nicht BUSYen (nur
+                // BEGIN/COMMIT, dort behandelt). Propagieren; `__tx` fällt aus dem Scope →
+                // ROLLBACK.
                 ::std::result::Result::Err(__err) => break ::std::result::Result::Err(__err),
             }
         }
@@ -121,9 +105,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn nebenlaeufige_read_then_write_ohne_lost_update() {
-        // 40 parallele read-then-write-Erhöhungen desselben Zählers. Ohne
-        // BEGIN IMMEDIATE + Retry gäbe das Lost Updates bzw. SQLITE_BUSY-Fehler;
-        // mit dem Makro muss jede Erhöhung zählen. Braucht das Datei/WAL-Harness (F28).
+        // 40 parallele read-then-write-Erhöhungen desselben Zählers; jede muss zählen. Braucht das
+        // Datei/WAL-Harness.
         let (_dir, pool) = crate::db::test_pool_datei().await;
         sqlx::query("CREATE TABLE zaehler (id INTEGER PRIMARY KEY, wert INTEGER NOT NULL)")
             .execute(&pool)

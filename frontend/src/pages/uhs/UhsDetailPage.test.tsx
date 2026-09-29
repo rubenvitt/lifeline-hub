@@ -9,19 +9,17 @@ import { AuthProvider } from '../../auth/AuthContext';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { ladeUhs } from '../../api/einsatzUhs';
 
-// Auto-Mocks: für den Robustheits-Guard reicht no-op-API — bei ungültiger ID wird ohnehin
-// vor jedem Laden auf die Liste umgeleitet.
+// Auto-Mocks: bei ungültiger ID wird ohnehin vor jedem Laden auf die Liste umgeleitet.
 vi.mock('../../api/einsaetze');
 vi.mock('../../api/einsatzUhs');
-// Kind-Komponenten stubben: LFH-149 testet die Seiten-Komposition (Tabs statt Drawer),
-// nicht die Datenflüsse von Grundriss/Material/Bewegungen.
+// Kind-Komponenten gestubbt: geprüft wird die Seiten-Komposition, nicht Grundriss/Material/
+// Bewegungen.
 vi.mock('./Grundriss', () => ({ default: () => <div>GRUNDRISS</div> }));
 vi.mock('./MaterialTab', () => ({ default: () => <div>MATERIAL-TAB</div> }));
 vi.mock('./BewegungenTab', () => ({ default: () => <div>BEWEGUNGEN-TAB</div> }));
 vi.mock('./UhsSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
 
-/** Macht den aktuellen Pfad+Query im DOM sichtbar (Muster aus `AuftraegePage.test.tsx`s
- *  `LocationProbe`) — `window.location` ist unter einem `MemoryRouter` falsch. */
+/** Macht Pfad+Query im DOM sichtbar — `window.location` ist unter einem `MemoryRouter` falsch. */
 function LocationProbe() {
   const loc = useLocation();
   return (
@@ -67,10 +65,6 @@ describe('UhsDetailPage — Deeplink-Robustheit (LFH-25)', () => {
 
 describe('UhsDetailPage — Material/Bewegungen als Inline-Tabs (LFH-149)', () => {
   const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
-  // `typ` war hier `'sammelplatz'` — kein gültiger `UhsTyp` (patientenablage/behandlungsplatz/
-  // verletztensammelstelle/sonstige). Solange die Meta-Zeile den Wert roh ausgab, fiel das
-  // nicht auf; seit dem Umzug auf `uhsTyp[uhs.typ].label` (LFH-341 · C6) wäre das ein
-  // `undefined.label`-Absturz. Korrigiert auf einen echten Typ.
   const uhs = {
     id: 9,
     einsatz_id: 1,
@@ -100,8 +94,8 @@ describe('UhsDetailPage — Material/Bewegungen als Inline-Tabs (LFH-149)', () =
 });
 
 describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () => {
-  // Schreibberechtigt (aktiv + Einsatzleitung) — sonst rendert keiner der Statuswechsel-Knöpfe,
-  // und die Primäraktions-Zählung im Kopf hätte keinen Fall, den sie prüfen könnte.
+  // Schreibberechtigt (aktiv + Einsatzleitung) — sonst rendert kein Statuswechsel-Knopf, und die
+  // Primäraktions-Zählung hätte keinen Fall.
   const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
   const uhsBasis = {
     id: 9,
@@ -134,10 +128,7 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
     const { container } = renderBei('/einsaetze/1/unfallhilfsstellen/9');
     await screen.findByText('GRUNDRISS');
 
-    // `EinsatzSeite` trägt keine eigene Wurzel-Marke (nur den Aktionen-Slot). Der Slot IST die
-    // Zusicherung: an ihm hängt die Primäraktions-Zählung des Primitivs — ohne ihn wäre „wie
-    // viele Primäraktionen stehen im Kopf" eine Handzählung. `container` ist deshalb der
-    // ehrlichere Anker als ein erfundenes `data-testid="uhs-detail-seite"`.
+    // Der Aktionen-Slot ist die Zusicherung: an ihm hängt die Primäraktions-Zählung des Primitivs.
     expect(container.querySelector('[data-lfh="seitenkopf-aktionen"]')).not.toBeNull();
   });
 
@@ -146,9 +137,7 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
 
     for (const { status, primaer: erwartetePrimaeraktionen } of [
       { status: 'geplant', primaer: 1 },
-      // War NULL (der Befund H38 selbst: eine UHS im Betrieb bot im Kopf keine Aufnahme an,
-      // jeder Patient kostete einen Modulwechsel). LFH-341/C6 zieht sie auf 1 — „Patient
-      // aufnehmen" ist ab jetzt die Primäraktion einer aktiven UHS, siehe die Tests unten.
+      // „Patient aufnehmen" ist die Primäraktion einer aktiven UHS.
       { status: 'aktiv', primaer: 1 },
     ] as const) {
       vi.mocked(ladeUhs).mockResolvedValue({
@@ -190,15 +179,14 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
     renderBei('/einsaetze/1/unfallhilfsstellen/7');
 
     await userEvent.click(await screen.findByRole('button', { name: 'Patient aufnehmen' }));
-    // Die ADRESSE ist die Zusicherung, nicht der Klick: der `uhs`-Auftrag ist das,
-    // woran die Aufnahmeseite den Wartebereich-Eintritt erkennt.
+    // Die Adresse ist die Zusicherung: am `uhs`-Auftrag erkennt die Aufnahmeseite den
+    // Wartebereich-Eintritt.
     await waitFor(() => expect(aktuellerPfad()).toBe('/einsaetze/1/personen/aufnahme?uhs=7'));
   });
 
   it('bietet die Aufnahme in einer geplanten UHS nicht an', async () => {
-    // Eine geplante UHS nimmt niemanden auf — dort ist „In Betrieb nehmen" die
-    // Primäraktion. Ohne diese Gegenaussage wäre „genau eine Primäraktion" in Task 2
-    // eine Zählung ohne Fall, der sie verletzen könnte.
+    // Eine geplante UHS nimmt niemanden auf, dort ist „In Betrieb nehmen" die Primäraktion — die
+    // Gegenaussage zur Zählung.
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
     vi.mocked(ladeUhs).mockResolvedValue({
       ...uhsBasis,
@@ -213,8 +201,7 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
   });
 
   it('bietet die Aufnahme ohne Schreibrecht gar nicht erst an', async () => {
-    // Der Weg endet in einem POST; ein 403 nach dem Ausfüllen der Maske wäre die
-    // spaeteste denkbare Absage.
+    // Der Weg endet in einem POST; ein 403 nach dem Ausfüllen wäre die späteste denkbare Absage.
     vi.mocked(ladeEinsatz).mockResolvedValue({ ...einsatz, meine_rolle: 'beobachter' } as Awaited<
       ReturnType<typeof ladeEinsatz>
     >);

@@ -20,12 +20,11 @@ export function verschiebeEcken(ecken: Ecken, dLng: number, dLat: number): Ecken
   return ecken.map(([lng, lat]) => [lng + dLng, lat + dLat] as Ecke) as Ecken;
 }
 
-/** Uniform um die dem Griff gegenüberliegende Ecke (Anker) skalieren.
- *  Gleichmäßige Skalierung erhält Seitenverhältnis UND Drehung exakt — genau das
- *  gewünschte „Seitenverhältnis immer erhalten". Punkte in Bildschirm-Pixeln;
- *  `maus` ist die aktuelle Zeigerposition. Der Faktor ist die Projektion des
- *  Vektors anker→maus auf die Diagonale anker→griff (so folgt der Griff der Maus
- *  entlang der Diagonale, ohne das Rechteck zu scheren). */
+/**
+ * Uniform um die dem Griff gegenüberliegende Ecke (Anker) skalieren — erhält Seitenverhältnis und
+ * Drehung exakt. Punkte in Bildschirm-Pixeln; der Faktor ist die Projektion von anker→maus auf die
+ * Diagonale anker→griff, so folgt der Griff der Maus ohne das Rechteck zu scheren.
+ */
 export function skaliereUmAnker(
   ecken: Vier,
   griffIndex: number,
@@ -48,9 +47,9 @@ export function skaliereUmAnker(
 
 export type Kante = 'oben' | 'rechts' | 'unten' | 'links';
 
-// Pro Kante: die zwei Ecken, die mitwandern (gezogen), und die zwei der gegenüberliegenden
-// Kante (anker, bleiben fix). Indizes: 0=TL, 1=TR, 2=BR, 3=BL. gezogen[k] ist die direkt
-// gegenüber von anker[k] liegende Ecke derselben Längsseite.
+// Je Kante: die zwei mitwandernden Ecken (gezogen) und die zwei der gegenüberliegenden Kante
+// (anker, fix). Indizes 0=TL, 1=TR, 2=BR, 3=BL; `gezogen[k]` liegt `anker[k]` auf derselben
+// Längsseite gegenüber.
 const KANTEN_ECKEN: Record<Kante, { gezogen: [number, number]; anker: [number, number] }> = {
   oben: { gezogen: [0, 1], anker: [3, 2] },
   rechts: { gezogen: [1, 2], anker: [0, 3] },
@@ -58,10 +57,11 @@ const KANTEN_ECKEN: Record<Kante, { gezogen: [number, number]; anker: [number, n
   links: { gezogen: [0, 3], anker: [1, 2] },
 };
 
-/** Eine Kante entlang der Bild-Normalen verschieben (1D-Resize; gegenüberliegende Kante
- *  als Anker). Ändert NUR diese Dimension → Seitenverhältnis darf sich ändern (freies
- *  Strecken wie bei einem Rechteck). Drehung bleibt erhalten. Pixel-Raum; `maus` ist die
- *  Zeigerposition, die neue Ausdehnung ist deren Projektion auf die Normale ab dem Anker. */
+/**
+ * Eine Kante entlang der Bild-Normalen verschieben (gegenüberliegende Kante als Anker). Ändert nur
+ * diese Dimension, das Seitenverhältnis darf sich also ändern; die Drehung bleibt. Pixel-Raum, die
+ * neue Ausdehnung ist die Projektion von `maus` auf die Normale ab dem Anker.
+ */
 export function skaliereKante(ecken: Vier, kante: Kante, maus: Punkt, minPx = 8): Vier {
   const { gezogen, anker } = KANTEN_ECKEN[kante];
   const a0 = ecken[anker[0]];
@@ -93,9 +93,10 @@ export function rotiereUmZentroid(ecken: Vier, deltaRad: number): Vier {
   }) as Vier;
 }
 
-/** Achsenparalleles Rechteck (Pixel) um `centerPx`, Breite `breitePx`,
- *  Seitenverhältnis `ar` = Breite/Höhe. Reihenfolge TL, TR, BR, BL — passend zur
- *  image-source-Konvention; Pixel-Y wächst nach unten (TL/TR oben). */
+/**
+ * Achsenparalleles Rechteck (Pixel) um `centerPx`, Breite `breitePx`, Seitenverhältnis `ar` =
+ * Breite/Höhe. Reihenfolge TL, TR, BR, BL (image-source-Konvention); Pixel-Y wächst nach unten.
+ */
 export function eckenInitialPixel(centerPx: Punkt, breitePx: number, ar: number): Vier {
   const hw = breitePx / 2;
   const hh = hw / ar;

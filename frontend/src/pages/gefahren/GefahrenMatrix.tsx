@@ -11,26 +11,21 @@ import GefahrenZelleDetails from './GefahrenZelleDetails';
 import { useKopfFreiraum } from '../../components/KatalogTabelle';
 import './gefahrenMatrix.css';
 
-/** Bevorzugte Breite der fixierten Spalte „Gefahr". Mit `scroll={{ x: 'max-content' }}` ist
- *  sie eine MINDESTbreite: im Handschuh-Betrieb wächst die Spalte mit Polsterung und
- *  Beschriftung darüber hinaus — deshalb wird der Fokusabstand gemessen, nicht hieraus gelesen. */
+/**
+ * Bevorzugte Breite der fixierten Spalte „Gefahr". Mit `scroll={{ x: 'max-content' }}` ist sie nur
+ * eine Mindestbreite — deshalb wird der Fokusabstand gemessen, nicht hieraus gelesen.
+ */
 const GEFAHR_SPALTE_BREITE = 180;
 
 /** CSS-Variable des Fokusabstands zur fixierten Spalte (`gefahrenMatrix.css`). */
 export const SPALTEN_FREIRAUM = '--lfh-gefahr-spalte';
 
 /**
- * Schreibt die GEMESSENE Breite der fixierten Spalte als {@link SPALTEN_FREIRAUM} an die
- * Tabellenwurzel (LFH-373, WCAG 2.4.11).
- *
- * DER BEFUND: jede Spalte der Matrix trägt ein Fokusziel. Beim Tabben in eine weiter links
- * liegende Zelle rollt der Scrollcontainer nach links und richtet das Ziel am linken Rand des
- * Scrollports aus — unter der fixierten Spalte. Gemessen vollständig verdeckt bei 390 px in
- * allen Stufen, bei 1024 px in `kompakt`/`komfortabel`, bei 1366 px in `handschuh`.
- *
- * GEMESSEN statt aus {@link GEFAHR_SPALTE_BREITE}: der erste Fix las die Konstante und blieb
- * bei 1024 px in `handschuh` rückwärts rot — die Spalte war dort breiter als ihre 180 px.
- * Muster: `setzeKopfFreiraum` in `components/KatalogTabelle.tsx` (LFH-677).
+ * Schreibt die gemessene Breite der fixierten Spalte als {@link SPALTEN_FREIRAUM} an die
+ * Tabellenwurzel (WCAG 2.4.11): beim Tabben nach links richtet der Scrollcontainer das Ziel am
+ * linken Rand aus, also unter der fixierten Spalte. Gemessen statt aus {@link
+ * GEFAHR_SPALTE_BREITE}, weil die Spalte mit der Dichte breiter wird. Muster: `setzeKopfFreiraum`
+ * in `components/KatalogTabelle.tsx`.
  */
 export function setzeSpaltenFreiraum(wurzel: HTMLElement): void {
   const spalte = wurzel.querySelector<HTMLElement>('th.ant-table-cell-fix-start');
@@ -58,17 +53,19 @@ interface ZeilenDaten {
   label: string;
 }
 
-/** Welche Zelle der Detail-Dialog meint. Bewusst die Kennung statt des Datensatzes —
- *  Begründung am Zustand in {@link GefahrenMatrix}. */
+/**
+ * Welche Zelle der Detail-Dialog meint — die Kennung statt des Datensatzes, Begründung am Zustand
+ * in {@link GefahrenMatrix}.
+ */
 interface Zellkennung {
   typ: Gefahrentyp;
   objekt: Schutzobjekt;
 }
 
-/** Symbol + Kurzform je Schutzobjekt. Der Kopf trug vorher das volle Wort und war mit
- *  ~85 px nie breitenbestimmend — die Zelle ist es. Das Symbol ist deshalb Gewinn an
- *  Lesbarkeit, nicht an Breite; das Kurzwort bleibt als zweiter Kanal daneben stehen.
- *  Exportiert für den Matrixauszug der Palettenvorschau (LFH-664) — derselbe Kopf, keine Kopie. */
+/**
+ * Symbol + Kurzform je Schutzobjekt; das Kurzwort ist der zweite Kanal. Exportiert für den
+ * Matrixauszug der Palettenvorschau.
+ */
 export const SPALTENKOPF: Record<Schutzobjekt, { icon: IconType; kurz: string }> = {
   menschen: { icon: TbUsers, kurz: 'Mensch' },
   tiere: { icon: TbPaw, kurz: 'Tier' },
@@ -77,22 +74,16 @@ export const SPALTENKOPF: Record<Schutzobjekt, { icon: IconType; kurz: string }>
   einsatzkraefte: { icon: TbShieldHalf, kurz: 'Kraft' },
 };
 
-/** EINE Schreibweise für die Zell-Identität. Die Seite bildet den Schlüssel der
- *  laufenden Mutation mit derselben Funktion — zwei Schreibweisen und die Sperre
- *  greift stillschweigend nie. */
 /** Balken einer Matrixzelle — rein; ohne Warnstufe kein Balken. */
 export function zellBalkenStil(farbe: string | null): { boxShadow?: string } {
   return farbe == null ? {} : { boxShadow: `inset 0 -3px 0 0 ${farbe}` };
 }
 
 /**
- * Fläche + Balken einer Matrixzelle zur Warnstufe — EINE Stelle für die volle Matrix und den
- * Auszug der Palettenvorschau (LFH-664), damit beide dieselbe Zelle zeigen.
- *
- * Warnstufenbalken des Neuentwurfs (Gefahrenmatrix-Balken, umsetzung.md Palette „Warnstufe"):
- * 3 px unten, als Innenschatten — null Layout, die Zeilenhöhe springt beim Umbewerten nicht.
- * Der Balken trägt die Skala niedrig → akut in eigenen Tönen, die Fläche darunter die zwei
- * Intensitäten aus dem Flächenvertrag; der zweite Kanal bleibt das Kürzel in der Zelle.
+ * Fläche + Balken einer Matrixzelle zur Warnstufe — eine Stelle für Matrix und Palettenauszug. Der
+ * Balken sitzt 3 px unten als Innenschatten (kein Layout, die Zeilenhöhe springt beim Umbewerten
+ * nicht) und trägt die Skala niedrig → akut; die Fläche darunter die zwei Intensitäten aus dem
+ * Flächenvertrag. Zweiter Kanal bleibt das Kürzel.
  */
 export function zellFlaechenStil(
   stufe: Warnstufe,
@@ -104,6 +95,7 @@ export function zellFlaechenStil(
   };
 }
 
+/** Die eine Schreibweise der Zell-Identität — auch für den Schlüssel der laufenden Mutation. */
 export function zellSchluessel(typ: Gefahrentyp, objekt: Schutzobjekt): string {
   return `${typ}×${objekt}`;
 }
@@ -112,29 +104,20 @@ export interface GefahrenMatrixProps {
   matrix: GefahrBewertung[];
   darfSchreiben: boolean;
   /**
-   * Die Zelle, deren PUT unterwegs ist (`zellSchluessel`), oder `null`.
-   *
-   * Vorher stand hier `pending: boolean` und sperrte alle 58 bedienbaren Zellen —
-   * in einer Maske, die im Minutentakt bedient wird, ein Vollstopp pro Klick.
+   * Die Zelle, deren PUT unterwegs ist (`zellSchluessel`), oder `null` — gesperrt wird nur sie,
+   * nicht alle 58.
    */
   laufendeZelle: string | null;
   /** Stufenwechsel aus dem Menü. Kein Formularzustand zu schützen → `mutate` genügt. */
   onSetzen: (daten: BewertungEingabe) => void;
   /**
-   * Speichern aus dem Detail-Dialog. **Muss bei Ablehnung ablehnen** — also
-   * `mutateAsync`, nicht `mutate` (`components/Erfassung.tsx:121-124`).
-   *
-   * Zwei Wege statt einem, weil sie verschieden enden: ein abgelehnter Stufenwechsel
-   * kostet nichts, ein abgelehntes Detail-Speichern kostet den getippten Wortlaut. Gäbe
-   * es hier nur `onSetzen` (`=> void`), löste die Hülle sofort auf, leerte die Felder
-   * und schlösse den Dialog — auch bei 422. Genau der Fehler, gegen den die Hülle
-   * gebaut wurde.
+   * Speichern aus dem Detail-Dialog. Muss bei Ablehnung ablehnen (`mutateAsync`): ein abgelehntes
+   * Detail-Speichern kostete sonst den getippten Wortlaut, weil die Hülle leert und schließt.
    */
   onDetailsSpeichern: (daten: BewertungEingabe) => Promise<unknown>;
 }
 
-/** Das 13×5-Raster eines Gefahrengebiets. Einziger Konsument ist `GefahrenPage`;
- *  der frühere Hinweis auf einen „Karten-Drawer" beschrieb keinen. */
+/** Das 13×5-Raster eines Gefahrengebiets. */
 export default function GefahrenMatrix({
   matrix,
   darfSchreiben,
@@ -143,23 +126,16 @@ export default function GefahrenMatrix({
   onDetailsSpeichern,
 }: GefahrenMatrixProps) {
   const { token } = theme.useToken();
-  // Freiraum unter der stehenden Kopfzeile beim Rückwärtstabben (LFH-373, Mechanik LFH-677).
+  // Freiraum unter der stehenden Kopfzeile beim Rückwärtstabben.
   const tabelleRef = useRef<TableRef>(null);
   useKopfFreiraum(tabelleRef);
-  // Freiraum neben der fixierten Spalte beim Tabben nach links (LFH-373).
+  // Freiraum neben der fixierten Spalte beim Tabben nach links.
   useSpaltenFreiraum(tabelleRef);
   /**
-   * Im Zustand steht die KENNUNG der Zelle, nicht ihr Datensatz.
-   *
-   * Ein `useState<GefahrBewertung>` wäre eine Momentaufnahme: einmal beim Menüklick
-   * aus `matrix` kopiert und danach von keinem Nachladen mehr erreicht. Der Detail-PUT
-   * schickt aber `warnstufe` mit — die Momentaufnahme schriebe also die Stufe zurück,
-   * die zum Zeitpunkt des Klicks galt, und drehte eine inzwischen gesetzte still
-   * zurück. Zwei erreichbare Wege: ein zweiter Bediener am selben Gefahrengebiet
-   * (`GefahrenPage` invalidiert die Matrix bei jedem erfolgreichen PUT), und derselbe
-   * Bediener, der eine Stufe setzt und sofort „Details …" öffnet, bevor das Nachladen
-   * durch ist. Der frühere Inline-`DetailPopover` hatte dieses Problem nicht — er stand
-   * in der Zelle und bekam `zelle` bei jedem Render frisch.
+   * Im Zustand steht die Kennung der Zelle, nicht ihr Datensatz. Eine Momentaufnahme vom Menüklick
+   * würde von keinem Nachladen erreicht; der Detail-PUT schickt aber `warnstufe` mit und drehte
+   * eine inzwischen gesetzte Stufe still zurück (zweiter Bediener, oder Stufe setzen und sofort
+   * „Details …" öffnen).
    */
   const [detailKennung, setDetailKennung] = useState<Zellkennung | null>(null);
 
@@ -191,7 +167,6 @@ export default function GefahrenMatrix({
           return {
             'data-warnstufe': stufe,
             style: {
-              // Fläche + Warnstufenbalken — Begründung an `zellFlaechenStil`.
               ...zellFlaechenStil(stufe, token),
               textAlign: 'center' as const,
             },
@@ -199,10 +174,8 @@ export default function GefahrenMatrix({
         },
         render: (_: unknown, zeile: ZeilenDaten) => {
           if (!kombinationGueltig(zeile.typ, obj.wert)) {
-            // Zweiter Kanal für den gesperrten Zustand ist TEXT, nicht Blässe (WCAG 1.4.1):
-            // eine ausgegraute Fläche ohne Wort ist von „noch nicht bewertet" nicht zu
-            // unterscheiden. Kein Knopf — ein deaktivierter Auslöser gibt vor, es gäbe
-            // hier eine Entscheidung.
+            // Zweiter Kanal für „ungültig" ist Text, nicht Blässe (WCAG 1.4.1). Kein Knopf — ein
+            // deaktivierter Auslöser gäbe vor, es gäbe hier eine Entscheidung.
             return (
               <Typography.Text
                 type="secondary"
@@ -227,16 +200,13 @@ export default function GefahrenMatrix({
           return (
             <Dropdown
               trigger={['click']}
-              // `autoFocus` steht AM DROPDOWN, nicht im `menu`-Objekt: antd führt es in
-              // `DropdownProps`, `MenuProps` kennt es nicht (`antd/es/dropdown/dropdown.d.ts:35`).
-              // Gleiche Schreibweise wie `etb/MetaChip.tsx:152`.
+              // `autoFocus` steht am Dropdown: `MenuProps` kennt es nicht.
               autoFocus
               disabled={!darfSchreiben || laufendeZelle === schluessel}
               menu={{
                 items,
-                // Zuordnung AM MENÜ, nicht je Eintrag: ein Riegel hat dann einen Ort,
-                // und das Synthetic Event des Portals steigt nicht in einen klickbaren
-                // Elternteil (Muster und Falle aus LFH-365).
+                // Zuordnung am Menü, nicht je Eintrag: ein Riegel hat einen Ort, und das Synthetic
+                // Event des Portals steigt nicht in einen klickbaren Elternteil.
                 onClick: ({ key }) => {
                   if (key === 'details') {
                     setDetailKennung({ typ: zeile.typ, objekt: obj.wert });
@@ -254,12 +224,10 @@ export default function GefahrenMatrix({
             >
               <Button
                 type="text"
-                // Der Name trägt die ZEILENKENNUNG und die Stufe: 58 gleichnamige
-                // Knöpfe wären für Screenreader und Test gleich unbrauchbar.
+                // Der Name trägt Zeilenkennung und Stufe: 58 gleichnamige Knöpfe wären unbrauchbar.
                 aria-label={`Bewertung ${zeile.label} × ${obj.label}: ${warnstufeFlaeche[aktuell].label}`}
-                // Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider
-                // (30/48/72). `minWidth` = Höhe hält die Zelle quadratisch, damit die
-                // Matrix in jeder Dichtestufe im Breitenbudget bleibt.
+                // Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider. `minWidth` = Höhe
+                // hält die Zelle quadratisch und die Matrix im Breitenbudget.
                 style={{ minWidth: token.controlHeight }}
               >
                 {warnstufeFlaeche[aktuell].kuerzel}
@@ -272,8 +240,7 @@ export default function GefahrenMatrix({
   ];
   const zeilen: ZeilenDaten[] = GEFAHRENTYPEN.map((g) => ({ typ: g.wert, label: g.label }));
 
-  // Je Render frisch aus `matrix` abgeleitet — DAS ist die Zusicherung, die die
-  // Kennung im Zustand erkauft. Ein Nachladen erreicht den offenen Dialog damit.
+  // Je Render frisch aus `matrix` abgeleitet — so erreicht ein Nachladen den offenen Dialog.
   const detailZelle = detailKennung
     ? (zelleVon(detailKennung.typ, detailKennung.objekt) ?? null)
     : null;
@@ -292,9 +259,7 @@ export default function GefahrenMatrix({
         columns={spalten}
         dataSource={zeilen}
         pagination={false}
-        // Stehende Kopfzeile — der benannte Restposten der Guard-Ausnahme in
-        // `katalogTabelle.guard.test.ts`. 13 Zeilen scrollen im Fükw nicht, auf dem
-        // Handschirm schon.
+        // Stehende Kopfzeile — Restposten der Ausnahme in `katalogTabelle.guard.test.ts`.
         sticky
         scroll={{ x: 'max-content' }}
         ref={tabelleRef}
@@ -302,21 +267,15 @@ export default function GefahrenMatrix({
       />
       <GefahrenZelleDetails
         offen={detailKennung !== null}
-        // Die stabile Kennung trennt „ein anderer Datensatz" von „derselbe Datensatz,
-        // frisch geladen". Nur das Erste darf das Formular neu belegen — warum, steht
-        // am Vorbeleg-Effekt in `GefahrenZelleDetails`.
+        // Die stabile Kennung trennt „anderer Datensatz" von „derselbe, frisch geladen"; nur
+        // Ersteres belegt das Formular neu (siehe `GefahrenZelleDetails`).
         kennung={detailSchluessel}
         zelle={detailZelle}
         titel={detailTitel}
         laeuft={detailSchluessel !== null && laufendeZelle === detailSchluessel}
-        // `onDetailsSpeichern`, NICHT `onSetzen`: die Hülle darf die Felder nur leeren,
-        // wenn der PUT angenommen wurde. Das zurückgegebene Promise ist die Zusage —
-        // ein `async`-Wrapper um ein `=> void` wäre eine Zusage ohne Deckung.
-        //
-        // `warnstufe` kommt aus der ABGELEITETEN Zelle, nicht aus dem Zustand: sonst
-        // schriebe das Detail-Speichern eine überholte Stufe zurück. Der Rückfall auf
-        // `'keine'` greift nur, wenn die Zelle zwischenzeitlich aus der Matrix
-        // verschwunden ist — den Eintrag „Details …" gibt es sonst gar nicht.
+        // `onDetailsSpeichern`, nicht `onSetzen`: die Hülle leert nur, wenn der PUT angenommen
+        // wurde. `warnstufe` kommt aus der abgeleiteten Zelle, nicht aus dem Zustand; `'keine'`
+        // greift nur, wenn die Zelle inzwischen aus der Matrix verschwunden ist.
         onSpeichern={(beschreibung, gemeldetVon) =>
           onDetailsSpeichern({
             gefahrentyp: detailKennung!.typ,

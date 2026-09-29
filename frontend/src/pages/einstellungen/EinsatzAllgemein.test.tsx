@@ -4,15 +4,9 @@ import { Route, Routes } from 'react-router';
 import { renderMitProviders } from '../../test/utils';
 import EinsatzAllgemein from './EinsatzAllgemein';
 
-/**
- * Sektion „Allgemein" (LFH-345 · C10). Die fachlichen Aussagen stammen aus dem
- * Bestandstest von `EinsatzEinstellungenPage` (LFH-131/136, Task 15) und sind unverändert
- * gültig — sie sind nur dorthin gezogen, wo die Felder jetzt wohnen.
- */
-
-// Die Systemrolle ist umschaltbar, weil `darfImEinsatzSchreiben` einen System-Admin
-// unabhaengig von `meine_rolle` durchlaesst — ein fest auf 'admin' verdrahteter Mock kann
-// den Rechte-Hinweis also gar nicht ausloesen.
+// Die Systemrolle ist umschaltbar, weil `darfImEinsatzSchreiben` einen System-Admin unabhängig von
+// `meine_rolle` durchlässt — ein fest auf 'admin' verdrahteter Mock löste den Rechte-Hinweis nie
+// aus.
 const { benutzerRolle } = vi.hoisted(() => ({ benutzerRolle: { wert: 'admin' } }));
 
 vi.mock('../../auth/AuthContext', () => ({
@@ -90,7 +84,7 @@ describe('EinsatzAllgemein', () => {
     rendern();
 
     expect(await screen.findByText('Standard-Modul (Einstieg)')).toBeInTheDocument();
-    // Karten-Defaults (Basemap/Fachebenen) sind seit LFH-319 aus dem Formular entfernt.
+    // Karten-Defaults (Basemap/Fachebenen) stehen nicht im Formular (sie leben auf der Lagekarte).
     expect(screen.queryByText('Karten-Defaults')).not.toBeInTheDocument();
     // Gewähltes Standard-Modul: das Select-Selection-Item trägt title="ETB".
     expect(screen.getByTitle('ETB')).toBeInTheDocument();
@@ -186,12 +180,9 @@ describe('EinsatzAllgemein', () => {
   });
 
   /**
-   * „Enter sendet ab" ist auf DIESER Sektion nicht per Tastendruck belegbar: alle fünf
-   * Felder sind `Select`/`AutoComplete`, und `@rc-component/select` ruft in
-   * `BaseSelect/index.js:246` bei jedem Enter `preventDefault()`, solange der Modus nicht
-   * `combobox` ist. Prüfbar ist die STRUKTUR, aus der die Zusicherung folgt — der
-   * Absende-Knopf liegt im `<form>` (Muster `components/Erfassung.test.tsx`). Den
-   * Tastendruck selbst belegen die Sektionen mit echten Eingabefeldern.
+   * „Enter sendet ab" ist hier nicht per Tastendruck belegbar: alle Felder sind
+   * `Select`/`AutoComplete`, und rc-select ruft bei jedem Enter `preventDefault()`. Prüfbar ist die
+   * Struktur — der Absende-Knopf liegt im `<form>`.
    */
   it('haelt den Speichern-Knopf IM Formular (Erfassungs-Norm B4/LFH-332)', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue(BASIS as never);
@@ -226,8 +217,7 @@ describe('EinsatzAllgemein', () => {
     rendern();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
-    // Der Alert haengt an `mutation.error` und nicht an einer Toast-Queue mit eigener
-    // Lebensdauer — er steht noch, wenn der Toast laengst weg waere.
+    // Der Alert hängt an `mutation.error`, nicht an einer Toast-Queue mit eigener Lebensdauer.
     expect(await screen.findByText('Zeitzone unbekannt')).toBeInTheDocument();
     expect(screen.getByText('Nicht gespeichert')).toBeInTheDocument();
   });

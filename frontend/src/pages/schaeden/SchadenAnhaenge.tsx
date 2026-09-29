@@ -33,29 +33,19 @@ interface Props {
 }
 
 /**
- * Paneel „Fotos und Dateien“ auf der Schaden-Detailseite (LFH-21, design.md D9).
+ * Paneel „Fotos und Dateien“ auf der Schaden-Detailseite — eine Liste, keine Tabelle. Jede Zeile
+ * ist ein nativer Download-Anker auf die modul-gegatete Schadensroute (nie `/anhaenge/{aid}` des
+ * Einsatzes, dort ist die Datei 404), mit Zeilenkennung im zugänglichen Namen.
  *
- * Eine LISTE, keine Tabelle: die Frage ist „was ist mit diesem Schaden?“, nicht „welche
- * Datei ist die richtige?“ (LFH-330). Jede Zeile ist ein nativer Download-Anker auf die
- * modul-gegatete Schadensroute — nie auf `/anhaenge/{aid}` des Einsatzes, dort ist die Datei
- * 404 — mit Zeilenkennung im zugänglichen Namen.
+ * Entfernen ist serverseitig ein Soft-Delete ohne Rückweg in der Oberfläche, also Rückfrage mit
+ * rotem OK-Knopf und kein Rückgängig-Toast. Scheitert es, trägt die Zeile `data-fehler` und der
+ * Alert nennt die Datei (die Serverantwort nennt keinen Namen). Nach dem Erfolg hängt die Zeile
+ * aus; der Fokus geht auf den Anker der nächsten (sonst vorigen) Zeile bzw. auf „Datei ablegen“,
+ * statt auf `<body>` zu fallen.
  *
- * ENTFERNEN — erst die Umkehrbarkeit (LFH-363/343): serverseitig ein Soft-Delete, aber ohne
- * Wiederherstellen in der Oberfläche, aus Bediensicht also unumkehrbar. Deshalb Rückfrage mit
- * rotem OK-Knopf und KEIN Rückgängig-Toast (es gibt keinen Rückweg, der nicht 404 liefert).
- * Der Knopf ist icon-only, rot, und steht mit Abstand `middle` neben dem Anker.
- *
- * Bis zur Serverantwort lädt der Entfernen-Knopf DER Zeile (Rückmeldung vor der Antwort);
- * scheitert es, trägt die Zeile `data-fehler` und die Alarmkante, und der Alert nennt die Datei
- * (Muster H15/LFH-345: die Serverantwort nennt keinen Dateinamen). Nach dem Erfolg hängt die
- * Zeile samt Knopf aus — der Fokus geht deshalb gezielt auf den Anker der nächsten Zeile
- * (sonst der vorigen), bei leerer Liste auf „Datei ablegen“, statt auf `<body>` zu fallen.
- *
- * „Datei ablegen“ steht NUR im Paneelkopf, auch im Leerzustand: zwei gleichnamige Ziele mit
- * derselben Wirkung wären für Vorlesende nicht unterscheidbar (Review C2).
- *
- * Ohne Schreibrecht und am stornierten Schaden entfallen Ablegen und Entfernen; die Liste
- * bleibt lesbar (Spec „Stornierter Schaden bleibt lesbar“).
+ * „Datei ablegen“ steht nur im Paneelkopf, auch im Leerzustand: zwei gleichnamige Ziele wären für
+ * Vorlesende nicht unterscheidbar. Ohne Schreibrecht und am stornierten Schaden bleibt die Liste
+ * nur lesbar.
  */
 export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: Props) {
   const { message } = App.useApp();

@@ -11,16 +11,14 @@ interface HistorienBannerProps {
 }
 
 /**
- * Historien-Modus-Banner (C/LFH-321): steht über der Karte, sobald ein Snapshot aktiv ist,
- * und macht die Schreibsperre sichtbar. Der „Aktuell"-Button springt in den Live-Modus zurück.
- *
- * Seit dem Neuentwurf (S5) IM FLUSS über der Kartenfläche statt absolut auf ihr: oben links
- * liegen jetzt Kartengrundlage und Zeigerkoordinate, oben rechts der Knopfblock — ein
- * schwebendes Banner auf `top: 12` verdeckte beide.
+ * Historien-Banner: steht über der Karte, sobald ein Snapshot aktiv ist, und macht die
+ * Schreibsperre sichtbar. „Aktuell" springt in den Live-Modus zurück. Im Fluss über der
+ * Kartenfläche statt absolut auf ihr — oben liegen Kartengrundlage, Zeigerkoordinate und
+ * Knopfblock.
  */
 export function HistorienBanner({ standAt, bezeichnung, onZurueckAktuell }: HistorienBannerProps) {
-  // formatZeit (dayjs.utc) statt new Date(): stand_at ist ein naiver UTC-Wire-String
-  // ('YYYY-MM-DD HH:MM:SS'), den new Date() als Lokalzeit fehlinterpretieren würde (LFH-321-Review).
+  // `formatZeit` (dayjs.utc) statt `new Date()`: `stand_at` ist ein naiver UTC-Wire-String, den
+  // `new Date()` als Lokalzeit läse.
   const stand = standAt ? formatZeit(standAt) : '';
   const beschreibung = [bezeichnung?.trim(), stand].filter(Boolean).join(' · ');
   return (
@@ -30,8 +28,7 @@ export function HistorienBanner({ standAt, bezeichnung, onZurueckAktuell }: Hist
       message="Historischer Stand — schreibgeschützt"
       description={beschreibung || undefined}
       action={
-        /* Ohne Größen-Prop: der Rückweg aus dem schreibgeschützten Stand ist die einzige
-           Bedienung des Banners und erbt seine Trefffläche aus `controlHeight` (LFH-366). */
+        /* Ohne Größen-Prop: die Trefffläche kommt aus `controlHeight`. */
         <Button onClick={onZurueckAktuell}>Aktuell</Button>
       }
     />

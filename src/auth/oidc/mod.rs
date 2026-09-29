@@ -1,16 +1,12 @@
-//! OIDC/SSO-Provider (LFH-41, Increment 3): OIDC-Client-Aufbau mit lazy gecachter Discovery und
-//! SSRF-resistentem HTTP-Client.
+//! OIDC/SSO-Provider (LFH-41): Client-Aufbau mit lazy gecachter Discovery und SSRF-resistentem
+//! HTTP-Client.
 //!
-//! **Warum kein `openidconnect`-HTTP-Feature:** die Crate ist in `Cargo.toml` bewusst
-//! `default-features = false` gepinnt — deren `reqwest`/`rustls-tls`-Features ziehen `oauth2`s
-//! eigenen `reqwest`-Stack (mit dem `ring`-Crypto-Provider) herein, der mit dem Projekt-`reqwest`
-//! (`aws-lc-rs`) auf demselben rustls kollidiert: rustls kann dann keinen Default-`CryptoProvider`
-//! mehr automatisch bestimmen (siehe Kanarienvogel-Test `tls::tests::rcgen_pem_ist_per_rustls_ladbar`,
-//! der genau das in Inc. 2 aufgedeckt hat). Statt dessen adaptiert dieses Modul das
-//! Projekt-eigene `reqwest::Client` (SSRF-Policy `redirect::Policy::none()`) an
-//! `openidconnect::AsyncHttpClient` — ein simpler Closure-Adapter reicht, weil `oauth2` diesen
-//! Trait blanket für `Fn(HttpRequest) -> impl Future<Output = Result<HttpResponse, E>>`
-//! implementiert (kein eigener `impl`-Block auf einem fremden Typ, kein Orphan-Rule-Problem).
+//! `openidconnect` ist ohne HTTP-Features gepinnt: deren `reqwest`-Stack brächte den
+//! `ring`-Provider mit, der neben dem Projekt-`reqwest` (`aws-lc-rs`) rustls die automatische
+//! Wahl des `CryptoProvider` unmöglich macht (Kanarienvogel:
+//! `tls::tests::rcgen_pem_ist_per_rustls_ladbar`). Stattdessen adaptiert ein Closure das
+//! Projekt-`reqwest::Client` an `openidconnect::AsyncHttpClient` — `oauth2` implementiert den
+//! Trait blanket für `Fn(HttpRequest) -> impl Future<…>`.
 pub mod provisioning;
 pub mod state;
 
@@ -25,16 +21,10 @@ use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
-/// Resolved OIDC-Einstellungen (Issuer/Client-ID/Client-Secret/Redirect-URL) — prozessweiter
-/// `OnceLock` statt `AppState`-Feld, analog zu `anhang::ScanConfig` (LFH-114) und
-/// `session::COOKIE_SECURE`: `AppState` bricht sonst dutzende Inline-Test-Konstruktionen
-/// (Memory: appstate-feld-bricht-test-konstruktionen), nur um dieses eine Auth-Feature an die
-/// `Config` zu binden. `oidc_client` nimmt bewusst weiterhin eine EXPLIZITE `&OidcSettings`-
-/// Referenz entgegen (kein Lesen des globalen Zustands intern) — die bestehenden Unit-Tests
-/// unten prüfen unterschiedliche Konfigurationen (leer/unerreichbar) im selben Testprozess;
-/// würde `oidc_client` selbst aus dem `OnceLock` lesen, könnten sich Tests nicht mehr
-/// unterscheiden (ein `OnceLock` lässt sich nach dem ersten `set` nicht mehr ändern). Die
-/// Handler-Schicht (`routes::auth::oidc_start`, Task 5) liefert dafür `oidc_settings()`.
+/// Aufgelöste OIDC-Einstellungen, prozessweit per `OnceLock` statt `AppState`-Feld (das bräche
+/// die Inline-Test-Konstruktionen). `oidc_client` nimmt trotzdem eine explizite `&OidcSettings`,
+/// damit Tests im selben Prozess verschiedene Konfigurationen prüfen können; die Handler lesen
+/// über [`oidc_settings`].
 #[derive(Debug, Clone, Default)]
 pub struct OidcSettings {
     pub issuer: Option<String>,
@@ -56,24 +46,20 @@ impl From<&Config> for OidcSettings {
 
 static OIDC_SETTINGS: OnceLock<OidcSettings> = OnceLock::new();
 
-/// Einmalig beim Serverstart setzen (`main::run_server`, direkt nach `Config::parse()`).
-/// Doppelsetzen wird ignoriert (wie `registry::set_oidc_konfiguriert`).
+/// Einmalig beim Serverstart setzen; Doppelsetzen wird ignoriert.
 pub fn init_oidc_settings(cfg: OidcSettings) {
     let _ = OIDC_SETTINGS.set(cfg);
 }
 
-/// Liefert die prozessweiten OIDC-Einstellungen; ungesetzt (die meisten Tests) → alle Felder
-/// `None`, `oidc_client` degradiert dann korrekt zu `AppError::NotImplemented`.
+/// Liefert die prozessweiten OIDC-Einstellungen; ungesetzt sind alle Felder `None`, und
+/// `oidc_client` antwortet mit `AppError::NotImplemented`.
 pub fn oidc_settings() -> &'static OidcSettings {
     OIDC_SETTINGS.get_or_init(OidcSettings::default)
 }
 
-/// Konkreter `CoreClient`-Typ nach `from_provider_metadata` + `set_redirect_uri` (v4-Typestate,
-/// Build-Verify-Punkt wie `rcgen`s `signing_key` in Inc. 2): der Authorization-Endpoint ist über
-/// Discovery immer gesetzt (`EndpointSet`), Token- und UserInfo-Endpoint sind laut Spec optional
-/// (`EndpointMaybeSet`); Device-Authorization/Introspection/Revocation nutzt dieser Client nicht
-/// (`EndpointNotSet`). Öffentlich, damit spätere Tasks (5/6: `start`/`callback`-Handler) denselben
-/// Typ ohne erneute Herleitung referenzieren können.
+/// `CoreClient`-Typ nach `from_provider_metadata` + `set_redirect_uri`: Authorization-Endpoint
+/// über Discovery immer gesetzt, Token- und UserInfo-Endpoint laut Spec optional, die übrigen
+/// Endpoints nutzt dieser Client nicht.
 pub type OidcCoreClient = CoreClient<
     EndpointSet,
     EndpointNotSet,
@@ -83,37 +69,27 @@ pub type OidcCoreClient = CoreClient<
     EndpointMaybeSet,
 >;
 
-/// Lebensdauer eines Discovery-Cache-Eintrags. Nach Ablauf wird beim nächsten `oidc_client`-Aufruf
-/// neu discovert — fängt IdP-JWKS-Key-Rotation ohne Server-Neustart ab (LFH-277). Bewusst TTL statt
-/// Refresh-on-verify-failure: kein Angreifer-getriggerter JWKS-Refetch (Amplification), voll in
-/// diesem Modul gekapselt.
+/// Lebensdauer eines Discovery-Cache-Eintrags; fängt JWKS-Key-Rotation des IdP ohne Neustart ab
+/// (LFH-277). TTL statt Refresh-bei-Verify-Fehler, damit ein Angreifer keinen JWKS-Refetch
+/// auslösen kann.
 const DISCOVERY_TTL: Duration = Duration::from_secs(60 * 60);
 
-/// Prozessweiter Discovery-Cache mit TTL — lazy befüllt beim ERSTEN erfolgreichen
-/// `oidc_client`-Aufruf, NICHT beim Serverstart (Global Constraint „Offline-First / Lazy
-/// Discovery" im Plan `2026-07-14-auth-provider-increment-3-oidc-sso.md`). Nur ein Issuer pro
-/// Prozess (`Config` ändert sich zur Laufzeit nicht) — ein Issuer-Wechsel braucht einen Neustart.
-/// `None` bedeutet „noch nie discovert" ODER „letzter Refetch-Versuch scheiterte" (kein
-/// Fehler-Einfrieren: ein IdP-Ausfall bleibt transient, der nächste Aufruf discovert erneut). Nach
-/// Ablauf der TTL wird der Eintrag beim nächsten `discovery()`-Aufruf verworfen und neu geholt —
-/// fängt IdP-JWKS-Key-Rotation ab, ohne dass der Server neu gestartet werden muss.
+/// Prozessweiter Discovery-Cache, lazy beim ersten erfolgreichen `oidc_client`-Aufruf befüllt,
+/// nie beim Serverstart. Ein Issuer je Prozess. `None` heißt „noch nie“ oder „letzter Versuch
+/// scheiterte“ — ein IdP-Ausfall wird nicht eingefroren.
 ///
-/// `tokio::sync::RwLock` (NICHT `std::sync::RwLock`): der Schreib-Guard in `discovery()` wird über
-/// den Discovery-`.await` gehalten — ein `std`-Guard über einem `.await` machte den aufrufenden
-/// axum-Handler `!Send` (Modul-Falle, siehe Test `oidc_client_future_ist_send` unten sowie Memory
-/// „Mutex-Guard über await → !Send").
+/// `tokio::sync::RwLock`, weil der Schreib-Guard über den Discovery-`.await` gehalten wird; ein
+/// `std`-Guard dort machte den axum-Handler `!Send` (s. Test `oidc_client_future_ist_send`).
 static DISCOVERY: RwLock<Option<(CoreProviderMetadata, Instant)>> = RwLock::const_new(None);
 
-/// True, wenn ein Cache-Eintrag von `gespeichert` gegenüber `jetzt` noch innerhalb der
-/// [`DISCOVERY_TTL`] liegt.
+/// True, solange `gespeichert` gegenüber `jetzt` innerhalb der [`DISCOVERY_TTL`] liegt.
 fn cache_ist_frisch(gespeichert: Instant, jetzt: Instant) -> bool {
     jetzt.duration_since(gespeichert) < DISCOVERY_TTL
 }
 
-/// Baut den OIDC-Client: lazy (gecachte) Discovery + `CoreClient` aus den `OidcSettings`. Fehlt
-/// eines der vier Felder oder ist der IdP nicht erreichbar/liefert kaputte Metadaten, wird ein
-/// `AppError` geliefert — NIE ein Panic, NIE ein blockierender Serverstart-Pfad (dieser Pfad wird
-/// erst bei `GET /api/auth/oidc/start`/`callback` betreten, siehe Task 5/6 des Plans).
+/// Baut den OIDC-Client aus gecachter Discovery und den `OidcSettings`. Fehlende Felder,
+/// unerreichbarer IdP oder kaputte Metadaten liefern einen `AppError`, nie einen Panic; der Pfad
+/// wird erst bei `/api/auth/oidc/start`/`callback` betreten.
 pub async fn oidc_client(cfg: &OidcSettings) -> Result<OidcCoreClient, AppError> {
     let issuer = oidc_konfigfeld(&cfg.issuer, "LIFELINE_OIDC_ISSUER")?;
     let client_id = oidc_konfigfeld(&cfg.client_id, "LIFELINE_OIDC_CLIENT_ID")?;
@@ -129,8 +105,7 @@ pub async fn oidc_client(cfg: &OidcSettings) -> Result<OidcCoreClient, AppError>
             )
         })?;
 
-    // Vor dem (potenziell netzwerkgebundenen) Discovery-Aufruf validieren: eine kaputte
-    // Redirect-URL soll billig (ohne Roundtrip zum IdP) scheitern, nicht erst danach.
+    // Die Redirect-URL vor der Discovery prüfen, damit sie ohne IdP-Roundtrip scheitert.
     let redirect_url = RedirectUrl::new(redirect_url)
         .map_err(|e| AppError::Internal(format!("OIDC-Redirect-URL ungültig: {e}")))?;
 
@@ -146,29 +121,19 @@ pub async fn oidc_client(cfg: &OidcSettings) -> Result<OidcCoreClient, AppError>
     Ok(client)
 }
 
-/// Tauscht den Authorization-Code gegen ein Token-Response (Task 6, `GET /api/auth/oidc/callback`):
-/// **muss NACH dem State-Store-Guard-Drop aufgerufen werden** (Aufrufer: `routes::auth::oidc_callback`
-/// ruft `state::entnehme` SYNC und VOR diesem `.await`, Plan-MUST „!Send" — hier selbst ist kein
-/// Guard im Spiel, das ist reine Aufrufer-Disziplin). Baut denselben SSRF-resistenten
-/// HTTP-Client-Adapter wie `discovery()` (kein zweiter TLS-/Redirect-Policy-Stack im Prozess).
+/// Tauscht den Authorization-Code gegen ein Token-Response. Der Aufrufer entnimmt den
+/// State-Store-Eintrag vorher synchron (kein Guard über `.await`).
 ///
-/// `exchange_code` liefert hier ein `Result` (nicht den Request direkt), weil `OidcCoreClient`s
-/// Token-Endpoint-Zustand `EndpointMaybeSet` ist (Discovery setzt ihn nur, wenn der IdP einen
-/// `token_endpoint` meldet — Build-Verify-Punkt, siehe Modul-Doc oben zu `OidcCoreClient`).
-///
-/// Jeder Fehler (fehlender Token-Endpoint, Netzwerk-/IdP-Fehler, vom Server abgelehnter Code)
-/// wird als `AppError` geliefert — der Aufrufer verwirft den Fehlerinhalt und redirected
-/// generisch auf die LoginPage, damit kein IdP-/Token-Detail in der HTTP-Antwort landet
-/// (Security-MUST „kein Detail-Leak" des Plans).
+/// `exchange_code` liefert ein `Result`, weil der Token-Endpoint `EndpointMaybeSet` ist. Jeder
+/// Fehler kommt als `AppError`; der Aufrufer leitet generisch auf die Login-Seite um, damit kein
+/// IdP-/Token-Detail in der Antwort landet.
 pub async fn tausche_code_gegen_token(
     client: &OidcCoreClient,
     code: String,
     pkce_verifier: String,
 ) -> Result<CoreTokenResponse, AppError> {
-    // Kein `{e}` in der `AppError`-Meldung (Security-Fix, siehe Doc-Kommentar oben): `Service-
-    // Unavailable` rendert seinen `Display` verbatim an den HTTP-Client (anders als `Database`/
-    // `Internal`, die `error.rs` redacted) — das rohe `oauth2`-Fehlerdetail landet daher NICHT in
-    // der Antwort, nur im Server-Log.
+    // Kein `{e}` in der Meldung: `ServiceUnavailable` rendert seinen `Display` an den Client, das
+    // rohe `oauth2`-Detail gehört nur ins Log.
     let token_request = client
         .exchange_code(AuthorizationCode::new(code))
         .map_err(|e| {
@@ -178,7 +143,7 @@ pub async fn tausche_code_gegen_token(
         .set_pkce_verifier(PkceCodeVerifier::new(pkce_verifier));
 
     let reqwest_client = ssrf_http_client()?;
-    // Closure statt eigener `impl AsyncHttpClient`-Block, siehe Modul-Doc oben (`discovery()`).
+    // Closure-Adapter statt `impl AsyncHttpClient`, s. Modul-Doku.
     let http_client = move |request: HttpRequest| {
         let reqwest_client = reqwest_client.clone();
         async move { fuehre_http_request_aus(&reqwest_client, request).await }
@@ -193,23 +158,20 @@ pub async fn tausche_code_gegen_token(
         })
 }
 
-/// Liest ein Pflicht-OIDC-Config-Feld; fehlt/ist leer → `AppError::NotImplemented` („nicht
-/// konfiguriert", 501) statt Panic. Rein aus `Config`, kein Netz — erfüllt damit dieselbe
-/// Offline-Disziplin wie `registry::konfiguriert` (Task 1).
+/// Liest ein Pflicht-OIDC-Feld; fehlt es oder ist es leer → `AppError::NotImplemented` (501).
+/// Rein aus der Konfiguration, ohne Netz.
 fn oidc_konfigfeld(feld: &Option<String>, env_name: &str) -> Result<String, AppError> {
     feld.clone().filter(|s| !s.is_empty()).ok_or_else(|| {
         AppError::NotImplemented(format!("OIDC ist nicht konfiguriert ({env_name} fehlt)"))
     })
 }
 
-/// Discovery mit TTL-gecachtem Ergebnis: der erste (bzw. erste nach TTL-Ablauf) Aufruf holt
-/// `.well-known/openid-configuration` + JWKS vom Issuer, jeder weitere innerhalb der TTL liefert
-/// den gecachten Wert ohne erneutes Netz.
+/// Discovery mit TTL-Cache: nur der erste Aufruf (bzw. der erste nach Ablauf) holt
+/// `.well-known/openid-configuration` und JWKS vom Issuer.
 async fn discovery(issuer: &str) -> Result<CoreProviderMetadata, AppError> {
     let jetzt = Instant::now();
 
-    // Fast-Path: frischen Eintrag unter Read-Lock klonen und Lock SOFORT freigeben (kein Guard
-    // über den return hinaus — hier ohnehin kein await danach).
+    // Fast-Path: frischen Eintrag unter Read-Lock klonen.
     {
         let read = DISCOVERY.read().await;
         if let Some((metadata, gespeichert)) = read.as_ref() {
@@ -219,9 +181,8 @@ async fn discovery(issuer: &str) -> Result<CoreProviderMetadata, AppError> {
         }
     }
 
-    // Slow-Path: Write-Lock, Double-Check (ein paralleler Refetch könnte zwischenzeitlich befüllt
-    // haben), sonst neu discovern. Der Write-Guard wird über den Discovery-`.await` gehalten →
-    // MUST tokio::sync (nicht std), sonst wird der Handler !Send.
+    // Slow-Path: Write-Lock mit Double-Check, sonst neu discovern. Der Guard hält über das
+    // `.await`, daher `tokio::sync`.
     let mut write = DISCOVERY.write().await;
     let jetzt = Instant::now();
     if let Some((metadata, gespeichert)) = write.as_ref() {
@@ -233,8 +194,7 @@ async fn discovery(issuer: &str) -> Result<CoreProviderMetadata, AppError> {
     let issuer_url = IssuerUrl::new(issuer.to_string())
         .map_err(|e| AppError::Internal(format!("OIDC-Issuer-URL ungültig: {e}")))?;
     let client = ssrf_http_client()?;
-    // Closure statt eigener `impl AsyncHttpClient`-Block: `oauth2` implementiert den Trait
-    // blanket für `Fn(HttpRequest) -> F`, siehe Modul-Doc oben.
+    // Closure-Adapter, s. Modul-Doku.
     let http_client = move |request: HttpRequest| {
         let client = client.clone();
         async move { fuehre_http_request_aus(&client, request).await }
@@ -242,32 +202,26 @@ async fn discovery(issuer: &str) -> Result<CoreProviderMetadata, AppError> {
     let metadata = CoreProviderMetadata::discover_async(issuer_url, &http_client)
         .await
         .map_err(|e| {
-            // Kein `{e}` im `AppError` (Security-Fix, siehe `tausche_code_gegen_token`-
-            // Doc-Kommentar): rohes Discovery-/IdP-Fehlerdetail nur ins Server-Log, nicht in die
-            // client-renderbare `ServiceUnavailable`-Meldung.
+            // Kein `{e}` in der client-sichtbaren Meldung, nur ins Log (s.
+            // `tausche_code_gegen_token`).
             tracing::warn!(error = %e, "OIDC-Discovery fehlgeschlagen");
             AppError::ServiceUnavailable("OIDC-Discovery fehlgeschlagen".into())
         })?;
 
-    // NUR bei Erfolg cachen (Fehlschlag friert nichts ein — nächster Aufruf discovert erneut).
+    // Nur Erfolge cachen.
     *write = Some((metadata.clone(), Instant::now()));
     Ok(metadata)
 }
 
-/// Overall-Timeout für einen Discovery-/Token-Roundtrip: ein verbundener, aber stummer IdP
-/// (TCP-Connect erfolgreich, nie eine Antwort) darf den wartenden OIDC-Handler nicht unbegrenzt
-/// blockieren (Offline-First-MUST „IdP-Ausfall darf den Handler nicht blockieren" des Plans).
+/// Gesamt-Timeout je Discovery-/Token-Roundtrip: ein verbundener, aber stummer IdP darf den
+/// Handler nicht unbegrenzt blockieren.
 const OIDC_HTTP_TIMEOUT: Duration = Duration::from_secs(15);
 
-/// Connect-Timeout (separat vom Overall-Timeout): fängt tote/nicht antwortende Hosts schon beim
-/// TCP-Handshake ab, statt erst nach dem vollen Overall-Timeout.
+/// Connect-Timeout: fängt tote Hosts schon beim TCP-Handshake ab.
 const OIDC_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
 
-/// HTTP-Client für Discovery + Token-Exchange (SSRF-MUST des Plans): keine Redirects folgen
-/// (`redirect::Policy::none()`), sonst Default-Konfiguration — bleibt auf dem Projekt-TLS-Stack
-/// (rustls/`aws-lc-rs`), kein zweiter TLS-Stack im Prozess. Timeout + Connect-Timeout gegen einen
-/// verbundenen, aber stummen IdP (siehe Konstanten oben) — sonst würde ein hängender IdP den
-/// awaitenden Handler unbegrenzt blockieren.
+/// HTTP-Client für Discovery und Token-Exchange: folgt keinen Redirects (SSRF), bleibt auf dem
+/// Projekt-TLS-Stack und trägt beide Timeouts.
 fn ssrf_http_client() -> Result<reqwest::Client, AppError> {
     reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
@@ -279,11 +233,8 @@ fn ssrf_http_client() -> Result<reqwest::Client, AppError> {
         })
 }
 
-/// Adapter: führt einen von `openidconnect`/`oauth2` gebauten `HttpRequest`
-/// (`http::Request<Vec<u8>>`) über das Projekt-`reqwest::Client` aus und liefert die Antwort als
-/// `HttpResponse` (`http::Response<Vec<u8>>`) zurück. `http` ist im Dependency-Baum einheitlich
-/// Version 1 (ein Eintrag in `Cargo.lock`) — Method/HeaderMap/StatusCode sind identische Typen
-/// zwischen `reqwest` und `openidconnect`/`oauth2`, keine Konvertierung nötig.
+/// Führt einen von `oauth2` gebauten `HttpRequest` über das Projekt-`reqwest::Client` aus.
+/// `http` ist im Baum einheitlich Version 1, die Typen passen ohne Konvertierung.
 async fn fuehre_http_request_aus(
     client: &reqwest::Client,
     request: HttpRequest,
@@ -313,10 +264,7 @@ async fn fuehre_http_request_aus(
         .map_err(|e| HttpClientFehler::Antwort(e.to_string()))
 }
 
-/// Fehler des SSRF-HTTP-Client-Adapters — deckt sowohl Netzwerk-/Request-Fehler (`reqwest`) als
-/// auch (praktisch nie auftretende) Fehler beim Rekonstruieren der `http::Response` ab.
-/// `openidconnect`/`oauth2` verlangen an dieser Stelle nur `std::error::Error + 'static`, keinen
-/// spezifischen Fehlertyp.
+/// Fehler des HTTP-Adapters (Netzwerk oder Rekonstruktion der `http::Response`).
 #[derive(Debug)]
 enum HttpClientFehler {
     Reqwest(reqwest::Error),
@@ -353,8 +301,7 @@ impl From<reqwest::Error> for HttpClientFehler {
 mod tests {
     use super::*;
 
-    /// Baut `OidcSettings` direkt (keine `Config`/`clap`-Umwege mehr nötig, seit `oidc_client`
-    /// die schlanke `OidcSettings`-Struct statt der vollen `Config` entgegennimmt — Task 5).
+    /// Vollständige `OidcSettings` für den übergebenen Issuer.
     fn vollstaendige_config(issuer: &str) -> OidcSettings {
         OidcSettings {
             issuer: Some(issuer.to_string()),
@@ -369,18 +316,15 @@ mod tests {
         let jetzt = Instant::now();
         // Eintrag „jetzt" gespeichert → frisch.
         assert!(cache_ist_frisch(jetzt, jetzt));
-        // Eintrag vor >TTL → veraltet. (Kein Instant-Subtraktion-Unterlauf: Referenzzeit
-        // künstlich in die Zukunft schieben statt gespeicherte Zeit in die Vergangenheit.)
+        // Eintrag älter als die TTL → veraltet. Die Referenzzeit wird nach vorn geschoben, weil
+        // `Instant`-Subtraktion unterlaufen kann.
         let spaeter = jetzt + DISCOVERY_TTL + Duration::from_secs(1);
         assert!(!cache_ist_frisch(jetzt, spaeter));
     }
 
-    /// Kompilier-Check statt Laufzeit-Test (Futures sind lazy, kein I/O nötig): `oidc_client`s
-    /// Future muss `Send` sein, sonst bricht der axum-Handler-Aufruf in Task 5/6 (Plan-MUST
-    /// „!Send" — Callback darf keinen Guard über await halten, UND der Handler selbst muss
-    /// `Send` bleiben). `#[tokio::test]` liefe current-thread und würde ein `!Send`-Problem NICHT
-    /// aufdecken (Memory: mutex-guard-await-send-axum) — daher hier als reiner `Send`-Bound-Test
-    /// ohne Runtime.
+    /// Kompilier-Check: das Future von `oidc_client` muss `Send` sein, sonst lässt es sich in
+    /// keinem
+    /// axum-Handler verwenden. Ein `#[tokio::test]` (current-thread) deckte `!Send` nicht auf.
     #[test]
     fn oidc_client_future_ist_send() {
         fn ist_send<T: Send>(_: &T) {}
@@ -390,9 +334,7 @@ mod tests {
 
     #[tokio::test]
     async fn ohne_oidc_config_liefert_appfehler_kein_panic() {
-        // Registry-/Provider-Konstruktion ohne Netz ist bereits in Task 1 abgedeckt
-        // (oidc_konfiguriert_ohne_netz); hier: der Client-Aufbau selbst degradiert bei
-        // fehlender Config sauber statt zu paniken.
+        // Fehlende Konfiguration degradiert sauber statt zu paniken.
         let cfg = OidcSettings::default();
 
         let ergebnis = oidc_client(&cfg).await;
@@ -403,11 +345,8 @@ mod tests {
         );
     }
 
-    /// Offline-Isolationstest (Plan Task 4, Step 1): `http://127.0.0.1:1` ist ein bewusst
-    /// scheiternder LOKALER Verbindungsversuch (Port 1 nimmt nie Verbindungen an) — KEIN
-    /// externer IdP, kein echtes Netz. Belegt die Offline-First-MUST: ein unerreichbarer IdP
-    /// liefert `Err` (Connection-Fehler) statt zu paniken/zu blockieren; der lokale
-    /// Passwort-Login bleibt davon unberührt (dieser Test berührt ihn erst gar nicht).
+    /// Ein unerreichbarer IdP (`127.0.0.1:1`, lokal, kein echtes Netz) liefert `Err` statt zu
+    /// paniken oder zu blockieren.
     #[tokio::test]
     async fn unerreichbarer_idp_liefert_err_statt_panic() {
         let cfg = vollstaendige_config("http://127.0.0.1:1");
@@ -424,9 +363,8 @@ mod tests {
         }
     }
 
-    /// Nach einem gescheiterten Discovery-Versuch bleibt der Cache leer (kein Einfrieren des
-    /// Fehlers) — ein zweiter Aufruf versucht erneut zu discovern (und scheitert erneut am
-    /// selben unerreichbaren Host), statt einen stale/leeren Zustand zurückzugeben.
+    /// Ein gescheiterter Discovery-Versuch hinterlässt keinen Cache-Eintrag; der nächste Aufruf
+    /// versucht es erneut.
     #[tokio::test]
     async fn wiederholter_aufruf_nach_fehlschlag_versucht_discovery_erneut() {
         let cfg = vollstaendige_config("http://127.0.0.1:1");

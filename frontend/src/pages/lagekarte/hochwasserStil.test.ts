@@ -26,8 +26,8 @@ function fc(klassen: (string | undefined)[]): FeatureCollection {
 
 describe('hochwasserRadius', () => {
   it('macht jede gemeldete Klasse größer als jede nicht gemeldete', () => {
-    // DIE eigentliche Zusicherung der Ebene: ein Kreis trägt keine Beschriftung, der
-    // Durchmesser ist der zweite Kanal neben der Rolle (WCAG 1.4.1).
+    // Die eigentliche Zusicherung: ein Kreis trägt keine Beschriftung, der Durchmesser ist der
+    // zweite Kanal neben der Rolle (WCAG 1.4.1).
     const gemeldet = ['klein', 'mittel', 'gross', 'sehr_gross'] as const;
     const stumm = ['kein_hochwasser', 'keine_daten', 'unklassifiziert'] as const;
     for (const g of gemeldet) {
@@ -77,8 +77,7 @@ describe('hochwasserDarstellung', () => {
   });
 
   it('fällt auch bei Namen aus der Prototypkette auf „keine Daten" zurück', () => {
-    // `roh in karte` sähe `constructor`/`toString` als Schlüssel und gäbe die
-    // Object-Funktion statt einer Darstellung zurück.
+    // `roh in karte` sähe `constructor`/`toString` und gäbe eine Object-Funktion zurück.
     for (const roh of ['constructor', 'toString', '__proto__']) {
       expect(hochwasserDarstellung(roh).label, roh).toBe('keine Daten');
     }

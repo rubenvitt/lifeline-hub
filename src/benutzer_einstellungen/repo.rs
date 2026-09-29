@@ -1,12 +1,8 @@
-//! Datenzugriff für die Benutzer-Präferenzen (LFH-391 · Etappe D).
+//! Datenzugriff für die Benutzer-Präferenzen (LFH-391).
 //!
-//! Alle Funktionen sind strikt an EINE `benutzer_id` gebunden — die stammt in der Route
-//! immer aus der Sitzung, nie aus Pfad oder Body. Damit gibt es keinen Weg, das Fach eines
-//! anderen Benutzers zu lesen oder zu beschreiben, und keine Org-Prüfung ist nötig: der
-//! Benutzer IST der Schutzbereich.
-//!
-//! Gültigkeit von Schlüssel und Wert prüft die Route (Statuscode-Konvention LFH-267); das
-//! Repo nimmt geprüfte Werte an.
+//! Alle Funktionen sind an EINE `benutzer_id` gebunden, die in der Route immer aus der Sitzung
+//! stammt. Ein fremdes Fach ist so unerreichbar, eine Org-Prüfung unnötig. Schlüssel und Wert
+//! prüft die Route.
 
 use super::BenutzerEinstellungenAnzeige;
 use crate::error::AppError;
@@ -28,9 +24,9 @@ pub async fn laden(
 
     let mut stand = BenutzerEinstellungenAnzeige::leer();
     for (schluessel, wert, geaendert_at) in zeilen {
-        // Jüngster Zeitstempel über alle Schlüssel. Das Format ist SQLites
-        // `datetime('now')` (`YYYY-MM-DD HH:MM:SS`, fixe Breite) — lexikographisch
-        // vergleichbar, deshalb kein Parsen nötig.
+        // Jüngster Zeitstempel über alle Schlüssel. SQLites `datetime('now')`-Format hat feste
+        // Breite
+        // und ist lexikographisch vergleichbar.
         if stand
             .geaendert_at
             .as_deref()
@@ -137,8 +133,8 @@ mod tests {
         assert_eq!(zeilen, 1);
     }
 
-    /// Der Kern der Trennung: zwei Benutzer, zwei Fächer. Ohne die `WHERE`-Bindung wäre
-    /// dieser Test rot — und zwar mit dem fremden Wert im eigenen Fach.
+    /// Zwei Benutzer, zwei Fächer: ohne die `WHERE`-Bindung stünde hier der fremde Wert im eigenen
+    /// Fach.
     #[tokio::test]
     async fn zwei_benutzer_haben_getrennte_faecher() {
         let pool = crate::db::test_pool().await;

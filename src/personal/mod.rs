@@ -170,9 +170,9 @@ mod tests {
     }
 }
 
-// ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────
-// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
-// importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
+// ── System-ETB-Wortlaute ──────────────────────────────────────────────────────────
+// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein importierter
+// Einsatz dieselben ETB-Texte trägt wie ein echter.
 
 /// Personen-Bezeichnung für ETB-Texte: Name, bei nicht leerer Funktion mit der Funktion in
 /// Klammern. Eine leere Funktion (`Some("")`) zählt wie keine.

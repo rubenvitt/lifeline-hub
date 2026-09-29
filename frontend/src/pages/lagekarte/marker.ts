@@ -34,14 +34,16 @@ export type MarkerTyp =
   | 'abschnitt'
   | 'lagemeldung'
   | 'freies_zeichen'
-  /** Betreuungsstelle (LFH-673). Erzeugt `baueBetreuungMarker`; läuft wie die UHS in
-   *  `alleVerortet` und „Nicht verortet", aber nur bei Lesezugriff auf das Modul Betreuung
-   *  (`betreuungEbene.ts`). */
+  /**
+   * Betreuungsstelle (`baueBetreuungMarker`): läuft wie die UHS in `alleVerortet` und „Nicht
+   * verortet", aber nur bei Lesezugriff auf das Modul Betreuung (`betreuungEbene.ts`).
+   */
   | 'betreuungsstelle'
-  /** Betroffene (LFH-613). Erzeugt ausschließlich `personenMarker` — auf der Betroffenen-Seite
-   *  und seit LFH-648 als Ebene „Betroffene" der Lagekarte. Dort laufen sie als eigene Liste
-   *  `personenVerortet` NEBEN `alleVerortet` (Startausschnitt/Kopfzahl ohne Personen) und
-   *  clustern — nur dort — in eigener Quelle (`clusterQuelle`, `PERSONEN_CLUSTER_QUELLE`). */
+  /**
+   * Betroffene, nur aus `personenMarker` — auf der Betroffenen-Seite und als Ebene „Betroffene" der
+   * Lagekarte. Dort laufen sie als eigene Liste `personenVerortet` neben `alleVerortet` und
+   * clustern in eigener Quelle (`PERSONEN_CLUSTER_QUELLE`).
+   */
   | 'person';
 
 export interface KarteMarker {
@@ -56,37 +58,39 @@ export interface KarteMarker {
   farbe: string;
   /** Wenn gesetzt → DV-102-SVG (taktisches Zeichen) statt einfachem Kreis. */
   tz?: TzProps;
-  /** Flächen-/Linien-Geometrie des Markers (z. B. Abschnittsfläche) → Kennzahlen im
-   *  Inspector (Fläche/Umfang/Länge, LFH-146). FE-lokal, nicht Teil des Response-DTO. */
+  /**
+   * Flächen-/Linien-Geometrie des Markers (z. B. Abschnittsfläche) → Kennzahlen im Inspector.
+   * FE-lokal, nicht Teil des Response-DTO.
+   */
   geometrie?: GeoJsonGeometry;
-  /** Kurzzeichen IM Kreis, unabhängig vom Zoom sichtbar (Betroffene: Sichtung „II", LFH-613).
-   *  Nur für Marker ohne taktisches Zeichen (`tz`) — sonst läge es auf dem Symbol. */
+  /**
+   * Kurzzeichen im Kreis, unabhängig vom Zoom sichtbar (Betroffene: Sichtung „II"). Nur ohne
+   * taktisches Zeichen — sonst läge es auf dem Symbol.
+   */
   kurzzeichen?: string;
   /**
-   * Durchmesser der unsichtbaren Trefferzone in px (LFH-650, für die Lagekarte LFH-711). Das
-   * gezeichnete Zeichen bleibt, wie es ist (Personen-Kreis 26 px, taktisches Zeichen ≤ 34 px,
-   * Lagemeldungs-Kreis 22 px); die Zone macht die Trefffläche so groß, wie die Dichtestufe
-   * verlangt (`token.controlHeight`: 30 / 48 / 72). Jeder Builder hier und `personenMarker`
-   * setzen sie; ohne Angabe gäbe es keine Zone.
+   * Durchmesser der unsichtbaren Trefferzone in px. Das gezeichnete Zeichen bleibt, wie es ist; die
+   * Zone macht die Trefffläche so groß, wie die Dichtestufe verlangt (`token.controlHeight`). Jeder
+   * Builder hier und `personenMarker` setzen sie.
    */
   trefferDurchmesser?: number;
   /**
-   * Sichtungskategorie eines Personen-Markers (LFH-650) — speist die Cluster-Aggregation,
-   * damit ein Cluster seine Zusammensetzung nach Sichtung und die dringlichste Kategorie
-   * zeigen kann (`clusterDonut.ts`). `'ohne'` = noch nicht gesichtet.
+   * Sichtungskategorie eines Personen-Markers — speist die Cluster-Aggregation (`clusterDonut.ts`).
+   * `'ohne'` = noch nicht gesichtet.
    */
   sichtung?: Sichtungskategorie | 'ohne';
   /**
-   * Eigene Cluster-Quelle (LFH-648): gesetzt NUR auf der Lagekarte, für die Ebene „Betroffene".
-   * Dort clustern Personen getrennt von den Kräften und liegen unter ihnen
-   * (`PERSONEN_CLUSTER_QUELLE`). Die Betroffenen-Karte setzt es nicht — ihre Personen bleiben
-   * in `marker-cluster` mit den Sichtungs-Donuts aus LFH-650.
+   * Eigene Cluster-Quelle, nur auf der Lagekarte für die Ebene „Betroffene": Personen clustern dort
+   * getrennt von den Kräften und liegen unter ihnen. Die Betroffenen-Karte setzt es nicht — ihre
+   * Personen bleiben in `marker-cluster` mit den Sichtungs-Donuts.
    */
   clusterQuelle?: 'personen';
   /** FMS-Status-Ring, nur für Fahrzeuge. */
   statusFarbe?: string | null;
-  /** Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung').
-   *  `meldungId` = id der QUELL-Meldung (Deeplink-Ziel ?meldung=), `meldungLfdNr` = Anzeigenr. */
+  /**
+   * Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung'). `meldungId` = id der
+   * Quell-Meldung (Deeplink ?meldung=), `meldungLfdNr` = Anzeigenummer.
+   */
   lageMeldung?: { meldungId: number; meldungLfdNr: number; absender: string; inhalt: string };
 }
 
@@ -97,17 +101,13 @@ export interface NichtVerortet {
 }
 
 /**
- * Farbrollen der beiden Signaturen, die A2 (LFH-328) aus harten Hex-Werten gelöst hat.
+ * Farbrollen der Einsatzort- und UHS-Signatur:
+ * - Einsatzort → `marke`: der Ankerpunkt des eigenen Einsatzes, kein Gefahrenobjekt. Mit `alarm`
+ *   trüge eine Farbe Gefahrengebiet und Ortssignatur.
+ * - UHS → `bedien`.
  *
- * - **Einsatzort → `marke`.** Der Einsatzort ist der Ankerpunkt des EIGENEN Einsatzes, kein
- *   Gefahrenobjekt. Auf `alarm` gezogen läse er sich als Gefahr, und „eine Farbe = eine
- *   Bedeutung" (A1 Festlegung 5) wäre verletzt: `alarm` trüge dann Gefahrengebiet UND
- *   Ortssignatur. Vorher: der Marken-Hexwert, aus `tokens.ts` herauskopiert.
- * - **UHS → `bedien`.** Vorher `#1677ff` — antd-v5-Default-Blau und damit nicht einmal der
- *   A0-Bedienwert; die Signatur wich still vom Rest der Anwendung ab.
- *
- * DIESES MODUL ERZEUGT MapLibre-`paint`-WERTE, keine DOM-Styles — kein `useToken()`-Zugang.
- * Der Token kommt von der aufrufenden Ebene (`useLagekarteDaten`).
+ * Dieses Modul erzeugt MapLibre-`paint`-Werte, keine DOM-Styles — es hat keinen
+ * `useToken()`-Zugang. Der Token kommt von der aufrufenden Ebene (`useLagekarteDaten`).
  */
 const EINSATZORT_ROLLE = 'marke' as const;
 const UHS_ROLLE = 'bedien' as const;
@@ -181,11 +181,10 @@ export function baueMarker(
 }
 
 /**
- * Betreuungsstellen (LFH-673): verortete als Marker, unverortete in „Nicht verortet".
- * Stornierte fallen heraus — die Übersicht liefert sie ohnehin nicht, aber ein eingefrorener
- * Stand oder ein künftiger Aufrufer soll keine Fehlanlage als Ort zeigen. Rolle `bedien` wie
- * die UHS: Rot bedient nichts, und eine neue Rolle wird nicht erfunden (design.md D8); das
- * Zeichen und die eigene Ebene unterscheiden die Stelle von der UHS.
+ * Betreuungsstellen: verortete als Marker, unverortete in „Nicht verortet". Stornierte fallen
+ * heraus (auch aus einem eingefrorenen Stand). Rolle `bedien` wie die UHS — Rot bedient nichts, und
+ * eine neue Rolle wird nicht erfunden; Zeichen und eigene Ebene unterscheiden die Stelle von der
+ * UHS.
  */
 export function baueBetreuungMarker(
   stellen: readonly Betreuungsstelle[],
@@ -216,8 +215,10 @@ export function baueBetreuungMarker(
 
 const LAGEMELDUNG_FARBE = '#d48806';
 
-/** Leitet Marker für verortete Lagemeldungen ab (LFH-113). Unverortete bleiben außen vor —
- *  Lagemeldungen werden NICHT auf der Karte platziert (Verorten erfolgt beim Übergeben). */
+/**
+ * Marker für verortete Lagemeldungen. Unverortete bleiben außen vor — verortet wird beim Übergeben,
+ * nicht auf der Karte.
+ */
 export function baueLageMeldungMarker(
   lagemeldungen: LageMeldung[],
   token: Pick<GlobalToken, 'controlHeight'>,
@@ -248,10 +249,11 @@ export function baueLageMeldungMarker(
 // Neutrale DV-102-Tinte, wenn das freie Zeichen keine eigene Farbe trägt.
 const FREIES_ZEICHEN_FARBE = '#333333';
 
-/** Baut die DV-102-Spec eines freien Zeichens aus grundzeichen + Overlays des Records und
- *  STRIPPT dabei jedes Overlay, das das gewählte Grundzeichen laut `accepts`-Katalog nicht
- *  rendert (via {@link grundzeichenAkzeptiert}) — sonst divergierte der Icon-Dedup-Key und ein
- *  Phantom-Overlay entstünde. Gilt auch für die Farbe (nur farb-akzeptierende Grundzeichen). */
+/**
+ * Baut die DV-102-Spec eines freien Zeichens und strippt jedes Overlay (auch die Farbe), das das
+ * Grundzeichen laut `accepts`-Katalog nicht rendert ({@link grundzeichenAkzeptiert}) — sonst
+ * divergierte der Icon-Dedup-Key und ein Phantom-Overlay entstünde.
+ */
 export function baueFreiesZeichenTz(
   z: Pick<
     FreiesZeichen,
@@ -274,11 +276,13 @@ export function baueFreiesZeichenTz(
   } as TzProps;
 }
 
-/** Ersatztext eines freien Zeichens ohne eigenen Namen. Inspector und Leiste zeigen ihn; die
- *  Kartenplakette nicht (LFH-622) — ein Platzhalter ist kein Name. */
+/**
+ * Ersatztext eines freien Zeichens ohne eigenen Namen. Inspector und Leiste zeigen ihn, die
+ * Kartenplakette nicht — ein Platzhalter ist kein Name.
+ */
 export const FREIES_ZEICHEN_ERSATZLABEL = '(freies Zeichen)';
 
-/** Leitet Karten-Marker für freie taktische Zeichen ab (immer verortet, LFH-170). */
+/** Karten-Marker für freie taktische Zeichen (immer verortet). */
 export function baueFreieZeichenMarker(
   zeichen: FreiesZeichen[],
   token: Pick<GlobalToken, 'controlHeight'>,
@@ -397,9 +401,9 @@ export function baueTaktischeMarker(
 const ABSCHNITT_FARBE = '#722ed1';
 
 /**
- * Taktisches Zeichen eines Einsatzabschnitts am Zentroid seiner Fläche. `polygon` trägt die
- * Kennzahlen (Fläche/Umfang) in den Inspector (LFH-146). Eigener Builder statt Literal im
- * Datenhook, damit die Trefferzone (LFH-711) hier geprüft wird wie an jedem anderen Marker.
+ * Taktisches Zeichen eines Einsatzabschnitts am Zentroid seiner Fläche; `polygon` trägt die
+ * Kennzahlen in den Inspector. Eigener Builder, damit die Trefferzone hier geprüft wird wie an
+ * jedem Marker.
  */
 export function baueAbschnittMarker(
   a: Pick<Einsatzabschnitt, 'id' | 'name' | 'tz_fachaufgabe' | 'tz_organisation'>,

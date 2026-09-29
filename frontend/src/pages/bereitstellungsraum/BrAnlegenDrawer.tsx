@@ -70,13 +70,9 @@ export default function BrAnlegenDrawer({ einsatzId, open, onClose, onAngelegt }
           const br = await anlegenMut.mutateAsync(daten);
           if (abbruchGeneration.current === generation) angelegterBr.current = br;
         }}
-        // Bindet einen laufenden Auftrag an dessen Einsatz-ID: `onFertig` schließt hier über
-        // das `einsatzId`-Prop des Renders, in dem der Auftrag gestartet wurde — das hält nur,
-        // weil `abschicken` in `components/Erfassung.tsx` ein `useCallback` ist und den zu
-        // diesem Zeitpunkt aktuellen `onFertig`-Wert beim Absenden einfriert. Ein Wechsel dort
-        // von `useCallback` weg auf eine bei jedem Render neu gebundene Funktion (oder ein Ref
-        // ohne Re-Erzeugung bei geänderten Deps) bricht diesen Test lautlos, ohne dass hier
-        // etwas geändert wird.
+        // Bindet einen laufenden Auftrag an dessen Einsatz-ID. Das hält nur, weil `abschicken` in
+        // `components/Erfassung.tsx` ein `useCallback` ist und den `onFertig` beim Absenden
+        // einfriert.
         onFertig={() => {
           const br = angelegterBr.current;
           angelegterBr.current = null;

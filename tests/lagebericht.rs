@@ -275,9 +275,9 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     );
 }
 
-/// Charakterisierung der Freigabe (LFH-690): Antwort, ETB-Snapshot und die beiden
-/// 422-Wortlaute sind byte-genau gepinnt. Der Handler rendert seit LFH-690 über
-/// `lagebericht::repo::freigeben_tx` auf der Verbindung; der Snapshot muss derselbe bleiben.
+/// Charakterisierung der Freigabe: Antwort, ETB-Snapshot und die beiden 422-Wortlaute sind
+/// byte-genau gepinnt. Der Handler rendert über `lagebericht::repo::freigeben_tx` auf der
+/// Verbindung; der Snapshot muss derselbe bleiben.
 #[tokio::test]
 async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     let app = setup().await;

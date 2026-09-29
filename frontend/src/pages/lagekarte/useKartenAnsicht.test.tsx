@@ -74,9 +74,8 @@ describe('useKartenAnsicht', () => {
       wrapper: wrapper(),
     });
     await waitFor(() => expect(result.current.fachebenenSichtbar.autobahn).toBe(true));
-    // Die Spalte ist opakes JSON; ein neuer Key ohne Eintrag in `leseFachebenen` käme
-    // stillschweigend als `undefined` zurück und die Ebene wäre nach jedem Reload aus —
-    // ohne Fehler und ohne roten Test anderswo.
+    // Die Spalte ist opakes JSON; ein neuer Key ohne Eintrag in `leseFachebenen` käme still als
+    // `undefined` zurück, und die Ebene wäre nach jedem Reload aus.
     expect(result.current.fachebenenSichtbar.nina).toBe(true);
     expect(result.current.fachebenenSichtbar.kritis).toBe(false);
     expect(result.current.dirty).toBe(false);
@@ -87,12 +86,12 @@ describe('useKartenAnsicht', () => {
     const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
       wrapper: wrapper(),
     });
-    // Auf die HYDRATION warten, nicht auf `dirty === false`: das ist es vor dem Hydrieren
-    // ohnehin, die Bedingung wäre sofort erfüllt und der Toggle liefe ins Re-Seed.
+    // Auf die Hydration warten, nicht auf `dirty === false`: das gilt schon vor dem Hydrieren, der
+    // Toggle liefe sonst ins Re-Seed.
     await waitFor(() => expect(result.current.basemap).toBe('offline'));
     expect(result.current.dirty).toBe(false);
-    // Ohne den Key im Vergleichs-Tupel (`FACHEBENE_KEYS`) bliebe die Ansicht sauber und
-    // „Ansicht speichern" böte sich nie an — die Wahl wäre nach dem Reload weg.
+    // Ohne den Key in `FACHEBENE_KEYS` bliebe die Ansicht sauber und „Ansicht speichern" böte sich
+    // nie an.
     act(() => result.current.setFachebenenSichtbar((v) => ({ ...v, autobahn: true })));
     await waitFor(() => expect(result.current.dirty).toBe(true));
   });
@@ -124,7 +123,7 @@ describe('useKartenAnsicht', () => {
   });
 
   it('ein gespeicherter Stand ohne Energie-Schlüssel liest „aus" (LFH-81)', async () => {
-    // Ein vor LFH-81 gespeicherter Stand: andere Ebenen an, `energie` fehlt ganz.
+    // Ein älterer gespeicherter Stand: andere Ebenen an, `energie` fehlt ganz.
     ladeKartenAnsichten.mockResolvedValue([
       standardansicht({
         fachebenen_sichtbar: { kritis: true, nina: true },
@@ -151,10 +150,8 @@ describe('useKartenAnsicht', () => {
     expect(result.current.dirty).toBe(false);
   });
 
-  // Jede Fachebene muss den Schmutzig-Vergleich treffen — sonst böte sich „Ansicht
-  // speichern" nach dem Umschalten nie an. `hochwasser` fehlte im Vergleichs-Tupel seit
-  // LFH-77; der Test läuft deshalb über ALLE Ebenen (seit LFH-81 auch `energie`), nicht nur
-  // über die jeweils neue.
+  // Jede Fachebene muss den Schmutzig-Vergleich treffen, sonst böte sich „Ansicht speichern" nach
+  // dem Umschalten nie an. Deshalb über alle Ebenen, nicht nur die jeweils neue.
   it.each(fachebeneKeys())('das Umschalten von %s macht die Ansicht schmutzig', async (k) => {
     ladeKartenAnsichten.mockResolvedValue([standardansicht()]);
     const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
@@ -208,8 +205,8 @@ describe('useKartenAnsicht', () => {
   });
 
   it('das Umschalten der Hochwasser-Ebene macht die Ansicht schmutzig (Nachzug LFH-77)', async () => {
-    // Gefunden beim Anfassen für LFH-78: das Vergleichs-Tupel führte `hochwasser` nicht,
-    // die Wahl ging beim Neuladen verloren. Jede Ebene aus `fachebeneKeys()` gehört hinein.
+    // Jede Ebene aus `fachebeneKeys()` gehört ins Vergleichs-Tupel, sonst geht die Wahl beim
+    // Neuladen verloren.
     ladeKartenAnsichten.mockResolvedValue([standardansicht()]);
     const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
       wrapper: wrapper(),
@@ -219,7 +216,7 @@ describe('useKartenAnsicht', () => {
     await waitFor(() => expect(result.current.dirty).toBe(true));
   });
 
-  // Ebene „Betroffene" (LFH-648): Vorgabe AUS. `leseLayer` legt den Default unter — ohne
+  // Ebene „Betroffene" (LFH-648): Vorgabe aus. `leseLayer` legt den Default unter; ohne
   // ausdrückliches `person: false` öffnete jede Bestandsansicht mit sichtbaren Personen.
   it('liest eine Ansicht ohne `person`-Schlüssel als „Betroffene aus", die übrigen Ebenen bleiben', async () => {
     ladeKartenAnsichten.mockResolvedValue([
@@ -324,8 +321,6 @@ describe('useKartenAnsicht', () => {
     expect(result.current.basemap).toBe('blind');
     expect(result.current.dirty).toBe(true);
   });
-
-  // ---------- B (LFH-320) ----------
 
   it('wählt die Ansicht aus aktiveAnsichtId statt der Standardansicht', async () => {
     ladeKartenAnsichten.mockResolvedValue([

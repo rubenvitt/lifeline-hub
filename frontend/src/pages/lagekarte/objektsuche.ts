@@ -4,26 +4,26 @@ import type { BetreuungZugriff } from './betreuungEbene';
 import { OBJEKTART } from './leistenDaten';
 
 /**
- * Objektsuche der Kartenleiste (LFH-716; Herleitung `openspec/changes/
- * lfh-716-lagekarte-markersuche-zeichenpicker/design.md`, D1/D2). Rein, damit die
+ * Objektsuche der Kartenleiste (Herleitung:
+ * `openspec/changes/lfh-716-lagekarte-markersuche-zeichenpicker/design.md`). Rein, damit die
  * Modulsperre ohne Rendern als Paar prüfbar ist.
  */
 
 /**
- * Die Menge, die die Suche überhaupt sieht.
+ * Die Menge, die die Suche sieht.
  *
- * **Die Sperre hängt am Typ, nicht an der Herkunft.** `alleVerortet` trägt Betreuungsstellen
- * heute schon nur bei freiem Modul (`useLagekarteDaten`, `stellenRoh`), geprüft wird hier
- * trotzdem: „kein Name ohne Recht" soll nicht an einem Nebeneffekt der Datenquelle hängen.
+ * Die Sperre hängt am Typ, nicht an der Herkunft: `alleVerortet` trägt Betreuungsstellen nur bei
+ * freiem Modul, geprüft wird trotzdem — „kein Name ohne Recht" soll nicht an einem Nebeneffekt der
+ * Datenquelle hängen.
  *
- * **Betroffene nur bei eingeschalteter Ebene.** Ein Treffer wählt über `onMarkerWaehlen` aus,
- * und das findet nur, was die Karte zeichnet (`waehlbar`). Ein Treffer, der die Ebene selbst
- * einschaltete, änderte eine einsatzweit geteilte Ansicht.
+ * Betroffene nur bei eingeschalteter Ebene: ein Treffer wählt über `onMarkerWaehlen` aus, und das
+ * findet nur, was die Karte zeichnet. Ein Treffer, der die Ebene einschaltete, änderte die
+ * einsatzweit geteilte Ansicht.
  */
 export function suchbareMarker(a: {
   /** `alleVerortet` — ohne Betroffene. */
   verortet: KarteMarker[];
-  /** `personenVerortet` — die Betroffenen, getrennt geführt (LFH-648). */
+  /** `personenVerortet` — die Betroffenen, getrennt geführt. */
   personen: KarteMarker[];
   personenZugriff: PersonenZugriff;
   personenEbeneAn: boolean;
@@ -37,11 +37,8 @@ export function suchbareMarker(a: {
 }
 
 /**
- * Reihenfolge bei Gleichstand der Trefferzahl.
- *
- * Ausgeschrieben statt aus `Object.keys(OBJEKTART)` abgeleitet: die Schlüsselreihenfolge eines
- * Objektliterals ist keine erklärte Absicht und drehte sich beim nächsten Umsortieren still
- * mit. Dass beide dieselbe Menge tragen, prüft ein Test in beide Richtungen.
+ * Reihenfolge bei Gleichstand der Trefferzahl — ausgeschrieben, weil die Schlüsselreihenfolge von
+ * `OBJEKTART` keine erklärte Absicht ist. Dass beide dieselbe Menge tragen, prüft ein Test.
  */
 export const TYP_REIHENFOLGE: readonly MarkerTyp[] = [
   'einsatzort',
@@ -64,19 +61,16 @@ export interface MarkerGruppe {
 }
 
 /**
- * Gruppiert die Treffer eines Suchbegriffs nach Objektart. Gesucht wird in Beschriftung und
- * Objektart.
- *
- * Leere Gruppen fallen weg. Sortiert wird nach Trefferzahl absteigend, bei Gleichstand nach
- * {@link TYP_REIHENFOLGE} — ausdrücklich zweistufig: bei gleicher Zahl entschiede sonst die
- * Eingabereihenfolge, und die hängt an der Ladereihenfolge der Module.
+ * Gruppiert die Treffer nach Objektart; gesucht wird in Beschriftung und Objektart. Leere Gruppen
+ * fallen weg. Sortiert nach Trefferzahl absteigend, bei Gleichstand nach {@link TYP_REIHENFOLGE} —
+ * sonst entschiede die Ladereihenfolge der Module.
  */
 export function gruppiereTreffer(marker: KarteMarker[], suche: string): MarkerGruppe[] {
   const begriff = suche.trim().toLocaleLowerCase();
   const nachTyp = new Map<MarkerTyp, KarteMarker[]>();
   for (const x of marker) {
-    // Beschriftung ODER Objektart: ein unbenanntes Zeichen heißt überall „(freies Zeichen)",
-    // gefunden wird es über „takt"; „fahrzeug" listet alle Fahrzeuge (Browserprobe LFH-716).
+    // Beschriftung oder Objektart: ein unbenanntes Zeichen wird über „takt" gefunden, „fahrzeug"
+    // listet alle Fahrzeuge.
     const text = `${x.label} ${OBJEKTART[x.typ]}`.toLocaleLowerCase();
     if (begriff !== '' && !text.includes(begriff)) continue;
     const bisher = nachTyp.get(x.typ);

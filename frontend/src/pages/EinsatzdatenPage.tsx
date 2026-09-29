@@ -56,15 +56,13 @@ import { einsatzStatus } from '../theme/statusFarben';
 dayjs.extend(utc);
 
 /**
- * UTC-Wirestring → Dayjs für den DatePicker, in LOKALER Zeit.
+ * UTC-Wirestring → Dayjs für den DatePicker, in lokaler Zeit.
  *
- * `dayjs(wire)` läse den naiven Wirestring als lokale Zeit und landete damit auf einem
- * anderen Instant (in Europe/Berlin um 2 h daneben). Das `.local()` ist ebenso wenig
- * verzichtbar: es hält den Picker auf derselben Wanduhrzeit, die `ZeitAnzeige` daneben
- * rendert (`anzeige/format.ts:inZone` → `dayjs.utc(x).local()`); ein Dayjs im UTC-Modus
- * zeigte die UTC-Wanduhrzeit und widerspräche der Descriptions-Zelle direkt daneben.
- * Nebeneffekt: antds generateConfig bleibt durchgehend im Lokal-Modus, auch wenn der
- * Nutzer einen neuen Wert wählt.
+ * `dayjs(wire)` läse den naiven Wirestring als lokale Zeit und landete auf einem anderen Instant.
+ * Das `.local()` hält den Picker auf derselben Wanduhrzeit, die `ZeitAnzeige` daneben rendert
+ * (`anzeige/format.ts:inZone` → `dayjs.utc(x).local()`); ein Dayjs im UTC-Modus widerspräche der
+ * Zelle daneben. Nebeneffekt: antds generateConfig bleibt im Lokal-Modus, auch bei neu gewähltem
+ * Wert.
  */
 export function wireZuPicker(wire: string): Dayjs {
   return dayjs.utc(wire).local();
@@ -91,38 +89,28 @@ interface FormWerte {
 }
 
 /**
- * Mindestbreite einer Kopfangabe. KEIN neuer Wert — dasselbe Mass wie
- * `flaeche.kachelMinKlein` (220). Es steht hier lokal statt als sechster Schlüssel in
- * `flaeche`: das trägt die gemessenen §2.2-Baselines und ist als geschlossene Menge
- * gepinnt, und eine Kopfleiste ist kein Nebenraster. Präzedenz für die lokale Konstante
- * mit genau dieser Begründung: `KACHEL_MIN_HOEHE` in `EinsaetzePage`.
+ * Mindestbreite einer Kopfangabe, dasselbe Maß wie `flaeche.kachelMinKlein` (220). Lokal statt als
+ * weiterer Schlüssel in `flaeche`: das ist als geschlossene Menge gepinnt, und eine Kopfleiste ist
+ * kein Nebenraster.
  *
- * Die Wirkung ist die Staffelung ohne Umbruchregel: `auto-fit` legt bei ~900 px
- * Lesebreite vier Spalten nebeneinander (Fükw), auf dem Handschirm (~390 px minus
- * Seitenrinne) genau eine.
+ * `auto-fit` legt bei ~900 px Lesebreite vier Spalten nebeneinander (Fükw), auf dem Handschirm
+ * eine.
  */
 const KOPF_MIN_BREITE = 220;
 
 /**
- * Eine Angabe der Kopfleiste: gedämpftes Etikett, darunter der Wert mit Gewicht.
+ * Eine Angabe der Kopfleiste: gedämpftes Etikett, darunter der Wert mit Gewicht. Vier Angaben sind
+ * herausgestellt, weil sie im Fükw zuerst gebraucht werden — Stichwort, Alarmzeit, Einsatzort,
+ * Einsatzleitung.
  *
- * Die Gewichtung IST der Befund (M14): zwölf gleich schwere `Descriptions`-Zeilen
- * beantworten die Frage „was ist hier los?" genauso langsam wie eine Volltextsuche.
- * Vier Angaben sind herausgestellt, weil sie im Fükw zuerst gebraucht werden —
- * Stichwort, Alarmzeit, Einsatzort, Einsatzleitung.
+ * Ein leerer Wert lässt den Platz stehen und zeigt „—": eine Kopfleiste mit wechselnder Spaltenzahl
+ * wäre bei jedem Einsatz anders zu lesen.
  *
- * Ein leerer Wert lässt den Platz stehen und zeigt „—", statt die Angabe wegzulassen:
- * eine Kopfleiste mit wechselnder Spaltenzahl wäre bei jedem Einsatz anders zu lesen.
- * (Die Karten auf `EinsaetzePage` lassen ihre Ortszeile weg — das ist eine Karte in
- * einem Raster, keine feste Vierergruppe, und die Regel überträgt sich nicht.)
- *
- * Nichts hier ist bedienbar, also gilt die Zwei-Angaben-Regel für handgebaute
- * Bedienziele (LFH-365) NICHT — es gibt kein Ziel.
+ * Nichts hier ist bedienbar, die Zwei-Angaben-Regel für handgebaute Bedienziele gilt nicht.
  */
 /**
- * Eine Angabe der Kopfleiste als Zelle im Fugenraster (Neuentwurf: Augenbraue über dem
- * Wert, Zelle auf `flaeche`). Kein `Kennzahl`-Baustein: die Werte sind Wörter, keine
- * Zahlen — ein Stichwort in Datenwert-Mono 22 läse sich wie ein Messwert.
+ * Eine Angabe als Zelle im Fugenraster (Augenbraue über dem Wert). Kein `Kennzahl`-Baustein: die
+ * Werte sind Wörter — ein Stichwort in Datenwert-Mono läse sich wie ein Messwert.
  */
 function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode; mono?: boolean }) {
   const { token, rollen } = useRollen();
@@ -150,8 +138,8 @@ function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode;
 }
 
 /**
- * Beschriftete Angaben als Zeilen (`dl`) — ersetzt die umrandete `Descriptions`-Tabelle:
- * Augenbraue links, Wert rechts, Trenner `flaeche3` wie jede Paneelzeile.
+ * Beschriftete Angaben als Zeilen (`dl`) statt umrandeter `Descriptions`-Tabelle: Augenbraue links,
+ * Wert rechts, Trenner `flaeche3`.
  */
 function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] }) {
   const { token, rollen } = useRollen();
@@ -201,9 +189,8 @@ export default function EinsatzdatenPage() {
 
   const speichernMutation = useMutation({
     mutationFn: (felder: KopfdatenUpdate) => aktualisiereEinsatz(einsatzId, felder),
-    // KEIN `onError`-Toast mehr (LFH-345 · C10, H14): der Fehler hängt an `mutation.error`
-    // und steht als `<SpeicherFehler>` über dem Formular. Ein Toast verfällt nach ~3 s,
-    // das ausgefüllte Formular stand danach unverändert da und wirkte gespeichert.
+    // Kein `onError`-Toast: der Fehler steht als `<SpeicherFehler>` über dem Formular. Ein Toast
+    // verfällt nach ~3 s, und das Formular wirkte danach gespeichert.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
@@ -280,17 +267,13 @@ export default function EinsatzdatenPage() {
 
   return (
     <EinsatzSeite
-      // Datenblatt und Bearbeitungsformular: ausdrücklich die schmale Lesebreite, unabhängig
-      // von der Vorgabe des Primitivs (die für Arbeitsflächen breit wird).
+      // Datenblatt und Bearbeitungsformular: ausdrücklich die schmale Lesebreite.
       breite="schmal"
       titel={
         <Space>
           {einsatz.bezeichnung}
-          {/* Vorher stand hier der ROHE Wire-Wert in einem `Tag color="green"` — also
-              „aktiv"/„abgeschlossen" klein geschrieben und mit einer Farbe, die an
-              keiner Rolle hing. Beides kommt jetzt aus `theme/statusFarben.ts`
-              (Beschriftung als zweiter Kanal) über `StatusTag` (Rollenfarbe auf Rand
-              und Text, nie als Fläche). */}
+          {/* Beschriftung und Rollenfarbe aus `theme/statusFarben.ts` über `StatusTag`, nicht
+              der rohe Wire-Wert. */}
           <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
       }
@@ -319,10 +302,9 @@ export default function EinsatzdatenPage() {
               ]}
             >
               {/* Der Knopf, der hierher geführt hat, verschwindet im selben Rendern — ohne
-                `autoFocus` fiele der Fokus auf `<body>` und die Tastaturbedienung finge
-                wieder ganz oben an. Das Formular wird beim Wechsel frisch eingehängt,
-                also genügt Reacts Mount-Fokus; das `requestAnimationFrame` aus dem
-                Erfassungs-Primitiv braucht es nur, wo ein Dialog stehen BLEIBT. */}
+                  `autoFocus` fiele der Fokus auf `<body>`. Das Formular wird frisch eingehängt,
+                  Reacts Mount-Fokus genügt; `requestAnimationFrame` braucht es nur, wo ein
+                  Dialog stehen bleibt. */}
               <Input autoFocus />
             </Form.Item>
             <Form.Item label="Einsatzstichwort" name="stichwort">
@@ -358,8 +340,8 @@ export default function EinsatzdatenPage() {
             <Form.Item label="Anzahl Betroffene (initial)" name="anzahl_betroffene_initial">
               <InputNumber min={0} style={{ width: 180 }} />
             </Form.Item>
-            {/* Der Fehler steht ÜBER dem Knopf, an dem er entsteht — dort ist der Blick nach
-              dem Klick, und dort bleibt er stehen, bis das nächste Absenden ihn räumt. */}
+            {/* Der Fehler steht über dem Knopf, an dem er entsteht, bis das nächste Absenden
+                ihn räumt. */}
             <SpeicherFehler fehler={speichernMutation.error} />
             <Space style={{ marginTop: token.margin }}>
               <Button type="primary" htmlType="submit" loading={speichernMutation.isPending}>
@@ -371,10 +353,8 @@ export default function EinsatzdatenPage() {
         </Paneel>
       ) : (
         <>
-          {/* KOPFLEISTE — die vier Angaben, die im Fükw zuerst gebraucht werden.
-              Sie stehen NICHT zusätzlich in der Tabelle darunter: doppelter Text hiesse
-              zweimal dieselbe Frage beantworten, und im Test lieferte `findByText` dann
-              zwei Treffer statt einem. */}
+          {/* Kopfleiste — die vier Angaben, die im Fükw zuerst gebraucht werden. Sie stehen
+              nicht zusätzlich in der Tabelle darunter. */}
           <div
             style={{
               ...kennzahlenbandStil(rollen),
@@ -432,13 +412,10 @@ export default function EinsatzdatenPage() {
             />
           </Paneel>
 
-          {/* TECHNISCHE ANGABEN — Aktenzeichen und der Anlege-Zeitstempel. Sie werden
-              gebraucht, wenn jemand nachweist oder rückfragt, nicht wenn jemand führt;
-              eingeklappt kosten sie keine Zeile im Blickfeld.
-              KEIN `forceRender`: hier wird keine Feldzahl gezählt (die Falle aus der
-              Erfassungs-Norm), und der eingeklappte Zustand IST die Aussage — mit
-              `forceRender` stünde der Inhalt im Baum und die Gegenprobe „vorher nicht
-              sichtbar" wäre nicht mehr formulierbar. */}
+          {/* Technische Angaben — Aktenzeichen und Anlege-Zeitstempel: gebraucht beim
+              Nachweisen, nicht beim Führen, deshalb eingeklappt. Kein `forceRender`: der
+              eingeklappte Zustand ist die Aussage, mit `forceRender` wäre die Gegenprobe
+              „vorher nicht sichtbar" nicht formulierbar. */}
           <Collapse
             style={{ marginTop: token.margin }}
             items={[

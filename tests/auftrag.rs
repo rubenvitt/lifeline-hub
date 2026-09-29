@@ -696,7 +696,7 @@ async fn auftrag_ohne_setting_keine_frist() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    // Ohne Setting + ohne frist_at → keine Frist (heutiges Verhalten).
+    // Ohne Setting + ohne frist_at → keine Frist.
     let (status, a) = anfrage(
         &app,
         "POST",
@@ -879,10 +879,9 @@ async fn quittieren_schliesst_frist_erinnerung_erst_beim_letzten_empfaenger() {
 }
 
 /// LFH-371: der Gleichstand ist auch jenseits der Anzeigegrenze der Karte (drei Chips)
-/// erreichbar. Die Karte bot dem vierten und fünften Empfänger keinen Knopf, wenn die
-/// ersten drei quittiert waren; der Server zählt über ALLE Empfänger. Quittiert werden
-/// die ersten drei zuerst — genau die Konstellation, in der die Karte vorher verstummte —,
-/// und die Erinnerung schließt erst beim fünften.
+/// erreichbar; der Server zählt über ALLE Empfänger. Quittiert werden die ersten drei zuerst
+/// — die Konstellation, in der die Karte dem vierten und fünften keinen Knopf bot —, und die
+/// Erinnerung schließt erst beim fünften.
 #[tokio::test]
 async fn frist_erinnerung_schliesst_erst_beim_fuenften_von_fuenf_empfaengern() {
     let (app, pool) = setup_mit_pool().await;
@@ -940,7 +939,7 @@ async fn frist_erinnerung_schliesst_erst_beim_fuenften_von_fuenf_empfaengern() {
     }
 }
 
-/// Rücknahme von „In Bearbeitung" (LFH-343 · C8, Befund H50).
+/// Rücknahme von „In Bearbeitung" (LFH-343).
 ///
 /// Die Direktaktion ohne Rückfrage braucht einen Rückweg, den der Server annimmt —
 /// ein Rückgängig-Knopf, der 422 liefert, wäre schlechter als keiner. Aus

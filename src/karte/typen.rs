@@ -4,12 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use utoipa::ToSchema;
 
-// LFH-323: Cross-Service-Kontrakt-Typen des karten-service (aus dem geteilten Crate
-// `karten-katalog`). Hier re-exportiert, damit `src/api_doc.rs` sie mit ToSchema registriert und
-// der Proxy in `routes/karte.rs` sie typisiert deserialisiert — statt roh als `serde_json::Value`.
-// `JobStatus` bleibt bewusst UNregistriert: es ist datentragend (`Failed(String)`) und in
-// `BuildJob` inline (`#[schema(inline)]`), damit weder ein `enum_wire_kontrakt`-Pin nötig noch der
-// Inventar-Guard verletzt ist (siehe `karten-katalog`).
+// Kontrakt-Typen des karten-service aus dem geteilten Crate `karten-katalog`, re-exportiert
+// für die ToSchema-Registrierung in `src/api_doc.rs` und die typisierte Deserialisierung im
+// Proxy. `JobStatus` bleibt unregistriert: datentragend (`Failed(String)`) und in `BuildJob`
+// inline (`#[schema(inline)]`), so braucht es keinen `enum_wire_kontrakt`-Pin.
 pub use karten_katalog::{BuildJob, RegionDto};
 
 /// Status einer Fachebenen-Antwort.
@@ -142,25 +140,23 @@ impl Bbox {
     pub fn overpass(&self) -> String {
         format!("{},{},{},{}", self.sued, self.west, self.nord, self.ost)
     }
-    /// Cache-Schlüssel der KRITIS-Ebene. Bleibt byte-gleich zum Stand vor LFH-81
-    /// (`kritis:<bbox>`) — ein anderer Schlüssel ließe den Bestand seinen Cache verlieren.
+    /// Cache-Schlüssel der KRITIS-Ebene, byte-gleich `kritis:<bbox>` — ein anderer Schlüssel ließe
+    /// den Bestand seinen Cache verlieren.
     pub fn cache_key(&self) -> String {
         self.cache_key_mit("kritis")
     }
-    /// Cache-Schlüssel `<praefix>:<bbox>`, auf 2 Nachkommastellen gerundet (≈1 km); das
-    /// reduziert die Cache-Streuung. Das Präfix trennt die bbox-Ebenen voneinander.
+    /// Cache-Schlüssel `<praefix>:<bbox>`, auf 2 Nachkommastellen (≈1 km) gerundet gegen
+    /// Cache-Streuung.
     pub fn cache_key_mit(&self, praefix: &str) -> String {
         format!(
             "{praefix}:{:.2},{:.2},{:.2},{:.2}",
             self.west, self.sued, self.ost, self.nord
         )
     }
-    /// Um `meter` in jede Richtung erweiterter Ausschnitt, auf den gültigen Bereich
-    /// begrenzt. Die Breite rechnet mit dem Erdradius von [`haversine_m`], damit Rand und
-    /// Abstandsmessung dieselbe Erde meinen. Die Länge teilt durch den Kosinus der
-    /// POLNÄHEREN Kante: dort ist ein Längengrad am kürzesten, der Rand also nirgends zu
-    /// schmal. Konstruiert direkt statt über [`Bbox::parse`], weil ein 1°-Ausschnitt mit
-    /// Rand die 1°-Grenze überschreiten darf.
+    /// Um `meter` in jede Richtung erweiterter Ausschnitt, auf den gültigen Bereich begrenzt. Die
+    /// Breite rechnet mit dem Erdradius von [`haversine_m`], damit Rand und Abstandsmessung
+    /// dieselbe Erde meinen. Die Länge teilt durch den Kosinus der POLNÄHEREN Kante, damit der Rand
+    /// nirgends zu schmal ist. Direkt konstruiert statt über [`Bbox::parse`].
     ///
     /// [`haversine_m`]: crate::geocoding::peilung::haversine_m
     pub fn erweitert_um_m(&self, meter: f64) -> Bbox {
@@ -190,8 +186,7 @@ mod bbox_tests {
         let b = Bbox::parse("6.0,50.0,7.0,51.0").unwrap();
         assert_eq!((b.west, b.sued, b.ost, b.nord), (6.0, 50.0, 7.0, 51.0));
     }
-    /// Ein Rand von 2 km: in der Breite überall ~0,018°, in der Länge bei 51,6° N ~0,029°
-    /// (Kosinus der POLNÄHEREN Kante, also eher etwas mehr als nötig).
+    /// Ein Rand von 2 km: Breite ~0,018°, Länge bei 51,6° N ~0,029° (eher etwas mehr als nötig).
     #[test]
     fn erweitert_um_meter_mit_breitenkorrektur() {
         let b = Bbox::parse("6.9,51.45,7.3,51.65").unwrap();
@@ -202,7 +197,7 @@ mod bbox_tests {
         let dlon = dlat / (51.65_f64 + dlat).to_radians().cos();
         assert!((b.west - e.west - dlon).abs() < 1e-4, "{e:?}");
         assert!((e.ost - b.ost - dlon).abs() < 1e-4, "{e:?}");
-        // Ein 1°-Ausschnitt darf wachsen — `parse` hätte ihn als „zu groß" abgelehnt.
+        // Ein 1°-Ausschnitt darf wachsen.
         let voll = Bbox::parse("6.0,51.0,7.0,52.0")
             .unwrap()
             .erweitert_um_m(6000.0);
@@ -238,16 +233,14 @@ mod bbox_tests {
         // Lon < -180
         assert!(Bbox::parse("-181.0,50.0,-179.0,51.0").is_err());
     }
-    /// Bis LFH-83 war alles über 1° × 1° ein Fehler („weiter hineinzoomen"), weil jede bbox
-    /// eine Overpass-Anfrage auslöste. Der Extrakt-Bestand beantwortet jede Größe.
+    /// Der Extrakt-Bestand beantwortet jede Ausschnittgröße.
     #[test]
     fn akzeptiert_ganz_deutschland_und_die_welt() {
         assert!(Bbox::parse("5.0,47.0,15.0,55.0").is_ok());
         assert!(Bbox::parse("-180,-90,180,90").is_ok());
     }
-    /// LFH-81: das Präfix wird Parameter, der KRITIS-Schlüssel bleibt Byte für Byte, was er
-    /// war. Geprüft gegen ein handgeschriebenes Literal — ein Vergleich gegen
-    /// `cache_key_mit("kritis")` prüfte die Funktion gegen sich selbst.
+    /// Der KRITIS-Schlüssel bleibt byte-gleich; geprüft gegen ein handgeschriebenes Literal, nicht
+    /// gegen `cache_key_mit("kritis")`.
     #[test]
     fn cache_schluessel_mit_praefix_und_kritis_byte_gleich() {
         let b = Bbox::parse("6.9,51.45,7.3,51.65").unwrap();
@@ -267,7 +260,7 @@ mod bbox_tests {
     }
     #[test]
     fn akzeptiert_bbox_mit_genau_einem_grad_spanne() {
-        // Genau 1.0 Grad in jeder Richtung (nicht > 1.0) → Ok
+        // Genau 1.0 Grad je Richtung → Ok.
         let b = Bbox::parse("6.0,50.0,7.0,51.0").unwrap();
         assert_eq!(b.west, 6.0);
     }

@@ -7,17 +7,15 @@ use crate::staerke::Staerke;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-// Geteilte Konstanten/Validierung leben jetzt neutral in `crate::katalog` und werden
-// hier re-exportiert, damit Bestandscode (crate::fahrzeug::KATEGORIE_*, super::*) gilt.
+// Geteilte Konstanten und Validierung liegen in `crate::katalog` und werden hier re-exportiert.
 pub use crate::katalog::{
     ist_gueltige_kategorie, StatusKategorie, DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST,
     KATEGORIE_GEBUNDEN, KATEGORIE_NICHT_VERFUEGBAR, KATEGORIE_VERFUEGBAR,
 };
 
-/// Default-Status-Katalog je neu angelegter Organisation
-/// (label, kategorie, fms_anker, sortier). **Muss mit dem Seed in
-/// `migrations/0008_fahrzeug_status.sql` übereinstimmen.** bootstrap_admin
-/// iteriert diese Liste für neue Orgs.
+/// Default-Status-Katalog je neuer Organisation (label, kategorie, fms_anker, sortier), den
+/// `bootstrap_admin` anlegt. **Muss mit dem Seed in `migrations/0008_fahrzeug_status.sql`
+/// übereinstimmen.**
 pub const STATUS_STARTLISTE: [(&str, &str, i64, i64); 10] = [
     ("1 – Frei auf Funk", KATEGORIE_VERFUEGBAR, 1, 10),
     ("2 – Frei auf Wache", KATEGORIE_VERFUEGBAR, 2, 20),
@@ -225,9 +223,9 @@ mod tests {
     }
 }
 
-// ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────
-// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
-// importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
+// ── System-ETB-Wortlaute ──────────────────────────────────────────────────────────
+// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein importierter
+// Einsatz dieselben ETB-Texte trägt wie ein echter.
 
 /// System-ETB beim Disponieren eines Fahrzeugs (Stamm oder Ad-hoc).
 pub fn etb_text_disponiert(funkrufname: &str) -> String {

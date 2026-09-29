@@ -27,13 +27,9 @@ interface TotpCodeWerte {
 }
 
 /**
- * Rollen-Beschriftung als WORT statt als Wire-Wert (LFH-345 · C10, N5).
- *
- * Die Schreibweise folgt den Etiketten in `pages/BenutzerPage.tsx` („Admin" /
- * „Führungskraft" / „Benutzer") — dieselbe Rolle darf nicht an zwei Stellen zwei Namen
- * tragen. Bewusst KEINE geteilte Map: die gäbe es dann an drei Orten (hier, BenutzerPage,
- * `auth/`), und ihr richtiger Platz wäre `theme`/`auth`, nicht diese Seite. Wer die dritte
- * Stelle baut, zieht sie hoch.
+ * Rollen-Beschriftung als Wort statt als Wire-Wert. Die Schreibweise folgt `pages/BenutzerPage.tsx`
+ * („Admin" / „Führungskraft" / „Benutzer"), damit dieselbe Rolle nicht zwei Namen trägt. Bewusst
+ * keine geteilte Map: ihr Platz wäre `theme`/`auth`; wer die dritte Stelle baut, zieht sie dorthin.
  */
 function rollenText(benutzer: { system_rolle: string; org_rolle: string } | null): string {
   if (!benutzer) return '—';
@@ -42,9 +38,11 @@ function rollenText(benutzer: { system_rolle: string; org_rolle: string } | null
   return 'Benutzer';
 }
 
-/** Laufendes TOTP-Enrollment (LFH-43): das Secret ist bereits serverseitig gespeichert, aber
- *  NOCH NICHT aktiv (`totp_aktiviert = 0`) — erst ein bestätigender Code in `enrollFinish`
- *  schaltet MFA scharf (s. `enrollStart`-Doc in `api/totp.ts`). */
+/**
+ * Laufendes TOTP-Enrollment: das Secret ist serverseitig gespeichert, aber noch nicht aktiv
+ * (`totp_aktiviert = 0`) — erst ein bestätigender Code in `enrollFinish` schaltet MFA scharf (s.
+ * `enrollStart` in `api/totp.ts`).
+ */
 interface TotpEnrollment {
   otpauthUrl: string;
   secretBase32: string;
@@ -53,14 +51,13 @@ interface TotpEnrollment {
 export default function ProfilPage() {
   const { benutzer, aktualisiere } = useAuth();
   // Kein vierter Alert-Zustand neben `fehler`/`erfolg`/`totpFehler`: das Kopieren ist eine
-  // flüchtige Aktion ohne Folgezustand, die drei Alerts tragen Zustände. `App.useApp()`
-  // hat im Repo breite Präzedenz, `<AntApp>` steht in main.tsx und in test/utils.tsx.
+  // flüchtige Aktion ohne Folgezustand. `<AntApp>` steht in main.tsx und test/utils.tsx.
   const { message } = App.useApp();
   const { token, rollen } = useRollen();
   const [provider, setProvider] = useState<AuthProvider[]>([]);
-  // Die Organisation steht nicht an `BenutzerAnzeige` — sie kommt aus einem eigenen Abruf.
-  // Nicht-blockierend und ohne Fehlerzweig: schlägt er fehl, zeigt die Kopfsektion „—",
-  // und die beiden Sicherheits-Abschnitte darunter bleiben unberührt bedienbar.
+  // Die Organisation steht nicht an `BenutzerAnzeige` — eigener Abruf. Nicht-blockierend und ohne
+  // Fehlerzweig: schlägt er fehl, zeigt die Kopfsektion „—", die Sicherheits-Abschnitte bleiben
+  // bedienbar.
   const { data: organisation } = useQuery({
     queryKey: globalKeys.organisation(),
     queryFn: ladeOrganisation,
@@ -69,36 +66,34 @@ export default function ProfilPage() {
   const [erfolg, setErfolg] = useState(false);
   const [laedt, setLaedt] = useState(false);
 
-  // TOTP-Enroll (LFH-43, Increment 5, Task 7).
+  // TOTP-Enroll.
   const [totpForm] = Form.useForm<TotpCodeWerte>();
   const [totpEnrollment, setTotpEnrollment] = useState<TotpEnrollment | null>(null);
   const [totpFehler, setTotpFehler] = useState<string | null>(null);
   const [totpLaedt, setTotpLaedt] = useState(false);
   /** Riegel gegen zwei gleichzeitige `enrollFinish` — s. `totpBestaetigen`. */
   const sendetRef = useRef(false);
-  // Die Recovery-Codes werden vom Server NUR EINMALIG (bei `enrollFinish`) zurückgegeben —
-  // lokaler State, UNABHÄNGIG vom `totp_aktiviert`-Status im Context: sobald `aktualisiere()`
-  // danach den Status auf „aktiv" dreht, darf die Box mit den Codes nicht verschwinden (sie ist
-  // die einzige Chance, sie zu sichern).
+  // Die Recovery-Codes gibt der Server nur einmal zurück (bei `enrollFinish`) — lokaler State,
+  // unabhängig von `totp_aktiviert`: dreht `aktualisiere()` den Status auf „aktiv", darf die Box
+  // nicht verschwinden (einzige Chance, die Codes zu sichern).
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
 
   // Aktive Auth-Provider laden (wie LoginPage), um die Passkey-Sektion bedingt zu rendern.
   useEffect(() => {
     providerListe()
       .then(setProvider)
-      // Fehler/Netzwerkproblem → Passkey-Sektion bleibt einfach ausgeblendet, kein Fake-Button.
+      // Fehler/Netzwerkproblem → die Passkey-Sektion bleibt ausgeblendet.
       .catch(() => setProvider([]));
   }, []);
 
   const webauthnAktiv = provider.some((p) => p.typ === 'webauthn' && p.aktiviert);
-  // WebAuthn selbst verlangt einen Secure Context (https/localhost) — ohne den würde
-  // `navigator.credentials.create` serverseitig scheitern, bevor überhaupt eine Ceremony
-  // beginnt. Der Button erscheint also nur, wenn er auch tatsächlich funktionieren kann.
+  // WebAuthn verlangt einen Secure Context (https/localhost); ohne ihn scheiterte
+  // `navigator.credentials.create`, bevor eine Ceremony beginnt. Der Knopf erscheint nur, wenn er
+  // funktionieren kann.
   const passkeySichtbar = window.isSecureContext && webauthnAktiv;
-  // Dieselbe Frage für die Zwischenablage, aus demselben Grund: `navigator.clipboard` ist
-  // ein Secure-Context-Feature und im Nicht-Secure-Context gar nicht erst vorhanden — die
-  // Zeile darüber belegt, dass diese App dort läuft. Die Fähigkeit wird gefragt, nicht
-  // geraten; ein Knopf, der nichts tut, ist schlimmer als kein Knopf.
+  // Dieselbe Frage für die Zwischenablage: `navigator.clipboard` ist ein Secure-Context-Feature und
+  // dort sonst gar nicht vorhanden. Die Fähigkeit wird gefragt, nicht geraten; ein Knopf, der
+  // nichts tut, ist schlimmer als keiner.
   const kopierenMoeglich = typeof navigator.clipboard?.writeText === 'function';
 
   async function passkeyRegistrieren() {
@@ -117,8 +112,8 @@ export default function ProfilPage() {
     }
   }
 
-  // TOTP-Enroll (LFH-43): startet ein Enrollment. Ein erneuter Klick (Re-Enroll, z.B. neues
-  // Gerät) überschreibt serverseitig das noch nicht bestätigte Secret — s. `enrollStart`-Doc.
+  // Startet ein TOTP-Enrollment. Ein erneuter Klick (Re-Enroll, z. B. neues Gerät) überschreibt
+  // serverseitig das noch nicht bestätigte Secret.
   async function totpEinrichtenStarten() {
     setTotpFehler(null);
     setTotpLaedt(true);
@@ -133,10 +128,9 @@ export default function ProfilPage() {
   }
 
   async function totpBestaetigen(werte: TotpCodeWerte) {
-    // Doppelabsende-Riegel (LFH-345 · C10, M20) — dieselbe Begründung wie in `LoginPage`:
-    // seit die sechste Ziffer selbst absendet, führen zwei Wege hierher, und ein TOTP-Code
-    // ist serverseitig genau einmal gültig. Der zweite Aufruf verbrauchte kein Recht,
-    // sondern erzeugte eine Fehlermeldung für einen Code, der gerade funktioniert hat.
+    // Doppelabsende-Riegel wie in `LoginPage`: die sechste Ziffer sendet selbst ab, zwei Wege
+    // führen hierher, und ein TOTP-Code ist serverseitig genau einmal gültig — der zweite Aufruf
+    // meldete einen Fehler für einen Code, der gerade funktioniert hat.
     if (sendetRef.current) return;
     sendetRef.current = true;
     setTotpFehler(null);
@@ -158,13 +152,10 @@ export default function ProfilPage() {
 
   function recoveryCodesKopieren() {
     if (!recoveryCodes) return;
-    // BEIDE Ausgänge melden sich. Vorher stand hier `navigator.clipboard?.writeText(...)
-    // .catch(() => {})`: im Nicht-Secure-Context kurzschloss das `?.` die ganze Kette, und
-    // im Erfolgsfall sagte ohnehin nichts etwas — der einzige Ein-Klick-Weg zu Codes, die
-    // nur EINMAL angezeigt werden, war ein stiller No-Op.
-    // Zwei Zweige, nicht einer: `writeText` kann vorhanden sein und trotzdem ablehnen
-    // (NotAllowedError, fehlende Berechtigung). Das `?.` fällt weg, weil der Aufrufer die
-    // Fähigkeit über `kopierenMoeglich` bereits geprüft hat.
+    // Beide Ausgänge melden sich — der einzige Ein-Klick-Weg zu Codes, die nur einmal angezeigt
+    // werden, darf kein stiller No-Op sein. Zwei Zweige: `writeText` kann vorhanden sein und
+    // trotzdem ablehnen (NotAllowedError, fehlende Berechtigung). Kein `?.`, weil der Aufrufer die
+    // Fähigkeit über `kopierenMoeglich` geprüft hat.
     navigator.clipboard.writeText(recoveryCodes.join('\n')).then(
       () => message.success('Recovery-Codes kopiert'),
       () =>
@@ -177,13 +168,12 @@ export default function ProfilPage() {
   const totpAktiv = benutzer?.totp_aktiviert ?? false;
 
   return (
-    // Reine Formularseite: ausdrücklich schmal, unabhängig von der Vorgabe des Primitivs.
+    // Reine Formularseite: ausdrücklich schmal.
     <AdminPage titel="Profil" breite="schmal">
       <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
         <Paneel titel="Konto">
-          {/* Die Organisation steht nicht am Benutzer, sie kommt aus einem eigenen Abruf.
-              Fällt der aus, bleibt „—" — die Kopfsektion ist deshalb nicht weniger
-              brauchbar. Benutzername in Mono: er ist eine Kennung, kein Name. */}
+          {/* Die Organisation kommt aus einem eigenen Abruf; fällt der aus, bleibt „—".
+              Benutzername in Mono: er ist eine Kennung, kein Name. */}
           <Datenraster spalten={2} beschriftung="Kontodaten" style={{ border: 0 }}>
             <Datenfeld label="Anzeigename">{benutzer?.anzeigename ?? '—'}</Datenfeld>
             <Datenfeld label="Benutzername" mono>
@@ -231,7 +221,7 @@ export default function ProfilPage() {
                   type="warning"
                   showIcon
                   style={{ marginBottom: 16 }}
-                  // `title` statt des in antd 6 abgelösten `message` (LFH-345 · C10, N5).
+                  // `title` statt des in antd 6 abgelösten `message`.
                   title="Recovery-Codes jetzt sichern"
                   description={
                     <div>
@@ -252,11 +242,10 @@ export default function ProfilPage() {
                       >
                         {recoveryCodes.join('\n')}
                       </pre>
-                      {/* `block` statt Klein-Angabe: das ist der einzige Ein-Klick-Weg zu Codes,
-                    die nur einmal angezeigt werden. Ohne Zwischenablage KEIN toter Knopf,
-                    sondern der ehrliche Hinweis auf das `<pre>` darüber — die Codes sind
-                    markierbar, ein zweiter Mechanismus wäre überflüssig. Bewusst ohne
-                    „Strg+C": das Führungs-Tablet hat keine Strg-Taste. */}
+                      {/* `block` statt Klein-Angabe: der einzige Ein-Klick-Weg zu Codes, die
+                          nur einmal angezeigt werden. Ohne Zwischenablage kein toter Knopf,
+                          sondern der Hinweis auf das markierbare `<pre>` darüber. Bewusst ohne
+                          „Strg+C": das Führungs-Tablet hat keine Strg-Taste. */}
                       {kopierenMoeglich ? (
                         <Button block onClick={recoveryCodesKopieren}>
                           Codes kopieren
@@ -293,10 +282,9 @@ export default function ProfilPage() {
                   <div
                     style={{
                       // Ein QR-Code braucht hellen Grund, auch im Nachtbetrieb — Scanner lesen
-                      // dunkle Module auf hellem Feld. Den hellen Grund samt Ruhezone
-                      // (4 Module, `marginSize`) trägt das SVG selbst (Vorgabe `bgColor` der
-                      // Bibliothek); die Hülle nimmt nur die Modus-Rolle und liest keine
-                      // Palette fest aus (vorher `farbenHell.flaeche`).
+                      // dunkle Module auf hellem Feld. Grund und Ruhezone (4 Module, `marginSize`)
+                      // trägt das SVG selbst (`bgColor`-Vorgabe der Bibliothek); die Hülle nimmt
+                      // nur die Modus-Rolle.
                       background: rollen.flaeche,
                       width: 'fit-content',
                       marginBottom: token.marginSM,
@@ -319,10 +307,8 @@ export default function ProfilPage() {
                       name="code"
                       rules={[{ required: true, message: 'Bitte Code eingeben' }]}
                     >
-                      {/* Dasselbe Primitiv wie auf der Anmeldeseite (LFH-345 · C10, M20). Hier
-                    stand ein nacktes `<Input>` — ohne Ziffern-Tastatur, ohne Längengrenze,
-                    ohne Ziffern-Optik. Ausgerechnet an der Stelle, an der 2FA eingerichtet
-                    wird, war die schlechtere der beiden Bauformen. */}
+                      {/* Dasselbe Primitiv wie auf der Anmeldeseite (Ziffern-Tastatur,
+                          Längengrenze, Ziffern-Optik). */}
                       <OtpEingabe autoFocus onVoll={() => totpForm.submit()} />
                     </Form.Item>
                     <Button type="primary" htmlType="submit" loading={totpLaedt}>

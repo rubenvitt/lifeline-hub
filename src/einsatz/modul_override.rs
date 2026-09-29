@@ -1,9 +1,6 @@
-//! Einsatz-Modul-Override (LFH-132) — je (Einsatz, Modul) eine Zeile.
-//!
-//! Leaf-Tabelle `einsatz_modul_override`; Validierung der Keys/Rollen in Rust
-//! (`super::modul`). Die Overrides werden strikt über die `einsatz_id` geladen —
-//! NIE über die Benutzer-Org abgeleitet (Org-Isolation, vgl. Memory
-//! cross-org-lesezugriff-luecke).
+//! Einsatz-Modul-Override (LFH-132) — je (Einsatz, Modul) eine Zeile in
+//! `einsatz_modul_override`; Keys und Rollen validiert `super::modul`. Geladen wird strikt über
+//! die `einsatz_id`, nie über die Benutzer-Org (Org-Isolation).
 
 use crate::error::AppError;
 use serde::Serialize;
@@ -23,9 +20,8 @@ pub struct EinsatzModulOverride {
     pub geaendert_von: Option<i64>,
 }
 
-/// Lädt alle Overrides eines Einsatzes als Map `modul_key → Override`. Existiert
-/// keine Zeile, ist die Map leer (= alle Module sichtbar, keine Rollen-Schranke).
-/// Strikt per `einsatz_id` (Org-Isolation).
+/// Alle Overrides eines Einsatzes als Map `modul_key → Override`; leer heißt alle Module
+/// sichtbar, keine Rollen-Schranke.
 pub async fn laden_alle(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -43,8 +39,7 @@ pub async fn laden_alle(
         .collect())
 }
 
-/// UPSERT eines Overrides auf (einsatz_id, modul_key); setzt die Audit-Felder.
-/// Key-/Rollen-Gültigkeit prüft der Aufrufer (Handler) vor dem Aufruf.
+/// UPSERT auf (einsatz_id, modul_key) mit Audit-Feldern. Key und Rolle prüft der Handler.
 pub async fn setzen(
     pool: &SqlitePool,
     einsatz_id: i64,

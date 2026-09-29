@@ -1,13 +1,12 @@
 //! Route des Wetters am Einsatzort (LFH-633): `GET /api/einsaetze/{id}/wetter`.
 //!
-//! Gate `EinsatzLesezugriff<WetterPegel>`: ist das Modul „Wetter & Pegel“ ausgeblendet oder
-//! gesperrt, antwortet die Route mit 403. Die Pegel-Routen bleiben modul-los.
+//! Gate `EinsatzLesezugriff<WetterPegel>`: ist das Modul ausgeblendet oder gesperrt → 403. Die
+//! Pegel-Routen bleiben modul-los.
 //!
-//! **Ein Quellausfall ist kein HTTP-Fehler**: Warnungen und Vorhersage tragen je einen
-//! eigenen Zustand (`ok | kein_ort | ausfall`), die Antwort ist 200 — sonst risse der Ausfall
-//! eines Teils den anderen mit. Ohne Koordinate des Einsatzorts gibt es keinen Abruf.
-//!
-//! **Kein Live-Ereignis**: das Frontend fragt alle 5 min nach, wie bei der Pegel-Kennzahl.
+//! **Ein Quellausfall ist kein HTTP-Fehler:** Warnungen und Vorhersage tragen je einen Zustand
+//! (`ok | kein_ort | ausfall`), die Antwort ist 200, damit ein Ausfall nicht den anderen Teil
+//! mitreißt. Ohne Koordinate des Einsatzorts kein Abruf. Kein Live-Ereignis; das Frontend fragt
+//! alle 5 min.
 
 use axum::extract::State;
 use axum::Json;
@@ -18,9 +17,9 @@ use crate::einsatz::modul::WetterPegel;
 use crate::error::AppError;
 use crate::wetter::{abruf, WetterAnzeige};
 
-/// GET /api/einsaetze/{id}/wetter — Warnungen der Warnzelle des Einsatzorts und Vorhersage
-/// der nächsten 24 Stunden. Der Cache liegt im Nachschlage-Cache (eigene DB, Fallback auf den
-/// operativen Pool — dieselbe Wahl wie `routes::pegel`).
+/// GET /api/einsaetze/{id}/wetter — Warnungen der Warnzelle des Einsatzorts und Vorhersage der
+/// nächsten 24 Stunden. Cache im Nachschlage-Cache mit Rückfall auf den operativen Pool (wie
+/// `routes::pegel`).
 pub async fn anzeige(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<WetterPegel>,

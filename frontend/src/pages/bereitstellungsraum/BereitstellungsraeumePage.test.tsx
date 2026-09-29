@@ -111,12 +111,9 @@ describe('BereitstellungsraeumePage', () => {
   });
 
   /**
-   * AK4-Regressionsklammer (LFH-331 · B3) zur Ebenen-Trennung D3: die Listen-Query
-   * gehört an die Stelle der Liste, nicht in den Seitenguard. Vor dem Umbau blieb die
-   * Seite bei gescheitertem Abruf im Ladebild stehen und sagte nie, was los war.
-   *
-   * Beide Hälften nennen dasselbe Leertext-Literal — die negative Zusicherung soll eine
-   * Aussage über die Zustandsweiche sein, nicht über die Schreibweise eines Strings.
+   * Die Listen-Query gehört an die Stelle der Liste, nicht in den Seitenguard: ein gescheiterter
+   * Abruf zeigt den Fehler statt eines ewigen Ladebilds. Beide Hälften nennen dasselbe
+   * Leertext-Literal, damit die Zusicherung die Zustandsweiche prüft.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
@@ -142,13 +139,9 @@ describe('BereitstellungsraeumePage', () => {
   });
 
   /**
-   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
-   * nicht `isStale`.
-   *
-   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
-   * Aktualisierung. Ein bloß vorbefüllter Zwischenspeicher belegte den Produktionsweg nicht.
-   * Vor dem Umbau verschwand die Zeile hier — die Einsatzkraft verlor Daten, die sie eben
-   * noch hatte, und bekam dafür eine Fehlermeldung über etwas, das sie längst gelesen hatte.
+   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher. Der Ablauf ist bewusst der echte
+   * (erst Erfolg, dann gescheiterte Aktualisierung); ein bloß vorbefüllter Cache belegte den
+   * Produktionsweg nicht.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
     server.use(
@@ -177,9 +170,8 @@ describe('BereitstellungsraeumePage', () => {
   });
 
   /**
-   * Eine vollständig stornierte Liste ist ein echter Leerzustand: der Seitenfilter
-   * (`storniert_at`) läuft durch dieselbe Weiche wie eine leere Antwort. Ohne diesen
-   * Fall bliebe der Filter unbelegt, obwohl er die Menge auf null bringen kann.
+   * Eine vollständig stornierte Liste ist ein echter Leerzustand: der Seitenfilter läuft durch
+   * dieselbe Weiche wie eine leere Antwort.
    */
   it('behandelt eine ausschließlich stornierte Liste als Leerzustand', async () => {
     server.use(
@@ -194,22 +186,10 @@ describe('BereitstellungsraeumePage', () => {
   });
 
   /**
-   * PIN auf die MESSACHSE der beiden Zustandsflaggen — die einzige Stelle im Bündel, an
-   * der die Wahl überhaupt widerlegbar ist.
-   *
-   * Auf den übrigen sechs Seiten leben Suche und Filter IM Primitiv; dort steht neben der
-   * ungefilterten Menge gar keine zweite Zahl, gegen die man messen könnte. Hier schon:
-   * `sichtbar` liegt eine Zeile über den Flaggen, und wer sie „vereinfachend" einsetzt,
-   * holt eine Spielart genau des Befunds zurück, den B3 behebt — alles storniert plus
-   * gescheiterte Aktualisierung, und der Fehler verdrängt wieder eine Tabelle, die die
-   * Einsatzkraft eben noch gelesen hat.
-   *
-   * Gemessen: an `alle.length` grün, an `sichtbar.length` rot („Bereitstellungsräume
-   * konnten nicht geladen werden" tritt an die Stelle des Banners).
-   *
-   * Die Lage selbst ist die benannte Folge aus dem Dateikopf der Seite: das Banner steht
-   * über einer leeren Tabelle. Das ist die ehrlichere der beiden Aussagen — der Bestand
-   * IST leer, nur eben womöglich veraltet leer.
+   * Pinnt die Messachse der Zustandsflaggen: sie messen an der ungefilterten Menge (`alle`), nicht
+   * an `sichtbar`. An `sichtbar` gemessen verdrängte bei „alles storniert + gescheiterte
+   * Aktualisierung" wieder der Seitenfehler das Banner. Dass das Banner dann über einer leeren
+   * Tabelle steht, ist gewollt (siehe Seite).
    */
   it('misst an der ungefilterten Menge: alles storniert + Fehler ergibt Banner, nicht Seitenfehler', async () => {
     server.use(

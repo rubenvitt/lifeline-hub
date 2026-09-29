@@ -102,9 +102,8 @@ describe('useLeistenWahl (LFH-715)', () => {
     expect(result.current.wahl).toBe(false);
   });
 
-  // LFH-713: die Wahl eines Zeichenwerkzeugs schließt die Leiste unter `lg`. Das darf die
-  // Vorgabe „offen" des Tablets nicht dauerhaft überschreiben — nach dem Neuladen gilt wieder
-  // die Vorgabe bzw. die eigene Wahl.
+  // Die Wahl eines Zeichenwerkzeugs schließt die Leiste unter `lg` nur für die Sitzung — nach dem
+  // Neuladen gilt wieder Vorgabe bzw. eigene Wahl.
   it('`verberge` schließt nur für die Sitzung: nichts gespeichert, nach dem Neuladen gilt die Wahl', () => {
     const erst = renderHook(() => useLeistenWahl(false));
     act(() => erst.result.current.verberge());

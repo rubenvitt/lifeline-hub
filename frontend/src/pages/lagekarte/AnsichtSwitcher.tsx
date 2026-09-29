@@ -27,10 +27,9 @@ interface AnsichtSwitcherProps {
 type NameDialog = { modus: 'neu' } | { modus: 'umbenennen'; id: number; start: string } | null;
 
 /**
- * Ansichts-Switcher (B/LFH-320) oben in der Lagekarten-Sidebar: Select zum Umschalten plus
- * die Verwaltungs-Aktionen Neu / Umbenennen / Als Standard / Löschen. Kompaktes
- * Navigationsmuster (Select + ⋯-Menü) statt einer eigenen Seite. Löschen fragt, was mit den
- * ansichtsgebundenen Objekten geschieht (freigeben vs. mitlöschen).
+ * Ansichts-Switcher oben in der Lagekarten-Sidebar: Select zum Umschalten plus Neu / Umbenennen /
+ * Als Standard / Löschen. Löschen fragt, was mit den ansichtsgebundenen Objekten geschieht
+ * (freigeben vs. mitlöschen).
  */
 export default function AnsichtSwitcher({
   ansichten,
@@ -114,9 +113,7 @@ export default function AnsichtSwitcher({
   }
 
   return (
-    // Kein Außenabstand: der Switcher steht im gepolsterten Paneel „Kartenansicht", dessen
-    // Polsterung den Abstand zur Haarlinie trägt. Das frühere `marginBottom` stammte aus dem
-    // Kartenstapel der alten Leiste und legte sich dort zusätzlich darauf (LFH-377).
+    // Kein Außenabstand: die Polsterung des Paneels „Kartenansicht" trägt den Abstand.
     <div>
       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
         Ansicht

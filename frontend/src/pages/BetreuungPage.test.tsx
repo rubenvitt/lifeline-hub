@@ -43,9 +43,9 @@ const api = vi.hoisted(() => ({
 vi.mock('../api/betreuung', () => api);
 
 /**
- * Tausendertrenner, wie `getByText` ihn sieht: die Seite setzt ein schmales geschütztes
- * Leerzeichen (U+202F, gepinnt in `betreuungText.test.ts`), der Standard-Normalisierer von
- * Testing Library faltet jedes `\s` des Knotentextes zu einem Leerzeichen — der Suchtext nicht.
+ * Tausendertrenner, wie `getByText` ihn sieht: die Seite setzt ein schmales geschütztes Leerzeichen
+ * (U+202F, gepinnt in `betreuungText.test.ts`), der Normalisierer von Testing Library faltet jedes
+ * `\s` des Knotentextes zu einem Leerzeichen — der Suchtext nicht.
  */
 const T = ' ';
 
@@ -104,8 +104,10 @@ const MIT_DATEN: BetreuungUebersicht = {
   stellen: [TURNHALLE, STADION, SCHULE],
 };
 
-/** Angemeldet als Benutzer 1: Stand- und Belegungsmeldungen laufen offline-fähig über die
- *  Queue, und die gehört einem Benutzer (LFH-675). */
+/**
+ * Angemeldet als Benutzer 1: Stand- und Belegungsmeldungen laufen über die Offline-Queue, und die
+ * gehört einem Benutzer.
+ */
 const BENUTZER_ID = 1;
 
 function renderPage(pfad = '/einsaetze/1/betreuung') {
@@ -140,16 +142,15 @@ function renderPage(pfad = '/einsaetze/1/betreuung') {
   return { ...ergebnis, client };
 }
 
-/** Ziel des Sprungs „Auf Karte verorten" (LFH-673): zeigt die angesteuerte Adresse. */
+/** Ziel des Sprungs „Auf Karte verorten": zeigt die angesteuerte Adresse. */
 function LagekarteSonde() {
   const ort = useLocation();
   return <div data-testid="lagekarte-ziel">{ort.pathname + ort.search}</div>;
 }
 
 /**
- * Einsatz-Abrufe seit dem ersten (LFH-607). Eine Bezirksänderung kann den Auslöser der
- * Lagekennzahl `evakuiert` kippen — sie muss den Einsatz neu abrufen lassen, sonst sähe die
- * festlegende Person den neuen Zuschnitt des Lage-Dashboards erst beim nächsten Fokus.
+ * Einsatz-Abrufe seit dem ersten. Eine Bezirksänderung kann den Auslöser der Lagekennzahl
+ * `evakuiert` kippen und muss den Einsatz neu abrufen lassen.
  */
 async function einsatzAbrufeNach(aktion: () => Promise<void>): Promise<() => number> {
   await waitFor(() => expect(vi.mocked(ladeEinsatz)).toHaveBeenCalled());
@@ -163,9 +164,9 @@ const karteVon = (titel: string) =>
 const zeileVon = (titel: string) => screen.getByText(titel).closest('tr') as HTMLElement;
 
 /**
- * Der offene Dialog mit diesem Titel. Nicht über `findByRole('dialog', { name })`: in diesem
- * Render ohne `ConfigProvider` vergibt antd ids über `useId` im Testmodus als „test-id", der
- * Name aus `aria-labelledby` zeigt dann auf den ERSTEN Knoten dieser id im Dokument.
+ * Der offene Dialog mit diesem Titel. Nicht über `findByRole('dialog', { name })`: ohne
+ * `ConfigProvider` vergibt antd im Testmodus die id „test-id", der Name aus `aria-labelledby`
+ * zeigte auf den ersten Knoten dieser id.
  */
 async function dialogMit(titel: string): Promise<HTMLElement> {
   const dialog = await screen.findByRole('dialog');
@@ -173,7 +174,7 @@ async function dialogMit(titel: string): Promise<HTMLElement> {
   return dialog;
 }
 
-/** Das GEÖFFNETE Menü — antd lässt die Portale geschlossener Dropdowns im Baum stehen. */
+/** Das geöffnete Menü — antd lässt die Portale geschlossener Dropdowns im Baum stehen. */
 async function offenesMenue() {
   return waitFor(() => {
     const m = document.querySelector(
@@ -269,7 +270,7 @@ describe('BetreuungPage (LFH-639)', () => {
       const hinweis = (zeile: HTMLElement) =>
         zeile.querySelector<HTMLElement>('[data-lfh="stelle-namentlich"]');
       expect(hinweis(turnhalle)).toHaveTextContent('· davon namentlich 2');
-      // Die Zahl läuft Mono (Neuentwurf: Zahlen immer Mono mit tabular-nums), das Wort nicht.
+      // Die Zahl läuft Mono mit tabular-nums, das Wort nicht.
       expect(within(hinweis(turnhalle)!).getByText('2')).toHaveStyle({
         fontVariantNumeric: 'tabular-nums',
       });
@@ -295,7 +296,7 @@ describe('BetreuungPage (LFH-639)', () => {
   });
 
   it('Kopf Betreuungsstellen ohne jede Meldung: „keine Meldung", nicht „0 untergebracht"', async () => {
-    // Spec (Kopfzahl): „nichts gemeldet" ist nicht „niemand in Betreuung".
+    // „nichts gemeldet" ist nicht „niemand in Betreuung".
     api.ladeBetreuung.mockResolvedValue({
       bezirke: [],
       stellen: [SCHULE, stelle({ id: 11, bezeichnung: 'Halle West' })],
@@ -442,7 +443,7 @@ describe('BetreuungPage (LFH-639)', () => {
         await waitFor(() => expect(api.nimmStandZurueck).toHaveBeenCalledWith(1, 77));
       });
       expect(api.nimmStandZurueck).not.toHaveBeenCalledWith(1, 55);
-      // LFH-607: eine Standmeldung ist ein Messwert, keine Entscheidung — der Einsatz bleibt.
+      // Eine Standmeldung ist ein Messwert, keine Entscheidung — der Einsatz bleibt.
       expect(neu()).toBe(0);
     });
 
@@ -565,8 +566,8 @@ describe('BetreuungPage (LFH-639)', () => {
     beforeEach(() => {
       api.meldeStand.mockResolvedValue({ meldung_id: 77, bezirk: UFER });
       api.meldeBelegung.mockResolvedValue({ meldung_id: 91, stelle: TURNHALLE });
-      // Zwei VERSCHIEDENE Wortlaute als `ApiError`: mit einem nackten `Error` zeigte der
-      // Alert beide Male denselben Rückfalltext, und „der neue Text steht da" wäre trivial.
+      // Zwei verschiedene Wortlaute als `ApiError`: mit einem nackten `Error` zeigte der Alert
+      // beide Male denselben Rückfalltext.
       api.nimmStandZurueck.mockRejectedValue(new ApiError(422, 'Stand-Rücknahme abgelehnt'));
       api.nimmBelegungZurueck.mockRejectedValue(new ApiError(422, 'Belegungs-Rücknahme abgelehnt'));
     });
@@ -715,7 +716,7 @@ describe('BetreuungPage (LFH-639)', () => {
       await userEvent.click(ok);
       await waitFor(() => expect(api.storniereBezirk).toHaveBeenCalledWith(1, 5));
     });
-    // LFH-607: Stornieren kann die Lagekennzahl `evakuiert` wegnehmen.
+    // Stornieren kann die Lagekennzahl `evakuiert` wegnehmen.
     await waitFor(() => expect(neu()).toBeGreaterThan(0));
   });
 
@@ -737,7 +738,7 @@ describe('BetreuungPage (LFH-639)', () => {
         }),
       );
     });
-    // LFH-607: Anlegen IST die Anordnung — der Einsatz trägt danach `evakuiert`.
+    // Anlegen ist die Anordnung — der Einsatz trägt danach `evakuiert`.
     await waitFor(() => expect(neu()).toBeGreaterThan(0));
   });
 
@@ -765,7 +766,7 @@ describe('BetreuungPage (LFH-639)', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(await screen.findByText('Bezirk Uferstraße 12–40 gespeichert')).toBeInTheDocument();
     await waitFor(() => expect(api.ladeBetreuung.mock.calls.length).toBeGreaterThan(abrufeVorher));
-    // LFH-607: jede Bezirksänderung fragt den Einsatz neu — auch die Plangröße.
+    // Jede Bezirksänderung fragt den Einsatz neu, auch die Plangröße.
     await waitFor(() => expect(neu()).toBeGreaterThan(0));
   });
 
@@ -833,8 +834,8 @@ describe('BetreuungPage (LFH-639)', () => {
       api.aendereStelle.mock.invocationCallOrder[0],
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    // Die Leermeldung ist Teil des Schließens: ein Rückweg auf sie ließe eine geschlossene,
-    // belegte Stelle zu (D4) — deshalb kein Rückgängig-Toast.
+    // Die Leermeldung ist Teil des Schließens: ein Rückweg auf sie ließe eine geschlossene, belegte
+    // Stelle zu — deshalb kein Rückgängig-Toast.
     expect(
       await screen.findByText('Betreuungsstelle Turnhalle Ost gespeichert'),
     ).toBeInTheDocument();
@@ -897,11 +898,11 @@ describe('BetreuungPage (LFH-639)', () => {
         expect(api.aendereBezirk).toHaveBeenCalledWith(1, 5, { raeumung: 'geraeumt' }),
       );
     });
-    // LFH-607: „aufgehoben" nähme die Lagekennzahl weg; jede Bezirksänderung fragt nach.
+    // „aufgehoben" nähme die Lagekennzahl weg; jede Bezirksänderung fragt nach.
     await waitFor(() => expect(neu()).toBeGreaterThan(0));
   });
 
-  // ── Verlauf (LFH-676) ─────────────────────────────────────────────────────────────
+  // ── Verlauf (LFH-676) ──
   it('Verlauf: Auslöser an jeder Karte und Zeile, auch ohne Schreibrecht, Abruf erst beim Aufklappen', async () => {
     einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
     api.ladeStandVerlauf.mockResolvedValue([
