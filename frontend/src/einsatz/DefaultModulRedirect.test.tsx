@@ -7,20 +7,27 @@ import DefaultModulRedirect from './DefaultModulRedirect';
 vi.mock('../api/einsaetze', () => ({ ladeEinstellungen: vi.fn() }));
 import { ladeEinstellungen } from '../api/einsaetze';
 
-function rendern() {
+function rendern(route = '/einsaetze/7') {
   return renderMitProviders(
     <Routes>
+      <Route path="/einsaetze" element={<div>Einsatzliste</div>} />
       <Route path="/einsaetze/:id" element={<DefaultModulRedirect />} />
       <Route path="/einsaetze/:id/ueberblick" element={<div>Überblick-Inhalt</div>} />
       <Route path="/einsaetze/:id/etb" element={<div>ETB-Inhalt</div>} />
     </Routes>,
-    { route: '/einsaetze/7' },
+    { route },
   );
 }
 
 describe('DefaultModulRedirect', () => {
   beforeEach(() => {
     vi.mocked(ladeEinstellungen).mockReset();
+  });
+
+  it('leitet bei ungültiger Einsatz-ID auf die Einsatzliste, ohne Einstellungen zu laden (LFH-438)', async () => {
+    rendern('/einsaetze/abc');
+    expect(await screen.findByText('Einsatzliste')).toBeInTheDocument();
+    expect(ladeEinstellungen).not.toHaveBeenCalled();
   });
 
   it('leitet ohne Override auf den Führungsüberblick um', async () => {

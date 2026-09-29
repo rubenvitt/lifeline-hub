@@ -32,7 +32,6 @@ const RECONNECT_BACKOFF_MS = [1000, 3000, 10000, 30000];
 export function useEinsatzLiveStream(einsatzId: number): void {
   const qc = useQueryClient();
   useEffect(() => {
-    if (!Number.isFinite(einsatzId)) return;
     const inval = (key: string) => qc.invalidateQueries({ queryKey: [key, einsatzId] });
     const invalAlle = (keys: readonly string[]) => keys.forEach(inval);
     const meldeStatus = (status: LiveVerbindungsStatus) =>

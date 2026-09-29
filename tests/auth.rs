@@ -42,6 +42,20 @@ async fn login_erfolgreich_setzt_httponly_cookie() {
     assert!(cookie.to_lowercase().contains("httponly"));
 }
 
+/// LFH-779: Das Cookie ist persistent und lebt genau so lange wie die Serversitzung (7 Tage).
+/// Ohne `Max-Age` verwerfen Webviews (Tauri-Hülle) und Browser es beim Prozessende.
+#[tokio::test]
+async fn login_cookie_lebt_so_lange_wie_die_serversitzung() {
+    let app = setup().await;
+    let (status, cookie) = login(&app, "admin", "startpw12").await;
+    assert_eq!(status, StatusCode::OK);
+    let cookie = cookie.expect("Set-Cookie erwartet");
+    assert!(
+        cookie.contains("Max-Age=604800"),
+        "Max-Age = 7 Tage erwartet: {cookie}"
+    );
+}
+
 #[tokio::test]
 async fn login_mit_falschem_passwort_ist_401() {
     let app = setup().await;
@@ -121,6 +135,17 @@ async fn logout_invalidiert_session() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    // Das persistente Cookie (LFH-779) muss der Logout aktiv verfallen lassen.
+    let geraeumt = resp
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("Logout räumt das Cookie")
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(geraeumt.starts_with("lifeline_sid=;"), "{geraeumt}");
+    assert!(geraeumt.contains("Max-Age=0"), "{geraeumt}");
+    assert!(geraeumt.contains("Path=/"), "{geraeumt}");
 
     // Dieselbe Session ist danach ungültig.
     let resp = app
@@ -213,6 +238,54 @@ async fn providers_admin_zeigt_deaktivierte_public_verbirgt_sie() {
         .find(|p| p["id"] == "oidc")
         .expect("admin: oidc sichtbar");
     assert_eq!(oidc["aktiviert"], false);
+}
+
+/// Die Anmeldeverfahren-Sektion sagt der Org-Führungskraft eine Nur-Lese-Ansicht zu
+/// (`Anmeldeverfahren.tsx`). Lesen folgt deshalb `darf_admin_bereich`, Schalten bleibt
+/// Admin-only. Gefunden vom Führungskraft-Durchgang in `e2e/trefflaeche-tablet.spec.ts`
+/// (LFH-435): vorher 403, die Seite zeigte „nicht ladbar".
+#[tokio::test]
+async fn providers_admin_lesen_fuehrungskraft_ja_ohne_rolle_nein_schalten_nur_admin() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    for body in [
+        r#"{"anzeigename":"Frieda Führung","benutzername":"frieda","passwort":"friedapw1","org_rolle":"fuehrungskraft"}"#,
+        r#"{"anzeigename":"Otto Ohne","benutzername":"otto","passwort":"ottopw123"}"#,
+    ] {
+        let (status, _) = anfrage(&app, "POST", "/api/benutzer", &admin, Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED);
+    }
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let otto = login_cookie(&app, "otto", "ottopw123").await;
+
+    let (status, json) = anfrage(&app, "GET", "/api/auth/providers/admin", &frieda, None).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "Führungskraft liest die volle Liste"
+    );
+    assert!(json
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|p| p["id"] == "passwort"));
+
+    let (status, _) = anfrage(&app, "GET", "/api/auth/providers/admin", &otto, None).await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "ohne Org-Rolle kein Admin-Bereich"
+    );
+
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        "/api/auth/providers/passwort",
+        &frieda,
+        Some(r#"{"aktiviert":false}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "Schalten bleibt Admin-only");
 }
 
 #[tokio::test]

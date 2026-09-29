@@ -193,6 +193,14 @@ Tickets werden können.
    `Layout.Header`-Theme-Override entwertete die Aussage lautlos, ohne dass ein Test
    rot würde. Zielticket-Kandidat: `#001529` als benannten Token führen oder den
    tatsächlich gerenderten Grund per Browser-Test messen.
+   **Erledigt (LFH-437, 29.09.2026):** Seit dem Neuentwurf steht der Grund als
+   `rahmenFarben.grund` (= `farbenDunkel.kopf`, `#0c0e11`) in `theme/tokens.ts`, und beide
+   Kopfleisten setzen ihn selbst am `Header` (`KOPF_STIL` in `AppLayout.tsx` und
+   `EinsatzLayout.tsx`); `#001529` kommt im Frontend nicht mehr vor. Ein Inline-Stil schlägt
+   jedes `Layout.headerBg`-Override. Gepinnt ist beides: der Wert über die Kontrastrechnung in
+   `theme/rahmenKontrast.test.ts` (LFH-434), die Verdrahtung über je einen Test in
+   `AppLayout.test.tsx` und `EinsatzLayout.test.tsx`, der am `banner` den Grund prüft. Fehlt
+   der Grund am `Header`, werden beide rot (Mutationsprobe).
 2. **`einsatz/ModulRedirect.tsx:13` nutzt `Number(id)` statt `parseRouteId`.** Der
    projektweite Deep-Link-Vertrag (`routing/deeplinks.ts`) verlangt validierte,
    positive Ganzzahl-IDs über `parseRouteId`; `ModulRedirect` liest den Route-Param

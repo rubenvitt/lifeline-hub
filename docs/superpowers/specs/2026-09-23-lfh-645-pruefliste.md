@@ -20,7 +20,7 @@ Gerechnetes und aus Quelltext Geschlossenes trägt **[abgeleitet]**.
 | Nachweis | Ergebnis |
 | --- | --- |
 | e2e `palette-oeffnung.spec.ts` (5 Fälle) | Strg+↵ auf Person: kalt geladener neuer Tab zeigt die Detailseite angemeldet, der alte Tab behält seine URL. Strg/⌘+Klick auf das Modul „Lagekarte“ und der Koordinatensprung landen im neuen Tab auf der Lagekarte. → öffnet die Personenvorschau, Esc geht eine Ebene zurück (Zeile markiert und `toBeInViewport`), ein zweites Esc schließt. „Zurück“ misst in allen drei Stufen mindestens 30/48/72 px |
-| Vitest `CommandPalette.oeffnung.test.tsx`, `CommandPaletteProvider.oeffnung.test.tsx` | Szenarien aus `openspec/changes/lfh-645-palette-vorschau-neuer-tab/specs/sprungpalette/spec.md`, jeweils als Paar |
+| Vitest `CommandPalette.oeffnung.test.tsx`, `CommandPaletteProvider.oeffnung.test.tsx` | Szenarien aus `openspec/changes/archive/2026-09-29-lfh-645-palette-vorschau-neuer-tab/specs/sprungpalette/spec.md`, jeweils als Paar |
 | Guards `befehle.test.ts`, `datensaetze.test.ts`, `koordinatenSprung.test.ts`, `useBefehle.test.tsx` | Jede Zeile mit Ziel reicht `'neuerTab'` bis `navigate` durch, auch an der Verdrahtung im Hook |
 | Mutationsproben (zurückgenommen) | `sprungZu` ohne Durchreichen: 4 Guards rot. Esc ohne `preventDefault`: Palette- und Provider-Test rot. → ohne Textende-Prüfung: Cursor-Test rot. Strg+↵ ohne Abfangen: Provider-Test **grün**. Der Riegel ist dort der Dispatcher, das ist in `design.md` korrigiert |
 

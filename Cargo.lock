@@ -3296,7 +3296,7 @@ dependencies = [
 
 [[package]]
 name = "lifeline-hub"
-version = "1.0.0-alpha.53"
+version = "1.0.0-alpha.55"
 dependencies = [
  "anyhow",
  "argon2",
@@ -3327,6 +3327,7 @@ dependencies = [
  "sha2 0.11.0",
  "sqlx",
  "tempfile",
+ "time",
  "tokio",
  "tokio-stream",
  "totp-rs",

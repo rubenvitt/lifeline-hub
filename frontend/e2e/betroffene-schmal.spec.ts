@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Die Betroffenen-Module am Handschirm: geprüft wird die WEICHE — bei 390 px der Kartenzweig,
@@ -140,6 +141,79 @@ test('bei 390 px steht auf allen drei Listen die Karte statt der Tabelle, ohne Q
       page.locator('[data-lfh="datensicht-karte"]').first(),
       `${pfad}: Kartenzweig`,
     ).toBeVisible();
+    await expect(page.locator('.ant-table'), `${pfad}: keine Tabelle bei 390 px`).toHaveCount(0);
+    await keinQuerlauf(page, pfad);
+  }
+});
+
+/**
+ * Kopfaktionen, die der Nur-Lese-Zweig versteckt (`PersonenPage.tsx`, `TierePage.tsx`,
+ * `SchaedenPage.tsx`: `aktionen` nur mit `darfSchreiben`), und je Route ein Geschwister, das
+ * BLEIBT — erst dessen Sichtbarkeit belegt, dass die Seite gerendert hat, sonst wäre die
+ * Abwesenheit auch bei einem Tippfehler im Namen grün.
+ */
+const LESEZWEIG: Record<(typeof MODULE)[number]['route'], { weg: string[]; bleibt?: string }> = {
+  personen: {
+    weg: ['Schnellerfassung', 'Vermisst melden', 'Betroffene/n erfassen'],
+    bleibt: 'Ansicht',
+  },
+  tiere: { weg: ['Schnellerfassung', 'Vermisst melden'], bleibt: 'Tiere nach Status filtern' },
+  schaeden: { weg: ['Schnellerfassung'] },
+};
+
+/**
+ * LFH-435 · Zweig: Beobachter (kein Schreibrecht). Der Kopf verliert seine Erfassungsknöpfe,
+ * die Karte ihre Bedienung; gemessen wird wie im Admin-Geschwister oben (Kartenzweig, keine
+ * Tabelle, kein Querlauf), dazu, dass die Karte ohne Bedienziele nicht in sich zusammenfällt.
+ */
+test('bei 390 px steht auf allen drei Listen die Karte statt der Tabelle, ohne Querlauf (Beobachter)', async ({
+  page,
+}) => {
+  // Zusätzliche Anmeldung gegenüber dem Admin-Geschwister.
+  test.slow();
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Betroffene lesend ${Date.now()}`);
+  await seedeAlles(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  await page.setViewportSize(HANDSCHIRM);
+  for (const modul of MODULE) {
+    const pfad = `/einsaetze/${einsatzId}/${modul.route}`;
+    await page.goto(pfad);
+    await expect(
+      page.getByText(modul.anker).first(),
+      `${pfad}: Datensatz muss stehen`,
+    ).toBeVisible();
+
+    // ── VORBEDINGUNGEN: der Nur-Lese-Zweig steht.
+    const { weg, bleibt } = LESEZWEIG[modul.route];
+    if (bleibt) {
+      await expect(
+        page.getByRole('radiogroup', { name: bleibt }),
+        `${pfad}: Vorbedingung — „${bleibt}" bleibt auch ohne Schreibrecht`,
+      ).toBeVisible();
+    }
+    for (const name of weg) {
+      await expect(
+        page.getByRole('button', { name, exact: true }),
+        `${pfad}: Vorbedingung — ohne Schreibrecht kein „${name}"`,
+      ).toHaveCount(0);
+    }
+
+    // ── MESSUNG: Kartenzweig, der nicht kollabiert, keine Tabelle, kein Querlauf.
+    const karte = page.locator('[data-lfh="datensicht-karte"]');
+    await expect(karte, `${pfad}: genau eine Karte`).toHaveCount(1);
+    await expect(karte, `${pfad}: Kartenzweig`).toBeVisible();
+    const kasten = await karte.boundingBox();
+    expect(kasten, `${pfad}: Karte nicht messbar`).not.toBeNull();
+    expect(
+      kasten!.width,
+      `${pfad}: Karte kollabiert (gemessen ${kasten!.width} px breit)`,
+    ).toBeGreaterThanOrEqual(HANDSCHIRM.width / 2);
+    expect(
+      kasten!.height,
+      `${pfad}: Karte kollabiert (gemessen ${kasten!.height} px hoch)`,
+    ).toBeGreaterThanOrEqual(24);
     await expect(page.locator('.ant-table'), `${pfad}: keine Tabelle bei 390 px`).toHaveCount(0);
     await keinQuerlauf(page, pfad);
   }

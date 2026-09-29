@@ -1830,6 +1830,56 @@ describe('LagekartePage · Neuentwurf S5', () => {
     },
   );
 
+  // LFH-765: Die Freigabe hängt am laufenden Modus, nicht an der Sitzung. Bei 768 px ist die Leiste
+  // per Vorgabe offen — nach dem Modus ist sie wieder da, nicht für die Sitzung zu.
+  it('nach dem Zeichenmodus bekommt die Leiste bei 768 px ihren vorherigen Zustand (LFH-765)', async () => {
+    setzeViewportBreite(768);
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    expect(await screen.findByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(
+      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Leiste ausblenden' })).toBeInTheDocument();
+  });
+
+  // Messen startet über den Kartenknopf, nicht aus der Leiste — die Freigabe gilt trotzdem.
+  it('Messen gibt bei 768 px die Karte frei und die Leiste danach zurück (LFH-765)', async () => {
+    setzeViewportBreite(768);
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    expect(screen.getByRole('button', { name: 'Leiste ausblenden' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Messen' }));
+    expect(await screen.findByRole('button', { name: 'Leiste einblenden' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Beenden' }));
+    expect(await screen.findByRole('button', { name: 'Leiste ausblenden' })).toBeInTheDocument();
+  });
+
+  // Der Stift während eines Modus: holt die Leiste nur für den Modus zurück. Ein `zeige()` hier bliebe
+  // im Modus wirkungslos und öffnete die Leiste erst nach dem Modus (Review LFH-765).
+  it('Stift während Messen bei 390 px: Leiste nur für den Modus offen (LFH-765)', async () => {
+    setzeViewportBreite(390);
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    expect(screen.getByRole('button', { name: 'Leiste einblenden' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Messen' }));
+    await user.click(screen.getByRole('button', { name: 'Zeichenwerkzeuge' }));
+    expect(await screen.findByRole('button', { name: 'Leiste ausblenden' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Beenden' }));
+    expect(await screen.findByRole('button', { name: 'Leiste einblenden' })).toBeInTheDocument();
+  });
+
   it('hängt die Maßstabsleiste als Band in den Kartenfuß, nicht frei über die Karte', async () => {
     basisHandler();
     renderSeite();

@@ -69,7 +69,11 @@ export function useBefehle(
    * drei Einträge). Memoisiert über die Zeichenkette statt das je Render frische Array, damit die
    * Dependency-Liste vollständig bleibt, ohne `eslint-disable`.
    */
-  const zuletztSchluessel = einsatzId == null ? '' : leseZuletztModule(einsatzId).join(',');
+  const benutzerId = benutzer?.id ?? null;
+  const zuletztSchluessel =
+    einsatzId == null || benutzerId == null
+      ? ''
+      : leseZuletztModule(benutzerId, einsatzId).join(',');
   const zuletztModulKeys = useMemo(
     () => (zuletztSchluessel ? zuletztSchluessel.split(',') : []),
     [zuletztSchluessel],
@@ -82,9 +86,10 @@ export function useBefehle(
    */
   const merkeBesuch = useCallback(
     (modulKey: string) => {
-      if (einsatzId != null) merkeModulBesuch(einsatzId, modulKey);
+      if (einsatzId != null && benutzerId != null)
+        merkeModulBesuch(benutzerId, einsatzId, modulKey);
     },
-    [einsatzId],
+    [einsatzId, benutzerId],
   );
 
   return useMemo(

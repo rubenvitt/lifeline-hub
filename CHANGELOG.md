@@ -1,3 +1,27 @@
+## [1.0.0-alpha.55](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.54...v1.0.0-alpha.55) (2026-09-29)
+
+### Betrieb und Installation
+
+- **Anmeldung bleibt nach Neustart erhalten**: Nutzer müssen sich nicht mehr nach jedem Neustart der Anwendung erneut anmelden. Die Sitzung bleibt bis zu 7 Tage gültig, sofern sie nicht durch Abmelden, Kontosperrung oder Passwortwechsel widerrufen wird.
+
+## [1.0.0-alpha.54](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.53...v1.0.0-alpha.54) (2026-09-29)
+
+### Wichtige Änderungen
+
+In dieser Version wurden umfangreiche Architektur- und Spezifikationsarbeiten durchgeführt. 33 bereits umgesetzte Änderungen wurden archiviert und 35 neue Fähigkeiten in die technischen Spezifikationen übernommen.
+
+### Einsatzverwaltung
+
+**Verbesserte Fehlerbehandlung bei ungültigen Einsatz-IDs**: Die Anwendung prüft jetzt beim Aufruf von Einsatzseiten, ob die ID in der Adresszeile gültig ist. Bei ungültigen IDs (z.B. durch fehlerhafte Lesezeichen oder manipulierte Links) erfolgt eine automatische Weiterleitung zur Einsatzliste statt einer Fehlermeldung.
+
+### Darstellung und Bedienoberfläche
+
+**Einheitliche Kopfleisten-Hintergründe**: Die Hintergrundfarbe der Kopfleisten in der Haupt- und Einsatzansicht wird jetzt konsistent aus dem Farbschema berechnet. Dies stellt sicher, dass die Kontrastberechnung für Texte in den Kopfleisten immer korrekt funktioniert.
+
+### Betrieb und Installation
+
+**Dokumentierte Systemanforderungen für automatisierte Tests**: Die Systemanforderungen für das Ausführen der automatisierten Test-Suite wurden dokumentiert. Auf ausgelasteten Systemen können Tests unzuverlässig werden – die Dokumentation beschreibt die Erkennungsmerkmale und empfohlene Gegenmaßnahmen.
+
 ## [1.0.0-alpha.53](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.52...v1.0.0-alpha.53) (2026-09-29)
 
 ### Bedienbarkeit und Barrierefreiheit

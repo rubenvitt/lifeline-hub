@@ -1,6 +1,6 @@
 //! Standort-Grundpegel je ODL-Sonde und die relative Bewertung darauf (LFH-598). Rein und ohne
 //! Netz prüfbar; Abruf und Ablage stehen in `karte::quellen` (`fetch_odl`). Herleitung:
-//! `openspec/changes/lfh-598-odl-standort-grundpegel/design.md`.
+//! `openspec/changes/archive/2026-09-29-lfh-598-odl-standort-grundpegel/design.md`.
 
 use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
 use serde::{Deserialize, Serialize};

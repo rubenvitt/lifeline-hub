@@ -1,7 +1,7 @@
 # LFH-23 · Aufbewahrung — Prüfliste Einsatztauglichkeit
 
 Angelegt an die vier neuen Flächen der Aufbewahrung (Change
-`openspec/changes/lfh-23-retention-rest/`):
+`openspec/changes/archive/2026-09-29-lfh-23-retention-rest/`):
 
 - **Übersicht** `/admin/aufbewahrung` (`aufbewahrung/AufbewahrungUebersicht.tsx`)
 - **Archivakte** `/admin/aufbewahrung/:einsatzId` (`aufbewahrung/ArchivAktePage.tsx`)

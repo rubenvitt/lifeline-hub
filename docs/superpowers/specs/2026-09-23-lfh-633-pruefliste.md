@@ -2,7 +2,7 @@
 
 Gate 7 der Bedien-Leitlinie (`2026-07-25-bedien-leitlinie-einsatzkontexte.md`, Festlegung 7)
 verlangt diese Liste an jeder neuen Seite. Planung, Spec und Entwurf liegen in
-`openspec/changes/lfh-633-fachmodul-wetter-pegel/`.
+`openspec/changes/archive/2026-09-29-lfh-633-fachmodul-wetter-pegel/`.
 
 ## Geltungsbereich
 
