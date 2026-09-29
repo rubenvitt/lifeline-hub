@@ -459,6 +459,9 @@ export const GLOBAL_KEYS = {
   fachebene: 'fachebene',
 } as const;
 
+/** Werte von {@link GLOBAL_KEYS} — modul-lokal, nur für {@link LAGEBILD_OFFLINE}. */
+type GlobalKey = (typeof GLOBAL_KEYS)[keyof typeof GLOBAL_KEYS];
+
 /**
  * Dienstfilter der Stammdaten-Listen (`personal` / `fahrzeuge` / `material`). String-Union
  * statt boolean, weil der Wert als Key-Element auf der Wire liegt. Eingefroren: ein Umbau auf
