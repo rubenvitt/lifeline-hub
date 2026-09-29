@@ -20,8 +20,8 @@ export function ladeEinsatz(id: number): Promise<EinsatzAnzeige> {
 }
 
 /**
- * Anlegefelder eines Einsatzes (LFH-332 · B4). `einsatzart` und `begonnen_at` sind
- * optional — fehlen sie, greifen die DB-Defaults `'realeinsatz'` und `jetzt`.
+ * Anlegefelder eines Einsatzes. `einsatzart` und `begonnen_at` sind optional; fehlen sie,
+ * greifen die DB-Defaults `'realeinsatz'` und `jetzt`.
  */
 interface NeuerEinsatz {
   bezeichnung: string;
@@ -64,8 +64,8 @@ export interface KopfdatenUpdate {
   bezeichnung: string;
   stichwort: string | null;
   einsatzart: Einsatzart;
-  // Keine `einsatznummer_intern`: die vergibt das System beim Anlegen, der Server weist
-  // den Schlüssel im PATCH mit 400 ab — auch mit `null` (LFH-617).
+  // Keine `einsatznummer_intern`: die vergibt das System beim Anlegen, der Server weist den
+  // Schlüssel im PATCH mit 400 ab, auch mit `null`.
   leitstellen_nr: string | null;
   einsatzort: string | null;
   einsatzort_lat: number | null;

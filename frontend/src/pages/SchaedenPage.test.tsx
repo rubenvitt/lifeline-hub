@@ -3,24 +3,13 @@ import { act, fireEvent, isInaccessible, screen, within } from '@testing-library
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import SchaedenPage from './SchaedenPage';
+import { benutzerFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
-class FakeEventSource {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {
-    this.closed = true;
-  }
-}
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
   sessionStorage.clear();
@@ -29,12 +18,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
 // schreibrecht.test.ts ab.
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-};
+const nutzer = benutzerFixture({ org_rolle: 'fuehrungskraft' });
 const einsatzAktiv = {
   id: 1,
   bezeichnung: 'Lage',
@@ -103,7 +87,7 @@ function render(
   personal: object[] = [],
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json(schaeden)),
     // Quellen der Geschädigt-Combobox (mounten beim Öffnen der Formulare):
@@ -111,13 +95,11 @@ function render(
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json(personal)),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
-        <Route path="/einsaetze/:id/schaeden/:schadenId" element={<div>SCHADEN-DETAIL</div>} />
-        <Route path="/einsaetze/:id/personen" element={<div>Personen-Modul</div>} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+      <Route path="/einsaetze/:id/schaeden/:schadenId" element={<div>SCHADEN-DETAIL</div>} />
+      <Route path="/einsaetze/:id/personen" element={<div>Personen-Modul</div>} />
+    </Routes>,
     { route: '/einsaetze/1/schaeden' },
   );
 }
@@ -130,18 +112,16 @@ function SchadenEinsatzWechsel() {
 /** Rendert SchaedenPage mit konfigurierbarer Route (z.B. mit Query-Params). */
 function renderSchaedenPage(route: string) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+    </Routes>,
     { route },
   );
 }
@@ -149,18 +129,16 @@ function renderSchaedenPage(route: string) {
 /** Rendert SchaedenPage mit wählbarem Einsatz-Objekt und Route. */
 function renderSchaedenPageMitEinsatz(einsatzObj: object, route: string) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+    </Routes>,
     { route },
   );
 }
@@ -635,7 +613,7 @@ describe('SchaedenPage', () => {
     sessionStorage.setItem('lfh:erfassung:1:schaden:ort', 'Schadenort A');
     sessionStorage.setItem('lfh:erfassung:2:schaden:ort', 'Schadenort B');
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/:einsatzId', ({ params }) => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Lage ${id}` });
@@ -647,19 +625,17 @@ describe('SchaedenPage', () => {
       http.get('/api/einsaetze/:einsatzId/personal', () => HttpResponse.json([])),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route
-            path="/einsaetze/:id/schaeden"
-            element={
-              <>
-                <SchadenEinsatzWechsel />
-                <SchaedenPage />
-              </>
-            }
-          />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route
+          path="/einsaetze/:id/schaeden"
+          element={
+            <>
+              <SchadenEinsatzWechsel />
+              <SchaedenPage />
+            </>
+          }
+        />
+      </Routes>,
       { route: '/einsaetze/1/schaeden' },
     );
 
@@ -847,18 +823,16 @@ describe('SchaedenPage', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/schaeden', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/schaeden' },
     );
 

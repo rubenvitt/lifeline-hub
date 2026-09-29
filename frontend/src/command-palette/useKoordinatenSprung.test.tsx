@@ -1,4 +1,3 @@
-// frontend/src/command-palette/useKoordinatenSprung.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { act, renderHook, waitFor } from '@testing-library/react';
@@ -9,33 +8,15 @@ import { neuerQueryClient } from '../test/utils';
 import { formatiere } from '../anzeige/koordinaten';
 import { useKoordinatenSprung } from './useKoordinatenSprung';
 import type { PaletteModus } from './typen';
+import { authWertFixture, benutzerFixture } from '../test/fixtures';
 
 /**
- * Die Beschaffungs-Hälfte des Koordinatensprungs (LFH-619). Der reine Kern steht in
- * `koordinatenSprung.test.ts`; hier steht, WANN angefragt wird, und dass Rechte und
- * eingestelltes Format ankommen.
- *
- * Zähler je Endpunkt wie in `useDatensaetze.test.tsx`: „kein Request, solange keine Koordinate
- * getippt ist" ist die Zusicherung, die die Bestands-Palettentests grün hält — die fahren MSW
- * mit `onUnhandledRequest: 'error'`, ein eager Abruf bräche sie.
+ * Die Beschaffungs-Hälfte des Koordinatensprungs: WANN angefragt wird und dass Rechte und Format
+ * ankommen (der reine Kern steht in `koordinatenSprung.test.ts`). „Kein Request ohne Koordinate“
+ * hält die Palettentests mit `onUnhandledRequest: 'error'` grün.
  */
 vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => ({
-    benutzer: {
-      id: 1,
-      anzeigename: 'EL',
-      benutzername: 'el',
-      system_rolle: 'keiner',
-      org_rolle: 'fuehrungskraft',
-      aktiv: true,
-      erstellt_at: '',
-      totp_aktiviert: false,
-    },
-    laedt: false,
-    login: vi.fn(),
-    logout: vi.fn(),
-    aktualisiere: vi.fn(),
-  }),
+  useAuth: () => authWertFixture(benutzerFixture({ org_rolle: 'fuehrungskraft' })),
 }));
 
 const EINSATZ = 1;

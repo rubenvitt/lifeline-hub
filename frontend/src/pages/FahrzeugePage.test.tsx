@@ -3,47 +3,25 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
-import { AuthProvider } from '../auth/AuthContext';
 import FahrzeugePage from './FahrzeugePage';
+import type { EinsatzAnzeige } from '../api/types';
+import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
 // schreibrecht.test.ts ab.
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  benutzername: 'nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-26 10:00:00',
-};
+const nutzer = benutzerFixture();
 
-function einsatz(overrides: Record<string, unknown> = {}) {
-  return {
+function einsatz(overrides: Partial<EinsatzAnzeige> = {}) {
+  return einsatzFixture({
     id: 7,
     bezeichnung: 'Hochwasser Nord',
-    stichwort: null,
-    status: 'aktiv',
-    begonnen_at: '2026-05-26 09:00:00',
-    abgeschlossen_at: null,
-    abgeschlossen_von: null,
-    einsatzart: 'realeinsatz',
     einsatznummer_intern: '2026-001',
-    angelegt_at: '2026-05-26 09:00:00',
-    leitstellen_nr: null,
-    einsatzort: null,
-    einsatzort_lat: null,
-    einsatzort_lon: null,
-    meldende_stelle: null,
-    sachverhalt: null,
-    anzahl_betroffene_initial: null,
-    meine_rolle: 'einsatzleitung',
     ...overrides,
-  };
+  });
 }
 
 const ef = {
@@ -101,7 +79,7 @@ function render(
 ) {
   const efListe = Array.isArray(efObj) ? efObj : [efObj];
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(efListe)),
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personal)),
@@ -109,11 +87,9 @@ function render(
     http.get('/api/fahrzeuge', () => HttpResponse.json([])), // Pool (nur_im_dienst)
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
+    </Routes>,
     { route: '/einsaetze/7/fahrzeuge' },
   );
 }
@@ -243,7 +219,7 @@ describe('FahrzeugePage', () => {
 
   it('hebt per ?fahrzeug=<id> die Zeile hervor (LFH-25 Inspector-Deeplink)', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])),
       http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
@@ -251,11 +227,9 @@ describe('FahrzeugePage', () => {
       http.get('/api/fahrzeuge', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
+      </Routes>,
       { route: '/einsaetze/7/fahrzeuge?fahrzeug=10' },
     );
     await screen.findByText('Florian 1');
@@ -622,7 +596,7 @@ describe('FahrzeugePage', () => {
  */
 describe('FahrzeugePage · Datenzustände', () => {
   const gruenerBoden = () => [
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
@@ -635,11 +609,9 @@ describe('FahrzeugePage · Datenzustände', () => {
     // erste Treffer gewinnt. Andersherum schluckte der grüne Boden jede Abweichung.
     server.use(...abweichungen, ...gruenerBoden());
     return renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
+      </Routes>,
       { route: '/einsaetze/7/fahrzeuge' },
     );
   }
@@ -912,7 +884,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
       status_seit: '2026-05-26 09:10:00',
     };
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([stand])),
       http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
@@ -932,19 +904,17 @@ describe('FahrzeugePage — FMS-Tableau', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route
-            path="/einsaetze/:id/fahrzeuge"
-            element={
-              <>
-                <FahrzeugePage />
-                <Ort />
-              </>
-            }
-          />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route
+          path="/einsaetze/:id/fahrzeuge"
+          element={
+            <>
+              <FahrzeugePage />
+              <Ort />
+            </>
+          }
+        />
+      </Routes>,
       { route },
     );
     return { patches };

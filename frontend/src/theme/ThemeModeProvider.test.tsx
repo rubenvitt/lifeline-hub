@@ -1,20 +1,10 @@
 /**
- * Der Dichte-Schalter (LFH-329 · B1).
+ * Der Dichte-Schalter an seinen drei Austritten, weil eine halb verdrahtete Umschaltung nichts
+ * bricht: (1) der antd-ConfigProvider, (2) das Dichte-Merkmal am `<html>` (CSS-Seite), (3) der
+ * Speicher (die Wahl überlebt den Neustart).
  *
- * A2/LFH-328 hat den TRÄGER gebaut: `antdToken(farben, dichte)` nimmt die Stufe
- * als Parameter, `rollen.css` spiegelt sie als `[data-dichte='…']`. Was fehlte,
- * war der Schalter. Dieser Test bewacht ihn an allen drei Austritten, weil eine
- * halb verdrahtete Umschaltung **nichts bricht**: der Provider rendert weiter,
- * kein Test wird rot, die Fläche trägt nur stillschweigend die kompakte Stufe.
- *
- * Die drei Austritte:
- *   1. der antd-ConfigProvider (alle Steuerelemente auf einmal),
- *   2. das Dichte-Merkmal am `<html>` (die `var(--lfh-*)`-CSS-Seite),
- *   3. der Speicher (die Wahl überlebt den Neustart).
- *
- * Diese Datei rendert `ThemeModeProvider` DIREKT statt über `renderMitProviders`
- * — jenes Hilfsmittel hängt einen nackten ConfigProvider ohne Theme-Provider
- * auf, an dem sich über die Stufe nichts belegen ließe.
+ * Rendert `ThemeModeProvider` DIREKT statt über `renderMitProviders`: jenes hängt einen nackten
+ * ConfigProvider ohne Theme-Provider auf.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -27,15 +17,12 @@ import { setzeViewportZurueck, setzeZeigerGrob } from '../test/viewport';
 const STUFEN: Dichte[] = ['kompakt', 'komfortabel', 'handschuh'];
 const SPEICHER_SCHLUESSEL = 'lifeline-hub.dichte';
 
-/** Die antd-Maße, die die Stufe tragen soll — je Kennung der erwartete
- *  Staffelwert. Ausgelesen wird über eine Sonde IM Provider, weil die Tokens
- *  erst dort abgeleitet sind. */
+/** Die antd-Maße, die die Stufe tragen soll. Ausgelesen über eine Sonde IM Provider, weil die
+ *  Tokens erst dort abgeleitet sind. */
 function masse(token: ReturnType<typeof theme.useToken>['token']) {
   return {
     controlHeight: token.controlHeight,
-    // Der Durchstich-Beweis für LFH-361: `tokens.test.ts` prüft `antdToken()`
-    // isoliert, hier steht die Sonde IM Provider und belegt, dass die kleine
-    // Höhe die antd-Ableitung (× 0,75) tatsächlich schlägt.
+    // Belegt im Provider, dass die kleine Höhe antds Ableitung (× 0,75) schlägt.
     controlHeightSM: token.controlHeightSM,
     fontSize: token.fontSize,
     padding: token.padding,
@@ -93,14 +80,12 @@ function zeigeSonde() {
 const stufe = () => screen.getByTestId('stufe').textContent;
 const gemesseneMasse = () => JSON.parse(screen.getByTestId('masse').textContent!);
 
-// `src/test/setup.ts` räumt den Speicher, aber NICHT das Merkmalsverzeichnis am
-// `<html>` — ohne diesen Aufräumer trüge ein Test die zuletzt gesetzte Stufe in
-// seine Nachfolger, und die Anfangsbehauptungen wären Attrappen.
+// `src/test/setup.ts` räumt den Speicher, aber nicht das Merkmal am `<html>`; ohne diesen
+// Aufräumer trüge ein Test seine Stufe in die Nachfolger.
 afterEach(() => {
   delete document.documentElement.dataset.dichte;
   delete document.documentElement.dataset.theme;
-  // Seit LFH-361 liest der Provider die Zeigerart. Ohne diesen Rückbau trüge
-  // ein Test seine Zeigerannahme in die Nachfolger.
+  // Der Provider liest die Zeigerart; ohne Rückbau trüge ein Test seine Zeigerannahme weiter.
   setzeViewportZurueck();
 });
 
@@ -135,16 +120,9 @@ describe('Bediendichte — Zustand und Persistenz (LFH-329 · B1)', () => {
 });
 
 /**
- * Die Ableitung aus dem Einsatzkontext (LFH-361 · B5a).
- *
- * Bewusst NUR als Vorbelegung: das Kontextsignal entscheidet, womit jemand
- * anfängt, nie was er gewählt hat. Eine Ableitung, die die gespeicherte Wahl
- * überstimmt, wäre auf dem 2-in-1-Tablet mit angesteckter Tastatur ein
- * Umschalter, der sich beim Neuladen selbst zurückdreht.
- *
- * Es gibt deshalb KEINE vierte Stufe `automatisch` analog zu `ThemeModus`:
- * die Wahl bleibt die effektive Stufe, und der Provider braucht keinen zweiten
- * Typ, den vier Bedienwege mittragen müssten.
+ * Die Zeigerart belegt die Stufe nur VOR: sie entscheidet, womit jemand anfängt, nie was er
+ * gewählt hat. Sonst drehte sich der Umschalter auf einem 2-in-1-Tablet beim Neuladen selbst
+ * zurück.
  */
 describe('Bediendichte — Ableitung aus der Zeigerart (LFH-361 · B5a)', () => {
   it('grober Zeiger ohne gespeicherte Wahl beginnt bei komfortabel', () => {
@@ -160,8 +138,8 @@ describe('Bediendichte — Ableitung aus der Zeigerart (LFH-361 · B5a)', () => 
     expect(stufe()).toBe('kompakt');
   });
 
-  // Ohne diesen Fall wäre der erste Test auch dann grün, wenn die Ableitung
-  // pauschal `komfortabel` lieferte, statt den Zeiger zu lesen.
+  // Ohne diesen Fall wäre der erste Test auch grün, wenn die Ableitung pauschal
+  // `komfortabel` lieferte.
   it('feiner Zeiger ohne gespeicherte Wahl bleibt bei kompakt', () => {
     setzeZeigerGrob(false);
     zeigeSonde();
@@ -188,9 +166,8 @@ describe('Bediendichte — die drei Austritte (LFH-329 · B1)', () => {
   });
 
   it('Literal-Gegenprobe: auf handschuh trägt die Trefffläche 72 px', async () => {
-    // Der Test oben speist BEIDE Seiten aus `dichten` — bei verbogener Ableitung
-    // bliebe er grün. Diese Zahl steht deshalb als Literal da (72 px ≙ 19,05 mm,
-    // MIL-STD-1472F Fig. 12) und ist aus keiner Quelle abgeleitet.
+    // Der Test oben speist beide Seiten aus `dichten`; diese Zahl steht deshalb als Literal da
+    // (72 px ≙ 19,05 mm, MIL-STD-1472F Fig. 12).
     zeigeSonde();
     await userEvent.click(screen.getByRole('button', { name: 'handschuh' }));
     expect(gemesseneMasse().controlHeight).toBe(72);
@@ -205,12 +182,11 @@ describe('Bediendichte — die drei Austritte (LFH-329 · B1)', () => {
   });
 
   it('die Dichte-Achse rührt die Theme-Achse nicht an', () => {
-    // Zwei Zustände in EINEM Provider: ein gemeinsamer useMemo, aber getrennte
-    // Setzer. Ein versehentlich geteilter Speicherschlüssel oder ein Setzer, der
-    // beide Felder schreibt, fiele hier auf.
+    // Zwei Zustände in EINEM Provider: ein geteilter Speicherschlüssel oder ein Setzer, der beide
+    // Felder schreibt, fiele hier auf.
     zeigeSonde();
-    // Ohne gespeicherte Wahl gilt seit dem Neuentwurf (21.09.2026) der Nachtbetrieb —
-    // die Aussage hier ist, dass die Dichte-Achse daran nichts dreht und nichts speichert.
+    // Ohne gespeicherte Wahl gilt der Nachtbetrieb; die Dichte-Achse dreht daran nichts und
+    // speichert nichts.
     expect(document.documentElement.dataset.theme).toBe('dark');
     expect(localStorage.getItem('lifeline-hub.theme')).toBeNull();
   });
@@ -218,8 +194,7 @@ describe('Bediendichte — die drei Austritte (LFH-329 · B1)', () => {
 
 describe('Nachtbetrieb als Vorgabe (Neuentwurf „Instrumententafel", 21.09.2026)', () => {
   it('startet ohne gespeicherte Wahl dunkel — unabhängig von der OS-Einstellung', () => {
-    // `matchMedia` meldet in der Testumgebung kein dunkles System; vorher (Vorgabe
-    // `system`) landete dieser Fall deshalb hell. Genau das dreht die Entscheidung um.
+    // `matchMedia` meldet hier kein dunkles System; die Vorgabe ist trotzdem dunkel.
     expect(window.matchMedia('(prefers-color-scheme: dark)').matches).toBe(false);
     zeigeSonde();
     expect(document.documentElement.dataset.theme).toBe('dark');
@@ -240,18 +215,10 @@ describe('Nachtbetrieb als Vorgabe (Neuentwurf „Instrumententafel", 21.09.2026
 });
 
 /**
- * Die kurze Achse eines beschrifteten Knopfs (LFH-381).
- *
- * Die HÖHE eines kleinen Knopfs folgt der Staffel seit LFH-361 (`controlHeightSM`), seine
- * BREITE hing an antds `paddingInlineSM` — einem Literal (`8 - lineWidth` = 7), das keine
- * Dichte kennt. Ein „OK" blieb damit rund 38 px breit, während es 72 px hoch wurde. Der
- * Träger ist ein Boden am Kontext (`button.style.minWidth`) und nicht die Polsterung: die
- * bände die Breite nicht an die Höhe, ein Ein-Zeichen-Etikett fiele weiter durch, und
- * breite Etiketten wüchsen grundlos mit.
- *
- * Geprüft wird die VERDRAHTUNG im Provider, nicht eine Hilfsfunktion: ein Test nur auf
- * `antdKnopf()` bliebe grün, wenn die `button`-Prop am ConfigProvider fehlte. Die Werte
- * stehen als Literale da — aus `dichten` gelesen prüfte die Zusicherung sich selbst.
+ * Die kurze Achse eines beschrifteten Knopfs (LFH-381): Boden am Kontext
+ * (`button.style.minWidth`), weil antds Polsterung kleiner Knöpfe ein Literal ohne Dichte ist.
+ * Geprüft wird die VERDRAHTUNG im Provider, nicht `antdKnopf()` allein; die Werte stehen als
+ * Literale da.
  */
 describe('Bediendichte — die kurze Achse beschrifteter Knöpfe (LFH-381)', () => {
   const BODEN = { kompakt: '24px', komfortabel: '48px', handschuh: '72px' } as const;
@@ -282,9 +249,8 @@ describe('Bediendichte — die kurze Achse beschrifteter Knöpfe (LFH-381)', () 
     expect(screen.getByRole('button', { name: 'Abbrechen' }).style.minWidth).toBe('72px');
   });
 
-  // Das Gegenstück zur Ausnahme darunter: antd führt Kontext- und Knopfstil JE EIGENSCHAFT
-  // zusammen (`useMergeSemantic`). Ersetzte eine Bibliotheksversion den Kontextstil ganz,
-  // verlören alle Knöpfe mit eigenem `style` den Boden still — dieser Fall würde rot.
+  // antd führt Kontext- und Knopfstil JE EIGENSCHAFT zusammen (`useMergeSemantic`). Ersetzte eine
+  // Bibliotheksversion den Kontextstil ganz, verlören Knöpfe mit eigenem `style` den Boden still.
   it('ein eigener Stil OHNE minWidth behält den Boden', () => {
     localStorage.setItem(SPEICHER_SCHLUESSEL, 'handschuh');
     render(
@@ -309,26 +275,18 @@ describe('Bediendichte — die kurze Achse beschrifteter Knöpfe (LFH-381)', () 
 });
 
 /**
- * Der Kippschalter bekommt seine Maße über die GLOBALE Stelle (LFH-380).
- *
- * `tokens.test.ts` beweist eine RECHNUNG, nicht dass antd die Tokennamen honoriert. Genau
- * daran scheiterte beim Segmented (LFH-370) der naheliegende interne Name, der wirkungslos
- * durchging. Gemessen wird deshalb der von cssinjs erzeugte CSS-Text, verankert an der
- * `css-var-…`-Klasse GENAU dieses Schalters — ohne die Verankerung färbte ein Schalter aus
- * einem früheren Test derselben Datei den Nachweis grün.
- *
- * Drei Werte statt einem: die Spurhöhe allein belegte nicht, dass der abhängige Satz
- * mitkommt (Griff und Mindestbreite rechnet antd aus der Schrift, nicht aus der Spur).
+ * Der Kippschalter bekommt seine Maße über die GLOBALE Stelle (LFH-380). `tokens.test.ts` prüft
+ * die Rechnung, nicht ob antd die Tokennamen honoriert. Gemessen wird deshalb der von cssinjs
+ * erzeugte CSS-Text, verankert an der `css-var-…`-Klasse GENAU dieses Schalters (sonst färbte
+ * ein Schalter aus einem früheren Test den Nachweis grün). Drei Werte, weil antd Griff und
+ * Mindestbreite aus der Schrift rechnet.
  */
 describe('Switch folgt der Staffel bis in den CSS-Text (LFH-380)', () => {
   function regelFuer(schalter: HTMLElement): string {
     const scope = [...schalter.classList].find((k) => k.startsWith('css-var-'));
     expect(scope, 'antd vergibt dem Schalter eine Variablen-Klasse').toBeTruthy();
-    // `innerHTML`, NICHT `textContent`: der Testfilter aus LFH-623 (`test/antdCssVariablen.ts`)
-    // streicht die Custom-Property-Deklarationen aus antds Stilen, und `textContent` zeigte
-    // hier deshalb in JEDEM Fall eine leere Regel — die Zusicherung wäre nie grün geworden,
-    // auch nicht mit korrekter Verdrahtung. Der `innerHTML`-Getter gibt den ungefilterten Text
-    // zurück (dort als tragend begründet).
+    // `innerHTML`, NICHT `textContent`: der Testfilter in `test/antdCssVariablen.ts` streicht die
+    // Custom-Property-Deklarationen aus dem Text, `textContent` zeigte immer eine leere Regel.
     const css = [...document.querySelectorAll('style')].map((s) => s.innerHTML).join('');
     return css.match(new RegExp(`\\.${scope}\\.ant-switch\\{([^}]*)\\}`))?.[1] ?? '';
   }

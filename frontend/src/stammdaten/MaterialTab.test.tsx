@@ -2,21 +2,13 @@ import { http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import MaterialTab from './MaterialTab';
+import { adminFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-27 10:00:00',
-};
-const nichtAdmin = { ...admin, system_rolle: 'keiner' };
+const admin = adminFixture();
+const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
 
 const material = {
   id: 1,
@@ -35,15 +27,11 @@ const material = {
 // ließe sie an der Mehrdeutigkeit scheitern statt an der Sache.
 function render(benutzer: typeof admin, posten = [material]) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+    meHandler(benutzer),
     http.get('/api/material', () => HttpResponse.json(posten)),
     http.get('/api/material-kategorien', () => HttpResponse.json(['Betreuung'])),
   );
-  return renderMitProviders(
-    <AuthProvider>
-      <MaterialTab />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<MaterialTab />);
 }
 
 describe('MaterialTab', () => {
@@ -257,15 +245,11 @@ describe('MaterialTab', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/material', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/material-kategorien', () => HttpResponse.json([])),
     );
-    renderMitProviders(
-      <AuthProvider>
-        <MaterialTab />
-      </AuthProvider>,
-    );
+    renderMitProviders(<MaterialTab />);
 
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch kein Material')).not.toBeInTheDocument();

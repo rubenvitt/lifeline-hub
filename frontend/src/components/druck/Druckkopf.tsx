@@ -40,19 +40,19 @@ interface DruckkopfProps {
  * Der gemeinsame Druckkopf (LFH-22, design.md D2 des Changes `lfh-22-druck-export`).
  *
  * Ein Blatt muss ohne Bildschirm zuordenbar sein: WELCHE Organisation, WELCHES Dokument,
- * WELCHER Einsatz, WELCHER Stand, WER hat gedruckt und WANN. Lagebericht, Befehl, Meldebild
- * und ETB-Druck tragen denselben Kopf — vorher hatte nur das Meldebild einen eigenen.
+ * WELCHER Einsatz, WELCHER Stand, WER hat gedruckt und WANN. Lagebericht, Befehl, Meldebild und
+ * ETB-Druck tragen denselben Kopf.
  *
- * Er gehört INNERHALB der Druckwurzel (`data-lfh="druckwurzel"`): `druck/druck.css` blendet
- * im Druck alles außerhalb aus. Seine Bildschirmregel (`.druckkopf--nur-druck`) steht dort.
+ * Er gehört INNERHALB der Druckwurzel (`data-lfh="druckwurzel"`): `druck/druck.css` blendet im
+ * Druck alles außerhalb aus. Seine Bildschirmregel (`.druckkopf--nur-druck`) steht dort.
  *
- * DRUCKZEITPUNKT: in der Anzeigezone (`useAnzeigeKonventionen`), als taktische DTG. Er wird
- * beim Rendern gesetzt UND bei `beforeprint` erneuert — zwischen Öffnen der Seite und
- * Strg+P können Stunden liegen. `flushSync`, weil ein Update aus einem Browser-Ereignis
- * außerhalb von React sonst erst nach dem Druckbild gerendert würde.
+ * DRUCKZEITPUNKT: in der Anzeigezone (`useAnzeigeKonventionen`), als taktische DTG. Gesetzt
+ * beim Rendern UND bei `beforeprint` erneuert — zwischen Öffnen und Strg+P können Stunden
+ * liegen. `flushSync`, weil ein Update aus einem Browser-Ereignis außerhalb von React sonst erst
+ * nach dem Druckbild gerendert würde.
  *
- * Gedruckt wird erst, wenn die Organisation geladen ist — das stellt `useDrucken` sicher,
- * nicht dieser Baustein. Er zeigt bis dahin keinen Namen statt eines Platzhalters.
+ * Gedruckt wird erst mit geladener Organisation — das stellt `useDrucken` sicher. Bis dahin
+ * zeigt der Kopf keinen Namen statt eines Platzhalters.
  */
 export default function Druckkopf({
   dokumentart,
@@ -89,9 +89,8 @@ export default function Druckkopf({
       wert: nummer ? `${einsatz.bezeichnung} (${nummer})` : einsatz.bezeichnung,
     },
     ...zeilen,
-    // Die DRUCKENDE Person (Spec „Gemeinsamer Druckkopf"), nicht die Urheberin: „Erstellt
-    // von" las sich auf Befehl und Lagebericht als Urheberschaft des Dokuments. Zwei Zeilen
-    // statt „Gedruckt: DTG · Name": die DTG bleibt ein eigener, maschinenlesbarer Wert.
+    // Die DRUCKENDE Person, nicht die Urheberin: „Erstellt von" läse sich als Urheberschaft. Zwei
+    // Zeilen statt „Gedruckt: DTG · Name": die DTG bleibt ein eigener, maschinenlesbarer Wert.
     { etikett: 'Gedruckt von', wert: benutzer?.anzeigename ?? '—' },
     { etikett: 'Gedruckt am', wert: taktischeDtgVoll(jetzt.toISOString(), konventionen) },
   ];

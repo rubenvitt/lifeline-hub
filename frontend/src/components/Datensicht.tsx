@@ -28,122 +28,82 @@ import {
   SpaltenSchalter,
 } from './SpaltenSchalter';
 
-// Zählung und Schalter wohnen seit LFH-374 in `SpaltenSchalter.tsx` (zweiter Träger:
-// `KatalogTabelle`). Der Weiterexport hält die Bestandsimporte stabil; neue Aufrufer
-// importieren direkt von dort.
+// Zählung und Schalter wohnen in `SpaltenSchalter.tsx` (zweiter Träger: `KatalogTabelle`). Der
+// Weiterexport hält Bestandsimporte stabil; neue Aufrufer importieren direkt von dort.
 export { etikettVon, hatWaehlbareSpalten, sichtbareSpalten };
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 
 /**
- * Datensicht-Primitiv der Einsatzmodule (LFH-330 · B2).
+ * Datensicht-Primitiv der Einsatzmodule (LFH-330 · B2): EINE Spaltendefinition je Modul, zwei
+ * Darstellungsformen. `form`: `'tabelle'` immer Tabelle, `'karte'` immer Karte, `'auto'` Tabelle ab
+ * `md` und Karte darunter. Der Tabellenzweig rendert durch `KatalogTabelle` (EINE
+ * Scroll-/Sticky-/Fixier-Wahrheit); diese Datei setzt kein Bildlauf-Prop.
  *
- * EINE Spaltendefinition je Modul, zwei Darstellungsformen. Die Formwahl liegt an
- * `form`, nicht am Zufall: `'tabelle'` immer Tabelle, `'karte'` immer Karte,
- * `'auto'` Tabelle ab `md` und Karte darunter. Der Tabellenzweig rendert nicht selbst,
- * sondern durch `KatalogTabelle` — es bleibt bei EINER Scroll-/Sticky-/Fixier-Wahrheit
- * im Repo, und diese Datei setzt kein Bildlauf-Prop.
+ * ── DIE KARTEN-AUSNAHME (begründungspflichtig) ──
  *
- * ── DIE KARTEN-AUSNAHME, und sie ist begründungspflichtig ───────────────────────
- *
- * `form: 'auto'` löst unterhalb `md` eine Tabelle in Karten auf. Das WIDERSPRICHT der
- * Regel aus CLAUDE.md und A1/Festlegung 2: „Auf schmalem Schirm wird eine Tabelle
- * angepasst, nicht in Karten aufgelöst — Karten-Fallback ist die Ausnahme mit
- * Begründung im Task."
- *
- * Träger der Ausnahme ist der Kontext **mobil** aus A1: ~390 px, einhändig, komfortabel,
- * keine Vergleichsansichten. Dort ist ein Datensatz, der als EINHEIT erfasst und gelesen
- * wird — ein Fahrzeug, eine Person, eine Bewegung — keine Vergleichsaufgabe, und
- * Festlegung 2 sagt für diesen Fall „Liste/Karte, wenn gelesen wird".
+ * `form: 'auto'` löst unter `md` eine Tabelle in Karten auf, entgegen der Regel „auf schmalem
+ * Schirm wird eine Tabelle angepasst, nicht in Karten aufgelöst“. Träger der Ausnahme ist der
+ * Kontext **mobil** (~390 px, einhändig, keine Vergleichsansichten): ein Datensatz, der als
+ * EINHEIT gelesen wird (Fahrzeug, Person, Bewegung), ist keine Vergleichsaufgabe.
  *
  * DIE TRENNLINIE, damit die Ausnahme nicht wandert:
- *   · `KatalogTabelle` + Bildlauf bleibt für die Stammdaten-VERGLEICHSTABELLEN. Keine der
- *     dreizehn wird zu Karten, keine ihrer Aufrufstellen wird angefasst.
- *   · `form: 'tabelle'` gilt für Vergleichsflächen, die auch schmal verglichen werden —
- *     das Meldebild der Kräfteübersicht, das A1/Festlegung 2 namentlich als „wird
- *     verglichen: ja" führt. Prüflisten-Kriterium 14 verbietet dort die Auflösung in
- *     Karten ausdrücklich; das ist kein Ermessen.
- *   · `form: 'auto'` gilt für Einsatzmodule, in denen ein Datensatz eine Einheit ist.
- *   · `form: 'karte'` gilt für Module, die heute schon kartenbasiert gelesen werden
- *     (Befehle, Lageberichte). Dort ist die Tabelle der Befund, nicht der Zielzustand.
+ *   · `KatalogTabelle` + Bildlauf bleibt für die Stammdaten-VERGLEICHSTABELLEN; keine wird Karte.
+ *   · `form: 'tabelle'` für Vergleichsflächen, die auch schmal verglichen werden (Meldebild;
+ *     Prüflisten-Kriterium 14 verbietet dort Karten).
+ *   · `form: 'auto'` für Einsatzmodule, in denen ein Datensatz eine Einheit ist.
+ *   · `form: 'karte'` für Module, die kartenbasiert gelesen werden (Befehle, Lageberichte).
  *
- * Was die Karte NICHT kann, ist an der Aufrufstelle sichtbar statt still: die
- * Bestands-`aufklappzeile` läuft nur im Tabellenzweig, und eine Spalte ohne Platz im
- * Kartenplan erscheint dort nicht. Der Funktionsverlust unter `md` ist damit lesbar, nicht
- * überraschend. Der beschriftete Aufklappbereich `aufklappen` (LFH-676) läuft dagegen in
- * BEIDEN Zweigen, mit einem Zustand für beide.
+ * Was die Karte NICHT kann, ist an der Aufrufstelle sichtbar: `aufklappzeile` läuft nur im
+ * Tabellenzweig, eine Spalte ohne Platz im Kartenplan erscheint dort nicht. `aufklappen` läuft
+ * in BEIDEN Zweigen, mit einem Zustand.
  *
- * ── FÜNF ZUSICHERUNGEN, sie gehören dem Primitiv ────────────────────────────────
+ * ── FÜNF ZUSICHERUNGEN ──
  *
- * 1. **Genau EIN Zweig im Baum.** Kein Umschalten per verborgener Fläche. Ein zweiter,
- *    verborgener Zweig machte jedes „unter md keine Tabelle"-Gate bedeutungslos und
- *    montierte die In-Zeile-Steuerelemente doppelt — die Lehre aus dem Navigations-Drawer
- *    (B1), der seinen Inhalt deshalb erst beim Öffnen rendert.
- * 2. **EINE Reihenfolge, EINE Menge für beide Zweige.** Antds Sortier- und Filterhaken
- *    sind am Spaltentyp abgeschnitten, weil `Table` deren Zustand INTERN hält: der
- *    Kartenzweig könnte ihn nicht lesen und zeigte still eine andere Reihenfolge.
- *    Sortiert und gefiltert wird hier, die Tabelle bekommt nur den Pfeil und dessen
- *    kontrollierte Richtung.
- * 3. **EINE Sichtbarkeitswahrheit.** `abBreite` ersetzt antds Breiten-Prop, das
- *    Verbergen-Flag ist gestrichen, und beide Ausblendungsgründe fließen in DENSELBEN
- *    Zähler. Ein Zähler, der „0 ausgeblendet" meldet, während antd zwei Spalten verbirgt,
- *    verfehlt genau das Kriterium (14), für das er existiert.
- * 4. **Das Tastaturziel der Zeile ist die Titelzelle, nicht die Fläche.** Bei gesetztem
- *    `titel.ziel` rendert sie in BEIDEN Zweigen einen echten `<Link>` mit Höhe aus
- *    `controlHeight`. Grund: `ListenEintrag` (`components/Liste.tsx`) legt `onClick` auf
- *    ein nacktes `<div>` — ohne `role`, ohne `tabIndex`, ohne `onKeyDown`. Ein Zeilenklick
- *    darauf wäre maus-/tippgebunden und für die Trefflächenmessung unsichtbar. Eine
- *    klickbare Karte als Ganzes gehört B7 (LFH-335) samt `Liste.tsx`.
- * 5. **Zeilen springen nicht unter dem Cursor.** Solange der Fokus in der Sicht liegt,
- *    sind Zeilenmenge und -reihenfolge eingefroren; Zellinhalte laufen weiter. Zufluss
- *    erscheint als Banner in der Werkzeugzeile (WCAG 3.2.5 / G76, CLS ≤ 0,1). Die
- *    Werkzeugzeile wird IMMER gerendert, auch leer — eine Zeile, die beim Eintreffen
- *    erscheint, verschiebt Inhalt und arbeitet gegen ihr eigenes Ziel.
+ * 1. **Genau EIN Zweig im Baum**, kein Umschalten per verborgener Fläche: ein verborgener Zweig
+ *    machte jedes „unter md keine Tabelle“-Gate bedeutungslos und montierte Steuerelemente
+ *    doppelt.
+ * 2. **EINE Reihenfolge, EINE Menge für beide Zweige.** antds Sortier- und Filterhaken sind am
+ *    Spaltentyp abgeschnitten, weil `Table` deren Zustand intern hält; sortiert und gefiltert
+ *    wird hier, die Tabelle bekommt nur den Pfeil.
+ * 3. **EINE Sichtbarkeitswahrheit.** `abBreite` ersetzt antds Breiten-Prop, das Verbergen-Flag
+ *    ist gestrichen, beide Ausblendungsgründe fließen in DENSELBEN Zähler (Kriterium 14).
+ * 4. **Das Tastaturziel der Zeile ist die Titelzelle.** Bei gesetztem `titel.ziel` rendert sie
+ *    in BEIDEN Zweigen einen echten `<Link>` mit Höhe aus `controlHeight`; `ListenEintrag` legt
+ *    `onClick` auf ein nacktes `<div>` ohne Rolle und Tastaturbedienung.
+ * 5. **Zeilen springen nicht unter dem Cursor.** Solange der Fokus in der Sicht liegt, sind
+ *    Zeilenmenge und -reihenfolge eingefroren, Zellinhalte laufen weiter; Zufluss erscheint als
+ *    Banner (WCAG 3.2.5, CLS ≤ 0,1). Die Werkzeugzeile steht IMMER, auch leer.
  *
- * ── VIER FALLEN ────────────────────────────────────────────────────────────────
+ * ── VIER FALLEN ──
  *
- * · **Die Werkzeugzeile liegt AUSSERHALB des Tabellenrahmens.** `katalogtabelle-schmal.spec.ts`
- *   misst die Bildlaufbreite am Tabellenwurzelknoten gegen 390 px; eine Leiste darin
- *   zählte in dieses Maß hinein und machte die Messung stumpf.
- * · **`const K` ist verlierbar.** Wer die Spaltenliste ANNOTIERT statt sie durch
- *   `spaltenFuer<T>()` zu führen, weitet `K` auf `string`; der Kartenplan nimmt danach
- *   jeden Tippfehler ohne Meldung an. Deshalb prüft {@link pruefeKartenplan} die
- *   Slot-Schlüssel im DEV-Effekt gegen die echten Spaltenschlüssel, und der Guard
- *   verlangt die Marke `spaltenFuer` je Konsumentendatei.
- * · **Der Statusslot ist NICHT das `render` der Statusspalte.** Dort steht im
- *   Schreibmodus ein Auswahlfeld mit fester Mindestbreite, das eine 390-px-Karte breit
- *   drückt. Der Slot nimmt eine `StatusDarstellung` — `label` ist dort Pflichtfeld und
- *   damit der zweite Kanal (WCAG 1.4.1).
- * · **Filter, Suche und Gruppen sind im Baummodus VERBOTEN, nicht bloß unbenutzt.**
- *   Die Aggregate der Elternzeilen des Meldebilds sind stromaufwärts über die VOLLMENGE
- *   kumuliert (`kraefte/kraeftebild.ts`, `addKategorie`). Fiele hier eine Zeile weg,
- *   behielten die Eltern Zahlen über nicht mehr sichtbare Kinder — sie lügen still, und
- *   kein Test sieht es. Vorgefiltert wird stromaufwärts (`filtereKraefte`).
+ * · Die Werkzeugzeile liegt AUSSERHALB des Tabellenrahmens: `katalogtabelle-schmal.spec.ts`
+ *   misst die Bildlaufbreite am Tabellenwurzelknoten.
+ * · `const K` ist verlierbar: eine ANNOTIERTE Spaltenliste (statt über `spaltenFuer<T>()`) weitet
+ *   `K` auf `string`. Deshalb prüft {@link pruefeKartenplan} die Slot-Schlüssel im DEV-Effekt, und
+ *   der Guard verlangt die Marke `spaltenFuer` je Konsumentendatei.
+ * · Der Statusslot ist NICHT das `render` der Statusspalte (dort drückt ein Auswahlfeld mit fester
+ *   Mindestbreite die 390-px-Karte breit); er nimmt eine `StatusDarstellung` mit Pflicht-`label`.
+ * · Filter, Suche und Gruppen sind im Baummodus VERBOTEN: die Aggregate der Elternzeilen sind
+ *   stromaufwärts über die Vollmenge kumuliert (`kraefte/kraeftebild.ts`) und lögen still, fiele
+ *   hier eine Zeile weg. Vorgefiltert wird stromaufwärts (`filtereKraefte`).
  */
 
 // ── Formachse ────────────────────────────────────────────────────────────────────────
 /**
- * `'auto'` Tabelle ab `md`, Karte darunter — begründungspflichtig. Einen eigenen
- *            Umbruchpunkt je Konsument gibt es nicht mehr (`tabelleAb` fiel am 22.09.2026 mit
- *            seiner einzigen Nutzerin, der ETB-Chronologie).
- * `'tabelle'` immer Tabelle. Für Vergleichsflächen (Meldebild), die Kriterium 14
- *            ausdrücklich nicht in Karten auflösen dürfen.
- * `'karte'` immer Karte. Für Module, die heute schon kartenbasiert gelesen werden
- *            (Befehle, Lageberichte) — dort ist die Tabelle der Befund, nicht das Ziel.
+ * `'auto'` Tabelle ab `md`, Karte darunter (begründungspflichtig, fester Umbruchpunkt).
+ * `'tabelle'` immer Tabelle, für Vergleichsflächen (Meldebild, Kriterium 14).
+ * `'karte'` immer Karte, für Module, die kartenbasiert gelesen werden (Befehle, Lageberichte).
  */
 type Darstellungsform = 'auto' | 'tabelle' | 'karte';
 
 // ── Spaltenregister ──────────────────────────────────────────────────────────────────
 /**
- * Was dem Primitiv gehört und der Aufrufer nicht setzen darf. Muster `KatalogTabelle`.
- *
- * Die antd-Sortier- und Filterhaken gehören `Datensicht`: antd hält deren Zustand INTERN,
- * der Kartenzweig könnte ihn nicht lesen und zeigte still eine andere Reihenfolge und
- * Menge. Gemessen tut das im Bestand niemand, die Amputation kostet also keinen Bestand.
- * `fixed` gehört `KatalogTabelle`. Antds Breiten-Prop und sein Verbergen-Flag sind
- * gestrichen und durch {@link DatensichtSpalte.abBreite} bzw. den Spaltenschalter
- * ersetzt — beide würden sonst Spalten verbergen, die der Zähler nicht kennt, und ein
- * Zähler, der lügen kann, verfehlt Kriterium 14.
+ * Was dem Primitiv gehört und der Aufrufer nicht setzen darf. Sortier- und Filterhaken gehören
+ * `Datensicht` (antd hält sie intern, der Kartenzweig sähe sie nicht), `fixed` gehört
+ * `KatalogTabelle`. antds Breiten-Prop und Verbergen-Flag sind durch
+ * {@link DatensichtSpalte.abBreite} bzw. den Spaltenschalter ersetzt, sonst verbärgen sie Spalten,
+ * die der Zähler nicht kennt.
  */
 type AntdErbe<T> = Omit<
   TableColumnType<T>,
@@ -183,33 +143,25 @@ export type DatensichtSpalte<T, K extends string = string> = AntdErbe<T> & {
   /** Erst ab dieser Breite in der TABELLE sichtbar (Ersatz für antds Breiten-Prop). */
   abBreite?: AbBreitePunkt;
   /**
-   * Diese Spalte FLIESST im Tabellenzweig: sie nimmt den Rest der Breite und bricht um,
-   * statt die Tabelle zu verbreitern (LFH-523). Wert ist ihr Mindestmaß in px.
-   *
-   * Durchgereicht an {@link KatalogSpalte.mindestBreite} — EIN Begriff, zwei Träger, wie
-   * bei `suchText`. Im KARTENZWEIG wirkungslos und das mit Absicht: eine Karte ist so breit
-   * wie ihre Fläche, dort bricht der Text ohnehin um. Genau deshalb war der Befund von
-   * LFH-523 ein reiner Tabellenbefund.
+   * Diese Spalte FLIESST im Tabellenzweig: sie nimmt den Rest der Breite und bricht um, statt die
+   * Tabelle zu verbreitern (LFH-523). Wert ist ihr Mindestmaß in px, durchgereicht an
+   * {@link KatalogSpalte.mindestBreite}. Im Kartenzweig wirkungslos, eine Karte bricht ohnehin um.
    */
   mindestBreite?: number;
   /** Nicht abwählbar (Aktionsspalte). Spalte 0 ist es immer, unabhängig vom Flag. */
   immerSichtbar?: boolean;
   /**
-   * Zahl, Zeit, Kennung (Funkrufname, Nr., Koordinate): Mono mit `tabular-nums` in BEIDEN
-   * Zweigen (Neuentwurf). Durchgereicht an {@link KatalogSpalte.zahl} — EIN Begriff, zwei
-   * Träger, wie `suchText` und `mindestBreite`.
+   * Zahl, Zeit, Kennung (Funkrufname, Nr., Koordinate): Mono mit `tabular-nums` in BEIDEN Zweigen.
+   * Durchgereicht an {@link KatalogSpalte.zahl}.
    */
   zahl?: boolean;
 };
 
 /**
- * Bewahrt die Schlüssel-Literale, ohne die T-Angabe zu verlieren. Curried, weil TypeScript
- * keine teilweise Typargument-Inferenz kennt.
- *
- * FALLE: eine Liste, die als `readonly DatensichtSpalte<Person>[]` ANNOTIERT wird, weitet
- * `K` auf `string` und der Kartenplan nimmt danach jeden Tippfehler an. Der Typ kann das
- * nicht schließen; geschlossen wird es zweifach — {@link pruefeKartenplan} im DEV-Effekt
- * und die Guard-Marke `spaltenFuer` je Konsumentendatei.
+ * Bewahrt die Schlüssel-Literale, ohne die T-Angabe zu verlieren; curried, weil TypeScript keine
+ * teilweise Typargument-Inferenz kennt. Eine als `readonly DatensichtSpalte<Person>[]` ANNOTIERTE
+ * Liste weitet `K` auf `string`; dagegen helfen {@link pruefeKartenplan} und die Guard-Marke
+ * `spaltenFuer`.
  */
 export function spaltenFuer<T extends object>(): <const K extends string>(
   spalten: readonly DatensichtSpalte<T, K>[],
@@ -219,20 +171,12 @@ export function spaltenFuer<T extends object>(): <const K extends string>(
 
 // ── Kartenplan ───────────────────────────────────────────────────────────────────────
 /**
- * GENAU EINE Primäraktion — als Deskriptor, nicht als `ReactNode`-Slot. Damit besitzt das
- * Primitiv Form, Höhe (`controlHeight`) und Trefffläche; eine Klein-Variante oder ein
- * Gefahren-Anstrich sind von außen nicht einschmuggelbar („Rot bedient nichts").
+ * GENAU EINE Primäraktion, als Deskriptor statt `ReactNode`-Slot: Form, Höhe und Trefffläche
+ * gehören dem Primitiv, eine Klein-Variante oder ein Gefahren-Anstrich sind nicht einschmuggelbar.
  *
- * `bestaetigung` ist nicht Zierde: die drei Bestands-„Entfernen" (Fahrzeuge, Personal,
- * Material) hängen an einer Rückfrage. Ohne dieses Feld feuerte die Aktion im Kartenzweig
- * ohne Rückfrage — Prüflisten-Kriterium 4.
- *
- * ZWEI KNÖPFE, ZWEI REGELN (LFH-632). Der AUSLÖSER bleibt immer neutral — er bedient, und
- * Rot bedient nichts. Der OK-Knopf der RÜCKFRAGE ist etwas anderes: er bestätigt, und für
- * eine UNUMKEHRBARE Aktion verlangt CLAUDE.md dort `okButtonProps={{ danger: true }}`
- * („sonst bestätigt man das Löschen mit einem blauen Knopf"). Deshalb gibt es genau diese
- * eine Gefahren-Angabe, als Opt-in und nur für die Rückfrage: {@link bestaetigungGefahr}.
- * Umkehrbares („Aus Einsatz entfernen" im Material) setzt es nicht.
+ * `bestaetigung` hält die Rückfrage vor „Entfernen“ auch im Kartenzweig (Kriterium 4). Der
+ * AUSLÖSER bleibt immer neutral (Rot bedient nichts); nur der OK-Knopf der Rückfrage wird für
+ * unumkehrbare Aktionen rot ({@link bestaetigungGefahr}).
  */
 export interface PrimaerAktion<T> {
   etikett: string;
@@ -258,26 +202,19 @@ export interface MenueEintrag {
   key: string;
   label: string;
   /**
-   * Unumkehrbares (Stornieren). Der Eintrag wird rot und steht hinter einem Trenner — der
-   * Menü-Trenner ist dort die Trennung, die in einer Knopfreihe der Abstand wäre
-   * (CLAUDE.md, „Rot steht auch nicht bündig neben Neutralem").
+   * Unumkehrbares (Stornieren): der Eintrag wird rot und steht hinter einem Trenner, der Trennung,
+   * die in einer Knopfreihe der Abstand wäre.
    */
   gefahr?: true;
 }
 
 /**
- * Weitere Zeilenaktionen, GEBÜNDELT (LFH-365 · B5e, eingeführt mit LFH-639).
+ * Weitere Zeilenaktionen, GEBÜNDELT (LFH-365): die EINE Primäraktion bleibt sichtbar, alles
+ * Weitere steht in einem Menü, dessen Auslöser das Primitiv baut (icon-only `type="text"`,
+ * `trigger={['click']}`, `autoFocus`, Zuordnung am `menu`).
  *
- * Der Plan-Modus sichert genau EINE Primäraktion zu ({@link PrimaerAktion}). Eine Zeile mit
- * mehr Handlungen bekam bis hierher nur den Eigenbau (`art: 'eigen'`) — und damit alles, was
- * das Primitiv sonst garantiert, in Handarbeit. Dieser Deskriptor ist der dritte Weg: die
- * EINE Primäraktion bleibt sichtbar, alles Weitere steht in einem Menü, dessen Auslöser das
- * Primitiv baut — icon-only `type="text"`, `trigger={['click']}`, `autoFocus`, Zuordnung am
- * `menu` statt je Eintrag (ein Riegel hat so einen Ort).
- *
- * `eintraege` wird NACH der Rechte- und Zustandsprüfung ausgewertet: liefert es nichts, gibt
- * es gar keinen Auslöser, keinen deaktivierten. Ein Deskriptor, kein `ReactNode`-Slot — aus
- * demselben Grund wie bei der Primäraktion: Form und Höhe gehören dem Primitiv.
+ * `eintraege` wird NACH der Rechte- und Zustandsprüfung ausgewertet: liefert es nichts, gibt es
+ * keinen Auslöser, auch keinen deaktivierten.
  */
 export interface WeitereAktionen<T> {
   eintraege: (zeile: T) => readonly MenueEintrag[];
@@ -298,14 +235,9 @@ export function menueEintraege(eintraege: readonly MenueEintrag[]): MenuProps['i
 }
 
 /**
- * Titelzeile der Karte UND erste Spalte der Tabelle.
- *
- * `ziel` macht die Titelzelle in BEIDEN Zweigen zu einem echten `<Link>` — das ist das
- * Tastaturziel der Zeile.
- *
- * REGEL: trägt `ziel` einen Wert, darf das `render` der Titelspalte selbst KEINEN Anker
- * erzeugen — sonst verschachtelte Links. Wer heute im Spalten-`render` verlinkt, hebt den
- * Link hierher.
+ * Titelzeile der Karte UND erste Spalte der Tabelle. `ziel` macht die Titelzelle in BEIDEN
+ * Zweigen zu einem echten `<Link>`, dem Tastaturziel der Zeile. REGEL: trägt `ziel` einen Wert,
+ * darf das `render` der Titelspalte KEINEN Anker erzeugen (verschachtelte Links).
  */
 export interface TitelBezug<T, K extends string> {
   spalte: K;
@@ -326,25 +258,16 @@ export type Kartenplan<T, K extends string> =
       art: 'plan';
       titel: TitelBezug<T, K>;
       /**
-       * Statusetikett. Vertragstyp, KEIN Farbstring — `label` ist Pflichtfeld und damit
-       * der erzwungene zweite Kanal. `null` = kein Etikett.
-       *
-       * Ausdrücklich NICHT das `render` der Statusspalte: dort steht im Schreibmodus ein
-       * Auswahlfeld mit fester Mindestbreite, das eine 390-px-Karte breit drückt.
+       * Statusetikett als Vertragstyp, KEIN Farbstring: `label` ist der erzwungene zweite Kanal.
+       * `null` = kein Etikett. NICHT das `render` der Statusspalte (dessen Auswahlfeld drückt die
+       * 390-px-Karte breit).
        */
       status?: (zeile: T) => StatusDarstellung | null;
       /**
-       * Macht das Statusetikett BEDIENBAR (LFH-339 · C4, Zielform-Spec §5). Deskriptor,
-       * kein `ReactNode`-Slot — damit behält das Primitiv Form, Höhe und Trefffläche;
-       * eine Klein-Variante oder eine Farbfläche sind von außen nicht einschmuggelbar.
-       *
-       * Der Bedienweg sitzt bewusst HIER und nicht am {@link PrimaerAktion}-Slot: dort ist
-       * genau EINE Aktion zugesichert, und die ist auf allen drei Kräfteseiten mit
-       * „Entfernen" belegt. Die Antwort ist nicht, den Slot zu verdoppeln, sondern ihn
-       * nicht zu brauchen — bedient wird, wo der Status schon steht. Die
-       * Ein-Aktion-Zusicherung bleibt damit unangetastet.
-       *
-       * Fehlt das Feld oder liefert es `null`, bleibt das Etikett reine Anzeige.
+       * Macht das Statusetikett BEDIENBAR (LFH-339), als Deskriptor, damit Form, Höhe und Trefffläche
+       * beim Primitiv bleiben. Bedient wird, wo der Status steht, nicht am {@link PrimaerAktion}-Slot
+       * (der ist mit „Entfernen“ belegt). Fehlt das Feld oder liefert es `null`, bleibt das Etikett
+       * Anzeige.
        */
       statusBedienung?: (zeile: T) => StatusBedienung | null;
       /** HÖCHSTENS DREI Sekundärfelder — der Tupeltyp erzwingt die Obergrenze. */
@@ -364,13 +287,11 @@ export type Kartenplan<T, K extends string> =
 type Sortierung<K extends string> = { spalte: K; richtung: 'auf' | 'ab' } | null;
 
 /**
- * Gruppenachse. Beide Zweige verwenden dieselben Schlüssel und Zähler, aber NICHT
- * dieselbe Form:
- *  · Kartenzweig: echte Gruppenköpfe („verfügbar · 7") über verschachtelten Listen.
- *  · Tabellenzweig: die Gruppenachse wird zur FÜHRENDEN Sortierachse (Gruppen liegen
- *    zusammenhängend), die Zähler stehen als Streifen in der Werkzeugzeile. KEINE
- *    synthetischen Gruppenzeilen — Spaltenfixierung × zeilenübergreifende Zellverbünde
- *    sind in diesem Repo ungeprüft, und `KatalogTabelle` fixiert Spalte 0 unbedingt.
+ * Gruppenachse; beide Zweige nutzen dieselben Schlüssel und Zähler, nicht dieselbe Form:
+ *  · Kartenzweig: echte Gruppenköpfe („verfügbar · 7“) über verschachtelten Listen.
+ *  · Tabellenzweig: die Gruppenachse wird FÜHRENDE Sortierachse, Zähler als Streifen in der
+ *    Werkzeugzeile. Keine synthetischen Gruppenzeilen: Spaltenfixierung × Zellverbünde sind
+ *    ungeprüft, und `KatalogTabelle` fixiert Spalte 0 immer.
  */
 interface Gruppierung<T> {
   schluessel: (zeile: T) => string;
@@ -388,16 +309,13 @@ type KinderFeld<T> = {
 }[keyof T];
 
 /**
- * Beschrifteter Aufklappbereich je Zeile (LFH-676), in BEIDEN Zweigen gleich.
+ * Beschrifteter Aufklappbereich je Zeile, in BEIDEN Zweigen gleich (LFH-676).
  *
  * Der Auslöser ist ein antd-`Button` mit sichtbarem `etikett`, `aria-expanded` und der
- * Zeilenkennung im zugänglichen Namen — nicht antds 16-px-Aufklappsymbol, dessen Name aus der
- * Locale in jeder Zeile gleich ist (LFH-369) und dessen Trefffläche die Dichte-Staffel
- * unterschreitet. Aufklappen ist LESEN: der Auslöser zählt nicht gegen „eine Primäraktion +
- * `weitere`“ (LFH-616, ein Sprung ist keine Handlung).
+ * Zeilenkennung im zugänglichen Namen, nicht antds 16-px-Symbol (Name aus der Locale, zu kleine
+ * Trefffläche). Aufklappen ist LESEN und zählt nicht gegen „eine Primäraktion + `weitere`“.
  *
- * `inhalt` wird erst beim Aufklappen gerendert — ein Inhalt, der beim Mount lädt, lädt damit
- * nur für die aufgeklappte Zeile. Der Aufklappzustand gehört der Sicht und überlebt den
+ * `inhalt` wird erst beim Aufklappen gerendert. Der Zustand gehört der Sicht und überlebt den
  * Wechsel zwischen Karte und Tabelle.
  */
 interface Aufklappbereich<T> {
@@ -417,28 +335,25 @@ interface BaumSicht<T> {
 }
 
 /**
- * Verhalten bei nachfließenden Daten (Prüflisten-Kriterium 12, WCAG 3.2.5, CLS ≤ 0,1).
+ * Verhalten bei nachfließenden Daten (Kriterium 12, WCAG 3.2.5, CLS ≤ 0,1).
  *
- * `'sammelbanner'` (Default): solange der Fokus INNERHALB der Sicht liegt, bleiben
- *   Zeilenmenge und Zeilenreihenfolge eingefroren; Zellinhalte aktualisieren weiter
- *   (ein Statuswechsel muss sofort sichtbar sein, nur die Zeile darf nicht wandern).
- *   Neue Zeilen erscheinen als Banner in der Werkzeugzeile („7 neue Einträge — anzeigen").
- * `'sofort'`: kein Einfrieren. Nur für Flächen ohne fokussierbare Zeileninhalte.
+ * `'sammelbanner'` (Default): solange der Fokus INNERHALB der Sicht liegt, bleiben Zeilenmenge und
+ *   -reihenfolge eingefroren; Zellinhalte aktualisieren weiter. Neue Zeilen erscheinen als Banner
+ *   („7 neue Einträge — anzeigen“).
+ * `'sofort'`: kein Einfrieren, nur für Flächen ohne fokussierbare Zeileninhalte.
  */
 type Zufluss = 'sammelbanner' | 'sofort';
 
 // ── Props ────────────────────────────────────────────────────────────────────────────
 interface DatensichtProps<T extends object, K extends string> {
   /**
-   * Zugängliche Bezeichnung. Wird `aria-label` an einem `<section>` (nicht an einem `<div>`
-   * — ein nacktes `div` mit `aria-label` hat keine Rolle, `getByRole('region')` greift dort
-   * nicht), Präfix der DEV-Diagnosen und Beschriftung des Spaltenschalters.
+   * Zugängliche Bezeichnung: `aria-label` an einem `<section>` (ein nacktes `div` hat keine Rolle),
+   * Präfix der DEV-Diagnosen und Beschriftung des Spaltenschalters.
    */
   bezeichnung: string;
   /**
-   * DIE Inferenzquelle für `K`. Alle anderen K-Positionen sind über `NoInfer` von der
-   * Inferenz ausgenommen — sonst weitete ein Tippfehler im Kartenplan `K` einfach um sein
-   * eigenes Literal, und die ganze Literalbewahrung wäre wirkungslos (gemessen).
+   * DIE Inferenzquelle für `K`. Alle anderen K-Positionen sind per `NoInfer` ausgenommen, sonst
+   * weitete ein Tippfehler im Kartenplan `K` um sein eigenes Literal.
    */
   spalten: readonly DatensichtSpalte<T, K>[];
   daten: readonly T[];
@@ -470,23 +385,19 @@ interface DatensichtProps<T extends object, K extends string> {
   /** EINE Klasse für BEIDE Zweige: `rowClassName` bzw. `ListenEintrag className`. */
   zeilenKlasse?: (zeile: T) => string | undefined;
   /**
-   * Zeilenklick als KOMFORT, nur im Tabellenzweig (`onRow`). Das Tastatur- und
-   * Berührungsziel ist in beiden Zweigen `karte.titel.ziel` — nicht die ganze Fläche.
-   * Ein klickbarer Karten-Container gehört B7 (LFH-335), zusammen mit `Liste.tsx`.
+   * Zeilenklick als KOMFORT, nur im Tabellenzweig (`onRow`). Tastatur- und Berührungsziel ist in
+   * beiden Zweigen `karte.titel.ziel`.
    */
   onZeileKlick?: (zeile: T) => void;
   /** Zusatzknöpfe links in der Werkzeugzeile (z. B. „Drucken"). */
   werkzeuge?: ReactNode;
   /**
-   * Antd-Aufklappzeile. Allowlist statt durchgereichtem `expandable`: ein per Subtraktion
-   * definierter Durchlass wächst mit jedem fremden Prop mit und verrottet still, wenn ein
-   * ausgeschlossener Name verschwindet. Nur im Tabellenzweig; schließt `baum` aus.
-   *
-   * Nur noch für den Bestand (Besatzung der Fahrzeugseite). Neues nimmt {@link aufklappen},
-   * das beschriftet ist und in beiden Zweigen läuft. Umstellung und Streichen: LFH-697.
+   * Antd-Aufklappzeile, als Allowlist statt durchgereichtem `expandable`. Nur im Tabellenzweig;
+   * schließt `baum` aus. Nur noch für den Bestand (Besatzung der Fahrzeugseite); Neues nimmt
+   * {@link aufklappen}. Streichen: LFH-697.
    */
   aufklappzeile?: (zeile: T) => ReactNode;
-  /** Beschrifteter Aufklappbereich in beiden Zweigen (LFH-676); schließt `baum` und `aufklappzeile` aus. */
+  /** Beschrifteter Aufklappbereich in beiden Zweigen; schließt `baum` und `aufklappzeile` aus. */
   aufklappen?: Aufklappbereich<T>;
 }
 
@@ -517,12 +428,9 @@ function pfadWert<T>(spalte: DatensichtSpalte<T>, zeile: T): unknown {
 }
 
 /**
- * Der Zellinhalt, den BEIDE Zweige benutzen.
- *
- * antds `render` darf eine Zellbeschreibung `{ props?, children? }` liefern
- * (`@rc-component/table`, `RenderedCell`). React-Elemente tragen ebenfalls `props`,
- * deshalb ZUERST `isValidElement` prüfen und erst danach auf `children` auspacken.
- * Zellverbund-Angaben sind in der Karte bedeutungslos.
+ * Der Zellinhalt, den BEIDE Zweige benutzen. antds `render` darf eine Zellbeschreibung
+ * `{ props?, children? }` liefern; React-Elemente tragen ebenfalls `props`, deshalb ZUERST
+ * `isValidElement` prüfen. Zellverbund-Angaben sind in der Karte bedeutungslos.
  */
 export function zelle<T>(spalte: DatensichtSpalte<T>, zeile: T, index: number): ReactNode {
   const wert = pfadWert(spalte, zeile);
@@ -536,12 +444,8 @@ export function zelle<T>(spalte: DatensichtSpalte<T>, zeile: T, index: number): 
 }
 
 /**
- * Sortiert Text so, wie eine Einsatzkraft ihn liest: „Florian 2" vor „Florian 10".
- *
- * Ohne `numeric` vergleicht `localeCompare` Ziffer für Ziffer und legt die 10 vor die 2 —
- * genau in der Spalte, die die Bedien-Leitlinie als menschenlesbare Kennung fixiert
- * (Funkrufname, Ordnungsnummer). Die Sprache steht FEST auf `de` statt auf der
- * Systemsprache: sonst hinge die Reihenfolge an der Umgebung, in der der Test läuft.
+ * Sortiert Text so, wie eine Einsatzkraft ihn liest: „Florian 2“ vor „Florian 10“ (`numeric`).
+ * Die Sprache steht fest auf `de`, sonst hinge die Reihenfolge an der Umgebung.
  */
 const KOLLATOR = new Intl.Collator('de', { numeric: true });
 
@@ -561,9 +465,8 @@ function vergleiche(
 }
 
 /**
- * Die EINE Quelle der gerenderten Zeilen und der benannte Seam für B3 (LFH-331): dort
- * wechselt nur die Herkunft von `daten`, die Signatur bleibt.
- * Flach: filtern, suchen, gruppen-sortieren, sortieren. Baum: `daten` unverändert.
+ * Die EINE Quelle der gerenderten Zeilen. Flach: filtern, suchen, gruppen-sortieren, sortieren.
+ * Baum: `daten` unverändert.
  */
 export function effektiveDaten<T extends object, K extends string>(args: {
   daten: readonly T[];
@@ -600,9 +503,8 @@ export function effektiveDaten<T extends object, K extends string>(args: {
   const sortWert = sortSpalte?.sortWert;
   if (!gruppen && !sortWert) return zeilen;
 
-  // Die Gruppenachse ist die FÜHRENDE Achse: nur so liegen die Gruppen zusammenhängend,
-  // und der Tabellenzweig (der keine synthetischen Gruppenzeilen bekommt) zeigt eine
-  // Gruppierung, die man auch sieht.
+  // Die Gruppenachse ist die FÜHRENDE Achse, damit die Gruppen zusammenhängend liegen, auch im
+  // Tabellenzweig ohne Gruppenzeilen.
   const rang = gruppen ? gruppenRang(zeilen, gruppen) : undefined;
   return [...zeilen].sort((a, b) => {
     if (rang) {
@@ -638,8 +540,7 @@ export function gruppiere<T>(
     else eimer.set(wert, [zeile]);
   }
   const rang = gruppenRang(daten, gruppen);
-  // Nur BELEGTE Gruppen: ein leerer Kopf „· 0" aus der festen Reihenfolge wäre Rauschen
-  // und bliese die Zählerstreifen der Werkzeugzeile auf.
+  // Nur BELEGTE Gruppen: ein leerer Kopf „· 0“ wäre Rauschen.
   return [...eimer.keys()]
     .sort((a, b) => rang.get(a)! - rang.get(b)!)
     .map((wert) => ({ wert, etikett: gruppen.etikett(wert), zeilen: eimer.get(wert)! }));
@@ -649,15 +550,9 @@ export function gruppiere<T>(
 export const HERVORGEHOBEN = 'zeile-hervorgehoben';
 
 /**
- * Scrollt die per Deeplink angesteuerte Zeile ins Bild — in BEIDEN Zweigen.
- *
- * Der Selektor `[data-row-key="…"]` allein trifft nur die Tabelle. Unter `md` rendert das
- * Primitiv Karten, dort gibt es kein `data-row-key`, und der Sprung lief still ins Leere:
- * genau auf dem Gerät, auf dem eine lange Liste am wenigsten überschaubar ist. Deshalb liegt
- * die Funktion hier und nicht in den Seiten — die Zweige und ihre Merkmale gehören dem
- * Primitiv, nicht seinen Aufrufern.
- *
- * `scrollIntoView` fehlt in jsdom; der optionale Aufruf hält das No-op fest.
+ * Scrollt die per Deeplink angesteuerte Zeile ins Bild, in BEIDEN Zweigen: `[data-row-key]` allein
+ * trifft nur die Tabelle, unter `md` liefe der Sprung ins Leere. Deshalb hier und nicht in den
+ * Seiten. `scrollIntoView` fehlt in jsdom; der optionale Aufruf hält das No-op fest.
  */
 export function scrolleZurZeile(schluessel: Key): void {
   const ziel = document.querySelector(
@@ -667,10 +562,9 @@ export function scrolleZurZeile(schluessel: Key): void {
 }
 
 /**
- * Mängelliste des Kartenplans gegen das Spaltenregister; leeres Array = in Ordnung.
- * `Datensicht` ruft sie im DEV-Effekt und gibt sie an `console.warn` mit Präfix
- * `[Datensicht: <bezeichnung>]`; der Test ruft sie DIREKT — kein console-Spion, keine
- * Abgrenzung gegen antd-Fremdwarnungen.
+ * Mängelliste des Kartenplans gegen das Spaltenregister; leeres Array = in Ordnung. `Datensicht`
+ * gibt sie im DEV-Effekt an `console.warn` (Präfix `[Datensicht: <bezeichnung>]`), der Test ruft
+ * sie direkt.
  */
 export function pruefeKartenplan<T extends object, K extends string>(
   props: Pick<
@@ -732,9 +626,8 @@ export function pruefeKartenplan<T extends object, K extends string>(
     if (gruppen) befunde.push('gruppen und baum schließen sich aus.');
     if (aufklappzeile) befunde.push('aufklappzeile und baum schließen sich aus.');
     if (aufklappen) befunde.push('aufklappen und baum schließen sich aus.');
-    // Im Baummodus klappt die ganze Zeile auf (LFH-338 · C3). Ein zusätzliches
-    // `onZeileKlick` wäre eine zweite Wirkung auf demselben Klick, und welche einträte,
-    // hinge an der Reihenfolge im DOM.
+    // Im Baummodus klappt die ganze Zeile auf; ein zusätzliches `onZeileKlick` wäre eine zweite
+    // Wirkung auf demselben Klick.
     if (onZeileKlick) befunde.push('onZeileKlick und baum schließen sich aus.');
   }
   // Zwei Aufklappwege an derselben Tabelle: antd kennt nur EINE Aufklappzeile je Zeile.
@@ -798,40 +691,19 @@ export default function Datensicht<T extends object, const K extends string>(
   const werkzeugWurzel = useRef<HTMLDivElement>(null);
 
   /**
-   * DIE ZEILENSCHLEUSE (Prüflisten-Kriterium 12) — Zustand zuerst, weil die Setter der
-   * Sortierung, Suche, Filter und des Spaltenschalters unten auf
-   * {@link nachBenutzeraktion} zugreifen.
+   * DIE ZEILENSCHLEUSE (Kriterium 12). Im Zustand `gefroren` hält `folge` die Schlüsselreihenfolge
+   * beim Fokuseintritt; gerendert wird diese FOLGE, der Inhalt kommt frisch aus `daten`. Ein
+   * Statuswechsel bleibt sofort sichtbar, die Zeile wandert nicht. (Die frischen Zeilen auf die
+   * gefrorene Menge zu filtern gäbe den Überlebenden die NEUE Reihenfolge.)
    *
-   * Im Zustand `gefroren` hält `folge` die Schlüsselreihenfolge, die beim Fokuseintritt
-   * sichtbar war. Gerendert wird dann diese FOLGE, durch eine frische
-   * Schlüssel→Zeile-Karte gezogen: die Position kommt aus der eingefrorenen Liste, der
-   * Inhalt aus `daten`. Ein Statuswechsel bleibt damit sofort sichtbar, die Zeile wandert
-   * aber nicht.
+   * `gruppeVon` friert auch die GRUPPENZUGEHÖRIGKEIT ein: sonst hinge ein Live-Statuswechsel die
+   * Karte unter einen anderen Gruppenkopf um. Bis zum Auftauen bleibt sie unter dem alten Kopf.
    *
-   * Bewusst NICHT „filtere die frischen Zeilen auf die gefrorene Schlüsselmenge": die
-   * Überlebenden bekämen dann die NEUE Reihenfolge, und genau das ist der Sprung unter dem
-   * Cursor, den das Kriterium verbietet.
-   *
-   * `gruppeVon` friert die GRUPPENZUGEHÖRIGKEIT mit ein, nicht nur die Folge. Ohne sie
-   * bestimmt {@link gruppiere} die Gruppe aus den frischen Daten: ein Statuswechsel per
-   * Live-Ereignis hängt die Karte unter einen anderen Gruppenkopf um, während die Sicht
-   * eingefroren ist — dieselbe Bewegung, die die Zusicherung oben („nur die Zeile darf nicht
-   * wandern") verbietet, nur eine Achse weiter. Eine Zeile, deren Gruppenwert sich ändert,
-   * bleibt deshalb bis zum Auftauen unter ihrem alten Kopf; der Zellinhalt zeigt den neuen
-   * Status sofort.
-   *
-   * ── WARUM DREI ZUSTÄNDE UND NICHT `readonly Key[] | null` ────────────────────────
-   *
-   * Zwei Bewegungen sehen gleich aus und sind es nicht: eine Zeile, die von SELBST unter
-   * dem Cursor wegrutscht, ist der verbotene Sprung — eine Neuordnung, die der Benutzer
-   * SELBST angestoßen hat (Sortierklick, Suche, Filter, Bannerklick), ist die Antwort auf
-   * seine Eingabe und muss sofort zu sehen sein.
-   *
-   * `null` allein kann beides nicht unterscheiden. `'neu'` ist deshalb ein eigener Zustand:
-   * ein AUFTRAG, neu einzufrieren, den der Layout-Effekt unten mit der dann bereits
-   * neugeordneten Zeilenfolge erfüllt. Das Einfrieren beim Fokuseintritt dagegen geschieht
-   * SYNCHRON im Handler — dort ist die noch sichtbare Folge die richtige, und ein
-   * nachgelagerter Effekt ließe genau einen Datenstand durchrutschen.
+   * Drei Zustände statt `readonly Key[] | null`: eine Zeile, die von SELBST wegrutscht, ist der
+   * verbotene Sprung; eine Neuordnung, die der Benutzer angestoßen hat (Sortierklick, Suche,
+   * Filter, Banner), muss sofort sichtbar sein. `'neu'` ist ein AUFTRAG, neu einzufrieren, den der
+   * Layout-Effekt mit der neu geordneten Folge erfüllt. Das Einfrieren beim Fokuseintritt geschieht
+   * SYNCHRON im Handler.
    */
   type Schleuse =
     | { art: 'offen' }
@@ -865,24 +737,17 @@ export default function Datensicht<T extends object, const K extends string>(
     (k: K[]) => {
       if (spaltenAus === undefined) setEigeneSpaltenAus(k);
       onSpaltenAus?.(k);
-      // Eine Spaltenumschaltung IST eine Benutzeraktion — und zwar die einzige der
-      // Werkzeugzeile, die das hier lange vergessen hat. Blendet man eine gefilterte
-      // Spalte aus, wird ihr Filter unwirksam (siehe „Spaltensichtbarkeit" unten); die
-      // dadurch freigegebenen Zeilen sind die ANTWORT auf den Klick, kein Zufluss. Ohne
-      // diesen Aufruf zaehlt die gefrorene Schleuse sie als neu und schiebt sie hinter das
-      // Sammelbanner: die Liste bleibt kurz, und daneben behauptet ein Banner „1 neuer
-      // Eintrag" fuer eine Zeile, die nicht neu ist.
-      // Greift nur fuer den eingebauten Schalter: nimmt eine Seite den exportierten
-      // SpaltenSchalter mit kontrolliertem spaltenAus/onSpaltenAus, laeuft die Umschaltung
-      // am Setter vorbei. Heute tut das keine (gemessen).
+      // Eine Spaltenumschaltung IST eine Benutzeraktion: blendet man eine gefilterte Spalte aus, wird
+      // ihr Filter unwirksam, und die freigegebenen Zeilen sind die Antwort auf den Klick, kein
+      // Zufluss. Ohne diesen Aufruf zählte die Schleuse sie als neu. Greift nur für den eingebauten
+      // Schalter (keine Seite nutzt den kontrollierten Weg).
       nachBenutzeraktion();
     },
     [spaltenAus, onSpaltenAus, nachBenutzeraktion],
   );
 
-  // Die zweite Handwahl (LFH-374 · D9): per Breite weggefallene, von Hand zurückgeholte
-  // Spalten. Bewusst unkontrolliert — die kontrollierte Achse `spaltenAus` bleibt, wie sie
-  // war, und hat heute keinen Konsumenten, der auch diese Hälfte bräuchte (gemessen).
+  // Per Breite weggefallene, von Hand zurückgeholte Spalten. Bewusst unkontrolliert, weil kein
+  // Konsument diese Hälfte braucht.
   const [spaltenAn, setSpaltenAn] = useState<readonly K[]>([]);
   const setzeSpaltenAn = useCallback(
     (k: K[]) => {
@@ -902,25 +767,19 @@ export default function Datensicht<T extends object, const K extends string>(
   }, [nachBenutzeraktion]);
 
   // ── Formwahl ──────────────────────────────────────────────────────────────────────
-  // Steht HIER und nicht erst bei der Werkzeugzeile, weil die Ebenen-Registrierung
-  // gleich darunter sie liest: der Spaltenschalter existiert nur im Tabellenzweig.
+  // Steht HIER, weil die Ebenen-Registrierung darunter sie liest: der Spaltenschalter existiert
+  // nur im Tabellenzweig.
   const alsTabelle = form === 'tabelle' || (form === 'auto' && abBreite('md'));
 
   const [spaltenOffen, setSpaltenOffen] = useState(false);
 
-  // Steht der Schalter überhaupt? EINE Wahrheit für drei Leser: die Palettenmeldung unten,
-  // der Rücksetzer daneben und der Schalter selbst (Kartenzweig → gar nicht gerendert;
-  // ohne wählbare Spalte → `null`).
+  // Steht der Schalter überhaupt? EINE Wahrheit für Palettenmeldung, Rücksetzer und Schalter.
   const spaltenSchalterDa = alsTabelle && hatWaehlbareSpalten(spalten);
 
   /*
-   * Verschwindet der Schalter, feuert antd KEIN `onOpenChange(false)` — der Zustand bliebe
-   * auf `true` stehen und das Overlay klappte beim Wiederauftauchen unaufgefordert über den
-   * Inhalt (gemessen: `form='auto'`, Fenster unter `md` und zurück). Vor der kontrollierten
-   * Offen-Achse aus LFH-391 · B4 starb der Zustand mit der Komponente; die Achse hat ihn
-   * überlebensfähig gemacht, also muss sie ihn auch beenden. Der Riegel hängt an BEIDEN
-   * Bedingungen, nicht nur an der Breite: ein Wechsel der Spaltengarnitur nimmt den Schalter
-   * genauso weg.
+   * Verschwindet der Schalter, feuert antd KEIN `onOpenChange(false)`; der kontrollierte Zustand
+   * bliebe `true`, und das Overlay klappte beim Wiederauftauchen unaufgefordert auf. Der Riegel
+   * hängt an Breite UND Spaltengarnitur.
    */
   useEffect(() => {
     if (!spaltenSchalterDa) setSpaltenOffen(false);
@@ -930,8 +789,7 @@ export default function Datensicht<T extends object, const K extends string>(
     name: `Datensicht-Filter: ${bezeichnung}`,
     wurzel: werkzeugWurzel,
     aktionen: {
-      // Nur melden, was die Zeile auch hält (LFH-391 · B4) — ein Befehl auf einen nicht
-      // vorhandenen Schalter wäre ein Befehl ohne Wirkung.
+      // Nur melden, was die Zeile auch hält; ein Befehl auf einen fehlenden Schalter wäre wirkungslos.
       'filter-zuruecksetzen': filterZuruecksetzen,
       ...(spaltenSchalterDa ? { spalten: () => setSpaltenOffen(true) } : {}),
     },
@@ -947,19 +805,13 @@ export default function Datensicht<T extends object, const K extends string>(
   );
 
   /**
-   * WAS MAN NICHT SIEHT, WIRKT NICHT: nur Filter sichtbarer Spalten schneiden die Zeilenmenge.
+   * WAS MAN NICHT SIEHT, WIRKT NICHT: nur Filter sichtbarer Spalten schneiden die Zeilenmenge. Sonst
+   * behielte, wer eine gefilterte Spalte ausblendet, eine gefilterte Liste ohne sichtbaren Grund und
+   * ohne Rückweg.
    *
-   * Vorher hing das Bedienelement an {@link gezeigteSpalten}, die Wirkung aber an allen
-   * Spalten — wer eine Spalte mit gesetztem Filter ausblendete, behielt eine gefilterte
-   * Liste ohne sichtbaren Grund und ohne Rückweg (das Bedienelement war ja weg).
-   *
-   * Der Wert bleibt im Zustand stehen und wirkt beim Wiedereinblenden erneut; verworfen wird
-   * er nicht. GEWÄHLTE FOLGE, kein Nebeneffekt: das gilt auch für Spalten, die `abBreite`
-   * verbirgt — beim Verkleinern des Fensters ändert sich also die Zeilenzahl. Das ist die
-   * Kehrseite derselben Regel und bewusst so: ein unsichtbar wirkender Filter ist der
-   * schlechtere Zustand. Der Spaltenzähler behandelt beide Ursachen ebenfalls gleich
-   * (`sichtbareSpalten` zählt Handauswahl UND `abBreite`) — Zähler und Filter folgen damit
-   * derselben einen Wahrheit, nur an verschiedenen Enden.
+   * Der Wert bleibt im Zustand und wirkt beim Wiedereinblenden erneut. Das gilt auch für Spalten,
+   * die `abBreite` verbirgt: beim Verkleinern ändert sich die Zeilenzahl, bewusst, denn ein
+   * unsichtbar wirkender Filter ist schlechter. Zähler und Filter folgen derselben Wahrheit.
    */
   const wirksameFilterWerte = useMemo(() => {
     const sichtbar = new Set(gezeigteSpalten.map((s) => s.key as string));
@@ -986,7 +838,7 @@ export default function Datensicht<T extends object, const K extends string>(
     [zeilenSchluessel],
   );
 
-  // ── Aufklappbereich (LFH-676) ─────────────────────────────────────────────────────
+  // ── Aufklappbereich ───────────────────────────────────────────────────────────────
   // EIN Zustand für beide Zweige: ein Wechsel zwischen Karte und Tabelle behält, was offen ist.
   const [aufgeklappt, setAufgeklappt] = useState<readonly Key[]>([]);
   const umschalten = useCallback(
@@ -994,9 +846,8 @@ export default function Datensicht<T extends object, const K extends string>(
       setAufgeklappt((jetzt) => (jetzt.includes(k) ? jetzt.filter((x) => x !== k) : [...jetzt, k])),
     [],
   );
-  // IDs für `aria-controls`/`aria-labelledby` im Kartenzweig. `useId` liefert Doppelpunkte,
-  // die in einer ID erlaubt sind; die Zeilenkennung hängt kodiert dahinter — ein Schlüssel mit
-  // Leerzeichen (ein Funkrufname) zerbräche sonst die IDREF-Liste von `aria-labelledby`.
+  // IDs für `aria-controls`/`aria-labelledby` im Kartenzweig. Die Zeilenkennung hängt kodiert
+  // dahinter; ein Schlüssel mit Leerzeichen (Funkrufname) zerbräche sonst die IDREF-Liste.
   const idPraefix = useId();
   const aufklappAusloeser = (zeile: T, mitRegion: boolean): ReactNode => {
     if (!aufklappen) return null;
@@ -1009,9 +860,8 @@ export default function Datensicht<T extends object, const K extends string>(
         aria-expanded={offen}
         aria-controls={mitRegion && offen ? `${idPraefix}-bereich-${idTeil(k)}` : undefined}
         aria-label={aufklappen.zugaenglicherName(zeile)}
-        // `bedienText` statt antds `colorLink` (LFH-650): der Linkton trug gemessen am Tag
-        // 5,51–6,59 : 1 und nachts 4,55–4,82 : 1, unter 7 bzw. 5 : 1
-        // (`e2e/betreuung-pruefliste.spec.ts`). Blauer TEXT nimmt die Textrolle.
+        // `bedienText` statt antds `colorLink`: der Linkton unterschreitet 7 : 1 (Tag) bzw. 5 : 1
+        // (Nacht). Blauer TEXT nimmt die Textrolle.
         style={{ color: rollenwerte(token).bedienText }}
         onClick={(e) => {
           // Die Tabelle darf den Klick nicht zusätzlich als Zeilenklick lesen.
@@ -1019,8 +869,8 @@ export default function Datensicht<T extends object, const K extends string>(
           umschalten(k);
         }}
         icon={
-          // antds Ikone bringt `role="img"` mit englischem Namen mit — die Hülle nimmt sie aus
-          // dem Vorlesebaum (CLAUDE.md, „Ein Emoji ist keine Ikone").
+          // antds Ikone bringt `role="img"` mit englischem Namen mit; die Hülle nimmt sie aus dem
+          // Vorlesebaum.
           <span aria-hidden="true" style={{ display: 'inline-flex' }}>
             {offen ? <DownOutlined /> : <RightOutlined />}
           </span>
@@ -1036,8 +886,7 @@ export default function Datensicht<T extends object, const K extends string>(
     const nachSchluessel = new Map(zeilen.map((z) => [schluessel(z), z]));
     const gefrorenMenge = new Set(gefroren);
     return {
-      // Entfallene Schlüssel fallen sofort weg — eine nicht mehr vorhandene Zeile kann man
-      // nicht rendern. Die Schleuse hält nur Zuwachs zurück.
+      // Entfallene Schlüssel fallen sofort weg; die Schleuse hält nur Zuwachs zurück.
       sichtbareZeilen: gefroren
         .map((k) => nachSchluessel.get(k))
         .filter((z): z is T => z !== undefined),
@@ -1046,16 +895,13 @@ export default function Datensicht<T extends object, const K extends string>(
   }, [gefroren, zeilen, schluessel]);
 
   /**
-   * Erfüllt den `'neu'`-Auftrag. `useLayoutEffect`, nicht `useEffect` — und das ist keine
-   * Testkosmetik: ein nachgelagerter Effekt ließe genau EINEN Bildaufbau zwischen
-   * „Benutzeraktion" und „Folge ist wieder gefroren". Trifft in dieser Lücke ein Datenstand
-   * ein, rutscht er durch und die Zeile springt doch.
+   * Erfüllt den `'neu'`-Auftrag mit `useLayoutEffect`: ein nachgelagerter Effekt ließe genau EINEN
+   * Bildaufbau zwischen Benutzeraktion und erneutem Einfrieren, in dem ein Datenstand
+   * durchrutschen könnte.
    */
   /**
-   * Der eingefrorene Stand — Folge UND Gruppenzugehörigkeit. Beide Einfrierstellen (der
-   * `'neu'`-Auftrag unten und {@link betreten}) gehen hierdurch: sie einzeln zu bauen hieße,
-   * eine von beiden zu vergessen, und dann bliebe der Bannerweg kaputt, während der
-   * Fokusweg richtig einfriert.
+   * Der eingefrorene Stand, Folge UND Gruppenzugehörigkeit. Beide Einfrierstellen (`'neu'`-Auftrag
+   * und {@link betreten}) gehen hierdurch, damit keine die Gruppen vergisst.
    */
   const standJetzt = useCallback(
     (): { folge: readonly Key[]; gruppeVon: ReadonlyMap<Key, string> } => ({
@@ -1073,32 +919,17 @@ export default function Datensicht<T extends object, const K extends string>(
   }, [schleuse, standJetzt]);
 
   /**
-   * DIE LEERE LADEANSICHT FRIERT NICHT EIN.
+   * DIE LEERE LADEANSICHT FRIERT NICHT EIN: wer den Fokus vor der ersten Antwort ins Suchfeld setzt,
+   * fröre eine LEERE Folge ein, und die erste Lieferung landete hinter dem Sammelbanner. Ohne
+   * gerenderte Zeile kann nichts unter dem Cursor wegrutschen.
    *
-   * Die Werkzeugzeile steht IMMER im Baum, auch ohne Daten (Begründung unten am
-   * `werkzeugzeile`-Knoten). Wer den Fokus vor der ersten Antwort ins Suchfeld setzt, fröre
-   * damit eine LEERE Folge ein — und die gesamte erste Lieferung landete hinter dem
-   * Sammelbanner statt in der Liste. Bei null gerenderten Zeilen gibt es nichts
-   * einzufrieren: es steht kein Cursor über einer Zeile, also kann auch nichts unter ihm
-   * wegrutschen.
+   * Nicht auf `ladend` gaten: ein Query, der auf `[]` auflöst und per SSE nachbekommt, hat
+   * `ladend === false` bei leerer Menge. `zeilen` ist die ehrliche Quelle. Der `'neu'`-Pfad braucht
+   * die Bedingung nicht: {@link nachBenutzeraktion} ist aus `'offen'` ein No-op.
    *
-   * NICHT auf `ladend` gaten: ein Query, der auf `[]` auflöst und seine Zeilen erst per
-   * SSE nachbekommt, hat `ladend === false` bei leerer Menge — derselbe Fehler, nur eine
-   * Runde später. `zeilen` ist die einzige ehrliche Quelle.
-   *
-   * Der `'neu'`-Pfad braucht die Bedingung NICHT: {@link nachBenutzeraktion} ist aus dem
-   * Zustand `'offen'` heraus ein No-op, und in einer nie eingefrorenen Sicht ist die
-   * Schleuse genau das — es gibt also gar keinen Auftrag, den der Layout-Effekt erfüllen
-   * könnte.
-   *
-   * BENANNTER REST, bewusst so: bleibt der Fokus nach dem Eintreffen in der Werkzeugzeile
-   * stehen, ist die Schleuse weiter offen und späterer Zufluss schiebt sich live ein. Sie
-   * schärft sich beim NÄCHSTEN Fokuseintritt nach — React delegiert `onFocus` über
-   * `focusin`, das bubbelt, also genügt schon der Sprung Suchfeld → Zeilenlink (gemessen im
-   * Test „… und schärft sich beim nächsten Fokuseintritt nach"); die Sicht ganz zu
-   * verlassen ist nicht nötig. Nachzurüsten wäre nur ein Einfrieren beim ersten Datenstand,
-   * das der Benutzer nicht ausgelöst hat — und es fröre ausgerechnet die Lieferung ein, auf
-   * die er wartet.
+   * Bleibt der Fokus nach dem Eintreffen in der Werkzeugzeile, ist die Schleuse offen, bis zum
+   * nächsten Fokuseintritt (`focusin` bubbelt, der Sprung Suchfeld → Zeilenlink genügt). Ein
+   * Einfrieren beim ersten Datenstand fröre ausgerechnet die erwartete Lieferung ein.
    */
   const betreten = useCallback(() => {
     if (zufluss !== 'sammelbanner') return;
@@ -1110,33 +941,19 @@ export default function Datensicht<T extends object, const K extends string>(
   }, [zufluss, zeilen.length, standJetzt]);
 
   /**
-   * `focusout` feuert AUCH beim Sprung von der Titelzelle zum Aktionsknopf derselben
-   * Sicht. Ein Zuhörer ohne `contains`-Prüfung taute dort auf und schöbe die Zeilen unter
-   * dem Finger weg — genau in der Sekunde, in der jemand bedient.
+   * `focusout` feuert auch beim Sprung von der Titelzelle zum Aktionsknopf derselben Sicht; ohne
+   * `contains`-Prüfung taute die Schleuse genau beim Bedienen auf.
    */
   const pruefeVerlassen = useCallback((ziel: EventTarget | null) => {
     if (ziel != null && wurzel.current?.contains(ziel as Node)) return;
     /**
-     * EIN ÜBERLAGERNDES MENÜ IST KEIN VERLASSEN (LFH-339 · C4).
+     * EIN ÜBERLAGERNDES MENÜ IST KEIN VERLASSEN. Menüs (Statuswahl, `weitere`) liegen in einem PORTAL
+     * an `document.body`, und antds `autoFocus` schiebt den Fokus dorthin; ohne diesen Zweig taute
+     * die Schleuse, während jemand das Menü offen hält.
      *
-     * Seit der Statuswechsel am Etikett hängt, öffnet eine Bedienung in der Zeile ein
-     * `Dropdown` — und dessen Inhalt liegt in einem PORTAL an `document.body`, also
-     * ausserhalb von {@link wurzel}. antds `autoFocus` schiebt den Fokus beim Öffnen
-     * dorthin; ohne diesen Zweig taute die Schleuse damit ausgerechnet in dem Moment auf,
-     * für den sie gebaut ist: jemand hält das Menü offen, und die Zeile darunter wandert
-     * weg.
-     *
-     * GEMESSEN UND DESHALB HIER NOTIERT: in jsdom passiert das NICHT — `autoFocus` lässt
-     * den Fokus dort auf dem Auslöser stehen (nachgemessen am 17.08.2026, der aktive
-     * Knoten war der `ant-dropdown-trigger` selbst, `inSicht: true`). Ein Test, der bloss
-     * ein Menü öffnet und die Reihenfolge prüft, ist deshalb GRÜN, ohne diesen Zweig zu
-     * berühren — er belegt nichts. Prüfbar ist nur der Handler selbst, mit einem
-     * `relatedTarget` im Portal; genau so steht es im Test.
-     *
-     * Absichtlich über die Overlay-Klasse und nicht über eine Portal-Referenz: die
-     * Overlays hängen an `document.body` und gehören keinem Knoten dieser Sicht, es gibt
-     * also nichts, worauf eine Referenz zeigen könnte. Der Preis ist eine Kopplung an
-     * antds Klassennamen — sichtbar hier statt versteckt in einer Hilfsfunktion.
+     * In jsdom bleibt der Fokus beim Öffnen auf dem Auslöser: ein Test, der nur ein Menü öffnet, ist
+     * auch ohne diesen Zweig grün. Geprüft wird der Handler direkt, mit `relatedTarget` im Portal.
+     * Erkennung über antds Overlay-Klassen, weil die Overlays keinem Knoten dieser Sicht gehören.
      */
     if (
       ziel instanceof Node &&
@@ -1149,10 +966,8 @@ export default function Datensicht<T extends object, const K extends string>(
 
   // ── DEV-Diagnose ──────────────────────────────────────────────────────────────────
   /**
-   * `useMemo` über die Eingaben, Effekt über einen PRIMITIVEN Schlüssel. Ein Effekt mit
-   * den Objekten selbst in den Deps feuerte bei jedem Render (alle Aufrufstellen bauen
-   * Kartenplan und Spaltenliste je Render neu) und flutete die Konsole — und
-   * `exhaustive-deps` ließe sich dann nur mit einem verbotenen Disable beruhigen.
+   * `useMemo` über die Eingaben, Effekt über einen PRIMITIVEN Schlüssel: die Aufrufer bauen
+   * Kartenplan und Spaltenliste je Render neu, ein Effekt über die Objekte flutete die Konsole.
    */
   const befunde = useMemo(
     () =>
@@ -1169,14 +984,11 @@ export default function Datensicht<T extends object, const K extends string>(
   }, [befundSchluessel, bezeichnung]);
 
   // ── Werkzeugzeile ─────────────────────────────────────────────────────────────────
-  // (`alsTabelle` steht weiter oben — die Ebenen-Registrierung liest es mit.)
   const filterSpalten = gezeigteSpalten.filter((s) => s.filter != null);
   /**
-   * Gruppiert wird über die EINGEFRORENE Achse, solange die Schleuse zu ist — sonst hängt ein
-   * Statuswechsel die Karte im Kartenzweig unter einen anderen Gruppenkopf um (der Sprung,
-   * den Kriterium 12 verbietet). Der Rückfall auf die frische Achse greift nur für Zeilen,
-   * die beim Einfrieren nicht dabei waren; eine Zeile, deren Gruppenwert sich GEÄNDERT hat,
-   * behält ihren alten Eimer, auch wenn der neue Wert in `reihenfolge` gar nicht vorkommt.
+   * Gruppiert wird über die EINGEFRORENE Achse, solange die Schleuse zu ist. Der Rückfall auf die
+   * frische Achse gilt nur für Zeilen, die beim Einfrieren nicht dabei waren; eine Zeile mit
+   * GEÄNDERTEM Gruppenwert behält ihren alten Eimer.
    */
   const gruppenAchse = useMemo(() => {
     if (!gruppen || !gefroreneGruppeVon) return gruppen;
@@ -1187,15 +999,9 @@ export default function Datensicht<T extends object, const K extends string>(
     };
   }, [gruppen, gefroreneGruppeVon, schluessel]);
   /**
-   * ZWEI Gruppierungen, und die Trennung ist der Punkt:
-   *
-   *  - `gruppenKarten` (gefrorene Achse) ordnet im KARTENZWEIG die Karten den Köpfen zu. Dort
-   *    ist die Gruppe eine POSITION — eine umgehängte Karte ist der verbotene Sprung.
-   *  - `gruppenZaehler` (frische Achse) speist den Zählerstreifen der Werkzeugzeile im
-   *    Tabellenzweig. Dort ist die Gruppe eine ZAHL, keine Position: die Zeilenfolge steht
-   *    ohnehin fest, und ein eingefrorener Zähler wäre dasselbe wie ein eingefrorener
-   *    Zellinhalt — den schließt die Zusicherung oben ausdrücklich aus („ein Statuswechsel
-   *    muss sofort sichtbar sein").
+   * ZWEI Gruppierungen: `gruppenKarten` (gefrorene Achse) ordnet im Kartenzweig Karten den Köpfen
+   * zu, dort ist die Gruppe eine POSITION. `gruppenZaehler` (frische Achse) speist den
+   * Zählerstreifen des Tabellenzweigs, dort ist sie eine ZAHL und muss sofort stimmen.
    */
   const gruppenZaehler = gruppen ? gruppiere(sichtbareZeilen, gruppen) : [];
   const gruppenKarten = gruppenAchse ? gruppiere(sichtbareZeilen, gruppenAchse) : [];
@@ -1203,10 +1009,9 @@ export default function Datensicht<T extends object, const K extends string>(
   const werkzeugzeile =
     (
       /**
-       * IMMER gerendert, auch leer. Eine Zeile, die erst beim Eintreffen neuer Daten
-       * erscheint, verschiebt Inhalt und arbeitet gegen ihr eigenes Ziel — die
-       * Sticky-Reserve-Lehre aus B1. Und sie liegt AUSSERHALB des Tabellenrahmens, weil
-       * `katalogtabelle-schmal.spec.ts` die Bildlaufbreite an dessen Wurzelknoten misst.
+       * IMMER gerendert, auch leer: eine Zeile, die erst beim Eintreffen erscheint, verschiebt Inhalt.
+       * AUSSERHALB des Tabellenrahmens, weil `katalogtabelle-schmal.spec.ts` die Bildlaufbreite an
+       * dessen Wurzel misst.
        */
       <div
         ref={werkzeugWurzel}
@@ -1222,10 +1027,8 @@ export default function Datensicht<T extends object, const K extends string>(
       >
         {werkzeuge}
         {suche != null && baum == null && (
-          // Bewusst ein nacktes `<input type="search">` statt `Input.Search`: der
-          // Tabellenzweig läuft durch `KatalogTabelle`, dessen `suche` hier NICHT gesetzt
-          // wird — zwei Felder nebeneinander wären die Folge. Höhe aus `controlHeight`,
-          // kein `size`-Prop, fluide Breite ohne feste Zahl.
+          // Ein nacktes `<input type="search">` statt `Input.Search`: `KatalogTabelle` bekommt hier keine
+          // `suche`, zwei Felder wären die Folge. Höhe aus `controlHeight`, fluide Breite.
           <input
             type="search"
             aria-label={`Suche in ${bezeichnung}`}
@@ -1288,8 +1091,7 @@ export default function Datensicht<T extends object, const K extends string>(
           </Space>
         )}
         {zufluessig > 0 && (
-          // Sammelbanner statt eingeschobener Zeilen (WCAG 3.2.5, CLS ≤ 0,1). Kein
-          // `danger`: Rot ist Gefahr, nicht Bedienung.
+          // Sammelbanner statt eingeschobener Zeilen (WCAG 3.2.5). Kein `danger`: Rot bedient nichts.
           <Button type="primary" onClick={nachBenutzeraktion}>
             {zufluessig === 1 ? '1 neuer Eintrag' : `${zufluessig} neue Einträge`} — anzeigen
           </Button>
@@ -1299,17 +1101,13 @@ export default function Datensicht<T extends object, const K extends string>(
 
   // ── Tabellenzweig ─────────────────────────────────────────────────────────────────
   /**
-   * Zwei Stellen, an denen die Spaltenliste vor der Übergabe verändert wird, beide dem
-   * Primitiv gehörend: die `abBreite`-Auflösung (oben, streicht die Spalte) und hier die
-   * Injektion von `sorter: true` samt kontrollierter Richtung. `sorter: true` heißt für
-   * antd „extern sortiert" — es zeichnet nur den Pfeil, sortiert wird in `effektiveDaten`.
-   */
-  /**
-   * `mindestBreite` wird ABSICHTLICH NICHT herausgelöst, anders als `suchText` daneben: es
-   * ist die Fließmarke, die `KatalogTabelle` für seine Breitenrechnung braucht (LFH-523),
-   * und die Zieltypisierung als {@link KatalogSpalte} macht dieses Durchreichen sichtbar
-   * statt zum Nebeneffekt des Spreads. Als `TableColumnsType` getippt fiele das Feld aus
-   * dem Typ und der nächste Umbau hier nähme es stillschweigend mit.
+   * Die Spaltenliste wird vor der Übergabe verändert: `abBreite` streicht Spalten, hier kommt
+   * `sorter: true` samt kontrollierter Richtung dazu („extern sortiert“, antd zeichnet nur den
+   * Pfeil).
+   *
+   * `mindestBreite` wird ABSICHTLICH nicht herausgelöst: `KatalogTabelle` braucht die Fließmarke
+   * für seine Breitenrechnung. Die Zieltypisierung als {@link KatalogSpalte} macht das Durchreichen
+   * sichtbar; als `TableColumnsType` fiele das Feld still weg.
    */
   const antdSpalten = useMemo<KatalogSpalte<T>[]>(
     () =>
@@ -1331,13 +1129,8 @@ export default function Datensicht<T extends object, const K extends string>(
         const gebaut: KatalogSpalte<T> = { ...antd };
 
         /**
-         * Der Titel-Link steht in BEIDEN Zweigen, nicht nur in der Karte: er ist das
-         * Tastatur- und Berührungsziel der Zeile. Ein `onRow`-Klick allein wäre
-         * maus-/tippgebunden und für die Trefflächenmessung unsichtbar.
-         *
-         * Deshalb die REGEL am Kartenplan: trägt `titel.ziel` einen Wert, darf das `render`
-         * dieser Spalte selbst KEINEN Anker erzeugen — sonst verschachtelte Links. Wer im
-         * Spalten-`render` verlinkt, hebt den Link hierher.
+         * Der Titel-Link steht in BEIDEN Zweigen, als Tastatur- und Berührungsziel der Zeile. Trägt
+         * `titel.ziel` einen Wert, darf das `render` dieser Spalte keinen Anker erzeugen.
          */
         if (karte.art === 'plan' && karte.titel.ziel && spalte.key === karte.titel.spalte) {
           const ziel = karte.titel.ziel;
@@ -1356,8 +1149,8 @@ export default function Datensicht<T extends object, const K extends string>(
         }
 
         if (!sortWert) return gebaut;
-        // `sorter: true` heißt für antd „extern sortiert" — es zeichnet nur den Pfeil,
-        // sortiert wird in `effektiveDaten`.
+        // `sorter: true` heißt für antd „extern sortiert“: nur der Pfeil, sortiert wird in
+        // `effektiveDaten`.
         return {
           ...gebaut,
           sorter: true,
@@ -1373,12 +1166,9 @@ export default function Datensicht<T extends object, const K extends string>(
   );
 
   /**
-   * Mit `aufklappen` trägt die KENNUNGSZELLE den Auslöser, unter dem Kennungstext — keine
-   * eigene Aufklappspalte. Gemessen in Gate 1 bei 390 px (LFH-676): eine Spalte hinter der
-   * fixierten Kennung glitt beim waagerechten Scrollen unter sie und war nicht mehr
-   * klickbar; an Position 0 übernähme sie `fixed` von der Kennung (rc-table `useColumns`), und
-   * zwei angeheftete Spalten fräßen die schmale Breite. Die Kennungszelle ist immer sichtbar,
-   * und der Auslöser steht dort wie in der Karte: unter dem, was die Zeile benennt.
+   * Mit `aufklappen` trägt die KENNUNGSZELLE den Auslöser, keine eigene Aufklappspalte: hinter der
+   * fixierten Kennung glitt eine solche Spalte bei 390 px unter sie (Gate 1), an Position 0 erbte
+   * sie deren `fixed`. Die Kennungszelle ist immer sichtbar, wie in der Karte.
    */
   const ersteSpalte = gezeigteSpalten[0];
   const tabellenSpalten: KatalogSpalte<T>[] =
@@ -1388,8 +1178,7 @@ export default function Datensicht<T extends object, const K extends string>(
             ...antdSpalten[0],
             render: (wert: unknown, zeile: T, index: number) => {
               const basis = antdSpalten[0].render;
-              // Der Titel-Link (oben gebaut) ersetzt das Spalten-`render`; sonst die Zelle wie
-              // überall über `zelle`, die eine RenderedCell auspackt.
+              // Der Titel-Link ersetzt das Spalten-`render`; sonst die Zelle über `zelle`.
               const inhalt =
                 basis && basis !== ersteSpalte.render
                   ? (basis(wert, zeile, index) as ReactNode)
@@ -1420,29 +1209,16 @@ export default function Datensicht<T extends object, const K extends string>(
       rowKey={(zeile) => schluessel(zeile)}
       loading={ladend}
       locale={leerText != null ? { emptyText: leerText } : undefined}
-      // Kein Suchfeld und keine Blätterung von `KatalogTabelle`: die Suche steht in der
-      // Werkzeugzeile oben, und eine Seitenblätterung schnitte die Zeilenschleuse entzwei.
+      // Keine Suche und keine Blätterung von `KatalogTabelle`: die Suche steht in der Werkzeugzeile,
+      // eine Seitenblätterung schnitte die Zeilenschleuse entzwei.
       pagination={false}
       rowClassName={zeilenKlasse ? (zeile) => zeilenKlasse(zeile) ?? '' : undefined}
       /**
-       * DER ANKER BEDIENT DEN KLICK ALLEIN (LFH-340 · C5, gemessen an der Schadensliste).
-       *
-       * Eine Zeile trägt regelmäßig echte `<a>`: den Titel-Link, den das Primitiv aus
-       * `karte.titel.ziel` selbst setzt, und Deeplinks aus einem Spalten-`render` (die
-       * Geschädigt-Spalte der Schäden zeigt auf Personen- und Personal-Seiten). Ohne
-       * diesen Riegel feuern bei EINEM Klick beide Wege: der Link navigiert auf sein
-       * Ziel, und `onZeileKlick` schickt dieselbe Zeile auf ihre Detailseite. Bei
-       * gleichem Ziel bleibt das unbemerkt, bei verschiedenem gewinnt der zweite.
-       *
-       * Am sichtbarsten wird es beim MODIFIER-Klick: Cmd/Strg+Klick öffnet den neuen Tab
-       * (der Browser bedient das, `defaultPrevented` bleibt false) — und die aktuelle
-       * Seite navigiert trotzdem weg. Genau das hat der Bestandstest der Schadensliste
-       * gemessen, als sie noch eine handgebaute Tabelle mit `stopPropagation` am Link war.
-       *
-       * Der Riegel sitzt hier statt an jedem Link: ein `stopPropagation` je Anker müsste
-       * jede Konsumentendatei mitbringen, und die Regel „trägt `titel.ziel` einen Wert,
-       * darf das `render` keinen Anker erzeugen" verbietet dem Konsumenten gerade, den
-       * Titel-Link selbst zu bauen — er kann dort also gar nichts stoppen.
+       * DER ANKER BEDIENT DEN KLICK ALLEIN (LFH-340). Eine Zeile trägt echte `<a>` (Titel-Link,
+       * Deeplinks aus Spalten-`render`); ohne Riegel feuerten bei einem Klick Link UND `onZeileKlick`.
+       * Beim Modifier-Klick öffnete der Link den neuen Tab, und die aktuelle Seite navigierte trotzdem
+       * weg. Der Riegel sitzt hier statt an jedem Link, weil die Konsumenten den Titel-Link gar nicht
+       * selbst bauen.
        */
       onRow={
         onZeileKlick
@@ -1455,14 +1231,9 @@ export default function Datensicht<T extends object, const K extends string>(
           : undefined
       }
       /**
-       * In dieser Sicht ist Sortieren der EINZIGE Auslöser: die Tabelle bekommt von hier
-       * weder Blätterung noch Spaltenfilter. Deshalb darf `onChange` die Sortierung auch
-       * LÖSCHEN, ohne einen fremden Anlass zu treffen.
-       *
-       * Und das muss es: antds Zyklus ist aufsteigend → absteigend → gar nicht, und im
-       * dritten Schritt kommt `columnKey` als `undefined` zurück. Ein `if (columnKey == null)
-       * return` schluckt genau diesen Schritt — die Tabelle bliebe dann für immer absteigend,
-       * ohne Fehler und ohne roten Test (gemessen).
+       * Sortieren ist hier der EINZIGE Auslöser von `onChange`, also darf es die Sortierung auch
+       * LÖSCHEN: antds Zyklus endet mit `columnKey === undefined`, und ein früher Rücksprung darauf
+       * ließe die Tabelle für immer absteigend.
        */
       onChange={(_seite, _filter, sorter) => {
         const einzeln = Array.isArray(sorter) ? sorter[0] : sorter;
@@ -1480,20 +1251,15 @@ export default function Datensicht<T extends object, const K extends string>(
               childrenColumnName: baum.kinder,
               expandedRowKeys: [...baum.aufgeklappt],
               onExpandedRowsChange: (schluessel) => baum.onAufgeklappt([...schluessel]),
-              // Die ganze Zeile ist das Trefferziel, nicht das ~16 px breite Symbol
-              // (LFH-338 · C3, Befund H7). Die Dichte-Staffel kann daran nichts ändern —
-              // antd zeichnet das Symbol in fester Größe. Deshalb hier und nicht per
-              // seitenlokalem `onRow`: die Regel gilt für jeden Baum, nicht nur für den
-              // einen, der ihn heute nutzt. `onZeileKlick` ist im Baummodus dafür gesperrt
-              // (siehe `pruefeKartenplan`).
+              // Die ganze Zeile ist das Trefferziel, nicht das ~16 px breite Symbol (antd zeichnet es in fester
+              // Größe). Im Primitiv, damit es für jeden Baum gilt; `onZeileKlick` ist im Baummodus gesperrt.
               expandRowByClick: true,
             }
           : aufklappen
             ? {
                 expandedRowKeys: [...aufgeklappt],
                 expandedRowRender: (zeile) => aufklappen.inhalt(zeile),
-                // KEINE eigene Aufklappspalte: der beschriftete Auslöser steht in der
-                // Kennungszelle (`tabellenSpalten`) und schaltet den Zustand der Sicht selbst.
+                // KEINE eigene Aufklappspalte: der Auslöser steht in der Kennungszelle.
                 showExpandColumn: false,
               }
             : aufklappzeile
@@ -1521,8 +1287,8 @@ export default function Datensicht<T extends object, const K extends string>(
     const zeigeAktion = aktion != null && (aktion.sichtbar?.(zeile) ?? true);
 
     const knopf = zeigeAktion ? (
-      // Kein `size`-Prop und kein `danger`: die Höhe kommt aus `controlHeight`, und Rot
-      // bedient nichts. Die Rückfrage ist der zweite Handgriff aus Kriterium 4.
+      // Kein `size`-Prop und kein `danger`: die Höhe kommt aus `controlHeight`, Rot bedient nichts.
+      // Die Rückfrage ist der zweite Handgriff aus Kriterium 4.
       aktion!.bestaetigung != null ? (
         <Popconfirm
           key="aktion"
@@ -1587,8 +1353,6 @@ export default function Datensicht<T extends object, const K extends string>(
             >
               {ziel != null ? (
                 // Das Tastaturziel der Zeile: ein echter Link mit Höhe aus `controlHeight`.
-                // `ListenEintrag` ist ein nacktes `<div onClick>` und für die
-                // Trefflächenmessung unsichtbar.
                 <Link
                   to={ziel}
                   style={{
@@ -1603,10 +1367,9 @@ export default function Datensicht<T extends object, const K extends string>(
               ) : (
                 <Typography.Text strong>{titelInhalt}</Typography.Text>
               )}
-              {/* Das Statusetikett ist der Auslöser, wenn es einen Bedienweg gibt — und
-                  sonst reine Anzeige. Ein `Select` passte hier nicht: seine feste
-                  Mindestbreite drückte die 390-px-Karte breit, das Menü liegt dagegen im
-                  Portal (LFH-339 · C4). */}
+              {/* Das Statusetikett ist der Auslöser, wenn es einen Bedienweg gibt, sonst Anzeige. Kein
+                  `Select`: seine feste Mindestbreite drückte die 390-px-Karte breit, das Menü liegt im
+                  Portal. */}
               {statusBedienung ? (
                 <StatusWahl
                   darstellung={status}
@@ -1631,8 +1394,7 @@ export default function Datensicht<T extends object, const K extends string>(
                     data-lfh="datensicht-feld"
                     style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 0 }}
                   >
-                    {/* Feldetikett als Augenbraue (Neuentwurf): 10 px, Versalien per CSS —
-                        der Wortlaut im DOM bleibt, wie die Spalte ihn nennt. */}
+                    {/* Feldetikett als Augenbraue, Versalien per CSS; der Wortlaut im DOM bleibt. */}
                     <Augenbraue>{etikettVon(spalte) ?? spalte.key}</Augenbraue>
                     <span style={spalte.zahl ? monoStil(token.fontSize) : undefined}>
                       {zelle(spalte, zeile, index)}
@@ -1644,9 +1406,8 @@ export default function Datensicht<T extends object, const K extends string>(
             {aufklappen && <div>{aufklappAusloeser(zeile, true)}</div>}
           </div>
         </ListenEintrag>
-        {/* Der Bereich steht UNTER der Karte in voller Breite, nicht in ihrer Inhaltsspalte:
-            dort zöge er die Aktionsleiste von `ListenEintrag` in die senkrechte Mitte und nähme
-            einer Zeitachse bei 390 px die Breite der Aktionen weg. */}
+        {/* Der Bereich steht UNTER der Karte in voller Breite, sonst zöge er die Aktionsleiste von
+            `ListenEintrag` in die Mitte und nähme ihr bei 390 px die Breite. */}
         {aufklappen && aufgeklappt.includes(schluessel(zeile)) && (
           <div
             id={`${idPraefix}-bereich-${idTeil(schluessel(zeile))}`}
@@ -1661,10 +1422,8 @@ export default function Datensicht<T extends object, const K extends string>(
   };
 
   /**
-   * Rekursion für den Kartenzweig mit gesetztem `baum`. Am Tag 1 nutzt sie niemand
-   * (`form="tabelle"` am Meldebild) — sie ist der Weg, auf dem eine spätere, NICHT
-   * vergleichende Baumfläche Karten bekommt, ohne eine zweite Rekursion zu bauen.
-   * Die Einrückung wächst bis {@link TIEFE_DECKEL} und dann nicht weiter (390 px).
+   * Rekursion für den Kartenzweig mit gesetztem `baum`: der Weg, auf dem eine NICHT vergleichende
+   * Baumfläche Karten bekommt. Die Einrückung wächst bis {@link TIEFE_DECKEL}.
    */
   const baumEintrag = (zeile: T, index: number, tiefe: number): ReactNode => {
     const kinder = (zeile[baum!.kinder as keyof T] as readonly T[] | undefined) ?? [];
@@ -1702,7 +1461,7 @@ export default function Datensicht<T extends object, const K extends string>(
       rowKey={(zeile) => schluessel(zeile)}
       header={kopf}
       loading={ladend}
-      // `emptyText` statt eines eigenen Leerzustands-Knotens — es entsteht kein zweiter.
+      // `emptyText` statt eines eigenen Leerzustands-Knotens.
       emptyText={leerText}
       renderItem={(zeile, index) =>
         baum ? baumEintrag(zeile, index, 0) : kartenEintrag(zeile, index, 0)
@@ -1737,8 +1496,7 @@ export default function Datensicht<T extends object, const K extends string>(
       onBlur={(e) => pruefeVerlassen(e.relatedTarget)}
     >
       {werkzeugzeile}
-      {/* GENAU EIN Zweig im Baum — kein Umschalten per verborgener Fläche. Ein zweiter,
-          verborgener Zweig machte jedes „unter md keine Tabelle"-Gate bedeutungslos. */}
+      {/* GENAU EIN Zweig im Baum, kein Umschalten per verborgener Fläche. */}
       {alsTabelle ? tabelle : kartenZweig}
     </section>
   );

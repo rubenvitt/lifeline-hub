@@ -1,31 +1,23 @@
 /**
- * AST-Scanner für Query-Key-Fundstellen (LFH-312, AP3).
+ * AST-Scanner für Query-Key-Fundstellen (LFH-312). Sieht mehrzeilige Literale, ignoriert
+ * Kommentare strukturell und kennt den Kontext (`['KB','MB']` gegen `queryKey: [...]`).
  *
- * Ersetzt die zeilenlokale Regex der Guards in `queryKeys.guard.test.ts`. Die Regex hatte
- * drei Schwächen, die hier strukturell entfallen:
- *   1. mehrzeilige Literale (`[\n  'einsatz-uhs',`) waren unsichtbar,
- *   2. Kommentare mussten per `istKommentarzeile`-Heuristik ausgefiltert werden (ein
- *      Block-Kommentar-Rumpf ohne `*`-Präfix rutschte trotzdem durch),
- *   3. es gab keinen Kontext — `['KB','MB']` und `queryKey: ['einsatz-uhs']` sahen gleich aus.
+ * BEWUSST OHNE `import.meta.glob`: der Scanner nimmt Quelltext als String entgegen, das Glob
+ * bleibt im Guard-Test. Sonst landete bei einem versehentlichen Produktiv-Import der Quelltext
+ * des Frontends im App-Bundle.
  *
- * BEWUSST OHNE `import.meta.glob`: der Scanner nimmt Quelltext als String entgegen. Das Glob
- * bleibt im Guard-Test. Würde diese Datei das Glob ziehen, landete bei einem versehentlichen
- * Produktiv-Import der komplette Quelltext des Frontends im App-Bundle.
- *
- * ZWEI RADIEN, absichtlich getrennt (siehe {@link ENGE_ARTEN}):
- *   WEIT (alle Arten) — für die Denylist-Guards (a)/(c)/(e). Sie fragen „steht ein VERBOTENER
- *     String an Position 0 IRGENDEINES Arrays". Das fängt auch die Extraktion in eine Konstante
- *     (`const K = ['einheiten', id]`) und entspricht dem Radius der bisherigen Regex.
- *   ENG (nur Query-Key-Kontexte) — für den Allowlist-Guard (f). Er fragt „ist dieser Query-Key
- *     erlaubt" und darf Sichtungskategorie-Konstanten wie `['KB','MB','GB','TB']` nicht anfassen.
+ * ZWEI RADIEN (siehe {@link ENGE_ARTEN}):
+ *   WEIT (alle Arten): für die Denylist-Guards. „Steht ein VERBOTENER String an Position 0
+ *     IRGENDEINES Arrays?“ Fängt auch die Extraktion in eine Konstante.
+ *   ENG (nur Query-Key-Kontexte): für den Allowlist-Guard (f); darf Konstanten wie
+ *     `['KB','MB','GB','TB']` nicht anfassen.
  */
 import * as ts from 'typescript';
 
 /**
- * Aufrufe des QueryClient, die einen Query-Key als ERSTES ARGUMENT nehmen (TanStack v4-Stil,
- * `qc.invalidateQueries(['key'])`). Die im Bestand durchgängige v5-Form
- * `qc.invalidateQueries({ queryKey: ['key'] })` wird stattdessen über das
- * `queryKey`-PropertyAssignment erfasst — beide Formen sind damit abgedeckt.
+ * Aufrufe des QueryClient, die einen Query-Key als ERSTES ARGUMENT nehmen (v4-Stil,
+ * `qc.invalidateQueries(['key'])`). Die v5-Form `{ queryKey: ['key'] }` erfasst das
+ * `queryKey`-PropertyAssignment.
  */
 const CACHE_CALLS = new Set([
   'invalidateQueries',
@@ -61,12 +53,9 @@ export type FundArt =
   | 'schluessel-helfer-arg';
 
 /**
- * Arten, die der Allowlist-Guard (f) konsumiert — der ENGE Radius.
- *
- * `array-literal` fehlt hier bewusst: sonst wären beliebige String-Arrays im Code
- * (`['KB','MB','GB','TB']`) Query-Key-Verstöße. `dynamischer-prefix` fehlt ebenfalls, weil
- * dort gar kein Prefix zum Vergleichen existiert — der Guard behandelt die Art gesondert
- * als immer-verboten (eine Allowlist kann einen unbekannten Prefix nicht erlauben).
+ * Arten, die der Allowlist-Guard (f) konsumiert: der ENGE Radius. `array-literal` fehlt, sonst
+ * wären beliebige String-Arrays Verstöße. `dynamischer-prefix` fehlt, weil es keinen Prefix zum
+ * Vergleichen gibt; der Guard verbietet die Art gesondert.
  */
 export const ENGE_ARTEN: readonly FundArt[] = [
   'queryKey',
@@ -109,31 +98,13 @@ function schluesselKontext(arr: ts.ArrayLiteralExpression): FundArt | undefined 
   return undefined;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════════════════════
- * (A)-ERWEITERUNG über den LFH-312-Plan hinaus — isoliert entfernbar.
- *
- * Der Plan erfasst ausdrücklich NUR Array-Literale („Identifier als erstes Element wird NICHT
- * gemeldet"). Diese Erweiterung deckt zusätzlich den Argumentpfad ab. Vom Team-Lead bewilligt
- * mit drei Auflagen, alle erfüllt: Pflicht-Mutationsprobe (`inval('einsatz-uhs')` → Guard (a)
- * UND (f) rot), null gemessene Fehlalarme im Bestand, und Abbruch bei ausufernder Analyse —
- * deshalb hart auf EINEN Schritt in DERSELBEN Datei begrenzt.
- *
- * Nutzen, prospektiv: LFH-307 migriert direkt im Anschluss ~90 Call-Sites. Ein still ins Leere
- * laufender `inval('…')` ist dort der teuerste Fehler — er macht keinen Test rot, er sorgt nur
- * dafür, dass eine fremde Änderung nicht mehr live ankommt.
- *
- * RÜCKBAU auf reinen Plan-Stand: diesen Block, `'schluessel-helfer-arg'` aus `FundArt` und
- * `ENGE_ARTEN`, den `isCallExpression`-Zweig in `scanneQueryKeys` und den describe-Block
- * „Indirektion über lokale Key-Helfer" in queryKeyScan.test.ts löschen. Sonst nichts.
- * ══════════════════════════════════════════════════════════════════════════════════════════
- *
- * Erkennt Funktionen, deren Parameter i strukturell an Position 0 eines Query-Key-Arrays landet,
- * und liefert `name → Parameterindex`. Damit wird anschließend `inval('einsatz-uhs')` sichtbar —
- * der dokumentierte Blindfleck der Regex-Variante (LFH-122/215): dort steht das Literal NICHT
- * in einem Array, keine `[\s*'`-Regel der Welt sieht es.
- *
- * Bestandsform: `const inval = (key: string) => qc.invalidateQueries({ queryKey: [key, id] })`
- * in `live/useEinsatzLiveStream.ts` — die einzige Fundstelle im Repo.
+/**
+ * Erkennt Funktionen, deren Parameter i strukturell an Position 0 eines Query-Key-Arrays landet
+ * (`name → Parameterindex`). Damit wird `inval('einsatz-uhs')` sichtbar, wo das Literal in keinem
+ * Array steht. Bestandsform:
+ * `const inval = (key: string) => qc.invalidateQueries({ queryKey: [key, id] })` in
+ * `live/useEinsatzLiveStream.ts`. Hart auf EINEN Schritt in DERSELBEN Datei begrenzt; alles
+ * darüber wäre Datenfluss-Analyse.
  */
 function findeSchluesselHelfer(quelle: ts.SourceFile): Map<string, number> {
   const helfer = new Map<string, number>();
@@ -170,15 +141,10 @@ function findeSchluesselHelfer(quelle: ts.SourceFile): Map<string, number> {
 }
 
 /**
- * Meldet jede Query-Key-Fundstelle einer Datei.
- *
- * Gemeldet wird jedes ArrayLiteral, dessen erstes Element ein String-Literal ist — plus
- * Template-Literale mit Platzhaltern (`dynamischer-prefix`) und String-Argumente an lokale
- * Key-Helfer. NICHT gemeldet werden Identifier/PropertyAccess an Position 0
+ * Meldet jede Query-Key-Fundstelle einer Datei: jedes ArrayLiteral mit String-Literal an
+ * Position 0, Template-Literale mit Platzhaltern (`dynamischer-prefix`) und String-Argumente an
+ * lokale Key-Helfer. NICHT gemeldet: Identifier/PropertyAccess an Position 0
  * (`[EINSATZ_KEYS.uhs, id]` ist die erwünschte Form) und Spreads.
- *
- * Kommentare fallen strukturell weg — sie sind keine AST-Knoten. Die alte
- * `istKommentarzeile`-Heuristik entfällt ersatzlos.
  */
 export function scanneQueryKeys(pfad: string, quelltext: string): Fund[] {
   const tsx = pfad.endsWith('.tsx');

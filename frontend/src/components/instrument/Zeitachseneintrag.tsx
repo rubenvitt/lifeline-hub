@@ -6,28 +6,24 @@ import { useViewport } from '../useViewport';
 import { monoStil, useRollen } from './rollenwerte';
 
 /**
- * Zeitachsen-Eintrag (Neuentwurf S1/S4, S2 „Entscheidungen der letzten Stunde") — die
- * Zeile des Einsatztagebuchs und jedes anderen zeitlich gelesenen Stroms (Meldungen,
- * Entscheidungen, Anordnungen).
+ * Zeitachsen-Eintrag — die Zeile des Einsatztagebuchs und jedes anderen zeitlich gelesenen
+ * Stroms (Meldungen, Entscheidungen, Anordnungen).
  *
  * Aufbau von links: Zeit Mono 13/500 (+ Nr. Mono 10 `schwach`) · 2-px-KANTE in Typfarbe ·
- * TYPWORT Mono 10 Versalien, Sperrung .1em, in Wortfarbe, daneben Meta Mono 10 · Text
- * 13/1.5 · optionale Hinweiszeile 11 · rechts Verfasser Mono 11 / Weg Mono 10 · Aktionen.
+ * TYPWORT Mono 10 Versalien, Sperrung .1em, in Wortfarbe, daneben Meta Mono 10 · Text 13/1.5 ·
+ * optionale Hinweiszeile 11 · rechts Verfasser Mono 11 / Weg Mono 10 · Aktionen.
  *
- * TYP ALS KANTE + WORT, NICHT ALS ETIKETT (Entscheidung 2 des Auftraggebers). Die Farbe
- * kommt aus `etbTypFarbe` (`theme/statusFarben.ts`): Kante und Wort sind zwei Werte, weil
- * sie verschiedene Böden haben — die Kante ist Dekoration, das Wort ist Text. Der zweite
- * Kanal ist das TYPWORT; es ist deshalb Pflicht und kommt vom Aufrufer (`etbTyp[typ].label`
- * o. ä.), nicht aus diesem Baustein — hier steht keine zweite Beschriftungskarte.
- * Für Ströme außerhalb des ETB nimmt `farben` ein eigenes Kante/Wort-Paar (aus einer Rolle
- * aufgelöst), `typ` bleibt dann weg.
+ * TYP ALS KANTE + WORT, NICHT ALS ETIKETT. Die Farbe kommt aus `etbTypFarbe`
+ * (`theme/statusFarben.ts`): Kante und Wort sind zwei Werte, weil sie verschiedene Böden haben
+ * (Dekoration gegen Text). Der zweite Kanal ist das TYPWORT; es ist Pflicht und kommt vom
+ * Aufrufer (`etbTyp[typ].label` o. ä.), hier steht keine zweite Beschriftungskarte. Für Ströme
+ * außerhalb des ETB nimmt `farben` ein eigenes Kante/Wort-Paar, `typ` bleibt dann weg.
  *
  * ZEILENTÖNUNG `berichtigung` / `luecke` / `problem` — ganze Zeile auf der jeweiligen
  * Zeilenrolle. Sie ersetzt das Typwort nicht; sie markiert den Eintrag in der Menge.
  *
- * Die Hülle reicht HTML-Attribute durch (`data-*`, `id`, `className`): ein Konsument im
- * Kartenzweig der `Datensicht` braucht `data-lfh="datensicht-karte"` und seine
- * `zeilenKlasse`, sonst findet `scrolleZurZeile` die Zeile nicht (CLAUDE.md, ETB-Eigenbau).
+ * Die Hülle reicht HTML-Attribute durch (`data-*`, `id`, `className`): eine Zeile braucht
+ * `data-lfh="datensicht-karte"` und ihre Zeilenklasse, sonst findet `scrolleZurZeile` sie nicht.
  */
 
 type Zeilentoenung = 'berichtigung' | 'luecke' | 'problem';
@@ -55,11 +51,9 @@ export function zeilenGrund(rollen: Farbrollen, toenung?: Zeilentoenung): string
 /**
  * Waagerechte Rinne der drei Spalten — rein und exportiert (Muster `bedienzielStil`).
  *
- * Unter `md` die kleine Stufe (`paddingSM`), sonst `padding`. Grund, gemessen
- * (e2e `etb-chronologie`, 390 px in `handschuh`): mit `padding` = 26 px kosteten allein die
- * fünf Rinnen 130 px, dazu die Zeitspalte (56) und die 72-px-Aktion — dem Eintragstext
- * blieben 29 % der Zeilenbreite, unter dem Boden von 30 %. Die Rinne ist Luft, keine
- * Treffläche; die Bedienziele behalten ihre Staffelhöhe.
+ * Unter `md` die kleine Stufe (`paddingSM`), sonst `padding`: bei 390 px in `handschuh` ließen
+ * fünf 26-px-Rinnen plus Zeitspalte und 72-px-Aktion dem Eintragstext weniger als 30 % der
+ * Zeilenbreite (e2e `etb-chronologie`). Die Rinne ist Luft, keine Trefffläche.
  */
 export function zeitachsenRinne(token: { padding: number; paddingSM: number }, schmal: boolean) {
   return schmal ? token.paddingSM : token.padding;
@@ -214,9 +208,9 @@ export default function Zeitachseneintrag({
           }}
         >
           {verfasser != null && (
-            // Gedeckelt (LFH-615): mit Funktion („Administrator ·\u00A0EL") wuchs die Spalte
-            // so weit, dass der Meldungstext bei 1200 px unter die halbe Sicht fiel. `ch` misst
-            // in der Mono-Schrift DIESES Elements; ein längerer Verfasser bricht um.
+            // Gedeckelt (LFH-615): mit Funktion („Administrator ·\u00A0EL") drückte die Spalte den
+            // Meldungstext bei 1200 px unter die halbe Sicht. `ch` misst in der Mono-Schrift DIESES
+            // Elements; ein längerer Verfasser bricht um.
             <span
               data-lfh="verfasser"
               style={{

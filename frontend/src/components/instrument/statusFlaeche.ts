@@ -2,16 +2,15 @@ import type { Statusrolle } from '../../theme/statusFarben';
 import type { Farbrollen } from '../../theme/tokens';
 
 /**
- * Status als getönte FLÄCHE mit getöntem Text — „Ampel als Fläche, Zahl bleibt lesbar"
- * (Neuentwurf S1, Entscheidung 2 des Auftraggebers: hebt „nie Textfläche" für
- * ROLLENfarben auf). Die eine Übersetzung Ton → Grund/Text/Kante für `StatusZelle`,
- * `StatusChip` und die Flächen-Darstellung von `StatusTag`.
+ * Status als getönte FLÄCHE mit getöntem Text — „Ampel als Fläche, Zahl bleibt lesbar". Die eine
+ * Übersetzung Ton → Grund/Text/Kante für `StatusZelle`, `StatusChip` und die
+ * Flächen-Darstellung von `StatusTag`.
  *
- * ── DIE KONTRASTRECHNUNG, und sie entscheidet eine Zeile ────────────────────────────
+ * ── DIE KONTRASTRECHNUNG ────────────────────────────────────────────────────────────
  *
- * Böden: Kriterium 5 der Bedien-Leitlinie, gemessen in `e2e/betroffene-kontrast.spec.ts`
- * und `e2e/kraefte-kontrast.spec.ts` — Tag ≥ 7 : 1, Nacht ≥ 5 : 1. WCAG-Formel,
- * gerechnet 21.09.2026 aus `farbenHell`/`farbenDunkel`:
+ * Böden: Kriterium 5 der Bedien-Leitlinie, gemessen in `e2e/betroffene-kontrast.spec.ts` und
+ * `e2e/kraefte-kontrast.spec.ts` — Tag ≥ 7 : 1, Nacht ≥ 5 : 1. WCAG-Formel aus
+ * `farbenHell`/`farbenDunkel`:
  *
  * | Ton      | Text / Grund                 | Tag   | Nacht |
  * |----------|------------------------------|-------|-------|
@@ -21,14 +20,11 @@ import type { Farbrollen } from '../../theme/tokens';
  * | alarm    | alarmText / alarmFlaeche     | 7,31  |  6,89 |
  * | neutral  | text2 / flaeche3             | 10,30 | 10,89 |
  *
- * Bis LFH-618 (22.09.2026) wich der TAGMODUS bei `achtung`/`alarm` auf `text` aus: die
- * Füllfarben tragen als Text den Boden nicht (6,02 bzw. 5,52), und die Textrollen fehlten.
- * Das machte die Kontrastspecs grün, aber die Ampel am Tag farblos — S3 und S6 standen im
- * Meldebild schwarz, nachts gelb und rot. Seit es `achtungText`/`alarmText` gibt, färben
- * beide Modi; die Füllfarbe bleibt die KANTE.
+ * Die Füllfarben von `achtung`/`alarm` tragen als Text den Tagesboden nicht (6,02 bzw. 5,52),
+ * deshalb die Textrollen `achtungText`/`alarmText`; die Füllfarbe bleibt die KANTE.
  *
- * `neutral` hat keine Statusfläche — `flaeche3` + `text2`, NICHT `schwach` (4,72 nachts,
- * unter 5) und nicht `gedaempft` (6,60 am Tag, unter 7).
+ * `neutral` hat keine Statusfläche — `flaeche3` + `text2`, NICHT `schwach` (4,72 nachts, unter 5)
+ * und nicht `gedaempft` (6,60 am Tag, unter 7).
  *
  * `kante` ist die Rollenfarbe für einen Rahmen, der sich vom Grund abhebt (WCAG 1.4.11,
  * ≥ 3 : 1 — `kraefte-kontrast.spec.ts` prüft ihn am `StatusTag`): Tag normal 5,96 · bedien

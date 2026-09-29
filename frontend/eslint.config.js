@@ -46,6 +46,28 @@ export default tseslint.config(
     },
   },
   {
+    // LFH-385: Einsatzrouten halten einen SSE-Strom offen, `networkidle` tritt dort nur unter
+    // Glück ein (parallel rot, `--workers=1` grün). Gewartet wird auf das Element, das der Test
+    // danach misst.
+    files: ['e2e/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.property.name='waitForLoadState'] > Literal[value='networkidle']",
+          message:
+            'Kein `networkidle` in e2e (LFH-385): der SSE-Strom der Einsatzrouten hält das Netz offen. Auf einen Inhaltsanker warten (`expect(…).toBeVisible()`/`toHaveCount(n)`).',
+        },
+        {
+          selector: "Property[key.name='waitUntil'] > Literal[value='networkidle']",
+          message:
+            'Kein `waitUntil: networkidle` in e2e (LFH-385): der SSE-Strom der Einsatzrouten hält das Netz offen. Auf einen Inhaltsanker warten.',
+        },
+      ],
+    },
+  },
+  {
     files: ['scripts/**/*.{js,mjs}'],
     languageOptions: {
       globals: { process: 'readonly', console: 'readonly', URL: 'readonly' },

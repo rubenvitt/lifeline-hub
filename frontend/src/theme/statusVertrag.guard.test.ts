@@ -1,172 +1,58 @@
 /**
  * Vertrags-Guards des Statusfarb-Vertrags (LFH-358).
  *
- * ── WAS HIER AUF DEM SPIEL STEHT ────────────────────────────────────────────────
+ * Guard 1: kein `Record<…, StatusDarstellung>` außerhalb von `theme/statusFarben.ts`. Eine
+ * Karte anderswo liefe an `ALLE_MAPS` in `statusFarben.test.ts` vorbei, das die geprüften
+ * Karten aus den Exporten des Moduls ableitet.
  *
- * `theme/statusFarben.ts` sagt von sich, er sei „EINE Quelle für welche Bedeutung hat
- * welche Statusfarbe". Zwei Löcher haben das relativiert, beide im Code-Review zu
- * LFH-328 · A2 gefunden:
+ * Guard 2: kein `<Tag color={…}>`, das ein Vertrags-Enum einfärbt (Wire-Wert als Literal oder
+ * gelesener Vertragsname). Dafür ist `components/StatusTag.tsx` da: antd 6 rechnet für einen
+ * Nicht-Preset ein statisches Farbpaar, das den Modus nicht mehr sieht.
  *
- * 1. **Eine Karte mit dem Vertragstyp lag außerhalb der Vertragsdatei.** Das ist nicht
- *    bloß unordentlich: `statusFarben.test.ts` leitet die geprüfte Map-Liste BEWUSST aus
- *    den Exporten des Moduls ab, „damit eine zehnte Map nicht still durchrutscht". Eine
- *    Karte ANDERSWO läuft an genau diesem Wächter vorbei — der Präzedenzfall untergräbt
- *    die Aussage, die der Test schützen soll. Gemessen lagen zwei draußen
- *    (`einsatz/einsatzStatus.ts`, `pages/lage-dashboard/lagebild.ts`), beide mit
- *    derselben Begründung: der Abdeckungstest zählt gegen ein `toHaveLength`, ein
- *    Eintrag mehr sei eine Vertragsänderung. Das war richtig — und es ist genau die
- *    Entscheidung, die LFH-358 trifft. Beide sind drin, dieser Guard hält die Tür zu.
+ * Guards statt ESLint-Regel wie bei `components/dichte.guard.test.ts`. Es gibt bewusst keine
+ * Schuldmenge: ein leerer Ausnahmetopf „für später“ sichert nichts zu.
  *
- * 2. **Eine Farbkarte über einem Vertrags-Enum blieb unbemerkt, bis ein Mensch sie
- *    fand.** `pages/lagekarte/ZonenInspector.tsx` färbte ein Status-Etikett mit
- *    `warnstufeFarbe()`; Gate 5 (`theme/gate5.guard.test.ts`) sieht das nicht, weil kein
- *    A0-Rollenwert im Quelltext steht. Dieser Guard ist die maschinelle Fassung dieser
- *    Grenze, und er hat beim Bau geliefert: ZEHN Seiten malten
- *    `<Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>`
- *    — antd-Farbnamen plus roher Wire-Wert, also derselbe Befund, den LFH-345 · M14 an
- *    `EinsatzdatenPage` einzeln behoben hatte (gemessen am 12.09.2026). Dazu ein elfter
- *    Fall in `pages/gefahren/GefahrenPage.tsx`, der die Rolle zwar aus dem Vertrag las,
- *    den Wert aber an antds `color`-Prop gab — wogegen `components/StatusTag.tsx`
- *    ausdrücklich gebaut ist (antd 6 rechnet für einen Nicht-Preset ein STATISCHES
- *    Farbpaar; der Modus erreicht es nicht mehr).
+ * ── WAS DIESE GUARDS NICHT SEHEN (Teil des Vertrags) ──
  *
- * ── WARUM ZWEI GUARDS UND NICHT EINE ESLINT-REGEL ───────────────────────────────
+ *   • Eine EINZELNE `StatusDarstellung` statt eines `Record` (`kraefte/statusAchse.ts`,
+ *     `OHNE_STATUS`: die Abwesenheit eines Werts, keine Enum-Achse).
+ *   • Einen Alias als Werttyp (`type Karte = StatusDarstellung`). Qualifizierte Namen,
+ *     Vereinigungsglieder und Hüllen aus {@link FORMERHALTEND} werden erkannt, Aliase nicht.
+ *   • Eine unbekannte formerhaltende Hülle (`DeepReadonly<…>`), siehe {@link FORMERHALTEND}.
+ *   • Eine gespreizte Prop (`<Tag {...props}>`): {@link farbAusdruck} überspringt jede
+ *     Prop-Expression als Ganzes.
+ *   • Einen Namensraum-Import von antd (`<antd.Tag color=…>`).
+ *   • Stellungen, in denen ein Bezeichner nicht gelesen wird, außer den erfassten
+ *     (Eigenschaft hinter Punkt, Objektschlüssel, Methoden-Kurzform, Text in Zeichenketten).
+ *     Destrukturierung, Label oder Parameternamen erkennt der Scanner nicht.
+ *   • Einen Vertragsnamen, der über eine zweite Datei umbenannt weitergereicht wird
+ *     (`personen/personMeta.ts`: `personStatus as STATUS_META`); aufgelöst wird nur der
+ *     direkte Import.
+ *   • Ein mehrzeiliges Template-Literal mit Kommentarzeichen darin (siehe {@link stringEnde}).
+ *   • Eine FUNKTION, die eine `StatusDarstellung` baut (`MaterialPage`, `FahrzeugePage`,
+ *     `PersonalPage`): das ist die DB-Achse `status_farbe`, die `statusFarben.ts` ausdrücklich
+ *     außerhalb des Vertrags führt.
+ *   • Eine Farbe, die den Tag nicht über `color` erreicht (`style`, Klasse, anderes Element).
+ *     Die Matrix-Zellfläche (`flaechenFarbe`) ist so eine legitime {@link Flaechendarstellung}.
+ *   • Jede Indirektion über eine Bindung (`const AKTIV = 'aktiv'`, `const f = rollenFarbe(…)`):
+ *     der Scanner sieht Zeichen, keine Auswertung.
+ *   • Ein Regex-Literal in einer Nachbar-Prop: {@link tagEnde} beendet das Tag dort zu früh
+ *     (derselbe Blindfleck wie in `dichte.guard.test.ts`).
  *
- * Dieselbe Erwägung wie bei `components/dichte.guard.test.ts`: `pnpm lint` läuft mit
- * `--max-warnings 0`, eine Regel mit elf Funden am Liefertag wird abgeschaltet statt
- * befolgt. Hier sind die elf Funde stattdessen behoben, der Guard startet bei null —
- * es gibt deshalb bewusst KEINE Schuldmenge: ein leerer Ausnahmetopf „für später"
- * sichert nichts zu (dieselbe Linie wie beim fehlenden `auditConfig.ignoreGhsas`,
- * CLAUDE.md · Qualitäts-Gates).
+ * ── WO DIESE GUARDS ZU VIEL MELDEN KÖNNEN ──
  *
- * ── WAS DIESE GUARDS NICHT SEHEN ────────────────────────────────────────────────
+ * (1) Ein gleichnamiger, unverwandter Typ `StatusDarstellung`: Guard 1 vergleicht dem Namen
+ * nach. Ein Import-Nachweis wie bei den Werten ist bewusst nicht gebaut: er hätte mehrere
+ * Importformen und Re-Exporte zu verfolgen, und jede verfehlte Form wäre ein Falsch-Negativ an
+ * der Hauptzusicherung. Ein Fehlalarm ist in Minuten geklärt.
  *
- * Teil des Vertrags, nicht Beiwerk — jeder Punkt mit gemessener Fundstelle vom
- * 12.09.2026, keiner hypothetisch:
+ * (2) Ein Wire-Wert, den eine Nicht-Vertrags-Achse teilt: `TierStatus` teilt alle drei Werte
+ * mit Vertragskarten. Die Tierseiten färben deshalb über eine eigene `STATUS_META`-Karte; wer
+ * sie durch einen Inline-Vergleich ersetzt, bekommt diesen Guard rot, und die Abhilfe ist die
+ * Karte. Sauber trennen ließe sich das nur über den Typ des Ausdrucks (Syntaxbaum).
  *
- *   • **Eine EINZELNE `StatusDarstellung`**, kein `Record`: `kraefte/statusAchse.ts:58`
- *     (`OHNE_STATUS`) trägt „kein Status" als Darstellung. Bewusst draußen, denn es ist
- *     die ABWESENHEIT eines Enum-Werts und damit gerade keine Enum-Achse (die Datei
- *     begründet das über 20 Zeilen). Wer eine ganze Achse als lauter Einzel-Konstanten
- *     danebenbaut, umgeht den Guard — das ist Aufwand, keine Nachlässigkeit.
- *   • **Ein Alias als Wert-Typ**: `type Karte = StatusDarstellung` und dann
- *     `Record<X, Karte>`. Der Parser vergleicht den letzten Typparameter dem NAMEN nach —
- *     seine Vereinigungsglieder einzeln (`| null` fällt auf), den letzten Punkt-Abschnitt
- *     (`sf.StatusDarstellung` fällt auf) und den Kern unter durchsichtigen Hüllen
- *     (`Readonly<StatusDarstellung>` fällt auf). Aliase löst er nicht auf; das wäre ein
- *     Typchecker, kein Guard. Im Bestand gibt es keinen solchen Alias.
- *   • **Eine unbekannte formerhaltende Hülle** um den Werttyp (`DeepReadonly<…>` o. ä.).
- *     {@link FORMERHALTEND} ist eine Liste, kein Kriterium — bewusst, siehe die Begründung
- *     dort: alles abzuschälen meldet `Record<Gruppe, Array<StatusDarstellung>>` und wäre
- *     ein Fehlalarm. Im Bestand kommt keine Hülle ausserhalb der Liste vor.
- *   • **Eine gespreizte Prop**: `<Tag {...{ color: rollenFarbe(rolle, token) }}>` oder
- *     `<Tag {...props}>`. {@link farbAusdruck} überspringt jede Prop-Expression als
- *     Ganzes — das ist genau der Schritt, der das verschachtelte `color` einer
- *     Nachbar-Prop draussen hält, und beides ist dieselbe Klammer. Der Nachbar-Guard
- *     `components/dichte.guard.test.ts:39` führt den Spread aus demselben Grund als
- *     Blindfleck. Im Bestand trägt kein `<Tag` eine gespreizte Prop (gemessen).
- *   • **Ein Namensraum-Import von antd** (`import * as antd from 'antd'`, dann
- *     `<antd.Tag color=…>`). {@link tagNamenIn} löst die Umbenennung beim benannten
- *     Import auf, nicht die Qualifizierung im JSX-Namen. Im Bestand kommt weder das eine
- *     noch das andere vor (gemessen).
- *   • **Eine Stellung, in der ein Bezeichner NICHT gelesen wird, die hier nicht
- *     aufgezählt ist.** Erfasst sind heute: Eigenschaft hinter einem Punkt, Objekt-
- *     Schlüssel (`name:`), Methoden-Kurzform (`name() {}`, auch mit `get`/`set`/`async`)
- *     und Bezeichner in Zeichenketten. Die Liste ist im Review dreimal nacheinander
- *     gewachsen, und sie ist erkennbar nicht abgeschlossen — JavaScript hat weitere
- *     Bindungsstellen (Destrukturierungsmuster, Label, Parameternamen), die in einem
- *     `color`-Ausdruck heute niemand schreibt. Jede weitere Variante ist eine Kante
- *     mehr an einem Scanner, der die Frage „liest dieser Ausdruck jene Bindung?"
- *     grundsätzlich nur schätzen kann. Das ist der eigentliche Grund für das
- *     AST-Folgeticket, nicht bloß Aufräumen.
- *   • **Ein Vertragsname, der über EINE ZWEITE Datei umbenannt weitergereicht wird**:
- *     `personen/personMeta.ts:31` exportiert `personStatus as STATUS_META` weiter.
- *     {@link vertragsNamenIn} löst die Umbenennung beim DIREKTEN Import auf, folgt aber
- *     keiner Re-Export-Kette. Gemessen am 12.09.2026 geht kein Konsument dieser
- *     Re-Exporte über `<Tag color=` — alle nutzen `StatusTag` oder nur `.label`.
- *   • **Ein mehrzeiliges Template-Literal mit einem Kommentarzeichen darin.** Der
- *     Kommentar-Stripper erkennt eine Zeichenkette nur, wenn sie auf ihrer Zeile schließt —
- *     die Beschränkung verhindert, dass ein Apostroph in JSX-Text den halben Rest
- *     verschluckt (siehe {@link stringEnde}). Im Bestand ohne Fundstelle.
- *   • **Eine FUNKTION, die eine `StatusDarstellung` baut**: `pages/MaterialPage.tsx:74`,
- *     `pages/FahrzeugePage.tsx:103`, `pages/PersonalPage.tsx:79`. Alle drei liegen auf
- *     der DB-Achse (`status_farbe`, mandantengepflegter Freitext), die der Kopf von
- *     `statusFarben.ts` namentlich AUSSERHALB des Vertrags führt. Ein Verbot träfe hier
- *     die dokumentierte Grenze statt eines Verstoßes.
- *   • **Eine Farbe, die den Tag nicht über `color` erreicht**: `style={{ background }}`,
- *     eine Klasse, ein anderes Element als `<Tag>`. Die Matrix-Zellhinterlegung
- *     (`pages/gefahren/GefahrenMatrix.tsx`, `flaechenFarbe`) ist genau das und darf
- *     bleiben — sie ist die dritte DARSTELLUNGSSORTE (Fläche statt Etikett), im Vertrag
- *     als {@link Flaechendarstellung} benannt. Sie wird hier nicht als Ausnahme
- *     GELISTET, sondern vom Schnitt gar nicht erst erfasst: eine Ausnahmeliste, die den
- *     legitimen Fall nennt, veraltet mit ihm.
- *   • **JEDE Indirektion über eine Bindung** — in beiden Fühlern dieselbe Grenze:
- *     `const AKTIV = 'aktiv'` und dann `color={AKTIV === e.status ? …}` (Wire-Wert), oder
- *     `const farbwert = rollenFarbe(…)` und dann `color={farbwert}` (Vertragsname). Der
- *     Ausdruck nennt dann weder das eine noch das andere, und was hier steht, ist wahr:
- *     der Scanner sieht Zeichen, keine Auswertung. Das ist keine Lücke IM Scanner,
- *     sondern die Fähigkeit, die er nicht hat — sie käme mit dem Syntaxbaum, nicht mit
- *     einem weiteren Sonderfall. Im Bestand kam beides an keiner der 132 (12.09.2026)
- *     `<Tag color=`-Stellen vor (gemessen: kein `color={<bezeichner>}` ausserhalb der
- *     Tests).
- *   • **Ein Regex-Literal in einer Nachbar-Prop** desselben Tags: {@link tagEnde} kennt
- *     Zeichenketten, aber keine Regex-Literale, und beendet das Tag dort zu früh.
- *     Altlast, wortgleich mit dem Blindfleck von `dichte.guard.test.ts`.
- *
- * ── ZWEI RICHTUNGEN, IN DENEN DIESE GUARDS ZU VIEL MELDEN KÖNNEN ───────────────
- *
- * (1) EIN GLEICHNAMIGER TYP. Guard 1 vergleicht den Werttyp dem NAMEN nach. Gäbe es
- * irgendwo einen zweiten, unverwandten Typ `StatusDarstellung`, würde eine Karte darüber
- * gemeldet. Der naheliegende Gegenvorschlag — den Typ nur zählen, wenn die Datei ihn
- * nachweislich importiert, wie {@link vertragsNamenIn} es für die WERTE tut — ist hier
- * bewusst NICHT umgesetzt, und der Unterschied ist gemessen, nicht geahnt:
- *
- *   • Der Bestand kennt **eine** Deklaration dieses Namens (`statusFarben.ts:94`). Ein
- *     zweiter Typ gleichen Namens wäre in diesem Repo selbst ein Befund, kein Normalfall.
- *   • Bei den WERTEN war die Namensgleichheit real und belegt (`STATUS_META` liegt einmal
- *     im Vertrag und einmal als eigene Tier-Karte, `dringlichkeit`/`sichtung` sind
- *     gewöhnliche Fachwörter). Bei einem erfundenen Typnamen ist sie es nicht.
- *   • Vor allem: der Import-Nachweis ist bei einem TYP löchriger als bei einem Wert. Der
- *     Bestand schreibt ihn schon in zwei Formen (`import type { StatusDarstellung }` und
- *     `import { …, type StatusDarstellung }`), dazu kämen Re-Export-Ketten. Jede Form, die
- *     der Nachweis verfehlt, wird zum FALSCH-NEGATIV — und zwar an der Hauptzusicherung
- *     dieses Guards. Bei den Werten trägt daneben noch der Wire-Wert-Fühler; hier gäbe es
- *     nichts, was den Ausfall auffängt.
- *
- * Ein Fehlalarm nennt Datei, Zeile und Ausdruck und ist in Minuten geklärt; ein
- * verpasster Vertragsbruch bleibt unsichtbar. Taucht je ein echtes Homonym auf, ist das
- * der Anlass, hier neu zu entscheiden — dann aber mit dem Syntaxbaum, nicht mit einem
- * zweiten Import-Regex.
- *
- * (2) EIN WIRE-WERT, DEN EINE NICHT-VERTRAGS-ACHSE TEILT.
- *
- * Der Wire-Wert-Fühler ist eine HEURISTIK über Zeichenketten, kein Typurteil. Gemessen
- * am 12.09.2026: `TierStatus` ist `'aktiv' | 'vermisst' | 'abgeschlossen'` und teilt damit
- * ALLE DREI Werte mit Vertragskarten (`einsatzStatus`, `personStatus`) — obwohl der Kopf
- * von `statusFarben.ts` die Tier-Achse ausdrücklich draussen führt. Ein
- * `<Tag color={t.status === 'aktiv' ? 'green' : 'default'}>` über einem TIER würde hier
- * also als Einsatz-Status gemeldet, und das wäre ein Fehlalarm (im Codex-Review benannt).
- *
- * Er tritt heute nicht auf, und zwar nicht zufällig: `pages/TierePage.tsx` und
- * `pages/TiereDetailPage.tsx` färben über eine eigene `STATUS_META`-Karte statt über ein
- * Literal — das ist die Bauform, die das Repo auch für Achsen ausserhalb des Vertrags
- * fährt. Wer sie durch einen Inline-Vergleich ersetzt, bekommt diesen Guard rot; die
- * Abhilfe ist dann die Karte, nicht eine Ausnahme hier.
- *
- * Sauber trennen liesse sich das nur über den TYP des Ausdrucks, also über den
- * TypeScript-Syntaxbaum. Das ist die benannte Grenze dieses Guards und der Grund, warum
- * die Umstellung als eigener Befund geführt wird (siehe nächster Abschnitt) — nicht als
- * Nebenprodukt. Den Fühler dafür aufzugeben ist keine Option: er hat die ZEHN
- * Bestandsfunde geliefert, die dieses Ticket überhaupt sichtbar gemacht haben.
- *
- * ── EINE ZWEITE KOPIE VON `tagEnde`, UND WARUM SIE HIER TROTZDEM STEHT ──────────
- *
- * Gemessen: `components/dichte.guard.test.ts` und `components/aktionsabstand.guard.test.ts`
- * tragen die Funktion bereits je einmal — dies ist die dritte. Sie zu vereinen ist
- * richtig und hier bewusst NICHT getan: beide Bestandsguards hängen mit Schuldmengen und
- * Mutationsproben daran, und ein Scanner-Umbau in einem Vertrags-Ticket wäre ein
- * Nebenprodukt statt einer Entscheidung. Eigener Befund, eigenes Ticket. Importieren
- * ginge ohnehin nicht: ein `import` aus einer `*.test.ts` führte deren `describe`-Blöcke
+ * `tagEnde` existiert auch in `dichte.guard.test.ts` und `aktionsabstand.guard.test.ts`.
+ * Importieren geht nicht: ein `import` aus einer `*.test.ts` führte deren `describe`-Blöcke
  * ein zweites Mal aus.
  */
 import { readFileSync, readdirSync } from 'node:fs';
@@ -192,18 +78,12 @@ function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, str
 }
 
 /**
- * Schließendes Anführungszeichen zu `auf` — aber NUR auf derselben Zeile; sonst `-1`.
+ * Schließendes Anführungszeichen zu `auf`, aber NUR auf derselben Zeile; sonst `-1`.
  *
- * Die Beschränkung ist der ganze Trick (Codex-Review zu diesem PR). Ein Stripper, der
- * Zeichenketten gar nicht kennt, hält das `//` in `title="https://…"` für einen Kommentar
- * und schneidet den Rest der Zeile ab — das verbotene `color` dahinter verschwindet. Einer,
- * der jedes Anführungszeichen verfolgt, verschluckt am Apostroph in JSX-TEXT alles bis zum
- * nächsten und reißt damit ein größeres Loch, als er schließt. Beides sind
- * Falsch-Negative, und genau die sieht niemand.
- *
- * Ein Literal, das auf seiner Zeile schließt, ist eine Zeichenkette; ein einzelnes
- * Apostroph in Prosa ist keine. Mehrzeilige Template-Literale bleiben damit
- * unberücksichtigt — dokumentierter Blindfleck, im Bestand ohne Fundstelle.
+ * Ein Stripper ohne Zeichenketten hält das `//` in `title="https://…"` für einen Kommentar
+ * und schneidet ein `color` dahinter ab. Einer, der jedes Anführungszeichen verfolgt,
+ * verschluckt am Apostroph in JSX-Text alles bis zum nächsten. Nur was auf seiner Zeile
+ * schließt, gilt deshalb als Zeichenkette; mehrzeilige Template-Literale bleiben Blindfleck.
  */
 function stringEnde(zeile: string, auf: number): number {
   const zeichen = zeile[auf];
@@ -219,13 +99,8 @@ function stringEnde(zeile: string, auf: number): number {
 
 /**
  * Blendet Kommentarinhalt aus, Blockzustand über Zeilengrenzen getragen; die Zeilenzahl
- * bleibt erhalten (Index = Zeile - 1).
- *
- * Anders als die Kopien in `components/dichte.guard.test.ts` und
- * `theme/gate5.guard.test.ts` überspringt dieser Stripper Zeichenketten
- * ({@link stringEnde}). Dort ist der Blindfleck als Falsch-Negativ hingeschrieben und für
- * einen Hex-Scan folgenlos; hier hätte ein `/*`-Literal in einer Zeichenkette den Rest der
- * Datei stummgeschaltet, und ein stummer Guard ist von einem grünen nicht zu unterscheiden.
+ * bleibt erhalten (Index = Zeile - 1). Überspringt Zeichenketten ({@link stringEnde}), sonst
+ * schaltete ein `/*` in einem Literal den Rest der Datei stumm.
  */
 function ohneKommentare(inhalt: string): string[] {
   const zeilen: string[] = [];
@@ -265,17 +140,9 @@ function ohneKommentare(inhalt: string): string[] {
 }
 
 /**
- * Der Vertrag selbst, die Tests und der Codegen sind kein Prüfgegenstand — und der
- * Vertrag ist EINE DATEI, nicht das Verzeichnis.
- *
- * Die erste Fassung nahm `/src/theme/` ganz heraus. Das war falsch, und zwar genau im
- * Sinne der Zusicherung (im Codex-Review zu diesem PR gefunden): eine Karte in einem
- * Geschwistermodul wie `theme/darstellungOptionen.ts` wäre von `statusFarben.ts` nicht
- * exportiert, liefe also am selbst ableitenden {@link ALLE_MAPS} des Abdeckungstests
- * genauso vorbei wie eine Karte in `pages/` — und der Guard hätte dazu geschwiegen.
- * „Im selben Ordner" ist kein Ersatz für „im Vertrag". Gemessen am 12.09.2026 trägt
- * kein Geschwistermodul eine solche Karte; der engere Schnitt kostet also nichts und
- * schließt die Lücke, bevor sie jemand füllt.
+ * Der Vertrag selbst, die Tests und der Codegen sind kein Prüfgegenstand. Der Vertrag ist
+ * EINE DATEI, nicht das Verzeichnis: eine Karte in einem Geschwistermodul wie
+ * `theme/darstellungOptionen.ts` liefe am Abdeckungstest genauso vorbei wie eine in `pages/`.
  */
 function ausserhalbDesVertrags(pfad: string): boolean {
   if (pfad === '/src/theme/statusFarben.ts') return false;
@@ -286,21 +153,13 @@ function ausserhalbDesVertrags(pfad: string): boolean {
 // ──────────────────── Guard 1: Karten neben der Vertragsdatei ──────────────────
 
 /**
- * Ein `Record<…, StatusDarstellung>` — und NUR mit `StatusDarstellung` als WERT-Typ.
+ * Ein `Record<…, StatusDarstellung>`, und NUR mit `StatusDarstellung` als WERT-Typ.
  *
- * WARUM EIN PARSER UND KEINE REGEX, gemessen im Codex-Review zu diesem PR: die erste
- * Fassung war `Record<[^>]*,\s*StatusDarstellung\s*>`, und `[^>]` überquert kein `>` —
- * ein verschachteltes Typargument im SCHLÜSSEL beendete den Ausdruck vorzeitig.
- * `Record<Exclude<MeinStatus, null>, StatusDarstellung>` ist gültiges TypeScript, ist
- * genau die verbotene Karte und lief unsichtbar durch. Die naheliegende Lockerung
- * (`Record<[^>]*StatusDarstellung[^>]*>`) tauscht das Loch gegen einen Fehlalarm: sie
- * meldet `Record<NonNullable<StatusDarstellung['form']>, string>` aus
- * `components/StatusTag.tsx:6`, also einen Konsumenten. Beides vermeidet nur, wer die
- * Typargumente wirklich zerlegt.
- *
- * NEBENEFFEKT, und er schließt einen zuvor DOKUMENTIERTEN Blindfleck: weil der letzte
- * Parameter als Vereinigung gelesen wird, fällt auch `Record<X, StatusDarstellung | null>`
- * auf. Der Kopfkommentar führte ihn bis hierher als bekannte Grenze.
+ * Die Typargumente werden wirklich zerlegt statt per Regex gesucht: `[^>]` überquert kein
+ * verschachteltes `>` im Schlüssel (`Record<Exclude<X, null>, StatusDarstellung>`), und eine
+ * gelockerte Regex meldete Konsumenten wie `Record<NonNullable<StatusDarstellung['form']>,
+ * string>`. Der letzte Parameter wird als Vereinigung gelesen, damit fällt auch
+ * `Record<X, StatusDarstellung | null>` auf.
  */
 function typargumente(text: string, auf: number): string[] | null {
   let tiefe = 0;
@@ -321,11 +180,8 @@ function typargumente(text: string, auf: number): string[] | null {
       args.push(text.slice(letzter, i));
       letzter = i + 1;
     } else if (z === '>' && text[i - 1] === '=') {
-      // Der Pfeil eines FUNKTIONSTYPS, kein schliessendes Typargument. Ohne diese
-      // Ausnahme senkt `(x: X) => string` die Bilanz, das echte `>` bringt sie nie auf
-      // null, `typargumente` gibt `null` zurück — und die Karte liefe unsichtbar durch
-      // (im Codex-Review gefunden; `components/dichte.guard.test.ts` führt denselben Fall
-      // als Blindfleck, dort ohne Folgen).
+      // Der Pfeil eines FUNKTIONSTYPS, kein schließendes Typargument. Ohne diese Ausnahme
+      // senkt `(x: X) => string` die Bilanz und die Karte liefe unsichtbar durch.
       continue;
     } else if (z === '>') {
       tiefe--;
@@ -339,20 +195,11 @@ function typargumente(text: string, auf: number): string[] | null {
 }
 
 /**
- * Hüllen, die die FORM des Werts erhalten — `Readonly<StatusDarstellung>` ist derselbe
- * Vertragstyp, nur anders geschrieben.
- *
- * EINE NAMENSLISTE, und das ist eine Korrektur: die erste Fassung schälte JEDE Hülle mit
- * genau einem Typargument ab, mit der Begründung, eine Liste veralte bei der nächsten
- * Hilfstype. Das war die falsche Abwägung (im Codex-Review gefunden). `Array`, `Promise`
- * und `Set` haben ebenfalls ein Typargument und sind gerade NICHT durchsichtig — ein
- * `Record<Gruppe, Array<StatusDarstellung>>` gruppiert Darstellungen, es bildet kein Enum
- * auf seine Darstellung ab, und es zu melden wäre ein Fehlalarm.
- *
- * Die zwei Fehlerrichtungen sind nicht gleich viel wert: eine unvollständige Liste lässt
- * eine neue Hilfstype durch (Falsch-Negativ, dokumentierter Blindfleck), das Abschälen
- * von allem meldet gültigen Code (Fehlalarm). Und ein Gate, das aus dem falschen Grund
- * rot wird, wird abgeschaltet statt befolgt — das wiegt hier schwerer.
+ * Hüllen, die die FORM des Werts erhalten: `Readonly<StatusDarstellung>` ist derselbe
+ * Vertragstyp. Bewusst eine Namensliste: `Array`, `Promise` oder `Set` haben ebenfalls ein
+ * Typargument, aber `Record<Gruppe, Array<StatusDarstellung>>` bildet kein Enum auf seine
+ * Darstellung ab, und ihn zu melden wäre ein Fehlalarm. Eine neue Hilfstype außerhalb der
+ * Liste ist der dokumentierte Blindfleck.
  */
 const FORMERHALTEND = ['Readonly', 'Required', 'Partial', 'NonNullable'];
 
@@ -370,12 +217,9 @@ function klammerPaarEnde(text: string): number {
 function blattTyp(arg: string): string {
   let rest = arg.trim();
   for (;;) {
-    // Eine UMSCHLIESSENDE Klammer ist Gruppierung, kein Typ (im Codex-Review gefunden):
-    // `typglieder` laesst die Vereinigung in `(StatusDarstellung | null) & {…}` bewusst
-    // stehen, weil sie in Klammertiefe > 0 liegt — dann muss das Abschaelen sie oeffnen,
-    // sonst vergleicht der Aufrufer die Klammer mitsamt Inhalt gegen einen Namen und
-    // findet nie etwas. Geprueft wird, dass die Klammer den GANZEN Ausdruck umschliesst;
-    // bei `(A|B)&(C)` schliesst die erste vor dem Ende, und der Ausdruck bleibt stehen.
+    // Eine UMSCHLIESSENDE Klammer ist Gruppierung: `typglieder` lässt die Vereinigung in
+    // `(StatusDarstellung | null) & {…}` stehen (Tiefe > 0), das Abschälen muss sie öffnen.
+    // Bei `(A|B)&(C)` schließt die erste Klammer vor dem Ende, der Ausdruck bleibt stehen.
     if (rest.startsWith('(') && klammerPaarEnde(rest) === rest.length - 1) {
       rest = rest.slice(1, -1).trim();
       continue;
@@ -390,13 +234,8 @@ function blattTyp(arg: string): string {
 }
 
 /**
- * Zerlegt den letzten Typparameter in seine Glieder auf oberster Ebene — Vereinigung `|`
- * UND Durchschnitt `&`.
- *
- * Der Durchschnitt kam im Codex-Review dazu: `Record<X, StatusDarstellung & { icon: … }>`
- * erweitert den Vertragseintrag um Zusatzfelder und ist damit erst recht eine Karte über
- * dem Vertragstyp. Beide Trennzeichen zusammen zu behandeln ist richtig, weil BEIDE den
- * Vertragstyp als Glied führen können und die Frage hier nur lautet „kommt er vor?".
+ * Zerlegt den letzten Typparameter in seine Glieder auf oberster Ebene, Vereinigung `|` UND
+ * Durchschnitt `&`: `Record<X, StatusDarstellung & { icon: … }>` ist erst recht eine Karte.
  */
 function typglieder(arg: string): string[] {
   const teile: string[] = [];
@@ -404,7 +243,7 @@ function typglieder(arg: string): string[] {
   let letzter = 0;
   for (let i = 0; i < arg.length; i++) {
     const z = arg[i];
-    if (z === '>' && arg[i - 1] === '=') continue; // Pfeil eines Funktionstyps, siehe oben
+    if (z === '>' && arg[i - 1] === '=') continue; // Pfeil eines Funktionstyps
     if (z === '<' || z === '[' || z === '(' || z === '{') tiefe++;
     else if (z === '>' || z === ']' || z === ')' || z === '}') tiefe--;
     else if ((z === '|' || z === '&') && tiefe === 0) {
@@ -417,18 +256,9 @@ function typglieder(arg: string): string[] {
 }
 
 /**
- * Trägt dieser Typausdruck den Vertragstyp — als Glied, unter einer Hülle, oder beides?
- *
- * REKURSIV, und das ist eine Korrektur (im Codex-Review gefunden): {@link typglieder} und
- * {@link blattTyp} griffen ineinander verzahnt, aber nur EINE Runde tief. Bei
- * `Readonly<StatusDarstellung & { icon: ReactNode }>` liegt das `&` beim Zerlegen noch
- * verschachtelt, und nach dem Abschälen wurde die Vereinigung nie erneut geteilt — der
- * Vergleich sah die ganze Zeichenkette und fand nichts. Beide Einzelfälle hatten ihre
- * Zusicherung, ihre KOMBINATION hatte keine; das ist die Sorte Lücke, die zwischen zwei
- * richtigen Bausteinen entsteht.
- *
- * Die Rekursion läuft nur, wenn {@link blattTyp} wirklich etwas abgeschält hat — sonst
- * stünde hier eine Endlosschleife statt eines Guards.
+ * Trägt dieser Typausdruck den Vertragstyp, als Glied, unter einer Hülle oder beides?
+ * Rekursiv, weil bei `Readonly<StatusDarstellung & { icon }>` das `&` erst nach dem Abschälen
+ * zerlegt werden kann. Die Rekursion läuft nur, wenn {@link blattTyp} etwas abgeschält hat.
  */
 function traegtVertragstyp(ausdruck: string): boolean {
   for (const glied of typglieder(ausdruck)) {
@@ -442,46 +272,21 @@ function traegtVertragstyp(ausdruck: string): boolean {
 /**
  * Liegt `spalte` INNERHALB einer Zeichenkette dieser Zeile?
  *
- * Ein FILTER auf den Fund, keine weitere Umformung der Eingabe — und das ist Absicht:
- * die Kette in diesem Guard (Kommentare strippen → `Record<` finden → Klammern
- * bilanzieren → zerlegen → abschälen) hat in diesem PR schon zweimal an ihren Nahtstellen
- * versagt. Ein Prädikat am Ende komponiert trivial, eine sechste Stufe nicht.
- *
- * Nötig, weil {@link ohneKommentare} Zeichenketten ABSICHTLICH stehen lässt — der
- * Tag-Guard braucht ihren INHALT, dort stecken die Wire-Werte. Für den ANFANG einer
- * Deklaration oder Auszeichnung ist das falsch herum: `const beispiel =
- * 'Record<X, StatusDarstellung>'` und `const beispiel = '<Tag color={…}>'` sind Text,
- * und sie zu melden wäre ein Fehlalarm (beide im Codex-Review gefunden, der zweite als
- * Hinweis darauf, dass ich die Klasse zuerst nur halb geschlossen hatte).
- *
- * BEIDE Guards filtern deshalb die POSITION ihrer Marke, nicht deren Inhalt: `Record<`
- * bzw. `<Tag`. Die Attribute dahinter bleiben lesbar — sonst verlöre der Wire-Wert-Fühler
- * genau das, wofür es ihn gibt.
- *
- * Im Bestand kommt keiner der beiden Fälle vor. Die Fundstellen mit `Record<` bzw. `<Tag`
- * hinter einem Anführungszeichen liegen entweder in KOMMENTAREN (fallen vorher weg) oder
- * HINTER einer auf derselben Zeile geschlossenen Zeichenkette — etwa
- * `stammdaten/SprechgruppenTab.tsx:94`, wo das zweite `<Tag>` dem `"green"` des ersten
- * folgt. Genau deshalb überspringt die Schleife geschlossene Zeichenketten, statt beim
- * ersten Anführungszeichen aufzugeben.
- *
- * Dieselbe Zurückhaltung wie in {@link stringEnde}: nur was auf seiner Zeile schliesst,
- * gilt als Zeichenkette.
+ * {@link ohneKommentare} lässt Zeichenketten absichtlich stehen, weil der Tag-Guard ihren
+ * Inhalt (die Wire-Werte) braucht. Für den ANFANG einer Deklaration oder Auszeichnung ist das
+ * falsch: `'Record<X, StatusDarstellung>'` und `'<Tag color={…}>'` sind Text. Beide Guards
+ * filtern deshalb die POSITION ihrer Marke, nicht deren Inhalt. Geschlossene Zeichenketten
+ * davor werden übersprungen, weil ein zweites `<Tag>` hinter dem `"green"` eines ersten auf
+ * derselben Zeile echt ist. Wie in {@link stringEnde} gilt nur, was auf seiner Zeile schließt.
  */
 function inZeichenkette(zeile: string, spalte: number): boolean {
   for (let i = 0; i < spalte; i++) {
     const z = zeile[i];
     if (z !== '"' && z !== "'" && z !== '`') continue;
-    // Ein Anfuehrungszeichen DIREKT hinter einem Bezeichnerzeichen oeffnet keine
-    // Zeichenkette — in JavaScript gibt es diese Stellung nicht. In JSX-Prosa dagegen
-    // schon: `<div>geht's <Tag color={s === 'aktiv' ? …}` paarte das Apostroph mit dem
-    // Oeffner vor `aktiv`, und die Marke `<Tag` lag damit scheinbar in einer
-    // Zeichenkette (im Codex-Review gefunden). Gegengerechnet an Vergleich, Klammer,
-    // Argument, Array, Konkatenation und Objektwert: dort steht davor immer ein
-    // Leerzeichen oder ein Satzzeichen.
-    // HEURISTIK, keine Herleitung: ein Apostroph am ANFANG eines JSX-Textknotens
-    // (`<div>'tis …`) steht hinter einem `>` und gilt weiterhin als Oeffner. Ihn zu
-    // erkennen hiesse, JSX zu parsen — dieselbe Grenze wie die drei im Dateikopf.
+    // Ein Anführungszeichen direkt hinter einem Bezeichnerzeichen öffnet keine Zeichenkette
+    // (`<div>geht's <Tag color={…}`); in JavaScript gibt es diese Stellung nicht.
+    // Heuristik: ein Apostroph am Anfang eines JSX-Textknotens (`<div>'tis`) gilt weiter als
+    // Öffner; ihn zu erkennen hieße, JSX zu parsen.
     if (/[A-Za-z0-9_$]/.test(zeile[i - 1] ?? '')) continue;
     const zu = stringEnde(zeile, i);
     if (zu === -1) continue;
@@ -494,19 +299,9 @@ function inZeichenkette(zeile: string, spalte: number): boolean {
 /**
  * Stellen, an denen ein `Record<…>` den Vertragstyp als WERT trägt (Index des `Record`).
  *
- * Die Marke braucht eine Wortgrenze DAVOR (im Codex-Review gefunden): ohne sie beginnt
- * die Teilstringsuche mitten in einem fremden Bezeichner, und `CustomRecord<K,
- * StatusDarstellung>` oder ein Aufruf `parseRecord<Input, StatusDarstellung>()` wären
- * gemeldet worden — beides gültiger, unverwandter Code. Heute kommt kein solcher Name im
- * Baum vor (gegengezählt: null Treffer für `[A-Za-z0-9_$]Record<`), der Fall ist also
- * latent; ein Fehlalarm, der erst beim nächsten Helfernamen zuschlägt, ist trotzdem
- * einer — und der Guard, der aus dem falschen Grund rot wird, kostet die Zeit dessen,
- * der ihn debuggt.
- *
- * Ein **Punkt** davor zählt bewusst NICHT als Grenze: `sf.Record<X, StatusDarstellung>`
- * ist derselbe eingebaute Abbildungstyp, nur über einen Namensraum geschrieben — dieselbe
- * Linie wie beim Wert-Typ eine Zeile weiter unten. `CustomRecord` dagegen ist ein ANDERER
- * Bezeichner, kein anders geschriebener gleicher.
+ * Die Marke braucht eine Wortgrenze davor, sonst würden `CustomRecord<K, StatusDarstellung>`
+ * oder `parseRecord<…>()` gemeldet. Ein Punkt davor zählt nicht als Grenze:
+ * `sf.Record<…>` ist derselbe Abbildungstyp.
  */
 export function kartenStellen(text: string): number[] {
   const treffer: number[] = [];
@@ -518,10 +313,8 @@ export function kartenStellen(text: string): number[] {
     if (inZeichenkette(zeile, davor[davor.length - 1].length)) continue;
     const args = typargumente(text, i + 'Record'.length);
     if (!args || args.length < 2) continue;
-    // Der letzte Punkt-Abschnitt, damit ein Namensraum-Import (`Record<X,
-    // sf.StatusDarstellung>`, gültiges TypeScript) nicht am Vergleich vorbeiläuft —
-    // im Codex-Review gefunden. Aliase löst der Guard weiterhin nicht auf, das wäre ein
-    // Typchecker; ein QUALIFIZIERTER Name ist aber derselbe Typ, nur anders geschrieben.
+    // Der letzte Punkt-Abschnitt zählt, damit `sf.StatusDarstellung` nicht vorbeiläuft.
+    // Aliase löst der Guard nicht auf.
     if (traegtVertragstyp(args[args.length - 1])) {
       treffer.push(i);
     }
@@ -556,8 +349,7 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
     ).toEqual([]);
   });
 
-  // DIE MUTATIONSPROBE, festgeschrieben statt einmal von Hand gefahren: ohne sie wäre
-  // die leere Liste oben auch dann grün, wenn der Scanner gar nichts fände.
+  // Ohne diesen Test wäre die leere Liste oben auch dann grün, wenn der Scanner nichts fände.
   it('wird rot, sobald eine Karte neben der Vertragsdatei angelegt wird', () => {
     const einzeilig = kartenBefunde({
       '/src/pages/Irgendwas.tsx': 'const x: Record<MeinEnum, StatusDarstellung> = { a: b };',
@@ -573,10 +365,7 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
       }),
     ).toHaveLength(1);
 
-    // UND im Vertragsverzeichnis selbst: ein Geschwistermodul ist nicht der Vertrag.
-    // Es exportiert nichts über `statusFarben.ts`, läuft also am Abdeckungstest genauso
-    // vorbei wie eine Karte in `pages/` — mit dem Verzeichnis-Schnitt der ersten Fassung
-    // war genau dieser Fall unsichtbar.
+    // Auch ein Geschwistermodul im Vertragsverzeichnis ist nicht der Vertrag.
     expect(
       kartenBefunde({
         '/src/theme/darstellungOptionen.ts': 'const k: Record<X, StatusDarstellung> = {};',
@@ -591,25 +380,22 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
   });
 
   it('zerlegt die Typargumente, statt am ersten `>` abzubrechen', () => {
-    // Im Codex-Review gefunden: ein verschachteltes Typargument im SCHLÜSSEL beendete
-    // die alte Regex vorzeitig. Gültiges TypeScript, genau die verbotene Karte, unsichtbar.
+    // Ein verschachteltes Typargument im Schlüssel darf den Ausdruck nicht vorzeitig beenden.
     expect(
       kartenBefunde({
         '/src/pages/Eng.ts': 'const k: Record<Exclude<MeinStatus, null>, StatusDarstellung> = {};',
       }),
     ).toHaveLength(1);
 
-    // Dieselbe Zerlegung schließt den früher DOKUMENTIERTEN Blindfleck mit: der letzte
-    // Parameter wird als Vereinigung gelesen.
+    // Der letzte Parameter wird als Vereinigung gelesen.
     expect(
       kartenBefunde({
         '/src/pages/Union.ts': 'const k: Record<X, StatusDarstellung | null> = {};',
       }),
     ).toHaveLength(1);
 
-    // Und die Gegenrichtung bleibt ruhig — sonst hätte der Parser nur das Loch gegen
-    // einen Fehlalarm getauscht. `Partial<>` daneben zeigt, dass die Schachtelung nach
-    // AUSSEN nicht stört.
+    // Gegenrichtung: ein Konsument des Typs bleibt ruhig; `Partial<>` zeigt, dass Schachtelung
+    // nach außen nicht stört.
     expect(
       kartenBefunde({
         '/src/components/Attrappe5.tsx': [
@@ -656,9 +442,7 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
       kartenBefunde({ '/src/pages/Fremd.ts': 'const k: Record<X, Readonly<TierMeta>> = {};' }),
     ).toEqual([]);
 
-    // NICHT jede Hülle mit einem Typargument ist durchsichtig: eine Sammlung von
-    // Darstellungen bildet kein Enum auf SEINE Darstellung ab. Das zu melden wäre ein
-    // Fehlalarm — und ein Gate, das aus dem falschen Grund rot wird, wird abgeschaltet.
+    // Eine Sammlung von Darstellungen bildet kein Enum auf SEINE Darstellung ab: kein Befund.
     expect(
       kartenBefunde({
         '/src/pages/Sammlung.ts': [
@@ -671,15 +455,13 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
   });
 
   it('liest keine Zeichenkette als Deklaration', () => {
-    // Im Codex-Review gefunden: `ohneKommentare` lässt Zeichenketten ABSICHTLICH stehen,
-    // weil der Tag-Guard ihren Inhalt braucht. Für die Karten ist das falsch herum.
+    // Zeichenketten sind Text, keine Deklaration.
     expect(
       kartenBefunde({
         '/src/pages/Text.ts': "const beispiel = 'Record<X, StatusDarstellung>';",
       }),
     ).toEqual([]);
-    // Gegenprobe: dieselbe Zeile OHNE Anführungszeichen wird gemeldet — sonst hätte der
-    // Filter die Aussage mit weggenommen statt nur den Fehlalarm.
+    // Gegenprobe: dieselbe Zeile ohne Anführungszeichen wird gemeldet.
     expect(
       kartenBefunde({ '/src/pages/Echt2.ts': 'const k: Record<X, StatusDarstellung> = {};' }),
     ).toHaveLength(1);
@@ -693,8 +475,7 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
   });
 
   it('lässt sich von einem Funktionstyp nicht aus dem Tritt bringen', () => {
-    // Das `>` in `=>` senkte die Klammerbilanz, das echte `>` brachte sie nie auf null,
-    // `typargumente` gab `null` zurück — die Karte lief unsichtbar durch.
+    // Das `>` in `=>` darf die Klammerbilanz nicht senken.
     expect(
       kartenBefunde({
         '/src/pages/Pfeil.ts':
@@ -710,17 +491,14 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
   });
 
   it('setzt Abschälen und Zerlegen zusammen — beide Bausteine, EIN Ausdruck', () => {
-    // Im Codex-Review gefunden: beide Einzelfälle hatten ihre Zusicherung, ihre
-    // KOMBINATION hatte keine. Beim Zerlegen liegt das `&` noch unter `Readonly<…>`,
-    // und nach dem Abschälen wurde nie erneut geteilt.
+    // Die Kombination aus Hülle und Durchschnitt: nach dem Abschälen wird erneut geteilt.
     expect(
       kartenBefunde({
         '/src/pages/Beides.ts':
           'const k: Record<X, Readonly<StatusDarstellung & { icon: ReactNode }>> = {};',
       }),
     ).toHaveLength(1);
-    // Und die Gegenrichtung, damit die Rekursion nicht einfach alles meldet: eine
-    // Sammlung unter einer Hülle bleibt ruhig.
+    // Gegenrichtung: eine Sammlung unter einer Hülle bleibt ruhig.
     expect(
       kartenBefunde({
         '/src/pages/Beides2.ts': 'const k: Record<X, Readonly<Array<StatusDarstellung>>> = {};',
@@ -729,10 +507,7 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
   });
 
   it('steigt in eine Klammer-Gruppierung hinab', () => {
-    // Im Codex-Review gefunden: `typglieder` laesst die Vereinigung IN der Klammer
-    // bewusst stehen (Tiefe > 0), `blattTyp` schaelte die Klammer aber nicht ab — der
-    // Vergleich sah `(StatusDarstellung | null)` und blieb gruen. Klammern sind
-    // Gruppierung, kein Typ.
+    // Klammern sind Gruppierung, kein Typ: `(StatusDarstellung | null)` wird geöffnet.
     expect(
       kartenBefunde({
         '/src/pages/Gruppe.ts':
@@ -743,19 +518,18 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
     expect(
       kartenBefunde({ '/src/pages/Gruppe2.ts': 'const k: Record<X, (StatusDarstellung)> = {};' }),
     ).toHaveLength(1);
-    // Gegenprobe: eine Klammer ohne den Vertragstyp bleibt ruhig — sonst meldete das
-    // Abschaelen jede Gruppierung.
+    // Gegenprobe: eine Klammer ohne den Vertragstyp bleibt ruhig.
     expect(
       kartenBefunde({
         '/src/pages/Gruppe3.ts': 'const k: Record<X, (TierMeta | null) & { icon: R }> = {};',
       }),
     ).toEqual([]);
-    // Ein geklammerter ARRAY-Typ ist weiterhin eine Sammlung, keine Karte: die Klammer
-    // umschliesst hier NICHT den ganzen Ausdruck, also wird sie nicht abgeschaelt.
+    // Ein geklammerter ARRAY-Typ bleibt eine Sammlung: die Klammer umschließt hier nicht den
+    // ganzen Ausdruck.
     expect(
       kartenBefunde({ '/src/pages/Gruppe5.ts': 'const k: Record<X, (StatusDarstellung)[]> = {};' }),
     ).toEqual([]);
-    // Und die Sammlung bleibt draussen, auch geklammert.
+    // Die Sammlung bleibt draußen, auch geklammert.
     expect(
       kartenBefunde({
         '/src/pages/Gruppe4.ts': 'const k: Record<X, (Array<StatusDarstellung>)> = {};',
@@ -764,8 +538,7 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
   });
 
   it('erkennt den Vertragstyp auch als Glied eines Durchschnitts', () => {
-    // `StatusDarstellung & { icon }` erweitert den Vertragseintrag — erst recht eine Karte
-    // über dem Vertragstyp. Im Codex-Review gefunden.
+    // `StatusDarstellung & { icon }` erweitert den Vertragseintrag, also eine Karte.
     expect(
       kartenBefunde({
         '/src/pages/Schnitt.ts':
@@ -779,8 +552,7 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
   });
 
   it('greift nur am eigenstaendigen `Record` — `CustomRecord<…>` ist ein anderer Name', () => {
-    // Im Codex-Review gefunden. Die Teilstringsuche begann sonst mitten im fremden
-    // Bezeichner; beide Bauformen sind gueltiger, unverwandter Code.
+    // Die Suche darf nicht mitten in einem fremden Bezeichner beginnen.
     expect(
       kartenBefunde({
         '/src/pages/Eigen.ts': 'const k: CustomRecord<MeinStatus, StatusDarstellung> = {};',
@@ -791,9 +563,7 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
         '/src/pages/Aufruf.ts': 'const k = parseRecord<Input, StatusDarstellung>(roh);',
       }),
     ).toEqual([]);
-    // Die Gegenprobe traegt die Aussage: ein ECHTES `Record` in derselben Datei wird
-    // weiterhin gefunden — sonst waere die Wortgrenze von „Guard abgeschaltet" nicht zu
-    // unterscheiden.
+    // Gegenprobe: ein echtes `Record` in derselben Datei wird weiterhin gefunden.
     expect(
       kartenBefunde({
         '/src/pages/Beide.ts':
@@ -807,8 +577,7 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
   });
 
   it('erkennt den Vertragstyp auch qualifiziert — `sf.StatusDarstellung`', () => {
-    // Im Codex-Review gefunden: ein Namensraum-Import ist gültiges TypeScript und derselbe
-    // Typ, nur anders geschrieben. Der Vergleich gegen den nackten Namen lief daran vorbei.
+    // Ein Namensraum-Import ist derselbe Typ, nur anders geschrieben.
     expect(
       kartenBefunde({ '/src/pages/Ns.ts': 'const k: Record<X, sf.StatusDarstellung> = {};' }),
     ).toHaveLength(1);
@@ -828,10 +597,7 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
     const traeger = Object.entries(dateien).filter(
       ([p, i]) => ausserhalbDesVertrags(p) && i.includes('StatusDarstellung'),
     );
-    // Gemessen am 12.09.2026: NEUN Nicht-Test-Dateien neben dem Vertrag nennen den Typ —
-    // vier Primitive (`StatusTag`, `StatusWahl`, `Datensicht`, `EinstiegSwitcher`), die drei
-    // DB-Achsen-Funktionen, `kraefte/statusAchse.ts` und `lage-dashboard/lagebild.ts`. Die
-    // untere Schranke hält den Scan ehrlich, ohne bei jedem neuen Konsumenten rot zu werden.
+    // Untere Schranke als Selbsttest des Scans; sie wird nicht bei jedem neuen Konsumenten rot.
     expect(traeger.length).toBeGreaterThanOrEqual(6);
   });
 });
@@ -840,9 +606,8 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
 
 /**
  * Ende des öffnenden JSX-Tags ab `start` (Index des `<`), oder `-1`. Zählt geschweifte
- * Klammern und überspringt Zeichenketten — sonst beendete das `>` einer Pfeilfunktion
- * (`onClick={() => tu()}`) das Tag zu früh, und die `color`-Prop dahinter bliebe
- * unsichtbar. Siehe Dateikopf, Abschnitt „zweite Kopie".
+ * Klammern und überspringt Zeichenketten, sonst beendete das `>` einer Pfeilfunktion
+ * (`onClick={() => tu()}`) das Tag zu früh.
  */
 export function tagEnde(text: string, start: number): number {
   let tiefe = 0;
@@ -864,8 +629,8 @@ export function tagEnde(text: string, start: number): number {
 
 /**
  * Balanciertes Ende eines `{…}`-Ausdrucks ab `auf` (Index der öffnenden Klammer);
- * `tag.length`, wenn er nicht schließt. Überspringt Zeichenketten, damit eine Klammer
- * IM String die Bilanz nicht verschiebt (der in LFH-364 gemessene Fehler).
+ * `tag.length`, wenn er nicht schließt. Überspringt Zeichenketten, damit eine Klammer IM
+ * String die Bilanz nicht verschiebt.
  */
 function klammerEnde(tag: string, auf: number): number {
   let tiefe = 0;
@@ -885,20 +650,13 @@ function klammerEnde(tag: string, auf: number): number {
 }
 
 /**
- * Der Wert der `color`-Prop eines Tag-Textes, oder `null` — AUF ATTRIBUTEBENE.
+ * Der Wert der `color`-Prop eines Tag-Textes, oder `null`, AUF ATTRIBUTEBENE.
  *
- * „Attributebene" ist hier die ganze Aussage, nicht eine Feinheit (im Codex-Review zu
- * diesem PR gefunden). Die erste Fassung nahm das ERSTE `color=` im Tag-Text, und das
- * kann in einer Nachbar-Prop stecken: `<Tag icon={<Icon color="blue" />} color={…}>`.
- * Beide Richtungen gehen dann schief — ein verschachteltes Vertrags-`color` erzeugte
- * einen Fehlalarm für den Tag, und ein verschachteltes Preset verdeckte ein verbotenes
- * äußeres `color={rollenFarbe(…)}` vollständig, weil nur der erste Treffer angesehen
- * wurde. Ein Guard, der aus dem falschen Grund rot wird, kostet die Zeit dessen, der
- * ihn debuggt; einer, der aus dem falschen Grund grün bleibt, ist schlimmer.
- *
- * Der Durchlauf überspringt deshalb jede Prop-Expression als Ganzes ({@link klammerEnde})
- * und sieht nur, was zwischen den Attributen steht. `style={{ color: farbe }}` fällt
- * damit ebenfalls heraus — richtig so, das ist keine `color`-Prop.
+ * Das erste `color=` im Tag-Text kann in einer Nachbar-Prop stecken
+ * (`<Tag icon={<Icon color="blue" />} color={…}>`): ein inneres Vertrags-`color` ergäbe einen
+ * Fehlalarm, ein inneres Preset verdeckte ein verbotenes äußeres. Jede Prop-Expression wird
+ * deshalb als Ganzes übersprungen ({@link klammerEnde}); `style={{ color }}` fällt damit
+ * ebenfalls heraus, es ist keine `color`-Prop.
  */
 export function farbAusdruck(tag: string): string | null {
   let i = 0;
@@ -939,16 +697,10 @@ export function farbAusdruck(tag: string): string | null {
 }
 
 /**
- * Die Wire-Werte ALLER Vertragskarten, aus dem Modul abgeleitet statt handgepflegt.
- *
- * Selbst ableitend wie {@link ALLE_MAPS} in `statusFarben.test.ts`: eine neue
- * Enum-Variante ist damit sofort mit abgedeckt. Die Gegenprobe („der Topf ist nicht
- * leer") steht als eigene Zusicherung unten — ohne sie wäre ein kaputter Ableitungsweg
- * von einem sauberen Bestand nicht zu unterscheiden.
- *
- * KEINE Kollision mit antds Farbnamen, und das ist der Grund, warum ein Stringliteral
- * im `color`-Ausdruck überhaupt als Signal taugt: `green`/`blue`/`gold`/`processing`/
- * `default`/… kommen in keiner Vertragskarte als Schlüssel vor (unten geprüft).
+ * Die Wire-Werte ALLER Vertragskarten, aus dem Modul abgeleitet statt handgepflegt; eine neue
+ * Enum-Variante ist damit sofort abgedeckt. Die Gegenprobe („der Topf ist nicht leer“) steht
+ * unten. Kein Wert kollidiert mit antds Farbnamen (unten geprüft), nur deshalb taugt ein
+ * Stringliteral im `color`-Ausdruck als Signal.
  */
 const WIRE_WERTE: ReadonlySet<string> = new Set(
   Object.values(sf).flatMap((wert) =>
@@ -960,8 +712,8 @@ const WIRE_WERTE: ReadonlySet<string> = new Set(
   ),
 );
 
-/** Die Karten und Auflöser des Vertrags beim Namen. Wer sie liest und den Wert dann
- *  selbst an antds `color` gibt, umgeht `StatusTag` — genau der LFH-446-Fall. */
+/** Die Karten und Auflöser des Vertrags beim Namen. Wer sie liest und den Wert selbst an
+ *  antds `color` gibt, umgeht `StatusTag`. */
 const VERTRAGS_NAMEN: readonly string[] = [
   ...Object.keys(sf).filter((k) => k !== 'default'),
   'rollenFarbe',
@@ -969,50 +721,27 @@ const VERTRAGS_NAMEN: readonly string[] = [
 ];
 
 /**
- * Die Vertragsnamen, wie SIE IN DIESER DATEI HEISSEN — und NUR die, die sie wirklich
- * importiert, inklusive Umbenennung (`import { rollenFarbe as farbe }`).
+ * Die Vertragsnamen, wie sie IN DIESER DATEI heißen, und NUR die wirklich importierten,
+ * inklusive Umbenennung (`import { rollenFarbe as farbe }`, real in `pages/uhs/Grundriss.tsx`).
  *
- * „Nur die importierten" ist eine Korrektur (im Codex-Review gefunden): die erste Fassung
- * legte jeder Datei ALLE Vertragsnamen in den Topf. Eine Seite mit einer eigenen lokalen
- * `sichtung`- oder `dringlichkeit`-Variablen und `<Tag color={dringlichkeit}>` wäre damit
- * gemeldet worden, obwohl sie `statusFarben.ts` nie importiert — ein Fehlalarm aus reiner
- * Namensgleichheit, dieselbe Falle wie bei `STATUS_META` eine Ebene tiefer. Die
- * Zusicherung verliert dadurch nichts: wer einen Vertragsexport LIEST, muss ihn
- * importieren; der zweistufige Re-Export bleibt der benannte Blindfleck, der er war.
- *
- * Im Codex-Review gefunden, und es ist kein konstruierter Fall: `pages/uhs/Grundriss.tsx`
- * importiert heute `verfuegbarkeit as verfuegbarkeitVertrag`. Ohne Auflösung trägt ein
- * `<Tag color={farbe(wk[s].rolle, token)}>` weder einen bekannten Namen noch ein
- * Wire-Literal und läuft durch.
- *
- * WARUM JE DATEI UND NICHT EINE GLOBALE NAMENSLISTE — gemessen, nicht abgeleitet:
- * `personen/personMeta.ts` reicht `personStatus as STATUS_META` weiter, und
- * `pages/TiereDetailPage.tsx:44` hat eine EIGENE, gleichnamige Konstante über
- * `TierStatus` (kein Vertrags-Enum), die zu Recht `<Tag color={STATUS_META[…].color}>`
- * malt. Eine globale Liste hätte diese Zeile gemeldet — ein Fehlalarm aus reiner
- * Namensgleichheit, und der ist beim Debuggen teurer als die Lücke, die er schliesst.
- *
- * Der zweite Sprung fehlt bewusst: wer `STATUS_META` aus `personMeta` importiert, wird
- * hier nicht aufgelöst. Gemessen am 12.09.2026 geht KEIN Konsument dieser Re-Exporte
- * über `<Tag color=` — alle nutzen `StatusTag` oder nur `.label`.
+ * Je Datei statt einer globalen Namensliste: eine lokale `dringlichkeit`-Variable oder die
+ * eigene `STATUS_META` über `TierStatus` in `pages/TiereDetailPage.tsx` wären sonst Fehlalarme
+ * aus reiner Namensgleichheit. Re-Export-Ketten werden nicht verfolgt (Blindfleck, siehe
+ * Dateikopf).
  */
 function vertragsNamenIn(inhalt: string): readonly string[] {
   const namen = new Set<string>();
-  // Namensraum-Import: erreichbar sind die Vertragsnamen dann NUR über den Alias, und
-  // genau so kommen sie in den Topf — als `sf.dringlichkeit`, nicht als nackter Name
-  // (im Codex-Review gefunden). Die nackte Fassung meldete jede fremde Eigenschaft
-  // gleichen Namens: `<Tag color={own.dringlichkeit}>` in einer Datei, die `sf`
-  // irgendwo sonst benutzt, liest den Vertrag nicht — und wurde trotzdem gemeldet.
+  // Namensraum-Import: erreichbar sind die Vertragsnamen dann NUR über den Alias, deshalb
+  // kommen sie als `sf.dringlichkeit` in den Topf. Der nackte Name meldete sonst jede fremde
+  // Eigenschaft gleichen Namens.
   const raum = /import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s*['"][^'"]*statusFarben['"]/.exec(
     inhalt,
   );
   if (raum) {
     for (const name of VERTRAGS_NAMEN) namen.add(`${raum[1]}.${name}`);
   }
-  // `[^'"]*statusFarben`, NICHT `theme/statusFarben`: ein Geschwistermodul schreibt
-  // `from './statusFarben'` — ohne Verzeichnis im Pfad. Dass die Geschwister im Schnitt
-  // liegen, ist die Zusicherung von Guard 1; sie hier wieder auszuschliessen wäre
-  // derselbe Fehler eine Ebene tiefer (im Codex-Review gefunden).
+  // `[^'"]*statusFarben`, nicht `theme/statusFarben`: ein Geschwistermodul importiert
+  // `./statusFarben` ohne Verzeichnis, und die Geschwister liegen im Schnitt von Guard 1.
   const importe = inhalt.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"][^'"]*statusFarben['"]/g);
   for (const [, liste] of importe) {
     for (const teil of liste.split(',')) {
@@ -1026,22 +755,10 @@ function vertragsNamenIn(inhalt: string): readonly string[] {
 }
 
 /**
- * Die INHALTE der Zeichenketten-Literale eines Ausdrucks, Maskierung beachtet.
- *
- * Vormals ein Regex (`/(['"`])([^'"`]*)\1/g`) — das kannte kein `\\'` und verschob nach
- * einem maskierten Anfuehrungszeichen alle folgenden Literalgrenzen um eins (im
- * Codex-Review gefunden). Der Wire-Wert dahinter wurde dann nie gefunden, und der Guard
- * blieb gruen ueber genau dem Bestandsbefund, gegen den er gebaut ist. Drei andere
- * Scanner dieser Datei beachten die Maskierung laengst; dieser war der Ausreisser.
- *
- * Die Template-Substitution wird DURCHSTIEGEN, und die erste Fassung tat das nicht —
- * mit einer Begruendung, die schlicht falsch war („mitlesen kann hoechstens einen
- * Treffer mehr liefern, nie einen weniger"). Das Gegenteil stimmt: der ganze Bereich
- * zwischen den Backticks wurde als EIN Literal verbraucht, die Literale DARIN nie
- * besucht. `` `${s.status === 'aktiv' ? 'green' : 'default'}` `` lieferte damit kein
- * `aktiv`, und der Guard blieb gruen ueber genau der Darstellung, gegen die er gebaut
- * ist (im Codex-Review gefunden). Der Text AUSSERHALB der Substitution bleibt dabei ein
- * Literal — beides zusammen, sonst tauscht der Fix die eine Luecke gegen die andere.
+ * Die INHALTE der Zeichenketten-Literale eines Ausdrucks, Maskierung beachtet (ein `\'`
+ * verschöbe sonst alle folgenden Literalgrenzen). Template-Substitutionen werden
+ * durchstiegen: in `` `${s.status === 'aktiv' ? 'green' : 'default'}` `` steckt der Wire-Wert
+ * IN der Substitution. Der Text außerhalb bleibt ein Literal.
  */
 function literalInhalte(text: string, von = 0, bis = text.length): string[] {
   const inhalte: string[] = [];
@@ -1073,42 +790,14 @@ function literalInhalte(text: string, von = 0, bis = text.length): string[] {
 }
 
 /**
- * Die lokalen Namen von antds `Tag` in dieser Datei — `Tag` selbst plus Umbenennungen
- * beim Import (`import { Tag as StatusLabel } from 'antd'`).
+ * Die lokalen Namen von antds `Tag` in dieser Datei: `Tag` selbst plus Umbenennungen beim
+ * Import (`import { Tag as StatusLabel } from 'antd'`).
  *
- * Dieselbe Auflösung wie {@link vertragsNamenIn}, nur auf der anderen Seite des
- * Ausdrucks: dort der gelesene Vertragsname, hier das bemalte Element. Im Bestand
- * benennt niemand `Tag` um (gemessen am 12.09.2026); die Maschinerie stand aber schon,
- * und sie nur einseitig anzuwenden wäre eine Lücke aus Nachlässigkeit statt aus
- * Entscheidung.
- *
- * `Tag` steht IMMER im Topf, auch ohne passenden antd-Import — eine bewusste
- * ÜBER-Annäherung, und die Begründung hier stand zuerst falsch: sie sprach vom Fall
- * „gar kein Import" („die Datei wäre ohnehin kaputt"). Der Fall, auf den es ankommt,
- * ist ein anderer und kam im Codex-Review: ein `Tag`, der aus einer ANDEREN Quelle
- * kommt.
- *
- * Ihn sauber auszuschliessen kann ein Textscanner nicht, und das ist der Grund für die
- * Setzung: `import { Tag } from './ui'` ist EIN Text mit zwei entgegengesetzten
- * Bedeutungen — ein Sammelmodul, das antds `Tag` weiterreicht (muss gescannt werden),
- * und eine eigene Komponente gleichen Namens (müsste draussen bleiben). Welche von
- * beiden, sagt erst die Bindung. Dieselbe Wurzel wie die drei Grenzen oben.
- *
- * Wo die Unterscheidung nicht möglich ist, entscheidet die RICHTUNG des Irrtums. Ein
- * gemeldeter Treffer ist sichtbar und kann bestritten werden; ein stilles Grün über
- * einer verbotenen Darstellung kann das nicht — und Letzteres ist genau der Zustand,
- * gegen den dieser Guard gebaut ist. Dazu kommt, dass ein handbemaltes
- * `<Tag color={rollenFarbe(…)}>` auch auf einer EIGENEN Komponente das ist, was die
- * A2-Regel verbietet („Statusfarbe nur als Punkt/Rand/Beistrich"); antds statisches
- * Farbpaar ist der Ursprung der Regel, nicht ihre Grenze.
- *
- * Gemessen am 13.09.2026: es gibt im Repo keine Nicht-antd-Komponente namens `Tag` und
- * kein Sammelmodul, das aus `antd` weiterexportiert — beide Seiten des Falls sind heute
- * hypothetisch. Meldet der Guard hier je einen legitimen Fall, ist das eine Entscheidung
- * mit Fundstelle statt einer Vermutung.
- *
- * Nicht erfasst: ein Namensraum-Import (`import * as antd from 'antd'` mit
- * `<antd.Tag …>`); im Bestand kommt er an keiner Stelle vor.
+ * `Tag` steht IMMER im Topf, auch ohne antd-Import. Ein Textscanner kann
+ * `import { Tag } from './ui'` nicht auflösen (Sammelmodul mit antds `Tag` oder eigene
+ * Komponente); wo er nicht unterscheiden kann, meldet er lieber sichtbar als still grün zu
+ * bleiben. Ein handbemaltes `<Tag color={rollenFarbe(…)}>` verbietet die Regel auch auf einer
+ * eigenen Komponente. Nicht erfasst: `<antd.Tag …>` nach Namensraum-Import.
  */
 function tagNamenIn(inhalt: string): readonly string[] {
   const namen = new Set(['Tag']);
@@ -1133,9 +822,8 @@ export function tagBefunde(dateien: Record<string, string>): string[] {
       for (let i = inhalt.indexOf(marke); i !== -1; i = inhalt.indexOf(marke, i + marke.length)) {
         // `<Tagline` o. ä. — der Name muss hier enden.
         if (!/[\s/>]/.test(inhalt[i + marke.length] ?? '')) continue;
-        // Und derselbe Filter wie bei den Karten: ein `<Tag …>` IN einer Zeichenkette ist
-        // Text, keine Auszeichnung. Gefiltert wird die Position der MARKE, nicht ihr
-        // Inhalt — die Wire-Werte stecken in den Attributen und müssen lesbar bleiben.
+        // Derselbe Filter wie bei den Karten: ein `<Tag …>` IN einer Zeichenkette ist Text.
+        // Gefiltert wird die Position der Marke; die Wire-Werte in den Attributen bleiben lesbar.
         const davor = inhalt.slice(0, i).split('\n');
         if (inZeichenkette(zeilen[davor.length - 1] ?? '', davor[davor.length - 1].length)) {
           continue;
@@ -1159,9 +847,8 @@ export function tagBefunde(dateien: Record<string, string>): string[] {
 const BEZEICHNER = /[A-Za-z_$][\w$]*/g;
 
 /**
- * Index der zu `auf` gehörenden schliessenden Klammer, oder `bis`. Überspringt
- * Zeichenketten, damit eine Klammer IM String die Bilanz nicht verschiebt — dieselbe
- * Vorsichtsmassnahme wie in {@link klammerEnde}.
+ * Index der zu `auf` gehörenden schließenden Klammer, oder `bis`. Überspringt Zeichenketten
+ * wie {@link klammerEnde}.
  */
 function klammerZu(text: string, auf: number, bis: number): number {
   let tiefe = 0;
@@ -1212,21 +899,12 @@ function markiereZeichenketten(text: string, von: number, bis: number, frei: boo
 }
 
 /**
- * Für jede Stelle: steht sie ausserhalb einer Zeichenkette?
+ * Für jede Stelle: steht sie außerhalb einer Zeichenkette?
  *
- * Der Namensvergleich darf Zeichenketten NICHT sehen (im Codex-Review gefunden):
- * `mode === 'dringlichkeit' ? 'blue' : 'default'` liest den Vertrag nicht, es vergleicht
- * einen Modusnamen — der Bezeichner steht als Wort in einem Literal. Der Wire-Wert-Test
- * eine Funktion weiter unten braucht dieselben Literale dagegen zwingend; die beiden
- * Hälften von {@link grundFuerBefund} sehen den Ausdruck deshalb bewusst verschieden,
- * und das ist keine Ungenauigkeit, sondern der Unterschied zwischen „liest eine
- * Bindung" und „vergleicht einen Wert".
- *
- * Die Template-Substitution ist der Grund für die Rekursion: in
- * `` `${dringlichkeit[s].rolle}` `` ist der Inhalt Code und muss sichtbar bleiben, in
- * `` `Text ${x ? 'dringlichkeit' : y}` `` steckt darin wieder eine Zeichenkette. Eine
- * Maske, die den ganzen Backtick-Bereich ausblendet, hätte den Fehlalarm gegen einen
- * Bypass getauscht.
+ * Der Namensvergleich darf Zeichenketten nicht sehen (`mode === 'dringlichkeit'` liest den
+ * Vertrag nicht), der Wire-Wert-Test braucht sie dagegen. Die beiden Hälften von
+ * {@link grundFuerBefund} sehen den Ausdruck deshalb bewusst verschieden. Rekursiv, weil eine
+ * Template-Substitution wieder Code ist und darin wieder Zeichenketten stehen können.
  */
 function freieStellen(text: string): boolean[] {
   const frei = new Array<boolean>(text.length).fill(true);
@@ -1236,17 +914,16 @@ function freieStellen(text: string): boolean[] {
 
 /**
  * Die innerste zum Zeitpunkt `stelle` offene Klammer (`{`, `(`, `[`) oder `null`.
- * Zeichenketten werden uebersprungen — `frei` sagt, welche Stellen Code sind.
+ * Zeichenketten werden übersprungen; `frei` sagt, welche Stellen Code sind.
  */
 function offeneKlammer(ausdruck: string, stelle: number, frei: boolean[]): string | null {
   const stapel: string[] = [];
   for (let i = 0; i < stelle; i++) {
     if (!frei[i]) continue;
     const z = ausdruck[i];
-    // Die AEUSSERSTE `{` ist der JSX-Ausdruckscontainer der `color`-Prop, kein
-    // Objekt-Literal — `farbAusdruck` liefert den Ausdruck samt Klammern. Ohne diese
-    // Unterscheidung sah `{farbe(wk[s].rolle, token)}` wie eine Methoden-Kurzform aus
-    // und zwei Bestandszusicherungen fielen (beim Bauen gemessen).
+    // Die äußerste `{` ist der JSX-Ausdruckscontainer der `color`-Prop (`farbAusdruck` liefert
+    // die Klammern mit), kein Objekt-Literal. Sonst sähe `{farbe(…)}` wie eine
+    // Methoden-Kurzform aus.
     if (z === '{') stapel.push(i === 0 ? 'jsx' : '{');
     else if (z === '(' || z === '[') stapel.push(z);
     else if (z === '}' || z === ')' || z === ']') stapel.pop();
@@ -1257,42 +934,29 @@ function offeneKlammer(ausdruck: string, stelle: number, frei: boolean[]): strin
 /**
  * Die Zugriffe eines Ausdrucks, getrennt nach WURZEL und QUALIFIZIERT.
  *
- * Eine Wurzel steht für sich (`farbe(…)`, `dringlichkeit`), eine Eigenschaft hinter
- * einem Punkt gehört ihrem Objekt (`sf.dringlichkeit`). Die Trennung ist der Grund,
- * warum ein Name im Topf überhaupt etwas AUSSAGT: ein direkt importierter Name wird
- * gelesen, wenn er als Wurzel auftaucht — als Eigenschaft eines fremden Objekts ist er
- * ein anderer Wert, der bloss gleich heisst. Bei einem Namensraum-Import ist es genau
- * umgekehrt: dort trägt erst der Alias davor die Aussage.
- *
- * Optionales Verketten (`sf?.dringlichkeit`) zählt als derselbe Zugriff.
+ * Ein direkt importierter Name wird gelesen, wenn er als Wurzel auftaucht; als Eigenschaft
+ * eines fremden Objekts ist er ein anderer Wert. Bei einem Namensraum-Import trägt erst der
+ * Alias davor die Aussage. Optionales Verketten (`sf?.x`) zählt als derselbe Zugriff.
  */
 function zugriffe(ausdruck: string): { wurzeln: Set<string>; qualifiziert: Set<string> } {
   const wurzeln = new Set<string>();
   const qualifiziert = new Set<string>();
   const frei = freieStellen(ausdruck);
   const treffer = [...ausdruck.matchAll(BEZEICHNER)].filter((m) => frei[m.index ?? 0]);
-  // Ob der Bezeichner an Position i selbst eine Wurzel ist — gebraucht eine Runde
-  // später, um `theme.sf.x` von `sf.x` zu unterscheiden.
+  // Ob der Bezeichner an Position i selbst eine Wurzel ist, um `theme.sf.x` von `sf.x` zu
+  // unterscheiden.
   const istWurzel: boolean[] = [];
   for (let i = 0; i < treffer.length; i++) {
     const stelle = treffer[i].index ?? 0;
     if (!ausdruck.slice(0, stelle).trimEnd().endsWith('.')) {
-      // Ein Objekt-SCHLUESSEL nennt den Namen, liest die Bindung aber nicht (im
-      // Codex-Review gefunden): in `{ dringlichkeit: eigeneFarbe }` steht der Name
-      // links vom Doppelpunkt. Die KURZFORM `{ dringlichkeit }` liest sie sehr wohl
-      // und hat keinen Doppelpunkt — deshalb reicht „folgt ein `:`" NICHT als
-      // Kennzeichen: im Fragezeichen-Ausdruck `x ? dringlichkeit : andere` folgt
-      // ebenfalls einer, und dort ist es ein echter Zugriff. Ein Schluessel steht
-      // zusaetzlich hinter `{` oder `,`, ein Ternaer-Zweig hinter `?`.
+      // Ein Objekt-SCHLÜSSEL (`{ dringlichkeit: x }`) nennt den Namen, liest die Bindung aber nicht;
+      // die Kurzform `{ dringlichkeit }` liest sie. „Folgt ein `:`“ allein reicht nicht, weil
+      // `x ? dringlichkeit : y` ein echter Zugriff ist: ein Schlüssel steht hinter `{` oder `,`.
       const davor = ausdruck.slice(0, stelle).trimEnd();
       const danach = ausdruck.slice(stelle + treffer[i][0].length).trimStart();
-      // Die METHODEN-Kurzform (`{ dringlichkeit() {…} }`, auch mit `get`/`set`/`async`
-      // davor) ist ebenfalls ein Schluessel. „Folgt ein `(`" allein reicht dafuer nicht
-      // und oeffnete einen Bypass: `waehle(a, dringlichkeit())` sieht genauso aus, ist
-      // aber ein AUFRUF und liest die Bindung. Unterschieden wird an der innersten
-      // offenen Klammer — `{` ist ein Objekt-Literal, `(` eine Argumentliste. Ein
-      // BERECHNETER Schluessel (`{ [dringlichkeit]: x }`) steht in `[` und liest die
-      // Bindung ebenfalls.
+      // Die Methoden-Kurzform (`{ dringlichkeit() {…} }`, auch mit `get`/`set`/`async`) ist ein
+      // Schlüssel, `waehle(a, dringlichkeit())` aber ein Aufruf. Unterschieden wird an der
+      // innersten offenen Klammer; ein berechneter Schlüssel (`[dringlichkeit]`) liest die Bindung.
       const imObjekt = offeneKlammer(ausdruck, stelle, frei) === '{';
       const nachModifikator = /(?:^|[{,])\s*(?:get|set|async)$/.test(davor);
       const istSchluessel =
@@ -1309,11 +973,8 @@ function zugriffe(ausdruck: string): { wurzeln: Set<string>; qualifiziert: Set<s
     }
     istWurzel[i] = false;
     const vorher = treffer[i - 1];
-    // Nur ein Paar, dessen linke Seite die WURZEL der Kette ist (im Codex-Review
-    // gefunden): in `theme.sf.dringlichkeit` heisst das mittlere Glied zufällig wie der
-    // Namensraum, die Kette beginnt aber bei `theme` — `sf` ist dort eine fremde
-    // Eigenschaft, kein Import. Ohne diese Bedingung meldete der Guard den Ausdruck als
-    // Vertragszugriff.
+    // Nur ein Paar, dessen linke Seite die WURZEL der Kette ist: in `theme.sf.dringlichkeit`
+    // ist `sf` eine fremde Eigenschaft, kein Import.
     if (!vorher || !istWurzel[i - 1]) continue;
     const dazwischen = ausdruck.slice((vorher.index ?? 0) + vorher[0].length, stelle);
     if (/^\s*\??\.\s*$/.test(dazwischen)) {
@@ -1324,21 +985,12 @@ function zugriffe(ausdruck: string): { wurzeln: Set<string>; qualifiziert: Set<s
 }
 
 /**
- * Warum dieser `color`-Ausdruck ein Befund ist — oder `null`. Der Grund steht in der
- * Meldung, weil die zwei Fälle verschiedene Abhilfen haben.
+ * Warum dieser `color`-Ausdruck ein Befund ist, oder `null`. Der Grund steht in der Meldung,
+ * weil die zwei Fälle verschiedene Abhilfen haben.
  *
- * Der Namensvergleich zerlegt den Ausdruck in BEZEICHNER, statt aus dem Namen eine
- * Regex zu bauen (im Codex-Review gefunden). Ein Alias darf ein `$` tragen
- * (`import { rollenFarbe as farbe$ }` ist gültiges JavaScript), und interpoliert wird
- * daraus ein Endanker — `<Tag color={farbe$(rolle, token)}>` lief durch, der Guard
- * blieb grün über einer verbotenen Darstellung.
- *
- * **Escapen allein behebt das NICHT, und das ist gemessen** (die naheliegende erste
- * Abhilfe): mit maskiertem `$` verlangt das nachgestellte `\b` eine Wortgrenze hinter
- * dem `$`, und in `farbe$(` stehen dort zwei Nicht-Wortzeichen — der Treffer bleibt
- * aus. Beide Regex-Fassungen liefern `false`, der Token-Vergleich `true`. Ein Name ist
- * ohnehin ein Bezeichner und kein Muster; ihn als Muster zu behandeln war der Fehler,
- * nicht das fehlende Escape.
+ * Verglichen wird Bezeichner gegen Bezeichner, nicht per Regex aus dem Namen: ein Alias darf
+ * ein `$` tragen (`farbe$`), und auch escaped verlangte das nachgestellte `\b` eine Wortgrenze
+ * hinter dem `$`, die in `farbe$(` fehlt.
  */
 function grundFuerBefund(farbe: string, namen: readonly string[]): string | null {
   const { wurzeln, qualifiziert } = zugriffe(farbe);
@@ -1346,10 +998,7 @@ function grundFuerBefund(farbe: string, namen: readonly string[]): string | null
     const trifft = name.includes('.') ? qualifiziert.has(name) : wurzeln.has(name);
     if (trifft) return `liest \`${name}\``;
   }
-  // `[, , wert]`, nicht `[, wert]`: Gruppe 1 ist das Anführungszeichen, Gruppe 2 der
-  // Inhalt. Die kürzere Schreibweise verglich den Quote gegen den Wire-Topf, fand nie
-  // etwas — und der Bestands-Scan war dadurch still halb blind (gemessen: beide
-  // Mutationsproben rot, der echte Baum trotzdem grün).
+  // `[, , wert]`: Gruppe 1 ist das Anführungszeichen, Gruppe 2 der Inhalt.
   for (const wert of literalInhalte(farbe)) {
     if (WIRE_WERTE.has(wert)) return `vergleicht Wire-Wert \`${wert}\``;
   }
@@ -1383,15 +1032,13 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
       ].join('\n'),
     });
     expect(gelesen).toHaveLength(1);
-    // Welchen der beiden Namen die Meldung nennt, hängt an der Exportreihenfolge des
-    // Moduls — festzunageln hieße, sie zum Vertrag zu machen. Geprüft wird, DASS der
-    // Grund benannt ist.
+    // Welchen Namen die Meldung nennt, hängt an der Exportreihenfolge des Moduls; geprüft wird,
+    // DASS der Grund benannt ist.
     expect(gelesen[0]).toMatch(/liest `(rollenFarbe|warnstufeKarte)`/);
   });
 
   it('sieht die Prop auch hinter einer Pfeilfunktion im selben Tag', () => {
-    // Ohne `tagEnde` endete der Tag-Text am `>` von `=>`, und die Prop dahinter wäre
-    // unsichtbar. Genau der Blindfleck, an dem `dichte.guard.test.ts` 21 Stellen verlor.
+    // Ohne `tagEnde` endete der Tag-Text am `>` von `=>`.
     expect(
       tagBefunde({
         '/src/pages/Attrappe3.tsx':
@@ -1401,9 +1048,8 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('liest die `color`-Prop des Tags, nicht die eines Elements in einer Nachbar-Prop', () => {
-    // Im Codex-Review gefunden, und der Fall geht in BEIDE Richtungen schief.
-    // (a) Falsch-negativ: ein verschachteltes Preset verdeckte das verbotene äußere
-    //     `color` vollständig, weil nur der erste Treffer angesehen wurde.
+    // (a) Falsch-negativ: ein verschachteltes Preset darf das verbotene äußere `color` nicht
+    //     verdecken.
     const verdeckt = tagBefunde({
       '/src/pages/Verschachtelt.tsx': [
         "import { rollenFarbe, warnstufeKarte } from '../theme/statusFarben';",
@@ -1412,8 +1058,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     });
     expect(verdeckt).toHaveLength(1);
 
-    // (b) Falsch-positiv: ein Vertrags-`color` INNEN gehört nicht dem Tag. Ein anderes
-    //     Element als `<Tag>` ist dokumentierter Blindfleck, kein Befund dieses Guards.
+    // (b) Falsch-positiv: ein Vertrags-`color` INNEN gehört nicht dem Tag.
     expect(
       tagBefunde({
         '/src/pages/Innen.tsx': [
@@ -1428,8 +1073,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('hält ein Kommentarzeichen IN einer Zeichenkette nicht für einen Kommentar', () => {
-    // Im Codex-Review gefunden, beide Male als Falsch-NEGATIV — der gefährlichen Richtung.
-    // (a) Das `//` einer URL schnitt die Zeile ab, das verbotene `color` dahinter verschwand.
+    // (a) Das `//` einer URL darf die Zeile nicht abschneiden.
     expect(
       tagBefunde({
         '/src/pages/Url.tsx': [
@@ -1439,7 +1083,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
       }),
     ).toHaveLength(1);
 
-    // (b) Ein `/*` im Literal schaltete den GANZEN Rest der Datei stumm.
+    // (b) Ein `/*` im Literal darf den Rest der Datei nicht stummschalten.
     expect(
       tagBefunde({
         '/src/pages/Block.tsx': [
@@ -1449,8 +1093,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
       }),
     ).toHaveLength(1);
 
-    // Und die Gegenprobe, ohne die der Stripper genauso gut fehlen könnte: ein ECHTER
-    // Kommentar mit demselben Wortlaut bleibt unsichtbar.
+    // Gegenprobe: ein ECHTER Kommentar mit demselben Wortlaut bleibt unsichtbar.
     expect(
       tagBefunde({
         '/src/pages/Echt.tsx':
@@ -1460,8 +1103,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('löst eine Umbenennung beim Import auf — je Datei, nicht global', () => {
-    // Im Codex-Review gefunden, und der Alias ist im Bestand real:
-    // `pages/uhs/Grundriss.tsx` importiert `verfuegbarkeit as verfuegbarkeitVertrag`.
+    // Umbenannter Import, real in `pages/uhs/Grundriss.tsx`.
     const umbenannt = tagBefunde({
       '/src/pages/Alias.tsx': [
         "import { rollenFarbe as farbe, warnstufeKarte as wk } from '../theme/statusFarben';",
@@ -1471,8 +1113,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     expect(umbenannt).toHaveLength(1);
     expect(umbenannt[0]).toMatch(/liest `(farbe|wk)`/);
 
-    // Und das Geschwistermodul, das ohne Verzeichnis importiert — genau der Schnitt,
-    // den Guard 1 abdeckt, also muss die Auflösung ihn auch abdecken.
+    // Das Geschwistermodul importiert ohne Verzeichnis und liegt im Schnitt von Guard 1.
     expect(
       tagBefunde({
         '/src/theme/nachbar.ts': [
@@ -1482,10 +1123,8 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
       }),
     ).toHaveLength(1);
 
-    // DIE GEGENPROBE, und sie ist der Grund für „je Datei": `pages/TiereDetailPage.tsx`
-    // hat eine EIGENE `STATUS_META` über `TierStatus` — kein Vertrags-Enum — und malt
-    // damit zu Recht. Eine globale Namensliste hätte die Zeile gemeldet, sobald
-    // `personen/personMeta.ts` denselben Namen für eine Vertragskarte vergibt.
+    // Gegenprobe für „je Datei“: `pages/TiereDetailPage.tsx` hat eine EIGENE `STATUS_META` über
+    // `TierStatus` und malt damit zu Recht.
     expect(
       tagBefunde({
         '/src/pages/EigenerName.tsx': [
@@ -1497,9 +1136,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('vergleicht Bezeichner, nicht Muster — ein Alias mit `$` ist kein Endanker', () => {
-    // Im Codex-Review gefunden. `import { rollenFarbe as farbe$ }` ist gültiges
-    // JavaScript; aus dem Namen eine Regex zu bauen machte aus dem `$` einen Endanker,
-    // und der Guard blieb grün über einer verbotenen Darstellung.
+    // Ein `$` im Alias darf keinen Regex-Endanker ergeben.
     const dollar = tagBefunde({
       '/src/pages/Dollar.tsx': [
         "import { rollenFarbe as farbe$ } from '../theme/statusFarben';",
@@ -1509,9 +1146,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     expect(dollar).toHaveLength(1);
     expect(dollar[0]).toContain('liest `farbe$`');
 
-    // Die Gegenprobe zur Zerlegung: der Vergleich bleibt AM GANZEN Bezeichner. Ein
-    // Alias, der bloss Präfix eines fremden Namens ist, darf nicht melden — sonst
-    // tauschte der Fix den verschluckten Befund gegen einen Fehlalarm.
+    // Gegenprobe: der Vergleich gilt dem ganzen Bezeichner, ein Präfix meldet nicht.
     expect(
       tagBefunde({
         '/src/pages/Praefix.tsx': [
@@ -1523,11 +1158,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('liest Wire-Werte auch hinter einem maskierten Anfuehrungszeichen', () => {
-    // Im Codex-Review gefunden: das Literal-Regex kannte keine Maskierung, waehrend drei
-    // andere Scanner derselben Datei sie laengst beruecksichtigen. Ein `\\'` mitten im
-    // Ausdruck verschob damit alle folgenden Literalgrenzen um eins — `aktiv` wurde nie
-    // gefunden, und der Guard blieb gruen ueber genau dem Bestandsbefund, gegen den er
-    // gebaut ist.
+    // Ein maskiertes `\'` darf die folgenden Literalgrenzen nicht verschieben.
     const maskiert = tagBefunde({
       '/src/pages/Maskiert.tsx':
         "<Tag color={label === 'it\\'s' && s.status === 'aktiv' ? 'green' : 'default'}>{x}</Tag>",
@@ -1537,11 +1168,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('steigt beim Wire-Scan in eine Template-Substitution hinab', () => {
-    // Im Codex-Review gefunden, und es widerlegt meine eigene Begruendung eine Runde
-    // zuvor: ich hatte geschrieben, das Mitlesen einer Substitution koenne "hoechstens
-    // einen Treffer mehr liefern, nie einen weniger". Falsch — der ganze Bereich
-    // zwischen den Backticks wird als EIN Literal verbraucht, die Literale DARIN werden
-    // nie besucht, und der Wire-Wert geht verloren.
+    // Literale IN einer Template-Substitution werden gelesen.
     const vorlage = tagBefunde({
       '/src/pages/WireVorlage.tsx':
         "<Tag color={`${s.status === 'aktiv' ? 'green' : 'default'}`}>{x}</Tag>",
@@ -1549,8 +1176,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     expect(vorlage).toHaveLength(1);
     expect(vorlage[0]).toContain('vergleicht Wire-Wert `aktiv`');
 
-    // Gegenprobe: der Text AUSSERHALB der Substitution bleibt ein Literal und wird
-    // weiterhin gelesen — sonst tauschte der Fix die eine Luecke gegen die andere.
+    // Gegenprobe: der Text AUSSERHALB der Substitution bleibt ein Literal.
     const drumherum = tagBefunde({
       '/src/pages/WireText.tsx': '<Tag color={`aktiv`}>{x}</Tag>',
     });
@@ -1559,9 +1185,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('sieht Vertragsnamen NICHT in Zeichenketten — der Wire-Test dagegen schon', () => {
-    // Im Codex-Review gefunden. Die beiden Hälften von `grundFuerBefund` sehen den
-    // Ausdruck bewusst verschieden: „liest eine Bindung" darf Literale nicht sehen,
-    // „vergleicht einen Wert" braucht sie zwingend.
+    // „Liest eine Bindung“ darf Literale nicht sehen, „vergleicht einen Wert“ braucht sie.
     expect(
       tagBefunde({
         '/src/pages/Wort.tsx': [
@@ -1581,8 +1205,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
       }),
     ).toHaveLength(1);
 
-    // Gegenprobe 2, die tragende: der WIRE-Wert-Test liest weiter aus Literalen —
-    // sonst hätte die Maske den Bestandsbefund dieses PR mit abgeschaltet.
+    // Gegenprobe 2: der Wire-Wert-Test liest weiter aus Literalen.
     const wire = tagBefunde({
       '/src/pages/Wire2.tsx':
         "<Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{x}</Tag>",
@@ -1590,9 +1213,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     expect(wire).toHaveLength(1);
     expect(wire[0]).toContain('vergleicht Wire-Wert `aktiv`');
 
-    // Gegenprobe 3: eine Template-Substitution ist Code und bleibt sichtbar — eine
-    // Maske über den ganzen Backtick-Bereich hätte den Fehlalarm gegen einen Bypass
-    // getauscht.
+    // Gegenprobe 3: eine Template-Substitution ist Code und bleibt sichtbar.
     expect(
       tagBefunde({
         '/src/pages/Vorlage.tsx': [
@@ -1614,13 +1235,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('scannt `<Tag>` auch ohne antd-Importzeile — bewusste Über-Annäherung', () => {
-    // Im Codex-Review vorgeschlagen, den Topf nur aus einem echten antd-Import zu
-    // füllen. Bewusst NICHT übernommen: `import { Tag } from './ui'` ist EIN Text mit
-    // zwei Bedeutungen — Sammelmodul (muss gescannt werden) oder eigene Komponente
-    // (müsste draussen bleiben) —, und welche, sagt erst die Bindung. Wo ein
-    // Textscanner nicht unterscheiden kann, entscheidet die Richtung des Irrtums: ein
-    // Treffer ist sichtbar und bestreitbar, ein stilles Grün über einer verbotenen
-    // Darstellung nicht. Siehe Kopfkommentar von `tagNamenIn`.
+    // Bewusst: `Tag` zählt auch ohne antd-Import, siehe {@link tagNamenIn}.
     const ohneImport = tagBefunde({
       '/src/pages/Sammelmodul.tsx': [
         "import { Tag } from '../components/ui';",
@@ -1630,9 +1245,8 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     });
     expect(ohneImport).toHaveLength(1);
 
-    // Die Gegenprobe: die Über-Annäherung greift NUR über den Namen `Tag`, nicht über
-    // jedes Element mit einer `color`-Prop. Ohne sie wäre die Zusicherung oben von
-    // „der Guard meldet alles" nicht zu unterscheiden.
+    // Gegenprobe: die Über-Annäherung greift nur über den Namen `Tag`, nicht über jedes Element
+    // mit einer `color`-Prop.
     expect(
       tagBefunde({
         '/src/pages/Anderes.tsx': [
@@ -1644,8 +1258,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('folgt auch einer Umbenennung des Tags selbst', () => {
-    // Die andere Seite des Ausdrucks: nicht der gelesene Vertragsname, sondern das
-    // bemalte Element. Im Codex-Review gefunden; im Bestand benennt niemand `Tag` um.
+    // Das bemalte Element kann umbenannt importiert sein.
     const umbenannt = tagBefunde({
       '/src/pages/TagAlias.tsx': [
         "import { Tag as StatusLabel } from 'antd';",
@@ -1655,8 +1268,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     });
     expect(umbenannt).toHaveLength(1);
 
-    // Gegenprobe: ein gleichnamiges Element OHNE den antd-Import bleibt unsichtbar —
-    // sonst meldete der Guard jedes fremde `color` an irgendeinem Element.
+    // Gegenprobe: ein gleichnamiges Element OHNE den antd-Import bleibt unsichtbar.
     expect(
       tagBefunde({
         '/src/pages/Fremdes.tsx':
@@ -1666,10 +1278,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('meldet einen gleichnamigen LOKALEN Wert nicht — Namensgleichheit ist kein Import', () => {
-    // Im Codex-Review gefunden: der Topf wurde jeder Datei mit ALLEN Vertragsnamen
-    // vorbelegt. Eine Seite mit einer eigenen `dringlichkeit` wäre damit gemeldet worden,
-    // ohne `statusFarben.ts` je zu importieren — derselbe Fehlalarm aus Namensgleichheit
-    // wie bei `STATUS_META`, nur eine Ebene höher.
+    // Ohne Import von `statusFarben.ts` zählt eine eigene `dringlichkeit` nicht als Vertragsname.
     expect(
       tagBefunde({
         '/src/pages/Eigen.tsx': [
@@ -1679,8 +1288,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
       }),
     ).toEqual([]);
 
-    // Die Gegenprobe, ohne die der Topf genauso gut leer bleiben könnte: MIT Import wird
-    // derselbe Ausdruck gemeldet.
+    // Gegenprobe: MIT Import wird derselbe Ausdruck gemeldet.
     expect(
       tagBefunde({
         '/src/pages/Gelesen.tsx': [
@@ -1702,9 +1310,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('erreicht einen Namensraum nur über seinen Alias — nicht über den nackten Namen', () => {
-    // Im Codex-Review gefunden. Der Zweig legte bei einem `import * as sf` ALLE
-    // Vertragsnamen nackt in den Topf; eine fremde Eigenschaft gleichen Namens wurde
-    // damit gemeldet, obwohl der Ausdruck `sf` gar nicht liest.
+    // Bei `import * as sf` zählt eine fremde Eigenschaft gleichen Namens nicht.
     expect(
       tagBefunde({
         '/src/pages/Fremdfeld.tsx': [
@@ -1715,7 +1321,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
       }),
     ).toEqual([]);
 
-    // Die Gegenprobe, und sie traegt: derselbe Name ÜBER den Alias bleibt ein Befund.
+    // Gegenprobe: derselbe Name ÜBER den Alias bleibt ein Befund.
     const ueberAlias = tagBefunde({
       '/src/pages/UeberAlias.tsx': [
         "import * as sf from '../theme/statusFarben';",
@@ -1725,10 +1331,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     expect(ueberAlias).toHaveLength(1);
     expect(ueberAlias[0]).toContain('liest `sf.dringlichkeit`');
 
-    // Der Alias muss die WURZEL der Kette sein, nicht irgendein Glied darin: in
-    // `theme.sf.dringlichkeit` heisst das mittlere Glied zufaellig wie der Namensraum,
-    // die Kette beginnt aber bei `theme`. Im Codex-Review gefunden, als Fehler in genau
-    // diesem Fix.
+    // Der Alias muss die WURZEL der Kette sein: in `theme.sf.dringlichkeit` ist `sf` fremd.
     expect(
       tagBefunde({
         '/src/pages/Kette.tsx': [
@@ -1738,9 +1341,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
       }),
     ).toEqual([]);
 
-    // Und die andere Haelfte derselben Trennung: ein DIREKT importierter Name zaehlt als
-    // Wurzel, nicht als fremde Eigenschaft. Ohne diese Zusicherung koennte der Vergleich
-    // still auf „ueberall wo der Name vorkommt" zurueckfallen.
+    // Ein DIREKT importierter Name zählt als Wurzel, nicht als fremde Eigenschaft.
     expect(
       tagBefunde({
         '/src/pages/AlsFeld.tsx': [
@@ -1752,9 +1353,8 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('zaehlt einen Objekt-Schluessel nicht als Lesen — die Kurzform dagegen schon', () => {
-    // Im Codex-Review gefunden: `{ dringlichkeit: eigeneFarbe }` nennt den Namen, liest
-    // die Bindung aber nicht. Die KURZFORM `{ dringlichkeit }` liest sie sehr wohl —
-    // beide Faelle gehoeren als Paar geprueft, sonst ist der Fix eine Abschaltung.
+    // `{ dringlichkeit: eigeneFarbe }` liest die Bindung nicht, die Kurzform
+    // `{ dringlichkeit }` schon. Beide als Paar.
     expect(
       tagBefunde({
         '/src/pages/Schluessel.tsx': [
@@ -1772,9 +1372,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     });
     expect(kurz).toHaveLength(1);
 
-    // Und die Falle daneben: im Fragezeichen-Ausdruck steht vor dem Doppelpunkt ein
-    // echter Zugriff, kein Schluessel. Ein Fix, der nur auf das folgende `:` sieht,
-    // verschluckt ihn.
+    // Im Fragezeichen-Ausdruck steht vor dem Doppelpunkt ein echter Zugriff, kein Schlüssel.
     const frage = tagBefunde({
       '/src/pages/Frage.tsx': [
         "import { dringlichkeit } from '../theme/statusFarben';",
@@ -1785,10 +1383,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('kennt auch die Methoden-Kurzform als Schluessel — ohne den Aufruf zu verlieren', () => {
-    // Im Codex-Review gefunden. Die naheliegende Abhilfe („folgt ein `(`") oeffnet einen
-    // BYPASS: `waehle(a, dringlichkeit())` sieht genauso aus, ist aber ein Aufruf und
-    // liest die Bindung. Unterschieden wird an der innersten offenen Klammer — `{` ist
-    // ein Objekt-Literal, `(` eine Argumentliste.
+    // Methoden-Kurzform ist ein Schlüssel; unterschieden wird an der innersten offenen Klammer.
     expect(
       tagBefunde({
         '/src/pages/Methode.tsx': [
@@ -1808,8 +1403,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
       }),
     ).toEqual([]);
 
-    // DIE GEGENPROBE, ohne die der Fix eine Luecke waere: derselbe Text in einer
-    // Argumentliste ist ein Aufruf und bleibt ein Befund.
+    // Gegenprobe: derselbe Text in einer Argumentliste ist ein Aufruf und bleibt ein Befund.
     const aufruf = tagBefunde({
       '/src/pages/Aufruf2.tsx': [
         "import { dringlichkeit } from '../theme/statusFarben';",
@@ -1829,9 +1423,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('haelt ein Apostroph im JSX-Text nicht fuer den Anfang einer Zeichenkette', () => {
-    // Im Codex-Review gefunden: `stringEnde` paarte das Apostroph in „geht's" mit dem
-    // oeffnenden Anfuehrungszeichen vor `aktiv`. Die Marke `<Tag` lag damit scheinbar
-    // IN einer Zeichenkette und wurde uebersprungen — ein echter Befund verschwand.
+    // Das Apostroph in „geht's“ darf sich nicht mit dem Anführungszeichen vor `aktiv` paaren.
     const prosa = tagBefunde({
       '/src/pages/Prosa.tsx':
         "<div>geht's <Tag color={s.status === 'aktiv' ? 'green' : 'default'} /></div>",
@@ -1839,8 +1431,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     expect(prosa).toHaveLength(1);
     expect(prosa[0]).toContain('vergleicht Wire-Wert `aktiv`');
 
-    // Gegenprobe: eine ECHTE Zeichenkette schirmt weiterhin ab. Ohne sie waere der Fix
-    // von „Filter abgeschaltet" nicht zu unterscheiden.
+    // Gegenprobe: eine ECHTE Zeichenkette schirmt weiterhin ab.
     expect(
       tagBefunde({
         '/src/pages/Doku2.tsx':
@@ -1850,8 +1441,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 
   it('liest ein `<Tag>` IN einer Zeichenkette nicht als Auszeichnung', () => {
-    // Die zweite Hälfte derselben Klasse — im Codex-Review gefunden, nachdem ich sie für
-    // die Karten geschlossen hatte. Fehlalarme zählen in beiden Guards gleich.
+    // Auch für Tags gilt: eine Auszeichnung in einer Zeichenkette ist Text.
     expect(
       tagBefunde({
         '/src/pages/Doku.tsx':
@@ -1866,10 +1456,8 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
       }),
     ).toHaveLength(1);
 
-    // Gegenprobe 2, und die ist die wichtigere: ein Tag HINTER einer geschlossenen
-    // Zeichenkette derselben Zeile ist echt — so steht es im Bestand
-    // (`stammdaten/SprechgruppenTab.tsx:94`). Ein Filter, der beim ersten
-    // Anführungszeichen aufgäbe, machte den halben Bestand unsichtbar.
+    // Gegenprobe 2: ein Tag HINTER einer geschlossenen Zeichenkette derselben Zeile ist echt
+    // (so im Bestand, `stammdaten/SprechgruppenTab.tsx`).
     expect(
       tagBefunde({
         '/src/pages/Nachbar.tsx':
@@ -1881,9 +1469,8 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   it('lässt die legitimen Nachbarn in Ruhe', () => {
     expect(
       tagBefunde({
-        // Presets ohne Enum-Bezug, ein Nicht-Vertrags-Enum, eine Fläche statt eines
-        // Etiketts (Matrix-Zellhinterlegung) und ein `<StatusTag>` — alle vier Formen
-        // stehen so im Bestand.
+        // Presets ohne Enum-Bezug, ein Nicht-Vertrags-Enum, eine Fläche statt eines Etiketts und
+        // ein `<StatusTag>`: alle vier Formen stehen so im Bestand.
         '/src/pages/Attrappe4.tsx': [
           '<Tag color="green">in Dienst</Tag>',
           "<Tag color={ba === 'TMO' ? 'blue' : 'orange'}>{ba}</Tag>",
@@ -1938,12 +1525,9 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
             .join('\n')
             .match(/<Tag(?=[\s/>])/g) ?? [],
       );
-    // Gemessen mit genau diesem Schnitt: 132 `<Tag`-Stellen am 12.09.2026, 70 am 22.09.2026
-    // (Neuentwurf „Instrumententafel" — Status als `StatusChip`/`StatusZelle` statt antd-Tag).
-    // Die untere Schranke ist der Selbsttest gegen einen Schnitt, der nichts mehr findet und
-    // deshalb trivial grün wäre. Sie liegt mit Absicht deutlich unter dem Messwert: der
-    // Neuentwurf baut weitere Tag-Stellen ab, die Zahl kann nur fallen. Wer sie unter 50
-    // drückt, misst neu und senkt die Schranke — ein Schnitt, der NICHTS findet, bleibt rot.
+    // Selbsttest gegen einen Schnitt, der nichts mehr findet. Die Zahl kann nur fallen, weil
+    // Status zunehmend als `StatusChip`/`StatusZelle` erscheint; wer sie unter 50 drückt, misst
+    // neu und senkt die Schranke.
     expect(stellen.length).toBeGreaterThanOrEqual(50);
   });
 });

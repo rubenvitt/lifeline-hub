@@ -2,21 +2,13 @@ import { http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import PersonalTab from './PersonalTab';
+import { adminFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-26 10:00:00',
-};
-const nichtAdmin = { ...admin, system_rolle: 'keiner' };
+const admin = adminFixture();
+const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
 
 const personal = [
   {
@@ -86,7 +78,7 @@ async function menueEintrag(text: string): Promise<HTMLElement> {
 
 function render(benutzer: typeof admin, liste: unknown[] = personal) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+    meHandler(benutzer),
     http.get('/api/personal', () => HttpResponse.json(liste)),
     http.get('/api/personal-vorschlaege', () =>
       HttpResponse.json({ traegerorganisation: ['DRK'] }),
@@ -96,11 +88,7 @@ function render(benutzer: typeof admin, liste: unknown[] = personal) {
     ),
     http.get('/api/benutzer', () => HttpResponse.json([])),
   );
-  return renderMitProviders(
-    <AuthProvider>
-      <PersonalTab />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<PersonalTab />);
 }
 
 describe('PersonalTab', () => {
@@ -284,17 +272,13 @@ describe('PersonalTab', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/personal', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/personal-vorschlaege', () => HttpResponse.json({ traegerorganisation: [] })),
       http.get('/api/qualifikationen', () => HttpResponse.json([])),
       http.get('/api/benutzer', () => HttpResponse.json([])),
     );
-    renderMitProviders(
-      <AuthProvider>
-        <PersonalTab />
-      </AuthProvider>,
-    );
+    renderMitProviders(<PersonalTab />);
 
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch kein Personal')).not.toBeInTheDocument();

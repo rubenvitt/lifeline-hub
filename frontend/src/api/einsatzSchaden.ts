@@ -63,10 +63,9 @@ export function legeSchadenAn(einsatzId: number, daten: SchadenEingabe): Promise
 }
 
 /**
- * Optimistisches Lock (LFH-300/F10): `basisGeaendertAt` trägt den beim Laden gelesenen
- * `geaendert_at`-Stand. Ist er veraltet → 409 statt stillem Overwrite. Ohne Baseline
- * (Lagekarten-Drag lat/lon, Geschädigt-Zuordnung aus der Personen-Detailseite,
- * Konfliktdialog-Overwrite) wird bewusst blind geschrieben.
+ * Optimistisches Lock: `basisGeaendertAt` trägt den beim Laden gelesenen `geaendert_at`-Stand;
+ * veraltet → 409. Ohne Baseline (Lagekarten-Drag lat/lon, Geschädigt-Zuordnung aus der
+ * Personen-Detailseite, Konfliktdialog-Overwrite) wird bewusst blind geschrieben.
  */
 export function aktualisiereSchaden(
   einsatzId: number,
@@ -113,7 +112,7 @@ export function schadenRegistrierAnzeige(nr: number): string {
   return registrierNummer('S', nr);
 }
 
-// ---------- Fotos und Dateien (LFH-21) ----------
+// ---------- Fotos und Dateien ----------
 
 const anhangBasis = (einsatzId: number, schadenId: number) =>
   `/api/einsaetze/${einsatzId}/schaeden/${schadenId}/anhaenge`;
@@ -127,9 +126,8 @@ export function listeSchadenAnhaenge(
 }
 
 /**
- * Legt EINE Datei am Schaden ab (Feld `datei`, design.md D5). Mehrere Fotos entstehen über
- * den Serienmodus des Dialogs, jedes mit eigenem ETB-Nachweis. Timeout wie die übrigen
- * Uploads (25 MiB samt Virenscan über Mobilfunk).
+ * Legt EINE Datei am Schaden ab (Feld `datei`). Mehrere Fotos entstehen über den Serienmodus des
+ * Dialogs, jedes mit eigenem ETB-Nachweis. Timeout wie die übrigen Uploads.
  */
 export function legeSchadenAnhangAb(
   einsatzId: number,
@@ -153,9 +151,9 @@ export function entferneSchadenAnhang(
 }
 
 /**
- * Download über die modul-gegatete Schadensroute — nie über `/anhaenge/{aid}` des Einsatzes
- * (dort 404, die Datei ist modulgebunden). Ein API-Pfad, keine Navigation, deshalb hier und
- * nicht in `routing/deeplinks.ts` (wie `dokumentDownloadPfad`).
+ * Download über die modul-gegatete Schadensroute, nie über `/anhaenge/{aid}` des Einsatzes (dort
+ * 404, die Datei ist modulgebunden). Ein API-Pfad, keine Navigation, deshalb nicht in
+ * `routing/deeplinks.ts`.
  */
 export function schadenAnhangDownloadPfad(
   einsatzId: number,

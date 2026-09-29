@@ -1,4 +1,3 @@
-// frontend/src/command-palette/CommandPalette.zeilenstil.test.tsx
 import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { screen } from '@testing-library/react';
@@ -7,20 +6,12 @@ import { CommandPalette } from './CommandPalette';
 import type { Befehl } from './typen';
 
 /**
- * Belegt, dass BEIDE Renderzweige der Palette denselben Trefflächenboden benutzen
- * (LFH-391 · A3).
+ * Belegt, dass BEIDE Renderzweige (flach und gruppiert) denselben Trefflächenboden benutzen. Der
+ * Boden ist ein Inline-Style, den `dichte.guard` nicht sieht.
  *
- * Seit A3 rendert die Palette bei aktiver Suche flach und bei leerer Suche gruppiert. Der
- * Bedienziel-Boden aus LFH-365 (`minHeight` + Polsterung) ist ein Inline-Style — `dichte.guard`
- * sieht ihn strukturell NICHT, ein Pixel-Padding ist keine Größen-Prop. Ginge er in einem der
- * beiden Zweige verloren, fiele kein Gate und kein anderer Test darauf; genau das ist der
- * Grund für die gemeinsame Renderfunktion, und diese Datei ist ihr Nachweis.
- *
- * Deshalb liegt `palettenZeilenStil` in einem EIGENEN Modul statt neben der Komponente
- * (Präzedenz `bedienzielStil` in `pages/lagekarte/Sidebar.tsx` gilt der Bauform, nicht dem
- * Ort): eine Funktion in der Datei, die man testet, lässt sich nicht ersetzen — und ein
- * Vergleich der zwei gerenderten Zweige gegeneinander bliebe grün, wenn beide dieselbe
- * kopierte Zahl trügen. Die Marke unten kann nur aus der Funktion stammen.
+ * `palettenZeilenStil` liegt deshalb in einem eigenen, ersetzbaren Modul: die Marke unten kann nur
+ * aus der Funktion stammen; ein Vergleich zweier Zweige bliebe grün, wenn beide dieselbe kopierte
+ * Zahl trügen.
  */
 vi.mock('./zeilenStil', () => ({
   palettenZeilenStil: () => ({ minHeight: 4242, padding: '1px 2px' }),
@@ -57,13 +48,8 @@ describe('CommandPalette · Bedienziel-Boden in beiden Zweigen', () => {
 });
 
 /**
- * Die dritte Zeilensorte (LFH-391 · C3): ein Datensatz-Treffer.
- *
- * Er entsteht in `baueDatensatzTreffer` und kommt als `Treffer` herein statt als `Befehl` —
- * genau die Stelle, an der ein eigener Renderzweig naheläge (zweizeilige Treffer, eigene
- * Beschriftungsform). Er läuft deshalb ausdrücklich durch DIESELBE `role="option"`-Schleife;
- * ein eigener Zweig verlöre den Bedienziel-Boden still, und `dichte.guard.test.ts` sieht ein
- * Pixel-Padding strukturell nicht.
+ * Ein Datensatz-Treffer läuft durch DIESELBE `role="option"`-Schleife; ein eigener Renderzweig
+ * verlöre den Boden still.
  */
 describe('CommandPalette · Bedienziel-Boden der Datensatz-Zeile', () => {
   it('nimmt denselben Zeilenstil für einen Datensatz-Treffer', async () => {
@@ -97,9 +83,8 @@ describe('CommandPalette · Bedienziel-Boden der Datensatz-Zeile', () => {
 });
 
 /**
- * Das Tippziel (LFH-665) nimmt seinen Boden aus `vorschauZielStil` — und aus nichts anderem.
- * Die Marke kann nur aus der ersetzten Funktion stammen; ein kopierter Wert im JSX fiele hier
- * auf.
+ * Das Tippziel nimmt seinen Boden aus `vorschauZielStil` und aus nichts anderem; ein kopierter Wert
+ * im JSX fiele hier auf.
  */
 describe('CommandPalette · Bedienziel-Boden des Vorschau-Ziels', () => {
   it('nimmt den Stil aus vorschauZielStil', () => {

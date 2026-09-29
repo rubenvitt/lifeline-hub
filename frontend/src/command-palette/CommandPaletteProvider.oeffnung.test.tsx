@@ -1,8 +1,5 @@
-// frontend/src/command-palette/CommandPaletteProvider.oeffnung.test.tsx
-//
-// Die Öffnungswege der Palette (LFH-645) über den ECHTEN Provider — dort hängen die zwei
-// Stellen, die die präsentationale Palette nicht sieht: der neue Tab (`window.open` in
-// `gehZu`) und der globale Tastendispatcher, der Esc und Strg/⌘+↵ sonst selbst deutete.
+// Die Öffnungswege der Palette über den ECHTEN Provider: dort hängen der neue Tab (`window.open`
+// in `gehZu`) und der globale Tastendispatcher, der Esc und Strg/⌘+↵ sonst selbst deutete.
 import { useRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
@@ -34,9 +31,8 @@ vi.mock('./useBefehle', () => ({
 // Kein Netz: die Datensatzsuche liefert nichts, die Vorschau ist eine Attrappe.
 vi.mock('./useDatensaetze', () => ({ useDatensatzTreffer: () => [] }));
 vi.mock('./Vorschau', () => ({ Vorschau: () => <div>Vorschau-Inhalt</div> }));
-// Der Koordinatensprung ist der ECHTE `koordinatenBefehl` am ECHTEN `navigate` des Hosts —
-// nur die Rechte- und Formatabfragen davor sind weggelassen. So läuft Strg/⌘+↵ genau den Weg,
-// den die Palette im Betrieb nimmt: Zeile → `ausfuehren('neuerTab')` → `gehZu` → `window.open`.
+// Der ECHTE `koordinatenBefehl` am ECHTEN `navigate` des Hosts, nur ohne Rechte- und
+// Formatabfragen: Zeile → `ausfuehren('neuerTab')` → `gehZu` → `window.open`.
 vi.mock('./useKoordinatenSprung', () => ({
   useKoordinatenSprung:
     ({ navigate }: { navigate: (pfad: string, o?: Oeffnung) => void }) =>
@@ -135,9 +131,9 @@ describe('CommandPaletteProvider · Öffnungswege (LFH-645)', () => {
     expect(screen.getByRole('listbox')).toBeInTheDocument();
   });
 
-  // Der Riegel ist der `offen`-Zweig des globalen Dispatchers, NICHT die Palette: gemessen
-  // bleibt dieser Test grün, wenn die Palette Strg+↵ gar nicht abfängt. Er pinnt das
-  // Verhalten aus der Spec, damit ein Umbau des Dispatchers es nicht still kippt.
+  // Der Riegel ist der `offen`-Zweig des globalen Dispatchers, NICHT die Palette (der Test bleibt
+  // grün, wenn die Palette Strg+↵ nicht abfängt). Er pinnt das Verhalten gegen einen Umbau des
+  // Dispatchers.
   it('Strg+↵ auf einer Zeile ohne Ziel löst NICHT das Speichern der Seite darunter aus', async () => {
     const u = userEvent.setup();
     const speichern = vi.fn();

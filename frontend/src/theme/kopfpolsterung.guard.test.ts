@@ -1,21 +1,12 @@
 /**
- * Die Kopf-Polsterung ist verdrahtet — an beiden Kopfzeilen (LFH-329 · B1/M12).
+ * Die Kopf-Polsterung ist an beiden Kopfzeilen verdrahtet (LFH-329 · B1/M12). Ohne sie hängen
+ * die Kopfzeilen am antd-Komponententoken, kompakt rund 47 px je Seite, auf 390 px ein Viertel
+ * der Breite.
  *
- * WARUM QUELLTEXT-PIN UND KEIN KOMPONENTENTEST: `vite.config.ts` fährt Vitest
- * mit `css: false`, und jsdom rechnet kein Layout — eine Media-Regel hat im
- * Unit-Lauf null Wirkung. Eine DOM-Behauptung auf `style.paddingInline` wäre
- * zusätzlich riskant, weil cssstyle logische Kurzschreibweisen mit `var()`
- * verwerfen kann: rot (oder grün) aus dem falschen Grund. Die WIRKUNG belegt
- * `e2e/kopfzeile-schmal.spec.ts` im Browser. Muster: `seitenrinne.guard.test.ts`.
- *
- * Gelesen wird per `node:fs`, NICHT per `import.meta.glob(…?raw)` — der liefert
- * für CSS unter Vitest den Leerstring.
- *
- * WAS HIER AUF DEM SPIEL STEHT: ohne eigene Polsterung hängen beide Kopfzeilen
- * am antd-Komponententoken. Der leitet sich aus der Steuerhöhe ab und beträgt
- * bei der kompakten Stufe rund 47 px je Seite — auf einem 390-px-Schirm knapp
- * ein Viertel der Breite, nur für Rand. Das bricht nichts und fällt erst im
- * Einsatz auf; genau dafür gibt es diesen Pin.
+ * Quelltext-Pin statt Komponententest: Vitest fährt mit `css: false`, jsdom rechnet kein Layout,
+ * und cssstyle kann logische Kurzschreibweisen mit `var()` verwerfen. Die Wirkung belegt
+ * `e2e/kopfzeile-schmal.spec.ts`. Gelesen wird per `node:fs`, weil `import.meta.glob(…?raw)`
+ * für CSS den Leerstring liefert.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -34,11 +25,8 @@ const EINSATZ_LAYOUT = 'einsatz/EinsatzLayout.tsx';
 /** Die Property, um die es geht — als handgeschriebenes Literal, nicht als Konstante. */
 const PROPERTY = '--lfh-kopf-polsterung';
 
-/** Die Schwelle, ab der die Kopfzeile die volle Polsterung trägt: antds `lg`.
- *  Bewusst als Argument und nicht als generisches `@media` — die Datei trägt
- *  bereits einen zweiten Media-Block (die Seitenrinne ab `md`), und ein Guard,
- *  der irgendeinen davon greift, ginge je nach Reihenfolge aus dem falschen
- *  Grund rot. */
+/** Die Schwelle, ab der die Kopfzeile die volle Polsterung trägt: antds `lg`. Als Argument,
+ *  weil die Datei einen zweiten Media-Block (Seitenrinne ab `md`) trägt. */
 function medienblock(mindestbreite: number): Record<string, string> {
   const treffer = new RegExp(`^@media \\(min-width: ${mindestbreite}px\\)\\s*\\{`, 'm').exec(css);
   if (!treffer) throw new Error(`Kein @media-Block ab ${mindestbreite}px in rollen.css`);
@@ -66,47 +54,39 @@ function wurzelblock(): Record<string, string> {
 
 describe('Kopf-Polsterung — die Verdrahtung (LFH-329 · B1/M12)', () => {
   it('mobil zuerst: `:root` trägt das schmale Maß', () => {
-    // Wer die Property ohne Media-Kontext liest, bekommt den sicheren Wert.
-    // Dieselbe Richtung wie bei der Seitenrinne — zwei Achsen, ein Muster.
+    // Ohne Media-Kontext gilt der sichere Wert, wie bei der Seitenrinne.
     expect(wurzelblock()[PROPERTY]).toBe('12px');
   });
 
   it('ab der lg-Schwelle trägt sie das volle Maß', () => {
-    // Die Schwelle wird NICHT neu erfunden: sie ist antds `lg` — dieselbe, an
-    // der die Kopfzeile ihre Umschalter ablegt und der Navigationsrahmen hinter
-    // den Griff wandert. Die Seitenrinne liegt bewusst tiefer (`md`): die
-    // Kopfzeile wird enger, bevor die Fläche es wird.
+    // antds `lg`, dieselbe Schwelle wie für Kopfzeilen-Umschalter und Navigationsrahmen. Die
+    // Seitenrinne liegt tiefer (`md`): die Kopfzeile wird enger, bevor die Fläche es wird.
     const lg = theme.getDesignToken().screenLG;
     expect(lg).toBe(992);
     expect(medienblock(lg)[PROPERTY]).toBe('24px');
   });
 
   it('die Seitenrinne bleibt davon unberührt (zwei Achsen, zwei Schwellen)', () => {
-    // Gegenprobe zum Schnitt oben: der md-Block darf die Kopf-Property NICHT
-    // tragen und der lg-Block nicht die Rinne — sonst hätte einer der beiden
-    // Guards still den falschen Block gelesen.
+    // Gegenprobe: der md-Block darf die Kopf-Property nicht tragen und der lg-Block nicht die
+    // Rinne, sonst läse einer der Guards still den falschen Block.
     expect(medienblock(768)[PROPERTY]).toBeUndefined();
     expect(medienblock(992)['--lfh-seiten-polsterung']).toBeUndefined();
   });
 
   it('der Haupt-`:root`-Block wird vom neuen Media-Block nicht beschattet', () => {
-    // `rollen.guard.test.ts` ankert `:root` am Zeilenanfang und nimmt den ERSTEN
-    // Treffer. Ein unindentierter oder zu weit oben stehender zweiter `:root`
-    // ließe dort ~30 Wertvergleiche still gegen die falschen Werte laufen.
-    // Tagwert seit dem Neuentwurf (21.09.2026): neutral-kühles Grau statt Blaugrau.
+    // `rollen.guard.test.ts` nimmt den ERSTEN `:root` am Zeilenanfang; ein zweiter davor ließe
+    // dessen Wertvergleiche still gegen die falschen Werte laufen.
     expect(wurzelblock()['--lfh-grund']).toBe('#e9ebee');
-    // `[ \t]`, nicht `\s`: letzteres schlösse den Zeilenumbruch ein und träfe
-    // damit JEDEN Media-Block, dem eine Leerzeile vorausgeht (gemessen).
+    // `[ \t]`, nicht `\s`: das schlösse den Zeilenumbruch ein und träfe jeden Media-Block nach
+    // einer Leerzeile.
     expect(css).not.toMatch(/^[ \t]+@media/m);
     // Genau zwei Deklarationen: eine unter `:root`, eine im Media-Block.
     expect(css.match(new RegExp(PROPERTY, 'g'))).toHaveLength(2);
   });
 
   it('beide Kopfzeilen lesen dieselbe Property — genau einmal je Datei', () => {
-    // GEZÄHLT, nicht auf einer Zeile gesucht: der Stil des `<Header>` bricht je
-    // nach Formatierung um, ein Zeilen-Filter wäre also an prettier gebunden.
-    // Beide Layouts sind Geschwister — wer nur eines umstellt, lässt den
-    // Handschirm auf der halben App auf dem Fükw-Maß stehen.
+    // Gezählt statt auf einer Zeile gesucht, damit Prettier-Umbrüche nicht stören. Beide Layouts
+    // sind Geschwister und müssen gemeinsam umgestellt werden.
     for (const datei of [APP_LAYOUT, EINSATZ_LAYOUT]) {
       const inhalt = lies(datei);
       expect(inhalt, `${datei}: hat überhaupt eine Kopfzeile`).toContain('<Header');
