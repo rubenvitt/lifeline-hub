@@ -233,6 +233,13 @@ fn main() {
                 .title("Lifeline Hub")
                 .inner_size(1366.0, 860.0)
                 .min_inner_size(800.0, 560.0)
+                // Im Protokoll steht, welche Seite geladen wurde — beim Support die erste Frage
+                // („Maske oder Server? Welcher?“).
+                .on_page_load(|_fenster, seite| {
+                    if matches!(seite.event(), tauri::webview::PageLoadEvent::Finished) {
+                        log::info!("Seite geladen: {}", seite.url());
+                    }
+                })
                 // Downloads: Vorgabeverhalten beider Webviews — Download-Ordner, Umlaute
                 // erhalten, Dubletten mit Zählzusatz (gemessen in LFH-720, Befund 14).
                 .on_download(|_fenster, ereignis| {
