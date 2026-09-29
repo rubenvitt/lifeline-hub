@@ -9,22 +9,16 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { alsBackendZeit } from '../etb/filterZeit';
 
 /**
- * „Wiederherstellen" während der Karenz (LFH-23, design.md D5/D8) als `ErfassungsModal`.
+ * „Wiederherstellen" während der Karenz als `ErfassungsModal`.
  *
- * Die neue Frist ist PFLICHT: ohne sie stünde `retention_bis` weiter in der Vergangenheit, und
- * der nächste Purge-Lauf merkte den Einsatz sofort wieder vor. Zwei Felder — der Zeitpunkt und
- * „unbegrenzt" (Schalter, Vorgabe AUS: ein Schalter, der von selbst ansteht, ist benutzt
- * worden, ohne gewählt worden zu sein). Ist er an, geht `null` hinaus, der Zeitpunkt ist dann
- * gesperrt und wird nicht verlangt.
+ * Die neue Frist ist PFLICHT: sonst merkte der nächste Purge-Lauf den Einsatz sofort wieder
+ * vor. Zwei Felder: Zeitpunkt und „unbegrenzt" (Schalter, Vorgabe AUS); ist er an, geht `null`
+ * hinaus und der Zeitpunkt ist gesperrt.
  *
- * **Keine `danger`-Rückfrage:** Wiederherstellen ist umkehrbar (die neue Frist lässt sich
- * wieder ändern) und hebt eine Sperre auf, statt sie zu setzen (LFH-363).
- *
- * **Fehler im Dialog, nicht im Toast (Muster `FreigabeDialog`, LFH-535):** die Mutation hat
- * kein `onError`, `mutateAsync` lehnt ab, die Hülle lässt die Felder stehen. 409 (Karenz
- * abgelaufen oder geschwärzt) und 422 (Frist nicht in der Zukunft) erscheinen mit dem
- * Wortlaut des Servers. Montiert = offen: jede Öffnung hat eine frische Mutation ohne alten
- * Fehler.
+ * Keine `danger`-Rückfrage: Wiederherstellen ist umkehrbar und hebt eine Sperre auf.
+ * Fehler (409, 422) stehen im Dialog mit dem Wortlaut des Servers, nicht im Toast; `mutateAsync`
+ * lehnt ab, die Hülle lässt die Felder stehen. Montiert = offen, jede Öffnung hat eine frische
+ * Mutation.
  */
 
 interface WiederherstellenWerte {

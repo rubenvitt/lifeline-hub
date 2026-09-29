@@ -52,9 +52,9 @@ function standAusUrl(url: string | null | undefined): string | null {
 }
 
 /**
- * Verwaltungstabelle der Offline-Karten (MBTiles) mit In-App-Download-Manager (LFH-181).
- * Lesen für alle Admin-Bereichs-Berechtigten; Schreiben (Download/Aktivieren/Abbrechen/Löschen)
- * nur System-Admin. Solange eine Zeile lädt, pollt die Liste (Status-Polling statt SSE).
+ * Verwaltungstabelle der Offline-Karten (MBTiles) mit In-App-Download-Manager. Lesen für alle
+ * Admin-Bereichs-Berechtigten; Schreiben nur System-Admin. Solange eine Zeile lädt, pollt die
+ * Liste (Status-Polling statt SSE).
  */
 export default function OfflineKartenVerwaltung() {
   const { benutzer } = useAuth();
@@ -65,8 +65,8 @@ export default function OfflineKartenVerwaltung() {
   const [urlOffen, setUrlOffen] = useState(false);
   const [vorhandenOffen, setVorhandenOffen] = useState(false);
 
-  // Geteilter Config-Key mit der LagekartePage (`ladeKarteConfig`) — Feature-Flag für die
-  // Bau-UI (LFH-203, B1: `karten_bau_verfuegbar`). `invalidiereKarte` invalidiert diesen Key mit.
+  // Geteilter Config-Key mit der LagekartePage — Feature-Flag für die Bau-UI
+  // (`karten_bau_verfuegbar`). `invalidiereKarte` invalidiert ihn mit.
   const configQuery = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
   const bauVerfuegbar = configQuery.data?.karten_bau_verfuegbar ?? false;
 
@@ -89,8 +89,8 @@ export default function OfflineKartenVerwaltung() {
   const kartenQuery = useQuery({
     queryKey: globalKeys.adminKarteBereich('offline-karten'),
     queryFn: listeOfflineKarten,
-    // Polling: solange irgendeine Karte lädt ODER in-place aktualisiert (Zeile bleibt 'bereit', hat
-    // aber laufenden Fortschritt), alle 2 s neu laden — sonst aus.
+    // Polling alle 2 s, solange eine Karte lädt ODER in-place aktualisiert (Zeile bleibt 'bereit',
+    // trägt aber Fortschritt) — sonst aus.
     refetchInterval: (query) =>
       query.state.data?.some((k) => k.status === 'laedt' || k.geladen != null) ? 2000 : false,
   });
@@ -107,8 +107,8 @@ export default function OfflineKartenVerwaltung() {
     onError: (e) => message.error(fehlerText(e, 'Löschen fehlgeschlagen')),
   });
   // „Aktualisieren" = One-Click-Update: neueren Katalog-Stand laden; das Backend aktiviert die
-  // neue Version nach Erfolg automatisch und entfernt die alte (ersetzt_karte_id). Der Katalog-Pin
-  // (katalog_sha256) wird zur verifizierten Re-Download-Prüfung mitgeschickt.
+  // neue Version nach Erfolg und entfernt die alte (`ersetzt_karte_id`). Der Katalog-Pin
+  // (`katalog_sha256`) geht zur verifizierten Prüfung mit.
   const aktualisierenMutation = useMutation({
     mutationFn: (k: OfflineKarte) =>
       starteOfflineDownload({
@@ -127,9 +127,9 @@ export default function OfflineKartenVerwaltung() {
     },
     onError: (e) => message.error(fehlerText(e, 'Aktualisieren fehlgeschlagen')),
   });
-  // „Neu laden" = In-Place-Hot-Swap (B3) der AKTIVEN Karte: Update in DIESELBE Zeile/Datei. Die
-  // alte Datei bleibt bis zum atomaren Swap aktiv+ausgeliefert (downtime-frei, stabile id). Nur für
-  // die aktive Karte angeboten; inaktive nutzen weiter „Aktualisieren" (neue Zeile + Auto-Aktivieren).
+  // „Neu laden" = In-Place-Hot-Swap der AKTIVEN Karte in dieselbe Zeile/Datei; die alte bleibt
+  // bis zum atomaren Swap ausgeliefert (downtime-frei, stabile id). Inaktive nutzen
+  // „Aktualisieren".
   const neuLadenMutation = useMutation({
     mutationFn: (k: OfflineKarte) =>
       neuLadeOfflineKarte(k.id, {
@@ -153,17 +153,10 @@ export default function OfflineKartenVerwaltung() {
       dataIndex: 'name',
       key: 'name',
       /**
-       * Leitspalte: am Regionsnamen sucht und vergleicht man eine Offline-Karte, nie an der
-       * DB-Kennung — dieselbe Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert.
-       *
-       * KEIN `defaultSortOrder`: das Backend liefert `ORDER BY sortier, id`
-       * (`src/karte/registry/repo.rs:334`); diese fachliche Reihenfolge bleibt Voreinstellung,
-       * die alphabetische ist ein Angebot.
-       *
-       * Die Zelle zeigt mehr, als die Suche liest: „Stand YYYY-MM-DD" und das
-       * Update-Etikett entstehen erst beim Rendern (aus `quell_url` bzw. `update_verfuegbar`)
-       * und tragen deshalb nicht zum Suchkorpus bei — die im Dateikopf von `KatalogTabelle`
-       * beschriebene Grenze, hier ohne Folgen: gesucht wird nach dem Namen.
+       * Leitspalte: am Regionsnamen sucht und vergleicht man, nie an der DB-Kennung.
+       * KEIN `defaultSortOrder`: die Backend-Reihenfolge (`ORDER BY sortier, id`) bleibt Vorgabe, die
+       * alphabetische ist ein Angebot. „Stand YYYY-MM-DD" und das Update-Etikett entstehen erst beim
+       * Rendern und tragen nicht zum Suchkorpus bei — ohne Folgen, gesucht wird nach dem Namen.
        */
       sorter: (a, b) => a.name.localeCompare(b.name, 'de'),
       render: (name: string, k: OfflineKarte) => {
@@ -193,26 +186,16 @@ export default function OfflineKartenVerwaltung() {
       title: 'Status',
       key: 'status',
       /**
-       * Die Statusachse dieser Tabelle, geschlossen und vollständig in den Daten vorhanden:
-       * `listeOfflineKarten` liefert alle Zeilen (`src/karte/registry/repo.rs:334`), erst der
-       * Auslieferungspfad daneben siebt auf `status = 'bereit'` (`:694`).
+       * Die Statusachse, vollständig in den Daten (die Liste liefert alle Zeilen; erst der
+       * Auslieferungspfad siebt auf `bereit`).
        *
-       * BEWUSST OHNE `dataIndex` (Norm der Katalogtabellen): der Filter braucht ihn nicht
-       * (`onFilter` liest den Datensatz selbst), zöge aber den Drahtwert in die
-       * Freitextsuche — „laedt" ist ein Wort, das niemand tippt, weil die Zelle „lädt" zeigt.
-       * Die Kehrseite: `render` bekommt damit als erstes Argument den DATENSATZ, nicht den
-       * Status; der Status wird unten aus `k.status` gelesen.
+       * BEWUSST OHNE `dataIndex`: der Filter braucht ihn nicht, zöge aber den Drahtwert „laedt" in
+       * die Freitextsuche. `render` bekommt damit den DATENSATZ als erstes Argument.
        *
-       * NAMENTLICHE FOLGE, damit sie niemand als Fehler sucht: diese Liste pollt im Zwei-
-       * Sekunden-Takt, solange etwas lädt. Bei gesetztem Filter „lädt" verschwindet eine
-       * Zeile also von selbst aus der Sicht, sobald ihr Download fertig ist. Das ist die
-       * gefilterte Frage ehrlich beantwortet, kein Sprung unter dem Cursor im Sinne von
-       * Kriterium 12 — dort geht es um Zeilen, die ungefragt DAZUkommen.
-       *
-       * Der Filter siebt den STATUS, nicht das Etikett, und einmal fällt beides auseinander:
-       * eine Zeile im In-Place-Neuladen bleibt `status: 'bereit'` und zeigt trotzdem
-       * „aktualisiert" (siehe `render` unten). Sie steckt also im Filter „bereit", nicht in
-       * „lädt" — richtig so, denn die Karte wird währenddessen weiter ausgeliefert.
+       * Bei Filter „lädt" verschwindet eine Zeile von selbst, sobald ihr Download fertig ist (Polling)
+       * — die gefilterte Frage ehrlich beantwortet, kein ungefragter Zuwachs.
+       * Der Filter siebt den STATUS, nicht das Etikett: eine Zeile im In-Place-Neuladen bleibt
+       * `bereit` und zeigt „aktualisiert" — richtig, denn die Karte wird weiter ausgeliefert.
        */
       filters: [
         { text: 'registriert', value: 'registriert' },
@@ -220,20 +203,17 @@ export default function OfflineKartenVerwaltung() {
         { text: 'bereit', value: 'bereit' },
         { text: 'Fehler', value: 'fehler' },
       ],
-      // `String(wert)`: antd typisiert das Filterargument als `React.Key | boolean`, nicht
-      // als unser `OfflineKarteStatus`.
+      // `String(wert)`: antd typisiert das Filterargument als `React.Key | boolean`.
       onFilter: (wert, k) => k.status === String(wert),
       render: (_: unknown, k: OfflineKarte) => {
         const s = k.status;
-        // Ein Download läuft, wenn status='laedt' (Neu-Zeile) ODER ein In-Place-Reload aktiv ist
-        // (die Zeile bleibt 'bereit', trägt aber Live-Fortschritt).
+        // Ein Download läuft bei status 'laedt' (neue Zeile) ODER aktivem In-Place-Reload.
         const laeuft = s === 'laedt' || k.geladen != null;
         if (!laeuft) {
           const t = STATUS_TAG[s];
           return <Tag color={t.color}>{t.label}</Tag>;
         }
-        // Live-Fortschritt aus dem Backend (geladen/gesamt). Ohne Content-Length (gesamt null)
-        // → geladene Bytes statt Prozent.
+        // Live-Fortschritt (geladen/gesamt); ohne Content-Length geladene Bytes statt Prozent.
         const prozent =
           k.geladen != null && k.gesamt ? Math.floor((k.geladen / k.gesamt) * 100) : undefined;
         // In-Place-Reload einer 'bereit'-Zeile: „aktualisiert" (Karte bleibt aktiv), sonst „lädt".
@@ -259,23 +239,17 @@ export default function OfflineKartenVerwaltung() {
       dataIndex: 'groesse',
       key: 'groesse',
       /**
-       * Die zweite Frage an diese Tabelle nach dem Namen: was liegt hier eigentlich auf der
-       * Platte. Numerisch vergleichen, nicht über die formatierte Zeichenkette — sonst stünde
-       * „9,1 MB" hinter „44,0 MB".
-       *
-       * `?? -1`: eine registrierte oder noch ladende Zeile trägt `groesse: null` — unbekannt,
-       * nicht null Bytes. Aufsteigend steht sie damit VOR jeder bekannten Größe, auch vor einer
-       * (theoretischen) Null-Byte-Datei, mit der `?? 0` sie verschmelzen ließe. Der Test misst
-       * die Richtung (unbekannt zuerst), nicht den Unterschied zwischen -1 und 0.
+       * Numerisch vergleichen, nicht über die formatierte Zeichenkette („9,1 MB" hinter „44,0 MB").
+       * `?? -1`: `groesse: null` heißt unbekannt, nicht null Bytes — aufsteigend steht sie VOR jeder
+       * bekannten Größe.
        */
       sorter: (a, b) => (a.groesse ?? -1) - (b.groesse ?? -1),
       render: (g: number | null) => formatGroesse(g),
     },
     {
-      // Multi-Region (LFH-188): alle bereiten Vektor-Regionen werden gemeinsam angezeigt (kein
-      // manuelles Aktivieren mehr). Raster-Offline-Karten (selten/legacy) laufen NICHT über den
-      // Multi-Vektor-Style → sie sind „bereit", aber nicht Teil der gemeinsamen Anzeige; das Tag
-      // verspricht dann kein „wird angezeigt".
+      // Alle bereiten Vektor-Regionen werden gemeinsam angezeigt (kein manuelles Aktivieren).
+      // Raster-Offline-Karten laufen nicht über den Multi-Vektor-Style; ihr Tag verspricht kein
+      // „wird angezeigt".
       title: 'Anzeige',
       key: 'anzeige',
       render: (_: unknown, k: OfflineKarte) => {
@@ -293,19 +267,14 @@ export default function OfflineKartenVerwaltung() {
       dataIndex: 'lizenz',
       key: 'lizenz',
       /**
-       * Lizenztexte sind Fließtext („© OpenStreetMap contributors (ODbL)" und länger) und
-       * trieben ungekürzt die Zeilenhöhe (Befund N13). `showTitle` hält den vollen Wert
-       * erreichbar. Gekappt wird an der ZELLE, nicht über eine Spaltenbreite — die im
-       * Browser gemessene Begründung steht in `OnlineQuellenVerwaltung.tsx`: unter
-       * `table-layout: auto`, das `KatalogTabelle` mit `scroll={{ x: 'max-content' }}`
-       * erzwingt, ist eine Spaltenbreite wirkungslos.
+       * Lizenztexte sind Fließtext und trieben ungekürzt die Zeilenhöhe; `showTitle` hält den vollen
+       * Wert erreichbar. Gekappt an der ZELLE (Begründung in `OnlineQuellenVerwaltung.tsx`).
        */
       ellipsis: { showTitle: true },
       onCell: () => ({ style: { maxWidth: 200 } }),
       render: (l: string | null) => l ?? '—',
-      // LFH-374: gekappter Freitext mit der schwächsten Vergleichsaussage — fällt unter `lg`
-      // weg und wird vom Spaltenschalter mitgezählt (Begründung der Schwelle am Gegenstück
-      // in `OnlineQuellenVerwaltung.tsx`).
+      // Gekappter Freitext mit der schwächsten Vergleichsaussage — fällt unter `lg` weg und wird vom
+      // Spaltenschalter mitgezählt.
       abBreite: 'lg',
     },
     ...(istAdmin
@@ -316,21 +285,18 @@ export default function OfflineKartenVerwaltung() {
             // Die Zeilenaktionen sind kein Vergleichsgegenstand — nicht abwählbar.
             immerSichtbar: true,
             render: (_, k: OfflineKarte) => {
-              // Läuft ein Download (Neu-Zeile 'laedt' ODER In-Place-Reload einer 'bereit'-Zeile)?
-              // Dann nur Abbrechen anbieten, keine Aktivieren/Update/Löschen-Aktionen.
+              // Läuft ein Download, gibt es nur Abbrechen — keine Aktivieren/Update/Löschen-Aktionen.
               const laeuft = k.status === 'laedt' || k.geladen != null;
               return (
-                // `size="middle"` trennt „Löschen" von der neutralen Nachbaraktion (LFH-363-Norm,
-                // hier für B5f eingelöst — das Elternticket führte diese Stelle irrtümlich als
-                // Referenzmuster, sie war in Wahrheit dieselbe Fundstelle wie in `stammdaten/`).
-                // Erzwungen von `components/aktionsabstand.guard.test.ts`.
+                // `size="middle"` trennt „Löschen" von der neutralen Nachbaraktion
+                // (`components/aktionsabstand.guard.test.ts`).
                 <Space size="middle">
                   {k.status === 'bereit' &&
                     k.update_verfuegbar &&
                     k.katalog_url &&
                     !laeuft &&
-                    // Aktive Karte → In-Place-„Neu laden" (downtime-frei, stabile id); inaktive →
-                    // „Aktualisieren" (neue Zeile + Auto-Aktivieren + Alt-Löschung).
+                    // Aktive Karte → In-Place-„Neu laden"; inaktive → „Aktualisieren" (neue Zeile, Auto-Aktivieren,
+                    // Alt-Löschung).
                     (k.aktiv_basemap ? (
                       <Button
                         loading={neuLadenMutation.isPending}
@@ -366,11 +332,11 @@ export default function OfflineKartenVerwaltung() {
     <>
       {istAdmin && (
         <Space style={{ marginBottom: 12 }}>
-          {/* Ein Weg für den Regelfall: bauen (falls nötig) + laden hinter einem Button (LFH-206). */}
+          {/* Ein Weg für den Regelfall: bauen (falls nötig) + laden hinter einem Button. */}
           <Button type="primary" onClick={() => setPickerOffen(true)}>
             Region aufs Gerät bringen
           </Button>
-          {/* Spezialfälle (eigene URL, lokal gebaute Datei) demoted unter „Erweitert". */}
+          {/* Spezialfälle (eigene URL, lokal gebaute Datei) unter „Erweitert". */}
           <Dropdown
             menu={{
               items: [
@@ -398,12 +364,8 @@ export default function OfflineKartenVerwaltung() {
           ))}
         </Space>
       )}
-      {/* Meldung und Detailzeile sind die der abgelösten Handrolle, byte-gleich: das Primitiv
-          bildet mit `ursacheText` genau dieselbe Weiche ab (nur eine `ApiError` trägt eine
-          Meldung, die vor einem Menschen besteht), der Umbau ist also verhaltensgleich und
-          bringt nur die Wiederholung dazu. Wiederholt wird GENAU diese Query, nicht der ganze
-          Karten-Zweig: `invalidiereKarte` zöge Karten-Config und Bau-Status mit, die beide
-          nicht gescheitert sind. */}
+      {/* Wiederholt wird GENAU diese Query, nicht der ganze Karten-Zweig: `invalidiereKarte` zöge
+         Karten-Config und Bau-Status mit, die nicht gescheitert sind. */}
       {kartenQuery.isError ? (
         <SeitenFehler
           text="Offline-Karten konnten nicht geladen werden"
@@ -417,13 +379,10 @@ export default function OfflineKartenVerwaltung() {
           dataSource={karten}
           columns={spalten}
           locale={{ emptyText: 'Noch keine Offline-Karten' }}
-          // Durchsucht werden die Spalten mit Datenbezug: Name, Größe (technisch mit, als
-          // Bytezahl) und Attribution. Status und Anzeige tragen keinen `dataIndex` und damit
-          // nichts bei — Absicht, siehe Statusspalte. Der Platzhalter nennt die beiden Felder,
-          // nach denen tatsächlich getippt wird.
+          // Durchsucht werden Name, Größe (als Bytezahl) und Attribution; Status und Anzeige tragen
+          // keinen `dataIndex`. Der Platzhalter nennt die beiden Felder, nach denen getippt wird.
           suche={{ platzhalter: 'Name oder Attribution' }}
-          // Kriterium 14 (LFH-374): umschaltbarer Spaltensatz mit Zähler. Name ist Spalte 0
-          // und damit nie abwählbar, Aktionen sind `immerSichtbar`.
+          // Umschaltbarer Spaltensatz mit Zähler; Name ist Spalte 0 und nie abwählbar.
           spaltenSchalter={{ bezeichnung: 'Offline-Karten' }}
         />
       )}

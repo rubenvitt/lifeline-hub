@@ -50,8 +50,7 @@ describe('kettenKoepfe', () => {
 
   it('zeigt auch einen VOLLSTÄNDIGEN Zyklus, statt die Berichte fallen zu lassen', () => {
     // Datenfehler 11 → 13 → 11: jedes Glied hat einen Nachfolger, es gibt also keinen Kopf.
-    // Bis LFH-495 war das Ergebnis eine LEERE Liste — beide Berichte verschwanden lautlos
-    // aus der Übersicht. Jetzt trägt das erste Glied der Listenreihenfolge die Kette.
+    // Das erste Glied der Listenreihenfolge trägt die Kette, statt dass beide verschwinden.
     const k = kettenKoepfe([b(11, 13, 1), b(13, 11, 2)]);
     expect(k.map((x) => x.kopf.id)).toEqual([11]);
     expect(k[0].vorgaenger.map((x) => x.id)).toEqual([13]);
@@ -67,8 +66,7 @@ describe('kettenKoepfe', () => {
   });
 
   it('lässt KEINEN Bericht aus der Sicht fallen — auch nicht bei zwei Zyklen', () => {
-    // Die tragende Aussage des Nachzugs, als Mengenvergleich statt als Einzelfall: was in
-    // die Funktion geht, kommt als Kopf oder als Vorgänger wieder heraus.
+    // Mengenvergleich: was in die Funktion geht, kommt als Kopf oder als Vorgänger wieder heraus.
     const liste = [b(11, 13, 1), b(13, 11, 2), b(21, 22, 1), b(22, 21, 2), b(30, null, 1)];
     const k = kettenKoepfe(liste);
     const sichtbar = new Set(k.flatMap((x) => [x.kopf.id, ...x.vorgaenger.map((v) => v.id)]));

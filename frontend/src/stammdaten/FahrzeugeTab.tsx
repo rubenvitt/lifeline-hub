@@ -40,23 +40,20 @@ export default function FahrzeugeTab() {
       dataIndex: 'funkrufname',
       key: 'funkrufname',
       /**
-       * Leitspalte: am Funkrufname wird ein Fahrzeug gesucht, nie an der DB-Kennung —
-       * dieselbe Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert.
+       * Leitspalte: am Funkrufname wird ein Fahrzeug gesucht, nie an der DB-Kennung — dieselbe
+       * Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert.
        *
-       * `numeric: true`, weil Funkrufnamen durchnummeriert sind; rein lexikografisch
-       * stünde „Florian 10" vor „Florian 2" [abgeleitet].
+       * `numeric: true`, weil Funkrufnamen durchnummeriert sind; rein lexikografisch stünde
+       * „Florian 10" vor „Florian 2" [abgeleitet].
        *
-       * KEIN `defaultSortOrder`: das Backend liefert bereits `ORDER BY funkrufname`
-       * (`src/fahrzeug/repo.rs:74`). Die Sortierung ist hier also ein Angebot —
-       * absteigend, und mit `de`-Kollation statt SQLites BINARY-Vergleich — kein
-       * neuer Default.
+       * KEIN `defaultSortOrder`: das Backend liefert bereits `ORDER BY funkrufname`. Die Sortierung
+       * ist ein Angebot — absteigend, und mit `de`-Kollation statt SQLites BINARY-Vergleich.
        */
       sorter: (a, b) => a.funkrufname.localeCompare(b.funkrufname, 'de', { numeric: true }),
       /**
-       * Die Leitspalte führt auf die Detailseite (LFH-346 · A7). Der Anker-Riegel aus
-       * LFH-340 ist hier NICHT nötig: `KatalogTabelle` kennt kein `onZeileKlick` — er
-       * betrifft ausschliesslich `Datensicht`, wo Zeilenklick und Link gleichzeitig feuern
-       * könnten.
+       * Die Leitspalte führt auf die Detailseite. Ein Anker-Riegel ist NICHT nötig: `KatalogTabelle`
+       * kennt kein `onZeileKlick` — das betrifft nur `Datensicht`, wo Zeilenklick und Link
+       * gleichzeitig feuern könnten.
        */
       render: (_, f) => (
         <Link to={fahrzeugDetailPfad(f.id)} style={monoStil(13)}>
@@ -91,12 +88,10 @@ export default function FahrzeugeTab() {
     <AdminPage
       titel="Fahrzeuge"
       aktionen={
-        /* Der Knopf VERSCHWINDET nicht mehr, wenn das Recht fehlt (M16, LFH-345 · C10) —
-           er steht gesperrt, den Grund nennt der Hinweis darunter. Ein fehlender Knopf ist
-           von „diese Seite kann das gar nicht" nicht zu unterscheiden; „ausgegraut" allein
-           wäre eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1).
-           Der Slot liegt AUSSERHALB jedes `<form>` (Dateikopf `AdminPage`) — hier steht
-           deshalb nie ein `htmlType="submit"`, sondern immer ein Modal-Öffner. */
+        /* Der Knopf steht ohne Recht gesperrt, den Grund nennt der Hinweis (LFH-345): ein fehlender
+           Knopf ist von „diese Seite kann das gar nicht" nicht zu unterscheiden, „ausgegraut" allein
+           wäre eine Ein-Kanal-Aussage (WCAG 1.4.1). Der Slot liegt AUSSERHALB jedes `<form>`
+           (`AdminPage`) — hier steht deshalb ein Modal-Öffner, nie ein `htmlType="submit"`. */
         <Button
           type="primary"
           disabled={!istAdmin}
@@ -110,11 +105,9 @@ export default function FahrzeugeTab() {
       }
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
-          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
-          der beiden Formen. Ohne diese Weiche behauptet „Noch keine Fahrzeuge" auch dann
-          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
+         `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Noch
+         keine Fahrzeuge" einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
       {fahrzeugeQuery.isError ? (
         <SeitenFehler
           text="Fahrzeuge konnten nicht geladen werden"
@@ -128,10 +121,9 @@ export default function FahrzeugeTab() {
           dataSource={fahrzeugeQuery.data ?? []}
           columns={spalten}
           locale={{ emptyText: 'Noch keine Fahrzeuge' }}
-          // Durchsucht werden die vier Spalten mit Datenbezug: Funkrufname, Typ, Träger,
-          // Kennzeichen. Stärke und Status sind render-only und tragen nichts bei. Der
-          // Platzhalter nennt die drei, nach denen tatsächlich gesucht wird — die volle
-          // Aufzählung würde im 220 px breiten Feld ohnehin abgeschnitten.
+          // Durchsucht werden die vier Spalten mit Datenbezug (Funkrufname, Typ, Träger, Kennzeichen);
+          // Stärke und Status sind render-only. Der Platzhalter nennt drei — die volle Aufzählung würde
+          // im schmalen Feld abgeschnitten.
           suche={{ platzhalter: 'Funkrufname, Typ oder Kennzeichen' }}
         />
       )}

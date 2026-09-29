@@ -10,9 +10,8 @@ function verteilung(v: Partial<StatusVerteilung> = {}): StatusVerteilung {
 describe('AmpelZelle', () => {
   it('trägt die Bezeichnung an der ZÄHLGRUPPE und blendet die Zierde für Vorleser aus', () => {
     /**
-     * Die Auflösung des scheinbaren Widerspruchs „`aria-hidden`" gegen „`aria-label`":
-     * es sind zwei verschiedene Knoten. Die Ikone ist Zierde und darf nicht der
-     * alleinige Bedeutungsträger sein; die Bedeutung hängt am Etikett der Gruppe.
+     * `aria-hidden` und `aria-label` sind zwei Knoten: die Ikone ist Zierde, die Bedeutung hängt am
+     * Etikett der Gruppe.
      */
     const { container } = render(
       <AmpelZelle bezeichnung="Personal" verteilung={verteilung({ verfuegbar: 7 })} />,
@@ -20,24 +19,20 @@ describe('AmpelZelle', () => {
     const gruppe = screen.getByRole('group', { name: 'Personal' });
     expect(gruppe).toBeInTheDocument();
     expect(screen.getByLabelText('Personal')).toBeInTheDocument();
-    // Ein antd-Icon bringt sein eigenes englisches `aria-label` mit (`role="img"`, hier
-    // „user"). Der Gruppenname bleibt davon unberührt — `aria-label` schlägt den Inhalt —,
-    // aber der Knoten selbst überlebt und stünde in JEDER Zeile der Tabelle als eigenes,
-    // ansteuerbares Ziel. Gemessen: ohne die `aria-hidden`-Hülle wird diese Zeile rot.
+    // Ein antd-Icon bringt `role="img"` mit englischem `aria-label` mit; ohne `aria-hidden`-Hülle
+    // stünde es in jeder Tabellenzeile als eigenes Ziel.
     expect(within(gruppe).queryByRole('img')).toBeNull();
     const zierde = container.querySelector('[aria-hidden="true"]');
-    // KEIN Emoji, kein Schriftzeichen: ein `@ant-design/icons`-Knoten (`.anticon`) mit
-    // einem echten SVG. Der Test geht rot, wenn jemand die Zierde wieder als Zeichenkette
-    // hereinreicht ODER die `aria-hidden`-Hülle entfernt.
+    // Ein `@ant-design/icons`-Knoten mit echtem SVG — rot, wenn die Zierde wieder als Zeichenkette
+    // käme ODER die Hülle fehlte.
     expect(zierde?.querySelector('.anticon svg')).not.toBeNull();
     expect(zierde?.textContent).toBe('');
   });
 
   it('jede Zahl trägt einen Kurztext — die Farbe ist Verstärkung, nicht Kanal', () => {
     /**
-     * Kriterium 6 / WCAG 1.4.1. `.lfh-feld--alarm .lfh-zahl` codiert AUSSCHLIESSLICH über
-     * Textfarbe; ohne den Kurztext daneben wäre „3" in Rot die einzige Aussage. Der
-     * Volltext hängt zusätzlich als `title` am Feld.
+     * `.lfh-feld--alarm .lfh-zahl` codiert NUR über Textfarbe; ohne den Kurztext wäre „3" in Rot
+     * die einzige Aussage. Der Volltext hängt zusätzlich als `title` am Feld.
      */
     const { container } = render(
       <AmpelZelle
@@ -70,7 +65,7 @@ describe('AmpelZelle', () => {
         verteilung={verteilung({ gebunden: 2, nicht_verfuegbar: 0 })}
       />,
     );
-    // gebunden = 2 → achtung; nicht_verfuegbar = 0 → keine Klasse (rote 0 wäre Kriterium 7).
+    // gebunden = 2 → achtung; nicht_verfuegbar = 0 → keine Klasse (eine rote 0 wäre falsch).
     expect(container.querySelectorAll('.lfh-feld--achtung')).toHaveLength(1);
     expect(container.querySelectorAll('.lfh-feld--alarm')).toHaveLength(0);
   });
@@ -82,8 +77,6 @@ describe('AmpelZelle', () => {
   });
 
   it('bringt KEIN Status-Etikett mit — sonst stünden hier wieder bis zu acht Tags', () => {
-    // Regressionsanker gegen den Bestand (`verteilungTags`): vier `Space`-Tags je Achse,
-    // acht in einer 220-px-Spalte, ohne `wrap`.
     const { container } = render(
       <AmpelZelle
         bezeichnung="Fahrzeuge"

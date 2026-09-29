@@ -1,10 +1,9 @@
 /**
- * Geteilte Status-/Prio-Semantik der Kommunikations-Module (LFH-112).
+ * Geteilte Status-/Prio-Semantik der Kommunikations-Module.
  *
- * Drei gemeinsame Ober-Phasen (+ Ausnahme) mit festen antd-Tag-Farben. Jedes
- * Modul mappt seine eigenen Status-Strings auf diese Phasen, behält aber sein
- * Fachlabel als Badge-Text. „Quittiert" (Kenntnisnahme) ist eine ORTHOGONALE
- * Achse und NICHT Teil der Phase (siehe QuittungIndikator).
+ * Drei gemeinsame Ober-Phasen (+ Ausnahme). Jedes Modul mappt seine Status-Strings darauf und
+ * behält sein Fachlabel. „Quittiert" ist eine ORTHOGONALE Achse, nicht Teil der Phase (siehe
+ * QuittungIndikator).
  */
 
 export type KommPhase = 'offen' | 'in_arbeit' | 'abgeschlossen' | 'ausnahme';
@@ -36,16 +35,10 @@ export function prioRang(prio: string): number {
 /**
  * Status-Deskriptor eines Moduls: Fachlabel + gemeinsame Ober-Phase.
  *
- * `unbearbeitet` markiert den EINGANGSZUSTAND — den, den noch niemand angefasst
- * hat (LFH-343 · C8, Befund H47). Er trägt einen eigenen Akzent und ein fettes
- * Warn-Etikett, während der angefasste Zustand neutral bleibt.
- *
- * Es ist bewusst KEINE fünfte {@link KommPhase}: `BEFEHL_STATUS.entwurf`,
- * `LAGEBERICHT_STATUS.entwurf`, `ERINNERUNG_STATUS.offen` und
- * `NACHFORDERUNG_STATUS.angefordert` liegen alle auf der Phase `offen` und wären
- * von einer neuen Phase stillschweigend zu „neu" umklassifiziert worden — samt
- * Durchschlag auf `PHASE_META` und `istAbgeschlossen`. Die Marke gehört an den
- * einzelnen Status, nicht an die Achse.
+ * `unbearbeitet` markiert den EINGANGSZUSTAND (noch von niemandem angefasst) mit eigenem
+ * Akzent. Bewusst KEINE fünfte {@link KommPhase}: Befehls-/Lagebericht-Entwurf, offene
+ * Erinnerung und angeforderte Nachforderung liegen ebenfalls auf `offen` und wären von einer
+ * neuen Phase zu „neu" umklassifiziert worden. Die Marke gehört an den Status, nicht an die Achse.
  */
 export type StatusDeskriptor = Record<
   string,
@@ -85,12 +78,9 @@ export const ERINNERUNG_STATUS: StatusDeskriptor = {
 };
 
 /**
- * BEFEHL (`BefehlStatus`, `api/types.generated.ts` — `'entwurf' | 'freigegeben'`).
- *
- * Zwei Zustände, keine Zwischenphase: ein Befehl ist bearbeitbarer Entwurf oder
- * freigegeben. Die Fortschreibung erzeugt eine NEUE Zeile mit `version + 1` im Status
- * `entwurf`, der Vorgänger bleibt `freigegeben` — beide Fassungen stehen deshalb
- * gleichzeitig in der Liste (LFH-330 · B2).
+ * BEFEHL (`BefehlStatus` — `'entwurf' | 'freigegeben'`).
+ * Die Fortschreibung erzeugt eine NEUE Zeile mit `version + 1` im Status `entwurf`, der
+ * Vorgänger bleibt `freigegeben` — beide Fassungen stehen gleichzeitig in der Liste.
  */
 export const BEFEHL_STATUS: StatusDeskriptor = {
   entwurf: { label: 'Entwurf', phase: 'offen' },
@@ -98,11 +88,9 @@ export const BEFEHL_STATUS: StatusDeskriptor = {
 };
 
 /**
- * LAGEBERICHT (`LageberichtStatus`, `api/types.generated.ts` — dieselben zwei Werte).
- *
- * Bewusst dieselbe Achse wie {@link BEFEHL_STATUS} und nicht deren Alias: die Gleichheit
- * ist eine fachliche Aussage über zwei Module und in `phase.test.ts` gepinnt. Ein Alias
- * machte eine spätere Divergenz zu einer Umbenennung statt zu einer Entscheidung.
+ * LAGEBERICHT (`LageberichtStatus` — dieselben zwei Werte).
+ * Bewusst dieselbe Achse wie {@link BEFEHL_STATUS} und nicht deren Alias: eine spätere
+ * Divergenz soll eine Entscheidung sein, keine Umbenennung (gepinnt in `phase.test.ts`).
  */
 export const LAGEBERICHT_STATUS: StatusDeskriptor = {
   entwurf: { label: 'Entwurf', phase: 'offen' },

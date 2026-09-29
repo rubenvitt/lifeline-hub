@@ -85,9 +85,8 @@ describe('FahrzeugVorschau (LFH-664)', () => {
   });
 
   /**
-   * Die Spec „Kein zusätzlicher Abruf": ist das Fach der Palette warm, holt die Vorschau
-   * nicht neu. `new QueryClient()` statt `neuerQueryClient()` — dessen `gcTime: 0` räumte
-   * das per `setQueryData` gesetzte, noch unbeobachtete Fach vor dem Render weg.
+   * Ist das Fach der Palette warm, holt die Vorschau nicht neu. `new QueryClient()`: dessen
+   * `gcTime: 0` räumte das unbeobachtete Fach vor dem Render weg.
    */
   it('holt bei warmem Fach nicht neu', async () => {
     const zaehler = { n: 0 };
@@ -116,7 +115,7 @@ describe('FahrzeugVorschau (LFH-664)', () => {
     expect(zaehler.n).toBe(1);
   });
 
-  /** Die Spec „Live-Änderung während der Vorschau": der neue Status kommt ohne Neuöffnen an. */
+  /** Live-Änderung während der Vorschau: der neue Status kommt ohne Neuöffnen an. */
   it('zeigt einen live geänderten Status', async () => {
     const client = new QueryClient();
     const key = datensatzAbfrage.fahrzeuge(5).queryKey;

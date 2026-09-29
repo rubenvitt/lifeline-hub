@@ -13,41 +13,26 @@ import { useDemoDatenStatus } from './useDemoDaten';
 const { Sider, Content } = Layout;
 
 /**
- * Admin-Shell (LFH-284): eine linke Sidebar (gruppiertes `Menu`) als EINZIGE Nav-Ebene für
- * `/admin` + `<Outlet>`. Löst die frühere doppelte Nav (Top-Tabs + In-Page-Umschalter) auf.
- * Menu-Einträge und Routen stammen aus derselben `adminNav`-Registry; die aktive Sektion folgt
- * der URL (kein eigener Nav-State). Sitzt unter <AppLayout> (globale Topbar kommt von dort).
- * Gate: `darfVerwaltung` (admin oder fuehrungskraft, seit LFH-328 aus `einsatz/schreibrecht.ts`
- * statt lokaler Kopie) — sonst Redirect zu /einsaetze. Benutzer-Eintrag nur für System-Admins
- * (strengeres Gate der Seite selbst bleibt zusätzlich bestehen). Der Eintrag „Demo-Daten“
- * (LFH-690) zusätzlich nur, wenn `GET /api/demo-daten` mit 200 antwortet.
+ * Admin-Shell: eine linke Sidebar (gruppiertes `Menu`) als EINZIGE Nav-Ebene für `/admin`, plus
+ * `<Outlet>`. Menü und Routen stammen aus der `adminNav`-Registry; die aktive Sektion folgt der
+ * URL. Gate `darfVerwaltung` (sonst Redirect zu /einsaetze). „Benutzer" und „Aufbewahrung" nur
+ * für System-Admins, „Demo-Daten“ zusätzlich nur bei 200 von `GET /api/demo-daten`.
  */
 /**
- * Menü-Key einer Sektion — EINE Quelle für den Eintrag UND den Präfix-Match unten. Zwei
- * Schreibweisen desselben Schlüssels wären genau die Drift, die die Markierung still verlöre.
+ * Menü-Key einer Sektion — EINE Quelle für Eintrag und Präfix-Match, sonst verlöre eine
+ * Schreibweisen-Drift die Markierung still.
  */
 function sektionsKey(gruppe: string, sektion: string): string {
   return `${gruppe}/${sektion}`;
 }
 
 /**
- * Der zu markierende Menü-Eintrag zum aktuellen Pfad — PRÄFIX-Match statt Gleichheit
- * (LFH-346 · C11, Review-Befund): die Menü-Keys sind exakt zweisegmentig
- * (`stammdaten/fahrzeuge`), die Detailrouten aus A7 dreisegmentig
- * (`stammdaten/fahrzeuge/7`). Mit `selectedKeys={[aktiv]}` war auf einer Detailseite KEIN
- * Eintrag markiert — die Sidebar sah aus, als hätte man die Verwaltung verlassen, und der
- * Rückweg hatte keinen hervorgehobenen Anker.
- *
- * Zwei Riegel gegen ein zu gieriges Präfix: der Trenner `/` (ohne ihn markierte der Key
- * `stammdaten/personal` auch eine Route `stammdaten/personalstatus`) und der LÄNGSTE statt
- * erste Treffer (bei künftig tiefer verschachtelten Keys gewänne sonst der kürzere).
- *
- * Gemessen und hier festgehalten, damit es niemand als Deckung missversteht: auf den heute
- * erreichbaren Routen genügt JEDER der beiden allein — einzeln zurückgedreht bleibt die Suite
- * grün, rot wird sie erst, wenn beide fallen. Das einzige Präfix-Paar im Bestand
- * (`stammdaten/personal` / `…-status`) wird vom Trenner schon abgefangen. Beide bleiben
- * trotzdem stehen: der erste dreisegmentige Menü-Key braucht den Längen-Vergleich, der erste
- * Key ohne Trenner den anderen.
+ * Der zu markierende Menü-Eintrag — PRÄFIX-Match statt Gleichheit, weil Detailrouten
+ * (`stammdaten/fahrzeuge/7`) tiefer liegen als die Menü-Keys; sonst sähe die Sidebar auf einer
+ * Detailseite verlassen aus.
+ * Zwei Riegel gegen ein zu gieriges Präfix: der Trenner `/` (sonst träfe `stammdaten/personal`
+ * auch `…personalstatus`) und der LÄNGSTE statt erste Treffer (für tiefer verschachtelte Keys).
+ * Heute genügt jeder allein; beide bleiben für künftige Keys.
  */
 function markierterKey(keys: string[], aktiv: string): string | undefined {
   return keys
@@ -64,16 +49,12 @@ export default function AdminLayout() {
   const { pathname } = useLocation();
   const { token } = theme.useToken();
   const { rollen } = useRollen();
-  // ALLE Hooks vor den frühen Rückgaben unten. Die Breitenfrage stellt ausschließlich
-  // `useViewport` — nicht antds `Sider breakpoint`, das eine zweite Wahrheit neben der
-  // Viewport-Achse wäre. Gemessen am Vorgänger (e2e, 390 px): die Leiste klappte auf 1 px,
-  // ihr Nullbreiten-Griff (50 px in `kompakt`, 102 px in `handschuh`) lag dann ÜBER dem
-  // linken Inhaltsrand; in der Vorschau wurde zusätzlich ein Überlauf auf 408/411 px
-  // gemeldet, der sich im e2e nicht nachstellen ließ.
+  // ALLE Hooks vor den frühen Rückgaben. Die Breitenfrage stellt nur `useViewport`, nicht antds
+  // `Sider breakpoint` (eine zweite Wahrheit, deren Nullbreiten-Griff bei 390 px über dem Inhalt lag).
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
   const [navOffen, setNavOffen] = useState(false);
-  // Demo-Daten (LFH-690): fragt nur für den System-Admin ab (`enabled` im Hook), 404 heißt aus.
+  // Demo-Daten: fragt nur für den System-Admin ab, 404 heißt aus.
   const { freigeschaltet: demoFreigeschaltet } = useDemoDatenStatus();
 
   if (laedt) {
@@ -90,8 +71,7 @@ export default function AdminLayout() {
 
   const istSystemAdmin = benutzer?.system_rolle === 'admin';
   // Die Sonder-Einträge in EINER Liste, damit Menü, Markierung und schmale Bauform nicht
-  // auseinanderlaufen. `demoFreigeschaltet` ist ohnehin nur für den System-Admin wahr, die
-  // Bedingung steht trotzdem ausgeschrieben da.
+  // auseinanderlaufen.
   const sonderEintraege = [
     ...(istSystemAdmin ? [adminBenutzer] : []),
     ...(istSystemAdmin ? [adminAufbewahrung] : []),
@@ -104,8 +84,7 @@ export default function AdminLayout() {
     ...adminGruppen.map((g) => ({
       key: g.key,
       type: 'group' as const,
-      // Gruppentitel als Augenbraue (Neuentwurf: Modulpanel-Kopf) — der Wortlaut bleibt der
-      // der Registry, nur der Satz ist 10 px/600/Versalien.
+      // Gruppentitel als Augenbraue; der Wortlaut bleibt der der Registry.
       label: <Augenbraue>{g.label}</Augenbraue>,
       children: g.sektionen.map((s) => ({ key: sektionsKey(g.key, s.key), label: s.label })),
     })),
@@ -128,7 +107,7 @@ export default function AdminLayout() {
             itemColor: rollen.text2,
             itemHoverBg: rollen.flaeche,
             itemHoverColor: rollen.text,
-            // `flaeche3`, nicht `flaeche2`: die läge am Tag bei 1,01 : 1 auf `paneel` (LFH-618).
+            // `flaeche3`, nicht `flaeche2`: die läge am Tag bei 1,01 : 1 auf `paneel`.
             itemSelectedBg: rollen.flaeche3,
             itemSelectedColor: rollen.text,
             activeBarBorderWidth: 0,
@@ -151,12 +130,9 @@ export default function AdminLayout() {
 
   if (!breit) {
     /*
-     * UNTER `lg` STAPELT DIE SEITENLEISTE (Leitlinie „Seitenleisten stapeln unter lg"), als
-     * EXPANDER über dem Inhalt — kein zweiter Navigations-Drawer: die Ausnahme dafür ist in
-     * CLAUDE.md ausdrücklich auf den Einsatz-Rahmen beschränkt. Zugeklappt nennt der Knopf
-     * den aktuellen Bereich, damit der Ort auch ohne offene Liste lesbar bleibt; nach der
-     * Wahl klappt die Liste wieder zu, sonst schöbe sie jede Sektion um ihre volle Höhe
-     * nach unten. Der Knopf ist ein antd-`Button` und erbt damit die Dichte-Staffel.
+     * UNTER `lg` STAPELT DIE SEITENLEISTE als Expander über dem Inhalt — kein zweiter
+     * Navigations-Drawer (die Ausnahme gilt nur dem Einsatz-Rahmen). Zugeklappt nennt der Knopf den
+     * aktuellen Bereich; nach der Wahl klappt die Liste zu, sonst schöbe sie jede Sektion nach unten.
      */
     const aktuell = [
       ...adminGruppen.flatMap((g) =>
@@ -201,10 +177,8 @@ export default function AdminLayout() {
 
   return (
     <Layout style={{ background: 'transparent' }}>
-      {/* Die Verwaltungs-Seitenleiste im Stil des Modulpanels (Neuentwurf, `shell.dc.html`):
-          Grund `paneel`, Haarlinie zur Seite, Radius 0, aktive Zeile auf `flaeche3` statt
-          der antd-Pille. Farben aus den Rollen, Höhen aus der Staffel. Ab `lg` immer
-          sichtbar; die schmale Bauform steht oben. */}
+      {/* Die Verwaltungs-Seitenleiste im Stil des Modulpanels: Grund `paneel`, Haarlinie, Radius 0,
+         aktive Zeile auf `flaeche3`. Ab `lg` immer sichtbar; die schmale Bauform steht oben. */}
       <Sider
         theme="light"
         width={220}

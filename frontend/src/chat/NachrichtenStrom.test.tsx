@@ -348,15 +348,10 @@ describe('NachrichtenStrom', () => {
 });
 
 /**
- * „n neue Nachrichten"-Pille statt bedingungslosem Sprung (LFH-466, Nachzug LFH-343 · C8).
- *
- * WARUM DIE METRIKEN GESTELLT WERDEN: jsdom rechnet kein Layout und liefert für
- * `scrollTop`/`clientHeight`/`scrollHeight` konstant 0. Damit wäre
- * `0 + 0 >= 0 - TOLERANZ` immer wahr — die Komponente hielte sich in JEDEM
- * Vitest-Lauf für „am Boden", spränge und zeigte nie eine Pille. Ein Test „am
- * Boden erscheint keine Pille" wäre so trivial grün und könnte nicht rot werden.
- * Deshalb werden die drei Werte per `defineProperty` gesetzt; die e2e-Zusicherung
- * im Browser (`e2e/chat-neue-nachrichten.spec.ts`) bleibt die tragende.
+ * „n neue Nachrichten"-Pille statt bedingungslosem Sprung.
+ * Die Scroll-Metriken werden gestellt: jsdom liefert konstant 0, die Komponente hielte sich
+ * sonst immer für „am Boden", und „am Boden keine Pille" wäre trivial grün. Tragend bleibt
+ * `e2e/chat-neue-nachrichten.spec.ts`.
  */
 describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
   /** Setzt die drei Scroll-Metriken, die jsdom nicht rechnet. */
@@ -384,8 +379,7 @@ describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
     );
     const strom = screen.getByTestId('nachrichten-strom');
     const scrollTo = vi.fn();
-    // jsdom kennt `scrollTo` auf Elementen nicht — der Spion IST hier zugleich
-    // das Polyfill, deshalb wird die Sprung-Aussage über ihn geführt.
+    // jsdom kennt `scrollTo` auf Elementen nicht — der Spion ist zugleich das Polyfill.
     (strom as unknown as { scrollTo: unknown }).scrollTo = scrollTo;
     return {
       strom,
@@ -459,10 +453,8 @@ describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
     fireEvent.scroll(strom);
     expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
 
-    // Die zweite Hälfte, und die schärfere: der MERKER muss mit zurück. Ohne
-    // `amBodenRef.current = unten` im Scroll-Handler bliebe der Zähler geräumt (also
-    // keine Pille, obiger Satz grün), aber der Strom spränge für den Rest der Sitzung
-    // nie wieder mit.
+    // Der MERKER muss mit zurück: ohne `amBodenRef.current = unten` im Scroll-Handler bliebe
+    // keine Pille, aber der Strom spränge für den Rest der Sitzung nie wieder mit.
     zeige([A, B, C]);
     expect(scrollTo).toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
@@ -489,9 +481,8 @@ describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
     zeige([A, B]);
     expect(await screen.findByRole('button', { name: '1 neue Nachricht' })).toBeInTheDocument();
 
-    // Das Fenster wird breiter, der Inhalt passt wieder — `scrollTop` steht schon auf
-    // 0 und bleibt es, es feuert also KEIN Scroll-Ereignis mehr. Ohne die Rückstellung
-    // im Effekt bliebe die Pille für immer stehen.
+    // Das Fenster wird breiter, der Inhalt passt wieder: `scrollTop` bleibt 0, es feuert KEIN
+    // Scroll-Ereignis. Ohne die Rückstellung im Effekt bliebe die Pille stehen.
     scrollTo.mockClear();
     setzeMetriken(strom, { scrollTop: 0, clientHeight: 2000, scrollHeight: 2000 });
     zeige([A, B, C]);

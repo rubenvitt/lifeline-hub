@@ -8,9 +8,8 @@ import {
   istEinsatzLeitung,
 } from './schreibrecht';
 
-// Wahrheitstabelle für die zentrale Schreibrecht-Regel (LFH-234). Sie ist das Sicherheitsnetz
-// für die 4→1-Vereinheitlichung der zuvor 29-fach kopierten Inline-Varianten (A/B/C/D) und
-// pinnt die beiden bewussten Verhaltens-Deltas: (a) Admin-global-WRITE, (b) Null-Rolle-Tightening.
+// Wahrheitstabelle für die zentrale Schreibrecht-Regel (LFH-234). Pinnt die beiden bewussten
+// Verhaltensentscheidungen: (a) Admin-global-WRITE, (b) Null-Rolle ohne Schreibrecht.
 
 const aktiv = { status: 'aktiv' as const };
 const zu = { status: 'abgeschlossen' as const };

@@ -6,10 +6,9 @@ import { einsatzKeys } from '../api/queryKeys';
 import { aufloeseStandardModul, redirectZiel } from './modulRegistry';
 
 /**
- * Index-Route /einsaetze/:id → relatives Default-Modul. Berücksichtigt das pro
- * Einsatz konfigurierbare Standard-Modul (LFH-131); fällt auf das globale
- * `redirectZiel()` (Dashboard, sonst ETB) zurück, wenn keines gesetzt oder das
- * gesetzte Modul nicht (mehr) fertig ist.
+ * Index-Route /einsaetze/:id → relatives Default-Modul. Berücksichtigt das pro Einsatz
+ * konfigurierbare Standard-Modul (LFH-131); fällt auf `redirectZiel()` (Überblick, sonst ETB)
+ * zurück, wenn keines gesetzt oder das gesetzte Modul nicht (mehr) fertig ist.
  */
 export default function DefaultModulRedirect() {
   const { id } = useParams();

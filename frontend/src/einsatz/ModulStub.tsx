@@ -6,9 +6,10 @@ import { ladeEinstellungen } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
 
-/** Beschriftung des Rückweg-Knopfes aus der Registry — „Überblick öffnen" statt eines
- *  nichtssagenden „Zurück". Fällt die Route aus der Registry heraus, bleibt der
- *  generische Text (der Pfad selbst ist von `aufloeseStandardModul` gedeckt). */
+/**
+ * Beschriftung des Rückweg-Knopfes aus der Registry („Überblick öffnen" statt „Zurück").
+ * Fällt die Route aus der Registry heraus, bleibt der generische Text.
+ */
 function rueckwegLabel(zielRoute: string): string {
   const ziel = modulZuRoute(zielRoute);
   return ziel ? `${ziel.label} öffnen` : 'Standardmodul öffnen';
@@ -17,14 +18,11 @@ function rueckwegLabel(zielRoute: string): string {
 /**
  * Stub-Seite für geplante/WIP-Module. Route existiert, Inhalt ist Platzhalter.
  *
- * Die Route bleibt bewusst erreichbar und der Registry-Eintrag sichtbar (LFH-328/A2,
- * Task 11): `stab` ist über `App.tsx` als Route erreichbar und in `App.test.tsx`
- * gepinnt — ein ausgeblendeter Navigationseintrag ließe die Route als unerreichbare
- * Sackgasse zurück, statt sie aufzulösen. Aufgelöst wird sie stattdessen durch einen
- * Rückweg auf das Standardmodul des Einsatzes.
+ * Route und Registry-Eintrag bleiben bewusst erreichbar (LFH-328): ein ausgeblendeter Eintrag
+ * ließe die Route als Sackgasse zurück. Aufgelöst wird sie durch einen Rückweg auf das
+ * Standardmodul des Einsatzes.
  *
- * Dass die Kommandopalette WIP-Module dagegen ausfiltert (`command-palette/befehle.ts`,
- * `status !== 'fertig'`), ist keine Inkonsistenz, sondern Absicht: die Palette ist der
+ * Dass die Kommandopalette WIP-Module ausfiltert, ist Absicht: die Palette ist der
  * Schnellzugriff auf Arbeitsfähiges, die Modul-Rail zeigt den Modulbestand.
  */
 export default function ModulStub({ modul }: { modul: ModulEintrag }) {

@@ -5,11 +5,9 @@ import type { EtbFilterWerte } from '../api/etb';
 import EtbFilterleiste from './EtbFilterleiste';
 
 /**
- * Tippen unter Fake-Timern läuft über `fireEvent`, nicht über `userEvent` — gemessen:
- * `userEvent.type` kommt in dieser Kombination nicht voran und der Test endet im
- * 10-s-Timeout statt in einer Aussage. `fireEvent.change` ist synchron und braucht keine
- * Timer-Kooperation; die Entprellung selbst wird davon nicht berührt, sie hängt am
- * `onChange` des Feldes.
+ * Tippen unter Fake-Timern läuft über `fireEvent`: `userEvent.type` kommt in dieser
+ * Kombination nicht voran und endet im Timeout. `fireEvent.change` ist synchron; die
+ * Entprellung hängt am `onChange` des Feldes und bleibt unberührt.
  */
 function tippe(feld: HTMLElement, text: string) {
   let bisher = '';
@@ -30,11 +28,8 @@ describe('EtbFilterleiste', () => {
   });
 
   /**
-   * Entprellung der Volltextsuche (LFH-342 · C7, Befund M80).
-   *
-   * Der Befund war messbar: jedes Zeichen erzeugte einen eigenen Query-Key, zwölf
-   * Zeichen also zwölf Abrufe über den ganzen Tagebuchbestand. Die Zusicherung ist
-   * deshalb eine ZAHL, keine Anwesenheit.
+   * Entprellung der Volltextsuche: jedes Zeichen erzeugte sonst einen eigenen Query-Key und
+   * einen Abruf über den ganzen Tagebuchbestand. Die Zusicherung ist deshalb eine ZAHL.
    */
   it('entprellt die Volltextsuche — 13 Zeichen ergeben höchstens 2 Meldungen', () => {
     vi.useFakeTimers();
@@ -70,11 +65,10 @@ describe('EtbFilterleiste', () => {
   });
 
   /**
-   * Der Typ ist seit dem Neuentwurf (S4) NICHT mehr Teil dieser Leiste — er steht als
-   * Segmentleiste im Seitenkopf. Die Zusicherung „ein Nachläufer der Suchfrist
-   * überschreibt den gewählten Typ nicht" lebt deshalb an der Nahtstelle: die Leiste meldet
-   * nur IHRE Schlüssel, die Seite führt zusammen (`zeitachseModell.test.ts`,
-   * `filterZusammenfuehren`; `EtbPage.test.tsx`, „Segment und Suche …").
+   * Der Typ ist nicht Teil dieser Leiste — er steht als Segmentleiste im Seitenkopf. „Ein
+   * Nachläufer der Suchfrist überschreibt den gewählten Typ nicht" lebt deshalb an der
+   * Nahtstelle: die Leiste meldet nur IHRE Schlüssel, die Seite führt zusammen
+   * (`zeitachseModell.test.ts`, `filterZusammenfuehren`; `EtbPage.test.tsx`, „Segment und Suche …").
    */
   it('meldet nur ihre eigenen Schlüssel — nie einen Typ, auch wenn einer in der URL stand', () => {
     vi.useFakeTimers();
@@ -108,8 +102,8 @@ describe('EtbFilterleiste', () => {
   });
 
   /**
-   * Hydrierung aus der URL (LFH-342 · C7). Die Leiste bleibt unkontrolliert — begründet
-   * im Dateikopf —, nimmt ihren Anfangsstand aber aus `startWerte`.
+   * Hydrierung aus der URL: die Leiste bleibt unkontrolliert, nimmt ihren Anfangsstand aber aus
+   * `startWerte`.
    */
   it('zeigt einen aus der URL geladenen Filter an', () => {
     render(
@@ -119,9 +113,8 @@ describe('EtbFilterleiste', () => {
       />,
     );
     expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('brand');
-    // Der Zeitwert kommt als UTC-Wire-String und muss als ORTSZEIT im Feld stehen.
-    // Ohne die Umkehr aus `filterZeit.ts` stünde hier der Wert um den Zonenversatz
-    // verschoben — der Fehlermodus, wegen dem die Leiste bis LFH-342 nicht hydrierte.
+    // Der Zeitwert kommt als UTC-Wire-String und muss als ORTSZEIT im Feld stehen; ohne die Umkehr
+    // aus `filterZeit.ts` stünde er um den Zonenversatz verschoben.
     expect(screen.getByPlaceholderText('von')).toHaveValue('2026-08-21 08:00:00');
   });
 

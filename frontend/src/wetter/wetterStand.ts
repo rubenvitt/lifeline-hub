@@ -1,16 +1,13 @@
 /**
- * Reine Einordnung der Wetterteile der Modulseite „Wetter & Pegel" (LFH-633, design.md D2).
+ * Reine Einordnung der Wetterteile der Modulseite „Wetter & Pegel".
  *
- * Arbeitsteilung wie beim Pegel (LFH-606): das Backend prüft beim Antworten die OBERGRENZE,
- * ab der ein Stand gar nicht mehr taugt (6 h Warnungen, 12 h Vorhersage), und meldet dann
- * `ausfall`. Ob ein Stand „veraltet" ist, entscheidet diese Datei gegen die Uhr der Anzeige,
- * aus `abgerufen_at` (letzter erfolgreicher Abruf, RFC 3339) — und sie prüft die Obergrenze
- * NOCH EINMAL: kommt keine neue Antwort (Rechner offline, aus dem Ruhezustand geweckt), hält
- * die Abfrage ihre alten Daten, und die Prüfung des Backends greift nie. Aus demselben Grund
- * fallen abgelaufene Warnungen und vergangene Vorhersagestunden hier noch einmal heraus.
+ * Das Backend meldet `ausfall` ab der OBERGRENZE (6 h Warnungen, 12 h Vorhersage). „Veraltet"
+ * entscheidet diese Datei gegen die Uhr der Anzeige aus `abgerufen_at` — und prüft die
+ * Obergrenze NOCH EINMAL: kommt keine neue Antwort (offline, Ruhezustand), hält die Abfrage
+ * alte Daten und die Backend-Prüfung greift nie. Aus demselben Grund fallen abgelaufene
+ * Warnungen und vergangene Stunden hier noch einmal heraus.
  *
- * Die Eingabetypen sind strukturell, damit die Datei nicht an den Namen der generierten
- * Wire-Typen hängt, sondern nur an den Feldern, die sie liest.
+ * Strukturelle Eingabetypen, damit die Datei nur an den gelesenen Feldern hängt.
  */
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
 import { PEGEL_STAND_UNBEKANNT, VERALTET, standZeit } from '../pegel/pegelKennzahl';
@@ -42,8 +39,8 @@ export interface TeilStand {
   stand: string | null;
 }
 
-/** Zustand eines Teils. Unlesbares oder fehlendes `abgerufen_at` bei `ok` zählt als
- *  unbekannt — ein Stand ohne Zeitpunkt ist keiner. Rein. */
+/** Zustand eines Teils. Fehlendes oder unlesbares `abgerufen_at` bei `ok` zählt als unbekannt.
+    Rein. */
 export function teilStand(
   teil: { zustand: string; abgerufen_at?: string | null },
   name: WetterTeilName,
@@ -62,10 +59,8 @@ export function teilStand(
 }
 
 /**
- * „gilt jetzt" (Beginn ≤ jetzt oder unbekannt) gegen „angekündigt". Eine Warnung, deren Ende
- * verstrichen ist (`ende ≤ jetzt`, dieselbe Grenze wie `quelle::gueltige` im Backend), fällt
- * heraus — die Abfrage läuft alle 5 min, die Uhr alle 30 s. Die Reihenfolge der Eingabe
- * (Backend: Stufe absteigend, dann Beginn) bleibt in beiden Hälften erhalten. Rein.
+ * „gilt jetzt" (Beginn ≤ jetzt oder unbekannt) gegen „angekündigt". Abgelaufene Warnungen
+ * (`ende ≤ jetzt`, wie `quelle::gueltige`) fallen heraus. Die Eingabereihenfolge bleibt. Rein.
  */
 export function teileWarnungen<W extends { beginn?: string | null; ende?: string | null }>(
   warnungen: readonly W[],
@@ -89,9 +84,8 @@ const STUNDE_MS = 60 * 60_000;
 
 /**
  * Jede dritte Stunde ab der laufenden, innerhalb von 24 h — gezählt nach ZEIT, nicht nach
- * Index: fehlt in der Reihe eine Stunde, verrutscht der Takt sonst unbemerkt. Stunden VOR der
- * laufenden fallen heraus, auch wenn seit dem letzten Abruf eine volle Stunde verstrichen ist
- * (dieselbe Regel wie `quelle::kommende_stunden` im Backend). Rein.
+ * Index, sonst verrutscht der Takt bei einer fehlenden Stunde. Vergangene Stunden fallen
+ * heraus (wie `quelle::kommende_stunden`). Rein.
  */
 export function dreiStundenTakt<S extends { zeitpunkt: string }>(
   alle: readonly S[],

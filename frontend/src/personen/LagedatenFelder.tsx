@@ -7,17 +7,13 @@ import { parseKoordinate } from './koordinate';
 dayjs.extend(utc);
 
 /**
- * Die zwei Formularfelder der Lagedaten einer Person (LFH-613), die Maske
- * (`AufnahmeFelder`) und Detailseite (`PersonenDetailPage`) GLEICH brauchen — eine
- * Schreibweise, ein Prüfweg, eine Zeitumrechnung.
+ * Die zwei Lagedaten-Felder einer Person, die Maske und Detailseite gleich brauchen:
  *
- *  · **Koordinate** — EIN Textfeld `52.2691/9.1342` (Design D6) statt zweier Zahlenfelder,
- *    geprüft über `personen/koordinate.ts`, dieselbe Funktion wie die Schnellerfassungszeile.
- *    Leer ist gültig. Zerlegt wird beim Absenden vom Aufrufer, nicht hier: die Maske schickt
- *    eine leere Koordinate gar nicht, die Detailseite leert mit ihr das Paar.
- *  · **„vermisst seit"** — das Formular hält den WIRE-String (UTC ohne Zone), der Picker
- *    zeigt Ortszeit (`etb/filterZeit.ts`, beidseits der Sommerzeit getestet). Höchstens
- *    fünf Minuten Vorlauf wie im Backend (sonst 400).
+ *  · **Koordinate** — EIN Textfeld `52.2691/9.1342`, geprüft über `personen/koordinate.ts`.
+ *    Leer ist gültig. Zerlegt wird vom Aufrufer: die Maske schickt eine leere Koordinate nicht,
+ *    die Detailseite leert mit ihr das Paar.
+ *  · **„vermisst seit"** — das Formular hält den WIRE-String (UTC ohne Zone), der Picker zeigt
+ *    Ortszeit (`etb/filterZeit.ts`). Höchstens fünf Minuten Vorlauf wie im Backend (sonst 400).
  */
 
 /** Wie das Backend: höchstens fünf Minuten Vorlauf (vorgehende Geräteuhr). */

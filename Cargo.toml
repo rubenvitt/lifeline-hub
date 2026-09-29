@@ -36,7 +36,7 @@ mime_guess = "2"
 percent-encoding = "2"
 rust-embed = "8"
 # OpenAPI-Codegen als Wahrheitsquelle für die Frontend-Typen.
-utoipa = "5"
+utoipa = "6"
 tower-http = { version = "0.7", features = ["fs", "catch-panic", "trace", "request-id"] }
 # Prod-Abhängigkeit: der PMTiles-Tile-Handler nutzt `tower::ServiceExt::oneshot` (routes/karte.rs).
 tower = { version = "0.5", features = ["util", "limit"] }

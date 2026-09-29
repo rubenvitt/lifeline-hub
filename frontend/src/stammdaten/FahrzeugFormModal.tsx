@@ -12,17 +12,16 @@ import { fahrzeugDetailPfad } from './stammdatenDetail';
 import { teilwortSuche } from '../components/teilwortSuche';
 
 /**
- * SCHNELLERFASSUNG, kein Vollformular mehr (LFH-346 · A7, Befund H36).
+ * SCHNELLERFASSUNG, kein Vollformular (LFH-346, Befund H36).
  *
  * Sichtbar bleiben genau die vier Felder, ohne die ein Fahrzeug nicht angelegt bzw. im
  * Einsatz nicht gefunden werden kann. Die übrigen sieben (OPTA, Standort, FMS-ISSI,
- * Sonder-/Wegerecht, Tragenkapazität, Soll-Stärke, Bemerkung) sind nicht gestrichen,
- * sondern auf `FahrzeugDetailPage` gewandert — elf Felder in einem 520-px-Dialog
- * verletzen die UI-Form-Leitlinie (LFH-19: Modal ≤ ~3, Schnellerfassung ≤ ~4).
+ * Sonder-/Wegerecht, Tragenkapazität, Soll-Stärke, Bemerkung) stehen auf
+ * `FahrzeugDetailPage` — elf Felder in einem Dialog verletzen LFH-19 (Modal ≤ ~3,
+ * Schnellerfassung ≤ ~4).
  *
  * **Kein `<Collapse>` für den Rest.** Ein eingeklapptes Feld ist immer noch in diesem
- * Formular; die Faustregel aus CLAUDE.md sagt für einen Edit-Modus mit vielen Feldern
- * „eigene Route", nicht „weniger sichtbar".
+ * Formular; ein Edit-Modus mit vielen Feldern gehört auf eine eigene Route.
  */
 interface FormWerte {
   funkrufname: string;
@@ -47,11 +46,9 @@ export default function FahrzeugFormModal({
   const { message } = App.useApp();
 
   /**
-   * VORBELEGUNG, kein Zurücksetzen (LFH-346/A6 nach dem Muster von `PersonalFormModal`).
-   * Der frühere Anlegen-Zweig (`resetFields()` + `sondersignal: false`) ist weg: das
-   * Zurücksetzen macht `ErfassungsModal` auf allen vier Auswegen selbst. Ein
-   * zurückgebliebener Aufrufer-Reset wäre doppelt und verdeckte, ob die Hülle ihre
-   * Zusicherung überhaupt einlöst.
+   * VORBELEGUNG, kein Zurücksetzen (Muster `PersonalFormModal`): das Zurücksetzen macht
+   * `ErfassungsModal` auf allen vier Auswegen selbst. Ein Aufrufer-Reset wäre doppelt und
+   * verdeckte, ob die Hülle ihre Zusicherung einlöst.
    */
   useEffect(() => {
     if (!offen || !fahrzeug) return;
@@ -68,12 +65,10 @@ export default function FahrzeugFormModal({
       /**
        * NUR die vier sichtbaren Felder — beide Wege.
        *
-       * Beim BEARBEITEN ist das die tragende Zusicherung: `PATCH /api/fahrzeuge/{id}` ist
-       * ein echter Teil-Patch (LFH-306), fehlender Key = unverändert, `null` = leeren. Ein
-       * `opta: leerZuNull(undefined)` wäre `null` — ein Bearbeiten in der Liste löschte
-       * damit die sieben Felder, die diese Maske gar nicht zeigt. Beim ANLEGEN gibt es
-       * nichts zu erhalten; dieselben vier Keys genügen, `sondersignal` trägt serverseitig
-       * ein `#[serde(default)]`.
+       * Beim BEARBEITEN tragend: `PATCH /api/fahrzeuge/{id}` ist ein echter Teil-Patch (LFH-306),
+       * fehlender Key = unverändert, `null` = leeren. Ein `opta: leerZuNull(undefined)` wäre
+       * `null` und löschte die sieben Felder, die diese Maske nicht zeigt. Beim ANLEGEN genügen
+       * dieselben vier Keys, `sondersignal` trägt serverseitig ein `#[serde(default)]`.
        */
       const daten = {
         funkrufname: werte.funkrufname.trim(),
@@ -83,9 +78,9 @@ export default function FahrzeugFormModal({
       };
       return fahrzeug ? aktualisiereFahrzeug(fahrzeug.id, daten) : legeFahrzeugAn(daten);
     },
-    // Nur noch invalidieren: das Schliessen macht `onFertig`, das Leeren die Hülle.
-    // Ein `onClose()` hier schlösse den Dialog auch beim „Speichern und nächstes" —
-    // der Serienmodus wäre still wirkungslos.
+    // Nur invalidieren: das Schließen macht `onFertig`, das Leeren die Hülle. Ein `onClose()` hier
+    // schlösse den Dialog auch bei „Speichern und nächstes" — der Serienmodus wäre still
+    // wirkungslos.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.fahrzeuge() });
       qc.invalidateQueries({ queryKey: globalKeys.fahrzeugVorschlaege() });
@@ -103,13 +98,11 @@ export default function FahrzeugFormModal({
       // `serie` nur im ANLEGEN-Modus: „Speichern und nächste" ergibt beim Bearbeiten
       // eines bestehenden Fahrzeugs keinen Sinn und stünde dort als toter Knopf.
       serie={fahrzeug == null}
-      // Nur, was über eine Erfassungsserie hinweg gleich bleibt. Der Standort ist mit A7
-      // auf die Detailseite gewandert und darf hier NICHT mehr stehen — `uebernahme` nennt
-      // ausschliesslich sichtbare Felder, sonst behauptet „Werte behalten" etwas über ein
-      // Feld, das niemand sieht.
+      // Nur, was über eine Erfassungsserie hinweg gleich bleibt, und nur sichtbare Felder — sonst
+      // behauptete „Werte behalten" etwas über ein Feld, das niemand sieht.
       uebernahme={['traegerorganisation']}
-      // `mutateAsync`, nicht `mutate`: bei Ablehnung muss die Zusage BRECHEN, sonst
-      // leert die Hülle die Felder trotz 422 und der Wortlaut ist weg (LFH-332).
+      // `mutateAsync`, nicht `mutate`: bei Ablehnung muss die Zusage BRECHEN, sonst leert die Hülle
+      // die Felder trotz 422.
       onErfassen={(w) => mutation.mutateAsync(w)}
       onFertig={onClose}
       onAbbrechen={onClose}
@@ -140,9 +133,8 @@ export default function FahrzeugFormModal({
       <Form.Item label="Kennzeichen" name="kennzeichen">
         <Input />
       </Form.Item>
-      {/* NUR im Bearbeiten-Modus: ein neu angelegtes Fahrzeug hat noch keine id und damit
-          keine Route. Der Weg zu den sieben übrigen Feldern ist damit von hier aus
-          sichtbar, statt dass sie unauffindbar wären. */}
+      {/* NUR im Bearbeiten-Modus: ein neues Fahrzeug hat noch keine id und keine Route. So ist der
+         Weg zu den übrigen Feldern von hier aus sichtbar. */}
       {fahrzeug && (
         <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
           <Link to={fahrzeugDetailPfad(fahrzeug.id)}>

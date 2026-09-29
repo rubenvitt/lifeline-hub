@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import AuftragFormular from './AuftragFormular';
 
-/** Die sieben SKK-Schemafelder, die das Ticket namentlich hinter den Collapse schickt. */
+/** Die sieben SKK-Schemafelder hinter dem Collapse. */
 const SKK = [
   'Absicht / Ziel',
   'Lage',
@@ -34,10 +34,8 @@ function rendern(over: Partial<Parameters<typeof AuftragFormular>[0]> = {}) {
 
 describe('AuftragFormular — Feldbudget (LFH-343 · C8, Befund H49)', () => {
   /**
-   * Das Ticket nennt 14 Felder in einem 520-px-Modal als LFH-19-Verstoß. Die
-   * „≤ 4"-Hälfte allein ist nicht widerlegbar: ein `Collapse` rendert seinen Inhalt
-   * ohne `forceRender` ohnehin erst beim Aufklappen, die Zahl wäre also trivial
-   * erfüllt. Erst das Paar — Zahl klein UND Aufklappen bringt die Felder — trägt.
+   * „≤ 4" allein ist nicht widerlegbar (ohne `forceRender` rendert der Collapse erst beim
+   * Aufklappen); erst das Paar — Zahl klein UND Aufklappen bringt die Felder — trägt.
    */
   it('zeigt im Ausgangszustand höchstens vier Felder', () => {
     rendern();
@@ -56,9 +54,8 @@ describe('AuftragFormular — Feldbudget (LFH-343 · C8, Befund H49)', () => {
   });
 
   /**
-   * Der Empfänger ist PFLICHT — ohne ihn lehnt das Formular ab. Deshalb darf er
-   * nicht hinter den Collapse: strukturierte Ziele (Abschnitte/Einheiten) und
-   * freie Funktionstexte laufen seit C8 durch EIN Feld, statt durch zwei nebeneinander.
+   * Der Empfänger ist PFLICHT und darf nicht hinter den Collapse: strukturierte Ziele und freie
+   * Funktionstexte laufen durch EIN Feld.
    */
   it('nimmt freie Funktionstexte über dasselbe Feld wie die strukturierten Ziele', async () => {
     const onAnlegen = vi.fn();

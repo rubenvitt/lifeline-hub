@@ -44,7 +44,7 @@ describe('verlaufsPfad (reine Geometrie)', () => {
   it('kleine Schwankungen werden nicht zur vollen Höhe aufgeblasen (Mindestspanne)', () => {
     const g = verlaufsPfad([punkt(60, 500), punkt(0, 501)], 240, 60)!;
     const hub = Math.abs(g.punkte[0].y - g.punkte[1].y);
-    // Literal statt aus der Konstante zurückgelesen: 60 px Höhe / 20 cm Mindestspanne × 1 cm.
+    // Literal: 60 px Höhe / 20 cm Mindestspanne × 1 cm.
     expect(hub).toBeCloseTo(3);
   });
 
@@ -71,8 +71,7 @@ describe('verlaufsPfad (reine Geometrie)', () => {
 
 describe('beschriftungsHoehen', () => {
   it('Höchst- und Tiefstwert stehen AUF der Höhe ihrer Werte, nicht an den Rändern', () => {
-    // Reihe 560–640 cm, Prognose 710: die Reihe liegt im unteren Teil des Felds, weit genug
-    // gespreizt, dass kein Auseinanderrücken greift.
+    // Reihe 560–640 cm, Prognose 710: weit genug gespreizt, dass kein Auseinanderrücken greift.
     const g = verlaufsPfad([punkt(60, 560), punkt(0, 640)], 240, 48, 710)!;
     const lage = beschriftungsHoehen(g, 6, 14);
     expect(lage.max).toBeCloseTo(6 + g.yFuer(640));

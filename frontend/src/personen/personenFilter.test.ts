@@ -8,11 +8,7 @@ import {
   sichtNachSprung,
 } from './personenFilter';
 
-/**
- * Die Filterkette der Personenliste als reine Funktionen (Muster
- * `pages/schaeden/schadenHelfer.tsx`) — prüfbar ohne Rendern, damit die Sicht-Semantik nicht
- * an einer Tabellendarstellung hängt.
- */
+/** Die Filterkette der Personenliste als reine Funktionen, prüfbar ohne Rendern. */
 
 const basis: Person = {
   id: 10,

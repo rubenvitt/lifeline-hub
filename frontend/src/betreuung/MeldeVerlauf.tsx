@@ -31,28 +31,21 @@ import {
 } from './verlauf';
 
 /**
- * Meldeverlauf eines Evakuierungsbezirks bzw. einer Betreuungsstelle (LFH-676, design.md D4–D6).
+ * Meldeverlauf eines Evakuierungsbezirks bzw. einer Betreuungsstelle.
  *
- * Steht im Aufklappbereich der `Datensicht` und wird erst beim Aufklappen gerendert — die
- * Abfrage läuft deshalb beim Mount und nur für die aufgeklappte Zeile. Der Schlüssel hängt
- * unter dem Betreuungs-Prefix: das Live-Ereignis `betreuung` und jede eigene Mutation der
- * Seite ziehen einen offenen Verlauf mit.
+ * Wird erst beim Aufklappen gerendert, die Abfrage läuft also nur für die aufgeklappte Zeile.
+ * Der Schlüssel hängt unter dem Betreuungs-Prefix, damit Live-Ereignis und eigene Mutationen
+ * einen offenen Verlauf mitziehen.
  *
- * DARSTELLUNG: eine Zeitachse aus `Zeitachseneintrag` (ein zeitlich gelesener Strom). Typkante
- * und Typwort sind die des ETB — „Meldung“, zurückgenommen „Berichtigung“-Farbe mit dem Wort
- * „zurückgenommen“ und getönter Zeile. Die aktuelle, nachgetragene und zurückgenommene
- * Meldung trägt je ein WORT (WCAG 1.4.1), nicht nur Farbe.
+ * Darstellung als Zeitachse (`Zeitachseneintrag`) mit Typkante und Typwort des ETB; aktuelle,
+ * nachgetragene und zurückgenommene Meldung tragen je ein WORT (WCAG 1.4.1).
+ * Laden, Fehler und leer stehen in Worten; ein Ladefehler ist nie „Noch keine Meldung“. Nicht
+ * über `PaneelZustand`, weil dessen Leerzustand eine eigene Aktion verlangt, die hier schon
+ * daneben steht.
  *
- * ZUSTÄNDE: Laden, Fehler und leer in Worten; ein Ladefehler ist nie „Noch keine Meldung“.
- * Nicht über `PaneelZustand`: dessen Leerzustand verlangt eine eigene Aktion, und die steht
- * hier schon daneben („Stand melden“ an der Karte, „Belegung melden“ in der Zeile) — eine
- * zweite wäre eine Doppelung. Den Wortlaut des Fehlers teilt der Verlauf mit dem Baustein.
- *
- * RÜCKNAHME (D6): unumkehrbar, es gibt keine Route, die eine Rücknahme aufhebt — deshalb eine
- * Rückfrage (LFH-363) mit rotem Bestätigungsknopf, als `Modal` mit eigenem State außerhalb der
- * Eintrags-`map` (LFH-365). Der Auslöser selbst bleibt neutral (Vorbild Verpflegung).
- * Ein Fehler bleibt IM Dialog (LFH-535), nicht im Toast; die Mutation gehört dem Verlauf und
- * nicht der Seite, damit derselbe Grund nicht zusätzlich über der Seite erscheint.
+ * Rücknahme: unumkehrbar, deshalb eine `danger`-Rückfrage als `Modal` mit eigenem State
+ * außerhalb der `map`; der Auslöser bleibt neutral. Ein Fehler bleibt IM Dialog; die Mutation
+ * gehört dem Verlauf, damit der Grund nicht zusätzlich über der Seite erscheint.
  */
 export default function MeldeVerlauf({
   einsatzId,
@@ -67,8 +60,8 @@ export default function MeldeVerlauf({
   /** Auslöser „Zurücknehmen“ an jeder nicht zurückgenommenen Meldung. */
   darfZuruecknehmen: boolean;
   /**
-   * Steht EINMAL über der Reihe, wenn Zurücknehmen gerade nicht geht (geschlossene Stelle).
-   * Ohne Schreibrecht bleibt es leer: den Grund nennt der Rechtehinweis über der Seite.
+   * Steht EINMAL über der Reihe, wenn Zurücknehmen nicht geht (geschlossene Stelle). Ohne
+   * Schreibrecht leer: den Grund nennt der Rechtehinweis über der Seite.
    */
   sperrHinweis?: string;
 }) {
@@ -92,13 +85,12 @@ export default function MeldeVerlauf({
 
   const [ziel, setZiel] = useState<VerlaufZeile | null>(null);
   const wurzel = useRef<HTMLDivElement>(null);
-  // Nach einer gelungenen Rücknahme verschwindet der Knopf, der die Rückfrage öffnete; antd
-  // gäbe den Fokus an ihn zurück und landete auf <body>. Der Verlauf nimmt ihn stattdessen —
-  // als State, weil er `focusTriggerAfterClose` im selben Render abschalten muss.
+  // Nach einer gelungenen Rücknahme verschwindet der auslösende Knopf; antd gäbe den Fokus an ihn
+  // zurück und landete auf <body>. Als State, weil `focusTriggerAfterClose` im selben Render
+  // abgeschaltet werden muss.
   const [fokusZurueck, setFokusZurueck] = useState(false);
-  // Sofort beim Schließen, nicht erst in `afterClose`: das feuert erst am Ende der
-  // Zoom-Animation (in jsdom nie). `afterClose` holt ihn im Browser ein zweites Mal, falls
-  // die Animation ihn verschoben hat.
+  // Sofort beim Schließen, nicht erst in `afterClose` (feuert am Ende der Zoom-Animation, in jsdom
+  // nie); `afterClose` holt den Fokus im Browser ein zweites Mal.
   useEffect(() => {
     if (ziel == null && fokusZurueck) wurzel.current?.focus();
   }, [ziel, fokusZurueck]);
@@ -118,13 +110,13 @@ export default function MeldeVerlauf({
       setZiel(null);
       message.success('Meldung zurückgenommen');
     },
-    // Kein Toast: der Grund steht im offenen Dialog. Neu laden trotzdem — ein 422 heißt oft,
-    // dass die Reihe veraltet ist (von anderer Hand zurückgenommen, Stelle geschlossen).
+    // Kein Toast: der Grund steht im offenen Dialog. Neu laden trotzdem — ein 422 heißt oft, dass
+    // die Reihe veraltet ist.
     onError: invalidiere,
   });
   const oeffne = (z: VerlaufZeile) => {
-    // react-query hält `error` bis zum nächsten `mutate()` — ein alter Grund wanderte sonst in
-    // eine neue Rückfrage.
+    // react-query hält `error` bis zum nächsten `mutate()` — ein alter Grund wanderte sonst in eine
+    // neue Rückfrage.
     ruecknahme.reset();
     setFokusZurueck(false);
     setZiel(z);
@@ -151,8 +143,8 @@ export default function MeldeVerlauf({
   } else if (abfrage.isPending) {
     koerper = (
       <div aria-busy="true" style={polster}>
-        {/* Der Zustand in WORTEN (Spec): ein Skelett allein sagt Sehenden wie Vorlesenden
-            nichts, und ein `aria-label` an einem rollenlosen `div` wird nicht vorgelesen. */}
+        {/* Der Zustand in WORTEN: ein Skelett allein sagt nichts, und ein `aria-label` an einem
+           rollenlosen `div` wird nicht vorgelesen. */}
         <Typography.Text type="secondary">Verlauf wird geladen …</Typography.Text>
         <Skeleton active title={false} paragraph={{ rows: 2 }} />
       </div>
@@ -202,9 +194,8 @@ export default function MeldeVerlauf({
               verfasser={z.erfasst_von}
               aktionen={
                 darfZuruecknehmen && !zurueck ? (
-                  // Neutral wie „Zurücknehmen“ an der Ausgabenzeile der Verpflegung (LFH-634):
-                  // rot ist erst der Bestätigungsknopf der Rückfrage — drei rote Knöpfe
-                  // untereinander machten aus einer Liste eine Alarmfläche.
+                  // Neutral: rot ist erst der Bestätigungsknopf; drei rote Knöpfe untereinander machten aus einer
+                  // Liste eine Alarmfläche.
                   <Button
                     aria-label={ruecknahmeName(z, formatZeitKurz(z.zeitpunkt_at, konventionen))}
                     onClick={() => oeffne(z)}
@@ -244,8 +235,7 @@ export default function MeldeVerlauf({
         onOk={() => {
           if (ziel) ruecknahme.mutate(ziel.id);
         }}
-        // Solange die Rücknahme läuft, führt KEIN Weg hinaus: ein Fehlschlag danach hätte
-        // weder Dialog noch Toast und ginge still verloren (H14/LFH-535).
+        // Solange die Rücknahme läuft, führt KEIN Weg hinaus: ein Fehlschlag danach ginge still verloren.
         onCancel={() => {
           if (!ruecknahme.isPending) setZiel(null);
         }}

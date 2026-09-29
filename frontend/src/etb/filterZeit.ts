@@ -4,18 +4,12 @@ import utc from 'dayjs/plugin/utc';
 dayjs.extend(utc);
 
 /**
- * Zeitachse der ETB-Filterleiste, beide Richtungen an EINER Stelle (LFH-342 · C7).
+ * Zeitachse der ETB-Filterleiste, beide Richtungen an EINER Stelle.
  *
- * Die Hinrichtung stand bis hierher als lokale Funktion in `EtbFilterleiste.tsx`; die
- * Rückrichtung gab es nicht, und ihr Fehlen war der ausdrückliche Grund, die Leiste
- * unkontrolliert zu lassen (siehe deren Dateikopf, LFH-331 · B3). Sobald der Filter aus
- * der URL zurückgelesen wird, ist sie unvermeidlich.
- *
- * Warum als eigenes Modul mit eigenem Test statt als Einzeiler an der Aufrufstelle: der
- * Fehlermodus ist eine STILLE Verschiebung um den Zonenversatz — kein roter Test, kein
- * Fehlerbild, nur ein falscher Zeitraum in einer beweissichernden Unterlage.
- * `filterZeit.test.ts` prüft deshalb beidseits beider Sommerzeit-Grenzen und vergleicht
- * gegen den absoluten Zeitpunkt, nicht bloß gegen sich selbst.
+ * Eigenes Modul mit eigenem Test statt eines Einzeilers an der Aufrufstelle: der Fehlermodus
+ * ist eine STILLE Verschiebung um den Zonenversatz — kein roter Test, kein Fehlerbild, nur ein
+ * falscher Zeitraum in einer beweissichernden Unterlage. `filterZeit.test.ts` prüft deshalb
+ * beidseits beider Sommerzeit-Grenzen gegen den absoluten Zeitpunkt.
  */
 
 /** Wandelt einen dayjs-Zeitpunkt ins SQLite-/Backend-Format (UTC). */

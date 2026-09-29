@@ -3,43 +3,30 @@ import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
 import { parseKoordinate } from './koordinate';
 
 /**
- * Der Parser der Betroffenen-Schnellerfassungszeile (Neuentwurf S7 „Das Formular wird zur
- * Zeile"). Rein — ohne Render prüfbar; die Zeile (`personen/BetroffeneZeile.tsx`) zeigt
- * nur an, was diese Datei erkennt.
+ * Der Parser der Betroffenen-Schnellerfassungszeile. Rein; `personen/BetroffeneZeile.tsx`
+ * zeigt nur an, was diese Datei erkennt.
  *
  * ── DIE KÜRZEL ──────────────────────────────────────────────────────────────────────────
- *
- *  · Name          „Nachname, Vorname" (Komma trennt), ohne Komma nur Nachname.
- *                  „unbekannt" und „?" bedeuten ausdrücklich: kein Name.
- *  · Geschlecht    `m` / `w` / `d` als eigenes Wort, direkt gefolgt vom Alter (`w 34`,
- *                  `m ~50`) oder zusammengeschrieben (`w34`).
- *  · Alter         `34` oder `~50`, 0–120. Das Datenmodell kennt nur das GESCHÄTZTE
- *                  Alter (`alter_geschaetzt`) — die Tilde ist deshalb Schreibhilfe, keine
- *                  zweite Genauigkeitsstufe; beide Formen landen im selben Feld.
+ *  · Name          „Nachname, Vorname", ohne Komma nur Nachname. „unbekannt" und „?" heißen:
+ *                  kein Name.
+ *  · Geschlecht    `m` / `w` / `d` als eigenes Wort, gefolgt vom Alter (`w 34`, `m ~50`)
+ *                  oder zusammengeschrieben (`w34`).
+ *  · Alter         `34` oder `~50`, 0–120. Das Modell kennt nur `alter_geschaetzt`; die Tilde
+ *                  ist Schreibhilfe, beide Formen landen im selben Feld.
  *  · Sichtung      `sk1`–`sk4`, `skt` (tot), `sku` (unverletzt), römisch `SKIII` oder
  *                  getrennt `SK III` / `SK 3`. Groß-/Kleinschreibung egal.
- *  · Unfallhilfsstelle  `@` + Bezeichnung (`@Weserstadion`, `@UHS Weserstadion`). `uhs_id`
- *                  geht im SELBEN Anlege-POST mit (LFH-458, Wartebereich-Eintritt in
- *                  derselben Transaktion). Das `@` nimmt alle folgenden Wörter bis zur
- *                  nächsten Sichtung, zum nächsten Geschlecht oder zum nächsten `@`/`#`
- *                  — es gehört also ans Ende oder vor diese Kürzel. Zahlen gehören zur
- *                  Bezeichnung („@UHS 2").
- *  · Koordinate    `#` + Breite/Länge (`#52.2691/9.1342`, `#52,2691/9,1342`, Minus
- *                  erlaubt) — der Fundort als WGS84-Paar (LFH-613). Geht als
- *                  `antreff_lat`/`antreff_lon` im SELBEN Anlege-POST mit (Offline-Queue,
- *                  `client_id`); gelesen über `personen/koordinate.ts`, dieselbe Funktion
- *                  wie in Maske und Detailseite. Ein `#`-Wort wird nie als Namensteil
- *                  geschluckt — sonst stünde die Koordinate als Nachname im Register.
+ *  · Unfallhilfsstelle  `@` + Bezeichnung (`@Weserstadion`, `@UHS Weserstadion`); `uhs_id`
+ *                  geht im SELBEN Anlege-POST mit. Das `@` nimmt die folgenden Wörter bis zur
+ *                  nächsten Sichtung, zum nächsten Geschlecht oder zum nächsten `@`/`#`; Zahlen
+ *                  gehören zur Bezeichnung („@UHS 2").
+ *  · Koordinate    `#` + Breite/Länge (`#52.2691/9.1342`, `#52,2691/9,1342`) — der Fundort,
+ *                  im SELBEN POST als `antreff_lat`/`antreff_lon`, gelesen über
+ *                  `personen/koordinate.ts`. Ein `#`-Wort wird nie als Namensteil geschluckt.
  *
  * ── UNERKANNTES SPERRT DAS ABSENDEN ─────────────────────────────────────────────────────
- *
- * Doppelte Angaben (zwei Sichtungen, zwei Koordinaten), ein Alter außerhalb 0–120, ein
- * unbrauchbares `#` (halbes Paar, außerhalb des Bereichs), ein `@` ohne Bezeichnung und
- * eine nicht eindeutige Unfallhilfsstelle erzeugen je ein PROBLEM. Mit Problemen wird
- * nicht gesendet: ein halb verstandener Befehl legte eine Person mit
- * falscher Sichtung oder in der falschen UHS an — und die Sichtung ist genau die Angabe,
- * an der die Lage hängt. Dieselbe Regel wie `parsePlatzierenAuftrag`: Unbrauchbares ganz
- * verwerfen, nicht halb übernehmen.
+ * Doppelte Angaben, ein Alter außerhalb 0–120, ein unbrauchbares `#`, ein `@` ohne Bezeichnung
+ * und eine nicht eindeutige UHS erzeugen je ein PROBLEM, und dann wird nicht gesendet: ein halb
+ * verstandener Befehl legte eine Person mit falscher Sichtung oder in der falschen UHS an.
  */
 
 export type BefehlTeil =
@@ -121,9 +108,8 @@ function sichtungAus(wort: string): Sichtungskategorie | null {
 }
 
 /**
- * Beendet dieses Wort einen `@`-Suchtext? Sichtung, Geschlecht (auch `w34`), `@`, `#`.
- * Eine NACKTE Zahl dagegen nicht: Bezeichnungen wie „UHS 2" oder „BHP 1" sind üblich, und
- * ein Alter steht in der Zeile ohnehin hinter dem Geschlecht (`w 34`).
+ * Beendet dieses Wort einen `@`-Suchtext? Sichtung, Geschlecht (auch `w34`), `@`, `#`. Eine
+ * NACKTE Zahl nicht: „UHS 2" ist üblich, und ein Alter steht hinter dem Geschlecht.
  */
 function beendetUhsSuche(wort: string, naechstes: string | undefined): boolean {
   const klein = wort.toLowerCase();
@@ -298,9 +284,8 @@ export function istWaehlbareUhs(u: Pick<Uhs, 'status' | 'storniert_at'>): boolea
 export type UhsAufloesung = { uhs: Uhs } | { problem: string };
 
 /**
- * `@`-Suchtext → Unfallhilfsstelle. Nur ein EINDEUTIGER Treffer gilt: zuerst exakt
- * (ohne Groß-/Kleinschreibung, mit oder ohne vorangestelltes „UHS"), dann als Teilwort.
- * Mehrdeutig oder unbekannt → Problem, kein Raten.
+ * `@`-Suchtext → Unfallhilfsstelle. Nur ein EINDEUTIGER Treffer gilt: zuerst exakt (mit oder
+ * ohne „UHS"), dann als Teilwort. Mehrdeutig oder unbekannt → Problem, kein Raten.
  */
 export function loeseUhsAuf(suche: string, liste: readonly Uhs[]): UhsAufloesung {
   const norm = (s: string) =>
@@ -322,8 +307,8 @@ export type BefehlErgebnis =
   { ok: true; eingabe: PersonAnlegenEingabe; uhs: Uhs | null } | { ok: false; probleme: string[] };
 
 /**
- * Befehl + UHS-Liste → Anlage oder Probleme. Leere Eingabe ist KEIN Problem, sondern
- * „noch nichts" — sie liefert `ok: false` ohne Grund, und die Zeile tut dann nichts.
+ * Befehl + UHS-Liste → Anlage oder Probleme. Leere Eingabe ist KEIN Problem, sondern „noch
+ * nichts": `ok: false` ohne Grund.
  */
 export function loeseBefehl(befehl: PersonBefehl, uhsListe: readonly Uhs[]): BefehlErgebnis {
   if (befehl.leer) return { ok: false, probleme: [] };

@@ -6,10 +6,9 @@ import { renderMitProviders } from '../test/utils';
 import LagebesprechungStand from './LagebesprechungStand';
 
 /**
- * Hier werden die TIMER gefälscht, weil die 30-s-Uhr das Prüfobjekt ist. `shouldAdvanceTime`
- * wie in `etb/WiedervorlageModal.test.tsx`: die echte Zeit läuft mit. Die Termine liegen
- * deshalb neben der Minutengrenze (Takt-Test: siehe dort), damit ein paar echte Millisekunden
- * die abgerundete Zahl nicht kippen. Kein `findBy*` — alles rendert synchron.
+ * Hier werden die TIMER gefälscht, weil die 30-s-Uhr das Prüfobjekt ist; `shouldAdvanceTime`
+ * lässt die echte Zeit mitlaufen. Die Termine liegen deshalb neben der Minutengrenze. Kein
+ * `findBy*` — alles rendert synchron.
  */
 const JETZT = new Date('2026-09-13T10:00:00Z');
 const wireAb = (sekunden: number) =>
@@ -41,11 +40,7 @@ const stab = (over: Partial<Stab> = {}): Stab => ({
 function zeige(daten: Stab) {
   return renderMitProviders(<LagebesprechungStand einsatzId={1} stab={daten} />);
 }
-/**
- * Feld des `Datenraster`s (Neuentwurf): Begriff (`<dt>`) und Wert (`<dd>`) stehen in EINER
- * Feldhülle `data-lfh="datenfeld"`. Gegriffen wird die Hülle, damit die Aussagen „im Feld X
- * steht Y" dieselben bleiben wie an der früheren `Descriptions`-Zeile.
- */
+/** Feld des `Datenraster`s: Begriff und Wert stehen in EINER Hülle `data-lfh="datenfeld"`. */
 const zeile = (label: string) =>
   screen.getByText(label, { selector: 'dt' }).closest<HTMLElement>('[data-lfh="datenfeld"]')!;
 
@@ -74,9 +69,8 @@ describe('LagebesprechungStand · Nächste', () => {
   });
 
   it('aktualisiert im 30-s-Takt — nicht früher, ohne Remount und ohne Toast', async () => {
-    // Viertel- statt halbe Minute neben der Grenze, gemessen: `advanceTimersByTimeAsync` stellt
-    // die Uhr beim Tick auf GENAU +30,000 s — ein Termin bei +23:30 läge dann auf exakt 23:00 und
-    // zeigte weiter „in 23 min". Tragend ist das Fenster [+23:00, +23:30): vor dem Tick 23, danach 22.
+    // Viertel- statt halbe Minute neben der Grenze: `advanceTimersByTimeAsync` stellt die Uhr auf
+    // GENAU +30,000 s. Tragend ist das Fenster [+23:00, +23:30): vor dem Tick 23, danach 22.
     zeige(stab({ naechste_lagebesprechung_at: wireAb(23 * 60 + 15) }));
     const tabelle = document.querySelector('[data-lfh="datenraster"]');
     expect(screen.getByText('in 23 min')).toBeInTheDocument();
@@ -90,7 +84,7 @@ describe('LagebesprechungStand · Nächste', () => {
     // Kein Blinken: derselbe Knoten, nur der Wortlaut ändert sich.
     expect(tabelle).not.toBeNull();
     expect(document.querySelector('[data-lfh="datenraster"]')).toBe(tabelle);
-    // Kein Toast. Dass die Queue zählbar ist, belegt `LagebesprechungModal.test.tsx`.
+    // Kein Toast.
     expect(document.querySelectorAll('.ant-message')).toHaveLength(0);
   });
 

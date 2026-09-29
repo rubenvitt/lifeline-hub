@@ -4,9 +4,8 @@ import type { Abloesung } from '../api/types';
 import { abloesungZeit, VORWARNUNG_MINUTEN } from './einstufung';
 
 /**
- * Die Uhr der Ablösungsseite (LFH-635) — tickt alle 30 s, damit Einstufung und „in x min"
- * mit der Zeit weiterlaufen, ohne dass ein neuer Abruf nötig wäre. Kein Blinken: nur der
- * Wert wechselt.
+ * Die Uhr der Ablösungsseite — tickt alle 30 s, damit Einstufung und „in x min" ohne neuen
+ * Abruf weiterlaufen. Kein Blinken: nur der Wert wechselt.
  */
 export function useUhr(intervallMs = 30_000): Dayjs {
   const [jetzt, setJetzt] = useState(() => dayjs());
@@ -35,20 +34,16 @@ export function naechsterWechsel(liste: readonly Abloesung[], jetzt: Dayjs): Day
 
 /**
  * Uhr für den Modulzähler im Einsatzrahmen: stellt sich NUR auf den nächsten Wechsel der
- * Einstufung, statt alle 30 s den ganzen Rahmen neu zu zeichnen. Ohne laufende Schicht steht
- * sie still.
+ * Einstufung, statt alle 30 s den Rahmen neu zu zeichnen; ohne laufende Schicht steht sie.
  *
- * Die Zeit wird bei JEDER neuen Liste frisch gelesen, nicht nur am Wecker: sonst bliebe
- * `jetzt` beim Einhängen stehen, solange keine Schicht lief, und eine rückdatiert begonnene
- * oder durch eine verkürzte Vorgabe sofort fällige Schicht zählte als planmäßig — ohne
- * künftige Grenze auch dauerhaft (Review LFH-635).
+ * Die Zeit wird bei JEDER neuen Liste frisch gelesen, nicht nur am Wecker: sonst bliebe `jetzt`
+ * beim Einhängen stehen, und eine rückdatiert begonnene Schicht zählte dauerhaft als planmäßig.
  */
 export function useEinstufungsUhr(liste: readonly Abloesung[] | undefined): Dayjs {
   const [takt, setTakt] = useState(0);
-  // Neu gelesen bei neuer Liste ODER abgelaufenem Wecker — beides sind die einzigen Momente,
-  // in denen sich die Einstufung ändern kann.
-  // Begründete Ausnahme: `liste` und `takt` werden im Rumpf nicht gelesen, sie SIND der
-  // Anlass, die Uhr neu zu lesen. Ohne sie bliebe `jetzt` beim Einhängen stehen.
+  // Neu gelesen bei neuer Liste ODER abgelaufenem Wecker — den einzigen Momenten, in denen sich
+  // die Einstufung ändern kann. `liste` und `takt` werden im Rumpf nicht gelesen, sie SIND der
+  // Anlass, die Uhr neu zu lesen.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const jetzt = useMemo(() => dayjs(), [liste, takt]);
   useEffect(() => {

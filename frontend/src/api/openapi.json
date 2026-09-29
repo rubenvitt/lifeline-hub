@@ -137,11 +137,11 @@
           "einstufung": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/Einstufung",
                 "description": "Nur bei laufenden Schichten; berechnet gegen die Zeit der Abfrage."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -218,10 +218,10 @@
           "folgeschicht": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/AbloesungAnzeige"
               },
               {
-                "$ref": "#/components/schemas/AbloesungAnzeige"
+                "type": "null"
               }
             ]
           }
@@ -429,10 +429,10 @@
           "meldeweg": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/MeldeWeg"
               },
               {
-                "$ref": "#/components/schemas/MeldeWeg"
+                "type": "null"
               }
             ]
           },
@@ -543,30 +543,30 @@
           "aktuelle_sichtung": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/Sichtungskategorie"
               },
               {
-                "$ref": "#/components/schemas/Sichtungskategorie"
+                "type": "null"
               }
             ]
           },
           "aktuelle_verbleib_art": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/VerbleibArt"
               },
               {
-                "$ref": "#/components/schemas/VerbleibArt"
+                "type": "null"
               }
             ]
           },
           "aktueller_verbleib_status": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/VerbleibStatus"
               },
               {
-                "$ref": "#/components/schemas/VerbleibStatus"
+                "type": "null"
               }
             ]
           },
@@ -607,10 +607,10 @@
           "abschluss_grund": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/SchadenAbschlussGrund"
               },
               {
-                "$ref": "#/components/schemas/SchadenAbschlussGrund"
+                "type": "null"
               }
             ]
           },
@@ -656,10 +656,10 @@
           "abschluss_grund": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/AbschlussGrund"
               },
               {
-                "$ref": "#/components/schemas/AbschlussGrund"
+                "type": "null"
               }
             ]
           },
@@ -1007,11 +1007,11 @@
           "extern_kategorie": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/AdressatKategorie",
                 "description": "Externer Adressat (LFH-87): Kategorie + Bezeichnung (nur bei empfaenger_typ='extern')."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -1716,11 +1716,11 @@
           "belegung": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/BelegungsmeldungAnzeige",
                 "description": "Fehlt, solange keine (nicht zurückgenommene) Belegungsmeldung vorliegt."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -2074,100 +2074,95 @@
           "status": {
             "oneOf": [
               {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "required": [
-                      "status"
-                    ],
-                    "properties": {
-                      "status": {
-                        "type": "string",
-                        "enum": [
-                          "queued"
-                        ]
-                      }
-                    }
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "status"
-                    ],
-                    "properties": {
-                      "status": {
-                        "type": "string",
-                        "enum": [
-                          "building"
-                        ]
-                      }
-                    }
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "status"
-                    ],
-                    "properties": {
-                      "status": {
-                        "type": "string",
-                        "enum": [
-                          "uploading"
-                        ]
-                      }
-                    }
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "status"
-                    ],
-                    "properties": {
-                      "status": {
-                        "type": "string",
-                        "enum": [
-                          "publishing"
-                        ]
-                      }
-                    }
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "status"
-                    ],
-                    "properties": {
-                      "status": {
-                        "type": "string",
-                        "enum": [
-                          "done"
-                        ]
-                      }
-                    }
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "fehler",
-                      "status"
-                    ],
-                    "properties": {
-                      "fehler": {
-                        "type": "string"
-                      },
-                      "status": {
-                        "type": "string",
-                        "enum": [
-                          "failed"
-                        ]
-                      }
-                    }
-                  }
+                "type": "object",
+                "required": [
+                  "status"
                 ],
-                "description": "Adjacently-tagged Status eines karten-service-Build-Jobs (LFH-323, verschoben aus\n`karten-service/src/jobs.rs`). Wire: `{\"status\":\"building\"}` bzw. `{\"status\":\"failed\",\"fehler\":\"…\"}`.\n`karten-service` serialisiert ihn, `lifeline-hub` deserialisiert die Proxy-Antwort und exponiert\nihn (eingebettet in [`BuildJob`]) durch den Typ-Codegen. `Failed(String)` macht ihn\n**datentragend** — deshalb bewusst NICHT in `tests/enum_wire_kontrakt.rs` gepinnt (dessen Makros\nverlangen feldlose Enums) und in [`BuildJob`] `inline` statt als eigenes Component-Schema\nregistriert; die Wire-Treue sichert stattdessen der Round-Trip-Test unten."
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "queued"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "building"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "uploading"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "publishing"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "done"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "fehler",
+                  "status"
+                ],
+                "properties": {
+                  "fehler": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "failed"
+                    ]
+                  }
+                }
               }
             ],
-            "description": "Inline statt `$ref`: [`JobStatus`] ist datentragend und bewusst kein registriertes\nComponent-Schema — utoipa bettet die Union direkt hier ein."
+            "description": "Adjacently-tagged Status eines karten-service-Build-Jobs (LFH-323, verschoben aus\n`karten-service/src/jobs.rs`). Wire: `{\"status\":\"building\"}` bzw. `{\"status\":\"failed\",\"fehler\":\"…\"}`.\n`karten-service` serialisiert ihn, `lifeline-hub` deserialisiert die Proxy-Antwort und exponiert\nihn (eingebettet in [`BuildJob`]) durch den Typ-Codegen. `Failed(String)` macht ihn\n**datentragend** — deshalb bewusst NICHT in `tests/enum_wire_kontrakt.rs` gepinnt (dessen Makros\nverlangen feldlose Enums) und in [`BuildJob`] `inline` statt als eigenes Component-Schema\nregistriert; die Wire-Treue sichert stattdessen der Round-Trip-Test unten."
           }
         }
       },
@@ -2277,11 +2272,11 @@
           "bezug_typ": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/BezugTyp",
                 "description": "Polymorpher Sachbezug (LFH-103): Verweis auf ein bestehendes Domänenobjekt.\n`None`/`None`, wenn kein Bezug gesetzt ist (both-or-neither). `bezug_typ` ist\nein [`BezugTyp`]-Code, `bezug_id` die Objekt-ID im selben Einsatz."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -2404,22 +2399,22 @@
           "bericht": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/DemoBericht",
                 "description": "Bericht des letzten Vorgangs (Import oder Entfernen); fehlt, wenn es keinen gab."
+              },
+              {
+                "type": "null"
               }
             ]
           },
           "import": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/DemoImportKopf",
                 "description": "Der aktive Import; fehlt, wenn keiner besteht."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -2721,10 +2716,10 @@
           "soll": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/Staerke"
               },
               {
-                "$ref": "#/components/schemas/Staerke"
+                "type": "null"
               }
             ]
           },
@@ -2801,11 +2796,11 @@
           "status": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/StatusWert",
                 "description": "Aktueller FMS-Status des Fahrzeugs (LFH-609); `None` = ohne Status."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -2876,10 +2871,10 @@
           "staerke_position": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/StaerkePosition"
               },
               {
-                "$ref": "#/components/schemas/StaerkePosition"
+                "type": "null"
               }
             ]
           }
@@ -2896,11 +2891,11 @@
           "kategorie": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/StatusKategorie",
                 "description": "Die gemeinsame Kategorie — auch bei `Gemischt`, wenn alle Fahrzeuge einen Status\nderselben Kategorie tragen (S3 + S4 sind beide „gebunden“)."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -2917,11 +2912,11 @@
           "status": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/StatusWert",
                 "description": "Der eine Status — gesetzt bei `Fahrzeuge` und `Hand`."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -2963,11 +2958,11 @@
           "soll": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/Staerke",
                 "description": "Standard-Soll-Stärke; `None`, wenn der Typ keine Soll-Stärke definiert."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -3093,10 +3088,10 @@
           "meine_rolle": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/EinsatzRolle"
               },
               {
-                "$ref": "#/components/schemas/EinsatzRolle"
+                "type": "null"
               }
             ]
           },
@@ -3251,11 +3246,11 @@
           "soll_besatzung": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/Staerke",
                 "description": "Soll-Besatzung (taktische Soll-Stärke) aus dem Stamm-Fahrzeug (LFH-9); `None` für\nAd-hoc-Fahrzeuge oder unvollständig gepflegte Soll-Stärke. Das Ist berechnet das\nFrontend aus den Besatzungs-Positionen (orthogonal, keine Backend-Aggregation)."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -3275,10 +3270,10 @@
           "status_kategorie": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/StatusKategorie"
               },
               {
-                "$ref": "#/components/schemas/StatusKategorie"
+                "type": "null"
               }
             ]
           },
@@ -3524,10 +3519,10 @@
           "staerke_position": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/StaerkePosition"
               },
               {
-                "$ref": "#/components/schemas/StaerkePosition"
+                "type": "null"
               }
             ]
           },
@@ -3547,10 +3542,10 @@
           "status_kategorie": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/StatusKategorie"
               },
               {
-                "$ref": "#/components/schemas/StatusKategorie"
+                "type": "null"
               }
             ]
           },
@@ -3653,11 +3648,11 @@
           "lagezustand": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/AbschnittLagezustand",
                 "description": "Beurteilter Lagezustand (LFH-608); fehlt = nicht beurteilt."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -3777,20 +3772,20 @@
           "basemap_modus": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/BasemapModus"
               },
               {
-                "$ref": "#/components/schemas/BasemapModus"
+                "type": "null"
               }
             ]
           },
           "einheiten": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/EinheitenSystem"
               },
               {
-                "$ref": "#/components/schemas/EinheitenSystem"
+                "type": "null"
               }
             ]
           },
@@ -3839,10 +3834,10 @@
           "koordinatenformat": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/Koordinatenformat"
               },
               {
-                "$ref": "#/components/schemas/Koordinatenformat"
+                "type": "null"
               }
             ]
           },
@@ -3894,10 +3889,10 @@
           "zeitformat": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/Zeitformat"
               },
               {
-                "$ref": "#/components/schemas/Zeitformat"
+                "type": "null"
               }
             ]
           },
@@ -4133,10 +4128,10 @@
           "meldeweg": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/MeldeWeg"
               },
               {
-                "$ref": "#/components/schemas/MeldeWeg"
+                "type": "null"
               }
             ]
           },
@@ -4259,10 +4254,10 @@
           "meldeweg": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/MeldeWeg"
               },
               {
-                "$ref": "#/components/schemas/MeldeWeg"
+                "type": "null"
               }
             ]
           },
@@ -4468,11 +4463,11 @@
           "stand": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/EvakuierungsstandAnzeige",
                 "description": "Fehlt, solange keine (nicht zurückgenommene) Standmeldung vorliegt — „keine Meldung“\nist nicht „0 evakuiert“."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -4611,10 +4606,10 @@
           "staerke": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/Staerke"
               },
               {
-                "$ref": "#/components/schemas/Staerke"
+                "type": "null"
               }
             ]
           },
@@ -5007,10 +5002,10 @@
           "geometry": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/GeoJsonGeometrie"
               },
               {
-                "$ref": "#/components/schemas/GeoJsonGeometrie"
+                "type": "null"
               }
             ]
           },
@@ -5163,11 +5158,11 @@
           "offline_format": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/OnlineStyleTyp",
                 "description": "Grober Kachel-Typ der ersten sichtbaren Region (LFH-185): `\"vektor\"` (pbf) oder `\"raster\"`\n(png/jpg/webp) — Kompat. `None`, wenn keine Region bereit."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -5212,10 +5207,10 @@
           "basemap_modus": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/BasemapModus"
               },
               {
-                "$ref": "#/components/schemas/BasemapModus"
+                "type": "null"
               }
             ]
           },
@@ -5254,10 +5249,10 @@
           "karten_theme": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/KartenTheme"
               },
               {
-                "$ref": "#/components/schemas/KartenTheme"
+                "type": "null"
               }
             ]
           },
@@ -6208,80 +6203,80 @@
           "auftraege": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/AuftragsZaehler"
               },
               {
-                "$ref": "#/components/schemas/AuftragsZaehler"
+                "type": "null"
               }
             ]
           },
           "chat": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/ChatZaehler"
               },
               {
-                "$ref": "#/components/schemas/ChatZaehler"
+                "type": "null"
               }
             ]
           },
           "einheiten": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/MengenZaehler"
               },
               {
-                "$ref": "#/components/schemas/MengenZaehler"
+                "type": "null"
               }
             ]
           },
           "einsatzabschnitte": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/MengenZaehler"
               },
               {
-                "$ref": "#/components/schemas/MengenZaehler"
+                "type": "null"
               }
             ]
           },
           "erinnerungen": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/ErinnerungsZaehler"
               },
               {
-                "$ref": "#/components/schemas/ErinnerungsZaehler"
+                "type": "null"
               }
             ]
           },
           "etb": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/MengenZaehler"
               },
               {
-                "$ref": "#/components/schemas/MengenZaehler"
+                "type": "null"
               }
             ]
           },
           "meldungen": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/MeldungsZaehler"
               },
               {
-                "$ref": "#/components/schemas/MeldungsZaehler"
+                "type": "null"
               }
             ]
           },
           "personen": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/MengenZaehler"
               },
               {
-                "$ref": "#/components/schemas/MengenZaehler"
+                "type": "null"
               }
             ]
           }
@@ -6803,10 +6798,10 @@
           "einheiten": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/EinheitenSystem"
               },
               {
-                "$ref": "#/components/schemas/EinheitenSystem"
+                "type": "null"
               }
             ]
           },
@@ -6844,10 +6839,10 @@
           "koordinatenformat": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/Koordinatenformat"
               },
               {
-                "$ref": "#/components/schemas/Koordinatenformat"
+                "type": "null"
               }
             ]
           },
@@ -6886,10 +6881,10 @@
           "zeitformat": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/Zeitformat"
               },
               {
-                "$ref": "#/components/schemas/Zeitformat"
+                "type": "null"
               }
             ]
           },
@@ -6931,10 +6926,10 @@
           "einheiten": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/EinheitenSystem"
               },
               {
-                "$ref": "#/components/schemas/EinheitenSystem"
+                "type": "null"
               }
             ]
           },
@@ -6947,10 +6942,10 @@
           "koordinatenformat": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/Koordinatenformat"
               },
               {
-                "$ref": "#/components/schemas/Koordinatenformat"
+                "type": "null"
               }
             ]
           },
@@ -6989,10 +6984,10 @@
           "zeitformat": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/Zeitformat"
               },
               {
-                "$ref": "#/components/schemas/Zeitformat"
+                "type": "null"
               }
             ]
           },
@@ -7053,11 +7048,11 @@
           "logo": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/OrgLogoAnzeige",
                 "description": "Logo der Organisation (LFH-22) ohne Bytes; fehlt, wenn keines hinterlegt ist. Die\nBytes liefert `GET /api/organisation/logo`."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -7085,10 +7080,10 @@
           "peilung": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/PeilungAntwort"
               },
               {
-                "$ref": "#/components/schemas/PeilungAntwort"
+                "type": "null"
               }
             ]
           }
@@ -7117,11 +7112,11 @@
           "messung": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/PegelMessung",
                 "description": "Fehlt, wenn weder ein Abruf gelang noch ein Cache-Eintrag vorliegt (Ausfall)."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -7132,11 +7127,11 @@
           "prognose": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/PegelPrognose",
                 "description": "Erwarteter Höchststand (LFH-628); fehlt, wenn keiner gepflegt ist."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -7279,10 +7274,10 @@
           "vorhersage": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/PegelVorhersage"
               },
               {
-                "$ref": "#/components/schemas/PegelVorhersage"
+                "type": "null"
               }
             ]
           }
@@ -7325,10 +7320,10 @@
           "aktuelle_sichtung": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/Sichtungskategorie"
               },
               {
-                "$ref": "#/components/schemas/Sichtungskategorie"
+                "type": "null"
               }
             ]
           },
@@ -7348,11 +7343,11 @@
           "aktuelle_verbleib_art": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/VerbleibArt",
                 "description": "Strukturierter Cache des jüngsten Verbleib-Ereignisses (neben der Kurzform\n`aktueller_verbleib`)."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -7380,10 +7375,10 @@
           "aktueller_verbleib_status": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/VerbleibStatus"
               },
               {
-                "$ref": "#/components/schemas/VerbleibStatus"
+                "type": "null"
               }
             ]
           },
@@ -7448,10 +7443,10 @@
           "geschlecht": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/Geschlecht"
               },
               {
-                "$ref": "#/components/schemas/Geschlecht"
+                "type": "null"
               }
             ]
           },
@@ -7624,10 +7619,10 @@
           "staerke_position": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/StaerkePosition"
               },
               {
-                "$ref": "#/components/schemas/StaerkePosition"
+                "type": "null"
               }
             ]
           },
@@ -7998,10 +7993,10 @@
           "abschluss_grund": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/SchadenAbschlussGrund"
               },
               {
-                "$ref": "#/components/schemas/SchadenAbschlussGrund"
+                "type": "null"
               }
             ]
           },
@@ -8338,10 +8333,10 @@
           "letzte_lagebesprechung": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/LagebesprechungAnzeige"
               },
               {
-                "$ref": "#/components/schemas/LagebesprechungAnzeige"
+                "type": "null"
               }
             ]
           },
@@ -8501,10 +8496,10 @@
           "status": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/StatusWert"
               },
               {
-                "$ref": "#/components/schemas/StatusWert"
+                "type": "null"
               }
             ]
           }
@@ -8637,10 +8632,10 @@
           "abschluss_grund": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/AbschlussGrund"
               },
               {
-                "$ref": "#/components/schemas/AbschlussGrund"
+                "type": "null"
               }
             ]
           },
@@ -8690,10 +8685,10 @@
           "geschlecht": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/TierGeschlecht"
               },
               {
-                "$ref": "#/components/schemas/TierGeschlecht"
+                "type": "null"
               }
             ]
           },
@@ -9015,10 +9010,10 @@
           "status": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/VerbleibStatus"
               },
               {
-                "$ref": "#/components/schemas/VerbleibStatus"
+                "type": "null"
               }
             ]
           },
@@ -9124,11 +9119,11 @@
           "ort": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/WetterOrt",
                 "description": "Warnzelle des Einsatzorts. Fehlt ohne Einsatzort und solange kein Warnstand vorliegt."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -9284,11 +9279,11 @@
           "daten": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/WetterVorhersage",
                 "description": "Nur bei `ok`."
+              },
+              {
+                "type": "null"
               }
             ]
           },

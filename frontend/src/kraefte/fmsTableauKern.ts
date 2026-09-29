@@ -4,28 +4,17 @@ import { statusKategorie } from '../theme/statusFarben';
 import { fmsWort } from './meldebildRaster';
 
 /**
- * Reines Modell des FMS-Tableaus (LFH-642) — Gliederung, Menüwerte, Ziffernzuordnung.
+ * Reines Modell des FMS-Tableaus — Gliederung, Menüwerte, Ziffernzuordnung.
+ * Das Suffix `Kern` ist Pflicht: `fmsTableau.ts` kollidierte case-insensitiv mit
+ * `FmsTableau.tsx`, und Vite löst `.ts` vor `.tsx` auf.
  *
- * Der Name trägt das Suffix `Kern` mit Absicht: `fmsTableau.ts` kollidierte
- * case-insensitiv mit `FmsTableau.tsx`, und Vite löst `.ts` vor `.tsx` auf — der Import
- * der Komponente träfe auf macOS still diese Datei (gemessen, dieselbe Falle wie
- * `components/direkteinstiegKern.ts`).
+ * FORMVERDIKT: Kachel, nicht Tabelle — die Frage ist „wie steht die ganze Flotte?", eine
+ * Überblicksfläche. Die Tabelle bleibt als Ansicht „Liste" derselben Seite; beide lesen dieselbe
+ * Query und bedienen dieselbe Mutation.
  *
- * ── FORMVERDIKT ────────────────────────────────────────────────────────────────────────
- *
- * Kachel, nicht Tabelle (LFH-19/LFH-330, entschieden am 23.09.2026). Die Frage an diese
- * Fläche ist weder „welcher von diesen ist der richtige?" (Vergleich → Tabelle) noch „was
- * ist mit diesem hier?" (Liste), sondern „wie steht die ganze Flotte?" — eine
- * Überblicksfläche, und für die sieht LFH-330 die Kachel vor. Die Tabelle gibt es daneben
- * weiter, als Ansicht „Liste" derselben Seite; beide lesen dieselbe Query und bedienen
- * dieselbe Mutation.
- *
- * ── REIHENFOLGE IST STABIL ─────────────────────────────────────────────────────────────
- *
- * Abschnitt → Einheit → Funkrufname, NIE nach Status. Ein Tableau wird bedient, während es
- * sich ändert: sortierte es nach Status, spränge die Kachel beim eigenen Klick unter dem
- * Finger weg (Kriterium 12). Der Abschnitt kommt über die Einheit — ein Fahrzeug hat keinen
- * eigenen Abschnittsbezug (`src/fahrzeug/mod.rs`, `EinsatzFahrzeugAnzeige`).
+ * REIHENFOLGE IST STABIL: Abschnitt → Einheit → Funkrufname, NIE nach Status — sonst spränge
+ * die Kachel beim eigenen Klick unter dem Finger weg. Der Abschnitt kommt über die Einheit (ein
+ * Fahrzeug hat keinen eigenen).
  */
 
 export const OHNE_ABSCHNITT_TITEL = 'ohne Abschnitt';
@@ -54,10 +43,9 @@ function nachEinheitUndFunkruf(a: FmsKachel, b: FmsKachel): number {
 }
 
 /**
- * Gruppen des Tableaus. `einheiten === null` heißt „nicht abrufbar" — dann steht alles in
- * EINER Gruppe, statt dass die Fläche ausfällt: der Status lässt sich auch ohne Gliederung
- * setzen. Eine Einheit-ID, die in der Liste fehlt, zählt als „ohne Einheit": das Fahrzeug
- * verschwindet nicht, nur weil seine Einheit gerade nicht mitgeliefert wurde.
+ * Gruppen des Tableaus. `einheiten === null` heißt „nicht abrufbar" — dann steht alles in EINER
+ * Gruppe, der Status lässt sich auch ohne Gliederung setzen. Eine fehlende Einheit-ID zählt als
+ * „ohne Einheit": das Fahrzeug verschwindet nicht.
  */
 export function baueFmsTableau(
   fahrzeuge: readonly EinsatzFahrzeug[],
@@ -113,9 +101,8 @@ export function baueFmsTableau(
 }
 
 /**
- * Der Fahrzeugkatalog als Menüwerte, beschriftet wie der Chip („S4 · Am Einsatzort").
- * Der S-Code im Menü ist zugleich der Hinweis auf das Tastenkürzel. Ton aus der Kategorie,
- * Mandantenfarbe nur als Punkt (`StatusWahl`).
+ * Der Fahrzeugkatalog als Menüwerte, beschriftet wie der Chip („S4 · Am Einsatzort"); der
+ * S-Code ist zugleich der Hinweis auf das Tastenkürzel. Mandantenfarbe nur als Punkt.
  */
 export function fmsStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOption<number>[] {
   return katalog.map((s) => ({
@@ -131,10 +118,9 @@ export type ZifferZiel =
   { art: 'eindeutig'; status: FahrzeugStatus } | { art: 'mehrdeutig'; anzahl: number };
 
 /**
- * Ziffer → Status aus `fms_anker`. Der Anker ist NULLABLE und NICHT eindeutig
- * (`migrations/0008_fahrzeug_status.sql`: nur `UNIQUE(org_id, label)`), deshalb ist die
- * Ziffer nur ein Beschleuniger (Bedien-Leitlinie, C4): eine doppelt belegte Ziffer setzt
- * NICHTS — raten, welcher der beiden gemeint war, hieße einen Status erfinden.
+ * Ziffer → Status aus `fms_anker`. Der Anker ist nullable und NICHT eindeutig (nur
+ * `UNIQUE(org_id, label)`), deshalb nur ein Beschleuniger: eine doppelt belegte Ziffer setzt
+ * NICHTS — raten hieße einen Status erfinden.
  */
 export function zifferZuordnung(
   katalog: readonly FahrzeugStatus[],
