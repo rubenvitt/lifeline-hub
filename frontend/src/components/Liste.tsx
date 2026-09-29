@@ -89,7 +89,8 @@ export function Liste<T>({
 }: ListeProps<T>) {
   const { token, rollen } = useRollen();
   const kopfId = useId();
-  const KopfElement = kopf ? KOPF_ELEMENT[kopf.unterEbene] : null;
+  // Ein Kopf ohne Inhalt ergäbe eine leere Überschrift und einen leeren Listennamen.
+  const KopfElement = kopf != null && kopf.inhalt != null ? KOPF_ELEMENT[kopf.unterEbene] : null;
 
   const containerStyle: CSSProperties = {
     ...(bordered
@@ -131,7 +132,7 @@ export function Liste<T>({
       leer
     ) : (
       <ul
-        aria-labelledby={kopf ? kopfId : undefined}
+        aria-labelledby={KopfElement ? kopfId : undefined}
         style={{ margin: 0, padding: 0, listStyle: 'none' }}
       >
         {dataSource.map((item, index) => (
@@ -148,7 +149,7 @@ export function Liste<T>({
   return (
     <ListeContext.Provider value={{ size, bordered }}>
       <div style={containerStyle} className={className}>
-        {kopf && KopfElement && (
+        {KopfElement && (
           <KopfElement
             id={kopfId}
             style={{
@@ -164,7 +165,7 @@ export function Liste<T>({
               borderBlockEnd: `1px solid ${rollen.linie}`,
             }}
           >
-            {kopf.inhalt}
+            {kopf?.inhalt}
           </KopfElement>
         )}
         <Spin spinning={loading}>{inhalt}</Spin>

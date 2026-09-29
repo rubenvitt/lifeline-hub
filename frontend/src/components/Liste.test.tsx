@@ -209,6 +209,18 @@ describe('Liste — Kopf ist eine Überschrift und benennt die Liste', () => {
     expect(screen.getByRole('list').hasAttribute('aria-labelledby')).toBe(false);
   });
 
+  it('ein Kopf ohne Inhalt ist keiner: weder leere Überschrift noch leerer Listenname', () => {
+    renderMitProviders(
+      <Liste
+        kopf={{ inhalt: null, unterEbene: 2 }}
+        dataSource={['A']}
+        renderItem={(t) => <ListenEintrag>{t}</ListenEintrag>}
+      />,
+    );
+    expect(screen.queryByRole('heading')).toBeNull();
+    expect(screen.getByRole('list').hasAttribute('aria-labelledby')).toBe(false);
+  });
+
   it('bei leerer Menge bleibt der Kopf, ein Verweis ins Leere entsteht nicht', () => {
     const { container } = renderMitProviders(
       <Liste
