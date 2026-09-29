@@ -20,11 +20,6 @@ pub const WELT_UEBERSICHT_DATEI: &str = "welt-uebersicht.mbtiles";
 /// Embed-Pfad der optionalen Welt-Übersicht.
 const WELT_EMBED_PFAD: &str = "welt/welt-uebersicht.mbtiles";
 
-/// Ist eine Welt-Übersicht eingebettet? Dann wird sie immer offline als unterste Basis gezeichnet.
-pub fn welt_uebersicht_eingebettet() -> bool {
-    KartenAssets::get(WELT_EMBED_PFAD).is_some()
-}
-
 /// Cache-Bust-Token der Welt-Übersicht (Hex-Präfix des Embed-sha256), oder `None` wenn nicht eingebettet.
 /// Wechselt bei einer neuen Welt-Version → MapLibre lädt die Kacheln frisch (kein Stale-Cache).
 pub fn welt_uebersicht_version() -> Option<String> {
@@ -122,12 +117,8 @@ mod tests {
         let existiert = tmp.path().join(WELT_UEBERSICHT_DATEI).exists();
         assert_eq!(
             existiert,
-            welt_uebersicht_eingebettet(),
-            "Datei genau dann, wenn eingebettet"
-        );
-        assert_eq!(
             welt_uebersicht_version().is_some(),
-            welt_uebersicht_eingebettet()
+            "Datei genau dann, wenn eingebettet"
         );
         // Zweiter Aufruf panickt nicht (idempotent).
         extrahiere_welt_uebersicht(tmp.path());

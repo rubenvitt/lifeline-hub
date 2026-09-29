@@ -1,12 +1,11 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
-use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::katalog::Betriebsart;
-use crate::routes::support::{deserialize_optional_field, trimme_tri};
+use crate::routes::support::{deserialize_optional_field, parse_enum, pflicht, trimme_tri};
 use crate::sprechgruppe::repo as sg_repo;
 use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};
 use axum::extract::{Query, State};
@@ -61,18 +60,15 @@ impl NormalisierterKatalog {
 /// `Betriebsart::parse` (ungültig → `Validation`), trimmt `hinweis`
 /// (leer → `None`).
 fn normalisiere_katalog(body: KatalogBody) -> Result<NormalisierterKatalog, AppError> {
-    let bezeichnung = body.bezeichnung.trim().to_string();
-    if bezeichnung.is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
-    if Betriebsart::parse(&body.betriebsart).is_none() {
-        return Err(AppError::Validation(format!(
+    let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
+    parse_enum(
+        Betriebsart::parse,
+        &body.betriebsart,
+        format!(
             "Ungültige Betriebsart «{}» — erlaubt: TMO, DMO",
             body.betriebsart
-        )));
-    }
+        ),
+    )?;
     let hinweis = body
         .hinweis
         .map(|s| s.trim().to_string())
@@ -129,22 +125,17 @@ impl PatchNormalisiert {
 fn normalisiere_patch_katalog(body: PatchKatalog) -> Result<PatchNormalisiert, AppError> {
     let bezeichnung = match body.bezeichnung {
         Some(b) => {
-            let b = b.trim().to_string();
-            if b.is_empty() {
-                return Err(AppError::Validation(
-                    "Bezeichnung darf nicht leer sein".into(),
-                ));
-            }
+            let b = pflicht(&b, "Bezeichnung")?;
             Some(b)
         }
         None => None,
     };
     if let Some(ba) = &body.betriebsart {
-        if Betriebsart::parse(ba).is_none() {
-            return Err(AppError::Validation(format!(
-                "Ungültige Betriebsart «{ba}» — erlaubt: TMO, DMO"
-            )));
-        }
+        parse_enum(
+            Betriebsart::parse,
+            ba,
+            format!("Ungültige Betriebsart «{ba}» — erlaubt: TMO, DMO"),
+        )?;
     }
     Ok(PatchNormalisiert {
         bezeichnung,
@@ -165,18 +156,15 @@ struct NormalisierterLokal {
 }
 
 fn normalisiere_lokal(body: EinsatzLokalBody) -> Result<NormalisierterLokal, AppError> {
-    let bezeichnung = body.bezeichnung.trim().to_string();
-    if bezeichnung.is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
-    if Betriebsart::parse(&body.betriebsart).is_none() {
-        return Err(AppError::Validation(format!(
+    let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
+    parse_enum(
+        Betriebsart::parse,
+        &body.betriebsart,
+        format!(
             "Ungültige Betriebsart «{}» — erlaubt: TMO, DMO",
             body.betriebsart
-        )));
-    }
+        ),
+    )?;
     let hinweis = body
         .hinweis
         .map(|s| s.trim().to_string())
@@ -255,14 +243,11 @@ pub async fn deaktivieren(
 /// Lesezugriff erforderlich; kein Modul-Key (Sprechgruppen sind modulübergreifend).
 pub async fn liste_fuer_einsatz(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff,
 ) -> Result<Json<Vec<SprechgruppeAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let einsatz_id = ctx.einsatz.id;
     // org_id kommt vom Einsatz, nicht vom Aufrufer (Cross-Org-Zugriff möglich).
-    let sgs = sg_repo::liste_fuer_einsatz(&state.pool, einsatz.org_id, einsatz_id).await?;
+    let sgs = sg_repo::liste_fuer_einsatz(&state.pool, ctx.einsatz.org_id, einsatz_id).await?;
     Ok(Json(sgs.iter().map(Sprechgruppe::anzeige).collect()))
 }
 
@@ -270,19 +255,15 @@ pub async fn liste_fuer_einsatz(
 /// Schreibrecht + aktiver Einsatz; kein Modul-Key.
 pub async fn anlegen_einsatz_lokal(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff,
     JsonBody(body): JsonBody<EinsatzLokalBody>,
 ) -> Result<(StatusCode, Json<SprechgruppeAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_aktiv(&einsatz)?;
+    let einsatz_id = ctx.einsatz.id;
     let n = normalisiere_lokal(body)?;
     // org_id kommt vom Einsatz, nicht vom Aufrufer (Cross-Org-Zugriff möglich).
     let sg = sg_repo::anlegen_einsatz_lokal(
         &state.pool,
-        einsatz.org_id,
+        ctx.einsatz.org_id,
         einsatz_id,
         &n.bezeichnung,
         &n.betriebsart,

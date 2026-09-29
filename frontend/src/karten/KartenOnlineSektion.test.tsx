@@ -1,6 +1,8 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderMitProviders } from '../test/utils';
+import { authWertFixture, benutzerFixture } from '../test/fixtures';
+import type { OrgRolle, SystemRolle } from '../api/types';
 import KartenOnlineSektion from './KartenOnlineSektion';
 import KartenOfflineSektion from './KartenOfflineSektion';
 
@@ -14,23 +16,8 @@ vi.mock('./OfflineKartenVerwaltung', () => ({ default: () => <div>offline-kind</
 
 import { useAuth } from '../auth/AuthContext';
 
-function setzeRolle(system_rolle: string, org_rolle = 'keine') {
-  vi.mocked(useAuth).mockReturnValue({
-    benutzer: {
-      id: 1,
-      system_rolle,
-      org_rolle,
-      anzeigename: 'X',
-      benutzername: 'x',
-      aktiv: true,
-      erstellt_at: '',
-      totp_aktiviert: false,
-    },
-    laedt: false,
-    login: vi.fn(),
-    logout: vi.fn(),
-    aktualisiere: vi.fn(),
-  } as never);
+function setzeRolle(system_rolle: SystemRolle, org_rolle: OrgRolle = 'keine') {
+  vi.mocked(useAuth).mockReturnValue(authWertFixture(benutzerFixture({ system_rolle, org_rolle })));
 }
 
 describe('KartenOnlineSektion', () => {

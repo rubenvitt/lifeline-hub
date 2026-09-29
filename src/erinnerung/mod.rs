@@ -2,6 +2,7 @@ pub mod faelligkeit;
 pub mod repo;
 pub mod scheduler;
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -36,17 +37,19 @@ pub struct ErinnerungAnzeige {
     pub vollzogen_von_id: Option<i64>,
 }
 
-pub const STATUS_OFFEN: &str = "offen";
-pub const STATUS_ERLEDIGT: &str = "erledigt";
-pub const STATUS_QUITTIERT: &str = "quittiert";
+pub const STATUS_OFFEN: &str = ErinnerungStatus::Offen.as_str();
+pub const STATUS_ERLEDIGT: &str = ErinnerungStatus::Erledigt.as_str();
+pub const STATUS_QUITTIERT: &str = ErinnerungStatus::Quittiert.as_str();
 
-/// LFH-120: Schema-Anker für die `status`-Union (geschlossenes Code-Vokabular, s. STATUS_*).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ErinnerungStatus {
-    Offen,
-    Erledigt,
-    Quittiert,
+wire_enum! {
+    /// LFH-120: Schema-Anker für die `status`-Union (geschlossenes Code-Vokabular, s. STATUS_*).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum ErinnerungStatus {
+        Offen => "offen",
+        Erledigt => "erledigt",
+        Quittiert => "quittiert",
+    }
 }
+
 pub const QUELLE_MANUELL: &str = "manuell";
 pub const QUELLE_AUTO_FRIST: &str = "auto_frist";

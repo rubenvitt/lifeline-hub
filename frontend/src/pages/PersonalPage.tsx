@@ -21,7 +21,6 @@ import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { kraefteuebersichtPfad, einheitenPfad, fahrzeugePfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import AdhocPersonModal from '../kraefte/AdhocPersonModal';
-import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition } from '../api/types';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
@@ -44,6 +43,11 @@ import { einsatzStatus, statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
 import { personalStatusDarstellung } from '../kraefte/mittelStatus';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import {
+  katalogStatusWechsel,
+  useOptimistischesZeilenUpdate,
+} from '../kraefte/useOptimistischesZeilenUpdate';
 
 export default function PersonalPage() {
   const { id } = useParams();
@@ -95,8 +99,7 @@ export default function PersonalPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   const disponiereMutation = useMutation({
     mutationFn: (personalId: number) => disponierePerson(einsatzId, personalId),
@@ -106,53 +109,15 @@ export default function PersonalPage() {
     },
     onError: fehler,
   });
-  const statusMutation = useMutation({
-    mutationFn: (v: { epId: number; statusId: number }) =>
-      aktualisiereDisposition(einsatzId, v.epId, { status_id: v.statusId }),
-    onMutate: async (v) => {
-      const queryKey = einsatzKeys.personal(einsatzId);
-      await qc.cancelQueries({ queryKey });
-      const vorher = qc.getQueryData<EinsatzPersonal[]>(queryKey)?.find((ep) => ep.id === v.epId);
-      const status = statusQuery.data?.find((s) => s.id === v.statusId);
-      qc.setQueryData<EinsatzPersonal[]>(queryKey, (alt) =>
-        alt?.map((ep) =>
-          ep.id === v.epId
-            ? {
-                ...ep,
-                status_id: v.statusId,
-                status_label: status?.label ?? ep.status_label,
-                status_kategorie: status?.kategorie ?? ep.status_kategorie,
-                status_farbe: status?.farbe ?? null,
-              }
-            : ep,
-        ),
-      );
-      return { vorher };
-    },
-    onSuccess: (serverStand) => {
-      qc.setQueryData<EinsatzPersonal[]>(einsatzKeys.personal(einsatzId), (alt) =>
-        alt?.map((ep) => (ep.id === serverStand.id ? serverStand : ep)),
-      );
-    },
-    onError: (e, v, kontext) => {
-      const vorher = kontext?.vorher;
-      if (vorher) {
-        qc.setQueryData<EinsatzPersonal[]>(einsatzKeys.personal(einsatzId), (aktuell) =>
-          aktuell?.map((ep) =>
-            ep.id === v.epId && ep.status_id === v.statusId
-              ? {
-                  ...ep,
-                  status_id: vorher.status_id,
-                  status_label: vorher.status_label,
-                  status_kategorie: vorher.status_kategorie,
-                  status_farbe: vorher.status_farbe,
-                }
-              : ep,
-          ),
-        );
-      }
-      fehler(e);
-    },
+  const statusMutation = useOptimistischesZeilenUpdate<
+    EinsatzPersonal,
+    { epId: number; statusId: number }
+  >({
+    queryKey: einsatzKeys.personal(einsatzId),
+    mutationFn: (v) => aktualisiereDisposition(einsatzId, v.epId, { status_id: v.statusId }),
+    zeilenId: (v) => v.epId,
+    ...katalogStatusWechsel<EinsatzPersonal>(statusQuery.data),
+    onFehler: fehler,
     onSettled: invalidate,
   });
   const positionMutation = useMutation({

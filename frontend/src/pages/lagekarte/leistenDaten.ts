@@ -6,7 +6,6 @@ import type {
   FuehrungskraftKarte,
   Rueckmeldungen,
   Schaden,
-  Staerke,
   Uhs,
 } from '../../api/types';
 import type { OnlineStyle } from '../../api/karte';
@@ -29,6 +28,7 @@ import type { LayerSichtbar } from './Sidebar';
 import { PERSONEN_SPERRGRUND, type PersonenZugriff } from './personenEbene';
 import { BETREUUNG_SPERRGRUND, type BetreuungZugriff } from './betreuungEbene';
 import { ART_LABEL, personenZahl } from '../../betreuung/betreuungText';
+import { staerkeText } from '../../anzeige/staerke';
 
 /**
  * Reine Ableitungen der rechten Kartenleiste — getrennt von `Sidebar.tsx`, damit Zähler,
@@ -232,12 +232,7 @@ export const OBJEKTART: Record<MarkerTyp, string> = {
   betreuungsstelle: 'Betreuungsstelle',
 };
 
-/** Stärke in BOS-Schreibweise `F/UF/M//Σ` (wie `StaerkeAnzeige`), „—" ohne Angabe. */
-export function staerkeText(s: Staerke | null | undefined): string {
-  if (!s) return '—';
-  const { fuehrer, unterfuehrer, mannschaft } = s;
-  return `${fuehrer}/${unterfuehrer}/${mannschaft}//${fuehrer + unterfuehrer + mannschaft}`;
-}
+export { staerkeText };
 
 const text = (w: string | null | undefined): string => (w && w.trim() ? w : '—');
 

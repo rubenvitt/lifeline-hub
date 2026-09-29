@@ -1,5 +1,5 @@
 import type { EinheitTyp } from './types';
-import { apiGet, apiSend } from './client';
+import { katalogApi } from './katalogApi';
 
 export interface TypEingabe {
   label: string;
@@ -9,18 +9,9 @@ export interface TypEingabe {
   sortier: number;
 }
 
-export function listeEinheitTypen(): Promise<EinheitTyp[]> {
-  return apiGet<EinheitTyp[]>('/api/einheit-typen');
-}
+const api = katalogApi<EinheitTyp, TypEingabe>('/api/einheit-typen');
 
-export function legeTypAn(daten: TypEingabe): Promise<EinheitTyp> {
-  return apiSend<EinheitTyp>('/api/einheit-typen', 'POST', daten);
-}
-
-export function aktualisiereTyp(id: number, daten: TypEingabe): Promise<EinheitTyp> {
-  return apiSend<EinheitTyp>(`/api/einheit-typen/${id}`, 'PATCH', daten);
-}
-
-export function deaktiviereTyp(id: number): Promise<void> {
-  return apiSend<void>(`/api/einheit-typen/${id}/deaktivieren`, 'POST');
-}
+export const listeEinheitTypen = api.liste;
+export const legeTypAn = api.legeAn;
+export const aktualisiereTyp = api.aktualisiere;
+export const deaktiviereTyp = api.deaktiviere;

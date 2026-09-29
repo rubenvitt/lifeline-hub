@@ -531,9 +531,7 @@ pub async fn melde_vollzug(
     vollzugsmeldung: &str,
     jetzt: &str,
 ) -> Result<i64, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
     let etb_id = melde_vollzug_tx(
         &mut tx,

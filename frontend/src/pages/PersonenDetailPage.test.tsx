@@ -3,61 +3,23 @@ import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import PersonenDetailPage from './PersonenDetailPage';
 import type { Person, PersonDetail, Sichtungskategorie } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { erzeugeQueryClient } from '../api/queryClient';
+import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
-class FakeEventSource {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {
-    this.closed = true;
-  }
-}
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
 // schreibrecht.test.ts ab.
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  benutzername: 'nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-27 10:00:00',
-};
-const einsatzAktiv = {
-  id: 1,
-  bezeichnung: 'Hochwasser',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '2026-05-27 08:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '2026-05-27 08:00:00',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-};
-const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
+const nutzer = benutzerFixture();
+const einsatzAktiv = einsatzFixture();
+const einsatzBeobachter = einsatzFixture({ meine_rolle: 'beobachter' });
 
 const detail = {
   id: 10,
@@ -96,7 +58,7 @@ function render(
   cacheBehalten = false,
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)),
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
@@ -113,30 +75,26 @@ function render(
       })
     : undefined;
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/personen" element={<div>LISTE</div>} />
-        <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
-        <Route path="/einsaetze/:id/tiere/:tierId" element={<div>TIERE-DETAIL</div>} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/personen" element={<div>LISTE</div>} />
+      <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
+      <Route path="/einsaetze/:id/tiere/:tierId" element={<div>TIERE-DETAIL</div>} />
+    </Routes>,
     { route: '/einsaetze/1/personen/10', client },
   );
 }
 
 function renderBei(route: string) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/personen" element={<div>LISTE</div>} />
-        <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
-        <Route path="/einsaetze/:id/tiere/:tierId" element={<div>TIERE-DETAIL</div>} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/personen" element={<div>LISTE</div>} />
+      <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
+      <Route path="/einsaetze/:id/tiere/:tierId" element={<div>TIERE-DETAIL</div>} />
+    </Routes>,
     { route },
   );
 }

@@ -44,6 +44,22 @@ export function fehlerText(e: unknown, standard = 'Aktion fehlgeschlagen'): stri
   return standard;
 }
 
+/**
+ * Hängt die gesetzten Parameter als Query an (`URLSearchParams`-Kodierung). Ohne Wert gilt
+ * `undefined`, `null`, `''` und `false`; eine `0` bleibt stehen.
+ */
+export function mitParametern(
+  pfad: string,
+  parameter: Record<string, string | number | boolean | null | undefined>,
+): string {
+  const p = new URLSearchParams();
+  for (const [name, wert] of Object.entries(parameter)) {
+    if (wert != null && wert !== '' && wert !== false) p.set(name, String(wert));
+  }
+  const q = p.toString();
+  return q ? `${pfad}?${q}` : pfad;
+}
+
 /** True, wenn der Fehler ein optimistischer Sperrkonflikt (HTTP 409) ist — der Datensatz
  *  wurde seit dem Laden von jemand anderem geändert (LFH-241/F10). Der Aufrufer bietet dann
  *  „neu laden vs. überschreiben" an, statt den Fehler nur generisch zu melden. */

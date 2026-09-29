@@ -36,9 +36,6 @@ use super::{DemoBericht, DemoVorgang};
 use crate::error::AppError;
 use crate::katalog::StatusKategorie;
 
-/// Zeitformat der Datenbank: UTC ohne Zonenkennung, wie `datetime('now')` es schreibt.
-const ZEITFORMAT: &str = "%Y-%m-%d %H:%M:%S";
-
 /// Ergebnis eines gelungenen Imports; die Route (Block 5) baut daraus den Status.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ImportErgebnis {
@@ -50,12 +47,8 @@ pub struct ImportErgebnis {
     pub bericht: DemoBericht,
 }
 
-fn zeit(t: NaiveDateTime) -> String {
-    t.format(ZEITFORMAT).to_string()
-}
-
 fn schrittzeit(jetzt: NaiveDateTime, vor_min: i64) -> String {
-    zeit(jetzt - chrono::Duration::minutes(vor_min))
+    crate::zeit::formatiere(jetzt - chrono::Duration::minutes(vor_min))
 }
 
 /// Spielt das Demo-Szenario für `org_id` ein. `admin_id` wird Einsatzleitung und steht als
@@ -121,7 +114,7 @@ pub async fn importieren_tx(
 
     // 4. Der Kopf braucht die Einsatz-ID. Der Bericht ist vorläufig und wird am Ende ersetzt;
     //    die Transaktion macht ihn nie sichtbar.
-    let importiert_at = zeit(jetzt);
+    let importiert_at = crate::zeit::formatiere(jetzt);
     let vorlaeufig = DemoBericht {
         vorgang: DemoVorgang::Importiert,
         zeitpunkt: importiert_at.clone(),

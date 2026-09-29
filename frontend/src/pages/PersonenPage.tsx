@@ -8,7 +8,6 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { listePersonen, registrierAnzeige, schlageAbgleichVor } from '../api/einsatzPerson';
-import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeUhs } from '../api/einsatzUhs';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
@@ -54,6 +53,8 @@ import {
   personErfassungsQuittungEntfernen,
   personErfassungsQuittungenLaden,
 } from '../offline/queue';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { useFrischAngelegt } from '../components/useFrischAngelegt';
 
 /**
  * Betroffene: das Formular wird zur Zeile.
@@ -178,9 +179,8 @@ export default function PersonenPage() {
   const [zuletztNachEinsatz, setZuletztNachEinsatz] = useState<
     Record<number, { benutzerId: number; quittung: ZeilenQuittung }>
   >({});
-  const [frischErfasst, setFrischErfasst] = useState<
-    Array<{ einsatzId: number; person: Person; bestaetigenNach: number }>
-  >([]);
+  const frischErfasst = useFrischAngelegt<Person>(einsatzId, einsatzKeys.personen, personenQuery);
+  const merkeFrisch = frischErfasst.merke;
   const [dokumentSichtbar, setDokumentSichtbar] = useState(
     () => typeof document === 'undefined' || document.visibilityState === 'visible',
   );
@@ -215,7 +215,7 @@ export default function PersonenPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) => message.error(fehlerText(e));
+  const fehler = useFehlerMeldung();
 
   const anlegenMutation = useMutation({
     mutationFn: async (v: {
@@ -264,17 +264,7 @@ export default function PersonenPage() {
         return;
       }
       const person = ergebnis.daten;
-      setFrischErfasst((alt) => [
-        {
-          einsatzId: zielEinsatzId,
-          person,
-          bestaetigenNach:
-            qc.getQueryState(einsatzKeys.personen(zielEinsatzId))?.dataUpdatedAt ?? 0,
-        },
-        ...alt.filter(
-          (eintrag) => eintrag.einsatzId !== zielEinsatzId || eintrag.person.id !== person.id,
-        ),
-      ]);
+      merkeFrisch(zielEinsatzId, [person]);
       zeigeNeuePerson(zielEinsatzId, person);
       setHighlightFuer(zielEinsatzId, person.id);
       if (variablen.quelle === 'zeile') {
@@ -309,20 +299,6 @@ export default function PersonenPage() {
   });
 
   useEffect(() => {
-    const serverIds = new Set((personenQuery.data ?? []).map((person) => person.id));
-    if (serverIds.size === 0) return;
-    setFrischErfasst((alt) => {
-      const offen = alt.filter(
-        (eintrag) =>
-          eintrag.einsatzId !== einsatzId ||
-          personenQuery.dataUpdatedAt <= eintrag.bestaetigenNach ||
-          !serverIds.has(eintrag.person.id),
-      );
-      return offen.length === alt.length ? alt : offen;
-    });
-  }, [einsatzId, personenQuery.data, personenQuery.dataUpdatedAt]);
-
-  useEffect(() => {
     pageMontiert.current = true;
     return () => {
       pageMontiert.current = false;
@@ -347,17 +323,11 @@ export default function PersonenPage() {
 
       const neueste = quittungen[quittungen.length - 1];
       const bestaetigenNach = qc.getQueryState(einsatzKeys.personen(einsatzId))?.dataUpdatedAt ?? 0;
-      const quittungsIds = new Set(quittungen.map((quittung) => quittung.person.id));
-      setFrischErfasst((alt) => [
-        ...quittungen.map((quittung) => ({
-          einsatzId,
-          person: quittung.person,
-          bestaetigenNach,
-        })),
-        ...alt.filter(
-          (eintrag) => eintrag.einsatzId !== einsatzId || !quittungsIds.has(eintrag.person.id),
-        ),
-      ]);
+      merkeFrisch(
+        einsatzId,
+        quittungen.map((quittung) => quittung.person),
+        bestaetigenNach,
+      );
       setSichtNachEinsatz((alt) => ({
         ...alt,
         [einsatzId]: sichtFuerNeuePerson(alt[einsatzId] ?? SICHT_VORGABE, neueste.person),
@@ -390,7 +360,7 @@ export default function PersonenPage() {
       // IndexedDB bleibt bei einem Lesefehler unverändert; ein späteres Signal, visibilitychange
       // oder Mount kann dieselbe Quittung erneut laden.
     }
-  }, [benutzer?.id, einsatzId, qc]);
+  }, [benutzer?.id, einsatzId, qc, merkeFrisch]);
 
   useEffect(() => {
     void ladePersistiertePersonQuittungen();
@@ -419,18 +389,7 @@ export default function PersonenPage() {
     const erfolgreichGesendet = (event: Event) => {
       const detail = (event as CustomEvent<OfflineSchreibaktionGesendet>).detail;
       if (detail?.art !== 'person' || detail.benutzerId !== benutzer?.id) return;
-      setFrischErfasst((alt) => [
-        {
-          einsatzId: detail.einsatzId,
-          person: detail.daten,
-          bestaetigenNach:
-            qc.getQueryState(einsatzKeys.personen(detail.einsatzId))?.dataUpdatedAt ?? 0,
-        },
-        ...alt.filter(
-          (eintrag) =>
-            eintrag.einsatzId !== detail.einsatzId || eintrag.person.id !== detail.daten.id,
-        ),
-      ]);
+      merkeFrisch(detail.einsatzId, [detail.daten]);
       // Aus der Antwort (`detail.daten`), nicht aus der vorgemerkten Sicht: mit Erst-Sichtung hebt
       // der Server `erfasst` auf `betroffen`.
       setSichtNachEinsatz((alt) => ({
@@ -461,7 +420,7 @@ export default function PersonenPage() {
     window.addEventListener(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, erfolgreichGesendet);
     return () =>
       window.removeEventListener(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, erfolgreichGesendet);
-  }, [benutzer?.id, qc]);
+  }, [benutzer?.id, qc, merkeFrisch]);
 
   const quittungSchliessen = () => {
     if (!erfassungsQuittung || benutzer?.id == null) return;
@@ -562,14 +521,7 @@ export default function PersonenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  const aktuelleFrische = frischErfasst
-    .filter((eintrag) => eintrag.einsatzId === einsatzId)
-    .map((eintrag) => eintrag.person);
-  const frischeIds = new Set(aktuelleFrische.map((person) => person.id));
-  const alle = [
-    ...aktuelleFrische,
-    ...(personenQuery.data ?? []).filter((person) => !frischeIds.has(person.id)),
-  ];
+  const alle = frischErfasst.alle;
   const gefundene = gefundenePersonen(alle);
 
   /**

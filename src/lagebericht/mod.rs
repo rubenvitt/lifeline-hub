@@ -1,12 +1,10 @@
 pub mod repo;
 
-use crate::error::AppError;
+use crate::vorlagendokument::{self as kern, Abschnittsart, Dokumentart};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// Status-Konstanten.
-pub const STATUS_ENTWURF: &str = "entwurf";
-pub const STATUS_FREIGEGEBEN: &str = "freigegeben";
+pub use crate::vorlagendokument::{render_snapshot, AbschnittDef, VorlageDef};
 
 /// Lagebericht-Vorlage (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `LageberichtVorlageKey`).
 /// Wire == `vorlage`.
@@ -24,19 +22,6 @@ pub enum LageberichtVorlage {
 pub enum LageberichtStatus {
     Entwurf,
     Freigegeben,
-}
-
-/// Ein Abschnitt der Vorlagen-Definition (fest im Code).
-pub struct AbschnittDef {
-    pub schluessel: &'static str,
-    pub label: &'static str,
-}
-
-/// Eine Berichtsvorlage: Schlüssel, Anzeigelabel und geordnete Abschnitte.
-pub struct VorlageDef {
-    pub schluessel: &'static str,
-    pub label: &'static str,
-    pub abschnitte: &'static [AbschnittDef],
 }
 
 /// Vorlagen-Registry (Spec „Berichtsvorlagen"). MUSS synchron zu
@@ -124,9 +109,23 @@ pub const VORLAGEN: &[VorlageDef] = &[
     },
 ];
 
+/// Marker der Dokumentart Lagebericht (gemeinsamer Kern: [`crate::vorlagendokument`]).
+pub struct Lagebericht;
+
+impl Dokumentart for Lagebericht {
+    type Abschnitt = Abschnitt;
+    type Anzeige = repo::LageberichtAnzeige;
+    const TABELLE: &'static str = "lagebericht";
+    const ETB_TYP: &'static str = crate::etb::TYP_LAGE;
+    const ETB_VERWEIS: &'static str = "lagebericht_id";
+    const VORLAGEN: &'static [VorlageDef] = VORLAGEN;
+    const NOMEN: &'static str = "Bericht";
+    const NOMEN_PLURAL: &'static str = "Berichte";
+}
+
 /// Liefert die Vorlagendefinition zu einem Schlüssel, `None` bei Unbekanntem.
 pub fn vorlage(schluessel: &str) -> Option<&'static VorlageDef> {
-    VORLAGEN.iter().find(|v| v.schluessel == schluessel)
+    kern::vorlage::<Lagebericht>(schluessel)
 }
 
 /// Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element).
@@ -137,63 +136,16 @@ pub struct Abschnitt {
     pub text: String,
 }
 
-/// Leeres Abschnitts-Skelett gemäß Vorlage (Reihenfolge der Vorlage).
-pub fn leere_abschnitte(v: &VorlageDef) -> Vec<Abschnitt> {
-    v.abschnitte
-        .iter()
-        .map(|a| Abschnitt {
-            schluessel: a.schluessel.to_string(),
-            text: String::new(),
-        })
-        .collect()
-}
-
-/// Deterministisches Markdown-Rendering des Berichts (Snapshot-Inhalt für das ETB).
-/// Reihenfolge = Vorlage; fehlende Abschnitte werden als leer gerendert.
-pub fn render_snapshot(
-    v: &VorlageDef,
-    titel: &str,
-    zeitstand: &str,
-    abschnitte: &[Abschnitt],
-) -> String {
-    let mut out = String::new();
-    out.push_str(&format!("# {titel}\n\n"));
-    out.push_str(&format!("_Zeitstand: {zeitstand}_\n"));
-    for def in v.abschnitte {
-        let text = abschnitte
-            .iter()
-            .find(|a| a.schluessel == def.schluessel)
-            .map(|a| a.text.trim())
-            .unwrap_or("");
-        out.push_str(&format!("\n## {}\n", def.label));
-        if text.is_empty() {
-            out.push_str("_(keine Angabe)_\n");
-        } else {
-            out.push_str(text);
-            out.push('\n');
-        }
+impl Abschnittsart for Abschnitt {
+    fn neu(schluessel: String, text: String) -> Self {
+        Self { schluessel, text }
     }
-    out
-}
-
-/// Freigabe-Validierung (Spec „Offene Punkte"): Pflicht ist die Abschnitts-*Struktur*
-/// (alle Vorlagen-Schlüssel vorhanden), nicht jedes einzelne Feld. Zusätzlich darf der
-/// *gesamte* Bericht nicht leer sein.
-pub fn validiere_freigabe(v: &VorlageDef, abschnitte: &[Abschnitt]) -> Result<(), AppError> {
-    for def in v.abschnitte {
-        if !abschnitte.iter().any(|a| a.schluessel == def.schluessel) {
-            return Err(AppError::UnprocessableEntity(format!(
-                "Abschnitt «{}» fehlt im Bericht",
-                def.label
-            )));
-        }
+    fn schluessel(&self) -> &str {
+        &self.schluessel
     }
-    if abschnitte.iter().all(|a| a.text.trim().is_empty()) {
-        return Err(AppError::UnprocessableEntity(
-            "Der Bericht ist leer und kann nicht freigegeben werden".into(),
-        ));
+    fn text(&self) -> &str {
+        &self.text
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -227,7 +179,7 @@ mod tests {
     #[test]
     fn leere_abschnitte_folgt_vorlagen_reihenfolge() {
         let v = vorlage("freitext").unwrap();
-        let leer = leere_abschnitte(v);
+        let leer = kern::leere_abschnitte::<Abschnitt>(v);
         assert_eq!(leer.len(), 1);
         assert_eq!(leer[0].schluessel, "text");
         assert_eq!(leer[0].text, "");
@@ -253,16 +205,16 @@ mod tests {
     fn validierung_verlangt_alle_abschnitts_schluessel() {
         let v = vorlage("freitext").unwrap();
         let leer: Vec<Abschnitt> = vec![];
-        assert!(validiere_freigabe(v, &leer).is_err());
+        assert!(kern::validiere_freigabe::<Lagebericht>(v, &leer).is_err());
         let leer_text = vec![Abschnitt {
             schluessel: "text".into(),
             text: "  ".into(),
         }];
-        assert!(validiere_freigabe(v, &leer_text).is_err());
+        assert!(kern::validiere_freigabe::<Lagebericht>(v, &leer_text).is_err());
         let ok = vec![Abschnitt {
             schluessel: "text".into(),
             text: "Inhalt".into(),
         }];
-        assert!(validiere_freigabe(v, &ok).is_ok());
+        assert!(kern::validiere_freigabe::<Lagebericht>(v, &ok).is_ok());
     }
 }

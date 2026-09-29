@@ -6,6 +6,7 @@ use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::karten_ansicht::{ist_gueltiges_karten_theme, repo, KartenAnsichtAnzeige};
 use crate::live::LiveEvent;
+use crate::routes::support::pflicht;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -15,11 +16,12 @@ use serde::Deserialize;
 /// `karten_ansicht` — das Frontend filtert exakt darauf und invalidiert den
 /// Ansichts-Cache des Einsatzes.
 fn sse_ansicht(state: &AppState, einsatz_id: i64, ansicht_id: i64) {
-    let data =
-        serde_json::json!({ "einsatz_id": einsatz_id, "ansicht_id": ansicht_id }).to_string();
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::KartenAnsicht, data);
+    state.live.publiziere_objekt(
+        einsatz_id,
+        LiveEvent::KartenAnsicht,
+        "ansicht_id",
+        ansicht_id,
+    );
 }
 
 /// SSE-Notify für die drei ansichtsgebundenen Objekt-Layer (LFH-320): beim Löschen einer
@@ -29,16 +31,13 @@ fn sse_ansicht(state: &AppState, einsatz_id: i64, ansicht_id: i64) {
 /// `einsatz_id` (das FE invalidiert die ganze Liste). Ohne das sähen andere Clients, die die
 /// betroffene Ansicht offen haben, veraltete Objekte bis zu einem unbezogenen Refetch.
 fn sse_objekt_layer(state: &AppState, einsatz_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id }).to_string();
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::FreiesZeichen, data.clone());
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::LageZone, data.clone());
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::KarteBild, data);
+    for event in [
+        LiveEvent::FreiesZeichen,
+        LiveEvent::LageZone,
+        LiveEvent::KarteBild,
+    ] {
+        state.live.publiziere_einsatz(einsatz_id, event);
+    }
 }
 
 /// GET /api/einsaetze/{id}/karten-ansichten — Liste der Ansichten des Einsatzes.
@@ -86,11 +85,7 @@ pub async fn anlegen(
     PfadParam(_id): PfadParam<i64>,
     JsonBody(req): JsonBody<repo::AnsichtNeu>,
 ) -> Result<(StatusCode, Json<KartenAnsichtAnzeige>), AppError> {
-    if req.name.trim().is_empty() {
-        return Err(AppError::Validation(
-            "Der Ansichts-Name darf nicht leer sein".into(),
-        ));
-    }
+    pflicht(&req.name, "Der Ansichts-Name")?;
     validiere_enums(req.basemap_modus.as_deref(), req.karten_theme.as_deref())?;
     let einsatz_id = ctx.einsatz.id;
     let ansicht = repo::anlegen(&state.pool, einsatz_id, &req, ctx.benutzer.id).await?;
@@ -118,13 +113,8 @@ pub async fn patch(
         repo::patche(&state.pool, einsatz_id, aid, &req, benutzer_id).await?;
     }
     if let Some(name) = req.name.as_deref() {
-        let name = name.trim();
-        if name.is_empty() {
-            return Err(AppError::Validation(
-                "Der Ansichts-Name darf nicht leer sein".into(),
-            ));
-        }
-        repo::benenne_um(&state.pool, einsatz_id, aid, name, benutzer_id).await?;
+        let name = pflicht(&name, "Der Ansichts-Name")?;
+        repo::benenne_um(&state.pool, einsatz_id, aid, &name, benutzer_id).await?;
     }
     if req.ist_standard == Some(true) {
         repo::setze_standard(&state.pool, einsatz_id, aid, benutzer_id).await?;

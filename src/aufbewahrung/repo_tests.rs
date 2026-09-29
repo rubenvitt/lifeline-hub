@@ -3,13 +3,11 @@
 use super::repo::{self, ArchivEtbFilter};
 use crate::einsatz::retention::AufbewahrungZustand;
 use crate::etb::EtbTyp;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 
 fn t(s: &str) -> DateTime<Utc> {
-    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-        .unwrap()
-        .and_utc()
+    crate::zeit::parse_utc(s).unwrap()
 }
 
 const JETZT: &str = "2026-06-30 12:00:00";

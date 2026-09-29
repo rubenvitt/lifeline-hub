@@ -116,9 +116,7 @@ pub async fn anlegen(
     ersteller_id: i64,
     daten: NachforderungDaten<'_>,
 ) -> Result<NachforderungAnzeige, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
     let id = anlegen_tx(&mut tx, einsatz_id, ersteller_id, etb_startwert, &daten).await?;
     tx.commit().await?;

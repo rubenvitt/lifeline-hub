@@ -15,7 +15,7 @@ import {
 } from '../api/etb';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import { etbDruckPfad, etbPfad, parseEtbFilter, parseRouteId } from '../routing/deeplinks';
@@ -270,7 +270,7 @@ export default function EtbPage() {
       await erfassen({ ...puffer.eintrag, client_id: crypto.randomUUID() });
       if (puffer.id != null) await abgelehntVerwerfen(puffer.id);
     } catch (err) {
-      message.error(err instanceof ApiError ? err.message : 'Erneut senden fehlgeschlagen');
+      message.error(fehlerText(err, 'Erneut senden fehlgeschlagen'));
     }
   }
 
@@ -329,7 +329,7 @@ export default function EtbPage() {
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
       message.success('Einsatz abgeschlossen');
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Abschließen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Abschließen fehlgeschlagen')),
   });
 
   const auftragMutation = useMutation({
@@ -342,8 +342,7 @@ export default function EtbPage() {
       setAuftragZu(null);
       message.success('Auftrag aus ETB-Eintrag erteilt');
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Auftrag erteilen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Auftrag erteilen fehlgeschlagen')),
   });
 
   /**
@@ -368,7 +367,7 @@ export default function EtbPage() {
       await erfassen(e);
       zeitachseKopf.current?.scrollIntoView?.({ block: 'nearest' });
     } catch (err) {
-      message.error(err instanceof ApiError ? err.message : 'Senden fehlgeschlagen');
+      message.error(fehlerText(err, 'Senden fehlgeschlagen'));
       throw err;
     }
   }

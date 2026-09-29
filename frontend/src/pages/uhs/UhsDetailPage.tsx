@@ -12,7 +12,6 @@ import {
   unfallhilfsstellenListePfad,
 } from '../../routing/deeplinks';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
-import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { UhsStatus } from '../../api/types';
 import EinsatzSeite from '../../components/EinsatzSeite';
@@ -24,6 +23,7 @@ import { merkeLetzteUhs } from './uhsAuswahl';
 import Grundriss from './Grundriss';
 import MaterialTab from './MaterialTab';
 import BewegungenTab from './BewegungenTab';
+import { useFehlerMeldung } from '../../components/useFehlerMeldung';
 
 export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
@@ -60,8 +60,7 @@ export default function UhsDetailPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   const statusMut = useMutation({
     mutationFn: (status: UhsStatus) => setzeUhsStatus(einsatzId, uhsId, status),

@@ -1,44 +1,20 @@
-import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Navigate, Route, Routes, useLocation } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import AdminLayout from './AdminLayout';
 import { adminBenutzerPfad, defaultAdminPfad, ersteSektionPfad } from './adminNav';
+import { adminFixture, benutzerFixture } from '../test/fixtures';
+import type { BenutzerAnzeige } from '../api/types';
 
-const fuehrungskraft = {
-  id: 2,
-  anzeigename: 'Eva',
-  benutzername: 'eva',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const fuehrungskraft = benutzerFixture({ id: 2, anzeigename: 'Eva', org_rolle: 'fuehrungskraft' });
 
-const admin = {
-  id: 1,
-  anzeigename: 'Chef',
-  benutzername: 'chef',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const admin = adminFixture({ anzeigename: 'Chef' });
 
-const sonstiger = {
-  id: 3,
-  anzeigename: 'Max',
-  benutzername: 'max',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const sonstiger = benutzerFixture({ id: 3, anzeigename: 'Max' });
 
 /** Zeigt den aktuellen Pfad — Landepunkt der Sektions-/Redirect-Routen. */
 function Pfad() {
@@ -46,35 +22,33 @@ function Pfad() {
 }
 
 /** Routen-Baum wie in App.tsx (registry-getriebene Redirects + generischer Sektions-Stub). */
-function setup(me: Record<string, unknown>, route = defaultAdminPfad()) {
-  server.use(http.get('/api/auth/me', () => HttpResponse.json(me)));
+function setup(me: BenutzerAnzeige, route = defaultAdminPfad()) {
+  server.use(meHandler(me));
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
-        <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
-          <Route
-            path="stammdaten"
-            element={<Navigate to={ersteSektionPfad('stammdaten')} replace />}
-          />
-          <Route
-            path="einstellungen"
-            element={<Navigate to={ersteSektionPfad('einstellungen')} replace />}
-          />
-          <Route path="karten" element={<Navigate to={ersteSektionPfad('karten')} replace />} />
-          <Route path=":gruppe/:sektion" element={<Pfad />} />
-          {/* Die A7-Detailrouten NAMENTLICH wie in `App.tsx` — ein generisches
-              `:gruppe/:sektion/:id` machte im Test Adressen auflösbar, die es in der
-              Anwendung nicht gibt (z. B. `/admin/karten/online/7`). */}
-          <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<Pfad />} />
-          <Route path="stammdaten/personal/:personalId" element={<Pfad />} />
-          <Route path="benutzer" element={<Pfad />} />
-        </Route>
-        <Route path="/einsaetze" element={<div>Einsätze</div>} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
+      <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
+        <Route
+          path="stammdaten"
+          element={<Navigate to={ersteSektionPfad('stammdaten')} replace />}
+        />
+        <Route
+          path="einstellungen"
+          element={<Navigate to={ersteSektionPfad('einstellungen')} replace />}
+        />
+        <Route path="karten" element={<Navigate to={ersteSektionPfad('karten')} replace />} />
+        <Route path=":gruppe/:sektion" element={<Pfad />} />
+        {/* Die A7-Detailrouten NAMENTLICH wie in `App.tsx` — ein generisches
+            `:gruppe/:sektion/:id` machte im Test Adressen auflösbar, die es in der
+            Anwendung nicht gibt (z. B. `/admin/karten/online/7`). */}
+        <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<Pfad />} />
+        <Route path="stammdaten/personal/:personalId" element={<Pfad />} />
+        <Route path="benutzer" element={<Pfad />} />
+      </Route>
+      <Route path="/einsaetze" element={<div>Einsätze</div>} />
+    </Routes>,
     { route },
   );
 }
