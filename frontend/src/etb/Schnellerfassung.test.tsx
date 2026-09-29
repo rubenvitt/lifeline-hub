@@ -5,12 +5,13 @@ import { setzeViewportBreite } from '../test/viewport';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NeuerEintrag } from '../api/etb';
-import type { EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige } from '../api/types';
+import type { EtbBaustein, EtbEintragAnzeige } from '../api/types';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
 import Schnellerfassung, { chipZeileStil, rolleWaagerechtInsBild } from './Schnellerfassung';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
+import { einsatzFixture } from '../test/fixtures';
 
 // Die Schnellerfassung lädt über useFunkrufnamen immer /fahrzeuge + /einheiten.
 // onUnhandledRequest: 'error' im Setup → Default-Handler (leere Listen) bereitstellen,
@@ -23,13 +24,7 @@ beforeEach(() => {
   );
 });
 
-const einsatz = {
-  id: 7,
-  bezeichnung: 'Test',
-  stichwort: null,
-  leitstellen_nr: null,
-  einsatzort: null,
-} as unknown as EinsatzAnzeige;
+const einsatz = einsatzFixture({ id: 7, bezeichnung: 'Test' });
 
 function original(): EtbEintragAnzeige {
   return {

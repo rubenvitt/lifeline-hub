@@ -11,27 +11,9 @@ import GefahrenPage, { gebietszeileStil } from './GefahrenPage';
 import { dichten } from '../../theme/tokens';
 import { einsatzKeys } from '../../api/queryKeys';
 import { formatiereDatenstand } from '../../components/Datenstand';
+import { einsatzFixture } from '../../test/fixtures';
 
-const einsatz = {
-  id: 1,
-  bezeichnung: 'Lage',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-};
+const einsatz = einsatzFixture({ bezeichnung: 'Lage' });
 const gebiet = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
 
 function handlers(gebiete: unknown[] = [gebiet], matrix: unknown[] = []) {

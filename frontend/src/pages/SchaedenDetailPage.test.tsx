@@ -3,35 +3,19 @@ import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import SchaedenDetailPage from './SchaedenDetailPage';
+import { benutzerFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
-class FakeEventSource {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {
-    this.closed = true;
-  }
-}
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
 // schreibrecht.test.ts ab.
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-};
+const nutzer = benutzerFixture({ org_rolle: 'fuehrungskraft' });
 const einsatzAktiv = {
   id: 1,
   bezeichnung: 'Lage',
@@ -93,7 +77,7 @@ function render(
   route = '/einsaetze/1/schaeden/10',
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(schaden)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([einePerson])),
@@ -102,13 +86,11 @@ function render(
   );
   if (extra.length > 0) server.use(...extra);
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/schaeden" element={<div>LISTE</div>} />
-        <Route path="/einsaetze/:id/schaeden/:schadenId" element={<SchaedenDetailPage />} />
-        <Route path="/einsaetze/:id/personen/:personId" element={<div>PERSON-DETAIL</div>} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/schaeden" element={<div>LISTE</div>} />
+      <Route path="/einsaetze/:id/schaeden/:schadenId" element={<SchaedenDetailPage />} />
+      <Route path="/einsaetze/:id/personen/:personId" element={<div>PERSON-DETAIL</div>} />
+    </Routes>,
     { route },
   );
 }

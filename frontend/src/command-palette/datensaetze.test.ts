@@ -11,7 +11,6 @@ import { filtereBefehle, ordneTreffer, praefixStufe, type Treffer } from './fuzz
 import type { Befehl, DatensatzQuelle, PaletteModus } from './typen';
 import type {
   Auftrag,
-  BenutzerAnzeige,
   Einheit,
   Einsatzabschnitt,
   Gefahrengebiet,
@@ -25,6 +24,7 @@ import type {
   Schaden,
   Uhs,
 } from '../api/types';
+import { benutzerFixture } from '../test/fixtures';
 
 /**
  * FIXTUREN ALS TEILOBJEKTE mit `as`-Cast (Bauform `offline/ereignisse.test.ts:8`), nicht als
@@ -67,16 +67,7 @@ const einheit = (o: Partial<Einheit>): Einheit =>
 const etb = (o: Partial<EtbEintragAnzeige>): EtbEintragAnzeige =>
   ({ id: 1, lfd_nr: 1, inhalt: 'Lage erkundet', typ: 'lage', ...o }) as EtbEintragAnzeige;
 
-const fuehrungskraft: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'EL',
-  benutzername: 'el',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-  aktiv: true,
-  erstellt_at: '',
-  totp_aktiviert: false,
-};
+const fuehrungskraft = benutzerFixture({ anzeigename: 'EL', org_rolle: 'fuehrungskraft' });
 
 /** Vollständiges ModulOverride bauen (Bauform `befehle.test.ts:19`). */
 function ueberschreibung(felder: Partial<ModulOverride>): ModulOverride {

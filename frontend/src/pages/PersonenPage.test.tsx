@@ -3,12 +3,11 @@ import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Person } from '../api/types';
+import type { EinsatzAnzeige, Person } from '../api/types';
 import PersonenPage from './PersonenPage';
 import PersonenDetailPage from './PersonenDetailPage';
 import {
@@ -26,6 +25,8 @@ import {
 } from '../offline/ereignisse';
 import { useOfflineSync } from '../offline/useOfflineSync';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
+import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
 /**
  * Die echte Karte braucht WebGL, jsdom hat keins — Stub nach dem Muster von
@@ -45,19 +46,6 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
     </div>
   ),
 }));
-
-class FakeEventSource {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {
-    this.closed = true;
-  }
-}
 
 class FakeBroadcastChannel {
   static instanzen: FakeBroadcastChannel[] = [];
@@ -106,36 +94,9 @@ afterEach(() => {
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
 // schreibrecht.test.ts ab.
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  benutzername: 'nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-27 10:00:00',
-};
-const einsatzAktiv = {
-  id: 1,
-  bezeichnung: 'Hochwasser',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '2026-05-27 08:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '2026-05-27 08:00:00',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-};
-const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
+const nutzer = benutzerFixture();
+const einsatzAktiv = einsatzFixture();
+const einsatzBeobachter = einsatzFixture({ meine_rolle: 'beobachter' });
 
 const person: Person = {
   id: 10,
@@ -188,19 +149,17 @@ function render(
   route = '/einsaetze/1/personen',
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)),
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
-        <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+      <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
+    </Routes>,
     { route },
   );
 }
@@ -217,19 +176,17 @@ function EinsatzNavigation() {
 
 function renderMitEinsatzNavigation(route = '/einsaetze/1/personen') {
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route
-          path="/einsaetze/:id/personen"
-          element={
-            <>
-              <EinsatzNavigation />
-              <PersonenPage />
-            </>
-          }
-        />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route
+        path="/einsaetze/:id/personen"
+        element={
+          <>
+            <EinsatzNavigation />
+            <PersonenPage />
+          </>
+        }
+      />
+    </Routes>,
     { route },
   );
 }
@@ -446,7 +403,7 @@ describe('PersonenPage', () => {
     });
     let abrufe = 0;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/personen', async () => {
         abrufe += 1;
@@ -462,11 +419,9 @@ describe('PersonenPage', () => {
       http.post('/api/einsaetze/1/personen', () => HttpResponse.json(neu, { status: 201 })),
     );
     const { client } = renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/personen' },
     );
 
@@ -520,7 +475,7 @@ describe('PersonenPage', () => {
       antwortFreigeben = resolve;
     });
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/:einsatzId', ({ params }) => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
@@ -808,7 +763,7 @@ describe('PersonenPage', () => {
       vorname: null,
     };
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/:einsatzId', ({ params }) => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
@@ -1176,16 +1131,14 @@ describe('PersonenPage', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT die Leertexte', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/personen' },
     );
 
@@ -1494,26 +1447,24 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
 
   function renderMitSuche(route: string) {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/personen', () => HttpResponse.json([person, unbekannt])),
       http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
     );
     return renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route
-            path="/einsaetze/:id/personen"
-            element={
-              <>
-                <Suche />
-                <PersonenPage />
-              </>
-            }
-          />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route
+          path="/einsaetze/:id/personen"
+          element={
+            <>
+              <Suche />
+              <PersonenPage />
+            </>
+          }
+        />
+      </Routes>,
       { route },
     );
   }
@@ -1571,15 +1522,9 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
     return <output data-testid="ort">{useLocation().pathname}</output>;
   }
 
-  function renderKarte(
-    personen: unknown[],
-    einsatzObj: Omit<typeof einsatzAktiv, 'einsatzort_lat' | 'einsatzort_lon'> & {
-      einsatzort_lat: number | null;
-      einsatzort_lon: number | null;
-    } = einsatzAktiv,
-  ) {
+  function renderKarte(personen: unknown[], einsatzObj: EinsatzAnzeige = einsatzAktiv) {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
       http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)),
       http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
@@ -1588,13 +1533,13 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
       http.get('/api/einsaetze/1/karten-ansichten', () => HttpResponse.json([])),
     );
     return renderMitProviders(
-      <AuthProvider>
+      <>
         <Ort />
         <Routes>
           <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
           <Route path="/einsaetze/:id/personen/:personId" element={<p>Detailseite</p>} />
         </Routes>
-      </AuthProvider>,
+      </>,
       { route: '/einsaetze/1/personen' },
     );
   }
