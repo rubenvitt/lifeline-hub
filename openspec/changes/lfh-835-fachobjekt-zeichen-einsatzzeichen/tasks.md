@@ -39,7 +39,7 @@
 ## 5. Nachweise und Abschluss
 
 - [x] 5.1 Keine Fachobjekt-Datei importiert mehr aus `taktische-zeichen-react`. Prüfen per `grep` in `marker.ts`, `markerIcons.ts`, `EinheitZeichen.tsx`, `Inspector.tsx` (außer im Zweig für freie Zeichen) und `taktischesZeichen.ts` (außer `grundzeichenAkzeptiert` und den Typen). Die verbleibenden Importe stehen mit Verweis auf LFH-836 im Dateikopf.
-- [ ] 5.2 Sichtprüfung im Browser (Dev-Stack, Demo-Einsatz) in Tag- und Nachtmodus: Karte mit Einheit, Fahrzeug, Führungskraft, Abschnitt, UHS, Betreuungsstelle, Schaden und Einsatzort, dazu die Inspector-Kachel und die Spalte „TZ“ im Meldebild. Screenshots liegen im Change-Ordner.
-- [ ] 5.3 Prüfliste Einsatztauglichkeit (15 Kriterien) für Lagekarte und Meldebild als `pruefliste.md` im Change-Ordner, jede Zeile mit Verdikt.
-- [ ] 5.4 Bundle messen: `vite build`, Größe des neuen Chunks und Precache-Summe vorher/nachher in `pruefliste.md` notiert. `e2e/lagekarte-offline-precache.spec.ts` ist grün.
+- [x] 5.2 Sichtprüfung im Browser (Dev-Stack, Demo-Einsatz) in Tag- und Nachtmodus: Karte mit Einheit, Fahrzeug, Führungskraft, Abschnitt, UHS, Betreuungsstelle, Schaden und Einsatzort, dazu die Inspector-Kachel und die Spalte „TZ“ im Meldebild. Screenshots liegen im Change-Ordner.
+- [x] 5.3 Prüfliste Einsatztauglichkeit (15 Kriterien) für Lagekarte und Meldebild als `pruefliste.md` im Change-Ordner, jede Zeile mit Verdikt.
+- [x] 5.4 Bundle messen: `vite build`, Größe des neuen Chunks und Precache-Summe vorher/nachher in `pruefliste.md` notiert. `e2e/lagekarte-offline-precache.spec.ts` ist grün.
 - [ ] 5.5 `./scripts/check-all.sh` ist grün, mit eigenem `CARGO_TARGET_DIR`.
