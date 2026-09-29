@@ -645,9 +645,11 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
 
       for (const f of faelle) {
         await page.getByRole('button', { name: `Aktionen zu ${f.name}` }).click();
-        // Das Menü des vorigen Bildes kann noch ausblenden: nur das offene Dropdown zählt.
+        // Das Menü des vorigen Bildes kann unter Last noch ausblenden (gemessen im Sammel-Gate):
+        // jedes Dropdown hat einen eigenen Portal-Container, der zuletzt geöffnete liegt hinten.
         await page
           .locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')
+          .last()
           .getByRole('menuitem', { name: 'Auf der Karte platzieren' })
           .click();
         // Nur die Griffe auf der Karte, nicht der Hinweis `bildgriff-hinweis` in der Leiste.

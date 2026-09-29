@@ -24,4 +24,4 @@
 ## 5. Dokumentation und Abschluss
 
 - [x] 5.1 CLAUDE.md, Abschnitt „Lagekarte": Eintrag zu Griffregel und Klick-Schiedsrichter mit Verweis auf dieses Design; `data-lfh`-/Prüfspur-Pfade prüfen. Nachweis: Eintrag vorhanden, Pfade existieren.
-- [ ] 5.2 Gesamtlauf `./scripts/check-all.sh` (eigenes `CARGO_TARGET_DIR`), Ergebnis je Schritt festhalten. Nachweis: alle Schritte grün oder Abweichung begründet.
+- [x] 5.2 Gesamtlauf `./scripts/check-all.sh` (eigenes `CARGO_TARGET_DIR`), Ergebnis je Schritt festhalten. Nachweis: alle Schritte grün oder Abweichung begründet.
