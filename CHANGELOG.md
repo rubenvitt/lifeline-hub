@@ -10,6 +10,55 @@
 - **Kartenmodi geben die Karte frei**: Auf Tablets und größeren Bildschirmen schließt die Werkzeugleiste automatisch, solange ein Kartenmodus aktiv ist (Platzieren, Zeichnen, Messen, Bild einpassen). Die Bedienung erscheint in einem Band am unteren Bildschirmrand. Nach dem Modus stellt sich der vorherige Zustand der Leiste wieder her.
 - **Bildgriffe nur mit ausreichend Platz**: Beim Anpassen von Bildern auf der Karte werden Kantengriffe nur angezeigt, wenn sie sich nicht mit Eckgriffen oder anderen Kanten überschneiden. Ein Hinweis weist auf das Heranzoomen hin, wenn Griffe ausgeblendet sind.
 - **Eindeutige Klickziele**: Ein Tipp auf die Karte gehört eindeutig zu genau einem Ziel. Gezeichnete Markierungen haben Vorrang vor Trefferzonen, diese vor Flächen.
+- **Fachobjekt-Zeichen aktualisiert**: Kartenmarker und taktische Zeichen nutzen nun die aktuelle Einsatzzeichen-Bibliothek mit verbesserter Darstellung und Symbolauflösung.
+
+### Einsatztagebuch
+
+- **Einsatzdaten zeilenweise bearbeiten**: Die wichtigsten Einsatzdaten (Stichwort, Alarmzeit, Einsatzort, Einsatzart, nächste Lagebesprechung, meldende Stelle, Sachverhalt, Anzahl Betroffene, Leitstellen-Nr.) lassen sich direkt in der Leseansicht bearbeiten, ohne das gesamte Formular zu öffnen. Die übrigen Angaben bleiben dabei sichtbar.
+
+### Kräfte und Mittel
+
+- **Keine Rückfrage mehr bei „Außer Dienst"**: Das Setzen von Fahrzeugen, Personal oder Material auf „Außer Dienst" erfolgt ohne Bestätigungsdialog, da der Vorgang jederzeit umkehrbar ist und keine Disposition auslöst.
+- **Statusfarben vereinheitlicht**: Der Dienststatus wird nun einheitlich mit denselben Farben wie alle anderen Statusanzeigen dargestellt.
+- **Speicherquittung stapelt nicht mehr**: Nach dem schnellen Schalten mehrerer Modulzeilen erscheint nur noch eine Erfolgsmeldung statt mehrerer nacheinander.
+
+### Führung
+
+- **Schnellerfassung per Link**: Tiere, Bereitstellungsräume und Einsatzabschnitte lassen sich über einen Link mit ?neu=1 direkt zur Erfassung öffnen – wie bereits bei anderen Modulen.
+- **Zuletzt besuchte Module merken sich mehr Zugänge**: Die Palettengruppe „Zuletzt besucht" füllt sich jetzt auch über die Startseite Führung · Überblick, das Lage-Dashboard und Schnellaktionen. Einträge verfallen nach 12 Stunden und gelten je Benutzer und Einsatz.
+
+### Kommunikation
+
+- **Lageberichte drucken Markdown korrekt**: Beim Drucken eines Lagebericht-Entwurfs erscheint die gerenderte Fassung mit Überschriften, Fettungen und Listen – nicht der Rohtext aus dem Eingabefeld. Dies gilt für alle Layout-Varianten (Toggle, Split, Akkordeon).
+
+### Verwaltung
+
+- **Passwort selbst ändern**: Im eigenen Profil können Nutzer unter „Sicherheit" ihr Passwort selbst ändern, sofern die Passwort-Anmeldung aktiviert ist. Alle anderen Sitzungen desselben Benutzers enden dabei, die aktuelle Sitzung bleibt bestehen.
+- **Fehler bei Katalogaktionen bleiben sichtbar**: Fehler beim Statuswechsel, Deaktivieren oder Löschen in Stammdaten-Katalogen erscheinen als stehender Hinweis oben auf der Seite, nicht nur als kurzer Toast.
+- **Anmeldeverfahren für Org-Führungskraft lesbar**: Die Verwaltungssektion „Anmeldeverfahren" zeigt der Org-Führungskraft die konfigurierten Verfahren in einer Nur-Lese-Ansicht.
+
+### Bedienung
+
+- **Speicherleiste hält Fokusziele frei**: Die Speicherleiste am unteren Bildschirmrand verdeckt keine Eingabefelder mehr. Ein Tabulator-Sprung rollt die Seite so, dass das Ziel vollständig sichtbar ist.
+- **Rollen-Spalte fällt nicht mehr zusammen**: In den Modul-Einstellungen bleibt die Rollen-Auswahl bei 1280 Pixel Breite vollständig lesbar, statt auf 56 Pixel zusammenzufallen.
+- **Detailköpfe brechen bei langem Namen um**: Lange Namen in Unterstützende Stellen und Bereitstellungsräumen brechen auf schmalen Bildschirmen um, statt über den Rand zu ragen.
+
+### Betrieb und Installation
+
+- **Desktop-App verfügbar**: Die Anwendung wird für macOS (arm64) und Windows (x64) als ausführbare Desktop-App ausgeliefert. Sie verbindet sich mit einem Server über https, merkt sich die Adresse und prüft automatisch nach Updates. Ein Deeplink-Schema lifeline://verbinden erlaubt das Vorbelegen der Serveradresse.
+
+## [1.0.0-alpha.55](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.54...v1.0.0-alpha.55) (2026-09-29)
+
+### Wichtige Änderungen
+
+- **Anmeldung bleibt nach Neustart erhalten**: Die Anwendung merkt sich die Anmeldung bis zu 7 Tage. Nach einem Neustart müssen sich Nutzer nicht mehr erneut anmelden. Die Sitzung endet nur durch explizites Abmelden, Kontosperrung oder Passwortwechsel.
+
+### Lagekarte
+
+- **Übereinanderliegende Flächen auswählbar**: Wenn mehrere Flächen (z.B. Zonen, Einsatzabschnitte, Warngebiete) an derselben Stelle liegen, öffnet ein Tipp ein Auswahlmenü. Eigene Flächen werden dabei vor Warnflächen des DWD oder NINA angeboten.
+- **Kartenmodi geben die Karte frei**: Auf Tablets und größeren Bildschirmen schließt die Werkzeugleiste automatisch, solange ein Kartenmodus aktiv ist (Platzieren, Zeichnen, Messen, Bild einpassen). Die Bedienung erscheint in einem Band am unteren Bildschirmrand. Nach dem Modus stellt sich der vorherige Zustand der Leiste wieder her.
+- **Bildgriffe nur mit ausreichend Platz**: Beim Anpassen von Bildern auf der Karte werden Kantengriffe nur angezeigt, wenn sie sich nicht mit Eckgriffen oder anderen Kanten überschneiden. Ein Hinweis weist auf das Heranzoomen hin, wenn Griffe ausgeblendet sind.
+- **Eindeutige Klickziele**: Ein Tipp auf die Karte gehört eindeutig zu genau einem Ziel. Gezeichnete Markierungen haben Vorrang vor Trefferzonen, diese vor Flächen.
 
 ### Einsatztagebuch
 
