@@ -49,8 +49,8 @@ schließt (LFH-829 bis LFH-834).
   `markerLayer.ts`, `Kartenflaeche.tsx` und `Inspector.tsx`; `kraefte/EinheitZeichen.tsx`;
   neues Modul `frontend/src/zeichen/` für Adapter, Zeichnen und Komponente.
 - **Abhängigkeiten:** neu `@einsatzzeichen/core`, `schema`, `react` und `maplibre`, alle exakt
-  2.1.0. `taktische-zeichen-react` bleibt bis LFH-836. `@einsatzzeichen/catalog` (deprecated)
-  und `conformance` (nur Node) kommen nicht hinein.
+  3.0.0 (Planung auf 2.1.0, vor dem Merge nachgezogen). `taktische-zeichen-react` bleibt bis
+  LFH-836. `@einsatzzeichen/catalog` (deprecated) und `conformance` (nur Node) kommen nicht hinein.
 - **Bundle:** Die Lagekarte und die Kräfteübersicht, beide Lazy-Routen, bekommen einen
   gemeinsamen Chunk von etwa 146 kB gzip dazu. Dieser Chunk wird vorgehalten (Precache). Eine
   Schrift ist nicht nötig, weil keines der Fachobjekt-Zeichen Text zeichnet.

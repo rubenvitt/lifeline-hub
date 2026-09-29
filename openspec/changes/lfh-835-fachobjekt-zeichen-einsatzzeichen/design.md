@@ -19,6 +19,11 @@ Siehe proposal.md für das Warum. Stand heute:
   `vocabulary`/`checkSpec` und `serializeSpec`. `@einsatzzeichen/maplibre` 2.1.0 bringt
   `addSymbolImage`, synchron über Canvas. `@einsatzzeichen/react` 2.1.0 bringt `Einsatzzeichen`.
   Alle Pakete pinnen einander exakt.
+- Nachtrag 29.09.2026: Umgesetzt wurde auf **3.0.0**. Der Breaking Change von 3.0.0, die Boxfassung
+  (`capabilities`) wird abgelehnt, wo eine vermessene Körperfassung existiert, verschiebt nur
+  eine Hub-Abbildung: THW mit Technischer Hilfe an der Formation steht jetzt randbündig (C.1.4).
+  Die Kaskade versucht `bodyMarks` ohnehin zuerst. Die Drift-Wache der Fachaufgaben blieb
+  unverändert.
 - Probe vom 29.09.2026: Jede Hub-Abbildung unten komponiert, und keine davon zeichnet Text. Der
   viewBox ist immer 32 × 32 mm.
 
@@ -167,7 +172,7 @@ Zeichen Text trägt, fehlte die Schrift.
 *Warum `idPrefix`:* Der Vorgabepräfix `ez` erzeugt in einer Liste doppelte IDs.
 
 ### D7 Abhängigkeiten
-Aufgenommen werden `@einsatzzeichen/core`, `schema`, `react` und `maplibre`, alle exakt `2.1.0`
+Aufgenommen werden `@einsatzzeichen/core`, `schema`, `react` und `maplibre`, alle exakt `3.0.0`
 ohne `^`. Ein Vitest-Guard prüft, dass alle `@einsatzzeichen/*` in `package.json` dieselbe exakte
 Version tragen. Sonst entstünde still ein zweites `core` im Bundle, weil `react@2.0.0` exakt
 `core@2.0.0` pinnt (gemessen).

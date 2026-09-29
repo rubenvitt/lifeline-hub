@@ -6,10 +6,10 @@ allowBuilds:
 # die Karenzzeit für frisch veröffentlichte Versionen gilt ihr nicht, weil Hub und Bibliothek
 # im Gleichschritt veröffentlichen (LFH-505). Nur exakte Versionen, keine Scope-Freigabe.
 minimumReleaseAgeExclude:
-  - '@einsatzzeichen/core@2.1.0'
-  - '@einsatzzeichen/maplibre@2.1.0'
-  - '@einsatzzeichen/react@2.1.0'
-  - '@einsatzzeichen/schema@2.1.0'
+  - '@einsatzzeichen/core@3.0.0'
+  - '@einsatzzeichen/maplibre@3.0.0'
+  - '@einsatzzeichen/react@3.0.0'
+  - '@einsatzzeichen/schema@3.0.0'
 
 # ═══════════════════════════════════════════════════════════════════════════════════
 # DIES IST DAS FRONTEND-GEGENSTÜCK ZU .cargo/audit.toml (LFH-354).
@@ -116,7 +116,6 @@ overrides:
   # workbox-build → glob → minimatch@10 → brace-expansion@5. ^5.0.9 ist ein
   # Same-Major-Patch und wird durch den Frontend-Produktionsbuild sowie check-all.sh geprüft.
   brace-expansion@>=5.0.0 <5.0.9: ^5.0.9
-
   # GHSA-2v37-7h3g-55p8 (high): custom-Generatoren von nanoid loopen unbegrenzt bei size 0.
   # Kette: postcss → nanoid, postcss selbst über vite (@vitejs/plugin-react,
   # @vitest/mocker/vitest, vite-plugin-pwa). Reines Build-/Test-Zeit-Tooling (PostCSS läuft

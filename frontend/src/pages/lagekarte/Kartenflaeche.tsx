@@ -316,7 +316,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   });
   // Eigenposition: zuletzt gezeichnete Daten + Farbe, nach setStyle re-angelegt.
   const eigenpositionRef = useRef({ daten: eigenpositionFc(null), farbe: rollen.bedien });
-  // Image-Key → Zeichenquelle; der styleimagemissing-Handler erzeugt daraus lazy die Karten-Icons.
+  // Image-Key → Zeichenquelle; Resolver (`ez|`) und styleimagemissing-Handler (`tz|`) erzeugen
+  // daraus lazy die Karten-Icons.
   const zeichenRegistryRef = useRef<Map<string, ZeichenQuelle>>(new Map());
   // Cluster-DOM-Donut-Marker (`clusterSchluessel` → Marker): alle bekannten bzw. aktuell auf der
   // Karte. Nur für `marker-cluster` — Personen-Cluster sind WebGL-Layer, damit sie unter den

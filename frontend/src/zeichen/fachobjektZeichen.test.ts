@@ -58,7 +58,9 @@ const FAELLE: Array<[string, TzProps, SymbolSpec]> = [
     },
   ],
   [
-    'Einheit THW mit Technischer Hilfe (nur als Box darstellbar)',
+    // Seit @einsatzzeichen 3.0.0 randbündig (vermessene Körperfassung C.1.4); die Box lehnt die
+    // Bibliothek dort ab (`capabilities-pictogram-has-measured-rendition`).
+    'Einheit THW mit Technischer Hilfe (randbündig, C.1.4)',
     baueTzProps({
       objekttyp: 'einheit',
       einheitTypLabel: 'Gruppe',
@@ -69,7 +71,7 @@ const FAELLE: Array<[string, TzProps, SymbolSpec]> = [
       kind: 'formation',
       organization: 'thw',
       strength: 'gruppe',
-      capabilities: ['technical-assistance'],
+      bodyMarks: ['technical-assistance'],
     },
   ],
   [
@@ -334,7 +336,7 @@ describe('fachobjektZeichen — Rückfall statt Ausfall (design.md D3)', () => {
 // Drift-Wache: welche Fachaufgaben des Hub-Vokabulars die Bibliothek am Körper NICHT zeichnet
 // (Rückfall ohne Fachaufgabe). Ändert ein Update von @einsatzzeichen die Komponierbarkeit, wird das
 // hier in BEIDE Richtungen rot — ein stiller Verlust genauso wie ein neu darstellbares Paar, das
-// dann in design.md D2 und die Abbildungspins gehört (Stand core 2.1.0, 29.09.2026).
+// dann in design.md D2 und die Abbildungspins gehört (Stand core 3.0.0, 29.09.2026).
 describe('fachobjektZeichen — Abdeckung der Fachaufgaben je Körper', () => {
   const ALLE_FACHAUFGABEN = [
     'brandbekaempfung',
