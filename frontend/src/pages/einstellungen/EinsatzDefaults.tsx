@@ -13,7 +13,7 @@ import AdminPage from '../../components/AdminPage';
 import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys, istRueckmeldungenKey } from '../../api/queryKeys';
-import { speicherLeisteStil } from '../../components/speicherLeiste';
+import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import {
   type FormWerteEinsatz,
   initialEinsatz,
@@ -40,6 +40,7 @@ export default function EinsatzDefaults() {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerteEinsatz>();
   const { token } = theme.useToken();
+  const speicherLeiste = useSpeicherLeiste();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const [hatFassung, setHatFassung] = useState(false);
 
@@ -229,7 +230,7 @@ export default function EinsatzDefaults() {
         </Formularpaneel>
 
         {/* Ohne Recht steht der Knopf gesperrt da, der Grund als `RechteHinweis` im Kopf. */}
-        <div style={speicherLeisteStil(token)}>
+        <div {...speicherLeiste}>
           <Button
             type="primary"
             htmlType="submit"

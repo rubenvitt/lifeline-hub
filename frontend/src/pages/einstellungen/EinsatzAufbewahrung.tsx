@@ -1,4 +1,4 @@
-import { App, Button, Form, InputNumber, theme } from 'antd';
+import { App, Button, Form, InputNumber } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
@@ -13,7 +13,7 @@ import {
   zuUpdate,
   type FormWerteAufbewahrung,
 } from './einsatzEinstellungenForm';
-import { speicherLeisteStil } from '../../components/speicherLeiste';
+import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import { Formularpaneel } from '../../components/instrument';
 import FristPaneel from '../../aufbewahrung/FristPaneel';
 
@@ -33,7 +33,7 @@ export default function EinsatzAufbewahrung() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerteAufbewahrung>();
-  const { token } = theme.useToken();
+  const speicherLeiste = useSpeicherLeiste();
   const daten = useEinstellungenDaten(einsatzId);
 
   // Kein `onError`-Toast — der Fehler steht als Alert über dem Formular.
@@ -93,7 +93,7 @@ export default function EinsatzAufbewahrung() {
           </Form.Item>
         </Formularpaneel>
 
-        <div style={speicherLeisteStil(token)}>
+        <div {...speicherLeiste}>
           <Button type="primary" htmlType="submit" loading={speichern.isPending}>
             Speichern
           </Button>
