@@ -29,9 +29,8 @@ interface Props {
   /** Läuft die Anlege-Mutation? → beide Speicher-Knöpfe zeigen Ladeanzeige. */
   isPending: boolean;
   /**
-   * Speichern. **Muss bei Ablehnung ablehnen** (`mutateAsync`, nicht `mutate`) — sonst leert
-   * die Hülle die Felder, obwohl der Datensatz nie ankam. Der Aufrufer leitet den Folgestatus
-   * aus `modus` ab.
+   * Speichern. **Muss bei Ablehnung ablehnen** (`mutateAsync`) — sonst leert die Hülle die
+   * Felder, obwohl nichts ankam. Den Folgestatus leitet der Aufrufer aus `modus` ab.
    */
   onErfassen: (daten: AufnahmeEingabe) => Promise<unknown>;
   /** Einzel-Erfassen erfolgreich. Der Aufrufer setzt `modus` auf `null`. */
@@ -41,32 +40,17 @@ interface Props {
 }
 
 /**
- * Schnellerfassungs-Modal für Personen (Schnell/Vermisst/Betroffen), auf dem
- * Schnellerfassungs-Primitiv `ErfassungsModal` (LFH-332 · B4).
+ * Schnellerfassungs-Modal für Personen (Schnell/Vermisst/Betroffen) auf `ErfassungsModal`.
+ * Der Aufrufer hält `modus` und die Anlege-Mutation, das Modal nur das Formular; zurückgesetzt
+ * wird von der Hülle. Die Felder kommen aus `AufnahmeFelder` (dort begründet).
  *
- * Der Aufrufer (PersonenPage) hält `modus`-State und die Anlege-Mutation; dieses Modal besitzt
- * nur das Formular. **Zurückgesetzt wird nicht mehr hier** — die Hülle leert auf beiden Wegen
- * (nach dem Erfassen UND beim Abbrechen); ein zusätzlicher Reset an dieser Stelle wäre doppelt
- * und verdeckte Fehler.
+ * `uebernahme={['antreff_ort']}`: bei „Werte behalten" überlebt der Antreffort den
+ * Serien-Reset. Davon getrennt merkt `erfassungsSitzung` den Ort bis Tab-Ende und setzt ihn beim
+ * nächsten Öffnen einmal ein — bewusst nicht als `initialValues`, sonst füllte jeder Reset ihn
+ * auch bei ausgeschaltetem Schalter wieder auf.
  *
- * ── DIE FELDER LIEGEN NICHT MEHR HIER ──────────────────────────────
- *
- * Seit LFH-340 · C5 kommen sie aus `AufnahmeFelder` — dasselbe Bauteil trägt die
- * Aufnahme-Route (`pages/personen/AufnahmePage`). Feldbudget, Reihenfolge, das
- * Sichtungsfeld und seine Abwesenheit im Vermisst-Modus sind dort begründet und gelten für
- * beide Mounts; zwei Kopien wären zwei Stellen, an denen die Sichtung fehlen kann.
- *
- * ── KONTEXT-DEFAULT ────────────────────────────────────────────────
- *
- * `uebernahme={['antreff_ort']}`: bei eingeschaltetem B4-Schalter überlebt der Antreffort den
- * nächsten Serien-Reset. Davon getrennt merkt `erfassungsSitzung` den Ort nach erfolgreicher
- * Mutation bis zum Ende des Browser-Tabs und setzt ihn beim nächsten Öffnen genau einmal ein.
- * Der Sitzungswert wird bewusst nicht zu `initialValues`: sonst füllte jeder Serien-Reset den
- * Ort auch bei ausgeschaltetem „Werte behalten" heimlich wieder auf.
- *
- * Die SICHTUNG steht ausdrücklich NICHT in `uebernahme`: sie ist die eine Angabe, die je
- * Person neu erhoben wird. Sie stehen zu lassen hieße, die vorige Kategorie auf die nächste
- * Person zu übertragen — der teuerste denkbare Übernahmefehler an einer Aufnahme.
+ * Die SICHTUNG steht NICHT in `uebernahme`: sie wird je Person neu erhoben; die vorige Kategorie
+ * zu übertragen wäre der teuerste denkbare Übernahmefehler.
  */
 export default function PersonErfassungModal({
   einsatzId,
@@ -102,8 +86,8 @@ export default function PersonErfassungModal({
       offen={modus !== null}
       titel={modus === null ? '' : TITEL[modus]}
       form={form}
-      // Die Koordinate steht im Formular als EIN Textfeld; zerlegt wird hier, damit der
-      // Aufrufer weiter die Anlage bekommt (dieselbe Funktion wie an der Aufnahme-Route).
+      // Die Koordinate ist im Formular EIN Textfeld; zerlegt wird hier (dieselbe Funktion wie an der
+      // Aufnahme-Route).
       onErfassen={(werte) => onErfassen(aufnahmeZuEingabe(werte))}
       onErfasst={ortMerken}
       onFertig={onFertig}

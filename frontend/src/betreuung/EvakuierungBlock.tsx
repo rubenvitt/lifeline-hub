@@ -15,20 +15,16 @@ import { evakuierungKennzahl } from './evakuierungKennzahl';
 import MeldeVerlauf from './MeldeVerlauf';
 
 /**
- * Block „Evakuierung" der Betreuungsseite (LFH-639, design.md D7).
+ * Block „Evakuierung" der Betreuungsseite.
  *
- * FORM: Karten (`form="karte"`, Plan-Modus) in JEDER Breite — ein Bezirk wird GELESEN („was
- * ist mit diesem Bezirk?"), nicht verglichen. Titel = Bezeichnung, Status = Räumungszustand,
- * drei Sekundärfelder: „N · von M geplant", Stand-Zeit, Abschnitt. Genau EINE Primäraktion
- * („Stand melden"), alles Weitere gebündelt im Menü (`weitere`, LFH-365).
+ * Karten in JEDER Breite — ein Bezirk wird gelesen, nicht verglichen. Titel = Bezeichnung,
+ * Status = Räumungszustand, drei Sekundärfelder: „N · von M geplant", Stand-Zeit, Abschnitt.
+ * Genau EINE Primäraktion („Stand melden"), alles Weitere im Menü (`weitere`).
  *
- * VERLAUF (LFH-676): ein beschrifteter Aufklappbereich „Verlauf“ an jeder Karte, auch ohne
- * Schreibrecht — Lesen ist keine Handlung und zählt nicht gegen die eine Primäraktion. Die
- * Standreihe lädt erst beim Aufklappen.
- *
- * Der Zeilenschlüssel trägt ein Präfix (`bezirk-5`): `scrolleZurZeile` sucht über
- * `[data-row-key]` UND die Kartenmarke, und die Stellen-Tabelle derselben Seite hat eigene
- * Zeilen mit eigenen Nummern.
+ * „Verlauf“ als beschrifteter Aufklappbereich an jeder Karte, auch ohne Schreibrecht (Lesen
+ * zählt nicht gegen die Primäraktion); die Reihe lädt erst beim Aufklappen.
+ * Der Zeilenschlüssel trägt ein Präfix (`bezirk-5`), weil die Stellen-Tabelle derselben Seite
+ * eigene Zeilen mit eigenen Nummern hat und `scrolleZurZeile` beide Marken sucht.
  */
 
 export type BezirkAktion = 'karte' | 'plangroesse' | 'raeumung' | 'stornieren';
@@ -54,7 +50,7 @@ const spalten = spaltenFuer<Evakuierungsbezirk>()([
     title: 'Stand',
     zahl: true,
     sortWert: (b) => b.stand?.zeitpunkt_at,
-    // `ZeitAnzeige` liest den Wire-String als UTC (`dayjs.utc`) — nie `dayjs(s)` (D2).
+    // `ZeitAnzeige` liest den Wire-String als UTC — nie `dayjs(s)`.
     render: (_, b) =>
       b.stand ? (
         <ZeitAnzeige wert={b.stand.zeitpunkt_at} format="kurz" />
@@ -79,10 +75,9 @@ const MENUE: readonly (MenueEintrag & { key: BezirkAktion })[] = [
 ];
 
 /**
- * Menü einer Bezirkskarte (LFH-673): „Auf Karte zeigen" zuerst, sobald der Bezirk eine Fläche
- * hat — auch OHNE Schreibrecht, denn ein Sprung ist Lesen (LFH-616). Die Handlungen folgen
- * nur mit Schreibrecht. Ohne Fläche fehlt der Eintrag; ein eigenes Feld „keine Fläche" hat
- * der Plan-Modus nicht (höchstens drei Sekundärfelder, alle belegt). Rein und exportiert.
+ * Menü einer Bezirkskarte: „Auf Karte zeigen" zuerst, sobald der Bezirk eine Fläche hat — auch
+ * OHNE Schreibrecht, denn ein Sprung ist Lesen. Die Handlungen folgen nur mit Schreibrecht.
+ * Rein und exportiert.
  */
 export function bezirkMenue(
   b: Pick<Evakuierungsbezirk, 'flaechen'>,
@@ -121,8 +116,7 @@ export default function EvakuierungBlock({
       titel: { spalte: 'bezeichnung' },
       status: (b) => raeumungszustand[b.raeumung],
       sekundaer: ['evakuiert', 'stand', 'abschnitt'],
-      // Ohne Schreibrecht entfallen die Zeilenaktionen ganz (LFH-346, zwei Zuschnitte): der
-      // Grund steht EINMAL über der Seite, nicht n-mal als gesperrter Knopf.
+      // Ohne Schreibrecht entfallen die Zeilenaktionen; der Grund steht EINMAL über der Seite.
       aktion: darfSchreiben
         ? {
             etikett: 'Stand melden',
@@ -130,8 +124,7 @@ export default function EvakuierungBlock({
             onKlick: onStandMelden,
           }
         : undefined,
-      // Ohne Schreibrecht bleibt nur der Sprung auf die Karte; ohne Fläche gibt es dann
-      // keinen Auslöser (das Primitiv baut keinen für ein leeres Menü).
+      // Ohne Schreibrecht bleibt nur der Sprung auf die Karte; ohne Fläche dann kein Auslöser.
       weitere: {
         eintraege: (b) => bezirkMenue(b, darfSchreiben),
         zugaenglicherName: (b) => `Aktionen zu Bezirk ${b.bezeichnung}`,

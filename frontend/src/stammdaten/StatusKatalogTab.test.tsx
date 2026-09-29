@@ -11,10 +11,9 @@ const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
 
 /**
- * Die Feldtypen stehen ausgeschrieben da, statt aus den Werten geschlossen zu werden:
- * `farbe` und `fms_anker` sind hier zufällig überall `null` bzw. gesetzt, und aus dem
- * Vorrat abgeleitet hiessen sie `null` und `number` — ein Vorrat mit gesetzter Farbe
- * (Prüfung „erbt keine Werte", ganz unten) liesse sich dann gar nicht erst übergeben.
+ * Die Feldtypen stehen ausgeschrieben da: aus dem Vorrat abgeleitet hießen `farbe` und
+ * `fms_anker` `null` bzw. `number`, und ein Vorrat mit gesetzter Farbe (Prüfung „erbt keine
+ * Werte") ließe sich nicht übergeben.
  */
 const status: {
   id: number;
@@ -50,8 +49,8 @@ describe('StatusKatalogTab', () => {
     expect(screen.getByText('gebunden')).toBeInTheDocument();
   });
 
-  // Neuentwurf (LFH-621): Farbcode, FMS-Anker und Sortierung stehen Mono mit
-  // `tabular-nums`, das Label nicht. Die Kategorie ist bereits Fläche (`StatusTag`-Vorgabe).
+  // Farbcode, FMS-Anker und Sortierung stehen Mono mit `tabular-nums`, das Label nicht. Die
+  // Kategorie ist bereits Fläche (`StatusTag`-Vorgabe).
   it('setzt Farbcode, FMS-Anker und Sortierung in die Zahlenschrift, das Label nicht', async () => {
     render(admin, [{ ...status[0], farbe: '#22aa55' }, status[1]]);
     await screen.findByText('einsatzbereit');
@@ -70,12 +69,10 @@ describe('StatusKatalogTab', () => {
   });
 
   /**
-   * Zwei Zuschnitte, nicht einer (LFH-346, Nacharbeit zu Befund M45). Die PRIMÄRAKTION
-   * steht gesperrt — sie zu verstecken machte „kein Recht" von „diese Seite kann das gar
-   * nicht" ununterscheidbar; den Grund nennt der Hinweis darüber. Die ZEILENAKTIONEN
-   * entfallen weiterhin ganz: n Zeilen mal zwei gesperrte Knöpfe kosten Platz für null
-   * Handlungsmöglichkeit. Beide Hälften gehören in dieselbe Aussage, sonst liest sich die
-   * eine als Versehen der anderen.
+   * Zwei Zuschnitte (LFH-346): die PRIMÄRAKTION steht gesperrt — versteckt wäre „kein Recht"
+   * von „diese Seite kann das nicht" nicht zu unterscheiden; den Grund nennt der Hinweis. Die
+   * ZEILENAKTIONEN entfallen: n Zeilen × 2 gesperrte Knöpfe kosteten Platz für null
+   * Handlungsmöglichkeit.
    */
   it('Nicht-Admin: Primäraktion GESPERRT, Zeilenaktionen weg', async () => {
     render(nichtAdmin);
@@ -87,18 +84,16 @@ describe('StatusKatalogTab', () => {
 
   it('Label sortierbar, Kategorie filterbar — die fachliche Reihenfolge bleibt Voreinstellung', async () => {
     /**
-     * Der Vorrat oben steht in der Serverreihenfolge `ORDER BY sortier, id`
-     * (`src/fahrzeug/status_repo.rs:44`): „einsatzbereit" (10) vor „disponiert" (20).
-     * Alphabetisch wäre es umgekehrt — genau deshalb kann diese Prüfung fallen. Stünde
-     * ein `defaultSortOrder` an der Label-Spalte, wäre die erste Erwartung rot; fehlte
-     * der `sorter`, die zweite.
+     * Der Vorrat steht in der Serverreihenfolge `ORDER BY sortier, id`
+     * (`src/fahrzeug/status_repo.rs`): „einsatzbereit" (10) vor „disponiert" (20), alphabetisch
+     * umgekehrt. Ein `defaultSortOrder` an der Label-Spalte färbte die erste Erwartung rot, ein
+     * fehlender `sorter` die zweite.
      *
-     * Danach die zweite Achse: die Filterliste wird aus `theme/statusFarben.statusKategorie`
-     * abgeleitet, ihre Einträge tragen deshalb das Anzeige-Label („verfügbar"), nicht den
-     * Drahtwert (`verfuegbar`).
+     * Die Filterliste kommt aus `theme/statusFarben.statusKategorie` und trägt deshalb das
+     * Anzeige-Label („verfügbar"), nicht den Drahtwert (`verfuegbar`).
      *
      * `renderMitProviders` montiert `ConfigProvider` OHNE Locale — die Bestätigung im
-     * Filtermenü heißt daher „OK", in en_US wie in de_DE derselbe Text.
+     * Filtermenü heißt daher „OK".
      */
     const { container } = render(admin);
     await screen.findByText('einsatzbereit');
@@ -110,9 +105,8 @@ describe('StatusKatalogTab', () => {
     await userEvent.click(container.querySelector('th.ant-table-column-has-sorters')!);
     expect(zeilen()[0].textContent).toContain('disponiert');
 
-    // Erst der Griff, dann der Klick: ohne diese Zwischenprüfung meldete die Probe
-    // (Filter entfernt) erst zwölf Zeilen später ein leeres Filtermenü statt hier den
-    // fehlenden Auslöser — gemessen.
+    // Erst der Griff, dann der Klick: so meldet ein fehlender Filter sich hier statt erst am
+    // leeren Filtermenü.
     const ausloeser = container.querySelector<HTMLElement>('.ant-table-filter-trigger');
     expect(ausloeser, 'die Kategoriespalte muss einen Filter tragen').not.toBeNull();
     await userEvent.click(ausloeser!);
@@ -133,15 +127,12 @@ describe('StatusKatalogTab', () => {
 
   it('die Freitextsuche greift den Rohwert — deshalb nennt der Platzhalter nur das Label', async () => {
     /**
-     * Gemessen wird die WIRKUNG, nicht die Anwesenheit des `suche`-Props: ohne das Prop
-     * rendert `KatalogTabelle` keine Werkzeugzeile, der Griff aufs Feld fällt dann schon
-     * am `null`, bevor eine Zeile gezählt wird.
+     * Gemessen wird die WIRKUNG, nicht die Anwesenheit des `suche`-Props: ohne das Prop gibt es
+     * kein Suchfeld, und der Griff darauf fällt schon am `null`.
      *
-     * Der zweite Teil pinnt die Begründung, die am Produktivcode nur als Prosa steht: die
-     * Suche liest über `zellenWert` den ROHWERT der Spalte. Die Kategoriespalte zeigt
-     * „verfügbar", trägt aber den Drahtwert `verfuegbar` — wer den Umlaut tippt, findet
-     * nichts. Genau deshalb verspricht der Platzhalter nur „Label" und die Kategorie wird
-     * vom Spaltenfilter oben bedient, nicht von der Suche.
+     * Der zweite Teil pinnt, warum der Platzhalter nur „Label" verspricht: die Suche liest über
+     * `zellenWert` den ROHWERT. Die Kategoriespalte zeigt „verfügbar", trägt aber `verfuegbar` —
+     * wer den Umlaut tippt, findet nichts. Die Kategorie bedient der Spaltenfilter.
      *
      * `userEvent.clear` zwischen den Läufen, damit die Begriffe sich nicht überlagern.
      */
@@ -169,10 +160,9 @@ describe('StatusKatalogTab', () => {
   });
 
   /**
-   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
-   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
-   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
-   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   * Partnerpaar zu AK4 (LFH-331): die negative Hälfte allein wäre auch im Leerfall trivial
+   * grün; erst die positive darunter mit demselben Literal macht sie zu einer Aussage über die
+   * Zustandsweiche.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
@@ -193,15 +183,12 @@ describe('StatusKatalogTab', () => {
   });
 
   /**
-   * LFH-332 · B4. Geprüft wird der RUMPF, nicht bloß, dass gesendet wurde: der
-   * Anlege-Zweig setzt seine fünf Felder jetzt von Hand zusammen. `kategorie` ist
-   * darunter die Vorgabe, die zu einem SICHTBAR falschen Datensatz führt — ein
-   * Fahrzeugstatus in der falschen Kategorie färbt jede Kräfteübersicht falsch ein;
-   * `fms_anker: null` hält den Anker frei, statt eine Ziffer zu erfinden. Ein Test,
-   * der nur zählt, bliebe bei beidem grün.
+   * Geprüft wird der RUMPF, nicht bloß, dass gesendet wurde: eine falsche `kategorie` färbte
+   * jede Kräfteübersicht falsch ein, und `fms_anker: null` hält den Anker frei, statt eine
+   * Ziffer zu erfinden. Ein Test, der nur zählt, bliebe bei beidem grün.
    *
-   * Der Knopf trägt weiter den Namen des gestrichenen Dialog-Knopfes, deshalb sind
-   * die Rechte-Prüfungen oben unverändert gültig.
+   * Der Knopf trägt den Namen des früheren Dialog-Knopfes, deshalb gelten die Rechte-Prüfungen
+   * oben unverändert.
    */
   it('die Schnellerfassung legt mit Label und den Vorgaben des alten Dialogs an', async () => {
     const ruempfe: unknown[] = [];
@@ -240,9 +227,8 @@ describe('StatusKatalogTab', () => {
   });
 
   /**
-   * Der Dialog ist seit LFH-332 · B4 reines Bearbeiten. Ohne diese Prüfung schiffe
-   * eine kaputte Vorbelegung mit vollständig grüner Suite: kein anderer Test dieser
-   * Datei öffnet ihn.
+   * Der Dialog ist reines Bearbeiten, und kein anderer Test dieser Datei öffnet ihn: ohne diese
+   * Prüfung schiffte eine kaputte Vorbelegung mit grüner Suite.
    */
   it('Bearbeiten öffnet den Dialog mit vorbelegten Werten', async () => {
     render(admin);
@@ -253,10 +239,9 @@ describe('StatusKatalogTab', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Status bearbeiten')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Label')).toHaveValue('einsatzbereit');
-    // Der FMS-Anker liegt seit LFH-346 · A8 unter „Weitere Angaben" — die Vorbelegung
-    // muss ihn trotzdem erreichen, obwohl das Feld beim Öffnen des Dialogs noch gar
-    // nicht montiert ist (`setFieldsValue` schreibt in den Speicher, das Feld liest ihn
-    // beim Einhängen). Genau das prüft der Griff nach dem Aufklappen.
+    // Der FMS-Anker liegt unter „Weitere Angaben" — die Vorbelegung muss ihn erreichen, obwohl
+    // das Feld beim Öffnen noch nicht montiert ist (`setFieldsValue` schreibt in den Speicher,
+    // das Feld liest ihn beim Einhängen).
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
     expect(await within(dialog).findByLabelText('FMS-Anker (0–9, optional)')).toHaveValue('1');
   });
@@ -264,21 +249,14 @@ describe('StatusKatalogTab', () => {
   /**
    * Der zweite Datensatz darf nicht die Werte des ersten erben.
    *
-   * Seit LFH-332 · B4 ist der Dialog reines Bearbeiten, und die Vorbelegung setzt
-   * KEIN `resetFields()` davor. Die Sorge dabei ist antds Wertespeicher: der
-   * überlebt das Schliessen, und ein `setFieldsValue({ fms_anker: undefined })`
-   * könnte einen Schlüssel mit `undefined` als „nicht gemeint" behandeln, statt zu
-   * leeren — dann trüge der zweite Status Farbe und FMS-Anker des ersten.
+   * Die Vorbelegung setzt KEIN `resetFields()` davor. Die Sorge ist antds Wertespeicher, der das
+   * Schließen überlebt: behandelte `setFieldsValue({ fms_anker: undefined })` den Schlüssel als
+   * „nicht gemeint", trüge der zweite Status Farbe und FMS-Anker des ersten. rc-field-form
+   * schreibt den `undefined` heute durch, auch ohne `destroyOnHidden`. Die Prüfung pinnt deshalb
+   * das ERGEBNIS, keinen der beiden Mechanismen — fällt einer bei einem antd-Sprung weg, fällt
+   * es hier auf.
    *
-   * GEMESSEN: er tut es nicht. Diese Prüfung bleibt auch grün, wenn man
-   * `destroyOnHidden` am Dialog entfernt — rc-field-form schreibt den `undefined`
-   * durch. Sie pinnt deshalb bewusst das ERGEBNIS und keinen der beiden
-   * Mechanismen: fällt einer von beiden bei einem antd-Sprung weg, ist das hier
-   * die Stelle, an der es auffällt, statt in einem stillen Datensatz mit fremdem
-   * FMS-Anker.
-   *
-   * Der Vorrat ist eigens dafür gewählt: der erste Eintrag hat beide optionalen
-   * Felder gesetzt, der zweite keines davon.
+   * Der erste Eintrag hat beide optionalen Felder gesetzt, der zweite keines.
    */
   it('ein zweiter Datensatz erbt keine Werte des ersten', async () => {
     render(admin, [
@@ -314,8 +292,8 @@ describe('StatusKatalogTab', () => {
     await waitFor(() =>
       expect(within(zweiterDialog).getByLabelText('Label')).toHaveValue('disponiert'),
     );
-    // Der Collapse ist im frisch montierten Dialog wieder zu (`destroyOnHidden`) — das
-    // Aufklappen gehört also zur Prüfung, nicht bloss der Griff danach.
+    // Der Collapse ist im frisch montierten Dialog wieder zu (`destroyOnHidden`) — das Aufklappen
+    // gehört zur Prüfung.
     await userEvent.click(within(zweiterDialog).getByRole('button', { name: /Weitere Angaben/ }));
     expect(await within(zweiterDialog).findByLabelText('FMS-Anker (0–9, optional)')).toHaveValue(
       '',
@@ -324,15 +302,10 @@ describe('StatusKatalogTab', () => {
   });
 
   /**
-   * LFH-346 · A6. DIE Zusicherung des Umbaus auf `ErfassungsModal`, und die einzige,
-   * die strukturell prüfbar ist: Enter kommt aus der eingebauten Formularübermittlung
-   * des Browsers, und die greift nur, wenn der Knopf IM `<form>` liegt. Ein
-   * Tastendruck belegte es hier ohnehin nicht — die Maske trägt ein `Select`, und
-   * `@rc-component/select` ruft bei jedem Enter `preventDefault()`. Beide Hälften
-   * zusammen sind die Aussage: keine antd-Fusszeile (dort stünde der Knopf als
-   * DOM-Geschwister ausserhalb, Befund H69) UND der Knopf hat tatsächlich ein `form`
-   * als Vorfahr. Mutationsprobe: dreht man auf `<Modal onOk okText="Speichern">`
-   * zurück, fallen beide Abfragen.
+   * Die Zusicherung der Hülle `ErfassungsModal`: Enter kommt aus der eingebauten
+   * Formularübermittlung und greift nur, wenn der Knopf IM `<form>` liegt. Ein Tastendruck
+   * belegte es hier nicht — `@rc-component/select` ruft bei jedem Enter `preventDefault()`.
+   * Beide Hälften zusammen sind die Aussage: keine antd-Fußzeile UND ein `form` als Vorfahr.
    */
   it('trägt keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
     render(admin);
@@ -346,11 +319,7 @@ describe('StatusKatalogTab', () => {
     ).not.toBeNull();
   });
 
-  /**
-   * Die zweite Zusicherung der Hülle: der Fokus steht beim Öffnen im ersten Feld.
-   * Vorher fokussierte dieser Dialog nichts — wer bearbeiten wollte, musste erst
-   * ins Feld klicken.
-   */
+  /** Die zweite Zusicherung der Hülle: der Fokus steht beim Öffnen im ersten Feld. */
   it('setzt den Fokus beim Öffnen ins erste Feld', async () => {
     render(admin);
     await screen.findByText('einsatzbereit');
@@ -361,9 +330,8 @@ describe('StatusKatalogTab', () => {
   });
 
   /**
-   * `onErfassen` bekommt `mutateAsync`, nicht `mutate` — sonst löste die Hülle den
-   * Erfolgszweig aus, während der Server ablehnt: Felder leer, Dialog zu, nichts
-   * gespeichert. Geprüft wird das Ergebnis, nicht die Schreibweise.
+   * `onErfassen` bekommt `mutateAsync`, nicht `mutate` — sonst löste die Hülle den Erfolgszweig
+   * aus, während der Server ablehnt: Felder leer, Dialog zu, nichts gespeichert.
    */
   it('lässt nach einer Ablehnung Dialog und Wortlaut stehen', async () => {
     server.use(
@@ -389,19 +357,16 @@ describe('StatusKatalogTab', () => {
   });
 
   /**
-   * LFH-346 · A8, Befund N20. DIE tragende Prüfung des Collapse-Umbaus — und nicht
-   * die Zählung darunter: beide Hälften der Zählung können grün stehen, während jedes
-   * Speichern drei Felder still leert.
+   * DIE tragende Prüfung des Collapse-Umbaus (LFH-346): die Zählung darunter kann grün stehen,
+   * während jedes Speichern drei Felder still leert.
    *
-   * `StatusEingabe` ist Vollersatz. Ohne `forceRender` sind die eingeklappten Felder
-   * nicht montiert, und `onFinish` liefert nur montierte Felder — ein `onErfassen`,
-   * das seine Werte von dort nimmt, schickte `farbe: null`, `fms_anker: null`,
-   * `sortier: 0` an einen Datensatz, an dem niemand etwas davon angefasst hat. Kein
-   * Fehler, kein roter Test, nur ein Katalog, der nach der ersten Label-Korrektur
-   * seine Farben und seine Reihenfolge verloren hat.
+   * `StatusEingabe` ist Vollersatz. Ohne `forceRender` sind die eingeklappten Felder nicht
+   * montiert, und `onFinish` liefert nur montierte Felder — ein `onErfassen` von dort schickte
+   * `farbe: null`, `fms_anker: null`, `sortier: 0` an einen Datensatz, an dem niemand etwas
+   * davon angefasst hat.
    *
-   * Der Vorrat trägt deshalb in allen drei Feldern echte Werte, und der Weg klappt
-   * bewusst NICHT auf.
+   * Der Vorrat trägt deshalb in allen drei Feldern echte Werte, und der Weg klappt bewusst
+   * NICHT auf.
    */
   it('behält Farbe, FMS-Anker und Sortierung, wenn niemand aufklappt', async () => {
     let ruempf: Record<string, unknown> | null = null;
@@ -441,10 +406,8 @@ describe('StatusKatalogTab', () => {
   });
 
   /**
-   * Die Gegenprobe zur Prüfung darüber: ein SICHTBAR geleertes Feld muss auch geleert
-   * ankommen. Ein Rückfall auf den Bestandswert (`werte.farbe ?? bearbeite.farbe`)
-   * bestünde die Prüfung oben und fiele hier — er kann „nie montiert" nicht von
-   * „aufgeklappt und bewusst geräumt" unterscheiden.
+   * Die Gegenprobe: ein SICHTBAR geleertes Feld muss geleert ankommen. Ein Rückfall auf den
+   * Bestandswert (`werte.farbe ?? bearbeite.farbe`) bestünde die Prüfung oben und fiele hier.
    */
   it('ein aufgeklappt geleertes Feld kommt auch geleert an', async () => {
     let ruempf: Record<string, unknown> | null = null;
@@ -477,11 +440,10 @@ describe('StatusKatalogTab', () => {
   });
 
   /**
-   * Das Feldbudget selbst (LFH-346 · A8): zwei sichtbare Felder statt fünf.
+   * Das Feldbudget: zwei sichtbare Felder statt fünf.
    *
-   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — die Kategorie ist
-   * ein `Select` und hätte in der Rollenzählung gefehlt. Und die zweite Hälfte ist
-   * Pflicht: „höchstens zwei" allein erfüllte auch ein Dialog ganz ohne Felder.
+   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — die Kategorie ist ein
+   * `Select`. Die zweite Hälfte ist Pflicht: „höchstens zwei" erfüllte auch ein Dialog ohne Felder.
    */
   it('zeigt zwei Felder und deckt drei weitere erst beim Aufklappen auf', async () => {
     render(admin);

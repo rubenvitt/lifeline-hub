@@ -73,7 +73,7 @@ describe('personenMarker', () => {
       farbe: sichtungsfarben.gelb,
       // Zweiter Kanal IM Kreis, unabhängig vom Plaketten-Zoom.
       kurzzeichen: 'II',
-      // Speist die Cluster-Aggregation nach Sichtung (LFH-650).
+      // Speist die Cluster-Aggregation nach Sichtung.
       sichtung: 'sk2',
     });
     expect(marker[1]).toMatchObject({ sichtung: 'ohne', kurzzeichen: '–' });
@@ -81,9 +81,8 @@ describe('personenMarker', () => {
 
   it('die Trefferzone folgt der Dichtestufe — controlHeight, keine feste Zahl (LFH-650)', () => {
     /**
-     * Der gezeichnete Kreis bleibt eine feste MapLibre-Angabe (~22 px); die Zone darunter
-     * trägt die Trefffläche. Geprüft über zwei Stufen mit LITERALEN Böden — aus dem Token
-     * zurückgelesen prüfte die Aussage den Token gegen sich selbst (LFH-365).
+     * Der gezeichnete Kreis bleibt eine feste MapLibre-Angabe; die Zone darunter trägt die
+     * Trefffläche. Böden als LITERALE über zwei Stufen.
      */
     const personen = [p({ id: 1, antreff_lat: 50.1, antreff_lon: 8.6 })];
     const kompakt = personenMarker(personen, { ...token, controlHeight: 30 });
@@ -142,9 +141,8 @@ describe('personenMarker', () => {
   });
 
   it('AK LFH-648: ein ERFASSTER Name steht nicht in der Beschriftung', () => {
-    // Alle übrigen Fixtures tragen name/vorname: null — ohne diesen Fall belegte kein Test,
-    // dass die Beschriftung den Namen weglässt, statt nur keinen vorzufinden. Dieselbe
-    // Beschriftung ist auf der Lagekarte Plakette UND Inspector-Titel.
+    // Alle übrigen Fixtures tragen keinen Namen — ohne diesen Fall belegte kein Test, dass die
+    // Beschriftung den Namen weglässt. Sie ist auf der Lagekarte Plakette UND Inspector-Titel.
     const { marker } = personenMarker(
       [
         p({

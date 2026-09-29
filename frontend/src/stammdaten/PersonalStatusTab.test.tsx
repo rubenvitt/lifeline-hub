@@ -31,9 +31,8 @@ const labels = (c: HTMLElement) =>
   [...c.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
 
 /**
- * Der Eintrag IM Filtermenü. Das Kategorie-Label steht zweimal im Dokument — in der Zelle als
- * `StatusTag` und im Menü —, ein schlichtes `findByText` bräche an der Mehrdeutigkeit. Und das
- * Menü hängt in einem Portal unter `document.body`, nicht unter dem `container`.
+ * Der Eintrag IM Filtermenü. Das Kategorie-Label steht zweimal im Dokument (Zelle und Menü),
+ * und das Menü hängt in einem Portal unter `document.body`, nicht unter dem `container`.
  */
 async function menueEintrag(text: string): Promise<HTMLElement> {
   const treffer = (await screen.findAllByText(text)).find((k) =>
@@ -58,8 +57,8 @@ describe('PersonalStatusTab', () => {
     expect(screen.getByText('gebunden')).toBeInTheDocument();
   });
 
-  // Neuentwurf (LFH-621): Farbcode und Sortierung stehen Mono mit `tabular-nums`, das Label
-  // nicht. Die Kategorie ist bereits Fläche (`StatusTag`-Vorgabe, keine Mandantenfarbe).
+  // Farbcode und Sortierung stehen Mono mit `tabular-nums`, das Label nicht. Die Kategorie ist
+  // bereits Fläche (`StatusTag`-Vorgabe).
   it('setzt Farbcode und Sortierung in die Zahlenschrift, das Label nicht', async () => {
     render(admin, [{ ...status[0], farbe: '#22aa55' }, status[1]]);
     await screen.findByText('dienstbereit');
@@ -78,12 +77,10 @@ describe('PersonalStatusTab', () => {
   });
 
   /**
-   * Zwei Zuschnitte, nicht einer (LFH-346, Nacharbeit zu Befund M45). Die PRIMÄRAKTION
-   * steht gesperrt — sie zu verstecken machte „kein Recht" von „diese Seite kann das gar
-   * nicht" ununterscheidbar; den Grund nennt der Hinweis darüber. Die ZEILENAKTIONEN
-   * entfallen weiterhin ganz: n Zeilen mal zwei gesperrte Knöpfe kosten Platz für null
-   * Handlungsmöglichkeit. Beide Hälften gehören in dieselbe Aussage, sonst liest sich die
-   * eine als Versehen der anderen.
+   * Zwei Zuschnitte (LFH-346): die PRIMÄRAKTION steht gesperrt — versteckt wäre „kein Recht"
+   * von „diese Seite kann das nicht" nicht zu unterscheiden; den Grund nennt der Hinweis. Die
+   * ZEILENAKTIONEN entfallen: n Zeilen × 2 gesperrte Knöpfe kosteten Platz für null
+   * Handlungsmöglichkeit.
    */
   it('Nicht-Admin: Primäraktion GESPERRT, Zeilenaktionen weg', async () => {
     render(nichtAdmin);
@@ -98,8 +95,8 @@ describe('PersonalStatusTab', () => {
     await screen.findByText('dienstbereit');
     expect(labels(container)).toEqual(['dienstbereit', 'alarmiert']);
 
-    // Der Sortierauslöser sitzt in der Kopfzelle der fixierten Leitspalte. jsdom rechnet
-    // dort kein Layout — dass der Klick auch am 390-px-Schirm ankommt, ist hier NICHT belegt.
+    // Der Sortierauslöser sitzt in der Kopfzelle der fixierten Leitspalte; ob der Klick am
+    // 390-px-Schirm ankommt, belegt jsdom NICHT.
     await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
     expect(labels(container)).toEqual(['alarmiert', 'dienstbereit']);
 
@@ -120,10 +117,9 @@ describe('PersonalStatusTab', () => {
   });
 
   /**
-   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
-   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
-   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
-   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   * Partnerpaar zu AK4 (LFH-331): die negative Hälfte allein wäre auch im Leerfall trivial
+   * grün; erst die positive darunter mit demselben Literal macht sie zu einer Aussage über die
+   * Zustandsweiche.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
@@ -144,14 +140,11 @@ describe('PersonalStatusTab', () => {
   });
 
   /**
-   * LFH-332 · B4. Geprüft wird der RUMPF, nicht bloß, dass gesendet wurde: der
-   * Anlege-Zweig setzt seine Vorgaben jetzt von Hand zusammen, und `kategorie` ist
-   * darunter die einzige, die zu einem SICHTBAR falschen Datensatz führt — ein
-   * Status in der falschen Kategorie färbt jede Kräfteübersicht falsch ein. Ein
-   * Test, der nur zählt, bliebe dabei grün.
+   * Geprüft wird der RUMPF, nicht bloß, dass gesendet wurde: eine falsche `kategorie` färbte
+   * jede Kräfteübersicht falsch ein, und ein Test, der nur zählt, bliebe grün.
    *
-   * Der Knopf trägt weiter den Namen des gestrichenen Dialog-Knopfes, deshalb sind
-   * die Rechte-Prüfungen oben unverändert gültig.
+   * Der Knopf trägt den Namen des früheren Dialog-Knopfes, deshalb gelten die Rechte-Prüfungen
+   * oben unverändert.
    */
   it('die Schnellerfassung legt mit Label und den Vorgaben des alten Dialogs an', async () => {
     const ruempfe: unknown[] = [];
@@ -180,9 +173,8 @@ describe('PersonalStatusTab', () => {
   });
 
   /**
-   * Der Dialog ist seit LFH-332 · B4 reines Bearbeiten. Ohne diese Prüfung schiffe
-   * eine kaputte Vorbelegung mit vollständig grüner Suite: kein anderer Test dieser
-   * Datei öffnet ihn.
+   * Der Dialog ist reines Bearbeiten, und kein anderer Test dieser Datei öffnet ihn: ohne diese
+   * Prüfung schiffte eine kaputte Vorbelegung mit grüner Suite.
    */
   it('Bearbeiten öffnet den Dialog mit vorbelegten Werten', async () => {
     render(admin);
@@ -196,14 +188,10 @@ describe('PersonalStatusTab', () => {
   });
 
   /**
-   * LFH-346 · A6. DIE Zusicherung des Umbaus auf `ErfassungsModal`, und die einzige,
-   * die strukturell prüfbar ist: Enter kommt aus der eingebauten Formularübermittlung
-   * des Browsers, und die greift nur, wenn der Knopf IM `<form>` liegt (bei einer
-   * Select-lastigen Maske ist der Tastendruck ohnehin kein Beleg — `@rc-component/select`
-   * ruft bei jedem Enter `preventDefault()`). Beide Hälften zusammen sind die Aussage:
-   * keine antd-Fusszeile (dort stünde der Knopf als DOM-Geschwister ausserhalb,
-   * Befund H69) UND der Knopf hat tatsächlich ein `form` als Vorfahr. Mutationsprobe:
-   * dreht man auf `<Modal onOk okText="Speichern">` zurück, fallen beide Abfragen.
+   * Die Zusicherung der Hülle `ErfassungsModal`: Enter kommt aus der eingebauten
+   * Formularübermittlung und greift nur, wenn der Knopf IM `<form>` liegt (ein Tastendruck
+   * belegte nichts — `@rc-component/select` ruft bei jedem Enter `preventDefault()`). Beide
+   * Hälften zusammen sind die Aussage: keine antd-Fußzeile UND ein `form` als Vorfahr.
    */
   it('trägt keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
     render(admin);
@@ -217,11 +205,7 @@ describe('PersonalStatusTab', () => {
     ).not.toBeNull();
   });
 
-  /**
-   * Die zweite Zusicherung der Hülle: der Fokus steht beim Öffnen im ersten Feld.
-   * Vorher fokussierte dieser Dialog nichts — wer bearbeiten wollte, musste erst
-   * ins Feld klicken.
-   */
+  /** Die zweite Zusicherung der Hülle: der Fokus steht beim Öffnen im ersten Feld. */
   it('setzt den Fokus beim Öffnen ins erste Feld', async () => {
     render(admin);
     await screen.findByText('dienstbereit');
@@ -232,9 +216,8 @@ describe('PersonalStatusTab', () => {
   });
 
   /**
-   * `onErfassen` bekommt `mutateAsync`, nicht `mutate` — sonst löste die Hülle den
-   * Erfolgszweig aus, während der Server ablehnt: Felder leer, Dialog zu, nichts
-   * gespeichert. Geprüft wird das Ergebnis, nicht die Schreibweise.
+   * `onErfassen` bekommt `mutateAsync`, nicht `mutate` — sonst löste die Hülle den Erfolgszweig
+   * aus, während der Server ablehnt: Felder leer, Dialog zu, nichts gespeichert.
    */
   it('lässt nach einer Ablehnung Dialog und Wortlaut stehen', async () => {
     server.use(

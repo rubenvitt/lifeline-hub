@@ -1,8 +1,8 @@
-/** Kanal zwischen den React-freien react-query-Cache-Callbacks und dem React-Baum (LFH-268/F24).
- *  Der QueryClient entsteht in `main.tsx` auf Modulebene und liegt in der Provider-Hierarchie
- *  ÜBER `AntApp` und `BrowserRouter` — seine `onError`-Closures können `message` und `navigate`
- *  deshalb strukturell nicht lesen. Ein window-CustomEvent ist im Projekt das etablierte Mittel
- *  dafür (vgl. `lfh:live-status`, `lfh:sofortmeldung`, `lfh:erinnerung-alarm`). */
+/**
+ * Kanal zwischen den React-freien Query-Cache-Callbacks und dem React-Baum: der QueryClient
+ * entsteht in `main.tsx` ÜBER `AntApp` und dem Router, seine `onError`-Closures erreichen
+ * `message` und `navigate` nicht. Daher ein window-CustomEvent (wie `lfh:live-status`).
+ */
 export const SITZUNG_ABGELAUFEN = 'lfh:sitzung-abgelaufen';
 
 /** Wiederhol-Sperre: bei Session-Ablauf laufen typischerweise mehrere Queries gleichzeitig in

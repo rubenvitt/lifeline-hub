@@ -9,12 +9,8 @@ import {
 import type { StatusVerteilung } from './kraeftebild';
 
 /**
- * Die EINE Statusachse der vier Kräfteseiten (LFH-330 · B2, Bündel IV).
- *
- * Die Erwartungswerte stehen hier als HANDGESCHRIEBENE Literale, nicht als
- * `statusKategorie.x.label`. Gegen die Konstante zu prüfen, aus der der Code sie holt,
- * prüfte die Konstante gegen sich selbst — dieselbe Lektion wie bei den Wire-Strings in
- * `api/globalKeys.test.ts`.
+ * Die EINE Statusachse der Kräfteseiten. Die Erwartungswerte sind HANDGESCHRIEBENE Literale,
+ * sonst prüfte der Test die Konstante gegen sich selbst.
  */
 
 function verteilung(v: Partial<StatusVerteilung> = {}): StatusVerteilung {
@@ -24,10 +20,8 @@ function verteilung(v: Partial<StatusVerteilung> = {}): StatusVerteilung {
 describe('KATEGORIE_WERTE', () => {
   it('trägt VIER Eimer — den vierten für „kein Status"', () => {
     /**
-     * Die Daten haben vier Eimer: `EinsatzFahrzeugAnzeige`/`EinsatzPersonalAnzeige` führen
-     * `status_kategorie` als `StatusKategorie | null`, `theme/statusFarben.ts` kennt aber nur
-     * DREI Schlüssel. Ohne den vierten fällt jede Zeile ohne Status aus der gruppierten
-     * Ansicht und aus dem Filter — lautlos.
+     * Die Daten haben vier Eimer, der Vertrag drei Schlüssel. Ohne den vierten fiele jede Zeile ohne
+     * Status lautlos aus Gruppe und Filter.
      */
     expect(KATEGORIE_WERTE.map((w) => w.value)).toEqual([
       'verfuegbar',
@@ -65,9 +59,8 @@ describe('KATEGORIE_WERTE', () => {
 describe('verteilungFelder', () => {
   it('liefert VIER Felder in fester Folge, auch wenn drei davon 0 sind', () => {
     /**
-     * Ausrichtung ist der Zweck einer Vergleichsspalte (Prüflisten-Kriterium 14). Der
-     * Bestand (`verteilungTags`) rendert nur Werte > 0 — dann fluchten die Zahlen zweier
-     * Zeilen nicht mehr übereinander.
+     * Ausrichtung ist der Zweck einer Vergleichsspalte: nur Werte > 0 zu rendern ließe die Zahlen
+     * zweier Zeilen nicht fluchten.
      */
     const felder = verteilungFelder(verteilung({ verfuegbar: 7 }));
     expect(felder.map((f) => f.etikett)).toEqual(['frei', 'geb.', 'n.v.', 'o.A.']);
@@ -84,10 +77,7 @@ describe('verteilungFelder', () => {
   });
 
   it('eine 0 trägt KEINE Stufe', () => {
-    /**
-     * `.lfh-feld--alarm .lfh-zahl` färbt die Zahl rot. „0 nicht verfügbar" ist das
-     * Gegenteil einer Gefahr; Rot dafür bricht Kriterium 7.
-     */
+    /** „0 nicht verfügbar" ist das Gegenteil einer Gefahr; Rot dafür wäre falsch. */
     expect(verteilungFelder(verteilung()).map((f) => f.stufe)).toEqual([
       undefined,
       undefined,
@@ -104,8 +94,7 @@ describe('verteilungFelder', () => {
   });
 
   it('verteilungFelder(null) ist leer', () => {
-    // `MeldebildZeile.personalVerteilung` ist `StatusVerteilung | null`; `mittel`-Zeilen
-    // tragen `null` und dürfen dann gar keine Zählzeile bekommen.
+    // `mittel`-Zeilen tragen `null` und bekommen keine Zählzeile.
     expect(verteilungFelder(null)).toEqual([]);
   });
 });

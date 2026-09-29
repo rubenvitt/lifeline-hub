@@ -8,14 +8,10 @@ export type BerichtUnterEbene = 1 | 2 | 3 | 4;
 
 /**
  * Der Berichtstext eines Lageberichts zum Lesen: je Vorlagen-Abschnitt Titel und Markdown,
- * ein leerer Abschnitt als „—". EIN Bauteil für den Lesezweig der Detailseite und die
- * Vorschau der Sprungpalette (LFH-664) — zwei Kopien wären zwei Stellen, an denen ein
- * Abschnitt fehlen kann.
+ * ein leerer Abschnitt als „—". Ein Bauteil für Detailseite und Sprungpalette.
  *
- * `unterEbene` hat dieselbe Bedeutung wie an `components/Markdown.tsx` (LFH-621): die Ebene
- * der nächsten Überschrift ÜBER dem Bauteil. Die Abschnittstitel stehen eine Ebene darunter,
- * und `#` im Abschnittstext ebenfalls — so wie vorher auf der Seite: unter dem Paneel (`h2`)
- * Titel `h3`, Markdown mit `unterEbene` 3. Der Rahmen (Paneel, Druck-Hülle) bleibt beim
+ * `unterEbene` wie an `components/Markdown.tsx`: die Ebene der nächsten Überschrift ÜBER dem
+ * Bauteil. Abschnittstitel und `#` im Text stehen eine Ebene darunter. Der Rahmen bleibt beim
  * Aufrufer.
  */
 export default function LageberichtText({

@@ -8,29 +8,12 @@ import { rollenFarbe, statusKategorie } from '../theme/statusFarben';
 import { staerkeText, verdichte } from './kraeftebild';
 
 /**
- * Der Meldebild-Link (bis 21.09.2026 „Kräfteübersicht") als Bedienziel auf der Dichte-Staffel (LFH-515, Gate 3).
- *
- * GEMESSEN im Browser (`e2e/gate3-trefflaeche.spec.ts`, Stand vor dem Fix): **15 / 16 / 16 px**
- * über die drei Stufen — der Link ist das EINZIGE Bedienelement dieser Zeile und blieb in der
- * Handschuh-Stufe bei 16 px stehen, also bei nicht einmal einem Viertel des 72-px-Bodens. Es
- * ist derselbe Befund, den LFH-396 am Titel-Link der Einsatzkarte gemessen hat, und
- * CLAUDE.md führt ihn seither als Regel: **ein `<a>` erbt keine Steuerhöhe.** Die Prüfliste
- * von LFH-338 hatte für Kriterium 1 „alle neuen Bedienelemente sind echte antd-Steuerelemente
- * und erben damit die Dichte-Staffel vom `ConfigProvider`" geschrieben — für `Segmented` und
- * `Button type="link"` stimmt das (30 / 48 / 72 gemessen), für `Link` nicht. Eine Annahme,
- * keine Messung; genau die Sorte, für deren Aufdeckung dieser Nachzug existiert.
- *
- * ZWEI Angaben, nicht eine (LFH-365): `minHeight` aus `controlHeight` trägt den Boden,
- * die Polsterung zieht mit — die Polsterung allein käme im Handschuh-Betrieb auf grob 54 px.
- * `inline-flex` statt `flex` wie bei `kartenTitelStil` (`pages/EinsaetzePage.tsx`): der Link ist ein Glied einer
- * waagerechten `Space`-Zeile und kein Kartenkopf mit `nowrap`; ein `flex` risse ihn auf die
- * volle Zeilenbreite. Die Polsterung liegt auf BEIDEN Achsen (anders als am Kartentitel, wo
- * der Kopf selbst waagerecht polstert): hier polstert niemand sonst, und `Space` setzt
- * Abstände ZWISCHEN den Gliedern, nicht innerhalb.
- *
- * Rein und exportiert nach dem Muster von `bedienzielStil` (`pages/lagekarte/Sidebar.tsx`):
- * nur so ist die Zusicherung über zwei Dichtestufen ohne Rendern prüfbar — `test/utils.tsx`
- * montiert ein nacktes `ConfigProvider` ohne unser Theme.
+ * Der Meldebild-Link als Bedienziel auf der Dichte-Staffel: ein `<a>` erbt keine Steuerhöhe
+ * (im Browser blieb er im Handschuh-Betrieb bei 16 px).
+ * ZWEI Angaben: `minHeight` aus `controlHeight` plus mitziehende Polsterung auf BEIDEN Achsen
+ * (hier polstert niemand sonst). `inline-flex`, weil der Link ein Glied einer waagerechten
+ * `Space`-Zeile ist; `flex` risse ihn auf volle Breite. Rein und exportiert, damit über zwei
+ * Dichtestufen ohne Rendern prüfbar.
  */
 export function verdichtungsLinkStil(token: { controlHeight: number; paddingSM: number }) {
   return {
@@ -42,47 +25,21 @@ export function verdichtungsLinkStil(token: { controlHeight: number; paddingSM: 
 }
 
 /**
- * Die Führungsantwort im Kopf einer Kräfte-Modulseite (LFH-338 · C3, Befund H21).
+ * Die Führungsantwort im Kopf einer Kräfte-Modulseite: Σ-Stärke und Fahrzeugverfügbarkeit über
+ * der Tabelle, verlinkt auf das volle Meldebild.
  *
- * Σ-Stärke und Fahrzeugverfügbarkeit über der Tabelle, verlinkt auf das volle Meldebild:
- * die Führungsantwort oben, die Pflegearbeit darunter. Bis dahin verlinkte KEINE der vier
- * Kräfte-Modulseiten die aggregierende Übersicht (grep: 0 Treffer) — wer auf der
- * Fahrzeugseite stand und die Gesamtstärke brauchte, suchte sie über die Modulnavigation.
+ * SIE LÄDT SELBST (wie die Lage-Dashboard-Kacheln), statt dass jede Seite Listen hereinreicht,
+ * die sie selbst nicht anzeigt. Die Schlüssel sind DIESELBEN `einsatzKeys` wie auf den Seiten,
+ * TanStack dedupliziert.
  *
- * ── SIE LÄDT SELBST ─────────────────────────────────────────────────────────────
+ * KEIN MATERIAL: die Zeile beantwortet „welche Kräfte habe ich"; `verdichte` bekommt eine leere
+ * Materialliste, der Abruf bleibt bei zwei Listen.
  *
- * Nach dem Muster der Lage-Dashboard-Kacheln („jede Kachel hängt an ihren eigenen
- * Queries"). Gemessen am Bestand führt von den vier Seiten nur `EinheitenPage` beide
- * Listen; `MaterialPage` führt keine von beiden. Die Alternative wäre, jeder Seite ein bis
- * zwei Queries zu verpassen und die Zahlen über Props hereinzureichen — viermal dieselbe
- * Verdrahtung, und drei der vier Seiten trügen Daten, die sie selbst nicht anzeigen.
+ * STUMM BEI FEHLER UND BEIM LADEN: „0/0/0//0" läse sich wie „keine Kräfte im Einsatz", und ein
+ * ein- und ausblendender Platzhalter verschöbe die Tabelle darunter. Die Fehleranzeige gehört
+ * der Tabelle, die dieselben Daten trägt.
  *
- * Der zweite Abruf ist keiner: die Schlüssel sind DIESELBEN `einsatzKeys` wie auf den
- * Seiten, TanStack Query dedupliziert also gegen die schon laufende Query.
- *
- * ── KEIN MATERIAL ───────────────────────────────────────────────────────────────
- *
- * Die Zeile beantwortet „welche Kräfte habe ich", nicht „welches Gerät". `verdichte` nimmt
- * Material als dritten Parameter und bekommt hier bewusst eine leere Liste — das hält den
- * Abruf bei zwei Listen statt drei, auch auf der Materialseite selbst, wo die Gerätefrage
- * die Tabelle darunter beantwortet.
- *
- * ── STUMM BEI FEHLER, STUMM BEIM LADEN ──────────────────────────────────────────
- *
- * Kein Nullwert und kein Skelett. „0/0/0//0" auf einer Führungsfläche liest sich wie eine
- * Meldung und ist keine — es sähe aus wie „keine Kräfte im Einsatz", während in Wahrheit
- * nur der Abruf scheiterte. Und ein Platzhalter, der eine Zeile hoch ein- und ausblendet,
- * verschöbe die Tabelle darunter bei jedem Laden (Prüflisten-Kriterium 12, CLS ≤ 0,1).
- * Die Fehleranzeige gehört der Tabelle darunter, die dieselben Daten trägt.
- *
- * ── DEN PFAD BAUT DER AUFRUFER ──────────────────────────────────────────────────
- *
- * Dieselbe Arbeitsteilung wie bei `SeitenLeerAktion.pfad` und `PlatzhalterRueckweg`: die
- * Komponente kennt keine Einsatz-Routen, sie bekommt den fertigen Pfad. Der Nebeneffekt ist
- * der eigentliche Gewinn — `kraefteuebersichtPfad` steht damit einmal in jeder der vier
- * Modulseiten, statt viermal gar nicht. Das ist wörtlich das Akzeptanzkriterium des
- * Tickets, und es gibt trotzdem nur EINEN Link je Seite; ein zweiter Kopf-Link daneben
- * hätte den Grep ebenfalls befriedigt und die Bedienung verschlechtert.
+ * Den Pfad baut der Aufrufer; die Komponente kennt keine Einsatz-Routen.
  */
 
 export default function Verdichtungszeile({
@@ -102,16 +59,9 @@ export default function Verdichtungszeile({
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
 
-  // Der Datenriegel steht VORN, und die Reihenfolge ist die ganze Aussage: liegen keine
-  // Zahlen vor, ist die Zeile still — ob der Abruf noch läuft oder gescheitert ist, ändert
-  // daran nichts, und ein „0/0/0//0" wäre in beiden Fällen eine erfundene Meldung.
-  //
-  // Liegen ZAHLEN vor und scheitert erst ein Folgeabruf, bleiben sie stehen: sie sind echt,
-  // nur womöglich alt. Dieselbe Entscheidung trifft `SeitenStandVeraltet` für Listen. Stünde
-  // die Fehlerprüfung vorn, spränge die Tabelle darunter bei jeder Störung eine Zeile hoch —
-  // unter dem Cursor, mitten in der Arbeit (Prüflisten-Kriterium 12) — und der einzige Weg
-  // zum Meldebild wäre für die Dauer der Störung weg. Gemessen, nicht vermutet: mit
-  // der umgekehrten Reihenfolge verschwand die Zeile im Test tatsächlich.
+  // Der Datenriegel steht VORN: liegen keine Zahlen vor, ist die Zeile still — ob der Abruf noch
+  // läuft oder scheiterte. Liegen Zahlen vor und scheitert erst ein Folgeabruf, bleiben sie
+  // stehen (echt, nur womöglich alt), sonst spränge die Tabelle darunter unter dem Cursor.
   if (!personalQuery.data || !fahrzeugeQuery.data) return null;
 
   const v = verdichte(personalQuery.data, fahrzeugeQuery.data, []);
@@ -130,9 +80,7 @@ export default function Verdichtungszeile({
       <span style={{ color: rollenFarbe(statusKategorie.nicht_verfuegbar.rolle, token) }}>
         {v.fahrzeugStatus.nicht_verfuegbar} n. verf.
       </span>
-      {/* Seit dem Neuentwurf (21.09.2026) heißt die Zielseite „Meldebild" und steht unter
-          Kräfte & Mittel; die Route `kraefteuebersicht` bleibt. Der Linktext folgt dem Namen,
-          den Modulpanel und Seitenkopf zeigen — zwei Namen für eine Seite wären ein Suchbild. */}
+      {/* Der Linktext folgt dem Seitennamen „Meldebild"; die Route bleibt `kraefteuebersicht`. */}
       <Link to={pfad} style={verdichtungsLinkStil(token)}>
         Meldebild
       </Link>

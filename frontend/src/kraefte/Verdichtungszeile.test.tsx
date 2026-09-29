@@ -29,14 +29,7 @@ function setup() {
   );
 }
 
-/**
- * Die Führungsantwort im Kopf einer Kräfte-Modulseite (LFH-338 · C3, Befund H21).
- *
- * Die aggregierende Kräfteübersicht war von KEINER der vier Modulseiten verlinkt. Wer auf
- * der Fahrzeugseite stand und die Gesamtstärke brauchte, musste sie über die Modulnavigation
- * suchen — die Verdichtung, für die es eine eigene Seite gibt, war von der Pflegefläche aus
- * unsichtbar.
- */
+/** Die Führungsantwort im Kopf einer Kräfte-Modulseite. */
 describe('Verdichtungszeile', () => {
   it('zeigt Stärke und Fahrzeugverfügbarkeit und verlinkt auf das Meldebild', async () => {
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([
@@ -69,13 +62,8 @@ describe('Verdichtungszeile', () => {
     const { container } = setup();
 
     /**
-     * „0/0/0//0" auf einer Führungsfläche liest sich wie eine Meldung und ist keine. Ein
-     * Nullwert im Fehlerfall wäre schlimmer als gar keine Angabe: er sähe aus wie „keine
-     * Kräfte im Einsatz", während in Wahrheit nur der Abruf scheiterte.
-     *
-     * DIESE Zusicherung allein belegt den Fehlerzweig NICHT — ohne Daten ist der Ladezweig
-     * ebenfalls still, die Aussage wäre schon bei t=0 wahr. Was sie trägt, ist der Test
-     * darunter: dort liegen Daten vor, und erst dann unterscheiden sich die beiden Zweige.
+     * „0/0/0//0" sähe aus wie „keine Kräfte im Einsatz". Diese Zusicherung allein belegt den
+     * Fehlerzweig nicht (ohne Daten ist auch der Ladezweig still); das trägt der Test darunter.
      */
     await vi.waitFor(() => expect(container.textContent).not.toContain('Stärke'));
     expect(container.textContent).not.toContain('0/0/0//0');
@@ -83,14 +71,8 @@ describe('Verdichtungszeile', () => {
 
   it('lässt die zuletzt bekannten Zahlen stehen, wenn erst der ZWEITE Abruf scheitert', async () => {
     /**
-     * Der Fall, der im Betrieb häufiger ist als der kalte Fehlschlag: die Zahlen stehen, eine
-     * Invalidierung stößt einen neuen Abruf an, und der scheitert. Verschwände die Zeile
-     * dann, spränge die Tabelle darunter eine Zeile hoch — unter dem Cursor, mitten in der
-     * Arbeit (Prüflisten-Kriterium 12) —, und der einzige Weg zur Kräfteübersicht wäre für
-     * die Dauer der Störung weg.
-     *
-     * Die Zahlen sind dann echt, nur womöglich alt. Dieselbe Entscheidung trifft
-     * `SeitenStandVeraltet` für Listen: stehen lassen, nicht verbergen.
+     * Der häufigere Fall: die Zahlen stehen, ein Folgeabruf scheitert. Verschwände die Zeile,
+     * spränge die Tabelle darunter unter dem Cursor. Die Zahlen sind echt, nur womöglich alt.
      */
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([
       { staerke_position: 'fuehrer', status_kategorie: 'gebunden' },
@@ -104,38 +86,27 @@ describe('Verdichtungszeile', () => {
     vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new Error('kaputt'));
     await client.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(1) });
 
-    // Gewartet wird auf den FEHLERZUSTAND im Zwischenspeicher, nicht auf die Zahl der
-    // Aufrufe: nach dem Aufruf ist der Fehler noch nicht propagiert, und eine Prüfung dort
-    // liefe an beiden möglichen Verhalten vorbei (gemessen — die Zusicherung war in beide
-    // Richtungen grün).
+    // Gewartet wird auf den FEHLERZUSTAND im Cache, nicht auf die Zahl der Aufrufe — direkt nach
+    // dem Aufruf ist der Fehler noch nicht propagiert.
     await vi.waitFor(() =>
       expect(client.getQueryState(einsatzKeys.fahrzeuge(1))?.status).toBe('error'),
     );
-    // …und danach EINEN Tick, damit React den Fehlerzustand auch gerendert hat: direkt nach
-    // dem Cache-Übergang steht die alte Ausgabe noch, und die Zusicherung wäre in beide
-    // Richtungen grün (gemessen).
+    // …und EINEN Tick, damit React den Fehlerzustand gerendert hat.
     await new Promise((weiter) => setTimeout(weiter, 0));
     expect(screen.getByText('1/0/0//1')).toBeInTheDocument();
   });
 
   it('zeigt nichts, solange die Listen noch nicht da sind', () => {
-    // Kein Skelett und keine Null: die Zeile ist ein Zusatz im Kopf einer Pflegeseite,
-    // kein eigener Seiteninhalt. Ein Platzhalter, der eine Zeile hoch ein- und ausblendet,
-    // verschöbe die Tabelle darunter bei jedem Laden (Prüflisten-Kriterium 12, CLS).
+    // Kein Skelett und keine Null: ein ein- und ausblendender Platzhalter verschöbe die Tabelle
+    // darunter bei jedem Laden.
     const { container } = setup();
     expect(container.textContent).toBe('');
   });
 });
 
 /**
- * Der Link als Bedienziel auf der Dichte-Staffel (LFH-515, Nachzug zu LFH-338 · C3,
- * Kriterium 2).
- *
- * WARUM HIER NUR DER INLINE-STIL UND KEIN PIXEL: `test/utils.tsx` rendert ein NACKTES
- * `ConfigProvider` ohne unser Theme, und jsdom rechnet ohnehin kein Layout — eine
- * Höhenbehauptung hier maß antd-Vorgaben und belegte nichts. Die Pixel misst
- * `e2e/gate3-trefflaeche.spec.ts` (15 / 16 / 16 px vor dem Fix, gemessen im Browser);
- * hier steht, dass die Höhe aus dem Token kommt und über die Stufen MITZIEHT.
+ * Der Link als Bedienziel auf der Dichte-Staffel. Hier nur der Inline-Stil: ohne Theme und
+ * Layout bewiese ein Pixel nichts; die Pixel misst `e2e/gate3-trefflaeche.spec.ts`.
  */
 describe('Meldebild-Link — Bedienziel auf der Dichte-Staffel (LFH-515)', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({
@@ -143,8 +114,7 @@ describe('Meldebild-Link — Bedienziel auf der Dichte-Staffel (LFH-515)', () =>
     paddingSM: dichten[stufe].abstand.sm,
   });
 
-  // Die Böden als Literale, nicht aus dem Token zurückgelesen — sonst prüfte der Test den
-  // Token gegen sich selbst (LFH-365).
+  // Die Böden als Literale, sonst prüfte der Test den Token gegen sich selbst.
   it('trägt den Boden aus controlHeight — 30 / 48 / 72 px', () => {
     expect(verdichtungsLinkStil(tokenFuer('kompakt')).minHeight).toBe(30);
     expect(verdichtungsLinkStil(tokenFuer('komfortabel')).minHeight).toBe(48);
@@ -159,20 +129,13 @@ describe('Meldebild-Link — Bedienziel auf der Dichte-Staffel (LFH-515)', () =>
     expect(hoehen[1]).toBeLessThan(hoehen[2]);
   });
 
-  /**
-   * ZWEI Angaben, nicht eine (LFH-365) — und die Polsterung zieht mit. Anders als am
-   * Kartentitel (`kartenTitelStil`) liegt sie auf BEIDEN Achsen: dort polstert der
-   * Kartenkopf waagerecht, hier polstert niemand sonst.
-   */
+  /** ZWEI Angaben, und die Polsterung liegt auf BEIDEN Achsen (hier polstert niemand sonst). */
   it('trägt neben der Höhe eine mitziehende Polsterung auf beiden Achsen', () => {
     expect(verdichtungsLinkStil(tokenFuer('kompakt')).padding).toBe('7px');
     expect(verdichtungsLinkStil(tokenFuer('handschuh')).padding).toBe('16px');
   });
 
-  /**
-   * `inline-flex`, nicht `flex`: der Link ist ein Glied einer waagerechten `Space`-Zeile.
-   * Ein `flex` risse ihn auf die volle Zeilenbreite und schöbe die Zahlen davor um.
-   */
+  /** `inline-flex`: ein `flex` risse den Link auf volle Breite. */
   it('bleibt ein Inline-Glied der Zeile', () => {
     expect(verdichtungsLinkStil(tokenFuer('kompakt')).display).toBe('inline-flex');
   });

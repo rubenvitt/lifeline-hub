@@ -2,20 +2,13 @@ import type { FormInstance } from 'antd';
 import { useEffect, useRef } from 'react';
 
 /**
- * Welcher Abschnitt bekommt beim Öffnen eines Entwurfs den Einstiegsfokus: **der erste ohne
- * Text, sonst der erste überhaupt**. Rein und exportiert, damit die Wahl ohne Render prüfbar
- * ist (Muster `bedienzielStil`, LFH-365).
+ * Welcher Abschnitt beim Öffnen eines Entwurfs den Einstiegsfokus bekommt: **der erste ohne
+ * Text, sonst der erste überhaupt**. Rein und exportiert.
  *
- * Die Bedienentscheidung hinter dem „ersten leeren" (LFH-495, das Ticket liess sie offen):
- * ein fortgeschriebener Bericht trägt die Abschnitte des Vorgängers bereits befüllt, der
- * erste leere ist also die Stelle, an der die Arbeit weitergeht. Der Titel ist dafür der
- * falsche Kandidat — er ist beim Anlegen UND beim Fortschreiben schon gesetzt, ein Fokus
- * dort sässe regelmässig auf dem einen Feld, das niemand anfassen will.
- *
- * Leerraum zählt nicht, gleichlautend mit `befuellteAbschnitte` — ein Abschnitt aus drei
- * Leerzeichen ist leer. Ist ALLES befüllt, fällt die Wahl auf den ersten Abschnitt statt auf
- * „gar keinen": die Seite ist dann eine Überarbeitung, und der Tastaturweg soll trotzdem im
- * Text beginnen und nicht auf `<body>`.
+ * Ein fortgeschriebener Bericht trägt die Abschnitte des Vorgängers befüllt; der erste leere
+ * ist die Stelle, an der die Arbeit weitergeht. Der Titel ist beim Anlegen und Fortschreiben
+ * schon gesetzt und damit der falsche Kandidat. Leerraum zählt nicht (wie
+ * `befuellteAbschnitte`). Ist alles befüllt, der erste Abschnitt statt `<body>`.
  */
 export function einstiegsAbschnitt(
   schluessel: readonly string[],
@@ -31,28 +24,20 @@ interface Props<W extends object> {
 }
 
 /**
- * Setzt den Einstiegsfokus — und ist eine KOMPONENTE im Formularzweig, kein Effekt in der
- * Seite. Der Grund ist der Zeitpunkt: beide Entwurfsseiten zeigen erst einen `<Spin>`, das
- * `<Form>` entsteht also Runden später als die Seite. Ein `useEffect(…, [])` oben liefe,
- * während es das Feld noch nicht gibt, und käme nie wieder — dieselbe Falle, die
- * `pages/ChatPage.tsx` (C8/H51) mit einem Callback-Ref löst. Hier ist der Mount dieser
- * Komponente der feste Punkt: sie steht als LETZTES Kind im Formular, React führt Effekte
- * nach dem Commit des ganzen Baums aus, also stehen alle Felder im DOM.
+ * Setzt den Einstiegsfokus — als KOMPONENTE im Formularzweig, kein Effekt in der Seite: beide
+ * Entwurfsseiten zeigen erst einen `<Spin>`, ein `useEffect(…, [])` oben liefe ohne Feld und
+ * käme nie wieder. Als letztes Kind im Formular stehen beim Effekt alle Felder im DOM.
  *
- * EIN EFFEKT, KEIN `requestAnimationFrame` (Lektion aus `components/Erfassung.tsx`): ein
- * aufgeschobener Fokus greift, wann immer das Bild kommt — notfalls erst, wenn die Person
- * schon tippt, und reisst den Cursor dann mitten im Wortlaut zurück.
+ * Ein Effekt, kein `requestAnimationFrame`: ein aufgeschobener Fokus griffe notfalls erst,
+ * wenn die Person schon tippt.
  *
- * DAS ZIEL WIRD AM MOUNT EINGEFROREN (`useRef`-Initialwert, nie neu zugewiesen). Eine
- * lebende Prop wäre ein Fehler: sobald jemand den leeren Abschnitt befüllt, zeigte
- * `einstiegsAbschnitt` auf den NÄCHSTEN leeren, und der Fokus spränge beim ersten Autosave
- * weiter. Je Datensatz genau einmal — der Remount über `key={id}` ist der Reset.
+ * DAS ZIEL WIRD AM MOUNT EINGEFROREN: sonst zeigte `einstiegsAbschnitt` nach dem Befüllen auf
+ * den nächsten leeren und der Fokus spränge beim ersten Autosave weiter. Der Remount über
+ * `key={id}` ist der Reset.
  *
- * GESTOHLEN WIRD KEIN FOKUS: liegt er schon irgendwo (jemand hat in der Ladezeit die
- * Kopfzeile angefasst), bleibt er dort. Der Scroll bleibt der native des Browsers —
- * `preventScroll` wäre hier falsch, sonst tippt man im Befehl in ein Feld unterhalb des
- * Bildes; die verankerte Aktionsleiste hält es über `scroll-padding-block-end` frei
- * (LFH-465).
+ * KEIN FOKUS-DIEBSTAHL: liegt er schon irgendwo, bleibt er dort. Der Scroll bleibt der native
+ * (`preventScroll` wäre falsch); die verankerte Aktionsleiste hält das Feld über
+ * `scroll-padding-block-end` frei.
  */
 export default function Einstiegsfokus<W extends object>({ form, feld }: Props<W>) {
   const zielRef = useRef(feld);

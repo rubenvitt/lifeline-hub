@@ -1,13 +1,8 @@
 /**
- * Globaler Koordinatensystem-Override (localStorage). Übersteuert die effektive
- * Anzeige-/Eingabe-Konvention app-weit — Anwender wählt das System einmal, nicht je
- * Feld. Reaktiv über useSyncExternalStore.
- *
- * Semantik: localStorage ist PERSISTENT (überlebt Browser-Neustarts, nicht nur die
- * Session). Ein einmal gesetzter Override übersteuert damit dauerhaft einen später
- * geänderten Org-Default, bis der Anwender ihn wieder auf den Org-Wert zurückstellt.
- * Bewusst so gewählt (User-Entscheidung). Für „nur bis Tab-Ende" wäre sessionStorage
- * der Tausch.
+ * Globaler Koordinatensystem-Override (localStorage), reaktiv über useSyncExternalStore: der
+ * Anwender wählt das System einmal, nicht je Feld.
+ * localStorage ist bewusst PERSISTENT: ein gesetzter Override übersteuert auch einen später
+ * geänderten Org-Default, bis er zurückgestellt wird.
  */
 import { useSyncExternalStore } from 'react';
 import type { Koordinatenformat } from '../api/types';

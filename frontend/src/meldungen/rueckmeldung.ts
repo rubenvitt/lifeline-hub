@@ -1,18 +1,14 @@
 /**
- * Rückmeldung je Einheit/Abschnitt (LFH-610) — reine Ableitungen über
- * `GET …/meldungen/rueckmeldungen`.
+ * Rückmeldung je Einheit/Abschnitt — reine Ableitungen über `GET …/meldungen/rueckmeldungen`.
  *
- * Als Rückmeldung zählt JEDE an die Einheit gebundene Meldung, gleich welcher Meldungsart
- * (Entscheidung des Auftraggebers, 22.09.2026): eine Einheit, die gerade eine Sofortmeldung
- * abgesetzt hat, steht nicht auf „überfällig". Die Fälligkeit (`faellig_at`) setzt der
- * Server aus der effektiven Frist; der Vergleich mit „jetzt" liegt hier, damit die Anzeige
- * mit der Seitenuhr umschlägt, ohne dass ein Live-Ereignis kommen muss.
+ * Als Rückmeldung zählt JEDE an die Einheit gebundene Meldung, gleich welcher Art. Die
+ * Fälligkeit setzt der Server; der Vergleich mit „jetzt" liegt hier, damit die Anzeige mit der
+ * Seitenuhr umschlägt.
  *
- * Drei Zustände, drei Darstellungen (Neuentwurf S6):
  * - `aktuell`: Uhrzeit, neutral.
  * - `ueberfaellig`: Uhrzeit, `achtung` — die letzte Rückmeldung ist älter als die Frist.
- * - `keine`: „—", `alarm` — von dieser Einheit kam noch nie eine Rückmeldung. NUR diese
- *   zählt die Kachel „keine Rückmeldung"; eine überfällige Einheit hat zurückgemeldet.
+ * - `keine`: „—", `alarm` — noch nie eine Rückmeldung. NUR diese zählt die Kachel
+ *   „keine Rückmeldung".
  */
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -70,9 +66,8 @@ function juenger(a: LetzteRueckmeldung, b: LetzteRueckmeldung): LetzteRueckmeldu
 }
 
 /**
- * Jüngste Rückmeldung eines Teilbaums: direkt an einen der Abschnitte gebundene Meldungen
- * UND Meldungen der Einheiten darin. Der Server liefert beide Listen getrennt (die
- * Einheit-zu-Abschnitt-Zuordnung kennt der Client ohnehin aus dem Kräftebild).
+ * Jüngste Rückmeldung eines Teilbaums: direkt an einen der Abschnitte gebundene Meldungen UND
+ * Meldungen der Einheiten darin (der Server liefert beide Listen getrennt).
  */
 export function letzteImTeilbaum(
   daten: Rueckmeldungen | null | undefined,

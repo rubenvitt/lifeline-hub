@@ -1,22 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Guard (LFH-255/F32): verbietet zwei Dateien, die sich nur in der Endung
- * `.ts` vs. `.tsx` unterscheiden.
+ * Guard: verbietet zwei Dateien, die sich nur in der Endung `.ts` vs. `.tsx` unterscheiden.
  *
- * TypeScript nimmt bei gleichem Basename nur EINE der beiden ins Programm (die `.ts`
- * gewinnt). Die andere ist damit für **jedes** Typecheck-Gate unsichtbar — `pnpm
- * typecheck`, der Build und Schritt 4 des Codegen-Drift-Gates (LFH-120) laufen an ihr
- * vorbei —, während Vitest sie ungeprüft ausführt, weil esbuild die Typen nur strippt.
- * Der Test bleibt dann auch dann grün, wenn er längst gegen veraltete Props läuft.
+ * TypeScript nimmt bei gleichem Basename nur EINE ins Programm (die `.ts` gewinnt). Die andere
+ * ist für jedes Typecheck-Gate unsichtbar, während Vitest sie ungeprüft ausführt (esbuild
+ * strippt nur) — ein Test liefe dann still gegen veraltete Props.
  *
- * Genau das war live: `Sidebar.test.ts` beschattete die 7,8 KB große
- * Komponententestdatei `Sidebar.test.tsx`. Die Fehlerklasse war als Lektion notiert
- * und stand trotzdem im Baum — Konvention allein trägt hier nicht, deshalb ein Guard.
- *
- * Nur die Glob-Schlüssel werden gebraucht, nicht der Inhalt: kein `?raw`, kein `eager`.
- * Das macht den Guard billiger als die beiden Vorbilder (`queryKeys.guard.test.ts`,
- * `schreibrecht.guard.test.ts`).
+ * Nur die Glob-Schlüssel werden gebraucht, kein `?raw`, kein `eager`.
  */
 
 // `src` deckt den Anwendungscode ab; `e2e` liegt ebenfalls in der tsconfig und

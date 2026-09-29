@@ -1,32 +1,19 @@
 /**
- * Breitenbewusster Medienabfrage-Stub für jsdom (LFH-329 · B1/H24).
+ * Breitenbewusster Medienabfrage-Stub für jsdom.
  *
- * jsdom bringt `window.matchMedia` nicht mit. Der Vorgänger-Stub in `setup.ts` lieferte
- * für JEDE Abfrage `matches: false` — für antds Breakpoint-Beobachter heißt das eine
- * vollständige All-false-Karte, also „schmaler als xs" in jedem einzelnen Testlauf. Jede
- * Behauptung über responsives Verhalten wäre damit eine Attrappe gewesen, und die
- * Layout-Suiten wären beim ersten Konsumenten des Viewport-Hooks auf den Schmal-Zweig
- * gekippt — aus einem Grund, der mit ihrer Änderung nichts zu tun hat.
+ * jsdom bringt `window.matchMedia` nicht mit. Ein Stub mit `matches: false` für alles hieße
+ * für antd „schmaler als xs" in jedem Testlauf — jede Behauptung über responsives Verhalten
+ * wäre eine Attrappe. Dieser Stub wertet `min-width`/`max-width` gegen eine modulweite Breite
+ * aus (Default {@link VIEWPORT_STANDARD}) und die Zeigerart gegen einen zweiten Schalter. Jede
+ * andere Abfrage bleibt bewusst falsch (`prefers-color-scheme`, `prefers-reduced-motion`).
  *
- * Dieser Stub wertet stattdessen `min-width`/`max-width` gegen eine modulweite Breite aus
- * (Default {@link VIEWPORT_STANDARD}) und die Zeigerart gegen einen zweiten Schalter.
- * Jede andere Abfrage bleibt bewusst falsch: `prefers-color-scheme` und
- * `prefers-reduced-motion` dürfen sich nicht verschieben, sonst kippen Theme- und
- * Animationszweige quer durch die Suite.
- *
- * Eigenes Modul statt Code in `setup.ts` — nach dem Muster von `./server`: die setupFile
- * bindet es nur ein, Testdateien importieren dieselbe Instanz und steuern sie über die
- * Setter. `setup.ts` setzt im globalen `afterEach` {@link setzeViewportZurueck} zurück,
- * damit eine gesetzte Breite nicht in den nächsten Test leckt (der Stub hängt per
- * `Object.defineProperty` am window, kein Spy holt ihn zurück).
+ * Eigenes Modul (Muster `./server`): Testdateien steuern dieselbe Instanz über die Setter;
+ * `setup.ts` setzt im globalen `afterEach` {@link setzeViewportZurueck} zurück.
  */
 
 /**
- * Default-Breite jedes Testlaufs: 1024 px, der Fükw-/Führungs-Kontext.
- *
- * Liegt über antds `md` (768) UND über `lg` (992), ist also auf beiden Achsen „breit",
- * und deckt sich mit jsdoms nativem `window.innerWidth` — Stub und jsdom laufen damit
- * nicht auseinander.
+ * Default-Breite jedes Testlaufs: 1024 px, der Fükw-/Führungs-Kontext — über `md` UND `lg`,
+ * und gleich jsdoms `window.innerWidth`.
  */
 export const VIEWPORT_STANDARD = 1024;
 
@@ -70,12 +57,9 @@ function haengeAb(abfrage: string, funktion: Hoerer): void {
 /**
  * Baut eine Stub-Implementierung der Medienabfrage-Funktion.
  *
- * `matches` ist ein Getter, liest also bei jedem Zugriff den aktuellen Zustand — ein
- * einmal gehaltenes Ergebnisobjekt veraltet dadurch nicht. Die zurückgegebene Struktur
- * trägt alle sieben Bauteile (`media`, `onchange`, `addListener`, `removeListener`,
- * `addEventListener`, `removeEventListener`, `dispatchEvent`), weil `ThemeModeProvider`
- * und antds Beobachter darauf An-/Abmelden aufrufen: fehlt eines, wirft nicht ein Test,
- * sondern jeder Render der Provider-Kette.
+ * `matches` ist ein Getter, ein gehaltenes Ergebnisobjekt veraltet also nicht. Alle sieben
+ * Bauteile (`media`, `onchange`, `addListener`, `removeListener`, `addEventListener`,
+ * `removeEventListener`, `dispatchEvent`) sind da, sonst wirft jeder Render der Provider-Kette.
  */
 export function baueMatchMedia(): (abfrage: string) => MediaQueryList {
   return (abfrage: string) => {
@@ -111,10 +95,7 @@ export function installiereMatchMedia(): void {
 
 /**
  * Setzt die Viewport-Breite für alle folgenden Abfragen.
- *
- * VOR dem Render aufrufen: antds Beobachter ruft seinen Zuhörer beim Abonnieren synchron
- * auf und liest dabei nur `matches` — eine nachträglich gesetzte Breite ohne gefeuertes
- * Ereignis erreicht ihn nicht mehr.
+ * VOR dem Render aufrufen: antds Beobachter liest `matches` nur beim Abonnieren.
  */
 export function setzeViewportBreite(breiteInPx: number): void {
   breite = breiteInPx;
@@ -126,13 +107,9 @@ export function setzeZeigerGrob(grob: boolean): void {
 }
 
 /**
- * Setzt die Zeigerart UND feuert das Änderungsereignis an alle angemeldeten Zuhörer —
- * der Weg, auf dem ein Test einen Gerätewechsel zur Laufzeit nachstellt.
- *
- * Gibt die Anzahl der benachrichtigten Zuhörer zurück. Das ist kein Beiwerk: nur damit
- * lässt sich belegen, dass ein Aufräum-Effekt seinen Zuhörer wirklich abgemeldet hat
- * (nach `unmount` muss die Zahl 0 sein) — ein bloß ausbleibender Zustandswechsel wäre
- * auch bei einem nie angemeldeten Zuhörer zu sehen.
+ * Setzt die Zeigerart UND feuert das Änderungsereignis — ein Gerätewechsel zur Laufzeit.
+ * Gibt die Zahl der benachrichtigten Zuhörer zurück; nur so lässt sich belegen, dass ein
+ * Aufräum-Effekt seinen Zuhörer abgemeldet hat (nach `unmount` 0).
  */
 export function sendeZeigerAenderung(grob: boolean): number {
   zeigerGrob = grob;
@@ -143,17 +120,10 @@ export function sendeZeigerAenderung(grob: boolean): number {
 }
 
 /**
- * Setzt die Breite UND feuert das Änderungsereignis an alle Breiten-Zuhörer — der Weg, auf
- * dem ein Test einen Fensterwechsel ZUR LAUFZEIT nachstellt (Pendant zu
- * {@link sendeZeigerAenderung}).
- *
- * {@link setzeViewportBreite} allein reicht dafür nicht: antds Beobachter
- * (`_util/responsiveObserver.js`) liest `matches` nur beim Anmelden und danach ausschließlich
- * im `change`-Zuhörer — eine nachträglich gesetzte Breite ohne Ereignis erreicht eine bereits
- * gerenderte Komponente nie, und der Test bliebe trivial grün.
- *
- * Gibt die Anzahl der benachrichtigten Zuhörer zurück, aus demselben Grund wie oben: nur so
- * ist belegbar, dass überhaupt jemand zugehört hat.
+ * Setzt die Breite UND feuert das Änderungsereignis — ein Fensterwechsel zur Laufzeit.
+ * {@link setzeViewportBreite} allein erreicht eine schon gerenderte Komponente nie: antds
+ * Beobachter liest `matches` danach nur im `change`-Zuhörer. Gibt die Zahl der
+ * benachrichtigten Zuhörer zurück.
  */
 export function sendeBreitenAenderung(breiteInPx: number): number {
   breite = breiteInPx;
@@ -171,11 +141,8 @@ export function sendeBreitenAenderung(breiteInPx: number): number {
 
 /**
  * Alle bisher abgefragten Medienabfragen, in Abfragereihenfolge.
- *
- * Die Liste ist INNERHALB eines Tests kumulativ (erst `setzeViewportZurueck` im globalen
- * `afterEach` leert sie): jeder Render registriert antds sieben Breiten-Abfragen erneut.
- * Stabil sind deshalb nur `toContain`/`not.toContain` — Behauptungen über die Länge oder
- * über einen festen Index sind es nicht.
+ * Innerhalb eines Tests kumulativ (jeder Render registriert antds Abfragen erneut) — stabil
+ * sind nur `toContain`/`not.toContain`, keine Länge oder festen Indizes.
  */
 export function erfassteQueries(): string[] {
   return [...erfasst];

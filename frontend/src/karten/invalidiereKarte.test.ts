@@ -3,30 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { invalidiereKarte } from './invalidiereKarte';
 
 /**
- * CHARAKTERISIERUNGSTEST (LFH-307): pinnt das Invalidierungsverhalten von `invalidiereKarte`
- * gegen den Ist-Stand, BEVOR die Query-Keys auf die `globalKeys`-Registry migriert werden.
+ * Charakterisierungstest des Invalidierungsverhaltens von `invalidiereKarte`.
  *
- * Warum vorher: ein Test, der erst mit der Migration entsteht, belegt nur, dass neuer Code zu
- * sich selbst passt. Dieser hier lief gegen die alten Literale grün und muss gegen die
- * Accessoren grün bleiben — erst das ist ein Beweis, dass Verhalten ERHALTEN blieb.
+ * DIE KEYS SIND ABSICHTLICH LITERALE: mit derselben Factory gebaut, die auch
+ * `invalidiereKarte` benutzt, matchten beide Seiten auch bei falschem Prefix — der Test wäre
+ * tautologisch. Die Literale sind die unabhängige zweite Quelle.
  *
- * Die eigentliche Regressionsklasse dieser Migration (90 Call-Sites, verändertes
- * Invalidierungsverhalten) wäre e2e. Schritt 7 von `check-all.sh` überspringt e2e aber STILL,
- * wenn `target/debug/lifeline-hub` fehlt — worauf man sich als Netz also nicht verlassen kann.
- * Dieser Test plus der Byte-Pin in `queryKeys.test.ts` sind der Ersatz.
- *
- * DIE KEYS BLEIBEN HIER ABSICHTLICH LITERALE — bewusste Abweichung vom LFH-307-Plan, der sie
- * mit der Migration auf `globalKeys.*` umstellen wollte. Gemessen, warum das schlechter wäre:
- * baut man den `setQueryData`-Key MIT derselben Factory, die auch `invalidiereKarte` benutzt,
- * dann matchen beide Seiten auch dann noch, wenn die Factory einen falschen Prefix liefert —
- * der Test wäre tautologisch. Probe: `adminKarte()` auf `['admin-karte-FALSCH']` verbogen →
- * dieser Test (Literale) wird ROT; mit Accessoren gebaut wäre er grün geblieben. Die Literale
- * sind die unabhängige zweite Quelle, genau dafür ist ein Charakterisierungstest da.
- *
- * `new QueryClient()` statt `neuerQueryClient()` ist ABSICHT und gemessen: der App-Client setzt
- * `gcTime: 0`, was einen per `setQueryData` gesetzten, NICHT beobachteten Eintrag beim ersten
- * `await` wegräumt — die `isStale()`-Assertions unten wären dann trivial grün. Tests MIT
- * gerenderter Komponente (= mounted Observer) dürfen `neuerQueryClient()` nutzen.
+ * `new QueryClient()` statt `neuerQueryClient()`: dessen `gcTime: 0` räumt einen per
+ * `setQueryData` gesetzten, unbeobachteten Eintrag beim ersten `await` weg — die
+ * `isStale()`-Assertions wären dann trivial grün.
  */
 
 /** Die sieben Bereiche, die heute unter dem `admin-karte`-Prefix hängen. */
@@ -49,8 +34,8 @@ describe('invalidiereKarte: Charakterisierung des Ist-Verhaltens (LFH-307)', () 
     ];
     for (const k of keys) qc.setQueryData(k, { wert: 1 });
 
-    // Vorbedingung: frisch gesetzt ist nichts stale. Ohne diesen Anker könnte der Test auch
-    // dann grün sein, wenn die Einträge nie existiert haben.
+    // Vorbedingung: frisch gesetzt ist nichts stale — sonst könnte der Test grün sein, wenn die
+    // Einträge nie existierten.
     for (const k of keys) {
       expect(
         qc.getQueryState(k)?.isInvalidated ?? true,

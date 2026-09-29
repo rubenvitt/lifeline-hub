@@ -3,7 +3,8 @@
 # Skript unverändert auf; wer einen Schritt ergänzt, ergänzt ihn hier.
 #
 # Reihenfolge ist Absicht: erst die billigen, schnell scheiternden Prüfungen, dann die teuren
-# Suiten.
+# Suiten. Ein roter Schritt hält die folgenden NICHT auf: jeder Schritt läuft, am Ende steht
+# der Gesamtstatus je Schritt und EIN Exit-Code (Schrittläufer: lib/schritte.sh, LFH-386).
 #
 # Bewusst NICHT enthalten: `cargo clippy -D warnings` — der Bestand hat noch Warnungen, und
 # ein rot geborenes Gate wird abgeschaltet statt befolgt.
@@ -23,9 +24,13 @@ set -euo pipefail
 #   --nur rust       cargo test --workspace                  (~17 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
+# Unabhängig vom Bündel:
+#   --abbrechen      nach dem ersten roten Schritt keinen weiteren starten (Vorgabe:
+#                    alle fahren und am Ende einmal rot melden)
 # Geteilt wird über die Umgebung, nicht über weitere Flags:
 #   VITEST_SHARD=1/3   PW_SHARD=2/4
 NUR="alle"
+ABBRECHEN=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --nur)
@@ -34,6 +39,7 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     --nur=*) NUR="${1#--nur=}"; shift ;;
+    --abbrechen) ABBRECHEN=1; shift ;;
     -h|--help) sed -n '/^# Bündel-Auswahl/,/^#   VITEST_SHARD/p' "$0"; exit 0 ;;
     *) echo "FEHLER: unbekanntes Argument '$1'." >&2; exit 2 ;;
   esac
@@ -45,12 +51,14 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 # shellcheck source=lib/dev-env.sh
 . "$ROOT/scripts/lib/dev-env.sh"
+# shellcheck source=lib/schritte.sh
+. "$ROOT/scripts/lib/schritte.sh"
 
 FE="$ROOT/frontend"
 # Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
 # Nachbarn der gepinnten Node-Version ausfallen. Hier steht bewusst KEINE Zahl.
 PNPM="mise exec -- pnpm"
-SCHRITTE=11
+SCHRITTE=12
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
@@ -64,7 +72,7 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die elf Schritte, je als Funktion ──────────────────────────────────────────────
+# ── Die zwölf Schritte, je als Funktion ──────────────────────────────────────────────
 # Funktionen, damit die CI sie auf mehreren Runnern einzeln ansprechen kann. Die Nummer in
 # der Ausgabe ist die Position im GESAMTgate, nicht im laufenden Teilstück.
 
@@ -180,6 +188,7 @@ schritt_7() {
     echo "    klassen ab, die nur der echte Browser sieht (Layout, WebGL, StrictMode)." >&2
     echo "    (Bewusst kein harter Fehler: auf einem frischen Checkout wäre das Gate sonst" >&2
     echo "     von Tag eins rot — und ein rotes Gate wird abgeschaltet statt befolgt.)" >&2
+    return "$UEBERSPRUNGEN_RC"
   fi
 }
 
@@ -218,7 +227,14 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Node und pnpm aus einer Quelle: mise.toml [tools] (LFH-773)"
+  echo "==> [11/$SCHRITTE] Schrittläufer des Sammel-Gates (Selbsttest, LFH-386)"
+  # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
+  # erstes Kommando scheitert, grün meldet — beides wäre still.
+  "$ROOT/scripts/check-all.test.sh"
+}
+
+schritt_12() {
+  echo "==> [12/$SCHRITTE] Node und pnpm aus einer Quelle: mise.toml [tools] (LFH-773)"
   # Erst der Selbsttest, dann die Prüfung: der Guard irrt in beide Richtungen still.
   "$ROOT/scripts/check-toolversionen.test.sh"
   "$ROOT/scripts/check-toolversionen.sh"
@@ -227,13 +243,13 @@ schritt_11() {
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Schritte bekommen je einen eigenen Runner.
-BUENDEL_schnell="1 2 3 6 8 9 10 11"
+BUENDEL_schnell="1 2 3 6 8 9 10 11 12"
 BUENDEL_rust="4"
 BUENDEL_frontend="5"
 BUENDEL_e2e="7"
-BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11"
+BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12"
 
-# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die elf Schritte, jeden einmal —
+# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die zwölf Schritte, jeden einmal —
 # sonst fiele beim Umsortieren still ein Schritt aus der CI.
 _summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e | sort -n | tr '\n' ' ')"
 _soll="$(printf '%s\n' $BUENDEL_alle | sort -n | tr '\n' ' ')"
@@ -257,14 +273,14 @@ case "$NUR" in
     ;;
 esac
 
-for n in $lauf; do
-  "schritt_$n"
-done
-
-echo
-if [ "$NUR" = alle ]; then
-  echo "==> OK: alle Gates grün."
-else
-  echo "==> OK: Bündel '$NUR' grün (Schritte: $lauf von $SCHRITTE)."
-  echo "    Das ist ein TEILSTÜCK. Vor dem Merge gilt der volle Lauf ohne --nur."
+# $lauf unquotiert: die Schrittnummern sollen als einzelne Argumente ankommen. Nicht in einer
+# Bedingung aufrufen (s. lib/schritte.sh).
+# shellcheck disable=SC2086
+schritte_fahren "$ABBRECHEN" $lauf
+gesamt=0
+schritte_bericht || gesamt=$?
+if [ "$NUR" != alle ]; then
+  echo "    Bündel '$NUR' (Schritte: $lauf von $SCHRITTE) ist ein TEILSTÜCK."
+  echo "    Vor dem Merge gilt der volle Lauf ohne --nur."
 fi
+exit "$gesamt"

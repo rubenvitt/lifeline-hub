@@ -9,14 +9,10 @@ import { VorschauZustand } from '../command-palette/VorschauZustand';
 import { personalStatusDarstellung } from './mittelStatus';
 
 /**
- * Lese-Vorschau einer disponierten Einsatzkraft in der Sprungpalette (LFH-664).
- *
- * DATEN: das Listenfach der Palette (`datensatzAbfrage.personal`) mit `select` auf die `id` —
- * warm nach einem Treffer, live über den Stream. Status als `StatusTag` mit Wort; die
- * Mandantenfarbe (`status_farbe`) erzwingt die Rand-Form.
- *
- * WEGGELASSEN: Einheit und Fahrzeug (die Liste trägt nur `einheit_id`/`fahrzeug_id`, die
- * Namen stünden erst in zwei weiteren Listen). Leere optionale Angaben fehlen ganz.
+ * Lese-Vorschau einer disponierten Einsatzkraft in der Sprungpalette. Daten aus dem Listenfach
+ * der Palette mit `select` auf die `id`; Status als `StatusTag`, die Mandantenfarbe erzwingt
+ * die Rand-Form. Einheit und Fahrzeug fehlen (nur IDs in der Liste). Leere optionale Angaben
+ * fehlen ganz.
  */
 export default function PersonalVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {
   const select = useCallback((liste: EinsatzPersonal[]) => liste.find((p) => p.id === id), [id]);

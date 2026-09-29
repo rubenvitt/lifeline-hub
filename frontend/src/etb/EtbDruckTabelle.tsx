@@ -12,18 +12,16 @@ import { berichtigungsindex } from './zeitachseModell';
  * Die Papierform des Einsatztagebuchs (LFH-22, design.md D5).
  *
  * ── BENANNTE AUSNAHME ──────────────────────────────────────────────────────────────
- * Zwei Regeln der Bedien-Leitlinie gelten hier ausdrücklich NICHT: „das ETB ist auf allen
- * Breiten eine Zeitachse" (Neuentwurf S4) und „Tabelle nur, wenn verglichen wird"
- * (LFH-330/B2). Die Druckansicht ist kein Bedienort, sondern die Papierform des Tagebuchs —
- * der Vordruck mit laufender Nummer, Zeit, Von/An, Inhalt. Deshalb:
+ * „Das ETB ist eine Zeitachse" und „Tabelle nur, wenn verglichen wird" gelten hier
+ * ausdrücklich NICHT: die Druckansicht ist kein Bedienort, sondern der Vordruck mit laufender
+ * Nummer, Zeit, Von/An, Inhalt. Deshalb:
  * - ein schlichtes HTML-`<table>`, weder `KatalogTabelle` noch `Datensicht`: keine
  *   Sortierung, kein Filter, kein Spaltenschalter, keine Zeilenaktion;
  * - nur eine Tabelle wiederholt ihren Kopf auf jeder Druckseite (`thead` als
  *   `table-header-group` in `druck/druck.css`), und eine Zeile bricht nicht über den Rand;
  * - Ordnung AUFSTEIGEND nach `lfd_nr`, nicht nach Ereigniszeit: auf Papier beweist die
  *   lückenlose Nummernfolge die Vollständigkeit, und ein Nachtrag steht an seiner Nummer.
- * Das Typwort steht ohne Farbe: Farbe trägt auf Papier nichts, das Wort war schon der
- * zweite Kanal.
+ * Das Typwort steht ohne Farbe: Farbe trägt auf Papier nichts, das Wort ist der zweite Kanal.
  *
  * Wer hier Sortierung oder Filter nachrüstet, baut einen zweiten Bedienort für das ETB und
  * gehört auf `Datensicht` zurück — mit Begründung gegen die Zeitachse.

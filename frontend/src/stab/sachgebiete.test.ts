@@ -9,9 +9,8 @@ describe('SACHGEBIETE', () => {
   });
 
   /**
-   * Die Labels sind DIESELBEN wie im System-ETB-Eintrag (`src/stab/mod.rs`, `Sachgebiet::label`):
-   * die Zeile und der Führungsnachweis dürfen dasselbe Sachgebiet nicht verschieden benennen.
-   * Literale, nicht aus dem Backend gelesen — sonst prüfte der Test die Quelle gegen sich selbst.
+   * Die Labels sind DIESELBEN wie im System-ETB-Eintrag (`Sachgebiet::label`). Literale, sonst
+   * prüfte der Test die Quelle gegen sich selbst.
    */
   it('benennt die Sachgebiete wie der System-ETB-Eintrag', () => {
     expect(SACHGEBIETE.map((s) => s.label)).toEqual([
@@ -40,8 +39,8 @@ describe('SACHGEBIETE', () => {
   });
 
   /**
-   * S4 „Versorgung“ führt Verpflegung (LFH-634, Spec „Stab-Werkzeug S4“). Die Zeile trägt
-   * höchstens drei Werkzeuge — Fahrzeuge weicht dafür. Literal, damit ein stiller Tausch auffällt.
+   * S4 „Versorgung“ führt Verpflegung, Fahrzeuge weicht (höchstens drei Werkzeuge). Literal, damit
+   * ein stiller Tausch auffällt.
    */
   it('S4 führt Nachforderungen, Verpflegung und Material', () => {
     expect(SACHGEBIETE.find((s) => s.sachgebiet === 's4')!.werkzeuge).toEqual([

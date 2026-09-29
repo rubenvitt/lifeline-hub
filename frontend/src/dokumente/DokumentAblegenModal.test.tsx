@@ -52,10 +52,10 @@ function rendere() {
   return renderMitProviders(<Rahmen />);
 }
 
-/** Der Dialog, NACHDEM sein Anfangsfokus sitzt. Die Hülle fokussiert „Datei wählen“ per
- *  `requestAnimationFrame`; tippte ein Test vorher, zog der nachlaufende Fokus die Tasten aus
- *  dem Titelfeld ab — unter Last blieb „Titel“ leer und die Dateiwahl belegte ihn mit dem
- *  Dateinamen (in der CI von PR #158 rot, lokal 2 von 4 vollen Läufen). */
+/**
+ * Der Dialog, NACHDEM sein Anfangsfokus sitzt: die Hülle fokussiert „Datei wählen“ per
+ * `requestAnimationFrame`, ein vorher tippender Test verlöre die Tasten an den Fokuswechsel.
+ */
 async function dialog() {
   const d = (await screen.findAllByRole('dialog'))[0];
   const knopf = within(d).getByRole('button', { name: /Datei wählen/ });
@@ -257,8 +257,7 @@ describe('DokumentAblegenModal', () => {
   });
 
   it('fokussiert beim Öffnen „Datei wählen" statt des verborgenen Datei-Inputs', async () => {
-    // Belegt die Verdrahtung. Dass der Knopf im echten Browser fokussierbar ist und das
-    // `<input type="file">` nicht, misst erst das e2e (Task 5) — jsdom rechnet kein display.
+    // Belegt die Verdrahtung; die Fokussierbarkeit im echten Browser misst das e2e.
     rendere();
     const d = await dialog();
     const knopf = within(d).getByRole('button', { name: /Datei wählen/ });

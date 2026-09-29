@@ -8,29 +8,25 @@ import { parseKoordinate } from './koordinate';
 import { KoordinateFeld, VermisstSeitFeld } from './LagedatenFelder';
 
 /**
- * Werte der Personen-Aufnahme. `PersonEingabe` plus die Erst-Sichtung — und NUR diese
- * beiden: `status` leitet der Aufrufer aus seinem Modus ab, `client_id` setzt der
- * Offline-Pfad. Der Typ läuft unverändert durch Formular, Hülle und Mutation; ein
- * `Form.useForm<PersonEingabe>` darüber verlöre `sichtung` still.
+ * Werte der Personen-Aufnahme: `PersonEingabe` plus Erst-Sichtung — `status` leitet der
+ * Aufrufer ab, `client_id` setzt der Offline-Pfad. Ein `Form.useForm<PersonEingabe>` darüber
+ * verlöre `sichtung` still.
  */
 export type AufnahmeEingabe = PersonEingabe & { sichtung?: Sichtungskategorie };
 
 /**
- * Die FORMULARwerte der Maske — `AufnahmeEingabe` bis auf die Koordinate: die steht als
- * EIN Textfeld (`52.2691/9.1342`, Design D6) statt als zwei Zahlen und wird erst von
- * {@link aufnahmeZuEingabe} in `antreff_lat`/`antreff_lon` zerlegt. „vermisst seit" liegt
- * schon im Formular als Wire-String (UTC), die Umrechnung macht das `Form.Item` selbst.
+ * Die FORMULARwerte: `AufnahmeEingabe` bis auf die Koordinate, die als EIN Textfeld
+ * (`52.2691/9.1342`) steht und erst in {@link aufnahmeZuEingabe} zerlegt wird. „vermisst seit"
+ * liegt schon als Wire-String (UTC) im Formular.
  */
 export type AufnahmeWerte = Omit<AufnahmeEingabe, 'antreff_lat' | 'antreff_lon'> & {
   koordinate?: string;
 };
 
 /**
- * Formularwerte → Anlage. Beide Mounts rufen sie, damit es EINE Zerlegung gibt.
- *
- * Nur GESETZTE Werte gehen mit: `vermisst_seit` fehlt ohne Angabe ganz (dann setzt der
- * Server die Meldezeit), eine leere Koordinate ebenso. Ein unbrauchbarer Koordinatentext
- * erreicht diese Funktion nicht — die Feldprüfung hält das Absenden vorher an.
+ * Formularwerte → Anlage; beide Mounts rufen sie. Nur GESETZTE Werte gehen mit
+ * (`vermisst_seit` ohne Angabe fehlt, dann setzt der Server die Meldezeit). Ein unbrauchbarer
+ * Koordinatentext erreicht diese Funktion nicht — die Feldprüfung hält vorher an.
  */
 export function aufnahmeZuEingabe(werte: AufnahmeWerte): AufnahmeEingabe {
   const { koordinate, vermisst_seit, ...rest } = werte;
@@ -49,13 +45,8 @@ export type AufnahmeModus = 'schnell' | 'vermisst' | 'betroffen';
 const SK_REIHE: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot', 'unverletzt'];
 
 /**
- * Boden der Sichtungs-Auswahlflächen: **64 px oder die Dichtestufe, je nachdem, was größer
- * ist**. Die 64 px sind eine Untergrenze aus dem Ticket, kein Sollwert — im
- * Handschuh-Betrieb steht `controlHeight` auf 72 und gewinnt.
- *
- * Rein und exportiert (Muster `bedienzielStil`): so ist die Zusicherung über zwei
- * Dichtestufen prüfbar, ohne zu rendern — jsdom rechnet kein Layout, ein gemessenes Pixel
- * gäbe es dort ohnehin nicht.
+ * Boden der Sichtungs-Auswahlflächen: 64 px oder die Dichtestufe, je nachdem, was größer ist
+ * (im Handschuh-Betrieb gewinnt 72). Rein und exportiert, damit über zwei Dichtestufen prüfbar.
  */
 export function skFlaechenStil(token: { controlHeight: number }): CSSProperties {
   return {
@@ -68,40 +59,25 @@ export function skFlaechenStil(token: { controlHeight: number }): CSSProperties 
 }
 
 /**
- * Die Feldgruppe der Personen-Aufnahme — **ohne eigenes `<Form>`**.
- *
- * Ein Bauteil, zwei Mounts: das Schnellerfassungs-Modal (`PersonErfassungModal`) und die
- * Aufnahme-Route (`pages/personen/AufnahmePage`) zeigen dieselben Felder in derselben
- * Reihenfolge. Zwei Kopien wären zwei Feldbudgets, zwei Tastaturwege und zwei Stellen, an
- * denen die Sichtung fehlen kann.
+ * Die Feldgruppe der Personen-Aufnahme — **ohne eigenes `<Form>`**, für zwei Mounts
+ * (`PersonErfassungModal` und `pages/personen/AufnahmePage`): eine Maske, ein Feldbudget.
  *
  * ── FELDBUDGET: VIER SICHTBARE FELDER ──────────────────────────────
+ * Sichtung, Geschlecht, Geschätztes Alter, Antreffort. Der Name liegt unter „Weitere Angaben":
+ * an der Aufnahme wird zuerst die Kategorie vergeben, der Name ist meist unbekannt.
+ * Pflichtfelder gibt es keine.
  *
- * Sichtung, Geschlecht, Geschätztes Alter, Antreffort. **Der Name ist unter „Weitere
- * Angaben" gewandert** (bis LFH-340 · C5 war er sichtbar): an der Aufnahme wird zuerst die
- * Kategorie vergeben — das ist die Angabe, an der die Lage hängt —, und der Name ist der
- * langsamste Teil und in der Masse der Fälle unbekannt. Pflichtfelder gibt es weiterhin
- * keine: eine Person, von der man nichts weiß, muss trotzdem erfassbar sein.
+ * Unter „Weitere Angaben" liegen außerdem Zustand und Koordinate (geprüft über
+ * `personen/koordinate.ts`), im Vermisst-Modus statt ihrer „vermisst seit". Der Collapse bleibt
+ * OHNE `forceRender` (Beleg in `PersonErfassungModal.test.tsx`): ein Wert entsteht nur
+ * aufgeklappt, und einmal aufgeklappt bleibt der Bereich eingehängt.
  *
- * Unter „Weitere Angaben" (LFH-613) liegen zusätzlich **Zustand** und **Koordinate**
- * (Fundort als `52.2691/9.1342`, geprüft über `personen/koordinate.ts` — dieselbe Funktion
- * wie in der Schnellerfassungszeile und auf der Detailseite), im Vermisst-Modus statt
- * ihrer **„vermisst seit"**. Das sichtbare Budget wächst dadurch nicht. Der Collapse bleibt
- * OHNE `forceRender` (Entscheidung und Beleg in `PersonErfassungModal.test.tsx`): ein Wert
- * entsteht nur aufgeklappt, und einmal aufgeklappt bleibt der Bereich eingehängt — eine
- * ungültige Koordinate hält das Absenden also auch nach dem Zuklappen an.
+ * Zustand und Koordinate fehlen im Vermisst-Modus (sie beschreiben eine angetroffene Person);
+ * „vermisst seit" fehlt außerhalb (das Backend lehnt es ohne `vermisst` mit 422 ab).
  *
- * Zustand und Koordinate fehlen im Vermisst-Modus: beide beschreiben eine ANGETROFFENE
- * Person — eine Koordinate an einer vermissten Person stünde auf der Betroffenen-Karte wie
- * ein Fundort. „vermisst seit" fehlt umgekehrt außerhalb: das Backend lehnt es ohne Status
- * `vermisst` mit 422 ab.
- *
- * ── DIE SICHTUNG FEHLT IM VERMISST-MODUS, UND ZWAR MIT ABSICHT ─────
- *
- * Eine vermisste Person ist nicht angetroffen und damit nicht sichtbar. Das ist keine
- * Anzeige-Entscheidung, sondern der Vertrag: `POST /personen` antwortet auf die Kombination
- * `status: 'vermisst'` + `sichtung` mit 422 (`src/routes/einsatz_person.rs`). Ein Feld, das
- * hier stünde, könnte nur einen Fehler erzeugen.
+ * ── DIE SICHTUNG FEHLT IM VERMISST-MODUS ───────────────────────────
+ * Eine vermisste Person ist nicht angetroffen. `POST /personen` antwortet auf `vermisst` +
+ * `sichtung` mit 422 — ein Feld hier könnte nur einen Fehler erzeugen.
  */
 export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
   const { token } = theme.useToken();
@@ -141,17 +117,11 @@ export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
     <>
       {modus !== 'vermisst' && (
         <Form.Item label="Sichtungskategorie" name="sichtung">
-          {/* LFH-455: dieselbe fachliche Kennzeichnung wie in Liste und Verlauf.
-              Die Farbfelder sind keine Auswahlflächen; ihre Beschriftung trägt den
-              Textkontrast unabhängig von der SK-Farbe und dem Radio-Zustand. */}
-          {/* `aria-label` zusätzlich zum `Form.Item`-Label, und das ist kein Gürtel-plus-
-              Hosenträger: antds `FormItemLabel` rendert ausschließlich `<label htmlFor>`,
-              und `label[for]` benennt in HTML nur *labelable elements*. Eine
-              `Radio.Group` ist ein `div[role="radiogroup"]` und gehört nicht dazu — ohne
-              den Namen stünden hier sechs Auswahlflächen in einer namenlosen Gruppe.
-              Dieselbe Lösung trugen bis LFH-392 die zwei `Segmented` der Kopfzeile
-              („Farbschema wählen", „Bediendichte wählen"); sie sind fort, die
-              Begründung darüber steht für sich. */}
+          {/* Dieselbe fachliche Kennzeichnung wie in Liste und Verlauf; die Beschriftung trägt den
+             Textkontrast unabhängig von SK-Farbe und Radio-Zustand. */}
+          {/* `aria-label` zusätzlich zum `Form.Item`-Label: `label[for]` benennt nur labelable elements,
+             und eine `Radio.Group` (`div[role="radiogroup"]`) gehört nicht dazu — sonst stünden sechs
+             Flächen in einer namenlosen Gruppe. */}
           <Radio.Group
             name="sichtung"
             aria-label="Sichtungskategorie"
@@ -181,9 +151,8 @@ export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
       <Form.Item label="Geschätztes Alter (Jahre)" name="alter_geschaetzt">
         <InputNumber min={0} max={120} style={{ width: 140 }} />
       </Form.Item>
-      {/* „Antreffort" ist bewusst das LETZTE sichtbare Eingabefeld: Enter darin sendet ab
-          (Zusicherung 1 der Erfassungs-Hülle), und der Ort ist die Angabe, die am Ende
-          eines Aufnahmegesprächs steht. */}
+      {/* „Antreffort" ist bewusst das LETZTE sichtbare Eingabefeld: Enter darin sendet ab, und der Ort
+         steht am Ende eines Aufnahmegesprächs. */}
       <Form.Item label="Antreffort" name="antreff_ort">
         <Input placeholder="z. B. Brücke, Sammelstelle" />
       </Form.Item>

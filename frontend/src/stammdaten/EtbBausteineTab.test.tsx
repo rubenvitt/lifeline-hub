@@ -23,10 +23,9 @@ const bausteine = [
 ];
 
 /**
- * Zweiter Baustein NUR für die Ordnungs-Prüfung, deshalb als Parameter und nicht in
- * `bausteine`: der Bestandstest greift „Bearbeiten" per `getByRole` (Einzahl), eine zweite
- * Zeile machte die Schaltfläche mehrdeutig. Er steht fachlich hinten (`sortier` 20) und
- * alphabetisch vorn — sonst sähe die Tabelle nach dem Sortierklick genauso aus wie davor.
+ * Zweiter Baustein NUR für die Ordnungs-Prüfung, als Parameter: eine zweite Zeile machte den
+ * `getByRole`-Griff auf „Bearbeiten" mehrdeutig. Er steht fachlich hinten (`sortier` 20) und
+ * alphabetisch vorn, sonst bewiese der Sortierklick nichts.
  */
 const zweiBausteine = [
   bausteine[0],
@@ -44,9 +43,8 @@ const zweiBausteine = [
 /**
  * Die Leitspalte aller Datenzeilen — der Kopf ist ein eigenes `<table>`, siehe KatalogTabelle.
  *
- * Gegriffen wird die MARKE, nicht `td:first-child`: seit LFH-346 · A4 teilen Label und Inhalt
- * eine Zelle, deren `textContent` sonst „Lage unverändertLage unverändert." lautete. Die
- * Marke sitzt am Label-Knoten und hält die Aussage scharf, statt sie zu lockern.
+ * Gegriffen wird die MARKE, nicht `td:first-child`: Label und Inhalt teilen eine Zelle, deren
+ * `textContent` sonst beides aneinanderhängte.
  */
 const labels = (c: HTMLElement) =>
   [...c.querySelectorAll('tr.ant-table-row [data-lfh="baustein-label"]')].map((z) => z.textContent);
@@ -86,11 +84,9 @@ describe('EtbBausteineTab', () => {
   });
 
   /**
-   * Die Primäraktion ist seit LFH-346 · A3 SICHTBAR UND GESPERRT, die Zeilenaktionsspalte
-   * bleibt weg. Zwei Zuschnitte, bewusst: der eine Knopf im Kopf soll den Grund nennen
-   * können (M16 — ein fehlender Knopf ist von „diese Seite kann das gar nicht" nicht zu
-   * unterscheiden), n Zeilen × 2 Knöpfe wären dagegen eine Spalte toter Knöpfe, die
-   * waagerechten Platz für null Handlungsmöglichkeit kostet.
+   * Primäraktion SICHTBAR UND GESPERRT, Zeilenaktionsspalte weg (LFH-346): der Knopf im Kopf
+   * nennt über den Hinweis den Grund, n Zeilen × 2 gesperrte Knöpfe kosteten Platz für null
+   * Handlungsmöglichkeit.
    */
   it('Nicht-Admin sieht die Primäraktion gesperrt und keine Zeilenaktionen', async () => {
     render(nichtAdmin);
@@ -105,8 +101,8 @@ describe('EtbBausteineTab', () => {
     // Einstieg ist die fachliche Reihenfolge des Servers (`sortier`), nicht das Alphabet.
     expect(labels(container)).toEqual(['Lage unverändert', 'Abschnitt gebildet']);
 
-    // Der Sortierauslöser sitzt in der Kopfzelle der fixierten Leitspalte. jsdom rechnet
-    // dort kein Layout — dass der Klick auch am 390-px-Schirm ankommt, ist hier NICHT belegt.
+    // Der Sortierauslöser sitzt in der Kopfzelle der fixierten Leitspalte; ob der Klick am
+    // 390-px-Schirm ankommt, belegt jsdom NICHT.
     await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
     expect(labels(container)).toEqual(['Abschnitt gebildet', 'Lage unverändert']);
 
@@ -117,11 +113,9 @@ describe('EtbBausteineTab', () => {
     await userEvent.clear(feld);
     expect(labels(container)).toHaveLength(2);
 
-    // Die andere Hälfte derselben Zusicherung: seit LFH-346 · C11 trägt die Leitspalte einen
-    // `suchText`-Haken, der Label UND Inhalt in den Korpus hebt — die Zwei-Zeilen-Zelle
-    // (A4) hatte den Inhalt ins `render` geschoben und damit aus der Suche genommen.
-    // „Einsatzabschnitt" steht ausschließlich im Inhalt der zweiten Zeile; „Abschnitt" allein
-    // träfe deren Label mit und bewiese nichts.
+    // Die andere Hälfte: der `suchText`-Haken der Leitspalte hebt Label UND Inhalt in den
+    // Korpus, obwohl der Inhalt im `render` steht. „Einsatzabschnitt" steht nur im Inhalt der
+    // zweiten Zeile; „Abschnitt" allein träfe deren Label mit und bewiese nichts.
     await userEvent.type(feld, 'Einsatzabschnitt');
     expect(labels(container)).toEqual(['Abschnitt gebildet']);
     await userEvent.clear(feld);
@@ -137,10 +131,9 @@ describe('EtbBausteineTab', () => {
   });
 
   /**
-   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
-   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
-   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
-   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   * Partnerpaar zu AK4 (LFH-331): die negative Hälfte allein wäre auch im Leerfall trivial
+   * grün; erst die positive darunter mit demselben Literal macht sie zu einer Aussage über die
+   * Zustandsweiche.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
@@ -162,12 +155,10 @@ describe('EtbBausteineTab', () => {
 });
 
 /**
- * Zwei-Zeilen-Zelle und Freitext-Begrenzung (LFH-346 · A4, Befund N13).
+ * Zwei-Zeilen-Zelle und Freitext-Begrenzung (LFH-346).
  *
- * Label und Inhalt gehören zusammen gelesen („was fügt dieser Baustein ein?"), nicht
- * verglichen — als zwei Spalten zwangen sie den Blick zum Springen, und der ungekürzte
- * Inhalt trieb die Zeilenhöhe. Warum die Kappung an der ZELLE sitzt und nicht an der
- * Spalte, steht ausführlich und im Browser gemessen in
+ * Label und Inhalt werden zusammen gelesen („was fügt dieser Baustein ein?"), nicht
+ * verglichen. Warum die Kappung an der ZELLE sitzt und nicht an der Spalte, steht in
  * `karten/OnlineQuellenVerwaltung.test.tsx`.
  */
 describe('EtbBausteineTab — Zwei-Zeilen-Zelle (LFH-346 · A4)', () => {
@@ -190,18 +181,16 @@ describe('EtbBausteineTab — Zwei-Zeilen-Zelle (LFH-346 · A4)', () => {
     expect(tabelle.style.tableLayout).toBe('auto');
     expect(zelle).toHaveStyle({ maxWidth: '320px' });
 
-    // Die Kürzung selbst rechnet der Browser; jsdom meldet keine Unterstützung. Belegbar ist,
-    // DASS sie konfiguriert ist — antd setzt die Klasse unabhängig vom Messweg
-    // (Muster `pages/lagekarte/Inspector.test.tsx`).
+    // Die Kürzung selbst rechnet der Browser. Belegbar ist, DASS sie konfiguriert ist — antd
+    // setzt die Klasse unabhängig vom Messweg (Muster `pages/lagekarte/Inspector.test.tsx`).
     expect(screen.getByText(langerInhalt)).toHaveClass('ant-typography-ellipsis');
   });
 
   it('nennt im Suchplatzhalter nur, was die Suche wirklich liest', async () => {
     render(admin);
     await screen.findByText('Lage unverändert');
-    // Der Testname bleibt richtig, das Verdikt kehrt sich um: der `suchText`-Haken der
-    // Leitspalte (LFH-346 · C11) liest wieder beides, der Platzhalter darf es also wieder
-    // versprechen. Dass er es hält, misst der Ordnungs-Test oben mit „Einsatzabschnitt".
+    // Der `suchText`-Haken der Leitspalte liest beides, der Platzhalter darf es also versprechen.
+    // Dass er es hält, misst der Ordnungs-Test oben mit „Einsatzabschnitt".
     expect(screen.getByPlaceholderText('Label oder Inhalt')).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Label')).toBeNull();
   });

@@ -204,9 +204,8 @@ describe('useEtbErfassung', () => {
         HttpResponse.json({ error: 'Session abgelaufen' }, { status: 401 }),
       ),
     );
-    // Das Signal geht an die zentrale Sitzungswache (LFH-268) — vorher setzte der Hook nur
-    // einen `reLoginNoetig`-State, den kein Aufrufer las: der Nutzer sah nichts, und die
-    // Queue lief in einen 30s-Endlos-Retry.
+    // Das Signal geht an die zentrale Sitzungswache; ohne sie sähe der Nutzer nichts und die
+    // Queue liefe in einen Endlos-Retry.
     const horcher = vi.fn();
     window.addEventListener(SITZUNG_ABGELAUFEN, horcher);
     await act(async () => {
@@ -532,6 +531,6 @@ describe('useEtbErfassung', () => {
 
 afterEach(() => {
   delete (navigator as { locks?: unknown }).locks;
-  // Die Melde-Sperre ist modulweit — ohne Reset bliebe ein zweiter 401-Test stumm (LFH-268).
+  // Die Melde-Sperre ist modulweit — ohne Reset bliebe ein zweiter 401-Test stumm.
   sitzungsMeldungZuruecksetzen();
 });

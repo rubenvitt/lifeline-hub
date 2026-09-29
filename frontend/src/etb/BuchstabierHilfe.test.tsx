@@ -24,18 +24,13 @@ describe('BuchstabierHilfe', () => {
   });
 
   /**
-   * Der Auslöser erklärt sich, BEVOR man ihn drückt (LFH-365 · B5e). Er ist icon-only und
-   * hatte bis hierhin nur ein `aria-label` — für eine Maus- oder Touch-Bedienung also
-   * keine Erklärung außer dem Ausprobieren.
+   * Der icon-only Auslöser erklärt sich per Tooltip, BEVOR man ihn drückt (LFH-365).
    *
-   * Diese Zusicherung ist nötig, weil die drei Fälle daneben sie NICHT mitliefern: sie
-   * greifen den Knopf über `name: 'Buchstabierhilfe'`, und das ist der Wert des
-   * `aria-label`, der in der Namensrechnung gegen jeden sichtbaren Text gewinnt (gemessen).
-   * Sie wären mit und ohne Tooltip grün.
+   * Die drei Fälle daneben liefern das NICHT mit: sie greifen den Knopf über
+   * `name: 'Buchstabierhilfe'`, also über das `aria-label`, und wären mit und ohne Tooltip grün.
    *
-   * Der Wortlaut ist mit dem `aria-label` identisch — Absicht, nicht Redundanz: ein
-   * sichtbarer Hinweis, der anders lautet als der zugängliche Name, verletzt WCAG 2.5.3
-   * (Label in Name) und macht Sprachsteuerung unbedienbar.
+   * Der Wortlaut ist mit dem `aria-label` identisch — Absicht: ein sichtbarer Hinweis, der
+   * anders lautet als der zugängliche Name, verletzt WCAG 2.5.3 (Label in Name).
    */
   it('erklärt den Auslöser per Tooltip, bevor er gedrückt wird', async () => {
     renderMitProviders(<BuchstabierHilfe text="Florian" />);
@@ -44,21 +39,15 @@ describe('BuchstabierHilfe', () => {
   });
 
   /**
-   * Der Tooltip weicht, sobald die Tafel steht (Review-Nachtrag zu LFH-365).
+   * Der Tooltip weicht, sobald die Tafel steht.
    *
-   * Beide Hüllen hängen am selben Knopf, und der Kommentar „sie beißen sich nicht — der
-   * Tooltip hängt am Zeigereintritt, das Popover am Klick" gilt nur für die AUSLÖSER, nicht
-   * für die Overlays: gemessen liegen nach Zeigen-und-Klicken beide gleichzeitig im DOM.
-   * Sie teilen Anker und Ausrichtungsregel (`placement: 'top'`), fallen also an derselben
-   * Kante zusammen, und der Tooltip liegt oben (`zIndexPopupBase + 70` gegen `+ 30`) —
-   * er verdeckt die erste Zeile der Buchstabiertafel.
+   * Tooltip (Zeigereintritt) und Popover (Klick) hängen am selben Knopf, ihre OVERLAYS liegen
+   * nach Zeigen-und-Klicken aber gleichzeitig im DOM. Sie teilen Anker und `placement: 'top'`,
+   * und der Tooltip liegt oben (`zIndexPopupBase + 70` gegen `+ 30`) — er verdeckte die erste
+   * Zeile der Tafel. Auf Touch ist das der Normalfall: rc-trigger ergänzt einem Hover-Auslöser
+   * `touch`, ein Tipp öffnet beides.
    *
-   * Auf Touch ist das der Normalfall, nicht die Ausnahme: rc-trigger ergänzt einem
-   * Hover-Auslöser zusätzlich `touch`, ein Tipp öffnet also beides zugleich. Das
-   * Führungs-Tablet ist nach der Bedien-Leitlinie ein Primärkontext.
-   *
-   * Geprüft wird die antd-KLASSE, nicht `role="tooltip"`: antd gibt seinem Popover-Popup
-   * dieselbe Rolle, eine Rollenzählung läse sich als Doppeltreffer und belegte nichts.
+   * Geprüft wird die antd-KLASSE, nicht `role="tooltip"`: antd gibt dem Popover dieselbe Rolle.
    */
   it('räumt den Tooltip weg, sobald die Tafel offen ist', async () => {
     renderMitProviders(<BuchstabierHilfe text="Florian" />);

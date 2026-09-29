@@ -1,9 +1,8 @@
 /**
- * Registriert die Gauß-Krüger-Zonen (DHDN/Bessel, EPSG:31466–31469) in proj4 —
- * einmalig auf Modul-Top-Level. ZWINGEND mit +towgs84 (EPSG:1777, 7-Parameter-
- * Helmert), sonst liefert proj4 still ~136 m falsche Werte. Genauigkeit ~3 m
- * (kein NTv2-Grid) — für taktische Lagekarten ausreichend, nicht für Kataster.
- * Muster: Zone n → lon_0 = 3·n, x_0 = n·1_000_000 + 500_000.
+ * Registriert die Gauß-Krüger-Zonen (DHDN/Bessel, EPSG:31466–31469) in proj4. ZWINGEND mit
+ * +towgs84 (EPSG:1777, Helmert), sonst liefert proj4 still ~136 m falsche Werte. Genauigkeit
+ * ~3 m (kein NTv2-Grid) — für Lagekarten ausreichend, nicht für Kataster.
+ * Zone n → lon_0 = 3·n, x_0 = n·1_000_000 + 500_000.
  */
 import proj4 from 'proj4';
 

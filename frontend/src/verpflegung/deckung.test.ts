@@ -4,9 +4,8 @@ import type { Sonderkost, VerpflegungZeitfenster } from '../api/types';
 import { deckungEinstufung, istVergangen } from './deckung';
 
 /**
- * Einstufung eines Verpflegungszeitfensters (LFH-634, design.md D2). Geprüft wird gegen
- * ABSOLUTE Zeitpunkte (`…Z`), nie per Round-Trip: ein Ortszeit-Lesen der Wire-Zeit verschöbe
- * beide Seiten eines Round-Trips um denselben Betrag und bliebe grün.
+ * Einstufung eines Verpflegungszeitfensters, geprüft gegen ABSOLUTE Zeitpunkte: ein
+ * Ortszeit-Lesen verschöbe beide Seiten eines Round-Trips gleich und bliebe grün.
  */
 
 /** Absoluter Zeitpunkt, unabhängig von der Zone der Testmaschine. */

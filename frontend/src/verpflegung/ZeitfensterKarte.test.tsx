@@ -34,7 +34,7 @@ function zeige(zf: VerpflegungZeitfenster, over: Partial<ZeitfensterKarteProps> 
   return { props, karte: screen.getByRole('article') };
 }
 
-/** Das geöffnete Menü — Konvention aus CLAUDE.md (LFH-365). */
+/** Das geöffnete Menü. */
 async function oeffneMenue() {
   await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Zeitfenster ${kennung}` }));
   return waitFor(() => {

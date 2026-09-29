@@ -66,9 +66,8 @@ describe('PersonalVorschau (LFH-664)', () => {
   });
 
   /**
-   * Spec „Kein zusätzlicher Abruf": das Fach der Palette ist warm, 30 s alt — also ZWISCHEN
-   * der Frische der Palette (60 s) und der globalen Vorgabe (10 s). Nur so wird der Test rot,
-   * wenn die Vorschau die Frische der Palette nicht teilt.
+   * Das Fach der Palette ist warm, 30 s alt — ZWISCHEN der Frische der Palette (60 s) und der
+   * globalen Vorgabe (10 s). Nur so wird der Test rot, wenn die Vorschau die Frische nicht teilt.
    */
   it('holt bei warmem Fach der Palette nicht neu', () => {
     let abrufe = 0;

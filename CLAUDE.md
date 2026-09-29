@@ -550,9 +550,14 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
-`check-migrationen.sh` → `check-toolversionen.sh`.
+`check-migrationen.sh` → `check-all.test.sh` → `check-toolversionen.sh`.
 - **Das Skript ist die Wahrheit**; `.github/workflows/ci.yml` ruft es unverändert. Neue Schritte
   gehören ins Skript.
+- **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
+  laufen, am Ende Gesamtstatus je Schritt und EIN Exit-Code; `--abbrechen` ist das Opt-in für
+  den schnellen Abbruch. Schritte laufen als eigenes Kommando in einer Subshell mit `set -e`,
+  **nie** in einer Bedingung (`if`/`||` schaltet errexit im ganzen Körper ab). Übersprungen
+  meldet ein Schritt mit `return "$UEBERSPRUNGEN_RC"`, nicht mit 0.
 - **Ein rot geborenes Gate wird abgeschaltet statt befolgt** — erst sweepen, dann scharf schalten
   (deshalb nicht im Gate: `cargo clippy -D warnings`).
 - Prettier prüft nur `frontend/`; nicht idempotent (nach `--write` noch rot → nochmal).

@@ -54,8 +54,8 @@ async function waehle(feld: string, option: string) {
 
 describe('BesetzungModal', () => {
   /**
-   * Das erste Feld ist ein Select — „Enter sendet" ist für diese Maske nicht belegbar
-   * (rc-select verschluckt Enter). Geprüft wird die Struktur, aus der die Zusicherung folgt.
+   * Das erste Feld ist ein Select — „Enter sendet" ist nicht belegbar (rc-select verschluckt
+   * Enter). Geprüft wird die Struktur, aus der die Zusicherung folgt.
    */
   it('trägt die Erfassungs-Norm: keine Modal-Fusszeile, Knopf im <form>', async () => {
     rendere(undefined);
@@ -105,11 +105,9 @@ describe('BesetzungModal', () => {
   });
 
   /**
-   * LFH-303-Fehlerklasse: die Seite reicht `zeile` live aus der Query durch. Trifft während der
-   * offenen Maske ein `stab`-Ereignis ein, ändert sich `zeile` — das Formular nicht. Verglichen
-   * wird deshalb gegen den Stand beim ÖFFNEN; ein Bestätigen ohne Änderung schreibt nie.
-   * Je `rerender` ein NEUES Element: dasselbe Element-Objekt liesse React den Teilbaum
-   * überspringen, und der Test wäre trivial grün.
+   * Die Seite reicht `zeile` live aus der Query durch; ändert sie sich bei offener Maske, bleibt
+   * das Formular. Verglichen wird gegen den Stand beim ÖFFNEN — ein Bestätigen ohne Änderung
+   * schreibt nie. Je `rerender` ein NEUES Element, sonst übersprünge React den Teilbaum.
    */
   describe('Stand beim Öffnen ist die Basis, nicht der Live-Stand', () => {
     const fremdGesetzt: Stabsfunktion = {
@@ -169,10 +167,8 @@ describe('BesetzungModal', () => {
   });
 
   /**
-   * Ein abgelehnter PUT steht IN der Maske (LFH-345 · C10/H14), die Felder bleiben — und beim
-   * nächsten Absenden räumt react-query `error` weg, der Alert geht. Beide Hälften gehören
-   * zusammen: ein Alert, der stehen bleibt, wäre so falsch wie einer, der nie kommt. Der Text
-   * ist die Meldung aus dem `{error}`-Body (`fehlerWerfen` → `ApiError.message`).
+   * Ein abgelehnter PUT steht IN der Maske, die Felder bleiben; beim nächsten Absenden räumt
+   * react-query `error` weg. Beide Hälften gehören zusammen.
    */
   it('abgelehnter PUT: Grund steht im Dialog, Felder bleiben; erneutes Übernehmen räumt ihn', async () => {
     const grund = 'Einsatz ist abgeschlossen und schreibgeschützt';
@@ -210,17 +206,15 @@ describe('BesetzungModal', () => {
     await screen.findByRole('button', { name: 'Übernehmen' });
     await waehle('Besetzung', 'disponierte Person');
     await waehle('Person', 'Ad-hoc-Person anlegen …');
-    // Nicht über `getByRole('dialog', { name })`: im Test vergibt antd jedem Modal-Titel dieselbe
-    // id (`aria-labelledby="test-id"`), mit zwei offenen Dialogen zeigt der Name beider auf den
-    // ersten Titel. Der Griff über den Titeltext prüft dieselbe Aussage.
+    // Nicht über `getByRole('dialog', { name })`: im Test tragen alle Modal-Titel dieselbe id, mit
+    // zwei offenen Dialogen zeigt der Name beider auf den ersten Titel.
     const titel = await screen.findByText('Ad-hoc-Person disponieren');
     expect(titel.closest('.ant-modal')).not.toBeNull();
   });
 
   /**
-   * Ruling 4: eine abgebrochene Ad-hoc-Anlage lässt die Person LEER — auch in der Anzeige. Mit
-   * `undefined` fiele rc-select auf seinen inneren Zustand zurück und zeigte weiter
-   * „Ad-hoc-Person anlegen …" als Wert, während der Speicher leer ist (gemessen).
+   * Eine abgebrochene Ad-hoc-Anlage lässt die Person LEER, auch in der Anzeige: mit `undefined`
+   * zeigte rc-select weiter „Ad-hoc-Person anlegen …", während der Speicher leer ist.
    */
   it('abgebrochene Ad-hoc-Anlage: Person leer, Übernehmen meldet die Pflicht, kein Request', async () => {
     const onSchliessen = rendere(undefined);

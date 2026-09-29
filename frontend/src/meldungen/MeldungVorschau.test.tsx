@@ -84,10 +84,7 @@ describe('MeldungVorschau (LFH-664)', () => {
     expect(await screen.findByText(/Erledigt:/)).toBeInTheDocument();
   });
 
-  /**
-   * Der schlimmste Fall aus `MeldungKarte.test.tsx`: neu, bestätigungspflichtig, nicht
-   * lagerelevant, ohne Auftrag — auf der Seite stehen hier alle Aktionen. Die Vorschau liest.
-   */
+  /** Der schlimmste Fall: auf der Seite stünden alle Aktionen. Die Vorschau liest nur. */
   it('trägt keine Aktion, auch nicht an einer neuen bestätigungspflichtigen Meldung', async () => {
     meldungenHandler([
       meldung({
@@ -126,9 +123,8 @@ describe('MeldungVorschau (LFH-664)', () => {
   });
 
   /**
-   * 30 s alt, also ZWISCHEN den beiden Frischen (Review-Befund): für die Palette
-   * (`FRISCH_MS` = 60 s) frisch, für die globale Vorgabe (10 s) nicht. Mit „jetzt" bliebe der
-   * Test auch grün, wenn die Vorschau die Frische der Palette nicht teilte.
+   * 30 s alt, also zwischen beiden Frischen: für die Palette (60 s) frisch, für die globale
+   * Vorgabe (10 s) nicht. Mit „jetzt" bliebe der Test auch ohne geteilte Frische grün.
    */
   it('liest aus dem warmen Listenfach der Palette, ohne neu abzurufen', () => {
     const zaehler = { n: 0 };

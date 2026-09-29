@@ -1,4 +1,3 @@
-// src/etb/SlashMenu.tsx
 import { Typography, theme } from 'antd';
 import { useEffect, useImperativeHandle, useMemo, useState, forwardRef } from 'react';
 import type { EtbBaustein } from '../api/types';
@@ -17,9 +16,9 @@ interface Props {
   onWahl: (eintrag: SlashEintrag) => void;
   onSchliessen: () => void;
   /**
-   * Typbefehle (`/meldung`, `/anordnung` …) als eigene, ERSTE Sektion anbieten. Der
-   * Aufrufer setzt das nur für ein `/` am Zeilenanfang (Neuentwurf S4) — mitten im Satz
-   * bleibt das Menü bei Feldern und Bausteinen, und seine Reihenfolge unverändert.
+   * Typbefehle (`/meldung`, `/anordnung` …) als eigene, ERSTE Sektion anbieten. Der Aufrufer
+   * setzt das nur für ein `/` am Zeilenanfang — mitten im Satz bleibt das Menü bei Feldern und
+   * Bausteinen.
    */
   typenAnbieten?: boolean;
   /**
@@ -28,8 +27,8 @@ interface Props {
    */
   einheiten?: readonly SlashEintrag[] | null;
   /**
-   * Wohin das Menü aufgeht. Die ETB-Erfassung steht seit dem Neuentwurf am SEITENFUSS —
-   * ein Menü nach unten liefe dort aus dem Fenster.
+   * Wohin das Menü aufgeht. Die ETB-Erfassung steht am SEITENFUSS — ein Menü nach unten liefe
+   * dort aus dem Fenster.
    */
   richtung?: 'unten' | 'oben';
 }
@@ -61,13 +60,9 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
     [einheiten, treffer],
   );
   const [aktiv, setAktiv] = useState(0);
-  // Aufgelöste Theme-Tokens (theme.useToken()) statt antd-CSS-Variablen: robust
-  // gegenüber dem Theme-Modus. Eine antd-Custom-Property griff hier früher nie und
-  // lief still auf ihren dunklen Fallback — das war unter antd 5, dort war `cssVar`
-  // tatsächlich aus (LFH-72, vor dem Sprung auf antd 6 in LFH-159). antd 6 emittiert
-  // `--ant-*` immer, laut LFH-623 aber nur unter der Klasse `css-var-root`, nicht an
-  // `<html>`. Die Regel bleibt deshalb: handgeschriebenes CSS liest `--lfh-*` aus
-  // `theme/rollen.css`, TSX liest useToken(), keines hängt an antds Variablennamen.
+  // Aufgelöste Theme-Tokens statt antd-CSS-Variablen: antd 6 emittiert `--ant-*` nur unter der
+  // Klasse `css-var-root`, nicht an `<html>` (LFH-623). Handgeschriebenes CSS liest `--lfh-*`
+  // aus `theme/rollen.css`, TSX liest useToken(), keines hängt an antds Variablennamen.
   const { token } = theme.useToken();
 
   useEffect(() => setAktiv(0), [filter, offen]);
@@ -143,23 +138,12 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
                 onWahl(e);
               }}
               /*
-               * Die Zeile ist ein Bedienziel und folgt deshalb der Dichte-Staffel
-               * (LFH-365 · B5e). Zwei getrennte Angaben, weil sie zwei Dinge sind:
+               * Die Zeile ist ein Bedienziel und folgt der Dichte-Staffel (LFH-365). Zwei Angaben, weil
+               * sie zwei Dinge sind: `minHeight` trägt den Trefflächenboden (30 / 48 / 72 px aus
+               * `controlHeight`) — ohne ihn entstünde die Höhe allein aus Polsterung plus Zeilenbox und
+               * bliebe im Handschuh unter dem Boden. `padding` ist die Polsterung.
                *
-               *   `minHeight` trägt den Trefflächenboden (30 / 48 / 72 px aus
-               *   `controlHeight`). Ohne sie entsteht die Höhe allein aus Polsterung plus
-               *   Zeilenbox — im Handschuh gemessen grob 54 px gegen einen Boden von 72.
-               *   Präzedenz ist `components/Datensicht.tsx:1255`, dasselbe Problem an
-               *   einem anderen interaktiven Zeilenziel.
-               *
-               *   `padding` ist die Polsterung. Der Tausch bewegt in der kompakten Stufe
-               *   je ±1 px (6→7, 12→11), ist also ein Token-Tausch und keine
-               *   Umgestaltung.
-               *
-               * Tokens und nicht `var(--lfh-*)`: die Arbeitsteilung steht oben an
-               * `useToken()` und in `theme/rollen.css` — handgeschriebenes CSS liest die
-               * Custom Properties, TSX liest die aufgelösten Tokens. Die Dichteachse
-               * wurde in TSX noch nie über eine CSS-Variable gelesen.
+               * Tokens und nicht `var(--lfh-*)`: TSX liest die aufgelösten Tokens (s. oben an `useToken()`).
                */
               style={{
                 minHeight: token.controlHeight,

@@ -70,7 +70,9 @@ im Log. Alles Weitere — TLS, Anmeldeverfahren, Offline-Karten, Sicherung — s
 
 Das ist die **eine** Durchsetzungsinstanz vor jedem Merge: Formatierung, Lint, Typ-Drift
 zwischen Backend und Frontend, Rust-Suite, Frontend-Suite, Abhängigkeits-Advisories und die
-Playwright-Suite. Dieselbe Datei fährt auch die CI — was hier grün ist, ist dort grün.
+Playwright-Suite. Dieselbe Datei fährt auch die CI — was hier grün ist, ist dort grün. Ein
+roter Schritt hält die übrigen nicht auf; am Ende steht der Gesamtstatus je Schritt
+(`--abbrechen` bricht stattdessen beim ersten roten Schritt ab).
 
 Für die tägliche Arbeit laufen Backend und Frontend getrennt, damit Änderungen am Frontend
 ohne Neubau des Binaries sichtbar werden:

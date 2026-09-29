@@ -32,7 +32,7 @@ describe('Statusband', () => {
     expect(z.style.background).toBe('');
     const quadrat = z.querySelector('[data-lfh="kennzahl-punkt"]') as HTMLElement;
     expect(quadrat.style.background).toBe(rgb(farbenHell.achtung));
-    // Am Tag trägt die Zahl die Textrolle — getönt wie nachts, aber über 7 : 1 (LFH-618).
+    // Am Tag trägt die Zahl die Textrolle — getönt wie nachts, aber über 7 : 1.
     const wert = z.querySelector('[data-lfh="kennzahl-wert"]') as HTMLElement;
     expect(wert.style.color).toBe(rgb(farbenHell.achtungText));
     expect(container.querySelectorAll('[data-lfh="meldebild-bandzelle"]')).toHaveLength(0);

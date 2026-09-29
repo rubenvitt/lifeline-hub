@@ -5,10 +5,8 @@ import type { StatusDarstellung } from '../theme/statusFarben';
 dayjs.extend(utc);
 
 /**
- * Wire-Zeit → Zeitpunkt. Der Wire-String ist UTC OHNE Zonenkennung ('YYYY-MM-DD HH:mm:ss');
- * `dayjs(s)` läse ihn als Ortszeit und verschöbe ihn still um den Zonenversatz. `null` bei
- * fehlendem oder unlesbarem Wert — ein `Invalid Date` ist von außen nicht von einem Termin
- * zu unterscheiden.
+ * Wire-Zeit → Zeitpunkt. Der Wire-String ist UTC OHNE Zonenkennung, `dayjs(s)` läse ihn als
+ * Ortszeit. `null` bei fehlendem oder unlesbarem Wert — ein `Invalid Date` sähe aus wie ein Termin.
  */
 export function terminZeitpunkt(wire: string | null | undefined): Dayjs | null {
   if (!wire) return null;
@@ -24,18 +22,15 @@ export function dauerText(minuten: number): string {
 }
 
 /**
- * Stand der nächsten Lagebesprechung (LFH-543, Spec 10): „in 23 min" neutral, „seit 5 min
- * überfällig" `achtung`, „kein Termin" neutral. Das Wort ist der zweite Kanal (WCAG 1.4.1).
+ * Stand der nächsten Lagebesprechung: „in 23 min" neutral, „seit 5 min überfällig" `achtung`,
+ * „kein Termin" neutral; das Wort ist der zweite Kanal (WCAG 1.4.1).
  *
- * Rein und mit `jetzt` als Argument: die Seite tickt alle 30 s, der Test braucht keine Uhr.
- * Gerechnet wird in absoluten Millisekunden, nie in Wanduhrzeit — an der Sommerzeitgrenze
- * lägen sonst eine Stunde daneben. `termin ≤ jetzt` gilt als überfällig; abgerundet.
- *
- * Unter einer vollen Minute (Ruling 12): „in < 1 min" neutral und, ab dem Termin, „jetzt fällig"
- * `achtung` — „in 0 min"/„seit 0 min überfällig" sagten nichts Lesbares.
+ * Rein, mit `jetzt` als Argument. Gerechnet in absoluten Millisekunden, nie in Wanduhrzeit
+ * (Sommerzeitgrenze). `termin ≤ jetzt` gilt als überfällig; abgerundet. Unter einer Minute
+ * „in < 1 min" bzw. ab dem Termin „jetzt fällig".
  *
  * Eine FUNKTION, keine Karte: `statusVertrag.guard` verbietet `Record<…, StatusDarstellung>`
- * außerhalb `theme/statusFarben.ts`, und dort zählt der Abdeckungstest die Vertragskarten.
+ * außerhalb `theme/statusFarben.ts`.
  */
 export function lagebesprechungZustand(
   terminWire: string | null | undefined,

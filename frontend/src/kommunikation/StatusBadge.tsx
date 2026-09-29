@@ -4,13 +4,8 @@ import { phaseTon } from './kartenKante';
 import type { KommPhase } from './phase';
 
 /**
- * Status-Badge: Fachlabel des Moduls als getönte Statusfläche (Neuentwurf „Status als
- * getönte Fläche", `StatusChip`) im Ton der gemeinsamen Ober-Phase ({@link phaseTon}).
- * `title` (optional) zeigt eine Tooltip-Erklärung.
- *
- * Vorher ein antd-`Tag` mit antds STATUS-Farben (`PHASE_META.color`); die Phasenachse
- * bleibt dieselbe, nur ihre Darstellung ist die des Neuentwurfs. `data-phase` trägt die
- * Achse für Tests und Werkzeuge, `data-ton` (am Chip) die Farbe.
+ * Status-Badge: Fachlabel des Moduls als getönte Statusfläche im Ton der gemeinsamen
+ * Ober-Phase ({@link phaseTon}). `data-phase` trägt die Achse für Tests, `data-ton` die Farbe.
  */
 export default function StatusBadge({
   phase,
@@ -22,12 +17,8 @@ export default function StatusBadge({
   label: string;
   title?: string;
   /**
-   * Eingangszustand (LFH-343 · C8, Befund H47): Achtung-Ton statt Phasenton, dazu
-   * fett. Eine neue Meldung sah vorher exakt aus wie eine bereits gesichtete —
-   * beide auf `phase: 'offen'`.
-   *
-   * Der zweite Kanal neben der Farbe ist das Gewicht UND der Wortlaut (WCAG 1.4.1);
-   * die Farbe allein trüge die Aussage nicht.
+   * Eingangszustand: Achtung-Ton statt Phasenton, dazu fett — zweiter Kanal neben der Farbe sind
+   * Gewicht UND Wortlaut (WCAG 1.4.1).
    */
   unbearbeitet?: boolean;
 }) {
