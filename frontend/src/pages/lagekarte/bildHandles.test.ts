@@ -43,10 +43,29 @@ vi.mock('./bildLayer', () => ({ setzeBildGeometrie: vi.fn() }));
 
 const { erzeugeBildHandles } = await import('./bildHandles');
 
+/**
+ * Nachgebaute Karte: `skala` Pixel je Grad, also ist das Einheitsbild `skala` px groß. Zoomen heißt
+ * `skala` ändern und `move` feuern.
+ */
 const karte = {
-  project: (ll: [number, number] | { lng: number; lat: number }) =>
-    Array.isArray(ll) ? { x: ll[0] * 100, y: ll[1] * 100 } : { x: ll.lng * 100, y: ll.lat * 100 },
-  unproject: (p: [number, number]) => ({ lng: p[0] / 100, lat: p[1] / 100 }),
+  skala: 200,
+  hoerer: new Map<string, Set<() => void>>(),
+  project(ll: [number, number] | { lng: number; lat: number }) {
+    const [lng, lat] = Array.isArray(ll) ? ll : [ll.lng, ll.lat];
+    return { x: lng * this.skala, y: lat * this.skala };
+  },
+  unproject(p: [number, number]) {
+    return { lng: p[0] / this.skala, lat: p[1] / this.skala };
+  },
+  on(ereignis: string, f: () => void) {
+    this.hoerer.set(ereignis, new Set([...(this.hoerer.get(ereignis) ?? []), f]));
+  },
+  off(ereignis: string, f: () => void) {
+    this.hoerer.get(ereignis)?.delete(f);
+  },
+  feuere(ereignis: string) {
+    for (const f of this.hoerer.get(ereignis) ?? []) f();
+  },
 };
 const ECKEN: Ecken = [
   [0, 0],
@@ -64,8 +83,14 @@ function griffe(art: string): FakeMarker[] {
   return [...angehaengt].filter((m) => m.getElement().dataset.lfh === `bildgriff-${art}`);
 }
 
+function vorher() {
+  angehaengt.clear();
+  karte.skala = 200;
+  karte.hoerer.clear();
+}
+
 describe('erzeugeBildHandles — Modus (LFH-711)', () => {
-  beforeEach(() => angehaengt.clear());
+  beforeEach(vorher);
 
   it('hängt je Modus nur die passende Griffsorte an die Karte', () => {
     const h = erzeugeBildHandles(karte as never, 1, ECKEN, vi.fn(), KONTEXT, 'groesse');
@@ -109,5 +134,65 @@ describe('erzeugeBildHandles — Modus (LFH-711)', () => {
     mitte.feuere('dragend');
     h.setzeModus('groesse');
     expect(scharf()).toHaveLength(8);
+  });
+});
+
+/**
+ * Griffwahl nach der Darstellung (LFH-764): Kanten nur mit Platz. Das Einheitsbild ist bei
+ * `skala` 100 genau 100 px groß — bei Griffkante 72 liegen Ecke und Kantenmitte 50 px auseinander.
+ */
+describe('erzeugeBildHandles — Griffwahl nach Platz (LFH-764)', () => {
+  beforeEach(vorher);
+  const eckUndKante = [...Array(4).fill('bildgriff-eck'), ...Array(4).fill('bildgriff-kante')];
+
+  it('hält auf einem kleinen Bild nur die Ecken scharf und meldet das', () => {
+    karte.skala = 100;
+    const onStand = vi.fn();
+    erzeugeBildHandles(karte as never, 1, ECKEN, vi.fn(), KONTEXT, 'groesse', onStand);
+    expect(scharf()).toEqual(Array(4).fill('bildgriff-eck'));
+    expect(onStand).toHaveBeenLastCalledWith({ kantenAusgeblendet: true });
+  });
+
+  it('entscheidet bei jeder Kartenbewegung neu und meldet nur Wechsel', () => {
+    karte.skala = 100;
+    const onStand = vi.fn();
+    erzeugeBildHandles(karte as never, 1, ECKEN, vi.fn(), KONTEXT, 'groesse', onStand);
+    karte.skala = 200;
+    karte.feuere('move');
+    expect(scharf()).toEqual(eckUndKante);
+    expect(onStand).toHaveBeenLastCalledWith({ kantenAusgeblendet: false });
+    const aufrufe = onStand.mock.calls.length;
+    karte.feuere('move');
+    expect(onStand).toHaveBeenCalledTimes(aufrufe);
+    karte.skala = 100;
+    karte.feuere('move');
+    expect(scharf()).toEqual(Array(4).fill('bildgriff-eck'));
+  });
+
+  it('zieht während eines Zugs nichts ab; erst `dragend` entscheidet neu', () => {
+    erzeugeBildHandles(karte as never, 1, ECKEN, vi.fn(), KONTEXT, 'groesse');
+    const ecke = griffe('eck')[0];
+    ecke.feuere('dragstart');
+    karte.skala = 100;
+    karte.feuere('move');
+    // Ein abgezogener Griff verlöre seinen `mouseup`-Hörer mitten in der Geste (LFH-711).
+    expect(scharf()).toEqual(eckUndKante);
+    ecke.feuere('dragend');
+    expect(scharf()).toEqual(Array(4).fill('bildgriff-eck'));
+  });
+
+  it('entscheidet nach dem Umschalten auf „Größe" nach dem aktuellen Platz', () => {
+    const h = erzeugeBildHandles(karte as never, 1, ECKEN, vi.fn(), KONTEXT, 'drehen');
+    karte.skala = 100;
+    karte.feuere('move');
+    h.setzeModus('groesse');
+    expect(scharf()).toEqual(Array(4).fill('bildgriff-eck'));
+  });
+
+  it('meldet den Kartenhörer beim Zerstören ab', () => {
+    const h = erzeugeBildHandles(karte as never, 1, ECKEN, vi.fn(), KONTEXT, 'groesse');
+    expect(karte.hoerer.get('move')?.size).toBe(1);
+    h.zerstoeren();
+    expect(karte.hoerer.get('move')?.size ?? 0).toBe(0);
   });
 });

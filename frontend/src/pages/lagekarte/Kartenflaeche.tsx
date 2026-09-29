@@ -198,6 +198,8 @@ export interface KartenflaecheProps {
    * Griffe in Fingergröße lägen auf einem kleinen Bild übereinander.
    */
   griffModus?: GriffModus;
+  /** Meldet, ob die Griffe mangels Platz Kanten ausblenden (LFH-764, `scharfeGriffe`). */
+  onGriffStand?: (stand: { kantenAusgeblendet: boolean }) => void;
   /** Zeigerlage über der Karte (Koordinatenanzeige); `null`, sobald er die Karte verlässt. */
   onZeigerLage?: (lage: { lat: number; lon: number } | null) => void;
   /**
@@ -286,6 +288,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     platzierBild,
     onPlatzierGeometrie,
     griffModus,
+    onGriffStand,
     onZeigerLage,
     massstabZiel,
     startAnsicht,
@@ -1203,6 +1206,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // Stabile Ref für onPlatzierGeometrie (Callback-Identität soll den Effekt nicht neu auslösen).
   const onPlatzierGeometrieRef = useRef(onPlatzierGeometrie);
   onPlatzierGeometrieRef.current = onPlatzierGeometrie;
+  const onGriffStandRef = useRef(onGriffStand);
+  onGriffStandRef.current = onGriffStand;
 
   // Bild-Manipulationsgriffe (Ecken/Drehen/Verschieben) im Platzier-Modus.
   const handlesRef = useRef<BildHandles | null>(null);
@@ -1234,6 +1239,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       },
       griffKontextRef.current,
       griffModusRef.current,
+      (stand) => onGriffStandRef.current?.(stand),
     );
     handlesRef.current = handles;
     return () => {

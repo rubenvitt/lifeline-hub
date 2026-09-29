@@ -111,6 +111,13 @@ export default function LagekartePage() {
   const leistenWahl = useLeistenWahl(breit);
   /** Scharfe Griffsorte beim Bild-Einpassen. Vorgabe: Größe. */
   const [griffModus, setGriffModus] = useState<GriffModus>('groesse');
+  // Ob die Karte Kantengriffe mangels Platz ausblendet (LFH-764) — für den Hinweis der Leiste.
+  const [griffKantenAusgeblendet, setGriffKantenAusgeblendet] = useState(false);
+  const onGriffStand = useCallback(
+    (stand: { kantenAusgeblendet: boolean }) =>
+      setGriffKantenAusgeblendet(stand.kantenAusgeblendet),
+    [],
+  );
   // Zeigerkoordinate: die Karte meldet, nur die Anzeige rendert mit (siehe `mausPosition.ts`).
   const zeigerQuelle = useMemo(() => erzeugeZeigerQuelle(), []);
   // Band des Kartenfußes, in das die MapLibre-Maßstabsleiste gehängt wird. State statt Ref, damit
@@ -868,6 +875,7 @@ export default function LagekartePage() {
         platzierBild={aktivesPlatzierBild}
         onPlatzierGeometrie={onPlatzierGeometrie}
         griffModus={griffModus}
+        onGriffStand={onGriffStand}
         onZeigerLage={zeigerQuelle.melde}
         massstabZiel={massstabZiel}
         eigenposition={eigenposition.position}
@@ -1088,6 +1096,7 @@ export default function LagekartePage() {
         bildPlatzierenId={bildPlatzierenId}
         bildPlatzierZentrum={bildPlatzierZentrum}
         griffModus={griffModus}
+        griffKantenAusgeblendet={griffKantenAusgeblendet}
         onGriffModus={setGriffModus}
         ansichten={ansichten ?? []}
         aktiveAnsichtId={aktiveAnsichtId}

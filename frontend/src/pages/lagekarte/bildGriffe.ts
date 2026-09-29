@@ -2,6 +2,7 @@
  * Aussehen und Auswahl der Bild-Ziehgriffe. Ohne `maplibre-gl`-Import, damit die Zusicherungen ohne
  * Karte prüfbar sind (`bildHandles.ts` braucht eine echte Map).
  */
+import type { Punkt } from './bildGeometrie';
 
 /** Griffarten: Ecke (proportional), Kante (frei strecken), Drehung, Mitte (verschieben). */
 export type GriffArt = 'eck' | 'kante' | 'dreh' | 'mitte';
@@ -91,14 +92,69 @@ export function griffeFuerModus(modus: GriffModus): GriffArt[] {
   }
 }
 
-/** Hinweis unter dem Umschalter: nennt nur die Griffe, die gerade scharf sind. */
-export function griffHinweis(modus: GriffModus): string {
+type Vier<T> = [T, T, T, T];
+
+/** Pixelpositionen aller Griffe: Ecken 0–3 und Kanten oben/rechts/unten/links wie in `bildHandles`. */
+export interface GriffPunkte {
+  eck: Vier<Punkt>;
+  kante: Vier<Punkt>;
+  dreh: Punkt;
+  mitte: Punkt;
+}
+
+/** Welche Griffe scharf sind; `kantenAusgeblendet`: im Modus „Größe" fehlt mindestens eine Kante. */
+export interface GriffWahl {
+  eck: Vier<boolean>;
+  kante: Vier<boolean>;
+  dreh: boolean;
+  mitte: boolean;
+  kantenAusgeblendet: boolean;
+}
+
+/** Zwei Container (achsenparallele Quadrate der Kante `kante` um den Griffpunkt) überlappen. */
+function ueberlappen(a: Punkt, b: Punkt, kante: number): boolean {
+  return Math.abs(a[0] - b[0]) < kante && Math.abs(a[1] - b[1]) < kante;
+}
+
+/**
+ * Welche Griffe scharf sind (LFH-764). Die Arten kommen aus {@link griffeFuerModus}; im Modus
+ * „Größe" gilt zusätzlich: Ecken immer — ohne sie wäre ein winziges Bild nicht mehr skalierbar —,
+ * eine Kante nur, wenn ihr Container weder eine Ecke noch eine ANDERE Kante überlappt. Symmetrisch
+ * statt gierig: zwei sich überlappende Kanten fallen beide weg, sonst hinge die Wahl an der
+ * Aufzählreihenfolge. Die Container drehen nicht mit dem Bild; `kante` ist {@link griffKante}.
+ */
+export function scharfeGriffe(modus: GriffModus, punkte: GriffPunkte, kante: number): GriffWahl {
+  const arten = new Set(griffeFuerModus(modus));
+  const kanteFrei = (i: number) =>
+    punkte.eck.every((e) => !ueberlappen(punkte.kante[i], e, kante)) &&
+    punkte.kante.every((k, j) => j === i || !ueberlappen(punkte.kante[i], k, kante));
+  const eck = arten.has('eck');
+  const kanten = [0, 1, 2, 3].map((i) => arten.has('kante') && kanteFrei(i)) as Vier<boolean>;
+  return {
+    eck: [eck, eck, eck, eck],
+    kante: kanten,
+    dreh: arten.has('dreh'),
+    mitte: arten.has('mitte'),
+    kantenAusgeblendet: arten.has('kante') && kanten.some((k) => !k),
+  };
+}
+
+/**
+ * Hinweis unter dem Umschalter: nennt nur die Griffe, die gerade scharf sind. Fehlen im Modus
+ * „Größe" Kanten ({@link scharfeGriffe}), sagt er das und nennt den Ausweg.
+ */
+export function griffHinweis(
+  modus: GriffModus,
+  stand: { kantenAusgeblendet: boolean } = { kantenAusgeblendet: false },
+): string {
   switch (modus) {
     case 'verschieben':
       return 'Auf der Karte: Mitte ziehen zum Verschieben.';
     case 'drehen':
       return 'Auf der Karte: ↻ ziehen zum Drehen.';
     case 'groesse':
-      return 'Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken.';
+      return stand.kantenAusgeblendet
+        ? 'Auf der Karte: Ecken = Größe (Seitenverhältnis). Zum freien Strecken an den Kanten heranzoomen.'
+        : 'Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken.';
   }
 }

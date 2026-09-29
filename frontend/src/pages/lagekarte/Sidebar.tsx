@@ -266,6 +266,8 @@ export interface SidebarProps {
   bildPlatzierenId: number | null;
   /** Scharfe Griffsorte beim Bild-Einpassen. */
   griffModus: GriffModus;
+  /** Die Karte blendet Kantengriffe mangels Platz aus (LFH-764) — der Hinweis sagt es. */
+  griffKantenAusgeblendet: boolean;
   onGriffModus: (modus: GriffModus) => void;
   /** Aktueller Mittelpunkt des Platzier-Bilds (für die numerische Eingabe). */
   bildPlatzierZentrum: LatLon | null;
@@ -1204,7 +1206,10 @@ export default function Sidebar(props: SidebarProps) {
                       style={{ fontSize: 12, display: 'block' }}
                       data-lfh="bildgriff-hinweis"
                     >
-                      {griffHinweis(props.griffModus)} Oder Mittelpunkt numerisch:
+                      {griffHinweis(props.griffModus, {
+                        kantenAusgeblendet: props.griffKantenAusgeblendet,
+                      })}{' '}
+                      Oder Mittelpunkt numerisch:
                     </Typography.Text>
                     <div style={{ marginTop: token.marginSM }}>
                       <KoordinatenEingabe

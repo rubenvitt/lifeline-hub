@@ -7,7 +7,9 @@ import {
   griffKante,
   griffStil,
   griffeFuerModus,
+  scharfeGriffe,
   type GriffArt,
+  type GriffPunkte,
   type GriffKontext,
   type GriffModus,
 } from './bildGriffe';
@@ -114,5 +116,126 @@ describe('griffeFuerModus', () => {
     expect(griffHinweis('drehen')).not.toMatch(/Ecken|Kanten|Mitte/);
     expect(griffHinweis('verschieben')).not.toMatch(/Ecken|Kanten|↻/);
     expect(griffHinweis('groesse')).not.toMatch(/↻|Mitte/);
+  });
+
+  it('sagt, wenn Kanten wegen Platzmangel fehlen, und nennt Heranzoomen (LFH-764)', () => {
+    const aus = griffHinweis('groesse', { kantenAusgeblendet: true });
+    expect(aus).toMatch(/Ecken/);
+    expect(aus).toMatch(/heranzoomen/i);
+    // Keine Anweisung für Griffe, die es gerade nicht gibt.
+    expect(aus).not.toMatch(/Kanten = frei strecken/);
+    // Mit allen Kanten bleibt der bisherige Text, und die übrigen Modi kennen den Zustand nicht.
+    expect(griffHinweis('groesse', { kantenAusgeblendet: false })).toBe(griffHinweis('groesse'));
+    expect(griffHinweis('groesse')).toMatch(/Kanten = frei strecken/);
+    for (const m of ['verschieben', 'drehen'] as const) {
+      expect(griffHinweis(m, { kantenAusgeblendet: true })).toBe(griffHinweis(m));
+    }
+  });
+});
+
+/**
+ * Welche Griffe scharf sind, entscheidet die Darstellung (LFH-764): Ecken immer, eine Kante nur, wenn
+ * ihr Container weder eine Ecke noch eine andere Kante überlappt. Container sind achsenparallele
+ * Quadrate der Griffkante um den Griffpunkt; überlappend heißt |dx| < kante UND |dy| < kante.
+ */
+describe('scharfeGriffe', () => {
+  type P = [number, number];
+  /** Griffpunkte eines Rechtecks b × h ab (0, 0), optional um seinen Mittelpunkt gedreht. */
+  function rechteck(b: number, h: number, grad = 0): GriffPunkte {
+    const c: P = [b / 2, h / 2];
+    const r = (grad * Math.PI) / 180;
+    const dreh = ([x, y]: P): P => [
+      c[0] + (x - c[0]) * Math.cos(r) - (y - c[1]) * Math.sin(r),
+      c[1] + (x - c[0]) * Math.sin(r) + (y - c[1]) * Math.cos(r),
+    ];
+    const ecken: P[] = [
+      [0, 0],
+      [b, 0],
+      [b, h],
+      [0, h],
+    ];
+    const mitte = (i: number, j: number): P => [
+      (ecken[i][0] + ecken[j][0]) / 2,
+      (ecken[i][1] + ecken[j][1]) / 2,
+    ];
+    return {
+      eck: ecken.map(dreh) as GriffPunkte['eck'],
+      kante: [mitte(0, 1), mitte(1, 2), mitte(2, 3), mitte(3, 0)].map(dreh) as GriffPunkte['kante'],
+      dreh: dreh([b / 2, -28]),
+      mitte: dreh(c),
+    };
+  }
+
+  /** Alle scharfen Griffpunkte, um die Überlappung unabhängig von der Regel nachzurechnen. */
+  function scharfePunkte(punkte: GriffPunkte, wahl: ReturnType<typeof scharfeGriffe>): P[] {
+    return [
+      ...punkte.eck.filter((_, i) => wahl.eck[i]),
+      ...punkte.kante.filter((_, i) => wahl.kante[i]),
+      ...(wahl.dreh ? [punkte.dreh] : []),
+      ...(wahl.mitte ? [punkte.mitte] : []),
+    ];
+  }
+  function ueberlappungen(ps: P[], kante: number): number {
+    let n = 0;
+    for (let i = 0; i < ps.length; i++)
+      for (let j = i + 1; j < ps.length; j++)
+        if (Math.abs(ps[i][0] - ps[j][0]) < kante && Math.abs(ps[i][1] - ps[j][1]) < kante) n++;
+    return n;
+  }
+
+  it('lässt auf 120 px in „kompakt" Ecken und Kanten scharf', () => {
+    const w = scharfeGriffe('groesse', rechteck(120, 120), 44);
+    expect(w.eck).toEqual([true, true, true, true]);
+    expect(w.kante).toEqual([true, true, true, true]);
+    expect(w.kantenAusgeblendet).toBe(false);
+  });
+
+  it('nimmt auf 120 px in „handschuh" die Kanten weg, die Ecken bleiben', () => {
+    const w = scharfeGriffe('groesse', rechteck(120, 120), 72);
+    expect(w.eck).toEqual([true, true, true, true]);
+    expect(w.kante).toEqual([false, false, false, false]);
+    expect(w.kantenAusgeblendet).toBe(true);
+  });
+
+  for (const kante of [44, 48, 72]) {
+    for (const grad of [0, 30, 45]) {
+      it(`überlappt bei Kante ${kante} und ${grad}° auf 120 px keine zwei scharfen Griffe`, () => {
+        const punkte = rechteck(120, 120, grad);
+        const w = scharfeGriffe('groesse', punkte, kante);
+        expect(w.eck).toEqual([true, true, true, true]);
+        expect(ueberlappungen(scharfePunkte(punkte, w), kante)).toBe(0);
+      });
+    }
+  }
+
+  it('entscheidet symmetrisch: zwei sich überlappende Kanten fallen beide weg', () => {
+    // 300 × 60 in „handschuh": oben und unten liegen 60 px auseinander. Gierig bekäme „oben" den
+    // Griff und „unten" nicht — die Wahl hinge an der Aufzählreihenfolge.
+    const w = scharfeGriffe('groesse', rechteck(300, 60), 72);
+    expect(w.kante).toEqual([false, false, false, false]);
+  });
+
+  it('lässt auf einem langen Bild die langen Kanten scharf, wo Platz ist', () => {
+    // 300 × 60 in „kompakt": links/rechts liegen 30 px neben den Ecken, oben/unten 150 px.
+    const w = scharfeGriffe('groesse', rechteck(300, 60), 44);
+    expect(w.kante).toEqual([true, false, true, false]);
+    expect(w.kantenAusgeblendet).toBe(true);
+  });
+
+  it('lässt auf einem winzigen Bild die Ecken trotzdem scharf (dokumentierter Rest)', () => {
+    const w = scharfeGriffe('groesse', rechteck(30, 30), 44);
+    expect(w.eck).toEqual([true, true, true, true]);
+    expect(w.kante).toEqual([false, false, false, false]);
+    expect(w.kantenAusgeblendet).toBe(true);
+  });
+
+  it('lässt in „Verschieben" und „Drehen" genau einen Griff scharf', () => {
+    const punkte = rechteck(30, 30);
+    const v = scharfeGriffe('verschieben', punkte, 72);
+    expect(scharfePunkte(punkte, v)).toEqual([punkte.mitte]);
+    expect(v.kantenAusgeblendet).toBe(false);
+    const d = scharfeGriffe('drehen', punkte, 72);
+    expect(scharfePunkte(punkte, d)).toEqual([punkte.dreh]);
+    expect(d.kantenAusgeblendet).toBe(false);
   });
 });
