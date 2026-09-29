@@ -1,20 +1,15 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::einstellungen::etb_startwert;
+use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Lagekarte;
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
-use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "lagekarte";
-use crate::error::AppError;
 use crate::lage_zone::repo::{self as zone_repo, ZoneNeu, ZonePatch};
+use crate::live::LiveEvent;
 // ETB-Wortlaut der Zone: der Baustein liegt seit LFH-690 im Fachmodul (Demo-Import).
 use crate::lage_zone::{self, etb_text, LageZoneAnzeige};
-use crate::routes::support::{deserialize_optional_field, trimme, AnsichtFilter};
+use crate::routes::support::{deserialize_optional_field, parse_enum, trimme, AnsichtFilter};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -22,10 +17,9 @@ use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): eine Zone hat sich geändert. Event-Tag `lage_zone`.
 pub(crate) fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "zone_id": zid }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::LageZone, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::LageZone, "zone_id", zid);
 }
 
 /// SSE-Notify an das Modul Betreuung (LFH-673): die Flächenzahl eines Bezirks hat sich
@@ -33,10 +27,9 @@ pub(crate) fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
 /// `lage_zone` erreicht nur Leser von Lagekarte/Gefahren — wer nur die Betreuung liest, sähe
 /// `flaechen` sonst nie nachziehen. Nutzlast nur Kennungen, wie in `routes/betreuung.rs`.
 fn sse_bezirk(state: &AppState, einsatz_id: i64, bezirk_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "bezirk_id": bezirk_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Betreuung, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Betreuung, "bezirk_id", bezirk_id);
 }
 
 /// Prüft eine Bezirks-Zuordnung (LFH-673, design.md D4/D5). Reihenfolge = Codes:
@@ -48,8 +41,7 @@ fn sse_bezirk(state: &AppState, einsatz_id: i64, bezirk_id: i64) {
 ///   Überschreiben-Dialog).
 async fn pruefe_bezirk_zuordnung(
     state: &AppState,
-    einsatz: &crate::einsatz::Einsatz,
-    benutzer: &crate::auth::Benutzer,
+    ctx: &EinsatzKontext,
     typ: &str,
     bezirk_id: i64,
 ) -> Result<(), AppError> {
@@ -58,15 +50,9 @@ async fn pruefe_bezirk_zuordnung(
             "Bezirks-Zuordnung nur an Zonen vom Typ evakuierungsbezirk".into(),
         ));
     }
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz.id,
-        einsatz.org_id,
-        "betreuung",
-        benutzer,
-    )
-    .await?;
-    let bezirk = crate::betreuung::repo::bezirk_laden(&state.pool, einsatz.id, bezirk_id).await?;
+    ctx.fordere_modul_zugriff(&state.pool, "betreuung").await?;
+    let bezirk =
+        crate::betreuung::repo::bezirk_laden(&state.pool, ctx.einsatz.id, bezirk_id).await?;
     if bezirk.storniert_at.is_some() {
         return Err(AppError::Conflict(format!(
             "Evakuierungsbezirk ‚{}‘ ist storniert",
@@ -79,21 +65,10 @@ async fn pruefe_bezirk_zuordnung(
 /// GET /api/einsaetze/{id}/zonen — Liste aller Zonen. Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Lagekarte>,
     Query(filter): Query<AnsichtFilter>,
 ) -> Result<Json<Vec<LageZoneAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
         zone_repo::liste(&state.pool, einsatz_id, filter.ansicht).await?,
     ))
@@ -129,26 +104,13 @@ fn validiere_neu(body: &ZoneBody) -> Result<String, AppError> {
 /// POST /api/einsaetze/{id}/zonen — anlegen. Schreibrecht + aktiv. ETB „eingerichtet".
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Lagekarte>,
     JsonBody(body): JsonBody<ZoneBody>,
 ) -> Result<(StatusCode, Json<LageZoneAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let geometrie = validiere_neu(&body)?;
     if let Some(bid) = body.evakuierungsbezirk_id {
-        pruefe_bezirk_zuordnung(&state, &einsatz, &benutzer, &body.typ, bid).await?;
+        pruefe_bezirk_zuordnung(&state, &ctx, &body.typ, bid).await?;
     }
 
     let label = trimme(body.label.clone());
@@ -163,9 +125,7 @@ pub async fn anlegen(
     // F06/LFH-244 Tier-A: Zonen-INSERT (+ ggf. Gruppen-INSERT) + System-ETB-Eintrag atomar
     // in EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für
     // ETB-Text (Typ-Label + Label) UND Response. SSE erst nach dem Commit (Reinheits-Kontrakt).
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let z = crate::write_retry!(&state.pool, |conn| {
         let id = zone_repo::anlegen_tx(
             conn,
@@ -179,7 +139,7 @@ pub async fn anlegen(
                 notiz: notiz.as_deref(),
                 ansicht_id: body.ansicht_id,
                 evakuierungsbezirk_id: body.evakuierungsbezirk_id,
-                erstellt_von: benutzer.id,
+                erstellt_von: ctx.benutzer.id,
             },
         )
         .await?;
@@ -187,7 +147,7 @@ pub async fn anlegen(
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             startwert,
             &etb_text(z.typ.as_str(), z.label.as_deref(), "eingerichtet"),
         )
@@ -204,25 +164,13 @@ pub async fn anlegen(
 #[derive(Debug, Deserialize)]
 pub struct ZonePatchBody {
     pub typ: Option<String>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub label: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub farbe: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub gefahrengebiet_id: Option<Option<i64>>,
     /// Verschieben/Freigeben (LFH-320): absent = unverändert, `null` = auf alle Ansichten.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
@@ -236,23 +184,11 @@ pub struct ZonePatchBody {
 /// ETB „geändert" NUR wenn effektiver typ oder label sich gegenüber vorher unterscheidet.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, zid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Lagekarte>,
+    PfadParam((_eid, zid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<ZonePatchBody>,
 ) -> Result<Json<LageZoneAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let vorher = zone_repo::laden(&state.pool, einsatz_id, zid).await?;
 
     // Effektiver neuer typ; wenn geändert: gültig + passt zur *gespeicherten* Geometrie.
@@ -260,9 +196,11 @@ pub async fn aktualisieren(
         Some(t) => {
             // Feld isoliert unbrauchbar → 400; die Passung zur gespeicherten Geometrie
             // darunter ist ein Zusammenhang → bleibt 422 (LFH-305).
-            if lage_zone::LageZoneTyp::parse(t).is_none() {
-                return Err(AppError::Validation(format!("Unbekannter Zonen-Typ: {t}")));
-            }
+            parse_enum(
+                lage_zone::LageZoneTyp::parse,
+                t,
+                format!("Unbekannter Zonen-Typ: {t}"),
+            )?;
             if !lage_zone::geometrie_klasse_passt(t, &vorher.geometrie_typ) {
                 return Err(AppError::UnprocessableEntity(format!(
                     "Typ {t} ist mit der vorhandenen Geometrie ({}) nicht zulässig",
@@ -305,14 +243,14 @@ pub async fn aktualisieren(
     // Bezirks-Zuordnung (LFH-673). Nur das SETZEN wird geprüft: Lösen (`null`) und der
     // Wegfall beim Typwechsel legen keine Bezirksangabe offen.
     if let Some(Some(bid)) = body.evakuierungsbezirk_id {
-        pruefe_bezirk_zuordnung(&state, &einsatz, &benutzer, &neuer_typ, bid).await?;
+        pruefe_bezirk_zuordnung(&state, &ctx, &neuer_typ, bid).await?;
     }
 
     let z = zone_repo::aktualisiere(
         &state.pool,
         einsatz_id,
         zid,
-        benutzer.id,
+        ctx.benutzer.id,
         ZonePatch {
             typ: body.typ.as_deref(),
             label: body
@@ -338,10 +276,10 @@ pub async fn aktualisieren(
         super::etb_system_degradiert(
             &state,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             &etb_text(z.typ.as_str(), z.label.as_deref(), "geändert"),
         )
-        .await?;
+        .await;
     }
 
     sse_zone(&state, einsatz_id, zid);
@@ -359,12 +297,9 @@ pub async fn aktualisieren(
     // Merge/Split hat die Gebiete-Liste verändert → zusätzlich gefahr-Event (Design-Spec).
     if gebiet_patch.is_some() {
         if let Some(gid) = z.gefahrengebiet_id {
-            state.live.publiziere_event(
-                einsatz_id,
-                LiveEvent::Gefahr,
-                serde_json::json!({ "einsatz_id": einsatz_id, "gefahrengebiet_id": gid })
-                    .to_string(),
-            );
+            state
+                .live
+                .publiziere_objekt(einsatz_id, LiveEvent::Gefahr, "gefahrengebiet_id", gid);
         }
     }
 
@@ -374,22 +309,10 @@ pub async fn aktualisieren(
 /// DELETE /api/einsaetze/{id}/zonen/{zid} — aufheben (Hard-Delete). ETB „aufgehoben".
 pub async fn aufloesen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, zid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Lagekarte>,
+    PfadParam((_eid, zid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let vorher = zone_repo::laden(&state.pool, einsatz_id, zid).await?;
 
     // F06/LFH-244 Tier-A: Zonen-DELETE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
@@ -397,12 +320,10 @@ pub async fn aufloesen(
     // Aufräumen einer dadurch verwaisten Gefahrengebiet-Gruppe läuft NACH dem Commit auf dem
     // Pool (zweiter Writer — darf nicht in die BEGIN-IMMEDIATE-Tx). SSE ebenfalls nach dem Commit.
     let text = etb_text(vorher.typ.as_str(), vorher.label.as_deref(), "aufgehoben");
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let weg = crate::write_retry!(&state.pool, |conn| {
         let weg = zone_repo::loese_auf_tx(conn, einsatz_id, zid).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(weg)
     })?;
     if let Some(g) = weg.gefahrengebiet_id {

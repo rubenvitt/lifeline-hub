@@ -347,39 +347,23 @@ pub async fn setze_status(
 }
 
 /// Soft-Delete (Fehleingabe): setzt `storniert_at`. Bleibt referenzierbar.
-/// `NotFound`, falls nicht zum Einsatz.
+/// Fremd → `NotFound`, schon storniert → `Conflict`.
 pub async fn storniere_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     tier_id: i64,
     geaendert_von: i64,
 ) -> Result<(), AppError> {
-    let betroffen = sqlx::query(
-        "UPDATE einsatz_tier SET storniert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-            geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
-         WHERE id = ? AND einsatz_id = ?",
+    crate::storno::storniere(
+        conn,
+        "einsatz_tier",
+        "einsatz_id",
+        einsatz_id,
+        tier_id,
+        crate::storno::Vermerk::Geaendert(geaendert_von),
+        Some("Tier ist bereits storniert"),
     )
-    .bind(geaendert_von)
-    .bind(tier_id)
-    .bind(einsatz_id)
-    .execute(&mut *conn)
-    .await?
-    .rows_affected();
-    if betroffen == 0 {
-        return Err(AppError::NotFound);
-    }
-    Ok(())
-}
-
-/// Pool-Wrapper (eigene Tx).
-pub async fn storniere(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    tier_id: i64,
-    geaendert_von: i64,
-) -> Result<(), AppError> {
-    let mut conn = pool.acquire().await?;
-    storniere_tx(&mut conn, einsatz_id, tier_id, geaendert_von).await
+    .await
 }
 
 #[cfg(test)]
@@ -442,10 +426,28 @@ mod tests {
         let t1 = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
         assert_eq!(t1.registrier_nr, 1);
         assert_eq!(t1.status, TierStatus::Aktiv);
-        storniere(&pool, e, t1.id, b).await.unwrap();
+        storniere_tx(&mut *pool.acquire().await.unwrap(), e, t1.id, b)
+            .await
+            .unwrap();
         let t2 = anlegen(&pool, e, b, "vermisst", hund()).await.unwrap();
         assert_eq!(t2.registrier_nr, 2, "Soft-Delete recycelt keine Nummern");
         assert_eq!(t2.status, TierStatus::Vermisst);
+    }
+
+    /// Der zweite Storno in einer Transaktion scheitert mit 409 und rollt damit auch den
+    /// ETB-Nachweis zurück, den der Handler in derselben Transaktion schreibt.
+    #[tokio::test]
+    async fn doppel_storno_in_tx_ist_konflikt() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let t = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        storniere_tx(&mut conn, e, t.id, b).await.unwrap();
+        let err = storniere_tx(&mut conn, e, t.id, b).await.unwrap_err();
+        assert!(
+            matches!(&err, AppError::Conflict(m) if m == "Tier ist bereits storniert"),
+            "{err:?}"
+        );
     }
 
     #[tokio::test]
@@ -453,7 +455,9 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         let t1 = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
-        storniere(&pool, e, t1.id, b).await.unwrap();
+        storniere_tx(&mut *pool.acquire().await.unwrap(), e, t1.id, b)
+            .await
+            .unwrap();
         let liste = liste(&pool, e, None, None, None).await.unwrap();
         assert!(liste.is_empty(), "storniertes Tier nicht in der Liste");
         let detail = laden(&pool, e, t1.id).await.unwrap();

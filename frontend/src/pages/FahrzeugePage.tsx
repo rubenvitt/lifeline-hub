@@ -33,7 +33,6 @@ import {
   type AdhocEingabe,
 } from '../api/einsatzFahrzeuge';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
-import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
@@ -67,6 +66,11 @@ import { einsatzStatus, statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
 import { fahrzeugStatusDarstellung } from '../kraefte/mittelStatus';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import {
+  katalogStatusWechsel,
+  useOptimistischesZeilenUpdate,
+} from '../kraefte/useOptimistischesZeilenUpdate';
 
 /**
  * Ist-Besatzungsstärke aus den Stärke-Positionen der zugeordneten Kräfte, clientseitig gezählt und
@@ -284,8 +288,7 @@ export default function FahrzeugePage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   const disponiereMutation = useMutation({
     mutationFn: (fahrzeugId: number) => disponiereFahrzeug(einsatzId, fahrzeugId),
@@ -303,56 +306,18 @@ export default function FahrzeugePage() {
     onSuccess: invalidate,
     onError: fehler,
   });
-  const statusMutation = useMutation({
-    mutationFn: (v: { efId: number; statusId: number }) =>
-      aktualisiereDisposition(einsatzId, v.efId, { status_id: v.statusId }),
-    onMutate: async (v) => {
-      const queryKey = einsatzKeys.fahrzeuge(einsatzId);
-      await qc.cancelQueries({ queryKey });
-      const vorher = qc.getQueryData<EinsatzFahrzeug[]>(queryKey)?.find((ef) => ef.id === v.efId);
-      const status = statusQuery.data?.find((s) => s.id === v.statusId);
-      qc.setQueryData<EinsatzFahrzeug[]>(queryKey, (alt) =>
-        alt?.map((ef) =>
-          ef.id === v.efId
-            ? {
-                ...ef,
-                status_id: v.statusId,
-                status_label: status?.label ?? ef.status_label,
-                status_kategorie: status?.kategorie ?? ef.status_kategorie,
-                status_farbe: status?.farbe ?? null,
-              }
-            : ef,
-        ),
-      );
-      return { vorher };
-    },
-    onSuccess: (serverStand) => {
-      qc.setQueryData<EinsatzFahrzeug[]>(einsatzKeys.fahrzeuge(einsatzId), (alt) =>
-        alt?.map((ef) => (ef.id === serverStand.id ? serverStand : ef)),
-      );
-      // Der Einheitenstatus ist aus den Fahrzeugen abgeleitet — nicht auf das Live-Ereignis warten,
-      // das ohne Stream (offline, Proxy) nie käme.
-      void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
-    },
-    onError: (e, v, kontext) => {
-      const vorher = kontext?.vorher;
-      if (vorher) {
-        qc.setQueryData<EinsatzFahrzeug[]>(einsatzKeys.fahrzeuge(einsatzId), (aktuell) =>
-          aktuell?.map((ef) =>
-            ef.id === v.efId && ef.status_id === v.statusId
-              ? {
-                  ...ef,
-                  status_id: vorher.status_id,
-                  status_label: vorher.status_label,
-                  status_kategorie: vorher.status_kategorie,
-                  status_farbe: vorher.status_farbe,
-                }
-              : ef,
-          ),
-        );
-      }
-      fehler(e);
-    },
+  const statusMutation = useOptimistischesZeilenUpdate<
+    EinsatzFahrzeug,
+    { efId: number; statusId: number }
+  >({
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
+    mutationFn: (v) => aktualisiereDisposition(einsatzId, v.efId, { status_id: v.statusId }),
+    zeilenId: (v) => v.efId,
+    ...katalogStatusWechsel<EinsatzFahrzeug>(statusQuery.data),
+    // Der Einheitenstatus ist aus den Fahrzeugen abgeleitet — nicht auf das Live-Ereignis warten,
+    // das ohne Stream (offline, Proxy) nie käme.
+    onErfolg: () => void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
+    onFehler: fehler,
     onSettled: invalidate,
   });
   const bemerkungMutation = useMutation({

@@ -5,6 +5,7 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::personal::qualifikation_repo as repo;
 use crate::personal::Qualifikation;
+use crate::routes::support::pflicht;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -18,10 +19,7 @@ pub struct QualifikationBody {
 }
 
 fn normalisiere_label(label: &str) -> Result<String, AppError> {
-    let l = label.trim().to_string();
-    if l.is_empty() {
-        return Err(AppError::Validation("Label darf nicht leer sein".into()));
-    }
+    let l = pflicht(&label, "Label")?;
     Ok(l)
 }
 

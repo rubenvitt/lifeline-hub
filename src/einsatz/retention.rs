@@ -5,12 +5,10 @@
 //! und `Utc::now()` — der Aufrufer injiziert `jetzt`, damit die Grenzen deterministisch
 //! testbar sind (Muster wie `berechtigung::retention_abgelaufen`).
 
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use crate::wire_enum::wire_enum;
+use chrono::{DateTime, Duration, Utc};
 use serde::Serialize;
 use utoipa::ToSchema;
-
-/// Kanonisches DB-Zeitformat (UTC, ohne Zeitzone).
-const FMT: &str = "%Y-%m-%d %H:%M:%S";
 
 /// Karenz zwischen Soft-Delete (`geloescht_at`, reversibel) und der irreversiblen
 /// PII-Schwärzung — als globale Konstante (wie `NACHLAUF_STUNDEN`), nicht pro Einsatz
@@ -18,20 +16,13 @@ const FMT: &str = "%Y-%m-%d %H:%M:%S";
 /// bevor die Daten endgültig gescrubbt werden.
 pub const KARENZ_TAGE: i64 = 30;
 
-/// Parst einen DB-Zeitstempel; bei Unparsbarkeit `None` (defensiv).
-fn parse(s: &str) -> Option<DateTime<Utc>> {
-    NaiveDateTime::parse_from_str(s, FMT)
-        .ok()
-        .map(|n| n.and_utc())
-}
-
 /// Berechnet den Aufbewahrungs-Zeitpunkt `retention_bis = abschluss + dauer_tage`.
 /// `None`, wenn `abschluss` unparsebar ist (defensiv — kein Auto-Fill auf Müll).
 /// Das Ergebnis ist im kanonischen DB-Format formatiert.
 pub fn berechne_retention_bis(abschluss: &str, dauer_tage: i64) -> Option<String> {
-    let start = parse(abschluss)?;
+    let start = crate::zeit::parse_utc(abschluss)?;
     let bis = start + Duration::days(dauer_tage);
-    Some(bis.format(FMT).to_string())
+    Some(crate::zeit::formatiere_utc(bis))
 }
 
 /// Ob die Karenz nach einem Soft-Delete abgelaufen ist
@@ -42,44 +33,31 @@ pub fn karenz_abgelaufen(geloescht_at: Option<&str>, jetzt: DateTime<Utc>) -> bo
     let Some(s) = geloescht_at else {
         return false;
     };
-    let Some(geloescht) = parse(s) else {
+    let Some(geloescht) = crate::zeit::parse_utc(s) else {
         return false;
     };
     jetzt >= geloescht + Duration::days(KARENZ_TAGE)
 }
 
-/// Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben
-/// keinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an
-/// [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
-/// `tests/enum_wire_kontrakt.rs`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AufbewahrungZustand {
-    /// Keine Frist gesetzt.
-    OhneFrist,
-    /// Frist in der Zukunft.
-    FristLaeuft,
-    /// Frist abgelaufen, noch nicht zur Löschung vorgemerkt (der Purge-Lauf holt es nach).
-    Faellig,
-    /// Zur Löschung vorgemerkt, Karenz läuft — nur hier ist Wiederherstellen möglich.
-    Vorgemerkt,
-    /// Karenz abgelaufen, noch nicht geschwärzt (der nächste Purge-Lauf schwärzt).
-    SchwaerzungAusstehend,
-    /// Personendaten unwiderruflich geschwärzt.
-    Geschwaerzt,
-}
-
-impl AufbewahrungZustand {
-    /// Wire-/Anzeige-Schlüssel.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            AufbewahrungZustand::OhneFrist => "ohne_frist",
-            AufbewahrungZustand::FristLaeuft => "frist_laeuft",
-            AufbewahrungZustand::Faellig => "faellig",
-            AufbewahrungZustand::Vorgemerkt => "vorgemerkt",
-            AufbewahrungZustand::SchwaerzungAusstehend => "schwaerzung_ausstehend",
-            AufbewahrungZustand::Geschwaerzt => "geschwaerzt",
-        }
+wire_enum! {
+    /// Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben
+    /// keinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an
+    /// [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
+    /// `tests/enum_wire_kontrakt.rs`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AufbewahrungZustand {
+        /// Keine Frist gesetzt.
+        OhneFrist => "ohne_frist",
+        /// Frist in der Zukunft.
+        FristLaeuft => "frist_laeuft",
+        /// Frist abgelaufen, noch nicht zur Löschung vorgemerkt (der Purge-Lauf holt es nach).
+        Faellig => "faellig",
+        /// Zur Löschung vorgemerkt, Karenz läuft — nur hier ist Wiederherstellen möglich.
+        Vorgemerkt => "vorgemerkt",
+        /// Karenz abgelaufen, noch nicht geschwärzt (der nächste Purge-Lauf schwärzt).
+        SchwaerzungAusstehend => "schwaerzung_ausstehend",
+        /// Personendaten unwiderruflich geschwärzt.
+        Geschwaerzt => "geschwaerzt",
     }
 }
 
@@ -122,17 +100,15 @@ pub fn zustand(
 /// Ende der Karenz (`geloescht_at + KARENZ_TAGE`) im DB-Format; `None` ohne oder bei
 /// unparsebarer Vormerkung.
 pub fn karenz_ende(geloescht_at: Option<&str>) -> Option<String> {
-    let g = parse(geloescht_at?)?;
-    Some((g + Duration::days(KARENZ_TAGE)).format(FMT).to_string())
+    let g = crate::zeit::parse_utc(geloescht_at?)?;
+    Some(crate::zeit::formatiere_utc(g + Duration::days(KARENZ_TAGE)))
 }
 
 /// Frühester Vormerkungszeitpunkt, dessen Karenz zu `jetzt` NOCH läuft, im DB-Format:
 /// `geloescht_at > karenz_grenze(jetzt)` ⇔ `!karenz_abgelaufen(geloescht_at, jetzt)`.
 /// Für bewachte UPDATEs (Wiederherstellen), die die Grenze in SQL prüfen müssen.
 pub fn karenz_grenze(jetzt: DateTime<Utc>) -> String {
-    (jetzt - Duration::days(KARENZ_TAGE))
-        .format(FMT)
-        .to_string()
+    crate::zeit::formatiere_utc(jetzt - Duration::days(KARENZ_TAGE))
 }
 
 #[cfg(test)]
@@ -140,7 +116,7 @@ mod tests {
     use super::*;
 
     fn t(s: &str) -> DateTime<Utc> {
-        NaiveDateTime::parse_from_str(s, FMT).unwrap().and_utc()
+        crate::zeit::parse_utc(s).unwrap()
     }
 
     #[test]

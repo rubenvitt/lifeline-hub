@@ -1,20 +1,17 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
 use crate::bereitstellungsraum::belegung_repo;
 use crate::bereitstellungsraum::repo::{self as br_repo, NeueDaten, PatchDaten};
 use crate::bereitstellungsraum::{BrAnzeige, BrBelegungAnzeige, BrStatus};
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::einstellungen::etb_startwert;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Bereitstellungsraeume;
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "bereitstellungsraeume";
-use crate::error::AppError;
-use crate::routes::support::trimme;
+use crate::routes::support::{
+    deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pflicht_tri, trimme,
+};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -47,10 +44,9 @@ pub struct BrFahrzeugKurz {
 // ---------- ETB-/SSE-Helfer ----------
 
 fn sse_br(state: &AppState, einsatz_id: i64, br_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "br_id": br_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Bereitstellungsraum, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Bereitstellungsraum, "br_id", br_id);
 }
 
 // ---------- Detail-Helfer ----------
@@ -90,29 +86,15 @@ pub struct ListeParams {
 /// GET /api/einsaetze/{id}/bereitstellungsraeume
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Bereitstellungsraeume>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<BrAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
-    if let Some(s) = &params.status {
-        if BrStatus::parse(s).is_none() {
-            return Err(AppError::Validation(
-                "Unbekannter BR-Status im Filter".into(),
-            ));
-        }
-    }
+    let einsatz_id = ctx.einsatz.id;
+    parse_enum_opt(
+        BrStatus::parse,
+        params.status.as_deref(),
+        "Unbekannter BR-Status im Filter",
+    )?;
     Ok(Json(
         br_repo::liste(
             &state.pool,
@@ -136,36 +118,18 @@ pub struct AnlegenBody {
 /// KEIN ETB-Eintrag (erst Inbetriebnahme ist lagerelevant). SSE.
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<BrAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
-    let bezeichnung = body.bezeichnung.trim().to_string();
-    if bezeichnung.is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
+    let einsatz_id = ctx.einsatz.id;
+    let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
     let standort = trimme(body.standort);
     let notiz = trimme(body.notiz);
 
     let br = br_repo::anlegen(
         &state.pool,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         NeueDaten {
             bezeichnung: &bezeichnung,
             abschnitt_id: body.abschnitt_id,
@@ -181,41 +145,21 @@ pub async fn anlegen(
 /// GET /api/einsaetze/{id}/bereitstellungsraeume/{bid}
 pub async fn detail(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, br_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLesezugriff<Bereitstellungsraeume>,
+    PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<BrDetail>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(lade_detail(&state, einsatz_id, br_id).await?))
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PatchBody {
     pub bezeichnung: Option<String>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub abschnitt_id: Option<Option<i64>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub standort: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
 }
 
@@ -223,23 +167,11 @@ pub struct PatchBody {
 /// KEIN ETB-Eintrag. SSE.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, br_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
+    PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<BrAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let vorher = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -247,18 +179,7 @@ pub async fn aktualisieren(
         ));
     }
 
-    let bezeichnung = body
-        .bezeichnung
-        .as_deref()
-        .map(str::trim)
-        .map(str::to_string);
-    if let Some(b) = &bezeichnung {
-        if b.is_empty() {
-            return Err(AppError::Validation(
-                "Bezeichnung darf nicht leer sein".into(),
-            ));
-        }
-    }
+    let bezeichnung = pflicht_tri(body.bezeichnung.as_deref(), "Bezeichnung")?;
     let standort = body
         .standort
         .map(|opt| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
@@ -270,7 +191,7 @@ pub async fn aktualisieren(
         &state.pool,
         einsatz_id,
         br_id,
-        benutzer.id,
+        ctx.benutzer.id,
         PatchDaten {
             bezeichnung: bezeichnung.as_deref(),
             abschnitt_id: body.abschnitt_id,
@@ -292,26 +213,12 @@ pub struct StatusBody {
 /// ETB-Spur bei → aktiv und → aufgeloest. SSE.
 pub async fn status_wechsel(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, br_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
+    PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<StatusBody>,
 ) -> Result<Json<BrAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
-    if BrStatus::parse(&body.status).is_none() {
-        return Err(AppError::Validation("Unbekannter Status".into()));
-    }
+    let einsatz_id = ctx.einsatz.id;
+    parse_enum(BrStatus::parse, &body.status, "Unbekannter Status")?;
     let vorher = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -324,14 +231,13 @@ pub async fn status_wechsel(
     // darf_uebergehen/Belegungs-Vorbedingung prüft `setze_status_tx` in der Tx; SSE erst
     // nach dem Commit (Reinheits-Kontrakt).
     let etb_text = crate::bereitstellungsraum::etb_text_status(&vorher.bezeichnung, &body.status);
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let nachher = crate::write_retry!(&state.pool, |conn| {
         let nachher =
-            br_repo::setze_status_tx(conn, einsatz_id, br_id, &body.status, benutzer.id).await?;
+            br_repo::setze_status_tx(conn, einsatz_id, br_id, &body.status, ctx.benutzer.id)
+                .await?;
         if let Some(text) = &etb_text {
-            crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, text).await?;
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, text).await?;
         }
         Ok(nachher)
     })?;
@@ -343,23 +249,11 @@ pub async fn status_wechsel(
 /// Soft-Delete. KEIN ETB. SSE.
 pub async fn stornieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, br_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
+    PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
-    br_repo::storniere(&state.pool, einsatz_id, br_id, benutzer.id).await?;
+    let einsatz_id = ctx.einsatz.id;
+    br_repo::storniere(&state.pool, einsatz_id, br_id, ctx.benutzer.id).await?;
     sse_br(&state, einsatz_id, br_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -376,23 +270,11 @@ pub struct BelegungBody {
 /// ETB bei Eintritt/Austritt/Wechsel mit realen Namen. SSE.
 pub async fn belegung(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, br_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
+    PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<BelegungBody>,
 ) -> Result<(StatusCode, Json<BrBelegungAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let notiz = trimme(body.notiz);
 
     let event = belegung_repo::belege(
@@ -403,7 +285,7 @@ pub async fn belegung(
         body.objekt_id,
         &body.art,
         notiz.as_deref(),
-        benutzer.id,
+        ctx.benutzer.id,
     )
     .await?;
 
@@ -412,7 +294,7 @@ pub async fn belegung(
     if let Some(etb_text) =
         belegungs_etb_text(&state.pool, einsatz_id, &br.bezeichnung, &event).await?
     {
-        super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &etb_text).await?;
+        super::etb_system_degradiert(&state, einsatz_id, ctx.benutzer.id, &etb_text).await;
     }
 
     sse_br(&state, einsatz_id, br_id);

@@ -6,92 +6,52 @@
 pub mod repo;
 
 use crate::kommunikation::{AdressatKategorie, Prioritaet};
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
 /// Priorität (TEXT in der DB, im Code validiert).
-pub const PRIO_SOFORT: &str = "sofort";
-pub const PRIO_DRINGEND: &str = "dringend";
-pub const PRIO_NORMAL: &str = "normal";
+pub const PRIO_SOFORT: &str = Prioritaet::Sofort.as_str();
+pub const PRIO_DRINGEND: &str = Prioritaet::Dringend.as_str();
+pub const PRIO_NORMAL: &str = Prioritaet::Normal.as_str();
 
 /// Adressat-Kategorie (externe Stelle).
-pub const ADRESSAT_LEITSTELLE: &str = "leitstelle";
-pub const ADRESSAT_NACHBAR_EA: &str = "nachbar_ea";
-pub const ADRESSAT_UEBERGEORDNET: &str = "uebergeordnet";
-pub const ADRESSAT_ANDERE_BOS: &str = "andere_bos";
+pub const ADRESSAT_LEITSTELLE: &str = AdressatKategorie::Leitstelle.as_str();
+pub const ADRESSAT_NACHBAR_EA: &str = AdressatKategorie::NachbarEa.as_str();
+pub const ADRESSAT_UEBERGEORDNET: &str = AdressatKategorie::Uebergeordnet.as_str();
+pub const ADRESSAT_ANDERE_BOS: &str = AdressatKategorie::AndereBos.as_str();
 
 /// Bedarfs-Status (linear + Abzweig).
-pub const STATUS_ANGEFORDERT: &str = "angefordert";
-pub const STATUS_ZUGESAGT: &str = "zugesagt";
-pub const STATUS_UNTERWEGS: &str = "unterwegs";
-pub const STATUS_EINGETROFFEN: &str = "eingetroffen";
-pub const STATUS_ABGELEHNT: &str = "abgelehnt";
+pub const STATUS_ANGEFORDERT: &str = NachforderungStatus::Angefordert.as_str();
+pub const STATUS_ZUGESAGT: &str = NachforderungStatus::Zugesagt.as_str();
+pub const STATUS_UNTERWEGS: &str = NachforderungStatus::Unterwegs.as_str();
+pub const STATUS_EINGETROFFEN: &str = NachforderungStatus::Eingetroffen.as_str();
+pub const STATUS_ABGELEHNT: &str = NachforderungStatus::Abgelehnt.as_str();
 
-/// Bedarfs-Status einer Nachforderung (Schema-Anker für die OpenAPI-Union, LFH-120).
-/// Wire == `status`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum NachforderungStatus {
-    Angefordert,
-    Zugesagt,
-    Unterwegs,
-    Eingetroffen,
-    Abgelehnt,
-}
-
-impl NachforderungStatus {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            NachforderungStatus::Angefordert => STATUS_ANGEFORDERT,
-            NachforderungStatus::Zugesagt => STATUS_ZUGESAGT,
-            NachforderungStatus::Unterwegs => STATUS_UNTERWEGS,
-            NachforderungStatus::Eingetroffen => STATUS_EINGETROFFEN,
-            NachforderungStatus::Abgelehnt => STATUS_ABGELEHNT,
-        }
+wire_enum! {
+    /// Bedarfs-Status einer Nachforderung (Schema-Anker für die OpenAPI-Union, LFH-120).
+    /// Wire == `status`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum NachforderungStatus {
+        Angefordert => "angefordert",
+        Zugesagt => "zugesagt",
+        Unterwegs => "unterwegs",
+        Eingetroffen => "eingetroffen",
+        Abgelehnt => "abgelehnt",
     }
-
-    /// Parst einen gespeicherten/übergebenen Bedarfs-Status; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<NachforderungStatus> {
-        match s {
-            STATUS_ANGEFORDERT => Some(NachforderungStatus::Angefordert),
-            STATUS_ZUGESAGT => Some(NachforderungStatus::Zugesagt),
-            STATUS_UNTERWEGS => Some(NachforderungStatus::Unterwegs),
-            STATUS_EINGETROFFEN => Some(NachforderungStatus::Eingetroffen),
-            STATUS_ABGELEHNT => Some(NachforderungStatus::Abgelehnt),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for NachforderungStatus {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        NachforderungStatus::parse(&s).ok_or_else(|| format!("Ungültiger NachforderungStatus: {s}"))
-    }
+    try_from = |s| format!("Ungültiger NachforderungStatus: {s}");
 }
 
 pub fn prioritaet_gueltig(p: &str) -> bool {
-    matches!(p, PRIO_SOFORT | PRIO_DRINGEND | PRIO_NORMAL)
+    Prioritaet::parse(p).is_some()
 }
 
 pub fn adressat_kategorie_gueltig(a: &str) -> bool {
-    matches!(
-        a,
-        ADRESSAT_LEITSTELLE | ADRESSAT_NACHBAR_EA | ADRESSAT_UEBERGEORDNET | ADRESSAT_ANDERE_BOS
-    )
+    AdressatKategorie::parse(a).is_some()
 }
 
 pub fn status_gueltig(s: &str) -> bool {
-    matches!(
-        s,
-        STATUS_ANGEFORDERT
-            | STATUS_ZUGESAGT
-            | STATUS_UNTERWEGS
-            | STATUS_EINGETROFFEN
-            | STATUS_ABGELEHNT
-    )
+    NachforderungStatus::parse(s).is_some()
 }
 
 /// Erlaubter Status-Übergang: linear vorwärts (angefordert→zugesagt→unterwegs→eingetroffen)

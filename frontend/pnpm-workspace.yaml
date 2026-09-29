@@ -76,11 +76,9 @@ overrides:
   # brach Schritt 6. BEIDE Grenzen sind nachgezogen: die Obergrenze des Bereichs UND die
   # Zielversion. ^3.1.6 bleibt ein Same-Major-Patch.
   #
-  # NACHGEZOGEN 2026-09-29 (LFH-394): ZUM ZWEITEN MAL GEWANDERT. GHSA-qw65-cvwx-89v3 hebt die
-  # Schwelle auf 3.1.7, dazu GHSA-58mr-gqgx-xq4g (Host-Confusion über eine ungeschlossene
-  # Klammer in der Authority), das genau die bisherige Zielversion 3.1.6 trifft. Beide
-  # Grenzen nachgezogen; ^3.1.7 bleibt ein Same-Major-Patch. AJV fordert weiterhin nur
-  # ^3.0.1 — ohne Override hielte nichts die Untergrenze.
+  # NACHGEZOGEN 2026-09-29: GHSA-qw65-cvwx-89v3 (Authority-Injection über einen
+  # unvalidierten Port, betrifft < 3.1.7) und GHSA-58mr-gqgx-xq4g (Host-Confusion über eine
+  # offene Klammer, betrifft genau 3.1.6). Schwelle und Ziel stehen jetzt bei 3.1.7.
   fast-uri@>=3.0.0 <3.1.7: ^3.1.7
 
   # GHSA-c83g-rgw3-j3cx (high): unbegrenztes Cache-Wachstum ohne Eviction (OOM), sowie
