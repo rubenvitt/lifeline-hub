@@ -173,6 +173,6 @@ Knopfblock ab `lg` ist davon nicht betroffen.
 | 10 | Alarmbudget | nicht anwendbar: keine Alarme |
 | 11 | Warnverhalten | nicht anwendbar: keine Warnungen, kein Blinken |
 | 12 | Kein Sprung unter dem Cursor | erfüllt: Leiste und Band wechseln nur auf eine Nutzerhandlung (Modusstart oder -ende), nie auf Live-Daten |
-| 13 | Fokus nie verdeckt | offen → Folgeticket: Das Band liegt im Fuß-Fluss wie Zeichnen- und Mess-Steuerung, aber kein Fokus-Nachweis betritt unter `lg` einen Kartenmodus (gilt für alle Fuß-Bänder) |
+| 13 | Fokus nie verdeckt | offen → LFH-811: Das Band liegt im Fuß-Fluss wie Zeichnen- und Mess-Steuerung, aber kein Fokus-Nachweis betritt unter `lg` einen Kartenmodus (gilt für alle Fuß-Bänder) |
 | 14 | Tabellenseite vollständig | nicht anwendbar: keine Tabelle |
 | 15 | Erfassungsmaske vollständig | nicht anwendbar: keine Erfassungsmaske; die Koordinateneingabe bleibt unverändert in der Leiste |

@@ -31,4 +31,4 @@
 ## 6. Doku und Abschluss
 
 - [x] 6.1 `CLAUDE.md`, Lagekarte: „Rest LFH-765“ durch die neue Regel ersetzen (Freigabe aus dem Modus, vorheriger Zustand, Band unter `lg`, Verweis auf dieses Design); `openspec validate lfh-765-lagekarte-modi-karte-freigeben` grün
-- [ ] 6.2 `./scripts/check-all.sh` grün (bzw. Abweichungen mit Log belegt)
+- [x] 6.2 `./scripts/check-all.sh` grün (bzw. Abweichungen mit Log belegt): 11/12 Schritte grün; e2e (`--nur e2e`) unter Last (Load 40–80) 273 grün / 83 rot, alle rot per Timeout (Login, `page.goto`, Browser-Session geschlossen); Lagekarten-, Leisten-, Gate-1- und Fokus-Specs seriell nachgefahren: 63/63 grün
