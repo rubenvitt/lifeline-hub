@@ -116,10 +116,9 @@ interface AnlegenWerte {
 }
 
 /**
- * Titelvorschlag aus der Uhrzeit („Lageüberblick 10:30 Uhr") in taktischer Schreibweise. Rein und
- * exportiert, damit die Form ohne Uhr prüfbar ist.
+ * Titelvorschlag aus der Uhrzeit („Lageüberblick 10:30 Uhr") in taktischer Schreibweise.
  */
-export function titelVorschlag(jetzt: Dayjs): string {
+function titelVorschlag(jetzt: Dayjs): string {
   return `Lageüberblick ${jetzt.format('HHmm')}`;
 }
 

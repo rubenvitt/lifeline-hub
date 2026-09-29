@@ -6,6 +6,9 @@
  * AuthProvider mit, und zwei Provider prüften hier gleichzeitig.
  */
 import { http, HttpResponse } from 'msw';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { lagebildAnlegen, lagebildLesen } from '../offline/lagebildSpeicher';
+import type { BenutzerAnzeige } from '../api/types';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -88,10 +91,13 @@ function Sonde() {
 }
 
 function rendere() {
+  // Der Provider hält das Lagebild (LFH-723) am QueryClient — ohne ihn kein AuthProvider.
   render(
-    <AuthProvider>
-      <Sonde />
-    </AuthProvider>,
+    <QueryClientProvider client={new QueryClient()}>
+      <AuthProvider>
+        <Sonde />
+      </AuthProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -394,6 +400,36 @@ describe('An- und Abmelden über mehrere Tabs (LFH-387)', () => {
       expect(screen.getByTestId('konflikt')).toHaveTextContent('Anna Admin→Bruno Beispiel'),
     );
     expect(sitzung).toEqual(bruno);
+  });
+
+  it('Logout aus einem veralteten Tab (412) lässt das Lagebild der neuen Sitzung stehen (LFH-723)', async () => {
+    // Der Datensatz gehört Bruno, der sich in einem anderen Tab angemeldet hat. Ein Abmelden,
+    // das der Server ablehnt, darf ihn nicht löschen — Gegenprobe: ein gelungenes Abmelden
+    // löscht ihn.
+    const brunosStand = () =>
+      lagebildAnlegen({
+        benutzer: bruno as unknown as BenutzerAnzeige,
+        bestaetigtAt: Date.now(),
+        buster: __APP_VERSION__,
+        client: {
+          timestamp: Date.now(),
+          buster: __APP_VERSION__,
+          clientState: { queries: [], mutations: [] },
+        },
+      });
+    await starte();
+    sitzung = bruno;
+    await brunosStand();
+    ergebnisLogout = undefined;
+    await userEvent.click(screen.getByText('logout'));
+    await waitFor(() => expect(ergebnisLogout).toBe(false));
+    expect((await lagebildLesen())?.benutzer.id).toBe(bruno.id);
+
+    sitzung = anna;
+    ergebnisLogout = undefined;
+    await userEvent.click(screen.getByText('logout'));
+    await waitFor(() => expect(ergebnisLogout).toBe(true));
+    await waitFor(async () => expect(await lagebildLesen()).toBeUndefined());
   });
 
   it('Logout meldet den anderen Tabs „abgemeldet“', async () => {

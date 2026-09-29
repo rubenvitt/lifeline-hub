@@ -4,7 +4,7 @@ import type { EtbEintragAnzeige } from '../api/types';
 /** Seitengröße des Vollabrufs = `MAX_LIMIT` der Liste (`src/etb/repo.rs`). */
 export const DRUCK_SEITE = 500;
 
-export interface EtbDruckStand {
+interface EtbDruckStand {
   /** Alle Einträge der Auswahl, in Serverordnung (`lfd_nr` absteigend). */
   eintraege: EtbEintragAnzeige[];
   /**

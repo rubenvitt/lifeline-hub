@@ -10,7 +10,7 @@ import type {
 } from 'taktische-zeichen-react';
 import type { Ausmass, UhsTyp } from '../../api/types';
 
-export type Objekttyp = 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt';
+type Objekttyp = 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt';
 
 const GRUNDZEICHEN: Record<Objekttyp, GrundzeichenId> = {
   einheit: 'taktische-formation',
@@ -33,7 +33,7 @@ export function groesseAusLabel(label: string | null | undefined): EinheitId | u
   return GROESSE_NACH_LABEL[label.trim().toLowerCase()];
 }
 
-export interface TzEingabe {
+interface TzEingabe {
   objekttyp: Objekttyp;
   einheitTypLabel?: string | null;
   fachaufgabe?: string | null; // tz_fachaufgabe am Objekt (manueller Override)

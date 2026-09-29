@@ -131,7 +131,7 @@ export function bezugsDarstellung(label: string): StatusDarstellung {
   return { label, rolle: 'bedien' };
 }
 
-export interface SichtungsDarstellung {
+interface SichtungsDarstellung {
   label: string;
   farbe: keyof typeof sichtungsfarben | null;
 }
@@ -418,7 +418,7 @@ export const dwdWarnstufe: Record<WetterWarnstufe, StatusDarstellung> = {
  * Konsumenten im Typcheck bricht. Drei, weil {@link dringlichkeit} je Stufe ein Formzeichen
  * trägt und es kein viertes gibt.
  */
-export type Dringlichkeit = Extract<Statusrolle, 'alarm' | 'achtung' | 'normal'>;
+type Dringlichkeit = Extract<Statusrolle, 'alarm' | 'achtung' | 'normal'>;
 
 /**
  * Der ZWEITE KANAL des Dringlichkeitsmarkers (LFH-395, WCAG 1.4.1).
@@ -478,7 +478,7 @@ function istDunklerModus(token: GlobalToken): boolean {
 
 /** Eine Flächen-Füllungsrolle. Bewusst enger als `keyof Farbrollen`: `markeGlut` ist
  *  ein Schatten, keine Fläche, und `text` schon gar nicht. */
-export type Fuellungsrolle =
+type Fuellungsrolle =
   | 'achtungFuellung'
   | 'achtungFuellungStark'
   | 'alarmFuellung'
@@ -489,7 +489,7 @@ export type Fuellungsrolle =
  * Die dritte Darstellungssorte: eine FLÄCHE, kein Etikett. Eigener Typ, weil eine Füllung keine
  * {@link Statusrolle} ist und `rollenFarbe` sie nicht auflösen kann.
  */
-export interface Flaechendarstellung {
+interface Flaechendarstellung {
   /** `null` = keine Fläche. Kein `'transparent'` als Rollenname — das ist ein Wert. */
   fuellung: Fuellungsrolle | null;
   /** Pflicht, zweiter Kanal (WCAG 1.4.1). */

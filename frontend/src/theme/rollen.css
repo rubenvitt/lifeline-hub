@@ -284,6 +284,36 @@
   --lfh-schriftgroesse: 15px;
 }
 
+/* ── Helligkeit · die Deckschicht (LFH-397) ───────────────────────────────
+   Der Helligkeitsregler dimmt über EINE schwarze Schicht über der ganzen Seite,
+   nicht über die Paletten: `farbenDunkel`/`farbenHell` und jedes Kontrast-Gate
+   bleiben unberührt. Die Deckkraft `--lfh-abdunkelung` (= 1 − Stufe) und die
+   WIRKSAME Stufe `data-helligkeit` setzt `ThemeModeProvider` — bei aktiver
+   Warnung mindestens der Boden (`theme/helligkeit.ts`). Vor dem Mount setzt sie
+   das Bootstrap-Skript in `index.html`, sonst blitzte der dunkle Fükw beim Laden
+   hell auf.
+
+   - kein `filter: brightness()` am <html>: der rechnete jedes Bild neu, die
+     Kartenleinwand bei jedem Frame; die Schicht wird nur zusammengesetzt.
+   - `pointer-events: none`: Klick und `elementFromPoint` gehen hindurch.
+   - `z-index` über jedem antd-Portal (Modal, Message, Dropdown) — auch
+     Überlagerungen werden abgedunkelt.
+   - nur `@media screen`: der Druck wird nie abgedunkelt.
+   Nachweis: `theme/helligkeit.test.ts` (Quelltext), `e2e/helligkeit.spec.ts`.
+   ======================================================================== */
+
+@media screen {
+  html[data-helligkeit]:not([data-helligkeit='100'])::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: #000;
+    opacity: var(--lfh-abdunkelung, 0);
+    pointer-events: none;
+    z-index: 2147483647;
+  }
+}
+
 /* ── Seitenrinne · die Viewport-Schwelle (LFH-329 · B1) ────────────────────
    Ab antds `md` (768 px) trägt die Seite die volle Rinne — Fükw, ortsfeste
    Stelle und Führungs-Tablet liegen alle darüber, der Handschirm darunter.

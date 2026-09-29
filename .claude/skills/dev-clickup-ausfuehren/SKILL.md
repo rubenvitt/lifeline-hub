@@ -163,8 +163,8 @@ Frontend über den **Vite-Dev-Server**, nicht über das eingebettete Bundle:
 
 - Backend (Repo-Root): `cargo run` (Default-Bind `127.0.0.1:8080`; mit Testdaten
   `cargo run --features dev-seeds`).
-- Frontend: `mise exec pnpm@11.10.0 -- pnpm -C <absoluter-frontend-pfad> dev` — dann die
-  von Vite ausgegebene URL öffnen (Default-Port 5173, aber nicht garantiert:
+- Frontend (im Repo aufgerufen, damit mise die `mise.toml` findet):
+  `mise exec -- pnpm -C <absoluter-frontend-pfad> dev` — dann die von Vite ausgegebene URL öffnen (Default-Port 5173, aber nicht garantiert:
   `strictPort` ist aus, und ein `pnpm run setup` im Frontend-Ordner vergibt bei parallelen
   Workspaces andere Ports über `.env.local` und nennt dabei auch den passenden
   `cargo run --bind …`-Befehl).

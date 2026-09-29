@@ -29,7 +29,7 @@ import {
 } from './leistenDaten';
 import type { TzProps } from './taktischesZeichen';
 
-export interface InspectorProps {
+interface InspectorProps {
   einsatzId: number;
   marker: KarteMarker;
   darfSchreiben: boolean;

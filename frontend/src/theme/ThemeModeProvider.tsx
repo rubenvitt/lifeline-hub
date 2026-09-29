@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ConfigProvider } from 'antd';
 import deDE from 'antd/locale/de_DE';
@@ -12,14 +12,23 @@ import {
   type Dichte,
 } from './tokens';
 import { zeigerIstGrob } from '../components/useViewport';
+import {
+  HELLIGKEIT_DEFAULT,
+  abdunkelung,
+  alsHelligkeit,
+  wirksameHelligkeit,
+  type Helligkeit,
+} from './helligkeit';
 
 /** Vom Nutzer wählbarer Modus. `system` folgt der OS-Einstellung. */
 export type ThemeModus = 'system' | 'light' | 'dark';
 /** Tatsächlich angewandtes Theme nach Auflösung von `system`. */
-export type EffektivesTheme = 'light' | 'dark';
+type EffektivesTheme = 'light' | 'dark';
 
 const SPEICHER_SCHLUESSEL = 'lifeline-hub.theme';
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
+/** Gespiegelt im Bootstrap-Skript von `index.html` (LFH-397) — wer eines ändert, ändert beide. */
+const HELLIGKEIT_SCHLUESSEL = 'lifeline-hub.helligkeit';
 
 /** Ausgangsstufe ohne gespeicherte Wahl: der Fükw-Arbeitsplatz (A1 Festlegung 1). */
 const DICHTE_DEFAULT: Dichte = 'kompakt';
@@ -37,6 +46,14 @@ interface ThemeModeWert {
    *  überstimmen. */
   dichte: Dichte;
   setDichte: (d: Dichte) => void;
+  /** Gewählte Helligkeit (LFH-397). Die WAHL — was wirkt, sagt `helligkeitWirksam`. */
+  helligkeit: Helligkeit;
+  setHelligkeit: (h: Helligkeit) => void;
+  /** Die Stufe am Bildschirm: die Wahl, bei aktiver Warnung mindestens der Boden. */
+  helligkeitWirksam: Helligkeit;
+  warnungAktiv: boolean;
+  /** Meldet eine Warnquelle an oder ab (nur über `useWarnsperre`). */
+  meldeWarnung: (quelle: string, aktiv: boolean) => void;
 }
 
 const ThemeModeContext = createContext<ThemeModeWert | null>(null);
@@ -72,6 +89,10 @@ function gespeicherteDichte(): Dichte {
   return zeigerIstGrob() ? DICHTE_DEFAULT_BERUEHRUNG : DICHTE_DEFAULT;
 }
 
+function gespeicherteHelligkeit(): Helligkeit {
+  return alsHelligkeit(localStorage.getItem(HELLIGKEIT_SCHLUESSEL));
+}
+
 function systemBevorzugtDunkel(): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
@@ -80,6 +101,10 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
   const [modus, setModusState] = useState<ThemeModus>(gespeicherterModus);
   const [systemDunkel, setSystemDunkel] = useState<boolean>(systemBevorzugtDunkel);
   const [dichte, setDichteState] = useState<Dichte>(gespeicherteDichte);
+  const [helligkeit, setHelligkeitState] = useState<Helligkeit>(gespeicherteHelligkeit);
+  // Die angemeldeten Warnquellen (LFH-397). Eine MENGE statt eines Schalters: endet die
+  // Warnung der einen Quelle, darf das die Sperre einer zweiten nicht mit aufheben.
+  const [warnQuellen, setWarnQuellen] = useState<ReadonlySet<string>>(() => new Set());
 
   // OS-Einstellung live verfolgen — relevant, sobald der Modus `system` ist.
   useEffect(() => {
@@ -99,6 +124,25 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(DICHTE_SCHLUESSEL, d);
   }, []);
 
+  const setHelligkeit = useCallback((h: Helligkeit) => {
+    setHelligkeitState(h);
+    localStorage.setItem(HELLIGKEIT_SCHLUESSEL, String(h));
+  }, []);
+
+  const meldeWarnung = useCallback((quelle: string, aktiv: boolean) => {
+    setWarnQuellen((vorher) => {
+      // Unverändert → dieselbe Menge zurück, sonst rendert jeder Effektlauf den Baum neu.
+      if (vorher.has(quelle) === aktiv) return vorher;
+      const neu = new Set(vorher);
+      if (aktiv) neu.add(quelle);
+      else neu.delete(quelle);
+      return neu;
+    });
+  }, []);
+
+  const warnungAktiv = warnQuellen.size > 0;
+  const helligkeitWirksam = wirksameHelligkeit(helligkeit, warnungAktiv);
+
   const effektiv: EffektivesTheme = modus === 'system' ? (systemDunkel ? 'dark' : 'light') : modus;
 
   // `data-theme` + `color-scheme` am <html> setzen, damit reines CSS
@@ -116,11 +160,43 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
     document.documentElement.dataset.dichte = dichte;
   }, [dichte]);
 
+  // Die Helligkeit wirkt ausschließlich über dieses Merkmal (LFH-397): die schwarze
+  // Deckschicht in `rollen.css` liest `--lfh-abdunkelung`. Gesetzt wird die WIRKSAME Stufe,
+  // nicht die Wahl — sonst dimmte die Anzeige an der Sperre vorbei. Paletten und
+  // antd-Tokens bleiben unberührt (design.md D4).
+  useEffect(() => {
+    const wurzel = document.documentElement;
+    wurzel.dataset.helligkeit = String(helligkeitWirksam);
+    wurzel.style.setProperty('--lfh-abdunkelung', String(abdunkelung(helligkeitWirksam)));
+  }, [helligkeitWirksam]);
+
   const knopf = useMemo(() => antdKnopf(dichte), [dichte]);
 
   const wert = useMemo<ThemeModeWert>(
-    () => ({ modus, effektiv, setModus, dichte, setDichte }),
-    [modus, effektiv, setModus, dichte, setDichte],
+    () => ({
+      modus,
+      effektiv,
+      setModus,
+      dichte,
+      setDichte,
+      helligkeit,
+      setHelligkeit,
+      helligkeitWirksam,
+      warnungAktiv,
+      meldeWarnung,
+    }),
+    [
+      modus,
+      effektiv,
+      setModus,
+      dichte,
+      setDichte,
+      helligkeit,
+      setHelligkeit,
+      helligkeitWirksam,
+      warnungAktiv,
+      meldeWarnung,
+    ],
   );
 
   return (
@@ -160,6 +236,11 @@ export function useThemeMode(): ThemeModeWert {
     setModus: () => {},
     dichte: DICHTE_DEFAULT,
     setDichte: () => {},
+    helligkeit: HELLIGKEIT_DEFAULT,
+    setHelligkeit: () => {},
+    helligkeitWirksam: HELLIGKEIT_DEFAULT,
+    warnungAktiv: false,
+    meldeWarnung: () => {},
   };
 }
 
@@ -173,4 +254,39 @@ export function useThemeMode(): ThemeModeWert {
 export function useDichte(): { dichte: Dichte; setDichte: (d: Dichte) => void } {
   const { dichte, setDichte } = useThemeMode();
   return { dichte, setDichte };
+}
+
+/**
+ * Benannter Zugang zur Helligkeit (LFH-397), wie `useDichte` für die Dichte.
+ *
+ * `helligkeit` ist die WAHL (Anzeige im Menü, Speicher), `wirksam` die Stufe am
+ * Bildschirm. Beide zu trennen ist die Aussage der Sperre: sie hebt an, was wirkt, und
+ * lässt stehen, was gewählt ist.
+ *
+ * Wie bei `useDichte` ist das Objekt je Aufruf frisch — nicht in ein Dependency-Array.
+ */
+export function useHelligkeit(): {
+  helligkeit: Helligkeit;
+  setHelligkeit: (h: Helligkeit) => void;
+  wirksam: Helligkeit;
+  warnungAktiv: boolean;
+} {
+  const { helligkeit, setHelligkeit, helligkeitWirksam, warnungAktiv } = useThemeMode();
+  return { helligkeit, setHelligkeit, wirksam: helligkeitWirksam, warnungAktiv };
+}
+
+/**
+ * Meldet eine aktive Warnung an den Helligkeitsregler (LFH-397, design.md D3).
+ *
+ * Der Provider liegt über dem Router und kennt keinen Einsatz — die Quelle, die eine
+ * Warnung erkennt, meldet sie hier. Beim Abbau (Einsatz verlassen) meldet sie sich
+ * selbst ab; eine vergessene Abmeldung könnte die Sperre sonst nie lösen.
+ */
+export function useWarnsperre(aktiv: boolean): void {
+  const quelle = useId();
+  const { meldeWarnung } = useThemeMode();
+  useEffect(() => {
+    meldeWarnung(quelle, aktiv);
+    return () => meldeWarnung(quelle, false);
+  }, [quelle, aktiv, meldeWarnung]);
 }

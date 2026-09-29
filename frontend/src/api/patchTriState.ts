@@ -33,7 +33,7 @@
  * Laufzeit-Garantie liefert {@link normalisierePatch}, gepinnt in `patchTriState.test.ts` gegen
  * die SERIALISIERTE Form.
  */
-export type PatchWire<T> = { [K in keyof T]?: Exclude<T[K], undefined> | null };
+type PatchWire<T> = { [K in keyof T]?: Exclude<T[K], undefined> | null };
 
 /**
  * Feld-Helfer: EIN Formular-String → Wire-Wert. Trimmt, und macht aus einem leeren (auch

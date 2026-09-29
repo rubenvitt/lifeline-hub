@@ -30,7 +30,7 @@ interface NameWerte {
 const MAX_NAME = 120;
 
 /** Höchstgröße des Logos — deckungsgleich mit `org::logo::MAX_GROESSE` (1 MiB). */
-export const MAX_LOGO_BYTES = 1024 * 1024;
+const MAX_LOGO_BYTES = 1024 * 1024;
 const LOGO_TYPEN = ['image/png', 'image/jpeg'];
 
 /**
@@ -38,7 +38,7 @@ const LOGO_TYPEN = ['image/png', 'image/jpeg'];
  * MASSGEBLICH bleibt der Server, der den Typ am Inhalt erkennt (ein umbenanntes SVG besteht
  * diese Prüfung und scheitert dort). `null` = in Ordnung.
  */
-export function logoVorpruefung(datei: File): string | null {
+function logoVorpruefung(datei: File): string | null {
   if (!LOGO_TYPEN.includes(datei.type)) return 'Nur PNG oder JPEG als Logo.';
   if (datei.size === 0) return 'Die Datei ist leer.';
   if (datei.size > MAX_LOGO_BYTES) return 'Das Logo ist zu groß (höchstens 1 MiB).';

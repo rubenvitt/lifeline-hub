@@ -10,7 +10,7 @@ export function istAlarmiert(m: Meldung): boolean {
   return !!(m.bestaetigung_pflicht && !m.ist_bestaetigt && (m.ist_ueberfaellig || m.eskaliert));
 }
 
-export interface MeldungKennzahlen {
+interface MeldungKennzahlen {
   /** Offen und noch von niemandem angefasst (Eingangszustand, `unbearbeitet`). */
   unbearbeitet: number;
   /** Offen und bereits angefasst. */

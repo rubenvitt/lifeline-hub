@@ -18,19 +18,19 @@ import { monoStil, useRollen } from '../components/instrument';
 import { wasserstandMeter, type TrendRichtung } from '../pegel/pegelKennzahl';
 
 /** Kleinste dargestellte Spanne in cm (Mindesthöhe der y-Achse). */
-export const MIN_SPANNE_CM = 20;
+const MIN_SPANNE_CM = 20;
 /** Breite des Zeitfensters. */
-export const FENSTER_MS = 24 * 60 * 60_000;
+const FENSTER_MS = 24 * 60 * 60_000;
 /** Luft über und unter der Spanne, als Anteil der Spanne. */
 const LUFT = 0.08;
 
 /** Ein Punkt der Reihe, wie ihn `GET …/pegel/verlauf` liefert. */
-export interface VerlaufsPunkt {
+interface VerlaufsPunkt {
   zeitpunkt: string;
   wasserstand_cm: number;
 }
 
-export interface VerlaufsGeometrie {
+interface VerlaufsGeometrie {
   /** SVG-Pfad (`M x y L x y …`). */
   d: string;
   punkte: { x: number; y: number; t: number; cm: number }[];
@@ -127,7 +127,7 @@ const RAND = 6;
 /** Mindestabstand der zwei Wertbeschriftungen in viewBox-Einheiten (etwa eine Zeile Mono 11). */
 const BESCHRIFTUNG_ABSTAND = 14;
 
-export interface VerlaufslinieProps {
+interface VerlaufslinieProps {
   punkte: readonly VerlaufsPunkt[];
   richtung: TrendRichtung | null;
   /** Erwarteter Höchststand in cm — nur übergeben, solange die Prognose offen ist. */

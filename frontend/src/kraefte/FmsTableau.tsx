@@ -72,8 +72,8 @@ function darstellungVon(ef: EinsatzFahrzeug): StatusDarstellung | null {
   return { ...statusKategorie[ef.status_kategorie], label: ef.status_label };
 }
 
-/** Kachelraster — rein und exportiert. `min(100%, …)` hält die Spalte am 390-px-Schirm. */
-export function kachelRasterStil(token: { marginXS: number }): CSSProperties {
+/** Kachelraster — rein. `min(100%, …)` hält die Spalte am 390-px-Schirm. */
+function kachelRasterStil(token: { marginXS: number }): CSSProperties {
   return {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 208px), 1fr))',

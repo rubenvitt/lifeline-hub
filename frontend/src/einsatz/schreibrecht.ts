@@ -69,7 +69,7 @@ export function darfImEinsatzSchreiben(
 
 /** Nur die zwei Benutzer-Felder der Org-Achse — getrennt von `BenutzerSchreibkontext`, damit die
     Achsen nicht über einen gemeinsamen Typ verschmelzen. */
-export type BenutzerVerwaltungskontext =
+type BenutzerVerwaltungskontext =
   Pick<BenutzerAnzeige, 'system_rolle' | 'org_rolle'> | null | undefined;
 
 /**

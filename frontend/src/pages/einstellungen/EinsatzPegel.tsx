@@ -42,7 +42,7 @@ import PegelPrognoseModal from './PegelPrognoseModal';
 import { wiederherstellBody } from './pegelPrognoseKern';
 
 /** Eine wählbare PEGELONLINE-Station aus der Fachebene (`properties` der Features). */
-export interface PegelStation {
+interface PegelStation {
   uuid: string;
   name: string;
   gewaesser: string | null;
@@ -92,7 +92,7 @@ export function verschiebe<T>(liste: readonly T[], index: number, richtung: -1 |
 }
 
 /** Eine Listenoperation, benannt über die STATION, nicht über ihren Index im alten Stand. */
-export type PegelOperation =
+type PegelOperation =
   { art: 'verschieben'; uuid: string; richtung: -1 | 1 } | { art: 'entfernen'; uuid: string };
 
 /**

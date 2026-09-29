@@ -1,9 +1,4 @@
-import type {
-  LageSnapshot,
-  LageSnapshotDokument,
-  NeuerLageSnapshot,
-  PatchLageSnapshot,
-} from './types';
+import type { LageSnapshot, LageSnapshotDokument, NeuerLageSnapshot } from './types';
 import { apiGet, apiSend } from './client';
 
 /** Metadaten-Liste der Lage-Snapshots eines Einsatzes (LFH-321), neueste zuerst, ohne `daten`. */
@@ -25,19 +20,6 @@ export function erzeugeLageSnapshot(
   daten: NeuerLageSnapshot = {},
 ): Promise<LageSnapshotDokument> {
   return apiSend<LageSnapshotDokument>(`/api/einsaetze/${einsatzId}/lage-snapshots`, 'POST', daten);
-}
-
-/** Metadaten (Bezeichnung/Notiz) eines Standes ändern — `daten`/`stand_at` bleiben unveränderlich. */
-export function patcheLageSnapshot(
-  einsatzId: number,
-  snapshotId: number,
-  daten: PatchLageSnapshot,
-): Promise<LageSnapshotDokument> {
-  return apiSend<LageSnapshotDokument>(
-    `/api/einsaetze/${einsatzId}/lage-snapshots/${snapshotId}`,
-    'PATCH',
-    daten,
-  );
 }
 
 /** Einen Stand löschen (Dokumenten-Vernichtung, nur Einsatzleitung). */

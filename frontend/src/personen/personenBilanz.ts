@@ -28,7 +28,7 @@ function leer(s: string | null | undefined): boolean {
   return s == null || s.trim() === '';
 }
 
-export interface Luecken {
+interface Luecken {
   verbleib: boolean;
   fundort: boolean;
 }
@@ -64,7 +64,7 @@ export function lueckenText(l: Luecken): string | null {
 
 // ── Verbleib ────────────────────────────────────────────────────────────────────────────
 
-export type VerbleibKlasse = VerbleibArt | 'uhs' | 'offen';
+type VerbleibKlasse = VerbleibArt | 'uhs' | 'offen';
 
 export function verbleibKlasse(
   p: Pick<Person, 'aktuelle_verbleib_art' | 'aktuelle_uhs_id'>,
@@ -89,7 +89,7 @@ export function verbleibLabel(art: VerbleibArt): string {
   return VERBLEIB_LABEL[art];
 }
 
-export interface VerbleibPosten {
+interface VerbleibPosten {
   schluessel: string;
   label: string;
   wert: number;
@@ -154,7 +154,7 @@ export function transportBilanz(
 
 // ── Offene Felder ───────────────────────────────────────────────────────────────────────
 
-export interface OffeneFelder {
+interface OffeneFelder {
   ohneVerbleib: number;
   ohneFundort: number;
   /** Datensätze mit mindestens einer Lücke — die Menge, die „Nur Lücken zeigen" zeigt. */
@@ -189,7 +189,7 @@ export const SICHTUNGSBILD_REIHE = [
 
 export type SichtungsbildSchluessel = (typeof SICHTUNGSBILD_REIHE)[number];
 
-export interface Sichtungsbild {
+interface Sichtungsbild {
   gesamt: number;
   je: Record<SichtungsbildSchluessel, number>;
 }

@@ -26,7 +26,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import { ThemeModeProvider } from '../theme/ThemeModeProvider';
+import { ThemeModeProvider, useWarnsperre } from '../theme/ThemeModeProvider';
 import BenutzerMenu from './BenutzerMenu';
 import { adminFixture } from '../test/fixtures';
 
@@ -233,5 +233,71 @@ describe.each([
     // DIE ACHSEN SIND UNABHÄNGIG — der Dichte-Klick setzt das Farbschema nicht mit (ein Context im
     // `ThemeModeProvider`, zwei Setter).
     expect(document.documentElement.dataset.theme).toBe('light');
+  });
+});
+
+/**
+ * Die Helligkeitsgruppe (LFH-397, design.md D6). Mit Warnung wird die Sperre ERKLÄRT, nicht
+ * stumm weggeschaltet (M16): die Überschrift nennt Boden und Grund, die Stufen darunter
+ * sind gesperrt, und eine Wahl unter dem Boden sagt, was wirkt.
+ */
+describe('BenutzerMenu — Helligkeit (LFH-397)', () => {
+  afterEach(() => {
+    delete document.documentElement.dataset.helligkeit;
+  });
+
+  function Warnquelle() {
+    useWarnsperre(true);
+    return null;
+  }
+
+  it('fünf Stufen, die gewählte trägt ✓, ein Klick führt bis ans <html> durch', async () => {
+    zeige();
+    await oeffne();
+    expect(await screen.findByRole('menuitem', { name: /^100 % ✓$/ })).toBeInTheDocument();
+    for (const s of ['80 %', '60 %', '40 %', '20 %']) {
+      expect(screen.getByRole('menuitem', { name: new RegExp(`^${s}$`) })).toBeInTheDocument();
+    }
+    await userEvent.click(screen.getByRole('menuitem', { name: /^40 %$/ }));
+    expect(document.documentElement.dataset.helligkeit).toBe('40');
+    expect(localStorage.getItem('lifeline-hub.helligkeit')).toBe('40');
+  });
+
+  it('ohne Warnung ist keine Stufe gesperrt und die Überschrift nennt keinen Boden', async () => {
+    zeige();
+    await oeffne();
+    const zwanzig = await screen.findByRole('menuitem', { name: /^20 %$/ });
+    expect(zwanzig).not.toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Helligkeit')).toBeInTheDocument();
+    expect(screen.queryByText(/Warnung aktiv/)).not.toBeInTheDocument();
+  });
+
+  it('mit Warnung: Boden und Grund in der Überschrift, Stufen darunter gesperrt, Wahl zeigt die Wirkung', async () => {
+    localStorage.setItem('lifeline-hub.helligkeit', '40');
+    server.use(meHandler(benutzer));
+    renderMitProviders(
+      <ThemeModeProvider>
+        <BenutzerMenu />
+        <Warnquelle />
+      </ThemeModeProvider>,
+    );
+    await oeffne();
+    expect(await screen.findByText('Helligkeit · mind. 80 % (Warnung aktiv)')).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /^40 % ✓ \(wirkt 80 %\)$/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    for (const s of ['60 %', '20 %']) {
+      expect(screen.getByRole('menuitem', { name: new RegExp(`^${s}$`) })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
+    }
+    for (const s of ['100 %', '80 %']) {
+      expect(screen.getByRole('menuitem', { name: new RegExp(`^${s}$`) })).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
+    }
   });
 });

@@ -134,6 +134,17 @@ vorgemerkte Einträge bei A bleiben. Kein Erfassungsformular, daher nicht `Erfas
   (c) Sitzungsablauf: Logout per `context.request`, Tab 1 schreibt → Anmeldung mit
   Rückkehrziel, Tab 2 folgt ohne Neuladen.
 
+**Nachtrag Zusammenführung mit LFH-723 (Lagebild offline lesen, 29.09.2026).** Beide
+Änderungen fassen `AuthProvider` an. Es gilt: `abmeldenLokal` setzt den Benutzer zuerst (und
+damit den erwarteten Benutzer der Schreibanfragen) und räumt danach das Lagebild, Speicher und
+Platte; ein Fehler beim Löschen hält die Abmeldung nicht auf. `logout()` bei 412 räumt
+**nichts** — der Datensatz gehört dann der neuen Sitzung (`AuthContext.pruefen.test.tsx`, mit
+Gegenprobe). Übernimmt ein anonymer Tab die Sitzung eines anderen Tabs, läuft das wie ein Login
+über `lagebildAnmelden`. Das Erstladen folgt dem Ablauf aus LFH-723 (Sitzungsprüfung, dann
+`lagebildStarten`); jeder Schritt übernimmt nur, solange die Generation seine eigene ist. Ein
+Tab im Konflikt schreibt nicht in den Datensatz von B: der Persister ändert nur einen Satz
+desselben Benutzers (`lagebildSpeicher.bestehendenAendern`).
+
 ## Risks / Trade-offs
 
 - [Ein Aufrufer außerhalb von `apiSend`/`apiUpload` schreibt ohne Kopf] → bleibt ungebunden wie

@@ -1,5 +1,5 @@
-import { screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import Datenstand, { formatiereDatenstand, gemeinsamerDatenstand } from './Datenstand';
 
@@ -35,6 +35,34 @@ describe('Datenstand', () => {
     const { container } = renderMitProviders(<Datenstand dataUpdatedAt={zeit} platzHalten />);
     expect(container.querySelector('[data-lfh="datenstand-platzhalter"]')).toBeNull();
     expect(screen.getByText('Stand 14:07')).toHaveAccessibleName('Datenstand 14:07');
+  });
+
+  // LFH-723: ohne Verbindung steht der vorgehaltene Stand da — die Uhrzeit ist die der letzten
+  // Server-Antwort, das Wort sagt, dass nichts nachkommt. Das Wort ist der zweite Kanal neben
+  // der Farbe (WCAG 1.4.1) und gehört in den zugänglichen Namen.
+  it('kennzeichnet einen Stand ohne Verbindung mit „offline", im Text und im Namen', () => {
+    const zeit = new Date(2026, 5, 10, 14, 32, 0).getTime();
+    renderMitProviders(<Datenstand dataUpdatedAt={zeit} offline />);
+    expect(screen.getByText('Stand 14:32 · offline')).toHaveAccessibleName(
+      'Datenstand 14:32, offline',
+    );
+  });
+
+  it('folgt ohne Prop dem Online-Zustand des Browsers', async () => {
+    const zeit = new Date(2026, 5, 10, 14, 32, 0).getTime();
+    renderMitProviders(<Datenstand dataUpdatedAt={zeit} />);
+    expect(screen.getByText('Stand 14:32')).toBeInTheDocument();
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    act(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
+    expect(await screen.findByText('Stand 14:32 · offline')).toBeInTheDocument();
+    onLine.mockRestore();
+  });
+
+  it('kennzeichnet ohne Datenstand nichts als offline', () => {
+    renderMitProviders(<Datenstand dataUpdatedAt={0} offline />);
+    expect(screen.queryByText(/offline/)).not.toBeInTheDocument();
   });
 
   it('nimmt bei zusammengesetzten Ansichten den ältesten geladenen Teil', () => {

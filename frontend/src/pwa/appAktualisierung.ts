@@ -1,5 +1,5 @@
 /** Rückgabefunktion von `registerSW`; der boolesche Parameter fordert den Reload an. */
-export type AppAktualisierer = (neuLaden?: boolean) => Promise<void>;
+type AppAktualisierer = (neuLaden?: boolean) => Promise<void>;
 
 let aktualisierer: AppAktualisierer | null = null;
 let verfuegbar = false;

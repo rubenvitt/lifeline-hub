@@ -235,7 +235,7 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
     assert_eq!((offen, neu), (2, 1), "Erwartung aus der Liste: {liste:?}");
     assert_eq!(
         v["meldungen"],
-        json!({ "offen": offen, "ungesehen": neu }),
+        json!({ "offen": offen, "ungesehen": neu, "bestaetigung_ueberfaellig": 0 }),
         "{v:?}"
     );
 
@@ -264,6 +264,106 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
     // Zwei: die eigene plus die Quittierfrist, die der überfällige Auftrag selbst anlegt.
     assert_eq!(faellig, 2, "Erwartung aus der Liste: {liste:?}");
     assert_eq!(v["erinnerungen"], json!({ "faellig": faellig }), "{v:?}");
+}
+
+/// Überfällige Bestätigungspflicht (LFH-397): die Quelle der Warnsperre am
+/// Helligkeitsregler. Dieselbe Regel wie `istAlarmiert` im Frontend
+/// (`meldungen/meldungKennzahlen.ts`) — die Erwartung wird deshalb aus der Liste nachgerechnet,
+/// nicht nur als Zahl gesetzt.
+#[tokio::test]
+async fn bestaetigung_ueberfaellig_zaehlt_wie_die_liste() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+    let meldung = |inhalt: &str, sofort: bool| {
+        let mut b = json!({
+            "absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
+            "inhalt": inhalt, "ereigniszeit": "2026-06-12 09:00:00"
+        });
+        if sofort {
+            b["prioritaet"] = json!("sofort");
+            b["bestaetigung_frist_min"] = json!(5);
+        }
+        b.to_string()
+    };
+    let abgelaufen = post(
+        &app,
+        &admin,
+        &format!("{basis}/meldungen"),
+        &meldung("Deich bricht", true),
+    )
+    .await;
+    let bestaetigt = post(
+        &app,
+        &admin,
+        &format!("{basis}/meldungen"),
+        &meldung("MANV", true),
+    )
+    .await;
+    let _kuenftig = post(
+        &app,
+        &admin,
+        &format!("{basis}/meldungen"),
+        &meldung("Pegel", true),
+    )
+    .await;
+    let _ohne_pflicht = post(
+        &app,
+        &admin,
+        &format!("{basis}/meldungen"),
+        &meldung("Straße frei", false),
+    )
+    .await;
+    for m in [&abgelaufen, &bestaetigt] {
+        sqlx::query(
+            "UPDATE meldung SET bestaetigung_frist_at = '2000-01-01 00:00:00' WHERE id = ?",
+        )
+        .bind(m["id"].as_i64().unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    let (status, m) = anfrage(
+        &app,
+        "POST",
+        &format!("{basis}/meldungen/{}/bestaetigen", bestaetigt["id"]),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{m:?}");
+
+    let liste = get(&app, &admin, &format!("{basis}/meldungen")).await;
+    let alarmiert = anzahl(&liste, |m| {
+        m["bestaetigung_pflicht"] == json!(true)
+            && m["ist_bestaetigt"] != json!(true)
+            && (m["ist_ueberfaellig"] == json!(true) || m["eskaliert"] == json!(true))
+    });
+    assert_eq!(alarmiert, 1, "Erwartung aus der Liste: {liste:?}");
+    let v = zaehler(&app, &admin, einsatz).await;
+    assert_eq!(
+        v["meldungen"]["bestaetigung_ueberfaellig"],
+        json!(alarmiert),
+        "{v:?}"
+    );
+
+    // Bestätigt → die Warnung ist fort.
+    let (status, m) = anfrage(
+        &app,
+        "POST",
+        &format!("{basis}/meldungen/{}/bestaetigen", abgelaufen["id"]),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{m:?}");
+    let v = zaehler(&app, &admin, einsatz).await;
+    assert_eq!(
+        v["meldungen"]["bestaetigung_ueberfaellig"],
+        json!(0),
+        "{v:?}"
+    );
 }
 
 #[tokio::test]
@@ -323,7 +423,7 @@ async fn erlaubtes_leeres_modul_steht_auf_null() {
     assert_eq!(v["personen"], json!({ "gesamt": 0 }), "{v:?}");
     assert_eq!(
         v["meldungen"],
-        json!({ "offen": 0, "ungesehen": 0 }),
+        json!({ "offen": 0, "ungesehen": 0, "bestaetigung_ueberfaellig": 0 }),
         "{v:?}"
     );
     // Nur die belegten Module — kein Zähler für Module ohne festgelegte Bedeutung.

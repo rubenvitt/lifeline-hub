@@ -2,7 +2,7 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import type { Auftrag } from '../api/types';
 import AuftragKarte from './AuftragKarte';
 
-export interface AuftragListeProps {
+interface AuftragListeProps {
   auftraege: Auftrag[];
   /** Steuert die Read-back-Spalten (Vollzug/Abnahme) in der Abgeschlossen-Ansicht. */
   ansicht?: 'offen' | 'abgeschlossen';

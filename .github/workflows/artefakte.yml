@@ -102,7 +102,6 @@ jobs:
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: 2026.9.1
-          install_args: node@26.7.0 pnpm@11.10.0
           cache: true
 
       # Nur einmal: der Cargo-Graph ist über alle Targets derselbe.
@@ -113,12 +112,12 @@ jobs:
         # scripts/build-release.sh).
         run: |
           cargo install cargo-cyclonedx --locked --version 0.5.7
-          mise exec node@26.7.0 -- npm install -g @cyclonedx/cdxgen@11.11.0
+          mise exec -- npm install -g @cyclonedx/cdxgen@11.11.0
           # Der PATH-Eintrag ist Teil der Installation: `npm -g` legt die Binary unter mises
           # Node-Verzeichnis ab, und build-release.sh findet sie per `command -v cdxgen` —
           # sonst bräche der Lauf erst am SBOM_PFLICHT-Gate mit einer falschen Ursache. Ein
           # nacktes `npm`/`node` ist hier nicht zugesichert, deshalb `mise exec`.
-          echo "$(mise exec node@26.7.0 -- npm prefix -g)/bin" >> "$GITHUB_PATH"
+          echo "$(mise exec -- npm prefix -g)/bin" >> "$GITHUB_PATH"
 
       - name: Bauen
         env:
@@ -148,7 +147,7 @@ jobs:
           SBOM: ${{ matrix.sbom && '1' || '' }}
         run: |
           set -euo pipefail
-          target_dir="$(cargo metadata --format-version 1 --no-deps | mise exec node@26.7.0 -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
+          target_dir="$(cargo metadata --format-version 1 --no-deps | mise exec -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
           ausgabe="$target_dir/$ZIEL/release"
           mkdir -p versand
           case "$ZIEL" in

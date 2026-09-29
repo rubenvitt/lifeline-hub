@@ -20,7 +20,7 @@
  */
 
 /** Was der Wächter von einem MapLibre-`error`-Event braucht (strukturell, nicht nominal). */
-export interface StilFehlerEreignis {
+interface StilFehlerEreignis {
   /** Bei Kachel-Ladefehlern gesetzt (`ErrorEvent(err, { tile })`), sonst undefined. */
   tile?: unknown;
 }
@@ -33,7 +33,7 @@ export function istStilLadefehler(e: StilFehlerEreignis | undefined | null): boo
   return e?.tile === undefined;
 }
 
-export interface StilFehlerWaechter {
+interface StilFehlerWaechter {
   /** Ein (neuer) Style wurde auf die Karte gesetzt — eine Abstufung ist wieder möglich. */
   stilAngewandt(): void;
   /** Die Karte hat den Style geladen (`style.load`) — ab hier stuft nichts mehr ab. */

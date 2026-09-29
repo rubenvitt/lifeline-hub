@@ -9,12 +9,12 @@ import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext
 import { taktischeDtgVoll } from '../../anzeige/format';
 
 /** Eine Angabe unter dem Titel: „Stand", „Auswahl" o. Ä. — vom Aufrufer geliefert. */
-export interface DruckkopfZeile {
+interface DruckkopfZeile {
   etikett: string;
   wert: ReactNode;
 }
 
-export interface DruckkopfProps {
+interface DruckkopfProps {
   /** Art des Dokuments: „Befehl", „Lagebericht", „Meldebild", „Einsatztagebuch". */
   dokumentart: string;
   /** Titel des Dokuments, falls es einen eigenen hat (Befehl, Lagebericht). */

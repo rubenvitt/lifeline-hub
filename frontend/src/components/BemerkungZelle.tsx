@@ -69,7 +69,7 @@ export function wertKnopfStil(token: {
   };
 }
 
-export interface BemerkungZelleProps {
+interface BemerkungZelleProps {
   /**
    * Aktueller Wert. `null`/`undefined`/`''` = leer, dann erscheint der Platzhalter. `undefined`
    * kommt aus dem Wire (`bemerkung?: string | null`); für die Anzeige ist beides dasselbe Nichts.

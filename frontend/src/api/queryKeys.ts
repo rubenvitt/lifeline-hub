@@ -238,9 +238,11 @@ const EINSATZ_PREFIXE: ReadonlySet<unknown> = new Set<unknown>(Object.values(EIN
  * 1 hinter vielen verschiedenen Prefixen; alle Accessoren von {@link einsatzKeys} tragen sie
  * dort.
  *
- * Nur für `invalidateQueries({ predicate })`. Ein `removeQueries` damit wäre die erste
- * Mengen-Räumung im Produktivcode und löste die XOR-Auflage aus dem Kopf von
- * {@link GLOBAL_KEYS} aus.
+ * Seit LFH-723 auch für `removeQueries`: der Rechteentzug räumt damit alle Keys eines
+ * Einsatzes (`api/queryClient.ts`). Die XOR-Auflage aus dem Kopf von {@link GLOBAL_KEYS}
+ * löst das NICHT aus — die Räumung wählt nur einsatzbezogene Keys, deren Partition
+ * live/nicht-live ohnehin maschinell erzwungen ist; eine Menge „alle Org-Keys" braucht sie
+ * nicht.
  */
 export function istKeyDesEinsatzes(key: readonly unknown[], einsatzId: number): boolean {
   return EINSATZ_PREFIXE.has(key[0]) && key[1] === einsatzId;
@@ -408,9 +410,11 @@ export const einsatzKeys = {
  * `ORG_KEYS`: `admin-karte`/`karte-config` sind instanzweit, `fachebene` bezeichnet externe
  * Fremdquellen.
  *
- * Die Gliederung unten ist DOKUMENTATION, keine erzwungene Partition: es gibt im Produktivcode
- * kein `qc.clear()`, `removeQueries` oder `resetQueries`. Käme ein Konsument „aller Org-Keys“
- * dazu, gehört sie in eine XOR-Partition nach dem Muster von {@link NICHT_LIVE_KEYS}.
+ * Die Gliederung unten ist DOKUMENTATION, keine erzwungene Partition. Der Produktivcode räumt
+ * seit LFH-723 an zwei Stellen, keine braucht „alle Org-Keys“ als Menge: `qc.clear()` beim
+ * Abmelden räumt alles, der Rechteentzug nur einsatzbezogene Keys (`api/queryClient.ts`). Käme
+ * ein Konsument der Gliederung dazu, gehört sie in eine XOR-Partition nach dem Muster von
+ * {@link NICHT_LIVE_KEYS}.
  *
  * Die Wire-Strings sind EINGEFROREN und byte-gepinnt (`queryKeys.test.ts`): ein geänderter Key
  * bricht nichts, er trifft still ein anderes Cache-Fach.
@@ -455,20 +459,21 @@ export const GLOBAL_KEYS = {
   fachebene: 'fachebene',
 } as const;
 
-export type GlobalKey = (typeof GLOBAL_KEYS)[keyof typeof GLOBAL_KEYS];
+/** Ein globaler Key; nur die Lagebild-Allowlist unten braucht den Typ (LFH-723). */
+type GlobalKey = (typeof GLOBAL_KEYS)[keyof typeof GLOBAL_KEYS];
 
 /**
  * Dienstfilter der Stammdaten-Listen (`personal` / `fahrzeuge` / `material`). String-Union
  * statt boolean, weil der Wert als Key-Element auf der Wire liegt. Eingefroren: ein Umbau auf
  * ein Filter-Objekt änderte jeden Cache-Key dieser drei Listen.
  */
-export type Dienstfilter = 'alle' | 'im-dienst';
+type Dienstfilter = 'alle' | 'im-dienst';
 
 /** Die zwei adressierten Bereiche unter dem `aufbewahrung`-Prefix. */
-export type AufbewahrungBereich = 'akte' | 'etb';
+type AufbewahrungBereich = 'akte' | 'etb';
 
 /** Die sieben Bereiche unter dem `admin-karte`-Prefix. */
-export type AdminKarteBereich =
+type AdminKarteBereich =
   | 'katalog'
   | 'bau-status'
   | 'offline-karten'
@@ -537,7 +542,8 @@ export const globalKeys = {
    * Mechanismus, und eine Sitzung kann ohne Abmeldung enden (401).
    *
    * `null` heißt „niemand angemeldet“; das Fach bleibt leer, weil die Abfrage dann abgeschaltet
-   * ist. KEIN barer Prefix-Accessor daneben.
+   * ist. KEIN barer Prefix-Accessor daneben. Die Bindung an die Id bleibt, obwohl `logout()`
+   * seit LFH-723 den Cache räumt: sie hängt nicht daran, dass jeder Weg hinaus dort durchläuft.
    */
   benutzerEinstellungenVon: (benutzerId: number | null) =>
     [GLOBAL_KEYS.benutzerEinstellungen, benutzerId] as const,
@@ -555,3 +561,80 @@ export const globalKeys = {
   fachebeneKritis: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'kritis', bbox] as const,
   fachebeneEnergie: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'energie', bbox] as const,
 } as const;
+
+/**
+ * Was vom Lagebild ohne Netz lesbar bleibt (LFH-723, design.md D3) — die EINE Quelle für
+ * „was darf auf die Platte".
+ *
+ * Sie steht hier und nicht im Persister, damit Invalidierung, SSE-Fan-out und Vorhaltung über
+ * dieselben Keys sprechen: ein URL-Cache daneben wäre eine zweite Wahrheit ohne Invalidierung
+ * und ohne Benutzerbindung. Gelistet sind die fünf Ansichten ETB, Meldebild, Betroffene,
+ * Aufträge und Lagekarte sowie die Rahmendaten, ohne die sie nicht rendern (Einsatzkopf,
+ * Freigaben, Einstellungen, Zähler, Einsatzliste, Kartenkonfiguration, Organisation,
+ * Fahrzeugstatus-Katalog). Von den Meldungen nur die Rückmeldungen, nicht die Liste.
+ *
+ * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit, Chat, Dokumente,
+ * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys.
+ * `lagebildOffline.guard.test.ts` vergleicht die Liste mit JEDEM verwalteten Prefix.
+ */
+export const LAGEBILD_OFFLINE = {
+  einsatz: [
+    // Rahmen
+    EINSATZ_KEYS.einsatz,
+    EINSATZ_KEYS.modulOverrides,
+    EINSATZ_KEYS.einstellungen,
+    EINSATZ_KEYS.modulZaehler,
+    // ETB — samt der Nummern-Abfragen der Palette unter demselben Prefix: dieselbe
+    // Datenklasse, dieselben Rechte, und ihr kurzes `gcTime` räumt sie ohnehin schnell.
+    EINSATZ_KEYS.etb,
+    // Meldebild
+    EINSATZ_KEYS.einheiten,
+    EINSATZ_KEYS.personal,
+    EINSATZ_KEYS.fahrzeuge,
+    EINSATZ_KEYS.material,
+    EINSATZ_KEYS.abschnitte,
+    EINSATZ_KEYS.auftraege,
+    // Aufträge
+    EINSATZ_KEYS.befehle,
+    // Betroffene
+    EINSATZ_KEYS.personen,
+    EINSATZ_KEYS.uhs,
+    // Lagekarte
+    EINSATZ_KEYS.zonen,
+    EINSATZ_KEYS.freieZeichen,
+    EINSATZ_KEYS.gefahrengebiete,
+    EINSATZ_KEYS.schaeden,
+    EINSATZ_KEYS.lagemeldungen,
+    EINSATZ_KEYS.fuehrungskraefte,
+    EINSATZ_KEYS.betreuung,
+    EINSATZ_KEYS.kartenAnsicht,
+    EINSATZ_KEYS.kartenbilder,
+    EINSATZ_KEYS.lageSnapshot,
+  ],
+  /** Einzelne Sub-Keys eines sonst ungelisteten Prefix: `[prefix, einsatzId, sub]`. */
+  einsatzUnterKeys: [[EINSATZ_KEYS.meldungen, 'rueckmeldungen']],
+  global: [
+    GLOBAL_KEYS.einsaetze,
+    GLOBAL_KEYS.karteConfig,
+    GLOBAL_KEYS.organisation,
+    GLOBAL_KEYS.fahrzeugStatus,
+  ],
+} as const satisfies {
+  einsatz: readonly EinsatzKey[];
+  einsatzUnterKeys: readonly (readonly [EinsatzKey, string])[];
+  global: readonly GlobalKey[];
+};
+
+const LAGEBILD_EINSATZ: ReadonlySet<unknown> = new Set<unknown>(LAGEBILD_OFFLINE.einsatz);
+const LAGEBILD_GLOBAL: ReadonlySet<unknown> = new Set<unknown>(LAGEBILD_OFFLINE.global);
+
+/** Gehört der Key zur Allowlist {@link LAGEBILD_OFFLINE}? Einsatz-Keys verlangen an Stelle 1
+ *  eine Einsatz-ID, wie jeder Accessor von {@link einsatzKeys} sie setzt. */
+export function istLagebildOfflineKey(key: readonly unknown[]): boolean {
+  if (LAGEBILD_GLOBAL.has(key[0])) return true;
+  if (typeof key[1] !== 'number') return false;
+  if (LAGEBILD_EINSATZ.has(key[0])) return true;
+  return LAGEBILD_OFFLINE.einsatzUnterKeys.some(
+    ([prefix, unter]) => key[0] === prefix && key[2] === unter,
+  );
+}

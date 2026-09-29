@@ -22,7 +22,7 @@ const NAECHSTER: Partial<Record<NachforderungStatus, NachforderungStatus>> = {
   unterwegs: 'eingetroffen',
 };
 
-export interface NachforderungKarteProps {
+interface NachforderungKarteProps {
   nachforderung: Nachforderung;
   /** Steuert die Übergangs-Zeitstempel/Grund-Zeilen in der Abgeschlossen-Ansicht. */
   ansicht?: 'offen' | 'abgeschlossen';

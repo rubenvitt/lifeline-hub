@@ -19,7 +19,7 @@ import { luftqualitaetDarstellung } from './luftqualitaetStil';
 import { odlDarstellung, odlGrundlage } from './odlStil';
 import KartenDetailCard from './KartenDetailCard';
 
-export interface FachebenenInspectorProps {
+interface FachebenenInspectorProps {
   quelle: FachebeneQuelle;
   properties: Record<string, unknown>;
   /** Volle (ungeclippte) Geometrie des angeklickten Features → Fläche/Umfang/Länge. */

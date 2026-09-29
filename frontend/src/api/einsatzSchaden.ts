@@ -34,7 +34,7 @@ export interface SchadenPatch {
   lon?: number | null;
 }
 
-export interface SchaedenFilter {
+interface SchaedenFilter {
   status?: SchadenStatus;
   typ?: SchadenTyp;
   ausmass?: Ausmass;

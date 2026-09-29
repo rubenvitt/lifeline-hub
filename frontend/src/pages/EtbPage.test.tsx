@@ -562,6 +562,23 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     expect(screen.queryByText(LEER_TITEL)).not.toBeInTheDocument();
   });
 
+  /** Rechteentzug (LFH-723, design.md D6): nach einer 403 steht der entzogene Stand nicht
+   *  mehr da — weder als Zeitachse noch unter einem „veraltet"-Hinweis. */
+  it('zeigt nach einer 403 den Fehler und nicht mehr die zuvor geladenen Einträge', async () => {
+    const { client } = setupMit([]);
+    expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
+    server.use(
+      http.get('/api/einsaetze/7/etb', () =>
+        HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
+      ),
+    );
+    await client.refetchQueries({ queryKey: einsatzKeys.etbListe(7, {}).slice(0, 2) });
+    expect(
+      await screen.findByText('ETB-Einträge konnten nicht geladen werden'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Erste Meldung')).not.toBeInTheDocument();
+  });
+
   it('nennt die leere Menge beim Namen und führt zur Erfassung (Schreibrecht)', async () => {
     setupMit([http.get('/api/einsaetze/7/etb', () => HttpResponse.json([]))]);
     expect(await screen.findByText(LEER_TITEL)).toBeInTheDocument();

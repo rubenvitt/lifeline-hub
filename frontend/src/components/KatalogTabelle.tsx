@@ -122,7 +122,7 @@ type OhneAntdAusblendung<C> = C extends unknown ? Omit<C, 'responsive' | 'hidden
  * Hover auf `flaeche3` aus demselben Grund. Die Zellpolsterung folgt der Dichte-Staffel
  * (`paddingSM` / `padding`).
  */
-export function tabellenTokens(
+function tabellenTokens(
   rollen: Pick<Farbrollen, 'kopf' | 'schwach' | 'flaeche2' | 'flaeche3'>,
   dunkel: boolean,
   token: { paddingSM: number; padding: number },
@@ -202,7 +202,7 @@ function zellenWert<T>(spalte: Spalte<T>, zeile: T): unknown {
  * Das Ergebnis der Breitenrechnung: entweder eine Zahl (gedeckelt) oder das
  * inhaltsgetriebene `'max-content'` des Bestands, dann mit Grund.
  */
-export interface Fliessmass {
+interface Fliessmass {
   /** Was als `scroll.x` an antd geht. */
   x: number | 'max-content';
   /** Gesetzt, wenn ein Opt-in vorlag, aber nicht trug. Wird in DEV gemeldet. */

@@ -40,10 +40,10 @@ import {
   windText,
 } from './wetterText';
 
-export const QUELLENVERMERK = 'Datenbasis: Deutscher Wetterdienst · über Bright Sky';
-export const KEIN_ORT_TEXT =
+const QUELLENVERMERK = 'Datenbasis: Deutscher Wetterdienst · über Bright Sky';
+const KEIN_ORT_TEXT =
   'Warnungen und Vorhersage brauchen einen verorteten Einsatzort. Der Einsatz hat noch keine Koordinate.';
-export const AUSFALL_TEXT =
+const AUSFALL_TEXT =
   'Die Wetterquelle antwortet nicht, und es liegt kein verwertbarer Stand vor. Es werden keine Werte gezeigt.';
 
 interface TeilProps {
@@ -215,9 +215,7 @@ function WarnGruppe({
  * Nachladen eine aufgeklappte Beschreibung zu oder sprang auf die Nachbarwarnung. Dubletten
  * bekommen einen Zähler. Rein.
  */
-export function warnungsSchluessel(
-  liste: readonly WetterWarnung[],
-): Array<[string, WetterWarnung]> {
+function warnungsSchluessel(liste: readonly WetterWarnung[]): Array<[string, WetterWarnung]> {
   const gesehen = new Map<string, number>();
   return liste.map((w) => {
     const grund = [w.stufe, w.ereignis, w.beginn ?? '', w.ende ?? '', w.ueberschrift].join('|');

@@ -1,6 +1,7 @@
 import { Typography } from 'antd';
 import dayjs from 'dayjs';
 import { schrift, schriftskala } from '../theme/tokens';
+import { useOhneVerbindung } from '../offline/verbindung';
 
 interface DatenstandProps {
   /** TanStack-Query-Zeitstempel (`query.dataUpdatedAt`) in Millisekunden. */
@@ -13,6 +14,19 @@ interface DatenstandProps {
    * `EinsatzSeite.css` ihn aus, weil die spät eintreffende Meta ihn seitwärts schöbe.
    */
   platzHalten?: boolean;
+  /**
+   * Ohne Verbindung (LFH-723): der Stand ist vorgehalten und kommt nicht nach. Dann lautet die
+   * Anzeige „Stand 14:32 · offline" — die Uhrzeit bleibt die der letzten Server-Antwort
+   * (`hydrate` übernimmt `dataUpdatedAt`), nicht die des Neuladens.
+   *
+   * Vorgabe ist der Verbindungszustand (`useOhneVerbindung`: Browser offline ODER Server nicht
+   * erreichbar, `offline/verbindung.ts`), abgefragt HIER und nicht bei den Aufrufern:
+   * der Datenstand steht im Seitenkopf, in Abschnittsköpfen (`Bereichskopf`, `SektionHeader`)
+   * und in Paneelen, und eine Kennzeichnung, die jede Stelle einzeln durchreichen muss, fehlt
+   * an der ersten vergessenen (gemessen: die Aufträge führen ihren Stand im Abschnittskopf).
+   * Die Prop übersteuert nur.
+   */
+  offline?: boolean;
 }
 
 /** Formatiert einen Query-Zeitstempel in der lokalen Browserzeit. */
@@ -42,7 +56,13 @@ const STIL = {
   whiteSpace: 'nowrap',
 } as const;
 
-export default function Datenstand({ dataUpdatedAt, platzHalten = false }: DatenstandProps) {
+export default function Datenstand({
+  dataUpdatedAt,
+  platzHalten = false,
+  offline: offlineVorgabe,
+}: DatenstandProps) {
+  const ohneVerbindung = useOhneVerbindung();
+  const offline = offlineVorgabe ?? ohneVerbindung;
   if (!dataUpdatedAt || !Number.isFinite(dataUpdatedAt)) {
     if (!platzHalten) return null;
     // Unsichtbar UND stumm: ein Vorleser soll keinen Stand „00:00" hören.
@@ -61,10 +81,10 @@ export default function Datenstand({ dataUpdatedAt, platzHalten = false }: Daten
     <Typography.Text
       type="secondary"
       title={`Letzte Aktualisierung: ${dayjs(dataUpdatedAt).format('DD.MM.YYYY HH:mm:ss')}`}
-      aria-label={`Datenstand ${uhrzeit}`}
+      aria-label={offline ? `Datenstand ${uhrzeit}, offline` : `Datenstand ${uhrzeit}`}
       style={STIL}
     >
-      Stand {uhrzeit}
+      {offline ? `Stand ${uhrzeit} · offline` : `Stand ${uhrzeit}`}
     </Typography.Text>
   );
 }

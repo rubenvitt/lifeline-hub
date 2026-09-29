@@ -3,9 +3,19 @@ import { DownOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import type { IconType } from 'react-icons';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
-import { useDichte, useThemeMode, type ThemeModus } from '../theme/ThemeModeProvider';
+import {
+  useDichte,
+  useHelligkeit,
+  useThemeMode,
+  type ThemeModus,
+} from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben, schrift, type Dichte } from '../theme/tokens';
-import { DARSTELLUNG_OPTIONEN, DICHTE_OPTIONEN } from '../theme/darstellungOptionen';
+import {
+  DARSTELLUNG_OPTIONEN,
+  DICHTE_OPTIONEN,
+  HELLIGKEIT_OPTIONEN,
+} from '../theme/darstellungOptionen';
+import { HELLIGKEIT_BODEN_WARNUNG, alsHelligkeit } from '../theme/helligkeit';
 import { useViewport } from './useViewport';
 
 /** Initialen aus dem Anzeigenamen (erstes + letztes Wort, sonst erste zwei Zeichen). */
@@ -20,6 +30,7 @@ function initialen(name: string): string {
  *  damit `onClick` ohne zweite Zuordnungstabelle auskommt. */
 const DARSTELLUNG_PRAEFIX = 'darstellung:';
 const DICHTE_PRAEFIX = 'stufe:';
+const HELLIGKEIT_PRAEFIX = 'helligkeit:';
 
 /**
  * Beschriftung eines Umschalt-Eintrags. Die aktive Stufe trägt ihren Zustand im TEXT — zweiter
@@ -67,6 +78,7 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
   const { abBreite } = useViewport();
   const { modus, setModus } = useThemeMode();
   const { dichte, setDichte } = useDichte();
+  const { helligkeit, setHelligkeit, wirksam, warnungAktiv } = useHelligkeit();
   // Funktion und Pfeil erst ab `xl`: auf dem Führungs-Tablet brächen sie die Kopfzeile um.
   const breit = abBreite('xl');
 
@@ -156,6 +168,35 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
         umschaltEintrag(DICHTE_PRAEFIX, wert, titel, Icon, wert === dichte),
       ),
     },
+    // DIE SPERRE WIRD ERKLÄRT, NICHT STUMM WEGGESCHALTET (LFH-397, M16): mit aktiver Warnung
+    // nennt die Überschrift Boden und Grund, die Stufen darunter sind gesperrt, und eine
+    // Wahl unter dem Boden sagt, was tatsächlich wirkt. Die Wahl selbst bleibt stehen —
+    // endet die Warnung, gilt sie wieder.
+    {
+      key: 'helligkeit',
+      type: 'group',
+      label: warnungAktiv
+        ? `Helligkeit · mind. ${HELLIGKEIT_BODEN_WARNUNG} % (Warnung aktiv)`
+        : 'Helligkeit',
+      children: HELLIGKEIT_OPTIONEN.map(({ wert, titel, Icon }) => {
+        const eintrag = umschaltEintrag(
+          HELLIGKEIT_PRAEFIX,
+          String(wert),
+          titel,
+          Icon,
+          wert === helligkeit,
+        );
+        const gesperrt = warnungAktiv && wert < HELLIGKEIT_BODEN_WARNUNG;
+        return {
+          ...eintrag,
+          label:
+            wert === helligkeit && wirksam !== wert
+              ? `${eintrag.label} (wirkt ${wirksam} %)`
+              : eintrag.label,
+          disabled: gesperrt,
+        };
+      }),
+    },
     { type: 'divider' },
     { key: 'profil', icon: <UserOutlined />, label: 'Profil' },
     { key: 'abmelden', icon: <LogoutOutlined />, label: 'Abmelden', danger: true },
@@ -167,6 +208,8 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
     else if (key.startsWith(DARSTELLUNG_PRAEFIX))
       setModus(key.slice(DARSTELLUNG_PRAEFIX.length) as ThemeModus);
     else if (key.startsWith(DICHTE_PRAEFIX)) setDichte(key.slice(DICHTE_PRAEFIX.length) as Dichte);
+    else if (key.startsWith(HELLIGKEIT_PRAEFIX))
+      setHelligkeit(alsHelligkeit(key.slice(HELLIGKEIT_PRAEFIX.length)));
   };
 
   return (

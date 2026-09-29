@@ -9,7 +9,7 @@ interface AnlegenSlot<T> {
   onAngelegt: (eintrag: T) => void;
 }
 
-export interface DirekteinstiegProps<T extends { id: number }> {
+interface DirekteinstiegProps<T extends { id: number }> {
   query: UseQueryResult<T[]>;
   /** Trifft die Wahl aus der ersten geladenen Liste — meist `waehleDefaultEintrag` mit gemerkter id. */
   waehle: (liste: T[]) => number | null;

@@ -46,10 +46,18 @@ const NETZFEHLER_TEXT = 'Keine Verbindung — die Aktion wurde NICHT abgeschickt
  *  Server-Meldung aus dem `{ error }`-Format. */
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /**
+   * Hat der eigene Anwendungsserver geantwortet, erkennbar am `{error}`-Umschlag, den jede
+   * `AppError`-Antwort trägt (LFH-723)? Ein 502/503/504 OHNE Umschlag ist die Fehlerseite eines
+   * vorgeschalteten Gateways: der Server dahinter ist nicht erreichbar. MIT Umschlag hat er
+   * geantwortet (Lastabwurf, ausgefallener Upstream wie die Pegel-Vorhersage) — er ist also da.
+   */
+  vomAnwendungsserver: boolean;
+  constructor(status: number, message: string, { vomAnwendungsserver = false } = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.vomAnwendungsserver = vomAnwendungsserver;
   }
 }
 
@@ -100,13 +108,17 @@ async function fehlerWerfen(res: Response): Promise<never> {
   // Nie abmelden — nur prüfen lassen; das entscheidet der AuthProvider (LFH-387).
   if (res.status === 412) window.dispatchEvent(new CustomEvent(BENUTZER_PRUEFEN));
   let message = `Serverfehler (${res.status})`;
+  let vomAnwendungsserver = false;
   try {
     const body = (await res.json()) as { error?: unknown };
-    if (typeof body.error === 'string') message = body.error;
+    if (typeof body.error === 'string') {
+      message = body.error;
+      vomAnwendungsserver = true;
+    }
   } catch {
     // keine JSON-Antwort — generische Meldung beibehalten
   }
-  throw new ApiError(res.status, message);
+  throw new ApiError(res.status, message, { vomAnwendungsserver });
 }
 
 /** Fetch wirft bei einem Leitungsfehler `TypeError`, bei Abbruch je nach Browser

@@ -46,7 +46,7 @@ export function zaehleFaellige(abloesungen: readonly Abloesung[], jetzt: Dayjs):
 
 /** Eine Überblick-Marke der Ablösung: Schichten desselben Abschnitts mit gleicher
  *  Fälligkeit (minutengenau) zusammengefasst. */
-export interface AbloesungsMarke {
+interface AbloesungsMarke {
   key: string;
   /** Fälligkeit (Wire-String der frühesten Schicht der Gruppe). */
   zeit: string;

@@ -77,7 +77,7 @@ export interface StatusBedienung {
   kennung: string;
 }
 
-export interface StatusWahlProps<W> {
+interface StatusWahlProps<W> {
   /** Aktueller Stand als Etikett. `null` = kein Status gesetzt. */
   darstellung: StatusDarstellung | null;
   /**

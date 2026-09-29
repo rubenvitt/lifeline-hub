@@ -25,7 +25,7 @@ import type { EinsatzEinstellungen } from '../api/types';
  * der nächste Klick auf Speichern schickt einen Vollersatz-PUT aus lauter `null`. TanStack führt
  * gleiche Query-Keys zusammen, der doppelte Aufruf kostet keinen zweiten Request.
  */
-export interface EinstellungenDaten {
+interface EinstellungenDaten {
   laedt: boolean;
   einsatz?: Awaited<ReturnType<typeof ladeEinsatz>>;
   einstellungen?: EinsatzEinstellungen;
