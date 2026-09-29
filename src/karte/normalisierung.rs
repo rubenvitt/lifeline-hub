@@ -1184,7 +1184,7 @@ mod odl_tests {
 // Hybride Fachebene „Energieanlagen“: OSM `power=plant` für die Standorte (auch
 // konventionelle Kraftwerke, die das MaStR ohne Koordinaten führt) und der bundesweite
 // MaStR-Abzug der Einheiten über 10 MW, beide zu Punkten mit denselben flachen Properties
-// normalisiert. Herleitung: `openspec/changes/lfh-81-fachebene-energie/design.md`.
+// normalisiert. Herleitung: `openspec/changes/archive/2026-09-29-lfh-81-fachebene-energie/design.md`.
 
 use crate::karte::typen::Bbox;
 

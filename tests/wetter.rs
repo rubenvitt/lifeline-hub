@@ -1,6 +1,6 @@
 //! Integrationstests des Wetters am Einsatzort (LFH-633), `GET /api/einsaetze/{id}/wetter`.
 //!
-//! Spec: `openspec/changes/lfh-633-fachmodul-wetter-pegel/specs/lage-wetter-pegel/spec.md`.
+//! Spec: `openspec/changes/archive/2026-09-29-lfh-633-fachmodul-wetter-pegel/specs/lage-wetter-pegel/spec.md`.
 //!
 //! **Kein Test geht ins Netz.** Jeder Router bekommt eine Bright-Sky-Attrappe auf
 //! `127.0.0.1` (oder eine tote Adresse) und ein EIGENES `karten_dir` (Tempdir): der

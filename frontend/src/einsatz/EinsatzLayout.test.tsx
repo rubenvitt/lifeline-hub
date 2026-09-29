@@ -10,7 +10,7 @@ import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/k
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import EinsatzLayout, { einsatzKennung, navGriffMass } from './EinsatzLayout';
 import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
-import { dichten, farbenDunkel } from '../theme/tokens';
+import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { adminFixture } from '../test/fixtures';
 
@@ -117,6 +117,43 @@ function setupRoute(route: string, childPath: string) {
 }
 
 describe('EinsatzLayout', () => {
+  /**
+   * LFH-438: eine verbogene Einsatz-ID (Hand-URL, kaputtes Lesezeichen) führt auf die Einsatzliste,
+   * wie die Detailseiten unter `pages/`. Vorher entstand `NaN` und damit Abrufe gegen
+   * `/api/einsaetze/NaN`; die Anfrage-Sonde belegt, dass der Rahmen gar nicht erst abruft.
+   */
+  it.each(['abc', '0', '-3', '1.5'])(
+    'leitet bei ungültiger Einsatz-ID „%s“ auf die Einsatzliste um, ohne abzurufen',
+    async (id) => {
+      const anfragen: string[] = [];
+      const sonde = ({ request }: { request: Request }) => {
+        anfragen.push(new URL(request.url).pathname);
+      };
+      server.events.on('request:start', sonde);
+      try {
+        server.use(meHandler(admin));
+        renderMitProviders(
+          <CommandPaletteProvider>
+            <Routes>
+              <Route path="/einsaetze" element={<div>Einsatzliste</div>} />
+              <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+                <Route path="etb" element={<div>ETB-Inhalt</div>} />
+              </Route>
+            </Routes>
+            <PfadAnzeige />
+          </CommandPaletteProvider>,
+          { route: `/einsaetze/${id}/etb` },
+        );
+        expect(await screen.findByText('Einsatzliste')).toBeInTheDocument();
+        expect(pfad()).toBe('/einsaetze');
+        expect(screen.queryByText('ETB-Inhalt')).not.toBeInTheDocument();
+        expect(anfragen.filter((a) => a.startsWith('/api/einsaetze/'))).toEqual([]);
+      } finally {
+        server.events.removeListener('request:start', sonde);
+      }
+    },
+  );
+
   it('zeigt Switcher mit Einsatznamen, Kategorie-Rail und Outlet-Inhalt', async () => {
     setup();
     await waitFor(() =>
@@ -124,6 +161,16 @@ describe('EinsatzLayout', () => {
     );
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
     expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument();
+  });
+
+  it('setzt den Kopfgrund aus rahmenFarben.grund, statt antds Header-Default zu erben (LFH-437)', async () => {
+    setup();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Hochwasser Nord/ })).toBeInTheDocument(),
+    );
+    // Gegenstück zu `AppLayout.test.tsx`: beide Kopfleisten tragen ihren Grund selbst, und
+    // `theme/rahmenKontrast.test.ts` rechnet jeden Text darauf gegen genau diesen Wert.
+    expect(screen.getByRole('banner')).toHaveStyle({ backgroundColor: rahmenFarben.grund });
   });
 
   /**
@@ -136,12 +183,12 @@ describe('EinsatzLayout', () => {
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     // Die Ankunft auf /etb allein merkt NICHTS — ohne diese Gegenaussage bliebe der Test auch mit
     // einem Routen-Effekt grün.
-    expect(leseZuletztModule(7)).toEqual([]);
+    expect(leseZuletztModule(admin.id, 7)).toEqual([]);
 
     await userEvent.click(screen.getByRole('button', { name: 'Personen' }));
 
     expect(await screen.findByText('Personen-Inhalt')).toBeInTheDocument();
-    expect(leseZuletztModule(7)).toEqual(['personen']);
+    expect(leseZuletztModule(admin.id, 7)).toEqual(['personen']);
   });
 
   /**
@@ -151,7 +198,7 @@ describe('EinsatzLayout', () => {
    */
   it('zeigt gemerkte Module nicht als „Zuletzt"-Gruppe im Panel', async () => {
     localStorage.clear();
-    merkeModulBesuch(7, 'lagekarte');
+    merkeModulBesuch(admin.id, 7, 'lagekarte');
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Personen' })).toBeInTheDocument();
@@ -557,7 +604,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
       'aria-current',
       'true',
     );
-    expect(leseZuletztModule(7)).toEqual([]);
+    expect(leseZuletztModule(admin.id, 7)).toEqual([]);
   });
 
   it('springt beim Klick auf eine ANDERE Kategorie in deren erstes Modul', async () => {
@@ -584,7 +631,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
 
     await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
-    expect(leseZuletztModule(7)).toEqual([]);
+    expect(leseZuletztModule(admin.id, 7)).toEqual([]);
   });
 
   it('navigiert beim Klick auf die AKTIVE Kategorie nicht, sondern klappt nur zu', async () => {

@@ -10,7 +10,7 @@
 //! Szenario samt Drehbuch als reine Daten ([`szenario`]). Der Bericht liegt als JSON am
 //! Import-Kopf, deshalb sind die Typen auch `Deserialize`.
 //!
-//! Spec: `openspec/changes/lfh-690-demo-daten-laufzeit-import/`
+//! Spec: `openspec/changes/archive/2026-09-29-lfh-690-demo-daten-laufzeit-import/`
 
 use crate::wire_enum::wire_enum;
 use serde::{Deserialize, Serialize};

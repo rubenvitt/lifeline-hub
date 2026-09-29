@@ -432,7 +432,7 @@ Dichtestufe (`platzBedienform` in `pages/uhs/Grundriss.tsx`):
 
 Entschieden hat der Auftraggeber am 24.09.2026: In den Berührungsstufen öffnet jeder Tipp das
 Menü, und Zuweisen braucht dort zwei Tipps statt einem. Herleitung:
-`openspec/changes/lfh-359-uhs-platzkarte-beruehrungsstufen/design.md`.
+`openspec/changes/archive/2026-09-29-lfh-359-uhs-platzkarte-beruehrungsstufen/design.md`.
 
 ## Die 15 Kriterien, verdiktet für LFH-359
 

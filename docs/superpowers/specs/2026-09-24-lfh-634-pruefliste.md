@@ -2,7 +2,7 @@
 
 Gate 7 der Bedien-Leitlinie (`2026-07-25-bedien-leitlinie-einsatzkontexte.md`, Festlegung 7)
 verlangt diese Liste an jeder neuen Seite. Planung und Spec liegen in
-`openspec/changes/lfh-634-fachmodul-verpflegung/` (Aufgaben 6.3 und 6.4).
+`openspec/changes/archive/2026-09-29-lfh-634-fachmodul-verpflegung/` (Aufgaben 6.3 und 6.4).
 
 ## Geltungsbereich
 

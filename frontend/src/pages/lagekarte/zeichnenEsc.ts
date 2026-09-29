@@ -3,7 +3,7 @@
  * exportiert, damit jede Zeile der Stufentafel ohne Karte prüfbar ist; die Seite führt nur aus.
  *
  * Esc gehört der Seite, nicht terra-draw — Begründung in `zeichnen.ts` (`keyEvents`) und
- * `openspec/changes/lfh-712-lagekarte-zeichnen-korrigierbar/design.md` D2. Das Messen endet mit
+ * `openspec/changes/archive/2026-09-29-lfh-712-lagekarte-zeichnen-korrigierbar/design.md` D2. Das Messen endet mit
  * einem Esc über einen eigenen Zuhörer der Seite.
  */
 

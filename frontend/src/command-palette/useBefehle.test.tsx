@@ -5,7 +5,11 @@ import { MemoryRouter } from 'react-router';
 import type { ReactNode } from 'react';
 import { neuerQueryClient } from '../test/utils';
 import { authWertFixture, benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { merkeModulBesuch } from '../einsatz/zuletztModule';
 import { useBefehle } from './useBefehle';
+
+/** Die Person, die `useAuth` im Mock liefert; ihre `id` trennt den Zuletzt-Speicher. */
+const ICH = benutzerFixture().id;
 
 vi.mock('../auth/AuthContext', () => ({
   useAuth: () => authWertFixture(benutzerFixture({ org_rolle: 'fuehrungskraft' })),
@@ -45,7 +49,9 @@ describe('useBefehle', () => {
    * ein Riegel grün, der die Gruppe leert.
    */
   it('lässt das Modul der aktuellen Route aus der Zuletzt-Gruppe heraus', async () => {
-    localStorage.setItem('lfh:nav:zuletzt:5', JSON.stringify(['etb', 'personen']));
+    localStorage.clear();
+    merkeModulBesuch(ICH, 5, 'personen');
+    merkeModulBesuch(ICH, 5, 'etb');
     const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn()), {
       wrapper: wrapper('/einsaetze/5/etb'),
     });
@@ -54,6 +60,23 @@ describe('useBefehle', () => {
     expect(result.current.some((b) => b.id === 'zuletzt:etb')).toBe(false);
     // Die Modul-Gruppe behält den Eintrag: sie zeigt den Modulbestand, keine Abkürzung.
     expect(result.current.some((b) => b.id === 'modul:etb')).toBe(true);
+  });
+
+  /**
+   * Schichtwechsel am gemeinsamen Rechner (LFH-436): die Palette liest nur den Speicher der
+   * angemeldeten Person. Die Vorbedingung (eigener Eintrag erscheint) macht die Abwesenheit des
+   * fremden zur Aussage.
+   */
+  it('zeigt in der Zuletzt-Gruppe nur die Wahlen der angemeldeten Person', async () => {
+    localStorage.clear();
+    merkeModulBesuch(ICH + 1, 5, 'lagekarte');
+    merkeModulBesuch(ICH, 5, 'personen');
+    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn()), {
+      wrapper: wrapper('/einsaetze/5/etb'),
+    });
+
+    await waitFor(() => expect(result.current.some((b) => b.id === 'zuletzt:personen')).toBe(true));
+    expect(result.current.some((b) => b.id === 'zuletzt:lagekarte')).toBe(false);
   });
 
   /**

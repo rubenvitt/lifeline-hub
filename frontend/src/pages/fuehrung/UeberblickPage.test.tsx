@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { server } from '../../test/server';
+import { meHandler, server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { benutzerFixture } from '../../test/fixtures';
+import { leseZuletztModule } from '../../einsatz/zuletztModule';
 import UeberblickPage from './UeberblickPage';
 
 dayjs.extend(utc);
@@ -816,5 +818,69 @@ describe('UeberblickPage', () => {
     await waitFor(() =>
       expect(within(band()).getByRole('link', { name: /Warnstufe/ })).toHaveTextContent('hoch'),
     );
+  });
+
+  /**
+   * Der Überblick ist die Startseite, und jedes Ziel darauf ist eine bewusste Modulwahl: sie füllt
+   * die Palettengruppe „Zuletzt besucht" (LFH-436). Jeder Test prüft zuerst, dass das Laden allein
+   * nichts gemerkt hat — sonst bliebe er auch mit einem Routen-Effekt grün.
+   */
+  describe('„Zuletzt"-Speicher (LFH-436)', () => {
+    const ICH = benutzerFixture({ id: 9, org_rolle: 'fuehrungskraft' });
+    const gemerkt = () => leseZuletztModule(ICH.id, 1, JETZT.getTime());
+
+    beforeEach(() => {
+      localStorage.clear();
+      server.use(meHandler(ICH));
+    });
+
+    it('die Kennzahl „Betroffene" merkt Personen', async () => {
+      stelleBereit(volleDaten);
+      rendern();
+      await waitFor(() => expect(within(band()).getByText('+1 in 60 min')).toBeInTheDocument());
+      expect(gemerkt()).toEqual([]);
+      await userEvent.click(within(band()).getAllByRole('link')[0]);
+      expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/personen');
+      expect(gemerkt()).toEqual(['personen']);
+    });
+
+    it('eine Abschnittszeile merkt die Einsatzabschnitte', async () => {
+      stelleBereit(volleDaten);
+      rendern();
+      const zeile = await screen.findByText('Abschnitt Nord', {
+        selector: '[data-lfh="ueberblick-abschnitt"] *',
+      });
+      expect(gemerkt()).toEqual([]);
+      await userEvent.click(zeile);
+      expect(gemerkt()).toEqual(['einsatzabschnitte']);
+    });
+
+    it('der Kopfknopf „Eintrag" merkt das ETB', async () => {
+      stelleBereit(volleDaten);
+      rendern();
+      const knopf = await screen.findByRole('button', { name: 'Eintrag' });
+      await waitFor(() => expect(knopf).toBeEnabled());
+      expect(gemerkt()).toEqual([]);
+      await userEvent.click(knopf);
+      expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/etb?neu=1');
+      expect(gemerkt()).toEqual(['etb']);
+    });
+
+    it('eine Leer-Aktion merkt ihr Modul', async () => {
+      stelleBereit(leereDaten);
+      rendern();
+      const knopf = await screen.findByRole('button', { name: 'Abschnitt anlegen' });
+      expect(gemerkt()).toEqual([]);
+      await userEvent.click(knopf);
+      expect(gemerkt()).toEqual(['einsatzabschnitte']);
+    });
+
+    it('die Brotkrume „Einsätze" merkt nichts, sie führt in kein Modul', async () => {
+      stelleBereit(volleDaten);
+      rendern();
+      await userEvent.click(await screen.findByRole('link', { name: 'Einsätze' }));
+      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze$/);
+      expect(localStorage.length).toBe(0);
+    });
   });
 });
