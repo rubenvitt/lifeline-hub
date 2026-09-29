@@ -660,6 +660,27 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   einem Wegwerf-Verzeichnis (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`; nie
   `node_modules`; Node/pnpm aus `mise.toml`), Selbsttest `scripts/check-deps.test.sh`.
 
+## Desktop-Hülle (LFH-721)
+
+`src-tauri/` (Crate `lifeline-desktop`, Tauri 2), Anforderungen `openspec/specs/desktop-huelle/`
+und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
+- **Keine Anwendungslogik in der Hülle** (Variante A, LFH-720): der Webview lädt die
+  https-Adresse des Servers. Abhilfen für Webview-Grenzen gehören in die Hülle (Init-Skript,
+  Command), nicht ins Frontend.
+- **Rechte:** Adresse setzen nur die lokale Maske (`capabilities/lokal.json`); die Serverseite
+  bekommt zur Laufzeit genau für ihre Origin nur `drucken` (`server_freigeben`). Jeder neue
+  Command steht im `AppManifest` von `build.rs`, sonst wäre er für jede Seite offen.
+- Adresse, Deeplink (`lifeline://verbinden?server=`, Vertrag für LFH-38) und Speicherung sind
+  reine, getestete Funktionen (`adresse.rs`, `deeplink.rs`, `verbindung.rs`).
+- **Version** setzt `release.config.mjs` (`prepareCmd`, `-p lifeline-desktop`);
+  `tauri.conf.json` trägt keine, `version_gleich_der_anwendungsversion` pinnt die Gleichheit.
+- Pakete + `latest.json` nur bei stabilen Tags (`artefakte.yml`, Ausgabe `desktop`);
+  `scripts/release/desktop-manifest.mjs`, Selbsttest in Schritt 8. Der Updater-Schlüssel liegt
+  außerhalb des Repos (Secrets `TAURI_SIGNING_PRIVATE_KEY[_PASSWORD]`), der Pubkey in
+  `tauri.conf.json`.
+- `cargo test --workspace` übersetzt die Hülle: Linux-Runner brauchen die GTK-/WebKit-Pakete
+  (`ci.yml` Rust-Job, `coverage.yml`).
+
 ## Backend↔Frontend — Typ-Codegen (LFH-120)
 
 Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
