@@ -4,7 +4,7 @@ import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { listeOnlineQuellen, loescheOnlineQuelle, type OnlineQuelle } from '../api/onlineQuellen';
 import { invalidiereKarte } from './invalidiereKarte';
 import OnlineQuelleFormModal from './OnlineQuelleFormModal';
@@ -37,7 +37,7 @@ export default function OnlineQuellenVerwaltung() {
   const loeschenMutation = useMutation({
     mutationFn: (id: number) => loescheOnlineQuelle(id),
     onSuccess: () => invalidiereKarte(qc),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Löschen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Löschen fehlgeschlagen')),
   });
 
   const spalten: KatalogSpalte<OnlineQuelle>[] = [

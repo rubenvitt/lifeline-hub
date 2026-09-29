@@ -4,7 +4,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { legeErinnerungAn } from '../api/erinnerungen';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SCHNELLWAHL_TERMIN, schnellwahlTermin } from '../components/terminSchnellwahl';
@@ -95,7 +95,7 @@ export default function WiedervorlageModal({
       qc.invalidateQueries({ queryKey: einsatzKeys.erinnerungen(einsatzId) });
       message.success('Wiedervorlage angelegt');
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Anlegen fehlgeschlagen')),
   });
 
   return (

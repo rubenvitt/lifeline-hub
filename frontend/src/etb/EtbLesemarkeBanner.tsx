@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App } from 'antd';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { ladeEtbLesemarke, setzeEtbLesemarke } from '../api/etb';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -50,8 +50,7 @@ export default function EtbLesemarkeBanner({ einsatzId }: { einsatzId: number })
      */
     onMutate: () => qc.cancelQueries({ queryKey: einsatzKeys.etbLesemarke(einsatzId) }),
     onSuccess: (neu) => qc.setQueryData(einsatzKeys.etbLesemarke(einsatzId), neu),
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Markieren als gesichtet fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Markieren als gesichtet fehlgeschlagen')),
     onSettled: () => qc.invalidateQueries({ queryKey: einsatzKeys.etbLesemarke(einsatzId) }),
   });
 

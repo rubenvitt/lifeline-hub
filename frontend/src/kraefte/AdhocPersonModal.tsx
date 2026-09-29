@@ -1,7 +1,7 @@
 import { App, Form, Input } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { disponiereAdhoc, type AdhocEingabe } from '../api/einsatzPersonal';
 import { POSITION_OPTIONEN } from '../api/personal';
 import { einsatzKeys } from '../api/queryKeys';
@@ -44,8 +44,7 @@ export default function AdhocPersonModal({
       void qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
       void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     },
-    onError: (e: unknown) =>
-      message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
+    onError: (e: unknown) => message.error(fehlerText(e)),
   });
 
   return (

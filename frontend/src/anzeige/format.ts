@@ -1,7 +1,6 @@
 /**
  * Reine Formatlogik für Anzeige-Konventionen: Zeit (Zeitzone + 24h/12h), Koordinaten
- * (WGS84/MGRS/UTM/GK) und Einheiten (metrisch/imperial). Provider/Hook und
- * `kommunikation/zeit.ts` delegieren hierher.
+ * (WGS84/MGRS/UTM/GK) und Einheiten (metrisch/imperial). Provider/Hook delegieren hierher.
  */
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';

@@ -6,7 +6,7 @@ import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { deaktiviereBaustein, listeBausteine } from '../api/etbBaustein';
 import type { EtbBaustein } from '../api/types';
 import { monoStil } from '../components/instrument';
@@ -29,8 +29,7 @@ export default function EtbBausteineTab() {
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereBaustein(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.etbBausteine() }),
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Deaktivieren fehlgeschlagen')),
   });
 
   const spalten: KatalogSpalte<EtbBaustein>[] = [

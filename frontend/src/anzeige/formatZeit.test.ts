@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { formatZeit, formatZeitKurz, formatZeitMitKonvention } from './zeit';
+import { formatZeit, formatZeitKurz } from './format';
 
 dayjs.extend(utc);
 
@@ -39,10 +39,10 @@ describe('formatZeitKurz', () => {
   });
 });
 
-describe('formatZeitMitKonvention', () => {
+describe('formatZeit mit Konvention', () => {
   it('wendet die Zeitzone an, ignoriert aber 12h (taktisch immer 24h)', () => {
     const wire = '2026-06-11 15:00:00'; // 15:00 UTC → 17:00 Berlin
-    expect(formatZeitMitKonvention(wire, { zeitzone: 'Europe/Berlin', zeitformat: '12h' })).toBe(
+    expect(formatZeit(wire, { zeitzone: 'Europe/Berlin', zeitformat: '12h' })).toBe(
       '111700JUN2026',
     );
   });

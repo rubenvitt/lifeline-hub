@@ -2,13 +2,14 @@ import { App, AutoComplete, Form, Input, Typography } from 'antd';
 import { useEffect } from 'react';
 import { Link } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import { aktualisiereFahrzeug, legeFahrzeugAn } from '../api/fahrzeuge';
 import type { Fahrzeug, FahrzeugVorschlaege } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { fahrzeugDetailPfad } from './stammdatenDetail';
+import { teilwortSuche } from '../components/teilwortSuche';
 
 /**
  * SCHNELLERFASSUNG, kein Vollformular (LFH-346, Befund H36).
@@ -84,7 +85,7 @@ export default function FahrzeugFormModal({
       qc.invalidateQueries({ queryKey: globalKeys.fahrzeuge() });
       qc.invalidateQueries({ queryKey: globalKeys.fahrzeugVorschlaege() });
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   return (
@@ -118,10 +119,7 @@ export default function FahrzeugFormModal({
           options={vorschlaege.fahrzeugtyp.map((t) => ({ value: t }))}
           allowClear
           placeholder="z. B. LF 20, RTW"
-          showSearch={{
-            filterOption: (input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-          }}
+          showSearch={teilwortSuche}
         />
       </Form.Item>
       <Form.Item label="Trägerorganisation" name="traegerorganisation">
@@ -129,10 +127,7 @@ export default function FahrzeugFormModal({
           options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
           allowClear
           placeholder="z. B. Feuerwehr Musterstadt"
-          showSearch={{
-            filterOption: (input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-          }}
+          showSearch={teilwortSuche}
         />
       </Form.Item>
       <Form.Item label="Kennzeichen" name="kennzeichen">

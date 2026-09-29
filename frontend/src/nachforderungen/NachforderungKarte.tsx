@@ -1,7 +1,8 @@
 import { Button, Flex, Space, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
-import { NACHFORDERUNG_STATUS, PrioBadge, StatusBadge, formatZeit } from '../kommunikation';
+import { NACHFORDERUNG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
+import { formatZeit } from '../anzeige/format';
 import KommKarte from '../kommunikation/KommKarte';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 

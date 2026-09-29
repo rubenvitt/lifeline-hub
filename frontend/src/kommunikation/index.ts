@@ -17,8 +17,6 @@ export {
 } from './phase';
 export type { KommPhase, KommPrio, StatusDeskriptor } from './phase';
 
-export { formatZeit, formatZeitKurz } from './zeit';
-
 export { faelligGruppe, GRUPPE_LABEL, GRUPPE_ORDNUNG } from './gruppierung';
 export type { FaelligGruppe } from './gruppierung';
 

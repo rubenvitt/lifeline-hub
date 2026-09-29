@@ -1,24 +1,22 @@
-import { App, Button, Popconfirm, Space, type TableColumnsType } from 'antd';
+import { Button, type TableColumnsType } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, monoStil } from '../components/instrument';
+import { monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
 import { listeKategorien, listeMaterial, setzeDienststatus } from '../api/material';
 import type { Material } from '../api/types';
 import MaterialFormModal from './MaterialFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import { dienststatusSpalten, useDienststatusMutation } from './dienststatus';
 
 export default function MaterialTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
-  const qc = useQueryClient();
-  const { message } = App.useApp();
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Material | null>(null);
 
@@ -31,11 +29,7 @@ export default function MaterialTab() {
     queryFn: listeKategorien,
   });
 
-  const dienststatusMutation = useMutation({
-    mutationFn: (v: { id: number; inDienst: boolean }) => setzeDienststatus(v.id, v.inDienst),
-    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.material() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
-  });
+  const dienststatusMutation = useDienststatusMutation(setzeDienststatus, globalKeys.material());
 
   const spalten: TableColumnsType<Material> = [
     {
@@ -60,95 +54,14 @@ export default function MaterialTab() {
       render: (t) => (t ? <span style={monoStil(13)}>{t}</span> : '—'),
     },
     { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
-    {
-      title: 'Status',
-      key: 'dienststatus',
-      /**
-       * Gefiltert wird über den Dienststatus, nicht über die Kategorie: `Dienststatus` ist ein
-       * geschlossenes Enum und beantwortet die Frage, die im Einsatz zuerst gestellt wird. Die
-       * Kategorie ist mandantengepflegt — eine Filterliste daraus käme aus einer zweiten Abfrage
-       * und könnte driften; sie hat einen `dataIndex` und wird von der Freitextsuche bedient.
-       *
-       * OHNE `dataIndex` (wie in `FahrzeugeTab`): ein gesetzter zöge den Drahtwert `in_dienst` in
-       * die Suche. `String(wert)`, weil antd das Filterargument als `React.Key | boolean` typisiert.
-       */
-      filters: [
-        { text: 'in Dienst', value: 'in_dienst' },
-        { text: 'außer Dienst', value: 'ausser_dienst' },
-      ],
-      onFilter: (wert, m) => m.dienststatus === String(wert),
-      render: (_, m) =>
-        m.dienststatus === 'in_dienst' ? (
-          <StatusChip ton="normal" wort="in Dienst" />
-        ) : (
-          <StatusChip ton="neutral" wort="außer Dienst" />
-        ),
-    },
-    ...(istAdmin
-      ? ([
-          {
-            title: 'Aktionen',
-            key: 'aktionen',
-            render: (_, m: Material) => {
-              /**
-               * Eine laufende Mutation gehört GENAU EINER Zeile (LFH-346): eine Sperre an
-               * `dienststatusMutation.isPending` legte die ganze Tabelle still.
-               *
-               * Der Riegel gegen ein zweites Absenden DERSELBEN Zeile sitzt im `onConfirm`/`onClick`: ein
-               * Klick auf eine ANDERE Zeile ist die nächste Aufgabe, kein Doppelklick.
-               *
-               * Er hält bewusst WENIGER: EIN `useMutation`-Observer meldet nur den JÜNGSTEN Aufruf, die
-               * Marke WANDERT also. Nach A → B → A ist A wieder klickbar, obwohl seine erste Anfrage noch
-               * läuft. Unschädlich, weil der Endpunkt einen Status SETZT (idempotent). Enger ginge es nur
-               * mit einem Zustand je Zeile.
-               */
-              const laeuft =
-                dienststatusMutation.isPending && dienststatusMutation.variables?.id === m.id;
-              return (
-                <Space size="middle">
-                  <Button
-                    disabled={laeuft}
-                    onClick={() => {
-                      setBearbeite(m);
-                      setModalOffen(true);
-                    }}
-                  >
-                    Bearbeiten
-                  </Button>
-                  {m.dienststatus === 'in_dienst' ? (
-                    <Popconfirm
-                      title="Außer Dienst stellen?"
-                      disabled={laeuft}
-                      okButtonProps={{ danger: true }}
-                      onConfirm={() => {
-                        if (!laeuft) {
-                          dienststatusMutation.mutate({ id: m.id, inDienst: false });
-                        }
-                      }}
-                    >
-                      <Button danger loading={laeuft} disabled={laeuft}>
-                        Außer Dienst
-                      </Button>
-                    </Popconfirm>
-                  ) : (
-                    <Button
-                      loading={laeuft}
-                      disabled={laeuft}
-                      onClick={() => {
-                        if (!laeuft) {
-                          dienststatusMutation.mutate({ id: m.id, inDienst: true });
-                        }
-                      }}
-                    >
-                      Wieder in Dienst
-                    </Button>
-                  )}
-                </Space>
-              );
-            },
-          },
-        ] as TableColumnsType<Material>)
-      : []),
+    ...dienststatusSpalten<Material>({
+      mutation: dienststatusMutation,
+      istAdmin,
+      onBearbeiten: (m) => {
+        setBearbeite(m);
+        setModalOffen(true);
+      },
+    }),
   ];
 
   return (

@@ -2,7 +2,7 @@ import { App, Button, Modal, Spin, Tag, Tooltip, Typography } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { ladeKarteConfig } from '../api/karte';
 import {
   ladeBaubareRegionen,
@@ -127,7 +127,7 @@ export default function OfflineRegionPicker({
       invalidiereKarte(qc);
       message.success('Download gestartet');
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Download fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Download fehlgeschlagen')),
   });
 
   const bauen = useMutation({
@@ -137,8 +137,7 @@ export default function OfflineRegionPicker({
       qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('bau-status') });
       message.success('Bau gestartet — die Region wird danach automatisch geladen');
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Bau konnte nicht gestartet werden'),
+    onError: (e) => message.error(fehlerText(e, 'Bau konnte nicht gestartet werden')),
   });
 
   // Verkettung: ein Bau-Job einer verketteten Region erreicht „done“ → frischen Katalog holen

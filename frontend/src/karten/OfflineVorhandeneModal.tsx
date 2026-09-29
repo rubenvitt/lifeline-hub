@@ -2,7 +2,7 @@ import { App, Button, Input, Modal, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import {
   listeVorhandeneKarten,
   registriereOfflineKarte,
@@ -56,7 +56,7 @@ export default function OfflineVorhandeneModal({
       qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('offline-vorhandene') });
       message.success('Region übernommen');
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Übernehmen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Übernehmen fehlgeschlagen')),
   });
 
   return (

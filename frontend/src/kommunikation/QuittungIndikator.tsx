@@ -1,6 +1,6 @@
 import { Tooltip } from 'antd';
 import { StatusChip } from '../components/instrument';
-import { formatZeit } from './zeit';
+import { formatZeit } from '../anzeige/format';
 
 const ERKLAERUNG = 'Quittiert = empfangen/zur Kenntnis genommen — sagt nichts über die Erledigung.';
 

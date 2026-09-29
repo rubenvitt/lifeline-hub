@@ -1,9 +1,8 @@
-import { App, Button, Form, Input, Modal } from 'antd';
+import { Button, Form, Input, Modal } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
 import { legeBefehlAn, listeBefehle, type NeuerBefehl } from '../api/befehle';
 import { einsatzKeys } from '../api/queryKeys';
 import type { BefehlAnzeige, BefehlVorlageKey } from '../api/types';
@@ -13,6 +12,7 @@ import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
  * Befehlsliste des Aufträge/Befehle-Tabs.
@@ -91,7 +91,6 @@ export default function BefehlListe({
   einsatzId: number;
   darfSchreiben: boolean;
 }) {
-  const { message } = App.useApp();
   const qc = useQueryClient();
   const [anlegenOffen, setAnlegenOffen] = useState(false);
   const [form] = Form.useForm<NeuerBefehl>();
@@ -101,8 +100,7 @@ export default function BefehlListe({
     queryFn: () => listeBefehle(einsatzId),
   });
   const invalidate = () => qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   const anlegenMutation = useMutation({
     mutationFn: (daten: NeuerBefehl) => legeBefehlAn(einsatzId, daten),

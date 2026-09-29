@@ -4,13 +4,14 @@ import { Select } from '../components/Select';
 import { ErfassungsModal } from '../components/Erfassung';
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { aktualisierePerson, legePersonAn } from '../api/personal';
 import { listeQualifikationen } from '../api/qualifikationen';
 import type { Personal, PersonalVorschlaege } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { personalDetailPfad } from './stammdatenDetail';
+import { teilwortSuche } from '../components/teilwortSuche';
 
 /**
  * SCHNELLERFASSUNG, kein Vollformular (LFH-346) — dieselbe Entscheidung wie bei
@@ -83,7 +84,7 @@ export default function PersonalFormModal({
       qc.invalidateQueries({ queryKey: globalKeys.personal() });
       qc.invalidateQueries({ queryKey: globalKeys.personalVorschlaege() });
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   // Aktive Qualifikationen + bereits zugeordnete (auch deaktivierte) als Optionen,
@@ -133,10 +134,7 @@ export default function PersonalFormModal({
           options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
           allowClear
           placeholder="z. B. DRK Musterstadt"
-          showSearch={{
-            filterOption: (input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-          }}
+          showSearch={teilwortSuche}
         />
       </Form.Item>
       <Form.Item label="Qualifikationen" name="qualifikation_ids">

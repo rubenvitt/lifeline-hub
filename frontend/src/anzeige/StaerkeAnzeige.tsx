@@ -1,4 +1,5 @@
 import type { Staerke } from '../api/types';
+import { staerkeText } from './staerke';
 
 /**
  * Reine Darstellung einer taktischen Stärke als `F/UF/M//Σ` (BOS-Schreibweise), "—" bei `null`.
@@ -6,7 +7,5 @@ import type { Staerke } from '../api/types';
  * in mehrere Textknoten zerfallen.
  */
 export default function StaerkeAnzeige({ wert }: { wert: Staerke | null }) {
-  if (!wert) return <>—</>;
-  const { fuehrer, unterfuehrer, mannschaft } = wert;
-  return <>{`${fuehrer}/${unterfuehrer}/${mannschaft}//${fuehrer + unterfuehrer + mannschaft}`}</>;
+  return <>{staerkeText(wert)}</>;
 }

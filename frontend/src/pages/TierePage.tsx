@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Space, Tag, Typography } from 'antd';
+import { Alert, Breadcrumb, Button, Form, Input, Space, Tag, Typography } from 'antd';
 import { Augenbraue, Segmentleiste, StatusChip } from '../components/instrument';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -13,7 +13,6 @@ import {
   tierRegistrierAnzeige,
   type TierEingabe,
 } from '../api/einsatzTier';
-import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import Datensicht, {
   scrolleZurZeile,
@@ -33,6 +32,9 @@ import { SPEZIES_META, TIER_STATUS, filterTiere, type TiereSicht } from './tiere
 import type { Spezies, Tier } from '../api/types';
 import StatusTag from '../components/StatusTag';
 import { einsatzStatus } from '../theme/statusFarben';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { useFrischAngelegt } from '../components/useFrischAngelegt';
+import { registrierNummer } from '../anzeige/registrierNummer';
 
 const STATUS_META = TIER_STATUS;
 
@@ -49,9 +51,7 @@ const SICHTEN: { key: Sicht; label: string }[] = [
 
 /** Registriernummer des Halters in Anzeigeschreibweise, oder `null`. */
 function halterNummer(t: Tier): string | null {
-  return t.halter_registrier_nr != null
-    ? `R-${String(t.halter_registrier_nr).padStart(3, '0')}`
-    : null;
+  return t.halter_registrier_nr != null ? registrierNummer('R', t.halter_registrier_nr) : null;
 }
 
 /** Halter-Kurzanzeige für die Liste. */
@@ -165,13 +165,6 @@ export default function TierePage() {
     {},
   );
   const [highlight, setHighlight] = useState<{ einsatzId: number; tierId: number } | null>(null);
-  const [frischAngelegt, setFrischAngelegt] = useState<
-    Array<{
-      einsatzId: number;
-      tier: Tier;
-      bestaetigenNach: number;
-    }>
-  >([]);
   const aktuellerEinsatzRef = useRef(einsatzId);
   aktuellerEinsatzRef.current = einsatzId;
   const sicht = sichtNachEinsatz[einsatzId] ?? 'aktiv';
@@ -194,9 +187,9 @@ export default function TierePage() {
     queryKey: einsatzKeys.tiere(einsatzId),
     queryFn: () => listeTiere(einsatzId),
   });
+  const frischAngelegt = useFrischAngelegt<Tier>(einsatzId, einsatzKeys.tiere, tiereQuery);
 
   const qc = useQueryClient();
-  const { message } = App.useApp();
   const [modus, setModus] = useState<{
     einsatzId: number;
     wert: 'schnell' | 'vermisst';
@@ -223,27 +216,12 @@ export default function TierePage() {
     form.setFieldValue('antreff_ort', ort);
   }, [aktuellerModus, einsatzId, form]);
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   useEffect(() => {
     if (highlight?.einsatzId !== einsatzId) return;
     scrolleZurZeile(highlight.tierId);
   }, [highlight, einsatzId, sicht]);
-
-  useEffect(() => {
-    const serverIds = new Set((tiereQuery.data ?? []).map((tier) => tier.id));
-    if (serverIds.size === 0) return;
-    setFrischAngelegt((alt) => {
-      const offen = alt.filter(
-        (eintrag) =>
-          eintrag.einsatzId !== einsatzId ||
-          tiereQuery.dataUpdatedAt <= eintrag.bestaetigenNach ||
-          !serverIds.has(eintrag.tier.id),
-      );
-      return offen.length === alt.length ? alt : offen;
-    });
-  }, [einsatzId, tiereQuery.data, tiereQuery.dataUpdatedAt]);
 
   /**
    * Anlegen. `onSuccess` invalidiert nur — Schließen macht `onFertig` der Erfassungshülle, Leeren
@@ -259,20 +237,7 @@ export default function TierePage() {
       await qc.cancelQueries({ queryKey: einsatzKeys.tiere(v.einsatzId) });
     },
     onSuccess: (tier, variablen) => {
-      // Die Quittung lebt bis zu dem Refetch, der dieselbe ID erstmals bestätigt, in einer lokalen
-      // Overlay-Liste. So blendet weder ein alter GET noch Replikationsverzug die neue Zeile aus,
-      // und bei fehlendem Cache entsteht keine scheinbar vollständige Singleton-Serverliste.
-      setFrischAngelegt((alt) => [
-        {
-          einsatzId: variablen.einsatzId,
-          tier,
-          bestaetigenNach:
-            qc.getQueryState(einsatzKeys.tiere(variablen.einsatzId))?.dataUpdatedAt ?? 0,
-        },
-        ...alt.filter(
-          (eintrag) => eintrag.einsatzId !== variablen.einsatzId || eintrag.tier.id !== tier.id,
-        ),
-      ]);
+      frischAngelegt.merke(variablen.einsatzId, [tier]);
       setHighlight({ einsatzId: variablen.einsatzId, tierId: tier.id });
       setSichtFuer(variablen.einsatzId, tier.status);
       setSpeziesFuer(variablen.einsatzId, undefined);
@@ -303,14 +268,7 @@ export default function TierePage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  const aktuelleFrische = frischAngelegt
-    .filter((eintrag) => eintrag.einsatzId === einsatzId)
-    .map((eintrag) => eintrag.tier);
-  const frischeIds = new Set(aktuelleFrische.map((tier) => tier.id));
-  const alle = [
-    ...aktuelleFrische,
-    ...(tiereQuery.data ?? []).filter((tier) => !frischeIds.has(tier.id)),
-  ];
+  const alle = frischAngelegt.alle;
   const tiere = filterTiere(alle, { sicht, spezies: speziesFilter });
 
   /**

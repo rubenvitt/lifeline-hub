@@ -17,3 +17,10 @@ export function summiereStaerke(
     { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
   );
 }
+
+/** Stärke in BOS-Schreibweise `F/UF/M//Σ` (Doppelstrich vor der Gesamtstärke), „—" ohne Angabe. */
+export function staerkeText(s: Staerke | null | undefined): string {
+  if (!s) return '—';
+  const { fuehrer, unterfuehrer, mannschaft } = s;
+  return `${fuehrer}/${unterfuehrer}/${mannschaft}//${fuehrer + unterfuehrer + mannschaft}`;
+}

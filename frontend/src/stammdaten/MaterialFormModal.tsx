@@ -1,12 +1,13 @@
 import { App, AutoComplete, Collapse, Form, Input } from 'antd';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import { aktualisiereMaterial, legeMaterialAn, type MaterialEingabe } from '../api/material';
 import type { Material } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
+import { teilwortSuche } from '../components/teilwortSuche';
 
 interface FormWerte {
   bezeichnung: string;
@@ -63,7 +64,7 @@ export default function MaterialFormModal({
       qc.invalidateQueries({ queryKey: globalKeys.material() });
       qc.invalidateQueries({ queryKey: globalKeys.materialKategorien() });
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   return (
@@ -105,10 +106,7 @@ export default function MaterialFormModal({
           options={kategorien.map((k) => ({ value: k }))}
           allowClear
           placeholder="z. B. Betreuung, Sanität, Hochwasser"
-          showSearch={{
-            filterOption: (input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-          }}
+          showSearch={teilwortSuche}
         />
       </Form.Item>
       <Form.Item label="Bestandsnummer" name="bestandsnummer">

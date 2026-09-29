@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 import { meldeBelegung, meldeStand } from '../api/betreuung';
-import { ApiError } from '../api/client';
+import { ApiError, fehlerText } from '../api/client';
 import { erfasseEtb } from '../api/etb';
 import { legePersonAn } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
@@ -28,10 +28,6 @@ const BACKOFF_MS = [1_000, 5_000, 15_000, 30_000];
 
 type QueueElement =
   { art: 'etb'; wert: AusstehenderEintrag } | { art: 'schreiben'; wert: AusstehendeSchreibaktion };
-
-function fehlermeldung(e: unknown): string {
-  return e instanceof ApiError ? e.message : 'Abgelehnt';
-}
 
 /** Globaler Queue-Flush für genau die aktuell angemeldete, datenbankweit
  * eindeutige Benutzer-ID. Fremde und unzugeordnete Legacy-Zeilen werden weder
@@ -154,9 +150,13 @@ export function useOfflineSync(benutzerId?: number): void {
             break; // Reihenfolge innerhalb eines Einsatzes wahren
           }
           if (element.art === 'etb') {
-            await queueAblehnen(aktuellerBenutzerId, element.wert, fehlermeldung(e));
+            await queueAblehnen(aktuellerBenutzerId, element.wert, fehlerText(e, 'Abgelehnt'));
           } else {
-            await schreibaktionAblehnen(aktuellerBenutzerId, element.wert, fehlermeldung(e));
+            await schreibaktionAblehnen(
+              aktuellerBenutzerId,
+              element.wert,
+              fehlerText(e, 'Abgelehnt'),
+            );
           }
         }
       }

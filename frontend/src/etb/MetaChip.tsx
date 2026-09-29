@@ -6,6 +6,7 @@ import { useState } from 'react';
 import type { MeldeWeg } from '../api/types';
 import { MELDEWEG_OPTIONEN, METADATEN_FELDER, type MetaFeld } from './schnellerfassungModell';
 import BuchstabierHilfe from './BuchstabierHilfe';
+import { teilwortSuche } from '../components/teilwortSuche';
 
 type Wert = string | dayjs.Dayjs | MeldeWeg | undefined;
 
@@ -75,10 +76,7 @@ export default function MetaChip({
             // Klick auf Vorschlag feuert nur onChange → onSelect committet sofort.
             onSelect={(v) => onCommit(feld, v)}
             options={optionen.map((o) => ({ value: o }))}
-            showSearch={{
-              filterOption: (input, option) =>
-                (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-            }}
+            showSearch={teilwortSuche}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 if (text.trim()) onCommit(feld, text.trim());

@@ -24,6 +24,7 @@ import type { Personal, StaerkePosition } from '../api/types';
 import { personalListePfad } from './stammdatenDetail';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { Formularpaneel } from '../components/instrument';
+import { teilwortSuche } from '../components/teilwortSuche';
 
 interface FormWerte {
   name: string;
@@ -187,10 +188,7 @@ export default function PersonalDetailPage() {
                     options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
                     allowClear
                     placeholder="z. B. DRK Musterstadt"
-                    showSearch={{
-                      filterOption: (input, option) =>
-                        (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-                    }}
+                    showSearch={teilwortSuche}
                   />
                 </Form.Item>
               </Col>
