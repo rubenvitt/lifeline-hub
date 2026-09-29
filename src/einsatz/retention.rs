@@ -5,6 +5,7 @@
 //! und `Utc::now()` — der Aufrufer injiziert `jetzt`, damit die Grenzen deterministisch
 //! testbar sind (Muster wie `berechtigung::retention_abgelaufen`).
 
+use crate::wire_enum::wire_enum;
 use chrono::{DateTime, Duration, Utc};
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -38,38 +39,25 @@ pub fn karenz_abgelaufen(geloescht_at: Option<&str>, jetzt: DateTime<Utc>) -> bo
     jetzt >= geloescht + Duration::days(KARENZ_TAGE)
 }
 
-/// Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben
-/// keinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an
-/// [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
-/// `tests/enum_wire_kontrakt.rs`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AufbewahrungZustand {
-    /// Keine Frist gesetzt.
-    OhneFrist,
-    /// Frist in der Zukunft.
-    FristLaeuft,
-    /// Frist abgelaufen, noch nicht zur Löschung vorgemerkt (der Purge-Lauf holt es nach).
-    Faellig,
-    /// Zur Löschung vorgemerkt, Karenz läuft — nur hier ist Wiederherstellen möglich.
-    Vorgemerkt,
-    /// Karenz abgelaufen, noch nicht geschwärzt (der nächste Purge-Lauf schwärzt).
-    SchwaerzungAusstehend,
-    /// Personendaten unwiderruflich geschwärzt.
-    Geschwaerzt,
-}
-
-impl AufbewahrungZustand {
-    /// Wire-/Anzeige-Schlüssel.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            AufbewahrungZustand::OhneFrist => "ohne_frist",
-            AufbewahrungZustand::FristLaeuft => "frist_laeuft",
-            AufbewahrungZustand::Faellig => "faellig",
-            AufbewahrungZustand::Vorgemerkt => "vorgemerkt",
-            AufbewahrungZustand::SchwaerzungAusstehend => "schwaerzung_ausstehend",
-            AufbewahrungZustand::Geschwaerzt => "geschwaerzt",
-        }
+wire_enum! {
+    /// Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben
+    /// keinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an
+    /// [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
+    /// `tests/enum_wire_kontrakt.rs`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AufbewahrungZustand {
+        /// Keine Frist gesetzt.
+        OhneFrist => "ohne_frist",
+        /// Frist in der Zukunft.
+        FristLaeuft => "frist_laeuft",
+        /// Frist abgelaufen, noch nicht zur Löschung vorgemerkt (der Purge-Lauf holt es nach).
+        Faellig => "faellig",
+        /// Zur Löschung vorgemerkt, Karenz läuft — nur hier ist Wiederherstellen möglich.
+        Vorgemerkt => "vorgemerkt",
+        /// Karenz abgelaufen, noch nicht geschwärzt (der nächste Purge-Lauf schwärzt).
+        SchwaerzungAusstehend => "schwaerzung_ausstehend",
+        /// Personendaten unwiderruflich geschwärzt.
+        Geschwaerzt => "geschwaerzt",
     }
 }
 

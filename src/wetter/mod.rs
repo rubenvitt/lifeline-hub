@@ -17,60 +17,42 @@
 //!
 //! Spec: `openspec/changes/lfh-633-fachmodul-wetter-pegel/`
 
+use crate::wire_enum::wire_enum;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 pub mod abruf;
 pub mod quelle;
 
-/// Amtliche Warnstufe des DWD, abgebildet aus `severity` der Quelle. Wire == `as_str()`.
-///
-/// Die Reihenfolge der Varianten ist die Schwere (`Ord`): die Liste wird danach absteigend
-/// sortiert.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum WetterWarnstufe {
-    /// `minor` — „Wetterwarnung“.
-    Gering,
-    /// `moderate` — „Markantes Wetter“.
-    Maessig,
-    /// `severe` — „Unwetterwarnung“.
-    Schwer,
-    /// `extreme` — „Extremes Unwetter“.
-    Extrem,
-}
-
-impl WetterWarnstufe {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            WetterWarnstufe::Gering => "gering",
-            WetterWarnstufe::Maessig => "maessig",
-            WetterWarnstufe::Schwer => "schwer",
-            WetterWarnstufe::Extrem => "extrem",
-        }
+wire_enum! {
+    /// Amtliche Warnstufe des DWD, abgebildet aus `severity` der Quelle. Wire == `as_str()`.
+    ///
+    /// Die Reihenfolge der Varianten ist die Schwere (`Ord`): die Liste wird danach absteigend
+    /// sortiert.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
+    pub enum WetterWarnstufe {
+        /// `minor` — „Wetterwarnung“.
+        Gering => "gering",
+        /// `moderate` — „Markantes Wetter“.
+        Maessig => "maessig",
+        /// `severe` — „Unwetterwarnung“.
+        Schwer => "schwer",
+        /// `extreme` — „Extremes Unwetter“.
+        Extrem => "extrem",
     }
 }
 
-/// Zustand eines Teils der Wetter-Antwort. Wire == `as_str()`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum WetterTeilZustand {
-    /// Ein verwertbarer Stand liegt vor (`daten` ist gesetzt, `abgerufen_at` ebenfalls).
-    Ok,
-    /// Der Einsatz hat keine Koordinate des Einsatzorts; es gab keinen Abruf.
-    KeinOrt,
-    /// Kein verwertbarer Stand: kein Cache und der Abruf scheiterte, oder der Cache ist älter
-    /// als die Obergrenze (Warnungen 6 h, Vorhersage 12 h). Die Seite zeigt „Stand unbekannt“.
-    Ausfall,
-}
-
-impl WetterTeilZustand {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            WetterTeilZustand::Ok => "ok",
-            WetterTeilZustand::KeinOrt => "kein_ort",
-            WetterTeilZustand::Ausfall => "ausfall",
-        }
+wire_enum! {
+    /// Zustand eines Teils der Wetter-Antwort. Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum WetterTeilZustand {
+        /// Ein verwertbarer Stand liegt vor (`daten` ist gesetzt, `abgerufen_at` ebenfalls).
+        Ok => "ok",
+        /// Der Einsatz hat keine Koordinate des Einsatzorts; es gab keinen Abruf.
+        KeinOrt => "kein_ort",
+        /// Kein verwertbarer Stand: kein Cache und der Abruf scheiterte, oder der Cache ist älter
+        /// als die Obergrenze (Warnungen 6 h, Vorhersage 12 h). Die Seite zeigt „Stand unbekannt“.
+        Ausfall => "ausfall",
     }
 }
 

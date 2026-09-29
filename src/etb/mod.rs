@@ -3,23 +3,24 @@ pub mod repo;
 pub mod zaehler;
 
 use crate::error::AppError;
+use crate::wire_enum::wire_enum;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
 
 /// Eintragstyp: Meldung.
-pub const TYP_MELDUNG: &str = "meldung";
+pub const TYP_MELDUNG: &str = EtbTyp::Meldung.as_str();
 /// Eintragstyp: Anordnung.
-pub const TYP_ANORDNUNG: &str = "anordnung";
+pub const TYP_ANORDNUNG: &str = EtbTyp::Anordnung.as_str();
 /// Eintragstyp: Lage.
-pub const TYP_LAGE: &str = "lage";
+pub const TYP_LAGE: &str = EtbTyp::Lage.as_str();
 /// Eintragstyp: Entscheidung.
-pub const TYP_ENTSCHEIDUNG: &str = "entscheidung";
+pub const TYP_ENTSCHEIDUNG: &str = EtbTyp::Entscheidung.as_str();
 /// Eintragstyp: System (automatisch durch spätere Module; in T1 nicht client-erfassbar).
-pub const TYP_SYSTEM: &str = "system";
+pub const TYP_SYSTEM: &str = EtbTyp::System.as_str();
 /// Eintragstyp: Berichtigung (verweist auf den berichtigten Eintrag).
-pub const TYP_BERICHTIGUNG: &str = "berichtigung";
+pub const TYP_BERICHTIGUNG: &str = EtbTyp::Berichtigung.as_str();
 
 /// Baut die `EintragDaten` eines pseudonymen System-ETB-Eintrags (nur `inhalt`, Rest leer).
 fn system_daten(inhalt: &str) -> repo::EintragDaten<'_> {
@@ -68,44 +69,20 @@ pub async fn system_audit(
     repo::anlegen(pool, einsatz_id, erfasser_id, system_daten(inhalt)).await
 }
 
-/// Eintragstyp eines ETB-Eintrags. Wird als TEXT in der DB gespeichert.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EtbTyp {
-    Meldung,
-    Anordnung,
-    Lage,
-    Entscheidung,
-    System,
-    Berichtigung,
+wire_enum! {
+    /// Eintragstyp eines ETB-Eintrags. Wird als TEXT in der DB gespeichert.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum EtbTyp {
+        Meldung => "meldung",
+        Anordnung => "anordnung",
+        Lage => "lage",
+        Entscheidung => "entscheidung",
+        System => "system",
+        Berichtigung => "berichtigung",
+    }
 }
 
 impl EtbTyp {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            EtbTyp::Meldung => TYP_MELDUNG,
-            EtbTyp::Anordnung => TYP_ANORDNUNG,
-            EtbTyp::Lage => TYP_LAGE,
-            EtbTyp::Entscheidung => TYP_ENTSCHEIDUNG,
-            EtbTyp::System => TYP_SYSTEM,
-            EtbTyp::Berichtigung => TYP_BERICHTIGUNG,
-        }
-    }
-
-    /// Parst einen Typstring; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<EtbTyp> {
-        match s {
-            TYP_MELDUNG => Some(EtbTyp::Meldung),
-            TYP_ANORDNUNG => Some(EtbTyp::Anordnung),
-            TYP_LAGE => Some(EtbTyp::Lage),
-            TYP_ENTSCHEIDUNG => Some(EtbTyp::Entscheidung),
-            TYP_SYSTEM => Some(EtbTyp::System),
-            TYP_BERICHTIGUNG => Some(EtbTyp::Berichtigung),
-            _ => None,
-        }
-    }
-
     /// Ob dieser Typ eine Berichtigung ist (erfordert `berichtigt_eintrag_id`).
     pub fn ist_berichtigung(&self) -> bool {
         matches!(self, EtbTyp::Berichtigung)
@@ -143,36 +120,14 @@ where
     }
 }
 
-/// Meldeweg eines Eintrags (optional).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum MeldeWeg {
-    Funk,
-    Telefon,
-    Persoenlich,
-    Sonstige,
-}
-
-impl MeldeWeg {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            MeldeWeg::Funk => "funk",
-            MeldeWeg::Telefon => "telefon",
-            MeldeWeg::Persoenlich => "persoenlich",
-            MeldeWeg::Sonstige => "sonstige",
-        }
-    }
-
-    /// Parst einen Meldeweg-String; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<MeldeWeg> {
-        match s {
-            "funk" => Some(MeldeWeg::Funk),
-            "telefon" => Some(MeldeWeg::Telefon),
-            "persoenlich" => Some(MeldeWeg::Persoenlich),
-            "sonstige" => Some(MeldeWeg::Sonstige),
-            _ => None,
-        }
+wire_enum! {
+    /// Meldeweg eines Eintrags (optional).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum MeldeWeg {
+        Funk => "funk",
+        Telefon => "telefon",
+        Persoenlich => "persoenlich",
+        Sonstige => "sonstige",
     }
 }
 

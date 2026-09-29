@@ -1,3 +1,4 @@
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -66,34 +67,14 @@ impl Staerke {
     }
 }
 
-/// Taktische Stärke-Position einer einzelnen Person (genau einer von drei Töpfen).
-/// Wird als TEXT in der DB gespeichert (kein sqlx-Enum-Decode → manuell konvertiert).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum StaerkePosition {
-    Fuehrer,
-    Unterfuehrer,
-    Mannschaft,
-}
-
-impl StaerkePosition {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            StaerkePosition::Fuehrer => "fuehrer",
-            StaerkePosition::Unterfuehrer => "unterfuehrer",
-            StaerkePosition::Mannschaft => "mannschaft",
-        }
-    }
-
-    /// Parst einen gespeicherten/übergebenen Positionsstring; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<StaerkePosition> {
-        match s {
-            "fuehrer" => Some(StaerkePosition::Fuehrer),
-            "unterfuehrer" => Some(StaerkePosition::Unterfuehrer),
-            "mannschaft" => Some(StaerkePosition::Mannschaft),
-            _ => None,
-        }
+wire_enum! {
+    /// Taktische Stärke-Position einer einzelnen Person (genau einer von drei Töpfen).
+    /// Wird als TEXT in der DB gespeichert (kein sqlx-Enum-Decode → manuell konvertiert).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum StaerkePosition {
+        Fuehrer => "fuehrer",
+        Unterfuehrer => "unterfuehrer",
+        Mannschaft => "mannschaft",
     }
 }
 
