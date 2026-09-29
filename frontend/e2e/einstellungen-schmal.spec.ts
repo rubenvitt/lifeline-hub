@@ -198,25 +198,38 @@ for (const { dichte, soll } of STAFFEL) {
 }
 
 /**
- * Der Rollen-Auswähler bleibt auf der schmalen Karte bedienbar: im Raster
- * `minmax(0, 1fr) auto auto` hat ein `<Select>` mit `width: 100%` keine eigene Mindestbreite
- * und könnte auf seine Pfeil-Ikone zusammenfallen.
+ * Der Rollen-Auswähler bleibt auf jeder Breite bedienbar: ein `<Select>` mit `width: 100%` hat
+ * keine eigene Inhaltsbreite und fiel in einer `auto`-Spur bei 1280 px auf rund 56 px zusammen
+ * (LFH-474). Bei 390 px stapelt das Raster, bei 1280 px trägt ihn die feste Rollen-Spur.
  */
-test('der Rollen-Auswähler bleibt auf 390 px breit genug zum Treffen', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `Rollenspalte ${Date.now()}`);
+for (const [name, fenster] of [
+  ['390 px', HANDSCHIRM],
+  ['1280 px', FUEKW],
+] as const) {
+  test(`der Rollen-Auswähler bleibt auf ${name} breit genug zum Treffen`, async ({ page }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `Rollenspalte ${Date.now()}`);
 
-  await page.setViewportSize(HANDSCHIRM);
-  await page.goto(modulPfad(einsatzId));
+    await page.setViewportSize(fenster);
+    await page.goto(modulPfad(einsatzId));
 
-  const auswahl = page.getByRole('combobox', { name: `Benötigte Rolle: ${MODUL}` });
-  await expect(auswahl).toBeVisible();
+    const auswahl = page.getByRole('combobox', { name: `Benötigte Rolle: ${MODUL}` });
+    await expect(auswahl).toBeVisible();
 
-  const kasten = await auswahl.boundingBox();
-  expect(kasten, 'Rollen-Auswähler nicht messbar').not.toBeNull();
-  // Die Breite, ab der die längste Option („Führungskraft") lesbar steht statt abgeschnitten.
-  expect(
-    kasten!.width,
-    `Rollen-Auswähler (gemessen ${kasten!.width} px) ist zu schmal zum Treffen und Lesen`,
-  ).toBeGreaterThanOrEqual(120);
-});
+    const kasten = await auswahl.boundingBox();
+    expect(kasten, 'Rollen-Auswähler nicht messbar').not.toBeNull();
+    const zeilenbreite = await auswahl.evaluate(
+      (el) => (el.closest('[data-modul-zeile]') as HTMLElement).clientWidth,
+    );
+    // Die Breite, ab der die längste Option („Führungskraft") lesbar steht statt abgeschnitten.
+    expect(
+      kasten!.width,
+      `Rollen-Auswähler bei ${name} (gemessen ${kasten!.width} px in einer ${zeilenbreite} px breiten Zeile) ist zu schmal zum Treffen und Lesen`,
+    ).toBeGreaterThanOrEqual(120);
+    // …und er sprengt die Zeile nicht: ohne Obergrenze erfüllte auch ein Überlauf die Aussage.
+    expect(
+      kasten!.width,
+      `Rollen-Auswähler (${kasten!.width} px) darf die Contentbreite seiner Zeile (${zeilenbreite} px) nicht überschreiten`,
+    ).toBeLessThanOrEqual(zeilenbreite + SUBPIXEL);
+  });
+}

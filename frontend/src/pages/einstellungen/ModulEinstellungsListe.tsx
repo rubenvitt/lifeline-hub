@@ -31,6 +31,27 @@ export function modulZeilenStil(token: {
   };
 }
 
+/**
+ * Spurvorschrift des breiten Rasters — rein und exportiert (LFH-474). Die Rollen-Spalte trägt
+ * eine FESTE Spur statt `auto`: ein `<Select>` mit `width: 100%` bringt keine Inhaltsbreite mit,
+ * und die `auto`-Spur fiel bei 1280 px auf rund 56 px zusammen („Führungskraft" abgeschnitten).
+ *
+ * Die Spur statt einer `minWidth` am Auswähler: die Spur gilt nur im breiten Raster, unter `md`
+ * stapelt die Zeile (`1fr`) und der Auswähler nimmt die ganze Kartenbreite. Eine Mindestbreite am
+ * Steuerelement gälte auch dort und drängte es aus der schmalen Karte (vgl. `Datensicht.tsx`,
+ * LFH-369). Fest statt `minmax(…, auto)`: jede Zeile ist ein eigenes Raster, und nur eine feste
+ * Spur hält die Rollen-Spalte über alle Zeilen und den Kopf bündig; der Hinweis darunter bricht um.
+ *
+ * Die Breite folgt der Grundschrift der Dichte (zwölf Schriftgrade: 162 px bei 13,5, 180 px bei
+ * 15), damit die längste Option in jeder Stufe samt Pfeil lesbar steht. Ohne Sichtbar-Spalte hat
+ * die Zeile zwei Kinder und bekommt genau zwei Spuren — sonst fiele der Auswähler in die
+ * `auto`-Spur des Schalters.
+ */
+export function modulRasterSpalten(vorgabe: { mitSichtbar: boolean; fontSize: number }): string {
+  const rollenSpur = `${Math.round(vorgabe.fontSize * 12)}px`;
+  return vorgabe.mitSichtbar ? `minmax(0, 1fr) auto ${rollenSpur}` : `minmax(0, 1fr) ${rollenSpur}`;
+}
+
 /** Warum eine Zeile gesperrt ist — je Zeile genau EINER, auch wenn mehrere Quellen greifen. */
 type ModulSperrGrund = 'modul' | 'rechte' | 'laeuft';
 
@@ -109,10 +130,9 @@ interface ModulEinstellungsListeProps {
  * Aufrufer kennt seinen Endpunkt. `istModulAusblendbar` wird hier ausgewertet: das ist eine
  * Eigenschaft des Moduls, keine Berechtigungsfrage, und gilt auch für Verwaltende.
  *
- * Raster `minmax(0, 1fr) auto auto` statt fester Breiten; der Rollen-Select nimmt die volle
- * Spaltenbreite (eine feste Mindestbreite drängte ihn aus der schmalen Karte). Unter `md`
- * gestapelt, und die Spaltenköpfe fallen dann ganz weg. Die Köpfe stehen einmal über allen Blöcken,
- * weil das Raster über alle Gruppen dasselbe ist.
+ * Raster aus `modulRasterSpalten` (fließende Modul-Spalte, feste Rollen-Spur); der Rollen-Select
+ * nimmt die volle Spurbreite. Unter `md` gestapelt, und die Spaltenköpfe fallen dann ganz weg.
+ * Die Köpfe stehen einmal über allen Blöcken, weil das Raster über alle Gruppen dasselbe ist.
  *
  * `laeuftKey` sperrt nur die schreibende Zeile. Der fehlgeschlagene Wert springt von selbst zurück
  * (kein optimistisches Update); `fehlerKey` markiert die Zeile am linken Rand.
@@ -160,7 +180,10 @@ export default function ModulEinstellungsListe({
     ? { display: 'grid', gridTemplateColumns: '1fr', gap: token.marginXXS }
     : {
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) auto auto',
+        gridTemplateColumns: modulRasterSpalten({
+          mitSichtbar: Boolean(sichtbarSpalte),
+          fontSize: token.fontSize,
+        }),
         alignItems: 'center',
         gap: token.margin,
       };

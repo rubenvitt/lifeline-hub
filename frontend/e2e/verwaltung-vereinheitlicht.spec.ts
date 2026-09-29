@@ -193,16 +193,11 @@ test('bei 390 px stapelt die Modulzeile der Einsatz-Defaults, die Spaltenköpfe 
 });
 
 /**
- * BEFUND, BEWUSST NICHT BEHOBEN: in der breiten Ansicht (1280 px) fällt die `auto`-Spalte des
- * Rasters `minmax(0, 1fr) auto auto` in `ModulEinstellungsListe.tsx` auf rund 56 px zusammen —
- * auf der Einsatz- wie auf der Admin-Route. Die Behebung (etwa eine `minmax()`-Spur) gehört
- * in ein eigenes Ticket.
- *
- * Ein GRÜNER Pin statt `test.fail()`: `test.fail()` akzeptierte jeden Fehler, auch einen
- * kaputten Locator, und hörte still auf zu messen. Das Fenster um den Ist-Wert wird rot, wenn
- * der Befund behoben ist (dann Test samt Block entfernen) oder sich verschlechtert.
+ * Die breite Ansicht (LFH-474): bis dahin fiel die `auto`-Spur der Rollen-Spalte hier auf rund
+ * 56 px zusammen, weil ein `<Select>` mit `width: 100%` keine Inhaltsbreite beiträgt. Die Spur
+ * ist jetzt fest (`modulRasterSpalten`); gemessen wird dieselbe Schwelle wie bei 390 px.
  */
-test('BEFUND (Bestand seit LFH-345): der Rollen-Auswähler fällt bei 1280 px auf 56 px zusammen', async ({
+test('bei 1280 px steht der Rollen-Auswähler der Einsatz-Defaults breit genug zum Lesen', async ({
   page,
 }) => {
   await anmelden(page);
@@ -215,17 +210,14 @@ test('BEFUND (Bestand seit LFH-345): der Rollen-Auswähler fällt bei 1280 px au
   ).toBeVisible();
 
   const masse = await rollenspaltenMasse(page);
-  const meldung =
-    `Rollen-Auswähler bei 1280 px: gemessen ${masse.breite} px in einer ` +
-    `${masse.zeilenbreite} px breiten Zeile (Befundstand: 56,3 px).`;
-  // Untergrenze: nicht auf die nackte Pfeil-Ikone (~32 px) zusammengefallen.
-  expect(masse.breite, `${meldung} Verschlechterung auf die Pfeil-Ikone.`).toBeGreaterThan(40);
-  // Obergrenze: solange der Befund steht, unter der Lesbarkeitsschwelle. Fällt sie, gehört die
-  // Aussage als `>= LESBAR` in den 390-px-Fall daneben.
   expect(
     masse.breite,
-    `${meldung} Sieht nach BEHOBEN aus — Befund-Test entfernen und die Zusicherung regulär stellen.`,
-  ).toBeLessThan(LESBAR);
+    `Rollen-Auswähler bei 1280 px (gemessen ${masse.breite} px in einer ${masse.zeilenbreite} px breiten Zeile) ist zu schmal zum Lesen`,
+  ).toBeGreaterThanOrEqual(LESBAR);
+  expect(
+    masse.breite,
+    `Rollen-Auswähler (${masse.breite} px) darf die Contentbreite seiner Zeile (${masse.zeilenbreite} px) nicht überschreiten`,
+  ).toBeLessThanOrEqual(masse.zeilenbreite + SUBPIXEL);
 });
 
 // ── MESSUNG 3 ───────────────────────────────────────────────────────────────────────────
