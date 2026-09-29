@@ -485,14 +485,20 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
     expect(merkeModulBesuch).toHaveBeenCalledWith('etb');
   });
 
-  it('lässt eine Schnellaktion den Besuch NICHT melden', () => {
-    // Gegenaussage: eine Schnellaktion ist ein Erfassungssprung, keine Modulwahl.
-    const merkeModulBesuch = vi.fn();
-    const befehle = baueBefehle({ ...kontext(), merkeModulBesuch });
+  /**
+   * LFH-436 kehrt die Gegenaussage aus LFH-337 um: ein Griff zur Schnellaktion führt in genau EIN
+   * Modul und ist damit eine Wahl. Gemerkt wird das MODUL; die Aktion selbst trägt das
+   * Befehls-Gedächtnis (`ausgefuehrt:`), eine Dublette entsteht nicht.
+   */
+  it('meldet beim Ausführen einer Schnellaktion ihr Modul, bevor es navigiert', () => {
+    const reihenfolge: string[] = [];
+    const merkeModulBesuch = vi.fn((key: string) => reihenfolge.push(`merke:${key}`));
+    const navigate = vi.fn((p: string) => reihenfolge.push(`nav:${p}`));
+    const befehle = baueBefehle({ ...kontext({ navigate }), merkeModulBesuch });
 
-    befehle.find((b) => b.id === 'aktion:personen')!.ausfuehren();
+    befehle.find((b) => b.id === 'aktion:etb')!.ausfuehren();
 
-    expect(merkeModulBesuch).not.toHaveBeenCalled();
+    expect(reihenfolge).toEqual(['merke:etb', 'nav:/einsaetze/5/etb?neu=1']);
   });
 
   it('vergibt Zuletzt-Befehlen eigene ids, die nicht mit den Modul-Befehlen kollidieren', () => {

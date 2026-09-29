@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { anmeldenAlsAdmin, benutzerAnlegen, wechsleZu, wechsleZuRolle } from './rollen-kern';
 
 // Beide Kopfzeilen teilen Auslöser, aber nicht ihren Layout-Rahmen. Die gespeicherte Wahl
 // muss auch bei Touch gelten; Pixel prüft nur der Browser.
@@ -39,23 +40,12 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
           await page.setViewportSize({ width: breite, height: 900 });
 
           if (!mitVerwaltung) {
-            const benutzername = `lfh460-${Date.now()}`;
-            const passwort = 'lfh-460-test-passwort';
-            const antwort = await page.request.post('/api/benutzer', {
-              data: {
-                benutzername,
-                passwort,
-                anzeigename: 'Maximiliane Kirchgassner-Wohlfahrt',
-              },
-            });
-            expect(antwort.ok(), await antwort.text()).toBeTruthy();
-            const logout = await page.request.post('/api/auth/logout');
-            expect(logout.ok()).toBeTruthy();
-            await page.goto('/login');
-            await page.getByLabel('Benutzername').fill(benutzername);
-            await page.getByLabel('Passwort').fill(passwort);
-            await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-            await expect(page).toHaveURL(/\/einsaetze/);
+            // Ohne `org_rolle` 'keiner'/'keine', kein Einsatzmitglied: nur `/einsaetze`.
+            // Langer Anzeigename als Überlaufstoff für das Benutzermenü.
+            await wechsleZu(
+              page,
+              await benutzerAnlegen(page, 'beobachter', 'Maximiliane Kirchgassner-Wohlfahrt'),
+            );
           }
           const routen = mitVerwaltung
             ? ['/einsaetze', `/einsaetze/${einsatzId}/etb`]
@@ -194,9 +184,6 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
  * `tr.ant-table-row`).
  */
 
-const ADMIN = 'admin';
-const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
-
 /**
  * Führungswagen · Führungs-Tablet quer · Führungs-Tablet hoch · mobil (A1, Gate 1).
  *
@@ -211,11 +198,7 @@ const PRUEFBREITEN = [
 ] as const;
 
 async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenAlsAdmin(page);
 }
 
 async function einsatzAnlegen(page: Page, name: string): Promise<string> {
@@ -234,11 +217,16 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
  *  - Wächst ein gelisteter Verstoß über seinen `deckel`, ist er rot.
  *  - Ist ein gelisteter Eintrag behoben (≤ 1 px) oder wird er nicht mehr gemessen, meldet
  *    das Gate ihn als TOT und erzwingt seine Streichung.
- * Wer einen Eintrag braucht, misst ihn und schreibt den Verursacher dazu.
+ * Wer einen Eintrag braucht, misst ihn und schreibt den Verursacher dazu — und legt ein Ticket an.
  */
 type Freistellung = {
   /** Modulroute wie in {@link ROUTEN}. */
   modul: string;
+  /**
+   * Rolle des Durchgangs (LFH-435): eine Freistellung für den Beobachter lässt den
+   * Admin-Durchgang derselben Route × Breite unberührt — und umgekehrt.
+   */
+  rolle: Gate1Rolle;
   /** Sichtbreite in px, auf der der Verstoß auftritt. */
   breite: number;
   /** Obergrenze: darüber ist der Eintrag rot statt freigestellt. */
@@ -443,6 +431,19 @@ async function gate1Vorbereiten(page: Page): Promise<string> {
       'Ausgabe',
     );
   }
+  // Ein ETB-Eintrag mit langem Inhalt: der Lese-Anker des Beobachters, der keine
+  // Erfassungsleiste hat — und für den Admin zusätzlicher Überlaufstoff.
+  {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+      data: {
+        typ: 'meldung',
+        inhalt: ETB_STOFF,
+        von: 'Abschnittsleitung Deichverteidigung Nordwestring',
+        an: 'Einsatzleitung Technische Einsatzleitung Musterstadt',
+      },
+    });
+    expect(antwort.ok(), `Seeding ETB: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  }
   // Wetter per Stub, sonst ginge das Backend an Bright Sky. Langer Gemeindename als Stoff.
   await page.route(`**/api/einsaetze/${einsatzId}/wetter`, (route) =>
     route.fulfill({
@@ -468,12 +469,36 @@ async function gate1Vorbereiten(page: Page): Promise<string> {
   return einsatzId;
 }
 
+type Gate1Rolle = 'admin' | 'beobachter' | 'fuehrungskraft';
+
+const ETB_STOFF =
+  'Pegel Musterstadt-Nordwest steigt weiter, Deichverteidigung zwischen Kilometer 4,7 und 6,2 ' +
+  'verstärken, Sandsackbefüllung am Bauhof Nordwestring anlaufen lassen';
+
 type Gate1Route = {
   pfad: string;
   anker: (p: Page) => Locator;
   /** Läuft nach `goto` und VOR der Ankerprüfung, je Breite erneut. */
   vorbereiten?: (p: Page) => Promise<void>;
+  /**
+   * Nur-Lese-Zweig (LFH-435): Anker und Vorbedingung des Beobachters, wo sie vom Admin
+   * abweichen. Die VORBEDINGUNG belegt, dass der Rollenzweig steht — ohne sie mäße der
+   * Durchgang still den Admin-Zustand oder weniger Ziele.
+   */
+  lesend?: { anker?: (p: Page) => Locator; vorbedingung?: (p: Page) => Promise<void> };
+  /** Für Nicht-Admins leitet die Route um — zugesichert statt gemessen. */
+  umleitungOhneAdmin?: boolean;
 };
+
+/** Der Rechtehinweis des Nur-Lese-Zweigs (`RechteHinweis`, antd `Alert`). */
+function rechteHinweis(p: Page, text: RegExp) {
+  return expect(
+    p.getByRole('alert').filter({ hasText: text }),
+    'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
+  ).toBeVisible();
+}
+
+const NUR_SCHREIBENDE = /^Nur Einsatzleitung und Führungspersonal/;
 
 function gate1Routen(einsatzId: string): Gate1Route[] {
   // Eine Route je Layoutfamilie (Ebene-1-Shell, Lagebild, Einsatz-Workspace, Admin-Layout)
@@ -484,7 +509,28 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
   // müssen auf allen Breiten stehen, also nie ein `tr.ant-table-row` auf Datensicht-Routen
   // (unter `md` Karten). „Neuer Einsatz" liegt auf 390 px hinter dem Kopfgriff.
   return [
-    { pfad: '/einsaetze', anker: (p: Page) => p.locator('[data-testid="einsaetze-raster"]') },
+    {
+      pfad: '/einsaetze',
+      anker: (p: Page) => p.locator('[data-testid="einsaetze-raster"]'),
+      lesend: {
+        vorbedingung: async (p: Page) => {
+          await expect(
+            p.getByRole('link', { name: 'Verwaltung' }),
+            'Vorbedingung: kein freier Verwaltungs-Link',
+          ).toHaveCount(0);
+          await expect(
+            p.getByRole('button', { name: 'Neuer Einsatz' }),
+            'Vorbedingung: ohne Recht kein „Neuer Einsatz"',
+          ).toHaveCount(0);
+        },
+      },
+    },
+    {
+      // Die Startseite des Einsatzes (`redirectZiel()`); der Beobachter sieht dort den Hinweis.
+      pfad: `/einsaetze/${einsatzId}/ueberblick`,
+      anker: (p: Page) => p.getByRole('heading', { name: 'Überblick', level: 1 }),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
+    },
     {
       pfad: `/einsaetze/${einsatzId}/lage-dashboard`,
       anker: (p: Page) =>
@@ -493,12 +539,25 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
     {
       pfad: `/einsaetze/${einsatzId}/etb`,
       anker: (p: Page) => p.getByPlaceholder('Inhalt …'),
+      lesend: {
+        anker: (p: Page) => p.getByText(ETB_STOFF),
+        vorbedingung: (p: Page) =>
+          expect(
+            p.getByPlaceholder('Inhalt …'),
+            'Vorbedingung: ohne Schreibrecht keine Erfassungsleiste',
+          ).toHaveCount(0),
+      },
     },
-    { pfad: '/admin/benutzer', anker: (p: Page) => p.locator('tr.ant-table-row').first() },
+    {
+      pfad: '/admin/benutzer',
+      anker: (p: Page) => p.locator('tr.ant-table-row').first(),
+      umleitungOhneAdmin: true,
+    },
     {
       // Anker ist der Seitentitel, nicht eine Tabellenzeile: die Fahrzeugliste kann leer sein.
       pfad: '/admin/stammdaten/fahrzeuge',
       anker: (p: Page) => p.getByRole('heading', { name: 'Fahrzeuge', level: 1 }),
+      umleitungOhneAdmin: true,
     },
     {
       pfad: `/einsaetze/${einsatzId}/personal`,
@@ -543,6 +602,7 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
         p.getByRole('article', {
           name: 'Schicht Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
         }),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
     },
     {
       // Datenanker ist die Bezirkskarte (in jeder Breite Karte); die Stellen-Tabelle trägt auf
@@ -552,6 +612,7 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
         p
           .getByRole('region', { name: 'Evakuierungsbezirke' })
           .getByText('Uferstraße 12–40 und Deichweg 1–9 zwischen Schleuse und Pumpwerk Nordwest'),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
     },
     {
       // Dieselbe Seite mit AUFGEKLAPPTEM Verlauf an Karte und Zeile. Der Anker steht erst,
@@ -572,6 +633,7 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
         p.getByRole('article', {
           name: /^Zeitfenster Mittagessen Deichverteidigung Nordwestring Kilometer 4,7 bis 6,2 /,
         }),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
     },
     {
       // Gemessen mit OFFENER Leiste (unter `lg` unter der Karte, auf dem Handschirm per
@@ -595,90 +657,190 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
   ];
 }
 
+/** Nur Systemrolle „Admin" ändert Stammdaten und Org-Defaults — der Rest liest nach. */
+const NUR_SYSTEM_ADMIN = /^Nur Benutzer mit der Systemrolle „Admin“ dürfen/;
+
+const FAHRZEUG_STOFF = 'Florian Musterstadt-Nordwest 46/11-1 Wechsellader Abrollbehälter';
+
+/**
+ * Verwaltungsrouten der Org-Führungskraft (LFH-435): sie kommt in die Verwaltung, ist aber kein
+ * System-Admin — Rechtehinweis und gesperrte Aktionen stehen, die Benutzerverwaltung leitet um.
+ */
+function gate1VerwaltungRouten(): Gate1Route[] {
+  return [
+    {
+      pfad: '/admin/stammdaten/fahrzeuge',
+      anker: (p: Page) => p.getByText(FAHRZEUG_STOFF).first(),
+      lesend: {
+        vorbedingung: async (p: Page) => {
+          await rechteHinweis(p, NUR_SYSTEM_ADMIN);
+          await expect(
+            p.getByRole('button', { name: 'Fahrzeug anlegen' }),
+            'Vorbedingung: die Primäraktion steht gesperrt, nicht versteckt',
+          ).toBeDisabled();
+        },
+      },
+    },
+    {
+      pfad: '/admin/einstellungen/einsatz',
+      anker: (p: Page) => p.getByRole('heading', { name: 'Einsatz-Defaults', level: 1 }),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SYSTEM_ADMIN) },
+    },
+    {
+      pfad: '/admin/benutzer',
+      anker: (p: Page) => p.locator('tr.ant-table-row').first(),
+      umleitungOhneAdmin: true,
+    },
+  ];
+}
+
+/**
+ * Misst alle Routen einer Rolle auf einer Breite und meldet gesammelt. Für Nicht-Admins
+ * gelten Lese-Anker und Vorbedingungen des Nur-Lese-Zweigs (`lesend`).
+ */
+async function gate1Messen(
+  page: Page,
+  routen: Gate1Route[],
+  rolle: Gate1Rolle,
+  { name, breite, hoehe }: (typeof PRUEFBREITEN)[number],
+) {
+  // ALLE Routen messen und gesammelt melden: sonst verdeckt der erste Fund die übrigen.
+  const verstoesse: string[] = [];
+  const messwerte: string[] = [];
+  const tot: string[] = [];
+  const genutzteFreistellungen = new Set<string>();
+  const lesend = rolle !== 'admin';
+  await page.setViewportSize({ width: breite, height: hoehe });
+  for (const { pfad, anker, vorbereiten, lesend: zweig, umleitungOhneAdmin } of routen) {
+    await page.goto(pfad);
+    if (lesend && umleitungOhneAdmin) {
+      // Ohne Admin-Recht gibt es diese Fläche nicht — die Umleitung ist die Zusicherung.
+      await expect(page, `${pfad}: leitet für ${rolle} um`).toHaveURL(/\/einsaetze$/);
+      messwerte.push(`${pfad} @${breite}: umgeleitet`);
+      continue;
+    }
+    // Erst wenn der Rahmen steht, ist die Messung aussagekräftig. `first()`, weil der
+    // Verwaltungsbereich zwei Rahmen schachtelt.
+    await expect(page.locator('.ant-layout-content').first()).toBeVisible();
+    // Reiter-Umschaltungen o. Ä. VOR dem Anker, sonst prüft er eine Fläche außerhalb des Baums.
+    if (vorbereiten) await vorbereiten(page);
+    // Erst der Anker belegt, dass die GEMEINTE Seite steht; er ersetzt das Warten auf ein
+    // ruhiges Netz, das der SSE-Strom nie hergibt (LFH-385).
+    await expect(
+      ((lesend && zweig?.anker) || anker)(page),
+      `${pfad} bei ${breite}px (${rolle}): die gemeinte Seite ist nicht gerendert`,
+    ).toBeVisible();
+    // Der Rollenzweig muss stehen, BEVOR gemessen wird — sonst misst der Durchgang still den
+    // Admin-Zustand.
+    if (lesend && zweig?.vorbedingung) await zweig.vorbedingung(page);
+
+    const { ueber, schuldige } = await ueberlauf(page);
+    messwerte.push(`${pfad} @${breite}: ${ueber}px`);
+
+    // Freistellung über das Modul-Segment (der ganze Pfad enthält die laufende Einsatz-ID),
+    // die Breite UND die Rolle.
+    const frei = BESTAND_OFFEN.find(
+      (b) => pfad.endsWith(`/${b.modul}`) && b.breite === breite && b.rolle === rolle,
+    );
+    if (frei) {
+      genutzteFreistellungen.add(`${frei.modul}@${frei.breite}`);
+      if (ueber <= 1) {
+        tot.push(
+          `${pfad} bei ${breite}px (${rolle}) ist BEHOBEN (${ueber}px) — der Eintrag in ` +
+            `BESTAND_OFFEN ist tot und muss samt seiner Zeile im Kopfkommentar weg.`,
+        );
+      } else if (ueber > frei.deckel) {
+        verstoesse.push(
+          `${pfad} bei ${breite}px (${name}, ${rolle}): ${ueber}px über — das ist mehr als der ` +
+            `freigestellte Deckel ${frei.deckel}px (gemessen war ${frei.gemessen}px), also eine ` +
+            `VERSCHLECHTERUNG, kein Bestand\n  ${schuldige.slice(0, 4).join('\n  ')}`,
+        );
+      }
+      continue;
+    }
+
+    if (ueber > 1) {
+      verstoesse.push(
+        `${pfad} bei ${breite}px (${name}, ${rolle}): ${ueber}px über\n  ${schuldige.slice(0, 4).join('\n  ')}`,
+      );
+    }
+  }
+
+  // Ein Eintrag, den keine Route dieser Breite und Rolle getroffen hat, ist ebenso tot. Einträge
+  // auf einer Breite, die keine Prüfbreite ist, meldet JEDER Test seiner Rolle.
+  const pruefbreiten: readonly number[] = PRUEFBREITEN.map((pb) => pb.breite);
+  for (const b of BESTAND_OFFEN) {
+    if (b.rolle !== rolle) continue;
+    const hierZustaendig = b.breite === breite || !pruefbreiten.includes(b.breite);
+    if (hierZustaendig && !genutzteFreistellungen.has(`${b.modul}@${b.breite}`)) {
+      tot.push(
+        `BESTAND_OFFEN nennt ${b.modul}@${b.breite}px (${b.rolle}), aber diese Route × Breite ` +
+          `wird für die Rolle gar nicht gemessen — tote Freistellung.`,
+      );
+    }
+  }
+  expect(tot, `Tote Freistellungen:\n${tot.join('\n')}`).toEqual([]);
+  // Messwerte protokollieren: ein grüner Lauf ohne Zahlen lässt offen, ob gemessen wurde.
+  test.info().annotations.push({ type: 'messwert', description: messwerte.join(' · ') });
+  expect(verstoesse, `Gate 1 verletzt:\n${verstoesse.join('\n')}`).toEqual([]);
+}
+
 /*
- * JE PRÜFBREITE EIN TEST: jede Breite hat ihr eigenes Zeitbudget, und ein Bruch nennt seine
- * Breite im Testnamen. Innerhalb einer Breite wird ALLES gemessen und gesammelt gemeldet.
+ * JE PRÜFBREITE UND ROLLE EIN TEST: jeder hat sein eigenes Zeitbudget, und ein Bruch nennt
+ * Breite und Rolle im Testnamen. Innerhalb eines Tests wird ALLES gemessen und gesammelt
+ * gemeldet.
  *
- * `mode: 'parallel'` verteilt die Breiten auf Worker (die Konfiguration fährt kein
- * `fullyParallel`). Sie sind unabhängig, jede legt ihren eigenen Einsatz an.
+ * ROLLEN (LFH-435): der Admin läuft nur durch die freien Zweige. Der Beobachter (weder
+ * Verwaltungs- noch Schreibrecht) sieht Rechtehinweise, gesperrte Aktionen und den
+ * Nur-Lese-ETB; die Org-Führungskraft die Verwaltung ohne Admin-Recht.
+ *
+ * `mode: 'parallel'` verteilt die Tests auf Worker (die Konfiguration fährt kein
+ * `fullyParallel`). Sie sind unabhängig, jeder legt seinen eigenen Einsatz an.
  */
 test.describe('Gate 1', () => {
   test.describe.configure({ mode: 'parallel' });
-  for (const { name, breite, hoehe } of PRUEFBREITEN) {
+  for (const pruefbreite of PRUEFBREITEN) {
+    const { name, breite } = pruefbreite;
     test(`Gate 1 · ${name} (${breite} px): keine tragende Route läuft waagerecht über`, async ({
       page,
     }) => {
-      // 15+ Routen je Breite, jede mit `goto` und Inhaltsanker.
-      test.slow();
-
+      // 17 Routen je Breite, jede mit `goto` und Inhaltsanker; `test.slow()` (90 s) reichte
+      // unter Last nicht mehr, seit der Überblick mitgemessen wird (LFH-435).
+      test.setTimeout(180_000);
       const einsatzId = await gate1Vorbereiten(page);
-      const routen = gate1Routen(einsatzId);
+      await gate1Messen(page, gate1Routen(einsatzId), 'admin', pruefbreite);
+    });
 
-      // ALLE Routen messen und gesammelt melden: sonst verdeckt der erste Fund die übrigen.
-      const verstoesse: string[] = [];
-      const messwerte: string[] = [];
-      const tot: string[] = [];
-      const genutzteFreistellungen = new Set<string>();
-      await page.setViewportSize({ width: breite, height: hoehe });
-      for (const { pfad, anker, vorbereiten } of routen) {
-        await page.goto(pfad);
-        // Erst wenn der Rahmen steht, ist die Messung aussagekräftig. `first()`, weil der
-        // Verwaltungsbereich zwei Rahmen schachtelt.
-        await expect(page.locator('.ant-layout-content').first()).toBeVisible();
-        // Reiter-Umschaltungen o. Ä. VOR dem Anker, sonst prüft er eine Fläche außerhalb des Baums.
-        if (vorbereiten) await vorbereiten(page);
-        // Erst der Anker belegt, dass die GEMEINTE Seite steht; er ersetzt das Warten auf ein
-        // ruhiges Netz, das der SSE-Strom nie hergibt (LFH-385).
-        await expect(
-          anker(page),
-          `${pfad} bei ${breite}px: die gemeinte Seite ist nicht gerendert`,
-        ).toBeVisible();
+    test(`Gate 1 · ${name} (${breite} px) · Beobachter: auch ohne Schreibrecht läuft keine Route über`, async ({
+      page,
+    }) => {
+      test.setTimeout(180_000);
+      // Gesät wird als Admin; der Wechsel im selben Kontext behält den Wetter-Stub.
+      const einsatzId = await gate1Vorbereiten(page);
+      await wechsleZuRolle(page, 'beobachter', einsatzId);
+      await gate1Messen(page, gate1Routen(einsatzId), 'beobachter', pruefbreite);
+    });
 
-        const { ueber, schuldige } = await ueberlauf(page);
-        messwerte.push(`${pfad} @${breite}: ${ueber}px`);
-
-        // Freistellung über das Modul-Segment: der ganze Pfad enthält die laufende Einsatz-ID.
-        const frei = BESTAND_OFFEN.find((b) => pfad.endsWith(`/${b.modul}`) && b.breite === breite);
-        if (frei) {
-          genutzteFreistellungen.add(`${frei.modul}@${frei.breite}`);
-          if (ueber <= 1) {
-            tot.push(
-              `${pfad} bei ${breite}px ist BEHOBEN (${ueber}px) — der Eintrag in ` +
-                `BESTAND_OFFEN ist tot und muss samt seiner Zeile im Kopfkommentar weg.`,
-            );
-          } else if (ueber > frei.deckel) {
-            verstoesse.push(
-              `${pfad} bei ${breite}px (${name}): ${ueber}px über — das ist mehr als der ` +
-                `freigestellte Deckel ${frei.deckel}px (gemessen war ${frei.gemessen}px), also eine ` +
-                `VERSCHLECHTERUNG, kein Bestand\n  ${schuldige.slice(0, 4).join('\n  ')}`,
-            );
-          }
-          continue;
-        }
-
-        if (ueber > 1) {
-          verstoesse.push(
-            `${pfad} bei ${breite}px (${name}): ${ueber}px über\n  ${schuldige.slice(0, 4).join('\n  ')}`,
-          );
-        }
-      }
-
-      // Ein Eintrag, den keine Route dieser Breite getroffen hat, ist ebenso tot. Einträge auf
-      // einer Breite, die keine Prüfbreite ist, meldet JEDER der Tests.
-      const pruefbreiten: readonly number[] = PRUEFBREITEN.map((pb) => pb.breite);
-      for (const b of BESTAND_OFFEN) {
-        const hierZustaendig = b.breite === breite || !pruefbreiten.includes(b.breite);
-        if (hierZustaendig && !genutzteFreistellungen.has(`${b.modul}@${b.breite}`)) {
-          tot.push(
-            `BESTAND_OFFEN nennt ${b.modul}@${b.breite}px, aber diese Route × Breite wird gar ` +
-              `nicht gemessen — tote Freistellung.`,
-          );
-        }
-      }
-      expect(tot, `Tote Freistellungen:\n${tot.join('\n')}`).toEqual([]);
-      // Messwerte protokollieren: ein grüner Lauf ohne Zahlen lässt offen, ob gemessen wurde.
-      test.info().annotations.push({ type: 'messwert', description: messwerte.join(' · ') });
-      expect(verstoesse, `Gate 1 verletzt:\n${verstoesse.join('\n')}`).toEqual([]);
+    test(`Gate 1 · ${name} (${breite} px) · Führungskraft: die Verwaltung ohne Admin-Recht läuft nicht über`, async ({
+      page,
+    }) => {
+      test.slow();
+      await anmelden(page);
+      const antwort = await page.request.post('/api/fahrzeuge', {
+        data: {
+          // Funkrufnamen sind je Org eindeutig: Breite und Zeitstempel trennen parallele Tests
+          // und den CI-Retry, der auf derselben DB läuft.
+          funkrufname: `${FAHRZEUG_STOFF} ${breite} ${Date.now()}`,
+          fahrzeugtyp: 'WLF mit AB-Hochwasser',
+          kennzeichen: 'MU-NW 4611',
+        },
+      });
+      expect(
+        antwort.ok(),
+        `Seeding Fahrzeug: ${antwort.status()} ${await antwort.text()}`,
+      ).toBeTruthy();
+      await wechsleZuRolle(page, 'fuehrungskraft');
+      await gate1Messen(page, gate1VerwaltungRouten(), 'fuehrungskraft', pruefbreite);
     });
   }
 });

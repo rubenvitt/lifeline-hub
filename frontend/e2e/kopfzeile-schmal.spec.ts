@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { anmeldenAlsAdmin, benutzerAnlegen, wechsleZu } from './rollen-kern';
 
 /**
  * Die Kopfzeile auf dem Handschirm. Ob das Inline-`paddingInline` antds Klassenregel schlägt
@@ -12,22 +13,11 @@ import { expect, test, type Page } from '@playwright/test';
  * fremder Befunde.
  */
 
-const ADMIN = 'admin';
-const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
-
 const SCHMAL = { width: 390, height: 844 };
 const BREIT = { width: 1366, height: 768 };
 
-async function anmeldenAls(page: Page, benutzer: string, passwort: string) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(benutzer);
-  await page.getByLabel('Passwort').fill(passwort);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
-}
-
 async function anmelden(page: Page) {
-  await anmeldenAls(page, ADMIN, PW);
+  await anmeldenAlsAdmin(page);
 }
 
 async function einsatzAnlegen(page: Page, name: string): Promise<string> {
@@ -126,59 +116,64 @@ for (const [stufe, hasTouch] of [
 }
 
 /**
- * Derselbe Nachweis für den GESPERRTEN Verwaltungs-Zweig der Topbar: gedämpfter Text plus
- * „Keine Berechtigung"-Tag, der weder kürzen noch umbrechen kann. Ein Admin läuft nur durch
- * den freien Zweig. Nur `/einsaetze`: `GlobalLink` wohnt in der Ebene-1-Schale.
+ * Derselbe Nachweis für den GESPERRTEN Verwaltungs-Zweig der Topbar: gedämpfter Text, ab `lg`
+ * plus „Keine Berechtigung"-Tag. Ein Admin läuft nur durch den freien Zweig. Nur `/einsaetze`:
+ * `GlobalLink` wohnt in der Ebene-1-Schale.
+ *
+ * BEIDE BREITEN (LFH-435): auf 390 px entfällt der Tag (so wurde LFH-337 behoben), auf dem
+ * Führungs-Tablet (1024 px) steht er — dort ist der Zweig am breitesten.
  *
  * Die VORBEDINGUNGEN sind tragend: ohne sie bliebe der Test grün, wenn jemand den gesperrten
  * Zweig ganz entfernte.
  */
-test('Kopfzeile: auf 390 px läuft sie auch für einen Benutzer OHNE Verwaltungsrecht nicht über', async ({
-  page,
-}) => {
-  const LAUF = Date.now();
-  const NUTZER = `e2e-kopf-ohne-${LAUF}`;
-  const NUTZER_PW = 'e2e-kopf-ohne-pw-123';
+for (const { breite, mitTag } of [
+  { breite: SCHMAL.width, mitTag: false },
+  { breite: 1024, mitTag: true },
+]) {
+  test(`Kopfzeile: auf ${breite} px läuft sie auch für einen Benutzer OHNE Verwaltungsrecht nicht über`, async ({
+    page,
+  }) => {
+    // Ohne `org_rolle` gilt 'keiner'/'keine' — `darfVerwaltung` ist false. Mitglied eines
+    // Einsatzes muss der Benutzer dafür nicht sein.
+    await anmelden(page);
+    await wechsleZu(page, await benutzerAnlegen(page, 'beobachter'));
 
-  // Anlegen braucht den Admin. Ohne `system_rolle`/`org_rolle` im Body gilt 'keiner'/'keine',
-  // `darfVerwaltung` ist damit false.
-  await anmelden(page);
-  const angelegt = await page.request.post('/api/benutzer', {
-    data: { anzeigename: `E2E Ohne Recht ${LAUF}`, benutzername: NUTZER, passwort: NUTZER_PW },
+    await page.setViewportSize({ width: breite, height: 844 });
+    await page.goto('/einsaetze');
+
+    const kopf = page.locator('header');
+    await expect(kopf).toHaveCount(1);
+    // ── VORBEDINGUNGEN: der gesperrte Zweig muss überhaupt stehen.
+    await expect(
+      page.getByRole('link', { name: 'Verwaltung' }),
+      'Vorbedingung: kein freier Verwaltungs-Link — sonst misst der Test den falschen Zweig',
+    ).toHaveCount(0);
+    // Präfix statt Wortlaut: ab `lg` trägt dasselbe Element den Tag mit.
+    await expect(
+      kopf.getByText(/^Verwaltung/),
+      'Vorbedingung: der gedämpfte Eintrag bleibt auf JEDER Breite stehen (gesperrt statt versteckt)',
+    ).toBeVisible();
+    // Unter `lg` entfällt der Tag — das behebt den Überlauf; ab `lg` MUSS er stehen, sonst
+    // misst der Tablet-Durchgang den schmalen Zweig.
+    await expect(
+      kopf.getByText('Keine Berechtigung'),
+      mitTag ? 'Vorbedingung: ab lg steht der Tag' : 'unter lg trägt die Kopfzeile den Tag nicht',
+    ).toHaveCount(mitTag ? 1 : 0);
+
+    const masse = await kopf.evaluate((el) => ({
+      scrollB: el.scrollWidth,
+      klientB: el.clientWidth,
+      scrollH: el.scrollHeight,
+      klientH: el.clientHeight,
+    }));
+    expect(masse.scrollB, 'Kopfzeile läuft WAAGERECHT über (gesperrter Zweig)').toBeLessThanOrEqual(
+      masse.klientB,
+    );
+    expect(masse.scrollH, 'Kopfzeile läuft SENKRECHT über (gesperrter Zweig)').toBeLessThanOrEqual(
+      masse.klientH,
+    );
   });
-  expect(
-    angelegt.ok(),
-    `Seeding Benutzer: ${angelegt.status()} ${await angelegt.text()}`,
-  ).toBeTruthy();
-
-  // Sitzung wechseln: der Cookie-Jar ist geteilt, ein Abmelden über die API genügt.
-  const abgemeldet = await page.request.post('/api/auth/logout');
-  expect(abgemeldet.ok(), `Abmelden: ${abgemeldet.status()}`).toBeTruthy();
-  await anmeldenAls(page, NUTZER, NUTZER_PW);
-
-  await page.setViewportSize(SCHMAL);
-  await page.goto('/einsaetze');
-
-  const kopf = page.locator('header');
-  await expect(kopf).toHaveCount(1);
-  // ── VORBEDINGUNGEN: der gesperrte Zweig muss überhaupt stehen.
-  await expect(
-    page.getByRole('link', { name: 'Verwaltung' }),
-    'Vorbedingung: kein freier Verwaltungs-Link — sonst misst der Test den falschen Zweig',
-  ).toHaveCount(0);
-  await expect(
-    kopf.getByText('Verwaltung', { exact: true }),
-    'Vorbedingung: der gedämpfte Eintrag bleibt auf JEDER Breite stehen (gesperrt statt versteckt)',
-  ).toBeVisible();
-  // Der Tag selbst entfällt unter `lg` — das behebt den Überlauf.
-  await expect(
-    kopf.getByText('Keine Berechtigung'),
-    'unter lg trägt die Kopfzeile den Tag nicht',
-  ).toHaveCount(0);
-
-  const masse = await kopf.evaluate((el) => ({ scroll: el.scrollWidth, klient: el.clientWidth }));
-  expect(masse.scroll, 'Kopfzeile läuft über (gesperrter Zweig)').toBeLessThanOrEqual(masse.klient);
-});
+}
 
 test('Such-Trigger bleibt auf 390 px in beiden Kopfzeilen eine 48-px-Trefffläche', async ({
   page,

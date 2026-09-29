@@ -94,6 +94,22 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
 };
 
 /**
+ * Was gerade platziert wird, als Text für das Fuß-Band (LFH-765) — dieselbe Schreibweise wie die
+ * Zeile in „Nicht verortet". Steht das Ziel dort nicht (Verschieben eines verorteten Objekts per
+ * `?platzieren=`, Betroffene), bleibt der Typname.
+ */
+export function platzierObjekt(
+  ziel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number },
+  nichtVerortet: NichtVerortet[],
+): string {
+  if (ziel.typ === 'einsatzort') return 'Einsatzort';
+  if (ziel.typ === 'person') return 'Betroffene Person';
+  const typName = NICHT_VERORTET_LABEL[ziel.typ];
+  const eintrag = nichtVerortet.find((o) => o.typ === ziel.typ && o.id === ziel.id);
+  return eintrag ? `${typName}: ${eintrag.label}` : typName;
+}
+
+/**
  * Ab wie vielen Einträgen „Nicht verortet" ein Suchfeld trägt: ab fünf beginnt die Liste in der
  * 300-px-Leiste zu scrollen, darunter ist Hinsehen schneller als Tippen.
  */
@@ -202,6 +218,13 @@ export interface SidebarProps {
   /** Bereits gesetzte Zeichen der laufenden Serie; 0 = noch keins (dann heißt Beenden „Abbrechen"). */
   zeichenSerieAnzahl: number;
   onZeichenPlatzierenFertig: () => void;
+  /**
+   * Unter `lg` steht die Bedienung der Leistenmodi (Abbrechen/Fertig, Serien-Schalter, Griffwahl)
+   * im Fuß-Band `PlatzierSteuerung` über der Karte (LFH-765). Die Leiste zeigt dann an ihrer Stelle
+   * nur einen Hinweis — je Breite genau ein Knopf je Handlung. Zusatzangaben (Koordinate,
+   * Mittelpunkt numerisch) bleiben hier.
+   */
+  modusBedienungImFuss?: boolean;
   onKoordinateEingeben: (lat: number, lon: number) => void;
   einsatzortVerortet: boolean;
   onEinsatzortPlatzieren: () => void;
@@ -618,7 +641,8 @@ export default function Sidebar(props: SidebarProps) {
           }}
         >
           <Typography.Text type="secondary">
-            Klick auf die Karte setzt die Koordinate. (Abbrechen beendet.)
+            Klick auf die Karte setzt die Koordinate.{' '}
+            {props.modusBedienungImFuss ? '(Beenden über der Karte.)' : '(Abbrechen beendet.)'}
           </Typography.Text>
           <div style={{ marginTop: token.marginXS }}>
             <KoordinatenEingabe
@@ -746,7 +770,11 @@ export default function Sidebar(props: SidebarProps) {
                         </Button>
                       );
                     } else if (aktiv) {
-                      action = <Button onClick={props.onPlatzierenAbbrechen}>Abbrechen</Button>;
+                      action = props.modusBedienungImFuss ? (
+                        <Typography.Text type="secondary">wird platziert</Typography.Text>
+                      ) : (
+                        <Button onClick={props.onPlatzierenAbbrechen}>Abbrechen</Button>
+                      );
                     } else {
                       // o.typ ist hier auf die Punkt-Typen verengt (abschnitt oben behandelt).
                       const punktTyp = o.typ;
@@ -785,7 +813,11 @@ export default function Sidebar(props: SidebarProps) {
           </Typography.Text>
           {darfSchreiben &&
             (platzierungZiel?.typ === 'einsatzort' ? (
-              <Button onClick={props.onPlatzierenAbbrechen}>Abbrechen</Button>
+              props.modusBedienungImFuss ? (
+                <Typography.Text type="secondary">wird platziert</Typography.Text>
+              ) : (
+                <Button onClick={props.onPlatzierenAbbrechen}>Abbrechen</Button>
+              )
             ) : (
               <Button
                 type={props.einsatzortVerortet ? 'default' : 'primary'}
@@ -878,30 +910,36 @@ export default function Sidebar(props: SidebarProps) {
                     <Typography.Text type="secondary">
                       Auf Karte klicken zum Platzieren.
                     </Typography.Text>
-                    {/* Serienmodus: der Schalter beschreibt den laufenden Modus und steht
-                        deshalb hier, nicht im Picker. `wrap`: im Handschuh ist er 144 px breit. */}
-                    <Space wrap>
-                      <Switch
-                        checked={props.zeichenSerie}
-                        onChange={props.onZeichenSerieWechsel}
-                        aria-label="Weitere platzieren"
-                      />
-                      <Typography.Text>Weitere platzieren</Typography.Text>
-                    </Space>
-                    {props.zeichenSerieAnzahl > 0 && (
-                      <Typography.Text type="secondary">
-                        {props.zeichenSerieAnzahl} platziert
-                      </Typography.Text>
-                    )}
-                    {/* Solange nichts gesetzt ist, verwirft Beenden nur die Absicht
-                        („Abbrechen"); ab dem ersten Zeichen wäre „Abbrechen" falsch — das
-                        Gespeicherte bleibt. */}
-                    {props.zeichenSerieAnzahl > 0 ? (
-                      <Button type="primary" onClick={props.onZeichenPlatzierenFertig}>
-                        Fertig
-                      </Button>
+                    {props.modusBedienungImFuss ? (
+                      <Typography.Text type="secondary">Bedienung über der Karte.</Typography.Text>
                     ) : (
-                      <Button onClick={props.onZeichenPlatzierenAbbrechen}>Abbrechen</Button>
+                      <>
+                        {/* Serienmodus: der Schalter beschreibt den laufenden Modus und steht
+                            deshalb hier, nicht im Picker. `wrap`: im Handschuh ist er 144 px breit. */}
+                        <Space wrap>
+                          <Switch
+                            checked={props.zeichenSerie}
+                            onChange={props.onZeichenSerieWechsel}
+                            aria-label="Weitere platzieren"
+                          />
+                          <Typography.Text>Weitere platzieren</Typography.Text>
+                        </Space>
+                        {props.zeichenSerieAnzahl > 0 && (
+                          <Typography.Text type="secondary">
+                            {props.zeichenSerieAnzahl} platziert
+                          </Typography.Text>
+                        )}
+                        {/* Solange nichts gesetzt ist, verwirft Beenden nur die Absicht
+                            („Abbrechen"); ab dem ersten Zeichen wäre „Abbrechen" falsch — das
+                            Gespeicherte bleibt. */}
+                        {props.zeichenSerieAnzahl > 0 ? (
+                          <Button type="primary" onClick={props.onZeichenPlatzierenFertig}>
+                            Fertig
+                          </Button>
+                        ) : (
+                          <Button onClick={props.onZeichenPlatzierenAbbrechen}>Abbrechen</Button>
+                        )}
+                      </>
                     )}
                   </Space>
                 ) : zeichenPickerOffen ? (
@@ -1188,17 +1226,23 @@ export default function Sidebar(props: SidebarProps) {
                     {/* Ein Umschalter statt zehn gleichzeitig scharfer Griffe: in Fingergröße
                         lägen Ecken, Kanten, Drehung und Mitte auf einem kleinen Bild
                         übereinander. Der Hinweis nennt nur die aktiven Griffe. */}
-                    <Segmentleiste<GriffModus>
-                      beschriftung="Griffe auf der Karte"
-                      wert={props.griffModus}
-                      onWechsel={props.onGriffModus}
-                      optionen={[
-                        { wert: 'verschieben', label: 'Verschieben' },
-                        { wert: 'groesse', label: 'Größe' },
-                        { wert: 'drehen', label: 'Drehen' },
-                      ]}
-                      style={{ marginBottom: token.marginXS }}
-                    />
+                    {props.modusBedienungImFuss ? (
+                      <Typography.Text type="secondary" style={{ display: 'block' }}>
+                        Bedienung über der Karte.
+                      </Typography.Text>
+                    ) : (
+                      <Segmentleiste<GriffModus>
+                        beschriftung="Griffe auf der Karte"
+                        wert={props.griffModus}
+                        onWechsel={props.onGriffModus}
+                        optionen={[
+                          { wert: 'verschieben', label: 'Verschieben' },
+                          { wert: 'groesse', label: 'Größe' },
+                          { wert: 'drehen', label: 'Drehen' },
+                        ]}
+                        style={{ marginBottom: token.marginXS }}
+                      />
+                    )}
                     <Typography.Text
                       type="secondary"
                       style={{ fontSize: 12, display: 'block' }}
@@ -1231,9 +1275,11 @@ export default function Sidebar(props: SidebarProps) {
                       >
                         Mittelpunkt setzen
                       </Button>
-                      <Button type="primary" onClick={props.onBildPlatzierenFertig}>
-                        Fertig
-                      </Button>
+                      {!props.modusBedienungImFuss && (
+                        <Button type="primary" onClick={props.onBildPlatzierenFertig}>
+                          Fertig
+                        </Button>
+                      )}
                     </Space>
                   </div>
                 )}

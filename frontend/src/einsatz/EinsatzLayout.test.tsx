@@ -183,12 +183,12 @@ describe('EinsatzLayout', () => {
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     // Die Ankunft auf /etb allein merkt NICHTS — ohne diese Gegenaussage bliebe der Test auch mit
     // einem Routen-Effekt grün.
-    expect(leseZuletztModule(7)).toEqual([]);
+    expect(leseZuletztModule(admin.id, 7)).toEqual([]);
 
     await userEvent.click(screen.getByRole('button', { name: 'Personen' }));
 
     expect(await screen.findByText('Personen-Inhalt')).toBeInTheDocument();
-    expect(leseZuletztModule(7)).toEqual(['personen']);
+    expect(leseZuletztModule(admin.id, 7)).toEqual(['personen']);
   });
 
   /**
@@ -198,7 +198,7 @@ describe('EinsatzLayout', () => {
    */
   it('zeigt gemerkte Module nicht als „Zuletzt"-Gruppe im Panel', async () => {
     localStorage.clear();
-    merkeModulBesuch(7, 'lagekarte');
+    merkeModulBesuch(admin.id, 7, 'lagekarte');
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Personen' })).toBeInTheDocument();
@@ -604,7 +604,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
       'aria-current',
       'true',
     );
-    expect(leseZuletztModule(7)).toEqual([]);
+    expect(leseZuletztModule(admin.id, 7)).toEqual([]);
   });
 
   it('springt beim Klick auf eine ANDERE Kategorie in deren erstes Modul', async () => {
@@ -631,7 +631,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
 
     await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
-    expect(leseZuletztModule(7)).toEqual([]);
+    expect(leseZuletztModule(admin.id, 7)).toEqual([]);
   });
 
   it('navigiert beim Klick auf die AKTIVE Kategorie nicht, sondern klappt nur zu', async () => {

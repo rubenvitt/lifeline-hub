@@ -5,6 +5,7 @@ import {
   kopfFelder,
   zuordnungsKarte,
 } from './einheit-fixture';
+import { benutzerAnlegen, wechsleZu, wechsleZuRolle } from './rollen-kern';
 
 /**
  * Gate 3 der Bedien-Leitlinie: Trefflächen gegen die Dichte-Staffel auf Lage-Dashboard,
@@ -162,6 +163,34 @@ async function alleHaltenStufe(
     kleinstes = Math.min(kleinstes, kasten!.height);
   }
   return kleinstes;
+}
+
+// ── Nur-Lese-Zweig (LFH-435) ───────────────────────────────────────────────────────────
+//
+// Die Admin-Tests laufen nur durch die freien Zweige. Die Geschwister „… (Beobachter)" säen als
+// Admin, wechseln im SELBEN Kontext auf einen Beobachter (`rollen-kern.ts`) und messen danach,
+// was dem Beobachter bleibt. Reihenfolge je Stufe: erst ein DATENANKER (die Seite trägt ihre
+// Daten), dann die Vorbedingungen des Zweigs, dann die Messung. Ein `toHaveCount(0)` vor dem
+// Anker wäre grün durch Nichtstun — während des Ladens fehlen die Ziele ohnehin.
+
+/** Wortanfang aller Rechtehinweise der Einsatzmodule (aktiver Einsatz, ohne Schreibrecht). */
+const NUR_SCHREIBENDE = /^Nur Einsatzleitung und Führungspersonal/;
+
+/** Der Rechtehinweis des Nur-Lese-Zweigs (`RechteHinweis`, antd `Alert` mit `role="alert"`). */
+async function rechteHinweisSteht(page: Page) {
+  await expect(
+    page.getByRole('alert').filter({ hasText: NUR_SCHREIBENDE }),
+    'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
+  ).toBeVisible();
+}
+
+/**
+ * Eine gesperrte Primäraktion im Seitenkopf: gesperrt statt versteckt, also MUSS sie da und
+ * gesperrt sein — und hält trotzdem die Stufe (ein gesperrtes Ziel ist ein sichtbares Ziel).
+ */
+async function gesperrtHaeltStufe(ziel: Locator, soll: number, name: string): Promise<number> {
+  await expect(ziel, `Vorbedingung: ${name} steht gesperrt`).toBeDisabled();
+  return haeltStufe(ziel, soll, name);
 }
 
 test('Lage-Dashboard: Kennzahl-Zellen und Paneel-Ausgänge folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
@@ -580,6 +609,75 @@ test('Globale Kopfzeile: Logo, Verwaltungs-Link, Suchzugang und Benutzermenü fo
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+test('Globale Kopfzeile (ohne Verwaltungsrecht): Logo, Suchzugang und Benutzermenü folgen auf 1024 px der Staffel', async ({
+  page,
+}) => {
+  // LFH-435: der gesperrte Zweig von `GlobalLink` — gedämpfter Text, ab `lg` plus Tag „Keine
+  // Berechtigung". Er ist breiter als der freie Link und teilt sich die Zeile mit dem
+  // Suchzugang, der ab `lg` `width: 100%` bei `minWidth: 0` trägt: er wird nicht niedriger,
+  // sondern SCHMALER. Deshalb misst dieser Test den Suchzugang auf beiden Achsen. 1024 px ist
+  // das Führungs-Tablet, die engste Breite, auf der der Tag steht.
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await anmelden(page);
+  // Ohne `org_rolle` gilt 'keiner'/'keine' — `darfVerwaltung` ist false. Mitglied eines
+  // Einsatzes muss der Benutzer dafür nicht sein.
+  await wechsleZu(page, await benutzerAnlegen(page, 'beobachter'));
+
+  const gemessen: string[] = [];
+
+  for (const { dichte } of STAFFEL) {
+    await page.goto('/einsaetze');
+    await stelleDichte(page, dichte);
+
+    const kopf = page.locator('.ant-layout-header');
+    await expect(kopf, 'genau eine Kopfzeile auf der Einsatzauswahl').toHaveCount(1);
+
+    // ── VORBEDINGUNGEN: der gesperrte Zweig steht, und zwar in seiner breiten Form.
+    await expect(
+      page.getByRole('link', { name: 'Verwaltung' }),
+      'Vorbedingung: kein freier Verwaltungs-Link — sonst misst der Test den Admin-Zweig',
+    ).toHaveCount(0);
+    // Präfix statt Wortlaut: ab `lg` trägt dasselbe Element den Tag mit.
+    await expect(
+      kopf.getByText(/^Verwaltung/),
+      'Vorbedingung: der gedämpfte Eintrag steht (gesperrt statt versteckt)',
+    ).toBeVisible();
+    await expect(
+      kopf.getByText('Keine Berechtigung'),
+      'Vorbedingung: ab lg steht der Tag „Keine Berechtigung"',
+    ).toHaveCount(1);
+
+    // ── Die übrigen Kopfziele. Der gedämpfte Eintrag selbst ist kein Ziel.
+    const logo = await haeltStufe(
+      kopf.getByRole('link', { name: 'lifeline-hub', exact: true }),
+      BODEN.staffel[dichte],
+      `Logo-Link (${dichte})`,
+    );
+    const suchZiel = kopf.getByRole('button', { name: 'Suchen', exact: true });
+    // Ab `lg` hängt der Suchzugang allein an `controlHeight` — die Staffel, nicht der A1-Boden.
+    const suchen = await haeltStufe(suchZiel, BODEN.staffel[dichte], `Suchzugang (${dichte})`);
+    const suchBreite = (await suchZiel.boundingBox())!.width;
+    expect(
+      suchBreite,
+      `Suchzugang-Breite (${dichte}, gemessen ${suchBreite}px, Soll ≥ ${BODEN.staffel[dichte]}) — ` +
+        'der gesperrte Verwaltungs-Eintrag darf ihn nicht zusammendrücken',
+    ).toBeGreaterThanOrEqual(BODEN.staffel[dichte] - SUBPIXEL);
+    const benutzer = await haeltStufe(
+      kopf.getByRole('button', { name: 'Benutzermenü', exact: true }),
+      BODEN.benutzermenue[dichte],
+      `Benutzermenü (${dichte})`,
+    );
+
+    gemessen.push(
+      `${dichte}: Logo ${logo}, Suchen ${suchen}×${suchBreite}, ` +
+        `Benutzermenü ${benutzer} (Soll ≥ ${BODEN.benutzermenue[dichte]})`,
+    );
+  }
+
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 test('Navigations-Drawer auf 390 px: Hamburger, Akkordeon-Kopf, Modulzeilen und Schließer folgen der Staffel', async ({
   page,
 }) => {
@@ -744,6 +842,84 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurücksetzen" folgen der Staffel, Schreibziele fehlen', async ({
+  page,
+}) => {
+  // LFH-435: der Nur-Lese-Zweig der Kräfteübersicht NIMMT WEG — Kopfknopf „Einheit" und „In
+  // Lagebericht übernehmen" fehlen, die Statuszellen sind Text. Einen Rechtehinweis gibt es
+  // hier nicht; der Zweig wird über die Abwesenheit belegt, gemessen wird, was bleibt.
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Meldebild Lesend`);
+  await anlegen(page, einsatzId, 'personal', { adhoc: { name: 'Messkraft Gate3' } }, 'Personal');
+  await anlegen(
+    page,
+    einsatzId,
+    'fahrzeuge',
+    { adhoc: { funkrufname: 'Florian Musterstadt 1/44-2' } },
+    'Fahrzeug',
+  );
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
+    await stelleDichte(page, dichte);
+
+    // Datenanker: die Seite steht UND die gesäten Kräfte sind angekommen (Auswahlzeile nicht
+    // „0 von 0") — erst danach sagt eine Abwesenheit etwas.
+    await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
+    await expect(
+      page.locator('[data-lfh="meldebild-werkzeuge"]').getByText(/^[1-9]\d* von [1-9]\d* Kräften$/),
+    ).toBeVisible();
+
+    // ── VORBEDINGUNGEN: die Schreibziele fehlen.
+    const kopfAktionen = page.locator('[data-lfh="seitenkopf-aktionen"]');
+    await expect(
+      kopfAktionen.getByTitle('Einheit anlegen (Einheiten-Seite)'),
+      'Vorbedingung: ohne Schreibrecht kein Kopfknopf „Einheit"',
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'In Lagebericht übernehmen' }),
+      'Vorbedingung: ohne Schreibrecht kein „In Lagebericht übernehmen"',
+    ).toHaveCount(0);
+
+    // ── Was bleibt: Umschalter, Suchfeld, nach dem Filtern „Filter zurücksetzen".
+    const umschalter = await haeltStufe(
+      page.locator('.ant-segmented'),
+      soll,
+      `Umschalter-Hülle (${dichte})`,
+    );
+    const wahlfeld = await alleHaltenStufe(
+      page.locator('.ant-segmented-item'),
+      soll - 2 * SEGMENTED_POLSTER,
+      `Umschalter-Wahlfeld (${dichte})`,
+      2,
+    );
+    const feld = await haeltStufe(
+      page.locator('.ant-input-affix-wrapper'),
+      soll,
+      `Filter-Suchfeld (${dichte})`,
+    );
+    await page.getByPlaceholder('Suche...').fill('Messkraft');
+    await expect(page.locator('.ant-tag').filter({ hasText: 'Suche:' })).toHaveCount(1);
+    const knopf = await haeltStufe(
+      page.getByRole('button', { name: 'Filter zurücksetzen', exact: true }),
+      soll,
+      `„Filter zurücksetzen" (${dichte})`,
+    );
+
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Umschalter-Hülle ${umschalter}, Wahlfeld ${wahlfeld}, ` +
+        `Suchfeld ${feld}, Zurücksetzen ${knopf}`,
+    );
+  }
+
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,
 }) => {
@@ -890,6 +1066,77 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern" und Kopfaktion folg
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+test('Stab (Beobachter): ETB-Links, Werkzeug-Links und die gesperrte Kopfaktion folgen der Staffel', async ({
+  page,
+}) => {
+  // LFH-435: im Nur-Lese-Zweig des Stabs fehlt „Besetzung ändern" (versteckt), die Kopfaktion
+  // „Lagebesprechung abschließen" steht GESPERRT, darüber der Rechtehinweis. Gemessen wird, was
+  // bleibt: Lese-Links und die gesperrte Primäraktion.
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fuehrung Lesend`);
+  for (const nr of [1, 2]) {
+    await anlegen(
+      page,
+      einsatzId,
+      'stab/lagebesprechungen',
+      { entschluss: `Lage unverändert, Maßnahmen fortführen (${nr})` },
+      `Lagebesprechung ${nr}`,
+    );
+  }
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/stab`);
+    await stelleDichte(page, dichte);
+
+    // Datenanker: die ETB-Links hängen am geladenen Stand — derselbe Stand gibt im Schreibzweig
+    // „Besetzung ändern" frei. Erst danach ist dessen Abwesenheit eine Aussage.
+    const lage = page.getByRole('region', { name: 'Lagebesprechung', exact: true });
+    const besetzung = page.getByRole('region', { name: 'Besetzung S1–S6', exact: true });
+    await expect(lage).toHaveCount(1);
+    await expect(besetzung).toHaveCount(1);
+    const etbLinks = lage.getByRole('link', { name: /^ETB-Eintrag zu Lagebesprechung Nr\. \d+$/ });
+    await expect(etbLinks).toHaveCount(STAB_ETB_LINKS);
+
+    // ── VORBEDINGUNGEN: Rechtehinweis steht, „Besetzung ändern" fehlt.
+    await rechteHinweisSteht(page);
+    await expect(
+      besetzung.getByRole('button', { name: /^Besetzung ändern/ }),
+      'Vorbedingung: ohne Schreibrecht kein „Besetzung ändern"',
+    ).toHaveCount(0);
+
+    // ── Was bleibt.
+    const etb = await alleHaltenStufe(etbLinks, soll, `ETB-Link (${dichte})`, STAB_ETB_LINKS);
+    const gruppen = besetzung.getByRole('group', { name: /^Werkzeuge S\d$/ });
+    await expect(gruppen).toHaveCount(STAB_WERKZEUG_GRUPPEN);
+    const werkzeugLinks = gruppen.getByRole('link');
+    await expect(werkzeugLinks).toHaveCount(STAB_WERKZEUG_LINKS);
+    const werkzeug = await alleHaltenStufe(
+      werkzeugLinks,
+      soll,
+      `Werkzeug-Link (${dichte})`,
+      STAB_WERKZEUG_LINKS,
+    );
+    const kopf = await gesperrtHaeltStufe(
+      page
+        .locator('[data-lfh="seitenkopf-aktionen"]')
+        .getByRole('button', { name: 'Lagebesprechung abschließen', exact: true }),
+      soll,
+      `Kopfaktion gesperrt (${dichte})`,
+    );
+
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Werkzeug-Link ${werkzeug}, Kopfaktion gesperrt ${kopf}`,
+    );
+  }
+
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // ── Ablösung ─────────────────────────────────────────────────────────────────────────
 //
 // Nur antd-`Button`, gemessen wird trotzdem: die Karte ist eine eigene Flex-Hülle, ein
@@ -948,6 +1195,77 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): Vollziehen ${primaer}, Dreipunkt ${dreipunkt}, Vorgabe ${vorgabe}, Abstand ${luecke}`,
     );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Ablösung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folgen der Staffel, Kartenaktionen fehlen', async ({
+  page,
+}) => {
+  // LFH-435: ohne Schreibrecht steht „Schicht beginnen" GESPERRT im Kopf, darüber der
+  // Rechtehinweis; Kartenaktionen und der Vorgabe-Knopf fehlen. Gemessen werden die gesperrte
+  // Primäraktion und die Segmente der Ansichtsleiste — die Ziele, die dem Beobachter bleiben.
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Abloesung Lesend`);
+
+  const post = async (pfad: string, data: unknown, was: string) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    expect(
+      antwort.ok(),
+      `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return (await antwort.json()) as { id: number };
+  };
+  const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
+  for (const name of ['Florian Nord 1', 'Florian Nord 2']) {
+    const einheit = await post('einheiten', { name, abschnitt_id: abschnitt.id }, name);
+    await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 360 }, `Schicht ${name}`);
+  }
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/abloesung`);
+    await stelleDichte(page, dichte);
+
+    // Datenanker: beide Karten und die Vorgabezeile des Abschnitts sind geladen.
+    const karten = page.locator('[data-lfh="abloesung-karte"]');
+    await expect(karten).toHaveCount(2);
+    await expect(
+      page
+        .getByRole('region', { name: 'Rhythmus je Abschnitt', exact: true })
+        .getByText('Deichwache Nord', { exact: true }),
+    ).toBeVisible();
+
+    // ── VORBEDINGUNGEN: Rechtehinweis steht, Karten- und Vorgabeaktionen fehlen.
+    await rechteHinweisSteht(page);
+    await expect(
+      karten.getByRole('button'),
+      'Vorbedingung: ohne Schreibrecht tragen die Karten keine Aktionen',
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: /^Rhythmus-Vorgabe .* ändern$/ }),
+      'Vorbedingung: ohne Schreibrecht kein Vorgabe-Knopf',
+    ).toHaveCount(0);
+
+    // ── Was bleibt: die gesperrte Primäraktion und die zwei Segmente der Ansichtsleiste
+    //    (`role="radio"`, deshalb per Struktur gegriffen, nicht per `getByRole('button')`).
+    const kopf = await gesperrtHaeltStufe(
+      page
+        .locator('[data-lfh="seitenkopf-aktionen"]')
+        .getByRole('button', { name: 'Schicht beginnen', exact: true }),
+      soll,
+      `„Schicht beginnen" gesperrt (${dichte})`,
+    );
+    const segmente = page.locator(
+      '[data-lfh="abloesung-werkzeugzeile"] [data-lfh="segmentleiste"] button',
+    );
+    await expect(segmente).toHaveCount(2);
+    const segment = await alleHaltenStufe(segmente, soll, `Ansichts-Segment (${dichte})`, 2);
+
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Primär gesperrt ${kopf}, Segment ${segment}`);
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
@@ -1099,6 +1417,124 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+test('Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verlaufs-Auslöser folgen der Staffel, Meldeaktionen fehlen', async ({
+  page,
+}) => {
+  // LFH-435: ohne Schreibrecht stehen „Evakuierungsbezirk anlegen" (Kopf) und
+  // „Betreuungsstelle anlegen" (Block) GESPERRT, darüber der Rechtehinweis. „Stand melden",
+  // „Belegung melden", beide Dreipunkte (die Bezirke haben keine Fläche, also kein „Auf Karte
+  // zeigen") und „Zurücknehmen" im Verlauf fehlen. Die Verlaufs-Auslöser bleiben — Aufklappen
+  // ist Lesen.
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Raeumung Lesend`);
+
+  const senden = async (methode: 'post' | 'patch', pfad: string, data: unknown, was: string) => {
+    const antwort = await page.request[methode](`/api/einsaetze/${einsatzId}/betreuung/${pfad}`, {
+      data,
+    });
+    expect(
+      antwort.ok(),
+      `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return (await antwort.json()) as { id: number };
+  };
+  // Dieselbe Saat wie im Admin-Test: die Stände geben dem Verlauf Einträge, an denen
+  // „Zurücknehmen" fehlen KANN; die offenen Stellen tragen Belegungen.
+  for (const bezeichnung of ['Deichweg 1–9', 'Uferstraße 12–40']) {
+    const bezirk = await senden(
+      'post',
+      'bezirke',
+      { bezeichnung, plan_personen: 640, plan_erhebung: 'geschaetzt' },
+      `Bezirk ${bezeichnung}`,
+    );
+    await senden(
+      'post',
+      `bezirke/${bezirk.id}/staende`,
+      { evakuiert: 212, erhebung: 'gezaehlt' },
+      'Stand',
+    );
+  }
+  for (const bezeichnung of ['Turnhalle Ost', 'Gemeindehaus Süd']) {
+    const stelle = await senden(
+      'post',
+      'stellen',
+      { bezeichnung, art: 'notunterkunft', kapazitaet_personen: 150 },
+      `Stelle ${bezeichnung}`,
+    );
+    await senden('patch', `stellen/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
+    await senden('post', `stellen/${stelle.id}/belegungen`, { belegt: 140 }, 'Belegung');
+  }
+  const zu = await senden(
+    'post',
+    'stellen',
+    { bezeichnung: 'Schule Nord', art: 'anlaufstelle' },
+    'Stelle Schule Nord',
+  );
+  await senden('patch', `stellen/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/betreuung`);
+    await stelleDichte(page, dichte);
+
+    // Datenanker: zwei Bezirkskarten und drei Stellenzeilen sind geladen.
+    const karten = page
+      .getByRole('region', { name: 'Evakuierungsbezirke' })
+      .locator('[data-lfh="datensicht-karte"]');
+    await expect(karten).toHaveCount(2);
+    const tabelle = page.getByRole('region', { name: 'Betreuungsstellen' });
+    await expect(tabelle.locator('tr[data-row-key^="stelle-"]')).toHaveCount(3);
+
+    // ── VORBEDINGUNGEN: Rechtehinweis steht, die Meldeaktionen fehlen.
+    await rechteHinweisSteht(page);
+    for (const [ziel, was] of [
+      [karten.getByRole('button', { name: /^Stand melden für Bezirk / }), '„Stand melden"'],
+      [karten.getByRole('button', { name: /^Aktionen zu Bezirk / }), 'Dreipunkt Bezirk'],
+      [tabelle.getByRole('button', { name: /^Belegung melden für / }), '„Belegung melden"'],
+      [tabelle.getByRole('button', { name: /^Aktionen zu Stelle / }), 'Dreipunkt Stelle'],
+    ] as const) {
+      await expect(ziel, `Vorbedingung: ohne Schreibrecht kein ${was}`).toHaveCount(0);
+    }
+
+    // ── Was bleibt: die zwei gesperrten Anlage-Knöpfe und die Verlaufs-Auslöser.
+    const kopf = await gesperrtHaeltStufe(
+      page
+        .locator('[data-lfh="seitenkopf-aktionen"]')
+        .getByRole('button', { name: 'Evakuierungsbezirk anlegen', exact: true }),
+      soll,
+      `Kopfaktion gesperrt (${dichte})`,
+    );
+    const stelleAnlegen = await gesperrtHaeltStufe(
+      page.getByRole('button', { name: 'Betreuungsstelle anlegen', exact: true }),
+      soll,
+      `„Betreuungsstelle anlegen" gesperrt (${dichte})`,
+    );
+    const verlaufKarte = karten.getByRole('button', { name: /^Verlauf zu Bezirk / });
+    const verlaufZeile = tabelle.getByRole('button', { name: /^Verlauf zu Stelle / });
+    await expect(verlaufKarte).toHaveCount(2);
+    await expect(verlaufZeile).toHaveCount(3);
+    const vKarte = await alleHaltenStufe(verlaufKarte, soll, `Verlauf Bezirk (${dichte})`, 2);
+    const vZeile = await alleHaltenStufe(verlaufZeile, soll, `Verlauf Stelle (${dichte})`, 3);
+
+    // Aufgeklappt: erst der Verlaufseintrag (Anker), dann fehlt „Zurücknehmen".
+    await verlaufKarte.first().click();
+    await expect(karten.first().locator('[data-lfh="verlauf-eintrag"]').first()).toBeVisible();
+    await expect(
+      karten.first().getByRole('button', { name: /zurücknehmen/i }),
+      'Vorbedingung: ohne Schreibrecht kein „Zurücknehmen" im Verlauf',
+    ).toHaveCount(0);
+
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Kopf gesperrt ${kopf}, Stelle anlegen gesperrt ${stelleAnlegen}, ` +
+        `Verlauf Bezirk ${vKarte}, Verlauf Stelle ${vZeile}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // ── Verpflegung ──────────────────────────────────────────────────────────────────────
 //
 // Nur antd-`Button`, gemessen wird wegen der eigenen Flex-Hüllen (Aktionszeile der Karte,
@@ -1240,6 +1676,108 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folgen der Staffel, Kartenaktionen fehlen', async ({
+  page,
+}) => {
+  // LFH-435: ohne Schreibrecht steht „Zeitfenster anlegen" GESPERRT im Kopf, darüber der
+  // Rechtehinweis. Die Aktionszeile der Karte (`verpflegung-aktionen`) entfällt ganz, ebenso
+  // „Zurücknehmen" an den Ausgaben. Gemessen werden die gesperrte Primäraktion und die Segmente
+  // der Ansichtsleiste.
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Essen Lesend`);
+
+  const post = async (pfad: string, data: unknown, was: string) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/verpflegung/${pfad}`, {
+      data,
+    });
+    expect(
+      antwort.ok(),
+      `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return (await antwort.json()) as { id: number };
+  };
+  const jetzt = Date.now();
+  const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
+  // Dieselbe Saat wie im Admin-Test: die Ausgaben am Mittag geben „Zurücknehmen" eine Stelle,
+  // an der es fehlen KANN.
+  await post(
+    'zeitfenster',
+    {
+      bezeichnung: 'Frühstück Deich',
+      von_at: zeit(-30),
+      bis_at: zeit(90),
+      bedarf_kraefte: 60,
+      bedarf_betreute: 20,
+    },
+    'Zeitfenster Frühstück',
+  );
+  const mittag = await post(
+    'zeitfenster',
+    {
+      bezeichnung: 'Mittag Deich',
+      von_at: zeit(-10),
+      bis_at: zeit(110),
+      bedarf_kraefte: 30,
+      bedarf_betreute: 10,
+    },
+    'Zeitfenster Mittag',
+  );
+  for (const minuten of [-8, -4]) {
+    await post(
+      `zeitfenster/${mittag.id}/ausgaben`,
+      { menge: 20, zeitpunkt_at: zeit(minuten), ort: 'Feldküche Nord' },
+      'Ausgabe',
+    );
+  }
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/verpflegung`);
+    await stelleDichte(page, dichte);
+
+    // Datenanker: beide Karten mit ihrer Einstufung und die zwei Ausgaben am Mittag.
+    const karten = page.locator('[data-lfh="verpflegung-karte"]');
+    const fruehstueck = page.getByRole('article', { name: /^Zeitfenster Frühstück Deich / });
+    const mittagKarte = page.getByRole('article', { name: /^Zeitfenster Mittag Deich / });
+    await expect(karten).toHaveCount(2);
+    await expect(fruehstueck).toHaveAttribute('data-einstufung', 'unterdeckung');
+    await expect(mittagKarte).toHaveAttribute('data-einstufung', 'gedeckt');
+    await expect(mittagKarte.locator('[data-lfh="verpflegung-ausgabe"]')).toHaveCount(2);
+
+    // ── VORBEDINGUNGEN: Rechtehinweis steht, die Karten tragen keine Aktion.
+    await rechteHinweisSteht(page);
+    await expect(
+      karten.locator('[data-lfh="verpflegung-aktionen"]'),
+      'Vorbedingung: ohne Schreibrecht keine Aktionszeile an den Karten',
+    ).toHaveCount(0);
+    await expect(
+      karten.getByRole('button'),
+      'Vorbedingung: ohne Schreibrecht kein Bedienziel in den Karten (auch kein „Zurücknehmen")',
+    ).toHaveCount(0);
+
+    // ── Was bleibt: gesperrte Primäraktion und die zwei Segmente der Ansichtsleiste
+    //    (`role="radio"`, deshalb per Struktur gegriffen).
+    const kopf = await gesperrtHaeltStufe(
+      page
+        .locator('[data-lfh="seitenkopf-aktionen"]')
+        .getByRole('button', { name: 'Zeitfenster anlegen', exact: true }),
+      soll,
+      `„Zeitfenster anlegen" gesperrt (${dichte})`,
+    );
+    const segmente = page.locator(
+      '[data-lfh="verpflegung-werkzeugzeile"] [data-lfh="segmentleiste"] button',
+    );
+    await expect(segmente).toHaveCount(2);
+    const segment = await alleHaltenStufe(segmente, soll, `Ansichts-Segment (${dichte})`, 2);
+
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Primär gesperrt ${kopf}, Segment ${segment}`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // ── Betroffene ───────────────────────────────────────────────────────────────────────
 //
 // Vier Flächen:
@@ -1324,6 +1862,57 @@ test('Betroffene Liste: Zustand-Knopf leer und gefüllt folgen der Staffel, Abst
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): leer ${hLeer}, gefüllt ${hVoll}, Abstand ${abstand}`,
     );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Betroffene Liste (Beobachter): die Ansichtsleiste folgt der Staffel, Zustand-Knöpfe und Erfassung fehlen', async ({
+  page,
+}) => {
+  // LFH-435: der Nur-Lese-Zweig der Betroffenen NIMMT WEG — Zustand steht als Text statt als
+  // `BemerkungZelle`, Erfassungsband und die drei Kopfknöpfe fehlen. Einen Rechtehinweis gibt es
+  // im aktiven Einsatz nicht (nur „abgeschlossen — nur Ansicht"). Dem Beobachter bleibt im Kopf
+  // die Ansichtsleiste; sie wird gemessen.
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Betroffene Lesend`);
+  await personAnlegen(page, einsatzId, { name: 'Albers' });
+  const gefuellt = await personAnlegen(page, einsatzId, { name: 'Brandt', zustand: 'gehfähig' });
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personen`);
+    await stelleDichte(page, dichte);
+
+    // Datenanker: die Zeile mit gesätem Zustand ist geladen und zeigt ihn als Text.
+    await expect(personZeile(page, gefuellt)).toContainText('gehfähig');
+
+    // ── VORBEDINGUNGEN: die Schreibziele fehlen.
+    await expect(
+      page.getByRole('button', { name: /^Zustand zu R-\d+ (hinzufügen|bearbeiten)$/ }),
+      'Vorbedingung: ohne Schreibrecht keine Zustand-Knöpfe',
+    ).toHaveCount(0);
+    await expect(page.locator('[data-lfh="zustand-zelle"]')).toHaveCount(0);
+    await expect(
+      page.locator('[data-lfh="erfassungsband"]'),
+      'Vorbedingung: ohne Schreibrecht kein Erfassungsband',
+    ).toHaveCount(0);
+    const kopfAktionen = page.locator('[data-lfh="seitenkopf-aktionen"]');
+    for (const name of ['Schnellerfassung', 'Vermisst melden', 'Betroffene/n erfassen']) {
+      await expect(
+        kopfAktionen.getByRole('button', { name, exact: true }),
+        `Vorbedingung: ohne Schreibrecht kein Kopfknopf „${name}"`,
+      ).toHaveCount(0);
+    }
+
+    // ── Was bleibt: die drei Segmente der Ansichtsleiste im Kopf (`role="radio"`).
+    const segmente = kopfAktionen.locator('[data-lfh="segmentleiste"] button');
+    await expect(segmente).toHaveCount(3);
+    const segment = await alleHaltenStufe(segmente, soll, `Ansichts-Segment (${dichte})`, 3);
+
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Segment ${segment}`);
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
