@@ -119,8 +119,10 @@ Modussperre der Callbacks bleibt die zweite Linie.
 ### D6 — Spec-Abhängigkeit zu LFH-764
 
 `lagekarte-klickziele` existiert erst nach dem Archivieren von LFH-764. Das Delta hier ist ein
-`MODIFIED` auf dessen Anforderung „Rangfolge der Klickziele" (vollständiger Block, Szenario „Zwei
-Flächen übereinander" umgeschrieben) plus eine neue Anforderung. **Reihenfolge:** LFH-764 mergen und
+`MODIFIED` auf dessen Anforderung „Rangfolge der Klickziele" (vollständiger Block am Stand des
+LFH-764-Merges; Szenarien „Zwei Flächen übereinander" und „Warnfläche über einer Zone" umgeschrieben:
+statt der festen Rangfolge „eigene vor Fachebene" das Menü mit dieser Reihenfolge) plus eine neue
+Anforderung. **Reihenfolge:** LFH-764 mergen und
 archivieren, dann LFH-812. Bis dahin prüft `openspec validate` das Delta nur strukturell.
 `klickziel.test.ts` aus LFH-764 („oberste Fläche gewinnt") wird umgeschrieben, nicht gelöscht.
 

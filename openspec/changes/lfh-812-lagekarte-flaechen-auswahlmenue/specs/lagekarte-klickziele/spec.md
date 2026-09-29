@@ -11,7 +11,8 @@ Die Karte SHALL das Ziel eines Tipps in dieser Reihenfolge bestimmen:
    sie das Ziel; liegen zwei oder mehr verschiedene dort, entscheidet der Mensch über ein Auswahlmenü.
 
 Eine Trefferzone MUST gegen jedes gezeichnete Punktziel zurückstehen und MUST jede Fläche schlagen.
-Dieselbe Fläche MUST als eine zählen, auch wenn die Karte sie mehrfach meldet (Füllung und Umriss,
+Eine eigene Fläche (Zone, Abschnitt) MUST im Auswahlmenü vor jeder Fachebenen-Fläche stehen, auch
+wenn diese darüber gezeichnet ist. Dieselbe Fläche MUST als eine zählen, auch wenn die Karte sie mehrfach meldet (Füllung und Umriss,
 Kachelgrenzen).
 
 #### Scenario: Trefferzone schlägt eine Fläche
@@ -33,6 +34,14 @@ Kachelgrenzen).
 #### Scenario: Zwei Flächen übereinander
 - **WHEN** eine Zone über einem Abschnitt liegt und der Mensch in die Überschneidung tippt
 - **THEN** öffnet sich ein Auswahlmenü mit der Zone und dem Abschnitt, und keine der beiden ist ausgewählt
+
+#### Scenario: Warnfläche über einer Zone
+- **WHEN** eine DWD-Warnfläche über einer Zone liegt und der Mensch in die Zone tippt
+- **THEN** öffnet sich ein Auswahlmenü mit der Zone zuerst und der Warnung danach, und keine der beiden ist ausgewählt
+
+#### Scenario: Warnfläche ohne eigene Fläche
+- **WHEN** der Mensch in eine DWD-Warnfläche tippt, unter der keine Zone und kein Abschnitt liegt
+- **THEN** öffnet sich die Detailansicht der Warnung, ohne Auswahlmenü
 
 #### Scenario: Pegelpunkt im Ring eines Markers
 - **WHEN** ein Fachebenen-Punkt innerhalb der Trefferzone eines Markers liegt und der Mensch auf den Punkt tippt
