@@ -75,7 +75,12 @@ overrides:
   # hob weiterhin korrekt auf 3.1.5 — nur reichte das Ziel nicht mehr, und `pnpm audit`
   # brach Schritt 6. BEIDE Grenzen sind nachgezogen: die Obergrenze des Bereichs UND die
   # Zielversion. ^3.1.6 bleibt ein Same-Major-Patch.
-  fast-uri@>=3.0.0 <3.1.6: ^3.1.6
+  #
+  # NACHGEZOGEN 2026-09-29 (LFH-386-Gate-Lauf): VIERTES MAL. Zwei neue Funde
+  # (GHSA-qw65-cvwx-89v3, Authority-Injection über einen ungeprüften Port in `serialize`,
+  # betroffen >=3.0.0 <3.1.7; GHSA-58mr-gqgx-xq4g, Host-Confusion über eine ungeschlossene
+  # Klammer, betroffen genau 3.1.6). Die Schwelle steht bei 3.1.7; beide Grenzen nachgezogen.
+  fast-uri@>=3.0.0 <3.1.7: ^3.1.7
 
   # GHSA-c83g-rgw3-j3cx (high): unbegrenztes Cache-Wachstum ohne Eviction (OOM), sowie
   # ein zweiter Fund derselben Version (Crash/Prototype-Write über eine untrusted
