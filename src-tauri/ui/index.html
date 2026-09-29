@@ -1,0 +1,114 @@
+<!doctype html>
+<!--
+  Erststart-Maske der Desktop-Hülle (LFH-721, desktop-huelle). Die einzige lokale Seite der
+  Hülle; alles andere lädt vom Einsatzserver. Die Maske ist in beiden Lichtlagen dunkel und hält
+  deshalb für Text die Tag-Schwelle 7 : 1 (LFH-434): Werte aus `rahmenFarben` in
+  frontend/src/theme/tokens.ts; der Primärknopf füllt mit `bedienText` (10,6 : 1), weil keine
+  Beschriftung auf `bedien` 7 : 1 erreicht. Radius 0. Die Adresse prüft die Hülle
+  (src-tauri/src/adresse.rs) — hier steht keine zweite Prüflogik, die Maske zeigt nur deren Meldung.
+-->
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lifeline Hub – Server verbinden</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --grund: #0c0e11;
+        --paneel: #0c0e11;
+        --feld: #14171b;
+        --linie: #22262b;
+        --text: #e8ebee;
+        --text2: #a0a8b1;
+        --rahmen: #626a73;
+        --bedien: #4d94d6;
+        --bedien-text: #8ec2f0;
+        --alarm: #ff7070;
+        --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+        background: var(--grund);
+        color: var(--text);
+        font: 15px/1.5 Archivo, -apple-system, 'Segoe UI', system-ui, sans-serif;
+      }
+      form {
+        width: min(520px, 100%);
+        background: var(--paneel);
+        border: 1px solid var(--linie);
+        padding: 24px;
+      }
+      .augenbraue {
+        margin: 0 0 4px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text2);
+      }
+      h1 { margin: 0 0 12px; font-size: 20px; font-weight: 600; }
+      p { margin: 0 0 16px; color: var(--text2); }
+      label { display: block; margin-bottom: 6px; font-weight: 600; }
+      input {
+        width: 100%;
+        min-height: 48px;
+        padding: 0 12px;
+        background: var(--feld);
+        color: var(--text);
+        border: 1px solid var(--rahmen);
+        border-radius: 0;
+        font: 15px var(--mono);
+        font-variant-numeric: tabular-nums;
+      }
+      input[aria-invalid='true'] { border-color: var(--alarm); }
+      input:focus-visible, button:focus-visible { outline: 2px solid var(--bedien); outline-offset: 2px; }
+      #fehler { min-height: 1.5em; margin: 8px 0 0; color: var(--alarm); }
+      .aktionen { display: flex; gap: 12px; margin-top: 16px; }
+      button {
+        min-height: 48px;
+        padding: 0 20px;
+        border-radius: 0;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button[type='submit'] { background: var(--bedien-text); color: var(--grund); border: 1px solid var(--bedien-text); }
+      button[type='button'] { background: transparent; color: var(--text); border: 1px solid var(--rahmen); }
+      button:disabled { opacity: 0.8; cursor: progress; }
+      code { font-family: var(--mono); }
+    </style>
+    <script src="maske.js" defer></script>
+  </head>
+  <body>
+    <form id="maske" novalidate>
+      <p class="augenbraue">Lifeline Hub</p>
+      <h1>Mit Einsatzserver verbinden</h1>
+      <p>
+        Adresse des Lifeline-Hub-Servers Ihrer Einsatzorganisation, zum Beispiel
+        <code>https://elw.local:8443</code>. Sie steht auch im Link aus „Geräte verbinden“.
+      </p>
+      <label for="adresse">Serveradresse</label>
+      <input
+        id="adresse"
+        name="adresse"
+        type="url"
+        inputmode="url"
+        autocomplete="url"
+        spellcheck="false"
+        placeholder="https://"
+        aria-describedby="fehler"
+        required
+      />
+      <p id="fehler" role="alert"></p>
+      <div class="aktionen">
+        <button type="submit" id="verbinden">Verbinden</button>
+        <button type="button" id="abbrechen" hidden>Abbrechen</button>
+      </div>
+    </form>
+  </body>
+</html>

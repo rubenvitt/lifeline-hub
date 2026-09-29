@@ -178,8 +178,11 @@ export default {
         /*
          * ZWEI VERSIONSDATEIEN, EIN LAUF.
          *
-         * `-p lifeline-hub`: `karten-katalog` und `karten-service` sind interne Crates mit
-         * eigener Versionsgeschichte. `cargo set-version` zieht `Cargo.lock` mit, deshalb
+         * `-p lifeline-hub`: dessen Version erbt aus `[workspace.package]`, also setzt der Aufruf
+         * die Workspace-Version — und die Desktop-Hülle (LFH-721), die sie ebenfalls erbt, zieht
+         * mit; ihr Updater vergleicht sie mit `latest.json`, `tauri.conf.json` hat keine eigene.
+         * `karten-katalog` und `karten-service` sind interne Crates mit eigener
+         * Versionsgeschichte. `cargo set-version` zieht `Cargo.lock` mit, deshalb
          * steht sie bei den Assets (sonst wäre der Baum nach dem Release dirty).
          *
          * Fürs Frontend `pnpm pkg set`, NICHT `pnpm version`: das bricht mit
@@ -194,7 +197,12 @@ export default {
     [
       '@semantic-release/git',
       {
-        assets: ['Cargo.toml', 'Cargo.lock', 'frontend/package.json', 'CHANGELOG.md'],
+        assets: [
+          'Cargo.toml',
+          'Cargo.lock',
+          'frontend/package.json',
+          'CHANGELOG.md',
+        ],
         /*
          * `[skip ci]` verhindert die Schleife Release → Push → Gate → Release. Der
          * Artefakt-Workflow hängt am `release: published`-Ereignis und läuft trotzdem.

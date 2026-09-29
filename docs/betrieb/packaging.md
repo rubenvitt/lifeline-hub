@@ -6,6 +6,9 @@ separater Webserver, keine Laufzeit-Bibliotheken vom Zielsystem. Die frühere
 Ausnahme (System-OpenSSL über WebAuthn/Passkeys, LFH-275) ist seit **LFH-522**
 geschlossen; der nächste Abschnitt erklärt wie und was das kostet.
 
+Die **Desktop-App** für macOS und Windows ist eine Hülle um genau diese Anwendung und
+beschreibt sich selbst in [desktop-app.md](desktop-app.md).
+
 ## Bauen
 
 Voraussetzungen: Rust-Toolchain (stable), Node.js (für den Frontend-Build),

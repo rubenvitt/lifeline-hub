@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vorbelegung"
+description = "Enables the vorbelegung command without any pre-configured scope."
+commands.allow = ["vorbelegung"]
+
+[[permission]]
+identifier = "deny-vorbelegung"
+description = "Denies the vorbelegung command without any pre-configured scope."
+commands.deny = ["vorbelegung"]

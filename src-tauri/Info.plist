@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Ohne diese Freigabe löst WKWebView einen .local-Namen nicht auf und bricht nach 60 s
+       ohne Fehlerbild ab (LFH-720, Befund 1). Der Bundler führt die Datei ins App-Bundle. -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Lifeline Hub verbindet sich mit dem Einsatzserver im lokalen Netz, z. B. elw.local.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_https._tcp</string>
+  </array>
+</dict>
+</plist>

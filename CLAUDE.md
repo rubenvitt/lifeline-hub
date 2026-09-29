@@ -669,7 +669,7 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
 ## Qualitäts-Gates — ein Kommando (LFH-235/F17)
 
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
-`check-typ-codegen.sh` → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e` →
+`check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
 `check-migrationen.sh` → `check-all.test.sh` → `check-toolversionen.sh`.
 - **Das Skript ist die Wahrheit**; `.github/workflows/ci.yml` ruft es unverändert. Neue Schritte
@@ -714,6 +714,31 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   Verstoß). Overrides pflegen Bereich **und** Zielversion. Der Audit prüft das **Lockfile** in
   einem Wegwerf-Verzeichnis (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`; nie
   `node_modules`; Node/pnpm aus `mise.toml`), Selbsttest `scripts/check-deps.test.sh`.
+
+## Desktop-Hülle (LFH-721)
+
+`src-tauri/` (Crate `lifeline-desktop`, Tauri 2), Anforderungen `openspec/specs/desktop-huelle/`
+und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
+- **Keine Anwendungslogik in der Hülle** (Variante A, LFH-720): der Webview lädt die
+  https-Adresse des Servers. Abhilfen für Webview-Grenzen gehören in die Hülle (Init-Skript,
+  Command), nicht ins Frontend.
+- **Rechte:** Adresse setzen nur die lokale Maske (`capabilities/lokal.json`); die Serverseite
+  bekommt zur Laufzeit genau für ihre Origin nur `drucken` (`server_freigeben`). Jeder neue
+  Command steht im `AppManifest` von `build.rs`, sonst wäre er für jede Seite offen.
+- Adresse, Deeplink (`lifeline://verbinden?server=`, Vertrag für LFH-38) und Speicherung sind
+  reine, getestete Funktionen (`adresse.rs`, `deeplink.rs`, `verbindung.rs`).
+- **Version: eine Quelle** in `[workspace.package]` der Wurzel, Server und Hülle erben
+  (`version.workspace = true`), `tauri.conf.json` trägt keine; `prepareCmd` setzt sie über
+  `-p lifeline-hub`. Kein eigenes Versionsfeld in `src-tauri` (driftet beim alpha-Merge; Test
+  `version_kommt_aus_dem_workspace`).
+- Pakete + `latest.json` nur bei stabilen Tags (`artefakte.yml`, Ausgabe `desktop`);
+  `scripts/release/desktop-manifest.mjs`, Selbsttest in Schritt 8. Der Updater-Schlüssel liegt
+  außerhalb des Repos (Secrets `TAURI_SIGNING_PRIVATE_KEY[_PASSWORD]`), der Pubkey in
+  `tauri.conf.json`.
+- **Schritt 4 testet Server und Hülle getrennt** (`--workspace --exclude lifeline-desktop`, dann
+  `-p lifeline-desktop`): in einem Zug vereinigte Cargo die Features, der Server liefe mit zwei
+  rustls-Providern (Stolperdraht `tls::tests::rcgen_pem_ist_per_rustls_ladbar`). Linux-Runner
+  des Rust-Jobs brauchen die GTK-/WebKit-Pakete (`ci.yml`); `coverage.yml` misst ohne Hülle.
 
 ## Backend↔Frontend — Typ-Codegen (LFH-120)
 

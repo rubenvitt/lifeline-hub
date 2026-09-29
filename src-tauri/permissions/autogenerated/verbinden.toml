@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-verbinden"
+description = "Enables the verbinden command without any pre-configured scope."
+commands.allow = ["verbinden"]
+
+[[permission]]
+identifier = "deny-verbinden"
+description = "Denies the verbinden command without any pre-configured scope."
+commands.deny = ["verbinden"]
