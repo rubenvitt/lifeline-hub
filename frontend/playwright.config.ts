@@ -6,23 +6,17 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Die Suite ist selbsttragend: `pnpm e2e` startet Backend UND Vite selbst (LFH-309/F29).
-// Vorher stand hier nur der Vite-Dev-Server und der Hinweis, das Backend „separat (siehe
-// Step 5)" zu starten — ein Verweis auf einen Schritt, den es im Repo nie gab.
+// Die Suite ist selbsttragend: `pnpm e2e` startet Backend UND Vite selbst.
 
 const frontendVerzeichnis = fileURLToPath(new URL('.', import.meta.url));
 /*
- * Der Pfad zum Backend-Binary — normalerweise über `cargo metadata`, weil
- * `build.target-dir` bzw. `CARGO_TARGET_DIR` es außerhalb des Worktrees ablegen kann.
- * Das ist dieselbe Cargo-Wahrheit, die auch check-all.sh befragt.
+ * Der Pfad zum Backend-Binary — über `cargo metadata`, weil `build.target-dir` bzw.
+ * `CARGO_TARGET_DIR` es außerhalb des Worktrees ablegen kann (dieselbe Wahrheit, die
+ * check-all.sh befragt).
  *
- * `PW_BINAER` übersteuert das (LFH-534). Der Name trägt bewusst das `PW_`-Präfix wie
- * `PW_WORKERS`/`PW_SHARD`: ein `LIFELINE_`-Name fiele unter die Env-Hygiene in
- * scripts/lib/dev-env.sh und würde vor dem Testlauf geräumt. Der Grund ist die geteilte CI: dort lädt
- * ein e2e-Shard das fertig gebaute Binary als Artefakt herunter und braucht sonst nichts von
- * Rust. Ohne diese Übersteuerung müsste er trotzdem die komplette Toolchain installieren —
- * nur damit `cargo metadata` ein Verzeichnis nennen kann, in dem gar nichts liegt.
- * Lokal bleibt alles wie es war: ohne die Variable wird Cargo gefragt.
+ * `PW_BINAER` übersteuert das: ein e2e-Shard der CI lädt das Binary als Artefakt und bräuchte
+ * sonst die ganze Rust-Toolchain. Der Präfix `PW_` ist Absicht — ein `LIFELINE_`-Name fiele
+ * unter die Env-Hygiene und würde geräumt.
  */
 const binaerUeberschrieben = process.env.PW_BINAER;
 const binaer = binaerUeberschrieben
@@ -40,8 +34,8 @@ const binaer = binaerUeberschrieben
       'lifeline-hub',
     );
 
-// Vorgebautes Binary voraussetzen statt bauen: `cargo build` im webServer-Command würde
-// jeden Lauf um Minuten verlängern und den Fehlerfall hinter einem Compile-Log verstecken.
+// Vorgebautes Binary voraussetzen statt bauen: `cargo build` im webServer-Command verlängerte
+// jeden Lauf um Minuten und versteckte den Fehlerfall hinter einem Compile-Log.
 if (!existsSync(binaer)) {
   throw new Error(
     `Backend-Binary fehlt: ${binaer}\n` +
@@ -51,12 +45,9 @@ if (!existsSync(binaer)) {
 }
 
 /*
- * AUSFÜHRBAR MUSS ES AUCH SEIN — und das ist in der CI keine Selbstverständlichkeit:
- * `actions/upload-artifact` zippt ohne Dateirechte und stellt beim Auspacken alles auf 644.
- * Das heruntergeladene Binary ist dann da, aber nicht startbar. Ein `existsSync` allein
- * ginge darüber hinweg, und der Lauf stürbe erst Minuten später im webServer-Start mit
- * EACCES — an einer Stelle, die nach einem Anwendungsfehler aussieht. Der Workflow setzt das
- * Bit nach dem Download; diese Prüfung ist das Netz darunter.
+ * Ausführbar muss es auch sein: `actions/upload-artifact` stellt beim Auspacken alles auf 644,
+ * und ohne diese Prüfung stürbe der Lauf erst im webServer-Start mit EACCES — an einer Stelle,
+ * die nach einem Anwendungsfehler aussieht.
  */
 try {
   accessSync(binaer, constants.X_OK);
@@ -90,28 +81,19 @@ async function freiePorts(anzahl: number): Promise<number[]> {
   return ports;
 }
 
-// Playwright lädt diese Config in JEDEM Worker-Prozess erneut. Ohne Stabilisierung
-// zöge jeder Worker eigene Ports und ein eigenes Temp-Verzeichnis — die Tests liefen
-// dann gegen Ports, auf denen nie ein Server gestartet wurde (gemessen: 18/18 rot mit
-// ERR_CONNECTION_REFUSED, jeder Worker auf einer anderen Portnummer). Der Hauptprozess
-// entscheidet einmal und vererbt das Ergebnis über die Umgebung an seine Worker.
+// Playwright lädt diese Config in JEDEM Worker-Prozess erneut; ohne Stabilisierung zöge
+// jeder Worker eigene Ports und ein eigenes Temp-Verzeichnis und liefe gegen Ports ohne
+// Server. Der Hauptprozess entscheidet einmal und vererbt das Ergebnis über die Umgebung.
 const ENV_SCHLUESSEL = 'LIFELINE_E2E_LAUF';
 const vorbelegt = process.env[ENV_SCHLUESSEL];
 
-// Env-Hygiene wie im Sammel-Gate (scripts/lib/dev-env.sh): Playwright merged
-// webServer.env mit process.env, das e2e-Backend erbt also die komplette Dev-Umgebung.
-// Auf der CLI gepinnt sind nur --db-path/--bind/--admin-password; alles andere käme
-// ungefiltert durch, und der Lauf wäre grün oder rot je nach lokaler Env-Belegung statt
-// durch Konstruktion. Konkrete Brecher: LIFELINE_TLS=true (Backend spricht HTTPS, der
-// Health-Check auf http:// wird nie grün), LIFELINE_ADMIN_USER (Bootstrap legt einen
-// anderen Benutzer an → jeder Spec-Login scheitert), LIFELINE_BACKUP_VERZEICHNIS (der
-// Testlauf schreibt ins echte Dev-Backup-Verzeichnis).
-// Bewusst hier statt nur in check-all.sh: der Task fordert ein alleinstehendes
-// `pnpm e2e`, und das läuft nicht durch den Gate-Wrapper.
+// Env-Hygiene wie im Sammel-Gate (scripts/lib/dev-env.sh): Playwright merged webServer.env mit
+// process.env, das e2e-Backend erbte sonst die Dev-Umgebung — etwa LIFELINE_TLS (der
+// Health-Check auf http:// würde nie grün), LIFELINE_ADMIN_USER (jeder Login scheiterte) oder
+// LIFELINE_BACKUP_VERZEICHNIS. Hier statt nur in check-all.sh, damit auch ein alleinstehendes
+// `pnpm e2e` sauber läuft.
 for (const schluessel of Object.keys(process.env)) {
-  // Unsere eigene Lauf-Variable trägt zwar das LIFELINE_-Präfix, ist aber KEINE
-  // Dev-Variable, sondern der Kanal zu den Workern — würde sie mitgeräumt, zöge jeder
-  // Worker wieder eigene Ports.
+  // Die eigene Lauf-Variable ist keine Dev-Variable, sondern der Kanal zu den Workern.
   if (schluessel !== ENV_SCHLUESSEL && /^(LIFELINE|KS|AWS)_/.test(schluessel)) {
     delete process.env[schluessel];
   }
@@ -121,10 +103,8 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
   ? JSON.parse(vorbelegt)
   : await (async () => {
       const [backendPort, frontendPort] = await freiePorts(2);
-      // Temp-DB je Lauf erspart jedes Cleanup im Repo-Baum: die Specs dürfen ihre
-      // `Date.now()`-Fixtures behalten, und es bleibt kein frontend/lifeline.db zurück.
-      // Was bleibt, ist ein Verzeichnis pro Lauf unter $TMPDIR — klein und vom System
-      // periodisch geräumt.
+      // Temp-DB je Lauf: kein Cleanup im Repo-Baum, die Specs dürfen ihre
+      // `Date.now()`-Fixtures behalten.
       const datenbank = join(mkdtempSync(join(tmpdir(), 'lifeline-e2e-')), 'lifeline.db');
       const neu = { backendPort, frontendPort, datenbank };
       process.env[ENV_SCHLUESSEL] = JSON.stringify(neu);
@@ -133,73 +113,37 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
 
 const { backendPort, frontendPort, datenbank } = lauf;
 const backendUrl = `http://127.0.0.1:${backendPort}`;
-// IPv4 durchgängig: Vite bindet ohne --host ausschließlich auf [::1], und Playwrights
-// Health-Check gegen 127.0.0.1 läuft dann in den Timeout, obwohl der Server längst
-// lauscht (gemessen: curl auf [::1] → 200, auf 127.0.0.1 → connection refused). Das war
-// der eigentliche Blocker; die vermeintlich fehlende Vite-Ausgabe war nur Playwrights
-// stdout-Default 'ignore'.
+// IPv4 durchgängig: Vite bindet ohne --host nur auf [::1], und Playwrights Health-Check gegen
+// 127.0.0.1 liefe in den Timeout.
 const baseURL = `http://127.0.0.1:${frontendPort}`;
 
 export default defineConfig({
   testDir: './e2e',
   /**
-   * GEDECKELTE WORKER-ZAHL — gemessen, nicht vorsichtshalber (03.09.2026).
-   *
-   * Playwrights Vorgabe ist `cpus / 2`, hier also 6. Damit fielen in zwei
-   * Vollläufen hintereinander je zwei bis drei Tests aus — WANDERND (erst
-   * `kraefte-schmal`, dann `fokus-verdeckung` + `gate1-ueberlauf`) und
-   * ausnahmslos mit Infrastruktur-Signaturen: `page.goto`-Timeout nach 90 s,
-   * `ERR_CONNECTION_REFUSED`, ein fehlgeschlagenes Seeding („mindestens 8
-   * gesäte Zeilen" → 0). Nie eine Zusicherung über das geprüfte Verhalten.
-   *
-   * Der Grund ist Lastdruck, kein Testfehler: sechs Chromium-Instanzen plus
-   * Backend plus Vite kommen auf eine Maschine, die im Leerlauf schon rund 10
-   * ihrer 12 Kerne belegt hat. Mit drei Workern: 93/93, und der Preis sind
-   * 4,2 statt 3,4 Minuten.
-   *
-   * Das ist bewusst KEINE Toleranz an einer Zusicherung — die Tests bleiben
-   * scharf, es laufen nur weniger gleichzeitig. Ein Gate, das je Lauf andere
-   * Tests rot färbt, wird abgeschaltet statt befolgt; genau deshalb steht die
-   * Zahl hier und nicht in einem Kommentar.
-   *
-   * Übersteuerbar: `PW_WORKERS=6 pnpm e2e` auf einer ruhigen Maschine.
+   * Gedeckelte Worker-Zahl: mit Playwrights Vorgabe (`cpus / 2`) fielen unter Lastdruck
+   * wandernde Tests mit Infrastruktur-Signaturen aus (goto-Timeout, ERR_CONNECTION_REFUSED),
+   * nie an einer Zusicherung. Keine Toleranz an einer Zusicherung — es laufen nur weniger
+   * gleichzeitig. Übersteuerbar: `PW_WORKERS=6 pnpm e2e` auf einer ruhigen Maschine.
    */
   workers: Number(process.env.PW_WORKERS ?? 3),
   /*
-   * FRISTEN NACH HARDWARE, NICHT NACH WUNSCH (LFH-522, gemessen im ersten CI-Lauf).
-   *
-   * Auf einem GitHub-Runner (2 vCPU) fielen 10 von 151 Tests aus — ausnahmslos an der Uhr:
-   * `page.goto`/`locator.click` überschritten den 30-s-Testtimeout, während 141 grün
-   * durchliefen. Das ist keine Regression, sondern die Hardware: die Suite fährt gegen den
-   * Vite-DEV-Server, der jedes Modul beim ersten Aufruf übersetzt, und zwei Worker teilen
-   * sich dabei zwei Kerne mit dem Backend.
-   *
-   * Deshalb längere Fristen NUR unter `CI` — lokal bleiben 30 s, damit ein echt hängender
-   * Test hier schnell auffällt und nicht eine halbe Minute pro Lauf kostet.
+   * Längere Fristen NUR unter `CI`: auf 2-vCPU-Runnern übersetzt der Vite-DEV-Server jedes
+   * Modul beim ersten Aufruf, und `page.goto`/`click` überschritten 30 s. Lokal bleiben 30 s,
+   * damit ein echt hängender Test schnell auffällt.
    */
   timeout: process.env.CI ? 90_000 : 30_000,
   expect: { timeout: process.env.CI ? 25_000 : 10_000 },
   /*
-   * EIN Wiederholungsversuch, und nur unter CI. Das ist bewusst die schwächste Zusicherung
-   * in dieser Datei, deshalb die Grenze: ein Test, der ZWEIMAL scheitert, bleibt rot — ein
-   * deterministisch kaputter Test wird also nicht grün gewaschen. Was `retries` auffängt,
-   * ist der Fall, den `trace: 'on-first-retry'` unten ohnehin schon voraussetzt: ein Ausfall,
-   * der beim zweiten Anlauf nicht wiederkehrt. Wer hier auf 2 erhöht, verschiebt die Grenze
-   * zwischen „flaky" und „kaputt" — und sollte vorher wissen, warum.
+   * EIN Wiederholungsversuch, nur unter CI: ein Test, der ZWEIMAL scheitert, bleibt rot — ein
+   * deterministisch kaputter Test wird nicht grün gewaschen. Wer hier erhöht, verschiebt die
+   * Grenze zwischen „flaky" und „kaputt".
    */
   retries: process.env.CI ? 1 : 0,
   /*
-   * BERICHTERSTATTUNG — ohne diese Zeile war der Report-Upload in ci.yml wirkungslos.
-   * Playwright nimmt unter CI von sich aus den `dot`-Reporter; ein `playwright-report/`
-   * entsteht dabei NIE. Der `if: failure()`-Upload im Workflow lud also seit jeher ein
-   * Verzeichnis hoch, das es nicht gab — stillschweigend, weil ein fehlender Pfad dort
-   * nur eine Warnung ist.
-   *
-   * `blob` statt `html`, weil die Suite auf mehrere Runner geteilt wird: Blob-Berichte
-   * lassen sich hinterher mit `playwright merge-reports` zu EINEM HTML-Bericht
-   * zusammenführen (seit Playwright 1.37; wir fahren 1.62). `github` daneben schreibt
-   * Fehler als Annotationen direkt an die betroffene Zeile im Pull Request.
-   * Lokal bleibt `list` — das ist das gewohnte Bild und ändert sich nicht.
+   * Unter CI nimmt Playwright sonst `dot` und schreibt keinen Bericht. `blob`, weil die Suite
+   * auf mehrere Runner geteilt wird (`playwright merge-reports` führt sie zu EINEM
+   * HTML-Bericht zusammen); `github` schreibt Fehler als Annotationen an die PR-Zeile.
+   * Lokal `list`.
    */
   reporter: process.env.CI ? [['blob'], ['github']] : 'list',
   use: { baseURL, trace: 'on-first-retry' },
@@ -207,35 +151,26 @@ export default defineConfig({
   webServer: [
     {
       name: 'Backend',
-      // `--kritis-extrakt false` (LFH-83): der KRITIS-Import ist Default-an und lädt nach
-      // 60 s Startverzögerung den Deutschland-Extrakt von Geofabrik — rund 4–5 GB je Lauf,
-      // in ein Temp-Verzeichnis, das nach der Suite niemand mehr ansieht. Die Specs brauchen
-      // keinen Bestand; ohne ihn antwortet die KRITIS-Route mit `offline`.
+      // `--kritis-extrakt false`: der KRITIS-Import lüde sonst nach 60 s den
+      // Deutschland-Extrakt (mehrere GB je Lauf); die Specs brauchen keinen Bestand.
       command: `${binaer} --db-path ${datenbank} --bind 127.0.0.1:${backendPort} --admin-password e2e-admin-pw --kritis-extrakt false`,
       url: `${backendUrl}/api/health`,
-      // Nie einen fremden Server übernehmen: ein laufender Dev-Stack hätte eine andere DB
-      // und ein anderes Admin-Passwort — alle Logins scheiterten mit irreführender Meldung.
-      // Dank eigener freier Ports gibt es ohnehin nichts zu übernehmen.
+      // Nie einen fremden Server übernehmen: ein laufender Dev-Stack hätte eine andere DB und ein
+      // anderes Admin-Passwort.
       reuseExistingServer: false,
       timeout: 60_000,
     },
     {
       name: 'Frontend',
-      // Port als CLI-Argument, nicht über FRONTEND_PORT: die Variable steht in der
-      // mise-Umgebung bereits auf 5173 und gewinnt gegen alles, was wir hier setzen.
-      // `pnpm run dev -- --port X` reicht das `--` an Vite durch, deshalb ruft der Befehl
-      // Vite direkt auf.
+      // Port als CLI-Argument, nicht über FRONTEND_PORT (steht in der mise-Umgebung auf 5173
+      // und gewönne). Vite direkt, weil `pnpm run dev -- --port X` das `--` durchreicht.
       //
-      // `--no-turbo-fast-api-calls` ist eine Messung, kein Tuning (28.09.2026): Node 26
-      // (V8 14.6.202.34, in JEDEM 26.x-Release dieselbe) bricht den Dev-Server gelegentlich
-      // mit „Lazy deopt after a fast API call with return value is unsupported" ab, Stack
-      // `Buffer.byteLength` ← `_http_outgoing.end` ← Vites `send` beim Ausliefern eines
-      // großen vorgebündelten Moduls (`@ant-design_icons.js`, ~2,5 MB samt Sourcemap).
-      // Alle Folgetests des Shards laufen dann in ERR_CONNECTION_REFUSED; auf `alpha` traf
-      // das am 25. und 28.09. mehrfach Shard 3/4. Ohne Fast-API-Calls gibt es den Pfad, der
-      // abbricht, nicht mehr. Der Schalter ist eine V8-Option und in NODE_OPTIONS verboten,
-      // deshalb startet der Befehl Node selbst — `process.execPath` ist dieselbe
-      // Node-Version, unter der Playwright läuft, also die in `check-all.sh` gepinnte.
+      // `--no-turbo-fast-api-calls`: Node 26 (V8 14.6, in jedem 26.x-Release) bricht den
+      // Dev-Server gelegentlich mit „Lazy deopt after a fast API call with return value is
+      // unsupported" ab (`Buffer.byteLength` beim Ausliefern eines großen vorgebündelten
+      // Moduls); alle Folgetests liefen dann in ERR_CONNECTION_REFUSED. Der Schalter ist eine
+      // V8-Option und in NODE_OPTIONS verboten, deshalb startet der Befehl Node selbst
+      // (`process.execPath`, dieselbe gepinnte Version).
       command: `"${process.execPath}" --no-turbo-fast-api-calls node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${frontendPort} --strictPort`,
       url: baseURL,
       // Proxy-Ziel auf unser Test-Backend umbiegen (vite.config.ts liest die Variable,

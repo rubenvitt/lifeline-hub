@@ -9,52 +9,19 @@ import { pruefeFokusVerdeckung } from './fokus-kern';
 
 /**
  * Prüflisten-Zeile Z13 der Bedien-Leitlinie — WCAG 2.4.11 „Focus Not Obscured (Minimum)":
- * ein fokussiertes Ziel darf nicht VOLLSTÄNDIG von autoreneigenem Inhalt verdeckt sein
- * (LFH-330 · B2, Bündel V).
+ * ein fokussiertes Ziel darf nicht VOLLSTÄNDIG von autoreneigenem Inhalt verdeckt sein.
+ * Gemessen an stehenden Kopfzeilen, fixierten Spalten, angepinnten Leisten und
+ * Kartenaufbauten; jsdom rechnet kein Layout, deshalb im Browser.
  *
- * WARUM DIESE DATEI ÜBERHAUPT EXISTIERT: `2026-07-28-katalogtabellen-pruefliste.md:36/65`
- * hat Z13 namentlich an B2 delegiert, mit genau dieser Begründung — „genau dieses Paket zieht
- * eine fixierte Kopfzeile und eine fixierte erste Spalte ein", also die zwei Konstrukte, auf
- * die 2.4.11 zielt. Ein Tabulatordurchlauf dahinter war nirgends gemessen.
+ * Der Messkern liegt in `./fokus-kern`; sein Selbstbeweis (erster Test) ist die Gegenprobe,
+ * ohne die „grün" nichts belegt.
  *
- * WARUM NICHT IN VITEST: jsdom rechnet kein Layout (`vite.config.ts` fährt `css: false`) —
- * `position: sticky` hat dort keine geometrische Wirkung, jedes Rechteck ist 0×0, und die
- * Aussage wäre strukturell unfähig rot zu werden.
- *
- * NEUBAU OHNE VORBILD: `press(`/`keyboard.` trifft in `frontend/e2e/` ausschließlich
- * `command-palette.spec.ts`, `'Tab'` gar nicht. Deshalb trägt der Messkern einen eigenen
- * POSITIVNACHWEIS (erster Test) — bei einem Neubau ist „grün" ohne Gegenprobe kein Ergebnis,
- * sondern eine unbelegte Behauptung. Genau die Rolle, die `katalogTabelle.guard.test.ts:122-135`
- * im Vitest spielt.
- *
- * WELCHE HÄLFTE VON Z13 HIER FÄLLT: die Tabellen-Hälfte (stehende Kopfzeile, fixierte erste
- * Spalte). Die DRAWER-Hälfte — Tabulatordurchlauf bei offenem Navigations-Drawer — bleibt
- * **B7 (LFH-335)**, so von `2026-07-28-rahmen-pruefliste.md:47/90` ausdrücklich getrennt. Wer
- * Z13 abhakt, muss sagen, welche Hälfte er meint.
- *
- * SEEDING PER `page.request`, mit Begründung: die Session ist Cookie-basiert
- * (`api/client.ts:35/46/56`, `credentials: 'same-origin'`, kein CSRF-Header), und
- * `page.request` teilt den Cookie-Jar des Kontexts. Acht Benutzer per Anlege-Modal wären ~40
- * Formularaktionen ohne Erkenntnisgewinn.
- *
- * NEBENBEFUND, benannt statt verschwiegen: die gesäten Benutzer machen die ZAHLEN IN DEN
- * KOMMENTAREN von `katalogtabelle-schmal.spec.ts:134` („gemessen 206 px") und `:160-165`
- * („Dokument 884 px hoch") ungenau. Alle dortigen ZUSICHERUNGEN sind dagegen abgeleitet und
- * unberührt (nachgeprüft: `:135` misst waagerecht, `:184`/`:192`/`:200` rechnen aus eigenen
- * Messwerten) — und mehr Zeilen erhöhen die Bildlaufreserve, machen sie also sicherer. Die
- * Datei wird deshalb nicht angefasst.
- *
- * DER MESSKERN LIEGT SEIT LFH-465 IN `./fokus-kern`: `befehl-aktionsleiste.spec.ts` braucht
- * denselben Kern, und zwei Kopien, die verschieden rechnen, machen beide Nachweise wertlos.
- * Der Umzug war ein reiner Move — die Tests dieser Datei sind unverändert und belegen den
- * Kern weiterhin, samt seinem Selbstbeweis gleich unten.
+ * Seeding per `page.request` (teilt den Cookie-Jar des Kontexts).
  */
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-// Login-/Anlege-Helfer aus `kernfluss.spec.ts` kopiert — es gibt (noch) kein geteiltes
-// e2e-Hilfsmodul (gleichlautend in fünf Bestands-Specs vermerkt).
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -72,9 +39,8 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 }
 
 test('Selbstbeweis: der Messkern meldet eine erfundene Verdeckung', async ({ page }) => {
-  // DER ERSATZ FÜR „ROT VOR GRÜN". Ob die zwei Tests unten heute rot sind, war beim Schreiben
-  // offen — deshalb braucht der Messkern einen Fall, der JETZT rot ist, solange er falsch
-  // rechnet, und der von jeder B2-Zeile unabhängig ist.
+  // Der Messkern braucht einen Fall, der rot ist, solange er falsch rechnet — unabhängig von
+  // jeder Produktfläche.
   await anmelden(page);
   await page.setViewportSize({ width: 390, height: 400 });
   await page.goto('/admin/benutzer');
@@ -105,20 +71,16 @@ test('Selbstbeweis: der Messkern meldet eine erfundene Verdeckung', async ({ pag
 test('Selbstbeweis (LFH-373): Zusatzkandidaten machen einen ABSOLUTEN Verdecker sichtbar — ohne sie nicht', async ({
   page,
 }) => {
-  // Die Kartenaufbauten der Lage- und Personenkarte sind `position: absolute`. Die Vorgabe des
-  // Kerns wertet nur `sticky|fixed` — ein Lauf dort wäre grün durch Konstruktion. Dieser Test
-  // belegt beide Hälften der Opt-in-Erweiterung: mit `zusatzKandidaten` findet der Kern die
-  // Verdeckung, OHNE sie findet er sie nicht. Die zweite Hälfte ist die schärfere: sie zeigt,
-  // dass die Vorgabe die Option nicht still mitenthält, dass also die Bestandsaufrufer
-  // unverändert rechnen.
+  // Kartenaufbauten sind `position: absolute`, die Vorgabe des Kerns wertet nur
+  // `sticky|fixed`. Belegt beide Hälften des Opt-ins: MIT `zusatzKandidaten` findet der Kern
+  // die Verdeckung, OHNE nicht — die Vorgabe enthält die Option also nicht still mit.
   await anmelden(page);
   await page.setViewportSize({ width: 390, height: 400 });
 
   const laufMitAttrappe = async (optionen?: { zusatzKandidaten: string[] }) => {
     await page.goto('/admin/benutzer');
     await expect(page.locator('tr.ant-table-row').first()).toBeVisible();
-    // Absolut über das GANZE Dokument, nicht über den Schirm: sonst läge ein Ziel nach dem
-    // Bildlauf außerhalb der Attrappe und der Befund hinge an der Scrollposition.
+    // Über das GANZE Dokument, sonst hinge der Befund an der Scrollposition.
     await page.evaluate(() => {
       const hoehe = document.scrollingElement!.scrollHeight;
       document.body.append(
@@ -149,10 +111,8 @@ test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierte
 }) => {
   await anmelden(page);
 
-  // WARUM `/admin/benutzer` und nicht ein Stammdaten-Reiter: Qualifikationen kostet weniger
-  // Seeding (EIN Pflichtfeld), trägt aber nur drei Spalten — die fixierte Spalte hätte dort
-  // keinen waagerechten Bildlaufweg und die halbe Zusicherung wäre leer. Die Benutzerliste
-  // trägt sechs Spalten und zwei fokussierbare Knöpfe je Zeile.
+  // `/admin/benutzer` statt einer kleinen Stammdatenliste: erst sechs Spalten geben der
+  // fixierten Spalte einen waagerechten Bildlaufweg.
   const LAUF = Date.now();
   for (let i = 0; i < 8; i += 1) {
     const antwort = await page.request.post('/api/benutzer', {
@@ -168,36 +128,18 @@ test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierte
     ).toBeTruthy();
   }
 
-  // Höhe bewusst verkürzt: die Bildlaufreserve ist die Vorbedingung dieses Nachweises, und
-  // 844 px Schirmhöhe lassen der Benutzerliste des Harness nur ~40 px (die Falle, die
-  // `katalogtabelle-schmal.spec.ts:158-169` protokolliert).
+  // Höhe bewusst verkürzt: die Bildlaufreserve ist die Vorbedingung dieses Nachweises.
   await page.setViewportSize({ width: 390, height: 400 });
   await page.goto('/admin/benutzer');
   await page.waitForLoadState('networkidle');
 
   /**
-   * MINDESTENS 9 Zeilen (8 gesät + Harness-Admin), NICHT genau 9.
-   *
-   * Gemessen und behoben: `toHaveCount(9)` schlug unter `--repeat-each=5` in vier von fünf
-   * Wiederholungen fehl. Die Benutzerliste hängt an `globalKeys`, ist also nicht je Einsatz
-   * getrennt, und die Temp-DB lebt über den ganzen Lauf — jede Wiederholung sät acht weitere
-   * Benutzer (9 → 17 → 25 …). Eine absolute Zeilenzahl gegen eine geteilte Datenbank ist
-   * hier grundsätzlich falsch; gebraucht wird ohnehin nur die UNTERGRENZE, weil sie die
-   * Bildlaufreserve trägt. Mehr Zeilen machen den Nachweis sicherer, nicht schwächer.
-   *
-   * Die Blätterung von `KatalogTabelle` setzt erst über 50 Zeilen ein
-   * (`KatalogTabelle.tsx:61/219`); bis dahin stehen alle Zeilen im Baum. Wird diese Datei
-   * einmal mit mehr als fünf Wiederholungen gefahren, greift die Blätterung und die
-   * Untergrenze bleibt trotzdem erfüllt (Seitengröße 50 ≥ 9).
+   * MINDESTENS 9 Zeilen (8 gesät + Harness-Admin), nicht genau 9: die Benutzerliste ist
+   * global und die Temp-DB lebt über den ganzen Lauf, jede Wiederholung sät acht weitere.
+   * Gebraucht wird nur die Untergrenze, sie trägt die Bildlaufreserve.
    */
-  // `expect.poll` statt `count()`: Letzteres ist die EINZIGE Abfrage dieser Datei ohne
-  // Nachwartung, und `waitForLoadState('networkidle')` davor ist zu früh, wenn die Seite
-  // ihre erste Datenanfrage erst NACH dem 500-ms-Ruhefenster stellt — Assets fertig,
-  // 500 ms still, „idle", dann montiert React und holt erst jetzt `/api/benutzer`. Auf
-  // zwei geteilten Kernen mit zwei Playwright-Workern ist das erreichbar: in CI zweimal
-  // rot mit „Received: 0" (LFH-358, PR #59), lokal 3/3 grün. Die Aussage bleibt wortgleich
-  // — die UNTERGRENZE gegen die geteilte Temp-DB, siehe der Absatz darüber —, sie bekommt
-  // nur die Wiederholung, die jede andere Zeile dieses Specs schon hat.
+  // `expect.poll` statt `count()`: `networkidle` kommt zu früh, wenn React die Liste erst
+  // nach dem Ruhefenster abruft (in CI mit „Received: 0" gesehen).
   await expect
     .poll(() => page.locator('tr.ant-table-row').count(), {
       message: 'Vorbedingung: mindestens 8 gesäte Zeilen + Harness-Admin',
@@ -221,8 +163,7 @@ test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierte
       'sonst kann keine Zeile unter den Kopf wandern und die Aussage ist leer',
   ).toBeGreaterThan(kopfHoehe);
 
-  // Wirklich unter den Kopf scrollen. Ein Durchlauf am Dokumentanfang trifft die Fixierung
-  // gar nicht.
+  // Wirklich unter den Kopf scrollen; am Dokumentanfang trifft der Lauf die Fixierung nicht.
   await page.evaluate((z) => window.scrollTo(0, z), Math.round(reserve / 2));
 
   const ergebnis = await pruefeFokusVerdeckung(page, 60);
@@ -296,9 +237,8 @@ test('Datensicht-Tabellenzweig: Tabulaturdurchlauf hinter Werkzeugzeile, Kopfzei
 
   const ergebnis = await pruefeFokusVerdeckung(page, 60);
   expect(ergebnis.fixierteKandidaten, 'Vorbedingung: fixierte Knoten vorhanden').toBeGreaterThan(0);
-  // Höher als in der Katalogtabelle: hier kommen Spaltenschalter, Suchfeld, Spaltenfilter und
-  // die Sortierauslöser als Fokusziele dazu. Eine zu niedrige Schwelle ließe einen Durchlauf
-  // durch, der die Fläche nur streift.
+  // Höher als in der Katalogtabelle: Spaltenschalter, Suchfeld, Filter und Sortierauslöser
+  // kommen als Fokusziele dazu. Eine zu niedrige Schwelle ließe einen streifenden Lauf durch.
   expect(
     ergebnis.stoppsInTabelle,
     `Vorbedingung: Durchlauf muss in der Tabelle landen (${ergebnis.stoppsGesamt} Stopps gesamt)`,
@@ -319,27 +259,15 @@ test('Datensicht-Tabellenzweig: Tabulaturdurchlauf hinter Werkzeugzeile, Kopfzei
 });
 
 /**
- * Die sticky Speicherleiste der Einstellungs-Sektionen (LFH-345 · C10, Prüflisten-Zeile 13).
- *
- * DIE DRITTE HÄLFTE VON Z13. Die Tabellen-Hälfte fiel mit B2, die Drawer-Hälfte mit B7 —
- * C10 zieht ein NEUES `position: sticky` ein, und zwar genau die Konstruktion, auf die
- * WCAG 2.4.11 zielt: eine am unteren Rand verankerte Leiste über einem langen Formular. Das
- * unterste Feld liegt dann potenziell dahinter.
- *
- * Die Sektion „Verhalten" ist der scharfe Fall: neun Felder, das letzte steht unmittelbar
- * über der Leiste. „Allgemein" (5) und „Aufbewahrung" (1) kommen ohne Bildlauf aus.
- *
- * ── WARUM ES DIESEN TEST GIBT ───────────────────────────────────────────────────────────
- * Die Prüfliste führte Zeile 13 zunächst als „erfüllt — wird gegen `fokus-verdeckung.spec.ts`
- * gehalten". Diese Datei enthielt die Einstellungen aber gar nicht; das Verdikt stand auf
- * nicht existierender Evidenz. Im eigenen Review aufgefallen — das hier ist die Nachbesserung.
+ * Die sticky Speicherleiste der Einstellungs-Sektionen: eine am unteren Rand verankerte
+ * Leiste über einem langen Formular. „Verhalten" ist der scharfe Fall — das letzte von neun
+ * Feldern steht unmittelbar über der Leiste.
  */
 test('Einstellungen: Tabulaturdurchlauf unter der sticky Speicherleiste', async ({ page }) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `Fokus Einstellungen ${Date.now()}`);
 
-  // Verkürzte Höhe ist die Vorbedingung: ohne Bildlaufreserve klebt die Leiste am Seitenende
-  // statt über dem Inhalt, und die Zusicherung wäre trivial wahr.
+  // Ohne Bildlaufreserve klebt die Leiste am Seitenende statt über dem Inhalt.
   await page.setViewportSize({ width: 390, height: 420 });
   await page.goto(`/einsaetze/${einsatzId}/einstellungen/verhalten`);
   await expect(page.getByLabel('Präfix ETB')).toBeVisible();
@@ -374,7 +302,7 @@ test('Einstellungen: Tabulaturdurchlauf unter der sticky Speicherleiste', async 
   });
 });
 
-/** LFH-446: Besuchsnachweise gehören zur Route, allgemeine Stopps zählen auch die Navigation. */
+/** Besuchsnachweise gehören zur Route, allgemeine Stopps zählen auch die Navigation. */
 async function einheitFokusBereit(page: Page, dichte: string) {
   await anmelden(page);
   const { pfad } = await einheitMitZuordnungen(page);
@@ -563,13 +491,9 @@ test('Einheit Selbstbeweis: ein Fokusziel hinter der echten sticky Aktionsleiste
 });
 
 /**
- * Der klebende Fuß des Modulpanels (Einsatzdauer, `sticky; bottom: 0`) verdeckt kein Ziel
- * der Liste darüber — deterministisch statt über den Tabulatordurchlauf oben, der die Lage
- * nur zufällig trifft: im vollen Lauf mit gewachsenem Datenbestand landete
- * „Bereitstellungsräume" (72 px, `handschuh`) ganz hinter dem Fuß, einzeln lief derselbe
- * Test grün. Hier wird die Seite je Schritt anders gescrollt und das Ziel frisch fokussiert.
- * Gegenprobe beim Bau: ohne `fussFokusabstandStil` blieb es bei 0/20/40 px Ausgangslage
- * unter dem Fuß (Unterkante 520 gegen Fußoberkante 438).
+ * Der klebende Fuß des Modulpanels (Einsatzdauer, `sticky; bottom: 0`) verdeckt kein Ziel der
+ * Liste darüber. Deterministisch statt per Tabulatordurchlauf, der die Lage nur zufällig
+ * trifft: die Seite wird je Schritt anders gescrollt und das Ziel frisch fokussiert.
  */
 test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modul (1366 × 520, handschuh)', async ({
   page,
@@ -593,8 +517,7 @@ test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modu
       (document.activeElement as HTMLElement | null)?.blur();
       window.scrollTo(0, wert);
     }, y);
-    // Vorbedingung zählen: nur Lagen, in denen das Ziel VOR dem Fokus den Fuß berührt,
-    // prüfen überhaupt etwas.
+    // Nur Lagen, in denen das Ziel VOR dem Fokus den Fuß berührt, prüfen überhaupt etwas.
     const vorher = await ziel.evaluate(
       (el, f) => el.getBoundingClientRect().bottom > f!.getBoundingClientRect().top,
       await fuss.elementHandle(),
@@ -614,17 +537,9 @@ test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modu
   expect(befunde, befunde.join('\n')).toEqual([]);
 });
 
-// ── LFH-373 ──────────────────────────────────────────────────────────────────────────────
-//
-// MUTATIONSPROBE (25.09.2026, je Fix einzeln zurückgedreht): ETB ohne Fokusabstand → ROT;
-// Matrix ohne Spalten-Freiraum → ROT; Matrix ohne Kopf-Freiraum → ROT; Kartenfuß über die
-// Knopfspalte → ROT; Kern ignoriert `zusatzKandidaten` → Selbstbeweis ROT; Attrappe über
-// „Herauszoomen" der Personenkarte → ROT; Katalog ohne Kopf-Freiraum → Personenliste ROT —
-// dieser Fall überlebte zuerst (nur halb verdeckt, der Kern zählt vollständig) und hat die
-// Mittelpunkt-Prüfung `mittelpunktUnterKopf` hervorgebracht.
+// ── ETB, Gefahrenmatrix, Lagekarte, Personenkarte und -liste ─────────────────────────────
 
-/** Stellt die Dichte über den Weg eines wiederkehrenden Benutzers (localStorage + Neuladen)
- *  und hält die Wache am `<html>` — Muster `stelleDichte` in `gate3-trefflaeche.spec.ts`. */
+/** Stellt die Dichte über localStorage + Neuladen und hält die Wache am `<html>`. */
 async function stelleDichte(page: Page, dichte: string) {
   await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
   await page.reload();
@@ -632,11 +547,9 @@ async function stelleDichte(page: Page, dichte: string) {
 }
 
 /**
- * Blendet den Öffnen-Knopf der TanStack-Query-Devtools aus (LFH-373). Er steht nur im
- * DEV-Build (`main.tsx`, `ReactQueryDevtools`), gegen den die e2e-Suite fährt, als
- * `position: fixed` unten rechts — auf 390 px lag er gemessen vollständig über einer
- * Matrixzelle. Ein Verdecker, den es im Betrieb nicht gibt, ist kein Befund über die Seite.
- * Per Init-Skript, weil `stelleDichte` neu lädt und ein `addStyleTag` dabei verloren ginge.
+ * Blendet den Knopf der TanStack-Query-Devtools aus: er steht nur im DEV-Build, gegen den die
+ * Suite fährt, als `position: fixed` unten rechts — ein Verdecker, den es im Betrieb nicht
+ * gibt. Per Init-Skript, weil `stelleDichte` neu lädt.
  */
 async function ohneDevtoolsKnopf(page: Page) {
   await page.addInitScript(() => {
@@ -649,14 +562,9 @@ async function ohneDevtoolsKnopf(page: Page) {
 }
 
 /**
- * Kleinster freier Streifen zwischen der UNTERKANTE eines angesteuerten Ziels und der
- * OBERKANTE einer angepinnten Fußleiste, über `schritte` Tabulatorschritte. Gezählt werden
- * nur Ziele mit `data-e2e-fokus`.
- *
- * WARUM NEBEN DEM KERN: der Kern meldet nur VOLLSTÄNDIGE Verdeckung (WCAG 2.4.11 Minimum).
- * Ein Ziel, das zur Hälfte unter der Leiste steckt, ist dort frei — für die Bedienung aber
- * nicht. Der Befehls-Spec hat eine verwandte Messung (`kleinsterFreiraum`), die auf dessen
- * Formularfelder und Leiste zugeschnitten ist und sich deshalb nicht teilen lässt.
+ * Kleinster freier Streifen zwischen der Unterkante eines angesteuerten Ziels (mit
+ * `data-e2e-fokus`) und der Oberkante einer angepinnten Fußleiste. Der Kern meldet nur
+ * VOLLSTÄNDIGE Verdeckung; ein halb verdecktes Ziel ist für die Bedienung aber nicht frei.
  */
 async function kleinsterStreifen(page: Page, schritte: number, leiste: string): Promise<number> {
   let kleinster = Number.POSITIVE_INFINITY;
@@ -674,17 +582,12 @@ async function kleinsterStreifen(page: Page, schritte: number, leiste: string): 
 }
 
 /**
- * ETB (LFH-373, Prüfliste ETB Zeile 13): die angepinnte Erfassungsleiste am Seitenfuß.
+ * ETB: die angepinnte Erfassungsleiste am Seitenfuß. Vorwärts getabbt rollt der Browser jedes
+ * Ziel an den unteren Rand — genau dorthin, wo die Leiste klebt.
  *
- * GEMESSEN VOR DEM FIX (24.09.2026): beim Vorwärtstabben rollt der Browser jedes Ziel an den
- * UNTEREN Rand des Fensters — genau dorthin, wo die Leiste klebt. Jeder zweite bis jeder
- * Zeilenauslöser lag vollständig hinter ihr, auf beiden Breiten und in beiden Stufen.
- *
- * START AM ERSTEN AUSLÖSER, nicht am Dokumentanfang: die Erfassung fokussiert beim Einhängen
- * ihr Textfeld am Seitenfuß, ein nacktes Tab nach `goto` liefe an der Zeitachse vorbei.
- *
- * KLEINE HÖHEN mit Absicht: ohne Bildlaufreserve klebt die Leiste am Seitenende statt über
- * der Zeitachse, und „0 verdeckt" wäre trivial wahr. Deshalb 600 bzw. 520 px und 16 Einträge.
+ * Start am ersten Auslöser: die Erfassung fokussiert beim Einhängen ihr Textfeld, ein nacktes
+ * Tab liefe an der Zeitachse vorbei. Kleine Höhen und 16 Einträge, damit die Leiste über der
+ * Zeitachse klebt statt am Seitenende.
  */
 test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Erfassungsleiste', async ({
   page,
@@ -711,9 +614,8 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
     expect(eintrag.ok(), await eintrag.text()).toBeTruthy();
     ids.push(((await eintrag.json()) as { id: number }).id);
   }
-  // Zwei Berichtigungen, damit die Bilanz Links trägt (Review LFH-373): unter `xl` steht die
-  // Bilanz UNTER der Zeitachse, und seit die Leiste als Seitenfuß an der Wurzel hängt, klebt sie
-  // auch über der Bilanz — deren Links brauchen denselben Fokusabstand.
+  // Zwei Berichtigungen, damit die Bilanz Links trägt: unter `xl` steht sie unter der
+  // Zeitachse, und die Leiste klebt auch über ihr.
   for (const ziel of ids.slice(0, 2)) {
     const b = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
       data: {
@@ -839,22 +741,13 @@ async function matrixEinsatz(page: Page): Promise<number> {
 }
 
 /**
- * Gefahrenmatrix (LFH-373, Prüfliste B5h Zeile 13): stehende Kopfzeile und fixierte Spalte
- * „Gefahr" gegenüber 58 Zell-Auslösern.
+ * Gefahrenmatrix: stehende Kopfzeile und fixierte Spalte „Gefahr" gegenüber 58 Zell-Auslösern.
+ * Hier trägt JEDE Spalte ein Fokusziel: beim Sprung zur ersten Zelle der nächsten Zeile rollt
+ * der Container nach links, und der Browser richtet das Ziel unter der fixierten Spalte aus.
  *
- * STRUKTURELL ANDERS ALS DIE KATALOGTABELLEN: dort trägt eine Zeile ein, zwei Fokusziele, hier
- * trägt JEDE Spalte eins. Beim Sprung von der letzten Zelle einer Zeile zur ersten der nächsten
- * rollt der Tabellencontainer nach links, und der Browser richtet das Ziel am linken Rand des
- * Scrollports aus — unter der 180 px breiten fixierten Spalte. GEMESSEN VOR DEM FIX
- * (24.09.2026): vollständig verdeckt bei 390 px in allen Stufen, bei 1024 px in `kompakt`/
- * `komfortabel`, bei 1366 px in `handschuh`.
- *
- * VORBEDINGUNG „die Tabelle läuft waagerecht über": ohne Überlauf rollt nichts, die fixierte
- * Spalte steht nie vor einem Ziel, und „0 verdeckt" wäre trivial wahr.
- *
- * RÜCKWÄRTS eigens: vorwärts rollt ein Ziel an den UNTEREN Rand, unter die OBEN stehende
- * Kopfzeile gerät es so nie (Kern, Abschnitt RICHTUNG). `Shift+Tab` von der letzten Zelle aus
- * prüft die Kopfzeile, `stoppsAnTabellenkopf` belegt, dass der Lauf sie erreicht hat.
+ * Vorbedingung „die Tabelle läuft waagerecht über", sonst ist „0 verdeckt" trivial wahr.
+ * Rückwärts eigens, weil nur `Shift+Tab` Ziele unter die oben stehende Kopfzeile rollt;
+ * `stoppsAnTabellenkopf` belegt, dass der Lauf sie erreicht hat.
  */
 test('Gefahrenmatrix (LFH-373): keine Zelle verschwindet beim Tabben unter der fixierten Spalte oder der Kopfzeile', async ({
   page,
@@ -901,9 +794,8 @@ test('Gefahrenmatrix (LFH-373): keine Zelle verschwindet beim Tabben unter der f
         57,
       );
       expect(rueck.verdeckt, `${lauf} rückwärts:\n${rueck.verdeckt.join('\n')}`).toEqual([]);
-      // Vorbedingung (Review LFH-373): auf dem Handschirm rollt die Matrix senkrecht, der
-      // Rückwärtslauf MUSS dort an der stehenden Kopfzeile vorbeikommen — sonst belegt er den
-      // Kopf-Freiraum nicht. Bei 1024 × 768 passt die Matrix in `kompakt` ins Fenster.
+      // Vorbedingung: auf dem Handschirm rollt die Matrix senkrecht, der Rückwärtslauf MUSS an
+      // der Kopfzeile vorbeikommen. Bei 1024 × 768 passt die Matrix in `kompakt` ins Fenster.
       if (flaeche.width < 768) {
         expect(
           rueck.stoppsAnTabellenkopf,
@@ -919,7 +811,7 @@ test('Gefahrenmatrix (LFH-373): keine Zelle verschwindet beim Tabben unter der f
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-/** Kandidaten der Kartenaufbauten für den Kern (`position: absolute`, Opt-in LFH-373). */
+/** Kandidaten der Kartenaufbauten für den Kern (`position: absolute`, Opt-in). */
 const KARTEN_AUFBAUTEN = [
   '[data-lfh="karten-fuss"] > *',
   '[data-lfh="karten-knoepfe"]',
@@ -934,7 +826,7 @@ const KARTENKNOEPFE = [
   'Zeichenwerkzeuge',
 ];
 
-/** Ab `lg` (992) sitzt der Leisten-Umschalter unten im Knopfblock (LFH-715). */
+/** Ab `lg` (992) sitzt der Leisten-Umschalter unten im Knopfblock. */
 const LG = 992;
 
 /**
@@ -960,19 +852,11 @@ async function knopfblockUeberFuss(page: Page): Promise<string[]> {
 }
 
 /**
- * Lagekarte (LFH-373, Prüfliste Lagekarte Zeile 13): Knopfblock oben rechts, Überlagerung
- * links, Fußbänder unten — alle `position: absolute` über der Karte.
- *
- * GEMESSEN VOR DEM FIX (24.09.2026): bei 390 px in `handschuh` lagen „Herauszoomen", „Nach
- * Norden ausrichten" und „Messen" VOLLSTÄNDIG unter dem ausgeklappten Zeitachsenband, bei
- * 1024 px „Zeichenwerkzeuge" zu 92 %. Beide `zIndex: 5`, der Fuß kommt später im DOM und liegt
- * oben — die Knöpfe waren damit auch per Zeiger nicht erreichbar, nicht nur per Tastatur.
- *
- * DREI BELEGE, weil jeder allein zu wenig sagt: der Kern (mit den Aufbauten als
- * Zusatzkandidaten — ohne sie wäre dieser Lauf grün durch Konstruktion), der Rechteckschnitt
- * Knopfblock ↔ Fußband (auch eine Teilüberdeckung, die der Kern bewusst nicht meldet), und
- * die Trefferprobe je Knopf (`click({ trial: true })`: Playwrights Prüfung, ob der Klick
- * wirklich beim Knopf ankommt — `toBeVisible()` belegt das nicht, LFH-355).
+ * Lagekarte: Knopfblock oben rechts, Überlagerung links, Fußbänder unten — alle
+ * `position: absolute` über der Karte, der Fuß später im DOM. Drei Belege, weil jeder allein
+ * zu wenig sagt: der Kern (mit den Aufbauten als Zusatzkandidaten), der Rechteckschnitt
+ * Knopfblock ↔ Fußband (auch Teilüberdeckung) und die Trefferprobe je Knopf
+ * (`click({ trial: true })` — `toBeVisible()` belegt keine Klickbarkeit).
  */
 test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', async ({ page }) => {
   test.setTimeout(300_000);
@@ -1000,8 +884,7 @@ test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', asy
     const lauf = `${lage.width}×${lage.height}${lage.leiste ? ' mit Leiste' : ''}/${lage.dichte}`;
     await page.setViewportSize({ width: lage.width, height: lage.height });
     await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
-    // Die Leisten-Wahl ist seit LFH-715 gemerkt: gesetzt statt geklickt, sonst erbte eine
-    // spätere Lage die offene Leiste der vorigen.
+    // Die Leisten-Wahl ist gemerkt: gesetzt statt geklickt, sonst erbte eine Lage die der vorigen.
     await page.evaluate((offen) => {
       localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0');
       localStorage.removeItem('lfh:lagekarte:leiste-offen:ab-lg');
@@ -1016,8 +899,7 @@ test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', asy
     if (lage.leiste) {
       await expect(page.getByRole('complementary', { name: 'Kartenleiste' })).toBeVisible();
     }
-    // Vorbedingung: die Zeitachse steht ausgeklappt — sonst gäbe es das hohe Band nicht, und
-    // der Test wäre still wertlos statt rot.
+    // Vorbedingung: die Zeitachse steht ausgeklappt — sonst wäre der Test still wertlos statt rot.
     await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
 
     const knoepfe = page.locator('[data-lfh="karten-knoepfe"]');
@@ -1047,10 +929,8 @@ test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', asy
 });
 
 /**
- * Personenkarte (LFH-373, LFH-613-Prüfliste 4 · 13): dieselbe `KartenUeberlagerung` wie die
- * Lagekarte (Knopfblock oben rechts, Überlagerung links, `position: absolute`), aber OHNE
- * Kartenfuß. Der Kern bekommt die Aufbauten als Zusatzkandidaten — ohne sie wäre der Lauf
- * grün durch Konstruktion (Selbstbeweis LFH-373 oben).
+ * Personenkarte: dieselbe `KartenUeberlagerung` wie die Lagekarte, aber ohne Kartenfuß. Die
+ * Aufbauten gehen als Zusatzkandidaten in den Kern.
  */
 test('Personenkarte (LFH-373): kein Fokusziel liegt unter den Kartenaufbauten', async ({
   page,
@@ -1111,12 +991,8 @@ test('Personenkarte (LFH-373): kein Fokusziel liegt unter den Kartenaufbauten', 
 
 /**
  * Rückwärts getabbte Ziele, deren MITTELPUNKT unter einer stehenden Tabellenkopfzeile liegt.
- *
- * STRENGER ALS DER KERN, mit Absicht (LFH-373, gemessen): ohne den Kopf-Freiraum der
- * Katalogtabellen (LFH-677) landete ein Ziel der Personenliste bei y 20…50 unter einer
- * 35 px hohen Kopfzeile — halb verdeckt, der Mittelpunkt darunter. WCAG 2.4.11 (AA) zählt nur
- * VOLLSTÄNDIGE Verdeckung, der Kern blieb grün, und die Mutationsprobe „Freiraum-Regel
- * entfernt" überlebte. Diese Prüfung macht die Regel belegbar.
+ * Strenger als der Kern mit Absicht: ein halb verdecktes Ziel ließe den Kern (nur
+ * VOLLSTÄNDIGE Verdeckung) grün, auch ohne den Kopf-Freiraum der Katalogtabellen.
  */
 async function mittelpunktUnterKopf(page: Page, schritte: number): Promise<string[]> {
   const befunde: string[] = [];
@@ -1138,10 +1014,9 @@ async function mittelpunktUnterKopf(page: Page, schritte: number): Promise<strin
 }
 
 /**
- * Personenliste (LFH-373, LFH-613-Prüfliste 1 · 13): Tabellenzweig der `Datensicht` mit
- * stehender Kopfzeile, ein Tab-Stopp je Zeile. Vorwärts UND rückwärts: nur rückwärts rollt ein
- * Ziel an den oberen Rand, unter die Kopfzeile (Kern, Abschnitt RICHTUNG). Unter `md` stehen
- * Karten ohne stehende Kopfzeile — deshalb 1024 und 1366 px.
+ * Personenliste: Tabellenzweig der `Datensicht` mit stehender Kopfzeile. Vorwärts UND
+ * rückwärts, weil nur rückwärts ein Ziel unter die Kopfzeile rollt. Unter `md` stehen Karten,
+ * deshalb 1024 und 1366 px.
  */
 test('Personenliste (LFH-373): kein Fokusziel verschwindet hinter der stehenden Kopfzeile', async ({
   page,

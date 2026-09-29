@@ -1,40 +1,11 @@
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
 use serde_json::{json, Value};
 use sqlx::SqlitePool;
 use tower::ServiceExt;
 
 mod common;
-use common::{benutzer_anlegen, login_cookie};
-
-/// Router + DB mit Bootstrap-Admin (admin / startpw12).
-async fn setup() -> axum::Router {
-    setup_with_pool().await.0
-}
-
-/// Wie `setup`, liefert zusätzlich den `SqlitePool`, damit Tests direkt am
-/// DB-Zustand manipulieren können (z.B. Einsätze künstlich altern lassen).
-async fn setup_with_pool() -> (axum::Router, SqlitePool) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let router = build_router(AppState {
-        pool: pool.clone(),
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, pool)
-}
+use common::{benutzer_anlegen, login_cookie, setup, setup_mit_pool};
 
 /// Legt als gegebener Cookie-Inhaber einen Einsatz an und liefert (Status, JSON).
 async fn einsatz_anlegen(
@@ -156,7 +127,7 @@ async fn liste_blendet_fremde_org_fuer_fuehrungskraft_aus() {
     // LFH-115: Eine Org-Führungskraft sieht in GET /api/einsaetze NUR Einsätze der
     // eigenen Org (auch ohne Mitgliedschaft) — fremde-Org-Einsätze werden über
     // liste_fuer → darf_lesen(r.org_id) → darf_fremdeinsatz_lesen ausgeblendet.
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
 
     // Eigener Einsatz (Org 1), den die Führungskraft sehen soll (sie ist NICHT Mitglied).
@@ -653,7 +624,7 @@ async fn abgeschlossener_einsatz_nach_frist_nur_fuer_einsatzleitung() {
     // Abgeschlossener Einsatz, künstlich auf >24h gealtert:
     // - Beobachter-Mitglied: 403 und nicht mehr in der Liste,
     // - Einsatzleitung: 200.
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (_, json) = einsatz_anlegen(&app, &admin, "Lage").await;
     let einsatz_id = json["id"].as_i64().unwrap();
@@ -1499,7 +1470,7 @@ async fn geloescht_at_tombstone_sperrt_detail_export_stream_403() {
     // LFH-135: ein gesetzter geloescht_at-Tombstone sperrt den Lesezugriff über
     // fordere_lesezugriff in ALLEN Routen — auch für den System-Admin (höhere
     // Berechtigung). Geprüft an Detail, Personen-Export und Personen-Stream.
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
     let id = einsatz["id"].as_i64().unwrap();
@@ -1779,7 +1750,7 @@ async fn einstellungen_verhalten_ungueltig_ist_400() {
 
 #[tokio::test]
 async fn einstellungen_freeze_409_je_nummernkreis_und_xor() {
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
     let id = einsatz["id"].as_i64().unwrap();
@@ -1830,7 +1801,7 @@ async fn einstellungen_freeze_409_je_nummernkreis_und_xor() {
 
 #[tokio::test]
 async fn einstellungen_freeze_ist_org_isoliert() {
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (_, ea) = einsatz_anlegen(&app, &admin, "Lage A").await;
     let (_, eb) = einsatz_anlegen(&app, &admin, "Lage B").await;
@@ -1855,7 +1826,7 @@ async fn einstellungen_freeze_ist_org_isoliert() {
 
 #[tokio::test]
 async fn einstellungen_get_enthalt_org_defaults() {
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
     let id = einsatz["id"].as_i64().unwrap();
@@ -2155,7 +2126,7 @@ async fn abgelaufene_frist_ohne_tombstone_sperrt_admin_ueberall_403() {
     // LFH-23 (design.md D2): die ZWEITE Sperrvariante — Frist abgelaufen, noch nicht
     // vorgemerkt. Der Archiv-Namensraum öffnet daran nichts: auch der System-Admin bekommt
     // auf Detail, ETB, Personen, Anhängen und Live 403.
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
     let aid: i64 = sqlx::query_scalar(
@@ -2223,7 +2194,7 @@ async fn frist_stand(pool: &SqlitePool, id: i64) -> (Option<String>, Option<Stri
 
 #[tokio::test]
 async fn aufbewahrungsfrist_vorgemerkt_ist_422_und_aendert_nichts() {
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
     // Echte Vormerkung INNERHALB der Karenz, relativ zu jetzt — ein fester Zeitpunkt läge
@@ -2257,7 +2228,7 @@ async fn aufbewahrungsfrist_vorgemerkt_ist_422_und_aendert_nichts() {
 #[tokio::test]
 async fn aufbewahrungsfrist_vorgemerkt_unveraendert_ist_auch_422() {
     // Die Prüfung steht VOR dem frühen Rücksprung „unverändert → 200“.
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
     // Echte Vormerkung INNERHALB der Karenz, relativ zu jetzt — ein fester Zeitpunkt läge
@@ -2280,7 +2251,7 @@ async fn aufbewahrungsfrist_vorgemerkt_unveraendert_ist_auch_422() {
 
 #[tokio::test]
 async fn aufbewahrungsfrist_geschwaerzt_ist_409() {
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
     sqlx::query(
@@ -2308,7 +2279,7 @@ async fn aufbewahrungsfrist_antwort_traegt_an_gesperrtem_einsatz_keinen_kopf_pii
     // reaktiv verlängert werden kann. Seine Antwort darf an einem gesperrten Einsatz aber nicht
     // Einsatzort, Koordinate, meldende Stelle und Sachverhalt ausliefern — auch nicht über den
     // frühen Rücksprung bei unveränderter Frist.
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
     sqlx::query(
@@ -2344,7 +2315,7 @@ async fn aufbewahrungsfrist_antwort_traegt_an_gesperrtem_einsatz_keinen_kopf_pii
 async fn aufbewahrungsfrist_nach_karenz_ist_409_und_aendert_nichts() {
     // Karenz abgelaufen, noch nicht geschwärzt (`schwaerzung_ausstehend`): auch das
     // Wiederherstellen ist dort 409, ein Hinweis darauf wäre ein Weg, den es nicht mehr gibt.
-    let (app, pool) = setup_with_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
     sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")

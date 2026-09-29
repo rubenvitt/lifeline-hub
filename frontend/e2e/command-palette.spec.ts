@@ -1,10 +1,7 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
 
-// e2e-Smoke der CMD+K-Command-Palette (LFH-11). Deckt das ab, was jsdom nicht kann:
-// echtes Hotkey-Verhalten, Navigation, und vor allem die Koexistenz des Palette-Modals
-// über einem offenen antd-Drawer (AK6 — nur im echten Browser-Layout prüfbar).
-// Harness: Backend und Vite startet playwright.config.ts selbst (LFH-309), Login
-// admin / e2e-admin-pw gegen eine Temp-DB je Lauf.
+// e2e-Smoke der Kommandopalette: echtes Hotkey-Verhalten, Navigation und die Koexistenz des
+// Palette-Modals über einem offenen antd-Drawer — was jsdom nicht kann.
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -31,24 +28,23 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
   return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
-/** Hartes Navigieren zu einem Modul + warten bis die App (EinsatzLayout-Header)
- *  gemountet ist — sonst kommt der Hotkey vor der Provider-Listener-Bindung. */
+/** Hartes Navigieren zu einem Modul + warten, bis der Header gemountet ist — sonst kommt der
+ *  Hotkey vor der Listener-Bindung des Providers. */
 async function zumModul(page: Page, id: string, modul: string) {
   await page.goto(`/einsaetze/${id}/${modul}`);
   await expect(page.locator('header').first()).toBeVisible();
 }
 
-/** Das Suchfeld der Datensicht auf der Schadensliste — zugleich der einzige Weg, den
- *  Fokus verlässlich IN die Werkzeugzeile zu setzen (LFH-391 · B6). */
+/** Das Suchfeld der Datensicht auf der Schadensliste — der verlässliche Weg, den Fokus IN die
+ *  Werkzeugzeile zu setzen. */
 function schadenSuche(page: Page): Locator {
   return page.getByPlaceholder('S-Nr., Ort, Beschreibung');
 }
 
 /**
- * Die Schadensliste als Prüffläche: sie ist die einzige Konstellation, in der beide neuen
- * Ebenen gleichzeitig stehen — `EinsatzSeite` meldet seitenweit „Neue Zeile", die
- * Werkzeugzeile der `Datensicht` darunter „Spalten". Gewartet wird auf das Suchfeld, nicht
- * auf den Kopf: die Ebenen registrieren sich erst, wenn die Liste wirklich gerendert ist.
+ * Die Schadensliste als Prüffläche: dort stehen beide Ebenen zugleich — `EinsatzSeite` meldet
+ * seitenweit „Neue Zeile", die Werkzeugzeile der `Datensicht` „Spalten". Gewartet wird auf das
+ * Suchfeld: die Ebenen registrieren sich erst mit der gerenderten Liste.
  */
 async function zurSchadensliste(page: Page, name: string): Promise<string> {
   await anmelden(page);
@@ -59,12 +55,9 @@ async function zurSchadensliste(page: Page, name: string): Promise<string> {
 }
 
 /**
- * Steht der Fokus im SICHTBAREN Dropdown-Overlay?
- *
- * Gefragt wird am echten `document.activeElement` statt über einen `:focus`-Nachfahren:
- * antds `autoFocus` darf den Fokus auch auf den Menü-Container selbst legen, und ein
- * Nachfahren-Selektor übersähe genau diesen Fall. Das `:not(.ant-dropdown-hidden)` ist
- * Pflicht — antd lässt die Portale geschlossener Dropdowns im Baum stehen (LFH-366).
+ * Steht der Fokus im SICHTBAREN Dropdown-Overlay? Gefragt am echten `document.activeElement`:
+ * antds `autoFocus` darf den Menü-Container selbst fokussieren, den ein Nachfahren-Selektor
+ * übersähe. `:not(.ant-dropdown-hidden)` ist Pflicht — antd lässt geschlossene Portale stehen.
  */
 async function fokusImOffenenMenue(page: Page): Promise<boolean> {
   return page.evaluate(() => {
@@ -124,8 +117,7 @@ test('legt sich über den mobilen Navigations-Drawer, ESC schließt nur die Pale
   await page.setViewportSize(SCHMAL);
   await zumModul(page, id, 'etb');
 
-  // Den echten Navigations-Drawer aus EinsatzLayout öffnen. Ein fachlicher
-  // Anlegen-Drawer belegt den mobilen Navigationsvertrag nicht.
+  // Den echten Navigations-Drawer aus EinsatzLayout öffnen.
   await page.getByRole('button', { name: 'Navigation öffnen' }).click();
   const navDrawer = page.getByRole('dialog', { name: 'Navigation' });
   await expect(navDrawer).toBeVisible();
@@ -190,22 +182,14 @@ test('Schnelleinstellung schaltet das Theme sichtbar um (Schnelleinstellungen)',
 });
 
 /*
- * ── Gruppe „Aktionen" (LFH-391 · B6) ────────────────────────────────────────────────
+ * ── Gruppe „Aktionen" ───────────────────────────────────────────────────────────────
  *
- * Die drei Fälle darunter prüfen genau das, was jsdom nicht beantworten kann: welche
- * Ebenen der ECHTE Browser-Fokus in die Kette legt, und wer das Fokus-Rennen zwischen dem
- * schließenden Palette-Modal und dem `autoFocus` des Spalten-Dropdowns gewinnt.
+ * Geprüft wird, welche Ebenen der ECHTE Browser-Fokus in die Kette legt und wer das
+ * Fokus-Rennen zwischen schließendem Palette-Modal und dem `autoFocus` des Spalten-Dropdowns
+ * gewinnt. Die Beschriftungen stammen aus `TASTATUR_AKTIONEN` (gepinnt in `befehle.test.ts`).
  *
- * Prüffläche ist die Schadensliste, weil dort beide neuen Ebenen übereinanderliegen:
- * `EinsatzSeite` meldet seitenweit „Neue Zeile" (`neueZeile`-Prop), die Werkzeugzeile der
- * `Datensicht` darunter „Spalten". Die Beschriftungen stammen aus `TASTATUR_AKTIONEN` und
- * sind in `befehle.test.ts` gepinnt — hier ist der Wortlaut der sichtbare Bedienweg.
- *
- * `exact: true` ist an jedem dieser Locator Pflicht und gemessen: Playwright matcht
- * `name` sonst als TEILSTRING, und die Gruppe „Einsatz wechseln" führt den Namen des
- * Einsatzes als eigene Option. Ein Fixture „E2E Aktionen Spalten …" ließ
- * `getByRole('option', { name: 'Spalten' })` auf zwei Knoten laufen — und die
- * Abwesenheitsaussage unten wäre umgekehrt allein vom Fixturenamen abhängig gewesen.
+ * `exact: true` ist Pflicht: Playwright matcht `name` sonst als Teilstring, und die Gruppe
+ * „Einsatz wechseln" führt den Einsatznamen als eigene Option.
  */
 const AKTION = { exact: true } as const;
 
@@ -214,20 +198,15 @@ test('über den sichtbaren Trigger geöffnet, zeigt die Palette die Seitenaktion
 }) => {
   await zurSchadensliste(page, `E2E Trigger ${Date.now()}`);
 
-  // Der Klick nimmt den Fokus aus JEDER registrierten Wurzel — genau das war vor dem
-  // Anzeige-Fallback der gemessene Befund (per Hotkey eine Aktion, per Trigger keine). Die
-  // Palette blieb damit auf dem Berührungsweg leer, für den der Trigger gebaut wurde.
+  // Der Klick nimmt den Fokus aus JEDER registrierten Wurzel; der Anzeige-Fallback sorgt
+  // dafür, dass die Palette auf dem Berührungsweg trotzdem Aktionen zeigt.
   await page.getByRole('button', { name: 'Suchen' }).click();
   await expect(paletteInput(page)).toBeFocused();
 
   await expect(page.getByRole('option', { name: 'Neue Zeile', ...AKTION })).toBeVisible();
 
-  // Gegenstück zum Fall darunter, keine eigenständige Behauptung: der Fallback nimmt
-  // bewusst NUR die flachste Ebene (`flachsteEbene`), nicht alle der Seite. Stünden
-  // mehrere gleichrangige Kandidaten zugleich in der Liste, trüge sie dieselbe
-  // Beschriftung mehrfach, ohne dass die Zeile sagt, welche Fläche sie meint —
-  // Abwesenheit ist an dieser Stelle besser als Mehrdeutigkeit. Die Begründung steht
-  // ausführlich am Doc-Block von `flachsteEbene`; wer sie ändert, ändert sie dort.
+  // Gegenstück zum Fall darunter: der Fallback nimmt bewusst NUR die flachste Ebene
+  // (`flachsteEbene`, Begründung dort) — Abwesenheit ist besser als Mehrdeutigkeit.
   await expect(page.getByRole('option', { name: 'Spalten', ...AKTION })).toHaveCount(0);
 });
 
@@ -236,11 +215,9 @@ test('mit Fokus in der Werkzeugzeile stehen „Spalten" und „Neue Zeile" zusam
 }) => {
   await zurSchadensliste(page, `E2E Kette ${Date.now()}`);
 
-  // Fokus IN die Werkzeugzeile, danach per Tastenweg öffnen: nur so bleibt die Kette
-  // erhalten, und nur dann trägt die Aussage. Die zwei Optionen stammen aus ZWEI
-  // verschiedenen Ebenen — „Spalten" von der tiefen Werkzeugzeile, „Neue Zeile" von der
-  // seitenweiten Ebene darüber. Mit der früheren Auswahl „genau eine Ebene" verdeckte die
-  // tiefere die flachere vollständig; dass beide zugleich stehen, IST die Ketten-Aussage.
+  // Fokus IN die Werkzeugzeile, danach per Tastenweg öffnen, damit die Kette erhalten bleibt.
+  // „Spalten" kommt von der tiefen Werkzeugzeile, „Neue Zeile" von der Ebene darüber — dass
+  // beide zugleich stehen, IST die Ketten-Aussage.
   await schadenSuche(page).click();
   await page.keyboard.press('Control+k');
   await expect(paletteInput(page)).toBeVisible();
@@ -259,17 +236,14 @@ test('„Spalten" öffnet die Spaltenwahl UND legt den Fokus hinein (Fokus-Renne
   await page.getByRole('option', { name: 'Spalten', ...AKTION }).click();
   await expect(paletteInput(page)).toBeHidden();
 
-  // Das SICHTBARE Overlay, nicht irgendeines: antd lässt die Portale geschlossener
-  // Dropdowns im Baum stehen (LFH-366).
+  // Das SICHTBARE Overlay: antd lässt die Portale geschlossener Dropdowns im Baum stehen.
   const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
   await expect(menue).toBeVisible();
   await expect(menue.getByRole('checkbox', { name: 'Typ' })).toBeVisible();
 
-  // Die zweite Hälfte und der eigentliche Grund für diesen Fall: `CommandPalette.fuehreAus`
-  // ruft `schliesse()` VOR `ausfuehren()`. Das Modal gibt den Fokus an das zuvor
-  // fokussierte Suchfeld zurück, während das Dropdown ihn per `autoFocus` zieht — wer
-  // gewinnt, rechnet jsdom nicht. Ohne Fokus im Menü heben die Pfeiltasten keinen Eintrag
-  // hervor, und der Befehl wäre nur mit der Maus zu Ende bedienbar.
+  // `CommandPalette.fuehreAus` ruft `schliesse()` VOR `ausfuehren()`: das Modal gibt den Fokus
+  // ans Suchfeld zurück, während das Dropdown ihn per `autoFocus` zieht. Ohne Fokus im Menü
+  // wäre der Befehl nur mit der Maus zu Ende bedienbar.
   await expect
     .poll(() => fokusImOffenenMenue(page), { message: 'Fokus steht im geöffneten Spalten-Menü' })
     .toBe(true);

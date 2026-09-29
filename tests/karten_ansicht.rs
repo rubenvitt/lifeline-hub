@@ -1,112 +1,16 @@
-use axum::body::{to_bytes, Body};
-use axum::http::{header, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::{LiveHub, LiveNachricht};
+use axum::http::StatusCode;
 use serde_json::{json, Value};
 use std::time::Duration;
-use tokio::sync::broadcast::Receiver;
-use tower::ServiceExt;
 
 mod common;
-use common::login_cookie;
+use common::{
+    anfrage_json, einsatz_anlegen, login_cookie, recv_until_tag, setup_mit_live, setup_mit_pool,
+};
 
 // ---------- Harness ----------
 
-async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let router = build_router(AppState {
-        pool: pool.clone(),
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, pool)
-}
-
-/// Wie [`setup_mit_pool`], liefert aber zusätzlich einen LiveHub-Klon (teilt den inneren
-/// Arc mit dem AppState) — für den SSE-Mithör-Test (LFH-320, Muster aus tests/lage_zone.rs).
-async fn setup_mit_live() -> (axum::Router, LiveHub) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let live = LiveHub::new();
-    let router = build_router(AppState {
-        pool,
-        live: live.clone(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, live)
-}
-
-async fn recv_until_tag(rx: &mut Receiver<LiveNachricht>, tag: &str, timeout: Duration) -> bool {
-    loop {
-        match tokio::time::timeout(timeout, rx.recv()).await {
-            Ok(Ok(n)) if n.event.as_str() == tag => return true,
-            Ok(Ok(_)) => continue,
-            _ => return false,
-        }
-    }
-}
-
-async fn anfrage(
-    app: &axum::Router,
-    method: &str,
-    uri: &str,
-    cookie: &str,
-    body: Option<&Value>,
-) -> (StatusCode, Value) {
-    let mut req = Request::builder()
-        .method(method)
-        .uri(uri)
-        .header(header::COOKIE, cookie);
-    let body = match body {
-        Some(b) => {
-            req = req.header(header::CONTENT_TYPE, "application/json");
-            Body::from(b.to_string())
-        }
-        None => Body::empty(),
-    };
-    let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
-    let status = resp.status();
-    let bytes = to_bytes(resp.into_body(), 1024 * 1024).await.unwrap();
-    let value = if bytes.is_empty() {
-        Value::Null
-    } else {
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
-    };
-    (status, value)
-}
-
-async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
-    let (s, v) = anfrage(
-        app,
-        "POST",
-        "/api/einsaetze",
-        cookie,
-        Some(&json!({"bezeichnung":"Lage"})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED, "einsatz_anlegen: {v:?}");
-    v["id"].as_i64().unwrap()
-}
-
 async fn einstellungen_setzen(app: &axum::Router, cookie: &str, einsatz: i64, body: &Value) {
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         app,
         "PUT",
         &format!("/api/einsaetze/{einsatz}/einstellungen"),
@@ -138,7 +42,7 @@ async fn standardansicht_wird_lazy_geseedet_aus_einstellungen() {
     )
     .await;
 
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/karten-ansichten"),
@@ -165,8 +69,8 @@ async fn zweiter_get_seedet_nicht_neu() {
     let e = einsatz_anlegen(&app, &cookie).await;
 
     let url = format!("/api/einsaetze/{e}/karten-ansichten");
-    let (_, v1) = anfrage(&app, "GET", &url, &cookie, None).await;
-    let (_, v2) = anfrage(&app, "GET", &url, &cookie, None).await;
+    let (_, v1) = anfrage_json(&app, "GET", &url, &cookie, None).await;
+    let (_, v2) = anfrage_json(&app, "GET", &url, &cookie, None).await;
     assert_eq!(v1.as_array().unwrap().len(), 1);
     assert_eq!(v2.as_array().unwrap().len(), 1, "kein Doppel-Seed");
     assert_eq!(v1[0]["id"], v2[0]["id"], "dieselbe Ansicht");
@@ -177,7 +81,7 @@ async fn zweiter_get_seedet_nicht_neu() {
 async fn get_nicht_existenter_einsatz_ist_404() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "GET",
         "/api/einsaetze/999999/karten-ansichten",
@@ -197,10 +101,10 @@ async fn patch_ueberschreibt_konfiguration() {
     let e = einsatz_anlegen(&app, &cookie).await;
 
     let url = format!("/api/einsaetze/{e}/karten-ansichten");
-    let (_, v) = anfrage(&app, "GET", &url, &cookie, None).await;
+    let (_, v) = anfrage_json(&app, "GET", &url, &cookie, None).await;
     let aid = v[0]["id"].as_i64().unwrap();
 
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "PATCH",
         &format!("{url}/{aid}"),
@@ -220,7 +124,7 @@ async fn patch_ueberschreibt_konfiguration() {
     assert_eq!(v["zoom"], 14.5);
     assert_eq!(v["layer_sichtbar"]["zone"], false);
 
-    let (_, v2) = anfrage(&app, "GET", &url, &cookie, None).await;
+    let (_, v2) = anfrage_json(&app, "GET", &url, &cookie, None).await;
     assert_eq!(
         v2[0]["basemap_modus"], "online",
         "Stand persistiert: {v2:?}"
@@ -236,10 +140,10 @@ async fn patch_unbekannter_basemap_modus_ist_400() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
     let url = format!("/api/einsaetze/{e}/karten-ansichten");
-    let (_, v) = anfrage(&app, "GET", &url, &cookie, None).await;
+    let (_, v) = anfrage_json(&app, "GET", &url, &cookie, None).await;
     let aid = v[0]["id"].as_i64().unwrap();
 
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("{url}/{aid}"),
@@ -257,10 +161,10 @@ async fn patch_unbekanntes_theme_ist_400() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
     let url = format!("/api/einsaetze/{e}/karten-ansichten");
-    let (_, v) = anfrage(&app, "GET", &url, &cookie, None).await;
+    let (_, v) = anfrage_json(&app, "GET", &url, &cookie, None).await;
     let aid = v[0]["id"].as_i64().unwrap();
 
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("{url}/{aid}"),
@@ -275,7 +179,7 @@ async fn patch_unbekanntes_theme_ist_400() {
 
 /// Seedet die Standardansicht und liefert ihre id.
 async fn standard_aid(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
-    let (_, v) = anfrage(
+    let (_, v) = anfrage_json(
         app,
         "GET",
         &format!("/api/einsaetze/{einsatz}/karten-ansichten"),
@@ -298,9 +202,9 @@ async fn delete_feuert_objekt_layer_sse() {
     let e = einsatz_anlegen(&app, &cookie).await;
     let url = format!("/api/einsaetze/{e}/karten-ansichten");
     standard_aid(&app, &cookie, e).await;
-    let (_, neu) = anfrage(&app, "POST", &url, &cookie, Some(&json!({"name": "Nord"}))).await;
+    let (_, neu) = anfrage_json(&app, "POST", &url, &cookie, Some(&json!({"name": "Nord"}))).await;
     let aid = neu["id"].as_i64().unwrap();
-    anfrage(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/zonen"),
@@ -315,7 +219,7 @@ async fn delete_feuert_objekt_layer_sse() {
 
     // Erst JETZT abonnieren → das nächste lage_zone-Event stammt vom DELETE, nicht vom POST.
     let mut rx = live.abonniere(e);
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("{url}/{aid}?objekte=loeschen"),
@@ -324,10 +228,8 @@ async fn delete_feuert_objekt_layer_sse() {
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    assert!(
-        recv_until_tag(&mut rx, "lage_zone", Duration::from_secs(1)).await,
-        "DELETE feuert ein lage_zone-SSE-Event (Multi-Client-Konsistenz)"
-    );
+    // DELETE feuert ein lage_zone-SSE-Event (Multi-Client-Konsistenz).
+    recv_until_tag(&mut rx, "lage_zone", Duration::from_secs(1)).await;
 }
 
 /// POST legt eine zweite, benannte Ansicht an — nicht Standard, reiht hinter die
@@ -340,7 +242,7 @@ async fn post_legt_zweite_ansicht_an() {
     let url = format!("/api/einsaetze/{e}/karten-ansichten");
     standard_aid(&app, &cookie, e).await; // seed
 
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &url,
@@ -353,7 +255,7 @@ async fn post_legt_zweite_ansicht_an() {
     assert_eq!(v["ist_standard"], false, "neue Ansicht ist nicht Standard");
     assert_eq!(v["basemap_modus"], "online");
 
-    let (_, liste) = anfrage(&app, "GET", &url, &cookie, None).await;
+    let (_, liste) = anfrage_json(&app, "GET", &url, &cookie, None).await;
     assert_eq!(
         liste.as_array().unwrap().len(),
         2,
@@ -368,7 +270,7 @@ async fn post_leerer_name_ist_400() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
     standard_aid(&app, &cookie, e).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/karten-ansichten"),
@@ -386,7 +288,7 @@ async fn post_unbekannter_basemap_modus_ist_400() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &cookie).await;
     standard_aid(&app, &cookie, e).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/karten-ansichten"),
@@ -407,7 +309,7 @@ async fn patch_benennt_um_ohne_config_zu_beruehren() {
     let aid = standard_aid(&app, &cookie, e).await;
 
     // Config setzen
-    anfrage(
+    anfrage_json(
         &app,
         "PATCH",
         &format!("{url}/{aid}"),
@@ -416,7 +318,7 @@ async fn patch_benennt_um_ohne_config_zu_beruehren() {
     )
     .await;
     // Nur umbenennen
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "PATCH",
         &format!("{url}/{aid}"),
@@ -443,10 +345,10 @@ async fn patch_standard_setzen_verschiebt_flag() {
     let url = format!("/api/einsaetze/{e}/karten-ansichten");
     let alt_standard = standard_aid(&app, &cookie, e).await;
 
-    let (_, neu) = anfrage(&app, "POST", &url, &cookie, Some(&json!({"name": "Neu"}))).await;
+    let (_, neu) = anfrage_json(&app, "POST", &url, &cookie, Some(&json!({"name": "Neu"}))).await;
     let neu_aid = neu["id"].as_i64().unwrap();
 
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "PATCH",
         &format!("{url}/{neu_aid}"),
@@ -457,7 +359,7 @@ async fn patch_standard_setzen_verschiebt_flag() {
     assert_eq!(s, StatusCode::OK, "{v:?}");
     assert_eq!(v["ist_standard"], true);
 
-    let (_, liste) = anfrage(&app, "GET", &url, &cookie, None).await;
+    let (_, liste) = anfrage_json(&app, "GET", &url, &cookie, None).await;
     let standards: Vec<i64> = liste
         .as_array()
         .unwrap()
@@ -485,9 +387,9 @@ async fn delete_standardansicht_ist_422() {
     let url = format!("/api/einsaetze/{e}/karten-ansichten");
     let standard = standard_aid(&app, &cookie, e).await;
     // eine zweite Ansicht existiert, damit „letzte" nicht der Grund ist
-    anfrage(&app, "POST", &url, &cookie, Some(&json!({"name": "Zwei"}))).await;
+    anfrage_json(&app, "POST", &url, &cookie, Some(&json!({"name": "Zwei"}))).await;
 
-    let (s, _) = anfrage(&app, "DELETE", &format!("{url}/{standard}"), &cookie, None).await;
+    let (s, _) = anfrage_json(&app, "DELETE", &format!("{url}/{standard}"), &cookie, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
@@ -499,7 +401,7 @@ async fn delete_letzte_ansicht_ist_422() {
     let e = einsatz_anlegen(&app, &cookie).await;
     let url = format!("/api/einsaetze/{e}/karten-ansichten");
     let standard = standard_aid(&app, &cookie, e).await;
-    let (s, _) = anfrage(&app, "DELETE", &format!("{url}/{standard}"), &cookie, None).await;
+    let (s, _) = anfrage_json(&app, "DELETE", &format!("{url}/{standard}"), &cookie, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "letzte Ansicht bleibt");
 }
 
@@ -512,11 +414,11 @@ async fn delete_freigeben_gibt_objekte_frei() {
     let e = einsatz_anlegen(&app, &cookie).await;
     let url = format!("/api/einsaetze/{e}/karten-ansichten");
     standard_aid(&app, &cookie, e).await;
-    let (_, neu) = anfrage(&app, "POST", &url, &cookie, Some(&json!({"name": "Nord"}))).await;
+    let (_, neu) = anfrage_json(&app, "POST", &url, &cookie, Some(&json!({"name": "Nord"}))).await;
     let aid = neu["id"].as_i64().unwrap();
 
     // Zone auf der neuen Ansicht anlegen
-    let (zs, zone) = anfrage(
+    let (zs, zone) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/zonen"),
@@ -532,7 +434,7 @@ async fn delete_freigeben_gibt_objekte_frei() {
     let zid = zone["id"].as_i64().unwrap();
 
     // freigeben (Default)
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("{url}/{aid}?objekte=freigeben"),
@@ -543,7 +445,7 @@ async fn delete_freigeben_gibt_objekte_frei() {
     assert_eq!(s, StatusCode::NO_CONTENT);
 
     // Zone existiert noch, nun ohne ansicht_id (auf allen Ansichten)
-    let (_, zonen) = anfrage(
+    let (_, zonen) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/zonen"),
@@ -571,10 +473,10 @@ async fn delete_loeschen_entfernt_objekte() {
     let e = einsatz_anlegen(&app, &cookie).await;
     let url = format!("/api/einsaetze/{e}/karten-ansichten");
     standard_aid(&app, &cookie, e).await;
-    let (_, neu) = anfrage(&app, "POST", &url, &cookie, Some(&json!({"name": "Nord"}))).await;
+    let (_, neu) = anfrage_json(&app, "POST", &url, &cookie, Some(&json!({"name": "Nord"}))).await;
     let aid = neu["id"].as_i64().unwrap();
 
-    let (_, zone) = anfrage(
+    let (_, zone) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/zonen"),
@@ -588,7 +490,7 @@ async fn delete_loeschen_entfernt_objekte() {
     .await;
     let zid = zone["id"].as_i64().unwrap();
 
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("{url}/{aid}?objekte=loeschen"),
@@ -598,7 +500,7 @@ async fn delete_loeschen_entfernt_objekte() {
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
 
-    let (_, zonen) = anfrage(
+    let (_, zonen) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/zonen"),
@@ -625,7 +527,7 @@ async fn delete_fremde_ansicht_ist_404() {
     let e2 = einsatz_anlegen(&app, &cookie).await;
     let fremde = standard_aid(&app, &cookie, e2).await;
     // e2 braucht zwei Ansichten, damit nicht „letzte" der ablehnende Grund wäre
-    anfrage(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e2}/karten-ansichten"),
@@ -633,7 +535,7 @@ async fn delete_fremde_ansicht_ist_404() {
         Some(&json!({"name": "Zwei"})),
     )
     .await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e1}/karten-ansichten/{fremde}"),
@@ -653,7 +555,7 @@ async fn patch_fremde_ansicht_ist_404() {
     let e2 = einsatz_anlegen(&app, &cookie).await;
 
     // Ansicht von e2 seeden
-    let (_, v2) = anfrage(
+    let (_, v2) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e2}/karten-ansichten"),
@@ -664,7 +566,7 @@ async fn patch_fremde_ansicht_ist_404() {
     let fremde_aid = v2[0]["id"].as_i64().unwrap();
 
     // …über e1 patchen → 404
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e1}/karten-ansichten/{fremde_aid}"),

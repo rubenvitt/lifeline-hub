@@ -5,8 +5,10 @@ use axum::http::{header, Request, StatusCode};
 use lifeline_hub::app::{build_router, build_router_mit, AppState, RouterOptionen};
 use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
+use lifeline_hub::live::{LiveHub, LiveNachricht};
 use serde_json::Value;
+use std::time::Duration;
+use tokio::sync::broadcast::Receiver;
 use tower::ServiceExt;
 
 pub async fn setup() -> axum::Router {
@@ -31,6 +33,26 @@ pub async fn setup_mit_pool_und_live() -> (axum::Router, sqlx::SqlitePool, LiveH
     let live = LiveHub::new();
     let router = build_router(test_state(&pool, &live));
     (router, pool, live)
+}
+
+/// Wie [`setup_mit_pool`], mit abweichendem `AppState` (eigenes `karten_dir`,
+/// Fachebenen-Attrappe, karten-service).
+pub async fn setup_mit_state(
+    anpassen: impl FnOnce(&mut AppState),
+) -> (axum::Router, sqlx::SqlitePool) {
+    let pool = db::test_pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let mut state = test_state(&pool, &LiveHub::new());
+    anpassen(&mut state);
+    (build_router(state), pool)
+}
+
+/// Wie [`setup`], liefert zusätzlich den geteilten LiveHub.
+pub async fn setup_mit_live() -> (axum::Router, LiveHub) {
+    let (router, _pool, live) = setup_mit_pool_und_live().await;
+    (router, live)
 }
 
 /// Wie [`setup_mit_pool`], aber mit gesetzten Router-Optionen (LFH-690: `demo_daten`).
@@ -63,7 +85,9 @@ pub async fn setup_mit_optionen_auf(
     (router, pool, live)
 }
 
-fn test_state(pool: &sqlx::SqlitePool, live: &LiveHub) -> AppState {
+/// Der Test-`AppState` aller Setups. Abweichende Felder setzt [`setup_mit_state`] oder ein
+/// Struct-Update (`AppState { karten_dir, ..test_state(..) }`).
+pub fn test_state(pool: &sqlx::SqlitePool, live: &LiveHub) -> AppState {
     AppState {
         pool: pool.clone(),
         live: live.clone(),
@@ -205,6 +229,18 @@ pub async fn anfrage(
     )
 }
 
+/// Wie [`anfrage`], mit einem `serde_json::Value` als Body.
+pub async fn anfrage_json(
+    app: &axum::Router,
+    methode: &str,
+    uri: &str,
+    cookie: &str,
+    body: Option<&Value>,
+) -> (StatusCode, Value) {
+    let body = body.map(Value::to_string);
+    anfrage(app, methode, uri, cookie, body.as_deref()).await
+}
+
 /// Wie [`anfrage`], aber mit dem Besitz-Nachweis eines Offline-Queue-Eintrags.
 pub async fn anfrage_mit_offline_queue_benutzer(
     app: &axum::Router,
@@ -236,15 +272,83 @@ pub async fn anfrage_mit_offline_queue_benutzer(
 }
 
 pub async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
+    einsatz_anlegen_mit(app, cookie, "Lage").await
+}
+
+/// Wie [`einsatz_anlegen`], mit eigener Bezeichnung.
+pub async fn einsatz_anlegen_mit(app: &axum::Router, cookie: &str, bezeichnung: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "POST",
         "/api/einsaetze",
         cookie,
-        Some(r#"{"bezeichnung":"Lage"}"#),
+        Some(&format!(r#"{{"bezeichnung":"{bezeichnung}"}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "einsatz_anlegen: {json:?}");
+    json["id"].as_i64().unwrap()
+}
+
+/// Legt eine betroffene Person (`…/personen`) mit dem gegebenen JSON-Body an; liefert ihre id.
+pub async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> i64 {
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        cookie,
+        Some(body),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);
+    json["id"].as_i64().unwrap()
+}
+
+/// Legt eine Stamm-Person (`/api/personal`) an; liefert deren id.
+pub async fn stammpersonal_anlegen(app: &axum::Router, admin: &str, name: &str) -> i64 {
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        "/api/personal",
+        admin,
+        Some(&format!(r#"{{"name":"{name}"}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    json["id"].as_i64().unwrap()
+}
+
+/// Legt eine Stamm-Person an und disponiert sie in den Einsatz; liefert die
+/// `einsatz_personal.id`.
+pub async fn stammpersonal_disponieren(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    name: &str,
+) -> i64 {
+    let pid = stammpersonal_anlegen(app, cookie, name).await;
+    let (status, dispo) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        cookie,
+        Some(&format!(r#"{{"personal_id":{pid}}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    dispo["id"].as_i64().unwrap()
+}
+
+/// Bildet eine Einheit im Einsatz; liefert ihre id.
+pub async fn einheit_bilden(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        cookie,
+        Some(&format!(r#"{{"name":"{name}"}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "einheit_bilden: {json:?}");
     json["id"].as_i64().unwrap()
 }
 
@@ -315,6 +419,78 @@ pub async fn system_etb_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -
         .iter()
         .filter(|e| e["typ"] == "system")
         .count()
+}
+
+/// Die Inhalte der ETB-Einträge mit typ='system'.
+pub async fn system_etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {
+    let (_, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        cookie,
+        None,
+    )
+    .await;
+    json.as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["typ"] == "system")
+        .map(|e| e["inhalt"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Liest vom Live-Kanal, bis ein Event mit `tag` kommt; Timeout oder geschlossener Kanal
+/// lassen den Test scheitern.
+pub async fn recv_until_tag(
+    rx: &mut Receiver<LiveNachricht>,
+    tag: &str,
+    timeout: Duration,
+) -> LiveNachricht {
+    loop {
+        let n = tokio::time::timeout(timeout, rx.recv())
+            .await
+            .unwrap_or_else(|_| panic!("Timeout: kein '{tag}'-Event empfangen"))
+            .expect("Broadcast-Kanal geschlossen");
+        if n.event.as_str() == tag {
+            return n;
+        }
+    }
+}
+
+/// Öffnet `/live` für `cookie` und liefert die Response (Body bleibt offen).
+pub async fn live_oeffnen(app: &axum::Router, cookie: &str, eid: i64) -> axum::response::Response {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/einsaetze/{eid}/live"))
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    resp
+}
+
+/// Liest den Anfang eines OFFENEN SSE-Stroms: sammelt Frames, bis für `stille_ms` nichts
+/// mehr kommt. `to_bytes` scheidet aus — ein Live-Feed endet nie von selbst.
+pub async fn sse_anfang_lesen(body: Body, stille_ms: u64) -> String {
+    use http_body_util::BodyExt;
+    let mut body = body;
+    let mut gelesen = String::new();
+    while let Ok(Some(Ok(frame))) = tokio::time::timeout(
+        Duration::from_millis(stille_ms),
+        std::pin::Pin::new(&mut body).frame(),
+    )
+    .await
+    {
+        if let Some(daten) = frame.data_ref() {
+            gelesen.push_str(&String::from_utf8_lossy(daten));
+        }
+    }
+    gelesen
 }
 
 /// LFH-21: legt per direktem SQL einen Schaden (S-00n) samt Anhang und Linker

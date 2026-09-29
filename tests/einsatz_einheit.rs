@@ -2,46 +2,9 @@ use axum::http::StatusCode;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup,
-    system_etb_anzahl,
+    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, rolle_setzen, setup,
+    stammpersonal_disponieren, system_etb_anzahl,
 };
-
-async fn person_anlegen(app: &axum::Router, admin: &str, einsatz: i64, name: &str) -> i64 {
-    // Stamm anlegen + in den Einsatz disponieren → liefert die einsatz_personal.id.
-    let (s1, stamm) = anfrage(
-        app,
-        "POST",
-        "/api/personal",
-        admin,
-        Some(&format!(r#"{{"name":"{name}"}}"#)),
-    )
-    .await;
-    assert_eq!(s1, StatusCode::CREATED);
-    let pid = stamm["id"].as_i64().unwrap();
-    let (s2, dispo) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
-        admin,
-        Some(&format!(r#"{{"personal_id":{pid}}}"#)),
-    )
-    .await;
-    assert_eq!(s2, StatusCode::CREATED);
-    dispo["id"].as_i64().unwrap()
-}
-
-async fn einheit_bilden(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
-    let (s, json) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
-        cookie,
-        Some(&format!(r#"{{"name":"{name}"}}"#)),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED);
-    json["id"].as_i64().unwrap()
-}
 
 #[tokio::test]
 async fn bilden_schreibt_etb_und_liefert_nullstaerke() {
@@ -70,7 +33,7 @@ async fn mitglied_zuordnen_wechseln_freigeben_mit_etb() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let a = einheit_bilden(&app, &admin, einsatz, "A").await;
     let b = einheit_bilden(&app, &admin, einsatz, "B").await;
-    let ep = person_anlegen(&app, &admin, einsatz, "Anna").await; // disponiert ins Personal
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await; // disponiert ins Personal
 
     assert_eq!(
         anfrage(
@@ -153,7 +116,7 @@ async fn freier_pool_zeigt_einheit_id_null() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let a = einheit_bilden(&app, &admin, einsatz, "A").await;
-    let ep = person_anlegen(&app, &admin, einsatz, "Anna").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
     // Vor Zuordnung: einheit_id null im Personal.
     let (_, personal) = anfrage(
         &app,
@@ -204,7 +167,7 @@ async fn fuehrer_nur_mitglied_dieser_einheit() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let a = einheit_bilden(&app, &admin, einsatz, "A").await;
-    let ep = person_anlegen(&app, &admin, einsatz, "Chef").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Chef").await;
     // Nicht-Mitglied als Führer bei gleichzeitigem Namens-Edit → 400 UND kein Teil-Update.
     let body_umbenennen = format!(r#"{{"name":"A-NEU","fuehrer_id":{ep}}}"#);
     assert_eq!(
@@ -265,7 +228,7 @@ async fn aufloesen_gibt_mitglieder_frei() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let a = einheit_bilden(&app, &admin, einsatz, "A").await;
-    let ep = person_anlegen(&app, &admin, einsatz, "Anna").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
     anfrage(
         &app,
         "PUT",
@@ -961,7 +924,7 @@ async fn patch_fuehrer_laesst_kommunikationsmittel_erreichbarkeit_und_sprechgrup
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
     let e = einheit_voll(&app, &admin, einsatz, sg).await;
-    let ep = person_anlegen(&app, &admin, einsatz, "Chef").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Chef").await;
     personal_zuordnen(&app, &admin, einsatz, e, ep).await;
 
     let (status, json) = anfrage(
@@ -1001,7 +964,7 @@ async fn patch_ohne_fuehrer_id_loest_keinen_fuehrerwechsel_aus() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
     let e = einheit_voll(&app, &admin, einsatz, sg).await;
-    let ep = person_anlegen(&app, &admin, einsatz, "Chef").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Chef").await;
     personal_zuordnen(&app, &admin, einsatz, e, ep).await;
     // Führer setzen (erzeugt EINEN ETB-Eintrag).
     anfrage(
@@ -1042,7 +1005,7 @@ async fn patch_fuehrer_id_null_entfernt_fuehrer() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
     let e = einheit_voll(&app, &admin, einsatz, sg).await;
-    let ep = person_anlegen(&app, &admin, einsatz, "Chef").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Chef").await;
     personal_zuordnen(&app, &admin, einsatz, e, ep).await;
     anfrage(
         &app,

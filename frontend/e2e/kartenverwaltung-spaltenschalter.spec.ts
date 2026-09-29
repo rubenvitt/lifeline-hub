@@ -1,16 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Spaltenschalter der Kartenverwaltungen am Handschirm (LFH-374, Kriterium 14).
-//
-// Warum hier und nicht nur in Vitest: jsdom rechnet kein Layout. Die Unit-Tests pinnen
-// Zähler und Menü; dieser Spec misst, was nur ein Browser weiß — die Tabelle bleibt bei
-// 390 px eine Tabelle (keine Auflösung in Karten), die Werkzeugzeile mit Suche UND Schalter
-// drückt nichts breit, und der Schalter lässt sich mit einem echten Klick bedienen
-// (`toBeVisible()` ist kein Beleg für Klickbarkeit, CLAUDE.md/LFH-355).
-//
-// Gemessen werden das DOM des Primitivs (`.ant-table`, `[data-lfh="katalog-werkzeuge"]`) UND
-// die Seite als Ganzes (`documentElement.scrollWidth`): `gate1-ueberlauf.spec.ts` führt diese
-// zwei Routen nicht, die seitenweite Aussage stünde sonst nirgends.
+// Spaltenschalter der Kartenverwaltungen am Handschirm: die Tabelle bleibt bei 390 px eine
+// Tabelle, die Werkzeugzeile mit Suche UND Schalter drückt nichts breit, und der Schalter ist
+// per echtem Klick bedienbar. Gemessen am DOM des Primitivs UND an der ganzen Seite
+// (`documentElement.scrollWidth`) — `gate1-ueberlauf.spec.ts` führt diese Routen nicht.
 
 const BREITE = 390;
 const ADMIN = 'admin';
@@ -50,10 +43,8 @@ test('Online-Quellen bei 390 px: Tabelle, Zähler für URL und Attribution, einb
 }) => {
   await anmelden(page);
   // Eine Zeile legt der Spec selbst an — ohne Zeile wäre „bleibt eine Tabelle" nur ein Kopf.
-  // INAKTIV und am Ende wieder gelöscht: Online-Quellen gelten instanzweit, und das e2e-Backend
-  // teilen alle Specs eines Shards. Eine aktive Quelle mit unerreichbarer URL blieb stehen und
-  // brach jede spätere Lagekarte im Shard (Marker kamen nie in der Quelle an; in der CI von
-  // PR #158 und auf alpha 7e427fef gemessen, lokal mit/ohne diesen Spec belegt, LFH-741).
+  // INAKTIV und am Ende wieder gelöscht: Online-Quellen gelten instanzweit, und eine aktive
+  // Quelle mit unerreichbarer URL brach jede spätere Lagekarte im selben Shard.
   const antwort = await page.request.post('/api/karte/online-quellen', {
     data: {
       name: `E2E Spalten ${Date.now()}`,

@@ -8,31 +8,11 @@ use std::collections::BTreeSet;
 use tower::ServiceExt;
 
 mod common;
-use common::{benutzer_anlegen, login_cookie, rolle_setzen, setup};
+use common::{
+    benutzer_anlegen, einsatz_anlegen_mit, login_cookie, rolle_setzen, setup, sse_anfang_lesen,
+};
 
 // ----------------------------- Test-Harness -----------------------------
-
-async fn einsatz_anlegen(app: &axum::Router, cookie: &str, bezeichnung: &str) -> i64 {
-    let body = format!(r#"{{"bezeichnung":"{bezeichnung}"}}"#);
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/einsaetze")
-                .header(header::CONTENT_TYPE, "application/json")
-                .header(header::COOKIE, cookie.to_string())
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::CREATED);
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
-        .as_i64()
-        .unwrap()
-}
 
 /// PUT eines Modul-Overrides; liefert nur den Status.
 async fn override_setzen(
@@ -168,7 +148,7 @@ fn backend_modul_keys_decken_frontend_registry() {
 async fn admin_setzt_override_und_get_spiegelt_ihn() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     assert_eq!(
         override_setzen(&app, &admin, eid, "chat", false, None).await,
@@ -185,7 +165,7 @@ async fn admin_setzt_override_und_get_spiegelt_ihn() {
 async fn override_setzt_benoetigte_rolle() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     assert_eq!(
         override_setzen(&app, &admin, eid, "etb", true, Some("fuehrungskraft")).await,
@@ -199,7 +179,7 @@ async fn override_setzt_benoetigte_rolle() {
 async fn nicht_ausblendbares_modul_verstecken_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     for key in ["einsatzdaten", "einsatz-einstellungen"] {
         assert_eq!(
@@ -216,7 +196,7 @@ async fn nicht_ausblendbares_modul_rollen_beschraenken_ist_400() {
     // nicht rollen-beschränkt werden (sonst Aussperrung aus den Einstellungen).
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     for key in ["einsatzdaten", "einsatz-einstellungen"] {
         assert_eq!(
             override_setzen(&app, &admin, eid, key, true, Some("fuehrungskraft")).await,
@@ -233,7 +213,7 @@ async fn einsatzleitung_sperrt_sich_nicht_aus_einstellungen_aus() {
     // und ihre Stammdaten immer.
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let lid = benutzer_anlegen(&app, &admin, "lotta", "keine").await;
     rolle_setzen(&app, &admin, eid, lid, "einsatzleitung").await;
     let lotta = login_cookie(&app, "lotta", "lottapw1").await;
@@ -253,7 +233,7 @@ async fn einsatzleitung_sperrt_sich_nicht_aus_einstellungen_aus() {
 async fn unbekannter_modul_key_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     assert_eq!(
         override_setzen(&app, &admin, eid, "gibtsnicht", true, None).await,
         StatusCode::BAD_REQUEST
@@ -264,7 +244,7 @@ async fn unbekannter_modul_key_ist_400() {
 async fn ungueltige_benoetigte_rolle_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     assert_eq!(
         override_setzen(&app, &admin, eid, "etb", true, Some("einsatzleitung")).await,
         StatusCode::BAD_REQUEST
@@ -275,7 +255,7 @@ async fn ungueltige_benoetigte_rolle_ist_400() {
 async fn nicht_leitung_kann_keinen_override_setzen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let bid = benutzer_anlegen(&app, &admin, "berta", "keine").await;
     rolle_setzen(&app, &admin, eid, bid, "beobachter").await;
 
@@ -291,7 +271,7 @@ async fn nicht_leitung_kann_keinen_override_setzen() {
 async fn override_get_fuer_nicht_mitglied_ist_403() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     benutzer_anlegen(&app, &admin, "fremd", "keine").await;
     let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
 
@@ -303,8 +283,8 @@ async fn override_get_fuer_nicht_mitglied_ist_403() {
 async fn overrides_sind_pro_einsatz_isoliert() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid_a = einsatz_anlegen(&app, &admin, "Lage A").await;
-    let eid_b = einsatz_anlegen(&app, &admin, "Lage B").await;
+    let eid_a = einsatz_anlegen_mit(&app, &admin, "Lage A").await;
+    let eid_b = einsatz_anlegen_mit(&app, &admin, "Lage B").await;
 
     override_setzen(&app, &admin, eid_a, "chat", false, None).await;
 
@@ -321,7 +301,7 @@ async fn overrides_sind_pro_einsatz_isoliert() {
 /// (admin_cookie, frieda_cookie, einsatz_id). Frieda darf normal lesen+schreiben.
 async fn etb_fixture(app: &axum::Router) -> (String, String, i64) {
     let admin = login_cookie(app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(app, &admin, "Lage").await;
     let fid = benutzer_anlegen(app, &admin, "frieda", "keine").await;
     rolle_setzen(app, &admin, eid, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(app, "frieda", "friedapw1").await;
@@ -468,7 +448,7 @@ fn jeder_ausblendbare_modul_key_ist_guard_abgedeckt() {
 async fn alle_modul_gruppen_gegated_get_baseline_und_versteckt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
     rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
@@ -510,25 +490,6 @@ async fn alle_modul_gruppen_gegated_get_baseline_und_versteckt() {
     }
 }
 
-/// Liest den Anfang eines OFFENEN SSE-Streams: sammelt Frames, bis für `stille_ms`
-/// nichts mehr kommt. `to_bytes` scheidet aus — ein Live-Feed endet nie von selbst.
-async fn sse_anfang_lesen(body: axum::body::Body, stille_ms: u64) -> String {
-    use http_body_util::BodyExt;
-    let mut body = body;
-    let mut gelesen = String::new();
-    while let Ok(Some(Ok(frame))) = tokio::time::timeout(
-        std::time::Duration::from_millis(stille_ms),
-        std::pin::Pin::new(&mut body).frame(),
-    )
-    .await
-    {
-        if let Some(daten) = frame.data_ref() {
-            gelesen.push_str(&String::from_utf8_lossy(daten));
-        }
-    }
-    gelesen
-}
-
 /// **Der Kern von F01/LFH-227.** Früher gatete jede der 9 `…/stream`-Routen nur ihr
 /// eigenes Modul und leitete danach den kompletten Kanal weiter — wer irgendeine öffnen
 /// durfte, las ETB und Chat mit. Jetzt gibt es EINEN `/live`-Feed: die Verbindung steht
@@ -537,7 +498,7 @@ async fn sse_anfang_lesen(body: axum::body::Body, stille_ms: u64) -> String {
 async fn versteckte_module_werden_aus_dem_live_feed_gefiltert() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
     rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
@@ -658,7 +619,7 @@ fn sse_ids(roh: &str) -> Vec<String> {
 async fn org_modul_default_wirkt_auch_im_live_feed() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
     rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
@@ -710,7 +671,7 @@ async fn org_modul_default_wirkt_auch_im_live_feed() {
 async fn reconnect_replay_wird_ebenfalls_gefiltert() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
     rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
@@ -779,7 +740,7 @@ async fn reconnect_replay_wird_ebenfalls_gefiltert() {
 async fn live_payloads_tragen_keinen_klartext() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let feed = live_oeffnen(&app, &admin, eid, None).await;
     assert_eq!(feed.status(), StatusCode::OK);
@@ -863,8 +824,8 @@ async fn org_default_fuehrungskraft_blockt_normales_mitglied_via_route() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
 
     // Einsatz 1 anlegen, damit Einsatz 2 einsatz_id=2 hat (≠ org_id=1).
-    einsatz_anlegen(&app, &admin, "Dummy").await;
-    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    einsatz_anlegen_mit(&app, &admin, "Dummy").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
     rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;

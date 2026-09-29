@@ -3,20 +3,6 @@ use axum::http::StatusCode;
 mod common;
 use common::*;
 
-/// Legt eine Stamm-Person an (Admin) und liefert deren id.
-async fn person_anlegen(app: &axum::Router, admin: &str, name: &str) -> i64 {
-    let (status, json) = anfrage(
-        app,
-        "POST",
-        "/api/personal",
-        admin,
-        Some(&format!(r#"{{"name":"{name}"}}"#)),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED);
-    json["id"].as_i64().unwrap()
-}
-
 // ---------- Tests ----------
 
 #[tokio::test]
@@ -24,7 +10,7 @@ async fn disponieren_stamm_setzt_status_und_schreibt_etb() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let person = person_anlegen(&app, &admin, "Thomas Müller").await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas Müller").await;
 
     let (status, json) = anfrage(
         &app,
@@ -49,7 +35,7 @@ async fn doppelte_stamm_disposition_ist_409() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas").await;
     let body = format!(r#"{{"personal_id":{person}}}"#);
     assert_eq!(
         anfrage(
@@ -112,7 +98,7 @@ async fn beobachter_liest_disponiert_nicht() {
         .0,
         StatusCode::OK
     );
-    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas").await;
     let (status, _) = anfrage(
         &app,
         "POST",
@@ -129,7 +115,7 @@ async fn disponieren_auf_abgeschlossenem_einsatz_ist_409() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas").await;
     assert_eq!(
         anfrage(
             &app,
@@ -158,7 +144,7 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas").await;
     let (_, json) = anfrage(
         &app,
         "POST",
@@ -213,7 +199,7 @@ async fn snapshot_bleibt_nach_stamm_aenderung_bei_abgeschlossenem_einsatz() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let person = person_anlegen(&app, &admin, "Thomas Müller").await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas Müller").await;
     anfrage(
         &app,
         "POST",
@@ -291,7 +277,7 @@ async fn disponieren_beides_meldet_nicht_beides() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas").await;
     // personal_id UND adhoc → "nicht beides".
     let body = format!(r#"{{"personal_id":{person},"adhoc":{{"name":"Extern"}}}}"#);
     let (status, json) = anfrage(
@@ -316,7 +302,7 @@ async fn dispo_position_explizit_null_entfernt_absent_behaelt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let person = person_anlegen(&app, &admin, "Thomas").await; // Stamm ohne Position
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas").await; // Stamm ohne Position
     let (_, json) = anfrage(
         &app,
         "POST",
@@ -364,7 +350,7 @@ async fn dispo_position_ungueltiger_wert_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas").await;
     let (_, json) = anfrage(
         &app,
         "POST",
@@ -396,7 +382,7 @@ async fn patch_null_leert_bemerkung() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas").await;
     let (_, json) = anfrage(
         &app,
         "POST",
@@ -442,7 +428,7 @@ async fn patch_leerstring_leert_bemerkung() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas").await;
     let (_, json) = anfrage(
         &app,
         "POST",
@@ -480,7 +466,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let person = stammpersonal_anlegen(&app, &admin, "Thomas").await;
     let (_, json) = anfrage(
         &app,
         "POST",

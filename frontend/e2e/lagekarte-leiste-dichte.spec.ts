@@ -1,23 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Die Lagekarten-Leiste trägt den gewachsenen Kippschalter (LFH-380).
+ * Die Lagekarten-Leiste trägt den mitwachsenden Kippschalter (im Handschuh 72 × 144 px, siehe
+ * `switchMasse`). Die Leiste ist fest 300 px breit; die Schalterzeile bricht deshalb um
+ * (`leistenZeileStil`/`namensteilStil` in `Sidebar.tsx`), statt Namen auf „…" zu kürzen oder
+ * aus der Leiste zu ragen. Kompakt und komfortabel stehen mit, damit die Umbruchregel dort
+ * keine Zeile bricht, die in eine passte.
  *
- * Seit `switchMasse` (`theme/tokens.ts`) folgt der Schalter der Staffel und ist im Handschuh
- * 72 × 144 px. Die Leiste ist fest 300 px breit, nach der Polsterung des Klapppaneels bleiben
- * rund 247. VOR der Umbruchregel (`leistenZeileStil`/`namensteilStil` in `Sidebar.tsx`)
- * gemessen, am Führungs-Tablet mit 1024 px:
- *
- *   - der Bildname stand bei 19 px und zeigte nur noch „…" — der Name lebte allein im
- *     `aria-label`;
- *   - „Wetterwarnungen (DWD)" ragte 16 px, „Energieanlagen" 3 px aus der Leiste.
- *
- * Kompakt und komfortabel passten schon vorher; sie stehen hier mit, damit die Umbruchregel
- * dort keine Zeile bricht, die vorher in eine passte (die Bildzeile hielt komfortabel 107 px
- * Namensbreite in einer Zeile).
- *
- * Nicht gemessen: der Schalter „Weitere platzieren" (nur im laufenden Platzier-Modus sichtbar,
- * `Space wrap`) — dort bricht das Wort unter den Schalter, statt aus der Leiste zu ragen.
+ * Nicht gemessen: „Weitere platzieren" (nur im Platzier-Modus, `Space wrap`) — dort bricht das
+ * Wort unter den Schalter.
  */
 
 const TABLET = { width: 1024, height: 768 };
@@ -32,13 +23,11 @@ const PNG = Buffer.from(
 );
 
 /**
- * Boden für die sichtbare Namensbreite. Handgeschriebenes Literal: 8em bei 13,5 px Schrift
- * sind 108 px, darunter bricht der Name um. Der Bestand vor LFH-380 lag bei 19 px (Handschuh).
+ * Boden für die sichtbare Namensbreite, als Literal: 8em bei 13,5 px Schrift sind 108 px,
+ * darunter bricht der Name um.
  */
 const NAMENSBODEN = 100;
 
-// Login-/Anlege-Helfer kopiert — es gibt kein geteiltes e2e-Hilfsmodul (gleichlautend in den
-// Bestands-Specs vermerkt).
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill('admin');
@@ -94,14 +83,12 @@ for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
     // ── Fachebenen: keine Beschriftung ragt aus der Leiste ──────────────────────────
     const fachebenen = page.locator('section[data-paneel="fachebenen"]');
     const schalter = fachebenen.getByRole('switch');
-    // Vorbedingung: ohne Zeilen wäre die Überstandsliste unten leer und der Test grün.
+    // Vorbedingung: ohne Zeilen wäre die Überstandsliste leer und der Test grün.
     await expect(schalter.first()).toBeVisible();
     expect(await schalter.count(), 'mindestens die neun Bestandsebenen').toBeGreaterThanOrEqual(9);
     /**
-     * Gemessen wird STRUKTURUNABHÄNGIG: jedes Element im Paneel, das rechts über das Paneel
-     * hinausragt. Ein Griff nach dem Namensteil als Geschwister des Schalters hinge an der
-     * heutigen Zeilenstruktur — auf der früheren (antd-`Space` mit einer Hülle je Kind) liefe
-     * er ins Leere, und die Gegenprobe wäre rot aus dem falschen Grund (gemessen: Timeout).
+     * STRUKTURUNABHÄNGIG gemessen: jedes Element im Paneel, das rechts hinausragt. Ein Griff
+     * nach dem Namensteil als Geschwister des Schalters hinge an der heutigen Zeilenstruktur.
      */
     const ueberstand = await fachebenen.evaluate((paneel, toleranz) => {
       const rand = paneel.getBoundingClientRect().right + toleranz;
