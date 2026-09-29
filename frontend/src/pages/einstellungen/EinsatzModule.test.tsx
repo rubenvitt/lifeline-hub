@@ -182,6 +182,21 @@ describe('EinsatzModule', () => {
     expect(screen.queryByRole('switch', { name: 'Sichtbar: ETB' })).toBeNull();
   });
 
+  it('hinterlässt nach fünf Schaltvorgängen in Folge EINE Meldung, nicht fünf (LFH-478)', async () => {
+    rendern();
+    await screen.findByRole('switch', { name: 'Sichtbar: ETB' });
+    const schalter = screen.getAllByRole('switch').filter((s) => !s.hasAttribute('disabled'));
+    expect(schalter.length).toBeGreaterThanOrEqual(5);
+
+    for (const [i, s] of schalter.slice(0, 5).entries()) {
+      fireEvent.click(s);
+      await waitFor(() => expect(setzeModulOverride).toHaveBeenCalledTimes(i + 1));
+    }
+
+    await waitFor(() => expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(1));
+    expect(screen.getByText('Modul-Einstellung gespeichert')).toBeInTheDocument();
+  });
+
   it('nennt einen gescheiterten Zeilen-Schreibversuch dauerhaft auf der Seite (H14)', async () => {
     vi.mocked(setzeModulOverride).mockRejectedValue(new ApiError(409, 'Modul gesperrt'));
 
