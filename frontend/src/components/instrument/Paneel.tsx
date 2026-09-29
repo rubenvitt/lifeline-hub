@@ -4,31 +4,25 @@ import Augenbraue from './Augenbraue';
 import { monoStil, useRollen } from './rollenwerte';
 
 /**
- * Paneel — die Grundfläche des Neuentwurfs für Seitenleisten, Kachel-Paneele und
- * Listenblöcke (S2 „Einsatzabschnitte", „Offene Anordnungen"; S4 „Tagesbilanz").
+ * Paneel — die Grundfläche für Seitenleisten, Kachel-Paneele und Listenblöcke.
  *
- * Rahmen `linie`, Grund `paneel`, Kopf 38 px mit Augenbraue links und optionalem
- * Mono-Meta bzw. einer Aktion rechts, Haarlinie darunter, Radius 0. Der Körper trägt
- * keine eigene Polsterung — Zeilen bringen sie mit (Trenner `flaeche3`, siehe
- * {@link paneelZeileStil}); wer Fließinhalt hineinlegt, setzt `koerperPolster`.
+ * Rahmen `linie`, Grund `paneel`, Kopf 38 px mit Augenbraue links und optionalem Mono-Meta bzw.
+ * einer Aktion rechts, Haarlinie darunter, Radius 0. Der Körper trägt keine eigene Polsterung —
+ * Zeilen bringen sie mit (Trenner `flaeche3`, siehe {@link paneelZeileStil}); wer Fließinhalt
+ * hineinlegt, setzt `koerperPolster`.
  *
- * Die Überschrift ist SEMANTISCH (`ueberschrift="h2"` … `"h6"`), die Augenbraue nur ihre
- * Optik; das `<section>` wird über sie benannt (`aria-labelledby`). Die Ebene folgt der
- * Gliederung der Seite, nicht der Optik: ein Paneel in einem Paneel ist eine Ebene tiefer,
- * sieht aber gleich aus. Ein Paneel ohne
- * Überschrift gibt es nicht — ein unbenannter Block ist genau die Fläche, die der
- * Entwurf durch die Augenbraue abschafft.
+ * Die Überschrift ist SEMANTISCH (`ueberschrift="h2"` … `"h6"`), die Augenbraue nur ihre Optik;
+ * das `<section>` wird über sie benannt (`aria-labelledby`). Die Ebene folgt der Gliederung:
+ * ein Paneel in einem Paneel ist eine Ebene tiefer, sieht aber gleich aus. Ein Paneel ohne
+ * Überschrift gibt es nicht.
  *
- * Die 38 px sind eine MINDESThöhe, keine feste: steht rechts eine Aktion, wächst der Kopf
- * mit deren Dichte-Staffel (30 / 48 / 72) mit, statt sie abzuschneiden.
+ * Die 38 px sind eine MINDESThöhe: steht rechts eine Aktion, wächst der Kopf mit deren
+ * Dichte-Staffel mit.
  *
- * ENGER KOPF (22.09.2026, gemessen im Lage-Dashboard bei 1024 px: „5 Gebiete · Gefahren ↗"
- * lief in den Nachbarkopf). Keins der beiden Kinder konnte schrumpfen, und
- * `space-between` schob den rechten Block einfach über den Rand. Jetzt:
- * der Kopf BRICHT UM (`flexWrap`), der rechte Block rückt als Ganzes in eine zweite Zeile
- * und bleibt rechtsbündig (`marginInlineStart: auto`); reicht selbst die nicht, kürzt das
+ * ENGER KOPF: der Kopf BRICHT UM (`flexWrap`), der rechte Block rückt als Ganzes in eine zweite
+ * Zeile und bleibt rechtsbündig (`marginInlineStart: auto`); reicht selbst die nicht, kürzt das
  * Meta mit Auslassung (`paneelMetaStil`), die Aktion nie — ein abgeschnittener Link ist kein
- * Ziel mehr. Das volle Meta steht dann im `title`, wenn es ein Text ist.
+ * Ziel. Das volle Meta steht dann im `title`, wenn es ein Text ist.
  */
 export const PANEEL_KOPF_HOEHE = 38;
 
@@ -88,7 +82,7 @@ export function paneelMetaStil(rollen: Pick<Farbrollen, 'schwach'>): CSSProperti
   };
 }
 
-/** Eine Zeile im Paneel: Trenner `flaeche3` (Entwurf `#16191d`), Polster aus der Staffel. */
+/** Eine Zeile im Paneel: Trenner `flaeche3`, Polster aus der Staffel. */
 export function paneelZeileStil(
   rollen: Pick<Farbrollen, 'flaeche3'>,
   token: { padding: number; paddingSM: number },

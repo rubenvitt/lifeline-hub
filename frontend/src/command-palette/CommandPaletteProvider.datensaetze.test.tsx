@@ -1,4 +1,3 @@
-// frontend/src/command-palette/CommandPaletteProvider.datensaetze.test.tsx
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -10,19 +9,13 @@ import { CommandPaletteProvider } from './CommandPaletteProvider';
 import { benutzerFixture } from '../test/fixtures';
 
 /**
- * DIE AKZEPTANZKRITERIEN DES TICKETS, an der verdrahteten Palette (LFH-391 · C3).
+ * Die Naht an der verdrahteten Palette: Tastendruck → Entprellung → Query → Kern → Optionszeile →
+ * Navigation. `datensaetze.test.ts` (Kern) und `useDatensaetze.test.tsx` (Beschaffung) könnten
+ * beide grün sein, während die Hälften nicht verbunden sind.
  *
- * `datensaetze.test.ts` prüft den reinen Kern und `useDatensaetze.test.tsx` die
- * Beschaffung — beide für sich könnten grün sein, während die zwei Hälften gar nicht
- * miteinander verbunden sind. Diese Datei ist die Naht: Tastendruck → Eingabe →
- * Entprellung → Query → Kern → Optionszeile → Navigation. Sie ist der einzige Ort, an dem
- * „findet eine Person über die Registriernummer" als BEDIENUNG geprüft wird und nicht als
- * Funktionsaufruf.
- *
- * `useBefehle` ist gestubbt (Bauform `CommandPaletteProvider.test.tsx`): das echte fordert
- * beim Öffnen `/api/einsaetze` an und brächte mit `onUnhandledRequest: 'error'` den Lauf zu
- * Fall, ohne eine Aussage zu schärfen. Der Datensatz-Weg dagegen läuft ECHT — mit MSW,
- * react-query und der wirklichen Entprellung.
+ * `useBefehle` ist gestubbt: das echte fordert `/api/einsaetze` an und brächte mit
+ * `onUnhandledRequest: 'error'` den Lauf zu Fall. Der Datensatz-Weg läuft ECHT (MSW, react-query,
+ * echte Entprellung).
  */
 vi.mock('./useBefehle', () => ({ useBefehle: () => [] }));
 
@@ -103,8 +96,8 @@ describe('Kommandopalette · Datensätze finden (LFH-391 · C3)', () => {
     );
     await u.click(zeile);
 
-    // Literal-Pin auf den Builder-Ausgang (Bestandskonvention `befehle.test.ts`): ein
-    // `personDetailPfad(1, 7)` auf beiden Seiten prüfte den Builder gegen sich selbst.
+    // Literal-Pin auf den Builder-Ausgang: `personDetailPfad(1, 7)` auf beiden Seiten prüfte den
+    // Builder gegen sich selbst.
     await waitFor(() => expect(ort()).toBe('/einsaetze/1/personen/7'));
   });
 
@@ -133,19 +126,16 @@ describe('Kommandopalette · Datensätze finden (LFH-391 · C3)', () => {
     const zeile = await screen.findByRole('option', { name: /Lage erkundet/ }, { timeout: 3000 });
     await u.click(zeile);
 
-    // `?eintrag=` trägt die DB-`id`, nicht die laufende Nummer (Deeplink-Muster LFH-25).
+    // `?eintrag=` trägt die DB-`id`, nicht die laufende Nummer.
     await waitFor(() => expect(ort()).toBe('/einsaetze/1/etb?eintrag=12'));
   });
 });
 
 describe('Kommandopalette · Datensätze und die Leseachse (LFH-391 · C3)', () => {
   /**
-   * PAAR. Die negative Hälfte allein wäre trivial grün — auch eine Palette, die gar nichts
-   * findet, zeigt keine Personenzeile. Erst der Schaden mit DERSELBEN Nummer im selben Lauf
-   * belegt, dass der Riegel je Modul greift und die Suche als Ganzes weiterläuft.
-   *
-   * Die Achse ist die LESEACHSE `istModulFreigegeben`, nicht `darfImEinsatzSchreiben`: ein
-   * Beobachter darf lesen und behält seine Suche.
+   * PAAR: die negative Hälfte allein wäre trivial grün. Der Schaden mit DERSELBEN Nummer belegt,
+   * dass der Riegel je Modul greift. Die Achse ist die LESEACHSE, ein Beobachter behält seine
+   * Suche.
    */
   it('zeigt den Personen-Treffer, solange das Modul freigegeben ist', async () => {
     const u = userEvent.setup();
@@ -187,23 +177,16 @@ describe('Kommandopalette · Datensätze und die Leseachse (LFH-391 · C3)', () 
 });
 
 /**
- * DIE NAHT DES HEIMVORTEILS (LFH-391 · C4, Arbeitspunkt 3).
- *
- * `datensaetze.test.ts` prüft die Sortierregel am reinen Kern; hier hängt sie an der
- * AKTUELLEN ROUTE. Beides für sich könnte grün sein, während der Modulschlüssel gar nicht
- * aus dem Pfad gezogen und durchgereicht wird — genau die Lücke, wegen der Arbeitspunkt 3
- * zwischen Etappe B und C hindurchgefallen ist.
- *
- * Gleichnamiges Fahrzeug und gleichnamige Kraft, ein Suchwort, zwei Routen: die
- * Reihenfolge ist die einzige beobachtbare Wirkung, und sie kehrt sich um.
+ * Die Naht des Heimvorteils: im Kern ist die Sortierregel geprüft, hier hängt sie an der
+ * AKTUELLEN ROUTE. Gleichnamiges Fahrzeug und gleichnamige Kraft, zwei Routen: die Reihenfolge
+ * kehrt sich um.
  */
 describe('Kommandopalette · Rangvorteil des Moduls, in dem man steht (LFH-391 · C4)', () => {
   const KRAFT = { id: 9, einsatz_id: EINSATZ, name: 'Florian 1' };
 
   /**
-   * Nur die beiden gleichnamigen Zeilen. Die ETB-Quelle ist SERVERSEITIG gefiltert und
-   * läuft ohne zweiten lokalen Filter durch — der Handler oben antwortet auf jeden
-   * Suchbegriff mit demselben Eintrag, sie stünde also unbeteiligt in der Liste.
+   * Nur die beiden gleichnamigen Zeilen; der ETB-Handler antwortet auf jeden Begriff mit demselben
+   * Eintrag, der unbeteiligt in der Liste stünde.
    */
   async function florianZeilen(route: string): Promise<string[]> {
     const u = userEvent.setup();
@@ -216,8 +199,7 @@ describe('Kommandopalette · Rangvorteil des Moduls, in dem man steht (LFH-391 �
       { name: /Florian 1/, description: 'Personal' },
       { timeout: 3000 },
     );
-    // „Kontext · Label", wie die Zeile gelesen wird: seit dem Neuentwurf steht die
-    // Modulherkunft als Kontext (Beschreibung der Option) neben dem Label.
+    // „Kontext · Label“, wie die Zeile gelesen wird.
     return screen
       .getAllByRole('option')
       .map((o) => {

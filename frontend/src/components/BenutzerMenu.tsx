@@ -22,9 +22,8 @@ const DARSTELLUNG_PRAEFIX = 'darstellung:';
 const DICHTE_PRAEFIX = 'stufe:';
 
 /**
- * Beschriftung eines Umschalt-Eintrags. Die aktive Stufe trägt ihren Zustand im
- * TEXT, nicht nur in der Auswahlfarbe — zweiter Kanal nach WCAG 1.4.1, und
- * zugleich das Einzige, was im Test über den zugänglichen Namen prüfbar ist.
+ * Beschriftung eines Umschalt-Eintrags. Die aktive Stufe trägt ihren Zustand im TEXT — zweiter
+ * Kanal nach WCAG 1.4.1 und über den zugänglichen Namen prüfbar.
  */
 function umschaltEintrag(
   praefix: string,
@@ -41,46 +40,34 @@ function umschaltEintrag(
 }
 
 /**
- * Identitäts-Menü in der Topbar: Avatar + Name als Trigger, Dropdown mit
- * Rollen-Übersicht, Profil und Abmelden. Holt sich Benutzer und Logout selbst,
- * damit es in beiden Layout-Ebenen (global + Einsatz-Workspace) gleich nutzbar ist.
+ * Identitäts-Menü in der Topbar: Avatar + Name als Trigger, Dropdown mit Rollen-Übersicht,
+ * Profil und Abmelden. Holt sich Benutzer und Logout selbst, damit es in beiden Layout-Ebenen
+ * gleich nutzbar ist.
  *
- * DIE INITIALEN STEHEN NEUTRAL (Neuentwurf „Instrumententafel", 21.09.2026): eine 24-px-
- * Kachel auf `flaeche3`, nicht mehr markenrot. Rot ist im Rahmen genau zweimal vergeben —
- * Logo-Quadrat und aktive Rail-Marke —, eine dritte rote Fläche daneben verwässerte beide.
- * Neben der Kachel steht ab `xl` die FUNKTION (`funktion`, z. B. „S2 Lage"), sonst der
- * Anzeigename. Die Funktion leitet das Backend ab (`EinsatzAnzeige.meine_funktion`,
- * LFH-615) — dieselbe Ableitung, die der ETB-Eintrag als Snapshot trägt; eine zweite im
- * Frontend könnte davon abweichen.
+ * DIE INITIALEN STEHEN NEUTRAL: eine 24-px-Kachel auf `flaeche3`. Rot ist im Rahmen genau
+ * zweimal vergeben (Logo-Quadrat, aktive Rail-Marke). Neben der Kachel steht ab `xl` die
+ * FUNKTION (`funktion`, z. B. „S2 Lage"), sonst der Anzeigename. Die Funktion leitet das Backend
+ * ab (`EinsatzAnzeige.meine_funktion`, LFH-615), dieselbe Ableitung wie im ETB-Snapshot.
  *
- * ZWEI GESTALTEN, EINE SCHWELLE — die Schwelle gilt nur noch dem TRIGGER
- * (LFH-329 · B1/M12, eingeschränkt in LFH-392; seit 22.09.2026 `xl` statt `lg`, damit
- * der Kopf auf dem Führungs-Tablet einzeilig bleibt). Unterhalb von antds `xl`
- * schrumpft der Auslöser auf den Avatar (kein Name, kein Pfeil). Die zwei
- * Umschaltgruppen im Dropdown hängen dagegen an KEINER Breite mehr: seit
- * LFH-392 ist dies der einzige sichtbare Bedienweg für Darstellung und
- * Bediendichte, auf jedem Schirm.
+ * DIE SCHWELLE `xl` GILT NUR DEM TRIGGER: darunter schrumpft er auf den Avatar, damit der Kopf
+ * auf dem Führungs-Tablet einzeilig bleibt. Die zwei Umschaltgruppen hängen an KEINER Breite:
+ * sie sind der einzige sichtbare Bedienweg für Darstellung und Bediendichte (die
+ * Kommandopalette zeigt keinen aktiven Wert an), und A1 weist Tablet und Handschirm
+ * `komfortabel` und `handschuh` zu.
  *
- * Die Kommandopalette trägt beide Achsen zwar als sechs Befehle, ersetzt diese
- * Gruppen aber nicht: sie zeigt keinen aktiven Wert an. Ohne sie wären genau die
- * Stufen unbedienbar, die A1 dem Führungs-Tablet und dem mobilen Kontext
- * zuweist: `komfortabel` und `handschuh`.
- *
- * Angebunden wird über `useThemeMode`/`useDichte`, NICHT über die
- * Kommandopalette: deren Hook wirft außerhalb seines Providers, und der
- * Test-Wrapper rendert keinen — ein Zugriff darüber risse die Layout-Suiten mit.
+ * Angebunden über `useThemeMode`/`useDichte`, NICHT über die Kommandopalette: deren Hook wirft
+ * außerhalb seines Providers, und der Test-Wrapper rendert keinen.
  */
 export default function BenutzerMenu({ funktion }: { funktion?: string | null } = {}) {
   const { benutzer, logout } = useAuth();
   const navigate = useNavigate();
   const { token } = theme.useToken();
-  // ALLE Hooks vor dem frühen Rückgabewert unten — sonst wechselt die
-  // Hook-Reihenfolge, sobald der Benutzer eintrifft.
+  // ALLE Hooks vor dem frühen Rückgabewert unten — sonst wechselt die Hook-Reihenfolge, sobald
+  // der Benutzer eintrifft.
   const { abBreite } = useViewport();
   const { modus, setModus } = useThemeMode();
   const { dichte, setDichte } = useDichte();
-  // Funktion und Pfeil erst ab `xl`: auf dem Führungs-Tablet (1024–1199 px) kosteten sie
-  // bis zu 190 px und brachen die Kopfzeile auf zwei Zeilen (22.09.2026, gemessen 104 px).
+  // Funktion und Pfeil erst ab `xl`: auf dem Führungs-Tablet brächen sie die Kopfzeile um.
   const breit = abBreite('xl');
 
   if (!benutzer) return null;
@@ -147,17 +134,10 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
         </div>
       ),
     },
-    // AUF JEDER BREITE (LFH-392). Bis dahin hing das an `breit ? [] : […]`, weil
-    // ab `lg` zwei Segmentleisten in der Kopfzeile dieselbe Wahl trugen — und
-    // zwei Bedienwege mit getrenntem Aussehen für eine Wahl sind schlechter als
-    // einer. Der Satz gilt weiter; aufgelöst ist er jetzt zugunsten DIESER
-    // Stelle: die Kopfzeile ist die Aktionsreihe, und eine Einstellung gehört da
-    // nicht hinein.
-    //
-    // WER DEN RIEGEL ZURÜCKDREHT, nimmt beiden Achsen ab 992 px ihren einzigen
-    // sichtbaren Bedienweg: die Kommandopalette trägt sie zwar als sechs Befehle,
-    // zeigt aber keinen aktiven Wert an (`command-palette/typen.ts` kennt kein
-    // Zustandsfeld) — der zweite Kanal nach WCAG 1.4.1 hinge dann an nichts.
+    // AUF JEDER BREITE (LFH-392): die Kopfzeile ist die Aktionsreihe, eine Einstellung gehört dort
+    // nicht hinein. Wer das an eine Breite hängt, nimmt beiden Achsen ihren einzigen sichtbaren
+    // Bedienweg — die Palette zeigt keinen aktiven Wert (`command-palette/typen.ts` kennt kein
+    // Zustandsfeld).
     { type: 'divider' },
     {
       key: 'darstellung',
@@ -207,9 +187,9 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
           gap: 9,
         }}
       >
-        {/* Initialen-Kachel 24 px, quadratisch (Entwurf). Kein antd-`Avatar`: der trägt
-            seine Farbe über `colorTextLightSolid`, und der Kopf ist in beiden Modi dunkel —
-            die Kachel liest deshalb die Nachtrollen wie der übrige Rahmen. */}
+        {/* Initialen-Kachel 24 px, quadratisch. Kein antd-`Avatar`: der färbt über
+            `colorTextLightSolid`, der Kopf ist aber in beiden Modi dunkel — die Kachel liest die
+            Nachtrollen wie der übrige Rahmen. */}
         <span
           style={{
             width: 24,
@@ -226,10 +206,8 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
         >
           {initialen(benutzer.anzeigename)}
         </span>
-        {/* Unter `xl` bleibt die Kachel allein stehen: Funktion und Pfeil kosten dort
-            bis zu 190 px der Kopfzeile, und der Name steht ohnehin in der Kopfgruppe des
-            Dropdowns. Das `aria-label` am Knopf bleibt, damit der Trigger auch als reines
-            Symbol benannt ist. Höhe und Mindestbreite folgen der Dichte; 40 px bleiben nur
+        {/* Unter `xl` bleibt die Kachel allein; der Name steht in der Kopfgruppe des Dropdowns, das
+            `aria-label` benennt den Trigger. Höhe und Mindestbreite folgen der Dichte; 40 px sind nur
             der kompakte Höhenboden (LFH-460). */}
         {breit && (
           <>

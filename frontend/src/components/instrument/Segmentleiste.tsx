@@ -4,33 +4,29 @@ import { useRollen } from './rollenwerte';
 import '../../theme/sprache.css';
 
 /**
- * Segmentleiste — Umschalter im Instrumentenstil (Neuentwurf S4 ETB-Filter, S5
- * Basiskarte, S7 Ansicht). Ersatz für antds `Segmented`, dessen Pillenform, Schatten und
- * Gleitanimation die Formensprache (Radius 0, Fugenraster) an genau der Stelle brechen,
- * an der sie sitzt.
+ * Segmentleiste — Umschalter im Instrumentenstil (ETB-Filter, Basiskarte, Ansicht). Ersatz für
+ * antds `Segmented`, dessen Pillenform, Schatten und Gleitanimation die Formensprache (Radius 0,
+ * Fugenraster) brechen.
  *
- * FUGENRASTER: die Segmente stehen mit `gap: 1px` auf `linieStark`; aktiv `flaeche3` +
- * `text`, inaktiv `flaeche` + `gedaempft`, optional ein 6-px-Farbpunkt (quadratisch —
- * Radius 0 gilt auch für den Punkt). Die Farben und die Zustände Hover/Fokus liegen als
- * Klassen in `theme/sprache.css` (`.lfh-segmente`, `.lfh-segment`), weil `:hover` und
- * `:focus-visible` inline nicht erreichbar sind; die GEOMETRIE steht inline aus den Tokens.
+ * FUGENRASTER: die Segmente stehen mit `gap: 1px` auf `linieStark`; aktiv `flaeche3` + `text`,
+ * inaktiv `flaeche` + `gedaempft`, optional ein 6-px-Farbpunkt (quadratisch). Farben und
+ * Hover/Fokus liegen als Klassen in `theme/sprache.css` (`.lfh-segmente`, `.lfh-segment`), weil
+ * `:hover` und `:focus-visible` inline nicht erreichbar sind; die GEOMETRIE steht inline aus den
+ * Tokens.
  *
- * ZUGÄNGLICH als `radiogroup` (Vorgabe — eine Wahl unter mehreren, etwa ein Filter) oder
- * als `tablist` (wenn das Segment eine Fläche darunter umschaltet). Tastatur nach APG:
- * ←/→ (und ↑/↓) wandern und wählen, Pos1/Ende springen; nur das gewählte Segment liegt in
- * der Tab-Reihenfolge (roving tabindex).
+ * ZUGÄNGLICH als `radiogroup` (Vorgabe, eine Wahl unter mehreren) oder als `tablist` (wenn das
+ * Segment eine Fläche darunter umschaltet). Tastatur nach APG: ←/→ (und ↑/↓) wandern und
+ * wählen, Pos1/Ende springen; nur das gewählte Segment liegt in der Tab-Reihenfolge (roving
+ * tabindex).
  *
- * BEDIENZIEL: jedes Segment ist ein `<button>` ohne antd-Höhe, trägt also die ZWEI Angaben
- * aus LFH-365 — `minHeight: token.controlHeight` plus Polsterung aus der Staffel
- * ({@link segmentStil}). Der Entwurf zeichnet 26–30 px; das ist Skizze, die Staffel
- * 30 / 48 / 72 gilt (umsetzung.md § Form & Typografie).
+ * BEDIENZIEL: jedes Segment ist ein `<button>` ohne antd-Höhe und trägt die ZWEI Angaben aus
+ * LFH-365 ({@link segmentStil}). Die Staffel 30 / 48 / 72 gilt, nicht die Entwurfsskizze.
  *
- * GESPERRT (22.09.2026): ein Segment mit `gesperrt` bleibt SICHTBAR und nennt seinen Grund —
- * als Tooltip fürs Auge und als Beschreibung (`aria-describedby`) für Vorlesende. Es ist
- * `aria-disabled`, nicht `disabled`: ein natives `disabled` nähme es aus dem Fokus und dem
- * Baum der Hilfstechnik, und der Grund wäre nicht mehr erreichbar. Klick und Pfeiltasten
- * wählen es nicht; die Pfeile springen darüber hinweg. „Ausgegraut" allein wäre eine
- * Ein-Kanal-Aussage (WCAG 1.4.1, CLAUDE.md M16) — der Grund ist der zweite Kanal.
+ * GESPERRT: ein Segment mit `gesperrt` bleibt SICHTBAR und nennt seinen Grund — als Tooltip und
+ * als Beschreibung (`aria-describedby`). Es ist `aria-disabled`, nicht `disabled`: ein natives
+ * `disabled` nähme es aus Fokus und Hilfstechnik, der Grund wäre unerreichbar. Klick und Pfeile
+ * wählen es nicht, die Pfeile springen darüber hinweg. Der Grund ist der zweite Kanal neben
+ * dem Grau (WCAG 1.4.1).
  */
 
 export interface SegmentOption<W extends string | number> {
@@ -42,9 +38,8 @@ export interface SegmentOption<W extends string | number> {
   /** Nur `tablist`: Id der Fläche, die dieses Segment zeigt. */
   steuert?: string;
   /**
-   * Sperrt das Segment und nennt den GRUND („Keine Offline-Karte hinterlegt"). Ohne Grund
-   * gibt es keine Sperre — ein stumm gesperrtes Segment ist von „kaputt" nicht zu
-   * unterscheiden.
+   * Sperrt das Segment und nennt den GRUND („Keine Offline-Karte hinterlegt"). Ohne Grund keine
+   * Sperre — ein stumm gesperrtes Segment ist von „kaputt" nicht zu unterscheiden.
    */
   gesperrt?: string;
 }

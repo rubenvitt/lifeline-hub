@@ -16,17 +16,15 @@ interface Props {
 }
 
 /**
- * Dateifeld einer Erfassungsmaske (LFH-21; vorher im `DokumentAblegenModal`, „dieselbe Eingabe
- * wird nicht zweimal gebaut“, M20). Eine Datei, keine Übertragung beim Wählen
- * (`beforeUpload={() => false}`: gesendet wird mit dem Formular), Pflicht, und die Größe wird
- * VORAB geprüft, damit niemand 25 MiB über Mobilfunk schickt, nur um die Absage zu lesen.
+ * Dateifeld einer Erfassungsmaske (LFH-21), geteilt von Dokumentenablage und Schaden-Anhängen.
+ * Eine Datei, keine Übertragung beim Wählen (`beforeUpload={() => false}`: gesendet wird mit
+ * dem Formular), Pflicht, und die Größe wird VORAB geprüft, damit niemand 25 MiB über Mobilfunk
+ * schickt, nur um die Absage zu lesen.
  *
- * Fokus: der Knopf trägt `data-erfassung-fokus` — die Erfassungshülle nimmt ihn beim Öffnen
- * UND nach jedem Serien-Speichern statt des ersten `<input>`, das hier rc-uploads
- * `<input type="file">` mit `display: none` wäre (im Browser nicht fokussierbar, jsdom merkt
- * das nicht). Vorher trug ein Mount-Callback-Ref den Fokus; nach „Speichern und nächste“ hing
- * er nur daran, dass der Knopf zufällig neu einhängt (Code-Review C2, e2e-Beleg in
- * `e2e/schaden-anhaenge.spec.ts`).
+ * Fokus: der Knopf trägt `data-erfassung-fokus` — die Erfassungshülle nimmt ihn beim Öffnen UND
+ * nach jedem Serien-Speichern statt des ersten `<input>`, das hier rc-uploads
+ * `<input type="file">` mit `display: none` wäre (im Browser nicht fokussierbar, jsdom merkt das
+ * nicht; e2e-Beleg in `e2e/schaden-anhaenge.spec.ts`).
  */
 export default function DateiFeld({ accept, name = 'datei', onDateiWahl }: Props) {
   return (

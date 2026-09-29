@@ -1,9 +1,8 @@
 import { apiGet, apiSend, apiUpload } from './client';
 import type { components } from './types.generated';
 
-// LFH-265 (Teil A, Frontend): `Hintergrundbild` ist ein Re-Export des generierten Schemas;
-// `BildPatch` bleibt als Eingabe-DTO handgepflegt (CLAUDE.md). `Ecke`/`Ecken` sind FE-lokale
-// Tupel-Formen für den `ecken`-Multipart-Teil, kein Response-DTO.
+// `Hintergrundbild` ist ein Re-Export des generierten Schemas; `BildPatch` bleibt als Eingabe-DTO
+// handgepflegt. `Ecke`/`Ecken` sind FE-lokale Tupel für den `ecken`-Multipart-Teil.
 
 export type Ecke = [number, number]; // [lng, lat]
 export type Ecken = [Ecke, Ecke, Ecke, Ecke];

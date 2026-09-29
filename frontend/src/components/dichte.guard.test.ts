@@ -1,37 +1,22 @@
 /**
  * Dichte-Guard (LFH-362 · B5b): keine punktuelle Klein-Angabe an interaktiven Elementen.
  *
- * ── Warum es diesen Guard gibt ──────────────────────────────────────────────────
- * Die Bediendichte hängt seit LFH-329/B1 am `ConfigProvider` und trägt alle
- * Steuerelemente auf einmal (Staffel 30 / 48 / 72 px). Eine Größen-Prop AM ELEMENT
- * schlägt den Provider (`antd/es/button/Button.js`) und nagelt die Trefffläche auf
- * eine Stufe fest — der Handschuh-Betrieb bekommt sie dann nicht mehr mit. CLAUDE.md
- * verbietet das als Norm; hier wird die Norm maschinell.
+ * ── Warum ──────────────────────────────────────────────────────────────────────
+ * Die Bediendichte hängt am `ConfigProvider` (Staffel 30 / 48 / 72 px). Eine Größen-Prop AM
+ * ELEMENT schlägt den Provider und nagelt die Trefffläche auf eine Stufe fest; der
+ * Handschuh-Betrieb bekommt sie nicht mehr mit.
  *
  * ── Warum ein Vitest-Guard und keine ESLint-Regel ───────────────────────────────
- * `pnpm lint` läuft mit `--max-warnings 0`. Eine Regel, die am Liefertag 82-mal
- * feuert, wird abgeschaltet statt befolgt — und auf „schon saubere Verzeichnisse"
- * gescopt bewiese sie nichts über den Bestand. Ein Guard mit SCHULDMENGE
- * ({@link OFFEN}) hält den Bestand sichtbar, ohne das Lint-Gate rot zu färben, und
- * schrumpft mit jedem Verzeichnis-Bündel von LFH-333. Bauform nach
- * `datensicht.guard.test.ts`.
+ * `pnpm lint` läuft mit `--max-warnings 0`; eine rot geborene Regel wird abgeschaltet. Ein Guard
+ * mit SCHULDMENGE ({@link OFFEN}) hält den Bestand sichtbar, ohne das Lint-Gate rot zu färben.
  *
  * ── Warum ein Tag-Scanner und keine Regex ───────────────────────────────────────
- * Das naheliegende `<Button\b[^>]*size="small"` ist MEHRZEILIGEN Elementen blind:
- * gemessen am 30.07.2026 fand es 61 Stellen, der Scanner hier 82 — 21 Knöpfe standen
- * unsichtbar da, u. a. in `SnapshotLeiste.tsx` und `uhs/Grundriss.tsx`. Schlimmer:
- * `[^>]*` überquert kein `>`, also verschwindet ein Treffer auch, sobald eine
- * Pfeilfunktion VOR der Größen-Prop steht. Ein Gate, das eine Zeilenumbruch-Änderung
- * für Fortschritt hält, misst nicht das, wofür es existiert.
+ * `<Button\b[^>]*size="small"` ist MEHRZEILIGEN Elementen blind, und `[^>]*` überquert kein `>`:
+ * eine Pfeilfunktion VOR der Größen-Prop ließe den Treffer verschwinden.
  *
- * ── Warum das Element-Muster generische Typargumente kennt (LFH-364 · B5d) ──────
- * `<Select<number | null> size="small">` schrieb sich am Guard vorbei: das Muster
- * verlangte hinter dem Namen ein `[\s/>{]`, und ein `<` ist keins davon. Gemessen
- * am 30.07.2026 versteckte diese eine Lücke 4 Stellen — darunter genau den Select,
- * den LFH-364 ausdrücklich mitnehmen sollte, und einen Verstoß in
- * `personen/personenSpalten.tsx`, der in keiner Schuldzeile stand.
- * Der Lookahead allein genügt NICHT: `tagEnde` nähme dann das `>` des Typarguments
- * für das Tag-Ende, und die Prop dahinter bliebe unsichtbar. Deshalb überspringt
+ * ── Warum das Element-Muster generische Typargumente kennt (LFH-364) ────────────
+ * `<Select<number | null> size="small">`: hinter dem Namen steht ein `<`. Der Lookahead allein
+ * genügt nicht, `tagEnde` nähme sonst das `>` des Typarguments als Tag-Ende. Deshalb überspringt
  * {@link generikEnde} das balancierte `<…>` zuerst.
  *
  * ── Was dieser Guard NICHT sieht ────────────────────────────────────────────────
@@ -40,27 +25,17 @@
  *   • eine Größe aus einer Variablen (`size={klein}`) oder einem Ausdruck;
  *   • eine eigene Wrapper-Komponente, die die Prop intern setzt;
  *   • Elemente, die hier nicht als interaktiv gelistet sind ({@link INTERAKTIV});
- *   • einen FUNKTIONSTYP im Typargument (`<Select<(x: N) => S> size="small">`) —
- *     dessen `=>` beendet für {@link generikEnde} die Klammer zu früh. Im Bestand
- *     kommt das an keiner der 25 Generic-Stellen vor; wer es einführt, umgeht die
- *     Norm;
+ *   • einen FUNKTIONSTYP im Typargument (`<Select<(x: N) => S> size="small">`) — dessen `=>`
+ *     beendet für {@link generikEnde} die Klammer zu früh; wer es einführt, umgeht die Norm;
  *   • eine geschweifte Klammer in einem REGEX-Literal einer Prop
  *     (`onClick={() => s.replace(/}/g, '')} size="small"`) — {@link tagEnde} kennt
  *     Zeichenketten, aber keine Regex-Literale, und beendet das Tag dort zu früh.
- *     Altlast, unabhängig von LFH-364 (der Scanner davor war genauso blind).
  *
  * ── Warum die Klein-Angaben an Karten, Beschreibungen und Listen STEHEN BLEIBEN ──
- * Nicht als Restarbeit, sondern als Regel — sonst vergrößert der nächste Sweep
- * Flächen, die niemand antippt. Ein Element, das nicht in {@link INTERAKTIV} steht
- * (`Card`, `Descriptions`, `Space`, `Spin`) oder in {@link EIGENE_SEMANTIK}
- * (`Liste`, `KatalogTabelle`), trägt mit `size` eine POLSTERUNG, keine Trefffläche.
- * Es gehört deshalb auch nicht in {@link OFFEN}: `befunde` markiert einen Eintrag nur
- * als belegt, wenn {@link stellenIn} dort etwas findet — ein Eintrag für eine
- * nicht-interaktive Fläche wäre also sofort eine „tote Schuld-Ausnahme" und färbte
- * den Guard rot. Wer diese Ausnahme dokumentieren will, tut es hier und nicht in der
- * Schuldliste. (Das AK von LFH-364 verlangte genau das Gegenteil und war darin
- * falsch; es sprach zudem von „drei" Karten, während allein das B5d-Bündel zwölf
- * trägt — eine handgezählte Inventarliste verrottet, die Regel nicht.)
+ * Als Regel, nicht als Restarbeit: ein Element außerhalb {@link INTERAKTIV} (`Card`,
+ * `Descriptions`, `Space`, `Spin`) oder in {@link EIGENE_SEMANTIK} (`Liste`, `KatalogTabelle`)
+ * trägt mit `size` eine POLSTERUNG, keine Trefffläche. Es gehört auch nicht in {@link OFFEN}:
+ * ein Eintrag ohne Fund gilt dort als tote Schuld-Ausnahme und färbt den Guard rot.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -71,11 +46,8 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ENDUNGEN = /\.(ts|tsx)$/;
 
 /**
- * Elemente, deren Größen-Prop die TREFFFLÄCHE bestimmt.
- *
- * Bewusst NICHT enthalten sind Flächen ohne Bedienfunktion (`Card`,
- * `Descriptions`, `Spin`, `Progress`, `Space`): dort steuert die Prop Polsterung,
- * keine Trefffläche, und ein Verbot vergrößerte nur die Karten.
+ * Elemente, deren Größen-Prop die TREFFFLÄCHE bestimmt. Flächen ohne Bedienfunktion (`Card`,
+ * `Descriptions`, `Spin`, `Progress`, `Space`) fehlen bewusst: dort steuert die Prop Polsterung.
  */
 const INTERAKTIV = [
   'Button',
@@ -107,82 +79,24 @@ const INTERAKTIV = [
 ] as const;
 
 /**
- * Projekt-Primitive, an denen die Größe eine ANDERE Bedeutung hat: bei
- * `components/Liste.tsx` ist sie ein Abstandsmaß der Karte, keine antd-Trefffläche
- * — `Liste.test.tsx` prüft das über mehrere Dichtestufen ausdrücklich. Sie stehen
- * deshalb nicht in {@link INTERAKTIV}; ein elementunabhängiger Scanner drehte eine
- * getestete Entscheidung zurück.
+ * Projekt-Primitive, an denen die Größe eine ANDERE Bedeutung hat: bei `components/Liste.tsx`
+ * ist sie ein Abstandsmaß der Karte (`Liste.test.tsx` prüft das über mehrere Dichtestufen).
  */
 const EIGENE_SEMANTIK = ['Liste', 'KatalogTabelle'] as const;
 
 /**
- * SCHULDMENGE — Dateien, die die Norm heute noch verletzen (Stand 30.07.2026,
- * LFH-362). Jede Zeile fällt mit ihrem Verzeichnis-Bündel aus LFH-333:
- * B5c stammdaten/+Verwaltung · B5d Kommunikationskarten · B5e ETB ·
- * B5f Lagekarte/Karten · B5g UHS · B5h Gefahren · B5i Kräfte-Listen · B5j Rest.
- *
- * Die Liste ist eine SCHULD, kein Freibrief: sie darf nur schrumpfen. Ein Eintrag
- * ohne Verstoß gilt als Verstoß (siehe „tote Einträge"), damit sie nicht
- * stillschweigend zur Dauerausnahme wird.
+ * SCHULDMENGE — Dateien, die die Norm noch verletzen. Sie darf nur schrumpfen: ein Eintrag ohne
+ * Verstoß gilt als Verstoß (siehe „tote Einträge").
  */
 const OFFEN: string[] = [
-  // B5c (stammdaten/ und Verwaltung) ist mit LFH-363 abgetragen — 24 Stellen in
-  // 10 Dateien. Der Abstand zur destruktiven Nachbaraktion, der dort auf denselben
-  // Zeilen saß, hält seither `aktionsabstand.guard.test.ts`.
-  // ── B5d · Kommunikationskarten (LFH-364) ── ABGERÄUMT, 24 Stellen in 12 Dateien.
-  // ── B5e · Einsatztagebuch (LFH-365) ── ABGERÄUMT, 8 Stellen in 3 Dateien.
-  // Darunter der `Space.Compact`-Wrapper in `etb/MetaChip.tsx`: er trug die Kleingröße
-  // auch den Kindern OHNE eigene Größen-Prop auf (`antd/es/space/Compact.js` über
-  // `SpaceCompactItemContext`), ein Entfernen nur am Knopf darin wäre also wirkungslos
-  // geblieben. Der Wrapper steht in {@link INTERAKTIV} und war damit ein gezählter
-  // Verstoß, keine Ermessensfrage.
-  // ── B5f · Lagekarte und Kartenverwaltung (LFH-366) ── ABGERÄUMT, 16 Stellen in 6 Dateien.
-  // Die sechs schwierigen Entscheidungen stehen als Kommentar an ihrer jeweiligen Stelle, weil
-  // keine von ihnen aus einer Prop-Zählung folgt: die schwebende `SnapshotLeiste` (grössere
-  // Knöpfe verdecken Kartenfläche — sie klappt dafür ein), das Eingabefeld im Titel einer
-  // Listenzeile (`OfflineVorhandeneModal`), der Schliess-Knopf einer `Card`, die weiterhin
-  // klein bleibt (`KartenDetailCard`), und zwei danger-Nachbarschaften, die jetzt
-  // `aktionsabstand.guard.test.ts` hält. `Sidebar.tsx` stand hier NIE — der Befund M61 des
-  // Elterntickets („38× size=small") war zum Liefertag überholt; die Datei trug 0 Verstöße,
-  // ihre 15 Angaben sitzen auf `Card`/`Liste`/`Spin` und bleiben nach der Regel oben stehen.
-  // ── B5g · UHS-Grundriss (LFH-367) ── TEILWEISE ABGERÄUMT ──────────────────
-  // `MaterialTab.tsx` ist raus (1 Stelle): der Lösen-Knopf sass in einer Tabellenzelle,
-  // die mit der Dichtestufe wachsen darf. Was bleibt, sind die VIER Knöpfe der
-  // Platzkarte. Seit LFH-359/LFH-379 sind sie KEINE Unterschreitung mehr, nur noch ein
-  // Quelltext-Fund: gerendert werden sie ausschließlich in `kompakt`, und dort sind ihre
-  // 24 px der Gate-3-Boden der Stufe (A1-Spec: „kompakt ≥ 24 px"). In `komfortabel` und
-  // `handschuh` trägt die Karte keine Knopfzeile; sie ist selbst das eine Ziel und öffnet
-  // das Aktionsmenü (`platzBedienform`, Dateikopf von `uhs/Grundriss.tsx`). Die Zeile
-  // bleibt hier, weil dieser Guard Quelltext zählt und keine Dichte kennt — sie fiele erst,
-  // wenn die Zeilenform ihre Knöpfe auf voller Steuerhöhe trüge, und die passt nicht in den
-  // festen Innenraum der Karte (Rechnung im Dateikopf).
+  // UHS-Platzkarte (LFH-367/359/379): die VIER Knöpfe werden nur in `kompakt` gerendert, wo 24 px
+  // der Gate-3-Boden sind; in `komfortabel`/`handschuh` ist die Karte selbst das eine Ziel mit
+  // Aktionsmenü (`platzBedienform`). Die Zeile bleibt, weil dieser Guard Quelltext zählt und keine
+  // Dichte kennt. Sie fiele erst, wenn die Zeilenform volle Steuerhöhe trüge, und die passt nicht
+  // in den festen Innenraum der Karte (Rechnung im Dateikopf von `uhs/Grundriss.tsx`).
   '/src/pages/uhs/Grundriss.tsx',
-  // ── B5h · Gefahren (LFH-368) ── ABGERÄUMT, 5 Stellen in 2 Dateien.
-  // Darunter das rohe `<Table>` selbst (`Table` steht in {@link INTERAKTIV}) und der
-  // `Select` je Zelle, den ein einziger dichte-treuer Auslöser ersetzt hat. Die
-  // `Liste size="small"` in `GefahrenPage.tsx` zählte korrekt NICHT mit — sie steht in
-  // {@link EIGENE_SEMANTIK} und trägt dort ein Abstandsmaß, keine Trefffläche.
-  // ── B5i · Kräfte-Listen (LFH-369) ── ABGERÄUMT mit LFH-339 · C4 ───────────
-  // Die eine verbliebene Stelle war das Mengen-Eingabefeld in `MaterialPage.tsx`. Sie
-  // fiel, weil C4 die Datei ohnehin anfasste (Statuswechsel) — die Breite von 80 px
-  // bleibt, sie trägt eine zweistellige Menge und keine Trefffläche.
-  //
-  // Damit ist die Schuldmenge auf die EINE geprüfte Dauerausnahme geschrumpft: die vier
-  // Knöpfe der UHS-Platzkarte, die seit LFH-359 nur noch in `kompakt` gerendert werden.
-  // ── B5j · Rest: Kopfzeile, Profil, Editor, Sonstiges (LFH-370) ────────────
-  // ABGERÄUMT: 14 Stellen in 9 Dateien (MarkdownEditor, SprechgruppenPicker, AlarmZentrale,
-  // LoginPage, ProfilPage, SchaedenDetailPage, TiereDetailPage, KraefteOhneBrSidebar,
-  // personenSpalten).
-  //
-  // Drei Dinge, die dabei gelernt wurden und die nächste Stelle betreffen:
-  //  - Die zwei danger-Nachbarschaften (SchaedenDetailPage, TiereDetailPage) sind ERST durch
-  //    den Abbau entstanden und hängen seither an `aktionsabstand.guard.test.ts`. Eine
-  //    Klein-Angabe zu entfernen kann eine Abstandsfrage aufwerfen, die vorher keine war.
-  //  - `personenSpalten.tsx` war der Fund des Scanner-Fix von LFH-364 (`<Select<…>` schrieb
-  //    sich am Lookahead vorbei), nicht neu entstanden.
-  //  - Der Dev-Schnellanmeldungs-Knopf in `LoginPage.tsx` steht hinter `import.meta.env.DEV`
-  //    und folgt trotzdem der Staffel: der Dev-Build ist derselbe Betrieb, und ein Knopf, der
-  //    nur für Entwickler zu klein ist, ist immer noch zu klein.
+  // Wer eine Klein-Angabe entfernt, prüft `aktionsabstand.guard.test.ts` mit: der Abbau kann eine
+  // danger-Nachbarschaft erst entstehen lassen.
 ];
 
 function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, string> {
@@ -199,9 +113,8 @@ function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, str
 }
 
 /**
- * Blendet Kommentarinhalt aus, Blockzustand über Zeilengrenzen getragen.
- * Kopie aus `datensicht.guard.test.ts` — ohne sie zählte dieser Dateikopf seine
- * eigenen Beispiele als Verstoß.
+ * Blendet Kommentarinhalt aus, Blockzustand über Zeilengrenzen getragen — ohne das zählte dieser
+ * Dateikopf seine eigenen Beispiele.
  */
 function ohneKommentare(inhalt: string): string {
   const zeilen: string[] = [];
@@ -243,9 +156,8 @@ function istTest(pfad: string): boolean {
 /**
  * Ende des öffnenden JSX-Tags ab `start` (Index des `<`), oder `-1`.
  *
- * Zählt geschweifte Klammern mit und überspringt Zeichenketten — sonst beendete
- * das `>` einer Pfeilfunktion (`onClick={() => tu()}`) das Tag zu früh, und genau
- * dahinter versteckt sich die Prop, die wir suchen.
+ * Zählt geschweifte Klammern mit und überspringt Zeichenketten — sonst beendete das `>` einer
+ * Pfeilfunktion (`onClick={() => tu()}`) das Tag vor der gesuchten Prop.
  */
 export function tagEnde(text: string, start: number): number {
   let tiefe = 0;
@@ -266,12 +178,9 @@ export function tagEnde(text: string, start: number): number {
 }
 
 /**
- * Index HINTER dem balancierten `<…>` eines generischen Typarguments; `start` zeigt
- * auf das öffnende `<`. `-1`, wenn es nicht schließt.
- *
- * Nötig, weil `tagEnde` das erste `>` auf Klammertiefe 0 nimmt — und das ist bei
- * `<Select<number | null> size="small">` das des TYPARGUMENTS, nicht das des Tags.
- * Ohne diesen Vorlauf endete der Tag-Text vor der Prop.
+ * Index HINTER dem balancierten `<…>` eines generischen Typarguments; `start` zeigt auf das
+ * öffnende `<`. `-1`, wenn es nicht schließt. Nötig, weil `tagEnde` das erste `>` auf Tiefe 0
+ * nimmt, bei `<Select<number | null> size="small">` also das des Typarguments.
  */
 export function generikEnde(text: string, start: number): number {
   let tiefe = 0;
@@ -294,20 +203,13 @@ export function generikEnde(text: string, start: number): number {
 }
 
 /**
- * Reduziert einen Tag-Text auf seine ATTRIBUT-Ebene: jeder `{…}`-Ausdruck, der mehr
- * als ein nacktes Stringliteral enthält, wird zu `{}`.
+ * Reduziert einen Tag-Text auf seine ATTRIBUT-Ebene: jeder `{…}`-Ausdruck, der mehr als ein
+ * nacktes Stringliteral enthält, wird zu `{}`. Sonst zählte eine Klein-Angabe eines
+ * VERSCHACHTELTEN Elements (`items={[{ children: <Descriptions size="small" …> }]}`) dem
+ * äußeren zu, und der Guard ließe den Verstoß nicht mehr los.
  *
- * Ohne diesen Schritt zählte eine Klein-Angabe aus einem VERSCHACHTELTEN Element dem
- * äußeren zu. Gemessen an `auftraege/AuftragKarte.tsx` (LFH-364): das `<Collapse>`
- * trägt seine Kinder in `items={[{ children: <Descriptions size="small" …> }]}` —
- * `tagEnde` überspringt die Klammer richtig, aber der Tag-Text ENTHÄLT sie, und der
- * Guard meldete den Collapse noch, als dessen eigene Angabe längst weg war. Ein Gate,
- * das einen Verstoß nicht wieder loslässt, ist von einem kaputten nicht zu
- * unterscheiden.
- *
- * `{'small'}` bleibt erhalten — die geklammerte Schreibweise ist ein echter Verstoß.
- * Alles Berechnete (`size={klein}`) fällt hier weg und ist ohnehin dokumentierter
- * Blindfleck (siehe Dateikopf).
+ * `{'small'}` bleibt erhalten — die geklammerte Schreibweise ist ein echter Verstoß. Alles
+ * Berechnete (`size={klein}`) fällt weg und ist dokumentierter Blindfleck.
  */
 export function attributEbene(tag: string): string {
   let raus = '';
@@ -332,12 +234,9 @@ export function attributEbene(tag: string): string {
       raus += z;
       continue;
     }
-    // Balancierten Ausdruck greifen und entscheiden, ob er wörtlich genug ist.
-    // Die Bilanz MUSS Zeichenketten überspringen — genau wie `tagEnde` und
-    // `generikEnde`. Sonst verschiebt eine Klammer INNERHALB eines Strings die Tiefe,
-    // der Ausdruck wird über sein Ende hinaus verschluckt und der Rest des Tags samt
-    // Klein-Angabe verschwindet: `<Button title={x ? "{" : ""} size="small" />` war so
-    // unsichtbar (gemessen im LFH-364-Review) — ein Fix, der ein neues Loch reißt.
+    // Balancierten Ausdruck greifen und entscheiden, ob er wörtlich genug ist. Die Bilanz MUSS
+    // Zeichenketten überspringen: sonst verschluckte `<Button title={x ? "{" : ""} size="small" />`
+    // den Rest des Tags samt Klein-Angabe.
     let tiefe = 0;
     let j = i;
     let inner: string | null = null;
@@ -371,22 +270,15 @@ export interface Stelle {
 }
 
 /**
- * Vollständige Regex-Maskierung eines Elementnamens. Vorher stand hier ein
- * `replace(/\./g, '\\.')`, das genau EIN Metazeichen kannte: der Punkt in
- * `Space.Compact` war der einzige Fall im Bestand. Das ist eine Maskierung, die nur
- * solange hält, wie die Liste keinen anderen Sonderfall bekommt — und ein Backslash
- * oder eine Klammer in einem Namen erzeugte dann kein rotes Gate, sondern ein
- * **still falsch zählendes**: ein kaputtes Muster findet nichts, und „nichts gefunden"
- * ist von „kein Verstoß" nicht zu unterscheiden. Deshalb die ganze Zeichenklasse.
+ * Vollständige Regex-Maskierung eines Elementnamens. Eine Maskierung nur des Punkts
+ * (`Space.Compact`) erzeugte bei einem anderen Metazeichen ein still falsch zählendes Muster:
+ * „nichts gefunden" ist von „kein Verstoß" nicht zu unterscheiden.
  */
 function regexMaskiert(name: string): string {
   return name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * Alle Verstöße einer Datei. Rein, damit der Selbstbeweis unten sie ohne
- * Dateisystem prüfen kann.
- */
+/** Alle Verstöße einer Datei. Rein, damit der Selbstbeweis sie ohne Dateisystem prüfen kann. */
 export function stellenIn(pfad: string, quelltext: string): Stelle[] {
   const text = ohneKommentare(quelltext);
   const gefunden: Stelle[] = [];
@@ -431,8 +323,7 @@ export function befunde(dateien: Record<string, string>, offen: readonly string[
     }
   }
 
-  // Ein Eintrag ohne Verstoß ist selbst einer: sonst überlebt die Schuldmenge ihre
-  // Schuld und niemand merkt, dass das Verzeichnis längst sauber ist.
+  // Ein Eintrag ohne Verstoß ist selbst einer: sonst überlebt die Schuldmenge ihre Schuld.
   for (const eintrag of offen) {
     if (!belegt.has(eintrag)) meldungen.push(`tote Schuld-Ausnahme: ${eintrag}`);
   }
@@ -451,8 +342,8 @@ describe('Dichte-Guard (LFH-362 · B5b)', () => {
     expect(tote).toEqual([]);
   });
 
-  // ── Selbstbeweise: ein Guard, der nichts findet, ist von einem kaputten Guard
-  //    nicht zu unterscheiden. Die drei Fälle sind die, an denen eine Regex scheitert.
+  // ── Selbstbeweise: ein Guard, der nichts findet, ist von einem kaputten nicht zu
+  //    unterscheiden. Die Fälle sind die, an denen eine Regex scheitert.
   it('findet die Angabe auch, wenn das Element über mehrere Zeilen geht', () => {
     const quelle = ['<Button', '  type="text"', '  size="small"', '>Weg</Button>'].join('\n');
     expect(stellenIn('/src/x.tsx', quelle)).toHaveLength(1);
@@ -467,8 +358,7 @@ describe('Dichte-Guard (LFH-362 · B5b)', () => {
     expect(stellenIn('/src/x.tsx', "<Select size={'small'} />")).toHaveLength(1);
   });
 
-  // LFH-364/B5d: die Lücke, die `MeldungKarte.tsx:183` unsichtbar machte. Ein reiner
-  // Lookahead-Fix ließe den ersten Fall durch und den zweiten scheitern — das
+  // Ein reiner Lookahead-Fix ließe den ersten Fall durch und den zweiten scheitern: das
   // Typargument-`>` verkürzte den Tag-Text vor die Prop.
   it('findet sie hinter einem generischen Typargument', () => {
     expect(stellenIn('/src/x.tsx', '<Select<number | null> size="small" />')).toHaveLength(1);
@@ -487,9 +377,7 @@ describe('Dichte-Guard (LFH-362 · B5b)', () => {
     expect(stellenIn('/src/x.tsx', '<Select<Map<string, number>> size="small" />')).toHaveLength(1);
   });
 
-  // LFH-364/B5d: die Angabe eines VERSCHACHTELTEN Elements gehört nicht dem äußeren.
-  // Ohne `attributEbene` blieb `AuftragKarte`s Collapse gemeldet, nachdem seine eigene
-  // Angabe entfernt war — der Verstoß saß im `items`-Ausdruck.
+  // Die Angabe eines VERSCHACHTELTEN Elements gehört nicht dem äußeren (`attributEbene`).
   it('rechnet eine Angabe aus einer Prop-Expression nicht dem äußeren Element zu', () => {
     const quelle = '<Collapse ghost items={[{ children: <Descriptions size="small" /> }]} />';
     expect(stellenIn('/src/x.tsx', quelle)).toEqual([]);
@@ -501,10 +389,8 @@ describe('Dichte-Guard (LFH-362 · B5b)', () => {
     expect(stellenIn('/src/x.tsx', quelle)).toHaveLength(1);
   });
 
-  // Die Kehrseite von `attributEbene`: seine Klammer-Bilanz muss Zeichenketten
-  // überspringen. Ohne das verschluckt eine Klammer IM STRING den Rest des Tags und
-  // die Angabe dahinter wird unsichtbar — ein Fix, der ein neues Loch reißt, ist
-  // schlimmer als der Fehlalarm, den er behebt.
+  // Die Kehrseite von `attributEbene`: seine Klammer-Bilanz muss Zeichenketten überspringen,
+  // sonst verschluckt eine Klammer IM STRING den Rest des Tags.
   it('lässt sich von einer geschweiften Klammer in einer Zeichenkette nicht abschütteln', () => {
     expect(stellenIn('/src/x.tsx', '<Button title={x ? "{" : ""} size="small" />')).toHaveLength(1);
     expect(stellenIn('/src/x.tsx', '<Button title={"}"} size="small" />')).toHaveLength(1);

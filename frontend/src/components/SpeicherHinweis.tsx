@@ -2,27 +2,19 @@ import { Alert, Flex, theme } from 'antd';
 import { ApiError } from '../api/client';
 
 /**
- * Persistenter Speicher-Fehler und erklärender Rechte-Hinweis (LFH-345 · C10, Befunde H14/M16).
+ * Persistenter Speicher-Fehler und erklärender Rechte-Hinweis (LFH-345 · C10).
  *
- * ── Warum nicht der Toast (H14) ────────────────────────────────────────────────
- * Sieben Speicherpfade dieser Gruppe meldeten Fehler ausschließlich über `message.error`.
- * Nach rund drei Sekunden war die Meldung weg, das ausgefüllte Formular stand unverändert
- * da und wirkte gespeichert — bei Aufbewahrungsfrist, Nummernkreisen und Fristen fällt das
- * erst Stunden später auf. Der Fehlerzustand gehört deshalb an die SEITE
- * (`mutation.error`) statt an eine Queue mit eigener Lebensdauer.
+ * ── Warum nicht der Toast ──────────────────────────────────────────────────────
+ * Ein Toast ist nach rund drei Sekunden weg, das ausgefüllte Formular steht unverändert da und
+ * wirkt gespeichert. Der Fehlerzustand gehört deshalb an die SEITE (`mutation.error`). Der
+ * ERFOLG bleibt beim Toast: er quittiert eine abgeschlossene Handlung.
  *
- * Der ERFOLG bleibt beim Toast: er quittiert eine abgeschlossene Handlung und braucht
- * keinen Platz auf der Seite. Das ist dieselbe Trennung wie beim Autosave in LFH-342/C7 —
- * der Fehlerfall meldet sich sichtbar, der Erfolg leise.
+ * Der Alert verschwindet beim nächsten Absenden von selbst (react-query räumt `error` beim
+ * Übergang nach `pending`) — die zweite Hälfte der Zusicherung, mitgetestet.
  *
- * Der Alert verschwindet von selbst beim nächsten Absenden: react-query räumt `error` beim
- * Übergang nach `pending` weg. Das ist die zweite Hälfte der Zusicherung und gehört
- * mitgetestet — ein Alert, der stehen bleibt, wäre so falsch wie einer, der zu früh geht.
- *
- * ── Warum eine reine Funktion daneben ──────────────────────────────────────────
- * `fehlerText` ist rein und exportiert, damit die Fallunterscheidung ohne Render prüfbar
- * ist (Muster `bedienzielStil`/`zeilenzielStil`). Die Aussage „ohne Fehler NICHTS" ist die,
- * die ein Primitiv auffliegen lässt, das immer einen Text liefert.
+ * `fehlerText` ist rein und exportiert, damit die Fallunterscheidung ohne Render prüfbar ist.
+ * „Ohne Fehler NICHTS" ist die Aussage, die ein Primitiv auffliegen lässt, das immer einen Text
+ * liefert.
  */
 export function fehlerText(fehler: unknown, fallback = 'Speichern fehlgeschlagen'): string | null {
   if (fehler == null) return null;
@@ -37,7 +29,7 @@ interface SpeicherFehlerProps {
   /**
    * Text für einen Fehler, der keine `ApiError` ist (Netz, Programmfehler); Vorgabe
    * „Speichern fehlgeschlagen" wie in {@link fehlerText}. Für Seiten, deren Vorgang kein
-   * Speichern ist (LFH-690: Import/Entfernen der Demo-Daten).
+   * Speichern ist (etwa Import/Entfernen der Demo-Daten).
    */
   fallback?: string;
 }
@@ -56,12 +48,9 @@ interface RechteHinweisProps {
 }
 
 /**
- * Erklärt eine fehlende Berechtigung, statt sie stumm auszugrauen (M16).
- *
- * „Ausgegraut" allein ist eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1) und
- * nennt zudem keinen Grund — dieselbe Diagnose, die in LFH-370/B5j den sichtbaren
- * Sperrgrund an den Anmeldeverfahren-Zeilen ausgelöst hat. Der Unterschied hier ist der
- * Zuschnitt: dort steht der Grund je Zeile, hier über einem ganzen Block.
+ * Erklärt eine fehlende Berechtigung, statt sie stumm auszugrauen. „Ausgegraut" allein ist eine
+ * Ein-Kanal-Aussage (WCAG 1.4.1) und nennt keinen Grund. Hier steht der Grund über einem ganzen
+ * Block, nicht je Zeile.
  */
 export function RechteHinweis({ text, sichtbar }: RechteHinweisProps) {
   if (!sichtbar) return null;
@@ -81,17 +70,12 @@ interface SeitenHinweiseProps {
 }
 
 /**
- * Beide Hinweise für EINEN Slot (`AdminPage`/`EinsatzSeite` haben genau einen `hinweis`).
+ * Beide Hinweise für EINEN Slot (`AdminPage`/`EinsatzSeite` haben genau einen `hinweis`); der
+ * Abstand zwischen den Alerts steht an einer Stelle.
  *
- * Die Bündelung hält den **Abstand zwischen** den beiden Alerts an einer Stelle, statt ihn
- * an jeder der fünf Aufrufstellen zu wiederholen; ohne sie stünden zwei Alerts bündig
- * aufeinander.
- *
- * Das `null` im Leerfall spart den Slot dagegen **nicht** ein — das wäre eine Behauptung, die
- * nicht hält, und stand hier zunächst so: `<SeitenHinweise/>` ist als JSX-Element immer
- * truthy, die Hüllen in `AdminPage`/`EinsatzSeite` rendern ihr `<div>` also ohnehin. Sichtbar
- * bleibt trotzdem nichts (ein leeres `<div>` kollabiert, die Ränder fallen zusammen). Wer
- * hier einmal einen festen Abstand hineinschreibt, muss die Hülle mit anfassen.
+ * Das `null` im Leerfall spart den Slot **nicht** ein: `<SeitenHinweise/>` ist als JSX-Element
+ * immer truthy, die Hüllen rendern ihr `<div>` ohnehin. Sichtbar bleibt nichts, weil ein leeres
+ * `<div>` kollabiert. Wer hier einen festen Abstand hineinschreibt, fasst die Hülle mit an.
  */
 export function SeitenHinweise({
   fehler,

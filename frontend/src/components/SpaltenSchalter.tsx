@@ -6,18 +6,13 @@ import { useViewport, type AbBreitePunkt } from './useViewport';
  * Spaltensichtbarkeit und Spaltenschalter — EINE Zählwahrheit, zwei Träger (LFH-374).
  *
  * Kriterium 14 der Bedien-Leitlinie verlangt einen umschaltbaren Spaltensatz mit Zähler
- * ausgeblendeter Spalten. Die Rechnung dafür stand bis LFH-374 in `Datensicht.tsx`; seit
- * `KatalogTabelle` den Schalter als Opt-in trägt, liegt sie HIER, und beide Träger lesen von
- * hier. Der Grund ist die Importrichtung: `Datensicht` rendert seinen Tabellenzweig durch
- * `KatalogTabelle` — hätte das Primitiv den Schalter aus `Datensicht.tsx` geholt, wäre das
- * ein Zyklus, und eine zweite Kopie der Zählung wäre genau die Drift, gegen die die
- * Festlegung aus LFH-330 · B2 steht: ein Zähler, der lügen kann, verfehlt das Kriterium, für
- * das er existiert.
+ * ausgeblendeter Spalten. Die Rechnung liegt HIER, weil `Datensicht` seinen Tabellenzweig durch
+ * `KatalogTabelle` rendert: holte das Primitiv den Schalter aus `Datensicht.tsx`, entstünde ein
+ * Zyklus, und eine zweite Kopie der Zählung könnte lügen.
  *
  * Gearbeitet wird auf einem STRUKTURELLEN Minimaltyp ({@link SchaltbareSpalte}):
  * `DatensichtSpalte` erfüllt ihn ohne Zutun, `KatalogSpalte` mit Opt-in ebenso. `Datensicht`
- * exportiert die Namen weiter, damit Bestandsimporte unverändert bleiben — neue Aufrufer
- * importieren direkt von hier.
+ * exportiert die Namen weiter; neue Aufrufer importieren direkt von hier.
  */
 
 /** Was Zählung und Schalter von einer Spalte wissen müssen — und nicht mehr. */
@@ -51,10 +46,9 @@ export function sichtbareSpalten<K extends string, S extends SchaltbareSpalte<K>
   spalten: readonly S[];
   verborgen: ReadonlySet<K>;
   /**
-   * Die zweite Handwahl (LFH-374 · D9): Spalten, die TROTZ unterschrittener Breite gezeigt
-   * werden sollen. Ohne sie ließe sich eine per `abBreite` weggefallene Spalte nie
-   * zurückholen — der Zähler zählte sie, der Schalter könnte aber nichts dagegen tun.
-   * `verborgen` gewinnt immer: eine Spalte in beiden Mengen ist aus.
+   * Die zweite Handwahl (LFH-374 · D9): Spalten, die TROTZ unterschrittener Breite gezeigt werden.
+   * Ohne sie ließe sich eine per `abBreite` weggefallene Spalte nie zurückholen. `verborgen`
+   * gewinnt immer: eine Spalte in beiden Mengen ist aus.
    */
   eingeblendet?: ReadonlySet<K>;
   abBreite: (punkt: AbBreitePunkt) => boolean;
@@ -64,17 +58,15 @@ export function sichtbareSpalten<K extends string, S extends SchaltbareSpalte<K>
   let anzahlVerborgen = 0;
   spalten.forEach((spalte, index) => {
     /**
-     * INDEX 0 IST NIE ENTFERNBAR. `KatalogTabelle` fixiert, was als Spalte 0 ANKOMMT,
-     * nicht eine benannte. Fällt Spalte 0 weg, wird still eine ANDERE Spalte die fixierte
-     * Kennung — kein Fehler, kein roter Test, nur eine falsche Fixierung. `immerSichtbar`
-     * allein genügt dafür nicht: es ist ein Flag, das jemand vergisst.
+     * INDEX 0 IST NIE ENTFERNBAR. `KatalogTabelle` fixiert, was als Spalte 0 ankommt; fiele sie
+     * weg, würde still eine ANDERE Spalte die fixierte Kennung. `immerSichtbar` allein ist ein Flag,
+     * das jemand vergisst.
      */
     if (index === 0 || spalte.immerSichtbar) {
       sichtbar.push(spalte);
       return;
     }
-    // BEIDE Gründe in EINEM Zähler, und eine doppelt verborgene Spalte nur einmal —
-    // ein Zähler, der „0 ausgeblendet" meldet, verfehlt das Kriterium, für das er da ist.
+    // BEIDE Gründe in EINEM Zähler, eine doppelt verborgene Spalte nur einmal.
     const zuSchmal =
       spalte.abBreite != null && !abBreite(spalte.abBreite) && !eingeblendet?.has(spalte.key);
     if (verborgen.has(spalte.key) || zuSchmal) {
@@ -94,12 +86,9 @@ function waehlbareSpalten<K extends string>(
 }
 
 /**
- * Gibt es überhaupt etwas zu schalten? EINE Wahrheit für zwei Leser (LFH-391 · B4).
- *
- * Der Schalter selbst rendert bei `false` gar nichts — und die Kommandopalette darf dann
- * auch keinen Befehl „Spalten" anbieten, der auf einen nicht vorhandenen Schalter zeigt.
- * Rechnete jede Seite das für sich, wäre das derselbe Fehlermodus wie beim Spaltenzähler:
- * eine Angabe, die lügen kann, verfehlt genau das Kriterium, für das sie existiert.
+ * Gibt es überhaupt etwas zu schalten? EINE Wahrheit für zwei Leser (LFH-391 · B4): der
+ * Schalter rendert bei `false` nichts, und die Kommandopalette bietet dann keinen Befehl
+ * „Spalten" an.
  */
 export function hatWaehlbareSpalten<K extends string>(
   spalten: readonly SchaltbareSpalte<K>[],
@@ -114,26 +103,22 @@ export function SpaltenSchalter<K extends string>(props: {
   aus: readonly K[];
   onAus: (schluessel: K[]) => void;
   /**
-   * Optionale KONTROLLIERTE Offen-Achse. Ohne beide Props bleibt das Dropdown unkontrolliert
-   * wie bisher — der Export ist für Seiten gedacht, die den Schalter selbst platzieren, und
-   * ein Pflicht-Prop wäre eine Vertragsänderung ohne Gegenstand (gemessen: kein externer
-   * Aufrufer). Gebraucht wird sie, weil die Kommandopalette den Schalter von AUSSEN öffnet:
-   * `trigger={['click']}` allein hat keinen Weg hinein.
+   * Optionale KONTROLLIERTE Offen-Achse. Ohne beide Props bleibt das Dropdown unkontrolliert.
+   * Gebraucht, weil die Kommandopalette den Schalter von AUSSEN öffnet — `trigger={['click']}`
+   * allein hat keinen Weg hinein.
    */
   offen?: boolean;
   onOffen?: (offen: boolean) => void;
   /**
-   * Die zweite Handwahl (D9): per Breite weggefallene, aber von Hand eingeblendete Spalten.
-   * Ohne `onAn` bleibt eine weggefallene Spalte ohne Häkchen und lässt sich nicht
-   * zurückholen — der Schalter verspricht dann nichts, was er nicht einlösen kann.
+   * Die zweite Handwahl (D9): per Breite weggefallene, aber von Hand eingeblendete Spalten. Ohne
+   * `onAn` lässt sich eine weggefallene Spalte nicht zurückholen.
    */
   an?: readonly K[];
   onAn?: (schluessel: K[]) => void;
 }): ReactNode {
   const { bezeichnung, spalten, aus, onAus, offen, onOffen, an = [], onAn } = props;
-  // Der Schalter stellt die Breitenfrage SELBST, statt den Zähler übergeben zu bekommen:
-  // sonst gäbe es zwei Stellen, an denen „wie viele sind ausgeblendet" gerechnet wird, und
-  // die Seiten-Variante (ein Schalter über mehreren Sichten) driftete von der internen weg.
+  // Der Schalter stellt die Breitenfrage SELBST, statt den Zähler übergeben zu bekommen — sonst
+  // gäbe es zwei Stellen, an denen „wie viele sind ausgeblendet" gerechnet wird.
   const { abBreite } = useViewport();
   const { spalten: gezeigt, anzahlVerborgen } = sichtbareSpalten({
     spalten,
@@ -141,23 +126,16 @@ export function SpaltenSchalter<K extends string>(props: {
     eingeblendet: new Set(an),
     abBreite,
   });
-  /**
-   * Das Häkchen zeigt die WIRKLICHE Sichtbarkeit, aus derselben Funktion wie der Zähler.
-   * Bis LFH-374 las es `!aus.includes(key)` — eine per Breite weggefallene Spalte stand
-   * damit angehakt im Menü, obwohl sie in der Tabelle fehlte (D9).
-   */
+  /** Das Häkchen zeigt die WIRKLICHE Sichtbarkeit, aus derselben Funktion wie der Zähler (D9). */
   const sichtbar = new Set(gezeigt.map((s) => s.key));
   const waehlbar = waehlbareSpalten(spalten);
-  // Bewusst über {@link hatWaehlbareSpalten} statt über `waehlbar.length` — es ist genau die
-  // Funktion, die auch die Palette liest. Wer die Bedingung hier ändert, sieht die zweite
-  // Seite im selben Aufruf.
+  // Bewusst über {@link hatWaehlbareSpalten}: es ist dieselbe Funktion, die die Palette liest.
   if (!hatWaehlbareSpalten(spalten)) return null;
 
   /**
-   * Sichtbar → per Hand aus (und aus `an` heraus, sonst hielte eine alte Einblendung sie
-   * beim nächsten Umschalten fest). Verborgen → aus `aus` heraus, und fällt sie per Breite
-   * weg, zusätzlich nach `an`. Ohne `onAn` fehlt der zweite Schritt — dann bleibt es beim
-   * Häkchen, das die Wahrheit sagt.
+   * Sichtbar → per Hand aus (und aus `an` heraus, sonst hielte eine alte Einblendung sie fest).
+   * Verborgen → aus `aus` heraus, und fällt sie per Breite weg, zusätzlich nach `an`. Ohne `onAn`
+   * fehlt der zweite Schritt.
    */
   const umschalten = (schluessel: K) => {
     if (sichtbar.has(schluessel)) {
@@ -172,13 +150,11 @@ export function SpaltenSchalter<K extends string>(props: {
   };
 
   /**
-   * Der Zähler steht als TEXT im Namen, nicht als Zähl-Abzeichen: ein antd-`Badge` mit
-   * `count` und ohne `color` rendert auf `token.colorError` — Rot für einen Spaltenzähler
-   * bricht „Rot bedient nichts" und Kriterium 7.
+   * Der Zähler steht als TEXT im Namen, nicht als `Badge`: ein `count`-Badge ohne `color` ist rot,
+   * und Rot bedient nichts (Kriterium 7).
    *
-   * Und er zählt BEIDE Ursachen (Handauswahl UND `abBreite`) aus {@link sichtbareSpalten},
-   * nicht bloß `aus.length`: ein Zähler, der „1 ausgeblendet" meldet, während zwei Spalten
-   * fehlen, verfehlt genau das Kriterium (14), für das er existiert.
+   * Er zählt BEIDE Ursachen (Handauswahl UND `abBreite`) aus {@link sichtbareSpalten}, nicht bloß
+   * `aus.length` (Kriterium 14).
    */
   const beschriftung =
     anzahlVerborgen === 0 ? 'Spalten' : `Spalten · ${anzahlVerborgen} ausgeblendet`;
@@ -186,41 +162,34 @@ export function SpaltenSchalter<K extends string>(props: {
   return (
     <Dropdown
       trigger={['click']}
-      // `undefined` lässt rc-trigger in seinem unkontrollierten Zweig — die Achse ist
-      // additiv, kein Bruch für Aufrufer ohne die Props.
+      // `undefined` lässt rc-trigger in seinem unkontrollierten Zweig.
       open={offen}
       onOpenChange={onOffen}
       /*
-       * Der Fokus muss beim Öffnen IN das Menü wandern. Ohne `autoFocus` bleibt er am Knopf,
-       * die Pfeiltasten heben keinen Eintrag hervor, und die Eingabetaste schließt das Menü
-       * wieder — gemessen: nach `ArrowDown` stand `document.activeElement` weiter auf dem
-       * Knopf und `.ant-dropdown-menu-item-active` bei 0.
+       * Der Fokus muss beim Öffnen IN das Menü wandern. Ohne `autoFocus` bliebe er am Knopf, die
+       * Pfeiltasten höben keinen Eintrag hervor, und die Eingabetaste schlösse das Menü wieder.
        */
       autoFocus
       menu={{
         /*
-         * Umgeschaltet wird am MENÜEINTRAG, nicht am Kontrollkästchen: rc-menu ruft `onClick`
-         * auf beiden Wegen auf — Mausklick und Eingabe-/Leertaste auf dem hervorgehobenen
-         * Eintrag. Hing der Umschalter allein am `onChange` des Kästchens, gab es nur einen
-         * Mausweg; die Tastatur konnte den Schalter öffnen, aber keine Spalte umschalten
-         * (WCAG 2.1.1). Der Nachweis liegt in `frontend/e2e/datensicht-schmal.spec.ts` und
-         * nicht in Vitest: jsdom liefert kein Fokusverhalten für ein Portal-Menü.
+         * Umgeschaltet wird am MENÜEINTRAG, nicht am Kontrollkästchen: rc-menu ruft `onClick` für
+         * Mausklick UND Eingabe-/Leertaste. Am `onChange` des Kästchens gäbe es nur einen Mausweg
+         * (WCAG 2.1.1). Nachweis in `frontend/e2e/datensicht-schmal.spec.ts`: jsdom liefert kein
+         * Fokusverhalten für ein Portal-Menü.
          */
         onClick: ({ key }) => umschalten(key as K),
         items: waehlbar.map((spalte) => ({
           key: spalte.key,
           /*
-           * Ohne `onAn` lässt sich eine per Breite weggefallene Spalte nicht zurückholen.
-           * Gesperrt statt klickbar: ein Eintrag, der auf Klick still nichts tut, wäre von
-           * einem kaputten nicht zu unterscheiden. Heute trägt jeder Aufrufer `onAn`.
+           * Ohne `onAn` lässt sich eine per Breite weggefallene Spalte nicht zurückholen. Gesperrt statt
+           * klickbar: ein Eintrag, der still nichts tut, wäre von einem kaputten nicht zu unterscheiden.
            */
           disabled: !onAn && !sichtbar.has(spalte.key) && !aus.includes(spalte.key),
           label:
             (
               /*
-               * Das Kästchen ist ANZEIGE, kein zweiter Umschalter: mit eigenem `onChange` würde
-               * ein Mausklick darauf zusätzlich das `onClick` des Eintrags auslösen und die
-               * Umschaltung im selben Atemzug zurücknehmen.
+               * Das Kästchen ist ANZEIGE: mit eigenem `onChange` löste ein Mausklick zusätzlich das `onClick`
+               * des Eintrags aus und nähme die Umschaltung im selben Zug zurück.
                */
               <Checkbox checked={sichtbar.has(spalte.key)}>
                 {etikettVon(spalte) ?? spalte.key}

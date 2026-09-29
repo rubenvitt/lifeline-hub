@@ -48,20 +48,12 @@ describe('AdminPage', () => {
   });
 
   it('füllt ohne Angabe die Spalte; schmal (`flaeche.seiteSchmal`) nur ausdrücklich', () => {
-    // Wörtlich nach dem Muster des Schwester-Primitivs `EinsatzSeite.test.tsx`:
-    // `renderMitProviders` legt eine `.ant-app`-Hülle um den Baum — die Wurzel
-    // des Primitivs ist deren erstes Kind, nicht `container.firstElementChild`.
-    // ACHTUNG: kein zusätzlicher Wrapper-DIV in `AdminPage` — der Selektor
-    // zeigte sonst still auf ihn und der Test wäre aussagelos.
-    //
-    // Der Test ist am Bestand GRÜN, weil das hartkodierte Maß zufällig
-    // `flaeche.seiteSchmal` ist. Sein Rotnachweis läuft als Mutationsprobe
-    // (`seiteSchmal` in `tokens.ts` verstellen → dieser Test rot); ohne sie
-    // belegte er nur die Zahl, nicht deren Quelle.
+    // Wie in `EinsatzSeite.test.tsx`: `renderMitProviders` legt eine `.ant-app`-Hülle um den Baum,
+    // die Wurzel des Primitivs ist deren erstes Kind. ACHTUNG: ein zusätzlicher Wrapper-DIV in
+    // `AdminPage` ließe den Selektor still auf ihn zeigen.
     const wurzel = (c: HTMLElement) => c.querySelector<HTMLElement>('.ant-app > div')!;
 
-    // Vorgabe `voll` wie an `EinsatzSeite` (Neuentwurf 22.09.2026): die Stammdaten-Tabellen
-    // füllen die Spalte neben der Verwaltungs-Seitenleiste.
+    // Vorgabe `voll` wie an `EinsatzSeite`: Tabellen füllen die Spalte neben der Seitenleiste.
     const voll = renderMitProviders(
       <AdminPage titel="Voll">
         <div>x</div>
@@ -75,13 +67,9 @@ describe('AdminPage', () => {
         <div>x</div>
       </AdminPage>,
     );
-    // HANDGESCHRIEBENE LITERALE, nicht `${flaeche.seiteSchmal}px`: seit die
-    // Komponente ihre Vorgabe aus demselben Token liest, kämen sonst beide
-    // Seiten aus einer Quelle und bewegten sich gemeinsam — ein Rückfall auf
-    // die früher hartkodierte 900 bliebe grün. Dass die Zahlen zum Token
-    // passen, sichert der Byte-Pin in `theme/tokens.test.ts`; erst beide
-    // zusammen belegen die Verdrahtung. Die Regel dahinter steht in CLAUDE.md
-    // („Charakterisierungstests bauen ihre Keys als Literale").
+    // HANDGESCHRIEBENE LITERALE, nicht `${flaeche.seiteSchmal}px`: die Komponente liest dasselbe
+    // Token, beide Seiten bewegten sich sonst gemeinsam. Dass die Zahl zum Token passt, sichert der
+    // Byte-Pin in `theme/tokens.test.ts`; erst beide zusammen belegen die Verdrahtung.
     expect(wurzel(container).style.maxWidth).toBe('900px');
   });
 });

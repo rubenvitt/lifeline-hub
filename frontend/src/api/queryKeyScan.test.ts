@@ -2,12 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { ENGE_ARTEN, scanneQueryKeys, type Fund } from './queryKeyScan';
 
 /**
- * Unit-Tests des AST-Scanners (LFH-312, AP3) gegen SYNTHETISCHE Fixtures.
- *
- * Warum Fixtures statt Bestandsjagd: der Bestand ist per Definition sauber (sonst wäre der
- * Guard rot) und kann einen NEUEN Fangfall deshalb gar nicht belegen. Eine Fixture wandert
- * außerdem bei einem Refactor nicht davon. Die drei Regex-Blindflecken (mehrzeilig, Kommentar,
- * Quote-Stil) werden hier als Verhalten festgenagelt, nicht bloß im Kommentar behauptet.
+ * Unit-Tests des AST-Scanners gegen SYNTHETISCHE Fixtures: der Bestand ist per Definition sauber
+ * und kann einen neuen Fangfall nicht belegen.
  */
 
 const prefixe = (funde: Fund[]): string[] => funde.map((f) => f.prefix);
@@ -53,17 +49,14 @@ describe('queryKeyScan: die drei Regex-Blindflecken', () => {
   });
 
   it('BLINDFLECK 2 — Kommentare erzeugen keinen Fehlalarm (auch ohne `*`-Präfix)', () => {
-    // Die alte `istKommentarzeile`-Heuristik traf nur `//`, `*`, `/*` am Zeilenanfang; ein
-    // eingerückter Block-Kommentar-Rumpf ohne `*` rutschte durch. Im AST gibt es den Knoten nicht.
+    // Ein eingerückter Block-Kommentar-Rumpf ohne `*` ist im AST kein Knoten.
     const quelle = `/*\n  historisch: queryKey: ['einsatz-uhs', id]\n*/\nconst x = 1;`;
     expect(scanneQueryKeys('/src/x.ts', quelle)).toEqual([]);
   });
 
   it('BLINDFLECK 3 — doppelt-quotiertes Literal wird gefunden', () => {
-    // Akzeptanzpunkt des Tickets. Reale Fundstellen: 0 (Prettier erzwingt Single-Quotes), der
-    // Nachweis ist deshalb bewusst synthetisch. Er ist trotzdem aussagekräftig: der Scanner
-    // fragt `ts.isStringLiteralLike`, für den der Quote-Stil gar nicht existiert — anders als
-    // bei der alten Regex, die `'` hart kodierte und `"` strukturell nie sehen konnte.
+    // Der Quote-Stil spielt keine Rolle (`ts.isStringLiteralLike`); synthetisch, weil Prettier
+    // Single-Quotes erzwingt.
     const funde = scanneQueryKeys('/src/x.ts', `useQuery({ queryKey: ["einsatz-uhs", id] });`);
     expect(prefixe(funde)).toEqual(['einsatz-uhs']);
   });
@@ -85,8 +78,7 @@ describe('queryKeyScan: Radius-Pinning (WEIT vs. ENG)', () => {
 
 describe('queryKeyScan: Indirektion über lokale Key-Helfer', () => {
   it('sieht ein bare String-Literal, das in einen Key-Helfer fließt (LFH-122/215-Blindfleck)', () => {
-    // Muster aus live/useEinsatzLiveStream.ts:48. Das Literal steht in KEINEM Array —
-    // keine `[\s*'`-Regex der Welt konnte es sehen.
+    // Muster aus live/useEinsatzLiveStream.ts: das Literal steht in KEINEM Array.
     const quelle = [
       `const inval = (key: string) => qc.invalidateQueries({ queryKey: [key, einsatzId] });`,
       `inval('einsatz-uhs');`,

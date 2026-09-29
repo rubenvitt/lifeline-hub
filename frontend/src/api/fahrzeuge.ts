@@ -32,21 +32,16 @@ export function ladeFahrzeugVorschlaege(): Promise<FahrzeugVorschlaege> {
 }
 
 /**
- * Anlegen: nur `funkrufname` ist Pflicht (`FahrzeugBody` in `src/routes/fahrzeug.rs:20` —
- * jedes weitere Feld ist `Option<T>`, `sondersignal` traegt ein `#[serde(default)]`). Die
- * gekuerzte Schnellerfassung schickt deshalb ihre vier Felder und sonst nichts.
+ * Anlegen: nur `funkrufname` ist Pflicht (`FahrzeugBody` in `src/routes/fahrzeug.rs`). Die
+ * Schnellerfassung schickt ihre vier Felder und sonst nichts.
  */
 export type FahrzeugNeu = { funkrufname: string } & Partial<Omit<FahrzeugEingabe, 'funkrufname'>>;
 
 /**
- * PATCH ist ein ECHTER Teil-Patch (LFH-306): fehlender Key = unveraendert, `null` = leeren.
- *
- * Der Typ ist deshalb `Partial` und nicht `FahrzeugEingabe` — und das ist keine Bequemlichkeit,
- * sondern der Riegel gegen einen stillen Datenverlust: seit LFH-346 · A7 zeigt
- * `FahrzeugFormModal` nur noch vier Felder. Schickte es weiterhin den vollen Satz, traege jedes
- * nicht gezeigte Feld ein `null` (`leerZuNull(undefined)` ist `null`) und ein Bearbeiten in der
- * Liste loeschte OPTA, Standort, FMS-ISSI, Tragenkapazitaet, Soll-Staerke und Bemerkung.
- * Die Detailseite schickt weiterhin alle Felder — sie zeigt sie auch alle.
+ * PATCH ist ein ECHTER Teil-Patch: fehlender Key = unverändert, `null` = leeren. `Partial` ist der
+ * Riegel gegen stillen Datenverlust: `FahrzeugFormModal` zeigt nur vier Felder, und der volle Satz
+ * trüge für jedes nicht gezeigte Feld ein `null`. Die Detailseite schickt alle Felder, sie zeigt
+ * sie auch alle.
  */
 export type FahrzeugPatch = Partial<FahrzeugEingabe>;
 

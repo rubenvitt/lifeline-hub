@@ -57,9 +57,8 @@ describe('VorschauZustand (LFH-664)', () => {
   });
 
   /**
-   * DER STILLE FALL: `select` findet den Datensatz nicht mehr. Die Abfrage ist dann weder
-   * am Laden noch gescheitert, `data` ist schlicht `undefined` — ohne eigenen Zweig bliebe die
-   * Vorschau leer, und niemand sähe den Unterschied zu „lädt noch“.
+   * Der stille Fall: `select` findet den Datensatz nicht mehr, `data` ist `undefined`, ohne dass
+   * die Abfrage lädt oder scheitert.
    */
   it('sagt, dass der Datensatz nicht mehr vorhanden ist', () => {
     renderMitProviders(
@@ -71,10 +70,8 @@ describe('VorschauZustand (LFH-664)', () => {
   });
 
   /**
-   * OHNE NETZ (Review-Befund): `networkMode` ist TanStacks Vorgabe 'online', eine kalte
-   * Abfrage ohne Verbindung steht dann auf `pending` + `paused` — `isLoading` ist false und
-   * `data` undefined. An `isLoading` gehängt hiess das „nicht mehr vorhanden", eine falsche
-   * Aussage über einen Datensatz, den es sehr wohl gibt.
+   * OHNE NETZ steht eine kalte Abfrage auf `pending` + `paused`; `isLoading` ist dann false. An
+   * `isLoading` gehängt hieße das fälschlich „nicht mehr vorhanden“.
    */
   it('sagt ohne Verbindung, dass nicht abgerufen werden kann — nicht „nicht mehr vorhanden"', () => {
     renderMitProviders(

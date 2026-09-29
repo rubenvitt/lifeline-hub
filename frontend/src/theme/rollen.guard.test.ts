@@ -1,21 +1,8 @@
 /**
- * Hält die zwei Seiten der Gestaltungssprache deckungsgleich (LFH-352 · A0).
- *
- * `tokens.ts` (TS, für antd) und `rollen.css` (CSS-Custom-Properties, für
- * handgeschriebenes CSS) tragen dieselben Werte. Das ist bewusste Redundanz — die
- * zwei Quellen bleiben getrennt, damit handgeschriebenes CSS nicht an antds
- * Variablennamen hängt; die Begründung steht im Kopf von `rollen.css`. Eine
- * abgeschaltete antd-Weiche ist es nicht: antd 6 emittiert `--ant-*` immer (LFH-623).
- * Dieser Test hängt an der Begründung nicht — er vergleicht nur zwei Dateien Wert
- * für Wert.
- *
- * WARUM DAS EINEN TEST BRAUCHT: eine Drift zwischen beiden **bricht nichts**.
- * Kein Fehler, kein roter Build — die antd-Fläche trägt dann nur eine andere
- * Farbe als die handgeschriebene daneben, und das fällt erst jemandem im Einsatz
- * auf. Dasselbe Muster wie beim Byte-Pin der Wire-Strings in `queryKeys`.
- *
- * Der Test liest die CSS-Datei als TEXT und parst sie — nicht über einen Import,
- * der von Vite transformiert würde. So prüft er, was wirklich im Repo steht.
+ * Hält die zwei Seiten der Gestaltungssprache deckungsgleich (LFH-352 · A0): `tokens.ts` (TS,
+ * für antd) und `rollen.css` (Custom Properties für handgeschriebenes CSS) tragen dieselben
+ * Werte. Eine Drift bricht nichts; die antd-Fläche trüge nur eine andere Farbe als das CSS
+ * daneben. Die CSS-Datei wird als TEXT gelesen, nicht über einen Vite-Import.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -32,11 +19,8 @@ import {
   type Dichte,
   type Farbrollen,
 } from './tokens';
-// Eigene Importzeilen (LFH-329 · B1): der Bestandsblock oben bleibt so
-// unangetastet, während die Seitenrinne unten ihren eigenen Guard bekommt.
 import { theme } from 'antd';
 import { seitenrinne } from './tokens';
-// Neuentwurf „Instrumententafel" (21.09.2026): eigene Importzeile aus demselben Grund.
 import {
   etbTypFarbenDunkel,
   etbTypFarbenHell,
@@ -52,14 +36,11 @@ import {
 const hier = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(hier, 'rollen.css'), 'utf-8');
 
-/** Schneidet einen Selektor-Block heraus und liest seine `--lfh-*`-Deklarationen.
- *  Sucht den Selektor am ZEILENANFANG — `indexOf` fände sonst zuerst seine
- *  Erwähnung im Kopfkommentar der CSS-Datei und läse den falschen Block
- *  (gemessen: alle Nachtmodus-Prüfungen liefen gegen die Tagwerte und waren
- *  rot, obwohl beide Dateien stimmten). */
+/** Schneidet einen Selektor-Block heraus und liest seine `--lfh-*`-Deklarationen. Sucht den
+ *  Selektor am ZEILENANFANG, sonst fände `indexOf` zuerst seine Erwähnung im Kopfkommentar
+ *  der CSS-Datei. */
 function block(selektor: string): Record<string, string> {
-  // Vollständiges RegExp-Escaping (inkl. Backslash) — nur `[`/`]` zu escapen reicht für die
-  // heutigen Selektoren, wäre aber für jeden anderen Sonderzeichen-Selektor falsch (CodeQL).
+  // Vollständiges RegExp-Escaping inkl. Backslash (CodeQL).
   const muster = selektor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const treffer = new RegExp(`^${muster}\\s*\\{`, 'm').exec(css);
   if (!treffer) throw new Error(`Selektor ${selektor} fehlt in rollen.css`);
@@ -85,9 +66,8 @@ const DICHTE_BLOECKE: Record<Dichte, Record<string, string>> = {
   handschuh: block("[data-dichte='handschuh']"),
 };
 
-/** Abstandsstufe in TS → Property-Name in CSS. Die Namen laufen bewusst
- *  auseinander (`xs/sm/md/lg` gegen `luft-1..4`), deshalb eine Abbildung und
- *  keine abgeleitete Namensbildung. */
+/** Abstandsstufe in TS → Property-Name in CSS. Die Namen laufen auseinander
+ *  (`xs/sm/md/lg` gegen `luft-1..4`), deshalb eine Abbildung. */
 const LUFT_ABBILDUNG: Record<keyof Abstandsraster, string> = {
   xs: '--lfh-luft-1',
   sm: '--lfh-luft-2',
@@ -213,10 +193,8 @@ describe('Gestaltungssprache E — CSS und TS tragen dieselben Werte', () => {
   );
 
   it('der Nachtmodus überschreibt genau die Farbrollen — keine mehr, keine weniger', () => {
-    // Form, Raster, Schrift und der Rahmen sind modusunabhängig und dürfen im
-    // dark-Block NICHT noch einmal auftauchen; sonst driften sie unbemerkt.
-    // Seit dem Neuentwurf gehören ETB-Typfarben und Warnstufen-Balken zur Menge —
-    // beide existieren je Modus.
+    // Form, Raster, Schrift und Rahmen sind modusunabhängig und dürfen im dark-Block NICHT
+    // noch einmal auftauchen; ETB-Typfarben und Warnstufen-Balken existieren je Modus.
     expect(Object.keys(dunkel).sort()).toEqual([...MODUS_PROPERTIES].sort());
   });
 
@@ -277,10 +255,8 @@ describe('Dichte-Staffel — CSS und TS tragen dieselben Stufen (LFH-328 · A2)'
   });
 
   it('die beiden Nicht-:root-Stufen überschreiben genau die Dichte-Properties', () => {
-    // Gleiche Schärfe wie beim Nachtmodus oben: GENAU diese Menge, nicht eine
-    // Teilmenge. Eine vergessene Property fiele sonst still auf `:root` zurück
-    // (halb umgeschaltete Stufe), eine zusätzliche würde Farbe oder Form an die
-    // Dichte koppeln — beides bricht nichts und fällt erst im Einsatz auf.
+    // GENAU diese Menge: eine vergessene Property fiele still auf `:root` zurück, eine
+    // zusätzliche koppelte Farbe oder Form an die Dichte.
     for (const stufe of ['komfortabel', 'handschuh'] as const) {
       expect(Object.keys(DICHTE_BLOECKE[stufe]).sort(), stufe).toEqual(
         [...DICHTE_PROPERTIES].sort(),
@@ -289,28 +265,10 @@ describe('Dichte-Staffel — CSS und TS tragen dieselben Stufen (LFH-328 · A2)'
   });
 
   it('B1 liefert den Schalter — genau EIN Setzer, und der sitzt in ThemeModeProvider', () => {
-    // UMGEDREHT gegenüber A2 (LFH-329 · B1): dort verbot dieser Guard das
-    // Merkmal noch jedem Produktivfile, weil A2 nur den Träger baute. Jetzt gibt
-    // es den Schalter — und die Aussage ist die positive: er existiert GENAU
-    // EINMAL. Zwei Setzer wären das eigentliche Übel, denn sie überschreiben sich
-    // gegenseitig ohne Fehler; die Fläche träge dann je nach Renderfolge eine
-    // andere Stufe.
-    //
-    // Zuständigkeitsgrenze, damit der nächste Leser sie nicht falsch liest: der
-    // MECHANISMUS (Benutzerwahl, Speicher, ConfigProvider, Merkmal am `<html>`)
-    // ist B1/LFH-329. Die POLITIK — die Stufe aus dem Einsatzkontext ableiten —
-    // bleibt B5. Die Kommentare in `tokens.ts` und `rollen.css` benennen dafür
-    // noch pauschal B5; das ist Nacharbeit am Elternstrang, nicht hier.
-    //
-    // `/src/theme/` ist ABSICHTLICH NICHT ausgenommen: der Setzer sitzt genau
-    // dort, und ein Guard, der ausgerechnet dort wegsähe, bewachte nichts.
-    // Ausgenommen sind nur Testdateien und Kommentarzeilen; ohne letztere meldet
-    // der Guard die eigene Begründung als Verstoß (gemessen: `tokens.ts` schlug
-    // allein wegen seines Doc-Kommentars an).
-    //
-    // Verglichen wird auf DATEI-Ebene und dedupliziert: ein Zeilennummern-Pin
-    // bräche bei jeder Einrückung, und zwei Treffer in derselben Datei (Setzen
-    // plus Aufräumen) sind kein Verstoß.
+    // Der Dichte-Schalter existiert GENAU EINMAL: zwei Setzer überschrieben sich gegenseitig ohne
+    // Fehler. `/src/theme/` ist absichtlich nicht ausgenommen, denn dort sitzt der Setzer.
+    // Ausgenommen sind Testdateien und Kommentarzeilen. Verglichen wird auf Datei-Ebene: Setzen
+    // plus Aufräumen in einer Datei ist kein Verstoß.
     const quellen = import.meta.glob('/src/**/*.{ts,tsx}', {
       query: '?raw',
       eager: true,
@@ -356,15 +314,9 @@ describe('Gestaltungssprache E — die Entscheidungen selbst', () => {
   });
 });
 
-/** Schneidet den `:root`-Block aus DEM Media-Block, der ab der genannten
- *  Mindestbreite greift, und liest seine `--lfh-*`-Deklarationen.
- *
- *  Die Schwelle steht bewusst als Argument im Regex und nicht als generisches
- *  `@media`: ein zweiter Media-Block am selben Dateiende (eine `max-width`-Regel
- *  etwa) würde sonst je nach Reihenfolge mitgelesen, und der Guard ginge aus dem
- *  falschen Grund rot. Geschnitten wird bis zur schließenden Klammer des
- *  Media-Blocks am Zeilenanfang — der eingerückte innere Block landet dabei
- *  vollständig im Ausschnitt. */
+/** Schneidet den `:root`-Block aus DEM Media-Block, der ab der genannten Mindestbreite greift,
+ *  und liest seine `--lfh-*`-Deklarationen. Die Schwelle steht im Regex, damit ein zweiter
+ *  Media-Block (etwa `max-width`) nicht mitgelesen wird. */
 function medienblock(mindestbreite: number): Record<string, string> {
   const treffer = new RegExp(`^@media \\(min-width: ${mindestbreite}px\\)\\s*\\{`, 'm').exec(css);
   if (!treffer) throw new Error(`Kein @media-Block ab ${mindestbreite}px in rollen.css`);
@@ -379,30 +331,25 @@ function medienblock(mindestbreite: number): Record<string, string> {
 
 describe('Seitenrinne — CSS und TS tragen dieselben Stufen (LFH-329 · B1)', () => {
   it(':root trägt die schmale Rinne', () => {
-    // Mobil zuerst: der Ausgangszustand ist der schmale Schirm. Wer die
-    // Property ohne Media-Kontext liest, bekommt so den sicheren Wert.
+    // Mobil zuerst: ohne Media-Kontext gilt der sichere, schmale Wert.
     expect(hell['--lfh-seiten-polsterung']).toBe(`${seitenrinne.schmal}px`);
   });
 
   it('der Haupt-`:root`-Block wird vom Media-Block nicht beschattet', () => {
-    // `block(':root')` ankert am Zeilenanfang und nimmt den ERSTEN Treffer. Läge
-    // der Media-Block vor dem Haupt-`:root` oder wäre sein innerer Selektor
-    // nicht eingerückt, liefen die 18 Farbvergleiche oben still gegen die
-    // falschen Werte. Diese eine Zeile ist die Gegenprobe darauf.
+    // Gegenprobe: `block(':root')` nimmt den ERSTEN Treffer am Zeilenanfang. Läge der Media-Block
+    // davor, liefen die Farbvergleiche oben still gegen die falschen Werte.
     expect(hell['--lfh-grund']).toBe(farbenHell.grund);
   });
 
   it('ab der md-Schwelle trägt sie die volle Rinne', () => {
-    // Die Schwelle wird NICHT neu erfunden: sie ist antds `md`. Damit tragen
-    // die CSS-Achse (diese Datei) und jede spätere JS-Achse dieselbe Zahl.
+    // Die Schwelle ist antds `md`, damit CSS- und JS-Achse dieselbe Zahl tragen.
     const md = theme.getDesignToken().screenMD;
     expect(md).toBe(768);
     expect(medienblock(md)['--lfh-seiten-polsterung']).toBe(`${seitenrinne.breit}px`);
   });
 
   it('die Seitenrinne steht in keinem Dichte-Block (Viewport ≠ Dichte)', () => {
-    // Folgt zwar schon aus dem Partitionstest oben, liefert hier aber die
-    // benannte Diagnose statt eines Mengendiffs.
+    // Folgt schon aus dem Partitionstest oben, hier mit benannter Diagnose.
     expect(DICHTE_BLOECKE.komfortabel['--lfh-seiten-polsterung']).toBeUndefined();
     expect(DICHTE_BLOECKE.handschuh['--lfh-seiten-polsterung']).toBeUndefined();
   });
@@ -417,16 +364,16 @@ describe('Rahmen — modusunabhängig dunkel (Neuentwurf, 21.09.2026)', () => {
   );
 
   it('kein Rahmenwert hat einen Nachtmodus-Gegenwert — der Rahmen folgt keinem Modus', () => {
-    // Folgt schon aus der Partition oben; hier mit benannter Diagnose, weil genau
-    // dieser Eintrag der naheliegende Fehler ist (vgl. `--lfh-kopf-vordergrund`).
+    // Folgt schon aus der Partition oben; hier mit benannter Diagnose, weil genau dieser Eintrag
+    // der naheliegende Fehler ist.
     for (const property of [...Object.values(RAHMEN_ABBILDUNG), '--lfh-kopf-vordergrund']) {
       expect(dunkel[property], property).toBeUndefined();
     }
   });
 
   it('der Rahmen ist die Nachtpalette, nicht eine Kopie daneben', () => {
-    // Literale, nicht `farbenDunkel.x`: der Rahmen soll auch dann dunkel bleiben,
-    // wenn jemand die Zeiger in `rahmenFarben` auf `farbenHell` umbiegt.
+    // Literale statt `farbenDunkel.x`: der Rahmen bleibt auch dunkel, wenn jemand die Zeiger in
+    // `rahmenFarben` auf `farbenHell` umbiegt.
     expect(rahmenFarben.grund).toBe('#0c0e11');
     expect(rahmenFarben.text).toBe('#e8ebee');
     expect(rahmenFarben.grund).toBe(farbenDunkel.kopf);
@@ -480,9 +427,8 @@ describe('Schriftskala — CSS und TS tragen dieselben Stufen (Neuentwurf, 21.09
   });
 
   it('jeder Schnitt der Skala wird lokal ausgeliefert — kein künstlicher Fettdruck', () => {
-    // Die Skala verlangt Archivo 400/500/600 und JetBrains Mono 400/500. Fehlt ein
-    // Schnitt in `schriften.css`, setzt der Browser den nächsten — gemessen am
-    // Lage-Dashboard: über 600 hinaus lieferte die Datei keinen, die Breite blieb stehen.
+    // Die Skala verlangt Archivo 400/500/600 und JetBrains Mono 400/500. Fehlt ein Schnitt in
+    // `schriften.css`, setzt der Browser still den nächsten.
     const schriften = readFileSync(join(hier, 'schriften.css'), 'utf-8');
     const familie = {
       text: 'LFH Archivo',

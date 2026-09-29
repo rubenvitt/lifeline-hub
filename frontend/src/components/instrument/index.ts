@@ -1,7 +1,7 @@
 /**
- * Bausteine des Neuentwurfs „Instrumententafel" (21.09.2026,
- * `docs/design/2026-09-21-neuentwurf/umsetzung.md` § Bausteine). Seiten importieren von
- * hier; jede Datei trägt im Kopf, wofür sie da ist und welche Regel sie hält.
+ * Bausteine der Gestaltungssprache „Instrumententafel"
+ * (`docs/design/2026-09-21-neuentwurf/umsetzung.md` § Bausteine). Seiten importieren von hier;
+ * jede Datei trägt im Kopf, wofür sie da ist und welche Regel sie hält.
  */
 export { default as Augenbraue, augenbraueStil, type AugenbraueElement } from './Augenbraue';
 export {

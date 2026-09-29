@@ -1,4 +1,3 @@
-// frontend/src/command-palette/CommandPaletteProvider.gedaechtnis.test.tsx
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -11,15 +10,9 @@ import { SCHLUESSEL_ZULETZT_BEFEHLE } from './zuletztBefehle';
 import { benutzerFixture } from '../test/fixtures';
 
 /**
- * DIE NAHT des Befehls-Gedächtnisses (LFH-391 · Etappe D).
- *
- * `zuletztBefehle.test.ts` prüft den reinen Kern, `useZuletztBefehle.test.tsx` die
- * Beschaffung, `befehle.test.ts` die Auflösung — alle drei könnten grün sein, während die
- * Teile gar nicht miteinander verbunden sind. Hier läuft der Weg als BEDIENUNG: Palette
- * auf, Befehl ausführen, Palette schliesst sich dabei selbst, Palette wieder auf, Eintrag da.
- *
- * `useBefehle` ist hier ECHT (anders als in den beiden anderen Provider-Testdateien) — die
- * Injektion `zuletztBefehlIds`/`merkeBefehl` ist genau das, was geprüft werden soll.
+ * Die Naht des Befehls-Gedächtnisses als BEDIENUNG: Palette auf, Befehl ausführen (die Palette
+ * schließt sich), Palette wieder auf, Eintrag da. Kern, Beschaffung und Auflösung sind je für
+ * sich geprüft. `useBefehle` ist hier ECHT, die Injektion ist genau das Prüfobjekt.
  */
 
 const nutzer = benutzerFixture({ anzeigename: 'EL', org_rolle: 'fuehrungskraft' });
@@ -44,10 +37,8 @@ const gedaechtnisGruppe = () => screen.queryByRole('group', { name: 'Zuletzt aus
 
 describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
   /**
-   * FALLE (a): `CommandPalette.fuehreAus` ruft `schliesse()` VOR `ausfuehren()`, und
-   * `{offen && <PaletteHost/>}` hängt den Teilbaum dabei ab. Ein Träger mit
-   * Komponentenbindung schriebe aus einem abgehängten Baum — der Eintrag fehlte beim
-   * nächsten Öffnen, ohne Fehlermeldung. Genau dieser Ablauf steht hier.
+   * `CommandPalette.fuehreAus` ruft `schliesse()` VOR `ausfuehren()` und hängt den Palettenbaum
+   * ab; ein Träger mit Komponentenbindung verlöre den Eintrag still.
    */
   it('merkt einen ausgeführten Befehl über das Schliessen der Palette hinweg', async () => {
     server.use(http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })));
@@ -71,13 +62,12 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
 
     const gruppe = await screen.findByRole('group', { name: 'Zuletzt ausgeführt' });
     expect(within(gruppe).getByRole('option', { name: 'Profil' })).toBeInTheDocument();
-    // Zuoberst — die Gruppe ist die erste im Kasten, nicht irgendwo dazwischen.
+    // Zuoberst: die Gruppe ist die erste im Kasten.
     const gruppen = within(screen.getByRole('listbox')).getAllByRole('group');
     expect(gruppen[0]).toHaveAttribute('aria-label', 'Zuletzt ausgeführt');
   });
 
-  /** Die Gegenaussage: ohne Ausführung entsteht die Gruppe nicht. Ohne sie wäre auch eine
-   *  Fassung grün, die jeden Befehl von Anfang an ins Gedächtnis schriebe. */
+  /** Gegenaussage: ohne Ausführung entsteht die Gruppe nicht. */
   it('zeigt ohne gemerkten Befehl gar keine Gedächtnisgruppe', async () => {
     server.use(http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })));
     const u = userEvent.setup();
@@ -95,14 +85,9 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
   });
 
   /**
-   * FALLE (b): der Serverstand kommt nicht synchron. Die Startansicht ist per Vertrag
-   * kuratiert (LFH-337 · M11) und „Live-Updates springen nicht unter dem Cursor" ist
-   * Projektregel (WCAG 3.2.5) — eine Gruppe, die ZUOBERST nachklappt, schiebt jede darunter
-   * liegende Zeile nach unten, während der Finger schon unterwegs ist.
-   *
-   * Gelöst durch EINEN Standbild-Griff beim Öffnen (`useState`-Initialwert in `PaletteHost`).
-   * Der Test belegt beide Hälften: während die Palette offen steht, ändert die eintreffende
-   * Antwort nichts; beim nächsten Öffnen ist sie da.
+   * Der Serverstand kommt nicht synchron; eine ZUOBERST nachklappende Gruppe schöbe jede Zeile
+   * unter dem Finger nach unten (WCAG 3.2.5). Gelöst durch das Standbild beim Öffnen: in der
+   * offenen Palette ändert die späte Antwort nichts, beim nächsten Öffnen ist sie da.
    */
   it('lässt eine nachträglich eintreffende Antwort nicht in die offene Palette springen', async () => {
     let loese: () => void = () => {};
@@ -133,7 +118,7 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
       expect(client.getQueryData(globalKeys.benutzerEinstellungenVon(nutzer.id))).toBeDefined(),
     );
 
-    // Der Stand IST da — und die offene Palette hat sich trotzdem nicht umsortiert.
+    // Der Stand IST da, und die offene Palette hat sich trotzdem nicht umsortiert.
     expect(gedaechtnisGruppe()).toBeNull();
 
     await u.keyboard('{Escape}');
@@ -145,8 +130,8 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
   });
 
   /**
-   * Bei AKTIVER Suche entfällt die Gruppe — sonst stünde jeder gemerkte Befehl doppelt in
-   * der flachen Trefferliste, mit gleichem Label und gleichem Ziel.
+   * Bei AKTIVER Suche entfällt die Gruppe, sonst stünde jeder gemerkte Befehl doppelt in der
+   * flachen Liste.
    */
   it('zeigt den gemerkten Befehl bei aktiver Suche genau einmal', async () => {
     server.use(
