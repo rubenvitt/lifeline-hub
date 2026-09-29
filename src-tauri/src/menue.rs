@@ -99,8 +99,14 @@ pub fn behandeln(app: &AppHandle, ereignis: MenuEvent) {
     match ereignis.id().as_ref() {
         SERVER_WECHSELN => crate::zeige_maske(app, None),
         UPDATES_SUCHEN => crate::update::auf_wunsch_pruefen(app.clone()),
+        // Das Fenster mit Fokus — mit Nebenfenstern (LFH-782) ist das nicht immer das Hauptfenster.
         NEU_LADEN => {
-            if let Some(fenster) = app.get_webview_window(crate::FENSTER) {
+            let fenster = app
+                .webview_windows()
+                .into_values()
+                .find(|fenster| fenster.is_focused().unwrap_or(false))
+                .or_else(|| app.get_webview_window(crate::FENSTER));
+            if let Some(fenster) = fenster {
                 let _ = fenster.reload();
             }
         }

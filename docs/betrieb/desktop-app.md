@@ -82,7 +82,8 @@ selbst, wohin ein Link geht:
 
 - **Seite des eigenen Servers in neuem Fenster** (etwa „in neuem Tab öffnen“ in der
   Sprungpalette, Strg/⌘+↵): Die App öffnet ein **weiteres Fenster**, angemeldet und mit Druck.
-  Das bisherige Fenster bleibt, wo es war. Ein Serverwechsel schließt die weiteren Fenster.
+  Das bisherige Fenster bleibt, wo es war. Ein Serverwechsel schließt die weiteren Fenster,
+  ebenso das Schließen des Hauptfensters. „Neu laden“ wirkt auf das Fenster, das vorn ist.
 - **Fremde Website** (Links im Fachebenen-Inspector, Lizenzhinweise): Sie öffnet der
   **Standardbrowser** des Systems. `mailto:`- und `tel:`-Links gehen an das zuständige
   Programm.

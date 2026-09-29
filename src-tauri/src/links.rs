@@ -37,6 +37,12 @@ fn ist_dateiroute(ziel: &Url) -> bool {
     pfad.starts_with("/api/") && !pfad.starts_with("/api/auth/")
 }
 
+/// Zeigt `seite` noch den Server `server`? Beim Verbinden bleiben nur Nebenfenster offen, für die
+/// das gilt — ein Abbrechen oder erneutes Verbinden mit derselben Adresse schließt nichts.
+pub fn gehoert_zum_server(server: &Url, seite: &Url) -> bool {
+    eigene_origin(Some(server), seite)
+}
+
 /// `window.open` bzw. `target="_blank"`.
 pub fn entscheide_neues_fenster(server: Option<&Url>, ziel: &Url) -> Ziel {
     if eigene_origin(server, ziel) {
@@ -185,6 +191,21 @@ mod tests {
         }
         assert_eq!(navigation("mailto:lage@example.org"), Ziel::System);
         assert_eq!(navigation("tel:+4930123"), Ziel::System);
+    }
+
+    #[test]
+    fn nebenfenster_gehoert_zum_server_derselben_origin() {
+        let seite = url("https://elw.local:8443/einsaetze/1/lageberichte/3");
+        assert!(gehoert_zum_server(&server(), &seite));
+        assert!(gehoert_zum_server(
+            &url("https://elw.local:8443/einsaetze"),
+            &seite
+        ));
+        assert!(!gehoert_zum_server(
+            &url("https://fuekw.local:8443/"),
+            &seite
+        ));
+        assert!(!gehoert_zum_server(&server(), &url("about:blank")));
     }
 
     /// Ohne verbundenen Server (Erststart-Maske) gibt es keine eigene Origin.

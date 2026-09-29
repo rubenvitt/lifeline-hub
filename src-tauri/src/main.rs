@@ -131,9 +131,14 @@ fn fuers_protokoll(url: &Url) -> String {
 }
 
 fn lade_server(app: &AppHandle, server: &Url) -> Result<(), String> {
-    // Nebenfenster zeigen den bisherigen Server; nach dem Wechsel gehörten sie zu keinem mehr.
+    // Nebenfenster eines anderen Servers gehören nach dem Wechsel zu keinem mehr. Beim Abbrechen
+    // oder Verbinden mit derselben Adresse bleiben sie — `close()` fragt nicht nach, ein offener
+    // Entwurf verlöre sonst, was der Autosave noch nicht hat.
     for (label, nebenfenster) in app.webview_windows() {
-        if label.starts_with(NEBENFENSTER_PRAEFIX) {
+        let bleibt = nebenfenster
+            .url()
+            .is_ok_and(|seite| links::gehoert_zum_server(server, &seite));
+        if label.starts_with(NEBENFENSTER_PRAEFIX) && !bleibt {
             let _ = nebenfenster.close();
         }
     }
@@ -398,6 +403,17 @@ fn main() {
         ])
         .menu(menue::bauen)
         .on_menu_event(menue::behandeln)
+        // Ohne Hauptfenster liefen Maske, Deeplink und Serverwechsel ins Leere: es geht, und die
+        // Nebenfenster gehen mit — die App endet, statt kopflos weiterzulaufen.
+        .on_window_event(|fenster, ereignis| {
+            if fenster.label() == FENSTER && matches!(ereignis, tauri::WindowEvent::Destroyed) {
+                for (label, nebenfenster) in fenster.app_handle().webview_windows() {
+                    if label.starts_with(NEBENFENSTER_PRAEFIX) {
+                        let _ = nebenfenster.close();
+                    }
+                }
+            }
+        })
         .setup(|app| {
             let handle = app.handle().clone();
 

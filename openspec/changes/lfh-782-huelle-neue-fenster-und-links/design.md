@@ -97,8 +97,12 @@ gemeinsamen Datenspeicher des Webviews (Vorgabe beider Plattformen).
 
 Die Laufzeit-Freigabe in `server_freigeben` gilt künftig für `main` **und** `neben-*`, damit
 der Druck im Nebenfenster ankommt. `capabilities/lokal.json` bleibt bei `main`: Die Befehle
-der Maske gehören nicht ins Nebenfenster. `lade_server` schließt vor dem Laden alle
-`neben-*`-Fenster.
+der Maske gehören nicht ins Nebenfenster. `lade_server` schließt vor dem Laden die
+`neben-*`-Fenster, deren Seite nicht zur neuen Origin gehört. Abbrechen oder erneutes Verbinden
+mit derselben Adresse schließt nichts, denn `close()` fragt nicht nach, und ein offener Entwurf
+verlöre, was der Autosave noch nicht hat. Schließt die Person das Hauptfenster, gehen die
+Nebenfenster mit, die App endet. Sonst liefen Maske, Deeplink und Serverwechsel ohne
+Hauptfenster ins Leere. „Neu laden“ im Menü wirkt auf das Fenster mit Fokus.
 
 ### D4 Systemprogramm über `tauri-plugin-opener`, nur Rust-seitig
 
