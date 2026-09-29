@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Lifeline Hub",
+  "identifier": "dev.rubeen.lifeline.desktop",
+  "build": {
+    "frontendDist": "ui"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg", "nsis"],
+    "createUpdaterArtifacts": true,
+    "category": "Utility",
+    "shortDescription": "Führungsunterstützung für Einsatzlagen",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "14.0"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["German"]
+      }
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["lifeline"]
+      }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUxMTM4QzY3NUVCRjQ2MEUKUldRT1JyOWVaNHdUNFVFUk9MT2RKckJDVGVGNS92YVNESEU4MCtVT2dEQ1N5MWdEZ0pFZkVnZ0QK",
+      "endpoints": ["https://github.com/rubenvitt/lifeline-hub/releases/latest/download/latest.json"],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

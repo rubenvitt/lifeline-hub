@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "lokal",
+  "description": "Nur die lokale Erststart-Maske (tauri://localhost): Serveradresse setzen, Wechsel abbrechen. Die Serverseite bekommt ihre Freigabe zur Laufzeit (nur `drucken`).",
+  "windows": ["main"],
+  "permissions": ["core:default", "allow-verbinden", "allow-abbrechen", "allow-vorbelegung"]
+}

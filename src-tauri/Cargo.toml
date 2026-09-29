@@ -1,0 +1,29 @@
+# Desktop-Hülle (LFH-721, Variante A aus LFH-720): der Webview lädt die https-Adresse des
+# Servers. Die Hülle trägt Fenster, Erststart, Deeplink, Druck-Umleitung und Update — keine
+# zweite Anwendungslogik. Anforderungen: openspec/specs/desktop-huelle/spec.md.
+#
+# Die Version setzt semantic-release zusammen mit der des Servers (release.config.mjs,
+# prepareCmd); tauri.conf.json trägt bewusst keine eigene.
+[package]
+name = "lifeline-desktop"
+version = "1.0.0-alpha.51"
+edition = "2021"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2.5", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = [] }
+tauri-plugin-deep-link = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-updater = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-process = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+log = "0.4"
+
+[dev-dependencies]
+tempfile = "3"

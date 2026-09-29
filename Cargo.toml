@@ -108,7 +108,7 @@ dev-seeds = []
 clamav = ["dep:clamav-client"]
 
 [workspace]
-members = [".", "crates/karten-katalog", "karten-service"]
+members = [".", "crates/karten-katalog", "karten-service", "src-tauri"]
 
 # Der KRITIS-Import liest einen 4–5 GB großen PBF-Extrakt, auch im Dev-Stack. Nur diese
 # Abhängigkeiten werden im Dev-Build optimiert; der eigene Code bleibt debugbar.
