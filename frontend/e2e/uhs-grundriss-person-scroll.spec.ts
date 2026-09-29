@@ -54,18 +54,37 @@ async function setupBelegterPlatz(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'In Betrieb nehmen' }).click();
   await expect(page.getByRole('button', { name: 'Plätze bearbeiten' })).toBeVisible();
 
+  // Die erste Belegung hängt künstlich: so steht die Last, unter der der Folgezug früher ins
+  // Leere ging, in jedem Lauf.
+  await page.route(
+    '**/uhs-belegung',
+    async (route) => {
+      await new Promise((fertig) => setTimeout(fertig, 1_000));
+      await route.continue();
+    },
+    { times: 1 },
+  );
+
   // Person aus „Noch nicht aufgenommen" auf „Bett 1" ziehen → belegt.
   await ziehe(page, page.getByText(personName).first(), page.getByText('Bett 1'));
   await expect(page.getByText('belegt')).toBeVisible();
-
-  // Warten, bis der Umbau durch ist: die Invalidierungen landen nach der 201-Antwort, und bis
-  // dahin steht der Name doppelt im Baum. Ein zweiter Zug in diesem Fenster griffe ein Layout,
-  // das gleich umbricht, und verfehlte den Drop. Bedingung statt fester Wartezeit: genau EINE
-  // Personenmarke mit dem Namen (über `data-lfh`).
-  await expect(
-    page.locator('[data-lfh="personenkarte"]').filter({ hasText: personName }),
-  ).toHaveCount(1);
+  await warteBisBelegungDurch(page, personName);
   return personName;
+}
+
+/**
+ * Wartet, bis die Belegung samt Nachladen durch ist (LFH-389). „belegt" und die Marke auf dem
+ * Platz stehen schon durch das OPTIMISTISCHE Update; solange `belegMut` läuft, ist die Marke aber
+ * nicht ziehbar und `drop-transport` ruht — ein Folgezug in diesem Fenster ginge still ins Leere.
+ * `pending` hält bis zum Ende aller Refetches, danach springt auch das Layout nicht mehr.
+ * Gewartet wird auf die Ziehbarkeit selbst: das `aria-disabled` der dnd-kit-Marke.
+ */
+async function warteBisBelegungDurch(page: Page, personName: string) {
+  const marke = page
+    .locator('[aria-roledescription="draggable"]')
+    .filter({ has: page.locator('[data-lfh="personenkarte"]', { hasText: personName }) });
+  await expect(marke).toHaveCount(1);
+  await expect(marke).toHaveAttribute('aria-disabled', 'false');
 }
 
 /** Drop-Target zu einem Spalten-Titel: der Paneel-Körper (zweites Kind), nicht der Kopf —
@@ -90,11 +109,16 @@ test('UHS Grundriss: belegte Person in den Wartebereich ziehen räumt den Platz'
   page,
 }) => {
   const personName = await setupBelegterPlatz(page);
-  await ziehe(page, page.getByText(personName).first(), dropZone(page, 'Wartebereich (Eingang)'));
-  // Platz nicht mehr belegt …
+  const wartebereich = dropZone(page, 'Wartebereich (Eingang)');
+  await ziehe(page, page.getByText(personName).first(), wartebereich);
+  // Die Person steht im Wartebereich — erst ab hier läuft die Mutation sicher; vorher sähe das
+  // Warten noch die freigegebene Marke auf dem Platz.
+  await expect(wartebereich.getByText(personName)).toBeVisible();
+  // Geprüft wird der Serverstand, nicht der optimistische: ein abgelehnter Wechsel rollte die
+  // Person auf den Platz zurück.
+  await warteBisBelegungDurch(page, personName);
+  await expect(wartebereich.getByText(personName)).toBeVisible();
   await expect(page.getByText('belegt')).toBeHidden();
-  // … und die Person steht im Wartebereich.
-  await expect(page.getByText(personName).first()).toBeVisible();
 });
 
 // Platz-Karten bleiben unabhängig von Belegung, Titellänge und Tag-Anzahl EXAKT gleich groß,
@@ -148,6 +172,8 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
   // Behandlungsplatz 1 belegen (2-zeiliger Titel + belegt + Person + Aktionen).
   await ziehe(page, page.getByText(personName).first(), page.getByText('Behandlungsplatz 1'));
   await expect(page.getByText('belegt')).toBeVisible();
+  // Erst nach dem Nachladen ins Menü: ein später Refetch räumte ein offenes Platzmenü ab.
+  await warteBisBelegungDurch(page, personName);
   // Behandlungsplatz 2 zusätzlich auf „aufbereitung" — die Tag-Zeile als dritte Varianzquelle.
   const bp2 = page.locator('[data-testid="platz-karte"]', { hasText: 'Behandlungsplatz 2' });
   // CSS-Selektor auf das echte <button>: `getByRole` träfe den Karten-Div, den dnd-kit mit
