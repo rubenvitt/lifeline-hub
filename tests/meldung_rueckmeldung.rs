@@ -4,20 +4,7 @@ use axum::http::StatusCode;
 use serde_json::{json, Value};
 
 mod common;
-use common::{anfrage, einsatz_anlegen, login_cookie, setup};
-
-async fn einheit_bilden(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
-    let (s, json) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
-        cookie,
-        Some(&json!({ "name": name }).to_string()),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED, "{json:?}");
-    json["id"].as_i64().unwrap()
-}
+use common::{anfrage, einheit_bilden, einsatz_anlegen, login_cookie, setup};
 
 async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
     let (s, json) = anfrage(

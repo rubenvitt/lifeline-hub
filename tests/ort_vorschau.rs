@@ -1,9 +1,6 @@
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
 use serde_json::Value;
 use tower::ServiceExt;
 
@@ -19,10 +16,8 @@ fn geschlossener_geocoder() -> String {
 }
 
 async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool, std::path::PathBuf) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
+    let kd = db::test_karten_dir();
+    let (router, pool) = common::setup_mit_state(|s| s.karten_dir = kd.clone()).await;
     // Deterministisch: Org-1-Geocoder auf garantiert verweigerte Adresse setzen,
     // damit ortsname-null-Tests netzunabhängig bleiben (Cache-Treffer umgehen dies).
     sqlx::query(
@@ -33,17 +28,6 @@ async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool, std::path::PathBuf
     .execute(&pool)
     .await
     .unwrap();
-    let kd = db::test_karten_dir();
-    let router = build_router(AppState {
-        pool: pool.clone(),
-        live: LiveHub::new(),
-        karten_dir: kd.clone(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
     (router, pool, kd)
 }
 

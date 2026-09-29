@@ -12,15 +12,10 @@ const frontendVersion = (
 ).version;
 
 // `frontend/dist` muss zur Compile-Zeit existieren, sonst bricht rust-embed
-// (src/static_files.rs) und damit der komplette Backend-Build — deshalb ist die
-// .gitkeep dort getrackt (LFH-242/F19). Vites emptyOutDir räumt den Ordner bei
-// jedem Build aus und würde sie mitnehmen: der Fix zerfiele beim ersten
-// `pnpm build`, und die Löschung landete früher oder später in einem Commit.
-// Also nach dem Schreiben des Bundles wiederherstellen.
-// Die Datei ist bewusst LEER: der Hook schreibt sie nach jedem Build neu, und nur
-// bei byte-identischem Inhalt bleibt der Arbeitsbaum sauber. Den Zielpfad holen wir
-// aus der aufgelösten Vite-Config statt aus __dirname/cwd — das Paket ist ESM, und
-// der Hook soll auch stimmen, wenn woanders her gebaut wird.
+// (src/static_files.rs) den Backend-Build — deshalb ist die .gitkeep dort getrackt.
+// Vites emptyOutDir räumt sie bei jedem Build weg; der Hook schreibt sie danach LEER
+// neu, damit der Arbeitsbaum byte-identisch sauber bleibt. Pfad aus der aufgelösten
+// Config, weil das Paket ESM ist und auch von woanders gebaut werden kann.
 const gitkeepBewahren = (): Plugin => {
   let gitkeepPfad = '';
   return {
@@ -35,9 +30,8 @@ const gitkeepBewahren = (): Plugin => {
   };
 };
 
-// Dev-Server und Proxy-Ziel werden NICHT fest verdrahtet (Workspaces vergeben Ports
-// dynamisch). Quelle: .env.local (vom `pnpm run setup` geschrieben) + Shell-/CI-ENV,
-// wobei process.env Vorrang hat. Defaults greifen für „einfach lokal".
+// Dev-Port und Proxy-Ziel kommen aus .env.local und der Umgebung (process.env hat
+// Vorrang), weil Workspaces Ports dynamisch vergeben.
 export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, process.cwd(), ''), ...process.env };
   const backendUrl = env.LIFELINE_BACKEND_URL || 'http://127.0.0.1:8080';
@@ -51,13 +45,11 @@ export default defineConfig(({ mode }) => {
         registerType: 'prompt',
         includeAssets: ['favicon.svg'],
         workbox: {
-          // Der App-Haupt-Chunk überschreitet das 2-MiB-Default-Precache-Limit.
-          // Workaround bis zum Code-Splitting (eigener Folge-Task: MapLibre/antd lazy laden).
+          // Der Haupt-Chunk überschreitet das 2-MiB-Precache-Limit, solange es kein Code-Splitting gibt.
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
           // Seitenwechsel auf /api/ MÜSSEN zum Server: der OIDC-Login ist ein Full-Page-Redirect
-          // über `/api/auth/oidc/start` und `/api/auth/oidc/callback`. Ohne diese Ausnahme
-          // beantwortet der Service Worker beide mit dem gecachten `index.html` — der Login
-          // erreicht weder Backend noch IdP und endet stumm wieder auf der Login-Seite.
+          // über `/api/auth/oidc/…`. Sonst antwortet der Service Worker mit dem gecachten
+          // `index.html`, und der Login endet stumm wieder auf der Login-Seite.
           navigateFallbackDenylist: [/^\/api\//],
         },
         manifest: {
@@ -78,12 +70,9 @@ export default defineConfig(({ mode }) => {
     define: {
       __APP_VERSION__: JSON.stringify(frontendVersion),
     },
-    // maplibre-gl aus der Dep-Optimierung heraushalten (ab v6 nötig): der Optimizer bündelt es
-    // sonst nach `node_modules/.vite/deps/`, und weil maplibre seine Worker-URL zur Laufzeit als
-    // Geschwisterdatei von `import.meta.url` konstruiert, sucht es den Worker dann dort — wo er
-    // nicht liegt (gemessen: 404 auf `/node_modules/.vite/deps/maplibre-gl-worker.mjs`, mit
-    // exclude: 200 auf den echten Pfad). Betrifft NUR den Dev-Server; der Prod-Build wird über
-    // `setWorkerUrl` in Kartenflaeche.tsx versorgt, dort steht die ausführliche Begründung.
+    // maplibre-gl nicht vorbündeln (nur Dev-Server): maplibre baut seine Worker-URL relativ zu
+    // `import.meta.url` und suchte den Worker sonst unter `node_modules/.vite/deps/`, wo er nicht
+    // liegt. Den Prod-Build versorgt `setWorkerUrl` in Kartenflaeche.tsx.
     optimizeDeps: { exclude: ['maplibre-gl'] },
     server: {
       port: frontendPort, // undefined → Vite-Default (5173) bzw. nächster freier Port

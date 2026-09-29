@@ -2,17 +2,14 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 
 /**
- * Browser-Nachweise der Prüfliste Einsatztauglichkeit für LFH-606
- * (`docs/superpowers/specs/2026-09-22-lfh-606-pruefliste.md`).
+ * Browser-Nachweise der Prüfliste für den Pegel (LFH-606): Trefflächen über die
+ * Dichte-Staffel (Kriterien 1/2), Kontrast der Pegel-Kennzahl in beiden Modi samt
+ * Achtungskante (5/6), Querlauf der Einstellungssektion auf 390 px (Gate 1), verdeckte
+ * Fokusziele (13) und der CLS-Beitrag des Nachladens (12).
  *
- * Gemessen wird, was jsdom nicht rechnet: Trefflächen über die Dichte-Staffel (Kriterien 1/2),
- * Kontrast der Pegel-Kennzahl in beiden Modi samt Achtungskante (5/6), Querlauf der
- * Einstellungssektion auf 390 px (Gate 1) und verdeckte Fokusziele (13).
- *
- * HERMETISCH: die Pegel-Liste und die Stationsliste der Fachebene kommen per `page.route`
- * aus Literalen. Der echte Abruf ginge an PEGELONLINE (Messungen) — ein e2e-Nachweis, der
- * am Netz eines Fremddienstes hängt, misst dessen Erreichbarkeit, nicht die Oberfläche.
- * Die Wire-Form ist dieselbe, die `api/types.generated.ts` beschreibt.
+ * HERMETISCH: Pegel- und Stationsliste kommen per `page.route` aus Literalen in der Wire-Form
+ * von `api/types.generated.ts` — der echte Abruf ginge an PEGELONLINE und mäße dessen
+ * Erreichbarkeit.
  */
 
 const ADMIN = 'admin';
@@ -27,9 +24,8 @@ const STAFFEL = [
   { dichte: 'komfortabel', soll: 48, sollSM: 48 },
   { dichte: 'handschuh', soll: 72, sollSM: 72 },
 ] as const;
-// `sollSM` ist das Tripel von `controlHeightSM` (24 / 48 / 72, CLAUDE.md „Welches
-// Zahlentripel, hängt am Token"): antd gibt Menüeinträgen eines `Dropdown` die kleine
-// Steuerhöhe, im Kompaktbetrieb also 24 px = der WCAG-2.5.8-Boden, nicht 30.
+// `sollSM` ist das Tripel von `controlHeightSM` (24 / 48 / 72): antd gibt Menüeinträgen eines
+// `Dropdown` die kleine Steuerhöhe.
 
 const UUID = [
   '47174d8f-1b8e-4599-8a59-b580dd55bc87',
@@ -89,10 +85,9 @@ async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> 
 }
 
 /**
- * Legt einen maßgeblichen Pegel ECHT im Backend fest (LFH-640). Die Kennzahl des
- * Lage-Dashboards erscheint nur, wenn der Einsatz den Auslöser `pegel` trägt — und den
- * liefert der Einsatz-Abruf, nicht die per `page.route` gestellte Pegelliste. Der PUT wartet
- * nicht auf die Quelle (`tests/pegel.rs`, `put_und_post_warten_nicht_auf_den_abruf`).
+ * Legt einen maßgeblichen Pegel ECHT im Backend fest: die Kennzahl erscheint nur, wenn der
+ * Einsatz den Auslöser `pegel` trägt, und den liefert der Einsatz-Abruf, nicht die gestellte
+ * Pegelliste. Der PUT wartet nicht auf die Quelle.
  */
 async function legePegelFest(page: Page, einsatzId: string) {
   const r = await page.request.put(`/api/einsaetze/${einsatzId}/pegel`, {
@@ -131,9 +126,9 @@ async function haeltStufe(ziel: Locator, soll: number, name: string): Promise<nu
 }
 
 /**
- * Kontrast eines Textknotens gegen die zusammengesetzte Grundfläche; optional zusätzlich
- * eine fremde Farbe (die Kante steckt im `box-shadow`, nicht im Rand). Kern wie
- * `kraefte-kontrast.spec.ts` — Alpha wird gemischt, unebene Flächen werden abgelehnt.
+ * Kontrast eines Textknotens gegen die zusammengesetzte Grundfläche; optional zusätzlich eine
+ * fremde Farbe (die Kante steckt im `box-shadow`). Alpha wird gemischt, unebene Flächen werden
+ * abgelehnt.
  */
 async function kontrast(ziel: Locator, zusatz?: string) {
   await expect(ziel).toHaveCount(1);
@@ -201,8 +196,7 @@ for (const modus of ['light', 'dark'] as const) {
     await page.addInitScript(([k, v]) => localStorage.setItem(k, v), [THEMA_SCHLUESSEL, modus]);
 
     const werte: string[] = [];
-    // Frisch (neutral) und veraltet (achtung): der Achtungston ändert im Nachtmodus die
-    // Zahlfarbe — beide Zustände gehören gemessen.
+    // Frisch (neutral) und veraltet (achtung): der Achtungston ändert nachts die Zahlfarbe.
     for (const [fall, alter] of [
       ['frisch', 10],
       ['veraltet', 180],
@@ -302,9 +296,8 @@ test('Einstellungssektion Pegel: Trefflächen über die Staffel, kein Querlauf a
       }
       await page.keyboard.press('Escape');
 
-      // Abstände zwischen benachbarten Zielen (Kriterium 2: ≥ 16 px im Handschuh-Betrieb):
-      // Auswahl ↔ Hinzufügen (neben- oder untereinander, je nach Umbruch) und die beiden
-      // Zeilenmenüs untereinander.
+      // Abstände zwischen benachbarten Zielen (≥ 16 px im Handschuh-Betrieb): Auswahl ↔
+      // Hinzufügen und die beiden Zeilenmenüs untereinander.
       const a = (await main
         .locator('.ant-select')
         .filter({ has: page.getByRole('combobox', { name: 'Station wählen' }) })
@@ -347,8 +340,7 @@ test('Einstellungssektion Pegel: Tabulaturdurchlauf ohne verdecktes Fokusziel (3
   await page.goto(`/einsaetze/${einsatzId}/einstellungen/pegel`);
   await expect(page.getByRole('main').locator('[data-lfh="pegel-titel"]')).toHaveCount(2);
 
-  // Die Ziele der Sektion markieren: nur so belegt der Durchlauf, dass er sie ERREICHT hat —
-  // allgemeine Stopps zählen auch Kopfzeile und Navigation mit.
+  // Die Ziele der Sektion markieren: nur so belegt der Durchlauf, dass er sie ERREICHT hat.
   const main = page.getByRole('main');
   const ziele: [string, Locator][] = [
     ['Reiter Pegel', page.getByRole('tab', { name: 'Pegel' })],
@@ -408,25 +400,13 @@ for (const modus of ['light', 'dark'] as const) {
 
 /**
  * Kriterium 12 (CLS ≤ 0,1) — gemessen wird der BEITRAG DES PEGEL-NACHLADENS, nicht die
- * Seiten-CLS insgesamt.
+ * Seiten-CLS insgesamt: unter Linux-Chromium bricht die Kopfzeile bei 1024 px nach dem Mount
+ * auf eine zweite Reihe um und verschiebt die Fläche auch auf Routen ohne Pegel-Bezug — ein
+ * Bestandsbefund der Kopfzeile, den ein Pegel-Test nicht mitzählen darf.
  *
- * WARUM SO (CI-Befund 22.09.2026, Run 35726795873): die erste Fassung summierte ALLE
- * `layout-shift`-Einträge ab Seitenaufbau und fiel in der CI bei 1024 px mit 0,40–0,45 — auf
- * allen drei Flächen, auch in der Sektion ohne Kennzahlenband. Unter Linux-Chromium (Docker,
- * `mcr.microsoft.com/playwright:v1.62.0-noble`) reproduziert: EIN Eintrag von 0,4645 kurz
- * nach dem Mount, Quellen `ant-layout` (y 53 → 105), `kopf-rechts` (y 0 → 52) und
- * `kopf-suche` — die KOPFZEILE bricht auf eine zweite Reihe um, sobald der Einsatzname im
- * Umschalter steht, und schiebt die ganze Fläche um 52 px. Gleiche Zahl auf
- * `/einsatzdaten`, einer Route ohne jeden Pegel-Bezug. Unter macOS bleibt die Kopfzeile bei
- * 1024 px einreihig (schmalere Schriftmetrik), deshalb war der Sprung lokal unsichtbar. Das
- * ist ein Bestandsbefund der Kopfzeile (Prüfliste, offener Punkt), kein Beitrag des Pegels —
- * ein Test, der ihn mitzählt, misst etwas anderes, als er behauptet.
- *
- * Deshalb hält die Spec die Pegel-Antworten ZURÜCK, bis die Seite ruhig steht (keine neue
- * Verschiebung für {@link RUHE_MS}), setzt dann eine Marke (`performance.now()`) und gibt sie
- * frei. Gezählt wird nur, was NACH der Marke verschiebt und nicht auf eine Eingabe folgt
- * (`hadRecentInput`). Die Einträge davor stehen mit ihren Quellen als Messwert daneben — so
- * bleibt sichtbar, was die Seite beim Aufbau tut, ohne es dem Pegel anzulasten.
+ * Die Spec hält deshalb die Pegel-Antworten ZURÜCK, bis die Seite ruhig steht
+ * ({@link RUHE_MS}), setzt eine Marke und gibt sie frei. Gezählt wird nur, was NACH der Marke
+ * ohne vorherige Eingabe verschiebt; die Aufbau-Einträge davor stehen als Messwert daneben.
  */
 const RUHE_MS = 700;
 

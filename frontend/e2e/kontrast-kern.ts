@@ -1,21 +1,8 @@
 import { expect, type Locator } from '@playwright/test';
 
 /**
- * Messkern für Text-/Hintergrundkontrast — geteiltes e2e-Modul.
- *
- * WARUM EIGENES MODUL: der Kern entstand in `betroffene-kontrast.spec.ts` (LFH-455) und wird
- * seit LFH-618 auch von `hellmodus-kontrast.spec.ts` gebraucht. Eine Kopie driftet still
- * auseinander, und ein Messkern, der an zwei Orten verschieden rechnet, macht beide
- * Nachweise wertlos (Präzedenz: `fokus-kern.ts`).
- *
- * Der Inhalt ist ein REINER MOVE aus der Bestandsdatei; deren Selbstprobe („komponiert
- * Alpha und erkennt unlesbare Schrift") bleibt dort und belegt weiterhin denselben Kern.
- *
- * Seit LFH-646 misst derselbe Kern auch eine RANDFARBE ({@link randKontrast}). Dafür ist die
- * Rechnung in EINE Seitenfunktion gezogen, die Vordergrund-Eigenschaft und Grundfläche als
- * Auftrag bekommt — `kontrast()` ruft sie mit `color` gegen die eigene Fläche und liefert
- * dieselben Werte wie vorher. Eine zweite Kopie der Kompositionsrechnung für den Rand wäre
- * genau die Drift, gegen die dieses Modul existiert.
+ * Messkern für Text-/Hintergrund- und Randkontrast, geteilt von allen Kontrast-Specs. Eine
+ * Kopie je Spec driftete still auseinander und machte beide Nachweise wertlos.
  */
 
 type Farbe = [number, number, number, number];
@@ -33,8 +20,8 @@ interface Messung {
   verhaeltnis: number;
 }
 
-// LFH-455: echte Text-/Hintergrundpaare inklusive transparenter Vorfahren.
-// Keine Farbwerte aus dem Produkt importieren: eine schlechte Palette muss rot werden.
+// Echte Text-/Hintergrundpaare inklusive transparenter Vorfahren. Keine Farbwerte aus dem
+// Produkt importieren: eine schlechte Palette muss rot werden.
 function messe(ziel: Locator, auftrag: Auftrag): Promise<Messung> {
   return ziel.evaluate((element, { vordergrund, grund: grundAb }) => {
     type F = [number, number, number, number];

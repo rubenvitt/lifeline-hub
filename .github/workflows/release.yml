@@ -1,45 +1,26 @@
-# Release (LFH-522/LFH-527) — ermittelt die Version, bumpt, taggt, legt das Release an.
+# Release — ermittelt die Version, bumpt, taggt, legt das Release an.
 #
-# WIRD AUFGERUFEN, LÄUFT NICHT SELBST LOS: `ci.yml` ruft diesen Workflow nach grünem Gate
-# und nur bei einem Push auf. Der Umweg über `workflow_call` statt `workflow_run` ist kein
-# Stilfrage, sondern behebt einen Fehler, der erst spät aufgefallen wäre:
+# WIRD AUFGERUFEN, LÄUFT NICHT SELBST LOS: ci.yml ruft ihn nach grünem Gate und nur bei einem
+# Push. `workflow_call` statt `workflow_run`, weil semantic-release den Branch über env-ci aus
+# `GITHUB_REF` liest — ein `workflow_run`-Lauf trägt dort immer den Default-Branch, und ein
+# Push auf `beta` released sonst still als stabile Version. `workflow_call` erbt den
+# auslösenden Ereigniskontext.
 #
-#   semantic-release ermittelt den aktuellen Branch über env-ci aus `GITHUB_REF` — NICHT aus
-#   dem, was `actions/checkout` auscheckt. Ein `workflow_run`-Lauf läuft im Kontext des
-#   Default-Branches, `GITHUB_REF` zeigt dort also auf `main`, egal welcher Branch das Gate
-#   ausgelöst hat. Solange `main` der einzige Kanal ist, fällt das nicht auf. In dem Moment,
-#   in dem `beta` angelegt wird, released ein Push auf `beta` still als stabile Version —
-#   also genau dann, wenn die vorbereiteten Kanäle scharf werden sollen.
-#
-# `workflow_call` erbt den auslösenden Ereigniskontext, damit stimmt `GITHUB_REF` von selbst
-# und es braucht keinen nachgebauten Branch-Wechsel.
-#
-# NICHT JEDER AUFRUF FÜHRT ZU EINEM RELEASE. Der Schritt „Ruhefenster" unten kann den Lauf
-# still zurücktreten lassen, und das ist der Normalfall bei schnell aufeinanderfolgenden
-# Merges: sonst trüge jeder gemergte Pull Request seine eigene Vorabversion, deren Notizen
-# eine Handvoll Commits enthalten. Die Regel und ihre zwei Hälften stehen im Kopf von
-# `scripts/release-ruhefenster.sh` — hier wird sie nur aufgerufen. Dass die Entscheidung
-# in einem Skript liegt und nicht in diesem YAML, ist dieselbe Arbeitsteilung wie beim
-# Sammel-Gate (`scripts/check-all.sh`): das Skript ist die Wahrheit, die CI ist der Ort,
-# an dem es läuft — und nur so ist sie überhaupt testbar (`release-ruhefenster.test.sh`,
-# Schritt 8 des Gates).
+# NICHT JEDER AUFRUF FÜHRT ZU EINEM RELEASE: der Schritt „Ruhefenster" kann den Lauf
+# zurücktreten lassen (Regel im Kopf von `scripts/release-ruhefenster.sh`, dort testbar).
 name: Release
 
 on:
   workflow_call:
     secrets:
-      # Bewusst NICHT `required: true`: dann bräche der Aufruf, solange die App noch nicht
-      # eingerichtet ist (LFH-527), und der allererste Merge auf main käme mit einem roten
-      # Lauf heraus — für einen Schritt, der planmäßig noch nicht laufen kann. Stattdessen
-      # prüft der Job unten selbst und überspringt mit klarer Ansage.
+      # Bewusst NICHT `required: true`: ohne eingerichtete App bräche sonst der Aufruf. Der Job
+      # prüft unten selbst und überspringt mit klarer Ansage.
       RELEASE_APP_ID:
         required: false
       RELEASE_APP_PRIVATE_KEY:
         required: false
-      # Die Release-Notizen schreibt Claude (`scripts/release/ki-notizen.mjs`). Aus demselben
-      # Grund optional wie die App-Secrets: fehlt der Schlüssel, entstehen die konventionellen
-      # Notizen wie bisher — mit Warnung im Protokoll, ohne roten Lauf. Ein Release scheitert
-      # nie an der Prosa.
+      # Die Release-Notizen schreibt Claude (`scripts/release/ki-notizen.mjs`). Optional: ohne
+      # Schlüssel entstehen die konventionellen Notizen, mit Warnung, ohne roten Lauf.
       ANTHROPIC_API_KEY:
         required: false
 
@@ -49,16 +30,12 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    # 45 statt der früheren 20 Minuten, und die Zahl hängt am Ruhefenster: dessen Deckel
-    # steht bei 30 Minuten (RUHEFENSTER_DECKEL_SEK), die eigentliche Release-Arbeit braucht
-    # gemessen rund zehn. Bliebe es bei 20, würde ein wartender Lauf vom Job-Timeout
-    # abgeschnitten — und zwar möglicherweise MITTEN im Release, was genau den Tag ohne
-    # Release erzeugt, gegen den der Nebenläufigkeits-Kommentar in ci.yml argumentiert.
+    # Hängt am Ruhefenster: dessen Deckel steht bei 30 Minuten, die Release-Arbeit braucht rund
+    # zehn. Ein kürzerer Timeout schnitte einen wartenden Lauf womöglich MITTEN im Release ab.
     # Wer den Deckel hebt, hebt diese Zahl mit.
     timeout-minutes: 45
     steps:
       # Solange die App fehlt, ist „nichts tun" das richtige Verhalten — nicht „scheitern".
-      # Ein rot geborener Workflow wird abgeschaltet statt eingerichtet.
       - name: Ist die Release-App eingerichtet?
         id: bereit
         env:
@@ -73,21 +50,15 @@ jobs:
             echo "bereit=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # Der Token kommt aus einer GitHub App, nicht aus GITHUB_TOKEN und nicht aus einem
-      # persönlichen Zugriffstoken. Zwei Gründe: (1) mit GITHUB_TOKEN erzeugte Pushes lösen
-      # bewusst KEINE weiteren Workflows aus — das `release: published`-Ereignis käme nie
-      # an und die Artefakte würden nie gebaut. (2) Ein PAT läuft ab und hängt an einer
-      # Person; die App bleibt, auch wenn sich Zuständigkeiten ändern.
+      # Der Token kommt aus einer GitHub App: mit GITHUB_TOKEN erzeugte Pushes lösen KEINE
+      # weiteren Workflows aus (das `release: published`-Ereignis für die Artefakte käme nie
+      # an), und ein PAT läuft ab und hängt an einer Person.
       #
-      # Die App braucht drei Berechtigungen: `Contents: Read & Write` (Versions-Commit und
-      # Tag), `Issues: Read & Write` (der Kommentar an den enthaltenen Pull Requests läuft
-      # über die Issue-Route) und `Pull requests: Read`. Das `permissions:` oben im Workflow
-      # regelt sie NICHT — es gilt für `GITHUB_TOKEN`, gearbeitet wird mit dem App-Token.
-      #
-      # Bewusst nicht per `permission-*` an dieser Stelle eingeengt: fehlt der App eine hier
-      # angeforderte Berechtigung, bricht schon dieser Schritt — und damit der ganze Release.
-      # Ohne Einengung fehlt im schlechtesten Fall nur der Kommentar, und zwar still; der
-      # Fehlermodus steht bei SUCCESS_COMMENT_TEMPLATE in release.config.mjs.
+      # Die App braucht `Contents: Read & Write` (Versions-Commit und Tag), `Issues: Read &
+      # Write` (Kommentar an den enthaltenen PRs) und `Pull requests: Read`. Das
+      # `permissions:` oben gilt nur für GITHUB_TOKEN. Bewusst nicht per `permission-*`
+      # eingeengt: fehlte der App eine angeforderte Berechtigung, bräche der ganze Release
+      # statt nur des Kommentars (Fehlermodus bei SUCCESS_COMMENT_TEMPLATE in release.config.mjs).
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
         if: steps.bereit.outputs.bereit == 'true'
@@ -98,19 +69,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.bereit.outputs.bereit == 'true'
         with:
-          # Die komplette Historie: semantic-release liest alle Commits seit dem letzten Tag,
-          # ein flacher Klon liefert eine falsche (meist zu kleine) Versionsanhebung.
+          # Die komplette Historie: semantic-release liest alle Commits seit dem letzten Tag.
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: true
 
-      # VOR JEDER TEUREN UND VOR JEDER SCHREIBENDEN HANDLUNG. Der Schritt braucht nur den
-      # Checkout — Toolchains, pnpm-Install und semantic-release hängen unten an seinem
-      # Ergebnis und laufen bei einem Rücktritt gar nicht erst an.
-      #
-      # `git fetch` im Skript braucht die Zugangsdaten aus dem Checkout oben
-      # (`persist-credentials: true`) — ohne sie sieht es den Kanal nicht und hielte einen
-      # überholten Lauf für aktuell.
+      # VOR JEDER TEUREN UND SCHREIBENDEN HANDLUNG — alles unten hängt an seinem Ergebnis.
+      # Das Skript holt den Kanal mit den Zugangsdaten des Checkouts (`persist-credentials`);
+      # ohne sie hielte es einen überholten Lauf für aktuell.
       - name: Ruhefenster
         id: fenster
         if: steps.bereit.outputs.bereit == 'true'
@@ -120,8 +86,8 @@ jobs:
         if: steps.fenster.outputs.freigabe == 'true'
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
 
-      # cargo-set-version aus cargo-edit bumpt Cargo.toml UND Cargo.lock (siehe prepareCmd
-      # in release.config.mjs). Ohne Lock-Bump bräche der nächste --frozen-lockfile-Lauf.
+      # cargo-set-version bumpt Cargo.toml UND Cargo.lock (prepareCmd in release.config.mjs);
+      # ohne Lock-Bump bräche der nächste --frozen-lockfile-Lauf.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: edit-cache
         if: steps.fenster.outputs.freigabe == 'true'
@@ -152,6 +118,5 @@ jobs:
           GIT_COMMITTER_NAME: lifeline-hub-release
           GIT_COMMITTER_EMAIL: noreply@github.com
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        # Der ganze Schritt läuft unter `mise exec`, weil der prepareCmd `pnpm` auf dem PATH
-        # braucht (er bumpt frontend/package.json) — nicht nur semantic-release selbst.
+        # Unter `mise exec`, weil der prepareCmd `pnpm` auf dem PATH braucht.
         run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm exec semantic-release

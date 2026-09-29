@@ -1,14 +1,10 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
-// LFH-674: Verbleib „Notunterkunft" an eine Betreuungsstelle knüpfen — Durchstich im echten
-// Browser gegen das echte Backend.
-//
-// Die Einzelheiten prüfen Vitest (Dialog, Kern, Stellenzelle) und `tests/verbleib_
-// betreuungsstelle.rs` (Prüfkette, Rechte, Zählung). Hier geht es um das Zusammenspiel, das
-// nur der ganze Stack zeigt: Dialog → POST → Personenseite, und eine ZWEITE geöffnete
+// Verbleib „Notunterkunft" an eine Betreuungsstelle knüpfen — Durchstich gegen das echte
+// Backend. Die Einzelheiten prüfen Vitest und `tests/verbleib_betreuungsstelle.rs`; hier geht
+// es um das Zusammenspiel: Dialog → POST → Personenseite, und eine ZWEITE geöffnete
 // Betreuungsseite, die „davon namentlich 1" ohne Neuladen bekommt (Live-Fan-out
-// `person → betreuung`). Dazu der Gegenfall ohne Modul Betreuung. Die Bilder unter
-// `test-results/` sind Sichtbelege für die Prüfliste.
+// `person → betreuung`). Dazu der Gegenfall ohne Modul Betreuung.
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
