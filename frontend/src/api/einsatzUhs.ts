@@ -9,7 +9,7 @@ import type {
   Verfuegbarkeit,
   BelegungsArt,
 } from './types';
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, mitParametern } from './client';
 
 // ---------- UHS ----------
 
@@ -18,11 +18,9 @@ export function listeUhs(
   status?: UhsStatus,
   abschnittId?: number,
 ): Promise<Uhs[]> {
-  const params = new URLSearchParams();
-  if (status) params.set('status', status);
-  if (abschnittId != null) params.set('abschnitt_id', String(abschnittId));
-  const q = params.toString();
-  return apiGet<Uhs[]>(`/api/einsaetze/${einsatzId}/uhs${q ? '?' + q : ''}`);
+  return apiGet<Uhs[]>(
+    mitParametern(`/api/einsaetze/${einsatzId}/uhs`, { status, abschnitt_id: abschnittId }),
+  );
 }
 
 export function ladeUhs(einsatzId: number, uhsId: number): Promise<UhsDetail> {

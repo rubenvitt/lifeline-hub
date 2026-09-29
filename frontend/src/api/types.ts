@@ -159,6 +159,7 @@ export type EtbAnzahl = S['EtbAnzahlAnzeige'];
 export type LiveEvent = S['LiveEvent'];
 
 // ============================== Fahrzeuge / Material / Personal ==============================
+export type Dienststatus = S['Dienststatus'];
 export type StatusKategorie = S['StatusKategorie'];
 export type Staerke = S['Staerke'];
 export type Fahrzeug = S['FahrzeugAnzeige'];

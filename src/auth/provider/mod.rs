@@ -3,6 +3,7 @@
 pub mod password;
 pub mod registry;
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -18,30 +19,19 @@ pub const ID_OIDC: &str = "oidc";
 /// garantierte Admin-Weg, bis Admin-Linking/Policy das ändert (LFH-277).
 pub const ID_WEBAUTHN: &str = "webauthn";
 
-/// Art eines Auth-Providers — bestimmt, wie das Frontend den Login rendert.
-/// Wire == snake_case (Enum-Wire-Kontrakt).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AuthProviderTyp {
-    /// Lokaler Benutzername+Passwort-Login (heutiger Flow).
-    Passwort,
-    /// Dev-Schnellanmeldung (nur mit Cargo-Feature `dev-seeds`).
-    Dev,
-    /// OIDC/SSO-Login gegen einen externen Identity-Provider (LFH-41, Increment 3).
-    Oidc,
-    /// App-eigener Passkey/WebAuthn-Login (LFH-275, Increment 4).
-    Webauthn,
-}
-
-impl AuthProviderTyp {
-    /// Wire-/DB-Stringrepräsentation. MUSS dem serde-Wire entsprechen (enum_wire_kontrakt).
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            AuthProviderTyp::Passwort => "passwort",
-            AuthProviderTyp::Dev => "dev",
-            AuthProviderTyp::Oidc => "oidc",
-            AuthProviderTyp::Webauthn => "webauthn",
-        }
+wire_enum! {
+    /// Art eines Auth-Providers — bestimmt, wie das Frontend den Login rendert.
+    /// Wire == snake_case (Enum-Wire-Kontrakt).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AuthProviderTyp {
+        /// Lokaler Benutzername+Passwort-Login (heutiger Flow).
+        Passwort => "passwort",
+        /// Dev-Schnellanmeldung (nur mit Cargo-Feature `dev-seeds`).
+        Dev => "dev",
+        /// OIDC/SSO-Login gegen einen externen Identity-Provider (LFH-41, Increment 3).
+        Oidc => "oidc",
+        /// App-eigener Passkey/WebAuthn-Login (LFH-275, Increment 4).
+        Webauthn => "webauthn",
     }
 }
 

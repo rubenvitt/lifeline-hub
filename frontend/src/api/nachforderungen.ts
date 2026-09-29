@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, mitParametern } from './client';
 import type { Nachforderung, NachforderungStatus, NeueNachforderung } from './types';
 
 interface NachforderungFilter {
@@ -9,10 +9,9 @@ export function listeNachforderungen(
   einsatzId: number,
   filter: NachforderungFilter = {},
 ): Promise<Nachforderung[]> {
-  const p = new URLSearchParams();
-  if (filter.status) p.set('status', filter.status);
-  const q = p.toString() ? `?${p.toString()}` : '';
-  return apiGet<Nachforderung[]>(`/api/einsaetze/${einsatzId}/nachforderungen${q}`);
+  return apiGet<Nachforderung[]>(
+    mitParametern(`/api/einsaetze/${einsatzId}/nachforderungen`, { status: filter.status }),
+  );
 }
 
 export function legeNachforderungAn(

@@ -1,4 +1,5 @@
 use super::{EtbEintragAnzeige, FolgeauftragVerweis};
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::error::AppError;
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
 use std::collections::HashMap;
@@ -91,9 +92,7 @@ pub async fn anlegen(
     erfasser_id: i64,
     daten: EintragDaten<'_>,
 ) -> Result<EtbEintragAnzeige, AppError> {
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(pool, einsatz_id).await?;
     let id = {
         let mut conn = pool.acquire().await?;
         anlegen_tx(&mut *conn, einsatz_id, erfasser_id, startwert, daten).await?
@@ -171,9 +170,7 @@ pub async fn anlegen_idempotent(
     anhang_ids: &[i64],
     daten: EintragDaten<'_>,
 ) -> Result<(EtbEintragAnzeige, bool), AppError> {
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(pool, einsatz_id).await?;
     let (id, war_neu) = crate::write_retry!(pool, |conn| {
         if let Some(cid) = client_id {
             if let Some(id) = bestehende_client_id(&mut *conn, einsatz_id, cid).await? {

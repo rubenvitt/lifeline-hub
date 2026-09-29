@@ -245,39 +245,23 @@ pub async fn storniere(
     id: i64,
     geaendert_von: i64,
 ) -> Result<(), AppError> {
-    let belegt = aktive_belegungen(pool, id).await?;
+    let mut conn = pool.acquire().await?;
+    let belegt = aktive_belegungen_tx(&mut conn, id).await?;
     if belegt > 0 {
         return Err(AppError::Conflict(format!(
             "Storno nicht möglich — noch {belegt} Einheit(en)/Fahrzeug(e) belegt"
         )));
     }
-    let ergebnis = sqlx::query(
-        "UPDATE bereitstellungsraum \
-         SET storniert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-             geaendert_von = ? \
-         WHERE id = ? AND einsatz_id = ? AND storniert_at IS NULL",
+    crate::storno::storniere(
+        &mut conn,
+        "bereitstellungsraum",
+        "einsatz_id",
+        einsatz_id,
+        id,
+        crate::storno::Vermerk::Geaendert(geaendert_von),
+        Some("BR ist bereits storniert"),
     )
-    .bind(geaendert_von)
-    .bind(id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?;
-    if ergebnis.rows_affected() == 0 {
-        // Entweder nicht zum Einsatz oder bereits storniert. Differenzierung:
-        let existiert: Option<Option<String>> = sqlx::query_scalar(
-            "SELECT storniert_at FROM bereitstellungsraum WHERE id = ? AND einsatz_id = ?",
-        )
-        .bind(id)
-        .bind(einsatz_id)
-        .fetch_optional(pool)
-        .await?;
-        return match existiert {
-            None => Err(AppError::NotFound),
-            Some(_) => Err(AppError::Conflict("BR ist bereits storniert".into())),
-        };
-    }
-    Ok(())
+    .await
 }
 
 /// Anzahl aktiv belegter Einheiten + Fahrzeuge über den denormalisierten Cache,
@@ -298,12 +282,6 @@ pub async fn aktive_belegungen_tx(
     .bind(br_id)
     .fetch_one(&mut *conn)
     .await?)
-}
-
-/// Pool-Wrapper: zählt aktive Belegungen auf einer frischen Connection.
-pub async fn aktive_belegungen(pool: &SqlitePool, br_id: i64) -> Result<i64, AppError> {
-    let mut conn = pool.acquire().await?;
-    aktive_belegungen_tx(&mut conn, br_id).await
 }
 
 #[cfg(test)]
@@ -581,7 +559,12 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         let br = anlegen(&pool, e, b, neu("BR Zaehlen")).await.unwrap();
-        assert_eq!(aktive_belegungen(&pool, br.id).await.unwrap(), 0);
+        assert_eq!(
+            aktive_belegungen_tx(&mut *pool.acquire().await.unwrap(), br.id)
+                .await
+                .unwrap(),
+            0
+        );
         // Eine Einheit + ein Fahrzeug belegen:
         sqlx::query(
             "INSERT INTO einsatz_einheit (einsatz_id, name, aktueller_br_id) VALUES (?, 'E1', ?)",
@@ -599,7 +582,12 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        assert_eq!(aktive_belegungen(&pool, br.id).await.unwrap(), 2);
+        assert_eq!(
+            aktive_belegungen_tx(&mut *pool.acquire().await.unwrap(), br.id)
+                .await
+                .unwrap(),
+            2
+        );
         // Ungebundenes Fahrzeug zählt nicht:
         sqlx::query(
             "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'FLF2')",
@@ -608,6 +596,11 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        assert_eq!(aktive_belegungen(&pool, br.id).await.unwrap(), 2);
+        assert_eq!(
+            aktive_belegungen_tx(&mut *pool.acquire().await.unwrap(), br.id)
+                .await
+                .unwrap(),
+            2
+        );
     }
 }

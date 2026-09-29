@@ -1,6 +1,6 @@
 import { Alert, App, Form, Input } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import { starteOfflineDownload } from '../api/offlineKarten';
 import { invalidiereKarte } from './invalidiereKarte';
@@ -45,7 +45,7 @@ export default function OfflineDownloadUrlModal({
       invalidiereKarte(qc);
       message.success('Download gestartet');
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Download fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Download fehlgeschlagen')),
   });
 
   return (

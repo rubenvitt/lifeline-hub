@@ -6,7 +6,7 @@ import type {
   ObjektTyp,
   BrBelegungsArt,
 } from './types';
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, mitParametern } from './client';
 
 // ---------- Bereitstellungsräume ----------
 
@@ -15,12 +15,11 @@ export function listeBr(
   status?: BrStatus,
   abschnittId?: number,
 ): Promise<Bereitstellungsraum[]> {
-  const params = new URLSearchParams();
-  if (status) params.set('status', status);
-  if (abschnittId != null) params.set('abschnitt_id', String(abschnittId));
-  const q = params.toString();
   return apiGet<Bereitstellungsraum[]>(
-    `/api/einsaetze/${einsatzId}/bereitstellungsraeume${q ? '?' + q : ''}`,
+    mitParametern(`/api/einsaetze/${einsatzId}/bereitstellungsraeume`, {
+      status,
+      abschnitt_id: abschnittId,
+    }),
   );
 }
 

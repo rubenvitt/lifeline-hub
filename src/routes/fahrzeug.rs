@@ -5,7 +5,7 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::fahrzeug::repo::{self, FahrzeugDaten, FahrzeugPatch};
 use crate::fahrzeug::{FahrzeugAnzeige, FahrzeugVorschlaege};
-use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
+use crate::routes::support::{deserialize_optional_field, pflicht, trimme, trimme_tri};
 use crate::staerke::Staerke;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -68,12 +68,7 @@ impl Normalisiert {
 }
 
 fn normalisiere(body: FahrzeugBody) -> Result<Normalisiert, AppError> {
-    let funkrufname = body.funkrufname.trim().to_string();
-    if funkrufname.is_empty() {
-        return Err(AppError::Validation(
-            "Funkrufname darf nicht leer sein".into(),
-        ));
-    }
+    let funkrufname = pflicht(&body.funkrufname, "Funkrufname")?;
     let staerke = Staerke::aus_optionen(
         body.staerke_fuehrer,
         body.staerke_unterfuehrer,
@@ -187,12 +182,7 @@ fn normalisiere_patch(
 ) -> Result<PatchNormalisiert, AppError> {
     let funkrufname = match body.funkrufname {
         Some(f) => {
-            let f = f.trim().to_string();
-            if f.is_empty() {
-                return Err(AppError::Validation(
-                    "Funkrufname darf nicht leer sein".into(),
-                ));
-            }
+            let f = pflicht(&f, "Funkrufname")?;
             Some(f)
         }
         None => None,

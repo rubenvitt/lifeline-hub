@@ -23,16 +23,12 @@ use crate::error::AppError;
 // ---------------------------------------------------------------------------------------------
 
 const JETZT: &str = "2026-09-25 12:00:00";
-const ZEITFORMAT: &str = "%Y-%m-%d %H:%M:%S";
-
 fn jetzt() -> NaiveDateTime {
-    NaiveDateTime::parse_from_str(JETZT, ZEITFORMAT).unwrap()
+    crate::zeit::parse(JETZT).unwrap()
 }
 
 fn zeit_vor(min: i64) -> String {
-    (jetzt() - chrono::Duration::minutes(min))
-        .format(ZEITFORMAT)
-        .to_string()
+    crate::zeit::formatiere(jetzt() - chrono::Duration::minutes(min))
 }
 
 struct Org {

@@ -28,6 +28,7 @@ use super::{
     SonderkostEingabe, VerpflegungAnzeige, ZeitfensterAnzeige,
 };
 use crate::error::AppError;
+use crate::routes::support::pflicht;
 
 /// Eingabe „Zeitfenster anlegen“. Die Route hat JSON gelesen und die Zeitpunkte normalisiert
 /// (UTC, `YYYY-MM-DD HH:MM:SS`); Bezeichnung, Bedarf, Sonderkost und Zeitregel prüft das Repo.
@@ -295,16 +296,6 @@ pub async fn zeitzone(pool: &SqlitePool, einsatz_id: i64) -> Result<Tz, AppError
 
 // ── Feldprüfungen (400) ─────────────────────────────────────────────────────────────────────
 
-fn bezeichnung_pruefen(s: &str) -> Result<String, AppError> {
-    let t = s.trim();
-    if t.is_empty() {
-        return Err(AppError::Validation(
-            "bezeichnung darf nicht leer sein".into(),
-        ));
-    }
-    Ok(t.to_string())
-}
-
 /// Optionaler Freitext: getrimmt, leer = nicht gesetzt.
 fn text_opt(s: Option<&str>) -> Option<String> {
     s.map(str::trim)
@@ -390,7 +381,7 @@ pub async fn zeitfenster_anlegen_tx(
     eingabe: &ZeitfensterEingabe,
 ) -> Result<Geschrieben, AppError> {
     // 400 — jedes Feld für sich
-    let bezeichnung = bezeichnung_pruefen(&eingabe.bezeichnung)?;
+    let bezeichnung = pflicht(&eingabe.bezeichnung, "bezeichnung")?;
     draht_lesen("von_at", &eingabe.von_at)?;
     draht_lesen("bis_at", &eingabe.bis_at)?;
     anzahl_pruefen("bedarf_kraefte", eingabe.bedarf_kraefte)?;
@@ -460,7 +451,7 @@ pub async fn zeitfenster_aendern_tx(
 
     // 400 — jedes übergebene Feld für sich
     let bezeichnung = match &a.bezeichnung {
-        Some(b) => bezeichnung_pruefen(b)?,
+        Some(b) => pflicht(b, "bezeichnung")?,
         None => roh.bezeichnung.clone(),
     };
     let von_at = a.von_at.clone().unwrap_or_else(|| roh.von_at.clone());

@@ -10,7 +10,8 @@ import {
   parseRouteId,
   abloesungPfad,
 } from '../routing/deeplinks';
-import { ERINNERUNG_STATUS, StatusBadge, QuittungIndikator, formatZeit } from '../kommunikation';
+import { ERINNERUNG_STATUS, StatusBadge, QuittungIndikator } from '../kommunikation';
+import { formatZeit } from '../anzeige/format';
 import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';

@@ -21,7 +21,7 @@ pub async fn liste(
     let einsatz_id = ctx.einsatz.id;
     let erlaubt =
         erlaubte_module(&state.pool, einsatz_id, ctx.einsatz.org_id, &ctx.benutzer).await?;
-    let jetzt = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let jetzt = crate::zeit::jetzt();
     Ok(Json(
         zaehler::berechne(&state.pool, einsatz_id, &ctx.benutzer, &erlaubt, &jetzt).await?,
     ))

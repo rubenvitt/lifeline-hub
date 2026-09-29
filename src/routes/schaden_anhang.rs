@@ -13,6 +13,7 @@ use axum::Json;
 
 use crate::anhang;
 use crate::app::AppState;
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Schaeden;
 use crate::error::AppError;
@@ -88,9 +89,7 @@ pub async fn ablegen(
     let (dateiname, daten) = genau_eine_datei(&mut multipart).await?;
     let mime =
         anhang::pruefe_vor_persist(&dateiname, &daten, anhang::ERLAUBTE_MIME_ERFASSUNG).await?;
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let (id, etb_id) = schaden_anhang::ablegen(
         &state.pool,
         einsatz_id,
@@ -136,9 +135,7 @@ pub async fn entfernen(
     PfadParam((_einsatz_id, schaden_id, id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let etb_id = schaden_anhang::entfernen(
         &state.pool,
         einsatz_id,

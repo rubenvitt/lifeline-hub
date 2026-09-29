@@ -4,7 +4,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { EinsatzRolle, MitgliedAnzeige } from '../api/types';
-import { ApiError } from '../api/client';
+import { ApiError, fehlerText } from '../api/client';
 import { entferneMitglied, ladeMitglieder, setzeMitglied } from '../api/einsaetze';
 import { listeBenutzer } from '../api/benutzer';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -127,12 +127,12 @@ export default function MitgliederAbschnitt({
       qc.setQueryData(einsatzKeys.mitglieder(einsatzId), liste);
       setNeuerBenutzer(undefined);
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e)),
   });
   const entfernen = useMutation({
     mutationFn: (benutzerId: number) => entferneMitglied(einsatzId, benutzerId),
     onSuccess: (liste) => qc.setQueryData(einsatzKeys.mitglieder(einsatzId), liste),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e)),
   });
 
   const mitglieder = mitgliederQuery.data ?? [];
