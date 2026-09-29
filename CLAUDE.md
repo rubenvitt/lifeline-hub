@@ -212,9 +212,14 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   Flow-Geschwister mit `bandStil(…)` (`'auto'`, nie `position: 'absolute'`). Der Fuß endet vor der
   Knopfspalte (`fussStil(knopfKante)`) und oben an der Karte; kein `overflow` am Rahmen.
 - **Die Karte kippt nicht** (`touchPitch: false` **und** `maxPitch: 0` in `Kartenflaeche.tsx`).
-  Unter `lg` schließt eine Zonen-/Abschnittszeichnung die Leiste für die Sitzung
-  (`karteFreigeben` in `LagekartePage.tsx`, `verberge` in `lagekarte/leistenWahl.ts`; Rest
-  LFH-765).
+- **Unter `lg` gibt jeder Kartenmodus die Karte frei** (LFH-765,
+  `openspec/changes/lfh-765-lagekarte-modi-karte-freigeben/design.md`): abgeleitet aus
+  `exklusiverModusAktiv` in `leisteSichtbar` (`lagekarte/leistenWahl.ts`), nie per Aufruf je
+  Startweg; nach dem Modus gilt wieder der vorherige Zustand (Entscheidung 29.09.2026).
+  „Leiste einblenden" im Modus ist `umschalteImModus` (nie gespeichert). Die Bedienung der
+  Leistenmodi (Platzieren, Taktisches Zeichen, Bild) steht unter `lg` im Fuß-Band
+  `PlatzierSteuerung`, die Sidebar zeigt dann nur einen Hinweis (`modusBedienungImFuss`) — je
+  Breite genau ein Knopf je Handlung. Ab `lg` erzwingen die Leistenmodi die Leiste wie bisher.
 - Nachweise: `e2e/lagekarte-smoke.spec.ts`, `e2e/gate1-ueberlauf.spec.ts`,
   `e2e/lagekarte-touch.spec.ts` (LFH-713, `hasTouch`, Trefferwache `elementFromPoint`), `fokus-verdeckung.spec.ts`; Kartenaufbauten sieht
   `e2e/fokus-kern.ts` nur über `zusatzKandidaten`.
