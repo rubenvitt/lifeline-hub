@@ -1,4 +1,4 @@
-import { App, Button, Popconfirm, Space, type TableColumnsType } from 'antd';
+import { Button, Popconfirm, Space, type TableColumnsType } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { StatusChip, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -7,7 +7,6 @@ import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { fehlerText } from '../api/client';
 import { deaktiviereSprechgruppe, listeSprechgruppen } from '../api/sprechgruppen';
 import type { Sprechgruppe } from '../api/types';
 import SprechgruppeFormModal from './SprechgruppeFormModal';
@@ -18,7 +17,6 @@ export default function SprechgruppenTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
-  const { message } = App.useApp();
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Sprechgruppe | null>(null);
 
@@ -27,10 +25,11 @@ export default function SprechgruppenTab() {
     queryFn: () => listeSprechgruppen(false),
   });
 
+  // KEIN `onError` (LFH-473): ein Toast wäre nach drei Sekunden weg, danach sagte nichts mehr, dass
+  // und warum das Deaktivieren scheiterte. Der Fehler steht im `SeitenHinweise`-Slot unten.
   const deaktivierenMutation = useMutation({
     mutationFn: (id: number) => deaktiviereSprechgruppe(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.sprechgruppenAlle() }),
-    onError: (e) => message.error(fehlerText(e)),
   });
 
   const spalten: TableColumnsType<Sprechgruppe> = [
@@ -148,7 +147,15 @@ export default function SprechgruppenTab() {
           Sprechgruppe anlegen
         </Button>
       }
-      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
+      hinweis={
+        <SeitenHinweise
+          fehler={deaktivierenMutation.error}
+          fehlerTitel="Nicht deaktiviert"
+          fehlerFallback="Deaktivieren fehlgeschlagen"
+          rechteFehlt={!istAdmin}
+          rechteText={STAMMDATEN_RECHTE_TEXT}
+        />
+      }
     >
       {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
          `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Noch

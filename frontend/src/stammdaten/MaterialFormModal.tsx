@@ -64,6 +64,8 @@ export default function MaterialFormModal({
       qc.invalidateQueries({ queryKey: globalKeys.material() });
       qc.invalidateQueries({ queryKey: globalKeys.materialKategorien() });
     },
+    // Toast bleibt (LFH-473): nach der Ablehnung stehen Dialog und Wortlaut offen, nichts wirkt
+    // gespeichert; der Seiten-Slot läge hinter der Maske.
     onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 

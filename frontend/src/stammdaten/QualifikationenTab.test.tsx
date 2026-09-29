@@ -6,6 +6,8 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import QualifikationenTab from './QualifikationenTab';
 import { adminFixture } from '../test/fixtures';
+import { offeneRueckfrage } from '../test/rueckfrage';
+import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
@@ -205,5 +207,58 @@ describe('QualifikationenTab', () => {
     await screen.findByText('Label bereits vergeben');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(within(screen.getByRole('dialog')).getByLabelText('Label')).toHaveValue('Gruppenführer');
+  });
+});
+
+/**
+ * Fehlschläge stehen an der SEITE, nicht im Toast (LFH-473). Der Slot ist EINER für zwei
+ * Handlungen (Anlegen und Deaktivieren); wer eine auslöst, räumt auch den Fehler der
+ * anderen — sonst stünde nach dem nächsten Versuch ein alter Grund über der Seite.
+ */
+describe('QualifikationenTab — Fehlschläge als stehender Hinweis (LFH-473)', () => {
+  it('Deaktivieren: der Hinweis steht und geht beim nächsten Absenden', async () => {
+    let versuch = 0;
+    server.use(
+      http.post('/api/qualifikationen/:id/deaktivieren', () => {
+        versuch += 1;
+        if (versuch > 1) return new Promise<never>(() => {});
+        return HttpResponse.json(
+          { error: 'Qualifikation ist Personal zugeordnet' },
+          { status: 409 },
+        );
+      }),
+    );
+    render(admin);
+    await screen.findByText('Sanitäter');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Deaktivieren' })[0]);
+    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    const hinweis = await stehenderFehler('Qualifikation ist Personal zugeordnet');
+    expect(hinweis).toHaveTextContent('Nicht deaktiviert');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Deaktivieren' })[0]);
+    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    await keinStehenderFehler('Qualifikation ist Personal zugeordnet');
+    expect(versuch).toBe(2);
+  });
+
+  it('Anlegen: der Hinweis steht, das Feld behält den Text, Deaktivieren räumt ihn', async () => {
+    server.use(
+      http.post('/api/qualifikationen', () =>
+        HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 409 }),
+      ),
+      http.post('/api/qualifikationen/:id/deaktivieren', () => new Promise<never>(() => {})),
+    );
+    render(admin);
+    await screen.findByText('Sanitäter');
+
+    await userEvent.type(screen.getByLabelText('Neue Qualifikation'), 'Sanitäter{Enter}');
+    const hinweis = await stehenderFehler('Label bereits vergeben');
+    expect(hinweis).toHaveTextContent('Nicht angelegt');
+    expect(screen.getByLabelText('Neue Qualifikation')).toHaveValue('Sanitäter');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Deaktivieren' })[0]);
+    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    await keinStehenderFehler('Label bereits vergeben');
   });
 });

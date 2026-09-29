@@ -1,11 +1,13 @@
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import EtbBausteineTab from './EtbBausteineTab';
 import { adminFixture } from '../test/fixtures';
+import { offeneRueckfrage } from '../test/rueckfrage';
+import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
@@ -193,5 +195,36 @@ describe('EtbBausteineTab — Zwei-Zeilen-Zelle (LFH-346 · A4)', () => {
     // Dass er es hält, misst der Ordnungs-Test oben mit „Einsatzabschnitt".
     expect(screen.getByPlaceholderText('Label oder Inhalt')).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Label')).toBeNull();
+  });
+});
+
+/**
+ * Ein gescheitertes Deaktivieren steht an der SEITE, nicht im Toast (LFH-473): nach drei Sekunden
+ * wäre der Toast weg und die Zeile stünde unverändert da. Das nächste Absenden räumt den Hinweis
+ * (react-query setzt `error` beim Übergang nach `pending` zurück) — deshalb hängt der zweite
+ * Versuch, statt zu gelingen.
+ */
+describe('EtbBausteineTab — Fehlschlag des Deaktivierens (LFH-473)', () => {
+  it('hinterlässt einen stehenden Hinweis, den das nächste Absenden räumt', async () => {
+    let versuch = 0;
+    server.use(
+      http.post('/api/etb-bausteine/:id/deaktivieren', () => {
+        versuch += 1;
+        if (versuch > 1) return new Promise<never>(() => {});
+        return HttpResponse.json({ error: 'Baustein wird gerade bearbeitet' }, { status: 409 });
+      }),
+    );
+    render(admin);
+    await screen.findByText('Lage unverändert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Deaktivieren' }));
+    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    const hinweis = await stehenderFehler('Baustein wird gerade bearbeitet');
+    expect(hinweis).toHaveTextContent('Nicht deaktiviert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Deaktivieren' }));
+    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    await keinStehenderFehler('Baustein wird gerade bearbeitet');
+    expect(versuch).toBe(2);
   });
 });

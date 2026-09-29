@@ -1,4 +1,4 @@
-import { App, Button, Popconfirm, Space, Typography, theme } from 'antd';
+import { Button, Popconfirm, Space, Typography, theme } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
@@ -6,7 +6,6 @@ import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { fehlerText } from '../api/client';
 import { deaktiviereBaustein, listeBausteine } from '../api/etbBaustein';
 import type { EtbBaustein } from '../api/types';
 import { monoStil } from '../components/instrument';
@@ -19,17 +18,17 @@ export default function EtbBausteineTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
-  const { message } = App.useApp();
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<EtbBaustein | null>(null);
   const { token } = theme.useToken();
 
   const query = useQuery({ queryKey: globalKeys.etbBausteine(), queryFn: listeBausteine });
 
+  // KEIN `onError` (LFH-473): ein Toast wäre nach drei Sekunden weg, danach sagte nichts mehr, dass
+  // und warum das Deaktivieren scheiterte. Der Fehler steht im `SeitenHinweise`-Slot unten.
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereBaustein(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.etbBausteine() }),
-    onError: (e) => message.error(fehlerText(e, 'Deaktivieren fehlgeschlagen')),
   });
 
   const spalten: KatalogSpalte<EtbBaustein>[] = [
@@ -166,7 +165,15 @@ export default function EtbBausteineTab() {
           Baustein anlegen
         </Button>
       }
-      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
+      hinweis={
+        <SeitenHinweise
+          fehler={deaktivieren.error}
+          fehlerTitel="Nicht deaktiviert"
+          fehlerFallback="Deaktivieren fehlgeschlagen"
+          rechteFehlt={!istAdmin}
+          rechteText={STAMMDATEN_RECHTE_TEXT}
+        />
+      }
     >
       {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
          `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Keine
