@@ -11,9 +11,8 @@ import {
   istRueckmeldungenKey,
 } from './queryKeys';
 
-// LFH-122: Das deklarative Event→Keys-Registry ist die EINE Quelle, aus der
-// useEinsatzLiveStream Listener, Invalidierung und den lagged-Vollabgleich ableitet.
-// Diese Tests pinnen die Zuordnung, damit ein neues Live-Modul = ein Map-Eintrag bleibt.
+// Das Event→Keys-Registry ist die EINE Quelle für Listener, Invalidierung und lagged-Abgleich
+// von useEinsatzLiveStream; diese Tests pinnen die Zuordnung.
 
 describe('EINSATZ_KEYS', () => {
   it('trägt wire-korrekte Prefix-Strings (erstes Query-Key-Element)', () => {
@@ -23,32 +22,21 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.gefahrenmatrix).toBe('gefahrenmatrix');
     expect(EINSATZ_KEYS.br).toBe('einsatz-br');
     expect(EINSATZ_KEYS.brDetail).toBe('einsatz-br-detail');
-    // LFH-46: als HANDGESCHRIEBENES Literal, nicht über `EINSATZ_KEYS.stab` — sonst prüfte
-    // der Pin die Konstante gegen sich selbst. Ein geänderter Query-Key bricht nichts, er
-    // trifft still ein anderes Cache-Fach: kein Fehler, kein roter Test, kein auffälliger
-    // Request. Der Byte-Pin ist die einzige Stelle, die das bemerkt.
+    // Als HANDGESCHRIEBENES Literal, nicht über `EINSATZ_KEYS.stab`, sonst prüfte der Pin die
+    // Konstante gegen sich selbst. Ein geänderter Query-Key trifft still ein anderes Cache-Fach.
     expect(EINSATZ_KEYS.stab).toBe('einsatz-stab');
     expect(EINSATZ_KEYS.modulZaehler).toBe('einsatz-modul-zaehler');
-    // LFH-632: ebenfalls als Literal gepinnt.
     expect(EINSATZ_KEYS.dokumente).toBe('einsatz-dokumente');
-    // LFH-635: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
     expect(EINSATZ_KEYS.abloesungen).toBe('einsatz-abloesungen');
-    // LFH-639: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
     expect(EINSATZ_KEYS.betreuung).toBe('einsatz-betreuung');
-    // LFH-634: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
     expect(EINSATZ_KEYS.verpflegung).toBe('einsatz-verpflegung');
-    // LFH-21: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
     expect(EINSATZ_KEYS.schadenAnhaenge).toBe('einsatz-schaden-anhaenge');
   });
 });
 
 describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
-  // F01/LFH-227: `person` und `personal` sind getrennte Wire-Events. Vorher trug EIN
-  // `person`-Tag beide ID-Räume (betroffene Person vs. einsatz_personal-Disposition) und
-  // musste deshalb ×5 fan-outen; getrennt kann das Backend die Module getrennt gaten.
-  // LFH-674: … plus die Betreuungsübersicht, denn „davon namentlich n“ hängt am Verbleib der
-  // Personen. Das Personen-Ereignis erreicht nur Leser mit Personenrecht — genau die, die die
-  // Zahl sehen (design.md D5).
+  // `person` und `personal` sind getrennte Wire-Events. Die Betreuungsübersicht hängt mit dran,
+  // weil „davon namentlich n“ am Verbleib der Personen hängt.
   it('bildet person auf die Personen-Registrierung und die Betreuungsübersicht ab', () => {
     expect(EINSATZ_STREAM_EVENTS.person).toEqual([
       EINSATZ_KEYS.personen,
@@ -71,8 +59,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     expect(EINSATZ_STREAM_EVENTS.fahrzeug).toEqual([
       EINSATZ_KEYS.fahrzeuge,
       EINSATZ_KEYS.einheiten,
-      // Die Einheitenliste ist eine gezählte Menge (LFH-612) — wer sie invalidiert, zieht
-      // den Modulzähler mit.
+      // Die Einheitenliste ist eine gezählte Menge, wer sie invalidiert, zieht den Modulzähler mit.
       EINSATZ_KEYS.modulZaehler,
     ]);
   });
@@ -85,15 +72,14 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.fahrzeuge,
       EINSATZ_KEYS.material,
       EINSATZ_KEYS.modulZaehler,
-      // LFH-635: Einheitsname und Auflösung wirken auf die Ablösungsschichten.
+      // Einheitsname und Auflösung wirken auf die Ablösungsschichten.
       EINSATZ_KEYS.abloesungen,
     ]);
   });
 
   it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung und Betreuung ab (LFH-612/635/639)', () => {
-    // Ohne Guard (design.md D10 a): Bezirke und Stellen tragen den Abschnittsnamen per Join.
-    // Umbenennen oder Löschen eines Abschnitts feuert nur `abschnitt` — fehlt die Betreuung
-    // hier, zeigt die Seite still den alten Namen.
+    // Bezirke und Stellen tragen den Abschnittsnamen per Join; fehlt die Betreuung hier, zeigt die
+    // Seite still den alten Namen.
     expect(EINSATZ_STREAM_EVENTS.abschnitt).toEqual([
       EINSATZ_KEYS.abschnitte,
       EINSATZ_KEYS.fuehrungskraefte,
@@ -107,12 +93,11 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     expect(EINSATZ_STREAM_EVENTS.uhs).toEqual([EINSATZ_KEYS.uhs]);
     expect(EINSATZ_STREAM_EVENTS.tier).toEqual([EINSATZ_KEYS.tiere]);
     expect(EINSATZ_STREAM_EVENTS.karte_bild).toEqual([EINSATZ_KEYS.kartenbilder]);
-    // LFH-634 (design.md D6): das DTO trägt keine Nachforderungsdaten, also kein Fan-out.
+    // Das DTO trägt keine Nachforderungsdaten, also kein Fan-out.
     expect(EINSATZ_STREAM_EVENTS.verpflegung).toEqual([EINSATZ_KEYS.verpflegung]);
   });
 
-  // LFH-21: Ablegen und Entfernen einer Datei verteilen `schaden` — die Anhangliste der
-  // Detailseite hängt deshalb neben der Schadensliste an diesem Ereignis.
+  // Ablegen und Entfernen einer Datei verteilen `schaden`.
   it('schaden invalidiert Schadensliste und Anhanglisten', () => {
     expect(EINSATZ_STREAM_EVENTS.schaden).toEqual(['einsatz-schaeden', 'einsatz-schaden-anhaenge']);
   });
@@ -143,10 +128,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     }
   });
 
-  // LFH-612: Vollständigkeit ist eine REGEL, keine Liste. Wer die Liste eines gezählten
-  // Moduls invalidiert, hat eine gezählte Menge verändert — ohne den Modulzähler stünde im
-  // Navigationsrahmen still eine alte Zahl. Die gezählten Listen-Keys kommen aus dem Hook
-  // selbst (`ZAEHLER_LISTEN_KEYS`), nicht aus einer Kopie hier.
+  // Vollständigkeit ist eine REGEL: wer die Liste eines gezählten Moduls invalidiert, invalidiert
+  // den Modulzähler mit. Die gezählten Listen-Keys kommen aus dem Hook (`ZAEHLER_LISTEN_KEYS`).
   it('invalidiert den Modulzähler bei jedem Ereignis, das eine gezählte Liste invalidiert', () => {
     const gezaehlt = new Set<string>(Object.values(ZAEHLER_LISTEN_KEYS));
     const betroffen = Object.entries(EINSATZ_STREAM_EVENTS).filter(([, keys]) =>
@@ -158,8 +141,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
         'etb',
         'person',
         'einheit',
-        // Seit LFH-609 leitet sich der Einheitenstatus aus den Fahrzeugen ab: das
-        // `fahrzeug`-Ereignis invalidiert die Einheitenliste und damit eine gezählte Menge.
+        // Der Einheitenstatus leitet sich aus den Fahrzeugen ab.
         'fahrzeug',
         'abschnitt',
         'meldung',
@@ -179,8 +161,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
   });
 });
 
-// LFH-122: Factory-Output-Tests — die Migrations-Sicherung. Jede Funktion muss ihren
-// exakten Key liefern; ein falscher Shape hier = stille tote Invalidierung im Produktivcode.
+// Factory-Output-Tests: ein falscher Shape wäre eine stille tote Invalidierung.
 describe('einsatzKeys (Factory-Output)', () => {
   it('baut die 2-elementigen Listen-/Prefix-Keys als [prefix, einsatzId]', () => {
     expect(einsatzKeys.einsatz(1)).toEqual(['einsatz', 1]);
@@ -215,18 +196,18 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.dokumente(1)).toEqual(['einsatz-dokumente', 1]);
     expect(einsatzKeys.pegel(1)).toEqual(['einsatz-pegel', 1]);
     expect(einsatzKeys.pegelVorhersage(1, 7)).toEqual(['einsatz-pegel', 1, 'vorhersage', 7]);
-    // LFH-633: Verlauf als Sub-Key des Pegel-Prefix, Wetter als eigener Prefix.
+    // Verlauf als Sub-Key des Pegel-Prefix, Wetter als eigener Prefix.
     expect(einsatzKeys.pegelVerlauf(1)).toEqual(['einsatz-pegel', 1, 'verlauf']);
     expect(einsatzKeys.wetter(1)).toEqual(['einsatz-wetter', 1]);
   });
 
   it('baut die 3-elementigen Detail-Keys als [prefix, einsatzId, id]', () => {
     expect(einsatzKeys.person(1, 2)).toEqual(['einsatz-person', 1, 2]);
-    // null reicht unverändert durch (enabled-Guard-Queries; wie das bisherige Inline-Literal):
+    // null reicht unverändert durch (enabled-Guard-Queries).
     expect(einsatzKeys.person(1, null)).toEqual(['einsatz-person', 1, null]);
     expect(einsatzKeys.einsatz(null)).toEqual(['einsatz', null]);
     expect(einsatzKeys.modulOverrides(1)).toEqual(['einsatz-modul-overrides', 1]);
-    // null wie bei `einsatz`: das Command-Palette lädt nur im Einsatzkontext (enabled-Guard).
+    // null wie bei `einsatz`: die Kommandopalette lädt nur im Einsatzkontext.
     expect(einsatzKeys.modulOverrides(null)).toEqual(['einsatz-modul-overrides', null]);
     expect(einsatzKeys.personAudit(1, 2)).toEqual(['einsatz-person-audit', 1, 2]);
     expect(einsatzKeys.uhsDetail(1, 2)).toEqual(['einsatz-uhs-detail', 1, 2]);
@@ -266,10 +247,9 @@ describe('einsatzKeys (Factory-Output)', () => {
       'geschaedigt',
       2,
     ]);
-    // LFH-543: Sub-Key UNTER dem Stab-Prefix — das `stab`-Ereignis invalidiert ihn mit.
-    // Als Literal gepinnt: ein geänderter Key bricht nichts, er trifft still ein anderes Fach.
+    // Sub-Key UNTER dem Stab-Prefix: das `stab`-Ereignis invalidiert ihn mit.
     expect(einsatzKeys.stabLagebesprechungen(1)).toEqual(['einsatz-stab', 1, 'lagebesprechungen']);
-    // LFH-635: Liste und Vorgaben UNTER dem Ablösungs-Prefix — das `abloesung`-Ereignis trifft beide.
+    // Liste und Vorgaben UNTER dem Ablösungs-Prefix: das `abloesung`-Ereignis trifft beide.
     expect(einsatzKeys.abloesungen(1)).toEqual(['einsatz-abloesungen', 1]);
     expect(einsatzKeys.abloesungListe(1, 'laufend')).toEqual([
       'einsatz-abloesungen',
@@ -278,21 +258,18 @@ describe('einsatzKeys (Factory-Output)', () => {
       'laufend',
     ]);
     expect(einsatzKeys.abloesungVorgaben(1)).toEqual(['einsatz-abloesungen', 1, 'vorgaben']);
-    // LFH-639: Betreuungs-Prefix als Literal gepinnt.
     expect(einsatzKeys.betreuung(1)).toEqual(['einsatz-betreuung', 1]);
-    // LFH-639: Kopfzahl UNTER dem Betreuungs-Prefix — das `betreuung`-Ereignis trifft sie mit.
-    // Der Stichtag ist der Wire-String (UTC ohne Zonenkennung), kein Objekt.
+    // Kopfzahl UNTER dem Betreuungs-Prefix. Der Stichtag ist der Wire-String, kein Objekt.
     expect(einsatzKeys.betreuungKopfzahl(1, '2026-09-23 12:00:00')).toEqual([
       'einsatz-betreuung',
       1,
       'kopfzahl',
       '2026-09-23 12:00:00',
     ]);
-    // Ohne Stichtag („jetzt“) ein fester Platzhalter statt eines sekundengenauen Zeitstempels —
-    // sonst entstünde bei jedem Rendern ein neuer Key und damit ein neuer Abruf.
+    // Ohne Stichtag ein fester Platzhalter statt eines Zeitstempels, sonst entstünde bei jedem
+    // Rendern ein neuer Key.
     expect(einsatzKeys.betreuungKopfzahl(1)).toEqual(['einsatz-betreuung', 1, 'kopfzahl', 'jetzt']);
-    // LFH-676: Verlauf UNTER dem Betreuungs-Prefix — das `betreuung`-Ereignis und die
-    // Invalidierung nach jeder eigenen Mutation treffen ihn ohne eigenen Event-Eintrag.
+    // Verlauf UNTER dem Betreuungs-Prefix, ohne eigenen Event-Eintrag.
     expect(einsatzKeys.betreuungVerlauf(1, 'bezirk', 5)).toEqual([
       'einsatz-betreuung',
       1,
@@ -307,12 +284,11 @@ describe('einsatzKeys (Factory-Output)', () => {
       'stelle',
       9,
     ]);
-    // LFH-634: Verpflegungs-Prefix als Literal gepinnt.
     expect(einsatzKeys.verpflegung(1)).toEqual(['einsatz-verpflegung', 1]);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
-    // LFH-611: Lesemarke UNTER dem ETB-Prefix — das `etb`-Ereignis invalidiert sie mit.
+    // Lesemarke UNTER dem ETB-Prefix: das `etb`-Ereignis invalidiert sie mit.
     expect(einsatzKeys.etbLesemarke(1)).toEqual(['etb', 1, 'lesemarke']);
-    // LFH-612: Zählung UNTER dem ETB-Prefix, mit Filter im Key — das `etb`-Ereignis zieht sie mit.
+    // Zählung UNTER dem ETB-Prefix, mit Filter im Key.
     expect(einsatzKeys.etbZaehler(1, { q: 'x' })).toEqual(['etb', 1, 'zaehler', { q: 'x' }]);
     expect(einsatzKeys.modulZaehler(1)).toEqual(['einsatz-modul-zaehler', 1]);
     // Die gerundeten Koordinaten sind Teil des Keys — Cache-Trefferquote hängt daran.
@@ -345,9 +321,9 @@ describe('einsatzKeys (Factory-Output)', () => {
 });
 
 /**
- * ETB-Druckansicht (LFH-22, design.md D4): ein Druckbeleg ist ein SCHNAPPSCHUSS — er ändert
- * sich nicht unter der Hand. Deshalb ein eigener Prefix außerhalb von `etb` (das Live-Ereignis
- * `etb` matcht per Prefix nur `['etb', …]`) und ein Eintrag in `NICHT_LIVE_KEYS`.
+ * ETB-Druckansicht: ein Druckbeleg ist ein SCHNAPPSCHUSS. Deshalb ein eigener Prefix außerhalb
+ * von `etb` (das Live-Ereignis matcht per Prefix nur `['etb', …]`) und ein Eintrag in
+ * `NICHT_LIVE_KEYS`.
  */
 describe('einsatzKeys.etbDruck (LFH-22)', () => {
   it('baut den Key als [prefix, einsatzId, filter] mit handgeschriebenem Prefix', () => {

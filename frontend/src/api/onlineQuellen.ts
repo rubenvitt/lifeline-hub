@@ -3,18 +3,13 @@ import type { OnlineStyle, OnlineStyleTyp } from './karte';
 import type { components } from './types.generated';
 
 /**
- * Frontend-Seam für die Online-Basemap-Quellen-Verwaltung (LFH-180).
- * Verdrahtet die LFH-179-Endpunkte unter `/api/karte/online-quellen`.
- * Einziger API-Berührungspunkt der Karten-Verwaltung — Komponenten importieren
- * ausschließlich von hier.
- *
- * LFH-265 (Teil A, Frontend): `OnlineQuelle` ist ein Re-Export des generierten Schemas;
- * `OnlineQuelleBody` bleibt als Eingabe-DTO handgepflegt (CLAUDE.md).
+ * Frontend-Seam für die Online-Basemap-Quellen (`/api/karte/online-quellen`); Komponenten
+ * importieren ausschließlich von hier. `OnlineQuelle` ist ein Re-Export des generierten Schemas,
+ * `OnlineQuelleBody` bleibt als Eingabe-DTO handgepflegt.
  */
 
-/** Eine persistierte Online-Quelle (Server-Antwort, inkl. id/sortier/aktiv). `proxy` = serverseitig
- *  proxen (key-basierte Anbieter, LFH-182); bei aktivem Proxy maskiert der Server die `url` für
- *  Nicht-Admins (`***`), der echte Admin sieht/editiert sie weiter. */
+/** Eine persistierte Online-Quelle. `proxy` = serverseitig proxen (key-basierte Anbieter); bei
+ *  aktivem Proxy maskiert der Server die `url` für Nicht-Admins (`***`). */
 export type OnlineQuelle = components['schemas']['OnlineQuelle'];
 
 /**
@@ -29,7 +24,7 @@ export interface OnlineQuelleBody {
   attribution: string | null;
   sortier: number;
   aktiv: boolean;
-  /** Über den Server proxen (key-basierte Anbieter, LFH-182). Default false. */
+  /** Über den Server proxen (key-basierte Anbieter). Default false. */
   proxy: boolean;
 }
 

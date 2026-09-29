@@ -1,16 +1,11 @@
-// frontend/src/command-palette/VorschauZustand.tsx
 import type { ReactNode } from 'react';
 import { Spin, Typography } from 'antd';
 import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 
 /**
- * Überschriftenebene, unter der Markdown in der Palettenvorschau steht (LFH-664) — die
- * `unterEbene` von `components/Markdown.tsx`.
- *
- * Die Palette ist ein Dialog ohne eigene Gliederung, ihre Vorschau-Kopfzeile ist ein `<span>`.
- * 2 heißt: `#` im Text wird `h3`; der Lagebericht setzt seine Abschnittstitel als `h3`, sein
- * Text rückt entsprechend nach. EINE Konstante für ETB-Inhalt und Lagebericht, damit die beiden
- * Sorten in derselben Region nicht auf verschiedenen Ebenen beginnen.
+ * Überschriftenebene, unter der Markdown in der Palettenvorschau steht (`unterEbene` von
+ * `components/Markdown.tsx`). Die Palette hat keine eigene Gliederung; 2 heißt: `#` wird `h3`, wie
+ * die Abschnittstitel des Lageberichts. EINE Konstante für ETB und Lagebericht.
  */
 export const VORSCHAU_UNTER_EBENE = 2;
 
@@ -27,20 +22,16 @@ export interface VorschauAbfrage<T> {
 }
 
 /**
- * Laden · ohne Verbindung · Fehler · „nicht mehr vorhanden" · Inhalt — EINMAL für alle Vorschau-Sorten
- * (LFH-664), statt elfmal in jedem Bauteil.
+ * Laden · ohne Verbindung · Fehler · „nicht mehr vorhanden“ · Inhalt, EINMAL für alle
+ * Vorschau-Sorten.
  *
- * Der dritte Zustand ist der Grund für diese Hülle. Die Vorschau liest ihren Datensatz per
- * `select` aus dem Listenfach der Palette. Ist er dort nicht mehr (gelöscht, aufgelöst, beim
- * ETB eine fremde `id` hinter der Nummer), ist die Abfrage weder am Laden noch gescheitert —
- * `data` ist schlicht `undefined`, und ohne eigenen Zweig bliebe die Vorschau leer. Das wäre
- * von „lädt noch" nicht zu unterscheiden.
+ * Der Grund für die Hülle ist „nicht mehr vorhanden“: die Vorschau liest per `select` aus dem
+ * Listenfach der Palette; fehlt der Datensatz dort, ist `data` schlicht `undefined`, und ohne
+ * eigenen Zweig sähe das aus wie „lädt noch“. Ein Fehler bei vorhandenem Stand zeigt den Stand mit
+ * `SeitenStandVeraltet`.
  *
- * Ein Fehler BEI vorhandenem Stand (gescheitertes Nachladen) wirft den Stand nicht weg, sondern
- * zeigt ihn mit `SeitenStandVeraltet` — dieselbe Regel wie auf den Seiten.
- *
- * `sorte` ist die Nominalphrase mit Artikel („Die Meldung", „Der ETB-Eintrag"): sie beginnt
- * jeden der drei Sätze, und ein Artikel lässt sich aus dem Wort nicht ableiten.
+ * `sorte` ist die Nominalphrase mit Artikel („Die Meldung“); ein Artikel lässt sich nicht
+ * ableiten.
  */
 export function VorschauZustand<T>({
   abfrage,
@@ -52,9 +43,8 @@ export function VorschauZustand<T>({
   children: (daten: T) => ReactNode;
 }) {
   const wiederholen = () => void abfrage.refetch();
-  // An `isPending`, NICHT an `isLoading` (Review-Befund): eine kalte Abfrage OHNE NETZ steht
-  // auf `pending` + `paused`, `isLoading` ist dann false und `data` undefined — sie fiele in
-  // den Zweig „nicht mehr vorhanden" und behauptete etwas über einen Datensatz, den es gibt.
+  // An `isPending`, NICHT an `isLoading`: eine kalte Abfrage OHNE NETZ steht auf `pending` +
+  // `paused`; `isLoading` wäre false und sie fiele in „nicht mehr vorhanden“.
   if (abfrage.isPending) {
     if (abfrage.fetchStatus === 'paused') {
       return (

@@ -32,9 +32,8 @@ describe('useViewport (LFH-329 · H24)', () => {
   });
 
   it("useViewport: bei 800 px greift abBreite('md'), abBreite('lg') aber nicht", () => {
-    // Der Punkt, der die Pakete trennt: Navigationsrahmen und Kopfzeile schalten bei
-    // < lg (992), die Verwaltungsseiten bei < md (768). Ohne diese beiden Achsen im
-    // Hook baut sich jedes Paket seine eigene Ableitung.
+    // Der Punkt, der die Achsen trennt: Navigationsrahmen und Kopfzeile schalten bei < lg (992),
+    // die Verwaltungsseiten bei < md (768).
     setzeViewportBreite(800);
     const { result } = renderHook(() => useViewport());
 
@@ -53,9 +52,8 @@ describe('useViewport (LFH-329 · H24)', () => {
   });
 
   it('abBreiteAus: eine leere Screens-Map gilt als breit', () => {
-    // `Grid.useBreakpoint()` liefert auf dem ERSTEN Render `{}` und korrigiert erst im
-    // useLayoutEffect. Wäre „unbekannt" gleich „schmal", blitzte im Primärkontext Fükw
-    // für einen Frame das Handy-Layout auf. Deshalb: unbekannt ⇒ breit.
+    // `Grid.useBreakpoint()` liefert auf dem ERSTEN Render `{}`. Wäre „unbekannt" gleich „schmal",
+    // blitzte im Primärkontext Fükw für einen Frame das Handy-Layout auf.
     expect(abBreiteAus({}, 'md')).toBe(true);
     expect(abBreiteAus({}, 'lg')).toBe(true);
 
@@ -64,17 +62,16 @@ describe('useViewport (LFH-329 · H24)', () => {
   });
 
   it("abBreite nimmt 'xs' gar nicht erst entgegen", () => {
-    // `xs` ist als EINZIGER antd-Breakpoint eine max-width-Abfrage (responsiveObserver.js):
-    // bei 1024 px wäre screens.xs falsch, und abBreite('xs') läse sich als „schmaler als
-    // xs" — die Umkehrung dessen, was der Name verspricht. Der Typ verhindert den Aufruf.
-    // Diese Zeile wird rot, sobald sie doch typecheckt.
+    // `xs` ist als EINZIGER antd-Breakpoint eine max-width-Abfrage: abBreite('xs') läse sich als
+    // „schmaler als xs". Der Typ verhindert den Aufruf; diese Zeile wird rot, sobald er doch
+    // typecheckt.
     // @ts-expect-error 'xs' ist aus AbBreitePunkt ausgeschlossen
     expect(() => abBreiteAus({}, 'xs')).toBeTypeOf('function');
   });
 
   it('useViewport: fragt (pointer: coarse) und nicht (any-pointer: coarse)', () => {
-    // Ohne diesen Pin wäre ein stiller Wechsel auf any-pointer folgenlos — und der
-    // erzwänge am Fükw-Laptop mit Touchscreen dauerhaft Berührungs-Trefflächen.
+    // Sonst wäre ein stiller Wechsel auf any-pointer folgenlos — und der erzwänge am Fükw-Laptop mit
+    // Touchscreen dauerhaft Berührungs-Trefflächen.
     renderHook(() => useViewport());
 
     expect(erfassteQueries()).toContain('(pointer: coarse)');
@@ -91,9 +88,8 @@ describe('useViewport (LFH-329 · H24)', () => {
   });
 
   it('useViewport: eine Zeigerart-Änderung schlägt durch und feuert nach unmount nicht mehr', () => {
-    // Der einzige Beleg dafür, dass der Zuhörer-Effekt keine tote Zeile ist: der frühere
-    // Stub speicherte Zuhörer gar nicht, jedes Ereignis verpuffte, und ein Effekt ohne
-    // Beleg sähe grün aus.
+    // Belegt, dass der Zuhörer-Effekt keine tote Zeile ist: ohne Ereignis sähe ein Effekt ohne
+    // Wirkung grün aus.
     const { result, unmount } = renderHook(() => useViewport());
     expect(result.current.istBeruehrung).toBe(false);
 

@@ -1,0 +1,4 @@
+{
+  "ergebnis": "[{\"art\":\"get\",\"start\":\"2026-09-29T07:36:57.052Z\",\"aktiv\":true},{\"art\":\"get\",\"ok\":false,\"name\":\"NotAllowedError\",\"msg\":\"The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client.\",\"ms\":3982}]",
+  "name": "pkw2"
+}

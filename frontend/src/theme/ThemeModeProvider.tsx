@@ -33,22 +33,17 @@ const HELLIGKEIT_SCHLUESSEL = 'lifeline-hub.helligkeit';
 /** Ausgangsstufe ohne gespeicherte Wahl: der Fükw-Arbeitsplatz (A1 Festlegung 1). */
 const DICHTE_DEFAULT: Dichte = 'kompakt';
 
-/** …und die Ausgangsstufe, wenn der primäre Zeiger grob ist (LFH-361 · B5a). */
+/** …und die Ausgangsstufe, wenn der primäre Zeiger grob ist. */
 const DICHTE_DEFAULT_BERUEHRUNG: Dichte = 'komfortabel';
 
 interface ThemeModeWert {
   modus: ThemeModus;
   effektiv: EffektivesTheme;
   setModus: (m: ThemeModus) => void;
-  /** Gewählte Bediendichte. Es gibt hier bewusst KEINEN zweiten Typ analog
-   *  `ThemeModus`/`EffektivesTheme`: die Wahl IST die effektive Stufe.
-   *
-   *  Das bleibt auch nach LFH-361 so. Die Zeigerart entscheidet dort nur, WOMIT
-   *  eine Sitzung ohne gespeicherte Wahl beginnt (`gespeicherteDichte`) — sie
-   *  bleibt keine laufende Auflösung wie `system` beim Theme. Ein `automatisch`
-   *  müsste von vier Bedienwegen mitgetragen werden und könnte die Wahl
-   *  überstimmen; beides ist nicht gewollt. Die Abfrage selbst kommt aus
-   *  `useViewport`, nicht aus einer zweiten Medienabfrage in diesem Provider. */
+  /** Gewählte Bediendichte. Kein zweiter Typ wie bei `ThemeModus`/`EffektivesTheme`: die Wahl
+   *  IST die effektive Stufe. Die Zeigerart entscheidet nur, womit eine Sitzung ohne
+   *  gespeicherte Wahl beginnt (`gespeicherteDichte`); ein `automatisch` könnte die Wahl
+   *  überstimmen. */
   dichte: Dichte;
   setDichte: (d: Dichte) => void;
   /** Gewählte Helligkeit (LFH-397). Die WAHL — was wirkt, sagt `helligkeitWirksam`. */
@@ -68,10 +63,8 @@ function istThemeModus(wert: string | null): wert is ThemeModus {
 }
 
 /**
- * Modus ohne gespeicherte Wahl: NACHTBETRIEB (Neuentwurf „Instrumententafel",
- * Entscheidung 1 des Auftraggebers, 21.09.2026). Vorher `system`. „System" bleibt als
- * Wahl erhalten — es ist nur nicht mehr der Ausgangszustand. Gespiegelt im
- * Bootstrap-Skript von `index.html`; wer eines ändert, ändert beide.
+ * Modus ohne gespeicherte Wahl: NACHTBETRIEB. Gespiegelt im Bootstrap-Skript von `index.html`;
+ * wer eines ändert, ändert beide.
  */
 const MODUS_DEFAULT: ThemeModus = 'dark';
 
@@ -85,18 +78,10 @@ function istDichte(wert: string | null): wert is Dichte {
 }
 
 /**
- * Die Stufe, mit der eine Sitzung beginnt (LFH-361 · B5a).
- *
- * Reihenfolge ist die Aussage: eine getroffene Wahl gewinnt IMMER, das
- * Kontextsignal belegt nur vor. Andersherum wäre der Dichte-Umschalter auf
- * jedem Gerät mit grobem Zeiger ein Knopf, der sich beim Neuladen selbst
- * zurückdreht.
- *
- * Ein unbekannter gespeicherter Wert (alte Version, Handeingriff) fällt auf das
- * Kontextsignal zurück, nicht auf `kompakt` — er ist keine Wahl, sondern Müll.
- *
- * Die Zeigerfrage kommt aus dem Viewport-Primitiv, nicht aus einem eigenen
- * `matchMedia` hier: siehe die Begründung an `zeigerIstGrob`.
+ * Die Stufe, mit der eine Sitzung beginnt. Eine getroffene Wahl gewinnt IMMER, die Zeigerart
+ * belegt nur vor; sonst drehte sich der Dichte-Umschalter beim Neuladen selbst zurück. Ein
+ * unbekannter gespeicherter Wert fällt auf das Zeigersignal zurück. Die Zeigerfrage kommt aus
+ * `useViewport` (`zeigerIstGrob`), nicht aus einem eigenen `matchMedia`.
  */
 function gespeicherteDichte(): Dichte {
   const wert = localStorage.getItem(DICHTE_SCHLUESSEL);
@@ -167,17 +152,10 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
     document.documentElement.style.colorScheme = effektiv;
   }, [effektiv]);
 
-  // Die zweite Hälfte des Dichte-Schalters: das Merkmal am <html> schaltet die
-  // `[data-dichte='…']`-Blöcke in `rollen.css` und damit alle `var(--lfh-luft-*)`-
-  // Konsumenten. Ohne diese Zeile folgte nur die antd-Fläche, das
-  // handgeschriebene CSS daneben bliebe kompakt — eine halb umgeschaltete Stufe,
-  // die nichts bricht und erst im Einsatz auffällt.
-  //
-  // Gesetzt wird für ALLE drei Stufen, auch für `kompakt` (kein bedingtes
-  // Entfernen): `kompakt` lebt in `rollen.css` unter `:root` und braucht deshalb
-  // keinen eigenen Block. Wer je einen `[data-dichte='kompakt']`-Block ergänzt,
-  // muss `DICHTE_BLOECKE` und die Partitionsprüfung in `rollen.guard.test.ts`
-  // nachziehen — sonst prüft der Guard die kompakte Stufe weiter gegen `:root`.
+  // Das Merkmal am <html> schaltet die `[data-dichte='…']`-Blöcke in `rollen.css`; ohne es folgte
+  // nur die antd-Fläche und das handgeschriebene CSS bliebe kompakt. Gesetzt für ALLE Stufen:
+  // `kompakt` lebt unter `:root`. Wer einen `[data-dichte='kompakt']`-Block ergänzt, zieht
+  // `DICHTE_BLOECKE` in `rollen.guard.test.ts` nach.
   useEffect(() => {
     document.documentElement.dataset.dichte = dichte;
   }, [dichte]);
@@ -225,31 +203,17 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
     <ThemeModeContext.Provider value={wert}>
       <ConfigProvider
         locale={deDE}
-        // Der Boden der kurzen Achse (LFH-381): die Höhe folgt der Staffel über die Tokens,
-        // die Breite eines beschrifteten Knopfs nur über diesen Kontext-Stil.
+        // Boden der kurzen Achse (LFH-381): die Breite eines beschrifteten Knopfs folgt der Staffel
+        // nur über diesen Kontext-Stil.
         button={knopf}
         theme={{
-          // Die Farbrollen kommen je Modus aus derselben Quelle wie `rollen.css`
-          // (LFH-352 · A0). Der antd-Algorithmus bleibt darunter: er leitet die
-          // abgeleiteten Töne (Hover, Rand, Füllung) aus den gesetzten ab.
-          //
-          // Die Dichte kommt seit LFH-329 · B1 aus der Benutzerwahl (vorher stand
-          // sie fest auf `kompakt`, weil A2 nur den Träger baute). Sie hängt genau
-          // hier und nicht an einer Größen-Prop je Element: die Steuerhöhe trägt
-          // alle Steuerelemente auf einmal, während die verworfene Prop bei 40 px
-          // endet und die 48-/72-px-Stufen nicht darstellen kann.
-          //
-          // Seit LFH-361 · B5a belegt die Zeigerart die Stufe vor, wenn noch keine
-          // Wahl gespeichert ist (`gespeicherteDichte`), und `antdToken` setzt die
-          // kleine Steuerhöhe mit — sonst rechnete antd sie unter den Boden aus
-          // A1 Gate 3 zurück und die Staffel griffe an jedem Element vorbei, das
-          // eine Bibliothek intern klein nennt.
+          // Farbrollen je Modus aus derselben Quelle wie `rollen.css`; die Dichte hängt hier und nicht
+          // an einer Größen-Prop je Element (die endet bei 40 px). `antdToken` setzt die kleine
+          // Steuerhöhe mit, sonst rechnete antd sie unter den Boden aus A1 Gate 3.
           token: antdToken(effektiv === 'dark' ? farbenDunkel : farbenHell, dichte),
-          // Nachts hält `antdAlgorithmus` die Signalfarben auf ihrem Rollenwert — ohne
-          // die zweite Stufe rechnete `darkAlgorithm` sie um (#4d94d6 → #4481b9).
+          // Nachts hält `antdAlgorithmus` die Signalfarben auf ihrem Rollenwert.
           algorithm: antdAlgorithmus(effektiv === 'dark'),
-          // Die Dichte auch hier (LFH-380): antds Switch rechnet seine Maße aus der
-          // Schrift statt aus `controlHeight` und folgte der Staffel sonst nicht.
+          // antds Switch rechnet seine Maße aus der Schrift statt aus `controlHeight` (LFH-380).
           components: antdKomponenten(effektiv === 'dark' ? farbenDunkel : farbenHell, dichte),
         }}
       >
@@ -260,11 +224,8 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * Liefert den aktuellen Theme-Modus. Außerhalb des Providers (z. B. in
- * isolierten Tests) wird die Vorgabe zurückgegeben, statt zu werfen — so brauchen
- * Komponententests keinen Theme-Wrapper. Die Vorgabe ist seit dem Neuentwurf der
- * Nachtbetrieb, also auch hier `dark`; ein Fallback, der einen anderen Modus meldet
- * als den, mit dem die App startet, wäre eine zweite Wahrheit.
+ * Liefert den aktuellen Theme-Modus. Außerhalb des Providers (z. B. in isolierten Tests) wird
+ * die Vorgabe `dark` zurückgegeben statt zu werfen, dieselbe, mit der die App startet.
  */
 export function useThemeMode(): ThemeModeWert {
   const wert = useContext(ThemeModeContext);
@@ -284,21 +245,11 @@ export function useThemeMode(): ThemeModeWert {
 }
 
 /**
- * Benannter Zugang zur Bediendichte (LFH-329 · B1).
+ * Benannter Zugang zur Bediendichte. Bedienwege sind die Umschaltgruppe im Benutzermenü (der
+ * einzige, der die aktive Stufe auch anzeigt) und die Kommandopalette.
  *
- * Beide Achsen teilen einen Provider (ein Context, ein `useMemo`), aber sie
- * teilen keinen Namen: wer eine Trefffläche umschaltet, soll nicht `useThemeMode`
- * lesen müssen. Jeder Bedienweg ist dieselbe Quelle — seit LFH-392 sind das die
- * Umschaltgruppe im Benutzermenü (auf jeder Breite, der einzige Weg, der die
- * aktive Stufe auch ANZEIGT) und die Kommandopalette. Der frühere dritte, ein
- * Segmented-Paar in der Kopfzeile, ist fort: sechs Ziele für zwei Einstellungen
- * in einer Aktionsreihe, deren Wahl im Menü darunter schon vollständig lag.
- * Unverzichtbar bleibt der Menüweg, weil A1 dem Führungs-Tablet und dem mobilen
- * Kontext `komfortabel` und `handschuh` zuweist.
- *
- * Das zurückgegebene Objekt ist je Aufruf frisch — es gehört NICHT in ein
- * Dependency-Array. Stabil sind `dichte` (ein String) und `setDichte` (per
- * `useCallback` identitätsstabil); genau die zwei gehören hinein.
+ * Das zurückgegebene Objekt ist je Aufruf frisch und gehört NICHT in ein Dependency-Array;
+ * `dichte` und `setDichte` (identitätsstabil) gehören hinein.
  */
 export function useDichte(): { dichte: Dichte; setDichte: (d: Dichte) => void } {
   const { dichte, setDichte } = useThemeMode();

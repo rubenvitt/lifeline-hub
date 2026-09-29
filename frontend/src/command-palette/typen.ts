@@ -1,4 +1,3 @@
-// frontend/src/command-palette/typen.ts
 import type { IconType } from 'react-icons';
 import type {
   BenutzerAnzeige,
@@ -9,35 +8,27 @@ import type {
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
 import type { Helligkeit } from '../theme/helligkeit';
-// NUR-TYP-IMPORT, und nur deshalb unbedenklich: `datensaetze.ts` importiert von hier
-// zurück (`Befehl`). Ein `import type` wird beim Übersetzen restlos entfernt — es entsteht
-// kein Modulzyklus zur Laufzeit. Die Ableitung geht bewusst in DIESE Richtung: die
-// Quellenmenge einer Abfrage ist dort zuhause, wo die Listen beschrieben sind.
+// Nur-Typ-Import, deshalb kein Laufzeit-Zyklus, obwohl `datensaetze.ts` von hier zurück
+// importiert. Die Quellenmenge einer Abfrage ist dort zuhause, wo die Listen beschrieben sind.
 import type { DatensatzQuellen } from './datensaetze';
 
 /**
- * Die Aktionen, die eine Maske oder Seite an die Palette meldet (LFH-391 · B3).
+ * Die Aktionen, die eine Maske oder Seite an die Palette meldet.
  *
- * NICHT jede hat einen Tastenweg: `tastaturAktionFuerEreignis` bindet weiterhin nur
- * `speichern`/`verwerfen`/`filter-zuruecksetzen` — das sind die Mutations- und
- * Abbruchwege, die man mitten im Tippen braucht. `neue-zeile` und `spalten` sind
- * ausschliesslich über die Palette erreichbar; ein viertes globales Kürzel wäre eine
- * neue Kollisionsfläche mit Browser- und antd-Bindungen.
+ * Nur `speichern`/`verwerfen`/`filter-zuruecksetzen` haben einen Tastenweg
+ * (`tastaturAktionFuerEreignis`); `neue-zeile` und `spalten` sind nur über die Palette erreichbar,
+ * ein weiteres globales Kürzel wäre eine neue Kollisionsfläche mit Browser und antd.
  *
- * Wer die Union erweitert, trägt in `befehle.ts` BEIDES nach: den Eintrag im
- * exhaustiven `TASTATUR_AKTIONEN` (das erzwingt der Typcheck, TS2741) und die Position
- * in `TASTATUR_AKTION_REIHENFOLGE` (das erzwingt der Guard in `befehle.test.ts` — ein
- * Record hat keine vertragliche Ordnung, die Palette-Gruppe aber schon).
+ * Wer die Union erweitert, trägt in `befehle.ts` BEIDES nach: den Eintrag im exhaustiven
+ * `TASTATUR_AKTIONEN` (Typcheck) und die Position in `TASTATUR_AKTION_REIHENFOLGE` (Guard in
+ * `befehle.test.ts`).
  */
 export type TastaturAktionId =
   'speichern' | 'verwerfen' | 'filter-zuruecksetzen' | 'neue-zeile' | 'spalten';
 
 export type TastaturAktionen = Partial<Record<TastaturAktionId, () => void>>;
 
-/**
- * Die Gruppen der Palette — ABGELEITET aus `GRUPPEN_REIHENFOLGE` (LFH-391 · A2),
- * nicht daneben deklariert. Siehe den Vertrag am Array weiter unten.
- */
+/** Die Gruppen der Palette, ABGELEITET aus `GRUPPEN_REIHENFOLGE` (Vertrag dort). */
 export type BefehlGruppe = (typeof GRUPPEN_REIHENFOLGE)[number];
 
 export interface Befehl {
@@ -47,73 +38,59 @@ export interface Befehl {
   schlagworte?: string[];
   icon?: IconType;
   /**
-   * Kontext rechts neben dem Label (Neuentwurf, Sprungpalette S2): wo der Treffer wohnt —
-   * die Kategorie eines Moduls („Lage"), das Modul eines Datensatzes („Personen"). Er
-   * ersetzt das frühere Präfix „Modul · …" IM Label.
+   * Kontext rechts neben dem Label: wo der Treffer wohnt (Kategorie eines Moduls, Modul eines
+   * Datensatzes).
    *
-   * DARSTELLUNG, KEIN NAME: die Zeile nennt ihn als Beschreibung (`aria-describedby`), nicht
-   * im zugänglichen Namen — sonst hieße jede Moduloption „ETB Erfassung", und der Name, an
-   * dem Tests und Gedächtnis hängen, wechselte mit der Kategorie. Wer über den Kontext
-   * SUCHEN können soll, trägt ihn zusätzlich in `schlagworte` (so `datensaetze.ts`).
+   * DARSTELLUNG, KEIN NAME: die Zeile nennt ihn als Beschreibung (`aria-describedby`), nicht im
+   * zugänglichen Namen, an dem Tests und Gedächtnis hängen. Wer über den Kontext SUCHEN können
+   * soll, trägt ihn zusätzlich in `schlagworte`.
    */
   kontext?: string;
   kuerzel?: string;
   /**
-   * Dieser eine Befehl geht NICHT ins Gedächtnis, obwohl seine Gruppe merkbar ist
-   * (Review-Befund zu LFH-391 · Etappe D).
+   * Dieser eine Befehl geht NICHT ins Gedächtnis, obwohl seine Gruppe merkbar ist.
    *
-   * DIE ZWEITE ACHSE NEBEN {@link GRUPPE_MERKBAR}, und sie kann ausschliesslich ABZIEHEN:
-   * der Typ ist `true` und nicht `boolean`. Ein `nichtMerkbar: false` läse sich als
-   * „ausdrücklich merkbar" und lüde dazu ein, die Achse auch zum Hinzufügen zu benutzen —
-   * damit wäre die Eigenschaft weg, für die der exhaustive Record existiert: eine NEUE
-   * Gruppe muss den Typcheck brechen (TS2741), statt still mitzulaufen. So bleibt „merkbar"
-   * die Konjunktion aus Gruppenurteil und Einzel-Opt-out; ohne Gruppenurteil hilft das
-   * Weglassen des Flags nichts.
+   * Die zweite Achse neben {@link GRUPPE_MERKBAR} kann ausschließlich ABZIEHEN, deshalb `true`
+   * statt `boolean`: sonst lüde sie zum Hinzufügen ein, und eine neue Gruppe bräche nicht mehr den
+   * exhaustiven Record.
    *
-   * Heute trägt es genau `nav:abmelden` (Begründung dort). Wer eine zweite Zeile setzt,
-   * begründet sie ebenso: das Gedächtnis steht ZUOBERST und ist vorausgewählt, `Strg/⌘+K`
-   * gefolgt von Enter löst also aus, was hier drinsteht.
+   * Heute trägt es genau `nav:abmelden`. Wer eine zweite Zeile setzt, begründet sie ebenso: das
+   * Gedächtnis steht ZUOBERST und ist vorausgewählt, `Strg/⌘+K` + Enter löst es aus.
    */
   nichtMerkbar?: true;
   /**
-   * Das Navigationsziel der Zeile (LFH-645) — die MARKE, an der die Palette entscheidet, ob
-   * Strg/⌘+↵ überhaupt greift. Fehlt es (Aktionen, Einstellungen, Abmelden), bleibt die Taste
-   * wirkungslos und fällt NICHT auf ↵ zurück: ein Modifier, der still die Grundaktion
-   * auslöst, lügt.
+   * Das Navigationsziel der Zeile: die MARKE, an der die Palette entscheidet, ob Strg/⌘+↵ greift.
+   * Fehlt es, bleibt die Taste wirkungslos und fällt NICHT auf ↵ zurück.
    *
-   * Es ist Angabe, nicht Weg: navigiert wird weiterhin in `ausfuehren`, denn dort hängen die
-   * Nebenwirkungen (Modulbesuch, Gedächtnis), die für beide Öffnungsarten gleich gelten.
-   * Wer `ziel` setzt, reicht `oeffnung` bis zu `navigate` durch — das prüft der Guard in
-   * `befehle.test.ts` für jede Zeile.
+   * Angabe, nicht Weg: navigiert wird in `ausfuehren`, wo die Nebenwirkungen (Modulbesuch,
+   * Gedächtnis) hängen. Wer `ziel` setzt, reicht `oeffnung` bis zu `navigate` durch; das prüft der
+   * Guard in `befehle.test.ts` für jede Zeile.
    */
   ziel?: string;
-  /** Lese-Vorschau in der Palette (LFH-645, Taste →). Siehe {@link VorschauZiel}. */
+  /** Lese-Vorschau in der Palette (Taste →). Siehe {@link VorschauZiel}. */
   vorschau?: VorschauZiel;
   /**
-   * `oeffnung` erreicht nur Zeilen mit {@link Befehl.ziel} — die Palette übergibt
-   * `'neuerTab'` ausschliesslich dort. Befehle ohne Ziel ignorieren das Argument.
+   * `oeffnung` erreicht nur Zeilen mit {@link Befehl.ziel}; Befehle ohne Ziel ignorieren das
+   * Argument.
    */
   ausfuehren: (oeffnung?: Oeffnung) => void;
 }
 
 /**
- * Wie eine Zeile mit Ziel geöffnet wird (LFH-645): im aktuellen Tab (↵) oder in einem neuen
- * Browser-Tab (Strg/⌘+↵). EIN Argument an `ausfuehren` statt eines zweiten Callbacks je
- * Befehl — sonst stünde jede Nebenwirkung an zwölf Bauorten doppelt und liefe auseinander.
+ * Wie eine Zeile mit Ziel geöffnet wird: im aktuellen Tab (↵) oder in einem neuen Browser-Tab
+ * (Strg/⌘+↵). Ein Argument an `ausfuehren` statt eines zweiten Callbacks, sonst stünde jede
+ * Nebenwirkung doppelt.
  */
 export type Oeffnung = 'hier' | 'neuerTab';
 
 /**
- * Was die Vorschau zeigt (LFH-645, alle Datensatzsorten seit LFH-664). Eine DISKRIMINIERTE
- * Union als Datum, keine Render-Funktion: `Vorschau.tsx` bildet `art` exhaustiv ab, eine neue
- * Sorte bricht dort den Typcheck statt still zu fehlen.
+ * Was die Vorschau zeigt. Eine DISKRIMINIERTE Union als Datum: `Vorschau.tsx` bildet `art`
+ * exhaustiv ab, eine neue Sorte bricht dort den Typcheck.
  *
- * Das Ziel trägt nur Kennungen, nie den geladenen Datensatz: das Bauteil liest ihn aus dem
- * Fach der Trefferliste (`datensatzAbfrage.ts`) und bleibt damit live. Ein mitgegebener
- * Datensatz wäre beim Öffnen eingefroren.
- *
- * Der ETB trägt zusätzlich `lfdNr`: kein Fach adressiert einen Eintrag über seine `id`, die
- * Vorschau liest ihn über den Nummerncursor und prüft danach die `id`.
+ * Das Ziel trägt nur Kennungen, nie den Datensatz: das Bauteil liest ihn aus dem Fach der
+ * Trefferliste (`datensatzAbfrage.ts`) und bleibt live. Der ETB trägt zusätzlich `lfdNr`, weil
+ * kein Fach einen Eintrag über seine `id` adressiert; gelesen wird über den Nummerncursor, danach
+ * wird die `id` geprüft.
  */
 export type VorschauZiel =
   | { art: VorschauArt; einsatzId: number; id: number }
@@ -134,14 +111,12 @@ export type VorschauArt =
   | 'abschnitt';
 
 /**
- * Ziel und Weg einer Navigationszeile aus EINER Hand (LFH-645) — für alle drei Bauorte
- * (`befehle.ts`, `datensaetze.ts`, `koordinatenSprung.ts`). Der Bauort nennt das Ziel nur
- * einmal: `ziel` (die Marke für Strg/⌘+↵) und der Pfad in `navigate` können nicht
- * auseinanderlaufen, und die Öffnungsart geht immer durch.
+ * Ziel und Weg einer Navigationszeile aus EINER Hand, für alle Bauorte (`befehle.ts`,
+ * `datensaetze.ts`, `koordinatenSprung.ts`): `ziel` (Marke für Strg/⌘+↵) und der Pfad in
+ * `navigate` können nicht auseinanderlaufen, und die Öffnungsart geht immer durch.
  *
- * 'hier' wird NICHT mitgeschickt: der gewöhnliche Weg bleibt für jeden Konsumenten von
- * `navigate` die bisherige Ein-Argument-Form. `vorher` trägt die Nebenwirkung, die für beide
- * Öffnungsarten gilt (Modulbesuch) — ein neuer Tab ist ein Öffnen wie jedes andere.
+ * 'hier' wird nicht mitgeschickt (Ein-Argument-Form von `navigate`). `vorher` trägt die
+ * Nebenwirkung, die für beide Öffnungsarten gilt (Modulbesuch).
  */
 export function sprungZu(
   ziel: string,
@@ -164,55 +139,35 @@ export interface BefehlKontext {
   einsaetze: EinsatzAnzeige[];
   overrides?: ModulOverrides;
   darfSchreibenImEinsatz: boolean;
-  /** Zuletzt besuchte Modulschlüssel des aktuellen Einsatzes (LFH-337 · H12),
-   *  jüngstes zuerst. Kommt aus `einsatz/zuletztModule.ts`. */
+  /** Zuletzt besuchte Modulschlüssel des aktuellen Einsatzes, jüngstes zuerst
+   *  (`einsatz/zuletztModule.ts`). */
   zuletztModulKeys?: string[];
   /**
-   * Das Modul, auf dessen Seite die Palette geöffnet wurde — aus der AKTUELLEN ROUTE über
-   * `modulAusPfad` (`einsatz/modulRegistry.ts`), Arbeitspunkt 3 des Tickets (LFH-391 · C4).
-   *
-   * Konsument ist die Zuletzt-Gruppe: die Seite, auf der man steht, ist keine Abkürzung.
-   * Die Palette führte bis LFH-391 · C4 einen Sprung auf die eigene Seite, und zwar auf dem
-   * knappsten der drei Plätze.
-   *
-   * OPTIONAL wie sein Geschwister `zuletztModulKeys`, und aus demselben Grund: ohne
-   * gemerkte Module hat er gar keine Bedeutung. (In `DatensatzKontext` ist der gleichnamige
-   * Schlüssel dagegen PFLICHT — dort ordnet er die ganze Trefferliste.)
-   *
-   * KEIN Konsument in den übrigen sechs Gruppen, und das ist Absicht: die Modul-Gruppe
-   * behält den Eintrag der aktuellen Seite, weil sie den MODULBESTAND zeigt und nicht eine
-   * Abkürzung.
+   * Das Modul, auf dessen Seite die Palette geöffnet wurde (aus der Route über `modulAusPfad`).
+   * Konsument ist nur die Zuletzt-Gruppe: die Seite, auf der man steht, ist keine Abkürzung. Die
+   * Modul-Gruppe behält den Eintrag, sie zeigt den Modulbestand. Optional wie
+   * `zuletztModulKeys`; in `DatensatzKontext` ist der gleichnamige Schlüssel Pflicht.
    */
   aktuellerModulKey?: string | null;
   /**
-   * Aufzeichnung einer BEWUSSTEN Modulwahl (LFH-337 · Fix-Welle, Befund B4). Als Callback
-   * injiziert, damit `baueBefehle` rein bleibt: die Funktion kennt weder `localStorage`
-   * noch die `einsatzId`-Bindung, sie ruft nur, was ihr `useBefehle` gibt.
+   * Aufzeichnung einer BEWUSSTEN Modulwahl. Als Callback injiziert, damit `baueBefehle` rein
+   * bleibt (kein `localStorage`, keine `einsatzId`-Bindung).
    */
   merkeModulBesuch?: (modulKey: string) => void;
   /**
-   * Zuletzt AUSGEFÜHRTE Befehls-IDs, jüngstes zuerst (LFH-391 · Etappe D).
+   * Zuletzt AUSGEFÜHRTE Befehls-IDs, jüngstes zuerst.
    *
-   * IDs, keine Beschriftungen und keine Ziele. Aufgelöst wird gegen die Liste, die in
-   * derselben Runde gebaut wird — womit drei Dinge auf einmal gelten: ein Verweis auf einen
-   * gelöschten Datensatz löst nicht auf, ein entzogenes Modul oder Recht löst nicht auf (der
-   * Rechtefilter ist gratis, ohne eine zweite Wahrheit über Berechtigungen), und die
-   * Beschriftung ist immer frisch.
-   *
-   * OPTIONAL wie `zuletztModulKeys`, und aus demselben Grund: ohne gemerkte Befehle hat der
-   * Schlüssel keine Bedeutung. Die Herkunft (Server-Slot am Benutzer, `useZuletztBefehle`)
-   * kennt `baueBefehle` nicht — sie bekommt eine Liste.
+   * IDs, keine Beschriftungen oder Ziele: aufgelöst wird gegen die Liste derselben Runde. Ein
+   * gelöschter Datensatz oder ein entzogenes Recht löst damit nicht auf, und die Beschriftung ist
+   * immer frisch. Die Herkunft (`useZuletztBefehle`) kennt `baueBefehle` nicht.
    */
   zuletztBefehlIds?: string[];
   /**
-   * Aufzeichnung einer ausgeführten Bedienung. Als Callback injiziert, damit `baueBefehle`
-   * rein bleibt — dieselbe Bauform wie `merkeModulBesuch`: die Funktion kennt weder Netz
-   * noch Speicher, sie ruft nur, was ihr `useBefehle` gibt.
-   *
+   * Aufzeichnung einer ausgeführten Bedienung, als Callback injiziert wie `merkeModulBesuch`.
    * WELCHE Befehle melden, entscheidet {@link GRUPPE_MERKBAR}, nicht der Aufrufer.
    */
   merkeBefehl?: (id: string) => void;
-  /** `oeffnung` fehlt = im aktuellen Tab (LFH-645). */
+  /** `oeffnung` fehlt = im aktuellen Tab. */
   navigate: (pfad: string, oeffnung?: Oeffnung) => void;
   setThemeModus: (m: ThemeModus) => void;
   setDichte: (d: Dichte) => void;
@@ -225,28 +180,17 @@ export interface BefehlKontext {
 }
 
 /**
- * Reihenfolge der Startansicht (LFH-337 · M11): das Nützlichste zuerst.
+ * Reihenfolge der Startansicht: das Nützlichste zuerst (Gedächtnis, Aktionen, Schnellaktionen,
+ * Zuletzt vor den Modulen).
  *
- * `schnellaktionen` und `zuletzt` stehen jetzt VOR `module` — vorher lagen die vier
- * Schnellaktionen hinter 24 Modulen und waren bei leerer Suche faktisch unerreichbar.
- * `aktionen` (die kontextabhängigen Tastatur-Aktionen aus `TASTATUR_AKTIONEN`) stand bis
- * Etappe D an der Spitze; davor liegt jetzt allein das Befehls-Gedächtnis `ausgefuehrt`
- * (Begründung an seinem Eintrag in `GRUPPEN_LABEL`).
- *
- * ZWEI VERTRÄGE an dieser Liste (LFH-391 · A2):
+ * ZWEI VERTRÄGE:
  *
  * 1. **Die Reihenfolge IST die Union.** `BefehlGruppe` wird aus diesem `as const`-Tupel
- *    abgeleitet — eine Gruppe kann also nicht mehr existieren, ohne hier zu stehen.
- *    Vorher waren es zwei unabhängige Deklarationen, und `GRUPPEN_LABEL` (ein Record
- *    über die Union) brach den Typcheck bei einer fehlenden Gruppe, dieses Array NICHT:
- *    eine Gruppe in Union und Label, aber nicht in der Reihenfolge, renderte gar nicht —
- *    `CommandPalette.tsx` iteriert ausschliesslich über dieses Array. Kein Typfehler,
- *    kein roter Test, kein Fehlerbild. Die Mutationsprobe ist ein gestrichener Eintrag:
- *    dann bricht `tsc` — gemessen an 'zuletzt' TS2353 an `GRUPPEN_LABEL`, TS2322 am
- *    `gruppe:`-Literal in `befehle.ts` und TS2345/TS2367 in `befehle.test.ts`.
- * 2. **Kein Eintrag steht zweimal.** Das sieht der Typ NICHT — eine Dublette lässt die
- *    Union unverändert, rendert die Gruppe aber doppelt und macht `aria-activedescendant`
- *    über doppelte `cmd-<id>` mehrdeutig. Dafür `typen.test.ts`.
+ *    abgeleitet; eine Gruppe kann nicht existieren, ohne hier zu stehen. `CommandPalette.tsx`
+ *    iteriert ausschließlich über dieses Array, eine fehlende Gruppe renderte sonst still gar
+ *    nicht.
+ * 2. **Kein Eintrag steht zweimal.** Das sieht der Typ nicht; eine Dublette renderte die Gruppe
+ *    doppelt und machte `aria-activedescendant` mehrdeutig. Dafür `typen.test.ts`.
  */
 export const GRUPPEN_REIHENFOLGE = [
   'ausgefuehrt',
@@ -263,34 +207,23 @@ export const GRUPPEN_REIHENFOLGE = [
 
 export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
   /**
-   * Das Gedächtnis zuletzt ausgeführter Befehle (LFH-391 · Etappe D). Es steht ZUOBERST und
-   * damit über `aktionen` — eine bewusste Umkehrung der M11-Begründung, die `aktionen` „an
-   * der Spitze" festhielt: die Kontextaktionen einer Maske sind stets vollständig sichtbar
-   * (höchstens fünf, und sie erscheinen nur dort, wo eine Maske sie registriert hat), das
-   * Gedächtnis dagegen ist der einzige Platz, an dem ein häufig benutzter Befehl aus 42+
-   * einen kurzen Weg bekommt. Der Deckel `ZULETZT_BEFEHLE_MAX` (`zuletztBefehle.ts`)
-   * begrenzt, wie weit `aktionen` dadurch nach unten rückt.
+   * Das Gedächtnis zuletzt ausgeführter Befehle steht ZUOBERST, über `aktionen`: die
+   * Kontextaktionen einer Maske sind stets vollständig sichtbar (höchstens fünf), das Gedächtnis
+   * ist der einzige kurze Weg zu einem häufigen Befehl aus 42+. `ZULETZT_BEFEHLE_MAX` begrenzt,
+   * wie weit `aktionen` nach unten rückt.
    */
   ausgefuehrt: 'Zuletzt ausgeführt',
   aktionen: 'Aktionen',
   /**
-   * Der Koordinatensprung (LFH-619, `koordinatenSprung.ts`): höchstens EINE Zeile, und nur
-   * solange die Eingabe die Form einer Koordinate hat. Wie bei `datensaetze` ist der Slot
-   * Formalie — die Zeile entsteht nie in der leeren Startansicht; sichtbar vorn steht sie,
-   * weil sie auf Stufe 0 läuft.
+   * Der Koordinatensprung (`koordinatenSprung.ts`): höchstens EINE Zeile, nur solange die Eingabe
+   * die Form einer Koordinate hat; nie in der leeren Startansicht.
    */
   koordinate: 'Koordinate',
   /**
-   * Gefundene Datensätze aus den Modullisten (LFH-391 · C1). EINE Gruppe für alle zwölf
-   * Entitäten, die Modulherkunft steht im Label — zwölf Gruppen wären zwölf Überschriften
-   * für im Schnitt ein bis zwei Zeilen, und bei AKTIVER Suche rendert die Palette seit A3
-   * ohnehin flach.
-   *
-   * Der Slot ist FORMALIE, keine Ordnungsaussage: Datensatz-Treffer entstehen erst ab zwei
-   * getippten Zeichen, also nie in der leeren Startansicht — dem einzigen Zustand, in dem
-   * die Gruppenreihenfolge noch rendert. Die sichtbare Rangfolge macht `ordneTreffer`; der
-   * Gruppenrang ist dort nur Tiebreak. Notwendig ist der Eintrag trotzdem, weil
-   * `BefehlGruppe` aus diesem Tupel abgeleitet wird.
+   * Gefundene Datensätze aus den Modullisten, EINE Gruppe für alle Entitäten (die Herkunft steht
+   * im Kontext). Der Slot ist Formalie: Treffer entstehen erst ab zwei Zeichen, also nie in der
+   * Startansicht; die Rangfolge macht `ordneTreffer`. Nötig ist der Eintrag, weil `BefehlGruppe`
+   * aus diesem Tupel abgeleitet wird.
    */
   datensaetze: 'Datensätze',
   schnellaktionen: 'Schnellaktionen',
@@ -302,56 +235,29 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
 };
 
 /**
- * Darf ein ausgeführter Befehl dieser Gruppe ins Gedächtnis (LFH-391 · Etappe D)?
+ * Darf ein ausgeführter Befehl dieser Gruppe ins Gedächtnis?
  *
- * EIN exhaustiver Record über {@link BefehlGruppe}, Bauform wie {@link PALETTE_MODI}: eine
- * neue Gruppe bricht den Typcheck (TS2741), statt still mitzulaufen. Eine Denylist tut das
- * nicht — dort ist „nicht erwähnt" dasselbe wie „erlaubt", und die teure Richtung des
- * Fehlers ist genau die: ein Befehl, der ins Gedächtnis gerät, obwohl er nicht hineingehört,
- * steht dauerhaft und an oberster Stelle da.
+ * Exhaustiver Record wie {@link PALETTE_MODI}: eine neue Gruppe bricht den Typcheck. Eine
+ * Denylist täte das nicht, und ein falsch Gemerkter stünde dauerhaft ganz oben.
  *
- * SECHS Gruppen stehen aus FÜNF verschiedenen Gründen auf `false` (`module` und `zuletzt`
- * teilen sich einen):
+ * `false` und warum:
+ *  - `module`/`zuletzt`: Dublettenriegel an der Schreibseite; dasselbe Modul steht schon zweimal
+ *    in der Liste, das Modul-Gedächtnis trägt diese Einträge.
+ *  - `datensaetze`: ein Datensatz-Befehl entsteht nur während einer Suche, im Startzustand wäre
+ *    das Gedächtnis blind.
+ *  - `aktionen`: die ID benennt einen SLOT (`tastatur:speichern` bedeutet je Maske etwas
+ *    anderes); gegen eine fremde Maske aufgelöst schriebe „Speichern“ etwas anderes.
+ *  - `koordinate`: eine getippte Stelle ist kein wiederkehrender Befehl.
+ *  - `ausgefuehrt`: die Kopie trägt die Meldung des ORIGINALS schon in `ausfuehren`.
  *
- *  - `module` und `zuletzt`: das IST der Dublettenriegel, und er sitzt an der SCHREIBseite
- *    statt als eigene Filterschleife. Dasselbe Modul steht bereits zweimal in der Liste
- *    (LFH-337 · H12, getrennt allein durch das id-Präfix) — ein drittes Vorkommen wäre eine
- *    dritte Kopie derselben Zeile, mit demselben Label und demselben Ziel. Das
- *    Modul-Gedächtnis trägt diese Einträge schon.
- *  - `datensaetze`: ein gemerkter Verweis auf einen konkreten Datensatz ist morgen eine tote
- *    Zeile. Er löste zwar sauber nicht auf (die Auflösung geht gegen die aktuelle Liste), aber
- *    ein Datensatz-Befehl entsteht überhaupt nur, solange dieselbe Suche läuft — im leeren
- *    Startzustand gibt es keine `datensaetze`, das Gedächtnis wäre also dauerhaft blind.
- *  - `aktionen`: die ID benennt einen SLOT, keinen Befehl. `tastatur:speichern` bedeutet auf
- *    der ETB-Seite etwas anderes als auf der Personen-Seite; gegen eine fremde Maske aufgelöst
- *    stünde „Speichern" da und schriebe etwas anderes. Dazu ist die Gruppe ohnehin die erste
- *    sichtbare der Startansicht — ein Gedächtniseintrag verdoppelte eine Zeile, die eine
- *    Zeile tiefer schon steht.
- *  - `koordinate` (LFH-619): eine getippte Stelle ist kein wiederkehrender Befehl, und die
- *    Zeile gibt es nur, solange die Eingabe eine Koordinate ist — im Startzustand nie.
- *  - `ausgefuehrt` selbst: die Kopie merkt sich nicht sich selbst. Ihre `ausfuehren` trägt
- *    die Meldung des ORIGINALS bereits in sich (siehe `befehle.ts`) — ein Griff ins
- *    Gedächtnis rückt den Befehl also sehr wohl nach vorn, nur unter seiner echten ID.
- *
- * `navigation` steht auf `true`, weil „Stammdaten"/„Administration"/„Alle Einsätze" genau die
- * wiederholten Sprünge sind, für die das Gedächtnis gebaut ist. Der frühere Zusatz „also darf
- * auch Abmelden hinein" ist im Review widerlegt worden und ist zurückgenommen: die oberste
- * Zeile der Startansicht ist VORAUSGEWÄHLT, `Strg/⌘+K` + Enter meldete damit dauerhaft ab
- * statt den erwarteten Kontextbefehl auszulösen. Der Vergleich mit „Speichern"/„Neue Person
- * erfassen" trug nicht: die stehen in `aktionen`/`schnellaktionen`, sind umkehrbar und
- * kosten keine Sitzung.
- *
- * Der Ausschluss ist deshalb eine ZWEITE ACHSE am einzelnen Befehl ({@link Befehl.nichtMerkbar})
- * statt einer feineren Gruppierung — eine Gruppe „navigation ohne Abmelden" hiesse, die
- * Bedeutung der Gruppe an einer Gedächtnisfrage auszurichten, und die Exhaustivität dieses
- * Records bliebe trotzdem die einzige Stelle, die eine neue Gruppe erzwingt. Die Achse zieht
- * nur ab, sie fügt nie hinzu; siehe die Begründung an ihrem Feld.
+ * `navigation` ist `true` (wiederholte Sprünge), ausgenommen Abmelden über
+ * {@link Befehl.nichtMerkbar}: die oberste Zeile ist vorausgewählt, `Strg/⌘+K` + Enter meldete
+ * sonst ab. Die Achse am Befehl zieht nur ab.
  */
 export const GRUPPE_MERKBAR: Record<BefehlGruppe, boolean> = {
   ausgefuehrt: false,
   aktionen: false,
-  // Eine einmal getippte Stelle ist kein wiederkehrender Befehl — und wie ein Datensatz
-  // entsteht die Zeile nur, solange dieselbe Eingabe steht (LFH-619).
+  // Eine getippte Stelle ist kein wiederkehrender Befehl.
   koordinate: false,
   datensaetze: false,
   schnellaktionen: true,
@@ -363,14 +269,10 @@ export const GRUPPE_MERKBAR: Record<BefehlGruppe, boolean> = {
 };
 
 /**
- * Ist die Gruppe eine reine ORDNUNGSKOPIE, die bei aktiver Suche entfällt?
- *
- * Zweiter exhaustiver Record aus demselben Grund wie der erste — und ausdrücklich NICHT die
- * Negation von {@link GRUPPE_MERKBAR}: `module` ist nicht merkbar und bleibt bei aktiver
- * Suche trotzdem stehen. Gemeint ist hier allein „jeder Eintrag dieser Gruppe hat anderswo
- * in derselben Liste einen Zwilling mit gleichem Label, gleicher Ikone und gleichem Ziel".
- * Das trifft genau die beiden Gedächtnisgruppen; die Begründung steht an
- * `ohneOrdnungsdubletten` in `fuzzy.ts`.
+ * Ist die Gruppe eine reine ORDNUNGSKOPIE, die bei aktiver Suche entfällt? Ausdrücklich NICHT
+ * die Negation von {@link GRUPPE_MERKBAR} (`module` ist nicht merkbar und bleibt stehen). Gemeint
+ * ist: jeder Eintrag hat anderswo in derselben Liste einen Zwilling mit gleichem Label, Ikone und
+ * Ziel. Begründung an `ohneOrdnungsdubletten` in `fuzzy.ts`.
  */
 export const GRUPPE_NUR_ORDNUNG: Record<BefehlGruppe, boolean> = {
   ausgefuehrt: true,
@@ -386,30 +288,17 @@ export const GRUPPE_NUR_ORDNUNG: Record<BefehlGruppe, boolean> = {
 };
 
 /**
- * Präfix-Modi der Sucheingabe (LFH-391 · A4). `alles` ist der Vorgabemodus ohne Präfix.
+ * Präfix-Modi der Sucheingabe; `alles` ist der Vorgabemodus ohne Präfix.
  *
- * `>` ist ein reiner TEILMENGEN-Filter: er zeigt `aktionen` + `schnellaktionen`, also genau
- * die zwei Gruppen, die seit LFH-337 · M11 ohnehin an der Spitze der Startansicht stehen.
- * Ohne das Zeichen wird damit nichts unerreichbar — das Präfix ist Abkürzung, kein Zugang.
- * Deshalb bewusst KEIN Wortalias („aktionen"), obwohl `>` auf deutscher Tastatur Shift+`<`
- * ist und die Palette laut CLAUDE.md auch der Berührungs-/Handschuhweg zu 42+ Befehlen
- * ist: ein zweiter Syntaxweg für eine Bequemlichkeit wäre eine zweite Wahrheit, und wer
- * „aktionen" tippt, will meistens danach SUCHEN. Für die Datensatz-Modi der Etappe C ist
- * die Lage anders (dort sind die Ziele ohne Präfix nicht erreichbar) — die Frage wird dort
- * neu gestellt.
- *
- * ETAPPE C HAT SIE GESTELLT UND GLEICH BEANTWORTET (LFH-391 · C3): auch '#' und '@'
- * bekommen KEINEN Wortalias. Der Grund ist derselbe wie bei '>' und trägt hier sogar
- * weiter — ein getipptes „etb" ist ein SUCHBEGRIFF, es steht als Modullabel in der Liste;
- * es zugleich als Moduswechsel zu lesen machte die Eingabe mehrdeutig. Und unerreichbar
- * wird ohne Präfix nichts: der Vorgabemodus durchsucht alle vierzehn Quellen, die Präfixe
- * kürzen nur.
+ * Die Präfixe (`>`, `#`, `@`) kürzen nur, ohne sie wird nichts unerreichbar (der Vorgabemodus
+ * durchsucht alle Quellen). Bewusst KEIN Wortalias: ein getipptes „etb“ ist ein Suchbegriff, es
+ * zugleich als Moduswechsel zu lesen machte die Eingabe mehrdeutig.
  */
 export type PaletteModus = 'alles' | 'aktionen' | 'etb' | 'kraefte';
 
 /**
- * Ein Abfrageweg des Datensatz-Finders — abgeleitet aus {@link DatensatzQuellen}, damit ein
- * neues Feld dort hier nicht vergessen werden kann.
+ * Ein Abfrageweg des Datensatz-Finders, abgeleitet aus {@link DatensatzQuellen}, damit ein neues
+ * Feld dort hier nicht vergessen werden kann.
  */
 export type DatensatzQuelle = keyof DatensatzQuellen;
 
@@ -419,9 +308,9 @@ export interface ModusBeschreibung {
   /** Gruppen, auf die eingeschränkt wird; `null` = keine Einschränkung. */
   gruppen: readonly BefehlGruppe[] | null;
   /**
-   * Datenquellen, die dieser Modus durchsucht; `null` = keine Einschränkung, `[]` = gar
-   * keine. Gelesen von BEIDEN Hälften des Finders: `useDatensaetze` hängt sein `enabled`
-   * daran, `baueDatensatzTreffer` seinen Quellenfilter.
+   * Datenquellen, die dieser Modus durchsucht; `null` = keine Einschränkung, `[]` = gar keine.
+   * Gelesen von beiden Hälften des Finders: `useDatensaetze` (`enabled`) und
+   * `baueDatensatzTreffer` (Quellenfilter).
    */
   quellen: readonly DatensatzQuelle[] | null;
   /** Wortlaut der Modusanzeige, solange der Modus aktiv ist. */
@@ -431,16 +320,11 @@ export interface ModusBeschreibung {
 }
 
 /**
- * EIN exhaustiver Record für ALLE Angaben eines Modus — Präfixzeichen, Befehlsgruppen,
- * Datenquellen und Wortlaut gehören zusammen. Getrennte Tabellen wären getrennte Orte, an
- * denen ein neuer Modus vergessen werden kann; hier erzwingt der Typcheck (TS2741) alles
- * auf einmal. Genau deshalb ist `quellen` in C3 ein FELD geworden und kein zweiter Record
- * daneben: der Plan hatte die Zuordnung Modus → Entität in `useDatensaetze.ts` liegen, wo
- * sie ein vierter Ort gewesen wäre — die Vorgabemenge zu erben ist dort still, nicht rot.
+ * EIN exhaustiver Record für ALLE Angaben eines Modus (Präfix, Gruppen, Quellen, Wortlaut):
+ * getrennte Tabellen wären getrennte Orte, an denen ein neuer Modus vergessen werden kann.
  *
- * `gruppen` ist für die Datensatz-Modi `[]` (kein statischer Befehl), nicht `null` — `null`
- * zeigte weiterhin alle Module. Die Datensatz-Treffer selbst laufen NICHT durch diesen
- * Filter: sie kommen als eigene Prop in die Palette (siehe `CommandPalette.tsx`).
+ * `gruppen` ist für die Datensatz-Modi `[]`, nicht `null` (das zeigte alle Module). Die
+ * Datensatz-Treffer laufen nicht durch diesen Filter, sie kommen als eigene Prop in die Palette.
  */
 export const PALETTE_MODI: Record<PaletteModus, ModusBeschreibung> = {
   alles: { praefix: null, gruppen: null, quellen: null, hinweis: null, legende: null },
@@ -452,8 +336,7 @@ export const PALETTE_MODI: Record<PaletteModus, ModusBeschreibung> = {
     legende: 'zeigt nur Aktionen',
   },
   /**
-   * '#' ist das Zeichen, das im ETB ohnehin vor der laufenden Nummer steht (`etbLabel`,
-   * `meldungLabel`) — wer '#42' tippt, meint den Eintrag 42 und nicht die Person 42.
+   * '#' steht im ETB ohnehin vor der laufenden Nummer: wer '#42' tippt, meint den Eintrag 42.
    */
   etb: {
     praefix: '#',
@@ -463,16 +346,9 @@ export const PALETTE_MODI: Record<PaletteModus, ModusBeschreibung> = {
     legende: 'sucht im Einsatztagebuch',
   },
   /**
-   * '@' beantwortet die Frage „WER?" — und die hat im Einsatz zwei Seiten: die handelnden
-   * Kräfte (Fahrzeug, Personal, Einheit) und die betroffenen Personen. Alle vier tragen
-   * einen NAMEN als tragendes Suchmerkmal; die übrigen sechs Quellen tragen einen
-   * Sachverhalt (Schaden, Meldung, Auftrag, ETB-Eintrag, Unfallhilfsstelle).
-   *
-   * Die Personen sind bewusst DRIN, obwohl sie keine Kraft sind: der Funkrufname trägt nur
-   * das Fahrzeug, Personal und Einheit tragen `name`, die Person ihren über `personLabel` —
-   * „hat einen Namen" ist die einzige Beschreibung dieser Menge, die ohne Ausnahme
-   * auskommt. Und die Personenliste ist im MANV die längste von allen; ein Präfix, das
-   * gerade sie ausspart, spart dort nichts.
+   * '@' beantwortet „WER?“: Kräfte (Fahrzeug, Personal, Einheit) und betroffene Personen. Alle vier
+   * tragen einen NAMEN als Suchmerkmal, die übrigen Quellen einen Sachverhalt. Die Personen sind
+   * bewusst drin: im MANV ist ihre Liste die längste.
    */
   kraefte: {
     praefix: '@',
@@ -484,16 +360,12 @@ export const PALETTE_MODI: Record<PaletteModus, ModusBeschreibung> = {
 };
 
 /**
- * Mindestlänge des Restes, bevor der Datensatz-Finder überhaupt etwas holt.
+ * Mindestlänge des Restes, bevor der Datensatz-Finder etwas holt. Nach unten begrenzt durch die
+ * kürzeste gedruckte Kennung (zweistellig), nach oben durch die Selektivität (ein Zeichen trifft
+ * in einer MANV-Personenliste alles).
  *
- * Nach unten begrenzt es der Zahlenzweig: die kürzeste gedruckte Kennung im System ist
- * zweistellig, mit N = 3 wäre „42 findet die Person 42" unerfüllbar. Nach oben begrenzt es
- * die Selektivität: ein einzelnes Zeichen ist keine Anfrage, es trifft in einer
- * MANV-Personenliste alles und kostet ein Dutzend Abrufe für null Aussage.
- *
- * HIER und nicht in `useDatensaetze.ts`, weil die Palette die Zahl selbst braucht: bei
- * einem einzelnen Zeichen im Datensatz-Modus ist die Liste per Konstruktion leer, und ein
- * stummes „Keine Treffer" wäre dort von „kaputt" nicht zu unterscheiden.
+ * HIER statt in `useDatensaetze.ts`, weil die Palette die Zahl selbst braucht: bei einem Zeichen
+ * ist die Liste leer, und ein stummes „Keine Treffer“ wäre von „kaputt“ nicht zu unterscheiden.
  */
 export const DATENSATZ_MINDESTZEICHEN = 2;
 
@@ -506,17 +378,11 @@ export function modusZeigtDatensaetze(modus: PaletteModus): boolean {
 /**
  * Quelle → Modulschlüssel der LESEACHSE (`istModulFreigegeben`).
  *
- * ZWÖLF MODULE, VIERZEHN QUELLEN (seit LFH-619): 'Kräfte' zerfällt in `fahrzeuge`,
- * `personal` und `einheiten`, die in der `modulRegistry` drei getrennte Einträge mit eigener
- * Sichtbarkeits- und Rollenschranke sind — ein Sammelbegriff wäre eine vierte, erfundene
- * Achse. Die drei ETB-Zweige (Nummer, Volltext, Zählung) teilen sich denselben Schlüssel: ein
- * Modul, drei Abfragewege.
+ * 'Kräfte' zerfällt in `fahrzeuge`, `personal` und `einheiten` (drei Registry-Einträge mit eigener
+ * Schranke); die drei ETB-Zweige (Nummer, Volltext, Zählung) teilen einen Schlüssel.
  *
- * HIER und nicht neben den Abrufen (C2 hatte sie dort), weil der REINE Kern sie ebenfalls
- * braucht: er darf `useDatensaetze.ts` nicht importieren, das zöge react-query und die
- * zwölf API-Clients in eine Datei, die ohne Netz prüfbar sein soll. Zwei Kopien wären zwei
- * Zuordnungen, die auseinanderlaufen, ohne dass ein Test es sieht — der Kern filterte dann
- * nach einem anderen Modul als der Abruf.
+ * HIER, weil auch der reine Kern sie braucht und `useDatensaetze.ts` (react-query, API-Clients)
+ * nicht importieren darf. Zwei Kopien liefen still auseinander.
  */
 export const QUELLE_MODUL = {
   personen: 'personen',
@@ -530,8 +396,7 @@ export const QUELLE_MODUL = {
   etbNummer: 'etb',
   etbText: 'etb',
   etbAnzahl: 'etb',
-  // LFH-619. `gefahrenzonen` ist der Registry-Schlüssel des Moduls „Gefahren" — die
-  // Gefahrengebiete wohnen dort, nicht unter einem eigenen Schlüssel.
+  // `gefahrenzonen` ist der Registry-Schlüssel des Moduls „Gefahren“.
   lageberichte: 'lageberichte',
   gefahrengebiete: 'gefahrenzonen',
   abschnitte: 'einsatzabschnitte',

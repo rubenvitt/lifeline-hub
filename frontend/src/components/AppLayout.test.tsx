@@ -28,18 +28,17 @@ function setup(me: BenutzerAnzeige) {
 }
 
 describe('AppLayout (globale Topbar)', () => {
-  // Der Name steht seit 22.09.2026 erst ab `xl` im Benutzer-Trigger; die Tests hier lesen
-  // ihn als Ladeanker und prüfen die Fükw-Kopfzeile.
+  // Der Name steht erst ab `xl` im Benutzer-Trigger; die Tests lesen ihn als Ladeanker.
   beforeEach(() => setzeViewportBreite(1366));
 
   it('Admin: Verwaltung ist Link, Profil/Abmelden im Benutzermenü (Benutzer wohnt in der Sidebar)', async () => {
     setup(admin);
     await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'Verwaltung' })).toBeInTheDocument();
-    // Benutzer ist kein Topbar-Link mehr (steht in der Admin-Sidebar).
+    // Benutzer ist kein Topbar-Link (steht in der Admin-Sidebar).
     expect(screen.queryByRole('link', { name: 'Benutzer' })).not.toBeInTheDocument();
     expect(screen.getByText('Inhalt')).toBeInTheDocument();
-    // Profil und Abmelden liegen jetzt im Benutzermenü (Dropdown).
+    // Profil und Abmelden liegen im Benutzermenü.
     await userEvent.click(screen.getByRole('button', { name: 'Benutzermenü' }));
     expect(await screen.findByText('Profil')).toBeInTheDocument();
     expect(screen.getByText('Abmelden')).toBeInTheDocument();
@@ -49,8 +48,8 @@ describe('AppLayout (globale Topbar)', () => {
     setup({ ...admin, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'Eva' });
     await waitFor(() => expect(screen.getByText('Eva')).toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'Verwaltung' })).toBeInTheDocument();
-    // Der Grund steht seit LFH-337/M10 als sichtbarer Text (Tag), nicht mehr nur im
-    // `title`-Hover — bei freier Berechtigung darf dieser Text gar nicht erscheinen.
+    // Der Grund steht als sichtbarer Text (Tag), nicht nur im `title` — bei freier Berechtigung
+    // darf er nicht erscheinen.
     expect(screen.queryByText('Keine Berechtigung')).not.toBeInTheDocument();
   });
 
@@ -58,36 +57,24 @@ describe('AppLayout (globale Topbar)', () => {
     setup({ ...admin, system_rolle: 'keiner', org_rolle: 'keine', anzeigename: 'Max' });
     await waitFor(() => expect(screen.getByText('Max')).toBeInTheDocument());
     expect(screen.queryByRole('link', { name: 'Verwaltung' })).not.toBeInTheDocument();
-    // Seit LFH-337/M10 steht der Grund als sichtbarer Tag-Text da, nicht mehr im
-    // `title`-Attribut (auf dem Führungs-Tablet gibt es kein Hover).
+    // Der Grund steht als sichtbarer Tag-Text (auf dem Führungs-Tablet gibt es kein Hover).
     const grundTags = screen.getAllByText('Keine Berechtigung');
     // GENAU einer — sonst bliebe „kein Benutzer-Eintrag" unbewiesen.
     expect(grundTags).toHaveLength(1);
     const gesperrt = grundTags[0].closest('.ant-typography') as HTMLElement;
     expect(gesperrt).toHaveTextContent('Verwaltung');
-    // Die Schloss-Ikone ist mit dem Tag entfallen (LFH-337 · M10, sie sagte dasselbe
-    // wie der jetzt sichtbare Text) — hier bleibt geprüft, dass kein Icon-Vorleseziel
-    // in den gesperrten Eintrag zurückkehrt.
+    // Kein Icon-Vorleseziel im gesperrten Eintrag: das Wort trägt den Grund.
     expect(within(gesperrt).queryByRole('img')).not.toBeInTheDocument();
     expect(screen.queryByText('Admin')).not.toBeInTheDocument();
   });
 
   /**
-   * AK 1 von LFH-392: die Zahl der Bedienziele ist BELEGT gesunken.
-   *
-   * KALIBRIERT GEGEN DEN BESTAND, nicht gegen eine Wunschzahl: vor dem Umbau
-   * zählte dieselbe Abfrage hier 10 (2 Links + 2 Knöpfe + 6 Segment-Radios),
-   * danach 4. Wer den Zähler auf `getAllByRole('button')` verkürzt, misst vorher
-   * wie nachher 2 und behauptet einen Fortschritt, den er nicht gemessen hat —
+   * AK 1 von LFH-392: die Zahl der Bedienziele ist BELEGT gesunken — kalibriert gegen den Bestand
+   * (dieselbe Abfrage zählte vorher 10). `getAllByRole('button')` allein mäße vorher wie nachher 2;
    * die Herleitung steht in `test/kopfzeile.ts`.
    *
-   * `radio: 0` IST DIE NULLAUSSAGE dieses Pakets, und zwar die einzige, die rot
-   * werden kann. Hier stand zuerst ein Paar `queryByRole('radiogroup', { name:
-   * 'Farbschema wählen' })` — nutzlos: das Etikett kam mit `ThemeToggle.tsx` fort
-   * und existiert im ganzen Repo nicht mehr, die Null war damit durch keine
-   * Änderung am Produktivcode widerlegbar. Diese hier schlägt an, sobald
-   * IRGENDEIN Segmented oder Radio in die Kopfzeile zurückkehrt — unabhängig
-   * davon, wie es beschriftet ist.
+   * `radio: 0` IST DIE NULLAUSSAGE und die einzige, die rot werden kann: sie schlägt an, sobald
+   * IRGENDEIN Segmented oder Radio in die Kopfzeile zurückkehrt, unabhängig von der Beschriftung.
    */
   it('AK1 — die Kopfzeile trägt nur noch 4 Bedienziele (vorher 10)', async () => {
     setup(admin);
@@ -97,15 +84,10 @@ describe('AppLayout (globale Topbar)', () => {
   });
 
   /**
-   * AK 2 als PAAR zum Test darüber: was aus der Kopfzeile verschwindet, ist
-   * nachweislich woanders erreichbar. Ohne diese Hälfte belegte die 4 oben nur,
-   * dass etwas WEG ist — nicht, dass es noch bedienbar ist.
+   * AK 2 als PAAR zum Test darüber: was aus der Kopfzeile verschwindet, ist woanders erreichbar.
    *
-   * Geprüft wird ERREICHBARKEIT, nicht Wirkung: `renderMitProviders` montiert
-   * keinen `ThemeModeProvider`, `useThemeMode` fällt deshalb auf `system` /
-   * `kompakt` zurück (ThemeModeProvider.tsx:165-175). Dass ein Klick bis ans
-   * `<html>` durchschlägt, prüft `BenutzerMenu.test.tsx` — dort steht der
-   * Provider.
+   * Geprüft wird ERREICHBARKEIT, nicht Wirkung: ohne `ThemeModeProvider` fällt `useThemeMode` auf
+   * die Vorgaben zurück. Die Wirkung bis ans `<html>` prüft `BenutzerMenu.test.tsx`.
    */
   it('AK2 — beide Achsen sind ab lg im Benutzermenü erreichbar', async () => {
     setup(admin);
@@ -113,7 +95,7 @@ describe('AppLayout (globale Topbar)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Benutzermenü' }));
 
     const menu = await screen.findByRole('menu');
-    // Vorgabe seit dem Neuentwurf (21.09.2026): Nachtbetrieb trägt das Häkchen.
+    // Vorgabe: Nachtbetrieb trägt das Häkchen.
     expect(within(menu).getByRole('menuitem', { name: /Dunkel ✓/ })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /^System$/ })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /Kompakt ✓/ })).toBeInTheDocument();
@@ -128,21 +110,18 @@ describe('AppLayout (globale Topbar)', () => {
   });
 
   describe('unter lg', () => {
-    // Breite VOR dem Render: antds Beobachter ruft seinen Zuhörer beim
-    // Abonnieren synchron auf und liest dabei nur `matches`.
+    // Breite VOR dem Render: antds Beobachter liest beim Abonnieren nur `matches`.
     beforeEach(() => setzeViewportBreite(390));
 
     it('legt beide Umschalter ab und behält das Benutzermenü', async () => {
       setup(admin);
-      // Der Trigger trägt hier keinen Namen mehr, deshalb hängt das Warten am
-      // `aria-label` statt am Anzeigenamen.
+      // Der Trigger trägt hier keinen Namen, deshalb hängt das Warten am `aria-label`.
       expect(await screen.findByRole('button', { name: 'Benutzermenü' })).toBeInTheDocument();
-      // Über die ROLLE gezählt, nicht über das Etikett: „Farbschema wählen"
-      // existiert seit LFH-392 nirgends mehr im Repo, eine Null darauf wäre
-      // durch keine Änderung widerlegbar. Siehe `test/kopfzeile.ts`.
+      // Über die ROLLE gezählt, nicht über ein Etikett, das es nicht mehr gibt (siehe
+      // `test/kopfzeile.ts`).
       expect(radiosImKopf()).toBe(0);
-      // Der Anzeigename ist mit dem Trigger geschrumpft — die drei
-      // Bestandsfälle oben laufen deshalb bewusst auf der Standardbreite.
+      // Der Anzeigename ist mit dem Trigger geschrumpft; die Bestandsfälle oben laufen deshalb auf
+      // der Standardbreite.
       expect(screen.queryByText('Chef')).not.toBeInTheDocument();
       const suche = screen.getByRole('button', { name: 'Suchen' });
       expect(suche).toHaveAttribute('aria-label', 'Suchen');
@@ -155,9 +134,8 @@ describe('AppLayout (globale Topbar)', () => {
 describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
   it('nennt den Grund als sichtbaren Text, nicht nur im title', async () => {
     // Default-`/api/auth/me` liefert 401 → benutzer = null → darfVerwaltung false.
-    // CommandPaletteProvider ist hier Pflicht: AppLayout rendert CommandPaletteTrigger,
-    // dessen useCommandPalette() außerhalb dieses Providers wirft — renderMitProviders
-    // liefert ihn nicht mit, das ist AppLayout-spezifisch wie im `setup()` oben.
+    // CommandPaletteProvider ist Pflicht: AppLayout rendert CommandPaletteTrigger, dessen
+    // useCommandPalette() außerhalb des Providers wirft.
     renderMitProviders(
       <CommandPaletteProvider>
         <AppLayout />
@@ -173,10 +151,8 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
       </CommandPaletteProvider>,
     );
     const text = (await screen.findByText('Verwaltung')).closest('span');
-    // Die ROLLE ist die Aussage, nicht die Zahl: `farbenDunkel.schwach` liefert gegen
-    // den Kopfzeilengrund #001529 gerechnete 5,3:1, der abgelöste Wert
-    // rgba(255,255,255,0.35) nur ~3,2:1. jsdom rechnet keine Farbmischung — die Zahl
-    // steht deshalb im Commit, hier steht die Herkunft.
+    // Die ROLLE ist die Aussage, nicht die Zahl: `farbenDunkel.schwach` hält gegen den
+    // Kopfzeilengrund den Kontrast. jsdom rechnet keine Farbmischung, hier steht die Herkunft.
     expect(text).toHaveStyle({ color: farbenDunkel.schwach });
   });
 
@@ -194,20 +170,14 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
   });
 
   /**
-   * Der Tag steht erst ab `lg` (LFH-337 · Fix-Welle, Befund B1).
+   * Der Tag steht erst ab `lg` (LFH-337): er kann weder kürzen noch umbrechen und sprengte bei
+   * 390 px die Kopfzeile. Die Zahl misst `e2e/kopfzeile-schmal.spec.ts`, hier die Verdrahtung.
    *
-   * Der Block kann weder kürzen noch umbrechen (`flexShrink: 0` plus antds
-   * `white-space: nowrap` am Tag); auf 390 px sprengte er die Kopfzeile. Die Zahl
-   * misst nur der Browser — die e2e-Wache dafür steht in
-   * `e2e/kopfzeile-schmal.spec.ts`. Hier wird die Verdrahtung geprüft, die sie trägt.
-   *
-   * ZWEI Zusicherungen, nicht eine: ohne die zweite („der gedämpfte Link steht noch")
-   * bliebe der Test auch dann grün, wenn jemand den ganzen gesperrten Zweig entfernte —
-   * und „gesperrt statt versteckt" ist die Regel, die dieser Zweig trägt.
+   * ZWEI Zusicherungen: ohne „der gedämpfte Link steht noch" bliebe der Test grün, wenn jemand
+   * den gesperrten Zweig entfernte — und „gesperrt statt versteckt" ist die Regel.
    */
   it('lässt auf 390 px nur den Tag weg, nicht den gedämpften Link', async () => {
-    // Breite VOR dem Render: antds Beobachter ruft seinen Zuhörer beim Abonnieren
-    // synchron auf und liest dabei nur `matches`.
+    // Breite VOR dem Render: antds Beobachter liest beim Abonnieren nur `matches`.
     setzeViewportBreite(390);
     renderMitProviders(
       <CommandPaletteProvider>
@@ -216,8 +186,7 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
     );
     const verwaltung = await screen.findByText('Verwaltung');
     expect(verwaltung).toBeVisible();
-    // Immer noch der GESPERRTE Zweig, nicht der freie Link — sonst prüfte die Zeile
-    // darunter einen Zustand, in dem es ohnehin keinen Tag gäbe.
+    // Immer noch der GESPERRTE Zweig — sonst prüfte die Zeile darunter einen Zustand ohne Tag.
     expect(screen.queryByRole('link', { name: 'Verwaltung' })).toBeNull();
     expect(screen.queryByText('Keine Berechtigung')).toBeNull();
   });

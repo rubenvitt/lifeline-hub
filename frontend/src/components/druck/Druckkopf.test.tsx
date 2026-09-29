@@ -53,8 +53,7 @@ describe('Druckkopf', () => {
     expect(k.getByText('Hochwasser Nord (E-2026-0007)')).toBeInTheDocument();
     expect(k.getByText('freigegeben, Version 2')).toBeInTheDocument();
     expect(k.getByText('Abschnitt: Nord')).toBeInTheDocument();
-    // Die Person ist die DRUCKENDE (Spec „Gemeinsamer Druckkopf"), nicht die Urheberin des
-    // Dokuments — „Erstellt von" läse sich auf Befehl und Lagebericht als Urheberschaft.
+    // Die DRUCKENDE Person, nicht die Urheberin — „Erstellt von" läse sich als Urheberschaft.
     const person = await k.findByText('Erika Einsatzleiterin');
     expect(person.previousElementSibling).toHaveTextContent(/^Gedruckt von$/);
     expect(k.getByText('Gedruckt am')).toBeInTheDocument();
@@ -110,9 +109,9 @@ describe('Druckkopf', () => {
 
   /**
    * Zwischen Öffnen der Seite und Strg+P können Stunden liegen: `beforeprint` erneuert den
-   * Druckzeitpunkt. Geprüft SYNCHRON direkt nach dem Ereignis und OHNE `act`/`fireEvent` —
-   * der Browser friert das Druckbild unmittelbar nach den Listenern ein. Ohne `flushSync`
-   * im Listener stünde das Update hier noch aus (Mutationsprobe).
+   * Druckzeitpunkt. Geprüft SYNCHRON direkt nach dem Ereignis und OHNE `act`/`fireEvent` — der
+   * Browser friert das Druckbild unmittelbar nach den Listenern ein. Ohne `flushSync` im Listener
+   * stünde das Update hier noch aus.
    */
   it('erneuert den Druckzeitpunkt bei beforeprint, synchron vor dem Druckbild', async () => {
     mitOrganisation();

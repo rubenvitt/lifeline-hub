@@ -4,20 +4,15 @@ import { monoStil, useRollen } from './rollenwerte';
 import { datenfeldStil, datenrasterStil } from './datenrasterStil';
 
 /**
- * Datenraster — die Detail-Optik des Neuentwurfs statt antds `Descriptions`: je Feld eine
- * Augenbraue über dem Wert, 2–4 Spalten im Fugenraster, Kennungen/Zahlen/Zeiten in Mono.
+ * Datenraster — die Detail-Optik statt antds `Descriptions`: je Feld eine Augenbraue über dem
+ * Wert, 2–4 Spalten im Fugenraster, Kennungen/Zahlen/Zeiten in Mono.
  *
- * Seit 22.09.2026 ein Baustein in `components/instrument/` (vorher lokal unter
- * `pages/datenraster/`, als die Bausteine parallel in Arbeit waren). Umgezogen ohne
- * Schnittstellenänderung.
+ * SEMANTIK: ein `<dl>`; jedes Feld ist ein `<div>` mit `<dt>` (Augenbraue) und `<dd>` — die
+ * zulässige Gruppierung nach HTML, Vorleser hören Begriff und Wert als Paar.
  *
- * SEMANTIK: ein `<dl>`; jedes Feld ist ein `<div>` mit `<dt>` (Augenbraue) und `<dd>`.
- * Das ist die zulässige Gruppierung nach HTML — Vorleser hören Begriff und Wert als Paar.
- *
- * BEARBEITEN AN ORT UND STELLE: der Wert ist ein beliebiger Knoten. Eine Detailseite, die
- * im Edit-Modus ein `Form.Item noStyle` in die Zelle legt, behält dasselbe Raster (so
- * wie vorher dieselbe `Descriptions`-Tabelle). Mono gilt dann nur für die Anzeige —
- * `mono` setzt die Schrift am `<dd>`, ein antd-Eingabefeld darin bringt seine eigene mit.
+ * BEARBEITEN AN ORT UND STELLE: der Wert ist ein beliebiger Knoten. Eine Detailseite, die im
+ * Edit-Modus ein `Form.Item noStyle` in die Zelle legt, behält dasselbe Raster. `mono` setzt die
+ * Schrift am `<dd>`; ein antd-Eingabefeld darin bringt seine eigene mit.
  */
 interface DatenrasterProps {
   children: ReactNode;

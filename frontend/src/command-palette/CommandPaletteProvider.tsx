@@ -1,4 +1,3 @@
-// frontend/src/command-palette/CommandPaletteProvider.tsx
 import {
   createContext,
   useCallback,
@@ -40,17 +39,13 @@ interface PaletteWert {
 const PaletteContext = createContext<PaletteWert | null>(null);
 
 /**
- * Löst eine Ebenen-KETTE zu einer Aktionsmenge auf: die erste Ebene, die eine Aktion
- * belegt, gewinnt — die Kette kommt von TIEF nach FLACH (LFH-391 · B).
+ * Löst eine Ebenen-KETTE zu einer Aktionsmenge auf: die erste Ebene, die eine Aktion belegt,
+ * gewinnt; die Kette kommt von TIEF nach FLACH. Rein und exportiert, damit „tief gewinnt“ als
+ * Regel prüfbar ist.
  *
- * Rein und exportiert nach dem Repo-Muster von `bedienzielStil`/`aktionsabstand`: nur so
- * ist die Richtung „tief gewinnt" eine Aussage über die REGEL statt über eine zufällige
- * Verschachtelung im Test.
- *
- * Ein Schlüssel mit `undefined` zählt bewusst NICHT als Belegung. `TastaturAktionen` ist
- * ein Partial, und Aufrufer schreiben regelmäßig `speichern: darfSchreiben ? cb :
- * undefined` — würde das Loch als Belegung gelten, verdeckte eine tiefe Ebene die Aktion
- * einer flacheren, und die Aktion verschwände, statt durchzureichen.
+ * Ein Schlüssel mit `undefined` zählt NICHT als Belegung: Aufrufer schreiben
+ * `speichern: darfSchreiben ? cb : undefined`, und das Loch darf die Aktion einer flacheren Ebene
+ * nicht verdecken.
  */
 export function verschmelzeAktionen(ketteVonTiefNachFlach: TastaturAktionen[]): TastaturAktionen {
   const verschmolzen: TastaturAktionen = {};
@@ -67,28 +62,18 @@ export function verschmelzeAktionen(ketteVonTiefNachFlach: TastaturAktionen[]): 
 }
 
 /**
- * Die Wurzel der Ebene, wenn sie als ANZEIGE-Fallback taugt — sonst `null`. Drei
- * Ausschlüsse, jeder mit eigenem Grund:
+ * Die Wurzel der Ebene, wenn sie als ANZEIGE-Fallback taugt, sonst `null`. Ausgeschlossen:
  *
- *  - **nicht am Dokument** (`isConnected`): eine ausgehängte Wurzel ist unerreichbar. Die
- *    Abmeldung läuft im Effekt-Cleanup und damit nach dem Aushängen; dazwischen steht die
- *    Ebene noch in der Map.
- *  - **`[hidden]` / `[aria-hidden="true"]` an der Wurzel oder darüber**: gemessen an antds
- *    `Tabs` — ein besuchter und wieder verlassener Reiter bleibt IM Baum
- *    (`class="ant-tabs-content ant-tabs-content-hidden"`, `aria-hidden="true"`). Auf der
- *    UHS-Detailseite gewann so die unsichtbare „Bewegungen"-Liste den Fallback und bot
- *    „Spalten" an, deren Portal-Menü an einem Auslöser ohne Layout hängt.
- *  - **keine belegte Aktion**: eine leere Ebene hat nichts anzubieten, verdrängte als
- *    flachste aber die nützliche darunter. Das ist die Verteidigung in der Tiefe hinter
- *    dem `aktiv`-Riegel von `EinsatzSeite`, nicht sein Ersatz.
+ *  - **nicht am Dokument** (`isConnected`): die Abmeldung läuft im Effekt-Cleanup, nach dem
+ *    Aushängen.
+ *  - **`[hidden]` / `[aria-hidden="true"]` an der Wurzel oder darüber**: antds `Tabs` lassen
+ *    verlassene Reiter so im Baum; deren unsichtbare Liste böte sonst „Spalten“ an.
+ *  - **keine belegte Aktion**: eine leere Ebene verdrängte die nützliche darunter.
  *
- * **Was der Filter NICHT sieht** (Vertragsteil, kein Beiwerk): jede Unsichtbarkeit, die
- * erst aus dem LAYOUT folgt — `display: none`/`visibility: hidden` aus einer Klasse, Höhe
- * 0, aus dem Sichtfeld geschoben, `content-visibility`. jsdom rechnet kein Layout,
- * `offsetParent` ist dort IMMER null und `getComputedStyle` liefert keine
- * Stylesheet-Regeln zurück; ein Filter darauf wäre im Vitest nicht prüfbar. Geprüft
- * werden deshalb die zwei ATTRIBUTE, die eine Bibliothek setzt, wenn sie etwas absichtlich
- * versteckt — sie tragen zugleich die Aussage, die für Vorlesende ohnehin gilt.
+ * **Was der Filter NICHT sieht** (Vertragsteil): Unsichtbarkeit aus dem LAYOUT (`display: none`
+ * aus einer Klasse, Höhe 0, `content-visibility`). jsdom rechnet kein Layout, ein Filter darauf
+ * wäre im Vitest nicht prüfbar. Geprüft werden die zwei Attribute, die eine Bibliothek zum
+ * absichtlichen Verstecken setzt.
  */
 function fallbackWurzel(ebene: TastaturEbene): HTMLElement | null {
   const wurzel = ebene.wurzel.current;
@@ -99,17 +84,10 @@ function fallbackWurzel(ebene: TastaturEbene): HTMLElement | null {
 }
 
 /**
- * Die flachste registrierte Ebene als einelementige Kette — Kandidat für den
- * ANZEIGE-Fallback, wenn kein Fokus-Containment greift (LFH-391 · B).
- *
- * „Flachste" heisst kleinste DOM-Tiefe der Wurzel, bei Gleichstand die zuerst
- * registrierte. Bewusst GENAU EINE Ebene und nicht „alle Ebenen der Seite": mehrere
- * gleichrangige Kandidaten stellten dieselbe Beschriftung mehrfach in die Liste
- * („Spalten", „Filter zurücksetzen"), ohne dass die Zeile sagt, welche Fläche sie meint —
- * und Mehrdeutigkeit ist an dieser Stelle schlechter als Abwesenheit. (Die früher hier
- * genannte Begründung „zwei gleich tiefe Datensichten nebeneinander, PersonenPage rendert
- * zwei" stimmt nicht und ist nachgezählt: deren beide `Datensicht`-Aufrufe stehen im
- * ENTWEDER/ODER an derselben Baumstelle, im Bestand rendert keine Seite zwei gleichzeitig.)
+ * Die flachste registrierte Ebene als einelementige Kette, Kandidat für den ANZEIGE-Fallback,
+ * wenn kein Fokus-Containment greift. „Flachste“ = kleinste DOM-Tiefe, bei Gleichstand die zuerst
+ * registrierte. GENAU EINE Ebene: mehrere stellten dieselbe Beschriftung mehrfach in die Liste,
+ * ohne zu sagen, welche Fläche gemeint ist.
  */
 function flachsteEbene(ebenen: Map<symbol, TastaturEbene>): TastaturEbene[] {
   let flachste: TastaturEbene | null = null;
@@ -119,11 +97,8 @@ function flachsteEbene(ebenen: Map<symbol, TastaturEbene>): TastaturEbene[] {
     if (!wurzel) continue;
     let tiefe = 0;
     for (let el: HTMLElement | null = wurzel; el; el = el.parentElement) tiefe += 1;
-    // Der `reihenfolge`-Vergleich sagt heute dasselbe wie die Iterationsreihenfolge der
-    // Map: jede Registrierung bekommt ein frisches Symbol und hängt hinten an, gelöscht
-    // wird ohne Umsortieren. Der Gleichstands-Test pinnt deshalb das ERGEBNIS („die zuerst
-    // registrierte gewinnt"), nicht diesen Zweig; er steht trotzdem hier, damit die Regel
-    // nicht an einer ungeschriebenen Eigenschaft der Map hängt.
+    // Der `reihenfolge`-Vergleich entspricht heute der Iterationsreihenfolge der Map; er steht hier,
+    // damit die Regel nicht an einer ungeschriebenen Eigenschaft der Map hängt.
     if (
       tiefe < kleinsteTiefe ||
       (tiefe === kleinsteTiefe && ebene.reihenfolge < (flachste?.reihenfolge ?? Infinity))
@@ -138,18 +113,15 @@ function flachsteEbene(ebenen: Map<symbol, TastaturEbene>): TastaturEbene[] {
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [offen, setOffen] = useState(false);
   /**
-   * Das Befehls-Gedächtnis hängt HIER und nicht in `PaletteHost` (LFH-391 · Etappe D) —
-   * beide Hälften brauchen einen Träger, der die Palette überlebt bzw. ihr vorausgeht.
-   * Die Herleitung steht an `useZuletztBefehle`; hier steht nur die Folge: der Provider
-   * ist app-weit montiert, also ist der Stand beim ersten `Strg/⌘+K` in aller Regel schon
-   * da, und der Schreib-Callback funktioniert noch, wenn die Palette längst abgehängt ist.
+   * Das Befehls-Gedächtnis hängt HIER und nicht in `PaletteHost`: der Provider ist app-weit
+   * montiert, der Stand ist beim ersten `Strg/⌘+K` meist schon da, und der Schreib-Callback
+   * funktioniert noch nach dem Abhängen der Palette (Herleitung an `useZuletztBefehle`).
    */
   const gedaechtnis = useZuletztBefehle();
   const ebenenRef = useRef(new Map<symbol, TastaturEbene>());
-  // Ketten statt einzelner Ebenen (LFH-391 · B): eine Werkzeugleiste kennt „Filter
-  // zurücksetzen", die Seite darüber „Neue Zeile" — mit genau EINER aktiven Ebene
-  // verdeckte die tiefere die flachere vollständig. Beide Refs halten die Kette von TIEF
-  // nach FLACH; leer heißt „keine registrierte Wurzel enthält den Fokus".
+  // Ketten statt einzelner Ebenen: eine Werkzeugleiste kennt „Filter zurücksetzen“, die Seite
+  // darüber „Neue Zeile“. Beide Refs halten die Kette von TIEF nach FLACH; leer heißt „keine
+  // registrierte Wurzel enthält den Fokus“.
   const aktiveKetteRef = useRef<TastaturEbene[]>([]);
   const vorPaletteKetteRef = useRef<TastaturEbene[]>([]);
   const naechsteReihenfolgeRef = useRef(0);
@@ -160,9 +132,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   }, []);
   const oeffne = useCallback(() => {
     if (offenRef.current) return;
-    // Bewusst die ROHE Kette merken. Schliche hier ein Anzeige-Fallback ein, gäbe
-    // `schliesse` ihn an den Tastenweg zurück — und Strg+S feuerte auf einer Maske, die
-    // der Fokus längst verlassen hat.
+    // Bewusst die ROHE Kette merken: ein Anzeige-Fallback liefe sonst über `schliesse` in den
+    // Tastenweg, und Strg+S feuerte auf einer Maske, die der Fokus verlassen hat.
     vorPaletteKetteRef.current = aktiveKetteRef.current;
     offenRef.current = true;
     setOffen(true);
@@ -180,10 +151,9 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   }, [oeffne, schliesse]);
 
   /**
-   * Sammelt ALLE Ebenen, deren Wurzel das Ziel enthält, und ordnet sie von tief nach
-   * flach (Gleichstand → später registrierte zuerst). Die Auswahlregel bleibt strikt
-   * Fokus-Containment: enthält keine Wurzel das Ziel, ist die Kette LEER. Ein Fallback
-   * gehört hier ausdrücklich nicht hin — er liefe in den Tastenweg.
+   * Sammelt ALLE Ebenen, deren Wurzel das Ziel enthält, von tief nach flach (Gleichstand → später
+   * registrierte zuerst). Strikt Fokus-Containment: enthält keine Wurzel das Ziel, ist die Kette
+   * LEER. Ein Fallback gehört nicht hierher, er liefe in den Tastenweg.
    */
   const waehleEbene = useCallback((ziel: EventTarget | null) => {
     if (!(ziel instanceof Node)) return;
@@ -215,9 +185,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
           aktiveKetteRef.current = [];
           waehleEbene(document.activeElement);
         }
-        // FILTERN, nicht leeren: die gemerkte Kette trägt mehrere Ebenen, und eine
-        // abgemeldete darf die übrigen nicht mitnehmen. (Mit einer einzelnen Ebene war
-        // „nullen" dasselbe wie „filtern" — bei einer Kette ist es ein Datenverlust.)
+        // FILTERN, nicht leeren: eine abgemeldete Ebene darf die übrigen der Kette nicht mitnehmen.
         vorPaletteKetteRef.current = vorPaletteKetteRef.current.filter((e) => e.id !== id);
         if (offenRef.current) meldeTastaturAktionenAenderung();
       };
@@ -281,23 +249,14 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
     }),
     [offen, oeffne, schliesse, toggle, registriereTastaturEbene, meldeTastaturAktionenAenderung],
   );
-  // Die KETTE wird beim Rendern festgehalten, die CALLBACKS erst beim Auslösen aufgelöst.
-  // Beides ist nötig, und beides ist gemessen:
-  //   - spät auflösen, weil eine Ebene ihre Aktionen tauschen kann, während die Palette
-  //     offen steht (`meldeTastaturAktionenAenderung` rendert dann neu);
-  //   - die Kette aber lokal halten, weil `CommandPalette.fuehreAus` erst `schliesse()`
-  //     und dann `ausfuehren()` ruft — `schliesse` leert `vorPaletteKetteRef`, und ein
-  //     Zugriff auf die Ref zur Aufrufzeit liefe deshalb ins Leere.
-  // Anzeige-Fallback (LFH-391 · B) — und AUSSCHLIESSLICH hier, nie in `waehleEbene` und
-  // nie in der gemerkten Kette. Im Browser gemessen: der Klick auf den sichtbaren
-  // „Suchen"-Trigger nimmt den Fokus aus jeder registrierten Wurzel (perHotkey=1 gegen
-  // perTrigger=0), die Gruppe „Aktionen" blieb also genau auf dem Berührungsweg leer, für
-  // den der Trigger gebaut wurde.
-  //
-  // Der Unterschied zum Tastenweg ist inhaltlich, nicht kosmetisch: eine Palettenzeile
-  // ist ein bewusster Griff auf eine sichtbar beschriftete Aktion, ein globales
-  // Tastenkürzel ist es nicht. Läge der Fallback in der Auswahl, feuerte Strg+S das
-  // `speichern` einer Maske, die der Fokus längst verlassen hat.
+  // Die KETTE wird beim Rendern festgehalten, die CALLBACKS erst beim Auslösen aufgelöst:
+  //   - spät auflösen, weil eine Ebene ihre Aktionen bei offener Palette tauschen kann;
+  //   - die Kette lokal halten, weil `CommandPalette.fuehreAus` erst `schliesse()` (leert
+  //     `vorPaletteKetteRef`) und dann `ausfuehren()` ruft.
+  // Anzeige-Fallback AUSSCHLIESSLICH hier: der Klick auf den „Suchen“-Trigger nimmt den Fokus aus
+  // jeder Wurzel, die Gruppe „Aktionen“ bliebe sonst auf dem Berührungsweg leer. Eine
+  // Palettenzeile ist ein bewusster Griff auf eine beschriftete Aktion, ein globales Tastenkürzel
+  // nicht; im Tastenweg feuerte Strg+S sonst auf einer verlassenen Maske.
   const paletteKette =
     vorPaletteKetteRef.current.length > 0
       ? vorPaletteKetteRef.current
@@ -323,13 +282,9 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * Lädt die Befehle erst beim Öffnen (Query läuft nicht im Leerlauf) — und seit LFH-391 · C3
- * auch die Datensätze.
- *
- * ZWEI HOOKS, nicht ein erweitertes `useBefehle`, und der Grund ist gemessen: `useBefehle`
- * memoisiert über elf Dependencies; eine tastenabhängige Quelle dort baute die ganze
- * Befehlsliste bei jedem Anschlag neu. Der Datensatz-Weg hängt dagegen ausschliesslich am
- * ENTPRELLTEN Stand, den die Palette selbst meldet.
+ * Lädt Befehle und Datensätze erst beim Öffnen. ZWEI HOOKS statt eines erweiterten `useBefehle`:
+ * das memoisiert über viele Dependencies, eine tastenabhängige Quelle dort baute die ganze
+ * Befehlsliste je Anschlag neu. Der Datensatz-Weg hängt am ENTPRELLTEN Stand.
  */
 function PaletteHost({
   schliesse,
@@ -341,27 +296,14 @@ function PaletteHost({
   gedaechtnis: BefehlsGedaechtnis;
 }) {
   /**
-   * EIN STANDBILD beim Öffnen (LFH-391 · Etappe D). `useState` liest den Initialwert genau
-   * einmal — der Stand, den die Palette beim Öffnen vorfindet, gilt für ihre ganze Öffnung.
+   * EIN STANDBILD beim Öffnen: `useState` liest den Initialwert einmal, der Stand gilt für die ganze
+   * Öffnung. Sonst entstünde bei später Serverantwort die OBERSTE Gruppe mitten in der offenen
+   * Palette, und jede Zeile rückte unter dem Finger nach unten (WCAG 3.2.5).
    *
-   * Ohne das könnte die Antwort des Servers mitten in der offenen Palette eintreffen und die
-   * OBERSTE Gruppe entstehen lassen: jede Zeile darunter rückte nach unten, während der
-   * Finger schon unterwegs ist. Das ist derselbe Vertrag, aus dem die Auswahl an der
-   * Befehls-ID statt am Index hängt („Live-Updates springen nicht unter dem Cursor",
-   * WCAG 3.2.5) — und derselbe, aus dem die Startansicht kuratiert ist und keine
-   * nachrückende Datenhalde (LFH-337 · M11).
-   *
-   * `PaletteHost` wird beim Schliessen abgehängt (`{offen && …}`), das Standbild gilt also
-   * je Öffnung neu. Der SCHREIBweg ist bewusst NICHT eingefroren: er liest den Stand aus dem
-   * QueryClient, damit zwei Ausführungen hintereinander sich nicht gegenseitig überschreiben.
-   *
-   * DER PREIS IST GEMESSEN und angenommen: wer die Palette öffnet, BEVOR der erste Abruf
-   * zurück ist, sieht das Gedächtnis erst beim nächsten Öffnen — im Betrieb liegen zwischen
-   * App-Start und dem ersten `Strg/⌘+K` Sekunden, im Playwright-Lauf Millisekunden, weshalb
-   * `e2e/palette-gedaechtnis.spec.ts` ausdrücklich auf die Antwort wartet. Der Tausch ist
-   * die Vorgabe des Tickets („erst ab Antwort rendern"): eine Gruppe, die ZUOBERST
-   * nachklappt, verschiebt jede Zeile darunter, und das trifft jeden Griff, nicht nur den
-   * allerersten nach dem Laden.
+   * `PaletteHost` wird beim Schließen abgehängt, das Standbild gilt je Öffnung neu. Der SCHREIBweg
+   * liest aus dem QueryClient, damit zwei Ausführungen sich nicht überschreiben. Preis: wer die
+   * Palette vor der ersten Antwort öffnet, sieht das Gedächtnis erst beim nächsten Mal
+   * (`e2e/palette-gedaechtnis.spec.ts` wartet deshalb auf die Antwort).
    */
   const [zuletztBefehlIds] = useState(gedaechtnis.ids);
   const gefroren = useMemo(
@@ -376,13 +318,12 @@ function PaletteHost({
     rest: '',
   });
 
-  // Identitätsstabil, weil beide in `useMemo`-Dependencies der Hooks darunter stehen: ein
-  // je Render frisch gebautes Paar machte deren Memoisierung wirkungslos.
+  // Identitätsstabil, weil beide in `useMemo`-Dependencies der Hooks darunter stehen.
   //
-  // Der NEUE TAB (LFH-645, Strg/⌘+↵) wird hier geöffnet und nirgends sonst: die Palette bleibt
-  // präsentational, die Bauorte der Befehle rein. Die Pfade sind App-absolut und der Router
-  // läuft ohne `basename` — sie sind damit direkt eine URL dieses Ursprungs. `noopener`, weil
-  // der neue Tab mit diesem nichts teilen muss; die Sitzung liegt im Cookie und reist mit.
+  // Der NEUE TAB (Strg/⌘+↵) wird hier geöffnet und nirgends sonst: die Palette bleibt
+  // präsentational, die Bauorte rein. Die Pfade sind App-absolut (Router ohne `basename`), also
+  // direkt eine URL dieses Ursprungs. `noopener`, weil der neue Tab nichts teilen muss; die
+  // Sitzung liegt im Cookie.
   const gehZu = useCallback(
     (pfad: string, oeffnung?: Oeffnung) => {
       if (oeffnung === 'neuerTab') window.open(pfad, '_blank', 'noopener');
@@ -390,12 +331,11 @@ function PaletteHost({
     },
     [navigate],
   );
-  // ALLE drei Befehlsquellen öffnen über `gehZu` — die festen Befehle, die Datensätze und
-  // der Koordinatensprung. Nur so gilt der neue Tab für jede Zeile mit Ziel (LFH-645).
+  // ALLE drei Befehlsquellen öffnen über `gehZu` (feste Befehle, Datensätze, Koordinatensprung),
+  // nur so gilt der neue Tab für jede Zeile mit Ziel.
   const befehle = useBefehle(tastaturAktionen, gefroren, gehZu);
   const melde = useCallback((modus: PaletteModus, rest: string) => {
-    // Gleicher Stand → gleiches Objekt: die Frist läuft auch beim blossen Öffnen einmal ab
-    // und meldete sonst je Palettenöffnung ein neues, inhaltsgleiches Objekt.
+    // Gleicher Stand → gleiches Objekt: die Frist läuft auch beim bloßen Öffnen ab.
     setStand((v) => (v.modus === modus && v.rest === rest ? v : { modus, rest }));
   }, []);
 
@@ -403,10 +343,8 @@ function PaletteHost({
     einsatzId,
     modus: stand.modus,
     suche: stand.rest,
-    // Die AKTUELLE ROUTE als Modulschlüssel (LFH-391 · C4, Arbeitspunkt 3): wer im
-    // Kräfte-Modul einen Funkrufnamen tippt, meint das Fahrzeug und nicht die gleichnamige
-    // Person. Die Zerlegung kommt aus der Registry, nicht von Hand — sie stand im Bestand
-    // schon zweimal (`EinsatzLayout`, `ModulStub`).
+    // Die AKTUELLE ROUTE als Modulschlüssel (aus der Registry): wer im Kräfte-Modul einen
+    // Funkrufnamen tippt, meint das Fahrzeug.
     aktuellerModulKey: modulAusPfad(pathname)?.key ?? null,
     navigate: gehZu,
   });
@@ -423,10 +361,9 @@ function PaletteHost({
       befehle={befehle}
       datensatzTreffer={datensatzTreffer}
       onSucheEntprellt={melde}
-      // Ausserhalb eines Einsatzes gibt es keine Lagekarte, auf die man springen könnte —
-      // dann auch keinen Fußhinweis (LFH-619).
+      // Außerhalb eines Einsatzes gibt es keine Lagekarte, also auch keinen Fußhinweis.
       koordinatenSprung={einsatzId == null ? undefined : koordinatenSprung}
-      // Vorschauen gibt es nur für Datensätze, Datensätze nur im Einsatz (LFH-645).
+      // Vorschauen gibt es nur für Datensätze, Datensätze nur im Einsatz.
       vorschauVerfuegbar={einsatzId != null}
       schliesse={schliesse}
     />

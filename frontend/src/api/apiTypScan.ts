@@ -1,35 +1,20 @@
 /**
- * AST-Scanner für handgerollte Objekt-Typen im API-Seam (LFH-265, Teil A).
+ * AST-Scanner für handgerollte Objekt-Typen im API-Seam (LFH-265), konsumiert von
+ * `apiResponseTypen.guard.test.ts`. Response-Formen sollen aus `types.generated.ts`
+ * re-exportiert werden; eine Handrolle driftet still gegen das Backend.
  *
- * Zweck: `frontend/src/api/*.ts` soll Response-Formen NICHT mehr von Hand beschreiben, sondern
- * aus `types.generated.ts` re-exportieren. Eine Handrolle driftet still gegen das Backend — genau
- * das, was der Typ-Codegen (LFH-120) verhindern soll. Der Guard `apiResponseTypen.guard.test.ts`
- * konsumiert diesen Scanner.
+ * Mechanik wie `queryKeyScan.ts`: TS-AST, ohne `import.meta.glob` (das Glob bleibt im
+ * Guard-Test, sonst landete bei einem Produktiv-Import der Quelltext im Bundle).
  *
- * MECHANIK GEERBT von `queryKeyScan.ts` (LFH-312): TS-AST statt zeilenlokaler Regex. Dieselben
- * drei Gründe gelten hier unverändert — mehrzeilige Deklarationen sind sichtbar, Kommentare sind
- * strukturell keine Knoten (kein Fehlalarm für ein auskommentiertes `export interface`), und der
- * Formatierungsstil ist egal.
+ * ERFASST: `export interface X { … }` (art 'interface') und `export type X = { … }` (art
+ * 'objekt-alias'). NICHT gemeldet: `export type X = S['…']` (IndexedAccessType) und Mapped Types
+ * wie `PatchWire`.
  *
- * BEWUSST OHNE `import.meta.glob` — wie im Vorbild: der Scanner nimmt Quelltext als String
- * entgegen, das Glob bleibt im Guard-Test. Sonst landete bei einem versehentlichen
- * Produktiv-Import der komplette Quelltext des Frontends im App-Bundle.
- *
- * ERFASST WERDEN ZWEI FORMEN, damit die naheliegende Umgehung nicht offensteht:
- *   `export interface X { … }`       → art 'interface'
- *   `export type X = { … }`          → art 'objekt-alias'
- * Ein `export type X = S['…']` (der erwünschte Re-Export) ist ein IndexedAccessType, kein
- * TypeLiteral, und wird NICHT gemeldet. Ein Mapped Type (`{ [K in keyof T]?: … }`, z. B.
- * `PatchWire` in `patchTriState.ts`) ist ebenfalls ein eigener Knoten und fällt nicht auf.
- *
- * WAS DER SCANNER NICHT SIEHT — bewusste Grenzen, damit die nächste Session nicht raten muss:
- *  1. STRUKTURELLE UMSCHREIBUNGEN einer Handrolle, die kein TypeLiteral sind: ein Interface, das
- *     per `extends` von einem anderen erbt und selbst leer ist, oder eine Intersection aus
- *     benannten Typen (`type X = A & B`). Beides ist im Bestand nicht vorhanden.
- *  2. OB DER RE-EXPORT DAS RICHTIGE SCHEMA TRIFFT. Der Guard prüft die FORM (Handrolle vs.
- *     Re-Export), nicht, ob `OfflineKarte` auf `OfflineKarteAntwort` statt auf `OfflineKarte`
- *     zeigt. Das leistet der Typecheck an den Konsumenten, nicht dieser Scanner.
- *  3. NICHT-EXPORTIERTE lokale Hilfstypen. Sie verlassen das Modul nicht und sind kein Vertrag.
+ * WAS DER SCANNER NICHT SIEHT:
+ *  1. Strukturelle Umschreibungen, die kein TypeLiteral sind: ein leeres Interface mit `extends`
+ *     oder eine Intersection benannter Typen (`type X = A & B`).
+ *  2. Ob der Re-Export das RICHTIGE Schema trifft (das leistet der Typecheck der Konsumenten).
+ *  3. Nicht-exportierte lokale Hilfstypen; sie sind kein Vertrag.
  */
 import * as ts from 'typescript';
 
@@ -41,8 +26,8 @@ export interface ApiTypFund {
   zeile: number;
   name: string;
   art: ApiTypArt;
-  /** `<dateiname>#<Name>` — der Schlüssel, unter dem die Allowlist einen Eintrag führt.
-   *  Datei-qualifiziert, weil Namen kollidieren (`AdhocEingabe` gibt es zweimal). */
+  /** `<dateiname>#<Name>`, der Schlüssel der Allowlist. Datei-qualifiziert, weil Namen
+   *  kollidieren. */
   schluessel: string;
 }
 
@@ -50,7 +35,7 @@ const istExportiert = (knoten: ts.Node): boolean =>
   ts.canHaveModifiers(knoten) &&
   (ts.getModifiers(knoten) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 
-/** Dateiname ohne Verzeichnis — die Allowlist soll beim Verschieben des Ordners nicht brechen. */
+/** Dateiname ohne Verzeichnis, damit die Allowlist beim Verschieben des Ordners nicht bricht. */
 const dateiname = (pfad: string): string => pfad.split('/').pop() ?? pfad;
 
 /** Meldet jede exportierte Objekt-Typ-Deklaration einer Datei (siehe Kopfkommentar). */

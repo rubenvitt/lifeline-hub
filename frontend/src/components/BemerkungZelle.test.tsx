@@ -6,24 +6,16 @@ import { dichten } from '../theme/tokens';
 import { BemerkungZelle, BEMERKUNG_HINZUFUEGEN, wertKnopfStil } from './BemerkungZelle';
 
 /**
- * Verhalten der Bemerkungszelle (LFH-369 · B5i, Befund M21).
+ * Verhalten der Bemerkungszelle (LFH-369 · B5i).
  *
- * ── WAS HIER NICHT GEPRÜFT WIRD UND WARUM ──────────────────────────────────────────────
+ * Keine Pixelhöhe: `test/utils.tsx` rendert ein NACKTES `ConfigProvider`, eine Höhenbehauptung
+ * mäße antd-Vorgaben. Geprüft wird die tragfähige Aussage: der Platzhalter ist ein
+ * antd-Steuerelement OHNE eigene Größenangabe und erbt `controlHeight` vom Provider.
  *
- * Keine Pixelhöhe und keine Trefffläche in Pixeln: `test/utils.tsx` rendert ein NACKTES
- * `ConfigProvider` ohne Theme, eine Höhenbehauptung im Vitest misst also antd-Vorgaben und
- * belegt nichts über die Dichte-Staffel (Norm aus CLAUDE.md). Geprüft wird stattdessen die
- * tragfähige Aussage: der Platzhalter ist ein antd-Steuerelement OHNE eigene Größenangabe —
- * damit erbt er `controlHeight` vom Provider, statt eine Zahl zu setzen, die nicht mitzieht.
- *
- * ── GEMESSENE TESTFALLE: antds Editable liest `keyCode`, userEvent setzt es nicht ───────
- *
- * `Editable.js:70-86` entscheidet über Übernehmen und Abbrechen ausschließlich am
- * **legacy `keyCode`** (13 / 27) und verlangt zusätzlich, dass keydown und keyup denselben
- * Wert tragen. `userEvent.type(feld, '…{Enter}')` liefert `key`/`code`, aber keinen
- * `keyCode` — die Bedingung wird nie wahr, die Eingabe bleibt stehen und der Test scheitert
- * mit „0 calls", als wäre die Komponente kaputt. Deshalb: Tastenwege über `fireEvent` mit
- * explizitem `keyCode`, Text weiterhin über `userEvent`.
+ * TESTFALLE: antds `Editable` entscheidet über Übernehmen/Abbrechen am **legacy `keyCode`**
+ * (13 / 27) und verlangt denselben Wert an keydown und keyup. `userEvent` setzt keinen
+ * `keyCode`, der Test scheiterte mit „0 calls". Tastenwege deshalb über `fireEvent` mit
+ * explizitem `keyCode`, Text über `userEvent`.
  */
 const ENTER = { keyCode: 13 };
 const ESCAPE = { keyCode: 27 };
@@ -71,8 +63,8 @@ describe('BemerkungZelle', () => {
 
   it('der Platzhalter öffnet ein Eingabefeld und übergibt den getippten Wert', async () => {
     /**
-     * Der Test, der den Knopf zur ARBEIT verpflichtet: ein Platzhalter, der zwar einen Namen
-     * trägt, beim Klick aber nichts öffnet, bestünde die reine Anwesenheitsprüfung.
+     * Verpflichtet den Knopf zur ARBEIT: ein Platzhalter mit Namen, der beim Klick nichts öffnet,
+     * bestünde die reine Anwesenheitsprüfung.
      */
     const onSpeichern = vi.fn();
     renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={onSpeichern} />);
@@ -89,9 +81,8 @@ describe('BemerkungZelle', () => {
 
   it('Wegklicken übernimmt ebenfalls — nicht nur die Eingabetaste', async () => {
     /**
-     * Der zweite Weg hinaus (`Editable.js:88`, `onBlur → confirmChange`) und im Betrieb der
-     * häufigere: in einer Tabellenzeile klickt man in die nächste Zelle, statt Enter zu
-     * drücken. Wäre nur der Tastenweg belegt, blieb der Mausweg unbewacht.
+     * Der zweite Weg hinaus (`onBlur → confirmChange`) und im Betrieb der häufigere: man klickt in
+     * die nächste Zelle, statt Enter zu drücken.
      */
     const onSpeichern = vi.fn();
     renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={onSpeichern} />);
@@ -106,12 +97,10 @@ describe('BemerkungZelle', () => {
 
   it('gefüllter Wert: der Wert selbst ist der Knopf, benannt als Aufforderung, beschrieben durch den Wert (LFH-650)', async () => {
     /**
-     * Seit LFH-650 trägt nicht mehr antds kleiner Stift, sondern der Wert als
-     * `Button type="text"` — dieselbe Bauform wie der Platzhalter, damit beide Zustände
-     * gleich hoch sind (gemessen in `e2e/gate3-trefflaeche.spec.ts`). Die Aussagen hier:
-     * es IST ein antd-Knopf (erbt `controlHeight`), er steht in der Textfarbe (`text`, nicht
-     * `link` — der Wert ist Inhalt, kein Verweis), und der Wert geht für Vorlesende nicht
-     * verloren: das `aria-label` verdeckt den Inhalt, die Beschreibung bringt ihn zurück.
+     * Der gefüllte Wert ist ein `Button type="text"`, dieselbe Bauform wie der Platzhalter (LFH-650).
+     * Die Aussagen: es IST ein antd-Knopf (erbt `controlHeight`), er steht in der Textfarbe (der
+     * Wert ist Inhalt, kein Verweis), und das `aria-label` verdeckt den Wert nicht ersatzlos — die
+     * Beschreibung bringt ihn zurück.
      */
     renderMitProviders(
       <BemerkungZelle wert="gehfähig" darfSchreiben kennung="R-042" onSpeichern={vi.fn()} />,
@@ -130,10 +119,9 @@ describe('BemerkungZelle', () => {
 
   it('während ein Schreibvorgang läuft, steht der NEUE Wert schon da und öffnet nicht erneut (LFH-650)', async () => {
     /**
-     * Der Befund aus der LFH-613-Prüfliste (Tabelle 1, Nr. 3): bis zur Serverantwort stand bei
-     * einem vorher leeren Feld wieder „… hinzufügen" da — die Eingabe wirkte verworfen. Der
-     * Aufrufer reicht den neuen Wert samt `laeuft`; die Zelle zeigt ihn mit Ladeanzeige und
-     * nimmt keinen zweiten Klick an, solange der erste schreibt.
+     * Bis zur Serverantwort darf bei einem vorher leeren Feld nicht wieder „… hinzufügen" stehen.
+     * Der Aufrufer reicht den neuen Wert samt `laeuft`; die Zelle zeigt ihn mit Ladeanzeige und
+     * nimmt keinen zweiten Klick an.
      */
     const { rerender } = renderMitProviders(
       <BemerkungZelle wert="gehfähig" darfSchreiben laeuft kennung="R-042" onSpeichern={vi.fn()} />,
@@ -154,9 +142,8 @@ describe('BemerkungZelle', () => {
 
   it('gefüllter Wert: Wertknopf statt Platzhalter — und der Knopf öffnet das Eingabefeld', async () => {
     /**
-     * Regressionsschutz für den Weg in die Bearbeitung: seit LFH-650 öffnet der Wertknopf per
-     * `setBearbeitet(true)`, `Typography` steht nur noch für das Eingabefeld im Baum. Fiele
-     * der `onClick` weg, stünde der Wert da und klickte ins Leere.
+     * Der Wertknopf öffnet die Bearbeitung per `setBearbeitet(true)`; `Typography` steht nur für das
+     * Eingabefeld im Baum. Fiele der `onClick` weg, klickte der Wert ins Leere.
      */
     const onSpeichern = vi.fn();
     renderMitProviders(
@@ -193,14 +180,12 @@ describe('BemerkungZelle', () => {
 
   it('auch wenn der gespeicherte Wert NACHKOMMT, fällt der Fokus nicht auf <body>', () => {
     /**
-     * Der Weg, den der BETRIEB nimmt und den ein `vi.fn()` nicht nachstellt: nach dem
-     * Übernehmen läuft die Mutation, der neue Wert kommt per Invalidierung nach, `gefuellt`
-     * kippt — und der Platzhalter hängt aus dem Baum aus. Der Rückgabe-Effekt des Primitivs
-     * greift dann NICHT (`warBearbeitet` steht in dieser Runde schon auf `false`), und antds
-     * eigener auch nicht (das frisch eingehängte `Typography` hat kein `prevEditing`).
+     * Der Weg, den der BETRIEB nimmt: der neue Wert kommt per Invalidierung nach, der Platzhalter
+     * hängt aus, und weder der eigene Rückgabe-Effekt (in dieser Runde `warBearbeitet === false`)
+     * noch antds (frisches `Typography` ohne `prevEditing`) greift von selbst.
      *
-     * Mit einem Mock bleibt `wert` null, der leere Zweig steht weiter und der Test wäre für
-     * genau diesen Fall blind — der Nachlauf wird deshalb per `rerender` gestellt.
+     * Mit einem Mock bliebe `wert` null und der Test blind; der Nachlauf wird per `rerender`
+     * gestellt.
      */
     const { rerender } = renderMitProviders(
       <BemerkungZelle wert={null} darfSchreiben kennung="Florian 1" onSpeichern={vi.fn()} />,
@@ -217,15 +202,12 @@ describe('BemerkungZelle', () => {
 
   it('nach dem Verlassen liegt der Fokus wieder auf dem Platzhalter, nicht auf <body>', async () => {
     /**
-     * antd stellt den Fokus beim Verlassen selbst her — aber nur auf seinen EIGENEN Stift
-     * (`Base/index.js:90-95`, `useLayoutEffect` auf `editIconRef`). Auf dem leeren Zweig
-     * hängt `Typography.Text` in derselben Runde aus dem Baum aus, in der `bearbeitet` auf
-     * `false` fällt: der Effekt läuft für diesen Wert nie, `editIconRef` ist ohnehin leer,
-     * und der Fokus fällt auf `<body>`. Genau diese Klasse führt die Erfassungs-Norm bereits
-     * („der Fokus landet gemessen auf `<body>`").
+     * antd gibt den Fokus nur an seinen EIGENEN Stift zurück. Auf dem leeren Zweig hängt
+     * `Typography.Text` in derselben Runde aus, in der `bearbeitet` fällt, und der Fokus fiele auf
+     * `<body>`.
      *
-     * Beide Auswege werden geprüft — Abbrechen UND Übernehmen —, weil sie verschiedene
-     * Zweige nehmen und ein Fix nur für einen von beiden nicht auffiele.
+     * Beide Auswege werden geprüft — Abbrechen UND Übernehmen —, weil sie verschiedene Zweige
+     * nehmen.
      */
     const onSpeichern = vi.fn();
     renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={onSpeichern} />);
@@ -243,10 +225,8 @@ describe('BemerkungZelle', () => {
 
   it('Lesezweig zeigt „—" und KEINEN Platzhalter — eine Aufforderung ohne Aktion wäre gelogen', () => {
     /**
-     * „Lesezweig konsistent halten" heißt gleiche BEDEUTUNG des Leerzustands, nicht gleicher
-     * Wortlaut: ohne Schreibrecht gibt es keine Aktion, ein „Bemerkung hinzufügen" wäre eine
-     * Aufforderung ins Leere. Über gleiche Zeilenhöhe sagt dieser Test nichts — jsdom rechnet
-     * kein Layout, und die beiden Zweige sind gemessen auch nicht gleich hoch.
+     * Konsistent ist die BEDEUTUNG des Leerzustands, nicht der Wortlaut: ohne Schreibrecht gibt es
+     * keine Aktion. Über gleiche Zeilenhöhe sagt dieser Test nichts (jsdom rechnet kein Layout).
      */
     const { container } = renderMitProviders(
       <BemerkungZelle wert={null} darfSchreiben={false} onSpeichern={vi.fn()} />,
@@ -264,13 +244,9 @@ describe('BemerkungZelle', () => {
 
   it('mit Zeilenkennung tragen mehrere Zellen unterscheidbare Namen — sichtbar bleibt der kurze Text', () => {
     /**
-     * Die Bündelungs-Festlegung aus LFH-365 verlangt die Zeilenkennung im zugänglichen Namen,
-     * „weil n Zeilen sonst n gleichnamige Knöpfe liefern". Das gilt hier genauso: auf der
-     * Materialseite steht die Bemerkungsspalte per Voreinstellung SICHTBAR, eine 50-Zeilen-
-     * Liste lieferte also 50-mal denselben Namen in der Knopfliste eines Screenreaders.
-     *
-     * Sichtbar bleibt der kurze Text — die Kennung steht daneben schon in der Zeile und
-     * würde die Spalte sonst unnötig breit machen.
+     * Die Zeilenkennung steht im zugänglichen Namen (Bündelungs-Festlegung aus LFH-365), sonst
+     * lieferte eine Liste n-mal denselben Namen. Sichtbar bleibt der kurze Text, damit die Spalte
+     * nicht unnötig breit wird.
      */
     renderMitProviders(
       <>
@@ -288,10 +264,9 @@ describe('BemerkungZelle', () => {
 
   it('ohne Änderung wird nicht gespeichert — ein Fehlklick kostet keinen Schreibvorgang', async () => {
     /**
-     * antd vergleicht nicht: `Base/index.js` ruft `onChange` beim Verlassen unbedingt. Ein
-     * Klick auf den Platzhalter und ein Klick daneben schickten damit ein PATCH mit leerem
-     * Wert, samt Invalidierung und Live-Ereignis an alle Verbundenen — für nichts. Der
-     * sichtbare Platzhalter macht diesen Fehlklick deutlich leichter als der alte Stift.
+     * antd vergleicht nicht: `onChange` feuert beim Verlassen unbedingt. Ein Klick auf den
+     * Platzhalter und einer daneben schickten sonst ein PATCH mit leerem Wert samt Invalidierung und
+     * Live-Ereignis.
      */
     const onSpeichern = vi.fn();
     renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={onSpeichern} />);
@@ -304,11 +279,9 @@ describe('BemerkungZelle', () => {
 
   it('der Platzhalter setzt keine eigene Größe und keine Klein-Variante', () => {
     /**
-     * Gate aus LFH-362: neues punktuelles `size="small"` auf interaktiven Elementen ist
-     * verboten. Und ein handgebautes Bedienziel bräuchte nach LFH-365 zwei Angaben
-     * (`minHeight` PLUS Polsterung) samt eigener Zusicherung über zwei Dichtestufen — ein
-     * echter `Button` schuldet nichts davon, weil er vom `ConfigProvider` erbt. Genau das
-     * wird hier festgenagelt: antd-Knopf, keine Klein-Marke, kein Inline-Maß.
+     * Dichte-Gate (LFH-362): kein punktuelles `size="small"`. Ein echter `Button` erbt vom
+     * `ConfigProvider` und schuldet nicht die zwei Angaben eines handgebauten Bedienziels
+     * (LFH-365). Festgenagelt: antd-Knopf, keine Klein-Marke, kein Inline-Maß.
      */
     renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={vi.fn()} />);
     const knopf = screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN });
@@ -323,9 +296,9 @@ describe('BemerkungZelle', () => {
 
   it('der Platzhalter steht in `bedienText`, nicht in antds `colorLink` (LFH-650)', () => {
     /**
-     * Gemessen in `e2e/betroffene-kontrast.spec.ts`: auf einer Zeile mit Lücken-Tönung trug
-     * `colorLink` am Tag 5,93 und nachts 4,50. Der Wert steht als Literal — aus dem Token
-     * gelesen prüfte der Test die Rolle gegen sich selbst.
+     * Der Knopftext nimmt `bedienText`, nicht `colorLink` (der auf Lücken-Tönung die Kontrastböden
+     * nicht hielt, `e2e/betroffene-kontrast.spec.ts`). Als Literal — aus dem Token gelesen prüfte
+     * der Test die Rolle gegen sich selbst.
      */
     renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={vi.fn()} />);
     expect(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }).style.color).toBe(
@@ -336,8 +309,7 @@ describe('BemerkungZelle', () => {
 
 /**
  * Der gefüllte Wertknopf darf umbrechen (`height: auto`) und ist damit ein handgebautes
- * Bedienziel mit ZWEI Angaben (LFH-365). Böden als Literale, die Werte aus `dichten` — aus
- * dem antd-Token zurückgelesen prüfte die Zusicherung den Token gegen sich selbst.
+ * Bedienziel mit ZWEI Angaben (LFH-365). Böden als Literale, die Werte aus `dichten`.
  */
 describe('wertKnopfStil (LFH-650)', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({

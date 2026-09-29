@@ -1,0 +1,20 @@
+{
+  "art": "anhang",
+  "eintrag": {
+    "id": 166,
+    "status": 201
+  },
+  "fetchDownload": {
+    "cd": "attachment; filename=\"Spike-Pr_fbeleg____.pdf\"; filename*=UTF-8''Spike-Pr%C3%BCfbeleg%20%C3%84%C3%96%C3%9C.pdf",
+    "laenge": 193,
+    "status": 200
+  },
+  "linkGeklickt": "/api/einsaetze/1/etb/166/anhaenge/1",
+  "upload": {
+    "anhang": {
+      "id": 1,
+      "name": "Spike-Prüfbeleg ÄÖÜ.pdf"
+    },
+    "status": 201
+  }
+}

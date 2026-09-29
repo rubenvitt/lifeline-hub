@@ -4,29 +4,19 @@ import { aktualisiereTier } from './einsatzTier';
 import { leerZuNull, normalisierePatch, nurGesetzteFelder, patchBody } from './patchTriState';
 
 /**
- * LFH-266/F12, ausgebaut für LFH-306: PATCH-Tri-State am Wire.
+ * PATCH-Tri-State am Wire. antds `Select allowClear` liefert beim Leeren `undefined`, und
+ * `JSON.stringify` entfernt undefined-Keys; das Feld käme nie beim Server an.
  *
- * Der Backend-Fix allein reicht nicht: antds `Select allowClear` liefert beim Leeren
- * `undefined`, und `JSON.stringify` entfernt undefined-Keys komplett — das Feld käme nie
- * beim Server an. Diese Tests prüfen genau die Stelle, an der das FE das reparieren muss.
- *
- * WARUM DIE ASSERTIONS AUF DER SERIALISIERTEN FORM SITZEN: `{ notiz: null }` und
- * `{ notiz: undefined }` sind auf der Objekt-Ebene mit `toEqual` NICHT unterscheidbar —
- * Vitest behandelt eine Property mit `undefined` wie eine fehlende. Der Unterschied
- * zwischen „leeren" und „nicht anfassen" entsteht aber genau dort und nirgends sonst.
- * Deshalb wird durchgängig gegen `JSON.stringify(...)` bzw. gegen `Object.keys` des
- * geparsten Bodys assertiert, nie gegen das Objekt davor.
- *
- * Kein e2e-Netz: `frontend/e2e/` hat 7 Specs, keine berührt Stamm-/Kopfdaten-Formulare
- * (nachgemessen). Und jsdom bildet antd-Select-Clearing nicht zuverlässig ab. Diese
- * Unit-Tests sind die einzige Absicherung des Umbaus — deshalb liegen sie nah an der
- * Serialisierung und nicht an der UI.
+ * Die Assertions sitzen auf der SERIALISIERTEN Form: `{ notiz: null }` und
+ * `{ notiz: undefined }` sind mit `toEqual` nicht unterscheidbar, der Unterschied zwischen
+ * „leeren“ und „nicht anfassen“ entsteht erst dort. jsdom bildet antd-Select-Clearing nicht
+ * zuverlässig ab; diese Unit-Tests sind die Absicherung.
  */
 
 describe('Die Falle selbst (Grund für den ganzen Unterbau)', () => {
   it('JSON.stringify verschluckt einen undefined-Key ersatzlos', () => {
-    // Das ist der Ist-Zustand von JavaScript, kein Projektverhalten — und der Grund,
-    // warum ein geleertes Select ohne Normalisierung NIE beim Server ankommt.
+    // JavaScript selbst, kein Projektverhalten: der Grund, warum ein geleertes Select ohne
+    // Normalisierung nie beim Server ankommt.
     expect(JSON.stringify({ notiz: undefined })).toBe('{}');
     expect(JSON.stringify({ notiz: null })).toBe('{"notiz":null}');
   });
@@ -91,8 +81,7 @@ describe('normalisierePatch — Formular-Lesart (undefined = geleert = löschen)
   });
 
   it('fasst Nicht-String-Werte nicht an (0 und false sind Werte, keine Leere)', () => {
-    // Eine Falsy-Prüfung statt der expliziten undefined/Leerraum-Prüfung würde hier
-    // `0` und `false` zu null machen — ein stiller Datenverlust bei alter_geschaetzt.
+    // Eine Falsy-Prüfung machte `0` und `false` zu null, ein stiller Datenverlust.
     expect(JSON.stringify(normalisierePatch({ alter_geschaetzt: 0, flag: false }))).toBe(
       '{"alter_geschaetzt":0,"flag":false}',
     );
@@ -123,8 +112,7 @@ describe('nurGesetzteFelder — Spread-Lesart (undefined = nicht angefasst)', ()
   });
 
   it('WERT GESETZT: reicht Werte unverändert durch, inkl. Leerstring', () => {
-    // Anders als normalisierePatch: hier bleibt '' ein '' — wer diese Funktion wählt,
-    // baut den Body selbst und meint, was er schreibt.
+    // Anders als normalisierePatch bleibt '' ein '': wer diese Funktion wählt, baut den Body selbst.
     expect(JSON.stringify(nurGesetzteFelder({ a: 7, b: '' }))).toBe('{"a":7,"b":""}');
   });
 
@@ -147,16 +135,16 @@ describe('patchBody — Steuerfeld basis_geaendert_at', () => {
   });
 
   it('setzt den Key GAR NICHT, wenn keine Baseline übergeben wurde', () => {
-    // Zwingend absent, nicht null: `basis_geaendert_at: null` hieße für den Server
-    // „kein Lock, bewusstes Overwrite" — aus 409-Schutz würde stilles Überschreiben.
+    // Zwingend absent, nicht null: `basis_geaendert_at: null` hieße für den Server „kein Lock,
+    // bewusstes Overwrite“.
     const roh = JSON.stringify(patchBody({ notiz: 'x' }));
     expect(roh).toBe('{"notiz":"x"}');
     expect(roh).not.toContain('basis_geaendert_at');
   });
 
   it('normalisiert die Baseline selbst nicht (Steuerfeld, kein Spaltenwert)', () => {
-    // Liefe sie durch normalisierePatch, würde ein leerer String zu null — und damit
-    // aus „Lock mitschicken" ein „Overwrite erzwingen".
+    // Liefe sie durch normalisierePatch, würde ein leerer String zu null und damit zu „Overwrite
+    // erzwingen“.
     const wire = JSON.parse(JSON.stringify(patchBody({ notiz: 'x' }, '   ')));
     expect(wire.basis_geaendert_at).toBe('   ');
   });
@@ -231,10 +219,8 @@ describe('PATCH-Tri-State am echten Wire (durch apiSend/fetch)', () => {
   });
 
   /**
-   * Schutz für die Partial-Patches aus PersonenDetailPage: `aktualisiereTier` wird dort nur
-   * mit den Halter-Feldern aufgerufen. Würde die Normalisierung über eine feste Feldliste
-   * statt über die vorhandenen Keys laufen, kämen die neun Identitätsfelder als `null` mit
-   * und das Halter-Entfernen leerte still den halben Tierdatensatz.
+   * `aktualisiereTier` wird aus PersonenDetailPage nur mit den Halter-Feldern aufgerufen. Liefe die
+   * Normalisierung über eine feste Feldliste, kämen die Identitätsfelder als `null` mit.
    */
   it('injiziert bei einem Tier-Partial-Patch keine Identitätsfelder', async () => {
     const mock = fetchMock();

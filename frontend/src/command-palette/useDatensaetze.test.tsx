@@ -1,4 +1,3 @@
-// frontend/src/command-palette/useDatensaetze.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { act, renderHook, waitFor } from '@testing-library/react';
@@ -13,23 +12,15 @@ import type { PaletteModus } from './typen';
 import { authWertFixture, benutzerFixture } from '../test/fixtures';
 
 /**
- * Die BESCHAFFUNGS-Aussagen des Datensatz-Finders (LFH-391 · C2).
+ * Die BESCHAFFUNGS-Aussagen des Datensatz-Finders: WAS ÜBERHAUPT ANGEFRAGT WIRD (der reine Kern
+ * steht in `datensaetze.test.ts`). Jede Query hier feuert im Moment des Tastendrucks.
  *
- * Getrennt von `datensaetze.test.ts`: dort steht der reine Kern (welcher Datensatz ist ein
- * Treffer), hier steht ausschliesslich, WAS ÜBERHAUPT ANGEFRAGT WIRD. Das ist die Hälfte,
- * die man ohne Netz nicht prüfen kann — und die teure: die Palette rendert ihren Inhalt erst
- * beim Öffnen (`{offen && <PaletteHost/>}`), jede hier angehängte Query feuert also im Moment
- * des Tastendrucks.
+ * MSW-Handler statt `vi.mock`s: nur der Handler belegt die URL, und die Zähler stellen „kein
+ * Request“ und „doch ein Request“ im selben Lauf nebeneinander. `onUnhandledRequest: 'error'`
+ * bricht bei einem zu früh feuernden Request.
  *
- * MSW-HANDLER STATT NEUN `vi.mock`s: nur der Handler belegt die URL mit, und die Zähler sind
- * die einzige Bauform, in der „kein Request" und „doch ein Request" im SELBEN Lauf
- * nebeneinander stehen — genau das braucht sowohl das Rechte- als auch das Modus-Argument.
- * Zusätzlich hilft `onUnhandledRequest: 'error'` (`test/setup.ts`): ein zu früh feuernder
- * Request bricht den Lauf, statt still durchzugehen.
- *
- * `useAuth` ist gestubbt (Bauform `pages/lagekarte/useLagekarteDaten.test.tsx:12`) — der
- * echte `AuthProvider` brächte einen weiteren Abruf in jeden Zähler, ohne eine Aussage zu
- * schärfen. Die Rechteachse fährt hier über die Overrides, nicht über den Benutzer.
+ * `useAuth` ist gestubbt: der echte `AuthProvider` brächte einen weiteren Abruf in jeden Zähler.
+ * Die Rechteachse fährt über die Overrides.
  */
 vi.mock('../auth/AuthContext', () => ({
   useAuth: () => authWertFixture(benutzerFixture({ org_rolle: 'fuehrungskraft' })),
@@ -41,7 +32,7 @@ const EINSATZ = 1;
 let zaehler: Record<string, number>;
 /** Angefragte ETB-Adressen; die Fragezeichenkette IST die Aussage des Cursor-Tests. */
 let etbAdressen: URL[];
-/** Angefragte Zähl-Adressen des ETB-Sammeltreffers (LFH-619). */
+/** Angefragte Zähl-Adressen des ETB-Sammeltreffers. */
 let anzahlAdressen: URL[];
 /** Sichtbarkeits-Overrides, die der Handler ausliefert — je Test gesetzt. */
 let overrides: Record<string, object>;
@@ -110,11 +101,8 @@ function wrapperFuer(): {
 }
 
 /**
- * Eine Runde Ereignisschleife abwarten.
- *
- * Ein synchroner Blick auf die Zähler stünde auch dann auf 0, wenn der Request gerade
- * abgesetzt WURDE — MSW liefert asynchron. Die Abwesenheits-Hälften der Paare unten wären
- * damit trivial grün und könnten nicht rot werden.
+ * Eine Runde Ereignisschleife abwarten: MSW liefert asynchron, ein synchroner Blick stünde auch
+ * nach einem abgesetzten Request auf 0, und die Abwesenheits-Hälften wären trivial grün.
  */
 async function ruhe() {
   await act(async () => {
@@ -145,11 +133,9 @@ function starte(anfang: Eingabe) {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('useDatensaetze — die Schwelle', () => {
   /**
-   * PAAR IN EINEM LAUF. „Null Requests" allein ist trivial grün, solange der Hook gar nichts
-   * tut; erst die zweite Hälfte belegt, dass dieselbe Palette mit einem Zeichen mehr wirklich
-   * lädt. N = 2 ist nach unten vom Zahlenzweig begrenzt (die kürzeste gedruckte Kennung ist
-   * zweistellig, N = 3 machte das Akzeptanzkriterium „42 findet die Person 42" unerfüllbar)
-   * und nach oben von der Selektivität (ein Zeichen trifft in einer MANV-Personenliste alles).
+   * PAAR IN EINEM LAUF: „null Requests“ allein wäre grün, solange der Hook gar nichts tut; erst die
+   * zweite Hälfte belegt, dass ein Zeichen mehr wirklich lädt. Zur Schwelle N = 2 siehe
+   * `DATENSATZ_MINDESTZEICHEN`.
    */
   it('fragt unter zwei Zeichen keine einzige Liste ab, mit zwei Zeichen dieselbe Eingabe schon', async () => {
     const { rerender } = starte({ suche: 'a' });
@@ -160,11 +146,7 @@ describe('useDatensaetze — die Schwelle', () => {
     await waitFor(() => expect(zaehler.personen).toBe(1));
   });
 
-  /**
-   * Ohne Einsatzkontext bleibt der Hook still. Das ist zugleich der Grund, warum die
-   * Bestands-Palettentests auf Route '/' (`CommandPaletteProvider.test.tsx`,
-   * `CommandPaletteTrigger.test.tsx`) von C2 unberührt bleiben.
-   */
+  /** Ohne Einsatzkontext bleibt der Hook still (Palettentests auf Route '/' bleiben unberührt). */
   it('fragt ohne Einsatz nichts ab, auch mit langem Begriff', async () => {
     starte({ suche: 'brandstelle', einsatzId: null });
     await ruhe();
@@ -175,12 +157,9 @@ describe('useDatensaetze — die Schwelle', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
   /**
-   * Die LESEACHSE `istModulFreigegeben` sitzt VOR dem `enabled`, nicht hinter dem Ergebnis:
-   * ohne Freigabe wird die Liste gar nicht erst geholt. Das ist der Lastvorteil und zugleich
-   * die ehrliche Spiegelung des Backends, das dieselbe Liste mit 403 ablehnte.
-   *
-   * PAAR IN EINEM LAUF: der Schaden belegt, dass der Riegel je Modul greift und nicht alles
-   * abwürgt — sonst wäre „personen ungefragt" auch bei einem kaputten Hook grün.
+   * Die LESEACHSE `istModulFreigegeben` sitzt VOR dem `enabled`: ohne Freigabe wird die Liste gar
+   * nicht geholt, wie das Backend sie mit 403 ablehnte. PAAR: der Schaden belegt, dass der Riegel
+   * je Modul greift und nicht alles abwürgt.
    */
   it('lädt die freigegebenen Listen und lässt die des ausgeblendeten Moduls ungefragt', async () => {
     overrides = {
@@ -200,22 +179,18 @@ describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
   });
 
   /**
-   * Der Riegel wartet auf die Antwort der Overrides. Ohne dieses Warten liefen die neun
-   * Listen in der Ladelücke mit `overrides === undefined` los — der Registry-Default sagt
-   * dort „sichtbar", der Einsatz aber „ausgeblendet". Der Fehler wäre ein Request, den es
-   * nicht geben darf, und er verschwände, sobald der Cache warm ist: unreproduzierbar.
+   * Der Riegel wartet auf die Antwort der Overrides; sonst liefen die Listen in der Ladelücke gegen
+   * den Registry-Default „sichtbar“ los, ein Fehler, der bei warmem Cache verschwände.
    */
   it('holt die Sichtbarkeit, bevor die erste Liste angefragt wird', async () => {
     /*
-     * Die REIHENFOLGE wird ausserhalb der Handler geprüft, nicht in ihnen: ein `expect` im
-     * Handler wirft in MSW, die Antwort wird zu einem Fehler — der Zähler ist da aber
-     * schon hochgezählt, und der Test bliebe grün. Gemessen an der Mutationsprobe „Riegel
-     * `rechteBekannt` entfernt".
+     * Die REIHENFOLGE wird außerhalb der Handler geprüft: ein `expect` im Handler wirft in MSW, der
+     * Zähler ist dann schon hochgezählt, und der Test bliebe grün.
      */
     const reihenfolge: string[] = [];
     server.use(
       http.get('/api/einsaetze/:id/modul-overrides', async () => {
-        // Verzögert, damit „danach" nicht bloss die schnellere Leitung ist.
+        // Verzögert, damit „danach“ nicht bloß die schnellere Leitung ist.
         await new Promise((r) => setTimeout(r, 20));
         reihenfolge.push('modul-overrides');
         return HttpResponse.json({});
@@ -235,12 +210,9 @@ describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('useDatensaetze — Modus-Riegel', () => {
   /**
-   * `>` zeigt per Definition nur Aktionen und Schnellaktionen — dort ist keine
-   * Datensatz-Zeile sichtbar. Ohne Modus im `enabled` feuerte '>sp' (Rest 'sp', zwei
-   * Zeichen) neun ungedeckelte Listenabrufe für eine Ansicht, die keinen Datensatz zeigt.
-   *
-   * PAAR IN EINEM LAUF mit demselben Rest: nur so misst der Test den MODUS und nicht die
-   * Schwelle aus dem Absatz darüber.
+   * `>` zeigt nur Aktionen und Schnellaktionen; ohne Modus im `enabled` feuerte '>sp' alle
+   * Listenabrufe für eine Ansicht ohne Datensatz. PAAR mit demselben Rest, damit der Test den
+   * MODUS misst und nicht die Schwelle.
    */
   it('fragt im Aktionen-Modus keine Liste ab, ohne Präfix dieselbe Eingabe schon', async () => {
     const { rerender } = starte({ suche: 'sp', modus: 'aktionen' });
@@ -255,11 +227,9 @@ describe('useDatensaetze — Modus-Riegel', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('useDatensaetze — die zwei ETB-Wege', () => {
   /**
-   * Der ETB ist die einzige serverseitig gefilterte Quelle, und seine Nummernsuche geht
-   * NICHT über `q`: `fts_query` (src/etb/repo.rs) quotet jedes Token zu einer Phrase und
-   * sucht über inhalt/von/an/veranlassung — '42' fände jeden Eintrag, in dessen TEXT die
-   * Zahl vorkommt, und den Eintrag Nr. 42 nur zufällig. Der Cursor `before_lfd_nr` filtert
-   * strikt `<` bei `ORDER BY lfd_nr DESC`; `n + 1` liefert damit genau den Eintrag n.
+   * Die ETB-Nummernsuche geht NICHT über `q`: `fts_query` sucht über den Text, '42' fände jeden
+   * Eintrag mit der Zahl im Text. Der Cursor `before_lfd_nr` filtert strikt `<` bei
+   * `ORDER BY lfd_nr DESC`; `n + 1` liefert genau den Eintrag n.
    */
   it('holt einen ETB-Eintrag über den Cursor, nicht über die Volltextsuche', async () => {
     starte({ suche: '42' });
@@ -271,7 +241,7 @@ describe('useDatensaetze — die zwei ETB-Wege', () => {
     expect(p.get('q')).toBeNull();
   });
 
-  /** Gegenstück: ein Wort geht über den Volltext — mit gedeckelter Nutzlast (5 statt 100). */
+  /** Gegenstück: ein Wort geht über den Volltext, mit gedeckelter Nutzlast (5 statt 100). */
   it('sucht ein Wort über den Volltext und deckelt die Nutzlast im Request', async () => {
     starte({ suche: 'brand' });
     await waitFor(() => expect(etbAdressen).toHaveLength(1));
@@ -283,9 +253,8 @@ describe('useDatensaetze — die zwei ETB-Wege', () => {
   });
 
   /**
-   * Ein gebundener Sortenbuchstabe schliesst den ETB aus: 'R-42' fragt nach der Person 42,
-   * und eine Phrasensuche nach 'R-42' im ETB-Volltext wäre eine Anfrage ins Blaue.
-   * PAAR mit der Personenliste, damit „kein ETB-Abruf" nicht bloss heisst, dass nichts lief.
+   * Ein gebundener Sortenbuchstabe schließt den ETB aus ('R-42' fragt nach der Person 42). PAAR
+   * mit der Personenliste, damit „kein ETB-Abruf“ nicht bloß heißt, dass nichts lief.
    */
   it('lässt den ETB bei einer gebundenen Kennung aus, fragt die Person aber ab', async () => {
     starte({ suche: 'R-42' });
@@ -294,16 +263,11 @@ describe('useDatensaetze — die zwei ETB-Wege', () => {
   });
 
   /**
-   * REIN NICHT-ALPHANUMERISCHE EINGABE (Review-Befund 6 zu Etappe C).
+   * Rein nicht-alphanumerische Eingabe: `fts_query` verwirft solche Tokens, und bei leerer Query
+   * lässt das Backend den MATCH-Filter ganz weg (die jüngsten Einträge kämen ungefiltert).
    *
-   * `fts_query` (src/etb/repo.rs) wirft jedes Token weg, das kein einziges alphanumerisches
-   * Zeichen trägt; bleibt nichts übrig, ist die FTS-Query leer — und der Aufrufer lässt den
-   * MATCH-Filter dann WEG statt nichts zu finden (`.filter(|s| !s.is_empty())`). Die Antwort
-   * auf '??' waren gemessen die fünf JÜNGSTEN ETB-Einträge, ungefiltert, und die Palette bot
-   * sie als Treffer an: Treffer für eine Suche, die niemand beantwortet hat.
-   *
-   * PAAR IN EINEM LAUF, und die erste Hälfte hängt an den ÜBRIGEN Listen: sie laufen, also
-   * misst die Zeile den ETB-Riegel und nicht die Schwelle (auch '??' hat zwei Zeichen).
+   * PAAR IN EINEM LAUF; die übrigen Listen laufen, also misst die Zeile den ETB-Riegel und nicht
+   * die Schwelle (auch '??' hat zwei Zeichen).
    */
   it('fragt bei rein nicht-alphanumerischer Eingabe keinen ETB-Volltext ab, mit einem Wort schon', async () => {
     const { rerender } = starte({ suche: '??' });
@@ -316,9 +280,7 @@ describe('useDatensaetze — die zwei ETB-Wege', () => {
   });
 
   /**
-   * Die Grenze steht am TOKEN, nicht an der ganzen Zeichenkette: `fts_query` filtert je
-   * Token, ein einziges brauchbares genügt. '?? brand' ist eine echte Anfrage — würde der
-   * Riegel die ganze Eingabe verwerfen, verlöre er sie.
+   * Die Grenze steht am TOKEN: ein einziges brauchbares genügt, '?? brand' ist eine echte Anfrage.
    */
   it('fragt weiter ab, sobald irgendein Token alphanumerisch ist', async () => {
     starte({ suche: '?? brand' });
@@ -330,17 +292,11 @@ describe('useDatensaetze — die zwei ETB-Wege', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('useDatensaetze — Cache-Fach der ETB-Seite', () => {
   /**
-   * DIE EINZIGE STELLE, AN DER EIN FEHLER STILL BLEIBT UND EINE FREMDE SEITE KAPUTTMACHT.
-   *
-   * `pages/EtbPage.tsx` belegt `einsatzKeys.etbListe(einsatzId, parseEtbFilter(...))` mit
-   * einer `useInfiniteQuery`. Landete die Palette mit einem strukturgleichen `{ q }` in
-   * DEMSELBEN Fach, läge dort einmal `{ pages, pageParams }` und einmal ein nacktes Array —
-   * `etbQuery.data?.pages.flat()` liefe auf ein Array. Kein Guard sieht das, kein roter Test,
-   * kein Fehlerbild: die ETB-Seite bräche erst, sobald jemand mit offener Palette gesucht hat.
-   *
-   * Der Palettenschlüssel trägt deshalb `limit` — ehrlich, weil der Request es wirklich
-   * trägt, und strukturell verschieden von allem, was `parseEtbFilter` je erzeugen kann
-   * (das Ergebnis hat nur q/typ/von/bis).
+   * `pages/EtbPage.tsx` belegt `einsatzKeys.etbListe(einsatzId, parseEtbFilter(...))` mit einer
+   * `useInfiniteQuery`. Läge die Palette mit strukturgleichem `{ q }` im selben Fach, stünde dort
+   * einmal `{ pages, pageParams }` und einmal ein Array, und die ETB-Seite bräche still, sobald
+   * jemand mit offener Palette gesucht hat. Der Palettenschlüssel trägt deshalb `limit`, das
+   * `parseEtbFilter` nie erzeugt.
    */
   const seitenSchluessel = (q: string) =>
     einsatzKeys.etbListe(EINSATZ, parseEtbFilter(new URLSearchParams(`q=${q}`)));
@@ -353,8 +309,8 @@ describe('useDatensaetze — Cache-Fach der ETB-Seite', () => {
   });
 
   /**
-   * Die schärfere Hälfte: nicht der Hash, sondern der Cache nach einem echten Lauf. PAAR —
-   * das eigene Fach TRÄGT die Antwort, das Fach der ETB-Seite bleibt leer.
+   * Die schärfere Hälfte: der Cache nach einem echten Lauf. PAAR: das eigene Fach trägt die
+   * Antwort, das der ETB-Seite bleibt leer.
    */
   it('schreibt seine Antwort ins eigene Fach und lässt das der ETB-Seite unberührt', async () => {
     const { client } = starte({ suche: 'brand' });
@@ -368,10 +324,8 @@ describe('useDatensaetze — Cache-Fach der ETB-Seite', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('useDatensaetze — Übergabe an den Kern', () => {
   /**
-   * Der Hook beschafft, der reine Kern (`datensaetze.ts`) entscheidet. Diese Aussage hält
-   * die Naht: was hier nicht ankommt, kann dort kein Treffer werden. Der Kern prüft die
-   * Cursor-Antwort selbst gegen die gesuchte Nummer (`datensaetze.test.ts`, „verwirft eine
-   * Cursor-Antwort, deren lfd. Nr. nicht die gesuchte ist") — der Hook reicht sie roh durch.
+   * Der Hook beschafft, der reine Kern entscheidet: was hier nicht ankommt, kann dort kein Treffer
+   * werden. Die Cursor-Antwort reicht der Hook roh durch, geprüft wird sie im Kern.
    */
   it('reicht die geladenen Listen unter ihren Quellennamen durch', async () => {
     const { result } = starte({ suche: 'flori' });
@@ -379,7 +333,7 @@ describe('useDatensaetze — Übergabe an den Kern', () => {
     expect(result.current.personen).toEqual([PERSON]);
   });
 
-  /** Gegenstück: ohne Abruf sind die Quellen leer, nicht etwa mit Altdaten gefüllt. */
+  /** Gegenstück: ohne Abruf sind die Quellen leer, nicht mit Altdaten gefüllt. */
   it('liefert unter der Schwelle leere Quellen', () => {
     const { result } = starte({ suche: 'a' });
     expect(result.current).toEqual({});
@@ -389,9 +343,8 @@ describe('useDatensaetze — Übergabe an den Kern', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('useDatensaetze — die zwei Datensatz-Modi (LFH-391 · C3)', () => {
   /**
-   * PAAR IN EINEM LAUF mit demselben Rest: '@no' holt genau die vier Namensquellen, '#no'
-   * genau den ETB. Ohne die jeweils negative Hälfte wäre auch ein Modus grün, der die
-   * Quellenmenge gar nicht einschränkt — unpräfigiert holt der Hook alle zehn.
+   * PAAR IN EINEM LAUF mit demselben Rest: '@no' holt genau die vier Namensquellen, '#no' genau den
+   * ETB. Ohne die negativen Hälften wäre auch ein Modus grün, der nicht einschränkt.
    */
   it('holt unter „@" nur Person, Fahrzeug, Personal und Einheit', async () => {
     starte({ suche: 'no', modus: 'kraefte' });
@@ -412,19 +365,14 @@ describe('useDatensaetze — die zwei Datensatz-Modi (LFH-391 · C3)', () => {
     await waitFor(() => expect(zaehler.etb).toBe(1));
     await ruhe();
 
-    // Der Sammeltreffer (LFH-619) gehört zum ETB und kommt deshalb unter „#" mit.
+    // Der Sammeltreffer gehört zum ETB und kommt unter „#“ mit.
     expect(Object.keys(zaehler).sort()).toEqual(['etb', 'etb-anzahl', 'modul-overrides']);
   });
 
   /**
-   * DIE MESSUNG, auf der der Modusriegel im REINEN KERN beruht (`datensaetze.ts`).
-   *
-   * TanStack schaltet mit `enabled: false` das Nachladen ab, nicht die Auslieferung: die
-   * zwischengespeicherte Antwort steht weiter im `data`. Wer 'meier' tippt und danach '@'
-   * davorsetzt, hat die Schadensliste also noch — ein Riegel allein im `enabled` liesse sie
-   * in der Kräfte-Ansicht stehen. Der Zähler in der zweiten Hälfte belegt zugleich, dass
-   * dabei KEIN neuer Abruf läuft; nur beides zusammen erklärt, warum der Kern denselben
-   * Riegel ein zweites Mal führt.
+   * Die Messung hinter dem Modusriegel im REINEN KERN: `enabled: false` schaltet das Nachladen ab,
+   * nicht die Auslieferung; die Antwort steht weiter in `data`. Der Zähler belegt zugleich, dass
+   * kein neuer Abruf läuft.
    */
   it('hält die Antwort einer abgeschalteten Query im Cache, ohne sie neu zu holen', async () => {
     const { result, rerender } = starte({ suche: 'meier' });

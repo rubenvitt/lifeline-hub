@@ -15,18 +15,15 @@ import { renderMitProviders } from '../test/utils';
 import EinsatzSeite, { seitenBreiteMax, seitenkopfStil } from './EinsatzSeite';
 
 /**
- * Attrappe für die Palettenbefehle (LFH-391 · B5). Nötig, weil `src/test/setup.ts` MSW mit
- * `onUnhandledRequest: 'error'` fährt — das echte `useBefehle` fordert beim Öffnen
- * `/api/einsaetze` an und bräche den Lauf.
+ * Attrappe für die Palettenbefehle (LFH-391 · B5): `src/test/setup.ts` fährt MSW mit
+ * `onUnhandledRequest: 'error'`, und das echte `useBefehle` forderte `/api/einsaetze` an.
  *
- * Sie beschriftet mit der Id und wird über `#cmd-tastatur:<id>` gegriffen, nicht über den
- * Wortlaut: der kommt in der Produktion aus `TASTATUR_AKTIONEN` und ist dort gepinnt
- * (`befehle.test.ts`) — hier behauptet, belegte der Test die Beschriftung der Attrappe.
- * `modul:etb` steht fest darin, damit „die Option fehlt" von „die Palette ist gar nicht
- * offen" unterscheidbar bleibt.
+ * Gegriffen wird über `#cmd-tastatur:<id>`, nicht über den Wortlaut (der ist in
+ * `befehle.test.ts` gepinnt). `modul:etb` steht fest darin, damit „die Option fehlt" von „die
+ * Palette ist gar nicht offen" unterscheidbar bleibt.
  *
- * Dateiweit, wie `vi.mock` es ohnehin erzwingt: die übrigen Aussagen dieser Datei rendern
- * `EinsatzSeite` ohne Provider, wo `useTastaturEbene` ein No-op ist.
+ * Dateiweit, wie `vi.mock` es erzwingt: die übrigen Aussagen rendern ohne Provider, wo
+ * `useTastaturEbene` ein No-op ist.
  */
 vi.mock('../command-palette/useBefehle', () => ({
   useBefehle: (aktionen: TastaturAktionen = {}) => [
@@ -68,12 +65,11 @@ describe('EinsatzSeite', () => {
     expect(screen.getByRole('button', { name: 'Anlegen' })).toBeInTheDocument();
     expect(screen.getByText('Nur lesend')).toBeInTheDocument();
     expect(screen.getByText('Seiteninhalt')).toBeInTheDocument();
-    // Neuentwurf (21.09.2026): die Seitenkopfleiste trägt die Seite — Titel und Aktionen
-    // stehen in EINER Leiste, ein Titelblock darüber existiert nicht mehr.
+    // Die Seitenkopfleiste trägt Titel und Aktionen in EINER Leiste.
     const leiste = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
     expect(leiste).toContainElement(heading);
     expect(leiste).toContainElement(screen.getByRole('button', { name: 'Anlegen' }));
-    // 14/600 — der Satz des Entwurfs, die Ebene bleibt h4.
+    // 14/600 — der Satz des Entwurfs, die Ebene bleibt h1.
     expect(heading).toHaveStyle({ fontSize: '14px', fontWeight: '600' });
   });
 
@@ -90,12 +86,10 @@ describe('EinsatzSeite', () => {
   });
 
   it('zieht die Kopfleiste über die Seitenrinne, die Lesebreite gilt dem Inhalt', () => {
-    // Über die REINE Stilfunktion, nicht über das gerenderte `style`: cssstyle (jsdom)
-    // verwirft logische Kurzschreibweisen mit `var()` — rot oder grün aus dem falschen Grund.
+    // Über die REINE Stilfunktion: cssstyle (jsdom) verwirft logische Kurzschreibweisen mit `var()`.
     const token = { margin: 11, marginLG: 18, paddingXS: 3 };
     const vollbreit = seitenkopfStil(token, { linie: '#LINIE' }, true);
-    // Derselbe negative Rand wie die ETB-Erfassungsleiste — und der Innenrand nimmt die
-    // Rinne wieder auf, sonst klebte der Titel am Rand.
+    // Derselbe negative Rand wie die ETB-Erfassungsleiste; der Innenrand nimmt die Rinne wieder auf.
     expect(vollbreit.marginInline).toBe('calc(-1 * var(--lfh-seiten-polsterung))');
     expect(vollbreit.marginTop).toBe('calc(-1 * var(--lfh-seiten-polsterung))');
     expect(vollbreit.paddingInline).toBe('var(--lfh-seiten-polsterung)');
@@ -106,10 +100,9 @@ describe('EinsatzSeite', () => {
   });
 
   it('füllt ohne Angabe die volle Inhaltsbreite; schmal nur ausdrücklich', () => {
-    // Neuentwurf (22.09.2026): eine Instrumententafel über die ganze Breite ist die Vorgabe.
-    // Die WURZEL ist ohnehin vollbreit (die Kopfleiste zieht bis an den Rand); die Grenze,
-    // falls gesetzt, trägt der Inhaltsbereich darunter. Die Pixel stehen als LITERALE da —
-    // aus `flaeche` zurückgelesen prüfte der Test den Token gegen sich selbst.
+    // Vollbreit ist die Vorgabe. Die WURZEL ist ohnehin vollbreit; eine Grenze trägt der
+    // Inhaltsbereich. Pixel als LITERALE — aus `flaeche` gelesen prüfte der Test den Token gegen
+    // sich selbst.
     const inhalt = (c: HTMLElement) => c.querySelector<HTMLElement>('[data-lfh="seiten-inhalt"]')!;
 
     const voll = renderMitProviders(
@@ -143,13 +136,10 @@ describe('EinsatzSeite', () => {
     expect(screen.getByText('Stand 14:07')).toBeInTheDocument();
   });
 
-  // LFH-373: eine Seite, die einen Datenstand führt, reicht vor dem ersten Abruf `0` durch
-  // (`query.dataUpdatedAt`). Dann steht der Platzhalter — eine Seite ohne Datenstand bekommt
-  // keinen, sonst trüge jeder Kopf eine Lücke.
-  // LFH-373 (gemessen): bei 390 px erschien die Meta („8 Einträge") in der Titelzeile und
-  // schob „Stand" in eine neue Zeile — alles darunter rückte 22 px. Meta und Stand sind
-  // deshalb EINE Gruppe, die unter `md` eine eigene Zeile hat: die hält der Platzhalter, und
-  // die Meta wächst darin, statt etwas umzubrechen.
+  // LFH-373: eine Seite mit Datenstand reicht vor dem ersten Abruf `0` durch, dann steht der
+  // Platzhalter; eine Seite ohne Datenstand bekommt keinen. Meta und Stand sind EINE Gruppe mit
+  // eigener Zeile unter `md`: die hält der Platzhalter, und eine spät eintreffende Meta wächst
+  // darin, statt etwas umzubrechen.
   it('fasst Meta und Datenstand zu einer Gruppe, die unter md eine eigene Zeile hat', () => {
     const { container } = renderMitProviders(
       <EinsatzSeite titel="Liste" meta="8 Einträge" dataUpdatedAt={0}>
@@ -160,9 +150,8 @@ describe('EinsatzSeite', () => {
     expect(gruppe).not.toBeNull();
     expect(gruppe).toHaveTextContent('8 Einträge');
     expect(gruppe.querySelector('[data-lfh="datenstand-platzhalter"]')).not.toBeNull();
-    // Die Gruppe selbst DARF umbrechen, nur ihre Teile nicht (Review): eine lange Meta
-    // („3 von 12 Einheiten · Stärke 1/3/18//22 von 4/12/60//76", Meldebild mit Filter) liefe
-    // bei 390 px sonst quer über die Seite.
+    // Die Gruppe selbst DARF umbrechen, nur ihre Teile nicht: eine lange Meta liefe bei 390 px
+    // sonst quer über die Seite.
     expect(gruppe.style.flexWrap).toBe('wrap');
     expect(gruppe.style.minWidth).toBe('0px');
     for (const teil of Array.from(gruppe.children) as HTMLElement[]) {
@@ -175,10 +164,9 @@ describe('EinsatzSeite', () => {
     expect(regel![1]).toMatch(/flex-basis:\s*100%/);
   });
 
-  // LFH-373, im Gate gemessen (`einsatzauswahl-cls.spec.ts`): ab `md` steht die Gruppe in der
-  // Titelzeile, und die spät eintreffende Meta schob den schon stehenden Platzhalter weit nach
-  // rechts. CLS nimmt die größte Strecke eines Bildes mal der ganzen bewegten Fläche — das
-  // Raster daneben kam so von 0,020 auf 0,068. Der Platzhalter gilt deshalb nur unter `md`.
+  // LFH-373 (`einsatzauswahl-cls.spec.ts`): ab `md` steht die Gruppe in der Titelzeile, und die
+  // spät eintreffende Meta schöbe den Platzhalter nach rechts (CLS). Der Platzhalter gilt deshalb
+  // nur unter `md`.
   it('blendet den Datenstand-Platzhalter ab md aus', () => {
     const regel = seiteCss.match(/@media\s*\(min-width:\s*768px\)\s*\{([^}]*\{[^}]*\})/);
     expect(regel, 'EinsatzSeite.css trägt die Breit-Regel').not.toBeNull();
@@ -212,11 +200,9 @@ describe('EinsatzSeite', () => {
   });
 
   /**
-   * Die EINE Regel, die „Schäden › Schäden" verhindert: der letzte Pfadeintrag (der
-   * Seitenname) wird ausgeblendet, weil der Titel ihn direkt danach trägt. Vitest fährt mit
-   * `css: false` — die Wirkung ist hier nicht messbar, deshalb ein Quelltext-Pin (Muster
-   * `theme/seitenrinne.guard.test.ts`). Der Trenner davor darf NICHT mit verschwinden: er ist
-   * der Chevron vor dem Titel.
+   * Die Regel gegen „Schäden › Schäden": der letzte Pfadeintrag wird ausgeblendet, weil der Titel
+   * ihn trägt. Vitest fährt mit `css: false`, deshalb ein Quelltext-Pin. Der Trenner davor darf
+   * NICHT mit verschwinden: er ist der Chevron vor dem Titel.
    */
   it('blendet im Ortspfad genau den letzten EINTRAG aus, nicht den Trenner davor', () => {
     const regel = seiteCss.match(/([^{}]+)\{\s*display:\s*none;\s*\}/);
@@ -293,10 +279,8 @@ describe('EinsatzSeite', () => {
 });
 
 /**
- * Die ERSTE seitenweite Tastatur-Ebene des Repos (LFH-391 · B5) — die vier bisherigen
- * Registrierungen (Datensicht, Erfassung, EtbPage, KatalogTabelle) haben alle schmale
- * Wurzeln. Genau dafür ist die Kette aus B1 gebaut: eine flache Seitenebene über den
- * tiefen Werkzeugleisten.
+ * Seitenweite Tastatur-Ebene (LFH-391 · B5): eine flache Seitenebene über den tiefen
+ * Werkzeugleisten der Ebenenkette.
  */
 describe('EinsatzSeite · Seitenebene der Kommandopalette', () => {
   function oeffnen(neueZeile?: () => void) {
@@ -315,8 +299,7 @@ describe('EinsatzSeite · Seitenebene der Kommandopalette', () => {
     oeffnen(neueZeile);
 
     // Der Fokus muss VOR Strg+K in der Seite liegen: nur dann enthält die Ebenenkette die
-    // Seitenebene. (Ohne Fokus im Baum trüge der Anzeige-Fallback aus B1 sie ebenfalls —
-    // dann prüfte dieser Test aber den Fallback statt die Registrierung.)
+    // Seitenebene. Ohne Fokus trüge sie der Anzeige-Fallback, und der Test prüfte diesen.
     await u.click(screen.getByRole('button', { name: 'Inhalt' }));
     await u.keyboard('{Control>}k{/Control}');
 
@@ -330,9 +313,8 @@ describe('EinsatzSeite · Seitenebene der Kommandopalette', () => {
   });
 
   /**
-   * Eine Werkzeugleiste tief IN der Seite — die Bauform, die es im Bestand vierfach gibt
-   * (Datensicht, Erfassung, EtbPage, KatalogTabelle). Sie ist hier der Zeuge dafür, dass
-   * die Seitenebene ohne `neueZeile` gar nicht erst entsteht.
+   * Eine Werkzeugleiste tief IN der Seite — Zeuge dafür, dass die Seitenebene ohne `neueZeile`
+   * gar nicht erst entsteht.
    */
   function Werkzeugzeile({ zuruecksetzen }: { zuruecksetzen: () => void }) {
     const wurzel = useRef<HTMLDivElement>(null);
@@ -349,15 +331,12 @@ describe('EinsatzSeite · Seitenebene der Kommandopalette', () => {
   }
 
   /**
-   * Der `aktiv`-Riegel — und ausdrücklich NICHT über „die Option `neue-zeile` fehlt"
-   * geprüft: das garantiert schon `verschmelzeAktionen` (ein `undefined`-Schlüssel ist
-   * keine Belegung), weshalb die Mutation `aktiv: true` den Test darüber grün lässt.
+   * Der `aktiv`-Riegel — NICHT über „die Option `neue-zeile` fehlt" geprüft, das garantiert schon
+   * `verschmelzeAktionen`.
    *
-   * Sichtbar wird der Riegel am Anzeige-FALLBACK: die Seitenwurzel umspannt die ganze
-   * Seite, eine registrierte Seitenebene enthält den Fokus also fast immer — und eine
-   * nicht-leere Kette verdrängt den Fallback. Ohne Riegel bliebe die Gruppe „Aktionen"
-   * auf jeder Detailseite ohne Anlegen-Aktion leer, obwohl die Werkzeugleiste darunter
-   * etwas anzubieten hat.
+   * Sichtbar wird er am Anzeige-FALLBACK: eine registrierte Seitenebene enthält den Fokus fast
+   * immer und verdrängt den Fallback. Ohne Riegel bliebe die Gruppe „Aktionen" auf jeder
+   * Detailseite ohne Anlegen-Aktion leer, obwohl die Werkzeugleiste darunter etwas anbietet.
    */
   it('lässt ohne `neueZeile` die Aktion einer inneren Ebene im Fallback stehen', async () => {
     const u = userEvent.setup();
@@ -370,8 +349,8 @@ describe('EinsatzSeite · Seitenebene der Kommandopalette', () => {
       </CommandPaletteProvider>,
     );
 
-    // Fokus IN der Seite, aber ausserhalb der Werkzeugzeile: genau die Lage, in der eine
-    // (leere) Seitenebene die Kette belegen würde.
+    // Fokus IN der Seite, aber außerhalb der Werkzeugzeile: dort belegte eine (leere) Seitenebene
+    // die Kette.
     await u.click(screen.getByRole('button', { name: 'Inhalt' }));
     await u.keyboard('{Control>}k{/Control}');
 
@@ -386,18 +365,16 @@ describe('EinsatzSeite · Seitenebene der Kommandopalette', () => {
     await u.click(screen.getByRole('button', { name: 'Inhalt' }));
     await u.keyboard('{Control>}k{/Control}');
 
-    // Positivhälfte: die Palette steht wirklich offen und rendert Optionen. Ohne sie wäre
-    // das `null` unten nur der Beleg, dass gar nichts auf ist.
+    // Positivhälfte: die Palette steht offen und rendert Optionen, sonst belegte das `null` unten
+    // nur, dass nichts auf ist.
     await waitFor(() => expect(document.getElementById('cmd-modul:etb')).not.toBeNull());
     expect(document.getElementById('cmd-tastatur:neue-zeile')).toBeNull();
   });
 
   /**
-   * LFH-373: ein angepinnter Seitenfuß steht als LETZTES Kind der Seitenwurzel, nach dem
-   * Inhalt — nicht darin. Ein `position: sticky; bottom: 0` kann nie über die Oberkante
-   * seines Elternblocks steigen; im Inhalt hing die ETB-Erfassung bei 390 px im
-   * Handschuh-Betrieb unter einem 489 px hohen Kopf fest und ragte 61 px unter das Fenster.
-   * Als Kind der Wurzel beginnt ihr Elternblock mit dem Seitenkopf.
+   * LFH-373: ein angepinnter Seitenfuß steht als LETZTES Kind der Seitenwurzel, nach dem Inhalt.
+   * Ein `position: sticky; bottom: 0` steigt nie über die Oberkante seines Elternblocks; als Kind
+   * der Wurzel beginnt dieser mit dem Seitenkopf.
    */
   it('stellt einen Fuß als letztes Kind der Wurzel hinter den Inhalt', () => {
     const { container } = renderMitProviders(
