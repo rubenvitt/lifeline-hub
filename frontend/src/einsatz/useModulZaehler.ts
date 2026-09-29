@@ -172,15 +172,13 @@ export function darfZaehlerZeigen(
  * Browser-Zähler aus ihren eigenen Modullisten.
  */
 export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): ModulZaehlerMap {
-  const gueltigerEinsatz = Number.isFinite(einsatzId);
-  const dokumenteAktiv = gueltigerEinsatz && darfZaehlerZeigen('dokumente', benutzer, overrides);
-  const abloesungAktiv = gueltigerEinsatz && darfZaehlerZeigen('abloesung', benutzer, overrides);
-  const betreuungAktiv = gueltigerEinsatz && darfZaehlerZeigen('betreuung', benutzer, overrides);
+  const dokumenteAktiv = darfZaehlerZeigen('dokumente', benutzer, overrides);
+  const abloesungAktiv = darfZaehlerZeigen('abloesung', benutzer, overrides);
+  const betreuungAktiv = darfZaehlerZeigen('betreuung', benutzer, overrides);
 
   const zaehler = useQuery({
     queryKey: einsatzKeys.modulZaehler(einsatzId),
     queryFn: () => ladeModulZaehler(einsatzId),
-    enabled: gueltigerEinsatz,
   });
   const dokumente = useQuery({
     queryKey: einsatzKeys.dokumente(einsatzId),

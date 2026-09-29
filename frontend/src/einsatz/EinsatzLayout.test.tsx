@@ -117,6 +117,43 @@ function setupRoute(route: string, childPath: string) {
 }
 
 describe('EinsatzLayout', () => {
+  /**
+   * LFH-438: eine verbogene Einsatz-ID (Hand-URL, kaputtes Lesezeichen) führt auf die Einsatzliste,
+   * wie die Detailseiten unter `pages/`. Vorher entstand `NaN` und damit Abrufe gegen
+   * `/api/einsaetze/NaN`; die Anfrage-Sonde belegt, dass der Rahmen gar nicht erst abruft.
+   */
+  it.each(['abc', '0', '-3', '1.5'])(
+    'leitet bei ungültiger Einsatz-ID „%s“ auf die Einsatzliste um, ohne abzurufen',
+    async (id) => {
+      const anfragen: string[] = [];
+      const sonde = ({ request }: { request: Request }) => {
+        anfragen.push(new URL(request.url).pathname);
+      };
+      server.events.on('request:start', sonde);
+      try {
+        server.use(meHandler(admin));
+        renderMitProviders(
+          <CommandPaletteProvider>
+            <Routes>
+              <Route path="/einsaetze" element={<div>Einsatzliste</div>} />
+              <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+                <Route path="etb" element={<div>ETB-Inhalt</div>} />
+              </Route>
+            </Routes>
+            <PfadAnzeige />
+          </CommandPaletteProvider>,
+          { route: `/einsaetze/${id}/etb` },
+        );
+        expect(await screen.findByText('Einsatzliste')).toBeInTheDocument();
+        expect(pfad()).toBe('/einsaetze');
+        expect(screen.queryByText('ETB-Inhalt')).not.toBeInTheDocument();
+        expect(anfragen.filter((a) => a.startsWith('/api/einsaetze/'))).toEqual([]);
+      } finally {
+        server.events.removeListener('request:start', sonde);
+      }
+    },
+  );
+
   it('zeigt Switcher mit Einsatznamen, Kategorie-Rail und Outlet-Inhalt', async () => {
     setup();
     await waitFor(() =>

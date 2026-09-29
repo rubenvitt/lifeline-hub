@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { TbMenu2 } from 'react-icons/tb';
-import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
+import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
@@ -42,7 +42,7 @@ import { useViewport } from '../components/useViewport';
 import type { EinsatzAnzeige } from '../api/types';
 import { einsatzStatus } from '../theme/statusFarben';
 import { farbenDunkel, navDrawerBreite, rahmenFarben, schrift } from '../theme/tokens';
-import { einsatzModulPfad } from '../routing/deeplinks';
+import { einsaetzePfad, einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { useModulZaehler } from './useModulZaehler';
@@ -132,8 +132,17 @@ function StatusPunkt({ status }: { status: EinsatzAnzeige['status'] }) {
  * (erzwungen von `components/useViewport.guard.test.ts`).
  */
 export default function EinsatzLayout() {
-  const { id } = useParams();
-  const einsatzId = Number(id);
+  const einsatzId = parseRouteId(useParams().id);
+  /*
+   * LFH-438: eine verbogene ID (Hand-URL, kaputtes Lesezeichen) führt auf die Einsatzliste, wie
+   * bei den Detailseiten unter `pages/`. Die Weiche steht VOR dem Rahmen, damit darin keine
+   * `NaN`-Abrufe, -Pfade oder -Speicherschlüssel entstehen und jede Kindroute eine gültige ID erbt.
+   */
+  if (einsatzId == null) return <Navigate to={einsaetzePfad()} replace />;
+  return <EinsatzRahmen einsatzId={einsatzId} />;
+}
+
+function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   const { benutzer } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -200,7 +209,6 @@ export default function EinsatzLayout() {
    * und stellte sonst eine zweite Fehlermeldung daneben. Hinter einem kaputten Einsatz führt die
    * ganze Navigation ins Leere, deshalb die Großform statt eines Banners.
    * Nur an `isError`, NICHT an „keine Daten": während des Abrufs ist `einsatz` regulär leer.
-   * Der Rückweg ist ein Literal (`routing/deeplinks.ts` führt keinen Builder für die nackte Liste).
    */
   if (einsatzQuery.isError) {
     return (
@@ -208,7 +216,7 @@ export default function EinsatzLayout() {
         titel="Einsatz konnte nicht geladen werden"
         ursache={einsatzQuery.error}
         onWiederholen={() => void einsatzQuery.refetch()}
-        rueckweg={{ pfad: '/einsaetze', label: 'Zur Einsatzliste' }}
+        rueckweg={{ pfad: einsaetzePfad(), label: 'Zur Einsatzliste' }}
       />
     );
   }
@@ -249,11 +257,10 @@ export default function EinsatzLayout() {
    * Kommandopalette) gefüllt wird. Gemerkt wird, was jemand GEWÄHLT hat, keine Ankünfte: ein
    * Deep-Link von außen läuft bewusst nicht hinein, sonst käme die Erosion durch Rail-Sprünge
    * zurück.
-   * VOR `navigate`, weil der Routenwechsel den lesenden Render auslöst. `Number.isFinite`, weil
-   * `einsatzId` aus `useParams` stammt (sonst ein Eintrag unter `…:NaN`).
+   * VOR `navigate`, weil der Routenwechsel den lesenden Render auslöst.
    */
   function onModulKlick(modul: ModulEintrag) {
-    if (Number.isFinite(einsatzId)) merkeModulBesuch(einsatzId, modul.key);
+    merkeModulBesuch(einsatzId, modul.key);
     navigate(einsatzModulPfad(einsatzId, modulZielRoute(modul)));
     setNavOffen(false);
   }
@@ -356,7 +363,7 @@ export default function EinsatzLayout() {
            Einsatz nicht nur über eine Ikone laufen. */}
         <KopfRechts>
           <div data-lfh="kopf-alarm" style={kopfZelleStil(zellToken)}>
-            <AlarmZentrale />
+            <AlarmZentrale einsatzId={einsatzId} />
           </div>
           <SyncAnzeige liveErwartet kompakt={!mittel} ruheOhneWort={!weit} />
           {mittel && <Uhr />}

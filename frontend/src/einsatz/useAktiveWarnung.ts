@@ -30,11 +30,8 @@ const GEFAHREN_MODUL = modulRegistry.find((m) => m.key === 'gefahrenzonen');
  * Meldungsrecht fehlt das Feld.
  */
 export function useAktiveWarnung({ einsatzId, benutzer, overrides }: Args): boolean {
-  const gueltig = Number.isFinite(einsatzId);
   const gefahrenFrei =
-    gueltig &&
-    GEFAHREN_MODUL !== undefined &&
-    istModulFreigegeben(GEFAHREN_MODUL, benutzer, overrides);
+    GEFAHREN_MODUL !== undefined && istModulFreigegeben(GEFAHREN_MODUL, benutzer, overrides);
 
   const hoechsteWarnstufe = useQuery({
     queryKey: einsatzKeys.gefahrengebiete(einsatzId),
@@ -46,7 +43,6 @@ export function useAktiveWarnung({ einsatzId, benutzer, overrides }: Args): bool
   const bestaetigungUeberfaellig = useQuery({
     queryKey: einsatzKeys.modulZaehler(einsatzId),
     queryFn: () => ladeModulZaehler(einsatzId),
-    enabled: gueltig,
     select: (z) => z.meldungen?.bestaetigung_ueberfaellig,
   }).data;
 
