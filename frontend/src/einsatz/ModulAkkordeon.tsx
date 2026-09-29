@@ -47,7 +47,9 @@ interface Props {
 /**
  * 48 px ist die Trefffläche aus A1 Festlegung 4 (Material 48 dp) — dieselbe Zahl,
  * die die Rail schon trägt. Der Drawer ist der Berührungsfall; das ist eine
- * Trefffläche, keine Dichte-Angabe an einem Steuerelement.
+ * Trefffläche, keine Dichte-Angabe an einem Steuerelement — und deshalb ein BODEN unter der
+ * Staffel, nie ihr Deckel: Kopf und Modulzeilen rechnen `Math.max(48, controlHeight)` und
+ * halten in `handschuh` 72 (LFH-537, abgeschlossen mit LFH-384).
  */
 const TREFFLAECHE = 48;
 

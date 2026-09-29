@@ -9,9 +9,9 @@ import { setzeViewportBreite } from '../test/viewport';
 import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
 import { AuthProvider } from '../auth/AuthContext';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
-import EinsatzLayout, { einsatzKennung } from './EinsatzLayout';
+import EinsatzLayout, { einsatzKennung, navGriffMass } from './EinsatzLayout';
 import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
-import { farbenDunkel } from '../theme/tokens';
+import { dichten, farbenDunkel } from '../theme/tokens';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
 
@@ -751,3 +751,19 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+/**
+ * Die zwei Griffe des Drawer-Zweigs OHNE Rendern — `test/utils.tsx` montiert ein nacktes
+ * `ConfigProvider`, `useToken()` kennt dort die Staffel nicht. Böden als LITERALE.
+ */
+describe('EinsatzLayout · Griffmaß des Drawer-Zweigs (LFH-384)', () => {
+  const griff = (s: keyof typeof dichten) =>
+    navGriffMass({ controlHeight: dichten[s].zeilenhoehe });
+
+  it('hält den A1-Boden von 48 px und wächst in `handschuh` auf 72', () => {
+    // `Math.max`, nicht `??`: mit `??` stände in `kompakt` 30, mit fester 48 in `handschuh` 48.
+    expect(griff('kompakt')).toBe(48);
+    expect(griff('komfortabel')).toBe(48);
+    expect(griff('handschuh')).toBe(72);
+  });
+});

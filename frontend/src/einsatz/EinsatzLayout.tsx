@@ -51,11 +51,21 @@ const { Header, Content } = Layout;
 
 /**
  * 48 px ist die Trefffläche aus A1 Festlegung 4 (Material 48 dp) — dieselbe Zahl,
- * die die Rail trägt. Sie ist der Boden für den Hamburger (Handschuh: 72 px) und den Schließen-Knopf, den
+ * die die Rail trägt. Sie ist der BODEN für den Hamburger und den Schließen-Knopf, den
  * der Drawer selbst mitbringt: der ist von Haus aus kleiner, und ein Knopf, den
- * man auf dem Handschirm nicht trifft, ist keiner.
+ * man auf dem Handschirm nicht trifft, ist keiner. Gelesen wird nur {@link navGriffMass}.
  */
 const TREFFLAECHE = 48;
+
+/**
+ * Kantenmaß der zwei Griffe des Drawer-Zweigs (Hamburger, Drawer-Schließer): der A1-Boden,
+ * darüber die Staffel — 48 / 48 / 72. `Math.max`, nie eine feste 48: die unterschritt in
+ * `handschuh` die Stufe um 24 px (LFH-384). REIN und exportiert, damit die Zusicherung ohne
+ * Rendern prüfbar ist.
+ */
+export function navGriffMass(token: { controlHeight: number }): number {
+  return Math.max(TREFFLAECHE, token.controlHeight);
+}
 
 /**
  * Die Kommandoleiste (Neuentwurf „Instrumententafel", `shell.dc.html`): 52 px auf dem
@@ -348,8 +358,8 @@ export default function EinsatzLayout() {
                 // zusammen (gemessen: 26 px). Die Farbe folgt dem dunklen Rahmengrund,
                 // nicht dem Modus — sonst verschwände der Griff im Tagmodus.
                 style={{
-                  width: Math.max(TREFFLAECHE, token.controlHeight),
-                  height: Math.max(TREFFLAECHE, token.controlHeight),
+                  width: navGriffMass(token),
+                  height: navGriffMass(token),
                   flexShrink: 0,
                   color: rahmenFarben.text,
                 }}
@@ -497,7 +507,8 @@ export default function EinsatzLayout() {
           open={navOffen}
           onClose={() => setNavOffen(false)}
           destroyOnHidden
-          styles={{ close: { minWidth: TREFFLAECHE, minHeight: TREFFLAECHE } }}
+          // Der Schließer folgt der Staffel wie der Hamburger, der ihn öffnet (LFH-384).
+          styles={{ close: { minWidth: navGriffMass(token), minHeight: navGriffMass(token) } }}
         >
           <ModulAkkordeon
             kategorien={kategorien}

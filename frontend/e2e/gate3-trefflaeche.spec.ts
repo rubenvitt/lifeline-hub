@@ -60,24 +60,24 @@ const HANDSCHIRM = { width: 390, height: 844 };
 
 /**
  * Die Böden JE ZIEL des Navigationsrahmens, als Literale wie {@link STAFFEL}. Der Rahmen
- * trägt vier Verträge:
+ * trägt drei Verträge:
  *
  *  - `staffel` (30/48/72) — liest nur `token.controlHeight`: Modul-Panel-Zeilen,
  *    Palettenzeilen, Kopfzeilen-Ziele und der Suchzugang ab `lg`.
- *  - `mitA1Boden` (48/48/72) — `Math.max(48, controlHeight)`: Kategorie-Rail, Hamburger,
- *    Suchzugang unter `lg` und die Modulzeilen im Drawer. Die 48 ist BODEN unter der
+ *  - `mitA1Boden` (48/48/72) — `Math.max(48, controlHeight)`: Kategorie-Rail (Höhe UND
+ *    Breite, die Spalte wächst in `handschuh` mit), Hamburger, Suchzugang unter `lg`,
+ *    Akkordeon-Kopf, Modulzeilen und Schließer im Drawer. Die 48 ist BODEN unter der
  *    Staffel, deshalb misst `kompakt` hier ≥ 48.
  *  - `benutzermenue` (40/48/72) — `Math.max(40, controlHeight)`, weil der Auslöser einen
  *    28-px-Avatar trägt.
- *  - `fest48` (48/48/48) — die zwei festen 48er des Drawer-Zweigs (LFH-537).
  *
- * Alle vier sind UNTERGRENZEN; `fest48` zementiert die Ausnahme also nicht.
+ * Alle drei sind UNTERGRENZEN. Den vierten, `fest48` für Akkordeon-Kopf und Drawer-Schließer
+ * (LFH-537), hat LFH-384 aufgelöst: beide folgen jetzt der Staffel.
  */
 const BODEN = {
   staffel: { kompakt: 30, komfortabel: 48, handschuh: 72 },
   mitA1Boden: { kompakt: 48, komfortabel: 48, handschuh: 72 },
   benutzermenue: { kompakt: 40, komfortabel: 48, handschuh: 72 },
-  fest48: { kompakt: 48, komfortabel: 48, handschuh: 48 },
 } as const;
 
 /** Schlüssel aus `theme/ThemeModeProvider.tsx`. Bewusst literal — Vertrag, kein Import. */
@@ -408,9 +408,8 @@ test('Einheit Selbstbeweis: feste Kompaktgröße fällt trotz aktiver Handschuhs
 // und wird deshalb mitgemessen:
 //  (1) Die Modulzeilen im Drawer folgen der Staffel: `mindestTrefflaeche={48}` wird per
 //      `Math.max` mit `controlHeight` verrechnet (mit `??` deckelte es `handschuh` auf 48).
-//  (2) Akkordeon-Kopf und Drawer-Schließer tragen ein nacktes `minHeight: 48` und bleiben
-//      auch in `handschuh` bei 48 — festgehalten auf {@link BODEN}.fest48, nicht behoben
-//      (Bedienentscheidung, LFH-537). Als Untergrenze bliebe die Zeile nach einem Fix grün.
+//  (2) Akkordeon-Kopf und Drawer-Schließer ebenso — bis LFH-384 standen sie fest auf 48 und
+//      unterschritten `handschuh` um 24 px. Der Schließer ist icon-only, deshalb beide Achsen.
 
 test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommandopalette folgen der Staffel', async ({
   page,
@@ -443,6 +442,13 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
       `Kategorie-Ziel (${dichte})`,
       6,
     );
+    // Die Rail-Spalte ist fest; in `handschuh` muss sie mitwachsen, sonst bleibt das Ziel
+    // 59 px breit (LFH-384). Ein Ziel genügt — alle teilen dieselbe Spaltenbreite.
+    const railBreite = (await rail.locator('button').first().boundingBox())!.width;
+    expect(
+      railBreite,
+      `Kategorie-Ziel (${dichte}, gemessen ${railBreite}px breit, Soll ≥ ${BODEN.mitA1Boden[dichte]})`,
+    ).toBeGreaterThanOrEqual(BODEN.mitA1Boden[dichte] - SUBPIXEL);
 
     // (b) Modul-Panel — fünf freigegebene Module der Kategorie „Kräfte & Mittel".
     const panel = page.locator('[data-lfh="modul-panel"]');
@@ -515,7 +521,7 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
     );
 
     gemessen.push(
-      `${dichte}: Rail ${railZiel} (Soll ≥ ${BODEN.mitA1Boden[dichte]}), Panel ${panelZeile}, ` +
+      `${dichte}: Rail ${railZiel}×${railBreite} (Soll ≥ ${BODEN.mitA1Boden[dichte]}), Panel ${panelZeile}, ` +
         `Wechsler ${wechsler}, Desktop ${desktop}, Ton ${ton}, Suchen ${suchen}, ` +
         `Benutzermenü ${benutzer} (Soll ≥ ${BODEN.benutzermenue[dichte]}), Palette ${zeile}`,
     );
@@ -574,7 +580,7 @@ test('Globale Kopfzeile: Logo, Verwaltungs-Link, Suchzugang und Benutzermenü fo
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-test('Navigations-Drawer auf 390 px: Hamburger und Modulzeilen folgen der Staffel, Akkordeon-Kopf und Schließer bleiben bei 48', async ({
+test('Navigations-Drawer auf 390 px: Hamburger, Akkordeon-Kopf, Modulzeilen und Schließer folgen der Staffel', async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -618,7 +624,7 @@ test('Navigations-Drawer auf 390 px: Hamburger und Modulzeilen folgen der Staffe
     const koepfe = nav.locator('button[aria-expanded]');
     const kopfHoehe = await alleHaltenStufe(
       koepfe,
-      BODEN.fest48[dichte],
+      BODEN.mitA1Boden[dichte],
       `Akkordeon-Kopf (${dichte})`,
       6,
     );
@@ -629,17 +635,22 @@ test('Navigations-Drawer auf 390 px: Hamburger und Modulzeilen folgen der Staffe
       `Drawer-Modulzeile (${dichte})`,
       5,
     );
+    const schliesserZiel = drawer.locator('.ant-drawer-close');
     const schliesser = await haeltStufe(
-      drawer.locator('.ant-drawer-close'),
-      BODEN.fest48[dichte],
+      schliesserZiel,
+      BODEN.mitA1Boden[dichte],
       `Drawer-Schließer (${dichte})`,
     );
+    const schliesserBreite = (await schliesserZiel.boundingBox())!.width;
+    expect(
+      schliesserBreite,
+      `Drawer-Schließer-Breite (${dichte}, gemessen ${schliesserBreite}px, Soll ≥ ${BODEN.mitA1Boden[dichte]})`,
+    ).toBeGreaterThanOrEqual(BODEN.mitA1Boden[dichte] - SUBPIXEL);
 
     gemessen.push(
       `${dichte}: Hamburger ${griff}×${griffBreite}, Suchen ${suchen} ` +
         `(Soll ≥ ${BODEN.mitA1Boden[dichte]}), Modulzeile ${modulZeile}, ` +
-        `Akkordeon-Kopf ${kopfHoehe}, Schließer ${schliesser} ` +
-        `(feste 48 — LFH-537, Soll ≥ ${BODEN.fest48[dichte]})`,
+        `Akkordeon-Kopf ${kopfHoehe}, Schließer ${schliesser}×${schliesserBreite}`,
     );
   }
 
