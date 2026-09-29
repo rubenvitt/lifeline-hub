@@ -93,10 +93,9 @@ export default function AnlegenDrawer<T, E extends object>({
           const neu = await anlegenMut.mutateAsync(daten);
           if (abbruchGeneration.current === generation) angelegt.current = neu;
         }}
-        // Bindet einen laufenden Auftrag an dessen Einsatz-ID: `onFertig` schließt hier über
-        // das `einsatzId`-Prop des Renders, in dem der Auftrag gestartet wurde — das hält nur,
-        // weil `abschicken` in `components/Erfassung.tsx` ein `useCallback` ist und den zu
-        // diesem Zeitpunkt aktuellen `onFertig`-Wert beim Absenden einfriert.
+        // Bindet einen laufenden Auftrag an dessen Einsatz-ID. Das hält nur, weil `abschicken` in
+        // `components/Erfassung.tsx` ein `useCallback` ist und den `onFertig` beim Absenden
+        // einfriert.
         onFertig={() => {
           const neu = angelegt.current;
           angelegt.current = null;

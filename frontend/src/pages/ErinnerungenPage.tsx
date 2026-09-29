@@ -44,7 +44,7 @@ export default function ErinnerungenPage() {
   const { token } = useRollen();
 
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
-  // Inline-Anlegen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Sidebar.
+  // Inline-Anlegen-Formular: per Kopf-Button auf-/zugeklappt, kein Drawer.
   const [formOffen, setFormOffen] = useState(false);
 
   const einsatzQuery = useQuery({
@@ -62,10 +62,8 @@ export default function ErinnerungenPage() {
 
   const anlegenMutation = useMutation({
     mutationFn: (daten: NeueErinnerung) => legeErinnerungAn(einsatzId, daten),
-    // LFH-343/C8: kein `setFormOffen(false)` mehr — das Inline-Formular bleibt
-    // offen, damit die nächste Erinnerung ohne Aufklappen weitergeht. Der
-    // conditional Render des Paneels würde es sonst unmounten, samt Serienzähler
-    // und Wertübernahme (Muster: `pages/MeldungenPage.tsx`, LFH-332/B4).
+    // Das Inline-Formular bleibt nach dem Anlegen offen, damit die nächste Erinnerung ohne
+    // Aufklappen folgt; ein Schließen unmountete es samt Serienzähler und Wertübernahme.
     onSuccess: () => {
       invalidiere();
       message.success('Erinnerung angelegt');
@@ -73,10 +71,9 @@ export default function ErinnerungenPage() {
     onError: fehler,
   });
   /**
-   * Der Rückweg beider Abschluss-Aktionen (LFH-343 · C8, Befund H50). Seit C8
-   * schalten „Erledigt" und „Quittieren" mit EINEM Klick statt mit Rückfrage;
-   * `POST …/erinnerungen/{eid}/oeffnen` räumt dafür alle drei Achsen — Status,
-   * Vollzug und Quittung. Ohne diese Route wäre der Rückgängig-Knopf ein 422.
+   * Der Rückweg beider Abschluss-Aktionen: „Erledigt" und „Quittieren" schalten mit einem Klick
+   * statt mit Rückfrage; `POST …/erinnerungen/{eid}/oeffnen` räumt dafür alle drei Achsen (Status,
+   * Vollzug, Quittung).
    */
   const oeffnenMutation = useMutation({
     mutationFn: (eid: number) => oeffneErinnerung(einsatzId, eid),
@@ -114,7 +111,7 @@ export default function ErinnerungenPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
   const alleErinnerungen = erinnerungenQuery.data ?? [];
 
-  // Offen/Abgeschlossen clientseitig ueber die gemeinsame Phasen-Semantik trennen.
+  // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen.
   const offene = alleErinnerungen.filter(
     (e) => !istAbgeschlossen(ERINNERUNG_STATUS[e.status]?.phase ?? 'offen'),
   );
@@ -122,7 +119,7 @@ export default function ErinnerungenPage() {
     istAbgeschlossen(ERINNERUNG_STATUS[e.status]?.phase ?? 'offen'),
   );
 
-  // Offen-Ansicht: nach Faelligkeit gruppieren, je Gruppe nach faellig_at aufsteigend.
+  // Offen-Ansicht: nach Fälligkeit gruppieren, je Gruppe nach faellig_at aufsteigend.
   const offeneGruppen: { gruppe: FaelligGruppe; erinnerungen: Erinnerung[] }[] = GRUPPE_ORDNUNG.map(
     (gruppe) => ({
       gruppe,
@@ -184,8 +181,8 @@ export default function ErinnerungenPage() {
             />
           }
         >
-          {/* mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn die
-              Erinnerung wirklich angekommen ist (LFH-332/B4). */}
+          {/* mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn die Erinnerung
+              angekommen ist. */}
           <ErinnerungFormular
             card={false}
             senden={anlegenMutation.isPending}

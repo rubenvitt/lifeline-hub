@@ -22,10 +22,9 @@ import StatusTag from '../components/StatusTag';
 import { SeitenFehler, SeitenLeer } from '../components/SeitenZustand';
 import { abstand, flaeche } from '../theme/tokens';
 import { einsatzStatus } from '../theme/statusFarben';
-// Die Skelettform lebt als Klasse in der Gestaltungssprache. Der Import steht
-// bewusst HIER und nicht nur transitiv über `SeitenZustand`/`EinsatzSeite`: ohne
-// ihn wären die Balken 0 px hoch, und jsdom rechnet kein Layout — der Ausfall
-// wäre in keinem Test sichtbar (dieselbe Falle wie `SeitenZustand.tsx:3-7`).
+// Die Skelettform lebt als Klasse in der Gestaltungssprache. Der Import steht bewusst hier und
+// nicht nur transitiv: ohne ihn wären die Balken 0 px hoch, und jsdom rechnet kein Layout — der
+// Ausfall wäre in keinem Test sichtbar.
 import '../theme/sprache.css';
 import './EinsaetzePage.css';
 import { monoStil, useRollen } from '../components/instrument';
@@ -42,43 +41,31 @@ interface AnlegeWerte {
 }
 
 /**
- * Mindesthöhe einer Kachel. KEIN neuer Wert — die 120 px standen schon am
- * Anlegen-Knopf; sie sind hier nur an EINE Stelle gehoben, damit Skelett, Karte und
- * Anlegen-Kachel dieselbe Höhe tragen (Prüfliste Kriterium 12, kein Sprung beim
- * Wechsel Laden → Daten). BEFUND: `flaeche` kennt `kachelMin`/`kachelMinKlein`
- * (Breiten), aber keine Kachel-Höhenrolle — erfunden wird hier keine.
+ * Mindesthöhe einer Kachel, damit Skelett, Karte und Anlegen-Kachel dieselbe Höhe tragen (kein
+ * Sprung beim Wechsel Laden → Daten). `flaeche` kennt Kachelbreiten, aber keine Kachel-Höhenrolle.
  */
 const KACHEL_MIN_HOEHE = 120;
 
 /**
- * Ab wie vielen aktiven Einsätzen ein Suchfeld erscheint.
- *
- * Acht, weil das Raster darunter auf dem Fükw-Schirm zwei Reihen füllt — bis
- * dahin ist Suchen langsamer als Hinsehen. Ein dauerhaft stehendes Suchfeld über
- * drei Karten wäre Bedienlast ohne Nutzen.
+ * Ab wie vielen aktiven Einsätzen ein Suchfeld erscheint. Acht, weil das Raster auf dem Fükw-Schirm
+ * dann zwei Reihen füllt — bis dahin ist Suchen langsamer als Hinsehen.
  */
 const SUCHE_AB = 8;
 
 /**
- * Der Titel-Link der Einsatzkarte als Bedienziel auf der Dichte-Staffel (LFH-396, Gate 3).
+ * Der Titel-Link der Einsatzkarte als Bedienziel auf der Dichte-Staffel (Gate 3). Ein nacktes
+ * Inline-`<a>` im Kartenkopf ist nur so hoch wie seine Zeile und unterschreitet schon in `kompakt`
+ * den 24-px-Boden. Die Karte ist klickbar, der Link aber ist das Tastaturziel, und Gate 3 misst
+ * jedes fokussierbare Element.
  *
- * GEMESSEN im Browser (`e2e/gate3-trefflaeche.spec.ts`, Stand vor dem Fix): 17 px in jeder
- * Stufe — ein nacktes Inline-`<a>` im Kartenkopf ist so hoch wie seine Zeile und
- * unterschreitet damit schon in `kompakt` den 24-px-Boden. Die Karte selbst ist 120 px hoch
- * und klickbar, der Link aber ist das TASTATURziel (Tab erreicht ihn, Enter navigiert), und
- * Gate 3 misst jedes fokussierbare Element.
+ * Zwei Angaben: `minHeight` aus `controlHeight` trägt den Boden (30 / 48 / 72), die Polsterung
+ * zieht mit — nur senkrecht, waagerecht polstert der Kartenkopf selbst. `display: flex` statt
+ * `inline-flex`, damit der Text als eigenes Flex-Item per Ellipsis abschneidet (der Kopf ist
+ * `white-space: nowrap`); ein atomarer Inline-Kasten würde hart geclippt, ohne „…".
  *
- * ZWEI Angaben, nicht eine (LFH-365): `minHeight` aus `controlHeight` trägt den Boden
- * (30 / 48 / 72), die Polsterung zieht mit. Sie liegt nur auf der SENKRECHTEN Achse —
- * waagerecht polstert der Kartenkopf selbst, ein Versatz des Titels gegenüber dem
- * Kartenkörper wäre eine Sichtänderung, keine Trefflächenänderung. `display: flex` statt
- * `inline-flex`, damit der Text darin als eigenes Flex-Item weiterhin per Ellipsis
- * abschneidet (der Kopf ist `white-space: nowrap`): ein atomarer Inline-Kasten würde vom
- * Kopf hart geclippt, ohne „…".
- *
- * Rein und exportiert nach dem Muster von `bedienzielStil` (`pages/lagekarte/Sidebar.tsx`):
- * nur so ist die Zusicherung über zwei Dichtestufen ohne Rendern prüfbar — `test/utils.tsx`
- * montiert ein nacktes `ConfigProvider` ohne unser Theme.
+ * Rein und exportiert nach dem Muster von `bedienzielStil` (`pages/lagekarte/Sidebar.tsx`): so ist
+ * die Zusicherung über zwei Dichtestufen ohne Rendern prüfbar — `test/utils.tsx` montiert ein
+ * nacktes `ConfigProvider` ohne unser Theme.
  */
 export function kartenTitelStil(token: { controlHeight: number; paddingSM: number }) {
   return {
@@ -107,13 +94,9 @@ function rasterStil(minBreite: number, luft: number): CSSProperties {
 }
 
 /**
- * Ladeplatzhalter in Kachelform.
- *
- * Bewusst NICHT `SeitenSkeleton`: das Primitiv trägt `paddingTop:
- * flaeche.zustandOben` (80 px) für den Seiten-Ladezustand — in einer Rasterzelle
- * wüchse damit jede Kachel um 80 px, und genau der Sprung Skelett → Karte, den
- * Kriterium 12 klein halten soll, wäre wieder da. Eine Kachel-Variante am Primitiv
- * ist der Zielzustand (Ticket B3, Datenzustands-Primitive).
+ * Ladeplatzhalter in Kachelform. Bewusst nicht `SeitenSkeleton`: dessen `paddingTop:
+ * flaeche.zustandOben` (80 px) ließe in einer Rasterzelle jede Kachel um 80 px wachsen, und der
+ * Sprung Skelett → Karte wäre wieder da.
  */
 function KachelSkelett() {
   return (
@@ -141,23 +124,18 @@ export default function EinsaetzePage() {
 
   /**
    * Hinweis auf die Demo-Daten (LFH-690, design.md D13): nur für den System-Admin, nur bei
-   * Freischaltung (Status 200) und nur, solange für die Organisation nichts importiert ist.
-   * Die Abfrage läuft ausschließlich für den System-Admin; ein 404 ist kein Fehlerbild.
+   * Freischaltung (Status 200) und nur, solange für die Organisation nichts importiert ist. Ein 404
+   * ist kein Fehlerbild.
    *
-   * BENANNTE ABWEICHUNG vom Ticket, das den Leerzustand vorschlägt: der ist seit LFH-331 · AK3
-   * aktionslos gepinnt und rechnet je Benutzer, „nicht importiert“ ist dagegen eine Aussage
-   * über die Organisation. Der Hinweis springt in die Verwaltung — ein Direktimport von hier
+   * Nicht im Leerzustand: der ist aktionslos und rechnet je Benutzer, „nicht importiert" ist eine
+   * Aussage über die Organisation. Der Hinweis springt in die Verwaltung — ein Direktimport hier
    * wäre eine zweite Stelle für einen unumkehrbaren Vorgang.
    *
-   * ORT: UNTER allem, was die Einsatzliste zeichnet, nicht im `hinweis`-Slot darüber
-   * (Prüfliste T3-12, gemessen). Die Status-Abfrage kommt regelmäßig NACH der Liste an; über
-   * dem Raster schob der Hinweis es dann um 118–266 px, CLS 0,12 auf dem Tablet in
-   * `handschuh` und 0,17–0,21 mobil (Soll ≤ 0,1). Unter dem Raster liegt nichts, das springen
-   * könnte, und ein Element, das neu erscheint, zählt selbst nicht als Verschiebung. Die
-   * andere Lösung, den Inhalt erst nach beiden Abfragen zu zeichnen, hielte die Einsatzliste
-   * für eine Aufforderung ohne Eile an einer zweiten Abfrage fest. Aus demselben Grund wartet
-   * der Hinweis auf die Liste (`!isPending`): stünde er schon unter den Skeletten, schöbe ihn
-   * der Wechsel Skelett → Kacheln (andere Reihenzahl, Leerzustand darüber) selbst.
+   * Ort: unter allem, was die Einsatzliste zeichnet, nicht im `hinweis`-Slot darüber. Die
+   * Status-Abfrage kommt regelmäßig nach der Liste an; über dem Raster schöbe der Hinweis es weg
+   * (CLS über 0,1). Unter dem Raster liegt nichts, das springen könnte. Aus demselben Grund wartet
+   * er auf die Liste (`!isPending`): unter den Skeletten schöbe ihn der Wechsel Skelett → Kacheln
+   * selbst.
    */
   const demo = useDemoDatenStatus();
   const demoPfad = adminDemoDatenPfad();
@@ -174,16 +152,13 @@ export default function EinsaetzePage() {
               Ein Übungseinsatz samt Stammdaten für Vorführung und Schulung lässt sich in der
               Verwaltung anlegen.
             </div>
-            {/* Der Verweis ist ein eigenes Bedienziel unter dem Satz, nicht Teil davon
-                (Prüfliste T3-5/T3-6/T3-2, gemessen): im Satz trennte ihn nur die Farbe vom
-                Text (2,20 / 1,58 : 1, WCAG 1.4.1), `bedienText` hielt auf der Info-Fläche am
-                Tag 6,04 : 1, und `minHeight` ohne Polsterung riss die Textzeile in
-                `handschuh` auf 72 px. Als antd-`Button` erbt er Höhe und Polsterung vom
-                `ConfigProvider` (kein punktuelles `size`) und trägt `colorText` auf eigener
-                Fläche. Mit `href` bleibt er ein `<a>` (Rolle Link, Strg/⌘-Klick öffnet
-                einen Tab); `useLinkClickHandler` navigiert beim schlichten Klick in der App
-                statt mit einem Seitenneuladen. Nicht der `action`-Slot: dort stünde der Knopf
-                neben dem Text und drückte ihn bei 390 px auf die halbe Breite. */}
+            {/* Der Verweis ist ein eigenes Bedienziel unter dem Satz: im Satz trennte ihn nur
+                die Farbe vom Text (WCAG 1.4.1), und `minHeight` ohne Polsterung risse die
+                Textzeile in `handschuh` auf 72 px. Als antd-`Button` erbt er Höhe und
+                Polsterung vom `ConfigProvider` und trägt `colorText` auf eigener Fläche. Mit
+                `href` bleibt er ein `<a>` (Strg/⌘-Klick öffnet einen Tab);
+                `useLinkClickHandler` navigiert beim schlichten Klick in der App. Nicht der
+                `action`-Slot: dort drückte der Knopf den Text bei 390 px auf die halbe Breite. */}
             <div style={{ marginTop: token.marginSM }}>
               <Button href={demoPfad} onClick={zuDenDemoDaten}>
                 Zu den Demo-Daten
@@ -194,9 +169,8 @@ export default function EinsaetzePage() {
       />
     ) : undefined;
 
-  // `isPending` (erster Abruf), NICHT `isFetching`: nach dem Anlegen invalidiert die
-  // Mutation die Liste — ein Ladezweig an `isFetching` nähme den Anlegen-Knopf
-  // mitten im Hintergrund-Nachladen wieder weg.
+  // `isPending` (erster Abruf), nicht `isFetching`: nach dem Anlegen invalidiert die Mutation die
+  // Liste, ein Ladezweig an `isFetching` nähme den Anlegen-Knopf beim Hintergrund-Nachladen weg.
   const {
     data: einsaetze = [],
     dataUpdatedAt: einsaetzeAktualisiertAt,
@@ -220,13 +194,9 @@ export default function EinsaetzePage() {
         bezeichnung: werte.bezeichnung,
         stichwort: werte.stichwort,
         einsatzart: werte.einsatzart,
-        // `.utc()` VOR dem Formatieren — `begonnen_at` ist ein UTC-Wirestring, und
-        // gelesen wird er auch so (`anzeige/format.ts:46` parst mit `dayjs.utc`).
-        // Ohne die Umrechnung landete die lokale Wanduhrzeit als UTC in der Spalte,
-        // und jeder neue Einsatz trüge eine um den Zonenversatz verschobene
-        // Alarmzeit — in Berlin zwei Stunden NACH seinem eigenen Anlagezeitpunkt.
-        // Dieselbe Form wie bei allen anderen Zeit-Sendern des Frontends
-        // (`MeldungFormular`, `AuftragFormular`, `WiedervorlageModal`, ETB).
+        // `.utc()` vor dem Formatieren: `begonnen_at` ist ein UTC-Wirestring und wird auch so
+        // gelesen (`anzeige/format.ts` parst mit `dayjs.utc`). Ohne die Umrechnung landete die
+        // lokale Wanduhrzeit als UTC in der Spalte, um den Zonenversatz verschoben.
         begonnen_at: werte.begonnen_at?.utc().format('YYYY-MM-DD HH:mm:ss'),
       }),
     onSuccess: (neuerEinsatz) => {
@@ -238,9 +208,8 @@ export default function EinsaetzePage() {
 
   const [suche, setSuche] = useState('');
 
-  // Der jüngste Einsatz zuerst: wer die Auswahl öffnet, sucht in aller Regel den,
-  // der gerade läuft. Absteigend nach `begonnen_at` — der Wirestring ist
-  // sortierbar (`YYYY-MM-DD HH:mm:ss`), ein Date-Parse wäre hier überflüssig.
+  // Der jüngste Einsatz zuerst: gesucht wird meist der, der gerade läuft. Der Wirestring
+  // (`YYYY-MM-DD HH:mm:ss`) ist direkt sortierbar.
   const aktive = einsaetze
     .filter((e: EinsatzAnzeige) => e.status === 'aktiv')
     .sort((a, b) => (a.begonnen_at === b.begonnen_at ? 0 : a.begonnen_at < b.begonnen_at ? 1 : -1));
@@ -255,34 +224,24 @@ export default function EinsaetzePage() {
   const sichtbareAktive = aktive.filter(passt);
   const sucheZeigen = aktive.length >= SUCHE_AB;
 
-  // Befund M6 (Abschluss-Review): fällt die Zahl aktiver Einsätze unter SUCHE_AB,
-  // während ein Suchbegriff im Zustand steht (react-query lädt bei Fensterfokus neu
-  // — `refetchOnWindowFocus` ist nicht abgeschaltet), verschwand bisher das Suchfeld
-  // samt `allowClear`, der Filter wirkte aber unbeirrt weiter — Sackgasse: leeres
-  // Raster, kein Hinweis, kein Ausweg. Gewählter Fix: `suche` wird zurückgesetzt,
-  // sobald das Feld selbst verschwindet — NICHT die Alternative „keineTreffer von
-  // sucheZeigen entkoppeln", denn die hätte nur den Hinweistext zurückgebracht, aber
-  // weiterhin keinen Ausweg (das `allowClear` steht ja am unsichtbaren Feld). Ein
-  // zurückgesetzter Suchbegriff macht die Sackgasse ganz zu: der Filter wirkt nicht
-  // mehr, das Raster zeigt wieder alle aktiven Einsätze.
+  // Fällt die Zahl aktiver Einsätze unter SUCHE_AB, während ein Suchbegriff steht (etwa nach einem
+  // Refetch bei Fensterfokus), verschwindet das Suchfeld samt `allowClear`. `suche` wird dann
+  // zurückgesetzt, sonst wirkte der Filter weiter — leeres Raster, kein Hinweis, kein Ausweg.
   useEffect(() => {
     if (!sucheZeigen && suche !== '') {
       setSuche('');
     }
   }, [sucheZeigen, suche]);
 
-  // Dritte Sorte stummer Fläche neben „lädt" und „keine Einsätze überhaupt" (Ticket-Leitmotiv:
-  // „Fehler sieht aus wie leer" darf hier nicht wiederkehren): filtert die Suche ALLE aktiven
-  // Einsätze weg, ist `leer` unten weiterhin false (es GIBT ja Einsätze), das Raster zeigte ohne
-  // diesen Zweig nur noch den „Neuer Einsatz"-Knopf oder gar nichts.
+  // Filtert die Suche alle aktiven Einsätze weg, ist `leer` weiterhin false (es gibt Einsätze);
+  // ohne diesen Zweig stünde eine stumme Fläche da.
   const keineTreffer = sucheZeigen && suchbegriff !== '' && sichtbareAktive.length === 0;
 
   /**
-   * Die Einsatzkachel im Instrumentenstil (Neuentwurf): Fläche + Haarlinie statt antd-Card.
-   * Kopf: Status-Punkt (quadratisch, Radius 0) und der Titel-Link als Tastaturziel. Leib:
-   * Status als Wort (zweiter Kanal zum Punkt, WCAG 1.4.1), Einsatzart, Rolle, Ort und eine
-   * Mono-Zeile aus Einsatznummer, Beginn und Stichwort. Die Nummer steht nur, wenn es eine
-   * gibt (`kachelKennung`) — die Datenbank-`id` ist keine.
+   * Die Einsatzkachel: Fläche + Haarlinie statt antd-Card. Kopf: Status-Punkt und der Titel-Link
+   * als Tastaturziel. Leib: Status als Wort (zweiter Kanal zum Punkt, WCAG 1.4.1), Einsatzart,
+   * Rolle, Ort und eine Mono-Zeile aus Einsatznummer, Beginn und Stichwort. Die Nummer steht nur,
+   * wenn es eine gibt (`kachelKennung`) — die Datenbank-`id` ist keine.
    */
   const renderKarte = (e: EinsatzAnzeige, klein = false) => {
     const kennung = kachelKennung(e);
@@ -323,10 +282,8 @@ export default function EinsaetzePage() {
             <Tag>{EINSATZART_LABELS[e.einsatzart]}</Tag>
             {e.meine_rolle && <Tag>{e.meine_rolle}</Tag>}
           </div>
-          {/* Ort und Beginn beantworten „welcher ist meiner?" — vorher standen sie nur im
-              Kopfdatenformular, drei Klicks entfernt (Befund M4). Die Ikone kommt aus
-              `@ant-design/icons` und trägt eine `aria-hidden`-Hülle: der Knoten brächte
-              sonst ein englisches `role="img"`-Label mit. */}
+          {/* Ort und Beginn beantworten „welcher ist meiner?". Die Ikone trägt eine
+              `aria-hidden`-Hülle, sonst brächte sie ein englisches `role="img"`-Label mit. */}
           {e.einsatzort && (
             <span data-testid="einsatz-ort" style={{ color: rollen.text2 }}>
               <span aria-hidden="true">
@@ -371,14 +328,9 @@ export default function EinsaetzePage() {
       meta={isPending ? undefined : einsaetzeMeta(aktive.length, abgeschlossene.length)}
       dataUpdatedAt={einsaetzeAktualisiertAt}
     >
-      {/* Leer und anlegeberechtigt schließen sich NICHT aus: vorher lief der
-          Leer-Zweig nur für Nutzer ohne Anlegerecht, alle anderen sahen beim
-          Laden, bei leerer Liste und im Fehlerfall dieselbe leere Fläche.
-
-          KEINE Primäraktion am Leerknoten (LFH-331 · B3): der Weg heraus ist die
-          Anlegen-Kachel unmittelbar darunter. Ein zweiter Knopf mit derselben
-          Beschriftung machte jede Abfrage darauf mehrdeutig — und AK3 verlangt
-          höchstens einen Primärknopf je Leerzustand. */}
+      {/* Leer und anlegeberechtigt schließen sich nicht aus. Keine Primäraktion am Leerknoten:
+          der Weg heraus ist die Anlegen-Kachel direkt darunter; ein zweiter gleich
+          beschrifteter Knopf machte jede Abfrage darauf mehrdeutig. */}
       {!isPending && leer && (
         <div style={{ marginBottom: abstand.lg }}>
           <SeitenLeer titel="Keine Einsätze" />
@@ -397,18 +349,16 @@ export default function EinsaetzePage() {
         </div>
       )}
 
-      {/* Dritter Zustand neben „lädt" und „gar keine Einsätze" — eine dritte Sorte
-          stummer Fläche wäre genau das, wogegen dieses Ticket antritt (M4/M5). KEINE
-          Primäraktion (LFH-331 · B3): der Weg heraus ist das `allowClear` am Suchfeld
-          unmittelbar darüber, ein zweiter Knopf machte jede Abfrage darauf mehrdeutig. */}
+      {/* Dritter Zustand neben „lädt" und „gar keine Einsätze". Keine Primäraktion: der Weg
+          heraus ist das `allowClear` am Suchfeld darüber. */}
       {!isPending && keineTreffer && (
         <div style={{ marginBottom: abstand.lg }}>
           <SeitenLeer titel={`Keine Treffer für „${suche.trim()}"`} />
         </div>
       )}
 
-      {/* EIN Rasterknoten für Skelette wie Karten — dieselben Spalten, derselbe
-          Abstand, dieselbe Kachelhöhe. Der Wechsel tauscht nur die Kinder. */}
+      {/* Ein Rasterknoten für Skelette wie Karten — dieselben Spalten, derselbe Abstand,
+          dieselbe Kachelhöhe. Der Wechsel tauscht nur die Kinder. */}
       <div
         data-testid="einsaetze-raster"
         style={rasterStil(flaeche.kachelMin, abstand.md)}
@@ -453,11 +403,9 @@ export default function EinsaetzePage() {
         </div>
       )}
 
-      {/* Vier Felder statt zwei (LFH-332 · B4, Befund H18). Einsatzart und Alarmzeit
-          waren bisher nur über das 11-Feld-Kopfdatenformular erreichbar — die
-          Nachpflege nach dem Anlegen entfällt damit im Regelfall. Vier Felder ist
-          zugleich die Obergrenze für eine Schnellerfassung (LFH-19); ein fünftes
-          gehört in die Kopfdaten, nicht hierher. */}
+      {/* Vier Felder: Einsatzart und Alarmzeit gleich beim Anlegen, damit die Nachpflege in den
+          Kopfdaten im Regelfall entfällt. Vier ist die Obergrenze einer Schnellerfassung; ein
+          fünftes gehört in die Kopfdaten. */}
       <ErfassungsModal<AnlegeWerte>
         offen={dialogOffen}
         titel="Neuen Einsatz anlegen"

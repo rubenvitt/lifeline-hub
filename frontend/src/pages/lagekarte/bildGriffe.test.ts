@@ -14,15 +14,9 @@ import {
 import { antdToken, farbenDunkel, farbenHell, type Dichte } from '../../theme/tokens';
 
 /**
- * Die Ziehgriffe eines Bild-Overlays (LFH-711, Befund H55 aus LFH-344).
- *
- * Sie maßen 11 bis 22 px — mit Handschuhen kein Ziel, und zehn davon lagen gleichzeitig
- * scharf auf einem Bild, das im Zweifel kleiner ist als eine Handfläche. Jeder Griff ist
- * jetzt ein durchsichtiger Container in Stufengröße (mindestens 44 px) mit farbigem Kern;
- * die SICHTBARE Größe bleibt, die anfassbare wächst.
- *
- * Die Steuerhöhe kommt aus dem echten Dichte-Helfer (`antdToken`), die Böden stehen als
- * Literale — ein Token mit eingebauter Erwartung prüfte nur sich selbst.
+ * Die Ziehgriffe eines Bild-Overlays: jeder Griff ist ein durchsichtiger Container in Stufengröße
+ * (mindestens 44 px) mit farbigem Kern — die sichtbare Größe bleibt, die anfassbare wächst. Die
+ * Steuerhöhe kommt aus dem echten Dichte-Helfer (`antdToken`), die Böden stehen als Literale.
  */
 const ARTEN: GriffArt[] = ['eck', 'kante', 'dreh', 'mitte'];
 
@@ -58,8 +52,7 @@ describe('griffStil', () => {
   });
 
   it('lässt den sichtbaren Kern klein', () => {
-    // Der Sinn ist ein größeres ZIEL, keine größeren Griffe: ein 72-px-Quadrat in Vollfarbe
-    // auf jeder Ecke verdeckte das Bild, das man gerade einpassen will.
+    // Größeres Ziel, keine größeren Griffe: ein 72-px-Quadrat in Vollfarbe verdeckte das Bild.
     for (const art of ['eck', 'kante'] as GriffArt[]) {
       expect(griffStil(art, kontext('handschuh')).kern, art).toContain(`width:${GRIFF_KERN}px`);
     }
@@ -78,8 +71,8 @@ describe('griffStil', () => {
   });
 
   it('unterscheidet die Griffarten weiterhin an der Form', () => {
-    // Eckgriff eckig (proportional skalieren), Kantengriff rund (frei strecken) — der
-    // Unterschied ist die einzige Ansage darüber, was der Griff tut.
+    // Eckgriff eckig (proportional), Kantengriff rund (frei strecken) — die einzige Ansage, was der
+    // Griff tut.
     expect(griffStil('eck', kontext('kompakt')).kern).toContain('border-radius:2px');
     expect(griffStil('kante', kontext('kompakt')).kern).toContain('border-radius:50%');
   });
@@ -91,9 +84,8 @@ describe('griffStil', () => {
 });
 
 /**
- * Der Modus-Umschalter. Mit großen Zielen wird die Überlappung zum eigentlichen Problem:
- * vier Ecken, vier Kanten, Drehung und Mitte sind zehn Griffe, und auf einem daumengroßen
- * Bild liegen sie übereinander. Deshalb ist immer nur EINE Sorte scharf.
+ * Der Modus-Umschalter: zehn große Griffe lägen auf einem kleinen Bild übereinander, deshalb ist
+ * immer nur eine Sorte scharf.
  */
 describe('griffeFuerModus', () => {
   it('lässt je Modus genau die passenden Arten scharf', () => {
@@ -103,9 +95,8 @@ describe('griffeFuerModus', () => {
   });
 
   it('lässt keine Art in zwei Modi zugleich stehen und keine unerreichbar', () => {
-    // Zwei Modi mit derselben Griffsorte unterschieden für die Bedienung nichts — der
-    // Umschalter wäre eine Beschriftung ohne Wirkung. Und eine Art, die in keinem Modus
-    // vorkommt, nähme eine Funktion weg, statt sie zu ordnen.
+    // Zwei Modi mit derselben Griffsorte wären eine Beschriftung ohne Wirkung, und eine Art in
+    // keinem Modus nähme eine Funktion weg.
     const alle: GriffModus[] = ['verschieben', 'groesse', 'drehen'];
     const gesehen = new Set<GriffArt>();
     for (const m of alle) {
@@ -118,8 +109,7 @@ describe('griffeFuerModus', () => {
   });
 
   it('der Hinweis nennt nur die Griffe, die es gerade gibt', () => {
-    // Sonst wäre der Umschalter von „wirkungslos" nicht zu unterscheiden: der Text behauptete
-    // weiter, man könne an den Ecken ziehen, während dort nichts mehr hängt.
+    // Sonst behauptete der Text weiter, man könne an den Ecken ziehen.
     expect(griffHinweis('drehen')).toMatch(/Drehen/);
     expect(griffHinweis('drehen')).not.toMatch(/Ecken|Kanten|Mitte/);
     expect(griffHinweis('verschieben')).not.toMatch(/Ecken|Kanten|↻/);

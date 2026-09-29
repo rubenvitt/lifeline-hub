@@ -26,14 +26,13 @@ vi.mock('../../api/lageSnapshot', () => ({
 
 import { useLagekarteDaten } from './useLagekarteDaten';
 
-// Ebene „Betroffene" (LFH-648): ohne Benutzer ist das Modul „Personen" im Client frei, die
-// Personen-Query läuft also in jedem Live-Test. Vorgaben hier, damit sie nicht in jedem
-// Bestandstest als Ausfall „Betroffene" auftaucht; ein Test kann sie per `server.use` überlagern.
+// Ebene „Betroffene": ohne Benutzer ist das Modul „Personen" im Client frei, die Personen-Query
+// läuft also in jedem Live-Test. Vorgaben hier; ein Test kann sie per `server.use` überlagern.
 beforeEach(() => {
   server.use(
     http.get('/api/einsaetze/5/modul-overrides', () => HttpResponse.json({})),
     http.get('/api/einsaetze/5/personen', () => HttpResponse.json([])),
-    // Ebene „Betreuungsstellen" (LFH-673): dieselbe Lage — ohne Benutzer ist das Modul frei.
+    // Ebene „Betreuungsstellen": dieselbe Lage, ohne Benutzer ist das Modul frei.
     http.get('/api/einsaetze/5/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
   );
 });
@@ -45,9 +44,11 @@ function wrapper() {
   );
 }
 
-/** Minimal-Snapshot-Dokument: eine Gefahrengebiet-Zone (EINGEFRORENE Warnstufe) + eine verortete
- *  Einheit OHNE eigene Org (org-scoped tz_organisation=null) → prüft den org_default-Freeze.
- *  `stand_at` bewusst im ECHTEN naiven UTC-Wire-Format (ohne 'T'/'Z'), wie das Backend liefert. */
+/**
+ * Minimal-Snapshot-Dokument: eine Gefahrengebiet-Zone (eingefrorene Warnstufe) + eine verortete
+ * Einheit ohne eigene Org → prüft den org_default-Freeze. `stand_at` im echten naiven
+ * UTC-Wire-Format (ohne 'T'/'Z').
+ */
 function dokument(warnstufe: string, ohneGebiete = false) {
   const stand = '2026-07-24 08:00:00';
   return {
@@ -112,8 +113,8 @@ describe('useLagekarteDaten Standquelle', () => {
   beforeEach(() => ladeLageSnapshot.mockReset());
 
   it('Historien-Modus sperrt Schreiben und ladt trägt die Snapshot-Query (pending → false)', async () => {
-    // Deferred Promise: die Pending-Phase explizit festnageln — sonst greift waitFor(false) sofort
-    // und die `istSnapshot ? snapQuery.isLoading`-Regel bliebe ungetestet (Review-Fix #5).
+    // Deferred Promise: die Pending-Phase festnageln, sonst griffe waitFor(false) sofort und die
+    // `istSnapshot ? snapQuery.isLoading`-Regel bliebe ungetestet.
     let aufloesen!: (v: unknown) => void;
     ladeLageSnapshot.mockReturnValue(
       new Promise((r) => {
@@ -125,8 +126,8 @@ describe('useLagekarteDaten Standquelle', () => {
         useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
       { wrapper: wrapper() },
     );
-    // Solange das Dokument nicht da ist, MUSS ladt true sein (die disabled Live-Queries melden
-    // isLoading=false → nur die Snapshot-Query darf das Gate tragen).
+    // Solange das Dokument fehlt, muss ladt true sein: die abgeschalteten Live-Queries melden
+    // isLoading=false, nur die Snapshot-Query darf das Gate tragen.
     expect(result.current.ladt).toBe(true);
     expect(result.current.darfSchreiben).toBe(false);
 
@@ -144,22 +145,20 @@ describe('useLagekarteDaten Standquelle', () => {
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
-    // Der Token kommt aus DEMSELBEN Render-Pfad wie im Hook (LFH-328/A2: `gefahrengebietStil`
-    // bekommt ihn durchgereicht, weil Kartenstil-Module keinen `useToken()`-Zugang haben) —
-    // nicht aus `theme.getDesignToken()`, das wäre eine ungeprüfte Gleichheitsannahme.
+    // Der Token kommt aus demselben Render-Pfad wie im Hook, nicht aus `theme.getDesignToken()` —
+    // das wäre eine ungeprüfte Gleichheitsannahme.
     const { result: tk } = renderHook(() => theme.useToken(), { wrapper: wrapper() });
     const token = tk.current.token;
-    // Die Zonenfarbe stammt aus der eingefrorenen Warnstufe 'mittel'. Läse der Hook aus einer
-    // Live-Quelle (im Snapshot-Modus abgeschaltet → undefined → 'keine'), wäre die Farbe eine andere.
-    // NICHT auf 'niedrig' vs. 'mittel' umschreiben: beide fallen seit A2 auf die Rolle `achtung`
-    // (dokumentierter Auflösungsverlust), die Gegenprobe würde damit stillschweigend leer.
+    // Die Zonenfarbe stammt aus der eingefrorenen Warnstufe 'mittel'; läse der Hook live (im
+    // Snapshot-Modus undefined → 'keine'), wäre sie eine andere. Nicht auf 'niedrig' vs. 'mittel'
+    // umschreiben: beide fallen auf die Rolle `achtung`, die Gegenprobe würde leer.
     expect(result.current.zonenFeatures[0].stil).toEqual(gefahrengebietStil('mittel', token));
     expect(result.current.zonenFeatures[0].stil).not.toEqual(gefahrengebietStil('keine', token));
   });
 
-  // LFH-357: die Stufe muss auf der Kartenfläche ANKOMMEN. `stil` allein kann sie nicht tragen —
-  // `niedrig`/`mittel` fallen auf dieselbe Rolle, `keine`/`hoch`/`akut` ebenso. Der Text ist der
-  // zweite Kanal, und diese Zusicherung prüft die VERDRAHTUNG: dass der Hook ihn setzt.
+  // Die Stufe muss auf der Kartenfläche ankommen (LFH-357). `stil` kann sie nicht tragen (je
+  // mehrere Stufen auf derselben Rolle); der Text ist der zweite Kanal, geprüft wird die
+  // Verdrahtung.
   it('trägt die Warnstufe in die Zonenbeschriftung, nicht nur in die Farbe', async () => {
     ladeLageSnapshot.mockResolvedValue(dokument('mittel'));
     const { result } = renderHook(
@@ -168,18 +167,16 @@ describe('useLagekarteDaten Standquelle', () => {
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
-    // Die Zone im Dokument hat keinen eigenen Namen (`label: null`) — übrig bleibt die Stufe.
-    // Erwartung als LITERAL, nicht über `zonenBeschriftung`: sonst stünden beide Seiten auf
-    // derselben Quelle und eine verbogene Beschriftung bliebe grün.
+    // Die Zone hat keinen eigenen Namen (`label: null`), übrig bleibt die Stufe. Erwartung als
+    // Literal, nicht über `zonenBeschriftung`, sonst stünden beide Seiten auf derselben Quelle.
     expect(result.current.zonenFeatures[0].label).toBe('mittel');
-    // Gegenprobe gegen die Nachbarin auf DERSELBEN Farbe — sie muss am Text auseinandergehen.
+    // Gegenprobe gegen die Nachbarin auf derselben Farbe — sie muss am Text auseinandergehen.
     expect(result.current.zonenFeatures[0].label).not.toBe('niedrig');
   });
 
-  // Codex-Review zu LFH-357 (P1): das Ladegate der Karte (`ladt`) hängt an `einsatz`/`config`,
-  // NICHT an der Gefahrengebiete-Query — die Zone wird also gezeichnet, während der Nachschlag
-  // noch leer ist (Ladefenster) oder leer bleibt (gescheiterter Abruf). Der Farb-Fallback auf
-  // `keine` ist dort richtig und bleibt; der TEXT darf die Stufe nicht behaupten.
+  // Das Ladegate (`ladt`) hängt nicht an der Gefahrengebiete-Query: die Zone wird gezeichnet,
+  // während der Nachschlag leer ist oder bleibt. Der Farb-Fallback auf `keine` ist dort richtig;
+  // der Text darf die Stufe nicht behaupten.
   it('sagt `unbekannt`, wenn der Gebiets-Nachschlag ins Leere geht — die Farbe bleibt Alarm', async () => {
     ladeLageSnapshot.mockResolvedValue(dokument('mittel', true));
     const { result } = renderHook(
@@ -189,8 +186,7 @@ describe('useLagekarteDaten Standquelle', () => {
     );
     await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
     expect(result.current.zonenFeatures[0].label).toBe('Stufe unbekannt');
-    // Die zweite Hälfte der Zusicherung: der vorsichtshalber rote Fallback ist NICHT
-    // mitgewandert. Ohne sie beliesse ein Fix, der die Fläche entfärbt, den Test grün.
+    // Zweite Hälfte: der vorsichtshalber rote Fallback ist nicht mitgewandert.
     const { result: tk } = renderHook(() => theme.useToken(), { wrapper: wrapper() });
     expect(result.current.zonenFeatures[0].stil).toEqual(
       gefahrengebietStil('keine', tk.current.token),
@@ -205,19 +201,16 @@ describe('useLagekarteDaten Standquelle', () => {
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.alleVerortet.length).toBeGreaterThan(0));
-    // Die Einheit hat kein eigenes tz_organisation → ihre TZ nutzt den EINGEFRORENEN org_default 'thw'.
-    // Läse der Hook die (im Snapshot-Modus abgeschaltete) Live-Org-Query, wäre organisation nicht 'thw'.
+    // Die Einheit hat kein eigenes tz_organisation → ihre TZ nutzt den eingefrorenen org_default
+    // 'thw'. Läse der Hook die Live-Org-Query, wäre organisation nicht 'thw'.
     const einheit = result.current.alleVerortet.find((m) => m.schluessel === 'einheit-1');
     expect(einheit?.tz?.organisation).toBe('thw');
   });
 });
 
 /**
- * Der benannte Quellenkatalog (LFH-331 · B3).
- *
- * Hier liegt die Beweislast für AK6, nicht in der Seitenklammer: dort ist die Negativhälfte
- * strukturell wahr (kein Fehler → das Overlay ist gar nicht montiert), hier wird die
- * Zuordnung Query → Name und die Trennlinie Lagebild/Render-Kontext tatsächlich geprüft.
+ * Der benannte Quellenkatalog (LFH-331). Geprüft werden die Zuordnung Query → Name und die
+ * Trennlinie Lagebild/Render-Kontext.
  */
 /** Eine Rückmeldung (LFH-610) — Form von `GET …/meldungen/rueckmeldungen`. */
 const RUECKMELDUNGEN = {
@@ -238,10 +231,9 @@ const RUECKMELDUNGEN = {
 
 describe('useLagekarteDaten fehlerhafteQuellen', () => {
   it('nennt die gescheiterten Lagebild-Quellen — und KEINEN Render-Kontext', async () => {
-    // Zwei Lagebild-Quellen scheitern (uhs, zonen) UND alle drei Render-Kontext-Quellen
-    // (Organisation, Karten-Config, Einstellungen). Genau das trennt die Entscheidung von
-    // einem „alles, was rot ist"-Sammelsurium: nur die zwei stehen in der Meldung. Wäre der
-    // Render-Kontext im Katalog, käme die Liste hier auf fünf Einträge.
+    // Zwei Lagebild-Quellen scheitern (uhs, zonen) und alle drei Render-Kontext-Quellen
+    // (Organisation, Karten-Config, Einstellungen). Nur die zwei stehen in der Meldung; wäre der
+    // Render-Kontext im Katalog, käme die Liste auf fünf.
     server.use(
       http.get('/api/einsaetze/5', () =>
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
@@ -251,8 +243,8 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       http.get('/api/organisation', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/karte/config', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/einsaetze/5/einstellungen', () => new HttpResponse(null, { status: 500 })),
-      // 403 auf die Rückmeldungen (LFH-610) ist für Rollen ohne „Meldungen" der Normalfall —
-      // er gehört ebenfalls NICHT in den Katalog.
+      // 403 auf die Rückmeldungen ist für Rollen ohne „Meldungen" der Normalfall und gehört nicht
+      // in den Katalog.
       http.get(
         '/api/einsaetze/5/meldungen/rueckmeldungen',
         () => new HttpResponse(null, { status: 403 }),
@@ -322,14 +314,13 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
     });
     await waitFor(() => expect(result.current.ladt).toBe(false));
     expect(result.current.fehlerhafteQuellen).toEqual([]);
-    // Live: die Rückmeldungen reichen bis ins Paneel „Ausgewählt" durch (LFH-610).
+    // Live: die Rückmeldungen reichen bis ins Paneel „Ausgewählt" durch.
     await waitFor(() => expect(result.current.rohdaten.rueckmeldungen).toEqual(RUECKMELDUNGEN));
   });
 
   it('spiegelt im Historien-Modus die EINE aktive Quelle, nicht die elf abgeschalteten', async () => {
-    // Die Weiche ist dieselbe wie bei `ladt`: im Snapshot-Modus sind die Live-Queries
-    // `enabled: false` und melden nie einen Fehler — die Aussage über den Stand kann also
-    // nur das Dokument treffen.
+    // Dieselbe Weiche wie bei `ladt`: im Snapshot-Modus sind die Live-Queries abgeschaltet und
+    // melden nie einen Fehler; die Aussage kann nur das Dokument treffen.
     ladeLageSnapshot.mockRejectedValue(new Error('weg'));
     const { result } = renderHook(
       () =>
@@ -341,8 +332,8 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
 });
 
 /**
- * `markerLaden` (Nacharbeit 22.09.2026): die Startansicht der Karte entscheidet erst über das
- * VOLLSTÄNDIGE Markerbild. `ladt` hängt nur an Einsatz und Config und wäre dafür zu früh.
+ * `markerLaden`: die Startansicht entscheidet erst über das vollständige Markerbild. `ladt` hängt
+ * nur an Einsatz und Config und wäre dafür zu früh.
  */
 describe('useLagekarteDaten markerLaden', () => {
   it('bleibt wahr, solange eine Marker-Quelle lädt — auch wenn `ladt` schon fertig ist', async () => {
@@ -394,9 +385,9 @@ describe('useLagekarteDaten markerLaden', () => {
 });
 
 /**
- * Ebene „Betroffene" (LFH-648): die Zugriffsgrenze sitzt an der Personen-QUERY. Die Tests
- * zählen deshalb die Requests an `…/personen` mit — „nichts gezeichnet" allein belegte nicht,
- * dass für einen Benutzer ohne Zugriff auch nichts geladen wurde.
+ * Ebene „Betroffene": die Zugriffsgrenze sitzt an der Personen-Query. Die Tests zählen deshalb die
+ * Requests an `…/personen` mit — „nichts gezeichnet" allein belegte nicht, dass auch nichts geladen
+ * wurde.
  */
 describe('useLagekarteDaten Betroffene (LFH-648)', () => {
   const PERSON = {
@@ -496,7 +487,7 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
   });
 
   it('Rollensperre im Client: „gesperrt" und KEIN Request', async () => {
-    // Die Auth ist hier gemockt ohne Benutzer — eine Führungskraft-Schranke sperrt also.
+    // Die Auth ist ohne Benutzer gemockt, eine Führungskraft-Schranke sperrt also.
     const z = handler({ personen: { sichtbar: true, benoetigte_rolle: 'fuehrungskraft' } }, () =>
       HttpResponse.json([PERSON]),
     );
@@ -537,8 +528,8 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
   });
 
   it('Historien-Modus mit ausgeblendetem Modul: keine Zeile, nicht „rueckblick"', async () => {
-    // Die Overrides sind Render-Kontext, kein Teil des gesicherten Stands — sie laden auch im
-    // Rückblick. Ohne sie wäre „ausgeblendet" hier der triviale Ladezustand.
+    // Die Overrides sind Render-Kontext und laden auch im Rückblick; ohne sie wäre „ausgeblendet"
+    // hier der triviale Ladezustand.
     const z = handler({ personen: { sichtbar: false, benoetigte_rolle: null } }, () =>
       HttpResponse.json([PERSON]),
     );

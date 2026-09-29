@@ -57,27 +57,24 @@ import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
 
 /**
- * Betroffene (Neuentwurf S7 „Erfassung Betroffene — das Formular wird zur Zeile").
+ * Betroffene: das Formular wird zur Zeile.
  *
- * ── AUFBAU ──────────────────────────────────────────────────────────────────────────────
+ * ── Aufbau ──
  *
- *  · Seitenkopf: Titel „Betroffene", Mono-Meta „n erfasst", rechts die Ansicht als
- *    Segmentleiste („Zeilen" / „Sichtungsraster" / „Karte") und die Masken-Wege. Die
- *    Karte (LFH-613, `personen/BetroffeneKarte.tsx`) zeigt die Fundort-Koordinaten und
- *    nennt, wie viele Personen ohne Koordinate fehlen; sie wird per `React.lazy` erst
- *    geladen, wenn sie gewählt ist — MapLibre gehört nicht ins Bündel der Liste. Der UHS-Bezug
- *    des Entwurfs im Meta fehlt ebenfalls — die Liste ist einsatzweit, einen eindeutigen
- *    UHS-Bezug hat sie nicht.
- *  · Schnellerfassungszeile `/person` (`personen/BetroffeneZeile.tsx`) — eine Eingabe, die
- *    per Kürzel parst und über DIESELBE offlinefähige Mutation anlegt wie die Maske.
- *  · Statusfilter als zweite Leiste (die früheren Reiter Neu/Vermisst/Betroffen/
- *    Verstorben/Alle; „Patienten" ist im Sichtungsraster aufgegangen) und die Tabelle über
- *    `Datensicht`.
- *  · Seitenleiste 268 px ab `xl` (Sichtungsbild, Verbleib, Offene Felder), darunter
- *    gestapelt unter der Liste.
+ * - Seitenkopf: Titel „Betroffene", Mono-Meta „n erfasst", rechts die Ansicht als Segmentleiste
+ *   („Zeilen" / „Sichtungsraster" / „Karte") und die Masken-Wege. Die Karte
+ *   (`personen/BetroffeneKarte.tsx`) zeigt die Fundort-Koordinaten und nennt, wie viele ohne
+ *   Koordinate fehlen; sie lädt per `React.lazy` erst bei Wahl. Ein UHS-Bezug im Meta fehlt — die
+ *   Liste ist einsatzweit.
+ * - Schnellerfassungszeile `/person` (`personen/BetroffeneZeile.tsx`): eine Eingabe, die per Kürzel
+ *   parst und über dieselbe offlinefähige Mutation anlegt wie die Maske.
+ * - Statusfilter als zweite Leiste (Neu/Vermisst/Betroffen/Verstorben/Alle; „Patienten" ist im
+ *   Sichtungsraster aufgegangen) und die Tabelle über `Datensicht`.
+ * - Seitenleiste 268 px ab `xl` (Sichtungsbild, Verbleib, Offene Felder), darunter gestapelt unter
+ *   der Liste.
  *
- * Die Maske (`AufnahmeFelder` im Modal, Route `/personen/aufnahme`) bleibt der vollständige
- * Weg — mit Namen, Notiz, Melder und Vermisst-Meldung.
+ * Die Maske (`AufnahmeFelder` im Modal, Route `/personen/aufnahme`) bleibt der vollständige Weg —
+ * mit Namen, Notiz, Melder und Vermisst-Meldung.
  */
 
 const SEITENLEISTE_BREITE = 268;
@@ -88,11 +85,11 @@ const ANSICHT_OPTIONEN = [
   { wert: 'karte', label: 'Karte' },
 ] as const satisfies readonly { wert: PersonenAnsicht; label: string }[];
 
-/** Eigenes Bündel: MapLibre lädt erst, wenn „Karte" gewählt ist (LFH-613, design D7). */
+/** Eigenes Bündel: MapLibre lädt erst, wenn „Karte" gewählt ist. */
 const BetroffeneKarte = lazy(() => import('../personen/BetroffeneKarte'));
 
 type Sicht = PersonenSicht;
-/** Quittung der Erfassungszeile — aus der ANTWORT, oder die gesendeten Werte als „vorgemerkt". */
+/** Quittung der Erfassungszeile — aus der Antwort, oder die gesendeten Werte als „vorgemerkt". */
 type ZeilenQuittung =
   | { art: 'gesendet'; person: Person }
   | { art: 'vorgemerkt'; name: string | null; sichtung?: Sichtungskategorie };
@@ -147,7 +144,7 @@ export default function PersonenPage() {
   const zeigeNeuePerson = (zielEinsatzId: number, person: Person) =>
     aendereSichtFuer(zielEinsatzId, (alt) => sichtFuerNeuePerson(alt, person));
 
-  // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207).
+  // Live-Updates über useEinsatzLiveStream im EinsatzLayout.
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -159,8 +156,8 @@ export default function PersonenPage() {
   });
   /**
    * Die Unfallhilfsstellen: für `@UHS` in der Erfassungszeile und für den Namen in der
-   * Verbleib-Spalte. Ein Fehler hier ist KEIN Seitenfehler — ohne Liste löst `@` schlicht
-   * nicht auf (die Zeile sagt das), und die Verbleib-Spalte nennt „UHS" ohne Namen.
+   * Verbleib-Spalte. Ein Fehler hier ist kein Seitenfehler — ohne Liste löst `@` nicht auf (die
+   * Zeile sagt das), und die Verbleib-Spalte nennt „UHS" ohne Namen.
    */
   const uhsQuery = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
@@ -237,8 +234,8 @@ export default function PersonenPage() {
     onMutate: async (v) => {
       await qc.cancelQueries({ queryKey: einsatzKeys.personen(v.einsatzId) });
     },
-    // Geschlossen wird über `onFertig` des Erfassungs-Primitivs (LFH-332 · B4):
-    // im Serienmodus ist ein erfolgreiches Speichern gerade KEIN Grund zu schließen.
+    // Geschlossen wird über `onFertig` des Erfassungs-Primitivs: im Serienmodus ist ein
+    // erfolgreiches Speichern kein Grund zu schließen.
     onSuccess: (ergebnis, variablen) => {
       const zielEinsatzId = variablen.einsatzId;
       if (ergebnis.zustand === 'vorgemerkt') {
@@ -271,8 +268,8 @@ export default function PersonenPage() {
       zeigeNeuePerson(zielEinsatzId, person);
       setHighlightFuer(zielEinsatzId, person.id);
       if (variablen.quelle === 'zeile') {
-        // Die Zeile quittiert im Minutentakt an sich selbst; ein Alert je Person müsste
-        // jedes Mal weggeklickt werden.
+        // Die Zeile quittiert im Minutentakt an sich selbst; ein Alert je Person müsste jedes Mal
+        // weggeklickt werden.
         setZuletztNachEinsatz((alt) => ({
           ...alt,
           [zielEinsatzId]: {
@@ -283,10 +280,8 @@ export default function PersonenPage() {
       } else
         setQuittungFuer(zielEinsatzId, {
           typ: 'success',
-          // Die Sichtung kommt aus der ANTWORT, nicht aus den gesendeten Werten: das Backend
-          // schreibt sie in derselben Transaktion, und nur die Antwort belegt, dass sie
-          // angekommen ist. Aus dem Formularwert gelesen behauptete die Quittung eine
-          // Kategorie, die ein 422 gerade verworfen hätte.
+          // Die Sichtung kommt aus der Antwort, nicht aus den gesendeten Werten: nur die Antwort
+          // belegt, dass sie angekommen ist; ein 422 hätte sie verworfen.
           text: person.aktuelle_sichtung
             ? `Erfasst als ${registrierAnzeige(person.registrier_nr)} · ${SK_META[person.aktuelle_sichtung].label}`
             : `Erfasst als ${registrierAnzeige(person.registrier_nr)}`,
@@ -296,8 +291,8 @@ export default function PersonenPage() {
       void qc.invalidateQueries({ queryKey: einsatzKeys.etb(zielEinsatzId) });
     },
     onError: (e, variablen) => {
-      // Die Zeile zeigt 400/422 mit dem Wortlaut des Servers an sich selbst (role=alert);
-      // ein Toast daneben wäre dieselbe Meldung zweimal und nach drei Sekunden weg.
+      // Die Zeile zeigt 400/422 mit dem Wortlaut des Servers an sich selbst (role=alert); ein Toast
+      // daneben wäre dieselbe Meldung zweimal.
       if (variablen.quelle === 'zeile') return;
       if (aktuellerEinsatzRef.current === variablen.einsatzId) fehler(e);
     },
@@ -362,8 +357,8 @@ export default function PersonenPage() {
       void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
       void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     } catch {
-      // IndexedDB bleibt bei einem Lesefehler unverändert; ein späteres Signal,
-      // visibilitychange oder Mount kann dieselbe Quittung erneut laden.
+      // IndexedDB bleibt bei einem Lesefehler unverändert; ein späteres Signal, visibilitychange
+      // oder Mount kann dieselbe Quittung erneut laden.
     }
   }, [benutzer?.id, einsatzId, qc, merkeFrisch]);
 
@@ -395,8 +390,8 @@ export default function PersonenPage() {
       const detail = (event as CustomEvent<OfflineSchreibaktionGesendet>).detail;
       if (detail?.art !== 'person' || detail.benutzerId !== benutzer?.id) return;
       merkeFrisch(detail.einsatzId, [detail.daten]);
-      // Aus der ANTWORT (`detail.daten`), nicht aus der vorgemerkten Sicht: mit Erst-Sichtung
-      // hebt der Server `erfasst` auf `betroffen`.
+      // Aus der Antwort (`detail.daten`), nicht aus der vorgemerkten Sicht: mit Erst-Sichtung hebt
+      // der Server `erfasst` auf `betroffen`.
       setSichtNachEinsatz((alt) => ({
         ...alt,
         [detail.einsatzId]: sichtFuerNeuePerson(
@@ -430,9 +425,9 @@ export default function PersonenPage() {
   const quittungSchliessen = () => {
     if (!erfassungsQuittung || benutzer?.id == null) return;
     const persistenzClientIds = erfassungsQuittung.persistenzClientIds ?? [];
-    // Persistente Zustellung wird nur durch eine bewusste Aktion in einem
-    // sichtbaren Dokument quittiert. Insbesondere der sendende Tab löscht damit
-    // nicht direkt nach dem lokalen Event, bevor andere Tabs aus IDB lesen konnten.
+    // Persistente Zustellung wird nur durch eine bewusste Aktion in einem sichtbaren Dokument
+    // quittiert — der sendende Tab löscht nicht direkt nach dem lokalen Event, bevor andere Tabs
+    // aus IDB lesen konnten.
     if (persistenzClientIds.length > 0 && document.visibilityState !== 'visible') return;
     setQuittungFuer(einsatzId, null);
     if (persistenzClientIds.length === 0) return;
@@ -443,26 +438,23 @@ export default function PersonenPage() {
     ).catch(() => undefined);
   };
 
-  // Deep-Link: ?person=<id> leitet auf die Detailseite um (rückwärtskompatibel
-  // mit dem alten Drawer-Verhalten, z. B. „Vollständig öffnen" aus dem UHS-Drawer).
+  // Deeplink ?person=<id> leitet auf die Detailseite um (rückwärtskompatibel, z. B. „Vollständig
+  // öffnen" aus dem UHS-Drawer).
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     const pid = searchParams.get('person');
     if (pid) navigate(personDetailPfad(einsatzId, Number(pid)), { replace: true });
   }, [searchParams, einsatzId, navigate]);
 
-  // Sichtvorgabe: ?filter= / ?ansicht= (LFH-620, Sprungmarken „Patienten"/„Vermisste" im
-  // Modulpanel). Apply-then-clean wie `?neu=1`: die Sicht ist Seitenzustand, die URL trägt
-  // nur den Auftrag. Geräumt wird auch ein UNBRAUCHBARER Wert — sonst stünde er in der
-  // Adresse und beim Teilen des Links wieder im Auftrag, ohne je zu wirken.
+  // Sichtvorgabe ?filter= / ?ansicht= (Sprungmarken „Patienten"/„Vermisste"). Apply-then-clean wie
+  // `?neu=1`: die Sicht ist Seitenzustand, die URL trägt nur den Auftrag. Geräumt wird auch ein
+  // unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag.
   //
-  // Über den Setter direkt, nicht über `aendereSichtFuer`: der ist je Render neu und
-  // löste den Effekt sonst bei jedem Render wieder aus. Der Setter ist stabil.
+  // Über den Setter direkt, nicht über `aendereSichtFuer`: der ist je Render neu und löste den
+  // Effekt bei jedem Render aus.
   //
-  // KEINE Weiche „eigene gegen fremde Änderung" wie auf der ETB-Seite: dort setzt ein
-  // Remount die UNKONTROLLIERTE Filterleiste neu auf. `sicht` hier ist kontrollierter
-  // Zustand, die Segmentleisten lesen ihn direkt — nichts wird neu aufgesetzt, und das
-  // Räumen der Parameter löst keinen zweiten Auftrag aus, weil dann keiner mehr steht.
+  // Keine Weiche „eigene gegen fremde Änderung" wie auf der ETB-Seite: `sicht` ist kontrollierter
+  // Zustand, nichts wird neu aufgesetzt.
   useEffect(() => {
     if (!searchParams.has('filter') && !searchParams.has('ansicht')) return;
     const vorgabe = parsePersonenSicht(searchParams);
@@ -477,12 +469,11 @@ export default function PersonenPage() {
     setSearchParams(rest, { replace: true });
   }, [searchParams, setSearchParams, einsatzId]);
 
-  // Schnellaktion: ?neu=1 öffnet die Schnellerfassung (Command-Palette, LFH-11).
-  // Warten bis der Einsatz geladen ist; Param immer löschen, aber Modal nur bei Schreibrecht öffnen.
-  // BEWUSST weiter die MASKE und nicht die Zeile: `?neu=1` ist die Adresse, über die andere
-  // Oberflächen „eine Person anlegen" anspringen (Palette-Schnellaktion,
-  // `e2e/palette-datensaetze.spec.ts`), und dort ist der vollständige Weg gemeint. Die Zeile
-  // erreicht die Palette über „Neue Zeile" (`neueZeile` unten).
+  // Schnellaktion: ?neu=1 öffnet die Schnellerfassung (Command-Palette). Warten bis der Einsatz
+  // geladen ist; Param immer löschen, Modal nur bei Schreibrecht. Bewusst die Maske und nicht die
+  // Zeile: `?neu=1` ist die Adresse, über die andere Oberflächen „eine Person anlegen" anspringen
+  // (`e2e/palette-datensaetze.spec.ts`). Die Zeile erreicht die Palette über „Neue Zeile"
+  // (`neueZeile` unten).
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading) return;
@@ -512,10 +503,8 @@ export default function PersonenPage() {
   });
 
   /**
-   * SEITENZUSTAND — nur `einsatzQuery` (LFH-331 · B3, D3). Breadcrumb, Titelzeile und
-   * `darfImEinsatzSchreiben(...)` hängen an ihr; ohne sie gibt es keinen Rahmen, in dem
-   * ein Listenfehler stehen könnte. Deshalb hier ein Frühausstieg — und NUR hier.
-   * Der Wortlaut der Fehlerzeile ist byte-gleich zum Bestand.
+   * Seitenzustand — nur `einsatzQuery`: Breadcrumb, Titelzeile und `darfImEinsatzSchreiben(...)`
+   * hängen an ihr. Deshalb hier ein Frühausstieg, und nur hier.
    */
   if (einsatzQuery.isLoading) {
     return <SeitenSkeleton />;
@@ -536,16 +525,11 @@ export default function PersonenPage() {
   const gefundene = gefundenePersonen(alle);
 
   /**
-   * LISTENZUSTAND — an der Stelle der Liste entschieden, nie als Frühausstieg (D3).
+   * Listenzustand — an der Stelle der Liste entschieden, nie als Frühausstieg. Ohne Zeilen im
+   * Zwischenspeicher tritt der Fehler an die Stelle der Sicht — sonst behaupteten die Leertexte
+   * eine leere Menge. Mit Zeilen bleiben sie stehen und bekommen ein Banner.
    *
-   * Zwei Lagen, zwei Antworten: ohne Zeilen im Zwischenspeicher tritt der Fehler an die
-   * Stelle der Sicht — sonst behaupten „Keine Personen in dieser Sicht" bzw. „Keine
-   * Patienten in diesem Einsatz." eine leere Menge, obwohl nur der Abruf scheiterte. Mit
-   * Zeilen im Zwischenspeicher bleiben sie stehen und bekommen ein Banner: sie sind echt,
-   * nur womöglich alt.
-   *
-   * Der Ladezweig steht bewusst NICHT hier — er liegt am Primitiv (`ladend`), und eine
-   * zweite Kopie an der Seite wäre die doppelte Zustandslogik, die D3/D4 verbieten.
+   * Der Ladezweig liegt am Primitiv (`ladend`), nicht an der Seite.
    */
   const listeGescheitert = personenQuery.isError && alle.length === 0;
   const standVeraltet = personenQuery.isError && alle.length > 0;
@@ -556,11 +540,9 @@ export default function PersonenPage() {
   const register = personenSpalten(uhsName, { einsatzId, darfSchreiben });
 
   /**
-   * Die Spaltenliste der Zeilen-Ansicht: Register plus Abgleichspalte.
-   *
-   * Durch `spaltenFuer<Person>()` geführt, NICHT annotiert. Eine Annotation
-   * (`readonly DatensichtSpalte<Person>[]`) weitete die Schlüsselliterale auf `string`, und
-   * jeder Tippfehler in einem Kartenplan-Slot wäre danach unbemerkt.
+   * Die Spaltenliste der Zeilen-Ansicht: Register plus Abgleichspalte. Durch
+   * `spaltenFuer<Person>()` geführt, nicht annotiert — eine Annotation weitete die
+   * Schlüsselliterale auf `string`.
    */
   const listenSpalten = spaltenFuer<Person>()([
     ...register,
@@ -571,7 +553,7 @@ export default function PersonenPage() {
       : []),
   ]);
 
-  /** EINE Klasse für beide Zweige: Hervorhebung vor Lückentönung. */
+  /** Eine Klasse für beide Zweige: Hervorhebung vor Lückentönung. */
   const zeilenKlasse = (p: Person) =>
     p.id === highlightPersonId ? 'zeile-hervorgehoben' : hatLuecke(p) ? 'zeile-luecke' : undefined;
 
@@ -610,7 +592,7 @@ export default function PersonenPage() {
             wert={sicht.ansicht}
             onWechsel={(ansicht) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, ansicht }))}
           />
-          {/* Die Masken bleiben der VOLLSTÄNDIGE Weg (Name, Notiz, Melder; Vermisst-Meldung
+          {/* Die Masken bleiben der vollständige Weg (Name, Notiz, Melder; Vermisst-Meldung
               ohne Sichtung). Alle drei sekundär: die Primärhandlung der Seite ist die Zeile. */}
           {darfSchreiben && (
             <>
@@ -623,10 +605,9 @@ export default function PersonenPage() {
           )}
         </>
       }
-      // Zweiter Bedienweg auf die Erfassung („Neue Zeile" in der Palette, LFH-391 · B5) —
-      // mit DEMSELBEN Rechte-Riegel wie die Zeile selbst: ohne Schreibrecht gibt es sie nicht.
-      // Im nächsten Bild: die Palette gibt beim Schließen den Fokus zurück, ein direkter
-      // Aufruf verlöre gegen sie.
+      // Zweiter Bedienweg auf die Erfassung („Neue Zeile" in der Palette) mit demselben
+      // Rechte-Riegel. Im nächsten Bild: die Palette gibt beim Schließen den Fokus zurück, ein
+      // direkter Aufruf verlöre gegen sie.
       neueZeile={
         darfSchreiben ? () => requestAnimationFrame(() => feldRef.current?.focus()) : undefined
       }
@@ -637,9 +618,9 @@ export default function PersonenPage() {
         )
       }
     >
-      {/* DIE QUITTUNG STEHT IM INHALT, NICHT IM `hinweis`-SLOT (LFH-340 · C5): der trägt den
-          Schreibrecht-Zustand, und beide gleichzeitig verdrängten einander. Sie gilt den
-          Masken und der Offline-Zustellung; die Zeile quittiert an sich selbst. */}
+      {/* Die Quittung steht im Inhalt, nicht im `hinweis`-Slot: der trägt den
+          Schreibrecht-Zustand, und beide verdrängten einander. Sie gilt den Masken und der
+          Offline-Zustellung; die Zeile quittiert an sich selbst. */}
       {erfassungsQuittung && (
         <Alert
           style={{ marginBottom: token.marginSM }}
@@ -721,8 +702,8 @@ export default function PersonenPage() {
               style={{ marginBottom: token.marginSM }}
             />
             {sicht.ansicht === 'karte' ? (
-              // Statusfilter und Lücken-Filter gelten auch hier: die Karte zeigt dieselbe
-              // Menge wie die Zeilen, nur verortet.
+              // Statusfilter und Lücken-Filter gelten auch hier: die Karte zeigt dieselbe Menge wie
+              // die Zeilen, nur verortet.
               <Suspense fallback={<SeitenSkeleton />}>
                 {personenQuery.isLoading ? (
                   <SeitenSkeleton />
@@ -737,20 +718,18 @@ export default function PersonenPage() {
               </Suspense>
             ) : sicht.ansicht === 'raster' ? (
               /**
-               * SICHTUNGSRASTER — die verallgemeinerte Patienten-Sicht: ALLE Personen der
-               * Filtermenge nach Sichtung gruppiert, samt „unverletzt" und „ohne Sichtung".
-               * EINE Sicht mit Gruppenachse statt n Tabellen: eine stehende Kopfzeile, eine
-               * fixierte Kennungsspalte, ein Spaltenschalter. Innerhalb der Kategorie der
-               * ÄLTESTE Sichtungszeitpunkt zuerst — wer am längsten wartet, steht oben.
+               * Sichtungsraster: alle Personen der Filtermenge nach Sichtung gruppiert, samt
+               * „unverletzt" und „ohne Sichtung". Eine Sicht mit Gruppenachse statt n Tabellen:
+               * eine Kopfzeile, eine fixierte Kennungsspalte, ein Spaltenschalter. Innerhalb der
+               * Kategorie der älteste Sichtungszeitpunkt zuerst — wer am längsten wartet, steht
+               * oben.
                */
               <Datensicht
                 /**
-                 * `key` ist hier NICHT Kosmetik: beide Ansichten stehen an DERSELBEN Stelle im
-                 * Baum mit demselben Komponententyp, React reichte die Instanz samt Sortierung,
-                 * Suchbegriff und Zeilenschleuse einfach weiter. Gemessen: ohne Schlüssel
-                 * behielt das Raster die Sortierung der Zeilen (`reg`), und die
-                 * Dringlichkeitsordnung nach `seit` griff nie. `datensicht.guard.test.ts` hält
-                 * die Regel fest.
+                 * `key` ist nötig: beide Ansichten stehen an derselben Stelle im Baum mit demselben
+                 * Komponententyp, React reichte sonst die Instanz samt Sortierung, Suchbegriff und
+                 * Zeilenschleuse weiter — die Dringlichkeitsordnung nach `seit` griffe nie.
+                 * `datensicht.guard.test.ts` hält die Regel fest.
                  */
                 key={`raster-${sicht.filter}`}
                 bezeichnung="Betroffene nach Sichtungskategorie"
@@ -773,17 +752,13 @@ export default function PersonenPage() {
             ) : (
               <Datensicht
                 /**
-                 * Der Schlüssel trägt den FILTER, nicht bloß die Ansicht. Diese eine Stelle im
-                 * Baum bedient fünf Filter mit fünf Datenmengen; bei konstantem Schlüssel
-                 * reichte React beim Filterwechsel dieselbe Instanz weiter. Gemessen: unter
-                 * „Vermisst" nach einem Namen gesucht und auf „Betroffen" gewechselt — dort
-                 * stand der Begriff noch im Feld und filterte eine fremde Menge auf leer.
+                 * Der Schlüssel trägt den Filter, nicht bloß die Ansicht: diese Stelle bedient fünf
+                 * Filter mit fünf Datenmengen, und bei konstantem Schlüssel filterte ein
+                 * Suchbegriff aus „Vermisst" die Menge von „Betroffen".
                  *
-                 * Der Preis, gewollt: mit dem Filterwechsel fallen Sortierung, Spaltenauswahl,
-                 * Spaltenfilter und Zeilenschleuse zurück — alle vier sind Zustand IM Primitiv.
-                 * Für die Spaltenauswahl ist das richtig (`abgleich` gibt es nur unter
-                 * „Vermisst"), für die Spaltenfilter ebenso (ihre Werte stammen aus der
-                 * Menge, in der sie gesetzt wurden).
+                 * Gewollter Preis: mit dem Filterwechsel fallen Sortierung, Spaltenauswahl,
+                 * Spaltenfilter und Zeilenschleuse zurück — alle vier sind Zustand im Primitiv und
+                 * gehören zur jeweiligen Menge.
                  */
                 key={`liste-${sicht.filter}`}
                 bezeichnung="Personen"
@@ -798,8 +773,8 @@ export default function PersonenPage() {
                 zeilenKlasse={zeilenKlasse}
                 karte={{
                   ...personenKarte(einsatzId),
-                  // Der Kartenzweig trägt das Auswahlfeld der Abgleichspalte nicht (200 px
-                  // fest breit) — der Deskriptor ersetzt es durch einen Knopf plus Dialog.
+                  // Der Kartenzweig trägt das Auswahlfeld der Abgleichspalte nicht (200 px fest) —
+                  // der Deskriptor ersetzt es durch Knopf plus Dialog.
                   aktion: darfAbgleichen
                     ? { etikett: 'Abgleich vorschlagen …', onKlick: (p) => setAbgleichFuer(p) }
                     : undefined,
@@ -807,10 +782,8 @@ export default function PersonenPage() {
               />
             )}
           </div>
-          {/* Seitenleiste ab `xl` rechts, darunter unter der Liste gestapelt — in einem
-              Raster, das am Fükw/Tablet drei Paneele nebeneinander und am Handschirm
-              untereinander stellt. Sie steht im Datenzweig: über einem Ladefehler meldete sie
-              Nullen, die niemand erhoben hat. */}
+          {/* Seitenleiste ab `xl` rechts, darunter unter der Liste gestapelt. Sie steht im
+              Datenzweig: über einem Ladefehler meldete sie Nullen, die niemand erhoben hat. */}
           <aside
             aria-label="Lagebild der Betroffenen"
             data-lfh="betroffene-seitenleiste"
@@ -850,9 +823,8 @@ export default function PersonenPage() {
         }
         onCancel={() => setModusFuer(einsatzId, null)}
         onFertig={() => setModusFuer(einsatzId, null)}
-        // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der
-        // Datensatz wirklich angekommen ist — dafür muss das Versprechen bei einem Fehler
-        // ablehnen. Den Fehler-Toast wirft weiterhin `onError` der Mutation.
+        // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der Datensatz
+        // ankam. Den Fehler-Toast wirft `onError`.
         onErfassen={(daten) => {
           if (!benutzer) return Promise.reject(new Error('Nicht angemeldet'));
           return anlegenMutation.mutateAsync({

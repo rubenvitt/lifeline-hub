@@ -11,11 +11,9 @@ import { gefahrenMatrixAbfrage } from './gefahrenMatrixAbfrage';
 import GefahrenMatrixAuszug from './GefahrenMatrixAuszug';
 
 /**
- * Die höchste Warnstufe als Etikett — wie auf der Gefahrenseite über `warnstufeKarte`, mit einer
- * Ausnahme im WORT: „keine" allein läse sich hier als „nicht bewertet". Das Backend rechnet die
- * Stufe aber über ein Severity-MAX, in dem `keine` und gar keine Bewertung denselben Rang haben
- * (CLAUDE.md, LFH-357) — die beiden Fälle sind nicht trennbar. „keine Stufe gesetzt" behauptet
- * nur, was die Daten tragen. Rolle (und damit Farbe) bleiben die der Karte.
+ * Höchste Warnstufe als Etikett wie auf der Gefahrenseite, aber mit „keine Stufe gesetzt" statt
+ * „keine" — das läse sich hier als „nicht bewertet", und im Severity-MAX des Backends sind beide
+ * Fälle nicht trennbar (LFH-357). Rolle und Farbe bleiben die der Karte.
  */
 function hoechsteStufe(w: Warnstufe) {
   return w === 'keine'
@@ -24,13 +22,10 @@ function hoechsteStufe(w: Warnstufe) {
 }
 
 /**
- * Lese-Vorschau eines Gefahrengebiets in der Sprungpalette (LFH-664, Entscheidung 5a).
- *
- * Das Gebiet kommt aus der Gebietsliste — dem Fach der Palette. Sie trägt nur Name, höchste
- * Warnstufe und Zonen; der Name steht schon im Kopf der Palette. Darunter der Matrixauszug aus
- * DEMSELBEN Fach wie die Gefahrenseite (`gefahrenMatrixAbfrage`) — die einzige zusätzliche
- * Abfrage dieser Sorte, von der Spec ausdrücklich ausgenommen. Sie hat ihren eigenen Lade- und
- * Fehlerzustand und verdeckt das Gebiet nicht.
+ * Lese-Vorschau eines Gefahrengebiets in der Sprungpalette. Das Gebiet kommt aus der Gebietsliste
+ * (Name steht schon im Palettenkopf). Darunter der Matrixauszug aus demselben Fach wie die
+ * Gefahrenseite (`gefahrenMatrixAbfrage`) — die einzige zusätzliche Abfrage dieser Sorte, mit
+ * eigenem Lade- und Fehlerzustand.
  */
 export default function GefahrengebietVorschau({
   einsatzId,

@@ -62,12 +62,12 @@ describe('FreiesZeichenInspector', () => {
     expect(screen.getByLabelText('Grundzeichen suchen')).not.toHaveFocus();
   });
 
-  // LFH-710: das Zeichen wird hart gelöscht (`freies_zeichen/repo.rs`) — unumkehrbar, also
-  // Rückfrage mit rotem OK-Knopf (LFH-363), und sie nennt das Zeichen beim Namen.
+  // Das Zeichen wird hart gelöscht — Rückfrage mit rotem OK-Knopf, die das Zeichen beim Namen
+  // nennt.
   it('„Löschen" fragt erst nach und löscht erst auf Bestätigung, genau einmal', async () => {
     const { onLoeschen } = renderInspector();
-    // Auslöser und OK heißen beide „Löschen"; die Rückfrage bleibt in jsdom nach dem
-    // Schließen im Baum (keine Ausblend-Animation), also den Auslöser vorher greifen.
+    // Auslöser und OK heißen beide „Löschen", und die Rückfrage bleibt in jsdom im Baum — also den
+    // Auslöser vorher greifen.
     const ausloeser = screen.getByRole('button', { name: 'Löschen' });
     await userEvent.click(ausloeser);
 
@@ -131,9 +131,8 @@ const kachel = (name: string) =>
   within(screen.getByRole('radiogroup', { name: 'Grundzeichen' })).getByRole('radio', { name });
 
 /**
- * Entprelltes Schreiben (LFH-716, D6). Als Raster meldet jeder Pfeilschritt eine Auswahl,
- * und `onAendern` führt auf ein PATCH samt Invalidierung und Live-Ereignis — ohne Frist
- * schriebe das Durchsteppen des Katalogs jeden Zwischenstand in die Datenbank.
+ * Entprelltes Schreiben: im Raster meldet jeder Pfeilschritt eine Auswahl, und jedes `onAendern`
+ * ist ein PATCH samt Live-Ereignis.
  */
 describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
   afterEach(() => vi.useRealTimers());
@@ -174,9 +173,8 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     expect(onAendern).not.toHaveBeenCalled();
   });
 
-  // Das Paar zum Riegel gegen den Fremd-Refetch (CLAUDE.md, C7): ohne eigene Änderung folgt
-  // der Inspector dem Server; mit eigener sendet er genau einmal und nicht erneut, wenn der
-  // eigene Stand zurückkommt.
+  // Das Paar zum Riegel gegen den Fremd-Refetch: ohne eigene Änderung folgt der Inspector dem
+  // Server; mit eigener sendet er genau einmal und nicht erneut, wenn der eigene Stand zurückkommt.
   it('übernimmt eine fremde Änderung, solange nichts Eigenes offen ist, und schreibt nichts', () => {
     vi.useFakeTimers();
     const { onAendern, serverstand } = renderInspector();
@@ -211,8 +209,8 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     expect(kachel('Befehlsstelle')).toHaveAttribute('aria-checked', 'true');
   });
 
-  // Review-Befund I1: ein Merker, der ohne Sendung stehen bleibt, schaltet die Übernahme
-  // fremder Änderungen dauerhaft ab.
+  // Ein Merker, der ohne Sendung stehen bleibt, schaltete die Übernahme fremder Änderungen
+  // dauerhaft ab.
   it('Klick auf die schon gewählte Kachel, danach eine fremde Änderung: nichts zurückschreiben', () => {
     vi.useFakeTimers();
     const { onAendern, serverstand } = renderInspector();
@@ -235,8 +233,8 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     expect(onAendern).not.toHaveBeenCalled();
   });
 
-  // Review-Befund I2: das Feld „Bezeichnung" darf nach einer fremden Änderung weder den alten
-  // Wortlaut zeigen noch ihn beim bloßen Verlassen zurückschreiben.
+  // „Bezeichnung" zeigt nach einer fremden Änderung nicht den alten Wortlaut und schreibt ihn beim
+  // Verlassen nicht zurück.
   it('Bezeichnung nach fremder Änderung: zeigt den neuen Wortlaut und schreibt beim Verlassen nichts', () => {
     vi.useFakeTimers();
     const { onAendern, serverstand } = renderInspector();
@@ -271,8 +269,7 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     expect(feld).toHaveValue('Zug 3');
   });
 
-  // Review-Befund I3: der Wächter der Übernahme — eine offene eigene Änderung gewinnt gegen
-  // einen neuen Serverstand, der in ihrer Frist ankommt.
+  // Eine offene eigene Änderung gewinnt gegen einen neuen Serverstand in ihrer Frist.
   it('eine offene eigene Änderung überlebt einen fremden Serverstand und wird gesendet', () => {
     vi.useFakeTimers();
     const { onAendern, serverstand } = renderInspector();
@@ -285,13 +282,13 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     expect(onAendern).toHaveBeenCalledWith(expect.objectContaining({ grundzeichen: 'person' }));
   });
 
-  // Review-Befund M4: nach „Löschen" holt der Abbau keine offene Änderung mehr nach — ein
-  // PATCH auf das gelöschte Zeichen endete in 404 und einem Fehlertoast nach Erfolg.
+  // Nach „Löschen" holt der Abbau keine offene Änderung nach — ein PATCH auf das gelöschte Zeichen
+  // endete in 404.
   it('„Löschen" verwirft eine offene Änderung, statt sie beim Abbau nachzuholen', () => {
     vi.useFakeTimers();
     const { onAendern, onLoeschen, unmount } = renderInspector();
     fireEvent.click(kachel('Person'));
-    // Seit LFH-710 geht das Löschen über die Rückfrage; verworfen wird erst beim Bestätigen.
+    // Verworfen wird erst beim Bestätigen der Rückfrage.
     fireEvent.click(screen.getByRole('button', { name: 'Löschen' }));
     const rueckfrage = document.querySelector<HTMLElement>('.ant-popconfirm');
     expect(rueckfrage).not.toBeNull();

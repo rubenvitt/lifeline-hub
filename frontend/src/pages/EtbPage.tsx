@@ -50,7 +50,7 @@ import {
   type TypSegment,
 } from '../etb/zeitachseModell';
 
-/** Breite der Seitenleiste „Bilanz" (Entwurf S4, 260 px) — ab `xl`. */
+/** Breite der Seitenleiste „Bilanz" — ab `xl`. */
 const LEISTE_BREITE = 260;
 
 export default function EtbPage() {
@@ -59,19 +59,15 @@ export default function EtbPage() {
   const { benutzer } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207-C):
-  // der etb-Listener dort invalidiert ['etb', einsatzId] (Prefix deckt die gefilterte Liste ab).
+  // Live-Updates über useEinsatzLiveStream im EinsatzLayout: der etb-Listener invalidiert ['etb',
+  // einsatzId] (der Prefix deckt die gefilterte Liste ab).
   /**
-   * Der Filter steht in der URL, nicht im Seitenzustand (LFH-342 · C7, Befund M80).
+   * Der Filter steht in der URL, nicht im Seitenzustand: er überlebt einen Reload, ist teilbar und
+   * landet im Verlauf.
    *
-   * Damit überlebt er einen Reload, ist teilbar („schau dir den Zeitraum an") und
-   * landet im Verlauf. Der Query-Key hängt weiter an denselben Werten — die Umstellung
-   * bewegt die QUELLE, nicht die Achse.
-   *
-   * `useMemo` über den Query-STRING, nicht über das `searchParams`-Objekt: react-router
-   * gibt bei jedem Render eine neue Instanz zurück, ein Memo darauf wäre wirkungslos und
-   * jede Effekt-Abhängigkeit am Ergebnis liefe im Kreis. Der String ist der Wert — die
-   * Instanz wird deshalb hier gar nicht erst referenziert, sondern aus ihm gebaut.
+   * `useMemo` über den Query-String, nicht über das `searchParams`-Objekt: react-router gibt bei
+   * jedem Render eine neue Instanz zurück, ein Memo darauf wäre wirkungslos und jede
+   * Effekt-Abhängigkeit am Ergebnis liefe im Kreis.
    */
   const filterText = searchParams.toString();
   const filter = useMemo<EtbFilterWerte>(
@@ -79,26 +75,21 @@ export default function EtbPage() {
     [filterText],
   );
   /**
-   * Zählmarke, die `EtbFilterleiste` neu aufsetzt. Die Leiste nimmt ihren Anfangsstand
-   * aus `startWerte`, hält den sichtbaren Stand danach aber selbst — Begründung samt
-   * Zeitzonen-Fehlermodus im Dateikopf von `etb/EtbFilterleiste.tsx`. Ein Reset allein
-   * auf der URL ließe die sichtbaren Eingaben stehen.
+   * Zählmarke, die `EtbFilterleiste` neu aufsetzt. Die Leiste nimmt ihren Anfangsstand aus
+   * `startWerte` und hält den sichtbaren Stand danach selbst (Begründung im Dateikopf von
+   * `etb/EtbFilterleiste.tsx`). Ein Reset allein auf der URL ließe die sichtbaren Eingaben stehen.
    */
   const [filterMarke, setFilterMarke] = useState(0);
   const filterWurzel = useRef<HTMLDivElement>(null);
   const filterAktiv = Object.keys(filter).length > 0;
 
   /**
-   * Kam die Filteränderung von der Leiste selbst? Dann darf sie NICHT neu aufgesetzt
-   * werden — der Remount nähme dem Suchfeld bei jedem entprellten Wort den Fokus.
+   * Kam die Filteränderung von der Leiste selbst? Dann darf sie nicht neu aufgesetzt werden — der
+   * Remount nähme dem Suchfeld bei jedem entprellten Wort den Fokus.
    *
-   * Jede FREMDE Änderung (Zurücksetzen, Deeplink, Zurück-Taste) setzt sie dagegen neu
-   * auf, und zwar in der Runde NACH der Navigation. Das ist der Grund für den Umweg
-   * über den Effekt statt eines `setFilterMarke` direkt im Zurücksetzen: react-router
-   * liefert die geräumte URL erst in der Folgerunde, ein Remount in derselben Runde
-   * setzte die Leiste mit dem noch gültigen Filter neu auf und schriebe den
-   * Suchbegriff ins Feld zurück (gemessen an
-   * `EtbPage.test.tsx` › „setzt beim Zurücksetzen auch das Eingabefeld zurück").
+   * Jede fremde Änderung (Zurücksetzen, Deeplink, Zurück-Taste) setzt sie neu auf, und zwar in der
+   * Runde nach der Navigation: react-router liefert die geräumte URL erst in der Folgerunde, ein
+   * Remount in derselben Runde schriebe den alten Suchbegriff zurück ins Feld.
    */
   const eigeneFilteraenderung = useRef(false);
   const vorigerFilterText = useRef(filterText);
@@ -113,10 +104,9 @@ export default function EtbPage() {
   }, [filterText]);
 
   /**
-   * Der jeweils AKTUELLE Filter für Meldungen, die verspätet eintreffen: die Filterleiste
-   * meldet ihre Suche entprellt, und ein Nachläufer der Frist sähe sonst einen Filter, in
-   * dem der inzwischen per Segment gewählte Typ noch fehlt
-   * (`etb/zeitachseModell.ts`, `filterZusammenfuehren`).
+   * Der aktuelle Filter für verspätet eintreffende Meldungen: die Leiste meldet ihre Suche
+   * entprellt, und ein Nachläufer sähe sonst einen Filter ohne den inzwischen per Segment gewählten
+   * Typ (`etb/zeitachseModell.ts`, `filterZusammenfuehren`).
    */
   const filterRef = useRef(filter);
   useEffect(() => {
@@ -124,20 +114,18 @@ export default function EtbPage() {
   }, [filter]);
 
   /**
-   * Eine EIGENE Filteränderung — aus der Leiste (q/von/bis) oder der Typleiste. Beide
-   * setzen die Marke, damit die Leiste NICHT neu aufgesetzt wird: ein Segmentklick nähme
-   * sonst einem halb getippten Suchbegriff Feld und Fokus.
+   * Eine eigene Filteränderung — aus der Leiste (q/von/bis) oder der Typleiste. Beide setzen die
+   * Marke, damit die Leiste nicht neu aufgesetzt wird: ein Segmentklick nähme sonst einem halb
+   * getippten Suchbegriff Feld und Fokus.
    */
   function filterAendern(teil: Partial<EtbFilterWerte>) {
     const vorher = etbPfad(einsatzId, filterRef.current);
     const neu = etbPfad(einsatzId, filterZusammenfuehren(filterRef.current, teil));
-    // Keine Navigation ohne Änderung: die Marke bliebe sonst stehen und schluckte die
-    // nächste FREMDE Änderung (Zurücksetzen, Deeplink) — die Leiste behielte dann Werte,
-    // die nicht mehr gelten.
+    // Keine Navigation ohne Änderung: die Marke bliebe sonst stehen und schluckte die nächste
+    // fremde Änderung.
     if (neu === vorher) return;
     eigeneFilteraenderung.current = true;
-    // `replace`, damit eine Suche keine dreißig Verlaufseinträge hinterlässt — der
-    // Rückweg soll auf die vorige SEITE führen, nicht auf den vorigen Buchstaben.
+    // `replace`, damit eine Suche nicht dreißig Verlaufseinträge hinterlässt.
     navigate(neu, { replace: true });
   }
 
@@ -166,7 +154,7 @@ export default function EtbPage() {
 
   const bausteineQuery = useQuery({ queryKey: globalKeys.etbBausteine(), queryFn: listeBausteine });
 
-  // Auftrags-Ziele für das ETB→Auftrag-Formular (wie AuftraegePage/MeldungenPage).
+  // Auftrags-Ziele für das ETB→Auftrag-Formular.
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
@@ -184,53 +172,47 @@ export default function EtbPage() {
       letzteSeite.length === SEITENGROESSE ? letzteSeite[letzteSeite.length - 1].lfd_nr : undefined,
   });
 
-  // Riegel für die Bilanz unter `xl` (LFH-373): sie erscheint erst, wenn die Liste zum ersten
-  // Mal steht — stand sie vorher da, schoben die eintreffenden Zeilen sie aus dem Bild. Danach
-  // bleibt sie. `isLoading` allein hinge an jedem neuen Query-Schlüssel: die Bilanz verschwände
-  // bei jedem Filterwechsel, und beim Wiederverbinden nach einem Offline-Start genau dann, wenn
-  // der Puffer gesendet wird (Review). `isLoading` statt `isPending`, weil ein offline
+  // Riegel für die Bilanz unter `xl`: sie erscheint erst, wenn die Liste zum ersten Mal steht
+  // (sonst schöben die eintreffenden Zeilen sie aus dem Bild), und bleibt danach. `isLoading`
+  // allein hinge an jedem neuen Query-Schlüssel, die Bilanz verschwände bei jedem Filterwechsel und
+  // beim Wiederverbinden nach einem Offline-Start. `isLoading` statt `isPending`, weil ein offline
   // pausierter Abruf nicht lädt — dann trägt die Bilanz den Puffer. Je Einsatz, damit ein
-  // Wechsel des Einsatzes im selben Baum die Sperre neu setzt. Zustand statt Ref: die
-  // Ableitung während des Renderns ist das React-Muster für „Wert aus früherem Render".
+  // Einsatzwechsel im selben Baum die Sperre neu setzt; Zustand statt Ref, abgeleitet während des
+  // Renderns.
   const [bilanzFreiFuer, setBilanzFreiFuer] = useState<number | null>(null);
   if (!etbQuery.isLoading && bilanzFreiFuer !== einsatzId) setBilanzFreiFuer(einsatzId);
   const bilanzFrei = bilanzFreiFuer === einsatzId || !etbQuery.isLoading;
 
-  // Exakte Zählung über DENSELBEN Filter wie die Liste (LFH-612) — Kopf und Bilanz. Unter
-  // dem `etb`-Prefix, das `etb`-Live-Ereignis zieht sie mit.
+  // Exakte Zählung über denselben Filter wie die Liste — für Kopf und Bilanz. Unter dem
+  // `etb`-Prefix, das `etb`-Live-Ereignis zieht sie mit.
   const zaehlerQuery = useQuery({
     queryKey: einsatzKeys.etbZaehler(einsatzId, filter),
     queryFn: () => ladeEtbZaehler(einsatzId, filter),
   });
 
-  // Die leere Ersatzliste bleibt: die Chronologie braucht ein Array, und solange der
-  // Abruf läuft, gibt es keins. Falsch war daran nie die Ersatzliste, sondern das
-  // fehlende Lade-/Fehler-Gate daneben — das steht in `leerInhalt` weiter unten.
+  // Die leere Ersatzliste bleibt, die Chronologie braucht ein Array. Lade- und Fehler-Gate stehen
+  // in `leerInhalt` weiter unten.
   const eintraege = etbQuery.data?.pages.flat() ?? [];
 
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [berichtigungZu, setBerichtigungZu] = useState<EtbEintragAnzeige | null>(null);
   /**
-   * Der Schalter „Werte behalten" (LFH-332/H61) liegt HIER, nicht in `EtbEntwurfsTabs`.
-   * Grund: die Berichtigung unten rendert eine eigene `Schnellerfassung` STATT der Tabs,
-   * der Container verschwindet dabei also. Läge der Zustand dort, stünde eine bewusst
-   * abgewählte Wertübernahme nach jeder Berichtigung wieder auf AN — ohne Nutzeraktion.
+   * Der Schalter „Werte behalten" liegt hier, nicht in `EtbEntwurfsTabs`: die Berichtigung rendert
+   * eine eigene `Schnellerfassung` statt der Tabs, der Container verschwindet dabei. Läge der
+   * Zustand dort, stünde eine abgewählte Wertübernahme nach jeder Berichtigung wieder auf an.
    *
-   * Vorgabe AUS (30.07.2026), gleiche Begründung wie in `components/Erfassung.tsx`: der
-   * Schalter verändert, was nach dem Erfassen im Formular stehen bleibt. Steht er von
-   * selbst auf AN, hat ihn die erste Person, die ihn bemerkt, bereits benutzt, ohne ihn
-   * gewählt zu haben. Wer in Serie funkt, schaltet ihn einmal an — er hält, bis die Seite
-   * verlassen wird.
+   * Vorgabe aus (wie in `components/Erfassung.tsx`): ein Schalter, der von selbst ansteht, ist
+   * benutzt, ohne gewählt worden zu sein.
    */
   const [werteBehalten, setWerteBehalten] = useState(false);
   /**
-   * Ob ein Entwurf gerade sendet (LFH-117, Review C1). Solange, ist „Berichtigen" gesperrt:
-   * die Berichtigung ersetzt die Entwurfs-Reiter, und ein laufender Upload verlöre dabei
-   * seinen sichtbaren Zustand samt einem möglichen Fehlergrund.
+   * Ob ein Entwurf gerade sendet. Solange ist „Berichtigen" gesperrt: die Berichtigung ersetzt die
+   * Entwurfs-Reiter, und ein laufender Upload verlöre seinen sichtbaren Zustand samt möglichem
+   * Fehlergrund.
    */
   const [entwurfSendet, setEntwurfSendet] = useState(false);
-  /** Gewählte Anhänge je Entwurf — hier, damit sie eine Berichtigung überleben (LFH-117). */
+  /** Gewählte Anhänge je Entwurf — hier, damit sie eine Berichtigung überleben. */
   const entwurfsDateien = useEntwurfsDateien();
   const [wiedervorlageZu, setWiedervorlageZu] = useState<{
     eintrag: EtbEintragAnzeige;
@@ -238,18 +220,17 @@ export default function EtbPage() {
   } | null>(null);
   const [auftragZu, setAuftragZu] = useState<EtbEintragAnzeige | null>(null);
   /**
-   * Die Hervorhebung trägt eine Zählmarke neben der id: ein zweiter Sprung auf DENSELBEN
-   * Eintrag (zweimal „Grundeintrag anzeigen") änderte die id nicht, der Scroll-Effekt
-   * liefe nicht wieder, und die Zeile bliebe außer Sicht.
+   * Die Hervorhebung trägt eine Zählmarke neben der id: ein zweiter Sprung auf denselben Eintrag
+   * änderte die id nicht, der Scroll-Effekt liefe nicht wieder.
    */
   const [hervorhebung, setHervorhebung] = useState<{ id: number; marke: number } | null>(null);
   const highlightId = hervorhebung?.id ?? null;
   const zeitachseKopf = useRef<HTMLDivElement>(null);
   const { abBreite } = useViewport();
   const { token, rollen } = useRollen();
-  // Fokusabstand zur angepinnten Erfassungsleiste (WCAG 2.4.11, LFH-373): ohne ihn rollte der
-  // Browser jeden per Tab angesteuerten Zeilenauslöser hinter die Leiste. Verbraucht wird die
-  // Höhe als `scroll-margin` an der Zeitachse (`index.css`), nicht am Dokument.
+  // Fokusabstand zur angepinnten Erfassungsleiste (WCAG 2.4.11): sonst rollte der Browser jeden per
+  // Tab angesteuerten Zeilenauslöser hinter die Leiste. Verbraucht als `scroll-margin` an der
+  // Zeitachse (`index.css`), nicht am Dokument.
   const erfassungRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ETB);
   const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen } = useEtbErfassung(
     einsatzId,
@@ -274,19 +255,18 @@ export default function EtbPage() {
   }
 
   /**
-   * Ein abgelehnter Eintrag geht auf demselben Weg zurück, den er gekommen ist —
-   * `erfassen` reiht ihn wieder ein bzw. sendet direkt. Die `client_id` bleibt dabei
-   * erhalten: sie ist die Idempotenzmarke (F03/LFH-261), und ohne sie erzeugte ein
-   * Erneut-Senden nach einem Timeout-nach-Commit eine Dublette in der Beweiskette.
-   *
-   * Erst nach erfolgreichem Wiedereinreihen wird der abgelehnte Stand verworfen —
-   * andersherum wäre der Eintrag zwischen den beiden Schritten nirgends mehr.
+   * Zwei Zeilen, deren gruppengeführte Reihenfolge sich beim Statuswechsel umdreht. Eine
+   * einzeilige Fixture wäre wertlos: `toEqual(vorher)` über einem Einelement-Array ist immer grün.
+   *   Serverordnung  [10 Florian 1 (gebunden), 11 Florian 9 (verfügbar)]
+   *   gerendert      [11, 10]  (Gruppenachse führt: verfügbar vor gebunden)
+   *   nach dem Flip  [10, 11]  (beide verfügbar → nach Funkrufname)
+   * Die gerenderte Ausgangsfolge ist weder Server- noch Zielordnung.
    */
   async function abgelehntErneutSenden(puffer: AbgelehnterEintrag) {
     try {
-      // Mit NEUER client_id (Review C1): ein abgelehnter Eintrag ist nie erfasst worden, ein
-      // neuer Schlüssel legt also keine Dublette an. Mit dem alten liefe ein client_id-Konflikt
-      // (409, der Schlüssel steht für einen anderen Eintrag) endlos in dieselbe Ablehnung.
+      // Mit neuer client_id: ein abgelehnter Eintrag ist nie erfasst worden, ein neuer Schlüssel
+      // legt also keine Dublette an. Mit dem alten liefe ein client_id-Konflikt (409) endlos in
+      // dieselbe Ablehnung.
       await erfassen({ ...puffer.eintrag, client_id: crypto.randomUUID() });
       if (puffer.id != null) await abgelehntVerwerfen(puffer.id);
     } catch (err) {
@@ -294,12 +274,12 @@ export default function EtbPage() {
     }
   }
 
-  // Schnellaktion: ?neu=1 fokussiert die angepinnte Erfassungszeile (Command-Palette, LFH-11).
+  // Schnellaktion: ?neu=1 fokussiert die angepinnte Erfassungszeile (Command-Palette).
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     const leiste = document.querySelector('.etb-erfassung-sticky');
     if (leiste instanceof HTMLElement) {
-      // Die Leiste steht am Seitenfuß (Neuentwurf S4) — ins Bild rollt ihr unteres Ende.
+      // Die Leiste steht am Seitenfuß — ins Bild rollt ihr unteres Ende.
       leiste.scrollIntoView?.({ block: 'end' });
       const feld = leiste.querySelector('textarea, input');
       if (feld instanceof HTMLElement) feld.focus();
@@ -308,9 +288,9 @@ export default function EtbPage() {
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  // Deeplink ?eintrag=<id> (LFH-25): adressiert einen ETB-Eintrag. Da die Liste neueste-zuerst
-  // paginiert ist, werden ältere Seiten gezielt nachgeladen, bis der Eintrag gefunden ist
-  // (durch das Pagination-Ende begrenzt). Danach Highlight setzen und den Param räumen.
+  // Deeplink ?eintrag=<id>: die Liste paginiert neueste zuerst, ältere Seiten werden nachgeladen,
+  // bis der Eintrag gefunden ist (begrenzt durch das Pagination-Ende). Danach Highlight setzen und
+  // den Param räumen.
   const zielEintragId = parseRouteId(searchParams.get('eintrag') ?? undefined);
   useEffect(() => {
     if (zielEintragId == null) return;
@@ -335,10 +315,9 @@ export default function EtbPage() {
   useEffect(() => {
     if (hervorhebung == null) return;
     /*
-     * Über das Primitiv, nicht über einen eigenen Selektor (LFH-342 · C7): die
-     * Zeitachsen-Einträge tragen dieselbe Marke (`data-lfh="datensicht-karte"`) und die
-     * Hervorhebungsklasse, an denen `scrolleZurZeile` eine Karte findet. Einen
-     * `data-row-key` gibt es seit dem Neuentwurf auf keiner Breite mehr.
+     * Über das Primitiv, nicht über einen eigenen Selektor: die Zeitachsen-Einträge tragen dieselbe
+     * Marke (`data-lfh="datensicht-karte"`) und Hervorhebungsklasse, an denen `scrolleZurZeile`
+     * eine Karte findet.
      */
     scrolleZurZeile(`eintrag-${hervorhebung.id}`);
   }, [hervorhebung]);
@@ -367,31 +346,21 @@ export default function EtbPage() {
   });
 
   /**
-   * Gesendete und gepufferte Einträge als EINE Chronologie (LFH-342 · C7, Befund M82).
-   *
-   * Die beiden Banner unten bleiben — sie fassen zusammen, die Zeilen zeigen. Wer nur
-   * das Banner hat, sieht in der Chronologie einen Stand, in dem die eigene, gerade
-   * erfasste Meldung nicht vorkommt.
+   * Gesendete und gepufferte Einträge als eine Chronologie. Die Banner unten fassen zusammen, die
+   * Zeilen zeigen — sonst fehlte in der Chronologie die eigene, gerade erfasste Meldung.
    */
   const chronologie = baueZeilen({ eintraege, ausstehend, abgelehnt });
 
   /**
-   * EINGABE UNTEN, NEUESTE OBEN (Neuentwurf S4) — und was nach dem eigenen Eintrag passiert.
+   * Eingabe unten, neueste oben — und was nach dem eigenen Eintrag passiert.
    *
-   * Die Erfassung steht wie in einem Funkprotokoll am Fuß der Seite, die Zeitachse läuft
-   * neueste zuerst: wer auf die Lage schaut, sieht oben sofort das Jüngste, und wer
-   * schreibt, hat die Zeile immer an derselben Stelle. Die Vorgängerin stellte die
-   * Erfassung an den KOPF, damit ein neuer Eintrag direkt unter dem Feld erscheint; diese
-   * Nähe gibt der Entwurf bewusst auf.
-   *
-   * Den Preis bezahlt diese Funktion: wer weiter unten liest und erfasst, sähe seinen
-   * eigenen Eintrag nicht ankommen. Nach einem ANGENOMMENEN Eintrag (gesendet oder
-   * gepuffert) rollt die Seite deshalb den Kopf der Zeitachse ins Bild — mit
-   * `block: 'nearest'`, also gar nicht, wenn er ohnehin sichtbar ist. Das ist die Antwort
-   * auf eine eigene Handlung, kein Sprung unter dem Cursor (WCAG 3.2.5 zielt auf
-   * ungefragte Änderungen). Der Fokus bleibt im Feld (Rücksprung der Schnellerfassung),
-   * die Serienerfassung läuft also ungestört weiter. Bei einer Ablehnung rollt nichts:
-   * dann ist nichts angekommen, und der Wortlaut steht noch im Feld.
+   * Die Erfassung steht wie in einem Funkprotokoll am Fuß der Seite, die Zeitachse läuft neueste
+   * zuerst. Wer weiter unten liest und erfasst, sähe seinen Eintrag nicht ankommen. Nach einem
+   * angenommenen Eintrag (gesendet oder gepuffert) rollt die Seite deshalb den Kopf der Zeitachse
+   * ins Bild — `block: 'nearest'`, also gar nicht, wenn er sichtbar ist. Das ist die Antwort auf
+   * eine eigene Handlung, kein Sprung unter dem Cursor (WCAG 3.2.5 zielt auf ungefragte
+   * Änderungen). Der Fokus bleibt im Feld. Bei einer Ablehnung rollt nichts: der Wortlaut steht
+   * noch im Feld.
    */
   async function erfassenMitMeldung(e: NeuerEintrag) {
     try {
@@ -403,9 +372,8 @@ export default function EtbPage() {
     }
   }
 
-  // Seitenzustand (nicht Listenzustand): ohne den Einsatz gibt es weder Breadcrumb noch
-  // Schreibrecht — deshalb Frühausstieg. Der Listenzustand des Tagebuchs wird unten an
-  // der Tabelle entschieden, nicht hier (Spec-Festlegung D3).
+  // Seitenzustand: ohne den Einsatz gibt es weder Breadcrumb noch Schreibrecht — deshalb
+  // Frühausstieg. Der Listenzustand des Tagebuchs entscheidet sich unten.
   if (einsatzQuery.isLoading) {
     return <SeitenSkeleton />;
   }
@@ -425,12 +393,12 @@ export default function EtbPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   /**
-   * Der vierteilige Zustandsraum des Tagebuchs, dritter und vierter Teil: leer-mit-Filter
-   * und leer-ohne-Filter. Laden und Fehler unterdrücken diesen Knoten in `EtbZeitachse`.
+   * Der Zustandsraum des Tagebuchs, dritter und vierter Teil: leer mit und ohne Filter. Laden und
+   * Fehler unterdrücken diesen Knoten in `EtbZeitachse`.
    *
-   * Die Rechte-Weiche ist keine Kosmetik: ohne Schreibrecht wird die Erfassungsleiste gar
-   * nicht gerendert (siehe unten), ein Sprung dorthin zeigte auf einen Knoten, den es
-   * nicht gibt. Deshalb derselbe Titel, aber ein anderer Hinweis und keine Aktion.
+   * Die Rechte-Weiche ist nötig: ohne Schreibrecht wird die Erfassungsleiste nicht gerendert, ein
+   * Sprung dorthin zeigte ins Leere. Deshalb derselbe Titel, aber ein anderer Hinweis und keine
+   * Aktion.
    */
   const leerInhalt = filterAktiv ? (
     <SeitenLeer
@@ -442,8 +410,8 @@ export default function EtbPage() {
     <SeitenLeer
       titel="Noch keine Einträge."
       hinweis="Die Erfassungszeile am Fuß der Seite nimmt den ersten Eintrag auf."
-      // Ziel aus der Deeplink-Registry, nicht als Vorlagentext von Hand: `?neu=1` rollt die
-      // Erfassungszeile ins Bild und fokussiert sie (Effekt oben).
+      // Ziel aus der Deeplink-Registry: `?neu=1` rollt die Erfassungszeile ins Bild und fokussiert
+      // sie (Effekt oben).
       aktion={{ label: 'Ersten Eintrag erfassen', pfad: etbPfad(einsatzId, { neu: true }) }}
     />
   ) : (
@@ -454,9 +422,8 @@ export default function EtbPage() {
   );
 
   /**
-   * Die Einheiten als Filterwahl. Steht eine Einheit in der URL, die (noch) nicht in der
-   * Liste ist — sie lädt noch, oder sie wurde aufgelöst —, bekommt sie eine eigene Zeile:
-   * sonst zeigte der Select die rohe Zahl als Beschriftung.
+   * Die Einheiten als Filterwahl. Steht eine Einheit in der URL, die nicht in der Liste ist (lädt
+   * noch oder aufgelöst), bekommt sie eine eigene Zeile — sonst zeigte der Select die rohe Zahl.
    */
   const einheitOptionen = (einheitenQuery.data ?? []).map((e) => ({ value: e.id, label: e.name }));
   if (filter.einheit_id != null && !einheitOptionen.some((o) => o.value === filter.einheit_id)) {
@@ -472,11 +439,10 @@ export default function EtbPage() {
     punkt: t === 'alle' ? rollen.schwach : etbTypFarbe(t, token).kante,
   }));
 
-  // Die Erfassung hängt auf JEDER Breite als `fuss` an der Seitenwurzel (LFH-373): in der
-  // Zeitachsenspalte stieg sie nie über deren Oberkante (auf dem Handschirm ragte sie ganz oben
-  // 61 px unter das Fenster), und an zwei Stellen je nach Breite riss ein Wechsel über `xl` sie aus
-  // und hängte sie neu ein — der Text einer laufenden Berichtigung war ohne Rückfrage weg. Ab
-  // `xl` endet sie über den Außenrand vor der Bilanzspalte, wie vorher in der Spalte.
+  // Die Erfassung hängt auf jeder Breite als `fuss` an der Seitenwurzel: in der Zeitachsenspalte
+  // stiege sie nie über deren Oberkante, und an zwei Orten je nach Breite hängte ein Wechsel über
+  // `xl` sie neu ein — der Text einer laufenden Berichtigung wäre weg. Ab `xl` endet sie über den
+  // Außenrand vor der Bilanzspalte.
   const erfassung = darfSchreiben ? (
     <div
       ref={erfassungRef}
@@ -523,10 +489,9 @@ export default function EtbPage() {
       dataUpdatedAt={etbQuery.dataUpdatedAt}
       aktionen={
         <>
-          {/* Einstieg in die Druckansicht (LFH-22). Er ÖFFNET und sendet nichts ab, gehört
-              also in den Kopf (LFH-346 · C11) — sekundär, „genau eine Primäraktion" bleibt.
-              Ein Link mit Knopfgestalt: Strg/⌘+Klick öffnet einen neuen Tab. Der AKTIVE
-              Filter geht mit, sonst druckte die Person eine andere Auswahl als die sichtbare. */}
+          {/* Einstieg in die Druckansicht: öffnet und sendet nichts ab, gehört also in den Kopf
+              — sekundär, „genau eine Primäraktion" bleibt. Link mit Knopfgestalt (Strg/⌘+Klick
+              öffnet einen Tab). Der aktive Filter geht mit. */}
           <Button
             href={etbDruckPfad(einsatzId, filter)}
             onClick={(e) => {
@@ -537,9 +502,9 @@ export default function EtbPage() {
           >
             Drucken / als PDF
           </Button>
-          {/* Der Typfilter als Segmentleiste (Entwurf S4). Er schreibt in denselben
-              URL-Filter wie die Leiste darunter (`etbPfad`/`parseEtbFilter`) — das
-              gewählte Segment wird aus der URL GELESEN, Zurück/Vor stimmen also. */}
+          {/* Der Typfilter als Segmentleiste. Er schreibt in denselben URL-Filter wie die
+              Leiste darunter (`etbPfad`/`parseEtbFilter`); das gewählte Segment wird aus der
+              URL gelesen, Zurück/Vor stimmen also. */}
           <Segmentleiste<TypSegment>
             optionen={segmentOptionen}
             wert={filter.typ ?? 'alle'}
@@ -581,17 +546,16 @@ export default function EtbPage() {
         }}
       >
         <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-          {/* Volltext und Zeitraum: die schmale Filterzeile unter dem Kopf. Der Typ steht
-              oben als Segmentleiste. Entprellung und die Weiche „eigene gegen fremde
-              Änderung" bleiben (`EtbFilterleiste`, Effekt oben). */}
+          {/* Volltext und Zeitraum: die schmale Filterzeile unter dem Kopf. Entprellung und die
+              Weiche „eigene gegen fremde Änderung" in `EtbFilterleiste` und im Effekt oben. */}
           <div ref={filterWurzel}>
             <EtbFilterleiste
               key={filterMarke}
               startWerte={filter}
               onChange={leisteGeaendert}
               zusatz={
-                // Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an
-                // der Einheit auf der Lagekarte (LFH-616). Kein Entprellen: ein Sprungwert.
+                // Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an der
+                // Einheit auf der Lagekarte. Kein Entprellen: ein Sprungwert.
                 <Select<number>
                   aria-label="Nach Einheit filtern"
                   placeholder="Einheit"
@@ -605,8 +569,8 @@ export default function EtbPage() {
             />
           </div>
 
-          {/* Die Meldung steht ÜBER der Zeitachse, statt sie auszutauschen: bereits geladene
-              Einträge bleiben lesbar, wenn nur das Nachladen scheitert (Spec-Festlegung D4). */}
+          {/* Die Meldung steht über der Zeitachse, statt sie auszutauschen: geladene Einträge
+              bleiben lesbar, wenn nur das Nachladen scheitert. */}
           {etbQuery.isError && (
             <div style={{ marginBottom: token.marginSM }}>
               <SeitenFehler
@@ -660,8 +624,8 @@ export default function EtbPage() {
             data-lfh="etb-zeitachse-rahmen"
             style={{ border: `1px solid ${rollen.linie}`, background: rollen.grund }}
           >
-            {/* „neu seit Ihrer letzten Sichtung" (LFH-611) — im Fluss über der Zeitachse wie
-                im Entwurf S4; das Sammelbanner des Live-Zuflusses liegt dagegen AUF ihr. */}
+            {/* „neu seit Ihrer letzten Sichtung" — im Fluss über der Zeitachse; das
+                Sammelbanner des Live-Zuflusses liegt dagegen auf ihr. */}
             <EtbLesemarkeBanner einsatzId={einsatzId} />
             <EtbZeitachse
               zeilen={chronologie}
@@ -695,11 +659,9 @@ export default function EtbPage() {
           )}
         </div>
 
-        {/* Seitenleiste ab `xl` rechts (Entwurf S4), darunter UNTER der Zeitachsenspalte —
-            nicht dazwischen, damit die angepinnte Erfassung am Fuß der Zeitachse bleibt.
-            Darunter erscheint sie erst, wenn die Liste steht (LFH-373, gemessen): stand sie
-            schon, schoben die eintreffenden Zeilen sie aus dem Bild (CLS 0,22 bei 390 px).
-            Der Riegel `bilanzFrei` (oben) geht je Einsatz EINMAL auf. */}
+        {/* Seitenleiste ab `xl` rechts, darunter unter der Zeitachsenspalte — nicht dazwischen,
+            damit die angepinnte Erfassung am Fuß bleibt. Darunter erst, wenn die Liste steht
+            (Riegel `bilanzFrei`), sonst schöben die eintreffenden Zeilen sie aus dem Bild. */}
         {(breit || bilanzFrei) && (
           <aside
             aria-label="Bilanz des Tagebuchs"
@@ -742,9 +704,8 @@ export default function EtbPage() {
           einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
           senden={auftragMutation.isPending}
           onAbbrechen={() => setAuftragZu(null)}
-          // mutateAsync: die Erfassungshülle im Formular darf die Felder nur leeren,
-          // wenn der Auftrag wirklich angekommen ist (LFH-332/B4, gezogen von
-          // LFH-343 · C8 — dieselbe Bauform wie Meldung→Auftrag und Chat→Auftrag).
+          // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn der Auftrag
+          // angekommen ist (Bauform wie Meldung→Auftrag und Chat→Auftrag).
           onAnlegen={(daten) =>
             auftragZu
               ? auftragMutation.mutateAsync({ eintragId: auftragZu.id, daten })

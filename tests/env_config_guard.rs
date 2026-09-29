@@ -5,19 +5,18 @@
 //! über `#[arg(long, env = "…")]`, damit jeder Schalter in `--help` auftaucht, beim Start
 //! protokolliert werden kann und einen definierten Default hat.
 //!
-//! Warum das ein Guard sein muss und keine Konvention: genau diese Abkürzung hatte zwei
-//! sicherheitsrelevante Schalter unsichtbar gemacht — `LIFELINE_DOWNLOAD_ALLOW_LOOPBACK`
-//! schwächte den SSRF-Guard auch auf dem öffentlichen Proxy-Pfad, ohne Spur in `--help`
-//! oder im Log, und `LIFELINE_OFFLINE_KATALOG_MANIFEST_URL` verbog die Trust-Quelle des
-//! Offline-Katalogs. Beide wurden bei JEDEM Aufruf frisch aus dem Prozess-Env gelesen,
-//! womit eine ambient gesetzte Variable reproduzierbar die Security-Tests kippte.
+//! Warum ein Guard und keine Konvention: ad-hoc gelesene Schalter sind unsichtbar. Ein
+//! Loopback-Schalter schwächte so den SSRF-Guard auch auf dem öffentlichen Proxy-Pfad, ohne
+//! Spur in `--help` oder im Log, und eine Manifest-URL verbog die Trust-Quelle des
+//! Offline-Katalogs. Frisch aus dem Prozess-Env gelesen, kippte zudem eine ambient gesetzte
+//! Variable reproduzierbar die Security-Tests.
 //!
 //! Der laufzeitseitige Weg für Schalter, die nicht durch den `AppState` erreichbar sind
 //! (`'static`-Closures), ist ein prozessweiter `OnceLock`, der beim Serverstart aus der
 //! `Config` gefüllt wird — siehe `karte::init_karte_config` und `anhang::init_scan_config`.
 //!
-//! Parst Quelltext zeilenweise, bewusst ohne `regex`-Dependency (das Projekt hält die
-//! Abhängigkeiten schlank) — dasselbe Vorgehen wie `tests/json_extractor_guard.rs`.
+//! Parst Quelltext zeilenweise, bewusst ohne `regex`-Dependency — dasselbe Vorgehen wie
+//! `tests/json_extractor_guard.rs`.
 
 use std::fs;
 use std::path::{Path, PathBuf};

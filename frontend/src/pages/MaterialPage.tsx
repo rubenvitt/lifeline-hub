@@ -48,24 +48,13 @@ import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
 
 /**
- * ── DIE FARBFRAGE IST ENTSCHIEDEN (LFH-341 · C6) ─────────────────────────────────────
- *
- * Hier stand bis zum 20.08.2026 die Begründung, warum dieser Katalog KEINE Statusrolle
- * trägt. Sie endete auf den Satz, die Frage sei „eine eigene Entscheidung, kein
- * Nebenprodukt" — und genau als solche ist sie in C6 getroffen worden. Die Karte liegt
- * jetzt in `theme/statusFarben.ts` (`materialStatus`), samt der Herleitung für
- * `im_einsatz`, an dem C4 gebrochen war.
- *
- * Diese Datei hält davon nur noch die Reihenfolge und die Filterwerte — beide leiten sich
- * aus der Vertragskarte AB und werden nicht abgetippt. Das ist der Punkt: EIN
+ * Die Farbentscheidung für den Materialstatus liegt in `theme/statusFarben.ts` (`materialStatus`).
+ * Diese Datei hält nur Reihenfolge und Filterwerte, abgeleitet aus der Vertragskarte — ein
  * Behandlungsweg für dieses Enum, gemeinsam mit `pages/uhs/MaterialTab.tsx`.
  */
 const STATUS_REIHENFOLGE = Object.keys(materialStatus) as MaterialStatus[];
 
-/**
- * Menüwerte MIT `darstellung` — der Farbpunkt im Statusmenü kommt jetzt aus dem Vertrag.
- * Bis C6 stand hier keiner, weil die Farbfrage offen war; sie ist es nicht mehr.
- */
+/** Menüwerte mit `darstellung` — der Farbpunkt im Statusmenü kommt aus dem Vertrag. */
 const STATUS_OPTIONEN: StatusOption<MaterialStatus>[] = STATUS_REIHENFOLGE.map((s) => ({
   wert: s,
   label: materialStatus[s].label,
@@ -75,7 +64,7 @@ const STATUS_OPTIONEN: StatusOption<MaterialStatus>[] = STATUS_REIHENFOLGE.map((
 function statusDarstellung(em: EinsatzMaterial): StatusDarstellung {
   return materialStatus[em.status];
 }
-/** Filterwerte auf der EIGENEN Materialachse (fünf Werte), nicht auf der Kräfte-Kategorie. */
+/** Filterwerte auf der eigenen Materialachse (fünf Werte), nicht auf der Kräfte-Kategorie. */
 const STATUS_FILTER_WERTE = STATUS_REIHENFOLGE.map((s) => ({
   value: s,
   text: materialStatus[s].label,
@@ -95,9 +84,8 @@ function MengeZelle({ em, onChange }: { em: EinsatzMaterial; onChange: (menge: n
     onChange(wert);
   };
   return (
-    // Keine Klein-Variante: die Höhe kommt aus `controlHeight` und zieht mit der
-    // Dichtestufe mit (LFH-339 · C4 — die letzte Einzelstelle des B5i-Bündels). Die
-    // Breite bleibt fest: sie trägt eine zweistellige Menge, keine Trefffläche.
+    // Die Höhe kommt aus `controlHeight` und zieht mit der Dichtestufe mit. Die Breite bleibt fest:
+    // sie trägt eine zweistellige Menge, keine Trefffläche.
     <InputNumber
       min={1}
       style={{ width: 80 }}
@@ -162,10 +150,8 @@ export default function MaterialPage() {
         },
         w.menge ?? 1,
       ),
-    // Nur invalidieren und melden (LFH-332 · B4): geschlossen wird über `onFertig`,
-    // geleert wird von der Erfassungshülle — auf BEIDEN Wegen, auch beim Abbrechen.
-    // Das frühere `resetFields()` hier lief neben `setAdhocOffen(false)` und ließ den
-    // Abbruch-Weg ungeleert zurück; genau diese Asymmetrie behebt die Hülle.
+    // Nur invalidieren und melden: geschlossen wird über `onFertig`, geleert von der
+    // Erfassungshülle auf allen Wegen, auch beim Abbrechen.
     onSuccess: () => {
       invalidate();
       message.success('Ad-hoc-Material disponiert');
@@ -203,10 +189,9 @@ export default function MaterialPage() {
     onError: fehler,
   });
 
-  // Seitenzustand (LFH-331 · B3): NUR `einsatzQuery` — ohne sie tragen weder Breadcrumb
-  // noch `darfImEinsatzSchreiben` etwas. Alles andere wird an Ort und Stelle entschieden,
-  // nie als Frühausstieg. Der drehende Kreisel und das knopflose Alert von früher hatten
-  // beide keinen Weg zurück; jetzt steht überall derselbe „Erneut abrufen".
+  // Seitenzustand: nur `einsatzQuery` — ohne sie tragen weder Breadcrumb noch
+  // `darfImEinsatzSchreiben` etwas. Alles andere wird an Ort und Stelle entschieden, nie als
+  // Frühausstieg.
   if (einsatzQuery.isLoading) {
     return <SeitenSkeleton />;
   }
@@ -225,9 +210,8 @@ export default function MaterialPage() {
   const ems = emQuery.data ?? [];
 
   /**
-   * Gemeinsamer Bedienweg für Tabellen- und Kartenzweig — Herleitung siehe
-   * `FahrzeugePage.tsx`. Ohne `farbe`: das ist die Mandantenfarbe aus Fahrzeug-/
-   * Personalstammdaten, `materialStatus` kennt kein solches Feld (nur `rolle`+`label`).
+   * Gemeinsamer Bedienweg für Tabellen- und Kartenzweig (Herleitung in `FahrzeugePage.tsx`). Ohne
+   * `farbe`: `materialStatus` kennt keine Mandantenfarbe (nur `rolle` + `label`).
    */
   const statusBedienungVon = (em: EinsatzMaterial) => {
     const laeuft = statusMutation.isPending && statusMutation.variables?.emId === em.id;
@@ -246,37 +230,30 @@ export default function MaterialPage() {
   };
 
   /**
-   * LISTENZUSTAND — zwei Lagen, zwei Antworten (D3). Der Fehler allein reicht als
-   * Bedingung NICHT.
+   * Listenzustand — der Fehler allein reicht als Bedingung nicht. Ohne Zeilen im Zwischenspeicher
+   * tritt der Fehler an die Stelle der Datensicht, sonst behauptete „Noch kein Material disponiert"
+   * eine leere Disposition. Mit Zeilen bleiben sie stehen und bekommen ein Banner: echt, nur
+   * womöglich alt.
    *
-   * Ohne Zeilen im Zwischenspeicher tritt der Fehler an die Stelle der Datensicht, sonst
-   * behauptet „Noch kein Material disponiert" eine leere Disposition, wo bloß der Abruf
-   * scheiterte. MIT Zeilen bleiben sie stehen und bekommen ein Banner: sie sind echt, nur
-   * womöglich alt. Ein Fehler, der die Zeilen wegräumt, nähme der Einsatzkraft Daten, die
-   * sie eben noch hatte — das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
-   *
-   * Gemessen an `ems`, der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`):
-   * Suche und Filter leben IM Primitiv, an ihrer Restmenge gemessen kippte die Seite bei
-   * jedem engen Filter in den Fehlerzweig — und nähme dem Bediener die Schalter, mit denen
-   * er ihn wieder aufmachen könnte.
+   * Gemessen an `ems`, der ungefilterten Menge: Suche und Filter leben im Primitiv; an ihrer
+   * Restmenge gemessen kippte die Seite bei jedem engen Filter in den Fehlerzweig.
    */
   const listeGescheitert = emQuery.isError && ems.length === 0;
   const standVeraltet = emQuery.isError && ems.length > 0;
 
-  // Kein Dedup wie bei Fahrzeugen: dieselbe Material-Art darf mehrfach (als getrennte
-  // Position) disponiert werden (Mengen-Splitting auf Einheiten).
+  // Kein Dedup wie bei Fahrzeugen: dieselbe Material-Art darf mehrfach als getrennte Position
+  // disponiert werden (Mengen-Splitting auf Einheiten).
   const poolOptionen = (poolQuery.data ?? []).map((m) => ({
     value: m.id,
     label: `${m.bezeichnung}${m.kategorie ? ` (${m.kategorie})` : ''}`,
   }));
 
   /**
-   * Was ein leeres Auswahlfeld bedeutet, hängt daran, OB die Liste überhaupt ankam
-   * (LFH-331 · B3). Scheitert der Abruf, bleibt `poolOptionen` leer und das Feld behauptete
-   * „Kein Material im Dienst" — eine Aussage über den Bestand, die niemand geprüft hat.
-   * Ohne Fehler bleibt der Bestandswortlaut byte-gleich stehen.
+   * Was ein leeres Auswahlfeld bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,
+   * bleibt `poolOptionen` leer, und das Feld behauptete „Kein Material im Dienst". Ohne Fehler
+   * bleibt der Bestandswortlaut.
    *
-   * KEIN `kein403`: `src/routes/material.rs` ist org-lesbar ohne Admin-Schranke.
+   * Kein `kein403`: die Material-Route ist org-lesbar ohne Admin-Schranke.
    */
   const poolInhalt =
     nichtGefundenInhalt(poolQuery, {
@@ -284,9 +261,9 @@ export default function MaterialPage() {
     }) ?? 'Kein Material im Dienst';
 
   /**
-   * Kategoriefilter aus den EIGENEN Daten; `undefined` ohne Werte. Bewusste Folge: das Feld
-   * erscheint erst mit dem ersten gepflegten Wert. Ein dauerhaft leeres Filterfeld sieht wie
-   * ein Werkzeug aus und ist keins — der Tausch ist gewollt.
+   * Kategoriefilter aus den eigenen Daten; `undefined` ohne Werte. Das Feld erscheint erst mit dem
+   * ersten gepflegten Wert — ein dauerhaft leeres Filterfeld sieht wie ein Werkzeug aus und ist
+   * keins.
    */
   const kategorieWerte = [...new Set(ems.map((m) => m.kategorie).filter((k): k is string => !!k))]
     .sort()
@@ -297,12 +274,9 @@ export default function MaterialPage() {
       : undefined;
 
   /**
-   * Spaltenregister der Materialseite (LFH-330 · B2).
-   *
-   * `EinsatzMaterialAnzeige` hat KEIN `status_kategorie` — 15 Felder, am generierten Typ
-   * geprüft. Gruppiert und gefiltert wird deshalb auf der EIGENEN Fünf-Werte-Achse
-   * (`MaterialStatus`), nicht auf verfügbar/gebunden/nicht verfügbar. Dieselbe Grenze zieht
-   * `filtereKraefte` schon in der Datenschicht. Ein hierher gemapptes Feld wäre erfunden.
+   * Spaltenregister der Materialseite. `EinsatzMaterialAnzeige` hat kein `status_kategorie`;
+   * gruppiert und gefiltert wird auf der eigenen Fünf-Werte-Achse (`MaterialStatus`), dieselbe
+   * Grenze wie in `filtereKraefte`.
    */
   const spalten = spaltenFuer<EinsatzMaterial>()([
     {
@@ -332,8 +306,7 @@ export default function MaterialPage() {
       sortWert: (m) => m.menge,
       render: (_, em) =>
         darfSchreiben ? (
-          // `MengeZelle` bleibt unangetastet (samt ihrer Klein-Variante) — ihr Abbau ist
-          // LFH-333/B5, nicht dieser Umbau.
+          // `MengeZelle` bleibt, wie sie ist.
           <MengeZelle em={em} onChange={(menge) => mengeMutation.mutate({ emId: em.id, menge })} />
         ) : (
           em.menge
@@ -343,9 +316,8 @@ export default function MaterialPage() {
       title: 'Status',
       key: 'status',
       filter: { werte: STATUS_FILTER_WERTE, trifft: (m, w) => m.status === w },
-      // Kein `Select` mehr: `minWidth: 170` war hier sogar breiter als bei Fahrzeug und
-      // Personal — die Zahl, an der die 390-px-Karte scheiterte (LFH-339 · C4).
-      // Deskriptor GANZ gespreizt — Herleitung siehe `FahrzeugePage.tsx`.
+      // Kein `Select` mit Mindestbreite (die 390-px-Karte scheiterte daran). Deskriptor ganz
+      // gespreizt — Herleitung in `FahrzeugePage.tsx`.
       render: (_, em) => (
         <StatusWahl
           darstellung={statusDarstellung(em)}
@@ -377,7 +349,7 @@ export default function MaterialPage() {
                 title="Aus Einsatz entfernen?"
                 onConfirm={() => entfernenMutation.mutate(em.id)}
               >
-                {/* Ohne Klein-Variante und ohne `danger`: Rot ist Gefahr, nicht Bedienung. */}
+                {/* Ohne `danger`: Rot ist Gefahr, nicht Bedienung. */}
                 <Button>Entfernen</Button>
               </Popconfirm>
             ),
@@ -412,19 +384,16 @@ export default function MaterialPage() {
         )
       }
       /**
-       * DER SEITENKOPF MUSS UMBRECHEN (LFH-339 · C4, gemessen): die Disponier-Leiste bringt
-       * ein `Select` mit `minWidth: 260` plus Mengenfeld plus zwei Knöpfe mit; auf 390 px
-       * lief die Seite vorher bis 717 px. Seit dem Neuentwurf trägt `EinsatzSeite` den Kopf
-       * und bringt den Umbruch selbst mit; `wrap` + `maxWidth` am Block bleiben, weil der
-       * Umbruch allein den Block nur unter den Titel verschiebt.
+       * Der Seitenkopf muss umbrechen: die Disponier-Leiste bringt ein `Select` mit `minWidth:
+       * 260`, ein Mengenfeld und zwei Knöpfe mit. `EinsatzSeite` bricht selbst um; `wrap` +
+       * `maxWidth` am Block bleiben, weil der Umbruch allein den Block nur unter den Titel schiebt.
        */
       aktionen={
         darfSchreiben && (
           <Space wrap style={{ minWidth: 0 }}>
             <Select
-              // `minWidth` bleibt als Lesbarkeitsboden, `maxWidth` verhindert das Sprengen:
-              // ohne die zweite Angabe drückt das Feld die Reihe über den Schirm hinaus,
-              // auch wenn sie umbrechen darf.
+              // `minWidth` als Lesbarkeitsboden, `maxWidth` gegen das Sprengen: sonst drückte das
+              // Feld die Reihe über den Schirm hinaus.
               style={{ minWidth: 260, maxWidth: '100%' }}
               placeholder="Stamm-Material wählen …"
               value={poolAuswahl}
@@ -455,28 +424,18 @@ export default function MaterialPage() {
         )
       }
     >
-      {/* DER STATUS STEHT SEIT LFH-339 · C4 IM `karte.status`-SLOT, nicht mehr als
-          Sekundärfeld — hier stand vorher die gegenteilige Regel, und sie ist überholt.
-
-          Was sich mit C4 geändert hat, war die ANORDNUNG, nicht die Farbfrage: der Slot
-          trug ein Etikett ohne Rolle, weil die Farbfrage offen war. LFH-341 · C6 hat sie
-          entschieden — der Slot trägt jetzt die Vertragsrolle aus `theme/statusFarben.ts`
-          (`materialStatus`, siehe `statusDarstellung` oben), und `statusBedienung` macht
-          das Etikett zum Auslöser. Damit ist der Statuswechsel auf der 390-px-Karte
-          überhaupt erst erreichbar — als Sekundärfeld war er reine Anzeige.
+      {/* Der Status steht im `karte.status`-Slot mit der Vertragsrolle aus
+          `theme/statusFarben.ts` (`materialStatus`), und `statusBedienung` macht das Etikett
+          zum Auslöser — nur so ist der Statuswechsel auf der 390-px-Karte erreichbar.
 
           `titel` ohne `ziel`: Material hat keine Detailroute. */}
 
-      {/* KEIN Katalog-Banner auf dieser Seite, und das ist gemessen statt vergessen: der
-          Materialstatus ist das lokale Enum `MaterialStatus` (`materialStatus` in
-          `theme/statusFarben.ts`, fünf Werte). Er kommt nicht über die Leitung und kann
-          deshalb nicht ausfallen — anders als der Statuskatalog der Fahrzeug- und
-          Personalseite. Eine Meldung „Statuskatalog konnte nicht geladen werden" wäre hier
-          ein erfundener Fehlerfall.
+      {/* Kein Katalog-Banner: der Materialstatus ist das lokale Enum `MaterialStatus` (fünf
+          Werte) und kann nicht ausfallen, anders als der Statuskatalog der Fahrzeug- und
+          Personalseite.
 
-          Der Listenfehler tauscht die Datensicht aus, statt durch sie hindurchgereicht zu
-          werden (D3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps` kennt
-          keinen Fehlerbegriff — ein Prop am Primitiv wirkte nur in einer der beiden Formen. */}
+          Der Listenfehler tauscht die Datensicht aus: `Datensicht` führt den Kartenzweig an
+          `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. */}
       {listeGescheitert ? (
         <SeitenFehler
           text="Disponiertes Material konnte nicht geladen werden"
@@ -506,8 +465,7 @@ export default function MaterialPage() {
               titel: { spalte: 'bezeichnung' },
               status: (em) => statusDarstellung(em),
               statusBedienung: (em) => (darfSchreiben ? statusBedienungVon(em) : null),
-              // Nur noch zwei Sekundärfelder: `status` ist in den Slot darüber gewandert und
-              // stünde sonst doppelt auf der Karte.
+              // Zwei Sekundärfelder: `status` steht im Slot darüber und stünde sonst doppelt.
               sekundaer: ['kategorie', 'menge'],
               aktion: darfSchreiben
                 ? {
@@ -521,31 +479,18 @@ export default function MaterialPage() {
         </>
       )}
 
-      {/**
-       * Ad-hoc-Erfassung auf der Schnellerfassungs-Hülle (LFH-332 · B4).
-       *
-       * SERIENMODUS, weil Ad-hoc-Material stückweise nachkommt: eine Spende-Palette ist
-       * selten eine Position. „Speichern und nächste" hält den Dialog offen, zählt und
-       * setzt den Fokus zurück auf die Bezeichnung.
-       *
-       * WERTÜBERNAHME auf Kategorie und Trägerorganisation — die beiden Felder, die über
-       * eine ganze Anlieferung hinweg gleich bleiben. Sie stehen deshalb HINTEN: was sich
-       * je Position ändert (Bezeichnung, Menge), kommt zuerst; die stehenbleibenden Werte
-       * überspringt der Tabulatorlauf danach ohnehin, weil sie schon gefüllt sind.
-       *
-       * FELDBUDGET: höchstens vier sichtbare Felder. Die Bestandsnummer ist das fünfte —
-       * bei ad-hoc erfasstem Material (Spenden, Fremdmaterial) gibt es sie meistens gar
-       * nicht. Sie liegt unter „Weitere Angaben" mit `forceRender`.
-       *
-       * WAS `forceRender` HIER TUT, gemessen per Mutationsprobe (Prop entfernt, Tests
-       * gefahren): es registriert das Feld ab dem ersten Bild im Formular, statt erst beim
-       * ersten Aufklappen. Was es NICHT tut: den eingetippten Wert retten. Der überlebt das
-       * Zuklappen auch ohne die Prop — antd baut den Bereich nicht ab (`destroyOnHidden`
-       * ist aus) und hielte den Wert selbst dann noch (`Form.Item` bewahrt per Vorgabe).
-       * Ohne die Prop fiel genau ein Test: der, der das Feld VOR dem ersten Aufklappen im
-       * Baum sucht. Die naheliegende Begründung „sonst ist der Wert weg" wäre also falsch
-       * gewesen und steht deshalb nicht hier.
-       */}
+      {/* Ad-hoc-Erfassung auf der Schnellerfassungs-Hülle.
+
+          Serienmodus, weil Ad-hoc-Material stückweise nachkommt. Wertübernahme auf Kategorie
+          und Trägerorganisation — sie bleiben über eine Anlieferung gleich und stehen deshalb
+          hinten: was sich je Position ändert (Bezeichnung, Menge), kommt zuerst.
+
+          Feldbudget: höchstens vier sichtbare Felder. Die Bestandsnummer ist das fünfte; bei
+          Spenden und Fremdmaterial gibt es sie meist nicht. Sie liegt unter „Weitere Angaben".
+
+          `forceRender` registriert das Feld ab dem ersten Bild im Formular statt erst beim
+          Aufklappen. Den eingetippten Wert rettet es nicht — der überlebt das Zuklappen ohnehin
+          (antd baut den Bereich nicht ab, `Form.Item` bewahrt per Vorgabe). */}
       <ErfassungsModal<MaterialAdhocEingabe & { menge: number }>
         offen={adhocOffen}
         titel="Ad-hoc-Material disponieren"
@@ -555,8 +500,8 @@ export default function MaterialPage() {
         uebernahme={['kategorie', 'traegerorganisation']}
         initialValues={{ menge: 1 }}
         laeuft={adhocMutation.isPending}
-        // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage lässt die Hülle die
-        // eingetippten Werte stehen. Den Fehlertext meldet weiterhin `onError`.
+        // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage lässt die Hülle die Werte
+        // stehen. Den Fehlertext meldet `onError`.
         onErfassen={async (w) => {
           await adhocMutation.mutateAsync(w);
         }}

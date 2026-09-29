@@ -106,10 +106,9 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
 
   it('zeigt das Gruppen-Dropdown mit dem aktuellen Gebiet', () => {
     renderInspector({});
-    // Der Inspector soll ein Dropdown für die Gruppen-Zugehörigkeit zeigen.
     expect(screen.getAllByLabelText('Gehört zu Gefahrengebiet')[0]).toBeInTheDocument();
-    // Seit LFH-328 trägt ein echtes <label> den Namen (kein aria-label mehr): der sichtbare
-    // Text ist der Accessible Name, der gewählte Gebietsname steckt NICHT darin.
+    // Ein echtes <label> trägt den Namen: der sichtbare Text ist der Accessible Name, der gewählte
+    // Gebietsname steckt nicht darin.
     expect(screen.getByRole('combobox', { name: 'Gehört zu Gefahrengebiet' })).toBeInTheDocument();
   });
 
@@ -158,9 +157,8 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
 });
 
 /**
- * Rückfrage vor dem Aufheben (LFH-710). Die Zone wird hart gelöscht (`lage_zone/repo.rs`),
- * also unumkehrbar — in BEIDEN Zweigen, nicht nur bei einem Gefahrengebiet mit Warnstufen
- * (LFH-363: Unumkehrbares bekommt eine Rückfrage, deren OK-Knopf `danger` trägt).
+ * Rückfrage vor dem Aufheben: die Zone wird hart gelöscht, also unumkehrbar — in beiden Zweigen,
+ * nicht nur bei einem Gefahrengebiet mit Warnstufen. Der OK-Knopf trägt `danger`.
  */
 describe('ZonenInspector — Rückfrage vor dem Aufheben (LFH-710)', () => {
   it.each([
@@ -262,9 +260,8 @@ describe('ZonenInspector — Kennzahlen (LFH-146)', () => {
     const g: Gefahrengebiet = { ...gebiet, hoechste_warnstufe: 'hoch', zonen_ids: [1, 2, 3] };
     renderInspector({ zone, gebiete: [g] });
     expect(screen.getByText('Höchste Warnstufe')).toBeInTheDocument();
-    // Das Label kommt seit LFH-328 aus `warnstufeKarte` (Statusfarb-Vertrag) und nicht
-    // mehr aus dem WARNSTUFEN-Katalog: klein wie alle anderen Status-Labels des Vertrags
-    // ('aktiv', 'geplant', 'aufgelöst'). Der Katalog bleibt für Auswahl-Dropdowns.
+    // Das Label kommt aus `warnstufeKarte` (Statusfarb-Vertrag), klein wie alle Status-Labels. Der
+    // WARNSTUFEN-Katalog bleibt für Auswahl-Dropdowns.
     expect(screen.getByText('hoch')).toBeInTheDocument();
     expect(screen.getByText('Zonen')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
@@ -278,11 +275,9 @@ describe('ZonenInspector — Kennzahlen (LFH-146)', () => {
   });
 
   it('hinterlässt ohne Kennzahlen keine leere Space-Zeile', () => {
-    // antds `Space` filtert `false`/`null` als KIND heraus, wickelt aber eine Komponente,
-    // die null RENDERT, trotzdem in ein `.ant-space-item` (gemessen: 3 statt 2). Ein
-    // unbedingt eingehängtes `<GeoKennzahlen>` erzeugte damit im häufigen Fall (freie
-    // Skizze, unparsebare Geometrie) eine sichtbare Lücke. Die Bedingung gehört deshalb
-    // an die Aufrufstelle, nicht nur in die Komponente.
+    // antds `Space` filtert `false`/`null` als Kind heraus, wickelt aber eine Komponente, die null
+    // rendert, trotzdem in ein `.ant-space-item` — ein unbedingtes `<GeoKennzahlen>` erzeugte eine
+    // sichtbare Lücke. Die Bedingung gehört an die Aufrufstelle.
     const { container: ohne } = renderInspector({
       zone: { ...basisZone, gefahrengebiet_id: null },
       gebiete: [],
@@ -294,23 +289,18 @@ describe('ZonenInspector — Kennzahlen (LFH-146)', () => {
 });
 
 describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
-  // Träger der Zusicherung ist der Reset-Effekt IN `ZonenInspector` (Vergleich gegen
-  // `entwurfZoneId`), NICHT ein `key` an der Aufrufstelle in `LagekartePage`. Ein `key`
-  // daneben wäre eine zweite Wahrheit; hier wird deshalb der Effekt gepinnt.
-  //
-  // Der historische Fehler (H43): Bezeichnung/Farbe/Notiz waren unkontrolliert
-  // (`defaultValue`), beim Wechsel A→B standen also weiter die Werte von A im Feld — und ein
-  // bloßer Fokuswechsel im Label-Feld schrieb `onAendern({ label: 'Alpha' })` auf Zone B.
-  // Behoben wurde das mit LFH-334 (kontrollierte Felder + Reset-Effekt); hier kommt der
-  // fehlende Regressionstest nach.
+  // Träger der Zusicherung ist der Reset-Effekt in `ZonenInspector` (Vergleich gegen
+  // `entwurfZoneId`), nicht ein `key` in `LagekartePage` — der wäre eine zweite Wahrheit. Ohne ihn
+  // stünden beim Wechsel A→B die Werte von A im Feld, und ein bloßer Fokuswechsel schriebe sie auf
+  // Zone B.
   const zoneA: LageZone = {
     ...basisZone,
     id: 1,
     typ: 'freie_skizze',
     label: 'Alpha',
     notiz: 'NotizA',
-    // jsdom sanitisiert `input[type=color]` auf `#` + sechs KLEINbuchstaben-Hexziffern —
-    // ein Großbuchstabe im Fixture käme als '#000000' zurück.
+    // jsdom sanitisiert `input[type=color]` auf Kleinbuchstaben-Hex — ein Großbuchstabe käme als
+    // '#000000' zurück.
     farbe: '#ff0000',
     gefahrengebiet_id: null,
   };
@@ -322,9 +312,10 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
     farbe: '#00ff00',
   };
 
-  /** Sichtbarer Wert eines antd-Select — das `combobox` selbst ist ohne Suche leer.
-   *  antd 6 rendert die gewählte Option als `.ant-select-content` (nicht mehr
-   *  `-selection-item`); Präzedenz `stammdaten/EtbBausteinFormModal.test.tsx:88`. */
+  /**
+   * Sichtbarer Wert eines antd-Select — das `combobox` selbst ist ohne Suche leer. antd 6 rendert
+   * die gewählte Option als `.ant-select-content`.
+   */
   const gewaehlt = (combobox: HTMLElement) =>
     combobox.closest('.ant-select')?.querySelector('.ant-select-content')?.textContent;
 
@@ -346,8 +337,7 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
     expect(notiz).toHaveValue('NotizB');
     expect(farbe).toHaveValue('#00ff00');
 
-    // Reiner Fokuswechsel ohne Eingabe darf KEIN PATCH auslösen: der Entwurf trägt bereits
-    // die Werte von B, der onBlur-Vergleich gegen `zone.*` findet also keine Änderung.
+    // Ein reiner Fokuswechsel darf kein PATCH auslösen: der Entwurf trägt schon die Werte von B.
     await userEvent.click(label);
     fireEvent.blur(label);
     await userEvent.click(notiz);
@@ -356,8 +346,8 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
     fireEvent.blur(farbe);
     expect(onAendern).not.toHaveBeenCalled();
 
-    // Gegenaussage — ohne sie wäre „nicht aufgerufen" auch bei ersatzlos entferntem `onBlur`
-    // grün: eine echte Eingabe auf B muss weiterhin ankommen.
+    // Gegenaussage — sonst wäre „nicht aufgerufen" auch ohne `onBlur` grün: eine echte Eingabe auf
+    // B muss ankommen.
     await userEvent.clear(label);
     await userEvent.type(label, 'Charlie');
     fireEvent.blur(label);
@@ -382,8 +372,8 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
     rerenderZone(zoneB);
     expect(screen.queryByText('speichert …')).not.toBeInTheDocument();
 
-    // Der Lauf von A löst erst JETZT auf — ohne invalidierten Zähler stünde an Zone B
-    // „gespeichert" für einen Vorgang, der nie zu ihr gehörte.
+    // Der Lauf von A löst erst jetzt auf — ohne invalidierten Zähler stünde an Zone B „gespeichert"
+    // für einen fremden Vorgang.
     await act(async () => {
       freigeben?.();
     });
@@ -392,10 +382,9 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
   });
 
   it('quittiert weiter, wenn während des Speicherns ein Same-ID-Refetch eintrifft', async () => {
-    // Gegenaussage zum Test darüber: das Invalidieren des Lauf-Zählers gehört HINTER den
-    // Same-ID-Riegel. Der eigene Speichervorgang ändert genau die Werte, an denen der
-    // Effekt hängt (label/notiz/farbe), und `zoneAendern` wartet die Invalidierung ab —
-    // ein Increment vor dem Riegel ließe „gespeichert" also nie mehr erscheinen.
+    // Gegenaussage: das Invalidieren des Lauf-Zählers gehört hinter den Same-ID-Riegel. Der eigene
+    // Speichervorgang ändert die Werte, an denen der Effekt hängt — ein Increment davor ließe
+    // „gespeichert" nie erscheinen.
     let freigeben: (() => void) | undefined;
     const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(
       () =>
@@ -433,8 +422,7 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
 
     rerenderZone(gefahrenZone);
 
-    // Die beiden tragenden Aussagen hängen direkt an `entwurf.typ` und nicht an
-    // antd-Interna — der Text der Auswahlanzeige ist nur die Zusatzprobe.
+    // Die tragenden Aussagen hängen an `entwurf.typ`, nicht an antd-Interna.
     expect(screen.queryByLabelText('Farbe')).not.toBeInTheDocument();
     expect(screen.getByText('Gehört zu Gefahrengebiet')).toBeInTheDocument();
     expect(gewaehlt(screen.getByRole('combobox', { name: 'Zonen-Typ' }))).toBe('Gefahrengebiet');

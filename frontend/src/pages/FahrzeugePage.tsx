@@ -73,12 +73,9 @@ import {
 } from '../kraefte/useOptimistischesZeilenUpdate';
 
 /**
- * Ist-Besatzungsstärke aus den Stärke-Positionen der zugeordneten Kräfte (clientseitig
- * gezählt; LFH-9 hält das bewusst orthogonal zur Einheiten-Stärke — kein Backend-Aggregat).
- *
- * Eine Kraft ohne explizite F/UF-Position (`staerke_position == null`) ist trotzdem physisch
- * auf dem Fahrzeug und zählt zur Stärke — in der BOS-Schreibweise als Mannschaft (Sammeltopf),
- * sodass Σ die tatsächliche Kopfzahl der Besatzung bleibt.
+ * Ist-Besatzungsstärke aus den Stärke-Positionen der zugeordneten Kräfte, clientseitig gezählt und
+ * bewusst orthogonal zur Einheiten-Stärke. Eine Kraft ohne F/UF-Position ist trotzdem auf dem
+ * Fahrzeug und zählt als Mannschaft (Sammeltopf), sodass Σ die tatsächliche Kopfzahl bleibt.
  */
 function istBesatzungsStaerke(crew: EinsatzPersonal[]): Staerke {
   const s: Staerke = { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 };
@@ -100,10 +97,9 @@ function istSollErfuellt(ist: Staerke, soll: Staerke): boolean {
 }
 
 /**
- * Besatzungs-Ist als Ampel-Badge (LFH-9): blau ohne hinterlegtes Soll (kein „erfüllt"-Urteil
- * möglich), grün bei erfülltem Soll (nur Ist, ohne redundanten Soll-Text), sonst rot mit Soll
- * in Klammern. Die Klammer ist zugleich das nicht-farbliche Signal für Unterbesetzung (a11y),
- * `title` ergänzt grün/blau um ein nicht-farbliches Signal.
+ * Besatzungs-Ist als Ampel-Badge: blau ohne hinterlegtes Soll (kein Urteil möglich), grün bei
+ * erfülltem Soll (nur Ist), sonst rot mit Soll in Klammern. Die Klammer ist zugleich das
+ * nicht-farbliche Signal für Unterbesetzung, `title` ergänzt grün/blau.
  */
 function BesatzungsStaerkeBadge({ ist, soll }: { ist: Staerke; soll: Staerke | null }) {
   if (!soll) {
@@ -128,10 +124,9 @@ function BesatzungsStaerkeBadge({ ist, soll }: { ist: Staerke; soll: Staerke | n
 }
 
 /**
- * Besatzungs-Block je disponiertem Fahrzeug (LFH-9): Mitglieder (gefiltert über
- * `fahrzeug_id`), Ist/Soll als `Staerke`, Frei-Pool-Picker (nur `fahrzeug_id == null`).
- * Eine Kraft, die in einer anderen Einheit als das Fahrzeug ist, wird markiert
- * (Transparenz der bewusst orthogonalen Zuordnung).
+ * Besatzungs-Block je disponiertem Fahrzeug: Mitglieder (über `fahrzeug_id`), Ist/Soll als
+ * `Staerke`, Frei-Pool-Picker (nur `fahrzeug_id == null`). Eine Kraft in einer anderen Einheit als
+ * das Fahrzeug wird markiert.
  */
 function BesatzungsBlock({
   ef,
@@ -145,10 +140,9 @@ function BesatzungsBlock({
   personal: EinsatzPersonal[];
   darfSchreiben: boolean;
   /**
-   * Text des Frei-Pools, wenn er nichts anzubieten hat — vom Aufrufer entschieden, weil
-   * nur dort bekannt ist, OB die Personalliste überhaupt ankam (LFH-331 · B3). Der Block
-   * bekommt einen fertigen String und keine Query: er soll den Zustand anzeigen, nicht
-   * über ihn urteilen.
+   * Text des Frei-Pools, wenn er nichts anzubieten hat — vom Aufrufer entschieden, weil nur dort
+   * bekannt ist, ob die Personalliste ankam. Der Block zeigt den Zustand an und urteilt nicht über
+   * ihn.
    */
   freiInhalt: string;
   onZuordnen: (epId: number) => void;
@@ -208,8 +202,8 @@ function BesatzungsBlock({
 
 /**
  * Zwei Ansichten derselben Menge (LFH-642): die Tabelle zum Pflegen und Vergleichen, das
- * FMS-Tableau als Überblicksfläche mit Statuswahl. Beide lesen dieselbe Query und bedienen
- * dieselbe `statusMutation` — das Tableau ist kein zweites Modul.
+ * FMS-Tableau als Überblicksfläche mit Statuswahl. Beide lesen dieselbe Query und bedienen dieselbe
+ * `statusMutation` — das Tableau ist kein zweites Modul.
  */
 const ANSICHT_OPTIONEN = [
   { wert: 'liste', label: 'Liste' },
@@ -225,8 +219,8 @@ export default function FahrzeugePage() {
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
-  // Je Einsatz, damit ein Wechsel des Einsatzes in derselben Instanz nicht die Ansicht des
-  // vorigen mitnimmt (Muster `PersonenPage`).
+  // Je Einsatz, damit ein Einsatzwechsel in derselben Instanz nicht die Ansicht des vorigen
+  // mitnimmt (Muster `PersonenPage`).
   const [ansichtNachEinsatz, setAnsichtNachEinsatz] = useState<Record<number, FahrzeugeAnsicht>>(
     {},
   );
@@ -234,10 +228,9 @@ export default function FahrzeugePage() {
   const setzeAnsicht = (a: FahrzeugeAnsicht) =>
     setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: a }));
 
-  // Sichtvorgabe ?ansicht= (Sprungmarke „FMS-Tableau"): apply-then-clean wie bei den
-  // Personen (LFH-620). Geräumt wird auch ein unbrauchbarer Wert, sonst stünde er beim
-  // Teilen des Links wieder im Auftrag, ohne je zu wirken. Über den Setter direkt — er ist
-  // stabil, `setzeAnsicht` ist je Render neu. Geklont statt in-place gelöscht (LFH-156):
+  // Sichtvorgabe ?ansicht= (Sprungmarke „FMS-Tableau"), apply-then-clean. Geräumt wird auch ein
+  // unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag. Über den Setter
+  // direkt (stabil, `setzeAnsicht` ist je Render neu). Geklont statt in-place gelöscht:
   // `?fahrzeug=` räumt `useQueryParamSelektion` getrennt und später.
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
@@ -269,18 +262,17 @@ export default function FahrzeugePage() {
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
   });
-  // Nur das Tableau gliedert nach Einheit/Abschnitt. Die Route hängt am Modul `einheiten`
-  // (`src/routes/einsatz_einheit.rs`), nicht an `fahrzeuge` — ist es gesperrt, läuft das
-  // Tableau ungegliedert weiter, statt mit der Einheitenliste auszufallen.
+  // Nur das Tableau gliedert nach Einheit/Abschnitt. Die Route hängt am Modul `einheiten`, nicht an
+  // `fahrzeuge` — ist es gesperrt, läuft das Tableau ungegliedert weiter.
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
     enabled: ansicht === 'tableau',
   });
 
-  // Cross-Modul-Deeplink (LFH-25): ?fahrzeug=<id> hebt die Zeile hervor (Scroll best-effort).
-  // Der Deeplink zielt auf eine ZEILE — im Tableau gibt es keine, und `scrolleZurZeile` liefe
-  // still ins Leere (Review LFH-642). Er schaltet deshalb auf die Liste.
+  // Cross-Modul-Deeplink ?fahrzeug=<id> hebt die Zeile hervor (Scroll best-effort). Im Tableau gibt
+  // es keine Zeile, `scrolleZurZeile` liefe still ins Leere; der Deeplink schaltet deshalb auf die
+  // Liste.
   useQueryParamSelektion('fahrzeug', efQuery.isSuccess, (fid) => {
     if (!(efQuery.data ?? []).some((f) => f.id === fid)) return;
     setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'liste' }));
@@ -306,9 +298,9 @@ export default function FahrzeugePage() {
     },
     onError: fehler,
   });
-  // Schliessen und Leeren gehoeren seit LFH-332/B4 der Erfassungshuelle: sie schliesst ueber
-  // `onFertig` (nur beim Einzel-Erfassen) und setzt auf BEIDEN Wegen zurueck. Ein Reset hier
-  // waere doppelt — und im Serienmodus falsch, weil er die uebernommenen Werte mitloeschte.
+  // Schließen und Leeren gehören der Erfassungshülle: sie schließt über `onFertig` (nur beim
+  // Einzel-Erfassen) und setzt auf beiden Wegen zurück. Ein Reset hier wäre doppelt und im
+  // Serienmodus falsch, weil er die übernommenen Werte mitlöschte.
   const adhocMutation = useMutation({
     mutationFn: (daten: AdhocEingabe) => disponiereAdhoc(einsatzId, daten),
     onSuccess: invalidate,
@@ -322,8 +314,8 @@ export default function FahrzeugePage() {
     mutationFn: (v) => aktualisiereDisposition(einsatzId, v.efId, { status_id: v.statusId }),
     zeilenId: (v) => v.efId,
     ...katalogStatusWechsel<EinsatzFahrzeug>(statusQuery.data),
-    // Der Einheitenstatus ist aus den Fahrzeugen abgeleitet (LFH-609) — nicht erst auf
-    // das Live-Ereignis warten, das ohne Stream (offline, Proxy) nie käme.
+    // Der Einheitenstatus ist aus den Fahrzeugen abgeleitet — nicht auf das Live-Ereignis warten,
+    // das ohne Stream (offline, Proxy) nie käme.
     onErfolg: () => void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
     onFehler: fehler,
     onSettled: invalidate,
@@ -367,23 +359,17 @@ export default function FahrzeugePage() {
   const efs = efQuery.data ?? [];
 
   /**
-   * LISTENZUSTAND — zwei Lagen, zwei Antworten (D3). Der Fehler allein reicht als
-   * Bedingung NICHT.
+   * Listenzustand — der Fehler allein reicht als Bedingung nicht. Ohne Zeilen im Zwischenspeicher
+   * tritt der Fehler an die Stelle der Datensicht, sonst behauptete „Noch keine Fahrzeuge
+   * disponiert" eine leere Disposition. Mit Zeilen bleiben sie stehen und bekommen ein Banner:
+   * echt, nur womöglich alt.
    *
-   * Ohne Zeilen im Zwischenspeicher tritt der Fehler an die Stelle der Datensicht, sonst
-   * behauptet „Noch keine Fahrzeuge disponiert" eine leere Disposition, wo bloß der Abruf
-   * scheiterte. MIT Zeilen bleiben sie stehen und bekommen ein Banner: sie sind echt, nur
-   * womöglich alt. Ein Fehler, der die Zeilen wegräumt, nähme der Einsatzkraft Daten, die
-   * sie eben noch hatte — das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
+   * Gemessen an `efs`, der ungefilterten Menge: Suche, Trägerfilter und Gruppenachse leben im
+   * Primitiv; an ihrer Restmenge gemessen kippte die Seite bei jedem engen Filter in den
+   * Fehlerzweig und nähme die Schalter, um ihn wieder aufzumachen.
    *
-   * Gemessen an `efs`, der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`):
-   * Suche, Trägerfilter und Gruppenachse leben IM Primitiv, an ihrer Restmenge gemessen
-   * kippte die Seite bei jedem engen Filter in den Fehlerzweig — und nähme dem Bediener
-   * die Schalter, mit denen er ihn wieder aufmachen könnte.
-   *
-   * NICHT zu verwechseln mit dem Statuskatalog-Banner weiter unten: das steht ZUSÄTZLICH
-   * über der Tabelle und tauscht nichts aus. Eine Mengenbedingung hat dort nichts zu
-   * suchen — es verschwindet nichts, also ist auch nichts zu bewahren.
+   * Nicht zu verwechseln mit dem Statuskatalog-Banner weiter unten: das steht zusätzlich über der
+   * Tabelle und tauscht nichts aus.
    */
   const listeGescheitert = efQuery.isError && efs.length === 0;
   const standVeraltet = efQuery.isError && efs.length > 0;
@@ -392,13 +378,10 @@ export default function FahrzeugePage() {
   const personal = personalQuery.data ?? [];
 
   /**
-   * Der Katalog als Menüwerte — EINMAL gebaut, von beiden Zweigen gelesen.
-   *
-   * Der Fahrzeugkatalog ist mandantengepflegt (FMS 0–9 ist der Seed, nicht die
-   * Obergrenze), deshalb kommen Beschriftung, Kategorie und Farbe aus der Antwort und
-   * nicht aus einer Konstante. `fms_anker` bleibt Sortierachse und ist bewusst KEINE
-   * Bedienform: die Spalte ist nullable, ein Ziffernfeld darauf hätte Löcher
-   * (Zielform-Spec §4).
+   * Der Katalog als Menüwerte — einmal gebaut, von beiden Zweigen gelesen. Der Fahrzeugkatalog ist
+   * mandantengepflegt (FMS 0–9 ist der Seed, nicht die Obergrenze), deshalb kommen Beschriftung,
+   * Kategorie und Farbe aus der Antwort. `fms_anker` bleibt Sortierachse und ist keine Bedienform:
+   * die Spalte ist nullable, ein Ziffernfeld darauf hätte Löcher.
    */
   const statusOptionen: StatusOption<number>[] = stati.map((s) => ({
     wert: s.id,
@@ -408,13 +391,12 @@ export default function FahrzeugePage() {
   }));
 
   /**
-   * Der gemeinsame Bedienweg für Tabellen- und Kartenzweig. Zwei Formen für dieselbe
-   * Handlung wären ein Unterschied ohne Bedeutung — und die Falle, in die man beim
-   * Umstellen genau einer der beiden Stellen läuft.
+   * Der gemeinsame Bedienweg für Tabellen- und Kartenzweig; zwei Formen für dieselbe Handlung
+   * liefen beim Umstellen einer der Stellen auseinander.
    *
-   * `aktuell` zeigt WÄHREND der Mutation den angefragten Wert: der Zeilendatensatz trägt
-   * ihn durch das optimistische `setQueryData` zwar schon, aber der Riegel hier hält die
-   * Anzeige auch dann stabil, wenn ein Refetch dazwischenfunkt.
+   * `aktuell` zeigt während der Mutation den angefragten Wert: der Zeilendatensatz trägt ihn durch
+   * das optimistische `setQueryData` schon, der Riegel hält die Anzeige aber auch stabil, wenn ein
+   * Refetch dazwischenfunkt.
    */
   const statusBedienungVon = (ef: EinsatzFahrzeug) => {
     const laeuft = statusMutation.isPending && statusMutation.variables?.efId === ef.id;
@@ -424,9 +406,9 @@ export default function FahrzeugePage() {
       farbe: ef.status_farbe,
       kennung: ef.funkrufname,
       laeuft,
-      // Sichtbar gesperrt, solange IRGENDWO eine Statusmutation läuft — der Riegel im
-      // `onWaehlen` unten wirkt ohnehin, aber ein Auslöser, der klickbar aussieht und
-      // nichts tut, ist schlechter als ein gesperrter (Bestandsverhalten des `Select`).
+      // Sichtbar gesperrt, solange irgendwo eine Statusmutation läuft — der Riegel in `onWaehlen`
+      // wirkt ohnehin, aber ein Auslöser, der klickbar aussieht und nichts tut, ist schlechter als
+      // ein gesperrter.
       gesperrt: statusMutation.isPending,
       onWaehlen: (wert: string | number) => {
         if (!statusMutation.isPending)
@@ -445,15 +427,13 @@ export default function FahrzeugePage() {
     }));
 
   /**
-   * Was ein leeres Auswahlfeld bedeutet, hängt daran, OB die Liste überhaupt ankam
-   * (LFH-331 · B3). Scheitert der Abruf, filtert der Ausdruck darüber auf die leere Menge
-   * und das Feld behauptete „Keine freien Fahrzeuge" — eine Aussage über den Bestand, die
-   * niemand geprüft hat. `nichtGefundenInhalt` liefert nur im Fehlerfall einen Text; sonst
-   * bleibt der Bestandswortlaut byte-gleich stehen.
+   * Was ein leeres Auswahlfeld bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,
+   * filtert der Ausdruck darüber auf die leere Menge, und das Feld behauptete „Keine freien
+   * Fahrzeuge". `nichtGefundenInhalt` liefert nur im Fehlerfall einen Text, sonst bleibt der
+   * Bestandswortlaut.
    *
-   * KEIN `kein403`: `src/routes/fahrzeug.rs` und `personal.rs` sind org-lesbar ohne
-   * Admin-Schranke (nur `benutzer.rs` trägt eine). Ein „nur für Admins" am Fahrzeug-Pool
-   * wäre ein erfundener Fehlerfall.
+   * Kein `kein403`: die Fahrzeug- und Personal-Routen sind org-lesbar ohne Admin-Schranke. Ein „nur
+   * für Admins" am Fahrzeug-Pool wäre ein erfundener Fehlerfall.
    */
   const poolInhalt =
     nichtGefundenInhalt(poolQuery, {
@@ -465,14 +445,11 @@ export default function FahrzeugePage() {
     }) ?? 'Keine freien Kräfte';
 
   /**
-   * Trägerfilter aus den EIGENEN Daten (Muster der Kräfteübersicht). `undefined`, wenn
-   * kein Fahrzeug eine Trägerorganisation trägt — ein Filterfeld mit null Optionen wäre
-   * Rauschen in der Werkzeugzeile, kein Werkzeug.
-   *
-   * BEWUSSTE FOLGE, damit sie nicht unbenannt bleibt: das Feld erscheint erst mit dem
-   * ersten gepflegten Wert, also nach dem Laden — in der umbrechenden Werkzeugzeile eine
-   * kleine Verschiebung. Der Tausch ist gewollt: ein dauerhaft leeres Filterfeld sieht wie
-   * ein Werkzeug aus und ist keins.
+   * Trägerfilter aus den eigenen Daten (Muster der Kräfteübersicht). `undefined`, wenn kein
+   * Fahrzeug eine Trägerorganisation trägt — ein Filterfeld ohne Optionen wäre Rauschen. Folge: das
+   * Feld erscheint erst mit dem ersten gepflegten Wert, nach dem Laden, mit kleiner Verschiebung in
+   * der umbrechenden Werkzeugzeile. Gewollt: ein dauerhaft leeres Filterfeld sieht wie ein Werkzeug
+   * aus und ist keins.
    */
   const traegerWerte = [
     ...new Set(efs.map((e) => e.traegerorganisation).filter((t): t is string => !!t)),
@@ -488,19 +465,15 @@ export default function FahrzeugePage() {
       : undefined;
 
   /**
-   * Spaltenregister der Fahrzeugseite (LFH-330 · B2).
+   * Spaltenregister der Fahrzeugseite, durch `spaltenFuer<EinsatzFahrzeug>()` geführt und nicht
+   * annotiert: eine Annotation weitete die Schlüsselliterale auf `string`, und der Kartenplan nähme
+   * jeden Tippfehler an.
    *
-   * Durch `spaltenFuer<EinsatzFahrzeug>()` geführt und NICHT annotiert: eine Annotation
-   * weitet die Schlüsselliterale auf `string`, und der Kartenplan nähme danach jeden
-   * Tippfehler ohne Meldung an.
+   * ── `abBreite` nur für lesende Spalten ──
    *
-   * ── `abBreite` NUR FÜR LESENDE SPALTEN ──────────────────────────────────────────
-   *
-   * `abBreite` versteckt eine Spalte, ohne dass der Nutzer sie zurückholen kann.
-   * Schreibtragende Spalten (`status`, `bemerkung`, `aktionen`) bekommen deshalb NIE eins;
-   * soll eine davon weichen, dann über `spaltenAusVoreinstellung` — dann steht sie im
-   * Spaltenschalter, im Zähler, und ein Klick holt sie zurück. Genau deshalb hat
-   * `bemerkung` hier KEIN `abBreite`, obwohl die API-Spec eins vorschlägt.
+   * `abBreite` versteckt eine Spalte, ohne dass der Nutzer sie zurückholen kann. Schreibtragende
+   * Spalten (`status`, `bemerkung`, `aktionen`) bekommen deshalb nie eins; soll eine weichen, dann
+   * über `spaltenAusVoreinstellung` — dann steht sie im Spaltenschalter und im Zähler.
    */
   const spalten = spaltenFuer<EinsatzFahrzeug>()([
     {
@@ -511,7 +484,7 @@ export default function FahrzeugePage() {
       suchText: (ef) => ef.funkrufname,
       render: (_, ef) => (
         <Space>
-          {/* Funkrufname in Mono (Neuentwurf: Kennungen und Funkrufnamen immer Mono). */}
+          {/* Funkrufname in Mono. */}
           <span style={monoStil(13)}>{ef.funkrufname}</span>
           {ef.ist_adhoc && <Tag color="blue">ad-hoc</Tag>}
         </Space>
@@ -543,19 +516,16 @@ export default function FahrzeugePage() {
     {
       title: 'Status',
       key: 'status',
-      // Gefiltert wird über die KATEGORIE, nicht über `status_id`: die ID kommt aus dem
-      // Mandantenkatalog und filterte je Mandant anders — und stimmte nicht mit den
-      // Gruppen überein, die dieselbe Achse benutzen.
+      // Gefiltert wird über die Kategorie, nicht über `status_id`: die ID kommt aus dem
+      // Mandantenkatalog und stimmte nicht mit den Gruppen derselben Achse überein.
       filter: {
         werte: KATEGORIE_WERTE,
         trifft: (ef, w) => kategorieVon(ef.status_kategorie) === w,
       },
-      // Kein `Select` mehr: dessen `minWidth: 150` war der Grund, warum der Statuswechsel
-      // in der 390-px-Karte gar nicht erst stattfinden konnte. Der Auslöser IST jetzt das
-      // Etikett, das Menü liegt im Portal (LFH-339 · C4, Zielform-Spec §3/§4).
-      // Der Deskriptor wird GANZ gespreizt, nicht halb: würden `optionen` und `onWaehlen`
-      // hier eigens gesetzt, könnten Tabelle und Karte auseinanderlaufen, ohne dass ein
-      // Test es merkt — genau die Divergenz, gegen die der gemeinsame Deskriptor gebaut ist.
+      // Der Auslöser ist das Etikett, das Menü liegt im Portal — kein `Select`, dessen
+      // Mindestbreite die 390-px-Karte sprengte. Der Deskriptor wird ganz gespreizt: würden
+      // `optionen` und `onWaehlen` hier eigens gesetzt, könnten Tabelle und Karte unbemerkt
+      // auseinanderlaufen.
       render: (_, ef) => (
         <StatusWahl
           darstellung={fahrzeugStatusDarstellung(ef)}
@@ -597,8 +567,8 @@ export default function FahrzeugePage() {
                 title="Aus Einsatz entfernen?"
                 onConfirm={() => entfernenMutation.mutate(ef.id)}
               >
-                {/* Kein `danger`: Rot ist Gefahr, nicht Bedienung (LFH-352/LFH-315). Der
-                    zweite Handgriff aus Kriterium 4 ist die Rückfrage, nicht die Farbe. */}
+                {/* Kein `danger`: Rot ist Gefahr, nicht Bedienung. Der zweite Handgriff ist die
+                    Rückfrage, nicht die Farbe. */}
                 <Button>Entfernen</Button>
               </Popconfirm>
             ),
@@ -627,10 +597,9 @@ export default function FahrzeugePage() {
         />
       }
       aktionen={
-        // `wrap` plus `maxWidth` (LFH-339 · C4, gemessen): das `minWidth: 260` des
-        // Auswahlfeldes und der Knopf daneben ergeben zusammen mehr als 390 px. Der
-        // Umbruch im Seitenkopf-Primitiv allein reicht nicht — er verschiebt den Block
-        // nur unter den Titel, wo er weiterhin zu breit ist.
+        // `wrap` plus `maxWidth`: das `minWidth: 260` des Auswahlfeldes und der Knopf daneben
+        // ergeben mehr als 390 px. Der Umbruch im Seitenkopf allein reicht nicht — er schiebt den
+        // Block nur unter den Titel, wo er weiter zu breit ist.
         <Space wrap style={{ minWidth: 0 }}>
           {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. */}
           <Segmentleiste<FahrzeugeAnsicht>
@@ -665,24 +634,19 @@ export default function FahrzeugePage() {
         )
       }
     >
-      {/* `karte.titel` trägt bewusst KEIN `ziel`: `fahrzeugePfad` ist eine
-          Query-Param-Selektion auf DIESE Seite (Deeplink-Muster), der Link zeigte also auf
-          sich selbst — und er brach die gepinnte LFH-139-Aussage „in dieser Zeile steht kein
-          Link". Tastaturziel der Karte ist damit die Primäraktion. Benannte Folge: eine
-          Karte im Nur-Lese-Modus hat unter `md` kein fokussierbares Element; Kriterium 1
-          wird im Kartenzweig am Aktionsknopf und am Spaltenschalter gemessen.
+      {/* `karte.titel` trägt bewusst kein `ziel`: `fahrzeugePfad` ist eine
+          Query-Param-Selektion auf diese Seite, der Link zeigte auf sich selbst. Tastaturziel
+          der Karte ist die Primäraktion; eine Karte im Nur-Lese-Modus hat unter `md` kein
+          fokussierbares Element.
 
-          `zufluss` bleibt der Default `sammelbanner` — das ist die Kriterium-12-Antwort für
-          genau diese Fläche: der Status wird IN der Zeile gewechselt, eigen wie fremd über
-          eine Invalidierung. */}
+          `zufluss` bleibt `sammelbanner`: der Status wird in der Zeile gewechselt, eigen wie
+          fremd über eine Invalidierung. */}
 
-      {/* Der Statuskatalog trägt die Auswahlliste JEDER Statuszelle. Fällt er aus, steht in
-          der Zeile ein Auswahlfeld ohne Einträge — der Statuswechsel ist dann unmöglich, und
-          zwar lautlos. Die Meldung steht deshalb über der Tabelle, nicht in der Zelle.
+      {/* Der Statuskatalog trägt die Auswahlliste jeder Statuszelle. Fällt er aus, wäre der
+          Statuswechsel lautlos unmöglich; die Meldung steht deshalb über der Tabelle.
 
-          An `darfSchreiben` gekoppelt, weil das Auswahlfeld selbst es ist: wer nur liest,
-          sieht `StatusBadge` (aus den Zeilendaten) und verliert durch den Katalogausfall
-          nichts. Ihm eine verlorene Fähigkeit anzukündigen, die er nie hatte, wäre falsch. */}
+          An `darfSchreiben` gekoppelt: wer nur liest, sieht `StatusBadge` aus den Zeilendaten
+          und verliert nichts. */}
       {darfSchreiben && statusQuery.isError && (
         <div style={{ marginBottom: abstand.md }}>
           <SeitenFehler
@@ -693,11 +657,10 @@ export default function FahrzeugePage() {
         </div>
       )}
 
-      {/* Der Listenfehler tauscht die Datensicht aus, statt durch sie hindurchgereicht zu
-          werden (D3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps` kennt
-          keinen Fehlerbegriff — ein Prop am Primitiv wirkte nur in einer der beiden Formen.
-          Ohne diese Weiche behauptet „Noch keine Fahrzeuge disponiert" auch dann eine leere
-          Disposition, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Listenfehler tauscht die Datensicht aus: `Datensicht` führt den Kartenzweig an
+          `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete
+          „Noch keine Fahrzeuge disponiert" eine leere Disposition, wenn bloß die Verbindung
+          abgerissen ist. */}
       {listeGescheitert ? (
         <SeitenFehler
           text="Disponierte Fahrzeuge konnten nicht geladen werden"
@@ -713,8 +676,8 @@ export default function FahrzeugePage() {
               fahrzeuge={efs}
               katalog={stati}
               einheiten={einheitenQuery.data ?? null}
-              // Nur ohne Daten: scheitert bloß ein Refetch, steht die bekannte Gliederung
-              // weiter da — ein „ohne Gliederung" daneben behauptete das Gegenteil.
+              // Nur ohne Daten: scheitert bloß ein Refetch, steht die bekannte Gliederung weiter
+              // da.
               einheitenHinweis={
                 einheitenQuery.isError && !einheitenQuery.data
                   ? 'Einheiten nicht abrufbar — Fahrzeuge ohne Gliederung'
@@ -741,9 +704,9 @@ export default function FahrzeugePage() {
                 reihenfolge: KATEGORIE_REIHENFOLGE,
               }}
               zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
-              // Besatzung je Fahrzeug standardmäßig eingeklappt, per Icon aufklappbar; die
-              // kompakte Ist/Soll-Stärke steht dauerhaft in der Besatzungs-Spalte. Läuft nur im
-              // Tabellenzweig — unter `md` fehlt der Block, und das ist an dieser Stelle sichtbar.
+              // Besatzung je Fahrzeug eingeklappt, per Icon aufklappbar; die Ist/Soll-Stärke steht
+              // dauerhaft in der Besatzungs-Spalte. Nur im Tabellenzweig — unter `md` fehlt der
+              // Block.
               aufklappzeile={(ef) => (
                 <BesatzungsBlock
                   ef={ef}
@@ -757,13 +720,13 @@ export default function FahrzeugePage() {
               karte={{
                 art: 'plan',
                 titel: { spalte: 'funkrufname' },
-                // NICHT das `render` der Statusspalte — der Slot nimmt die Vertragsachse als
-                // Deskriptor. Seit LFH-339 · C4 tragen beide Zweige damit dieselbe Darstellung
-                // UND denselben Bedienweg; die Mandantenfarbe geht über `statusBedienung.farbe`
-                // mit und steht auf Rand und Text, nie auf der Fläche.
+                // Nicht das `render` der Statusspalte — der Slot nimmt die Vertragsachse als
+                // Deskriptor. Beide Zweige tragen dieselbe Darstellung und denselben Bedienweg; die
+                // Mandantenfarbe geht über `statusBedienung.farbe` mit und steht auf Rand und Text,
+                // nie auf der Fläche.
                 status: (ef) => fahrzeugStatusDarstellung(ef),
-                // Der Bedienweg sitzt hier und NICHT im `aktion`-Slot: der ist mit „Entfernen"
-                // belegt, und `Datensicht` sichert genau eine Primäraktion zu (Zielform-Spec §5).
+                // Der Bedienweg sitzt hier und nicht im `aktion`-Slot: der ist mit „Entfernen"
+                // belegt, und `Datensicht` sichert genau eine Primäraktion zu.
                 statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
                 sekundaer: ['typ', 'traeger', 'besatzung'],
                 aktion: darfSchreiben
@@ -779,26 +742,20 @@ export default function FahrzeugePage() {
         </>
       )}
 
-      {/**
-       * Ad-hoc-Disposition als Schnellerfassung (LFH-332 · B4).
-       *
-       * SERIENMODUS, weil hier der Regelfall eine MENGE ist: trifft eine fremde Einheit ein,
-       * werden ihre Fahrzeuge nacheinander erfasst. „Speichern und nächste" hält den Dialog
-       * offen und den Fokus im Funkrufnamen; `Trägerorganisation` und `Fahrzeugtyp` überleben
-       * das Speichern (`uebernahme`) — beim Zug einer Einheit ist der Träger für alle gleich
-       * und der Typ oft auch, und genau diese beiden Wiederholfelder kosten sonst je Fahrzeug
-       * einen zweiten Tippdurchgang.
-       *
-       * FELDBUDGET: vier sichtbare Felder, `OPTA` liegt zugeklappt unter „Weitere Angaben".
-       * Die OPTA ist die taktisch-technische Betriebsstelle — bei einem ad-hoc erfassten
-       * Fremdfahrzeug ist sie im Erfassungsmoment meist unbekannt, während Funkrufname, Typ,
-       * Träger und Kennzeichen am Fahrzeug ablesbar sind.
-       *
-       * `forceRender` am Klapp-Bereich: das eingeklappte Feld bleibt im Baum, damit ein
-       * eingetragener und danach zugeklappter Wert beim Absenden mitgeht. (antds `preserve`
-       * hielte den WERT zwar ohnehin, aber erst nach einem ersten Rendern — und ohne
-       * `forceRender` ist das Feld für Tastatur und Prüfung schlicht nicht da.)
-       */}
+      {/* Ad-hoc-Disposition als Schnellerfassung.
+
+          Serienmodus, weil der Regelfall eine Menge ist: trifft eine fremde Einheit ein, werden
+          ihre Fahrzeuge nacheinander erfasst. `Trägerorganisation` und `Fahrzeugtyp` überleben
+          das Speichern (`uebernahme`) — beim Zug einer Einheit ist der Träger für alle gleich
+          und der Typ oft auch.
+
+          Feldbudget: vier sichtbare Felder, `OPTA` liegt unter „Weitere Angaben" — bei einem
+          ad-hoc erfassten Fremdfahrzeug meist unbekannt, während Funkrufname, Typ, Träger und
+          Kennzeichen ablesbar sind.
+
+          `forceRender` am Klapp-Bereich: das eingeklappte Feld bleibt im Baum, damit ein
+          eingetragener und wieder zugeklappter Wert beim Absenden mitgeht und das Feld für
+          Tastatur und Prüfung existiert. */}
       <ErfassungsModal<AdhocEingabe>
         offen={adhocOffen}
         titel="Ad-hoc-Fahrzeug disponieren"
@@ -807,8 +764,8 @@ export default function FahrzeugePage() {
         serie
         uebernahme={['traegerorganisation', 'fahrzeugtyp']}
         laeuft={adhocMutation.isPending}
-        // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der
-        // Datensatz wirklich ankam. Den Fehlertext meldet weiterhin `onError` der Mutation.
+        // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der Datensatz
+        // ankam. Den Fehlertext meldet `onError` der Mutation.
         onErfassen={(w) => adhocMutation.mutateAsync(w)}
         onFertig={() => setAdhocOffen(false)}
         onAbbrechen={() => setAdhocOffen(false)}

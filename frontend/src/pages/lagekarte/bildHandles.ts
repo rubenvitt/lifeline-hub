@@ -1,6 +1,5 @@
-// Namespace-Import, weil maplibre-gl ab 6 echtes ESM ohne Default-Export ist (v5 lieferte ein
-// UMD-Bundle, aus dem Bundler/TS per CJS-Interop einen Default synthetisierten). `import * as ns,
-// { type X }` ist KEIN gültiges ES — Namespace und named müssen in zwei Statements.
+// Namespace-Import: maplibre-gl ab 6 ist ESM ohne Default-Export. `import * as ns, { type X }` ist
+// kein gültiges ES, daher zwei Statements.
 import * as maplibregl from 'maplibre-gl';
 import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import type { Ecke, Ecken } from '../../api/kartenbilder';
@@ -25,12 +24,9 @@ import {
 type Vier = [Punkt, Punkt, Punkt, Punkt];
 
 /**
- * Ein Griff ist seit LFH-711 ZWEI Knoten: ein durchsichtiger Container in Stufengröße (das
- * Ziel, mindestens 44 px) und ein kleiner farbiger Kern (die Ansage, wo genau der Punkt
- * sitzt). Vorher war es einer, 11 bis 22 px groß — mit Handschuhen kein Ziel.
- *
- * Der Container ist das Element des Markers; MapLibre setzt seine Position auf dessen
- * MITTELPUNKT, die Vergrößerung verschiebt den Griff also nicht.
+ * Ein Griff sind zwei Knoten: ein durchsichtiger Container in Stufengröße (das Ziel, mindestens 44
+ * px) und ein kleiner farbiger Kern. Der Container ist das Marker-Element; MapLibre setzt die
+ * Position auf dessen Mittelpunkt, die Vergrößerung verschiebt den Griff also nicht.
  */
 function griffEl(art: GriffArt, kontext: GriffKontext): HTMLElement {
   const { container, kern } = griffStil(art, kontext);
@@ -47,20 +43,20 @@ function griffEl(art: GriffArt, kontext: GriffKontext): HTMLElement {
 export interface BildHandles {
   /** Ecken extern setzen (z. B. nach numerischer Mittelpunkt-Eingabe oder Refetch). */
   setzeEcken(ecken: Ecken): void;
-  /** Griffsorte umschalten (LFH-711) — nur die gewählte hängt an der Karte. */
+  /** Griffsorte umschalten — nur die gewählte hängt an der Karte. */
   setzeModus(modus: GriffModus): void;
   zerstoeren(): void;
 }
 
-/** Direkte Manipulation eines Bild-Overlays über Griffe auf der Karte:
- *  - 4 Eckgriffe: skalieren uniform um die gegenüberliegende Ecke (Seitenverhältnis + Drehung bleiben),
- *  - 4 Kantengriffe: strecken eine Dimension frei,
- *  - 1 Drehgriff: dreht um den Mittelpunkt,
- *  - 1 Mittelgriff: verschiebt.
- *  Scharf ist immer nur die Sorte des Modus (`griffeFuerModus`, LFH-711).
- *  Während des Ziehens nur Live-Vorschau (setCoordinates, kein React-State, kein PATCH);
- *  `onCommit` feuert einmal bei `dragend` (→ persistierender PATCH). Gerechnet wird im
- *  Pixel-Raum (map.project/unproject) — exakt und ohne cos(lat)-Verzerrung. */
+/**
+ * Direkte Manipulation eines Bild-Overlays über Griffe auf der Karte:
+ * - 4 Eckgriffe: skalieren uniform um die gegenüberliegende Ecke,
+ * - 4 Kantengriffe: strecken eine Dimension frei,
+ * - 1 Drehgriff: dreht um den Mittelpunkt,
+ * - 1 Mittelgriff: verschiebt. Scharf ist nur die Sorte des Modus (`griffeFuerModus`). Während des
+ *   Ziehens nur Live-Vorschau (setCoordinates, kein PATCH); `onCommit` feuert einmal bei `dragend`.
+ *   Gerechnet wird im Pixel-Raum (project/unproject), ohne cos(lat)-Verzerrung.
+ */
 export function erzeugeBildHandles(
   map: MapLibreMap,
   bildId: number,
@@ -83,8 +79,8 @@ export function erzeugeBildHandles(
       return [ll.lng, ll.lat] as Ecke;
     }) as Ecken;
 
-  // Die Griffe werden EINMAL gebaut und je nach Modus an die Karte gehängt oder abgezogen;
-  // ihre Zieh-Verdrahtung hängt am Marker, nicht am Kartenzustand, und überlebt das Abziehen.
+  // Die Griffe werden einmal gebaut und je nach Modus angehängt oder abgezogen; ihre
+  // Zieh-Verdrahtung hängt am Marker und überlebt das Abziehen.
   const griff = (art: GriffArt) =>
     new maplibregl.Marker({ element: griffEl(art, kontext), draggable: true });
   const eckGriffe: Marker[] = [0, 1, 2, 3].map((i) =>
@@ -106,9 +102,8 @@ export function erzeugeBildHandles(
   };
 
   /**
-   * Nur die Griffe des aktuellen Modus hängen an der Karte. Zehn große Ziele auf einem
-   * daumengroßen Bild lägen übereinander, und welches man erwischt, entschiede die
-   * Reihenfolge im DOM statt die Absicht.
+   * Nur die Griffe des aktuellen Modus hängen an der Karte — sonst entschiede bei übereinander
+   * liegenden Griffen die DOM-Reihenfolge statt die Absicht.
    */
   function wendeModusAn() {
     const scharf = new Set(griffeFuerModus(modus).flatMap((a) => nachArt[a]));
@@ -241,12 +236,10 @@ export function erzeugeBildHandles(
     onCommit(ecken);
   });
 
-  // Nach den Griff-Hörern angemeldet, damit `dragend` ERST speichert und dann umschaltet.
-  // Ein Moduswechsel MITTEN in einer Ziehgeste (Multitouch: ein Finger zieht, der andere tippt
-  // den Umschalter) wartet bis `dragend` (Review LFH-711). Sofort angewandt zöge er den
-  // gezogenen Griff ab: MapLibre meldet dabei seinen `mouseup`-Hörer ab, `dragend` käme nie,
-  // der Vorschaustand würde nicht gespeichert, und der Griff behielte `pointer-events: none`
-  // aus der Geste — nach dem Zurückschalten wäre er tot.
+  // Nach den Griff-Hörern angemeldet, damit `dragend` erst speichert und dann umschaltet. Ein
+  // Moduswechsel mitten in einer Ziehgeste (ein Finger zieht, der andere tippt) wartet bis
+  // `dragend`: sofort angewandt zöge er den gezogenen Griff ab, MapLibre meldete dessen
+  // `mouseup`-Hörer ab, `dragend` käme nie, und der Griff bliebe mit `pointer-events: none` tot.
   let ziehend = false;
   let wartenderModus: GriffModus | null = null;
   for (const m of alle) {
@@ -276,8 +269,8 @@ export function erzeugeBildHandles(
         return;
       }
       modus = m;
-      // ERST positionieren, dann anhängen: ein Griff, der seit dem letzten Modus abgezogen
-      // war, hat die zwischenzeitlichen Ecken nie gesehen und säße sonst am alten Ort.
+      // Erst positionieren, dann anhängen: ein zuvor abgezogener Griff hat die zwischenzeitlichen
+      // Ecken nie gesehen.
       positioniere();
       wendeModusAn();
     },

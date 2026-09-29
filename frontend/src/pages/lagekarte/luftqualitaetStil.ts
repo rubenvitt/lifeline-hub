@@ -3,16 +3,14 @@ import { luftqualitaetIndex, rollenFarbe, type StatusDarstellung } from '../../t
 import type { FeatureCollection, LuftqualitaetKlasse } from '../../api/fachebenen';
 
 /**
- * Darstellung der UBA-Luftqualitätsebene (LFH-79): Rollenfarbe und Punktdurchmesser je
- * Indexstufe, in die Feature-Properties eingebacken — dieselbe Arbeitsteilung wie
- * `hochwasserStil.ts` und aus demselben Grund: die Farbe kommt aus dem aufgelösten
- * antd-Token (Hell/Dunkel), die Kartenstil-Module haben keinen `useToken()`-Zugang
- * (LFH-328/A2). Der Circle-Layer liest `['get','farbe']`/`['get','radius']`.
+ * Darstellung der UBA-Luftqualitätsebene: Rollenfarbe und Punktdurchmesser je Indexstufe, in die
+ * Feature-Properties eingebacken — wie `hochwasserStil.ts`, weil die Farbe aus dem aufgelösten
+ * Token kommt und die Kartenstil-Module keinen `useToken()`-Zugang haben.
  *
- * DER RADIUS IST DER ZWEITE KANAL, nicht Schmuck. `luftqualitaetIndex` legt fünf Stufen auf
- * drei Rollen; ohne den streng monotonen Durchmesser wären „sehr gut" und „gut" bzw.
- * „schlecht" und „sehr schlecht" auf der Karte nicht zu trennen (WCAG 1.4.1). Der Sprung
- * zwischen `maessig` und `schlecht` ist bewusst größer: dort wechselt die Rolle zu Alarm.
+ * Der Radius ist der zweite Kanal: `luftqualitaetIndex` legt fünf Stufen auf drei Rollen, ohne
+ * streng monotonen Durchmesser wären „sehr gut"/„gut" bzw. „schlecht"/„sehr schlecht" nicht zu
+ * trennen. Der Sprung zwischen `maessig` und `schlecht` ist größer: dort wechselt die Rolle zu
+ * Alarm.
  */
 const RADIUS: Record<LuftqualitaetKlasse, number> = {
   keine_daten: 3,
@@ -24,13 +22,13 @@ const RADIUS: Record<LuftqualitaetKlasse, number> = {
 };
 
 /**
- * Unbekannter/fehlender Wert → „keine Daten": die Ebene erfindet keine Stufe. Der Rückfall
- * ist still; ein geändertes Wire-Wort bleibt trotzdem nicht unbemerkt, weil beide Seiten
- * ihre Literale pinnen (`karte::luftqualitaet::tests` ↔ `theme/statusFarben.test.ts`).
+ * Unbekannter/fehlender Wert → „keine Daten": die Ebene erfindet keine Stufe. Ein geändertes
+ * Wire-Wort bleibt nicht unbemerkt, weil beide Seiten ihre Literale pinnen
+ * (`karte::luftqualitaet::tests` ↔ `theme/statusFarben.test.ts`).
  */
 function alsKlasse(roh: unknown): LuftqualitaetKlasse {
-  // Eigene Schlüssel, nicht `in`: das sähe auch `constructor`/`toString` aus der
-  // Prototypkette. `Object.hasOwn` scheidet wegen `lib: ES2020` aus.
+  // Eigene Schlüssel, nicht `in` (sähe die Prototypkette). `Object.hasOwn` scheidet wegen `lib:
+  // ES2020` aus.
   return typeof roh === 'string' && Object.prototype.hasOwnProperty.call(luftqualitaetIndex, roh)
     ? (roh as LuftqualitaetKlasse)
     : 'keine_daten';

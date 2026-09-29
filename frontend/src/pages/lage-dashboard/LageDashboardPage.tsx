@@ -1,88 +1,38 @@
 /**
- * Lage-Dashboard — die ganze Lage auf einem Schirm (Neuentwurf „Instrumententafel" S3,
+ * Lage-Dashboard — die ganze Lage auf einem Schirm (Neuentwurf S3,
  * `docs/design/2026-09-21-neuentwurf/neuentwurf.dc.html`).
  *
- * ── AUFBAU ──────────────────────────────────────────────────────────────────────────
+ * Aufbau: Seitenkopf mit „Lagebild <TT.MM. HH:MM>", rechts Alter des Datenstands und — nur wenn die
+ * höchste Warnstufe ein Alarmbeitrag ist — der Warnstufen-Hinweis. Darunter im Fugenraster:
+ * 1. Kennzahlenband, sechs Plätze (vier Kern-, zwei Lageplätze, siehe unten).
+ * 2. Drei Paneele (1fr 1fr 1.1fr, unter `lg` gestapelt): Gefahrenmatrix (je Gefahrentyp über alle
+ *    Gebiete verdichtet), Sichtung (BBK-Farben), Meldungsstrom (neue Einträge per Sammelbanner, nie
+ *    eingeschoben).
+ * 3. Führungsstand: Aufträge offen, Meldungen offen, Lagebericht, UHS aktiv. Er steht hier, weil an
+ *    ihm die Alarmbeiträge überfälliger Aufträge und Meldungen hängen — eine überfällige
+ *    Sofortmeldung soll auf dieser Seite rot stehen.
  *
- * Seitenkopf (`EinsatzSeite`, 44 px): „Lagebild <TT.MM. HH:MM>", rechts Mono-Meta mit dem
- * Alter des Datenstands und — nur wenn die höchste Warnstufe ein Alarmbeitrag ist — dem
- * Warnstufen-Hinweis. Darunter die volle Fläche im FUGENRASTER (`gap: 1px` auf `linie`):
+ * Die Warnstufe hat keine eigene Kennzahl: sie steht als Hinweis im Seitenkopf und je Gefahrentyp
+ * in der Matrix. Der Verbindungszustand steht in der SYNC-Anzeige der Kopfleiste und als Meta des
+ * Meldungsstroms („live" nur bei offener Leitung).
  *
- *  1. Kennzahlenband, sechs Plätze: vier Kernplätze und zwei Lageplätze (LFH-640, siehe unten).
- *  2. Drei Paneele nebeneinander (1fr 1fr 1.1fr, unter `lg` gestapelt): Gefahrenmatrix
- *     (je Gefahrentyp über alle Gebiete auf die höchste Stufe verdichtet), Sichtung (BBK-
- *     Farben, Anteil an allen Gesichteten), Meldungsstrom (jüngste ETB-Einträge aller Typen,
- *     neue per Sammelbanner, nie eingeschoben).
- *  3. Führungsstand, ein zweites, kleines Band — siehe unten.
+ * Lagebezogene Kennzahlreihe (LFH-640, Spec
+ * `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`): Kern auf
+ * 2/4/5/6 (Betroffene, Kräfte, Vermisste, Einsatzdauer), Lageplätze 1 und 3. Platz 1 zeigt den
+ * Pegel, wenn einer festgelegt ist, sonst „Verbleib offen"; Platz 3 „Evakuiert", wenn eine
+ * Evakuierung angeordnet ist, sonst „Schäden offen". Wer die Plätze belegt, steht am Einsatz
+ * (`lagekennzahlen`), nicht an den Fachabfragen — sonst stünde beim Laden kurz eine andere Kennzahl
+ * da. Kommt während der Betrachtung ein neuer Zuschnitt, bietet ein Sammelbanner ihn an, statt die
+ * Reihe zu tauschen.
  *
- * ── WAS AUS DEN SECHS KACHELN WURDE (Entscheidung, begründet) ──────────────────────
+ * „Evakuiert" liest die Betreuungs-Übersicht über `betreuung/useEvakuierungKennzahl.ts`. Wer
+ * Betreuung nicht sehen darf, sieht auf Platz 3 „Evakuiert" ohne Zahl und Link, mit Grund — nie
+ * eine andere Kennzahl, sonst hinge die Reihe am Rollenzuschnitt. Die Pegel-Prognose steht in der
+ * Pegel-Notiz (`pegel/pegelKennzahl.ts`). Die Notiz „n seit über 4 h" an „Vermisste" zieht mit dem
+ * Uhr-Takt (`TAKT_MS`) nach.
  *
- * Die A0-Referenzseite hatte sechs Kacheln (Betroffene, Kräfte, Infrastruktur,
- * Lagebericht, Aufträge, Meldungen) und ein Instrumentenband. Der Neuentwurf zeigt nur
- * Kennzahlen und drei Paneele. Geprüft wurde je Kachel, was ohne Verlust wichtiger
- * Information aufgeht:
- *
- *  - **Betroffene** → Kennzahl „Betroffene" (Notiz Patienten) + Kennzahl „Vermisste" +
- *    Paneel Sichtung. Nichts verloren.
- *  - **Kräfte** → Kennzahl „Kräfte" (Gesamtstärke, Notiz Einheiten + F/UF/M//Σ). Die
- *    BOS-Schreibweise des Bands bleibt damit erhalten. Abschnitte und „Fahrzeuge
- *    gebunden" entfallen hier — sie sind die Frage des Meldebilds, nicht der Lage.
- *  - **Infrastruktur** → „Schäden offen" bleibt Kennzahl; „UHS aktiv" wandert in den
- *    Führungsstand. „Tiere aktiv" und „Lagezonen" entfallen: sie stehen auf ihren
- *    Modulseiten und auf der Lagekarte, eine Zahl ohne Bezug sagt dort mehr als hier.
- *  - **Lagebericht, Aufträge, Meldungen** → der FÜHRUNGSSTAND: vier kleine Kennzahlen
- *    (Aufträge offen, Meldungen offen, Lagebericht, UHS aktiv). Der Grund, sie nicht
- *    ersatzlos der Überblicksseite (S2) zu überlassen: an ihnen hängen die einzigen
- *    ALARMBEITRÄGE der alten Seite, die sonst verschwänden — überfällige Aufträge und
- *    überfällige Meldungen. „Ganze Lage auf einem Schirm" heißt, dass eine überfällige
- *    Sofortmeldung hier rot steht. Die Kurzlisten (je drei Zeilen) und der Lageauszug
- *    entfallen; die Zeilen liest man in ihren Modulen, der Meldungsstrom zeigt das Neue.
- *  - **Instrumentenband** → DTG und Einsatzname trägt jetzt der Rahmen (Kopfleiste mit Uhr,
- *    Einsatznummer und -name, Seitenkopf mit Lagebild-Zeit). Der Verbindungszustand steht
- *    in der SYNC-Anzeige der Kopfleiste (dieselbe Quelle `liveStatusStore`) und als Meta
- *    des Meldungsstroms: „live" nur bei offener Leitung.
- *
- *  - **Höchste Warnstufe → Pegel** (LFH-606, Entscheidung des Auftraggebers vom 22.09.2026):
- *    Der Pegel des Leitpegels steht auf Platz 1 des Bands, wie im Entwurf S3, und verdrängt
- *    die Warnstufen-Kennzahl. Die Warnstufe geht dabei nicht verloren: sie steht als Hinweis
- *    im Seitenkopf, sobald sie ein Alarmbeitrag ist („Warnstufe hoch"), und je Gefahrentyp
- *    im Paneel Gefahrenmatrix — eine dritte Stelle mit derselben Aussage wäre Wiederholung,
- *    der Wasserstand dagegen stand vorher NIRGENDS auf der Seite.
- *
- * ── LAGEBEZOGENE KENNZAHLREIHE (LFH-640) ───────────────────────────────────────────
- *
- * Eine feste Reihe passt nur zu einer Lage. Seit LFH-640 (Spec
- * `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`) hat das
- * Band sechs Plätze: Kern auf 2/4/5/6 (Betroffene, Kräfte, Vermisste, Einsatzdauer),
- * Lageplätze auf 1 und 3. Platz 1 zeigt den Pegel, wenn einer festgelegt ist, sonst
- * „Verbleib offen"; Platz 3 zeigt „Evakuiert", wenn eine Evakuierung angeordnet ist (LFH-607),
- * sonst „Schäden offen".
- * Das ERSETZT die LFH-606-Festlegung „ohne Pegel bleibt der Platz belegt": beim MANV war
- * „kein Pegel festgelegt" eine Aufforderung ins Leere. Festgelegt wird weiter in den
- * Einsatz-Einstellungen und im Fachebenen-Inspektor der Lagekarte.
- *
- * Wer die Plätze belegt, steht am EINSATZ (`lagekennzahlen`), nicht an den Fachabfragen:
- * sonst stünde beim Laden kurz eine andere Kennzahl auf Platz 1. Und die Seite HÄLT ihren
- * Zuschnitt: kommt während der Betrachtung ein neuer an, tauscht die Reihe nicht unter dem
- * Blick, sondern ein Sammelbanner bietet ihn an („übernehmen").
- *
- * „Evakuiert N · von M geplant" (LFH-607) liest die Betreuungs-Übersicht über
- * `betreuung/useEvakuierungKennzahl.ts` — dieselbe Abfrage wie Modulseite und Modulzähler,
- * gegatet wie der Zähler. Der PLATZ hängt trotzdem am Einsatz (`lagekennzahlen`), nicht an
- * dieser Abfrage und nicht am Modulrecht: wer Betreuung nicht sehen darf, sieht auf Platz 3
- * „Evakuiert" ohne Zahl und ohne Link, mit dem Grund — nie eine andere Kennzahl, sonst hinge
- * die Reihe am Rollenzuschnitt und an einer zweiten, nicht live gehaltenen Abfrage. Der
- * erwartete Höchststand am Leitpegel (LFH-628) steht als Teil der Pegel-Notiz („Prognose 7,10 m bis
- * 18:00"), solange sein Zeitpunkt aussteht — die Ableitung liegt in `pegel/pegelKennzahl.ts`.
- * „Transportiert / offen" im Sichtungsfuß und die Notiz „n seit über 4 h" an „Vermisste"
- * gibt es seit LFH-613 (strukturierter Verbleib, `vermisst_seit`); die Notiz zieht mit dem
- * Uhr-Takt der Seite (`TAKT_MS`) nach, ohne dass neue Daten eintreffen.
- *
- * ── DATENZUSTÄNDE ──────────────────────────────────────────────────────────────────
- *
- * Jede Kennzahl und jedes Paneel hängt an den Zuständen IHRER Abfragen und unterscheidet
- * `laden` / `fehler` / `leer` sichtbar (LFH-331 · B3: „Fehler sieht aus wie leer"). Fällt
- * die Gefahrenmatrix aus, bleibt die Patientenzahl lesbar.
+ * Datenzustände: jede Kennzahl und jedes Paneel hängt an seinen Abfragen und unterscheidet `laden`
+ * / `fehler` / `leer` sichtbar; fällt die Gefahrenmatrix aus, bleibt der Rest lesbar.
  */
 import { useMemo, useState, useSyncExternalStore, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -157,8 +107,10 @@ import { transportBilanz } from '../../personen/personenBilanz';
 import { useEvakuierungKennzahl } from '../../betreuung/useEvakuierungKennzahl';
 import { darfZaehlerZeigen } from '../../einsatz/useModulZaehler';
 
-/** Verdichtet mehrere Queries auf einen Zustand. Fehler schlägt Laden: ein halb geladener
- *  Block mit einem toten Teil darf nicht so aussehen, als wäre er vollständig. */
+/**
+ * Verdichtet mehrere Queries auf einen Zustand. Fehler schlägt Laden: ein halb geladener Block mit
+ * totem Teil darf nicht vollständig aussehen.
+ */
 function zustandVon(...queries: UseQueryResult<unknown>[]): Datenzustand {
   if (queries.some((q) => q.isError)) return 'fehler';
   if (queries.some((q) => q.isLoading)) return 'laden';
@@ -245,26 +197,25 @@ export default function LageDashboardPage() {
     queryKey: einsatzKeys.meldungen(einsatzId),
     queryFn: () => listeMeldungen(einsatzId),
   });
-  // Die Matrix je Gefahrengebiet, unter DEMSELBEN Key wie die Gefahrenseite
-  // (`gefahrenmatrix(einsatzId, gebietId)`): der Cache wird geteilt, und das Live-Event
-  // `gefahr` invalidiert beide.
+  // Die Matrix je Gefahrengebiet unter demselben Key wie die Gefahrenseite: Cache geteilt, das
+  // Live-Event `gefahr` invalidiert beide.
   const matrixQueries = useQueries({
     queries: (gefahrenQuery.data ?? []).map((g) => ({
       queryKey: einsatzKeys.gefahrenmatrix(einsatzId, g.id),
       queryFn: () => ladeMatrix(einsatzId, g.id),
     })),
   });
-  // Eigener Filter-Key (`{ limit }`), getrennt vom Endlos-Abruf der ETB-Seite (`{}`): beide
-  // hängen am Prefix `etb`, das Live-Event invalidiert also auch diesen.
+  // Eigener Filter-Key (`{ limit }`), getrennt vom Endlos-Abruf der ETB-Seite; beide hängen am
+  // Prefix `etb`, das Live-Event trifft also auch diesen.
   const etbQuery = useQuery({
     queryKey: einsatzKeys.etbListe(einsatzId, { limit: STROM_ABRUF }),
     queryFn: () => listeEtb(einsatzId, { limit: STROM_ABRUF }),
   });
-  // Maßgebliche Pegel (LFH-606): kein Live-Ereignis, 5-min-Nachfrage aus `pegelAbfrage`.
+  // Maßgebliche Pegel: kein Live-Ereignis, 5-min-Nachfrage aus `pegelAbfrage`.
   const pegelQuery = useQuery(pegelAbfrage(einsatzId));
-  // LFH-633: die Pegel-Kennzahl führt auf „Wetter & Pegel", wenn das Modul für diese Person
-  // frei ist — sonst auf die Pflege. Bis die Overrides da sind, gilt die Pflege: ein Link auf
-  // ein womöglich ausgeblendetes Modul wäre ein Sprung ins Leere.
+  // Die Pegel-Kennzahl führt auf „Wetter & Pegel", wenn das Modul frei ist, sonst auf die Pflege.
+  // Bis die Overrides da sind, gilt die Pflege — sonst ein Sprung ins womöglich ausgeblendete
+  // Modul.
   const { benutzer, laedt: authLaedt } = useAuth();
   const overridesQuery = useQuery({
     queryKey: einsatzKeys.modulOverrides(einsatzId),
@@ -274,11 +225,9 @@ export default function LageDashboardPage() {
     einsatzId,
     overridesQuery.isSuccess && istKeyFreigegeben('wetter-pegel', benutzer, overridesQuery.data),
   );
-  // LFH-607: „Evakuiert N · von M geplant" aus der Betreuungs-Übersicht. Erst `bereit`, wenn
-  // Benutzer und Modul-Overrides FESTSTEHEN: vorher kein Abruf (bei ausgeblendetem Modul ein
-  // 403), kein kurz aufblitzendes „nicht freigegeben" und kein Link. Scheitert der
-  // Overrides-Abruf, bleibt das Recht unbekannt — die Zelle zeigt dann „Stand unbekannt" und
-  // fragt nicht trotzdem nach.
+  // „Evakuiert" erst `bereit`, wenn Benutzer und Overrides feststehen: vorher kein Abruf (sonst 403
+  // bei ausgeblendetem Modul), kein aufblitzendes „nicht freigegeben", kein Link. Scheitert der
+  // Overrides-Abruf, zeigt die Zelle „Stand unbekannt".
   const freigabenBekannt = !authLaedt && overridesQuery.isSuccess;
   const evakuierungZustand = useEvakuierungKennzahl({
     einsatzId,
@@ -299,21 +248,17 @@ export default function LageDashboardPage() {
 
   const einsatz = einsatzQuery.data;
 
-  // ── Kennzahlreihe: gehaltener Zuschnitt (LFH-640) ────────────────────────────────────
-  // Die Reihe des Einsatzes, wie der Server sie gerade meldet — als Schlüssel-String, damit
-  // ein Refetch mit gleichem Inhalt keine neue Identität erzeugt.
+  // ── Kennzahlreihe: gehaltener Zuschnitt ── Die Reihe des Einsatzes laut Server, als
+  // Schlüssel-String, damit ein Refetch mit gleichem Inhalt keine neue Identität erzeugt.
   const serverReiheSchluessel = einsatz ? kennzahlReihe(einsatz.lagekennzahlen).join('|') : null;
   /*
-   * Die Reihe, mit der die Seite für DIESEN Einsatz aufgebaut wurde. Im Render angeglichen,
-   * nicht per Effekt (dasselbe Muster wie die Wassermarke unten): beim ersten Einsatz-Abruf
-   * und bei einem Wechsel der `:id` gilt die Serverreihe sofort; danach hält die Seite sie,
-   * bis „übernehmen" geklickt wird. Ein Effekt ließe einen Commit mit der falschen Reihe durch.
+   * Die Reihe, mit der die Seite für diesen Einsatz aufgebaut wurde. Im Render angeglichen, nicht
+   * per Effekt (ein Effekt ließe einen Commit mit der falschen Reihe durch): beim ersten Abruf und
+   * bei `:id`-Wechsel gilt die Serverreihe sofort, danach hält die Seite sie bis „übernehmen".
    *
-   * Gehalten wird erst, wenn kein Abruf des Einsatzes mehr läuft. Wer einen Pegel festlegt und
-   * sofort zum Dashboard wechselt, findet im Speicher noch den alten Einsatz, während der von
-   * der Mutation ausgelöste Abruf unterwegs ist. Hielte die Seite diesen Stand, meldete sie die
-   * EIGENE Entscheidung als Banner (Spec: „beim Rückweg … ohne Banner"). Bis dahin folgt die
-   * Reihe dem Server, wie beim ersten Aufbau.
+   * Gehalten wird erst, wenn kein Einsatz-Abruf mehr läuft: wer einen Pegel festlegt und sofort
+   * herwechselt, findet noch den alten Einsatz im Speicher und bekäme sonst seine eigene
+   * Entscheidung als Banner.
    */
   const [zuschnitt, setZuschnitt] = useState<{ einsatzId: number; schluessel: string } | null>(
     null,
@@ -385,14 +330,11 @@ export default function LageDashboardPage() {
     evakuierungZiel,
   ]);
 
-  // ── Meldungsstrom: Wassermarke statt Einschieben (Festlegung 6) ──────────────────────
+  // ── Meldungsstrom: Wassermarke statt Einschieben ──
   const [angezeigtBis, setAngezeigtBis] = useState<number | null>(null);
   /*
-   * Die Marke gehört zu EINEM Einsatz: ein Wechsel der `:id` in derselben Seiteninstanz
-   * (gleiche Route, React behält die Komponente) setzt sie zurück — sonst zeigte der neue
-   * Einsatz nur seine Einträge bis zur Nummer des alten und meldete den Rest als „neu"
-   * (Review 22.09.2026). Im Render angeglichen, nicht per Effekt: ein Effekt ließe genau
-   * einen Commit mit der falschen Marke durch.
+   * Die Marke gehört zu einem Einsatz: ein `:id`-Wechsel in derselben Seiteninstanz setzt sie
+   * zurück. Im Render angeglichen, nicht per Effekt.
    */
   const [markeFuer, setMarkeFuer] = useState(einsatzId);
   if (markeFuer !== einsatzId) {
@@ -400,15 +342,14 @@ export default function LageDashboardPage() {
     setAngezeigtBis(null);
   }
   const etbDaten = etbQuery.data;
-  // Abgeleiteter Zustand während des Renderns (React-Muster „storing information from
-  // previous renders"): der erste Abruf und ein leer gewordenes Paneel ziehen die Marke
-  // nach, alles andere wartet auf „anzeigen".
+  // Abgeleiteter Zustand während des Renderns: erster Abruf und leer gewordenes Paneel ziehen die
+  // Marke nach, alles andere wartet auf „anzeigen".
   if (etbDaten && wassermarkeNachziehen(etbDaten, angezeigtBis)) {
     setAngezeigtBis(stromAuswahl(etbDaten, null).hoechste);
   }
   const strom = stromAuswahl(etbDaten ?? [], angezeigtBis);
 
-  // ── Zustände je Block ─────────────────────────────────────────────────────────────────
+  // ── Zustände je Block ──
   const zBetroffene = zustandVon(personenQuery);
   const zKraefte = zustandVon(
     abschnitteQuery,
@@ -427,8 +368,8 @@ export default function LageDashboardPage() {
   const zStrom: Datenzustand =
     zStromRoh === 'daten' && (etbDaten ?? []).length === 0 ? 'leer' : zStromRoh;
 
-  // Je Kennzahl der Zustand IHRER Quelle — als `Record` über alle Etiketten, damit eine neue
-  // Kennzahl hier den Build bricht, statt still den Zustand einer anderen zu tragen.
+  // Je Kennzahl der Zustand ihrer Quelle — als `Record` über alle Etiketten, damit eine neue
+  // Kennzahl den Build bricht.
   const kennzahlZustand: Record<KennzahlEtikett, Datenzustand> = {
     Pegel: zustandVon(pegelQuery),
     'Verbleib offen': zBetroffene,
@@ -475,8 +416,7 @@ export default function LageDashboardPage() {
           ]}
         />
       }
-      // Der rechte Slot trägt hier Meta, keine Aktion (Entwurf S3: „Stand" und Warnstufe
-      // rechts). Er enthält keinen Knopf, die Primäraktions-Regel bleibt unberührt.
+      // Der rechte Slot trägt hier Meta, keinen Knopf.
       aktionen={
         <span
           data-lfh="lagebild-meta"
@@ -531,11 +471,9 @@ export default function LageDashboardPage() {
             Kennzahlreihe geändert: {wechsel}
           </Sammelbanner>
         )}
-        {/* Die sechs Plätze stehen auch vor dem ersten Einsatz-Abruf (Kriterium 12, CLS):
-            ohne Lagebild als Ladezelle ohne Ziel — es gibt noch nichts, wohin sie führte.
-            OHNE Beschriftung: welche Kennzahl auf die Lageplätze kommt, steht erst mit dem
-            Einsatz fest, eine geratene wechselte beim Eintreffen. Das geschützte Leerzeichen
-            hält die Zeilenhöhe der Augenbraue. */}
+        {/* Die sechs Plätze stehen auch vor dem ersten Einsatz-Abruf (Kriterium 12, CLS), als
+            Ladezelle ohne Ziel und ohne Beschriftung — welche Kennzahl auf die Lageplätze kommt,
+            steht erst mit dem Einsatz fest. Das geschützte Leerzeichen hält die Zeilenhöhe. */}
         <Kennzahlenband
           beschriftung="Lage in Zahlen"
           spalten={bandSpalten}
@@ -610,8 +548,8 @@ export default function LageDashboardPage() {
           />
         </div>
 
-        {/* Führungsstand: was vorher eigene Kacheln hatte (Dateikopf). Die Überfällig-Zahlen
-            sind Alarmbeiträge und behalten deshalb ihren Ton. */}
+        {/* Führungsstand (siehe Dateikopf). Die Überfällig-Zahlen sind Alarmbeiträge und
+            behalten ihren Ton. */}
         <Kennzahlenband
           beschriftung="Führungsstand"
           spalten={abBreite('md') ? 4 : 2}
@@ -647,9 +585,8 @@ export default function LageDashboardPage() {
           <Kennzahl
             titel="Lagebericht"
             groesse="klein"
-            // `stand` ist ein UTC-Wirestring ohne Zonenkennung — roh ausgegeben stand er um
-            // den Zonenversatz falsch (LFH-350 · H60). Formatiert wird hier, weil die Zone
-            // am Provider hängt und `baueLagebild` sie nicht kennen muss.
+            // `stand` ist ein UTC-Wirestring ohne Zonenkennung; formatiert wird hier, weil die Zone
+            // am Provider hängt.
             wert={fuehrung?.bericht ? formatUhrzeitMitTag(fuehrung.bericht.stand, konv) : 'keiner'}
             notiz={
               fuehrung?.bericht

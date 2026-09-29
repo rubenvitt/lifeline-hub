@@ -108,13 +108,10 @@ export default function ChatPage() {
   }, []);
 
   /*
-   * Die Höhenkette der Chat-Seite (LFH-343 · C8, Befund H51) liegt seit dem Neuentwurf im
-   * Rahmen: `EinsatzSeite` mit `fensterInhalt` (→ `FensterRahmen`, LFH-459) begrenzt die
-   * Arbeitsfläche auf die Resthöhe des Fensters — gemessen statt gerechnet, in `dvh`, per
-   * Callback-Ref und ResizeObserver. Das ist genau die Bauform, die diese Seite vorher
-   * selbst trug (eigener Abstand zum Dokumentanfang, Callback-Ref statt Mount-Effekt, weil
-   * die Seite beim Laden früh zurückkehrt); sie steht jetzt EINMAL. `flex: 1; min-height: 0;
-   * overflow-y: auto` im Strom scrollt nur, weil dieser Rahmen eine begrenzte Höhe hat.
+   * Die Höhenkette liegt im Rahmen: `EinsatzSeite` mit `fensterInhalt` (→ `FensterRahmen`) begrenzt
+   * die Arbeitsfläche auf die Resthöhe des Fensters, gemessen in `dvh` per Callback-Ref und
+   * ResizeObserver. `flex: 1; min-height: 0; overflow-y: auto` im Strom scrollt nur, weil dieser
+   * Rahmen eine begrenzte Höhe hat.
    */
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -124,7 +121,7 @@ export default function ChatPage() {
     queryKey: einsatzKeys.chatKanaele(einsatzId),
     queryFn: () => listeKanaele(einsatzId),
   });
-  // Empfänger-Optionen für die Auftrag-Heraufstufung (LFH-101).
+  // Empfänger-Optionen für die Auftrag-Heraufstufung.
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
@@ -136,9 +133,9 @@ export default function ChatPage() {
 
   const kanaele = kanaeleQuery.data ?? [];
   const ausgewaehlterKanal = kanalAuswahl?.einsatzId === einsatzId ? kanalAuswahl.kanalId : null;
-  // Beim Routewechsel darf die Kanal-ID des vorherigen Einsatzes nicht einmal für
-  // einen Zwischen-Render in die neue URL geraten. Erst die erfolgreich geladene,
-  // aktuelle Kanalliste darf eine explizite Auswahl oder ihren ersten Kanal freigeben.
+  // Beim Routewechsel darf die Kanal-ID des vorherigen Einsatzes nicht einmal für einen
+  // Zwischen-Render in die neue URL geraten. Erst die erfolgreich geladene, aktuelle Kanalliste
+  // gibt eine Auswahl oder ihren ersten Kanal frei.
   const kanalId = kanaeleQuery.isSuccess
     ? kanaele.some((kanal) => kanal.id === ausgewaehlterKanal)
       ? ausgewaehlterKanal
@@ -169,9 +166,9 @@ export default function ChatPage() {
     enabled: kanalId !== null,
   });
 
-  // Erst NACH einem erfolgreichen Nachrichtenabruf markieren. Der serverseitige Zustand
-  // ist pro Nachricht und Benutzer persistent; ein späteres SSE-Update hebt den Stand durch
-  // `dataUpdatedAt` erneut an und markiert den gerade sichtbaren Kanal wieder gelesen.
+  // Erst nach einem erfolgreichen Nachrichtenabruf markieren. Der Gelesen-Stand ist je Nachricht
+  // und Benutzer persistent; ein späteres SSE-Update hebt `dataUpdatedAt` an und markiert den
+  // sichtbaren Kanal erneut.
   useEffect(() => {
     if (
       !dokumentSichtbar ||
@@ -187,13 +184,13 @@ export default function ChatPage() {
       .then(() => {
         if (!aktiv) return;
         void qc.invalidateQueries({ queryKey: einsatzKeys.chatKanaele(einsatzId) });
-        // Das Lesen ist benutzereigen und erzeugt kein Live-Ereignis — der Chat-Zähler im
-        // Navigationsrahmen (LFH-612) fiele sonst erst beim nächsten fremden Ereignis.
+        // Das Lesen ist benutzereigen und erzeugt kein Live-Ereignis — der Chat-Zähler fiele sonst
+        // erst beim nächsten fremden Ereignis.
         void qc.invalidateQueries({ queryKey: einsatzKeys.modulZaehler(einsatzId) });
       })
       .catch(() => {
-        // Die Kanalliste behält ihren ungelesenen Stand und macht den Fehlschlag damit sichtbar;
-        // keine störende Toast-Schleife bei jedem Live-Refetch.
+        // Die Kanalliste behält ihren ungelesenen Stand und macht den Fehlschlag sichtbar; keine
+        // Toast-Schleife bei jedem Live-Refetch.
       });
     return () => {
       aktiv = false;
@@ -208,9 +205,8 @@ export default function ChatPage() {
     ungelesenImAktivenKanal,
   ]);
 
-  // Sachbezug-Picker/Anzeige (LFH-103): Listen je Typ nur laden, wenn der Dialog offen
-  // ist (Picker) ODER eine geladene Nachricht diesen Typ referenziert (Label-Auflösung)
-  // — vermeidet 6 eager Requests bei jedem Chat-Öffnen.
+  // Sachbezug-Picker/Anzeige: Listen je Typ nur laden, wenn der Dialog offen ist oder eine geladene
+  // Nachricht den Typ referenziert — vermeidet sechs eager Requests bei jedem Chat-Öffnen.
   const bezugDialogOffen = bezugNachricht !== null;
   const referenzierteTypen = new Set<BezugTyp>();
   for (const n of nachrichtenQuery.data?.pages.flat() ?? []) {
@@ -267,12 +263,9 @@ export default function ChatPage() {
     },
     onSuccess: () => {
       invalidiereNachrichten();
-      // Wer selbst absendet, will seinen Satz sehen — auch wenn er gerade weiter oben
-      // im Verlauf las (LFH-466). Der Zähler unterscheidet die eigene ABSENDUNG vom
-      // Live-Ereignis; er hängt bewusst NICHT am Autor der Nachricht, sonst führte
-      // jede fremde Nachricht desselben Kontos zum Sprung — und die Pille wäre in
-      // einer Ein-Benutzer-Prüfung nicht mehr belegbar. Dieselbe Trennung, mit der
-      // LFH-343 · C8 den Rückgängig-Toast von den Alarmmeldungen abgrenzt.
+      // Wer selbst absendet, will seinen Satz sehen, auch wenn er gerade weiter oben las. Der
+      // Zähler unterscheidet die eigene Absendung vom Live-Ereignis und hängt bewusst nicht am
+      // Autor: sonst führte jede fremde Nachricht desselben Kontos zum Sprung.
       setEigeneSendungen((n) => n + 1);
     },
     onError: fehler,
@@ -397,12 +390,10 @@ export default function ChatPage() {
 
   const arbeitsflaeche = (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Unter `md` steht die Kanalauswahl als waagerechte Leiste ÜBER dem Strom,
-          statt als Spalte daneben — auf 390 px bliebe für den Strom sonst nichts
-          übrig. Sie wird bedingt gerendert und nicht bloß ausgeblendet: sonst
-          stünden beide Navigationen im Baum und die Aussage „unter md ist es die
-          Leiste" wäre nicht prüfbar (dieselbe Regel wie beim Navigations-Drawer,
-          LFH-329/B1). */}
+      {/* Unter `md` steht die Kanalauswahl als waagerechte Leiste über dem Strom, sonst bliebe
+          auf 390 px für den Strom nichts. Bedingt gerendert, nicht bloß ausgeblendet: sonst
+          stünden beide Navigationen im Baum und „unter md ist es die Leiste" wäre nicht
+          prüfbar. */}
       {istSchmal && kanalId != null && (
         <div
           data-testid="kanal-leiste"
@@ -415,20 +406,18 @@ export default function ChatPage() {
             onWechsel={(neu) => setKanalAuswahl({ einsatzId, kanalId: neu })}
             optionen={sortiereKanaele(kanaele).map((k) => ({
               wert: k.id,
-              // Ungelesen: Punkt in Bedienfarbe UND die Zahl im Wortlaut — dieselbe Auskunft
-              // wie in der Spalte, mit zweitem Kanal neben der Farbe.
+              // Ungelesen: Punkt in Bedienfarbe und die Zahl im Wortlaut — zweiter Kanal neben der
+              // Farbe.
               label: k.ungelesen_anzahl > 0 ? `${k.name} (${k.ungelesen_anzahl})` : k.name,
               punkt: k.ungelesen_anzahl > 0 ? rollen.bedien : undefined,
             }))}
           />
         </div>
       )}
-      {/* `flexWrap: 'nowrap'` ist tragend und keine Kosmetik — gemessen im Browser:
-          `ant-row` bringt `flex-wrap: wrap` mit, und eine umbrechende Flex-Zeile
-          bemisst sich an ihrem Inhalt, statt ihre Kinder auf die Containerhöhe zu
-          strecken. Der Col stand damit auf 1081 px in einem 619 px hohen Row, die
-          Begrenzung lief ins Leere und die Eingabe blieb unter dem Bild.
-          Unbedenklich, weil unter `md` ohnehin nur EIN Col in der Zeile steht. */}
+      {/* `flexWrap: 'nowrap'` ist tragend: `ant-row` bringt `flex-wrap: wrap` mit, und eine
+          umbrechende Flex-Zeile bemisst sich an ihrem Inhalt, statt ihre Kinder auf die
+          Containerhöhe zu strecken — die Begrenzung liefe ins Leere und die Eingabe stünde
+          unter dem Bild. Unbedenklich, weil unter `md` nur ein Col in der Zeile steht. */}
       <Row gutter={16} style={{ flex: 1, minHeight: 0, flexWrap: 'nowrap', alignItems: 'stretch' }}>
         {!istSchmal && (
           <Col data-testid="kanal-spalte" md={6} lg={5} style={{ overflowY: 'auto' }}>
@@ -474,11 +463,9 @@ export default function ChatPage() {
             </div>
           )}
           <NachrichtenStrom
-            /* Remount je Kanal (Repo-Muster aus LFH-348 · C13). Der Strom merkt sich
-               seit LFH-466, ob der Lesende unten steht und ab welcher id gezählt wird
-               — beides gehört zu EINEM Kanal. Ohne den Schlüssel nähme ein Wechsel den
-               Merker aus dem alten Kanal mit: die Sicht spränge nicht ans Ende, und die
-               Pille zeigte eine Zahl aus fremden ids. */
+            /* Remount je Kanal: der Strom merkt sich, ob der Lesende unten steht und ab welcher
+               id gezählt wird — beides gehört zu einem Kanal. Ohne den Schlüssel spränge die
+               Sicht beim Wechsel nicht ans Ende, und die Pille zeigte eine Zahl aus fremden ids. */
             key={kanalId ?? 'kein-kanal'}
             nachrichten={nachrichten}
             eigeneSendungen={eigeneSendungen}
@@ -576,8 +563,8 @@ export default function ChatPage() {
         einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
         senden={heraufstufenAuftragMutation.isPending}
         onAbbrechen={() => setHeraufstufenAuftragAuswahl(null)}
-        // mutateAsync: die Erfassungshülle im Formular darf die Felder nur leeren,
-        // wenn der Auftrag wirklich angekommen ist (LFH-332/B4).
+        // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn der Auftrag angekommen
+        // ist.
         onAnlegen={(daten) =>
           heraufstufenAuftrag
             ? heraufstufenAuftragMutation.mutateAsync({ nid: heraufstufenAuftrag.id, daten })

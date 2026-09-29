@@ -20,10 +20,9 @@ interface Props {
 }
 
 /**
- * Sidebar „Kräfte ohne BR": zeigt Einheiten und einheitenlose Fahrzeuge mit
- * `aktueller_br_id == null` (in keinem BR bereitgestellt). Mitglieder des
- * aktuellen BR werden zusätzlich ausgeblendet — Defense-in-Depth, falls der
- * Listen-Cache und der BR-Detail-Cache kurzzeitig auseinanderlaufen.
+ * Sidebar „Kräfte ohne BR": Einheiten und einheitenlose Fahrzeuge mit `aktueller_br_id == null`.
+ * Mitglieder des aktuellen BR werden zusätzlich ausgeblendet, falls Listen- und Detail-Cache kurz
+ * auseinanderlaufen.
  */
 export default function KraefteOhneBrSidebar({
   alleEinheiten,
@@ -41,12 +40,10 @@ export default function KraefteOhneBrSidebar({
   const brEinheitIds = new Set(brEinheiten.map((e) => e.id));
   const brFahrzeugIds = new Set(brFahrzeuge.map((f) => f.id));
 
-  // Einheiten in keinem BR (aktueller_br_id == null) und nicht im aktuellen BR
   const freieEinheiten = alleEinheiten.filter(
     (e) => e.aktueller_br_id == null && !brEinheitIds.has(e.id),
   );
 
-  // Einheitenlose Fahrzeuge in keinem BR und nicht im aktuellen BR
   const freiFahrzeuge = alleFahrzeuge.filter(
     (f) => f.einheit_id == null && f.aktueller_br_id == null && !brFahrzeugIds.has(f.id),
   );
@@ -55,9 +52,7 @@ export default function KraefteOhneBrSidebar({
   const gruppen = gruppiereFreieKraefte(freieEinheiten, freiFahrzeuge, suche);
 
   return (
-    // Unter `md` volle Breite und gestapelt (LFH-341 · H40) — dieselbe Form wie bei
-    // Gefahrengebietsliste und Gliederungsbaum. Die Zuweisung läuft hier ohnehin über
-    // den „zuweisen"-Knopf, nicht über einen Drag: der Umbruch kostet keinen Bedienweg.
+    // Unter `md` volle Breite und gestapelt; die Zuweisung läuft über den Knopf, nicht per Drag.
     <div
       data-testid="kraefte-ohne-br"
       style={breit ? { width: 240, minHeight: 400, display: 'flex' } : { width: '100%' }}
@@ -76,8 +71,8 @@ export default function KraefteOhneBrSidebar({
           onChange={(e) => setSuche(e.target.value)}
           style={{ marginBottom: token.marginSM }}
         />
-        {/* Eigener Scroll mit begrenzter Höhe (M58): die Höhenkette endet hier an der Karte selbst,
-          nicht am Layout (Falle aus LFH-343 · H51) — deshalb ein Maß in dvh direkt am Container. */}
+        {/* Eigener Scroll: die Höhenkette endet hier an der Karte, nicht am Layout (vgl. H51) —
+            deshalb ein dvh-Maß direkt am Container. */}
         <div style={{ maxHeight: 'min(60dvh, 560px)', overflowY: 'auto' }}>
           {leer && <Typography.Text type="secondary">keine freien Kräfte</Typography.Text>}
           {!leer && gruppen.length === 0 && (

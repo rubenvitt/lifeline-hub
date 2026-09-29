@@ -63,18 +63,23 @@ export interface LayerSichtbar {
   zone: boolean;
   lagemeldung: boolean;
   freies_zeichen: boolean;
-  /** Ebene „Betroffene" (LFH-648). Der Schalter ist die Wahl, NICHT die Zugriffsgrenze —
-   *  gezeichnet wird nur bei freigegebenem Modul „Personen" (`personenZugriff`). */
+  /**
+   * Ebene „Betroffene". Der Schalter ist die Wahl, nicht die Zugriffsgrenze — gezeichnet wird nur
+   * bei freigegebenem Modul „Personen" (`personenZugriff`).
+   */
   person: boolean;
-  /** Ebene „Betreuungsstellen" (LFH-673). Wie `person` ist der Schalter die Wahl, die
-   *  Zugriffsgrenze ist die Datenquelle (`betreuungEbene.ts`). */
+  /**
+   * Ebene „Betreuungsstellen". Wie `person`: die Zugriffsgrenze ist die Datenquelle
+   * (`betreuungEbene.ts`).
+   */
   betreuungsstelle: boolean;
 }
 
-/** Platzierbare Punkt-Typen (Fläche/Abschnitt läuft über onAbschnittZeichnenStart).
- *  `person` (Betroffene, LFH-613) kommt nur über den Deeplink-Auftrag von der Detailseite —
- *  die Lagekarte führt Personen zwar als Ebene (LFH-648), aber nicht in „Nicht verortet":
- *  die Koordinaten-Lücke zeigt die Betroffenen-Seite. */
+/**
+ * Platzierbare Punkt-Typen (Fläche/Abschnitt über `onAbschnittZeichnenStart`). `person` kommt nur
+ * über den Deeplink-Auftrag der Detailseite — Personen stehen nicht in „Nicht verortet", die
+ * Koordinaten-Lücke zeigt die Betroffenen-Seite.
+ */
 export type PlatzierenPunktTyp =
   'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'person' | 'betreuungsstelle';
 
@@ -83,29 +88,25 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   schaden: 'Schaden',
   einheit: 'Einheit',
   fahrzeug: 'Fahrzeug',
-  fuehrung: 'Personal', // LFH-276: beliebiges disponiertes Personal, nicht nur Führung
+  fuehrung: 'Personal', // beliebiges disponiertes Personal, nicht nur Führung
   abschnitt: 'Abschnitt',
   betreuungsstelle: 'Betreuungsstelle',
 };
 
 /**
- * Ab wie vielen Einträgen „Nicht verortet" ein Suchfeld trägt (LFH-360).
- *
- * Fünf, weil die Liste in der 300 px breiten Leiste ab dort zu scrollen beginnt — darunter
- * ist Hinsehen schneller als Tippen, und ein dauerhaft stehendes Feld ließe die Leiste im
- * Normalfall zuwachsen. Dieselbe Abwägung wie `SUCHE_AB` der Einsatzauswahl, dort acht.
+ * Ab wie vielen Einträgen „Nicht verortet" ein Suchfeld trägt: ab fünf beginnt die Liste in der
+ * 300-px-Leiste zu scrollen, darunter ist Hinsehen schneller als Tippen.
  */
 export const NICHT_VERORTET_SUCHE_AB = 5;
 
 /**
- * Filter der Liste „Nicht verortet" (LFH-360): Teilstring, Groß-/Kleinschreibung egal, gegen
- * die Zeile, wie sie DASTEHT — Typ-Präfix plus Label („Fahrzeug: ELW 1"). Deshalb findet
- * „einheit" alle Einheiten und „personal" das disponierte Personal, dessen Schlüssel
- * `fuehrung` nirgends angezeigt wird und folgerichtig nichts trifft.
+ * Filter der Liste „Nicht verortet": Teilstring ohne Groß-/Kleinschreibung gegen die Zeile, wie sie
+ * dasteht (Typ-Präfix plus Label) — „einheit" findet alle Einheiten, der Schlüssel `fuehrung`
+ * nichts.
  *
- * Das laufende Platzierungsziel bleibt IMMER stehen: seine Zeile trägt den einzigen
- * „Abbrechen"-Knopf des Modus (der Hinweis oben nennt ihn nur, Escape beendet nur das
- * Messwerkzeug). Filterte ein Begriff sie weg, säße die Einsatzkraft im Platzier-Modus fest.
+ * Das laufende Platzierungsziel bleibt immer stehen: seine Zeile trägt den einzigen
+ * „Abbrechen"-Knopf des Modus. Filterte ein Begriff sie weg, säße die Einsatzkraft im
+ * Platzier-Modus fest.
  */
 export function filtereNichtVerortet(
   liste: NichtVerortet[],
@@ -121,17 +122,18 @@ export function filtereNichtVerortet(
   );
 }
 
-/** Platzierungsziel → exclude-Tag (typ:id) für die Ort-Vorschau (Selbst-Ausschluss).
- *  Einsatzort-Marker trägt die echte einsatzId, nicht die Dummy-0 aus dem Platzierungs-Ziel. */
+/**
+ * Platzierungsziel → exclude-Tag (typ:id) für die Ort-Vorschau. Der Einsatzort-Marker trägt die
+ * echte einsatzId, nicht die 0 aus dem Platzierungsziel.
+ */
 export function ortVorschauExclude(
   ziel: SidebarProps['platzierungZiel'],
   einsatzId: number,
 ): string | undefined {
   if (!ziel) return undefined;
   if (ziel.typ === 'einsatzort') return `einsatzort:${einsatzId}`; // Marker-id = echte Einsatz-ID, nicht 0
-  // Sidebar-Typen → Backend-Marker-Typ-Tags. 'fuehrung' = Personal-Führung → 'personal'.
-  // Keine Betreuungsstelle (LFH-673): die Peilung prüft nur den Einsatz-Lesezugriff und darf
-  // deshalb keine Stellen kennen — es gibt nichts auszuschließen (wie `person`).
+  // Sidebar-Typen → Backend-Marker-Tags; 'fuehrung' → 'personal'. Keine Betreuungsstelle: die
+  // Peilung prüft nur den Einsatz-Lesezugriff und darf keine Stellen kennen (wie `person`).
   const map: Record<string, string> = {
     uhs: 'uhs',
     schaden: 'schaden',
@@ -153,23 +155,19 @@ export interface SektionFehler {
 }
 
 /**
- * Fehler-Slots je Sidebar-Sektion (LFH-331 · B3).
+ * Fehler-Slots je Sidebar-Sektion: gesetzt, sagt die Sektion, warum sie nichts zeigt — eine leere
+ * Objektliste läse sich als „nichts da", und das ist im Einsatz eine Lagebeurteilung.
  *
- * Gesetzt = die Sektion sagt, WARUM sie nichts zeigt, statt eine leere Liste zu zeigen.
- * Der Unterschied ist nicht kosmetisch: eine leere Objektliste liest sich als „nichts da",
- * und im Einsatz ist „nichts da" eine Lagebeurteilung.
- *
- * Bewusst KEIN Slot an der Karte „Verortet": sie trifft keine Vollständigkeitsaussage,
- * ihre beiden Zahlen zählen nur — und ein zweiter, gleich begründeter Fehlerkasten 100 px
- * unter dem ersten füllt die 300 px breite Leiste, ohne eine neue Tatsache zu melden. Die
- * namentliche Meldung steht am Seitenkopf.
+ * Bewusst kein Slot an „Verortet": sie trifft keine Vollständigkeitsaussage, ihre Zahlen zählen
+ * nur, und ein zweiter Fehlerkasten füllte die schmale Leiste ohne neue Tatsache. Die namentliche
+ * Meldung steht am Seitenkopf.
  */
 export interface SidebarSektionFehler {
   /** Die Lagebild-Quellen hinter „Nicht verortet" (und damit hinter „Alles verortet"). */
   nichtVerortet?: SektionFehler;
   /** Eigene Query: `useKartenbilder`. */
   bilder?: SektionFehler;
-  /** Eigene Query: `useKartenAnsicht`. Scheitert sie, rendert der Switcher heute NICHTS. */
+  /** Eigene Query: `useKartenAnsicht`. Ohne diesen Slot rendert der Switcher bei Fehler nichts. */
   ansichten?: SektionFehler;
 }
 
@@ -178,13 +176,12 @@ export interface SidebarProps {
   nichtVerortet: NichtVerortet[];
   verortet: KarteMarker[];
   /**
-   * Quelle der Objektsuche unter „Verortet" (LFH-716) — `suchbareMarker` aus
-   * `objektsuche.ts`, also schon ohne Namen aus Modulen, für die kein Recht besteht. Getrennt
-   * von `verortet`, weil das die Ebenen-Zeilen zählt und keine Betroffenen trägt.
+   * Quelle der Objektsuche unter „Verortet" — `suchbareMarker` aus `objektsuche.ts`, also ohne
+   * Namen aus Modulen ohne Recht. Getrennt von `verortet`, das die Ebenen-Zeilen zählt und keine
+   * Betroffenen trägt.
    */
   suchbar: KarteMarker[];
-  /** Eine Quelle der Suche ist ausgefallen — dann „—" statt Zahlen und keine behauptete Leere.
-   *  Weiter als `sektionFehler.nichtVerortet`, weil die Suche auch Betroffene trägt. */
+  /** Eine Quelle der Suche ist ausgefallen — dann „—" statt Zahlen, keine behauptete Leere. */
   suchbarUnvollstaendig?: boolean;
   darfSchreiben: boolean;
   platzierungZiel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } | null;
@@ -192,12 +189,14 @@ export interface SidebarProps {
   onPlatzierenAbbrechen: () => void;
   onAbschnittZeichnenStart: (id: number) => void;
   onZoneZeichnenStart: (entwurf: { typ: ZoneTyp; modus: ZeichenModus; farbe?: string }) => void;
-  /** Freies taktisches Zeichen (LFH-170): aktive Platzierung + Start/Abbrechen. */
+  /** Freies taktisches Zeichen: aktive Platzierung + Start/Abbrechen. */
   zeichenPlatzieren: FreiesZeichenUpdate | null;
   onZeichenPlatzierenStart: (spec: FreiesZeichenUpdate) => void;
   onZeichenPlatzierenAbbrechen: () => void;
-  /** Serienmodus des Platzierens (LFH-332/M76): AN heißt, ein erfolgreicher POST beendet
-   *  den Platzier-Modus NICHT. Beendet wird dann über „Fertig". */
+  /**
+   * Serienmodus des Platzierens: an heißt, ein erfolgreicher POST beendet den Platzier-Modus nicht;
+   * beendet wird über „Fertig".
+   */
   zeichenSerie: boolean;
   onZeichenSerieWechsel: (an: boolean) => void;
   /** Bereits gesetzte Zeichen der laufenden Serie; 0 = noch keins (dann heißt Beenden „Abbrechen"). */
@@ -211,16 +210,15 @@ export interface SidebarProps {
   /** Zahl der Zonen der aktiven Ansicht — UNGEGATTERT (siehe `ebenenZeilen`). */
   zonenAnzahl: number;
   /**
-   * Ebene „Betroffene" (LFH-648): Zugriff und Zahl der Personen-Marker. Die laufen getrennt
-   * von `verortet`, die Zahl kommt deshalb von hier. Fehlt die Angabe, gibt es keine Zeile.
+   * Ebene „Betroffene": Zugriff und Zahl der Personen-Marker (die laufen getrennt von `verortet`).
+   * Fehlt die Angabe, gibt es keine Zeile.
    */
   personen?: PersonenEbenenAngabe;
-  /** Ebene „Betreuungsstellen" (LFH-673): nur die Zugriffsgrenze — die Marker zählen in
-   *  `verortet` mit, wie die UHS. */
+  /** Ebene „Betreuungsstellen": nur die Zugriffsgrenze — die Marker zählen in `verortet` mit. */
   betreuung?: BetreuungEbenenAngabe;
   /**
-   * Gewählte Kartengrundlage. Gewählt wird sie in der Segmentleiste über der Karte; das
-   * Paneel „Kartengrundlage" trägt nur, was dort keinen Platz hat (Karten-Design, Hinweise).
+   * Gewählte Kartengrundlage. Gewählt wird sie in der Segmentleiste über der Karte; das Paneel
+   * trägt nur, was dort keinen Platz hat.
    */
   basemap: BasemapModus;
   /** Die Grundlagen-Wahl selbst — nur auf dem Handschirm, wo sie nicht über der Karte steht. */
@@ -231,8 +229,10 @@ export interface SidebarProps {
   /** Karten-lokale Theme-Wahl (Offline-Basemap): 'auto' folgt dem App-Theme. */
   kartenTheme: KartenThemeWahl;
   onKartenThemeWechsel: (wahl: KartenThemeWahl) => void;
-  /** „In dieser Ansicht speichern" (LFH-319/320): true, wenn der aktuelle Karten-Zustand von
-   *  der gespeicherten Ansicht abweicht (Basemap/Ebenen/Fachebenen). */
+  /**
+   * „In dieser Ansicht speichern": true, wenn der Karten-Zustand von der gespeicherten Ansicht
+   * abweicht (Basemap/Ebenen/Fachebenen).
+   */
   ansichtDirty: boolean;
   ansichtSpeichert: boolean;
   onAnsichtSpeichern: () => void;
@@ -245,8 +245,7 @@ export interface SidebarProps {
       import('../../api/fachebenen').FachebeneStatus
     >
   >;
-  /** Je bbox-abhängiger Ebene: aktiv, aber die Karte ist zu weit herausgezoomt für eine
-   *  Abfrage (LFH-81; bis dahin ein einzelnes Flag nur für KRITIS). */
+  /** Je bbox-abhängiger Ebene: aktiv, aber zu weit herausgezoomt für eine Abfrage. */
   zoomZuKlein?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */
   fachebenenLaedt?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
@@ -258,19 +257,18 @@ export interface SidebarProps {
   onBildPlatzieren: (id: number) => void;
   onBildPlatzierenFertig: () => void;
   onBildLoeschen: (id: number) => void;
-  /** Bild auf eine andere Ansicht verschieben bzw. auf alle (`null`) — B/LFH-320. */
+  /** Bild auf eine andere Ansicht verschieben bzw. auf alle (`null`). */
   onBildVerschieben: (id: number, ansichtId: number | null) => void;
   onBildZentrieren: (id: number) => void;
   onBildUmbenennen: (id: number, name: string) => void;
   /** Mittelpunkt des gerade platzierten Bilds numerisch setzen. */
   onBildMittelpunkt: (lat: number, lon: number) => void;
   bildPlatzierenId: number | null;
-  /** Scharfe Griffsorte beim Bild-Einpassen (LFH-711). */
+  /** Scharfe Griffsorte beim Bild-Einpassen. */
   griffModus: GriffModus;
   onGriffModus: (modus: GriffModus) => void;
   /** Aktueller Mittelpunkt des Platzier-Bilds (für die numerische Eingabe). */
   bildPlatzierZentrum: LatLon | null;
-  /** Ansichts-Switcher (B/LFH-320). */
   ansichten: KartenAnsicht[];
   aktiveAnsichtId?: number;
   onAnsichtWaehlen: (id: number) => void;
@@ -279,7 +277,7 @@ export interface SidebarProps {
   onAnsichtStandard: (id: number) => void;
   onAnsichtLoeschen: (id: number, objekte: 'freigeben' | 'loeschen') => void;
   ansichtBusy: boolean;
-  /** Fehler-Slots je Sektion (LFH-331 · B3) — siehe `SidebarSektionFehler`. */
+  /** Fehler-Slots je Sektion — siehe `SidebarSektionFehler`. */
   sektionFehler?: SidebarSektionFehler;
   /**
    * Inhalt des Paneels „Ausgewählt" — die Inspectors der gewählten Objekte (Marker, Zone,
@@ -287,17 +285,16 @@ export interface SidebarProps {
    */
   auswahl?: ReactNode;
   /**
-   * Zähler, der bei jeder Erhöhung das Paneel „Zeichnen" öffnet und in den Blick holt — der
-   * Zeichnen-Knopf über der Karte. Ein Zähler statt eines Booleans, damit ein zweiter Klick
-   * nach dem Zuklappen wieder greift.
+   * Zähler, der bei jeder Erhöhung das Paneel „Zeichnen" öffnet und in den Blick holt
+   * (Zeichnen-Knopf über der Karte). Ein Zähler statt eines Booleans, damit ein zweiter Klick nach
+   * dem Zuklappen wieder greift.
    */
   zeichnenAnfrage?: number;
 }
 
 /**
- * Stil einer Ebenen-Zeile — ein handgebautes Bedienziel (`<button role="switch">`), also die
- * ZWEI Angaben aus LFH-365: `minHeight` aus `controlHeight` plus Polsterung. Rein und
- * exportiert, damit die Staffel 30 / 48 / 72 ohne Rendern prüfbar ist.
+ * Stil einer Ebenen-Zeile — ein handgebautes Bedienziel (`<button role="switch">`): `minHeight` aus
+ * `controlHeight` plus Polsterung. Rein und exportiert.
  */
 export function ebenenZeileStil(token: {
   controlHeight: number;
@@ -324,10 +321,8 @@ const FARBFELD = 14;
 
 /**
  * Eine Zeile im Paneel „Ebenen": Farbfeld · Name · Anzahl; Klick schaltet die Ebene.
- *
- * `role="switch"` + `aria-checked` tragen den Zustand als Wort — das Farbfeld (gefüllt an,
- * leer aus) ist nur der zweite, sichtbare Kanal, und der gedämpfte Name der dritte. Der
- * zugängliche Name ist der Ebenenname allein; die Anzahl steht sichtbar daneben.
+ * `role="switch"` + `aria-checked` tragen den Zustand; das Farbfeld (gefüllt an, leer aus) ist der
+ * zweite Kanal. Der zugängliche Name ist der Ebenenname allein.
  */
 function EbenenZeilenKnopf({
   zeile,
@@ -376,12 +371,10 @@ function EbenenZeilenKnopf({
 }
 
 /**
- * Eine gesperrte Ebenen-Zeile (LFH-648, heute nur „Betroffene"): dieselbe Bauform wie ein
- * gesperrtes Modul in der Einsatz-Navigation (`einsatz/ModulPanel.tsx`) — `disabled`, Schloss
- * in `aria-hidden`-Hülle (sonst läse ein antd-Icon sein englisches `aria-label` „lock" vor),
- * und der GRUND als Text statt einer Zahl. Kein `role="switch"`: eine Ebene ohne Zugriff hat
- * keinen Zustand, den man umlegen könnte. Die Zahl entfällt, weil sie die Menge wäre, die der
- * Benutzer nicht sehen darf. Das leere Farbfeld hält die Spalte der übrigen Zeilen.
+ * Eine gesperrte Ebenen-Zeile (heute nur „Betroffene"), gebaut wie ein gesperrtes Modul in
+ * `einsatz/ModulPanel.tsx`: `disabled`, Schloss in `aria-hidden`-Hülle, der Grund als Text statt
+ * einer Zahl. Kein `role="switch"` — ohne Zugriff gibt es keinen Zustand. Die Zahl entfällt, weil
+ * sie die Menge wäre, die der Benutzer nicht sehen darf.
  */
 function GesperrteEbenenZeile({ zeile, grund }: { zeile: EbenenZeile; grund: string }) {
   const { token, rollen } = useRollen();
@@ -399,9 +392,8 @@ function GesperrteEbenenZeile({ zeile, grund }: { zeile: EbenenZeile; grund: str
         cursor: 'not-allowed',
         background: 'transparent',
         borderBlockEnd: `1px solid ${rollen.flaeche3}`,
-        // `text2`, nicht `schwach`: der Grund ist die Aussage der Zeile und muss im Tagmodus
-        // 7 : 1 halten (Prüfliste Kriterium 5; `schwach` auf `paneel` misst dort 5,8 : 1).
-        // Gesperrt sagt das Schloss und das Wort, nicht eine blassere Schrift.
+        // `text2`, nicht `schwach`: der Grund ist die Aussage der Zeile und muss am Tag 7 : 1
+        // halten (`schwach` auf `paneel`: 5,8 : 1).
         color: rollen.text2,
       }}
     >
@@ -426,7 +418,7 @@ function GesperrteEbenenZeile({ zeile, grund }: { zeile: EbenenZeile; grund: str
   );
 }
 
-/** Ein Fehler-Slot als Markup — oder nichts. Hält die drei Aufrufstellen unten einzeilig. */
+/** Ein Fehler-Slot als Markup — oder nichts. */
 function FehlerSlot({ fehler }: { fehler?: SektionFehler }) {
   if (!fehler) return null;
   return (
@@ -439,12 +431,9 @@ function FehlerSlot({ fehler }: { fehler?: SektionFehler }) {
 }
 
 /**
- * Derselbe Fehler, aber ÜBER erhalten gebliebenen Zeilen statt an ihrer Stelle (D5).
- *
- * `SeitenStandVeraltet` verlangt einen Wiederhol-Weg — ohne ihn trüge sein „Erneut abrufen"
- * ins Leere. `SektionFehler.onWiederholen` ist optional, also fällt der Slot dann auf die
- * gewöhnliche Fehlermeldung zurück. Bewusst NICHT auf „gar kein Banner": dass der gezeigte
- * Stand alt ist, bleibt die Aussage, die die Einsatzkraft braucht.
+ * Derselbe Fehler über erhalten gebliebenen Zeilen statt an ihrer Stelle. Ohne `onWiederholen`
+ * fällt der Slot auf die gewöhnliche Fehlermeldung zurück, nicht auf „kein Banner": dass der Stand
+ * alt ist, bleibt die Aussage.
  */
 function VeraltetSlot({ fehler }: { fehler?: SektionFehler }) {
   if (!fehler) return null;
@@ -453,21 +442,12 @@ function VeraltetSlot({ fehler }: { fehler?: SektionFehler }) {
 }
 
 /**
- * Das Bild, dessen Entfernen gerade bestätigt werden soll — oder `null`, wenn es keins (mehr)
- * gibt (LFH-366 · B5f, Review-Fund G2).
+ * Das Bild, dessen Entfernen bestätigt werden soll — oder `null`, wenn es keins (mehr) gibt. Nicht
+ * bloß `loeschBildId != null`: die Bildliste kommt live, und entfernt ein zweiter Bediener das Bild
+ * während der Rückfrage, stünde der Dialog mit leerem Titel und einem DELETE ins Leere da.
  *
- * Warum nicht einfach `loeschBildId != null`: die Bildliste kommt über den SSE-Fan-out und kann
- * sich ändern, WÄHREND die Rückfrage offensteht — ein zweiter Bediener entfernt dasselbe Bild.
- * Gemessen an einem `rerender` ohne das Bild blieb der Dialog dann offen, sein Titel fiel auf
- * `Bild „" entfernen?` zurück, und „Entfernen" schickte ein DELETE auf ein Objekt, das es nicht
- * mehr gibt. Der Zustand, den der Dialog beschreibt, ist die ZEILE, nicht die Nummer.
- *
- * Rein und exportiert aus demselben Grund wie {@link bedienzielStil}: die Aussage ist am DOM
- * nicht führbar. antd löst die Schliess-Animation eines `<Modal>` über `transitionend` auf, das
- * in jsdom nie feuert — nach `open={false}` steht der Knopf weiter im Baum (gemessen), und die
- * naheliegende Zusicherung `queryByRole('button') → null` wäre rot, obwohl die Härtung greift.
- * Eine Zusicherung auf antds `ant-zoom-leave` hinge dagegen an einer Animationsklasse, die beim
- * nächsten Bump wandert. Also wird geprüft, was die Entscheidung trägt, statt wie sie aussieht.
+ * Rein und exportiert, weil die Aussage am DOM nicht prüfbar ist: antd schließt ein `<Modal>` über
+ * `transitionend`, das in jsdom nie feuert.
  */
 export function loeschDialogBild<T extends { id: number; name: string }>(
   bilder: readonly T[],
@@ -478,27 +458,15 @@ export function loeschDialogBild<T extends { id: number; name: string }>(
 }
 
 /**
- * Trefflächenboden für ein HANDGEBAUTES Bedienziel (LFH-366 · B5f, Konvention aus LFH-365).
+ * Trefflächenboden für ein handgebautes Bedienziel. Die Einträge unter „Verortet" sind klickbar,
+ * aber `ListenEintrag` legt `onClick` auf ein nacktes `<div>`, dessen Höhe nur aus der Polsterung
+ * der `<Liste>` käme (Handschuh grob 54 statt 72 px). Deshalb zwei Angaben: `minHeight` aus
+ * `controlHeight` plus Polsterung.
  *
- * Die Einträge der Karte „Verortet" sind klickbar, aber kein antd-Steuerelement: `ListenEintrag`
- * legt sein `onClick` auf ein nacktes `<div>`, und dessen Höhe entsteht allein aus der Polsterung
- * der `<Liste>`. Die trägt den Boden NICHT — gemessen kommt eine Zeile im Handschuh-Betrieb damit
- * auf grob 54 px gegen die geforderten 72. Deshalb ZWEI Angaben und nicht eine: `minHeight` aus
- * `controlHeight` (30 / 48 / 72) plus die Polsterung.
+ * Aufgelöste Tokens, nie `var(--lfh-*)` (Arbeitsteilung in `theme/rollen.css`). Rein und
+ * exportiert, damit die Zusicherung ohne Render prüfbar ist.
  *
- * Aufgelöste Tokens, nie `var(--lfh-*)`: die Arbeitsteilung steht in `theme/rollen.css`
- * („ZWEI QUELLEN, EINE WAHRHEIT") — handgeschriebenes CSS liest die Custom Properties, TSX liest
- * `theme.useToken()`. Präzedenz: `components/Datensicht.tsx:1255`, `etb/SlashMenu.tsx:102`.
- *
- * Rein und exportiert, damit die Zusicherung über zwei Dichtestufen prüfbar ist, OHNE zu rendern:
- * `test/utils.tsx` montiert ein nacktes `ConfigProvider` ohne unser Theme, ein gerenderter Wert
- * belegte also antd-Vorgaben statt der Staffel — und jsdom rechnet ohnehin kein Layout.
- *
- * **Was hier NICHT gelöst wird:** die Tastaturbedienbarkeit. Das `<div onClick>` hat weder `role`
- * noch `tabIndex` noch `onKeyDown`; das zu ändern hieße, `components/Liste.tsx` anzufassen, und
- * die klickbare Zeile als Ganzes ist ausdrücklich B7 (LFH-335) zugeordnet
- * (`components/Datensicht.tsx`, Festlegung 4). Der Boden hier ist die Trefffläche, nicht der
- * ganze Zugang.
+ * Nicht gelöst: Tastaturbedienbarkeit des `<div onClick>` (LFH-335).
  */
 export function bedienzielStil(token: {
   controlHeight: number;
@@ -515,17 +483,11 @@ export function bedienzielStil(token: {
 }
 
 /**
- * Eine Schalter-Zeile der Leiste, die UMBRECHEN darf (LFH-380).
- *
- * Seit der Kippschalter der Staffel folgt, ist er im Handschuh 144 px breit. Die Leiste hat
- * 300 px, nach der Polsterung des Klapppaneels bleiben gemessen 247 — eine starre Zeile ließ
- * dem Bildnamen daneben 19 px („…"), und „Wetterwarnungen" ragte 16 px aus der Leiste.
- * Zusammen mit {@link namensteilStil} rückt der Namensteil deshalb in eine eigene Zeile,
- * sobald neben dem Schalter kein Platz für ihn bleibt; in kompakt und komfortabel bleibt es
- * eine Zeile. Das folgt aus dem Layout, nicht aus einer Stufenabfrage.
- *
- * Rein und exportiert wie {@link bedienzielStil}. Der Umbruch selbst ist in jsdom nicht
- * prüfbar; der Nachweis liegt in `e2e/lagekarte-leiste-dichte.spec.ts`.
+ * Eine Schalter-Zeile der Leiste, die umbrechen darf: der Kippschalter ist im Handschuh 144 px
+ * breit, nach der Polsterung bleiben 247 px — eine starre Zeile ließe dem Namen 19 px. Mit {@link
+ * namensteilStil} rückt der Namensteil in eine eigene Zeile, sobald neben dem Schalter kein Platz
+ * bleibt; in kompakt und komfortabel bleibt es eine Zeile. Das folgt aus dem Layout, nicht aus
+ * einer Stufenabfrage. Nachweis: `e2e/lagekarte-leiste-dichte.spec.ts`.
  */
 export function leistenZeileStil(token: { marginXS: number }) {
   return {
@@ -537,17 +499,12 @@ export function leistenZeileStil(token: { marginXS: number }) {
 }
 
 /**
- * Der Namensteil einer {@link leistenZeileStil}-Zeile — der Name UND was ihm rechts folgt
- * (Aktionsmenü, Statuswort), als EINE Umbrucheinheit.
+ * Der Namensteil einer {@link leistenZeileStil}-Zeile — Name und was ihm rechts folgt (Menü,
+ * Statuswort) als eine Umbrucheinheit; getrennt umgebrochen rutschte das Menü allein in eine zweite
+ * Zeile.
  *
- * Einheit statt zweier Teile, und das ist gemessen: brachen Name und Aktionen getrennt um,
- * rutschte in komfortabel das Aktionsmenü allein in eine zweite Zeile, obwohl vorher alles
- * in eine passte. So entscheidet genau eine Frage, ob der Teil neben den Schalter passt.
- *
- * Basis 0 plus Mindestbreite: ein Flex-Element bricht um, sobald seine Mindestbreite nicht
- * mehr neben die Vorgänger passt, und füllt sonst den Rest. Der Boden ist `6em` Name plus
- * ein Bedienziel der Stufe (`controlHeight` — ein Icon-Knopf ist so breit wie hoch). Die
- * Schrift-Einheit wandert mit der Stufe, keine Pixelzahl bildet die Leistenbreite nach.
+ * Basis 0 plus Mindestbreite: das Element bricht um, sobald die Mindestbreite nicht mehr neben die
+ * Vorgänger passt. Boden ist `6em` Name plus ein Bedienziel der Stufe (`controlHeight`).
  */
 export function namensteilStil(token: { controlHeight: number; marginXS: number }) {
   return {
@@ -560,12 +517,9 @@ export function namensteilStil(token: { controlHeight: number; marginXS: number 
 }
 
 /**
- * Rechte Leiste der Lagekarte (Neuentwurf S5 „Karte führt, Daten folgen"), 300 px ab `lg`.
- *
- * Oben die zwei festen Abschnitte des Entwurfs — **Ebenen** (Farbfeld · Name · Anzahl, Klick
- * schaltet) und **Ausgewählt** (die Inspectors, die vorher über der Karte schwebten). Darunter
- * als einklappbare Paneele alles, was die alte linke Kartenleiste trug; nichts ist entfallen.
- * Die Kartengrundlage selbst wird in der Segmentleiste ÜBER der Karte gewählt.
+ * Rechte Leiste der Lagekarte, 300 px ab `lg`. Oben die festen Abschnitte Ebenen und Ausgewählt
+ * (die Inspectors), darunter als einklappbare Paneele alles Übrige. Die Kartengrundlage selbst wird
+ * in der Segmentleiste über der Karte gewählt.
  */
 export default function Sidebar(props: SidebarProps) {
   const { nichtVerortet, verortet, darfSchreiben, platzierungZiel } = props;
@@ -576,45 +530,43 @@ export default function Sidebar(props: SidebarProps) {
   const paneele = usePaneelZustand();
   const umschalten = (k: Parameters<typeof paneele.setze>[0]) => () =>
     paneele.setze(k, !paneele.zustand[k]);
-  // Ein Paneel mit Fehler-Slot steht OFFEN, egal wie es zuletzt stand: ein zugeklappter Fehler
-  // wäre von „nichts da" nicht zu unterscheiden (Fehler ≠ leer, LFH-331 · B3).
+  // Ein Paneel mit Fehler-Slot steht offen, egal wie es zuletzt stand: ein zugeklappter Fehler wäre
+  // von „nichts da" nicht zu unterscheiden.
   const [koord, setKoord] = useState<LatLon | null>(null);
-  // Freies-Zeichen-Schnellerfassung (LFH-170): Picker erst auf Klick sichtbar (kein Dauer-
-  // Combobox in der Leiste), Entwurf bleibt über Platzierungen erhalten.
+  // Freies-Zeichen-Schnellerfassung: der Picker erscheint erst auf Klick, der Entwurf bleibt über
+  // Platzierungen erhalten.
   const [zeichenPickerOffen, setZeichenPickerOffen] = useState(false);
   const [zeichenEntwurf, setZeichenEntwurf] = useState<FreiesZeichenUpdate>({
     grundzeichen: 'taktische-formation',
   });
-  /** Knopf „Platzieren" und Enter im Picker: der Entwurf übernimmt die Spec, damit der
-   *  wieder geöffnete Picker dort weitermacht, wo platziert wurde. */
+  /**
+   * Knopf „Platzieren" und Enter im Picker: der Entwurf übernimmt die Spec, damit der wieder
+   * geöffnete Picker dort weitermacht.
+   */
   const platziereZeichen = (spec: FreiesZeichenUpdate) => {
     setZeichenEntwurf(spec);
     props.onZeichenPlatzierenStart(spec);
     setZeichenPickerOffen(false);
   };
-  // Suche über „Nicht verortet" (LFH-360). Wirksam ist der Begriff nur, solange das Feld
-  // steht: fällt die Liste unter die Schwelle, verschwindet mit dem Feld auch sein
-  // `allowClear` — ein weiterwirkender Filter verschluckte dann Einträge ohne sichtbaren
-  // Grund und ohne Ausweg (Befund M6 der Einsatzauswahl). Zurückgesetzt wird deshalb WÄHREND
-  // des Renderns, nicht im Effekt: React verwirft diesen Durchlauf vor dem Commit und rendert
-  // sofort mit leerem Begriff neu, es gibt also keinen sichtbaren Zwischenstand mit Filter.
-  // Ein zusätzlich abgeleiteter Begriff (`zeigen ? suche : ''`) wäre davon nicht zu
-  // unterscheiden gewesen — per Mutationsprobe gemessen — und steht deshalb nicht da.
+  // Suche über „Nicht verortet". Wirksam nur, solange das Feld steht: fällt die Liste unter die
+  // Schwelle, verschwindet mit dem Feld sein `allowClear` — ein weiterwirkender Filter verschluckte
+  // Einträge ohne Ausweg. Zurückgesetzt während des Renderns: React verwirft diesen Durchlauf vor
+  // dem Commit, es gibt keinen sichtbaren Zwischenstand.
   const [nvSuche, setNvSuche] = useState('');
   const nvSucheZeigen = nichtVerortet.length >= NICHT_VERORTET_SUCHE_AB;
   if (!nvSucheZeigen && nvSuche !== '') setNvSuche('');
   const nvBegriff = nvSuche.trim();
   const nvTreffer = filtereNichtVerortet(nichtVerortet, nvBegriff, platzierungZiel);
-  // Gezählt werden nur ECHTE Treffer: die angeheftete Zeile des laufenden Ziels steht auch
-  // ohne Treffer da, und mitgezählt behauptete „1 von 5" einen Treffer, den es nicht gibt.
+  // Gezählt werden nur echte Treffer: die angeheftete Zeile des laufenden Ziels steht auch ohne
+  // Treffer da.
   const nvTrefferzahl = nvBegriff
     ? filtereNichtVerortet(nichtVerortet, nvBegriff, null).length
     : nichtVerortet.length;
   // Entwurfswert der numerischen Mittelpunkt-Eingabe im Bild-Platzier-Modus.
   const [bildMitte, setBildMitte] = useState<LatLon | null>(null);
   /**
-   * Bild, dessen Entfernen bestätigt werden soll (LFH-366 · B5f) — EIN Dialog für die ganze
-   * Liste, nicht einer je Zeile: n Dialoge im Baum wären n gleichnamige Knöpfe pro Rolle.
+   * Bild, dessen Entfernen bestätigt werden soll — ein Dialog für die ganze Liste, nicht je Zeile
+   * (n Dialoge wären n gleichnamige Knöpfe).
    */
   const [loeschBildId, setLoeschBildId] = useState<number | null>(null);
   // Entwurf verwerfen, sobald ein anderes Bild platziert wird oder der Modus endet.
@@ -629,8 +581,8 @@ export default function Sidebar(props: SidebarProps) {
   );
   const zeigeSichtungslegende = props.layer.person && props.personen?.zugriff === 'frei';
 
-  // Zeichnen-Knopf über der Karte: Paneel öffnen und in den Blick holen. `setze` ist stabil;
-  // der Effekt hängt allein am Zähler, damit ein Zuklappen ihn nicht erneut auslöst.
+  // Zeichnen-Knopf über der Karte: Paneel öffnen und in den Blick holen. Der Effekt hängt allein am
+  // Zähler, damit ein Zuklappen ihn nicht erneut auslöst.
   const zeichnenRef = useRef<HTMLDivElement>(null);
   const { setze: paneelSetzen } = paneele;
   useEffect(() => {
@@ -640,14 +592,11 @@ export default function Sidebar(props: SidebarProps) {
     requestAnimationFrame(() => zeichnenRef.current?.scrollIntoView?.({ block: 'nearest' }));
   }, [props.zeichnenAnfrage, paneelSetzen]);
 
-  // Zum kleinen `size`-Prop in dieser Datei (LFH-328/A1 Festlegung 4): auf allen
-  // interaktiven Elementen — Button, Switch, Radio.Group — ist es ENTFERNT; deren Höhe kommt
-  // aus der Dichte-Staffel am `ConfigProvider`. Stehen bleiben die `Liste`-Angaben (dort ein
-  // Abstandsmaß, keine Treffläche) und der eine `Spin` (eine Anzeige). Die anklickbaren
-  // Einträge unter „Verortet" tragen `bedienzielStil`, die Ebenen-Zeilen `ebenenZeileStil`.
+  // Die kleine Größe steht in dieser Datei nur noch an `Liste` (Abstandsmaß) und am `Spin`
+  // (Anzeige); interaktive Elemente erben ihre Höhe vom `ConfigProvider`. Die anklickbaren Einträge
+  // tragen `bedienzielStil`, die Ebenen-Zeilen `ebenenZeileStil`.
   //
-  // Die Prop-Schreibweise steht hier bewusst NICHT ausgeschrieben: Gate 4 zählt ihr Literal
-  // repo-weit, und ein erklärender Kommentar darf das Gate, das er erklärt, nicht füllen.
+  // Die Prop-Schreibweise steht bewusst nicht ausgeschrieben: Gate 4 zählt ihr Literal repo-weit.
   return (
     <div
       data-lfh="kartenleiste"
@@ -730,13 +679,10 @@ export default function Sidebar(props: SidebarProps) {
         offen={paneele.zustand.nichtVerortet || sektionFehler.nichtVerortet != null}
         onUmschalten={umschalten('nichtVerortet')}
       >
-        {/* Die Weiche ist das Paar aus D3 und D5 (LFH-331 · B3) — dasselbe wie in
-            `PersonenPage`/`SchaedenPage`/`TierePage`, und der `anzahl === 0`-Wächter ist
-            der tragende Teil daran: **ein Fehler ersetzt Inhalt nur, wenn es keinen
-            Inhalt gibt.** Stehen noch Zeilen im Zwischenspeicher, wird der Fehler zum Banner
-            DARÜBER (`SeitenStandVeraltet`), und die Liste — die einzige Bedienung zum
-            Verorten — bleibt bedienbar. „Alles verortet" ist eine Erfolgsaussage und darf
-            nicht stehen, solange unklar ist, ob überhaupt etwas geladen wurde. */}
+        {/* Ein Fehler ersetzt Inhalt nur, wenn es keinen gibt (`anzahl === 0`): stehen noch
+            Zeilen im Zwischenspeicher, wird der Fehler zum Banner darüber, und die Liste — die
+            einzige Bedienung zum Verorten — bleibt bedienbar. „Alles verortet" darf nicht
+            stehen, solange unklar ist, ob etwas geladen wurde. */}
         {sektionFehler.nichtVerortet && nichtVerortet.length === 0 ? (
           <FehlerSlot fehler={sektionFehler.nichtVerortet} />
         ) : nichtVerortet.length === 0 ? (
@@ -746,10 +692,9 @@ export default function Sidebar(props: SidebarProps) {
             <VeraltetSlot fehler={sektionFehler.nichtVerortet} />
             {nvSucheZeigen && (
               <div style={{ marginBlockEnd: token.marginXS }}>
-                {/* Ein schlichtes Eingabefeld statt der Suchvariante: gefiltert wird live,
-                    deren Suchknopf wäre ein Tab-Ziel ohne Wirkung. Die Ikone steht in einer
-                    `aria-hidden`-Hülle — sie brächte sonst ein englisches „search" als
-                    eigenes Vorleseziel mit. Die Höhe erbt das Feld vom `ConfigProvider`. */}
+                {/* Schlichtes Eingabefeld statt Suchvariante: gefiltert wird live, deren
+                    Suchknopf wäre ein Tab-Ziel ohne Wirkung. Die Ikone in `aria-hidden`-Hülle
+                    (sonst ein englisches „search"). */}
                 <Input
                   aria-label="Nicht verortete Objekte durchsuchen"
                   placeholder="Name oder Typ"
@@ -762,13 +707,10 @@ export default function Sidebar(props: SidebarProps) {
                   value={nvSuche}
                   onChange={(ev) => setNvSuche(ev.target.value)}
                 />
-                {/* Die Trefferzahl ist die ZWEITE Angabe: der Kopf zählt weiter alle nicht
-                    verorteten Objekte, sonst verlöre die Warnzahl ihre Aussage.
-                    Die Region STEHT mit dem Feld, auch wenn sie schweigt: eine Live-Region
-                    meldet nur Änderungen an Inhalt, der schon da war (Regel der Sprungpalette).
-                    Sie trägt auch „0 von N" — die Leermeldung darunter hat keine Rolle, und
-                    der Fokus bleibt im Feld; ohne diese Zeile hörte ein Vorleser nie, dass die
-                    Suche alles weggefiltert hat. */}
+                {/* Die Trefferzahl ist die zweite Angabe: der Kopf zählt weiter alle nicht
+                    verorteten Objekte. Die Region steht mit dem Feld, auch wenn sie schweigt
+                    (eine Live-Region meldet nur Änderungen), und trägt auch „0 von N" — sonst
+                    hörte ein Vorleser nie, dass alles weggefiltert ist. */}
                 <div
                   role="status"
                   style={{
@@ -781,12 +723,9 @@ export default function Sidebar(props: SidebarProps) {
                 </div>
               </div>
             )}
-            {/* Dritter Zustand neben „Alles verortet" und der Liste: die Suche hat alles
-                weggefiltert. Eigener Wortlaut, weil „Alles verortet" hier eine falsche
-                Lagebeurteilung wäre. Keine Primäraktion — der Ausweg ist das Leeren am
-                Feld unmittelbar darüber. Steht das laufende Platzierungsziel als einzige
-                Zeile da, bleibt sie ohne Leermeldung: beides nebeneinander widerspräche sich,
-                und „0 von N" sagt schon, dass sie kein Treffer ist. */}
+            {/* Dritter Zustand: die Suche hat alles weggefiltert. Eigener Wortlaut, weil „Alles
+                verortet" eine falsche Lagebeurteilung wäre; der Ausweg ist das Leeren am Feld.
+                Steht das laufende Ziel als einzige Zeile da, entfällt die Leermeldung. */}
             {nvTreffer.length === 0 ? (
               <SeitenLeer titel={`Keine Treffer für „${nvBegriff}"`} />
             ) : (
@@ -797,9 +736,8 @@ export default function Sidebar(props: SidebarProps) {
                 renderItem={(o) => {
                   const aktiv = platzierungZiel?.typ === o.typ && platzierungZiel?.id === o.id;
                   let action: React.ReactNode = null;
-                  // Zeilenaktionen sind SEKUNDÄR (umrandet): n Zeilen mit je einem gefüllten
-                  // Knopf wären n Primäraktionen nebeneinander — „genau eine Primäraktion" gilt
-                  // auch in der Leiste. Gefüllt bleibt nur, was einen laufenden Modus abschließt.
+                  // Zeilenaktionen sind sekundär (umrandet) — „genau eine Primäraktion" gilt auch
+                  // in der Leiste. Gefüllt ist nur, was einen laufenden Modus abschließt.
                   if (darfSchreiben) {
                     if (o.typ === 'abschnitt') {
                       action = (
@@ -865,10 +803,8 @@ export default function Sidebar(props: SidebarProps) {
         offen={paneele.zustand.verortet}
         onUmschalten={umschalten('verortet')}
       >
-        {/* Kein eigener Fehlerkasten (Begründung an `SidebarSektionFehler`), aber die Zahlen
-            dürfen nicht lügen und die Leere wird nicht behauptet: im Fehlerfall hat die Lage
-            niemand geprüft (`zaehlerUnbekannt`). Seit LFH-716 über alle Objektarten statt
-            nur UHS und Schäden. */}
+        {/* Kein eigener Fehlerkasten (siehe `SidebarSektionFehler`), aber im Fehlerfall weder
+            Zahlen noch behauptete Leere (`zaehlerUnbekannt`). */}
         <MarkerSuche
           marker={props.suchbar}
           onMarkerWaehlen={props.onMarkerWaehlen}
@@ -894,11 +830,10 @@ export default function Sidebar(props: SidebarProps) {
                     return (
                       <Space key={t.typ} wrap>
                         <Typography.Text>{t.label}</Typography.Text>
-                        {/* `farbe` ist ein PERSISTIERTER Datenwert: er wandert über
-                            `onZoneZeichnenStart` in die Zone und damit in die Datenbank. Er
-                            darf deshalb NICHT auf ein Laufzeit-Token zeigen — ein
-                            Themenwechsel würde sonst gespeicherte Zonen nachträglich
-                            uminterpretieren. Das Literal bleibt bewusst (LFH-328/T14). */}
+                        {/* `farbe` ist ein persistierter Datenwert: er wandert über
+                            `onZoneZeichnenStart` in die Datenbank. Kein Laufzeit-Token, sonst
+                            deutete ein Themenwechsel gespeicherte Zonen um — das Literal bleibt
+                            bewusst. */}
                         <Button
                           onClick={() =>
                             props.onZoneZeichnenStart({
@@ -943,11 +878,8 @@ export default function Sidebar(props: SidebarProps) {
                     <Typography.Text type="secondary">
                       Auf Karte klicken zum Platzieren.
                     </Typography.Text>
-                    {/* Serienmodus (LFH-332/M76). Der Schalter steht hier und nicht im Picker,
-                        weil er den LAUFENDEN Modus beschreibt und mitten in einer Serie
-                        umgelegt werden können muss. `wrap`: der Schalter ist im Handschuh
-                        144 px breit (LFH-380), neben dem Wort bliebe die 300-px-Leiste zu
-                        schmal. */}
+                    {/* Serienmodus: der Schalter beschreibt den laufenden Modus und steht
+                        deshalb hier, nicht im Picker. `wrap`: im Handschuh ist er 144 px breit. */}
                     <Space wrap>
                       <Switch
                         checked={props.zeichenSerie}
@@ -961,9 +893,9 @@ export default function Sidebar(props: SidebarProps) {
                         {props.zeichenSerieAnzahl} platziert
                       </Typography.Text>
                     )}
-                    {/* Ein Knopf, zwei Wahrheiten: solange nichts gesetzt ist, verwirft
-                        Beenden nur die Absicht („Abbrechen"). Ab dem ersten gesetzten Zeichen
-                        wäre „Abbrechen" eine Lüge — das Gespeicherte bleibt. */}
+                    {/* Solange nichts gesetzt ist, verwirft Beenden nur die Absicht
+                        („Abbrechen"); ab dem ersten Zeichen wäre „Abbrechen" falsch — das
+                        Gespeicherte bleibt. */}
                     {props.zeichenSerieAnzahl > 0 ? (
                       <Button type="primary" onClick={props.onZeichenPlatzierenFertig}>
                         Fertig
@@ -974,9 +906,9 @@ export default function Sidebar(props: SidebarProps) {
                   </Space>
                 ) : zeichenPickerOffen ? (
                   <Space orientation="vertical" style={{ width: '100%' }}>
-                    {/* Enter im Picker (LFH-716, D4) nimmt denselben Weg wie der Knopf —
-                        mit der Spec, die der Picker mitbringt, weil `zeichenEntwurf` die per
-                        Enter gewählte Kachel in dieser Runde noch nicht trägt. */}
+                    {/* Enter im Picker nimmt denselben Weg wie der Knopf — mit der mitgebrachten
+                        Spec, weil `zeichenEntwurf` die per Enter gewählte Kachel in dieser Runde
+                        noch nicht trägt. */}
                     <FreiesZeichenPicker
                       wert={zeichenEntwurf}
                       onChange={setZeichenEntwurf}
@@ -1026,8 +958,7 @@ export default function Sidebar(props: SidebarProps) {
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               Karten-Konfiguration weicht von der gespeicherten Ansicht ab.
             </Typography.Text>
-            {/* Seit LFH-320 schreibt der Button in die AKTIVE Ansicht, nicht in eine
-                einsatzweite Einstellung (LFH-325). */}
+            {/* Schreibt in die aktive Ansicht, nicht in eine einsatzweite Einstellung. */}
             <Button
               type="primary"
               block
@@ -1057,22 +988,21 @@ export default function Sidebar(props: SidebarProps) {
             const zoomHinweis = sichtbar && istBboxAbhaengig(key) && props.zoomZuKlein?.[key];
             return (
               <div key={key} data-fachebene={key} style={leistenZeileStil(token)}>
-                {/* Der Name steht am Schalter selbst, wie am Bild-Schalter unten — ohne ihn
-                    las ein Vorleser neun namenlose Schalter. */}
+                {/* Der Name steht am Schalter selbst — sonst läse ein Vorleser namenlose
+                    Schalter. */}
                 <Switch
                   checked={sichtbar}
                   aria-label={def.label}
                   onChange={(v) => props.onFachebeneToggle(key, v)}
                 />
-                {/* Marke, Beschriftung und Statuswort sind EIN Umbruchteil: bricht die Zeile,
-                    geht das Farbquadrat mit seinem Wort, statt allein neben dem Schalter zu
-                    stehen, und das Statuswort bleibt rechts daneben. */}
+                {/* Marke, Beschriftung und Statuswort sind ein Umbruchteil: das Farbquadrat geht
+                    mit seinem Wort. */}
                 <span style={namensteilStil(token)}>
                   <span style={{ color: def.farbe }} aria-hidden="true">
                     ■
                   </span>
-                  {/* Der Geltungsbereich steht als ZEILE, nicht als Tooltip (LFH-80): auf
-                      einem Führungs-Tablet gibt es kein Hovern. */}
+                  {/* Der Geltungsbereich steht als Zeile, nicht als Tooltip: auf dem Tablet gibt
+                      es kein Hovern. */}
                   <span style={{ display: 'inline-flex', flexDirection: 'column', flex: 1 }}>
                     <span>{def.label}</span>
                     {def.geltung && (
@@ -1093,7 +1023,7 @@ export default function Sidebar(props: SidebarProps) {
                     </Tooltip>
                   ) : (
                     <>
-                      {/* `nowrap`: sonst bricht die Marke mitten im Wort (LFH-83). */}
+                      {/* `nowrap`: sonst bricht die Marke mitten im Wort. */}
                       {sichtbar && offline && (
                         <Tooltip title="Quelle offline — Ebene wird leer angezeigt">
                           <Typography.Text
@@ -1129,11 +1059,10 @@ export default function Sidebar(props: SidebarProps) {
         meta={props.bilder.length || undefined}
       >
         <Space orientation="vertical" style={{ width: '100%' }}>
-          {/* Der Slot ist ein BANNER über der Liste, kein Ersatz für sie: die Bild-Overlays
-              liegen weiter sichtbar auf der KARTE — verschwänden nur ihre Bedienelemente,
-              liesse sich ein Bild nicht mehr abschalten. `SeitenFehler` statt
-              `SeitenStandVeraltet`, weil dieser Slot eine `ursache` führt. Der Upload darunter
-              hängt an einer eigenen Route und bleibt bedienbar. */}
+          {/* Der Slot ist ein Banner über der Liste, kein Ersatz: die Overlays liegen weiter auf
+              der Karte, ohne Bedienelemente ließe sich keins mehr abschalten. `SeitenFehler`,
+              weil der Slot eine `ursache` führt. Der Upload hängt an einer eigenen Route und
+              bleibt bedienbar. */}
           <FehlerSlot fehler={sektionFehler.bilder} />
           {props.bilder.map((b) => {
             const imPlatzieren = props.bildPlatzierenId === b.id;
@@ -1170,15 +1099,14 @@ export default function Sidebar(props: SidebarProps) {
                     >
                       {b.name}
                     </Typography.Text>
-                    {/* Drei Aktionen an einer Zeile werden gebündelt (LFH-365 · B5e). OHNE
-                      Schreibrecht bleibt genau eine — dann steht der Zentrieren-Knopf direkt
-                      da, ein Menü wäre ein Umweg. Beide Fälle sind als Paar getestet. */}
+                    {/* Drei Aktionen an einer Zeile werden gebündelt; ohne Schreibrecht bleibt
+                        eine, dann steht der Zentrieren-Knopf direkt da. */}
                     <div style={{ flexShrink: 0 }}>
                       {darfSchreiben ? (
                         <Dropdown
                           trigger={['click']}
-                          // `autoFocus`: ohne ihn klebt der Fokus am Auslöser (Befund an
-                          // `components/Datensicht.tsx`). In jsdom nicht prüfbar.
+                          // `autoFocus`: ohne ihn klebt der Fokus am Auslöser. In jsdom nicht
+                          // prüfbar.
                           autoFocus
                           menu={{
                             items: [
@@ -1195,10 +1123,8 @@ export default function Sidebar(props: SidebarProps) {
                                   : 'Auf der Karte platzieren',
                               },
                               /*
-                               * Die Trennung zwischen destruktiver und harmloser Aktion (AK2): im
-                               * Menü ist sie der Trenner. Er trennt VISUELL; sein Weissraum
-                               * skaliert nicht mit der Dichte (antd rechnet ihn aus `lineWidth`),
-                               * was mitzieht, sind die Zeilenhöhen des Menüs.
+                               * Die Trennung zwischen destruktiver und harmloser Aktion ist im Menü
+                               * der Trenner.
                                */
                               { type: 'divider' as const },
                               {
@@ -1208,7 +1134,7 @@ export default function Sidebar(props: SidebarProps) {
                                 danger: true,
                               },
                             ],
-                            // Zuordnung am MENÜ, nicht je Eintrag: ein Riegel hat dann einen Ort.
+                            // Zuordnung am Menü, nicht je Eintrag: ein Riegel hat dann einen Ort.
                             onClick: ({ key }) => {
                               if (key === 'zentrieren') props.onBildZentrieren(b.id);
                               else if (key === 'platzieren') {
@@ -1218,7 +1144,7 @@ export default function Sidebar(props: SidebarProps) {
                             },
                           }}
                         >
-                          {/* Der Name trägt die Bild-Kennung (LFH-364). Kein `size`. */}
+                          {/* Der Name trägt die Bild-Kennung. Kein `size`. */}
                           <Button
                             type="text"
                             icon={<MoreOutlined />}
@@ -1259,9 +1185,9 @@ export default function Sidebar(props: SidebarProps) {
                       borderRadius: token.borderRadiusSM,
                     }}
                   >
-                    {/* Der Umschalter statt zehn gleichzeitig scharfer Griffe (LFH-711): in
-                        Fingergröße lägen Ecken, Kanten, Drehung und Mitte auf einem daumengroßen
-                        Bild übereinander. Der Hinweis nennt nur die Griffe, die es gerade gibt. */}
+                    {/* Ein Umschalter statt zehn gleichzeitig scharfer Griffe: in Fingergröße
+                        lägen Ecken, Kanten, Drehung und Mitte auf einem kleinen Bild
+                        übereinander. Der Hinweis nennt nur die aktiven Griffe. */}
                     <Segmentleiste<GriffModus>
                       beschriftung="Griffe auf der Karte"
                       wert={props.griffModus}
@@ -1329,13 +1255,10 @@ export default function Sidebar(props: SidebarProps) {
         </Space>
       </KlappPaneel>
 
-      {/*
-        Löschbestätigung als EIN Dialog für die ganze Bildliste (LFH-366 · B5f). Kein
-        `Popconfirm`: der bräuchte im Menü-Label ein `stopPropagation`. `okButtonProps={{
-        danger: true }}` ist AK2 — sonst bestätigt man das Entfernen mit einem blauen Knopf.
-        Er steht AUSSERHALB der `map` und des Paneels: n Dialoge im Baum trügen n gleichnamige
-        Knöpfe, und ein zugeklapptes Paneel darf eine offene Rückfrage nicht abhängen.
-      */}
+      {/* Löschbestätigung als ein Dialog für die ganze Bildliste, rot bestätigt. Kein
+          `Popconfirm`: der bräuchte im Menü-Label ein `stopPropagation`. Außerhalb der `map` und
+          des Paneels: n Dialoge trügen n gleichnamige Knöpfe, und ein zugeklapptes Paneel darf
+          eine offene Rückfrage nicht abhängen. */}
       <Modal
         // Eine Quelle für Sichtbarkeit UND Titel (siehe `loeschDialogBild`).
         open={loeschDialogBild(props.bilder, loeschBildId) != null}

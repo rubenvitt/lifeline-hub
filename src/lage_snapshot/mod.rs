@@ -1,11 +1,10 @@
-//! Lage-Snapshots (LFH-321, Inkrement C): manuell ausgelöster, unveränderlicher Stand des
-//! vollen Lagebilds (Geometrie + Fachdaten) eines Einsatzes. Das Dokument (`daten`) friert die
-//! **rohen `*Anzeige`-DTOs** der Lagekarte-Quellen ein — ein späteres Umbenennen/Verschieben/
-//! Löschen einer Entität ändert den Stand nicht. Speicherform: ein JSON-Dokument je Snapshot
-//! mit `schema_version`. Einsatzweit, orthogonal zu Kartenansichten (LFH-319/320).
+//! Lage-Snapshots (LFH-321): manuell ausgelöster, unveränderlicher Stand des vollen Lagebilds
+//! eines Einsatzes. Das Dokument (`daten`) friert die rohen `*Anzeige`-DTOs der
+//! Lagekarte-Quellen ein, damit spätere Änderungen an Entitäten den Stand nicht berühren. Ein
+//! JSON-Dokument je Snapshot mit `schema_version`; einsatzweit, unabhängig von Kartenansichten.
 //!
 //! **Unveränderlichkeit:** nach dem Anlegen sind `daten`, `stand_at` und `erstellt_*` nicht mehr
-//! schreibbar; ein PATCH berührt ausschließlich `bezeichnung`/`notiz`.
+//! schreibbar; ein PATCH berührt nur `bezeichnung`/`notiz`.
 
 pub mod repo;
 

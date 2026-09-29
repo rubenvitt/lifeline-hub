@@ -1,15 +1,14 @@
-//! Ende-zu-Ende-Nachweis für LFH-23 AK 3 (design.md D9): ein Einsatz mit Person, Tier und
-//! Schaden entsteht über die API, wird abgeschlossen und durchläuft den Purge über Frist und
-//! Karenz. Geprüft wird die ETB-Spur, die Fremdschlüssel, die Pseudonyme und die Lesbarkeit
-//! der Archivakte durch den Admin — während der Karenz und nach der Schwärzung.
+//! Ende-zu-Ende-Nachweis für LFH-23: ein Einsatz mit Person, Tier und Schaden entsteht über die
+//! API, wird abgeschlossen und durchläuft den Purge über Frist und Karenz. Geprüft wird die
+//! ETB-Spur, die Fremdschlüssel, die Pseudonyme und die Lesbarkeit der Archivakte durch den
+//! Admin — während der Karenz und nach der Schwärzung.
 //!
-//! **Ausnahmeliste (Annahme A2, bestätigt 25.09.2026):** Einige System-Einträge übernehmen
-//! einen Wert, den die Schwärzungs-Registry in der Quellzeile als Scrub führt, in ihren
-//! Wortlaut. Im ETB bleibt er als Führungsdokumentation erhalten (G_ETB), auch über die
-//! Schwärzung hinweg. Diese Stellen stehen abschließend in [`AUSNAHMEN_SYSTEM_ETB`]; eine
-//! neue solche Stelle ohne Eintrag ist ein Fehler. Ob künftige Einträge den Wert weglassen,
-//! entscheidet ein eigenes Folgeticket (siehe `openspec/changes/lfh-23-retention-rest/`,
-//! design.md D9 und Non-Goals) — hier wird nur dokumentiert und gepinnt.
+//! **Ausnahmeliste (Annahme A2):** Einige System-Einträge übernehmen einen Wert, den die
+//! Schwärzungs-Registry in der Quellzeile als Scrub führt, in ihren Wortlaut. Im ETB bleibt er
+//! als Führungsdokumentation erhalten (G_ETB), auch über die Schwärzung hinweg. Diese Stellen
+//! stehen abschließend in [`AUSNAHMEN_SYSTEM_ETB`]; eine neue solche Stelle ohne Eintrag ist ein
+//! Fehler. Ob künftige Einträge den Wert weglassen, entscheidet LFH-752 — hier wird nur
+//! dokumentiert und gepinnt.
 
 use axum::http::StatusCode;
 use chrono::{Duration, NaiveDateTime, Utc};
@@ -30,15 +29,14 @@ struct Ausnahme {
 }
 
 /// Ergebnis einer vollständigen DURCHSICHT aller ETB-Schreibwege (`etb::system_audit_tx`,
-/// `etb::repo::anlegen_tx`, `routes::etb_system_degradiert` samt Wrappern; 86 direkte
-/// Aufrufstellen in 27 Dateien, Stand LFH-23, nach dem Review der Welle D ein zweites Mal
-/// systematisch gegen jede Scrub-Spalte abgeglichen). Der Nutzerfreitext des ETB selbst
+/// `etb::repo::anlegen_tx`, `routes::etb_system_degradiert` samt Wrappern), zweimal
+/// systematisch gegen jede Scrub-Spalte abgeglichen. Der Nutzerfreitext des ETB selbst
 /// (`routes/etb.rs::erfassen`) ist keine Übernahme und steht nicht hier.
 ///
 /// **Die Vollständigkeit ist eine Durchsicht, kein Guard.** Maschinell gehalten sind nur die
 /// drei Werte, die der Ablauf unten pflanzt, und der Selbsttest (Funktion existiert, Spalte ist
 /// Scrub). Eine NEUE Übernahme bemerkt kein Test — wer einen ETB-Text aus einer Scrub-Spalte
-/// baut, trägt ihn hier ein (Folgeticket LFH-752 entscheidet über den Wortlaut).
+/// baut, trägt ihn hier ein (LFH-752 entscheidet über den Wortlaut).
 const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
     // --- vom Ablauf dieses Tests berührt (Wert gepflanzt und gepinnt) ---
     Ausnahme {
@@ -186,7 +184,7 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         spalte: "betreuungsstelle.bezeichnung",
         begruendung: "Bezeichnung der Betreuungsstelle",
     },
-    // --- Nachtrag aus dem Review der Welle D (zweite Durchsicht) ---
+    // --- vom Ablauf nicht berührt, aus der zweiten Durchsicht ---
     Ausnahme {
         datei: "src/routes/einsatz_personal.rs",
         funktion: "disponieren",
@@ -778,7 +776,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
 
     // Vorbedingung der Quellzeilen-Prüfung nach der Schwärzung: jeder gepflanzte Wert steht
     // JETZT in einer Scrub-Spalte, die der Scan liest. Fehlt einer, könnte die spätere
-    // Abwesenheit nicht rot werden (Review LFH-23).
+    // Abwesenheit nicht rot werden.
     let vorher = scrub_inhalt(&pool, e).await;
     for w in alle_gepflanzten() {
         assert!(

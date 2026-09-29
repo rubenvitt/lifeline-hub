@@ -20,14 +20,10 @@ pub struct PersonalDaten<'a> {
     pub bemerkung: Option<&'a str>,
 }
 
-/// Übersetzt einen Unique-Verstoß auf einem der beiden partiellen Indizes der
-/// `personal`-Tabelle (`idx_personal_personalnummer`, `idx_personal_benutzer`) in
-/// die passende `Conflict`-Meldung. Da `personal` zwei Unique-Indizes hat (und der
-/// Benutzer-Link trotz Vorab-Check durch eine Race zwischen `pruefe_benutzer_link`
-/// und dem Commit feuern kann), wird anhand der SQLite-Fehlermeldung unterschieden.
-/// SQLite nennt in `UNIQUE constraint failed: ...` die verletzten Spalten (nicht
-/// den Indexnamen), daher wird auf die Spalte `personal.benutzer_id` geprüft;
-/// alles andere ist die Personalnummer.
+/// Übersetzt einen Unique-Verstoß in die passende `Conflict`-Meldung. `personal` hat zwei
+/// partielle Unique-Indizes, und der Benutzer-Link kann trotz Vorab-Check durch ein Rennen
+/// feuern. SQLite nennt die verletzten Spalten, nicht den Index: `personal.benutzer_id` ist der
+/// Link, alles andere die Personalnummer.
 fn unique_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
     if let sqlx::Error::Database(db) = &e {
         if db.is_unique_violation() {
@@ -42,10 +38,9 @@ fn unique_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
     Err(e.into())
 }
 
-/// Validiert den optionalen Benutzer-Link: Konto muss zur Org gehören
-/// (`Validation`) und darf nicht schon mit einer anderen Person verknüpft sein
-/// (`Conflict`). `eigene_id` schließt die zu aktualisierende Person aus.
-/// Auf der Verbindung, damit [`anlegen_tx`] in einer offenen Transaktion prüft (LFH-690).
+/// Validiert den optionalen Benutzer-Link: das Konto gehört zur Org (`Validation`) und ist
+/// nicht schon mit einer anderen Person verknüpft (`Conflict`); `eigene_id` schließt die Person
+/// selbst aus. Auf der Verbindung, damit [`anlegen_tx`] in einer offenen Transaktion prüft.
 async fn pruefe_benutzer_link(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -80,10 +75,8 @@ async fn pruefe_benutzer_link(
     Ok(())
 }
 
-/// Setzt die Qualifikations-Zuordnung einer Person als Vollersatz (löscht alle und
-/// fügt die übergebenen wieder ein). Org-geschützt: nur ids, die zur Org gehören,
-/// werden eingefügt (unbekannte/fremde werden still ignoriert — die UI bietet
-/// ohnehin nur eigene Qualifikationen an).
+/// Setzt die Qualifikations-Zuordnung als Vollersatz. Nur ids der eigenen Org werden eingefügt;
+/// fremde werden still ignoriert (die UI bietet nur eigene an).
 async fn setze_qualifikationen(
     tx: &mut sqlx::SqliteConnection,
     org_id: i64,
@@ -109,8 +102,8 @@ async fn setze_qualifikationen(
 }
 
 /// Lädt eine Person der eigenen Org (roh); `NotFound` bei fremder/unbekannter id.
-/// Executor-generisch (Pool oder offene Verbindung), damit [`anlegen_tx`] den frisch
-/// angelegten Datensatz in derselben Transaktion zurücklesen kann (LFH-690).
+/// Executor-generisch, damit [`anlegen_tx`] den neuen Datensatz in derselben Transaktion
+/// zurückliest.
 pub async fn laden(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     org_id: i64,
@@ -173,9 +166,8 @@ fn zu_anzeige(p: Personal, qualifikationen: Vec<QualifikationRef>) -> PersonalAn
     }
 }
 
-/// Alle Personen der Org (Anzeige), sortiert nach Name; `nur_im_dienst` filtert
-/// auf `dienststatus = 'in_dienst'` (Dispositions-Auswahl). Lädt Qualifikationen in
-/// einer zweiten Sammelabfrage (kein N+1).
+/// Alle Personen der Org (Anzeige), nach Name; `nur_im_dienst` filtert auf `in_dienst`
+/// (Dispositions-Auswahl). Qualifikationen kommen in einer zweiten Sammelabfrage.
 pub async fn liste_anzeige(
     pool: &SqlitePool,
     org_id: i64,
@@ -233,14 +225,12 @@ pub async fn vorschlaege(pool: &SqlitePool, org_id: i64) -> Result<PersonalVorsc
     })
 }
 
-/// Legt eine Person an (mit optionaler Qualifikations-Zuordnung). Validiert den
-/// Benutzer-Link; Personalnummer-Dublette → `Conflict`.
+/// Legt eine Person an (optional mit Qualifikationen); prüft den Benutzer-Link,
+/// Personalnummer-Dublette → `Conflict`.
 ///
-/// Pool-Hülle um [`anlegen_tx`] in einer `write_retry!`-Transaktion. Bis LFH-690 lief die
-/// Link-Prüfung vor einem deferred `pool.begin()`; seit sie mit in die Transaktion gewandert
-/// ist, liest die Transaktion zuerst und schreibt dann. Unter einem deferred `BEGIN` wäre
-/// das ein Lock-Upgrade, das SQLite bei fremdem Writer sofort mit `SQLITE_BUSY` abweist
-/// (siehe `crate::tx`). `BEGIN IMMEDIATE` holt die Schreibsperre vorab.
+/// Pool-Hülle um [`anlegen_tx`] in `write_retry!`. Die Transaktion liest zuerst (Link-Prüfung)
+/// und schreibt dann; unter deferred `BEGIN` wäre das ein Lock-Upgrade mit sofortigem
+/// `SQLITE_BUSY` (s. `crate::tx`), `BEGIN IMMEDIATE` holt die Sperre vorab.
 pub async fn anlegen(
     pool: &SqlitePool,
     org_id: i64,
@@ -252,11 +242,9 @@ pub async fn anlegen(
     })
 }
 
-/// Legt eine Person auf einer offenen Verbindung/Transaktion an, samt Link-Prüfung und
-/// Qualifikations-Zuordnung, und liest sie dort zurück (LFH-690, Demo-Import in EINER
-/// Transaktion). Öffnet und committet selbst nichts — die Atomarität von Insert und
-/// Zuordnung liefert der Aufrufer. `Validation`/`Conflict` für den Benutzer-Link,
-/// Personalnummer-Dublette → `Conflict`.
+/// Legt eine Person auf einer offenen Verbindung an, samt Link-Prüfung und Qualifikationen, und
+/// liest sie dort zurück (Demo-Import in EINER Transaktion). Öffnet und committet nichts.
+/// `Validation`/`Conflict` für den Link, Personalnummer-Dublette → `Conflict`.
 pub async fn anlegen_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -291,9 +279,8 @@ pub async fn anlegen_tx(
     laden(&mut *conn, org_id, id).await
 }
 
-/// Teil-Patch der editierbaren Stammfelder (LFH-306, Tri-State): die äußere `Option` sagt
-/// „im Patch enthalten?" — `None` lässt die Spalte unverändert. Bei den nullable Spalten
-/// trägt der Wert selbst noch eine `Option`: `Some(None)` setzt sie auf NULL.
+/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“ (`None` lässt die Spalte stehen); bei
+/// nullable Spalten setzt `Some(None)` NULL.
 #[derive(Debug, Default)]
 pub struct PersonalPatch<'a> {
     pub name: Option<&'a str>,
@@ -305,21 +292,15 @@ pub struct PersonalPatch<'a> {
     pub bemerkung: Option<Option<&'a str>>,
 }
 
-/// Teil-Patch der editierbaren Felder + optional der Qualifikations-Zuordnung (org-scoped).
-/// `NotFound` bei fremder Org; `Validation`/`Conflict` für den Benutzer-Link;
-/// `Conflict` bei Personalnummer-Dublette — alles unverändert gegenüber dem Vollersatz.
+/// Teil-Patch der Felder und optional der Qualifikations-Zuordnung (org-scoped). `NotFound` bei
+/// fremder Org, `Validation`/`Conflict` für den Link, `Conflict` bei Personalnummer-Dublette.
 ///
-/// Flag/Wert-Paare mit **nummerierten** Parametern (LFH-266/F12, Vorlage
-/// `personal/status_repo.rs`): nur gesendete Spalten werden angefasst, und eine um eine
-/// Position verschobene Bind-Kette würde gleichtypige Nachbarspalten
-/// (`traegerorganisation`↔`telefon`) STILL vertauschen — abgesichert von
-/// `patche_setzt_jede_spalte_an_ihren_platz`.
+/// Flag/Wert-Paare mit nummerierten Parametern: nur gesendete Spalten werden angefasst, und eine
+/// verschobene Bind-Kette kann gleichtypige Nachbarn (`traegerorganisation`↔`telefon`) nicht
+/// still vertauschen (`patche_setzt_jede_spalte_an_ihren_platz`).
 ///
-/// `qualifikation_ids` ist der zweite Tri-State: `None` = Feld nicht gesendet, die
-/// Zuordnung bleibt **komplett unangetastet** (der Schreibpfad läuft gar nicht erst);
-/// `Some(ids)` ersetzt die Menge vollständig (`Some(&[])` leert sie). Die Vollersatz-
-/// Semantik INNERHALB von `Some` bleibt bewusst — ein Diff-Protokoll wäre eine andere
-/// API. Vor LFH-306 löschte jeder PATCH ohne das Feld ALLE Qualifikationen der Person.
+/// `qualifikation_ids` ist der zweite Tri-State: `None` lässt die Zuordnung komplett
+/// unangetastet, `Some(ids)` ersetzt die Menge vollständig (`Some(&[])` leert sie).
 pub async fn patche(
     pool: &SqlitePool,
     org_id: i64,
@@ -327,13 +308,11 @@ pub async fn patche(
     patch: PersonalPatch<'_>,
     qualifikation_ids: Option<&[i64]>,
 ) -> Result<Personal, AppError> {
-    // Existenz/Org sicherstellen (sonst NotFound statt stiller No-Op).
+    // Existenz/Org sicherstellen (NotFound statt stillem No-op).
     laden(pool, org_id, id).await?;
-    // Nur prüfen, wenn ein Konto GESETZT werden soll — `Some(None)` (Link lösen) und
-    // absent brauchen keine Prüfung.
+    // Nur prüfen, wenn ein Konto GESETZT wird; Lösen und Nichtsenden brauchen keine Prüfung.
     if let Some(Some(bid)) = patch.benutzer_id {
-        // Wie bisher vor der Transaktion; die geliehene Verbindung geht am Ende der
-        // Anweisung zurück an den Pool, bevor `begin` eine nimmt.
+        // Vor der Transaktion; die geliehene Verbindung geht zurück, bevor `begin` eine nimmt.
         pruefe_benutzer_link(&mut *pool.acquire().await?, org_id, bid, Some(id)).await?;
     }
     let mut tx = pool.begin().await?;
@@ -370,7 +349,7 @@ pub async fn patche(
     if let Err(e) = ergebnis {
         return unique_conflict(e);
     }
-    // NUR wenn das Feld gesendet wurde — sonst bliebe der Vollersatz-Schaden bestehen.
+    // Nur wenn das Feld gesendet wurde — sonst löschte ein PATCH alle Qualifikationen.
     if let Some(ids) = qualifikation_ids {
         setze_qualifikationen(&mut tx, org_id, id, ids).await?;
     }
@@ -378,13 +357,10 @@ pub async fn patche(
     laden(pool, org_id, id).await
 }
 
-/// Vollersatz der editierbaren Felder + Qualifikations-Zuordnung (org-scoped).
-/// `NotFound` bei fremder Org; `Validation`/`Conflict` für den Benutzer-Link;
-/// `Conflict` bei Personalnummer-Dublette.
+/// Vollersatz der Felder und der Qualifikations-Zuordnung (org-scoped).
 ///
-/// **Nicht mehr im Produktivpfad** — die PATCH-Route nutzt seit LFH-306 [`patche`].
-/// Bleibt stehen, weil die co-lokierten Tests von `personal/disposition_repo.rs` sie als
-/// Stamm-Änderungs-Werkzeug (Snapshot-vs-Live) aufrufen.
+/// Nicht im Produktivpfad (die PATCH-Route nutzt [`patche`]); die Tests von
+/// `personal/disposition_repo.rs` ändern damit den Stamm (Snapshot vs. Live).
 pub async fn aktualisiere(
     pool: &SqlitePool,
     org_id: i64,
@@ -392,7 +368,7 @@ pub async fn aktualisiere(
     daten: PersonalDaten<'_>,
     qualifikation_ids: &[i64],
 ) -> Result<Personal, AppError> {
-    // Existenz/Org sicherstellen (sonst NotFound statt stiller No-Op).
+    // Existenz/Org sicherstellen (NotFound statt stillem No-op).
     laden(pool, org_id, id).await?;
     if let Some(bid) = daten.benutzer_id {
         pruefe_benutzer_link(&mut *pool.acquire().await?, org_id, bid, Some(id)).await?;
@@ -660,9 +636,8 @@ mod tests {
         .unwrap()
     }
 
-    /// Bind-Reihenfolge der Flag/Wert-Kette: alle sieben Spalten in EINEM Patch auf
-    /// distinkte Werte setzen und einzeln prüfen. Eine um eine Position verschobene Kette
-    /// würde gleichtypige Nachbarspalten (`traegerorganisation`↔`telefon`) still vertauschen.
+    /// Bind-Reihenfolge: alle sieben Spalten in EINEM Patch auf distinkte Werte setzen und einzeln
+    /// prüfen.
     #[tokio::test]
     async fn patche_setzt_jede_spalte_an_ihren_platz() {
         let pool = crate::db::test_pool().await;
@@ -695,9 +670,8 @@ mod tests {
         assert_eq!(g.bemerkung.as_deref(), Some("bemerkung-wert"));
     }
 
-    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an. Der
-    /// `Default`-Patch (alle Felder absent, `qualifikation_ids: None`) darf die Zeile
-    /// Byte für Byte so lassen.
+    /// Ein Patch fasst NUR die gesendeten Spalten an; der `Default`-Patch lässt die Zeile
+    /// unverändert.
     #[tokio::test]
     async fn patche_laesst_nicht_gesendete_spalten_stehen() {
         let pool = crate::db::test_pool().await;
@@ -738,8 +712,8 @@ mod tests {
         assert_eq!(u.staerke_position.as_deref(), Some("fuehrer"));
     }
 
-    /// `Some(None)` ist der Leerwunsch und muss von „absent" unterscheidbar sein —
-    /// auch beim `benutzer_id`-Link, der so wieder gelöst werden kann.
+    /// `Some(None)` ist der Leerwunsch und von „absent“ unterscheidbar, auch beim
+    /// `benutzer_id`-Link.
     #[tokio::test]
     async fn patche_none_loescht_die_spalte() {
         let pool = crate::db::test_pool().await;
@@ -768,10 +742,8 @@ mod tests {
         assert_eq!(g.name, "Thomas", "Nachbar unberührt");
     }
 
-    /// **Der wichtigste Test dieser Route.** `qualifikation_ids: None` heißt „Feld nicht
-    /// gesendet" und darf die Zuordnung NICHT anfassen. Vor LFH-306 löschte jeder PATCH
-    /// ohne das Feld alle Qualifikationen der Person. `Some(&[])` ist die Gegenprobe:
-    /// der explizite Leerwunsch leert die Menge weiterhin.
+    /// **Der wichtigste Test dieser Route:** `qualifikation_ids: None` heißt „nicht gesendet“ und
+    /// fasst die Zuordnung nicht an. `Some(&[])` ist die Gegenprobe und leert die Menge.
     #[tokio::test]
     async fn patche_ohne_qualifikation_ids_laesst_zuordnung_stehen() {
         let pool = crate::db::test_pool().await;
@@ -779,7 +751,7 @@ mod tests {
         let q1 = qualifikation(&pool, "Sanitäter", 10).await;
         let q2 = qualifikation(&pool, "Gruppenführer", 20).await;
         let p = anlegen(&pool, 1, daten("Thomas"), &[q1, q2]).await.unwrap();
-        // Vorbedingung laut — sonst wäre „bleibt bei 2" trivial „bleibt bei 0".
+        // Vorbedingung, sonst wäre „bleibt bei 2“ trivial „bleibt bei 0“.
         assert_eq!(
             laden_anzeige(&pool, 1, p.id)
                 .await
@@ -856,7 +828,7 @@ mod tests {
         );
     }
 
-    /// Die Konflikt-/Validierungs-Zusagen des Vollersatzes gelten im Teil-Patch weiter.
+    /// Die Konflikt-/Validierungs-Zusagen gelten auch im Teil-Patch.
     #[tokio::test]
     async fn patche_benutzer_link_und_personalnummer_konflikte() {
         let pool = crate::db::test_pool().await;

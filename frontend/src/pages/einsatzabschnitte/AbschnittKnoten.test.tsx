@@ -34,10 +34,8 @@ function TokenSonde() {
 }
 
 /**
- * jsdom normalisiert `style.color`/`style.backgroundColor` bei Hex-Werten zu `rgb(...)`,
- * die `data-*`-Sonde trägt dagegen den rohen Token-String. Beide Seiten über dasselbe
- * Hilfselement normalisieren, statt Schreibweisen zu raten — eine Eigenheit des
- * Test-DOMs, keine Zusicherungslücke.
+ * jsdom normalisiert Hex-Farben in `style` zu `rgb(...)`, die `data-*`-Sonde trägt den rohen
+ * Token-String — beide Seiten über dasselbe Hilfselement normalisieren.
  */
 function normalisiere(wert: string | undefined): string {
   const el = document.createElement('i');
@@ -71,9 +69,8 @@ describe('AbschnittKnoten', () => {
     const sonde = renderKnoten(nord);
     const leiter = screen.getByText(/Leiter Nord/);
     expect(normalisiere(leiter.style.color)).toBe(normalisiere(sonde.dataset.sekundaer));
-    // Als Verkettung geschrieben, damit dieses Test-DOKUMENT selbst nicht das Literal
-    // trägt, gegen das `farbliteral.guard.test.ts` in `pages/` grept (AK3) — sonst
-    // träfe der Guard seine eigene Gegenprobe.
+    // Als Verkettung geschrieben, damit `farbliteral.guard.test.ts` diese Gegenprobe nicht selbst
+    // trifft.
     const verbotenerLiteralwert = '#' + '888';
     expect(normalisiere(leiter.style.color)).not.toBe(normalisiere(verbotenerLiteralwert));
   });

@@ -8,17 +8,12 @@ import AbschnittDaten from './AbschnittDaten';
 import { abschnittStaerken } from './abschnittStaerke';
 
 /**
- * Lese-Vorschau eines Einsatzabschnitts in der Sprungpalette (LFH-664) — die Angaben aus dem
- * Lesezweig der Abschnittsseite (`AbschnittDaten`), ohne Bearbeiten und Auflösen.
+ * Lese-Vorschau eines Einsatzabschnitts in der Sprungpalette (`AbschnittDaten`).
  *
- * ZWEI Fächer der Palette: die Abschnittsliste trägt den Datensatz, die Einheitenliste die
- * Stärke. Die Stärke „inkl. Unterabschnitte" braucht den ganzen Baum (`nachfahrenInkl`),
- * deshalb liefert `select` neben dem Abschnitt die Liste mit; fehlt der Abschnitt, bleibt das
- * Ergebnis `undefined`, und `VorschauZustand` sagt „nicht mehr vorhanden".
- *
- * Die Einheitenliste blockiert den Abschnitt nicht: lädt sie noch oder scheitert sie, steht
- * der Abschnitt trotzdem da und die Stärke sagt, warum sie fehlt. Ein „—" an ihrer Stelle
- * hieße „keine Einheit zugeordnet" — das wäre eine Aussage ohne Messung.
+ * Zwei Fächer der Palette: die Abschnittsliste trägt den Datensatz, die Einheitenliste die Stärke.
+ * „Inkl. Unterabschnitte" braucht den ganzen Baum, deshalb liefert `select` die Liste mit; fehlt
+ * der Abschnitt, bleibt das Ergebnis `undefined` und `VorschauZustand` meldet „nicht mehr
+ * vorhanden". Die Einheitenliste blockiert den Abschnitt nicht — fehlt sie, sagt die Stärke, warum.
  */
 export default function AbschnittVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {
   const { rollen } = useRollen();

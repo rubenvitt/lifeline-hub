@@ -1,4 +1,4 @@
-//! CRUD- und Lese-Queries der Karten-Registry (runtime-queries, Muster wie `benutzer.rs`).
+//! CRUD- und Lese-Queries der Karten-Registry.
 
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
@@ -34,12 +34,11 @@ pub struct OnlineQuelleEingabe {
     pub proxy: bool,
 }
 
-// Hinweis (sqlx 0.9): `query_as` akzeptiert nur `&'static str` (SqlSafeStr) — kein `format!`-
-// String. Die Spaltenliste wird daher als Literal je Query wiederholt, nicht zentral geteilt.
+// sqlx 0.9: `query_as` nimmt nur `&'static str`; die Spaltenliste steht deshalb je Query als
+// Literal.
 
-/// Aktive Online-Quelle für `GET /api/karte/config` — trägt zusätzlich `id` und `proxy`, die der
-/// Config-Handler für den Proxy-URL-Rewrite braucht (LFH-182). Ersetzt `aktive_online_styles` als
-/// Datenquelle des Handlers (das schlanke `OnlineStyle` kennt weder `id` noch `proxy`).
+/// Aktive Online-Quelle für `GET /api/karte/config` mit `id` und `proxy`, die der Handler für
+/// den Proxy-URL-Rewrite braucht (LFH-182).
 #[derive(Debug, sqlx::FromRow)]
 pub struct OnlineQuelleConfig {
     pub id: i64,
@@ -50,7 +49,7 @@ pub struct OnlineQuelleConfig {
     pub proxy: bool,
 }
 
-/// Eine Online-Quelle per `id`, oder `None` — für die Proxy-Handler (Existenz + proxy/aktiv prüfen).
+/// Eine Online-Quelle per `id`, oder `None` (für die Proxy-Handler).
 pub async fn finde_online_quelle(
     pool: &SqlitePool,
     id: i64,
@@ -76,7 +75,7 @@ pub async fn aktive_online_quellen_fuer_config(
     .await
 }
 
-// --- Proxy-Slot-Map (LFH-182): opake Slot-IDs ↔ Upstream-URLs (inkl. Key; nur server-seitig) ---
+// --- Proxy-Slot-Map (LFH-182): opake Slot-IDs ↔ Upstream-URLs (inkl. Key, nur serverseitig) ---
 
 /// Legt einen Slot für (`quelle_id`, `upstream_url`) an oder gibt den bestehenden zurück
 /// (dedup via UNIQUE). Liefert die Slot-`id`.
@@ -98,7 +97,7 @@ pub async fn slot_upsert(
 }
 
 /// Löst einen Slot zu seiner Upstream-URL auf — nur bei passender `quelle_id` UND `art`
-/// (Defense-in-Depth gegen art-Verwechslung / cross-quelle-Zugriff). `None` sonst.
+/// (gegen Art-Verwechslung und Zugriff über eine fremde Quelle).
 pub async fn slot_aufloesen(
     pool: &SqlitePool,
     quelle_id: i64,
@@ -125,10 +124,9 @@ pub async fn slots_loeschen(pool: &SqlitePool, quelle_id: i64) -> Result<u64, sq
     Ok(n)
 }
 
-/// Eine Online-Quelle per `id` lesen (interner Helfer für Anlegen/Aktualisieren).
+/// Eine Online-Quelle per `id` lesen.
 async fn hole_online_quelle(pool: &SqlitePool, id: i64) -> Result<OnlineQuelle, sqlx::Error> {
-    // Delegiert an finde_online_quelle (gleiche Spaltenliste) — `RowNotFound` erhält die bisherige
-    // fetch_one-Semantik für Anlegen/Aktualisieren.
+    // `RowNotFound` erhält die fetch_one-Semantik für Anlegen/Aktualisieren.
     finde_online_quelle(pool, id)
         .await?
         .ok_or(sqlx::Error::RowNotFound)
@@ -166,12 +164,11 @@ pub async fn anlegen_online_quelle(
     hole_online_quelle(pool, id).await
 }
 
-/// Teil-Patch einer Online-Quelle (LFH-306): `None` heißt „nicht im Patch enthalten" und
-/// lässt die Spalte unverändert.
+/// Teil-Patch einer Online-Quelle: `None` heißt „nicht im Patch“ und lässt die Spalte
+/// unverändert.
 ///
-/// `attribution` ist bewusst **kein** Tri-State: die Lizenzauflage macht sie zur Pflicht,
-/// ein `null` im Body lehnt der Handler mit 400 ab — die Spalte kann über diesen Weg also
-/// nie geleert werden.
+/// `attribution` ist kein Tri-State: die Lizenzauflage macht sie zur Pflicht, ein `null` lehnt
+/// der Handler mit 400 ab.
 #[derive(Debug, Default)]
 pub struct OnlineQuelleFelder<'a> {
     pub name: Option<&'a str>,
@@ -185,11 +182,9 @@ pub struct OnlineQuelleFelder<'a> {
 
 /// Teil-Patch einer Online-Quelle. `Ok(None)`, wenn keine Zeile mit `id` existiert.
 ///
-/// Flag/Wert-Paare statt Vollersatz (LFH-306): ein PATCH ohne `proxy` darf eine bewusst
-/// direkt geladene Quelle nicht zurück auf Proxy schalten, ein PATCH ohne `sortier` die
-/// Reihenfolge nicht auf 0 werfen. Die Parameter sind nummeriert, weil eine um eine
-/// Position verschobene Bind-Kette die gleichtypigen Nachbarn (`name`↔`url`↔`typ`,
-/// `aktiv`↔`proxy`) STILL vertauschen würde — abgesichert von
+/// Flag/Wert-Paare statt Vollersatz: ein PATCH ohne `proxy` bzw. `sortier` lässt diese Werte
+/// stehen. Die Parameter sind nummeriert, weil eine verschobene Bind-Kette gleichtypige Nachbarn
+/// (`name`↔`url`↔`typ`, `aktiv`↔`proxy`) still vertauschte — abgesichert von
 /// `patche_online_quelle_setzt_jede_spalte_an_ihren_platz`.
 pub async fn patche_online_quelle(
     pool: &SqlitePool,
@@ -290,7 +285,7 @@ pub struct OfflineKarte {
     pub sortier: i64,
 }
 
-/// Eingabefelder zum Registrieren einer Offline-Karte (Grundstein: extern vorhandene Datei).
+/// Eingabefelder zum Registrieren einer extern vorhandenen Offline-Karte.
 pub struct OfflineKarteEingabe {
     pub name: String,
     pub pfad: String,
@@ -301,7 +296,7 @@ pub struct OfflineKarteEingabe {
     pub sortier: i64,
 }
 
-/// Eine Offline-Karte per `id` lesen (interner Helfer).
+/// Eine Offline-Karte per `id` lesen.
 async fn hole_offline_karte(pool: &SqlitePool, id: i64) -> Result<OfflineKarte, sqlx::Error> {
     sqlx::query_as::<_, OfflineKarte>(
         "SELECT id, name, pfad, quell_url, lizenz, kachel_schema, format, groesse, sha256, download_at, \
@@ -313,8 +308,8 @@ async fn hole_offline_karte(pool: &SqlitePool, id: i64) -> Result<OfflineKarte, 
     .await
 }
 
-/// Pfad + Kachel-Format der aktiven, ausliefer-bereiten Offline-Karte (für `GET
-/// /api/karte/offline/tiles/{z}/{x}/{y}` — der Handler braucht das Format für Content-Type/Encoding).
+/// Pfad und Kachel-Format der aktiven, bereiten Offline-Karte; das Format bestimmt
+/// Content-Type/Encoding im Tile-Handler.
 pub async fn aktive_offline_karte_pfad_und_format(
     pool: &SqlitePool,
 ) -> Result<Option<(String, String)>, sqlx::Error> {
@@ -337,7 +332,7 @@ pub async fn liste_offline_karten(pool: &SqlitePool) -> Result<Vec<OfflineKarte>
     .await
 }
 
-/// Registriert eine (extern vorhandene) Offline-Karte mit `status = 'bereit'`, nicht aktiv.
+/// Registriert eine extern vorhandene Offline-Karte mit `status = 'bereit'`, nicht aktiv.
 pub async fn registriere_offline_karte(
     pool: &SqlitePool,
     eingabe: &OfflineKarteEingabe,
@@ -360,15 +355,15 @@ pub async fn registriere_offline_karte(
     hole_offline_karte(pool, id).await
 }
 
-/// Aktiviert eine Offline-Karte EXKLUSIV (alle anderen werden deaktiviert — sonst verletzt der
-/// partielle Unique-Index `idx_offline_eine_aktive`). `Ok(None)`, wenn keine Zeile mit `id` existiert.
+/// Aktiviert eine Offline-Karte EXKLUSIV (alle anderen werden deaktiviert, sonst verletzt der
+/// partielle Unique-Index `idx_offline_eine_aktive`). `Ok(None)`, wenn keine Zeile mit `id`
+/// existiert.
 pub async fn aktiviere_offline_karte(
     pool: &SqlitePool,
     id: i64,
 ) -> Result<Option<OfflineKarte>, sqlx::Error> {
-    // BEGIN IMMEDIATE (F09/LFH-240): read-then-write (Existenz-SELECT vor den UPDATEs)
-    // holt den Write-Lock vorab, statt beim ersten Write ein Lock-Upgrade unter fremdem
-    // Writer zu riskieren (sofortiges SQLITE_BUSY). Der busy_timeout wartet am BEGIN.
+    // `BEGIN IMMEDIATE`: read-then-write holt den Write-Lock vorab, statt beim ersten Write ein
+    // Lock-Upgrade unter fremdem Writer zu riskieren (sofortiges SQLITE_BUSY).
     let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
     let existiert: Option<i64> =
         sqlx::query_scalar("SELECT id FROM karte_offline_karte WHERE id = ?")
@@ -378,8 +373,8 @@ pub async fn aktiviere_offline_karte(
     if existiert.is_none() {
         return Ok(None);
     }
-    // Erst alle deaktivieren, DANN diese aktivieren — sonst kollidieren zwei aktive Zeilen
-    // mit dem partiellen Unique-Index.
+    // Erst alle deaktivieren, DANN diese aktivieren — sonst kollidieren zwei aktive Zeilen mit dem
+    // partiellen Unique-Index.
     sqlx::query(
         "UPDATE karte_offline_karte SET aktiv_basemap = 0, geaendert_at = datetime('now') \
          WHERE aktiv_basemap = 1",
@@ -397,20 +392,16 @@ pub async fn aktiviere_offline_karte(
     hole_offline_karte(pool, id).await.map(Some)
 }
 
-/// One-Click-Update (B2): ersetzt die Karte `alt_id` durch `neu_id` in EINER Transaktion.
-/// Die neue Version ERBT den Aktiv-Status der alten: war `alt` die aktive Basemap, wird `neu`
-/// aktiv (und alle anderen deaktiviert); war `alt` eine INAKTIVE Hintergrundkarte, bleibt die
-/// gerade aktive Basemap UNANGETASTET (sonst klaut ein Update einer Hintergrundkarte die aktive
-/// Basemap). `alt` wird immer gelöscht; den Datei-Cleanup (`entferne_download_dateien`) macht der
+/// Ersetzt die Karte `alt_id` durch `neu_id` in EINER Transaktion. `neu` erbt den Aktiv-Status:
+/// war `alt` die aktive Basemap, wird `neu` aktiv; war `alt` eine inaktive Hintergrundkarte,
+/// bleibt die aktive Basemap unangetastet. `alt` wird immer gelöscht, die Dateien räumt der
 /// Aufrufer. `Ok(None)`, wenn `neu_id` nicht existiert.
 pub async fn ersetze_aktive_offline_karte(
     pool: &SqlitePool,
     neu_id: i64,
     alt_id: i64,
 ) -> Result<Option<OfflineKarte>, sqlx::Error> {
-    // BEGIN IMMEDIATE (F09/LFH-240): read-then-write (Existenz-SELECT vor den UPDATEs)
-    // holt den Write-Lock vorab, statt beim ersten Write ein Lock-Upgrade unter fremdem
-    // Writer zu riskieren (sofortiges SQLITE_BUSY). Der busy_timeout wartet am BEGIN.
+    // `BEGIN IMMEDIATE`, s. [`aktiviere_offline_karte`].
     let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
     let existiert: Option<i64> =
         sqlx::query_scalar("SELECT id FROM karte_offline_karte WHERE id = ?")
@@ -447,8 +438,7 @@ pub async fn ersetze_aktive_offline_karte(
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
-    // Nach dem Commit die neue Karte zurückgeben. Wurde `neu_id` nebenläufig gelöscht, ist das
-    // konsistent mit dem Initial-Check `Ok(None)` (statt eines RowNotFound-Fehlers).
+    // Wurde `neu_id` nebenläufig gelöscht, ist `Ok(None)` konsistent mit dem Initial-Check.
     match hole_offline_karte(pool, neu_id).await {
         Ok(k) => Ok(Some(k)),
         Err(sqlx::Error::RowNotFound) => Ok(None),
@@ -466,13 +456,10 @@ pub async fn loesche_offline_karte(pool: &SqlitePool, id: i64) -> Result<bool, s
     Ok(betroffen > 0)
 }
 
-// --- Offline-Download-Lebenszyklus (LFH-181) ---
-// Verdrahtet den Download-Manager in die schon vorhandenen Lifecycle-Felder (Migration 0076):
-// FSM laedt → bereit/fehler. `registriere_offline_karte` (Status 'bereit') wird NICHT überladen.
+// --- Offline-Download-Lebenszyklus (LFH-181): laedt → bereit/fehler ---
 
-/// Eingabefelder zum Anlegen einer herunterzuladenden Offline-Karte. `quell_url` und `lizenz`
-/// sind Pflicht (Server-seitiger Fetch + Offline-Attributionspflicht); der `pfad` wird nicht
-/// übergeben, sondern aus der erzeugten `id` abgeleitet (`markiere_bereit`).
+/// Eingabefelder für eine herunterzuladende Offline-Karte. `quell_url` und `lizenz` sind
+/// Pflicht; der `pfad` wird aus der erzeugten `id` abgeleitet (`markiere_bereit`).
 pub struct OfflineDownloadEingabe {
     pub name: String,
     pub quell_url: String,
@@ -482,8 +469,8 @@ pub struct OfflineDownloadEingabe {
     pub sortier: i64,
 }
 
-/// Legt eine Download-Zeile im Status `'laedt'` an (noch ohne Datei; `pfad` leerer Platzhalter,
-/// bis `markiere_bereit` den finalen relativen Pfad setzt). Nicht aktiv.
+/// Legt eine Download-Zeile im Status `'laedt'` an, nicht aktiv; `pfad` bleibt leer, bis
+/// `markiere_bereit` ihn setzt.
 pub async fn neue_download_karte(
     pool: &SqlitePool,
     eingabe: &OfflineDownloadEingabe,
@@ -505,8 +492,8 @@ pub async fn neue_download_karte(
     hole_offline_karte(pool, id).await
 }
 
-/// Setzt den Status (FSM-Übergang). `Ok(true)`, wenn eine Zeile betroffen war. Aufrufer geben
-/// nur DB-CHECK-gültige Werte (`registriert`/`laedt`/`bereit`/`fehler`).
+/// Setzt den Status. `Ok(true)`, wenn eine Zeile betroffen war. Aufrufer geben nur
+/// CHECK-gültige Werte.
 pub async fn setze_status(pool: &SqlitePool, id: i64, status: &str) -> Result<bool, sqlx::Error> {
     let betroffen = sqlx::query(
         "UPDATE karte_offline_karte SET status = ?, geaendert_at = datetime('now') WHERE id = ?",
@@ -547,10 +534,8 @@ pub async fn markiere_bereit(
     hole_offline_karte(pool, id).await.map(Some)
 }
 
-/// Setzt die `quell_url` einer Karte neu (In-Place-Reload B3: nach dem Swap auf die neue Katalog-URL
-/// aktualisieren, sonst bliebe die Update-Erkennung `quell_url != katalog.url` dauerhaft „Update
-/// verfügbar" und der „Stand" veraltet). `markiere_bereit` fasst `quell_url` bewusst nicht an
-/// (es teilt sich den Neu-Zeile-Pfad, dort ist die URL schon korrekt gesetzt).
+/// Setzt die `quell_url` neu (nach dem In-Place-Reload auf die neue Katalog-URL), sonst bliebe
+/// „Update verfügbar“ dauerhaft stehen. `markiere_bereit` fasst `quell_url` nicht an.
 pub async fn aktualisiere_quell_url(
     pool: &SqlitePool,
     id: i64,
@@ -566,15 +551,12 @@ pub async fn aktualisiere_quell_url(
     Ok(())
 }
 
-/// Aktiviert die `bereit`e Karte `id` als Basemap, ABER nur solange noch KEINE andere Karte aktiv
-/// ist — die erste fertig heruntergeladene Karte wird automatisch ausgeliefert (sonst bliebe der
-/// Offline-Schalter trotz Download „nicht konfiguriert"). Eine bereits aktive Karte wird bewusst
-/// NICHT verdrängt. `Ok(true)`, wenn aktiviert wurde; `Ok(false)` ist der erwartete No-op
-/// (schon eine aktiv, Karte nicht `bereit` oder unbekannt). Race-sicher NICHT wegen „WAL
-/// serialisiert Writer", sondern weil Guard und Write EIN atomares UPDATE-Statement sind
-/// (`WHERE … AND NOT EXISTS(…)`): ein zweiter parallel fertig werdender Download prüft die
-/// aktive Zeile im selben Statement und greift nicht — der partielle Unique-Index
-/// `idx_offline_eine_aktive` bleibt der Backstop.
+/// Aktiviert die bereite Karte `id` als Basemap, aber nur, solange keine andere aktiv ist — die
+/// erste fertige Karte wird automatisch ausgeliefert, eine aktive nie verdrängt. `Ok(false)` ist
+/// der erwartete No-op.
+///
+/// Race-sicher, weil Guard und Write EIN atomares UPDATE sind (`WHERE … AND NOT EXISTS(…)`);
+/// der partielle Unique-Index `idx_offline_eine_aktive` bleibt Backstop.
 pub async fn aktiviere_wenn_keine_aktive(pool: &SqlitePool, id: i64) -> Result<bool, sqlx::Error> {
     let betroffen = sqlx::query(
         "UPDATE karte_offline_karte SET aktiv_basemap = 1, geaendert_at = datetime('now') \
@@ -588,9 +570,9 @@ pub async fn aktiviere_wenn_keine_aktive(pool: &SqlitePool, id: i64) -> Result<b
     Ok(betroffen > 0)
 }
 
-/// Crash-Recovery beim Start: alle im Status `'laedt'` hängenden Zeilen auf `'fehler'` setzen
-/// und ihre `id`s zurückgeben (Aufrufer löscht die verwaisten `*.part`-Dateien). Spawned
-/// Download-Tasks überleben keinen Neustart.
+/// Crash-Recovery beim Start: alle in `'laedt'` hängenden Zeilen auf `'fehler'` setzen und ihre
+/// `id`s liefern (der Aufrufer löscht die `*.part`-Dateien). Download-Tasks überleben keinen
+/// Neustart.
 pub async fn reset_haengende_downloads(pool: &SqlitePool) -> Result<Vec<i64>, sqlx::Error> {
     let ids: Vec<i64> =
         sqlx::query_scalar("SELECT id FROM karte_offline_karte WHERE status = 'laedt'")
@@ -607,8 +589,8 @@ pub async fn reset_haengende_downloads(pool: &SqlitePool) -> Result<Vec<i64>, sq
     Ok(ids)
 }
 
-/// Eine Offline-Karte per `id`, oder `None` — für Guards (Re-Download der aktiven Karte,
-/// Concurrency gegen Doppel-Download).
+/// Eine Offline-Karte per `id`, oder `None` (für die Guards gegen Re-Download und
+/// Doppel-Download).
 pub async fn finde_offline_karte(
     pool: &SqlitePool,
     id: i64,
@@ -626,13 +608,12 @@ pub async fn finde_offline_karte(
 /// Ausspielungs-Infos der aktiven Offline-Karte für `GET /api/karte/config`.
 pub struct AktiveOfflineKarte {
     pub pfad: String,
-    /// Cache-Bust-Token (`?v=…`): `sha256`, sonst `geaendert_at` (registrierte Dateien ohne
-    /// Download tragen kein sha256). Wechselt bei jedem Karten-Swap → frischer pmtiles-Cache.
+    /// Cache-Bust-Token (`?v=…`): `sha256`, sonst `geaendert_at` (registrierte Dateien haben kein
+    /// sha256).
     pub version: String,
     /// Lizenz/Attribution der aktiven Karte (offline sichtbar zu machen).
     pub lizenz: Option<String>,
-    /// Kachel-Format (`pbf`/`png`/`jpg`/`webp`) — `/config` gröbert es zu vektor/raster für die
-    /// Frontend-Style-Wahl (LFH-185).
+    /// Kachel-Format (`pbf`/`png`/`jpg`/`webp`); `/config` leitet daraus vektor/raster ab.
     pub format: String,
 }
 
@@ -662,8 +643,8 @@ pub async fn aktive_offline_karte(
     }))
 }
 
-/// Eine sichtbare Offline-Region für `GET /api/karte/config` (Multi-Region, LFH-188). Trägt die
-/// `id` für den region-adressierten Tile-Endpoint, `version` als Cache-Bust-Token.
+/// Eine sichtbare Offline-Region für `GET /api/karte/config` (LFH-188), mit `id` für den
+/// region-adressierten Tile-Endpoint.
 pub struct SichtbareOfflineKarte {
     pub id: i64,
     pub name: String,
@@ -673,10 +654,9 @@ pub struct SichtbareOfflineKarte {
     pub format: String,
 }
 
-/// Alle gemeinsam anzuzeigenden Offline-Regionen: die Offline-Karte ist die VEREINIGUNG aller
-/// bereiten Regionen (LFH-188, „alle automatisch gemeinsam"). Bewusst nur an `status = 'bereit'`
-/// gekoppelt — NICHT an `aktiv_basemap` (das bleibt Legacy-/Kompat-Marker der alten Single-Route).
-/// Reihenfolge `sortier, id` (stabile, deterministische Layer-/Attribution-Reihenfolge).
+/// Alle anzuzeigenden Offline-Regionen: die Offline-Karte ist die Vereinigung aller bereiten
+/// Regionen (LFH-188). Nur an `status = 'bereit'` gekoppelt, nicht an `aktiv_basemap` (Marker
+/// der alten Single-Route). Reihenfolge `sortier, id`.
 pub async fn sichtbare_offline_karten(
     pool: &SqlitePool,
 ) -> Result<Vec<SichtbareOfflineKarte>, sqlx::Error> {
@@ -707,9 +687,9 @@ pub async fn sichtbare_offline_karten(
         .collect())
 }
 
-/// Pfad + Kachel-Format einer bereiten Offline-Karte per `id` — für den region-adressierten
-/// Endpoint `GET /api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}` (LFH-188). `None`, wenn die
-/// Region unbekannt oder (noch) nicht `bereit` ist → der Handler antwortet dann `204`.
+/// Pfad und Kachel-Format einer bereiten Offline-Karte per `id` für
+/// `GET /api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}`. `None` bei unbekannter oder nicht
+/// bereiter Region → der Handler antwortet 204.
 pub async fn offline_karte_pfad_und_format(
     pool: &SqlitePool,
     id: i64,
@@ -799,10 +779,7 @@ mod tests {
         assert!(q.aktiv);
     }
 
-    /// Migriert von `aktualisiere_online_quelle_aendert_alle_felder` (LFH-306): ein
-    /// Vollbody-Patch ändert weiterhin jedes Feld. Die frühere `attribution: None`-Zusage
-    /// ist bewusst zu einem NEUEN Wert geworden — `None` heißt im Patch „unverändert",
-    /// und geleert werden kann die Pflicht-Attribution über die API ohnehin nicht.
+    /// Ein Vollbody-Patch ändert jedes Feld. `attribution: None` heißt im Patch „unverändert“.
     #[tokio::test]
     async fn patche_online_quelle_aendert_alle_felder() {
         let pool = test_pool().await;
@@ -832,9 +809,7 @@ mod tests {
         assert!(!akt.aktiv);
     }
 
-    /// Bind-Reihenfolge der Flag/Wert-Kette: alle sieben Spalten auf distinkte Werte setzen
-    /// und einzeln prüfen. Eine verschobene Kette vertauschte `name`↔`url`↔`typ` bzw.
-    /// `aktiv`↔`proxy` still — ohne Compile- und ohne Laufzeitfehler.
+    /// Bind-Reihenfolge: alle sieben Spalten auf distinkte Werte setzen und einzeln prüfen.
     #[tokio::test]
     async fn patche_online_quelle_setzt_jede_spalte_an_ihren_platz() {
         let pool = test_pool().await;
@@ -866,8 +841,8 @@ mod tests {
         assert!(akt.proxy);
     }
 
-    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an — insbesondere
-    /// bleiben `proxy` und `sortier` stehen, die vorher an `#[serde(default …)]` hingen.
+    /// Ein Patch fasst NUR die gesendeten Spalten an; insbesondere bleiben `proxy` und `sortier`
+    /// stehen.
     #[tokio::test]
     async fn patche_online_quelle_laesst_nicht_gesendete_spalten_stehen() {
         let pool = test_pool().await;
@@ -902,8 +877,7 @@ mod tests {
         assert!(!unveraendert.proxy);
     }
 
-    /// Pinnt das 404-Verhalten der Route (migriert von
-    /// `aktualisiere_online_quelle_unbekannt_gibt_none`).
+    /// Pinnt das 404-Verhalten der Route.
     #[tokio::test]
     async fn patche_online_quelle_unbekannt_gibt_none() {
         let pool = test_pool().await;
@@ -1032,8 +1006,8 @@ mod tests {
 
     #[tokio::test]
     async fn slot_upsert_gleiche_url_zwei_arten_zwei_slots() {
-        // art ist Teil der Identität: dieselbe URL in zwei Rollen bekommt zwei Slots, jeder über
-        // seine art auflösbar (sonst würde ON CONFLICT eine Art überschreiben → unauflösbar).
+        // `art` ist Teil der Identität: dieselbe URL in zwei Rollen bekommt zwei Slots (sonst
+        // überschriebe ON CONFLICT eine Art).
         let pool = test_pool().await;
         let q = anlegen_online_quelle(&pool, &eingabe("U", 1, true))
             .await
@@ -1096,8 +1070,8 @@ mod tests {
 
     #[tokio::test]
     async fn slots_cascade_beim_loeschen_der_quelle() {
-        // FK ON DELETE CASCADE (test_pool aktiviert PRAGMA foreign_keys): Löschen der Quelle
-        // entfernt ihre Slots auch OHNE den expliziten slots_loeschen-Aufruf des Handlers.
+        // FK ON DELETE CASCADE: das Löschen der Quelle entfernt ihre Slots auch ohne
+        // `slots_loeschen`.
         let pool = test_pool().await;
         let q = anlegen_online_quelle(&pool, &eingabe("C", 1, true))
             .await
@@ -1193,7 +1167,7 @@ mod tests {
 
     #[tokio::test]
     async fn format_round_trippt_und_defaultet_pbf() {
-        // LFH-185: format über Registrierung round-trippt; Roh-INSERT ohne format → DEFAULT 'pbf'.
+        // `format` round-trippt über die Registrierung; ein Roh-INSERT ohne format → DEFAULT 'pbf'.
         let pool = test_pool().await;
         let mut e = offline_eingabe("Raster");
         e.format = "png".into();
@@ -1287,7 +1261,7 @@ mod tests {
         assert_eq!(liste[0].id, neu.id);
     }
 
-    /// Diskriminierend: Update einer INAKTIVEN Hintergrundkarte darf die aktive Basemap NICHT klauen.
+    /// Das Update einer INAKTIVEN Hintergrundkarte darf die aktive Basemap nicht übernehmen.
     #[tokio::test]
     async fn ersetze_offline_karte_inaktiv_laesst_aktive_basemap_unberuehrt() {
         let pool = test_pool().await;
@@ -1318,7 +1292,7 @@ mod tests {
         assert!(liste.iter().all(|k| k.id != b.id), "alte B-Zeile gelöscht");
     }
 
-    // --- Offline-Download-Lebenszyklus (LFH-181) ---
+    // --- Offline-Download-Lebenszyklus ---
 
     fn download_eingabe(name: &str) -> OfflineDownloadEingabe {
         OfflineDownloadEingabe {
@@ -1551,7 +1525,7 @@ mod tests {
         );
     }
 
-    // --- Multi-Region-Anzeige (LFH-188, „alle automatisch gemeinsam") ---
+    // --- Multi-Region-Anzeige (LFH-188) ---
 
     #[tokio::test]
     async fn sichtbare_offline_karten_listet_alle_bereiten_unabhaengig_von_aktiv() {

@@ -110,14 +110,11 @@ async fn unbekannte_id_ist_404() {
 
 // ---------- LFH-306: Teil-PATCH mit Tri-State ----------
 
-/// **Der wichtigste Test dieser Route** — und der einzige Verlustpfad des ganzen Tickets,
-/// der heute bis in die UI durchschlägt:
-///
-/// `SprechgruppeFormModal` sendet beim Bearbeiten `{bezeichnung, betriebsart, hinweis}`
-/// OHNE `sortier`. Der alte Vollersatz-Body trug `#[serde(default)] sortier: i64`, also
-/// wurde „nicht gesendet" zu „auf 0 setzen": jede Hinweis-Änderung hat die Sortierung
-/// zurückgesetzt und den Eintrag in der Katalogliste verschoben — ohne Fehler, ohne
-/// Hinweis, ohne roten Test. Genau dieser Body steht unten.
+/// **Der wichtigste Test dieser Route:** `SprechgruppeFormModal` sendet beim Bearbeiten
+/// `{bezeichnung, betriebsart, hinweis}` OHNE `sortier`. Ein Vollersatz-Body mit
+/// `#[serde(default)] sortier: i64` machte aus „nicht gesendet" ein „auf 0 setzen": jede
+/// Hinweis-Änderung setzte die Sortierung zurück und verschob den Eintrag in der Katalogliste
+/// — ohne Fehler, ohne Hinweis. Genau dieser Body steht unten.
 #[tokio::test]
 async fn patch_ohne_sortier_behaelt_sortier() {
     let app = setup().await;
@@ -143,13 +140,12 @@ async fn patch_ohne_sortier_behaelt_sortier() {
 
 /// **Der unterscheidende Test.** Zusammen mit `patch_hinweis_null_loescht_hinweis` bildet
 /// er das Paar, das den Tri-State beweist: HIER ist `hinweis` nicht im Body und muss stehen
-/// bleiben, DORT steht `null` im Body und muss löschen. Unter dem alten Vollersatz war
-/// beides ununterscheidbar — das fehlende Feld nullte die Spalte.
+/// bleiben, DORT steht `null` im Body und muss löschen. Ein Vollersatz könnte beides nicht
+/// unterscheiden — das fehlende Feld nullte die Spalte.
 ///
-/// Der Body ist bewusst **unter HEAD gültig** (`bezeichnung`/`betriebsart`/`sortier` alle
-/// da, nur `hinweis` fehlt): so schlägt der Test gegen HEAD mit dem echten Datenverlust
-/// fehl (200 + `hinweis: null`) statt am Extractor — ein 400 wäre ein Fehlschlag aus dem
-/// falschen Grund.
+/// Der Body wäre bewusst auch als Vollersatz gültig (`bezeichnung`/`betriebsart`/`sortier`
+/// alle da, nur `hinweis` fehlt): so scheitert ein Rückfall am echten Datenverlust (200 +
+/// `hinweis: null`) statt am Extractor — ein 400 wäre ein Fehlschlag aus dem falschen Grund.
 #[tokio::test]
 async fn patch_ohne_hinweis_laesst_hinweis_stehen() {
     let app = setup().await;

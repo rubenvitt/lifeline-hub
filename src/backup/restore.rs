@@ -29,42 +29,31 @@ fn nebendatei(db: &Path, endung: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(p)
 }
 
-/// Deutet darauf hin, dass gerade jemand mit `ziel` verbunden ist (typischerweise ein
-/// laufender Server)?
+/// Ist `ziel` möglicherweise gerade verbunden (etwa von einem laufenden Server)?
 ///
 /// SQLite legt im WAL-Modus `-wal` und `-shm` an, sobald die erste Verbindung öffnet, und
-/// entfernt sie, wenn die letzte sie sauber schließt. Ihr Vorhandensein ist damit das
-/// brauchbare Signal.
+/// entfernt sie beim sauberen Schließen der letzten. Das ist das brauchbare Signal: `flock`
+/// interagiert nicht mit SQLites Byte-Range-Locks, und `BEGIN EXCLUSIVE` gelingt auch bei einer
+/// offenen, untätigen Verbindung.
 ///
-/// Die im Review und beim Entwurf naheliegenden Alternativen wurden **gemessen und
-/// verworfen**:
-/// - `flock` interagiert nicht mit SQLites POSIX-Byte-Range-Locks und würde immer gelingen.
-/// - `BEGIN EXCLUSIVE` gelingt bei einer offenen, aber untätigen Verbindung ebenfalls —
-///   im WAL-Modus blockieren idle Leser keinen Writer. Ein laufender, gerade nicht
-///   arbeitender Server wäre damit unsichtbar geblieben.
-///
-/// Bekannte Unschärfe: nach einem **Absturz** bleiben die Dateien verwaist liegen, dann
-/// meldet die Prüfung fälschlich „in Benutzung". Der Fehlertext nennt deshalb den Ausweg.
+/// Nach einem **Absturz** bleiben die Dateien verwaist liegen, dann meldet die Prüfung
+/// fälschlich „in Benutzung“; der Fehlertext nennt den Ausweg.
 fn ziel_moeglicherweise_in_benutzung(ziel: &Path) -> bool {
     ["-wal", "-shm"]
         .iter()
         .any(|endung| nebendatei(ziel, endung).exists())
 }
 
-/// Spielt die Sicherung `quelle` an die Stelle der Datenbank `ziel` ein.
+/// Spielt die Sicherung `quelle` an die Stelle der Datenbank `ziel` ein: Quelle validieren →
+/// prüfen, dass niemand auf `ziel` verbunden ist → verwaiste WAL-/SHM-Dateien entfernen →
+/// **atomar** einhängen (Kopie nach `.tmp`, dann `rename`).
 ///
-/// Ablauf: Quelle validieren → prüfen, dass niemand auf `ziel` verbunden ist → stale
-/// WAL-/SHM-Seitendateien entfernen → **atomar** einhängen (Kopie nach `.tmp`, dann
-/// `rename`).
+/// Die Benutzungsprüfung muss VOR dem Entfernen von `-wal`/`-shm` laufen, sonst zerstört der
+/// Restore genau das Signal, das ihn stoppen soll.
 ///
-/// Die Reihenfolge ist wesentlich: die Benutzungsprüfung muss VOR dem Entfernen der
-/// `-wal`/`-shm`-Dateien laufen — sonst zerstört der Restore genau das Signal, das ihn
-/// stoppen soll.
-/// `server_gestoppt`: Zusicherung des Operators, dass kein Prozess mehr auf `ziel`
-/// verbunden ist. Nötig, weil die Erkennung einen abgestürzten Server (verwaiste
-/// `-wal`/`-shm`) nicht von einem laufenden unterscheiden kann — und ein Restore gerade
-/// nach einem Absturz der wahrscheinlichste Fall ist. Ohne diese Zusicherung wäre der
-/// Hauptanwendungsfall blockiert, mit einem stillen Default wäre die Prüfung wertlos.
+/// `server_gestoppt`: Zusicherung des Operators, dass nichts mehr auf `ziel` verbunden ist.
+/// Nötig, weil die Erkennung einen abgestürzten Server nicht von einem laufenden unterscheiden
+/// kann — und nach einem Absturz ist ein Restore am wahrscheinlichsten.
 pub async fn restore_aus_datei(
     quelle: &Path,
     ziel: &Path,
@@ -107,10 +96,8 @@ pub async fn restore_aus_datei(
         }
     }
 
-    // Atomar einhängen: erst vollständig neben das Ziel kopieren, dann umbenennen.
-    // `rename` ist innerhalb desselben Dateisystems atomar — bricht der Vorgang während
-    // des Kopierens ab, bleibt die alte Datenbank unversehrt und nur die .tmp-Datei ist
-    // unvollständig. Vorher konnte ein Abbruch mitten in `fs::copy` das Ziel zerstören.
+    // Atomar einhängen: vollständig neben das Ziel kopieren, dann umbenennen. `rename` ist im
+    // selben Dateisystem atomar; ein Abbruch beim Kopieren lässt die alte Datenbank unversehrt.
     let tmp = nebendatei(ziel, ".restore-tmp");
     std::fs::copy(quelle, &tmp)
         .map_err(|e| AppError::Internal(format!("Kopieren der Sicherung fehlgeschlagen: {e}")))?;
@@ -178,9 +165,7 @@ mod tests {
             .unwrap();
         let (ziel, _dateien) = ziel_mit_nebendateien(&dir);
 
-        // Ohne Zusicherung: Abbruch. Ein Restore über eine laufende DB beschädigt sie —
-        // und -wal/-shm sind das einzige verlässliche Indiz dafür (BEGIN EXCLUSIVE und
-        // flock gelingen beide trotz offener Verbindung, gemessen).
+        // Ohne Zusicherung: Abbruch. Ein Restore über eine laufende DB beschädigt sie.
         let err = restore_aus_datei(&sicherung, &ziel, false)
             .await
             .unwrap_err();
@@ -204,7 +189,8 @@ mod tests {
         let (ziel, [wal, shm]) = ziel_mit_nebendateien(&dir);
 
         // Nach einem Absturz bleiben die Dateien verwaist liegen — genau dann will man
-        // restaurieren. Deshalb muss die Zusicherung den Weg freigeben.
+        // restaurieren;
+        // die Zusicherung gibt den Weg frei.
         restore_aus_datei(&sicherung, &ziel, true).await.unwrap();
 
         assert!(!wal.exists(), "stale -wal muss entfernt sein");

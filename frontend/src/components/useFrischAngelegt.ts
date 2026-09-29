@@ -10,9 +10,9 @@ interface Eintrag<T> {
 /**
  * Frisch angelegte Zeilen einer Einsatzliste als lokales Overlay über der Listen-Query.
  *
- * Eine Zeile lebt bis zu dem Refetch, der ihre ID erstmals bestätigt. So kann weder ein
- * alter GET noch Replikationsverzug die neue Zeile ausblenden; bei noch fehlendem Cache
- * wird zugleich keine scheinbar vollständige Serverliste erfunden.
+ * Eine Zeile lebt bis zu dem Refetch, der ihre ID erstmals bestätigt. So blendet weder ein alter
+ * GET noch Replikationsverzug die neue Zeile aus, und bei fehlendem Cache entsteht keine scheinbar
+ * vollständige Serverliste.
  */
 export function useFrischAngelegt<T extends { id: number }>(
   einsatzId: number,

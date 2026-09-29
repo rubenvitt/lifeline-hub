@@ -1,13 +1,8 @@
-//! Querschnittliche Extraktoren, die den `{error}`-JSON-Vertrag einhalten (LFH-267/F22).
+//! Querschnittliche Extraktoren, die den `{error}`-JSON-Vertrag einhalten (LFH-267).
 //!
-//! axums eigene Extractor-Rejections antworten mit `text/plain` und laufen damit am
-//! einheitlichen Fehlerformat aus [`crate::error::AppError`] vorbei. Das Frontend liest die
-//! Servermeldung aus dem JSON-Body (`frontend/src/api/client.ts`) und fällt sonst auf ein
-//! generisches „Serverfehler (status)" zurück — die Einsatzkraft sähe statt einer deutschen
-//! Fachmeldung eine Nullaussage.
-//!
-//! [`JsonBody`] delegiert deshalb an `axum::Json` (identische Deserialisierung und
-//! Content-Type-Prüfung) und ersetzt ausschließlich die Rejection.
+//! axums Extractor-Rejections antworten mit `text/plain`; das Frontend liest die Meldung aber
+//! aus dem JSON-Body (`frontend/src/api/client.ts`) und zeigte sonst nur „Serverfehler
+//! (status)“. [`JsonBody`] delegiert deshalb an `axum::Json` und ersetzt nur die Rejection.
 
 use axum::extract::rejection::{JsonRejection, PathRejection};
 use axum::extract::{ConnectInfo, FromRequest, FromRequestParts, Request};
@@ -18,20 +13,15 @@ use std::net::{IpAddr, SocketAddr};
 
 use crate::error::AppError;
 
-/// Quell-IP des Aufrufers, sofern ermittelbar (LFH-249/F30).
+/// Quell-IP des Aufrufers, sofern ermittelbar.
 ///
-/// `ConnectInfo<SocketAddr>` direkt im Handler ginge nicht: die Extension existiert nur,
-/// wenn der Server mit `into_make_service_with_connect_info` läuft — in jedem Router-Test
-/// (`oneshot` gegen den blanken Router) fehlt sie, und der Handler würde dort mit 500
-/// antworten statt zu arbeiten. `Option<ConnectInfo<_>>` ist seit axum 0.8 ebenfalls kein
-/// gültiger Extractor mehr (verlangt `OptionalFromRequestParts`).
+/// `ConnectInfo<SocketAddr>` direkt ginge nicht: die Extension fehlt in jedem Router-Test
+/// (`oneshot`), der Handler antwortete dort mit 500; `Option<ConnectInfo<_>>` ist in axum 0.8
+/// kein Extractor mehr. Dieser Extractor ist infallible und liefert `None`, wenn die Adresse
+/// unbekannt ist.
 ///
-/// Deshalb dieser Extractor: er ist **infallible** und liefert schlicht `None`, wenn die
-/// Adresse nicht bekannt ist. Eine unbekannte Quelle ist kein Fehlerfall — sie ist die
-/// normale Lage in Tests und hinter manchen Setups.
-///
-/// Bewusst NICHT aus `X-Forwarded-For` gelesen: der Header ist ohne vertrauenswürdigen
-/// Reverse-Proxy frei fälschbar, und ein fälschbares Rate-Limit ist keins.
+/// Bewusst nicht aus `X-Forwarded-For`: ohne vertrauenswürdigen Reverse-Proxy ist der Header
+/// frei fälschbar, und ein fälschbares Rate-Limit ist keins.
 #[derive(Debug, Clone, Copy)]
 pub struct PeerIp(pub Option<IpAddr>);
 
@@ -48,12 +38,9 @@ impl<S: Send + Sync> FromRequestParts<S> for PeerIp {
     }
 }
 
-/// Json-Body-Extractor mit deutschsprachiger Rejection im `{error}`-Format.
-///
-/// Verhält sich beim Deserialisieren exakt wie `axum::Json` — nur der Fehlerfall
-/// unterscheidet sich. Der Name ist bewusst distinkt (nicht `Json`), damit der Guard
-/// `tests/json_extractor_guard.rs` Wrapper und Rohform unterscheiden kann und ein
-/// vergessener Import nicht still auf `axum::Json` zurückfällt.
+/// Json-Body-Extractor mit deutschsprachiger Rejection im `{error}`-Format; deserialisiert
+/// exakt wie `axum::Json`. Der distinkte Name lässt `tests/json_extractor_guard.rs` Wrapper und
+/// Rohform unterscheiden.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct JsonBody<T>(pub T);
 
@@ -72,18 +59,11 @@ where
     }
 }
 
-/// Bildet eine `JsonRejection` auf einen `AppError` ab.
+/// Bildet eine `JsonRejection` auf einen `AppError` ab. Alle Arme landen auf 400 (formal
+/// ungültig).
 ///
-/// Alle Arme landen auf 400: der Body ist formal ungültig, unabhängig davon, ob er
-/// syntaktisch kaputt, typwidrig oder falsch deklariert war (LFH-267: 400 = formal
-/// ungültig, 422 = Zustand verbietet, 409 = Nebenläufigkeit/Lebenszyklus).
-///
-/// Bewusste Ungenauigkeit: `MissingJsonContentType` wäre HTTP-korrekt ein 415 und
-/// `LengthLimitError` ein 413. `AppError` trägt beide Codes nicht, und da eine
-/// Extractor-Rejection im Gegensatz zu einem Router-Fallback fest an den Rejection-Typ
-/// gebunden ist, ließe sich der Code nur über zwei neue Varianten erhalten. Das wurde
-/// gegen den Zuschnitt dieses Tasks abgewogen und verworfen — der Envelope zählt hier
-/// mehr als die exakte Code-Nuance.
+/// Bewusste Ungenauigkeit: `MissingJsonContentType` wäre HTTP-korrekt 415, `LengthLimitError`
+/// 413. `AppError` trägt beide Codes nicht; der Envelope zählt hier mehr als die Code-Nuance.
 fn rejection_zu_app_error(rejection: JsonRejection) -> AppError {
     match rejection {
         JsonRejection::JsonSyntaxError(_) => {
@@ -98,10 +78,9 @@ fn rejection_zu_app_error(rejection: JsonRejection) -> AppError {
         JsonRejection::BytesRejection(_) => {
             AppError::Validation("Anfrage-Body konnte nicht gelesen werden.".into())
         }
-        // `JsonRejection` ist `#[non_exhaustive]` — dieser Arm ist vom Compiler erzwungen
-        // und fängt Varianten, die ein künftiger axum-Bump hinzufügt. Bewusst NICHT auf 400:
-        // ein unbekannter Arm soll im Log auffallen, statt still als Eingabefehler
-        // durchzugehen.
+        // `JsonRejection` ist `#[non_exhaustive]`; dieser Arm fängt künftige Varianten. Nicht auf
+        // 400:
+        // ein unbekannter Arm soll im Log auffallen.
         andere => {
             tracing::error!("Unbehandelte JsonRejection-Variante: {andere}");
             AppError::Internal(format!("Unbehandelte Json-Rejection: {andere}"))
@@ -109,26 +88,16 @@ fn rejection_zu_app_error(rejection: JsonRejection) -> AppError {
     }
 }
 
-/// Pfad-Parameter-Extractor mit deutschsprachiger Rejection im `{error}`-Format (LFH-317/F22-B).
+/// Pfad-Parameter-Extractor mit deutschsprachiger Rejection im `{error}`-Format (LFH-317);
+/// deserialisiert exakt wie `axum::extract::Path`. Der distinkte Name lässt
+/// `tests/path_extractor_guard.rs` Wrapper und Rohform unterscheiden und vermeidet die
+/// Kollision mit `std::path::Path`.
 ///
-/// Verhält sich beim Deserialisieren exakt wie `axum::extract::Path` — nur der Fehlerfall
-/// unterscheidet sich. axums `Path` antwortet bei einer nicht-deserialisierbaren Route-ID
-/// (z. B. `abc` statt einer Zahl) mit `text/plain` und läuft damit am `{error}`-JSON-Vertrag
-/// vorbei; das Frontend (`api/client.ts`) sähe dann nur „Serverfehler (status)".
-///
-/// Der Name ist bewusst distinkt (nicht `Path`), aus drei Gründen: damit der Guard
-/// `tests/path_extractor_guard.rs` Wrapper und Rohform unterscheiden kann, damit ein vergessener
-/// Import nicht still auf `axum::extract::Path` zurückfällt, und wegen der Kollision mit
-/// `std::path::Path`.
-///
-/// **Status 400, nicht 404:** Eine nicht-parsebare Route-ID ist ein formal ungültiger
-/// Eingabewert (LFH-267: falscher Feldtyp → 400), und axums Default ist bereits 400 — die
-/// Ersetzung ist damit envelope-only, ohne Status-Änderung (gepinnt:
-/// `tests/karte.rs::proxy_raster_nicht_numerisches_z_ist_400`). Bewusst ANDERS als
-/// `src/einsatz/kontext.rs`, das die *einsatz_id* auf `NotFound` (404) abbildet: dort ist die
-/// fehlende ID eine Ressourcen-Existenzfrage (den Einsatz gibt es nicht), hier nur eine
-/// Parse-Frage des Pfad-Segments. Die beiden Extraktoren sind orthogonal — `EinsatzKontext`
-/// zieht die `{id}`, `PfadParam` die Sub-IDs; ein Modul nutzt oft beide (z. B. `auftrag.rs`).
+/// **Status 400, nicht 404:** eine nicht parsebare Route-ID ist ein formal ungültiger
+/// Eingabewert; axums Default ist ebenfalls 400, die Ersetzung ändert nur den Envelope (gepinnt:
+/// `tests/karte.rs::proxy_raster_nicht_numerisches_z_ist_400`). Anders `src/einsatz/kontext.rs`,
+/// das die *einsatz_id* auf 404 abbildet (Existenzfrage). Die Extraktoren sind orthogonal:
+/// `EinsatzKontext` zieht die `{id}`, `PfadParam` die Sub-IDs.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PfadParam<T>(pub T);
 
@@ -147,21 +116,20 @@ where
     }
 }
 
-/// Bildet eine `PathRejection` auf einen `AppError` ab. Der Deserialisierungsfehler (die häufige
-/// nicht-numerische ID) landet auf **400** — analog `rejection_zu_app_error` für den Body.
+/// Bildet eine `PathRejection` auf einen `AppError` ab; der Deserialisierungsfehler landet auf
+/// 400.
 fn pfad_rejection_zu_app_error(rejection: PathRejection) -> AppError {
     match rejection {
         PathRejection::FailedToDeserializePathParams(e) => {
             AppError::Validation(format!("Ungültiger Pfad-Parameter: {e}"))
         }
-        // `MissingPathParams` heißt: der Handler verlangt mehr Pfad-Segmente als die Route trägt —
-        // ein Router-/Handler-Fehler, kein Client-Fehler. Wie beim Json-Wrapper: auffallen (500 +
-        // Log) statt still als 400 durchgehen.
+        // `MissingPathParams`: der Handler verlangt mehr Segmente als die Route trägt — ein
+        // Programmierfehler, der als 500 im Log auffallen soll.
         PathRejection::MissingPathParams(e) => {
             tracing::error!("MissingPathParams (Route/Handler-Mismatch): {e}");
             AppError::Internal(format!("Pfad-Parameter fehlen (Router-Fehler): {e}"))
         }
-        // `PathRejection` ist `#[non_exhaustive]` — erzwungener Arm für künftige axum-Varianten.
+        // `PathRejection` ist `#[non_exhaustive]`; Arm für künftige Varianten.
         andere => {
             tracing::error!("Unbehandelte PathRejection-Variante: {andere}");
             AppError::Internal(format!("Unbehandelte Path-Rejection: {andere}"))
@@ -193,8 +161,7 @@ mod tests {
         farbe: Option<Farbe>,
     }
 
-    /// Router ohne State — `AppState` hat viele Pflichtfelder, und keins davon ist für
-    /// den Extractor relevant.
+    /// Router ohne State — kein Feld von `AppState` ist für den Extractor relevant.
     fn probe_router() -> Router {
         Router::new().route(
             "/t",
@@ -218,9 +185,8 @@ mod tests {
         (status, String::from_utf8_lossy(&bytes).to_string())
     }
 
-    /// Der wichtigste Test: der Wrapper verhält sich beim Deserialisieren identisch zu
-    /// `axum::Json`. Das ist die Voraussetzung dafür, dass die Ersetzung über alle
-    /// Routen hinweg verhaltensneutral ist.
+    /// Der Wrapper deserialisiert identisch zu `axum::Json`; darauf ruht die Verhaltensneutralität
+    /// der Ersetzung.
     #[tokio::test]
     async fn gueltiger_body_wird_unveraendert_deserialisiert() {
         let (status, body) = sende(
@@ -248,8 +214,7 @@ mod tests {
         assert!(json["error"].as_str().is_some());
     }
 
-    /// Kern der Nutzer-Entscheidung: ein unbekannter Enum-Wert ist formal ungültig (400),
-    /// nicht „Zustand verbietet" (422). axum allein lieferte hier 422.
+    /// Ein unbekannter Enum-Wert ist formal ungültig (400), nicht 422 (axum allein lieferte 422).
     #[tokio::test]
     async fn unbekannter_enum_wert_wird_400_nicht_422() {
         let (status, body) = sende(
@@ -274,7 +239,7 @@ mod tests {
         assert!(json["error"].as_str().unwrap().contains("Content-Type"));
     }
 
-    // ── PfadParam (LFH-317) ──
+    // ── PfadParam ──
 
     fn pfad_router() -> Router {
         Router::new().route(
@@ -295,9 +260,7 @@ mod tests {
         (status, String::from_utf8_lossy(&bytes).to_string())
     }
 
-    /// Wie beim Json-Wrapper der wichtigste Test: der PfadParam-Wrapper extrahiert identisch
-    /// zu `axum::extract::Path` — Voraussetzung dafür, dass die Ersetzung über ~206 Call-Sites
-    /// verhaltensneutral ist.
+    /// Der Wrapper extrahiert identisch zu `axum::extract::Path`.
     #[tokio::test]
     async fn pfad_gueltig_wird_unveraendert_extrahiert() {
         let (status, body) = hole("/t/42/hallo").await;
@@ -305,8 +268,7 @@ mod tests {
         assert_eq!(body, "42/hallo");
     }
 
-    /// Der Kern von LFH-317: eine nicht-numerische Route-ID liefert 400 im `{error}`-Envelope
-    /// statt `text/plain` (axum-Default-Status 400 bleibt, nur der Body wird JSON).
+    /// Eine nicht-numerische Route-ID liefert 400 im `{error}`-Envelope statt `text/plain`.
     #[tokio::test]
     async fn pfad_nicht_numerisch_wird_400_mit_envelope() {
         let (status, body) = hole("/t/abc/hallo").await;

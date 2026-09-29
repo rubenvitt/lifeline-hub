@@ -18,8 +18,8 @@ use tower::ServiceExt;
 /// Prüft den Fehler-Envelope: `application/json` + parsebarer Body + String-Feld `error`.
 ///
 /// Bewusst getrennt vom Statuscode-Assert: ein Fall kann den richtigen Status und trotzdem
-/// den falschen Body-Typ liefern (so verhält sich heute `JsonSyntaxError` — 400, aber
-/// `text/plain`). Beides einzeln zu prüfen macht sichtbar, welche Hälfte bricht.
+/// den falschen Body-Typ liefern (axums `JsonSyntaxError` etwa: 400, aber `text/plain`).
+/// Beides einzeln zu prüfen macht sichtbar, welche Hälfte bricht.
 async fn assert_fehler_envelope(resp: axum::response::Response, fall: &str) -> Value {
     let status = resp.status();
     assert!(
@@ -62,8 +62,8 @@ fn login_request(body: &str, content_type: Option<&str>) -> Request<Body> {
     req.body(Body::from(body.to_string())).unwrap()
 }
 
-/// Syntaktisch kaputter Body: axum liefert heute den RICHTIGEN Status (400), aber
-/// `text/plain` — der Envelope-Teil des Asserts ist rot.
+/// Syntaktisch kaputter Body: axum liefert von sich aus den richtigen Status (400), aber
+/// `text/plain` — den Envelope muss der Wrapper liefern.
 #[tokio::test]
 async fn kaputtes_json_liefert_400_im_fehler_envelope() {
     let app = common::setup().await;
@@ -81,9 +81,8 @@ async fn kaputtes_json_liefert_400_im_fehler_envelope() {
     );
 }
 
-/// Falscher Skalartyp: heute `JsonDataError` → 422 + `text/plain`.
-/// Nach LFH-267 ist das ein formaler Eingabefehler → 400 (Nutzer-Entscheidung:
-/// „unbekannter Enum-Wert / Typfehler = formal ungültig").
+/// Falscher Skalartyp: axums `JsonDataError` wäre 422 + `text/plain`. Nach LFH-267 ist das
+/// ein formaler Eingabefehler → 400 („unbekannter Enum-Wert / Typfehler = formal ungültig").
 #[tokio::test]
 async fn falscher_feldtyp_liefert_400_im_fehler_envelope() {
     let app = common::setup().await;
@@ -104,9 +103,8 @@ async fn falscher_feldtyp_liefert_400_im_fehler_envelope() {
     );
 }
 
-/// Fehlender `Content-Type`: heute `MissingJsonContentType` → 415 + `text/plain`.
-/// Wird bewusst auf 400 gefaltet — `AppError` trägt keinen 415-Code, und eine eigene
-/// Variante dafür hätte den Batch über das Fundament hinaus aufgezogen.
+/// Fehlender `Content-Type`: axums `MissingJsonContentType` wäre 415 + `text/plain`. Wird
+/// bewusst auf 400 gefaltet — `AppError` trägt keinen 415-Code.
 #[tokio::test]
 async fn fehlender_content_type_liefert_fehler_envelope() {
     let app = common::setup().await;
@@ -164,10 +162,11 @@ async fn falsche_methode_liefert_405_im_fehler_envelope() {
     assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
 }
 
-/// Nicht-numerische Route-ID (LFH-317): axums `Path` lieferte hier `text/plain`, `crate::extract::
-/// PfadParam` liefert 400 im `{error}`-Envelope. Genutzt wird der ÖFFENTLICHE Tile-Proxy
-/// (`/api/karte/proxy/{id}/raster/{z}/{x}/{y}`) — er erreicht den Extractor VOR dem Handler-Rumpf,
-/// also ohne Session oder DB-Fixture. Der Status bleibt 400 (axum-Default), nur der Body wird JSON.
+/// Nicht-numerische Route-ID (LFH-317): axums `Path` lieferte hier `text/plain`,
+/// `crate::extract::PfadParam` liefert 400 im `{error}`-Envelope. Genutzt wird der ÖFFENTLICHE
+/// Tile-Proxy (`/api/karte/proxy/{id}/raster/{z}/{x}/{y}`) — er erreicht den Extractor VOR dem
+/// Handler-Rumpf, also ohne Session oder DB-Fixture. Der Status bleibt 400 (axum-Default), nur
+/// der Body wird JSON.
 #[tokio::test]
 async fn nicht_numerische_route_id_liefert_400_im_fehler_envelope() {
     let app = common::setup().await;

@@ -74,8 +74,8 @@ export default function PersonalPage() {
     queryKey: globalKeys.personalListe('im-dienst'),
     queryFn: () => listePersonal(true),
   });
-  // LFH-139: Struktur-Listen zum Auflösen von einheit_id/fahrzeug_id → Klartext-Label
-  // (Gegenrichtung zur Fahrzeugseite). Reine Anzeige — keine eigene Backend-Erweiterung.
+  // Struktur-Listen zum Auflösen von einheit_id/fahrzeug_id → Klartext-Label (Gegenrichtung zur
+  // Fahrzeugseite).
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
@@ -85,8 +85,8 @@ export default function PersonalPage() {
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
 
-  // Cross-Modul-Deeplink (LFH-25): ?personal=<id> (z. B. Lagekarte-Führungskraft) hebt die
-  // Zeile hervor und scrollt sie ins Bild (Scroll best-effort, jsdom-No-op).
+  // Cross-Modul-Deeplink ?personal=<id> hebt die Zeile hervor und scrollt sie ins Bild
+  // (best-effort).
   useQueryParamSelektion('personal', epQuery.isSuccess, (pid) => {
     if ((epQuery.data ?? []).some((p) => p.id === pid)) setHighlightId(pid);
   });
@@ -155,23 +155,17 @@ export default function PersonalPage() {
   const eps = epQuery.data ?? [];
 
   /**
-   * LISTENZUSTAND — zwei Lagen, zwei Antworten (D3). Der Fehler allein reicht als
-   * Bedingung NICHT.
+   * Listenzustand — der Fehler allein reicht als Bedingung nicht. Ohne Zeilen im Zwischenspeicher
+   * tritt der Fehler an die Stelle der Datensicht, sonst behauptete „Noch kein Personal disponiert"
+   * eine leere Disposition. Mit Zeilen bleiben sie stehen und bekommen ein Banner: echt, nur
+   * womöglich alt.
    *
-   * Ohne Zeilen im Zwischenspeicher tritt der Fehler an die Stelle der Datensicht, sonst
-   * behauptet „Noch kein Personal disponiert" eine leere Disposition, wo bloß der Abruf
-   * scheiterte. MIT Zeilen bleiben sie stehen und bekommen ein Banner: sie sind echt, nur
-   * womöglich alt. Ein Fehler, der die Zeilen wegräumt, nähme der Einsatzkraft Daten, die
-   * sie eben noch hatte — das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
+   * Gemessen an `eps`, der ungefilterten Menge: Suche, Trägerfilter und Gruppenachse leben im
+   * Primitiv; an ihrer Restmenge gemessen kippte die Seite bei jedem engen Filter in den
+   * Fehlerzweig.
    *
-   * Gemessen an `eps`, der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`):
-   * Suche, Trägerfilter und Gruppenachse leben IM Primitiv, an ihrer Restmenge gemessen
-   * kippte die Seite bei jedem engen Filter in den Fehlerzweig — und nähme dem Bediener
-   * die Schalter, mit denen er ihn wieder aufmachen könnte.
-   *
-   * NICHT zu verwechseln mit dem Statuskatalog-Banner weiter unten: das steht ZUSÄTZLICH
-   * über der Tabelle und tauscht nichts aus. Eine Mengenbedingung hat dort nichts zu
-   * suchen — es verschwindet nichts, also ist auch nichts zu bewahren.
+   * Nicht zu verwechseln mit dem Statuskatalog-Banner weiter unten: das steht zusätzlich über der
+   * Tabelle und tauscht nichts aus.
    */
   const listeGescheitert = epQuery.isError && eps.length === 0;
   const standVeraltet = epQuery.isError && eps.length > 0;
@@ -181,9 +175,8 @@ export default function PersonalPage() {
   const stati = statusQuery.data ?? [];
 
   /**
-   * Der Katalog als Menüwerte — EINMAL gebaut, von Tabellen- und Kartenzweig gelesen.
-   * Sechs Werte im Seed (`migrations/0012:18-30`), mandantengepflegt wie beim Fahrzeug;
-   * beides liegt über jeder waagerechten Schwelle (Zielform-Spec §3).
+   * Der Katalog als Menüwerte — einmal gebaut, von Tabellen- und Kartenzweig gelesen.
+   * Mandantengepflegt wie beim Fahrzeug; zu viele Werte für eine waagerechte Reihe.
    */
   const statusOptionen: StatusOption<number>[] = stati.map((s) => ({
     wert: s.id,
@@ -192,7 +185,7 @@ export default function PersonalPage() {
     farbe: s.farbe,
   }));
 
-  /** Gemeinsamer Bedienweg für beide Zweige — Herleitung siehe `FahrzeugePage.tsx`. */
+  /** Gemeinsamer Bedienweg für beide Zweige — Herleitung in `FahrzeugePage.tsx`. */
   const statusBedienungVon = (ep: EinsatzPersonal) => {
     const laeuft = statusMutation.isPending && statusMutation.variables?.epId === ep.id;
     return {
@@ -220,12 +213,11 @@ export default function PersonalPage() {
     }));
 
   /**
-   * Was ein leeres Auswahlfeld bedeutet, hängt daran, OB die Liste überhaupt ankam
-   * (LFH-331 · B3). Scheitert der Abruf, filtert der Ausdruck darüber auf die leere Menge
-   * und das Feld behauptete „Keine freien Personen" — eine Aussage über den Bestand, die
-   * niemand geprüft hat. Ohne Fehler bleibt der Bestandswortlaut byte-gleich stehen.
+   * Was ein leeres Auswahlfeld bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,
+   * filtert der Ausdruck darüber auf die leere Menge, und das Feld behauptete „Keine freien
+   * Personen". Ohne Fehler bleibt der Bestandswortlaut.
    *
-   * KEIN `kein403`: `src/routes/personal.rs` ist org-lesbar ohne Admin-Schranke.
+   * Kein `kein403`: die Personal-Route ist org-lesbar ohne Admin-Schranke.
    */
   const poolInhalt =
     nichtGefundenInhalt(poolQuery, {
@@ -233,13 +225,9 @@ export default function PersonalPage() {
     }) ?? 'Keine freien Personen';
 
   /**
-   * Trägerfilter aus den EIGENEN Daten; `undefined` ohne Werte — ein Filterfeld mit null
-   * Optionen wäre Rauschen in der Werkzeugzeile.
-   *
-   * BEWUSSTE FOLGE, damit sie nicht unbenannt bleibt: das Feld erscheint erst mit dem
-   * ersten gepflegten Wert, also nach dem Laden — in der umbrechenden Werkzeugzeile eine
-   * kleine Verschiebung. Der Tausch ist gewollt: ein dauerhaft leeres Filterfeld sieht wie
-   * ein Werkzeug aus und ist keins.
+   * Trägerfilter aus den eigenen Daten; `undefined` ohne Werte. Das Feld erscheint erst mit dem
+   * ersten gepflegten Wert, nach dem Laden — gewollt: ein dauerhaft leeres Filterfeld sieht wie ein
+   * Werkzeug aus und ist keins.
    */
   const traegerWerte = [
     ...new Set(eps.map((e) => e.traegerorganisation).filter((t): t is string => !!t)),
@@ -255,20 +243,15 @@ export default function PersonalPage() {
       : undefined;
 
   /**
-   * Spaltenregister der Personalseite — die breiteste Fläche des Repos (9 Spalten) und
-   * damit der erste Adressat des Spaltenschalters (LFH-330 · B2).
+   * Spaltenregister der Personalseite — die breiteste Fläche (9 Spalten) und damit der erste
+   * Adressat des Spaltenschalters. Durch `spaltenFuer<EinsatzPersonal>()` geführt, nicht annotiert.
    *
-   * Durch `spaltenFuer<EinsatzPersonal>()` geführt, NICHT annotiert (sonst weitet sich `K`
-   * auf `string` und der Kartenplan nimmt jeden Tippfehler an).
+   * ── Kein `abBreite` auf `position` ──
    *
-   * ── KEIN `abBreite` AUF `position` — und das ist eine Entscheidung ───────────────
-   *
-   * Die API-Spec schlägt `abBreite: 'xl'` vor. Dagegen steht der Kontext
-   * **Führungs-Tablet** aus der Bedien-Leitlinie: 1024–1280 px, und antds `xl` liegt bei
-   * 1200 — die Spalte verschwände also genau dort. `position` ist eine von nur zwei
-   * Schreib-Bedienungen dieser Seite, und es gibt keine Detailroute, auf die man sie
-   * verlagern könnte. Wer sie weghaben will, nimmt `spaltenAusVoreinstellung`; dann steht
-   * sie im Schalter, im Zähler, und ein Klick holt sie zurück.
+   * antds `xl` liegt bei 1200 px; auf dem Führungs-Tablet (1024–1280 px) verschwände die Spalte
+   * genau dort, wo sie gebraucht wird. `position` ist eine von zwei Schreib-Bedienungen, und es
+   * gibt keine Detailroute als Ausweichort. Wer sie weghaben will, nimmt
+   * `spaltenAusVoreinstellung`; dann steht sie im Schalter und im Zähler.
    */
   const spalten = spaltenFuer<EinsatzPersonal>()([
     {
@@ -277,8 +260,8 @@ export default function PersonalPage() {
       immerSichtbar: true,
       sortWert: (ep) => ep.name,
       suchText: (ep) => ep.name,
-      // Der Deeplink der Fahrzeug-/Einheitsspalte wandert NICHT hierher: nur die
-      // Titelspalte dürfte `titel.ziel` tragen, und `personalPfad` zeigte auf DIESE Seite.
+      // Der Deeplink der Fahrzeug-/Einheitsspalte wandert nicht hierher: nur die Titelspalte dürfte
+      // `titel.ziel` tragen, und `personalPfad` zeigte auf diese Seite.
       render: (_, ep) => (
         <Space>
           {ep.name}
@@ -344,15 +327,14 @@ export default function PersonalPage() {
     {
       title: 'Status',
       key: 'status',
-      // Gefiltert wird über die KATEGORIE, nicht über `status_id`: die ID kommt aus dem
-      // Mandantenkatalog und filterte je Mandant anders — und passte nicht zu den Gruppen.
+      // Gefiltert wird über die Kategorie, nicht über `status_id`: die ID kommt aus dem
+      // Mandantenkatalog und passte nicht zu den Gruppen.
       filter: {
         werte: KATEGORIE_WERTE,
         trifft: (ep, w) => kategorieVon(ep.status_kategorie) === w,
       },
-      // Kein `Select` mehr: dessen `minWidth: 150` war der Grund, warum der Statuswechsel
-      // in der 390-px-Karte gar nicht erst stattfinden konnte (LFH-339 · C4).
-      // Deskriptor GANZ gespreizt — Herleitung siehe `FahrzeugePage.tsx`.
+      // Kein `Select` mit Mindestbreite (die 390-px-Karte scheiterte daran). Deskriptor ganz
+      // gespreizt — Herleitung in `FahrzeugePage.tsx`.
       render: (_, ep) => (
         <StatusWahl
           darstellung={personalStatusDarstellung(ep)}
@@ -384,8 +366,8 @@ export default function PersonalPage() {
                 title="Aus Einsatz entfernen?"
                 onConfirm={() => entfernenMutation.mutate(ep.id)}
               >
-                {/* Kein `danger`: Rot ist Gefahr, nicht Bedienung. Der zweite Handgriff
-                    aus Kriterium 4 ist die Rückfrage. */}
+                {/* Kein `danger`: Rot ist Gefahr, nicht Bedienung. Der zweite Handgriff ist die
+                    Rückfrage. */}
                 <Button>Entfernen</Button>
               </Popconfirm>
             ),
@@ -419,7 +401,7 @@ export default function PersonalPage() {
       }
       aktionen={
         darfSchreiben && (
-          // `wrap` plus `maxWidth` — Herleitung siehe `FahrzeugePage.tsx`.
+          // `wrap` plus `maxWidth` — Herleitung in `FahrzeugePage.tsx`.
           <Space wrap style={{ minWidth: 0 }}>
             <Select
               style={{ minWidth: 260, maxWidth: '100%' }}
@@ -444,24 +426,19 @@ export default function PersonalPage() {
         )
       }
     >
-      {/* `titel` ohne `ziel`: `personalPfad` ist eine Query-Param-Selektion auf DIESE Seite,
-          der Link zeigte auf sich selbst — und er machte aus der Namenszelle in beiden
-          Zweigen einen Link, was die gepinnte LFH-139-Aussage „in dieser Zeile steht kein
-          Link" lautlos umdrehte. Die echten Fremd-Links (Fahrzeug, Einheit) bleiben in ihren
-          Zellen.
+      {/* `titel` ohne `ziel`: `personalPfad` ist eine Query-Param-Selektion auf diese Seite,
+          der Link zeigte auf sich selbst und machte die Namenszelle zum Link. Die echten
+          Fremd-Links (Fahrzeug, Einheit) bleiben in ihren Zellen.
 
-          `zufluss` bleibt der Default `sammelbanner`: diese Seite trägt ZWEI Auswahlfelder
-          in der Zeile (Position, Status), eigener wie fremder Wechsel läuft über eine
-          Invalidierung. */}
+          `zufluss` bleibt `sammelbanner`: zwei Auswahlfelder in der Zeile (Position, Status),
+          eigener wie fremder Wechsel läuft über eine Invalidierung. */}
 
-      {/* Der Statuskatalog trägt die Auswahlliste JEDER Statuszelle. Fällt er aus, steht in
-          der Zeile ein Auswahlfeld ohne Einträge — der Statuswechsel ist dann unmöglich, und
-          zwar lautlos. Die Meldung steht deshalb über der Tabelle, nicht in der Zelle.
+      {/* Der Statuskatalog trägt die Auswahlliste jeder Statuszelle. Fällt er aus, wäre der
+          Statuswechsel lautlos unmöglich; die Meldung steht deshalb über der Tabelle.
 
-          An `darfSchreiben` gekoppelt, weil das Auswahlfeld selbst es ist: wer nur liest,
-          sieht `StatusBadge` aus den Zeilendaten und verliert durch den Katalogausfall
-          nichts. (Die Positionsspalte bleibt bedienbar — `POSITION_OPTIONEN` ist ein
-          lokales Enum und kommt nicht über die Leitung.) */}
+          An `darfSchreiben` gekoppelt: wer nur liest, sieht `StatusBadge` aus den Zeilendaten
+          und verliert nichts. (Die Positionsspalte bleibt bedienbar — `POSITION_OPTIONEN` ist
+          ein lokales Enum.) */}
       {darfSchreiben && statusQuery.isError && (
         <div style={{ marginBottom: abstand.md }}>
           <SeitenFehler
@@ -472,11 +449,10 @@ export default function PersonalPage() {
         </div>
       )}
 
-      {/* Der Listenfehler tauscht die Datensicht aus, statt durch sie hindurchgereicht zu
-          werden (D3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps` kennt
-          keinen Fehlerbegriff — ein Prop am Primitiv wirkte nur in einer der beiden Formen.
-          Ohne diese Weiche behauptet „Noch kein Personal disponiert" auch dann eine leere
-          Disposition, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Listenfehler tauscht die Datensicht aus: `Datensicht` führt den Kartenzweig an
+          `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete
+          „Noch kein Personal disponiert" eine leere Disposition, wenn bloß die Verbindung
+          abgerissen ist. */}
       {listeGescheitert ? (
         <SeitenFehler
           text="Disponiertes Personal konnte nicht geladen werden"
@@ -508,7 +484,7 @@ export default function PersonalPage() {
               titel: { spalte: 'name' },
               status: (ep) => personalStatusDarstellung(ep),
               // Der Bedienweg sitzt am Status-, nicht am Aktions-Slot: der ist mit „Entfernen"
-              // belegt, und `Datensicht` sichert genau eine Primäraktion zu (Zielform-Spec §5).
+              // belegt, und `Datensicht` sichert genau eine Primäraktion zu.
               statusBedienung: (ep) => (darfSchreiben ? statusBedienungVon(ep) : null),
               sekundaer: ['funktion', 'einheit', 'fahrzeug'],
               aktion: darfSchreiben
@@ -523,14 +499,10 @@ export default function PersonalPage() {
         </>
       )}
 
-      {/*
-       * Ad-hoc-Disposition — Schnellerfassung mit Serienmodus (LFH-332/B4). An der
-       * Bereitstellung wird eine Helferkette am Stück aufgenommen, deshalb bleibt der
-       * Dialog nach „Speichern und nächste" stehen; Trägerorganisation und
-       * Stärke-Position überleben das Speichern, weil sie sich über eine Kette hinweg
-       * am seltensten ändern (dieselbe Einheit, dieselbe Funktionsebene). Maske und
-       * Feldbudget liegen im Bauteil (LFH-542), das auch der Stab öffnet.
-       */}
+      {/* Ad-hoc-Disposition mit Serienmodus: an der Bereitstellung wird eine Helferkette am
+          Stück aufgenommen. Trägerorganisation und Stärke-Position überleben das Speichern,
+          weil sie sich über eine Kette am seltensten ändern. Maske und Feldbudget liegen im
+          Bauteil, das auch der Stab öffnet. */}
       <AdhocPersonModal
         offen={adhocOffen}
         einsatzId={einsatzId}

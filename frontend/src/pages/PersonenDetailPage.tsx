@@ -120,18 +120,17 @@ function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
 }
 
 /**
- * Statuswechsel, die eine Rückfrage tragen (LFH-363: „Destruktiv ist nicht gleich
- * destruktiv"). `naechsteStatus` kennt formal auch von `verstorben` einen Weg zurück — ein
- * versehentlich gebuchter Todesfall ist trotzdem nichts, was man beiläufig zurücknimmt, und
- * er erzeugt einen ETB-Eintrag, den keine Korrektur wieder einsammelt. `abgemeldet` steht
- * bewusst NICHT hier: das ist eine Verwaltungsbuchung mit sichtbarem Rückweg.
+ * Statuswechsel mit Rückfrage. `naechsteStatus` kennt formal auch von `verstorben` einen Weg zurück
+ * — ein versehentlich gebuchter Todesfall ist trotzdem nichts, was man beiläufig zurücknimmt, und
+ * sein ETB-Eintrag bleibt. `abgemeldet` steht bewusst nicht hier: eine Verwaltungsbuchung mit
+ * sichtbarem Rückweg.
  */
 const IRREVERSIBEL: PersonStatus[] = ['verstorben'];
 
 /**
- * Eine Aktion der Kopfleiste. Deskriptor statt `ReactNode`, damit dieselbe Beschreibung
- * einmal als Primärknopf und einmal als Menüeintrag gerendert werden kann — und damit die
- * Rangfolge an EINER Stelle entschieden wird statt im JSX.
+ * Eine Aktion der Kopfleiste. Deskriptor statt `ReactNode`, damit dieselbe Beschreibung als
+ * Primärknopf oder als Menüeintrag gerendert werden kann und die Rangfolge an einer Stelle
+ * entschieden wird.
  */
 type Kopfaktion =
   | {
@@ -193,14 +192,14 @@ export default function PersonenDetailPage() {
     queryKey: einsatzKeys.person(einsatzId, personId),
     queryFn: () => ladePerson(einsatzId, personId),
     enabled: idGueltig,
-    // Dieser GET schreibt serverseitig einen Zugriffsaudit. Ein automatischer Retry
-    // wuerde fuer dieselbe Oeffnung mehrere Auditzeilen erzeugen.
+    // Dieser GET schreibt serverseitig einen Zugriffsaudit. Ein automatischer Retry erzeugte für
+    // dieselbe Öffnung mehrere Auditzeilen.
     retry: false,
   });
   /**
-   * Ladehoheit (LFH-340 · C5, Befund M40): die vier Abfragen unten hängen am AUFGEKLAPPTEN
-   * Zustand ihres Abschnitts, nicht am Öffnen der Seite. Beim Öffnen laufen nur noch zwei —
-   * Einsatz und Detail —, und der medizinische Verlauf ist Teil desselben Detail-Abrufs.
+   * Ladehoheit: die vier Abfragen unten hängen am aufgeklappten Abschnitt, nicht am Öffnen der
+   * Seite. Beim Öffnen laufen nur Einsatz und Detail; der medizinische Verlauf ist Teil des
+   * Detail-Abrufs.
    */
   const [zuordnungenOffen, setZuordnungenOffen] = useState(false);
   const [auditOffen, setAuditOffen] = useState(false);
@@ -218,15 +217,9 @@ export default function PersonenDetailPage() {
     enabled: idGueltig && zuordnungenOffen,
   });
   /**
-   * LFH-152: UHS-Liste für die Klartext-Anzeige der aktuellen Verortung + den Zuweisungs-Picker.
-   *
-   * Hängt allein am aufgeklappten Abschnitt. Ein früherer Stand trug hier zusätzlich
-   * `|| uhsModalOffen` mit der Begründung, der Dialog überlebe das Zuklappen — die ist im
-   * Review als unbelegt aufgefallen und wieder abgetragen: **beide** Auslöser des Dialogs
-   * („UHS zuweisen", „UHS ändern") stehen INNERHALB des Abschnitts, er kann also nur offen
-   * sein, während der Abschnitt es ebenfalls ist. Danach deckt die Maske den Collapse-Kopf
-   * ab und der Fokus liegt im Dialog. Es gab keinen erreichbaren Fall, nur einen Zweig, der
-   * sich nicht widerlegen ließ — und kein Test, der ihn getroffen hätte.
+   * UHS-Liste für die Klartext-Anzeige der Verortung und den Zuweisungs-Picker. Hängt allein am
+   * aufgeklappten Abschnitt: beide Auslöser des Dialogs stehen innerhalb des Abschnitts, er kann
+   * also nur offen sein, während der Abschnitt es ist.
    */
   const uhsListeQuery = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
@@ -303,13 +296,12 @@ export default function PersonenDetailPage() {
       });
     },
   });
-  // Optimistisches Lock (LFH-241/F10): `basis` trägt den beim ÖFFNEN der Maske eingefrorenen
-  // geaendert_at-Stand (LFH-303 — aus den Live-Query-Daten gelesen hebelte ein
-  // Hintergrund-Refetch das Lock aus); ein 409 öffnet den Konfliktdialog (neu laden vs.
-  // überschreiben), statt still zu überschreiben.
+  // Optimistisches Lock: `basis` trägt den beim Öffnen der Maske eingefrorenen geaendert_at-Stand
+  // (aus den Live-Query-Daten gelesen hebelte ein Hintergrund-Refetch das Lock aus); ein 409 öffnet
+  // den Konfliktdialog, statt still zu überschreiben.
   const editMutation = useMutation({
-    // `basis` ist eine `CasBasis` und damit nur aus `useEditSitzung` zu bekommen: ein
-    // blanker `p.geaendert_at` aus den Live-Query-Daten bricht hier den Typcheck (LFH-303).
+    // `basis` ist eine `CasBasis` und nur aus `useEditSitzung` zu bekommen: ein blanker
+    // `p.geaendert_at` bricht hier den Typcheck.
     mutationFn: (v: { daten: PersonEingabe; basis?: CasBasis; overwrite?: boolean }) =>
       aktualisierePerson(einsatzId, personId, v.daten, v.overwrite ? undefined : v.basis),
     onSuccess: () => {
@@ -317,12 +309,11 @@ export default function PersonenDetailPage() {
       editSitzung.beende();
     },
     onError: (e, v) => {
-      // Nur der ERSTE 409 (Save MIT Baseline) ist der Sperrkonflikt. Die Personen-Route kennt
-      // einen ZWEITEN 409, der kein CAS-Konflikt ist: `fordere_aktiv` („Einsatz ist
-      // abgeschlossen und schreibgeschützt") greift VOR der CAS-Prüfung, und `overwrite` kann
-      // ihn nicht umgehen. Ein 409 auf den Overwrite muss deshalb die echte Servermeldung
-      // zeigen, statt denselben Dialog erneut zu öffnen — sonst wäre „Überschreiben" ein
-      // toter Button (LFH-351/H65; dieselbe Weiche wie in SchaedenDetailPage/TiereDetailPage).
+      // Nur der erste 409 (Save mit Baseline) ist der Sperrkonflikt. Der zweite 409 der Route,
+      // `fordere_aktiv` („Einsatz ist abgeschlossen und schreibgeschützt"), greift vor der
+      // CAS-Prüfung und ist per `overwrite` nicht zu umgehen. Ein 409 auf den Overwrite zeigt
+      // deshalb die Servermeldung, statt denselben Dialog erneut zu öffnen (dieselbe Weiche wie in
+      // SchaedenDetailPage/TiereDetailPage).
       if (istKonflikt(e) && !v.overwrite) {
         modal.confirm({
           title: 'Zwischenzeitlich geändert',
@@ -352,15 +343,14 @@ export default function PersonenDetailPage() {
   });
 
   /**
-   * Rückfragen der Kopfleiste — als `<Modal>` mit eigenem Zustand, nicht als `Popconfirm`
-   * im Menü-Label (LFH-365): ein `Popconfirm` überlebt dort nur mit `stopPropagation` das
-   * Auto-Schließen des Menüs. Beide Dialoge stehen außerdem AUSSERHALB jeder Aufzählung,
-   * es gibt sie also genau einmal im Baum.
+   * Rückfragen der Kopfleiste als `<Modal>` mit eigenem Zustand, nicht als `Popconfirm` im
+   * Menü-Label: ein `Popconfirm` überlebte dort nur mit `stopPropagation` das Auto-Schließen des
+   * Menüs. Beide Dialoge stehen außerhalb jeder Aufzählung, also genau einmal im Baum.
    */
   const [statusDialog, setStatusDialog] = useState<PersonStatus | null>(null);
   const [stornoOffen, setStornoOffen] = useState(false);
 
-  // E-2: Sichtung
+  // Sichtung
   const [reSichtenOffen, setReSichtenOffen] = useState(false);
   const [sichtungForm] = Form.useForm<{ kategorie: Sichtungskategorie; notiz?: string }>();
   const sichtungMutation = useMutation({
@@ -374,7 +364,7 @@ export default function PersonenDetailPage() {
     onError: fehler,
   });
 
-  // E-2: Verlaufsnotiz
+  // Verlaufsnotiz
   const [notizForm] = Form.useForm<{ text: string }>();
   const notizMutation = useMutation({
     mutationFn: (v: { text: string }) => legeNotizAn(einsatzId, personId, v.text),
@@ -385,11 +375,11 @@ export default function PersonenDetailPage() {
     onError: fehler,
   });
 
-  // E-2: Verbleib (Dialog seit LFH-674 in `personen/VerbleibErfassung.tsx`)
+  // Verbleib (Dialog in `personen/VerbleibErfassung.tsx`)
   const [verbleibOffen, setVerbleibOffen] = useState(false);
 
-  // LFH-152: UHS-Zuweisung von der Personen-Seite (Gegenrichtung zum Grundriss). art spiegelt
-  // die belegMut-Logik des Grundrisses: bereits belegt → wechsel, sonst eintritt. Austragen = austritt.
+  // UHS-Zuweisung von der Personen-Seite (Gegenrichtung zum Grundriss). art spiegelt die
+  // belegMut-Logik: bereits belegt → wechsel, sonst eintritt. Austragen = austritt.
   const [uhsForm] = Form.useForm<{ uhs_id: number; notiz?: string }>();
   function invalidateUhs() {
     invalidateDetail();
@@ -415,9 +405,9 @@ export default function PersonenDetailPage() {
     onError: fehler,
   });
 
-  // LFH-151: Tiere (Halter) / Schäden (Geschädigte) von der Personen-Seite zuweisen + lösen.
-  // Picker-Listen lazy (nur bei offenem Modal) laden; Zuweisen leert die konkurrierenden
-  // XOR-Slots im selben PATCH (sonst 500 durch den Mehrspalten-CHECK — PATCH-XOR).
+  // Tiere (Halter) / Schäden (Geschädigte) von der Personen-Seite zuweisen und lösen. Picker-Listen
+  // lazy (nur bei offenem Modal); Zuweisen leert die konkurrierenden XOR-Slots im selben PATCH
+  // (sonst 500 durch den Mehrspalten-CHECK).
   const [tierModalOffen, setTierModalOffen] = useState(false);
   const [schadenModalOffen, setSchadenModalOffen] = useState(false);
   const [tierForm] = Form.useForm<{ tier_id: number }>();
@@ -486,14 +476,13 @@ export default function PersonenDetailPage() {
     onError: fehler,
   });
 
-  // Die „Zugeordnete Tiere/Schäden"-Blöcke werden über den konsolidierten Einsatz-Live-
-  // Stream (useEinsatzLiveStream im EinsatzLayout) live gehalten: `tier`→'einsatz-tiere'
-  // (LFH-75), `schaden`→'einsatz-schaeden' (LFH-206). Der Prefix-Match deckt die
-  // Drawer-Keys ['einsatz-tiere', …, 'halter', personId] bzw.
-  // ['einsatz-schaeden', …, 'geschaedigt', personId] mit ab.
+  // Die Blöcke „Zugeordnete Tiere/Schäden" hält der Einsatz-Live-Stream im EinsatzLayout aktuell:
+  // `tier`→'einsatz-tiere', `schaden`→'einsatz-schaeden'. Der Prefix-Match deckt die Keys
+  // ['einsatz-tiere', …, 'halter', personId] bzw. ['einsatz-schaeden', …, 'geschaedigt', personId]
+  // mit ab.
 
-  // Deeplink-Robustheit (LFH-25): strukturell ungültige Personen-ID → zurück zur Liste,
-  // statt mit NaN aussichtslos zu laden. Steht nach allen Hooks (Rules-of-Hooks).
+  // Strukturell ungültige Personen-ID → zurück zur Liste, statt mit NaN zu laden. Steht nach allen
+  // Hooks (Rules-of-Hooks).
   if (!idGueltig) {
     return <Navigate to={personenPfad(einsatzId)} replace />;
   }
@@ -528,8 +517,8 @@ export default function PersonenDetailPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
   const darfZuordnen = darfSchreiben && !p.storniert_at;
 
-  // LFH-151: Picker-Kandidaten = FREIE Ziele (kein Halter/Geschädigter, nicht storniert,
-  // Schaden nicht abgeschlossen). Kein stilles Überschreiben fremder Zuordnungen.
+  // Picker-Kandidaten = freie Ziele (kein Halter/Geschädigter, nicht storniert, Schaden nicht
+  // abgeschlossen). Kein stilles Überschreiben fremder Zuordnungen.
   const freieTiere = (freieTiereQuery.data ?? []).filter(
     (t) => t.halter_person_id == null && t.halter_kontakt == null && t.storniert_at == null,
   );
@@ -566,11 +555,9 @@ export default function PersonenDetailPage() {
           )}
           {person.aktueller_verbleib && <Tag color="purple">{person.aktueller_verbleib}</Tag>}
         </Space>
-        {/* „Re-Sichten" und „Verbleib erfassen" standen bis LFH-340 · C5 hier als eigene
-            Reihe. Sie sind in die Kopfleiste gewandert — eine davon ist dort die
-            Primäraktion, die andere steht im Menü. Zwei Wege zu derselben Aktion wären ein
-            Unterschied ohne Bedeutung, und der Kopf ist der Ort, an dem die Seite sagt,
-            was zu tun ist. */}
+        {/* „Re-Sichten" und „Verbleib erfassen" stehen in der Kopfleiste (eine als
+            Primäraktion, die andere im Menü); zwei Wege zu derselben Aktion wären ein
+            Unterschied ohne Bedeutung. */}
         {darfSchreiben && person.aktuelle_sichtung === 'tot' && person.status !== 'verstorben' && (
           <Alert
             type="warning"
@@ -656,10 +643,8 @@ export default function PersonenDetailPage() {
                     )}
                   </Typography.Text>
                   {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
-                    /* `size="middle"` wie an der UHS-Zeile (LFH-363): „Verwerfen" ist
-                       `danger` und stünde sonst bündig neben „Bestätigen". Bestandsbefund,
-                       mit LFH-340 · C5 abgetragen, weil das Bündel die Datei ohnehin
-                       anfasste — der Scanner hat ihn selbst gemeldet. */
+                    /* `size="middle"`: „Verwerfen" ist `danger` und stünde sonst bündig neben
+                       „Bestätigen". */
                     <Space size="middle" style={{ marginLeft: 12 }}>
                       <Button
                         type="primary"
@@ -700,10 +685,9 @@ export default function PersonenDetailPage() {
 
   function stammdatenSpalte(person: PersonDetail) {
     const angetroffen = istAngetroffen(person);
-    // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen"
-    // verengt: `basis` ist dort nicht optional. Mit `editSitzung.sitzung?.basis` wäre der
-    // unmögliche Fall still ein Schreiben OHNE Lock — also genau der blinde Overwrite,
-    // gegen den F10 gebaut ist.
+    // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen" verengt:
+    // `basis` ist dort nicht optional. Mit `editSitzung.sitzung?.basis` wäre der unmögliche Fall
+    // still ein Schreiben ohne Lock.
     const sitzung = editSitzung.sitzung;
     return (
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
@@ -713,7 +697,7 @@ export default function PersonenDetailPage() {
             layout="vertical"
             initialValues={sitzung.werte}
             // Koordinate und „vermisst seit" werden gegen die Werte beim Öffnen gemessen:
-            // unverändert gehen sie gar nicht mit (Rundung, 400 auf `null`) —
+            // unverändert gehen sie nicht mit (Rundung, 400 auf `null`) —
             // `personen/personBearbeiten.ts`.
             onFinish={(werte) =>
               editMutation.mutate({
@@ -748,8 +732,8 @@ export default function PersonenDetailPage() {
             <Form.Item label="Herkunft / Adresse" name="herkunft_adresse">
               <Input />
             </Form.Item>
-            {/* Zustand und Koordinate beschreiben eine ANGETROFFENE Person — wie in der
-                Aufnahme (`AufnahmeFelder`) bekommt eine vermisste sie nicht angeboten. */}
+            {/* Zustand und Koordinate beschreiben eine angetroffene Person — wie in
+                `AufnahmeFelder` bekommt eine vermisste sie nicht angeboten. */}
             {angetroffen && (
               <Form.Item label="Zustand" name="zustand">
                 <Input placeholder="z. B. gehfähig, unterkühlt" />
@@ -794,8 +778,8 @@ export default function PersonenDetailPage() {
                 </span>
                 {darfSchreiben && !person.storniert_at && angetroffen && (
                   // Ein Link, kein Knopf: das Ziel ist eine Adresse (Platzier-Auftrag an die
-                  // Lagekarte, LFH-340-Muster), in einem neuen Tab öffenbar. Die zwei
-                  // Angaben des handgebauten Bedienziels (LFH-365) trägt `verortenLinkStil`.
+                  // Lagekarte), in einem neuen Tab öffenbar. Die zwei Angaben des handgebauten
+                  // Bedienziels trägt `verortenLinkStil`.
                   <Link
                     to={lagekartePfad(einsatzId, { platzieren: { typ: 'person', id: person.id } })}
                     style={verortenLinkStil(token, rollen.bedienText)}
@@ -821,22 +805,15 @@ export default function PersonenDetailPage() {
           </Descriptions>
         )}
 
-        {/**
-         * ZUORDNUNGEN UND AUDIT LADEN ERST BEIM AUFKLAPPEN (LFH-340 · C5, Befund M40).
-         *
-         * Die Seite setzte beim Öffnen sechs Abfragen ab, um eine nachgetragene Sichtung zu
-         * ermöglichen — fünf davon für Blöcke, die man in dieser Lage gar nicht ansieht.
-         * Kopf und medizinischer Verlauf kommen aus DEMSELBEN Detail-Abruf und stehen
-         * deshalb weiterhin sofort.
-         *
-         * KEIN `forceRender`: mit ihm stünden die Panels im Baum, und „erst beim
-         * Aufklappen" wäre nicht mehr von „immer da" zu unterscheiden — die Zählung im
-         * Test bewiese nichts mehr.
-         *
-         * Die UHS-Verortung steht MIT im Panel, obwohl `aktuelle_uhs_id` aus dem Detail
-         * kommt: nur der KLARTEXT-Name braucht die UHS-Liste, und dafür gibt es seit jeher
-         * den Rückfallwert `UHS #id`. Zugeklappt kostet der Name nichts.
-         */}
+        {/* Zuordnungen und Audit laden erst beim Aufklappen; Kopf und medizinischer Verlauf
+            kommen aus demselben Detail-Abruf und stehen sofort.
+
+            Kein `forceRender`: mit ihm stünden die Panels im Baum, und „erst beim Aufklappen"
+            wäre nicht von „immer da" zu unterscheiden.
+
+            Die UHS-Verortung steht mit im Panel, obwohl `aktuelle_uhs_id` aus dem Detail kommt:
+            nur der Klartext-Name braucht die UHS-Liste, und dafür gibt es den Rückfallwert `UHS
+            #id`. */}
         <Collapse
           ghost
           activeKey={[
@@ -954,9 +931,9 @@ export default function PersonenDetailPage() {
                     </Typography.Text>
                     <div style={{ marginTop: 4 }}>
                       {person.aktuelle_uhs_id != null ? (
-                        // `size="middle"` ist nicht Kosmetik (LFH-363): eine Aktionsreihe mit
-                        // einem `danger`-Knopf und mindestens einer weiteren Aktion trägt
-                        // mindestens `token.marginSM` Abstand — antds Vorgabe liegt darunter.
+                        // `size="middle"`: eine Aktionsreihe mit einem `danger`-Knopf und weiterer
+                        // Aktion trägt mindestens `token.marginSM` Abstand — antds Vorgabe liegt
+                        // darunter.
                         <Space wrap size="middle">
                           <StatusTag
                             darstellung={bezugsDarstellung(
@@ -1024,10 +1001,10 @@ export default function PersonenDetailPage() {
     );
   }
 
-  /** Die Bearbeiten-Sitzung öffnen — Formularwerte und CAS-Basis aus DEMSELBEN Snapshot. */
+  /** Die Bearbeiten-Sitzung öffnen — Formularwerte und CAS-Basis aus demselben Snapshot. */
   function starteBearbeiten() {
     const werte = bearbeitenWerteAus(p);
-    // Spaetere Live-/Refetch-Staende duerfen nur den Lesemodus aktualisieren.
+    // Spätere Live-/Refetch-Stände dürfen nur den Lesemodus aktualisieren.
     editSitzung.starte(p, werte);
   }
 
@@ -1048,10 +1025,9 @@ export default function PersonenDetailPage() {
       setStornoOffen(true);
       return;
     }
-    // Statuswechsel: irreversible Ziele über den Dialog, umkehrbare direkt. „Umkehrbar"
-    // heißt hier, dass `naechsteStatus` einen Weg zurück kennt — bei `verstorben` und
-    // `abgemeldet` steht er zwar formal in der Tabelle, aber ein versehentliches
-    // „verstorben" ist keine Buchung, die man beiläufig zurücknimmt.
+    // Statuswechsel: irreversible Ziele über den Dialog, umkehrbare direkt. Bei `verstorben` steht
+    // ein Weg zurück zwar formal in der Tabelle, ein versehentliches „verstorben" ist aber keine
+    // Buchung, die man beiläufig zurücknimmt.
     if (IRREVERSIBEL.includes(aktion.status)) setStatusDialog(aktion.status);
     else statusMutation.mutate({ einsatzId, personId: p.id, status: aktion.status });
   }
@@ -1059,22 +1035,17 @@ export default function PersonenDetailPage() {
   /**
    * Was der Kopf anbietet, und in welcher Rangfolge — abgeleitet, nicht im JSX verzweigt.
    *
-   * `null` heißt: gar keine Aktion. Ohne Schreibrecht, an einer stornierten Person und
-   * während einer laufenden Bearbeitung wird deshalb WEDER eine Primäraktion NOCH ein
-   * Menü-Auslöser gerendert — ein deaktivierter Auslöser wäre ein Bedienziel, das nichts tut.
+   * `null` heißt gar keine Aktion: ohne Schreibrecht, an einer stornierten Person und während einer
+   * Bearbeitung wird weder Primäraktion noch Menü-Auslöser gerendert — ein deaktivierter Auslöser
+   * wäre ein Bedienziel, das nichts tut.
    *
-   * Die Primäraktion hängt am Zustand, und zwar an GENAU EINER Frage: ist gesichtet worden?
-   * Nein → „Sichten". Ja → „Verbleib erfassen".
+   * Die Primäraktion hängt an einer Frage: ist gesichtet worden? Nein → „Sichten". Ja → „Verbleib
+   * erfassen".
    *
-   * ZWEI ABWEICHUNGEN VOM AK-WORTLAUT („bei Patient: Verbleib erfassen"), beide bewusst:
-   *
-   * 1. `aktuelle_sichtung: 'unverletzt'` ist nach `PATIENT_SK` KEIN Patient, bekommt hier
-   *    aber trotzdem „Verbleib erfassen". Das ist die richtige Frage an diesem Datensatz:
-   *    Unverletzte werden entlassen oder verbleiben vor Ort, und beides IST ein Verbleib.
-   *    Eine Zusatzbedingung auf `istPatient` machte den Kopf für diese Menge leer.
-   * 2. Ein bereits erfasster Verbleib schaltet nicht weiter. Ein dritter Zweig („dann
-   *    Bearbeiten") wäre eine Regel mehr für einen Zustand, in dem der Verbleib ohnehin
-   *    korrigierbar bleiben muss — „Bearbeiten" steht in beiden Fällen im Menü.
+   * 1. `aktuelle_sichtung: 'unverletzt'` ist nach `PATIENT_SK` kein Patient, bekommt aber „Verbleib
+   *    erfassen": Unverletzte werden entlassen oder verbleiben vor Ort, beides ist ein Verbleib.
+   * 2. Ein bereits erfasster Verbleib schaltet nicht weiter; „Bearbeiten" steht in beiden Fällen im
+   *    Menü.
    */
   const aktionenPlan = ((): { primaer: Kopfaktion; weitere: Kopfaktion[] } | null => {
     if (!darfSchreiben || p.storniert_at || editSitzung.sitzung) return null;
@@ -1143,19 +1114,13 @@ export default function PersonenDetailPage() {
       }
       aktionen={
         /**
-         * EINE Primäraktion, alles Weitere im Menü (LFH-340 · C5, Befund M37).
-         *
-         * Vorher standen hier bis zu sieben gleichrangige Knöpfe — vier Statuswechsel,
-         * Bearbeiten, Stornieren und ein „Zurück zur Liste" neben dem Breadcrumb — und
-         * KEINE Primäraktion: nichts sagte, was an dieser Person zu tun ist.
-         *
-         * „Zurück zur Liste" ist ersatzlos entfallen: der Breadcrumb darüber trägt denselben
-         * Weg, und `zurueck` bleibt der Rücksprung nach dem Stornieren.
+         * Eine Primäraktion, alles Weitere im Menü. Einen „Zurück zur Liste"-Knopf gibt es nicht:
+         * der Breadcrumb trägt denselben Weg, und `zurueck` bleibt der Rücksprung nach dem
+         * Stornieren.
          */
         aktionenPlan && (
           <Space>
-            {/* Kein `loading` hier: die Primäraktion öffnet in jeder ihrer drei Gestalten
-                nur einen Dialog — sie hat keinen Lauf, auf den man warten könnte. Der
+            {/* Kein `loading`: die Primäraktion öffnet in jeder Gestalt nur einen Dialog. Der
                 laufende Statuswechsel sitzt im Menü und zeigt sich am Auslöser. */}
             <Button type="primary" onClick={() => fuehreKopfaktionAus(aktionenPlan.primaer)}>
               {aktionenPlan.primaer.label}
@@ -1166,9 +1131,8 @@ export default function PersonenDetailPage() {
                 menu={{
                   autoFocus: true,
                   items: menueEintraege(aktionenPlan.weitere),
-                  // Die Zuordnung hängt am MENÜ, nicht an jedem Eintrag: so gibt es genau
-                  // eine Stelle, an der ein Riegel sitzen könnte, und die Einträge bleiben
-                  // reine Beschreibung.
+                  // Die Zuordnung hängt am Menü, nicht an jedem Eintrag: eine Stelle für einen
+                  // Riegel, die Einträge bleiben reine Beschreibung.
                   onClick: ({ key }) => {
                     const eintrag = aktionenPlan.weitere.find((w) => w.key === key);
                     if (eintrag) fuehreKopfaktionAus(eintrag);
@@ -1179,8 +1143,8 @@ export default function PersonenDetailPage() {
                   type="text"
                   loading={laeuftStatus}
                   icon={<MoreOutlined />}
-                  // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs (Zeilen,
-                  // Karten) lieferten n gleichnamige Knöpfe kein Ziel mehr.
+                  // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs lieferten n
+                  // gleichnamige Knöpfe kein Ziel.
                   aria-label={`Weitere Aktionen zu Person ${registrierAnzeige(p.registrier_nr)}`}
                 />
               </Dropdown>

@@ -30,28 +30,22 @@ type SchadenFormular = Omit<SchadenEingabe, 'lat' | 'lon'> & {
   koordinaten?: LatLon | null;
 };
 
-/** Schnellerfassungs-Modal für Schäden. Props-gesteuert: die Seite hält nur den `open`-State
- *  (Trigger-Button, ?neu=1), dieses Modal besitzt Formular, Geschädigt-Auswahl und die
- *  Anlege-Mutation. Vier Kernfelder bleiben sichtbar; Geschädigt und Koordinate liegen
- *  optional unter „Weitere Angaben“.
+/**
+ * Schnellerfassungs-Modal für Schäden. Die Seite hält nur `open`; Formular, Geschädigt-Auswahl und
+ * Mutation liegen hier. Vier Kernfelder sichtbar, Geschädigt und Koordinate unter „Weitere
+ * Angaben“.
  *
- *  SERIENMODUS (LFH-332 · B4): an einer Schadenslage werden Schäden am Stück erfasst, deshalb
- *  `serie` — „Speichern und nächste" lässt den Dialog stehen. Der Ort wiederholt sich dabei
- *  fast immer (dieselbe Straße, dasselbe Objekt) und überlebt als `uebernahme` ein
- *  Serien-Speichern. Zusätzlich wird er nach erfolgreicher Mutation sitzungsweit gemerkt und
- *  beim nächsten Öffnen einmal per Formularwert eingesetzt — bewusst nicht als `initialValues`,
- *  damit der ausgeschaltete B4-Schalter einen Serien-Reset leer lässt.
- *
- *  Zurückgesetzt wird NICHT mehr hier: die Hülle leert die Felder auf beiden Wegen (nach dem
- *  Erfassen und beim Abbrechen). Nur „Geschädigt" liegt außerhalb des Formstores in lokalem State
- *  — den muss dieses Modul selbst leeren. */
+ * Serienmodus: der Ort überlebt als `uebernahme` ein Serien-Speichern und wird sitzungsweit
+ * gemerkt; beim nächsten Öffnen wird er per Formularwert eingesetzt, nicht als `initialValues`,
+ * damit ein Serien-Reset bei ausgeschaltetem „Werte behalten" leer bleibt. Die Felder leert die
+ * Hülle; nur „Geschädigt" liegt in lokalem State und wird hier geleert.
+ */
 export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, orgName }: Props) {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [form] = Form.useForm<SchadenFormular>();
   const geladeneOeffnung = useRef<string | null>(null);
   const formularEinsatzId = useRef(einsatzId);
-  // Geschädigt liegt außerhalb des Formstores; der Reset erfolgt daher separat.
   const [geschaedigt, setGeschaedigt] = useState<GeschaedigtWert>(null);
 
   useEffect(() => {
@@ -82,15 +76,11 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
   });
 
   /**
-   * `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der Datensatz
-   * wirklich angekommen ist — sie erkennt das an der abgelehnten Zusage. Sitzungsort und
-   * lokaler Geschädigt-Wert ändern sich erst in `onErfasst`, also zusätzlich hinter der
-   * zentralen Abbruchprüfung. Den Fehlertext meldet weiterhin das `onError` der Mutation.
+   * `mutateAsync`, nicht `mutate`: die Hülle leert nur, wenn der Datensatz angekommen ist.
+   * Sitzungsort und Geschädigt-Wert ändern sich erst in `onErfasst`.
    *
-   * Der Geschädigt-Reset hängt hier und NICHT nur an `onFertig` (Abweichung von der
-   * Auftragsformulierung, bewusst): beim Serien-Speichern läuft `onFertig` nie, die Hülle leert
-   * aber das Formular — der lokale Geschädigt-Wert würde sonst stillschweigend auf den nächsten
-   * Schaden mitwandern. Das wäre ein falscher Datensatz, keine Kosmetik.
+   * Der Geschädigt-Reset hängt hier und nicht an `onFertig`: beim Serien-Speichern läuft `onFertig`
+   * nie, der Wert wanderte sonst still auf den nächsten Schaden.
    */
   async function onErfassen(daten: SchadenFormular) {
     await anlegenMutation.mutateAsync({

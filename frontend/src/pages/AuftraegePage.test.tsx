@@ -137,7 +137,7 @@ describe('AuftraegePage', () => {
   it('zeigt Aufträge mit Quittierungs-Stand', async () => {
     renderPage();
     expect(await screen.findByText('Deich sichern')).toBeInTheDocument();
-    // Quittierungs-Stand jetzt als Aggregat-Zeile auf der Karte (LFH-112).
+    // Quittierungs-Stand als Aggregat-Zeile auf der Karte.
     expect(screen.getByText('1 Empfänger · 0/1 quittiert')).toBeInTheDocument();
   });
 
@@ -156,13 +156,12 @@ describe('AuftraegePage', () => {
     legeAuftragAn.mockResolvedValue(auftrag());
     renderPage();
     await screen.findByText('Deich sichern');
-    // Formular ist jetzt inline-getoggelt → erst aufklappen. Der Kopf-Button trägt ein Icon
-    // (accessible name „plus Auftrag erteilen") → Regex; nach dem Öffnen heißt er „Formular schließen",
-    // sodass der spätere exakte „Auftrag erteilen"-Treffer eindeutig der Formular-Submit ist.
+    // Formular ist inline getoggelt → erst aufklappen. Der Kopf-Knopf trägt ein Icon (Name „plus
+    // Auftrag erteilen") → Regex; offen heißt er „Formular schließen", sodass der spätere exakte
+    // Treffer der Formular-Submit ist.
     await userEvent.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
-    // Empfänger seit LFH-343 · C8 in EINEM Feld (Optionen + freier Funktionstext).
+    // Empfänger in einem Feld (Optionen + freier Funktionstext).
     await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
-    // Robust statt index-abhängig: die "Auftrag / Was"-TextArea trägt aria-label.
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
     await waitFor(() =>
@@ -192,14 +191,13 @@ describe('AuftraegePage', () => {
     legeAuftragAn.mockResolvedValue(auftrag());
     renderPage();
     await screen.findByText('Deich sichern');
-    // Kopf-Button trägt Icon → Regex zum Aufklappen (siehe Hinweis oben).
+    // Kopf-Knopf trägt Icon → Regex zum Aufklappen.
     await userEvent.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
-    // Empfänger seit LFH-343 · C8 in EINEM Feld (Optionen + freier Funktionstext).
+    // Empfänger in einem Feld (Optionen + freier Funktionstext).
     await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
-    // Die sieben SKK-Felder liegen seit LFH-343 · C8 hinter einem zugeklappten
-    // Collapse (Befund H49: 14 Felder in einem 520-px-Modal). Ohne `forceRender`
-    // stehen sie vor dem Aufklappen gar nicht im DOM.
+    // Die sieben SKK-Felder liegen hinter einem zugeklappten Collapse; ohne `forceRender` stehen
+    // sie vor dem Aufklappen nicht im DOM.
     await userEvent.click(screen.getByText(/Befehlsschema/));
     await userEvent.type(await screen.findByLabelText('Zeit / Wann'), 'sofort');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
@@ -228,7 +226,7 @@ describe('AuftraegePage', () => {
     quittiereEmpfaenger.mockResolvedValue(auftrag());
     renderPage();
     await screen.findByText('Deich sichern');
-    // Aktion ist jetzt in einen Popconfirm gewickelt → Trigger + Bestätigen.
+    // Aktion in einem Popconfirm → Trigger + Bestätigen.
     await userEvent.click(screen.getByText('quittieren'));
     await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 1));
@@ -279,10 +277,9 @@ describe('AuftraegePage', () => {
     ).toBe('Extern geändert');
   });
 
-  // LFH-364/B5d: die Quittungs-Aktion liegt in einer EIGENEN Zeile (Weg (a)), der
-  // Empfänger-Chip ist wieder reine Statusanzeige. Zwei Aussagen, die nur zusammen
-  // etwas belegen: dass mehrere offene Empfänger unterscheidbar bleiben, und dass ein
-  // bereits quittierter Empfänger gar keine Aktion mehr trägt.
+  // Die Quittungs-Aktion liegt in einer eigenen Zeile, der Empfänger-Chip ist reine Statusanzeige.
+  // Zwei Aussagen, die nur zusammen etwas belegen: mehrere offene Empfänger bleiben unterscheidbar,
+  // und ein quittierter trägt keine Aktion.
   it('trennt die Quittungs-Aktionen mehrerer Empfänger über den zugänglichen Namen', async () => {
     listeAuftraege.mockResolvedValue([
       auftrag({
@@ -299,30 +296,25 @@ describe('AuftraegePage', () => {
     renderPage();
     await screen.findByText('Deich sichern');
 
-    // LFH-372/B5k: offene Empfänger standen doppelt — einmal als Statuschip, einmal in der
-    // Zeile „Quittung offen:". Bei drei Empfängern kostete das auf `handschuh` eine ganze
-    // Kartenzeile. Der Chip zeigt jetzt nur noch Quittiertes.
+    // Offene Empfänger stehen nur in der Quittungszeile, der Chip zeigt nur Quittiertes.
     expect(screen.getAllByText('EA Nord')).toHaveLength(1);
     expect(screen.getAllByText('EA Süd')).toHaveLength(1);
     expect(screen.getAllByText(/EA West/)).toHaveLength(1);
 
-    // Der quittierte Empfänger hat KEINEN Knopf — sonst wäre die Zeile nur eine
-    // zweite Chip-Reihe und die Trennung Status/Aktion bloß behauptet.
+    // Der quittierte Empfänger hat keinen Knopf — sonst wäre die Trennung Status/Aktion bloß
+    // behauptet.
     expect(screen.queryByRole('button', { name: /EA West/ })).not.toBeInTheDocument();
 
-    // Beide offenen Knöpfe heißen sichtbar „quittieren"; auseinanderhalten muss sie
-    // der zugängliche Name.
+    // Beide Knöpfe heißen sichtbar „quittieren"; auseinanderhalten muss sie der zugängliche Name.
     expect(screen.getAllByRole('button', { name: /quittieren$/ })).toHaveLength(2);
     await userEvent.click(screen.getByRole('button', { name: 'Empfang für EA Süd quittieren' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 2));
   });
 
-  // LFH-371: die Anzeigegrenze von drei Empfängern schnitt die Liste, BEVOR zwischen
-  // quittiert und offen getrennt wurde. Waren die ersten drei quittiert, verschwand die
-  // Zeile „Quittung offen:" ganz — der vierte und fünfte Empfänger hatten keinen Knopf,
-  // `empfaenger_anzahl == quittiert_anzahl` wurde nie wahr und die Auto-Frist-Erinnerung
-  // aus LFH-118 schloss nie. Genau diese Konstellation ist der Ausfall.
+  // Die Anzeigegrenze von drei Empfängern darf nicht vor der Trennung quittiert/offen schneiden:
+  // sonst hätten der vierte und fünfte keinen Knopf, `empfaenger_anzahl == quittiert_anzahl` würde
+  // nie wahr und die Auto-Frist-Erinnerung schlösse nie.
   it('macht Empfänger jenseits der ersten drei quittierbar', async () => {
     const q = '2026-06-11 10:00:00';
     listeAuftraege.mockResolvedValue([
@@ -352,8 +344,8 @@ describe('AuftraegePage', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Empfang für Florian 5 quittieren' }),
     );
-    // Der erste Popconfirm bleibt bis zum Ende seiner Animation im Baum — der zweite
-    // „Bestätigen" ist der jüngste.
+    // Der erste Popconfirm bleibt bis zum Ende seiner Animation im Baum — der zweite „Bestätigen"
+    // ist der jüngste.
     await waitFor(() =>
       expect(screen.getAllByRole('button', { name: 'Bestätigen' }).length).toBeGreaterThan(0),
     );
@@ -406,8 +398,8 @@ describe('AuftraegePage', () => {
     } as Awaited<ReturnType<typeof ladeEinsatz>>);
     renderPage();
     await screen.findByText('Deich sichern');
-    // Der Chip zeigt nur Quittiertes, der offene Empfänger steht in der Quittungszeile —
-    // hinge sie am Schreibrecht, verlöre ein Beobachter den Namen ganz (LFH-372/B5k).
+    // Der Chip zeigt nur Quittiertes, der offene Empfänger steht in der Quittungszeile — hinge sie
+    // am Schreibrecht, verlöre ein Beobachter den Namen ganz.
     expect(screen.getByText('EA Nord')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /quittieren/ })).not.toBeInTheDocument();
   });
@@ -430,8 +422,8 @@ describe('AuftraegePage', () => {
   });
 
   it('trennt Offen/Abgeschlossen clientseitig (Read-back in Abgeschlossen)', async () => {
-    // Status-Segmented entfällt; Aufträge werden ungefiltert geladen und clientseitig
-    // über die Phasen-Semantik gesplittet. Ein abgenommener Auftrag landet in „Abgeschlossen".
+    // Aufträge werden ungefiltert geladen und clientseitig über die Phasen-Semantik gesplittet. Ein
+    // abgenommener Auftrag landet in „Abgeschlossen".
     listeAuftraege.mockResolvedValue([
       auftrag({ id: 1, auftrag_text: 'Offener Auftrag', bearbeitungsstatus: 'offen' }),
       auftrag({
@@ -461,9 +453,8 @@ describe('AuftraegePage', () => {
   });
 
   /**
-   * Vorher öffnete der Knopf einen `Popconfirm`. Seit LFH-343 · C8 schaltet der
-   * erste Klick — der Rückweg steht im Rückgängig-Toast, und der Server nimmt ihn
-   * seit derselben Änderung an (`POST …/vollzug` mit `status: 'offen'`).
+   * Der erste Klick schaltet ohne Rückfrage — der Rückweg steht im Rückgängig-Toast (`POST
+   * …/vollzug` mit `status: 'offen'`).
    */
   it('setzt einen offenen Auftrag mit EINEM Klick auf „In Bearbeitung"', async () => {
     listeAuftraege.mockResolvedValue([auftrag({ bearbeitungsstatus: 'offen' })]);

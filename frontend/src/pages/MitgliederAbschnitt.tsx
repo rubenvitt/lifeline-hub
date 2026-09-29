@@ -69,18 +69,12 @@ function FuehrungsstelleModal({
 /**
  * Zugriffsverwaltung eines Einsatzes (gemountet in `EinsatzdatenPage`).
  *
- * ── WARUM HIER KEINE KARTEN UNTER `md` STEHEN (LFH-339 · C4) ─────────────────────────
+ * ── Keine Karten unter `md` ──
  *
- * Das Ticket verlangt, die Zeilen unter `md` „als Zeilen-Karte" zu rendern. Das wird
- * bewusst NICHT getan, und der Grund ist eine Regel, die dem Ticket vorausgeht: Träger ist
- * `KatalogTabelle`, und für die gilt „auf schmalem Schirm wird eine Tabelle ANGEPASST,
- * nicht in Karten aufgelöst" — das Primitiv bringt Scrollcontainer, stehende Kopfzeile und
- * fixierte Kennungsspalte selbst mit. Drei Spalten (Name · Rolle · Aktion) passen damit
- * auch auf 390 px, ohne dass die Seite quer läuft.
- *
- * Was am schmalen Schirm tatsächlich drückte, war die feste `width: 170` am Rollenfeld —
- * die ist unten zu einem `minWidth` geworden. Das ist die Anpassung, die der Befund
- * verlangt; die Kartenform wäre eine Formänderung ohne Not.
+ * Träger ist `KatalogTabelle`, und für die gilt: auf schmalem Schirm wird eine Tabelle angepasst,
+ * nicht in Karten aufgelöst. Das Primitiv bringt Scrollcontainer, stehende Kopfzeile und fixierte
+ * Kennungsspalte mit; drei Spalten (Name · Rolle · Aktion) passen auch auf 390 px. Die Anpassung
+ * ist das `minWidth` am Rollenfeld statt einer festen Breite.
  */
 export default function MitgliederAbschnitt({
   einsatzId,
@@ -174,9 +168,8 @@ export default function MitgliederAbschnitt({
         <Select
           value={m.einsatz_rolle}
           disabled={!darfVerwalten}
-          // `minWidth` statt fester `width` (LFH-339 · C4): eine feste Breite drückt die
-          // Zelle am schmalen Schirm auf, statt mitzugehen. Der Boden bleibt, damit
-          // „Führungspersonal" nicht abgeschnitten wird.
+          // `minWidth` statt fester `width`: eine feste Breite drückt die Zelle am schmalen Schirm
+          // auf. Der Boden bleibt, damit „Führungspersonal" nicht abgeschnitten wird.
           style={{ minWidth: 170, maxWidth: '100%' }}
           options={ROLLEN}
           onChange={(rolle) => setzen.mutate({ benutzerId: m.benutzer_id, rolle })}
@@ -184,8 +177,8 @@ export default function MitgliederAbschnitt({
       ),
     },
     {
-      // Beschriftet (LFH-339 · C4, Befund N7): eine namenlose Spalte ist für einen
-      // Screenreader eine Zelle ohne Zugehörigkeit.
+      // Beschriftet: eine namenlose Spalte ist für einen Screenreader eine Zelle ohne
+      // Zugehörigkeit.
       title: 'Aktion',
       key: 'aktion',
       render: (_, m) =>
@@ -197,9 +190,9 @@ export default function MitgliederAbschnitt({
             okButtonProps={{ danger: true }}
             onConfirm={() => entfernen.mutate(m.benutzer_id)}
           >
-            {/* Regulärer Knopf statt `type="link"`: ein Textlink sieht aus wie Fliesstext,
-                obwohl er die einzige destruktive Handlung der Zeile auslöst. `danger`
-                bleibt — Löschen IST Gefahr, und die Rückfrage ist der zweite Handgriff. */}
+            {/* Regulärer Knopf statt `type="link"`: ein Textlink sieht aus wie Fließtext,
+                obwohl er die einzige destruktive Handlung der Zeile auslöst. `danger` bleibt,
+                die Rückfrage ist der zweite Handgriff. */}
             <Button danger>Entfernen</Button>
           </Popconfirm>
         ) : null,
@@ -207,8 +200,8 @@ export default function MitgliederAbschnitt({
   ];
 
   return (
-    // Ein Paneel mit Augenbraue statt einer Sektionsüberschrift (Neuentwurf): Zählung und
-    // Datenstand stehen im Kopf rechts, die Hinzufügen-Zeile ist die erste Paneelzeile.
+    // Ein Paneel mit Augenbraue: Zählung und Datenstand stehen im Kopf rechts, die Hinzufügen-Zeile
+    // ist die erste Paneelzeile.
     <Paneel
       titel="Zugriff"
       meta={

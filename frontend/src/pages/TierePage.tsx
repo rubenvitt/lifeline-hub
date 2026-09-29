@@ -69,10 +69,9 @@ function halterAnzeige(t: Tier): React.ReactNode {
 }
 
 /**
- * Das EINE Spaltenregister der Tierliste (LFH-330 · B2). Modulkonstante, weil kein `render`
- * Komponentenzustand liest — und durch `spaltenFuer<Tier>()` geführt, nie annotiert: eine
- * Annotation weitete die Schlüsselliterale auf `string`, und der Kartenplan nähme danach
- * jeden Tippfehler unbemerkt an.
+ * Das eine Spaltenregister der Tierliste. Modulkonstante, weil kein `render` Komponentenzustand
+ * liest; durch `spaltenFuer<Tier>()` geführt, nie annotiert — eine Annotation weitete die
+ * Schlüsselliterale auf `string`.
  */
 const tierSpalten = spaltenFuer<Tier>()([
   {
@@ -80,10 +79,10 @@ const tierSpalten = spaltenFuer<Tier>()([
     key: 'reg',
     width: 90,
     immerSichtbar: true,
-    // Über die ZAHL sortiert — über den Text läge „T-10" vor „T-9".
+    // Über die Zahl sortiert — über den Text läge „T-10" vor „T-9".
     sortWert: (t) => t.registrier_nr,
     suchText: (t) => tierRegistrierAnzeige(t.registrier_nr),
-    // KEIN Anker: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden Zweigen.
+    // Kein Anker: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden Zweigen.
     render: (_, t) => (
       <Typography.Text strong>{tierRegistrierAnzeige(t.registrier_nr)}</Typography.Text>
     ),
@@ -114,8 +113,8 @@ const tierSpalten = spaltenFuer<Tier>()([
   {
     title: 'Halter',
     key: 'halter',
-    // Beide Halter-Wege tragen zur Suche bei: die verknüpfte Person über ihre R-Nummer, der
-    // frei erfasste Kontakt über seinen Text.
+    // Beide Halter-Wege tragen zur Suche bei: die verknüpfte Person über ihre R-Nummer, der frei
+    // erfasste Kontakt über seinen Text.
     suchText: (t) => halterNummer(t) ?? t.halter_kontakt,
     render: (_, t) => halterAnzeige(t),
   },
@@ -123,18 +122,11 @@ const tierSpalten = spaltenFuer<Tier>()([
     title: 'seit',
     key: 'seit',
     /**
-     * ABWEICHUNG von der Personenliste, und sie ist keine Nachlässigkeit: `TierAnzeige`
-     * trägt weder Sichtungskategorie noch Sichtungszeitpunkt (verifiziert am generierten
-     * Typ; die Rust-Doku nennt das Modul „bewusst schlank — keine Sichtungskette wie bei
-     * Personen"). Für Tiere gibt es deshalb KEINE Dringlichkeitssortierung, sondern nur
-     * „seit" aus `erfasst_at`.
+     * Anders als bei Personen: `TierAnzeige` trägt weder Sichtungskategorie noch -zeitpunkt (das
+     * Modul ist bewusst schlank). Keine Dringlichkeitssortierung, nur „seit" aus `erfasst_at` —
+     * `geaendert_at` liefe bei jeder Notiz weiter und beantwortete „wann zuletzt angefasst".
      *
-     * `geaendert_at` wäre der naheliegende und falsche Griff: es läuft bei jeder Notiz
-     * weiter und beantwortet „wann wurde der Satz zuletzt angefasst", nicht „seit wann ist
-     * das Tier erfasst".
-     *
-     * Keine Breitenschwelle: die Zeitachse ist der Zweck dieser Änderung, und eine Spalte,
-     * die schon unter 1200 px verschwindet, wäre in jeder jsdom-Prüfung abwesend.
+     * Keine Breitenschwelle: die Zeitachse ist der Zweck der Spalte.
      */
     sortWert: (t) => t.erfasst_at,
     render: (_, t) => <ZeitAnzeige wert={t.erfasst_at} />,
@@ -151,13 +143,11 @@ const tierSpalten = spaltenFuer<Tier>()([
 type TierSpaltenKey = (typeof tierSpalten)[number]['key'];
 
 /**
- * Kartenplan der Tierliste. KEIN `status`-Slot: `TierStatus` steht nicht im
- * A2-Statusfarbvertrag (`theme/statusFarben.ts` führt diese Seite ausdrücklich als bewusst
- * draußen), und der Slot nimmt eine `StatusDarstellung` aus diesem Vertrag. Seit dem
- * Neuentwurf trägt die Spalte eine getönte Statusfläche (`TIER_STATUS` in
- * `tiere/tierHelfer.ts`, Ton + Wort); in der Karte steht der Status weiter als
- * Sekundärfeld — mit Wort, also mit zweitem Kanal. Ihn in den Vertrag zu heben bleibt eine
- * eigene Entscheidung am Vertrag und seinem Guard.
+ * Kartenplan der Tierliste. Kein `status`-Slot: `TierStatus` steht nicht im Statusfarb-Vertrag
+ * (`theme/statusFarben.ts` führt ihn bewusst draußen), und der Slot nimmt eine `StatusDarstellung`
+ * daraus. Die Spalte trägt eine getönte Statusfläche (`TIER_STATUS` in `tiere/tierHelfer.ts`, Ton +
+ * Wort); in der Karte steht der Status als Sekundärfeld mit Wort. Ihn in den Vertrag zu heben ist
+ * eine eigene Entscheidung.
  */
 const tierKarte = (einsatzId: number): Kartenplan<Tier, TierSpaltenKey> => ({
   art: 'plan',
@@ -187,8 +177,8 @@ export default function TierePage() {
     setSpeziesNachEinsatz((alt) => ({ ...alt, [zielEinsatzId]: spezies }));
   };
 
-  // Tier-Liste wird über den konsolidierten Einsatz-Live-Stream (useEinsatzLiveStream
-  // im EinsatzLayout, `tier`-Event → 'einsatz-tiere') live gehalten — LFH-75.
+  // Die Tier-Liste hält der Einsatz-Live-Stream im EinsatzLayout aktuell (`tier` →
+  // 'einsatz-tiere').
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
@@ -234,24 +224,19 @@ export default function TierePage() {
   }, [highlight, einsatzId, sicht]);
 
   /**
-   * Anlegen. `onSuccess` invalidiert nur noch (LFH-332 · B4) — Schliessen macht `onFertig`
-   * der Erfassungshülle, Leeren macht die Hülle auf BEIDEN Wegen (Erfassen und Abbrechen).
-   * Ein hier verbliebenes `resetFields` wäre doppelt und leerte im Serienlauf auch die
-   * übernommenen Werte. `onError` bleibt: die Fehlermeldung kommt weiterhin von der Mutation,
-   * die Hülle sieht nur die Ablehnung und lässt den Wortlaut stehen.
+   * Anlegen. `onSuccess` invalidiert nur — Schließen macht `onFertig` der Erfassungshülle, Leeren
+   * die Hülle auf allen Wegen; ein `resetFields` hier leerte im Serienlauf auch die übernommenen
+   * Werte. `onError` bleibt: die Fehlermeldung kommt von der Mutation, die Hülle sieht nur die
+   * Ablehnung und lässt den Wortlaut stehen.
    */
   const anlegenMutation = useMutation({
     mutationFn: (v: { einsatzId: number; daten: TierEingabe }) => legeTierAn(v.einsatzId, v.daten),
     onMutate: async (v) => {
-      // Ein bereits laufender Listen-GET kann vor dem POST gelesen haben und spaeter dessen
-      // Ergebnis aus dem Cache verdrängen. Canceln, bevor der Schreibvorgang startet.
+      // Ein bereits laufender Listen-GET kann vor dem POST gelesen haben und später dessen Ergebnis
+      // aus dem Cache verdrängen. Canceln, bevor der Schreibvorgang startet.
       await qc.cancelQueries({ queryKey: einsatzKeys.tiere(v.einsatzId) });
     },
     onSuccess: (tier, variablen) => {
-      // Die Quittung lebt bis zu dem Refetch, der dieselbe ID erstmals bestaetigt, in einer
-      // kleinen lokalen Overlay-Liste. So kann weder ein alter GET noch Replikationsverzug die
-      // neue Zeile ausblenden; bei noch fehlendem Cache erfinden wir zugleich keine scheinbar
-      // vollstaendige Singleton-Serverliste.
       frischAngelegt.merke(variablen.einsatzId, [tier]);
       setHighlight({ einsatzId: variablen.einsatzId, tierId: tier.id });
       setSichtFuer(variablen.einsatzId, tier.status);
@@ -265,9 +250,8 @@ export default function TierePage() {
   });
 
   /**
-   * SEITENZUSTAND — nur `einsatzQuery` (LFH-331 · B3, D3): Breadcrumb, Titelzeile und
-   * `darfImEinsatzSchreiben(...)` hängen an ihr, ohne sie gibt es keinen Rahmen. Deshalb
-   * hier ein Frühausstieg — und NUR hier. Der Wortlaut ist byte-gleich zum Bestand.
+   * Seitenzustand — nur `einsatzQuery`: Breadcrumb, Titelzeile und `darfImEinsatzSchreiben(...)`
+   * hängen an ihr. Deshalb hier ein Frühausstieg, und nur hier.
    */
   if (einsatzQuery.isLoading) {
     return <SeitenSkeleton />;
@@ -288,17 +272,14 @@ export default function TierePage() {
   const tiere = filterTiere(alle, { sicht, spezies: speziesFilter });
 
   /**
-   * LISTENZUSTAND — an der Stelle der Liste entschieden, nie als Frühausstieg (D3).
+   * Listenzustand — an der Stelle der Liste entschieden, nie als Frühausstieg.
    *
-   * Gemessen wird an `alle`, NICHT an `tiere`: die gefilterte Menge ist bei gesetztem
-   * Reiter oder Spezies-Filter regelmäßig leer, während Zeilen im Zwischenspeicher stehen —
-   * an ihr gemessen kippte die Seite bei jedem engen Filter in den Fehlerzweig und nähme dem
-   * Bediener die Schalter, mit denen er ihn wieder aufmachen könnte.
+   * Gemessen an `alle`, nicht an `tiere`: die gefilterte Menge ist bei Reiter oder Spezies-Filter
+   * regelmäßig leer, während Zeilen im Zwischenspeicher stehen.
    *
-   * Ohne Zeilen tritt der Fehler an die Stelle der Sicht, sonst behauptet „Keine Tiere in
-   * dieser Sicht" eine leere Menge, wo bloß der Abruf scheiterte. Mit Zeilen bleiben sie
-   * stehen und bekommen ein Banner: echt, nur womöglich alt. Der Ladezweig steht bewusst
-   * nicht hier, sondern am Primitiv (`ladend`).
+   * Ohne Zeilen tritt der Fehler an die Stelle der Sicht, sonst behauptete „Keine Tiere in dieser
+   * Sicht" eine leere Menge. Mit Zeilen bleiben sie stehen und bekommen ein Banner. Der Ladezweig
+   * liegt am Primitiv (`ladend`).
    */
   const listeGescheitert = tiereQuery.isError && alle.length === 0;
   const standVeraltet = tiereQuery.isError && alle.length > 0;
@@ -334,8 +315,8 @@ export default function TierePage() {
           </Space>
         )
       }
-      // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette, LFH-391 · B5)
-      // — mit DEMSELBEN Rechte-Riegel wie der Knopf darüber.
+      // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette) — mit demselben
+      // Rechte-Riegel wie der Knopf.
       neueZeile={darfSchreiben ? () => setModus({ einsatzId, wert: 'schnell' }) : undefined}
       hinweis={
         !darfSchreiben &&
@@ -344,8 +325,7 @@ export default function TierePage() {
         )
       }
     >
-      {/* Sicht und Spezies als EINE Filterzeile (Neuentwurf: Segmentleiste statt antds
-          Reitern). Eine Wahl unter mehreren, die die Liste darunter filtert — deshalb
+      {/* Sicht und Spezies als eine Filterzeile. Eine Wahl, die die Liste darunter filtert —
           `radiogroup`, nicht `tablist`: es gibt kein eigenes Feld je Segment. */}
       <Space wrap size="middle" align="center" style={{ marginBottom: 12 }}>
         <Segmentleiste
@@ -355,9 +335,8 @@ export default function TierePage() {
           optionen={SICHTEN.map((s) => ({ wert: s.key, label: s.label }))}
         />
         <Augenbraue>Spezies</Augenbraue>
-        {/* `aria-label`, weil die `Typography.Text` daneben kein `<label>` ist (kein `htmlFor`,
-            keine Umschließung): ohne ihn hat das Feld keinen zugänglichen Namen und ist nur
-            solange eindeutig auffindbar, wie es die einzige Combobox der Seite ist. */}
+        {/* `aria-label`, weil die `Typography.Text` daneben kein `<label>` ist: ohne ihn hätte
+            das Feld keinen zugänglichen Namen. */}
         <Select<Spezies | undefined>
           aria-label="Spezies"
           allowClear
@@ -381,37 +360,23 @@ export default function TierePage() {
 
           <Datensicht
             /**
-             * Vier Reiter, EINE Sichtstelle — der Schlüssel trägt deshalb die Statusachse.
-             * Ohne ihn steht dieselbe Instanz über allen vier Mengen: React sieht denselben
-             * Komponententyp an derselben Baumstelle und montiert nicht neu, sondern reicht
-             * weiter. Der Suchbegriff lebt IM Primitiv (`suchbegriff` in `Datensicht.tsx`) und
-             * filtert danach eine Menge, für die er nie gemeint war — im Reiter „Vermisst" nach
-             * einem Rufnamen gesucht, auf „Alle" gewechselt, und dort steht eine fremde Menge auf
-             * diesen Rufnamen zusammengestrichen. Kein Fehler, keine Warnung, nur fehlende
-             * Zeilen. Dieselbe Falle wurde an `PersonenPage` gemessen und dort ebenso behoben.
+             * Vier Reiter, eine Sichtstelle — der Schlüssel trägt deshalb die Statusachse. Ohne ihn
+             * reichte React dieselbe Instanz über alle vier Mengen weiter, und der Suchbegriff im
+             * Primitiv filterte eine fremde Menge: im Reiter „Vermisst" nach einem Rufnamen
+             * gesucht, auf „Alle" gewechselt, und dort fehlen still Zeilen. Dieselbe Falle ist an
+             * `PersonenPage` behoben.
              *
-             * Der Preis, und er ist hier kleiner als dort: der Remount trifft ALLEN Zustand des
-             * Primitivs — `suchbegriff` (den wollen wir), `eigeneSortierung`, `eigeneSpaltenAus`,
-             * `schleuse`. Das ist die Folge des Schlüssels, keine Auswahl; getrennt abschaltbar
-             * ist nichts davon. Die Sortierung ist dabei reines Beiwerk: `tierSpalten` ist EINE
-             * Modulkonstante über allen vier Reitern, ein Zurückfallen auf `standardSortierung`
-             * wäre also verzichtbar. Und `filterWerte` ist auf dieser Seite ohnehin tot — keine
-             * Spalte von `tierSpalten` trägt ein `filter`. Der Spaltenauswahl-Grund aus
-             * `PersonenPage` (je Reiter eine andere Spaltenliste) gilt hier NICHT und wird
-             * deshalb auch nicht behauptet.
+             * Der Remount trifft allen Zustand des Primitivs (`suchbegriff`, `eigeneSortierung`,
+             * `eigeneSpaltenAus`, `schleuse`); getrennt abschaltbar ist nichts. Hier ist der Preis
+             * klein: `tierSpalten` ist eine Modulkonstante, und keine Spalte trägt ein `filter`.
              *
-             * SPEZIES BEWUSST NICHT im Schlüssel, obwohl sie die Zeilenmenge genauso
-             * mitbestimmt. Sie ist die INNERE, häufig getastete Achse: `filterTiere`
-             * (`tiere/tierHelfer.ts`) bildet die Schnittmenge aus Status und Spezies, und der
-             * Suchplatzhalter unten nennt Rufname und Rasse — Suche und Spezies werden zusammen
-             * gestellt. Ein Remount an dieser Achse löschte den Begriff, den der Bediener eine
-             * Handlung vorher getippt hat, und wegen `allowClear` ein zweites Mal beim
-             * Zurücknehmen der Einengung. Der Reiter wechselt das Arbeitsfach, die Spezies engt
-             * darin ein; nur das Erste rechtfertigt das Wegwerfen.
+             * Spezies bewusst nicht im Schlüssel: sie ist die innere, häufig getastete Achse
+             * (`filterTiere` bildet die Schnittmenge aus Status und Spezies), Suche und Spezies
+             * werden zusammen gestellt. Ein Remount daran löschte den eben getippten Begriff. Der
+             * Reiter wechselt das Arbeitsfach, die Spezies engt darin ein.
              *
-             * Der Guard (`components/datensicht.guard.test.ts`) entscheidet die Spezies-Frage
-             * NICHT: er prüft allein, ob der Schlüssel die Schalterachse `sicht` nennt — beide
-             * Varianten kämen durch. Die Entscheidung oben steht auf der Sache, nicht am Gate.
+             * Der Guard (`components/datensicht.guard.test.ts`) prüft nur, ob der Schlüssel die
+             * Schalterachse `sicht` nennt; die Spezies-Frage entscheidet er nicht.
              */
             key={sicht}
             bezeichnung="Tiere im Einsatz"
@@ -422,8 +387,7 @@ export default function TierePage() {
             leerText="Keine Tiere in dieser Sicht"
             suche={{ platzhalter: 'T-Nr., Rufname, Rasse' }}
             // Spiegelt die Backend-Ordnung (`ORDER BY t.registrier_nr DESC`): das jüngste Tier
-            // oben. Die Sortierung liegt jetzt trotzdem im Client — der Sortierpfeil der Spalte
-            // dreht sie um, ohne einen Nachladevorgang.
+            // oben. Die Sortierung liegt im Client, der Sortierpfeil dreht sie ohne Nachladen um.
             standardSortierung={{ spalte: 'reg', richtung: 'ab' }}
             onZeileKlick={(t) => navigate(tiereDetailPfad(einsatzId, t.id))}
             karte={tierKarte(einsatzId)}
@@ -436,26 +400,19 @@ export default function TierePage() {
         </>
       )}
 
-      {/**
-       * SERIENMODUS (LFH-332 · B4). An einer Sammelstelle kommen die Tiere in Serie an —
-       * ein Dialog, der nach jedem Satz zufällt, kostet dort je Tier einen Klick auf
-       * „Schnellerfassung" und einen weiteren in das erste Feld.
-       *
-       * `uebernahme` trägt genau die zwei Felder, die sich an einer Sammelstelle NICHT
-       * ändern: der Antreffort ist die Sammelstelle selbst, und wer eine Reihe Nutzgeflügel
-       * aufnimmt, wählt die Spezies sonst zwanzigmal neu (das Zurücksetzen fiele auf
-       * `initialValues` = 'hund' zurück). Die übrigen Felder — Rufname, Rasse, Farbe,
-       * Kennzeichnung, Halter-Kontakt, Notiz — beschreiben das EINZELNE Tier; sie
-       * mitzunehmen hiesse, den vorigen Satz zu wiederholen.
-       *
-       * Der sitzungsweite Antreffort ist ein eigener Vertrag: nach erfolgreicher Mutation
-       * wird er einsatz- und maskenbezogen gemerkt und beim Öffnen einmal per Formularwert
-       * eingesetzt. Er gehört nicht zu `initialValues`, damit ein Serien-Reset bei
-       * ausgeschaltetem B4-Schalter leer bleibt.
-       *
-       * `status` steht bewusst nicht im Formular: er kommt aus dem Modus, mit dem der
-       * Dialog geöffnet wurde, und die Ableitung sitzt deshalb in `onErfassen`.
-       */}
+      {/* Serienmodus: an einer Sammelstelle kommen die Tiere in Serie an.
+
+          `uebernahme` trägt die zwei Felder, die sich an einer Sammelstelle nicht ändern: der
+          Antreffort ist die Sammelstelle selbst, und die Spezies müsste sonst je Tier neu
+          gewählt werden (das Zurücksetzen fiele auf `initialValues` = 'hund'). Die übrigen
+          Felder beschreiben das einzelne Tier.
+
+          Der sitzungsweite Antreffort ist ein eigener Vertrag: nach erfolgreicher Mutation
+          einsatz- und maskenbezogen gemerkt und beim Öffnen einmal eingesetzt. Er gehört nicht
+          zu `initialValues`, damit ein Serien-Reset bei ausgeschaltetem Schalter leer bleibt.
+
+          `status` steht nicht im Formular: er kommt aus dem Modus, mit dem der Dialog geöffnet
+          wurde; die Ableitung sitzt in `onErfassen`. */}
       <ErfassungsModal<TierEingabe>
         offen={aktuellerModus !== null}
         titel={aktuellerModus === 'vermisst' ? 'Vermisst melden' : 'Schnellerfassung'}
@@ -475,8 +432,8 @@ export default function TierePage() {
           });
         }}
         onErfasst={(daten) => {
-          // Erst die zentrale Post-Acceptance-Stufe darf den Sitzungswert ändern:
-          // ein Abbruch während des POST besteht die Generation davor nicht.
+          // Erst die zentrale Post-Acceptance-Stufe darf den Sitzungswert ändern: ein Abbruch
+          // während des POST besteht die Generation davor nicht.
           if (typeof daten.antreff_ort === 'string') {
             schreibeErfassungsSitzungswert(einsatzId, 'tier', 'antreff_ort', daten.antreff_ort);
           }

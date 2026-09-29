@@ -1,8 +1,7 @@
-//! Exakte ETB-Zählung eines Einsatzes, gesamt und je Typ (LFH-612, Neuentwurf S4: ETB-Kopf
-//! „412 Einträge" und Bilanz-Leiste).
+//! Exakte ETB-Zählung eines Einsatzes, gesamt und je Typ (LFH-612: Kopfzahl und Bilanz).
 //!
-//! Die Zählung folgt DEMSELBEN Filter wie die Liste (`repo::filter_bedingung`) — der Kopf
-//! zeigt „n Treffer", und n muss genau die Menge sein, die die Liste seitenweise liefert.
+//! Die Zählung folgt DEMSELBEN Filter wie die Liste (`repo::filter_bedingung`): „n Treffer“
+//! muss genau die Menge sein, die die Liste seitenweise liefert.
 
 use super::EtbTyp;
 use crate::error::AppError;
@@ -31,13 +30,11 @@ pub struct EtbZaehlerAnzeige {
 }
 
 impl EtbZaehlerAnzeige {
-    /// Baut die Antwort aus den Rohzeilen `(typ, anzahl)` der Gruppierung.
+    /// Baut die Antwort aus den Rohzeilen `(typ, anzahl)`.
     ///
-    /// Die Zuordnung ist ein vollständiger `match` über [`EtbTyp`]: eine neue Variante bricht
-    /// den Build, statt still aus der Bilanz zu fallen. Ein Typstring, den `parse` nicht
-    /// kennt, schließt der CHECK aus `0004_etb.sql` aus — trifft er trotzdem ein, ist das
-    /// ein 500 und kein stilles Weglassen: eine Gesamtzahl, die kleiner ist als der
-    /// Bestand, wäre der schlimmere Fehler.
+    /// Ein vollständiger `match` über [`EtbTyp`]: eine neue Variante bricht den Build, statt still
+    /// aus der Bilanz zu fallen. Ein unbekannter Typstring (den der CHECK ausschließt) ist ein 500,
+    /// kein stilles Weglassen — eine zu kleine Gesamtzahl wäre der schlimmere Fehler.
     pub fn aus_zeilen(zeilen: &[(String, i64)]) -> Result<Self, AppError> {
         let mut je_typ = EtbTypZaehler::default();
         for (typ, anzahl) in zeilen {

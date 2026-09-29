@@ -1,14 +1,9 @@
-//! WebAuthn/Passkeys (LFH-275, Increment 4): app-eigener Passkey-Provider. Ein registrierter
-//! Nutzer legt aus seinem Profil einen Passkey an, danach ist passwortloser Login möglich —
-//! zusätzlich zu Passwort/OIDC.
+//! WebAuthn/Passkeys (LFH-275): passwortloser Login zusätzlich zu Passwort/OIDC.
 //!
-//! **Eager Boot-Validierung (MUST):** `WebauthnBuilder::new(rp_id, &rp_origin)?.build()?` wird
-//! beim Serverstart versucht (`main::run_server`); nur bei `Ok` wird der Provider als
-//! konfiguriert markiert (`registry::set_webauthn_konfiguriert`) UND das gebaute `Webauthn`
-//! prozessweit gehalten ([`set_webauthn`]/[`webauthn`]). Bei `Err`/fehlender Config bleibt der
-//! Provider ungelistet — kein Fake-Button, der erst beim Klick als Fehlkonfiguration auffällt
-//! (direkte Anwendung des OIDC-redirect_url-Footgun-Fixes). Keine lazy/offline-Discovery-
-//! Maschinerie nötig: WebAuthn ruft nichts übers Netz auf.
+//! **Eager Boot-Validierung:** das `Webauthn` wird beim Serverstart gebaut; nur bei Erfolg
+//! gilt der Provider als konfiguriert und das Objekt wird prozessweit gehalten ([`set_webauthn`]/
+//! [`webauthn`]). Sonst bleibt der Provider ungelistet — kein Knopf, der erst beim Klick als
+//! Fehlkonfiguration auffällt.
 use crate::error::AppError;
 use sqlx::SqlitePool;
 use std::sync::OnceLock;
@@ -18,34 +13,25 @@ use webauthn_rs::prelude::*;
 pub mod state;
 pub mod storage;
 
-/// Prozessweit EINMAL (beim Serverstart, nach erfolgreichem [`baue`]) gesetztes `Webauthn` —
-/// OnceLock statt `AppState`-Feld, analog zu `oidc::OIDC_SETTINGS`/`anhang::ScanConfig` (LFH-114):
-/// bricht keine der vielen inline-`AppState`-Testkonstruktionen (Memory:
-/// appstate-feld-bricht-test-konstruktionen). Anders als `OidcSettings` (rohe Config, immer
-/// gesetzt) hält dieser OnceLock das bereits erfolgreich GEBAUTE Objekt — ungesetzt heißt: der
-/// Boot-Bau ist fehlgeschlagen/die Config fehlt, kein Passkey-Login möglich.
+/// Prozessweit einmal gesetztes, erfolgreich gebautes `Webauthn` (OnceLock statt
+/// `AppState`-Feld). Ungesetzt heißt: kein Passkey-Login möglich.
 static WEBAUTHN: OnceLock<Webauthn> = OnceLock::new();
 
-/// Einmalig beim Serverstart setzen (`main::run_server`), NACHDEM [`baue`] `Ok` geliefert hat.
-/// Doppelsetzen wird ignoriert (wie `oidc::init_oidc_settings`/`registry::set_oidc_konfiguriert`).
+/// Einmalig beim Serverstart setzen, nachdem [`baue`] `Ok` geliefert hat; Doppelsetzen wird
+/// ignoriert.
 pub fn set_webauthn(w: Webauthn) {
     let _ = WEBAUTHN.set(w);
 }
 
-/// Liefert das prozessweit gebaute `Webauthn`, sofern der Boot-Bau erfolgreich war. `None`
-/// heißt: kein Passkey-Login/Enrollment möglich (fehlende/kaputte `rp_id`/`rp_origin`-Config) —
-/// spätere Endpoints (Task 5/6) müssen das behandeln (z.B. 404, analog zum inaktiven Provider).
+/// Das prozessweit gebaute `Webauthn`; `None` heißt kein Passkey-Login/Enrollment möglich.
 pub fn webauthn() -> Option<&'static Webauthn> {
     WEBAUTHN.get()
 }
 
-/// Baut das `Webauthn`-Objekt aus `rp_id`/`rp_origin` (eager Boot-Validierung, Plan-MUST).
+/// Baut das `Webauthn` aus `rp_id`/`rp_origin`.
 ///
-/// `rp_id` MUSS eine effektive Domain von `rp_origin` sein (KEINE IP) — `WebauthnBuilder`
-/// prüft das selbst (`rp_origin.domain()` liefert bei IP-Hosts `None`) und liefert sonst `Err`.
-/// Ein kaputtes `rp_origin` (kein parsbarer URL) scheitert schon vorher an `Url::parse`.
-/// Beides ist NIE ein Panic — der Aufrufer (`main::run_server`) loggt `warn!` und listet den
-/// Provider einfach nicht.
+/// `rp_id` muss eine effektive Domain von `rp_origin` sein (keine IP), sonst `Err`; ein
+/// unparsbares `rp_origin` scheitert an `Url::parse`. Nie ein Panic.
 pub fn baue(rp_id: &str, rp_origin: &str) -> Result<Webauthn, AppError> {
     let origin = Url::parse(rp_origin)
         .map_err(|e| AppError::Internal(format!("WebAuthn-rp_origin ungültig: {e}")))?;
@@ -56,16 +42,12 @@ pub fn baue(rp_id: &str, rp_origin: &str) -> Result<Webauthn, AppError> {
         .map_err(|e| AppError::Internal(format!("WebAuthn-Aufbau fehlgeschlagen: {e}")))
 }
 
-/// Liefert den gespeicherten Opaque-User-Handle für `benutzer_id`; ist er NULL (erster Aufruf),
-/// wird ein neuer zufälliger [`Uuid::new_v4`] erzeugt, persistiert und zurückgegeben — danach
-/// idempotent derselbe Wert.
+/// Opaker User-Handle für `benutzer_id`; beim ersten Aufruf zufällig erzeugt und persistiert,
+/// danach stets derselbe. Register und Auth nutzen beide diese Funktion.
 ///
-/// **MUST (irreversibel):** der Handle ist ein gespeicherter Zufallswert, NIEMALS aus
-/// `benutzer_id` abgeleitet — Authenticatoren binden sich an `(rp_id, handle)` dauerhaft, eine
-/// Ableitung aus der laufenden PK würde später den Wechsel auf discoverable/usernameless Login
-/// verbauen und eine PK-Änderung würde jeden Passkey invalidieren. Der Handle enthält keinerlei
-/// PII (reine `Uuid::new_v4`-Zufallsbytes). EINE Quelle für Register UND Auth (beide Ceremonien
-/// rufen diese Funktion).
+/// **Irreversibel:** der Handle ist Zufall, NIE aus `benutzer_id` abgeleitet. Authenticatoren
+/// binden sich dauerhaft an `(rp_id, handle)`; eine PK-Ableitung invalidierte bei jeder
+/// PK-Änderung alle Passkeys. Er enthält keine PII.
 pub async fn user_handle(pool: &SqlitePool, benutzer_id: i64) -> Result<Uuid, AppError> {
     let vorhanden: Option<Vec<u8>> =
         sqlx::query_scalar("SELECT webauthn_user_handle FROM benutzer WHERE id = ?")
@@ -87,15 +69,9 @@ pub async fn user_handle(pool: &SqlitePool, benutzer_id: i64) -> Result<Uuid, Ap
     Ok(neu)
 }
 
-/// Reverse-Lookup für den usernameless/discoverable Login (LFH-313): findet den **aktiven**
-/// Benutzer zu einem WebAuthn-User-Handle. Der Handle kommt aus
-/// `identify_discoverable_authentication` (dem `userHandle` der Assertion) — der discoverable-
-/// `finish`-Handler löst darüber den Benutzer auf, statt aus einem eingegebenen Benutzernamen.
-///
-/// `AND aktiv = 1`: ein deaktiviertes Konto darf sich nicht anmelden. Die Eindeutigkeit des
-/// Handles garantiert der partielle UNIQUE-Index (Migration 0092) — der Handle ist eine zufällige
-/// `Uuid::new_v4` (s. [`user_handle`]), Kollisionen sind praktisch ausgeschlossen, der Index macht
-/// sie zusätzlich strukturell unmöglich. Liefert `None`, wenn kein aktiver Benutzer passt.
+/// Reverse-Lookup für den discoverable Login (LFH-313): der **aktive** Benutzer zu einem
+/// User-Handle aus der Assertion. Deaktivierte Konten werden nicht gefunden; die Eindeutigkeit
+/// sichert ein partieller UNIQUE-Index.
 pub async fn benutzer_je_user_handle(
     pool: &SqlitePool,
     handle: Uuid,
@@ -216,8 +192,7 @@ mod tests {
 
     #[tokio::test]
     async fn benutzer_je_user_handle_ignoriert_deaktivierten_benutzer() {
-        // Ein zwischenzeitlich deaktiviertes Konto darf sich nicht per Passkey anmelden —
-        // der Reverse-Lookup filtert `aktiv = 1` (spiegelt den `aktiv`-Check im finish-Handler).
+        // Ein deaktiviertes Konto darf sich nicht per Passkey anmelden.
         let pool = pool_mit_org().await;
         let id = benutzer(&pool, "erika").await;
         let handle = user_handle(&pool, id).await.unwrap();
@@ -247,9 +222,7 @@ mod tests {
 
     #[test]
     fn baue_err_bei_ip_basierter_rp_id() {
-        // WebauthnBuilder verlangt rp_id als effektive Domain von rp_origin — bei einer
-        // IP-Origin liefert `Url::domain()` `None`, also scheitert der Bau (Boot-Validierungs-
-        // MUST: WebAuthn funktioniert grundsätzlich nicht auf reinen IP-Origins).
+        // Auf einer IP-Origin funktioniert WebAuthn nicht; der Bau muss scheitern.
         let ergebnis = baue("192.168.1.5", "https://192.168.1.5:8443");
         assert!(ergebnis.is_err(), "IP-basierte rp_id/Origin muss scheitern");
     }
@@ -262,8 +235,7 @@ mod tests {
 
     #[test]
     fn baue_err_bei_rp_id_mismatch() {
-        // rp_id passt nicht zur Origin-Domain — auch das ist eine Fehlkonfiguration, die der
-        // Boot-Bau abfangen muss (kein Fake-Button, der erst beim ersten Klick scheitert).
+        // rp_id passt nicht zur Origin-Domain — Fehlkonfiguration, die der Boot-Bau abfangen muss.
         let ergebnis = baue("example.com", "https://idm.different.example");
         assert!(ergebnis.is_err(), "rp_id/Origin-Mismatch muss scheitern");
     }

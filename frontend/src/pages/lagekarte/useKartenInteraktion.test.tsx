@@ -10,8 +10,7 @@ import { useKartenInteraktion } from './useKartenInteraktion';
 import { einsatzKeys } from '../../api/queryKeys';
 import { leseZuletztVerwendet } from './zuletztVerwendet';
 
-// API-Client der freien Zeichen mocken (LFH-170 Etappe 3): der Hook ruft ihn bei Platzieren/
-// Ändern/Löschen; hier nur die Aufrufe prüfen (kein Netz).
+// API-Client der freien Zeichen mocken; hier nur die Aufrufe prüfen.
 const freieZeichenApi = vi.hoisted(() => ({
   legeFreiesZeichenAn: vi.fn(() => Promise.resolve({ id: 42 })),
   aktualisiereFreiesZeichen: vi.fn(() => Promise.resolve({ id: 42 })),
@@ -20,9 +19,8 @@ const freieZeichenApi = vi.hoisted(() => ({
 }));
 vi.mock('../../api/freieZeichen', () => freieZeichenApi);
 
-// Zonen-API mocken (LFH-332): `bestaetigungSpeichern` ruft `legeZoneAn`. Die Factory MUSS
-// jeden vom Hook importierten Export tragen — fehlt einer, scheitert die Modul-Initialisierung
-// der GANZEN Datei, nicht nur der neue Fall. (`ZonePatch` ist ein reiner Typ und wird gelöscht.)
+// Zonen-API mocken. Die Factory muss jeden vom Hook importierten Export tragen, sonst scheitert die
+// Modul-Initialisierung der ganzen Datei.
 const lagezonenApi = vi.hoisted(() => ({
   legeZoneAn: vi.fn(() => Promise.resolve({ id: 5 })),
   aktualisiereZone: vi.fn(() => Promise.resolve({ id: 5 })),
@@ -35,19 +33,19 @@ const einsatzUhsApi = vi.hoisted(() => ({
 }));
 vi.mock('../../api/einsatzUhs', () => einsatzUhsApi);
 
-// Betroffene verorten (LFH-613): der Platzier-Auftrag `person` schreibt die Fundort-Koordinate.
+// Betroffene verorten: der Platzier-Auftrag `person` schreibt die Fundort-Koordinate.
 const einsatzPersonApi = vi.hoisted(() => ({
   aktualisierePerson: vi.fn(() => Promise.resolve({ id: 10 })),
 }));
 vi.mock('../../api/einsatzPerson', () => einsatzPersonApi);
 
-// Betreuungsstelle verorten (LFH-673): der Platzier-Auftrag `betreuungsstelle` PATCHt die Stelle.
+// Betreuungsstelle verorten: der Platzier-Auftrag `betreuungsstelle` PATCHt die Stelle.
 const betreuungApi = vi.hoisted(() => ({
   aendereStelle: vi.fn(() => Promise.resolve({ id: 4 })),
 }));
 vi.mock('../../api/betreuung', () => betreuungApi);
 
-// Die übrigen Zweige von `loescheVerortung` (LFH-710): je Objektart eine eigene API.
+// Die übrigen Zweige von `loescheVerortung`: je Objektart eine eigene API.
 const einsatzSchadenApi = vi.hoisted(() => ({
   aktualisiereSchaden: vi.fn(() => Promise.resolve({ id: 3 })),
 }));
@@ -105,12 +103,10 @@ const POLYGON: GeoJsonGeometry = {
   ],
 };
 
-// Jeder wechselseitig-exklusive Interaktionsmodus samt seiner Start-Sequenz.
-// Während eines dieser Modi darf ein Karten-Klick auf ein bestehendes Objekt kein
-// Auswahl-Panel öffnen (LFH-208: sonst Doppel-Panel neben der ZeichnenSteuerung).
-// `familie` = die Modus-Identität: zone-zeichnen und zone-bestaetigung sind zwei Phasen
-// DESSELBEN Modus (der Entwurf bleibt während der Bestätigung stehen) und dürfen daher
-// koexistieren. Zwei verschiedene Familien gleichzeitig sind dagegen immer ein Defekt.
+// Jeder wechselseitig exklusive Interaktionsmodus samt Start-Sequenz. Während eines Modus darf ein
+// Karten-Klick kein Auswahl-Panel öffnen (sonst Doppel-Panel neben der ZeichnenSteuerung).
+// `familie` ist die Modus-Identität: zone-zeichnen und zone-bestaetigung sind zwei Phasen desselben
+// Modus und dürfen koexistieren; zwei verschiedene Familien gleichzeitig sind ein Defekt.
 const MODI: { name: string; familie: string; betreten: (r: HookResult) => void }[] = [
   {
     name: 'platzieren',
@@ -141,14 +137,13 @@ const MODI: { name: string; familie: string; betreten: (r: HookResult) => void }
       act(() => r.current.onZoneGezeichnet(POLYGON));
     },
   },
-  // LFH-170: das Platzieren eines freien Zeichens ist ebenfalls exklusiv → muss das
-  // Selektions-Gate (exklusiverModusAktiv) auslösen.
+  // Das Platzieren eines freien Zeichens ist exklusiv und muss das Selektions-Gate auslösen.
   {
     name: 'zeichen-platzieren',
     familie: 'zeichen',
     betreten: (r) => act(() => r.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' })),
   },
-  // LFH-616: Messen zeichnet ebenfalls auf der Karte und ist damit exklusiv.
+  // Messen zeichnet auf der Karte und ist damit exklusiv.
   {
     name: 'messen',
     familie: 'messen',
@@ -168,10 +163,7 @@ function aktiveFamilien(r: HookResult): string[] {
   return [...f].sort();
 }
 
-// LFH-243/F15: Die Exklusivität der Interaktionsmodi wurde bisher in jedem Start-Handler
-// von Hand durch Reset-Kaskaden erzwungen — mit asymmetrischen Subsets, sodass ein
-// vergessener Reset zwei gleichzeitig scharfe Modi erlaubt (Bug-Klasse LFH-145). Dieses
-// Kreuzprodukt prüft die Invariante erschöpfend statt stichprobenartig.
+// Das Kreuzprodukt prüft die Exklusivität der Modi erschöpfend statt stichprobenartig.
 describe('useKartenInteraktion — Exklusivität der Interaktionsmodi (LFH-243)', () => {
   for (const zuerst of MODI) {
     for (const dann of MODI) {
@@ -187,8 +179,8 @@ describe('useKartenInteraktion — Exklusivität der Interaktionsmodi (LFH-243)'
     }
   }
 
-  // onEinsatzortPlatzieren ist ein eigener Start-Handler derselben Familie `platzieren`
-  // (das Kreuzprodukt oben überspringt ihn deshalb), hat aber dieselbe Reset-Lücke.
+  // onEinsatzortPlatzieren ist ein eigener Start-Handler der Familie `platzieren`, den das
+  // Kreuzprodukt überspringt.
   for (const zuerst of MODI.filter((m) => m.familie !== 'platzieren')) {
     it(`${zuerst.name} → einsatzort-platzieren: nur platzieren bleibt scharf`, () => {
       const { result } = rendere();
@@ -198,9 +190,8 @@ describe('useKartenInteraktion — Exklusivität der Interaktionsmodi (LFH-243)'
     });
   }
 
-  // Phasen-Invariante innerhalb der zone-Familie (LFH-145): die Bestätigungs-Phase ist ein
-  // Sub-Zustand des Zeichnens — der sichtbare Entwurf muss bestehen bleiben, solange die
-  // Bestätigung offen ist (das Kreuzprodukt überspringt diesen Intra-Familie-Übergang).
+  // Phasen-Invariante der zone-Familie: der sichtbare Entwurf bleibt stehen, solange die
+  // Bestätigung offen ist.
   it('onZoneGezeichnet öffnet die Bestätigung, OHNE den Entwurf zu verlieren', () => {
     const { result } = rendere();
     act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
@@ -210,11 +201,8 @@ describe('useKartenInteraktion — Exklusivität der Interaktionsmodi (LFH-243)'
   });
 });
 
-// LFH-243/F15: Die drei Auswahl-States (Marker/Abschnitt-`auswahl`, `zoneAuswahl`,
-// `fachebeneAuswahl`) sind ebenfalls wechselseitig exklusiv — nur ein Detail-Panel darf
-// offen sein. Auch hier erzwang jeder Klick-Handler die Exklusivität per Reset-Kaskade,
-// und onFlaecheKlick vergaß zoneAuswahl → zwei Panels gleichzeitig (LagekartePage rendert
-// jeden Inspektor unabhängig, ohne else). Erschöpfend statt stichprobenartig geprüft.
+// Die drei Auswahl-States (`auswahl`, `zoneAuswahl`, `fachebeneAuswahl`) sind wechselseitig
+// exklusiv: LagekartePage rendert jeden Inspektor unabhängig, zwei gleichzeitig wären zwei Panels.
 const SELEKTIONEN: {
   name: string;
   feld: 'auswahl' | 'zoneAuswahl' | 'fachebeneAuswahl';
@@ -320,7 +308,7 @@ describe('useKartenInteraktion — Betroffene verorten (LFH-613)', () => {
     });
     await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Objekt verortet'));
     const keys = invalidiert.mock.calls.map((c) => c[0]?.queryKey);
-    // Literale statt Factory (CLAUDE.md, Query-Key-Registry): sonst prüfte der Test die Factory gegen sich selbst.
+    // Literale statt Factory, sonst prüfte der Test die Factory gegen sich selbst.
     expect(keys).toContainEqual(['einsatz-personen', 1]);
     expect(keys).toContainEqual(['einsatz-person', 1, 10]);
     expect(result.current.platzierungZiel).toBeNull();
@@ -458,8 +446,8 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     expect(result.current.zeichenPlatzieren).toBeNull();
   });
 
-  // Restabdeckung Mutual-Exclusion (LFH-170): jeder weitere exklusive Start-Handler räumt
-  // einen offenen zeichenPlatzieren-Modus (onZoneZeichnenStart ist oben schon geprüft).
+  // Jeder weitere exklusive Start-Handler räumt einen offenen zeichenPlatzieren-Modus
+  // (onZoneZeichnenStart ist oben geprüft).
   const RAEUMT_ZEICHEN_PLATZIEREN: { name: string; start: (r: HookResult) => void }[] = [
     {
       name: 'onAbschnittZeichnenStart',
@@ -480,8 +468,8 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
 
   it('onZeichenPlatzierenStart räumt eine offene zoneBestaetigung (Mutual-Exclusion)', () => {
     const { result } = rendere();
-    // zoneBestaetigung aufbauen: Zone-Zeichnen starten, dann Geometrie abschließen (vgl. MODI
-    // „zone-bestaetigung"). onZoneGezeichnet setzt zoneBestaetigung, ohne zu persistieren.
+    // zoneBestaetigung aufbauen: Zone-Zeichnen starten, Geometrie abschließen (vgl. MODI
+    // „zone-bestaetigung").
     act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
     act(() => result.current.onZoneGezeichnet(POLYGON));
     expect(result.current.zoneBestaetigung).not.toBeNull();
@@ -501,20 +489,19 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
         lon: 8.6,
         grundzeichen: 'stelle',
         label: 'X',
-        // B/LFH-320: ohne aktive Ansicht wird auf „alle Ansichten" (null) gestempelt.
+        // Ohne aktive Ansicht wird auf „alle Ansichten" (null) gestempelt.
         ansicht_id: null,
       }),
     );
-    // Seit LFH-332 überlebt der Platzier-Modus den POST (Serie ist Vorgabe) — der Zähler ist
-    // das beobachtbare Zeichen dafür, dass onSuccess gelaufen ist. Das Ende der Serie prüft
-    // der eigene Block unten.
+    // Der Platzier-Modus überlebt den POST (Serie ist Vorgabe); der Zähler zeigt, dass onSuccess
+    // gelaufen ist.
     await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(1));
     expect(result.current.zeichenPlatzieren).toEqual({ grundzeichen: 'stelle', label: 'X' });
     expect(erfolg).toHaveBeenCalledWith('Taktisches Zeichen angelegt');
   });
 
-  // LFH-716 (D5): „zuletzt verwendet" zählt nur, was wirklich angelegt wurde — als Paar,
-  // sonst wäre ein Merken schon beim Start des Platzier-Modus ebenso grün.
+  // „Zuletzt verwendet" zählt nur, was wirklich angelegt wurde — als Paar, sonst wäre ein Merken
+  // beim Start ebenso grün.
   it('merkt das Zeichen nach erfolgreichem Anlegen unter „zuletzt verwendet"', async () => {
     localStorage.clear();
     freieZeichenApi.legeFreiesZeichenAn.mockClear();
@@ -527,8 +514,8 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
   });
 
   it('merkt das gesendete Zeichen auch, wenn der Modus vor der Antwort beendet wurde', async () => {
-    // Review LFH-716, M5: gemerkt wird, was gesendet wurde — nicht, was beim Eintreffen der
-    // Antwort noch im Platzier-Modus steht.
+    // Gemerkt wird, was gesendet wurde, nicht, was beim Eintreffen der Antwort im Platzier-Modus
+    // steht.
     localStorage.clear();
     let aufloesen: (v: { id: number }) => void = () => {};
     freieZeichenApi.legeFreiesZeichenAn.mockReset();
@@ -584,9 +571,8 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
   });
 
   it('Doppelklick legt nur EIN freies Zeichen an (isPending-Guard, kein Duplikat)', async () => {
-    // Mutation pending halten → der zweite Klick trifft den Guard, bevor onSuccess
-    // zeichenPlatzieren leert. legeFreiesZeichenAn erzeugt je Aufruf eine NEUE Entität
-    // (nicht idempotent), ein zweiter Aufruf würde ein Duplikat anlegen.
+    // Mutation pending halten, damit der zweite Klick den Guard trifft. legeFreiesZeichenAn ist
+    // nicht idempotent, ein zweiter Aufruf legte ein Duplikat an.
     let aufloesen: (v: { id: number }) => void = () => {};
     freieZeichenApi.legeFreiesZeichenAn.mockReset();
     freieZeichenApi.legeFreiesZeichenAn.mockImplementation(
@@ -636,15 +622,14 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
 });
 
 /**
- * Serienmodus (LFH-332/M76).
- *
- * Beide Platzier-Modi endeten nach JEDEM gesetzten Objekt. Für das zweite gleichartige
- * Zeichen kostete das drei Klicks Umweg — bei einer Lage mit einem Dutzend gleicher Zeichen
- * ist das der Unterschied zwischen „nebenbei" und „später".
+ * Serienmodus: der Platzier-Modus bleibt nach dem Speichern stehen, damit gleichartige Zeichen ohne
+ * Umweg folgen.
  */
 describe('useKartenInteraktion — Serienmodus freies Zeichen (LFH-332)', () => {
-  /** Ein Karten-Klick + Warten auf GENAU den n-ten POST. Die Zählung ist nötig: ein blosses
-   *  `toHaveBeenCalled()` wäre beim zweiten Klick schon durch den ersten erfüllt. */
+  /**
+   * Ein Karten-Klick + Warten auf genau den n-ten POST; `toHaveBeenCalled()` wäre beim zweiten
+   * Klick schon durch den ersten erfüllt.
+   */
   async function platziere(result: HookResult, lng: number, lat: number, malCount: number) {
     act(() => result.current.onKarteKlick({ lng, lat }));
     await waitFor(() =>
@@ -657,8 +642,7 @@ describe('useKartenInteraktion — Serienmodus freies Zeichen (LFH-332)', () => 
     expect(result.current.zeichenSerie).toBe(true);
   });
 
-  // Das wörtliche Akzeptanzkriterium: der Modus überlebt den erfolgreichen POST, und erst
-  // „Fertig" beendet ihn.
+  // Der Modus überlebt den erfolgreichen POST, erst „Fertig" beendet ihn.
   it('nach erfolgreichem Speichern bleibt der Platzier-Modus aktiv — erst „Fertig" beendet ihn', async () => {
     freieZeichenApi.legeFreiesZeichenAn.mockClear();
     const { result } = rendere();
@@ -678,8 +662,8 @@ describe('useKartenInteraktion — Serienmodus freies Zeichen (LFH-332)', () => 
     expect(result.current.zeichenPlatzieren).toBeNull();
   });
 
-  // Die Gegenprobe ist load-bearing, nicht Symmetrie: nur sie belegt, dass onSuccess den
-  // AKTUELLEN Schalterwert liest und nicht den, der bei Anlage der Mutation galt.
+  // Die Gegenprobe belegt, dass onSuccess den aktuellen Schalterwert liest, nicht den bei Anlage
+  // der Mutation.
   it('mit ausgeschalteter Serie endet der Modus nach dem Speichern wie zuvor', async () => {
     freieZeichenApi.legeFreiesZeichenAn.mockClear();
     const { result } = rendere();
@@ -717,14 +701,10 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
     expect(result.current.zoneSerie).toBe(true);
   });
 
-  // Codex-Review zu LFH-357 (P2): das Anlegen einer `gefahrengebiet`-Zone legt SERVERSEITIG
-  // eine neue Gefahrengebiet-Gruppe an (`lage_zone/repo.rs:anlegen_tx` → `gebiet_anlegen`).
-  // Invalidiert der Klick nur die Zonen, trägt die frische Zone eine `gefahrengebiet_id`, die
-  // in der veralteten Gebiets-Liste fehlt — der Nachschlag geht ins Leere und die Karte
-  // beschriftet sie „Stufe unbekannt", bis irgendein fremder Refetch kommt. Der
-  // SSE-Fan-out räumt beides ab (`lage_zone` → zonen + gefahrengebiete); genau deshalb fällt
-  // es nur auf, wenn der Live-Strom hängt. Die Änder- und Lösch-Pfade desselben Hooks
-  // invalidieren längst beides — hier fehlte die Symmetrie.
+  // Das Anlegen einer `gefahrengebiet`-Zone legt serverseitig eine neue Gefahrengebiet-Gruppe an.
+  // Invalidiert der Klick nur die Zonen, fehlt deren `gefahrengebiet_id` in der veralteten
+  // Gebiets-Liste, und die Karte beschriftet „Stufe unbekannt", bis ein fremder Refetch kommt
+  // (sichtbar nur bei hängendem Live-Strom).
   it('invalidiert nach dem Anlegen AUCH die Gefahrengebiete, nicht nur die Zonen', async () => {
     lagezonenApi.legeZoneAn.mockClear();
     const client = neuerQueryClient();
@@ -751,8 +731,8 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
 
     const schluessel = () =>
       spion.mock.calls.map((c) => JSON.stringify((c[0] as { queryKey: unknown }).queryKey));
-    // Vorbedingung: die Zonen-Invalidierung wird von diesem Spion überhaupt gesehen — sonst
-    // wäre die eigentliche Aussage unten trivial unerfüllbar und der Test bewiese nichts.
+    // Vorbedingung: der Spion sieht die Zonen-Invalidierung überhaupt, sonst bewiese die Aussage
+    // unten nichts.
     await waitFor(() => expect(schluessel()).toContain(JSON.stringify(einsatzKeys.zonen(1))));
     // Die tragende Aussage.
     await waitFor(() =>
@@ -780,11 +760,9 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
     });
     expect(result.current.zoneBestaetigung).toBeNull();
     expect(result.current.zoneSpeichern).toBe(false);
-    // Zweite Hälfte — ohne sie beweist der Test die Falle nicht: der Zonen-Effekt in
-    // Kartenflaeche hängt an [zoneZeichnen, zoneZeichnenNonce]. Der Modus bleibt bei
-    // Zone→Zone gleich, also feuert nur der gestiegene Nonce den Effekt neu; ohne ihn liefe
-    // kein starten() → der Zeichenmodus wäre tot und die gespeicherte Geometrie bliebe als
-    // zweite Kontur auf dem Zeichen-Layer liegen.
+    // Zweite Hälfte: der Zonen-Effekt in Kartenflaeche hängt an [zoneZeichnen, zoneZeichnenNonce].
+    // Bei Zone→Zone bleibt der Modus gleich, nur der gestiegene Nonce startet ihn neu; sonst wäre
+    // der Zeichenmodus tot und die gespeicherte Geometrie bliebe als zweite Kontur liegen.
     expect(result.current.zoneZeichnenNonce).toBeGreaterThan(nonceVorher);
 
     act(() => result.current.onZoneZeichnenFertig());
@@ -803,8 +781,8 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
     expect(result.current.zoneBestaetigung).toBeNull();
   });
 
-  // Ein gescheiterter POST darf die Serie NICHT fortsetzen: der Neustart verwürfe die nicht
-  // gespeicherte Geometrie und sähe aus, als sei nichts passiert.
+  // Ein gescheiterter POST setzt die Serie nicht fort: der Neustart verwürfe die ungespeicherte
+  // Geometrie, als sei nichts passiert.
   it('scheitert das Speichern, endet der Modus und der Fehler wird gemeldet', async () => {
     const fehler = vi.fn();
     lagezonenApi.legeZoneAn.mockClear();
@@ -819,12 +797,9 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
   });
 
   it('was während des Speicherns gestartet wurde, überlebt die Auflösung', async () => {
-    // Der Review-Fund: der Reducer-Fall 'zone' ist bedingungslos, anders als
-    // 'beenden' mit seiner `arten`-Prüfung. Die Kette wartet auf POST UND
-    // invalidateQueries; die Sidebar bleibt dabei bedienbar. Ohne den Schutz
-    // überschriebe die späte Auflösung den inzwischen gestarteten Modus mit dem
-    // ALTEN Entwurf und zählte „1 gespeichert" dazu — die Person zeichnete im
-    // falschen Zonentyp weiter.
+    // Der Reducer-Fall 'zone' ist bedingungslos, anders als 'beenden' mit seiner `arten`-Prüfung.
+    // Die Kette wartet auf POST und Invalidierung, die Sidebar bleibt bedienbar. Ohne Schutz
+    // überschriebe die späte Auflösung den inzwischen gestarteten Modus mit dem alten Entwurf.
     lagezonenApi.legeZoneAn.mockClear();
     let loese: () => void = () => {};
     lagezonenApi.legeZoneAn.mockImplementationOnce(
@@ -839,8 +814,7 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
     act(() => result.current.bestaetigungSpeichern());
     await waitFor(() => expect(lagezonenApi.legeZoneAn).toHaveBeenCalledTimes(1));
 
-    // Mittendrin etwas anderes anfangen — hier ein taktisches Zeichen, weil das
-    // den Zonen-Modus ganz verlässt und der Fehler damit am deutlichsten ist.
+    // Mittendrin etwas anderes anfangen: ein taktisches Zeichen verlässt den Zonen-Modus ganz.
     act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
     expect(result.current.zeichenPlatzieren).not.toBeNull();
 
@@ -941,10 +915,51 @@ describe('useKartenInteraktion — Betreuungsstelle (LFH-673)', () => {
 });
 
 /**
- * Quittungen (LFH-710). Jede Karten-Mutation sagt, ob sie geklappt hat — und zwar erst NACH
- * der erfolgreichen Antwort: ein Erfolg, der vor dem Fehlschlag gemeldet wird, ist schlimmer
- * als gar keiner. Deshalb je Mutation das Paar: Erfolg → Quittung, Fehlschlag → Fehler und
- * KEINE Erfolgsquittung.
+ * Erste Esc-Stufe in der Bestätigungsphase (LFH-712): die ungespeicherte Figur geht weg, der
+ * Zeichenmodus bleibt — anders als „Verwerfen", das ihn beendet.
+ */
+describe('useKartenInteraktion — Rückweg aus der Bestätigung (LFH-712)', () => {
+  it('führt zurück in die Zeichenphase desselben Entwurfs, ohne zu speichern', () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const { result } = rendere();
+    const entwurf = { typ: 'gefahrengebiet' as const, modus: 'polygon' as const };
+    act(() => result.current.onZoneZeichnenStart(entwurf));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    const nonceVorher = result.current.zoneZeichnenNonce;
+
+    act(() => result.current.onBestaetigungZurueck());
+
+    expect(result.current.zoneBestaetigung).toBeNull();
+    expect(result.current.zoneEntwurf).toEqual(entwurf);
+    // Die Nonce erzwingt `starten()` an der Karte — sonst bliebe die fertige Figur stehen.
+    expect(result.current.zoneZeichnenNonce).toBe(nonceVorher + 1);
+    expect(lagezonenApi.legeZoneAn).not.toHaveBeenCalled();
+  });
+
+  it('ist ohne offene Bestätigung wirkungslos', () => {
+    const { result } = rendere();
+    act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
+    const nonceVorher = result.current.zoneZeichnenNonce;
+    act(() => result.current.onBestaetigungZurueck());
+    expect(result.current.zoneZeichnenNonce).toBe(nonceVorher);
+    expect(result.current.zoneEntwurf).not.toBeNull();
+  });
+
+  it('behält den Serienzähler (die gespeicherten Zonen bleiben gezählt)', async () => {
+    const { result } = rendere();
+    act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(result.current.zoneSerieAnzahl).toBe(1));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    act(() => result.current.onBestaetigungZurueck());
+    expect(result.current.zoneSerieAnzahl).toBe(1);
+  });
+});
+
+/**
+ * Quittungen (LFH-710): jede Karten-Mutation meldet erst nach der erfolgreichen Antwort. Je
+ * Mutation das Paar: Erfolg → Quittung, Fehlschlag → Fehler und keine Erfolgsquittung.
  */
 describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', () => {
   type Ruf = ReturnType<typeof vi.fn>;

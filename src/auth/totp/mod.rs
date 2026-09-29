@@ -1,11 +1,6 @@
-//! Pure TOTP-/Recovery-Core (RFC 6238) für den Passwort→TOTP-Zweitfaktor (LFH-43,
-//! Increment 5 „MFA/TOTP").
-//!
-//! Bewusst frei von DB/HTTP: Secret-Erzeugung, otpauth-URL-Bau und Code-Prüfung sind reine
-//! Funktionen — deterministisch testbar über einen festen Unix-Timestamp (`jetzt_unix`),
-//! ohne Systemzeit-Abhängigkeit. Persistenz der Recovery-Codes ([`storage`]) und der
-//! prozessweite Pending-MFA-State zwischen Passwort- und TOTP-Schritt ([`state`]) sind
-//! eigene Module.
+//! TOTP-/Recovery-Kern (RFC 6238) für den Zweitfaktor (LFH-43). Frei von DB/HTTP und über
+//! einen festen Unix-Timestamp deterministisch testbar. Persistenz der Recovery-Codes steht in
+//! [`storage`], der Pending-State zwischen Passwort- und TOTP-Schritt in [`state`].
 
 pub mod state;
 pub mod storage;
@@ -21,20 +16,14 @@ pub const TOTP_ISSUER: &str = "lifeline-hub";
 /// Anzahl der bei einem Enrollment ausgegebenen Recovery-Codes.
 const RECOVERY_CODE_ANZAHL: usize = 10;
 
-/// Baut die RFC-6238-Instanz mit den projektweiten Parametern (SHA1, 6-stellig, ±1
-/// Zeitschritt Skew, 30s-Schritt). Zentral verdrahtet, damit `otpauth_url`/`pruefe_code`/
-/// `generiere_code` garantiert dieselbe TOTP-Konfiguration verwenden.
+/// Baut die RFC-6238-Instanz (SHA1, 6-stellig, ±1 Schritt Skew, 30 s) — eine Stelle für
+/// Erzeugung, Prüfung und otpauth-URL.
 ///
-/// Die Parameter stehen bewusst ausgeschrieben, obwohl sie den `Builder`-Vorgaben von
-/// totp-rs 6 entsprechen: eine geänderte Crate-Vorgabe darf die Codes bereits
-/// eingerichteter Authenticator-Apps nicht still ungültig machen.
-///
-/// `benutzername` fließt nur in `issuer`/`account_name` ein (otpauth-URL-Anzeige) — er
-/// beeinflusst weder Code-Erzeugung noch -Prüfung (s. `totp_rs::Totp::generate`/`check`).
-/// Ein leerer `account_name` ist beim Bauen erlaubt (nur `to_url` lehnt ihn ab).
+/// Die Parameter stehen ausgeschrieben, obwohl sie den Vorgaben von totp-rs entsprechen: eine
+/// geänderte Crate-Vorgabe darf eingerichtete Authenticator-Apps nicht still ungültig machen.
+/// `benutzername` fließt nur in die Anzeige der otpauth-URL ein.
 fn baue_totp(secret_base32: &str, benutzername: &str) -> Result<Totp, AppError> {
-    // Base32 nach RFC 4648 ohne Padding — dasselbe Alphabet wie `Secret::Encoded` in 5.x,
-    // gespeicherte Secrets bleiben damit gültig.
+    // Base32 nach RFC 4648 ohne Padding; gespeicherte Secrets bleiben damit gültig.
     let secret = Secret::try_from_base32(secret_base32)
         .map_err(|e| AppError::Internal(format!("TOTP-Secret ungültig: {e}")))?;
     Builder::new()
@@ -49,26 +38,21 @@ fn baue_totp(secret_base32: &str, benutzername: &str) -> Result<Totp, AppError> 
         .map_err(|e| AppError::Internal(format!("TOTP-Aufbau fehlgeschlagen: {e}")))
 }
 
-/// Erzeugt ein frisches, kryptografisch zufälliges Secret (base32, 160 Bit) für ein neues
-/// TOTP-Enrollment (`enroll/start`, Task 4).
+/// Frisches, kryptografisch zufälliges Secret (base32, 160 Bit) für ein neues Enrollment.
 pub fn neues_secret() -> String {
     Secret::generate().to_base32()
 }
 
-/// Baut die `otpauth://totp/...`-URL für den QR-Code-Scan im Enrollment (Task 4).
+/// Baut die `otpauth://totp/...`-URL für den QR-Code im Enrollment.
 pub fn otpauth_url(secret_base32: &str, benutzername: &str) -> Result<String, AppError> {
     baue_totp(secret_base32, benutzername)?
         .to_url()
         .map_err(|e| AppError::Internal(format!("otpauth-URL-Aufbau fehlgeschlagen: {e}")))
 }
 
-/// Prüft `code` gegen `secret_base32` zum Zeitpunkt `jetzt_unix` (±1 Zeitschritt Skew,
-/// s. Modul-Doku). Liefert `false` bei jedem Baufehler (z.B. korruptes Secret) statt zu
-/// panicen — der Aufrufer bekommt so nie fälschlich „gültig".
-///
-/// totp-rs 6 liefert beim Treffer den getroffenen Zeitschritt zurück; er wird hier bewusst
-/// verworfen. Ein Replay-Schutz (RFC 6238 §5.2: jeden Schritt nur einmal akzeptieren)
-/// könnte ihn je Benutzer persistieren — das ist nicht Teil dieser Funktion.
+/// Prüft `code` zum Zeitpunkt `jetzt_unix` (±1 Schritt Skew). Liefert `false` bei jedem
+/// Baufehler (z. B. korruptes Secret), nie fälschlich „gültig“. Einen Replay-Schutz (RFC 6238
+/// §5.2) leistet diese Funktion nicht.
 pub fn pruefe_code(secret_base32: &str, code: &str, jetzt_unix: u64) -> bool {
     match baue_totp(secret_base32, "") {
         Ok(totp) => totp.check(code, jetzt_unix).is_some(),
@@ -76,26 +60,24 @@ pub fn pruefe_code(secret_base32: &str, code: &str, jetzt_unix: u64) -> bool {
     }
 }
 
-/// Erzeugt den zu `jetzt_unix` gültigen Code. TEST-HELFER: wird von den deterministischen
-/// Integrationstests späterer Tasks (Enroll/Login) genutzt, um ohne echten Authenticator
-/// einen gültigen Code für ein bekanntes Secret zu erzeugen.
+/// Erzeugt den zu `jetzt_unix` gültigen Code. Test-Helfer für deterministische
+/// Integrationstests ohne echten Authenticator.
 pub fn generiere_code(secret_base32: &str, jetzt_unix: u64) -> Option<String> {
     baue_totp(secret_base32, "")
         .ok()
         .map(|totp| totp.generate(jetzt_unix).to_string())
 }
 
-/// Erzeugt frische, hochentropische Einmal-Recovery-Codes (Klartext) für den Fall eines
-/// Authenticator-Geräteverlusts. Format `xxxx-xxxx-xxxx-xxxx-xxxx` (20 Hex-Zeichen aus
-/// 10 CSPRNG-Bytes, in 4er-Gruppen für bessere Abtippbarkeit/Fehlererkennung).
+/// Frische, hochentropische Einmal-Recovery-Codes (Klartext) im Format
+/// `xxxx-xxxx-xxxx-xxxx-xxxx` (10 CSPRNG-Bytes, hex, in Vierergruppen).
 pub fn neue_recovery_codes() -> Vec<String> {
     (0..RECOVERY_CODE_ANZAHL)
         .map(|_| formatiere_recovery_code(&recovery_bytes()))
         .collect()
 }
 
-/// 10 CSPRNG-Bytes über den vom `totp-rs`-Crate bereitgestellten Secret-Generator (Feature
-/// `gen_secret`) — kein zusätzlicher direkter `rand`-Dependency nötig.
+/// 10 CSPRNG-Bytes über den Secret-Generator von `totp-rs` (Feature `gen_secret`), ohne
+/// direkte `rand`-Abhängigkeit.
 fn recovery_bytes() -> Vec<u8> {
     Secret::generate().as_bytes()[..10].to_vec()
 }
@@ -110,9 +92,8 @@ fn formatiere_recovery_code(bytes: &[u8]) -> String {
         .join("-")
 }
 
-/// SHA-256-Hex-Digest eines Recovery-Codes (Klartext). Recovery-Codes sind hochentropisch
-/// (CSPRNG-generiert, keine nutzergewählten Passwörter) → sha256 genügt (kein Argon2/Salt
-/// nötig, s. Plan „Global Constraints": Recovery-Codes atomar single-use).
+/// SHA-256-Hex eines Recovery-Codes. Die Codes sind hochentropisch, ein Argon2/Salt ist
+/// unnötig.
 pub fn hash_recovery(code: &str) -> String {
     Sha256::digest(code.as_bytes())
         .iter()
@@ -124,8 +105,7 @@ pub fn hash_recovery(code: &str) -> String {
 mod tests {
     use super::*;
 
-    /// Base32-Fixture aus den `totp-rs`-eigenen Doctests/Tests (dekodiert zu 23 Bytes,
-    /// deutlich über dem RFC-Minimum von 16 Bytes/128 Bit) — kein Secret aus Produktivdaten.
+    /// Base32-Fixture aus den Tests von `totp-rs` (23 Bytes), kein Produktiv-Secret.
     const TEST_SECRET: &str = "OBWGC2LOFVZXI4TJNZTS243FMNZGK5BNGEZDG";
     const JETZT: u64 = 1_700_000_000;
 
@@ -159,21 +139,17 @@ mod tests {
         let b = neues_secret();
         assert!(!a.is_empty());
         assert_ne!(a, b);
-        // Muss als base32 dekodierbar sein (RFC4648 ohne Padding) und 160 Bit tragen —
-        // 20 Bytes ergeben ungepolstert genau 32 Base32-Zeichen, wie unter totp-rs 5.x.
-        // Diagnose ohne das Secret selbst: ein fehlgeschlagener Assert landet im CI-Log,
-        // und ein TOTP-Secret gehört auch als Wegwerf-Testwert in keinen Log-Strom.
-        // `assert_eq!` nennt die Ist-Länge ohnehin; beim Padding genügt die Aussage.
+        // Base32 ohne Padding mit 160 Bit ergibt genau 32 Zeichen. Das Secret selbst gehört nicht
+        // in
+        // die Assert-Meldung, auch nicht als Testwert.
         assert_eq!(a.len(), 32);
         assert!(!a.contains('='), "Secret trägt Base32-Padding");
         let bytes = Secret::try_from_base32(&a).unwrap();
         assert_eq!(bytes.as_bytes().len(), 20);
     }
 
-    /// RFC-6238-Anhang-B-Testvektoren (SHA1, Secret „12345678901234567890", 8 Stellen),
-    /// auf 6 Stellen gekürzt. Belegt über den Crate-Wechsel 5.7 → 6.0 hinweg, dass ein
-    /// gespeichertes Base32-Secret weiterhin zu denselben Codes dekodiert und Algorithmus/
-    /// Schrittweite unverändert sind — die Vektoren sind crate-unabhängig.
+    /// RFC-6238-Anhang-B-Testvektoren (SHA1, 8 Stellen, auf 6 gekürzt): Algorithmus und
+    /// Schrittweite stimmen, crate-unabhängig.
     #[test]
     fn rfc6238_testvektoren_mit_gespeichertem_base32_secret() {
         const RFC_SECRET_BASE32: &str = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
@@ -193,10 +169,8 @@ mod tests {
         }
     }
 
-    /// Golden-Pin gegen totp-rs 5.7.2: die Codes wurden mit der Vorgängerversion
-    /// (`TOTP::new(SHA1, 6, 1, 30, Secret::Encoded(..).to_bytes(), ..).generate(t)`) für
-    /// dasselbe Base32-Secret erzeugt. Kippt dieser Test, erzeugen bereits eingerichtete
-    /// Authenticator-Apps andere Codes als der Server prüft.
+    /// Golden-Pin gegen totp-rs 5.7.2: kippt dieser Test, erzeugen eingerichtete
+    /// Authenticator-Apps andere Codes, als der Server prüft.
     #[test]
     fn codes_sind_identisch_zu_totp_rs_5() {
         for (zeit, code) in [
@@ -249,8 +223,7 @@ mod tests {
         assert!(generiere_code("kein-base32!", JETZT).is_none());
     }
 
-    /// Byte-Pin auf das otpauth-Format von totp-rs 5.7 (`get_url`): Parameterreihenfolge
-    /// `secret` vor `issuer`, keine Default-Parameter (`digits`/`algorithm`/`period`),
+    /// Byte-Pin auf das bisherige otpauth-Format: `secret` vor `issuer`, keine Default-Parameter,
     /// Base32 ohne Padding, Label percent-kodiert.
     #[test]
     fn otpauth_url_ist_byte_gleich_zum_bisherigen_format() {

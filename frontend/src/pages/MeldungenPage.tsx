@@ -39,9 +39,9 @@ import { meldungKennzahlen } from '../meldungen/meldungKennzahlen';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
- * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst
- * (Alarm oben), dann Ereigniszeit absteigend. Meldungen haben keine Frist im
- * Auftrags-Sinn → keine Fälligkeits-Gruppierung, flache Liste mit Badges.
+ * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst (Alarm oben), dann
+ * Ereigniszeit absteigend. Meldungen haben keine Frist im Auftrags-Sinn; die Gruppierung nach
+ * „unbearbeitet" steht in der Seite.
  */
 function vergleicheMeldung(a: Meldung, b: Meldung): number {
   const prio = prioRang(a.prioritaet) - prioRang(b.prioritaet);
@@ -52,8 +52,8 @@ function vergleicheMeldung(a: Meldung, b: Meldung): number {
 }
 
 /**
- * Sortierung der Abgeschlossen-Ansicht (LFH-113): zuletzt Erledigtes oben (erledigt_at ↓).
- * Ohne Stempel (Altbestand vor der Spalte) Fallback auf Ereigniszeit ↓.
+ * Sortierung der Abgeschlossen-Ansicht: zuletzt Erledigtes oben (erledigt_at ↓). Ohne Stempel
+ * (Altbestand) Fallback auf Ereigniszeit ↓.
  */
 function vergleicheAbgeschlossen(a: Meldung, b: Meldung): number {
   const erledigt = (b.erledigt_at ?? '').localeCompare(a.erledigt_at ?? '');
@@ -77,7 +77,7 @@ export default function MeldungenPage() {
     queryKey: einsatzKeys.mitglieder(einsatzId),
     queryFn: () => ladeMitglieder(einsatzId),
   });
-  // Auftrags-Ziele für das Meldung→Auftrag-Formular (wie AuftraegePage/ChatPage).
+  // Auftrags-Ziele für das Meldung→Auftrag-Formular.
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
@@ -87,27 +87,25 @@ export default function MeldungenPage() {
     queryFn: () => listeEinheiten(einsatzId),
   });
 
-  // Offen/Abgeschlossen-Trennung erfolgt clientseitig (alle Meldungen laden, Server-Default).
+  // Offen/Abgeschlossen-Trennung clientseitig (alle Meldungen laden, Server-Default).
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
   const [auftragMeldung, setAuftragMeldung] = useState<Meldung | null>(null);
   const [lageMeldung, setLageMeldung] = useState<Meldung | null>(null);
-  // Inline-Erfassen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Sidebar.
+  // Inline-Erfassen-Formular: per Kopf-Knopf auf-/zugeklappt, kein Drawer.
   const [formOffen, setFormOffen] = useState(false);
 
   const meldungenQuery = useQuery({
     queryKey: einsatzKeys.meldungenListe(einsatzId, richtungFilter ?? 'alle'),
     queryFn: () => listeMeldungen(einsatzId, { richtung: richtungFilter }),
-    // LFH-351/H48: jeder Richtungsfilter ist ein eigener Query-Key. Beim ersten Wechsel ist
-    // der Key kalt, und ohne Platzhalter zeigte die Seite für die Dauer des Requests
-    // „Keine Meldungen" samt „0 offen" — unter Zeitdruck genau die Sekunde, in der man die
-    // Lage falsch abliest. Die vorherige Liste steht, bis die neue da ist.
+    // Jeder Richtungsfilter ist ein eigener Query-Key. Beim ersten Wechsel ist der Key kalt, und
+    // ohne Platzhalter zeigte die Seite für die Dauer des Requests „Keine Meldungen" samt „0 offen"
+    // — unter Zeitdruck die Sekunde, in der man die Lage falsch abliest.
     placeholderData: (prev) => prev,
   });
 
-  // Cross-Modul-Deeplink (LFH-153): ?meldung=<id> (z. B. Lagekarte-Inspector) hebt die Meldung
-  // hervor; Ansicht (offen/abgeschlossen) + Richtungsfilter so setzen, dass sie sichtbar ist.
-  // Scroll ist best-effort (jsdom-No-op).
+  // Cross-Modul-Deeplink ?meldung=<id> hebt die Meldung hervor; Ansicht und Richtungsfilter so
+  // setzen, dass sie sichtbar ist. Scroll ist best-effort.
   const [highlightMeldungId, setHighlightMeldungId] = useState<number | null>(null);
   useQueryParamSelektion('meldung', meldungenQuery.isSuccess, (mid) => {
     const m = (meldungenQuery.data ?? []).find((x) => x.id === mid);
@@ -128,11 +126,9 @@ export default function MeldungenPage() {
   const fehler = useFehlerMeldung();
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(einsatzId) });
 
-  // LFH-332/B4: kein `setFormOffen(false)` mehr. Das Inline-Formular bleibt nach
-  // dem Senden offen, damit die nächste Meldung ohne Aufklappen weitergeht;
-  // Zuklappen ist ausdrückliche Nutzeraktion (Kopf-Umschalter oder Kreuz an der
-  // Paneel). Der conditional Render des Paneels (unten) würde das Formular sonst
-  // unmounten — samt Serienzähler und Wertübernahme.
+  // Das Inline-Formular bleibt nach dem Senden offen, damit die nächste Meldung ohne Aufklappen
+  // folgt; Zuklappen ist ausdrückliche Nutzeraktion. Ein Zuklappen unmountete es samt Serienzähler
+  // und Wertübernahme.
   const anlegenMutation = useMutation({
     mutationFn: (d: NeueMeldung) => {
       if (!benutzer) throw new Error('Nicht angemeldet');
@@ -154,13 +150,11 @@ export default function MeldungenPage() {
     onError: fehler,
   });
   /**
-   * Triage-Schritt und seine Rücknahme laufen durch DIESELBE Mutation
-   * (LFH-343 · C8, Befund H50). `vorher` ist der Stand VOR dem Klick und damit das
-   * Ziel des Rückwegs; `src/meldung/repo.rs:setze_status` nimmt jeden gültigen
-   * Status an, die Rücknahme braucht also keine eigene Route.
+   * Triage-Schritt und Rücknahme laufen durch dieselbe Mutation. `vorher` ist der Stand vor dem
+   * Klick und damit das Ziel des Rückwegs; `setze_status` nimmt jeden gültigen Status an.
    *
-   * `zurueck` unterscheidet die Richtungen: die Rücknahme darf keinen eigenen
-   * Rückgängig-Toast erzeugen, sonst schaukelte sich das Paar endlos auf.
+   * `zurueck` unterscheidet die Richtungen: die Rücknahme darf keinen eigenen Rückgängig-Toast
+   * erzeugen, sonst schaukelte sich das Paar endlos auf.
    */
   const statusMutation = useMutation({
     mutationFn: ({
@@ -213,17 +207,13 @@ export default function MeldungenPage() {
       invalidiere();
       qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
       setAuftragMeldung(null);
-      // Wer aus einer Meldung einen Auftrag erteilt, HAT sie bearbeitet
-      // (LFH-343 · C8, Befund H50). Ohne diesen Schritt stand sie danach weiter
-      // auf „neu", und der Weg Meldung→Auftrag→erledigt kostete zwei zusätzliche
-      // Klicks. Der Riegel auf den Ausgangsstatus ist tragend: ohne ihn schriebe
-      // die Seite bei einer schon laufenden Meldung denselben Status noch einmal
-      // — ein PATCH samt Invalidierung und Live-Ereignis für nichts.
+      // Wer aus einer Meldung einen Auftrag erteilt, hat sie bearbeitet — sonst stünde sie weiter
+      // auf „neu". Der Riegel auf den Ausgangsstatus ist tragend: ohne ihn schriebe die Seite bei
+      // einer laufenden Meldung denselben Status noch einmal.
       //
-      // Bewusst OHNE Rückgängig-Toast (`vorher` bleibt leer): der sichtbare
-      // Vorgang ist das Erteilen des Auftrags, und ein Rückweg, der nur den
-      // Meldungsstatus zurückdreht, ließe den Auftrag stehen — er verspräche
-      // eine Rücknahme, die keine ist.
+      // Bewusst ohne Rückgängig-Toast (`vorher` bleibt leer): ein Rückweg, der nur den
+      // Meldungsstatus zurückdreht, ließe den Auftrag stehen und verspräche eine Rücknahme, die
+      // keine ist.
       const quelle = (meldungenQuery.data ?? []).find((m) => m.id === meldungId);
       if (quelle && quelle.status !== 'in_bearbeitung' && quelle.status !== 'erledigt') {
         statusMutation.mutate({ meldungId, status: 'in_bearbeitung' });
@@ -257,13 +247,10 @@ export default function MeldungenPage() {
     .sort(vergleicheAbgeschlossen);
   const mitglieder = mitgliederQuery.data ?? [];
 
-  // Zwei Gruppen in der Offen-Ansicht (LFH-343 · C8, Befund H47). Die Seite war
-  // bewusst flach — der Kommentar an `vergleicheMeldung` sagt das noch —, und
-  // dieser Kopf ändert es: die erste Frage der Triage lautet „was hat noch niemand
-  // angefasst", nicht „was ist am dringendsten". Eine gesichtete Sofortmeldung
-  // steht danach unter einer neuen Normalmeldung; das ist gewollt.
-  // Innerhalb jeder Gruppe bleibt `vergleicheMeldung` die Ordnung — `offene` ist
-  // bereits sortiert, `filter` erhält die Reihenfolge.
+  // Zwei Gruppen in der Offen-Ansicht: die erste Frage der Triage ist „was hat noch niemand
+  // angefasst", nicht „was ist am dringendsten". Eine gesichtete Sofortmeldung steht danach unter
+  // einer neuen Normalmeldung; das ist gewollt. Innerhalb jeder Gruppe ordnet `vergleicheMeldung` —
+  // `offene` ist sortiert, `filter` erhält die Reihenfolge.
   const neue = offene.filter((m) => MELDUNG_STATUS[m.status]?.unbearbeitet);
   const angefasste = offene.filter((m) => !MELDUNG_STATUS[m.status]?.unbearbeitet);
   const offeneGruppen = [
@@ -324,8 +311,8 @@ export default function MeldungenPage() {
         )
       }
     >
-      {/* Kennzahlen der Triage (Neuentwurf „Zahl führt"): dieselben Mengen, aus denen die
-          Liste darunter gebaut ist — keine zweite Zählung, `meldungKennzahlen` ist rein. */}
+      {/* Kennzahlen der Triage: dieselben Mengen, aus denen die Liste gebaut ist — keine zweite
+          Zählung, `meldungKennzahlen` ist rein. */}
       <Kennzahlenband beschriftung="Meldungen in Zahlen" style={{ marginBottom: token.margin }}>
         <Kennzahl
           titel="Unbearbeitet"
@@ -375,9 +362,8 @@ export default function MeldungenPage() {
           <MeldungFormular
             card={false}
             senden={anlegenMutation.isPending}
-            // mutateAsync, nicht mutate: die Erfassungshülle darf die Felder nur
-            // leeren, wenn der Datensatz wirklich angekommen ist. Den Fehler-Toast
-            // wirft weiterhin `onError` der Mutation.
+            // mutateAsync, nicht mutate: die Erfassungshülle darf die Felder nur leeren, wenn der
+            // Datensatz angekommen ist. Den Fehler-Toast wirft `onError`.
             onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
             einheiten={einheitenQuery.data}
             abschnitte={abschnitteQuery.data}
@@ -454,8 +440,8 @@ export default function MeldungenPage() {
         einheiten={auftragsZiele.einheiten}
         senden={auftragMutation.isPending}
         onAbbrechen={() => setAuftragMeldung(null)}
-        // mutateAsync: die Erfassungshülle im Formular darf die Felder nur leeren,
-        // wenn der Auftrag wirklich angekommen ist (LFH-332/B4).
+        // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn der Auftrag angekommen
+        // ist.
         onAnlegen={(daten) =>
           auftragMeldung
             ? auftragMutation.mutateAsync({ meldungId: auftragMeldung.id, daten })

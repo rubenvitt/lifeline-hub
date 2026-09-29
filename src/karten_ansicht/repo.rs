@@ -5,17 +5,15 @@ use sqlx::SqlitePool;
 
 use super::KartenAnsichtAnzeige;
 
-/// „Für den Einsatz speichern" (LFH-319): Vollersatz der Konfigurationsfelder einer
-/// Ansicht. Das Frontend schickt beim Speichern den vollständigen Karten-Zustand;
-/// ein weggelassenes Config-Feld ist damit bewusst `NULL` (z. B. `online_stil` im
-/// Offline-Modus). `name`/`reihenfolge`/`ist_standard` gehören NICHT hierher — deren
-/// Pflege (Umbenennen, Standard setzen) ist Inkrement B.
+/// „Für den Einsatz speichern“: Vollersatz der Konfigurationsfelder einer Ansicht. Das Frontend
+/// schickt den vollständigen Karten-Zustand; ein weggelassenes Feld ist damit bewusst `NULL`
+/// (z. B. `online_stil` im Offline-Modus).
 #[derive(Debug, Deserialize)]
 pub struct AnsichtPatch {
-    /// Umbenennen (B/LFH-320): unabhängig von der Konfiguration. `None` = unverändert.
+    /// Umbenennen, unabhängig von der Konfiguration. `None` = unverändert.
     pub name: Option<String>,
-    /// Standard setzen (B/LFH-320): nur `Some(true)` wirkt (Transaktion). `Some(false)`
-    /// wäre ein Zustandsfehler (keine Standardansicht) und wird ignoriert.
+    /// Standard setzen: nur `Some(true)` wirkt (Transaktion). `Some(false)` hinterließe keine
+    /// Standardansicht und wird ignoriert.
     pub ist_standard: Option<bool>,
     pub basemap_modus: Option<String>,
     pub online_stil: Option<String>,
@@ -28,9 +26,8 @@ pub struct AnsichtPatch {
 }
 
 impl AnsichtPatch {
-    /// Trägt der Patch Konfigurations-Felder? Nur dann läuft der Config-Vollersatz
-    /// ([`patche`]) — sonst würde ein reines Umbenennen die Config auf NULL wischen
-    /// (Advisor-Falle, LFH-320). `name`/`ist_standard`/`reihenfolge` sind KEINE Config.
+    /// Trägt der Patch Konfigurations-Felder? Nur dann läuft der Config-Vollersatz ([`patche`]),
+    /// sonst wischte ein reines Umbenennen die Config auf NULL.
     pub fn hat_config(&self) -> bool {
         self.basemap_modus.is_some()
             || self.online_stil.is_some()
@@ -43,9 +40,9 @@ impl AnsichtPatch {
     }
 }
 
-/// Felder zum Anlegen einer weiteren Ansicht („Als neue Ansicht speichern", LFH-320).
-/// `name` ist Pflicht (Handler-validiert); die Config-Felder spiegeln [`AnsichtPatch`].
-/// Die neue Ansicht ist nie Standard und reiht hinter die bestehenden ein.
+/// Felder zum Anlegen einer weiteren Ansicht („Als neue Ansicht speichern“). `name` ist
+/// Pflicht; die Config-Felder spiegeln [`AnsichtPatch`]. Die neue Ansicht ist nie Standard und
+/// reiht hinter die bestehenden ein.
 #[derive(Debug, Deserialize)]
 pub struct AnsichtNeu {
     pub name: String,
@@ -59,7 +56,7 @@ pub struct AnsichtNeu {
     pub zoom: Option<f64>,
 }
 
-/// Behandlung der ansichtsgebundenen Objekte beim Löschen einer Ansicht (LFH-320).
+/// Behandlung der ansichtsgebundenen Objekte beim Löschen einer Ansicht.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjektBehandlung {
     /// Objekte auf `ansicht_id = NULL` setzen (einsatzweit sichtbar) — Default.
@@ -99,8 +96,8 @@ struct Row {
     geaendert_von: Option<i64>,
 }
 
-/// Rohen JSON-String aus der DB zu `Value` — ein unparsbarer Rest wird zu `None`
-/// (der Client fällt dann auf seinen Default zurück, statt zu brechen).
+/// Roher JSON-String aus der DB → `Value`; Unparsbares wird `None`, damit der Client auf seinen
+/// Default fällt.
 fn json_parse(s: Option<String>) -> Option<serde_json::Value> {
     s.and_then(|t| serde_json::from_str(&t).ok())
 }
@@ -194,14 +191,12 @@ pub async fn patche(
     laden(pool, einsatz_id, id).await
 }
 
-/// Existiert für den Einsatz keine Ansicht, lege lazy eine Standardansicht an —
-/// gespeist aus `einsatz_einstellungen` (basemap_modus/fachebenen_sichtbar/zoom),
-/// Layer bleibt NULL (= FE-Default „alle an").
+/// Lege lazy eine Standardansicht an, falls der Einsatz keine hat — aus `einsatz_einstellungen`
+/// (basemap_modus/fachebenen_sichtbar/zoom); Layer bleibt NULL (Frontend: „alle an“).
 ///
-/// Race-fest ohne Transaktion: `INSERT OR IGNORE … SELECT … WHERE NOT EXISTS` ist
-/// atomar; der partielle UNIQUE-Index (`ist_standard = 1`) ist das Sicherheitsnetz.
-/// Ein gleichzeitiger zweiter Seed sieht die Zeile (WHERE NOT EXISTS) oder wird vom
-/// `OR IGNORE` geschluckt — ein GET darf **nie** an einem 409 scheitern.
+/// Race-fest ohne Transaktion: `INSERT OR IGNORE … SELECT … WHERE NOT EXISTS` ist atomar, der
+/// partielle UNIQUE-Index (`ist_standard = 1`) das Netz. Ein GET darf nie an einem 409
+/// scheitern.
 pub async fn standard_oder_saat(pool: &SqlitePool, einsatz_id: i64) -> Result<(), AppError> {
     let einst = einstellungen::laden_oder_default(pool, einsatz_id).await?;
     sqlx::query(
@@ -220,8 +215,8 @@ pub async fn standard_oder_saat(pool: &SqlitePool, einsatz_id: i64) -> Result<()
     Ok(())
 }
 
-/// Legt eine weitere Ansicht an (LFH-320). Nie Standard; `reihenfolge = max+1`. Enum-Werte
-/// sind vom Handler bereits validiert.
+/// Legt eine weitere Ansicht an: nie Standard, `reihenfolge = max+1`. Enum-Werte hat der Handler
+/// validiert.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -254,8 +249,7 @@ pub async fn anlegen(
     laden(pool, einsatz_id, id).await?.ok_or(AppError::NotFound)
 }
 
-/// Benennt eine Ansicht um (LFH-320) — berührt die Konfiguration NICHT. `None` = die
-/// Ansicht gehört nicht zu diesem Einsatz (→ 404).
+/// Benennt eine Ansicht um, ohne die Konfiguration zu berühren. `None` = fremd (404).
 pub async fn benenne_um(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -279,10 +273,9 @@ pub async fn benenne_um(
     laden(pool, einsatz_id, id).await
 }
 
-/// Setzt eine Ansicht als Standard (LFH-320) — in EINER Transaktion: erst alle anderen des
-/// Einsatzes auf 0, dann diese auf 1, damit der partielle UNIQUE-Index (`ist_standard = 1`)
-/// nie doppelt trifft. Vorab-Existenzprüfung in der Tx: eine fremde `id` darf NICHT das
-/// Standard-Flag des Einsatzes löschen und ihn ohne Standard zurücklassen. `None` = fremd (404).
+/// Setzt eine Ansicht als Standard in EINER Transaktion: erst alle anderen auf 0, dann diese
+/// auf 1, damit der partielle UNIQUE-Index nie doppelt trifft. Die Existenzprüfung in der
+/// Transaktion verhindert, dass eine fremde `id` das Standard-Flag löscht. `None` = fremd (404).
 pub async fn setze_standard(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -317,13 +310,10 @@ pub async fn setze_standard(
     laden(pool, einsatz_id, id).await
 }
 
-/// Löscht eine Ansicht (LFH-320). Vorab-Guards nach der Statuscode-Konvention: eine fremde
-/// `id` → `NotFound` (404); die Standardansicht oder die letzte verbleibende Ansicht →
-/// `UnprocessableEntity` (422, der Zusammenhang verbietet die Aktion). Objekte werden je nach
-/// [`ObjektBehandlung`] freigegeben (`ansicht_id = NULL`) oder mitgelöscht — beides EXPLIZIT
-/// und in derselben Tx wie der Ansichts-DELETE, unabhängig vom `foreign_keys`-PRAGMA. Die
-/// Objekt-Behandlung läuft VOR dem Ansichts-DELETE, sonst hätte `ON DELETE SET NULL` die
-/// `ansicht_id` schon genullt und der `WHERE ansicht_id = ?`-Filter fände nichts mehr.
+/// Löscht eine Ansicht. Fremde `id` → 404; Standardansicht oder letzte Ansicht → 422. Objekte
+/// werden je [`ObjektBehandlung`] freigegeben oder mitgelöscht — explizit, in derselben
+/// Transaktion und VOR dem Ansichts-DELETE, weil `ON DELETE SET NULL` die `ansicht_id` sonst
+/// schon genullt hätte und der Filter nichts mehr fände.
 pub async fn loesche(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -403,7 +393,7 @@ pub async fn loesche(
         .await?;
     tx.commit().await?;
 
-    // Nach dem Commit (nicht in der Write-Lock-Tx): leer gewordene Gruppen aufräumen.
+    // Nach dem Commit, nicht unter dem Write-Lock: leer gewordene Gruppen aufräumen.
     gruppen.sort_unstable();
     gruppen.dedup();
     for g in gruppen {

@@ -40,32 +40,21 @@ import { einsatzStatus } from '../theme/statusFarben';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
- * Gliederung der Einheiten eines Einsatzes (LFH-339 · C4).
- *
- * ── DIE SEITE TRÄGT SEIT C4 NUR NOCH DIE GLIEDERUNG ────────────────────────────────────
- *
- * Vorher lag rechts daneben die Detailansicht: NEUN Formularfelder plus DREI sofort
- * wirkende Zuordnungslisten in einer Karte, mit dem Speichern-Knopf mitten im Inhalt
- * (Befund M26). Nach LFH-19 gehört das auf eine eigene Route — sie liegt jetzt in
- * `EinheitDetailPage.tsx` unter `/einsaetze/:id/einheiten/:einheitId`.
- *
- * Was hier bleibt, ist die Auswahl. Und die darf umbrechen: die Gliederungskarte hatte
- * `flex: '0 0 360px'` ohne `flexWrap` — eine Breite, die auf 390 px nicht passt und nicht
- * ausweichen darf (Befund M25).
+ * Gliederung der Einheiten eines Einsatzes. Die Detailansicht liegt auf eigener Route
+ * (`EinheitDetailPage.tsx`, `/einsaetze/:id/einheiten/:einheitId`); hier bleibt die Auswahl, und
+ * die darf umbrechen.
  */
 
 /**
  * Baut antd-Tree-Daten aus der flachen Einheitenliste (nach ueber_einheit_id).
  *
- * Jeder Knoten trägt einen echten `<Link>` auf die Detailroute: das ist das TASTATURZIEL
- * der Zeile und macht die Gliederung deep-link-fähig. Ein `onSelect` am Baum allein wäre
- * für die Tastatur ein Umweg und für „im neuen Tab öffnen" gar kein Weg.
+ * Jeder Knoten trägt einen echten `<Link>` auf die Detailroute: das ist das Tastaturziel der Zeile
+ * und macht die Gliederung deeplink-fähig. Ein `onSelect` am Baum allein wäre für die Tastatur ein
+ * Umweg und für „im neuen Tab öffnen" gar kein Weg.
  *
- * Das Führer-Emoji (👤) ist einer Ikone gewichen: Zeichnung, Farbe und Breite eines Emojis
- * kommen aus der Systemschrift statt aus dem Entwurf, und im Ausdruck verhält es sich
- * anders als der übrige Satz. Die Hülle ist `aria-hidden`, weil ein
- * `@ant-design/icons`-Knoten sonst sein eigenes ENGLISCHES `aria-label` („user") als
- * eigenes Vorleseziel in jede Zeile stellte.
+ * Der Führer ist eine Ikone, kein Emoji. Die Hülle ist `aria-hidden`, weil ein
+ * `@ant-design/icons`-Knoten sonst sein englisches `aria-label` („user") als Vorleseziel in jede
+ * Zeile stellte.
  */
 function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: string): TreeDataNode[] {
   const kinder = new Map<number | null, Einheit[]>();
@@ -81,8 +70,8 @@ function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: strin
         <Space size={4}>
           <Link to={einheitDetailPfad(einsatzId, e.id)}>{e.name}</Link>
           {e.typ_label && <Tag>{e.typ_label}</Tag>}
-          {/* Stärke als Mono-Zahl, nicht als blaues Etikett: Blau ist `bedien` und
-              kennzeichnet Bedienbares, eine Stärke ist eine Angabe (Neuentwurf S6). */}
+          {/* Stärke als Mono-Zahl, nicht als blaues Etikett: Blau ist `bedien`, eine Stärke ist
+              eine Angabe. */}
           <span style={{ ...monoStil(12), color: sekundaerFarbe }}>
             <StaerkeAnzeige wert={e.ist} />
             {e.soll ? (
@@ -137,23 +126,17 @@ export default function EinheitenPage() {
   const einheiten = useMemo(() => einheitenQuery.data ?? [], [einheitenQuery.data]);
 
   /**
-   * Bestands-Deeplink `?einheit=<id>` LEITET WEITER auf die Item-Route (LFH-25/LFH-339).
+   * Bestands-Deeplink `?einheit=<id>` leitet auf die Item-Route weiter: andere Module verlinken
+   * weiterhin mit `?einheit=`.
    *
-   * Der Query-Param war das Muster für Module OHNE Detailansicht — seit C4 hat die Einheit
-   * eine. Andere Module verlinken weiterhin mit `?einheit=`, deshalb wird der Param nicht
-   * fallengelassen, sondern übersetzt.
+   * Bewusst nicht über `useQueryParamSelektion`: der Hook ist apply-then-clean und räumt den Param
+   * danach mit einem eigenen `setSearchParams(..., { replace: true })`. Diese zweite Navigation
+   * überschriebe die Weiterleitung sofort; der Hook ist für eine Selektion auf derselben Seite
+   * gebaut.
    *
-   * BEWUSST NICHT über `useQueryParamSelektion`, und das ist gemessen: der Hook ist
-   * apply-then-clean — er ruft `anwenden(id)` und räumt den Param DANACH mit einem eigenen
-   * `setSearchParams(..., { replace: true })` aus der URL. Diese zweite Navigation
-   * überschreibt eine Weiterleitung aus der Closure sofort wieder; der Aufrufer landet
-   * zurück auf der Gliederung. Der Hook ist für eine SELEKTION auf derselben Seite gebaut,
-   * nicht für einen Routenwechsel.
-   *
-   * `<Navigate replace>` ist hier zudem die ehrlichere Form: es passiert beim Rendern, nicht
-   * als Nebenwirkung, und der Zurück-Knopf bleibt nicht in der Weiterleitung hängen. Die ID
-   * wird gegen die GELADENE Liste geprüft — eine erfundene Kennung soll auf der Gliederung
-   * landen, nicht auf einer Detailseite ohne Datensatz.
+   * `<Navigate replace>` passiert beim Rendern, und der Zurück-Knopf bleibt nicht in der
+   * Weiterleitung hängen. Die ID wird gegen die geladene Liste geprüft — eine erfundene Kennung
+   * landet auf der Gliederung, nicht auf einer Detailseite ohne Datensatz.
    */
   const [searchParams] = useSearchParams();
   const deeplinkZiel = parseRouteId(searchParams.get('einheit') ?? undefined);
@@ -161,18 +144,11 @@ export default function EinheitenPage() {
   const fehler = useFehlerMeldung();
 
   /**
-   * „Einheit bilden" fragt seit LFH-339 · C4 zuerst (Befund M27).
+   * „Einheit bilden" fragt zuerst: ein sofort geschriebener Platzhalter stünde nach einem Fehlklick
+   * in jedem Baum, jeder Zuordnungsliste und jeder Stärkeaggregation.
    *
-   * Vorher schrieb der Knopf SOFORT `{ name: 'Neue Einheit' }` in die Datenbank — vor jeder
-   * Eingabe. Ein Fehlklick oder ein Sinneswandel hinterliess damit eine Platzhalter-Einheit,
-   * die danach in jedem Baum, jeder Zuordnungsliste und jeder Stärkeaggregation stand;
-   * entfernen liess sie sich nur über „Auflösen".
-   *
-   * ZWEI Felder, nicht neun: Name (Pflicht, `autoFocus` durch die Hülle) und Typ. Alles
-   * Weitere gehört auf die Detailseite — das Feldbudget einer Erfassungsmaske liegt bei ~3.
-   *
-   * KEIN `serie`: eine Einheit zu bilden ist keine Minutentakt-Erfassung wie die
-   * Ad-hoc-Disposition eines Fahrzeugs.
+   * Zwei Felder: Name (Pflicht) und Typ; alles Weitere gehört auf die Detailseite (Feldbudget ~3).
+   * Kein `serie`: eine Einheit zu bilden ist keine Minutentakt-Erfassung.
    */
   const bilden = useMutation({
     mutationFn: (werte: BildenWerte) =>
@@ -181,8 +157,8 @@ export default function EinheitenPage() {
       qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       message.success('Einheit gebildet');
-      // Direkt in die frische Einheit: dort stehen die Kopfdaten, die gerade NICHT
-      // abgefragt wurden, und genau dorthin will, wer eine Einheit bildet.
+      // Direkt in die frische Einheit: dort stehen die Kopfdaten, die gerade nicht abgefragt
+      // wurden.
       void navigate(einheitDetailPfad(einsatzId, e.id));
     },
     onError: fehler,
@@ -193,7 +169,7 @@ export default function EinheitenPage() {
     [einheiten, einsatzId, rollen.gedaempft],
   );
 
-  // Seitenzustand: NUR `einsatzQuery` — ohne sie tragen weder Breadcrumb noch
+  // Seitenzustand: nur `einsatzQuery` — ohne sie tragen weder Breadcrumb noch
   // `darfImEinsatzSchreiben` etwas. Alles andere wird an Ort und Stelle entschieden.
   if (einsatzQuery.isLoading) {
     return <SeitenSkeleton />;
@@ -210,20 +186,15 @@ export default function EinheitenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  // Erst NACH dem Laden weiterleiten: vorher ist die Prüfung „gibt es die Einheit?" nicht
-  // beantwortbar, und ein Sprung ins Blaue landete auf einem Leerzustand.
+  // Erst nach dem Laden weiterleiten: vorher ist „gibt es die Einheit?" nicht beantwortbar.
   if (deeplinkZiel != null && einheiten.some((e) => e.id === deeplinkZiel)) {
     return <Navigate to={einheitDetailPfad(einsatzId, deeplinkZiel)} replace />;
   }
 
   /**
-   * LISTENZUSTAND der Gliederungs-Karte — zwei Lagen, zwei Antworten (D3). Der Fehler
-   * allein reicht als Bedingung NICHT.
-   *
-   * Ohne Einheiten im Zwischenspeicher tritt der Fehler an die Stelle des Baums. MIT
-   * Einheiten bleibt der Baum stehen und bekommt ein Banner: er ist echt, nur womöglich
-   * alt. Ein Fehler, der ihn wegräumt, nähme der Einsatzkraft die Gliederung, die sie eben
-   * noch vor sich hatte.
+   * Listenzustand der Gliederungs-Karte — der Fehler allein reicht als Bedingung nicht. Ohne
+   * Einheiten im Zwischenspeicher tritt der Fehler an die Stelle des Baums; mit Einheiten bleibt
+   * der Baum stehen und bekommt ein Banner, er ist echt, nur womöglich alt.
    */
   const listeGescheitert = einheitenQuery.isError && einheiten.length === 0;
   const standVeraltet = einheitenQuery.isError && einheiten.length > 0;
@@ -263,13 +234,8 @@ export default function EinheitenPage() {
     >
       <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
 
-      {/**
-       * Die Gliederung ist seit C4 die GANZE Seite — die Detailhälfte ist auf eine eigene
-       * Route gezogen. Was von M25 bleibt, ist der Umbruch: die Karte hatte
-       * `flex: '0 0 360px'` ohne `flexWrap`, also eine Breite, die auf 390 px nicht passt
-       * und nicht ausweichen darf. Jetzt wächst sie mit und deckelt bei 360 px auf breitem
-       * Schirm, wo ein Baum nicht über die ganze Fläche laufen soll.
-       */}
+      {/* Die Gliederung ist die ganze Seite. Sie wächst mit und deckelt bei 360 px auf breitem
+          Schirm; `flexWrap`, damit sie auf 390 px ausweichen kann. */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <Paneel
           titel="Gliederung"
@@ -277,14 +243,12 @@ export default function EinheitenPage() {
           koerperPolster
           style={{ flex: '1 1 clamp(260px, 30%, 360px)' }}
         >
-          {/* DREI Zustände, nicht zwei (LFH-331 · B3). Die frühere Weiche hing an
-              `einheiten.length === 0` — und das ist während des Ladens und im Fehlerfall
-              genauso wahr wie bei einer tatsächlich leeren Gliederung. Gefragt wird
-              deshalb die QUERY; die Länge entscheidet erst, wenn sie etwas bedeutet.
-              Reihenfolge ist Teil der Aussage: laden vor Fehler vor leer.
+          {/* Drei Zustände, nicht zwei: `einheiten.length === 0` ist auch während des Ladens
+              und im Fehlerfall wahr. Gefragt wird deshalb die Query; die Länge entscheidet
+              erst, wenn sie etwas bedeutet. Reihenfolge: laden vor Fehler vor leer.
 
-              Der Fehlerzweig trägt zusätzlich die MENGENBEDINGUNG (`listeGescheitert`):
-              er verdrängt den Baum nur, wenn es keinen gibt. */}
+              Der Fehlerzweig trägt zusätzlich die Mengenbedingung (`listeGescheitert`): er
+              verdrängt den Baum nur, wenn es keinen gibt. */}
           {einheitenQuery.isLoading ? (
             <SeitenSkeleton zeilen={3} />
           ) : listeGescheitert ? (
@@ -299,9 +263,7 @@ export default function EinheitenPage() {
               hinweis="Die Gliederung entsteht mit der ersten gebildeten Einheit."
               aktion={
                 darfSchreiben
-                  ? // Wortlaut BYTE-GLEICH zum Kopfknopf: es ist dieselbe Handlung, und eine
-                    // zweite Schreibweise für dieselbe Geste ist genau der Befund, den B3
-                    // behebt.
+                  ? // Wortlaut gleich dem Kopfknopf: es ist dieselbe Handlung.
                     { label: 'Einheit bilden', onClick: () => setBildenOffen(true) }
                   : undefined
               }
@@ -312,25 +274,23 @@ export default function EinheitenPage() {
                 <SeitenStandVeraltet onWiederholen={() => void einheitenQuery.refetch()} />
               )}
               {/* `selectable={false}`: das Bedienziel ist der Link im Knoten, nicht die
-                  Zeilenauswahl. Zwei Wege zur selben Handlung, von denen einer nur
-                  hervorhebt, wären ein Unterschied ohne Bedeutung. */}
+                  Zeilenauswahl. */}
               <Tree treeData={baumDaten} defaultExpandAll selectable={false} />
             </>
           )}
         </Paneel>
       </div>
 
-      {/* Zwei Felder statt neun: der Rest der Kopfdaten lebt auf der Detailansicht. Der
-          Dialog übernimmt das Zurücksetzen auf ALLEN Auswegen selbst (Knopf, Kreuz,
-          Escape, Maskenklick) — deshalb ruft hier niemand `resetFields`. */}
+      {/* Zwei Felder; der Rest der Kopfdaten lebt auf der Detailansicht. Der Dialog setzt auf
+          allen Auswegen selbst zurück. */}
       <ErfassungsModal<BildenWerte>
         offen={bildenOffen}
         titel="Einheit bilden"
         form={bildenForm}
         erfassenText="Bilden"
         laeuft={bilden.isPending}
-        // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der
-        // Datensatz wirklich ankam. Ein 422 kostete sonst den eingegebenen Namen.
+        // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der Datensatz
+        // ankam. Ein 422 kostete sonst den eingegebenen Namen.
         onErfassen={(w) => bilden.mutateAsync(w)}
         onFertig={() => setBildenOffen(false)}
         onAbbrechen={() => setBildenOffen(false)}

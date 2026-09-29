@@ -18,14 +18,10 @@ describe('gefahrenSchema', () => {
     expect(kombinationGueltig('angstreaktion', 'umwelt')).toBe(false);
     expect(kombinationGueltig('erkrankung_verletzung', 'umwelt')).toBe(false);
     expect(kombinationGueltig('ertrinken', 'umwelt')).toBe(false);
-    // gültige Beispiele
     expect(kombinationGueltig('brand', 'menschen')).toBe(true);
     expect(kombinationGueltig('atemgifte', 'umwelt')).toBe(true);
     expect(kombinationGueltig('brand', 'sachwerte')).toBe(true);
   });
 
-  // `warnstufeFarbe` war hier byte-genau gepinnt (`akut` = '#ff4d4f'). Die Skala liegt
-  // seit LFH-368 als `warnstufeFlaeche`/`flaechenFarbe` in `theme/statusFarben.ts`,
-  // der Pin steht dort auf den zwei neuen Fuellungswerten. Nicht hier neu aufbauen —
-  // sonst prueft eine Kopie in `pages/` wieder Farbwerte, die `theme/` besitzt.
+  // Die Farbskala liegt in `theme/statusFarben.ts` und ist dort gepinnt — nicht hier nachbauen.
 });

@@ -23,7 +23,7 @@ import AnsichtZuordnung from './AnsichtZuordnung';
 
 /** Sentinel im Dropdown für „in neues Gefahrengebiet abspalten". */
 const NEU = -1;
-/** Sentinel im Bezirks-Dropdown für „nicht zugeordnet" (LFH-673). */
+/** Sentinel im Bezirks-Dropdown für „nicht zugeordnet". */
 const KEIN_BEZIRK = -1;
 
 export interface ZonenInspectorProps {
@@ -43,12 +43,13 @@ export interface ZonenInspectorProps {
   }) => Promise<void>;
   onMatrixOeffnen: (gefahrengebietId: number) => void;
   onLoeschen: () => void;
-  /** Ansichts-Zuordnung (B/LFH-320). */
   ansichten: KartenAnsicht[];
-  /** Evakuierungsbezirke (LFH-673) — leer ohne Lesezugriff auf das Modul Betreuung. */
+  /** Evakuierungsbezirke — leer ohne Lesezugriff auf das Modul Betreuung. */
   bezirke?: Evakuierungsbezirk[];
-  /** Darf der Benutzer das Modul Betreuung lesen? Ohne Recht keine Zuordnung und keine
-   *  Bezirksangaben — der Server lehnt das Setzen dann ohnehin mit 403 ab. */
+  /**
+   * Darf der Benutzer das Modul Betreuung lesen? Ohne Recht keine Zuordnung und keine
+   * Bezirksangaben (der Server lehnte das Setzen mit 403 ab).
+   */
   betreuungFrei?: boolean;
   /** Ziel des Sprungs „Im Fachmodul öffnen" zu einem Bezirk (`betreuungPfad(?bezirk=)`). */
   bezirkPfad?: (bezirkId: number) => string;
@@ -86,14 +87,13 @@ export default function ZonenInspector({
   const entwurfZoneId = useRef(zone.id);
 
   useEffect(() => {
-    // Same-ID-Updates koennen jederzeit ueber SSE/Refetch eintreffen. Der kontrollierte
-    // Entwurf darf dabei nicht mit Serverwerten ueberschrieben werden, solange Label/Notiz
-    // noch auf ihren Blur warten. Bei einer wirklich anderen Zone ist ein Vollreset richtig.
+    // Same-ID-Updates können jederzeit über SSE/Refetch eintreffen; der kontrollierte Entwurf darf
+    // dabei nicht überschrieben werden, solange Label/Notiz auf ihren Blur warten. Bei einer
+    // anderen Zone ist ein Vollreset richtig.
     if (entwurfZoneId.current === zone.id) return;
     entwurfZoneId.current = zone.id;
-    // Ein auf der ALTEN Zone gestarteter Speichervorgang darf nach dem Wechsel keine
-    // Quittung („gespeichert"/„nicht gespeichert") an der neuen Zone hinterlassen —
-    // der Zähler invalidiert den nachlaufenden Lauf wie der Reset den Entwurf (LFH-349).
+    // Ein auf der alten Zone gestarteter Speichervorgang darf an der neuen keine Quittung
+    // hinterlassen — der Zähler invalidiert den nachlaufenden Lauf.
     speicherLauf.current++;
     setEntwurf({
       typ: zone.typ,
@@ -134,10 +134,10 @@ export default function ZonenInspector({
   );
   const aktuellesGebiet = gebiete.find((g) => g.id === entwurf.gefahrengebiet_id) ?? null;
   const aktuellHatWarnstufen = (aktuellesGebiet?.hoechste_warnstufe ?? 'keine') !== 'keine';
-  // Geometrie-Kennzahlen rein clientseitig aus der GeoJSON-Geometrie (LFH-146).
+  // Geometrie-Kennzahlen rein clientseitig aus der GeoJSON-Geometrie.
   const kennzahlen = geoKennzahlen(parseGeometry(zone.geometrie));
 
-  // Bezirksfläche (LFH-673): der zugeordnete Bezirk, sofern lesbar.
+  // Bezirksfläche: der zugeordnete Bezirk, sofern lesbar.
   const istBezirksflaeche = entwurf.typ === 'evakuierungsbezirk';
   const aktuellerBezirk =
     istBezirksflaeche && betreuungFrei
@@ -163,9 +163,8 @@ export default function ZonenInspector({
           <KennzahlZeile
             label="Höchste Warnstufe"
             zahl={false}
-            /* Kartenlesart, nicht Kennzahllesart: der Inspektor beschreibt EIN Objekt
-               (dieses Gefahrengebiet), nicht eine Verdichtung über viele. `keine` ist
-               hier deshalb `alarm` — unbewertet gilt vorsichtshalber als Gefahr. */
+            /* Kartenlesart, nicht Kennzahllesart: der Inspektor beschreibt ein Objekt, deshalb
+               ist `keine` hier `alarm` — unbewertet gilt vorsichtshalber als Gefahr. */
             wert={<StatusTag darstellung={warnstufeKarte[aktuellesGebiet.hoechste_warnstufe]} />}
           />
         )}
@@ -198,14 +197,11 @@ export default function ZonenInspector({
           <Typography.Text>{zoneTypLabel(zone.typ)}</Typography.Text>
         )}
 
-        {/* Warnstufe und Zonen-Anzahl sind keine Geo-Kennzahlen, gehören aber ins selbe
-            Label→Wert-Raster — dafür ist der `zusatz`-Slot da (LFH-328/A2). Die Warnstufe
-            ist ein Tag und läuft deshalb mit `zahl={false}` an der Zahlenschrift vorbei.
+        {/* Warnstufe und Zonen-Anzahl stehen im selben Label→Wert-Raster (`zusatz`-Slot); die
+            Warnstufe ist ein Tag und läuft mit `zahl={false}` an der Zahlenschrift vorbei.
 
-            Die Bedingung steht HIER und nicht nur in `GeoKennzahlen`: antds `Space` filtert
-            ein `false`-Kind heraus, wickelt aber eine Komponente, die null RENDERT, trotzdem
-            in ein `.ant-space-item` (gemessen: 3 statt 2) — das gäbe im häufigen Fall ohne
-            Kennzahlen eine leere Lücke. Gepinnt im Test. */}
+            Die Bedingung steht hier: antds `Space` wickelt auch eine Komponente, die null
+            rendert, in ein `.ant-space-item` — ohne Kennzahlen gäbe das eine leere Lücke. */}
         {(kennzahlen || zusatzZeilen) && (
           <GeoKennzahlen kennzahlen={kennzahlen} zusatz={zusatzZeilen} />
         )}
@@ -239,7 +235,7 @@ export default function ZonenInspector({
 
         {entwurf.typ === 'gefahrengebiet' && (
           <>
-            {/* Kein `aria-label` mehr: das FeldLabel trägt den Namen (LFH-328/A2). */}
+            {/* Das FeldLabel trägt den Namen. */}
             <FeldLabel text="Gehört zu Gefahrengebiet" htmlFor={gebietId}>
               <Select<number>
                 id={gebietId}
@@ -279,8 +275,8 @@ export default function ZonenInspector({
               options={[
                 { value: KEIN_BEZIRK, label: 'nicht zugeordnet' },
                 ...bezirke.map((b) => ({ value: b.id, label: b.bezeichnung })),
-                // Zugeordnet, aber (noch) nicht in der Liste — die Übersicht lädt, oder der
-                // Bezirk wurde eben storniert. Sonst stünde die rohe id im Feld.
+                // Zugeordnet, aber (noch) nicht in der Liste — die Übersicht lädt, oder der Bezirk
+                // wurde eben storniert. Sonst stünde die rohe id im Feld.
                 ...(entwurf.evakuierungsbezirk_id != null &&
                 !bezirke.some((b) => b.id === entwurf.evakuierungsbezirk_id)
                   ? [{ value: entwurf.evakuierungsbezirk_id, label: 'Bezirk nicht verfügbar' }]
@@ -310,8 +306,8 @@ export default function ZonenInspector({
               </Datenfeld>
             </Datenraster>
             {bezirkPfad && (
-              // Ein Sprung ist keine Handlung (LFH-616): eigene Zeile, der zugängliche Name
-              // trägt den Bezirk, das ↗ ist Deeplink-Zeichen und steht `aria-hidden`.
+              // Ein Sprung ist keine Handlung: eigene Zeile, der zugängliche Name trägt den Bezirk,
+              // das ↗ steht `aria-hidden`.
               <div
                 data-lfh="inspector-sprung"
                 style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXS }}
@@ -367,9 +363,8 @@ export default function ZonenInspector({
           </Typography.Text>
         )}
 
-        {/* Rückfrage in JEDEM Fall (LFH-710): die Zone wird hart gelöscht
-            (`lage_zone/repo.rs`), es gibt keinen Rückweg. Die Warnstufen entscheiden nur
-            über den Hinweis, nicht mehr darüber, ob gefragt wird (LFH-363). */}
+        {/* Rückfrage in jedem Fall: die Zone wird hart gelöscht. Die Warnstufen entscheiden nur
+            über den Hinweis. */}
         {darfSchreiben && (
           <Popconfirm
             title="Zone aufheben?"

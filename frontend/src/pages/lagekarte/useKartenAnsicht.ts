@@ -15,10 +15,9 @@ import { defaultFachebenenSichtbar, type FachebenenSichtbar } from './fachebenen
 import { fachebeneKeys } from './fachebenen';
 import type { LayerSichtbar } from './Sidebar';
 
-// Aus der Registry abgeleitet, NICHT von Hand gepflegt: die Handliste hatte `hochwasser`
-// (LFH-77) verloren — das Umschalten machte die Ansicht nie schmutzig, „Ansicht speichern"
-// bot sich nicht an, die Wahl war nach dem Neuladen weg. Aufgefallen bei LFH-78. Die
-// Hydration unten bleibt dagegen bewusst eine Aufzählung (siehe `leseFachebenen`).
+// Aus der Registry abgeleitet, nicht von Hand gepflegt: fehlt eine Ebene, macht ihr Umschalten die
+// Ansicht nie schmutzig. Die Hydration unten bleibt bewusst eine Aufzählung (siehe
+// `leseFachebenen`).
 const FACHEBENE_KEYS = fachebeneKeys();
 const LAYER_KEYS: (keyof LayerSichtbar)[] = [
   'einsatzort',
@@ -34,10 +33,11 @@ const LAYER_KEYS: (keyof LayerSichtbar)[] = [
   'person',
   'betreuungsstelle',
 ];
-/** Layer-Default beim Seed/ohne gespeicherten Wert: alle Ebenen an (heutiges Verhalten) —
- *  AUSSER „Betroffene" (LFH-648): Vorgabe aus. Weil `leseLayer` den Default unter jeden
- *  gespeicherten Stand legt, öffnet damit auch jede ältere Ansicht ohne den Schlüssel die
- *  Ebene ausgeschaltet. */
+/**
+ * Layer-Default ohne gespeicherten Wert: alle Ebenen an, außer „Betroffene" (LFH-648). Weil
+ * `leseLayer` den Default unter jeden gespeicherten Stand legt, öffnet auch jede ältere Ansicht
+ * ohne den Schlüssel die Ebene ausgeschaltet.
+ */
 const LAYER_DEFAULT: LayerSichtbar = {
   einsatzort: true,
   uhs: true,
@@ -50,7 +50,7 @@ const LAYER_DEFAULT: LayerSichtbar = {
   lagemeldung: true,
   freies_zeichen: true,
   person: false,
-  // LFH-673: an wie die UHS — wenige Lageobjekte; die Modulsperre greift an der Quelle.
+  // An wie die UHS: wenige Lageobjekte; die Modulsperre greift an der Quelle (LFH-673).
   betreuungsstelle: true,
 };
 
@@ -70,15 +70,14 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
     nina: o.nina === true,
     dwd: o.dwd === true,
     pegelonline: o.pegelonline === true,
-    // Ein vor LFH-77 gespeicherter Stand kennt den Schlüssel nicht — `=== true` liest das
-    // als „aus", nicht als `undefined`. Genau deshalb steht hier eine Aufzählung und kein
-    // Spread über das gespeicherte Objekt.
+    // Ein älterer Stand kennt den Schlüssel nicht; `=== true` liest das als „aus", nicht als
+    // `undefined`. Deshalb eine Aufzählung und kein Spread über das gespeicherte Objekt.
     hochwasser: o.hochwasser === true,
     luftqualitaet: o.luftqualitaet === true,
-    // Dasselbe für LFH-78: jede heute gespeicherte Ansicht kennt `odl` nicht.
+    // Dasselbe für `odl`.
     odl: o.odl === true,
     kritis: o.kritis === true,
-    // LFH-81: ein älterer Stand ohne den Schlüssel liest „aus" (siehe `hochwasser`).
+    // Dasselbe für `energie`.
     energie: o.energie === true,
     autobahn: o.autobahn === true,
   };
@@ -95,11 +94,10 @@ function leseLayer(roh: unknown): LayerSichtbar {
 }
 
 /**
- * Die Single Source für Hydration UND Schmutzig-Vergleich: transformiert eine (rohe)
- * Ansicht in den kanonischen Konfig-Stand — Basemap config-validiert (wie
- * `waehleInitialeBasemap`), `karten_theme`/`fachebenen`/`layer` mit ihren Defaults. So
- * ist der frisch hydratisierte State per Definition == der Ansicht → nicht schmutzig,
- * ohne separaten Baseline-Snapshot.
+ * Die eine Quelle für Hydration und Schmutzig-Vergleich: macht aus der rohen Ansicht den
+ * kanonischen Konfig-Stand (Basemap config-validiert wie `waehleInitialeBasemap`, übrige Felder mit
+ * Defaults). Der frisch hydratisierte State ist damit per Definition gleich der Ansicht, ohne
+ * eigenen Baseline-Snapshot.
  */
 function ansichtZuStand(a: KartenAnsicht, config: KarteServerConfig): KonfigStand {
   const gespeichert: GespeicherteBasemap | null =
@@ -133,16 +131,16 @@ function gleich(a: KonfigStand, b: KonfigStand): boolean {
 interface KartenAnsichtArgs {
   einsatzId: number;
   config: KarteServerConfig | undefined;
-  /** Aktive Ansicht (aus dem `?ansicht=`-Query-Param, LagekartePage besitzt die URL). `null`/
-   *  unbekannt → Standardansicht. B/LFH-320: ein Wechsel ändert die view-id → Config-Re-Seed. */
+  /**
+   * Aktive Ansicht aus `?ansicht=` (die URL besitzt LagekartePage); `null`/unbekannt →
+   * Standardansicht. Ein Wechsel ändert die id und seedet die Config neu.
+   */
   aktiveAnsichtId?: number | null;
 }
 
 /**
- * Kartenansichten-Leg (LFH-319): zentraler Owner der Karten-Konfiguration (Basemap,
- * Fachebenen-Sichtbarkeit, Layer). Löst die drei getrennten localStorage-Quellen ab —
- * die geteilte DB-Ansicht ist die Wahrheit. `useBasemap`/`useFachebenen` bekommen ihren
- * Startzustand von hier (Derivations-Hooks).
+ * Zentraler Owner der Karten-Konfiguration (Basemap, Fachebenen-Sichtbarkeit, Layer); die geteilte
+ * DB-Ansicht ist die Wahrheit. `useBasemap`/`useFachebenen` bekommen ihren Startzustand von hier.
  */
 export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenAnsichtArgs) {
   const qc = useQueryClient();
@@ -151,8 +149,8 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
     queryFn: () => ladeKartenAnsichten(einsatzId),
   });
   const ansichten = ansichtenQuery.data;
-  // B/LFH-320: die aktive Ansicht kommt aus `?ansicht=` (per Prop); fällt auf die
-  // Standardansicht (bzw. die erste) zurück, wenn der Param fehlt oder ins Leere zeigt.
+  // Fällt auf die Standardansicht (bzw. die erste) zurück, wenn `?ansicht=` fehlt oder ins Leere
+  // zeigt.
   const aktiveAnsicht = useMemo(() => {
     const byParam =
       aktiveAnsichtId != null ? ansichten?.find((a) => a.id === aktiveAnsichtId) : undefined;
@@ -165,13 +163,12 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
   const [fachebenenSichtbar, setFachebenenSichtbar] =
     useState<FachebenenSichtbar>(defaultFachebenenSichtbar);
   const [layer, setLayer] = useState<LayerSichtbar>(() => ({ ...LAYER_DEFAULT }));
-  // Anzeige-Fallback bei Style-Ladefehler (online→offline→blind). Getrennt von der
-  // gewählten `basemap`, damit ein Fallback NICHT als schmutzig gilt (Advisor-Falle).
+  // Anzeige-Fallback bei Style-Ladefehler (online → offline → blind), getrennt von der gewählten
+  // `basemap`, damit ein Fallback nicht als schmutzig gilt.
   const [basemapFallback, setBasemapFallback] = useState<BasemapModus | null>(null);
 
-  // Hydration genau EINMAL je Ansicht-id (flash-dirty-Gate). Vor dem Match ist `dirty`
-  // false; nach einem Save invalidiert der Refetch die Ansicht, ohne die id zu ändern →
-  // kein Re-Hydrate, User-Edits bleiben. Ein Ansichtswechsel (B) ändert die id → re-seed.
+  // Hydration genau einmal je Ansicht-id. Nach einem Save invalidiert der Refetch die Ansicht ohne
+  // neue id, User-Edits bleiben; ein Ansichtswechsel ändert die id und seedet neu.
   const hydratedFor = useRef<number | null>(null);
   useEffect(() => {
     if (!aktiveAnsicht || !config) return;
@@ -192,9 +189,9 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
     return !gleich({ basemap, onlineStilName, kartenTheme, fachebenenSichtbar, layer }, ziel);
   }, [aktiveAnsicht, config, basemap, onlineStilName, kartenTheme, fachebenenSichtbar, layer]);
 
-  // Der aktuelle Karten-Zustand als Config-Payload — geteilt von „Für den Einsatz speichern"
-  // (PATCH-Vollersatz) und „Als neue Ansicht speichern" (POST). `kartenZoom`/`zentrum` sind
-  // bewusst NICHT dabei (transient, siehe Hook-Kontrakt).
+  // Der aktuelle Karten-Zustand als Config-Payload für „Für den Einsatz speichern"
+  // (PATCH-Vollersatz) und „Als neue Ansicht speichern" (POST). `kartenZoom`/`zentrum` bewusst
+  // nicht (transient).
   const konfigPayload = useCallback(
     () => ({
       basemap_modus: basemap,
@@ -219,8 +216,8 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
     onSuccess: invalidiereAnsichten,
   });
 
-  // „Als neue Ansicht speichern" (B/LFH-320): friert den aktuellen Karten-Zustand unter einem
-  // neuen Namen ein. Liefert die neue Ansicht zurück (die Seite schaltet per ?ansicht= um).
+  // „Als neue Ansicht speichern": friert den Zustand unter neuem Namen ein und liefert die neue
+  // Ansicht (die Seite schaltet per `?ansicht=` um).
   const neueMut = useMutation({
     mutationFn: (name: string) => erstelleKartenAnsicht(einsatzId, { name, ...konfigPayload() }),
     onSuccess: invalidiereAnsichten,
@@ -240,8 +237,8 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
   const loeschenMut = useMutation({
     mutationFn: ({ id, objekte }: { id: number; objekte: 'freigeben' | 'loeschen' }) =>
       loescheKartenAnsicht(einsatzId, id, objekte),
-    // Ansichts-Liste UND die drei ansichtsgebundenen Objekt-Layer invalidieren — beim
-    // Löschen ändert sich deren Sichtbarkeit (freigegeben/mitgelöscht).
+    // Beim Löschen ändert sich die Sichtbarkeit der ansichtsgebundenen Objekte
+    // (freigegeben/mitgelöscht), daher auch deren Layer invalidieren.
     onSuccess: () => {
       invalidiereAnsichten();
       qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) });
@@ -256,8 +253,8 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
     setBasemap(m);
   }, []);
 
-  // Style-Ladefehler → auf die nächst-robustere Basemap fallen, OHNE die Wahl (und damit
-  // `dirty`) zu berühren.
+  // Style-Ladefehler → auf die nächst-robustere Basemap fallen, ohne die Wahl (und `dirty`) zu
+  // berühren.
   const onStyleFehler = useCallback(() => {
     setBasemapFallback((f) => {
       const m = f ?? basemap;
@@ -267,21 +264,19 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
 
   return {
     ansichten,
-    // Fehlerzustand der Ansichtsliste (LFH-331 · B3). Der stumme Fall dieser Seite:
-    // `AnsichtSwitcher` liefert bei leerer Liste `null`, ein gescheiterter Abruf sieht also
-    // exakt aus wie „noch nicht geladen" — dauerhaft und ohne jede Spur.
+    // Fehlerzustand der Ansichtsliste: `AnsichtSwitcher` liefert bei leerer Liste `null`, ein
+    // gescheiterter Abruf sähe sonst aus wie „noch nicht geladen".
     ansichtenFehler: ansichtenQuery.isError,
     ansichtenFehlerUrsache: ansichtenQuery.error,
     ansichtenNeuLaden: () => void ansichtenQuery.refetch(),
-    // Steht die Ansichtsliste noch aus? Die Startansicht der Karte (`startAnsicht.ts`) hängt
-    // an der aktiven Ansicht und wird genau einmal verbraucht — ohne dieses Signal entschied
-    // sie bei langsamer Abfrage ohne Ansicht, und deren Zentrum kam nie mehr zum Zug.
-    // Gescheitert zählt als entschieden (`isLoading` fällt), die Karte startet dann ohne.
+    // Die Startansicht (`startAnsicht.ts`) hängt an der aktiven Ansicht und wird genau einmal
+    // verbraucht; ohne dieses Signal entschiede sie bei langsamer Abfrage ohne Ansicht. Gescheitert
+    // zählt als entschieden.
     ansichtenLaden: ansichtenQuery.isLoading,
     aktiveAnsicht,
     // Aktive Ansicht-id — für Objekt-Filterung (client-seitig) und das Stempeln neuer Objekte.
     aktiveAnsichtId: aktiveAnsicht?.id,
-    // Ansichts-Verwaltung (B/LFH-320)
+    // Ansichts-Verwaltung
     neueAnsicht: neueMut.mutateAsync,
     umbenennen: umbenennenMut.mutateAsync,
     setzeStandard: standardMut.mutateAsync,
