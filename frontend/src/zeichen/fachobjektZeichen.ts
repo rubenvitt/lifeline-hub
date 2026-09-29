@@ -28,7 +28,7 @@ import {
   type SymbolSpec,
   type TechnicalBodyMarkId,
 } from '@einsatzzeichen/schema';
-import type { TzProps } from '../pages/lagekarte/taktischesZeichen';
+import { AUSMASS_FARBE, type TzProps } from '../pages/lagekarte/taktischesZeichen';
 
 export interface FachobjektZeichen {
   /** Die wirksame Spec — die erste Fassung der Kaskade, die tatsächlich komponiert. */
@@ -115,6 +115,7 @@ const FAEHIGKEIT: Record<string, CapabilityId[]> = {
   pumpen: ['pumping'],
   'umweltschaeden-gewaesser': ['water-environmental-damage-control'],
   warnen: ['loudspeaker-warning'],
+  transport: ['transport'],
 };
 
 // Versorgung (Anhang G) ist ein Fußband, keine Fähigkeit.
@@ -133,12 +134,13 @@ const SYMBOL_ERSATZ: Record<string, string> = {
   sammeln: 'rettungswesen',
 };
 
-// Schadensfarbe (Hex aus `AUSMASS_FARBE`) → Palettentoken; freie Farben kennt die Bibliothek nicht.
+// Schadensfarbe → Palettentoken; freie Farben kennt die Bibliothek nicht. Die Hexwerte stehen nur in
+// `AUSMASS_FARBE` (keine Kopie hier, Gate-5-Guard), der Schlüssel ist das Ausmaß.
 const FARBE_TOKEN: Record<string, ColorToken> = {
-  '#52c41a': 'gruen',
-  '#faad14': 'gelb',
-  '#fa8c16': 'orange',
-  '#f5222d': 'rot',
+  [AUSMASS_FARBE.gering]: 'gruen',
+  [AUSMASS_FARBE.mittel]: 'gelb',
+  [AUSMASS_FARBE.gross]: 'orange',
+  [AUSMASS_FARBE.katastrophal]: 'rot',
 };
 
 function organisation(wert: string | undefined): OrganizationId | undefined {
@@ -174,12 +176,17 @@ function verbinde(...teile: Array<Teil | undefined>): SymbolSpec {
 function fassungen(fachaufgabe: string | undefined, koerper: Teil): Teil[] {
   if (!fachaufgabe) return [];
   const versorgung = VERSORGUNG[fachaufgabe];
-  if (versorgung) return [versorgung];
+  // Ist die Marke am Körper nicht vermessen, bleibt wenigstens das Fußband (Versorgung, Anhang G).
+  if (versorgung) return [versorgung, { bodyVariant: versorgung.bodyVariant }];
   const faehigkeiten = FAEHIGKEIT[fachaufgabe];
   if (!faehigkeiten) return [];
   const liste: Teil[] = [{ bodyMarks: faehigkeiten }, { capabilities: faehigkeiten }];
-  // Rettungsdienstfahrzeuge (F.2) stehen auf dem Radpaar, nicht auf einer Kfz-Kategorie.
-  if (koerper.kind === 'vehicle-land' && faehigkeiten.includes('medical-service')) {
+  // Rettungsdienstfahrzeuge stehen auf dem Radpaar, nicht auf einer Kfz-Kategorie: RTW/KTW mit
+  // Sanität (F.2), NEF/NAW mit Arzt (F.2.4/F.2.5 „alternative“).
+  if (
+    koerper.kind === 'vehicle-land' &&
+    faehigkeiten.some((f) => f === 'medical-service' || f === 'physician')
+  ) {
     liste.push({
       vehicleCategory: undefined,
       bodyVariant: 'plain-wheel-pair',

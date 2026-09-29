@@ -25,6 +25,7 @@ interface MapHaken {
   getStyle(): { sources?: Record<string, unknown> } | undefined;
   isSourceLoaded(id: string): boolean;
   loaded(): boolean;
+  isStyleLoaded(): boolean;
   getZoom(): number;
   getCenter(): { lng: number; lat: number };
   listImages(): string[];
@@ -354,16 +355,22 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
     const zeichenBilder = () =>
       page.evaluate(() => {
         const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
-        if (!map) return null;
+        // Während eines Stilwechsels wirft `listImages` („Style is not done loading“): weiterpollen.
+        if (!map?.isStyleLoaded()) return null;
         return map
           .listImages()
           .filter((id) => id.startsWith('ez|'))
-          .map((id) => ({ id, breite: map.getImage(id)?.data.width }));
+          .map((id) => ({
+            id,
+            breite: map.getImage(id)?.data.width,
+            // Registriert ist nicht gezeichnet: das Symbol muss im Layer stehen.
+            gezeichnet: map.queryRenderedFeatures({ layers: ['marker-einsatzort-symbol'] }).length,
+          }));
       });
 
     await expect
       .poll(zeichenBilder, { timeout: 15_000, message: 'kein @einsatzzeichen-Bild auf der Karte' })
-      .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68 }]);
+      .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68, gezeichnet: 1 }]);
 
     // Ein Grundkarten-/Themenwechsel setzt den Stil neu (`diff: false`) und wirft alle Bilder weg.
     await page.evaluate(() => {
@@ -372,7 +379,7 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
     });
     await expect
       .poll(zeichenBilder, { timeout: 15_000, message: 'Zeichen nach Stilwechsel nicht zurück' })
-      .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68 }]);
+      .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68, gezeichnet: 1 }]);
   });
 
   // Gezählt wird, was GEZEICHNET ist, nicht, was registriert ist: MapLibre 6 baut die Bildantwort

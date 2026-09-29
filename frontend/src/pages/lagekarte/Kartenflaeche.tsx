@@ -486,6 +486,25 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       }
       synchronisiereBildLayer(map, bilderRef.current, 'abschnitte-fill');
     });
+    // Fachobjekte (@einsatzzeichen, LFH-835) über den Resolver, NICHT über `styleimagemissing`:
+    // MapLibre 6 baut die Bildantwort einer Kachel, bevor es das Event feuert — ein dort angelegtes
+    // Bild fehlte im laufenden Layout und erschiene erst beim nächsten Neu-Layout (nach einem
+    // Stilwechsel ohne neue Daten: nie). Den Resolver wartet MapLibre ab, und er überlebt
+    // `setStyle`. Synchron über Canvas, in Bildschirmschärfe, alle gleich groß (der Statusring in
+    // markerLayer.ts ist auf ZEICHEN_KARTEN_PX abgestimmt).
+    map.setMissingStyleImageResolver((id) => {
+      if (!id.startsWith('ez|')) return;
+      const quelle = zeichenRegistryRef.current.get(id);
+      if (quelle?.art !== 'ez' || map.hasImage(id)) return;
+      try {
+        addSymbolImage(map, id, quelle.drawing, {
+          size: ZEICHEN_KARTEN_PX,
+          pixelRatio: kartenPixelRatio(window.devicePixelRatio),
+        });
+      } catch {
+        // Kein Bild ist besser als ein Fehler im Resolver; der Marker bleibt klickbar.
+      }
+    });
     // Taktische Zeichen lazy als Karten-Icons: MapLibre meldet fehlende icon-image-IDs, wir rendern
     // on-demand. Race-Guard, weil das Event während des asynchronen Ladens mehrfach für dieselbe ID
     // feuern kann (sonst wirft addImage "image already exists").
@@ -499,21 +518,6 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         if (!bild || map.hasImage(id)) return;
         const { width, height, data, ...dehnung } = bild;
         map.addImage(id, { width, height, data }, dehnung);
-        return;
-      }
-      // Fachobjekte (@einsatzzeichen, LFH-835): synchron über Canvas, in Bildschirmschärfe, alle
-      // gleich groß (der Statusring in markerLayer.ts ist auf ZEICHEN_KARTEN_PX abgestimmt).
-      if (id.startsWith('ez|')) {
-        const quelle = zeichenRegistryRef.current.get(id);
-        if (quelle?.art !== 'ez' || map.hasImage(id)) return;
-        try {
-          addSymbolImage(map, id, quelle.drawing, {
-            size: ZEICHEN_KARTEN_PX,
-            pixelRatio: kartenPixelRatio(window.devicePixelRatio),
-          });
-        } catch {
-          // Kein Bild ist besser als ein Fehler aus dem MapLibre-Callback; der Marker bleibt klickbar.
-        }
         return;
       }
       if (!id.startsWith('tz|')) return; // fremde IDs ignorieren

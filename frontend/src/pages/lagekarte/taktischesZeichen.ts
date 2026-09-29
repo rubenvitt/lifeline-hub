@@ -168,7 +168,7 @@ export function baueTzProps(e: TzEingabe): TzProps {
 }
 
 // Schaden-Ausmaß → Farbe (einzige Quelle; marker.ts bezieht die Schaden-Farbe über schadenTz).
-const AUSMASS_FARBE: Record<string, string> = {
+export const AUSMASS_FARBE: Record<Ausmass, string> = {
   gering: '#52c41a',
   mittel: '#faad14',
   gross: '#fa8c16',

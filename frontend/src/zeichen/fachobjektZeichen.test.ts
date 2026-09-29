@@ -7,6 +7,7 @@ import {
   einsatzortTz,
   schadenTz,
   uhsTz,
+  AUSMASS_FARBE,
   type TzProps,
 } from '../pages/lagekarte/taktischesZeichen';
 import type { Ausmass, UhsTyp } from '../api/types';
@@ -239,12 +240,12 @@ describe('fachobjektZeichen — Rückfall statt Ausfall (design.md D3)', () => {
   });
 
   it('lässt eine am Kfz nicht darstellbare Fachaufgabe weg', () => {
-    // Ärztliche Versorgung ist am Kraftfahrzeug weder randbündig noch als Box vermessen.
+    // IuK ist am Kraftfahrzeug weder randbündig noch als Box vermessen.
     expect(
       wirksam({
         grundzeichen: 'kraftfahrzeug-landgebunden',
         organisation: 'hilfsorganisation',
-        fachaufgabe: 'aerztliche-versorgung',
+        fachaufgabe: 'iuk',
       }),
     ).toEqual({
       kind: 'vehicle-land',
@@ -271,6 +272,53 @@ describe('fachobjektZeichen — Rückfall statt Ausfall (design.md D3)', () => {
     ).toEqual({ kind: 'hazard', technicalFill: 'rot' });
   });
 
+  it('zeichnet ärztliche Versorgung am Kfz auf dem Radpaar (NEF, F.2.4)', () => {
+    expect(
+      wirksam({
+        grundzeichen: 'kraftfahrzeug-landgebunden',
+        organisation: 'hilfsorganisation',
+        fachaufgabe: 'aerztliche-versorgung',
+      }),
+    ).toEqual({
+      kind: 'vehicle-land',
+      bodyVariant: 'plain-wheel-pair',
+      organization: 'hilfsorganisation',
+      bodyMarks: ['physician'],
+    });
+  });
+
+  it('behält bei nicht darstellbarer Versorgungsmarke wenigstens das Fußband', () => {
+    expect(
+      wirksam({
+        grundzeichen: 'kraftfahrzeug-landgebunden',
+        organisation: 'feuerwehr',
+        fachaufgabe: 'verpflegung',
+      }),
+    ).toEqual({
+      kind: 'vehicle-land',
+      vehicleCategory: 'kfz-kategorie-1',
+      bodyVariant: 'foot-band',
+      organization: 'feuerwehr',
+    });
+  });
+
+  it('bildet die Fachaufgabe Transport ab', () => {
+    expect(
+      wirksam({
+        grundzeichen: 'kraftfahrzeug-landgebunden',
+        organisation: 'thw',
+        fachaufgabe: 'transport',
+      }),
+    ).toMatchObject({ bodyMarks: ['transport'] });
+  });
+
+  it('fällt bis auf den Körper allein zurück, wenn auch die Füllung nicht passt', () => {
+    // Das Ereignis nimmt keine Füllung: erst „Körper allein“ zeichnet.
+    expect(wirksam({ grundzeichen: 'anlass', farbe: AUSMASS_FARBE.katastrophal })).toEqual({
+      kind: 'event',
+    });
+  });
+
   it('liefert für ein unbekanntes Grundzeichen null statt zu werfen', () => {
     expect(
       fachobjektZeichen({ grundzeichen: 'gibt-es-nicht' as TzProps['grundzeichen'] }),
@@ -280,5 +328,114 @@ describe('fachobjektZeichen — Rückfall statt Ausfall (design.md D3)', () => {
   it('gibt für denselben Eingang dasselbe Objekt zurück (Cache)', () => {
     const tz: TzProps = { grundzeichen: 'person', organisation: 'polizei' };
     expect(fachobjektZeichen({ ...tz })).toBe(fachobjektZeichen({ ...tz }));
+  });
+});
+
+// Drift-Wache: welche Fachaufgaben des Hub-Vokabulars die Bibliothek am Körper NICHT zeichnet
+// (Rückfall ohne Fachaufgabe). Ändert ein Update von @einsatzzeichen die Komponierbarkeit, wird das
+// hier in BEIDE Richtungen rot — ein stiller Verlust genauso wie ein neu darstellbares Paar, das
+// dann in design.md D2 und die Abbildungspins gehört (Stand core 2.1.0, 29.09.2026).
+describe('fachobjektZeichen — Abdeckung der Fachaufgaben je Körper', () => {
+  const ALLE_FACHAUFGABEN = [
+    'brandbekaempfung',
+    'hoehenrettung',
+    'wasserversorgung',
+    'technische-hilfeleistung',
+    'heben',
+    'bergung',
+    'raeumen',
+    'entschaerfen',
+    'sprengen',
+    'beleuchtung',
+    'transport',
+    'abc',
+    'messen',
+    'dekontamination',
+    'dekontamination-personen',
+    'dekontamination-geraete',
+    'umweltschaeden-gewaesser',
+    'rettungswesen',
+    'aerztliche-versorgung',
+    'krankenhaus',
+    'einsatzeinheit',
+    'betreuung',
+    'seelsorge',
+    'unterbringung',
+    'logistik',
+    'verpflegung',
+    'verbrauchsgueter',
+    'versorgung-trinkwasser',
+    'versorgung-brauchwasser',
+    'versorgung-elektrizitaet',
+    'instandhaltung',
+    'fuehrung',
+    'iuk',
+    'erkundung',
+    'veterinaerwesen',
+    'schlachten',
+    'wasserrettung',
+    'wasserfahrzeuge',
+    'rettungshunde',
+    'pumpen',
+    'abwehr-wassergefahren',
+    'warnen',
+  ];
+  const ohneFachaufgabe = (basis: TzProps) =>
+    ALLE_FACHAUFGABEN.filter((fachaufgabe) => {
+      const s = wirksam({ ...basis, fachaufgabe } as TzProps);
+      const marken = (s.bodyMarks ?? []).filter((m) => !m.startsWith('formation-'));
+      return !s.capabilities && marken.length === 0 && s.bodyVariant === undefined;
+    });
+
+  it('an der Formation (Feuerwehr, Gruppe)', () => {
+    expect(
+      ohneFachaufgabe({
+        grundzeichen: 'taktische-formation',
+        organisation: 'feuerwehr',
+        einheit: 'gruppe',
+      }),
+    ).toEqual([
+      'hoehenrettung',
+      'heben',
+      'entschaerfen',
+      'sprengen',
+      'beleuchtung',
+      'transport',
+      'umweltschaeden-gewaesser',
+      'krankenhaus',
+      'seelsorge',
+      'fuehrung',
+      'pumpen',
+    ]);
+  });
+
+  it('am Kraftfahrzeug (Feuerwehr)', () => {
+    expect(
+      ohneFachaufgabe({ grundzeichen: 'kraftfahrzeug-landgebunden', organisation: 'feuerwehr' }),
+    ).toEqual([
+      'bergung',
+      'raeumen',
+      'entschaerfen',
+      'sprengen',
+      'beleuchtung',
+      'umweltschaeden-gewaesser',
+      'krankenhaus',
+      'einsatzeinheit',
+      'seelsorge',
+      'unterbringung',
+      'versorgung-trinkwasser',
+      'versorgung-brauchwasser',
+      'instandhaltung',
+      'fuehrung',
+      'iuk',
+      'erkundung',
+      'veterinaerwesen',
+      'schlachten',
+      'wasserfahrzeuge',
+      'rettungshunde',
+      'pumpen',
+      'abwehr-wassergefahren',
+      'warnen',
+    ]);
   });
 });

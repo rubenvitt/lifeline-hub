@@ -135,12 +135,20 @@ hat keinen Deckel: Die Zahl der unterschiedlichen Fachobjekt-Zeichen je Sitzung 
 - Für alle übrigen Marker mit `tz` gilt der Adapter-`schluessel` mit dem Präfix `ez|`.
 
 Die Registry in `Kartenflaeche.tsx` hält je Schlüssel entweder `{ art: 'ez', drawing }` oder
-`{ art: 'tz', tz }`. Der `styleimagemissing`-Handler bedient `ez|` synchron:
+`{ art: 'tz', tz }`. `ez|` bedient **`map.setMissingStyleImageResolver`** synchron:
 
 `addSymbolImage(map, id, drawing, { size: 34, pixelRatio: max(1, ceil(devicePixelRatio)) })`
 
-Das geschieht unter `hasImage`-Guard und in `try/catch`. Den `tz|`-Weg lässt der Handler
-unverändert.
+Das geschieht unter `hasImage`-Guard und in `try/catch`. Der `tz|`-Weg bleibt im
+`styleimagemissing`-Handler.
+
+*Warum der Resolver und nicht `styleimagemissing`:* MapLibre 6 baut die Bildantwort einer Kachel,
+**bevor** es das Event feuert (`render/image_manager.ts`, `_getImagesForIds`). Ein erst dort
+angelegtes Bild fehlt im laufenden Layout und erscheint erst beim nächsten Neu-Layout. Nach einem
+Stilwechsel ohne neue Daten erscheint es nie. Im Review gemessen: Der Einsatzort war nach
+`setStyle` registriert, aber nie gezeichnet, und Schadenszeichen fehlten in 1 von 4 Läufen. Den
+Resolver wartet MapLibre ab, und er überlebt `setStyle`. Dieselbe Ursache betrifft die Plaketten
+(`plakette|`) und das Altpaket (`tz|`), siehe Nachzug im Board.
 
 *Warum synchron über Canvas:* Das entfernt das `ladendeIcons`-Rennen für diesen Weg. Die Schärfe
 folgt dem Bildschirm. `size × pixelRatio` bleibt ganzzahlig, sonst wirft die Bibliothek einen
