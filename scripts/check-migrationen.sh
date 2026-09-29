@@ -6,35 +6,22 @@
 #     <kopf>   geprüfter Stand                        (Vorgabe: HEAD)
 #   Exit 0 = in Ordnung · 1 = Verstoß · 2 = Aufruf- oder Umgebungsfehler
 #
-# WARUM: jeder Branch nimmt beim Anlegen die nächste freie Nummer. Zwei parallele Branches
-# greifen zur selben, Git mergt das konfliktfrei (die Dateinamen sind verschieden), und rot
-# wird erst `alpha` — in jedem Test, der eine Datenbank anlegt (22.09.2026: dreimal `0106`).
 # `db::tests::migrationsnummern_sind_eindeutig` sieht nur den eigenen Stand; zwei PRs, die je
-# für sich grün sind, machen `alpha` zusammen rot. Dieses Skript sieht beide.
+# für sich eine freie Nummer nehmen, machen `alpha` zusammen rot. Dieses Skript sieht beide.
 #
 # DIE REGELN (Begründung in CLAUDE.md, „Backend — Migrationsvergabe"):
 #   1. Unveränderlich: eine Migration, die es an der ABZWEIGUNG (merge-base) schon gab, wird
-#      weder geändert noch umbenannt noch gelöscht — eingespielte Datenbanken scheitern sonst
-#      an der Prüfsumme bzw. an der fehlenden Version. Maßstab ist die Abzweigung und nicht
-#      die Basis: was die Basis seit der Abzweigung neu hat, fehlt dem Branch nur, er löscht
-#      es nicht.
-#   2. Anhängen, nicht einschieben: jede Migration, die der Branch seit der Abzweigung neu
-#      mitbringt, trägt eine Nummer GRÖSSER als jede Nummer auf der BASIS — nicht bloß eine
-#      freie. sqlx 0.9 spielt eine kleinere, fehlende Version still nach
-#      (`db::tests::sqlx_spielt_eingeschobene_kleinere_version_still_nach`): eine DB, die
-#      schon 0118 hat, nähme ein später gemergtes 0117 ohne Meldung mit, eine frische DB
-#      spielte beide in Nummernfolge. Bei den Tabellen-Rebuilds dieses Projekts ist das ein
-#      stiller Schemaunterschied.
+#      weder geändert noch umbenannt noch gelöscht. Maßstab ist die Abzweigung, nicht die
+#      Basis: was die Basis seitdem neu hat, fehlt dem Branch nur.
+#   2. Anhängen, nicht einschieben: jede neue Migration trägt eine Nummer GRÖSSER als jede
+#      auf der BASIS — sqlx 0.9 spielt eine kleinere, fehlende Version still nach.
 #   3. Die neuen Nummern eines Branches sind untereinander verschieden und vierstellig.
 #
 # Geprüft wird, was COMMITTET ist (Diff Abzweigung..Kopf), nicht der Arbeitsbaum.
 #
-# --umnummerieren (nur mit Kopf = HEAD): legt die neuen Migrationen des Branches in ihrer
-# Reihenfolge auf die nächsten freien Nummern über der Basis und ersetzt in allen
-# versionierten Dateien jeden Verweis auf den alten Dateinamen (`include_str!`, Doku). Beides
-# läuft über einen Zwischennamen, weil das Ziel der einen Datei der heutige Platz einer
-# anderen sein kann. Committet wird nicht. Bestands-Migrationen fasst es nie an — liegt ein
-# Verstoß gegen Regel 1 vor, bricht es ab.
+# --umnummerieren (nur mit Kopf = HEAD): legt die neuen Migrationen in ihrer Reihenfolge auf
+# die nächsten freien Nummern über der Basis und ersetzt in allen versionierten Dateien jeden
+# Verweis auf den alten Dateinamen. Committet wird nicht; Bestands-Migrationen fasst es nie an.
 set -euo pipefail
 
 UMNUMMERIEREN=0

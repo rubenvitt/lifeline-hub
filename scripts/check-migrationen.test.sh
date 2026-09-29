@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
-# Selbsttest für scripts/check-migrationen.sh (LFH-658).
+# Selbsttest für scripts/check-migrationen.sh. Das Prüfskript bemerkt als einzige Stelle eine
+# eingeschobene Migrationsnummer (sqlx spielt sie still nach) und irrt in beide Richtungen
+# still: es sperrte jeden PR mit Migration oder ließe `alpha` wieder rot werden.
 #
-# WARUM DIESES GATE EXISTIERT: das Prüfskript ist die einzige Stelle, die eine eingeschobene
-# Migrationsnummer bemerkt — sqlx spielt sie still nach (`db::tests::
-# sqlx_spielt_eingeschobene_kleinere_version_still_nach`). Irrt es in die eine Richtung,
-# sperrt es jeden PR mit Migration; irrt es in die andere, ist `alpha` wieder rot wie am
-# 22.09.2026, und die Prüfung sah dabei grün aus. Beides fiele erst beim nächsten Merge auf.
-#
-# Gefahren wird gegen echte Git-Repositories im Temp-Verzeichnis: die Aussagen hängen an
-# Merge-Base, Diff-Status und Umbenennungen, genau da liegen die Fallen (Fall 2 und 11).
+# Gefahren gegen echte Repositories im Temp-Verzeichnis: die Aussagen hängen an Merge-Base,
+# Diff-Status und Umbenennungen, dort liegen die Fallen (Fall 2 und 11).
 set -euo pipefail
 
 SKRIPT_UNTER_TEST="$(cd "$(dirname "$0")" && pwd)/check-migrationen.sh"
@@ -86,7 +82,7 @@ r="$(repo_neu anhaengen)"
 datei "$r" feature migrations/0003_eigen.sql
 pruefe "angehängte Migration grün" 0 "$(lauf "$r")"
 
-# 3 — Die Kollision vom 22.09.: beide Branches nahmen dieselbe nächste freie Nummer.
+# 3 — Die Kollision: beide Branches nahmen dieselbe nächste freie Nummer.
 r="$(repo_neu kollision)"
 datei "$r" feature migrations/0003_eigen.sql
 datei "$r" alpha migrations/0003_fremd.sql
@@ -144,9 +140,8 @@ datei "$r" feature migrations/README.md
 pruefe "Nicht-SQL-Datei unter migrations/ grün" 0 "$(lauf "$r")"
 
 # 11 — Der übliche Weg nach einer Kollision: alpha wird hereingemergt. Dann IST die
-# Abzweigung die alpha-Spitze, und 0003_fremd zählt zum Bestand. Die eigene 0003 muss
-# trotzdem als neu erkannt und rot bleiben — das Hereinmergen allein löst nichts, erst das
-# Umnummerieren. (Welche Hälfte des Skripts welche Mutation fängt, zeigen Fall 3 und 4.)
+# Abzweigung die alpha-Spitze, und 0003_fremd zählt zum Bestand. Die eigene 0003 muss trotzdem
+# als neu erkannt und rot bleiben — erst das Umnummerieren löst es.
 r="$(repo_neu nachgezogen)"
 datei "$r" feature migrations/0003_eigen.sql
 datei "$r" alpha migrations/0003_fremd.sql
@@ -154,12 +149,11 @@ git -C "$r" checkout -q feature
 git -C "$r" merge -q --no-edit alpha
 pruefe "Kollision nach Hereinmergen von alpha rot" 1 "$(lauf "$r")"
 
-# 12 — Umnummerieren: zwei eigene Migrationen ziehen hinter alpha, die Verweise ziehen mit,
-# die Folgeprüfung ist grün. Die FALLE dabei: beide tragen dieselbe Beschreibung, das Ziel der
-# ersten (0004_x) ist also genau der heutige Name der zweiten — als Datei wie als Verweis.
-# Einphasig schlüge `git mv` fehl, und die Ersetzung `0003_x -> 0004_x` machte aus dem
-# Verweis auf die erste einen auf die zweite, den der nächste Schritt dann auf 0005 zöge.
-# Deshalb wird auch der Inhalt verglichen, nicht nur der Name.
+# 12 — Umnummerieren: zwei eigene Migrationen ziehen hinter alpha, die Verweise ziehen mit, die
+# Folgeprüfung ist grün. Die FALLE: beide tragen dieselbe Beschreibung, das Ziel der ersten
+# (0004_x) ist der heutige Name der zweiten. Einphasig schlüge das Verschieben fehl, und die
+# Ersetzung `0003_x -> 0004_x` verbände den Verweis mit der falschen Datei — deshalb wird auch
+# der Inhalt verglichen.
 r="$(repo_neu umnummerieren)"
 datei "$r" feature migrations/0003_x.sql
 datei "$r" feature migrations/0004_x.sql

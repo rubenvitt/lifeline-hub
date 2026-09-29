@@ -1,12 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Korrigierbares Zeichnen und Eigenposition an der echten Karte (LFH-712).
- *
- * Die Vitest-Seite belegt Adapter, Stufentafel und Verdrahtung mit einem terra-draw-Mock. Was
- * sie nicht belegen kann: dass terra-draw 1.34 mit `undoRedo.modeLevel` wirklich GENAU einen
- * Punkt zurücknimmt, dass es Escape tatsächlich nicht mehr selbst verwirft, und dass die
- * Eigenposition an einer echten MapLibre-Karte landet und einen Grundlagenwechsel übersteht.
+ * Korrigierbares Zeichnen und Eigenposition an der echten Karte. Vitest belegt Adapter und
+ * Verdrahtung mit einem terra-draw-Mock; hier: dass `undoRedo.modeLevel` GENAU einen Punkt
+ * zurücknimmt, dass terra-draw Escape nicht mehr selbst verwirft, und dass die Eigenposition
+ * an einer echten MapLibre-Karte landet und einen Grundlagenwechsel übersteht.
  */
 
 const ADMIN = 'admin';
@@ -73,9 +71,8 @@ test('Zeichnen: Punkt zurück nimmt genau einen Punkt, Esc ist zweistufig', asyn
   await expect(zaehler).toHaveText('2 Punkte');
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeDisabled();
 
-  // Der Beleg an terra-draw selbst, nicht nur am Zähler: ein neuer dritter Punkt, abschließen,
-  // speichern — die gespeicherte Fläche hat drei Ecken (4 Ringpunkte mit Schluss). Hätte
-  // terra-draw nichts zurückgenommen, wären es vier Ecken.
+  // Der Beleg an terra-draw selbst: neuer dritter Punkt, abschließen, speichern — die Fläche
+  // hat drei Ecken. Hätte terra-draw nichts zurückgenommen, wären es vier.
   await setze(-120, -40);
   await expect(zaehler).toHaveText('3 Punkte');
   await page.getByRole('button', { name: 'Abschließen' }).click();
@@ -93,8 +90,8 @@ test('Zeichnen: Punkt zurück nimmt genau einen Punkt, Esc ist zweistufig', asyn
   await setze(60, -140);
   await expect(zaehler).toHaveText('2 Punkte');
 
-  // Erste Stufe — mit dem Fokus auf einem Knopf der Steuerung, NICHT auf dem Canvas: hier
-  // hätte terra-draws eigenes Esc die Taste nie gesehen.
+  // Erste Stufe — mit dem Fokus auf einem Knopf der Steuerung, nicht auf dem Canvas, wo
+  // terra-draws eigenes Esc die Taste nie gesehen hätte.
   await zurueck.focus();
   await page.keyboard.press('Escape');
   await expect(zaehler).toHaveText('0 Punkte');
@@ -105,10 +102,8 @@ test('Zeichnen: Punkt zurück nimmt genau einen Punkt, Esc ist zweistufig', asyn
   await setze(-60, -100);
   await expect(zaehler).toHaveText('1 Punkt');
 
-  // Esc mit dem Fokus auf der Karte: auch hier genau EINE Stufe. (Dass terra-draw die Taste
-  // abgegeben hat, `cancel: null`, belegt dieser Schritt NICHT — gemessen: die Seite verwirft
-  // beim `keydown` zuerst, terra-draws `keyup` fände danach nichts mehr. Die Option pinnt
-  // `zeichnen.test.ts`.)
+  // Esc mit dem Fokus auf der Karte: auch hier genau EINE Stufe. Dass terra-draw die Taste
+  // abgegeben hat (`cancel: null`), belegt dieser Schritt nicht — das pinnt `zeichnen.test.ts`.
   await canvas.focus();
   await page.keyboard.press('Escape');
   await expect(zaehler).toHaveText('0 Punkte');
@@ -168,10 +163,9 @@ test.describe('Eigenposition', () => {
       .toBe(true);
 
     // Grundlagenwechsel (`setStyle` mit `diff: false`) wirft eigene Quellen weg — die
-    // Eigenposition muss danach wieder stehen. Grenze dieses Belegs (Review): der Wechsel auf
-    // „Hell" ändert auch die Bedienfarbe, dann legt schon der Farb-Effekt die Ebene neu an —
-    // welcher der beiden Wege sie zurückholt, trennt der Schritt nicht. Einen reinen
-    // Grundlagenwechsel ohne zweite konfigurierte Grundlage gibt die e2e-Umgebung nicht her.
+    // Eigenposition muss danach wieder stehen. Grenze: „Hell" ändert auch die Bedienfarbe, dann
+    // legt schon der Farb-Effekt die Ebene neu an; welcher Weg sie zurückholt, trennt der
+    // Schritt nicht.
     await page.getByRole('button', { name: 'Benutzermenü' }).click();
     await page.getByRole('menuitem', { name: /Hell/ }).click();
     await expect.poll(quelleDa, { timeout: 10_000 }).toBe(true);

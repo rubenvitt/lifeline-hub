@@ -1,15 +1,8 @@
 import type { Page } from '@playwright/test';
 
 /**
- * Messkern für WCAG 2.4.11 „Focus Not Obscured (Minimum)" — geteiltes e2e-Modul.
- *
- * WARUM EIGENES MODUL: der Kern entstand in `fokus-verdeckung.spec.ts` (LFH-330 · B2) und
- * wird seit LFH-465 auch von `befehl-aktionsleiste.spec.ts` gebraucht. Eine Kopie driftet
- * still auseinander — und ein Messkern, der an zwei Orten verschieden rechnet, macht beide
- * Nachweise wertlos. Präzedenz für ein geteiltes e2e-Modul: `einheit-fixture.ts`.
- *
- * Der Inhalt ist ein REINER MOVE aus der Bestandsdatei; ihre Tests bleiben unverändert
- * grün und belegen damit weiterhin denselben Kern.
+ * Messkern für WCAG 2.4.11 „Focus Not Obscured (Minimum)", geteilt von mehreren Specs. Eine
+ * Kopie je Spec driftete still auseinander und machte beide Nachweise wertlos.
  */
 
 export interface Verdeckungsbefund {
@@ -19,42 +12,30 @@ export interface Verdeckungsbefund {
   fixierteKandidaten: number;
   besuchteZiele: string[];
   /**
-   * Stopps, deren Rechteck einen `sticky|fixed`-Knoten mindestens BERÜHRT (LFH-677, 2 px Spiel). Ein
-   * Vorbedingungs-Zähler wie `stoppsInTabelle`: ohne ihn kann ein Durchlauf „0 verdeckt"
-   * melden, obwohl nie ein Ziel in die Nähe der stehenden Fläche kam. Knoten, die den ganzen
-   * Schirm decken (Maske eines Dialogs), zählen hier nicht — sie berühren jedes Ziel.
+   * Stopps, deren Rechteck einen `sticky|fixed`-Knoten mindestens BERÜHRT (2 px Spiel).
+   * Vorbedingungs-Zähler: ohne ihn kann ein Lauf „0 verdeckt" melden, obwohl nie ein Ziel in
+   * die Nähe der stehenden Fläche kam. Schirmfüllende Knoten (Dialogmaske) zählen nicht.
    */
   stoppsBeruehrt: number;
   /**
-   * Davon die Stopps an der stehenden KOPFZEILE einer Tabelle (`.ant-table-sticky-holder`).
-   * `stoppsBeruehrt` zählt jede stehende Fläche — auch die fixierte erste Spalte, die in jeder
-   * Zeile steht — und kann deshalb nicht belegen, dass ein Lauf die Kopfzeile erreicht hat.
+   * Davon die Stopps an der stehenden Tabellenkopfzeile (`.ant-table-sticky-holder`).
+   * `stoppsBeruehrt` zählt auch die fixierte erste Spalte und belegt die Kopfzeile nicht.
    */
   stoppsAnTabellenkopf: number;
   /**
-   * Stopps innerhalb von {@link KernOptionen.region} (LFH-373). Vorbedingungs-Zähler wie
-   * `stoppsInTabelle`: ohne ihn kann ein Lauf an der Kartenspalte vorbeilaufen, und
-   * „0 verdeckt" wäre trivial wahr. Ohne `region` immer 0.
+   * Stopps innerhalb von {@link KernOptionen.region}. Vorbedingungs-Zähler: ohne ihn wäre
+   * „0 verdeckt" trivial wahr, wenn der Lauf an der Region vorbeigeht. Ohne `region` immer 0.
    */
   stoppsInRegion: number;
 }
 
-/**
- * Opt-in-Erweiterung des Kerns (LFH-373). Ohne dieses Argument rechnet der Kern exakt wie
- * vorher — er ist mit `fokus-verdeckung`, `befehl-aktionsleiste`, `dokumente`,
- * `pegel-pruefliste` und `betreuung-pruefliste` geteilt, und deren Zusicherungen dürfen sich nicht
- * still verschieben.
- */
+/** Opt-in-Erweiterungen; ohne sie rechnet der Kern für alle Bestands-Specs unverändert. */
 export interface KernOptionen {
   /**
-   * Zusätzliche Verdecker per Selektor, NEBEN den `sticky|fixed`-Knoten. Gebraucht für die
-   * absolut positionierten Kartenaufbauten (Knopfblock, Überlagerung links, Fußbänder):
-   * sie sind `position: absolute` und damit für die Vorgabe unsichtbar — ein Lauf über die
-   * Lagekarte wäre ohne sie grün durch Konstruktion, und `fixierteKandidaten` käme allein von
-   * den angepinnten Füßen der Rail und des Modulpanels.
-   *
-   * BEWUSST eine Liste und nicht „alles mit `position: absolute`": dann würden Canvas,
-   * Marker und antd-Portale (Tooltips, Menüs) zu Kandidaten und lieferten falsche Treffer.
+   * Zusätzliche Verdecker per Selektor, NEBEN den `sticky|fixed`-Knoten — für absolut
+   * positionierte Kartenaufbauten, die die Vorgabe nicht sieht (ohne sie wäre ein Lauf über
+   * die Lagekarte grün durch Konstruktion). Bewusst eine Liste statt „alles mit
+   * `position: absolute`": sonst würden Canvas, Marker und antd-Portale zu Fehltreffern.
    */
   zusatzKandidaten?: string[];
   /** Selektor einer Region, deren Stopps `stoppsInRegion` zählt. */
@@ -64,30 +45,16 @@ export interface KernOptionen {
 /**
  * Läuft `schritte` Tabulatorschritte und meldet jedes vollständig verdeckte Fokusziel.
  *
- * RICHTUNG (LFH-677): `taste` ist per Vorgabe `Tab`. Vorwärts rollt der Browser ein Ziel an
- * den UNTEREN Rand des Schirms — unter eine OBEN stehende Kopfzeile gerät es so nie. Wer die
- * Kopfzeile prüfen will, läuft zusätzlich mit `Shift+Tab`: dann rollt das Ziel an den oberen
- * Rand, genau unter die stehende Fläche.
+ * `Tab` rollt Ziele an den UNTEREN Rand; eine oben stehende Kopfzeile prüft nur `Shift+Tab`.
  *
- * GEMESSEN WIRD GEGEN JEDEN KNOTEN MIT `position: sticky|fixed`, nicht gegen einen benannten
- * Selektor: der Kopfhalter heißt bei antd `.ant-table-sticky-holder`, die fixierte Spalte
- * `.ant-table-cell-fix-start`, die Werkzeugzeile des Primitivs ist ein drittes, unbenanntes
- * Konstrukt — und ein vierter Kandidat käme namenlos dazu. Eine Selektorliste veraltet still.
+ * Kandidaten sind ALLE Knoten mit `position: sticky|fixed` (eine Selektorliste veraltet still),
+ * ohne Vorfahren des Ziels — ein Container, in dem das Ziel liegt, trägt es. Verdeckt ist ein
+ * Ziel nur, wenn BEIDES gilt, weil jede Bedingung allein falsch urteilt:
+ *  - Rechteck-Enthaltensein allein ist falsch positiv (durchsichtige Sticky-Hülle).
+ *  - `elementFromPoint` allein ist falsch negativ (ein Pixel Überstand am Mittelpunkt).
  *
- * ZWEI BEDINGUNGEN ZUSAMMEN, weil jede einzeln falsch urteilt:
- *  - Nur RECHTECK-ENTHALTENSEIN ist falsch POSITIV: eine durchsichtige Sticky-Hülle über der
- *    ganzen Fläche enthält jedes Ziel, verdeckt aber nichts.
- *  - Nur `elementFromPoint` ist falsch NEGATIV: ein Ziel mit einem Pixel Überstand liefert am
- *    Mittelpunkt sich selbst zurück und gilt als frei, obwohl es praktisch verdeckt ist.
- * Gemeldet wird nur, was BEIDE Bedingungen erfüllt.
- *
- * Vorfahren des Ziels sind ausgenommen: ein `sticky` Container, IN dem das Ziel liegt,
- * verdeckt es nicht — er trägt es.
- *
- * `stoppsInTabelle` zählt Stopps mit `closest('.ant-table')`, `fixierteKandidaten` die
- * gefundenen `sticky|fixed`-Knoten. Beide sind Vorbedingungs-Zähler, keine Nebenausgabe: ohne
- * sie kann ein Durchlauf an der Tabelle vorbeilaufen oder gar keinen fixierten Knoten
- * vorfinden, und „0 verdeckte Ziele" wäre in beiden Fällen trivial wahr.
+ * `stoppsInTabelle` und `fixierteKandidaten` sind Vorbedingungs-Zähler: ohne sie wäre
+ * „0 verdeckte Ziele" trivial wahr, wenn der Lauf die Tabelle verfehlt.
  */
 export async function pruefeFokusVerdeckung(
   page: Page,
@@ -112,10 +79,8 @@ export async function pruefeFokusVerdeckung(
         if (fokus == null || fokus === document.body || fokus === document.documentElement) {
           return null;
         }
-        // Der innere Combobox-/Zahleneingabe-Input ist kleiner als das sichtbare Fokusziel.
-        // Radio-Knopf (LFH-677): antd setzt dessen `input` auf 0 × 0 — ohne die Hülle fiele der
-        // Stopp unten als „keine Fläche" still aus der Zählung. Normales Radio und Checkbox
-        // brauchen das nicht: ihr `input` deckt Kreis bzw. Kästchen.
+        // Der innere Input von Combobox/Zahlenfeld ist kleiner als das sichtbare Fokusziel;
+        // den des Radio-Knopfs setzt antd auf 0 × 0, er fiele sonst still aus der Zählung.
         const ziel =
           fokus.closest(
             '.ant-select, .ant-input-number, .ant-input-affix-wrapper, .ant-radio-button-wrapper',
@@ -139,7 +104,7 @@ export async function pruefeFokusVerdeckung(
           if (stil.visibility === 'hidden' || stil.display === 'none') return false;
           return !el.contains(ziel);
         });
-        // Opt-in (LFH-373): die benannten Zusatzverdecker, mit denselben Ausschlüssen.
+        // Die benannten Zusatzverdecker, mit denselben Ausschlüssen.
         for (const sel of zusatz) {
           for (const el of Array.from(document.querySelectorAll(sel))) {
             if (kandidaten.includes(el) || el.contains(ziel)) continue;

@@ -1,93 +1,64 @@
-# CI (LFH-522/LFH-525, parallelisiert in LFH-534) — Gate und Release-Aufruf.
+# CI — Gate und Release-Aufruf.
 #
-# Coverage steht NICHT hier, sondern in coverage.yml: dieser Lauf wird auf einem Kanal-Branch
-# nicht abgebrochen (siehe `concurrency`), und ein ~66-Minuten-Job darin hielt jeden
-# Folge-Push so lange auf „pending", obwohl das Gate nach einer Viertelstunde fertig war.
+# JEDER Job ruft `scripts/check-all.sh` auf, keiner stellt sich seine Schritte selbst zusammen:
+# das Sammel-Gate bleibt die eine Wahrheit darüber, WAS geprüft wird; die Jobs entscheiden nur,
+# WO es läuft. Wer einen Schritt vermisst, ändert das Skript.
 #
-# JEDER Job ruft `scripts/check-all.sh` auf, keiner stellt sich seine Schritte selbst zusammen.
-# Das Sammel-Gate (LFH-235/F17) bleibt damit die eine Wahrheit darüber, WAS geprüft wird; die
-# Jobs hier entscheiden nur, WO es läuft. Wer einen Schritt vermisst, ändert das Skript.
+# Geteilt, weil die drei schweren Suiten (Rust, Vitest, Playwright) nicht voneinander abhängen;
+# der kritische Pfad ist die Rust-Suite allein. Sie bleibt EIN Job, weil Compile nur einen
+# kleinen Teil ihrer Laufzeit ausmacht und jeder Shard ihn erneut zahlte. Playwright verteilt
+# nach Testzahl in Dateireihenfolge, mehr als vier Shards würden ungleicher statt schneller.
 #
-# Warum überhaupt geteilt: der frühere Ein-Job-Aufbau fuhr drei schwere Suiten seriell —
-# Rust 17:00, Vitest 16:30, Playwright 17:54 — und brauchte 58 Minuten. Die drei hängen
-# nicht voneinander ab. Gemessen am grünen Lauf 34409143961.
+# Coverage steht in coverage.yml: dieser Lauf wird auf einem Kanal-Branch nicht abgebrochen,
+# ein langer Coverage-Job hielte jeden Folge-Push auf „pending".
 #
-# NACHHER, gemessen am grünen Pull-Request-Lauf 34636145213 (warme Caches): 14:12 Wall Clock
-# statt 58:00. Der kritische Pfad ist jetzt die Rust-Suite ALLEIN (13:13) — sie ist der Grund,
-# warum weiteres Sharden der beiden anderen Suiten nichts mehr brächte: Vitest-Shards liefen
-# 3:28 bis 5:50, die e2e-Shards 2:49 bis 4:45 (davor 5:00 für das Binary), Schnellprüfungen
-# 3:20. Wer die 14 Minuten weiter drücken will, muss an die Rust-Suite; die dafür nötige
-# Abwägung (nur 14,6 % Compile) steht unten am Job.
-#
-# DIE ZAHLEN, DIE DIE AUFTEILUNG BESTIMMT HABEN (alle gemessen, nicht geschätzt):
-#   - Compile ist nur 2:29 der 17 Rust-Minuten (14,6 %). Die Rust-Suite auf mehrere Runner
-#     zu partitionieren bringt deshalb weit weniger als sie zu PARALLELISIEREN — jeder Shard
-#     zahlt den Compile erneut. Sie bleibt darum EIN Job.
-#   - Playwright verteilt nach Testzahl in Dateireihenfolge. Bei 143 Tests in 38 Dateien
-#     liegt das Ungleichgewicht bei 4 Shards auf 1,06×, bei 6 auf 1,38× — sechs wären
-#     langsamer als vier.
-#   - Vitest verteilt nach Dateien (SHA-1 des Pfads, sortiert, zusammenhängender Slice):
-#     323 Dateien teilen sich auf 4 Shards als 81/81/81/80.
-#
-# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar). Ein Tag ist verschiebbar; ein
-# kompromittierter Upstream-Tag liefe sonst mit den Rechten dieses Workflows. Dependabot
-# (.github/dependabot.yml) hält die Pins aktuell.
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar): ein kompromittierter,
+# verschobener Upstream-Tag liefe sonst mit den Rechten dieses Workflows. Dependabot hält die
+# Pins aktuell.
 name: CI
 
 on:
   pull_request:
   push:
-    # `alpha` ist der Default-Branch und trägt die tägliche Arbeit, `main` die Freigabe.
-    # `beta` existiert noch nicht und steht als Zwischenstufe bereit — der Eintrag sorgt
-    # dafür, dass der Kanal beim Anlegen sofort geprüft wird.
+    # `alpha` ist der Default-Branch, `main` die Freigabe; `beta` steht als Zwischenstufe
+    # bereit und wird beim Anlegen sofort geprüft.
     branches: [main, beta, alpha]
 
-# Least privilege: der Gate-Job liest nur. Schreibrechte hat ausschließlich der
-# Release-Workflow, und der bezieht sie aus einer GitHub App, nicht aus GITHUB_TOKEN.
+# Least privilege: das Gate liest nur. Schreibrechte hat ausschließlich der Release-Workflow,
+# über eine GitHub App statt GITHUB_TOKEN.
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  # NUR Pull-Request-Läufe abbrechen. Auf einem Kanal-Branch hängt am selben Lauf der
-  # Release-Job — ein Abbruch träfe ihn möglicherweise ZWISCHEN dem Push des Versions-Commits
-  # und dem Anlegen des GitHub-Releases. Das Ergebnis wäre ein Tag ohne Release, und weil die
-  # Artefakte an `release: published` hängen, entstünden sie nie: kein roter Lauf, nur ein
-  # fehlendes Release. Ein zweiter Push auf main wartet deshalb, statt den ersten zu killen.
+  # NUR Pull-Request-Läufe abbrechen: auf einem Kanal-Branch hängt der Release-Job am selben
+  # Lauf, und ein Abbruch zwischen Versions-Commit und GitHub-Release hinterließe ein Tag ohne
+  # Release (und ohne Artefakte, die an `release: published` hängen).
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
-  # Der Runner hat 2 vCPU; die lokale Vorgabe von 3 Playwright-Workern überzeichnet ihn und
-  # ist die wahrscheinlichste Flake-Quelle (Memory: Suite unter Last flaky). Die Config sieht
-  # diese Schraube ausdrücklich vor (`PW_WORKERS`), deshalb hier statt einer Config-Änderung.
+  # 2 vCPU: die lokale Vorgabe von 3 Playwright-Workern überzeichnete den Runner.
   PW_WORKERS: 2
-  # Volle Debug-Symbole (`debuginfo=2`, Cargos Vorgabe im dev-Profil) sind der zweite große
-  # Platzfresser neben den vorinstallierten Toolchains — bei diesem Abhängigkeitsbaum
-  # mehrere GB. `line-tables-only` behält Datei und Zeile im Backtrace, wirft nur die
-  # Variablen-Debuginfo weg, die im CI ohnehin niemand liest. Ändert keine Testsemantik;
-  # lokal bleibt die Vorgabe unangetastet. coverage.yml setzt dasselbe (llvm-cov braucht
-  # Zeileninfo, mehr nicht).
+  # Volle Debug-Symbole kosten bei diesem Abhängigkeitsbaum mehrere GB Platte;
+  # `line-tables-only` behält Datei und Zeile im Backtrace und ändert keine Testsemantik.
+  # coverage.yml setzt dasselbe.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
-  # Der Runner läuft in UTC, die Zielumgebung dieses Systems nicht. scripts/check-all.sh setzt
-  # die Zone selbst (Begründung dort); hier steht sie für alles, was ausserhalb des Skripts
-  # läuft. Ohne sie wird jeder Test rot, der eine Ortszeit-Umrechnung festschreibt.
+  # Der Runner läuft in UTC. check-all.sh setzt die Zone selbst; hier steht sie für alles
+  # außerhalb des Skripts.
   TZ: Europe/Berlin
 
 jobs:
   # ── Die billigen Prüfungen, in einem Job und zuerst ──────────────────────────────────
-  # rustfmt, Lint, Typ-Drift und Advisories brauchen zusammen 1:37. Sie stehen vorn, damit
-  # ein Formatierungsfehler nicht erst nach einer Viertelstunde Testlauf auffällt.
+  # Damit ein Formatierungsfehler nicht erst nach einer Viertelstunde Testlauf auffällt.
   schnell:
     name: Schnellprüfungen
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Nur bei Bedarf: das Löschen kostete gemessen 1:20–1:40 je Job, und zwar auf dem
-      # kritischen Pfad. Die heutigen Runner bringen 145 GB mit, davon ~87 GB frei (gemessen am
-      # 24.09.2026, Lauf 35991775703) — das Aufräumen stammt aus der Zeit der ~14-GB-Runner.
-      # Die Schwelle hält den alten Weg für den Fall, dass ein Runner-Image wieder knapp wird.
+      # Nur bei Bedarf: das Aufräumen kostete auf dem kritischen Pfad über eine Minute, und die
+      # heutigen Runner haben genug Platz. Die Schwelle hält den Weg für knappe Images offen.
       - name: Plattenplatz schaffen (nur bei Bedarf)
         run: |
           df -h /
@@ -104,10 +75,9 @@ jobs:
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          # shared-key statt key: rust-cache hängt per Vorgabe die Job-ID an den Schlüssel,
-          # jeder Job hätte sonst seinen eigenen mehrere GB großen Eintrag — und GitHub
-          # deckelt bei 10 GB je Repository. `save-if: false` überall außer im Rust-Job:
-          # EINER pflegt den Eintrag, die anderen lesen ihn.
+          # shared-key statt key: sonst hängt rust-cache die Job-ID an, jeder Job hätte einen
+          # eigenen mehrere GB großen Eintrag (GitHub deckelt bei 10 GB je Repository).
+          # `save-if: false` überall außer im Rust-Job: EINER pflegt den Eintrag.
           shared-key: rust-openssl-vendored
           save-if: false
           cache-on-failure: true
@@ -138,19 +108,15 @@ jobs:
         run: ./scripts/check-all.sh --nur schnell
 
   # ── Rust-Suite ──────────────────────────────────────────────────────────────────────
-  # Bewusst NICHT partitioniert: nur 14,6 % der Laufzeit sind Compile, den jeder Shard
-  # erneut zahlen würde. Dieser Job pflegt zugleich den geteilten Cargo-Cache für alle
-  # anderen (als einziger mit save-if: true, der Vorgabe).
+  # Bewusst NICHT partitioniert (Compile würde je Shard erneut bezahlt). Dieser Job pflegt als
+  # einziger den geteilten Cargo-Cache (save-if: true, die Vorgabe).
   rust:
     name: Rust-Suite
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Nur bei Bedarf: das Löschen kostete gemessen 1:20–1:40 je Job, und zwar auf dem
-      # kritischen Pfad. Die heutigen Runner bringen 145 GB mit, davon ~87 GB frei (gemessen am
-      # 24.09.2026, Lauf 35991775703) — das Aufräumen stammt aus der Zeit der ~14-GB-Runner.
-      # Die Schwelle hält den alten Weg für den Fall, dass ein Runner-Image wieder knapp wird.
+      # Nur bei Bedarf aufräumen (s. Schnellprüfungen).
       - name: Plattenplatz schaffen (nur bei Bedarf)
         run: |
           df -h /
@@ -178,18 +144,14 @@ jobs:
         run: ./scripts/check-all.sh --nur rust
 
   # ── Backend-Binary für die e2e-Shards ───────────────────────────────────────────────
-  # Eigener Job statt „e2e wartet auf die Rust-Suite": so starten die Shards nach dem Build
-  # (~5 min warm) statt nach Build PLUS 17 Minuten Tests, mit denen sie nichts zu tun haben.
+  # Eigener Job: so starten die e2e-Shards nach dem Build statt nach Build PLUS Rust-Tests.
   binaer:
     name: e2e-Binary
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Nur bei Bedarf: das Löschen kostete gemessen 1:20–1:40 je Job, und zwar auf dem
-      # kritischen Pfad. Die heutigen Runner bringen 145 GB mit, davon ~87 GB frei (gemessen am
-      # 24.09.2026, Lauf 35991775703) — das Aufräumen stammt aus der Zeit der ~14-GB-Runner.
-      # Die Schwelle hält den alten Weg für den Fall, dass ein Runner-Image wieder knapp wird.
+      # Nur bei Bedarf aufräumen (s. Schnellprüfungen).
       - name: Plattenplatz schaffen (nur bei Bedarf)
         run: |
           df -h /
@@ -225,14 +187,10 @@ jobs:
     strategy:
       # Ohne fail-fast: ein roter Shard darf den anderen drei nicht die Diagnose nehmen.
       fail-fast: false
-      # ACHTUNG, DIE SHARD-ZAHL IST EIN PIN (LFH-528): der gerenderte Jobname
-      # ("{name} 1/4" … "4/4") steht als Required Status Check im Ruleset
-      # "Kanal-Branches (alpha/beta/main)". Wer die Zahl hier ändert, ändert die
-      # Check-NAMEN — die alten reporten dann nie mehr, und jeder Pull Request hängt
-      # still auf "Expected". Kein roter Lauf, keine Meldung, nur ein PR, der nicht
-      # mergebar wird. Die Zahl ändert man deshalb NUR zusammen mit der Checkliste in
-      # `gh api repos/:owner/:repo/rulesets/17017911`. Der oben diskutierte Vergleich
-      # 4 gegen 6 Shards ist damit nicht erledigt, aber er kostet zwei Schritte.
+      # DIE SHARD-ZAHL IST EIN PIN: die gerenderten Jobnamen („… 1/4" bis „4/4") sind Required
+      # Status Checks im Ruleset 17017911. Eine andere Zahl änderte die Check-Namen, die alten
+      # reporteten nie mehr, und jeder PR hinge still auf „Expected". Nur zusammen mit dem
+      # Ruleset ändern.
       matrix:
         shard: [1, 2, 3, 4]
     steps:
@@ -257,11 +215,8 @@ jobs:
         env:
           VITEST_SHARD: ${{ matrix.shard }}/4
         run: ./scripts/check-all.sh --nur frontend
-      # Vitest 5 legt die Blobs unter frontend/.vitest/blob/ ab (gemessen) — vorher
-      # frontend/.vitest-reports/; der alte Pfad lud in der CI ein leeres Verzeichnis hoch,
-      # weil der Blob-Reporter dort seit dem Major nichts mehr schreibt. include-hidden-files
-      # ist Pflicht, weil das Verzeichnis mit einem Punkt beginnt; ohne die Zeile lädt der
-      # Schritt nichts hoch.
+      # Vitest legt die Blobs unter frontend/.vitest/blob/ ab. include-hidden-files ist
+      # Pflicht, weil das Verzeichnis mit einem Punkt beginnt.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
@@ -278,14 +233,7 @@ jobs:
     timeout-minutes: 40
     strategy:
       fail-fast: false
-      # ACHTUNG, DIE SHARD-ZAHL IST EIN PIN (LFH-528): der gerenderte Jobname
-      # ("{name} 1/4" … "4/4") steht als Required Status Check im Ruleset
-      # "Kanal-Branches (alpha/beta/main)". Wer die Zahl hier ändert, ändert die
-      # Check-NAMEN — die alten reporten dann nie mehr, und jeder Pull Request hängt
-      # still auf "Expected". Kein roter Lauf, keine Meldung, nur ein PR, der nicht
-      # mergebar wird. Die Zahl ändert man deshalb NUR zusammen mit der Checkliste in
-      # `gh api repos/:owner/:repo/rulesets/17017911`. Der oben diskutierte Vergleich
-      # 4 gegen 6 Shards ist damit nicht erledigt, aber er kostet zwei Schritte.
+      # DIE SHARD-ZAHL IST EIN PIN (s. Frontend-Suite).
       matrix:
         shard: [1, 2, 3, 4]
     steps:
@@ -315,17 +263,15 @@ jobs:
         with:
           name: lifeline-hub-debug
           path: bin
-      # PFLICHT, kein Schmuck: upload-artifact zippt ohne Dateirechte, alles kommt als 644
-      # zurück. Ohne diese Zeile ist das Binary da, aber nicht startbar — check-all.sh
-      # bricht dann mit einer klaren Meldung ab (es prüft das Bit ausdrücklich), statt die
-      # Suite still zu überspringen.
+      # PFLICHT: upload-artifact zippt ohne Dateirechte, alles kommt als 644 zurück.
+      # check-all.sh prüft das Bit und bräche sonst mit klarer Meldung ab.
       - name: Ausführbar machen
         run: chmod +x bin/lifeline-hub
       - name: e2e-Suite (Anteil ${{ matrix.shard }}/4)
         env:
           PW_SHARD: ${{ matrix.shard }}/4
-          # Erspart diesem Job die komplette Rust-Toolchain: ohne die Variable fragte die
-          # Playwright-Config `cargo metadata` nach dem Target-Verzeichnis.
+          # Erspart die Rust-Toolchain: ohne die Variable fragte die Playwright-Config
+          # `cargo metadata` nach dem Target-Verzeichnis.
           PW_BINAER: ${{ github.workspace }}/bin/lifeline-hub
         run: ./scripts/check-all.sh --nur e2e
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -336,10 +282,9 @@ jobs:
           retention-days: 1
 
   # ── Ein Bericht aus den Teilläufen ──────────────────────────────────────────────────
-  # BEIDE Berichte sind ausdrücklich KEINE Required Checks — das sind die Shard-Jobs selbst.
-  # Grund: die Merge-Werkzeuge scheitern nur bei NULL Blobs. Ein an Speichermangel
-  # gestorbener Shard käme hier sonst als grüner Bericht über drei Viertel der Suite heraus.
-  # Sie laufen mit `!cancelled()`, weil man den Bericht gerade dann braucht, wenn es rot war.
+  # KEINE Required Checks — das sind die Shard-Jobs selbst: die Merge-Werkzeuge scheitern
+  # nur bei NULL Blobs, ein gestorbener Shard ergäbe sonst einen grünen Teilbericht. Mit
+  # `!cancelled()`, weil man den Bericht gerade bei Rot braucht.
   berichte:
     name: Testberichte zusammenführen
     needs: [frontend, e2e]
@@ -395,39 +340,23 @@ jobs:
           path: frontend/playwright-report
           retention-days: 7
 
-  # Der Release hängt hier drin und nicht in einem eigenen, per `workflow_run` ausgelösten
-  # Workflow. Grund steht im Kopf von release.yml: semantic-release liest den Branch aus
-  # GITHUB_REF, und ein workflow_run-Lauf trägt dort immer den Default-Branch — ein Push auf
-  # `beta` würde als stabiles Release herauskommen, sobald der Kanal existiert.
+  # Der Release hängt hier und nicht in einem `workflow_run`-Workflow: semantic-release liest
+  # den Branch aus GITHUB_REF, und ein workflow_run-Lauf trägt dort immer den Default-Branch
+  # (Näheres im Kopf von release.yml).
   #
-  # `needs` MUSS ALLE VIER PRÜFJOBS NENNEN, und das ist die Stelle, an der die Aufteilung
-  # gefährlich werden kann: solange alles in einem Job lief, hieß „gate grün" auch „e2e grün".
-  # Seit die Suiten getrennt sind, stimmt das nicht mehr — stünde hier weiter nur ein Job,
-  # entstünde ein Release über einer roten e2e-Suite, ohne dass irgendetwas rot aussieht.
-  # Bei einer Matrix verlangt `needs` alle Instanzen; ein einzelner roter Shard hält den
-  # Release also auf.
+  # `needs` MUSS ALLE VIER PRÜFJOBS NENNEN (bei einer Matrix alle Instanzen) — sonst entstünde
+  # ein Release über einer roten Suite. Auf `berichte` wird bewusst NICHT gewartet: der läuft
+  # mit `!cancelled()` und wäre auch bei roten Shards grün.
   #
-  # Auf `berichte` wird bewusst NICHT gewartet: der Job läuft mit `!cancelled()` und wäre
-  # auch dann grün, wenn alle Shards rot waren. Coverage läuft ohnehin in einem eigenen
-  # Workflow (coverage.yml) — die Zahl ist informativ und soll nichts aufhalten.
-  #
-  # EIN AUFRUF IST KEIN RELEASE. Seit dem Ruhefenster (siehe release.yml und
-  # `scripts/release-ruhefenster.sh`) tritt der Job still zurück, wenn auf dem Kanal
-  # inzwischen ein neuerer Commit liegt — bei drei Merges kurz hintereinander entsteht so
-  # EINE Vorabversion statt dreier. Ein übersprungener Release-Job ist damit der Normalfall
-  # und kein Fehlerbild; welcher Grund gerade greift, steht im Protokoll des Schritts.
-  #
-  # Zusammenspiel mit der Nebenläufigkeit oben: Push-Läufe desselben Kanals stehen in EINER
-  # Gruppe und warten aufeinander. Ein Release-Job, der sein Ruhefenster abwartet, hält den
-  # Lauf des nächsten Pushes also auf. Das ist eingepreist und klein — das Gate verbraucht
-  # von den 15 Minuten Fenster gemessen schon rund 14, gewartet wird der Rest. Wer das
-  # Fenster deutlich vergrößert, verlängert damit auch die Rückmeldung auf dem Kanal; dann
-  # gehört der Release in eine eigene Nebenläufigkeitsgruppe statt in ein größeres Fenster.
+  # EIN AUFRUF IST KEIN RELEASE: mit dem Ruhefenster (`scripts/release-ruhefenster.sh`) tritt
+  # der Job zurück, wenn auf dem Kanal ein neuerer Commit liegt. Ein übersprungener
+  # Release-Job ist der Normalfall. Push-Läufe desselben Kanals stehen in EINER
+  # Nebenläufigkeitsgruppe; ein wartender Release hält also den nächsten Lauf auf — wer das
+  # Fenster deutlich vergrößert, gibt dem Release eine eigene Gruppe.
   release:
     name: Release
     needs: [schnell, rust, frontend, e2e]
-    # Nur bei einem Push auf einen Kanal-Branch. Ohne diese Bedingung löste jeder grüne
-    # Pull-Request-Lauf einen Release-Versuch aus.
+    # Nur bei einem Push auf einen Kanal-Branch, nicht bei jedem grünen PR-Lauf.
     if: github.event_name == 'push'
     uses: ./.github/workflows/release.yml
     permissions:

@@ -1,33 +1,18 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
 
 /**
- * Der Datensatz-Finder der Kommandopalette im ECHTEN Browser (LFH-391 · C4).
+ * Der Datensatz-Finder der Kommandopalette im echten Browser. Die Unit-Ebene belegt, dass
+ * `navigate` mit dem richtigen Pfad gerufen wird; hier wird am ZIEL gemessen (Überschrift der
+ * Detailseite, hervorgehobene ETB-Zeile) — ein Deeplink, der auf der Liste landet, wäre ein
+ * Treffer ohne Wirkung.
  *
- * WARUM NICHT IN VITEST: die Unit-Ebene kann belegen, dass `navigate` mit dem richtigen
- * Pfad gerufen wird — `useDatensaetze.test.tsx` und `datensaetze.test.ts` tun genau das.
- * Sie kann NICHT belegen, dass die Zielseite den Datensatz danach auch zeigt, und daran
- * hängt der Nutzen des ganzen Tickets: ein Deeplink, der auf der Liste landet statt am
- * Datensatz, ist ein Treffer ohne Wirkung. Gemessen wird deshalb beide Male am ZIEL —
- * die Überschrift der Personen-Detailseite bzw. die hervorgehobene ETB-Zeile —, nicht an
- * der URL allein.
+ *  1. Person über die Registriernummer — die Kennung kommt aus der Quittung der eben
+ *     erfassten Person, nicht aus einer Annahme über die Nummernvergabe.
+ *  2. ETB über `#` plus laufender Nummer — der einzige Deeplink, der ÄLTERE SEITEN NACHLÄDT,
+ *     bis der Zieleintrag gefunden ist. Der Eintrag liegt deshalb hinter der ersten Seite,
+ *     und das wird vor der Messung am Server geprüft.
  *
- * DIE ZWEI FÄLLE SIND NICHT DERSELBE FALL ZWEIMAL:
- *
- *  1. **Person über die Registriernummer.** Sie prüft den Zahlenzweig gegen einen
- *     Datensatz, den dieselbe Sitzung eben über die Oberfläche erfasst hat — die Kennung
- *     kommt aus der Quittung, nicht aus einer Annahme über die Nummernvergabe.
- *  2. **ETB über `#` plus laufender Nummer.** Der ETB ist der einzige Deeplink, der
- *     ÄLTERE SEITEN NACHLÄDT, bis der Zieleintrag gefunden ist (`EtbPage.tsx`, Effekt zu
- *     `?eintrag=`). Das ist im Browser eine andere Aussage als in jsdom: dort hängt sie an
- *     einer Kette aus `useInfiniteQuery`, Effekt-Wiedereintritt und `hasNextPage`. Der
- *     Fall ist deshalb bewusst SO gesät, dass der Zieleintrag hinter der ersten Seite
- *     liegt — und dass er das tut, wird vor der Messung am Server geprüft statt geglaubt.
- *
- * SEEDING PER `page.request`: die Session ist Cookie-basiert, `page.request` teilt den
- * Cookie-Jar des Kontexts (Vorgehen aus `etb-chronologie.spec.ts`).
- *
- * KEIN `waitForLoadState('networkidle')`: auf Einsatzrouten bleibt ein SSE-Strom offen,
- * die Bedingung tritt nie sauber ein (LFH-385). Die Zusicherungen warten inhaltlich.
+ * Seeding per `page.request`; kein `networkidle` (SSE-Strom).
  */
 
 const ADMIN = 'admin';
@@ -37,21 +22,12 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const ETB_SEITE = 100;
 
 /**
- * Kleinste laufende Nummer, mit der der ETB-Fall überhaupt gefahren werden kann.
- *
- * `DATENSATZ_MINDESTZEICHEN = 2` bemisst den REST hinter dem Präfix: bei `#7` bleibt ein
- * Zeichen, der Finder holt nichts und die Palette sagt das auch so. Der Zieleintrag
- * bekommt deshalb einen Vorlauf, damit seine Nummer zweistellig ist.
+ * Kleinste laufende Nummer für den ETB-Fall: `DATENSATZ_MINDESTZEICHEN = 2` bemisst den REST
+ * hinter dem Präfix, bei `#7` holte der Finder nichts.
  */
 const ZWEISTELLIG = 10;
 
-/*
- * Gilt für BEIDE Fälle der Datei, nicht nur für den ETB-Fall darunter: `test.setTimeout`
- * auf Modulebene ist dateiweit. Gemessen brauchen die zwei Fälle 8 bzw. 9,5 s (das Säen
- * der zweiten ETB-Seite kostet gut hundert Anlagen und liegt darin) — die Vorgabe von 30 s
- * reicht also. Der Puffer deckt den Vite-Kaltstart der Detail- und Listenrouten, der beim
- * ersten Lauf je Datei mitbezahlt wird. Bauform aus `lagebericht-schmal.spec.ts`.
- */
+// Dateiweit: der Puffer deckt den Vite-Kaltstart und das Säen der zweiten ETB-Seite.
 test.setTimeout(180_000);
 
 /** Eindeutiges Palette-Signal: das Suchfeld (Placeholder ist projektweit einmalig). */
@@ -59,13 +35,9 @@ function paletteInput(page: Page): Locator {
   return page.getByPlaceholder(/Suchen: Module/);
 }
 
-// Login-/Anlege-Helfer aus `command-palette.spec.ts` kopiert — es gibt (noch) kein
-// geteiltes e2e-Hilfsmodul (gleichlautend in sechs Bestands-Specs vermerkt).
 /**
- * Eine Datensatz-Option über Label UND Modul-Kontext (Neuentwurf „Instrumententafel"): die
- * Modulherkunft steht seit 21.09.2026 als KONTEXT rechts in der Zeile (Beschreibung der
- * Option, `aria-describedby`), nicht mehr als Präfix „Personen · …" im Label. Der Name der
- * Option ist damit das Label allein; der Kontext wird über seinen eigenen Knoten gebunden.
+ * Eine Datensatz-Option über Label UND Modul-Kontext: die Modulherkunft steht als Kontext
+ * rechts in der Zeile (`aria-describedby`), der Name der Option ist das Label allein.
  */
 function datensatzOption(page: Page, kontext: string, name: RegExp): Locator {
   return page
@@ -109,21 +81,17 @@ test('findet eine eben erfasste Person über ihre Registriernummer und öffnet i
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Finder Person ${Date.now()}`);
 
-  // Über die Schnellaktion, nicht über den Knopf: `?neu=1` ist der Weg, den die Palette
-  // selbst nimmt, und der Datensatz soll aus derselben Oberfläche stammen, die ihn nachher
-  // wiederfinden muss.
+  // Über die Schnellaktion `?neu=1`, den Weg der Palette selbst.
   await page.goto(`/einsaetze/${einsatzId}/personen?neu=1`);
   await expect(page.getByRole('dialog', { name: 'Schnellerfassung' })).toBeVisible();
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
-  // Die Kennung kommt aus der QUITTUNG, nicht aus einer Annahme über die Nummernvergabe:
-  // sie ist das, was auf dem Papier landet und abgetippt wird.
+  // Die Kennung kommt aus der QUITTUNG — das, was auf Papier landet und abgetippt wird.
   const quittung = page.getByText(/Erfasst als R-\d+/);
   await expect(quittung).toBeVisible();
   const kennung = (await quittung.innerText()).match(/R-\d+/)![0];
 
-  // Weg von der Personenliste: von dort aus wäre nicht zu unterscheiden, ob der Deeplink
-  // trägt oder die Seite ohnehin schon die richtige war.
+  // Weg von der Personenliste: dort wäre nicht zu unterscheiden, ob der Deeplink trägt.
   await zumModul(page, einsatzId, 'etb');
 
   await suche(page, kennung);
@@ -131,15 +99,9 @@ test('findet eine eben erfasste Person über ihre Registriernummer und öffnet i
   await expect(treffer).toBeVisible();
 
   /*
-   * Die Gegenaussage, und sie ist mehr als eine Formalie: der Zahlenzweig vergleicht die
-   * Nummer EXAKT (`datensaetze.ts`, `kand.nummer !== zahl.nummer`), er sucht keine
-   * Teilzeichenkette und lässt Fuse nicht an eine Kennung. Eine benachbarte, nicht
-   * vergebene Nummer darf deshalb keine Personenzeile liefern — sonst wäre „R-042 findet
-   * die Person 42" von „R-042 findet irgendetwas mit 42" nicht zu unterscheiden.
-   *
-   * Die Abwesenheit steht bewusst NACH der Positivaussage: die Personenliste ist damit
-   * geladen und im Cache, ein leeres Ergebnis kann also nicht bloß ein noch laufender
-   * Abruf sein.
+   * Gegenaussage: der Zahlenzweig vergleicht die Nummer EXAKT, eine benachbarte, nicht
+   * vergebene Nummer liefert keine Personenzeile. Steht bewusst NACH der Positivaussage —
+   * die Liste ist dann im Cache, ein leeres Ergebnis ist kein laufender Abruf.
    */
   const nachbar = `R-${String(Number(kennung.slice(2)) + 1).padStart(3, '0')}`;
   await paletteInput(page).fill(nachbar);
@@ -149,17 +111,15 @@ test('findet eine eben erfasste Person über ihre Registriernummer und öffnet i
   await expect(treffer).toBeVisible();
   await treffer.click();
 
-  // Das eigentliche Ziel dieses Falls: nicht die Liste, sondern der Datensatz — und er
-  // trägt die Kennung, die gesucht wurde.
+  // Das Ziel ist der Datensatz, nicht die Liste — und er trägt die gesuchte Kennung.
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/\\d+$`));
   await expect(page.getByRole('heading', { name: `Person ${kennung}` })).toBeVisible();
   await expect(paletteInput(page)).toBeHidden();
 });
 
 /**
- * Ein ETB-Eintrag, sequentiell. Parallel geht nicht: `lfd_nr` wird über
- * `COALESCE(MAX(lfd_nr)+1)` vergeben und liegt unter `UNIQUE(einsatz_id, lfd_nr)`
- * (`migrations/0090`) — gleichzeitige Anlagen kollidierten.
+ * Ein ETB-Eintrag, sequentiell: `lfd_nr` wird über `MAX(lfd_nr)+1` unter
+ * `UNIQUE(einsatz_id, lfd_nr)` vergeben, gleichzeitige Anlagen kollidierten.
  */
 async function seedeEtb(
   page: Page,
@@ -189,15 +149,9 @@ test('findet einen ETB-Eintrag jenseits der ersten Seite über „#" und Nummer 
   expect(ziel.lfd_nr, 'die Zielnummer trägt zwei Ziffern').toBeGreaterThanOrEqual(ZWEISTELLIG);
 
   /*
-   * Ein NAMENSVETTER auf der anderen Zahlenachse: eine Person, deren Registriernummer
-   * dieselbe Zahl trägt wie der Zieleintrag seine laufende. Ohne sie wäre die Aussage
-   * „'#' bindet auf den ETB" nicht widerlegbar — bei einer reinen Zahl im Suchfeld matcht
-   * kein Modul- und kein Aktionsbefehl, ein leeres Ergebnis in der Fremdgruppe entstünde
-   * also auch ganz ohne Riegel (gemessen: die Mutationsprobe auf `PALETTE_MODI.etb.gruppen`
-   * blieb grün, solange keine Person mit dieser Nummer existierte).
-   *
-   * Dass die Nummernvergabe bei 1 beginnt und lückenlos zählt, wird dabei geprüft und
-   * nicht angenommen.
+   * Ein NAMENSVETTER auf der anderen Zahlenachse: eine Person mit derselben Nummer wie der
+   * Zieleintrag. Ohne sie wäre „'#' bindet auf den ETB" nicht widerlegbar — eine reine Zahl
+   * träfe sonst ohnehin nichts in der Fremdgruppe. Die lückenlose Vergabe ab 1 wird geprüft.
    */
   let letztePerson = { registrier_nr: 0 };
   for (let i = 1; i <= ziel.lfd_nr; i += 1) {
@@ -220,35 +174,29 @@ test('findet einen ETB-Eintrag jenseits der ersten Seite über „#" und Nummer 
   }
 
   /*
-   * DIE VORBEDINGUNG WIRD GEMESSEN, NICHT GEGLAUBT. Ohne sie prüfte der Fall nur „der
-   * Deeplink hebt eine sichtbare Zeile hervor" — die eigentliche Aussage ist aber, dass
-   * `EtbPage` ältere Seiten NACHLÄDT, bis der Eintrag da ist. Wäre der Zieleintrag schon
-   * auf der ersten Seite, bliebe der Test grün, ohne den Nachladeweg je zu betreten.
+   * VORBEDINGUNG, gemessen: der Zieleintrag liegt NICHT auf der ersten Seite — sonst bliebe
+   * der Test grün, ohne den Nachladeweg je zu betreten.
    */
   const ersteSeite = await page.request.get(`/api/einsaetze/${einsatzId}/etb?limit=${ETB_SEITE}`);
   expect(ersteSeite.ok(), await ersteSeite.text()).toBeTruthy();
   const ids = ((await ersteSeite.json()) as { id: number }[]).map((e) => e.id);
   expect(ids, 'der Zieleintrag liegt hinter der ersten Seite').not.toContain(ziel.id);
 
-  // Von einem anderen Modul aus: auf der ETB-Seite selbst wäre nicht zu unterscheiden, ob
-  // der Deeplink trägt oder die Chronologie ohnehin schon stand.
+  // Von einem anderen Modul aus, sonst wäre nicht zu unterscheiden, ob der Deeplink trägt.
   await zumModul(page, einsatzId, 'personen');
 
   const etbTreffer = datensatzOption(page, 'ETB', new RegExp(`#${zahl} · ${ZIELTEXT}`));
   const personTreffer = datensatzOption(page, 'Personen', new RegExp(personKennung));
 
   /*
-   * ERST OHNE PRÄFIX — die Hälfte, die die Bindung überhaupt prüfbar macht: dieselbe Zahl
-   * findet im Vorgabemodus BEIDE Datensätze. Ohne diese Positivaussage wäre die Abwesenheit
-   * der Personenzeile unten von „die Person gibt es gar nicht" nicht zu unterscheiden.
+   * Erst OHNE Präfix: dieselbe Zahl findet im Vorgabemodus BEIDE Datensätze — sonst wäre die
+   * Abwesenheit der Personenzeile unten nicht von „gibt es nicht" zu unterscheiden.
    */
   await suche(page, String(zahl));
   await expect(etbTreffer).toBeVisible();
   await expect(personTreffer).toBeVisible();
 
-  // … DANN MIT: '#' bindet die Quellen auf den ETB (`PALETTE_MODI.etb.quellen`). Der
-  // ETB-Treffer steht weiter, die Person ist weg — beides im selben Zustand gemessen, die
-  // Abwesenheit kann also kein noch laufender Abruf sein.
+  // … dann MIT: '#' bindet die Quellen auf den ETB. Beides im selben Zustand gemessen.
   await paletteInput(page).fill(`#${zahl}`);
   await expect(etbTreffer).toBeVisible();
   await expect(personTreffer).toHaveCount(0);
@@ -258,17 +206,15 @@ test('findet einen ETB-Eintrag jenseits der ersten Seite über „#" und Nummer 
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb`));
 
   /*
-   * Das Ziel: die Zeile ist wirklich DA und markiert. `zeile-hervorgehoben` (Konstante
-   * `HERVORGEHOBEN` in `components/Datensicht.tsx`) setzt `EtbPage` erst, NACHDEM der
-   * Eintrag in einer nachgeladenen Seite gefunden wurde — die Marke ist damit zugleich der
-   * Beleg für den Nachladeweg. Sie steht genau einmal; mehrere Marken hiessen, dass die
-   * Hervorhebung an etwas anderem hängt als am Zieleintrag.
+   * Die Zeile ist DA und markiert: `zeile-hervorgehoben` setzt `EtbPage` erst, nachdem der
+   * Eintrag in einer nachgeladenen Seite gefunden wurde — zugleich der Beleg für den
+   * Nachladeweg. Genau einmal, sonst hinge die Hervorhebung an etwas anderem.
    */
   const hervorgehoben = page.locator('.zeile-hervorgehoben');
   await expect(hervorgehoben).toHaveCount(1);
   await expect(hervorgehoben).toContainText(ZIELTEXT);
 
-  // Und der Auftrag ist verbraucht: `EtbPage` räumt `?eintrag=` nach dem Sprung, sonst
-  // schickte jedes Neuladen die Seite erneut hinein (apply-then-clean, LFH-340 · C5).
+  // `?eintrag=` ist nach dem Sprung geräumt (apply-then-clean), sonst schickte jedes Neuladen
+  // die Seite erneut hinein.
   await expect(page).not.toHaveURL(/eintrag=/);
 });
