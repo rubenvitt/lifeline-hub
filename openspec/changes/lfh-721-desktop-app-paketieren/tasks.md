@@ -121,10 +121,10 @@
   - der Kopfkommentar beschreibt die Desktop-Jobs,
   - nach dem Merge ein Dispatch-Lauf mit `desktop: true` auf dem jüngsten Alpha-Tag (Ergebnis in
     der Abschlussmeldung).
-- [x] 5.3 `release.config.mjs`: `prepareCmd` um `cargo set-version -p lifeline-desktop`
-  ergänzen, `src-tauri/Cargo.toml` zu den Assets. Prüfen: Der Lauf von `cargo set-version -p
-  lifeline-desktop 9.9.9` in einer Wegwerf-Kopie ändert genau `src-tauri/Cargo.toml` und
-  `Cargo.lock`.
+- [x] 5.3 Eine Versionsquelle (D2): `[workspace.package] version`, Server und Hülle erben;
+  `prepareCmd` unverändert (`-p lifeline-hub`). Prüfen: `cargo set-version -p lifeline-hub 9.9.9`
+  in einer Wegwerf-Kopie setzt die Workspace-Version, und `cargo metadata` zeigt beide Pakete
+  auf 9.9.9; `version_kommt_aus_dem_workspace` wird rot bei eigenem Versionsfeld in `src-tauri`.
 - [ ] 5.4 `ci.yml` (Rust-Job): die webkit2gtk-/GTK-Pakete in den vorhandenen `apt-get`-Aufruf
   aufnehmen; Schritt 4 von `check-all.sh` testet Server und Hülle getrennt, `coverage.yml` misst
   ohne Hülle (D1, Nachtrag). Prüfen: Der PR-Lauf von `check-all --nur rust` ist grün.

@@ -690,8 +690,10 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   Command steht im `AppManifest` von `build.rs`, sonst wäre er für jede Seite offen.
 - Adresse, Deeplink (`lifeline://verbinden?server=`, Vertrag für LFH-38) und Speicherung sind
   reine, getestete Funktionen (`adresse.rs`, `deeplink.rs`, `verbindung.rs`).
-- **Version** setzt `release.config.mjs` (`prepareCmd`, `-p lifeline-desktop`);
-  `tauri.conf.json` trägt keine, `version_gleich_der_anwendungsversion` pinnt die Gleichheit.
+- **Version: eine Quelle** in `[workspace.package]` der Wurzel, Server und Hülle erben
+  (`version.workspace = true`), `tauri.conf.json` trägt keine; `prepareCmd` setzt sie über
+  `-p lifeline-hub`. Kein eigenes Versionsfeld in `src-tauri` (driftet beim alpha-Merge; Test
+  `version_kommt_aus_dem_workspace`).
 - Pakete + `latest.json` nur bei stabilen Tags (`artefakte.yml`, Ausgabe `desktop`);
   `scripts/release/desktop-manifest.mjs`, Selbsttest in Schritt 8. Der Updater-Schlüssel liegt
   außerhalb des Repos (Secrets `TAURI_SIGNING_PRIVATE_KEY[_PASSWORD]`), der Pubkey in

@@ -176,12 +176,13 @@ export default {
       '@semantic-release/exec',
       {
         /*
-         * DREI VERSIONSDATEIEN, EIN LAUF.
+         * ZWEI VERSIONSDATEIEN, EIN LAUF.
          *
-         * `-p lifeline-hub` und `-p lifeline-desktop`: die Desktop-Hülle (LFH-721) trägt die
-         * Anwendungsversion, ihr Updater vergleicht sie mit `latest.json`; `tauri.conf.json`
-         * hat bewusst keine eigene. `karten-katalog` und `karten-service` sind interne Crates
-         * mit eigener Versionsgeschichte. `cargo set-version` zieht `Cargo.lock` mit, deshalb
+         * `-p lifeline-hub`: dessen Version erbt aus `[workspace.package]`, also setzt der Aufruf
+         * die Workspace-Version — und die Desktop-Hülle (LFH-721), die sie ebenfalls erbt, zieht
+         * mit; ihr Updater vergleicht sie mit `latest.json`, `tauri.conf.json` hat keine eigene.
+         * `karten-katalog` und `karten-service` sind interne Crates mit eigener
+         * Versionsgeschichte. `cargo set-version` zieht `Cargo.lock` mit, deshalb
          * steht sie bei den Assets (sonst wäre der Baum nach dem Release dirty).
          *
          * Fürs Frontend `pnpm pkg set`, NICHT `pnpm version`: das bricht mit
@@ -190,7 +191,6 @@ export default {
          */
         prepareCmd:
           'cargo set-version -p lifeline-hub ${nextRelease.version}' +
-          ' && cargo set-version -p lifeline-desktop ${nextRelease.version}' +
           ' && pnpm -C frontend pkg set version=${nextRelease.version}',
       },
     ],
@@ -200,7 +200,6 @@ export default {
         assets: [
           'Cargo.toml',
           'Cargo.lock',
-          'src-tauri/Cargo.toml',
           'frontend/package.json',
           'CHANGELOG.md',
         ],

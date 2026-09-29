@@ -125,9 +125,9 @@ trotzdem.
 
 ## Release-Ablauf
 
-- `semantic-release` setzt die Version der App zusammen mit der des Servers (`prepareCmd` in
-  `release.config.mjs`). `tauri.conf.json` trägt keine eigene Version, der Test
-  `version_gleich_der_anwendungsversion` in `src-tauri` hält beide gleich.
+- Server und App tragen dieselbe Version aus `[workspace.package]` der Wurzel-`Cargo.toml`;
+  `semantic-release` setzt sie (`prepareCmd` in `release.config.mjs`). `tauri.conf.json` trägt
+  keine eigene, der Test `version_kommt_aus_dem_workspace` in `src-tauri` pinnt das.
 - `artefakte.yml` baut die App nur bei stabilen Tags. Vor dem ersten stabilen Release lässt sich
   der Bau per „Run workflow“ mit einem Alpha-Tag und `desktop: true` prüfen — mit einem Tag,
   der **nach** dem Merge von LFH-721 entstanden ist; ältere Tags haben weder `src-tauri/` noch

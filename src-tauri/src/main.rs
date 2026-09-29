@@ -332,21 +332,38 @@ mod tests {
         );
     }
 
-    /// Die Hülle trägt die Anwendungsversion; ihr Updater vergleicht sie mit `latest.json`.
-    /// Beide setzt `prepareCmd` in `release.config.mjs` — fehlt dort `-p lifeline-desktop`,
-    /// driftet die Hülle still und bietet jedes Update erneut an.
+    /// Die Hülle trägt die Anwendungsversion; ihr Updater vergleicht sie mit `latest.json`. Beide
+    /// Pakete erben sie aus `[workspace.package]` — ein eigenes Versionsfeld in einem von beiden
+    /// drifte beim Einmergen eines alpha-Releases still auseinander.
     #[test]
-    fn version_gleich_der_anwendungsversion() {
+    fn version_kommt_aus_dem_workspace() {
+        // Zeilengenau: der Kopf muss allein auf der Zeile stehen — in Kommentaren kommt
+        // `[workspace.package]` als Text vor.
+        fn abschnitt<'a>(manifest: &'a str, kopf: &str) -> Vec<&'a str> {
+            manifest
+                .lines()
+                .skip_while(|zeile| zeile.trim() != kopf)
+                .skip(1)
+                .take_while(|zeile| !zeile.trim_start().starts_with('['))
+                .collect()
+        }
         let wurzel = include_str!("../../Cargo.toml");
-        let paket = wurzel
-            .split("[package]")
-            .nth(1)
-            .expect("[package] in der Wurzel-Cargo.toml");
-        let version = paket
-            .lines()
-            .find_map(|zeile| zeile.strip_prefix("version = \""))
+        for (name, manifest) in [
+            ("Wurzel", wurzel),
+            ("src-tauri", include_str!("../Cargo.toml")),
+        ] {
+            assert!(
+                abschnitt(manifest, "[package]")
+                    .iter()
+                    .any(|zeile| zeile.trim() == "version.workspace = true"),
+                "{name}: [package] muss `version.workspace = true` tragen"
+            );
+        }
+        let version = abschnitt(wurzel, "[workspace.package]")
+            .into_iter()
+            .find_map(|zeile| zeile.trim().strip_prefix("version = \""))
             .and_then(|rest| rest.strip_suffix('"'))
-            .expect("version im [package] der Wurzel");
+            .expect("version in [workspace.package]");
         assert_eq!(env!("CARGO_PKG_VERSION"), version);
     }
 }

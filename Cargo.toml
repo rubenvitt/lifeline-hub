@@ -1,6 +1,7 @@
 [package]
 name = "lifeline-hub"
-version = "1.0.0-alpha.55"
+# Die Anwendungsversion steht EINMAL, in [workspace.package] — die Desktop-Hülle erbt sie mit.
+version.workspace = true
 edition = "2021"
 
 [dependencies]
@@ -109,6 +110,12 @@ dev-seeds = []
 
 # Echter clamd-Upload-Scan; ohne dieses Feature (`--no-default-features`) ein No-op.
 clamav = ["dep:clamav-client"]
+
+# EINE Versionsquelle für Server und Desktop-Hülle (LFH-721): semantic-release setzt sie per
+# `cargo set-version -p lifeline-hub` (release.config.mjs), beide Pakete erben sie. Zwei eigene
+# Versionsfelder drifteten beim Einmergen eines alpha-Releases auseinander.
+[workspace.package]
+version = "1.0.0-alpha.55"
 
 [workspace]
 members = [".", "crates/karten-katalog", "karten-service", "src-tauri"]

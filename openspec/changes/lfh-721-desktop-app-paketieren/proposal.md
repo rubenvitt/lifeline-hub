@@ -35,7 +35,8 @@ diese Auflagen in dieselbe erste Auslieferung.
   `workflow_dispatch`. Ein Skript im Repo erzeugt aus den tatsächlich gebauten Plattformen ein
   `latest.json` und hängt es ans Release. Der Updater liest es über
   `…/releases/latest/download/latest.json`.
-- `release.config.mjs` führt die Version der Desktop-Crate mit der Anwendungsversion.
+- Server und Hülle erben ihre Version aus `[workspace.package]`; `release.config.mjs` setzt sie
+  wie bisher über `-p lifeline-hub`.
 - CI: Der Linux-Runner des Rust-Jobs bekommt die webkit2gtk-/GTK-Systempakete. Schritt 4 testet
   Server und Hülle getrennt, damit Cargo ihre Features nicht vereinigt; die Coverage misst ohne
   Hülle. `check-all.sh` bleibt die einzige Wahrheit. Der Selbsttest
@@ -64,7 +65,8 @@ diese Auflagen in dieselbe erste Auslieferung.
   - `Cargo.toml` (Workspace-Mitglied) und `Cargo.lock` (rund 400 zusätzliche Crates; der
     Server-Build bleibt davon unberührt, weil `cargo build` im Root nur das Root-Paket baut),
   - `.github/workflows/artefakte.yml`, `ci.yml` (Rust-Job), `coverage.yml`,
-  - `release.config.mjs` (`prepareCmd`, `assets`), `scripts/check-all.sh` (Schritt 8).
+  - `Cargo.toml` (`[workspace.package] version`, die Server und Hülle erben), `release.config.mjs`
+    (Kommentar), `scripts/check-all.sh` (Schritte 4 und 8).
 - **Laufzeit der Gates:** Schritt 4 kompiliert zusätzlich Tauri (einmalig einige Minuten, danach
   im Cache).
 - **Secrets (vom Menschen zu setzen):** `TAURI_SIGNING_PRIVATE_KEY`,

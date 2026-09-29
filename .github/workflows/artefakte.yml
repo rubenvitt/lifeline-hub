@@ -307,11 +307,12 @@ jobs:
             echo "FEHLER: Secret TAURI_SIGNING_PRIVATE_KEY fehlt (docs/betrieb/desktop-app.md)." >&2
             exit 1
           fi
-          # Die Hülle muss die Release-Version tragen, sonst vergleicht ihr Updater falsch.
-          # Gesetzt wird sie von release.config.mjs (prepareCmd). `tr`: der Windows-Checkout
-          # trägt CRLF (core.autocrlf), und `grep -x` sähe das \r am Zeilenende.
-          tr -d '\r' < Cargo.toml | grep -qx "version = \"$VERSION\"" \
-            || { echo "FEHLER: src-tauri/Cargo.toml trägt nicht die Version $VERSION." >&2; exit 1; }
+          # Die Hülle muss die Release-Version tragen, sonst vergleicht ihr Updater falsch. Sie
+          # erbt sie aus [workspace.package] (gesetzt von release.config.mjs); gefragt wird Cargo,
+          # nicht die Datei — die trägt nur `version.workspace = true` und unter Windows CRLF.
+          ist="$(cargo metadata --format-version 1 --no-deps | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).packages.find((p) => p.name === "lifeline-desktop").version')"
+          [ "$ist" = "$VERSION" ] \
+            || { echo "FEHLER: lifeline-desktop trägt $ist, erwartet $VERSION." >&2; exit 1; }
           cargo tauri build --ci --target "$ZIEL" --bundles "$BUNDLES"
 
       # Kanonische Dateinamen: Tauris eigene tragen Leerzeichen, die GitHub beim Hochladen still

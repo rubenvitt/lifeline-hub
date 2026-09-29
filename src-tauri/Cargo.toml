@@ -2,11 +2,11 @@
 # Servers. Die Hülle trägt Fenster, Erststart, Deeplink, Druck-Umleitung und Update — keine
 # zweite Anwendungslogik. Anforderungen: openspec/specs/desktop-huelle/spec.md.
 #
-# Die Version setzt semantic-release zusammen mit der des Servers (release.config.mjs,
-# prepareCmd); tauri.conf.json trägt bewusst keine eigene.
+# Die Version erbt die Hülle aus [workspace.package] der Wurzel — dieselbe wie der Server;
+# semantic-release setzt sie dort (release.config.mjs). tauri.conf.json trägt bewusst keine.
 [package]
 name = "lifeline-desktop"
-version = "1.0.0-alpha.55"
+version.workspace = true
 edition = "2021"
 publish = false
 

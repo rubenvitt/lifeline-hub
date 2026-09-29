@@ -74,12 +74,18 @@ fest installieren (ändert Server-Code für eine Test-Eigenheit und entschärft 
 - Tauri per `cfg` nur auf macOS/Windows: bricht `cargo test --workspace` auf Linux oder lässt
   die reinen Tests dort ungeprüft.
 
-### D2 — Version: die Crate trägt sie, `tauri.conf.json` keine eigene
+### D2 — Version: eine Quelle in `[workspace.package]`, `tauri.conf.json` ohne eigene
 
-`tauri.conf.json` lässt `version` weg, Tauri nimmt dann die Crate-Version. `prepareCmd` in
-`release.config.mjs` setzt zusätzlich `cargo set-version -p lifeline-desktop`. Die Assets von
-`@semantic-release/git` bekommen `src-tauri/Cargo.toml`, sonst wäre der Baum nach dem Release
-dirty oder die Version drifte. Die Startversion ist die aktuelle Anwendungsversion.
+`tauri.conf.json` lässt `version` weg, Tauri nimmt dann die Crate-Version. Server und Hülle
+tragen `version.workspace = true`; die Version steht einmal in `[workspace.package]` der Wurzel.
+`prepareCmd` bleibt unverändert: `cargo set-version -p lifeline-hub` setzt die geerbte
+Workspace-Version (geprüft mit cargo-edit 0.13.7), die Hülle zieht mit.
+
+*Erster Stand (verworfen):* ein eigenes Versionsfeld in `src-tauri/Cargo.toml`, von `prepareCmd`
+mitgesetzt. Beim Einmergen eines alpha-Releases driftete es zweimal (alpha.51 ↔ alpha.53 ↔ alpha.55),
+und ein Merge dieses PRs kurz nach einem Release hätte `alpha` selbst rot gemacht — der
+Release-Job wartet auf die Rust-Suite und wäre blockiert. Der Test
+`version_kommt_aus_dem_workspace` pinnt jetzt die Struktur (beide erben).
 
 ### D3 — Build-Matrix: eigener Job `desktop`, nativ je Plattform
 
@@ -282,7 +288,7 @@ Ergebnis per POST meldet. Die Seitenaufrufe stehen im Protokoll der Hülle
 | Downloads | Download-Ordner, Umlaute erhalten, Dubletten „(1)“ … „(3)“ | `Prüfanhang-LFH-721-äöü*.txt` |
 | Update 1.0.0 → 1.0.1 (Testschlüssel, lokales `latest.json` aus `desktop-manifest.mjs`) | Angebot mit Version, nach „Aktualisieren“ Neustart als 1.0.1 — **mit ad-hoc-Signatur** | Zugriffsprotokoll des Endpunkts, `CFBundleShortVersionString` 1.0.1, Nutzer bestätigte den Klick |
 | Update-Prüfung ohne erreichbares Manifest | still, nur Protokoll | „Update-Prüfung nicht möglich …“ ohne Dialog |
-| Version der Hülle nach einem Release-Merge | Test `version_gleich_der_anwendungsversion` erkennt die Drift (alpha.51 ↔ alpha.53 beim Einmergen von `alpha`) | Angleich-Commit |
+| Version der Hülle nach einem Release-Merge | der erste Versionstest erkannte die Drift (alpha.51 ↔ alpha.53); daraus D2 in der heutigen Form | Umstellung auf `[workspace.package]` |
 
 **Lehre für Prüfseiten:** Ein klassisches Skript mit `const ipc` auf oberster Ebene bricht in
 der Hülle ab — die IPC-Brücke belegt `window.ipc`. Das Frontend lädt als Modul und ist nicht
