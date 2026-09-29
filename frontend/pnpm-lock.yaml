@@ -28,7 +28,7 @@ importers:
         specifier: 2.1.0
         version: 2.1.0
       '@einsatzzeichen/react':
-        specifier: ^2.1.0
+        specifier: 2.1.0
         version: 2.1.0(react@19.3.0)
       '@einsatzzeichen/schema':
         specifier: 2.1.0
