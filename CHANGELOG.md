@@ -1,3 +1,15 @@
+## [1.0.0-alpha.53](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.52...v1.0.0-alpha.53) (2026-09-29)
+
+### Bedienbarkeit und Barrierefreiheit
+
+- **Verbesserte Lesbarkeit im Rahmen bei Tageslicht**: Die dauerhaft dunkle Kopfleiste und Navigation erfüllt jetzt durchgängig die Kontrastschwelle von 7:1 für Tageslicht. Gedämpfte Texte (inaktive Menüpunkte, Suchfeld-Hinweise, Kürzel) wurden aufgehellt und sind dadurch besser lesbar. Gesperrte Funktionen zeigen zusätzlich zum Text ein Schloss-Symbol, damit die Information auch ohne Farbe erkennbar bleibt.
+
+- **Klarere Alarmfarbe bei Verbindungsstörungen**: Die Störungsmeldungen GETRENNT, OFFLINE und PRÜFEN in der Synchronisierungsanzeige sind jetzt bei Tageslicht besser vom dunklen Hintergrund abgesetzt und erreichen ebenfalls einen Kontrast von mindestens 7:1.
+
+### Betrieb und Installation
+
+- OpenSpec-Kommandozeilenwerkzeuge (apply, archive, explore, propose, sync, update) wurden als wiederverwendbare Skills für Agenten bereitgestellt. Dies betrifft nur die interne Entwicklungsumgebung und hat keine Auswirkung auf die ausgelieferte Anwendung.
+
 ## [1.0.0-alpha.52](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.51...v1.0.0-alpha.52) (2026-09-29)
 
 ### Wichtige Änderungen
