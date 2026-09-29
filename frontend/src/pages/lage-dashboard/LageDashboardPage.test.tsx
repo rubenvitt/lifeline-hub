@@ -1435,13 +1435,13 @@ describe('LageDashboardPage — „Zuletzt"-Speicher (LFH-436)', () => {
     expect(gemerkt()).toEqual(['gefahrenzonen']);
   });
 
-  it('die Leer-Aktion „Gefahren bewerten" merkt das Gefahren-Modul', async () => {
+  it('die Leer-Aktion „Person aufnehmen" merkt Personen, auch über die Sub-Route', async () => {
     mockEndpunkte({});
     render();
-    const box = paneel('Gefahrenmatrix');
-    const knopf = await within(box).findByRole('button', { name: 'Gefahren bewerten' });
+    const knopf = await screen.findByRole('button', { name: 'Person aufnehmen' });
+    expect(gemerkt()).toEqual([]);
     await userEvent.click(knopf);
-    expect(await screen.findByText('GEFAHREN-MODUL')).toBeInTheDocument();
-    expect(gemerkt()).toEqual(['gefahrenzonen']);
+    expect(await screen.findByText('AUFNAHME')).toBeInTheDocument();
+    expect(gemerkt()).toEqual(['personen']);
   });
 });

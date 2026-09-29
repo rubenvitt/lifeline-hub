@@ -194,7 +194,7 @@ function Zustandsfeld({
 export default function UeberblickPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { waehle, beiLinkKlick } = useModulWahl();
+  const { waehle, linkFaenger } = useModulWahl();
   const { token, rollen } = useRollen();
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
@@ -390,7 +390,7 @@ export default function UeberblickPage() {
   return (
     // Jeder Link der Seite ist eine Modulwahl für „Zuletzt besucht" (LFH-436, `useModulWahl`).
     // `display: contents`: die Hülle trägt nur den Fänger und nimmt am Layout nicht teil.
-    <div style={{ display: 'contents' }} onClickCapture={beiLinkKlick}>
+    <div style={{ display: 'contents' }} {...linkFaenger}>
       <EinsatzSeite
         titel="Überblick"
         breadcrumb={

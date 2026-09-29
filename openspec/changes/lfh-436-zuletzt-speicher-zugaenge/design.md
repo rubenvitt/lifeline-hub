@@ -62,11 +62,13 @@ aktuellen Route, denn gemerkt wird in dem Einsatz, in den die Wahl führt. Er li
   (etwa die Brotkrume `/einsaetze`), passiert nichts.
 - `waehle(pfad)` ruft `merkeZiel(pfad)` und danach `navigate(pfad)`. Es ersetzt `navigate` an
   den Knöpfen von Überblick und Lage-Dashboard (Kopfknöpfe, Leer-Aktionen, Paneel-Links).
-- `beiLinkKlick` ist ein `onClickCapture` für die Seitenwurzel. Er sucht
-  `event.target.closest('a[href]')`, nimmt die `pathname` des `href` und ruft `merkeZiel`.
-  Damit sind alle `<Link>`-Ziele der Seite abgedeckt (Kennzahl `ziel`, Zeilenziele,
-  Abschnittszeilen), ohne jede Komponente einzeln zu verdrahten. Auch Strg/⌘-Klick in einen
-  neuen Tab zählt, denn die Wahl ist dieselbe.
+- `linkFaenger` wird an die Seitenwurzel gespreizt (`onClickCapture` und `onAuxClickCapture`).
+  Er sucht `event.target.closest('a[href]')`, nimmt die `pathname` des `href` und ruft
+  `merkeZiel`. Damit sind alle `<Link>`-Ziele der Seite abgedeckt (Kennzahl `ziel`,
+  Zeilenziele, Abschnittszeilen), ohne jede Komponente einzeln zu verdrahten. Strg/⌘-Klick und
+  Mittelklick in einen neuen Tab zählen, denn die Wahl ist dieselbe; der Rechtsklick
+  (Kontextmenü) zählt nicht. Ein Objekt statt zweier Handler, damit keine Seite den Mittelklick
+  vergisst.
 
 *Alternative:* ein `onKlick`-Prop an `Kennzahl` und an jedem Zeilenziel. Verworfen, weil ein
 künftig ergänzter `<Link>` dann still nicht aufzeichnete. Der Fänger ist auf die zwei Seiten

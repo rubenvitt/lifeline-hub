@@ -1,4 +1,4 @@
-import { useCallback, type MouseEvent } from 'react';
+import { useCallback, useMemo, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { einsatzIdAusPfad } from '../command-palette/einsatzPfad';
@@ -9,9 +9,11 @@ import { merkeModulBesuch } from './zuletztModule';
  * Verdrahtet eine Seite mit Modulzielen (Führung · Überblick, Lage-Dashboard) mit dem
  * „Zuletzt"-Speicher (LFH-436, Zugangstabelle in `zuletztModule.ts`).
  *
- * - `beiLinkKlick` kommt als `onClickCapture` an die SEITENWURZEL: jeder `<a href>` darunter
- *   merkt sein Modul, auch ein künftig ergänzter. Ein Prop je Kennzahl vergäße der nächste Link
- *   still. Strg/⌘-Klick zählt mit, die Wahl ist dieselbe.
+ * - `linkFaenger` wird an die SEITENWURZEL gespreizt: jeder `<a href>` darunter merkt sein
+ *   Modul, auch ein künftig ergänzter. Ein Prop je Kennzahl vergäße der nächste Link still.
+ *   Strg/⌘-Klick und Mittelklick (neuer Tab) zählen mit, die Wahl ist dieselbe; der Rechtsklick
+ *   öffnet nur das Kontextmenü und zählt nicht. Ein Objekt statt zweier Handler, damit keine
+ *   Seite den Mittelklick vergisst.
  * - `waehle` ersetzt `navigate` an Knöpfen, die in ein Modul führen; die sieht der Fänger nicht.
  *
  * Nur auf diesen Seiten, nicht layoutweit: ein Querverweis in einem Modulinhalt folgt einem
@@ -45,6 +47,8 @@ export function useModulWahl() {
 
   const beiLinkKlick = useCallback(
     (e: MouseEvent<HTMLElement>) => {
+      // `auxclick` feuert für jede Nicht-Haupttaste; nur die mittlere öffnet das Ziel.
+      if (e.type === 'auxclick' && e.button !== 1) return;
       const anker = (e.target as Element | null)?.closest?.('a[href]');
       if (!anker) return;
       // `getAttribute` statt `.href`: der rohe Wert ist der App-Pfad, `.href` hängt die Origin an.
@@ -54,5 +58,10 @@ export function useModulWahl() {
     [merkeZiel],
   );
 
-  return { merkeZiel, waehle, beiLinkKlick };
+  const linkFaenger = useMemo(
+    () => ({ onClickCapture: beiLinkKlick, onAuxClickCapture: beiLinkKlick }),
+    [beiLinkKlick],
+  );
+
+  return { merkeZiel, waehle, linkFaenger };
 }

@@ -36,10 +36,10 @@ function imEinsatz(children: ReactNode) {
 }
 
 function Seite() {
-  const { beiLinkKlick, waehle } = useModulWahl();
+  const { linkFaenger, waehle } = useModulWahl();
   return (
     // Der Fänger liegt an der Wurzel; die Knöpfe gehen über `waehle`.
-    <div onClickCapture={beiLinkKlick}>
+    <div {...linkFaenger}>
       {/* `preventDefault`: jsdom navigiert nicht, der Anker soll nur geklickt werden. */}
       <a href="/einsaetze/7/personen?filter=vermisst" onClick={(e) => e.preventDefault()}>
         <span>Betroffene</span>
@@ -67,6 +67,27 @@ describe('useModulWahl (LFH-436)', () => {
     });
     result.current.merkeZiel('/einsaetze/7/personen?filter=vermisst');
     expect(leseZuletztModule(3, 7)).toEqual(['personen']);
+  });
+
+  it('merkt im Einsatz des ZIELS, nicht der aktuellen Route', () => {
+    const { result } = renderHook(() => useModulWahl(), {
+      wrapper: ({ children }) => imEinsatz(children),
+    });
+    result.current.merkeZiel('/einsaetze/8/etb');
+    expect(leseZuletztModule(3, 8)).toEqual(['etb']);
+    expect(leseZuletztModule(3, 7)).toEqual([]);
+  });
+
+  it('merkt auch den Mittelklick, der das Ziel im neuen Tab öffnet', async () => {
+    render(imEinsatz(<Seite />));
+    await userEvent.pointer({ keys: '[MouseMiddle]', target: screen.getByText('Betroffene') });
+    expect(leseZuletztModule(3, 7)).toEqual(['personen']);
+  });
+
+  it('merkt nichts beim Rechtsklick, der nur das Kontextmenü öffnet', async () => {
+    render(imEinsatz(<Seite />));
+    await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByText('Betroffene') });
+    expect(leseZuletztModule(3, 7)).toEqual([]);
   });
 
   it('merkt nichts für einen Pfad ohne Modul', () => {
