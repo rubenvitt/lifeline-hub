@@ -22,7 +22,7 @@ const spalten: TableColumnsType<EinheitTyp> = [
     key: 'label',
     // Leitspalte: am Label sucht ein Mensch den Typ. Die Sortierung ist ein ANGEBOT ohne
     // `defaultSortOrder` — voreingestellt bleibt die fachliche Reihenfolge des Backends
-    // (`einheit/typ_repo.rs`: ORDER BY sortier, id), die die Zug-vor-Gruppe-Ordnung hält.
+    // (`ORDER BY sortier, id`), die die Zug-vor-Gruppe-Ordnung hält.
     sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
   },
   {

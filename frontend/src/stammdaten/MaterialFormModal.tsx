@@ -33,7 +33,7 @@ export default function MaterialFormModal({
   const qc = useQueryClient();
   const { message } = App.useApp();
 
-  // VORBELEGUNG, kein Zurücksetzen — Begründung in `FahrzeugFormModal` (LFH-346/A6).
+  // VORBELEGUNG, kein Zurücksetzen — Begründung in `FahrzeugFormModal`.
   useEffect(() => {
     if (!offen || !material) return;
     form.setFieldsValue({
@@ -58,8 +58,8 @@ export default function MaterialFormModal({
       };
       return material ? aktualisiereMaterial(material.id, daten) : legeMaterialAn(daten);
     },
-    // Kein `onClose()` mehr: das Schliessen macht `onFertig`. Hier stehengelassen
-    // schlösse es den Dialog auch beim „Speichern und nächstes".
+    // Kein `onClose()`: das Schließen macht `onFertig`. Hier schlösse es den Dialog auch bei
+    // „Speichern und nächstes".
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.material() });
       qc.invalidateQueries({ queryKey: globalKeys.materialKategorien() });
@@ -79,19 +79,17 @@ export default function MaterialFormModal({
       // Bestandsnummer und Bezeichnung sind je Gegenstand verschieden; Träger und
       // Standort bleiben über eine Erfassungsserie hinweg gleich.
       uebernahme={['traegerorganisation', 'standort']}
-      // `mutateAsync`: bei Ablehnung muss die Zusage brechen, sonst leert die Hülle
-      // die Felder trotz 422 (LFH-332).
+      // `mutateAsync`: bei Ablehnung muss die Zusage brechen, sonst leert die Hülle die Felder
+      // trotz 422.
       //
-      // Der Formularspeicher statt der `onFinish`-Werte (LFH-346 · A8): ohne
-      // `forceRender` sind Träger, Standort und Bemerkung nicht montiert, und
-      // `onFinish` liefert nur montierte Felder. `MaterialEingabe` ist Vollersatz —
-      // ein bearbeitetes Material verlöre die drei bei jedem Speichern, an dem
-      // niemand aufgeklappt hat. Ein Rückfall auf `material?.standort` wäre die
-      // falsche Reparatur: er kann „nie montiert" nicht von „aufgeklappt und bewusst
-      // geleert" unterscheiden. `getFieldsValue(true)` liest den Speicher ganz aus.
+      // Der Formularspeicher statt der `onFinish`-Werte: ohne `forceRender` sind Träger, Standort
+      // und Bemerkung nicht montiert, und `onFinish` liefert nur montierte Felder. `MaterialEingabe`
+      // ist Vollersatz — ein bearbeitetes Material verlöre die drei bei jedem Speichern ohne
+      // Aufklappen. Ein Rückfall auf `material?.standort` wäre die falsche Reparatur: er kann „nie
+      // montiert" nicht von „bewusst geleert" unterscheiden.
       //
-      // Beachten: `getFieldsValue(true)` ist bei antd `any`-typisiert — die Feldnamen
-      // prüft nicht dieser Aufruf, sondern der Parametertyp von `mutationFn`.
+      // `getFieldsValue(true)` ist bei antd `any`-typisiert — die Feldnamen prüft der Parametertyp
+      // von `mutationFn`.
       onErfassen={() => mutation.mutateAsync(form.getFieldsValue(true))}
       onFertig={onClose}
       onAbbrechen={onClose}
@@ -114,19 +112,16 @@ export default function MaterialFormModal({
       <Form.Item label="Bestandsnummer" name="bestandsnummer">
         <Input placeholder="Inventarnr. (nur für einzeln verfolgte Geräte)" />
       </Form.Item>
-      {/* FELDBUDGET (LFH-346 · A8, Befund N20): drei sichtbare Felder, drei eingeklappt.
-          Pflicht ist allein die Bezeichnung, und die steht oben — kein Pflichtfeld
-          wandert hinter den Collapse (LFH-343 · H49).
+      {/* FELDBUDGET: drei sichtbare Felder, drei eingeklappt. Pflicht ist allein die Bezeichnung,
+         und die steht oben — kein Pflichtfeld wandert hinter den Collapse (LFH-343).
 
-          Bewusst OHNE `forceRender` (wie `AuftragFormular`): nur wenn die
-          eingeklappten Felder gar nicht im DOM stehen, ist „im Ausgangszustand drei
-          Felder" prüfbar. Den Preis dafür — unmontierte Felder fehlen in `onFinish` —
-          zahlt das `onErfassen` oben, nicht `forceRender`.
+         Bewusst OHNE `forceRender` (wie `AuftragFormular`): nur so ist „im Ausgangszustand drei
+         Felder" prüfbar. Der Preis — unmontierte Felder fehlen in `onFinish` — ist am `onErfassen`
+         oben bezahlt.
 
-          Träger und Standort sind zugleich die Wiederholfelder des Serienlaufs
-          (`uebernahme`). Das passt zusammen: wer sie in einer Serie stehen lassen
-          will, hat sie im ersten Datensatz eingetragen — und dafür aufgeklappt.
-          Danach bleibt der Bereich offen, ein `resetFields` schliesst ihn nicht. */}
+         Träger und Standort sind zugleich die Wiederholfelder des Serienlaufs: wer sie stehen lassen
+         will, hat sie im ersten Datensatz eingetragen und dafür aufgeklappt. Danach bleibt der
+         Bereich offen, ein `resetFields` schließt ihn nicht. */}
       <Collapse
         ghost
         style={{ marginInline: -8 }}

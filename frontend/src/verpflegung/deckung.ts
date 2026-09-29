@@ -1,13 +1,11 @@
 /**
- * Verpflegung (LFH-634) — zeitabhängige Einstufung eines Zeitfensters (design.md D2).
+ * Verpflegung — zeitabhängige Einstufung eines Zeitfensters.
  *
- * Deckung und Fehlmenge rechnet EINE Stelle, das Backend (`src/verpflegung/deckung.rs`). Die
- * Einstufung hängt zusätzlich an „hat begonnen?" und damit an der Uhr; sie läuft deshalb nur
- * hier, neu bewertet über `useJetzt`. Das Backend liefert bewusst keine Einstufung — sie wäre
- * zwischen zwei Abrufen veraltet und eine zweite Wahrheit.
+ * Deckung und Fehlmenge rechnet das Backend (`src/verpflegung/deckung.rs`). Die Einstufung hängt
+ * zusätzlich an „hat begonnen?" und damit an der Uhr; sie läuft deshalb nur hier (neu bewertet
+ * über `useJetzt`) — vom Backend wäre sie zwischen zwei Abrufen veraltet.
  *
- * ZEIT: Wire-Strings sind UTC OHNE Zonenkennung; gelesen wird ausschließlich über
- * `dayjs.utc`, nie über `dayjs(s)` (das läse Ortszeit und verschöbe still um den Versatz).
+ * Wire-Strings sind UTC OHNE Zonenkennung: nur über `dayjs.utc` lesen, nie `dayjs(s)`.
  */
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -39,10 +37,9 @@ function istGedeckt(zf: VerpflegungZeitfenster): boolean {
 }
 
 /**
- * gedeckt (keine Fehlmenge) · offen (Fehlmenge, noch nicht begonnen) · unterdeckung
- * (Fehlmenge, begonnen). `jetzt == von` gilt als begonnen. Ein unlesbarer Beginn gilt als
- * begonnen: eine Fehlmenge soll auffallen, nicht verschwinden (wie `einstufungVon` der
- * Ablösung).
+ * gedeckt (keine Fehlmenge) · offen (Fehlmenge, noch nicht begonnen) · unterdeckung (Fehlmenge,
+ * begonnen). `jetzt == von` gilt als begonnen; ein unlesbarer Beginn ebenfalls, damit eine
+ * Fehlmenge auffällt.
  */
 export function deckungEinstufung(zf: VerpflegungZeitfenster, jetzt: Dayjs): VerpflegungDeckung {
   if (istGedeckt(zf)) return 'gedeckt';
@@ -52,8 +49,8 @@ export function deckungEinstufung(zf: VerpflegungZeitfenster, jetzt: Dayjs): Ver
 }
 
 /**
- * Trennung der Segmentleiste „laufend & anstehend" / „vergangen" (design.md D7): vergangen
- * erst, wenn das Ende VOR jetzt liegt. Ein unlesbares Ende bleibt bei „laufend" sichtbar.
+ * Trennung „laufend & anstehend" / „vergangen": vergangen erst, wenn das Ende VOR jetzt liegt.
+ * Ein unlesbares Ende bleibt bei „laufend" sichtbar.
  */
 export function istVergangen(zf: VerpflegungZeitfenster, jetzt: Dayjs): boolean {
   const bis = wireZeit(zf.bis_at);

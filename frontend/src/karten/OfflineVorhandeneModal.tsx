@@ -21,9 +21,8 @@ function nameAusDatei(dateiname: string): string {
 }
 
 /**
- * Lokaler Import gebauter Region-Packs (LFH-199): listet im karten_dir vorhandene, noch nicht
- * registrierte MBTiles und übernimmt sie ohne Download/Hosting in die Offline-Verwaltung. Für
- * self-hosted-Betrieb, wenn der Admin eine Region selbst gebaut/hinterlegt hat.
+ * Lokaler Import gebauter Region-Packs: listet im karten_dir vorhandene, noch nicht
+ * registrierte MBTiles und übernimmt sie ohne Download in die Offline-Verwaltung.
  */
 export default function OfflineVorhandeneModal({
   offen,
@@ -48,7 +47,7 @@ export default function OfflineVorhandeneModal({
       registriereOfflineKarte({
         name: (namen[v.dateiname] ?? nameAusDatei(v.dateiname)).trim(),
         pfad: v.dateiname,
-        // Selbst gebaute Shortbread-Packs sind OSM-abgeleitet → ODbL-Pflichtattribution (offline sichtbar).
+        // Selbst gebaute Shortbread-Packs sind OSM-abgeleitet → ODbL-Pflichtattribution.
         lizenz: '© OpenStreetMap contributors (ODbL)',
         kachel_schema: 'shortbread',
       }),
@@ -96,14 +95,9 @@ export default function OfflineVorhandeneModal({
               <ListenEintragMeta
                 title={
                   /*
-                   * Ohne Größen-Prop, obwohl das Feld im TITEL einer Listenzeile sitzt und die
-                   * Zeile damit wächst (LFH-366 · B5f). Bewusst so, nicht übersehen: das Feld
-                   * ist das Bedienziel dieser Zeile — hier wird der Name der zu übernehmenden
-                   * Region getippt —, und ein Eingabefeld, das im Handschuh-Betrieb auf 30 px
-                   * festgenagelt bleibt, verfehlt genau den Betrieb, für den die Staffel da ist.
-                   * Die `Liste` darum trägt ihre Größe weiter (Abstandsmaß, keine Trefffläche).
-                   * Die Zeile wird dadurch höher; jsdom rechnet kein Layout, ein Test kann das
-                   * also weder belegen noch widerlegen — die Entscheidung steht hier.
+                   * Ohne Größen-Prop, obwohl das Feld im Titel einer Listenzeile sitzt und die Zeile wächst: es
+                   * ist das Bedienziel der Zeile, und ein auf 30 px festgenageltes Eingabefeld verfehlte den
+                   * Handschuh-Betrieb.
                    */
                   <Input
                     style={{ maxWidth: 260 }}

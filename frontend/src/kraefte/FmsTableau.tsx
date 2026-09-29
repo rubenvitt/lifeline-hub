@@ -25,52 +25,28 @@ import {
 import { fahrzeugStatus } from './meldebildRaster';
 
 /**
- * FMS-Tableau (LFH-642) — alle Fahrzeuge des Einsatzes auf einer Fläche, Status per Klick,
- * die Ziffer als Beschleuniger. Formverdikt und Reihenfolge: Kopf von `fmsTableauKern.ts`.
+ * FMS-Tableau — alle Fahrzeuge des Einsatzes auf einer Fläche, Status per Klick, die Ziffer als
+ * Beschleuniger. Formverdikt und Reihenfolge: Kopf von `fmsTableauKern.ts`.
  *
- * ── EIN BEDIENZIEL JE KACHEL ───────────────────────────────────────────────────────────
+ * EIN BEDIENZIEL JE KACHEL: `StatusWahl` (antd-`Button` mit Menü im Portal). Die Kachel selbst
+ * ist NICHT klickbar — ein Klick daneben änderte sonst einen Status, den niemand gewählt hat.
+ * Der Ton kommt allein aus der Kategorie; `status_farbe` bleibt ein Punkt im Menü. Der
+ * Deskriptor kommt von der Seite ({@link FmsTableauProps.bedienungVon}): Tabelle, Karte und
+ * Tableau bedienen dieselbe Mutation; nur die Menüwerte tragen hier die FMS-Beschriftung.
  *
- * Bedient wird über `StatusWahl` (antd-`Button` mit Menü im Portal, Höhe vom
- * `ConfigProvider`). Die Kachel selbst ist NICHT klickbar: eine klickbare Fläche wäre ein
- * handgebautes Bedienziel mit Dichte-Zusicherung (LFH-365), und sie stünde als zweiter Weg
- * neben dem Auslöser — ein Klick daneben änderte dann einen Status, den niemand gewählt hat.
- * Der Auslöser trägt den `StatusChip` (S-Code + Wort) als Etikett; der Ton kommt allein aus
- * der Kategorie, `status_farbe` ist ungeprüfter Freitext und bleibt ein Punkt im Menü.
+ * ZIFFERN wirken auf die Kachel, IN DER der Fokus steht — per DOM-Vorfahr: ein Tastendruck im
+ * Statusmenü steigt aus dem Portal hierher auf, hat im DOM aber keine Kachel über sich. Der
+ * Listener hängt an der Tableau-Wurzel, nicht an `window`. Nur ein eindeutig belegter
+ * `fms_anker` setzt einen Status, sonst ein Hinweis und KEIN Wechsel.
  *
- * Der Deskriptor kommt von der Seite ({@link FmsTableauProps.bedienungVon}): Tabelle,
- * Karte und Tableau bedienen dieselbe Mutation mit demselben Riegel. Nur die Menüwerte
- * tauscht das Tableau gegen die FMS-Beschriftung („S4 · Am Einsatzort") — dieselben IDs.
+ * ZUFLUSS: steht der Fokus im Tableau, friert die Menge der Fahrzeuge ein; ein neues wartet
+ * hinter dem Sammelbanner (WCAG 3.2.5). Ein Wechsel ins Statusmenü ist KEIN Verlassen (wie
+ * `pruefeVerlassen` in `Datensicht`). Entfernte Fahrzeuge fallen sofort weg.
  *
- * ── ZIFFERN ────────────────────────────────────────────────────────────────────────────
- *
- * Eine Ziffer wirkt auf die Kachel, IN DER der Fokus steht — per DOM-Vorfahr, nicht per
- * Komponentenbaum: ein Tastendruck im geöffneten Statusmenü steigt als Synthetic Event aus
- * dem Portal bis hierher auf, hat im DOM aber keine Kachel über sich und bleibt wirkungslos.
- * Der Listener hängt an der Tableau-Wurzel, nicht an `window` — ausserhalb des Tableaus ist
- * eine Ziffer eine Ziffer. `fms_anker` ist nullable und nicht eindeutig: nur ein eindeutig
- * belegter Anker setzt einen Status, sonst gibt es einen Hinweis und KEINEN Wechsel.
- *
- * ── ZUFLUSS ────────────────────────────────────────────────────────────────────────────
- *
- * Steht der Fokus im Tableau, friert die Menge der gezeigten Fahrzeuge ein; ein neu
- * disponiertes Fahrzeug wartet hinter dem Sammelbanner, statt die Kacheln unter dem Finger
- * zu verschieben (Kriterium 12, WCAG 3.2.5). Statuswechsel ändern die Menge nicht und die
- * Reihenfolge ohnehin nicht. Ein Wechsel ins Statusmenü ist KEIN Verlassen — dieselbe
- * Ausnahme wie in `Datensicht` (`pruefeVerlassen`, LFH-339). Entfernte Fahrzeuge fallen
- * sofort weg: was es nicht mehr gibt, lässt sich nicht zurückhalten.
- *
- * ── FOKUS NACH DEM WECHSEL (gemessen im Review, Chromium und WebKit) ───────────────────
- *
- * Während der Mutation sind ALLE Auslöser `disabled` (Riegel der Seite). Ein fokussierter
- * Knopf, der `disabled` wird, verliert den Fokus an `<body>` — mit `focusout` und
- * `relatedTarget = null`. Das Menü gibt den Fokus ohnehin nur bei Escape zurück. Ohne
- * Gegenmaßnahme wirkte die zweite Ziffer ins Leere, und die Schleuse taute ausgerechnet in
- * dem Moment auf, in dem jemand bedient. Deshalb merkt sich das Tableau das gewählte
- * Fahrzeug ({@link fokusZiel}): solange der Wechsel läuft, gilt der Fokusverlust nicht als
- * Verlassen, und danach geht der Fokus an den Auslöser der Kachel zurück — aber nur, wenn
- * er noch auf `<body>` liegt; wer inzwischen woanders ist, wird nicht zurückgeholt.
- * `StatusWahl` selbst bleibt unverändert: die Tabelle hat dasselbe Verhalten, dort ist aber
- * keine Ziffernfolge und keine Schleuse daran gebunden.
+ * FOKUS NACH DEM WECHSEL: während der Mutation sind ALLE Auslöser `disabled`, und ein
+ * fokussierter Knopf verliert den Fokus dabei an `<body>`. Das Tableau merkt sich deshalb das
+ * Fahrzeug ({@link fokusZiel}): solange der Wechsel läuft, gilt das nicht als Verlassen, danach
+ * geht der Fokus an den Auslöser zurück — aber nur, wenn er noch auf `<body>` liegt.
  */
 
 export interface FmsTableauProps {
@@ -153,9 +129,8 @@ export default function FmsTableau({
     bedienung.onWaehlen(statusId);
   };
 
-  // Der Abschluss der Mutation kommt als neuer `bedienungVon`-Stand von der Seite (dort je
-  // Render neu gebaut), das Verschwinden einer Kachel als neue `fahrzeuge` — beide stehen
-  // deshalb in den Abhängigkeiten. Gelesen werden sonst nur Refs und das DOM.
+  // Der Abschluss der Mutation kommt als neuer `bedienungVon`-Stand, das Verschwinden einer
+  // Kachel als neue `fahrzeuge` — beide stehen deshalb in den Abhängigkeiten.
   useEffect(() => {
     const aktiv = document.activeElement;
     const aufBody = aktiv == null || aktiv === document.body;
@@ -174,10 +149,9 @@ export default function FmsTableau({
         return;
       }
     }
-    // WebKit feuert beim Entfernen des fokussierten Knotens KEIN `focusout` (gemessen im
-    // Review): verschwindet die Kachel unter dem Fokus, erreichte `verlassen` die Wurzel nie
-    // und die Schleuse bliebe gefroren. Deshalb hier nachgeprüft — ein offenes Menü im
-    // Portal zählt weiter als drinnen.
+    // WebKit feuert beim Entfernen des fokussierten Knotens KEIN `focusout`: verschwände die Kachel
+    // unter dem Fokus, bliebe die Schleuse gefroren. Deshalb hier nachgeprüft; ein offenes Menü im
+    // Portal zählt als drinnen.
     if (gefroren == null) return;
     if (aktiv instanceof Node && wurzel.current?.contains(aktiv)) return;
     if (aktiv instanceof Element && aktiv.closest(OVERLAY)) return;
@@ -202,8 +176,7 @@ export default function FmsTableau({
     e.preventDefault();
     const ziffer = Number(e.key);
     const zielStatus = zuordnung.get(ziffer);
-    // Fester Schlüssel: eine gehaltene Taste ersetzt den Hinweis, statt Toasts zu stapeln
-    // (Muster `kommunikation/rueckgaengig.tsx`).
+    // Fester Schlüssel: eine gehaltene Taste ersetzt den Hinweis, statt Toasts zu stapeln.
     if (!zielStatus) {
       void message.info({
         key: ZIFFER_HINWEIS,
@@ -229,8 +202,7 @@ export default function FmsTableau({
     whiteSpace: 'nowrap',
   };
 
-  // Auch während die Gliederung (Einheiten) noch lädt: sonst stünde kurz „Alle Fahrzeuge"
-  // da, und die Kacheln sortierten sich nach der Antwort in die Abschnitte um.
+  // Auch während die Gliederung lädt: sonst sortierten sich die Kacheln nach der Antwort um.
   if (ladend) return <Skeleton active />;
 
   return (

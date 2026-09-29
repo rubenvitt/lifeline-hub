@@ -12,8 +12,8 @@ import AusKatalogModal from './AusKatalogModal';
 import { globalKeys } from '../api/queryKeys';
 
 /**
- * Verwaltungstabelle der Online-Basemap-Quellen. Lesen für alle Admin-Bereichs-
- * Berechtigten; Schreiben (Anlegen/Katalog/Bearbeiten/Löschen) nur System-Admin.
+ * Verwaltungstabelle der Online-Basemap-Quellen. Lesen für alle Admin-Bereichs-Berechtigten;
+ * Schreiben nur System-Admin.
  */
 export default function OnlineQuellenVerwaltung() {
   const { benutzer } = useAuth();
@@ -28,8 +28,7 @@ export default function OnlineQuellenVerwaltung() {
     queryKey: globalKeys.adminKarteBereich('online-quellen'),
     queryFn: listeOnlineQuellen,
   });
-  // Stabile Identität (react-query liefert data referenz-stabil) → der Set-useMemo unten
-  // läuft nicht bei jedem Render neu.
+  // `data` ist referenzstabil, der Set-useMemo unten läuft also nicht je Render neu.
   const quellen = useMemo(() => quellenQuery.data ?? [], [quellenQuery.data]);
 
   const vorhandeneUrls = useMemo(() => new Set(quellen.map((q) => q.url)), [quellen]);
@@ -47,13 +46,9 @@ export default function OnlineQuellenVerwaltung() {
       dataIndex: 'name',
       key: 'name',
       /**
-       * Leitspalte: am Namen sucht ein Mensch die Quelle, nie an der DB-Kennung — dieselbe
-       * Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert.
-       *
-       * KEIN `defaultSortOrder`: das Backend liefert `ORDER BY sortier, id`
-       * (`src/karte/registry/repo.rs:141`), und `sortier` ist die vom Admin gesetzte
-       * Reihenfolge des Basemap-Switchers — genau die, die der Nutzer der Lagekarte zu
-       * sehen bekommt. Sie bleibt Voreinstellung; die alphabetische Sortierung ist ein
+       * Leitspalte: am Namen sucht ein Mensch die Quelle, nie an der DB-Kennung.
+       * KEIN `defaultSortOrder`: das Backend liefert `ORDER BY sortier, id`, und `sortier` ist die vom
+       * Admin gesetzte Reihenfolge des Basemap-Switchers. Sie bleibt Vorgabe; alphabetisch ist ein
        * Angebot, das der dritte Kopfklick zurücknimmt.
        */
       sorter: (a, b) => a.name.localeCompare(b.name, 'de'),
@@ -63,13 +58,9 @@ export default function OnlineQuellenVerwaltung() {
       dataIndex: 'typ',
       key: 'typ',
       /**
-       * BEWUSST OHNE `filters`, und das ist keine Auslassung: das Etikett zeigt den
-       * Drahtwert selbst (`{t}` → „vektor"/„raster"), der `dataIndex` trägt ihn damit
-       * ehrlich in die Freitextsuche — „raster" tippen siebt bereits. Ein Filter wäre eine
-       * zweite Tür in denselben Raum.
-       *
-       * Gegenstück ist „Aktiv" weiter unten: dort steht ein Wahrheitswert, den keine
-       * Suche erreicht — deshalb trägt jene Spalte den Filter und diese nicht.
+       * BEWUSST OHNE `filters`: das Etikett zeigt den Drahtwert selbst, der `dataIndex` trägt ihn in
+       * die Freitextsuche — „raster" tippen siebt bereits. Gegenstück ist „Aktiv", dessen
+       * Wahrheitswert keine Suche erreicht.
        */
       render: (t: OnlineQuelle['typ']) => (
         <Tag color={t === 'vektor' ? 'blue' : 'geekblue'}>{t}</Tag>
@@ -80,37 +71,27 @@ export default function OnlineQuellenVerwaltung() {
       dataIndex: 'url',
       key: 'url',
       /**
-       * Eine Kachel-URL ist 60–200 Zeichen lang und trägt ihre Aussage vorn (Schema, Host).
-       * Der frühere `word-break: break-all` machte daraus eine mehrzeilig hohe Zelle und
-       * damit die Zeilenhöhe der ganzen Tabelle (Befund N13); `showTitle` hält den vollen
-       * Wert erreichbar — die Kürzung ist eine Anzeige-, keine Datenentscheidung. Kein
-       * eigenes `render` mehr: nur so steht der Rohwert direkt im `<td>`, und Klasse,
-       * Kappung und Titel sitzen an EINEM Knoten statt an zweien.
+       * Eine Kachel-URL ist 60–200 Zeichen lang und trägt ihre Aussage vorn; umgebrochen triebe sie
+       * die Zeilenhöhe. `showTitle` hält den vollen Wert erreichbar. Kein eigenes `render`, damit
+       * Klasse, Kappung und Titel an EINEM Knoten sitzen.
        *
-       * DIE KAPPUNG SITZT AN DER ZELLE, NICHT AN DER SPALTE — im Browser gemessen
-       * (25.08.2026), weil die naheliegende `width`-Angabe hier nichts tut: `KatalogTabelle`
-       * fährt `scroll={{ x: 'max-content' }}` mit fixierter erster Spalte, und genau dafür
-       * wählt rc-table `table-layout: auto` (`lib/Table.js:427-434`). Unter `auto` ist eine
-       * Spaltenbreite nur ein Wunsch — dieselbe Zelle maß trotz `<col width="280">` 1177 px
-       * in einer 1578 px breiten Tabelle und kürzte nichts, weil antds
-       * `.ant-table-cell-ellipsis` allein `overflow`/`white-space`/`text-overflow` setzt und
-       * keins davon den Platzbedarf senkt. `maxWidth` allein bindet dagegen (gemessen: lange
-       * Zelle auf 280 px gekappt und gekürzt, kurze Zelle unbehelligt) — und ist zugleich die
-       * Form, die `components/feldbreiten.guard.test.ts` ausdrücklich will. Eine zusätzliche
-       * `width` wäre also nicht bloß wirkungslos, sondern ein Guard-Verstoß.
+       * DIE KAPPUNG SITZT AN DER ZELLE, NICHT AN DER SPALTE: unter `scroll={{ x: 'max-content' }}`
+       * mit fixierter erster Spalte wählt rc-table `table-layout: auto`, und dort ist eine
+       * Spaltenbreite nur ein Wunsch (im Browser gemessen: trotz `<col width="280">` ungekürzt;
+       * antds `.ant-table-cell-ellipsis` senkt den Platzbedarf nicht). `maxWidth` bindet — und eine
+       * zusätzliche `width` wäre ein Verstoß gegen `components/feldbreiten.guard.test.ts`.
        */
       ellipsis: { showTitle: true },
       onCell: () => ({ style: { maxWidth: 280 } }),
-      // LFH-374: gekappter Freitext mit der schwächsten Vergleichsaussage — fällt unter `lg`
-      // weg (Tablet hochkant, Handschirm) und wird vom Spaltenschalter mitgezählt. Fükw und
-      // Tablet quer liegen darüber und sehen die Spalte.
+      // Gekappter Freitext mit der schwächsten Vergleichsaussage — fällt unter `lg` weg und wird vom
+      // Spaltenschalter mitgezählt.
       abBreite: 'lg',
     },
     {
       title: 'Attribution',
       dataIndex: 'attribution',
       key: 'attribution',
-      // Freitext wie die URL, nur kürzer im Regelfall — gleiche Bauform, gleiche Begründung.
+      // Freitext wie die URL — gleiche Bauform, gleiche Begründung.
       ellipsis: { showTitle: true },
       onCell: () => ({ style: { maxWidth: 200 } }),
       render: (a: string | null) => a ?? '—',
@@ -120,30 +101,20 @@ export default function OnlineQuellenVerwaltung() {
       title: 'Sortierung',
       dataIndex: 'sortier',
       key: 'sortier',
-      // Numerisch vergleichen, nicht über die Zeichenkette: nur so steht 5 vor 40.
+      // Numerisch vergleichen: nur so steht 5 vor 40.
       sorter: (a, b) => a.sortier - b.sortier,
     },
     {
       title: 'Aktiv',
       key: 'aktiv',
       /**
-       * Die eine geschlossene Achse dieser Tabelle — und sie existiert wirklich in den
-       * DATEN: die Verwaltungsliste kommt ungefiltert aus `karte_online_quelle`
-       * (`src/karte/registry/repo.rs:141`), anders als der Switcher-Pfad daneben
-       * (`:73`, `WHERE aktiv = 1`). Inaktive Quellen stehen hier also mit drin, und
-       * „welche erscheint überhaupt in der Lagekarte?" ist die erste Frage an diese Tabelle.
-       * Genau daran scheiterte der Filter bei Qualifikationen und Einheitentypen: dort siebt
-       * schon der Server, clientseitig bliebe nichts zu filtern.
+       * Die geschlossene Achse dieser Tabelle, wirklich in den Daten: die Verwaltungsliste kommt
+       * ungefiltert (der Switcher-Pfad siebt `WHERE aktiv = 1`), und „erscheint sie in der
+       * Lagekarte?" ist die erste Frage an diese Tabelle.
        *
-       * KEIN `dataIndex` (Norm der Katalogtabellen): der Filter braucht ihn nicht
-       * (`onFilter` liest den Datensatz selbst), zöge aber den Wahrheitswert in die
-       * Freitextsuche — „true" träfe dann jede aktive Quelle, ein Wort, das in keiner Zelle
-       * steht. Die Kehrseite ist der Grund für den Filter: ein Wahrheitswert ist über die
-       * Suche NICHT erreichbar, das Filtermenü ist sein einziger Zugang.
-       *
-       * Die Werte sind Wahrheitswerte statt Zeichenketten — antd typisiert das
-       * Filterargument als `React.Key | boolean`, ein `String(wert)`-Umweg wie bei den
-       * Enum-Achsen der Stammdaten ist hier also nicht nötig.
+       * KEIN `dataIndex`: der Filter braucht ihn nicht, zöge aber „true" in die Freitextsuche. Ein
+       * Wahrheitswert ist über die Suche nicht erreichbar, der Filter ist sein einziger Zugang.
+       * Die Werte sind Wahrheitswerte — antd typisiert das Filterargument als `React.Key | boolean`.
        */
       filters: [
         { text: 'aktiv', value: true },
@@ -160,10 +131,8 @@ export default function OnlineQuellenVerwaltung() {
             // Die Zeilenaktionen sind kein Vergleichsgegenstand — nicht abwählbar.
             immerSichtbar: true,
             render: (_, q: OnlineQuelle) => (
-              // `size="middle"` trennt die destruktive von der neutralen Aktion (LFH-363-Norm,
-              // hier für B5f eingelöst): der Vorgabe-Abstand eines `<Space>` ist im Projekt
-              // `abstand.xs` = 3/5/7 px und damit im Handschuh-Betrieb keine Trennung.
-              // Erzwungen von `components/aktionsabstand.guard.test.ts`.
+              // `size="middle"` trennt die destruktive von der neutralen Aktion
+              // (`components/aktionsabstand.guard.test.ts`).
               <Space size="middle">
                 <Button
                   onClick={() => {
@@ -204,10 +173,8 @@ export default function OnlineQuellenVerwaltung() {
           <Button onClick={() => setKatalogOffen(true)}>Aus Katalog hinzufügen</Button>
         </Space>
       )}
-      {/* Wiederholt wird GENAU diese Query, nicht der ganze Karten-Zweig: `invalidiereKarte`
-          zöge Katalog und Karten-Config mit, die beide nicht gescheitert sind. Die Zusage aus
-          dem früheren Kommentar hier — Knopf samt Test mit AK1 — ist mit dem Partnerpaar in
-          `OnlineQuellenVerwaltung.test.tsx` eingelöst (LFH-331 · B3). */}
+      {/* Wiederholt wird GENAU diese Query: `invalidiereKarte` zöge Katalog und Karten-Config mit, die
+         nicht gescheitert sind. */}
       {quellenQuery.isError ? (
         <SeitenFehler
           text="Online-Quellen konnten nicht geladen werden"
@@ -221,14 +188,10 @@ export default function OnlineQuellenVerwaltung() {
           dataSource={quellen}
           columns={spalten}
           locale={{ emptyText: 'Noch keine Online-Quellen' }}
-          // Durchsucht werden die Spalten mit Datenbezug: Name, Typ, URL, Attribution und
-          // (technisch mit) Sortierung. „Aktiv" trägt bewusst keinen `dataIndex` und bleibt
-          // dem Filter vorbehalten. Der Platzhalter nennt die drei Felder, nach denen
-          // tatsächlich getippt wird — die volle Aufzählung würde im 220 px breiten Feld
-          // ohnehin abgeschnitten.
+          // Durchsucht werden Name, Typ, URL, Attribution und (technisch) Sortierung; „Aktiv" bleibt dem
+          // Filter vorbehalten. Der Platzhalter nennt die drei Felder, nach denen getippt wird.
           suche={{ platzhalter: 'Name, URL oder Attribution' }}
-          // Kriterium 14 (LFH-374): umschaltbarer Spaltensatz mit Zähler. Name ist Spalte 0
-          // und damit nie abwählbar, Aktionen sind `immerSichtbar`.
+          // Umschaltbarer Spaltensatz mit Zähler; Name ist Spalte 0 und nie abwählbar.
           spaltenSchalter={{ bezeichnung: 'Online-Quellen' }}
         />
       )}

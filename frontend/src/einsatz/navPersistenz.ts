@@ -1,23 +1,15 @@
 /**
- * Merkt, ob das Modul-Panel des Einsatz-Rahmens eingeklappt ist (LFH-329 · B1/H11).
+ * Merkt, ob das Modul-Panel des Einsatz-Rahmens eingeklappt ist (LFH-329).
  *
- * WARUM EIN EIGENES BOOLEAN UND NICHT `offeneKategorie`: die Zustandsvariable im
- * Layout trug bis hierher zwei Bedeutungen in einer — WELCHE Kategorie offen ist
- * und OB überhaupt eine offen ist. Der Effekt, der das Panel beim Navigieren an
- * die Kategorie des aktuellen Moduls angleicht, überschreibt sie bei jedem
- * Modulwechsel; ein darauf gestütztes „zugeklappt" klappte also beim ersten
- * Sprung in eine andere Kategorie wieder auf. Die beiden Bedeutungen sind
- * deshalb getrennt, und nur die zweite wird gemerkt.
+ * EIGENES BOOLEAN statt `offeneKategorie`: die gleicht der Layout-Effekt bei jedem
+ * Modulwechsel an die Kategorie des Moduls an; ein darauf gestütztes „zugeklappt" klappte
+ * beim nächsten Sprung wieder auf. Gemerkt wird nur, OB eine Kategorie offen ist.
  *
- * BEWUSST GLOBAL, nicht je Einsatz: der Rahmen ist einsatzunabhängig: mal auf,
- * mal zu, je nachdem welcher Einsatz gerade offen ist, wäre für den Benutzer
- * Zufall statt Einstellung.
+ * BEWUSST GLOBAL, nicht je Einsatz: mal auf, mal zu je nach Einsatz wäre Zufall statt
+ * Einstellung.
  *
- * Schreibweise des Schlüssels nach `lfh:alarm:mute` (`alarm/alarmTon.ts`), nicht
- * nach der Punktform aus `theme/ThemeModeProvider.tsx` — die Doppelpunkt-Form ist
- * im Bestand die häufigere. Jeder Zugriff liegt in `try`/`catch`: im Privatmodus
- * wirft der Speicher, und eine vergessene Navigation ist kein Grund, den
- * Einsatz-Rahmen abstürzen zu lassen.
+ * Jeder Zugriff liegt in `try`/`catch`: im Privatmodus wirft der Speicher, und eine
+ * vergessene Navigation ist kein Grund, den Einsatz-Rahmen abstürzen zu lassen.
  */
 
 const SCHLUESSEL = 'lfh:nav:eingeklappt';

@@ -7,18 +7,16 @@ import type {
 import { apiSend } from './client';
 
 /**
- * Deckt `webauthn_rs::prelude::CreationChallengeResponse` ab (LFH-275, Task 5). Das Backend
- * serialisiert `PublicKeyCredentialCreationOptions` camelCase mit base64url-kodierten Feldern
- * (`challenge`/`user.id`/`excludeCredentials[].id`) — geprüft gegen `webauthn-rs-proto` 0.5.5
- * (`attest.rs`): das Shape deckt sich Feld-für-Feld mit `PublicKeyCredentialCreationOptionsJSON`
- * aus `@simplewebauthn/browser`, daher kein manuelles Base64url-Handling nötig.
+ * Deckt `webauthn_rs::prelude::CreationChallengeResponse` ab. Das Backend serialisiert camelCase
+ * mit base64url-kodierten Feldern; das Shape deckt sich Feld für Feld mit
+ * `PublicKeyCredentialCreationOptionsJSON` aus `@simplewebauthn/browser`, daher kein manuelles
+ * Base64url-Handling.
  */
 export interface WebauthnCreationChallenge {
   publicKey: PublicKeyCredentialCreationOptionsJSON;
 }
 
-/** Deckt `webauthn_rs::prelude::RequestChallengeResponse` ab (LFH-275, Task 6). Analog
- *  {@link WebauthnCreationChallenge} — Shape deckungsgleich mit
+/** Deckt `webauthn_rs::prelude::RequestChallengeResponse` ab, deckungsgleich mit
  *  `PublicKeyCredentialRequestOptionsJSON`. */
 export interface WebauthnRequestChallenge {
   publicKey: PublicKeyCredentialRequestOptionsJSON;
@@ -40,14 +38,9 @@ export function webauthnRegistrierungAbschliessen(cred: RegistrationResponseJSON
   return apiSend<void>('/api/auth/webauthn/register/finish', 'POST', cred);
 }
 
-/** POST /api/auth/webauthn/discoverable/start — beginnt den **usernameless** Passkey-Login
- *  (öffentlich, PRE-Login, LFH-313). KEIN Body, KEIN Benutzername: der Authenticator entdeckt den
- *  Benutzer selbst (leere `allowCredentials`). Setzt das kurzlebige, HttpOnly `webauthn_disc`-
- *  Cookie; der Browser schickt es bei `discoverable/finish` automatisch mit.
- *
- *  Der frühere benutzergebundene Weg (`/auth/start` mit `{benutzername}`) bleibt serverseitig als
- *  Fallback bestehen, wird vom Frontend aber nicht mehr genutzt — der Passkey braucht keinen
- *  Benutzernamen. */
+/** POST /api/auth/webauthn/discoverable/start: beginnt den **usernameless** Passkey-Login
+ *  (öffentlich, vor der Anmeldung). KEIN Body: der Authenticator entdeckt den Benutzer selbst.
+ *  Setzt das kurzlebige, HttpOnly `webauthn_disc`-Cookie für `discoverable/finish`. */
 export function webauthnDiscoverableAnmeldungStarten(): Promise<WebauthnRequestChallenge> {
   return apiSend<WebauthnRequestChallenge>('/api/auth/webauthn/discoverable/start', 'POST');
 }

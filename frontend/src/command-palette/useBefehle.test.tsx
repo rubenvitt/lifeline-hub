@@ -1,4 +1,3 @@
-// frontend/src/command-palette/useBefehle.test.tsx
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -41,12 +40,9 @@ describe('useBefehle', () => {
   });
 
   /**
-   * DIE NAHT der aktuellen Route (LFH-391 · C4, Arbeitspunkt 3): `befehle.test.ts` prüft die
-   * Regel am reinen `baueBefehle`, hier hängt sie am PFAD. Ohne diesen Test bliebe
-   * unbewiesen, dass der Schlüssel überhaupt aus der Route gezogen und durchgereicht wird.
-   *
-   * Beide Hälften im selben Lauf: 'personen' bleibt, 'etb' fällt heraus — ein Riegel, der
-   * die ganze Gruppe leert, wäre sonst ebenso grün.
+   * Die Naht der aktuellen Route: die Regel ist am reinen `baueBefehle` geprüft, hier hängt sie am
+   * PFAD. Beide Hälften im selben Lauf ('personen' bleibt, 'etb' fällt heraus), sonst wäre auch
+   * ein Riegel grün, der die Gruppe leert.
    */
   it('lässt das Modul der aktuellen Route aus der Zuletzt-Gruppe heraus', async () => {
     localStorage.setItem('lfh:nav:zuletzt:5', JSON.stringify(['etb', 'personen']));
@@ -61,12 +57,9 @@ describe('useBefehle', () => {
   });
 
   /**
-   * DIE NAHT der Öffnungsart (LFH-645, Review-Befund): `befehle.test.ts` prüft das
-   * Durchreichen am reinen `baueBefehle` mit einem eigenen `navigate`. Hier hängt es an der
-   * VERDRAHTUNG — der Hook verwarf das zweite Argument (`(p) => navigate(p)`), und jede
-   * Modul-, Zuletzt-, Schnellaktions- und Navigationszeile öffnete mit Strg/⌘+↵ still im
-   * aktuellen Tab. Kein Test sah es: der Provider-Test mockt diesen Hook, e2e fuhr nur Person
-   * und Koordinate.
+   * Die Naht der Öffnungsart: der Hook muss das zweite Argument an das übergebene `navigate`
+   * weiterreichen, sonst öffnet Strg/⌘+↵ jede feste Zeile still im aktuellen Tab. Der Provider-Test
+   * mockt diesen Hook und sähe das nicht.
    */
   it('reicht die Öffnungsart bis zum übergebenen navigate durch', async () => {
     const navigate = vi.fn();

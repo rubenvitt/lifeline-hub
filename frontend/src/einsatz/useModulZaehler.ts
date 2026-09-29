@@ -44,15 +44,9 @@ function plural(anzahl: number, singular: string, pluralText: string): string {
 type Antwort<Q extends ServerZaehlerQuelle> = NonNullable<ModulZaehler[Q]>;
 
 /**
- * Serverfeld → Zahl + Bedeutung, je Quelle (LFH-612).
- *
- * WAS gezählt wird, entscheidet der Server (`src/einsatz/zaehler.rs`); hier steht nur, wie
- * es heißt. Die vier Kommunikations-Wortlaute sind byte-gleich zum Stand vor LFH-612, als
- * der Browser sie aus vollen Listen rechnete — Tooltip und zugänglicher Name ändern sich
- * durch den Umzug nicht.
- *
- * Ein `Record` über das String-Union der Quellen: eine neue Quelle ohne Abbildung bricht den
- * Typcheck, statt still ohne Zähler zu bleiben.
+ * Serverfeld → Zahl + Bedeutung je Quelle. WAS gezählt wird, entscheidet der Server
+ * (`src/einsatz/zaehler.rs`); hier steht nur, wie es heißt. Ein `Record` über die Quellen: eine
+ * neue Quelle ohne Abbildung bricht den Typcheck.
  */
 const ABBILDUNG: { [Q in ServerZaehlerQuelle]: (z: Antwort<Q>) => ModulZaehlerWert } = {
   etb: ({ gesamt }) => ({
@@ -93,10 +87,9 @@ const ABBILDUNG: { [Q in ServerZaehlerQuelle]: (z: Antwort<Q>) => ModulZaehlerWe
 export const ZAEHLER_QUELLEN = Object.keys(ABBILDUNG) as ServerZaehlerQuelle[];
 
 /**
- * Die Listen-Keys der gezählten Module. Wer einen davon invalidiert, verändert eine gezählte
- * Menge und muss den Modulzähler mit invalidieren — `queryKeys.test.ts` prüft das gegen
- * {@link EINSATZ_STREAM_EVENTS}. Hier und nicht im Test, damit eine neue Quelle ohne
- * Listen-Key den Typcheck bricht.
+ * Die Listen-Keys der gezählten Module: wer einen invalidiert, verändert eine gezählte Menge und
+ * muss den Modulzähler mit invalidieren (`queryKeys.test.ts` prüft das). Hier, damit eine neue
+ * Quelle ohne Listen-Key den Typcheck bricht.
  */
 export const ZAEHLER_LISTEN_KEYS: Record<ServerZaehlerQuelle, EinsatzKey> = {
   etb: EINSATZ_KEYS.etb,
@@ -122,16 +115,16 @@ export function bildeZaehler(antwort: ModulZaehler): ModulZaehlerMap {
 }
 
 /**
- * Die drei Zähler, die der Browser selbst rechnet (LFH-632, LFH-635, LFH-639) — sie stehen NICHT in
- * der Serverantwort und deshalb auch nicht in {@link ZAEHLER_QUELLEN}/{@link ZAEHLER_LISTEN_KEYS}:
- * ihre Frische hängt an der eigenen Modulliste, nicht am Modulzähler-Key.
+ * Die Zähler, die der Browser selbst rechnet — nicht in der Serverantwort und damit nicht in
+ * {@link ZAEHLER_QUELLEN}/{@link ZAEHLER_LISTEN_KEYS}: ihre Frische hängt an der eigenen
+ * Modulliste.
  */
 export function berechneDokumentZaehler(dokumente: readonly unknown[]): ModulZaehlerWert {
   const n = dokumente.length;
   return { wert: n, beschreibung: plural(n, 'abgelegtes Dokument', 'abgelegte Dokumente') };
 }
 
-/** LFH-635: Schichten in der Vorwarnzeit oder überfällig — was jetzt Handlung braucht. */
+/** Schichten in der Vorwarnzeit oder überfällig — was jetzt Handlung braucht. */
 export function berechneAbloesungZaehler(
   abloesungen: readonly Abloesung[],
   jetzt: Dayjs,
@@ -144,11 +137,8 @@ export function berechneAbloesungZaehler(
 }
 
 /**
- * LFH-639: aktive Evakuierungsbezirke — nicht storniert, nicht aufgehoben. „Aktiv" steht
- * EINMAL in `betreuung/evakuierungKennzahl.ts`, damit Zähler und Kennzahl nicht
- * auseinanderlaufen. Browser-Zähler, weil die Seite und die Kennzahl dieselbe Übersicht
- * (`einsatzKeys.betreuung`) ohnehin laden — ein Serverfeld wäre ein zweites Cache-Fach für
- * dieselbe Aussage.
+ * Aktive Evakuierungsbezirke; „aktiv" steht EINMAL in `betreuung/evakuierungKennzahl.ts`.
+ * Browser-Zähler, weil Seite und Kennzahl dieselbe Übersicht ohnehin laden.
  */
 export function berechneBetreuungZaehler(
   bezirke: ReadonlyArray<Pick<Evakuierungsbezirk, 'raeumung' | 'storniert_at'>>,
@@ -161,12 +151,10 @@ export function berechneBetreuungZaehler(
 }
 
 /**
- * Ob der Rahmen den Zähler einer Quelle zeigen darf: nur an einem sichtbaren UND freien
- * Modul. Das Laden filtert seit LFH-612 der Server (ein nicht erlaubtes Modul fehlt in der
- * Antwort, dort mit den Org-Vorgaben, die der Client nicht kennt); diese Prüfung hält die
- * Anzeige zusätzlich an dieselbe Sicht wie die Navigation — ein Modul, das der Rahmen nicht
- * zeigt, zeigt auch keine Zahl. Für die drei Browser-Zähler ist sie zugleich das Ladegate:
- * ein ausgeblendetes oder gesperrtes Modul erzeugt weder 403-Rauschen noch einen Seitenkanal.
+ * Ob der Rahmen den Zähler einer Quelle zeigen darf: nur an einem sichtbaren UND freien Modul.
+ * Das Laden filtert der Server (ein nicht erlaubtes Modul fehlt); diese Prüfung hält die Anzeige
+ * an dieselbe Sicht wie die Navigation. Für die Browser-Zähler ist sie zugleich das Ladegate:
+ * kein 403-Rauschen, kein Seitenkanal.
  */
 export function darfZaehlerZeigen(
   quelle: ModulZaehlerQuelle,
@@ -180,9 +168,8 @@ export function darfZaehlerZeigen(
 }
 
 /**
- * Die Zähler des Einsatz-Navigationsrahmens: EINE Serverabfrage für die acht Serverquellen
- * (LFH-612), dazu die drei Browser-Zähler aus ihren eigenen Modullisten (LFH-632, LFH-635,
- * LFH-639).
+ * Die Zähler des Einsatz-Navigationsrahmens: EINE Serverabfrage für die Serverquellen, dazu die
+ * Browser-Zähler aus ihren eigenen Modullisten.
  */
 export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): ModulZaehlerMap {
   const gueltigerEinsatz = Number.isFinite(einsatzId);
@@ -205,14 +192,14 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
     queryFn: () => listeAbloesungen(einsatzId, 'laufend'),
     enabled: abloesungAktiv,
   });
-  // Dieselbe Übersicht wie Seite und Kennzahl (LFH-639): ein Abruf, ein Cache-Fach.
+  // Dieselbe Übersicht wie Seite und Kennzahl: ein Abruf, ein Cache-Fach.
   const betreuung = useQuery({
     queryKey: einsatzKeys.betreuung(einsatzId),
     queryFn: () => ladeBetreuung(einsatzId),
     enabled: betreuungAktiv,
   });
-  // Die Einstufung hängt an der Uhr, nicht nur am Abruf: ohne Wecker bliebe der Zähler bei
-  // einer Schicht, die gerade in die Vorwarnzeit läuft, still auf dem alten Stand.
+  // Die Einstufung hängt an der Uhr: ohne Wecker bliebe der Zähler bei einer Schicht, die in die
+  // Vorwarnzeit läuft, auf dem alten Stand.
   const jetzt = useEinstufungsUhr(abloesungAktiv ? abloesungen.data : undefined);
 
   const karte: ModulZaehlerMap = zaehler.isSuccess ? bildeZaehler(zaehler.data) : {};

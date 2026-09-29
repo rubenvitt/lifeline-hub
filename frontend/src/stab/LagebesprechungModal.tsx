@@ -17,7 +17,7 @@ import {
   type AbschlussFormWerte,
 } from './lagebesprechungAbschluss';
 
-/** Teilmenge der geteilten Schnellwahl (Spec 10: +30/+60/+120; die Zahlen sind `[abgeleitet]`). */
+/** Teilmenge der geteilten Schnellwahl (+30/+60/+120). */
 const SCHNELLWAHL = schnellwahlAuswahl([30, 60, 120]);
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
 const NAECHSTE_ZU_FRUEH =
@@ -33,20 +33,16 @@ interface LagebesprechungModalProps {
 }
 
 /**
- * „Lagebesprechung abschließen" (LFH-543, Spec 10) auf `ErfassungsModal`.
+ * „Lagebesprechung abschließen" auf `ErfassungsModal`.
  *
  * Zwei sichtbare Felder — Entschluss (Pflicht) und nächster Termin mit Schnellwahl —, der
- * Zeitpunkt der Besprechung unter „Weitere Angaben". `forceRender` am Collapse ist TRAGEND:
- * nur so kommt der Zeitpunkt auch zugeklappt in `onFinish` an, und nur mit ihm lässt sich die
- * POST-Antwort der eigenen Anfrage zuordnen (`eigeneLagebesprechung`).
+ * Zeitpunkt unter „Weitere Angaben". `forceRender` ist TRAGEND: nur so kommt der Zeitpunkt
+ * zugeklappt in `onFinish` an, und nur mit ihm lässt sich die POST-Antwort der eigenen Anfrage
+ * zuordnen (`eigeneLagebesprechung`).
  *
- * Montiert = offen (die Seite rendert `{offen && …}`). Deshalb friert `useState` Vorbelegung und
- * Vergleichsbasis beim ÖFFNEN ein, obwohl `stab` live invalidiert wird (LFH-303), und jede
- * Öffnung hat eine frische Mutation ohne alten Fehler — ein `reset()` wie im `FreigabeDialog`
- * (der montiert bleibt) ist hier nicht nötig.
- *
- * Fehler des POST stehen IM Modal (LFH-535): die Mutation hat kein `onError`, `mutateAsync`
- * lehnt ab, die Hülle lässt die Felder stehen. Erfolg quittiert der Aufrufer per Toast.
+ * Montiert = offen: `useState` friert Vorbelegung und Vergleichsbasis beim ÖFFNEN ein, obwohl
+ * `stab` live invalidiert wird, und jede Öffnung hat eine frische Mutation. Fehler des POST
+ * stehen IM Modal; Erfolg quittiert der Aufrufer per Toast.
  */
 export default function LagebesprechungModal({
   einsatzId,
@@ -63,8 +59,8 @@ export default function LagebesprechungModal({
   const mutation = useMutation({
     mutationFn: (body: LagebesprechungAbschlussBody) => schliesseLagebesprechungAb(einsatzId, body),
     onSuccess: (antwort, body) => {
-      // Der Prefix trifft auch die Historie (Sub-Key). `einsatz` ist Hygiene: die
-      // Einsatzdaten-Seite zeigt denselben Termin und steht im NICHT_LIVE-Fach (Spec Entsch. 11).
+      // Der Prefix trifft auch die Historie. `einsatz` ist Hygiene: die Einsatzdaten-Seite zeigt
+      // denselben Termin und ist nicht live.
       void qc.invalidateQueries({ queryKey: einsatzKeys.stab(einsatzId) });
       void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       onAbgeschlossen(eigeneLagebesprechung(antwort, body));
@@ -81,7 +77,7 @@ export default function LagebesprechungModal({
       laeuft={mutation.isPending}
       onErfassen={async (werte) => {
         // `stab` ist hier die LIVE-Prop, nicht die eingefrorene Vorbelegung: nur so erkennt
-        // `abschlussBody` einen inzwischen fremd gesetzten oder gelöschten Termin (Ruling 10).
+        // `abschlussBody` einen inzwischen fremd gesetzten oder gelöschten Termin.
         await mutation.mutateAsync(
           abschlussBody(werte, vorbelegung, dayjs(), stab.naechste_lagebesprechung_at),
         );
@@ -99,8 +95,8 @@ export default function LagebesprechungModal({
       <Form.Item
         label="Nächste Lagebesprechung"
         name="naechste"
-        // Clientseitiger Spiegel des 422; hängt am Zeitpunkt, deshalb `dependencies` — ein
-        // nachträglich verschobener Zeitpunkt prüft den Termin neu. Ein leeres Feld ist zulässig.
+        // Clientseitiger Spiegel des 422; `dependencies`, damit ein verschobener Zeitpunkt den Termin
+        // neu prüft. Ein leeres Feld ist zulässig.
         dependencies={['abgehalten']}
         rules={[
           ({ getFieldValue }) => ({
@@ -110,9 +106,8 @@ export default function LagebesprechungModal({
                 : Promise.reject(new Error(NAECHSTE_ZU_FRUEH)),
           }),
         ]}
-        // Die Schnellwahl ist eine Vorbelegung DESSELBEN Wertes, kein eigenes Feld — sie steht
-        // im selben `Form.Item`, das Budget bleibt bei zwei. Echte `Button` ohne `size`: sie
-        // erben `controlHeight` aus der Dichte-Staffel.
+        // Die Schnellwahl belegt DENSELBEN Wert vor, sie steht im selben `Form.Item` (Budget bleibt
+        // zwei). Echte `Button` ohne `size`, sie erben die Dichte-Staffel.
         extra={
           <Space wrap>
             {SCHNELLWAHL.map((s) => (
@@ -121,10 +116,8 @@ export default function LagebesprechungModal({
                 onClick={() =>
                   form.setFieldValue(
                     'naechste',
-                    // Ab dem SPÄTEREN von Zeitpunkt der Besprechung und jetzt (Ruling 12): ein
-                    // Zeitpunkt in der Zukunft verhindert das 422 (`naechste ≤ abgehalten`), ein
-                    // zurückliegender — nachträglich erfasst oder beim Öffnen eingefroren — lässt
-                    // „+1 h" nicht in der Vergangenheit landen.
+                    // Ab dem SPÄTEREN von Zeitpunkt und jetzt: ein künftiger Zeitpunkt verhindert das 422, ein
+                    // zurückliegender lässt „+1 h" nicht in der Vergangenheit landen.
                     schnellwahlTermin(
                       terminBezug(form.getFieldValue('abgehalten'), dayjs()),
                       s.minuten,

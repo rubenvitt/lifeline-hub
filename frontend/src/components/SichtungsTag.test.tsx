@@ -20,7 +20,7 @@ describe('SichtungsTag', () => {
       );
       const tag = screen.getByText('tot');
       expect(tag).toHaveStyle({
-        // Literale der Textrolle je Modus (Neuentwurf, 21.09.2026).
+        // Literale der Textrolle je Modus.
         color: modus === 'dark' ? '#e8ebee' : '#111418',
         background: 'transparent',
       });

@@ -37,8 +37,8 @@ const detail = {
 } as unknown as PersonDetail;
 
 /**
- * Die Vorschau ist der gemeinsame Inhalt von `PersonDetailDrawer` und der Palette (LFH-645).
- * Geprüft wird, was an BEIDEN Orten stehen muss: Stammdaten, Sichtung und der Verlauf.
+ * Die Vorschau ist der gemeinsame Inhalt von Drawer und Palette; geprüft wird, was an BEIDEN
+ * Orten stehen muss.
  */
 describe('PersonVorschau', () => {
   it('zeigt Stammdaten, Sichtung und Verlauf einer Person', async () => {

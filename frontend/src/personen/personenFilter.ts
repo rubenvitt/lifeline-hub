@@ -2,27 +2,17 @@ import type { Person } from '../api/types';
 import { hatLuecke } from './personenBilanz';
 
 /**
- * Filterkette und Sichtzustand der Betroffenen-Seite als reine Funktionen (LFH-330 · B2,
- * Muster `pages/schaeden/schadenHelfer.tsx`; Neuentwurf S7).
+ * Filterkette und Sichtzustand der Betroffenen-Seite als reine Funktionen. Zwei Achsen plus
+ * ein Schalter:
  *
- * ── ZWEI ACHSEN STATT SECHS REITER ──────────────────────────────────────────────────────
+ *  · `ansicht`    — „Zeilen", „Sichtungsraster" oder „Karte". Das Raster gruppiert ALLE
+ *                   Personen nach Sichtung (samt „unverletzt" und „ohne Sichtung"), die Karte
+ *                   zeigt die Fundorte.
+ *  · `filter`     — der Personenstatus, gilt in allen Ansichten.
+ *  · `nurLuecken` — Umschalter aus der Seitenleiste „Offene Felder", gilt ebenfalls überall.
  *
- * Bis zum Neuentwurf standen sechs Reiter nebeneinander — fünf davon Statusfilter, einer
- * („Patienten") eine ANDERE DARSTELLUNG (nach Sichtung gruppiert). Zwei Achsen in einer
- * Reiterleiste verwischten, welche von beiden gerade die Zeilen bestimmt. Jetzt:
- *
- *  · `ansicht`    — „Zeilen", „Sichtungsraster" oder „Karte" (Segmentleiste im Seitenkopf).
- *                   Das Raster ist die verallgemeinerte Patienten-Gruppierung: ALLE
- *                   Personen nach Sichtung, samt „unverletzt" und „ohne Sichtung". Die
- *                   Karte zeigt die Fundorte (LFH-613, `personen/BetroffeneKarte.tsx`).
- *  · `filter`     — der Personenstatus (Neu/Vermisst/Betroffen/Verstorben/Alle), als
- *                   zweite Leiste über der Tabelle. Gilt in BEIDEN Ansichten.
- *  · `nurLuecken` — Umschalter aus der Seitenleiste „Offene Felder". Gilt ebenfalls in
- *                   beiden Ansichten.
- *
- * Was hier NICHT lebt: die Freitextsuche. Sie hängt am `suchText` der Spalten und läuft im
- * `Datensicht`-Primitiv — ein zweites Suchfeld auf der Seite wäre eine zweite, still
- * driftende Wahrheit.
+ * Die Freitextsuche lebt NICHT hier, sondern im `Datensicht`-Primitiv — ein zweites Suchfeld
+ * wäre eine zweite Wahrheit.
  */
 
 /** Statusfilter der Seite. `'alle'` filtert nicht. */
@@ -37,11 +27,9 @@ export interface PersonenSicht {
 }
 
 /**
- * Vorgabe: Zeilen, ALLE, Lücken-Filter AUS. „Alle" statt des früheren „Neu": wer über die
- * Zeile eine Person MIT Sichtung erfasst, bekommt serverseitig `betroffen` — unter „Neu"
- * verschwände sie im Moment des Erfassens. Der Lücken-Filter ist eine Einstellung, und
- * eine Einstellung, die von selbst ansteht, ist benutzt worden, ohne gewählt worden zu
- * sein (CLAUDE.md, „Werte behalten").
+ * Vorgabe: Zeilen, ALLE, Lücken-Filter AUS. „Alle", weil eine mit Sichtung erfasste Person
+ * serverseitig `betroffen` wird und unter „Neu" beim Erfassen verschwände. Der Lücken-Filter
+ * ist eine Einstellung und steht nicht von selbst an.
  */
 export const SICHT_VORGABE: PersonenSicht = {
   ansicht: 'zeilen',
@@ -62,24 +50,15 @@ export function trifftFilter(p: Pick<Person, 'status'>, filter: PersonenFilter):
   return filter === 'alle' || p.status === filter;
 }
 
-/**
- * Zeilenmenge einer Sicht. Das Raster filtert NICHT nach Sichtung — es GRUPPIERT danach
- * (`Datensicht.gruppen`); ungesichtete Personen stehen dort in „ohne Sichtung".
- */
+/** Zeilenmenge einer Sicht. Das Raster filtert NICHT nach Sichtung, es GRUPPIERT danach. */
 export function filterPersonen(alle: readonly Person[], sicht: PersonenSicht): readonly Person[] {
   return alle.filter((p) => trifftFilter(p, sicht.filter) && (!sicht.nurLuecken || hatLuecke(p)));
 }
 
 /**
- * Die Sicht, in der eine gerade erfasste Person SICHTBAR ist — ohne die Wahl der Person
- * mehr zu verbiegen als nötig. Jede Achse wird nur zurückgenommen, wenn sie die neue Zeile
- * verbirgt: ein passender Filter bleibt stehen, ein unpassender fällt auf „Alle"; der
- * Lücken-Filter fällt nur, wenn die Person keine Lücke hat. Die Ansicht bleibt — das
- * Raster zeigt jede Person (auch ohne Sichtung).
- *
- * Vorher sprang die Seite fest in einen Reiter; bei einer Person mit Erst-Sichtung, die der
- * Server von `erfasst` auf `betroffen` hebt, war das der falsche, und die Hervorhebung
- * stand an einer Zeile, die gar nicht angezeigt wurde.
+ * Die Sicht, in der eine gerade erfasste Person SICHTBAR ist — mit so wenig Eingriff wie
+ * nötig: ein unpassender Filter fällt auf „Alle", der Lücken-Filter nur, wenn die Person keine
+ * Lücke hat. Die Ansicht bleibt (das Raster zeigt jede Person).
  */
 export function sichtFuerNeuePerson(sicht: PersonenSicht, p: Person): PersonenSicht {
   const filter = trifftFilter(p, sicht.filter) ? sicht.filter : 'alle';
@@ -89,14 +68,10 @@ export function sichtFuerNeuePerson(sicht: PersonenSicht, p: Person): PersonenSi
 }
 
 /**
- * Die Sicht nach einem Sprung von außen (LFH-620, Sprungmarken „Patienten"/„Vermisste").
- *
- * Übernommen wird nur, was die Vorgabe nennt; eine fehlende Achse bleibt, wie sie war.
- * Der Lücken-Filter fällt dagegen IMMER: wer „Vermisste" anspringt, erwartet die
- * Vermissten — ein von früher stehengebliebenes „nur offene Felder" zeigte stattdessen
- * still eine Teilmenge, und die Seitenleiste mit dem Schalter steht unter `xl` gar nicht
- * im Blick. Ohne jede Vorgabe bleibt die Sicht unverändert (dieselbe Identität), damit ein
- * leerer Auftrag keinen Render auslöst.
+ * Die Sicht nach einem Sprung von außen (Sprungmarken „Patienten"/„Vermisste").
+ * Übernommen wird nur, was die Vorgabe nennt. Der Lücken-Filter fällt IMMER: ein stehen
+ * gebliebenes „nur offene Felder" zeigte still eine Teilmenge, und der Schalter ist unter `xl`
+ * nicht im Blick. Ohne Vorgabe bleibt die Sicht identisch, damit kein Render entsteht.
  */
 export function sichtNachSprung(
   sicht: PersonenSicht,
@@ -116,11 +91,8 @@ export function rasterSchluessel(p: Pick<Person, 'aktuelle_sichtung'>): string {
 }
 
 /**
- * Die für einen Vermisst-Abgleich in Frage kommenden Personen: betroffen oder verstorben,
- * und nicht storniert.
- *
- * `!p.storniert_at` ist nicht Beiwerk — eine stornierte Person darf als Abgleichsziel nicht
- * angeboten werden, und ohne diese Bedingung stünde sie unauffällig in der Auswahlliste.
+ * Kandidaten für einen Vermisst-Abgleich: betroffen oder verstorben und nicht storniert — eine
+ * stornierte Person stünde sonst unauffällig in der Auswahl.
  */
 export function gefundenePersonen(alle: readonly Person[]): readonly Person[] {
   return alle.filter(

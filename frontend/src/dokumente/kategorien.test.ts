@@ -3,10 +3,9 @@ import { DOKUMENT_KATEGORIEN, DOKUMENT_KATEGORIE_REIHENFOLGE } from './kategorie
 
 describe('Dokument-Kategorien', () => {
   it('REIHENFOLGE deckt jeden Schlüssel aus KATEGORIEN genau einmal ab', () => {
-    // DOKUMENT_KATEGORIEN ist ein Record über das generierte Enum — eine neue Backend-Variante
-    // bricht dort den Typcheck. Das allein sichert aber nicht, dass REIHENFOLGE (ein reines
-    // Array) mitwächst: ein sechster Schlüssel bekäme ein Label und verschwände dort still
-    // aus Anzeigereihenfolge/Filterliste. Diese beiden Prüfungen schließen genau diese Lücke.
+    // Der Record über das generierte Enum bricht bei neuer Variante den Typcheck, das Array
+    // REIHENFOLGE aber nicht — ohne diese Prüfungen verschwände ein neuer Schlüssel still aus
+    // Anzeigereihenfolge und Filterliste.
     const schluessel = Object.keys(DOKUMENT_KATEGORIEN).sort();
     const reihenfolge = [...DOKUMENT_KATEGORIE_REIHENFOLGE].sort();
     expect(reihenfolge).toEqual(schluessel);

@@ -7,17 +7,15 @@ import { darfZaehlerZeigen } from '../einsatz/useModulZaehler';
 import { evakuierungKennzahl, type EvakuierungKennzahl } from './evakuierungKennzahl';
 
 /**
- * Zustand der Kennzahl „Evakuiert N · von M geplant" (LFH-639, design.md D9). Vier Fälle,
- * die ein Aufrufer auseinanderhalten MUSS:
+ * Zustand der Kennzahl „Evakuiert N · von M geplant". Vier Fälle, die ein Aufrufer
+ * auseinanderhalten MUSS:
  *
- *  - `aus` — das Modul ist ausgeblendet oder rollen-gesperrt (oder die Einsatz-ID ist
- *    ungültig). Es wird NICHT geladen: das Backend antwortete mit 403, und ein Zähler, der
- *    trotzdem fragt, wäre 403-Rauschen und ein Seitenkanal. Kein Fehler, keine Kennzahl.
- *  - `laden` — der erste Abruf läuft, oder der Aufrufer meldet `bereit: false` (siehe dort).
- *  - `fehler` — der Abruf ist gescheitert. Auch dann, wenn ältere Daten im Cache liegen: eine
- *    Kennzahl aus einem Stand, von dem man nicht weiß, ob er noch gilt, wäre eine stille
- *    Behauptung. „Fehler" ist NIE „keine Kennzahl" (Spec, Requirement „Kennzahl …").
- *  - `daten` — `kennzahl` ist die Kennzahl oder `null`, wenn es keine geplante Evakuierung gibt.
+ *  - `aus` — Modul ausgeblendet oder gesperrt (oder ungültige Einsatz-ID). Es wird NICHT
+ *    geladen: ein 403 wäre Rauschen und ein Seitenkanal.
+ *  - `laden` — der erste Abruf läuft, oder der Aufrufer meldet `bereit: false`.
+ *  - `fehler` — der Abruf ist gescheitert, auch wenn ältere Daten im Cache liegen. „Fehler" ist
+ *    NIE „keine Kennzahl".
+ *  - `daten` — `kennzahl` ist die Kennzahl oder `null` (keine geplante Evakuierung).
  */
 export type EvakuierungKennzahlZustand =
   | { zustand: 'aus' }
@@ -30,21 +28,16 @@ interface Args {
   benutzer: BenutzerAnzeige | null;
   overrides?: ModulOverrides;
   /**
-   * `false`, solange Benutzer oder Modul-Overrides noch laden (LFH-607, Lage-Dashboard). Dann
-   * gilt `laden` OHNE Abruf: ohne Overrides hielte `darfZaehlerZeigen` ein ausgeblendetes
-   * Modul für sichtbar, der Abruf endete im 403 — und „kein Zugriff" stünde beim Kaltstart
-   * kurz da, bevor das Recht feststeht. Vorgabe `true` (Bestandsaufrufer).
+   * `false`, solange Benutzer oder Modul-Overrides laden: dann gilt `laden` OHNE Abruf — ohne
+   * Overrides hielte `darfZaehlerZeigen` ein ausgeblendetes Modul für sichtbar (403).
    */
   bereit?: boolean;
 }
 
 /**
- * Kennzahl aus der Betreuungs-Übersicht, gelesen vom Lage-Dashboard (LFH-607). Liest
- * DIESELBE Query wie Modulseite und Modulzähler (`einsatzKeys.betreuung`) — ein Abruf, ein
- * Cache-Fach, und das Live-Ereignis `betreuung` frischt alle drei auf.
- *
- * Gegatet über `darfZaehlerZeigen('betreuung', …)`: dieselbe Rechteprüfung wie der Zähler in
- * der Navigation, nicht eine zweite, die auseinanderlaufen könnte.
+ * Kennzahl aus der Betreuungs-Übersicht, gelesen vom Lage-Dashboard. DIESELBE Query wie
+ * Modulseite und Modulzähler; gegatet über `darfZaehlerZeigen('betreuung', …)` wie der Zähler
+ * in der Navigation.
  */
 export function useEvakuierungKennzahl({
   einsatzId,
@@ -59,8 +52,7 @@ export function useEvakuierungKennzahl({
     enabled: bereit && aktiv,
   });
   const { isError, error, isSuccess, data } = query;
-  // Identitätsstabil (LFH-607): das Lage-Dashboard reicht den Zustand in ein `useMemo` weiter,
-  // ein frisches Objekt je Render hebelte es aus.
+  // Identitätsstabil: das Lage-Dashboard reicht den Zustand in ein `useMemo` weiter.
   return useMemo((): EvakuierungKennzahlZustand => {
     if (!bereit) return { zustand: 'laden' };
     if (!aktiv) return { zustand: 'aus' };

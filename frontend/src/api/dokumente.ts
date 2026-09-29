@@ -3,11 +3,9 @@ import type { Dokument, DokumentKategorie } from './types';
 import { UPLOAD_TIMEOUT_MS } from './upload';
 
 /**
- * Dateiauswahl der Dokument-Allowlist (`ERLAUBTE_MIME_DOKUMENT` in `src/anhang/mod.rs`:
- * Chat-Liste plus HEIC/HEIF und TIFF). Geteilt von `DokumentAblegenModal` und der
- * ETB-Schnellerfassung (LFH-117), deren Upload dieselbe Liste nimmt — eine Kopie liefe beim
- * nächsten Dateityp still auseinander. Der Server prüft ohnehin; das hier filtert nur den
- * Dateidialog vor.
+ * Dateiauswahl der Dokument-Allowlist (`ERLAUBTE_MIME_DOKUMENT` in `src/anhang/mod.rs`), geteilt
+ * von `DokumentAblegenModal` und der ETB-Schnellerfassung. Der Server prüft ohnehin; das hier
+ * filtert nur den Dateidialog vor.
  */
 export const DOKUMENT_ACCEPT =
   '.pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.txt,.csv,.docx,.xlsx,.pptx';

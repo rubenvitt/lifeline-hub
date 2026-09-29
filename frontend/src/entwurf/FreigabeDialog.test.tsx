@@ -6,11 +6,8 @@ import FreigabeDialog, { freigabeGrund } from './FreigabeDialog';
 import { ApiError } from '../api/client';
 
 /**
- * LFH-535 — der Träger eines gescheiterten Zustandsübergangs.
- *
- * Die Fallunterscheidung steht als reine Funktion daneben, damit sie ohne Render prüfbar
- * ist (Muster `fehlerText`/`bedienzielStil`). Die Aussage, die ein Primitiv auffliegen
- * lässt, das immer etwas liefert, ist die über den LEERFALL.
+ * Die Fallunterscheidung als reine Funktion; die Aussage, die ein Primitiv mit immer gefülltem Ergebnis
+ * auffliegen lässt, ist die über den LEERFALL.
  */
 describe('freigabeGrund (rein)', () => {
   it('liefert ohne Fehler NICHTS', () => {
@@ -29,9 +26,8 @@ describe('freigabeGrund (rein)', () => {
   });
 
   /**
-   * Der Vorrang ist die Reihenfolge, nicht Geschmack: scheitert der Vorlauf, läuft die
-   * Freigabe gar nicht erst — ein dann noch stehender `freigabeFehler` stammt aus einem
-   * FRÜHEREN Versuch und wäre der veraltete von beiden.
+   * Scheitert der Vorlauf, läuft die Freigabe gar nicht erst — ein noch stehender
+   * `freigabeFehler` stammt aus einem FRÜHEREN Versuch.
    */
   it('zeigt bei zwei stehenden Gründen den Speicherfehler', () => {
     const speichern = new ApiError(503, 'Dienst weg');
@@ -67,8 +63,7 @@ describe('FreigabeDialog (LFH-535)', () => {
     renderDialog({ freigabeFehler: new ApiError(422, 'Abschnitt „Auftrag" ist leer') });
     const dialog = await screen.findByRole('dialog', { name: 'Befehl freigeben?' });
     const treffer = within(dialog).getByText('Abschnitt „Auftrag" ist leer');
-    // Die Aussage, die den Umbau trägt: der Grund hängt NICHT in der Message-Queue mit
-    // ihrer eigenen Lebensdauer von rund drei Sekunden (H14).
+    // Der Grund hängt NICHT in der Message-Queue mit ihren rund drei Sekunden Lebensdauer.
     expect(treffer.closest('.ant-message')).toBeNull();
     expect(within(dialog).getByText('Freigabe fehlgeschlagen')).toBeInTheDocument();
   });
@@ -92,8 +87,8 @@ describe('FreigabeDialog (LFH-535)', () => {
   });
 
   /**
-   * Escape muss abbrechen — `onCancel` bedient beim antd-`Modal` Schliesskreuz UND Escape.
-   * Ohne den Weg stünde der Dialog ohne Tastaturausgang da.
+   * `onCancel` bedient beim antd-`Modal` Schließkreuz UND Escape; ohne ihn gäbe es keinen
+   * Tastaturausgang.
    */
   it('bricht auch per Escape ab', async () => {
     const { onAbbrechen } = renderDialog();

@@ -31,13 +31,11 @@ describe('Liste', () => {
   });
 
   /**
-   * Der Fallback ohne `emptyText` (LFH-331 · B3). Er läuft jetzt über das Leer-Primitiv
-   * statt über antds Leer-Element; der Titel bleibt „Keine Daten", weil genau das die
-   * zehn Masken in Produktion (`ConfigProvider locale={deDE}`) heute schon zeigen —
-   * der Umbau ist am Wortlaut folgenlos, nur der Knoten wechselt.
+   * Der Fallback ohne `emptyText` (LFH-331 · B3) läuft über das Leer-Primitiv, nicht über antds
+   * Leer-Element; der Titel ist „Keine Daten".
    *
-   * Die zweite Zusicherung ist die tragende: der Text allein wäre unter dem antd-Element
-   * ebenfalls grün (in Produktion — im Test ohne Locale wäre er englisch).
+   * Die zweite Zusicherung ist die tragende: der Text allein wäre unter dem antd-Element ebenfalls
+   * grün (in Produktion — im Test ohne Locale wäre er englisch).
    */
   it('nutzt ohne emptyText das Leer-Primitiv, nicht antds Leer-Element', () => {
     const { container } = renderMitProviders(
@@ -88,9 +86,8 @@ describe('Liste', () => {
     expect(onKlick).toHaveBeenCalledTimes(1);
   });
 
-  // LFH-621: `aria-current` gehört an das Element mit der Rolle, nicht an ein inneres
-  // `div` — sonst sagt der Vorleser „Schaltfläche" ohne „aktuell". Beide Zweige: die
-  // Auswahlzeile (Klickbar-Primitiv) und die Anzeigezeile.
+  // LFH-621: `aria-current` gehört an das Element mit der Rolle, nicht an ein inneres `div`, sonst
+  // sagt der Vorleser „Schaltfläche" ohne „aktuell". Beide Zweige: Auswahl- und Anzeigezeile.
   it('reicht aria-current an das Wurzelelement der Zeile durch', () => {
     renderMitProviders(
       <Liste
@@ -165,15 +162,13 @@ describe('Liste', () => {
 });
 
 /**
- * Innenabstände (LFH-328/T14). `Liste` versorgt 10 Masken — zieht sie bei einer
- * Dichteumschaltung (B5) nicht mit, bleibt die Dichte-Staffel folgenlos.
+ * Innenabstände (LFH-328/T14): zieht `Liste` bei einer Dichteumschaltung nicht mit, bleibt die
+ * Dichte-Staffel in ihren Masken folgenlos.
  *
- * Der Test liest die Zahl NICHT aus dem Token (das prüfte den Token gegen sich
- * selbst), sondern belegt zweierlei:
- *  1. unter dem **antd-Standardtheme** bleiben die Werte byte-gleich zu vorher
- *     (16 klein / 24 default) — die 10 Masken sehen unverändert aus;
- *  2. unter `antdToken(farbenHell, 'handschuh')` **bewegen** sie sich, und zwar
- *     in beiden Größen. Ein hartkodiertes Pixel bliebe hier stehen.
+ * Die Zahl kommt NICHT aus dem Token (das prüfte den Token gegen sich selbst); belegt wird:
+ *  1. unter dem **antd-Standardtheme** stehen 16 (klein) / 24 (default);
+ *  2. unter `antdToken(farbenHell, 'handschuh')` **bewegen** sie sich, in beiden Größen. Ein
+ *     hartkodiertes Pixel bliebe stehen.
  * jsdom rechnet kein Layout, gibt Inline-Styles aber zurück — das genügt.
  */
 function abstaende(size: 'small' | 'default', dichte?: Dichte) {
@@ -219,12 +214,11 @@ describe('Liste — Innenabstände folgen der Dichte', () => {
     for (const size of ['small', 'default'] as const) {
       const kompakt = abstaende(size, 'kompakt');
       const handschuh = abstaende(size, 'handschuh');
-      // Waagerecht: die beiden Zeilen aus T14.
+      // Waagerecht.
       expect(handschuh.kopfInline).not.toBe(kompakt.kopfInline);
       expect(handschuh.eintragInline).not.toBe(kompakt.eintragInline);
-      // Senkrecht: `paddingContentVertical*` ist in diesem Theme genauso
-      // eingefroren wie die waagerechte Variante — mitgezogen, sonst wäre die
-      // Komponente nur halb dichteabhängig.
+      // Senkrecht: `paddingContentVertical*` ist in diesem Theme genauso eingefroren wie die
+      // waagerechte Variante — sonst wäre die Komponente nur halb dichteabhängig.
       expect(handschuh.kopfBlock).not.toBe(kompakt.kopfBlock);
       expect(handschuh.eintragBlock).not.toBe(kompakt.eintragBlock);
     }

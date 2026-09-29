@@ -25,11 +25,9 @@ interface FormWerte {
 }
 
 /**
- * An die Lage übergeben (LFH-95/113): optionaler Lage-Text + optionale Verortung (lat/lon).
- * Geo ist bewusst optional — ohne Koordinate landet die Meldung weiterhin nur als Listen-
- * Lageobjekt. Wird verortet, erscheint sie zusätzlich als Marker auf der Lagekarte.
- * KoordinatenEingabe liefert immer lat+lon gemeinsam oder null — kein Paar-Validator nötig.
- * Die Übergabe-Aktion ist einmalig (MeldungListe blendet sie danach aus).
+ * An die Lage übergeben: optionaler Lage-Text und optionale Verortung. Ohne Koordinate bleibt
+ * die Meldung ein Listen-Lageobjekt, verortet erscheint sie zusätzlich als Marker. Die Aktion
+ * ist einmalig (MeldungListe blendet sie danach aus).
  */
 export default function LagerelevantModal({
   offen,

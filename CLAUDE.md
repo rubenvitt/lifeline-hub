@@ -550,9 +550,14 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
-`check-migrationen.sh`.
+`check-migrationen.sh` → `check-all.test.sh`.
 - **Das Skript ist die Wahrheit**; `.github/workflows/ci.yml` ruft es unverändert. Neue Schritte
   gehören ins Skript.
+- **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
+  laufen, am Ende Gesamtstatus je Schritt und EIN Exit-Code; `--abbrechen` ist das Opt-in für
+  den schnellen Abbruch. Schritte laufen als eigenes Kommando in einer Subshell mit `set -e`,
+  **nie** in einer Bedingung (`if`/`||` schaltet errexit im ganzen Körper ab). Übersprungen
+  meldet ein Schritt mit `return "$UEBERSPRUNGEN_RC"`, nicht mit 0.
 - **Ein rot geborenes Gate wird abgeschaltet statt befolgt** — erst sweepen, dann scharf schalten
   (deshalb nicht im Gate: `cargo clippy -D warnings`).
 - Prettier prüft nur `frontend/`; nicht idempotent (nach `--write` noch rot → nochmal).
@@ -563,6 +568,9 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   (`prod_bundle_bereitstellen`; Service Worker für `e2e/lagekarte-offline-precache.spec.ts`,
   ausgeliefert vom e2e-Backend über `src/static_files.rs`).
 - **Kein `| tail` um Gate-Kommandos.** Testgüte belegen Mutationsproben, nicht Abdeckung.
+- **e2e wartet nie auf `networkidle`** (LFH-385): der SSE-Strom der Einsatzrouten lässt das Netz
+  nie ruhen (parallel rot, `--workers=1` grün). Gewartet wird auf einen Inhaltsanker; Riegel
+  `no-restricted-syntax` für `e2e/**` in `frontend/eslint.config.js`.
 - Optionaler pre-push-Hook: `git config core.hooksPath .githooks`.
 - **Release je Arbeitsschub** (`scripts/release-ruhefenster.sh`, Aufruf in `release.yml`); ein übersprungener Release-Job
   ist Normalfall; `chore(release):` zählt nicht als neuer Commit. Notizen über

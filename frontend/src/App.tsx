@@ -83,9 +83,7 @@ const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage')
 
 /**
  * Module mit echter Implementierung; alle übrigen rendern den ModulStub.
- * Gekeyt nach `ModulEintrag.key` (nicht nach `route`!) — bei `gefahrenzonen`
- * weichen key (`gefahrenzonen`) und route (`gefahren`) ab; das Element muss
- * unter dem key stehen, sonst greift der Stub-Fallback.
+ * Gekeyt nach `ModulEintrag.key`, nicht nach `route` — bei `gefahrenzonen` weichen beide ab.
  */
 const MODUL_ELEMENTE: Record<string, ReactElement> = {
   ueberblick: <UeberblickPage />,
@@ -136,17 +134,9 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
 };
 
 /**
- * Sektions-Routen der Einsatz-Einstellungen (LFH-345 · C10, H15/M15).
- *
- * Der bare Modulpfad `…/einstellungen` — den `modulZielRoute` und damit die Modul-Navigation
- * baut — leitet auf die ERSTE Sektion um. Ohne diese Index-Route rendert das Layout mit einem
- * leeren `<Outlet>`: Reiterband über weißer Fläche, und jeder Klick aus der Navigation landete
- * dort. Das Ziel kommt aus `EINSTELLUNGEN_SEKTIONEN` statt als Literal — dieselbe Liste trägt
- * das Reiterband, ein Auseinanderlaufen ist damit ausgeschlossen (Muster `ersteSektionPfad`
- * aus `admin/adminNav`).
- *
- * `Navigate` mit RELATIVEM Ziel, weil `App` die `:id` des Einsatzes nicht kennt; react-router
- * löst es gegen die Elternroute auf. Dasselbe tut `einsatz/DefaultModulRedirect`.
+ * Sektions-Routen der Einsatz-Einstellungen. Der bare Pfad `…/einstellungen` (Ziel von
+ * `modulZielRoute`) leitet auf die erste Sektion aus `EINSTELLUNGEN_SEKTIONEN` um, sonst
+ * stünde das Layout mit leerem `<Outlet>` da. `Navigate` relativ, weil `App` die `:id` nicht kennt.
  */
 const EINSTELLUNGEN_ROUTEN = (
   <>
@@ -156,18 +146,15 @@ const EINSTELLUNGEN_ROUTEN = (
     <Route path="aufbewahrung" element={<EinsatzAufbewahrung />} />
     <Route path="module" element={<EinsatzModule />} />
     <Route path="pegel" element={<EinsatzPegel />} />
-    {/* Ein unbekanntes Segment (Tippfehler, veralteter Link) trifft sonst KEIN Kind: das
-        Layout stünde mit leerem `<Outlet>` da, und das Reiterband markierte trotzdem die
-        erste Sektion — „Allgemein" ausgewählt über weißer Fläche. Dieselbe Regel wie bei
-        `parseRouteId` und `parseEtbFilter`: Unbrauchbares wird GANZ verworfen, nicht halb
-        angezeigt. Damit ist der Rückfall in `sektionAus` eine Zusicherung statt einer
-        Behauptung — es gibt keinen Pfad mehr, auf dem er greifen könnte. */}
+    {/* Unbekanntes Segment → erste Sektion, statt ein leeres `<Outlet>` unter markiertem Reiter. */}
     <Route path="*" element={<Navigate to={`../${EINSTELLUNGEN_SEKTIONEN[0].key}`} replace />} />
   </>
 );
 
-/** Genau eine Betriebszeile für alle angemeldeten Routen. Die beiden vorhandenen
- *  Layout-Zweige (globale Topbar und Einsatz-Workspace) bleiben darunter Geschwister. */
+/**
+ * Genau eine Betriebszeile für alle angemeldeten Routen; globale Topbar und
+ * Einsatz-Workspace bleiben darunter Geschwister.
+ */
 function BetriebsLayout() {
   const { benutzer, konflikt } = useAuth();
   useOfflineSync(abgleichFuer(benutzer, konflikt !== null));
@@ -210,9 +197,8 @@ export const appRouten = createRoutesFromElements(
         {/* Ebene 1 — globale Shell */}
         <Route element={<AppLayout />}>
           <Route path="/einsaetze" element={<EinsaetzePage />} />
-          {/* Benutzer-Verwaltung wohnt jetzt in der Admin-Sidebar; Alt-Link bleibt als Redirect. */}
+          {/* Alt-Link bleibt als Redirect in die Admin-Sidebar. */}
           <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
-          {/* Alt-Route bleibt für externe Links / EinsatzSwitcher erhalten */}
           <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
           <Route path="/profil" element={<ProfilPage />} />
           <Route path="/admin" element={<AdminLayout />}>
@@ -227,22 +213,14 @@ export const appRouten = createRoutesFromElements(
               </Fragment>
             ))}
             <Route path="benutzer" element={<BenutzerPage />} />
-            {/* Demo-Daten (LFH-690): Sonder-Eintrag wie `benutzer`; die Seite schützt sich
-                selbst (System-Admin UND Status 200, sonst Umleitung auf /einsaetze). */}
+            {/* Demo-Daten (LFH-690): die Seite schützt sich selbst (System-Admin UND Status 200). */}
             <Route path="demo-daten" element={<DemoDatenPage />} />
-            {/* Aufbewahrung (LFH-23): dritter Sonder-Eintrag, nur für den System-Admin; beide
-                Seiten schützen sich selbst. Die Akte trägt eine eigene, neuladefeste Adresse,
-                eine ungültige id leitet auf die Übersicht (`parseRouteId`). */}
+            {/* Aufbewahrung (LFH-23): nur für den System-Admin, beide Seiten schützen sich selbst;
+               eine ungültige id leitet auf die Übersicht. */}
             <Route path="aufbewahrung" element={<AufbewahrungUebersicht />} />
             <Route path="aufbewahrung/:einsatzId" element={<ArchivAktePage />} />
-            {/* Detailrouten der Stammdaten (LFH-346 · A7). Sie liegen IM `AdminLayout`,
-                  behalten also die Sidebar — eine Detailseite ohne den Verwaltungsrahmen
-                  wäre eine Sackgasse ohne Rückweg. Sie stehen NEBEN der `adminGruppen`-
-                  Schleife, weil die Registry Sektionen führt, keine Detailadressen.
-                  Die Reihenfolge gegenüber der Schleife ist gleichgültig: react-router 7
-                  rankt nach Spezifität, `stammdaten/fahrzeuge` (statisch) schlägt
-                  `stammdaten/fahrzeuge/:fahrzeugId` nicht, sondern trifft eine andere
-                  Adresse — die Liste bleibt unter dem Pfad ohne id erreichbar. */}
+            {/* Stammdaten-Detailrouten liegen IM `AdminLayout`, damit die Sidebar als Rückweg bleibt,
+               und neben der `adminGruppen`-Schleife, weil die Registry keine Detailadressen führt. */}
             <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
             <Route path="stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
           </Route>
@@ -262,11 +240,8 @@ export const appRouten = createRoutesFromElements(
                 )
               }
             >
-              {/* Das Einstellungs-Modul ist seit LFH-345 · C10 ein Layout mit vier
-                    Sektions-Routen. Die Kinder hängen HIER statt in einem eigenen
-                    <Route path="einstellungen">, weil zwei Routen mit demselben Pfad
-                    nebeneinander stünden; und nicht per Filter aus dem `map`, weil ein
-                    Filter beim nächsten verschachtelten Modul still auseinanderginge. */}
+              {/* Die Einstellungs-Sektionen hängen HIER statt unter einem eigenen
+                 <Route path="einstellungen">, sonst stünden zwei Routen mit demselben Pfad nebeneinander. */}
               {m.key === 'einsatz-einstellungen' && EINSTELLUNGEN_ROUTEN}
             </Route>
           ))}
@@ -277,12 +252,9 @@ export const appRouten = createRoutesFromElements(
           <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
           <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
           <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
-          {/* Statisches Segment VOR der dynamischen Detail-Route. React Router rankt
-                statisch ohnehin höher — die Reihenfolge steht so da, damit ein Leser das
-                nicht prüfen muss (LFH-340 · C5). */}
+          {/* Statisches Segment vor der dynamischen Detail-Route (React Router rankt ohnehin statisch höher). */}
           <Route path="personen/aufnahme" element={<AufnahmePage />} />
-          {/* ETB-Druckansicht (LFH-22): die Papierform des Tagebuchs, Filter aus der Adresse
-              (`etbDruckPfad`/`parseEtbFilter`). */}
+          {/* ETB-Druckansicht (LFH-22), Filter aus der Adresse. */}
           <Route path="etb/druck" element={<EtbDruckPage />} />
           <Route path="personen/:personId" element={<PersonenDetailPage />} />
           <Route path="tiere/:tierId" element={<TiereDetailPage />} />

@@ -4,25 +4,19 @@ import { monoStil, useRollen } from './rollenwerte';
 import '../../theme/sprache.css';
 
 /**
- * Schnellerfassungszeile — NUR die Hülle (Neuentwurf S1 „Eine Zeile ersetzt sechs
- * Formulare", S4 ETB unten, S7 Betroffene).
+ * Schnellerfassungszeile — NUR die Hülle (ETB unten, Betroffene).
  *
- * Rahmen `bedien` 1 px, Grund `flaeche2`, Höhe ≥ 40; links eine Präfix-Zelle Mono 14 in
- * `bedien` mit Trennlinie (`/anordnung`, `/person`), in der Mitte das Feld des Aufrufers,
- * rechts ein Mono-Hinweis 11 (`↵ eintragen`), darunter optional eine Hinweiszeile Mono 11
- * (`/meldung · /anordnung · @ Einheit · # Koordinate · ⧖ Nachtrag`).
+ * Rahmen `bedien` 1 px, Grund `flaeche2`, Höhe ≥ 40; links eine Präfix-Zelle Mono 14 in `bedien`
+ * mit Trennlinie (`/anordnung`, `/person`), in der Mitte das Feld des Aufrufers, rechts ein
+ * Mono-Hinweis 11 (`↵ eintragen`), darunter optional eine Hinweiszeile Mono 11.
  *
- * WAS SIE NICHT IST: kein Formular. Die Erfassungs-Norm (LFH-332/B4 — Enter sendet über
- * die eingebaute Übermittlung, Fokus-Rücksprung, Serienmodus, Offline-Queue mit
- * `client_id`, Sichtung im selben POST) bleibt beim Konsumenten, der seine Felder in
- * `ErfassungsFormular` oder `SchnellAnlegen` hält. Ein `<form>` HIER wäre ein
- * verschachteltes Formular und lüde beim Absenden die Seite neu (Memory
- * `antd-verschachteltes-form-submit`). Die Hülle rendert deshalb nur `<div>`.
+ * WAS SIE NICHT IST: kein Formular. Die Erfassungs-Norm (LFH-332/B4) bleibt beim Konsumenten,
+ * der seine Felder in `ErfassungsFormular` oder `SchnellAnlegen` hält. Ein `<form>` HIER wäre
+ * verschachtelt und lüde beim Absenden die Seite neu. Die Hülle rendert nur `<div>`.
  *
  * Das Feld im Kind verliert Rahmen und Grund über `.lfh-schnellerfassung__feld` in
- * `theme/sprache.css` — die Zeile trägt den Rahmen, nicht das Feld. Seine HÖHE bleibt die
- * des antd-Feldes (`controlHeight`), die Hülle wächst mit: 30 / 48 / 72 statt der 40 des
- * Entwurfs, wo die Staffel mehr verlangt.
+ * `theme/sprache.css` — die Zeile trägt den Rahmen. Seine HÖHE bleibt `controlHeight`, die Hülle
+ * wächst mit (30 / 48 / 72).
  */
 export function schnellerfassungStil(
   rollen: Pick<Farbrollen, 'bedien' | 'flaeche2' | 'text'>,
@@ -43,13 +37,11 @@ export function schnellerfassungStil(
 /**
  * Die drei Zellen der Zeile, rein und exportiert (Prüfbarkeit ohne Layout).
  *
- * `gestapelt` (LFH-373, opt-in): das FELD steht zuerst und auf voller Breite, Präfix und
- * Hinweis folgen in einer zweiten Zeile (Präfix links, Hinweis rechts). „Zuerst" heißt im DOM,
- * nicht per CSS-`order`: sonst wichen Tab- und Lesefolge von der Sichtfolge ab (Review). Gemessen im ETB bei
- * 390 px vorher: das Feld zwischen `/meldung` und „Erfassen" auf 158 von 366 px eingezwängt,
- * der Platzhalter brach es auf drei Zeilen — die angepinnte Leiste wuchs auf 59 % der
- * Fensterhöhe. Die Trennlinie hinter dem Präfix entfällt dann, eine Linie über der zweiten
- * Zeile trennt stattdessen Feld und Bedienung.
+ * `gestapelt` (LFH-373, opt-in): das FELD steht zuerst und auf voller Breite, Präfix und Hinweis
+ * folgen in einer zweiten Zeile. „Zuerst" heißt im DOM, nicht per CSS-`order` — sonst wichen
+ * Tab- und Lesefolge von der Sichtfolge ab. Auf dem Handschirm bleibt dem Feld so die volle
+ * Breite, und die angepinnte Leiste wächst nicht über die halbe Fensterhöhe. Die Trennlinie
+ * hinter dem Präfix entfällt dann, eine Linie über der zweiten Zeile trennt Feld und Bedienung.
  */
 export function zellenStile(
   rollen: Pick<Farbrollen, 'bedien' | 'linie' | 'schwach'>,

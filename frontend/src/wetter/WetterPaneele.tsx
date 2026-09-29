@@ -1,15 +1,11 @@
 /**
- * Paneele „Warnungen (DWD)" und „Vorhersage 24 h" der Modulseite „Wetter & Pegel" (LFH-633).
+ * Paneele „Warnungen (DWD)" und „Vorhersage 24 h" der Modulseite „Wetter & Pegel".
  *
- * JEDER TEIL TRÄGT SEINEN STAND (Spec „Datenstand und Quellausfall"): `kein_ort` erklärt,
- * was fehlt, und verweist auf die Einsatzdaten; `ausfall` (oder ein Stand über der Obergrenze,
- * die das Backend prüft) zeigt „Stand unbekannt" und KEINE Liste; ein Stand über der
- * Veraltet-Schwelle bleibt sichtbar, trägt aber Wort und Abrufzeit. Die Einordnung ist rein
- * und steht in `wetterStand.ts`.
- *
- * FORM: beide sind Listen, die man liest — „was gilt?", „was kommt?" —, keine Vergleiche.
- * Beschreibung und Handlungsempfehlung einer Warnung stehen INLINE hinter einem Umschalter
- * (LFH-19: Zusatzinhalt im Kontext), nicht in einem Drawer.
+ * Jeder Teil trägt seinen Stand: `kein_ort` erklärt, was fehlt; `ausfall` (oder ein Stand über
+ * der Obergrenze) zeigt „Stand unbekannt" und KEINE Liste; ein veralteter Stand bleibt sichtbar
+ * mit Wort und Abrufzeit. Die Einordnung steht in `wetterStand.ts`.
+ * Beide sind Listen zum Lesen; Beschreibung und Handlungsempfehlung einer Warnung stehen inline
+ * hinter einem Umschalter, nicht in einem Drawer.
  */
 import { Button } from 'antd';
 import { useId, useState } from 'react';
@@ -157,8 +153,7 @@ function WarnungEintrag({
         <span>
           <Button
             type="link"
-            // Die Zeilenkennung gehört in den zugänglichen Namen: n Warnungen ergäben sonst n
-            // gleichnamige Umschalter (Regel wie bei der Aktionsbündelung, LFH-365).
+            // Die Zeilenkennung gehört in den zugänglichen Namen, sonst n gleichnamige Umschalter.
             aria-label={`${offen ? 'Beschreibung ausblenden' : 'Beschreibung und Handlungsempfehlung'} zu ${titelSchreibung(w.ereignis)}`}
             aria-expanded={offen}
             aria-controls={textId}
@@ -216,10 +211,9 @@ function WarnGruppe({
 }
 
 /**
- * Stabiler Schlüssel je Warnung aus ihrem INHALT, nicht aus dem Listenplatz: beim Nachladen
- * kann vorne eine Warnung dazukommen oder wegfallen, und ein Index-Schlüssel hängte dann alle
- * folgenden Einträge neu ein (eine aufgeklappte Beschreibung klappte zu oder sprang auf die
- * Nachbarwarnung). Echte Dubletten bekommen einen Zähler je gleichem Grundschlüssel. Rein.
+ * Stabiler Schlüssel je Warnung aus ihrem INHALT, nicht aus dem Listenplatz: sonst klappte beim
+ * Nachladen eine aufgeklappte Beschreibung zu oder sprang auf die Nachbarwarnung. Dubletten
+ * bekommen einen Zähler. Rein.
  */
 export function warnungsSchluessel(
   liste: readonly WetterWarnung[],
@@ -315,8 +309,7 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
         onLeerAktion={onNeuladen}
         onNeuladen={onNeuladen}
       >
-        {/* Den Weg zu den Einsatzdaten trägt das Warnpaneel — zwei gleichnamige Knöpfe
-            auf einer Seite sagten nicht, welcher wohin führt. */}
+        {/* Den Weg zu den Einsatzdaten trägt das Warnpaneel, nicht zwei gleichnamige Knöpfe. */}
         {stand && <StandHinweis stand={stand} />}
         {mitInhalt &&
           (stunden.length === 0 ? (

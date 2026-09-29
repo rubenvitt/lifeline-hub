@@ -18,11 +18,11 @@ import {
   sitzungsMeldungZuruecksetzen,
 } from './sitzungsEvent';
 
-/** Ergebnis von `login()` (LFH-43, Increment 5): unterscheidet den Sofort-Erfolg (Session
- *  bereits gesetzt, `benutzer` im Context übernommen) vom TOTP-Zweitfaktor-Fall
- *  (`mfa_erforderlich`, s. `authApi.login`-Doc) — die aufrufende Seite (`LoginPage`) schaltet im
- *  letzteren Fall auf die Code-Eingabe um, statt direkt zu navigieren. `benutzer` bleibt in
- *  diesem Fall bewusst `null`: es gibt noch keine Session. */
+/**
+ * Ergebnis von `login()`: Sofort-Erfolg oder TOTP-Zweitfaktor (`mfa_erforderlich`), bei dem
+ * `LoginPage` auf die Code-Eingabe umschaltet. `benutzer` bleibt dann `null`: es gibt noch
+ * keine Session.
+ */
 export type LoginErgebnis = { status: 'ok' } | { status: 'mfa_erforderlich' };
 
 /** Die Sitzung gehört einem anderen Benutzer als dem, den dieser Tab zeigt (LFH-387): in einem
@@ -38,25 +38,19 @@ interface AuthWert {
   benutzer: BenutzerAnzeige | null;
   laedt: boolean;
   login: (benutzername: string, passwort: string) => Promise<LoginErgebnis>;
-  /** Meldet über den Server ab. `true`, wenn dieser Tab danach abgemeldet ist; `false`, wenn
-   *  der Server ablehnte, weil die Sitzung inzwischen einem anderen Benutzer gehört (412,
-   *  LFH-387) — dann bleibt der Tab angemeldet und zeigt den {@link BenutzerKonflikt}, statt die
-   *  fremde Sitzung zu beenden. */
+  /** Meldet über den Server ab. `false`, wenn der Server mit 412 ablehnte (die Sitzung gehört
+   *  inzwischen einem anderen Benutzer, LFH-387): dann bleibt der Tab angemeldet. */
   logout: () => Promise<boolean>;
-  /** Räumt nur den Zustand dieses Tabs, ohne Server-Logout (LFH-387). Für einen erkannten
-   *  Sitzungsablauf: die Sitzung ist ohnehin tot, und ein Server-Logout träfe in der Lücke
-   *  „401 → Logout“ eine inzwischen in einem anderen Tab neu angelegte Sitzung. */
+  /** Räumt nur den Zustand dieses Tabs, ohne Server-Logout (LFH-387) — für einen erkannten
+   *  Sitzungsablauf; ein Server-Logout träfe eine inzwischen neu angelegte Sitzung. */
   abmeldenLokal: () => void;
-  /** Steht, solange die Sitzung einem anderen Benutzer gehört (LFH-387). Aufgelöst wird er
-   *  NICHT im laufenden Baum, sondern durch Neuladen (`BenutzerKonfliktDialog`): eine noch
-   *  montierte Seite des bisherigen Benutzers könnte sonst dessen Entwurf unter dem neuen
-   *  speichern. */
+  /** Steht, solange die Sitzung einem anderen Benutzer gehört (LFH-387). Aufgelöst per Neuladen
+   *  (`BenutzerKonfliktDialog`), nie im laufenden Baum. */
   konflikt: BenutzerKonflikt | null;
-  /** Lädt `/api/auth/me` neu und übernimmt den Benutzer in den Context — für Login-Wege,
-   *  die (anders als `login()`) die Session ohne einen Aufruf von `authApi.login`
-   *  etablieren, z.B. den WebAuthn-Passkey-Login (LFH-275) oder den zweiten Schritt des
-   *  TOTP-Logins (`totpFinish`, LFH-43): `auth/finish`/`totp/finish` setzen das Session-Cookie
-   *  server­seitig, der Client muss den Benutzer danach selbst nachladen. */
+  /**
+   * Lädt `/api/auth/me` neu und übernimmt den Benutzer — für Login-Wege, die die Session
+   * serverseitig ohne `authApi.login` setzen (Passkey, `totpFinish`).
+   */
   aktualisiere: () => Promise<void>;
 }
 
@@ -200,16 +194,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (benutzername: string, passwort: string): Promise<LoginErgebnis> => {
       const antwort = await authApi.login(benutzername, passwort);
-      // Untagged Union (s. `authApi.login`-Doc): der MFA-Zweig ist am `mfa_erforderlich`-Feld
-      // erkennbar, das die bare `BenutzerAnzeige` nie trägt. KEIN `setBenutzer` in diesem Fall —
-      // es gibt noch keine Session.
+      // Untagged Union: der MFA-Zweig ist am Feld `mfa_erforderlich` erkennbar. KEIN `setBenutzer`
+      // — es gibt noch keine Session.
       if ('mfa_erforderlich' in antwort) {
         return { status: 'mfa_erforderlich' };
       }
       uebernimm(antwort);
       setKonflikt(null);
-      // Neue gültige Sitzung → die Melde-Sperre aus `meldeSitzungAbgelaufen` lösen, damit ein
-      // SPÄTERER Ablauf in derselben Browser-Sitzung wieder gemeldet wird (LFH-268).
+      // Neue gültige Sitzung → Melde-Sperre lösen, damit ein späterer Ablauf wieder gemeldet wird.
       sitzungsMeldungZuruecksetzen();
       meldeAuthWechsel({ art: 'angemeldet' });
       return { status: 'ok' };
@@ -217,18 +209,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [uebernimm],
   );
 
-  /** Meldet ab und wirft dabei **nie** — die lokale Abmeldung darf nicht am Serverruf hängen.
-   *
-   *  `session::loeschen` propagiert seinen Fehler (`src/routes/auth.rs:226`), ein Netzabriss
-   *  wirft ohnehin. Bliebe `benutzer` in dem Fall gesetzt, wäre der Nutzer sichtbar
-   *  „angemeldet" bei toter Session: `RequireAuth` ließe geschützte Routen passieren, und die
-   *  Sitzungswache (LFH-268) meldete wegen ihrer Wiederhol-Sperre keinen weiteren Ablauf mehr
-   *  — die App stünde still und ohne Re-Login-Angebot da. Serverseitig läuft die Session
-   *  regulär ab; lokal abgemeldet zu sein ist in jedem Fall der sicherere Zustand.
-   *
-   *  Einzige Ausnahme ist 412 (LFH-387): die Sitzung gehört inzwischen jemand anderem, der
-   *  Server hat sie deshalb NICHT beendet. Der Tab bleibt stehen; die 412 hat über
-   *  `api/client.ts` bereits die Prüfung angestoßen, die den Konflikt anzeigt. */
+  /**
+   * Meldet ab und wirft **nie** — die lokale Abmeldung darf nicht am Serverruf hängen.
+   * Bliebe `benutzer` nach einem Fehler gesetzt, ließe `RequireAuth` geschützte Routen passieren,
+   * und die Sitzungswache meldete wegen ihrer Sperre keinen Ablauf mehr. Lokal abgemeldet zu sein
+   * ist in jedem Fall der sicherere Zustand. Ausnahme 412 (LFH-387): die Sitzung gehört jemand
+   * anderem und bleibt bestehen; die 412 hat bereits die Prüfung angestoßen.
+   */
   const logout = useCallback(async (): Promise<boolean> => {
     try {
       await authApi.logout();
@@ -244,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const b = await authApi.me();
     uebernimm(b);
     setKonflikt(null);
-    // Wie in `login`: Passkey- und TOTP-Login etablieren die Sitzung hierüber (LFH-268).
+    // Wie in `login`: Passkey- und TOTP-Login etablieren die Sitzung hierüber.
     sitzungsMeldungZuruecksetzen();
     meldeAuthWechsel({ art: 'angemeldet' });
   }, [uebernimm]);
@@ -264,17 +251,11 @@ export function useAuth(): AuthWert {
 }
 
 /**
- * Wie {@link useAuth}, aber ohne Provider `null` statt einer Ausnahme (LFH-391 · Etappe D).
+ * Wie {@link useAuth}, aber ohne Provider `null` statt einer Ausnahme.
  *
- * Für querschnittliche Rahmen, die bewusst OHNE App-Provider gerendert werden dürfen —
- * dieselbe Nachsicht, die `useTastaturEbene` gegenüber dem Paletten-Context übt. Der
- * konkrete Anlass ist gemessen: `CommandPaletteProvider` fragt seit dem Befehls-Gedächtnis
- * nach dem angemeldeten Benutzer, und mindestens eine Bestands-Testfläche
- * (`pages/UnfallhilfsstellenPage.test.tsx`, Drawer-Escape) mountet ihn ohne `AuthProvider`.
- *
- * NICHT als bequemere Variante von `useAuth` gedacht: wer den Benutzer BRAUCHT, soll die
- * Ausnahme bekommen. Diese hier ist für Stellen, an denen „kein Provider" eine zulässige
- * Betriebsart ist und still zu „nicht angemeldet" führt.
+ * Für Rahmen, die zulässig OHNE `AuthProvider` gerendert werden (etwa `CommandPaletteProvider`
+ * in Testflächen); „kein Provider" heißt dann still „nicht angemeldet". Wer den Benutzer
+ * BRAUCHT, nimmt `useAuth`.
  */
 export function useAuthOptional(): AuthWert | null {
   return useContext(AuthContext);

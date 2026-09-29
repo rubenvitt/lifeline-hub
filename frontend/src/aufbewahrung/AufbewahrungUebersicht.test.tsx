@@ -10,7 +10,7 @@ import { renderMitProviders } from '../test/utils';
 import AufbewahrungUebersicht from './AufbewahrungUebersicht';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 
-/** Übersicht (LFH-23, tasks.md 6.8). */
+/** Übersicht. */
 
 const ME_ADMIN = adminFixture();
 const ME_FK = benutzerFixture({ id: 2, anzeigename: 'FK', org_rolle: 'fuehrungskraft' });

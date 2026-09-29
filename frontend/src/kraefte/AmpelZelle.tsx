@@ -1,6 +1,4 @@
-// Präzedenz `components/SeitenZustand.tsx`: die Sprachbausteine werden dort eingebunden,
-// wo sie gebraucht werden, nicht global. Alle Regeln hängen an `.lfh-*` — die Datei färbt
-// nichts ein, was sie nicht selbst anfasst.
+// Sprachbausteine werden dort eingebunden, wo sie gebraucht werden, nicht global.
 import '../theme/sprache.css';
 import { CarOutlined, UserOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
@@ -8,20 +6,10 @@ import { verteilungFelder } from './statusAchse';
 import type { StatusVerteilung } from './kraeftebild';
 
 /**
- * Die Zierde je Achse — ein Piktogramm, KEIN Emoji.
- *
- * Bis hierher kam das Symbol als `symbol: string` von aussen und war ein Emoji.
- * Ein Emoji ist keine Ikone: seine Zeichnung, seine Farbe und seine Breite kommen aus der
- * Schriftart des Betriebssystems, nicht aus dem Entwurf — es steht in der eigenen Farbe
- * neben einer Zeile, deren Farbgebung Bedeutung trägt (Kriterium 6), und im Ausdruck
- * verhält es sich anders als der übrige Satz.
- *
- * Die Zuordnung liegt deshalb HIER und nicht am Aufrufer: eine Prop, die eine Zeichenkette
- * nimmt, nimmt auch wieder ein Emoji. `bezeichnung` ist ein String-Union, die Abbildung
- * damit vollständig — es gibt keinen Weg, ein Bild von aussen hereinzureichen.
- *
- * `CarOutlined` hat Präzedenz für ein Fahrzeug (`pages/uhs/Grundriss.tsx`). `UserOutlined`
- * statt `TeamOutlined`: die Spalte zählt einzelne Kräfte, keine Gruppen.
+ * Die Zierde je Achse — ein Piktogramm, KEIN Emoji (Zeichnung, Farbe und Breite eines Emojis
+ * kommen aus der Systemschrift). Die Zuordnung liegt HIER über das String-Union der Achse: eine
+ * Prop, die eine Zeichenkette nimmt, nähme auch wieder ein Emoji. `UserOutlined`, weil die
+ * Spalte einzelne Kräfte zählt.
  */
 const IKONE: Record<'Personal' | 'Fahrzeuge', ReactNode> = {
   Personal: <UserOutlined />,
@@ -29,50 +17,25 @@ const IKONE: Record<'Personal' | 'Fahrzeuge', ReactNode> = {
 };
 
 /**
- * Zählzeile einer Statusverteilung als ZWEI eigene Spalten des Meldebilds (LFH-330 · B2).
+ * Zählzeile einer Statusverteilung als eigene Spalte des Meldebilds (Personal bzw.
+ * Fahrzeuge), Werte auch bei 0, damit zwei Zeilen fluchten.
  *
- * Vorher standen Personal und Fahrzeuge zusammen in EINER 220-px-Statusspalte: bis zu acht
- * `Tag` in einem `Space` ohne `wrap`, zwei Zierzeichen als einzige Unterscheidung der
- * Achsen, und Werte gleich 0 wurden weggelassen — zwei Zeilen einer Vergleichstabelle
- * fluchteten damit nicht mehr übereinander (Prüflisten-Kriterium 14).
+ * Zweiter Kanal: `.lfh-feld--alarm .lfh-zahl` färbt nur die ZAHL, deshalb ist jedes Feld ein
+ * Verbund aus `.lfh-etikett` (Kurztext) und `.lfh-zahl`.
  *
- * ── DER ZWEITE KANAL, und warum die naheliegende Lösung nicht reicht ────────────
+ * Die Ikone ist Zierde und trägt eine `aria-hidden`-Hülle: ein `@ant-design/icons`-Element
+ * bringt `role="img"` mit englischem `aria-label` („user"/„car") mit und stünde sonst in jeder
+ * Tabellenzeile als eigenes Vorleseziel. Der Test prüft, dass in der Gruppe keine `img`-Rolle
+ * überlebt.
  *
- * `.lfh-feld--alarm .lfh-zahl` färbt nur die ZAHL. Farbe allein trägt keine Bedeutung
- * (WCAG 1.4.1, Kriterium 6), also ist jedes Feld ein VERBUND aus `.lfh-etikett` (Kurztext,
- * immer sichtbar) und `.lfh-zahl`. Der Text trägt die Bedeutung, die Farbe die Dringlichkeit —
- * und `normal`/`neutral` haben gar keine Farbregel, was genau richtig ist.
- *
- * ── DIE IKONE IST ZIERDE ────────────────────────────────────────────────────────
- *
- * Sie trägt `aria-hidden`, die Zählgruppe trägt das Etikett. Beides gleichzeitig ist kein
- * Widerspruch: es sind zwei Knoten, und der bedeutungstragende ist die Gruppe. Wäre es
- * umgekehrt, hinge die Unterscheidung Personal/Fahrzeuge an einem Bild.
- *
- * Das `aria-hidden` ist hier NICHT bloss Hygiene: ein `@ant-design/icons`-Element bringt
- * selbst `role="img"` mit einem eigenen englischen `aria-label` mit („user"/„car"). Der
- * NAME der Gruppe leidet darunter nicht — `aria-label` schlägt den Inhalt, das ist
- * gemessen —, aber ohne die Hülle stünde in JEDER Zeile der Vergleichstabelle ein
- * zusätzlicher, fremdsprachiger Knoten im Baum, den ein Vorleser ansteuert und vorliest.
- * Verwandt mit LFH-366, wo dasselbe `aria-label` in einen Menü-Namen einfloss.
- * Der Test misst die Wirkung, nicht die Absicht: innerhalb der Gruppe überlebt keine
- * `img`-Rolle (ohne `aria-hidden` färbt sich das rot, per Mutationsprobe belegt).
- *
- * ── NICHT `.lfh-felder` ─────────────────────────────────────────────────────────
- *
- * Der Werteblock des Lage-Dashboards ist ein vierspaltiges Raster mit Rahmen. In einer
- * Tabellenzelle ist das falsch, deshalb `.lfh-ampel` — dieselben Felder, ohne Raster, ohne
- * Rahmen, mit engerer Polsterung. Die Klasse ist ADDITIV zu `sprache.css`; die bestehenden
- * Regeln sind nicht angetastet.
+ * `.lfh-ampel` statt `.lfh-felder`: dieselben Felder ohne Raster und Rahmen, passend für eine
+ * Tabellenzelle.
  */
 export default function AmpelZelle({
   bezeichnung,
   verteilung,
 }: {
-  /**
-   * Zugängliche Bezeichnung der Zählgruppe — dieselbe Zeichenkette wie der Spaltenkopf,
-   * und zugleich der Schlüssel der Zierde (siehe `IKONE`).
-   */
+  /** Zugängliche Bezeichnung der Zählgruppe — gleich dem Spaltenkopf und Schlüssel der Zierde. */
   bezeichnung: 'Personal' | 'Fahrzeuge';
   verteilung: StatusVerteilung | null;
 }) {

@@ -95,12 +95,7 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
   it('unfallhilfsstellenListePfad', () => {
     expect(unfallhilfsstellenListePfad(E)).toBe('/einsaetze/5/unfallhilfsstellen/liste');
   });
-  /**
-   * Die Schnellerfassung der UHS-Liste (LFH-331 · B3). `UnfallhilfsstellenPage` liest
-   * `?neu=1` seit je, der Builder konnte den Param aber nicht bauen — jeder Aufrufer
-   * musste ihn danebenschreiben. Der Schalter ist damit KEIN toter: er hat eine Seite,
-   * die ihn liest.
-   */
+  /** Die Schnellerfassung der UHS-Liste: `UnfallhilfsstellenPage` liest `?neu=1`. */
   it('unfallhilfsstellenListePfad mit ?neu=1', () => {
     expect(unfallhilfsstellenListePfad(E, { neu: true })).toBe(
       '/einsaetze/5/unfallhilfsstellen/liste?neu=1',
@@ -121,11 +116,7 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
   it('erinnerungenPfad zeigt auf die Erinnerungen-Liste', () => {
     expect(erinnerungenPfad(7)).toBe('/einsaetze/7/erinnerungen');
   });
-  /**
-   * Die aggregierende Kräfteübersicht (LFH-338 · C3, Befund H21). Sie war bis dahin von
-   * KEINER der vier Kräfte-Modulseiten verlinkt — es gab schlicht keinen Builder, und ein
-   * Inline-Literal wäre an dieser Datei vorbeigelaufen.
-   */
+  /** Die aggregierende Kräfteübersicht. */
   it('kraefteuebersichtPfad', () => {
     expect(kraefteuebersichtPfad(E)).toBe('/einsaetze/5/kraefteuebersicht');
   });
@@ -166,18 +157,13 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(parsePersonenSicht(new URLSearchParams('filter=vermisst&ansicht=globus'))).toEqual({
       filter: 'vermisst',
     });
-    // „karte" ist seit LFH-613 eine Ansicht (Kartenansicht der Betroffenen).
     expect(parsePersonenSicht(new URLSearchParams('ansicht=karte'))).toEqual({ ansicht: 'karte' });
     expect(parsePersonenSicht(new URLSearchParams(''))).toEqual({});
   });
   it('lagekartePfad mit Platzier-Auftrag', () => {
     /*
-     * Der Doppelpunkt steht seit LFH-342 als `%3A` in der URL: `mitQuery` kodiert die
-     * Werte, seit der ETB-Volltextfilter Freitext durchreicht. Das ist die EINZIGE
-     * Bestandsstelle, an der die Kodierung nicht die Identität ist — und sie ist
-     * unschädlich, weil der Aufrufer den Wert über `searchParams.get()` liest, das
-     * dekodiert. Die tragende Zusicherung ist deshalb der Round-Trip darunter, nicht
-     * das rohe Zeichen in der Zeile hier.
+     * Der Doppelpunkt steht als `%3A` in der URL (`mitQuery` kodiert) — unschädlich, weil der
+     * Aufrufer über `searchParams.get()` liest. Tragend ist der Round-Trip darunter.
      */
     expect(lagekartePfad(E, { platzieren: { typ: 'schaden', id: 7 } })).toBe(
       '/einsaetze/5/lagekarte?platzieren=schaden%3A7',
@@ -439,8 +425,7 @@ describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
   });
 
   it('verwirft einen unbekannten Typ GANZ statt halb zu füllen', () => {
-    // Dieselbe Regel wie bei `parsePlatzierenAuftrag` (LFH-340 · C5): ein unbrauchbarer
-    // Wert ergibt keinen Filter auf diesen Wert, sondern gar keinen.
+    // Wie bei `parsePlatzierenAuftrag`: ein unbrauchbarer Wert ergibt gar keinen Filter.
     expect(parseEtbFilter(new URLSearchParams('q=x&typ=quatsch'))).toEqual({ q: 'x' });
   });
 
@@ -455,8 +440,7 @@ describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
   });
 
   it('liefert für eine leere Query ein leeres Filterobjekt', () => {
-    // Trägt die Gegenaussage zu `filterAktiv` in `EtbPage`: ohne Parameter ist kein
-    // Filter gesetzt, und der leer-OHNE-Filter-Zweig aus B3 greift.
+    // Ohne Parameter ist kein Filter gesetzt (Gegenaussage zu `filterAktiv` in `EtbPage`).
     expect(parseEtbFilter(new URLSearchParams(''))).toEqual({});
   });
 });
@@ -496,9 +480,8 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
   });
 
   /**
-   * Die Liste ist die Wahrheit für das Tab-Band UND für die Routentabelle. Ein Pin auf ihre
-   * Reihenfolge, weil das erste Element zugleich das Ziel des baren Pfades ist: eine
-   * Umsortierung ohne diesen Test verschöbe stillschweigend den Einstieg.
+   * Die Liste ist die Wahrheit für Tab-Band und Routentabelle; die Reihenfolge ist gepinnt,
+   * weil das erste Element das Ziel des baren Pfades ist.
    */
   it('führt die Sektionen in Bedienreihenfolge; die erste ist das Redirect-Ziel', () => {
     expect(EINSTELLUNGEN_SEKTIONEN.map((s) => s.key)).toEqual([
@@ -515,8 +498,8 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
 });
 
 describe('deeplinks — Nachforderung mit Vorbelegung (LFH-634)', () => {
-  // Die Werte aus D9: typographische Anführungszeichen, Halbgeviertstrich, Doppelpunkt —
-  // dazu `&`, `=` und `+`, die unkodiert Parameter zerschneiden bzw. zu Leerzeichen würden.
+  // Typographische Anführungszeichen, Halbgeviertstrich, Doppelpunkt — dazu `&`, `=` und `+`,
+  // die unkodiert Parameter zerschneiden bzw. zu Leerzeichen würden.
   const vorbelegung = {
     art: 'Verpflegung',
     bezeichnung: 'Essensportionen ‚Mittag‘ 12:00–13:30 & Getränke = 1+1',

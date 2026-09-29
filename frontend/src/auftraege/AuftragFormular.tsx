@@ -29,14 +29,10 @@ export interface ZielOption {
 /** Werte des Formulars (lokale Picker-Zeiten, vor der UTC-Wandlung). */
 interface FormWerte {
   /**
-   * EIN Empfängerfeld für beide Sorten (LFH-343 · C8, Befund H49). Strukturierte
-   * Ziele tragen den Präfix `abschnitt:`/`einheit:` und kommen aus den Optionen;
-   * alles andere ist ein freier Funktionstext (`mode="tags"`).
-   *
-   * Vorher standen dafür zwei Felder nebeneinander. Das Feldbudget von vier
-   * sichtbaren Feldern gibt sie nicht her — und den Freitext hinter den Collapse
-   * zu schieben ging nicht: ohne gepflegte Abschnitte/Einheiten ist er der
-   * EINZIGE Weg, den Pflicht-Empfänger zu setzen.
+   * EIN Empfängerfeld für beide Sorten: strukturierte Ziele tragen den Präfix
+   * `abschnitt:`/`einheit:`, alles andere ist freier Funktionstext (`mode="tags"`). Zwei Felder
+   * sprengten das Budget, und der Freitext darf nicht hinter den Collapse: ohne gepflegte
+   * Abschnitte/Einheiten ist er der EINZIGE Weg zum Pflicht-Empfänger.
    */
   empfaenger: string[];
   externKategorie: AdressatKategorie;
@@ -61,13 +57,8 @@ function dayjsZuWire(d: dayjs.Dayjs | null): string | undefined {
 }
 
 /**
- * Wandelt die Werte des EINEN Empfängerfeldes in Empfänger-DTOs (LFH-343 · C8).
- *
- * Die beiden Sorten unterscheidet der Präfix: `abschnitt:<id>` und `einheit:<id>`
- * stammen aus den Optionen, alles andere hat jemand frei eingetippt und wird zum
- * Funktionstext. Ein Funktionstext, der zufällig wie ein Präfixwert aussähe
- * („einheit:7"), ist praktisch ausgeschlossen und wäre auch in der früheren
- * Zwei-Felder-Fassung mehrdeutig gewesen.
+ * Wandelt die Werte des Empfängerfeldes in Empfänger-DTOs: `abschnitt:<id>`/`einheit:<id>`
+ * stammen aus den Optionen, alles andere wird Funktionstext.
  */
 function baueEmpfaenger(werte: string[]): NeuerEmpfaenger[] {
   return werte.flatMap((wert): NeuerEmpfaenger[] => {
@@ -86,10 +77,8 @@ function baueEmpfaenger(werte: string[]): NeuerEmpfaenger[] {
 }
 
 /**
- * Wiederholfelder einer Auftrags-Serie (LFH-343 · C8, Befund H52). An derselben
- * Lage geht der nächste Auftrag meist an dieselbe Stelle, mit derselben
- * Dringlichkeit und in dieselbe Richtung; der WORTLAUT wechselt — er wird
- * geleert, ein stehengebliebener verfälschte den nächsten Auftrag.
+ * Wiederholfelder einer Auftrags-Serie: gleiche Stelle, Dringlichkeit und Richtung; der
+ * WORTLAUT wird geleert, ein stehengebliebener verfälschte den nächsten Auftrag.
  */
 const UEBERNAHME: (keyof FormWerte & string)[] = ['empfaenger', 'prioritaet', 'richtung'];
 
@@ -108,32 +97,25 @@ export default function AuftragFormular({
   abschnitte: ZielOption[];
   einheiten: ZielOption[];
   /**
-   * Speichern. **Muss bei Ablehnung ablehnen** (`mutateAsync`, nicht `mutate`) —
-   * die Erfassungshülle lässt den Wortlaut nur dann stehen, wenn sie den
-   * Fehlschlag sieht (LFH-332/B4).
+   * Speichern. **Muss bei Ablehnung ablehnen** (`mutateAsync`) — nur dann lässt die
+   * Erfassungshülle den Wortlaut stehen.
    */
   onAnlegen: (d: NeuerAuftrag) => Promise<unknown>;
-  /** Vorbelegung des Auftragstexts (z. B. Chat-Heraufstufung, LFH-101). */
+  /** Vorbelegung des Auftragstexts (z. B. Chat-Heraufstufung). */
   initialText?: string;
   /**
-   * Read-only Wortlaut der Quelle über den Feldern (LFH-343 · C8). Wer aus einer
-   * Meldung oder Nachricht einen Auftrag formuliert, braucht den Urtext im Blick —
-   * ändern darf er ihn nicht, die Quelle ist beweissichernd.
+   * Read-only Wortlaut der Quelle über den Feldern: wer aus einer Meldung einen Auftrag
+   * formuliert, braucht den Urtext, ändern darf er ihn nicht.
    */
   zitat?: ReactNode;
   /**
-   * Serienmodus (LFH-343 · C8, Befund H52): „Speichern und nächste" plus Zähler.
-   *
-   * In den beiden Modal-Einbettungen bewusst AUS: dort entsteht genau EIN Auftrag
-   * zu genau EINER Meldung bzw. Nachricht — ein „Nächstes" gibt es nicht, und der
-   * Aufrufer schliesst den Dialog nach dem Speichern ohnehin.
+   * Serienmodus: „Speichern und nächste" plus Zähler. In den Modal-Einbettungen AUS — dort
+   * entsteht genau ein Auftrag zu einer Meldung bzw. Nachricht.
    */
   serie?: boolean;
-  /** Nach erfolgreichem Einzel-Erfassen. Ohne Angabe passiert nichts — das
-   *  Inline-Formular bleibt offen (LFH-332/B4). */
+  /** Nach erfolgreichem Einzel-Erfassen. Ohne Angabe bleibt das Inline-Formular offen. */
   onFertig?: () => void;
-  /** Umschließendes Paneel mit Titel rendern. `false` für Inline-/Modal-Einbettung,
-   *  wo der Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
+  /** Umschließendes Paneel mit Titel rendern. `false`, wo der Container den Titel schon liefert. */
   card?: boolean;
 }) {
   const { message } = App.useApp();
@@ -147,16 +129,12 @@ export default function AuftragFormular({
   }, [initialText, form]);
 
   /**
-   * Das `return` ist tragend (LFH-332/B4): die Erfassungshülle wartet auf diese
-   * Zusage und lässt die Felder stehen, wenn sie bricht. Ein blosser Aufruf liesse
-   * die Ablehnung an ihr vorbeilaufen und leerte den Wortlaut trotz Fehler-Toast.
-   *
-   * Auch der fehlende Empfänger LEHNT AB statt still zurückzukehren — sonst
-   * räumte die Hülle das Formular, obwohl nichts gespeichert wurde.
+   * Das `return` ist tragend: die Hülle lässt die Felder stehen, wenn die Zusage bricht. Auch der
+   * fehlende Empfänger LEHNT AB, sonst räumte die Hülle ein Formular, das nichts gespeichert hat.
    */
   const absenden = (w: FormWerte) => {
     const empfaenger = baueEmpfaenger(w.empfaenger ?? []);
-    // Externer Adressat (LFH-87): bei Richtung extern als Empfänger-Zeile ergänzen.
+    // Externer Adressat: bei Richtung extern als Empfänger-Zeile ergänzen.
     if (w.richtung === 'extern' && (w.externBezeichnung ?? '').trim()) {
       empfaenger.push({
         empfaenger_typ: 'extern',
@@ -197,19 +175,11 @@ export default function AuftragFormular({
   ];
 
   /**
-   * Befehlsschema und Richtungs-Angaben (LFH-343 · C8, Befund H49): die sieben
-   * SKK-Felder plus die drei, die das Ticket nicht nennt, aber mitzählt.
-   *
-   * `richtung` ist der Grenzfall — sie steuert die Sichtbarkeit der Extern-Felder
-   * und ist damit kein reines Detail. Sie geht trotzdem hinein, weil `intern` der
-   * Normalfall ist und der externe Auftrag der begründete Sonderfall; ein fünftes
-   * sichtbares Feld sprengte das Budget. Die Extern-Felder gehen MIT, sonst
-   * stünden sie sichtbar unter einem eingeklappten Auslöser.
-   *
-   * Bewusst OHNE `forceRender`: die Felder sollen erst beim Aufklappen im DOM
-   * stehen. Nur so ist „im Ausgangszustand höchstens vier Felder" überhaupt
-   * prüfbar — und nur zusammen mit der zweiten Hälfte („Aufklappen bringt die
-   * sieben") ist die Zusicherung widerlegbar.
+   * Befehlsschema und Richtungs-Angaben hinter dem Collapse. `richtung` steuert zwar die
+   * Extern-Felder, geht aber mit, weil `intern` der Normalfall ist; die Extern-Felder gehen MIT,
+   * sonst stünden sie sichtbar unter einem eingeklappten Auslöser.
+   * Bewusst OHNE `forceRender`: nur so ist „im Ausgangszustand höchstens vier Felder" samt
+   * Gegenprobe („Aufklappen bringt die sieben") prüfbar.
    */
   const schemaFelder = (
     <>
@@ -313,10 +283,8 @@ export default function AuftragFormular({
         erteiltAm: dayjs(),
       }}
       onErfassen={absenden}
-      // Wie beim Meldungs-Zwilling: das Inline-Formular schliesst sich nach dem
-      // Senden NICHT — Zuklappen ist ausdrückliche Nutzeraktion über den
-      // Kopf-Umschalter oder das Kreuz an der Card (LFH-332/B4). In den beiden
-      // Modal-Einbettungen schliesst der Aufrufer selbst.
+      // Das Inline-Formular schließt nach dem Senden NICHT; in den Modal-Einbettungen schließt der
+      // Aufrufer selbst.
       onFertig={onFertig ?? (() => {})}
       laeuft={senden}
       erfassenText="Auftrag erteilen"
@@ -334,11 +302,8 @@ export default function AuftragFormular({
       </Form.Item>
       <Row gutter={16}>
         <Col xs={24} sm={12}>
-          {/* EIN Feld für beide Empfängersorten — Begründung an `FormWerte.empfaenger`.
-              `mode="tags"` nimmt die Optionen UND freien Text; getrennt wird am
-              Präfix in `baueEmpfaenger`. Das Komma bleibt Trennzeichen wie im
-              früheren Funktions-Freitext, damit „S3, Fachberater" weiterhin zwei
-              Empfänger ergibt. */}
+          {/* EIN Feld für beide Empfängersorten (Begründung an `FormWerte.empfaenger`). Das Komma bleibt
+             Trennzeichen, damit „S3, Fachberater" zwei Empfänger ergibt. */}
           <Form.Item name="empfaenger" label="Empfänger">
             <Select
               mode="tags"

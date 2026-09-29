@@ -4,11 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import ErinnerungFormular from './ErinnerungFormular';
 
-/**
- * Serienerfassung (LFH-343 · C8, Befund H52). Das Formular schloss nach jedem
- * Speichern und setzte auf die Defaults zurück — an einer Lage, an der im
- * Minutentakt erfasst wird, kostet genau das die meiste Zeit.
- */
+/** Serienerfassung: das Formular bleibt nach dem Speichern offen und hält die Wiederholfelder. */
 describe('ErinnerungFormular — Serienerfassung', () => {
   it('bleibt nach dem Speichern offen, leert den Titel und behält die Wiederholfelder', async () => {
     const onAnlegen = vi.fn().mockResolvedValue({});

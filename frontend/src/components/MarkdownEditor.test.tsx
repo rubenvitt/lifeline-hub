@@ -106,12 +106,10 @@ describe('MarkdownEditor – toggle-Variante', () => {
   });
 
   /**
-   * Die Voraussetzung der Druckregeln aus `pages/lageberichtPrint.css` (LFH-350/M86),
-   * hier als DOM-Messung statt als Annahme: das `split`-Layout wickelt sein Textfeld in
-   * `.markdown-editor__eingabe`, das `toggle`-Layout NICHT. Eine Druckregel auf
-   * `.markdown-editor__eingabe` kann einen Toggle-Abschnitt deshalb nicht leer drucken —
-   * und eine Regel auf `textarea` braucht eine gerenderte Fassung daneben (offene Vorschau
-   * oder `druckfassung`, siehe unten).
+   * Die Voraussetzung der Druckregeln aus `pages/lageberichtPrint.css` (LFH-350/M86), als
+   * DOM-Messung: `split` wickelt sein Textfeld in `.markdown-editor__eingabe`, `toggle` NICHT. Eine
+   * Druckregel darauf kann einen Toggle-Abschnitt nicht leer drucken, und eine Regel auf
+   * `textarea` braucht eine gerenderte Fassung daneben (offene Vorschau oder `druckfassung`).
    * Fällt diese Behauptung, ist die Begründung der Druckregeln hinfällig.
    */
   it('wickelt sein Textfeld NICHT in die Eingabespalte (anders als split)', () => {
@@ -131,11 +129,10 @@ describe('MarkdownEditor – toggle-Variante', () => {
   });
 
   /**
-   * Druckfassung (LFH-71, Review Welle B): bei geschlossener Vorschau trug im Toggle-Layout
-   * nur das Textfeld den Abschnitt — auf Papier kam die `<textarea>` mit ihrer
-   * Bildschirmhöhe, Markdown als Rohtext, langer Text abgeschnitten. Mit `druckfassung`
-   * steht daneben eine gerenderte Fassung, die nur der Druck zeigt (`lageberichtPrint.css`).
-   * Genau EINE gerenderte Fassung im Baum: ist die Vorschau offen, trägt sie den Text.
+   * Druckfassung (LFH-71): bei geschlossener Vorschau trüge im Toggle-Layout nur das Textfeld den
+   * Abschnitt — auf Papier eine `<textarea>` mit abgeschnittenem Rohtext. Mit `druckfassung`
+   * steht daneben eine gerenderte Fassung, die nur der Druck zeigt. Genau EINE gerenderte Fassung
+   * im Baum: ist die Vorschau offen, trägt sie den Text.
    */
   it('rendert mit `druckfassung` bei geschlossener Vorschau eine gerenderte Druckfassung', async () => {
     const { container } = renderMitProviders(
@@ -149,9 +146,9 @@ describe('MarkdownEditor – toggle-Variante', () => {
     );
     const druck = container.querySelector('.markdown-editor__druck');
     expect(druck, 'keine Druckfassung').not.toBeNull();
-    // Nur Papier: am Bildschirm `display: none` per CSS, für den Zugänglichkeitsbaum
-    // `aria-hidden` — auch dort, wo kein CSS geladen ist (jsdom), wie beim Druckkopf. Sonst
-    // stünden die Überschriften des Abschnitts ein zweites Mal im Vorlesebaum.
+    // Nur Papier: am Bildschirm `display: none` per CSS, für den Zugänglichkeitsbaum `aria-hidden`
+    // — auch ohne geladenes CSS (jsdom). Sonst stünden die Überschriften ein zweites Mal im
+    // Vorlesebaum.
     expect(druck).toHaveAttribute('aria-hidden', 'true');
     expect(druck!.querySelector('.markdown strong')).toHaveTextContent('fett');
     expect(druck!.querySelector('.markdown p:last-child')).toHaveTextContent('ENDE');
@@ -168,8 +165,7 @@ describe('MarkdownEditor – toggle-Variante', () => {
     expect(container.querySelector('.markdown-editor__druck')).toHaveTextContent(/^—$/);
   });
 
-  // Merge LFH-117 × LFH-22: `readOnly` sperrt nur das Textfeld; die Druckfassung bleibt
-  // Byte für Byte dieselbe, und das Feld trägt den Wortlaut weiter.
+  // `readOnly` (LFH-117) sperrt nur das Textfeld; die Druckfassung (LFH-22) bleibt dieselbe.
   it('rendert die Druckfassung im readOnly-Zustand unverändert', () => {
     const wert = '**fett**\n\nENDE';
     const frei = renderMitProviders(
@@ -206,10 +202,8 @@ describe('MarkdownEditor – toggle-Variante', () => {
   });
 
   /**
-   * LFH-373: der Aufrufer darf den Umschalter selbst führen. In der ETB-Erfassung stand der
-   * Knopf „Vorschau" auf eigener Zeile unter dem Feld und kostete im Handschuh-Betrieb eine
-   * volle Steuerhöhe der angepinnten Leiste; dort wandert er neben „Erfassen". Ohne die
-   * Eigenschaft bleibt alles, wie es war (Test darüber).
+   * LFH-373: der Aufrufer darf den Umschalter selbst führen (ETB-Erfassung: „Vorschau" neben
+   * „Erfassen" statt auf eigener Zeile). Ohne die Eigenschaft gilt der Test darüber.
    */
   it('mit umschalterAussen: kein eigener Knopf, die Vorschau folgt vorschauOffen', () => {
     const { container, rerender } = renderMitProviders(

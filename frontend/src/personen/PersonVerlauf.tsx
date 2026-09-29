@@ -8,15 +8,9 @@ import { kurzVerbleib } from './personMeta';
 const { useToken } = theme;
 
 /**
- * Chronologischer Verlauf einer Person (neueste zuerst) — Sichtungen, Verlaufsnotizen
- * und Verbleib in einer Spur (LFH-328). Einzige Quelle für diese Darstellung; genutzt
- * vom schlanken `PersonDetailDrawer` und von der vollen `PersonenDetailPage`.
- *
- * Die Überschrift bleibt beim Aufrufer — Drawer und Detailseite benennen die Sektion
- * fachlich unterschiedlich („Medizinischer Verlauf" vs. „Chronologischer Verlauf").
- *
- * Zeitstempel laufen über `ZeitAnzeige` (taktische DTG, zeitzonen-bewusst), nie als
- * roher Wire-String; die Trennlinie kommt aus `token.colorSplit` (dark-safe).
+ * Chronologischer Verlauf einer Person (neueste zuerst) — Sichtungen, Verlaufsnotizen und
+ * Verbleib in einer Spur, für Drawer und Detailseite. Die Überschrift bleibt beim Aufrufer.
+ * Zeitstempel über `ZeitAnzeige`, nie als roher Wire-String.
  */
 export default function PersonVerlauf({ person }: { person: PersonDetail }) {
   const { token } = useToken();

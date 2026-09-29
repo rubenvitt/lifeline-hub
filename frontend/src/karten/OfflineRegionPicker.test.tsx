@@ -89,7 +89,7 @@ describe('OfflineRegionPicker', () => {
       format: 'pbf',
       groesse: 1,
       sha256: 'x',
-      // LFH-265: `update_verfuegbar` ist Pflichtfeld im generierten Schema.
+      // `update_verfuegbar` ist Pflichtfeld im generierten Schema.
       download_at: 'd',
       status: 'bereit',
       aktiv_basemap: false,

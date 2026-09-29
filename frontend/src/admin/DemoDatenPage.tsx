@@ -22,33 +22,27 @@ import { einsatzPfad } from '../routing/deeplinks';
 import { invalidiereNachDemoVorgang, useDemoDatenStatus } from './useDemoDaten';
 
 /**
- * Verwaltungssektion „Demo-Daten“ (LFH-690, design.md D13; Spec „Verwaltungssektion
- * Demo-Daten“).
+ * Verwaltungssektion „Demo-Daten“.
  *
  * ── Wer sie sieht ─────────────────────────────────────────────────────────────────────
- * Nur der System-Admin, und nur, wenn `GET /api/demo-daten` mit 200 antwortet. Die Seite
- * schützt sich selbst mit derselben Umleitung wie `BenutzerPage`: das `AdminLayout` lässt
- * auch Führungskräfte herein, und ein Deeplink auf `/admin/demo-daten` bei 404 wäre sonst eine
- * leere Seite ohne Aussage.
+ * Nur der System-Admin, und nur bei 200 von `GET /api/demo-daten`. Die Seite schützt sich
+ * selbst (wie `BenutzerPage`): das `AdminLayout` lässt auch Führungskräfte herein.
  *
  * ── Bedienung ─────────────────────────────────────────────────────────────────────────
- * Genau EINE Primäraktion im Kopf, „Importieren“, und nur ohne aktiven Import (LFH-340 · C5).
- * Mit aktivem Import stehen „Neu importieren“ und „Entfernen“ beim Stand im Inhalt, beide
- * `danger` und beide hinter einer Rückfrage mit `danger`-Knopf: beide löschen den Demo-Einsatz
- * samt allem, was seit dem Import an ihm geändert wurde — unumkehrbar (LFH-363).
- * Die Rückfrage schließt beim Bestätigen sofort. Ein Fehler steht dann an der Seite und
- * nicht hinter der Maske eines offen gehaltenen Dialogs (die Falle aus LFH-535).
+ * Genau EINE Primäraktion im Kopf, „Importieren“, nur ohne aktiven Import. Mit aktivem Import
+ * stehen „Neu importieren“ und „Entfernen“ beim Stand, beide `danger` hinter einer
+ * `danger`-Rückfrage: beide löschen den Demo-Einsatz samt Änderungen — unumkehrbar. Die
+ * Rückfrage schließt beim Bestätigen sofort; ein Fehler steht dann an der Seite, nicht hinter
+ * der Maske eines offenen Dialogs.
  *
- * ── Fehler und Erfolg (LFH-345) ───────────────────────────────────────────────────────
- * EINE Mutation, verzweigt nach dem Vorgang, statt dreier: react-query räumt `error` nur beim
- * nächsten Lauf DERSELBEN Mutation. Mit drei Mutationen bliebe ein 409 vom Import stehen,
- * nachdem ein späteres Entfernen gelungen ist. Der Fehler steht über `SeitenHinweise` an der
- * Seite, der Erfolg geht als Toast.
+ * ── Fehler und Erfolg ─────────────────────────────────────────────────────────────────
+ * EINE Mutation, verzweigt nach dem Vorgang: react-query räumt `error` nur beim nächsten Lauf
+ * DERSELBEN Mutation; mit drei bliebe ein 409 vom Import nach gelungenem Entfernen stehen. Der
+ * Fehler steht über `SeitenHinweise` an der Seite, der Erfolg geht als Toast.
  *
  * ── Doppeltes Senden ──────────────────────────────────────────────────────────────────
- * Der Riegel `sendetRef` sitzt in der Absende-Funktion, nicht am Knopf. antds `loading` sperrt
- * erst, wenn react-query `pending` gemeldet hat, und das geschieht einen Takt nach dem Klick —
- * zwei Klicks im selben Takt erreichen den Knopf beide.
+ * Der Riegel `sendetRef` sitzt in der Absende-Funktion: antds `loading` sperrt erst einen Takt
+ * nach dem Klick, zwei Klicks im selben Takt erreichen den Knopf beide.
  */
 
 type Vorgang = 'import' | 'neu' | 'entfernen';
@@ -87,8 +81,8 @@ const NETZ_FEHLER = 'Der Server hat nicht geantwortet. Bitte erneut versuchen.';
 type Rueckfrage = Exclude<Vorgang, 'import'>;
 
 /**
- * Die beiden Rückfragen. Der OK-Knopf heißt bewusst anders als der auslösende Knopf: sonst
- * stünde, solange der Dialog offen ist, zweimal „Entfernen“ im Baum.
+ * Der OK-Knopf heißt bewusst anders als der auslösende Knopf, sonst stünde bei offenem Dialog
+ * zweimal „Entfernen“ im Baum.
  */
 const RUECKFRAGE: Record<Rueckfrage, { titel: string; text: string; ok: string }> = {
   neu: {
@@ -130,10 +124,7 @@ function berichtZeile(z: DemoBerichtZeile, vorgang: DemoVorgang): string {
     : `${z.entfernt} entfernt · ${z.behalten} behalten`;
 }
 
-/**
- * Wire-Zeit (UTC ohne Zone) in Ortszeit. Über `alsOrtszeit`, nie `dayjs(s)`: das läse den
- * String als Ortszeit und verschöbe ihn um den Zonenversatz (`etb/filterZeit.ts`).
- */
+/** Wire-Zeit (UTC ohne Zone) in Ortszeit — über `alsOrtszeit`, nie `dayjs(s)`. */
 function ortszeit(s: string): string {
   return alsOrtszeit(s)?.format('DD.MM.YYYY HH:mm') ?? s;
 }
@@ -144,8 +135,8 @@ export default function DemoDatenPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token, rollen } = useRollen();
-  // Die Art bleibt beim Schließen stehen, damit der Dialog während der Ausblende-Animation
-  // nicht ohne Titel und Text dasteht.
+  // Die Art bleibt beim Schließen stehen, damit der Dialog während der Ausblende-Animation nicht
+  // ohne Titel dasteht.
   const [rueckfrage, setRueckfrage] = useState<Rueckfrage>('entfernen');
   const [rueckfrageOffen, setRueckfrageOffen] = useState(false);
   const sendetRef = useRef(false);
@@ -158,14 +149,10 @@ export default function DemoDatenPage() {
       qc.setQueryData(globalKeys.demoDaten(), neu);
       void invalidiereNachDemoVorgang(qc, [altEinsatzId, neu.import?.einsatz_id]);
     },
-    // Nach JEDEM Fehler neu laden, nicht nur nach einem 409 (Branch-Review F4). Ein 409 heißt,
-    // der Stand ist anderswo schon geändert worden (zweiter Tab, zweiter Admin); ohne Neuladen
-    // böte die Seite weiter den Vorgang an, der gerade gescheitert ist. Nach einem Netzfehler
-    // oder Timeout ist offen, ob der Vorgang durchging: `apiSend` bricht nach 15 s ab, der
-    // Server kann unter Konkurrenz länger brauchen und trotzdem committen. Darum dieselben
-    // D13-Fächer wie nach einem Erfolg; einen neuen Demo-Einsatz kennt die Seite dann nicht,
-    // Abfragen von ihm liegen aber auch noch keine im Cache. Der Alert bleibt stehen:
-    // `vorgang.error` hängt nicht an der Abfrage.
+    // Nach JEDEM Fehler neu laden: ein 409 heißt, der Stand ist anderswo geändert worden; nach einem
+    // Netzfehler oder Timeout (15 s in `apiSend`) kann der Vorgang trotzdem committet sein. Darum
+    // dieselben Fächer wie nach einem Erfolg. Der Alert bleibt stehen, `vorgang.error` hängt nicht
+    // an der Abfrage.
     onError: (_e, { altEinsatzId }) => {
       void invalidiereNachDemoVorgang(qc, [altEinsatzId]);
     },
@@ -181,7 +168,7 @@ export default function DemoDatenPage() {
       });
       message.success(ERFOLG[v]);
     } catch {
-      // Der Grund steht über `vorgang.error` an der Seite (LFH-345), nicht im Toast.
+      // Der Grund steht über `vorgang.error` an der Seite, nicht im Toast.
     } finally {
       sendetRef.current = false;
     }
@@ -208,9 +195,8 @@ export default function DemoDatenPage() {
     );
   }
 
-  // Status-Abfrage gescheitert (≠ 404: 500, 403, Netz). Spec „Status-Abfrage scheitert“:
-  // Fehlerbild mit „Erneut abrufen“, KEINE der Aktionen und KEINE Umleitung — eine Umleitung
-  // sähe aus wie „nicht freigeschaltet“ und verschwiege den Fehler.
+  // Status-Abfrage gescheitert (≠ 404): Fehlerbild mit „Erneut abrufen“, KEINE Aktion und KEINE
+  // Umleitung — eine Umleitung sähe aus wie „nicht freigeschaltet“.
   const status = demo.status;
   if (!status) {
     return (
@@ -276,17 +262,15 @@ export default function DemoDatenPage() {
                     {kopf.einsatz_bezeichnung}
                   </Link>
                 ) : (
-                  // Verwaister Kopf: der Einsatz des aktiven Imports existiert nicht mehr
-                  // (Aufbewahrungsfrist, block-5-report Bedenken 2). Entfernen und
-                  // Neu-Import räumen ihn auf; ein Link ins Leere hülfe dabei nicht.
+                  // Verwaister Kopf: der Einsatz des aktiven Imports existiert nicht mehr (Aufbewahrung).
+                  // Entfernen und Neu-Import räumen ihn auf; ein Link ins Leere hülfe nicht.
                   <Typography.Text type="secondary">Einsatz nicht mehr vorhanden</Typography.Text>
                 )}
               </Datenfeld>
             )}
           </Datenraster>
           {status.importiert && (
-            // `middle`: Rot steht nicht bündig neben einer weiteren Aktion
-            // (aktionsabstand.guard.test.ts).
+            // `middle`: Rot steht nicht bündig neben einer weiteren Aktion.
             <Space size="middle" wrap style={{ marginBlockStart: token.margin }}>
               <Button
                 danger
@@ -325,7 +309,7 @@ export default function DemoDatenPage() {
         )}
       </Flex>
 
-      {/* EIN Dialog für beide Rückfragen, State außerhalb jeder Liste (LFH-365). */}
+      {/* EIN Dialog für beide Rückfragen, State außerhalb jeder Liste. */}
       <Modal
         open={rueckfrageOffen}
         title={RUECKFRAGE[rueckfrage].titel}

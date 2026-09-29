@@ -58,8 +58,8 @@ describe('modulRegistry', () => {
       label: 'Betreuung',
       route: 'betreuung',
       status: 'fertig',
-      // Ohne Zählerquelle fände `darfZaehlerZeigen('betreuung', …)` kein Modul und der
-      // Zähler wie die Kennzahl blieben still aus.
+      // Ohne Zählerquelle fände `darfZaehlerZeigen('betreuung', …)` kein Modul, Zähler und Kennzahl
+      // blieben aus.
       zaehlerQuelle: 'betreuung',
     });
     expect(typeof betreuung?.icon).toBe('function');
@@ -93,7 +93,7 @@ describe('modulRegistry', () => {
     expect(istModulGesperrt(fkModul, ohne)).toBe(true);
   });
 
-  // --- Override-Kontext (LFH-132) ---
+  // --- Override-Kontext ---
 
   const ov = (
     key: string,
@@ -148,8 +148,8 @@ describe('modulRegistry', () => {
   });
 
   it('istModulGesperrt: Override-Rolle null faellt auf Registry-Default zurueck', () => {
-    // adminModul hat Registry-Default 'admin'; Override setzt nur Sichtbarkeit (Rolle null).
-    // Wie das Backend (or_else(registry_default)) greift dann weiterhin der Default 'admin'.
+    // Override setzt nur Sichtbarkeit (Rolle null) — wie im Backend (`or_else(registry_default)`)
+    // greift weiter der Default 'admin'.
     expect(istModulGesperrt(adminModul, ohne, ov('x', true, null))).toBe(true);
     expect(istModulGesperrt(adminModul, admin, ov('x', true, null))).toBe(false);
   });
@@ -166,10 +166,9 @@ describe('modulRegistry', () => {
   });
 
   /**
-   * Modulstruktur des Neuentwurfs („UI neu denken", Entscheidung 3): Führung trägt den
-   * Überblick und die Aufträge (Anordnungen sind Führungsmittel), das Meldebild steht vorn
-   * unter Kräfte & Mittel, Lage führt keine Kräfteübersicht mehr. Die Reihenfolge ist
-   * Registry-Reihenfolge und damit die Rangfolge von `erstesFreigegebenesModul`.
+   * Modulstruktur: Führung trägt Überblick und Aufträge, das Meldebild steht vorn unter Kräfte &
+   * Mittel, Lage führt keine Kräfteübersicht. Die Reihenfolge ist die Rangfolge von
+   * `erstesFreigegebenesModul`.
    */
   it('Modulstruktur: Führung, Kräfte-Kopf, Lage ohne Meldebild', () => {
     expect(moduleNachKategorie('fuehrung').map((m) => m.key)).toEqual([
@@ -214,11 +213,8 @@ describe('modulRegistry', () => {
   });
 
   /**
-   * Die Statusachse wird gegen einen STUB-Register geprüft, nicht gegen den echten
-   * `stab`-Eintrag (LFH-541): `aufloeseStandardModul` nimmt seinen Register als Argument,
-   * die Zusicherung ist also ohne `vi.mock` prüfbar — und sie überlebt die Freischaltung
-   * von `stab` (LFH-46/ST4), nach der es im Bestand gar kein `wip`-Modul mehr gibt. Ein
-   * Test, der am letzten unfertigen Modul hängt, prüft ab dann nichts mehr.
+   * Die Statusachse wird gegen einen STUB-Register geprüft: `aufloeseStandardModul` nimmt ihn als
+   * Argument, und im Bestand gibt es kein `wip`-Modul mehr, an dem ein Test hängen könnte.
    */
   it('aufloeseStandardModul: Fallback bei nicht-fertigem Modul (wip)', () => {
     const stub: ModulEintrag[] = [
@@ -240,8 +236,8 @@ describe('modulRegistry', () => {
       },
     ];
     expect(aufloeseStandardModul('wip-modul', stub)).toBe(redirectZiel(stub));
-    // Gegenprobe: derselbe Register löst ein FERTIGES Modul auf seine Route auf — ohne sie
-    // wäre der Test auch dann grün, wenn die Funktion pauschal auf `redirectZiel` fiele.
+    // Gegenprobe: ein FERTIGES Modul wird auf seine Route aufgelöst — sonst wäre der Test auch grün,
+    // wenn die Funktion pauschal auf `redirectZiel` fiele.
     expect(aufloeseStandardModul('fertig-modul', stub)).toBe('f');
   });
 
@@ -290,7 +286,7 @@ describe('modulRegistry', () => {
     expect(gz).toBeDefined();
     expect(gz?.kategorie).toBe('lage');
     expect(gz?.status).toBe('fertig');
-    // LFH-74: Der Gefahren-Button zeigt die Gefahrenmatrix selbst, nicht die Lagekarte.
+    // Der Gefahren-Button zeigt die Gefahrenmatrix selbst, nicht die Lagekarte.
     expect(gz?.verweistAuf).toBeUndefined();
     expect(gz?.route).toBe('gefahren');
     expect(modulZielRoute(gz!)).toBe('gefahren');
@@ -326,12 +322,8 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
   });
 
   it('überspringt ausgeblendete Module', () => {
-    // Kategorie 'kraefte', nicht 'fuehrung': deren erstes Modul wäre 'einsatzdaten' —
-    // eines der beiden `NICHT_AUSBLENDBARE_MODULE`, an dem ein Sichtbarkeits-Override
-    // wirkungslos bleibt (`istModulSichtbar` liefert dafür immer `true`). Der Test
-    // bräuchte dann ein Modul, das der Override überhaupt treffen kann. (Seit dem
-    // Neuentwurf steht in 'fuehrung' zwar der Überblick vorn — die Kategorie 'kraefte'
-    // bleibt trotzdem die sprechendere Probe.)
+    // Kategorie 'kraefte', nicht 'fuehrung': deren erstes Modul 'einsatzdaten' ist nicht
+    // ausblendbar, ein Sichtbarkeits-Override bliebe dort wirkungslos.
     const erstes = erstesFreigegebenesModul('kraefte', admin)!;
     const m = erstesFreigegebenesModul('kraefte', admin, {
       [erstes.key]: {
@@ -343,19 +335,15 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
         geaendert_von: null,
       },
     });
-    // Konkretes Folgemodul statt bloßer Ungleichheit (Fix-Runde 1): ein Resolver, der bei
-    // gesetztem Override fälschlich kapituliert (`null` statt weiterzusuchen), bestünde
-    // `not.toBe(erstes.key)` trivial — `expect(undefined).not.toBe('einheiten')` ist wahr.
-    // 'einheiten' ist laut Registry-Reihenfolge das nächste fertige/sichtbare/entsperrte
-    // Modul der Kategorie 'kraefte' nach dem Meldebild (seit dem Neuentwurf vorn).
+    // Konkretes Folgemodul statt bloßer Ungleichheit: ein Resolver, der bei gesetztem Override
+    // fälschlich `null` liefert, bestünde `not.toBe(erstes.key)` trivial.
     expect(erstes.key).toBe('kraefteuebersicht');
     expect(m?.key).toBe('einheiten');
   });
 
   it('überspringt rollen-gesperrte Module', () => {
-    // Dieselbe Begründung wie oben: 'einsatzdaten' ist als nicht-ausblendbares Modul
-    // auch nie rollen-sperrbar (Selbst-Aussperr-Schutz in `istModulGesperrt`) — 'kraefte'
-    // trifft mit dem Meldebild ein Modul, an dem der Rollen-Override tatsächlich greift.
+    // Dieselbe Begründung: 'einsatzdaten' ist auch nie rollen-sperrbar; in 'kraefte' greift der
+    // Rollen-Override tatsächlich.
     const erstes = erstesFreigegebenesModul('kraefte', admin)!;
     const ohne: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'keine' };
     const m = erstesFreigegebenesModul('kraefte', ohne, {
@@ -368,14 +356,13 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
         geaendert_von: null,
       },
     });
-    // Konkretes Folgemodul statt bloßer Ungleichheit — dieselbe Begründung wie im Test darüber.
+    // Konkretes Folgemodul — dieselbe Begründung wie oben.
     expect(erstes.key).toBe('kraefteuebersicht');
     expect(m?.key).toBe('einheiten');
   });
 
   it('liefert null, wenn die Kategorie kein freigegebenes Modul hat', () => {
-    // Die Gegenaussage: ohne sie bliebe unbewiesen, dass der Resolver überhaupt
-    // ablehnen KANN — und der Aufrufer navigierte auf `undefined`.
+    // Gegenaussage: der Resolver KANN ablehnen — sonst navigierte der Aufrufer auf `undefined`.
     const nurGeplant: ModulEintrag[] = [
       { key: 'x', kategorie: 'lage', label: 'X', icon: () => null, route: 'x', status: 'geplant' },
     ];
@@ -384,16 +371,11 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-/**
- * Die Umkehrung Route → Eintrag stand vor LFH-391 · C4 ZWEIMAL wörtlich im Bestand
- * (`EinsatzLayout` für die Hervorhebung, `ModulStub` für die Rückweg-Beschriftung); der
- * Modulschlüssel der Kommandopalette wäre die dritte Kopie geworden.
- */
+/** Die Umkehrung Route → Eintrag. */
 describe('modulZuRoute / modulAusPfad', () => {
   it('findet den Eintrag zu einem Routen-Segment', () => {
     expect(modulZuRoute('etb')?.key).toBe('etb');
-    // Schlüssel und Route fallen NICHT überall zusammen — 'gefahren' ist der einzige
-    // Bestandsfall und deshalb der aussagekräftige: gesucht wird über `route`.
+    // Schlüssel und Route fallen NICHT überall zusammen — 'gefahren' ist der Bestandsfall.
     expect(modulZuRoute('gefahren')?.key).toBe('gefahrenzonen');
     expect(modulZuRoute('gefahrenzonen')).toBeNull();
   });
@@ -406,8 +388,7 @@ describe('modulZuRoute / modulAusPfad', () => {
 
   it('liest das Modul-Segment aus dem Pfad, auch auf einer Sub-Route', () => {
     expect(modulAusPfad('/einsaetze/7/etb')?.key).toBe('etb');
-    // Das Segment NACH der Einsatz-ID, nicht das letzte: sonst verlöre eine Detail- oder
-    // Listen-Unterseite ihr Modul (`EinsatzLayout` hängt seine Hervorhebung daran).
+    // Das Segment NACH der Einsatz-ID, nicht das letzte: sonst verlöre eine Unterseite ihr Modul.
     expect(modulAusPfad('/einsaetze/7/unfallhilfsstellen/liste')?.key).toBe('unfallhilfsstellen');
     expect(modulAusPfad('/einsaetze/7/personen/12')?.key).toBe('personen');
   });
@@ -416,8 +397,7 @@ describe('modulZuRoute / modulAusPfad', () => {
     expect(modulAusPfad('/einsaetze/7')).toBeNull();
     expect(modulAusPfad('/einsaetze')).toBeNull();
     expect(modulAusPfad('/profil')).toBeNull();
-    // Kein Einsatz-Bereich: ein Pfad, dessen DRITTES Segment zufällig wie eine Modulroute
-    // heisst, ist keiner — sonst gälte `/admin/stammdaten/personal` als Modul „Personal".
+    // Kein Einsatz-Bereich: sonst gälte `/admin/stammdaten/personal` als Modul „Personal".
     expect(modulAusPfad('/admin/stammdaten/personal')).toBeNull();
   });
 });

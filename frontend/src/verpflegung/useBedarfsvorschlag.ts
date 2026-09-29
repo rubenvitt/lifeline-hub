@@ -1,20 +1,15 @@
 /**
- * Verpflegung (LFH-634) — Bedarfsvorschläge für ein Zeitfenster (design.md D8).
+ * Verpflegung — Bedarfsvorschläge für ein Zeitfenster.
  *
  * Zwei Quellen, beide nur, wenn das Quellmodul für die Person BEDIENBAR ist
- * (`istKeyFreigegeben`: fertig, sichtbar und nicht per Rolle gesperrt). Sichtbar allein reicht
- * nicht — der Server antwortet auch bei einer Rollensperre mit 403. Kommt trotzdem ein Fehler
- * (etwa ein Override, der sich während der Sitzung ändert), gilt die Quelle als leer: kein
- * Vorschlag, keine Fehleranzeige, kein Wiederholungsversuch.
+ * (`istKeyFreigegeben`) — sichtbar allein reicht nicht, eine Rollensperre ist 403. Ein Fehler
+ * lässt die Quelle leer: kein Vorschlag, keine Fehleranzeige, kein Wiederholungsversuch.
  *
- * - Einsatzkräfte: `verdichte(personal, [], []).staerke.gesamt` — jede Personalzeile einmal.
+ * - Einsatzkräfte: `verdichte(personal, [], []).staerke.gesamt`.
  * - Betreute: Kopfzahl „in Betreuung“ zum Beginn (`ladeBelegungKopfzahl`).
  *
- * Der Hook folgt seiner Quelle. Dass ein gespeicherter Bedarf bei späterem Personalzuwachs
- * stehen bleibt, entscheidet der Dialog: er belegt nur beim ANLEGEN vor.
- *
- * ZEIT: `vonAt` ist ein Wire-String (UTC ohne Zonenkennung) und wird nur über `dayjs.utc`
- * gelesen; derselbe String geht unverändert als `zeitpunkt` an die Kopfzahl.
+ * Vorbelegt wird nur beim ANLEGEN (Sache des Dialogs). `vonAt` ist ein Wire-String (UTC ohne
+ * Zone), nur über `dayjs.utc` gelesen und unverändert als `zeitpunkt` an die Kopfzahl gegeben.
  */
 import { useQuery } from '@tanstack/react-query';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -49,10 +44,8 @@ export interface BedarfsvorschlagArgs {
   vonAt: string | undefined;
   benutzer: BenutzerAnzeige | null;
   /**
-   * Modul-Overrides des Einsatzes. ACHTUNG, anders als bei `istModulSichtbar`: `undefined`
-   * heißt hier „noch unbekannt“ und sperrt beide Quellen — ein Aufrufer reicht
-   * `overridesQuery.data` durch, und solange die lädt, soll kein Abruf ein 403 riskieren.
-   * „Keine Overrides“ ist `{}`.
+   * Modul-Overrides des Einsatzes. Anders als bei `istModulSichtbar` heißt `undefined` hier „noch
+   * unbekannt“ und sperrt beide Quellen, damit kein Abruf ein 403 riskiert. „Keine Overrides“ ist `{}`.
    */
   overrides: ModulOverrides | undefined;
   /** Uhr für „liegt der Beginn in der Zukunft?“ — die Seite reicht `useJetzt()` durch. */
@@ -67,9 +60,8 @@ function betreuteVorschlag(
   vonAt: string | undefined,
   jetzt: Dayjs,
 ): Vorschlag {
-  // `stellen` führt auch Stellen OHNE Meldung (`belegt` fehlt, `src/betreuung/repo.rs`):
-  // „nichts gemeldet“ heißt deshalb „keine Stelle mit Meldung“, nicht `stellen.length === 0`.
-  // Eine gemeldete 0 ist dagegen ein Wert.
+  // `stellen` führt auch Stellen OHNE Meldung: „nichts gemeldet“ heißt „keine Stelle mit Meldung“,
+  // nicht `stellen.length === 0`. Eine gemeldete 0 ist ein Wert.
   if (!k.stellen.some((s) => s.belegt != null)) {
     return { wert: null, hinweis: 'keine Belegung gemeldet' };
   }
@@ -111,8 +103,8 @@ export function useBedarfsvorschlag({
   });
 
   let kraefte = LEER;
-  // Ein Fehler (403 oder sonst) lässt die Quelle leer; `data` eines früheren Erfolgs bliebe
-  // bei einem Refetch-Fehler stehen — deshalb zusätzlich `isError`.
+  // Ein Fehler lässt die Quelle leer; `data` eines früheren Erfolgs bliebe bei einem
+  // Refetch-Fehler stehen — deshalb zusätzlich `isError`.
   if (personalFrei && personalQ.data && !personalQ.isError) {
     const gesamt = verdichte(personalQ.data, [], []).staerke.gesamt;
     if (gesamt > 0) {

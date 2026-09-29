@@ -11,8 +11,8 @@ import { personalDetailPfad } from './stammdatenDetail';
 import { adminFixture } from '../test/fixtures';
 
 /**
- * LFH-346 · A7 — die Personal-Detailroute. Gegenstück zu `FahrzeugDetailPage.test.tsx`;
- * dieselben vier Aussagen, an der Personal-Feldmenge gemessen.
+ * Die Personal-Detailroute (LFH-346). Gegenstück zu `FahrzeugDetailPage.test.tsx`; dieselben
+ * vier Aussagen, an der Personal-Feldmenge gemessen.
  */
 
 const admin = adminFixture();

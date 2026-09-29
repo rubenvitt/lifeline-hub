@@ -83,9 +83,8 @@ describe('BezugDialog', () => {
     await userEvent.click(comboboxen[0]);
     await userEvent.click(await screen.findByText('Person'));
 
-    // Wäre die Auswahl nicht zurückgesetzt, würde Speichern fälschlich mit der
-    // alten Schaden-ID (3) unter dem neuen Typ feuern. Stattdessen blockt die
-    // Pflichtvalidierung des leeren Objekt-Felds.
+    // Ohne Zurücksetzen feuerte Speichern mit der alten Schaden-ID unter dem neuen Typ;
+    // stattdessen blockt die Pflichtvalidierung des leeren Objekt-Felds.
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(onBestaetigen).not.toHaveBeenCalled();
   });

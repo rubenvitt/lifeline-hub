@@ -1,15 +1,12 @@
 /**
- * Ablösung (LFH-635) — reine Ableitungen: Einstufung, Modulzähler, Überblick-Marken.
+ * Ablösung — reine Ableitungen: Einstufung, Modulzähler, Überblick-Marken.
  *
- * Die Einstufung rechnet das Backend beim Lesen (`src/abloesung/mod.rs::einstufung`). Das
- * Frontend rechnet sie NACH, weil die Uhr im Client weitertickt: eine Schicht, die beim
- * letzten Abruf „planmäßig" war, ist zwanzig Minuten später in der Vorwarnzeit, ohne dass
- * ein neuer Abruf käme. Deshalb dieselbe Regel mit denselben Grenzfällen (genau fällig ⇒
- * überfällig, genau 30 min ⇒ Vorwarnung) — `einstufung.test.ts` pinnt sie wie der
- * Rust-Test `einstufung_grenzfaelle`.
+ * Die Einstufung rechnet das Backend beim Lesen (`src/abloesung/mod.rs::einstufung`); das
+ * Frontend rechnet sie NACH, weil die Uhr im Client weitertickt, ohne dass ein neuer Abruf
+ * käme. Deshalb dieselbe Regel mit denselben Grenzfällen (genau fällig ⇒ überfällig, genau
+ * 30 min ⇒ Vorwarnung), gepinnt wie im Rust-Test `einstufung_grenzfaelle`.
  *
- * ZEIT: Wire-Strings sind UTC OHNE Zonenkennung; gelesen wird ausschließlich über
- * `dayjs.utc`, nie über `dayjs(s)` (das läse Ortszeit und verschöbe still um den Versatz).
+ * Wire-Strings sind UTC OHNE Zonenkennung: nur über `dayjs.utc` lesen, nie `dayjs(s)`.
  */
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -68,9 +65,8 @@ export function rhythmusText(minuten: number): string {
 }
 
 /**
- * Laufende Schichten → Marken „Ablösung <Abschnitt>, <n> Einheiten" bzw. „Ablösung
- * <Einheit>". Schichten ohne Abschnitt bilden je eine eigene Marke — ohne Einsatzstelle
- * gibt es nichts, das sie gemeinsam benennen würde.
+ * Laufende Schichten → Marken „Ablösung <Abschnitt>, <n> Einheiten" bzw. „Ablösung <Einheit>".
+ * Schichten ohne Abschnitt bilden je eine eigene Marke.
  */
 export function abloesungsMarken(abloesungen: readonly Abloesung[]): AbloesungsMarke[] {
   const gruppen = new Map<string, Abloesung[]>();

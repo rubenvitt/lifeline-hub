@@ -4,21 +4,13 @@ import type { EinsatzStreamEvent } from './queryKeys';
 import type { LiveEvent } from './types';
 
 /**
- * LFH-298: Cross-Language-Kontrakt der SSE-Wire-Event-Namen. Das Rust-`LiveEvent`-Enum ist die
- * Wahrheitsquelle der Wire-Event-Namen (`src/live/mod.rs` → openapi.json → types.generated.ts).
- * Es MUSS exakt das decken, was das Frontend kennt: die {@link EINSATZ_STREAM_EVENTS}-Registry
- * ∪ {sofortmeldung, lagged}.
+ * Cross-Language-Kontrakt der SSE-Wire-Event-Namen. Das Rust-`LiveEvent`-Enum ist die
+ * Wahrheitsquelle und MUSS exakt decken, was das Frontend kennt: {@link EINSATZ_STREAM_EVENTS}
+ * ∪ {sofortmeldung, lagged} (die zwei behandelt `useEinsatzLiveStream` außerhalb der Registry).
  *
- * `sofortmeldung` + `lagged` sind die zwei Wire-Events, die `useEinsatzLiveStream` zusätzlich
- * zur Registry behandelt (Ton/CustomEvent-Seiteneffekt bzw. serverseitiger Voll-Resync) und die
- * bewusst NICHT in EINSATZ_STREAM_EVENTS stehen (siehe queryKeys.ts / queryKeys.test.ts).
- *
- * Der eigentliche Drift-Schutz ist TYP-LEVEL (die `AssertEqual`-Zeile unten) und greift im
- * `pnpm typecheck`-Gate (scripts/check-typ-codegen.sh Schritt 4): ein neues Backend-Event ODER
- * ein toter FE-Key bricht `tsc`, weil die beiden Unions dann nicht mehr deckungsgleich sind. Die
- * `openapi-typescript`-Generierung liefert `LiveEvent` als reinen Typ (kein Laufzeitwert) — ein
- * schlichtes `expect(...).toEqual(...)` gegen die Union ist deshalb nicht möglich; die Laufzeit-
- * Tests pinnen nur die Registry-Ausnahmen sichtbar im Report.
+ * Der Drift-Schutz ist TYP-LEVEL (`AssertEqual` unten, greift in `tsc`): ein neues Backend-Event
+ * oder ein toter FE-Key bricht den Typcheck. `LiveEvent` ist ein reiner Typ, deshalb pinnen die
+ * Laufzeit-Tests nur die Registry-Ausnahmen.
  */
 
 /** Wire-Events, die der Hook fest verdrahtet behandelt, ohne Registry-Eintrag. */

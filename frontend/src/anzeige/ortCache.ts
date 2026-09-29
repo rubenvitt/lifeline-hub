@@ -1,8 +1,7 @@
 /**
- * Persistenter, quasi-permanenter Local-Cache für Reverse-Geocoding-Ergebnisse
- * (Koordinate → Ortsname) in IndexedDB. Schlüssel auf ~100 m gerundet, identisch zur
- * serverseitigen Rundung. Ortsnamen sind faktisch unveränderlich → kein Eviction.
- * Fehler sind nie fatal: Lesen → null, Schreiben → no-op (geloggt).
+ * Persistenter Cache für Reverse-Geocoding (Koordinate → Ortsname) in IndexedDB, Schlüssel auf
+ * ~100 m gerundet wie serverseitig. Ortsnamen ändern sich faktisch nicht → keine Eviction.
+ * Fehler sind nie fatal: Lesen → null, Schreiben → no-op.
  */
 import { openDB, type IDBPDatabase } from 'idb';
 

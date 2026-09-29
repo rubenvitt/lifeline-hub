@@ -21,17 +21,9 @@ export function befuellteAbschnitte(
 
 /**
  * Dieselbe Aussage als ZEICHENKETTE, ein Zeichen je Abschnitt („1" befüllt, „0" leer).
- *
- * Der Zweck ist eine Memo-Abhängigkeit, die ein PRIMITIV ist (CLAUDE.md, Lint-Disziplin:
- * „Primitive statt Objekt in die Deps"). `befuellteAbschnitte` liefert bei jedem
- * Tastenanschlag ein NEUES `Set` mit identischem Inhalt — als Prop reicht das, um jede
- * Memoisierung des Akkordeons wertlos zu machen. Die Kette ändert sich dagegen nur, wenn ein
- * Abschnitt tatsächlich von leer auf befüllt kippt, also ein- oder zweimal je Abschnitt und
- * Sitzung statt vierzig Mal je Satz.
- *
- * Abgeleitet AUS `befuellteAbschnitte`, nicht daneben gebaut: die Frage „was ist befüllt"
- * hat eine Definition, und eine zweite mit eigener Leerraum-Regel wäre die Sorte Abweichung,
- * die niemandem auffällt.
+ * Ein Primitiv als Memo-Abhängigkeit: `befuellteAbschnitte` liefert je Anschlag ein NEUES
+ * `Set` und machte jede Memoisierung wertlos; die Kette ändert sich nur, wenn ein Abschnitt
+ * kippt. Abgeleitet aus `befuellteAbschnitte`, damit „befüllt" eine Definition hat.
  */
 export function befuellungsKette(
   werte: Record<string, unknown> | undefined,
@@ -65,45 +57,21 @@ export interface AbschnittsAkkordeonProps {
 }
 
 /**
- * Abschnittsnavigation der Lagebericht-Detailseite (LFH-348 · C13, Befund H62).
+ * Abschnittsnavigation der Lagebericht-Detailseite: ein Akkordeon, dessen Kopfzeilen die
+ * Navigation SIND (alle Abschnitte, leere markiert). Acht ausgeklappte Editoren wären viel zu
+ * hoch, ein `Anchor` daneben eine zweite Liste derselben Einträge.
  *
- * WARUM EIN AKKORDEON UND KEIN `Anchor`, obwohl das Ticket den nennt — gemessen: die
- * Bestandsseite mit acht Split-Editoren à acht Zeilen war 2108 px hoch
- * (`e2e/lagebericht-schmal.spec.ts`, 1366 × 768), das Ticket verlangt die Halbierung
- * (≤ 1054 px). Acht ausgeklappte Editoren erreichen das in keiner Bauform: schon bei
- * vier Mindestzeilen je Feld liegt allein das Formular über 1200 px. Der Körper der Seite
- * hat zudem einen Boden von `100vh` (`AppLayout`/`EinsatzLayout`, `minHeight`), 768 px
- * sind also das Minimum. Bleibt: EIN offener Editor, sieben Kopfzeilen — und die Kopfzeilen
- * SIND die Navigation. Sie listen alle Abschnitte, markieren die leeren und springen mit
- * einem Klick, ohne dass die Seite scrollt. Ein zusätzlicher `Anchor` daneben wäre eine
- * zweite Liste derselben acht Einträge.
+ * Zwei Zusicherungen, beide getestet:
+ *  · `forceRender`: alle Editoren stehen im DOM, sonst schickte ein Speichern die zugeklappten
+ *    Abschnitte leer.
+ *  · Die Leer-Marke trägt zwei Kanäle (WCAG 1.4.1): Ikone in `aria-hidden`-Hülle und das Wort
+ *    „(leer)".
  *
- * Die Vorlagen haben keine Reihenfolge-Logik (`Steps` entfällt): jeder Abschnitt ist
- * jederzeit erreichbar, das Akkordeon erzwingt nichts.
- *
- * ZWEI ZUSICHERUNGEN, beide getestet:
- *  · `forceRender`: alle Editoren stehen im DOM, auch die zugeklappten. Sonst hätte
- *    `Form` die Werte der geschlossenen Abschnitte nicht, und ein Speichern schickte sie
- *    leer — derselbe Grund, aus dem die Erfassungs-Norm `forceRender` an einem `Collapse`
- *    im Formular verlangt (CLAUDE.md, „Feldbudget").
- *  · Die Leer-Marke trägt ZWEI Kanäle (WCAG 1.4.1): Ikone in `aria-hidden`-Hülle und das
- *    Wort „(leer)" im Kopfzeilentext. Ein antd-Icon bringt sonst `role="img"` mit
- *    englischem Namen mit und stünde in jeder Zeile als eigenes Vorleseziel.
- *
- * `memo` IST HIER EINE MESSUNG, KEIN REFLEX (LFH-495, Nachzug N4). Die Detailseite hält mit
- * `Form.useWatch([], form)` die Leer-Marke am Tippen statt am Speichern und rendert dafür je
- * Anschlag neu — mit ihr acht Editoren, die alle `forceRender` tragen und ihre Höhe per
- * `autoSize` nachmessen. Gemessen bei 1366 × 768 (`e2e/lagebericht-tippen.spec.ts`,
- * Anschlag bis Bild): Median 36 ms, p90 73 ms, schlechtester 138 ms — gegen 17 / 30 / 72 ms
- * am Befehlsentwurf, der dieselben Editoren ohne `useWatch` trägt. Der schlechteste Anschlag
- * lag damit über der RAIL-Grenze von 100 ms.
- *
- * Die Sperre trägt nur, solange ALLE vier Props identitätsstabil bleiben: `abschnitte` kommt
- * aus `VORLAGEN` (dasselbe Objekt je Schlüssel), `onOffen` ist ein Setter, `offen` ist eine
- * Zeichenkette — und `befuellt` muss über `befuellungsKette`/`mengeAusKette` laufen, sonst
- * ist es je Anschlag ein neues `Set` und die Memoisierung ein No-op. Wer `editor` inline
- * übergibt statt per `useCallback`, hebt sie ebenso auf; beides fällt nicht auf, weil es
- * nichts kaputt macht — es wird nur wieder langsam.
+ * `memo`, weil die Detailseite über `Form.useWatch([], form)` je Anschlag neu rendert und acht
+ * Editoren mit `autoSize`-Nachmessung spürbar bremsen. Die Sperre trägt nur, solange ALLE
+ * Props identitätsstabil sind: `abschnitte` aus `VORLAGEN`, `onOffen` als Setter, `befuellt`
+ * über `befuellungsKette`/`mengeAusKette`, `editor` per `useCallback`. Ein Verstoß fällt nicht
+ * auf — es wird nur wieder langsam.
  */
 export const AbschnittsAkkordeon = memo(function AbschnittsAkkordeon({
   abschnitte,
@@ -118,9 +86,8 @@ export const AbschnittsAkkordeon = memo(function AbschnittsAkkordeon({
       accordion
       activeKey={offen}
       onChange={(k) => {
-        // Akkordeon liefert den Schlüssel oder — beim Zuklappen des offenen — nichts.
-        // Ein Bericht ohne offenen Abschnitt hätte keinen sichtbaren Editor; der offene
-        // bleibt deshalb offen.
+        // Beim Zuklappen des offenen Abschnitts liefert das Akkordeon nichts; der offene bleibt offen,
+        // sonst gäbe es keinen sichtbaren Editor.
         const naechster = Array.isArray(k) ? k[0] : k;
         if (typeof naechster === 'string') onOffen(naechster);
       }}

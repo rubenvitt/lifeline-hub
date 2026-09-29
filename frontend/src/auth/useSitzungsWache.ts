@@ -3,29 +3,26 @@ import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from './AuthContext';
 import { SITZUNG_ABGELAUFEN } from './sitzungsEvent';
 
-/** Einziger Empfänger von {@link SITZUNG_ABGELAUFEN} (LFH-268/F24). Gehört ins persistente Root-Layout (`App`/`SitzungsLayout`) innerhalb von
- *  `AntApp`, Data Router und `AuthProvider` — die
- *  Vorgänger-Brücke saß in `EinsatzLayout` und ließ damit `/admin`, `/profil`, die Stammdaten
- *  und die Einsatzliste ohne jede 401-Behandlung. */
+/**
+ * Einziger Empfänger von {@link SITZUNG_ABGELAUFEN}. Gehört ins persistente Root-Layout
+ * innerhalb von `AntApp`, Data Router und `AuthProvider`, damit jede Route eine
+ * 401-Behandlung hat.
+ */
 export function useSitzungsWache(): void {
   const { abmeldenLokal } = useAuth();
   const navigate = useNavigate();
   const { pathname, search, hash } = useLocation();
 
   useEffect(() => {
-    // Auf der Login-Seite selbst gäbe es nichts umzuleiten — und der Rückkehr-Pfad wäre
-    // `/login`, was nach dem Anmelden auf sich selbst zeigte.
+    // Auf der Login-Seite gibt es nichts umzuleiten; der Rückkehr-Pfad zeigte auf sich selbst.
     if (pathname === '/login') return;
 
     const beiAblauf = () => {
-      // Vollständige Rückkehr-URL: `pathname` allein verliert die Deeplink-Selektion des
-      // Query-Param-Musters (`?einheit=`, `?meldung=`, ETB `?eintrag=` — s. CLAUDE.md).
+      // Vollständige Rückkehr-URL: `pathname` allein verlöre die Deeplink-Selektion (`?eintrag=` …).
       const von = `${pathname}${search}${hash}`;
-      // NUR lokal abmelden (LFH-387): die Sitzung ist abgelaufen, serverseitig gibt es nichts
-      // zu beenden. Ein `POST /api/auth/logout` liefe mit dem Cookie, das der Browser JETZT
-      // hält — hat sich zwischen der 401 und diesem Ruf in einem anderen Tab jemand angemeldet,
-      // beendete er dessen Sitzung. Die Umleitung hängt trotzdem nicht am Abmelden: an einem
-      // sicherheitsrelevanten Seam soll eine gebrochene Zusage keinen hängenden Nutzer erzeugen.
+      // NUR lokal abmelden (LFH-387): ein Server-Logout liefe mit dem Cookie von JETZT und
+      // beendete eine inzwischen in einem anderen Tab angelegte Sitzung. Die Umleitung hängt
+      // nicht am Abmelden — an diesem Seam soll kein hängender Nutzer entstehen.
       try {
         abmeldenLokal();
       } catch (e) {

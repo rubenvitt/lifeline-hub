@@ -1,9 +1,8 @@
-// Reihenfolge zählt: erst die Schriftrollen, dann die Farb-/Formrollen, dann
-// das globale CSS, das beide benutzt (LFH-352 · A0).
+// Reihenfolge zählt: erst Schriftrollen, dann Farb-/Formrollen, dann das globale CSS, das beide benutzt.
 import './theme/schriften.css';
 import './theme/rollen.css';
 import './index.css';
-// Druckmechanik aller Druckstücke (LFH-71): greift nur unter `@media print` mit Druckwurzel.
+// Druckmechanik aller Druckstücke; greift nur unter `@media print` mit Druckwurzel.
 import './druck/druck.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';

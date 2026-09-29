@@ -11,14 +11,9 @@ import { useEvakuierungKennzahl } from './useEvakuierungKennzahl';
 import { benutzerFixture } from '../test/fixtures';
 
 /**
- * Der Hook zur Kennzahl (LFH-639, design.md D9): die Hälfte, die die reine Funktion nicht
- * sehen kann — der Query-Zustand. Das tragende Paar steht nebeneinander: „kein Bezirk" ergibt
- * `daten` mit `kennzahl: null`, ein 500 ergibt `fehler` und NIE `kennzahl: null` (Spec:
- * „Ein fehlgeschlagener Abruf MUST als Fehler gelten und nie als ‚keine Kennzahl'").
- *
- * MSW statt `vi.mock` des Clients: nur der Handler belegt die URL mit, und der Zähler ist die
- * einzige Bauform, in der „kein Request" überhaupt prüfbar ist. `onUnhandledRequest: 'error'`
- * (`test/setup.ts`) bricht zusätzlich jeden unerwarteten Abruf.
+ * Der Hook zur Kennzahl — der Query-Zustand, den die reine Funktion nicht sieht: „kein Bezirk"
+ * ergibt `daten` mit `kennzahl: null`, ein 500 ergibt `fehler` und NIE `kennzahl: null`.
+ * MSW statt `vi.mock`: nur der Handler-Zähler macht „kein Request" prüfbar.
  */
 
 const benutzer = benutzerFixture({ anzeigename: 'E' });
@@ -86,9 +81,7 @@ describe('useEvakuierungKennzahl', () => {
 
   it('ein Fehler hat Vorrang vor Altdaten im Cache — keine Kennzahl aus einem Stand, der vielleicht nicht mehr gilt (LFH-682)', async () => {
     // Plain `QueryClient` statt `neuerQueryClient()`: dessen `gcTime: 0` räumte den per
-    // `setQueryData` gesetzten Eintrag weg, bevor der Hook ihn beobachtet (CLAUDE.md,
-    // Query-Key-Registry) — dann gäbe es keine Altdaten, und der Test prüfte nur den
-    // Fehlerfall ohne Cache, den der Test darüber schon abdeckt.
+    // `setQueryData` gesetzten Eintrag weg, und der Test prüfte nur den Fehlerfall ohne Cache.
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     client.setQueryData(einsatzKeys.betreuung(7), UEBERSICHT);
     zaehleAbrufe(() => HttpResponse.json({ error: 'kaputt' }, { status: 500 }));
@@ -158,8 +151,8 @@ describe('useEvakuierungKennzahl', () => {
   });
 
   it('`bereit: false` (Freigaben noch unbekannt) → `laden` OHNE Abruf, danach entscheidet das Recht (LFH-607)', async () => {
-    // Ohne diesen Riegel liefe der Abruf, bevor die Overrides da sind — bei ausgeblendetem
-    // Modul ein 403, den der Zähler gerade vermeiden soll.
+    // Ohne diesen Riegel liefe der Abruf, bevor die Overrides da sind — bei ausgeblendetem Modul
+    // ein 403.
     const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [], stellen: [] }));
     const { result, rerender } = renderHook(
       ({ bereit }: { bereit: boolean }) =>

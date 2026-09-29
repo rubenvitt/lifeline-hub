@@ -2,14 +2,10 @@ import { apiGet, apiSend } from './client';
 import type { components } from './types.generated';
 
 /**
- * Frontend-Seam für den Offline-Karten-Manager (LFH-181). Verdrahtet die
- * `/api/karte/offline-karten`-Endpunkte (Liste/Download/Aktivieren/Abbrechen/Löschen + Katalog).
- * Einziger API-Berührungspunkt der Offline-Verwaltung — Komponenten importieren nur von hier.
- *
- * LFH-265 (Teil A) / LFH-323 (Teil B): die Response-Typen sind Re-Exporte der generierten Schemas
- * — inklusive der karten-service-Kontrakt-Typen ganz unten (`BauJob`/`BaubareRegion`), die seit
- * LFH-323 über das geteilte Crate `karten-katalog` durch den Codegen laufen. Eingabe-Bodies
- * (`Offline*Body`, `RegistriereBody`) bleiben handgepflegt (CLAUDE.md).
+ * Frontend-Seam für den Offline-Karten-Manager: `/api/karte/offline-karten` (Liste, Download,
+ * Aktivieren, Abbrechen, Löschen, Katalog). Komponenten importieren nur von hier.
+ * Response-Typen sind Re-Exporte der generierten Schemas, auch die karten-service-Typen unten;
+ * Eingabe-Bodies bleiben handgepflegt.
  */
 
 type S = components['schemas'];
@@ -17,25 +13,16 @@ type S = components['schemas'];
 export type OfflineKarteStatus = S['OfflineKarteStatus'];
 
 /**
- * Eine Offline-Karte, wie die LISTE sie liefert. Rust: `OfflineKarteAntwort` = DB-Zeile
- * (`OfflineKarte`) + Live-Download-Fortschritt (`geladen`/`gesamt`) + Katalog-Abgleich
- * (`update_verfuegbar`/`katalog_url`/`katalog_sha256`).
- *
- * `update_verfuegbar` ist PFLICHT — das Backend berechnet es für jede Listen-Zeile; die alte
- * Handrolle führte es fälschlich optional (genau die Drift, die LFH-265 auflöst).
+ * Eine Offline-Karte, wie die LISTE sie liefert. Rust: `OfflineKarteAntwort` = DB-Zeile +
+ * Download-Fortschritt (`geladen`/`gesamt`) + Katalog-Abgleich (`update_verfuegbar` usw.).
+ * `update_verfuegbar` ist PFLICHT.
  */
 export type OfflineKarte = S['OfflineKarteAntwort'];
 
 /**
- * Die nackte DB-Zeile OHNE Fortschritts- und Katalog-Felder. Rust: `OfflineKarte`.
- *
- * WARUM ZWEI TYPEN (LFH-265): nur `GET /offline-karten` antwortet mit `OfflineKarteAntwort`;
- * die vier schreibenden Endpunkte (`download`/`aktivieren`/`neu-laden`, `POST /offline-karten`)
- * geben die bare Zeile zurück — verifiziert an den Handler-Signaturen in `src/routes/karte.rs`.
- * Beide auf den Listen-Typ zu mappen wäre bequem und FALSCH: der Client bekäme ein garantiert
- * vorhandenes `update_verfuegbar` zugesagt, das auf dem Wire fehlt. Kein Konsument liest die
- * Mutations-Antwort heute aus (alle invalidieren nur), deshalb ist das reine Typ-Ehrlichkeit —
- * aber genau die ist der Zweck des Codegens.
+ * Die nackte DB-Zeile OHNE Fortschritts- und Katalog-Felder. Rust: `OfflineKarte`. Nur
+ * `GET /offline-karten` liefert `OfflineKarteAntwort`; die schreibenden Endpunkte geben die bare
+ * Zeile zurück, ein gemeinsamer Typ sagte ein Feld zu, das auf dem Wire fehlt.
  */
 export type OfflineKarteZeile = S['OfflineKarte'];
 
@@ -54,9 +41,9 @@ export interface OfflineDownloadBody {
 }
 
 /**
- * Body für den In-Place-Reload (B3): lädt ein Update der bestehenden Karte in DIESELBE Zeile/Datei.
- * Name/Lizenz bleiben die der Karte (kein neuer Eintrag). Anders als `ersetzt_karte_id` (neue Zeile)
- * bleibt die id stabil und die alte Datei wird bis zum atomaren Swap weiter ausgeliefert.
+ * Body für den In-Place-Reload: lädt ein Update der bestehenden Karte in DIESELBE Zeile/Datei.
+ * Name/Lizenz bleiben; anders als `ersetzt_karte_id` (neue Zeile) bleibt die id stabil, und die
+ * alte Datei wird bis zum atomaren Swap weiter ausgeliefert.
  */
 export interface OfflineNeuLadenBody {
   url: string;
@@ -81,7 +68,7 @@ export function aktiviereOfflineKarte(id: number): Promise<OfflineKarteZeile> {
   return apiSend<OfflineKarteZeile>(`/api/karte/offline-karten/${id}/aktivieren`, 'POST');
 }
 
-/** In-Place-Hot-Swap (B3): Update der aktiven Karte in dieselbe Zeile — downtime-frei. */
+/** In-Place-Hot-Swap: Update der aktiven Karte in dieselbe Zeile, downtime-frei. */
 export function neuLadeOfflineKarte(
   id: number,
   body: OfflineNeuLadenBody,
@@ -97,15 +84,15 @@ export function loescheOfflineKarte(id: number): Promise<void> {
   return apiSend<void>(`/api/karte/offline-karten/${id}`, 'DELETE');
 }
 
-/** Server-autoritativer Download-Vorschlagskatalog (kuratierte MBTiles-Quellen). `frisch` umgeht die
- *  Manifest-Cache-TTL (LFH-206, „Bauen & laden"): direkt nach einem Bau den neuen Eintrag sofort sehen. */
+/** Server-autoritativer Download-Vorschlagskatalog (kuratierte MBTiles-Quellen). `frisch` umgeht
+ *  die Manifest-Cache-TTL, damit ein gerade gebauter Eintrag sofort erscheint. */
 export function ladeOfflineKatalog(frisch = false): Promise<OfflineKatalogEintrag[]> {
   return apiGet<OfflineKatalogEintrag[]>(
     `/api/karte/offline-karten/katalog${frisch ? '?frisch=1' : ''}`,
   );
 }
 
-/** Eine im karten_dir vorhandene, noch nicht registrierte MBTiles-Datei (lokaler Import, LFH-199). */
+/** Eine im karten_dir vorhandene, noch nicht registrierte MBTiles-Datei (lokaler Import). */
 export type VorhandeneKarte = S['VorhandeneKarte'];
 
 /** Body zum Registrieren einer bereits im karten_dir liegenden Karte (lokaler Import). */
@@ -126,13 +113,9 @@ export function registriereOfflineKarte(body: RegistriereBody): Promise<OfflineK
   return apiSend<OfflineKarteZeile>('/api/karte/offline-karten', 'POST', body);
 }
 
-// ===== Region-Bau (zentraler karten-service, LFH-203) =====
-//
-// LFH-323: Re-Exporte der generierten Schemas. Die karten-service-Wire-Typen leben jetzt im
-// geteilten Crate `karten-katalog` (`BuildJob`/`JobStatus`/`RegionDto`), lifeline-hub deserialisiert
-// die Proxy-Antwort und exponiert sie mit ToSchema — der Cross-Service-Vertrag läuft damit durch
-// die Codegen-Kette statt als roher `serde_json::Value` daran vorbei (früher hier von Hand
-// nachmodelliert, mit Allowlist-Eintrag im Response-Typen-Guard). FE-Namen bleiben stabil (`Bau…`).
+// ===== Region-Bau (zentraler karten-service) =====
+// Re-Exporte der generierten Schemas (Crate `karten-katalog`: `BuildJob`/`JobStatus`/`RegionDto`);
+// die FE-Namen bleiben `Bau…`.
 
 /** Ein Build-Job des zentralen karten-service (`/bau-status`). */
 export type BauJob = S['BuildJob'];

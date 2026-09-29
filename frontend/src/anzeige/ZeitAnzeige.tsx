@@ -8,9 +8,8 @@ import {
 } from './format';
 
 /**
- * Zentrale, taktische Zeitanzeige (LFH-141) — analog zu `StaerkeAnzeige`. Rendert einen
- * UTC-Wirestring je nach `format` in taktischer Schreibweise, zeitzonen-bewusst über die
- * aktuellen Anzeige-Konventionen. Rendert ein Fragment (kein umschließendes Element).
+ * Zentrale taktische Zeitanzeige: rendert einen UTC-Wirestring zeitzonenbewusst über die
+ * Anzeige-Konventionen, als Fragment.
  *
  * - `uhrzeit` → `1430`
  * - `dtg`     → `161430` (Tag + Uhrzeit)

@@ -19,34 +19,29 @@ import { etbPfad } from '../routing/deeplinks';
 import { verfasserText } from './verfasser';
 
 /**
- * Lese-Vorschau eines ETB-Eintrags in der Sprungpalette (LFH-664, Design Entscheidung 2).
+ * Lese-Vorschau eines ETB-Eintrags in der Sprungpalette (LFH-664).
  *
  * ── DATEN ────────────────────────────────────────────────────────────────────────────
  *
- * Das ETB hat kein Fach, das einen Eintrag über seine `id` adressiert; die Suchfächer hängen
- * am Begriff. Gelesen wird deshalb das NUMMERNFACH der Palette ({@link etbNummerAbfrage},
- * dieselbe Abruffunktion und Frische): für einen Nummerntreffer ist es warm, für einen
- * Volltexttreffer kostet es genau einen Abruf mit `limit: 1`.
+ * Das ETB hat kein Fach, das einen Eintrag über seine `id` adressiert. Gelesen wird deshalb
+ * das NUMMERNFACH der Palette ({@link etbNummerAbfrage}, dieselbe Abruffunktion und Frische):
+ * für einen Nummerntreffer ist es warm, für einen Volltexttreffer kostet es einen Abruf mit
+ * `limit: 1`.
  *
  * Gezeigt wird nur ein Eintrag mit DERSELBEN `id`. `before_lfd_nr` filtert strikt `<` — fehlt
- * die Nummer (Lücke), liefert der Cursor den nächstälteren Eintrag, und ohne den Vergleich
- * stünde der still an seiner Stelle. So heißt es „nicht mehr vorhanden".
+ * die Nummer (Lücke), liefert der Cursor den nächstälteren Eintrag, der ohne den Vergleich
+ * still an seiner Stelle stünde. So heißt es „nicht mehr vorhanden".
  *
  * ── WAS FEHLT, MIT ABSICHT ───────────────────────────────────────────────────────────
  *
- * Die Berichtigung in RÜCKRICHTUNG fehlt („berichtigt durch Nr. …" am Grundeintrag): sie
- * braucht den Berichtigungsindex über die ganze Liste, die Vorschau hat einen Eintrag, und die
- * ETB-API filtert nicht nach `berichtigt_eintrag_id` (Design, Non-Goals; Nachzug LFH-689).
- * Die VORWÄRTSRICHTUNG steht dagegen da: eine Berichtigung trägt `berichtigt_eintrag_id` selbst
- * und verweist ohne weiteren Abruf auf ihren Grundeintrag — dessen Nummer kennt der Datensatz
- * nicht, der Satz heißt deshalb „berichtigt einen älteren Eintrag" wie der Rückfall der
- * Zeitachse. Keine Aktionen (Berichtigen, Wiedervorlage, Auftrag erteilen) — die
- * Vorschau liest nur. Leere optionale Angaben (von/an, Meldeweg, Veranlassung) stehen nicht
- * als Platzhalter da, sondern fehlen.
+ * Die Berichtigung in RÜCKRICHTUNG („berichtigt durch Nr. …"): sie braucht den
+ * Berichtigungsindex über die ganze Liste, und die ETB-API filtert nicht nach
+ * `berichtigt_eintrag_id` (LFH-689). Die VORWÄRTSRICHTUNG steht da, ohne Nummer des
+ * Grundeintrags („berichtigt einen älteren Eintrag", wie der Rückfall der Zeitachse). Keine
+ * Aktionen — die Vorschau liest nur. Leere optionale Angaben fehlen statt als Platzhalter.
  *
- * Die Verweise auf Befehl, Lagebericht, Auftrag und Folgeaufträge bleiben dagegen: sie ändern
- * nichts, brauchen nur diesen einen Eintrag (`EtbBacklinkBadges`, dasselbe Bauteil wie in der
- * Zeitachse), und ein Klick darauf schließt die Palette (Design Entscheidung 8).
+ * Die Verweise auf Befehl, Lagebericht, Auftrag und Folgeaufträge bleiben: sie ändern nichts,
+ * brauchen nur diesen Eintrag (`EtbBacklinkBadges`), und ein Klick darauf schließt die Palette.
  */
 export default function EtbEintragVorschau({
   einsatzId,
@@ -115,7 +110,7 @@ function EintragInhalt({
         <Datenfeld label="Verfasser">{verfasserText(e)}</Datenfeld>
         {e.berichtigt_eintrag_id != null && (
           <Datenfeld label="Berichtigung" breit>
-            {/* Blau, nicht rot: Rot bedient nichts (LFH-315) — wie der Verweis der Zeitachse. */}
+            {/* Blau, nicht rot: Rot bedient nichts — wie der Verweis der Zeitachse. */}
             berichtigt einen älteren Eintrag —{' '}
             <Link
               to={etbPfad(einsatzId, { eintrag: e.berichtigt_eintrag_id })}
@@ -139,7 +134,7 @@ function EintragInhalt({
       </Markdown>
       {/* Rendert nichts ohne Verknüpfung. */}
       <EtbBacklinkBadges eintrag={e} einsatzId={einsatzId} />
-      {/* Dasselbe Bauteil wie in der Zeitachse (LFH-117); rendert nichts ohne Anhang. */}
+      {/* Dasselbe Bauteil wie in der Zeitachse; rendert nichts ohne Anhang. */}
       <EtbAnhaenge eintrag={e} einsatzId={einsatzId} />
     </div>
   );

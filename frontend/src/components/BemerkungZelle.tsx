@@ -6,78 +6,41 @@ import { useRollen } from './instrument/rollenwerte';
 /**
  * Inline bearbeitbare Bemerkung — mit sichtbarer Affordanz im LEEREN Zustand (LFH-369 · B5i).
  *
- * ── WARUM DIESES PRIMITIV ──────────────────────────────────────────────────────────────
+ * Antds `Typography.Text editable` ließ bei leerem Wert nur das Stift-Icon übrig. Namenlos war
+ * es nicht (antd setzt `aria-label` aus der Locale, mit `deDE` „Bearbeiten"), aber:
  *
- * Befund M21: `FahrzeugePage`, `PersonalPage` und `MaterialPage` trugen drei zeichengleiche
- * Kopien von `Typography.Text editable` mit `{x.bemerkung ?? ''}` als Kind. Bei leerer
- * Bemerkung blieb davon genau das Stift-Icon übrig.
+ * 1. **Sichtbar stand keine Aufforderung**, nur ein Icon mit kleiner Trefffläche.
+ * 2. **Der Name sagt nicht, WAS**: n Zeilen lieferten n gleichnamige Knöpfe. Deshalb trägt
+ *    {@link BemerkungZelleProps.kennung} die Zeilenkennung in den Namen.
+ * 3. **Die Affordanz war falsch herum verteilt**: der Lesezweig hatte ein „—", der Schreibzweig
+ *    nichts.
  *
- * ── PRÄZISIERUNG GEGEN TICKET UND ERSTEN ANLAUF (im Review gemessen) ───────────────────
+ * ── NUR FÜR OPTIONALE NOTIZEN ──────────────────────────────────────────────────────────
  *
- * Der Stift ist NICHT namenlos, und das Akzeptanzkriterium des Tickets („nicht nur ein Icon
- * ohne zugänglichen Namen") beschreibt einen Zustand, den es so nie gab: antd setzt sein
- * `aria-label` unbedingt aus der Locale (`typography/Base/index.js:271-283`), und
- * `theme/ThemeModeProvider.tsx` fährt `deDE` — in Produktion heißt er **„Bearbeiten"**
- * (`locale/de_DE.js:78-79`). Der Befund bleibt gültig, nur anders benannt:
+ * `pages/gefahren/GefahrenPage.tsx` und `pages/lagekarte/Sidebar.tsx` benennen **Pflichtnamen**
+ * um; ein „hinzufügen"-Platzhalter hätte dort keinen Zustand. Die Mechanik ist verschieden:
+ * `Sidebar` verwirft eine leere Eingabe selbst, `GefahrenPage` fängt sie erst in der Anzeige ab
+ * (`api/gefahren.ts`, `gefahrengebietName`). Sie bleiben draußen.
  *
- * 1. **Sichtbar stand gar nichts.** In der leeren Zelle gab es keine Aufforderung, nur ein
- *    Icon — dessen Trefffläche zudem kleiner ist als die eines Textziels.
- * 2. **Der Name sagt nicht, WAS.** „Bearbeiten" ist antds Vorgabe für jedes editierbare
- *    `Typography`; n Zeilen lieferten n gleichnamige Knöpfe — genau der Mangel, den die
- *    Bündelungs-Regel aus LFH-365 benennt. Deshalb trägt {@link BemerkungZelleProps.kennung}
- *    die Zeilenkennung in den Namen.
- * 3. **Die Affordanz war falsch herum verteilt.** Der LESEzweig hatte längst ein „—": wer
- *    nichts tun kann, sah einen Platzhalter; wer schreiben durfte, sah nichts.
+ * {@link BemerkungZelleProps.bezeichnung} tauscht nur das Wort (etwa „Zustand hinzufügen" in
+ * `personen/personenSpalten.tsx`), die Mechanik bleibt eine.
  *
- * ── DREI AUFRUFER, NICHT FÜNF ──────────────────────────────────────────────────────────
+ * ── WARUM EIN ECHTER `Button` ──────────────────────────────────────────────────────────
  *
- * Das Ticket zählt fünf Aufrufer desselben Musters und leitet daraus das Primitiv ab. Die
- * zwei zusätzlichen sind `pages/gefahren/GefahrenPage.tsx:135` und
- * `pages/lagekarte/Sidebar.tsx:612` — gemessen hat BEI BEIDEN der Leerfall keinen sichtbaren
- * Zustand, aber aus zwei VERSCHIEDENEN Gründen, die nicht zusammenzuziehen sind:
- * `Sidebar.tsx:616` verwirft eine leere Eingabe selbst (`if (t && t !== b.name)`);
- * `GefahrenPage.tsx:135` tut das **nicht** — dort fängt erst die Anzeige es ab
- * (`api/gefahren.ts` `gefahrengebietName`: leeres Label → „Gefahrengebiet #<id>"). Beide sind
- * ein **Pflichtname**, der umbenannt wird (`trim`-Vergleich gegen den Altwert), keine
- * optionale Notiz — ein „hinzufügen"-Platzhalter hätte dort keinen Zustand, in dem er
- * erscheinen könnte. Nebenbei: beide tragen den Wertgleichheits-Riegel, den dieses Primitiv
- * anfangs vermissen ließ (siehe `onChange` unten).
- *
- * Sie bleiben deshalb draußen; das Primitiv trägt die drei Stellen mit einer OPTIONALEN Notiz.
- *
- * Seit LFH-613 ein vierter Aufrufer mit anderem WORT: der „Zustand" einer betroffenen Person
- * (`personen/personenSpalten.tsx`) ist dieselbe optionale Kurznotiz, also dieselbe Affordanz.
- * {@link BemerkungZelleProps.bezeichnung} tauscht nur das Wort („Zustand hinzufügen"), die
- * Mechanik bleibt eine.
- *
- * ── WARUM EIN ECHTER `Button` UND KEIN GESTYLTES `<span onClick>` ───────────────────────
- *
- * Ein handgebautes Bedienziel bräuchte nach der Festlegung aus LFH-365 ZWEI Angaben
- * (`minHeight: token.controlHeight` PLUS Polsterung aus `token.paddingSM`/`token.padding`)
- * und eine Zusicherung über zwei Dichtestufen, weil kein Guard eine Pixelangabe sieht. Ein
- * antd-`Button` erbt seine Höhe stattdessen vom `ConfigProvider` und schuldet nichts davon.
- * `type="link"` macht ihn zum Bedienziel in Blau — die TEXTfarbe kommt seit LFH-650 aber aus
- * `rollen.bedienText`, nicht aus antds `colorLink` (gemessen zu schwach, siehe am Knopf) —
- * „Rot bedient nichts" (LFH-352/LFH-315).
+ * Ein `Button` erbt seine Höhe vom `ConfigProvider`; ein gestyltes `<span onClick>` schuldete
+ * die zwei Angaben eines handgebauten Bedienziels (LFH-365). `type="link"` macht ihn zum
+ * Bedienziel in Blau, die TEXTfarbe kommt aus `rollen.bedienText` (siehe am Knopf).
  *
  * ── DER GEFÜLLTE WERT IST SELBST DAS ZIEL (LFH-650) ────────────────────────────────────
  *
- * Bis LFH-650 war das Bedienziel am gefüllten Wert antds Stift aus `Typography editable` —
- * ein Ikonknopf, dessen Fläche keine Dichtestufe kannte, und der Wert daneben blanker Text.
- * Zwei Befunde der LFH-613-Prüfliste hingen daran: der Stift blieb in jeder Stufe klein
- * (Gate 3, Nr. 1 · 2), und die Zeile SCHRUMPFTE nach dem ersten Speichern, weil der
- * Platzhalter-Knopf (`controlHeight`, in `handschuh` 72 px) blankem Text wich (Nr. 12).
+ * Der Wert ist ein `Button type="text"` mit Stift-Ikone: dieselbe Bauform wie der Platzhalter,
+ * also dieselbe Höhe in beiden Zuständen (keine Zeile schrumpft nach dem Speichern) und die
+ * ganze Zelle als Trefffläche. `text` statt `link`, weil der Wert Inhalt ist — blau läse er sich
+ * als Verweis. Er darf umbrechen (`height: auto`) und schuldet damit die ZWEI Angaben eines
+ * handgebauten Bedienziels: {@link wertKnopfStil}, rein und exportiert.
  *
- * Jetzt ist der Wert ein `Button type="text"` mit Stift-Ikone: dieselbe Bauform wie der
- * Platzhalter, also dieselbe Höhe in beiden Zuständen und die ganze Zelle als Trefffläche.
- * `type="text"` statt `link`, weil der Wert Inhalt ist und in der Textfarbe steht — blau
- * gesetzt läse er sich als Verweis. Der Knopf darf umbrechen (lange Bemerkungen der
- * Kräfte-Listen), deshalb `height: auto` — und damit schuldet er die ZWEI Angaben eines
- * handgebauten Bedienziels (LFH-365): {@link wertKnopfStil}, rein und exportiert.
- *
- * Der zugängliche NAME bleibt die Aufforderung („Zustand zu R-042 bearbeiten") und der
- * Wert wird zur BESCHREIBUNG (`aria-describedby`): ein `aria-label` verdeckt den Inhalt,
- * ohne die Beschreibung hörte man in der Zelle nur noch „bearbeiten".
+ * Der zugängliche NAME bleibt die Aufforderung („Zustand zu R-042 bearbeiten"), der Wert wird
+ * zur BESCHREIBUNG (`aria-describedby`) — ein `aria-label` verdeckte den Inhalt.
  */
 
 /**
@@ -93,8 +56,8 @@ export function wertKnopfStil(token: {
   return {
     height: 'auto',
     minHeight: token.controlHeight,
-    // Beide Achsen gesetzt (Konvention LFH-365: Polsterung aus `paddingSM`), nicht nur die
-    // Blockachse — sonst hinge die Inline-Polsterung an antds Knopfvorgabe statt an der Stufe.
+    // Beide Achsen gesetzt, sonst hinge die Inline-Polsterung an antds Knopfvorgabe statt an der
+    // Stufe.
     paddingBlock: token.paddingXS,
     paddingInline: token.paddingSM,
     maxWidth: '100%',
@@ -108,32 +71,21 @@ export function wertKnopfStil(token: {
 
 export interface BemerkungZelleProps {
   /**
-   * Aktueller Wert. `null`/`undefined`/`''` = leer, dann erscheint der Platzhalter.
-   *
-   * `undefined` steht mit im Typ, weil es aus dem Wire wirklich vorkommt: die generierten
-   * Response-Typen führen `bemerkung?: string | null`, seit die Norm aus LFH-265 leere
-   * `Option`-Felder per `skip_serializing_if` weglässt. Der Client kann „fehlt" und „ist
-   * null" also unterscheiden — für die Anzeige sind beide dasselbe Nichts.
+   * Aktueller Wert. `null`/`undefined`/`''` = leer, dann erscheint der Platzhalter. `undefined`
+   * kommt aus dem Wire (`bemerkung?: string | null`); für die Anzeige ist beides dasselbe Nichts.
    */
   wert: string | null | undefined;
   /** Ohne Schreibrecht bleibt die Zelle reine Anzeige. */
   darfSchreiben: boolean;
   /**
-   * Übernahme des neuen Wertes.
-   *
-   * Absichtlich NUR der Wert: die drei Seiten schließen über ihre eigene Kennung
-   * (`efId`/`epId`/`emId`) und ihre eigene Mutation. Eine gemeinsame Id-Gestalt zu erfinden
-   * hätte drei Aufrufer verbogen, um einem Primitiv Arbeit abzunehmen, die es nicht hat.
+   * Übernahme des neuen Wertes. Absichtlich NUR der Wert: die Aufrufer schließen über ihre eigene
+   * Kennung und Mutation.
    */
   onSpeichern: (wert: string) => void;
   /**
-   * Menschenlesbare Zeilenkennung (Funkrufname, Name, Bezeichnung) für den zugänglichen
-   * Namen. Ohne sie liefern n Zeilen n gleichnamige Knöpfe — dieselbe Begründung wie bei der
-   * Aktionsbündelung aus LFH-365, und hier besonders spürbar: auf der Materialseite steht die
-   * Bemerkungsspalte per Voreinstellung sichtbar.
-   *
-   * Optional, damit ein Einzelgebrauch außerhalb einer Liste nicht gezwungen ist, eine
-   * Kennung zu erfinden.
+   * Menschenlesbare Zeilenkennung (Funkrufname, Name, Bezeichnung) für den zugänglichen Namen —
+   * sonst liefern n Zeilen n gleichnamige Knöpfe. Optional für den Einzelgebrauch außerhalb einer
+   * Liste.
    */
   kennung?: string;
   /**
@@ -142,14 +94,13 @@ export interface BemerkungZelleProps {
    */
   bezeichnung?: string;
   /**
-   * Ein Schreibvorgang läuft (LFH-650). Der Aufrufer reicht dann den NEUEN Wert als `wert`
-   * — die Zelle zeigt ihn sofort mit Ladeanzeige, statt bis zur Serverantwort den alten
-   * Stand oder den Platzhalter zu zeigen (vorher wirkte die Eingabe verworfen).
+   * Ein Schreibvorgang läuft (LFH-650). Der Aufrufer reicht dann den NEUEN Wert als `wert`; die
+   * Zelle zeigt ihn sofort mit Ladeanzeige statt des alten Stands.
    */
   laeuft?: boolean;
 }
 
-/** Wortlaut an EINER Stelle — drei Seiten und ihre drei Tests greifen denselben Namen.
+/** Wortlaut an EINER Stelle — Seiten und Tests greifen denselben Namen.
  *  Entspricht dem Platzhalter mit der Vorgabe-`bezeichnung` (Test pinnt die Gleichheit). */
 export const BEMERKUNG_HINZUFUEGEN = 'Bemerkung hinzufügen';
 
@@ -172,26 +123,19 @@ export function BemerkungZelle({
   /**
    * Fokusrückgabe nach dem Verlassen der Bearbeitung.
    *
-   * antd stellt sie selbst her, aber nur auf seinen EIGENEN Stift (`Base/index.js:90-95`) und
-   * nur, solange `Typography.Text` am Baum bleibt. Hier bleibt es das nie — seit LFH-650
-   * steht `Typography` nur noch WÄHREND der Bearbeitung im Baum, außerhalb trägt ein
-   * eigener Knopf. Beide Fälle sind gemessen, und der zweite ist der, den der Betrieb nimmt:
+   * antd gibt den Fokus nur an seinen EIGENEN Stift zurück, und nur solange `Typography.Text` am
+   * Baum bleibt. Hier steht `Typography` nur WÄHREND der Bearbeitung im Baum:
    *
    * 1. **Abbrechen / leer geblieben:** `Typography` hängt in derselben Runde aus, in der der
-   *    Platzhalter zurückkommt. antds Effekt läuft für diesen Wert nie.
-   * 2. **Gespeichert, Wert kommt NACH:** die Mutation läuft, der neue Wert trifft per
-   *    Invalidierung erst eine Runde später ein. Dann wechselt der Zweig vom Platzhalter zum
-   *    Wertknopf — ein FRISCHER Knopf, den niemand fokussiert. (Vor LFH-650 war es ein
-   *    frisches `Typography` ohne `prevEditing`; der Fall ist derselbe.)
+   *    Platzhalter zurückkommt.
+   * 2. **Gespeichert, Wert kommt NACH:** der neue Wert trifft per Invalidierung erst eine Runde
+   *    später ein, und ein FRISCHER Wertknopf ersetzt den Platzhalter.
    *
-   * In beiden Fällen landet der Fokus sonst auf `<body>`; genau diese Klasse führt die
-   * Erfassungs-Norm schon. Deshalb ein Merker, der den Zweigwechsel ÜBERLEBT, statt einer
-   * Flanke auf `bearbeitet` — die ist beim Nachlauf längst vorbei.
+   * In beiden Fällen fiele der Fokus auf `<body>`. Deshalb ein Merker, der den Zweigwechsel
+   * ÜBERLEBT, statt einer Flanke auf `bearbeitet`.
    *
-   * Ohne Deps-Array: der Effekt muss auch in der Runde laufen, in der sich nur `wert` ändert.
-   * Eingegriffen wird NUR bei verwaistem Fokus (`activeElement === body`) — sonst risse man
-   * ihn einem Element weg, das die bedienende Person selbst angesteuert hat; sitzt er
-   * woanders, ist die Rückgabe erledigt und der Merker fällt.
+   * Ohne Deps-Array: der Effekt muss auch laufen, wenn sich nur `wert` ändert. Eingegriffen wird
+   * NUR bei verwaistem Fokus (`activeElement === body`); sitzt er woanders, fällt der Merker.
    *
    * `useLayoutEffect` wie antd: vor dem Anstrich, damit der Fokus nicht sichtbar springt.
    */
@@ -208,17 +152,12 @@ export function BemerkungZelle({
   });
 
   /**
-   * Lesezweig unverändert bei „—" — keine Nachlässigkeit, sondern die Aussage: ohne
-   * Schreibrecht gibt es keine Aktion, ein „Bemerkung hinzufügen" wäre eine Aufforderung ins
-   * Leere. Das Ticket verlangt, den Lesezweig „konsistent zu halten"; eingelöst wird das als
-   * **gleiche Bedeutung des Leerzustands** (beide Zweige sagen „hier steht nichts"), nicht als
-   * gleicher Wortlaut.
+   * Lesezweig bei „—": ohne Schreibrecht gibt es keine Aktion, eine Aufforderung liefe ins Leere.
+   * Konsistent ist die **Bedeutung** des Leerzustands, nicht der Wortlaut.
    *
-   * Was hier ausdrücklich NICHT behauptet wird, ist gleiche Zeilenhöhe ZWISCHEN Lese- und
-   * Schreibzweig: der Lesezweig gibt blanken Text zurück, der Schreibzweig einen `Button` mit
-   * `controlHeight` — die sind nicht gleich hoch. INNERHALB des Schreibzweigs sind leer und
-   * gefüllt seit LFH-650 gleich hoch (beide Knöpfe), gemessen in
-   * `e2e/gate3-trefflaeche.spec.ts`.
+   * Gleiche Zeilenhöhe ZWISCHEN Lese- und Schreibzweig ist NICHT zugesichert (blanker Text gegen
+   * `Button`). INNERHALB des Schreibzweigs sind leer und gefüllt gleich hoch
+   * (`e2e/gate3-trefflaeche.spec.ts`).
    */
   if (!darfSchreiben) return <>{wert || '—'}</>;
 
@@ -228,10 +167,9 @@ export function BemerkungZelle({
         ref={knopfRef}
         type="link"
         loading={laeuft}
-        // `bedienText` statt antds `colorLink` (LFH-650, gemessen in
-        // `e2e/betroffene-kontrast.spec.ts`): in einer Zeile mit Lücken-Tönung trug
-        // `colorLink` am Tag 5,93 und nachts 4,50 — unter 7 bzw. 5 : 1. `bedienText` ist die
-        // Rolle für blauen TEXT, wie `achtungText`/`alarmText` für ihre Füllfarben (LFH-618).
+        // `bedienText` statt antds `colorLink`: in einer Zeile mit Lücken-Tönung hielt `colorLink` die
+        // Kontrastböden nicht (`e2e/betroffene-kontrast.spec.ts`). `bedienText` ist die Rolle für
+        // blauen TEXT.
         style={{ color: rollen.bedienText }}
         // Sichtbar bleibt der kurze Text, der Name trägt die Zeile — sonst wird die Spalte
         // so breit wie die längste Kennung.
@@ -248,8 +186,8 @@ export function BemerkungZelle({
       <Button
         ref={knopfRef}
         type="text"
-        // `loading` sperrt zugleich den zweiten Klick, solange der erste noch schreibt, und
-        // ersetzt die Stift-Ikone durch antds Ladeanzeige — der neue Wert steht schon da.
+        // `loading` sperrt den zweiten Klick, solange der erste schreibt, und ersetzt die Stift-Ikone
+        // durch antds Ladeanzeige.
         loading={laeuft}
         aria-label={
           kennung ? `${bezeichnung} zu ${kennung} bearbeiten` : `${bezeichnung} bearbeiten`
@@ -278,9 +216,8 @@ export function BemerkungZelle({
         editing: true,
         onChange: (val) => {
           setBearbeitet(false);
-          // antd vergleicht NICHT — `onChange` feuert beim Verlassen unbedingt. Ohne diesen
-          // Riegel kostete ein Klick auf den Platzhalter und ein Klick daneben ein PATCH mit
-          // leerem Wert, samt Invalidierung und Live-Ereignis an alle Verbundenen.
+          // antd vergleicht NICHT — `onChange` feuert beim Verlassen unbedingt. Ohne diesen Riegel kostete
+          // ein Fehlklick ein PATCH samt Invalidierung und Live-Ereignis.
           if (val !== (wert ?? '')) onSpeichern(val);
         },
         onCancel: () => setBearbeitet(false),

@@ -1,4 +1,3 @@
-// frontend/src/etb/entwuerfe/useEtbEntwuerfe.ts
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EntwurfWerte, EtbEntwurf } from './entwurfModell';
 import { istLeer, werteZuPatch, zuWerte } from './entwurfModell';
@@ -107,11 +106,9 @@ export function useEtbEntwuerfe(
     const geaendert_at = new Date().toISOString();
     const bestand = entwuerfeRef.current.find((e) => e.id === id);
     setEntwuerfe((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch, geaendert_at } : e)));
-    // Persistenz NACH dem (jetzt seiteneffektfreien) Updater. Der nächste Zustand des
-    // geänderten Entwurfs wird funktional aus dem Bestand + patch gebildet — er hängt nicht
-    // vom Updater-Ergebnis ab (die nicht-gepatchten Felder id/einsatz_id/erstellt_at sind
-    // über die Lebensdauer konstant). So läuft der Write unter React.StrictMode genau einmal
-    // statt doppelt (LFH-216).
+    // Persistenz NACH dem seiteneffektfreien Updater. Der nächste Zustand wird aus Bestand +
+    // patch gebildet und hängt nicht vom Updater-Ergebnis ab (id/einsatz_id/erstellt_at sind über
+    // die Lebensdauer konstant). So läuft der Write unter React.StrictMode genau einmal (LFH-216).
     if (!bestand) return;
     if (istLeer(werte)) {
       if (!bestand.an_vorbelegung_geprueft) void entwurfEntfernen(id);
@@ -121,10 +118,9 @@ export function useEtbEntwuerfe(
   }, []);
 
   /**
-   * Sichert einen Entwurf auch ohne Wert (LFH-117, Review C1): trägt er gewählte Dateien, muss
-   * seine id einen Remount der Reiter überleben (Berichtigung), sonst hingen die Dateien nach
-   * dem Neuladen an keinem Entwurf mehr. Ein leerer Entwurf entfällt beim nächsten leeren
-   * Aktualisieren wie bisher.
+   * Sichert einen Entwurf auch ohne Wert: trägt er gewählte Dateien, muss seine id einen Remount
+   * der Reiter überleben (Berichtigung), sonst hingen die Dateien an keinem Entwurf mehr. Ein
+   * leerer Entwurf entfällt beim nächsten leeren Aktualisieren.
    */
   const entwurfFesthalten = useCallback((id: string) => {
     const bestand = entwuerfeRef.current.find((e) => e.id === id);
@@ -132,10 +128,9 @@ export function useEtbEntwuerfe(
   }, []);
 
   /**
-   * Gibt einem Entwurf eine NEUE id, Inhalt unverändert (Review C1). Die Entwurfs-id ist die
-   * client_id; steht sie schon für einen anderen Eintrag (409, zweiter Browser-Tab), käme der
-   * Entwurf mit ihr nie mehr durch. Liefert die neue id, oder `null`, wenn es den Entwurf
-   * nicht (mehr) gibt.
+   * Gibt einem Entwurf eine NEUE id, Inhalt unverändert. Die Entwurfs-id ist die client_id;
+   * steht sie schon für einen anderen Eintrag (409, zweiter Browser-Tab), käme der Entwurf mit
+   * ihr nie mehr durch. Liefert die neue id, oder `null`, wenn es den Entwurf nicht (mehr) gibt.
    */
   const entwurfNeuAusweisen = useCallback(
     async (id: string): Promise<string | null> => {
@@ -162,14 +157,11 @@ export function useEtbEntwuerfe(
   const entwurfSchliessen = useCallback(
     async (id: string, metadaten: MetadatenWerte = {}) => {
       await entwurfEntfernen(id);
-      // leer EINMAL außerhalb der Updater erzeugen (stabile Id): unter React.StrictMode
-      // (Dev-Server / e2e) werden Updater doppelt invoked — eine IM Updater erzeugte
-      // crypto.randomUUID-Id divergierte sonst zwischen entwuerfe und aktiverId, sodass der
-      // neue leere Tab keinen aktiven Inhalt mehr rendert (LFH-214). Beide Setter bleiben
-      // FUNKTIONAL (lesen prev = frisch committeter State) und sind damit immun gegen
-      // Zustandsänderungen während des vorausgehenden await (neuer Tab / paralleles
-      // Schließen) und chainen korrekt — ein Closure-Snapshot überschriebe den aktuellen
-      // State und ließe einen Zombie-Tab zurück.
+      // leer EINMAL außerhalb der Updater erzeugen (stabile Id): unter React.StrictMode laufen
+      // Updater doppelt, eine darin erzeugte randomUUID divergierte zwischen entwuerfe und
+      // aktiverId (LFH-214). Beide Setter bleiben FUNKTIONAL (lesen den frisch committeten State)
+      // und sind damit immun gegen Änderungen während des vorausgehenden await — ein
+      // Closure-Snapshot ließe einen Zombie-Tab zurück.
       const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger.current);
       let naechsteListe: EtbEntwurf[] = [];
       setEntwuerfe((prev) => {
