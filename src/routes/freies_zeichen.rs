@@ -1,9 +1,6 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Lagekarte;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -18,9 +15,6 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-/// Modul-Key dieses Route-Moduls (LFH-132) — freie Zeichen leben auf der Lage-Karte.
-const MODUL_KEY: &str = "lagekarte";
-
 /// SSE-Notify (Lage-Karte): ein freies Zeichen hat sich geändert. Event-Tag `freies_zeichen`.
 /// Der Wire-Tag ist load-bearing — das Frontend filtert exakt darauf.
 fn sse_zeichen(state: &AppState, einsatz_id: i64, id: i64) {
@@ -32,21 +26,10 @@ fn sse_zeichen(state: &AppState, einsatz_id: i64, id: i64) {
 /// GET /api/einsaetze/{id}/freie-zeichen — Liste aller freien Zeichen. Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Lagekarte>,
     Query(filter): Query<AnsichtFilter>,
 ) -> Result<Json<Vec<FreiesZeichenAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
         zeichen_repo::liste(&state.pool, einsatz_id, filter.ansicht).await?,
     ))
@@ -72,23 +55,10 @@ pub struct AnlegenBody {
 /// POST /api/einsaetze/{id}/freie-zeichen — anlegen. Schreibrecht + aktiv.
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Lagekarte>,
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<FreiesZeichenAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let grundzeichen = grundzeichen_pflicht(&body.grundzeichen)?;
     let organisation = trimme(body.organisation.clone());
     let fachaufgabe = trimme(body.fachaufgabe.clone());
@@ -113,7 +83,7 @@ pub async fn anlegen(
             farbe: farbe.as_deref(),
             label: label.as_deref(),
             ansicht_id: body.ansicht_id,
-            erstellt_von: benutzer.id,
+            erstellt_von: ctx.benutzer.id,
         },
     )
     .await?;
@@ -158,23 +128,11 @@ pub struct PatchBody {
 /// (v1). Schreibrecht + aktiv.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, zid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Lagekarte>,
+    PfadParam((_eid, zid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<FreiesZeichenAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     // Nur GESENDETE Felder werden geprüft: ein absentes `grundzeichen` ist schlicht kein
     // Wunsch, ein vorhandenes leeres bleibt 400.
     let grundzeichen = match &body.grundzeichen {
@@ -214,22 +172,10 @@ pub async fn aktualisieren(
 /// DELETE /api/einsaetze/{id}/freie-zeichen/{zid} — aufheben (Hard-Delete). Schreibrecht + aktiv.
 pub async fn aufloesen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, zid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Lagekarte>,
+    PfadParam((_eid, zid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     zeichen_repo::loese_auf(&state.pool, einsatz_id, zid).await?;
     sse_zeichen(&state, einsatz_id, zid);
     Ok(StatusCode::NO_CONTENT)

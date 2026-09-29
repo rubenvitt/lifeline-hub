@@ -1,17 +1,11 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
 use crate::einsatz::einstellungen::etb_startwert;
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Tiere;
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "tiere";
-use crate::error::AppError;
 use crate::person::repo as person_repo; // Org-Isolation der Halter-FK (404 bei fremder Person)
 use crate::routes::support::{
     deserialize_optional_field, parse_enum, parse_enum_opt, trimme, trimme_tri,
@@ -48,22 +42,10 @@ pub struct ListeParams {
 /// GET /api/einsaetze/{id}/tiere — Liste (Filter `?status=`, `?spezies=`, `?halter_person_id=`).
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Tiere>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<TierAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
+    let einsatz_id = ctx.einsatz.id;
     parse_enum_opt(
         TierStatus::parse,
         params.status.as_deref(),
@@ -108,23 +90,10 @@ pub struct AnlegenBody {
 /// (`abgeschlossen` → 422). Halter-Exklusivität → 422. Pseudonyme ETB-Spur + SSE.
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Tiere>,
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<TierAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     // Spezies (Pflicht) prüfen.
     parse_enum(
         Spezies::parse,
@@ -172,7 +141,7 @@ pub async fn anlegen(
         let (id, _reg) = tier_repo::anlegen_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             status,
             tier_repo::NeueDaten {
                 spezies: &body.spezies,
@@ -206,7 +175,7 @@ pub async fn anlegen(
                 spezies_label
             )
         };
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(tier)
     })?;
     sse_tier(&state, einsatz_id, tier.id);
@@ -216,20 +185,10 @@ pub async fn anlegen(
 /// GET /api/einsaetze/{id}/tiere/{tid} — Detail (voller Datensatz). NICHT auditiert.
 pub async fn detail(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, tier_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLesezugriff<Tiere>,
+    PfadParam((_eid, tier_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<TierAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
         tier_repo::laden(&state.pool, einsatz_id, tier_id).await?,
     ))
@@ -274,22 +233,11 @@ pub struct PatchBody {
 /// (Stammfelder sind nicht lagerelevant; vgl. E‑1-PATCH). SSE.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, tier_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Tiere>,
+    PfadParam((_eid, tier_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<TierAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+    let einsatz_id = ctx.einsatz.id;
     parse_enum_opt(
         TierGeschlecht::parse,
         body.geschlecht
@@ -343,7 +291,7 @@ pub async fn aktualisieren(
         &state.pool,
         einsatz_id,
         tier_id,
-        benutzer.id,
+        ctx.benutzer.id,
         body.basis_geaendert_at.as_deref(),
         tier_repo::PatchDaten {
             rasse_beschreibung: rasse.as_ref().map(|o| o.as_deref()),
@@ -378,23 +326,11 @@ pub struct StatusBody {
 /// storniert → 409. Pseudonyme ETB-Spur + SSE.
 pub async fn status_wechsel(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, tier_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Tiere>,
+    PfadParam((_eid, tier_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<StatusBody>,
 ) -> Result<Json<TierAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     parse_enum(TierStatus::parse, &body.status, "Unbekannter Status")?;
     let vorher = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
     if vorher.storniert_at.is_some() {
@@ -459,10 +395,10 @@ pub async fn status_wechsel(
             &body.status,
             grund.as_deref(),
             ziel.as_deref(),
-            benutzer.id,
+            ctx.benutzer.id,
         )
         .await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(())
     })?;
     sse_tier(&state, einsatz_id, tier_id);
@@ -475,29 +411,17 @@ pub async fn status_wechsel(
 /// Bereits storniert → 409. Pseudonyme ETB-Spur + SSE.
 pub async fn stornieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, tier_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Tiere>,
+    PfadParam((_eid, tier_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let tier = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
     // F06/LFH-244 Tier-A: Storno-UPDATE + System-ETB-Eintrag atomar in EINER Tx.
     let text = format!("Tier {} storniert", registrier_anzeige(tier.registrier_nr));
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
-        tier_repo::storniere_tx(conn, einsatz_id, tier_id, benutzer.id).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        tier_repo::storniere_tx(conn, einsatz_id, tier_id, ctx.benutzer.id).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(())
     })?;
     sse_tier(&state, einsatz_id, tier_id);
@@ -519,21 +443,9 @@ fn csv_feld(s: &str) -> String {
 /// NICHT auditiert (Tiere sind keine besondere Kategorie).
 pub async fn export(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Tiere>,
 ) -> Result<Response, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
+    let einsatz_id = ctx.einsatz.id;
     let tiere = tier_repo::liste(&state.pool, einsatz_id, None, None, None).await?;
     let mut csv =
         String::from("registrier_nr;status;spezies;rufname;rasse;geschlecht;alter;antreff_ort\n");

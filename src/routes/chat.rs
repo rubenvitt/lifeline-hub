@@ -1,19 +1,13 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
 use crate::chat::repo;
 use crate::chat::{BezugTyp, ChatKanalAnzeige, ChatNachrichtAnzeige};
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Chat;
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::routes::support::pflicht;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "chat";
-use crate::error::AppError;
 // Vokabular modulübergreifend über das Kommunikations-Fundament referenziert
 // (LFH-84) statt direkt aus `etb` — Single Source of Truth bleibt `etb`.
 use crate::kommunikation::EtbTyp;
@@ -53,22 +47,11 @@ fn kanal_ids(einsatz_id: i64, kanal_id: i64) -> String {
 /// GET /api/einsaetze/{id}/chat/kanaele — Kanäle listen (Default wird sichergestellt).
 pub async fn kanaele_liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Chat>,
 ) -> Result<Json<Vec<ChatKanalAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
-        repo::liste_kanaele(&state.pool, einsatz_id, benutzer.id).await?,
+        repo::liste_kanaele(&state.pool, einsatz_id, ctx.benutzer.id).await?,
     ))
 }
 
@@ -81,23 +64,10 @@ pub struct NeuerKanal {
 /// POST /api/einsaetze/{id}/chat/kanaele — Kanal anlegen. Schreibrecht + aktiv.
 pub async fn kanal_anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Chat>,
     JsonBody(req): JsonBody<NeuerKanal>,
 ) -> Result<(StatusCode, Json<ChatKanalAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let name = pflicht(&req.name, "Kanalname")?;
     let beschreibung = req
         .beschreibung
@@ -105,8 +75,14 @@ pub async fn kanal_anlegen(
         .map(str::trim)
         .filter(|s| !s.is_empty());
 
-    let kanal =
-        repo::kanal_anlegen(&state.pool, einsatz_id, benutzer.id, &name, beschreibung).await?;
+    let kanal = repo::kanal_anlegen(
+        &state.pool,
+        einsatz_id,
+        ctx.benutzer.id,
+        &name,
+        beschreibung,
+    )
+    .await?;
     sse_chat(&state, einsatz_id, kanal_ids(einsatz_id, kanal.id));
     Ok((StatusCode::CREATED, Json(kanal)))
 }
@@ -115,20 +91,10 @@ pub async fn kanal_anlegen(
 /// für den angemeldeten Benutzer als gelesen markieren. Auch Beobachter dürfen lesen.
 pub async fn kanal_gelesen_markieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, kanal_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLesezugriff<Chat>,
+    PfadParam((_eid, kanal_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     if !repo::gehoert_kanal_zu_einsatz(&state.pool, kanal_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
@@ -136,10 +102,10 @@ pub async fn kanal_gelesen_markieren(
     let jetzt = crate::zeit::jetzt();
     repo::kanal_gelesen_markieren(
         &state.pool,
-        einsatz.org_id,
+        ctx.einsatz.org_id,
         einsatz_id,
         kanal_id,
-        benutzer.id,
+        ctx.benutzer.id,
         &jetzt,
     )
     .await?;
@@ -158,22 +124,11 @@ pub struct NachrichtenParams {
 /// Lesezugriff (inkl. Beobachter). Cursor über `before_id`.
 pub async fn nachrichten_liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, kanal_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLesezugriff<Chat>,
+    PfadParam((_eid, kanal_id)): PfadParam<(i64, i64)>,
     Query(params): Query<NachrichtenParams>,
 ) -> Result<Json<Vec<ChatNachrichtAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
+    let einsatz_id = ctx.einsatz.id;
     // Cross-Einsatz-Schutz: Kanal muss zu diesem Einsatz gehören.
     if !repo::gehoert_kanal_zu_einsatz(&state.pool, kanal_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -205,23 +160,11 @@ pub struct NeueNachricht {
 /// Schreibrecht + aktiv. Cross-Einsatz-Schutz auf den Kanal.
 pub async fn nachricht_erfassen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, kanal_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Chat>,
+    PfadParam((_eid, kanal_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<NeueNachricht>,
 ) -> Result<(StatusCode, Json<ChatNachrichtAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if !repo::gehoert_kanal_zu_einsatz(&state.pool, kanal_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
@@ -243,7 +186,7 @@ pub async fn nachricht_erfassen(
     let nachricht = repo::anlegen_mit_anhaengen(
         &state.pool,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         kanal_id,
         inhalt,
         &anhang_ids,
@@ -253,34 +196,21 @@ pub async fn nachricht_erfassen(
     Ok((StatusCode::CREATED, Json(nachricht)))
 }
 
-/// Lädt Einsatz + verifiziert Schreibrecht/Aktiv + Autorenschaft der Nachricht.
-/// Gemeinsamer Vorlauf von Bearbeiten/Löschen. Liefert nichts (nur Gates).
+/// Verifiziert die Autorenschaft der Nachricht (die Gates laufen im Extractor).
+/// Gemeinsamer Vorlauf von Bearbeiten/Löschen.
 async fn fordere_autor(
     state: &AppState,
-    benutzer: &crate::auth::Benutzer,
+    benutzer_id: i64,
     einsatz_id: i64,
     nachricht_id: i64,
 ) -> Result<(), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
     // Cross-Einsatz-Schutz + Existenz.
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
     // Nur der Autor darf bearbeiten/löschen (auch die Einsatzleitung nicht fremd).
     match repo::autor_von(&state.pool, nachricht_id).await? {
-        Some(autor) if autor == benutzer.id => Ok(()),
+        Some(autor) if autor == benutzer_id => Ok(()),
         Some(_) => Err(AppError::Forbidden),
         None => Err(AppError::NotFound),
     }
@@ -289,11 +219,12 @@ async fn fordere_autor(
 /// PATCH /api/einsaetze/{id}/chat/nachrichten/{mid} — eigene Nachricht bearbeiten.
 pub async fn nachricht_bearbeiten(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, nachricht_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Chat>,
+    PfadParam((_eid, nachricht_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<NeueNachricht>,
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
-    fordere_autor(&state, &benutzer, einsatz_id, nachricht_id).await?;
+    let einsatz_id = ctx.einsatz.id;
+    fordere_autor(&state, ctx.benutzer.id, einsatz_id, nachricht_id).await?;
     let inhalt = pflicht(&req.inhalt, "Nachricht")?;
     let nachricht = repo::bearbeiten(&state.pool, nachricht_id, &inhalt).await?;
     sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
@@ -303,10 +234,11 @@ pub async fn nachricht_bearbeiten(
 /// DELETE /api/einsaetze/{id}/chat/nachrichten/{mid} — eigene Nachricht soft-löschen.
 pub async fn nachricht_loeschen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, nachricht_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Chat>,
+    PfadParam((_eid, nachricht_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    fordere_autor(&state, &benutzer, einsatz_id, nachricht_id).await?;
+    let einsatz_id = ctx.einsatz.id;
+    fordere_autor(&state, ctx.benutzer.id, einsatz_id, nachricht_id).await?;
     repo::loeschen(&state.pool, nachricht_id).await?;
     sse_chat(
         &state,
@@ -329,23 +261,11 @@ pub struct BezugBody {
 /// der Typ ist server-validiert, das Ziel muss zum Einsatz gehören (im Repo geprüft).
 pub async fn bezug_setzen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, nachricht_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Chat>,
+    PfadParam((_eid, nachricht_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<BezugBody>,
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
@@ -362,22 +282,10 @@ pub async fn bezug_setzen(
 /// Schreibrecht + aktiv.
 pub async fn bezug_loeschen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, nachricht_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Chat>,
+    PfadParam((_eid, nachricht_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
@@ -400,23 +308,11 @@ pub struct HeraufstufenBody {
 /// Schreibrecht + aktiv. Server erzwingt die zulässigen ETB-Typen.
 pub async fn heraufstufen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, nachricht_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Chat>,
+    PfadParam((_eid, nachricht_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<HeraufstufenBody>,
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
@@ -446,7 +342,7 @@ pub async fn heraufstufen(
         &state.pool,
         einsatz_id,
         nachricht_id,
-        benutzer.id,
+        ctx.benutzer.id,
         typ.as_str(),
         &inhalt,
         &quelle.erstellt_at,
@@ -466,23 +362,11 @@ pub async fn heraufstufen(
 /// Priorität …) kommen aus dem Request und durchlaufen dieselbe Validierung wie POST /auftraege.
 pub async fn heraufstufen_auftrag(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, nachricht_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Chat>,
+    PfadParam((_eid, nachricht_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<ChatNachrichtAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
@@ -495,7 +379,7 @@ pub async fn heraufstufen_auftrag(
         &state.pool,
         einsatz_id,
         nachricht_id,
-        benutzer.id,
+        ctx.benutzer.id,
         validiert.daten(),
     )
     .await?;

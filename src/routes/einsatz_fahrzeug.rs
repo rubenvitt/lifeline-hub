@@ -1,22 +1,16 @@
 use super::einsatz_personal::sse_personal;
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
 use crate::einsatz::einstellungen::etb_startwert;
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Fahrzeuge;
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
-use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "fahrzeuge";
-use crate::error::AppError;
 use crate::fahrzeug::besatzung_repo;
 use crate::fahrzeug::disposition_repo::{self, AdhocDaten};
 use crate::fahrzeug::status_repo;
 use crate::fahrzeug::EinsatzFahrzeugAnzeige;
+use crate::live::LiveEvent;
 use crate::routes::support::{
     deserialize_optional_field, pflicht, pruefe_koordinate, trimme, trimme_tri,
 };
@@ -35,22 +29,11 @@ pub(super) fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
 /// GET /api/einsaetze/{id}/fahrzeuge — disponierte Fahrzeuge (aufgelöst). Nur Mitglieder/höhere Berechtigung.
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Fahrzeuge>,
 ) -> Result<Json<Vec<EinsatzFahrzeugAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
-        disposition_repo::liste(&state.pool, einsatz_id, einsatz.ist_aktiv()).await?,
+        disposition_repo::liste(&state.pool, einsatz_id, ctx.einsatz.ist_aktiv()).await?,
     ))
 }
 
@@ -73,23 +56,10 @@ pub struct DisponierenBody {
 /// Schreibberechtigt + aktiver Einsatz. Schreibt ETB-Eintrag.
 pub async fn disponieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Fahrzeuge>,
     JsonBody(body): JsonBody<DisponierenBody>,
 ) -> Result<(StatusCode, Json<EinsatzFahrzeugAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     // Validierung + Aufbereitung VOR der Tx (Vorladen/Guards bleiben außerhalb des Tx-Bodys).
     enum Vorbereitet {
         Stamm(i64),
@@ -135,9 +105,9 @@ pub async fn disponieren(
                 disposition_repo::disponiere_stamm_tx(
                     conn,
                     einsatz_id,
-                    einsatz.org_id,
+                    ctx.einsatz.org_id,
                     *fahrzeug_id,
-                    benutzer.id,
+                    ctx.benutzer.id,
                 )
                 .await?
             }
@@ -151,7 +121,7 @@ pub async fn disponieren(
                 disposition_repo::disponiere_adhoc_tx(
                     conn,
                     einsatz_id,
-                    einsatz.org_id,
+                    ctx.einsatz.org_id,
                     AdhocDaten {
                         funkrufname: funkrufname.as_str(),
                         fahrzeugtyp: fahrzeugtyp.as_deref(),
@@ -159,7 +129,7 @@ pub async fn disponieren(
                         opta: opta.as_deref(),
                         traegerorganisation: traegerorganisation.as_deref(),
                     },
-                    benutzer.id,
+                    ctx.benutzer.id,
                 )
                 .await?
             }
@@ -168,7 +138,7 @@ pub async fn disponieren(
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             startwert,
             &crate::fahrzeug::etb_text_disponiert(&anzeige.funkrufname),
         )
@@ -191,26 +161,14 @@ pub struct DispoPatchBody {
 /// Status-Wechsel schreibt ETB-Eintrag.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, ef_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Fahrzeuge>,
+    PfadParam((_eid, ef_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<DispoPatchBody>,
 ) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     // Status muss (aktiv) zur Org gehören.
     if let Some(sid) = body.status_id {
-        if !status_repo::ist_in_org(&state.pool, einsatz.org_id, sid).await? {
+        if !status_repo::ist_in_org(&state.pool, ctx.einsatz.org_id, sid).await? {
             return Err(AppError::Validation("Unbekannter Status".into()));
         }
     }
@@ -236,7 +194,7 @@ pub async fn aktualisieren(
             crate::etb::system_audit_tx(
                 conn,
                 einsatz_id,
-                benutzer.id,
+                ctx.benutzer.id,
                 startwert,
                 &crate::fahrzeug::etb_text_status_wechsel(
                     &nachher.funkrufname,
@@ -255,22 +213,10 @@ pub async fn aktualisieren(
 /// DELETE /api/einsaetze/{id}/fahrzeuge/{ef_id} — aus dem Einsatz entfernen. Schreibt ETB-Eintrag.
 pub async fn entfernen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, ef_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Fahrzeuge>,
+    PfadParam((_eid, ef_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, true).await?;
     // F06/LFH-244 Tier-A: Besatzungs-Freigabe + DELETE + System-ETB atomar in EINER Tx.
     // Der ETB-Text ist aus dem Vorlade-`anzeige` (funkrufname) VOR der Tx berechenbar.
@@ -281,7 +227,7 @@ pub async fn entfernen(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         disposition_repo::entferne_tx(conn, einsatz_id, ef_id).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(())
     })?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
@@ -292,26 +238,14 @@ pub async fn entfernen(
 /// zuordnen (LFH-9, exklusiv: Wechsel überschreibt). Append-only System-ETB + SSE.
 pub async fn besatzung_zuordnen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, ef_id, ep_id)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Fahrzeuge>,
+    PfadParam((_eid, ef_id, ep_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     // Vorladen: aufgelöste Fahrzeug-Anzeige für den ETB-Text (funkrufname ist über die
     // Besatzungs-Zuordnung stabil). F06/LFH-244 Tier-A: Zuordnung + System-ETB atomar in EINER Tx.
     let fahrzeug =
-        disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, einsatz.ist_aktiv())
+        disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, ctx.einsatz.ist_aktiv())
             .await?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
@@ -319,7 +253,7 @@ pub async fn besatzung_zuordnen(
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             startwert,
             &format!(
                 "Fahrzeug «{}»: «{}» als Besatzung zugeordnet",
@@ -338,26 +272,14 @@ pub async fn besatzung_zuordnen(
 /// Fahrzeug-Besatzung freigeben (LFH-9). Append-only System-ETB + SSE.
 pub async fn besatzung_freigeben(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, ef_id, ep_id)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Fahrzeuge>,
+    PfadParam((_eid, ef_id, ep_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     // Vorladen: aufgelöste Fahrzeug-Anzeige für den ETB-Text (funkrufname ist über die
     // Besatzungs-Freigabe stabil). F06/LFH-244 Tier-A: Freigabe + System-ETB atomar in EINER Tx.
     let fahrzeug =
-        disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, einsatz.ist_aktiv())
+        disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, ctx.einsatz.ist_aktiv())
             .await?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
@@ -365,7 +287,7 @@ pub async fn besatzung_freigeben(
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             startwert,
             &format!(
                 "Fahrzeug «{}»: «{}» aus der Besatzung freigegeben",
@@ -395,23 +317,11 @@ pub struct PositionBody {
 /// PATCH /api/einsaetze/{id}/fahrzeuge/{ef_id}/position — reine Lage-Pflege, KEIN ETB.
 pub async fn position(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, ef_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Fahrzeuge>,
+    PfadParam((_eid, ef_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     // Effektivzustand für die Paar-Validierung: vorhandene lat/lon (404 falls fremd).
     let vorher: (Option<f64>, Option<f64>) =
         sqlx::query_as("SELECT lat, lon FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?")
@@ -434,7 +344,7 @@ pub async fn position(
             tz_fachaufgabe: body.tz_fachaufgabe.as_ref().map(|o| o.as_deref()),
             tz_organisation: body.tz_organisation.as_ref().map(|o| o.as_deref()),
         },
-        einsatz.ist_aktiv(),
+        ctx.einsatz.ist_aktiv(),
     )
     .await?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
