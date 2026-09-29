@@ -1843,8 +1843,11 @@ test('Betroffene Karte: Marker-Trefferzone, Cluster-Donut und Kartenknöpfe folg
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/personen?ansicht=karte`);
+    // Dichte vor der Ansicht (LFH-770): `?ansicht=karte` räumt die Seite nach dem Anwenden aus
+    // der URL; ein `reload` danach lüde die Zeilenansicht, und die Karte käme nie.
     await stelleDichte(page, dichte);
+    await page.goto(`/einsaetze/${einsatzId}/personen?ansicht=karte`);
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
     await karteBereit(page);
 
     // Kartenknöpfe (DOM): Hineinzoomen, Herauszoomen, Nach Norden.
