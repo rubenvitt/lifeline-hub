@@ -21,6 +21,7 @@ import { enrollFinish, enrollStart } from '../api/totp';
 import { webauthnRegistrierungAbschliessen, webauthnRegistrierungStarten } from '../api/webauthn';
 import type { AuthProvider } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+import PasswortAendernDialog from '../auth/PasswortAendernDialog';
 
 interface TotpCodeWerte {
   code: string;
@@ -78,15 +79,22 @@ export default function ProfilPage() {
   // nicht verschwinden (einzige Chance, die Codes zu sichern).
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
 
-  // Aktive Auth-Provider laden (wie LoginPage), um die Passkey-Sektion bedingt zu rendern.
+  const [passwortDialogOffen, setPasswortDialogOffen] = useState(false);
+
+  // Aktive Auth-Provider laden (wie LoginPage), um die Passkey- und Passwort-Sektion bedingt zu
+  // rendern.
   useEffect(() => {
     providerListe()
       .then(setProvider)
-      // Fehler/Netzwerkproblem → die Passkey-Sektion bleibt ausgeblendet.
+      // Fehler/Netzwerkproblem → Passkey- und Passwort-Sektion bleiben ausgeblendet.
       .catch(() => setProvider([]));
   }, []);
 
   const webauthnAktiv = provider.some((p) => p.typ === 'webauthn' && p.aktiviert);
+  // Ohne Passwort-Anmeldung kein Passwortwechsel (LFH-471); der Server lehnt ihn dann ohnehin mit
+  // 403 ab. Anders als die LoginPage kein Rückfall auf „aktiv" bei leerer Liste: dort sperrte er
+  // sonst jeden aus, hier bliebe nur ein Knopf, der nicht wirken kann.
+  const passwortAktiv = provider.some((p) => p.typ === 'passwort' && p.aktiviert);
   // WebAuthn verlangt einen Secure Context (https/localhost); ohne ihn scheiterte
   // `navigator.credentials.create`, bevor eine Ceremony beginnt. Der Knopf erscheint nur, wenn er
   // funktionieren kann.
@@ -186,6 +194,23 @@ export default function ProfilPage() {
 
         <Paneel titel="Sicherheit" koerperPolster>
           <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginLG }}>
+            {passwortAktiv && (
+              <section style={{ maxWidth: 480 }}>
+                <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
+                  Passwort
+                </Augenbraue>
+                <Typography.Paragraph type="secondary">
+                  Ändere dein Passwort mit Angabe des bisherigen. Diese Sitzung bleibt angemeldet,
+                  alle anderen Anmeldungen deines Kontos werden beendet.
+                </Typography.Paragraph>
+                <Button onClick={() => setPasswortDialogOffen(true)}>Passwort ändern</Button>
+                <PasswortAendernDialog
+                  offen={passwortDialogOffen}
+                  onSchliessen={() => setPasswortDialogOffen(false)}
+                />
+              </section>
+            )}
+
             {passkeySichtbar && (
               <section style={{ maxWidth: 480 }}>
                 <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>

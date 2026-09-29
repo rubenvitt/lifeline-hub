@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router';
 import type { BenutzerAnzeige, OrgRolle, SystemRolle } from '../api/types';
 import { fehlerText } from '../api/client';
+import { PASSWORT_MIN_LAENGE } from '../api/auth';
 import {
   bearbeiteBenutzer,
   deaktiviereBenutzer,
@@ -251,7 +252,13 @@ export default function BenutzerPage() {
         <Form.Item
           label="Passwort"
           name="passwort"
-          rules={[{ required: true, min: 8, message: 'Mindestens 8 Zeichen' }]}
+          rules={[
+            {
+              required: true,
+              min: PASSWORT_MIN_LAENGE,
+              message: `Mindestens ${PASSWORT_MIN_LAENGE} Zeichen`,
+            },
+          ]}
         >
           <Input.Password autoComplete="new-password" />
         </Form.Item>

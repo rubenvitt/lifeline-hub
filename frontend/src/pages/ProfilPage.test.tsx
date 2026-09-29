@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
@@ -430,5 +430,126 @@ describe('ProfilPage — Recovery-Codes kopieren (LFH-370)', () => {
     // Die Codes bleiben erreichbar — der Hinweis verweist auf sie, statt einen zweiten Mechanismus
     // zu bauen.
     expect(screen.getByText(/aaaa-1111/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Self-Service-Passwortwechsel (LFH-471). Der Abschnitt hängt am aktiven Passwort-Provider — die
+ * Negativaussage steht neben der positiven, sonst belegte die positive nichts (ein Abschnitt, der
+ * immer erscheint, bestünde sie auch).
+ */
+describe('ProfilPage — Passwort ändern (LFH-471)', () => {
+  const passwortProvider = [
+    { id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true },
+  ];
+
+  /** Öffnet den Dialog und liefert ihn. */
+  async function dialogOeffnen() {
+    await userEvent.click(await screen.findByRole('button', { name: 'Passwort ändern' }));
+    return screen.findByRole('dialog');
+  }
+
+  async function ausfuellen(dialog: HTMLElement, alt: string, neu: string, wiederholung = neu) {
+    await userEvent.type(within(dialog).getByLabelText('Bisheriges Passwort'), alt);
+    await userEvent.type(within(dialog).getByLabelText('Neues Passwort'), neu);
+    await userEvent.type(within(dialog).getByLabelText('Neues Passwort wiederholen'), wiederholung);
+  }
+
+  it('erscheint, wenn der Passwort-Provider aktiv ist', async () => {
+    setup(false, passwortProvider);
+    expect(await screen.findByRole('button', { name: 'Passwort ändern' })).toBeInTheDocument();
+  });
+
+  it('erscheint NICHT ohne aktiven Passwort-Provider', async () => {
+    setup(false, webauthnProvider);
+    // Anker: die Seite ist fertig geladen, erst dann trägt die Abwesenheit etwas.
+    await screen.findByText('Zwei-Faktor (TOTP)');
+    await waitFor(() => expect(screen.queryByText('Passwort')).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Passwort ändern' })).toBeNull();
+  });
+
+  it('erscheint NICHT, wenn der Passwort-Provider als deaktiviert geliefert wird', async () => {
+    setup(false, [{ ...passwortProvider[0], aktiviert: false }]);
+    await screen.findByText('Zwei-Faktor (TOTP)');
+    expect(screen.queryByRole('button', { name: 'Passwort ändern' })).toBeNull();
+  });
+
+  it('sendet altes und neues Passwort, meldet den Erfolg und schließt den Dialog', async () => {
+    setup(false, passwortProvider);
+    let body: unknown = null;
+    server.use(
+      http.post('/api/auth/passwort', async ({ request }) => {
+        body = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    const dialog = await dialogOeffnen();
+    await ausfuellen(dialog, 'startpw12', 'ganzneu1234');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Passwort ändern' }));
+
+    await waitFor(() =>
+      expect(body).toEqual({ altes_passwort: 'startpw12', neues_passwort: 'ganzneu1234' }),
+    );
+    expect(await screen.findByText(/Passwort geändert/)).toBeInTheDocument();
+    // antd schließt animiert; „zu" heißt im jsdom: Ausblend-Zustand (`ant-zoom-leave`).
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    // Kein Passwort bleibt im Formularspeicher stehen (Reset auf jedem Weg hinaus, B4).
+    expect(within(dialog).getByLabelText('Bisheriges Passwort')).toHaveValue('');
+  });
+
+  it('zeigt die Ablehnung im Dialog, nicht als Toast, und lässt die Felder stehen', async () => {
+    setup(false, passwortProvider);
+    server.use(
+      http.post('/api/auth/passwort', () =>
+        HttpResponse.json({ error: 'Das bisherige Passwort stimmt nicht.' }, { status: 422 }),
+      ),
+    );
+
+    const dialog = await dialogOeffnen();
+    await ausfuellen(dialog, 'daneben12', 'ganzneu1234');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Passwort ändern' }));
+
+    const meldung = await within(dialog).findByText('Das bisherige Passwort stimmt nicht.');
+    expect(meldung.closest('.ant-message')).toBeNull();
+    expect(within(dialog).getByLabelText('Bisheriges Passwort')).toHaveValue('daneben12');
+  });
+
+  it('sendet nicht, wenn die Wiederholung abweicht', async () => {
+    setup(false, passwortProvider);
+    const aufruf = vi.fn();
+    server.use(
+      http.post('/api/auth/passwort', () => {
+        aufruf();
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    const dialog = await dialogOeffnen();
+    await ausfuellen(dialog, 'startpw12', 'ganzneu1234', 'ganzneu9999');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Passwort ändern' }));
+
+    expect(
+      await within(dialog).findByText('Die Wiederholung weicht vom neuen Passwort ab'),
+    ).toBeInTheDocument();
+    expect(aufruf).not.toHaveBeenCalled();
+  });
+
+  it('sendet nicht, wenn das neue Passwort zu kurz ist', async () => {
+    setup(false, passwortProvider);
+    const aufruf = vi.fn();
+    server.use(
+      http.post('/api/auth/passwort', () => {
+        aufruf();
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    const dialog = await dialogOeffnen();
+    await ausfuellen(dialog, 'startpw12', 'kurz123');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Passwort ändern' }));
+
+    expect(await within(dialog).findByText('Mindestens 8 Zeichen')).toBeInTheDocument();
+    expect(aufruf).not.toHaveBeenCalled();
   });
 });

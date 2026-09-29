@@ -45,3 +45,18 @@ export function providerListeAdmin(): Promise<AuthProvider[]> {
 export function providerSchalten(id: string, aktiviert: boolean): Promise<AuthProvider[]> {
   return apiSend<AuthProvider[]>(`/api/auth/providers/${id}`, 'PUT', { aktiviert });
 }
+
+/** Mindestlänge eines neuen Passworts. Spiegel von `PASSWORT_MIN_LEN` in
+ *  `src/routes/benutzer.rs` — die Grenze setzt der Server durch (400); hier steht sie nur, damit
+ *  die Maske vor dem Absenden dasselbe sagt. */
+export const PASSWORT_MIN_LAENGE = 8;
+
+/** Wechselt das Passwort des angemeldeten Benutzers (LFH-471). `422` bei falschem bisherigem
+ *  Passwort, `400` bei zu kurzem neuen, beides als {@link ApiError}. Die eigene Sitzung bleibt,
+ *  alle anderen Sitzungen des Kontos beendet der Server. */
+export function passwortAendern(altesPasswort: string, neuesPasswort: string): Promise<void> {
+  return apiSend<void>('/api/auth/passwort', 'POST', {
+    altes_passwort: altesPasswort,
+    neues_passwort: neuesPasswort,
+  });
+}
