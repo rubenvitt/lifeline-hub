@@ -2,7 +2,7 @@
 
 Gate 7 der Bedien-Leitlinie (`2026-07-25-bedien-leitlinie-einsatzkontexte.md`, Festlegung 7)
 verlangt diese Liste an jeder umgebauten Seite. Planung und Spec liegen in
-`openspec/changes/lfh-21-schaden-anhaenge/`.
+`openspec/changes/archive/2026-09-29-lfh-21-schaden-anhaenge/`.
 
 ## Geltungsbereich
 

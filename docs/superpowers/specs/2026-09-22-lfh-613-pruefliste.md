@@ -3,7 +3,7 @@
 Gate 7 der Bedien-Leitlinie (`2026-07-25-bedien-leitlinie-einsatzkontexte.md`, Festlegung 7)
 verlangt diese Liste an jeder neuen oder umgebauten Seite; ein Modul-Task ohne ausgefüllte
 Prüfliste gilt nicht als fertig. Anlass ist Aufgabe 7.4 in
-`openspec/changes/lfh-613-betroffene-zustand-fundort-verbleib/tasks.md`.
+`openspec/changes/archive/2026-09-29-lfh-613-betroffene-zustand-fundort-verbleib/tasks.md`.
 
 ## Geltungsbereich
 

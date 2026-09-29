@@ -20,7 +20,7 @@
 //! (`nachforderung_id`), nichts Hineingejointes — sonst läse jemand mit Zugriff auf
 //! Verpflegung, aber ohne Zugriff auf Nachforderungen, deren Angaben (design.md D4).
 //!
-//! Spec: `openspec/changes/lfh-634-fachmodul-verpflegung/`
+//! Spec: `openspec/changes/archive/2026-09-29-lfh-634-fachmodul-verpflegung/`
 
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
