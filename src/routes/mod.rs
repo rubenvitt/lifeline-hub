@@ -57,6 +57,7 @@ pub mod stab;
 pub mod stichwort;
 pub mod support;
 pub mod verpflegung;
+pub mod vorlagendokument;
 pub mod wetter;
 
 use crate::app::AppState;
