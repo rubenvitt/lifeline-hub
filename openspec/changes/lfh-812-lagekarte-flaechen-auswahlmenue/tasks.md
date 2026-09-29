@@ -39,8 +39,8 @@ und `requesting-code-review`.
 
 ## 7. Integration
 
-- [ ] 7.1 `./scripts/check-all.sh` (eigenes `CARGO_TARGET_DIR` im Scratchpad) vollständig grün, Log nach „ÜBERSPRUNGEN" durchsehen.
-  Stand 29.09.2026: Schritte 1–3, 6, 8–12 grün. Schritte 4/5/7 rot bei Lastmittel ~300 nur in
-  fremden Fällen: e2e-Nachlauf der 23 roten Fälle 48/48 grün, Rust-Fall einzeln 3/3 grün,
-  Vitest-Fall `AuthContext.pruefen` auch einzeln wackelig (2/3 rot). Nachzug LFH-823.
-  Vor dem Merge erneut fahren.
+- [x] 7.1 `./scripts/check-all.sh` (eigenes `CARGO_TARGET_DIR` im Scratchpad) vollständig grün, Log nach „ÜBERSPRUNGEN" durchsehen.
+  Stand 29.09.2026 nach dem Umsetzen auf `alpha` (LFH-764 gemergt): Schritte 1–6 und 8–12 grün,
+  kein Schritt übersprungen. Schritt 7 (e2e) 405/407; die zwei roten Fälle (`kopfzeile-schmal`
+  „Ton blockiert", `lagekarte-betreuung` Fachmodul-Link) liefen im Nachlauf 45/45 grün
+  (`--repeat-each=3`). Ein früherer Lauf unter Last: Nachzug LFH-823.
