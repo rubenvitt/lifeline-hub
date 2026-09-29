@@ -780,7 +780,7 @@ async fn download_304_umgeht_ownership_guard_nicht() {
 // --- LFH-632: `einsatz_dokument` als zweiter Linker auf `anhang` ---
 
 /// Legt per direktem SQL einen Anhang samt `einsatz_dokument`-Zeile (inkl. ETB-Pflicht-FK)
-/// an und liefert die `anhang.id`. Die Dokument-Route gibt es in diesem Task noch nicht.
+/// an und liefert die `anhang.id`.
 async fn dokument_anhang(pool: &sqlx::SqlitePool, einsatz: i64) -> i64 {
     let von: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
         .fetch_one(pool)
@@ -996,11 +996,11 @@ async fn etb_anhang_nicht_an_chat_verknuepfbar() {
 
 // --- LFH-21: `einsatz_schaden_anhang` als vierter Linker auf `anhang` ---
 //
-// Alle drei laufen als `admin`, die Person, die die Datei abgelegt hat (design.md D12): für
-// sie wäre eine Schaden-Datei ohne Registereintrag „ungebunden“ und damit generisch ladbar
-// und hart löschbar. Als andere Person wären die Tests auch ohne Eintrag grün.
+// Alle drei laufen als `admin`, die Person, die die Datei abgelegt hat: für sie wäre eine
+// Schaden-Datei ohne Registereintrag „ungebunden“ und damit generisch ladbar und hart
+// löschbar. Als andere Person wären die Tests auch ohne Eintrag grün.
 
-/// Spec „Ablegende Person über den generischen Download“: 404.
+/// Ablegende Person über den generischen Download: 404.
 #[tokio::test]
 async fn schaden_anhang_generischer_download_ist_404() {
     let (app, pool) = setup_mit_pool().await;
@@ -1012,8 +1012,8 @@ async fn schaden_anhang_generischer_download_ist_404() {
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
 
-/// Spec „Generisches Löschen“: 422 mit dem Wortlaut des Registereintrags; Datei und
-/// Verknüpfung bleiben.
+/// Generisches Löschen: 422 mit dem Wortlaut des Registereintrags; Datei und Verknüpfung
+/// bleiben.
 #[tokio::test]
 async fn schaden_anhang_generisches_loeschen_ist_422() {
     let (app, pool) = setup_mit_pool().await;
@@ -1050,7 +1050,7 @@ async fn schaden_anhang_generisches_loeschen_ist_422() {
     );
 }
 
-/// Spec „Chat-Nachricht verknüpft Schaden-Datei“: 400, keine Nachricht, keine Verknüpfung.
+/// Chat-Nachricht verknüpft Schaden-Datei: 400, keine Nachricht, keine Verknüpfung.
 #[tokio::test]
 async fn schaden_anhang_nicht_an_chat_verknuepfbar() {
     let (app, pool) = setup_mit_pool().await;
@@ -1085,9 +1085,9 @@ async fn schaden_anhang_nicht_an_chat_verknuepfbar() {
     );
 }
 
-/// Review C2 zu LFH-21: eine ENTFERNTE Schaden-Datei bleibt Beweisstück — über die
-/// Schadensroute 404, generisch weiter gesperrt (Download 404, DELETE 422), und zwar für die
-/// Person, die sie abgelegt und entfernt hat (D12). Die Datei selbst bleibt gespeichert.
+/// Eine ENTFERNTE Schaden-Datei bleibt Beweisstück — über die Schadensroute 404, generisch
+/// weiter gesperrt (Download 404, DELETE 422), und zwar für die Person, die sie abgelegt und
+/// entfernt hat. Die Datei selbst bleibt gespeichert.
 #[tokio::test]
 async fn entfernte_schaden_datei_bleibt_generisch_gesperrt() {
     let (app, pool) = setup_mit_pool().await;
@@ -1126,9 +1126,9 @@ async fn entfernte_schaden_datei_bleibt_generisch_gesperrt() {
     assert_eq!(n, 1, "die Datei bleibt bis zur Schwärzung gespeichert");
 }
 
-/// Review C1 zu LFH-117, Gegenprobe Chat: ein ungebundener Anhang ist über die generische
-/// Route nur für die hochladende Person erreichbar — vor dem Senden. Ist er an eine Nachricht
-/// gebunden, gelten die Chat-Regeln wie bisher, auch für andere.
+/// Gegenprobe Chat: ein ungebundener Anhang ist über die generische Route nur für die
+/// hochladende Person erreichbar — vor dem Senden. Ist er an eine Nachricht gebunden, gelten
+/// die Chat-Regeln, auch für andere.
 #[tokio::test]
 async fn chat_anhang_vor_dem_senden_nur_fuer_die_hochladende_danach_fuer_alle() {
     let app = setup().await;

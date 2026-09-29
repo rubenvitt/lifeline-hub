@@ -3,14 +3,12 @@ import type { ModulEintrag } from '../../einsatz/modulRegistry';
 import { personenZugriffVon, type PersonenZugriff } from './personenEbene';
 
 /**
- * Zugriff auf die Ebene „Betreuungsstellen" der Lagekarte (LFH-673) — dieselbe Grenze wie
- * die Ebene „Betroffene" (`personenEbene.ts`): sie sitzt an der DATENquelle, nicht am
- * Schalter, und ein 403 des Servers ist „gesperrt", kein Ausfall einer Lagebild-Quelle.
+ * Zugriff auf die Ebene „Betreuungsstellen" — dieselbe Grenze wie „Betroffene"
+ * (`personenEbene.ts`): sie sitzt an der Datenquelle, nicht am Schalter, und ein 403 ist
+ * „gesperrt", kein Ausfall einer Lagebild-Quelle.
  *
- * Ein Unterschied, und deshalb eine eigene Funktion statt eines Aufrufs mit
- * `istSnapshot: true`: gesicherte Lagestände TRAGEN die Betreuungsstellen (design.md D10) —
- * der Server lässt sie für Personen ohne Modulrecht weg. `'rueckblick'` ist hier also kein
- * Zustand; im Historien-Modus gilt dieselbe Rechte-Frage, die Daten kommen aus dem Dokument.
+ * Eine eigene Funktion, weil gesicherte Lagestände die Betreuungsstellen tragen (der Server lässt
+ * sie für Personen ohne Modulrecht weg): `'rueckblick'` ist hier kein Zustand.
  */
 export type BetreuungZugriff = Exclude<PersonenZugriff, 'rueckblick'>;
 

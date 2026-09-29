@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-// LFH-460: Beide Kopfzeilen teilen Auslöser, aber nicht ihren Layout-Rahmen.
-// Die gespeicherte Wahl muss auch bei Touch gelten; Pixel prüft nur der Browser.
+// Beide Kopfzeilen teilen Auslöser, aber nicht ihren Layout-Rahmen. Die gespeicherte Wahl
+// muss auch bei Touch gelten; Pixel prüft nur der Browser.
 test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
   test.use({ hasTouch: true });
 
@@ -68,8 +68,7 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
             } else if (mitVerwaltung) {
               await expect(page.locator('[data-testid="einsaetze-raster"]')).toBeVisible();
             } else {
-              // LFH-462: Der neue Benutzer hat keine Einsatzmitgliedschaft. Das
-              // Raster ist nur während seiner Lade-Skelette sichtbar, danach leer.
+              // Der neue Benutzer hat keine Einsatzmitgliedschaft, das Raster bleibt leer.
               await expect(page.getByText('Keine Einsätze', { exact: true })).toBeVisible();
             }
             // Konkrete Inhaltsanker statt networkidle: die Einsatzroute hält SSE offen.
@@ -138,16 +137,11 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
               stufe === 'handschuh' ? 288 : stufe === 'komfortabel' ? 192 : 120,
             );
             /*
-             * EINZEILIG AUF DEM FÜHRUNGS-TABLET (22.09.2026): bei 1024 px brach der Kopf vorher
-             * auf zwei Zeilen (52 → 104 px). Seitdem stehen dort Ruhezustände nur als Ikone
-             * (Alarmzentrale, SYNC) und der Benutzer-Trigger ohne Funktion. Geprüft in
-             * `kompakt`, weil das der einzige Fall ist, den diese Umgebung deterministisch
-             * trifft: headless meldet der Browser „Desktop blockiert" und der Strom steht
-             * oft noch auf „VERBINDE" — beides Störungen, die ihr Wort BEHALTEN (LFH-392).
-             * Mit diesem ungünstigsten Stand ist der Kopf in `kompakt` einzeilig; in
-             * `komfortabel`/`handschuh` darf eine Störung ihn umbrechen (gemessen mit den
-             * Störungswörtern: 104/144 px). Den RUHEZUSTAND in `handschuh` belegt
-             * `kopfzeile-schmal.spec.ts` („Führungs-Tablet 1024 px") — gemessen 52/52/72 px.
+             * Einzeilig auf dem Führungs-Tablet: bei 1024 px stehen Ruhezustände nur als Ikone.
+             * Geprüft nur in `kompakt`, dem einzigen deterministischen Fall: headless meldet der
+             * Browser „Desktop blockiert" und der Strom oft „VERBINDE" — Störungen, die ihr
+             * Wort behalten und den Kopf in größeren Stufen umbrechen dürfen. Den Ruhezustand
+             * in `handschuh` belegt `kopfzeile-schmal.spec.ts`.
              */
             if (breite === 1024 && stufe === 'kompakt') {
               expect(messung.kopfHoehe, `${kontext}: einzeilig (52 px)`).toBeLessThanOrEqual(52);
@@ -180,79 +174,24 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
 });
 
 /**
- * Gate 1 der Bedien-Leitlinie: kein waagerechter Überlauf auf den drei
- * Arbeitsbreiten (LFH-329 · B1, Abschlussschritt).
+ * Gate 1 der Bedien-Leitlinie: kein waagerechter Überlauf auf den Arbeitsbreiten, gemessen
+ * über die ganze Seite (die Einzel-Specs sehen nur ihren Ausschnitt).
  *
- * WARUM ALS EIGENE SPEC: Die sieben Arbeitspakete von B1 messen jeweils nur
- * ihren eigenen Ausschnitt — die Rinne, die Kopfzeile, den Navigationsrahmen,
- * eine Katalogtabelle. Gate 1 ist aber eine Aussage über die ganze Seite. Ohne
- * diese Spec hätte das erste Akzeptanzkriterium des Tickets keinen Eigentümer:
- * jedes Paket wäre grün und die Seite trotzdem breiter als der Schirm.
+ * DIE 1-PX-TOLERANZ ist kein Aufweichen: Chromium rundet `scrollWidth` auf ganze Pixel,
+ * Layoutbreiten dürfen gebrochen sein.
  *
- * DIE PRÜFBREITEN stammen aus der Bedien-Leitlinie (A1, Gate 1): 1366 px
- * Führungswagen, 1024 px Führungs-Tablet, 390 px mobil — seit LFH-100 dazu
- * 768 px Führungs-Tablet hochkant (Begründung an {@link PRUEFBREITEN}).
+ * BEI EINEM BRUCH nennt die Diagnose das schuldige Element mit Tag, Klassen und Breite.
  *
- * DIE 1-PX-TOLERANZ ist kein Aufweichen: Chromium rundet `scrollWidth` auf
- * ganze Pixel, während Layoutbreiten gebrochen sein dürfen (die Kopfzeilen-
- * Polsterung rechnet mit 46,875 px). Ohne die Toleranz meldete das Gate einen
- * Rundungsrest als Überlauf.
+ * SEEDING, WEIL EINE LEERE LISTE NICHT ÜBERLAUFEN KANN: `seedeUeberlaufstoff` sät je Modul
+ * einen Datensatz mit ABSICHTLICH LANGEN Werten per `page.request` (teilt den Cookie-Jar des
+ * Kontexts), und der Anker jeder Zeile ist der gesäte Datensatz, nicht der Seitenrahmen.
  *
- * BEI EINEM BRUCH nennt die Diagnose das schuldige Element mit Tag, Klassen und
- * gemessener Breite. Ein nacktes „erwartet 390, war 400" schickt den nächsten
- * Leser sonst auf die Suche.
+ * DER EINSATZNAME `E2E Gate1 <ts>` trägt bewusst keinen Modulnamen: die Kommandopalette
+ * durchsucht Module und Einsätze gemeinsam, sonst flakte `command-palette.spec.ts`.
  *
- * ─── ERWEITERUNG LFH-330 · B2 (Bündel V) ────────────────────────────────────
- *
- * Fünf Routen kommen hinzu: Personal, Kräfteübersicht, Befehle-Reiter, Personen
- * und Tiere. Alle fünf sind vom `Datensicht`-Umbau betroffen, alle fünf tragen
- * jetzt acht bis zehn Spalten, und keine stand bisher in einem Überlauf-Gate.
- *
- * SEEDING, WEIL EINE LEERE LISTE NICHT ÜBERLAUFEN KANN. Ein frisch angelegter
- * Einsatz hat 0 Kräfte, 0 Befehle, 0 Personen, 0 Tiere. Ein 390-px-Überlauftest
- * über fünf Leerzustände ist grün durch Nichtstun — er misst einen Rahmen um
- * einen Leertext. Deshalb sät `seedeUeberlaufstoff` je Modul einen Datensatz mit
- * ABSICHTLICH LANGEN Werten (etablierte Form: `kopfzeile-schmal.spec.ts:72-91`
- * prüft die Kopfzeile mit absichtlich langem Einsatznamen), und der Anker jeder
- * neuen Zeile ist der gesäte Datensatz, nicht der Seitenrahmen.
- *
- * SEEDING PER `page.request`: neues Muster in `frontend/e2e/` (0 Vorkommen
- * vorher). Die Session ist Cookie-basiert (`api/client.ts:35/46/56`
- * `credentials: 'same-origin'`, kein CSRF-Header), und `page.request` teilt den
- * Cookie-Jar des Kontexts. Über die UI wären es fünf Modale und ~25 Aktionen je
- * Lauf — ohne Erkenntnisgewinn für ein Breitengate.
- *
- * DER EINSATZNAME BLEIBT `E2E Gate1 <ts>` — bewusst OHNE Modulnamen darin: die
- * Kommandopalette durchsucht Module UND Einsätze in einer Optionsliste, ein
- * „E2E Kräfteübersicht …" ließe `command-palette.spec.ts` per strict mode flaken
- * (dokumentiert in `lagekarte-smoke.spec.ts:56-60`). Personen-, Tier- und
- * Befehlstitel stehen nicht in der Palette.
- *
- * WAS BEI 390 PX GEMESSEN WIRD, ist NICHT durchgehend eine Tabelle: `Datensicht`
- * mit `form="auto"` rendert unter `md` (768 px) Karten, `form="tabelle"` am
- * Meldebild bleibt in jeder Breite Tabelle, `form="karte"` an den Befehlen in
- * jeder Breite Karte. Der Spaltendruck der acht bis zehn Spalten wirkt also nur
- * auf 1366 und 1024 px; auf 390 px prüft die Zeile den Kartenzweig. Beides ist
- * eine Aussage über Gate 1 — aber nicht dieselbe, und die Anker sind deshalb
- * form-agnostisch (gesäter Text, kein `tr.ant-table-row`).
- *
- * MUTATIONSPROBE, protokolliert — sonst ist die Erweiterung eine Behauptung
- * (Beweisform aus `katalogtabelle-schmal.spec.ts:90-98`). Mit entferntem
- * `scroll={{ x: 'max-content' }}` in `components/KatalogTabelle.tsx:252` meldet
- * diese Datei sechs Brüche:
- *   `/einsaetze/:id/etb`             1024 px → 166 px · 390 px → 506 px
- *   `/admin/benutzer`                1024 px →  15 px · 390 px → 105 px
- *   `/einsaetze/:id/kraefteuebersicht` 1024 px →  12 px · 390 px → 352 px
- * Die NEUE Kräfteübersicht-Zeile hängt damit nachweislich am Bildlaufcontainer
- * und ist nicht durch Konstruktion grün. Auf 390 px schlägt sie zugleich über
- * ihren Freistellungs-Deckel (60 px) und wird als VERSCHLECHTERUNG gemeldet —
- * das ist der Wirknachweis für den Deckel-Zweig von {@link BESTAND_OFFEN}.
- * Zurückgedreht und byte-gleich verglichen.
- *
- * Personal, Personen und Tiere bleiben in dieser Probe stumm: auf 390 px stehen
- * dort Karten (kein Bildlaufcontainer im Spiel), und auf 1366/1024 px passen ihre
- * Spalten auch ohne ihn. Ihre Zeilen belegen also den Karten- bzw. den
- * unauffälligen Tabellenzweig, nicht den Bildlaufcontainer.
+ * Bei 390 px wird nicht durchgehend eine Tabelle gemessen: `Datensicht` mit `form="auto"`
+ * rendert unter `md` Karten. Die Anker sind deshalb form-agnostisch (gesäter Text, kein
+ * `tr.ant-table-row`).
  */
 
 const ADMIN = 'admin';
@@ -261,11 +200,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 /**
  * Führungswagen · Führungs-Tablet quer · Führungs-Tablet hoch · mobil (A1, Gate 1).
  *
- * TABLET HOCH (768 × 1024) seit LFH-100: das Ticket nennt „Tablet (Quer/Hoch)" ausdrücklich,
- * die Leitlinie führte bis dahin nur die Querlage. 768 px ist genau antds `md`-Grenze —
- * die Breite, an der `Datensicht` (`form="auto"`) von Karten auf Tabelle wechselt und die
- * Lagekarte ihre Leiste noch UNTER der Karte trägt (`lg` = 992 px). Eine Tabelle, die dort
- * zum ersten Mal steht, hat die wenigsten Pixel, die sie je bekommt.
+ * 768 px ist genau antds `md`-Grenze: dort wechselt `Datensicht` (`form="auto"`) auf Tabelle,
+ * und die Tabelle hat die wenigsten Pixel, die sie je bekommt.
  */
 const PRUEFBREITEN = [
   { name: 'Fükw', breite: 1366, hoehe: 768 },
@@ -274,8 +210,6 @@ const PRUEFBREITEN = [
   { name: 'mobil', breite: 390, hoehe: 844 },
 ] as const;
 
-// Login-/Anlege-Helfer aus `kernfluss.spec.ts` kopiert — es gibt (noch) kein
-// geteiltes e2e-Hilfsmodul.
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -293,60 +227,14 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 }
 
 /**
- * GEMESSENE BESTANDS-VERSTÖSSE — die Burn-down-Liste dieses Gates.
- *
- * **LEER seit LFH-340 · C5, und das ist die Aussage.** Der eine verbliebene Eintrag war
- * `/personen` bei 390 px mit 120 px Überlauf: eine `Space`-Reihe ohne `wrap` mit den drei
- * Knöpfen „Schnellerfassung", „Vermisst melden", „Betroffene/n erfassen". C5 hat den Kopf
- * dieser Seite auf `EinsatzSeite` gezogen — dessen Aktionen-Slot liegt in einem `Flex wrap`
- * mit `minWidth: 0` an beiden Kindern (die Herleitung steht dort, gemessen in C4 an
- * `/fahrzeuge`). Der Überlauf ist damit nicht gedeckelt, sondern weg: der Guard hat die
- * Freistellung selbst als tot gemeldet, statt dass jemand sie gestrichen hätte.
- *
- * Das als ZIELTICKET notierte B5 (LFH-333) hat den Fall also nicht erledigt — der Umbau des
- * Seitenkopfs hat ihn nebenbei mitgenommen. Wer hier wieder einen Eintrag braucht, misst ihn
- * und schreibt den Verursacher dazu; eine leere Liste ist billiger zu halten als eine, in
- * der eine behobene Zeile weiterlebt.
- *
- * DER DRITTE EINTRAG IST WEG (LFH-338 · C3): `/kraefteuebersicht` stand hier mit 7 px,
- * verursacht von einem `Space` ohne `wrap` im Aktionen-Slot. C3 hat dem Slot einen dritten
- * Bedienknopf gegeben (den Aufklapp-Umschalter) — damit sprang der Überlauf auf 246 px und
- * das Gate schlug an, wie es soll. Der Fix ist das `wrap`, das die Freistellung ohnehin
- * gefordert hätte; gemessen steht die Route jetzt bei **0 px**, und die Totmeldung des
- * Gates hat die Streichung dieser Zeile erzwungen.
- *
- * DER ZWEITE EINTRAG IST WEG (LFH-339 · C4): `/personal` stand hier mit 79 px. C4 hat den
- * Verursacher an der Wurzel behoben — `wrap` samt `minWidth: 0` im Seitenkopf-Primitiv
- * `components/EinsatzSeite.tsx` PLUS `wrap` und ein `maxWidth` am Auswahlfeld der
- * Aktionsreihe selbst. Beides zusammen ist nötig: der Umbruch im Primitiv schiebt den
- * Aktionsblock nur unter den Titel, wo er weiterhin zu breit ist. Gemessen steht die Route
- * jetzt bei **0 px**, und die Totmeldung dieses Gates hat die Streichung erzwungen — genau
- * die Mechanik, die der Absatz darunter beschreibt.
- *
- * BEI DER GELEGENHEIT GEMESSEN, ohne hier gelistet zu sein: `/fahrzeuge` (115 px) und
- * `/material` (327 px) liefen ebenfalls über — dieselbe Ursache, nur auf Routen, die dieses
- * Gate nicht führt. Beide sind mit C4 behoben und werden seither von
- * `e2e/kraefte-schmal.spec.ts` gemessen. Wer diese Liste erweitert, nimmt sie NICHT auf:
- * eine zweite Messung derselben Zusicherung an zwei Orten veraltet an einem davon.
- *
- * WARUM FREISTELLUNG UND NICHT ROT: die verbliebene Reparatur ist `wrap` an einem fremden
- * Seitenkopf — Bestandsarbeit in `frontend/src/pages/`, die jenes Bündel nicht besaß,
- * und ein rot geborenes Gate wird abgeschaltet statt befolgt. Freigestellt wird deshalb
- * **namentlich, mit Deckel und mit Totmeldung**, nach dem Muster der `NOCH_OFFEN`-Listen der
- * Vitest-Guards:
- *  - Ein Verstoß auf einer NICHT gelisteten Route × Breite ist rot. Die Liste kann also
- *    nicht als Generalamnestie wirken.
- *  - Wächst ein gelisteter Verstoß über seinen `deckel`, ist er rot. Eine Verschlechterung
- *    fällt auf.
- *  - Ist ein gelisteter Eintrag behoben (≤ 1 px), meldet das Gate ihn als TOT und erzwingt
- *    seine Streichung. Die Liste kann nicht veralten.
- * Der `deckel` liegt bewusst über dem Messwert (Subpixel- und Schriftmetrik-Spielraum), aber
- * weit unter der nächsten Größenordnung.
- *
- * DIE MECHANIK BLEIBT, OBWOHL DIE LISTE LEER IST: sie ist der Weg, auf dem ein künftiger
- * Bestandsbefund benannt statt geduldet wird. Ihre Totmeldung hat sich gerade bewährt — sie
- * hat gemeldet, dass LFH-340 · C5 den letzten Eintrag eingelöst hat, statt ihn in einer
- * veralteten Liste weiterleben zu lassen.
+ * Namentliche Freistellungen bekannter Bestands-Verstöße — derzeit LEER. Die Mechanik
+ * bleibt als Weg, einen künftigen Befund zu benennen statt zu dulden (ein rot geborenes Gate
+ * wird abgeschaltet statt befolgt):
+ *  - Ein Verstoß auf einer NICHT gelisteten Route × Breite ist rot.
+ *  - Wächst ein gelisteter Verstoß über seinen `deckel`, ist er rot.
+ *  - Ist ein gelisteter Eintrag behoben (≤ 1 px) oder wird er nicht mehr gemessen, meldet
+ *    das Gate ihn als TOT und erzwingt seine Streichung.
+ * Wer einen Eintrag braucht, misst ihn und schreibt den Verursacher dazu.
  */
 type Freistellung = {
   /** Modulroute wie in {@link ROUTEN}. */
@@ -359,21 +247,14 @@ type Freistellung = {
   gemessen: number;
 };
 
-// Der EXPLIZITE Typ ist nötig, nicht Zierde: `[] as const` hätte den Elementtyp `never`,
-// und der Auswertungscode unten (der auf `modul`/`breite`/`deckel` zugreift) fiele mit
-// „Property does not exist on type never" um. Der Typ hält die Liste befüllbar.
+// Expliziter Typ: `[] as const` hätte den Elementtyp `never`, und der Zugriff auf
+// `modul`/`breite`/`deckel` unten fiele um.
 const BESTAND_OFFEN: readonly Freistellung[] = [];
 
 /**
- * Ein Datensatz je neu aufgenommenem Modul, mit absichtlich langen Werten.
- *
- * Die Ad-hoc-Kraft erscheint gleich in ZWEI der neuen Zeilen: auf der Personalseite als
- * eigene Zeile und im Meldebild über die Sammelzeile „Ohne Einheit"
- * (`kraefte/meldebildRaster.ts`, Mittel ohne `einheit_id`). Ein zweiter
- * Datensatz dafür wäre Aufwand ohne Aussage.
- *
- * Jede Antwort wird mit Status und Text zugesichert. Ein stillschweigend fehlgeschlagenes
- * Seeding ist der direkte Weg zurück in den Leerzustand, den dieses Seeding beseitigen soll.
+ * Ein Datensatz je Modul, mit absichtlich langen Werten. Die Ad-hoc-Kraft erscheint auf der
+ * Personalseite und im Meldebild (Sammelzeile „Ohne Einheit"). Jede Antwort wird
+ * zugesichert: ein still fehlgeschlagenes Seeding führt zurück in den Leerzustand.
  */
 async function seedeUeberlaufstoff(page: Page, einsatzId: string) {
   const anlegen = async (pfad: string, data: unknown, was: string) => {
@@ -400,10 +281,8 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string) {
     { vorlage: 'befehl_lad', titel: 'Befehl an den 2. Zug zur Menschenrettung im Abschnitt Nord' },
     'Befehl',
   );
-  // Status-Vorgabe bewusst weggelassen: das Backend setzt `erfasst`
-  // (`src/person/repo.rs:123`), und genau darauf steht der Standardreiter der Personenseite
-  // (`PersonenPage.tsx:37` `useState<Sicht>('erfasst')`). Eine Person mit anderem Status
-  // fiele aus der Standardsicht und die Zeile messte wieder einen Leerzustand.
+  // Ohne Status setzt das Backend `erfasst`, genau der Standardreiter der Personenseite;
+  // mit anderem Status fiele die Person aus der Standardsicht.
   await anlegen(
     'personen',
     {
@@ -414,8 +293,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string) {
     },
     'Person',
   );
-  // `spezies` ist Pflicht; der Status-Default `aktiv` (`src/routes/einsatz_tier.rs:102`)
-  // deckt sich mit dem Standardreiter der Tierseite (`TierePage.tsx` `useState<Sicht>('aktiv')`).
+  // Der Status-Default `aktiv` deckt sich mit dem Standardreiter der Tierseite.
   await anlegen(
     'tiere',
     {
@@ -431,35 +309,13 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string) {
 /**
  * Misst das Wurzelelement und benennt bei Überschreitung die Verursacher.
  *
- * WAS DIESES GATE NICHT SIEHT — und das ist seine eigentliche Grenze: jedes
- * `overflow-x: hidden` an IRGENDEINEM Vorfahren nimmt überlaufende Kinder aus
- * der Wurzelmetrik heraus. Ein geklippter Inhalt ist dann abgeschnitten und ohne
- * Bildlauf unerreichbar — und das Gate ist trotzdem grün. Gate 1 wäre also
- * erfüllbar, indem man KLIPPT statt repariert. Wer eine Rotmeldung dieses Gates
- * mit `overflow-x: hidden` „behebt", hat es nicht behoben, sondern versteckt.
+ * GRENZE: jedes `overflow-x: hidden` an einem Vorfahren nimmt überlaufende Kinder aus der
+ * Wurzelmetrik — der Inhalt ist abgeschnitten, das Gate trotzdem grün. Wer eine Rotmeldung
+ * mit `overflow-x: hidden` „behebt", hat sie versteckt.
  *
- * FRÜHER STAND HIER, `documentElement` werde gemessen, weil ein `body` mit
- * `overflow: hidden` den Überlauf sonst verstecke. Das ist sachlich falsch und
- * beschrieb die Lücke außerdem zu eng: `overflow` am `body` propagiert bei
- * `html: visible` auf den Viewport — `documentElement.scrollWidth` wächst dann
- * gerade NICHT, ein `body`-Klipp bliebe also ohnehin folgenlos für diese
- * Messung. Gemessen wird die Wurzel schlicht deshalb, weil die Bildlaufleiste
- * der Seite dort hängt.
- *
- * GEMESSEN AN HEAD ist das kein Verstoß: im Produktivcode gibt es kein globales
- * `overflow-x: hidden`. Die einzigen Klipp-Stellen sind `.login-seite`
- * (`LoginPage.css`, keine der vier Routen unten), zwei Ellipsen-Regeln in
- * `theme/sprache.css` und antds eigener `.ant-table-sticky-holder`. Alle vier
- * Routen messen auf allen drei Breiten 0 px Überlauf — die Wurzelbreite ist also
- * echt eingehalten und nicht bloß weggeklippt.
- *
- * Elemente in einem eigenen Bildlaufbereich sind KEIN Verstoß — genau dafür
- * trägt die Katalogtabelle ihren waagerechten Bildlauf. Deshalb steigt die
- * Diagnose an jedem Vorfahren mit eigenem `overflow-x` aus, statt dessen Kinder
- * anzuzeigen. `hidden` wird dabei von `auto`/`scroll` GETRENNT ausgewiesen:
- * beides nimmt das Element aus der Wurzelmetrik, aber nur `auto`/`scroll` gibt
- * dem Benutzer den Inhalt zurück. Ein `[GEKLIPPT]` in der Diagnose ist deshalb
- * ein Fund, kein Freispruch.
+ * Elemente in einem eigenen Bildlaufbereich sind KEIN Verstoß (dafür trägt die
+ * Katalogtabelle ihren Bildlauf). `hidden` wird von `auto`/`scroll` getrennt ausgewiesen:
+ * nur Letztere geben den Inhalt zurück, ein `[GEKLIPPT]` ist ein Fund, kein Freispruch.
  */
 async function ueberlauf(page: Page): Promise<{ ueber: number; schuldige: string[] }> {
   return page.evaluate(() => {
@@ -477,11 +333,8 @@ async function ueberlauf(page: Page): Promise<{ ueber: number; schuldige: string
       return '';
     };
 
-    // FLACH über alle Elemente, nicht als Baumabstieg: ein absolut
-    // positioniertes oder aus einem Bildlaufbereich ragendes Element hat
-    // Vorfahren, die selbst brav innerhalb liegen — ein Abstieg, der nur
-    // überragenden Knoten folgt, findet es nie und meldet „Überlauf ohne
-    // Verursacher". Genau das ist beim ersten Lauf passiert.
+    // FLACH über alle Elemente statt Baumabstieg: ein absolut positioniertes oder aus einem
+    // Bildlaufbereich ragendes Element hat brave Vorfahren, ein Abstieg fände es nie.
     for (const el of Array.from(document.querySelectorAll('body *'))) {
       const rechteck = el.getBoundingClientRect();
       if (rechteck.right <= grenze + 1) continue;
@@ -499,17 +352,12 @@ async function ueberlauf(page: Page): Promise<{ ueber: number; schuldige: string
   });
 }
 
-/**
- * Meldet an, legt den Einsatz an und sät den Überlaufstoff aller Routen. Je Prüfbreite
- * einmal — die Breiten laufen seit LFH-100 als eigene Tests (s. u.), und ein Seeding über
- * die API kostet gegen die Messungen nichts.
- */
+/** Meldet an, legt den Einsatz an und sät den Überlaufstoff aller Routen — je Prüfbreite. */
 async function gate1Vorbereiten(page: Page): Promise<string> {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate1 ${Date.now()}`);
   await seedeUeberlaufstoff(page, einsatzId);
-  // LFH-635: eine Schicht mit absichtlich langem Einheits- und Abschnittsnamen. Eigenes
-  // Seeding, weil die Einheit ihre id für die Schicht liefern muss.
+  // Eine Schicht mit absichtlich langem Einheits- und Abschnittsnamen.
   {
     const post = async (pfad: string, data: unknown, was: string) => {
       const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
@@ -534,10 +382,8 @@ async function gate1Vorbereiten(page: Page): Promise<string> {
     );
     await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 390 }, 'Schicht');
 
-    // LFH-639: ein Bezirk mit langem Namen, gemeldetem Stand, Räumungsetikett und Abschnitt
-    // (alle drei Sekundärfelder der Karte gefüllt) und eine Stelle mit langem Namen, deren
-    // Belegung das Auslastungswort „fast voll" neben die Zahl setzt — die breiteste Zelle der
-    // Tabelle. Namen OHNE „Betreuung" (design.md D10 e).
+    // Ein Bezirk mit allen drei Sekundärfeldern der Karte und eine Stelle, deren Belegung
+    // „fast voll" neben die Zahl setzt — die breiteste Tabellenzelle. Namen ohne „Betreuung".
     const bezirk = await post(
       'betreuung/bezirke',
       {
@@ -570,11 +416,8 @@ async function gate1Vorbereiten(page: Page): Promise<string> {
     );
     await post(`betreuung/stellen/${stelle.id}/belegungen`, { belegt: 1420 }, 'Belegung');
 
-    // LFH-634: ein LAUFENDES Zeitfenster (Beginn vor einer Stunde, Ende in drei — sonst stünde
-    // die Karte unter „vergangen" und der Anker fehlte) mit langer Bezeichnung, belegter
-    // Sonderkost und einer Ausgabe mit langem, mehrwortigem Ort samt Bemerkung: die
-    // Ausgabezeile (`120 EP · Ort · Sonderkost`) ist die breiteste Zeile der Karte. Namen OHNE
-    // den Modulnamen (die Palette durchsucht Module und Datensätze gemeinsam).
+    // Ein LAUFENDES Zeitfenster (sonst stünde die Karte unter „vergangen") mit Sonderkost und
+    // einer Ausgabe mit langem Ort — die breiteste Zeile der Karte.
     const jetzt = Date.now();
     const zeitfenster = await post(
       'verpflegung/zeitfenster',
@@ -600,8 +443,7 @@ async function gate1Vorbereiten(page: Page): Promise<string> {
       'Ausgabe',
     );
   }
-  // LFH-633: Wetter per Stub — sonst ginge das Backend an Bright Sky, sobald der Einsatz
-  // einen Ort hat. Langer Gemeindename als Querlauf-Stoff; die Pegel bleiben echt (leer).
+  // Wetter per Stub, sonst ginge das Backend an Bright Sky. Langer Gemeindename als Stoff.
   await page.route(`**/api/einsaetze/${einsatzId}/wetter`, (route) =>
     route.fulfill({
       json: {
@@ -634,33 +476,13 @@ type Gate1Route = {
 };
 
 function gate1Routen(einsatzId: string): Gate1Route[] {
-  // Eine Route je Layoutfamilie: Ebene-1-Shell, Lagebild, Modulseite unter dem
-  // Einsatz-Workspace, Verwaltung unter dem Admin-Layout. Die vier hängen an
-  // vier verschiedenen Rahmen — eine einzelne Route belegte nur einen davon.
+  // Eine Route je Layoutfamilie (Ebene-1-Shell, Lagebild, Einsatz-Workspace, Admin-Layout)
+  // plus die Datensicht- und Fachmodule.
   //
-  // JE ROUTE EIN INHALTSANKER, und zwar ein Knoten, den NUR diese Seite hat.
-  // Vorher stand hier bloß `.ant-layout-content` — das ist auf JEDER Route der
-  // Anwendung wahr und belegte nur, dass irgendein Rahmen steht. Das ist keine
-  // theoretische Lücke: die Modulrouten laufen über `modulRegistry` mit
-  // `ModulRedirect`/`ModulStub` (`src/App.tsx`), und ein Redirect auf eine leere
-  // Seite misst sich überlauffrei und wäre grün gewesen. Ein Gate, das eine
-  // verschwundene Seite als „kein Überlauf" liest, misst nichts.
-  //
-  // Die Anker sind bewusst aus den Nachbar-Specs übernommen, wo sie am
-  // Handschirm bereits belegt sind — sie müssen auf ALLEN DREI Breiten stehen,
-  // auch auf 390 px:
-  //  - `[data-lfh="kennzahl"]` im Band „Lage in Zahlen" → `lage-dashboard-schmal.spec.ts`
-  //  - `Inhalt …` (ETB-Schnellerfassung) → `nav-schmal.spec.ts`
-  //  - `tr.ant-table-row` → `katalogtabelle-schmal.spec.ts`
-  // Für `/einsaetze` gibt es keinen Nachbar-Spec; gemessen trägt die Seite auf
-  // allen drei Breiten `[data-testid="einsaetze-raster"]`. NICHT genommen wurde
-  // „Neuer Einsatz": der Knopf liegt auf 390 px hinter dem Kopfgriff.
-  //
-  // DIE FÜNF NEUEN ZEILEN (LFH-330 · B2) tragen form-agnostische Datenanker. Ein
-  // `tr.ant-table-row` wäre hier FALSCH: Personal, Personen und Tiere rendern bei
-  // 390 px Karten und hätten gar kein `<tr>`, die Befehlsliste in keiner Breite.
-  // Der naheliegende „Reparaturgriff" wäre dann, den Anker auf
-  // `.ant-layout-content` zu lockern — und der misst wieder nichts (siehe oben).
+  // JE ROUTE EIN INHALTSANKER, den NUR diese Seite hat — `.ant-layout-content` steht auf
+  // jeder Route, und ein Redirect auf eine leere Seite mäße sich überlauffrei. Die Anker
+  // müssen auf allen Breiten stehen, also nie ein `tr.ant-table-row` auf Datensicht-Routen
+  // (unter `md` Karten). „Neuer Einsatz" liegt auf 390 px hinter dem Kopfgriff.
   return [
     { pfad: '/einsaetze', anker: (p: Page) => p.locator('[data-testid="einsaetze-raster"]') },
     {
@@ -674,11 +496,7 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
     },
     { pfad: '/admin/benutzer', anker: (p: Page) => p.locator('tr.ant-table-row').first() },
     {
-      // Zweite Verwaltungsroute neben `/admin/benutzer` (22.09.2026): in der Vorschau wurde
-      // hier bei 390 px ein Überlauf gemeldet (411 px). Diese Umgebung stellte ihn mit der
-      // alten Seitenleiste NICHT nach — die Zeile belegt also den neuen Stand (Expander
-      // unter `lg`, `AdminLayout.tsx`), nicht die Ursache. Anker ist der Seitentitel, nicht
-      // eine Tabellenzeile: die Fahrzeugliste kann leer sein.
+      // Anker ist der Seitentitel, nicht eine Tabellenzeile: die Fahrzeugliste kann leer sein.
       pfad: '/admin/stammdaten/fahrzeuge',
       anker: (p: Page) => p.getByRole('heading', { name: 'Fahrzeuge', level: 1 }),
     },
@@ -687,24 +505,19 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       anker: (p: Page) => p.getByText('Kirchgassner-Wohlfahrt, Maximiliane'),
     },
     {
-      // DATENANKER, nicht der Kennzahlenkopf: der Seitenkopf steht auch über einer LEEREN
-      // Tabelle, die Zeile messte dann wieder einen Leerzustand. Seit dem Neuentwurf
-      // (21.09.2026, Meldebild als Statusraster) ist die Wurzel die Einheitenliste, und die
-      // Ad-hoc-Kraft landet in der Sammelzeile „Ohne Einheit" (`meldebildRaster.ts`) statt
-      // unter „Ohne Abschnitt". Sie gibt es nur, wenn wirklich eine Kraft disponiert ist.
+      // Datenanker statt Kennzahlenkopf (der steht auch über leerer Tabelle): die
+      // Sammelzeile „Ohne Einheit" gibt es nur, wenn eine Kraft disponiert ist.
       pfad: `/einsaetze/${einsatzId}/kraefteuebersicht`,
       anker: (p: Page) => p.getByText('Ohne Einheit', { exact: true }),
     },
     {
       pfad: `/einsaetze/${einsatzId}/auftraege`,
-      // `AuftraegePage.tsx:38` fährt `defaultActiveKey="auftraege"`, OHNE `forceRender`
-      // und ohne URL-Param: nach `goto` ist die Befehlsliste gar nicht im Baum, und die
-      // Zeile hätte stillschweigend den Aufträge-Reiter gemessen. `Tabs` fällt bei jedem
-      // `goto` auf den Default zurück, der Schritt läuft also je Breite erneut.
+      // Ohne `forceRender` ist die Befehlsliste nach `goto` nicht im Baum (Standardreiter
+      // „Aufträge"); der Reiterwechsel läuft deshalb je Breite erneut.
       vorbereiten: async (p: Page) => {
         const reiter = p.getByRole('tab', { name: 'Befehle' });
-        // `toHaveCount(1)` davor: antd klappt Reiter bei Enge in ein Mehr-Menü, und ein
-        // Klick auf einen nicht vorhandenen Reiter wäre eine irreführende Zeitüberschreitung.
+        // antd klappt Reiter bei Enge in ein Mehr-Menü; ohne Zählung wäre der Klick ein
+        // irreführender Timeout.
         await expect(reiter).toHaveCount(1);
         await reiter.click();
       },
@@ -719,12 +532,12 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       anker: (p: Page) => p.getByText('Donnerhall-vom-Wiesengrund'),
     },
     {
-      // LFH-633: Datenanker ist die gestubte Warnung, nicht der Seitenkopf.
+      // Datenanker ist die gestubte Warnung, nicht der Seitenkopf.
       pfad: `/einsaetze/${einsatzId}/wetter-pegel`,
       anker: (p: Page) => p.getByText('Orkanartige Böen'),
     },
     {
-      // LFH-635: Datenanker ist die Karte der gesäten Schicht, nicht der Seitenkopf.
+      // Datenanker ist die Karte der gesäten Schicht, nicht der Seitenkopf.
       pfad: `/einsaetze/${einsatzId}/abloesung`,
       anker: (p: Page) =>
         p.getByRole('article', {
@@ -732,9 +545,8 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
         }),
     },
     {
-      // LFH-639: Datenanker ist die Karte des gesäten Bezirks — der Kartenblock steht in
-      // JEDER Breite (`form="karte"`), die Stellen-Tabelle dahinter trägt auf 390 px ihren
-      // eigenen waagerechten Bildlauf (Katalogtabelle), der kein Verstoß ist.
+      // Datenanker ist die Bezirkskarte (in jeder Breite Karte); die Stellen-Tabelle trägt auf
+      // 390 px ihren eigenen Bildlauf, der kein Verstoß ist.
       pfad: `/einsaetze/${einsatzId}/betreuung`,
       anker: (p: Page) =>
         p
@@ -742,27 +554,19 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
           .getByText('Uferstraße 12–40 und Deichweg 1–9 zwischen Schleuse und Pumpwerk Nordwest'),
     },
     {
-      // LFH-676: dieselbe Seite mit AUFGEKLAPPTEM Verlauf an Karte und Zeile. Die Zeitachse im
-      // Aufklappbereich der Karte und die Aufklappzeile der Tabelle dürfen den Rumpf nicht
-      // verbreitern; der beschriftete Auslöser macht die erste Tabellenspalte breiter als
-      // antds 16-px-Symbol. Anker ist der Eintrag der Belegungsreihe — er steht erst, wenn
-      // BEIDE Bereiche offen und geladen sind (die Stelle wird als zweite aufgeklappt).
+      // Dieselbe Seite mit AUFGEKLAPPTEM Verlauf an Karte und Zeile. Der Anker steht erst,
+      // wenn beide Bereiche offen und geladen sind.
       pfad: `/einsaetze/${einsatzId}/betreuung`,
       vorbereiten: async (p: Page) => {
         await p.getByRole('button', { name: /^Verlauf zu Bezirk / }).click();
         await p.getByRole('button', { name: /^Verlauf zu Stelle / }).click();
       },
-      // Eingegrenzt auf den Verlaufseintrag: dieselbe Zahl steht auch als Kopfzahl im Kopf
-      // des Blocks „Betreuungsstellen“ („1 420 untergebracht“). Stand der Verlauf schon, als
-      // `toBeVisible` zum ersten Mal griff, fand der Anker zwei Elemente (strict mode) und lief
-      // in den Timeout; griff es vorher, trug der Anker nur die Kopfzahl und belegte den
-      // aufgeklappten Verlauf gar nicht (in der CI von PR #158 gemessen, LFH-741).
+      // Auf den Verlaufseintrag eingegrenzt: dieselbe Zahl steht auch als Kopfzahl des Blocks.
       anker: (p: Page) =>
         p.locator('[data-lfh="verlauf-eintrag"]').getByText(/1.420 untergebracht/),
     },
     {
-      // LFH-634: Datenanker ist die Karte des gesäten Zeitfensters. Ihr zugänglicher Name
-      // trägt hinter der Bezeichnung den Zeitraum in der Anzeigezone — Präfix statt Wortlaut.
+      // Der zugängliche Name trägt hinter der Bezeichnung den Zeitraum — Präfix statt Wortlaut.
       pfad: `/einsaetze/${einsatzId}/verpflegung`,
       anker: (p: Page) =>
         p.getByRole('article', {
@@ -770,22 +574,10 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
         }),
     },
     {
-      // LFH-100: die Lagekarte stand bis dahin in keinem Überlauf-Gate, obwohl sie die Seite
-      // mit den meisten schwebenden Aufbauten ist (`lagekarte-smoke.spec.ts` misst 1024, 1280
-      // und 1440 px, und nie den Querlauf). Unter `lg` liegt die Leiste UNTER der Karte und
-      // ist auf dem Handschirm per Vorgabe ZU (`lagekarte/leistenWahl.ts`) — gemessen
-      // wird der Zustand mit OFFENER Leiste, weil das der breitere Rahmen ist.
-      // WAS DIESE ZEILE MISST, ist der RAHMEN: Seitenkopf mit Umschaltknopf, das `<aside>`,
-      // die Kartenspalte mit ihren schwebenden Bändern. Den Leisteninhalt misst sie NICHT —
-      // die Leiste (`Sidebar.tsx`, `data-lfh="kartenleiste"`) trägt `overflowY: 'auto'`, damit
-      // rechnet der Browser auch `overflow-x` als `auto`, und ein zu breiter Eintrag liefe in
-      // ihrem eigenen Bildlauf über, nie in die Wurzel. Der Datenanker (die gesäte Einheit
-      // unter „Nicht verortet", Paneel per Vorgabe offen, `PANEEL_VORGABE`) belegt deshalb nur,
-      // dass die Leiste wirklich offen steht: der Name steht nirgends sonst auf der Seite.
-      // MUTATIONSPROBE (24.09.2026, protokolliert): `minWidth: 900` am `<aside>` unter `lg`
-      // (`LagekartePage.tsx`, Zweig `flex: '0 0 45%'`, also AUSSERHALB des Bildlaufs der
-      // Leiste) → der 390-px-Test meldet genau diese Zeile mit 510 px Überlauf, alle übrigen
-      // Routen bleiben stumm. Zurückgedreht.
+      // Gemessen mit OFFENER Leiste (unter `lg` unter der Karte, auf dem Handschirm per
+      // Vorgabe zu), weil das der breitere Rahmen ist. Die Zeile misst den RAHMEN: die Leiste
+      // trägt `overflowY: 'auto'` (damit auch `overflow-x: auto`), ein zu breiter Eintrag
+      // liefe in ihrem eigenen Bildlauf über. Der Datenanker belegt nur, dass sie offen steht.
       pfad: `/einsaetze/${einsatzId}/lagekarte`,
       vorbereiten: async (p: Page) => {
         await expect(
@@ -804,18 +596,11 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
 }
 
 /*
- * JE PRÜFBREITE EIN TEST (LFH-100). Vorher lief ein einziger Test über alle Routen × alle
- * Breiten, und seine Zeitschranke war schon bei 27 Messungen ausgereizt (einzeln 24–29 s gegen
- * die 30-s-Vorgabe, unter `--repeat-each=5` eine Zeitüberschreitung in acht Läufen — daher
- * `test.slow()`). Mit der vierten Breite und der Lagekarte wären es 60 Messungen in einem Test
- * geworden. Getrennt hat jede Breite ihr eigenes Zeitbudget, und ein Bruch nennt seine Breite
- * schon im Testnamen. Innerhalb einer Breite wird weiter ALLES gemessen und gesammelt
- * gemeldet — die Aussage „eine Ursache, wie viele Stellen" bleibt erhalten.
+ * JE PRÜFBREITE EIN TEST: jede Breite hat ihr eigenes Zeitbudget, und ein Bruch nennt seine
+ * Breite im Testnamen. Innerhalb einer Breite wird ALLES gemessen und gesammelt gemeldet.
  *
- * `mode: 'parallel'` ist nötig, damit die vier Breiten tatsächlich auf verschiedene Worker
- * gehen: die Konfiguration fährt kein `fullyParallel`, ohne die Zeile liefen die Tests dieser
- * Datei nacheinander in EINEM Worker (und `--shard` teilt nach Dateien). Unabhängig sind sie:
- * jede Breite meldet an und legt ihren eigenen Einsatz an (`gate1Vorbereiten`).
+ * `mode: 'parallel'` verteilt die Breiten auf Worker (die Konfiguration fährt kein
+ * `fullyParallel`). Sie sind unabhängig, jede legt ihren eigenen Einsatz an.
  */
 test.describe('Gate 1', () => {
   test.describe.configure({ mode: 'parallel' });
@@ -823,18 +608,13 @@ test.describe('Gate 1', () => {
     test(`Gate 1 · ${name} (${breite} px): keine tragende Route läuft waagerecht über`, async ({
       page,
     }) => {
-      /**
-       * `test.slow()` statt eines nackten `setTimeout(90_000)`: die benannte Playwright-Form,
-       * an die Konfiguration gekoppelt. 15 Routen je Breite, jede mit `goto` und `networkidle`.
-       */
+      // 15+ Routen je Breite, jede mit `goto` und `networkidle`.
       test.slow();
 
       const einsatzId = await gate1Vorbereiten(page);
       const routen = gate1Routen(einsatzId);
 
-      // ALLE Routen messen und gesammelt melden, nicht beim ersten Bruch aussteigen: sonst
-      // verdeckt der erste Fund die übrigen, und man behebt eine Ursache, ohne zu wissen, wie
-      // viele es sind.
+      // ALLE Routen messen und gesammelt melden: sonst verdeckt der erste Fund die übrigen.
       const verstoesse: string[] = [];
       const messwerte: string[] = [];
       const tot: string[] = [];
@@ -842,18 +622,13 @@ test.describe('Gate 1', () => {
       await page.setViewportSize({ width: breite, height: hoehe });
       for (const { pfad, anker, vorbereiten } of routen) {
         await page.goto(pfad);
-        // Erst wenn der Rahmen steht, ist die Messung aussagekräftig — sonst
-        // misst man eine halb gefüllte Seite und bekommt grün geschenkt.
-        // `first()`, weil der Verwaltungsbereich sein eigenes Layout in die
-        // Ebene-1-Shell schachtelt und dort zwei Rahmen stehen.
+        // Erst wenn der Rahmen steht, ist die Messung aussagekräftig. `first()`, weil der
+        // Verwaltungsbereich zwei Rahmen schachtelt.
         await expect(page.locator('.ant-layout-content').first()).toBeVisible();
         await page.waitForLoadState('networkidle');
-        // Reiter-Umschaltungen o. Ä. NACH dem Laden und VOR dem Anker: sonst prüft der
-        // Anker eine Fläche, die gar nicht im Baum ist.
+        // Reiter-Umschaltungen o. Ä. VOR dem Anker, sonst prüft er eine Fläche außerhalb des Baums.
         if (vorbereiten) await vorbereiten(page);
-        // …und erst der Anker belegt, dass die GEMEINTE Seite steht. Nach
-        // `networkidle`, damit ein datenabhängiger Anker nicht gegen seinen
-        // eigenen Ladevorgang antritt.
+        // Erst der Anker belegt, dass die GEMEINTE Seite steht (nach `networkidle`).
         await expect(
           anker(page),
           `${pfad} bei ${breite}px: die gemeinte Seite ist nicht gerendert`,
@@ -862,8 +637,7 @@ test.describe('Gate 1', () => {
         const { ueber, schuldige } = await ueberlauf(page);
         messwerte.push(`${pfad} @${breite}: ${ueber}px`);
 
-        // Freistellung greift über das MODUL-SEGMENT des Pfades, nicht über den ganzen
-        // Pfad: der enthält die laufende Einsatz-ID und wäre nicht schreibbar.
+        // Freistellung über das Modul-Segment: der ganze Pfad enthält die laufende Einsatz-ID.
         const frei = BESTAND_OFFEN.find((b) => pfad.endsWith(`/${b.modul}`) && b.breite === breite);
         if (frei) {
           genutzteFreistellungen.add(`${frei.modul}@${frei.breite}`);
@@ -889,10 +663,8 @@ test.describe('Gate 1', () => {
         }
       }
 
-      // Ein Eintrag, den keine Route dieser Breite getroffen hat, ist ebenso tot wie ein
-      // behobener — sonst überlebt eine Freistellung das Umbenennen ihrer Route. Einträge auf
-      // einer Breite, die gar keine Prüfbreite ist, meldet JEDER der vier Tests: sie gehören
-      // keinem, und ein Gate, das sie nur zufällig nirgends sähe, hielte sie für lebendig.
+      // Ein Eintrag, den keine Route dieser Breite getroffen hat, ist ebenso tot. Einträge auf
+      // einer Breite, die keine Prüfbreite ist, meldet JEDER der Tests.
       const pruefbreiten: readonly number[] = PRUEFBREITEN.map((pb) => pb.breite);
       for (const b of BESTAND_OFFEN) {
         const hierZustaendig = b.breite === breite || !pruefbreiten.includes(b.breite);
@@ -904,9 +676,7 @@ test.describe('Gate 1', () => {
         }
       }
       expect(tot, `Tote Freistellungen:\n${tot.join('\n')}`).toEqual([]);
-      // Die Messwerte werden protokolliert, nicht nur die Verstöße: ein grüner Lauf ohne
-      // Zahlen belegt „kein Überlauf" und lässt offen, ob überhaupt gemessen wurde. Sichtbar
-      // über `--reporter=list` bzw. im HTML-Bericht (Muster `lage-dashboard-schmal.spec.ts:88-97`).
+      // Messwerte protokollieren: ein grüner Lauf ohne Zahlen lässt offen, ob gemessen wurde.
       test.info().annotations.push({ type: 'messwert', description: messwerte.join(' · ') });
       expect(verstoesse, `Gate 1 verletzt:\n${verstoesse.join('\n')}`).toEqual([]);
     });

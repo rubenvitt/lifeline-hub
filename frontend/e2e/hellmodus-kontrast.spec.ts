@@ -1,9 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { pruefe } from './kontrast-kern';
 
-// LFH-618: der Tagmodus des Neuentwurfs war nur GERECHNET. Die ETB-Typwörter, die
-// Zeilentönungen und die Lückenmarke der Betroffenen hatten in keinem Modus eine
-// Browsermessung. Böden aus Kriterium 5 als Literale: Tag ≥ 7, Nacht ≥ 5.
+// Browsermessung des Tagmodus: ETB-Typwörter, Zeilentönungen und die Lückenmarke der
+// Betroffenen. Böden aus Kriterium 5 als Literale: Tag ≥ 7, Nacht ≥ 5.
 const ZIEL = { light: 7, dark: 5 } as const;
 
 async function anmelden(page: Page, modus: 'light' | 'dark') {

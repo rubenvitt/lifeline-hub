@@ -10,8 +10,10 @@ import {
 import { rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
 import type { Warnstufe } from '../../api/types';
 
-/** Reine Ableitung ohne Render — Erwartung und Code lesen denselben Token, geprüft wird
- *  die ROLLE, nicht der Wert. */
+/**
+ * Reine Ableitung ohne Render — Erwartung und Code lesen denselben Token, geprüft wird die Rolle,
+ * nicht der Wert.
+ */
 const token = theme.getDesignToken();
 
 describe('zoneStil', () => {
@@ -33,9 +35,8 @@ describe('zoneStil', () => {
     expect(zoneStil('freie_skizze', null).fillColor).toBe('#1677ff');
   });
 
-  // LFH-328/A2: die fünfstufige Warnstufen-Skala lag als `WARNSTUFE_KARTE` mit eigenen Hex-
-  // Werten hier und steht jetzt als `warnstufeKarte` im Statusfarb-Vertrag. Geprüft wird die
-  // Herkunft (Rolle), nicht ein Farbwert — sonst wäre die Skala nur umgezogen, nicht gebunden.
+  // Geprüft wird die Herkunft aus `warnstufeKarte` (Rolle), nicht ein Farbwert — sonst wäre die
+  // Skala nicht gebunden.
   it('zieht die Gefahrengebiet-Farbe aus dem Statusfarb-Vertrag, nicht aus einem Literal', () => {
     expect(gefahrengebietStil('akut', token).fillColor).toBe(rollenFarbe('alarm', token));
     expect(gefahrengebietStil('mittel', token).fillColor).toBe(rollenFarbe('achtung', token));
@@ -65,10 +66,9 @@ describe('zoneStil', () => {
   });
 });
 
-// LFH-357: die Farbe allein trägt die Skala NICHT — fünf Stufen fallen auf zwei Rollen
-// (`achtung`: niedrig/mittel, `alarm`: keine/hoch/akut). Der zweite Kanal auf der Kartenfläche
-// ist der Beschriftungstext; A2 hatte dafür `label` ODER `form` genannt, beide standen dort nicht
-// zur Verfügung. Diese Tests sind die Zusicherung, dass der Text sie jetzt wirklich auflöst.
+// Die Farbe allein trägt die Skala nicht: fünf Stufen fallen auf zwei Rollen (`achtung`:
+// niedrig/mittel, `alarm`: keine/hoch/akut). Der zweite Kanal auf der Kartenfläche ist der Text;
+// diese Tests sichern zu, dass er die Stufen auflöst.
 describe('zonenBeschriftung', () => {
   const ALLE = Object.keys(warnstufeKarte) as Warnstufe[];
 
@@ -110,15 +110,13 @@ describe('zonenBeschriftung', () => {
     expect(zonenBeschriftung(null, null)).toBe('');
   });
 
-  // Codex-Review zu LFH-357 (P1): das Ladegate der Karte hängt an `einsatz`/`config`, NICHT an
-  // der Gefahrengebiete-Query — die Karte zeichnet Zonen also, während die Gebiete noch laden
-  // oder gescheitert sind. Der Nachschlag geht dann ins Leere, und „keine" wäre an dieser Stelle
-  // eine Behauptung über Daten, die es nicht gibt. Genau der Maßstab, den dieser Fix selbst
-  // an das Wort „unbewertet" angelegt hat.
+  // Das Ladegate der Karte hängt nicht an der Gefahrengebiete-Query: Zonen werden gezeichnet,
+  // während die Gebiete laden oder gescheitert sind. „keine" wäre dann eine Behauptung über Daten,
+  // die es nicht gibt.
   it('nennt einen fehlenden Nachschlag `unbekannt` statt ihn zu `keine` zu runden', () => {
     expect(zonenBeschriftung('Werk', 'unbekannt')).toBe('Werk · Stufe unbekannt');
     expect(zonenBeschriftung(null, 'unbekannt')).toBe('Stufe unbekannt');
-    // Die tragende Aussage: `unbekannt` und `keine` sind ZWEI Zustände, nicht einer.
+    // Die tragende Aussage: `unbekannt` und `keine` sind zwei Zustände, nicht einer.
     expect(zonenBeschriftung('Werk', 'unbekannt')).not.toBe(zonenBeschriftung('Werk', 'keine'));
   });
 
@@ -136,8 +134,7 @@ describe('Evakuierungsbezirk (LFH-673)', () => {
       lineColor: '#a0522d',
       lineWidth: 2,
     });
-    // Nicht der Abschnittston (`kartenLayer.ts`) und nicht Hochwasser-Petrol (`fachebenen.ts`)
-    // — beide lagen im ersten Entwurf gleich bzw. daneben.
+    // Nicht der Abschnittston (`kartenLayer.ts`) und nicht Hochwasser-Petrol (`fachebenen.ts`).
     expect(zoneStil('evakuierungsbezirk', null).lineColor).not.toBe('#722ed1');
     expect(zoneStil('evakuierungsbezirk', null).lineColor).not.toBe('#08979c');
     const typ = ZONE_TYPEN.find((t) => t.typ === 'evakuierungsbezirk')!;

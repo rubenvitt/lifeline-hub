@@ -2,19 +2,14 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { kontrast } from './kontrast-kern';
 
 /**
- * Prüfliste Einsatztauglichkeit für den Bedienweg „Anhang" im ETB (LFH-117, Aufgabe 9.1;
- * Protokoll in `docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`).
+ * Prüfliste für den Bedienweg „Anhang" im ETB, im Browser gemessen (jsdom rechnet kein
+ * Layout, `test/utils.tsx` rendert ein nacktes `ConfigProvider` ohne Dichte):
+ *  · Kriterium 3: „Anhang", der Entfernen-Knopf einer gewählten Datei und der
+ *    Download-Verweis erreichen in „handschuh" 72 px (Boden als Literal);
+ *  · Kriterium 5: Verweis, Dateiliste und Offline-Hinweis gegen den Grund, auf dem sie
+ *    WIRKLICH stehen — Tag ≥ 7 : 1, Nacht ≥ 5 : 1.
  *
- * Gemessen wird im Browser, nicht in Vitest (jsdom rechnet kein Layout, und `test/utils.tsx`
- * rendert ein nacktes `ConfigProvider` ohne Dichte):
- *  · Kriterium 3 (Trefferflächen): „Anhang", der Entfernen-Knopf einer gewählten Datei und
- *    der Download-Verweis in der Zeitachse erreichen in der Stufe „handschuh" 72 px — Boden
- *    als Literal, nicht aus dem Token zurückgelesen;
- *  · Kriterium 5 (Kontrast): Verweis, Dateiliste und Offline-Hinweis gegen den Grund, auf dem
- *    sie WIRKLICH stehen — Tag ≥ 7 : 1, Nacht ≥ 5 : 1 (LFH-618).
- *
- * Die Bildschirmfotos hängen als Anlage am Testbericht; sie sind der Beleg der
- * Sichtprüfung, nicht ihre Zusicherung.
+ * Die Bildschirmfotos am Testbericht sind Beleg der Sichtprüfung, nicht ihre Zusicherung.
  */
 
 const ZIEL = { light: 7, dark: 5 } as const;

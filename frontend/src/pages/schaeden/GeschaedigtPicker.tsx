@@ -63,7 +63,6 @@ export default function GeschaedigtPicker({ einsatzId, orgName, value = null, on
     enabled: Number.isFinite(einsatzId),
   });
 
-  // Aktuell gewählter value-String (Schlüssel) + Label für die Anzeige.
   const aktuellerKey =
     value == null
       ? undefined

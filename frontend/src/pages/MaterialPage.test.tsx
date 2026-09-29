@@ -64,10 +64,8 @@ function render(einsatzObj: typeof einsatzAktiv, materialListe: (typeof em)[]) {
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json(materialListe)),
     http.get('/api/material', () => HttpResponse.json([])),
-    // Die Verdichtungszeile über der Tabelle lädt selbst (LFH-338 · C3). Ohne diese zwei
-    // Handler bliebe sie in JEDEM Test dieser Datei stumm — `test/setup.ts` fährt
-    // `onUnhandledRequest: 'error'`, die Query fiele auf `isError`, und die Zeile
-    // verschwände lautlos statt aufzufallen.
+    // Die Verdichtungszeile über der Tabelle lädt selbst. Ohne diese Handler fiele ihre Query in
+    // jedem Test auf `isError` (`onUnhandledRequest: 'error'`), und die Zeile verschwände lautlos.
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
   );
@@ -82,9 +80,9 @@ function render(einsatzObj: typeof einsatzAktiv, materialListe: (typeof em)[]) {
 }
 
 /**
- * Öffnet das Statusmenü einer Zeile und liefert das GEÖFFNETE Menü-Portal. antd lässt die
- * Portale geschlossener Dropdowns im Baum stehen, und ein verlassendes Portal bekommt in
- * jsdom nie `hidden` — deshalb zusätzlich über `pointerEvents` filtern.
+ * Öffnet das Statusmenü einer Zeile und liefert das geöffnete Menü-Portal. antd lässt die Portale
+ * geschlossener Dropdowns im Baum stehen, und ein verlassendes Portal bekommt in jsdom nie `hidden`
+ * — deshalb zusätzlich über `pointerEvents` filtern.
  */
 async function oeffneStatusmenue(wurzel: HTMLElement, bezeichnung: string): Promise<HTMLElement> {
   await userEvent.click(
@@ -101,18 +99,14 @@ async function oeffneStatusmenue(wurzel: HTMLElement, bezeichnung: string): Prom
 
 describe('MaterialPage', () => {
   it('bedient den Status am Etikett, nicht über ein Auswahlfeld in der Zelle', async () => {
-    /**
-     * Befund H19 an der Materialseite. Das `Select` hier trug `minWidth: 170` — noch
-     * breiter als die 150 bei Fahrzeug und Personal, und damit die Zahl, an der die
-     * 390-px-Karte am deutlichsten scheiterte.
-     */
+    /** Kein `Select` mit Mindestbreite in der Zeile (die 390-px-Karte scheiterte daran). */
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
 
     expect(within(zeile).queryByRole('combobox')).toBeNull();
     const menue = await oeffneStatusmenue(zeile, 'Wolldecke');
-    // Alle fünf Zustände senkrecht im Menü (Zielform-Spec §3).
+    // Alle fünf Zustände senkrecht im Menü.
     for (const label of [
       'einsatzbereit',
       'im Einsatz',
@@ -125,8 +119,8 @@ describe('MaterialPage', () => {
   });
 
   it('das Mengenfeld folgt der Dichtestufe statt einer festen Kleingröße', async () => {
-    // Letzte Einzelstelle des B5i-Bündels; die zugehörige Zeile in `dichte.guard.test.ts`
-    // ist im selben Zug gefallen (ein Eintrag ohne Verstoß gilt selbst als Verstoß).
+    // Das Mengenfeld trägt keine Klein-Angabe; die Zeile in `dichte.guard.test.ts` ist mit dem Fix
+    // gefallen.
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     const feld = container.querySelector('[data-row-key="10"] .ant-input-number');
@@ -135,12 +129,8 @@ describe('MaterialPage', () => {
   });
 
   /**
-   * Der Weg zur aggregierenden Kräfteübersicht (LFH-338 · C3, Befund H21).
-   *
-   * Die Übersicht war von KEINER der vier Kräfte-Modulseiten verlinkt — die Verdichtung,
-   * für die es eine eigene Seite gibt, war von der Pflegefläche aus unsichtbar. Geprüft
-   * wird das `href` und nicht bloß die Existenz eines Links: ein Inline-Pfad neben dem
-   * Builder wäre sonst von ihm nicht zu unterscheiden.
+   * Der Weg zum Meldebild von der Pflegefläche. Geprüft wird das `href`: ein Inline-Pfad neben dem
+   * Builder wäre sonst nicht zu unterscheiden.
    */
   it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
     render(einsatzAktiv, [em]);
@@ -178,7 +168,7 @@ describe('MaterialPage', () => {
         'defekt',
       );
     });
-    // Der neue Wert steht VOR der Server-Antwort in der ANSICHT, nicht bloß im Cache.
+    // Der neue Wert steht vor der Server-Antwort in der Ansicht, nicht bloß im Cache.
     expect(zeile.textContent).toContain('defekt');
     expect(within(zeile).getByRole('button', { name: /Status von Wolldecke/ })).toBeDisabled();
     expect(
@@ -231,23 +221,19 @@ describe('MaterialPage', () => {
     await screen.findByText('Wolldecke');
     expect(screen.queryByRole('button', { name: 'Disponieren' })).not.toBeInTheDocument();
     /**
-     * Status-Badge statt Auswahlfeld. Diese Abfrage HÄLT nur, weil das Gruppenetikett EIN
-     * Textknoten ist (`einsatzbereit · 1`) und RTL exakt gegen den normalisierten
-     * Textinhalt matcht — `'einsatzbereit'` trifft `'einsatzbereit · 1'` also nicht. Wäre
-     * der Kopf aus zwei Knoten gebaut, würfe derselbe Test mit einer
-     * Mehrfachtreffer-Verletzung. Steht hier, weil der Bruch sonst wie Zufall aussähe.
+     * Diese Abfrage hält nur, weil das Gruppenetikett ein Textknoten ist (`einsatzbereit · 1`) und
+     * RTL exakt gegen den normalisierten Text matcht — `'einsatzbereit'` trifft `'einsatzbereit ·
+     * 1'` nicht. Wäre der Kopf aus zwei Knoten gebaut, würfe der Test mit Mehrfachtreffern.
      */
     expect(screen.getByText('einsatzbereit')).toBeInTheDocument();
     expect(screen.getByText('einsatzbereit · 1')).toBeInTheDocument();
   });
 
-  // ── Datensicht (LFH-330 · B2) ───────────────────────────────────────────────────
+  // ── Datensicht ──
 
   /**
-   * `EinsatzMaterialAnzeige` hat KEIN `status_kategorie` (15 Felder, am generierten Typ
-   * geprüft) — dieselbe Grenze, die `filtereKraefte` schon zieht. Material gruppiert
-   * deshalb auf seiner EIGENEN Fünf-Werte-Achse, nicht auf verfügbar/gebunden/nicht
-   * verfügbar. Erfunden wird hier kein Feld.
+   * `EinsatzMaterialAnzeige` hat kein `status_kategorie` — dieselbe Grenze, die `filtereKraefte`
+   * zieht. Material gruppiert auf seiner eigenen Fünf-Werte-Achse; erfunden wird kein Feld.
    */
   const emDefekt = {
     ...em,
@@ -258,9 +244,9 @@ describe('MaterialPage', () => {
   };
 
   it('gruppiert nach dem eigenen Materialstatus, mit Zähler im Etikett', async () => {
-    // Serverordnung [11, 10]; Namensordnung ebenfalls [11 Aluleiter, 10 Wolldecke];
-    // gerendert [10, 11], weil die Statusachse führt (einsatzbereit vor defekt). Die
-    // gerenderte Folge ist damit WEDER Server- noch Namensordnung.
+    // Serverordnung [11, 10]; Namensordnung ebenfalls [11 Aluleiter, 10 Wolldecke]; gerendert [10,
+    // 11], weil die Statusachse führt (einsatzbereit vor defekt). Die gerenderte Folge ist weder
+    // Server- noch Namensordnung.
     const { container } = render(einsatzAktiv, [emDefekt, em]);
     await screen.findByText('Wolldecke');
     expect(screen.getByText('einsatzbereit · 1')).toBeInTheDocument();
@@ -274,11 +260,9 @@ describe('MaterialPage', () => {
 
   it('der Spaltenschalter lügt nicht: ohne ausgeblendete Spalte trägt er keinen Zähler', async () => {
     /**
-     * ABWEICHUNG von Plan §0.2 (c), gemessen: dort sollte der Schalter erst ab einer
-     * Spaltenschwelle erscheinen und auf dieser Seite (6 Spalten) fehlen. Das gelieferte
-     * Primitiv kennt keine Schwelle — es zeigt ihn, sobald überhaupt eine Spalte abwählbar
-     * ist. Geprüft wird deshalb, was zählt: der Zähler erfindet nichts. Hier ist keine
-     * Spalte per Voreinstellung abgewählt und keine per Breite verborgen → nur „Spalten".
+     * Das Primitiv zeigt den Spaltenschalter, sobald eine Spalte abwählbar ist. Geprüft wird, dass
+     * der Zähler nichts erfindet: keine Spalte ist abgewählt oder per Breite verborgen → nur
+     * „Spalten".
      */
     render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
@@ -294,16 +278,11 @@ describe('MaterialPage', () => {
     const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
     expect(karte).not.toBeNull();
     /**
-     * UMGEDREHT MIT LFH-339 · C4 — hier stand die gegenteilige Zusicherung.
+     * Der Status steht im `karte.status`-Slot mit Auslöser: als beschriftetes Sekundärfeld wäre der
+     * Statuswechsel, die häufigste Einzelaktion, am schmalen Schirm unerreichbar.
      *
-     * Der Status war ein beschriftetes Sekundärfeld und damit auf der 390-px-Karte reine
-     * ANZEIGE: der Statuswechsel, die häufigste Einzelaktion des Moduls, war am schmalen
-     * Schirm gar nicht erreichbar. Die alte Begründung stimmte in ihrer Prämisse (Material
-     * liegt ausserhalb des A2-Farbvertrags) und zog daraus den zu weiten Schluss — die
-     * Zielform-Spec §4 trennt Farbe von Anordnung.
-     *
-     * Beide Hälften geprüft: das Feld ist WEG und der Auslöser ist DA. Nur die zweite wäre
-     * auch grün, wenn der Status doppelt stünde.
+     * Beide Hälften: das Feld ist weg und der Auslöser ist da. Nur die zweite wäre auch grün, wenn
+     * der Status doppelt stünde.
      */
     const felder = [...karte.querySelectorAll('[data-lfh="datensicht-feld"]')].map(
       (f) => f.textContent,
@@ -324,17 +303,12 @@ describe('MaterialPage', () => {
 
   it('leere Bemerkung trägt einen sichtbaren, zeilenbenannten Auslöser statt eines Stift-Icons', async () => {
     /**
-     * Befund M21 (LFH-369 · B5i). Bei `bemerkung: null` blieb von `Typography.Text editable`
-     * genau das Stift-Icon übrig: sichtbar KEINE Aufforderung, und sein zugänglicher Name war
-     * antds Locale-Vorgabe „Bearbeiten" — der sagt nicht, was bearbeitet wird, und lieferte in
-     * einer n-zeiligen Liste n gleichnamige Knöpfe. Der LESEzweig hatte längst ein „—", der
-     * Schreibzweig nichts: die Affordanz war genau falsch herum verteilt.
+     * Leeres Bemerkungsfeld: ohne Platzhalter bliebe von `Typography.Text editable` nur das
+     * Stift-Icon mit antds Namen „Bearbeiten" — keine sichtbare Aufforderung, und n gleichnamige
+     * Knöpfe in einer Liste. Der Name trägt deshalb die Zeilenkennung, hier die Bezeichnung.
      *
-     * Der Name trägt deshalb die Zeilenkennung (Regel aus LFH-365) — hier die Bezeichnung.
-     *
-     * Geprüft wird im TABELLENzweig. Unter `md` führt keine der drei `karte.sekundaer`-Listen
-     * die Bemerkung (Slot auf 3 Einträge begrenzt) — ein Test am schmalen Schirm fände nichts
-     * und wäre leer grün.
+     * Geprüft im Tabellenzweig: unter `md` führt keine der `karte.sekundaer`-Listen die Bemerkung,
+     * ein Test dort wäre leer grün.
      */
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
@@ -346,17 +320,8 @@ describe('MaterialPage', () => {
 
   it('keine Klein-Variante mehr am Status-Auswahlfeld und am Entfernen-Knopf', async () => {
     /**
-     * Zwei ohnehin angefasste `size="small"` fallen weg (Verbot aus CLAUDE.md). Der Abbau des
-     * restlichen Bestands läuft über die Schuldmenge in `components/dichte.guard.test.ts`
-     * (LFH-362), je Verzeichnis-Bündel den B5-Teiltickets zugeordnet — nicht über „B5"
-     * pauschal, das es als einzelnen Task nicht gibt.
-     *
-     * `MengeZelle` bleibt bewusst unangetastet — sie ist nicht Teil dieses Umbaus.
-     *
-     * Das `<Select>` in dieser Zelle bleibt VORLÄUFIG: seine Zielform ist mit LFH-369 · B5i
-     * festgelegt (`docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`
-     * — Auslöser plus senkrechtes Menü, kein `Segmented`, keine Farbfläche), gebaut wird sie
-     * in LFH-339/C4. Wer diesen Test anfasst, prüft dort gegen.
+     * Keine punktuellen Klein-Angaben an den Zeilen-Bedienelementen (Dichte-Regel); den Bestand
+     * hält die Schuldmenge in `components/dichte.guard.test.ts`.
      */
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
@@ -370,15 +335,14 @@ describe('MaterialPage', () => {
 });
 
 /**
- * Datenzustände der Materialseite (LFH-331 · B3).
+ * Datenzustände der Materialseite.
  *
- * **Diese Seite hat KEINEN Katalog-Query.** Der Materialstatus ist das lokale Enum
- * `MaterialStatus` mit fünf Werten (`STATUS_META`) — er kommt nicht über die Leitung und
- * kann deshalb nicht ausfallen. Ein Banner „Statuskatalog konnte nicht geladen werden"
- * wäre hier ein erfundener Fehlerfall und steht bewusst nicht in dieser Datei.
+ * **Diese Seite hat keinen Katalog-Query.** Der Materialstatus ist das lokale Enum `MaterialStatus`
+ * mit fünf Werten — er kommt nicht über die Leitung und kann nicht ausfallen. Ein Banner
+ * „Statuskatalog konnte nicht geladen werden" wäre ein erfundener Fehlerfall.
  *
- * Ausfallen können genau drei Dinge: der **Einsatz** selbst (Seitenrahmen), die
- * **Dispositionsliste** und der **Stamm-Pool**.
+ * Ausfallen können drei Dinge: der **Einsatz** selbst (Seitenrahmen), die **Dispositionsliste** und
+ * der **Stamm-Pool**.
  */
 describe('MaterialPage · Datenzustände', () => {
   const gruenerBoden = () => [
@@ -386,10 +350,8 @@ describe('MaterialPage · Datenzustände', () => {
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
     http.get('/api/material', () => HttpResponse.json([])),
-    // Die Verdichtungszeile über der Tabelle lädt selbst (LFH-338 · C3). Ohne diese zwei
-    // Handler bliebe sie in JEDEM Test dieser Datei stumm — `test/setup.ts` fährt
-    // `onUnhandledRequest: 'error'`, die Query fiele auf `isError`, und die Zeile
-    // verschwände lautlos statt aufzufallen.
+    // Die Verdichtungszeile über der Tabelle lädt selbst. Ohne diese Handler fiele ihre Query in
+    // jedem Test auf `isError`, und die Zeile verschwände lautlos.
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
   ];
@@ -426,13 +388,9 @@ describe('MaterialPage · Datenzustände', () => {
   });
 
   /**
-   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
-   * nicht `isStale`.
-   *
-   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
-   * Aktualisierung. Vor dem Umbau verdrängte der Fehler die Zeilen — die Einsatzkraft verlor
-   * Daten, die sie eben noch gelesen hatte, und das ist das Gegenteil dessen, wofür
-   * `SeitenStandVeraltet` gebaut wurde.
+   * Veralteter Stand = `isError` mit Zeilen im Zwischenspeicher — nicht `isFetching`, nicht
+   * `isStale`. Der Ablauf ist der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung; die Zeilen müssen stehen bleiben.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
     const { client } = zeige(http.get('/api/einsaetze/1/material', () => HttpResponse.json([em])));
@@ -446,7 +404,7 @@ describe('MaterialPage · Datenzustände', () => {
     expect(
       await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
     ).toBeInTheDocument();
-    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
+    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('Wolldecke')).toBeInTheDocument();
     expect(
       screen.queryByText('Disponiertes Material konnte nicht geladen werden'),
@@ -475,33 +433,26 @@ describe('MaterialPage · Datenzustände', () => {
 });
 
 /**
- * Ad-hoc-Schnellerfassung (LFH-332 · B4).
- *
- * Der Dialog liegt auf `ErfassungsModal`. Was die Hülle selbst zusichert (Fokus, Enter,
- * Leeren auf beiden Wegen, Ablehnung), steht in `components/Erfassung.test.tsx` und wird
- * hier NICHT nachgespielt. Geprüft wird ausschließlich, was diese Seite entscheidet: das
- * Feldbudget mit dem eingeklappten Rest und der Serienlauf mit seinen Übernahmefeldern.
+ * Ad-hoc-Schnellerfassung. Was die Hülle zusichert (Fokus, Enter, Leeren auf allen Wegen,
+ * Ablehnung), prüft `components/Erfassung.test.tsx`. Hier steht nur, was diese Seite entscheidet:
+ * das Feldbudget mit dem eingeklappten Rest und der Serienlauf mit seinen Übernahmefeldern.
  */
 describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
   /**
-   * Zählt die BEDIENBAREN Felder des Dialogs: Textfelder plus Zahlenfelder
-   * (`InputNumber` trägt `role="spinbutton"`). Die Rollen-Abfrage blendet aus, was im
-   * Barrierefreiheitsbaum nicht steht — und genau das ist der eingeklappte Bereich:
-   * `forceRender` lässt sein Feld im Baum, `CSSMotion` legt bei unsichtbarem Bereich ein
-   * `display: none` DIREKT ans Element (kein Klassenname). Deshalb hält diese Zählung
-   * auch in jsdom, wo antds Stylesheet nicht wirkt.
+   * Zählt die bedienbaren Felder des Dialogs: Textfelder plus Zahlenfelder (`InputNumber` trägt
+   * `role="spinbutton"`). Die Rollen-Abfrage blendet aus, was nicht im Barrierefreiheitsbaum steht
+   * — den eingeklappten Bereich: `forceRender` lässt sein Feld im Baum, `CSSMotion` legt ein
+   * `display: none` direkt ans Element. Deshalb hält die Zählung auch in jsdom.
    */
   function sichtbareFelder(dialog: HTMLElement): number {
-    // Absichtlich breiter als die heute vorhandenen zwei Rollen: ein später ergänztes
-    // Auswahl- oder Schaltfeld soll die Vier-Feld-Grenze REISSEN, statt an einer zu engen
-    // Zählung vorbeizurutschen.
+    // Absichtlich breiter als die heute vorhandenen zwei Rollen: ein später ergänztes Auswahl- oder
+    // Schaltfeld soll die Vier-Feld-Grenze reißen.
     const rollen = ['textbox', 'spinbutton', 'combobox', 'checkbox', 'radio', 'switch'] as const;
     const felder = new Set<Element>();
     for (const rolle of rollen) {
       for (const el of within(dialog).queryAllByRole(rolle)) {
-        // Nur was in einem `Form.Item` steckt, ist ein FELD. Das Kästchen „Werte behalten"
-        // der Hülle sitzt in der Fusszeile und zählt nicht mit — es erfasst nichts, es
-        // steuert den Serienlauf.
+        // Nur was in einem `Form.Item` steckt, ist ein Feld. „Werte behalten" steuert den
+        // Serienlauf und zählt nicht mit.
         const item = el.closest('.ant-form-item');
         if (item) felder.add(item);
       }
@@ -519,12 +470,10 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
   it('zeigt eingeklappt höchstens vier Felder — das fünfte liegt unter „Weitere Angaben"', async () => {
     const dialog = await oeffneAdhoc();
 
-    // GENAU vier, nicht „höchstens vier": eine Obergrenze wäre auch bei drei grün und
-    // deckte eine Zählung, die still ein Feld verliert.
+    // Genau vier, nicht „höchstens vier": eine Obergrenze wäre auch bei drei grün.
     expect(sichtbareFelder(dialog)).toBe(4);
-    // Die Bestandsnummer ist IM Baum (forceRender → sie geht beim Absenden mit), aber
-    // nicht sichtbar. Nur diese Paarung belegt beides; `queryByLabelText` allein fände sie
-    // auch im eingeklappten Zustand und bewiese gar nichts.
+    // Die Bestandsnummer ist im Baum (forceRender → sie geht beim Absenden mit), aber nicht
+    // sichtbar. `queryByLabelText` allein fände sie auch eingeklappt und bewiese nichts.
     expect(within(dialog).getByLabelText('Bestandsnummer')).not.toBeVisible();
   });
 
@@ -532,9 +481,8 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     const dialog = await oeffneAdhoc();
     const vorher = sichtbareFelder(dialog);
 
-    // Teiltreffer statt genauem Namen: bis antd 6.5.2 trug der Zugangsname das
-    // Zustandssymbol mit („collapsed Weitere Angaben"); seit antd 6.6 ist der Pfeil
-    // `aria-hidden`. Der Teiltreffer hält beide Fassungen.
+    // Teiltreffer statt genauem Namen: ältere antd-Fassungen trugen das Zustandssymbol im Namen
+    // („collapsed Weitere Angaben").
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
 
     await waitFor(() => expect(sichtbareFelder(dialog)).toBe(vorher + 1));
@@ -543,21 +491,17 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
       'true',
     );
     /**
-     * KEIN `toBeVisible()` auf dem aufgeklappten Feld — gemessen, nicht vergessen: die
-     * Aufklapp-Animation beginnt mit `opacity: 0` und endet in jsdom nie (kein
-     * `transitionend`), jest-dom hielte das Feld also dauerhaft für unsichtbar. Der
-     * Barrierefreiheitsbaum kennt keine Deckkraft — die Rollen-Zählung oben ist deshalb das
-     * belastbare Mass. Im eingeklappten Zustand hält `not.toBeVisible()` dagegen sehr wohl:
-     * dort liegt ein `display: none` direkt am Element (Test darüber).
+     * Kein `toBeVisible()` auf dem aufgeklappten Feld: die Aufklapp-Animation beginnt mit `opacity:
+     * 0` und endet in jsdom nie, jest-dom hielte das Feld dauerhaft für unsichtbar. Der
+     * Barrierefreiheitsbaum kennt keine Deckkraft — die Rollen-Zählung ist das belastbare Maß.
+     * Eingeklappt hält `not.toBeVisible()` dagegen: dort liegt `display: none` direkt am Element.
      */
   });
 
   /**
-   * MUTATIONSPROBE zu `forceRender` (gemessen, Prop entfernt, Suite gefahren): rot wurde
-   * NUR der Test darüber — ohne die Prop existiert das Feld vor dem ersten Aufklappen gar
-   * nicht. DIESER Test blieb grün, weil antd den einmal aufgeklappten Bereich nicht wieder
-   * abbaut. Er pinnt deshalb den Leitungsvertrag (der Wert kommt hinten an), nicht die Prop
-   * — der Prop-Wächter ist die Existenzprüfung im eingeklappten Zustand.
+   * Pinnt den Leitungsvertrag (der Wert kommt hinten an), nicht die `forceRender`-Prop: antd baut
+   * einen einmal aufgeklappten Bereich nicht wieder ab. Der Prop-Wächter ist die Existenzprüfung im
+   * eingeklappten Zustand.
    */
   it('ein Wert aus dem eingeklappten Bereich geht beim Absenden mit', async () => {
     const gesendet: unknown[] = [];
@@ -573,7 +517,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     const kopf = within(dialog).getByRole('button', { name: /Weitere Angaben/ });
     await userEvent.click(kopf);
     await userEvent.type(within(dialog).getByLabelText('Bestandsnummer'), 'THW-4711');
-    // WIEDER ZUKLAPPEN und dann erst absenden — der Bediener lässt den Bereich selten offen.
+    // Wieder zuklappen und dann erst absenden.
     await userEvent.click(kopf);
     await waitFor(() => expect(kopf).toHaveAttribute('aria-expanded', 'false'));
 
@@ -593,7 +537,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
       }),
     );
 
-    // Der Schalter steht per Vorgabe AUS (30.07.2026) — ohne ihn gäbe es keine Übernahme.
+    // Der Schalter steht per Vorgabe aus — ohne ihn gäbe es keine Übernahme.
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Spende-Decken');
     await userEvent.type(within(dialog).getByLabelText('Kategorie'), 'Betreuung');
@@ -603,8 +547,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({ adhoc: { bezeichnung: 'Spende-Decken' }, menge: 1 });
 
-    // Offen geblieben — der Zähler ist der Beleg, dass gespeichert wurde und nicht bloß
-    // nichts passiert ist.
+    // Offen geblieben — der Zähler belegt, dass gespeichert wurde.
     expect(await screen.findByText('Erfasst: 1')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
@@ -612,7 +555,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     expect(within(dialog).getByLabelText('Kategorie')).toHaveValue('Betreuung');
     expect(within(dialog).getByLabelText('Trägerorganisation')).toHaveValue('THW');
     // Die Menge steht wieder auf ihrem Startwert, obwohl sie kein Übernahmefeld ist:
-    // `initialValues` wirkt bei jedem Zurücksetzen erneut.
+    // `initialValues` wirkt bei jedem Zurücksetzen.
     expect(within(dialog).getByLabelText('Menge')).toHaveValue('1');
   });
 
@@ -631,20 +574,17 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     await waitFor(() => expect(treffer).toHaveLength(1));
 
     /**
-     * GEMESSEN: `queryByRole('dialog')).toBeNull()` wäre hier NIE grün. jsdom feuert kein
-     * `transitionend`, und antds Modal räumt seinen Knoten erst am Ende der
-     * Zoom-Animation ab — der Dialog bleibt also im Baum stehen, eingefroren in
-     * `ant-zoom-leave-active`. Beobachtbar ist damit der Verlassen-Zustand, und der
-     * belegt, was zu belegen ist: `onFertig` hat den Dialog geschlossen (der Serienlauf
-     * tut das nicht, siehe Test darüber).
+     * `queryByRole('dialog')).toBeNull()` wäre nie grün: jsdom feuert kein `transitionend`, und
+     * antds Modal räumt seinen Knoten erst am Ende der Zoom-Animation ab. Beobachtbar ist der
+     * Verlassen-Zustand (`ant-zoom-leave`) — er belegt, dass `onFertig` den Dialog geschlossen hat.
      */
     await waitFor(() => expect(screen.getByRole('dialog')).toHaveClass('ant-zoom-leave'));
   });
 });
 
 /**
- * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den
- * Platzhalter selbst: dessen Knoten trägt `pointer-events: none` (gemessen).
+ * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den Platzhalter:
+ * dessen Knoten trägt `pointer-events: none`.
  */
 async function oeffneMaterialAuswahl(container: HTMLElement, platzhalter: string) {
   const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>

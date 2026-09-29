@@ -9,8 +9,7 @@ use rust_embed::Embed;
 #[folder = "frontend/dist"]
 struct Asset;
 
-/// MIME-Typ anhand der Dateiendung. Bewusst manuell (kleiner, deterministischer
-/// Satz statt zusätzlicher Dependency).
+/// MIME-Typ anhand der Dateiendung; ein kleiner fester Satz statt zusätzlicher Dependency.
 fn content_type(pfad: &str) -> &'static str {
     match pfad.rsplit('.').next() {
         Some("html") => "text/html; charset=utf-8",
@@ -34,15 +33,13 @@ fn hat_dateiendung(pfad: &str) -> bool {
 
 /// Baut die HTTP-Antwort für einen statischen Pfad.
 ///
-/// Regeln:
-/// - Vorhandenes Asset → 200 mit passendem Content-Type + Cache-Header.
+/// - Vorhandenes Asset → 200 mit Content-Type und Cache-Header.
 /// - Fehlendes Asset **ohne** Dateiendung → SPA-Fallback auf `index.html` (200).
-/// - Fehlendes Asset **mit** Dateiendung → 404 (sonst würde index.html z.B. als Bild ausgeliefert).
+/// - Fehlendes Asset **mit** Dateiendung → 404 (sonst käme index.html etwa als Bild).
 /// - Auch `index.html` fehlt → 404.
 ///
-/// Cache: Dateien unter `assets/` tragen hash-suffixierte Namen (Vite) →
-/// langes `immutable`-Caching. Alles andere (index.html, Service Worker, Manifest)
-/// → `no-cache`, damit nach einem Binary-Update kein veraltetes Frontend hängen bleibt.
+/// `assets/` trägt hash-suffixierte Namen (Vite) → `immutable`. Alles andere (index.html,
+/// Service Worker, Manifest) → `no-cache`, damit nach einem Update kein altes Frontend hängt.
 fn statische_antwort(pfad: &str, get: impl Fn(&str) -> Option<Vec<u8>>) -> Response {
     let pfad = pfad.trim_start_matches('/');
     let pfad = if pfad.is_empty() { "index.html" } else { pfad };
@@ -85,12 +82,10 @@ fn baue_antwort(pfad: &str, daten: Vec<u8>) -> Response {
         .unwrap()
 }
 
-/// Axum-Fallback-Handler: liefert eingebettete Frontend-Dateien aus.
-/// Nutzt den `Uri`-Extractor (ein Fallback hat kein gematchtes Routenmuster,
-/// daher funktioniert hier kein `Path`-Extractor).
+/// Axum-Fallback-Handler für die eingebetteten Frontend-Dateien. `Uri` statt `Path`, weil ein
+/// Fallback kein gematchtes Routenmuster hat.
 pub async fn serve(uri: Uri) -> Response {
-    // Unbekannte API-Routen dürfen NICHT auf das SPA-index.html zurückfallen —
-    // Clients erwarten dort JSON/404, kein HTML.
+    // Unbekannte API-Routen fallen nicht auf index.html zurück — Clients erwarten dort JSON/404.
     if uri.path().starts_with("/api/") {
         return Response::builder()
             .status(StatusCode::NOT_FOUND)

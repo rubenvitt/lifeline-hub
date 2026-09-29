@@ -24,10 +24,9 @@ use std::future::Future;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
-/// SWR-Kern: entscheidet anhand des Cache-Eintrags, ob sofort (frisch), sofort+Hintergrund-
-/// Refresh (veraltet) oder blockierend (kalt) ausgeliefert wird. `erneuere` liefert ein
-/// 'static-Future (für `tokio::spawn`), das die Quelle holt, in den Cache schreibt und das
-/// Ergebnis zurückgibt (None bei Fehlschlag). `inflight` entkoppelt doppelte Refreshes.
+/// SWR-Kern: frisch → sofort, veraltet → sofort plus Hintergrund-Refresh, kalt → blockierend.
+/// `erneuere` liefert ein `'static`-Future für `tokio::spawn`, das die Quelle holt, cacht und
+/// das Ergebnis zurückgibt (`None` bei Fehlschlag). `inflight` verhindert doppelte Refreshes.
 async fn liefere_mit_swr<Fut>(
     pool: &SqlitePool,
     inflight: &Arc<Mutex<HashSet<String>>>,
@@ -42,8 +41,8 @@ where
     match cache::eintrag(pool, key).await {
         Some((a, alter)) if alter < ttl.as_secs() as i64 => a, // frisch
         Some((a, _)) => {
-            // veraltet → alten Stand sofort ausliefern, im Hintergrund erneuern.
-            // Nur EIN Refresh pro Schlüssel gleichzeitig (verhindert Thundering Herd).
+            // Veraltet → alten Stand sofort ausliefern, im Hintergrund erneuern; nur ein Refresh je
+            // Schlüssel gleichzeitig.
             let claimed = inflight.lock().unwrap().insert(key.to_string());
             if claimed {
                 let inflight = inflight.clone();
@@ -172,19 +171,16 @@ async fn erneuere_pegelonline(
 // ---------------------------------------------------------------------------- ODL
 
 const ODL_ATTRIB: &str = "Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0";
-/// Die Quelle hat STUNDENtakt (`duration: "1h"`). 300 s wie bei DWD holte ~890 KB, ohne
-/// frischer zu werden; eine Stunde ließe einen neuen Stundenwert in einer radiologischen
-/// Lage bis zu einer Stunde liegen. 600 s begrenzt das auf zehn Minuten.
+/// Die Quelle hat Stundentakt; 600 s begrenzt die Verzögerung eines neuen Stundenwerts auf zehn
+/// Minuten, ohne bei jedem DWD-Takt ~890 KB zu holen.
 const ODL_TTL: Duration = Duration::from_secs(600);
-/// Der auf der BfS-Schnittstellenseite dokumentierte Layer (ODL-Info → Datenschnittstelle).
-/// Die Nachbar-Layer `odl_brutto_1h`/`odlinfo_sitelist` sind dort nicht beschrieben und
-/// liefen im Test über 120 s — die 8-s-Schranke des gemeinsamen Clients fängt einen
-/// hängenden GeoServer ab, ohne dass hier ein eigener Timeout stehen muss.
+/// Der auf der BfS-Schnittstellenseite dokumentierte Layer. Einen hängenden GeoServer fängt die
+/// 8-s-Schranke des gemeinsamen Clients ab.
 const ODL_URL: &str = "https://www.imis.bfs.de/ogc/opendata/ows?service=WFS&version=1.1.0&request=GetFeature&typeName=opendata:odlinfo_odl_1h_latest&outputFormat=application/json";
 
-/// Liefert die Sonden und bewertet sie bei Auslieferung gegen den Standort-Grundpegel
-/// (LFH-598). Der Grundpegel wird hier nur ANGESTOSSEN, nie abgewartet — auch im kalten
-/// Fall nicht: bis er da ist, gelten die absoluten Bänder aus `normalisiere_odl`.
+/// Liefert die Sonden und bewertet sie gegen den Standort-Grundpegel (LFH-598). Der Grundpegel
+/// wird nur angestoßen, nie abgewartet; bis er da ist, gelten die absoluten Bänder aus
+/// `normalisiere_odl`.
 pub async fn fetch_odl(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
     let (client, pool2) = (s.client.clone(), pool.clone());
     let mut a = liefere_mit_swr(
@@ -206,21 +202,17 @@ pub async fn fetch_odl(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwo
 
 /// Der Grundpegel ändert sich über Tage, nicht über Stunden; ein Abruf kostet ~8,6 MB.
 const ODL_GRUNDPEGEL_TTL: Duration = Duration::from_secs(24 * 3600);
-/// Gemessen ~10 s bei guter Leitung für ~8,6 MB, bei ~1 Mbit/s rund 70 s. Die 8 s des
-/// gemeinsamen Clients reichen nicht; da der Lauf niemanden blockiert, kostet die lange
-/// Schranke nur einen gebundenen Hintergrund-Task.
+/// Ein Abruf von ~8,6 MB dauert bei schlechter Leitung über eine Minute. Der Lauf blockiert
+/// niemanden, die lange Schranke kostet nur einen Hintergrund-Task.
 const ODL_GRUNDPEGEL_TIMEOUT: Duration = Duration::from_secs(90);
-/// Nach einem Fehlschlag eine Stunde Ruhe — sonst fragte jeder 10-min-Poll erneut 8,6 MB
-/// bei einem GeoServer an, der gerade nicht kann.
+/// Nach einem Fehlschlag eine Stunde Ruhe, sonst fragte jeder 10-min-Poll erneut 8,6 MB an.
 const ODL_GRUNDPEGEL_ABKUEHLUNG: Duration = Duration::from_secs(3600);
 static ODL_GRUNDPEGEL_FEHLSCHLAG: Mutex<Option<std::time::Instant>> = Mutex::new(None);
-/// Zeitreihe ALLER Sonden, sieben Tage, Stundenwerte (gemessen 21.09.2026: 263 687 Werte).
-/// Der Filter wählt die Stichprobe; `propertyName` spart Volumen (`name` kommt trotzdem mit).
+/// Zeitreihe aller Sonden, sieben Tage, Stundenwerte. `propertyName` spart Volumen.
 const ODL_ZEITREIHE_URL: &str = "https://www.imis.bfs.de/ogc/opendata/ows?service=WFS&version=1.1.0&request=GetFeature&typeName=opendata:odlinfo_timeseries_odl_1h&outputFormat=application/json&propertyName=id,end_measure,value,unit&CQL_FILTER=";
 
-/// Muss der Grundpegel neu geholt werden? Rein: fehlt er oder ist er älter als die TTL,
-/// und läuft keine Abkühlung nach einem Fehlschlag — dieselben Bausteine wie bei der
-/// Autobahn-Ebene.
+/// Muss der Grundpegel neu geholt werden? Fehlt er oder ist er älter als die TTL, und läuft
+/// keine Abkühlung nach einem Fehlschlag.
 pub(crate) fn grundpegel_anstossen(
     eintrag_alter: Option<i64>,
     seit_fehlschlag: Option<Duration>,
@@ -315,13 +307,12 @@ async fn erneuere_odl(client: reqwest::Client, pool: SqlitePool) -> Option<Fache
     Some(a)
 }
 
-/// Rohe BfS-Antwort → speicherbare Antwort, oder `None` bei Formatbruch. Rein und damit
-/// ohne Netz prüfbar, und zwar an der Stelle, an der die Entscheidung wirkt (Muster
-/// [`autobahn_antwort`]): wer `None` bekommt, schreibt nichts in den Cache.
+/// Rohe BfS-Antwort → speicherbare Antwort, oder `None` bei Formatbruch (dann wird nichts
+/// gecacht). Rein, geprüft an der Stelle, an der die Entscheidung wirkt.
 ///
-/// Ohne `features`-LISTE ist die Antwort unbrauchbar, nicht leer. Ein GeoServer meldet
-/// Fehler gern mit HTTP 200 und einem Report-Objekt; als `leer` gespeichert zeigte die
-/// Ebene zehn Minuten lang „keine Sonden", wo sie „offline" zeigen muss.
+/// Ohne `features`-Liste ist die Antwort unbrauchbar, nicht leer: ein GeoServer meldet Fehler
+/// gern mit HTTP 200 und einem Report-Objekt, und als `leer` gespeichert zeigte die Ebene
+/// „keine Sonden“ statt „offline“.
 pub(crate) fn odl_antwort(roh: &Value) -> Option<FachebeneAntwort> {
     roh.get("features").filter(|f| f.is_array())?;
     Some(FachebeneAntwort::ok(
@@ -402,10 +393,8 @@ async fn erneuere_nina(client: reqwest::Client, pool: SqlitePool) -> Option<Fach
     Some(a)
 }
 
-// KRITIS selbst kommt seit LFH-83 aus dem bundesweiten OSM-Extrakt (`karte::kritis::bestand`),
-// nicht mehr aus einem Live-Overpass-Abruf je Anfrage — `fetch_kritis`/`erneuere_kritis` samt
-// ihrer KRITIS-eigenen Overpass-Query sind deshalb entfallen. `hole_overpass` bleibt: Energie
-// (LFH-81) braucht denselben Mehrfach-Endpunkt-Abruf für `power=plant`.
+// KRITIS kommt aus dem OSM-Extrakt (`karte::kritis::bestand`). `hole_overpass` bleibt für
+// Energie (`power=plant`).
 /// Overpass antwortet langsamer als das globale Client-Timeout (8 s) — interne `[timeout:25]`.
 const OVERPASS_TIMEOUT: Duration = Duration::from_secs(30);
 /// Hauptinstanz ist oft überlastet (TimedOut) → Mirror als Fallback.
@@ -414,8 +403,8 @@ const OVERPASS_URLS: [&str; 2] = [
     "https://overpass.kumi.systems/api/interpreter",
 ];
 
-/// Overpass-Abruf über [`OVERPASS_URLS`], der Reihe nach (eigenes, längeres Timeout).
-/// Einzelfehler nur debug, erst wenn ALLE scheitern eine warn-Meldung (weniger Log-Rauschen).
+/// Overpass-Abruf über [`OVERPASS_URLS`] der Reihe nach. Einzelfehler nur `debug`, erst wenn
+/// alle scheitern `warn`.
 async fn hole_overpass(client: &reqwest::Client, query: &str, ebene: &str) -> Option<Value> {
     for url in OVERPASS_URLS {
         let resp = client
@@ -440,10 +429,9 @@ async fn hole_overpass(client: &reqwest::Client, query: &str, ebene: &str) -> Op
 
 // ------------------------------------------------------- HOCHWASSER (LHP, LFH-77)
 
-/// Marke, hinter der das Länderübergreifende Hochwasserportal seinen Sitzungs-Token in die
-/// Startseite schreibt: `addLagePegel(884284296001)`. Die schließende Klammer gehört zur
-/// Marke — `addLagePegelInteractive(` ist ein anderer Aufruf derselben Datei und bekommt
-/// seine `ki` als Variable; ohne die Klammer läse man dort das Wort `ki` als Token.
+/// Marke, hinter der das Hochwasserportal seinen Sitzungs-Token in die Startseite schreibt:
+/// `addLagePegel(884284296001)`. Die Klammer gehört dazu — `addLagePegelInteractive(` bekommt
+/// seine `ki` als Variable, ohne Klammer läse man dort das Wort `ki` als Token.
 const LHP_KI_MARKE: &str = "addLagePegel(";
 
 const HOCHWASSER_ATTRIB: &str = "Länderübergreifendes Hochwasserportal (LHP) — Urheberrecht bei den zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder";
@@ -464,10 +452,9 @@ pub async fn fetch_hochwasser(s: &FachebenenState, pool: &SqlitePool) -> Fachebe
     .await
 }
 
-/// Zweistufig wie NINA, aber aus einem anderen Grund: Stufe 1 holt nicht Daten, sondern den
-/// Sitzungs-Token (`ki`) aus der Startseite, den Stufe 2 mitschicken MUSS. Beide Stufen
-/// laufen nur beim Cache-Refresh (TTL 300 s), nicht je Anfrage — zwei Zugriffe pro
-/// Aktualisierung auf ein Behördenportal sind das Budget, nicht zwei pro Nutzer.
+/// Zweistufig: Stufe 1 liest den Sitzungs-Token (`ki`) aus der Startseite, den Stufe 2
+/// mitschicken MUSS. Beides läuft nur beim Cache-Refresh, nicht je Anfrage — zwei Zugriffe je
+/// Aktualisierung auf ein Behördenportal sind das Budget.
 async fn erneuere_hochwasser(
     client: reqwest::Client,
     pool: SqlitePool,
@@ -480,8 +467,9 @@ async fn erneuere_hochwasser(
         }
     };
     let Some(ki) = extrahiere_ki(&html) else {
-        // Kein Netzfehler, sondern ein Formatbruch: die Seite wurde umgebaut. Laut, aber
-        // nicht fatal — die Ebene fällt auf „offline" zurück.
+        // Formatbruch, kein Netzfehler: die Seite wurde umgebaut. Laut, aber nicht fatal — die
+        // Ebene
+        // fällt auf „offline“ zurück.
         tracing::warn!(
             "LHP-Startseite ohne `{LHP_KI_MARKE}…)`-Marke — Sitzungs-Token nicht lesbar"
         );
@@ -496,9 +484,9 @@ async fn erneuere_hochwasser(
         .await
     {
         Ok(r) if r.status().is_success() => match r.text().await {
-            // Ein ABGELAUFENER/ungültiger Token liefert HTTP 200 mit LEEREM Rumpf (gemessen).
-            // Ohne diese eigene Meldung landet der Fall als „JSON kaputt" im Log und die
-            // nächste Fehlersuche beginnt wieder bei null.
+            // Ein abgelaufener oder ungültiger Token liefert HTTP 200 mit leerem Rumpf. Die eigene
+            // Meldung
+            // hält den Fall im Log von „JSON kaputt“ unterscheidbar.
             Ok(t) if t.trim().is_empty() => {
                 tracing::warn!("LHP-Pegelabruf lieferte leeren Rumpf — `ki` ungültig/abgelaufen");
                 return None;
@@ -534,16 +522,11 @@ async fn erneuere_hochwasser(
     Some(a)
 }
 
-/// Zieht den `ki`-Token aus dem Quelltext der LHP-Startseite.
-///
-/// WARUM ÜBERHAUPT: die Webservices des Portals antworten NUR mit einem gültigen, vom
-/// Server ausgegebenen `ki`. Gemessen (20.09.2026): ohne Parameter, mit erfundener Zahl
-/// oder mit einem Token aus einem anderen Aufruf liefert `get_lagepegel.php`
-/// **HTTP 200 mit leerem Body**; mit dem frisch aus der Startseite gelesenen Token
-/// ~138 KB. Der Token ist also nicht ableitbar, er wird gelesen.
+/// Zieht den `ki`-Token aus der LHP-Startseite. Die Webservices antworten nur mit einem vom
+/// Server ausgegebenen `ki` (sonst HTTP 200 mit leerem Rumpf); der Token ist nicht ableitbar.
 fn extrahiere_ki(html: &str) -> Option<String> {
-    // Bis zur ersten Fundstelle mit ZIFFERN-Argument laufen, nicht bloß bis zur ersten
-    // Fundstelle: dieselbe Marke trägt auch die Funktionsdefinition (`addLagePegel(ki)`).
+    // Bis zur ersten Fundstelle mit Ziffern-Argument laufen: dieselbe Marke trägt auch die
+    // Funktionsdefinition (`addLagePegel(ki)`).
     html.match_indices(LHP_KI_MARKE).find_map(|(i, _)| {
         let rest = &html[i + LHP_KI_MARKE.len()..];
         let token = &rest[..rest.find(')')?];
@@ -554,29 +537,24 @@ fn extrahiere_ki(html: &str) -> Option<String> {
 // ----------------------------------------------------------------------- AUTOBAHN
 
 const AUTOBAHN_ATTRIB: &str = "Autobahn GmbH des Bundes";
-/// 10 min. Baustellen und Sperrungen sind mehrstündige bis mehrtägige Ereignisse; was sich
-/// bewegt, ist ihr `future`-Übergang. Kürzer zu takten holt keine frischeren Daten, kostet
-/// aber je Runde 334 Abrufe gegen eine fremde Behörden-API.
+/// Baustellen und Sperrungen dauern Stunden bis Tage; kürzer zu takten holt nichts Frischeres,
+/// kostet aber je Runde 334 Abrufe gegen eine fremde Behörden-API.
 const AUTOBAHN_TTL: Duration = Duration::from_secs(600);
 const AUTOBAHN_BASIS: &str = "https://verkehr.autobahn.de/o/autobahn/";
-/// Die drei für Anfahrt und Lageaufklärung belegten Dienste (LFH-80). `warning`,
-/// `parking_lorry`, `electric_charging_station` sind bewusst NICHT dabei: sie tragen zum
-/// Ticket-Zweck nichts bei und kosteten je 111 weitere Abrufe pro Runde.
+/// Die für Anfahrt und Lageaufklärung belegten Dienste (LFH-80). Die übrigen tragen nichts bei
+/// und kosteten je 111 weitere Abrufe pro Runde.
 const AUTOBAHN_DIENSTE: [&str; 3] = ["webcam", "roadworks", "closure"];
-/// Gemessen (20.09.2026): bei 8 gleichzeitigen Abrufen scheitern 1–2 der 334, bei 16 bereits
-/// 30 — die Quelle drosselt. Mehr Parallelität macht den Lauf also nicht schneller, sondern
-/// löchriger.
+/// Die Quelle drosselt: bei 16 gleichzeitigen Abrufen scheitern deutlich mehr als bei 8. Mehr
+/// Parallelität macht den Lauf nicht schneller, sondern löchriger.
 const AUTOBAHN_PARALLEL: usize = 8;
-/// Gesamtdeckel über den Fächer. Das Client-Timeout (8 s) gilt je Abruf; ohne diesen Deckel
-/// stünde der kalte, BLOCKIERENDE Pfad im schlechtesten Fall bei 334/8 × 8 s ≈ 5,5 min.
-/// Gemessener Normallauf: ~25 s.
+/// Gesamtdeckel über den Fächer. Das Client-Timeout (8 s) gilt je Abruf; ohne Deckel stünde der
+/// Lauf im schlechtesten Fall bei 334/8 × 8 s ≈ 5,5 min.
 const AUTOBAHN_BUDGET: Duration = Duration::from_secs(60);
 
-/// `{"roads":["A1","A2",…]}` → saubere Liste. Drei Dinge passieren hier, alle gemessen:
-/// getrimmt (die Liste führt am 20.09.2026 `"A60 "` mit Leerzeichen — der Abruf darauf
-/// liefert 0 Einträge, während `"A60"` 18 hat), entdoppelt (ebendeshalb), und **auf
-/// alphanumerisch gefiltert**: der Wert kommt aus einer fremden Quelle und landet in einem
-/// URL-PFAD — ein `../` darin zeigte auf einen anderen Endpunkt desselben Hosts.
+/// `{"roads":["A1","A2",…]}` → saubere Liste: getrimmt (die Quelle führt `"A60 "`, der Abruf
+/// darauf liefert nichts), entdoppelt und **auf alphanumerisch gefiltert** — der Wert kommt aus
+/// einer fremden Quelle und landet in einem URL-Pfad, ein `../` darin zeigte auf einen anderen
+/// Endpunkt.
 pub(crate) fn autobahn_strassen(roh: &Value) -> Vec<String> {
     let mut namen: Vec<String> = roh
         .get("roads")
@@ -595,30 +573,20 @@ pub(crate) fn autobahn_strassen(roh: &Value) -> Vec<String> {
     namen
 }
 
-/// Trägt dieser Teilabruf überhaupt eine Dienst-Liste? HTTP 200 mit gültigem JSON heisst
-/// NICHT, dass Daten drinstehen: ein `{}` oder ein Fehlerumschlag des Portals parst
-/// anstandslos. Ohne diese Prüfung zählte so eine Antwort als beantwortet, der
-/// Normalisierer überspränge sie still — und 333 davon ergäben eine „vollständige" Antwort
-/// mit null Features.
+/// Trägt dieser Teilabruf eine Dienst-Liste? Auch `{}` oder ein Fehlerumschlag parst als JSON;
+/// ohne diese Prüfung ergäben lauter solche Antworten eine „vollständige“ Antwort ohne Features.
 fn autobahn_nutzlast(eintrag: &(String, String, Value)) -> bool {
     let (_, dienst, antwort) = eintrag;
     antwort.get(dienst).is_some_and(Value::is_array)
 }
 
-/// Ergebnis eines Fächer-Laufs → speicherbare Antwort, oder `None`, wenn der Lauf zu
-/// löchrig war. Rein und damit ohne Netz prüfbar — und zwar **an der Stelle, an der die
-/// Entscheidung wirkt**: wer hier `None` bekommt, schreibt nichts in den Cache und lässt den
-/// bisherigen Stand stehen. Eine Schwelle, die nur als eigene Prädikatsfunktion getestet
-/// wird, kann an der Aufrufstelle entfallen, ohne dass ein Test rot wird.
+/// Ergebnis eines Fächer-Laufs → speicherbare Antwort, oder `None`, wenn der Lauf zu löchrig
+/// war; dann bleibt der bisherige Cache-Stand stehen. Rein und an der wirksamen Stelle geprüft.
 ///
-/// Gezählt wird, was eine **Dienst-Liste trägt**, nicht was ein HTTP 200 erwidert hat —
-/// sonst hinge die Schwelle an der Zustellung statt am Inhalt.
-///
-/// Die Schwelle ist die **Hälfte**, und das ist eine Abwägung, keine Messung: ein bis zwei
-/// Ausfälle je Lauf sind normal (Drosselung) und dürfen den Lauf nicht verwerfen — sonst
-/// veraltete die Ebene dauerhaft. Fällt dagegen mehr als die Hälfte aus, ist ein
-/// gespeicherter Teilstand schlechter als der bisherige: er sieht vollständig aus, ist es
-/// aber nicht, und niemand sieht ihm das an.
+/// Gezählt wird, was eine Dienst-Liste trägt, nicht was HTTP 200 erwidert hat. Die Schwelle ist
+/// die Hälfte (Abwägung): ein, zwei Ausfälle je Lauf sind normal und dürfen ihn nicht verwerfen,
+/// sonst veraltete die Ebene dauerhaft; ein gespeicherter Teilstand darüber hinaus sähe
+/// vollständig aus, ohne es zu sein.
 pub(crate) fn autobahn_antwort(
     gesamt: usize,
     roh: &[(String, String, Value)],
@@ -635,18 +603,16 @@ pub(crate) fn autobahn_antwort(
     ))
 }
 
-/// Nach einem GESCHEITERTEN Lauf wird nicht sofort neu versucht. Ohne diese Sperre trommelt
-/// eine anhaltende Störung die Quelle: die Ebene meldet `offline`, das Frontend pollt
-/// deshalb im Aufwärmtakt (20 s), und jeder Poll stiesse einen neuen Fächer mit 333 Abrufen
-/// an — gegen einen Anbieter, der ohnehin gerade nicht kann. Fünf Minuten sind kurz genug,
-/// dass eine Erholung zeitnah ankommt, und lang genug, dass aus dem Takt kein Dauerfeuer wird.
+/// Nach einem gescheiterten Lauf wird nicht sofort neu versucht: bei `offline` pollt das
+/// Frontend im Aufwärmtakt (20 s), und jeder Poll stieße sonst einen neuen Fächer mit 333
+/// Abrufen an.
 const AUTOBAHN_ABKUEHLUNG: Duration = Duration::from_secs(300);
 
-/// Zeitpunkt des letzten GESCHEITERTEN Laufs; `None` heisst „kein Fehlschlag offen".
-/// `std::sync::Mutex`, nie über ein `await` gehalten (wie `inflight`).
+/// Zeitpunkt des letzten gescheiterten Laufs. `std::sync::Mutex`, nie über ein `await`
+/// gehalten.
 static AUTOBAHN_FEHLSCHLAG: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 
-/// Darf ein neuer Fächer starten? Rein und ohne Uhr prüfbar (die Zeitspanne kommt von aussen).
+/// Darf ein neuer Fächer starten? Rein, die Zeitspanne kommt von außen.
 pub(crate) fn autobahn_darf_starten(
     seit_fehlschlag: Option<Duration>,
     abkuehlung: Duration,
@@ -657,9 +623,8 @@ pub(crate) fn autobahn_darf_starten(
     }
 }
 
-/// Entscheidung je Cache-Zustand — rein und ohne Netz prüfbar. Die Fälle sind dieselben wie
-/// in [`liefere_mit_swr`], **mit einer Ausnahme, die der ganze Grund für diese Funktion ist**:
-/// der KALTE Fall wartet nicht.
+/// Entscheidung je Cache-Zustand, rein. Wie [`liefere_mit_swr`], nur dass der KALTE Fall nicht
+/// wartet.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum AutobahnWeg {
     /// Frischer Cache → unverändert ausliefern, nichts anstoßen.
@@ -678,40 +643,32 @@ pub(crate) fn autobahn_weg(eintrag_alter: Option<i64>, ttl: Duration) -> Autobah
     }
 }
 
-/// Die Autobahn-Ebene benutzt [`liefere_mit_swr`] **nicht**, und das ist der Kern ihrer
-/// Besonderheit: dessen kalter Zweig wartet auf `erneuere()`, und genau das geht hier nicht.
+/// Die Autobahn-Ebene benutzt [`liefere_mit_swr`] **nicht**: dessen kalter Zweig wartet auf
+/// `erneuere()`, und ein voller Fächer dauert ~25 s. Das Frontend bricht nach 15 s ab
+/// (`api/client.ts`), und [`crate::zulassung::REQUEST_BUDGET`] setzt voraus, dass Routen mit
+/// ausgehendem Aufruf kürzere eigene Timeouts haben.
 ///
-/// Gemessen: ein voller Fächer dauert ~25 s. Dagegen stehen ZWEI Schranken, die beide vor ihm
-/// feuern würden — `apiGet` im Frontend bricht nach 15 s ab (`api/client.ts`), und
-/// [`crate::zulassung::REQUEST_BUDGET`] kappt den Handler nach 60 s mit einem 503. Die
-/// Schranke in `zulassung.rs` trägt sogar die Begründung, die Routen mit ausgehendem Aufruf
-/// hätten „deutlich kürzere" eigene Timeouts und feuerten „immer zuerst" — ein blockierender
-/// 25-s-Fächer bricht genau diese Zusage. Das erste Einschalten der Ebene liefe damit
-/// zuverlässig in einen Netzfehler statt in Daten.
-///
-/// Deshalb hängt der teure Lauf an KEINEM Request: er läuft als eigene Aufgabe, und die
-/// Anfrage ist sofort beantwortet. Der Preis ist eine Aufwärmphase, in der die Ebene
-/// `offline` meldet, obwohl sie gerade erst lädt; das Frontend pollt währenddessen kurz
-/// getaktet (`FACHEBENEN.autobahn.aufwaermPollMs`) und hat den ersten Stand nach ~30 s.
+/// Deshalb hängt der teure Lauf an keinem Request; die Anfrage ist sofort beantwortet. Während
+/// der Aufwärmphase meldet die Ebene `offline`, und das Frontend pollt kurz getaktet
+/// (`FACHEBENEN.autobahn.aufwaermPollMs`).
 pub async fn fetch_autobahn(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
     let eintrag = cache::eintrag(pool, "autobahn").await;
     let weg = autobahn_weg(eintrag.as_ref().map(|(_, alter)| *alter), AUTOBAHN_TTL);
     if weg == AutobahnWeg::Frisch {
         return eintrag.expect("Frisch entsteht nur aus einem Eintrag").0;
     }
-    // Zwei Riegel vor dem Lauf. ERSTENS die Abkühlung nach einem Fehlschlag — ohne sie
-    // stiesse jeder Aufwärm-Poll einen neuen Fächer an, solange die Quelle gestört ist.
+    // Erster Riegel: die Abkühlung nach einem Fehlschlag.
     let seit_fehlschlag = AUTOBAHN_FEHLSCHLAG.lock().unwrap().map(|t| t.elapsed());
     let darf = autobahn_darf_starten(seit_fehlschlag, AUTOBAHN_ABKUEHLUNG);
-    // ZWEITENS nur EIN Lauf gleichzeitig (wie der stale-Zweig von `liefere_mit_swr`). Der
-    // Schlüssel wird erst freigegeben, wenn die Aufgabe durch ist — ein Poll währenddessen
-    // stösst nichts Zweites an, was bei 333 Abrufen je Lauf der ganze Punkt ist.
+    // Zweiter Riegel: nur ein Lauf gleichzeitig. Der Schlüssel fällt erst nach der Aufgabe, damit
+    // ein Poll währenddessen keinen zweiten Fächer anstößt.
     if darf && s.inflight.lock().unwrap().insert("autobahn".to_string()) {
         let (client, pool2, inflight) = (s.client.clone(), pool.clone(), s.inflight.clone());
         tokio::spawn(async move {
             let ergebnis = erneuere_autobahn(client, pool2).await;
-            // Erst den Ausgang vermerken, dann freigeben: andersherum könnte ein Poll
-            // dazwischen den Schlüssel greifen und lospreschen, bevor die Sperre steht.
+            // Erst den Ausgang vermerken, dann freigeben: andersherum könnte ein Poll dazwischen
+            // den
+            // Schlüssel greifen, bevor die Sperre steht.
             *AUTOBAHN_FEHLSCHLAG.lock().unwrap() = match ergebnis {
                 Some(_) => None,
                 None => Some(std::time::Instant::now()),
@@ -727,21 +684,15 @@ pub async fn fetch_autobahn(s: &FachebenenState, pool: &SqlitePool) -> Fachebene
     }
 }
 
-/// Einzelspur für den Fächer. `liefere_mit_swr` entkoppelt nur die HINTERGRUND-Erneuerung
-/// (veralteter Cache) über `inflight`; sein **kalter** Zweig wartet direkt auf `erneuere()`
-/// und kennt keinen Riegel. Bei einer Ebene mit EINEM Abruf ist das belanglos — hier
-/// startete jeder Bediener, der die Ebene bei leerem Cache einschaltet, seine eigenen 333
-/// Abrufe. Schon zwei gleichzeitig ergäben die 16er-Nebenläufigkeit, bei der die Quelle
-/// gemessen drosselt; eine Anfangswelle vervielfachte das weiter.
-///
-/// Bewusst hier statt im geteilten `liefere_mit_swr`: dessen kalter Zweig trägt fünf weitere
-/// Ebenen, für die der Riegel nichts verbessert und deren Verhalten sich ändern würde.
+/// Einzelspur für den Fächer. Der kalte Zweig von `liefere_mit_swr` kennt keinen Riegel; hier
+/// startete sonst jeder Bediener, der die Ebene bei leerem Cache einschaltet, eigene 333
+/// Abrufe, und schon zwei gleichzeitig lösten die Drosselung aus. Bewusst nicht im geteilten
+/// `liefere_mit_swr`, das fünf weitere Ebenen trägt.
 static AUTOBAHN_EINZELSPUR: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
 async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
-    // Wer wartet, fetcht danach NICHT blind nach: der Vorgänger hat den Cache in aller Regel
-    // gerade gefüllt. Der Wartende bekommt damit DATEN statt `offline` — das ist der
-    // Unterschied zu einem Riegel, der den Zweiten einfach abweist.
+    // Wer gewartet hat, fetcht nicht blind nach, sondern bekommt den gerade gefüllten Cache — DATEN
+    // statt `offline`.
     let _spur = AUTOBAHN_EINZELSPUR
         .get_or_init(|| tokio::sync::Mutex::new(()))
         .lock()
@@ -764,9 +715,8 @@ async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<
         tracing::warn!("Autobahn-Streckenliste leer oder unlesbar");
         return None;
     }
-    // Aussortiertes sichtbar machen: heute ist das genau die Dublette `"A60 "`. Führte die
-    // Quelle eines Tages Namen mit Leer- oder Sonderzeichen ein, fielen sie durch den
-    // Pfad-Filter — das soll im Log stehen und nicht still passieren.
+    // Aussortiertes ins Log (heute die Dublette `"A60 "`), damit neue Sonderzeichen-Namen nicht
+    // still wegfallen.
     let roh_anzahl = liste
         .get("roads")
         .and_then(|r| r.as_array())
@@ -788,8 +738,7 @@ async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<
         })
         .collect();
     let gesamt = jobs.len();
-    // Einzelne Abrufe dürfen scheitern (Drosselung, leerer Body) — die übrigen Strecken
-    // bleiben. Dieselbe Toleranz wie bei den NINA-Einzelgeometrien.
+    // Einzelne Abrufe dürfen scheitern (Drosselung, leerer Body); die übrigen Strecken bleiben.
     let faecher = stream::iter(jobs)
         .map(|(strasse, dienst)| {
             let client = client.clone();
@@ -814,20 +763,16 @@ async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<
                 return None;
             }
         };
-    // Ein bis zwei Ausfälle je Lauf sind der gemessene Normalfall (Drosselung) und dürfen
-    // das Log nicht alle 10 min mit einer Warnung fluten — sonst gewöhnt man sich sie ab und
-    // übersieht den Tag, an dem die Quelle wirklich wegbricht. Erst ab einem Zehntel laut.
+    // Ein, zwei Ausfälle je Lauf sind normal und sollen das Log nicht fluten; erst ab einem Zehntel
+    // wird gewarnt.
     let fehlend = gesamt - roh.len();
     if fehlend * 10 > gesamt {
         tracing::warn!("Autobahn: {fehlend} von {gesamt} Teilabrufen ohne Antwort");
     } else if fehlend > 0 {
         tracing::debug!("Autobahn: {fehlend} von {gesamt} Teilabrufen ohne Antwort");
     }
-    // Ein zu löchriger Lauf wird VERWORFEN statt gespeichert. Ohne diesen Riegel schriebe ein
-    // Totalausfall der Dienste (Streckenliste antwortet, alle 333 Teilabrufe nicht) eine
-    // Antwort mit null Features in den Cache und überschriebe damit den gesunden Stand — die
-    // Ebene meldete zehn Minuten lang „keine Daten", statt den alten Stand weiterzureichen.
-    // Genau diese Zusicherung ist der Zweck des SWR-Caches; `None` lässt ihn stehen.
+    // Ein zu löchriger Lauf wird verworfen, statt den gesunden Cache-Stand mit null Features zu
+    // überschreiben.
     let Some(a) = autobahn_antwort(gesamt, &roh) else {
         tracing::warn!(
             "Autobahn: nur {} von {gesamt} Teilabrufen beantwortet — Lauf verworfen, \
@@ -836,14 +781,10 @@ async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<
         );
         return None;
     };
-    // Ein misslungener Schreibvorgang ist hier ein FEHLSCHLAG, nicht eine Randnotiz: dieser
-    // Lauf hängt an keinem Request, sein einziges Ergebnis IST der Cache-Eintrag. Meldete
-    // `setze` den Fehler nur ins Log und der Lauf trotzdem Erfolg, fiele die Abkühlung, der
-    // Cache bliebe leer — und der nächste Aufwärm-Poll 20 s später stiesse den nächsten
-    // Fächer mit 333 Abrufen an, dauerhaft. Das ist derselbe Schaden wie beim Quell-Ausfall,
-    // nur durch die Tür, die die Abkühlung nicht abdeckt (SQLite busy, Platte voll,
-    // read-only). Die fünf anderen Ebenen dürfen den Wert weiter ignorieren: sie reichen
-    // ihre Antwort im selben Request weiter, für sie ist der Cache eine Beschleunigung.
+    // Ein misslungener Cache-Schreibvorgang ist hier ein Fehlschlag: der Lauf hängt an keinem
+    // Request, sein einziges Ergebnis IST der Cache-Eintrag. Sonst fiele die Abkühlung, der Cache
+    // bliebe leer, und jeder Aufwärm-Poll stieße einen neuen Fächer an (SQLite busy, Platte voll).
+    // Die übrigen Ebenen dürfen den Wert ignorieren, für sie ist der Cache nur Beschleunigung.
     if !cache::setze(&pool, "autobahn", &a).await {
         tracing::warn!("Autobahn: Lauf nicht speicherbar — gilt als Fehlschlag, Abkühlung greift");
         return None;
@@ -856,16 +797,16 @@ async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<
 /// Pflicht-Attribution. Die Lizenzlage ist nur sekundär belegt (siehe Lizenz-Vorbehalt in
 /// `docs/fachebenen-quellen.md`); die Quellennennung wird deshalb immer mitgeführt.
 const LUFTQUALITAET_ATTRIB: &str = "Umweltbundesamt";
-/// Die Quelle liefert stündliche Werte zu einem unregelmäßigen Importzeitpunkt mit ~2 h
-/// Verzug. Eine Stunde TTL (die „Analogie zu KRITIS") legte eine weitere Stunde darauf.
+/// Stündliche Werte mit unregelmäßigem Import und ~2 h Verzug; eine längere TTL legte weiteren
+/// Verzug darauf.
 const LUFTQUALITAET_TTL: Duration = Duration::from_secs(900);
-/// Finaler Host: `https://www.umweltbundesamt.de/api/air_data/v2` antwortet gemessen mit 301
-/// hierher (Bindestrich statt Unterstrich). Kein Verlass auf die Weiterleitung.
+/// Finaler Host: der alte Host `…/api/air_data/v2` leitet per 301 hierher. Kein Verlass auf die
+/// Weiterleitung.
 const LUFTQUALITAET_BASIS: &str = "https://luftdaten.umweltbundesamt.de/api/air-data/v2";
 
-/// Die beiden Abruf-URLs eines Laufs (Stationsliste, Index im Acht-Stunden-Fenster).
-/// `index=id` steht explizit — das Echo der Quelle meldet trotzdem mal `code` (gemessen),
-/// weshalb der Normalisierer zusätzlich über den Stationscode auflöst.
+/// Die beiden Abruf-URLs eines Laufs (Stationsliste, Index im Acht-Stunden-Fenster). Die Quelle
+/// meldet trotz `index=id` mal `code`; der Normalisierer löst deshalb auch über den
+/// Stationscode auf.
 pub(crate) fn luftqualitaet_urls(jetzt: chrono::DateTime<chrono::Utc>) -> (String, String) {
     let fenster = luftqualitaet_fenster(jetzt)
         .iter()
@@ -878,9 +819,8 @@ pub(crate) fn luftqualitaet_urls(jetzt: chrono::DateTime<chrono::Utc>) -> (Strin
     )
 }
 
-/// Umschlag aus den beiden Abrufen eines Laufs. `None` = Lauf gescheitert: einer der Abrufe
-/// schlug fehl oder die Antwort ist strukturell unbrauchbar. Beides darf NICHT als `leer`
-/// in den Cache, sonst überdeckte es 15 Minuten lang den letzten guten Stand.
+/// Umschlag aus den beiden Abrufen. `None` = Lauf gescheitert (Abruf fehlgeschlagen oder
+/// unbrauchbar); das darf nicht als `leer` in den Cache und den letzten guten Stand überdecken.
 pub(crate) fn luftqualitaet_antwort(
     stationen: Result<Value, String>,
     index: Result<Value, String>,
@@ -917,8 +857,8 @@ pub async fn fetch_luftqualitaet(s: &FachebenenState, pool: &SqlitePool) -> Fach
     .await
 }
 
-/// Zwei Abrufe je Lauf (Stationsliste ~560 KB, Index ~210 KB), nebenläufig — gemessen beide
-/// unter einer Sekunde, der Lauf darf also blockierend am ersten Request hängen.
+/// Zwei nebenläufige Abrufe (zusammen ~770 KB, unter einer Sekunde); der Lauf darf blockierend
+/// am ersten Request hängen.
 async fn erneuere_luftqualitaet(
     client: reqwest::Client,
     pool: SqlitePool,
@@ -935,20 +875,18 @@ async fn erneuere_luftqualitaet(
 
 // ------------------------------------------------------------------ ENERGIE (LFH-81)
 //
-// Hybride Fachebene aus zwei unabhängig gecachten Teilen, die erst bei der Anfrage
-// zusammengeführt werden (design.md, Entscheidung 1):
+// Hybride Fachebene aus zwei unabhängig gecachten Teilen, zusammengeführt bei der Anfrage:
 //
 // | Teil            | Schlüssel                    | TTL  | kalter Pfad                                    |
 // |-----------------|------------------------------|------|------------------------------------------------|
 // | OSM power=plant | `energie:osm:<bbox gerundet>` | 24 h | gelöst, 30 s je Endpunkt, Abfrage auf bbox + 6 km |
 // | MaStR-Abzug     | `energie:mastr` (bundesweit)  | 24 h | gelöst, 30 s je Seite, 5-min-Sperre            |
 //
-// „Gelöst" heißt: der Abruf läuft als eigene Task, die Anfrage wartet auf beide Teile
-// zusammen höchstens `ENERGIE_WARTE` (10 s) und antwortet dann mit dem, was da ist. Grund
-// (Review-Befund zu LFH-81): das Frontend bricht nach 15 s ab, ein blockierendes Warten auf
-// den langsameren Teil ließ die GANZE Ebene offline wirken, obwohl der andere da war — und
-// verwarf axum den Handler-Future beim Abbruch, starb der MaStR-Abruf mit ihm, ohne je die
-// Sperre zu setzen. Die Task schreibt Cache bzw. Sperre auch nach der Antwort zu Ende.
+// „Gelöst“: der Abruf läuft als eigene Task, die Anfrage wartet auf beide Teile zusammen
+// höchstens `ENERGIE_WARTE` und antwortet mit dem, was da ist. Sonst ließe ein langsamer Teil
+// die ganze Ebene nach dem 15-s-Abbruch des Frontends offline wirken, und ein vom Client
+// abgebrochener Handler nähme den MaStR-Abruf samt Sperre mit. Die Task schreibt Cache bzw.
+// Sperre auch nach der Antwort zu Ende.
 
 /// Beide Teile ändern sich kaum → einen Tag cachen, veraltet im Hintergrund erneuern.
 const ENERGIE_TTL: Duration = Duration::from_secs(24 * 3600);
@@ -956,40 +894,34 @@ const ENERGIE_OSM_PRAEFIX: &str = "energie:osm";
 const ENERGIE_MASTR_KEY: &str = "energie:mastr";
 /// So lange wartet eine Anfrage höchstens auf kalte Teile (beide zusammen, nicht je Teil).
 const ENERGIE_WARTE: Duration = Duration::from_secs(10);
-/// Gemessen (21.09.2026): ~7 s und 5,2 MB für den ganzen Abzug — das globale
-/// Client-Timeout (8 s) reichte dafür nicht verlässlich.
+/// Ein ganzer Abzug (~5 MB) braucht einige Sekunden; das globale Client-Timeout (8 s) reicht
+/// nicht verlässlich.
 const ENERGIE_MASTR_TIMEOUT: Duration = Duration::from_secs(30);
 const ENERGIE_MASTR_BASIS: &str = "https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung";
 /// Upstream-Filter, fertig URL-kodiert. Klartext:
 /// `Nettonennleistung der Einheit~gt~10000~and~Koordinate: Breitengrad (WGS84)~gt~-90~and~Betriebs-Status~eq~'35,37'`
-/// — über 10 MW (kW-Angabe; `gt` ist undokumentiert, arbeitet aber live numerisch), mit
-/// Koordinate (`NULL` erfüllt keinen Bereichsvergleich) und im Status „In Betrieb" (35) oder
-/// „Vorübergehend stillgelegt" (37). Die Feldnamen sind Anzeigenamen des Portals und können
-/// sich still ändern; deshalb gilt eine unerwartete Antwortform als Fehlschlag.
+/// — über 10 MW (kW-Angabe; `gt` ist undokumentiert, arbeitet aber numerisch), mit Koordinate
+/// (`NULL` erfüllt keinen Bereichsvergleich) und „In Betrieb“ (35) oder „Vorübergehend
+/// stillgelegt“ (37). Die Feldnamen sind Anzeigenamen des Portals und können sich still ändern;
+/// eine unerwartete Antwortform gilt deshalb als Fehlschlag.
 const ENERGIE_MASTR_FILTER: &str = "Nettonennleistung%20der%20Einheit~gt~10000~and~Koordinate%3A%20Breitengrad%20%28WGS84%29~gt~-90~and~Betriebs-Status~eq~%2735%2C37%27";
 const ENERGIE_MASTR_SEITE: u64 = 2000;
-/// Obergrenze der Seitenschleife. Heute reicht eine Seite (1267 Einheiten); die Grenze hält
-/// eine kaputte `Total`-Angabe davon ab, das Portal mit Seitenabrufen zu überziehen.
+/// Obergrenze der Seitenschleife; schützt das Portal vor einer kaputten `Total`-Angabe.
 const ENERGIE_MASTR_MAX_SEITEN: u64 = 10;
 
-/// Nach einem gescheiterten MaStR-Abruf ruht der Upstream fünf Minuten. Seit der kalte
-/// Pfad gelöst ist, hält ein gestörter MaStR die Anfrage höchstens `ENERGIE_WARTE` auf; die
-/// Sperre sorgt dafür, dass es nicht bei JEDEM Verschieben der Karte so ist und dass nicht
-/// jede Anfrage einen neuen Abzug gegen ein Portal startet, das gerade nicht antwortet. Mit
-/// ihr bekommt die Anfrage sofort den OSM-Anteil. Gesetzt wird sie nur von einem echten
-/// Fehlschlag in der gelösten Task — eine gerissene Wartefrist ist keiner.
+/// Nach einem gescheiterten MaStR-Abruf ruht der Upstream fünf Minuten, damit nicht jedes
+/// Verschieben der Karte einen neuen Abzug gegen ein gestörtes Portal startet; die Anfrage
+/// bekommt sofort den OSM-Anteil. Nur ein echter Fehlschlag der Task setzt die Sperre, eine
+/// gerissene Wartefrist nicht.
 const ENERGIE_MASTR_ABKUEHLUNG: Duration = Duration::from_secs(300);
 static ENERGIE_MASTR_FEHLSCHLAG: Mutex<Option<std::time::Instant>> = Mutex::new(None);
-/// Einzelspur für den 5-MB-Abruf. Die `inflight`-Marke in `liefere_geloest` hält parallele
-/// Anfragen schon davon ab, einen zweiten Abruf zu starten; die Spur ist die Rückfallebene
-/// dahinter (eine Marke gilt nur für EINE `inflight`-Menge). Wer gewartet hat, bekommt den
-/// frischen Stand des Vorgängers aus dem Cache.
+/// Einzelspur für den 5-MB-Abruf, Rückfallebene hinter der `inflight`-Marke (die gilt nur für
+/// EINE `inflight`-Menge). Wer gewartet hat, bekommt den frischen Stand aus dem Cache.
 static ENERGIE_MASTR_EINZELSPUR: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
-/// Die beiden prozessweiten Riegel des MaStR-Abrufs als Naht: Produktion reicht die
-/// Statics durch ([`MastrRiegel::prozess`]), ein Test seine eigenen. Ohne die Naht schrieben
-/// parallel laufende Tests dieselbe Fehlschlag-Uhr — ein Test, der die Sperre setzt, hielte
-/// einen zweiten, der gerade abrufen will, still an.
+/// Die prozessweiten Riegel des MaStR-Abrufs als Naht: Produktion reicht die Statics durch
+/// ([`MastrRiegel::prozess`]), Tests eigene — sonst hielte die Fehlschlag-Uhr eines Tests einen
+/// parallel laufenden still an.
 #[derive(Clone, Copy)]
 struct MastrRiegel {
     fehlschlag: &'static Mutex<Option<std::time::Instant>>,
@@ -1005,15 +937,10 @@ impl MastrRiegel {
     }
 }
 
-/// Zuordnungsradius OSM-Anlage ↔ MaStR-Einheit (design.md, Entscheidung 4), **gemessen**
-/// am 21.09.2026 (Aufgabe 2.4): 18 zufällige MaStR-Einheiten (je 6 Wasser, Speicher, Solar,
-/// Seed 81) gegen OSM `power=plant` im Umkreis von 5 km, 17 auswertbar. Echte Paare
-/// (gleichnamig bzw. Einheitenpunkt in der OSM-Fläche) lagen bei Wasser 29–289 m, Speicher
-/// 20–113 m (Pumpspeicher Happurg eingerechnet), Solar 27–729 m — Höchstwert 729 m
-/// (Solarpark Halberstadt, flächig). Der kleinste Abstand zu einer gleichartigen Anlage, die
-/// NICHT dieselbe war, betrug 2,4 km (Elsterheide), der nächste 4,2 km. 2 km deckt also jedes
-/// gemessene Paar mit fast dreifacher Reserve und bleibt unter dem nächsten Fehlpaar; ein
-/// größerer Radius holte genau diese Fehlpaare herein.
+/// Zuordnungsradius OSM-Anlage ↔ MaStR-Einheit. Stichprobe (Wasser, Speicher, Solar): echte
+/// Paare lagen höchstens 729 m auseinander, das nächste Fehlpaar bei 2,4 km. 2 km deckt jedes
+/// gemessene Paar mit Reserve und bleibt unter dem Fehlpaar; ein größerer Radius holte
+/// Fehlpaare herein.
 pub(crate) const ENERGIE_RADIUS_M: f64 = 2000.0;
 
 pub(crate) fn mastr_url(seite: u64) -> String {
@@ -1051,32 +978,25 @@ fn energie_overpass_query(bbox_op: &str) -> String {
     format!("[out:json][timeout:25];nwr[power=plant]({bbox_op});out center tags;")
 }
 
-/// Overpass-Abfrage für einen Ausschnitt: auf den um [`ENERGIE_OSM_RAND_RADIEN`]
-/// Zuordnungsradien erweiterten Rand, damit die Zusammenführung an der Kante jede Anlage
-/// sieht, die eine Einheit im Ausschnitt an sich ziehen kann (siehe
-/// [`fuehre_energie_zusammen`]). Der Cache-Schlüssel bleibt am ORIGINAL-Raster.
+/// Overpass-Abfrage auf den um [`ENERGIE_OSM_RAND_RADIEN`] Zuordnungsradien erweiterten
+/// Ausschnitt, damit die Zusammenführung an der Kante jede passende Anlage sieht (s.
+/// [`fuehre_energie_zusammen`]). Der Cache-Schlüssel bleibt am ursprünglichen Raster.
 fn energie_osm_abfrage(bbox: &Bbox) -> String {
     let rand = bbox.erweitert_um_m(ENERGIE_OSM_RAND_RADIEN * ENERGIE_RADIUS_M);
     energie_overpass_query(&rand.overpass())
 }
 
-/// Größte Spanne eines Energie-Ausschnitts in Grad, je Achse. Bis LFH-83 stand diese Grenze
-/// in [`Bbox::parse`] und galt für KRITIS mit; seit KRITIS aus dem Extrakt-Bestand kommt, hat
-/// `parse` keine Größengrenze mehr. Die Energie-Ebene fragt Overpass aber weiter live je
-/// Ausschnitt — ohne eigene Grenze löste eine Deutschland-bbox eine bundesweite
-/// Overpass-Abfrage aus.
+/// Größte Spanne eines Energie-Ausschnitts in Grad, je Achse. `Bbox::parse` hat keine
+/// Größengrenze, die Energie-Ebene fragt Overpass aber live je Ausschnitt — ohne Grenze löste
+/// eine Deutschland-bbox eine bundesweite Abfrage aus.
 ///
-/// 3° statt der früheren 1°: die Ebene fragt ab Zoom 10, und dort ist ein Grad rund 1456 px
-/// breit. Ein 1920-px-Schirm zeigt damit schon ~1,3°, ein 4K-Schirm ~2,6° — mit 1° antwortete
-/// das Backend dort 400, und die Ebene stand leer auf „offline". `power=plant` ist dünn
-/// besetzt, drei Grad sind für Overpass eine kleine Abfrage; ganz Deutschland (~10°) bleibt
-/// abgelehnt. Das Frontend bremst mit derselben Zahl vorher (`ENERGIE_MAX_SPANNE_GRAD` in
+/// 3°, weil die Ebene ab Zoom 10 fragt und ein 4K-Schirm dort ~2,6° zeigt; ganz Deutschland
+/// (~10°) bleibt abgelehnt. Das Frontend bremst mit derselben Zahl (`ENERGIE_MAX_SPANNE_GRAD` in
 /// `pages/lagekarte/fachebenen.ts`).
 const ENERGIE_MAX_SPANNE_GRAD: f64 = 3.0;
 
-/// Ist der Ausschnitt klein genug für eine Overpass-Abfrage? Rein, damit die Grenze ohne
-/// Route prüfbar ist. Geprüft wird der ANGEFRAGTE Ausschnitt, vor dem Rand aus
-/// [`energie_osm_abfrage`] — der darf über die Grenze hinauswachsen.
+/// Ist der Ausschnitt klein genug für Overpass? Geprüft wird der angefragte Ausschnitt, vor dem
+/// Rand aus [`energie_osm_abfrage`].
 pub(crate) fn pruefe_energie_bbox(bbox: &Bbox) -> Result<(), String> {
     if bbox.ost - bbox.west > ENERGIE_MAX_SPANNE_GRAD
         || bbox.nord - bbox.sued > ENERGIE_MAX_SPANNE_GRAD
@@ -1115,12 +1035,12 @@ pub async fn fetch_energie(
     .await)
 }
 
-/// Kern von [`fetch_energie`] mit austauschbaren Abrufen und Wartefrist — so sind
-/// Teilausfall, langsame und scheiternde Teile ohne Netz und ohne Uhr prüfbar.
+/// Kern von [`fetch_energie`] mit austauschbaren Abrufen und Wartefrist, ohne Netz und Uhr
+/// prüfbar.
 ///
 /// `warte` gilt für die ganze Anfrage: beide Teile warten nebenläufig bis zu DEMSELBEN
 /// Zeitpunkt, jeder für sich. Ein gemeinsames `timeout` um beide verlöre bei Ablauf auch den
-/// Teil, der längst da ist — genau das, was die Frist verhindern soll.
+/// Teil, der längst da ist.
 async fn energie_kern<F1, F2>(
     pool: &SqlitePool,
     inflight: &Arc<Mutex<HashSet<String>>>,
@@ -1154,16 +1074,13 @@ where
     )
 }
 
-/// SWR mit **gelöstem** kalten Pfad — die Energie-Variante von [`liefere_mit_swr`], deren
-/// kalter Zweig bewusst unverändert blockiert (die übrigen Ebenen hängen daran).
+/// SWR mit **gelöstem** kaltem Pfad — die Energie-Variante von [`liefere_mit_swr`].
 ///
-/// Frisch und veraltet wie dort. Kalt wird der Abruf per `tokio::spawn` von der Anfrage
-/// gelöst und nur bis `bis` abgewartet. Reißt er die Frist, trägt der Teil zu DIESER Antwort
-/// nichts bei (`None`) — der Abruf läuft aber weiter und schreibt Cache bzw. MaStR-Sperre
-/// zu Ende, auch wenn axum den Handler-Future verwirft, weil der Client abgebrochen hat.
-/// Holt schon eine andere Anfrage denselben Schlüssel, wartet diese hier nicht und trägt
-/// nichts bei: ein zweiter Abruf wäre doppelte Last, ein Nachpollen des Cache holte die
-/// Uhr zurück in die Antwort; die nächste Anfrage trifft den Cache.
+/// Kalt läuft der Abruf per `tokio::spawn` und wird nur bis `bis` abgewartet. Reißt er die
+/// Frist, trägt der Teil zu dieser Antwort nichts bei; der Abruf schreibt Cache bzw.
+/// MaStR-Sperre trotzdem zu Ende, auch wenn axum den Handler verwirft. Holt schon eine andere
+/// Anfrage denselben Schlüssel, wartet diese nicht und trägt nichts bei; die nächste Anfrage
+/// trifft den Cache.
 async fn liefere_geloest<Fut>(
     pool: &SqlitePool,
     inflight: &Arc<Mutex<HashSet<String>>>,
@@ -1190,8 +1107,8 @@ where
 }
 
 /// Startet `erneuere` als eigene Task, sofern niemand den Schlüssel schon holt. Die
-/// `inflight`-Marke fällt über [`InflightFreigabe`] auch dann, wenn der Abruf panikt — sonst
-/// bliebe der Schlüssel bis zum Neustart gesperrt.
+/// `inflight`-Marke fällt über [`InflightFreigabe`] auch bei einer Panik, sonst bliebe der
+/// Schlüssel bis zum Neustart gesperrt.
 fn loese_ab<Fut>(
     inflight: &Arc<Mutex<HashSet<String>>>,
     key: &str,
@@ -1249,8 +1166,8 @@ pub(crate) fn baue_energie_antwort(
     };
     let punkte = fuehre_energie_zusammen(&features(osm), &features(mastr), bbox, ENERGIE_RADIUS_M);
     let (osm_traegt_bei, mastr_traegt_bei) = energie_beitraege(&punkte);
-    // `stand` ist der Zeitpunkt des MaStR-Abzugs — aus dessen eigenem Eintrag, damit ein
-    // veralteter Stand seinen echten Zeitpunkt behält.
+    // `stand` ist der Zeitpunkt des MaStR-Abzugs aus dessen eigenem Eintrag, damit ein veralteter
+    // Stand seinen echten Zeitpunkt behält.
     let stand = if mastr_da { mastr.stand.clone() } else { None };
     FachebeneAntwort::ok(
         "energie",
@@ -1369,19 +1286,17 @@ mod energie_tests {
     use serde_json::json;
 
     const BBOX: &str = "6.9,51.45,7.3,51.65";
-    /// Wartefrist im Test: kurz, damit kein Test an der Uhr hängt, aber mit Luft für einen
-    /// Cache-Zugriff und eine sofort fertige Task, wenn die Suite parallel unter Last läuft.
+    /// Wartefrist im Test: kurz, aber mit Luft für Cache-Zugriff und Task unter paralleler Last.
     const FRIST: Duration = Duration::from_millis(300);
     /// Äußere Schranke, damit ein Rückfall auf blockierendes Warten rot wird statt zu hängen.
     const HALT: Duration = Duration::from_secs(1);
 
-    /// Die Größengrenze ist seit LFH-83 energie-eigen (`Bbox::parse` nimmt jede Größe).
+    /// Die Größengrenze ist energie-eigen (`Bbox::parse` nimmt jede Größe).
     #[test]
     fn energie_bbox_grenze_drei_grad() {
         let ok = |b: &str| pruefe_energie_bbox(&Bbox::parse(b).unwrap());
         assert!(ok(BBOX).is_ok());
-        // Genau 3° je Achse ist noch erlaubt (nicht > 3) — das deckt einen Zoom-10-Ausschnitt
-        // auch auf einem breiten Schirm (1920 px ≈ 1,3°, 4K ≈ 2,6°).
+        // Genau 3° je Achse ist noch erlaubt.
         assert!(ok("6.0,50.0,9.0,53.0").is_ok());
         assert!(ok("6.0,50.0,7.6,51.0").is_ok());
         // Ganz Deutschland, und je eine Achse knapp drüber.
@@ -1439,7 +1354,7 @@ mod energie_tests {
             .collect()
     }
 
-    // ---- 2.1 reine Teile des MaStR-Abrufs
+    // ---- reine Teile des MaStR-Abrufs
 
     #[test]
     fn mastr_url_ist_das_literal() {
@@ -1481,9 +1396,8 @@ mod energie_tests {
         );
     }
 
-    /// Overpass wird auf den Ausschnitt plus drei Zuordnungsradien (6 km) gefragt — sonst
-    /// fehlt der Zusammenführung an der Kante die OSM-Anlage (Review-Befund 2). Geprüft an
-    /// den Zahlen der Abfrage, nicht über `erweitert_um_m`: das prüfte sich selbst.
+    /// Overpass wird auf den Ausschnitt plus drei Zuordnungsradien (6 km) gefragt. Geprüft an den
+    /// Zahlen der Abfrage, nicht über `erweitert_um_m` — das prüfte sich selbst.
     #[test]
     fn osm_abfrage_nimmt_den_erweiterten_ausschnitt() {
         let q = energie_osm_abfrage(&Bbox::parse(BBOX).unwrap());
@@ -1500,8 +1414,7 @@ mod energie_tests {
         }
     }
 
-    /// Eigene Riegel je Test — die prozessweiten Statics teilten sich alle parallel
-    /// laufenden Tests (siehe [`MastrRiegel`]).
+    /// Eigene Riegel je Test (s. [`MastrRiegel`]).
     fn riegel() -> MastrRiegel {
         MastrRiegel {
             fehlschlag: Box::leak(Box::new(Mutex::new(None))),
@@ -1535,10 +1448,8 @@ mod energie_tests {
         false
     }
 
-    /// Die zweite Hälfte der Einzelspur: wer gewartet hat, bekommt den frischen Stand des
-    /// Vorgängers aus dem Cache, ohne selbst abzurufen. Hermetisch: der Abruf ist eine
-    /// zählende Closure statt eines HTTP-Clients — ohne die Frisch-Prüfung zählt sie und
-    /// der Test wird rot, ohne dass ein Byte ins Netz geht.
+    /// Wer gewartet hat, bekommt den frischen Stand aus dem Cache, ohne selbst abzurufen.
+    /// Hermetisch über eine zählende Closure statt eines HTTP-Clients.
     #[tokio::test]
     async fn wartender_bekommt_frischen_mastr_stand_ohne_abruf() {
         let pool = crate::db::test_pool().await;
@@ -1562,7 +1473,7 @@ mod energie_tests {
         assert_eq!(abrufe.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 
-    // ---- Wartefrist und gelöster Abruf (Review-Befund 1)
+    // ---- Wartefrist und gelöster Abruf
 
     #[test]
     fn wartefrist_ist_zehn_sekunden() {
@@ -1570,10 +1481,8 @@ mod energie_tests {
         assert_eq!(ENERGIE_WARTE, Duration::from_secs(10));
     }
 
-    /// Spec „Nur OSM erreichbar": ein langsamer MaStR darf die Antwort nicht über die Frist
-    /// hinaus aufhalten — sonst bricht das Frontend nach 15 s ab und die GANZE Ebene wirkt
-    /// offline, obwohl der OSM-Teil längst da ist. Der gelöste Abruf läuft weiter und legt
-    /// seinen Stand in den Cache.
+    /// Ein langsamer MaStR darf die Antwort nicht über die Frist hinaus aufhalten; der gelöste
+    /// Abruf läuft weiter und legt seinen Stand in den Cache.
     #[tokio::test]
     async fn langsamer_mastr_haelt_die_antwort_nicht_auf() {
         let pool = crate::db::test_pool().await;
@@ -1611,8 +1520,8 @@ mod energie_tests {
         );
     }
 
-    /// Die Sperre setzt nur ein ECHTER Fehlschlag — und zwar auch dann, wenn er erst nach
-    /// der Antwort eintritt. Das Reißen der Wartefrist setzt sie nicht.
+    /// Die Sperre setzt nur ein echter Fehlschlag, auch nach der Antwort; das Reißen der Wartefrist
+    /// setzt sie nicht.
     #[tokio::test]
     async fn im_hintergrund_scheiternder_mastr_setzt_die_sperre() {
         let pool = crate::db::test_pool().await;
@@ -1717,7 +1626,7 @@ mod energie_tests {
         assert_eq!(b.status, FachebeneStatus::Offline);
     }
 
-    // ---- 2.2 fetch_energie: Teilausfall und Totalausfall
+    // ---- fetch_energie: Teilausfall und Totalausfall
 
     #[tokio::test]
     async fn beide_teile_aus_dem_cache() {
@@ -1826,9 +1735,8 @@ mod energie_tests {
         assert_eq!(titel(&a).len(), 2);
     }
 
-    /// Ein Teil, der geantwortet hat, aber im Ausschnitt nichts beiträgt, wird nicht genannt
-    /// (Spec: MUST NOT eine Quelle nennen, die nichts beiträgt) — die Ebene ist dann `leer`,
-    /// nicht `offline`.
+    /// Ein Teil, der im Ausschnitt nichts beiträgt, wird nicht als Quelle genannt; die Ebene ist
+    /// dann `leer`, nicht `offline`.
     #[tokio::test]
     async fn geantwortet_aber_nichts_im_ausschnitt() {
         let pool = crate::db::test_pool().await;
@@ -1854,14 +1762,14 @@ mod energie_tests {
         .await;
         assert_eq!(a.status, FachebeneStatus::Leer);
         assert_eq!(a.attribution, "");
-        // `stand` ist der Zeitpunkt des MaStR-Abzugs, nicht „einer beitragenden Quelle" — er
-        // bleibt also stehen, auch wenn MaStR im Ausschnitt nichts beiträgt.
+        // `stand` ist der Zeitpunkt des MaStR-Abzugs und bleibt stehen, auch wenn MaStR im
+        // Ausschnitt
+        // nichts beiträgt.
         assert_eq!(a.stand.as_deref(), Some("2026-09-21T10:00:00Z"));
     }
 
-    /// Pinnt den GEMESSENEN Radius dort, wo er verbraucht wird: die `fuehre_*`-Tests reichen
-    /// ihren Radius als Literal herein und sähen eine Änderung an `ENERGIE_RADIUS_M` nicht.
-    /// ~500 m (bei 51,6° N sind 0,0072° Länge rund 500 m) wird zusammengeführt, ~3 km nicht.
+    /// Pinnt den Radius dort, wo er verbraucht wird (die `fuehre_*`-Tests reichen ihn als Literal
+    /// herein). ~500 m wird zusammengeführt, ~3 km nicht.
     #[test]
     fn gemessener_radius_fuehrt_500_m_zusammen_und_3_km_nicht() {
         let bbox = Bbox::parse(BBOX).unwrap();
@@ -1890,8 +1798,7 @@ mod autobahn_strassen_tests {
 
     #[test]
     fn trimmt_entdoppelt_und_sortiert() {
-        // "A60 " mit Leerzeichen steht so in der echten Liste (gemessen) und ist dieselbe
-        // Strecke wie "A60" — ohne Trim+Dedup liefe ein Abruf ins Leere.
+        // "A60 " steht so in der echten Liste und ist dieselbe Strecke wie "A60".
         let l = autobahn_strassen(&json!({ "roads": ["A3", "A60 ", "A60", "A1"] }));
         assert_eq!(l, vec!["A1", "A3", "A60"]);
     }
@@ -1921,8 +1828,8 @@ mod autobahn_strassen_tests {
         )
     }
 
-    /// Der übliche Lauf (1–2 Ausfälle von 333) muss durchgehen — sonst veraltete die Ebene
-    /// dauerhaft, weil sie sich nie wieder speichern dürfte.
+    /// Der übliche Lauf (1–2 Ausfälle von 333) muss durchgehen, sonst veraltete die Ebene
+    /// dauerhaft.
     #[test]
     fn normaler_lauf_mit_wenigen_ausfaellen_wird_gespeichert() {
         let roh: Vec<_> = (0..331).map(|i| treffer(&format!("A{i}"))).collect();
@@ -1932,30 +1839,24 @@ mod autobahn_strassen_tests {
         assert_eq!(a.attribution, "Autobahn GmbH des Bundes");
     }
 
-    /// Ein Eintrag, der zugestellt wurde, aber KEINE Dienst-Liste trägt: HTTP 200 mit
-    /// gültigem JSON, wie es ein Portal in Wartung erwidert.
+    /// Zugestellt, aber ohne Dienst-Liste — wie ein Portal in Wartung antwortet.
     fn leere_nutzlast(strasse: &str) -> (String, String, Value) {
         (strasse.to_string(), "closure".to_string(), json!({}))
     }
 
-    /// Der zweite Weg in denselben Schaden: die Abrufe GELINGEN alle, tragen aber keine
-    /// Liste. Zählte die Schwelle die Zustellung statt den Inhalt, ginge ein Lauf mit 333
-    /// leeren Nutzlasten als vollständig durch und überschriebe den gesunden Cache mit null
-    /// Features — genau das Bild, gegen das die Schwelle existiert.
+    /// Alle Abrufe gelingen, tragen aber keine Liste: zählte die Schwelle die Zustellung, ginge
+    /// dieser Lauf als vollständig durch und überschriebe den Cache mit null Features.
     #[test]
     fn zugestellte_aber_leere_nutzlasten_zaehlen_nicht_als_antwort() {
         let roh: Vec<_> = (0..333).map(|i| leere_nutzlast(&format!("A{i}"))).collect();
         assert!(autobahn_antwort(333, &roh).is_none());
 
-        // Und die Gegenprobe: dieselbe Menge mit echten Listen geht durch. Ohne sie wäre der
-        // Test auch von einer Schwelle erfüllt, die grundsätzlich alles ablehnt.
+        // Gegenprobe: dieselbe Menge mit echten Listen geht durch.
         let echt: Vec<_> = (0..333).map(|i| treffer(&format!("A{i}"))).collect();
         assert!(autobahn_antwort(333, &echt).is_some());
     }
 
-    /// Eine LEERE Dienst-Liste (`{"closure": []}`) ist eine gültige Antwort — „auf dieser
-    /// Strecke ist gerade nichts" — und muss mitzählen. Sonst verwürfe ein ruhiger Tag den
-    /// ganzen Lauf.
+    /// Eine LEERE Dienst-Liste ist eine gültige Antwort („gerade nichts“) und zählt mit.
     #[test]
     fn leere_aber_vorhandene_dienstliste_zaehlt_mit() {
         let ruhig: Vec<(String, String, Value)> = (0..333)
@@ -1970,9 +1871,8 @@ mod autobahn_strassen_tests {
         assert!(autobahn_antwort(333, &ruhig).is_some());
     }
 
-    /// Die tragende Aussage, und zwar als NEGATIVE: aus einem Totalausfall entsteht gar keine
-    /// Antwort. Gäbe es hier eine, überschriebe sie den gesunden Cache-Stand mit null
-    /// Features, und die Ebene meldete zehn Minuten lang „keine Daten".
+    /// Aus einem Totalausfall entsteht gar keine Antwort, die den gesunden Cache überschreiben
+    /// könnte.
     #[test]
     fn totalausfall_und_zu_loechriger_lauf_liefern_keine_antwort() {
         assert!(autobahn_antwort(333, &[]).is_none());
@@ -1985,25 +1885,19 @@ mod autobahn_strassen_tests {
         assert!(autobahn_antwort(10, &knapp_drueber).is_some());
     }
 
-    /// Die drei Cache-Zustände. Die tragende Aussage ist die dritte: ein KALTER Cache führt
-    /// zu `LeerUndErneuern`, also zu einer sofortigen Antwort plus Hintergrundlauf — und
-    /// NICHT zu Warten. Ein wartender kalter Pfad liefe in die 15-s-Schranke von `apiGet`
-    /// und in das 60-s-`REQUEST_BUDGET` der Zulassung; das erste Einschalten der Ebene
-    /// endete zuverlässig im Netzfehler statt in Daten.
+    /// Die drei Cache-Zustände; entscheidend ist der dritte: kalt heißt sofort antworten plus
+    /// Hintergrundlauf, nicht warten (s. [`fetch_autobahn`]).
     #[test]
     fn kalter_cache_wartet_nicht() {
         let ttl = Duration::from_secs(600);
         assert_eq!(autobahn_weg(None, ttl), AutobahnWeg::LeerUndErneuern);
         assert_eq!(autobahn_weg(Some(599), ttl), AutobahnWeg::Frisch);
         assert_eq!(autobahn_weg(Some(601), ttl), AutobahnWeg::AltUndErneuern);
-        // Genau auf der TTL gilt als veraltet — dieselbe Grenze wie in `liefere_mit_swr`
-        // (`alter < ttl`), damit beide Ebenen-Sorten dasselbe Alter als frisch ansehen.
+        // Genau auf der TTL gilt als veraltet — dieselbe Grenze wie in `liefere_mit_swr`.
         assert_eq!(autobahn_weg(Some(600), ttl), AutobahnWeg::AltUndErneuern);
     }
 
-    /// Ohne Abkühlung trommelt eine anhaltende Störung die Quelle: die Ebene meldet
-    /// `offline`, das Frontend pollt deshalb im 20-s-Aufwärmtakt, und jeder Poll stiesse
-    /// einen neuen Fächer mit 333 Abrufen an — gegen einen Anbieter, der gerade nicht kann.
+    /// Ohne Abkühlung trommelte eine anhaltende Störung die Quelle im 20-s-Aufwärmtakt.
     #[test]
     fn nach_fehlschlag_wird_nicht_sofort_neu_gestartet() {
         let ab = Duration::from_secs(300);
@@ -2012,22 +1906,18 @@ mod autobahn_strassen_tests {
         // Frischer Fehlschlag → gesperrt.
         assert!(!autobahn_darf_starten(Some(Duration::from_secs(0)), ab));
         assert!(!autobahn_darf_starten(Some(Duration::from_secs(299)), ab));
-        // Abgelaufen → wieder erlaubt; auf der Grenze schon, sonst bliebe die Ebene bei
-        // exakt gleichem Takt für immer gesperrt.
+        // Abgelaufen → wieder erlaubt, auch genau auf der Grenze.
         assert!(autobahn_darf_starten(Some(ab), ab));
         assert!(autobahn_darf_starten(Some(Duration::from_secs(301)), ab));
     }
 
-    /// Die zweite Hälfte der Einzelspur: wer auf den Vorgänger gewartet hat, bekommt dessen
-    /// frischen Stand — und fetcht NICHT blind hinterher. Belegt über einen Client, der
-    /// nirgendwo hinkommt (Port 1, ECONNREFUSED): kommt trotzdem eine Antwort zurück, kann
-    /// sie nur aus dem Cache stammen. Ohne die Nachschau liefe der Wartende in die
-    /// Streckenliste, scheiterte und lieferte `None` — also 333 Abrufe umsonst und
-    /// `offline` für den Bediener.
+    /// Wer auf den Vorgänger gewartet hat, bekommt dessen frischen Stand und fetcht nicht blind
+    /// hinterher. Der Client kommt nirgendwo hin (Port 1); eine Antwort kann also nur aus dem Cache
+    /// stammen.
     ///
-    /// Die erste Hälfte (der Riegel selbst) ist bewusst NICHT getestet: zwei echte Fächer
-    /// gegeneinander laufen zu lassen hiesse, 666 Abrufe gegen eine fremde Behörden-API zu
-    /// schicken, und ein Test mit Netz wäre ohnehin eine Wackelstelle statt einer Aussage.
+    /// Der Riegel selbst ist nicht getestet: zwei echte Fächer gegeneinander hießen 666 Abrufe
+    /// gegen
+    /// eine fremde Behörden-API.
     #[tokio::test]
     async fn wartender_bekommt_den_frischen_stand_ohne_eigenen_abruf() {
         let pool = crate::db::test_pool().await;
@@ -2053,8 +1943,7 @@ mod autobahn_strassen_tests {
         assert_eq!(a.features["features"][0]["properties"]["titel"], "A1 | X");
     }
 
-    /// Randfall ohne eigene Bedeutung im Betrieb (eine leere Streckenliste bricht schon in
-    /// `erneuere_autobahn` ab), aber ohne ihn trüge `roh.is_empty()` die Aussage allein.
+    /// Randfall ohne Bedeutung im Betrieb; ohne ihn trüge `roh.is_empty()` die Aussage allein.
     #[test]
     fn leerer_gesamtlauf_liefert_keine_antwort() {
         assert!(autobahn_antwort(0, &[]).is_none());
@@ -2175,18 +2064,18 @@ mod lhp_ki_tests {
 
     #[test]
     fn ueberspringt_eine_fundstelle_mit_nicht_numerischem_argument() {
-        // Die Funktion wird in `lage-index.js` DEFINIERT (`function addLagePegel(ki)`) und
-        // im Seitenrumpf mit dem Token AUFGERUFEN. Zöge jemand das Skript inline, stünde die
-        // Definition vor dem Aufruf — bei Abbruch an der ersten Fundstelle ginge die Ebene
-        // offline, obwohl der Token zwei Zeilen tiefer steht.
+        // Die Funktion wird in `lage-index.js` definiert und im Seitenrumpf mit dem Token
+        // aufgerufen;
+        // stünde die Definition davor, darf das nicht an der ersten Fundstelle abbrechen.
         let html = "function addLagePegel(ki) { /* … */ }\naddLagePegel(884284296001)";
         assert_eq!(extrahiere_ki(html), Some("884284296001".to_string()));
     }
 
     #[test]
     fn greift_nicht_nach_addlagepegelinteractive() {
-        // `lage-basics.js` kennt BEIDE Namen; der Interactive-Aufruf bekommt seine ki
-        // als Variable, nicht als Literal — ein unverankertes Muster nähme hier `ki`.
+        // Der Interactive-Aufruf bekommt seine `ki` als Variable — ein unverankertes Muster nähme
+        // hier
+        // `ki`.
         let html = "function x(){ addLagePegelInteractive(ki, datetime); }";
         assert_eq!(extrahiere_ki(html), None);
     }
@@ -2232,8 +2121,7 @@ mod luftqualitaet_tests {
         assert_eq!(a.features["features"].as_array().unwrap().len(), 1);
     }
 
-    /// Scheitert einer der beiden Abrufe, ist der ganze Lauf gescheitert — sonst stünde eine
-    /// halbe Antwort als `leer` 15 Minuten im Cache und überdeckte den letzten guten Stand.
+    /// Scheitert einer der beiden Abrufe, ist der ganze Lauf gescheitert.
     #[test]
     fn ein_gescheiterter_abruf_laesst_den_lauf_scheitern() {
         assert!(luftqualitaet_antwort(Err("HTTP 502".into()), Ok(index())).is_none());
@@ -2259,9 +2147,7 @@ mod luftqualitaet_tests {
         assert!(a.attribution.contains("Umweltbundesamt"));
     }
 
-    /// Finaler Host fest verdrahtet (design D2): der im Ticket genannte Host antwortet mit
-    /// 301 hierher. Ein Verlass auf die Weiterleitung bräche still, sobald der alte Pfad
-    /// abgeschaltet wird.
+    /// Finaler Host fest verdrahtet: der alte Host leitet nur per 301 weiter.
     #[test]
     fn abruf_urls_zielen_auf_den_finalen_host_und_setzen_index_id() {
         let jetzt =
@@ -2321,10 +2207,8 @@ mod odl_antwort_tests {
 
     #[test]
     fn formatbruch_ist_ein_fehlschlag_und_kein_leerer_stand() {
-        // Ein GeoServer antwortet auf Fehler mit HTTP 200 und einem OGC-Report bzw. einem
-        // Objekt ohne `features`. Als „leer" gespeichert sähe das für zehn Minuten aus wie
-        // „keine Sonden" — die Ebene muss stattdessen `offline` zeigen (Spec: „Ausfall der
-        // Quelle bricht die Karte nicht"), und ein alter Stand bleibt stehen.
+        // Ein GeoServer antwortet auf Fehler mit HTTP 200 und einem Report bzw. Objekt ohne
+        // `features`. Die Ebene muss dann `offline` zeigen, und ein alter Stand bleibt stehen.
         for roh in [
             json!({ "exceptions": [] }),
             json!([]),

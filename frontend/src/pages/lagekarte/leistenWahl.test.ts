@@ -102,6 +102,28 @@ describe('useLeistenWahl (LFH-715)', () => {
     expect(result.current.wahl).toBe(false);
   });
 
+  // Die Wahl eines Zeichenwerkzeugs schließt die Leiste unter `lg` nur für die Sitzung — nach dem
+  // Neuladen gilt wieder Vorgabe bzw. eigene Wahl.
+  it('`verberge` schließt nur für die Sitzung: nichts gespeichert, nach dem Neuladen gilt die Wahl', () => {
+    const erst = renderHook(() => useLeistenWahl(false));
+    act(() => erst.result.current.verberge());
+    expect(erst.result.current.wahl).toBe(false);
+    expect(localStorage.getItem(LEISTE_SPEICHER_SCHLUESSEL.schmal)).toBeNull();
+    erst.unmount();
+    expect(renderHook(() => useLeistenWahl(false)).result.current.wahl).toBeNull();
+  });
+
+  it('nach `verberge` holt das eigene Einblenden die Leiste zurück, und `zeige` ebenso', () => {
+    const { result } = renderHook(() => useLeistenWahl(false));
+    act(() => result.current.verberge());
+    act(() => result.current.merke(true));
+    expect(result.current.wahl).toBe(true);
+    act(() => result.current.verberge());
+    expect(result.current.wahl).toBe(false);
+    act(() => result.current.zeige());
+    expect(result.current.wahl).toBe(true);
+  });
+
   it('ein unlesbarer Eintrag gilt als keine Wahl', () => {
     localStorage.setItem(LEISTE_SPEICHER_SCHLUESSEL.breit, 'kaputt');
     const { result } = renderHook(() => useLeistenWahl(true));

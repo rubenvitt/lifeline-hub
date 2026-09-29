@@ -43,25 +43,22 @@ const ORT_OPTIONEN: SegmentOption<Ortsfilter>[] = [
 ];
 
 /**
- * Lagerelevante Meldungen als ZEITACHSE (Neuentwurf, 22.09.2026) — wie das ETB: eine
- * chronologische Folge wird GELESEN („was ist passiert?"), nicht verglichen.
+ * Lagerelevante Meldungen als Zeitachse — wie das ETB: eine chronologische Folge wird gelesen („was
+ * ist passiert?"), nicht verglichen.
  *
- * Bis dahin war die Seite die zwölfte Konsumentin der `Datensicht` (`form="karte"`, LFH-348 ·
- * C13). Sie ist aus dem Primitiv herausgefallen wie das ETB: keine Spalte wird verglichen, die
- * Ordnung ist die Zeit, und die Zeile braucht Zeit · Typkante · Text · Herkunft · Ort — das
- * trägt der Baustein `Zeitachseneintrag`, nicht der Kartenplan (Titel + drei Sekundärfelder).
+ * Deshalb keine `Datensicht`: keine Spalte wird verglichen, die Ordnung ist die Zeit, und die Zeile
+ * braucht Zeit · Typkante · Text · Herkunft · Ort — das trägt der Baustein `Zeitachseneintrag`,
+ * nicht der Kartenplan (Titel + drei Sekundärfelder).
  *
- * WAS BLEIBT, und woher:
- * - Tagesgruppen jüngster Tag zuerst, Tagesgrenze in der ANZEIGEZONE (`lagemeldungen/
- *   zeitachse.ts`, `gruppiereNachTag` über `tagesSchluessel`/`tagesEtikett`). In der Gruppe
- *   genügt die Uhrzeit `HH:mm` — der Tag steht im Kopf darüber, wie im ETB.
- * - Rückweg zur Quellmeldung über `meldungenPfad` (LFH-25), jetzt im Meta der Zeile.
- * - Die drei Filterachsen der Datensicht (Zeitfenster, Koordinaten, Freitext) als
- *   Filterleiste über der Achse: Segmentleisten statt Spaltenfilter-Selects, dieselben
- *   Prädikate (`filtereLagemeldungen`, rein und getestet).
+ * - Tagesgruppen jüngster Tag zuerst, Tagesgrenze in der Anzeigezone (`lagemeldungen/zeitachse.ts`,
+ *   `gruppiereNachTag` über `tagesSchluessel`/`tagesEtikett`). In der Gruppe genügt `HH:mm` — der
+ *   Tag steht im Kopf.
+ * - Rückweg zur Quellmeldung über `meldungenPfad`, im Meta der Zeile.
+ * - Filterachsen (Zeitfenster, Koordinaten, Freitext) als Filterleiste über der Achse, Prädikate in
+ *   `filtereLagemeldungen`.
  *
- * Typkante und Typwort sind die des ETB-Typs „Lage" (`etbTyp.lage`): eine übergebene
- * Lagemeldung IST ein Lageeintrag, eine zweite Farbe für dieselbe Aussage wäre erfunden.
+ * Typkante und Typwort sind die des ETB-Typs „Lage" (`etbTyp.lage`): eine übergebene Lagemeldung
+ * ist ein Lageeintrag, eine zweite Farbe wäre erfunden.
  */
 export default function LagemeldungenPage() {
   const { id } = useParams();
@@ -106,7 +103,7 @@ export default function LagemeldungenPage() {
       typ="lage"
       typwort={etbTyp.lage.label}
       meta={
-        // Deeplink zur Quellmeldung — der einzige Weg zurück zum Vorgang (LFH-348 · C13).
+        // Deeplink zur Quellmeldung — der einzige Weg zurück zum Vorgang.
         <>
           {'aus '}
           <Link to={meldungenPfad(l.einsatz_id, { meldung: l.meldung_id })}>
@@ -134,7 +131,7 @@ export default function LagemeldungenPage() {
   if (lageQuery.isLoading) {
     inhalt = <SeitenSkeleton />;
   } else if (lageQuery.isError) {
-    // Fehler ist nicht leer (LFH-331 · B3): kein Leerzustand hinter der Fehlermeldung.
+    // Fehler ist nicht leer: kein Leerzustand hinter der Fehlermeldung.
     inhalt = (
       <Alert
         type="error"
@@ -144,9 +141,8 @@ export default function LagemeldungenPage() {
       />
     );
   } else if (eintraege.length === 0) {
-    // KEINE Primäraktion (LFH-331 · B3): eine Lagemeldung entsteht nicht hier, sondern
-    // dadurch, dass jemand anderswo eine Meldung als lagerelevant übergibt. Der Hinweis
-    // nennt den Weg; ein Knopf auf die Meldungsliste führte zur Voraussetzung.
+    // Keine Primäraktion: eine Lagemeldung entsteht, indem jemand anderswo eine Meldung als
+    // lagerelevant übergibt. Der Hinweis nennt den Weg.
     inhalt = (
       <SeitenLeer
         titel="Noch keine lagerelevanten Meldungen übergeben"

@@ -14,8 +14,7 @@ export const bildLayerId = (id: number) => `bild-${id}-raster`;
 
 const opacityWert = (o: BildOverlay) => (o.sichtbar ? o.opazitaet / 100 : 0);
 
-/** Idempotent: image source + raster layer. `beforeId` platziert den Layer unter
- *  den Vektor-Overlays (Abschnitte/Zonen), damit Marker/Zonen darüber liegen. */
+/** Idempotent: image source + raster layer. `beforeId` legt den Layer unter die Vektor-Overlays. */
 export function sorgeFuerBildLayer(map: MapLibreMap, ov: BildOverlay, beforeId?: string) {
   const sid = bildSourceId(ov.id);
   if (!map.getSource(sid)) {
@@ -76,8 +75,7 @@ export function entferneBildLayer(map: MapLibreMap, id: number) {
 /** WeakMap zur Verfolgung verwalteter IDs je Map-Instanz (für synchronisiereBildLayer). */
 const verwalteteIds = new WeakMap<object, Set<number>>();
 
-/** Soll-Abgleich: legt fehlende an, aktualisiert Geometrie/Opazität bestehender,
- *  entfernt nicht mehr gelistete. */
+/** Soll-Abgleich: legt fehlende an, aktualisiert bestehende, entfernt nicht mehr gelistete. */
 export function synchronisiereBildLayer(
   map: MapLibreMap,
   overlays: BildOverlay[],
@@ -86,14 +84,13 @@ export function synchronisiereBildLayer(
   const soll = new Set(overlays.map((o) => o.id));
   const vorherige = verwalteteIds.get(map as object) ?? new Set<number>();
 
-  // entfernen was nicht mehr im Soll ist
   for (const id of vorherige) {
     if (!soll.has(id)) {
       entferneBildLayer(map, id);
     }
   }
 
-  // anlegen / aktualisieren (in Reihenfolge: Aufrufer sortiert overlays aufsteigend)
+  // Aufrufer sortiert die Overlays aufsteigend.
   for (const ov of overlays) {
     sorgeFuerBildLayer(map, ov, beforeId);
     setzeBildGeometrie(map, ov.id, ov.ecken);

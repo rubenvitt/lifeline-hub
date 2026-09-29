@@ -9,9 +9,9 @@ use serde_json::json;
 pub enum AppError {
     /// Nicht angemeldet / ungültige Session (401).
     Unauthorized,
-    /// Offline-Queue-Eintrag gehoert zu einer anderen Benutzer-Session (412).
-    /// Bewusst KEIN 401: ein stale Tab darf die gueltige originweite Session des aktuell
-    /// angemeldeten Benutzers nicht durch den globalen Auth-Logout-Pfad invalidieren.
+    /// Offline-Queue-Eintrag gehört zu einer anderen Benutzer-Session (412). Bewusst KEIN 401: ein
+    /// veralteter Tab darf die gültige Session des aktuell angemeldeten Benutzers nicht über den
+    /// globalen Logout-Pfad beenden.
     OfflineQueueBenutzerMismatch,
     /// Angemeldet, aber keine Berechtigung (403).
     Forbidden,
@@ -32,14 +32,11 @@ pub enum AppError {
     NotImplemented(String),
     /// Ein angesprochener Upstream-Dienst ist fehlgeschlagen/unerreichbar (502).
     BadGateway(String),
-    /// Der Dienst kann die Anfrage vorübergehend nicht bedienen (503), z.B. weil eine
-    /// erforderliche Abhängigkeit (Virenscanner, LFH-114) nicht erreichbar ist und
-    /// fail-closed konfiguriert wurde. Signalisiert dem Client „später erneut versuchen".
+    /// Der Dienst kann die Anfrage vorübergehend nicht bedienen (503), z. B. weil der Virenscanner
+    /// fail-closed nicht erreichbar ist. Signalisiert „später erneut versuchen“.
     ServiceUnavailable(String),
-    /// Zu viele Anfragen aus derselben Quelle (429), heute nur der Anmelde-Bremse
-    /// (LFH-249/F30). Abgrenzung zu 503: dort kann der Server gerade generell nicht,
-    /// hier darf dieser eine Aufrufer gerade nicht — und zwar vorübergehend und
-    /// selbstheilend, ohne dauerhafte Sperre.
+    /// Zu viele Anfragen aus derselben Quelle (429), heute nur die Anmelde-Bremse. Anders als 503:
+    /// dieser eine Aufrufer darf gerade nicht, vorübergehend und selbstheilend.
     TooManyRequests(String),
 }
 
@@ -84,8 +81,9 @@ impl AppError {
             AppError::Validation(_) => StatusCode::BAD_REQUEST,
             AppError::Conflict(_) => StatusCode::CONFLICT,
             AppError::UnprocessableEntity(_) => StatusCode::UNPROCESSABLE_ENTITY,
-            // Sicherheitsnetz (LFH-245): nicht vorab abgefangene Constraint-Verletzungen
-            // bekommen einen fachlichen Statuscode statt eines nackten 500.
+            // Sicherheitsnetz: nicht vorab abgefangene Constraint-Verletzungen bekommen einen
+            // fachlichen
+            // Statuscode statt 500.
             AppError::Database(e) => {
                 if Self::ist_ueberlast(e) {
                     // Überlast, kein Defekt → fachlich „später erneut versuchen" statt
@@ -105,30 +103,21 @@ impl AppError {
         }
     }
 
-    /// `true`, wenn der DB-Fehler eine *transiente Überlast* ist statt eines Defekts —
-    /// die Klasse, die als 503 („später erneut versuchen") beantwortet gehört:
+    /// `true`, wenn der DB-Fehler eine *transiente Überlast* ist (→ 503 statt 500):
     ///
-    /// - **Erschöpfte Busy-Retries** (F09/LFH-240): der WAL-Writer ist dauerhaft belegt,
-    ///   `write_retry!` hat nach `MAX_VERSUCHE` aufgegeben.
-    /// - **Pool-Timeout** (G09/LFH-228): alle Pool-Verbindungen sind belegt, der
-    ///   `acquire_timeout` (10 s, `db.rs`) ist abgelaufen. Ohne diesen Zweig fiele
-    ///   `PoolTimedOut` — weder busy noch Constraint-Verletzung — auf 500 „Interner
-    ///   Serverfehler" durch, d.h. Backpressure sähe aus wie ein Serverdefekt.
+    /// - **Erschöpfte Busy-Retries**: `write_retry!` hat nach `MAX_VERSUCHE` aufgegeben.
+    /// - **Pool-Timeout**: alle Verbindungen belegt, `acquire_timeout` (`db.rs`) abgelaufen. Sonst
+    ///   sähe Backpressure aus wie ein Serverdefekt.
     ///
-    /// Bewusst eine exakte Varianten-Prüfung: der Zweig sitzt auf dem zentralen
-    /// `?`-Pfad ALLER Handler und darf keine andere Fehlerklasse mitreißen.
+    /// Exakte Varianten-Prüfung, weil der Zweig auf dem `?`-Pfad aller Handler sitzt und keine
+    /// andere Fehlerklasse mitreißen darf.
     fn ist_ueberlast(e: &sqlx::Error) -> bool {
         crate::tx::ist_busy(e) || matches!(e, sqlx::Error::PoolTimedOut)
     }
 
-    /// Sicherheitsnetz für DB-Constraint-Verletzungen (LFH-245/F07): eine nicht
-    /// explizit vorab abgefangene UNIQUE-/FK-/CHECK-Verletzung wird zu einem
-    /// fachlichen Statuscode + generischer Meldung statt eines undurchsichtigen 500.
-    /// UNIQUE/FK → 409 (Konflikt), CHECK → 422. Der konkrete Constraint wird nur
-    /// geloggt (in `into_response`), nie an den Client ausgegeben.
-    ///
-    /// Per-Handler-Prechecks bleiben für präzise Meldungen zuständig; das Netz fängt
-    /// Vergessenes und Races zwischen Precheck und Commit.
+    /// Sicherheitsnetz für DB-Constraint-Verletzungen (LFH-245): UNIQUE/FK → 409, CHECK → 422, mit
+    /// generischer Meldung; der konkrete Constraint steht nur im Log. Per-Handler-Prechecks bleiben
+    /// für präzise Meldungen zuständig, das Netz fängt Vergessenes und Races.
     fn constraint_violation(&self) -> Option<(StatusCode, &'static str)> {
         let AppError::Database(sqlx::Error::Database(db)) = self else {
             return None;
@@ -162,12 +151,12 @@ impl IntoResponse for AppError {
         let message = match &self {
             AppError::Database(e) => {
                 if Self::ist_ueberlast(e) {
-                    // Transiente Überlast: 503, nicht 500. Dieselbe Klassifikation wie in
-                    // `status()` (via `ist_ueberlast`), damit Statuscode und Meldung nicht
-                    // auseinanderlaufen; nur die Log-Zeile unterscheidet die zwei Quellen,
-                    // weil sie operativ verschiedene Gegenmaßnahmen nahelegen.
+                    // Transiente Überlast: 503, dieselbe Klassifikation wie in `status()`. Nur die
+                    // Log-Zeile
+                    // unterscheidet die zwei Quellen, weil sie verschiedene Gegenmaßnahmen
+                    // nahelegen.
                     if matches!(e, sqlx::Error::PoolTimedOut) {
-                        // G09/LFH-228: alle Pool-Slots belegt, acquire_timeout abgelaufen.
+                        // Alle Pool-Slots belegt, `acquire_timeout` abgelaufen.
                         tracing::warn!("Verbindungspool erschöpft (503): {e}");
                     } else {
                         tracing::warn!("Schreibkonflikt nach Busy-Retries (503): {e}");
@@ -331,10 +320,7 @@ mod tests {
 
     #[tokio::test]
     async fn pool_timeout_maps_to_503_and_is_generic() {
-        // G09/LFH-228: ein erschöpfter Verbindungspool ist Überlast, kein Defekt.
-        // Vorher fiel `PoolTimedOut` über `From<sqlx::Error>` in `Database(_)` und —
-        // weder busy noch Constraint-Verletzung — auf 500 „Interner Serverfehler"
-        // durch: Backpressure sah aus wie ein Serverdefekt. Jetzt ehrlicher Lastabwurf.
+        // Ein erschöpfter Verbindungspool ist Überlast, kein Defekt → 503.
         let app = AppError::from(sqlx::Error::PoolTimedOut);
         assert_eq!(app.status(), StatusCode::SERVICE_UNAVAILABLE);
 
@@ -357,9 +343,7 @@ mod tests {
 
     #[test]
     fn andere_sqlx_fehler_bleiben_500() {
-        // Abgrenzung zum neuen 503-Zweig (G09/LFH-228): der Arm sitzt auf dem zentralen
-        // `?`-Pfad ALLER Handler — er darf ausschließlich `PoolTimedOut` fangen und keine
-        // andere sqlx-Fehlerklasse mit in den Lastabwurf ziehen.
+        // Der 503-Arm darf ausschließlich `PoolTimedOut` fangen und keine andere sqlx-Fehlerklasse.
         assert_eq!(
             AppError::from(sqlx::Error::RowNotFound).status(),
             StatusCode::INTERNAL_SERVER_ERROR
@@ -388,7 +372,7 @@ mod tests {
 
     #[test]
     fn service_unavailable_maps_to_503() {
-        // LFH-114 fail-closed: Virenscanner nicht erreichbar → 503 (später erneut versuchen).
+        // Virenscanner nicht erreichbar (fail-closed) → 503.
         assert_eq!(
             AppError::ServiceUnavailable("clamd weg".into()).status(),
             StatusCode::SERVICE_UNAVAILABLE

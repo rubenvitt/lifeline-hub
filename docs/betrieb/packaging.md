@@ -169,6 +169,8 @@ Browser aber der sichere Kontext:
 - kein Service Worker, also kein Offline-Precache und keine Installation als PWA,
 - keine Passkeys (WebAuthn verlangt zusätzlich einen Hostnamen statt einer IP, siehe
   [betrieb-webauthn.md](../betrieb-webauthn.md)).
+- keine Eigenposition auf der Lagekarte: der Browser gibt den Gerätestandort nur im sicheren
+  Kontext heraus, der Knopf steht dann gesperrt da und nennt den Grund.
 
 Die Adresse sollte außerdem **stabil** bleiben. Die Offline-Warteschlange, lokal gemerkte
 Einstellungen (etwa die Bediendichte) und eine installierte PWA hängen an der Adresse, mit

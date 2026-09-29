@@ -14,14 +14,9 @@ const kartenThemeGueltig = (w: unknown): w is KartenThemeWahl =>
   w === 'auto' || w === 'light' || w === 'dark';
 
 /**
- * Wählt die initiale Kartenwahl für den Einstieg in die Lagekarte.
- * Priorität: gemerkte Wahl (localStorage) → Einsatz-Default (LFH-131) →
- * Verfügbarkeits-Default (online → offline → blind). Jede Stufe wird gegen die
- * aktuelle Server-Config validiert; ungültige Stufen werden übersprungen.
- *
- * Gültigkeitsprüfung gegen die Config, weil sich Verfügbarkeit/Views serverseitig
- * geändert haben können (z. B. Offline gemerkt, aber offline nicht mehr verfügbar;
- * Online-View gemerkt, aber umbenannt/entfernt).
+ * Initiale Kartenwahl für den Einstieg in die Lagekarte. Priorität: gemerkte Wahl (localStorage) →
+ * Einsatz-Default → Verfügbarkeits-Default (online → offline → blind). Jede Stufe wird gegen die
+ * aktuelle Server-Config geprüft (Verfügbarkeit und Views können sich geändert haben).
  */
 export function waehleInitialeBasemap(
   config: KarteServerConfig,

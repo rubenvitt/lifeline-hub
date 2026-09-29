@@ -23,12 +23,11 @@ export function warnungenMeta(n: number): string {
 }
 
 /**
- * Zeigt ein Pegel einen Messwert, aber keine Verlaufsreihe? Dann hat der Verlauf beim
- * Einhängen gegen die Liste verloren: beide Abfragen treffen einen kalten Cache-Eintrag, und
- * nur eine gewinnt die In-flight-Marke des Backends (`pegel::abruf`). Die Liste heilt sich
- * über ihre 10-s-Nachfrage selbst, der Verlauf hat nur den 5-min-Takt — ohne Nachziehen
- * stünde bis zu 5 min ein Wert neben „noch kein Verlauf". Ohne Messung fehlt beides: das ist
- * ein Ausfall, kein Wettlauf. Rein.
+ * Zeigt ein Pegel einen Messwert, aber keine Verlaufsreihe? Dann hat der Verlauf beim Einhängen
+ * gegen die Liste verloren: beide Abfragen treffen einen kalten Cache-Eintrag, und nur eine gewinnt
+ * die In-flight-Marke des Backends (`pegel::abruf`). Die Liste heilt sich über ihre 10-s-Nachfrage,
+ * der Verlauf hat nur den 5-min-Takt — ohne Nachziehen stünde bis zu 5 min ein Wert neben „noch
+ * kein Verlauf". Ohne Messung fehlt beides: ein Ausfall, kein Wettlauf. Rein.
  */
 export function verlaufLuecke(
   pegel: readonly PegelAnzeige[],
@@ -50,18 +49,15 @@ function paneelZustand(q: { isLoading: boolean; isError: boolean }): PaneelDaten
 /**
  * Fachmodul „Wetter & Pegel" (LFH-633): was Wasser und Wetter am Einsatzort tun.
  *
- * DREI PANEELE, DREI STÄNDE (Spec „Datenstand und Quellausfall"): Pegel, Warnungen und
- * Vorhersage kommen aus zwei Quellen (PEGELONLINE, Bright Sky) und tragen je ihren eigenen
- * Stand. Fällt eine aus, zeigt nur ihr Paneel „Stand unbekannt" — die anderen bleiben stehen.
+ * Drei Paneele, drei Stände: Pegel, Warnungen und Vorhersage kommen aus zwei Quellen (PEGELONLINE,
+ * Bright Sky) und tragen je ihren Stand. Fällt eine aus, zeigt nur ihr Paneel „Stand unbekannt".
  * Der Seitenkopf zeigt den ältesten Abruf (`gemeinsamerDatenstand`).
  *
- * LESESEITE: gepflegt wird in Einstellungen › Pegel (Festlegen, Reihenfolge, Prognose). Die
- * Primäraktion im Kopf ÖFFNET dorthin (LFH-346: der Kopf-Slot trägt, was öffnet); diese Seite
- * schreibt nichts und braucht darum keinen Rechte-Hinweis — die Einstellungsseite nennt ihn
- * selbst.
+ * Leseseite: gepflegt wird in Einstellungen › Pegel. Die Primäraktion im Kopf öffnet dorthin; diese
+ * Seite schreibt nichts und braucht keinen Rechte-Hinweis.
  *
- * KEIN LIVE-EREIGNIS: alle drei Abfragen fragen alle 5 min nach. Die Uhr (30 s) lässt
- * „veraltet" auch ohne neuen Abruf umschlagen.
+ * Kein Live-Ereignis: alle drei Abfragen fragen alle 5 min nach. Die Uhr (30 s) lässt „veraltet"
+ * auch ohne Abruf umschlagen.
  */
 export default function WetterPegelPage() {
   const { id } = useParams();
@@ -79,9 +75,9 @@ export default function WetterPegelPage() {
   const verlaufQuery = useQuery(pegelVerlaufAbfrage(einsatzId));
   const wetterQuery = useQuery(wetterAbfrage(einsatzId));
 
-  // Den Verlauf an die Liste koppeln (siehe `verlaufLuecke`): jede NEUE Listenantwort zieht
-  // ihn einmal nach, solange eine Lücke besteht. Bleibt sie, geschieht bis zur nächsten
-  // Listenantwort nichts — keine Schleife.
+  // Den Verlauf an die Liste koppeln (siehe `verlaufLuecke`): jede neue Listenantwort zieht ihn
+  // einmal nach, solange eine Lücke besteht. Bleibt sie, geschieht bis zur nächsten Listenantwort
+  // nichts — keine Schleife.
   const luecke = verlaufLuecke(pegelQuery.data ?? [], verlaufQuery.data);
   const { refetch: verlaufNeuLaden } = verlaufQuery;
   useEffect(() => {

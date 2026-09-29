@@ -9,7 +9,7 @@ import type { Bereitstellungsraum, BrStatus } from '../../api/types';
 import { brStatus } from '../../theme/statusFarben';
 import EinstiegSwitcher from '../../components/EinstiegSwitcher';
 
-/** Sortierrang — fachliche Reihenfolge dieser Liste, keine Darstellung (bleibt lokal, s. Bestand). */
+/** Sortierrang — fachliche Reihenfolge dieser Liste, keine Darstellung. */
 const STATUS_RANG: Record<BrStatus, number> = { aktiv: 0, geplant: 1, aufgeloest: 2 };
 
 /** Header-Switcher im BR-Detail — BR-Belegung von `EinstiegSwitcher`. */

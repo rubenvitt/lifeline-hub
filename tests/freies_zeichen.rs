@@ -7,84 +7,23 @@
 //! DELETE Schreibrecht+aktiv+Modul; Org-Isolation), SSE-Event `freies_zeichen` (Wire-Tag +
 //! Payload load-bearing für das Frontend).
 //!
-//! Harness 1:1 aus tests/lage_zone.rs; `setup()` liefert zusätzlich den LiveHub-Klon
+//! Harness aus tests/common; `setup_mit_live()` liefert zusätzlich den LiveHub-Klon
 //! (teilt den inneren Arc mit dem AppState), damit der SSE-Test direkt mithören kann.
 
 use axum::http::StatusCode;
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::{LiveHub, LiveNachricht};
 use serde_json::{json, Value};
 use std::time::Duration;
-use tokio::sync::broadcast::Receiver;
 
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, karten_ansicht_anlegen, login_cookie,
-    standard_ansicht_id,
+    recv_until_tag, setup_mit_live, setup_mit_pool, standard_ansicht_id,
 };
-
-async fn setup() -> (axum::Router, LiveHub) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let live = LiveHub::new();
-    let router = build_router(AppState {
-        pool,
-        live: live.clone(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, live)
-}
-
-/// Wie `setup()`, liefert aber zusätzlich den Pool-Klon für den Test-Shortcut „Einsatz
-/// abschließen" (direkter DB-UPDATE, umgeht die Abschluss-Route). Vorbild: `setup_mit_pool`
-/// in tests/einsatz_uhs.rs.
-async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let router = build_router(AppState {
-        pool: pool.clone(),
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, pool)
-}
 
 /// Fremder Nutzer ohne Einsatz-Mitgliedschaft und ohne höhere Berechtigung (org_rolle="keine").
 async fn fremder_nutzer(app: &axum::Router, admin: &str) -> String {
     benutzer_anlegen(app, admin, "fremd", "keine").await;
     login_cookie(app, "fremd", "fremdpw1").await
-}
-
-async fn recv_until_tag(
-    rx: &mut Receiver<LiveNachricht>,
-    tag: &str,
-    timeout: Duration,
-) -> LiveNachricht {
-    loop {
-        let n = tokio::time::timeout(timeout, rx.recv())
-            .await
-            .unwrap_or_else(|_| panic!("Timeout: kein '{tag}'-Event empfangen"))
-            .expect("Broadcast-Kanal geschlossen");
-        if n.event.as_str() == tag {
-            return n;
-        }
-    }
 }
 
 fn neu_body() -> String {
@@ -98,7 +37,7 @@ fn neu_body() -> String {
 
 #[tokio::test]
 async fn anlegen_und_liste() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
@@ -135,7 +74,7 @@ async fn anlegen_und_liste() {
 /// darunter deckt das beide Wege zum selben Code ab: Extractor und Handler-Validierung.
 #[tokio::test]
 async fn fehlendes_grundzeichen_ist_400() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
@@ -162,7 +101,7 @@ async fn fehlendes_grundzeichen_ist_400() {
 /// Objekt-Zustand), nicht das Feld für sich.
 #[tokio::test]
 async fn leeres_grundzeichen_ist_400() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
@@ -186,7 +125,7 @@ async fn leeres_grundzeichen_ist_400() {
 /// still mit; jetzt fasst er nur die gesendeten Felder an. lat/lon bleiben unverschiebbar.
 #[tokio::test]
 async fn crud_teil_patch_haelt_lat_lon_und_overlays() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
@@ -278,7 +217,7 @@ async fn zeichen_mit_allen_overlays(app: &axum::Router, admin: &str, einsatz: i6
 /// Body `{"label": …}` allein — der ist überhaupt erst seit LFH-306 zulässig.
 #[tokio::test]
 async fn patch_nur_label_laesst_overlays_stehen() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let zid = zeichen_mit_allen_overlays(&app, &admin, einsatz).await;
@@ -321,7 +260,7 @@ async fn patch_nur_label_laesst_overlays_stehen() {
 /// trifft GENAU das gesendete Feld — die übrigen sechs Overlays bleiben stehen.
 #[tokio::test]
 async fn patch_organisation_null_loescht_nur_diese() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let zid = zeichen_mit_allen_overlays(&app, &admin, einsatz).await;
@@ -350,7 +289,7 @@ async fn patch_organisation_null_loescht_nur_diese() {
 /// unberührt — dort ist das Feld strukturell Pflicht.
 #[tokio::test]
 async fn patch_ohne_grundzeichen_behaelt_grundzeichen() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let zid = zeichen_mit_allen_overlays(&app, &admin, einsatz).await;
@@ -381,7 +320,7 @@ async fn patch_ohne_grundzeichen_behaelt_grundzeichen() {
 
 #[tokio::test]
 async fn patch_und_delete_fremder_einsatz_oder_id_ist_404() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let a = einsatz_anlegen(&app, &admin).await;
     let b = einsatz_anlegen(&app, &admin).await;
@@ -440,7 +379,7 @@ async fn patch_und_delete_fremder_einsatz_oder_id_ist_404() {
 
 #[tokio::test]
 async fn org_isolation_fremder_nutzer_kann_nicht_lesen_oder_schreiben() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let (_, z) = anfrage(
@@ -511,7 +450,7 @@ async fn org_isolation_fremder_nutzer_kann_nicht_lesen_oder_schreiben() {
 
 #[tokio::test]
 async fn sse_feuert_bei_post_patch_delete() {
-    let (app, live) = setup().await;
+    let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mut rx = live.abonniere(einsatz);
@@ -655,7 +594,7 @@ async fn zeichen_anlegen(
 /// POST mit `ansicht_id` stempelt die Zugehörigkeit des freien Zeichens.
 #[tokio::test]
 async fn anlegen_mit_ansicht_id_stempelt_zugehoerigkeit() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let aid = standard_ansicht_id(&app, &admin, einsatz).await;
@@ -676,7 +615,7 @@ async fn anlegen_mit_ansicht_id_stempelt_zugehoerigkeit() {
 /// Assertion, Mutationsprobe-Ziel).
 #[tokio::test]
 async fn liste_ansicht_filtert_fremde_aus_haelt_null() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let x = standard_ansicht_id(&app, &admin, einsatz).await;

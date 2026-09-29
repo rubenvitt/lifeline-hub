@@ -64,9 +64,10 @@ const ORG_OPTIONEN = [
 
 const TAKTISCHE_TYPEN: MarkerTyp[] = ['einheit', 'fahrzeug', 'fuehrung', 'abschnitt'];
 
-/** Mappt Marker-Typ auf Backend-Tag für exclude-Parameter der Ort-Vorschau.
- *  `fuehrung` → `personal` (Führungskraft liegt in der personal-Tabelle).
- *  `abschnitt` → kein eindeutiges Backend-Tag → undefined (exclude weggelassen). */
+/**
+ * Marker-Typ → Backend-Tag für den exclude-Parameter der Ort-Vorschau. `fuehrung` → `personal`
+ * (Führungskraft liegt in der personal-Tabelle); `abschnitt` hat kein eindeutiges Tag → undefined.
+ */
 function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined {
   switch (m.typ) {
     case 'einsatzort':
@@ -88,21 +89,20 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
       return undefined;
     case 'abschnitt':
       return undefined;
-    // Betroffene (LFH-648) stehen in keiner Peilungsquelle der Ort-Vorschau (sie prüft nur
-    // den Einsatz-Lesezugriff und darf deshalb keine Personen kennen) → nichts auszuschließen.
+    // Betroffene stehen in keiner Peilungsquelle der Ort-Vorschau (sie prüft nur den
+    // Einsatz-Lesezugriff und darf keine Personen kennen).
     case 'person':
       return undefined;
-    // Betreuungsstellen (LFH-673) aus demselben Grund nicht: die Peilung kennt nur, was jeder
-    // Einsatz-Leser sehen darf, und die Stellen hängen am Modul Betreuung.
+    // Betreuungsstellen ebenso: die Peilung kennt nur, was jeder Einsatz-Leser sehen darf.
     case 'betreuungsstelle':
       return undefined;
   }
 }
 
 /**
- * Das taktische Zeichen als Bild-URL für die Symbol-Kachel — dieselbe Erzeugung wie die
- * Karten-Icons in `Kartenflaeche.tsx`. `null`, wenn das Zeichen sich nicht bauen lässt
- * (nicht DV-102-konforme Werte werfen synchron); dann trägt die Kachel das Kürzel.
+ * Das taktische Zeichen als Bild-URL für die Symbol-Kachel — wie die Karten-Icons in
+ * `Kartenflaeche.tsx`. `null`, wenn es sich nicht bauen lässt (nicht DV-102-konforme Werte werfen
+ * synchron); dann trägt die Kachel das Kürzel.
  */
 function tzBildUrl(tz: TzProps | undefined): string | null {
   if (!tz) return null;
@@ -140,10 +140,9 @@ function RasterZelle({ feld }: { feld: RasterFeld }) {
 }
 
 /**
- * Marker-Inspector im Paneel „Ausgewählt" der rechten Kartenleiste (Neuentwurf S5):
- * Symbol-Kachel mit dem taktischen Zeichen, Name, Mono-Unterzeile (Objektart · Typ),
- * Datenraster in zwei Spalten mit Augenbrauen — nur Felder mit Datenquelle, siehe
- * `auswahlRaster` —, bei einer Einheit die letzte Meldung (LFH-610), Ort, und die Aktionen.
+ * Marker-Inspector im Paneel „Ausgewählt": Symbol-Kachel, Name, Mono-Unterzeile, Datenraster (nur
+ * Felder mit Datenquelle, siehe `auswahlRaster`), bei einer Einheit die letzte Meldung, Ort und
+ * Aktionen.
  */
 export default function Inspector({
   einsatzId,
@@ -156,12 +155,11 @@ export default function Inspector({
 }: InspectorProps) {
   const { token, rollen } = useRollen();
   const { formatZeitKurz } = useAnzeigeKonventionen();
-  // Eigene ids statt fester Literale: der Inspector kann neben anderen Feldern derselben
-  // Beschriftung stehen, doppelte ids brächen die Label-Assoziation.
+  // Eigene ids: der Inspector kann neben Feldern derselben Beschriftung stehen.
   const fachaufgabeId = useId();
   const organisationId = useId();
   const modulLink = markerToUrl(marker, einsatzId);
-  // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig (LFH-146).
+  // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig.
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
   const bild = useMemo(() => tzBildUrl(marker.tz), [marker.tz]);
   const raster = auswahlRaster(marker, roh, formatZeitKurz);
@@ -200,8 +198,8 @@ export default function Inspector({
           ))}
         </dl>
       )}
-      {/* Eigener Block NEBEN dem Raster, nicht darin: ein Meldungstext ist kein Feld mit
-          Augenbraue über einem Wert, und im zweispaltigen `dl` bräche er auf die halbe Breite. */}
+      {/* Eigener Block neben dem Raster: ein Meldungstext ist kein Feld, und im zweispaltigen
+          `dl` bräche er auf halbe Breite. */}
       {letzte && (
         <section
           data-lfh="auswahl-letzte-meldung"
@@ -224,13 +222,9 @@ export default function Inspector({
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         <Augenbraue>Koordinate</Augenbraue>
-        {/* Drei Zeilen statt der vollen rückwärts aufgelösten Adresse: die füllt die
-            300-px-Leiste sonst ein halbes Dutzend Zeilen und drückt die Aktionen aus dem
-            Blick. Die Koordinate darüber bleibt ungekürzt — sie ist die tragende Angabe.
-            Drei und nicht zwei, weil der Tooltip mit dem vollen Wortlaut an `hover`/`focus`
-            hängt und die Karte auf Touch bedient wird: was hier steht, muss ohne ihn
-            tragen. Wo das nicht reicht, führt der Knopf darunter ins Fach-Modul, das die
-            Adresse ungekürzt zeigt. */}
+        {/* Drei Zeilen statt der vollen Adresse, die die 300-px-Leiste sonst füllte. Nicht zwei:
+            der Tooltip mit dem vollen Wortlaut hängt an Hover/Fokus, und auf Touch muss das
+            Sichtbare tragen. Die Koordinate darüber bleibt ungekürzt. */}
         <KoordinatenAnzeige
           lat={marker.lat}
           lon={marker.lon}
@@ -239,14 +233,12 @@ export default function Inspector({
           maxOrtZeilen={3}
         />
       </div>
-      {/* `GeoKennzahlen` rendert ohne Kennzahlen nichts — der Punkt-Marker ohne Geometrie
-          ist hier der Regelfall, also kein Wrapper mit eigenem Abstand. */}
+      {/* `GeoKennzahlen` rendert ohne Kennzahlen nichts — also kein Wrapper mit Abstand. */}
       {kennzahlen && <GeoKennzahlen kennzahlen={kennzahlen} />}
       {symbolAuswahl && (
         <Space orientation="vertical" size={token.marginXS} style={{ width: '100%' }}>
-          {/* Kein `aria-label` mehr: das FeldLabel trägt den Namen. Zwei Quellen wären eine
-              doppelte Benennung, bei der `aria-label` gewinnt und den sichtbaren Text vom
-              Accessible Name abkoppelt. */}
+          {/* Das FeldLabel trägt den Namen; ein zusätzliches `aria-label` gewönne und koppelte
+              den sichtbaren Text vom Accessible Name ab. */}
           <FeldLabel text="Fachaufgabe" htmlFor={fachaufgabeId}>
             <Select
               id={fachaufgabeId}
@@ -269,26 +261,20 @@ export default function Inspector({
           </FeldLabel>
         </Space>
       )}
-      {/* Senkrecht, nicht nebeneinander: die Leiste ist 300 px breit, die beiden volltextigen
-          Knöpfe tragen zusammen rund 300 px Eigenbreite und passen damit in keiner
-          Dichtestufe nebeneinander. Dieselbe Bauform wie in `ZonenInspector` und
-          `FreiesZeichenInspector`. Kein Dreipunkt-Menü: gezählt wird nach der Rechteprüfung
-          (LFH-366), und es bleiben höchstens zwei HANDLUNGEN — ein Menü wäre ein Umweg.
-          Die Sprünge „Im Fachmodul öffnen" und „ETB" (LFH-616, nur an der Einheit) zählen
-          als EINE Zeile Navigation, nicht als zwei Aktionen: sie ändern nichts, und der
-          Entwurf S5 stellt sie als Paar nebeneinander.
-          `size="middle"`: der rote Knopf steht nicht bündig unter dem blauen (LFH-363). */}
+      {/* Senkrecht: die zwei volltextigen Knöpfe passen in der 300-px-Leiste in keiner
+          Dichtestufe nebeneinander (wie `ZonenInspector`, `FreiesZeichenInspector`). Kein
+          Dreipunkt-Menü: es bleiben höchstens zwei Handlungen. Die Sprünge „Im Fachmodul öffnen"
+          und „ETB" zählen als eine Zeile Navigation, nicht als Aktionen. `size="middle"`: Rot
+          steht nicht bündig unter Blau. */}
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-        {/* Umbrechende Zeile statt fester Spalten: „ETB ↗" ist kurz, passt aber in der
-            Handschuh-Stufe nicht mehr neben den Fachmodul-Knopf — dann bricht es darunter,
-            statt von der Karte abgeschnitten zu werden (`KartenDetailCard` scrollt). */}
+        {/* Umbrechende Zeile: in der Handschuh-Stufe bricht „ETB ↗" unter den Fachmodul-Knopf,
+            statt abgeschnitten zu werden. */}
         <div
           data-lfh="inspector-sprung"
           style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXS }}
         >
-          {/* `display: block` am Anker: er ist inline, sonst liefe das `block` am Knopf darin
-              ins Leere und die Zeile bliebe auf Textbreite. Das ↗ ist Deeplink-Zeichen des
-              Entwurfs und steht `aria-hidden` — der zugängliche Name bleibt die Handlung. */}
+          {/* `display: block` am inline-Anker, sonst bliebe die Zeile auf Textbreite. Das ↗
+              steht `aria-hidden`. */}
           <Link to={modulLink} style={{ display: 'block', flex: '1 1 auto' }}>
             <Button type="primary" block>
               {marker.typ === 'lagemeldung' ? 'Zur Quell-Meldung' : 'Im Fachmodul öffnen'}
@@ -296,7 +282,7 @@ export default function Inspector({
             </Button>
           </Link>
           {marker.typ === 'einheit' && (
-            // Der zugängliche Name trägt die Einheit: „ETB" allein sagte nicht, WESSEN.
+            // Der zugängliche Name trägt die Einheit: „ETB" allein sagte nicht, wessen.
             <Link
               to={etbPfad(einsatzId, { einheit_id: marker.id })}
               aria-label={`Einsatztagebuch zu ${marker.label}`}
@@ -308,16 +294,14 @@ export default function Inspector({
             </Link>
           )}
         </div>
-        {/* Lagemeldungen sind auf der Karte read-only: verortet wird ausschließlich beim
-            Übergeben (LFH-113). Re-/Ent-Verorten würde am ON-CONFLICT-Upsert ohnehin verpuffen. */}
+        {/* Lagemeldungen sind auf der Karte read-only: verortet wird nur beim Übergeben. */}
         {darfSchreiben &&
           marker.typ !== 'einsatzort' &&
           marker.typ !== 'lagemeldung' &&
           (marker.typ === 'abschnitt' ? (
-            // Ein Abschnitt steht NUR mit gezeichneter Fläche auf der Karte (`flaechen` in
-            // `useLagekarteDaten`), und sein Löschen schickt `flaeche_geojson: null` — die
-            // Fläche ist danach weg. Unumkehrbar, also Rückfrage (LFH-710, LFH-363). Käme je
-            // ein Abschnitt als Punkt dazu, gehörte diese Bedingung an die Geometrie.
+            // Ein Abschnitt steht nur mit Fläche auf der Karte, sein Löschen schickt
+            // `flaeche_geojson: null` — unumkehrbar, also Rückfrage. Käme je ein Abschnitt als
+            // Punkt dazu, gehörte diese Bedingung an die Geometrie.
             <Popconfirm
               title={`Fläche von „${marker.label}“ löschen?`}
               description="Die gezeichnete Fläche geht verloren und muss neu gezeichnet werden."
@@ -332,7 +316,7 @@ export default function Inspector({
             </Popconfirm>
           ) : (
             // Ein Punkt lässt sich über „Auf Karte verorten" neu setzen: umkehrbar, keine
-            // Rückfrage (LFH-363).
+            // Rückfrage.
             <Button danger block onClick={() => onVerortungLoeschen(marker)}>
               Verortung löschen
             </Button>

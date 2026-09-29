@@ -1,22 +1,16 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
- * Öffnungswege der Sprungpalette im ECHTEN Browser (LFH-645, Raycast-Muster).
+ * Öffnungswege der Sprungpalette im echten Browser. In Vitest ist `window.open` ein Spy; ein
+ * neuer Tab ist aber immer ein KALTSTART (kein Query-Cache, kein Router-Zustand, nur Cookie
+ * und URL). Gemessen wird deshalb im neuen Tab am ZIEL und im alten daran, dass er stehen
+ * blieb.
  *
- * WARUM NICHT NUR VITEST: dort ist `window.open` ein Spy — belegt ist, DASS der Aufruf
- * geschieht, nicht, dass im neuen Tab etwas Brauchbares ankommt. Ein neuer Tab ist immer ein
- * KALTSTART: kein warmer Query-Cache, kein Router-Zustand, nur Cookie und URL. Genau dort ist
- * ein Deeplink schon einmal still gescheitert (Review zu LFH-340, `?platzieren=`). Gemessen
- * wird deshalb im neuen Tab am ZIEL — Überschrift der Personenseite, Pfad der Lagekarte —
- * und im alten Tab daran, dass er stehen blieb.
+ * Die Vorschau läuft ebenfalls hier: ob der Palette-Handler im Portal VOR dem globalen
+ * Dispatcher auf `window` `preventDefault` setzt, ist eine Frage der echten
+ * Ereignisreihenfolge.
  *
- * Die Vorschau wird hier ebenfalls gefahren, weil jsdom den zweiten Weg nicht sieht: der
- * globale Dispatcher läuft auf `window`, und ob der Palette-Handler im Portal VOR ihm
- * `preventDefault` setzt, ist eine Frage der echten Ereignisreihenfolge.
- *
- * SEEDING über die Oberfläche (Schnellerfassung) wie in `palette-datensaetze.spec.ts` — die
- * Kennung kommt aus der Quittung. KEIN `networkidle`: auf Einsatzrouten bleibt ein SSE-Strom
- * offen (LFH-385).
+ * Seeding über die Schnellerfassung (Kennung aus der Quittung); kein `networkidle`.
  */
 
 const ADMIN = 'admin';
@@ -28,7 +22,6 @@ function paletteInput(page: Page): Locator {
   return page.getByPlaceholder(/Suchen: Module/);
 }
 
-// Login-/Anlege-Helfer wie in `palette-datensaetze.spec.ts` — es gibt kein geteiltes Modul.
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -70,7 +63,7 @@ function personOption(page: Page, kennung: string): Locator {
   return page.getByRole('option', { name: new RegExp(kennung) });
 }
 
-/** Das Tippziel „Vorschau" rechts in einer Zeile (LFH-665). */
+/** Das Tippziel „Vorschau" rechts in einer Zeile. */
 function vorschauZiel(zeile: Locator): Locator {
   return zeile.locator('[data-lfh="palette-vorschau-ziel"]');
 }
@@ -103,10 +96,9 @@ test('Strg+↵ öffnet eine Person im neuen Tab — kalt, angemeldet, am Datensa
 });
 
 /**
- * Eine FESTE Navigationszeile (Modul) — sie kommt aus `useBefehle`, nicht aus dem
- * Datensatz-Finder. Genau dieser Weg verwarf die Öffnungsart (Review-Befund): der Hook hatte
- * ein eigenes `navigate` und reichte nur den Pfad weiter. Strg/⌘+KLICK zugleich, damit auch
- * der Mausweg im Browser belegt ist.
+ * Eine FESTE Navigationszeile (Modul) aus `useBefehle`, nicht aus dem Datensatz-Finder — ein
+ * eigener Weg, der die Öffnungsart verlieren kann. Strg/⌘+KLICK, damit auch der Mausweg
+ * belegt ist.
  */
 test('Strg/⌘+Klick auf ein Modul öffnet es im neuen Tab, der alte Tab bleibt', async ({
   page,
@@ -173,8 +165,8 @@ test('→ zeigt die Personenvorschau in der Palette, Esc führt zurück, ein zwe
   await expect(vorschau).toBeHidden();
   await expect(paletteInput(page)).toHaveValue(kennung);
   await expect(personOption(page, kennung)).toHaveAttribute('aria-selected', 'true');
-  // Im BLICK, nicht nur markiert: die Liste kommt mit `scrollTop` 0 zurück (Review-Befund).
-  // `toBeVisible` hielte auch eine Zeile unterhalb des sichtbaren Bereichs für sichtbar.
+  // Im BLICK, nicht nur markiert: die Liste kommt mit `scrollTop` 0 zurück. `toBeVisible`
+  // hielte auch eine Zeile unterhalb des sichtbaren Bereichs für sichtbar.
   await expect(personOption(page, kennung)).toBeInViewport();
 
   await page.keyboard.press('Escape');
@@ -182,28 +174,21 @@ test('→ zeigt die Personenvorschau in der Palette, Esc führt zurück, ein zwe
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb`));
 });
 
-/** Schlüssel der gespeicherten Dichtewahl (`e2e/dichte.spec.ts`). */
+/** Schlüssel der gespeicherten Dichtewahl. */
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 
-/**
- * Böden der Dichte-Staffel als LITERALE (CLAUDE.md, Gate 3): aus dem Token zurückgelesen
- * prüfte die Messung den Token gegen sich selbst.
- */
+/** Böden der Dichte-Staffel als LITERALE — aus dem Token gelesen prüfte die Messung sich selbst. */
 const BODEN = { kompakt: 30, komfortabel: 48, handschuh: 72 } as const;
 
 /**
- * Beide sichtbaren Wege der Vorschau, gemessen über alle drei Stufen:
+ * Beide sichtbaren Wege der Vorschau über alle drei Stufen:
  *
- * HINEIN das Tippziel (LFH-665), ein handgebautes Bedienziel mit `vorschauZielStil`. Gemessen
- * werden Höhe UND Breite gegen den Boden und seine Lage in der Zeile: es endet bündig an deren
- * rechter Kante und füllt ihre volle Höhe — daneben bleibt kein Streifen, der zur Zeile
- * gehörte und dort den Datensatz öffnete. Geöffnet wird die Vorschau hier per KLICK auf das
- * Ziel, nicht per →: der Tastaturweg steht im Test darüber.
+ * HINEIN das Tippziel (`vorschauZielStil`): Höhe UND Breite gegen den Boden, bündig an der
+ * rechten Kante über die volle Zeilenhöhe — daneben bliebe sonst ein Streifen, der den
+ * Datensatz öffnete. Geöffnet per KLICK aufs Ziel; der Tastaturweg steht im Test darüber.
  *
- * ZURÜCK „Zurück", ein antd-`Button`, der seine Höhe vom `ConfigProvider` erben soll. Das ist
- * eine ANNAHME, bis sie gemessen ist (LFH-396: ein Inline-`<a>` erbte gemessen 17 px in jeder
- * Stufe). Er ist neben Esc/← der einzige Weg zurück, und für Maus und Finger der einzige
- * sichtbare.
+ * ZURÜCK „Zurück", ein antd-`Button`, der seine Höhe erben soll — eine Annahme, bis sie
+ * gemessen ist. Für Maus und Finger der einzige sichtbare Weg zurück.
  */
 test('Vorschau-Ziel und „Zurück" halten den Dichte-Boden in allen drei Stufen', async ({
   page,
@@ -255,10 +240,9 @@ test('Vorschau-Ziel und „Zurück" halten den Dichte-Boden in allen drei Stufen
 });
 
 /**
- * Das Akzeptanzkriterium aus LFH-665 als echter TIPP auf dem Führungs-Tablet (1024 × 768,
- * `hasTouch`, Stufe Handschuh): ein Tipp aufs Ziel öffnet die Vorschau und lässt die Seite
- * stehen, ein Tipp auf die übrige Zeile öffnet die Person wie bisher. Erst der Tipp belegt die
- * Treffertrennung — `toBeVisible()` ist kein Beleg für Bedienbarkeit (LFH-355).
+ * Als echter TIPP auf dem Führungs-Tablet (Handschuh): ein Tipp aufs Ziel öffnet die Vorschau
+ * und lässt die Seite stehen, ein Tipp auf die übrige Zeile öffnet die Person. Erst der Tipp
+ * belegt die Treffertrennung.
  */
 test.describe('Tablet', () => {
   test.use({ hasTouch: true, viewport: { width: 1024, height: 768 } });
@@ -299,11 +283,8 @@ test.describe('Tablet', () => {
 });
 
 /**
- * Der engste Fall (LFH-665, Review-Befund): Handschirm 390 px in der Stufe Handschuh. Das Ziel
- * belegt dort 72 px, daneben stehen Kontext (`nowrap`), ↵-Marke und Abstände. Das Label darf
- * umbrechen (`minWidth: 0`), die Zeile aber nicht über ihre Box hinausragen, und das Ziel muss
- * ganz im Blick und tippbar bleiben. `gate1-ueberlauf.spec.ts` fährt keine Palette mit einer
- * Vorschau-Zeile, deshalb steht die Messung hier.
+ * Der engste Fall: Handschirm 390 px in der Stufe Handschuh. Das Label darf umbrechen, die
+ * Zeile aber nicht über ihre Box ragen, und das Ziel muss ganz im Blick und tippbar bleiben.
  */
 test.describe('Handschirm', () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
@@ -345,9 +326,8 @@ test.describe('Handschirm', () => {
 });
 
 /**
- * Vorschauen der übrigen Datensatzsorten (LFH-664). Geseedet wird hier über die API, nicht
- * über die Oberfläche: eine Meldung mit erteiltem Auftrag entstünde sonst erst nach zwei
- * Formularen, und keins davon ist Gegenstand dieses Tests.
+ * Vorschauen der übrigen Datensatzsorten. Seeding über die API: eine Meldung mit Auftrag
+ * entstünde sonst erst nach zwei Formularen, die nicht Gegenstand dieses Tests sind.
  */
 async function apiPost(page: Page, pfad: string, data: unknown) {
   const antwort = await page.request.post(pfad, { data });
@@ -385,17 +365,15 @@ test('→ zeigt eine Meldung, und ihr Verweis „↗ Auftrag" führt hin und sch
   // Nur lesen: die Triage-Knöpfe der Meldungskarte stehen in der Vorschau nicht.
   await expect(vorschau.getByRole('button', { name: 'Sichten' })).toHaveCount(0);
 
-  // Geklickt, nicht nur `toBeVisible` — nur der Klick belegt, dass der Weg trägt (CLAUDE.md).
+  // Geklickt, nicht nur `toBeVisible` — nur der Klick belegt, dass der Weg trägt.
   await vorschau.getByRole('link', { name: /Auftrag/ }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/auftraege\\?auftrag=\\d+`));
   await expect(paletteInput(page)).toBeHidden();
 });
 
 /**
- * Über die VOLLTEXTSUCHE gefunden, nicht über die Nummer: `#1` hätte hinter dem Präfix nur ein
- * Zeichen und läge unter `DATENSATZ_MINDESTZEICHEN`. Der Volltextweg ist zugleich der
- * strengere — die Vorschau liest den Eintrag dann KALT über den Nummerncursor nach und prüft
- * die `id` (Design, Entscheidung 2).
+ * Über die VOLLTEXTSUCHE gefunden: `#1` läge unter `DATENSATZ_MINDESTZEICHEN`. Der strengere
+ * Weg — die Vorschau liest den Eintrag KALT über den Nummerncursor nach und prüft die `id`.
  */
 test('→ zeigt einen ETB-Eintrag aus der Volltextsuche', async ({ page }) => {
   await anmelden(page);

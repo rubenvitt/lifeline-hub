@@ -75,10 +75,8 @@ pub async fn anlegen(
     laden(pool, org_id, id).await
 }
 
-/// Teil-Patch der editierbaren Felder (LFH-306, Tri-State): die äußere `Option` sagt
-/// „im Patch enthalten?" — `None` lässt die Spalte unverändert. Bei den nullable Spalten
-/// `farbe`/`fms_anker` trägt der Wert selbst noch eine `Option`: `Some(None)` setzt sie
-/// auf NULL.
+/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“; bei `farbe`/`fms_anker` setzt
+/// `Some(None)` NULL.
 #[derive(Debug, Default)]
 pub struct StatusPatch<'a> {
     pub label: Option<&'a str>,
@@ -88,14 +86,12 @@ pub struct StatusPatch<'a> {
     pub sortier: Option<i64>,
 }
 
-/// Teil-Patch der editierbaren Felder (org-scoped). `NotFound`/`Conflict` analog Stamm.
+/// Teil-Patch der editierbaren Felder (org-scoped); `NotFound`/`Conflict` wie beim Stamm.
 ///
-/// Flag/Wert-Paare statt COALESCE (LFH-266/F12, Vorlage `personal/status_repo.rs`): erst so
-/// lassen sich `farbe`/`fms_anker` über die API wieder auf NULL setzen, und ein nicht
-/// gesendetes Feld fasst seine Spalte nicht an. Die Parameter sind nummeriert, weil eine um
-/// eine Position verschobene Bind-Kette gleichtypige Nachbarspalten (`label`↔`kategorie`,
-/// `fms_anker`↔`sortier`) STILL vertauschen würde — abgesichert von
-/// `patche_setzt_jede_spalte_an_ihren_platz`.
+/// Flag/Wert-Paare statt COALESCE: so lassen sich `farbe`/`fms_anker` wieder auf NULL setzen,
+/// und ein nicht gesendetes Feld bleibt stehen. Nummerierte Parameter, damit eine verschobene
+/// Bind-Kette `label`↔`kategorie` bzw. `fms_anker`↔`sortier` nicht still vertauscht
+/// (`patche_setzt_jede_spalte_an_ihren_platz`).
 pub async fn patche(
     pool: &SqlitePool,
     org_id: i64,
@@ -150,9 +146,8 @@ pub async fn deaktivieren(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(),
     Ok(())
 }
 
-/// `id` des ersten aktiven Status einer Kategorie (deterministisch nach `sortier`,
-/// dann `id`); `None`, wenn die Org keinen solchen aktiven Status hat. Variante auf
-/// offener Connection/Transaktion (F06/LFH-244 Tier-A: atomares Disponieren).
+/// `id` des ersten aktiven Status einer Kategorie (nach `sortier`, dann `id`); `None`, wenn es
+/// keinen gibt. Variante auf offener Verbindung (atomares Disponieren).
 pub async fn erster_der_kategorie_tx(
     conn: &mut sqlx::SqliteConnection,
     org_id: i64,
@@ -308,10 +303,8 @@ mod tests {
         assert!(!ist_in_org(&pool, 2, s.id).await.unwrap(), "fremde Org");
     }
 
-    /// Bind-Reihenfolge der Flag/Wert-Kette: alle fünf Spalten in EINEM Patch auf distinkte
-    /// Werte setzen und einzeln prüfen. Eine um eine Position verschobene Kette würde
-    /// `label`↔`kategorie` bzw. `fms_anker`↔`sortier` still vertauschen — ohne Compile-
-    /// und ohne Laufzeitfehler.
+    /// Bind-Reihenfolge: alle fünf Spalten in EINEM Patch auf distinkte Werte setzen und einzeln
+    /// prüfen.
     #[tokio::test]
     async fn patche_setzt_jede_spalte_an_ihren_platz() {
         let pool = crate::db::test_pool().await;
@@ -340,8 +333,8 @@ mod tests {
         assert_eq!(neu.sortier, 42);
     }
 
-    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an. Der
-    /// `Default`-Patch (alle Felder absent) darf die Zeile Byte für Byte so lassen.
+    /// Ein Patch fasst NUR die gesendeten Spalten an; der `Default`-Patch lässt die Zeile
+    /// unverändert.
     #[tokio::test]
     async fn patche_laesst_nicht_gesendete_spalten_stehen() {
         let pool = crate::db::test_pool().await;
@@ -384,8 +377,7 @@ mod tests {
         assert_eq!(unveraendert.fms_anker, Some(3));
     }
 
-    /// `Some(None)` ist der Leerwunsch und muss von „absent" unterscheidbar sein —
-    /// grenzt gegen `patche_laesst_nicht_gesendete_spalten_stehen` ab.
+    /// `Some(None)` ist der Leerwunsch und von „absent“ unterscheidbar.
     #[tokio::test]
     async fn patche_null_loescht_farbe_und_fms_anker() {
         let pool = crate::db::test_pool().await;
@@ -421,8 +413,8 @@ mod tests {
         assert_eq!(neu.sortier, 10, "Nachbarfeld unberührt");
     }
 
-    /// `fms_anker = 0` ist ein gültiger FMS-Status, KEIN Leerwunsch — eine Implementierung,
-    /// die `0` wie „leer" behandelt (Falsy-Prüfung statt Tri-State), fällt hier durch.
+    /// `fms_anker = 0` ist ein gültiger FMS-Status, kein Leerwunsch — eine Falsy-Prüfung statt
+    /// Tri-State fällt hier durch.
     #[tokio::test]
     async fn patche_fms_anker_null_wert_wird_gesetzt_nicht_geloescht() {
         let pool = crate::db::test_pool().await;

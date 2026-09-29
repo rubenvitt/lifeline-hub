@@ -2,35 +2,17 @@ import { expect, test, type Page } from '@playwright/test';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 
 /**
- * LFH-465 — verankerte Aktionsleiste am Befehlsentwurf, Prüflisten-Zeile 13 der
- * Bedien-Leitlinie (WCAG 2.4.11 „Focus Not Obscured (Minimum)").
+ * Verankerte Aktionsleiste am Befehlsentwurf, Prüflisten-Zeile 13 der Bedien-Leitlinie
+ * (WCAG 2.4.11 „Focus Not Obscured (Minimum)"): eine sticky Leiste über einem langen
+ * Markdown-Formular ist genau die Konstruktion, auf die 2.4.11 zielt. Die Struktur prüft
+ * `src/pages/BefehlDetailPage.test.tsx`.
  *
- * ── WARUM ES DIESE DATEI GIBT ───────────────────────────────────────────────────────────
- * LFH-343 · C8 hat den Halbsatz „unterhalb des Tablet-Breakpoints die Aktionsleiste am
- * unteren Rand verankern" AUSDRÜCKLICH offen gelassen, mit dieser Begründung: eine sticky
- * Leiste über einem langen Markdown-Formular ist genau die Konstruktion, auf die 2.4.11
- * zielt — das unterste fokussierte Feld läge dahinter. Sie einzubauen, ohne das zu messen,
- * hieße einen Befund gegen einen anderen zu tauschen. Diese Datei ist die Messung.
+ * DIE UNGLEICHHEIT TRÄGT: bei 1024 px gibt es keine verankerte Leiste, „kein Ziel verdeckt"
+ * ist dort trivial wahr. Der 1024-Lauf behauptet deshalb die ABWESENHEIT der Verankerung
+ * (`position: static`) — ein Bau, der in jeder Breite verankert, wird daran rot.
  *
- * ── WARUM NICHT IN VITEST ───────────────────────────────────────────────────────────────
- * jsdom rechnet kein Layout: `position: sticky` hat dort keine geometrische Wirkung, jedes
- * Rechteck ist 0×0. Die STRUKTUR (ein Aktionsblock, zwei Orte, Autosave-Beleg geht mit)
- * fällt in `src/pages/BefehlDetailPage.test.tsx`; hier fällt, was nur ein echter Browser
- * beantwortet.
- *
- * ── DIE UNGLEICHHEIT TRÄGT, NICHT DER 390-ER LAUF ALLEIN ────────────────────────────────
- * Bei 1024 px gibt es keine verankerte Leiste, „kein Ziel verdeckt" ist dort also trivial
- * wahr — und `fixierteKandidaten > 0` fängt das nicht ab, weil die App-Kopfzeile ohnehin
- * fixiert ist. Der 1024-Lauf behauptet deshalb ausdrücklich die ABWESENHEIT der Verankerung
- * (`position: static` am Aktionsblock). Ein Bau, der in jeder Breite verankert, wird daran
- * rot; ohne diese Zeile bliebe er grün.
- *
- * ── SELBSTBEWEIS GEGEN DIE ECHTE LEISTE ─────────────────────────────────────────────────
- * Der Messkern bringt seinen eigenen Positivnachweis mit (`fokus-verdeckung.spec.ts`, erster
- * Test, mit einem erfundenen Vollbild-Verdecker). Der reicht hier nicht: er belegt, dass der
- * Kern rechnen kann, nicht dass DIESE Leiste verdecken würde, wenn der Fokus-Scroll sie
- * ignorierte. Der letzte Test setzt eine Sonde als GESCHWISTER hinter die echte Leiste
- * (Vorfahren sind im Kern ausgenommen) und prüft die Gegenprobe am selben Ziel gleich mit.
+ * SELBSTBEWEIS GEGEN DIE ECHTE LEISTE: der letzte Test setzt eine Sonde als GESCHWISTER hinter
+ * die echte Leiste (Vorfahren nimmt der Kern aus) und prüft die Gegenprobe am selben Ziel.
  */
 
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -47,23 +29,16 @@ const AKTIONEN = ['Drucken / als PDF', 'Entwurf speichern', 'Freigeben'];
 
 /**
  * Kleinster freier Streifen zwischen der Oberkante eines per Tabulator angesteuerten
- * Formularfelds und der Oberkante der verankerten Leiste, über `schritte` Schritte.
+ * Formularfelds und der Oberkante der verankerten Leiste.
  *
- * WARUM WEDER `toBeInViewport()` NOCH DER MESSKERN DAS TRAGEN. `toBeInViewport()` läuft mit
- * `ratio: 0` — ein Pixel Überschneidung mit dem Fenster genügt, und die Leiste liegt selbst
- * im Fenster; ein Feld zu 99 % hinter ihr wäre grün. Der Messkern wiederum meldet nur
- * VOLLSTÄNDIGE Verdeckung (WCAG 2.4.11 Minimum), und ein 164 px hohes Abschnittsfeld ist von
- * einer 78-px-Leiste nie vollständig verdeckt. Dazwischen liegt genau der gemessene
- * Fehlerfall: ohne den Fokus-Scroll-Abzug stand `einsatzunterstuetzung` beim
- * Tabulatorwechsel auf `top: 764`, während die Leiste bei 766 begann — der Streifen ist
- * dort MINUS ein Pixel; mit Abzug sind es 42 (`kompakt`) bzw. 133 (`handschuh`).
+ * `toBeInViewport()` (ratio 0) wäre auch bei einem Feld zu 99 % hinter der Leiste grün, und
+ * der Messkern meldet nur VOLLSTÄNDIGE Verdeckung — ein hohes Abschnittsfeld ist von der
+ * Leiste nie vollständig verdeckt. Dazwischen liegt der Fehlerfall: ohne Fokus-Scroll-Abzug
+ * stand ein Feld einen Pixel unter der Leistenoberkante.
  *
- * GEMESSEN WIRD IM DURCHLAUF, nicht an einem per `.focus()` angesprungenen Feld: ein
- * gezielter Fokus scrollt anders (`fuehrung_kommunikation` landet dabei frei bei `top: 461`),
- * und die Zusicherung wäre auch im Vorzustand grün — nachgemessen, bevor sie hier stand. Der
- * Zustand, um den es geht, entsteht beim schrittweisen Weitertabben.
- *
- * Die Knöpfe IN der Leiste sind ausgenommen: sie liegen bestimmungsgemäß dort.
+ * Gemessen im Durchlauf, nicht an einem per `.focus()` angesprungenen Feld: ein gezielter
+ * Fokus scrollt anders, und die Zusicherung wäre auch ohne Abzug grün. Die Knöpfe IN der
+ * Leiste sind ausgenommen.
  */
 async function kleinsterFreiraum(page: Page, schritte: number): Promise<number> {
   let kleinster = Number.POSITIVE_INFINITY;
@@ -94,8 +69,7 @@ async function entwurfBereit(
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
 
-  // Seeding per `page.request` (Cookie-Jar geteilt) statt über die Oberfläche — dieselbe
-  // Begründung wie in `fokus-verdeckung.spec.ts`.
+  // Seeding per `page.request` (Cookie-Jar geteilt).
   const einsatz = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Befehlsleiste ${Date.now()}` },
   });
@@ -108,16 +82,9 @@ async function entwurfBereit(
   const befehlId = (await befehl.json()).id as number;
 
   /**
-   * DIE DICHTESTUFE IST TEIL DER MESSUNG, nicht Beiwerk (Muster `fokus-verdeckung.spec.ts`,
-   * `einheitFokusBereit`). Die Leiste trägt vier Knöpfe, deren Höhe der Staffel 30/48/72 px
-   * folgt: gemessen 78 px in `kompakt`, 184 px in `handschuh` — mehr als das Doppelte. Ein
-   * Nachweis nur in `kompakt` ließe also den Fall aus, in dem ein Festwert oder ein am
-   * falschen Ort hängender Abzug am weitesten danebenläge.
-   *
-   * Was `handschuh` NICHT liefert, obwohl es naheliegt: einen Treffer des Messkerns. Auch
-   * bei 184 px Leiste ist kein Abschnittsfeld VOLLSTÄNDIG verdeckt (gemessen: 0
-   * Verdeckungen, Freiraum 133 px) — die scharfe Zusicherung dort ist die Kopplung, nicht
-   * die Geometrie. Das ist gemessen und ersetzt die frühere Vermutung an dieser Stelle.
+   * DIE DICHTESTUFE IST TEIL DER MESSUNG: die Leistenknöpfe folgen der Staffel, die Leiste ist
+   * in `handschuh` mehr als doppelt so hoch wie in `kompakt`. Einen Treffer des Messkerns
+   * liefert auch `handschuh` nicht — die scharfe Zusicherung dort ist die Kopplung.
    */
   await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
   await page.goto(`/einsaetze/${einsatzId}/auftraege/befehle/${befehlId}`);
@@ -125,12 +92,9 @@ async function entwurfBereit(
   const seite = page.locator('.befehl-print-root');
   await expect(seite.getByLabel('Titel')).toBeVisible();
 
-  // Benannte Fokusziele: ohne sie wäre ein Durchlauf grün, der das letzte Abschnittsfeld
-  // nie erreicht — und genau dort steht der Cursor, wenn die Leiste stört.
-  //
-  // AUF DIE SEITE GESCOPT, und das ist gemessen: ab `lg` steht das Modul-Akkordeon des
-  // Einsatzrahmens inline im Baum und trägt einen zweiten Treffer für „Lage" (das
-  // Lage-Modul). Ungescopt scheiterte der 1024-Lauf an der Fixture statt an der Sache.
+  // Benannte Fokusziele: ohne sie wäre ein Durchlauf grün, der das letzte Abschnittsfeld nie
+  // erreicht. Auf die Seite gescopt: ab `lg` trägt das Modul-Akkordeon einen zweiten Treffer
+  // für „Lage".
   const ziele: { name: string; ort: ReturnType<Page['getByLabel']> }[] = [
     { name: 'Titel', ort: seite.getByLabel('Titel') },
     ...ABSCHNITTE.map((name) => ({ name, ort: seite.getByLabel(name, { exact: true }) })),
@@ -167,16 +131,14 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
       'sticky',
     );
 
-    // Vorbedingung: ohne Bildlaufreserve klebt die Leiste am Seitenende statt über dem
-    // Inhalt, und jede Aussage darunter wäre trivial wahr.
+    // Vorbedingung: ohne Bildlaufreserve klebt die Leiste am Seitenende statt über dem Inhalt.
     const reserve = await page.evaluate(
       () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
     );
     expect(reserve, 'Vorbedingung: die Seite muss überhaupt scrollen').toBeGreaterThan(0);
 
-    // Das Akzeptanzkriterium wörtlich: Cursor im letzten Abschnittsfeld, „Freigeben"
-    // erreichbar ohne zu scrollen. `toBeInViewport`, nicht `toBeVisible` — ein Element
-    // unterhalb des sichtbaren Bereichs ist im Sinne von `toBeVisible` sichtbar.
+    // Cursor im letzten Abschnittsfeld, „Freigeben" erreichbar ohne zu scrollen —
+    // `toBeInViewport`, weil `toBeVisible` auch unterhalb des sichtbaren Bereichs besteht.
     await letzterAbschnitt.focus();
     await expect(seite.getByRole('button', { name: 'Freigeben', exact: true })).toBeInViewport();
 
@@ -184,13 +146,8 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
     await expect(letzterAbschnitt).toBeInViewport();
 
     /**
-     * Der Streifen, den `toBeInViewport()` und der Messkern beide nicht sehen — Begründung an
-     * `kleinsterFreiraum`. Die Schranke ist aus der Messung gesetzt, nicht gerundet
-     * abgeschrieben: im Vorzustand (ohne Abzug) sind es −1 px, mit Abzug 42 (`kompakt`) bzw.
-     * 133 (`handschuh`); die Mutationsprobe „Regel entfernt" färbt sie rot. Sie ist
-     * zugleich die einzige Zeile, die den Abzug auch dann prüft, wenn er am falschen
-     * Scrollport hinge — dort wäre die Eigenschaft gesetzt, aber wirkungslos, und die
-     * Kopplungsprüfung oben bliebe grün.
+     * Der Streifen, den `toBeInViewport()` und der Messkern nicht sehen (s. `kleinsterFreiraum`).
+     * Die einzige Zeile, die den Abzug auch prüft, wenn er am falschen Scrollport hinge.
      */
     await seite.getByRole('link', { name: 'Aufträge/Befehle' }).focus();
     const freiraum = await kleinsterFreiraum(page, 30);
@@ -200,18 +157,11 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
     ).toBeGreaterThan(20);
 
     /**
-     * DER FOKUS-SCROLL RECHNET DIE LEISTE AB — und diese Zusicherung steht hier, weil der
-     * Messkern sie NICHT trägt: er meldet nur VOLLSTÄNDIGE Verdeckung (WCAG 2.4.11 Minimum),
-     * und ein 164 px hohes Abschnittsfeld ist von einer 78 px hohen Leiste nie vollständig
-     * verdeckt. Die WIRKUNG prüft die Freiraum-Zeile darüber; diese hier prüft den
-     * MECHANISMUS und deckt den Fall mit ab, den die Geometrie in `handschuh` nicht mehr
-     * scharf stellt — dort bleibt der Streifen auch ohne Abzug über der Schranke.
-     *
-     * Geprüft wird die KOPPLUNG, nicht ein Pixelwert: `scroll-padding-block-end` am
-     * Scrollport trägt die gemessene Leistenhöhe. Fällt die CSS-Regel weg oder setzt der
-     * ResizeObserver die Eigenschaft nicht, wird diese Zeile rot — beides per Mutationsprobe
-     * belegt. Was hier NICHT behauptet wird: vollständige Freistellung (2.4.12 Enhanced) —
-     * ein Feld, das höher ist als der Restraum, lässt sich nicht freistellen.
+     * DER FOKUS-SCROLL RECHNET DIE LEISTE AB — der MECHANISMUS, der auch in `handschuh` greift,
+     * wo die Geometrie allein nicht mehr scharf stellt. Geprüft wird die KOPPLUNG:
+     * `scroll-padding-block-end` am Scrollport trägt die gemessene Leistenhöhe. Nicht
+     * behauptet ist vollständige Freistellung (2.4.12) — ein Feld, höher als der Restraum,
+     * lässt sich nicht freistellen.
      */
     const abzug = await page.evaluate(() =>
       Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBlockEnd),
@@ -232,18 +182,14 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
     expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
 
     /**
-     * DIE GLOBALE EIGENSCHAFT WIRD BEIM VERLASSEN WIEDER WEGGENOMMEN. Sie hängt am
-     * Wurzelelement und überlebt damit die Route — anders als bei LFH-446, wo das
-     * unmountende `<form>` sie trug. Bliebe sie stehen, verschöbe sie den Fokus-Scroll auf
-     * JEDER folgenden schmalen Route um eine Leistenhöhe, die es dort nicht gibt: kein
-     * sichtbarer Fehler, keine Fehlermeldung. Die Zeile belegt zugleich, dass React die
-     * zurückgegebene Aufräumfunktion des Callback-Refs überhaupt ruft — empirisch statt
-     * nach Präzedenz.
+     * Die globale Eigenschaft wird beim Verlassen wieder weggenommen: sie hängt am
+     * Wurzelelement und überlebte sonst die Route, jeder folgende Fokus-Scroll verschöbe sich
+     * still um eine Leistenhöhe. Belegt zugleich, dass React die Aufräumfunktion des
+     * Callback-Refs ruft.
      */
     await seite.getByRole('link', { name: 'Aufträge/Befehle' }).click();
-    // Auf den ABGEHÄNGTEN Baum warten, nicht auf die gewechselte URL: React räumt eine Runde
-    // später auf als der Router navigiert, und ein Blick direkt nach `toHaveURL` liest noch
-    // den alten Wert (gemessen: 85 px, obwohl die Aufräumfunktion einwandfrei läuft).
+    // Auf den ABGEHÄNGTEN Baum warten, nicht auf die URL: React räumt eine Runde später auf,
+    // als der Router navigiert.
     await expect(page).toHaveURL(/\/auftraege$/);
     await expect(page.locator('.befehl-print-root')).toHaveCount(0);
     expect(
@@ -266,8 +212,7 @@ test('1024 px: oberhalb der Schwelle ist NICHTS verankert, die Aktionen stehen i
   test.setTimeout(90_000);
   const { block, seite, zielnamen } = await entwurfBereit(page, { width: 1024, height: 768 });
 
-  // DIE TRAGENDE AUSSAGE DIESES LAUFS. „Keine Verdeckung" allein wäre hier ohne Leiste
-  // trivial wahr; erst diese Zeile macht einen immer-verankerten Bau rot.
+  // DIE TRAGENDE AUSSAGE DIESES LAUFS: erst sie macht einen immer-verankerten Bau rot.
   await expect(
     block,
     'ab `lg` (992) gehören die Aktionen in den Kopf — 1024 ist die Probe knapp oberhalb',
@@ -281,9 +226,7 @@ test('1024 px: oberhalb der Schwelle ist NICHTS verankert, die Aktionen stehen i
     'im Kopfzweig steht der Aktionsblock vor dem Titelfeld',
   ).toBeTruthy();
 
-  // Die zweite Hälfte der Ungleichheit: ohne verankerte Leiste gibt es auch nichts
-  // abzuziehen. Ein Bau, der den Abzug fest verdrahtet, verschöbe hier jeden Fokus-Scroll
-  // um eine Leistenhöhe, die es nicht gibt.
+  // Die zweite Hälfte der Ungleichheit: ohne verankerte Leiste gibt es nichts abzuziehen.
   expect(
     await page.evaluate(() =>
       Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBlockEnd),
@@ -325,8 +268,7 @@ test('Selbstbeweis: ein Fokusziel hinter der echten Aktionsleiste wird erkannt',
       height: '20px',
       zIndex: '0',
     });
-    // GESCHWISTER, kein Kind: ein `sticky` Vorfahr trägt sein Ziel, er verdeckt es nicht —
-    // der Messkern nimmt Vorfahren ausdrücklich aus.
+    // GESCHWISTER, kein Kind: der Messkern nimmt Vorfahren aus.
     el.before(probe);
     const start = document.createElement('button');
     start.id = 'e2e-probenstart';
@@ -340,8 +282,7 @@ test('Selbstbeweis: ein Fokusziel hinter der echten Aktionsleiste wird erkannt',
   expect(verdeckt.verdeckt).toHaveLength(1);
   expect(verdeckt.verdeckt[0]).toContain('e2e-befehl-leiste');
 
-  // Gegenprobe am SELBEN Ziel: außerhalb der Leistengeometrie muss es frei sein. Ohne sie
-  // bliebe offen, ob der Kern nicht jedes Ziel meldet.
+  // Gegenprobe am SELBEN Ziel: außerhalb der Leistengeometrie muss es frei sein.
   await page.locator('#e2e-leistenprobe').evaluate((el) => {
     el.style.top = '100px';
   });

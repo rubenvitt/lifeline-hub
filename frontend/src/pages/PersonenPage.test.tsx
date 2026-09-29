@@ -28,11 +28,10 @@ import { useOfflineSync } from '../offline/useOfflineSync';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
 
 /**
- * Die echte Karte braucht WebGL (MapLibre), jsdom hat keins — Stub nach dem Muster von
- * `LagekartePage.test.tsx`. Er macht sichtbar, WAS die Kartenansicht der Betroffenen an
- * die Karte übergibt (Marker samt Beschriftung, Startausschnitt), und bietet je Marker einen
- * Knopf, der den Klick so meldet wie die echte Karte. Ob die Marker tatsächlich gezeichnet
- * werden, belegt `e2e/betroffene-karte.spec.ts` über `window.__lfhKarte`.
+ * Die echte Karte braucht WebGL, jsdom hat keins — Stub nach dem Muster von
+ * `LagekartePage.test.tsx`. Er zeigt, was die Kartenansicht an die Karte übergibt (Marker samt
+ * Beschriftung, Startausschnitt), und bietet je Marker einen Knopf, der den Klick wie die echte
+ * Karte meldet. Ob die Marker gezeichnet werden, belegt `e2e/betroffene-karte.spec.ts`.
  */
 vi.mock('./lagekarte/Kartenflaeche', () => ({
   default: (props: Partial<KartenflaecheProps>) => (
@@ -95,8 +94,8 @@ beforeEach(async () => {
   vi.stubGlobal('BroadcastChannel', FakeBroadcastChannel);
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
-  // Die Seite lädt die Unfallhilfsstellen für `@UHS` und die Verbleib-Spalte; ohne eigene
-  // Angabe eines Tests gibt es keine.
+  // Die Seite lädt die Unfallhilfsstellen für `@UHS` und die Verbleib-Spalte; ohne eigene Angabe
+  // gibt es keine.
   server.use(http.get('/api/einsaetze/:einsatzId/uhs', () => HttpResponse.json([])));
   await queueLeerenFuerTests();
 });
@@ -105,8 +104,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
-// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+// Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
+// schreibrecht.test.ts ab.
 const nutzer = {
   id: 1,
   anzeigename: 'Nutzer',
@@ -168,15 +167,12 @@ const unbekannt = {
 };
 
 /**
- * Zeilenfolge der Registriernummern in Dokumentordnung.
+ * Zeilenfolge der Registriernummern in Dokumentordnung. Die Folge statt eines gerenderten
+ * Zeitstrings: ohne `EinsatzAnzeigeProvider` fällt `useAnzeigeKonventionen` auf Lokalzeit zurück,
+ * eine Zeitbehauptung prüfte die Zeitzone des Testrechners.
  *
- * Warum die FOLGE und nicht ein gerenderter Zeitstring: `renderMitProviders` hängt keinen
- * `EinsatzAnzeigeProvider` ein, `useAnzeigeKonventionen` fällt also auf Lokalzeit zurück —
- * eine Behauptung über „271100MAI2026" prüfte die Zeitzone des Testrechners. Die Folge ist
- * ohnehin genau das, was „sortierbar" behauptet.
- *
- * `getAllByText` vergleicht nur DIREKTE Textkinder, deshalb liefert die verschachtelte
- * Titelzelle (`<a><span><strong>R-001</strong></span></a>`) genau einen Treffer je Zeile.
+ * `getAllByText` vergleicht nur direkte Textkinder, die verschachtelte Titelzelle
+ * (`<a><span><strong>R-001</strong></span></a>`) liefert also einen Treffer je Zeile.
  */
 function regFolge(): string[] {
   return screen.getAllByText(/^R-\d{3}$/).map((e) => e.textContent ?? '');
@@ -245,8 +241,8 @@ function OfflineSyncTest({ benutzerId }: { benutzerId: number }) {
 
 describe('PersonenPage', () => {
   it('zeigt in der Vorgabe ALLE Personen; der Filter „Neu" zeigt nur erfasste', async () => {
-    // Vorgabe „Alle" statt des früheren „Neu": eine über die Zeile MIT Sichtung erfasste
-    // Person hebt der Server auf `betroffen` — unter „Neu" verschwände sie beim Erfassen.
+    // Vorgabe „Alle": eine mit Sichtung erfasste Person hebt der Server auf `betroffen` — unter
+    // „Neu" verschwände sie beim Erfassen.
     render(einsatzAktiv, [person, unbekannt]);
     expect(await screen.findByText('R-001')).toBeInTheDocument();
     expect(screen.getByText('R-002')).toBeInTheDocument();
@@ -268,16 +264,12 @@ describe('PersonenPage', () => {
 
   it('nimmt den Suchbegriff nicht in den nächsten Reiter mit', async () => {
     /**
-     * EINE `Datensicht` bedient fünf Reiter — sie stehen alle im selben Zweig des
-     * Ternärs. Bei konstantem `key` reicht React beim Reiterwechsel dieselbe Instanz
-     * weiter, und `suchbegriff` lebt IN der Sicht: der Begriff aus „Vermisst" filtert
-     * danach die Menge von „Betroffen".
+     * Eine `Datensicht` bedient fünf Reiter. Bei konstantem `key` reichte React beim Reiterwechsel
+     * dieselbe Instanz weiter, und `suchbegriff` lebt in der Sicht: der Begriff aus „Vermisst"
+     * filterte danach die Menge von „Betroffen".
      *
-     * Drei Schritte, weil der letzte allein nichts belegte: eine Behauptung über das
-     * leere Feld bliebe auch grün, wenn die Suche überhaupt nicht filterte (etwa ohne
-     * `suchText` an der Namensspalte). Schritt 1 zeigt erst, dass der Begriff wirkt;
-     * Schritt 3 nennt den Schaden beim Namen — eine fremde Menge auf einen fremden
-     * Begriff gefiltert.
+     * Drei Schritte: Schritt 1 zeigt, dass der Begriff wirkt (sonst bliebe „das Feld ist leer" auch
+     * ohne filternde Suche grün); Schritt 3 prüft die fremde Menge.
      */
     const mueller = {
       ...person,
@@ -319,10 +311,8 @@ describe('PersonenPage', () => {
   });
 
   /**
-   * LFH-340 · C5. Der Kopf kam aus einem handgebauten Block (Breadcrumb, `Title level={3}`,
-   * Status-Tag, `Datenstand`, Schreibrecht-Alert) — also genau aus dem Slotsatz, den
-   * `EinsatzSeite` seit LFH-328 · A2 trägt. Die zweite Zeile ist die tragende: „level 1 da"
-   * allein wäre auch grün, wenn der Handbau daneben stehen bliebe.
+   * Der Seitenkopf kommt aus `EinsatzSeite`, nicht aus einem handgebauten Block. Die zweite Zeile
+   * ist die tragende: „level 1 da" allein wäre auch mit Handbau daneben grün.
    */
   it('trägt den Seitenkopf „Betroffene" mit Mono-Meta „n erfasst"', async () => {
     render(einsatzAktiv, [person, unbekannt]);
@@ -361,12 +351,12 @@ describe('PersonenPage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    // Ein Filter, der die neue Person VERBIRGT: er muss auf „Alle" zurückfallen, sonst stünde
-    // die Hervorhebung an einer Zeile, die gar nicht angezeigt wird.
+    // Ein Filter, der die neue Person verbirgt: er muss auf „Alle" zurückfallen, sonst stünde die
+    // Hervorhebung an einer unsichtbaren Zeile.
     await userEvent.click(await screen.findByRole('tab', { name: 'Neu' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
-    // Der Name liegt seit LFH-340 · C5 unter „Weitere Angaben" — für diesen Fall genügt der
-    // Antreffort, die Maske hat ohnehin keine Pflichtfelder.
+    // Der Name liegt unter „Weitere Angaben" — hier genügt der Antreffort, die Maske hat keine
+    // Pflichtfelder.
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Brücke');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
@@ -377,10 +367,9 @@ describe('PersonenPage', () => {
   });
 
   /**
-   * Die Quittung nennt die Sichtung mit (LFH-340 · C5). Sie kommt aus der ANTWORT, nicht aus
-   * den gesendeten Werten: das Backend schreibt die Sichtung in derselben Transaktion und
-   * kann sie mit 422 verwerfen — aus dem Formularwert gelesen behauptete die Quittung dann
-   * eine Kategorie, die es nie gab.
+   * Die Quittung nennt die Sichtung aus der Antwort, nicht aus den gesendeten Werten: das Backend
+   * kann sie mit 422 verwerfen, aus dem Formularwert gelesen behauptete die Quittung dann eine
+   * Kategorie, die es nie gab.
    */
   it('nennt die vergebene Sichtung in der Quittung', async () => {
     const gesichtet = {
@@ -410,8 +399,8 @@ describe('PersonenPage', () => {
   });
 
   it('lässt die Quittung ohne Sichtung bei der reinen Registriernummer', async () => {
-    // Die Gegenhälfte: ohne sie wäre der Fall oben auch grün, wenn dort immer ein Zusatz
-    // stünde — etwa ein „undefined" aus einem fehlenden Nachschlag.
+    // Die Gegenhälfte: ohne sie wäre der Fall oben auch grün, wenn dort immer ein Zusatz stünde —
+    // etwa ein „undefined" aus einem fehlenden Nachschlag.
     server.use(
       http.post('/api/einsaetze/1/personen', () =>
         HttpResponse.json({ ...person, id: 49, registrier_nr: 49 }, { status: 201 }),
@@ -646,8 +635,8 @@ describe('PersonenPage', () => {
     expect(await screen.findByText('Erfasst als R-049')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
     expect((await screen.findByText('R-049')).closest('tr')).toHaveClass('zeile-hervorgehoben');
-    // Render allein ist kein globaler Ack: ein anderer sichtbarer Tab muss das
-    // Receipt nach seinem datenarmen Signal noch aus IDB lesen können.
+    // Render allein ist kein globaler Ack: ein anderer sichtbarer Tab muss die Quittung nach seinem
+    // datenarmen Signal noch aus IDB lesen können.
     expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1);
     const schliessen = quittungSchliessenButton();
     if (!schliessen) throw new Error('Schließen-Knopf der Quittung fehlt');
@@ -737,8 +726,8 @@ describe('PersonenPage', () => {
     expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
     expect((await screen.findByText('R-050')).closest('tr')).toHaveClass('zeile-hervorgehoben');
 
-    // Wiederholtes Signal und konkurrierender Re-Read bleiben idempotent; erst
-    // das explizite Schließen ist der persistente Ack.
+    // Wiederholtes Signal und konkurrierender Re-Read bleiben idempotent; erst das explizite
+    // Schließen ist der persistente Ack.
     await act(async () => {
       kanal.sendeAusAnderemTab({
         typ: 'person-erfassungsquittung',
@@ -875,7 +864,7 @@ describe('PersonenPage', () => {
   it('leitet den Alt-Deep-Link ?person=<id> auf die Detailseite um', async () => {
     server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)));
     render(einsatzAktiv, [person], '/einsaetze/1/personen?person=10');
-    // Redirect → Detailseite rendert den Heading:
+    // Redirect → Detailseite rendert die Überschrift:
     expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
   });
 
@@ -890,7 +879,7 @@ describe('PersonenPage', () => {
     };
     render(einsatzAktiv, [person, unbekannt, gesichtet]);
     await screen.findByText('R-001');
-    // Das Etikett in der Zeile ist der `SichtungsTag` (BBK-Farbfeld), nicht eine Designfarbe.
+    // Das Etikett in der Zeile ist der `SichtungsTag` (BBK-Farbfeld), keine Designfarbe.
     const zeile = (await screen.findByText('R-003')).closest('tr')!;
     expect(zeile.querySelector('[data-sichtung="sk2"]')).toHaveTextContent('SK II');
 
@@ -929,7 +918,7 @@ describe('PersonenPage', () => {
         ]),
       ),
     );
-    // `person` (erfasst, ohne Verbleib) ist offen; `unbekannt` (vermisst) zählt NICHT.
+    // `person` (erfasst, ohne Verbleib) ist offen; `unbekannt` (vermisst) zählt nicht.
     render(einsatzAktiv, [person, unbekannt, mitVerbleib, inUhs]);
     await screen.findByText('R-001');
 
@@ -966,7 +955,7 @@ describe('PersonenPage', () => {
     expect(voll).not.toHaveClass('zeile-luecke');
     // Regex statt Teilstring: „betroffen" enthält „offen".
     expect(voll).not.toHaveTextContent(/(Verbleib|Fundort) offen/);
-    // Vermisst ist KEINE Lücke — sie hat naturgemäß weder Fundort noch Verbleib.
+    // Vermisst ist keine Lücke — sie hat naturgemäß weder Fundort noch Verbleib.
     expect(screen.getByText('R-002').closest('tr')).not.toHaveClass('zeile-luecke');
 
     const knopf = screen.getByRole('button', { name: 'Nur Lücken zeigen' });
@@ -1009,15 +998,15 @@ describe('PersonenPage', () => {
     await screen.findByText('R-001');
     const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
     expect(within(ansicht).getByRole('radio', { name: 'Zeilen' })).toBeChecked();
-    // Die dritte Ansicht ist die Karte der Fundorte (LFH-613) — eigener Test unten.
+    // Die dritte Ansicht ist die Karte der Fundorte — eigener Test unten.
     expect(within(ansicht).getByRole('radio', { name: 'Karte' })).not.toBeChecked();
 
     await userEvent.click(within(ansicht).getByRole('radio', { name: 'Sichtungsraster' }));
     expect(
       await screen.findByRole('region', { name: 'Betroffene nach Sichtungskategorie' }),
     ).toBeInTheDocument();
-    // Die Gruppenachse erscheint im Tabellenzweig als Zählerstreifen der Werkzeugzeile —
-    // KEINE synthetischen Zwischenzeilen (API-Entscheidung §9.8).
+    // Die Gruppenachse erscheint im Tabellenzweig als Zählerstreifen der Werkzeugzeile, keine
+    // synthetischen Zwischenzeilen.
     expect(screen.getByText('SK II · 1')).toBeInTheDocument();
     expect(screen.getByText('tot · 1')).toBeInTheDocument();
     expect(screen.getByText('unverletzt · 1')).toBeInTheDocument();
@@ -1038,15 +1027,15 @@ describe('PersonenPage', () => {
 
   it('öffnet via ?neu=1 die Schnellerfassung NICHT für Beobachter', async () => {
     render(einsatzBeobachter, [], '/einsaetze/1/personen?neu=1');
-    // Seite lädt durch (Tabelle ist leer, kein Spinner mehr)
+    // Seite lädt durch (Tabelle leer, kein Spinner mehr)
     await screen.findByRole('heading', { name: /Betroffene/ });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('sortiert die Liste selbst, statt die Lieferreihenfolge zu übernehmen', async () => {
-    // Die Fixture liegt ABSICHTLICH verdreht: das Backend liefert `ORDER BY registrier_nr`
-    // aufsteigend (`src/person/repo.rs`), msw gibt das Array unverändert heraus. Eine in
-    // Backend-Reihenfolge gelieferte Fixture wäre auch ohne eine Zeile Sortiercode grün.
+    // Die Fixture liegt absichtlich verdreht: das Backend liefert `ORDER BY registrier_nr`
+    // aufsteigend, msw gibt das Array unverändert heraus. In Backend-Reihenfolge wäre der Test auch
+    // ohne Sortiercode grün.
     const drei = [
       { ...person, id: 30, registrier_nr: 3, status: 'betroffen' as const },
       { ...person, id: 31, registrier_nr: 1 },
@@ -1055,17 +1044,15 @@ describe('PersonenPage', () => {
     render(einsatzAktiv, drei);
     await screen.findByText('R-001');
     await vi.waitFor(() => expect(regFolge()).toHaveLength(3));
-    // Jüngste Registrierung oben (Entwurf S7): die zuletzt Erfasste steht dort, wo die
-    // Erfassungszeile ist.
+    // Jüngste Registrierung oben: die zuletzt Erfasste steht dort, wo die Erfassungszeile ist.
     expect(regFolge()).toEqual(['R-003', 'R-002', 'R-001']);
   });
 
   it('zeigt die Zeit und ordnet im Raster dieselbe SK ältester-zuerst', async () => {
     /**
-     * FALLE, gemessen: alle Bestandsfixtures sind aus `person` gespreizt und teilen
-     * `erfasst_at: '2026-05-27 09:00:00'`. Eine Zeitsortier-Behauptung über gleiche
-     * Zeitstempel ist eine Attrappe — diese beiden Personen tragen deshalb VERSCHIEDENE
-     * Sichtungszeitpunkte, und die spätere wird zuerst geliefert.
+     * Alle Bestandsfixtures teilen `erfasst_at`; eine Zeitsortier-Behauptung über gleiche
+     * Zeitstempel wäre eine Attrappe. Diese beiden tragen verschiedene Sichtungszeitpunkte, die
+     * spätere wird zuerst geliefert.
      */
     const spaet = {
       ...person,
@@ -1088,13 +1075,11 @@ describe('PersonenPage', () => {
     await vi.waitFor(() => expect(regFolge()).toHaveLength(2));
     // Die Spalte existiert überhaupt …
     expect(screen.getByRole('columnheader', { name: /Zeit/ })).toBeInTheDocument();
-    // … und trägt eine taktische DTG `DDHHmm` (Muster, kein Fixwert — Lokalzeit des
-    // Testrechners) …
+    // … und trägt eine taktische DTG `DDHHmm` (Muster, kein Fixwert — Lokalzeit des Testrechners) …
     const dtg = screen.getAllByText(/^\d{6}$/).map((e) => e.textContent);
     expect(dtg).toHaveLength(2);
-    // … mit ZWEI VERSCHIEDENEN Werten: beide Fixtures teilen `erfasst_at` und `geaendert_at`,
-    // also blieb ein `render` auf einem dieser Felder grün, solange nur das Format geprüft
-    // wurde. Nur der Sichtungszeitpunkt unterscheidet sie.
+    // … mit zwei verschiedenen Werten: beide Fixtures teilen `erfasst_at` und `geaendert_at`, nur
+    // der Sichtungszeitpunkt unterscheidet sie.
     expect(new Set(dtg).size).toBe(2);
     // … und die ältere Sichtung steht oben, obwohl die jüngere zuerst geliefert wurde.
     expect(regFolge()).toEqual(['R-009', 'R-008']);
@@ -1122,11 +1107,9 @@ describe('PersonenPage', () => {
     expect(await screen.findByText('SK II · 1')).toBeInTheDocument();
     expect(screen.getByText('tot · 1')).toBeInTheDocument();
     /**
-     * Die tragende Hälfte: SK I, III und IV stehen in der festen Gruppenfolge, haben aber
-     * keine Zeile. Emittierte `gruppiere` sie mit Zähler 0, zöge hier lautlos ein
-     * „SK I · 0" ein — das ist die Regel, die `PersonenPage` vorher per
-     * `if (gruppe.length === 0) return null` selbst hielt. `^`-Anker, weil „SK I" sonst in
-     * „SK II" matcht.
+     * Die tragende Hälfte: SK I, III und IV stehen in der festen Gruppenfolge, haben aber keine
+     * Zeile. Emittierte `gruppiere` sie mit Zähler 0, zöge lautlos ein „SK I · 0" ein. `^`-Anker,
+     * weil „SK I" sonst in „SK II" matcht.
      */
     expect(screen.queryByText(/^SK I · /)).not.toBeInTheDocument();
     expect(screen.queryByText(/^SK III · /)).not.toBeInTheDocument();
@@ -1136,25 +1119,23 @@ describe('PersonenPage', () => {
 
   it('trägt die Zeit in den Kartenzweig und ersetzt dort die Abgleich-Zelle durch einen Dialog', async () => {
     /**
-     * Zwei Aussagen in einem Fall, weil sie denselben Zweig brauchen:
+     * Zwei Aussagen, die denselben Zweig brauchen:
      *
-     * 1. Unter `md` rendert `Datensicht` genau einen ANDEREN Zweig, und die Zeit kommt dort
-     *    aus dem `sekundaer`-Tupel. Ein dort fehlender Slot wäre in jeder Tabellenprüfung
-     *    unsichtbar.
-     * 2. Die Abgleichspalte trägt ein 200 px breites, ~24 px hohes Auswahlfeld in der Zelle.
-     *    Auf einer 390-px-Karte ist das nicht bedienbar; der Aktions-Deskriptor ERSETZT es
-     *    durch einen Knopf plus Dialog. Ohne diesen Fall wäre die Ersetzung eine Behauptung.
+     * 1. Unter `md` rendert `Datensicht` den Kartenzweig, und die Zeit kommt dort aus dem
+     *    `sekundaer`-Tupel — ein fehlender Slot wäre in jeder Tabellenprüfung unsichtbar.
+     * 2. Die Abgleichspalte trägt ein 200 px breites Auswahlfeld, auf einer 390-px-Karte nicht
+     *    bedienbar; der Aktions-Deskriptor ersetzt es durch Knopf plus Dialog.
      *
-     * Breite VOR dem Rendern setzen: antds Beobachter liest beim Abonnieren synchron.
+     * Breite vor dem Rendern setzen: antds Beobachter liest beim Abonnieren synchron.
      */
     setzeViewportBreite(390);
     const gefunden = { ...person, id: 20, registrier_nr: 7, status: 'betroffen' as const };
     const schmal = render(einsatzAktiv, [unbekannt, gefunden]);
     await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
     await screen.findByRole('region', { name: 'Personen' });
-    // Genau EIN Zweig im Baum.
+    // Genau ein Zweig im Baum.
     expect(schmal.container.querySelector('.ant-table')).toBeNull();
-    // Etikett UND Wert — das Etikett ist der zweite Kanal der Karte.
+    // Etikett und Wert — das Etikett ist der zweite Kanal der Karte.
     expect(screen.getByText('Zeit')).toBeInTheDocument();
     expect(screen.getByText(/^\d{6}$/)).toBeInTheDocument();
     // Das Tastaturziel der Zeile ist der Titel-Link, nicht die Kartenfläche.
@@ -1173,7 +1154,7 @@ describe('PersonenPage', () => {
     server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)));
     render(einsatzAktiv, [person]);
     await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
-    // Detailseite zeigt den Personen-Titel als Heading:
+    // Die Detailseite zeigt den Personen-Titel als Überschrift:
     expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
   });
 
@@ -1187,17 +1168,11 @@ describe('PersonenPage', () => {
   });
 
   /**
-   * AK4-Pflichtstelle (LFH-331 · B3) — das Partnerpaar, nicht die einzelne Zusicherung.
-   *
-   * Die negative Hälfte allein belegte nichts: hätte der Umbau den Leertext umformuliert,
-   * wäre sie auch im Leerfall trivial grün. Erst der Fall darunter — gleiches Literal,
-   * gleiche Datei — macht aus ihr eine Aussage über die Zustandsweiche statt über die
-   * Schreibweise eines Strings.
+   * Partnerpaar: die negative Hälfte allein belegte nichts; erst der Fall darunter mit gleichem
+   * Literal macht daraus eine Aussage über die Zustandsweiche.
    *
    * Beide Leertexte der Seite stehen im Paar: die Listensicht bedient fünf Reiter, der
-   * Patienten-Reiter ist ein eigener Zweig mit eigenem Text — die Fehlerweiche muss beide
-   * verdrängen, sonst behauptet einer der zwei weiterhin eine leere Menge, wo bloß der
-   * Abruf scheiterte.
+   * Patienten-Zweig hat einen eigenen Text — die Fehlerweiche muss beide verdrängen.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT die Leertexte', async () => {
     server.use(
@@ -1217,8 +1192,8 @@ describe('PersonenPage', () => {
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.getByText('Personen konnten nicht geladen werden')).toBeInTheDocument();
     expect(screen.queryByText('Keine Personen in dieser Sicht')).not.toBeInTheDocument();
-    // Die Seitenleiste zählt aus derselben Menge — über dem Fehler meldete sie „0 erfasst",
-    // eine Zahl, die niemand erhoben hat.
+    // Die Seitenleiste zählt aus derselben Menge — über dem Fehler meldete sie „0 erfasst", eine
+    // nie erhobene Zahl.
     expect(screen.queryByRole('region', { name: 'Sichtungsbild' })).not.toBeInTheDocument();
   });
 
@@ -1234,16 +1209,13 @@ describe('PersonenPage', () => {
   });
 
   /**
-   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher — nicht `isFetching`, nicht
-   * `isStale` (D5).
+   * Veralteter Stand = `isError` mit Zeilen im Zwischenspeicher — nicht `isFetching`, nicht
+   * `isStale`.
    *
-   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
-   * Aktualisierung derselben Sicht. Ein bloß vorbefüllter Zwischenspeicher belegte den
-   * Produktionsweg NICHT — dort steht hinter den Zeilen nie ein erfolgreicher Abruf, und ob
-   * TanStack den Zustand nach einem HINTERGRUND-Fehlschlag überhaupt auf `error` stellt
-   * (statt die Meldung nur in `isRefetchError` abzulegen und `success` stehen zu lassen),
-   * wäre damit ungeprüft geblieben. Gemessen: er tut es und behält `data` — genau die Lage,
-   * die das Banner meint.
+   * Der Ablauf ist der echte: erst ein geglückter Abruf, dann eine gescheiterte Aktualisierung. Ein
+   * bloß vorbefüllter Zwischenspeicher ließe ungeprüft, ob TanStack nach einem
+   * Hintergrund-Fehlschlag auf `error` stellt (statt nur `isRefetchError`); er tut es und behält
+   * `data` — genau die Lage des Banners.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
     const { client } = render(einsatzAktiv, [person]);
@@ -1257,7 +1229,7 @@ describe('PersonenPage', () => {
     expect(
       await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
     ).toBeInTheDocument();
-    // Die Zeilen aus dem Zwischenspeicher bleiben stehen — der Fehler verdrängt sie NICHT.
+    // Die Zeilen aus dem Zwischenspeicher bleiben stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('R-001')).toBeInTheDocument();
     expect(screen.queryByText('Personen konnten nicht geladen werden')).not.toBeInTheDocument();
   });
@@ -1415,11 +1387,10 @@ describe('PersonenPage', () => {
 
     it('der Kürzel-Hinweis bleibt beim Tippen stehen, unsichtbar und aus der Beschreibung genommen (LFH-650)', async () => {
       /**
-       * Bei 390 px sprang der Inhalt unter der Zeile mit dem ersten Zeichen 40 px nach oben,
-       * weil der mehrzeilige Hinweis der kürzeren Erkennungszeile WICH (gemessen in
-       * `e2e/betroffene-layout.spec.ts`). Jetzt liegen beide gestapelt; die Höhe misst die
-       * e2e-Spec, hier steht die Struktur, aus der sie folgt — samt der Gegenhälfte, dass
-       * Vorlesende den verdeckten Hinweis nicht mehr hören.
+       * Der mehrzeilige Hinweis und die kürzere Erkennungszeile liegen gestapelt, damit der Inhalt
+       * darunter mit dem ersten Zeichen nicht springt. Die Höhe misst
+       * `e2e/betroffene-layout.spec.ts`; hier steht die Struktur samt Gegenhälfte, dass Vorlesende
+       * den verdeckten Hinweis nicht hören.
        */
       render(einsatzAktiv, []);
       const zeile = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
@@ -1532,10 +1503,9 @@ describe('PersonenPage', () => {
 });
 
 /**
- * Sichtvorgabe aus der URL (LFH-620) — der Anspringweg der Sprungmarken „Patienten" und
- * „Vermisste" im Modulpanel. Geprüft werden BEIDE Hälften von apply-then-clean: die Sicht
- * steht, UND die Parameter sind weg. Nur die erste Hälfte wäre auch mit einer Seite grün,
- * die den Filter bloß aus der URL spiegelt.
+ * Sichtvorgabe aus der URL — der Anspringweg der Sprungmarken „Patienten" und „Vermisste". Beide
+ * Hälften von apply-then-clean: die Sicht steht und die Parameter sind weg. Nur die erste wäre auch
+ * grün, wenn die Seite den Filter bloß aus der URL spiegelte.
  */
 describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
   function Suche() {
@@ -1592,8 +1562,8 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
       http.get('/api/einsaetze/1/karten-ansichten', () => HttpResponse.json([])),
     );
     renderMitSuche('/einsaetze/1/personen?ansicht=karte');
-    // Keine der beiden Personen trägt eine Koordinate, der Einsatz keinen Ort: Leerzustand,
-    // und die Lücke ist gezählt — nur die ANGETROFFENE, die vermisste hat keinen Fundort.
+    // Keine Person trägt eine Koordinate, der Einsatz keinen Ort: Leerzustand, und die Lücke ist
+    // gezählt — nur die angetroffene, die vermisste hat keinen Fundort.
     expect(await screen.findByText('Keine Person mit Koordinate')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Karte' })).toBeChecked();
     expect(screen.getByText('1 Person ohne Koordinate — nicht auf der Karte')).toBeInTheDocument();
@@ -1611,10 +1581,10 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
 });
 
 /**
- * Kartenansicht der Betroffenen (LFH-613, design D7) — mit gestubbter `Kartenflaeche`
- * (Kopf der Datei). Die Marker-Auswahl selbst prüft `personen/personenKarte.test.ts` ohne
- * Render; hier geht es um den Weg durch die Seite: wählbar, lazy geladen, die richtigen
- * Marker übergeben, die Lücke genannt, der Klick führt zur Detailseite.
+ * Kartenansicht der Betroffenen, mit gestubbter `Kartenflaeche` (Kopf der Datei). Die
+ * Marker-Auswahl prüft `personen/personenKarte.test.ts` ohne Render; hier geht es um den Weg durch
+ * die Seite: wählbar, lazy geladen, die richtigen Marker übergeben, die Lücke genannt, der Klick
+ * führt zur Detailseite.
  */
 describe('PersonenPage — Kartenansicht (LFH-613)', () => {
   function Ort() {
@@ -1695,15 +1665,14 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
     expect(JSON.parse(screen.getByTestId('startansicht').textContent ?? 'null')).toMatchObject({
       art: 'rahmen',
     });
-    // Die Liste ist in dieser Ansicht nicht gerendert — die Karte ERSETZT sie.
+    // Die Liste ist in dieser Ansicht nicht gerendert — die Karte ersetzt sie.
     expect(screen.queryByRole('region', { name: 'Personen' })).not.toBeInTheDocument();
   });
 
   it('ohne Lücke SAGT die Hinweiszeile es, statt zu verschwinden — kein Kartensprung (LFH-650)', async () => {
     /**
-     * Befund Tabelle 4, Nr. 12 der LFH-613-Prüfliste: die Zeile stand nur bei `> 0` da. Wurde
-     * die letzte Person live verortet, sprang die ganze Karte um eine Zeile unter dem Zeiger.
-     * Jetzt steht sie immer; die e2e-Spec misst den Sprung im Browser.
+     * Die Zeile steht immer, nicht nur bei `> 0`: sonst spränge die Karte um eine Zeile, wenn die
+     * letzte Person live verortet wird. Die e2e-Spec misst den Sprung.
      */
     // Beide angetroffenen Personen tragen eine Koordinate — R-001 bleibt der Anker von
     // `waehleKarte`.
@@ -1716,8 +1685,8 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
   });
 
   it('ohne Lücke und ohne Marker behauptet der Hinweis KEINE vollständige Karte (Review LFH-650)', async () => {
-    // Filter „Vermisst": keine angetroffene Person in der Auswahl. „Alle stehen auf der Karte"
-    // über einer leeren Karte wäre falsch.
+    // Filter „Vermisst": keine angetroffene Person in der Auswahl. „Alle stehen auf der Karte" über
+    // einer leeren Karte wäre falsch.
     renderKarte([mitKoordinate(person.id, person.registrier_nr), { ...unbekannt }], {
       ...einsatzAktiv,
       einsatzort_lat: 52.3,

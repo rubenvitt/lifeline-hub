@@ -1,9 +1,9 @@
 //! Repo-Tests der Stammdaten-Anlage `stammdaten_importieren_tx` und des Katalog-Lookups
-//! (LFH-690, design.md D8) gegen die voll migrierte DB.
+//! (LFH-690) gegen die voll migrierte DB.
 //!
-//! Den Kopf `demo_import` legt später `importieren_tx` an; hier entsteht er per SQL auf einem
-//! über den Betriebsweg angelegten Einsatz. Die Kataloge der Test-Orgs entstehen aus den
-//! Startlisten des Bootstraps, nur der Bootstrap-Test fährt den echten `bootstrap_admin`.
+//! Der Kopf `demo_import` entsteht hier per SQL auf einem über den Betriebsweg angelegten
+//! Einsatz. Die Kataloge kommen aus den Startlisten des Bootstraps; nur der Bootstrap-Test fährt
+//! den echten `bootstrap_admin`.
 
 use sqlx::SqlitePool;
 
@@ -225,8 +225,9 @@ async fn leere_org_legt_alles_an_und_markiert_jede_zeile() {
         assert_eq!(benutzer, None, "nie eine Zuordnung zum Benutzerkonto");
         assert_eq!(marke(&pool, "personal", id).await, Some(a.kopf), "{name}");
 
-        // Jede Qualifikation ist angekommen: `setze_qualifikationen` verwürfe eine fremde
-        // oder falsche ID still, die Zahl allein fiele dann nicht auf.
+        // Jede Qualifikation ist angekommen: `setze_qualifikationen` verwürfe eine falsche ID
+        // still, die
+        // Zahl allein fiele dann nicht auf.
         let mut labels: Vec<String> = sqlx::query_scalar(
             "SELECT q.label FROM personal_qualifikation pq \
              JOIN qualifikation q ON q.id = pq.qualifikation_id \
@@ -348,10 +349,9 @@ async fn vorhandenes_fahrzeug_in_dienst_wird_mitbenutzt_unveraendert_und_unmarki
     );
 }
 
-/// Je Art ein außer Dienst gestellter Namensvetter (gleiche Kennung): er wird nicht
-/// mitbenutzt, bleibt zeilengleich und ohne Marke, und daneben entsteht eine neue, markierte
-/// Zeile. Je Art einzeln, weil jede Art ihren eigenen Abgleich trägt: fehlte das
-/// `dienststatus`-Prädikat nur bei einer, bliebe ein Test über eine andere Art grün.
+/// Je Art ein außer Dienst gestellter Namensvetter (gleiche Kennung): er wird nicht mitbenutzt,
+/// bleibt zeilengleich und ohne Marke, und daneben entsteht eine neue, markierte Zeile. Je Art
+/// einzeln, weil jede Art ihren eigenen Abgleich trägt.
 #[tokio::test]
 async fn ausser_dienst_gestellter_namensvetter_bleibt_und_ein_neues_entsteht() {
     let pool = crate::db::test_pool().await;
@@ -703,9 +703,8 @@ async fn kataloge_einer_fremden_org_zaehlen_nicht() {
     assert_eq!(bild_org(&pool, 2).await, vorher);
 }
 
-/// Ein deaktivierter Einheitstyp, den das Szenario braucht: 422 mit seinem Namen. Den
-/// Einheitstyp schlägt erst der Einsatz-Teil nach (Block 4.2), deshalb über den gesamten
-/// Bedarf und über den Helfer.
+/// Ein deaktivierter Einheitstyp, den das Szenario braucht: 422 mit seinem Namen. Den Typ
+/// schlägt erst der Einsatz-Teil nach, deshalb über den gesamten Bedarf und den Helfer.
 #[tokio::test]
 async fn deaktivierter_einheitstyp_ist_422() {
     let pool = crate::db::test_pool().await;

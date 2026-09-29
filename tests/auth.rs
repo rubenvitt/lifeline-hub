@@ -138,12 +138,10 @@ async fn logout_invalidiert_session() {
 
 #[tokio::test]
 async fn login_mit_deaktiviertem_passwort_provider_ist_403() {
-    // Enforcement-Seam (LFH-41, defensiv): direkt in `auth_provider` geschrieben, weil der
-    // Aussperr-Guard (`registry::schalten`) den Provider "passwort" NICHT deaktivieren ließe,
-    // solange noch ein aktiver Admin existiert (409, siehe `admin_kann_passwort_nicht_
-    // deaktivieren_409` unten) — der Guard umgeht also den regulären Toggle-Endpunkt. Anders als
-    // beim OIDC-Override (`oidc_deaktiviert_override`) ist hier kein prozessweiter OnceLock im
-    // Spiel: "passwort" ist immer in `konfiguriert()` gelistet, die Override-Zeile greift sofort.
+    // Enforcement-Seam (LFH-41): direkt in `auth_provider` geschrieben, weil der Aussperr-Guard
+    // (`registry::schalten`) "passwort" nicht deaktivieren ließe, solange ein aktiver Admin
+    // existiert (409, siehe `admin_kann_passwort_nicht_deaktivieren_409`). "passwort" ist immer in
+    // `konfiguriert()` gelistet, die Override-Zeile greift sofort — kein OnceLock im Spiel.
     let (app, pool) = setup_mit_pool().await;
     sqlx::query(
         "INSERT INTO auth_provider (id, aktiviert) VALUES ('passwort', 0) \
@@ -178,12 +176,10 @@ async fn providers_admin_ohne_session_ist_401() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
-/// Router-Ebene (nicht nur die reine `public_provider_projektion`-Funktion, s.
-/// `routes::auth::tests`): `/api/auth/providers` filtert deaktivierte, `/api/auth/providers/admin`
-/// (hinter `AdminUser`) zeigt sie (LFH-277). Aktiviert "oidc" GLOBAL für den Rest dieses
-/// Testbinary-Prozesses (`OIDC_KONFIGURIERT`-OnceLock, s. `oidc_callback_mit_unbekanntem_state_
-/// redirect_auf_login_fehler`-Doc) — unschädlich für die 404-Tests oben, die per
-/// `oidc_deaktiviert_override` reihenfolge-unabhängig gemacht sind.
+/// Router-Ebene: `/api/auth/providers` filtert deaktivierte, `/api/auth/providers/admin` (hinter
+/// `AdminUser`) zeigt sie (LFH-277). Aktiviert "oidc" GLOBAL für diesen Testprozess
+/// (`OIDC_KONFIGURIERT`-OnceLock); die 404-Tests bleiben über `oidc_deaktiviert_override`
+/// reihenfolge-unabhängig.
 #[tokio::test]
 async fn providers_admin_zeigt_deaktivierte_public_verbirgt_sie() {
     lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(true);
@@ -248,17 +244,11 @@ async fn admin_kann_passwort_nicht_deaktivieren_409() {
     assert_eq!(status, StatusCode::CONFLICT);
 }
 
-/// Schreibt eine Override-Zeile, die "oidc" explizit deaktiviert — unabhängig davon, ob der
-/// prozessweite `OIDC_KONFIGURIERT`-OnceLock (in `auth::provider::registry`) in diesem
-/// Testbinary-Prozess (`--test auth`) bereits `true` ist oder noch `false`:
-/// - `false` (Default/noch keine andere Test-Funktion hat `set_oidc_konfiguriert(true)`
-///   aufgerufen): "oidc" taucht in `konfiguriert()` gar nicht auf, die Override-Zeile wird von
-///   `liste()` schlicht ignoriert (kein Effekt, aber auch kein Schaden) — 404 wie vorher.
-/// - `true` (irgendeine andere Testfunktion in diesem Prozess hat es bereits gesetzt — der
-///   OnceLock ist prozessweit, `#[tokio::test]`s in einer Datei laufen im selben Prozess,
-///   Reihenfolge ist NICHT garantiert): ohne diese Override-Zeile würde "oidc" plötzlich
-///   `aktiviert=true` gelistet und der Enforcement-Check hier fälschlich durchfallen (404 →
-///   Redirect). Die Zeile macht die Assertion damit reihenfolge-unabhängig.
+/// Schreibt eine Override-Zeile, die "oidc" explizit deaktiviert — unabhängig vom prozessweiten
+/// `OIDC_KONFIGURIERT`-OnceLock. Ist er noch `false`, taucht "oidc" in `konfiguriert()` nicht
+/// auf und die Zeile wirkt nicht. Hat ein anderer Test ihn schon auf `true` gesetzt (die
+/// Reihenfolge der Tests im Prozess ist nicht garantiert), würde "oidc" ohne diese Zeile als
+/// aktiviert gelistet und der 404-Check fiele fälschlich durch.
 async fn oidc_deaktiviert_override(pool: &sqlx::SqlitePool) {
     sqlx::query(
         "INSERT INTO auth_provider (id, aktiviert) VALUES ('oidc', 0) \
@@ -271,13 +261,9 @@ async fn oidc_deaktiviert_override(pool: &sqlx::SqlitePool) {
 
 #[tokio::test]
 async fn oidc_start_ohne_konfigurierten_provider_ist_404() {
-    // Siehe `oidc_deaktiviert_override`-Doc: macht diesen Test robust gegen die Ausführungs-
-    // reihenfolge mit `oidc_callback_mit_unbekanntem_state_redirect_auf_login_fehler` (setzt in
-    // diesem Prozess `set_oidc_konfiguriert(true)` — prozessweiter OnceLock, kein Zurücksetzen).
-    // Prüft die JSON-Fehler-Antwort (nicht nur den Statuscode): unterscheidet den echten
-    // Enforcement-404 (`AppError::NotFound`, JSON-Body `{"error": "Nicht gefunden"}`) von einem
-    // bloßen Routing-404 (nicht registrierte Route), das ein leerer Klartext-Body wäre und hier
-    // zu `Value::Null` degradieren würde.
+    // Reihenfolge-unabhängig über `oidc_deaktiviert_override`. Geprüft wird auch der JSON-Body:
+    // er trennt den Enforcement-404 (`{"error": "Nicht gefunden"}`) von einem Routing-404 mit
+    // leerem Body (`Value::Null`).
     let (app, pool) = setup_mit_pool().await;
     oidc_deaktiviert_override(&pool).await;
     let (status, json) = anfrage(&app, "GET", "/api/auth/oidc/start", "", None).await;
@@ -287,8 +273,8 @@ async fn oidc_start_ohne_konfigurierten_provider_ist_404() {
 
 #[tokio::test]
 async fn oidc_callback_ohne_konfigurierten_provider_ist_404() {
-    // Dieselbe Enforcement-Prüfung (Registry-Check) wie `oidc_start` — siehe
-    // `oidc_deaktiviert_override`-Doc zur Reihenfolge-Unabhängigkeit.
+    // Dieselbe Enforcement-Prüfung wie `oidc_start`, reihenfolge-unabhängig über
+    // `oidc_deaktiviert_override`.
     let (app, pool) = setup_mit_pool().await;
     oidc_deaktiviert_override(&pool).await;
     let (status, json) = anfrage(
@@ -305,17 +291,12 @@ async fn oidc_callback_ohne_konfigurierten_provider_ist_404() {
 
 #[tokio::test]
 async fn oidc_callback_mit_unbekanntem_state_redirect_auf_login_fehler() {
-    // Aktiviert "oidc" GLOBAL für den Rest dieses Testbinary-Prozesses (`OIDC_KONFIGURIERT`
-    // ist ein `OnceLock`, `set_oidc_konfiguriert` ignoriert jeden weiteren Aufruf) — siehe
-    // `oidc_deaktiviert_override`-Doc für die Kehrseite (macht die beiden 404-Tests oben
-    // reihenfolge-unabhängig).
+    // Aktiviert "oidc" GLOBAL für diesen Testprozess (`OnceLock`, weitere Aufrufe sind No-ops).
     lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(true);
     let app = setup().await;
 
-    // `state=unbekannt` wurde nie über `/oidc/start` angelegt: `entnehme` liefert `None` — DAS
-    // greift, BEVOR der Handler irgendeinen Netzzugriff (Token-Tausch/Discovery) macht, ist also
-    // ohne echten IdP testbar (kein `set_oidc_konfiguriert`-Discovery-Aufruf nötig, weil der
-    // State-Check zuerst läuft und hier sofort scheitert).
+    // `state=unbekannt` wurde nie angelegt: `entnehme` liefert `None`, BEVOR der Handler das Netz
+    // (Token-Tausch/Discovery) anfasst — ohne echten IdP testbar.
     let resp = app
         .oneshot(
             Request::builder()
@@ -336,11 +317,8 @@ async fn oidc_callback_mit_unbekanntem_state_redirect_auf_login_fehler() {
     assert_eq!(location, "/login?fehler=oidc");
 }
 
-/// Schreibt eine Override-Zeile, die "webauthn" explizit deaktiviert — unabhängig davon, ob der
-/// prozessweite `WEBAUTHN_KONFIGURIERT`-OnceLock in diesem Testbinary-Prozess (`--test auth`)
-/// bereits `true` ist (z. B. durch eine künftige Task-6-Testfunktion, die
-/// `set_webauthn_konfiguriert(true)` aufruft). Analog `oidc_deaktiviert_override` — macht die
-/// 404-Tests unten reihenfolge-unabhängig.
+/// Schreibt eine Override-Zeile, die "webauthn" explizit deaktiviert — unabhängig vom
+/// prozessweiten `WEBAUTHN_KONFIGURIERT`-OnceLock (analog `oidc_deaktiviert_override`).
 async fn webauthn_deaktiviert_override(pool: &sqlx::SqlitePool) {
     sqlx::query(
         "INSERT INTO auth_provider (id, aktiviert) VALUES ('webauthn', 0) \
@@ -360,10 +338,8 @@ async fn webauthn_register_start_ohne_session_ist_401() {
 
 #[tokio::test]
 async fn webauthn_register_start_mit_session_aber_ohne_provider_ist_404() {
-    // Default in Tests: "webauthn" ist NICHT konfiguriert (kein Boot-Bau in `setup_mit_pool`) —
-    // die Override-Zeile macht den Test zusätzlich robust gegen die Ausführungsreihenfolge mit
-    // künftigen Tests, die den prozessweiten OnceLock global auf `true` setzen (siehe
-    // `webauthn_deaktiviert_override`-Doc).
+    // "webauthn" ist in Tests per Vorgabe nicht konfiguriert; die Override-Zeile hält den Test
+    // zusätzlich unabhängig von Tests, die den OnceLock global auf `true` setzen.
     let (app, pool) = setup_mit_pool().await;
     webauthn_deaktiviert_override(&pool).await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
@@ -383,9 +359,8 @@ async fn webauthn_register_start_mit_session_aber_ohne_provider_ist_404() {
 
 #[tokio::test]
 async fn webauthn_register_finish_ohne_session_ist_401() {
-    // `CurrentUser` wird VOR dem `Json<RegisterPublicKeyCredential>`-Body-Extractor ausgewertet
-    // (Reihenfolge der Handler-Parameter) — ein fehlender/ungültiger Body ist hier irrelevant,
-    // der Request scheitert bereits an der fehlenden Session, bevor der Body je geparst wird.
+    // `CurrentUser` wird VOR dem Body-Extractor ausgewertet: der Request scheitert an der fehlenden
+    // Session, bevor der Body geparst wird.
     let app = setup().await;
     let (status, _) = anfrage(&app, "POST", "/api/auth/webauthn/register/finish", "", None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
@@ -393,13 +368,11 @@ async fn webauthn_register_finish_ohne_session_ist_401() {
 
 #[tokio::test]
 async fn webauthn_register_start_mit_provider_liefert_ccr_und_setzt_reg_cookie() {
-    // Aktiviert "webauthn" GLOBAL für den Rest dieses Testbinary-Prozesses (OnceLock, wie
-    // `set_oidc_konfiguriert`) UND hält ein ECHTES, lokal gebautes `Webauthn` im prozessweiten
-    // `WEBAUTHN`-OnceLock (`auth::webauthn::set_webauthn`) — `start_passkey_registration` ist
-    // reine Challenge-Generierung (kein Netz, kein Authenticator nötig), nur `finish` bräuchte
-    // ein echtes Gerät (siehe Task-8-Smoke). Macht `webauthn_deaktiviert_override` oben endlich
-    // diskriminierend (ohne die Override-Zeile in den beiden 404-Tests würden sie ab hier
-    // fälschlich durchfallen) und verifiziert die state-key-Cookie-Bindung end-to-end.
+    // Aktiviert "webauthn" GLOBAL für diesen Testprozess UND hält ein echtes, lokal gebautes
+    // `Webauthn` im `WEBAUTHN`-OnceLock. `start_passkey_registration` ist reine
+    // Challenge-Erzeugung (kein Netz, kein Authenticator); nur `finish` bräuchte ein echtes Gerät.
+    // Damit wird `webauthn_deaktiviert_override` diskriminierend, und die state-key-Cookie-Bindung
+    // ist end-to-end geprüft.
     lifeline_hub::auth::provider::registry::set_webauthn_konfiguriert(true);
     lifeline_hub::auth::webauthn::set_webauthn(
         lifeline_hub::auth::webauthn::baue("localhost", "https://localhost").unwrap(),
@@ -446,9 +419,8 @@ async fn webauthn_register_start_mit_provider_liefert_ccr_und_setzt_reg_cookie()
     );
 }
 
-/// Aktiviert "webauthn" GLOBAL für den Rest dieses Testbinary-Prozesses (idempotenter OnceLock,
-/// wie im Register-Test oben) — geteilter Helfer für alle `auth/start`/`auth/finish`-Tests
-/// (LFH-275 Task 6), die einen konfigurierten Provider brauchen.
+/// Aktiviert "webauthn" GLOBAL für diesen Testprozess (idempotenter OnceLock) — Helfer für die
+/// `auth/start`/`auth/finish`-Tests.
 fn webauthn_aktivieren() {
     lifeline_hub::auth::provider::registry::set_webauthn_konfiguriert(true);
     lifeline_hub::auth::webauthn::set_webauthn(
@@ -458,9 +430,8 @@ fn webauthn_aktivieren() {
 
 #[tokio::test]
 async fn webauthn_auth_start_deaktiviert_ist_404() {
-    // Default in Tests bzw. explizit per Override deaktiviert — unabhängig von der
-    // Ausführungsreihenfolge mit `webauthn_aktivieren`-Tests im selben Testbinary-Prozess
-    // (analog `webauthn_register_start_mit_session_aber_ohne_provider_ist_404`).
+    // Per Vorgabe bzw. per Override deaktiviert — unabhängig von der Reihenfolge mit
+    // `webauthn_aktivieren`-Tests.
     let (app, pool) = setup_mit_pool().await;
     webauthn_deaktiviert_override(&pool).await;
 
@@ -499,11 +470,9 @@ async fn webauthn_auth_start_unbekannter_benutzer_ist_generischer_fehler() {
 
 #[tokio::test]
 async fn webauthn_auth_start_bekannter_benutzer_ohne_passkey_liefert_denselben_fehler() {
-    // Beweist die NO-Enumeration-Eigenschaft diskriminierend: "admin" EXISTIERT (per
-    // `bootstrap_admin` in `setup_mit_pool`/`setup`) und ist aktiv, hat aber in diesem frisch
-    // isolierten Test-Pool garantiert KEINEN registrierten Passkey — Status UND Fehlertext
-    // müssen 1:1 identisch zum Unbekannt-Fall oben sein, sonst leakt die Antwort, ob ein
-    // Benutzername existiert.
+    // NO-Enumeration diskriminierend: "admin" existiert und ist aktiv, hat aber keinen Passkey —
+    // Status UND Fehlertext müssen identisch zum Unbekannt-Fall sein, sonst verrät die Antwort,
+    // ob ein Benutzername existiert.
     webauthn_aktivieren();
     let app = setup().await;
 
@@ -520,21 +489,14 @@ async fn webauthn_auth_start_bekannter_benutzer_ohne_passkey_liefert_denselben_f
     assert_eq!(json["error"], "Nicht angemeldet");
 }
 
-/// Ein strukturell valides (aber kryptografisch bedeutungsloses) `PublicKeyCredential`-JSON —
-/// genug, damit der `Json<PublicKeyCredential>`-Body-Extractor VOR der eigentlichen
-/// Handler-Logik erfolgreich deserialisiert (sonst schlägt der Request schon am Extractor mit
-/// `422` fehl, bevor der State-Cookie-Check in `webauthn_auth_finish` je läuft — analog der
-/// dokumentierten Extractor-Reihenfolge bei `webauthn_register_finish_ohne_session_ist_401`).
+/// Ein strukturell valides (kryptografisch bedeutungsloses) `PublicKeyCredential`-JSON, damit
+/// der Body-Extractor erfolgreich deserialisiert und der State-Cookie-Check in
+/// `webauthn_auth_finish` überhaupt läuft.
 ///
-/// `extensions` bewusst WEGGELASSEN statt `null`: die tatsächlich kompilierte
-/// `PublicKeyCredential` (re-exportiert aus `webauthn-rs-proto`, s. `webauthn-rs-core`s
-/// `pub mod proto { pub use webauthn_rs_proto::*; }` — die gleichnamigen Typen direkt in
-/// `webauthn-rs-core/src/proto.rs` sind TOTER, nie über `mod proto;` eingebundener Code) trägt
-/// `extensions: AuthenticationExtensionsClientOutputs` (KEIN `Option`!) mit
-/// `#[serde(default, alias = "clientExtensionResults")]` — der Schlüssel darf fehlen (Default),
-/// ein explizites JSON-`null` schlägt dagegen fehl ("invalid type: null, expected struct
-/// AuthenticationExtensionsClientOutputs"), verifiziert per Diagnose-Deserialisierung gegen den
-/// Crate-Quelltext.
+/// `extensions` fehlt bewusst, statt `null` zu sein: das Feld ist in `webauthn-rs-proto` kein
+/// `Option`, sondern `#[serde(default)]` — ein fehlender Schlüssel wird zum Default, ein
+/// explizites `null` scheitert ("invalid type: null, expected struct
+/// AuthenticationExtensionsClientOutputs").
 const FINISH_BODY_PLATZHALTER: &str = r#"{
     "id": "AAAA",
     "rawId": "AAAA",
@@ -624,9 +586,9 @@ async fn webauthn_discoverable_start_deaktiviert_ist_404() {
 
 #[tokio::test]
 async fn webauthn_discoverable_start_liefert_challenge_ohne_benutzername_und_setzt_disc_cookie() {
-    // Kern-Akzeptanz von LFH-313: der Start funktioniert OHNE Benutzernamen (leerer Body) und
-    // liefert eine Challenge mit LEERER allowCredentials-Liste (der Client entdeckt den Benutzer
-    // selbst) sowie das eigene `webauthn_disc`-State-Cookie.
+    // Der Start funktioniert OHNE Benutzernamen (leerer Body) und liefert eine Challenge mit
+    // LEERER allowCredentials-Liste (der Client entdeckt den Benutzer selbst) sowie das eigene
+    // `webauthn_disc`-State-Cookie.
     webauthn_aktivieren();
     let app = setup().await;
 
@@ -772,17 +734,13 @@ async fn webauthn_disc_state_cookie_passt_nicht_in_regulaeren_auth_finish() {
 
 #[tokio::test]
 async fn oidc_callback_mit_idp_error_redirect_ohne_400() {
-    // Derselbe prozessweite OnceLock wie in `oidc_callback_mit_unbekanntem_state_redirect_auf_
-    // login_fehler` — erneutes Setzen ist ein No-op, falls eine andere Testfunktion in diesem
-    // Prozess bereits `true` gesetzt hat (reihenfolge-unabhängig).
+    // Derselbe prozessweite OnceLock wie in den anderen OIDC-Tests; erneutes Setzen ist ein No-op.
     lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(true);
     let app = setup().await;
 
-    // IdP-Error-Callback (z. B. abgelehnte Zustimmung): `?error=access_denied&state=...`, KEIN
-    // `code` — ein normaler, spec-konformer Ablauf (RFC 6749 4.1.2.1). Vor Fix B waren `code`/
-    // `state` Pflichtfelder im Query-Extractor, der diesen Fall mit einer rohen 400 abgelehnt
-    // hätte. Erwartet: derselbe generische Redirect wie bei jedem anderen Callback-Fehler,
-    // KEIN 400.
+    // IdP-Error-Callback (z. B. abgelehnte Zustimmung): `?error=access_denied&state=...` ohne
+    // `code` ist ein spec-konformer Ablauf (RFC 6749 4.1.2.1). Erwartet: derselbe generische
+    // Redirect wie bei jedem anderen Callback-Fehler, kein 400 aus dem Query-Extractor.
     let resp = app
         .oneshot(
             Request::builder()
@@ -809,12 +767,9 @@ async fn oidc_callback_mit_falschem_state_cookie_redirect_ohne_session() {
     lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(true);
     let app = setup().await;
 
-    // Seedet DIREKT einen echten, gültigen State-Store-Eintrag (bypasst `/oidc/start`, das einen
-    // echten IdP für Discovery bräuchte) — das `state`-Query im Callback unten ist damit KEIN
-    // unbekannter/abgelaufener Key (anders als in
-    // `oidc_callback_mit_unbekanntem_state_redirect_auf_login_fehler`): der State-Store-Lookup
-    // allein würde hier also DURCHGEHEN. Diskriminierend prüft dieser Test daher, dass der
-    // Binding-Check (LFH-277) trotzdem VORHER abbricht, wenn der `oidc_state`-Cookie fehlt/nicht
+    // Seedet direkt einen gültigen State-Store-Eintrag (ohne `/oidc/start`, das einen IdP
+    // bräuchte): der Store-Lookup allein ginge hier also durch. Geprüft wird, dass der
+    // Binding-Check (LFH-277) VORHER abbricht, wenn der `oidc_state`-Cookie fehlt oder nicht
     // passt.
     let state_key = "echter-state-aber-falsches-cookie".to_string();
     lifeline_hub::auth::oidc::state::speichere(
@@ -855,11 +810,8 @@ async fn oidc_callback_mit_falschem_state_cookie_redirect_ohne_session() {
         .to_str()
         .unwrap();
     assert!(set_cookie.contains("oidc_state="));
-    // Diskriminierend (T3-Regressionsschutz): eine ECHTE Löschung (`jar.remove`) rendert
-    // `Max-Age=0` (`cookie`-Crate `make_removal`) — ein bloßes Überschreiben auf leer (`jar.add`)
-    // täte das NICHT und würde nur `oidc_state=` ohne `Max-Age=0` senden. Ohne diese Zeile würde
-    // dieser Test auch bestehen, wenn `oidc_callback` versehentlich wieder auf `jar.add(...)`
-    // zurückfiele (nur überschreiben statt löschen).
+    // Eine echte Löschung (`jar.remove`) rendert `Max-Age=0`; ein bloßes Überschreiben auf leer
+    // (`jar.add`) sendete nur `oidc_state=` und fiele hier auf.
     assert!(
         set_cookie.contains("Max-Age=0"),
         "Set-Cookie muss eine echte Löschung sein (Max-Age=0), kein bloßes Leer-Überschreiben: {set_cookie}"
@@ -869,12 +821,9 @@ async fn oidc_callback_mit_falschem_state_cookie_redirect_ohne_session() {
         "keine Session darf bei fehlgeschlagener state-Bindung entstehen"
     );
 
-    // Diskriminierend (sonst würde dieser Test auch bestehen, wenn der Binding-Check GAR NICHT
-    // existierte oder invertiert wäre — der seedete Eintrag würde dann in `oidc_client(...)` ohne
-    // echten IdP ebenfalls scheitern und denselben Redirect/dieselbe Cookie-Lage produzieren):
-    // ein Binding-Fehlschlag bricht VOR `state::entnehme` ab (s. Doc-Kommentar Punkt 3 in
-    // `oidc_callback`) — der Store-Eintrag muss also UNVERBRAUCHT überlebt haben. `entnehme`
-    // selbst ist einmalig/entfernend, dieser Aufruf hier räumt den Eintrag also gleich mit auf.
+    // Diskriminierend: ohne Binding-Check scheiterte der Eintrag ebenfalls (in `oidc_client` ohne
+    // IdP) mit demselben Redirect. Ein Binding-Fehlschlag bricht aber VOR `state::entnehme` ab —
+    // der Eintrag muss unverbraucht überlebt haben. `entnehme` entfernt ihn dabei gleich.
     assert!(
         lifeline_hub::auth::oidc::state::entnehme(&state_key).is_some(),
         "Binding-Check muss VOR state::entnehme greifen; der Store-Eintrag darf durch einen \
@@ -882,7 +831,7 @@ async fn oidc_callback_mit_falschem_state_cookie_redirect_ohne_session() {
     );
 }
 
-// ===== TOTP-Enroll (LFH-43, Increment 5, Task 4) =====
+// ===== TOTP-Enroll (LFH-43) =====
 
 fn jetzt_unix() -> u64 {
     std::time::SystemTime::now()
@@ -987,11 +936,9 @@ async fn totp_enroll_finish_mit_falschem_code_ist_422_und_aktiviert_nicht() {
     assert_eq!(status, StatusCode::OK);
     let secret = json["secret_base32"].as_str().unwrap().to_string();
 
-    // Deterministisch garantiert falsch (statt eines festen "000000", das zufällig der gültige
-    // Code sein könnte): `pruefe_code` akzeptiert wegen skew=1 GLEICH DREI Codes (Zeitschritt
-    // jetzt-30/jetzt/jetzt+30, s. `auth::totp`-Moduldoc) — alle drei werden berechnet und aus
-    // zehn repetitiven Kandidaten ("000000".."999999") der erste gewählt, der zu KEINEM der
-    // drei passt (mind. 7 der 10 Kandidaten bleiben immer übrig).
+    // Garantiert falscher Code: `pruefe_code` akzeptiert wegen skew=1 drei Codes (jetzt−30, jetzt,
+    // jetzt+30). Aus zehn Kandidaten ("000000".."999999") wird der erste gewählt, der zu keinem
+    // passt.
     let now = jetzt_unix();
     let gueltige_codes: std::collections::HashSet<String> = [now - 30, now, now + 30]
         .into_iter()
@@ -1030,12 +977,11 @@ async fn totp_enroll_start_ohne_session_ist_401() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
-// ===== Zweistufiger Passwort→TOTP-Login + /totp/finish (LFH-43, Increment 5, Task 5 —
-// „der Crux": Pending-State→Session-Gating) =====
+// ===== Zweistufiger Passwort→TOTP-Login + /totp/finish (LFH-43): Pending-State→Session =====
 
-/// Aktiviert TOTP für den admin-Nutzer über den bestehenden Enroll-Flow (Task 4, reused statt
-/// eines direkten DB-Schreibens — deckt damit zusätzlich ab, dass Enroll und Login
-/// zusammenspielen). Liefert (secret_base32, recovery_codes_klartext).
+/// Aktiviert TOTP für den admin über den regulären Enroll-Flow (statt direkt in die DB) — deckt
+/// damit zusätzlich ab, dass Enroll und Login zusammenspielen. Liefert (secret_base32,
+/// recovery_codes_klartext).
 async fn totp_fuer_admin_aktivieren(
     app: &axum::Router,
     admin_cookie: &str,
@@ -1142,10 +1088,9 @@ async fn totp_finish(
 
 #[tokio::test]
 async fn login_ohne_totp_liefert_weiterhin_die_nackte_benutzeranzeige() {
-    // Neutralitäts-MUST des Plans: `LoginAntwort::Angemeldet` serialisiert (`#[serde(untagged)]`)
-    // BYTE-IDENTISCH als die nackte `BenutzerAnzeige` — kein Wrapper-Feld, kein
-    // `mfa_erforderlich`. Die bestehenden Login-Tests prüfen nur Status/Cookie, nicht den Body;
-    // dieser Test pinnt die Body-Form explizit (ergänzend, kein Ersatz für die bestehenden).
+    // `LoginAntwort::Angemeldet` serialisiert (`#[serde(untagged)]`) byte-identisch als nackte
+    // `BenutzerAnzeige` — kein Wrapper-Feld, kein `mfa_erforderlich`. Dieser Test pinnt die
+    // Body-Form.
     let app = setup().await;
     let (status, json, cookies) = login_alle_cookies(&app, "admin", "startpw12").await;
     assert_eq!(status, StatusCode::OK);
@@ -1223,8 +1168,7 @@ async fn totp_finish_mit_falschem_code_ist_401_ohne_session() {
     let (_, _, login_cookies) = login_alle_cookies(&app, "admin", "startpw12").await;
     let pending_paar = login_cookies[0].split(';').next().unwrap().to_string();
 
-    // Deterministisch garantiert falsch (analog dem `totp_enroll_finish`-Test oben): alle drei
-    // durch den ±1-Skew gültigen Codes ausschließen.
+    // Garantiert falscher Code: alle drei durch den ±1-Skew gültigen Codes ausschließen.
     let now = jetzt_unix();
     let gueltige_codes: std::collections::HashSet<String> = [now - 30, now, now + 30]
         .into_iter()
@@ -1270,10 +1214,9 @@ async fn totp_finish_mit_recovery_code_liefert_session_und_verbraucht_ihn_einmal
         "gültiger Recovery-Code muss eine Session anlegen: {cookies:?}"
     );
 
-    // Zweiter Passwort-Schritt → NEUER Pending-Key (Pending-State ist single-use pro Login-
-    // Versuch, unabhängig vom Recovery-Code) — derselbe Recovery-Code muss trotzdem als bereits
-    // verbraucht gelten (Isoliert die Recovery-Code-Single-use-Eigenschaft von der
-    // Pending-Key-Single-use-Eigenschaft).
+    // Zweiter Passwort-Schritt → NEUER Pending-Key; derselbe Recovery-Code muss trotzdem als
+    // verbraucht gelten. Trennt die Single-use-Eigenschaft des Recovery-Codes von der des
+    // Pending-Keys.
     let (_, _, login_cookies_2) = login_alle_cookies(&app, "admin", "startpw12").await;
     let pending_paar_2 = login_cookies_2[0].split(';').next().unwrap().to_string();
 
@@ -1286,7 +1229,7 @@ async fn totp_finish_mit_recovery_code_liefert_session_und_verbraucht_ihn_einmal
     assert!(!cookies2.iter().any(|c| c.starts_with("lifeline_sid=")));
 }
 
-// ===== MFA-Status in `BenutzerAnzeige` (LFH-43, Increment 5, Task 6) =====
+// ===== MFA-Status in `BenutzerAnzeige` (LFH-43) =====
 
 #[tokio::test]
 async fn me_liefert_totp_aktiviert_false_fuer_frischen_benutzer() {

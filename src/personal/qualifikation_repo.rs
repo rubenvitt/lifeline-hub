@@ -2,15 +2,11 @@ use super::Qualifikation;
 use crate::error::AppError;
 use sqlx::SqlitePool;
 
-/// Funktion einer Person als kommaseparierter Text aus ihren **aktiven** Qualifikationen,
-/// geordnet nach `sortier`, dann `id`. **Einzige Quelle der `snap_funktion`-Komposition**
-/// (siehe `disposition_repo::disponiere_stamm`); die Live-Anzeige in
-/// `disposition_repo` verwendet die identische geordnete Subquery — beide MÜSSEN
-/// dieselbe Ausgabe erzeugen (Test `funktion_komposition_identisch` in Task 8).
-/// `None`, wenn die Person keine aktive Qualifikation hat.
-///
-/// Executor-generisch (Pool oder offene Verbindung): `disposition_repo::disponiere_stamm_tx`
-/// liest auf der Verbindung seiner Transaktion (LFH-690).
+/// Funktion einer Person als kommaseparierter Text ihrer **aktiven** Qualifikationen, nach
+/// `sortier`, dann `id`; `None` ohne aktive Qualifikation. **Einzige Quelle der
+/// `snap_funktion`-Komposition**; die Live-Anzeige in `disposition_repo` nutzt die identische
+/// Subquery (Test `funktion_komposition_identisch`). Executor-generisch für
+/// `disposition_repo::disponiere_stamm_tx`.
 pub async fn funktion_text(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     personal_id: i64,
@@ -82,21 +78,16 @@ pub async fn anlegen(
     laden(pool, org_id, id).await
 }
 
-/// Teil-Patch von label/sortier (LFH-306): die `Option` sagt „im Patch enthalten?" —
-/// `None` lässt die Spalte unverändert. Die Tabelle hat **keine** nullable Spalte, also
-/// auch keinen Tri-State; der Gewinn ist allein, dass ein nicht gesendetes `sortier`
-/// nicht mehr still auf 0 zurückfällt.
+/// Teil-Patch von label/sortier: `None` lässt die Spalte unverändert. Ohne nullable Spalte gibt
+/// es keinen Tri-State; ein nicht gesendetes `sortier` fällt nicht mehr auf 0.
 #[derive(Debug, Default)]
 pub struct QualifikationPatch<'a> {
     pub label: Option<&'a str>,
     pub sortier: Option<i64>,
 }
 
-/// Teil-Patch von label/sortier (org-scoped). `NotFound`/`Conflict` analog Stamm.
-///
-/// Flag/Wert-Paare statt Vollersatz (LFH-306): ein nicht gesendetes Feld fasst seine Spalte
-/// nicht an. Die Parameter sind nummeriert — abgesichert von
-/// `patche_setzt_jede_spalte_an_ihren_platz`.
+/// Teil-Patch von label/sortier (org-scoped); `NotFound`/`Conflict` wie beim Stamm.
+/// Nummerierte Parameter, abgesichert von `patche_setzt_jede_spalte_an_ihren_platz`.
 pub async fn patche(
     pool: &SqlitePool,
     org_id: i64,
@@ -199,8 +190,8 @@ mod tests {
         ));
     }
 
-    /// Bind-Reihenfolge der Flag/Wert-Kette: beide Spalten in EINEM Patch auf distinkte
-    /// Werte setzen und einzeln prüfen.
+    /// Bind-Reihenfolge: beide Spalten in EINEM Patch auf distinkte Werte setzen und einzeln
+    /// prüfen.
     #[tokio::test]
     async fn patche_setzt_jede_spalte_an_ihren_platz() {
         let pool = crate::db::test_pool().await;
@@ -221,8 +212,7 @@ mod tests {
         assert_eq!(neu.sortier, 42);
     }
 
-    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an. Ohne den Umbau
-    /// setzte ein Body ohne `sortier` die Spalte still auf 0 (`#[serde(default)]`).
+    /// Ein Patch fasst NUR die gesendeten Spalten an (ein Body ohne `sortier` setzte sonst 0).
     #[tokio::test]
     async fn patche_laesst_nicht_gesendete_spalten_stehen() {
         let pool = crate::db::test_pool().await;

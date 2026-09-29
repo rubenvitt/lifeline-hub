@@ -2,87 +2,15 @@
 //! Lifecycle/Status, Belegung (Einheit + Fahrzeug), ETB-Texte,
 //! Rechte-Matrix, Cross-Einsatz-404 und Read-only für abgeschlossene Einsätze.
 
-use axum::body::{to_bytes, Body};
-use axum::http::{header, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
-use serde_json::{json, Value};
-use tower::ServiceExt;
+use axum::http::StatusCode;
+use serde_json::json;
 
 mod common;
-use common::login_cookie;
+use common::{
+    anfrage_json, einsatz_anlegen, login_cookie, setup_mit_pool, setup_mit_pool_und_live,
+};
 
 // ---------- Harness ----------
-
-async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
-    let (router, pool, _live) = setup_mit_live().await;
-    (router, pool)
-}
-
-/// Wie `setup_mit_pool`, gibt aber zusätzlich den `LiveHub` zurück, um in
-/// SSE-Tests Events zu abonnieren.
-async fn setup_mit_live() -> (axum::Router, sqlx::SqlitePool, LiveHub) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let live = LiveHub::new();
-    let router = build_router(AppState {
-        pool: pool.clone(),
-        live: live.clone(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, pool, live)
-}
-
-async fn json_request(
-    app: &axum::Router,
-    method: &str,
-    uri: &str,
-    cookie: &str,
-    body: Option<&Value>,
-) -> (StatusCode, Value) {
-    let mut req = Request::builder()
-        .method(method)
-        .uri(uri)
-        .header(header::COOKIE, cookie);
-    let body = match body {
-        Some(b) => {
-            req = req.header(header::CONTENT_TYPE, "application/json");
-            Body::from(b.to_string())
-        }
-        None => Body::empty(),
-    };
-    let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
-    let status = resp.status();
-    let bytes = to_bytes(resp.into_body(), 1024 * 1024).await.unwrap();
-    let value = if bytes.is_empty() {
-        Value::Null
-    } else {
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
-    };
-    (status, value)
-}
-
-async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
-    let (s, v) = json_request(
-        app,
-        "POST",
-        "/api/einsaetze",
-        cookie,
-        Some(&json!({"bezeichnung": "Lage"})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED);
-    v["id"].as_i64().unwrap()
-}
 
 /// Legt einen BR an und versetzt ihn sofort auf aktiv.
 async fn br_anlegen_und_aktivieren(
@@ -91,7 +19,7 @@ async fn br_anlegen_und_aktivieren(
     einsatz: i64,
     bez: &str,
 ) -> i64 {
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
@@ -101,7 +29,7 @@ async fn br_anlegen_und_aktivieren(
     .await;
     assert_eq!(s, StatusCode::CREATED, "anlegen: {v}");
     let br = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/status"),
@@ -115,7 +43,7 @@ async fn br_anlegen_und_aktivieren(
 
 /// Liest alle ETB-System-Einträge und gibt deren Inhalt zurück.
 async fn etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         app,
         "GET",
         &format!("/api/einsaetze/{einsatz}/etb"),
@@ -141,7 +69,7 @@ async fn anlegen_liefert_geplant_und_keinen_etb() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &cookie).await;
 
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
@@ -165,7 +93,7 @@ async fn status_aktiv_schreibt_etb_in_betrieb_genommen() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &cookie).await;
 
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
@@ -176,7 +104,7 @@ async fn status_aktiv_schreibt_etb_in_betrieb_genommen() {
     assert_eq!(s, StatusCode::CREATED);
     let br_id = v["id"].as_i64().unwrap();
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/status"),
@@ -203,7 +131,7 @@ async fn ungueltiger_status_uebergang_ist_422() {
     let br_id = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Test").await;
 
     // aktiv → geplant ist kein erlaubter Übergang
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/status"),
@@ -232,7 +160,7 @@ async fn crud_und_belegung_einheit_erscheint_in_detail() {
     .unwrap();
 
     // Belegung: Eintritt
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
@@ -244,7 +172,7 @@ async fn crud_und_belegung_einheit_erscheint_in_detail() {
     assert_eq!(v["art"], "eintritt");
 
     // Detail zeigt die Einheit
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}"),
@@ -274,7 +202,7 @@ async fn austritt_entfernt_einheit_aus_detail() {
     .await
     .unwrap();
 
-    json_request(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
@@ -283,7 +211,7 @@ async fn austritt_entfernt_einheit_aus_detail() {
     )
     .await;
 
-    json_request(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
@@ -292,7 +220,7 @@ async fn austritt_entfernt_einheit_aus_detail() {
     )
     .await;
 
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}"),
@@ -324,7 +252,7 @@ async fn aufloesen_blockt_bei_belegung_409() {
     .await
     .unwrap();
 
-    json_request(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
@@ -333,7 +261,7 @@ async fn aufloesen_blockt_bei_belegung_409() {
     )
     .await;
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/status"),
@@ -370,7 +298,7 @@ async fn fahrzeug_mit_einheit_belegen_409() {
     .await
     .unwrap();
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
@@ -398,7 +326,7 @@ async fn fahrzeug_ohne_einheit_belegung_201() {
     .await
     .unwrap();
 
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
@@ -409,7 +337,7 @@ async fn fahrzeug_ohne_einheit_belegung_201() {
     assert_eq!(s, StatusCode::CREATED, "Fahrzeug-Belegung: {v}");
 
     // Detail zeigt Fahrzeug
-    let (_, d) = json_request(
+    let (_, d) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}"),
@@ -430,7 +358,7 @@ async fn unbekannter_objekt_typ_400() {
     let eid = einsatz_anlegen(&app, &cookie).await;
     let br_id = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Val").await;
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
@@ -449,7 +377,7 @@ async fn geplanter_br_akzeptiert_keine_belegung_422() {
     let eid = einsatz_anlegen(&app, &cookie).await;
 
     // BR anlegen, aber NICHT aktivieren (bleibt geplant)
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
@@ -468,7 +396,7 @@ async fn geplanter_br_akzeptiert_keine_belegung_422() {
     .await
     .unwrap();
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
@@ -486,7 +414,7 @@ async fn etb_inbetriebnahme_und_belegung() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &cookie).await;
 
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
@@ -498,7 +426,7 @@ async fn etb_inbetriebnahme_und_belegung() {
     let br_id = v["id"].as_i64().unwrap();
 
     // Aktivieren → ETB
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/status"),
@@ -523,7 +451,7 @@ async fn etb_inbetriebnahme_und_belegung() {
     .await
     .unwrap();
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
@@ -550,7 +478,7 @@ async fn patch_stammfelder_kein_etb() {
     let eid = einsatz_anlegen(&app, &cookie).await;
     let br_id = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Patch").await;
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}"),
@@ -577,7 +505,7 @@ async fn beobachter_kann_nicht_schreiben_403() {
     let eid = einsatz_anlegen(&app, &cookie_admin).await;
 
     // Beobachter-Benutzer anlegen
-    let (s, v) = json_request(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         "/api/benutzer",
@@ -589,7 +517,7 @@ async fn beobachter_kann_nicht_schreiben_403() {
     let beob_id = v["id"].as_i64().unwrap();
 
     // Mitgliedschaft als Beobachter
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "PUT",
         &format!("/api/einsaetze/{eid}/mitglieder/{beob_id}"),
@@ -601,7 +529,7 @@ async fn beobachter_kann_nicht_schreiben_403() {
 
     let cookie_beob = login_cookie(&app, "beob", "startpw12").await;
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
@@ -618,7 +546,7 @@ async fn fremder_einsatz_ist_404() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "GET",
         "/api/einsaetze/9999/bereitstellungsraeume",
@@ -647,7 +575,7 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
     .await
     .unwrap();
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
@@ -661,7 +589,7 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
         "Anlegen bei abgeschlossenem Einsatz"
     );
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}"),
@@ -690,7 +618,7 @@ async fn wechsel_verschiebt_einheit_zwischen_br() {
     .unwrap();
 
     // Eintritt in BR A
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_a}/belegung"),
@@ -701,7 +629,7 @@ async fn wechsel_verschiebt_einheit_zwischen_br() {
     assert_eq!(s, StatusCode::CREATED);
 
     // Wechsel nach BR B
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_b}/belegung"),
@@ -712,7 +640,7 @@ async fn wechsel_verschiebt_einheit_zwischen_br() {
     assert_eq!(s, StatusCode::CREATED, "Wechsel nach BR B");
 
     // Detail B zeigt die Einheit
-    let (_, vb) = json_request(
+    let (_, vb) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_b}"),
@@ -725,7 +653,7 @@ async fn wechsel_verschiebt_einheit_zwischen_br() {
     assert_eq!(einheiten_b[0]["id"], einheit_id);
 
     // Detail A zeigt sie nicht mehr
-    let (_, va) = json_request(
+    let (_, va) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_a}"),
@@ -743,7 +671,7 @@ async fn wechsel_verschiebt_einheit_zwischen_br() {
 /// damit die Kräfte-Ansicht live refetchen kann.
 #[tokio::test]
 async fn belegung_einheit_feuert_einheit_sse() {
-    let (app, pool, live) = setup_mit_live().await;
+    let (app, pool, live) = setup_mit_pool_und_live().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &cookie).await;
     let br_id = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR SSE").await;
@@ -759,7 +687,7 @@ async fn belegung_einheit_feuert_einheit_sse() {
     // VOR der Belegung abonnieren, damit das Broadcast-Event ankommt.
     let mut rx = live.abonniere(eid);
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
@@ -785,7 +713,7 @@ async fn belegung_einheit_feuert_einheit_sse() {
 /// Belegung eines Fahrzeugs feuert ein `fahrzeug`-SSE-Event.
 #[tokio::test]
 async fn belegung_fahrzeug_feuert_fahrzeug_sse() {
-    let (app, pool, live) = setup_mit_live().await;
+    let (app, pool, live) = setup_mit_pool_und_live().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &cookie).await;
     let br_id = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR SSE Fz").await;
@@ -801,7 +729,7 @@ async fn belegung_fahrzeug_feuert_fahrzeug_sse() {
 
     let mut rx = live.abonniere(eid);
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
@@ -831,7 +759,7 @@ async fn belegung_unbekanntes_objekt_404() {
     let eid = einsatz_anlegen(&app, &cookie).await;
     let br_id = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR NF").await;
 
-    let (s, _) = json_request(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),

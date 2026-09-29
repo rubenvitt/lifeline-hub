@@ -10,21 +10,14 @@ import { VorschauZustand } from '../../command-palette/VorschauZustand';
 import { uhsStatus, uhsTyp } from '../../theme/statusFarben';
 
 /**
- * Lese-Vorschau einer Unfallhilfsstelle in der Sprungpalette (LFH-664).
+ * Lese-Vorschau einer Unfallhilfsstelle in der Sprungpalette.
  *
- * DATEN: das LISTENfach der Palette (`datensatzAbfrage.uhs`) mit `select` auf die `id` — nicht
- * das Detailfach `uhsDetail`/`ladeUhs`: das steht in `NICHT_LIVE_KEYS`, eine Vorschau darauf
- * verpasste Live-Änderungen. Die Listenform trägt alles, was die Vorschau zeigt.
+ * Daten: das Listenfach der Palette (`datensatzAbfrage.uhs`) mit `select` auf die `id`, nicht das
+ * Detailfach `uhsDetail` — das steht in `NICHT_LIVE_KEYS`.
  *
- * INHALT wie der Kopf der Detailseite (Typ, Status, Standort, Notiz), dazu die Verortung.
- * Der Typ ist eine Kategorie und keine Lage (`uhsTyp` ist durchgängig `neutral`) — er steht
- * deshalb als Wort, nicht als Statusetikett. Grundriss, Material und Bewegungen bleiben der
- * Detailseite (design.md, Non-Goals).
- *
- * VERORTUNG ohne `einsatzId` an `KoordinatenAnzeige`: mit ihr holte die Ort-Zeile (Peilung,
- * Ortsname) einen eigenen Abruf — die Spec verlangt für einen geladenen Stand aber „kein
- * zusätzlicher Abruf". „nicht verortet" steht als Text ohne Verweis auf die Karte: die
- * Vorschau liest nur, das Verorten ist eine Handlung.
+ * Inhalt wie der Kopf der Detailseite (Typ als Wort, Status, Standort, Notiz) plus Verortung.
+ * `KoordinatenAnzeige` ohne `einsatzId`, weil die Ort-Zeile sonst einen eigenen Abruf holte. „nicht
+ * verortet" steht ohne Verweis auf die Karte: die Vorschau liest nur.
  */
 export default function UhsVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {
   const select = useCallback((liste: Uhs[]) => liste.find((u) => u.id === id), [id]);

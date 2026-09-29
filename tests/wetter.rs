@@ -13,8 +13,6 @@ use std::sync::{Arc, Mutex};
 
 use axum::http::StatusCode;
 use chrono::{SecondsFormat, Utc};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use serde_json::{json, Value};
 
 mod common;
@@ -27,23 +25,14 @@ struct Umgebung {
 }
 
 async fn setup_mit_basis(basis: &str) -> Umgebung {
-    let pool = lifeline_hub::db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
     let dir = tempfile::tempdir().unwrap();
-    let app = build_router(AppState {
-        pool: pool.clone(),
-        live: lifeline_hub::live::LiveHub::new(),
-        karten_dir: dir.path().to_path_buf(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu()
+    let (app, pool) = setup_mit_state(|s| {
+        s.karten_dir = dir.path().to_path_buf();
+        s.fachebenen = lifeline_hub::karte::FachebenenState::neu()
             .mit_pegel_basis_url("http://127.0.0.1:1")
-            .mit_wetter_basis_url(basis),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
+            .mit_wetter_basis_url(basis);
+    })
+    .await;
     Umgebung {
         app,
         pool,

@@ -1,29 +1,21 @@
-//! Zentrale Klassifikations-Registry für die irreversible PII-Schwärzung (F02/LFH-229).
+//! Zentrale Klassifikations-Registry für die irreversible PII-Schwärzung (LFH-229).
 //!
-//! Die Schwärzung (`repo::schwaerze_einsatz`, Phase B des Purge-Schedulers) war eine
-//! handgepflegte Liste von UPDATE-Statements. Nichts erzwang, dass eine NEUE PII-Spalte
-//! aufgenommen wird — reale Lücken (Anhang-BLOBs, Einsatz-Kopf, Lage-Freitexte) blieben
-//! stehen. Diese Registry **tötet die Fehlerklasse**:
-//!
-//! 1. Sie taggt für JEDE Spalte JEDER einsatz-scoped Tabelle eine [`Klassifikation`]
+//! 1. Sie taggt JEDE Spalte JEDER einsatz-scoped Tabelle mit einer [`Klassifikation`]
 //!    (`Scrub{Strategie}` oder `Retain{Grund}`).
 //! 2. Ein Guard-Test (`tests`) entdeckt die einsatz-scoped Tabellenmenge S dynamisch
-//!    (`einsatz_id` + transitive `ON DELETE CASCADE`-Hülle ab `einsatz`) und bricht ROT,
-//!    sobald eine Spalte/Tabelle **un**klassifiziert ist. Eine neue PII-Spalte kann also
-//!    nicht mehr still durchrutschen.
+//!    (`einsatz_id` + transitive `ON DELETE CASCADE`-Hülle ab `einsatz`) und wird ROT, sobald
+//!    eine Spalte oder Tabelle unklassifiziert ist — eine neue PII-Spalte kann nicht still
+//!    durchrutschen.
 //!
-//!    Die Entdeckung trägt eine Vorbedingung, die GUARD 5 (LFH-291) erzwingt: **Jede
-//!    FK-Kante nach S kommt aus S oder steht begründet auf der Allowlist**
-//!    (`FREMDKANTEN_ALLOWLIST` im `tests`-Modul, startet leer). Ohne sie fiele eine neue
-//!    Tabelle ohne `einsatz_id`, die per `ON DELETE SET NULL` oder ohne ON-DELETE-Angabe
-//!    auf eine Tabelle in S zeigt, aus der CASCADE-Hülle heraus — GUARD 1 fragte ihre
-//!    Spalten nie ab, ihre PII überlebte die Schwärzung still.
-//! 3. [`scrubbe_aus_registry`] treibt den tatsächlichen Scrub **data-driven** aus den
-//!    `Scrub`-Einträgen → kein Drift zwischen Guard und Scrub möglich (die Statements
-//!    entstehen aus denselben compile-time-Konstanten, die der Guard prüft).
+//!    Das setzt voraus, dass jede FK-Kante nach S aus S kommt oder begründet auf
+//!    `FREMDKANTEN_ALLOWLIST` steht (GUARD 5, LFH-291). Sonst fiele eine Tabelle ohne
+//!    `einsatz_id`, die per `SET NULL` oder ohne ON-DELETE auf S zeigt, aus der Hülle, und ihre
+//!    PII überlebte die Schwärzung.
+//! 3. [`scrubbe_aus_registry`] treibt den Scrub data-driven aus denselben Konstanten, die der
+//!    Guard prüft — kein Drift möglich.
 //!
-//! Tabellen-/Spaltennamen sind ausschließlich compile-time-Registry-Konstanten (nie
-//! User-Input) → `sqlx::AssertSqlSafe` ist hier injektionssicher; Werte bleiben `.bind`.
+//! Tabellen-/Spaltennamen sind ausschließlich compile-time-Konstanten (nie User-Input), daher
+//! ist `sqlx::AssertSqlSafe` hier injektionssicher; Werte werden gebunden.
 
 use super::repo::SCHWAERZUNG_PLATZHALTER;
 
@@ -34,20 +26,17 @@ pub enum Strategie {
     NullSetzen,
     /// `col = SCHWAERZUNG_PLATZHALTER` (NOT-NULL-Textspalte, NULL unmöglich).
     Platzhalter,
-    /// `col = CASE WHEN col IS NULL THEN NULL ELSE SCHWAERZUNG_PLATZHALTER END`
-    /// (nullable, aber ein CHECK erzwingt einen Wert, sobald ein Statusfeld gesetzt ist —
-    /// z. B. `einsatz_schaden.uebergeben_an` bei `status='uebergeben'`).
+    /// `col = CASE WHEN col IS NULL THEN NULL ELSE SCHWAERZUNG_PLATZHALTER END` — nullable, aber
+    /// ein CHECK verlangt einen Wert, sobald ein Statusfeld gesetzt ist (z. B.
+    /// `einsatz_schaden.uebergeben_an` bei `status='uebergeben'`).
     PlatzhalterWennGesetzt,
     /// `col = SCHWAERZUNG_PLATZHALTER || ' ' || id` — NOT-NULL-Textspalte unter einem
-    /// UNIQUE-Index (LFH-639: `evakuierungsbezirk.bezeichnung`, `betreuungsstelle.bezeichnung`,
-    /// eindeutig je Einsatz unter den nicht stornierten Zeilen). Ein für alle Zeilen gleicher
-    /// Platzhalter verletzte den Index ab der zweiten Zeile, und die ganze Schwärzung bräche
-    /// in ihrer Transaktion ab. Die Zeilen-ID ist Struktur (`G_PK`) und trägt keinen
-    /// Personenbezug.
+    /// UNIQUE-Index (z. B. `evakuierungsbezirk.bezeichnung`). Ein gleicher Platzhalter verletzte
+    /// den
+    /// Index ab der zweiten Zeile und bräche die ganze Schwärzung ab. Die Zeilen-ID ist Struktur.
     PlatzhalterMitId,
-    /// Die ganze Zeile wird gelöscht (`DELETE FROM t WHERE …`). Für Tabellen, deren
-    /// Nutzlast selbst PII ist und die kein zu erhaltendes Skelett tragen (`anhang`:
-    /// Foto-BLOBs Betroffener). CASCADE räumt abhängige Verknüpfungszeilen mit.
+    /// Die ganze Zeile wird gelöscht. Für Tabellen, deren Nutzlast selbst PII ist und die kein
+    /// Skelett tragen (`anhang`: Foto-BLOBs Betroffener); CASCADE räumt abhängige Zeilen mit.
     ZeileLoeschen,
 }
 
@@ -56,8 +45,8 @@ pub enum Strategie {
 pub enum Klassifikation {
     /// PII → wird bei der Schwärzung nach [`Strategie`] entfernt.
     Scrub(Strategie),
-    /// Bleibt erhalten. Der `&'static str` begründet, WARUM (Struktur, Führungs-Doku,
-    /// anonymisiertes Statistik-Skelett …) — Review-Anker.
+    /// Bleibt erhalten. Der `&'static str` begründet, warum (Struktur, Führungs-Doku,
+    /// anonymisiertes Statistik-Skelett …).
     Retain(&'static str),
 }
 
@@ -122,8 +111,8 @@ const G_IDEMPOTENZ: &str =
 const G_KONFIG: &str = "Einsatz-Konfiguration (kein Personenbezug)";
 const G_POLY: &str =
     "Polymorpher Bezug (objekt_typ/objekt_id o. Ä.; Struktur, Ziel wird eigenständig gescrubbt)";
-// Operatives Struktur-Label (Bezeichnung einer Einheit/eines Abschnitts/Raums/Funkgruppe):
-// benennt ein operatives Objekt, keine Person → Teil des operativen Skeletts.
+// Operatives Struktur-Label (Einheit, Abschnitt, Raum, Funkgruppe): benennt ein Objekt, keine
+// Person.
 const G_OP_LABEL: &str =
     "Operatives Struktur-Label (Objekt-/Einheiten-/Abschnitts-/Funkgruppen-Bezeichnung, kein Personenbezug)";
 const G_OP_SNAP: &str =
@@ -143,7 +132,7 @@ const G_ABGLEICH: &str =
      werden selbst gescrubbt)";
 const G_AUDIT: &str =
     "Zugriffs-Audit (Nachweis-Struktur; benutzer=System-Nutzer, kein Betroffenen-Freitext)";
-// REVIEW: operativer Freitext-Zettel, konservativ gescrubbt (LFH-229) — Begründung im Scrub-Kommentar.
+// REVIEW: operativer Freitext-Zettel, konservativ gescrubbt — Begründung im Scrub-Kommentar.
 
 /// Die vollständige Registry aller einsatz-scoped Tabellen (Menge S). Reihenfolge =
 /// Ausführungsreihenfolge des Scrubs (Korrektheit ist reihenfolgeunabhängig).
@@ -178,8 +167,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "leitstellen_nr",
                 "Leitstellen-Einsatznummer (operativer Verweis, kein Personenbezug)",
             ),
-            // SCRUB Einsatz-Kopf: Meldebild + Adresse/GPS + meldende Stelle sind Betroffenen-/
-            // Melder-PII. GPS mit-nullen (Adresse nullen aber Fix behalten wäre dieselbe Preisgabe).
+            // Meldebild, Adresse/GPS und meldende Stelle sind Betroffenen-/Melder-PII. GPS
+            // mit-nullen,
+            // sonst verriete der Fix die Adresse.
             scrub("einsatzort", Strategie::NullSetzen),
             scrub("einsatzort_lat", Strategie::NullSetzen),
             scrub("einsatzort_lon", Strategie::NullSetzen),
@@ -218,13 +208,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("storniert_at", G_ZEIT),
             retain("aktuelle_sichtung", G_TRIAGE),
             retain("aktuelle_sichtung_at", G_ZEIT),
-            // Denormalisierter Cache: trägt für Transporte den Klartext „Transport → {Klinik}“ → PII.
+            // Denormalisierter Cache: trägt bei Transporten „Transport → {Klinik}“ im Klartext.
             scrub("aktueller_verbleib", Strategie::NullSetzen),
             retain("aktuelle_uhs_id", G_FK),
             retain("aktueller_platz_id", G_FK),
-            // LFH-613: Zustand ist ein Gesundheitsdatum (Freitext), die Fundort-Koordinate ein
-            // Aufenthaltsort → beide PII. Das Verbleib-Ziel spiegelt person_verbleib.ziel
-            // (Klinikname/Adresse) und wird wie dort gescrubbt.
+            // Zustand ist ein Gesundheitsdatum, die Fundort-Koordinate ein Aufenthaltsort. Das
+            // Verbleib-Ziel spiegelt `person_verbleib.ziel` und wird wie dort gescrubbt.
             scrub("zustand", Strategie::NullSetzen),
             scrub("antreff_lat", Strategie::NullSetzen),
             scrub("antreff_lon", Strategie::NullSetzen),
@@ -233,8 +222,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("aktuelle_verbleib_art", G_TRIAGE),
             scrub("aktuelles_verbleib_ziel", Strategie::NullSetzen),
             retain("aktueller_verbleib_status", G_TRIAGE),
-            // LFH-674: Kennung der Betreuungsstelle, kein Personenbezug (der Name hängt an der
-            // Stelle, das Ziel wird oben gescrubbt).
+            // Kennung der Betreuungsstelle, kein Personenbezug (der Name hängt an der Stelle).
             retain("aktuelle_verbleib_betreuungsstelle_id", G_FK),
         ],
     },
@@ -275,17 +263,16 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("person_id", G_FK),
             retain("art", G_TRIAGE),
-            // transportmittel ist Freitext (nullable, "RTW, KTW, …") wie die Schwester-
-            // Freitexte ziel/notiz → gescrubbt (LFH-229 Review; G_TRIAGE galt nur für die
-            // CHECK-Enum-Kategorien art/status, nicht für Freitext).
+            // Freitext wie ziel/notiz → gescrubbt; G_TRIAGE gilt nur für die CHECK-Enums
+            // art/status.
             scrub("transportmittel", Strategie::NullSetzen),
-            // ziel = Klartext-Verbringungsort (Klinikname/Adresse) → PII.
+            // Klartext-Verbringungsort (Klinikname/Adresse) → PII.
             scrub("ziel", Strategie::NullSetzen),
             retain("status", G_TRIAGE),
             scrub("notiz", Strategie::NullSetzen),
             retain("zeitpunkt_at", G_ZEIT),
             retain("erfasst_von", G_FK),
-            // LFH-674: Kennung der Betreuungsstelle eines Notunterkunft-Verbleibs.
+            // Kennung der Betreuungsstelle eines Notunterkunft-Verbleibs.
             retain("betreuungsstelle_id", G_FK),
         ],
     },
@@ -350,8 +337,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geschlecht", G_TIER),
             retain("alter_geschaetzt", G_TIER),
             retain("farbe_beschreibung", G_TIER),
-            // Chip-/Tätowierungsnummer = im Haustierregister auf den Halter registrierter,
-            // eindeutiger Identifikator → personenverknüpfend.
+            // Chip-/Tätowierungsnummer ist im Haustierregister auf den Halter registriert →
+            // personenverknüpfend.
             scrub("kennzeichnung", Strategie::NullSetzen),
             retain("groesse_gewicht", G_TIER),
             retain("halter_person_id", G_FK),
@@ -379,18 +366,15 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status", G_ENUM),
             retain("typ", G_ENUM),
             retain("ausmass", G_ENUM),
-            // Schadensort = faktisch Adresse Betroffener → gescrubbt (Nutzer-Entscheidung LFH-229);
-            // NOT NULL → Platzhalter. Die Beschreibung bleibt operative Schadens-Doku (RETAIN).
+            // Schadensort ist faktisch die Adresse Betroffener → gescrubbt; NOT NULL → Platzhalter.
             scrub("ort", Strategie::Platzhalter),
-            // beschreibung ist unstrukturierter Freitext (NOT NULL) und kann dieselbe PII
-            // (Name/Adresse/Kontakt Betroffener) tragen wie ort → gescrubbt (LFH-229 Review +
-            // Nutzer-Entscheidung); kein Führungs-Doku-Rang.
+            // Unstrukturierter Freitext, kann dieselbe PII tragen wie `ort` → gescrubbt.
             scrub("beschreibung", Strategie::Platzhalter),
             retain("geschaedigt_person_id", G_FK),
             scrub("geschaedigt_kontakt", Strategie::NullSetzen),
             retain("geschaedigt_personal_id", G_FK),
             retain("geschaedigt_organisation_id", G_FK),
-            // uebergeben_an: CHECK status='uebergeben' ⇒ NOT NULL → Platzhalter nur wenn gesetzt.
+            // CHECK status='uebergeben' ⇒ NOT NULL → Platzhalter nur, wenn gesetzt.
             scrub("uebergeben_an", Strategie::PlatzhalterWennGesetzt),
             retain("uebergeben_at", G_ZEIT),
             retain("abschluss_grund", G_ENUM),
@@ -409,8 +393,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
     TabellenRegel {
         tabelle: "einsatz_personal",
         scoping: Scoping::EinsatzId,
-        // Nur Ad-hoc-externe sind einsatz-scoped PII. Dispositionen echter Stamm-Kräfte
-        // (personal_id gesetzt) sind Stammdaten → unberührt.
+        // Nur Ad-hoc-externe sind einsatz-scoped PII; Dispositionen von Stamm-Kräften sind
+        // Stammdaten.
         zeilenfilter: Some("personal_id IS NULL"),
         spalten: &[
             retain("id", G_PK),
@@ -441,9 +425,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
-            // Dateiname kann PII tragen (z. B. „Lageplan Familie Müller.png“) → Platzhalter (NOT NULL).
+            // Der Dateiname kann PII tragen („Lageplan Familie Müller.png“) → Platzhalter (NOT
+            // NULL).
             scrub("name", Strategie::Platzhalter),
-            // BLOB bleibt: georeferenziertes Kartografie-Skelett, KEIN Foto Betroffener (≠ anhang).
+            // BLOB bleibt: georeferenziertes Kartografie-Skelett, kein Foto Betroffener (≠ anhang).
             retain(
                 "daten",
                 "Kartografie-Skelett (georeferenzierter Bild-Hintergrund, kein Personenbezug)",
@@ -461,21 +446,19 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("hochgeladen_von", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
-            // Ansichts-Zugehörigkeit (LFH-320): FK auf karten_ansicht, kein Personenbezug.
+            // FK auf karten_ansicht, kein Personenbezug.
             retain("ansicht_id", G_FK),
         ],
     },
     TabellenRegel {
-        // Kartenansicht (LFH-319): einsatzweit geteilte Karten-Konfiguration. Reine
-        // Layout-/Konfig-Daten; einziger Freitext ist der Ansichts-Name.
+        // Kartenansicht: einsatzweit geteilte Layout-/Konfig-Daten; einziger Freitext ist der Name.
         tabelle: "karten_ansicht",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
-            // Ansichts-Name ist meist thematisch („Standard“, „Verkehr“), kann aber PII
-            // tragen → Platzhalter (NOT NULL), konsistent mit karte_hintergrundbild.name.
+            // Meist thematisch („Verkehr“), kann aber PII tragen → Platzhalter (NOT NULL).
             scrub("name", Strategie::Platzhalter),
             retain("reihenfolge", G_KONFIG),
             retain("ist_standard", G_KONFIG),
@@ -514,15 +497,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
-            // Ansichts-Zugehörigkeit (LFH-320): FK auf karten_ansicht, kein Personenbezug.
+            // FK auf karten_ansicht, kein Personenbezug.
             retain("ansicht_id", G_FK),
         ],
     },
     TabellenRegel {
-        // Ganze Zeile löschen: `daten` (BLOB NOT NULL) sind Fotos/Dateien Betroffener,
-        // KEIN Kartografie-Skelett. CASCADE räumt die Linker chat_nachricht_anhang,
-        // einsatz_dokument (s. u.), etb_eintrag_anhang (LFH-117) und
-        // einsatz_schaden_anhang (LFH-21, s. u.) mit.
+        // Ganze Zeile löschen: `daten` sind Fotos/Dateien Betroffener, kein Kartografie-Skelett.
+        // CASCADE räumt die Linker chat_nachricht_anhang, einsatz_dokument, etb_eintrag_anhang und
+        // einsatz_schaden_anhang mit.
         tabelle: "anhang",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
@@ -539,14 +521,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // LFH-632: ganze Zeile löschen wie `anhang` — der Titel ist Freitext (kann PII tragen,
-        // „Foto Familie Müller“), und die Datei, die die Zeile beschreibt, ist ohnehin weg
-        // (CASCADE von `anhang`, Entscheidung E9; `anhang` steht deshalb VOR dieser Regel).
-        // Der Titel ÜBERLEBT trotzdem im Wortlaut: `dokument::repo` schreibt ihn in die
-        // System-ETB-Einträge „Dokument abgelegt: {titel} ({kategorie})“ und „Dokument
-        // entfernt: {titel} ({kategorie})“, und `etb_eintrag.inhalt` ist Retain (G_ETB). Das
-        // ist die ETB-Politik — rechtsverbindliche Führungsdokumentation wird dort nicht
-        // gescrubbt, für diesen Titel so wenig wie für jeden anderen ETB-Freitext. Gepinnt in
+        // Ganze Zeile löschen wie `anhang`: der Titel ist Freitext, und die Datei ist ohnehin weg
+        // (CASCADE; `anhang` steht deshalb VOR dieser Regel). Der Titel überlebt im Wortlaut der
+        // System-ETB-Einträge „Dokument abgelegt/entfernt: {titel} ({kategorie})“ — ETB-Freitext
+        // ist
+        // Führungsdokumentation und bleibt (G_ETB). Gepinnt in
         // `einsatz::repo::tests::schwaerzung_loescht_dokument_samt_anhang_und_haelt_den_etb_nachweis`.
         tabelle: "einsatz_dokument",
         scoping: Scoping::EinsatzId,
@@ -568,13 +547,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // LFH-21: ganze Zeile löschen wie `anhang` — die Datei, die die Zeile beschreibt, ist
-        // ohnehin weg (CASCADE von `anhang`; `anhang` steht deshalb VOR dieser Regel), und
-        // ein Linker ohne Datei trägt nichts, was die Akte bräuchte. Anders als bei
-        // `einsatz_dokument` überlebt hier KEIN Freitext: die System-ETB-Einträge nennen nur
-        // Registriernummer und Art („Schaden S-003: Foto abgelegt“, `schaden::anhang`), nie den
-        // Dateinamen. `etb_eintrag.inhalt` bleibt Retain (G_ETB) und ist damit pseudonym.
-        // Gepinnt in
+        // Ganze Zeile löschen wie `anhang`: die Datei ist weg (CASCADE; `anhang` steht VOR dieser
+        // Regel), und ein Linker ohne Datei trägt nichts. Die System-ETB-Einträge nennen nur
+        // Registriernummer und Art, nie den Dateinamen. Gepinnt in
         // `einsatz::repo::tests::schwaerzung_loescht_schaden_anhaenge_und_haelt_den_etb_nachweis`.
         tabelle: "einsatz_schaden_anhang",
         scoping: Scoping::EinsatzId,
@@ -591,11 +566,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // Ganze Zeile löschen (LFH-321): `daten` ist das eingefrorene volle Lagebild inkl.
-        // PII (Personal-Marker, Freitext-Labels) — die Nutzlast IST die PII, kein zu
-        // erhaltendes Skelett. KEINE ETB-Kopplung → nicht Retain-fähig wie lagebericht/
-        // befehl.abschnitte (deren Rechtsstand ins ETB gesnapshottet ist); bezeichnung/notiz
-        // sind Freitext-PII und werden mitentfernt.
+        // Ganze Zeile löschen: `daten` ist das eingefrorene Lagebild inkl. PII. Anders als
+        // lagebericht/befehl gibt es keine ETB-Kopplung, die einen Retain begründete; bezeichnung
+        // und
+        // notiz gehen mit.
         tabelle: "lage_snapshot",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
@@ -622,10 +596,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("typ", G_ENUM),
             retain("geometrie_typ", G_ENUM),
             retain("geometrie", G_GEO),
-            // Das Label überlebt im System-ETB-Wortlaut („Gefahrengebiet «…» eingerichtet“,
-            // `routes/lage_zone.rs::etb_text`) — ETB-Politik G_ETB, Präzedenz LFH-632/E9
-            // (Dokumenttitel). Entscheidung des Auftraggebers zu LFH-283: dokumentieren und
-            // pinnen (`tests/gefahr.rs::schwaerzung_nullt_zonen_und_gebietslabel_und_haelt_den_etb_wortlaut`).
+            // Das Label überlebt im System-ETB-Wortlaut („Gefahrengebiet «…» eingerichtet“) —
+            // ETB-Politik
+            // G_ETB. Gepinnt in
+            // `tests/gefahr.rs::schwaerzung_nullt_zonen_und_gebietslabel_und_haelt_den_etb_wortlaut`.
             scrub("label", Strategie::NullSetzen),
             retain("farbe", G_ENUM),
             scrub("notiz", Strategie::NullSetzen),
@@ -633,10 +607,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
             retain("gefahrengebiet_id", G_FK),
-            // Ansichts-Zugehörigkeit (LFH-320): FK auf karten_ansicht, kein Personenbezug.
+            // FK auf karten_ansicht, kein Personenbezug.
             retain("ansicht_id", G_FK),
-            // LFH-673: Verweis auf den Evakuierungsbezirk — dessen Bezeichnung schwärzt der
-            // Block `evakuierungsbezirk`, der Verweis selbst trägt nichts.
+            // Verweis auf den Evakuierungsbezirk; dessen Bezeichnung schwärzt der Block
+            // `evakuierungsbezirk`.
             retain("evakuierungsbezirk_id", G_FK),
         ],
     },
@@ -647,9 +621,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
-            // Wie `lage_zone.label`: das Gebietslabel steht im System-ETB des
-            // Warnstufenwechsels („Gefahr «…» in «Label» …“, `routes/gefahr.rs`) und bleibt
-            // dort (G_ETB, Präzedenz LFH-632/E9) — gepinnt im selben Test.
+            // Wie `lage_zone.label`: das Gebietslabel bleibt im System-ETB des Warnstufenwechsels
+            // (G_ETB), gepinnt im selben Test.
             scrub("label", Strategie::NullSetzen),
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
@@ -670,11 +643,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("gefahrentyp", G_ENUM),
             retain("schutzobjekt", G_ENUM),
             retain("warnstufe", G_ENUM),
-            // Gefahren-Beschreibung = unstrukturierter Freitext (nullable), kann Betroffenen-
-            // PII tragen → gescrubbt (LFH-229 Review + Nutzer-Entscheidung).
+            // Unstrukturierter Freitext, kann Betroffenen-PII tragen → gescrubbt.
             scrub("beschreibung", Strategie::NullSetzen),
-            // gemeldet_von ist TEXT (Klartext-Name des Melders) — NICHT der benutzer-FK
-            // aktualisiert_von. → NULL.
+            // `gemeldet_von` ist Klartext-Name des Melders (nicht der Benutzer-FK) → NULL.
             scrub("gemeldet_von", Strategie::NullSetzen),
             retain("aktualisiert_von", G_FK),
             retain("erstellt_at", G_ZEIT),
@@ -698,10 +669,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     // ---------- Operative Struktur: Abschnitte / Einheiten / Räume / UHS / Funk ----------
-    // Bezeichnungen/Namen operativer Objekte = Skelett (RETAIN). Nullable Freitext-Zettel
-    // (notiz/bemerkung/hinweis/standort/erreichbarkeit/abschnittsauftrag) können
-    // Betroffenen-PII enthalten → konservativ NULL + REVIEW-Tag (LFH-229). Der Schlüssel
-    // `kommunikationsmittel` ist KEIN Freitext und bleibt (RETAIN, siehe unten).
+    // Bezeichnungen operativer Objekte sind Skelett (RETAIN). Nullable Freitext-Zettel
+    // (notiz/bemerkung/hinweis/standort/erreichbarkeit/abschnittsauftrag) können Betroffenen-PII
+    // enthalten → konservativ NULL + REVIEW-Tag. `kommunikationsmittel` ist kein Freitext
+    // (RETAIN).
     TabellenRegel {
         tabelle: "einsatzabschnitt",
         scoping: Scoping::EinsatzId,
@@ -718,32 +689,28 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("flaeche_geojson", G_GEO),
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
-            // Seit 0073 eingefrorene Alt-Spalten (read-only Reserve, kein Schreibweg mehr):
-            // Funkgruppen-Label, identisch mit `sprechgruppe.bezeichnung` (ebenfalls
-            // G_OP_LABEL). RETAIN ist die Entscheidung des Auftraggebers zu LFH-140 — sie hier
-            // zu nullen und die Bezeichnung im Katalog stehen zu lassen, wäre inkonsistent.
-            // Gepinnt in `repo::tests::schwaerzung_nullt_alle_abschnitts_freitexte_und_haelt_die_labels`.
+            // Eingefrorene Alt-Spalten ohne Schreibweg: Funkgruppen-Label wie
+            // `sprechgruppe.bezeichnung` (ebenfalls G_OP_LABEL). Gepinnt in
+            // `repo::tests::schwaerzung_nullt_alle_abschnitts_freitexte_und_haelt_die_labels`.
             retain("sprechgruppe_tmo", G_OP_LABEL),
             retain("sprechgruppe_dmo", G_OP_LABEL),
-            // kommunikationsmittel = Kommunikationsart-Schlüssel (digitalfunk/mobil/festnetz),
-            // kein Personenbezug (LFH-108, Feld-Autor) → RETAIN. Dass nur diese drei Schlüssel
-            // hineinkommen, erzwingt seit LFH-140 `routes::support::pruefe_kommunikationsmittel`
-            // an POST/PATCH (unbekannt → 400).
+            // Kommunikationsart-Schlüssel (digitalfunk/mobil/festnetz), kein Personenbezug. Die
+            // Wertemenge erzwingt `routes::support::pruefe_kommunikationsmittel` (unbekannt → 400).
             retain(
                 "kommunikationsmittel",
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
             ),
-            // erreichbarkeit = mögliche Rufnummer der Führung → PII, gescrubbt (LFH-108).
+            // Mögliche Rufnummer der Führung → PII.
             scrub("erreichbarkeit", Strategie::NullSetzen),
-            // LFH-608: Kürzel, Beurteilung und Einschätzung sind Führungsskelett (RETAIN).
-            // Der feste Abschnittsauftrag ist nullabler Freitext wie `bemerkung` — anders
-            // als `auftrag.auftrag_text` wird er nicht ins ETB gesnapshottet, und „Evakuierung
-            // Uferstraße 3, Familie …" ist genau die Sorte Satz, die hier stehen kann.
+            // Kürzel, Beurteilung und Einschätzung sind Führungsskelett (RETAIN). Der
+            // Abschnittsauftrag
+            // ist nullabler Freitext und wird, anders als `auftrag.auftrag_text`, nicht ins ETB
+            // gesnapshottet.
             retain("kurzbezeichnung", G_OP_LABEL),
             retain("lagezustand", G_ENUM),
             scrub("abschnittsauftrag", Strategie::NullSetzen), // REVIEW: operativer Freitext
             retain("fortschritt", G_ZAEHLER),
-            // LFH-635: Rhythmus-Vorgabe der Ablösung in Minuten.
+            // Rhythmus-Vorgabe der Ablösung in Minuten.
             retain("abloesung_rhythmus_minuten", G_KONFIG),
         ],
     },
@@ -763,16 +730,15 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("soll_unterfuehrer", G_ZAEHLER),
             retain("soll_mannschaft", G_ZAEHLER),
             scrub("bemerkung", Strategie::NullSetzen), // REVIEW: operativer Freitext-Zettel
-            // Funk-Felder (LFH-108, Migration 0086_einheit_funk): kommunikationsmittel =
-            // Kategorie-Schlüssel (RETAIN, Wertemenge per Handler-Precheck erzwungen, LFH-140),
-            // erreichbarkeit = mögliche Rufnummer der Führung (Scrub).
+            // Funk-Felder: kommunikationsmittel ist Kategorie-Schlüssel (RETAIN), erreichbarkeit
+            // eine
+            // mögliche Rufnummer (Scrub).
             retain(
                 "kommunikationsmittel",
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
             ),
             scrub("erreichbarkeit", Strategie::NullSetzen),
-            // LFH-614 (0105): Rufname der Einheit benennt ein operatives Objekt, keine
-            // Person — wie fahrzeug.funkrufname/snap_funkrufname.
+            // Der Rufname benennt ein operatives Objekt, keine Person (wie fahrzeug.funkrufname).
             retain("funkrufname", G_OP_LABEL),
             retain("sortier", G_KONFIG),
             retain("angelegt_at", G_ZEIT),
@@ -845,10 +811,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("zugewiesen_at", G_ZEIT),
         ],
     },
-    // LFH-46: Besetzung der Sachgebiete S1–S6. `snap_name`/`bezeichnung` sind PII (Name einer
-    // Person bzw. eines Externen) und werden genullt — dieselbe Linie wie
-    // `einsatz_mitgliedschaft.fuehrungsstelle` oben. Das Skelett (welches Sachgebiet war WIE
-    // besetzt, von wem und wann gesetzt) bleibt als anonymer Führungsnachweis stehen.
+    // Besetzung der Sachgebiete S1–S6. `snap_name`/`bezeichnung` sind PII und werden genullt (wie
+    // `einsatz_mitgliedschaft.fuehrungsstelle`); das Skelett (welches Sachgebiet wie, von wem und
+    // wann besetzt) bleibt als anonymer Führungsnachweis.
     TabellenRegel {
         tabelle: "einsatz_stabsfunktion",
         scoping: Scoping::EinsatzId,
@@ -865,9 +830,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("gesetzt_at", G_ZEIT),
         ],
     },
-    // LFH-635: Ablösungsschichten. Kein Freitext in der Tabelle (bewusst, design.md D1) —
-    // Namen kommen per Join aus `einsatz_einheit`/`einsatzabschnitt` und werden dort
-    // klassifiziert. Alles Struktur, Zeit oder Enum → RETAIN.
+    // Ablösungsschichten: kein Freitext, Namen kommen per Join aus `einsatz_einheit`/
+    // `einsatzabschnitt`. Alles Struktur, Zeit oder Enum → RETAIN.
     TabellenRegel {
         tabelle: "einsatz_abloesung",
         scoping: Scoping::EinsatzId,
@@ -891,12 +855,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angelegt_at", G_ZEIT),
         ],
     },
-    // LFH-639: Betreuung. Mengen, keine Personen — Anzahlen, Plangrößen, Kapazitäten,
-    // Zustände, Arten und Zeitpunkte bleiben als Statistik-Skelett. Die Bezeichnung trägt oft
-    // eine Adresse („Uferstraße 12–40“, „Turnhalle Ost, Ostring 5“) und wird deshalb anders als
-    // `uhs.bezeichnung` ersetzt (Spec „Schwärzung“). Sammelstelle, Standort und Notiz sind
-    // Freitexte mit möglichem Personen- oder Adressbezug → NULL. Die ETB-Texte nennen nur
-    // Bezeichnung und Zahlen (design.md D5), der Scrub hier läuft also nicht ins Leere.
+    // Betreuung: Mengen, keine Personen — Anzahlen, Kapazitäten, Zustände und Zeitpunkte bleiben
+    // als Statistik-Skelett. Die Bezeichnung trägt oft eine Adresse und wird deshalb, anders als
+    // `uhs.bezeichnung`, ersetzt. Sammelstelle, Standort und Notiz → NULL. Die ETB-Texte nennen
+    // nur Bezeichnung und Zahlen.
     TabellenRegel {
         tabelle: "evakuierungsbezirk",
         scoping: Scoping::EinsatzId,
@@ -928,7 +890,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("id", G_PK),
             retain("bezirk_id", G_FK),
             retain("einsatz_id", G_SCOPE),
-            // LFH-675: technische UUID der Offline-Queue, kein Personenbezug.
+            // Technische UUID der Offline-Queue, kein Personenbezug.
             retain("client_id", G_IDEMPOTENZ),
             retain("evakuiert", G_ZAEHLER),
             retain("erhebung", G_ENUM),
@@ -955,7 +917,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status", G_ENUM),
             scrub("standort", Strategie::NullSetzen),
             scrub("notiz", Strategie::NullSetzen),
-            // LFH-673: Koordinate auf der Lagekarte — Geo-Skelett wie `uhs.lat/lon`.
+            // Koordinate auf der Lagekarte — Geo-Skelett wie `uhs.lat/lon`.
             retain("lat", G_GEO),
             retain("lon", G_GEO),
             retain("belegung_id", G_FK),
@@ -974,7 +936,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("id", G_PK),
             retain("stelle_id", G_FK),
             retain("einsatz_id", G_SCOPE),
-            // LFH-675: technische UUID der Offline-Queue, kein Personenbezug.
+            // Technische UUID der Offline-Queue, kein Personenbezug.
             retain("client_id", G_IDEMPOTENZ),
             retain("belegt", G_ZAEHLER),
             retain("zeitpunkt_at", G_ZEIT),
@@ -985,11 +947,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("zurueckgenommen_von_id", G_FK),
         ],
     },
-    // LFH-634: Verpflegung. Mengen, keine Personen — Bedarfe, Mengen, Sonderkost-Anzahlen und
-    // Zeitpunkte bleiben als Statistik-Skelett (Spec „Schwärzung“). Die Bezeichnung eines
-    // Zeitfensters ist der Mahlzeitname („Mittag“) und bleibt; Ort und Bemerkung einer Ausgabe
-    // können eine Adresse oder einen Namen tragen („Hof Familie Meyer“) → NULL. Die ETB-Texte
-    // nennen weder Ort noch Bemerkung (design.md D5), der Scrub läuft also nicht ins Leere.
+    // Verpflegung: Mengen, keine Personen — Bedarfe, Sonderkost-Anzahlen und Zeitpunkte bleiben.
+    // Die Zeitfenster-Bezeichnung ist ein Mahlzeitname und bleibt; Ort und Bemerkung einer Ausgabe
+    // können Adresse oder Name tragen → NULL. Die ETB-Texte nennen beides nicht.
     TabellenRegel {
         tabelle: "verpflegung_zeitfenster",
         scoping: Scoping::EinsatzId,
@@ -1037,11 +997,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erfasst_at", G_ZEIT),
         ],
     },
-    // LFH-46: abgeschlossene Lagebesprechungen. `entschluss` bleibt RETAIN (G_FUEHRUNG) —
-    // dieselbe Klassifikation wie `lagebericht.abschnitte` und `befehl`, deren Inhalt derselbe
-    // Entschluss der Einsatzleitung ist. Ein Alleingang auf Scrub für genau eine der drei
-    // Tabellen wäre inkonsistent; käme die Linie „Führungs-Freitexte scrubben", dann für alle
-    // drei gemeinsam.
+    // Abgeschlossene Lagebesprechungen. `entschluss` bleibt RETAIN (G_FUEHRUNG), wie
+    // `lagebericht.abschnitte` und `befehl`, die denselben Entschluss tragen; eine andere Linie
+    // gälte nur für alle drei gemeinsam.
     TabellenRegel {
         tabelle: "einsatz_lagebesprechung",
         scoping: Scoping::EinsatzId,
@@ -1058,8 +1016,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erfasst_at", G_ZEIT),
         ],
     },
-    // LFH-606: maßgebliche Pegel. Stationsname und Gewässer benennen eine Messstelle der
-    // WSV, keine Person — operatives Label. Kein Personenbezug außer dem Benutzer-FK.
+    // Maßgebliche Pegel: Stationsname und Gewässer benennen eine WSV-Messstelle, keine Person.
     TabellenRegel {
         tabelle: "einsatz_pegel",
         scoping: Scoping::EinsatzId,
@@ -1073,8 +1030,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("reihenfolge", G_ZAEHLER),
             retain("gesetzt_von_id", G_FK),
             retain("gesetzt_at", G_ZEIT),
-            // LFH-628: erwarteter Höchststand — ein Messwert mit Zeitpunkt, kein Personenbezug
-            // außer dem Benutzer-FK.
+            // Erwarteter Höchststand: Messwert mit Zeitpunkt, kein Personenbezug.
             retain("prognose_cm", G_ZAEHLER),
             retain("prognose_zeit", G_ZEIT),
             retain("prognose_gesetzt_von_id", G_FK),
@@ -1253,8 +1209,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("meldeweg", G_ETB),
             retain("veranlassung", G_ETB),
             retain("erfasser_id", G_FK),
-            // Funktionskürzel („S2", „EL") aus Sachgebiet/Rolle, keine Person (LFH-615).
-            // Bewusst NICHT aus `einsatz_mitgliedschaft.fuehrungsstelle` (Scrub) abgeleitet.
+            // Funktionskürzel („S2“, „EL“), keine Person. Nicht aus
+            // `einsatz_mitgliedschaft.fuehrungsstelle` (Scrub) abgeleitet.
             retain("erfasser_funktion", G_ETB),
             retain("ereigniszeit", G_ZEIT),
             retain("received_at", G_ZEIT),
@@ -1433,12 +1389,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_at", G_ZEIT),
         ],
     },
-    // ---------- Chat / Erinnerungen (Freitexte gescrubbt, LFH-290) ----------
-    // Chat- und Erinnerungs-Freitexte tragen Personenbezug („Fam. Müller, Tel. …“) und
-    // werden entfernt — auch in soft-gelöschten Nachrichten (`geloescht_at` ist nur ein
-    // Tombstone, der Inhalt blieb stehen). Heraufgestufte Nachrichten liegen als KOPIE in
-    // `etb_eintrag.inhalt` (G_ETB) bzw. `auftrag.auftrag_text` (G_FUEHRUNG) und bleiben
-    // dort als Führungsdokumentation stehen (ETB-Politik, Präzedenz LFH-632/E9).
+    // ---------- Chat / Erinnerungen (Freitexte gescrubbt) ----------
+    // Chat- und Erinnerungs-Freitexte tragen Personenbezug und werden entfernt, auch in
+    // soft-gelöschten Nachrichten. Heraufgestufte Nachrichten liegen als KOPIE in
+    // `etb_eintrag.inhalt` (G_ETB) bzw. `auftrag.auftrag_text` (G_FUEHRUNG) und bleiben dort als
+    // Führungsdokumentation.
     TabellenRegel {
         tabelle: "chat_kanal",
         scoping: Scoping::EinsatzId,
@@ -1473,8 +1428,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // Junction; CASCADE von anhang/chat_nachricht räumt sie. Kein Scrub nötig: `anhang`
-        // ist ZeileLoeschen, die Verknüpfung geht per CASCADE mit (belegt in
+        // Junction; `anhang` ist ZeileLoeschen, die Verknüpfung geht per CASCADE mit (belegt in
         // `repo::tests::schwaerzung_entfernt_chat_und_erinnerungs_freitexte`).
         tabelle: "chat_nachricht_anhang",
         scoping: Scoping::UeberParent {
@@ -1485,10 +1439,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[retain("nachricht_id", G_FK), retain("anhang_id", G_FK)],
     },
     TabellenRegel {
-        // LFH-117: Junction (dritter Linker auf `anhang`); CASCADE von anhang/etb_eintrag
-        // räumt sie. Kein Scrub nötig: `anhang` ist ZeileLoeschen, die Verknüpfung geht per
-        // CASCADE mit, der Eintrag selbst bleibt (G_ETB). Der Dateiname steht in keinem
-        // ETB-Text — die Erfassung schreibt ihn nicht in `inhalt`. Belegt in
+        // Junction (Linker auf `anhang`); die Verknüpfung geht per CASCADE mit, der Eintrag bleibt
+        // (G_ETB). Der Dateiname steht in keinem ETB-Text. Belegt in
         // `einsatz::repo::tests::schwaerzung_loescht_etb_anhang_und_haelt_den_eintrag`.
         tabelle: "etb_eintrag_anhang",
         scoping: Scoping::UeberParent {
@@ -1509,8 +1461,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("beschreibung", Strategie::NullSetzen),
             retain("faellig_at", G_ZEIT),
             retain("intervall_minuten", G_KONFIG),
-            // Freitext-Empfänger (migrations/0044: „noch kein FK“), kann einen Personennamen
-            // tragen („Herr Müller“) — kein reines Funktionslabel (LFH-290).
+            // Freitext-Empfänger ohne FK, kann einen Personennamen tragen — kein reines
+            // Funktionslabel.
             scrub("empfaenger_funktion", Strategie::NullSetzen),
             retain("bezug_typ", G_POLY),
             retain("bezug_id", G_POLY),
@@ -1555,7 +1507,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("gelesen_at", G_ZEIT),
         ],
     },
-    // ETB-Lesemarke (LFH-611): wer bis wohin gesichtet hat — Struktur, kein Inhalt.
+    // ETB-Lesemarke: wer bis wohin gesichtet hat — Struktur, kein Inhalt.
     TabellenRegel {
         tabelle: "etb_lesemarke",
         scoping: Scoping::EinsatzId,
@@ -1567,10 +1519,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("gesichtet_at", G_ZEIT),
         ],
     },
-    // ---------- Demo-Daten (LFH-690, design.md D4) ----------
-    // Der Kopf wird über die Spalte `einsatz_id` entdeckt, obwohl sie bewusst KEIN FK ist:
-    // `entdecke_einsatz_scoped` prüft den Spaltennamen, nicht den Fremdschlüssel. Kein Scrub —
-    // der Kopf trägt Struktur, Zeitstempel und einen Mengenbericht, keinen Personenbezug.
+    // ---------- Demo-Daten (LFH-690) ----------
+    // Der Kopf wird über die Spalte `einsatz_id` entdeckt, obwohl sie kein FK ist
+    // (`entdecke_einsatz_scoped` prüft den Spaltennamen). Kein Scrub: Struktur, Zeitstempel und
+    // ein Mengenbericht, kein Personenbezug.
     TabellenRegel {
         tabelle: "demo_import",
         scoping: Scoping::EinsatzId,
@@ -1593,8 +1545,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             ),
         ],
     },
-    // Die Marke kommt über die CASCADE-Hülle mit (`import_id` → `demo_import`), nicht über
-    // einen Einsatzbezug: sie zeigt auf Stammdaten der Org, nie auf Einsatzzeilen.
+    // Die Marke kommt über die CASCADE-Hülle (`import_id` → `demo_import`) mit; sie zeigt auf
+    // Stammdaten der Org, nie auf Einsatzzeilen.
     TabellenRegel {
         tabelle: "demo_herkunft",
         scoping: Scoping::UeberParent {
@@ -1643,13 +1595,10 @@ fn where_klausel(regel: &TabellenRegel) -> String {
     }
 }
 
-/// Treibt den PII-Scrub **data-driven** aus [`TABELLEN`]: pro Tabelle mit `Scrub`-Spalten
-/// genau ein `UPDATE` (bzw. `DELETE` bei `ZeileLoeschen`). Läuft auf der übergebenen
-/// (Transaktions-)Verbindung des Aufrufers, damit der gesamte Scrub atomar bleibt.
-///
-/// Tabellen-/Spaltennamen stammen ausschließlich aus den compile-time-Registry-Konstanten
-/// (nie User-Input) → `AssertSqlSafe` ist injektionssicher; der Platzhalter-Wert und die
-/// `einsatz_id` werden regulär gebunden.
+/// Treibt den PII-Scrub data-driven aus [`TABELLEN`]: je Tabelle mit `Scrub`-Spalten genau ein
+/// `UPDATE` (bzw. `DELETE` bei `ZeileLoeschen`), auf der Transaktions-Verbindung des Aufrufers,
+/// damit der Scrub atomar bleibt. `AssertSqlSafe` ist sicher, weil alle Namen compile-time-
+/// Konstanten sind; Platzhalter und `einsatz_id` werden gebunden.
 pub async fn scrubbe_aus_registry(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
@@ -1669,8 +1618,8 @@ pub async fn scrubbe_aus_registry(
 
         let where_teil = where_klausel(regel);
 
-        // ZeileLoeschen: ganze Zeile weg. Muss (Kohärenz) für alle Scrub-Spalten der
-        // Tabelle gelten — sonst mischt die Registry Zeilenlöschung mit Spalten-Scrub.
+        // ZeileLoeschen muss für alle Scrub-Spalten der Tabelle gelten, sonst mischte die Registry
+        // Zeilenlöschung mit Spalten-Scrub.
         if scrubs.iter().any(|(_, s)| *s == Strategie::ZeileLoeschen) {
             debug_assert!(
                 scrubs.iter().all(|(_, s)| *s == Strategie::ZeileLoeschen),
@@ -1685,8 +1634,8 @@ pub async fn scrubbe_aus_registry(
             continue;
         }
 
-        // UPDATE: SET-Zuweisungen in Spaltenreihenfolge; Platzhalter-Strategien binden
-        // SCHWAERZUNG_PLATZHALTER (in genau dieser Reihenfolge VOR der einsatz_id).
+        // SET-Zuweisungen in Spaltenreihenfolge; Platzhalter-Strategien binden
+        // SCHWAERZUNG_PLATZHALTER in genau dieser Reihenfolge VOR der einsatz_id.
         let mut sets: Vec<String> = Vec::with_capacity(scrubs.len());
         let mut platzhalter_binds = 0usize;
         for (spalte, strategie) in &scrubs {
@@ -1767,15 +1716,12 @@ mod tests {
             .collect()
     }
 
-    /// Entdeckt die einsatz-scoped Tabellenmenge S dynamisch:
-    /// `{einsatz}` ∪ `{Tabellen mit einsatz_id}` ∪ transitive Hülle über
-    /// `ON DELETE CASCADE`-FKs ab S. Der benutzer/organisation/personal-Stammdaten-
-    /// Teilbaum bleibt außen vor (kein CASCADE-FK, der auf einsatz zeigt).
+    /// Entdeckt die einsatz-scoped Tabellenmenge S dynamisch: `{einsatz}` ∪ `{Tabellen mit
+    /// einsatz_id}` ∪ transitive Hülle über `ON DELETE CASCADE`-FKs ab S. Der Stammdaten-Teilbaum
+    /// bleibt außen vor.
     ///
-    /// Die Hülle folgt NUR `CASCADE`. Dass sie damit nichts verliert, ist eine
-    /// Vorbedingung, die GUARD 5 (`guard5_keine_fk_kante_von_aussen_nach_s`, LFH-291)
-    /// erzwingt: jede FK-Kante nach S kommt aus S oder steht begründet auf
-    /// `FREMDKANTEN_ALLOWLIST` — unabhängig von ihrem `on_delete`.
+    /// Die Hülle folgt nur `CASCADE`; dass sie damit nichts verliert, erzwingt GUARD 5
+    /// (`guard5_keine_fk_kante_von_aussen_nach_s`).
     async fn entdecke_einsatz_scoped(pool: &SqlitePool) -> BTreeSet<String> {
         let alle = alle_tabellen(pool).await;
         let mut s: BTreeSet<String> = BTreeSet::new();
@@ -1808,7 +1754,6 @@ mod tests {
     }
 
     /// GUARD 1: jede Spalte jeder einsatz-scoped Tabelle MUSS klassifiziert sein.
-    /// Eine neue PII-Spalte/-Tabelle bricht diesen Test ROT → Fehlerklasse getötet.
     #[tokio::test]
     async fn jede_einsatz_scoped_spalte_ist_klassifiziert() {
         let pool = crate::db::test_pool().await;
@@ -1833,8 +1778,8 @@ mod tests {
         );
     }
 
-    /// GUARD 2: kein Registry-Eintrag zeigt auf eine Spalte/Tabelle, die es nicht (mehr)
-    /// gibt (keine toten Einträge → data-driven Scrub kann kein NO-SUCH-COLUMN werfen).
+    /// GUARD 2: kein Registry-Eintrag zeigt auf eine Spalte/Tabelle, die es nicht gibt (sonst
+    /// würfe der Scrub NO-SUCH-COLUMN).
     #[tokio::test]
     async fn keine_toten_registry_eintraege() {
         let pool = crate::db::test_pool().await;
@@ -1887,8 +1832,8 @@ mod tests {
         );
     }
 
-    /// GUARD 4 (advisor must-do): der Stammdaten-/Katalog-Teilbaum darf NIEMALS in S
-    /// landen (sonst irreversibler Falsch-Scrub). Belegt die CASCADE-Ausschluss-Annahme.
+    /// GUARD 4: der Stammdaten-/Katalog-Teilbaum darf nie in S landen (sonst irreversibler
+    /// Falsch-Scrub).
     #[tokio::test]
     async fn stammdaten_teilbaum_nie_einsatz_scoped() {
         let pool = crate::db::test_pool().await;
@@ -1903,9 +1848,9 @@ mod tests {
             "einheit_typ",
             "qualifikation",
             "karte_registry",
-            // Logo der Organisation (LFH-22, design.md D8): hängt an der Org, nicht am
-            // Einsatz. Ein späterer FK/CASCADE Richtung Einsatz zöge es still in die
-            // Schwärzung — dieser Eintrag macht das rot.
+            // Logo der Organisation: hängt an der Org, nicht am Einsatz. Ein späterer FK Richtung
+            // Einsatz
+            // zöge es still in die Schwärzung — dieser Eintrag macht das rot.
             "org_logo",
         ] {
             assert!(
@@ -1916,20 +1861,16 @@ mod tests {
         }
     }
 
-    // ---------- GUARD 5 (LFH-291): FK-Kanten von außerhalb S nach S ----------
+    // ---------- GUARD 5: FK-Kanten von außerhalb S nach S ----------
 
-    /// Begründete Ausnahmen zu GUARD 5, Format `(tabelle, spalte, grund)`: einzelne
-    /// FK-Kanten aus Tabellen AUSSERHALB von S nach S, die legitim sind, weil die Zeilen
-    /// nicht einsatz-eigen sind und deshalb NICHT geschwärzt werden (z. B. eine
-    /// Stammdaten-Tabelle mit `REFERENCES einsatz ON DELETE SET NULL`). Je KANTE, nicht je
-    /// Tabelle: eine später ergänzte zweite Kante derselben Tabelle nach S muss eigens
-    /// begründet werden. Der Grund ist Pflicht (`guard5_allowlist_hat_keine_toten_eintraege`).
+    /// Begründete Ausnahmen zu GUARD 5, `(tabelle, spalte, grund)`: FK-Kanten aus Tabellen
+    /// AUSSERHALB von S nach S, deren Zeilen nicht einsatz-eigen sind und deshalb nicht geschwärzt
+    /// werden. Je KANTE, nicht je Tabelle; der Grund ist Pflicht.
     ///
-    /// Was GUARD 5 nicht sieht: Verweise ohne deklarierten FK (polymorphe
-    /// `objekt_typ`/`objekt_id`) und die per `_fts` ausgeschlossenen Tabellen. Die Liste startet LEER, weil der Bestand
-    /// keine einzige solche Kante hat (gemessen über alle Migrationen). Ein Eintrag ohne
-    /// Querkante gilt selbst als Verstoß (`guard5_allowlist_hat_keine_toten_eintraege`),
-    /// sonst veraltet die Liste still.
+    /// GUARD 5 sieht keine Verweise ohne deklarierten FK (polymorphe `objekt_typ`/`objekt_id`) und
+    /// keine `_fts`-Tabellen. Die Liste ist leer, weil der Bestand keine solche Kante hat; ein
+    /// Eintrag ohne Querkante gilt selbst als Verstoß
+    /// (`guard5_allowlist_hat_keine_toten_eintraege`).
     const FREMDKANTEN_ALLOWLIST: &[(&str, &str, &str)] = &[];
 
     /// Eine FK-Kante aus einer Tabelle außerhalb von S auf eine Tabelle in S.
@@ -1941,9 +1882,8 @@ mod tests {
         on_delete: String,
     }
 
-    /// Befund für GUARD 5 (reine Funktion über das Schema): jede FK-Kante aus einer
-    /// Tabelle AUSSERHALB von `s` auf eine Tabelle IN `s` — unabhängig von `on_delete`
-    /// (`SET NULL`, `NO ACTION`, `RESTRICT`, …), abzüglich der Kanten auf `allowlist`.
+    /// Befund für GUARD 5: jede FK-Kante aus einer Tabelle außerhalb von `s` auf eine Tabelle in
+    /// `s`, unabhängig von `on_delete`, abzüglich der Allowlist.
     async fn fremde_fk_auf_scoped(
         pool: &SqlitePool,
         s: &BTreeSet<String>,
@@ -1991,9 +1931,8 @@ mod tests {
             .collect()
     }
 
-    /// Allowlist-Einträge, deren `(tabelle, spalte)` im UNGEFILTERTEN Befund keine
-    /// Querkante hat (tot).
-    /// Gegen den ungefilterten Befund, sonst sähe jeder wirksame Eintrag tot aus.
+    /// Allowlist-Einträge ohne Querkante im UNGEFILTERTEN Befund (tot) — gegen den gefilterten sähe
+    /// jeder wirksame Eintrag tot aus.
     fn tote_allowlist_eintraege<'a>(
         ungefiltert: &[FremdKante],
         allowlist: &[(&'a str, &'a str, &'a str)],
@@ -2009,11 +1948,9 @@ mod tests {
             .collect()
     }
 
-    /// GUARD 5 (LFH-291): Die Menge S entsteht über `einsatz_id` und die
-    /// `ON DELETE CASCADE`-Hülle. Eine NEUE Tabelle ohne `einsatz_id`, die per `SET NULL`
-    /// oder ohne ON-DELETE-Angabe auf eine Tabelle in S zeigt, fiele aus S heraus — GUARD 1
-    /// fragte ihre Spalten nie ab, ihre PII überlebte die Schwärzung still. Deshalb muss
-    /// JEDE FK-Kante nach S aus S kommen oder begründet auf der Allowlist stehen.
+    /// GUARD 5: eine neue Tabelle ohne `einsatz_id`, die per `SET NULL` oder ohne ON-DELETE auf S
+    /// zeigt, fiele aus S heraus, und ihre PII überlebte die Schwärzung. Deshalb muss jede
+    /// FK-Kante nach S aus S kommen oder begründet auf der Allowlist stehen.
     #[tokio::test]
     async fn guard5_keine_fk_kante_von_aussen_nach_s() {
         let pool = crate::db::test_pool().await;
@@ -2060,9 +1997,8 @@ mod tests {
         );
     }
 
-    /// Beschränkt einen Befund auf die Sondentabellen: die synthetischen Tests sollen auch
-    /// dann grün bleiben, wenn das echte Schema eine begründete Querkante bekommt — die
-    /// Leerheit des echten Schemas prüft `guard5_keine_fk_kante_von_aussen_nach_s`.
+    /// Beschränkt einen Befund auf die Sondentabellen, damit die synthetischen Tests auch mit einer
+    /// künftigen begründeten Querkante grün bleiben.
     fn nur_sonden(befund: Vec<FremdKante>) -> Vec<FremdKante> {
         befund
             .into_iter()
@@ -2092,8 +2028,7 @@ mod tests {
                  id INTEGER PRIMARY KEY,
                  benutzer_id INTEGER REFERENCES benutzer(id) ON DELETE SET NULL
              )",
-            // Kontrolle 2: CASCADE-FK nach S — die Hülle nimmt die Tabelle in S auf, sie
-            //     ist damit kein Fremder mehr.
+            // Kontrolle 2: CASCADE-FK nach S — die Hülle nimmt die Tabelle in S auf.
             "CREATE TABLE lfh291_sonde_cascade (
                  id INTEGER PRIMARY KEY,
                  person_id INTEGER NOT NULL REFERENCES einsatz_person(id) ON DELETE CASCADE
@@ -2103,8 +2038,8 @@ mod tests {
         }
     }
 
-    /// AK LFH-291: SET NULL auf einen Parent ohne einsatz_id und ein FK ohne ON-DELETE-
-    /// Angabe werden beide gemeldet; FKs nach außen und CASCADE-Kinder nicht.
+    /// SET NULL auf einen Parent ohne einsatz_id und ein FK ohne ON-DELETE werden gemeldet; FKs
+    /// nach außen und CASCADE-Kinder nicht.
     #[tokio::test]
     async fn guard5_meldet_set_null_und_no_action_kanten_synthetisch() {
         let pool = crate::db::test_pool().await;
@@ -2137,9 +2072,8 @@ mod tests {
         assert_eq!(befund, erwartet, "genau die zwei Lecks, keine Kontrolle");
     }
 
-    /// Die Allowlist filtert je KANTE, nicht je Tabelle: eine später ergänzte zweite
-    /// Kante derselben Tabelle nach S bleibt sichtbar. Ein Eintrag ohne passende
-    /// Querkante (fremde Tabelle oder falsche Spalte) ist tot.
+    /// Die Allowlist filtert je KANTE: eine zweite Kante derselben Tabelle bleibt sichtbar. Ein
+    /// Eintrag ohne passende Querkante ist tot.
     #[tokio::test]
     async fn guard5_allowlist_filtert_je_kante_und_toter_eintrag_wird_gemeldet_synthetisch() {
         let pool = crate::db::test_pool().await;
@@ -2205,8 +2139,7 @@ mod tests {
         );
     }
 
-    /// Kohärenz: `ZeileLoeschen` gilt (wenn überhaupt) für ALLE Spalten der Tabelle —
-    /// sonst mischt der Generator Zeilenlöschung mit Spalten-Scrub.
+    /// `ZeileLoeschen` gilt (wenn überhaupt) für ALLE Scrub-Spalten einer Tabelle.
     #[test]
     fn zeile_loeschen_ist_kohaerent() {
         for regel in TABELLEN {

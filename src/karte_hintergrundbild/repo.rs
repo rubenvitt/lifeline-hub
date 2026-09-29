@@ -16,8 +16,8 @@ fn hex(bytes: &[u8]) -> String {
     s
 }
 
-/// `ansicht = Some(x)` filtert auf die Bilder der Ansicht x PLUS die ansichtslosen
-/// (`ansicht_id IS NULL`); `None` liefert alles (LFH-320).
+/// `ansicht = Some(x)` liefert die Bilder der Ansicht x PLUS die ansichtslosen; `None` liefert
+/// alles.
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -53,10 +53,9 @@ pub async fn laden(
     .ok_or(AppError::NotFound)
 }
 
-/// Lädt die Download-Metadaten OHNE die Bytes: `(name, mime, sha256)`. Speist die
-/// Cache-Header (ETag/Content-Type/Content-Disposition) und den `If-None-Match`-304-
-/// Kurzschluss, ohne den (teuren) BLOB zu lesen (LFH-258). `NotFound`, wenn das Bild
-/// nicht (zu diesem Einsatz) existiert.
+/// Download-Metadaten OHNE Bytes: `(name, mime, sha256)` für die Cache-Header und den
+/// `If-None-Match`-304-Kurzschluss, ohne den BLOB zu lesen. `NotFound`, wenn das Bild nicht (zu
+/// diesem Einsatz) existiert.
 pub async fn meta_fuer_download(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -72,9 +71,8 @@ pub async fn meta_fuer_download(
     .ok_or(AppError::NotFound)
 }
 
-/// Lädt die Bytes eines Hintergrundbilds für den Download: `(name, mime, daten)`.
-/// `name` speist den `Content-Disposition`-Header (LFH-238). `NotFound`, wenn das
-/// Bild nicht (zu diesem Einsatz) existiert.
+/// Bytes eines Hintergrundbilds für den Download: `(name, mime, daten)`; `name` speist
+/// `Content-Disposition`. `NotFound`, wenn das Bild nicht (zu diesem Einsatz) existiert.
 pub async fn laden_bytes(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -125,8 +123,8 @@ pub struct BildPatch {
     pub opazitaet: Option<i64>,
     pub sichtbar: Option<bool>,
     pub reihenfolge: Option<i64>,
-    /// Verschieben/Freigeben (LFH-320): `None` = unverändert, `Some(None)` = auf alle
-    /// Ansichten (NULL), `Some(Some(x))` = auf Ansicht x.
+    /// Verschieben/Freigeben: `None` = unverändert, `Some(None)` = auf alle Ansichten (NULL),
+    /// `Some(Some(x))` = auf Ansicht x.
     pub ansicht_id: Option<Option<i64>>,
 }
 
@@ -189,8 +187,8 @@ pub async fn loeschen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(),
 mod tests {
     use super::*;
 
-    /// Org idempotent anlegen, eindeutigen Benutzer + frischen Einsatz anlegen.
-    /// Gibt (einsatz_id, benutzer_id) zurück — passend zur Brief-Destrukturierung `(eid, uid)`.
+    /// Org idempotent, eindeutiger Benutzer und frischer Einsatz; liefert (einsatz_id,
+    /// benutzer_id).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(pool)
@@ -303,7 +301,7 @@ mod tests {
         )
         .await
         .unwrap();
-        // anderer Einsatz: ALLE einsatz-scoped Pfade müssen das fremde Bild abweisen.
+        // Anderer Einsatz: alle einsatz-scoped Pfade weisen das fremde Bild ab.
         let (eid2, _) = setup(&pool).await;
         assert!(laden(&pool, eid2, a.id).await.is_err());
         assert!(laden_bytes(&pool, eid2, a.id).await.is_err());

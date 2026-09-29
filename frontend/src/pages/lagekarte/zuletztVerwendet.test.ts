@@ -7,8 +7,8 @@ import {
   merkeZuletztVerwendet,
 } from './zuletztVerwendet';
 
-// Das globale afterEach in `test/setup.ts` räumt localStorage; hier zusätzlich VOR jedem
-// Test, damit die Reihenfolge der Dateien im Lauf keine Rolle spielt.
+// Das globale afterEach räumt localStorage; hier zusätzlich vor jedem Test, damit die Reihenfolge
+// der Dateien keine Rolle spielt.
 beforeEach(() => localStorage.clear());
 
 describe('zuletztVerwendet — Reihenfolge und Deckel', () => {
@@ -54,15 +54,12 @@ describe('zuletztVerwendet — Reihenfolge und Deckel', () => {
     ] as const;
     for (const gz of sieben) merkeZuletztVerwendet({ grundzeichen: gz } as FreiesZeichenUpdate);
     const liste = leseZuletztVerwendet();
-    // SECHS als Literal, nicht `ZULETZT_MAX`: aus der geprüften Konstante gelesen prüfte die
-    // Zeile sich selbst — mit einem Deckel von 4 oder 5 bliebe sie grün, und beide anderen
-    // Aussagen dieses Tests hielten ebenfalls. Sechs ist das Akzeptanzkriterium, also steht
-    // sie hier ausgeschrieben.
+    // Sechs als Literal, nicht `ZULETZT_MAX`: aus der geprüften Konstante gelesen prüfte die Zeile
+    // sich selbst.
     expect(liste).toHaveLength(6);
     expect(ZULETZT_MAX).toBe(6);
     expect(liste[0].grundzeichen).toBe('gebaeude');
-    // Das älteste ist raus — die Gegenaussage zum Deckel: nicht bloß „höchstens 6", sondern
-    // „das Neue verdrängt das Alte" statt selbst abgewiesen zu werden.
+    // Das älteste ist raus: das Neue verdrängt das Alte, statt selbst abgewiesen zu werden.
     expect(liste.map((z) => z.grundzeichen)).not.toContain('person');
   });
 });
@@ -82,9 +79,8 @@ describe('zuletztVerwendet — was gemerkt wird', () => {
   });
 
   it('ignoriert Fremdfelder eines breiteren Objekts (die Aufrufstelle hält lat/lon)', () => {
-    // Der Auftraggeber ruft die Funktion an der PLATZIER-Stelle — dort liegt ein
-    // `NeuesFreiesZeichen` mit lat/lon. Ein durchgereichtes Koordinatenpaar machte jede
-    // Platzierung zu einem eigenen Schlüssel, und „ohne Dubletten" stürbe lautlos.
+    // Die Platzier-Stelle übergibt ein `NeuesFreiesZeichen` mit lat/lon. Ein durchgereichtes
+    // Koordinatenpaar machte jede Platzierung zu einem eigenen Schlüssel.
     const mitOrt = {
       grundzeichen: 'person',
       lat: 50.1,
@@ -145,8 +141,8 @@ describe('zuletztVerwendet — Benachrichtigung', () => {
     const abbestellen = abonniereZuletztVerwendet(hoerer);
     merkeZuletztVerwendet({ grundzeichen: 'person' });
     expect(hoerer).toHaveBeenCalledTimes(1);
-    // Gegenaussage: ohne Abbestellen liefe der Hörer weiter — genau das darf nach dem
-    // Abhängen der Leiste nicht mehr passieren (setState auf einer toten Komponente).
+    // Gegenaussage: ohne Abbestellen liefe der Hörer nach dem Abhängen der Leiste weiter (setState
+    // auf einer toten Komponente).
     abbestellen();
     merkeZuletztVerwendet({ grundzeichen: 'befehlsstelle' });
     expect(hoerer).toHaveBeenCalledTimes(1);

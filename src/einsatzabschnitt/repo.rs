@@ -2,10 +2,9 @@ use super::{AbschnittLagezustand, EinsatzabschnittAnzeige};
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
-/// Editierbare Felder eines Abschnitts (bereits getrimmt/validiert durch den Handler,
-/// hier zusätzlich auf Einsatz-Zugehörigkeit von parent/leiter geprüft).
-/// Hinweis: `sprechgruppe_tmo`/`_dmo` sind eingefroren (Freitext-Migration LFH-109);
-/// Sprechgruppen werden über die Join-Tabelle via `setze_abschnitt_sprechgruppen` gesetzt.
+/// Editierbare Felder eines Abschnitts (vom Handler getrimmt/validiert, hier zusätzlich auf
+/// Einsatz-Zugehörigkeit von parent/leiter geprüft). `sprechgruppe_tmo`/`_dmo` sind
+/// eingefroren; Sprechgruppen setzt `setze_abschnitt_sprechgruppen`.
 #[derive(Debug)]
 pub struct AbschnittDaten<'a> {
     pub name: &'a str,
@@ -71,8 +70,8 @@ fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
         erreichbarkeit: row.erreichbarkeit,
         sortier: row.sortier,
         kurzbezeichnung: row.kurzbezeichnung,
-        // Der DB-CHECK lässt nur die drei Werte zu; ein unlesbarer Altwert fiele auf
-        // „nicht beurteilt" statt die ganze Liste mit einem 500 zu verlieren.
+        // Der DB-CHECK lässt nur drei Werte zu; ein unlesbarer Altwert fällt auf „nicht beurteilt“,
+        // statt die ganze Liste mit 500 zu verlieren.
         lagezustand: row
             .lagezustand
             .as_deref()
@@ -83,16 +82,14 @@ fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
     }
 }
 
-/// Setzt die Anzeigen für einen Satz Zeilen **desselben** Einsatzes zusammen. Die
-/// Sprechgruppen werden in EINER Abfrage für den ganzen Einsatz nachgeladen statt je
-/// Abschnitt einzeln (LFH-225/F23). `laden()` nutzt dieselbe Funktion mit einem
-/// Ein-Element-Satz, damit es genau EINE Anreicherungslogik gibt.
+/// Setzt die Anzeigen für Zeilen desselben Einsatzes zusammen; die Sprechgruppen kommen in EINER
+/// Abfrage für den ganzen Einsatz. Auch `laden()` nutzt diese Funktion, damit es genau eine
+/// Anreicherungslogik gibt.
 async fn zu_anzeige_batch(
     pool: &SqlitePool,
     einsatz_id: i64,
     rows: Vec<Row>,
 ) -> Result<Vec<EinsatzabschnittAnzeige>, AppError> {
-    // Ohne Zeilen gibt es nichts anzureichern — die Sammelabfrage bleibt aus.
     if rows.is_empty() {
         return Ok(Vec::new());
     }
@@ -144,8 +141,8 @@ pub async fn laden(
         .ok_or(AppError::NotFound)
 }
 
-/// Prüft, ob ein Abschnitt zum Einsatz gehört (für Parent-Validierung). `NotFound` sonst.
-/// Executor-generisch: [`anlegen_tx`] prüft auf der offenen Verbindung (LFH-690).
+/// Prüft, ob ein Abschnitt zum Einsatz gehört (für Parent-Validierung), sonst `NotFound`.
+/// Executor-generisch, damit [`anlegen_tx`] auf der offenen Verbindung prüft.
 async fn pruefe_parent(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
@@ -160,8 +157,8 @@ async fn pruefe_parent(
     treffer.map(|_| ()).ok_or(AppError::NotFound)
 }
 
-/// Prüft, ob `leiter_id` eine disponierte Person *desselben* Einsatzes ist.
-/// Executor-generisch: [`anlegen_tx`] prüft auf der offenen Verbindung (LFH-690).
+/// Prüft, ob `leiter_id` eine disponierte Person desselben Einsatzes ist. Executor-generisch
+/// (s. [`anlegen_tx`]).
 async fn pruefe_leiter(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
@@ -189,7 +186,7 @@ async fn waere_zyklus(
     kandidat_parent: i64,
 ) -> Result<bool, AppError> {
     let mut aktuell = Some(kandidat_parent);
-    // Begrenzung gegen korrupte Altdaten: Anzahl Knoten ist endlich.
+    // Begrenzung gegen korrupte Altdaten.
     let mut schritte = 0;
     while let Some(id) = aktuell {
         if id == start_id {
@@ -210,10 +207,9 @@ async fn waere_zyklus(
     Ok(false)
 }
 
-/// Validiert parent (selber Einsatz) und leiter (disponierte Person) beim Anlegen, auf der
-/// Verbindung des Aufrufers (LFH-690: so sieht die Prüfung auch Zeilen derselben offenen
-/// Transaktion). Eine Zyklenprüfung entfällt: ein Knoten, den es noch nicht gibt, kann
-/// nicht eigener Vorfahr werden. Beim Umhängen prüft [`validiere_patch`] den Zyklus.
+/// Validiert parent und leiter beim Anlegen auf der Verbindung des Aufrufers (so sieht die
+/// Prüfung auch Zeilen derselben offenen Transaktion). Keine Zyklenprüfung: ein neuer Knoten
+/// kann nicht eigener Vorfahr sein; beim Umhängen prüft [`validiere_patch`].
 async fn validiere(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -228,11 +224,8 @@ async fn validiere(
     Ok(())
 }
 
-/// Legt einen Abschnitt an (nach Validierung). Liefert die aufgelöste Anzeige.
-///
-/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, Prüfungen und Insert
-/// laufen im Autocommit einer geliehenen Verbindung. Die Anzeige wird danach über den Pool
-/// geladen, nachdem die Verbindung zurückgegeben ist.
+/// Legt einen Abschnitt an und liefert die aufgelöste Anzeige. Pool-Hülle um [`anlegen_tx`]
+/// ohne eigene Transaktion; die Anzeige wird nach Rückgabe der Verbindung über den Pool geladen.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -245,11 +238,9 @@ pub async fn anlegen(
     laden(pool, einsatz_id, id).await
 }
 
-/// Legt einen Abschnitt auf einer offenen Verbindung/Transaktion an, samt Prüfung von
-/// Parent, Leiter und Kurzbezeichnung auf derselben Verbindung (LFH-690, Demo-Import in
-/// EINER Transaktion). Öffnet und committet selbst nichts. Liefert die neue `id`, nicht
-/// die Anzeige: deren Anreicherung (Sprechgruppen) liest über den Pool, und der Import
-/// braucht sie nicht.
+/// Legt einen Abschnitt auf einer offenen Verbindung an, samt Prüfung von Parent, Leiter und
+/// Kurzbezeichnung auf derselben Verbindung (Demo-Import in EINER Transaktion). Öffnet und
+/// committet nichts. Liefert die `id`, weil die Anreicherung über den Pool liest.
 pub async fn anlegen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -283,8 +274,8 @@ pub async fn anlegen_tx(
     Ok(id)
 }
 
-/// Teil-Patch der editierbaren Felder (LFH-306, Tri-State): äußere `Option` = „im Patch
-/// enthalten?", innere = Wert (`Some(None)` setzt die Spalte auf NULL).
+/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“, innere = Wert (`Some(None)` setzt
+/// NULL).
 #[derive(Debug, Default)]
 pub struct AbschnittPatch<'a> {
     pub name: Option<&'a str>,
@@ -295,16 +286,14 @@ pub struct AbschnittPatch<'a> {
     pub erreichbarkeit: Option<Option<&'a str>>,
     pub sortier: Option<i64>,
     pub kurzbezeichnung: Option<Option<&'a str>>,
-    // Der Lagezustand fehlt hier absichtlich: er hat mit `setze_lagezustand_tx` einen
-    // eigenen Schreibweg, der den ETB-Eintrag in derselben Transaktion schreibt.
+    // Der Lagezustand fehlt absichtlich: `setze_lagezustand_tx` schreibt ihn samt ETB-Eintrag in
+    // derselben Transaktion.
     pub abschnittsauftrag: Option<Option<&'a str>>,
     pub fortschritt: Option<Option<i64>>,
 }
 
-/// Validiert nur die **gesendeten** Bezugsfelder. `Some(None)` (Zuordnung lösen) und ein
-/// absentes Feld brauchen keine Prüfung — es gibt keinen neuen Bezug zu prüfen. Beide
-/// Prüfungen hängen je an EINER Spalte, deshalb ist hier keine Effektivzustands-Bildung
-/// nötig.
+/// Validiert nur die gesendeten Bezugsfelder; `Some(None)` und ein fehlendes Feld bringen keinen
+/// neuen Bezug.
 async fn validiere_patch(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -328,10 +317,9 @@ async fn validiere_patch(
     Ok(())
 }
 
-/// Ob ein Kürzel im Einsatz noch frei ist (ohne den Abschnitt selbst). Groß-/Klein-
-/// schreibung zählt nicht, wie im UNIQUE-Index (`0104`). Der Index ist das eigentliche
-/// Netz (UNIQUE → 409, LFH-245); die Vorprüfung liefert nur die sprechende Meldung.
-/// Executor-generisch: [`anlegen_tx`] prüft auf der offenen Verbindung (LFH-690).
+/// Ob ein Kürzel im Einsatz noch frei ist (ohne den Abschnitt selbst), ohne Groß-/Kleinschreibung
+/// wie der UNIQUE-Index. Der Index ist das eigentliche Netz (→ 409); die Vorprüfung liefert nur
+/// die sprechende Meldung. Executor-generisch (s. [`anlegen_tx`]).
 async fn pruefe_kurzbezeichnung_frei(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
@@ -356,20 +344,19 @@ async fn pruefe_kurzbezeichnung_frei(
     }
 }
 
-/// Teil-Patch der editierbaren Felder (Parent-Wechsel zyklenfrei). `NotFound`,
-/// falls der Abschnitt nicht zum Einsatz gehört.
+/// Teil-Patch der editierbaren Felder (Parent-Wechsel zyklenfrei); `NotFound`, falls der
+/// Abschnitt nicht zum Einsatz gehört.
 ///
-/// Flag/Wert-Paare mit **nummerierten** Parametern (LFH-266/F12, Vorlage `person/repo.rs`):
-/// nur gesendete Spalten werden angefasst. Die Nummerierung schützt gegen eine um eine
-/// Position verschobene Bind-Kette, die gleichtypige Nachbarspalten
-/// (`kommunikationsmittel`↔`erreichbarkeit`) still vertauschte.
+/// Flag/Wert-Paare mit nummerierten Parametern: nur gesendete Spalten werden angefasst, und eine
+/// verschobene Bind-Kette kann gleichtypige Nachbarn (`kommunikationsmittel`↔`erreichbarkeit`)
+/// nicht still vertauschen.
 pub async fn patche(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
     patch: AbschnittPatch<'_>,
 ) -> Result<EinsatzabschnittAnzeige, AppError> {
-    // Existenz im Einsatz sichern (auch für die self_id-Zyklenprüfung).
+    // Existenz im Einsatz sichern (auch für die Zyklenprüfung).
     laden(pool, einsatz_id, id).await?;
     validiere_patch(pool, einsatz_id, id, &patch).await?;
     let resultat = sqlx::query(
@@ -416,19 +403,18 @@ pub async fn patche(
     laden(pool, einsatz_id, id).await
 }
 
-/// Ein tatsächlicher Wechsel des Lagezustands: der vorherige Wert und der Abschnittsname
-/// (für den ETB-Text, nach einer etwaigen Umbenennung im selben PATCH).
+/// Ein tatsächlicher Wechsel des Lagezustands: vorheriger Wert und Abschnittsname (für den
+/// ETB-Text, nach einer etwaigen Umbenennung im selben PATCH).
 #[derive(Debug, PartialEq, Eq)]
 pub struct Lagewechsel {
     pub vorher: Option<AbschnittLagezustand>,
     pub name: String,
 }
 
-/// Setzt den Lagezustand IN der übergebenen Transaktion und liefert den Wechsel, falls es
-/// einer ist (`None` bei gleichem Wert). Lesen und Schreiben liegen damit unter derselben
-/// Schreibsperre (`write_retry!` → `BEGIN IMMEDIATE`): zwei gleichzeitige Beurteilungen
-/// sehen je den Stand der anderen, und keine Entwarnung geht als „kein Wechsel“ verloren
-/// (LFH-608, Review). `NotFound`, falls der Abschnitt nicht zum Einsatz gehört.
+/// Setzt den Lagezustand IN der übergebenen Transaktion und liefert den Wechsel (`None` bei
+/// gleichem Wert). Lesen und Schreiben liegen unter derselben Schreibsperre (`write_retry!` →
+/// `BEGIN IMMEDIATE`), damit bei zwei gleichzeitigen Beurteilungen keine Entwarnung als „kein
+/// Wechsel“ verloren geht. `NotFound`, falls der Abschnitt nicht zum Einsatz gehört.
 pub async fn setze_lagezustand_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -456,7 +442,7 @@ pub async fn setze_lagezustand_tx(
     Ok(Some(Lagewechsel { vorher, name }))
 }
 
-/// Reine Fläche-/Symbol-Felder eines Abschnitts. `Some(None)` = auf NULL, `None` = unverändert.
+/// Fläche-/Symbol-Felder eines Abschnitts. `Some(None)` = NULL, `None` = unverändert.
 #[derive(Debug, Default)]
 pub struct FlaechePatch<'a> {
     pub flaeche_geojson: Option<Option<&'a str>>,
@@ -464,7 +450,7 @@ pub struct FlaechePatch<'a> {
     pub tz_organisation: Option<Option<&'a str>>,
 }
 
-/// Setzt/ändert/löscht Fläche (GeoJSON) + taktische Zeichen-Felder. KEIN ETB-Schreibpfad (Lage-Pflege).
+/// Setzt/ändert/löscht Fläche (GeoJSON) und taktische Zeichen-Felder; schreibt kein ETB.
 pub async fn aktualisiere_flaeche(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -495,12 +481,10 @@ pub async fn aktualisiere_flaeche(
     laden(pool, einsatz_id, aid).await
 }
 
-/// Löst einen Abschnitt auf, auf einer bereits offenen Connection/Transaktion (für den
-/// atomaren Handler-Pfad F06/LFH-244 Tier-A: Auflösen + System-ETB in EINER `write_retry!`-Tx):
-/// Unter-Abschnitte auf den Parent des gelöschten hochziehen, zugeordnete Einheiten
-/// `abschnitt_id = NULL`, uhs/Bereitstellungsraum freigeben, dann löschen. `NotFound`, falls
-/// nicht zum Einsatz. Öffnet KEINE eigene Tx — die Atomarität der Statement-Folge liefert der
-/// Aufrufer (write_retry! bzw. der Pool-Wrapper `loese_auf`).
+/// Löst einen Abschnitt auf einer offenen Verbindung auf: Unter-Abschnitte an den Parent hängen,
+/// Einheiten `abschnitt_id = NULL`, uhs/Bereitstellungsraum freigeben, dann löschen. `NotFound`,
+/// falls nicht zum Einsatz. Öffnet keine Transaktion; die Atomarität liefert der Aufrufer
+/// (`write_retry!` bzw. [`loese_auf`]).
 pub async fn loese_auf_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -525,8 +509,8 @@ pub async fn loese_auf_tx(
     .bind(einsatz_id)
     .execute(&mut *conn)
     .await?;
-    // uhs + Bereitstellungsraum referenzieren den Abschnitt ohne ON-DELETE-Aktion
-    // (LFH-237/F08): vor dem DELETE freigeben, sonst blockiert der FK das Auflösen.
+    // uhs und Bereitstellungsraum referenzieren den Abschnitt ohne ON-DELETE-Aktion: vor dem
+    // DELETE freigeben, sonst blockiert der FK.
     sqlx::query("UPDATE uhs SET abschnitt_id = NULL WHERE abschnitt_id = ? AND einsatz_id = ?")
         .bind(id)
         .bind(einsatz_id)
@@ -547,11 +531,8 @@ pub async fn loese_auf_tx(
     Ok(())
 }
 
-/// Löst einen Abschnitt auf (Transaktion): Unter-Abschnitte auf den Parent des
-/// gelöschten hochziehen, zugeordnete Einheiten `abschnitt_id = NULL`, dann löschen.
-/// `NotFound`, falls nicht zum Einsatz. Pool-Wrapper: delegiert an [`loese_auf_tx`] in
-/// einer eigenen Transaktion (die Statement-Folge muss atomar bleiben — daher `begin`/
-/// `commit`, nicht bloß eine Pool-Connection).
+/// Löst einen Abschnitt in einer eigenen Transaktion auf (delegiert an [`loese_auf_tx`]); die
+/// Statement-Folge muss atomar bleiben.
 pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
     loese_auf_tx(&mut tx, einsatz_id, id).await?;
@@ -672,10 +653,7 @@ mod tests {
         assert_eq!(a.kommunikationsmittel.as_deref(), Some("digitalfunk"));
         assert_eq!(a.erreichbarkeit.as_deref(), Some("0151 23456"));
 
-        // LFH-306: `kommunikationsmittel` geändert, `erreichbarkeit` EXPLIZIT geleert.
-        // Vor dem Umbau reichte dafür ein Vollbody mit `erreichbarkeit: None`; jetzt muss
-        // der Leerwunsch als `Some(None)` gesendet werden — genau das ist der Unterschied,
-        // den die Route neu kennt.
+        // `kommunikationsmittel` geändert, `erreichbarkeit` explizit per `Some(None)` geleert.
         let b = patche(
             &pool,
             einsatz,
@@ -711,9 +689,8 @@ mod tests {
         );
     }
 
-    /// LFH-690: Ober- und Unterabschnitt entstehen in EINER Transaktion. Die Parent-Prüfung
-    /// muss den noch nicht committeten Oberabschnitt sehen. Über den Pool (Datei/WAL: eigener
-    /// Snapshot) endete sie in `NotFound`.
+    /// Ober- und Unterabschnitt entstehen in EINER Transaktion; die Parent-Prüfung muss den noch
+    /// nicht committeten Oberabschnitt sehen (über den Pool endete sie in `NotFound`).
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn unterabschnitt_auf_abschnitt_aus_derselben_transaktion() {
         let (_dir, pool) = crate::db::test_pool_datei().await;
@@ -947,7 +924,7 @@ mod tests {
             sqlx::query("INSERT INTO einsatzabschnitt (einsatz_id, name, sprechgruppe_tmo) VALUES (?, ?, '412_F_DRK')")
                 .bind(e).bind(name).execute(&pool).await.unwrap();
         }
-        // TMO-Daten-Migration aus 0073 erneut ausführen (idempotent dank INSERT OR IGNORE):
+        // Die TMO-Daten-Migration erneut ausführen (idempotent dank INSERT OR IGNORE):
         sqlx::query(
             "INSERT OR IGNORE INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart) \
              SELECT DISTINCT e.org_id, ea.einsatz_id, trim(ea.sprechgruppe_tmo), 'TMO' \
@@ -981,9 +958,8 @@ mod tests {
         assert_eq!(joins, 2, "beide Abschnitte verknüpft (Sharing)");
     }
 
-    /// LFH-237/F08: Einen Abschnitt auflösen, der von uhs, bereitstellungsraum UND einem
-    /// Auftrag-Empfänger referenziert wird. uhs/br werden per Pre-Clean in der Lösch-Tx
-    /// freigegeben; der Empfänger-Bezug per ON DELETE SET NULL (Migration 0088).
+    /// Ein Abschnitt, auf den uhs, bereitstellungsraum und ein Auftrag-Empfänger zeigen: uhs/br
+    /// werden in der Lösch-Tx freigegeben, der Empfänger per ON DELETE SET NULL.
     #[tokio::test]
     async fn loese_auf_gibt_uhs_br_und_empfaenger_frei() {
         let pool = crate::db::test_pool().await;

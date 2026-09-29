@@ -72,9 +72,8 @@ pub async fn anlegen(
     laden(pool, org_id, id).await
 }
 
-/// Teil-Patch der editierbaren Felder (LFH-306, Tri-State): die äußere `Option` sagt
-/// „im Patch enthalten?" — `None` lässt die Spalte unverändert. Bei der nullable Spalte
-/// `farbe` trägt der Wert selbst noch eine `Option`: `Some(None)` setzt sie auf NULL.
+/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“; bei der nullable Spalte `farbe` setzt
+/// `Some(None)` NULL.
 #[derive(Debug, Default)]
 pub struct StatusPatch<'a> {
     pub label: Option<&'a str>,
@@ -83,13 +82,12 @@ pub struct StatusPatch<'a> {
     pub sortier: Option<i64>,
 }
 
-/// Teil-Patch der editierbaren Felder (org-scoped). `NotFound`/`Conflict` analog Stamm.
+/// Teil-Patch der editierbaren Felder (org-scoped); `NotFound`/`Conflict` wie beim Stamm.
 ///
-/// Flag/Wert-Paare statt COALESCE (LFH-266/F12, Vorlage `person/repo.rs`): erst so lässt
-/// sich `farbe` über die API wieder auf NULL setzen, und ein nicht gesendetes Feld fasst
-/// seine Spalte nicht an. Die Parameter sind nummeriert, weil eine um eine Position
-/// verschobene Bind-Kette gleichtypige Nachbarspalten (`label`↔`kategorie`) STILL
-/// vertauschen würde — abgesichert von `patche_setzt_jede_spalte_an_ihren_platz`.
+/// Flag/Wert-Paare statt COALESCE: so lässt sich `farbe` wieder auf NULL setzen, und ein nicht
+/// gesendetes Feld fasst seine Spalte nicht an. Nummerierte Parameter, damit eine verschobene
+/// Bind-Kette `label`↔`kategorie` nicht still vertauscht
+/// (`patche_setzt_jede_spalte_an_ihren_platz`).
 pub async fn patche(
     pool: &SqlitePool,
     org_id: i64,
@@ -141,11 +139,8 @@ pub async fn deaktivieren(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(),
     Ok(())
 }
 
-/// `id` des ersten aktiven Status einer Kategorie (deterministisch nach `sortier`,
-/// dann `id`); `None`, wenn die Org keinen solchen aktiven Status hat.
-///
-/// Executor-generisch (Pool oder offene Verbindung): `disposition_repo::disponiere_stamm_tx`
-/// liest auf der Verbindung seiner Transaktion (LFH-690).
+/// `id` des ersten aktiven Status einer Kategorie (nach `sortier`, dann `id`); `None`, wenn es
+/// keinen gibt. Executor-generisch für `disposition_repo::disponiere_stamm_tx`.
 pub async fn erster_der_kategorie(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     org_id: i64,
@@ -283,9 +278,8 @@ mod tests {
         assert!(!ist_in_org(&pool, 2, s.id).await.unwrap());
     }
 
-    /// Bind-Reihenfolge der Flag/Wert-Kette: alle vier Spalten in EINEM Patch auf distinkte
-    /// Werte setzen und einzeln prüfen. Eine um eine Position verschobene Kette würde
-    /// `label`↔`kategorie` still vertauschen — ohne Compile- und ohne Laufzeitfehler.
+    /// Bind-Reihenfolge: alle vier Spalten in EINEM Patch auf distinkte Werte setzen und einzeln
+    /// prüfen.
     #[tokio::test]
     async fn patche_setzt_jede_spalte_an_ihren_platz() {
         let pool = crate::db::test_pool().await;
@@ -312,8 +306,8 @@ mod tests {
         assert_eq!(neu.sortier, 42);
     }
 
-    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an. Der
-    /// `Default`-Patch (alle Felder absent) darf die Zeile Byte für Byte so lassen.
+    /// Ein Patch fasst NUR die gesendeten Spalten an; der `Default`-Patch lässt die Zeile
+    /// unverändert.
     #[tokio::test]
     async fn patche_laesst_nicht_gesendete_spalten_stehen() {
         let pool = crate::db::test_pool().await;
@@ -355,8 +349,7 @@ mod tests {
         assert_eq!(unveraendert.farbe.as_deref(), Some("#ff0000"));
     }
 
-    /// `Some(None)` ist der Leerwunsch und muss von „absent" unterscheidbar sein —
-    /// grenzt gegen `patche_laesst_nicht_gesendete_spalten_stehen` ab.
+    /// `Some(None)` ist der Leerwunsch und von „absent“ unterscheidbar.
     #[tokio::test]
     async fn patche_farbe_none_loescht_die_spalte() {
         let pool = crate::db::test_pool().await;

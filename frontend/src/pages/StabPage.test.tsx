@@ -216,8 +216,8 @@ describe('StabPage', () => {
       '/einsaetze/1/nachforderungen',
     );
     const s6 = screen.getByRole('group', { name: 'Werkzeuge S6' });
-    // Die Gruppen stehen schon vor der Override-Antwort da (Ruling 2). Erst positiv auf die
-    // Antwort warten — ein `waitFor` auf `null` wäre sonst sofort und trivial grün.
+    // Die Gruppen stehen schon vor der Override-Antwort da. Erst positiv auf die Antwort warten —
+    // ein `waitFor` auf `null` wäre sonst sofort und trivial grün.
     await waitFor(() => expect(overrideAufrufe).toBe(1));
     await waitFor(() => expect(within(s6).queryByRole('link', { name: label('chat') })).toBeNull());
     expect(within(s6).getByRole('link', { name: label('einsatzabschnitte') })).toBeInTheDocument();
@@ -280,9 +280,9 @@ describe('StabPage · Kopfaktion „Lagebesprechung abschließen"', () => {
   });
 
   /**
-   * Ruling 4: ohne Stand fehlte der Termin zur Vorbelegung. Die Positivhälfte steht davor
-   * (Schreibrecht besteht) und dahinter (derselbe Nutzer, der Stand kommt an → frei) — sonst
-   * wäre „gesperrt" aus dem falschen Grund richtig.
+   * Ohne Stand fehlte der Termin zur Vorbelegung. Die Positivhälfte steht davor (Schreibrecht
+   * besteht) und dahinter (der Stand kommt an → frei) — sonst wäre „gesperrt" aus dem falschen
+   * Grund richtig.
    */
   it('ist bei dauerhaft gescheitertem Stand gesperrt, ohne eigenen Hinweis', async () => {
     rendere({ stabStatus: 500 });
@@ -299,9 +299,9 @@ describe('StabPage · Kopfaktion „Lagebesprechung abschließen"', () => {
   });
 
   /**
-   * M3 (Ruling 13): fallen die Rechte bei offener Maske weg, ist sie weg — und sie steht nicht
-   * wieder auf, wenn die Rechte zurückkommen. Die Positivhälfte (Kopfaktion wieder frei) steht
-   * VOR der Negativaussage: ohne sie belegte „kein Dialog" nur eine noch gesperrte Seite.
+   * Fallen die Rechte bei offener Maske weg, ist sie weg — und sie steht nicht wieder auf, wenn die
+   * Rechte zurückkommen. Die Positivhälfte (Kopfaktion wieder frei) steht vor der Negativaussage:
+   * ohne sie belegte „kein Dialog" nur eine gesperrte Seite.
    */
   it('schließt die Maske beim Rechteverlust und öffnet sie danach nicht von selbst', async () => {
     const { client } = rendere();
@@ -325,10 +325,10 @@ describe('StabPage · Kopfaktion „Lagebesprechung abschließen"', () => {
   });
 
   /**
-   * Belegt Abweichung 6: Öffnen = Montieren, jede Öffnung hat eine frische Mutation. Die Maske
-   * wird beim Schliessen AUSGEHÄNGT (nicht `open=false`) — deshalb darf hier auf das Verschwinden
-   * des Dialogs gewartet werden. Bleibt dieser `waitFor` rot, steht der Dialog noch in der
-   * Verlassen-Bewegung: dann auf `ant-zoom-leave` umstellen (Muster `LageberichtDetailPage.test.tsx`).
+   * Öffnen = Montieren, jede Öffnung hat eine frische Mutation. Die Maske wird beim Schließen
+   * ausgehängt (nicht `open=false`) — deshalb darf auf das Verschwinden des Dialogs gewartet
+   * werden. Stünde der Dialog noch in der Verlassen-Bewegung, auf `ant-zoom-leave` umstellen
+   * (Muster `LageberichtDetailPage.test.tsx`).
    */
   it('öffnet nach einem Fehler ohne den Grund des vorigen Versuchs', async () => {
     rendere({ post: () => HttpResponse.json({ error: GRUND }, { status: 409 }) as Response });

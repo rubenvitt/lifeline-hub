@@ -1,16 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// LFH-613 (Aufgabe 5.4): Kartenansicht der Betroffenen.
+// Kartenansicht der Betroffenen. Ob die Marker wirklich in der MapLibre-Quelle landen (lazy
+// geladenes Bündel, Startausschnitt aus dem Rahmen um die Personen, Clustering), sieht nur ein
+// echter Renderer; `personenKarte.test.ts` prüft die Auswahl rein. Geprüft wird die Quelle.
 //
-// Warum im Browser: `personenKarte.test.ts` prüft die Marker-AUSWAHL rein, ohne WebGL. Ob
-// die Marker tatsächlich in der MapLibre-Quelle landen — lazy geladenes Bündel,
-// Startausschnitt aus dem Rahmen um die Personen, Clustering der Quelle —, sieht nur ein
-// echter Renderer. Geprüft wird die Quelle (`querySourceFeatures`), nicht die Optik.
-//
-// Die zwei verorteten Personen liegen rund 140 km auseinander. Der Startausschnitt rahmt
-// beide, sie stehen also an entgegengesetzten Rändern des Bildes und weit über dem
-// Cluster-Radius auseinander — sonst trüge die Quelle nur einen Cluster-Punkt ohne
-// `schluessel`, und der Test prüfte das Clustering statt der Marker.
+// Die zwei verorteten Personen liegen rund 140 km auseinander, weit über dem Cluster-Radius —
+// sonst trüge die Quelle nur einen Cluster-Punkt ohne `schluessel`.
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -64,8 +59,7 @@ test('Betroffene mit Koordinate stehen als Marker auf der Karte, die Lücke wird
   test.setTimeout(120_000);
   await anmelden(page);
 
-  // Der Name enthält keinen Modulnamen (siehe `lagekarte-smoke.spec.ts`: die Palette sucht
-  // Module und Einsätze gemeinsam).
+  // Kein Modulname im Einsatznamen (die Palette sucht Module und Einsätze gemeinsam).
   const einsatzId = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Fundorte ${Date.now()}`,
   });
@@ -78,9 +72,8 @@ test('Betroffene mit Koordinate stehen als Marker auf der Karte, die Lücke wird
     name: 'Brandt',
   });
 
-  // Zweiter Weg: die Schnellerfassungszeile `/person` mit dem Kürzel `#lat/lon`. Die
-  // Koordinate muss im SELBEN Anlege-POST mitgehen — geprüft am Serverstand, nicht an der
-  // Anzeige.
+  // Zweiter Weg: die Kurzeingabe mit `#lat/lon`. Die Koordinate muss im SELBEN Anlege-POST
+  // mitgehen — geprüft am Serverstand.
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   const zeile = page.getByRole('textbox', { name: 'Kurzeingabe Person' });
   await zeile.fill('Claasen, Carla #52.2691/9.1342');
@@ -137,11 +130,10 @@ interface SpiderHaken extends MapHaken {
   }[];
 }
 
-// Review LFH-650 (Befund „hoch"): in `handschuh` legt der Cluster-Donut eine 72-px-Hülle
-// (Radius 36) um den Ring; die aufgefächerten Blätter liegen ab 40 px, ihr gezeichneter Kreis
-// beginnt bei 27 px. Die Hülle fing den Tipp auf den inneren Teil eines Blatts ab und klappte
-// den Spider zu. Gemessen wird GENAU dieser Punkt: 30 px vom Mittelpunkt in Richtung Blatt —
-// innerhalb der alten Hülle UND innerhalb des gezeichneten Blattkreises.
+// In `handschuh` legt der Cluster-Donut eine 72-px-Hülle (Radius 36) um den Ring; die
+// aufgefächerten Blätter liegen ab 40 px, ihr gezeichneter Kreis beginnt bei 27 px. Die Hülle
+// darf den Tipp auf den inneren Teil eines Blatts nicht abfangen. Gemessen GENAU dort: 30 px
+// vom Mittelpunkt in Richtung Blatt.
 test('Handschuh: ein Tipp auf den inneren Teil eines aufgefächerten Blatts öffnet die Person, statt den Spider zu schließen', async ({
   page,
 }) => {
@@ -162,14 +154,14 @@ test('Handschuh: ein Tipp auf den inneren Teil eines aufgefächerten Blatts öff
       }),
     );
   }
-  // Erst die Stufe setzen, DANN die Karte aufrufen: `?ansicht=karte` wird nach dem ersten
-  // Laden aus der URL geräumt, ein Neuladen danach landete in der Zeilenansicht.
+  // Erst die Stufe setzen, DANN die Karte aufrufen: `?ansicht=karte` wird nach dem ersten Laden
+  // aus der URL geräumt.
   await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
   await page.goto(`/einsaetze/${einsatzId}/personen?ansicht=karte`);
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
-  // Nur auf die Instanz warten, nicht auf `loaded()`: der Startausschnitt rahmt zwei Punkte
-  // im Abstand von rund 11 m und springt dabei auf einen extremen Zoom; ohne Kachelquelle blieb
-  // `loaded()` dort gemessen stehen. Bereit ist die Karte nach dem EIGENEN Sprung (`idle`).
+  // Nur auf die Instanz warten, nicht auf `loaded()`: der Startausschnitt springt auf einen
+  // extremen Zoom, und ohne Kachelquelle bleibt `loaded()` dort stehen. Bereit ist die Karte
+  // nach dem EIGENEN Sprung (`idle`).
   await page.waitForFunction(
     () => Boolean((window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte),
     undefined,
@@ -200,8 +192,7 @@ test('Handschuh: ein Tipp auf den inneren Teil eines aufgefächerten Blatts öff
         blaetter = await page.evaluate(() => {
           const k = (window as unknown as { __lfhKarte: SpiderHaken }).__lfhKarte;
           const r = k.getCanvas().getBoundingClientRect();
-          // `querySourceFeatures` liefert ein Merkmal je Kachel, die es berührt — gemessen
-          // dreifach; je Schlüssel zählt eins.
+          // `querySourceFeatures` liefert ein Merkmal je berührter Kachel; je Schlüssel eins.
           const je = new Map<string, { id: number; x: number; y: number }>();
           for (const f of k.querySourceFeatures('spider-leaves')) {
             const s = String(f.properties?.schluessel ?? '');

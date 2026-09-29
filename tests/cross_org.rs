@@ -1,8 +1,7 @@
 //! Cross-Org-Smokes: die Mandanten-Grenze (`org_id`) gegen eine echte zweite
 //! Organisation (F05/LFH-232).
 //!
-//! Bis LFH-232 gab es keinen Test mit mehr als EINER Organisation — jeder Org-Check war
-//! damit trivial erfüllt und die Lücken blieben unsichtbar. Diese Suite baut über
+//! Mit nur EINER Organisation ist jeder Org-Check trivial erfüllt. Diese Suite baut über
 //! `common::fremde_org_anlegen` eine zweite Org und prüft die zwei Chokepoints, an denen
 //! eine org-fremde Einsatz-Mitgliedschaft überhaupt entstehen kann (die einzigen zwei
 //! produktiven INSERTs in `einsatz_mitgliedschaft`):
@@ -37,9 +36,8 @@ async fn org_id_von_einsatz(pool: &sqlx::SqlitePool, einsatz_id: i64) -> i64 {
 }
 
 /// Ein Einsatz gehört zur Organisation SEINES ERSTELLERS — nicht zur ersten Organisation
-/// der Tabelle. `repo::anlegen` nahm `SELECT id FROM organisation ORDER BY id LIMIT 1`;
-/// sobald eine zweite Org existiert, landete jeder ihrer Einsätze in Org 1, und der
-/// Ersteller wurde als org-fremde Einsatzleitung eingetragen.
+/// der Tabelle. Sonst landete jeder Einsatz einer zweiten Org in Org 1, und der Ersteller
+/// würde als org-fremde Einsatzleitung eingetragen.
 #[tokio::test]
 async fn einsatz_gehoert_zur_org_des_erstellers() {
     let (app, pool) = setup_mit_pool().await;

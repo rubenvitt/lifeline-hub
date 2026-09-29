@@ -3,11 +3,10 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * AK3 (LFH-347 · C12): kein `#888` in `pages/`. Der Wert war die eine Stelle, an der eine
- * Seite ihre Sekundärfarbe selbst erfand statt sie vom Theme zu nehmen — und im Dunkelmodus
- * damit Kontrast verlor. Farbwerte kommen aus `theme.useToken()` / `theme/statusFarben.ts`.
- * Bewusst ein enger Grep (nur dieses Literal) — ein Gate gegen jedes Hex-Literal wäre rot
- * geboren (`flaechenFarbe` u. a. tragen begründete Werte) und würde abgeschaltet statt befolgt.
+ * Kein `#888` in `pages/` (LFH-347): Farbwerte kommen aus `theme.useToken()` /
+ * `theme/statusFarben.ts`; das Literal verlor im Dunkelmodus Kontrast. Bewusst nur dieses Literal —
+ * ein Gate gegen jedes Hex-Literal wäre rot geboren (`flaechenFarbe` u. a. tragen begründete
+ * Werte).
  */
 function dateien(verz: string): string[] {
   return readdirSync(verz).flatMap((n) => {

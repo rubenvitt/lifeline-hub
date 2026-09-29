@@ -9,17 +9,13 @@ import { sichtungsfarben } from '../../theme/tokens';
 const KREIS = 18;
 
 /**
- * Legende der Ebene „Betroffene" auf der Lagekarte (LFH-648).
+ * Legende der Ebene „Betroffene": jeder Eintrag zeigt den Kreis genau wie die Karte (Farbe, weißer
+ * Rand, Kürzel) und daneben das Wort — die Farbe ist nie der einzige Kanal. Reihenfolge wie das
+ * Sichtungsbild der Betroffenen-Seite.
  *
- * Die Personen-Marker tragen Sichtungsfarben, die das einzelne Farbfeld der Ebenen-Zeile
- * nicht erklären kann. Jeder Eintrag zeigt deshalb den Kreis GENAU so, wie ihn die Karte
- * zeichnet (Farbe, weißer Rand, Kürzel innen), und daneben das Wort — die Farbe ist nie der
- * einzige Kanal (WCAG 1.4.1). Reihenfolge wie das Sichtungsbild der Betroffenen-Seite.
- *
- * Gelesen, nicht gebaut: `sichtung` (Label) aus `theme/statusFarben.ts`, `sichtungsfarben`
- * aus `theme/tokens.ts`, das Kürzel aus `personenKarte.ts` — dieselbe Quelle wie der Marker.
- * Kein eigenes `Record<…, StatusDarstellung>` und kein Farbwert hier (statusVertrag-/gate5-
- * Guard). Kein Bedienziel, also kein Dichte-Boden.
+ * Gelesen, nicht gebaut: `sichtung` aus `theme/statusFarben.ts`, `sichtungsfarben` aus
+ * `theme/tokens.ts`, das Kürzel aus `personenKarte.ts`. Kein eigenes `Record<…, StatusDarstellung>`
+ * und kein Farbwert hier. Kein Bedienziel, also kein Dichte-Boden.
  */
 export default function Sichtungslegende() {
   const { token, rollen } = useRollen();
@@ -65,8 +61,8 @@ export default function Sichtungslegende() {
               borderRadius: '50%',
               background: farbe(k),
               border: `2px solid ${token.colorWhite}`,
-              // Äußere Kante in der Textfarbe des Modus (CLAUDE.md, Sichtungsachse): ohne sie
-              // verschwände der weiße Ring — und mit ihm Gelb — auf hellem Grund.
+              // Äußere Kante in der Textfarbe des Modus: ohne sie verschwände der weiße Ring — und
+              // mit ihm Gelb — auf hellem Grund.
               boxShadow: `0 0 0 1px ${token.colorText}`,
               ...monoStil(8),
               color: sichtungsfarben.schwarz,

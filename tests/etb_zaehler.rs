@@ -1,4 +1,4 @@
-//! ETB-Zählung gesamt und je Typ (LFH-612, Neuentwurf S4: „412 Einträge", Bilanz-Leiste).
+//! ETB-Zählung gesamt und je Typ (LFH-612: „412 Einträge", Bilanz-Leiste).
 //!
 //! Die tragende Zusicherung ist die **Parität mit der Liste**: der Kopf zeigt „n Treffer",
 //! und n muss genau die Menge sein, die `GET …/etb` mit denselben Filtern seitenweise
@@ -236,10 +236,9 @@ async fn zaehlung_folgt_jedem_filter_wie_die_liste() {
     assert_eq!(v["gesamt"].as_i64(), Some(2));
 }
 
-/// Der Einheitenfilter aus LFH-616 kam parallel zu LFH-612 und läuft seit dem Merge durch
-/// dieselbe Bedingung (`filter_bedingung`). Beide Zählungen — `zaehler` (LFH-612) und
-/// `anzahl` (LFH-619) — müssen ihn tragen, sonst zeigt der Kopf bei gesetzter Einheit die
-/// ungefilterte Zahl über einer gefilterten Liste.
+/// Der Einheitenfilter (LFH-616) läuft durch dieselbe Bedingung (`filter_bedingung`). Beide
+/// Zählungen — `zaehler` (LFH-612) und `anzahl` (LFH-619) — müssen ihn tragen, sonst zeigt
+/// der Kopf bei gesetzter Einheit die ungefilterte Zahl über einer gefilterten Liste.
 #[tokio::test]
 async fn einheitenfilter_zaehlt_wie_die_liste() {
     let (app, admin, einsatz) = aufbau().await;

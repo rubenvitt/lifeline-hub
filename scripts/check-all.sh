@@ -1,41 +1,21 @@
 #!/usr/bin/env bash
-# LFH-235/F17: Sammel-Gate — die eine Durchsetzungsinstanz vor dem Merge.
+# Sammel-Gate — die eine Durchsetzungsinstanz vor dem Merge (LFH-235). Die CI ruft dieses
+# Skript unverändert auf; wer einen Schritt ergänzt, ergänzt ihn hier.
 #
-# Vorher lagen alle Gates einzeln herum (check-fmt.sh, check-typ-codegen.sh, pnpm lint,
-# pnpm typecheck, cargo test, pnpm test) und mussten von Hand einzeln aufgerufen werden.
-# Bei paralleler Multi-Session-Entwicklung ist jedes Vergessen unsichtbar — Code landet
-# auf main, ohne dass irgendein Gate maschinell gelaufen ist.
+# Reihenfolge ist Absicht: erst die billigen, schnell scheiternden Prüfungen, dann die teuren
+# Suiten.
 #
-# Reihenfolge ist Absicht: erst die billigen, schnell scheiternden Prüfungen (Sekunden),
-# dann die teuren Suiten (Minuten). Wer einen Formatierungsfehler hat, soll das nicht erst
-# nach der Rust-Suite erfahren.
+# Bewusst NICHT enthalten: `cargo clippy -D warnings` — der Bestand hat noch Warnungen, und
+# ein rot geborenes Gate wird abgeschaltet statt befolgt.
 #
-# Bewusst NICHT enthalten:
-#  - `cargo clippy -D warnings`: der Bestand hat ~27 Warnungen (~10 distinkte Lints). Ein
-#    Gate, das rot geboren wird, wird abgeschaltet statt befolgt. Erst aufräumen, dann
-#    verdrahten — additiv nachrüstbar.
-#
-# `pnpm e2e` ist seit LFH-309 selbsttragend (startet Backend und Vite selbst) und läuft als
-# Schritt 7 mit — aber NUR, wenn target/debug/lifeline-hub daliegt, sonst übersprungen mit
-# lautem Hinweis statt eines harten Fehlers (Muster wie check-deps.sh bei fehlendem
-# cargo-audit): die Suite kann das Binary nicht selbst bauen, ohne jeden Lauf um Minuten
-# zu verlängern, und ein Gate, das auf frischem Checkout rot ist, wird abgeschaltet.
-#
-# In der Praxis greift der Guard hier fast nie, und das ist Absicht, kein Widerspruch:
-# `cargo test --workspace` in Schritt 4 baut das bin-Target ohnehin mit (gemessen — das
-# beiseitegeschobene Binary lag nach dem Lauf wieder da und e2e lief). Innerhalb dieses
-# Skripts ist e2e damit faktisch immer dabei (+~30 s). Der Guard ist das Netz für alles
-# andere: verkürzte Läufe, umgebaute Reihenfolge, Aufruf einzelner Schritte von Hand.
-#
-# Schritt 7 stellt außerdem `frontend/dist` bereit (LFH-356, `prod_bundle_bereitstellen`):
-# `e2e/lagekarte-offline-precache.spec.ts` prüft, dass der maplibre-Tile-Worker offline aus dem
-# Service-Worker-Precache kommt — und einen Service Worker gibt es nur im PROD-Bundle. Ohne
-# diesen Build überspringt sich der Spec laut, und ein Nachweis, der nie läuft, ist keiner.
-# Gebaut wird nur, wenn der Bundle fehlt oder älter ist als die Quellen (~26 s lokal).
+# Schritt 7 (`pnpm e2e`, startet Backend und Vite selbst) läuft nur, wenn das Debug-Binary
+# daliegt, sonst laut übersprungen: die Suite kann es nicht selbst bauen. Im vollen Lauf baut
+# Schritt 4 es ohnehin mit; der Guard schützt verkürzte Läufe und Einzelaufrufe. Schritt 7
+# stellt außerdem `frontend/dist` bereit — den Service Worker für
+# `e2e/lagekarte-offline-precache.spec.ts` gibt es nur im Prod-Bundle.
 set -euo pipefail
 
-# Bündel-Auswahl für die parallele CI (LFH-534). OHNE Argument läuft alles wie bisher —
-# das ist der Weg vor dem Merge und die Vorgabe, an der sich nichts geändert hat.
+# Bündel-Auswahl für die parallele CI. OHNE Argument läuft alles — der Weg vor dem Merge.
 #   --nur schnell    rustfmt, Lint, Typ-Drift, Advisories,
 #                    Selbsttests der Gate-Skripte,
 #                    Migrationsnummern gegen origin/alpha    (Sekunden bis ~1:20)
@@ -66,42 +46,18 @@ cd "$ROOT"
 . "$ROOT/scripts/lib/dev-env.sh"
 
 FE="$ROOT/frontend"
-# NODE IST GEPINNT WIE pnpm — und das ist eine Messung, keine Vorliebe (2026-09-03).
-# Vorher stand hier nur die pnpm-Version; Node kam aus der globalen mise-Konfiguration
-# des jeweiligen Rechners, das Gate war also je Maschine ein anderes. Beide Nachbarn
-# dieser Version fallen aus, jeder auf eigene Weise:
-#
-#   26.8.1  Der Vite-Dev-Server stirbt mitten in Schritt 7 an einem V8-Abbruch
-#           („Lazy deopt after a fast API call with return value is unsupported",
-#           Stack: Buffer.byteLength ← _http_outgoing.end beim Ausliefern einer
-#           ~7-MB-Antwort). Danach laufen ALLE Folgetests in ERR_CONNECTION_REFUSED
-#           — gemessen 72 von 93 in einem Lauf, 3 von 93 in einem anderen, je nachdem
-#           wann es ihn erwischt. Das sieht aus wie eine wandernde Flakiness und ist
-#           in Wahrheit ein toter Server.
-#   22.23.0 e2e läuft sauber durch, aber `src/api/kartenbilder.test.ts` bricht
-#           deterministisch mit „object.stream is not a function" (@mswjs/interceptors
-#           ruft .stream() auf einem Blob, den Node 22 nicht so liefert).
-#
-# 26.7.0 trägt beides: Vitest 3666/3666 und e2e 93/93, ohne Absturz. Wer die Zahl
-# ändert, prüft BEIDE Schritte (5 und 7) — eine Version, die nur einen davon grün
-# macht, ist keine.
+# NODE IST GEPINNT WIE pnpm, sonst prüfte das Gate je Maschine etwas anderes. Die Nachbarn
+# dieser Version fallen aus: 22.x bricht `src/api/kartenbilder.test.ts` (@mswjs/interceptors
+# ruft `.stream()` auf einem Blob), 26.x-Releases teilen einen V8-Abbruch im Vite-Dev-Server
+# („Lazy deopt after a fast API call …"), dessen Abhilfe in `frontend/playwright.config.ts`
+# sitzt (`--no-turbo-fast-api-calls`). Wer die Zahl ändert, prüft Schritt 5 UND 7.
 PNPM="mise exec node@26.7.0 pnpm@11.10.0 -- pnpm"
 SCHRITTE=10
 
-# ZEITZONE FESTNAGELN (LFH-522, gemessen im ersten CI-Lauf).
-# Ohne diese Zeile hängt das Ergebnis der Suite an der Zone des Rechners: `EtbFilterleiste`
-# prüft, dass ein UTC-Wire-String als ORTSZEIT im Feld steht, und schreibt dafür einen festen
-# Wert hin (08:00 zu 06:00Z). Auf einem UTC-Runner ist die Umrechnung die Identität, der Test
-# wird rot — und zwar ohne dass sich eine Zeile Code geändert hätte. Dasselbe träfe jede
-# Entwicklerin außerhalb von Mitteleuropa.
-#
-# Europe/Berlin ist dabei keine willkürliche Wahl, sondern die Zielumgebung: das System läuft
-# auf einem Rechner im deutschen Einsatzdienst, und die Anzeigezone IST Ortszeit
-# (etb/filterZeit.ts). Der harte Wert im Test bleibt damit eine echte Aussage, statt aus der
-# Funktion zurückgelesen zu werden, die er prüft.
-#
-# Bekannte Lücke: ein alleinstehendes `pnpm test` oder `pnpm e2e` läuft nicht durch diesen
-# Wrapper. Wer dort eine Zeitverschiebung sieht, sucht sie zuerst hier.
+# ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
+# (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
+# ist die Zielumgebung, die Anzeigezone ist Ortszeit (etb/filterZeit.ts). Ein alleinstehendes
+# `pnpm test`/`pnpm e2e` läuft nicht durch diesen Wrapper.
 export TZ="${TZ_ERZWUNGEN:-Europe/Berlin}"
 echo "==> Zeitzone für den Lauf: $TZ"
 
@@ -111,13 +67,8 @@ if [ -n "${geraeumt// /}" ]; then
 fi
 
 # ── Die zehn Schritte, je als Funktion ──────────────────────────────────────────────
-# Warum Funktionen statt einer geraden Abfolge: die CI fährt sie seit LFH-534 auf MEHREREN
-# Runnern parallel und muss sie deshalb einzeln ansprechen können. Der Aufruf ohne Argument
-# ist davon unberührt — er fährt weiterhin alle zehn der Reihe nach, und das bleibt der
-# Weg vor dem Merge.
-#
-# Die Nummer in der Ausgabe ist die Position im GESAMTgate, nicht im gerade laufenden
-# Teilstück: wer im CI-Log „[4/7]" liest, weiß sofort, welcher Schritt das ist.
+# Funktionen, damit die CI sie auf mehreren Runnern einzeln ansprechen kann. Die Nummer in
+# der Ausgabe ist die Position im GESAMTgate, nicht im laufenden Teilstück.
 
 schritt_1() {
   echo "==> [1/$SCHRITTE] rustfmt-Baseline"
@@ -141,18 +92,15 @@ schritt_4() {
 
 schritt_5() {
   echo "==> [5/$SCHRITTE] Frontend-Suite${VITEST_SHARD:+ (Anteil $VITEST_SHARD)}"
-  # --no-file-parallelism BLEIBT auch im Shard-Betrieb, und das ist kein Versehen: Sharding
-  # verteilt DATEIEN über Maschinen, das Flag steuert die Nebenläufigkeit INNERHALB eines
-  # Prozesses. Ohne das Flag startete jeder Shard wieder so viele Worker, wie der Runner
-  # Kerne meldet — also genau die Kontention, die hier als Flakiness gemessen wurde. Die Zeit
-  # kommt aus mehr Maschinen, nicht aus mehr Last je Maschine.
+  # --no-file-parallelism BLEIBT auch im Shard-Betrieb: Sharding verteilt Dateien über
+  # Maschinen, das Flag steuert die Nebenläufigkeit innerhalb eines Prozesses. Ohne es
+  # startete jeder Shard so viele Worker wie der Runner Kerne hat — die Kontention, die als
+  # Flakiness auftrat.
   local bericht=()
   if [ -n "${VITEST_SHARD:-}" ]; then
-    # Im Shard-Betrieb zusätzlich ein Blob-Bericht: nur daraus lassen sich die Teilläufe
-    # hinterher zu EINEM Ergebnis zusammenführen (`vitest run --merge-reports`). Ohne ihn
-    # hätte man vier getrennte Ausgaben und keine Gesamtaussage.
-    # Seit Vitest 5 legt der Blob-Reporter unter `frontend/.vitest/blob/` ab (gemessen) —
-    # vorher `frontend/.vitest-reports/`. CI lädt den neuen Pfad hoch/herunter.
+    # Im Shard-Betrieb zusätzlich ein Blob-Bericht, damit die Teilläufe zu EINEM Ergebnis
+    # zusammengeführt werden können (`vitest run --merge-reports`). Ablage unter
+    # `frontend/.vitest/blob/`.
     bericht=(--reporter=default --reporter=blob)
   fi
   $PNPM -C "$FE" exec vitest run --no-file-parallelism "${bericht[@]}" ${VITEST_SHARD:+--shard="$VITEST_SHARD"}
@@ -163,34 +111,22 @@ schritt_6() {
   "$ROOT/scripts/check-deps.sh"
 }
 
-# Stellt frontend/dist bereit — den PROD-Bundle, den e2e/lagekarte-offline-precache.spec.ts
-# braucht (LFH-356). Begründung dort im Kopf: den Service Worker und sein Precache-Manifest gibt
-# es nur im Build, der Dev-Server hat beides nicht. Ausgeliefert wird der Bundle vom e2e-Backend
-# selbst (rust-embed liest `frontend/dist` im Debug-Build zur Laufzeit vom Dateisystem), es
-# braucht also keinen zweiten Webserver — nur die gebauten Dateien.
+# Stellt frontend/dist bereit — den Prod-Bundle für e2e/lagekarte-offline-precache.spec.ts
+# (Service Worker und Precache-Manifest gibt es nur im Build). Ausgeliefert wird er vom
+# e2e-Backend selbst (rust-embed liest `frontend/dist` im Debug-Build vom Dateisystem).
 #
-# GEBAUT WIRD NUR BEI BEDARF. Ein Bundle, das älter ist als die Quellen, prüft die Mechanik
-# weiterhin ehrlich (er wird als Ganzes ausgeliefert, ist also in sich schlüssig) — was er nicht
-# mehr fängt, ist eine FRISCHE Änderung, die das Precachen bricht. Genau deshalb ist die
-# Veraltungsprüfung bewusst grob-konservativ: irgendeine Quelle neuer als sw.js → neu bauen.
-# Lieber einmal zu oft 26 s (gemessen lokal; auf einem 2-vCPU-Runner ~1 min) als ein Gate, das
-# eine gebrochene Precache-Konfiguration übersieht.
-#
-# Der Preis in der geteilten CI: jeder der vier e2e-Shards baut, obwohl nur einer den Spec
-# fährt — welcher, steht vorher nicht fest. Sie laufen parallel, der Aufschlag auf die Laufzeit
-# ist also einmal ~1 min, nicht viermal. Bewusst KEIN dist-Artefakt zwischen den Jobs: das wäre
-# ein Schritt, den nur die CI kennt, und damit genau die Drift, gegen die LFH-522 den Workflow
-# auf dieses Skript zurückgeführt hat.
+# Gebaut wird nur bei Bedarf, bewusst grob-konservativ: irgendeine Quelle neuer als sw.js →
+# neu bauen. Lieber einmal zu oft bauen als eine gebrochene Precache-Konfiguration übersehen.
+# In der CI baut jeder e2e-Shard (welcher den Spec fährt, steht vorher nicht fest); ein
+# dist-Artefakt zwischen den Jobs wäre ein Schritt, den nur die CI kennt.
 prod_bundle_bereitstellen() {
   local sw="$FE/dist/sw.js" grund="" neuer
   if [ ! -f "$sw" ]; then
     grund="fehlt"
   else
     # Kein `-quit`/`head` (Portabilität bzw. SIGPIPE unter pipefail): die Liste wird ganz
-    # gelesen und nur auf „leer oder nicht" geprüft.
-    # Alles, was in den Bundle eingeht: Quellen, statische Dateien, Bau- und Typkonfiguration,
-    # Abhängigkeiten. Ein fehlender Pfad ist unschädlich (stderr verworfen, `|| true`), die
-    # übrigen werden weiter gelesen — die Liste darf also vorauseilend vollständig sein.
+    # gelesen und nur auf „leer oder nicht" geprüft. Fehlende Pfade sind unschädlich, die
+    # Liste darf vorauseilend vollständig sein.
     neuer="$(find "$FE/src" "$FE/public" "$FE/index.html" "$FE/vite.config.ts" \
       "$FE/tsconfig.json" "$FE/tsconfig.node.json" "$FE/package.json" "$FE/pnpm-lock.yaml" \
       -newer "$sw" 2>/dev/null || true)"
@@ -201,27 +137,19 @@ prod_bundle_bereitstellen() {
     return 0
   fi
   echo "    Prod-Bundle $grund → 'pnpm run build' (für den Offline-Precache-Nachweis, LFH-356)"
-  # `run build` ausgeschrieben, nicht `pnpm build`: der Kurzweg hängt daran, dass pnpm keinen
-  # eigenen Unterbefehl dieses Namens hat — eine Zusicherung, die von der pnpm-Version kommt.
+  # `run build` ausgeschrieben: `pnpm build` hinge daran, dass pnpm keinen eigenen
+  # Unterbefehl dieses Namens hat.
   $PNPM -C "$FE" run build
 }
 
 schritt_7() {
   echo "==> [7/$SCHRITTE] e2e-Suite (Playwright, LFH-309)${PW_SHARD:+ (Anteil $PW_SHARD)}"
-  # Cargo baut nicht zwingend nach ./target (globales build.target-dir, siehe
-  # ~/.cargo/config.toml) — den Pfad deshalb von Cargo selbst erfragen.
-  # JSON mit dem ohnehin benötigten Node lesen; jq ist keine Projektvoraussetzung.
+  # Cargo baut nicht zwingend nach ./target (globales build.target-dir) — den Pfad deshalb von
+  # Cargo erfragen, das JSON mit Node lesen (jq ist keine Voraussetzung).
   local target_dir binaer
-  # PW_BINAER übersteuert die Cargo-Abfrage (LFH-534) — dieselbe Variable, die auch
-  # playwright.config.ts liest. In der geteilten CI lädt ein e2e-Shard das Binary als Artefakt
-  # und hat gar kein Cargo-Target-Verzeichnis; ohne die Übersteuerung müsste er die
-  # Rust-Toolchain nur für diese eine Abfrage mitschleppen.
-  #
-  # DER NAME IST NICHT BELIEBIG, und der erste Anlauf hieß falsch: `PW_BINAER`
-  # fiel unter `DEV_ENV_PRAEFIXE` in lib/dev-env.sh (^(LIFELINE|KS|AWS)_) und wurde als
-  # Dev-Variable GERÄUMT — der eigene Testlauf meldete sie brav in der Räumliste. Das hätte
-  # in der CI genau dann zugeschlagen, wenn ein Schritt durch `ohne_dev_env` läuft. `PW_`
-  # gehört zur Playwright-Familie (PW_WORKERS, PW_SHARD) und wird nicht angefasst.
+  # PW_BINAER übersteuert die Abfrage (dieselbe Variable liest playwright.config.ts): ein
+  # e2e-Shard der CI lädt das Binary als Artefakt und hat kein Cargo-Target. Der Präfix `PW_`
+  # ist Absicht — `LIFELINE_`/`KS_`/`AWS_` räumt lib/dev-env.sh als Dev-Variablen weg.
   if [ -n "${PW_BINAER:-}" ]; then
     binaer="$PW_BINAER"
   else
@@ -229,23 +157,16 @@ schritt_7() {
     binaer="$target_dir/debug/lifeline-hub"
   fi
   if [ -x "$binaer" ]; then
-    # Die Suite startet Backend und Vite selbst auf freien Ports — ein parallel laufender
-    # Dev-Stack auf 8080/5173 stört sie nicht und wird nicht gekapert. Das gilt auch je
-    # Shard: jeder bringt seinen eigenen Stack auf eigenen Ports mit.
-    # Env-Hygiene macht hier die Playwright-Config selbst (gleiche Präfixe wie
-    # lib/dev-env.sh): Playwright merged webServer.env mit process.env, das e2e-Backend
-    # erbte sonst die Dev-Umgebung. Bewusst dort statt hier, weil `pnpm e2e` laut LFH-309
-    # auch alleinstehend sauber laufen muss — ohne diesen Wrapper.
-    #
-    # Der Prod-Bundle wird erst HIER bereitgestellt, innerhalb des Binary-Zweigs: ohne Binary
-    # läuft keine Suite, und dann wäre der Build 26 s für nichts.
+    # Die Suite startet Backend und Vite selbst auf freien Ports (auch je Shard); ein
+    # laufender Dev-Stack stört nicht. Die Env-Hygiene macht die Playwright-Config selbst,
+    # damit `pnpm e2e` auch ohne diesen Wrapper sauber läuft. Der Prod-Bundle wird erst hier
+    # gebaut: ohne Binary liefe keine Suite.
     prod_bundle_bereitstellen
     $PNPM -C "$FE" exec playwright test ${PW_SHARD:+--shard="$PW_SHARD"}
   elif [ -n "${PW_BINAER:-}" ]; then
-    # Wer den Pfad ausdrücklich setzt, erwartet dort ein lauffähiges Binary. Hier still zu
-    # überspringen hieße: die CI meldet einen grünen e2e-Schritt, der nie gelaufen ist —
-    # und genau das passiert, wenn actions/upload-artifact das Ausführbar-Bit verliert
-    # (es zippt ohne Dateirechte, alles kommt als 644 zurück).
+    # Wer den Pfad ausdrücklich setzt, erwartet dort ein lauffähiges Binary — still zu
+    # überspringen meldete einen grünen e2e-Schritt, der nie lief. actions/upload-artifact
+    # verliert das Ausführbar-Bit.
     echo "FEHLER: '$binaer' ist nicht ausführbar (PW_BINAER ist gesetzt)." >&2
     if [ -e "$binaer" ]; then
       echo "        Die Datei existiert, hat aber kein Ausführbar-Bit — nach einem" >&2
@@ -266,38 +187,30 @@ schritt_7() {
 
 schritt_8() {
   echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster und KI-Notizen (Selbsttests)"
-  # Im `schnell`-Bündel und nicht bei den teuren Suiten: der Test baut ein paar
-  # Temp-Repositories und ist in rund vier Sekunden durch. Er prüft NICHT das Release
-  # selbst, sondern die Entscheidung, ob ein Lauf releasen darf — und die ist in beide
-  # Richtungen still (Begründung im Kopf des Testskripts).
+  # Im `schnell`-Bündel: prüft nicht das Release, sondern die Entscheidung, ob ein Lauf
+  # releasen darf — die ist in beide Richtungen still.
   "$ROOT/scripts/release-ruhefenster.test.sh"
-  # Dieselbe Frage für die Release-Notizen: nicht, was Claude schreibt, sondern dass ein
-  # Fehlschlag auf die konventionellen Notizen zurückfällt und CHANGELOG und GitHub-Release
-  # denselben Text tragen. Im selben Schritt, weil es dasselbe Werkzeug ist und ein neuer
-  # Schritt das Gate umnummerierte. Braucht nur Node — die Generatoren sind Attrappen, die
-  # Release-Werkzeuge im Root müssen dafür nicht installiert sein.
+  # Dasselbe Werkzeug für die Release-Notizen: ein Fehlschlag fällt auf die konventionellen
+  # Notizen zurück, CHANGELOG und GitHub-Release tragen denselben Text. Braucht nur Node.
   mise exec node@26.7.0 -- node --test "$ROOT/scripts/release/ki-notizen.test.mjs"
 }
 
 schritt_9() {
   echo "==> [9/$SCHRITTE] Advisory-Gate liest das Lockfile (Selbsttest, LFH-316)"
-  # Neben Schritt 6, nicht in ihm: Schritt 6 fragt die Advisory-Datenbank und ist damit
-  # netzabhängig und über die Zeit veränderlich. Dieser hier fragt, WORAUF Schritt 6
-  # schaut — ohne Netz, in rund einer Sekunde. Er gehört ins `schnell`-Bündel, weil sein
-  # Fehlerbild still ist: ein Gate, das eine Teilmenge prüft, meldet „OK" wie eines, das
+  # Schritt 6 fragt die Advisory-Datenbank (netzabhängig); dieser Selbsttest fragt ohne Netz,
+  # WORAUF Schritt 6 schaut — ein Gate, das eine Teilmenge prüft, meldet „OK" wie eines, das
   # alles geprüft hat.
   "$ROOT/scripts/check-deps.test.sh"
 }
 
 schritt_10() {
   echo "==> [10/$SCHRITTE] Migrationsnummern gegen den Ziel-Branch (LFH-658)"
-  # Erst der Selbsttest: das Prüfskript ist die einzige Stelle, die eine eingeschobene
-  # Nummer bemerkt (sqlx spielt sie still nach), und es irrt in beide Richtungen still.
+  # Erst der Selbsttest: das Prüfskript bemerkt als einzige Stelle eine eingeschobene Nummer
+  # (sqlx spielt sie still nach) und irrt in beide Richtungen still.
   "$ROOT/scripts/check-migrationen.test.sh"
-  # Dann die Prüfung selbst, gegen `origin/alpha` so frisch wie der letzte `fetch` — eine
-  # Frühwarnung, keine Durchsetzung. Durchgesetzt wird über `.github/workflows/migrationen.yml`,
-  # der jeden offenen PR bei jedem Push auf den Ziel-Branch neu bewertet. Ohne den Ref (der
-  # flache PR-Checkout der CI hat ihn nicht) wird laut übersprungen, nicht gebrochen.
+  # Dann die Prüfung gegen `origin/alpha`, so frisch wie der letzte `fetch` — eine
+  # Frühwarnung; durchgesetzt wird über den Workflow `migrationen.yml`. Ohne den Ref (flacher
+  # PR-Checkout) laut übersprungen.
   if git -C "$ROOT" rev-parse --verify --quiet 'origin/alpha^{commit}' > /dev/null; then
     "$ROOT/scripts/check-migrationen.sh" origin/alpha
   else
@@ -315,10 +228,8 @@ BUENDEL_frontend="5"
 BUENDEL_e2e="7"
 BUENDEL_alle="1 2 3 4 5 6 7 8 9 10"
 
-# SELBSTPRÜFUNG: die vier Bündel müssen ZUSAMMEN genau die zehn Schritte ergeben — jeden
-# genau einmal. Ohne diese Zeile fiele beim Umsortieren still ein Schritt aus der CI heraus,
-# und niemand sähe es: die Jobs blieben grün, nur geprüft würde weniger. Das ist teurer als
-# ein roter Lauf.
+# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die zehn Schritte, jeden einmal —
+# sonst fiele beim Umsortieren still ein Schritt aus der CI.
 _summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e | sort -n | tr '\n' ' ')"
 _soll="$(printf '%s\n' $BUENDEL_alle | sort -n | tr '\n' ' ')"
 if [ "$_summe" != "$_soll" ]; then

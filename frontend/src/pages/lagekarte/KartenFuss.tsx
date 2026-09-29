@@ -2,46 +2,40 @@ import type { CSSProperties, ReactNode } from 'react';
 import { theme } from 'antd';
 import { UEBERLAGERUNG_RAND, kartenKnopfKante } from './KartenUeberlagerung';
 
-/**
- * Abstand der Fußleiste zum Kartenrand und zwischen ihren Bändern (px). Er ist die
- * Fortschreibung der beiden Einzelwerte, die vorher nebeneinander standen
- * (`SnapshotLeiste` 12, `ZeichnenSteuerung` 16) — zwei Zahlen für denselben Rand waren
- * schon vor der Überdeckung ein Widerspruch.
- */
+/** Abstand der Fußleiste zum Kartenrand und zwischen ihren Bändern (px). */
 export const FUSS_ABSTAND = 12;
 
 export type BandAusrichtung = 'voll' | 'mitte' | 'links';
 
 /**
- * Stil eines Bandes IM Fuß-Rahmen (LFH-355). Rein und exportiert nach dem Muster von
- * `bedienzielStil`/`aktionsabstand`: nur so ist die Zusicherung ohne Render prüfbar.
- *
- * `pointerEvents: 'auto'` ist die Gegenzeile zu `pointerEvents: 'none'` am Rahmen und
- * gehört zwingend an JEDES Band — ein Band ohne sie wäre sichtbar und tot.
+ * Stil eines Bandes im Fuß-Rahmen — rein und exportiert. `pointerEvents: 'auto'` ist die Gegenzeile
+ * zu `'none'` am Rahmen und gehört an jedes Band, sonst ist es sichtbar und tot.
  */
-export function bandStil(ausrichtung: BandAusrichtung = 'voll'): CSSProperties {
+export function bandStil(
+  ausrichtung: BandAusrichtung = 'voll',
+  /**
+   * Das Band gibt Höhe ab, wenn der Fuß nicht in die Karte passt, und rollt dann in sich. Genau ein
+   * Band trägt das: die Zeitachse, das höchste und am ehesten verzichtbare.
+   */
+  nachgiebig = false,
+): CSSProperties {
   return {
     pointerEvents: 'auto',
+    ...(nachgiebig ? { minHeight: 0, overflowY: 'auto' as const } : {}),
     alignSelf:
       ausrichtung === 'mitte' ? 'center' : ausrichtung === 'links' ? 'flex-start' : 'stretch',
-    // Ein Band darf den Rahmen nie überlaufen, sonst käme die Überdeckung über die
-    // Breitenachse zurück, die der Rahmen über die Höhenachse gerade ausgeräumt hat.
+    // Ein Band darf den Rahmen nie überlaufen, sonst käme die Überdeckung über die Breite zurück.
     maxWidth: '100%',
   };
 }
 
 /**
- * Stil des Fuß-Rahmens selbst. Rein und exportiert, damit die Zusicherungen prüfbar sind.
+ * Stil des Fuß-Rahmens — rein und exportiert.
  *
- * RECHTS ENDET DER FUSS VOR DER KNOPFSPALTE (LFH-373). Der Knopfblock oben rechts
- * (`KartenUeberlagerung`, bis zu fünf Knöpfe) und der Fuß lagen beide auf `zIndex: 5` in
- * derselben Kartenspalte; der Fuß kam später im DOM und lag oben. Gemessen bei 390 px im
- * Handschuh-Betrieb: „Herauszoomen", „Nach Norden ausrichten" und „Messen" vollständig unter
- * dem ausgeklappten Zeitachsenband, bei 1024 px „Zeichenwerkzeuge" zu 92 % — per Tastatur
- * UND per Zeiger unerreichbar. Die Abhilfe folgt demselben Grundsatz wie die Stapelung
- * (LFH-355): eine Aufteilung, kein `zIndex`. Die Spalte rechts gehört den Knöpfen, der Rest
- * dem Fuß; zwei Flächen, die sich die Breite teilen, können sich bei keiner Höhe
- * überschneiden. Der Preis ist ein um die Knopfspalte schmaleres Band (im Fükw 86 px).
+ * Rechts endet der Fuß vor der Knopfspalte: Knopfblock und Fuß lagen beide auf `zIndex: 5`, und der
+ * Fuß verdeckte Kartenknöpfe vollständig (Zeiger und Tastatur). Die Abhilfe ist eine Aufteilung der
+ * Breite, kein `zIndex`: zwei Flächen, die sich die Breite teilen, überschneiden sich bei keiner
+ * Höhe. Der Preis ist ein um die Knopfspalte schmaleres Band.
  */
 export function fussStil(knopfKante: number): CSSProperties {
   return {
@@ -54,9 +48,15 @@ export function fussStil(knopfKante: number): CSSProperties {
     flexDirection: 'column',
     alignItems: 'stretch',
     gap: FUSS_ABSTAND,
-    // Der Rahmen spannt bis vor die Knopfspalte, trägt aber selbst nichts. Ohne diese
-    // Zeile schluckte der Leerraum zwischen (und neben) den Bändern jedes Ziehen und Klicken
-    // auf der Karte darunter — die Bänder holen sich die Ereignisse über `bandStil` zurück.
+    // Oben endet der Fuß an der Karte: unten verankert und ohne Obergrenze wuchs er in den
+    // Seitenkopf. Der Rahmen spannt bis zur Oberkante und stapelt nach unten; was nicht passt, gibt
+    // die Zeitachse ab (`nachgiebig`). Bewusst kein `overflow` am Rahmen — es schnitte Schatten und
+    // Fokusringe der Bänder ab.
+    top: FUSS_ABSTAND,
+    justifyContent: 'flex-end',
+    // Der Rahmen trägt selbst nichts: ohne diese Zeile schluckte der Leerraum zwischen den Bändern
+    // jedes Ziehen und Klicken auf der Karte. Die Bänder holen sich die Ereignisse über `bandStil`
+    // zurück.
     pointerEvents: 'none',
   };
 }
@@ -64,27 +64,14 @@ export function fussStil(knopfKante: number): CSSProperties {
 /**
  * Gemeinsamer unterer Rand der Lagekarte (LFH-355).
  *
- * ── WARUM EIN RAHMEN UND NICHT EIN HÖHERER `zIndex` ─────────────────────────────
+ * `ZeichnenSteuerung` und `SnapshotLeiste` lagen beide absolut auf `zIndex: 5` am selben Rand; die
+ * Leiste verdeckte „Abschließen"/„Abbrechen" vollständig. Ein höherer `zIndex` hätte den Klick
+ * zurückgeholt und die Überdeckung gelassen. Der Rahmen stapelt die Bänder stattdessen als
+ * Flow-Geschwister in einer Spalte — zwei Elemente im Fluss können sich nicht überlagern. Deshalb
+ * geben die Bänder ihre absolute Positionierung ab; wer sie einem zurückgibt, holt den Bug wieder.
  *
- * `ZeichnenSteuerung` (`bottom: 16`, mittig) und `SnapshotLeiste` (`bottom: 12`, volle
- * Breite) lagen beide absolut auf `zIndex: 5` und kämpften um denselben unteren Rand. Bei
- * Gleichstand gewinnt die spätere DOM-Position, und das war die Leiste: die Knöpfe
- * „Abschließen"/„Abbrechen" waren im Default-Zustand (Zeitachse ausgeklappt) vollständig
- * verdeckt und damit **nicht bedienbar** — gemessen als Playwright-Timeout mit
- * „`<div>` intercepts pointer events", während `toBeVisible()` grün blieb. CSS-Sichtbarkeit
- * ist keine Klickbarkeit; diese Falle ist generisch für die e2e-Suite.
- *
- * Ein höherer `zIndex` an der Steuerung hätte den Klick zurückgeholt und die Überdeckung
- * gelassen — die Leiste läge weiter darunter, nur andersherum, und das Ticket verlangt
- * ausdrücklich das Gegenteil („kein neues Überdeckungspaar, auch bei schmalem Viewport").
- * Der Rahmen stapelt beide stattdessen als **Flow-Geschwister in einer Spalte**: zwei
- * Elemente im normalen Fluss können sich nicht überlagern, das folgt aus dem Layout und
- * nicht aus einer Zahl. Deshalb geben die Bänder ihre eigene absolute Positionierung ab —
- * wer sie einem von ihnen zurückgibt, nimmt es aus dem Fluss und holt genau den Bug wieder.
- *
- * Die Reihenfolge ist Teil der Aussage: die Zeichnen-Steuerung steht OBEN und schwenkt
- * damit über der Leiste ein, statt sich davorzulegen. Sie erscheint nur im Zeichenmodus;
- * die Leiste bleibt an ihrem gewohnten Platz am unteren Rand.
+ * Die Zeichnen-Steuerung steht oben und schwenkt über der Leiste ein; sie erscheint nur im
+ * Zeichenmodus.
  */
 export function KartenFuss({ children }: { children?: ReactNode }) {
   const { token } = theme.useToken();

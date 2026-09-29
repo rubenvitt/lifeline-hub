@@ -51,7 +51,7 @@ import ZeitfensterKarte from '../verpflegung/ZeitfensterKarte';
 import { deckungEinstufung, istVergangen } from '../verpflegung/deckung';
 import { nachforderungVorbelegung, zitat } from '../verpflegung/verpflegungText';
 
-/** Grund der fehlenden Schreibberechtigung als ganzer Satz (C10/M16). */
+/** Grund der fehlenden Schreibberechtigung als ganzer Satz. */
 export function verpflegungRechteText(status: EinsatzStatus): string {
   return status !== 'aktiv'
     ? 'Der Einsatz ist abgeschlossen — die Verpflegung ist nur noch lesbar.'
@@ -61,7 +61,7 @@ export function verpflegungRechteText(status: EinsatzStatus): string {
 /**
  * Sortierschlüssel der Zeitfenster für die Zufluss-Schleuse: der Beginn, wie der Server ordnet
  * (`ORDER BY von_at, id`). Verschiebt eine andere Person den Beginn, bleibt die gezeigte Folge
- * stehen, bis das Banner bedient wird (Muster LFH-660).
+ * stehen, bis das Banner bedient wird.
  */
 const BEGINN: Sortierschluessel<VerpflegungZeitfenster> = (zf) => zf.von_at;
 
@@ -97,28 +97,26 @@ type Dialog =
   | { art: 'loeschen'; zf: VerpflegungZeitfenster };
 
 /**
- * Fachmodul Verpflegung (LFH-634, design.md D7): Zeitfenster mit Bedarf, Ausgaben und Deckung.
+ * Fachmodul Verpflegung (LFH-634): Zeitfenster mit Bedarf, Ausgaben und Deckung.
  *
- * FORM: eine LISTE, keine Tabelle (LFH-330/B2) — die Frage ist „was ist mit diesem
- * Zeitfenster?", und die Ordnung ist die Zeit (`von_at`, vom Server). Die Segmentleiste trennt
- * „laufend & anstehend" (`bis ≥ jetzt`, Vorgabe) von „vergangen".
+ * Form: eine Liste, keine Tabelle — die Frage ist „was ist mit diesem Zeitfenster?", die Ordnung
+ * ist die Zeit (`von_at`, vom Server). Die Segmentleiste trennt „laufend & anstehend" (`bis ≥
+ * jetzt`, Vorgabe) von „vergangen".
  *
- * LIVE-ZUFLUSS (Spec „Live-Verteilung", Muster Ablösung LFH-647, `abloesung/zufluss.ts`): ein
- * fremdes neues Zeitfenster landet an seinem Platz in der Zeitordnung — auch oberhalb der
- * Karte, auf der der Cursor steht. Es wartet deshalb hinter dem Sammelbanner; eigene stehen
- * sofort. Die Schleuse läuft über ALLE Zeitfenster, nicht je Ansicht: ein Zeitfenster, das mit
- * der Uhr von „laufend" nach „vergangen" wandert, ist kein Neuzugang. Das Banner zählt nur die
- * Zurückgehaltenen der gezeigten Ansicht; ein Ansichtswechsel gibt alle frei. Geänderte Mengen
- * an bestehenden Karten fließen direkt ein — sie verschieben die Ordnung nicht.
+ * Live-Zufluss (Muster Ablösung, `abloesung/zufluss.ts`): ein fremdes neues Zeitfenster landet an
+ * seinem Platz in der Zeitordnung, auch oberhalb des Cursors; es wartet deshalb hinter dem
+ * Sammelbanner, eigene stehen sofort. Die Schleuse läuft über alle Zeitfenster, nicht je Ansicht:
+ * ein Zeitfenster, das mit der Uhr nach „vergangen" wandert, ist kein Neuzugang. Das Banner zählt
+ * nur die Zurückgehaltenen der gezeigten Ansicht; ein Ansichtswechsel gibt alle frei. Geänderte
+ * Mengen an bestehenden Karten fließen direkt ein.
  *
- * DAS BANNER NIMMT KEINE EIGENE ZEILE: es steht in der immer gerenderten Werkzeugzeile, deren
- * Höhe es nicht ändert (Bauform der Ablösung).
+ * Das Banner nimmt keine eigene Zeile: es steht in der immer gerenderten Werkzeugzeile, deren Höhe
+ * es nicht ändert.
  *
- * DIE UHR tickt alle 30 s (`useUhr`): Einstufung und Trennung „vergangen" laufen mit, ohne
- * Abruf. Nichts blinkt.
+ * Die Uhr tickt alle 30 s (`useUhr`): Einstufung und Trennung „vergangen" laufen ohne Abruf mit.
+ * Nichts blinkt.
  *
- * KOPFZAHLEN rechnen mit der vollen Menge, nicht mit der gezeigten — die Zahlen dürfen nicht
- * lügen, auch solange ein Neuzugang hinter dem Banner wartet.
+ * Kopfzahlen rechnen mit der vollen Menge, auch solange ein Neuzugang hinter dem Banner wartet.
  */
 export default function VerpflegungPage() {
   const { id } = useParams();
@@ -133,8 +131,8 @@ export default function VerpflegungPage() {
 
   const [ansicht, setAnsicht] = useState<Ansicht>('laufend');
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  // An den Einsatz gebunden: wechselt die Route den Einsatz bei stehender Komponente, wären
-  // sonst alle Zeitfenster des neuen Einsatzes „fremde Neuzugänge".
+  // An den Einsatz gebunden: wechselt die Route den Einsatz bei stehender Komponente, wären sonst
+  // alle Zeitfenster des neuen Einsatzes „fremde Neuzugänge".
   const [zuflussZustand, setZuflussZustand] = useState<{ einsatzId: number } & Zuflussstand>({
     einsatzId,
     ...LEERER_ZUFLUSSSTAND,
@@ -155,8 +153,8 @@ export default function VerpflegungPage() {
   const overrides = overridesQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
 
-  // Nachforderungen nur bei BEDIENBAREM Modul (D4/D8) — und erst, wenn die Overrides bekannt
-  // sind: ohne sie hielte `istKeyFreigegeben` jedes Modul für sichtbar. Ein 403 bleibt still.
+  // Nachforderungen nur bei bedienbarem Modul — und erst, wenn die Overrides bekannt sind: ohne sie
+  // hielte `istKeyFreigegeben` jedes Modul für sichtbar. Ein 403 bleibt still.
   const nachforderungenFrei =
     overrides !== undefined && istKeyFreigegeben('nachforderungen', benutzer, overrides);
   const nachforderungenQuery = useQuery({
@@ -190,15 +188,15 @@ export default function VerpflegungPage() {
     istVergangen(zf, jetzt) === (ansicht === 'vergangen');
   let sichtbar = geteilt.sichtbar;
   let zurueckgehalten = geteilt.zurueckgehalten.filter(inAnsicht);
-  // Null gezeigte Karten in DIESER Ansicht halten nichts zurück: ein Leerzustand neben einem
-  // Banner „1 neues Zeitfenster" wäre ein Widerspruch (Regel aus `abloesung/zufluss.ts`).
+  // Null gezeigte Karten in dieser Ansicht halten nichts zurück: ein Leerzustand neben „1 neues
+  // Zeitfenster" wäre ein Widerspruch.
   if (zurueckgehalten.length > 0 && !sichtbar.some(inAnsicht)) {
     const frei = new Set(zurueckgehalten.map((zf) => zf.id));
     sichtbar = alle.filter((zf) => frei.has(zf.id) || sichtbar.includes(zf));
     zurueckgehalten = [];
   }
-  // Nachführen IM RENDER (Muster Ablösung): `nachgefuehrt` liefert `null`, wenn nichts zu tun
-  // ist — der Riegel gegen die Schleife.
+  // Nachführen im Render (Muster Ablösung): `nachgefuehrt` liefert `null`, wenn nichts zu tun ist —
+  // der Riegel gegen die Schleife.
   if (verpflegungQuery.data) {
     const neu = nachgefuehrtNach(zufluss, sichtbar, umgeordnet, BEGINN);
     if (neu || zuflussZustand.einsatzId !== einsatzId) {
@@ -224,8 +222,8 @@ export default function VerpflegungPage() {
   };
   const schliesse = () => setDialog(null);
 
-  // Fehler stehen IM jeweiligen Dialog (SpeicherFehler); `mutateAsync` lehnt ab, die Hülle
-  // lässt die Felder stehen (LFH-332/B4).
+  // Fehler stehen im jeweiligen Dialog (SpeicherFehler); `mutateAsync` lehnt ab, die Hülle lässt
+  // die Felder stehen.
   const anlegenMut = useMutation({
     mutationFn: (body: ZeitfensterEingabe) => legeZeitfensterAn(einsatzId, body),
     onSuccess: (zf) => {
@@ -265,8 +263,7 @@ export default function VerpflegungPage() {
   const ausgabeMut = useMutation({
     mutationFn: ({ zf, body }: { zf: VerpflegungZeitfenster; body: AusgabeEingabe }) =>
       erfasseAusgabe(einsatzId, zf.id, body),
-    // Die Ausgabe hat einen serverseitigen Rückweg → Rückgängig-Toast statt Rückfrage
-    // (LFH-343 · C8).
+    // Die Ausgabe hat einen serverseitigen Rückweg → Rückgängig-Toast statt Rückfrage.
     onSuccess: (erg, { zf, body }) => {
       invalidiere(false);
       zeigeRueckgaengig(
@@ -324,7 +321,7 @@ export default function VerpflegungPage() {
           ]}
         />
       }
-      // Gesperrt statt versteckt (C10/M16): der Hinweis darunter nennt den Grund.
+      // Gesperrt statt versteckt: der Hinweis darunter nennt den Grund.
       aktionen={
         <Button type="primary" disabled={!darfSchreiben} onClick={oeffneAnlegen}>
           Zeitfenster anlegen
@@ -336,7 +333,7 @@ export default function VerpflegungPage() {
       }
     >
       {/* Werkzeugzeile: immer gerendert, `nowrap`, Mindesthöhe = Steuerhöhe + 2 px Rahmen. Das
-          Banner ändert ihre Höhe nicht, also verschiebt es keine Karte (Bauform Ablösung). */}
+          Banner ändert ihre Höhe nicht, also verschiebt es keine Karte. */}
       <Flex
         gap={token.marginSM}
         align="center"
@@ -442,9 +439,8 @@ export default function VerpflegungPage() {
         </section>
       )}
 
-      {/* Dialoge je Ziel frisch montiert und AUSSERHALB der Karten (LFH-365): `initialValues`
-          greift nur beim Einhängen, und der Speicher von rc-field-form überlebt sonst ein
-          Schließen (CLAUDE.md, B4). */}
+      {/* Dialoge je Ziel frisch montiert und außerhalb der Karten: `initialValues` greift nur
+          beim Einhängen, und der Speicher von rc-field-form überlebt sonst ein Schließen. */}
       {dialog?.art === 'anlegen' && (
         <ZeitfensterDialog
           modus={{ art: 'anlegen', onErfassen: (body) => anlegenMut.mutateAsync(body) }}

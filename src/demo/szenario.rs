@@ -1,18 +1,15 @@
-//! Das Szenario „ÜBUNG – Starkregen Musterstadt“ als reine Daten (LFH-690, design.md D9).
+//! Das Szenario „ÜBUNG – Starkregen Musterstadt“ als reine Daten (LFH-690).
 //!
 //! Diese Datei ist die **einzige Quelle** für Zahlen und Inhalte des Demo-Imports; der Bericht
-//! leitet sich daraus ab. Sie enthält keine Logik außer der Ableitung des Katalogbedarfs.
+//! leitet sich daraus ab. Logik enthält sie nur für den Katalogbedarf.
 //!
-//! Jeder Eintrag trägt einen stabilen **Schlüssel** (`&'static str`). Über ihn referenziert das
-//! Drehbuch des Einsatzes (Block 4.2) die Stammdaten, etwa beim Disponieren, und über ihn
-//! liefert [`super::stammdaten::StammdatenErgebnis`] die IDs.
+//! Jeder Eintrag trägt einen stabilen **Schlüssel** (`&'static str`), über den das Drehbuch die
+//! Stammdaten referenziert und [`super::stammdaten::StammdatenErgebnis`] die IDs liefert.
 //!
-//! Alle Namen sind erkennbar fiktiv und an „Musterstadt“ gebunden. Sie ahmen keine reale
-//! Organisation nach: keine Trägerorganisation, keine Funkrufnamen-Vorsilbe einer echten
-//! Hilfsorganisation, keine Kennzeichen, keine Telefonnummern.
-//!
-//! Die fachlichen Kennungen sind fest (`DEMO-P-001` …, `DEMO-M-001` …, „Musterstadt …“). Über
-//! sie gleicht der Import mit vorhandenen Stammdaten ab (design.md D8).
+//! Alle Namen sind erkennbar fiktiv und an „Musterstadt“ gebunden: keine reale
+//! Trägerorganisation, keine echte Funkrufnamen-Vorsilbe, keine Kennzeichen, keine
+//! Telefonnummern. Über die festen fachlichen Kennungen (`DEMO-P-001` …, „Musterstadt …“)
+//! gleicht der Import mit vorhandenen Stammdaten ab.
 
 use crate::betreuung::{BetreuungsstelleArt, Erhebung};
 use crate::einsatzabschnitt::AbschnittLagezustand;
@@ -34,8 +31,7 @@ pub struct FahrzeugVorlage {
     pub staerke: Option<(u16, u16, u16)>,
 }
 
-/// Stamm-Personal des Szenarios. Kennung für den Abgleich ist die Personalnummer, nie der
-/// Name (design.md D8).
+/// Stamm-Personal des Szenarios. Kennung für den Abgleich ist die Personalnummer, nie der Name.
 #[derive(Debug, Clone, Copy)]
 pub struct PersonalVorlage {
     pub schluessel: &'static str,
@@ -60,8 +56,8 @@ pub struct MaterialVorlage {
 /// Standort aller Demo-Fahrzeuge und -Materialien.
 pub const STANDORT: &str = "Wache Musterstadt-Mitte";
 
-/// Bemerkung an jeder angelegten Stammdatenzeile, damit sie auch außerhalb der
-/// Verwaltungssektion als Demo erkennbar ist.
+/// Bemerkung an jeder angelegten Stammdatenzeile, damit sie auch außerhalb der Verwaltung als
+/// Demo erkennbar ist.
 pub const BEMERKUNG: &str = "Demo-Daten (Übung Starkregen Musterstadt)";
 
 pub const FAHRZEUGE: [FahrzeugVorlage; 8] = [
@@ -264,22 +260,18 @@ pub enum Katalogeintrag {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Der Einsatz: Kopfdaten und Drehbuch (Block 4.2)
+// Der Einsatz: Kopfdaten und Drehbuch
 // ---------------------------------------------------------------------------------------------
 
 /// Bezeichnung des Demo-Einsatzes; beginnt nach der Spec mit „ÜBUNG – “.
 pub const EINSATZ_BEZEICHNUNG: &str = "ÜBUNG – Starkregen Musterstadt";
 
-/// Stichwort des Demo-Einsatzes, als Freitext. D9 nahm ein Stichwort „Unwetter“ aus dem
-/// Bootstrap-Katalog an; die Startliste (`auth/bootstrap.rs`, `STICHWORT_STARTLISTE`) kennt
-/// aber nur B-, MANV-, Sonderlage- und Übungsstichworte. Das Feld `einsatz.stichwort` ist
-/// Freitext (der Katalog liefert nur Combobox-Vorschläge), und die Spec verlangt ein Stichwort
-/// aus dem Bereich Unwetter/Starkregen. Einen Vorschlag legt der Import bewusst nicht an: die
-/// Zeile wäre org-weit, trüge keine Demo-Marke und überlebte das Entfernen.
+/// Stichwort des Demo-Einsatzes als Freitext: die Startliste (`STICHWORT_STARTLISTE`) kennt kein
+/// Unwetter-Stichwort, und `einsatz.stichwort` ist Freitext. Einen Katalogvorschlag legt der
+/// Import nicht an — die Zeile wäre org-weit, ohne Demo-Marke, und überlebte das Entfernen.
 pub const EINSATZ_STICHWORT: &str = "Unwetter – Starkregen";
 
-/// Einsatzbeginn in Minuten vor dem Importzeitpunkt (T−5 h, D9). Kein Drehbuch-Schritt liegt
-/// davor.
+/// Einsatzbeginn in Minuten vor dem Importzeitpunkt (T−5 h); kein Drehbuch-Schritt liegt davor.
 pub const BEGINN_VOR_MIN: i64 = 300;
 
 /// Einsatzabschnitt des Drehbuchs. `ueber` ist der Schlüssel eines früher angelegten
@@ -291,7 +283,7 @@ pub struct AbschnittVorlage {
     pub kurzbezeichnung: &'static str,
     pub ueber: Option<&'static str>,
     pub lagezustand: Option<AbschnittLagezustand>,
-    /// Manuelle Einschätzung in Prozent; leer ≠ 0 % (LFH-608).
+    /// Manuelle Einschätzung in Prozent; leer ≠ 0 %.
     pub fortschritt: Option<i64>,
     pub abschnittsauftrag: &'static str,
     pub sortier: i64,
@@ -308,9 +300,8 @@ pub struct EinheitVorlage {
     pub sortier: i64,
 }
 
-/// Typ eines fachlichen ETB-Eintrags. Nur die Typen, die ein Mensch im Betrieb frei erfasst;
-/// Meldung und Anordnung entstehen als Nebenwirkung ihrer Module (Block 4c), System aus den
-/// Vorgängen.
+/// Typ eines fachlichen ETB-Eintrags — nur die Typen, die ein Mensch frei erfasst. Meldung und
+/// Anordnung entstehen in ihren Modulen, System aus den Vorgängen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EtbArt {
     Lage,
@@ -327,10 +318,9 @@ impl EtbArt {
     }
 }
 
-/// Punkt in WGS84 als `(Länge, Breite)`, in der Reihenfolge von GeoJSON. Die Koordinaten
-/// liegen in der Mitte Deutschlands und damit zwangsläufig über realem Gelände. Der Ort
-/// „Musterstadt“ samt Unterstadt, Kirchberg und Mühlbachweg ist erfunden, ein Bezug zu dem, was
-/// dort tatsächlich liegt, ist nicht beabsichtigt.
+/// Punkt in WGS84 als `(Länge, Breite)` wie in GeoJSON. Die Koordinaten liegen in der Mitte
+/// Deutschlands; „Musterstadt“ samt Unterstadt, Kirchberg und Mühlbachweg ist erfunden, ein
+/// Bezug zum realen Gelände nicht beabsichtigt.
 pub type Punkt = (f64, f64);
 
 /// Gefahrengebiet der Lagekarte: eine Lage-Zone vom Typ `gefahrengebiet` (Polygon) samt einer
@@ -415,9 +405,9 @@ pub struct StelleVorlage {
     pub standort: &'static str,
 }
 
-/// Meldung, angelegt wie über `POST …/meldungen`. `ereigniszeit` und `eingang_at` sind die
-/// Schrittzeit. Eine Sofortmeldung (Art `sofortmeldung` oder Priorität `sofort`) trägt wie im
-/// Handler die Bestätigungspflicht samt Frist; sie muss `bestaetigt` sein (D10).
+/// Meldung wie über `POST …/meldungen`; `ereigniszeit` und `eingang_at` sind die Schrittzeit.
+/// Eine Sofortmeldung trägt wie im Handler Bestätigungspflicht und Frist und muss `bestaetigt`
+/// sein (Alarmbudget).
 #[derive(Debug, Clone, Copy)]
 pub struct MeldungVorlage {
     pub absender: &'static str,
@@ -428,16 +418,15 @@ pub struct MeldungVorlage {
     pub meldungsart: &'static str,
     pub prioritaet: &'static str,
     pub richtung: &'static str,
-    /// Schlüssel einer früher gebildeten Einheit: strukturierter Absender, macht die Meldung
-    /// zur Rückmeldung dieser Einheit (LFH-610).
+    /// Schlüssel einer früher gebildeten Einheit: strukturierter Absender, macht die Meldung zur
+    /// Rückmeldung dieser Einheit.
     pub einheit: Option<&'static str>,
     /// Im selben Schritt bestätigt (Quittung zur Schrittzeit).
     pub bestaetigt: bool,
 }
 
 /// Auftrag an eine Einheit, erteilt zur Schrittzeit, **ohne** Frist: eine künftige Frist
-/// widerspräche der Spec („nichts in der Zukunft außer höchstens einer Erinnerung“), eine
-/// abgelaufene wäre ein Alarm (D10).
+/// widerspräche der Spec, eine abgelaufene wäre ein Alarm.
 #[derive(Debug, Clone, Copy)]
 pub struct AuftragVorlage {
     pub schluessel: &'static str,
@@ -467,13 +456,13 @@ pub struct ErinnerungVorlage {
 }
 
 /// Ein Vorgang des Drehbuchs. Jede Variante entspricht einer Handlung, die im Betrieb ein
-/// Handler ausführt; der Import schreibt dieselben Zeilen und denselben System-ETB-Eintrag
-/// (design.md D5). Schlüssel verweisen auf Stammdaten ([`FAHRZEUGE`], [`PERSONAL`]) oder auf
-/// Objekte, die ein früherer Schritt angelegt hat.
+/// Handler ausführt; der Import schreibt dieselben Zeilen und denselben System-ETB-Eintrag.
+/// Schlüssel verweisen auf Stammdaten ([`FAHRZEUGE`], [`PERSONAL`]) oder auf Objekte eines
+/// früheren Schritts.
 ///
-/// **Ergänzen (Block 4c):** Variante hier anlegen, in [`katalog_bedarf_einsatz`] ihren
-/// Katalogbedarf entscheiden (der `match` dort ist erschöpfend und bricht sonst den Build),
-/// in `import.rs` einen Zweig schreiben und die Schritte in [`DREHBUCH`] einsortieren.
+/// **Ergänzen:** Variante hier anlegen, in [`katalog_bedarf_einsatz`] ihren Katalogbedarf
+/// entscheiden (der `match` ist erschöpfend), in `import.rs` einen Zweig schreiben und die
+/// Schritte in [`DREHBUCH`] einsortieren.
 #[derive(Debug, Clone, Copy)]
 pub enum Vorgang {
     /// Einsatzabschnitt anlegen. ETB: „Abschnitt «…» angelegt (Lage: …)“.
@@ -521,7 +510,7 @@ pub enum Vorgang {
     /// Betreuungsstelle in Betrieb setzen und verorten. ETB: Statuswechsel.
     StelleInBetrieb {
         stelle: &'static str,
-        /// Verortung auf der Lagekarte (LFH-673), `(Länge, Breite)`; schreibt kein ETB.
+        /// Verortung auf der Lagekarte, `(Länge, Breite)`; schreibt kein ETB.
         lage: Option<Punkt>,
     },
     /// Belegungsmeldung einer Betreuungsstelle zur Schrittzeit. ETB (Meldung).
@@ -850,13 +839,13 @@ const RING_KIRCHBERG: &[Punkt] = &[
 ];
 
 /// Das Drehbuch in Zeitfolge: `vor_min` fällt (nicht streng), der erste Schritt liegt beim
-/// Einsatzbeginn, der letzte wenige Minuten vor dem Import. Der Import spielt es in dieser
-/// Reihenfolge ab, damit die laufende ETB-Nummer der Zeit folgt (D9).
+/// Einsatzbeginn, der letzte wenige Minuten vor dem Import. Die Reihenfolge sorgt dafür, dass
+/// die laufende ETB-Nummer der Zeit folgt.
 ///
 /// Endstand FMS: ELW, RTW 1, GW-San, MTW 4 · RTW 2, LKW 3 · KTW 1 2 · KTW 2 6.
-/// Endstand Kommunikation: acht Meldungen (Rückmeldung Logistiktrupp überfällig, vier
-/// frisch, Sofortmeldung bestätigt), fünf Aufträge (drei vollzogen, zwei offen ohne Frist),
-/// drei Erinnerungen (zwei erledigt, eine in +20 min).
+/// Endstand Kommunikation: acht Meldungen (Rückmeldung Logistiktrupp überfällig, vier frisch,
+/// Sofortmeldung bestätigt), fünf Aufträge (drei vollzogen, zwei offen ohne Frist), drei
+/// Erinnerungen (zwei erledigt, eine in +20 min).
 pub const DREHBUCH: &[Schritt] = &[
     lage(
         300,
@@ -1393,13 +1382,13 @@ pub const DREHBUCH: &[Schritt] = &[
     ),
 ];
 
-/// Katalogbedarf des Einsatz-Teils, abgeleitet aus dem [`DREHBUCH`], jeder Eintrag einmal, in
-/// der Reihenfolge des ersten Vorkommens.
+/// Katalogbedarf des Einsatz-Teils aus dem [`DREHBUCH`], jeder Eintrag einmal, in der
+/// Reihenfolge des ersten Vorkommens.
 ///
-/// Der `match` ist bewusst erschöpfend und ohne `_`-Zweig: eine neue [`Vorgang`]-Variante
+/// Der `match` ist bewusst erschöpfend ohne `_`-Zweig: eine neue [`Vorgang`]-Variante
 /// kompiliert erst, wenn ihr Bedarf entschieden ist. Die Dispositionen verlangen je den ersten
-/// `gebunden`-Status, weil `disponiere_stamm_tx` ihn selbst nachschlägt und ohne ihn still
-/// `NULL` setzte; der Import prüft ihn vorab, damit das eine 422 wird.
+/// `gebunden`-Status, weil `disponiere_stamm_tx` ihn nachschlägt und ohne ihn still `NULL`
+/// setzte; der Import prüft ihn vorab (422).
 pub fn katalog_bedarf_einsatz() -> Vec<Katalogeintrag> {
     let mut bedarf = Vec::new();
     for schritt in DREHBUCH {
@@ -1482,9 +1471,9 @@ mod tests {
         }
     }
 
-    /// Schlüssel und fachliche Kennungen sind je Art eindeutig. Ein doppelter Schlüssel
-    /// überschriebe die ID im Ergebnis; eine doppelte Kennung ließe den zweiten Eintrag den
-    /// ersten „mitbenutzen“.
+    /// Schlüssel und fachliche Kennungen sind je Art eindeutig: ein doppelter Schlüssel
+    /// überschriebe
+    /// die ID, eine doppelte Kennung ließe den zweiten Eintrag den ersten mitbenutzen.
     #[test]
     fn schluessel_und_kennungen_sind_eindeutig() {
         alle_eindeutig(FAHRZEUGE.iter().map(|f| f.schluessel), "Fahrzeug-Schlüssel");
@@ -1495,7 +1484,7 @@ mod tests {
         alle_eindeutig(MATERIAL.iter().map(|m| m.bestandsnummer), "Bestandsnummer");
     }
 
-    /// Die Kennungen folgen dem festen Schema aus D8.
+    /// Die Kennungen folgen dem festen Schema.
     #[test]
     fn kennungen_folgen_dem_schema() {
         for (i, p) in PERSONAL.iter().enumerate() {
@@ -1545,8 +1534,8 @@ mod tests {
     }
 
     /// Zeitfolge: `vor_min` fällt nicht streng, der erste Schritt liegt nicht vor dem
-    /// Einsatzbeginn, der letzte vor dem Importzeitpunkt (Spec „Zeitachse relativ zum
-    /// Importzeitpunkt“: nichts in der Zukunft).
+    /// Einsatzbeginn,
+    /// der letzte vor dem Importzeitpunkt (nichts in der Zukunft).
     #[test]
     fn drehbuch_steht_in_zeitfolge() {
         assert!(!DREHBUCH.is_empty());
@@ -1739,9 +1728,8 @@ mod tests {
         }
     }
 
-    /// Alarmbudget (D10) und Zeitachse als Daten: jede Sofortmeldung ist bestätigt, keine
-    /// Erinnerung wird vor ihrer Fälligkeit erledigt, und in der Zukunft liegt genau eine
-    /// Erinnerung, die offen bleibt (Spec „Zeitachse relativ zum Importzeitpunkt“).
+    /// Alarmbudget und Zeitachse: jede Sofortmeldung ist bestätigt, keine Erinnerung wird vor ihrer
+    /// Fälligkeit erledigt, und in der Zukunft liegt genau eine offene Erinnerung.
     #[test]
     fn kein_alarm_und_nur_eine_erinnerung_in_der_zukunft() {
         let mut faellig = std::collections::BTreeMap::new();

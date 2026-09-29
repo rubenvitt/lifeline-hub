@@ -6,21 +6,17 @@ import { farbenHell } from '../../theme/tokens';
 export const fachebeneSourceId = (key: string) => `fachebene-${key}`;
 
 /**
- * Ein Feature ist ein Bündel, wenn MapLibre es zusammengefasst hat (`point_count`) ODER der
- * Server es als Sammelpunkt geliefert hat (`sammelpunkt`, LFH-83). Ein allein stehender
- * Sammelpunkt ist kein MapLibre-Bündel und muss trotzdem wie eines aussehen — sonst stünde
- * er als Einzelobjekt da und öffnete beim Klick ein Detail-Panel ohne Titel.
+ * Ein Feature ist ein Bündel, wenn MapLibre es zusammengefasst hat (`point_count`) oder der Server
+ * es als Sammelpunkt liefert. Ein allein stehender Sammelpunkt muss wie ein Bündel aussehen, sonst
+ * öffnete er beim Klick ein Detail-Panel ohne Titel.
  */
 const IST_BUENDEL = ['any', ['has', 'point_count'], ['has', 'sammelpunkt']];
 const IST_EINZEL = ['all', ['!', ['has', 'point_count']], ['!', ['has', 'sammelpunkt']]];
 
 /**
- * Bündel-Optik (LFH-83). Der Kreis trägt die Ebenenfarbe; Kontur und Zahl stehen AUF diesem
- * Kreis, nicht auf dem Kartengrund, und nehmen deshalb ein festes Paar aus `theme/tokens.ts`
- * statt eines Modus-Tokens: helle Fläche als Schrift, dunkler Text als Halo. Auf dem
- * gesättigten Violett trägt das in Tag- und Nachtkarte gleich; einen neuen Farbwert gibt es
- * dabei nicht. Der Radius staffelt mit der Zahl, damit ein Bündel aus Tausenden nicht so
- * aussieht wie eines aus drei.
+ * Bündel-Optik: der Kreis trägt die Ebenenfarbe; Kontur und Zahl stehen auf diesem Kreis und nehmen
+ * deshalb ein festes Paar aus `theme/tokens.ts` statt eines Modus-Tokens. Der Radius staffelt mit
+ * der Zahl.
  */
 const BUENDEL_RADIUS = ['step', ['get', 'anzahl'], 12, 10, 15, 100, 18, 1000, 22, 10000, 26];
 
@@ -38,14 +34,14 @@ export function sorgeFuerFachebeneLayer(
         ? {
             type: 'geojson',
             data: daten as never,
-            // Bündel-Optionen greifen NUR beim Anlegen — deshalb hier und nicht per setData.
-            // clusterMaxZoom 14: darüber stehen die Objekte einer Straße einzeln; der Server
-            // liefert dort ohnehin Einzelobjekte (≤ 5 000 im Ausschnitt).
+            // Bündel-Optionen greifen nur beim Anlegen — deshalb hier und nicht per setData. Ab
+            // clusterMaxZoom 14 stehen die Objekte einzeln; der Server liefert dort ohnehin
+            // Einzelobjekte.
             cluster: true,
             clusterRadius: 50,
             clusterMaxZoom: 14,
-            // Ein Server-Sammelpunkt zählt mit seiner `anzahl`, ein Einzelobjekt mit 1 —
-            // so trägt ein Client-Bündel die Zahl der Objekte, nicht die seiner Punkte.
+            // Ein Server-Sammelpunkt zählt mit seiner `anzahl`, ein Einzelobjekt mit 1 — so trägt
+            // ein Client-Bündel die Zahl der Objekte.
             clusterProperties: { anzahl: ['+', ['coalesce', ['get', 'anzahl'], 1]] },
           }
         : // `generateId`: die Feature-ID ist der Index im `features`-Array. Sie entscheidet beim
@@ -96,17 +92,14 @@ export function sorgeFuerFachebeneLayer(
         source: src,
         filter: IST_BUENDEL as never,
         layout: {
-          // `anzahl` ist bei beiden Bündelarten gesetzt: als Clustersumme und als Zahl des
-          // Sammelpunkts. Deutsche Tausenderpunkte („12.345"), weil die DE-Ansicht fünf-
-          // stellige Bündel zeigt.
+          // `anzahl` ist bei beiden Bündelarten gesetzt. Deutsche Tausenderpunkte, weil die
+          // DE-Ansicht fünfstellige Bündel zeigt.
           'text-field': ['number-format', ['get', 'anzahl'], { locale: 'de-DE' }] as never,
-          // Die einzige Schrift, die der Offline-Style ausliefert (`basemapStil.ts`,
-          // eingebettet aus `assets/karten/fonts/`). Styles ohne `glyphs` (Blind, Raster)
-          // zeichnet MapLibre 6 lokal.
+          // Die einzige Schrift, die der Offline-Style ausliefert (`assets/karten/fonts/`). Styles
+          // ohne `glyphs` zeichnet MapLibre 6 lokal.
           'text-font': ['Noto Sans Regular'],
           'text-size': 12,
-          // Die Zahl gehört auf ihren Kreis; eine Nachbarzahl darf sie nicht verdrängen,
-          // sonst stünde ein Bündel ohne Zahl da.
+          // Eine Nachbarzahl darf die Zahl nicht verdrängen, sonst stünde ein Bündel ohne Zahl da.
           'text-allow-overlap': true,
           'text-ignore-placement': true,
         },
@@ -124,15 +117,12 @@ export function sorgeFuerFachebeneLayer(
         source: src,
         // Bei gebündelten Ebenen nur die Einzelobjekte — Bündel zeichnen die zwei Layer oben.
         ...(def.buendeln ? { filter: IST_EINZEL as never } : {}),
-        // Größer zeichnet oben (LFH-78): Hochwasser und ODL tragen ihre Stufe im Radius, und
-        // ohne Schlüssel folgte die Reihenfolge der Quelle — ein später gezeichneter kleiner
-        // Nachbar deckte einen großen Alarm-Punkt zu. Ebenen ohne `radius` sind unberührt.
+        // Größer zeichnet oben: Hochwasser und ODL tragen ihre Stufe im Radius, ohne Schlüssel
+        // deckte ein später gezeichneter kleiner Nachbar einen großen Alarm-Punkt zu.
         layout: { 'circle-sort-key': ['coalesce', ['get', 'radius'], 0] },
         paint: {
-          // Ein Feature darf Durchmesser und Farbe selbst mitbringen (LFH-77:
-          // `hochwasserStil.ts` staffelt beides nach Pegelklasse und backt die im
-          // aktiven Modus aufgelösten Tokenwerte ein). Ohne Eigenangabe gilt die
-          // Ebenenfarbe — NINA/DWD/PEGELONLINE/KRITIS bleiben damit unverändert.
+          // Ein Feature darf Durchmesser und Farbe selbst mitbringen (`hochwasserStil.ts` backt die
+          // aufgelösten Tokenwerte ein). Ohne Eigenangabe gilt die Ebenenfarbe.
           'circle-radius': ['coalesce', ['get', 'radius'], 5],
           'circle-color': ['coalesce', ['get', 'farbe'], def.farbe],
           'circle-stroke-color': '#fff',
@@ -143,8 +133,8 @@ export function sorgeFuerFachebeneLayer(
   }
 }
 
-// Alle Layer, die eine Ebene haben KANN — `removeLayer` ist unten per `getLayer` bewacht,
-// überzählige IDs kosten also nichts, und keine Ebene kann einen Layer zurücklassen.
+// Alle Layer, die eine Ebene haben kann — `removeLayer` ist per `getLayer` bewacht, überzählige IDs
+// kosten nichts.
 const layerIds = (key: FachebeneQuelle) => [
   `fachebene-${key}-fill`,
   `fachebene-${key}-line`,
@@ -173,8 +163,8 @@ export function setzeFachebeneDaten(
 }
 
 /**
- * Die anklickbaren Layer einer Fachebene (Polygon → Fläche, Punkt → Kreis; gebündelte Ebene
- * zusätzlich der Bündel-Kreis). Die Zahl ist kein eigenes Ziel — sie liegt auf dem Kreis.
+ * Die anklickbaren Layer einer Fachebene (Polygon → Fläche, Punkt → Kreis, gebündelt zusätzlich der
+ * Bündel-Kreis). Die Zahl liegt auf dem Kreis und ist kein eigenes Ziel.
  */
 export function fachebeneClickLayerIds(def: FachebeneDef): string[] {
   if (def.geometrieTyp === 'polygon') return [`fachebene-${def.key}-fill`];
@@ -192,8 +182,7 @@ export type FachebeneKlickZiel =
   | { art: 'einzel' };
 
 /**
- * Entscheidet rein aus den Properties des angeklickten Features, was der Klick tut — ohne
- * Karte, damit die Unterscheidung ohne WebGL prüfbar ist. Die Ausführung
+ * Entscheidet allein aus den Properties, was der Klick tut — ohne Karte prüfbar. Die Ausführung
  * (`getClusterExpansionZoom` ist in MapLibre 6 asynchron, `easeTo`) liegt beim Aufrufer.
  */
 export function entscheideFachebeneKlick(props: Record<string, unknown>): FachebeneKlickZiel {

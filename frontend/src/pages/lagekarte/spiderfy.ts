@@ -1,5 +1,5 @@
-// Pixel-Offsets zum Auffächern (Spiderfy) der Cluster-Leaves. Pure & jsdom-testbar — nur
-// Geometrie, kein MapLibre. Kreis bis SPIDER_KREIS_MAX Leaves, danach Archimedische Spirale.
+// Pixel-Offsets zum Auffächern (Spiderfy) der Cluster-Leaves — reine Geometrie, kein MapLibre.
+// Kreis bis SPIDER_KREIS_MAX Leaves, danach Archimedische Spirale.
 
 import type { MarkerProps, MarkerFeature, MarkerFeatureCollection } from './markerLayer';
 
@@ -68,9 +68,8 @@ export interface SpiderFcs {
 
 /**
  * Baut aus den Cluster-Leaves die aufgefächerten Leaf-Punkte (unveränderte MarkerProps) und die
- * Beinchen-Linien. Der Anker wird in den Pixelraum projiziert, die Offsets addiert und zurück
- * un-projiziert → die Symbole sitzen mit festem Pixelabstand um den Cluster-Mittelpunkt.
- * Der Projektor ist injiziert (= `map.project`/`map.unproject`) → pure & testbar.
+ * Beinchen-Linien: Anker in den Pixelraum projizieren, Offsets addieren, zurückprojizieren. Der
+ * Projektor (`map.project`/`map.unproject`) ist injiziert.
  */
 export function baueSpiderFc(
   leaves: MarkerProps[],

@@ -50,7 +50,7 @@ vi.mock('../api/lageberichte', () => ({
 const { navigiere } = vi.hoisted(() => ({ navigiere: vi.fn() }));
 vi.mock('react-router', async (orig) => ({ ...(await orig()), useNavigate: () => navigiere }));
 
-// Nur die im Page genutzten Felder; Rest via Cast (Test-Fixture, kein echter Server-DTO).
+// Nur die in der Seite genutzten Felder; Rest via Cast.
 const EINSATZ = {
   id: 1,
   bezeichnung: 'Testeinsatz',
@@ -211,8 +211,8 @@ beforeEach(() => {
 });
 
 /**
- * Über `renderMitProviders`: ohne `ConfigProvider` fiele `theme.useToken()` auf
- * antd-Vorgaben, und jede Aussage über Zweig oder Dichte von `Datensicht` wäre unerreichbar.
+ * Über `renderMitProviders`: ohne `ConfigProvider` fiele `theme.useToken()` auf antd-Vorgaben, und
+ * Aussagen über Zweig oder Dichte von `Datensicht` wären unerreichbar.
  */
 function setup() {
   return renderMitProviders(
@@ -223,7 +223,7 @@ function setup() {
   );
 }
 
-/** Der Einheitenstatus, wie ihn der Server aus einem Fahrzeug in S4 ableitet (LFH-609). */
+/** Der Einheitenstatus, wie ihn der Server aus einem Fahrzeug in S4 ableitet. */
 const STATUS_S4 = {
   quelle: 'fahrzeuge' as const,
   status: {
@@ -286,7 +286,7 @@ describe('KraefteuebersichtPage — Seitenkopf', () => {
       return k;
     });
     const knopf = within(kopf).getByRole('button', { name: /Einheit/ });
-    // Genau eine Primäraktion im Kopf (LFH-340 · C5).
+    // Genau eine Primäraktion im Kopf.
     expect(kopf.querySelectorAll('.ant-btn-primary')).toHaveLength(1);
     expect(knopf).toHaveClass('ant-btn-primary');
     fireEvent.click(knopf);
@@ -372,8 +372,7 @@ describe('KraefteuebersichtPage — Statusband', () => {
     expect(within(gruppe).getByText('gebunden')).toBeInTheDocument();
   });
 
-  // Bis LFH-610 stand hier die Abwesenheit („dafür gibt es keine Daten"). Seit es die
-  // Rückmeldungen gibt, sind es die positiven Aussagen — und ihre Gegenproben.
+  // Die positiven Aussagen zur Rückmeldung — und ihre Gegenproben.
   it('zeigt die Kachel „keine Rückmeldung" mit der Zahl nie zurückgemeldeter Einheiten (LFH-610)', async () => {
     mitEinheit();
     setup();
@@ -442,7 +441,7 @@ describe('KraefteuebersichtPage — Raster', () => {
   });
 
   it('die Einheitenzeile trägt die verdichtete Verteilung bereit / gebunden / Ausfall — auch die 0', async () => {
-    // Die Spalte „Mittel" steht ab `xl` (LFH-609), darunter im Spaltenschalter.
+    // Die Spalte „Mittel" steht ab `xl`, darunter im Spaltenschalter.
     setzeViewportBreite(1440);
     mitEinheit();
     const { container } = setup();
@@ -458,10 +457,10 @@ describe('KraefteuebersichtPage — Raster', () => {
   });
 
   it('tönt eine Einheit mit Ausfall als Problemzeile — mit der Ausfall-Zahl als zweitem Kanal', async () => {
-    // Die Spalte „Mittel" steht ab `xl` (LFH-609).
+    // Die Spalte „Mittel" steht ab `xl`.
     setzeViewportBreite(1440);
-    // Beide Einheiten haben in der Frist zurückgemeldet: sonst tönte schon die fehlende
-    // Rückmeldung (LFH-610) die Zeile, und die Gegenprobe an eh-20 prüfte nichts über Ausfall.
+    // Beide Einheiten haben in der Frist zurückgemeldet: sonst tönte schon die fehlende Rückmeldung
+    // die Zeile, und die Gegenprobe an eh-20 prüfte nichts über Ausfall.
     vi.mocked(holeRueckmeldungen).mockResolvedValue({
       ...KEINE_RUECKMELDUNGEN,
       einheiten: [rueckmeldungVon(20, 30), rueckmeldungVon(21, 30)],
@@ -553,7 +552,7 @@ describe('KraefteuebersichtPage — Raster', () => {
     expect(within(e).queryByTitle('Aufträge nicht abrufbar')).toBeNull();
   });
 
-  // ── Rückmeldung (LFH-610) ──────────────────────────────────────────────────
+  // ── Rückmeldung (LFH-610) ──
   const rueckZelle = (container: HTMLElement, schluessel: string) =>
     zeile(container, schluessel)?.querySelector(
       '[data-lfh="meldebild-rueckmeldung"]',
@@ -660,7 +659,7 @@ describe('KraefteuebersichtPage — Raster', () => {
     mitEinheit();
     vi.mocked(holeRueckmeldungen).mockReturnValue(new Promise(() => {}));
     const { container } = setup();
-    // `findAll`: seit LFH-609 steht „Am Einsatzort" zweimal — im Band und am Einheitenstatus.
+    // `findAll`: „Am Einsatzort" steht zweimal — im Band und am Einheitenstatus.
     await screen.findAllByText('Am Einsatzort');
     expect(rueckZelle(container, 'eh-20')).toBeNull();
     expect(screen.queryByText(/keine Rückmeldung/i)).toBeNull();
@@ -814,8 +813,8 @@ describe('KraefteuebersichtPage — Druck', () => {
   });
 
   it('der Druck neutralisiert Bildlaufcontainer, Sticky-Kopf, fixierte Spalte und Werkzeugzeile', () => {
-    // jsdom rechnet kein `@media print` — bewusst eine TEXT-Prüfung der Regeldatei, als
-    // reguläre Ausdrücke (Quote-Stil ist Formatierung, keine Aussage; Lehre aus LFH-354).
+    // jsdom rechnet kein `@media print` — eine Text-Prüfung der Regeldatei, als reguläre Ausdrücke
+    // (der Quote-Stil ist Formatierung, keine Aussage).
     const hier = dirname(fileURLToPath(import.meta.url));
     const css = readFileSync(join(hier, 'kraefteuebersichtPrint.css'), 'utf-8');
     const druckblock = css.slice(css.indexOf('@media print'));
@@ -830,7 +829,7 @@ describe('KraefteuebersichtPage — Druck', () => {
     expect(druckblock).toMatch(/overflow:\s*visible\s*!important/);
   });
 
-  /** Der gemeinsame Druckkopf (LFH-22) — seit dem Umbau statt des eigenen Meldeblatt-Kopfs. */
+  /** Der gemeinsame Druckkopf. */
   async function druckkopf(): Promise<HTMLElement> {
     await screen.findByText('1. Zug');
     const kopf = document.querySelector<HTMLElement>('[data-lfh="druckkopf"]');
@@ -852,7 +851,7 @@ describe('KraefteuebersichtPage — Druck', () => {
     expect(stand.textContent).toMatch(/^\d{6}[A-ZÄÖÜ]{3}\d{4}$/);
     expect(within(kopf).getByText('Gedruckt von')).toBeInTheDocument();
     expect(await within(kopf).findByText(/Einheit · Stärke/)).toBeInTheDocument();
-    // Der alte Meldeblatt-Kopf ist weg — sonst stünde der Einsatz doppelt auf dem Blatt.
+    // Kein eigener Meldeblatt-Kopf — sonst stünde der Einsatz doppelt auf dem Blatt.
     expect(screen.queryByTestId('kraefte-druckkopf')).toBeNull();
   });
 
@@ -875,8 +874,8 @@ describe('KraefteuebersichtPage — Druck', () => {
     const hier = dirname(fileURLToPath(import.meta.url));
     const css = readFileSync(join(hier, 'kraefteuebersichtPrint.css'), 'utf-8');
     expect(css).not.toMatch(/kraefte-nur-print/);
-    // Kopfwiederholung und Zeilenschutz gelten seit LFH-71 für JEDE Druckwurzel und stehen
-    // in `druck/druck.css` — das Meldebild trägt die Marke (Test unten).
+    // Kopfwiederholung und Zeilenschutz gelten für jede Druckwurzel und stehen in `druck/druck.css`
+    // — das Meldebild trägt die Marke (Test unten).
     const gemeinsam = readFileSync(join(hier, '..', 'druck', 'druck.css'), 'utf-8');
     expect(gemeinsam).toMatch(/\] thead\s*\{[^}]*display:\s*table-header-group/);
     expect(gemeinsam).toMatch(/\btr\b[^{]*\{[^}]*break-inside:\s*avoid/);
@@ -897,11 +896,10 @@ describe('KraefteuebersichtPage — Druck', () => {
 });
 
 /**
- * ── FILTERWAHRHEIT (LFH-338 · C3, Befund H3) ────────────────────────────────────
+ * ── Filterwahrheit ──
  *
  * Wer kurz weggeht und dann abliest, darf die Teilstärke eines Abschnitts nicht für die
- * Gesamtstärke halten. Der Abschnitt-Filter sitzt seit dem Neuentwurf im Seitenkopf und
- * trägt einen zugänglichen Namen.
+ * Gesamtstärke halten. Der Abschnitt-Filter sitzt im Seitenkopf und trägt einen zugänglichen Namen.
  */
 async function waehleAbschnitt(name: string) {
   fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Abschnitt filtern' }));

@@ -8,56 +8,15 @@ use serde_json::{json, Value};
 use tower::ServiceExt;
 
 mod common;
-use common::{benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
-
-// ---------- Harness ----------
-
-async fn anfrage(
-    app: &axum::Router,
-    method: &str,
-    uri: &str,
-    cookie: &str,
-    body: Option<&Value>,
-) -> (StatusCode, Value) {
-    let mut req = Request::builder()
-        .method(method)
-        .uri(uri)
-        .header(header::COOKIE, cookie);
-    let body = match body {
-        Some(b) => {
-            req = req.header(header::CONTENT_TYPE, "application/json");
-            Body::from(b.to_string())
-        }
-        None => Body::empty(),
-    };
-    let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
-    let status = resp.status();
-    let bytes = to_bytes(resp.into_body(), 1024 * 1024).await.unwrap();
-    let value = if bytes.is_empty() {
-        Value::Null
-    } else {
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
-    };
-    (status, value)
-}
+use common::{
+    anfrage_json, benutzer_anlegen, einsatz_anlegen, login_cookie, person_anlegen, rolle_setzen,
+    setup, system_etb_inhalte,
+};
 
 // ---------- Domänen-Helfer ----------
 
-async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
-    let (s, v) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
-        cookie,
-        Some(&json!({})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED);
-    v["id"].as_i64().unwrap()
-}
-
 async fn tier_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &Value) -> i64 {
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/tiere"),
@@ -69,26 +28,8 @@ async fn tier_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &Val
     v["id"].as_i64().unwrap()
 }
 
-/// ETB-Einträge mit typ='system' als Vec der Inhalte.
-async fn system_etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {
-    let (_, json) = anfrage(
-        app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
-        cookie,
-        None,
-    )
-    .await;
-    json.as_array()
-        .unwrap()
-        .iter()
-        .filter(|e| e["typ"] == "system")
-        .map(|e| e["inhalt"].as_str().unwrap().to_string())
-        .collect()
-}
-
 async fn einsatz_abschliessen(app: &axum::Router, cookie: &str, einsatz: i64) {
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/abschliessen"),
@@ -106,7 +47,7 @@ async fn anlegen_vergibt_t_nummer_und_status_aktiv() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere"),
@@ -128,7 +69,7 @@ async fn registriernummer_fortlaufend_und_lueckenlos() {
     let t1 = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
     let _t2 = tier_anlegen(&app, &admin, e, &json!({"spezies":"katze"})).await;
     // Storno t1 → nächste Nummer bleibt 3 (keine Wiederverwendung).
-    anfrage(
+    anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/tiere/{t1}"),
@@ -136,7 +77,7 @@ async fn registriernummer_fortlaufend_und_lueckenlos() {
         None,
     )
     .await;
-    let (_, v) = anfrage(
+    let (_, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere"),
@@ -152,7 +93,7 @@ async fn anlegen_als_vermisst_erlaubt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere"),
@@ -169,7 +110,7 @@ async fn anlegen_als_abgeschlossen_ist_422() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere"),
@@ -185,7 +126,7 @@ async fn anlegen_ohne_spezies_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere"),
@@ -202,7 +143,7 @@ async fn gueltiger_status_wechsel_aktiv_vermisst_aktiv() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
-    let (s1, v1) = anfrage(
+    let (s1, v1) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere/{t}/status"),
@@ -212,7 +153,7 @@ async fn gueltiger_status_wechsel_aktiv_vermisst_aktiv() {
     .await;
     assert_eq!(s1, StatusCode::OK);
     assert_eq!(v1["status"], "vermisst");
-    let (s2, v2) = anfrage(
+    let (s2, v2) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere/{t}/status"),
@@ -230,7 +171,7 @@ async fn ungueltiger_status_wechsel_ist_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere/{t}/status"),
@@ -251,7 +192,7 @@ async fn unbekannter_zielstatus_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere/{t}/status"),
@@ -268,7 +209,7 @@ async fn abschluss_ohne_grund_ist_422_und_mit_grund_ok() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
-    let (s_ohne, _) = anfrage(
+    let (s_ohne, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere/{t}/status"),
@@ -277,7 +218,7 @@ async fn abschluss_ohne_grund_ist_422_und_mit_grund_ok() {
     )
     .await;
     assert_eq!(s_ohne, StatusCode::UNPROCESSABLE_ENTITY);
-    let (s_mit, v) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/tiere/{t}/status"), &admin,
+    let (s_mit, v) = anfrage_json(&app, "POST", &format!("/api/einsaetze/{e}/tiere/{t}/status"), &admin,
         Some(&json!({"status":"abgeschlossen","abschluss_grund":"uebergabe_tierarzt","abschluss_ziel":"Tierarzt Müller"}))).await;
     assert_eq!(s_mit, StatusCode::OK);
     assert_eq!(v["status"], "abgeschlossen");
@@ -292,7 +233,7 @@ async fn abschluss_mit_unbekanntem_grund_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere/{t}/status"),
@@ -321,7 +262,7 @@ async fn abschluss_mit_leerem_grund_ist_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere/{t}/status"),
@@ -339,8 +280,8 @@ async fn halter_beide_felder_ist_422() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let p = person_anlegen(&app, &admin, e).await;
-    let (s, _) = anfrage(
+    let p = person_anlegen(&app, &admin, e, "{}").await;
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere"),
@@ -356,7 +297,7 @@ async fn patch_zweites_halter_feld_bei_bestehendem_ist_422() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let p = person_anlegen(&app, &admin, e).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
     // Tier mit Freitext-Halter; dann PATCH nur halter_person_id → beide würden gesetzt.
     let t = tier_anlegen(
         &app,
@@ -365,7 +306,7 @@ async fn patch_zweites_halter_feld_bei_bestehendem_ist_422() {
         &json!({"spezies":"hund","halter_kontakt":"Frau Müller"}),
     )
     .await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/tiere/{t}"),
@@ -385,7 +326,7 @@ async fn halter_fk_auf_stornierte_person_bleibt_zulaessig() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let p = person_anlegen(&app, &admin, e).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
     let t = tier_anlegen(
         &app,
         &admin,
@@ -394,7 +335,7 @@ async fn halter_fk_auf_stornierte_person_bleibt_zulaessig() {
     )
     .await;
     // Person stornieren.
-    anfrage(
+    anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/personen/{p}"),
@@ -402,7 +343,7 @@ async fn halter_fk_auf_stornierte_person_bleibt_zulaessig() {
         None,
     )
     .await;
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/tiere/{t}"),
@@ -425,7 +366,7 @@ async fn soft_delete_blendet_aus_liste_und_doppelt_ist_409() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
-    let (s1, _) = anfrage(
+    let (s1, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/tiere/{t}"),
@@ -434,7 +375,7 @@ async fn soft_delete_blendet_aus_liste_und_doppelt_ist_409() {
     )
     .await;
     assert_eq!(s1, StatusCode::NO_CONTENT);
-    let (_, liste) = anfrage(
+    let (_, liste) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/tiere"),
@@ -447,7 +388,7 @@ async fn soft_delete_blendet_aus_liste_und_doppelt_ist_409() {
         0,
         "storniert nicht in Liste"
     );
-    let (s2, _) = anfrage(
+    let (s2, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/tiere/{t}"),
@@ -464,7 +405,7 @@ async fn patch_auf_storniertem_tier_ist_409() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
-    anfrage(
+    anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/tiere/{t}"),
@@ -472,7 +413,7 @@ async fn patch_auf_storniertem_tier_ist_409() {
         None,
     )
     .await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/tiere/{t}"),
@@ -489,9 +430,9 @@ async fn halter_aus_fremdem_einsatz_ist_404() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e1 = einsatz_anlegen(&app, &admin).await;
     let e2 = einsatz_anlegen(&app, &admin).await;
-    let p_fremd = person_anlegen(&app, &admin, e2).await; // Person in e2
-                                                          // Tier in e1 mit Halter-FK auf Person aus e2 → Org-Isolation greift → 404.
-    let (s, _) = anfrage(
+    let p_fremd = person_anlegen(&app, &admin, e2, "{}").await; // Person in e2
+                                                                // Tier in e1 mit Halter-FK auf Person aus e2 → Org-Isolation greift → 404.
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e1}/tiere"),
@@ -507,7 +448,7 @@ async fn liste_filtert_nach_halter_person_id() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let p = person_anlegen(&app, &admin, e).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
     tier_anlegen(
         &app,
         &admin,
@@ -516,7 +457,7 @@ async fn liste_filtert_nach_halter_person_id() {
     )
     .await;
     tier_anlegen(&app, &admin, e, &json!({"spezies":"katze"})).await; // ohne Halter
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/tiere?halter_person_id={p}"),
@@ -561,7 +502,7 @@ async fn lifecycle_etb_kein_leak_von_ziel_und_kennzeichnung() {
         &json!({"spezies":"katze","rufname":"GEHEIM_MIEZ","kennzeichnung":"TATTOO_ABC"}),
     )
     .await;
-    anfrage(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere/{t}/status"),
@@ -569,7 +510,7 @@ async fn lifecycle_etb_kein_leak_von_ziel_und_kennzeichnung() {
         Some(&json!({"status":"vermisst"})),
     )
     .await;
-    anfrage(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere/{t}/status"),
@@ -577,9 +518,9 @@ async fn lifecycle_etb_kein_leak_von_ziel_und_kennzeichnung() {
         Some(&json!({"status":"aktiv"})),
     )
     .await;
-    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/tiere/{t}/status"), &admin,
+    anfrage_json(&app, "POST", &format!("/api/einsaetze/{e}/tiere/{t}/status"), &admin,
         Some(&json!({"status":"abgeschlossen","abschluss_grund":"uebergabe_tierarzt","abschluss_ziel":"GEHEIM_ZIEL_TIERARZT"}))).await;
-    anfrage(
+    anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/tiere/{t}"),
@@ -630,7 +571,7 @@ async fn beobachter_kann_nicht_schreiben_aber_lesen() {
     tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
     let beob = login_cookie(&app, "beobachter", "beobachterpw1").await;
     // Lesen ok.
-    let (s_get, _) = anfrage(
+    let (s_get, _) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/tiere"),
@@ -640,7 +581,7 @@ async fn beobachter_kann_nicht_schreiben_aber_lesen() {
     .await;
     assert_eq!(s_get, StatusCode::OK);
     // Schreiben verboten.
-    let (s_post, _) = anfrage(
+    let (s_post, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere"),
@@ -658,7 +599,7 @@ async fn fremder_einsatz_detail_ist_404() {
     let e = einsatz_anlegen(&app, &admin).await;
     let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
     let anderer = einsatz_anlegen(&app, &admin).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{anderer}/tiere/{t}"),
@@ -677,7 +618,7 @@ async fn fremder_einsatz_ohne_mitgliedschaft_ist_403() {
     benutzer_anlegen(&app, &admin, "fremdnutzer", "keine").await;
     let e = einsatz_anlegen(&app, &admin).await; // admin ist Leitung, fremdnutzer kein Mitglied
     let fremd = login_cookie(&app, "fremdnutzer", "fremdnutzerpw1").await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/tiere"),
@@ -696,7 +637,7 @@ async fn abgeschlossener_einsatz_ist_readonly_409() {
     let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
     einsatz_abschliessen(&app, &admin, e).await;
     // Lesen weiterhin ok (Nachlauffrist), Schreiben → 409.
-    let (s_get, _) = anfrage(
+    let (s_get, _) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/tiere"),
@@ -705,7 +646,7 @@ async fn abgeschlossener_einsatz_ist_readonly_409() {
     )
     .await;
     assert_eq!(s_get, StatusCode::OK);
-    let (s_post, _) = anfrage(
+    let (s_post, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/tiere"),
@@ -714,7 +655,7 @@ async fn abgeschlossener_einsatz_ist_readonly_409() {
     )
     .await;
     assert_eq!(s_post, StatusCode::CONFLICT);
-    let (s_patch, _) = anfrage(
+    let (s_patch, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/tiere/{t}"),
@@ -723,7 +664,7 @@ async fn abgeschlossener_einsatz_ist_readonly_409() {
     )
     .await;
     assert_eq!(s_patch, StatusCode::CONFLICT);
-    let (s_del, _) = anfrage(
+    let (s_del, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/tiere/{t}"),
@@ -784,7 +725,7 @@ async fn patch_null_leert_identitaetsfeld() {
     )
     .await;
 
-    let (status, v) = anfrage(
+    let (status, v) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/tiere/{t}"),
@@ -812,7 +753,7 @@ async fn patch_leerstring_leert_identitaetsfeld() {
     )
     .await;
 
-    let (status, v) = anfrage(
+    let (status, v) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/tiere/{t}"),
@@ -841,7 +782,7 @@ async fn patch_identitaet_laesst_halter_unberuehrt() {
     )
     .await;
 
-    let (status, v) = anfrage(
+    let (status, v) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/tiere/{t}"),
@@ -871,7 +812,7 @@ async fn patch_leeres_objekt_laesst_tier_unveraendert() {
     )
     .await;
 
-    let (status, v) = anfrage(
+    let (status, v) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/tiere/{t}"),

@@ -126,11 +126,9 @@ export default function EinsatzabschnittePage() {
     queryFn: () => listeEinheiten(einsatzId),
   });
 
-  // Cross-Modul-Deeplink (LFH-25): ?abschnitt=<id> selektiert den Abschnitt, sofern vorhanden.
-  // Spiegelt `Tree onSelect`: der Kopfknopf ist klickbar, bevor `abschnitteQuery` aufgelöst
-  // ist, und ein danach feuernder Deeplink darf einen offenen Entwurf nicht überleben lassen
-  // (LFH-347 · Fix-Runde 1) — sonst nimmt `speichern` wegen `!entwurf === false` fälschlich
-  // den POST-Zweig für einen bereits ausgewählten Bestandsabschnitt.
+  // Cross-Modul-Deeplink: ?abschnitt=<id> selektiert den Abschnitt, sofern vorhanden. Spiegelt
+  // `Tree onSelect`: ein danach feuernder Deeplink darf einen offenen Entwurf nicht überleben
+  // lassen, sonst nähme `speichern` wegen `!entwurf === false` fälschlich den POST-Zweig.
   useQueryParamSelektion('abschnitt', abschnitteQuery.isSuccess, (zid) => {
     if ((abschnitteQuery.data ?? []).some((a) => a.id === zid)) {
       setEntwurf(false);
@@ -211,8 +209,10 @@ export default function EinsatzabschnittePage() {
     }
   }, [aktuell, bearbeiten, entwurf, form]);
 
-  /** Lokaler Entwurf statt Server-Datensatz (LFH-347 · M55): der POST — und damit der
-   *  ETB-Eintrag — entsteht erst beim Speichern. Abbrechen hinterlässt nichts. */
+  /**
+   * Lokaler Entwurf statt Server-Datensatz: der POST — und damit der ETB-Eintrag — entsteht erst
+   * beim Speichern. Abbrechen hinterlässt nichts.
+   */
   function entwurfOeffnen() {
     setGewaehlt(null);
     setBearbeiten(false);
@@ -238,23 +238,19 @@ export default function EinsatzabschnittePage() {
     (e) => e.abschnitt_id === aktuell?.id,
   );
 
-  // ZWEI Werte, getrennt beschriftet (LFH-347 · H37): „eigene" ist die Bedeutung der
-  // Bestandszeile und bleibt es; „inkl. Unterabschnitte" ist das, was der Einsatzleiter
-  // im Fükw bisher im Kopf addieren musste.
+  // Zwei Werte, getrennt beschriftet: „eigene" (Bedeutung der Bestandszeile) und „inkl.
+  // Unterabschnitte".
   const staerken = aktuell
     ? abschnittStaerken(abschnitte, einheitenQuery.data ?? [], aktuell.id)
     : { eigene: null, inklUnter: null };
 
-  // ZWEI EBENEN, getrennt gehalten (LFH-331 · B3, D3):
+  // Zwei Ebenen, getrennt gehalten:
   //
-  // SEITENZUSTAND — nur `einsatzQuery`. Ohne sie rendern weder Breadcrumb noch
-  // `darfImEinsatzSchreiben(...)`, also gibt es hier nichts zu zeigen als Ladebild oder
-  // Fehler. Nur diese Query rechtfertigt einen Frühausstieg.
+  // Seitenzustand — nur `einsatzQuery`. Ohne sie rendern weder Breadcrumb noch
+  // `darfImEinsatzSchreiben(...)`; nur diese Query rechtfertigt einen Frühausstieg.
   //
-  // LISTENZUSTAND — `abschnitteQuery` und alles Weitere. Diese Queries entscheiden an der
-  // Stelle, an der ihre Daten stehen (siehe Gliederungs-Karte unten), NIE als Frühausstieg:
-  // sonst reißt ein gescheiterter Nebenabruf die ganze Seite weg, obwohl der Rest bedienbar
-  // bliebe.
+  // Listenzustand — `abschnitteQuery` und alles Weitere entscheidet an der Stelle der Daten, nie
+  // als Frühausstieg: sonst risse ein gescheiterter Nebenabruf die ganze Seite weg.
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -269,16 +265,11 @@ export default function EinsatzabschnittePage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   /**
-   * LISTENZUSTAND der Gliederungs-Karte — zwei Lagen, zwei Antworten (D3). Der Fehler
-   * allein reicht als Bedingung NICHT.
+   * Listenzustand der Gliederungs-Karte — der Fehler allein reicht als Bedingung nicht. Ohne
+   * Abschnitte im Zwischenspeicher tritt der Fehler an die Stelle des Baums; mit Abschnitten bleibt
+   * der Baum stehen und bekommt ein Banner: er ist echt, nur womöglich alt.
    *
-   * Ohne Abschnitte im Zwischenspeicher tritt der Fehler an die Stelle des Baums. MIT
-   * Abschnitten bleibt der Baum stehen und bekommt ein Banner: er ist echt, nur womöglich
-   * alt. Ein Fehler, der ihn wegräumt, nähme der Einsatzkraft die Gliederung, die sie eben
-   * noch vor sich hatte — und mit ihr die Auswahl, über die die rechte Karte lebt. Genau
-   * das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
-   *
-   * Gemessen an der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`).
+   * Gemessen an der ungefilterten Menge (Muster aus `TierePage`/`SchaedenPage`).
    */
   const listeGescheitert = abschnitteQuery.isError && abschnitte.length === 0;
   const standVeraltet = abschnitteQuery.isError && abschnitte.length > 0;
@@ -354,10 +345,8 @@ export default function EinsatzabschnittePage() {
         />
       )}
 
-      {/* Unter `md` stapeln statt einer 360-px-Spalte neben dem Detail (LFH-341 · H40).
-          Kein Collapse: `GefahrenPage` hat die Frage für den Geschwisterfall entschieden —
-          eine zweite Bedienform für dieselbe Liste. Gestapelt trägt die Gliederung dieselbe
-          Bedienung wie breit, nur untereinander. */}
+      {/* Unter `md` stapeln statt einer 360-px-Spalte neben dem Detail. Kein Collapse:
+          gestapelt trägt die Gliederung dieselbe Bedienung wie breit. */}
       <div
         data-testid="abschnitte-rahmen"
         style={{
@@ -376,15 +365,12 @@ export default function EinsatzabschnittePage() {
             meta={abschnitteQuery.isSuccess ? String(abschnitte.length) : undefined}
             koerperPolster
           >
-            {/* Drei Zustände, in dieser Reihenfolge (LFH-331 · B3). Vorher stand hier eine
-              einzige Weiche auf die Länge der Liste — die ist während des Ladens und im
-              Fehlerfall genauso wahr wie bei einer wirklich leeren Gliederung. Die Seite
-              behauptete damit „keine Abschnitte", wenn bloß die Verbindung abgerissen war.
-              Solange geladen wird, wird über die Menge nichts behauptet.
+            {/* Drei Zustände in dieser Reihenfolge: eine Weiche auf die Länge der Liste wäre
+                auch beim Laden und im Fehlerfall wahr. Solange geladen wird, wird über die
+                Menge nichts behauptet.
 
-              Der Fehlerzweig trägt zusätzlich die MENGENBEDINGUNG (`listeGescheitert`):
-              er verdrängt den Baum nur, wenn es keinen gibt. Steht einer im
-              Zwischenspeicher, bleibt er und bekommt das Veraltet-Banner (unten). */}
+                Der Fehlerzweig trägt zusätzlich die Mengenbedingung (`listeGescheitert`): er
+                verdrängt den Baum nur, wenn es keinen gibt. */}
             {abschnitteQuery.isLoading ? (
               <SeitenSkeleton />
             ) : listeGescheitert ? (
@@ -397,9 +383,8 @@ export default function EinsatzabschnittePage() {
               <SeitenLeer
                 titel="Noch keine Abschnitte"
                 hinweis="Gliedere die Lage in Abschnitte, um Einheiten und Führung zuzuordnen."
-                /* Derselbe Wortlaut wie der Kopfknopf: eine zweite Schreibweise für dieselbe
-                 Geste wäre der Befund, den B3 behebt. Ohne Schreibrecht keine Aktion — ein
-                 Knopf, der nur eine Fehlermeldung auslöst, ist kein Weg aus dem Leerzustand. */
+                /* Derselbe Wortlaut wie der Kopfknopf. Ohne Schreibrecht keine Aktion — ein
+                   Knopf, der nur eine Fehlermeldung auslöst, ist kein Weg aus dem Leerzustand. */
                 aktion={
                   darfSchreiben
                     ? { label: 'Abschnitt anlegen', onClick: entwurfOeffnen }
@@ -436,9 +421,8 @@ export default function EinsatzabschnittePage() {
                 : 'Kein Abschnitt gewählt'
           }
         >
-          {/* KEIN Leerzustand, sondern eine Aufforderung bei fehlender Auswahl: die Menge
-              kann voll sein, es fehlt nur die Wahl. Deshalb ausdrücklich ohne Aktion — es
-              gibt nichts zu beheben, nur etwas anzuklicken. */}
+          {/* Kein Leerzustand, sondern eine Aufforderung bei fehlender Auswahl; deshalb ohne
+              Aktion. */}
           {!aktuell && !entwurf ? (
             <SeitenLeer titel="Wähle einen Abschnitt im Baum" />
           ) : entwurf || bearbeiten ? (

@@ -4,86 +4,41 @@ import { kontrast, randKontrast } from './kontrast-kern';
 
 /**
  * Browser-Nachweise für die Prüfliste der Betreuungsseite `/einsaetze/:id/betreuung`
- * (LFH-677, Nachzug zu LFH-639; Prüfliste `2026-09-23-lfh-639-pruefliste.md`, Zeilen T1-5,
- * T1-13 und T2-13). Muster: `verpflegung-kontrast.spec.ts` (Kriterium 5) und
- * `dokumente.spec.ts` (Kriterium 13). Fixture-Namen tragen kein „Betreuung" — die Palette
- * sucht Module und Einsätze gemeinsam (design.md D10 e).
+ * (Kriterien 5 und 13). Fixture-Namen tragen kein „Betreuung" — die Palette sucht Module und
+ * Einsätze gemeinsam.
  *
  * ═══ KRITERIUM 5 — Kontrast der ZUSAMMENGESETZTEN Paare, Tag und Nacht ═══════════════════
  *
- * GESÄT, damit jede Tönung der Seite vorkommt:
- *  · vier Bezirke, je ein Räumungszustand (angeordnet, läuft, geräumt, aufgehoben), mit
- *    geschätztem Stand („≈ 212"), gezähltem Stand und ohne Stand („keine Meldung"), ohne
- *    Abschnitt („—" im Sekundärfeld);
- *  · sechs Stellen: 135 / 150 („fast voll", achtung), 150 / 150 („voll", alarm),
- *    160 / 150 („überbelegt", alarm), eine vorbereitete ohne Meldung („keine Meldung",
- *    frei „—"), eine ohne Kapazität (Kapazität und frei „—") und eine geschlossene.
+ * GESÄT, damit jede Tönung vorkommt: vier Bezirke (je ein Räumungszustand; geschätzter,
+ * gezählter und fehlender Stand; ohne Abschnitt) und sechs Stellen („fast voll", „voll",
+ * „überbelegt", vorbereitet ohne Meldung, ohne Kapazität, geschlossen).
  *
- * SCHRANKEN (Literale; Kriterium 5 und WCAG 1.4.11):
- *  · Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1 — für JEDEN sichtbaren Text in Seitenkopf, Seiteninhalt,
- *    im geöffneten Zeilenmenü und in vier Dialogen („Stelle bearbeiten" mit
- *    Leermeldungs-Hinweis, „Evakuierungsbezirk anlegen", „Stand melden", „Stornieren"),
- *    gefunden über den Textbaum statt über eine Selektorliste und gemessen gegen den Grund, auf
- *    dem er WIRKLICH steht (LFH-618, Regel 3). Das Menü liegt als Portal außerhalb des
- *    Seiteninhalts und wird deshalb eigens geöffnet;
- *  · der Rand jedes Etiketts, das einen Zustand trägt, gegen die Fläche darum und gegen seine
- *    eigene Tönung: ≥ 3 : 1. Neutrale Etiketten (vorbereitet, geschlossen, aufgehoben) tragen
- *    ihre Aussage allein im Wort; ihr Rand wird gemessen und angehängt, aber nicht gepinnt.
+ * SCHRANKEN (Literale): Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1 für JEDEN sichtbaren Text in
+ * Seitenkopf, Inhalt, geöffnetem Zeilenmenü und vier Dialogen — über den Textbaum gefunden und
+ * gegen den Grund gemessen, auf dem er WIRKLICH steht. Der Rand jedes zustandstragenden
+ * Etiketts ≥ 3 : 1 (WCAG 1.4.11); neutrale Etiketten tragen ihre Aussage im Wort, ihr Rand
+ * wird nur protokolliert.
  *
- * DIE KRITISCHEN PAARE — im Tagmodus fällt die Füllfarbe unter den Boden, der Text muss über
- * `achtungText`/`alarmText` laufen (LFH-618, Regel 1): „angeordnet", „läuft" und „fast voll"
- * (achtung), „voll" und „überbelegt" (alarm). Sie stehen einzeln und benannt, nicht nur im
- * Textbaum — dort wären sie zwischen den Karten und Zeilen nicht zuzuordnen, und eine
- * benannte Zusicherung ist die Stelle, an der die Mutationsprobe rot wird.
+ * KRITISCHE PAARE stehen einzeln und benannt: am Tag muss Text über `achtungText`/`alarmText`
+ * laufen („angeordnet", „läuft", „fast voll"; „voll", „überbelegt"). Ebenso tragend ist der
+ * gewählte Radio-Knopf, dessen Text `src/index.css` auf `--lfh-bedien-text` setzt.
  *
- * DER GEWÄHLTE RADIO-KNOPF („geschlossen", „geschätzt", „gezählt") ist tragend. Er stand am
- * Tag in `bedien` auf Weiß bei 6,59 : 1 — im ersten Lauf dieses Specs gemessen und in
- * LFH-677 behoben: `src/index.css` setzt den TEXT des gewählten Knopfs und des Knopfs
- * unter dem Zeiger auf `--lfh-bedien-text` (Regel aus LFH-650), Rand und Flächen bleiben.
- *
- * DREI BENANNTE AUSNAHMEN — Eigenschaften geteilter Rollen, nicht dieser Seite; bis dahin gilt
- * die absolute Untergrenze 4,5 : 1 aus Kriterium 5, der Zielwert steht in jeder Meldung:
- *  · TERTIÄRTEXT (`schwach`) → LFH-643, in BEIDEN Modi. Hier: „keine Meldung" und „—" in der
- *    Stellentabelle (`Typography type="secondary"`, `StellenBlock.tsx`), der Tabellenkopf, die
- *    Augenbrauen (Blockköpfe „Evakuierung"/„Betreuungsstellen", Feldetiketten der
- *    Bezirkskarte), die Feldhilfen der Dialoge (`.ant-form-item-extra`), Platzhalter und der
- *    Ortspfad im Seitenkopf bis auf sein letztes Glied;
- *  · WEISS AUF `bedien` in jedem Primärknopf → LFH-661, nur am Tag;
- *  · ROT AM TAG → LFH-693, zwei Paare, getrennt geführt: der Menüeintrag „Stornieren"
- *    (roter Text auf der Menüfläche) und der gefüllte rote Knopf im Storno-Dialog (Weiß auf
- *    `alarm`, in der LFH-634-Prüfliste Befund S3).
- * Jeder andere Text — Bezeichnungen, „≈ 212 · von 380 geplant", „keine Meldung · von ≈ 640
- * geplant" (Karte), Etiketten, Kopfzahlen, der Leermeldungs-Hinweis, Feldbeschriftungen —
- * trägt den vollen Boden. FALLEN DIE AUSNAHMEN, wenn LFH-643/661/693 landen.
- *
- * MUTATIONSPROBE (24.09.2026, lokal gefahren, nicht committet): `achtungText` → `achtung` und
- * `alarmText` → `alarm` in `components/instrument/statusFlaeche.ts` — der Taglauf wird an
- * allen fünf benannten Etiketten rot („angeordnet", „läuft", „fast voll" 6,02 : 1; „voll",
- * „überbelegt" 5,52 : 1) und an denselben Wortlauten im Textbaum. Die Radio-Regel in
- * `index.css` entfernt → „geschlossen", „geschätzt", „gezählt" rot mit 6,59 : 1. Danach
- * zurückgesetzt.
+ * DREI BENANNTE AUSNAHMEN — Eigenschaften geteilter Rollen; bis dahin gilt 4,5 : 1, der
+ * Zielwert steht in jeder Meldung:
+ *  · Tertiärtext (`schwach`) → LFH-643, beide Modi;
+ *  · Weiß auf `bedien` im Primärknopf → LFH-661, nur am Tag;
+ *  · Rot am Tag → LFH-693: der Menüeintrag „Stornieren" und der rote Knopf im Storno-Dialog.
+ * Fallen die Ausnahmen, wenn diese Tickets landen.
  *
  * ═══ KRITERIUM 13 — Fokus nie verdeckt (WCAG 2.4.11) ════════════════════════════════════
  *
- * TABELLE: zwanzig gesäte Stellen, Seite halb gescrollt, Durchlauf VORWÄRTS UND RÜCKWÄRTS.
- * Vorwärts rollt der Browser jedes Ziel an den unteren Rand; unter die OBEN stehende
- * Kopfzeile gerät es so nie. Erst der Rückwärtslauf legt die Ziele an den oberen Rand, an
- * die stehende Kopfzeile der `KatalogTabelle` — `stoppsAnTabellenkopf` belegt, dass das auch
- * wirklich geschah. Gemessen im Fükw (1366 × 600, kompakt) und bei 390 px im Handschuh-Betrieb,
- * wo zusätzlich die fixierte Kennungsspalte neben den Aktionsknöpfen steht.
+ * TABELLE: zwanzig Stellen, Seite halb gescrollt, Durchlauf VORWÄRTS UND RÜCKWÄRTS — nur
+ * rückwärts geraten Ziele an die oben stehende Kopfzeile (`stoppsAnTabellenkopf` belegt es).
+ * Gemessen im Fükw und bei 390 px im Handschuh-Betrieb.
  *
- * DER BEFUND, den dieser Rückwärtslauf zuerst lieferte (24.09.2026): im Fükw lagen
- * „Belegung melden" und der Dreipunkt (30 px) bei y = 0 VOLLSTÄNDIG hinter der Kopfzeile,
- * zwei Zeilen, vier Stopps. Behoben im Primitiv (`setzeKopfFreiraum` in `KatalogTabelle.tsx`
- * plus `scroll-margin-top` in `theme/sprache.css`) — also für jede Katalogtabelle, nicht nur
- * hier. Mutationsprobe: die CSS-Regel entfernt → derselbe Befund kehrt zurück (4 verdeckt).
- * Bei 390 px im Handschuh-Betrieb war der Knopf (72 px) höher als die Kopfzeile und nie ganz
- * verdeckt.
- *
- * DIALOGE: jeder Dialog der Seite bei 390 × 844 px im Handschuh-Betrieb, „Weitere Angaben"
- * aufgeklappt. Die Ziele werden GENERISCH markiert (jedes tabbare, sichtbare Element im
- * Dialog; je Radiogruppe nur das gewählte Radio, weil der Browser die übrigen überspringt),
- * und der Durchlauf muss jedes davon besuchen — sonst wäre „0 verdeckt" trivial wahr.
+ * DIALOGE: jeder Dialog bei 390 × 844 px im Handschuh-Betrieb, „Weitere Angaben" aufgeklappt.
+ * Die Ziele werden GENERISCH markiert (je Radiogruppe nur das gewählte Radio), und der
+ * Durchlauf muss jedes besuchen — sonst wäre „0 verdeckt" trivial wahr.
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
@@ -101,13 +56,10 @@ const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
  */
 const TERTIAER = [
   '.ant-typography-secondary',
-  // Augenbraue (`schwach`): Blockköpfe „Evakuierung"/„Betreuungsstellen" und die
-  // Feldetiketten der Bezirkskarte („Evakuiert", „Stand", „Abschnitt").
+  // Augenbraue (`schwach`): Blockköpfe und Feldetiketten der Bezirkskarte.
   '.lfh-augenbraue',
-  // Kopf der Stellentabelle — antds Tabellenkopf läuft in `schwach` (wie in
-  // `dokumente.spec.ts` als geerbte Rolle geführt). Die Kopfzelle IST der Träger: sie hält
-  // den Titel als eigenen Textknoten (bzw. im Titel-`span` der sortierbaren Spalte) und
-  // sonst nur `aria-hidden`-Zeichen für Sortierung und Filter.
+  // Kopf der Stellentabelle (`schwach`). Die Kopfzelle IST der Träger: sonst stehen darin nur
+  // `aria-hidden`-Zeichen für Sortierung und Filter.
   '.ant-table-thead > tr > th',
   '.ant-form-item-extra',
   '.ant-select-placeholder',
@@ -323,8 +275,7 @@ for (const modus of ['light', 'dark'] as const) {
     await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
     await page.goto(`/einsaetze/${einsatzId}/betreuung`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
-    // Den EINGESCHWUNGENEN Stand messen: alle Karten und alle Dreipunkt-Auslöser der Tabelle
-    // stehen, erst dann zeigen die Messmarken auf bleibende Knoten.
+    // Den EINGESCHWUNGENEN Stand messen: erst dann zeigen die Messmarken auf bleibende Knoten.
     await expect(
       page
         .getByRole('region', { name: 'Evakuierungsbezirke' })
@@ -333,9 +284,7 @@ for (const modus of ['light', 'dark'] as const) {
     await expect(page.getByRole('button', { name: /^Aktionen zu Stelle / })).toHaveCount(
       STELLEN.length,
     );
-    // Ein Nachladen blendet den Block über `.ant-spin-container` ab; der Messkern lehnt jede
-    // Opacity ab. Erst messen, wenn kein Container mehr gedimmt ist (gemessen: 0,90 mitten im
-    // Übergang).
+    // Ein Nachladen dimmt den Block über `.ant-spin-container`; der Messkern lehnt Opacity ab.
     await expect
       .poll(() =>
         page
@@ -380,7 +329,7 @@ for (const modus of ['light', 'dark'] as const) {
     }
 
     // (2) Status- und Auslastungsetiketten der Stellentabelle — „fast voll", „voll" und
-    // „überbelegt" sind kritisch. Die Zeile trägt zwei Etiketten: Status und Auslastung.
+    // „überbelegt" sind kritisch.
     for (const a of AUSLASTUNG) {
       const zeile = stellenZeile(page, stellen[a.stelle]);
       const etiketten = zeile.locator('.ant-tag');
@@ -404,8 +353,7 @@ for (const modus of ['light', 'dark'] as const) {
     const messeTexte = async (wurzel: Locator, flaeche: string) => {
       await page.mouse.move(0, 0);
       const knoten = await textknoten(wurzel);
-      // Ein Dialog blendet mit Opacity ein; der Messkern lehnt das ab. Erst messen, wenn der
-      // erste Knoten eben steht.
+      // Ein Dialog blendet mit Opacity ein; erst messen, wenn der erste Knoten steht.
       await expect(async () => {
         await kontrast(knoten[0].ziel);
       }).toPass({ timeout: 10_000 });
@@ -431,7 +379,7 @@ for (const modus of ['light', 'dark'] as const) {
     await messeTexte(inhalt, 'inhalt');
 
     // „Stelle bearbeiten" an der belegten Stelle, Status auf „geschlossen": erst dann stehen
-    // Leermeldungs-Hinweis und Häkchen im Dialog (design.md D4).
+    // Leermeldungs-Hinweis und Häkchen im Dialog.
     await menue(page, 'Aktionen zu Stelle Gemeindehaus Süd', 'Bearbeiten (Status, Kapazität)');
     const bearbeiten = page.getByRole('dialog', { name: 'Stelle bearbeiten: Gemeindehaus Süd' });
     await dialogSteht(page, bearbeiten);
@@ -467,8 +415,7 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(dialog).toBeHidden();
     }
 
-    // Das gebündelte Zeilenmenü liegt als Portal AUSSERHALB des Seiteninhalts — der Textbaum
-    // oben sieht es nicht (die Lücke, die LFH-693 an `abloesung-kontrast.spec.ts` benennt).
+    // Das Zeilenmenü liegt als Portal AUSSERHALB des Seiteninhalts — der Textbaum sieht es nicht.
     await page
       .getByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost', exact: true })
       .click();
@@ -483,9 +430,8 @@ for (const modus of ['light', 'dark'] as const) {
     await page.keyboard.press('Escape');
     await expect(storno).toBeHidden();
 
-    // Die Probe hat die Texte wirklich gesehen — sonst wäre ein grüner Lauf leer. Und die
-    // tragenden liefen OHNE Ausnahme: eine zu weit gefasste Ausnahme-Liste senkte sonst still
-    // den Boden für genau die Paare, um die es geht.
+    // Die Probe hat die Texte wirklich gesehen, und die tragenden liefen OHNE Ausnahme — eine
+    // zu weit gefasste Ausnahme-Liste senkte sonst still den Boden.
     const pruefeGesehen = (flaeche: string | null, pflicht: string | RegExp, tragend: boolean) => {
       const treffer = gemessen.filter(
         ([f, t]) =>
@@ -541,8 +487,7 @@ for (const modus of ['light', 'dark'] as const) {
       ['Stelle bearbeiten', 'Abbrechen'],
       ['Evakuierungsbezirk anlegen', 'Bezeichnung'],
       ['Stand melden: Uferstraße 12–40', 'Zeitpunkt'],
-      // Der GEWÄHLTE Radio-Knopf: am Tag lag er in `bedien` bei 6,59 : 1 — seit LFH-677
-      // läuft sein Text über `--lfh-bedien-text` (`src/index.css`), tragend.
+      // Der GEWÄHLTE Radio-Knopf, tragend (Text über `--lfh-bedien-text`).
       ['Stelle bearbeiten', 'geschlossen'],
       ['Evakuierungsbezirk anlegen', 'geschätzt'],
       ['Stand melden: Uferstraße 12–40', 'gezählt'],
@@ -673,9 +618,8 @@ interface DialogFall {
   /** Nach dem Öffnen: den Dialog in seinen höchsten Zustand bringen. */
   vorbereiten?: (page: Page, dialog: Locator) => Promise<void>;
   /**
-   * Gemessen höher als der Schirm (390 × 844, handschuh, aufgeklappt) — der Fall, in dem ein
-   * Ziel beim Scrollen der Hülle unter eine fixierte Fläche geraten könnte. Gepinnt, damit
-   * der Nachweis nicht still auf einen Dialog schrumpft, der ganz auf den Schirm passt.
+   * Höher als der Schirm (390 × 844, handschuh, aufgeklappt) — gepinnt, damit der Nachweis
+   * nicht still auf einen Dialog schrumpft, der ganz auf den Schirm passt.
    */
   scrollt?: true;
 }
@@ -791,8 +735,7 @@ for (const fall of DIALOGE) {
       ziele.length,
       `mindestens Schließen, ein Feld/Knopf und Absenden: ${ziele.join(' | ')}`,
     ).toBeGreaterThanOrEqual(3);
-    // Schließkreuz und Absende-Knopf gehören zu den Zielen — sonst wäre die Markierung leer
-    // an der Stelle, die zählt.
+    // Schließkreuz und Absende-Knopf gehören zu den Zielen.
     await expect(dialog.locator('.ant-modal-close[data-e2e-fokus]')).toHaveCount(1);
     await expect(dialog.locator('button.ant-btn-primary[data-e2e-fokus]')).toHaveCount(1);
 

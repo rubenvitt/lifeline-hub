@@ -1,8 +1,8 @@
 //! Abruf der PEGELONLINE-Zeitreihe je Station mit Cache (LFH-606).
 //!
 //! Je Station ein Eintrag `pegel:<uuid>` in `karte::cache` (die geparste Reihe der letzten
-//! 24 Stunden; bis LFH-633 waren es drei — ältere Einträge bleiben gültig und wachsen mit
-//! dem nächsten Abruf). Stale-while-revalidate wie bei den Fachebenen (`karte::quellen`):
+//! 24 Stunden; ältere, kürzere Einträge bleiben gültig und wachsen mit dem nächsten Abruf).
+//! Stale-while-revalidate wie bei den Fachebenen (`karte::quellen`):
 //!
 //! - frisch (< 5 min) → sofort, ohne Netz;
 //! - abgelaufen → **sofort** den alten Stand ausliefern und im Hintergrund erneuern. Sein
@@ -58,9 +58,9 @@ pub fn cache_schluessel(station_uuid: &str) -> String {
     format!("pegel:{station_uuid}")
 }
 
-/// URL der W-Zeitreihe (Wasserstand) der letzten 24 Stunden (LFH-633: für den Verlauf; der
-/// Trend nutzt davon weiter nur die letzten 60 min, `trend::FENSTER_S`). Gemessen: 96 Punkte
-/// im 15-min-Raster, rund 5,6 KB je Station.
+/// URL der W-Zeitreihe (Wasserstand) der letzten 24 Stunden, für den Verlauf; der Trend nutzt
+/// davon nur die letzten 60 min (`trend::FENSTER_S`). Typisch 96 Punkte im 15-min-Raster, rund
+/// 5,6 KB je Station.
 pub fn messungen_url(basis: &str, station_uuid: &str) -> String {
     format!("{basis}/stations/{station_uuid}/W/measurements.json?start=P1D")
 }

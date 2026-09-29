@@ -3,33 +3,17 @@ import { beobachteShifts, bericht, ruheShifts, setzeShiftsZurueck } from './cls-
 
 /**
  * Prüflisten-Zeile 12 der Bedien-Leitlinie — „kein Sprung, kein Flächenfraß" — für die
- * angepinnten und schwebenden Leisten (LFH-373).
- *
- * WAS HIER STEHT UND WARUM NICHT IN VITEST: jsdom rechnet kein Layout; eine Leistenhöhe, ein
- * Umbruch oder ein Layout-Shift existieren dort nicht. Gemessen wird mit echten Kästen und dem
+ * angepinnten und schwebenden Leisten, gemessen mit echten Kästen und dem
  * `layout-shift`-Beobachter aus `cls-kern.ts`.
  *
- * DER DECKEL IST EINE SETZUNG, KEINE NORM: eine angepinnte oder schwebende Leiste belegt im
- * Ruhezustand höchstens die HÄLFTE der Fläche, auf der sie steht (Fensterhöhe für die
- * ETB-Erfassung, Kartenhöhe für die Zeitachse). Entscheidung des Auftraggebers vom 25.09.2026
- * nach der Vorab-Messung (ETB bei 390 × 844 im Handschuh-Betrieb 497 px = 59 %, bei 390 × 600
- * sogar 83 %). Wer die Zahl ändert, ändert Spec (`openspec/changes/lfh-373-…`), diese Datei
- * und die Prüflisten zusammen.
+ * DER DECKEL IST EINE SETZUNG DES AUFTRAGGEBERS, KEINE NORM: eine angepinnte oder schwebende
+ * Leiste belegt im Ruhezustand höchstens die HÄLFTE der Fläche, auf der sie steht
+ * (Fensterhöhe für die ETB-Erfassung, Kartenhöhe für die Zeitachse). Wer die Zahl ändert,
+ * ändert Spec, diese Datei und die Prüflisten zusammen.
  *
  * CLS IST FÜR EINGABEFOLGEN BLIND: Verschiebungen binnen 500 ms nach einer Eingabe tragen
- * `hadRecentInput` und zählen in keiner CLS-Definition. Der Chip-Umbruch der Erfassung folgt
- * immer einer Eingabe — dort wird deshalb die GEOMETRIE gemessen (Lage der Zeitachsenzeilen
- * vorher/nachher), nicht CLS. CLS misst nur, was ohne Eingabe geschieht: das Laden und eine
- * Fremdänderung, die live eintrifft.
- *
- * MUTATIONSPROBE (25.09.2026, je Fix einzeln zurückgedreht, Test muss rot werden):
- *  - Leiste zurück in die Zeitachsenspalte (`fuss` entfernt) → Deckel-Test ROT (Überstand).
- *  - Feld nicht gestapelt → Deckel-Test ROT. Chip-Zeile bricht um → Chip-Test ROT.
- *  - Zeitleiste ohne Umbruch UND „Abspielen" schrumpft → Zeitachsen-Test ROT.
- *  - ÜBERLEBT, erklärt: nur `abspielenStil` zurück — der Umbruch der Zeitleiste hält
- *    „Abspielen" allein breit, `flexShrink: 0` ist eine Sicherung. Nur `preventScroll` in
- *    `MetaChip` zurück — seit die Leiste als Seitenfuß ganz im Fenster steht, hat der native
- *    Fokus nichts mehr zu rollen; die Sicherung hält `MetaChip.test.tsx`.
+ * `hadRecentInput`. Der Chip-Umbruch der Erfassung folgt immer einer Eingabe — dort wird die
+ * GEOMETRIE gemessen. CLS misst nur das Laden und eine live eintreffende Fremdänderung.
  */
 
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -44,7 +28,6 @@ const DECKEL = 0.5;
 /** CLS-Grenze „gut", https://web.dev/articles/cls — Literal wie in `einsatzauswahl-cls`. */
 const CLS_GUT = 0.1;
 
-// Login-Helfer aus `kernfluss.spec.ts` kopiert — es gibt (noch) kein geteiltes Login-Modul.
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill('admin');
@@ -74,13 +57,10 @@ async function schriftenGeladen(page: Page) {
 }
 
 /**
- * Klick an die Mitte des Kastens über die Maus, ohne Playwrights Vorab-Rollen.
- *
- * GEMESSEN (LFH-373): `locator.click()` rollt ein Ziel vorher „bei Bedarf" ins Bild — bei
- * einem Knopf in einer `position: sticky`-Fußleiste rollte das die Seite um 390 px, obwohl
- * der Knopf längst sichtbar war. Mit `dispatchEvent` blieb die Seite bei 0: der Sprung war ein
- * Werkzeug-Artefakt, keiner der Anwendung. Wer einen Sprung unter dem Cursor MESSEN will, darf
- * ihn nicht selbst auslösen.
+ * Klick an die Mitte des Kastens über die Maus, ohne Playwrights Vorab-Rollen:
+ * `locator.click()` rollt „bei Bedarf" ins Bild und verschob die Seite bei einem Knopf in einer
+ * sticky Fußleiste um 390 px — ein Werkzeug-Artefakt. Wer einen Sprung MESSEN will, darf ihn
+ * nicht selbst auslösen.
  */
 async function klickeWieEinMensch(page: Page, ziel: Locator) {
   await expect(ziel).toBeVisible();
@@ -133,9 +113,8 @@ test('ETB (LFH-373): die Erfassungsleiste belegt höchstens die halbe Fensterhö
           `${lauf}: Leiste ${Math.round(m.leiste)} px > ${DECKEL * 100} % von ${m.fenster}`,
         );
       }
-      // Ganz oben auf der Seite ganz im Fenster (LFH-373): in der Zeitachsenspalte konnte die
-      // angepinnte Leiste nicht über deren Oberkante steigen und ragte auf dem Handschirm im
-      // Handschuh-Betrieb 61 px unter das Fenster — obwohl ihre Höhe den Deckel hielt.
+      // Ganz oben auf der Seite ganz im Fenster: ein `sticky; bottom: 0` steigt nie über die
+      // Oberkante seines Elternblocks, deshalb hängt die Leiste an der Seitenwurzel.
       expect(
         m.unterkante,
         `${lauf}: Leiste ganz oben auf der Seite ganz im Fenster (Unterkante ${Math.round(m.unterkante)})`,
@@ -144,8 +123,8 @@ test('ETB (LFH-373): die Erfassungsleiste belegt höchstens die halbe Fensterhö
         m.fensterBreite,
       );
       if (flaeche.width < 768) {
-        // Unter `md` nutzt das Feld die volle Breite der Erfassungskarte (vorher 124 von 366 px,
-        // eingezwängt zwischen Typ-Präfix und „Erfassen"). Spiel für Rahmen und Polsterung.
+        // Unter `md` nutzt das Feld die volle Breite der Erfassungskarte; Spiel für Rahmen und
+        // Polsterung.
         expect(
           m.feld,
           `${lauf}: Textfeld ${Math.round(m.feld)} px bei ${Math.round(m.karte)} px Karte`,
@@ -158,20 +137,10 @@ test('ETB (LFH-373): die Erfassungsleiste belegt höchstens die halbe Fensterhö
 });
 
 /**
- * ETB (LFH-373, Prüfliste ETB Zeile 12): drei gesetzte Felder auf dem Handschirm im
- * Handschuh-Betrieb — die Leiste bleibt ganz im Bild und unter dem Deckel, nichts springt.
- *
- * DIE PRÄMISSE DER PRÜFLISTE HAT SICH GEDREHT: im Juli stand die Erfassung als angepinnter
- * KOPF über einer Tabelle. Seit dem Neuentwurf ist sie ein angepinnter FUSS. Gemessen vor
- * LFH-373 (390 × 844, handschuh): jeder gesetzte Chip kostete eine eigene Reihe (+81 px), bei
- * drei Chips 578 px (68 %); die Leiste hing in der Zeitachsenspalte (Oberkante 489) und ragte
- * ganz oben 61–166 px unter das Fenster; Tippen in einen Chip rollte die Seite, um die
- * Schreibmarke zu zeigen; die Chip-Eingabe fokussierte per `autoFocus` und rollte die Seite
- * um bis zu 467 px. Behoben: einzeilige, waagerecht rollende Chip-Zeile unter `md`, die
- * Leiste als Fuß der Seitenwurzel (`EinsatzSeite.fuss`), Fokus mit `preventScroll`.
- *
- * GEMESSEN WIRD GEOMETRIE, nicht CLS: jede Bewegung hier folgt einer Eingabe
- * (`hadRecentInput`), CLS wäre blind (Kopfkommentar).
+ * ETB: drei gesetzte Felder auf dem Handschirm im Handschuh-Betrieb — die Leiste bleibt ganz im
+ * Bild und unter dem Deckel, nichts springt. Getragen von der einzeiligen, waagerecht rollenden
+ * Chip-Zeile unter `md`, der Leiste als Fuß der Seitenwurzel und Fokus mit `preventScroll`.
+ * Gemessen wird Geometrie, nicht CLS (jede Bewegung folgt einer Eingabe).
  */
 test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem Deckel, nichts springt', async ({
   page,
@@ -209,8 +178,7 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
     });
   const vorher = await lageDerZeilen();
   const kastenVorher = await leistenKasten();
-  // Vorbedingung (Review LFH-373): die Seite MUSS rollen können — sonst bliebe scrollY 0, was
-  // immer Fokus oder Tippen tun, und „nichts springt" wäre trivial wahr.
+  // Vorbedingung: die Seite MUSS rollen können — sonst wäre „nichts springt" trivial wahr.
   const reserve = await page.evaluate(
     () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
   );
@@ -226,9 +194,8 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
     const option = page
       .locator('[data-slash-menu]')
       .getByRole('option', { name: feld, exact: true });
-    // Im Handschuh-Betrieb (72 px je Option, Menü höchstens 280 px) liegt eine Option im
-    // internen Bildlauf des Menüs. Gerollt wird NUR das Menü, wie es eine Person mit dem Finger
-    // täte — `scrollTop` am Menü, nicht `scrollIntoView` (das rollte auch die Seite).
+    // Im Handschuh-Betrieb liegt eine Option im internen Bildlauf des Menüs. Gerollt wird NUR
+    // das Menü (`scrollTop`); `scrollIntoView` rollte auch die Seite.
     await option.evaluate((el) => {
       const menue = el.closest('[data-slash-menu]') as HTMLElement;
       const m = menue.getBoundingClientRect();
@@ -238,7 +205,7 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
     });
     await klickeWieEinMensch(page, option);
     // Die Anwendung fokussiert die Chip-Eingabe selbst; getippt wird per Tastatur, weil
-    // `fill()` ebenfalls vorab ins Bild rollt (siehe `klickeWieEinMensch`).
+    // `fill()` ebenfalls vorab ins Bild rollt.
     await expect(leiste.getByLabel(feld, { exact: true })).toBeFocused();
     await page.keyboard.type(wert);
     await page.keyboard.press('Enter');
@@ -257,8 +224,8 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
   expect(await lageDerZeilen(), 'die Zeilen der Zeitachse stehen an derselben Stelle').toEqual(
     vorher,
   );
-  // 2 px Spiel: gemessen wuchs die Leiste mit drei Chips um 1,2 px (Zeilenhöhe der Chips
-  // gegenüber dem Knopf „Feld"). Ohne einzeilige Zeile waren es 158 px — eine Reihe je Chip.
+  // 2 px Spiel: die Chips sind etwas höher als der Knopf „Feld". Ohne einzeilige Zeile kostete
+  // jeder Chip eine eigene Reihe.
   expect(
     kastenNachher.hoehe - kastenVorher.hoehe,
     `die Leiste wächst mit den Chips nicht (${Math.round(kastenVorher.hoehe)} → ${Math.round(kastenNachher.hoehe)} px)`,
@@ -282,19 +249,12 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
 });
 
 /**
- * Lagekarte (LFH-373, Prüfliste Lagekarte Zeile 12 und Zeile 2): die ausgeklappte Zeitachse
- * belegt höchstens die halbe Kartenhöhe, kein Kind ragt aus dem Band, das Band bleibt in der
- * Kartenspalte, und „Abspielen" hält die kurze Achse.
+ * Lagekarte: die ausgeklappte Zeitachse belegt höchstens die halbe Kartenhöhe, kein Kind ragt
+ * aus dem Band, das Band bleibt in der Kartenspalte, und „Abspielen" hält die kurze Achse.
  *
- * GEMESSEN VOR LFH-373: bei 390 px im Handschuh-Betrieb schrumpfte „Abspielen" als Flex-Kind
- * auf 17 × 72 px; nach der Einrückung des Fußes vor die Knopfspalte (Gruppe 5) ragte das
- * Bezeichnungsfeld mit festen 180 px über den Bandrand und fing die Klicks auf die
- * Kartenknöpfe ab. Behoben über `sichernFeldStil`, `zeitleisteStil`, `abspielenStil`.
- *
- * Handschirm mit AUSGEBLENDETER Leiste (die Vorgabe unter `md`). Mit eingeblendeter Leiste
- * bleibt die Karte nur rund 337 px hoch; dort gilt nicht der Deckel, sondern „Band in der
- * Kartenspalte, kein Kind über dem Rand" — und die Nicht-Überschneidung mit dem Knopfblock,
- * die `fokus-verdeckung.spec.ts` misst.
+ * Handschirm mit AUSGEBLENDETER Leiste (Vorgabe unter `md`). Mit eingeblendeter Leiste ist die
+ * Karte zu niedrig für den Deckel; dort gilt „Band in der Kartenspalte, kein Kind über dem
+ * Rand" und die Nicht-Überschneidung mit dem Knopfblock (`fokus-verdeckung.spec.ts`).
  */
 test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und läuft nicht über', async ({
   page,
@@ -320,9 +280,8 @@ test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und l
   ]) {
     await page.setViewportSize({ width: lage.width, height: lage.height });
     await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
-    // Die Kartenleiste merkt ihre Wahl seit LFH-715 je Breitenklasse und überlebt damit das
-    // Neuladen in `stelleDichte`. Ein Klick auf „Leiste einblenden“ je Stufe fände den Knopf ab
-    // der zweiten Stufe nicht mehr — die Vorbedingung wird deshalb gesetzt, nicht geklickt.
+    // Die Kartenleiste merkt ihre Wahl je Breitenklasse und überlebt das Neuladen — die
+    // Vorbedingung wird deshalb gesetzt, nicht geklickt.
     await page.evaluate((offen) => {
       localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0');
       localStorage.removeItem('lfh:lagekarte:leiste-offen:ab-lg');
@@ -423,19 +382,14 @@ async function matrixEinsatz(
 }
 
 /**
- * Laden ohne Sprung (LFH-373, Prüflisten Zeile 12): ETB, Lagekarte und Gefahrenmatrix auf dem
- * Handschirm. Summe der Verschiebungen OHNE vorherige Eingabe ab dem Laden bis zur Ruhe.
+ * Laden ohne Sprung: ETB, Lagekarte und Gefahrenmatrix auf dem Handschirm — Summe der
+ * Verschiebungen ohne vorherige Eingabe vom Laden bis zur Ruhe. Je Route ein Inhaltsanker,
+ * sonst wäre „kein Sprung" auch im Ladezustand wahr.
  *
- * Der Beobachter lebt je Dokument (`cls-kern.ts`); `stelleDichte` lädt neu, gemessen wird also
- * genau das Laden in der gewählten Stufe. VORBEDINGUNG je Route ist ein Inhaltsanker — ohne
- * ihn wäre „kein Sprung" auch für eine Seite wahr, die noch im Ladezustand steht.
- *
- * DAS RENNEN WIRD ERZWUNGEN, nicht abgewartet (gemessen im Gate-Lauf 25.09.2026): im ETB sprang
- * die Seite nur, wenn Liste oder Zählung NACH dem ersten Bild eintrafen — in einem von fünf bis
- * acht Läufen. Dann schoben die Zeilen die Bilanz aus dem Bild (0,22) oder die Meta brach den
- * Seitenkopf um (0,19). Der Durchgang `verzoegert` hält beide Antworten 1,5 s zurück; ohne ihn
- * wäre der Test grün durch Zufall. Die Verzögerung greift nur auf die API-Pfade, nie auf das
- * Dokument (`/einsaetze/…/etb` ist auch die Seitenadresse).
+ * DAS RENNEN WIRD ERZWUNGEN, nicht abgewartet: im ETB sprang die Seite nur, wenn Liste oder
+ * Zählung NACH dem ersten Bild eintrafen — selten. Der Durchgang `verzoegert` hält beide
+ * Antworten 1,5 s zurück, nur auf den API-Pfaden (`/einsaetze/…/etb` ist auch die
+ * Seitenadresse).
  */
 test('Laden ohne Sprung (LFH-373): ETB, Lagekarte und Gefahrenmatrix auf dem Handschirm', async ({
   page,
@@ -513,14 +467,10 @@ test('Laden ohne Sprung (LFH-373): ETB, Lagekarte und Gefahrenmatrix auf dem Han
 });
 
 /**
- * Fremdänderung einer Matrixzelle (LFH-373, Prüfliste Gefahrenmatrix Zeile 12): eine Bewertung,
- * die live eintrifft, färbt die Zelle um, ohne die Tabelle zu verschieben.
- *
- * VORBEDINGUNG: die Zelle trägt danach wirklich die neue `data-warnstufe` — sonst wäre „kein
- * Sprung" auch dann wahr, wenn das Live-Ereignis nie ankam. Gemessen wird ab dem Ruhezustand
- * (`setzeShiftsZurueck`), die Ladephase zählt nicht mit. Die Änderung kommt über
- * `page.request` (Präzedenz: `abloesung-zufluss.spec.ts`); dass sie vom selben Benutzer stammt,
- * ändert am Weg über den Live-Strom und das Nachladen der Matrix nichts.
+ * Fremdänderung einer Matrixzelle: eine live eintreffende Bewertung färbt die Zelle um, ohne
+ * die Tabelle zu verschieben. Vorbedingung: die Zelle trägt danach wirklich die neue
+ * `data-warnstufe`, sonst bewiese „kein Sprung" nichts. Gemessen ab dem Ruhezustand; die
+ * Änderung kommt über `page.request` und läuft über den Live-Strom wie eine fremde.
  */
 test('Fremdänderung (LFH-373): eine live eintreffende Bewertung verschiebt die Matrix nicht', async ({
   page,

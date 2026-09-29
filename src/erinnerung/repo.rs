@@ -11,16 +11,14 @@ pub struct ErinnerungDaten<'a> {
     pub faellig_at: &'a str,
     pub intervall_minuten: Option<i64>,
     pub empfaenger_funktion: Option<&'a str>,
-    /// Generischer Sachbezug (z. B. 'etb' + ETB-Eintrag-ID, LFH-106); both-or-neither,
-    /// vom Handler validiert. Kein FK — wie der Auto-Frist-/Chat-Bezug nur per Code geführt.
+    /// Generischer Sachbezug (z. B. 'etb' + ETB-Eintrag-ID); beide oder keiner, vom Handler
+    /// validiert. Kein FK, nur per Code geführt.
     pub bezug_typ: Option<&'a str>,
     pub bezug_id: Option<i64>,
 }
 
-/// SELECT-Projektion inkl. abgeleitetem `ist_faellig`. `jetzt` wird als erster
-/// positionaler `?`-Parameter gebunden (steht textuell vor der WHERE-Klausel),
-/// danach die WHERE-Parameter — wie im `chat`-Repo durchgehend `?` (keine
-/// numbered binds, deren sqlx-SQLite-Verhalten hier unnötig riskant wäre).
+/// SELECT-Projektion inkl. abgeleitetem `ist_faellig`. `jetzt` wird als erster positionaler
+/// `?` gebunden (steht vor der WHERE-Klausel), danach die WHERE-Parameter.
 const ANZEIGE_SELECT: &str =
     "SELECT e.id, e.einsatz_id, e.titel, e.beschreibung, e.faellig_at, e.intervall_minuten, \
             e.empfaenger_funktion, e.bezug_typ, e.bezug_id, e.quelle, e.status, e.erledigt_at, \
@@ -33,11 +31,8 @@ const ANZEIGE_SELECT: &str =
      LEFT JOIN kommunikation_status ks \
             ON ks.objekt_typ = 'erinnerung' AND ks.objekt_id = e.id";
 
-/// Lädt eine Erinnerung als Anzeige. `NotFound`, wenn sie nicht existiert.
-/// Bind-Reihenfolge: zuerst `jetzt` (computed column), dann `id` (WHERE).
-///
-/// Executor-generisch (Pool oder offene Verbindung): [`anlegen_tx`] lädt auf der
-/// Verbindung seiner Transaktion (LFH-690).
+/// Lädt eine Erinnerung als Anzeige; `NotFound`, wenn sie nicht existiert. Bind-Reihenfolge:
+/// `jetzt`, dann `id`. Executor-generisch, damit [`anlegen_tx`] auf seiner Verbindung lädt.
 pub async fn laden(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     id: i64,
@@ -53,9 +48,8 @@ pub async fn laden(
     .ok_or(AppError::NotFound)
 }
 
-/// Listet Erinnerungen eines Einsatzes. `nur_offen` filtert auf `status='offen'`.
-/// Sortierung: nach Fälligkeit aufsteigend (älteste/überfälligste zuerst).
-/// Bind-Reihenfolge: zuerst `jetzt` (computed column), dann `einsatz_id` (WHERE).
+/// Erinnerungen eines Einsatzes, nach Fälligkeit aufsteigend; `nur_offen` filtert auf
+/// `status='offen'`. Bind-Reihenfolge: `jetzt`, dann `einsatz_id`.
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -75,10 +69,8 @@ pub async fn liste(
         .map_err(Into::into)
 }
 
-/// Legt eine manuelle Erinnerung an und liefert sie als Anzeige.
-///
-/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, Insert und Rücklesen
-/// laufen im Autocommit einer geliehenen Verbindung.
+/// Legt eine manuelle Erinnerung an und liefert sie als Anzeige. Pool-Hülle um [`anlegen_tx`]
+/// ohne eigene Transaktion.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -90,10 +82,9 @@ pub async fn anlegen(
     anlegen_tx(&mut conn, einsatz_id, ersteller_id, &daten, jetzt).await
 }
 
-/// Legt eine manuelle Erinnerung (Status `offen`) auf einer offenen Verbindung/Transaktion an
-/// und lädt sie dort zurück (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet
-/// selbst nichts. Die Bezugsprüfung (both-or-neither, Existenz im Einsatz) liegt im Handler
-/// (`routes/erinnerung.rs`) und ist hier nicht enthalten.
+/// Legt eine manuelle Erinnerung (Status `offen`) auf einer offenen Verbindung an und lädt sie
+/// dort zurück (Demo-Import in EINER Transaktion). Öffnet und committet nichts. Die
+/// Bezugsprüfung liegt im Handler (`routes/erinnerung.rs`).
 pub async fn anlegen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -136,11 +127,8 @@ pub async fn gehoert_zu_einsatz(
     Ok(treffer.is_some())
 }
 
-/// Setzt den Status (erledigt/quittiert) und `erledigt_at = jetzt`.
-/// Nur erlaubte Zielstatus; sonst `Validation`.
-///
-/// Pool-Hülle um [`status_setzen_tx`]: wie bisher ohne eigene Transaktion, UPDATE und
-/// Rücklesen laufen im Autocommit einer geliehenen Verbindung.
+/// Setzt den Status (erledigt/quittiert) und `erledigt_at = jetzt`; andere Zielstatus →
+/// `Validation`. Pool-Hülle um [`status_setzen_tx`] ohne eigene Transaktion.
 pub async fn status_setzen(
     pool: &SqlitePool,
     id: i64,
@@ -151,9 +139,8 @@ pub async fn status_setzen(
     status_setzen_tx(&mut conn, id, neuer_status, jetzt).await
 }
 
-/// Wie [`status_setzen`], auf einer offenen Verbindung/Transaktion (LFH-690: der Demo-Import
-/// legt vergangene Erinnerungen in EINER Transaktion als erledigt an, design.md D10).
-/// Öffnet und committet selbst nichts.
+/// Wie [`status_setzen`] auf einer offenen Verbindung (der Demo-Import legt vergangene
+/// Erinnerungen als erledigt an). Öffnet und committet nichts.
 pub async fn status_setzen_tx(
     conn: &mut SqliteConnection,
     id: i64,
@@ -172,13 +159,10 @@ pub async fn status_setzen_tx(
     laden(&mut *conn, id, jetzt).await
 }
 
-/// Setzt eine erledigte/quittierte Erinnerung auf `offen` zurück (LFH-343 · C8).
+/// Setzt eine erledigte/quittierte Erinnerung auf `offen` zurück.
 ///
-/// Bewusst NICHT als dritter erlaubter Wert in [`status_setzen`]: dessen Riegel
-/// („nur erledigt/quittiert") ist eine Zusicherung über die Vorwärtsrichtung, und
-/// die Rücknahme räumt zusätzlich `erledigt_at` — was `status_setzen` gerade
-/// setzt. Zwei gegenläufige Wirkungen in einer Funktion wären ein Schalter, kein
-/// Vorgang.
+/// Nicht als dritter Wert in [`status_setzen`]: dessen Riegel sichert die Vorwärtsrichtung, und
+/// die Rücknahme räumt `erledigt_at`, das `status_setzen` gerade setzt.
 pub async fn wieder_oeffnen(
     pool: &SqlitePool,
     id: i64,
@@ -192,26 +176,25 @@ pub async fn wieder_oeffnen(
     laden(pool, id, jetzt).await
 }
 
-/// Eine fällige, offene Erinnerung, die ein Scheduler-Nudge braucht.
-/// `intervall_minuten` entscheidet einmalig vs. wiederkehrend in `tick_einmal`.
+/// Eine fällige, offene Erinnerung für den Scheduler; `intervall_minuten` entscheidet einmalig
+/// oder wiederkehrend.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct FaelligeErinnerung {
     pub id: i64,
     pub einsatz_id: i64,
     pub faellig_at: String,
     pub intervall_minuten: Option<i64>,
-    /// Generischer Bezug (z. B. 'meldung' + Meldungs-ID) — der Scheduler hängt daran
-    /// die Eskalation des Bezugs auf (LFH-97), ohne Fremdtabellen-Polling.
+    /// Generischer Bezug (z. B. 'meldung' + ID); daran hängt der Scheduler die Eskalation, ohne
+    /// Fremdtabellen zu pollen.
     pub bezug_typ: Option<String>,
     pub bezug_id: Option<i64>,
-    /// Titel der Erinnerung — der Ablösungs-Hinweis (LFH-635) trägt ihn in die AlarmZentrale.
+    /// Titel der Erinnerung; der Ablösungs-Hinweis trägt ihn in die AlarmZentrale.
     pub titel: String,
 }
 
-/// Liefert offene Erinnerungen, die fällig sind (`faellig_at <= jetzt`) und für
-/// ihren aktuellen `faellig_at`-Slot noch nicht benachrichtigt wurden
-/// (`zuletzt_ausgeloest_at IS NULL OR zuletzt_ausgeloest_at < faellig_at`).
-/// Einsatzübergreifend — der Scheduler läuft global.
+/// Offene, fällige Erinnerungen (`faellig_at <= jetzt`), die für ihren aktuellen Slot noch nicht
+/// benachrichtigt wurden (`zuletzt_ausgeloest_at IS NULL OR zuletzt_ausgeloest_at < faellig_at`).
+/// Einsatzübergreifend, der Scheduler läuft global.
 pub async fn faellige_zum_ausloesen(
     pool: &SqlitePool,
     jetzt: &str,
@@ -260,12 +243,9 @@ pub async fn markiere_ausgeloest(
     Ok(())
 }
 
-/// Generischer Auto-Quelle-Hook: erzeugt eine Erinnerung/Nachfass aus einer
-/// überschrittenen Frist eines beliebigen Bezugs (z. B. Auftrag, Meldung).
-/// **Idempotent** je offenem Bezug — der partielle UNIQUE-Index verhindert
-/// Dubletten; bei bereits vorhandener offener Auto-Erinnerung wird die
-/// bestehende zurückgeliefert. Für späteres Wiring durch das Aufträge-Modul
-/// (LFH-52); dort wird `bezug_typ='auftrag'` + Auftrags-ID übergeben.
+/// Erzeugt eine Erinnerung aus einer überschrittenen Frist eines beliebigen Bezugs (z. B.
+/// Auftrag, Meldung). **Idempotent** je offenem Bezug: der partielle UNIQUE-Index verhindert
+/// Dubletten, eine vorhandene offene Auto-Erinnerung wird zurückgeliefert.
 #[allow(clippy::too_many_arguments)]
 pub async fn anlegen_aus_frist(
     pool: &SqlitePool,
@@ -293,13 +273,12 @@ pub async fn anlegen_aus_frist(
     laden(pool, id, jetzt).await
 }
 
-/// Transaktionsfähige Variante von [`anlegen_aus_frist`] (LFH-635): liefert die `id` der
-/// offenen Auto-Frist des Bezugs — neu angelegt oder die bereits bestehende.
+/// Transaktionsfähige Variante von [`anlegen_aus_frist`]: liefert die `id` der offenen
+/// Auto-Frist des Bezugs, neu oder bestehend.
 ///
-/// Atomarer Ensure: konkurrierende Replays dürfen beide bis hier gelangen. Der partielle
-/// Unique-Index lässt genau einen Insert gewinnen; der Verlierer liest anschließend denselben
-/// offenen Datensatz statt mit einem Unique-Fehler zu enden. Eine bestehende Frist wird
-/// dabei **nicht** verschoben — dafür ist [`setze_auto_frist_tx`] da.
+/// Atomarer Ensure: bei konkurrierenden Replays gewinnt dank partiellem Unique-Index genau ein
+/// Insert, der Verlierer liest denselben Datensatz. Eine bestehende Frist wird nicht verschoben
+/// — dafür ist [`setze_auto_frist_tx`] da.
 pub async fn anlegen_aus_frist_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -337,9 +316,9 @@ pub async fn anlegen_aus_frist_tx(
     }
 }
 
-/// Setzt die offene Auto-Frist eines Bezugs auf `faellig_at` (Upsert, LFH-635): gibt es eine,
-/// werden Zeitpunkt und Titel ersetzt und `zuletzt_ausgeloest_at` geleert — eine
-/// **verschobene** Frist löst zum neuen Zeitpunkt erneut aus. Gibt es keine, wird sie angelegt.
+/// Setzt die offene Auto-Frist eines Bezugs auf `faellig_at` (Upsert): eine bestehende bekommt
+/// Zeitpunkt und Titel neu und `zuletzt_ausgeloest_at` geleert, löst also zum neuen Zeitpunkt
+/// erneut aus. Sonst wird sie angelegt.
 #[allow(clippy::too_many_arguments)]
 pub async fn setze_auto_frist_tx(
     conn: &mut SqliteConnection,
@@ -378,12 +357,11 @@ pub async fn setze_auto_frist_tx(
     }
 }
 
-/// Öffnet die zuletzt geschlossene Auto-Frist eines Bezugs wieder (Rücknahme, LFH-635).
+/// Öffnet die zuletzt geschlossene Auto-Frist eines Bezugs wieder (Rücknahme).
 ///
-/// `zuletzt_ausgeloest_at` bleibt **bewusst stehen**: eine Frist, die schon ausgelöst hatte,
-/// löst nicht ein zweites Mal aus — die Rücknahme ist eine Korrektur, kein neuer Anlass.
-/// Existiert bereits eine offene Auto-Frist des Bezugs, passiert nichts (der partielle
-/// UNIQUE-Index ließe keine zweite zu). Liefert, ob eine Frist geöffnet wurde.
+/// `zuletzt_ausgeloest_at` bleibt stehen: eine Rücknahme ist eine Korrektur, kein neuer
+/// Anlass zum Auslösen. Existiert schon eine offene Auto-Frist, passiert nichts. Liefert, ob
+/// eine Frist geöffnet wurde.
 pub async fn oeffne_letzte_auto_tx(
     conn: &mut SqliteConnection,
     bezug_typ: &str,
@@ -411,16 +389,15 @@ pub async fn oeffne_letzte_auto_tx(
     Ok(r.rows_affected() > 0)
 }
 
-/// Entfernt **alle** Auto-Fristen eines Bezugs (LFH-635): für einen Bezug, der selbst
-/// verschwindet (zurückgenommene Folgeschicht, aufgelöste Einheit). Eine erledigte Frist ohne
-/// Bezug bliebe sonst als Geist in der Erinnerungsliste stehen.
+/// Entfernt **alle** Auto-Fristen eines Bezugs, der selbst verschwindet (zurückgenommene
+/// Folgeschicht, aufgelöste Einheit); sonst blieben sie als Geister in der Liste.
 pub async fn loesche_auto_tx(
     conn: &mut SqliteConnection,
     bezug_typ: &str,
     bezug_id: i64,
 ) -> Result<(), AppError> {
-    // Die geteilten Kommunikations-Achsen hängen polymorph (ohne FK) an der Erinnerung und
-    // gingen sonst als verwaiste Zeilen zurück.
+    // Die Kommunikations-Achsen hängen polymorph (ohne FK) an der Erinnerung und blieben sonst
+    // verwaist zurück.
     sqlx::query(
         "DELETE FROM kommunikation_status WHERE objekt_typ = 'erinnerung' AND objekt_id IN ( \
              SELECT id FROM erinnerung \
@@ -440,14 +417,13 @@ pub async fn loesche_auto_tx(
     Ok(())
 }
 
-/// Stellt die offene Auto-Frist-Erinnerung einer Meldung mit EINEM atomaren
-/// `INSERT ... SELECT` sicher.
+/// Stellt die offene Auto-Frist-Erinnerung einer Meldung mit EINEM atomaren `INSERT ... SELECT`
+/// sicher.
 ///
-/// Der Bestaetigungszustand wird nicht vorab im Rust-Code gelesen, sondern ist Guard desselben
-/// SQLite-Statements, das den Reminder schreibt. Da SQLite Schreibvorgaenge serialisiert, sind
-/// damit beide Interleavings sicher: gewinnt die Bestaetigung zuerst, fuegt der Guard nichts ein;
-/// gewinnt der Ensure zuerst, schliesst die nachfolgende Bestaetigungs-Transaktion den Reminder.
-/// Der partielle Unique-Index haelt Replays und parallele Ensures idempotent.
+/// Der Bestätigungszustand ist Guard desselben Statements, nicht vorab gelesen. Da SQLite
+/// Schreibvorgänge serialisiert, sind beide Reihenfolgen sicher: gewinnt die Bestätigung, fügt
+/// der Guard nichts ein; gewinnt der Ensure, schließt die Bestätigung den Reminder. Der
+/// partielle Unique-Index hält Replays idempotent.
 pub async fn stelle_meldung_auto_frist_sicher(
     pool: &SqlitePool,
     meldung_id: i64,
@@ -475,8 +451,7 @@ pub async fn stelle_meldung_auto_frist_sicher(
 }
 
 /// Schließt eine offene Auto-Frist-Erinnerung eines Bezugs (z. B. Meldung bestätigt):
-/// setzt `status='erledigt'`, `erledigt_at=jetzt`. Idempotent — kein Treffer = No-op.
-/// Verstummt den Nachfass-Nudge und verhindert weitere Eskalations-Ticks für den Bezug.
+/// `status='erledigt'`, `erledigt_at=jetzt`. Idempotent. Beendet damit Nachfass und Eskalation.
 pub async fn schliesse_offene_auto(
     pool: &SqlitePool,
     bezug_typ: &str,
@@ -487,7 +462,7 @@ pub async fn schliesse_offene_auto(
     schliesse_offene_auto_tx(&mut conn, bezug_typ, bezug_id, jetzt).await
 }
 
-/// Transaktionsfaehige Variante von [`schliesse_offene_auto`].
+/// Transaktionsfähige Variante von [`schliesse_offene_auto`].
 pub async fn schliesse_offene_auto_tx(
     conn: &mut sqlx::SqliteConnection,
     bezug_typ: &str,
@@ -761,8 +736,8 @@ mod tests {
         assert_eq!(alle.len(), 1, "nur eine Auto-Erinnerung je Bezug");
     }
 
-    /// LFH-635: Eine verschobene Auto-Frist löst zum neuen Zeitpunkt erneut aus — sonst
-    /// bliebe eine schon ausgelöste Ablösung nach einer Rhythmusänderung stumm.
+    /// Eine verschobene Auto-Frist löst zum neuen Zeitpunkt erneut aus; sonst bliebe eine schon
+    /// ausgelöste Ablösung nach einer Rhythmusänderung stumm.
     #[tokio::test]
     async fn setze_auto_frist_verschiebt_und_loest_erneut_aus() {
         let pool = crate::db::test_pool().await;
@@ -805,8 +780,8 @@ mod tests {
         assert_eq!(a.titel, "B");
     }
 
-    /// LFH-635: Wiederöffnen stellt die Frist her, ohne eine schon erfolgte Auslösung zu
-    /// wiederholen; mit bereits offener Frist desselben Bezugs passiert nichts.
+    /// Wiederöffnen stellt die Frist her, ohne eine erfolgte Auslösung zu wiederholen; mit bereits
+    /// offener Frist desselben Bezugs passiert nichts.
     #[tokio::test]
     async fn oeffne_letzte_auto_loest_nicht_erneut_aus() {
         let pool = crate::db::test_pool().await;
@@ -846,7 +821,7 @@ mod tests {
         );
     }
 
-    /// LFH-635: `loesche_auto_tx` entfernt alle Auto-Fristen des Bezugs, fremde bleiben.
+    /// `loesche_auto_tx` entfernt alle Auto-Fristen des Bezugs, fremde bleiben.
     #[tokio::test]
     async fn loesche_auto_entfernt_nur_den_bezug() {
         let pool = crate::db::test_pool().await;

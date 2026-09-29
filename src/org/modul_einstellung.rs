@@ -1,9 +1,6 @@
-//! Org-weite Modul-Rollen-Defaults (admin-einstellungen) — je (org, modul_key) eine Zeile.
-//!
-//! Leaf-Tabelle `org_modul_einstellung`; Validierung der Keys/Rollen in der Route
-//! (Task 5). Das Repo nimmt gültige Werte an. `benoetigte_rolle=None` → NULL setzen,
-//! Zeile bleibt (Konsistenz, kein Delete). Strikt per `org_id` (Org-Isolation, vgl.
-//! Memory cross-org-lesezugriff-luecke).
+//! Org-weite Modul-Rollen-Defaults — je (org, modul_key) eine Zeile in
+//! `org_modul_einstellung`. Keys und Rollen validiert die Route. `benoetigte_rolle=None` setzt
+//! NULL, die Zeile bleibt. Strikt per `org_id` (Org-Isolation).
 
 use crate::error::AppError;
 use sqlx::SqlitePool;
@@ -26,9 +23,8 @@ pub async fn laden_alle(
     Ok(zeilen.into_iter().collect())
 }
 
-/// UPSERT eines Rollen-Defaults auf (org_id, modul_key).
-/// `benoetigte_rolle=None` → NULL setzen (Zeile bleibt).
-/// Key-/Rollen-Gültigkeit prüft der Aufrufer (Route/Task 5) vor dem Aufruf.
+/// UPSERT eines Rollen-Defaults auf (org_id, modul_key); `None` setzt NULL, die Zeile bleibt.
+/// Key und Rolle prüft die Route.
 pub async fn setzen(
     pool: &SqlitePool,
     org_id: i64,

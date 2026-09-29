@@ -50,8 +50,7 @@ describe('luftqualitaetRadius', () => {
 
 describe('luftqualitaetDarstellung', () => {
   it('fällt auch bei Namen aus der Prototypkette auf „keine Daten" zurück', () => {
-    // `roh in karte` sähe `constructor`/`toString` als Schlüssel und gäbe die
-    // Object-Funktion statt einer Darstellung zurück.
+    // `roh in karte` sähe `constructor`/`toString` und gäbe eine Object-Funktion zurück.
     for (const roh of ['constructor', 'toString', '__proto__']) {
       expect(luftqualitaetDarstellung(roh).label, roh).toBe('keine Daten');
     }

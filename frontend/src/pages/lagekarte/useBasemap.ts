@@ -20,11 +20,10 @@ interface BasemapArgs {
 }
 
 /**
- * Basemap-Derivations-Leg der Lagekarte: baut aus der (seit LFH-319 in `useKartenAnsicht`
- * zentral gehaltenen) Kartenwahl die MapLibre-Style- und Attributions-Bausteine. Kein
- * eigener State und keine localStorage-Persistenz mehr — die geteilte Kartenansicht ist
- * die Wahrheit. Die Fachebenen-Attribution wird bewusst NICHT hier gemergt (Grenze zu
- * useFachebenen) — die Page komponiert `basisAttribution` mit `fachebenenAttribution`.
+ * Basemap-Ableitung der Lagekarte: baut aus der Kartenwahl (gehalten in `useKartenAnsicht`) die
+ * MapLibre-Style- und Attributions-Bausteine. Kein eigener State — die geteilte Kartenansicht ist
+ * die Wahrheit. Die Fachebenen-Attribution mergt die Seite (`basisAttribution` +
+ * `fachebenenAttribution`).
  */
 export function useBasemap({
   basemap,

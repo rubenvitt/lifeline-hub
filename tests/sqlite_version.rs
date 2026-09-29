@@ -5,16 +5,13 @@
 //! Betriebssystem entkoppelt**: ein `apt upgrade` auf dem Zielrechner erreicht sie nie.
 //! Der einzige Fix-Pfad für eine SQLite-CVE ist Crate-Bump → Rebuild → Redeploy.
 //!
-//! Die Lücke ist nicht die Entscheidung für `bundled` (die ist bewusst und gut begründet:
-//! reproduzierbare Builds, keine System-Abhängigkeit), sondern dass niemand nachhält,
-//! WELCHE Version drinsteckt. Ohne diese Zahl lässt sich im Advisory-Fall nicht einmal
-//! feststellen, ob man betroffen ist.
+//! `bundled` ist bewusst (reproduzierbare Builds, keine System-Abhängigkeit); nachgehalten
+//! werden muss aber, WELCHE Version drinsteckt — ohne diese Zahl lässt sich im Advisory-Fall
+//! nicht einmal feststellen, ob man betroffen ist.
 //!
-//! Deshalb dieser Guard: er pinnt die Version hart. Bei jedem `libsqlite3-sys`-Bump wird
-//! er rot und erzwingt, dass `docs/betrieb/packaging.md` nachgezogen wird — die Doku kann
-//! so nicht unbemerkt veralten. Das ist der Punkt: G02 verlangt einen *Prozess*, nicht
-//! eine einmalige Momentaufnahme. Ohne CI trägt das nur, weil `cargo test` das faktische
-//! Gate des Projekts ist.
+//! Deshalb pinnt dieser Guard die Version hart. Bei jedem `libsqlite3-sys`-Bump wird er rot
+//! und erzwingt, dass `docs/betrieb/packaging.md` nachgezogen wird — die Doku kann so nicht
+//! unbemerkt veralten.
 
 use lifeline_hub::db;
 

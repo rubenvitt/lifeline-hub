@@ -133,8 +133,8 @@ async fn status_mit_farbe(app: &axum::Router, admin: &str, label: &str) -> i64 {
 
 /// **Der unterscheidende Test.** Zusammen mit `patch_farbe_null_loescht_die_farbe` bildet er
 /// das Paar, das den Tri-State beweist: HIER ist `farbe` nicht im Body und muss stehen
-/// bleiben, DORT steht `null` im Body und muss löschen. Unter dem alten Vollersatz-Verhalten
-/// war beides ununterscheidbar — das fehlende Feld wurde zu `None` und nullte die Spalte.
+/// bleiben, DORT steht `null` im Body und muss löschen. Ein Vollersatz könnte beides nicht
+/// unterscheiden — das fehlende Feld würde zu `None` und nullte die Spalte.
 #[tokio::test]
 async fn patch_ohne_farbe_laesst_farbe_stehen() {
     let app = setup().await;
@@ -197,8 +197,8 @@ async fn patch_farbe_leerstring_loescht_die_farbe() {
     assert!(json["farbe"].is_null());
 }
 
-/// Der schärfste Test der Route: `sortier` ist NOT NULL und trug im alten Body ein
-/// `#[serde(default)]` — jeder Teil-Patch setzte die Sortierung still auf 0 und verschob
+/// Der schärfste Test der Route: `sortier` ist NOT NULL; ein Vollersatz-Body mit
+/// `#[serde(default)]` setzte die Sortierung bei jedem Teil-Patch still auf 0 und verschob
 /// den Eintrag in der Katalogliste.
 #[tokio::test]
 async fn patch_ohne_sortier_laesst_sortier_stehen() {

@@ -3,21 +3,17 @@ import type { FachebeneQuelle, FachebeneStatus, FeatureCollection } from '../../
 type Feature = FeatureCollection['features'][number];
 
 /**
- * Mindest-Zoom der Energie-Ebene (LFH-81): unter diesem Zoom keine Abfrage, stattdessen der
- * Hinweis „näher heranzoomen". Bis LFH-81 hiess die Konstante `KRITIS_MIN_ZOOM`; seit LFH-83
- * fragt KRITIS in JEDER Zoomstufe (Extrakt-Bestand, gebündelt), die Schwelle gilt also nur
- * noch für Ebenen, die sie über `minZoom` tragen — heute allein Energie, deren Backend live
- * Overpass fragt und Ausschnitte über {@link ENERGIE_MAX_SPANNE_GRAD} ablehnt
- * (`pruefe_energie_bbox`). Wert unverändert.
+ * Mindest-Zoom für Ebenen, die ihn über `minZoom` tragen — heute allein Energie: deren Backend
+ * fragt Overpass live und lehnt Ausschnitte über {@link ENERGIE_MAX_SPANNE_GRAD} ab. Darunter steht
+ * der Hinweis „näher heranzoomen" statt einer Anfrage.
  */
 export const BBOX_MIN_ZOOM = 10;
 
 /**
- * Größte Spanne eines Energie-Ausschnitts in Grad je Achse — dieselbe Zahl wie
- * `ENERGIE_MAX_SPANNE_GRAD` im Backend (`src/karte/quellen.rs`). Der Zoom allein reicht als
- * Bremse nicht: bei Zoom 10 ist ein Grad rund 1456 px breit, ein breiter Schirm zeigt also
- * mehr als ein Grad. Das Frontend prüft deshalb die Spanne selbst, statt eine Anfrage zu
- * schicken, die das Backend mit 400 ablehnt und die Ebene auf „offline“ setzt.
+ * Größte Spanne eines Energie-Ausschnitts in Grad je Achse — wie `ENERGIE_MAX_SPANNE_GRAD` im
+ * Backend (`src/karte/quellen.rs`). Der Zoom allein bremst nicht: bei Zoom 10 zeigt ein breiter
+ * Schirm mehr als ein Grad. Das Frontend prüft selbst, statt eine Anfrage zu schicken, die mit 400
+ * abgelehnt wird und die Ebene auf „offline" setzt.
  */
 export const ENERGIE_MAX_SPANNE_GRAD = 3;
 
@@ -42,32 +38,26 @@ export interface FachebeneDef {
   /** True → braucht Karten-Viewport-bbox (kein Hintergrund-Polling, Refetch bei moveend). */
   bboxAbhaengig: boolean;
   /**
-   * Dauerhaft sichtbarer Geltungsbereich der Quelle — bewusst als TEXT unter dem Label und
-   * nicht als Tooltip (LFH-80): eine Reichweiten-Einschränkung, die man nur beim Hovern
-   * sieht, ist auf einem Touch-Führungsgerät gar nicht zu sehen, und wer die Ebene für
-   * flächendeckend hält, plant einen Anmarschweg auf einer Grundlage, die es nicht gibt.
+   * Dauerhaft sichtbarer Geltungsbereich der Quelle — als Text unter dem Label, nicht als Tooltip:
+   * auf einem Touch-Gerät gibt es kein Hovern, und wer die Ebene für flächendeckend hält, plant auf
+   * einer Grundlage, die es nicht gibt.
    */
   geltung?: string;
   /**
-   * Takt, solange die Ebene noch KEINEN brauchbaren Stand hat (LFH-80). Nur für Quellen,
-   * deren erster Lauf serverseitig im Hintergrund läuft und die deshalb kurz `offline`
-   * melden, obwohl sie gerade füllen. Ohne den kurzen Takt wartete der Bediener bis zum
-   * nächsten regulären Poll — bei 600 s also zehn Minuten auf Daten, die nach ~30 s da sind.
+   * Takt, solange die Ebene noch keinen brauchbaren Stand hat — nur für Quellen, deren erster Lauf
+   * serverseitig im Hintergrund läuft und die solange `offline` melden. Sonst wartete der Bediener
+   * bis zum nächsten regulären Poll auf Daten, die nach ~30 s da sind.
    */
   aufwaermPollMs?: number;
   /**
-   * Punkte der Ebene auf der Karte bündeln (LFH-83). Die Source wird dann mit
-   * `cluster: true` angelegt, und neben dem Einzelpunkt-Layer stehen Bündel-Kreis und
-   * Bündel-Zahl (`fachebenenLayer.ts`). Heute nur KRITIS: bundesweit mehrere
-   * hunderttausend Objekte, die der Server ab 5 000 zusätzlich zu Sammelpunkten verdichtet.
+   * Punkte der Ebene auf der Karte bündeln: die Source wird mit `cluster: true` angelegt, dazu
+   * Bündel-Kreis und Bündel-Zahl (`fachebenenLayer.ts`). Heute nur KRITIS (bundesweit
+   * hunderttausende Objekte, der Server verdichtet ab 5 000 zusätzlich zu Sammelpunkten).
    */
   buendeln?: boolean;
   /**
-   * Mindest-Zoom, unter dem die Ebene NICHT gefragt wird (Hinweis „näher heranzoomen" statt
-   * einer Anfrage). Bis LFH-81 galt {@link BBOX_MIN_ZOOM} für ALLE bbox-abhängigen Ebenen;
-   * seit LFH-83 fragt KRITIS in jeder Zoomstufe (Extrakt-Bestand, gebündelt) — die Schwelle
-   * gilt also nur für Ebenen, die sie hier ausdrücklich tragen. Heute allein Energie, deren
-   * Backend live Overpass fragt.
+   * Mindest-Zoom, unter dem die Ebene nicht gefragt wird. Gilt nur für Ebenen, die ihn hier tragen
+   * (heute Energie); KRITIS fragt in jeder Zoomstufe.
    */
   minZoom?: number;
 }
@@ -100,10 +90,9 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   hochwasser: {
     key: 'hochwasser',
     label: 'Hochwasser-Meldeklassen (LHP)',
-    // Die Ebenenfarbe ist nur der Rückfall für Panel-Punkt und Inspector-Akzent — auf der
-    // Karte trägt jedes Feature seine eigene Rollenfarbe je Meldeklasse
-    // (`hochwasserStil.ts`). Bewusst nicht das Blau von `pegelonline`: die beiden Ebenen
-    // stehen nebeneinander und sind im Panel sonst nicht auseinanderzuhalten.
+    // Die Ebenenfarbe ist nur Rückfall für Panel-Punkt und Inspector-Akzent — auf der Karte trägt
+    // jedes Feature seine Rollenfarbe je Meldeklasse (`hochwasserStil.ts`). Nicht das Blau von
+    // `pegelonline`: beide stehen im Panel nebeneinander.
     farbe: '#08979c',
     geometrieTyp: 'punkt',
     pollMs: 300_000,
@@ -112,12 +101,12 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   luftqualitaet: {
     key: 'luftqualitaet',
     label: 'Luftqualität (UBA)',
-    // Nur der Panel-Punkt: auf der Karte trägt jede Station ihre Rollenfarbe je Indexstufe
-    // (`luftqualitaetStil.ts`), und der Inspector-Akzent folgt ihr. Deshalb ein entsättigter
-    // Ton, der KEINE Rollenfarbe ist — ein Grün hieße dort schon „gute Luft", Gelb „mäßig".
+    // Nur der Panel-Punkt: auf der Karte trägt jede Station ihre Rollenfarbe
+    // (`luftqualitaetStil.ts`). Deshalb ein entsättigter Ton, der keine Rollenfarbe ist — Grün
+    // hieße dort schon „gute Luft".
     farbe: '#5b6b82',
     geometrieTyp: 'punkt',
-    // = serverseitige TTL (900 s). Die Quelle liefert Stundenwerte mit ~2 h Verzug.
+    // = serverseitige TTL (900 s); die Quelle liefert Stundenwerte mit ~2 h Verzug.
     pollMs: 900_000,
     bboxAbhaengig: false,
     geltung: 'Messstationen — keine Aussage zwischen den Stationen',
@@ -125,13 +114,11 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   odl: {
     key: 'odl',
     label: 'Strahlung / ODL (BfS)',
-    // Wie bei `hochwasser` nur Rückfall für Panel-Punkt und Inspector-Akzent — auf der Karte
-    // trägt jede Sonde ihre Rollenfarbe je Stufe (`odlStil.ts`). Eigener Ton neben den
-    // sechs belegten, damit die Ebene im Panel unterscheidbar bleibt.
+    // Nur Rückfall für Panel-Punkt und Inspector-Akzent — auf der Karte trägt jede Sonde ihre
+    // Rollenfarbe (`odlStil.ts`).
     farbe: '#7cb305',
     geometrieTyp: 'punkt',
-    // = serverseitige TTL (600 s). Die Quelle liefert Stundenwerte; häufiger abzufragen
-    // wird nicht frischer, seltener ließe einen neuen Stundenwert zu lange liegen.
+    // = serverseitige TTL (600 s); die Quelle liefert Stundenwerte.
     pollMs: 600_000,
     bboxAbhaengig: false,
     geltung: 'nur ortsfeste BfS-Sonden (Stundenwerte) — keine Einsatzmessungen',
@@ -139,18 +126,15 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   autobahn: {
     key: 'autobahn',
     label: 'Autobahn-Lage (BAB)',
-    // Eigener Ton neben Rot/Orange/Blau/Türkis/Violett der fünf Bestandsebenen. NICHT das
-    // `#08979c` von `hochwasser` — die beiden stünden im Panel untereinander.
+    // Eigener Ton neben den Bestandsebenen, nicht das `#08979c` von `hochwasser`.
     farbe: '#c41d7f',
     geometrieTyp: 'punkt',
-    // = serverseitige TTL (600 s). Die Ebene aggregiert 111 Autobahnen × 3 Dienste;
-    // häufiger abzufragen belastet die Quelle, ohne frischer zu werden.
+    // = serverseitige TTL (600 s); die Ebene aggregiert 111 Autobahnen × 3 Dienste.
     pollMs: 600_000,
     bboxAbhaengig: false,
-    // Der erste Lauf hängt an keinem Request (siehe `fetch_autobahn`), die Ebene meldet
-    // währenddessen `offline`. 20 s ist kurz genug, dass die Aufwärmphase nicht auffällt,
-    // und lang genug, dass ein dauerhaft gestörter Anbieter nicht getrommelt wird — der
-    // Abruf ist dann eine winzige Leer-Antwort aus dem Backend, kein neuer Fächer.
+    // Der erste Lauf hängt an keinem Request (`fetch_autobahn`), die Ebene meldet solange
+    // `offline`. 20 s fallen nicht auf und trommeln einen gestörten Anbieter nicht — die Antwort
+    // ist dann eine winzige Leer-Antwort aus dem Backend.
     aufwaermPollMs: 20_000,
     geltung: 'nur Bundesautobahnen — keine Kreis-, Land- oder Ortsstraßen',
   },
@@ -162,10 +146,8 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     // bbox-getrieben: neue Daten kommen mit jeder Kartenbewegung, nicht über einen Takt.
     pollMs: 0,
     bboxAbhaengig: true,
-    // Der erste Import des OSM-Extrakts läuft nach dem Start minutenlang im Hintergrund,
-    // die Ebene meldet solange `offline`. Ohne Aufwärm-Takt erschiene der erste Bestand
-    // erst beim nächsten Pannen. 30 s: der Import dauert Minuten, feiner zu fragen brächte
-    // nichts — die Antwort ist bis dahin eine winzige Leer-Antwort aus dem Backend.
+    // Der erste Import des OSM-Extrakts läuft minutenlang, die Ebene meldet solange `offline`; ohne
+    // Aufwärm-Takt erschiene der Bestand erst beim nächsten Pannen.
     aufwaermPollMs: 30_000,
     buendeln: true,
     geltung: 'OpenStreetMap-Daten, wöchentlicher Stand — keine amtliche KRITIS-Liste',
@@ -173,22 +155,18 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   energie: {
     key: 'energie',
     label: 'Energieanlagen',
-    // antd `lime-7`. `theme/tokens.ts` führt keine Fachebenen-Palette — dort stehen nur die
-    // Sichtungsfarben und die Farbrollen, und beide tragen Bedeutung (`normal` = grün,
-    // `alarm` = rot, `bedien` = blau); eine Ebenenfarbe daraus behauptete einen Status. Die
-    // Bestandsfarben sind wie diese hier Stufe 7 der antd-Presetpalette (rot, gold, blau,
-    // cyan, magenta, violett, lime). Die zunächst gewählte lime-7 hat inzwischen ODL
-    // (LFH-78) belegt — Gelb (`#d4b106`) liegt nah am DWD-Gold, ist aber unterscheidbar und
-    // die letzte freie Stufe-7-Tonlücke. Bewusst NICHT `green-7`: Grün ist die Rolle
-    // `normal` und die Sichtungsfarbe SK III, ein grüner Punkt läse sich als „in Ordnung".
+    // `theme/tokens.ts` führt keine Fachebenen-Palette (Sichtungs- und Rollenfarben tragen
+    // Bedeutung); die Bestandsfarben sind Stufe 7 der antd-Presetpalette. Gelb liegt nah am
+    // DWD-Gold, ist aber unterscheidbar und die letzte freie Tonlücke. Bewusst nicht `green-7`:
+    // Grün ist die Rolle `normal` und SK III, ein grüner Punkt läse sich als „in Ordnung".
     farbe: '#d4b106',
     geometrieTyp: 'punkt',
-    // Wie KRITIS: kein Hintergrund-Polling, Refetch nur über den Ausschnitt. Der Stand ist
-    // serverseitig 24 h frisch (design.md, Entscheidung 1).
+    // Wie KRITIS: kein Hintergrund-Polling, Refetch nur über den Ausschnitt (serverseitig 24 h
+    // frisch).
     pollMs: 0,
     bboxAbhaengig: true,
-    // Anders als KRITIS (LFH-83) fragt Energie live Overpass je Ausschnitt; das Backend lehnt
-    // alles über ENERGIE_MAX_SPANNE_GRAD ab. Erst ab dieser Zoomstufe wird gefragt.
+    // Energie fragt Overpass live je Ausschnitt; das Backend lehnt alles über
+    // ENERGIE_MAX_SPANNE_GRAD ab. Erst ab dieser Zoomstufe wird gefragt.
     minZoom: BBOX_MIN_ZOOM,
   },
 };
@@ -209,13 +187,9 @@ export function fachebeneKeys(): FachebeneQuelle[] {
 }
 
 /**
- * Poll-Takt einer Ebene nach ihrem zuletzt gesehenen Status. Rein und exportiert, damit die
- * Aufwärm-Regel ohne Render prüfbar ist.
- *
- * `undefined` (noch nichts geladen) und `offline` gelten als „wärmt noch auf" — aber nur bei
- * Ebenen mit `aufwaermPollMs`. `leer` NICHT: das heisst „Quelle erreichbar, gerade nichts zu
- * melden" — ein gültiger Endzustand, den kurz zu takten nichts brächte. Ein Ergebnis `0`
- * (KRITIS mit Bestand) schaltet in react-query den Timer ab.
+ * Poll-Takt einer Ebene nach ihrem zuletzt gesehenen Status — rein und exportiert. `undefined` und
+ * `offline` gelten als „wärmt noch auf" (nur bei Ebenen mit `aufwaermPollMs`); `leer` nicht, das
+ * ist ein gültiger Endzustand. Ein Ergebnis `0` schaltet in react-query den Timer ab.
  */
 export function fachebeneTakt(key: FachebeneQuelle, status: FachebeneStatus | undefined): number {
   const def = FACHEBENEN[key];
@@ -228,25 +202,21 @@ export function istBboxAbhaengig(key: FachebeneQuelle): boolean {
 }
 
 /**
- * True, sobald IRGENDEINE bbox-abhängige Ebene sichtbar ist — dann braucht die Seite den
- * Karten-Ausschnitt (LFH-81). Aus der Registry abgeleitet statt als Aufzählung, damit eine
- * weitere bbox-Ebene die Meldung nicht wieder vergisst; bis LFH-81 hing sie an KRITIS allein.
+ * True, sobald irgendeine bbox-abhängige Ebene sichtbar ist — dann braucht die Seite den
+ * Kartenausschnitt. Aus der Registry abgeleitet, damit eine neue bbox-Ebene die Meldung nicht
+ * vergisst.
  */
 export function braucheViewportBbox(sichtbar: Record<FachebeneQuelle, boolean>): boolean {
   return fachebeneKeys().some((k) => sichtbar[k] && istBboxAbhaengig(k));
 }
 
-/**
- * Rasterleiter in Grad, fein → grob. Die kleinste Stufe ist das bisherige Stadtraster.
- */
+/** Rasterleiter in Grad, fein → grob. Die kleinste Stufe ist das Stadtraster. */
 const RASTER_LEITER = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10] as const;
 
 /**
- * Rasterweite zu einer bbox-Breite (Grad West-Ost): die kleinste Leiterstufe, die mindestens
- * ein Achtel der Breite misst. Damit überdeckt eine Zelle stets einen spürbaren Bruchteil der
- * Ansicht — auf Stadtebene wie bisher 0,05°, auf Deutschland-Ebene 2°. Die Breite in Länge
- * hängt in Mercator nur an der Zoomstufe, nicht an der Lage; Pannen wechselt die Stufe also
- * nicht, Zoomen schon.
+ * Rasterweite zu einer bbox-Breite (Grad West-Ost): die kleinste Leiterstufe, die mindestens ein
+ * Achtel der Breite misst — auf Stadtebene 0,05°, auf Deutschland-Ebene 2°. Die Breite in Länge
+ * hängt in Mercator nur am Zoom, Pannen wechselt die Stufe also nicht.
  */
 export function rasterWeite(breite: number): number {
   const ziel = breite / 8;
@@ -254,24 +224,18 @@ export function rasterWeite(breite: number): number {
 }
 
 /**
- * Rastert eine bbox "west,sued,ost,nord" nach AUSSEN auf ein Gitter, dessen Weite mit der
- * bbox-Breite wächst (`rasterWeite`). Benachbarte Viewports liefern so denselben String →
- * identischer Query-Schlüssel, d. h. KRITIS lädt beim Pannen innerhalb einer Rasterzelle
- * nicht neu — auf Stadt- wie auf Deutschland-Ebene (LFH-83; vorher festes 0,05°-Raster, das
- * erst ab Zoom 10 gefragt wurde). Nach außen gerundet, damit der sichtbare Ausschnitt stets
- * abgedeckt ist.
+ * Rastert eine bbox "west,sued,ost,nord" nach außen auf ein Gitter, dessen Weite mit der Breite
+ * wächst (`rasterWeite`). Benachbarte Viewports liefern so denselben String → derselbe
+ * Query-Schlüssel, KRITIS lädt beim Pannen innerhalb einer Zelle nicht neu. Nach außen gerundet,
+ * damit der Ausschnitt stets abgedeckt ist.
  *
- * MapLibre meldet Längen jenseits ±180, sobald die Karte über den Antimeridian geschoben ist
- * (Weltkopien) — das Backend lehnt solche bboxes ab (400), die Ebene stünde dann `offline`.
- * Deshalb wird der Ausschnitt zuerst als Ganzes um Vielfache von 360° zurückgeschoben (eine
- * Weltkopie Deutschlands bei 365–376° wird zu 5–16°), erst dann gerastert und gekappt. Ergibt
- * das keine gültige bbox mehr (Ausschnitt breiter als die Welt, oder nach dem Kappen
- * `west ≥ ost`), gilt die ganze Welt — das Backend beantwortet sie verdichtet; eine
- * ausgelassene Anfrage ließe die Ebene dagegen dauerhaft leer (Review LFH-83).
+ * MapLibre meldet jenseits des Antimeridians Längen über ±180 (Weltkopien), die das Backend mit 400
+ * ablehnt. Der Ausschnitt wird deshalb erst um Vielfache von 360° zurückgeschoben, dann gerastert
+ * und gekappt. Ergibt das keine gültige bbox (breiter als die Welt, oder `west ≥ ost`), gilt die
+ * ganze Welt — eine ausgelassene Anfrage ließe die Ebene dauerhaft leer.
  *
- * `grid` setzt eine FESTE Rasterweite statt der Leiter. Die Energie-Ebene (LFH-81) nimmt das
- * alte 0,05°-Stadtraster: sie fragt Overpass live je Ausschnitt, und die Leiter rundet
- * einen Zoom-10-Ausschnitt (~0,9°) auf 0,25° nach außen — eine unnötig größere Abfrage.
+ * `grid` setzt eine feste Rasterweite: Energie nimmt das 0,05°-Stadtraster, weil die Leiter einen
+ * Zoom-10-Ausschnitt zu einer unnötig größeren Overpass-Abfrage aufrundete.
  */
 export function rasterBbox(bbox: string, grid?: number): string {
   const t = bbox.split(',').map(Number);
@@ -301,9 +265,9 @@ export function rasterBbox(bbox: string, grid?: number): string {
 export const WELT_BBOX = '-180,-90,180,90';
 
 /**
- * Mergt neue Features in `sammlung` (dedupliziert über die Koordinate), begrenzt auf `max`
- * (älteste zuerst entfernt). So bleiben einmal geladene Objekte einer bbox-Ebene sichtbar, auch wenn
- * man wegzoomt oder das Gebiet wechselt. Mutiert `sammlung`; true bei Änderung.
+ * Mergt neue Features in `sammlung` (dedupliziert über die Koordinate, begrenzt auf `max`, älteste
+ * zuerst entfernt): einmal geladene Objekte einer bbox-Ebene bleiben sichtbar. Mutiert `sammlung`;
+ * true bei Änderung.
  */
 export function mergeFeatures(
   sammlung: Map<string, Feature>,
@@ -337,20 +301,17 @@ const herkunftVon = (f: Feature): string => {
 };
 
 /**
- * Merge der Energie-Ebene (LFH-81). Anders als {@link mergeFeatures} (first-wins, für
- * KRITIS unverändert) GEWINNT hier die neuere Fassung an derselben Koordinate: nach einem
- * Teilausfall des MaStR-Teils kommt dieselbe OSM-Anlage später als `osm+mastr` mit
- * amtlicher Leistung und Nummer zurück — first-wins behielte die ärmere Fassung für immer.
+ * Merge der Energie-Ebene. Anders als {@link mergeFeatures} (first-wins, KRITIS) gewinnt die neuere
+ * Fassung an derselben Koordinate: nach einem Teilausfall des MaStR-Teils kommt dieselbe Anlage
+ * später als `osm+mastr` mit amtlichen Angaben zurück.
  *
- * Danach fallen reine `mastr`-Punkte weg, deren `mastr_nummer` ein `osm+mastr`-Punkt der
- * Sammlung in seinen `mastr_nummern` führt: im Ausfall stand die Einheit als eigener Punkt
- * da, jetzt ist sie einer OSM-Anlage zugeordnet und stünde sonst doppelt auf der Karte (an
- * verschiedenen Koordinaten, deshalb greift die Koordinaten-Deduplizierung dort nicht).
- * Die Bereinigung läuft über die GANZE Sammlung, nicht nur über den neuen Stand — die
- * Reihenfolge des Eintreffens darf das Ergebnis nicht ändern.
+ * Danach fallen reine `mastr`-Punkte weg, deren `mastr_nummer` ein `osm+mastr`-Punkt in seinen
+ * `mastr_nummern` führt — sonst stünde die Anlage doppelt (an verschiedenen Koordinaten). Die
+ * Bereinigung läuft über die ganze Sammlung, damit die Eintreffreihenfolge das Ergebnis nicht
+ * ändert.
  *
- * Mutiert `sammlung`; true bei Änderung. Eine inhaltsgleiche Fassung gilt NICHT als
- * Änderung, sonst liefe jeder Refetch als neues Objekt durch die Karte.
+ * Mutiert `sammlung`; true bei Änderung. Eine inhaltsgleiche Fassung ist keine Änderung, sonst
+ * liefe jeder Refetch als neues Objekt durch die Karte.
  */
 export function mergeEnergieFeatures(
   sammlung: Map<string, Feature>,
@@ -362,8 +323,8 @@ export function mergeEnergieFeatures(
     const key = koordinatenSchluessel(f);
     const alt = sammlung.get(key);
     if (alt !== undefined && JSON.stringify(alt) === JSON.stringify(f)) continue;
-    // `Map.set` auf einen vorhandenen Schlüssel behält dessen Position — die
-    // Älteste-zuerst-Kappung unten bleibt damit an der ersten Sichtung ausgerichtet.
+    // `Map.set` auf einen vorhandenen Schlüssel behält dessen Position — die Kappung unten bleibt
+    // an der ersten Sichtung ausgerichtet.
     sammlung.set(key, f);
     geaendert = true;
   }
@@ -402,16 +363,13 @@ export function mergeEnergieFeatures(
 export const NENNUNG_TRENNER = ' · ';
 
 /**
- * Quellennennung der Energie-Ebene aus der GEZEICHNETEN Sammlung (LFH-81), nicht aus der
- * letzten Antwort: die Sammlung akkumuliert über Ausschnitte, und nach dem Pannen in reines
- * OSM-Gebiet stünden sonst MaStR-Punkte ohne die dl-de/by-2-0-Nennung auf der Karte — die
- * Lizenz verlangt sie aber für jeden gezeigten Datensatz.
+ * Quellennennung der Energie-Ebene aus der gezeichneten Sammlung, nicht aus der letzten Antwort:
+ * die Sammlung akkumuliert über Ausschnitte, und die Lizenz verlangt die dl-de/by-2-0-Nennung für
+ * jeden gezeigten MaStR-Punkt.
  *
- * `teile` sind die in bisherigen Antworten gesehenen Nennungsteile. Ein Teil mit
- * „OpenStreetMap" bleibt, solange ein Punkt mit `osm` in der Herkunft gesammelt ist, einer
- * mit „Marktstammdatenregister" entsprechend für `mastr`. Ein Teil, der keiner der beiden
- * Quellen zuzuordnen ist, bleibt, solange überhaupt ein Punkt gezeigt wird. Ein Punkt ohne
- * Herkunft trägt beide Nennungen. Rein.
+ * Ein Teil mit „OpenStreetMap" bleibt, solange ein Punkt mit `osm` gesammelt ist, einer mit
+ * „Marktstammdatenregister" entsprechend für `mastr`; ein anderer Teil bleibt, solange überhaupt
+ * ein Punkt gezeigt wird. Ein Punkt ohne Herkunft trägt beide. Rein.
  */
 export function energieNennung(teile: readonly string[], features: readonly Feature[]): string[] {
   if (features.length === 0) return [];
@@ -419,8 +377,8 @@ export function energieNennung(teile: readonly string[], features: readonly Feat
   let mastr = false;
   for (const f of features) {
     const h = herkunftVon(f);
-    // Ohne Herkunft ist nicht entscheidbar, woher der Punkt stammt — dann beide Nennungen:
-    // eine überzählige Nennung schadet nicht, eine fehlende verletzt die Lizenz.
+    // Ohne Herkunft beide Nennungen: eine überzählige schadet nicht, eine fehlende verletzt die
+    // Lizenz.
     if (!h || h.includes('osm')) osm = true;
     if (!h || h.includes('mastr')) mastr = true;
   }

@@ -26,22 +26,17 @@ interface PegelPrognoseModalProps {
 }
 
 /**
- * Erwarteten Höchststand an einem maßgeblichen Pegel erfassen oder ändern (LFH-628).
+ * Erwarteten Höchststand an einem maßgeblichen Pegel erfassen oder ändern. Zwei Felder (Meter,
+ * Zeitpunkt). Montiert = offen: die Vorbelegung friert beim Öffnen ein, jede Öffnung hat eine
+ * frische Mutation.
  *
- * Zwei Felder (Modal-Budget LFH-19): Höchststand in Metern und Zeitpunkt. Montiert = offen
- * (Muster `LagebesprechungModal`): die Vorbelegung friert beim Öffnen ein, jede Öffnung hat
- * eine frische Mutation ohne alten Fehler.
+ * Führt die Station eine PEGELONLINE-Vorhersage (Reihe `WV`), steht ihr höchster künftiger Wert als
+ * Vorschlag mit „Übernehmen" darüber — nie still eingesetzt: die Prognose ist eine Angabe des
+ * Stabs, und eine Landes-Vorhersagezentrale kann eine andere Zahl nennen als die BfG. Ohne Reihe
+ * oder ohne Quelle steht ein Satz, der Dialog bleibt bedienbar. `retry: false`: einen 502 dreimal
+ * zu wiederholen hielte den Hinweis nur länger auf „wird abgerufen".
  *
- * ── VORSCHLAG AUS DER REIHE `WV` ───────────────────────────────────────────────────
- * Führt die Station eine PEGELONLINE-Vorhersage (gemessen: 43 Stationen), steht ihr
- * höchster künftiger Wert als Hinweis über den Feldern, mit „Übernehmen". Er wird NICHT
- * still eingesetzt: die Prognose ist eine Angabe des Stabs, und die Vorhersagezentrale eines
- * Landes kann eine andere Zahl nennen als die BfG — übernommen wird ausdrücklich. Ohne Reihe
- * steht ein Satz, der das sagt; ist die Quelle nicht erreichbar, ebenso — der Dialog bleibt
- * in beiden Fällen voll bedienbar. Kein Wiederholen (`retry: false`): ein 502 dreimal
- * nachzufragen hielte den Hinweis nur länger auf „wird abgerufen".
- *
- * Fehler des PUT stehen IM Dialog (`SpeicherFehler`, H14), die Hülle lässt die Felder stehen.
+ * Fehler des PUT stehen im Dialog (`SpeicherFehler`), die Hülle lässt die Felder stehen.
  */
 export default function PegelPrognoseModal({
   einsatzId,

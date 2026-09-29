@@ -11,13 +11,14 @@ interface Werte {
 export interface GefahrenZelleDetailsProps {
   offen: boolean;
   /**
-   * Stabile Kennung der gemeinten Zelle (`zellSchluessel`), `null` wenn keine gewählt
-   * ist. Sie — nicht {@link GefahrenZelleDetailsProps.zelle} — entscheidet, wann das
-   * Formular neu belegt wird.
+   * Stabile Kennung der gemeinten Zelle (`zellSchluessel`), `null` wenn keine gewählt ist. Sie —
+   * nicht {@link GefahrenZelleDetailsProps.zelle} — entscheidet, wann das Formular neu belegt wird.
    */
   kennung: string | null;
-  /** Die bewertete Zelle, bei jedem Render frisch aus der Matrix abgeleitet. `null`,
-   *  solange keine gewählt ist. Die Objektidentität wechselt also bei jedem Nachladen. */
+  /**
+   * Die bewertete Zelle, bei jedem Render frisch aus der Matrix abgeleitet (neue Identität bei
+   * jedem Nachladen). `null`, solange keine gewählt ist.
+   */
   zelle: GefahrBewertung | null;
   /** „Brand × Menschen" — steht im Dialogtitel. */
   titel: string;
@@ -27,15 +28,9 @@ export interface GefahrenZelleDetailsProps {
 }
 
 /**
- * Beschreibung und Meldeweg einer Matrixzelle. Nimmt `ErfassungsModal` statt eines
- * handgebauten `<Modal>` + `<Form>` (Erfassungs-Norm LFH-332/B4) — vorher war das ein
- * `Popover` mit einem Knopf AUSSERHALB des Formulars, in dem Enter tot war.
- *
- * Zwei Felder, damit das Feldbudget (Modal ≤ ~3, LFH-19) eingehalten ist.
- *
- * Vorbelegen zum Bearbeiten ist ausdrücklich kein Reset (Norm B4): `setFieldsValue`
- * beim Öffnen bleibt Aufgabe des Aufrufers, das Leeren übernimmt die Hülle — auf
- * jedem Weg hinaus, auch über Escape und den Klick auf die Maske.
+ * Beschreibung und Meldeweg einer Matrixzelle auf `ErfassungsModal` (zwei Felder, Feldbudget Modal
+ * ≤ ~3). Vorbelegen zum Bearbeiten ist kein Reset: `setFieldsValue` beim Öffnen macht der Effekt
+ * unten, das Leeren übernimmt die Hülle auf jedem Weg hinaus.
  */
 export default function GefahrenZelleDetails({
   offen,
@@ -49,19 +44,12 @@ export default function GefahrenZelleDetails({
   const [form] = Form.useForm<Werte>();
 
   /**
-   * Der Zellinhalt liegt in einer Ref, damit der Vorbeleg-Effekt ihn LESEN kann,
-   * ohne von ihm ABZUHÄNGEN.
+   * Der Zellinhalt liegt in einer Ref, damit der Vorbeleg-Effekt ihn lesen kann, ohne von ihm
+   * abzuhängen: hinge er an `zelle` (neue Identität bei jedem Nachladen), liefe er mitten im Tippen
+   * los. Er hängt an der Öffnung und an {@link GefahrenZelleDetailsProps.kennung}.
    *
-   * Der Aufrufer leitet `zelle` bei jedem Render frisch aus der Matrix ab — jedes
-   * Nachladen liefert also eine neue Objektidentität, auch wenn sich nichts geändert
-   * hat. Hinge der Effekt an `zelle`, liefe er dann mitten im Tippen los und
-   * überschriebe den Wortlaut mit dem Serverstand. Der Effekt hängt deshalb an der
-   * ÖFFNUNG und an der stabilen {@link GefahrenZelleDetailsProps.kennung}: eine andere
-   * Zelle belegt neu, dieselbe Zelle in frischer Fassung nicht.
-   *
-   * Die Ref wird in einem eigenen Effekt nachgezogen, nicht im Renderdurchgang.
-   * Er steht VOR dem Vorbeleg-Effekt, weil React sie in Deklarationsreihenfolge
-   * abarbeitet — beim Öffnen liest der zweite also bereits den aktuellen Wert.
+   * Die Ref zieht ein eigener Effekt nach, der vor dem Vorbeleg-Effekt steht — React arbeitet
+   * Effekte in Deklarationsreihenfolge ab.
    */
   const zelleRef = useRef(zelle);
   useEffect(() => {

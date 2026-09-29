@@ -36,8 +36,8 @@ function einsatz(over: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-// `renderMitProviders` (test/utils.tsx:37) rendert den `AuthProvider` selbst — ein
-// zweiter drumherum wäre ein doppelter `/api/auth/me`-Abruf ohne jeden Nutzen.
+// `renderMitProviders` rendert den `AuthProvider` selbst — ein zweiter wäre ein doppelter
+// `/api/auth/me`-Abruf.
 function setup() {
   server.use(http.get('/api/auth/me', () => HttpResponse.json(admin)));
   return renderMitProviders(<EinsaetzePage />);
@@ -73,10 +73,8 @@ describe('EinsaetzePage', () => {
   });
 
   it('erfasst Einsatzart und Alarmzeit gleich mit — vorbelegt und ohne Zutun', async () => {
-    // LFH-332 · B4 (Befund H18). Der Dialog schickt die beiden Felder selbst, statt
-    // sie dem 11-Feld-Kopfdatenformular zu überlassen. Geprüft wird der Rumpf, nicht
-    // die Anzeige: ein Dialog, der die Felder ZEIGT und nicht SENDET, sähe im DOM
-    // genauso aus.
+    // Der Dialog schickt die beiden Felder selbst. Geprüft wird der Rumpf, nicht die Anzeige: ein
+    // Dialog, der die Felder zeigt und nicht sendet, sähe im DOM genauso aus.
     let rumpf: Record<string, unknown> | null = null;
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
@@ -99,11 +97,10 @@ describe('EinsaetzePage', () => {
 
     await waitFor(() => expect(rumpf).not.toBeNull());
     expect(rumpf!.einsatzart).toBe('realeinsatz');
-    // Die Form allein beweist nichts — sie ist in jeder Zeitzone erfüllt, auch von
-    // der lokalen Wanduhrzeit. Geprüft wird deshalb der WERT gegen UTC: die
-    // Alarmzeit ist eine Vorbelegung auf „jetzt", also darf sie höchstens eine
-    // Minute von der aktuellen UTC-Zeit abweichen. Mit `.format()` statt
-    // `.utc().format()` schlägt das überall fehl, wo der Zonenversatz ≠ 0 ist.
+    // Die Form allein beweist nichts, sie ist in jeder Zeitzone erfüllt. Geprüft wird der Wert
+    // gegen UTC: die Alarmzeit ist eine Vorbelegung auf „jetzt" und weicht höchstens eine Minute
+    // von der UTC-Zeit ab. Mit `.format()` statt `.utc().format()` schlägt das überall fehl, wo der
+    // Zonenversatz ≠ 0 ist.
     expect(rumpf!.begonnen_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     const gesendet = dayjs.utc(rumpf!.begonnen_at as string, 'YYYY-MM-DD HH:mm:ss');
     expect(Math.abs(gesendet.diff(dayjs.utc(), 'minute'))).toBeLessThanOrEqual(1);
@@ -174,10 +171,8 @@ describe('EinsaetzePage', () => {
     );
     setup();
     await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
-    // Über die ÜBERSCHRIFT gegriffen, nicht über den Text: seit LFH-345 · C10 trägt das
-    // Status-Etikett der Karte dieselbe Beschriftung („Abgeschlossen" statt des
-    // Wire-Werts), `getByText` fände also zwei Knoten. Die Rollen-Abfrage sagt ohnehin
-    // genauer, was der Test behauptet — es geht um die SEKTION, nicht um ein Etikett.
+    // Über die Überschrift gegriffen: das Status-Etikett der Karte trägt dieselbe Beschriftung,
+    // `getByText` fände zwei Knoten. Es geht um die Sektion.
     expect(screen.getByRole('heading', { name: 'Abgeschlossen' })).toBeInTheDocument();
     expect(screen.getByText('Sturmtief Abschluss')).toBeInTheDocument();
   });
@@ -259,10 +254,8 @@ describe('EinsaetzePage', () => {
     expect(screen.queryByText('Workspace-7')).not.toBeInTheDocument();
   });
 
-  // ── Die drei Datenzustände (LFH-328 · A2, Task 10) ────────────────────────────
-  // Sie müssen UNTERSCHEIDBAR gerendert sein: vorher sah ein Anlegeberechtigter in
-  // allen dreien dieselbe leere Fläche mit nur dem „Neuer Einsatz"-Knopf — ein
-  // Serverfehler war von „noch keine Daten" nicht zu unterscheiden.
+  // ── Die drei Datenzustände ── Sie müssen unterscheidbar gerendert sein: ein Serverfehler darf
+  // nicht aussehen wie „noch keine Daten".
 
   it('zeigt beim Laden Karten-Skelette im Raster und noch keinen Anlegen-Knopf', async () => {
     server.use(
@@ -274,17 +267,16 @@ describe('EinsaetzePage', () => {
     );
     renderMitProviders(<EinsaetzePage />);
 
-    // Die Skelett-Kacheln liegen im SELBEN Rasterknoten, der danach die Karten
-    // trägt (Prüfliste Kriterium 12). jsdom rechnet kein Layout — die gleiche
-    // Kachelhöhe ist hier nicht messbar, nur die gemeinsame Herkunft.
+    // Die Skelett-Kacheln liegen im selben Rasterknoten, der danach die Karten trägt. jsdom rechnet
+    // kein Layout — gleiche Kachelhöhe ist hier nicht messbar, nur die gemeinsame Herkunft.
     const raster = await screen.findByTestId('einsaetze-raster');
     await waitFor(() =>
       expect(raster.querySelectorAll('.lfh-skelett__balken').length).toBeGreaterThan(0),
     );
     expect(screen.queryByRole('button', { name: /Neuer Einsatz/ })).toBeNull();
 
-    // Und erst nach dem Auflösen des Ladezustands erscheint er — das belegt, dass
-    // oben der Ladezustand ihn verborgen hat und nicht ein fehlendes Recht.
+    // Erst nach dem Laden erscheint er — oben hat also der Ladezustand ihn verborgen, nicht ein
+    // fehlendes Recht.
     expect(await screen.findByRole('button', { name: 'Neuer Einsatz' })).toBeInTheDocument();
     expect(screen.getByTestId('einsaetze-raster').querySelector('.lfh-skelett__balken')).toBeNull();
   });
@@ -305,8 +297,8 @@ describe('EinsaetzePage', () => {
     const meldung = await screen.findByRole('alert');
     expect(meldung).toHaveTextContent(/Einsatzliste/i);
 
-    // Der erneute Abruf wird über den Handler-Zähler belegt, nicht über einen Spy:
-    // nur so ist bewiesen, dass wirklich ein Request rausgegangen ist.
+    // Der erneute Abruf wird über den Handler-Zähler belegt, nicht über einen Spy: nur so ist ein
+    // echter Request bewiesen.
     await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
 
     expect(await screen.findByText('Hochwasser Nord')).toBeInTheDocument();
@@ -321,23 +313,21 @@ describe('EinsaetzePage', () => {
     );
     const { container } = renderMitProviders(<EinsaetzePage />);
 
-    // Bisher waren „leer" und „darf anlegen" ein Entweder-oder: der Leer-Zweig
-    // lief für Anlegeberechtigte nie, sie sahen nur den Knopf im leeren Raster.
+    // „leer" und „darf anlegen" schließen sich nicht aus: auch Anlegeberechtigte sehen den
+    // Leerzustand.
     expect(await screen.findByText('Keine Einsätze')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Neuer Einsatz' })).toBeInTheDocument();
-    // Getauscht ist der Knoten, nicht der Wortlaut (LFH-331 · B3) — die Textzeile
-    // darüber war vor dem Umbau genauso grün und belegt für sich genommen nichts.
-    // Der Leerknoten trägt KEINE eigene Aktion: die Anlegen-Kachel steht direkt
-    // darunter, ein zweiter „Neuer Einsatz"-Knopf machte die Abfrage mehrdeutig.
+    // Getauscht ist der Knoten, nicht der Wortlaut — die Textzeile darüber belegt allein nichts.
+    // Der Leerknoten trägt keine eigene Aktion: die Anlegen-Kachel steht darunter, ein zweiter
+    // „Neuer Einsatz"-Knopf machte die Abfrage mehrdeutig.
     expect(container.querySelector('.ant-empty')).toBeNull();
   });
 });
 
 describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () => {
-  // Eigene Fixture/Hilfen statt der Datei-Bestandshilfen `einsatz()`/`setup()`: die
-  // Bestandshilfe deckt weder `einsatzort`/`org_id`/`org_name`/`angelegt_at` noch das
-  // `/api/stichwort-vorschlaege`-Mock ab, das der Anlegedialog-Query bei jedem Mount
-  // abruft (`onUnhandledRequest: 'error'` in `test/setup.ts`).
+  // Eigene Fixture/Hilfen statt `einsatz()`/`setup()`: die decken weder
+  // `einsatzort`/`org_id`/`org_name`/`angelegt_at` noch das `/api/stichwort-vorschlaege`-Mock ab,
+  // das der Anlegedialog bei jedem Mount abruft (`onUnhandledRequest: 'error'`).
   function mockEinsaetze(liste: EinsatzAnzeige[]) {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
@@ -369,21 +359,16 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     mockEinsaetze([e({ einsatzort: 'Musterstadt, Deichweg 3' })]);
     render();
     expect(await screen.findByText(/Musterstadt, Deichweg 3/)).toBeInTheDocument();
-    // Positiv gegen den Testid, nicht nur gegen den Text: die negative Prüfung
-    // weiter unten („ohne Einsatzort … nicht im Dokument") wäre sonst immer grün,
-    // auch wenn `data-testid="einsatz-ort"` nie im DOM ankäme (antds
-    // `Typography.Text` reicht unbekannte Props zwar durch, das ist hier aber nicht
-    // unterstellt, sondern belegt).
+    // Positiv gegen den Testid, nicht nur gegen den Text: die negative Prüfung weiter unten wäre
+    // sonst immer grün, auch wenn `data-testid="einsatz-ort"` nie im DOM ankäme.
     expect(screen.getByTestId('einsatz-ort')).toHaveTextContent('Musterstadt, Deichweg 3');
   });
 
   it('die Karte nennt einen aus begonnen_at abgeleiteten Zeitstand', async () => {
     mockEinsaetze([e({ begonnen_at: '2026-06-08 06:12:00' })]);
     render();
-    // `formatZeitKurz` liefert „0806 12" bzw. „0612" je nach Tagesbezug; geprüft
-    // wird das WORT „seit" plus der von der Funktion gelieferte Wert — die
-    // Formatierung selbst ist in `format.test.ts` geprüft und wird hier nicht
-    // zweitgeprüft (sonst stünde die Erwartung an zwei Orten).
+    // `formatZeitKurz` liefert je nach Tagesbezug verschiedene Formen; geprüft wird das Wort „seit"
+    // plus der Funktionswert — die Formatierung prüft `format.test.ts`.
     const erwartet = formatZeitKurz('2026-06-08 06:12:00');
     expect(await screen.findByText(new RegExp(`seit ${erwartet}`))).toBeInTheDocument();
   });
@@ -391,9 +376,7 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
   it('die Karte trägt die Einsatzart als zweiten Tag neben dem Status', async () => {
     mockEinsaetze([e({ einsatzart: 'uebung' })]);
     render();
-    // Grossgeschrieben seit LFH-345 · C10 (M14): die Map trägt eine BESCHRIFTUNG statt
-    // des Wire-Werts; seit LFH-358 steht sie im Vertrag (`theme/statusFarben.ts`).
-    // Vorher stand hier 'aktiv' — also der Enum-Schlüssel, der nur zufällig lesbar war.
+    // Die Map trägt eine Beschriftung statt des Wire-Werts (Vertrag in `theme/statusFarben.ts`).
     expect(await screen.findByText('Aktiv')).toBeInTheDocument();
     expect(screen.getByText('Übung')).toBeInTheDocument();
   });
@@ -437,10 +420,7 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
 
   it('die Suche filtert über Bezeichnung, Ort und Stichwort', async () => {
     const nutzer = userEvent.setup();
-    // Je EIN Fall pro Feld mit einem eindeutigen Treffer — vorher trugen alle
-    // Fixtures dasselbe Stichwort und schematische Bezeichnungen, sodass ein
-    // Treffer allein über Bezeichnung oder Stichwort nie belegt war (Task-5-Review,
-    // Finding 3: Testname behauptete mehr, als der Testkörper prüfte).
+    // Je ein Fall pro Feld mit eindeutigem Treffer, damit jedes Suchfeld für sich belegt ist.
     mockEinsaetze([
       e({ id: 1, bezeichnung: 'Hochwasser Nordkreuz', einsatzort: 'Sonstwo', stichwort: 'THW' }),
       e({ id: 2, bezeichnung: 'Einsatz Zwei', einsatzort: 'Deichweg 7', stichwort: 'THW' }),
@@ -474,10 +454,8 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
   });
 
   it('bei leergefilterter Suche erscheint ein Hinweis, der den Suchbegriff nennt', async () => {
-    // Finding 1: `leer` (Zeile 215) beruht auf `aktive`, nicht auf `sichtbareAktive`
-    // — filtert die Suche ALLE aktiven Einsätze weg, blieb die Fläche bisher stumm
-    // (nur der „Neuer Einsatz"-Knopf oder gar nichts), statt eine dritte Sorte
-    // Leerzustand zu zeigen.
+    // Die Suche kann alle aktiven Einsätze wegfiltern; dann braucht es einen eigenen Leerzustand,
+    // nicht eine stumme Fläche.
     const nutzer = userEvent.setup();
     mockEinsaetze(
       Array.from({ length: 9 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
@@ -487,8 +465,7 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     await nutzer.type(feld, 'kein-treffer-xyz');
     expect(await screen.findByText(/Keine Treffer/)).toBeInTheDocument();
     expect(screen.getByText(/kein-treffer-xyz/)).toBeInTheDocument();
-    // Unterscheidbar vom „gar keine Einsätze"-Zustand — der träte hier nie auf, weil
-    // Einsätze vorhanden sind, nur eben weggefiltert.
+    // Unterscheidbar vom „gar keine Einsätze"-Zustand — Einsätze sind vorhanden, nur weggefiltert.
     expect(screen.queryByText('Keine Einsätze')).not.toBeInTheDocument();
   });
 
@@ -513,24 +490,19 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     render();
     await screen.findByText('Alter Einsatz');
     const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
-    // Suchbegriff trifft weder auf einen aktiven noch auf den abgeschlossenen
-    // Einsatz — die aktive Sektion muss leerlaufen, die abgeschlossene bleibt
-    // trotzdem stehen. Filterte `sichtbareAktive` versehentlich auch die
-    // abgeschlossene Sektion, verschwände „Alter Einsatz" hier mit.
+    // Der Suchbegriff trifft weder aktiv noch abgeschlossen: die aktive Sektion läuft leer, die
+    // abgeschlossene bleibt stehen. Filterte die Suche versehentlich auch sie, verschwände „Alter
+    // Einsatz" hier mit.
     await nutzer.type(feld, 'kein-treffer');
     expect(screen.queryByText('Einsatz 1')).not.toBeInTheDocument();
     expect(screen.getByText('Alter Einsatz')).toBeInTheDocument();
   });
 
   it('fällt die Zahl aktiver Einsätze unter die Schwelle, bleibt kein leeres Raster ohne Ausweg stehen (M6)', async () => {
-    // Befund M6: sichtbareAktive filtert UNBEDINGT, das Suchfeld erscheint nur ab
-    // SUCHE_AB, und keineTreffer verlangt zusätzlich sucheZeigen. Fällt die Zahl
-    // aktiver Einsätze unter die Schwelle — hier durch einen Refetch, wie ihn
-    // `refetchOnWindowFocus` (Vorgabewert true, nicht abgeschaltet) jederzeit
-    // auslösen kann —, während ein nicht passender Suchbegriff im Zustand steht,
-    // verschwindet das Feld samt allowClear, der Filter wirkt weiter, und der
-    // Nulltreffer-Hinweis erscheint nicht (er hängt an sucheZeigen): ein leeres
-    // Raster ohne Erklärung und ohne Ausweg.
+    // Fällt die Zahl aktiver Einsätze unter SUCHE_AB (etwa durch einen Refetch bei Fensterfokus),
+    // während ein nicht passender Suchbegriff im Zustand steht, verschwindet das Feld samt
+    // allowClear. Der Filter darf dann nicht weiterwirken, sonst stünde ein leeres Raster ohne
+    // Erklärung und ohne Ausweg da.
     const nutzer = userEvent.setup();
     mockEinsaetze(
       Array.from({ length: 9 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
@@ -550,9 +522,7 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     );
     await client.invalidateQueries({ queryKey: globalKeys.einsaetze() });
 
-    // Kein Suchfeld mehr (unter der Schwelle) — trotzdem müssen die drei
-    // verbliebenen Einsätze sichtbar sein statt in einem stummen, leeren Raster
-    // ohne jede Erklärung oder jeden Ausweg zu verschwinden.
+    // Kein Suchfeld mehr — trotzdem sind die drei verbliebenen Einsätze sichtbar.
     await waitFor(() => expect(screen.queryByRole('searchbox')).not.toBeInTheDocument());
     expect(await screen.findByText('Einsatz 1')).toBeInTheDocument();
     expect(screen.getByText('Einsatz 2')).toBeInTheDocument();
@@ -560,16 +530,13 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     expect(screen.queryByText(/Keine Treffer/)).not.toBeInTheDocument();
   });
 
-  // AK4. Der Titel ist schon ein `<Link>` — der Test hält diese Eigenschaft fest,
-  // damit ein späterer Umbau auf ein `<div onClick>` auffliegt statt still die
+  // Der Titel ist ein `<Link>` — ein Umbau auf ein `<div onClick>` flöge hier auf, statt still die
   // Tastaturbedienung zu kosten.
   it('die Tabulatortaste erreicht die Einsatzkarte, Enter navigiert', async () => {
     const nutzer = userEvent.setup();
     mockEinsaetze([e({ id: 7, bezeichnung: 'Hochwasser Musterstadt' })]);
-    // Die Zielroute muss MITGERENDERT werden. `renderMitProviders` fährt einen
-    // MemoryRouter (test/utils.tsx:38) — `window.location` bewegt sich dort nie,
-    // eine Zusicherung darauf wäre rot, ohne dass die Navigation kaputt ist.
-    // Dasselbe Muster wie im Dashboard-Test (dort „PERSONEN-MODUL").
+    // Die Zielroute muss mitgerendert werden: `renderMitProviders` fährt einen MemoryRouter,
+    // `window.location` bewegt sich dort nie.
     renderMitProviders(
       <Routes>
         <Route path="/einsaetze" element={<EinsaetzePage />} />
@@ -578,17 +545,16 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
       { route: '/einsaetze' },
     );
     const karte = await screen.findByRole('link', { name: 'Hochwasser Musterstadt' });
-    // Bis zur Karte tabben, statt sie zu fokussieren: „ist per Tastatur
-    // ERREICHBAR" ist die Aussage, nicht „reagiert, wenn man sie fokussiert".
-    // Vor den Karten liegt bei Anlegerecht der „Neuer Einsatz"-Knopf.
+    // Bis zur Karte tabben statt sie zu fokussieren: „per Tastatur erreichbar" ist die Aussage. Vor
+    // den Karten liegt bei Anlegerecht der „Neuer Einsatz"-Knopf.
     for (let i = 0; i < 10 && document.activeElement !== karte; i++) await nutzer.tab();
     expect(karte).toHaveFocus();
     await nutzer.keyboard('{Enter}');
     expect(await screen.findByText('EINSATZ-DETAIL')).toBeInTheDocument();
   });
 
-  // Neuentwurf „Instrumententafel": die Kachel ist keine antd-Card mehr, sondern eine
-  // Fläche mit Status-Punkt und Mono-Zeile. Geprüft wird, was sie TRÄGT, nicht die Optik.
+  // Die Kachel ist eine Fläche mit Status-Punkt und Mono-Zeile. Geprüft wird, was sie trägt, nicht
+  // die Optik.
   it('zeigt die Einsatznummer in Mono, wenn es eine gibt — und erfindet sonst keine', async () => {
     mockEinsaetze([
       e({ id: 1, bezeichnung: 'Mit Nummer', einsatznummer_intern: 'E-2026-014' }),
@@ -628,18 +594,14 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
 });
 
 /**
- * Der Titel-Link der Einsatzkarte ist ein handgebautes Bedienziel und folgt der
- * Dichte-Staffel (LFH-396, Gate 3). GEMESSEN im Browser vor dem Fix: 17 px in jeder Stufe —
- * ein nacktes Inline-`<a>` im Kartenkopf, unter dem 24-px-Boden schon in `kompakt`. Die
- * Karte selbst ist 120 px hoch und klickbar, aber der Link ist das TASTATURziel (Test „die
- * Tabulatortaste erreicht die Einsatzkarte" oben), und Gate 3 misst jedes fokussierbare
- * Element.
+ * Der Titel-Link der Einsatzkarte ist ein handgebautes Bedienziel auf der Dichte-Staffel (Gate 3):
+ * ein nacktes Inline-`<a>` im Kartenkopf ist nur so hoch wie seine Zeile. Die Karte ist klickbar,
+ * aber der Link ist das Tastaturziel, und Gate 3 misst jedes fokussierbare Element.
  *
  * Rein und exportiert wie `bedienzielStil` (`pages/lagekarte/Sidebar.tsx`): `test/utils.tsx`
- * rendert ein nacktes `ConfigProvider` ohne unser Theme, ein gerenderter Wert belegte
- * antd-Vorgaben statt der Staffel — und jsdom rechnet ohnehin kein Layout. Die Pixel misst
- * `e2e/gate3-trefflaeche.spec.ts`; hier steht, dass die Höhe aus dem Token kommt und
- * über die Stufen MITZIEHT.
+ * rendert ein nacktes `ConfigProvider` ohne unser Theme, und jsdom rechnet kein Layout. Die Pixel
+ * misst `e2e/gate3-trefflaeche.spec.ts`; hier steht, dass die Höhe aus dem Token kommt und über die
+ * Stufen mitzieht.
  */
 describe('Titel-Link der Einsatzkarte — Bedienziel auf der Dichte-Staffel (LFH-396)', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({
@@ -647,8 +609,8 @@ describe('Titel-Link der Einsatzkarte — Bedienziel auf der Dichte-Staffel (LFH
     paddingSM: dichten[stufe].abstand.sm,
   });
 
-  // Die Böden als Literale, nicht aus dem Token zurückgelesen — sonst prüfte der Test den
-  // Token gegen sich selbst (LFH-365).
+  // Die Böden als Literale, nicht aus dem Token zurückgelesen — sonst prüfte der Test den Token
+  // gegen sich selbst.
   it('trägt den Boden aus controlHeight — 30 / 48 / 72 px', () => {
     expect(kartenTitelStil(tokenFuer('kompakt')).minHeight).toBe(30);
     expect(kartenTitelStil(tokenFuer('komfortabel')).minHeight).toBe(48);
@@ -664,9 +626,8 @@ describe('Titel-Link der Einsatzkarte — Bedienziel auf der Dichte-Staffel (LFH
   });
 
   /**
-   * ZWEI Angaben, nicht eine (LFH-365). Die Polsterung liegt nur auf der SENKRECHTEN Achse:
-   * waagerecht polstert der Kartenkopf selbst, und ein Versatz des Titels gegenüber dem
-   * Kartenkörper wäre eine Sichtänderung, keine Trefflächenänderung.
+   * Zwei Angaben, nicht eine. Die Polsterung liegt nur auf der senkrechten Achse: waagerecht
+   * polstert der Kartenkopf selbst.
    */
   it('trägt neben der Höhe eine mitziehende senkrechte Polsterung', () => {
     expect(kartenTitelStil(tokenFuer('kompakt')).padding).toBe('7px 0');
@@ -675,10 +636,9 @@ describe('Titel-Link der Einsatzkarte — Bedienziel auf der Dichte-Staffel (LFH
 });
 
 /**
- * Hinweis auf die Demo-Daten (LFH-690, Task 6.3; design.md D13, Spec „Hinweis in der
- * Einsatzliste“). Jede Abwesenheit steht neben einer Positivprobe und hinter einem
- * Ankerpunkt (die Abfrage ist gelaufen bzw. die Liste steht) — sonst wäre sie auch dann
- * grün, wenn der Hinweis nie gebaut würde oder die Abfrage nie feuert.
+ * Hinweis auf die Demo-Daten (LFH-690, design.md D13). Jede Abwesenheit steht neben einer
+ * Positivprobe und hinter einem Ankerpunkt (Abfrage gelaufen bzw. Liste steht) — sonst wäre sie
+ * auch grün, wenn der Hinweis nie gebaut würde.
  */
 describe('Demo-Daten-Hinweis (LFH-690)', () => {
   const fuehrungskraft = { ...admin, id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };
@@ -734,10 +694,9 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
   });
 
   /**
-   * Prüfliste T3-5/T3-6/T3-2 (LFH-690): im Satz trennte den Verweis nur die Farbe vom Text
-   * (WCAG 1.4.1), am Tag hielt er 6,04 : 1, und sein `minHeight` riss die Textzeile in
-   * `handschuh` auf 72 px. Jetzt ist er ein eigenes Bedienziel in Knopfform außerhalb des
-   * Satzes, das Höhe und Polsterung vom `ConfigProvider` erbt — ohne punktuelles `size`.
+   * Der Verweis ist ein eigenes Bedienziel in Knopfform außerhalb des Satzes: im Satz trennte ihn
+   * nur die Farbe vom Text (WCAG 1.4.1), und sein `minHeight` risse die Textzeile in `handschuh`
+   * auf 72 px. Höhe und Polsterung erbt er vom `ConfigProvider`, ohne punktuelles `size`.
    */
   it('der Verweis steht als eigenes Bedienziel außerhalb des Satzes, ohne punktuelle Größe', async () => {
     demoStatus({ importiert: false });
@@ -760,10 +719,9 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
   });
 
   /**
-   * Prüfliste T3-12 (LFH-690): die Status-Abfrage kam regelmäßig nach der Einsatzliste an,
-   * der Hinweis erschien dann ÜBER dem schon gezeichneten Raster und schob es um 118–266 px
-   * (CLS bis 0,21). Er steht deshalb unter allem, was die Liste zeichnet — auch unter den
-   * abgeschlossenen Einsätzen, die ebenso verschoben würden.
+   * Der Status kommt oft nach der Einsatzliste an; ein Hinweis über dem schon gezeichneten Raster
+   * schöbe es weg (CLS). Er steht deshalb unter allem, was die Liste zeichnet — auch unter den
+   * abgeschlossenen Einsätzen.
    */
   it('der Hinweis steht unter dem Raster und unter den abgeschlossenen Einsätzen', async () => {
     demoStatus({ importiert: false });
@@ -775,8 +733,8 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
   });
 
   /**
-   * Die Gegenrichtung: stünde der Hinweis schon da, während die Liste noch lädt, schöbe der
-   * Wechsel Skelett → Kacheln (andere Reihenzahl, dazu der Leerzustand darüber) ihn selbst.
+   * Gegenrichtung: stünde der Hinweis schon während des Ladens da, schöbe ihn der Wechsel Skelett →
+   * Kacheln.
    */
   it('der Hinweis wartet auf die Einsatzliste, auch wenn der Status zuerst da ist', async () => {
     const { zaehler } = demoStatus({ importiert: false });
