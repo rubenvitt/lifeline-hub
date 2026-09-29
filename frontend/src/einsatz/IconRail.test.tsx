@@ -60,6 +60,9 @@ describe('IconRail', () => {
     const inaktiv = screen.getByRole('button', { name: 'Führung' });
     expect(inaktiv.style.boxShadow).toBe('none');
     expect(inaktiv).not.toHaveStyle({ backgroundColor: rahmenFarben.aktiv });
+    // Inaktiv heißt nicht gesperrt: das Etikett ist bedienbarer Text und hält die Tag-Schwelle
+    // (LFH-434, Zahl in `theme/rahmenKontrast.test.ts`).
+    expect(inaktiv).toHaveStyle({ color: rahmenFarben.gedaempft });
   });
 
   it('setzt „Einstellungen" abgesetzt an den Fuß — sechs Ziele bleiben in EINER Landmarke', () => {

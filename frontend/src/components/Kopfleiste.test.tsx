@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dichten, farbenDunkel } from '../theme/tokens';
+import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import {
   KOPF_NAME_FLEX,
   KOPF_NAME_FLEX_SCHMAL,
@@ -50,7 +50,7 @@ describe('syncZustand — Rangfolge der SYNC-Anzeige', () => {
   it('trägt je Zustand ein Wort (zweiter Kanal) und die Nachtrolle als Farbe', () => {
     expect(SYNC_DARSTELLUNG.verbunden).toMatchObject({ wort: 'SYNC', farbe: farbenDunkel.normal });
     expect(SYNC_DARSTELLUNG.verbinde.farbe).toBe(farbenDunkel.achtung);
-    expect(SYNC_DARSTELLUNG.getrennt.farbe).toBe(farbenDunkel.alarm);
+    expect(SYNC_DARSTELLUNG.getrennt.farbe).toBe(rahmenFarben.alarm);
     expect(SYNC_DARSTELLUNG.offline.wort).toBe('OFFLINE');
   });
 });

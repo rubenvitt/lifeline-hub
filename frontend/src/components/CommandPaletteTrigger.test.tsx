@@ -39,7 +39,9 @@ describe('CommandPaletteTrigger', () => {
     const knopf = screen.getByRole('button', { name: 'Suchen' });
     // Der Hinweistext ist Beiwerk; der zugängliche Name bleibt „Suchen" (e2e-Suiten).
     expect(knopf).toHaveTextContent(SUCHFELD_TEXT);
-    expect(screen.getByText('Strg+K', { selector: 'kbd' })).toBeInTheDocument();
+    expect(screen.getByText('Strg+K', { selector: 'kbd' })).toHaveStyle({
+      color: rahmenFarben.gedaempft,
+    });
     // Nur, was funktioniert: keine Koordinatensuche versprochen (Neuentwurf-Text gekürzt).
     expect(SUCHFELD_TEXT).not.toMatch(/Koordinate/);
   });
@@ -55,6 +57,8 @@ describe('CommandPaletteTrigger', () => {
     expect(suchfeldStil(tokenFuer('handschuh')).padding).toBe('7px 16px');
     expect(suchfeldStil(tokenFuer('kompakt')).maxWidth).toBe(520);
     expect(suchfeldStil(tokenFuer('kompakt')).background).toBe(rahmenFarben.feld);
+    // Hinweistext im Suchfeld hält die Tag-Schwelle auf `feld` (LFH-434).
+    expect(suchfeldStil(tokenFuer('kompakt')).color).toBe(rahmenFarben.gedaempft);
   });
 
   it('nutzt für das sichtbare Kürzel das Betriebssystem des Nutzers', () => {

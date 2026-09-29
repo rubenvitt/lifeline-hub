@@ -47,10 +47,11 @@ export function railZielStil(
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    // Nachtrollen, nicht Modus-Token: die Rail ist in BEIDEN Modi dunkel.
+    // Nachtrollen, nicht Modus-Token: die Rail ist in BEIDEN Modi dunkel. Inaktiv heißt nicht
+    // gesperrt: das Etikett ist bedienbarer Text und hält die Tag-Schwelle (LFH-434).
     background: zustand.aktiv ? rahmenFarben.aktiv : 'transparent',
     boxShadow: zustand.aktiv ? `inset ${MARKE_BREITE}px 0 0 ${rahmenFarben.marke}` : 'none',
-    color: zustand.aktiv ? rahmenFarben.text : rahmenFarben.schwach,
+    color: zustand.aktiv ? rahmenFarben.text : rahmenFarben.gedaempft,
   };
 }
 

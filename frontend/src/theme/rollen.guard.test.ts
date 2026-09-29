@@ -152,7 +152,8 @@ const RAHMEN_ABBILDUNG: Record<keyof typeof rahmenFarben, string> = {
   linie: '--lfh-rahmen-linie',
   text: '--lfh-rahmen-text',
   gedaempft: '--lfh-rahmen-gedaempft',
-  schwach: '--lfh-rahmen-schwach',
+  gesperrt: '--lfh-rahmen-gesperrt',
+  alarm: '--lfh-rahmen-alarm',
   marke: '--lfh-rahmen-marke',
 };
 
