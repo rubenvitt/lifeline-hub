@@ -1187,6 +1187,26 @@ describe('PersonenPage', () => {
     expect(screen.queryByText('Personen konnten nicht geladen werden')).not.toBeInTheDocument();
   });
 
+  /** Rechteentzug (LFH-723, design.md D6): eine 403 ist kein „veralteter Stand" — der
+   *  entzogene Stand verschwindet, statt unter einem Hinweis stehen zu bleiben. */
+  it('zeigt nach einer 403 den Fehler statt des entzogenen Stands', async () => {
+    const { client } = render(einsatzAktiv, [person]);
+    await screen.findByText('R-001');
+
+    server.use(
+      http.get('/api/einsaetze/1/personen', () =>
+        HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
+      ),
+    );
+    await client.refetchQueries({ queryKey: einsatzKeys.personen(1) });
+
+    expect(await screen.findByText('Personen konnten nicht geladen werden')).toBeInTheDocument();
+    expect(screen.queryByText('R-001')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).not.toBeInTheDocument();
+  });
+
   describe('Erfassungszeile /person', () => {
     const feld = () => screen.getByRole('textbox', { name: 'Kurzeingabe Person' });
 

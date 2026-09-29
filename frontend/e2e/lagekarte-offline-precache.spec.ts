@@ -12,9 +12,10 @@ import { fileURLToPath } from 'node:url';
 // Cache-Headern und same-origin mit der API. Der Port kommt aus `LIFELINE_E2E_LAUF`.
 //
 // NICHT BEHAUPTET: dass die Lagekarte offline vollständig hochkommt. Der Prod-Bundle trägt den
-// DEV-Haken `__lfhKarte` nicht, und die API ist nicht precacht (der React-Root bleibt offline
-// leer). Geprüft wird das Asset-Versprechen: Shell und Worker kommen aus dem Precache, und der
-// Worker ist aus dem Cache startbar.
+// DEV-Haken `__lfhKarte` nicht, und die API ist nicht precacht. Die Daten hält seit LFH-723 die
+// App selbst vor (IndexedDB), das belegen `lagebild-offline.spec.ts` und
+// `lagekarte-offline-zeichnen.spec.ts`. Geprüft wird hier das Asset-Versprechen: Shell und
+// Worker kommen aus dem Precache, und der Worker ist aus dem Cache startbar.
 //
 // TRAGEND ist `fromServiceWorker()`: das Asset ist `immutable` und könnte sonst aus dem
 // HTTP-Cache kommen. Gegenkontrolle: etwas NICHT-Precachtes (`/api/health`) MUSS offline
@@ -184,14 +185,15 @@ test('Lagekarte: der maplibre-Worker kommt offline aus dem Service-Worker-Precac
   ).toBe(true);
 
   // (5) Die App-Shell kommt offline aus dem Precache — sonst könnte die Seite den Worker nie
-  //     anfordern. Geprüft an der Navigations-Antwort; die Datenschicht ist offline tot.
+  //     anfordern. Geprüft an der Navigations-Antwort; welche Daten offline stehen, prüft
+  //     `lagebild-offline.spec.ts`.
   const navigation = await page.reload({ timeout: 20_000 });
   expect(navigation?.status()).toBe(200);
   expect(navigation?.fromServiceWorker(), 'Shell kam nicht aus dem Service-Worker-Cache').toBe(
     true,
   );
 
-  // Backstop über den ganzen Lauf: dass die Shell offline keine Daten zeigt, ist erwartet; dass
-  // sie dabei eine Ausnahme wirft und den React-Root abreißt, wäre ein Fehler.
+  // Backstop über den ganzen Lauf: dass Abrufe offline scheitern, ist erwartet; dass die Seite
+  // dabei eine Ausnahme wirft und den React-Root abreißt, wäre ein Fehler.
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
 });
