@@ -77,7 +77,10 @@ pub async fn benutzer_id_zu_token(pool: &SqlitePool, token: &str) -> Option<i64>
 }
 
 /// Löst eine gültige (nicht abgelaufene) Session zu einem aktiven Benutzer auf.
-async fn benutzer_aus_token(pool: &SqlitePool, token: &str) -> Result<Benutzer, AppError> {
+pub(crate) async fn benutzer_aus_token(
+    pool: &SqlitePool,
+    token: &str,
+) -> Result<Benutzer, AppError> {
     let benutzer = sqlx::query_as::<_, Benutzer>(
         "SELECT b.id, b.org_id, b.anzeigename, b.benutzername, b.passwort_hash, \
                 b.system_rolle, b.org_rolle, b.aktiv, b.erstellt_at \
@@ -92,8 +95,47 @@ async fn benutzer_aus_token(pool: &SqlitePool, token: &str) -> Result<Benutzer, 
     benutzer.ok_or(AppError::Unauthorized)
 }
 
+/// Kopf, mit dem ein Browser-Tab bei schreibenden Anfragen den Benutzer nennt, den er anzeigt
+/// (LFH-387). Das Session-Cookie gilt für den ganzen Origin; meldet sich in einem anderen Tab
+/// jemand anderes an, liefe jede Schreibaktion des alten Tabs sonst still unter der neuen
+/// Sitzung.
+pub const ERWARTETER_BENUTZER_ID_HEADER: &str = "x-erwarteter-benutzer-id";
+
+/// Bindet eine schreibende Anfrage an den erwarteten Benutzer.
+///
+/// Optional, aber strikt — dasselbe Muster wie der Queue-Besitzer aus LFH-334
+/// (`routes::support::fordere_offline_queue_benutzer`): ohne Kopf bleibt alles wie bisher
+/// (Skripte, Tests, ältere Frontend-Stände), ein ungültiger oder abweichender Wert ist 412.
+/// Lesende Methoden sind nicht gebunden. Der Aufrufer prüft die Sitzung VORHER, damit eine tote
+/// Sitzung 401 bleibt.
+pub fn pruefe_erwarteten_benutzer(
+    methode: &axum::http::Method,
+    headers: &axum::http::HeaderMap,
+    aktueller_benutzer_id: i64,
+) -> Result<(), AppError> {
+    if methode.is_safe() {
+        return Ok(());
+    }
+    let Some(erwartet) = headers.get(ERWARTETER_BENUTZER_ID_HEADER) else {
+        return Ok(());
+    };
+    let passt = erwartet
+        .to_str()
+        .ok()
+        .and_then(|wert| wert.trim().parse::<i64>().ok())
+        .is_some_and(|id| id == aktueller_benutzer_id);
+    if passt {
+        Ok(())
+    } else {
+        Err(AppError::SitzungsBenutzerMismatch)
+    }
+}
+
 /// Extractor: der aktuell angemeldete Benutzer (aus Session-Cookie).
-/// Liefert 401, wenn kein gültiger Session-Cookie vorliegt.
+/// Liefert 401, wenn kein gültiger Session-Cookie vorliegt, und 412, wenn eine schreibende
+/// Anfrage einen anderen Benutzer erwartet ([`pruefe_erwarteten_benutzer`], LFH-387). Weil
+/// `AdminUser` und `EinsatzKontext` hierüber laufen, greift die Bindung an jeder
+/// authentifizierten Schreibroute, vor dem Handler und damit vor jedem Idempotenz-Lookup.
 pub struct CurrentUser(pub Benutzer);
 
 impl FromRequestParts<AppState> for CurrentUser {
@@ -112,6 +154,7 @@ impl FromRequestParts<AppState> for CurrentUser {
             .ok_or(AppError::Unauthorized)?;
 
         let benutzer = benutzer_aus_token(&state.pool, &token).await?;
+        pruefe_erwarteten_benutzer(&parts.method, &parts.headers, benutzer.id)?;
         Ok(CurrentUser(benutzer))
     }
 }
@@ -158,6 +201,41 @@ mod tests {
             .fetch_one(pool)
             .await
             .unwrap()
+    }
+
+    fn kopf(wert: &str) -> axum::http::HeaderMap {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(ERWARTETER_BENUTZER_ID_HEADER, wert.parse().unwrap());
+        headers
+    }
+
+    #[test]
+    fn erwarteter_benutzer_bindet_nur_schreibende_methoden() {
+        use axum::http::Method;
+        let leer = axum::http::HeaderMap::new();
+        for methode in [Method::POST, Method::PUT, Method::PATCH, Method::DELETE] {
+            assert!(pruefe_erwarteten_benutzer(&methode, &kopf("7"), 7).is_ok());
+            assert!(pruefe_erwarteten_benutzer(&methode, &kopf(" 7 "), 7).is_ok());
+            assert!(
+                pruefe_erwarteten_benutzer(&methode, &leer, 7).is_ok(),
+                "ohne Kopf bleibt alles wie bisher"
+            );
+            for falsch in ["8", "", "abc", "7x"] {
+                assert!(
+                    matches!(
+                        pruefe_erwarteten_benutzer(&methode, &kopf(falsch), 7),
+                        Err(AppError::SitzungsBenutzerMismatch)
+                    ),
+                    "{methode} mit Kopf {falsch:?} muss 412 sein"
+                );
+            }
+        }
+        for methode in [Method::GET, Method::HEAD, Method::OPTIONS] {
+            assert!(
+                pruefe_erwarteten_benutzer(&methode, &kopf("8"), 7).is_ok(),
+                "lesende Anfragen sind nicht gebunden ({methode})"
+            );
+        }
     }
 
     #[test]

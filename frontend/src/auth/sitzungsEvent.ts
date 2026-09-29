@@ -22,3 +22,9 @@ export function meldeSitzungAbgelaufen(): void {
 export function sitzungsMeldungZuruecksetzen(): void {
   bereitsGemeldet = false;
 }
+
+/** Fensterereignis „prüfe, wem die Sitzung gehört“ (LFH-387). `api/client.ts` feuert es bei jeder
+ *  412-Antwort, der `AuthProvider` fragt daraufhin `GET /api/auth/me` ab. 412 kommt aus zwei
+ *  Quellen — Queue-Besitzer (LFH-334) und erwarteter Benutzer des Tabs —, die der Client nicht
+ *  trennen muss: gehört die Sitzung weiter dem angezeigten Benutzer, ergibt die Prüfung nichts. */
+export const BENUTZER_PRUEFEN = 'lfh:benutzer-pruefen';

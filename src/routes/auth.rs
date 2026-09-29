@@ -5,7 +5,7 @@ use crate::error::AppError;
 use crate::extract::PfadParam;
 use crate::extract::{JsonBody, PeerIp};
 use axum::extract::{Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, Method, StatusCode};
 use axum::response::Redirect;
 use axum::Json;
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
@@ -185,12 +185,21 @@ pub async fn login(
 }
 
 /// POST /api/auth/logout — löscht die Session und entfernt das Cookie.
+///
+/// Nennt der Tab den Benutzer, den er anzeigt (`X-Erwarteter-Benutzer-Id`, LFH-387), und
+/// gehört die noch gültige Sitzung inzwischen jemand anderem, antwortet der Logout 412 und
+/// lässt Sitzung und Cookie stehen: ein veralteter Tab darf die Sitzung des neu angemeldeten
+/// Benutzers nicht beenden. Eine tote Sitzung räumt der Logout wie bisher.
 pub async fn logout(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
+    headers: HeaderMap,
     jar: CookieJar,
 ) -> Result<(CookieJar, StatusCode), AppError> {
     if let Some(cookie) = jar.get(SESSION_COOKIE) {
+        if let Ok(inhaber) = session::benutzer_aus_token(&state.pool, cookie.value()).await {
+            session::pruefe_erwarteten_benutzer(&Method::POST, &headers, inhaber.id)?;
+        }
         // Wer sich abmeldet, wird vor dem Löschen bestimmt — danach ist die Zuordnung weg.
         let benutzer_id = session::benutzer_id_zu_token(&state.pool, cookie.value()).await;
 

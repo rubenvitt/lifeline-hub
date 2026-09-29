@@ -1,8 +1,10 @@
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
+import { BENUTZER_PRUEFEN } from '../auth/sitzungsEvent';
 import {
   ApiError,
+  ERWARTETER_BENUTZER_HEADER,
   NetzFehler,
   OFFLINE_QUEUE_BENUTZER_HEADER,
   apiGet,
@@ -10,9 +12,13 @@ import {
   apiUpload,
   fehlerText,
   istKonflikt,
+  setzeErwartetenBenutzer,
 } from './client';
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  setzeErwartetenBenutzer(null);
+});
 
 describe('istKonflikt', () => {
   it('erkennt einen 409-ApiError als optimistischen Sperrkonflikt', () => {
@@ -149,6 +155,101 @@ describe('apiUpload', () => {
     );
     await apiUpload('/api/upload', new FormData(), { timeoutMs: 120_000 });
     expect(timeout).toHaveBeenCalledWith(120_000);
+  });
+});
+
+/** LFH-387: der Tab nennt bei jeder schreibenden Anfrage den Benutzer, den er anzeigt; der
+ *  Server lehnt mit 412 ab, wenn die originweite Sitzung inzwischen jemand anderem gehört. */
+describe('erwarteter Benutzer (LFH-387)', () => {
+  function kopfMitschneiden(methode: 'get' | 'post' | 'put' | 'patch' | 'delete') {
+    const gesehen: { wert: string | null | undefined } = { wert: undefined };
+    server.use(
+      http[methode]('/api/ding', ({ request }) => {
+        gesehen.wert = request.headers.get(ERWARTETER_BENUTZER_HEADER);
+        return HttpResponse.json({ ok: true });
+      }),
+    );
+    return gesehen;
+  }
+
+  it.each(['POST', 'PUT', 'PATCH', 'DELETE'] as const)(
+    'setzt den Kopf an %s, sobald ein Benutzer gesetzt ist',
+    async (methode) => {
+      const gesehen = kopfMitschneiden(methode.toLowerCase() as 'post');
+      setzeErwartetenBenutzer(7);
+      await apiSend('/api/ding', methode, { a: 1 });
+      expect(gesehen.wert).toBe('7');
+    },
+  );
+
+  it('setzt keinen Kopf ohne gesetzten Benutzer', async () => {
+    const gesehen = kopfMitschneiden('post');
+    await apiSend('/api/ding', 'POST', { a: 1 });
+    expect(gesehen.wert).toBeNull();
+  });
+
+  it('setzt keinen Kopf mehr, nachdem der Benutzer entfernt wurde', async () => {
+    const gesehen = kopfMitschneiden('post');
+    setzeErwartetenBenutzer(7);
+    setzeErwartetenBenutzer(null);
+    await apiSend('/api/ding', 'POST', { a: 1 });
+    expect(gesehen.wert).toBeNull();
+  });
+
+  it('bindet lesende Anfragen nicht (apiGet und apiSend mit GET)', async () => {
+    const gesehen = kopfMitschneiden('get');
+    setzeErwartetenBenutzer(7);
+    await apiGet('/api/ding');
+    expect(gesehen.wert).toBeNull();
+    await apiSend('/api/ding', 'GET');
+    expect(gesehen.wert).toBeNull();
+  });
+
+  it('setzt den Kopf auch am Upload', async () => {
+    let wert: string | null = null;
+    server.use(
+      http.post('/api/upload', ({ request }) => {
+        wert = request.headers.get(ERWARTETER_BENUTZER_HEADER);
+        return HttpResponse.json({ ok: true });
+      }),
+    );
+    setzeErwartetenBenutzer(7);
+    await apiUpload('/api/upload', new FormData());
+    expect(wert).toBe('7');
+  });
+
+  it('löst bei 412 eine Benutzerprüfung aus und wirft den ApiError unverändert', async () => {
+    server.use(
+      http.post('/api/ding', () =>
+        HttpResponse.json(
+          { error: 'Die Sitzung gehört inzwischen einem anderen Benutzer' },
+          {
+            status: 412,
+          },
+        ),
+      ),
+    );
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      setzeErwartetenBenutzer(7);
+      await expect(apiSend('/api/ding', 'POST', {})).rejects.toMatchObject({ status: 412 });
+      expect(pruefen).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
+  });
+
+  it.each([401, 409, 422])('löst bei %i keine Benutzerprüfung aus', async (status) => {
+    server.use(http.post('/api/ding', () => HttpResponse.json({ error: 'x' }, { status })));
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      await expect(apiSend('/api/ding', 'POST', {})).rejects.toMatchObject({ status });
+      expect(pruefen).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
   });
 });
 

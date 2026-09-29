@@ -13,6 +13,9 @@ pub enum AppError {
     /// veralteter Tab darf die gültige Session des aktuell angemeldeten Benutzers nicht über den
     /// globalen Logout-Pfad beenden.
     OfflineQueueBenutzerMismatch,
+    /// Die Sitzung gehört inzwischen einem anderen Benutzer als dem, den der schreibende Tab
+    /// erwartet (412, LFH-387). Aus demselben Grund wie oben kein 401.
+    SitzungsBenutzerMismatch,
     /// Angemeldet, aber keine Berechtigung (403).
     Forbidden,
     /// Ressource nicht gefunden (404).
@@ -47,6 +50,9 @@ impl std::fmt::Display for AppError {
             AppError::OfflineQueueBenutzerMismatch => {
                 write!(f, "Offline-Eintrag gehört zu einem anderen Benutzer")
             }
+            AppError::SitzungsBenutzerMismatch => {
+                write!(f, "Die Sitzung gehört inzwischen einem anderen Benutzer")
+            }
             AppError::Forbidden => write!(f, "Keine Berechtigung"),
             AppError::NotFound => write!(f, "Nicht gefunden"),
             AppError::Validation(m) => write!(f, "{m}"),
@@ -76,6 +82,7 @@ impl AppError {
         match self {
             AppError::Unauthorized => StatusCode::UNAUTHORIZED,
             AppError::OfflineQueueBenutzerMismatch => StatusCode::PRECONDITION_FAILED,
+            AppError::SitzungsBenutzerMismatch => StatusCode::PRECONDITION_FAILED,
             AppError::Forbidden => StatusCode::FORBIDDEN,
             AppError::NotFound => StatusCode::NOT_FOUND,
             AppError::Validation(_) => StatusCode::BAD_REQUEST,
@@ -194,6 +201,21 @@ mod tests {
             StatusCode::PRECONDITION_FAILED
         );
         assert_eq!(AppError::Unauthorized.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// LFH-387: ein veralteter Tab schreibt unter einer inzwischen fremden Sitzung. Wie der
+    /// Queue-Fall 412 und nie 401 — sonst meldete die Sitzungswache die gültige Sitzung ab —,
+    /// aber mit eigener Meldung, damit Log und Fehlertext die beiden Fälle trennen.
+    #[test]
+    fn sitzungs_benutzerwechsel_ist_412_mit_eigener_meldung() {
+        assert_eq!(
+            AppError::SitzungsBenutzerMismatch.status(),
+            StatusCode::PRECONDITION_FAILED
+        );
+        assert_ne!(
+            AppError::SitzungsBenutzerMismatch.to_string(),
+            AppError::OfflineQueueBenutzerMismatch.to_string()
+        );
     }
 
     /// 1-Verbindungs-In-Memory-Pool mit aktivierten Foreign Keys, damit echte

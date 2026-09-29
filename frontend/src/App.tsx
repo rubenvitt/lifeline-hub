@@ -3,6 +3,7 @@ import { Fragment, lazy, Suspense } from 'react';
 import type { ReactElement } from 'react';
 import RequireAuth from './routes/RequireAuth';
 import { useSitzungsWache } from './auth/useSitzungsWache';
+import BenutzerKonfliktDialog from './auth/BenutzerKonfliktDialog';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 import EinsaetzePage from './pages/EinsaetzePage';
@@ -73,7 +74,7 @@ import ModulStub from './einsatz/ModulStub';
 import { modulRegistry } from './einsatz/modulRegistry';
 import { EINSTELLUNGEN_SEKTIONEN } from './routing/deeplinks';
 import LiveStatusBanner from './live/LiveStatusBanner';
-import { useOfflineSync } from './offline/useOfflineSync';
+import { abgleichFuer, useOfflineSync } from './offline/useOfflineSync';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider';
 
@@ -155,8 +156,8 @@ const EINSTELLUNGEN_ROUTEN = (
  * Einsatz-Workspace bleiben darunter Geschwister.
  */
 function BetriebsLayout() {
-  const { benutzer } = useAuth();
-  useOfflineSync(benutzer?.id);
+  const { benutzer, konflikt } = useAuth();
+  useOfflineSync(abgleichFuer(benutzer, konflikt !== null));
   return (
     <>
       <LiveStatusBanner benutzerId={benutzer?.id} />
@@ -178,7 +179,13 @@ function App() {
 
 function SitzungsLayout() {
   useSitzungsWache();
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      {/* Benutzerwechsel in einem anderen Tab (LFH-387) — neben der Wache, über jeder Route. */}
+      <BenutzerKonfliktDialog />
+    </>
+  );
 }
 
 /** Eine Routenquelle für Browser und Integrationstests; keine nachgelagerten Routes. */

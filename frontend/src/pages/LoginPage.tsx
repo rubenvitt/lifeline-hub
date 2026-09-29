@@ -26,7 +26,7 @@ interface TotpFormWerte {
 }
 
 export default function LoginPage() {
-  const { login, aktualisiere } = useAuth();
+  const { login, aktualisiere, benutzer, laedt: authLaedt } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [form] = Form.useForm<FormWerte>();
@@ -56,6 +56,20 @@ export default function LoginPage() {
   const [recoveryModus, setRecoveryModus] = useState(false);
 
   const zielPfad = (location.state as { von?: string } | null)?.von ?? '/einsaetze';
+
+  // Anmeldung aus einem anderen Tab (LFH-387): der AuthProvider übernimmt sie, die Seite zieht
+  // nach. Nur beim Übergang „anonym → angemeldet“ — wer angemeldet `/login` aufruft, um den
+  // Benutzer zu wechseln, bleibt hier. Der eigene Login navigiert ohnehin selbst dorthin.
+  const anonymGesehen = useRef(false);
+  useEffect(() => {
+    if (authLaedt) return;
+    if (benutzer === null) {
+      anonymGesehen.current = true;
+    } else if (anonymGesehen.current) {
+      anonymGesehen.current = false;
+      navigate(zielPfad, { replace: true });
+    }
+  }, [authLaedt, benutzer, navigate, zielPfad]);
 
   // Nur im Dev-Build: verfügbare Seed-Benutzer laden. Der Block steht hinter `import.meta.env.DEV`
   // und entfällt im Production-Build per DCE.

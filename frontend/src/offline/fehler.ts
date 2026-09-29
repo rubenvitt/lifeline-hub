@@ -5,8 +5,9 @@ import { ApiError, NetzFehler } from '../api/client';
 export function istOfflineTransient(e: unknown): boolean {
   if (e instanceof NetzFehler || e instanceof TypeError) return true;
   if (e instanceof ApiError) {
-    // 412 ist bei den offlinefähigen Endpunkten exklusiv der Queue-Eigentümer-Konflikt; anders
-    // als eine echte 401 darf er die gültige Sitzung des angemeldeten Benutzers nicht abmelden.
+    // 412 = die Sitzung gehört einem anderen Benutzer: Queue-Eigentümer-Konflikt oder (LFH-387)
+    // abweichender erwarteter Benutzer des Tabs. Der Eintrag bleibt liegen; anders als eine echte
+    // 401 darf er die gültige Sitzung des angemeldeten Benutzers nicht abmelden.
     return (
       e.status === 401 ||
       e.status === 408 ||

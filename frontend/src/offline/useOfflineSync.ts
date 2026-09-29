@@ -29,6 +29,16 @@ const BACKOFF_MS = [1_000, 5_000, 15_000, 30_000];
 type QueueElement =
   { art: 'etb'; wert: AusstehenderEintrag } | { art: 'schreiben'; wert: AusstehendeSchreibaktion };
 
+/** Für wen der Abgleich laufen soll. Während eines Benutzerkonflikts (LFH-387) pausiert er: die
+ *  Sitzung gehört dann einem anderen Benutzer, jeder Versuch scheiterte mit 412 und bliebe
+ *  liegen. Die Einträge warten, bis ihr Benutzer wieder angemeldet ist. */
+export function abgleichFuer(
+  benutzer: { id: number } | null,
+  konflikt: boolean,
+): number | undefined {
+  return konflikt || !benutzer ? undefined : benutzer.id;
+}
+
 /** Globaler Queue-Flush für genau die aktuell angemeldete, datenbankweit
  * eindeutige Benutzer-ID. Fremde und unzugeordnete Legacy-Zeilen werden weder
  * geladen noch automatisch gesendet. */

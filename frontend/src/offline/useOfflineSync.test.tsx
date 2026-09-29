@@ -10,6 +10,7 @@ import { legeMeldungAn } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Person } from '../api/types';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
+import { abgleichFuer } from './useOfflineSync';
 import {
   OFFLINE_SCHREIBAKTION_GESENDET_EVENT,
   type OfflineSchreibaktionGesendet,
@@ -414,5 +415,18 @@ describe('Stand- und Belegungsmeldungen in der Offline-Queue (LFH-675)', () => {
     await waitFor(() => expect(meldeStand).toHaveBeenCalled());
     expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1, abgelehnt: 0 });
     unmount();
+  });
+});
+
+/** LFH-387: während eines Benutzerkonflikts scheitert jeder Abgleich am Server (412) und stieße
+ *  jedes Mal eine Prüfung an — also pausieren, statt alle 30 s gegen die Wand zu laufen. */
+describe('abgleichFuer (LFH-387)', () => {
+  const anna = { id: 1 } as Parameters<typeof abgleichFuer>[0];
+  it('gleicht für den angemeldeten Benutzer ab', () => {
+    expect(abgleichFuer(anna, false)).toBe(1);
+  });
+  it('pausiert während eines Konflikts und ohne Benutzer', () => {
+    expect(abgleichFuer(anna, true)).toBeUndefined();
+    expect(abgleichFuer(null, false)).toBeUndefined();
   });
 });

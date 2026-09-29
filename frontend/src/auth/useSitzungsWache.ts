@@ -9,7 +9,7 @@ import { SITZUNG_ABGELAUFEN } from './sitzungsEvent';
  * 401-Behandlung hat.
  */
 export function useSitzungsWache(): void {
-  const { logout } = useAuth();
+  const { abmeldenLokal } = useAuth();
   const navigate = useNavigate();
   const { pathname, search, hash } = useLocation();
 
@@ -20,13 +20,20 @@ export function useSitzungsWache(): void {
     const beiAblauf = () => {
       // Vollständige Rückkehr-URL: `pathname` allein verlöre die Deeplink-Selektion (`?eintrag=` …).
       const von = `${pathname}${search}${hash}`;
-      // `logout` wirft nicht, das `catch` hält die Umleitung trotzdem davon unabhängig: an diesem
-      // Seam soll keine unbehandelte Rejection und kein hängender Nutzer entstehen.
-      void logout()
-        .catch(() => {})
-        .finally(() => navigate('/login', { replace: true, state: { von } }));
+      // NUR lokal abmelden (LFH-387): ein Server-Logout liefe mit dem Cookie von JETZT und
+      // beendete eine inzwischen in einem anderen Tab angelegte Sitzung. Die Umleitung hängt
+      // nicht am Abmelden — an diesem Seam soll kein hängender Nutzer entstehen.
+      // Der Benutzer ist sofort weg, das Lagebild (LFH-723) räumt im Hintergrund nach.
+      const fehler = (e: unknown) =>
+        console.error('Lokales Abmelden nach Sitzungsablauf fehlgeschlagen', e);
+      try {
+        abmeldenLokal().catch(fehler);
+      } catch (e) {
+        fehler(e);
+      }
+      navigate('/login', { replace: true, state: { von } });
     };
     window.addEventListener(SITZUNG_ABGELAUFEN, beiAblauf);
     return () => window.removeEventListener(SITZUNG_ABGELAUFEN, beiAblauf);
-  }, [logout, navigate, pathname, search, hash]);
+  }, [abmeldenLokal, navigate, pathname, search, hash]);
 }
