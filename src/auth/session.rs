@@ -71,6 +71,22 @@ pub async fn loeschen(pool: &SqlitePool, token: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Löscht alle Sessions eines Benutzers AUSSER der zum übergebenen Token (Passwortwechsel,
+/// LFH-471). Läuft auf dem Executor des Aufrufers, damit der Wechsel mit dem neuen Hash in einer
+/// Transaktion steht.
+pub async fn andere_loeschen(
+    conn: &mut sqlx::SqliteConnection,
+    benutzer_id: i64,
+    eigener_token: &str,
+) -> Result<u64, AppError> {
+    let ergebnis = sqlx::query("DELETE FROM session WHERE benutzer_id = ? AND token_hash <> ?")
+        .bind(benutzer_id)
+        .bind(hash_token(eigener_token))
+        .execute(conn)
+        .await?;
+    Ok(ergebnis.rows_affected())
+}
+
 /// Benutzer-ID hinter einem Session-Token, ohne Gültigkeitsprüfung. Für die Audit-Spur beim
 /// Logout, die den Benutzer VOR dem Löschen der Session bestimmen muss.
 pub async fn benutzer_id_zu_token(pool: &SqlitePool, token: &str) -> Option<i64> {

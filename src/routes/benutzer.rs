@@ -12,8 +12,20 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-/// Mindestlänge für Passwörter (siehe Plan-Design-Entscheidungen).
+/// Mindestlänge für Passwörter (siehe Plan-Design-Entscheidungen). Gilt beim Anlegen durch den
+/// Admin und beim Self-Service-Wechsel (LFH-471) — beide prüfen über [`pruefe_passwort_laenge`].
 const PASSWORT_MIN_LEN: usize = 8;
+
+/// 400, wenn ein neues Passwort kürzer als [`PASSWORT_MIN_LEN`] ist. Eine Stelle für die Grenze
+/// und ihre Meldung, damit Anlegen und Wechsel nicht auseinanderlaufen.
+pub(crate) fn pruefe_passwort_laenge(passwort: &str) -> Result<(), AppError> {
+    if passwort.len() < PASSWORT_MIN_LEN {
+        return Err(AppError::Validation(format!(
+            "Passwort muss mindestens {PASSWORT_MIN_LEN} Zeichen haben"
+        )));
+    }
+    Ok(())
+}
 
 #[derive(Debug, Deserialize)]
 pub struct NeuerBenutzer {
@@ -27,7 +39,8 @@ pub struct NeuerBenutzer {
 }
 
 /// Partielle Änderung eines bestehenden Benutzers (PATCH, LFH-286). `None` = Feld nicht
-/// ändern. `benutzername` (Login-Identität) und Passwort sind bewusst nicht änderbar.
+/// ändern. `benutzername` (Login-Identität) und Passwort sind hier bewusst nicht änderbar; das
+/// Passwort wechselt nur sein Inhaber selbst, mit dem alten (`POST /api/auth/passwort`, LFH-471).
 #[derive(Debug, Deserialize)]
 pub struct PatchBenutzer {
     pub anzeigename: Option<String>,
@@ -84,11 +97,7 @@ pub async fn anlegen(
 ) -> Result<(StatusCode, Json<BenutzerAnzeige>), AppError> {
     pflicht(&req.benutzername, "Benutzername")?;
     pflicht(&req.anzeigename, "Anzeigename")?;
-    if req.passwort.len() < PASSWORT_MIN_LEN {
-        return Err(AppError::Validation(format!(
-            "Passwort muss mindestens {PASSWORT_MIN_LEN} Zeichen haben"
-        )));
-    }
+    pruefe_passwort_laenge(&req.passwort)?;
     let rolle = req.system_rolle.as_deref().unwrap_or(ROLLE_KEINER);
     pruefe_system_rolle(rolle)?;
 

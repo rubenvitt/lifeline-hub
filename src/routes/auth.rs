@@ -242,6 +242,119 @@ pub async fn me(
     Ok(Json(benutzer.anzeige(totp_aktiviert)))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PasswortWechsel {
+    pub altes_passwort: String,
+    pub neues_passwort: String,
+}
+
+/// POST /api/auth/passwort — der angemeldete Benutzer wechselt sein eigenes Passwort (LFH-471).
+///
+/// **Das alte Passwort ist Pflicht.** Ohne diese Prüfung machte ein übernommenes Session-Cookie
+/// aus einer Sitzung ein Konto. Geprüft wird über denselben gedrosselten Weg wie beim Login
+/// (`provider::password::anmelden`: KDF-Gate, angeglichene Antwortzeit); ein Fehlversuch zählt
+/// in dieselbe Sperre je Quelle, sonst wäre dieser Endpunkt ein ungebremster Rateweg für jeden,
+/// der ein Cookie hat.
+///
+/// **Statuscodes** (Konvention `src/error.rs`): leeres Alt-Passwort oder zu kurzes neues → 400;
+/// falsches Alt-Passwort → 422 (Zustand, wie „Code ungültig" bei TOTP) — ausdrücklich nicht 401,
+/// denn die Sitzung ist gültig, und ein 401 ließe die Sitzungswache des Frontends abmelden.
+/// Abgeschalteter Passwort-Provider → 403, dieselbe Durchsetzung wie beim Login. Ein SSO-only-
+/// Konto hat kein Passwort, das es nennen könnte, und landet deshalb bei 422.
+///
+/// **Sitzungen:** alle ANDEREN Sitzungen des Benutzers enden, in derselben Transaktion wie der
+/// neue Hash. Der Wechsel ist die Antwort auf ein verratenes oder geteiltes Passwort; eine damit
+/// eröffnete Sitzung dürfte sonst bis zu [`session::SITZUNG_TAGE`] Tage weiterlaufen. Die eigene
+/// Sitzung bleibt, sonst würfe der Wechsel den Handelnden aus dem laufenden Einsatz. Passkeys
+/// und der TOTP-Zweitfaktor bleiben unberührt: sie hängen nicht am Passwort.
+pub async fn passwort_aendern(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PeerIp(peer_ip): PeerIp,
+    jar: CookieJar,
+    JsonBody(req): JsonBody<PasswortWechsel>,
+) -> Result<StatusCode, AppError> {
+    let liste = crate::auth::provider::registry::liste(&state.pool).await?;
+    let passwort_aktiv = liste
+        .iter()
+        .any(|p| p.id == crate::auth::provider::ID_PASSWORT && p.aktiviert);
+    if !passwort_aktiv {
+        return Err(AppError::Forbidden);
+    }
+
+    // Kein `pflicht`: ein Passwort wird nicht getrimmt.
+    if req.altes_passwort.is_empty() {
+        return Err(AppError::Validation(
+            "Altes Passwort darf nicht leer sein".to_string(),
+        ));
+    }
+    crate::routes::benutzer::pruefe_passwort_laenge(&req.neues_passwort)?;
+
+    if let Some(ip) = peer_ip {
+        if crate::auth::rate_limit::ist_gesperrt(ip) {
+            return Err(AppError::TooManyRequests(
+                "Zu viele fehlgeschlagene Versuche. Bitte kurz warten.".to_string(),
+            ));
+        }
+    }
+
+    match crate::auth::provider::password::anmelden(
+        &state.pool,
+        &benutzer.benutzername,
+        &req.altes_passwort,
+    )
+    .await
+    {
+        Ok(_) => {}
+        Err(AppError::Unauthorized) => {
+            if let Some(ip) = peer_ip {
+                crate::auth::rate_limit::fehlversuch(ip);
+            }
+            tracing::warn!(
+                benutzer_id = benutzer.id,
+                peer_ip = ?peer_ip,
+                "Passwortwechsel abgewiesen: altes Passwort falsch"
+            );
+            return Err(AppError::UnprocessableEntity(
+                "Das bisherige Passwort stimmt nicht.".to_string(),
+            ));
+        }
+        Err(e) => return Err(e),
+    }
+    if let Some(ip) = peer_ip {
+        crate::auth::rate_limit::erfolg(ip);
+    }
+
+    // Argon2 blockiert den Worker ~50–100 ms; auf den Blocking-Pool damit.
+    let neues = req.neues_passwort;
+    let hash = tokio::task::spawn_blocking(move || crate::auth::password::hash(&neues))
+        .await
+        .map_err(|e| AppError::Internal(format!("KDF-Task abgebrochen: {e}")))??;
+
+    // `CurrentUser` hat die Sitzung eben aufgelöst; das Cookie ist also da.
+    let token = jar
+        .get(SESSION_COOKIE)
+        .map(|c| c.value().to_string())
+        .ok_or(AppError::Unauthorized)?;
+
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("UPDATE benutzer SET passwort_hash = ? WHERE id = ?")
+        .bind(&hash)
+        .bind(benutzer.id)
+        .execute(&mut *tx)
+        .await?;
+    let beendet = session::andere_loeschen(&mut tx, benutzer.id, &token).await?;
+    tx.commit().await?;
+
+    tracing::info!(
+        benutzer_id = benutzer.id,
+        peer_ip = ?peer_ip,
+        andere_sitzungen_beendet = beendet,
+        "Passwort gewechselt"
+    );
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Öffentliche Projektion der Provider-Liste: nur aktivierte (LFH-277). Dieselbe DTO wie der
 /// Admin-Endpoint.
 fn public_provider_projektion(
