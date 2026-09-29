@@ -40,6 +40,13 @@ export interface KernOptionen {
   zusatzKandidaten?: string[];
   /** Selektor einer Region, deren Stopps `stoppsInRegion` zählt. */
   region?: string;
+  /**
+   * Meldet auch ein Ziel, das ein Vorfahr mit `overflow` ≠ `visible` (oder das Fenster)
+   * VOLLSTÄNDIG abschneidet (LFH-811). Ein Band, das Höhe abgibt und in sich rollt
+   * (`bandStil(…, nachgiebig)`), verdeckt nichts, es schneidet ab — das sieht die
+   * Überdeckungsprüfung nicht. Opt-in, damit die Bestands-Specs unverändert rechnen.
+   */
+  beschnitt?: boolean;
 }
 
 /**
@@ -74,7 +81,7 @@ export async function pruefeFokusVerdeckung(
   for (let i = 0; i < schritte; i += 1) {
     await page.keyboard.press(taste);
     const schritt = await page.evaluate(
-      ({ zusatz, region }) => {
+      ({ zusatz, region, beschnitt }) => {
         const fokus = document.activeElement;
         if (fokus == null || fokus === document.body || fokus === document.documentElement) {
           return null;
@@ -114,12 +121,45 @@ export async function pruefeFokusVerdeckung(
           }
         }
 
+        // Sichtbarer Rest des Ziels nach allen abschneidenden Vorfahren und dem Fenster.
+        let schnitt: string | null = null;
+        if (beschnitt) {
+          let l = Math.max(zr.left, 0);
+          let r = Math.min(zr.right, innerWidth);
+          let o = Math.max(zr.top, 0);
+          let u = Math.min(zr.bottom, innerHeight);
+          let schneider = 'dem Fenster';
+          for (
+            let a = ziel.parentElement;
+            a != null && a !== document.body && a !== document.documentElement;
+            a = a.parentElement
+          ) {
+            const stil = getComputedStyle(a);
+            if (stil.overflowX === 'visible' && stil.overflowY === 'visible') continue;
+            const ar = a.getBoundingClientRect();
+            const vorher = (r - l) * (u - o);
+            l = Math.max(l, ar.left);
+            r = Math.min(r, ar.right);
+            o = Math.max(o, ar.top);
+            u = Math.min(u, ar.bottom);
+            if (vorher > 0 && (r <= l || u <= o)) {
+              schneider = `${a.tagName.toLowerCase()}.${String(a.className).slice(0, 40)}`;
+            }
+          }
+          if (r <= l || u <= o) {
+            schnitt =
+              `${ziel.tagName.toLowerCase()}[${(ziel.getAttribute('aria-label') ?? ziel.textContent ?? '').trim().slice(0, 30)}] ` +
+              `bei (${Math.round(zr.x)},${Math.round(zr.y)}) ${Math.round(zr.width)}×${Math.round(zr.height)} ` +
+              `vollständig abgeschnitten von ${schneider}`;
+          }
+        }
+
         const mx = zr.x + zr.width / 2;
         const my = zr.y + zr.height / 2;
         const amPunkt = document.elementFromPoint(mx, my);
         const punktGehoertZiel = amPunkt != null && (amPunkt === ziel || ziel.contains(amPunkt));
 
-        let beschreibung: string | null = null;
+        let beschreibung: string | null = schnitt;
         let beruehrt = false;
         let anTabellenkopf = false;
         for (const el of kandidaten) {
@@ -161,7 +201,11 @@ export async function pruefeFokusVerdeckung(
           inRegion: region != null && ziel.closest(region) != null,
         };
       },
-      { zusatz: optionen.zusatzKandidaten ?? [], region: optionen.region ?? null },
+      {
+        zusatz: optionen.zusatzKandidaten ?? [],
+        region: optionen.region ?? null,
+        beschnitt: optionen.beschnitt ?? false,
+      },
     );
 
     if (schritt == null) continue;
