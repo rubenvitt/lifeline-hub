@@ -119,16 +119,21 @@ describe('griffeFuerModus', () => {
   });
 
   it('sagt, wenn Kanten wegen Platzmangel fehlen, und nennt Heranzoomen (LFH-764)', () => {
-    const aus = griffHinweis('groesse', { kantenAusgeblendet: true });
-    expect(aus).toMatch(/Ecken/);
-    expect(aus).toMatch(/heranzoomen/i);
+    const alle = griffHinweis('groesse', { kantenAus: 'alle' });
+    expect(alle).toMatch(/Ecken/);
+    expect(alle).toMatch(/heranzoomen/i);
     // Keine Anweisung für Griffe, die es gerade nicht gibt.
-    expect(aus).not.toMatch(/Kanten = frei strecken/);
+    expect(alle).not.toMatch(/Kanten = frei strecken/);
+    // Fehlen nur einige, bleiben die übrigen Kanten bedienbar — der Hinweis nennt beides.
+    const einige = griffHinweis('groesse', { kantenAus: 'einige' });
+    expect(einige).toMatch(/Kanten = frei strecken/);
+    expect(einige).toMatch(/heranzoomen/i);
     // Mit allen Kanten bleibt der bisherige Text, und die übrigen Modi kennen den Zustand nicht.
-    expect(griffHinweis('groesse', { kantenAusgeblendet: false })).toBe(griffHinweis('groesse'));
+    expect(griffHinweis('groesse', { kantenAus: 'keine' })).toBe(griffHinweis('groesse'));
     expect(griffHinweis('groesse')).toMatch(/Kanten = frei strecken/);
+    expect(griffHinweis('groesse')).not.toMatch(/heranzoomen/i);
     for (const m of ['verschieben', 'drehen'] as const) {
-      expect(griffHinweis(m, { kantenAusgeblendet: true })).toBe(griffHinweis(m));
+      expect(griffHinweis(m, { kantenAus: 'alle' })).toBe(griffHinweis(m));
     }
   });
 });
@@ -187,14 +192,14 @@ describe('scharfeGriffe', () => {
     const w = scharfeGriffe('groesse', rechteck(120, 120), 44);
     expect(w.eck).toEqual([true, true, true, true]);
     expect(w.kante).toEqual([true, true, true, true]);
-    expect(w.kantenAusgeblendet).toBe(false);
+    expect(w.kantenAus).toBe('keine');
   });
 
   it('nimmt auf 120 px in „handschuh" die Kanten weg, die Ecken bleiben', () => {
     const w = scharfeGriffe('groesse', rechteck(120, 120), 72);
     expect(w.eck).toEqual([true, true, true, true]);
     expect(w.kante).toEqual([false, false, false, false]);
-    expect(w.kantenAusgeblendet).toBe(true);
+    expect(w.kantenAus).toBe('alle');
   });
 
   for (const kante of [44, 48, 72]) {
@@ -219,23 +224,23 @@ describe('scharfeGriffe', () => {
     // 300 × 60 in „kompakt": links/rechts liegen 30 px neben den Ecken, oben/unten 150 px.
     const w = scharfeGriffe('groesse', rechteck(300, 60), 44);
     expect(w.kante).toEqual([true, false, true, false]);
-    expect(w.kantenAusgeblendet).toBe(true);
+    expect(w.kantenAus).toBe('einige');
   });
 
   it('lässt auf einem winzigen Bild die Ecken trotzdem scharf (dokumentierter Rest)', () => {
     const w = scharfeGriffe('groesse', rechteck(30, 30), 44);
     expect(w.eck).toEqual([true, true, true, true]);
     expect(w.kante).toEqual([false, false, false, false]);
-    expect(w.kantenAusgeblendet).toBe(true);
+    expect(w.kantenAus).toBe('alle');
   });
 
   it('lässt in „Verschieben" und „Drehen" genau einen Griff scharf', () => {
     const punkte = rechteck(30, 30);
     const v = scharfeGriffe('verschieben', punkte, 72);
     expect(scharfePunkte(punkte, v)).toEqual([punkte.mitte]);
-    expect(v.kantenAusgeblendet).toBe(false);
+    expect(v.kantenAus).toBe('keine');
     const d = scharfeGriffe('drehen', punkte, 72);
     expect(scharfePunkte(punkte, d)).toEqual([punkte.dreh]);
-    expect(d.kantenAusgeblendet).toBe(false);
+    expect(d.kantenAus).toBe('keine');
   });
 });

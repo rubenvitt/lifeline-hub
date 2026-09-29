@@ -57,7 +57,9 @@ Kante** überlappt.
   überlappen sie also unter 144 px.
 - *Ecken fest:* Ohne Ecke wäre ein winziges Bild gar nicht mehr skalierbar. Der Rest (Bild kleiner
   als eine Griffkante) ist in der Spec benannt.
-- Rückgabe zusätzlich `kantenAusgeblendet: boolean` (mindestens eine Kante fehlt, Modus „Größe").
+- Rückgabe zusätzlich `kantenAus: 'keine' | 'einige' | 'alle'` (wie viele Kanten im Modus „Größe"
+  fehlen). Dreiwertig nach dem Review: auf einem langen, schmalen Bild bleiben die langen Kanten
+  bedienbar, und der Hinweis soll sie weiter nennen.
 
 ### D2 — Neuentscheidung an Kartenbewegung und `dragend`, nie im Zug
 
@@ -70,10 +72,11 @@ also aus derselben Quelle wie die Marker.
 
 ### D3 — Hinweis bekommt den Zustand per Rückruf
 
-`erzeugeBildHandles(…, onGriffStand?)` ruft `onGriffStand({ kantenAusgeblendet })` bei jeder
-Änderung. `Kartenflaeche` reicht das über eine neue Prop `onGriffStand` an `LagekartePage`, die den
-Wert als State an `Sidebar` gibt. `griffHinweis(modus, { kantenAusgeblendet })` formuliert:
-„Auf der Karte: Ecken = Größe (Seitenverhältnis). Kanten erscheinen nach dem Heranzoomen."
+`erzeugeBildHandles(…, onGriffStand?)` ruft `onGriffStand({ kantenAus })` bei jeder Änderung.
+`Kartenflaeche` reicht das über eine neue Prop `onGriffStand` an `LagekartePage`, die den Wert als
+State an `Sidebar` gibt. `griffHinweis(modus, { kantenAus })` nennt bei `alle` nur die Ecken und das
+Heranzoomen, bei `einige` Ecken und Kanten und dazu, dass weitere Kanten nach dem Heranzoomen
+erscheinen.
 Der Rückruf geht wie `onPlatzierGeometrie` über einen Ref, damit ein neuer Callback die Griffe
 nicht neu baut.
 
@@ -81,23 +84,28 @@ nicht neu baut.
 
 Neues Modul `pages/lagekarte/klickziel.ts`:
 
-- `ordneKlickebene(layerId)` → `'punkt' | 'treffer' | 'flaeche' | null` aus den bekannten Listen
-  (`MARKER_KLICK_LAYER`, `SPIDER_KLICK_LAYER`, `PERSONEN_CLUSTER_KLICK_LAYER`, Trefferzonen per
-  `-treffer`-Suffix, `fachebene-*-circle|-buendel` Punkt, `fachebene-*-fill` Fläche, `zonen-*` und
-  `abschnitte-fill` Fläche).
+- `ordneKlickebene(layerId)` → `'marker' | 'treffer' | 'personenCluster' | 'fachebene' | 'zone' |
+  'abschnitt' | 'fachebeneFlaeche' | null` aus den bekannten Listen (`MARKER_KLICK_LAYER`,
+  `SPIDER_KLICK_LAYER`, `PERSONEN_CLUSTER_KLICK_LAYER`, Trefferzonen per `-treffer`-Suffix,
+  `fachebene-*-circle|-buendel`, `fachebene-*-fill`, `ZONEN_KLICK_LAYER`, `abschnitte-fill`).
 - `entscheideKlickziel(features, punkt, projiziere)` → Gewinner-Union
   `{ art: 'marker', merkmal } | { art: 'personenCluster', clusterId, center, anzahl } |
-  { art: 'fachebene', layerId, feature } | { art: 'zone', feature } | { art: 'flaeche', feature } |
-  null`. Regel aus der Spec: oberstes Punktziel; ist es ein Marker/Spider, wählt
-  `naechstesMerkmal` unter allen Marker-/Spider-Merkmalen (wie heute); sonst Trefferzone
-  (`naechstesMerkmal` unter den Trefferzonen); sonst oberste Fläche.
+  { art: 'fachebene', merkmal } | { art: 'zone', merkmal } | { art: 'abschnitt', merkmal } | null`.
+  Regel aus der Spec: oberstes Punktziel; ist es ein Marker/Spider, wählt `naechstesMerkmal` unter
+  allen Marker-/Spider-Merkmalen (wie heute); sonst Trefferzone (`naechstesMerkmal` unter den
+  Trefferzonen); sonst oberste eigene Fläche (Zone, Abschnitt); sonst oberste Fachebenen-Fläche.
+- *Eigene Flächen vor Fachebenen-Flächen* (Review-Befund, Entscheidung des Users 29.09.2026):
+  Später aktivierte Fachebenen hängt `addLayer` ans Ende, NINA-/DWD-Warnflächen liegen also immer
+  über Zonen und Abschnitten und decken oft einen ganzen Kreis ab. „Oberste Fläche" machte jede Zone
+  darunter unerreichbar. Die Warnung bleibt außerhalb eigener Flächen antippbar. Ein Auswahlmenü
+  für übereinanderliegende Flächen ist LFH-812.
 - In `Kartenflaeche.tsx`: `klickzielAm(map, e)` fragt `queryRenderedFeatures(e.point, { layers })`
-  über **alle** vorhandenen Klickebenen (per `getLayer` gefiltert, Fachebenen aus den aktuell
-  gebundenen Ebenen) und cacht das Ergebnis in einer `WeakMap` am `e.originalEvent`. Die fünf Hörer
+  über **alle** vorhandenen Klickebenen (`map.getLayersOrder()`, gefiltert per `ordneKlickebene`)
+  und cacht das Ergebnis in einer `WeakMap` am `e.originalEvent`. Die fünf Hörer
   eines Tipps teilen so eine Abfrage und dasselbe Urteil.
 - Jeder bestehende Hörer bleibt an seiner Stelle und prüft zuerst, ob er der Gewinner ist
-  (Zone-Hörer: `art === 'zone'` und dieselbe Feature-`id`; Fachebenen-Hörer: `art === 'fachebene'`
-  und `layerId === id`). `personenClusterAm` wird durch `klickzielAm(...).art === 'personenCluster'`
+  (Zonen-Hörer: `art === 'zone'`, jetzt EIN Hörer über alle drei Zonen-Ebenen; Fachebenen-Hörer:
+  `art === 'fachebene'` und dieselbe Ebene). `personenClusterAm` wird durch `klickzielAm(...).art === 'personenCluster'`
   ersetzt, `personenClusterTreffer` geht in `entscheideKlickziel` auf; seine Tests wandern mit.
 - *Warum nicht ein zentraler Hörer, der alles verteilt:* größerer Umbau von `Kartenflaeche.tsx`
   (Fachebenen-Bündellogik, Spider), ohne dass die Regel dadurch anders würde. Der Cache am
@@ -126,6 +134,8 @@ Neues Modul `pages/lagekarte/klickziel.ts`:
 
 - [Verhaltensänderung: Zeichen über Fläche wählt nur noch den Marker] → gewollt und in der Spec;
   die Fläche bleibt daneben antippbar. In der Abschlussmeldung benennen.
+- [Zwei eigene Flächen übereinander: die untere ist per Tipp nicht wählbar] → bewusst hingenommen,
+  bis LFH-812 ein Auswahlmenü bringt.
 - [`move` feuert pro Frame] → Rechnung ist zehn `project`-Aufrufe; DOM nur bei Mengenwechsel.
 - [Rendering-Reihenfolge der Flächen ändert sich später] → der Schiedsrichter liest die Reihenfolge
   aus `queryRenderedFeatures` (oben zuerst), nicht aus einer eigenen Liste.

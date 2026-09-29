@@ -102,13 +102,16 @@ export interface GriffPunkte {
   mitte: Punkt;
 }
 
-/** Welche Griffe scharf sind; `kantenAusgeblendet`: im Modus „Größe" fehlt mindestens eine Kante. */
+/** Wie viele Kantengriffe mangels Platz fehlen; außerhalb von „Größe" immer `keine`. */
+export type KantenAus = 'keine' | 'einige' | 'alle';
+
+/** Welche Griffe scharf sind, und ob Kanten mangels Platz fehlen ({@link KantenAus}). */
 export interface GriffWahl {
   eck: Vier<boolean>;
   kante: Vier<boolean>;
   dreh: boolean;
   mitte: boolean;
-  kantenAusgeblendet: boolean;
+  kantenAus: KantenAus;
 }
 
 /** Zwei Container (achsenparallele Quadrate der Kante `kante` um den Griffpunkt) überlappen. */
@@ -130,12 +133,13 @@ export function scharfeGriffe(modus: GriffModus, punkte: GriffPunkte, kante: num
     punkte.kante.every((k, j) => j === i || !ueberlappen(punkte.kante[i], k, kante));
   const eck = arten.has('eck');
   const kanten = [0, 1, 2, 3].map((i) => arten.has('kante') && kanteFrei(i)) as Vier<boolean>;
+  const fehlend = arten.has('kante') ? kanten.filter((k) => !k).length : 0;
   return {
     eck: [eck, eck, eck, eck],
     kante: kanten,
     dreh: arten.has('dreh'),
     mitte: arten.has('mitte'),
-    kantenAusgeblendet: arten.has('kante') && kanten.some((k) => !k),
+    kantenAus: fehlend === 0 ? 'keine' : fehlend === 4 ? 'alle' : 'einige',
   };
 }
 
@@ -145,7 +149,7 @@ export function scharfeGriffe(modus: GriffModus, punkte: GriffPunkte, kante: num
  */
 export function griffHinweis(
   modus: GriffModus,
-  stand: { kantenAusgeblendet: boolean } = { kantenAusgeblendet: false },
+  stand: { kantenAus: KantenAus } = { kantenAus: 'keine' },
 ): string {
   switch (modus) {
     case 'verschieben':
@@ -153,8 +157,13 @@ export function griffHinweis(
     case 'drehen':
       return 'Auf der Karte: ↻ ziehen zum Drehen.';
     case 'groesse':
-      return stand.kantenAusgeblendet
-        ? 'Auf der Karte: Ecken = Größe (Seitenverhältnis). Zum freien Strecken an den Kanten heranzoomen.'
-        : 'Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken.';
+      switch (stand.kantenAus) {
+        case 'keine':
+          return 'Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken.';
+        case 'einige':
+          return 'Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken. Weitere Kanten erscheinen nach dem Heranzoomen.';
+        case 'alle':
+          return 'Auf der Karte: Ecken = Größe (Seitenverhältnis). Zum freien Strecken an den Kanten heranzoomen.';
+      }
   }
 }

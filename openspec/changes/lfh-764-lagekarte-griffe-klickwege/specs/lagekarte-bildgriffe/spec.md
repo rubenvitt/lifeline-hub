@@ -41,11 +41,16 @@ unverändert bleiben; der gezogene Griff MUST bis zum Loslassen scharf bleiben.
 ### Requirement: Der Hinweis nennt nur scharfe Griffe
 Der Hinweis unter dem Griff-Umschalter SHALL nur die Griffe beschreiben, die gerade scharf sind. Sind
 im Modus „Größe" Kantengriffe wegen Platzmangel ausgeblendet, MUST der Hinweis das sagen und
-Heranzoomen als Ausweg nennen.
+Heranzoomen als Ausweg nennen. Sind nur einige ausgeblendet, MUST er die übrigen Kanten weiter als
+bedienbar nennen.
 
 #### Scenario: Kanten ausgeblendet
 - **WHEN** im Modus „Größe" die Kantengriffe ausgeblendet sind
 - **THEN** beschreibt der Hinweis die Ecken und sagt, dass die Kanten erst nach dem Heranzoomen erscheinen
+
+#### Scenario: Einige Kanten ausgeblendet
+- **WHEN** auf einem langen, schmalen Bild im Modus „Größe" nur die Griffe der langen Kanten scharf sind
+- **THEN** nennt der Hinweis Ecken und Kanten als bedienbar und sagt, dass weitere Kanten nach dem Heranzoomen erscheinen
 
 #### Scenario: Kanten scharf
 - **WHEN** im Modus „Größe" alle Kantengriffe scharf sind

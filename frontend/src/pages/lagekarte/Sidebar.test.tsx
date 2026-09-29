@@ -92,7 +92,7 @@ const basisProps: SidebarProps = {
   bildPlatzierenId: null,
   bildPlatzierZentrum: null,
   griffModus: 'groesse',
-  griffKantenAusgeblendet: false,
+  griffKantenAus: 'keine',
   onGriffModus: vi.fn(),
   ansichten: [],
   aktiveAnsichtId: undefined,
@@ -383,12 +383,12 @@ describe('Sidebar Bild-Hintergründe', () => {
       bildPlatzierenId: 1,
     };
     const { rerender } = renderMitProviders(
-      <Sidebar {...props} griffModus="groesse" griffKantenAusgeblendet />,
+      <Sidebar {...props} griffModus="groesse" griffKantenAus="alle" />,
     );
     const hinweis = () => document.querySelector('[data-lfh="bildgriff-hinweis"]')?.textContent;
     expect(hinweis()).toMatch(/heranzoomen/i);
     expect(hinweis()).not.toMatch(/Kanten = frei strecken/);
-    rerender(<Sidebar {...props} griffModus="groesse" griffKantenAusgeblendet={false} />);
+    rerender(<Sidebar {...props} griffModus="groesse" griffKantenAus="keine" />);
     expect(hinweis()).toMatch(/Kanten = frei strecken/);
   });
 

@@ -2,13 +2,13 @@
 
 ## 1. Griffwahl (rein)
 
-- [x] 1.1 `scharfeGriffe(modus, punkte, kante)` in `bildGriffe.ts` per TDD (D1): Vitest in `bildGriffe.test.ts` für Quadrat 120 px bei Kante 44/48/72, 45° gedreht, 300 × 60, 30 × 30, Verschieben/Drehen je genau ein Griff, `kantenAusgeblendet`; `griffeFuerModus` bleibt die Artenpartition. Nachweis: Tests grün, vorher rot.
-- [x] 1.2 `griffHinweis(modus, { kantenAusgeblendet })` erweitern (D3), Test für beide Fälle in „Größe" und unveränderte Texte der übrigen Modi. Nachweis: `bildGriffe.test.ts` grün.
+- [x] 1.1 `scharfeGriffe(modus, punkte, kante)` in `bildGriffe.ts` per TDD (D1): Vitest in `bildGriffe.test.ts` für Quadrat 120 px bei Kante 44/48/72, 45° gedreht, 300 × 60, 30 × 30, Verschieben/Drehen je genau ein Griff, `kantenAus` (keine/einige/alle); `griffeFuerModus` bleibt die Artenpartition. Nachweis: Tests grün, vorher rot.
+- [x] 1.2 `griffHinweis(modus, { kantenAus })` erweitern (D3), Test für alle drei Fälle in „Größe" und unveränderte Texte der übrigen Modi. Nachweis: `bildGriffe.test.ts` grün.
 
 ## 2. Griffe an der Karte
 
 - [x] 2.1 `bildHandles.ts`: `wendeModusAn` über `scharfeGriffe` mit `map.project`-Positionen; `move`-Hörer und Neuentscheidung nach `dragend`, nichts während `ziehend`, DOM nur bei Mengenwechsel, Abmelden in `zerstoeren` (D2). Nachweis: `bildHandles.test.ts` um Fälle „kein Abziehen im Zug", „`dragend` entscheidet neu", „`move` entscheidet neu", „Hörer nach `zerstoeren` weg" erweitert, grün.
-- [x] 2.2 Rückruf `onGriffStand` durch `bildHandles` → `Kartenflaeche` (Prop, über Ref) → `LagekartePage` (State) → `Sidebar` (Hinweis) (D3). Nachweis: `Sidebar.test.tsx` zeigt den Kanten-Hinweis bei `kantenAusgeblendet`; `pnpm lint` und `tsc` grün.
+- [x] 2.2 Rückruf `onGriffStand` durch `bildHandles` → `Kartenflaeche` (Prop, über Ref) → `LagekartePage` (State) → `Sidebar` (Hinweis) (D3). Nachweis: `Sidebar.test.tsx` zeigt den Kanten-Hinweis bei `kantenAus`; `pnpm lint` und `tsc` grün.
 - [x] 2.3 e2e in `e2e/lagekarte-touch.spec.ts`: Kartenbild per API anlegen und platzieren, auf rund 120 px zoomen, je Dichte (kompakt, handschuh) und gedreht die Bounding-Boxen aller angehängten `[data-lfh^="bildgriff-"]` paarweise überlappungsfrei; kompakt mit, handschuh ohne Kanten; Hinweistext passt. Nachweis: Spec grün, Mutationsprobe (Kantenregel aus → rot) im Commit-Text festgehalten.
 
 ## 3. Klick-Schiedsrichter (rein)

@@ -6,6 +6,8 @@ import type { Ecken } from '../../api/kartenbilder';
  * Geprüft wird, welche Griffe an der Karte hängen.
  */
 const angehaengt = new Set<FakeMarker>();
+/** Wie oft Griffe an- und abgehängt wurden — MapLibres `addTo` hängt vorher ab (DOM-Arbeit). */
+const domArbeit = { addTo: 0, remove: 0 };
 
 class FakeMarker {
   private hoerer = new Map<string, (() => void)[]>();
@@ -22,10 +24,12 @@ class FakeMarker {
     return this.lngLat;
   }
   addTo() {
+    domArbeit.addTo++;
     angehaengt.add(this);
     return this;
   }
   remove() {
+    domArbeit.remove++;
     angehaengt.delete(this);
     return this;
   }
@@ -85,6 +89,8 @@ function griffe(art: string): FakeMarker[] {
 
 function vorher() {
   angehaengt.clear();
+  domArbeit.addTo = 0;
+  domArbeit.remove = 0;
   karte.skala = 200;
   karte.hoerer.clear();
 }
@@ -150,7 +156,7 @@ describe('erzeugeBildHandles — Griffwahl nach Platz (LFH-764)', () => {
     const onStand = vi.fn();
     erzeugeBildHandles(karte as never, 1, ECKEN, vi.fn(), KONTEXT, 'groesse', onStand);
     expect(scharf()).toEqual(Array(4).fill('bildgriff-eck'));
-    expect(onStand).toHaveBeenLastCalledWith({ kantenAusgeblendet: true });
+    expect(onStand).toHaveBeenLastCalledWith({ kantenAus: 'alle' });
   });
 
   it('entscheidet bei jeder Kartenbewegung neu und meldet nur Wechsel', () => {
@@ -160,13 +166,24 @@ describe('erzeugeBildHandles — Griffwahl nach Platz (LFH-764)', () => {
     karte.skala = 200;
     karte.feuere('move');
     expect(scharf()).toEqual(eckUndKante);
-    expect(onStand).toHaveBeenLastCalledWith({ kantenAusgeblendet: false });
+    expect(onStand).toHaveBeenLastCalledWith({ kantenAus: 'keine' });
     const aufrufe = onStand.mock.calls.length;
     karte.feuere('move');
     expect(onStand).toHaveBeenCalledTimes(aufrufe);
     karte.skala = 100;
     karte.feuere('move');
     expect(scharf()).toEqual(Array(4).fill('bildgriff-eck'));
+  });
+
+  it('fasst bei einer Kartenbewegung ohne Mengenwechsel das DOM nicht an', () => {
+    // `move` feuert je Frame; `addTo` an einem hängenden Marker hinge ihn ab und wieder an.
+    erzeugeBildHandles(karte as never, 1, ECKEN, vi.fn(), KONTEXT, 'groesse');
+    domArbeit.addTo = 0;
+    domArbeit.remove = 0;
+    karte.skala = 210;
+    karte.feuere('move');
+    karte.feuere('move');
+    expect(domArbeit).toEqual({ addTo: 0, remove: 0 });
   });
 
   it('zieht während eines Zugs nichts ab; erst `dragend` entscheidet neu', () => {

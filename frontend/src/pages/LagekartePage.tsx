@@ -30,7 +30,7 @@ import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN } from './lagekarte/zonenStil';
 import Kartenflaeche, { type KartenHandle } from './lagekarte/Kartenflaeche';
-import type { GriffModus } from './lagekarte/bildGriffe';
+import type { GriffModus, KantenAus } from './lagekarte/bildGriffe';
 import Sidebar from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
 import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
@@ -111,11 +111,10 @@ export default function LagekartePage() {
   const leistenWahl = useLeistenWahl(breit);
   /** Scharfe Griffsorte beim Bild-Einpassen. Vorgabe: Größe. */
   const [griffModus, setGriffModus] = useState<GriffModus>('groesse');
-  // Ob die Karte Kantengriffe mangels Platz ausblendet (LFH-764) — für den Hinweis der Leiste.
-  const [griffKantenAusgeblendet, setGriffKantenAusgeblendet] = useState(false);
+  // Wie viele Kantengriffe die Karte mangels Platz ausblendet (LFH-764) — für den Hinweis der Leiste.
+  const [griffKantenAus, setGriffKantenAus] = useState<KantenAus>('keine');
   const onGriffStand = useCallback(
-    (stand: { kantenAusgeblendet: boolean }) =>
-      setGriffKantenAusgeblendet(stand.kantenAusgeblendet),
+    (stand: { kantenAus: KantenAus }) => setGriffKantenAus(stand.kantenAus),
     [],
   );
   // Zeigerkoordinate: die Karte meldet, nur die Anzeige rendert mit (siehe `mausPosition.ts`).
@@ -1096,7 +1095,7 @@ export default function LagekartePage() {
         bildPlatzierenId={bildPlatzierenId}
         bildPlatzierZentrum={bildPlatzierZentrum}
         griffModus={griffModus}
-        griffKantenAusgeblendet={griffKantenAusgeblendet}
+        griffKantenAus={griffKantenAus}
         onGriffModus={setGriffModus}
         ansichten={ansichten ?? []}
         aktiveAnsichtId={aktiveAnsichtId}

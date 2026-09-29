@@ -5,10 +5,13 @@
  *  1. das oberste GEZEICHNETE Punktziel (Markerzeichen samt Plakette, aufgefächertes Zeichen,
  *     Personen-Cluster, Fachebenen-Punkt oder -Bündel),
  *  2. sonst eine Trefferzone — der Marker, dessen Punkt dem Tipp am nächsten liegt,
- *  3. sonst die oberste Fläche (Zone, Abschnitt, Fachebenen-Fläche).
+ *  3. sonst die oberste eigene Fläche (Zone, Abschnitt),
+ *  4. sonst die oberste Fachebenen-Fläche.
  * Eine Trefferzone steht also jedem gezeichneten Punktziel nach (sonst nähme ihr unsichtbarer Ring
  * einem KRITIS-Bündel oder Pegel daneben den Tipp) und schlägt jede Fläche (Marker liegen fast
  * immer in einer Zone oder einem Abschnitt, die Zone aus LFH-711 wäre sonst dort wirkungslos).
+ * Eigene Flächen gehen Fachebenen-Flächen vor: NINA-/DWD-Warnungen liegen über Zonen und decken oft
+ * einen Kreis ab (Entscheidung 29.09.2026). Ein Auswahlmenü für übereinanderliegende Flächen: LFH-812.
  * Rein; `merkmale` kommt von `queryRenderedFeatures` (oben zuerst).
  */
 import {
@@ -49,7 +52,7 @@ export function ordneKlickebene(layerId: string): Klickebene | null {
 }
 
 const PUNKTZIELE = new Set<Klickebene>(['marker', 'personenCluster', 'fachebene']);
-const FLAECHEN = new Set<Klickebene>(['zone', 'abschnitt', 'fachebeneFlaeche']);
+const EIGENE_FLAECHEN = new Set<Klickebene>(['zone', 'abschnitt']);
 
 interface Merkmal {
   layer: { id: string };
@@ -103,9 +106,10 @@ export function entscheideKlickziel<F extends Merkmal>(
   const zone = naechster(['treffer']);
   if (zone) return { art: 'marker', merkmal: zone };
 
-  const flaeche = eingeordnet.find((x) => FLAECHEN.has(x.ebene));
-  if (!flaeche) return null;
-  if (flaeche.ebene === 'zone') return { art: 'zone', merkmal: flaeche.merkmal };
-  if (flaeche.ebene === 'abschnitt') return { art: 'abschnitt', merkmal: flaeche.merkmal };
-  return { art: 'fachebene', merkmal: flaeche.merkmal };
+  const eigene = eingeordnet.find((x) => EIGENE_FLAECHEN.has(x.ebene));
+  if (eigene?.ebene === 'zone') return { art: 'zone', merkmal: eigene.merkmal };
+  if (eigene?.ebene === 'abschnitt') return { art: 'abschnitt', merkmal: eigene.merkmal };
+
+  const fremde = eingeordnet.find((x) => x.ebene === 'fachebeneFlaeche');
+  return fremde ? { art: 'fachebene', merkmal: fremde.merkmal } : null;
 }

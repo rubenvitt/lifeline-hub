@@ -18,6 +18,7 @@ import {
   griffStil,
   scharfeGriffe,
   type GriffArt,
+  type KantenAus,
   type GriffKontext,
   type GriffModus,
 } from './bildGriffe';
@@ -55,7 +56,7 @@ export interface BildHandles {
  * - 4 Kantengriffe: strecken eine Dimension frei,
  * - 1 Drehgriff: dreht um den Mittelpunkt,
  * - 1 Mittelgriff: verschiebt. Scharf ist nur die Sorte des Modus, Kanten nur mit Platz
- *   (`scharfeGriffe`, LFH-764); `onGriffStand` meldet, ob Kanten fehlen. Während des Ziehens nur
+ *   (`scharfeGriffe`, LFH-764); `onGriffStand` meldet, wie viele Kanten fehlen. Während des Ziehens nur
  *   Live-Vorschau (setCoordinates, kein PATCH); `onCommit` feuert einmal bei `dragend`.
  *   Gerechnet wird im Pixel-Raum (project/unproject), ohne cos(lat)-Verzerrung.
  */
@@ -66,7 +67,7 @@ export function erzeugeBildHandles(
   onCommit: (ecken: Ecken) => void,
   kontext: GriffKontext,
   modusInitial: GriffModus = 'groesse',
-  onGriffStand?: (stand: { kantenAusgeblendet: boolean }) => void,
+  onGriffStand?: (stand: { kantenAus: KantenAus }) => void,
 ): BildHandles {
   let ecken: Ecken = initial;
   let modus: GriffModus = modusInitial;
@@ -105,7 +106,7 @@ export function erzeugeBildHandles(
   };
 
   const dran = new Set<Marker>();
-  let kantenAusgeblendet: boolean | null = null;
+  let kantenAus: KantenAus | null = null;
 
   /**
    * Nur die Griffe des aktuellen Modus hängen an der Karte, und von den Kanten nur die mit Platz —
@@ -142,9 +143,9 @@ export function erzeugeBildHandles(
         dran.delete(m);
       }
     }
-    if (wahl.kantenAusgeblendet !== kantenAusgeblendet) {
-      kantenAusgeblendet = wahl.kantenAusgeblendet;
-      onGriffStand?.({ kantenAusgeblendet });
+    if (wahl.kantenAus !== kantenAus) {
+      kantenAus = wahl.kantenAus;
+      onGriffStand?.({ kantenAus });
     }
   }
 

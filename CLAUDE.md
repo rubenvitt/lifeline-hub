@@ -199,8 +199,9 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
 - **Ein Tipp gehört genau einem Ziel** (LFH-764,
   `openspec/changes/lfh-764-lagekarte-griffe-klickwege/design.md`): jeder Karten-Klickhörer fragt
   `klickzielAm` (`Kartenflaeche.tsx`, ein Urteil je Originalereignis) → `entscheideKlickziel`
-  (`pages/lagekarte/klickziel.ts`): gezeichnetes Punktziel > Trefferzone > Fläche. Eine neue
-  Klickebene braucht eine Rolle in `ordneKlickebene` (Guard in `klickziel.test.ts`).
+  (`pages/lagekarte/klickziel.ts`): gezeichnetes Punktziel > Trefferzone > eigene Fläche (Zone,
+  Abschnitt) > Fachebenen-Fläche. Eine neue Klickebene braucht eine Rolle in `ordneKlickebene`
+  (Guard in `klickziel.test.ts`); Auswahlmenü für übereinanderliegende Flächen: LFH-812.
 - **Betreuung auf der Karte** (LFH-673, `openspec/changes/lfh-673-betreuung-auf-der-lagekarte/design.md`):
   Marker-Ebene wie UHS (`alleVerortet`, `?platzieren=betreuungsstelle:<id>`), Sperre an der
   **Datenquelle** (`pages/lagekarte/betreuungEbene.ts`);

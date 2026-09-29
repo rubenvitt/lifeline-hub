@@ -140,8 +140,24 @@ describe('entscheideKlickziel', () => {
       art: 'abschnitt',
       merkmal: abschnitt,
     });
+  });
+
+  it('eine eigene Fläche geht einer Fachebenen-Fläche darüber vor (Warnung über der Zone)', () => {
+    // NINA-/DWD-Warnflächen liegen über Zonen und Abschnitten und decken oft einen Kreis ab;
+    // „oberste Fläche" machte jede Zone darunter unerreichbar (Entscheidung 29.09.2026).
     const dwd = flaeche('fachebene-dwd-fill', 1);
+    const zone = flaeche('zonen-fill', 3);
+    const abschnitt = flaeche('abschnitte-fill', 9);
     expect(entscheideKlickziel([dwd, zone], klick, projiziere)).toEqual({
+      art: 'zone',
+      merkmal: zone,
+    });
+    expect(entscheideKlickziel([dwd, abschnitt], klick, projiziere)).toEqual({
+      art: 'abschnitt',
+      merkmal: abschnitt,
+    });
+    // Ohne eigene Fläche bleibt die Warnung antippbar.
+    expect(entscheideKlickziel([dwd], klick, projiziere)).toEqual({
       art: 'fachebene',
       merkmal: dwd,
     });

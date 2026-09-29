@@ -650,7 +650,10 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
           .locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')
           .getByRole('menuitem', { name: 'Auf der Karte platzieren' })
           .click();
-        const griffe = page.locator('[data-lfh^="bildgriff-"]');
+        // Nur die Griffe auf der Karte, nicht der Hinweis `bildgriff-hinweis` in der Leiste.
+        const griffe = page.locator(
+          ['eck', 'kante', 'dreh', 'mitte'].map((a) => `[data-lfh="bildgriff-${a}"]`).join(', '),
+        );
         await expect(page.locator('[data-lfh="bildgriff-eck"]')).toHaveCount(4);
 
         const kante = await page.evaluate(([a, b]) => {
@@ -746,11 +749,11 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
           type: 'Polygon',
           coordinates: [
             [
-              [EINZEL[0] - 0.01, EINZEL[1] - 0.005],
-              [EINZEL[0] + 0.01, EINZEL[1] - 0.005],
-              [EINZEL[0] + 0.01, EINZEL[1] + 0.005],
-              [EINZEL[0] - 0.01, EINZEL[1] + 0.005],
-              [EINZEL[0] - 0.01, EINZEL[1] - 0.005],
+              [EINZEL[0] - 0.03, EINZEL[1] - 0.015],
+              [EINZEL[0] + 0.03, EINZEL[1] - 0.015],
+              [EINZEL[0] + 0.03, EINZEL[1] + 0.015],
+              [EINZEL[0] - 0.03, EINZEL[1] + 0.015],
+              [EINZEL[0] - 0.03, EINZEL[1] - 0.015],
             ],
           ],
         }),
@@ -812,6 +815,20 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
     await tippe(page, zeichen);
     const auswahl = page.locator('[data-lfh="auswahl"] h3');
     await expect(auswahl).toHaveText(['Pumpe Ost']);
+
+    // Und die Zone bleibt wählbar, wo kein Marker und keine Trefferzone liegt: 120 px westlich.
+    await page.keyboard.press('Escape');
+    await springe(page, EINZEL, 13);
+    const inZone = await page.evaluate((ll) => {
+      const k = (window as unknown as { __lfhKarte: KarteLfh764 }).__lfhKarte;
+      const p = k.project(ll);
+      const r = (k as unknown as MapHaken).getCanvas().getBoundingClientRect();
+      return { x: r.left + p.x - 120, y: r.top + p.y };
+    }, EINZEL);
+    await aufKarte(page, [inZone], 'Zone ohne Marker');
+    await page.waitForTimeout(600);
+    await tippe(page, inZone);
+    await expect(auswahl).toHaveText(['Sperrzone Probe']);
     expect(seitenFehler.map((f) => f.message)).toEqual([]);
   });
 });

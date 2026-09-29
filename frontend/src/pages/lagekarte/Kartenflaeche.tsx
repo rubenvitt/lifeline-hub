@@ -74,7 +74,7 @@ import {
 import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './bildLayer';
 import { eckenInitialPixel, type Punkt } from './bildGeometrie';
 import { erzeugeBildHandles, type BildHandles } from './bildHandles';
-import type { GriffKontext, GriffModus } from './bildGriffe';
+import type { GriffKontext, GriffModus, KantenAus } from './bildGriffe';
 import type { Ecken } from '../../api/kartenbilder';
 import { BBOX_MIN_ZOOM } from './fachebenen';
 import type { FachebeneQuelle } from '../../api/fachebenen';
@@ -203,8 +203,8 @@ export interface KartenflaecheProps {
    * Griffe in Fingergröße lägen auf einem kleinen Bild übereinander.
    */
   griffModus?: GriffModus;
-  /** Meldet, ob die Griffe mangels Platz Kanten ausblenden (LFH-764, `scharfeGriffe`). */
-  onGriffStand?: (stand: { kantenAusgeblendet: boolean }) => void;
+  /** Meldet, wie viele Kanten die Griffe mangels Platz ausblenden (LFH-764, `scharfeGriffe`). */
+  onGriffStand?: (stand: { kantenAus: KantenAus }) => void;
   /** Zeigerlage über der Karte (Koordinatenanzeige); `null`, sobald er die Karte verlässt. */
   onZeigerLage?: (lage: { lat: number; lon: number } | null) => void;
   /**
@@ -1017,8 +1017,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const aufKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') schliesse();
     };
-    // Karten-Klick: ein Personen-Cluster (WebGL-Layer) fächert auf, wenn er das oberste Feature am
-    // Punkt ist. Jeder andere Klick klappt ein.
+    // Karten-Klick: ein Personen-Cluster (WebGL-Layer) fächert auf, wenn der Tipp ihm gehört
+    // (`klickzielAm`). Jeder andere Klick klappt ein.
     const klick = (e: maplibregl.MapMouseEvent) => {
       const ziel = klickzielAm(map, e);
       if (ziel?.art === 'personenCluster')
