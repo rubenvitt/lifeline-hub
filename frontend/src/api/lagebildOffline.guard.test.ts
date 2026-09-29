@@ -115,6 +115,24 @@ describe('Guard: nur die Allowlist erreicht die Platte', () => {
   });
 });
 
+describe('Guard: ein Fehler MIT Daten ist ein Stand', () => {
+  // Fällt der Server im laufenden Tab weg, behalten die Queries nach dem Fehler ihren letzten
+  // guten Stand. Der muss auf der Platte bleiben, sonst fände das Neuladen ohne Netz nichts.
+  it('schreibt eine gescheiterte Aktualisierung mit ihrem letzten Stand', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(einsatzKeys.personen(7), [{ id: 1 }]);
+    await qc
+      .fetchQuery({
+        queryKey: einsatzKeys.personen(7),
+        queryFn: () => Promise.reject(new Error('Leitung weg')),
+        staleTime: 0,
+      })
+      .catch(() => {});
+    expect(qc.getQueryState(einsatzKeys.personen(7))?.status).toBe('error');
+    expect(geschriebeneKeys(qc)).toEqual([einsatzKeys.personen(7)]);
+  });
+});
+
 describe('Guard: keine Mutationen auf der Platte (Review LFH-723, Befund 1)', () => {
   // Ohne eigene Regel nähme `dehydrate` jede PAUSIERTE Mutation samt `variables` mit — ohne
   // Netz pausiert jede (networkMode 'online'), also Chat-Texte, Personen-PATCHes …

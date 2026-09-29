@@ -211,10 +211,17 @@ describe('AuthContext — Lagebild ohne Netz (LFH-723)', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const { client } = rendern();
     await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Admin'));
-    expect(client.getQueryData(einsatzKeys.personen(3))).toEqual(personen);
+    // Serverbestätigt liegt der Stand auf der Platte, nicht im Speicher (design.md D2); im
+    // Speicher steht, was die Sitzung selbst geladen hat.
+    client.setQueryData(einsatzKeys.einheiten(3), [{ id: 9 }]);
+    await waitFor(async () =>
+      expect((await lagebildLesen())?.client.clientState.queries.map((q) => q.queryKey[0])).toEqual(
+        expect.arrayContaining(['einsatz-personen', 'einsatz-einheiten']),
+      ),
+    );
     await userEvent.click(screen.getByText('logout'));
     await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('anonym'));
-    expect(client.getQueryData(einsatzKeys.personen(3))).toBeUndefined();
+    expect(client.getQueryData(einsatzKeys.einheiten(3))).toBeUndefined();
     expect(await lagebildLesen()).toBeUndefined();
     vi.restoreAllMocks();
   });

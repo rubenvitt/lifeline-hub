@@ -111,7 +111,7 @@ exportierte Entscheidungsfunktion `startEntscheidung(meErgebnis, datensatz, jetz
 
 | `me()` | Datensatz | Folge |
 |---|---|---|
-| ok, gleiche `benutzer.id`, frisch (≤ 24 h), gleicher Buster | vorhanden | wiederherstellen, `bestaetigtAt = jetzt` |
+| ok, gleiche `benutzer.id`, frisch (≤ 24 h), gleicher Buster | vorhanden | **nicht hydrieren**, Stand als Vorrat für die Platte halten, `bestaetigtAt = jetzt` |
 | ok, andere Id, veraltet oder anderer Buster | vorhanden | löschen, nicht wiederherstellen |
 | `ApiError` (401 oder jeder andere Status außer 502/503/504) | beliebig | löschen, anonym |
 | `NetzFehler` oder `ApiError` 502/503/504 | frisch, gleicher Buster | wiederherstellen, `benutzer = datensatz.benutzer` |
@@ -130,11 +130,23 @@ Das ersetzt `IsRestoringProvider` ohne neuen Mechanismus. Erst nach der Wiederhe
 startet das Abonnement, das gedrosselt speichert.
 
 **Zwei Festlegungen aus der Umsetzung** (gemessen an der Vitest-Suite):
+- **Serverbestätigt wird nichts in den Speicher hydriert** (Nachtrag aus der CI, PR #175).
+  Online ist der Server die Wahrheit, gebraucht wird der Stand nur ohne Netz. Ein hydrierter
+  älterer Stand ließ jede Stelle, die „Daten da“ oder `isFetched` als „geladen“ liest, am
+  alten Stand entscheiden. Gemessen: Die ETB-Deeplink-Logik räumte `?eintrag=`, bevor der
+  neue Eintrag geladen war, und in der CI baute die Personenkarte keine Karte auf. Ein Stand
+  unter 10 s gilt nach `hydrate` sogar als frisch und wird gar nicht neu abgerufen.
+  - Der gelesene, gefilterte Stand bleibt stattdessen als **Vorrat** in der Sitzung. Jede
+    Speicherung führt ihn mit dem Live-Stand zusammen: Live gewinnt je `queryHash`, gefiltert
+    wird bei jeder Speicherung (Allowlist, Sperrmarke, 24 h je Einzelstand). Ohne das
+    Zusammenführen überschriebe die erste Speicherung den Datensatz mit dem fast leeren Cache
+    eines frisch geladenen Tabs.
+  - Regressionstest: `e2e/lagebild-offline-deeplink.spec.ts`. Der Eintrag entsteht am
+    vorgehaltenen Stand vorbei, die Liste antwortet 1,5 s verspätet. Mit dem alten Schnitt
+    waren 3 von 3 Läufen rot, mit dem neuen 3 von 3 grün.
 - **Serverbestätigt wechseln `benutzer` und `laedt` sofort und zusammen**, im selben `then`
-  von `me()` wie vor LFH-723. Die Wiederherstellung läuft danach. Das ist unbedenklich, weil
-  sie nur den **eigenen** Stand der bestätigten Identität bringt und `hydrate` keinen Abruf
-  überschreibt, der inzwischen neuer ist. Nur beim Netzfehler wartet `laedt` auf den
-  Datensatz, denn erst er sagt, wer angemeldet ist.
+  von `me()` wie vor LFH-723. Nur beim Netzfehler wartet `laedt` auf den Datensatz, denn erst
+  er sagt, wer angemeldet ist, und dort wird hydriert.
   - Gemessen: Kam `benutzer` eine IndexedDB-Runde später, scheiterten elf knapp getaktete
     Bestandstests (`stammdaten/rechteGate.test.tsx`).
   - Wechselten `benutzer` und `laedt` in zwei Takten, hängten Oberflächen außerhalb von
@@ -267,15 +279,19 @@ nicht zwischen „scheiternd“ und „Rest“.
   beobachtete Geschwister-Query. Sie zeigt dann den Fehlerzweig ihrer Seite statt einer Liste
   aus `undefined`, und das ist auch sachlich richtig, denn ihr Bereich ist gesperrt.
 - **Sperrmarke je Bereich** (Einsatz oder Einsatz + Prefix), die der Dehydrier-Filter
-  zusätzlich zur Allowlist prüft. Sie hält auch **die Wiederherstellung** fern (Nachtrag
-  aus dem Review): Serverbestätigt laufen die Abrufe der Seite schon, während der Start die
-  IndexedDB liest. Kam die 403 vorher, legte `hydrate` den entzogenen Stand sonst zurück in
-  den Speicher, denn der Rechteentzug hat `dataUpdatedAt` auf 0 gesetzt. Deshalb stellt
-  `lagebildSitzung.ts` selbst wieder her, statt `persistQueryClientRestore` zu nutzen. Es
-  filtert unmittelbar vor dem `hydrate` (Allowlist, Sperrmarke, Höchstliegezeit je
-  Einzelstand, kein Überschreiben einer Query auf `error`) und schreibt nur den gefilterten
-  Stand zurück. Die Marke fällt beim nächsten Fetch-Erfolg im Bereich (Tracker aus D4) und
-  lebt nur im Speicher des Tabs.
+  zusätzlich zur Allowlist prüft. Sie hält auch **den Vorrat** fern (D2): Ein Rechteentzug
+  im Lauf der Sitzung nimmt den Bereich bei der nächsten Speicherung aus dem Vorrat heraus.
+  Wiederhergestellt wird nur ohne Serverbestätigung, dort in einem eigenen Schritt statt
+  `persistQueryClientRestore`. Er filtert unmittelbar vor dem `hydrate` (Allowlist,
+  Sperrmarke, Höchstliegezeit je Einzelstand, kein Überschreiben einer Query auf `error`).
+  Die Marke fällt beim nächsten Fetch-Erfolg im Bereich (Tracker aus D4) und lebt nur im
+  Speicher des Tabs.
+- **Ein Fehler mit Daten ist ein Stand** (Nachtrag aus der CI-Nacharbeit). Fällt der Server
+  im laufenden Tab weg, stehen die Queries nach den Wiederholungen auf `error` und behalten
+  ihren letzten guten Stand. `defaultShouldDehydrateQuery` nähme nur `success`, und die
+  nächste Speicherung trüge den Stand von der Platte. Geschrieben wird deshalb jeder Stand
+  mit Daten, wiederhergestellt als `success`. Ein per Rechteentzug geleerter Bereich hat
+  keine Daten mehr und fällt heraus.
   - Die Seiten sehen dann `isError && !data` und zeigen ihren Fehlerzweig statt
     „Stand veraltet“ mit alten Daten.
   - Der Einsatz landet wie bisher in der `SeitenSackgasse`.
@@ -354,8 +370,10 @@ Kein neuer Banner: Kopfleiste (`OFFLINE`) und `LiveStatusBanner` melden den Zust
 - **Bewusst nicht umgesetzt:**
   - Die ETB-Filtervarianten werden je Variante mitgeschrieben. Das kostet Platz, verletzt
     aber keine Anforderung, messen, wenn es auffällt.
-  - Eine 503 **mit** Umschlag beim Start (Lastabwurf des eigenen Servers) stellt die
-    Offline-Identität her, kennzeichnet aber nicht „· offline“. Der Server ist erreichbar und
+  - Eine 503 **mit** Umschlag beim Start (Lastabwurf des eigenen Servers) führt in den
+    Netzfehler-Pfad und hydriert, obwohl der Server erreichbar ist. Dort kann das
+    Deeplink-Rennen aus D2 selten auftreten, das ist eine benannte Grenze. Außerdem
+    kennzeichnet dieser Fall nicht „· offline“. Der Server ist erreichbar und
     hat nur gerade nicht angenommen. Der nächste scheiternde Abruf zeigt auf den Seiten ihren
     Fehler bzw. „Stand veraltet“, und die Uhrzeit des Datenstands ist die alte.
   - Die Offline-Identität wird nach der Rückkehr des Netzes nicht per `me()` aufgefrischt.

@@ -1,9 +1,4 @@
-import {
-  defaultShouldDehydrateQuery,
-  type DehydrateOptions,
-  type Query,
-  type QueryClient,
-} from '@tanstack/react-query';
+import { type DehydrateOptions, type Query, type QueryClient } from '@tanstack/react-query';
 import { EINSATZ_KEYS, istLagebildOfflineKey } from '../api/queryKeys';
 import { HOECHSTLIEGEZEIT_MS } from './lagebildStart';
 
@@ -76,7 +71,19 @@ export function lagebildStandZulaessig(
 }
 
 /**
- * Die Dehydrier-Optionen des Persisters: nur Erfolgsstände, die {@link lagebildStandZulaessig}
+ * Trägt die Query einen Stand? Erfolg, oder Fehler MIT Daten: fällt der Server im laufenden Tab
+ * weg, stehen die Queries nach den Wiederholungen auf `error` und behalten ihren letzten guten
+ * Stand. `defaultShouldDehydrateQuery` nähme nur `success` — die nächste Speicherung trüge den
+ * Stand dann von der Platte, und genau das Neuladen danach fände nichts. Ein per Rechteentzug
+ * geleerter Bereich hat keine Daten mehr und fällt hier heraus.
+ */
+function hatStand(query: Query): boolean {
+  const { status, data } = query.state;
+  return data !== undefined && (status === 'success' || status === 'error');
+}
+
+/**
+ * Die Dehydrier-Optionen des Persisters: nur Stände (`hatStand`), die {@link lagebildStandZulaessig}
  * sind, und **keine Mutationen**. Ohne die zweite Regel nähme `dehydrate` jede pausierte
  * Mutation samt `variables` mit — ohne Netz pausiert jede (`networkMode: 'online'`), also
  * Chat-Texte und Personen-PATCHes (Review LFH-723, Befund 1). Offline-Schreiben läuft über die
@@ -85,8 +92,7 @@ export function lagebildStandZulaessig(
 export function lagebildDehydrierOptionen(qc: QueryClient): DehydrateOptions {
   return {
     shouldDehydrateQuery: (query: Query) =>
-      defaultShouldDehydrateQuery(query) &&
-      lagebildStandZulaessig(qc, query.queryKey, query.state.dataUpdatedAt),
+      hatStand(query) && lagebildStandZulaessig(qc, query.queryKey, query.state.dataUpdatedAt),
     shouldDehydrateMutation: () => false,
   };
 }

@@ -556,9 +556,15 @@ draußen gelassen werden.
   aus dem Datensatz. Jede Antwort des Servers selbst, auch eine 500, löscht. Die Frist beträgt
   **24 h ab der letzten Serverbestätigung** (`bestaetigtAt`, bewegt nur von Fetch-Erfolgen,
   nie von `setQueryData` oder `hydrate`), nicht ab dem letzten Speichern.
-- **Serverbestätigt wechseln `benutzer` und `laedt` im selben Takt wie vorher**, die
-  Wiederherstellung läuft danach. Gemessen: Ein Takt später färbte elf, zwei getrennte Takte
-  sieben Bestandstests rot. Nur beim Netzfehler wartet `laedt` auf den Datensatz.
+- **Serverbestätigt wird nichts hydriert.** Der Stand bleibt als Vorrat und wird bei jeder
+  Speicherung mit dem Live-Stand zusammengeführt (Live gewinnt, Filter bei jeder Speicherung).
+  Gemessen in der CI: Ein hydrierter älterer Stand ließ die ETB-Deeplink-Logik `?eintrag=`
+  räumen, bevor der neue Eintrag geladen war (`e2e/lagebild-offline-deeplink.spec.ts`).
+  Hydriert wird nur ohne Serverbestätigung. `benutzer` und `laedt` wechseln serverbestätigt im
+  selben Takt wie vorher: Ein Takt später färbte elf, zwei getrennte Takte sieben
+  Bestandstests rot.
+- **Ein Fehler mit Daten ist ein Stand.** Fällt der Server im Tab weg, behalten die Queries
+  auf `error` ihren letzten Stand. Nur `success` zu schreiben nähme ihn von der Platte.
 - **Gelöscht wird Speicher und Platte** bei Abmelden, 401 (über `logout()`) und
   Benutzerwechsel (`offline/lagebildSitzung.ts`). Die Offline-Queue bleibt, sie ist
   Beweissicherung. Beim **Start** löscht ein Verwerfen nur die Platte: Ein `clear()` dort
@@ -569,10 +575,9 @@ draußen gelassen werden.
   Daten und stehen auf `error` (`setState`), unbeobachtete werden entfernt. Entfernte beobachtete Geschwister (ETB-
   Liste und -Zähler) stießen sich sonst gegenseitig neu an, eine Abrufschleife.
   `resetQueries` scheidet aus demselben Grund aus. Eine Sperrmarke je Bereich hält die
-  geleerten Queries bis zum nächsten Erfolg von der Platte **und von der Wiederherstellung**
-  fern. Deshalb stellt `lagebildSitzung.ts` selbst wieder her (Filter unmittelbar vor
-  `hydrate`), nicht `persistQueryClientRestore`: Eine 403, die vor dem Lesen der IndexedDB
-  eintraf, holte `hydrate` sonst zurück.
+  geleerten Queries bis zum nächsten Erfolg von der Platte, aus dem Vorrat und von der
+  Offline-Wiederherstellung fern. Die läuft als eigener Schritt (Filter unmittelbar vor
+  `hydrate`), nicht über `persistQueryClientRestore`.
 - **Keine Mutationen, kein Einzelstand über 24 h** (`lagebildDehydrierOptionen`): Pausierte
   Mutationen trügen sonst ihre `variables` (Chat, Personen) auf die Platte.
 - **„· offline“ entscheidet `Datenstand` selbst** (`useOhneVerbindung`,

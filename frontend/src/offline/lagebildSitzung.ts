@@ -60,15 +60,51 @@ function leererClient(buster: string) {
   return { timestamp: Date.now(), buster, clientState: { queries: [], mutations: [] } };
 }
 
-/** Beginnt das Speichern für einen Benutzer. Ein bestehender Datensatz wird vorausgesetzt:
- *  der Persister legt keinen an (design.md D1). */
+type VorratEintrag = PersistedClient['clientState']['queries'][number];
+
+/** Die Einträge eines gelesenen Stands, die jetzt noch gelten dürfen (Allowlist, Sperrmarke,
+ *  24 h je Einzelstand). Wirft bei einem unlesbaren Stand. */
+function zulaessigeEintraege(qc: QueryClient, eintraege: VorratEintrag[]): VorratEintrag[] {
+  const jetzt = Date.now();
+  return eintraege.filter((q) =>
+    lagebildStandZulaessig(qc, q.queryKey, q.state.dataUpdatedAt, jetzt),
+  );
+}
+
+/**
+ * Beginnt das Speichern für einen Benutzer. Ein bestehender Datensatz wird vorausgesetzt: der
+ * Persister legt keinen an (design.md D1).
+ *
+ * `vorrat` ist der gelesene Stand einer SERVERBESTÄTIGTEN Sitzung, der bewusst NICHT im
+ * Speicher liegt (design.md D2). Jede Speicherung führt ihn mit dem Live-Stand zusammen: der
+ * Live-Stand gewinnt je `queryHash`, übrige Vorrat-Einträge kommen dazu — gefiltert bei JEDER
+ * Speicherung, damit ein Rechteentzug im Lauf der Sitzung (Sperrmarke) und die Höchstliegezeit
+ * auch den Vorrat treffen. Ohne das Zusammenführen überschriebe die erste Speicherung den
+ * Datensatz mit dem fast leeren Cache eines frisch geladenen Tabs, und offline wäre nur noch
+ * da, was seit dem letzten Neuladen besucht wurde.
+ */
 function abonnieren(
   qc: QueryClient,
   benutzerId: number,
   buster: string,
   { drosselMs }: SitzungsOptionen,
+  vorrat: VorratEintrag[] = [],
 ): void {
-  const persister = erzeugeLagebildPersister(benutzerId, { drosselMs });
+  const innen = erzeugeLagebildPersister(benutzerId, { drosselMs });
+  const persister: LagebildPersister = {
+    ...innen,
+    persistClient: (client) => {
+      const live = new Set(client.clientState.queries.map((q) => q.queryHash));
+      const dazu = zulaessigeEintraege(qc, vorrat).filter((q) => !live.has(q.queryHash));
+      return innen.persistClient({
+        ...client,
+        clientState: {
+          ...client.clientState,
+          queries: [...client.clientState.queries, ...dazu],
+        },
+      });
+    },
+  };
   const speichern = {
     queryClient: qc,
     persister,
@@ -77,9 +113,9 @@ function abonnieren(
   };
   const speichernAbmelden = persistQueryClientSubscribe(speichern);
   // Einmal sofort (gedrosselt): das Abonnement sieht nur KÜNFTIGE Änderungen. Serverbestätigt
-  // hängen die Seiten ihre Abfragen schon ein, während die Wiederherstellung läuft — sind sie
-  // fertig, bevor das Abonnement steht, käme sonst nie ein Ereignis, und der Stand bliebe
-  // leer (gemessen an der Lagekarte, e2e `lagebild-offline.spec.ts`).
+  // hängen die Seiten ihre Abfragen schon ein, während der Start noch die IndexedDB liest —
+  // sind sie fertig, bevor das Abonnement steht, käme sonst nie ein Ereignis, und der Stand
+  // bliebe leer (gemessen an der Lagekarte, e2e `lagebild-offline.spec.ts`).
   void persistQueryClientSave(speichern);
   let zuletztBestaetigt = 0;
   const bestaetigungAbmelden = fetchErfolgeVerfolgen(qc, () => {
@@ -99,32 +135,30 @@ function abonnieren(
 }
 
 /**
- * Legt den vorgehaltenen Stand in den Speicher — eigener Schritt statt
- * `persistQueryClientRestore`, weil gefiltert werden muss, und zwar UNMITTELBAR vor dem
- * `hydrate`, ohne `await` dazwischen (Review LFH-723, Befund 2):
+ * Legt den vorgehaltenen Stand in den Speicher — NUR ohne Serverbestätigung (design.md D2):
+ * online ist der Server die Wahrheit, und ein hydrierter älterer Stand ließe jede Stelle, die
+ * „Daten da" als „geladen" liest, am alten Stand entscheiden (gemessen in der CI: die
+ * Deeplink-Logik räumte `?eintrag=`, bevor der neue Eintrag geladen war).
  *
- * - Serverbestätigt laufen die Abrufe der Seite schon, während der Start die IndexedDB liest.
- *   Kam eine 403/404 vorher, trägt der Bereich eine Sperrmarke, und `hydrate` legte den
- *   entzogenen Stand sonst wieder in den Speicher: es übernimmt jeden Stand, dessen
- *   `dataUpdatedAt` neuer ist als der im Cache — und der Rechteentzug hat ihn auf 0 gesetzt.
- * - Eine Query, die im Cache schon auf `error` steht, wird nicht überschrieben: ihr Fehler ist
- *   jünger als jeder vorgehaltene Stand.
- * - Ein Einzelstand älter als die Höchstliegezeit kommt nicht zurück (`lagebildStandZulaessig`).
+ * Eigener Schritt statt `persistQueryClientRestore`, weil gefiltert wird, UNMITTELBAR vor dem
+ * `hydrate` und ohne `await` dazwischen: Allowlist, Sperrmarke, 24 h je Einzelstand, und keine
+ * Query, die im Cache schon auf `error` steht — ihr Fehler ist jünger als jeder vorgehaltene
+ * Stand. Ein Stand, der mit einem Leitungsfehler gespeichert wurde (`error` MIT Daten), kommt
+ * als `success` zurück: die Daten sind der letzte gute Stand, der Fehler gehörte zur Sitzung
+ * davor.
  *
  * Mutationen stellt der Schritt nie her — es werden keine geschrieben (`lagebildFilter.ts`).
- * Gibt den tatsächlich hergestellten Stand zurück; nur DER darf auf die Platte zurück.
  */
-function wiederherstellen(qc: QueryClient, client: PersistedClient): PersistedClient {
-  const jetzt = Date.now();
+function wiederherstellen(qc: QueryClient, client: PersistedClient): void {
   const cache = qc.getQueryCache();
-  const queries = client.clientState.queries.filter(
-    (q) =>
-      lagebildStandZulaessig(qc, q.queryKey, q.state.dataUpdatedAt, jetzt) &&
-      cache.find({ queryKey: q.queryKey, exact: true })?.state.status !== 'error',
-  );
-  const clientState = { mutations: [], queries };
-  hydrate(qc, clientState);
-  return { ...client, clientState };
+  const queries = zulaessigeEintraege(qc, client.clientState.queries)
+    .filter((q) => cache.find({ queryKey: q.queryKey, exact: true })?.state.status !== 'error')
+    .map((q) =>
+      q.state.status === 'error'
+        ? { ...q, state: { ...q.state, status: 'success' as const, error: null } }
+        : q,
+    );
+  hydrate(qc, { mutations: [], queries });
 }
 
 /** Beendet das Speichern, ohne zu löschen: ein ausstehender Durchlauf entfällt. */
@@ -178,10 +212,14 @@ export function lagebildStarten(
     if (SITZUNGEN.get(qc)?.benutzerId === benutzer.id) return benutzer;
     await beenden(qc);
 
-    let wiederhergestellt: PersistedClient | undefined;
+    // Serverbestätigt wird NICHT hydriert, der gelesene Stand bleibt als Vorrat für die
+    // Platte (design.md D2). Ohne Bestätigung ist er der einzige Stand und kommt in den
+    // Speicher.
+    let vorrat: VorratEintrag[] = [];
     if (entscheidung.wiederherstellen && satz) {
       try {
-        wiederhergestellt = wiederherstellen(qc, satz.client);
+        if (me.art === 'ok') vorrat = zulaessigeEintraege(qc, satz.client.clientState.queries);
+        else wiederherstellen(qc, satz.client);
       } catch (fehler) {
         // Ein unlesbarer Stand ist verworfen. Ohne Serverbestätigung gibt es dann auch keine
         // Offline-Anmeldung: sie verspräche einen Stand, der nicht da ist.
@@ -193,16 +231,16 @@ export function lagebildStarten(
     if (abgebrochen()) return null;
     if (me.art === 'ok') {
       // Serverbestätigt: Datensatz anlegen bzw. mit frischer Identität und Bestätigung
-      // fortschreiben — mit dem GEFILTERTEN Stand, nie dem gelesenen. Ohne Server
+      // fortschreiben — mit dem GEFILTERTEN Vorrat, nie dem gelesenen Stand. Ohne Server
       // (Netzfehler) bleibt der Datensatz, wie er ist.
       await lagebildAnlegen({
         benutzer,
         bestaetigtAt: jetzt,
         buster,
-        client: wiederhergestellt ?? leererClient(buster),
+        client: { ...leererClient(buster), clientState: { mutations: [], queries: vorrat } },
       });
     }
-    abonnieren(qc, benutzer.id, buster, optionen);
+    abonnieren(qc, benutzer.id, buster, optionen, vorrat);
     return benutzer;
   });
 }
@@ -226,14 +264,22 @@ export function lagebildAnmelden(
       (satz !== undefined && satz.benutzer.id !== benutzer.id);
     if (fremd) await loeschen(qc);
     const bestand = fremd ? undefined : satz;
+    let vorrat: VorratEintrag[] = [];
+    try {
+      if (bestand && bestand.buster === buster) {
+        vorrat = zulaessigeEintraege(qc, bestand.client.clientState.queries);
+      }
+    } catch {
+      // Unlesbarer Stand: ohne Vorrat weiter, der Datensatz wird unten ersetzt.
+    }
     await lagebildAnlegen({
       benutzer,
       bestaetigtAt: jetzt,
       buster,
-      client: bestand && bestand.buster === buster ? bestand.client : leererClient(buster),
+      client: { ...leererClient(buster), clientState: { mutations: [], queries: vorrat } },
     });
     if (SITZUNGEN.get(qc)?.benutzerId !== benutzer.id)
-      abonnieren(qc, benutzer.id, buster, optionen);
+      abonnieren(qc, benutzer.id, buster, optionen, vorrat);
   });
 }
 

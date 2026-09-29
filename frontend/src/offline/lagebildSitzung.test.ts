@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { QueryClient, dehydrate } from '@tanstack/react-query';
 import type { PersistedClient } from '@tanstack/query-persist-client-core';
-import { ApiError } from '../api/client';
+import { ApiError, NetzFehler } from '../api/client';
 import { erzeugeQueryClient } from '../api/queryClient';
 import type { BenutzerAnzeige } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
@@ -68,67 +68,145 @@ describe('Lagebild-Sitzung', () => {
     ]);
   });
 
-  it('holt einen nach 403 geleerten Stand über die Wiederherstellung nicht zurück', async () => {
-    // Review LFH-723, Befund 2: serverbestätigt laufen die Abrufe der Seite schon, während der
-    // Start noch die IndexedDB liest. Kommt die 403 vorher, darf `hydrate` den entzogenen
-    // Stand nicht wieder in den Speicher legen — weder für die gescheiterte Query noch für
-    // ihre Geschwister im gesperrten Bereich.
-    const erster = neuerClient();
-    await lagebildStarten(erster, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
-    erster.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]);
-    erster.setQueryData(einsatzKeys.einsatz(4), { id: 4 });
-    erster.setQueryData(einsatzKeys.etbZaehler(4, {}), { anzahl: 2 });
-    erster.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]);
-    await warteAufGeschrieben((n) => n >= 4);
-    await lagebildBeenden(erster);
+  /** Legt einen Datensatz des Benutzers A mit den gegebenen Ständen an. */
+  async function vorratAnlegen(fuellen: (qc: QueryClient) => void) {
+    const quelle = new QueryClient();
+    fuellen(quelle);
+    await lagebildAnlegen({
+      benutzer: A,
+      bestaetigtAt: Date.now(),
+      buster: __APP_VERSION__,
+      client: { timestamp: Date.now(), buster: __APP_VERSION__, clientState: dehydrate(quelle) },
+    });
+  }
 
-    const zweiter = erzeugeQueryClient({ queries: { retry: false } });
-    clients.push(zweiter);
-    await zweiter
-      .fetchQuery({
-        queryKey: einsatzKeys.personen(3),
-        queryFn: () => Promise.reject(new ApiError(403, 'Kein Zugriff')),
-      })
-      .catch(() => {});
-    await zweiter
-      .fetchQuery({
-        queryKey: einsatzKeys.einsatz(4),
-        queryFn: () => Promise.reject(new ApiError(404, 'weg')),
-      })
-      .catch(() => {});
-    await lagebildStarten(zweiter, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
-    expect(zweiter.getQueryData(einsatzKeys.personen(3))).toBeUndefined();
-    expect(zweiter.getQueryData(einsatzKeys.einsatz(4))).toBeUndefined();
-    expect(zweiter.getQueryData(einsatzKeys.etbZaehler(4, {}))).toBeUndefined();
-    // Nicht Gesperrtes kommt zurück.
-    expect(zweiter.getQueryData(einsatzKeys.einheiten(3))).toEqual([{ id: 5 }]);
-    // Und der Datensatz trägt den gesperrten Stand nicht weiter.
-    const keys = (await lagebildLesen())!.client.clientState.queries.map((q) => q.queryKey);
-    expect(keys).not.toContainEqual(einsatzKeys.personen(3));
-    expect(keys).not.toContainEqual(einsatzKeys.einsatz(4));
+  const plattenKeys = async () =>
+    ((await lagebildLesen())?.client.clientState.queries ?? []).map((q) => q.queryKey);
+
+  describe('serverbestätigt: kein Hydrieren, der Vorrat wird beim Speichern zusammengeführt', () => {
+    // Gemessen in der CI (PR #175): nach einem Neuladen legte die Wiederherstellung den älteren
+    // ETB-Stand in den Speicher, die Deeplink-Logik (`?eintrag=`) las „Daten da" als „geladen",
+    // fand den neuen Eintrag nicht und räumte den Parameter — und die Personenkarte baute sich
+    // nie auf. Online ist der Server die Wahrheit; der Vorrat wird nur offline gebraucht.
+
+    it('legt beim Start nichts in den Speicher', async () => {
+      await vorratAnlegen((q) => q.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]));
+      const qc = neuerClient();
+      expect(await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL })).toBe(A);
+      expect(qc.getQueryCache().getAll()).toHaveLength(0);
+    });
+
+    it('führt Vorrat und Live-Stand zusammen, der Live-Stand gewinnt', async () => {
+      await vorratAnlegen((q) => {
+        q.setQueryData(einsatzKeys.personen(3), [{ id: 1, alt: true }]);
+        q.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]);
+      });
+      const qc = neuerClient();
+      await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+      await qc.fetchQuery({ queryKey: einsatzKeys.personen(3), queryFn: async () => [{ id: 1 }] });
+      await qc.fetchQuery({ queryKey: einsatzKeys.etbZaehler(3, {}), queryFn: async () => 7 });
+      const satz = await warteAufGeschrieben((n) => n >= 3);
+      const personen = satz.client.clientState.queries.filter(
+        (q) => q.queryKey[0] === 'einsatz-personen',
+      );
+      expect(personen).toHaveLength(1);
+      expect(personen[0].state.data).toEqual([{ id: 1 }]);
+      expect(await plattenKeys()).toEqual(
+        expect.arrayContaining([
+          einsatzKeys.personen(3),
+          einsatzKeys.einheiten(3),
+          einsatzKeys.etbZaehler(3, {}),
+        ]),
+      );
+    });
+
+    it('nimmt einen per 403/404 entzogenen Bereich auch aus dem Vorrat', async () => {
+      await vorratAnlegen((q) => {
+        q.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]);
+        q.setQueryData(einsatzKeys.einsatz(4), { id: 4 });
+        q.setQueryData(einsatzKeys.etbZaehler(4, {}), 2);
+        q.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]);
+      });
+      const qc = erzeugeQueryClient({ queries: { retry: false } });
+      clients.push(qc);
+      await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+      await qc
+        .fetchQuery({
+          queryKey: einsatzKeys.personen(3),
+          queryFn: () => Promise.reject(new ApiError(403, 'Kein Zugriff')),
+        })
+        .catch(() => {});
+      await qc
+        .fetchQuery({
+          queryKey: einsatzKeys.einsatz(4),
+          queryFn: () => Promise.reject(new ApiError(404, 'weg')),
+        })
+        .catch(() => {});
+      await expect
+        .poll(plattenKeys, { timeout: 2000, interval: DROSSEL })
+        .not.toContainEqual(einsatzKeys.einsatz(4));
+      const keys = await plattenKeys();
+      expect(keys).not.toContainEqual(einsatzKeys.personen(3));
+      expect(keys).not.toContainEqual(einsatzKeys.etbZaehler(4, {}));
+      expect(keys).toContainEqual(einsatzKeys.einheiten(3));
+    });
+
+    it('behält bei erneuter Anmeldung derselben Person den Vorrat', async () => {
+      await vorratAnlegen((q) => q.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]));
+      const qc = neuerClient();
+      await lagebildAnmelden(qc, A, { drosselMs: DROSSEL });
+      qc.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]);
+      await warteAufGeschrieben((n) => n >= 2);
+      expect(await plattenKeys()).toEqual(
+        expect.arrayContaining([einsatzKeys.einheiten(3), einsatzKeys.personen(3)]),
+      );
+    });
   });
 
-  it('überdeckt einen jüngeren Fehler nicht mit dem vorgehaltenen Stand', async () => {
-    // Ohne Sperrmarke (500 ist kein Rechteentzug): die Query steht im Cache schon auf
-    // `error`, ohne Daten. `hydrate` übernähme den älteren Stand, weil 0 < dataUpdatedAt, und
-    // die Seite zeigte ihn als Erfolg statt ihres Fehlers.
-    const erster = neuerClient();
-    await lagebildStarten(erster, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
-    erster.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]);
+  it('hält den letzten Stand, wenn ein Abruf an der Leitung scheitert', async () => {
+    // Fällt der Server im laufenden Tab weg, stehen die Queries nach den Wiederholungen auf
+    // `error` — MIT ihren Daten. Ein Filter „nur success" nähme sie bei der nächsten
+    // Speicherung von der Platte, und genau das Neuladen danach fände nichts.
+    const qc = erzeugeQueryClient({ queries: { retry: false } });
+    clients.push(qc);
+    await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+    await qc.fetchQuery({ queryKey: einsatzKeys.personen(3), queryFn: async () => [{ id: 1 }] });
     await warteAufGeschrieben((n) => n > 0);
-    await lagebildBeenden(erster);
-
-    const zweiter = erzeugeQueryClient({ queries: { retry: false } });
-    clients.push(zweiter);
-    await zweiter
+    await qc
       .fetchQuery({
         queryKey: einsatzKeys.personen(3),
-        queryFn: () => Promise.reject(new ApiError(500, 'kaputt', { vomAnwendungsserver: true })),
+        queryFn: () => Promise.reject(new NetzFehler()),
+        staleTime: 0,
       })
       .catch(() => {});
-    await lagebildStarten(zweiter, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
-    expect(zweiter.getQueryState(einsatzKeys.personen(3))?.status).toBe('error');
-    expect(zweiter.getQueryData(einsatzKeys.personen(3))).toBeUndefined();
+    expect(qc.getQueryState(einsatzKeys.personen(3))?.status).toBe('error');
+    qc.setQueryData(einsatzKeys.einheiten(3), []);
+    await warteAufGeschrieben((n) => n >= 2);
+    expect(await plattenKeys()).toContainEqual(einsatzKeys.personen(3));
+    await lagebildBeenden(qc);
+
+    // Und die Wiederherstellung ohne Netz bringt ihn als Stand, nicht als Fehler.
+    const offline = neuerClient();
+    await lagebildStarten(offline, { art: 'netzfehler' });
+    expect(offline.getQueryState(einsatzKeys.personen(3))?.status).toBe('success');
+    expect(offline.getQueryData(einsatzKeys.personen(3))).toEqual([{ id: 1 }]);
+  });
+
+  it('überdeckt ohne Netz einen jüngeren Fehler nicht mit dem vorgehaltenen Stand', async () => {
+    // Die Query steht im Cache schon auf `error`, ohne Daten. `hydrate` übernähme den älteren
+    // Stand, weil 0 < dataUpdatedAt, und die Seite zeigte ihn als Erfolg statt ihres Fehlers.
+    await vorratAnlegen((q) => q.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]));
+    const qc = erzeugeQueryClient({ queries: { retry: false } });
+    clients.push(qc);
+    await qc
+      .fetchQuery({
+        queryKey: einsatzKeys.personen(3),
+        queryFn: () => Promise.reject(new ApiError(503, 'weg')),
+      })
+      .catch(() => {});
+    await lagebildStarten(qc, { art: 'netzfehler' }, { drosselMs: DROSSEL });
+    expect(qc.getQueryState(einsatzKeys.personen(3))?.status).toBe('error');
+    expect(qc.getQueryData(einsatzKeys.personen(3))).toBeUndefined();
   });
 
   it('stellt einen Einzelstand älter als 24 h nicht wieder her', async () => {
