@@ -55,7 +55,7 @@ export function ordneKlickebene(layerId: string): Klickebene | null {
 const PUNKTZIELE = new Set<Klickebene>(['marker', 'personenCluster', 'fachebene']);
 const FLAECHEN = new Set<Klickebene>(['zone', 'abschnitt', 'fachebeneFlaeche']);
 
-interface Merkmal {
+export interface Merkmal {
   id?: string | number;
   layer: { id: string };
   properties: Record<string, unknown> | null;
