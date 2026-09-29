@@ -13,9 +13,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 FE="$ROOT/frontend"
-# Node und pnpm gepinnt wie in check-all.sh: Prettier ändert seinen Stil zwischen
+# Node und pnpm aus `[tools]` in mise.toml (LFH-773): Prettier ändert seinen Stil zwischen
 # Major-Versionen, und das Gate soll überall dasselbe sagen.
-PNPM="mise exec node@26.7.0 pnpm@11.10.0 -- pnpm"
+PNPM="mise exec -- pnpm"
 
 echo "==> [1/2] cargo fmt --all --check (rustfmt-Baseline, LFH-5)"
 if ! cargo fmt --all --check; then

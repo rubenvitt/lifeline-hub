@@ -12,8 +12,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 FE="$ROOT/frontend"
-# Node mitgepinnt wie in check-all.sh — wer die Zahl dort ändert, ändert sie hier mit.
-PNPM="mise exec node@26.7.0 pnpm@11.10.0 -- pnpm"
+# Node und pnpm aus `[tools]` in mise.toml (LFH-773). Der Audit läuft mit `-C` im
+# Wegwerf-Verzeichnis, mise selbst aber hier im Repo — sonst fände es die mise.toml nicht.
+PNPM="mise exec -- pnpm"
 
 fehlend=()
 

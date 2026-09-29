@@ -619,7 +619,7 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
-`check-migrationen.sh` → `check-all.test.sh`.
+`check-migrationen.sh` → `check-all.test.sh` → `check-toolversionen.sh`.
 - **Das Skript ist die Wahrheit**; `.github/workflows/ci.yml` ruft es unverändert. Neue Schritte
   gehören ins Skript.
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
@@ -631,6 +631,10 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   (deshalb nicht im Gate: `cargo clippy -D warnings`).
 - Prettier prüft nur `frontend/`; nicht idempotent (nach `--write` noch rot → nochmal).
   Ausnahmen nur mit Begründung in `frontend/.prettierignore`. Kein `.git-blame-ignore-revs`.
+- **Node und pnpm stehen nur in `[tools]` von `mise.toml`** (LFH-773): Skripte rufen
+  `mise exec -- …`, Workflows `jdx/mise-action` ohne `install_args`. `packageManager`,
+  `engines.node` und der Devcontainer spiegeln die Zahl; `scripts/check-toolversionen.sh`
+  prüft das und bricht an jedem harten `node@…`/`pnpm@…` in `scripts/`, `.github/`, README, Skills.
 - Env-Hygiene über `scripts/lib/dev-env.sh`, keine handgepflegte `env -u`-Liste; Isolation wo
   möglich im Test (`config::tests::parse_hermetisch`).
 - e2e ist selbsttragend, braucht aber das Debug-Binary; Schritt 7 baut bei Bedarf den Prod-Bundle
@@ -651,7 +655,7 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   **Kein leerer `auditConfig.ignoreGhsas`-Block** (ein Eintrag ohne Verstoß gilt selbst als
   Verstoß). Overrides pflegen Bereich **und** Zielversion. Der Audit prüft das **Lockfile** in
   einem Wegwerf-Verzeichnis (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`; nie
-  `node_modules`; Node-Pin `node@26.7.0`), Selbsttest `scripts/check-deps.test.sh`.
+  `node_modules`; Node/pnpm aus `mise.toml`), Selbsttest `scripts/check-deps.test.sh`.
 
 ## Backend↔Frontend — Typ-Codegen (LFH-120)
 

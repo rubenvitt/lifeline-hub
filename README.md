@@ -79,7 +79,7 @@ ohne Neubau des Binaries sichtbar werden:
 
 ```bash
 cargo run --features dev-seeds
-mise exec pnpm@11.10.0 -- pnpm -C frontend dev
+mise exec -- pnpm -C frontend dev
 ```
 
 Die Konventionen des Projekts — UI-Form, Bedienleitlinie, Fehlercodes, Query-Keys,

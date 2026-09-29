@@ -102,12 +102,11 @@ jobs:
         if: steps.fenster.outputs.freigabe == 'true'
         with:
           version: 2026.9.1
-          install_args: node@26.7.0 pnpm@11.10.0
           cache: true
 
       - name: Release-Werkzeug installieren
         if: steps.fenster.outputs.freigabe == 'true'
-        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm install --frozen-lockfile
+        run: mise exec -- pnpm install --frozen-lockfile
 
       - name: semantic-release
         if: steps.fenster.outputs.freigabe == 'true'
@@ -119,4 +118,4 @@ jobs:
           GIT_COMMITTER_EMAIL: noreply@github.com
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         # Unter `mise exec`, weil der prepareCmd `pnpm` auf dem PATH braucht.
-        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm exec semantic-release
+        run: mise exec -- pnpm exec semantic-release

@@ -82,11 +82,10 @@ jobs:
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: 2026.9.1
-          install_args: node@26.7.0 pnpm@11.10.0
           cache: true
 
       - name: Frontend-Abhängigkeiten
-        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend install --frozen-lockfile
+        run: mise exec -- pnpm -C frontend install --frozen-lockfile
 
       # Dieselbe Env-Hygiene wie im Sammel-Gate: der Runner setzt zwar keine
       # LIFELINE_*-Variablen, aber der Aufruf soll dem lokalen gleichen.
@@ -103,7 +102,7 @@ jobs:
       # statt weiter Schrauben zu lockern.
       - name: Frontend-Coverage
         run: >-
-          mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend exec vitest run --coverage
+          mise exec -- pnpm -C frontend exec vitest run --coverage
           --coverage.reporter=lcov --testTimeout=30000 --no-file-parallelism --retry=1
 
       - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
