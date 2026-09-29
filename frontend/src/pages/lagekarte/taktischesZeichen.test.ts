@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
+import { renderSvg } from '@einsatzzeichen/core';
+import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import {
   baueTzProps,
   groesseAusLabel,
@@ -12,7 +13,16 @@ import {
   fachaufgabeAusFahrzeugtyp,
   fachaufgabeAusFunktion,
   grundzeichenAkzeptiert,
+  type TzProps,
 } from './taktischesZeichen';
+
+// Die Fachobjekt-Zeichen zeichnet @einsatzzeichen über den Adapter (LFH-835); die genaue
+// Abbildung pinnt zeichen/fachobjektZeichen.test.ts. Hier nur: die Ableitung ist zeichenbar.
+const render = (tz: TzProps) => {
+  const z = fachobjektZeichen(tz);
+  expect(z, JSON.stringify(tz)).not.toBeNull();
+  return renderSvg(z!.drawing, { size: 34 });
+};
 
 describe('taktischesZeichen', () => {
   it('Einheit: Grundzeichen + Größe aus Label + Org-Default', () => {
@@ -43,10 +53,9 @@ describe('taktischesZeichen', () => {
   });
   it('erzeugt valides SVG je Objekttyp', () => {
     for (const objekttyp of ['einheit', 'fahrzeug', 'fuehrung', 'abschnitt'] as const) {
-      const svg = erzeugeTaktischesZeichen({
-        ...baueTzProps({ objekttyp, einheitTypLabel: 'Gruppe', orgDefault: 'hilfsorganisation' }),
-        skipFontRegistration: true,
-      }).svg.render();
+      const svg = render(
+        baueTzProps({ objekttyp, einheitTypLabel: 'Gruppe', orgDefault: 'hilfsorganisation' }),
+      );
       expect(svg).toContain('<svg');
     }
   });
@@ -105,7 +114,7 @@ describe('LFH-171: Fahrzeug-Zeichen aus Fahrzeugtyp/OPTA ableiten', () => {
     });
   });
 
-  describe('baueTzProps – Fahrzeug-Ableitung + Override-Vorrang + accepts-Gating', () => {
+  describe('baueTzProps – Fahrzeug-Ableitung + Override-Vorrang', () => {
     it('leitet Grundzeichen aus dem Fahrzeugtyp ab', () => {
       expect(baueTzProps({ objekttyp: 'fahrzeug', fahrzeugtyp: 'MZB' }).grundzeichen).toBe(
         'wasserfahrzeug',
@@ -144,7 +153,9 @@ describe('LFH-171: Fahrzeug-Zeichen aus Fahrzeugtyp/OPTA ableiten', () => {
       });
       expect(p.organisation).toBe('thw');
     });
-    it('accepts-Gating: zweirad akzeptiert keine Overlays → Organisation/Fachaufgabe entfallen', () => {
+    // Kein accepts-Gating mehr im Hub-Vokabular (LFH-835, design.md D3): was sich zeichnen lässt,
+    // entscheidet der Adapter per Komposition. Die Ableitung behält Organisation und Fachaufgabe.
+    it('Krad: zweirad behält Organisation und Fachaufgabe', () => {
       const p = baueTzProps({
         objekttyp: 'fahrzeug',
         fahrzeugtyp: 'Krad',
@@ -152,10 +163,10 @@ describe('LFH-171: Fahrzeug-Zeichen aus Fahrzeugtyp/OPTA ableiten', () => {
         fachaufgabe: 'brandbekaempfung',
       });
       expect(p.grundzeichen).toBe('zweirad');
-      expect(p.organisation).toBeUndefined();
-      expect(p.fachaufgabe).toBeUndefined();
+      expect(p.organisation).toBe('feuerwehr');
+      expect(p.fachaufgabe).toBe('brandbekaempfung');
     });
-    it('accepts-Gating: hubschrauber akzeptiert Organisation, aber keine Fachaufgabe', () => {
+    it('Hubschrauber: behält Organisation und Fachaufgabe', () => {
       const p = baueTzProps({
         objekttyp: 'fahrzeug',
         fahrzeugtyp: 'Hubschrauber',
@@ -164,13 +175,11 @@ describe('LFH-171: Fahrzeug-Zeichen aus Fahrzeugtyp/OPTA ableiten', () => {
       });
       expect(p.grundzeichen).toBe('hubschrauber');
       expect(p.organisation).toBe('polizei');
-      expect(p.fachaufgabe).toBeUndefined();
+      expect(p.fachaufgabe).toBe('rettungswesen');
     });
   });
 
   describe('Render-Integration abgeleiteter Fahrzeug-Props', () => {
-    const render = (p: object) =>
-      erzeugeTaktischesZeichen({ ...p, skipFontRegistration: true }).svg.render();
     it('erzeugt valides SVG für abgeleitete Fahrzeug-Zeichen', () => {
       expect(
         render(
@@ -242,14 +251,13 @@ describe('LFH-172: Personal-Zeichen aus Funktion differenzieren', () => {
 
   describe('Render-Integration', () => {
     it('erzeugt valides SVG für eine Führungskraft mit Funktion + Fachaufgabe', () => {
-      const svg = erzeugeTaktischesZeichen({
-        ...baueTzProps({
+      const svg = render(
+        baueTzProps({
           objekttyp: 'fuehrung',
           istFuehrungskraft: true,
           funktion: 'Notfallsanitäter',
         }),
-        skipFontRegistration: true,
-      }).svg.render();
+      );
       expect(svg).toContain('<svg');
     });
   });
@@ -285,9 +293,9 @@ describe('schadenTz', () => {
 });
 
 describe('betreuungsstelleTz', () => {
-  it('ist Stelle + Fachaufgabe Betreuung (LFH-673), und das Overlay ist zulässig', () => {
+  it('ist Stelle + Fachaufgabe Betreuung (LFH-673) und zeichenbar', () => {
     expect(betreuungsstelleTz()).toEqual({ grundzeichen: 'stelle', fachaufgabe: 'betreuung' });
-    expect(grundzeichenAkzeptiert('stelle', 'fachaufgabe')).toBe(true);
+    expect(render(betreuungsstelleTz())).toContain('<svg');
   });
 });
 
@@ -307,9 +315,6 @@ describe('uhsTz', () => {
 });
 
 describe('Render-Integration (Library akzeptiert die Mapper-Props)', () => {
-  const render = (p: object) =>
-    erzeugeTaktischesZeichen({ ...p, skipFontRegistration: true }).svg.render();
-
   it('erzeugt valides SVG für Einsatzort und alle UHS-Typen', () => {
     expect(render(einsatzortTz())).toContain('<svg');
     for (const typ of [
@@ -323,8 +328,8 @@ describe('Render-Integration (Library akzeptiert die Mapper-Props)', () => {
   });
 
   it('Schaden-Farbe landet tatsächlich im gerenderten SVG', () => {
-    const svg = render(schadenTz('katastrophal'));
-    expect(svg).toContain('<svg');
-    expect(svg).toContain('#f5222d');
+    const katastrophal = render(schadenTz('katastrophal'));
+    expect(katastrophal).toContain('<svg');
+    expect(katastrophal).not.toBe(render(schadenTz('gering')));
   });
 });

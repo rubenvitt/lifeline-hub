@@ -111,10 +111,11 @@ export function fachaufgabeAusFunktion(
   return undefined;
 }
 
-// accepts-Gating: manche Grundzeichen rendern bestimmte Overlays nicht, die Library ignoriert sie
+// accepts-Gating NUR noch für freie Zeichen (Picker, `baueFreiesZeichenTz`), die bis LFH-836 auf dem
+// Altpaket bleiben: manche Grundzeichen rendern bestimmte Overlays nicht, die Library ignoriert sie
 // still. Wir setzen sie gar nicht erst, damit der Icon-Dedup-Key (`tzIconKey`) nicht divergiert und
-// kein Phantom-Overlay entsteht. Wahrheitsquelle ist der `accepts`-Katalog jedes Grundzeichens,
-// keine handgepflegte Liste.
+// kein Phantom-Overlay entsteht. Die Fachobjekte gaten nicht mehr: dort entscheidet die Komposition
+// in `zeichen/fachobjektZeichen.ts` (LFH-835).
 const AKZEPTIERTE_OVERLAYS: ReadonlyMap<string, ReadonlySet<ComponentType>> = new Map(
   grundzeichenKatalog.map((g) => [g.id, new Set(g.accepts ?? [])]),
 );
@@ -127,8 +128,8 @@ export function grundzeichenAkzeptiert(grundzeichen: string, overlay: ComponentT
 
 /**
  * Leitet die DV-102-Spec aus App-Feldern ab. Priorität je Overlay: manueller Override (tz_*) ??
- * abgeleitet aus Fahrzeugtyp/Träger/OPTA ?? Typ-/Org-Default. Das accepts-Gating entfernt Overlays,
- * die das Grundzeichen nicht rendert.
+ * abgeleitet aus Fahrzeugtyp/Träger/OPTA ?? Typ-/Org-Default. Ergebnis ist Hub-Vokabular: welche
+ * Merkmale sich am Grundzeichen zeichnen lassen, entscheidet erst `fachobjektZeichen` (LFH-835).
  */
 export function baueTzProps(e: TzEingabe): TzProps {
   const grundzeichen: GrundzeichenId =
@@ -155,8 +156,8 @@ export function baueTzProps(e: TzEingabe): TzProps {
 
   return {
     grundzeichen,
-    organisation: grundzeichenAkzeptiert(grundzeichen, 'organisation') ? organisation : undefined,
-    fachaufgabe: grundzeichenAkzeptiert(grundzeichen, 'fachaufgabe') ? fachaufgabe : undefined,
+    organisation,
+    fachaufgabe,
     einheit: e.objekttyp === 'einheit' ? groesseAusLabel(e.einheitTypLabel) : undefined,
     funktion,
   };

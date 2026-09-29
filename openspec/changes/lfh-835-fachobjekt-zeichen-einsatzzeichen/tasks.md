@@ -7,11 +7,11 @@
 
 ## 2. Adapter Hub-Vokabular → SymbolSpec (TDD)
 
-- [ ] 2.1 `zeichen/fachobjektZeichen.test.ts` rot anlegen:
+- [x] 2.1 `zeichen/fachobjektZeichen.test.ts` rot anlegen:
   - Pin je Abbildung aus design.md D2: Einheit mit den Größen und Zugtrupp, Fahrzeug LF/RTW/RW/GW-L/ELW, Boot, Heli, Anhänger, Krad, Führungskraft mit und ohne Funktion, Abschnitt, Einsatzort, Schaden mit 5 Ausmaßen, die 4 UHS-Typen, Betreuungsstelle, die 3 umbenannten Organisationen.
   - Jede Abbildung liefert die erwartete wirksame Spec, `drawSymbol` wirft nicht, und das gerenderte SVG enthält kein `<text` (Schrift-Wache).
-- [ ] 2.2 `zeichen/fachobjektZeichen.ts` umsetzen: Tabellen, Kaskade nach D3, Cache nach D4, `schluessel = 'ez|' + serializeSpec`. Die Tests aus 2.1 sind grün.
-- [ ] 2.3 Rückfall-Tests ergänzen und grün machen:
+- [x] 2.2 `zeichen/fachobjektZeichen.ts` umsetzen: Tabellen, Kaskade nach D3, Cache nach D4, `schluessel = 'ez|' + serializeSpec`. Die Tests aus 2.1 sind grün.
+- [x] 2.3 Rückfall-Tests ergänzen und grün machen:
   - unbekannte Fachaufgabe
   - unbekannte Organisation
   - nicht komponierende Fachaufgabe am Kfz
@@ -20,7 +20,7 @@
   - gleicher Eingang → gleiches Objekt (Cache)
 
   Mutationsprobe: Eine Kaskadenstufe entfernt → mindestens ein Test wird rot.
-- [ ] 2.4 `baueTzProps` vom accepts-Gating lösen (D3). Die Pins in `taktischesZeichen.test.ts`, die über `erzeugeTaktischesZeichen` Fachobjekte rendern oder das Gating an Fachobjekten prüfen, auf den Adapter umstellen: gleiche fachliche Aussage, neue Belege. Vitest für `pages/lagekarte` ist grün.
+- [x] 2.4 `baueTzProps` vom accepts-Gating lösen (D3). Die Pins in `taktischesZeichen.test.ts`, die über `erzeugeTaktischesZeichen` Fachobjekte rendern oder das Gating an Fachobjekten prüfen, auf den Adapter umstellen: gleiche fachliche Aussage, neue Belege. Vitest für `pages/lagekarte` ist grün.
 
 ## 3. Lagekarte
 

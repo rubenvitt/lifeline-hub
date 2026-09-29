@@ -30,6 +30,9 @@ describe('@einsatzzeichen-Versionen', () => {
         '@einsatzzeichen/core': '^2.1.0',
         '@einsatzzeichen/react': '2.0.0',
       }),
-    ).toEqual(['@einsatzzeichen/core: „^2.1.0“ ist nicht exakt', 'abweichende Versionen: ^2.1.0, 2.0.0']);
+    ).toEqual([
+      '@einsatzzeichen/core: „^2.1.0“ ist nicht exakt',
+      'abweichende Versionen: ^2.1.0, 2.0.0',
+    ]);
   });
 });
