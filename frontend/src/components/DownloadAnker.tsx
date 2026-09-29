@@ -49,8 +49,8 @@ interface Props {
 
 /**
  * Nativer Download-Verweis (`<a href download>`), geteilt von Dokumentenablage und
- * Schaden-Anhängen (LFH-21; vorher lokal in `DokumentePage`). Kein Knopf mit `fetch`: der
- * Browser lädt selbst, mit Sitzungs-Cookie, ETag und eigenem Fortschritt.
+ * Schaden-Anhängen (LFH-21). Kein Knopf mit `fetch`: der Browser lädt selbst, mit
+ * Sitzungs-Cookie, ETag und eigenem Fortschritt.
  */
 export default function DownloadAnker({
   href,
@@ -61,9 +61,8 @@ export default function DownloadAnker({
   zugaenglicherName,
 }: Props) {
   const { token, rollen } = useRollen();
-  // Das `aria-label` ersetzt den Inhalt im zugänglichen Namen; die Zusatzzeile (wer, wann)
-  // bleibt über `aria-describedby` erreichbar (Review C2). Ohne `aria-label` steht sie ohnehin
-  // im Namen — eine Beschreibung dazu wäre doppelt.
+  // Das `aria-label` ersetzt den Inhalt im zugänglichen Namen; die Zusatzzeile (wer, wann) bleibt
+  // über `aria-describedby` erreichbar. Ohne `aria-label` steht sie ohnehin im Namen.
   const zusatzId = useId();
   const beschrieben = zugaenglicherName != null && zusatz != null;
   return (

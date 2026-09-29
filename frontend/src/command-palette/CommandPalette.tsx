@@ -1,4 +1,3 @@
-// frontend/src/command-palette/CommandPalette.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Button, Modal, Input, theme, type InputRef } from 'antd';
@@ -31,22 +30,20 @@ import { Vorschau } from './Vorschau';
 import { palettenZeilenStil, vorschauZielStil } from './zeilenStil';
 
 /**
- * Frist der Meldung nach aussen. Wert und Bauform wörtlich aus `etb/EtbFilterleiste.tsx`
- * (Befund M80) — ein zweiter Entprellungsmechanismus wäre eine zweite Wahrheit.
+ * Frist der Meldung nach außen, Wert und Bauform wie in `etb/EtbFilterleiste.tsx`; ein zweiter
+ * Entprellungsmechanismus wäre eine zweite Wahrheit.
  */
 const ENTPRELLUNG_MS = 300;
 
 /**
- * Maß der Sprungpalette nach dem Neuentwurf (S2-Overlay): 640 breit, 120 px von oben, Kopf
- * 52 px. Layoutmaße, keine Trefflächen — die Zeilen tragen ihren Boden über
- * `palettenZeilenStil` aus der Dichte-Staffel.
+ * Maß der Sprungpalette: 640 breit, 120 px von oben, Kopf 52 px. Layoutmaße, keine Trefflächen;
+ * die Zeilen tragen ihren Boden über `palettenZeilenStil` aus der Dichte-Staffel.
  */
 const PALETTE = { breite: 640, oben: 120, kopf: 52 } as const;
 
 /**
- * Die abgedunkelte Maske hinter der Palette (Entwurf: `rgba(5,6,8,.72)`). Kein Rollenwert:
- * sie ist in beiden Modi dieselbe Abdunkelung — die Palette ist ein Fokusmoment, kein
- * Farbträger. Deshalb hier als Wert und nicht als Farbrolle in `theme/`.
+ * Die abgedunkelte Maske hinter der Palette. Kein Rollenwert: in beiden Modi dieselbe
+ * Abdunkelung, die Palette ist ein Fokusmoment, kein Farbträger.
  */
 const MASKE = 'rgba(5, 6, 8, 0.72)';
 
@@ -55,18 +52,16 @@ const MASKE = 'rgba(5, 6, 8, 0.72)';
 const KEINE_TREFFER: Treffer[] = [];
 
 /**
- * Das Kürzel „neuer Tab" als Marke — dieselbe Schreibweise wie das Speichern-Kürzel in
- * `TASTATUR_AKTIONEN` („⌘ ↵" / „Strg + ↵"), damit ein Kürzel nicht zweimal verschieden
- * aussieht.
+ * Das Kürzel „neuer Tab“ als Marke, in derselben Schreibweise wie das Speichern-Kürzel in
+ * `TASTATUR_AKTIONEN`.
  */
 function neuerTabKuerzel(userAgent: string): string {
   return istApplePlattform(userAgent) ? '⌘ ↵' : 'Strg + ↵';
 }
 
 /**
- * Strg/⌘+↵ (LFH-645). Beide Modifier gelten auf JEDER Plattform: Strg+↵ auf dem Mac ist
- * keine andere Bedienung, die man abfangen müsste, und `tastaturAktionFuerEreignis` liest
- * `speichern` genauso aus beiden. Shift/Alt bleiben ausgenommen — ⇧↵ ist bewusst frei.
+ * Strg/⌘+↵. Beide Modifier gelten auf JEDER Plattform, wie beim Speichern-Kürzel. Shift/Alt
+ * bleiben ausgenommen, ⇧↵ ist bewusst frei.
  */
 function istNeuerTabTaste(e: {
   key: string;
@@ -79,9 +74,8 @@ function istNeuerTabTaste(e: {
 }
 
 /**
- * Sichtbar versteckt (Screenreader-only). Die Live-Region der Palette steht immer im Baum;
- * die Ansage „Vorschau: …" braucht sie, aber nicht als zweite sichtbare Überschrift über
- * der Vorschau, die ihren Namen schon im Kopf trägt.
+ * Screenreader-only. Die Live-Region steht immer im Baum; die Ansage „Vorschau: …“ braucht sie,
+ * aber nicht als zweite sichtbare Überschrift.
  */
 const NUR_VORLESEN = {
   position: 'absolute',
@@ -95,36 +89,27 @@ const NUR_VORLESEN = {
 interface Props {
   befehle: Befehl[];
   /**
-   * Datensatz-Treffer als FERTIGE `Treffer`, nicht als `Befehl` (LFH-391 · C3).
-   *
-   * Sie tragen ihre `stufe` selbst — die Achse, auf der ein exakter Nummerntreffer vor
-   * Fuzzy-Rauschen steht. Aus einem Label ist sie nicht zurückzurechnen („Personen · R-042 ·
-   * Müller" liefert für '42' Stufe 3), ein Umweg über die `befehle`-Prop verlöre sie also
-   * still. Sie gehen deshalb auch NICHT durch `filtereBefehle`: der ETB-Volltext ist
-   * serverseitig entschieden, seine Fundstelle steht regelmässig in `veranlassung` und damit
-   * gar nicht im Label — Fuse würfe einen bestätigten Treffer weg.
+   * Datensatz-Treffer als FERTIGE `Treffer`, nicht als `Befehl`: sie tragen ihre `stufe` selbst
+   * (ein exakter Nummerntreffer vor Fuzzy-Rauschen), die aus dem Label nicht zurückzurechnen ist.
+   * Sie gehen auch NICHT durch `filtereBefehle`: der ETB-Volltext ist serverseitig entschieden,
+   * seine Fundstelle steht oft nicht im Label.
    */
   datensatzTreffer?: Treffer[];
   /**
-   * Meldet Modus und Rest ENTPRELLT nach oben. Das Paar, nicht die rohe Eingabe: das Präfix
-   * wird an genau einer Stelle zerlegt, ein zweiter Parser im Aufrufer wäre eine zweite
-   * Wahrheit darüber, was „der Suchbegriff" ist.
+   * Meldet Modus und Rest ENTPRELLT nach oben. Das Paar statt der rohen Eingabe: das Präfix wird an
+   * genau einer Stelle zerlegt.
    */
   onSucheEntprellt?: (modus: PaletteModus, rest: string) => void;
   /**
-   * Koordinatensprung (LFH-619): liefert für den LEBENDEN Rest die Zeile „Auf Lagekarte
-   * zeigen", wenn er die Form einer Koordinate hat — sonst `null`.
-   *
-   * Eine Funktion und keine fertige Zeile, weil der entprellte Stand der Eingabe um bis zu
-   * 300 ms hinterherhinkt: nach dem Löschen einer Ziffer stünde sonst noch ein Punkt da, den
-   * niemand mehr meint. Fehlt die Prop (ausserhalb eines Einsatzes), gibt es weder Zeile
-   * noch Fußhinweis.
+   * Koordinatensprung: liefert für den LEBENDEN Rest die Zeile „Auf Lagekarte zeigen“, wenn er die
+   * Form einer Koordinate hat, sonst `null`. Eine Funktion statt einer fertigen Zeile, weil der
+   * entprellte Stand bis zu 300 ms hinterherhinkt. Ohne Prop (außerhalb eines Einsatzes) weder
+   * Zeile noch Fußhinweis.
    */
   koordinatenSprung?: (rest: string) => Befehl | null;
   /**
-   * Kann es hier eine Vorschau geben (LFH-645)? Nur im Einsatz — ausserhalb gibt es keine
-   * Datensätze. Steuert allein den FUSSHINWEIS; ob eine Zeile eine Vorschau hat, sagt die
-   * Zeile selbst (`Befehl.vorschau`) und ihr Vorschau-Ziel (LFH-665).
+   * Kann es hier eine Vorschau geben? Nur im Einsatz. Steuert allein den FUSSHINWEIS; ob eine Zeile
+   * eine Vorschau hat, sagt `Befehl.vorschau`.
    */
   vorschauVerfuegbar?: boolean;
   /** Für die Plattformweiche des Kürzels; Vorgabe `navigator.userAgent`. */
@@ -146,20 +131,15 @@ export function CommandPalette({
   const farben = useModusFarben();
   const [suche, setSuche] = useState('');
   /**
-   * Die Auswahl hängt an der BEFEHLS-ID, nicht am Listenindex (LFH-391 · C3).
-   *
-   * Datensatz-Treffer treffen asynchron ein (300 ms Entprellung plus Netz) und stehen als
-   * Nummerntreffer auf Stufe 0 vor jedem Modultreffer — die markierte Zeile rückt unter dem
-   * Cursor nach unten. Mit einem Index markierte die Palette danach eine andere Zeile, ohne
-   * dass jemand etwas gedrückt hat: derselbe Vertrag wie „Live-Updates springen nicht unter
-   * dem Cursor" (WCAG 3.2.5).
+   * Die Auswahl hängt an der BEFEHLS-ID, nicht am Listenindex: Datensatz-Treffer treffen
+   * asynchron ein und stehen oft vor der markierten Zeile; mit einem Index spränge die Markierung
+   * ohne Zutun auf eine andere Zeile (WCAG 3.2.5).
    */
   const [aktivId, setAktivId] = useState<string | null>(null);
   /**
-   * Die offene Vorschau (LFH-645, Taste →) — als BEFEHL, nicht als Id: treffen während der
-   * offenen Vorschau neue Datensatztreffer ein, darf die gezeigte Person nicht verschwinden,
-   * nur weil ihre Zeile aus `flach` gefallen ist. `suche` und `aktivId` bleiben unberührt,
-   * damit der Rückweg Begriff und Markierung wiederfindet.
+   * Die offene Vorschau (Taste →), als BEFEHL statt Id: treffen neue Datensatztreffer ein, darf die
+   * gezeigte Person nicht verschwinden. `suche` und `aktivId` bleiben unberührt, damit der Rückweg
+   * Begriff und Markierung wiederfindet.
    */
   const [vorschau, setVorschau] = useState<Befehl | null>(null);
   const listeRef = useRef<HTMLDivElement>(null);
@@ -171,33 +151,24 @@ export function CommandPalette({
   }, []);
 
   /**
-   * Präfixmodus (LFH-391 · A4): das Zeichen am Anfang schränkt auf Befehlsgruppen ein, der
-   * Rest ist der eigentliche Suchbegriff. Beides sind Primitive — die `useMemo` darunter
-   * hängen damit an Werten statt an einer je Anschlag neuen Objektidentität.
-   *
-   * DIE EINZIGE Aufrufstelle des Parsers. Der Modus greift VOR dem Fuzzy-Filter: Fuse
-   * bewertete sonst Befehle mit, die der Modus ohnehin verwirft.
+   * Präfixmodus: das Zeichen am Anfang schränkt auf Befehlsgruppen ein, der Rest ist der
+   * Suchbegriff. Beides Primitive, damit die `useMemo` darunter an Werten hängen. DIE EINZIGE
+   * Aufrufstelle des Parsers; der Modus greift VOR dem Fuzzy-Filter.
    */
   const { modus, rest } = useMemo(() => parsePraefix(suche), [suche]);
   const gefiltertNachModus = useMemo(() => filtereNachModus(befehle, modus), [befehle, modus]);
 
-  // Die Ordnungsgruppe `zuletzt` fällt weg, SOBALD gesucht wird — sonst stünden ihre
-  // Einträge flach neben ihren label-gleichen Modul-Zwillingen. Vor `filtereBefehle`, damit
-  // Fuse nicht über Befehle bewertet, die ohnehin niemand sieht.
+  // Die Ordnungsgruppe `zuletzt` fällt weg, SOBALD gesucht wird, sonst stünden ihre Einträge neben
+  // ihren label-gleichen Modul-Zwillingen. Vor `filtereBefehle`, damit Fuse sie nicht bewertet.
   const imModus = useMemo(
     () => (rest === '' ? gefiltertNachModus : ohneOrdnungsdubletten(gefiltertNachModus)),
     [gefiltertNachModus, rest],
   );
 
   /**
-   * Die anstehenden Datensatz-Treffer gegen den LEBENDEN Stand geprüft, nicht gegen den, aus
-   * dem sie gebaut wurden (Review-Befunde 4, 5 und 6 zu Etappe C).
-   *
-   * Der Riegel gehört hierher, weil nur die Palette den ungefilterten Eingabestand kennt: der
-   * Hook darunter arbeitet auf dem ENTPRELLTEN Paar und liefert zusätzlich aus dem warmen
-   * Cache weiter, wenn seine Queries längst abgeschaltet sind. Beide Wege sind gemessen —
-   * Begründung und Bedingung stehen an `sichtbareDatensaetze`, damit Abruf und Anzeige nicht
-   * zwei Meinungen darüber haben, was gerade gefragt ist.
+   * Die anstehenden Datensatz-Treffer gegen den LEBENDEN Stand geprüft: nur die Palette kennt den
+   * ungefilterten Eingabestand, der Hook arbeitet entprellt und liefert aus dem warmen Cache weiter.
+   * Bedingung und Begründung an `sichtbareDatensaetze`.
    */
   const anstehendeDatensaetze = useMemo(
     () => sichtbareDatensaetze(datensatzTreffer, modus, rest),
@@ -205,14 +176,12 @@ export function CommandPalette({
   );
 
   /**
-   * Die Kartenzeile nur im Vorgabemodus: hinter einem Präfix ist die Eingabe eine Suche in
-   * einer bestimmten Menge (ETB, Kräfte, Aktionen), kein Ort.
+   * Die Kartenzeile nur im Vorgabemodus: hinter einem Präfix ist die Eingabe eine Suche in einer
+   * Menge, kein Ort.
    *
-   * Stufe 0, aber ein Score HINTER jedem anderen Stufe-0-Treffer (Review-Befund zu LFH-619):
-   * steht ein Datensatz oder Befehl da, dessen Name oder Nummer die Eingabe genau trifft,
-   * meint die Eingabe ihn. Vor allem Übrigen steht die Kartenzeile und ist dann
-   * vorausgewählt — ein Enter, und die Karte fliegt hin. `UNBEWERTET + 1` ist strikt
-   * schlechter als jeder Fuse-Score und als jeder unbewertete Datensatztreffer.
+   * Stufe 0, aber hinter jedem anderen Stufe-0-Treffer (`UNBEWERTET + 1`): trifft ein Name oder
+   * eine Nummer die Eingabe genau, ist der gemeint; vorn wäre die Kartenzeile vorausgewählt und
+   * ein Enter flöge die Karte hin.
    */
   const koordinate = useMemo<Treffer | null>(() => {
     if (modus !== 'alles' || !koordinatenSprung) return null;
@@ -222,31 +191,19 @@ export function CommandPalette({
 
   const treffer = useMemo(() => {
     const statisch = filtereBefehle(imModus, rest);
-    // Bei LEERER Suche bleiben die Datensatz-Treffer draussen, und das ist kein Sonderfall
-    // ohne Fall: der entprellte Rest hinkt der Eingabe um bis zu 300 ms hinterher. Wer das
-    // Feld leert, sieht sofort wieder die Startansicht — die Treffer des vorigen Begriffs
-    // stehen dann noch an und erschienen im Gruppenzweig als „Datensätze"-Gruppe. Die
-    // Startansicht ist per Vertrag kuratiert (LFH-337 · M11), nicht eine Datenhalde.
-    // (Der Riegel darüber deckt diesen Fall mit ab — die Zeile bleibt trotzdem stehen: sie
-    // trennt die zwei RENDERZWEIGE, nicht die Trefferquelle.)
+    // Bei LEERER Suche bleiben die Datensatz-Treffer draußen: der entprellte Rest hinkt nach, und
+    // die Treffer des vorigen Begriffs erschienen sonst in der kuratierten Startansicht. Die Zeile
+    // trennt die zwei Renderzweige.
     if (rest === '') return statisch;
     return [...(koordinate ? [koordinate] : []), ...statisch, ...anstehendeDatensaetze];
   }, [imModus, rest, anstehendeDatensaetze, koordinate]);
   /**
-   * Zwei Zustände, zwei Ordnungen (LFH-391 · A3):
-   *
-   * Bei LEERER Suche gilt die kuratierte Startansicht aus LFH-337 · M11 —
-   * `GRUPPEN_REIHENFOLGE` mit Überschriften, „das Nützlichste zuerst".
-   *
-   * Bei AKTIVER Suche ordnet die Bewertung, flach und gruppenübergreifend. Die Gruppenachse
-   * zerstörte hier die Trefferordnung: gemessen an fuse.js 7.5.0 stand für 'etb' die
-   * Schnellaktion „Neue Person erfassen" (Score 5.77e-1, reines Rauschen) vor dem genauen
-   * Modultreffer (8.60e-9), weil `schnellaktionen` vor `module` steht. Und eine
-   * Gruppenüberschrift über einer score-sortierten Liste behauptete eine Ordnung, die es
-   * dann nicht mehr gibt.
+   * Zwei Zustände, zwei Ordnungen: bei LEERER Suche die kuratierte Startansicht
+   * (`GRUPPEN_REIHENFOLGE` mit Überschriften), bei AKTIVER Suche flach nach Bewertung. Die
+   * Gruppenachse zerstörte dort die Trefferordnung (Fuse-Rauschen einer Schnellaktion vor dem
+   * genauen Modultreffer), und eine Überschrift behauptete eine Ordnung, die es nicht gibt.
    */
-  // Massgeblich ist der REST, nicht die rohe Eingabe: ein nacktes '>' schränkt ein, sucht
-  // aber nicht — dort gilt weiterhin die kuratierte Startansicht, nur mit weniger Gruppen.
+  // Maßgeblich ist der REST: ein nacktes '>' schränkt ein, sucht aber nicht.
   const sucheAktiv = rest !== '';
 
   const gruppen = useMemo(
@@ -259,15 +216,14 @@ export function CommandPalette({
           })).filter((x) => x.items.length > 0),
     [treffer, sucheAktiv],
   );
-  // EINZIGE Indexquelle für beide Zweige: `indexVon`, `aria-activedescendant`,
-  // `aria-expanded`, der Leerzustand und `aufTaste` lesen ausschliesslich von hier.
+  // EINZIGE Indexquelle für beide Zweige: `indexVon`, `aria-activedescendant`, `aria-expanded`,
+  // der Leerzustand und `aufTaste` lesen nur von hier.
   const flach = useMemo(
     () => (sucheAktiv ? ordneTreffer(treffer, rest) : gruppen.flatMap((x) => x.items)),
     [sucheAktiv, treffer, rest, gruppen],
   );
   const indexVon = useMemo(() => new Map(flach.map((b, i) => [b.id, i])), [flach]);
-  // Fällt der markierte Befehl aus der Liste (neuer Begriff, fremde Änderung), gilt wieder
-  // die erste Zeile — `findIndex` liefert dann -1, und -1 wäre `flach[-1] === undefined`.
+  // Fällt der markierte Befehl aus der Liste, gilt wieder die erste Zeile (`findIndex` liefert -1).
   const gefunden = aktivId === null ? -1 : flach.findIndex((b) => b.id === aktivId);
   const aktiv = gefunden >= 0 ? gefunden : 0;
 
@@ -276,19 +232,12 @@ export function CommandPalette({
   }, [suche]);
 
   /**
-   * Die Meldung nach aussen wartet, die sichtbare Liste nicht (LFH-391 · C3).
+   * Die Meldung nach außen wartet, die sichtbare Liste nicht: Text und Fuzzy-Filter über die
+   * statischen Befehle reagieren SOFORT, nur die Datenbeschaffung wartet.
    *
-   * Nur an dieser Stelle sind die zwei Achsen unterscheidbar: der getippte Text und der
-   * Fuzzy-Filter über die ~42 statischen Befehle kosten nichts und müssen SOFORT reagieren
-   * — hinge die Anzeige an der Frist, sähe die Bedienung aus wie ein hängendes Feld. Nur
-   * die Datenbeschaffung wartet; ein Wort tippen erzeugt damit EINEN Abruf-Stoss, nicht
-   * fünf.
-   *
-   * `clearTimeout` im Abbau (Bauform `EtbFilterleiste.tsx`): die Palette wird beim
-   * Schliessen abgehängt, ein Nachläufer meldete danach in einen geräumten Baum.
-   * `onSucheEntprellt` steht bewusst NICHT in den Dependencies — ein je Render frisch
-   * gebauter Callback des Aufrufers setzte die Frist sonst bei jedem Render zurück, und
-   * die Meldung ginge nie hinaus.
+   * `clearTimeout` im Abbau: die Palette wird beim Schließen abgehängt. `onSucheEntprellt` steht
+   * bewusst NICHT in den Dependencies (Ref): ein je Render neuer Callback setzte die Frist sonst
+   * immer zurück, die Meldung ginge nie hinaus.
    */
   const meldeRef = useRef(onSucheEntprellt);
   meldeRef.current = onSucheEntprellt;
@@ -297,10 +246,8 @@ export function CommandPalette({
     return () => clearTimeout(frist);
   }, [modus, rest]);
 
-  // aktiven Eintrag in den Sichtbereich scrollen — auch nach der Rückkehr aus der Vorschau
-  // (LFH-645, Review-Befund): die Liste hängt dort aus und kommt mit `scrollTop` 0 zurück,
-  // `aktiv` ändert sich beim Rückweg aber nicht. Ohne `vorschau` in der Liste stünde die
-  // Markierung auf Platz 8 in der Handschuh-Stufe ausserhalb des Blicks.
+  // Aktiven Eintrag in den Sichtbereich scrollen, auch nach der Rückkehr aus der Vorschau: die
+  // Liste kommt mit `scrollTop` 0 zurück, `aktiv` ändert sich dabei aber nicht.
   useEffect(() => {
     const el = listeRef.current?.querySelector('[aria-selected="true"]');
     if (el instanceof HTMLElement && typeof el.scrollIntoView === 'function') {
@@ -315,9 +262,8 @@ export function CommandPalette({
   }
 
   /**
-   * Strg/⌘+↵ und Strg/⌘+Klick (LFH-645): NUR eine Zeile mit `ziel` bekommt `'neuerTab'`. Ohne
-   * Ziel geschieht nichts — kein Rückfall auf ↵: ein Modifier, der still die Grundaktion
-   * auslöst, lügt, und auf „Speichern" hiesse das speichern.
+   * Strg/⌘+↵ und Strg/⌘+Klick: NUR eine Zeile mit `ziel` bekommt `'neuerTab'`. Ohne Ziel
+   * geschieht nichts, kein Rückfall auf ↵ (auf „Speichern“ hieße das speichern).
    */
   function oeffneImNeuenTab(b: Befehl | undefined) {
     if (!b?.ziel) return;
@@ -326,11 +272,9 @@ export function CommandPalette({
   }
 
   /**
-   * Das Tippziel (LFH-665): derselbe Zustand wie nach →. Im Normalfall steht der Fokus schon
-   * im Suchfeld (`mousedown` am Ziel ist abgefangen), dann ist `focus()` wirkungslos. Stand er
-   * woanders, holt `focus()` ihn zurück, weil ↵ (öffnen) und Esc/← (zurück) nur von dort bzw.
-   * aus der Palette heraus wirken. Der Preis ist benannt: auf einem Tablet, dessen
-   * Bildschirmtastatur ausgeblendet war, kann sie dabei erscheinen. Die Tastaturwege gehen vor.
+   * Das Tippziel: derselbe Zustand wie nach →. `focus()` holt den Fokus ins Suchfeld zurück, falls
+   * er woanders stand, weil ↵ und Esc/← von dort wirken. Auf einem Tablet kann dabei die
+   * Bildschirmtastatur erscheinen; die Tastaturwege gehen vor.
    */
   function oeffneVorschau(b: Befehl) {
     setVorschau(b);
@@ -343,11 +287,9 @@ export function CommandPalette({
   }
 
   /**
-   * Esc/← aus der Vorschau, an der WURZEL der Palette (LFH-645, Review-Befund): am Suchfeld
-   * allein sah die Taste nur, wer dort stand — mit Fokus auf „Zurück" (ein Tab weiter) kam
-   * Esc allein beim globalen Dispatcher an, und der schloss die GANZE Palette. Hier bubbelt
-   * jeder fokussierte Nachfahre durch. `preventDefault` ist tragend: ohne es liest der
-   * Dispatcher auf `window` dieselbe Taste als `verwerfen` (über den Provider gemessen).
+   * Esc/← aus der Vorschau, an der WURZEL der Palette: mit Fokus auf „Zurück“ käme Esc sonst allein
+   * beim globalen Dispatcher an, der die ganze Palette schlösse. `preventDefault` ist tragend, sonst
+   * liest der Dispatcher dieselbe Taste als `verwerfen`.
    */
   function aufWurzelTaste(e: KeyboardEvent<HTMLDivElement>) {
     if (!vorschau || e.defaultPrevented || e.nativeEvent.isComposing) return;
@@ -360,9 +302,8 @@ export function CommandPalette({
   function aufTaste(e: KeyboardEvent<HTMLInputElement>) {
     if (e.nativeEvent.isComposing) return;
     // Strg/⌘+↵ gehört der Palette. Ohne Ziel geschieht NICHTS, und das braucht kein
-    // `preventDefault`: der globale Dispatcher schluckt Mutationstasten bei offener Palette
-    // selbst (`offen`-Zweig in `CommandPaletteProvider`) — gemessen, die Seite darunter
-    // speichert auch ohne Abfangen hier nicht.
+    // `preventDefault`: der globale Dispatcher schluckt Mutationstasten bei offener Palette selbst
+    // (`CommandPaletteProvider`).
     if (istNeuerTabTaste(e)) {
       const b = vorschau ?? flach[aktiv];
       if (b?.ziel) {
@@ -372,10 +313,8 @@ export function CommandPalette({
       return;
     }
     if (vorschau) {
-      // In der Vorschau gibt es keine Liste: ↵ öffnet, Pfeil hoch/runter verschieben nichts,
-      // was man nicht sieht. Esc/← behandelt die WURZEL (`aufWurzelTaste`) — sie gelten auch,
-      // wenn der Fokus auf „Zurück" steht. Alle übrigen Tasten gehen ans Feld, und eine
-      // Änderung am Begriff verlässt die Vorschau (`onChange`).
+      // In der Vorschau gibt es keine Liste: ↵ öffnet, Pfeile verschieben nichts. Esc/← behandelt die
+      // WURZEL (`aufWurzelTaste`); eine Änderung am Begriff verlässt die Vorschau (`onChange`).
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
       } else if (e.key === 'Enter' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
@@ -385,8 +324,7 @@ export function CommandPalette({
       return;
     }
     if (e.key === 'ArrowRight') {
-      // Nur am TEXTENDE und ohne Auswahl (Bauform: Autovorschlag der fish-Shell) — mitten im
-      // Wort bleibt → die Cursortaste, die es im Suchfeld immer war.
+      // Nur am TEXTENDE und ohne Auswahl; mitten im Wort bleibt → die Cursortaste.
       const feld = e.currentTarget;
       const b = flach[aktiv];
       const amEnde =
@@ -415,22 +353,16 @@ export function CommandPalette({
     alignItems: 'center',
     gap: token.marginXS,
   } as const;
-  // Gilt für JEDEN Modus, der Datensätze durchsucht — auch für den Vorgabemodus: dort ist
-  // die Liste bei einem Zeichen nur selten leer, aber wenn sie es ist, fehlt genau dieses
-  // eine Zeichen.
-  //
-  // AB DEM PRÄFIX, nicht erst ab dem ersten Zeichen dahinter (Review-Befund 8): wer '@' aus
-  // der Legende übernimmt, las sofort „Keine Treffer" — eine Aussage über eine Suche, die er
-  // noch gar nicht gestellt hat. Im präfixlosen Vorgabemodus bleibt die leere Eingabe
-  // dagegen die kuratierte Startansicht und keine zu kurze Suche; dort ist „Keine Treffer"
-  // die richtige Auskunft.
+  // Gilt für JEDEN Modus, der Datensätze durchsucht, auch für den Vorgabemodus. Ab dem PRÄFIX, nicht
+  // erst ab dem Zeichen dahinter: wer '@' tippt, soll nicht „Keine Treffer“ lesen. Im präfixlosen
+  // Vorgabemodus bleibt die leere Eingabe die Startansicht.
   const zuKurzFuerDatensaetze =
     rest.length < DATENSATZ_MINDESTZEICHEN &&
     modusZeigtDatensaetze(modus) &&
     (rest.length > 0 || PALETTE_MODI[modus].praefix !== null);
   /**
-   * Der Wortlaut des Leerzustands — als WERT, nicht als Zweig im JSX: die Region darunter
-   * steht dauerhaft, nur ihr Inhalt wechselt (siehe dort).
+   * Der Wortlaut des Leerzustands als WERT, nicht als Zweig im JSX: die Region darunter steht
+   * dauerhaft, nur ihr Inhalt wechselt.
    */
   const leerText =
     flach.length > 0
@@ -440,9 +372,8 @@ export function CommandPalette({
         : 'Keine Treffer';
 
   /**
-   * EINE Zeile für BEIDE Zweige (LFH-391 · A3). Zwei Kopien wären zwei Orte, an denen der
-   * Bedienziel-Boden aus LFH-365 still verlorengehen kann — ein Inline-Padding sieht kein
-   * Guard. Der Boden selbst kommt aus `palettenZeilenStil`, siehe dort.
+   * EINE Zeile für BEIDE Zweige, sonst wären es zwei Orte, an denen der Bedienziel-Boden still
+   * verlorengehen kann. Der Boden kommt aus `palettenZeilenStil`.
    */
   function optionsZeile(b: Befehl) {
     const i = indexVon.get(b.id)!;
@@ -461,9 +392,8 @@ export function CommandPalette({
         onClick={(e: MouseEvent) => (e.ctrlKey || e.metaKey ? oeffneImNeuenTab(b) : fuehreAus(b))}
         style={{
           ...palettenZeilenStil(token),
-          // Aktive Zeile (Neuentwurf): Grund `flaeche3`, Ikone in Bedienfarbe. Der Text
-          // bleibt `text` — die Auswahl trägt die Fläche plus `aria-selected`, nicht eine
-          // eingefärbte Schrift.
+          // Aktive Zeile: Grund `flaeche3`, Ikone in Bedienfarbe. Der Text bleibt `text`; die Auswahl
+          // trägt die Fläche plus `aria-selected`.
           background: istAktiv ? farben.flaeche3 : 'transparent',
           color: token.colorText,
         }}
@@ -491,28 +421,21 @@ export function CommandPalette({
           </span>
         )}
         {b.kuerzel && <Tastenkuerzel>{b.kuerzel}</Tastenkuerzel>}
-        {/* Die Enter-Marke steht NUR an der aktiven Zeile (Entwurf): sie sagt, was Enter
-            gerade auslöst. Satz, kein Ziel — `aria-hidden`, der Weg steht in der Fußzeile. */}
+        {/* Die Enter-Marke steht NUR an der aktiven Zeile: sie sagt, was Enter gerade auslöst.
+            Satz, kein Ziel, deshalb `aria-hidden`. */}
         {istAktiv && !b.kuerzel && (
           <Tastenkuerzel aria-hidden style={{ color: farben.schwach }}>
             ↵
           </Tastenkuerzel>
         )}
         {/*
-         * DAS VORSCHAU-ZIEL (LFH-665) ist die zeilengenaue Aussage „hier gibt es eine
-         * Vorschau" und zugleich der Weg hinein für Finger und Maus. Es ersetzt die frühere
-         * →-Marke aus LFH-645 — zwei Pfeile nebeneinander sagten dasselbe zweimal.
+         * DAS VORSCHAU-ZIEL: die zeilengenaue Aussage „hier gibt es eine Vorschau“ und der Weg hinein
+         * für Finger und Maus, an JEDER Zeile mit Vorschau (Touch kennt kein Hover).
          *
-         * An JEDER Zeile mit Vorschau, nicht nur an der markierten: auf Touch gibt es kein
-         * Hover, und ein Ziel, das erst nach dem Zeigen erschiene, sähe niemand vor dem Tipp.
-         * Die markierte Zeile färbt es in Bedienfarbe wie ihre Ikone — dort öffnet auch →.
-         *
-         * KEIN `Button`: ein fokussierbarer Knopf zöge beim Klick den Fokus aus der Combobox,
-         * ↵ und Esc gingen danach ins Leere. Deshalb ein handgebautes Ziel (Boden aus
-         * `vorschauZielStil`), `mousedown` abgefangen, und `aria-hidden`: die Kinder einer
-         * Option sind ohnehin präsentational, und der zugängliche Weg ist →. Der Klick endet
-         * hier (`stopPropagation`) und öffnet nie zugleich den Datensatz — auch nicht mit
-         * Strg/⌘, das Ziel hat nur diese eine Bedeutung.
+         * KEIN `Button`: ein fokussierbarer Knopf zöge beim Klick den Fokus aus der Combobox, ↵ und
+         * Esc gingen danach ins Leere. Deshalb ein handgebautes Ziel (Boden aus `vorschauZielStil`),
+         * `mousedown` abgefangen und `aria-hidden` (der zugängliche Weg ist →). Der Klick endet hier
+         * (`stopPropagation`) und öffnet nie zugleich den Datensatz, auch nicht mit Strg/⌘.
          */}
         {b.vorschau && (
           <span
@@ -548,8 +471,8 @@ export function CommandPalette({
       style={{ top: PALETTE.oben }}
       styles={{
         mask: { background: MASKE },
-        // Rahmen in Bedienfarbe, keine Rundung (Entwurf). `colorBgElevated` ist `flaeche2`
-        // des Modus — die Palette folgt dem Farbschema, nur Kopf und Rail sind modusfest.
+        // Rahmen in Bedienfarbe, keine Rundung. `colorBgElevated` ist `flaeche2` des Modus; nur Kopf
+        // und Rail sind modusfest.
         container: {
           padding: 0,
           borderRadius: 0,
@@ -560,8 +483,8 @@ export function CommandPalette({
       }}
       destroyOnHidden
     >
-      {/* Kein Bedienziel und kein eigener Tab-Stopp — nur die Stelle, an der Esc/← aus der
-          Vorschau jeden fokussierten Nachfahren erreichen. */}
+      {/* Kein Bedienziel und kein Tab-Stopp: nur die Stelle, an der Esc/← aus der Vorschau jeden
+          fokussierten Nachfahren erreichen. */}
       <div onKeyDown={aufWurzelTaste}>
         <div
           style={{
@@ -580,18 +503,17 @@ export function CommandPalette({
             ref={inputRef}
             autoFocus
             variant="borderless"
-            // Der Platzhalter bleibt BYTE-GLEICH: sechs e2e-Locator greifen das Feld darüber,
-            // einer davon als zugänglichen Namen der Combobox (`gate1-ueberlauf.spec.ts`).
+            // Der Platzhalter bleibt BYTE-GLEICH: e2e-Locator greifen das Feld darüber, einer als
+            // zugänglichen Namen der Combobox (`gate1-ueberlauf.spec.ts`).
             placeholder="Suchen: Module, Aktionen, Einstellungen …"
             role="combobox"
-            // In der Vorschau steht keine Listbox im Baum (LFH-645): kein `aria-controls`
-            // ins Leere, keine aktive Option, die es nicht gibt.
+            // In der Vorschau steht keine Listbox im Baum: kein `aria-controls` ins Leere.
             aria-expanded={!vorschau && flach.length > 0}
             aria-controls={vorschau ? undefined : 'cmd-liste'}
             aria-activedescendant={!vorschau && aktiverId ? `cmd-${aktiverId}` : undefined}
             value={suche}
             onChange={(e) => {
-              // Ein geänderter Begriff ist eine neue Suche — die Vorschau gehört zur alten.
+              // Ein geänderter Begriff ist eine neue Suche; die Vorschau gehört zur alten.
               setVorschau(null);
               setSuche(e.target.value);
             }}
@@ -603,15 +525,10 @@ export function CommandPalette({
           </Tastenkuerzel>
         </div>
         {/*
-         * Die Modusanzeige (LFH-391 · A4): BIN ich im Modus? Solange ein Präfix steht,
-         * nennt sie ihn — ohne sie wäre ein Filter, der die Liste um zwei Drittel kürzt,
-         * von einem kaputten nicht zu unterscheiden. Die Legende „WIE komme ich hinein"
-         * steht seit dem Neuentwurf dauerhaft in der Fußzeile (unten), nicht mehr hier.
-         *
-         * Der Tastaturvertrag steht in Steuer- und Fußzeile und NICHT im Platzhalter
-         * (CLAUDE.md, Nacharbeit zu LFH-335).
-         *
-         * KEIN Bedienziel — Satz, kein Ziel, also kein `controlHeight`-Boden.
+         * Die Modusanzeige: solange ein Präfix steht, nennt sie ihn; ohne sie wäre ein Filter, der die
+         * Liste um zwei Drittel kürzt, von einem kaputten nicht zu unterscheiden. Die Legende steht in
+         * der Fußzeile. Der Tastaturvertrag steht in Steuer- und Fußzeile, NICHT im Platzhalter.
+         * Satz, kein Ziel, also kein `controlHeight`-Boden.
          */}
         {modus !== 'alles' && (
           <div
@@ -626,21 +543,12 @@ export function CommandPalette({
           </div>
         )}
         {vorschau?.vorschau ? (
-          /*
-           * DIE VORSCHAU (LFH-645, Taste →) ersetzt die Liste, statt neben ihr zu stehen:
-           * 640 px tragen Liste und Lese-Ansicht nicht nebeneinander. Der Fokus bleibt im
-           * Suchfeld — Esc/← führen von dort zurück, ↵ öffnet. Nur LESEN: die Vorschau
-           * verändert keinen Datensatz, sie ist dasselbe Bauteil wie der Personen-Drawer.
-           *
-           * „Zurück" ist ein antd-`Button` und erbt damit `controlHeight` — kein handgebautes
-           * Bedienziel, das die zwei Angaben aus LFH-365 schuldete.
-           */
-          // Ein VERWEIS in der Vorschau („↗ Auftrag" an einer Meldung) schließt die Palette
-          // (LFH-664). Die Navigation übernimmt der Link selbst — der Riegel lauscht in der
-          // Bubble-Phase, also NACH dessen `onClick`. Er sitzt am Container und nicht an jedem
-          // Link: so gilt er für jede Sorte, und die Karten der Fachmodule brauchen keine
-          // Palettenkenntnis. Ohne ihn wechselte die App unter der offenen Palette die Seite.
-          // Ein Modifier-Klick öffnet im neuen Tab und schließt ebenfalls — wie Strg/⌘+↵.
+          // DIE VORSCHAU (Taste →) ersetzt die Liste: 640 px tragen Liste und Lese-Ansicht nicht
+          // nebeneinander. Der Fokus bleibt im Suchfeld. Nur LESEN, dasselbe Bauteil wie der
+          // Personen-Drawer; „Zurück“ ist ein antd-`Button` und erbt `controlHeight`.
+          // Ein VERWEIS in der Vorschau schließt die Palette: der Riegel lauscht am Container in der
+          // Bubble-Phase, NACH dem `onClick` des Links, und gilt so für jede Sorte. Ohne ihn wechselte die
+          // App unter der offenen Palette die Seite. Ein Modifier-Klick schließt ebenfalls.
           <div
             role="region"
             aria-label={`Vorschau: ${vorschau.label}`}
@@ -684,9 +592,7 @@ export function CommandPalette({
             id="cmd-liste"
             role="listbox"
             ref={listeRef}
-            // `min(60vh, 480px)` statt der festen 380 (LFH-337 · M11): auf dem Fükw-Schirm
-            // zeigte der Kasten von 42+ Befehlen rund sieben. `60vh` deckelt ihn auf niedrigen
-            // Schirmen, wo 480 px über den Rand liefen.
+            // `min(60vh, 480px)`: zeigt am Fükw-Schirm genug Befehle, `60vh` deckelt auf niedrigen Schirmen.
             style={{
               maxHeight: 'min(60vh, 480px)',
               overflowY: 'auto',
@@ -711,17 +617,12 @@ export function CommandPalette({
           </div>
         )}
         {/*
-         * Zwei Leerzustände, nicht einer (LFH-391 · C3): wer '@a' tippt, sieht per
-         * Konstruktion nichts — die statischen Befehle sind vom Modus ausgefiltert, die
-         * Datensatz-Abrufe laufen erst ab zwei Zeichen. Ein stummes „Keine Treffer" wäre
-         * dort von „kaputt" nicht zu unterscheiden.
+         * Zwei Leerzustände: wer '@a' tippt, sieht per Konstruktion nichts (Datensatz-Abrufe laufen
+         * erst ab zwei Zeichen); ein stummes „Keine Treffer“ wäre dort von „kaputt“ nicht zu
+         * unterscheiden.
          *
-         * DIE REGION STEHT IMMER, auch wenn sie schweigt (Review-Befund 7): eine
-         * `aria-live`-Region meldet nur Änderungen an bereits vorhandenem Inhalt.
-         *
-         * AUSSERHALB der Listbox: deren Kinder sind Optionen und Gruppen.
-         *
-         * KEIN Bedienziel: Satz, kein Ziel, also kein `controlHeight`-Boden.
+         * DIE REGION STEHT IMMER, auch wenn sie schweigt: `aria-live` meldet nur Änderungen an bereits
+         * vorhandenem Inhalt. Außerhalb der Listbox (deren Kinder sind Optionen). Kein Bedienziel.
          */}
         <div
           data-lfh="palette-leerzustand"
@@ -732,24 +633,18 @@ export function CommandPalette({
               : { padding: leerText ? token.padding : 0, color: token.colorTextSecondary }
           }
         >
-          {/* In der Vorschau sagt dieselbe Region an, WO man ist — der Fokus bleibt im
-              Suchfeld, die neue Region allein hörte niemand. */}
+          {/* In der Vorschau sagt dieselbe Region an, WO man ist; der Fokus bleibt im Suchfeld. */}
           {vorschau ? `Vorschau: ${vorschau.label}. Escape führt zurück.` : leerText}
         </div>
         {/*
-         * FUSSZEILE (Neuentwurf): Mono 10, NUR Hinweise, die wirklich funktionieren — Enter
-         * öffnet, die drei Präfixe aus `PALETTE_MODI` (eine Quelle, kein zweiter Wortlaut)
-         * und, wo es einen Sprung gibt, die Koordinate (LFH-619). Der Entwurf zeigt sie als
-         * „# Koordinate"; `#` bleibt aber das ETB-Präfix — die Koordinate braucht kein
-         * Zeichen, sie wird an ihrer Form erkannt (`koordinatenSprung.ts`).
+         * FUSSZEILE: nur Hinweise, die wirklich funktionieren. Enter, die drei Präfixe aus
+         * `PALETTE_MODI` (eine Quelle) und, wo es einen Sprung gibt, die Koordinate (erkannt an ihrer
+         * Form, ohne Zeichen; `#` bleibt das ETB-Präfix). ⇧↵ ist frei: Strg/⌘+↵ öffnet im neuen Tab, →
+         * zeigt die Vorschau.
          *
-         * „⇧↵ im Panel" aus dem Entwurf ist ENTSCHIEDEN und entfallen (LFH-645, Raycast-
-         * Muster): Strg/⌘+↵ öffnet im neuen Tab, → zeigt die Vorschau IN der Palette, ⇧↵
-         * bleibt frei. Die Hinweise stehen STATISCH — „neuer Tab" gilt für fast jede Zeile,
-         * „→ Vorschau" nur im Einsatz (Muster Koordinate); ob eine Zeile eine Vorschau hat,
-         * sagt ihr Vorschau-Ziel (LFH-665). Ein je Zeile wechselnder Hinweis änderte die
-         * Zeilenzahl dieser umbrechenden Fußzeile und liesse die Palette beim Pfeilen springen.
-         * In der Vorschau gilt die Präfixlegende nicht; dort stehen die drei gültigen Wege.
+         * Die Hinweise stehen STATISCH: ein je Zeile wechselnder Hinweis änderte die Zeilenzahl der
+         * umbrechenden Fußzeile, die Palette spränge beim Pfeilen. In der Vorschau stehen die drei
+         * gültigen Wege.
          */}
         <div
           data-lfh="palette-fuss"
@@ -787,9 +682,8 @@ export function CommandPalette({
                 </span>
               )}
               {modiMitPraefix().map((m) => (
-                // Das Präfixzeichen als Marke, nicht als Satzzeichen im Fließtext: ein nacktes
-                // '>' hat weder Rahmen noch Abstand zum Nachbarn — JSX verschluckt den Umbruch
-                // zwischen zwei Elementen ersatzlos, deshalb die Flex-Zeile mit `gap`.
+                // Das Präfixzeichen als Marke: JSX verschluckt den Umbruch zwischen zwei Elementen, deshalb
+                // die Flex-Zeile mit `gap`.
                 <span key={m.modus} style={hinweisStil}>
                   <Tastenkuerzel>{m.praefix}</Tastenkuerzel>
                   {m.legende}

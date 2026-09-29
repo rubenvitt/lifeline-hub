@@ -3,80 +3,49 @@ import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS, NICHT_LIVE_KEYS } from './queryKey
 import { ENGE_ARTEN, scanneQueryKeys, type Fund } from './queryKeyScan';
 
 /**
- * Guard (LFH-122): erzwingt, dass das queryKeys-Registry die EINE Quelle für
- * einsatz-scoped Query-Keys bleibt und die Live-Anbindung explizit ist.
+ * Guard (LFH-122): das queryKeys-Registry bleibt die EINE Quelle für Query-Keys, und die
+ * Live-Anbindung ist explizit.
  *
  * (a) Kein Inline-Array-Literal mit einem managed oder Schatten-Prefix außerhalb von
- *     `queryKeys.ts` — jede Query nutzt `einsatzKeys.*`. Verhindert, dass eine neue Query still
- *     am Registry (und damit am SSE-Fan-out) vorbeigebaut wird.
- * (b) Jeder managed Key ist GENAU einmal klassifiziert: entweder live (invalidiert
- *     durch ein Wire-Event in EINSATZ_STREAM_EVENTS) oder bewusst NICHT_LIVE.
+ *     `queryKeys.ts`; jede Query nutzt die Factory.
+ * (b) Jeder managed Key ist GENAU einmal klassifiziert: live (EINSATZ_STREAM_EVENTS) oder
+ *     bewusst NICHT_LIVE.
  * (d) Das `befehl`-Wire-Event ist live angebunden.
- * (f) Jeder Inline-Query-Key außerhalb des Registry steht auf der Migrations-Allowlist.
+ * (f) Jeder Inline-Query-Key außerhalb des Registry steht auf der Allowlist (die leer ist).
  *
- * ERKENNUNG seit LFH-312: TS-AST statt zeilenlokaler Regex (siehe `queryKeyScan.ts`, dort auch
- * die Radius-Trennung WEIT/ENG). Mehrzeilige Literale sind damit sichtbar, Kommentare erzeugen
- * strukturell keinen Fehlalarm mehr, und der Quote-Stil ist irrelevant. Die
- * `istKommentarzeile`-Heuristik ist ersatzlos entfallen.
+ * Erkennung per TS-AST (`queryKeyScan.ts`, dort auch die Radien WEIT/ENG): mehrzeilige Literale
+ * sind sichtbar, Kommentare erzeugen keinen Fehlalarm, der Quote-Stil ist egal.
  *
- * VERHALTENSGLEICHHEIT der Umstellung wurde GEMESSEN, nicht behauptet: der weitere AST-Radius
- * fand im Bestand exakt dieselbe (leere) Verstoßmenge wie die alte Regex.
+ * ── WAS DIESER GUARD NICHT SIEHT ──
  *
- * Guard (c) ist in (a) aufgegangen (LFH-312), Guard (e) in (f) (LFH-307): (e) verbot EIN
- * bekanntes camelCase-Literal, (f) verbietet generisch jedes nicht registrierte Prefix und
- * deckt den Fall damit mit ab. Belegt per Mutationsprobe, nicht per Argument — `['orgModul-
- * Einstellungen']` in einer Produktionsdatei macht (f) rot.
+ *  1. MEHRSTUFIGE INDIREKTION. Erfasst wird EIN Schritt in DERSELBEN Datei: ein Literal, das in
+ *     einen lokalen Key-Helfer fließt (`inval('einsatz-uhs')`). Ein Helfer, der einen Helfer
+ *     ruft, oder einer über eine Modulgrenze ist unsichtbar.
+ *  2. LAUFZEIT-KOMPOSITION jenseits von Template-Literalen (`[praefix + '-liste', id]`, ein aus
+ *     einer Map gelesener Prefix).
+ *  3. „Derselbe Loader hängt an zwei Keys“ innerhalb der Registry; dafür bräuchte es Wissen
+ *     über den `queryFn`.
+ *  4. OB EIN KEY FACHLICH RICHTIG IST (passt der invalidierte Prefix zum Datenobjekt?).
  *
- * ─────────────────────────────────────────────────────────────────────────────────────────
- * WAS DIESER GUARD NICHT SIEHT — bewusste Grenzen, damit die nächste Session nicht raten muss:
- *
- *  1. MEHRSTUFIGE INDIREKTION. Erfasst wird EIN Schritt innerhalb DERSELBEN Datei: ein
- *     Literal, das in einen lokalen Key-Helfer fließt (`inval('einsatz-uhs')`, siehe
- *     `schluessel-helfer-arg` in queryKeyScan.ts). Ein Helfer, der einen Helfer ruft, oder
- *     einer, der über eine Modulgrenze importiert wird, ist unsichtbar. Die Grenze ist
- *     absichtlich hier gezogen (LFH-312): alles darüber ist Datenfluss-Analyse, und im
- *     Bestand existiert genau EIN Key-Helfer (`live/useEinsatzLiveStream.ts`).
- *  2. LAUFZEIT-KOMPOSITION jenseits von Template-Literalen — `[praefix + '-liste', id]` oder
- *     ein aus einer Map gelesener Prefix. Position 0 ist dann kein String-Literal.
- *  3. DIE BUG-KLASSE „derselbe Loader hängt an zwei Keys". Seit LFH-307 kann sie nur noch
- *     INNERHALB der Registry entstehen (zwei Accessoren, ein Datensatz) — von außen ist sie
- *     zu, weil jeder Inline-Key auffliegt. Ein Guard dafür bräuchte Wissen über den `queryFn`,
- *     nicht über den Key.
- *  4. OB EIN KEY FACHLICH RICHTIG IST. Der Guard prüft Herkunft und Schreibweise, nicht, ob
- *     der invalidierte Prefix zum geänderten Datenobjekt passt.
- *
- * Ausgeschlossene Dateien (siehe `istAusgeschlossen`) werden GAR NICHT gescannt — ein Verstoß
- * in einer `.test.ts`/`.typetest.ts` ist per Konstruktion unsichtbar, nicht bloß erlaubt.
- * ─────────────────────────────────────────────────────────────────────────────────────────
+ * Ausgeschlossene Dateien (`istAusgeschlossen`) werden GAR NICHT gescannt.
  */
 
 const MANAGED = new Set<string>(Object.values(EINSATZ_KEYS));
 
 /**
- * Bare-Prefix-Schatten managed Keys (LFH-215) — bis LFH-312 ein eigener Guard (c).
- *
- * Einige einsatz-scoped Queries trugen historisch einen bare-Prefix (`['einheiten', …]` statt
- * `einsatzKeys.einheiten(…)` = `['einsatz-einheiten', …]`). Der bare-Prefix steht NICHT in
- * EINSATZ_KEYS → ohne diesen Eintrag sieht Guard (a) ihn nicht, der SSE-Fan-out invalidiert ihn
- * nicht → die Liste wäre nicht live und teilte sich den Cache-Namespace nicht mit den
- * `einsatz-*`-Pendants.
- *
- * `modulOverrides` (F27/LFH-269): camelCase-Voraltschreibweise, ersetzt durch
- * `einsatzKeys.modulOverrides` mit dem Wert 'einsatz-modul-overrides'. Ohne diesen Eintrag wäre
- * ein Rückfall auf das alte Literal unsichtbar — Guard (a) kennt nur die Strings, die IN
- * EINSATZ_KEYS stehen, und das tut 'modulOverrides' nach der Umbenennung gerade nicht mehr.
- *
- * Sie stehen bewusst in der Prefix-Menge von Guard (a) (WEITER Radius) und NICHT in der
- * Allowlist von Guard (f): (f) sieht nur den ENGEN Radius, eine Extraktion in eine Konstante
- * (`const K = ['einheiten', id]`) wäre dort unsichtbar.
+ * Bare-Prefix-Schatten managed Keys: frühere Schreibweisen (`['einheiten', …]` statt
+ * `['einsatz-einheiten', …]`, camelCase `modulOverrides`), die nicht in EINSATZ_KEYS stehen.
+ * Ohne diesen Eintrag sähe Guard (a) einen Rückfall nicht, und der SSE-Fan-out invalidierte
+ * ihn nicht. Sie stehen im WEITEN Radius von (a), nicht in der Allowlist von (f): dort wäre die
+ * Extraktion in eine Konstante unsichtbar.
  */
 const SCHATTEN_PREFIXE = ['einheiten', 'abschnitte', 'mitglieder', 'modulOverrides'];
 
 /** Prefix-Menge von Guard (a): managed Keys + ihre bekannten Schatten. */
 const VERBOTEN_INLINE = new Set<string>([...MANAGED, ...SCHATTEN_PREFIXE]);
 
-// Alle Quelldateien als Rohtext (Vite). Das Glob bleibt bewusst HIER und nicht im Scanner —
-// sonst landete bei einem versehentlichen Produktiv-Import der Quelltext im App-Bundle.
+// Das Glob bleibt bewusst HIER und nicht im Scanner, sonst landete bei einem versehentlichen
+// Produktiv-Import der Quelltext im App-Bundle.
 const dateien = import.meta.glob('/src/**/*.{ts,tsx}', {
   query: '?raw',
   import: 'default',
@@ -86,10 +55,7 @@ const dateien = import.meta.glob('/src/**/*.{ts,tsx}', {
 function istAusgeschlossen(pfad: string): boolean {
   if (pfad.endsWith('/api/queryKeys.ts')) return true; // Home des Registry
   if (pfad.endsWith('/api/queryKeyScan.ts')) return true; // hält CACHE_CALLS-Strings in Arrays
-  // Tests pinnen Wire-Strings bewusst. `.typetest.ts` (LFH-265) zählt mit: es endet NICHT auf
-  // `.test.ts` (vor „test" steht ein „e", kein Punkt) und wäre sonst mitgescannt. Heute
-  // folgenlos — Typ-Ebenen-Pins enthalten keine Array-AUSDRÜCKE —, aber ein `as const`-Tupel
-  // zum Pinnen eines Key-Typs wäre ein Fehlalarm.
+  // Tests pinnen Wire-Strings bewusst. `.typetest.ts` zählt mit: es endet NICHT auf `.test.ts`.
   return /\.(type)?test\.tsx?$/.test(pfad);
 }
 
@@ -104,28 +70,19 @@ const ENGE_FUNDE = FUNDE.filter((f) => ENGE_ARTEN.includes(f.art));
 const zeige = (f: Fund): string => `${f.pfad}:${f.zeile}  '${f.prefix}' [${f.art}]`;
 
 /**
- * LEERLAUF-SCHUTZ. Alle Guards unten haben die Form „für jeden Fund gilt …" und wären über
- * einer LEEREN Fundmenge trivial wahr. Ein kaputtes Glob, ein zu breiter Ausschluss oder ein
- * Scanner, der nichts mehr meldet, sähe dann wie ein grüner Lauf aus — genau der stille
- * Durchfall, den dieser Guard verhindern soll.
+ * LEERLAUF-SCHUTZ: alle Guards unten haben die Form „für jeden Fund gilt …“ und wären über einer
+ * LEEREN Fundmenge trivial wahr (kaputtes Glob, zu breiter Ausschluss, stummer Scanner).
  */
 describe('queryKeys-Guard: der Scan läuft überhaupt', () => {
   it('scannt Dateien und findet Array-Literale', () => {
     expect(Object.keys(dateien).length).toBeGreaterThan(200);
-    // Untere Schranke auf der WEITEN Menge, NICHT auf der engen. Bis LFH-307 waren hier >50
-    // enge Funde (die 90 Inline-Query-Keys) die Lebendprobe; nach der vollständigen Migration
-    // ist die enge Menge legitim LEER, und dieselbe Schranke wäre dauerhaft rot. Sie ersatzlos
-    // zu streichen hätte aber den Vakuitätsschutz mitgenommen — alle „für jeden Fund gilt …"-
-    // Guards wären über einer leeren Menge trivial wahr, auch bei kaputtem Glob. Die weite
-    // Menge (gewöhnliche String-Arrays im Code) bleibt dauerhaft gut gefüllt und taugt deshalb
-    // als Lebendprobe, während die enge Menge zur Aussage „nichts umgeht die Registry" wird.
+    // Untere Schranke auf der WEITEN Menge: die enge ist legitim leer, die weite (gewöhnliche
+    // String-Arrays im Code) bleibt dauerhaft gut gefüllt und taugt als Lebendprobe.
     expect(FUNDE.length).toBeGreaterThan(50);
   });
 
   it('findet nach der LFH-307-Migration KEINEN Inline-Query-Key mehr', () => {
-    // Der Zielzustand, positiv formuliert: die enge Menge ist leer. Guard (f) unten sagt
-    // dasselbe über die Allowlist; dieser Test macht den erreichten Endstand explizit, damit
-    // ein Rückfall nicht bloß als „ein Eintrag mehr in einer Liste" durchgeht.
+    // Der Zielzustand, positiv formuliert: die enge Menge ist leer.
     expect(ENGE_FUNDE.map(zeige)).toEqual([]);
   });
 });
@@ -164,13 +121,7 @@ describe('queryKeys-Guard (b): jeder managed Key ist live ODER bewusst nicht-liv
   });
 });
 
-/**
- * Guard (d, LFH-262/F13): das `befehl`-Wire-Event ist live angebunden.
- *
- * Das Backend publiziert seit LFH-64 ein `befehl`-Wire-Event (Anlegen/Ändern/Freigeben/
- * Fortschreiben), das FE hat es aber ignoriert — Befehle (zentrales Führungsartefakt)
- * aktualisierten im Mehrbenutzerbetrieb nicht live. Dieser Test pinnt die Anbindung.
- */
+/** Guard (d): das `befehl`-Wire-Event ist live angebunden. */
 describe('queryKeys-Guard (d): befehl-Wire-Event ist live (LFH-262/F13)', () => {
   it('befehl-Event invalidiert Befehls-Liste und -Detail', () => {
     expect(EINSATZ_STREAM_EVENTS).toHaveProperty('befehl');
@@ -184,21 +135,10 @@ describe('queryKeys-Guard (d): befehl-Wire-Event ist live (LFH-262/F13)', () => 
 });
 
 /**
- * Guard (f, LFH-312/AP4): Allowlist statt Denylist für Inline-Query-Keys.
- *
- * Die Guards (a)/(c)/(e) waren DENYLISTS — sie verbieten benannte Literale. Ein NEUER
- * org-scoped Inline-Key (`['neues-modul', …]`) fiel durch jedes Netz, weil ihn niemand
- * vorher aufgeschrieben hatte. Guard (f) dreht die Beweislast um: jeder Inline-Query-Key
- * ist ein Verstoß, es sei denn, er steht unten.
- *
- * DIE ALLOWLIST IST MIGRATIONSSCHULD, KEIN FREIBRIEF. Jeder Eintrag ist ein org-scoped Key
- * ohne Registry — genau das, was LFH-307 (ORG_KEYS + orgKeys-Factory) auflöst. Die Liste
- * schrumpft dort im Lockstep und ist am Ende leer. EIN NEUES PREFIX HINZUZUFÜGEN IST NICHT
- * VORGESEHEN: neue Keys gehören in eine Registry, nicht in diese Liste.
- *
- * Der Seed ist per AST gegen den Stand dieses Branches GEMESSEN (90 enge Fundstellen,
- * 22 distinkte Prefixe), nicht abgeschrieben. Er ist disjunkt zu MANAGED/SCHATTEN/VERBOTEN —
- * ein managed Key kann hier also nicht versehentlich freigekauft werden (Test unten).
+ * Guard (f): Allowlist statt Denylist für Inline-Query-Keys. Jeder Inline-Query-Key ist ein
+ * Verstoß, es sei denn, er steht unten. Die Liste ist leer, und ein neues Prefix hinzuzufügen
+ * ist NICHT vorgesehen: neue Keys gehören in eine Registry. Sie ist disjunkt zu
+ * MANAGED/SCHATTEN/VERBOTEN (Test unten).
  */
 const QUERY_KEY_ALLOWLIST: readonly string[] = [];
 
@@ -218,9 +158,8 @@ describe('queryKeys-Guard (f): Inline-Query-Keys nur laut Allowlist (LFH-312)', 
   });
 
   it('findet keinen dynamisch zusammengesetzten Prefix', () => {
-    // Ein Template-Literal an Position 0 (`[\`einsatz-${modul}\`, id]`) umgeht JEDE Registry
-    // und JEDE Allowlist, weil der Prefix erst zur Laufzeit entsteht. Er ist deshalb
-    // unbedingt verboten und nicht allowlist-fähig. Bestand: 0 Fundstellen.
+    // Ein Template-Literal an Position 0 umgeht JEDE Registry und Allowlist, weil der Prefix erst
+    // zur Laufzeit entsteht; unbedingt verboten.
     const verstoesse = FUNDE.filter((f) => f.art === 'dynamischer-prefix').map(zeige);
     expect(
       verstoesse,
@@ -240,9 +179,8 @@ describe('queryKeys-Guard (f): Inline-Query-Keys nur laut Allowlist (LFH-312)', 
   });
 
   it('kauft keinen managed/Schatten-Key frei (Allowlist ∩ Denylist = ∅)', () => {
-    // Ohne diesen Test könnte ein späterer „mach den Guard grün"-Reflex einen managed Key
-    // in die Allowlist schreiben — Guard (f) wäre zufrieden und die Registry-Pflicht wäre
-    // still ausgehebelt. (a) und (f) dürfen sich nicht überlappen.
+    // Ein managed Key in der Allowlist hebelte die Registry-Pflicht still aus; (a) und (f) dürfen
+    // sich nicht überlappen.
     const ueberlappung = QUERY_KEY_ALLOWLIST.filter((p) => VERBOTEN_INLINE.has(p));
     expect(ueberlappung).toEqual([]);
   });

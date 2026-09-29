@@ -1,74 +1,39 @@
 pub mod repo;
 
+use crate::routes::support::parse_enum;
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Zonen-Typ (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `ZoneTyp`). Wire == `typ`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum LageZoneTyp {
-    Gefahrengebiet,
-    Absperrbereich,
-    Absperrgrenze,
-    Sperrgebiet,
-    FreieSkizze,
-    /// Fläche eines Evakuierungsbezirks (LFH-673). Nur Polygon; optional einem Bezirk des
-    /// Fachmoduls Betreuung zugeordnet (`evakuierungsbezirk_id`, n : 1).
-    Evakuierungsbezirk,
-}
-impl LageZoneTyp {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            LageZoneTyp::Gefahrengebiet => "gefahrengebiet",
-            LageZoneTyp::Absperrbereich => "absperrbereich",
-            LageZoneTyp::Absperrgrenze => "absperrgrenze",
-            LageZoneTyp::Sperrgebiet => "sperrgebiet",
-            LageZoneTyp::FreieSkizze => "freie_skizze",
-            LageZoneTyp::Evakuierungsbezirk => "evakuierungsbezirk",
-        }
+wire_enum! {
+    /// Zonen-Typ (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `ZoneTyp`). Wire == `typ`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum LageZoneTyp {
+        Gefahrengebiet => "gefahrengebiet",
+        Absperrbereich => "absperrbereich",
+        Absperrgrenze => "absperrgrenze",
+        Sperrgebiet => "sperrgebiet",
+        FreieSkizze => "freie_skizze",
+        /// Fläche eines Evakuierungsbezirks (LFH-673). Nur Polygon; optional einem Bezirk des
+        /// Fachmoduls Betreuung zugeordnet (`evakuierungsbezirk_id`, n : 1).
+        Evakuierungsbezirk => "evakuierungsbezirk",
     }
-    pub fn parse(s: &str) -> Option<LageZoneTyp> {
-        match s {
-            "gefahrengebiet" => Some(LageZoneTyp::Gefahrengebiet),
-            "absperrbereich" => Some(LageZoneTyp::Absperrbereich),
-            "absperrgrenze" => Some(LageZoneTyp::Absperrgrenze),
-            "sperrgebiet" => Some(LageZoneTyp::Sperrgebiet),
-            "freie_skizze" => Some(LageZoneTyp::FreieSkizze),
-            "evakuierungsbezirk" => Some(LageZoneTyp::Evakuierungsbezirk),
-            _ => None,
-        }
-    }
+    try_from = |s| format!("Ungültiger LageZoneTyp: {s}");
 }
-impl TryFrom<String> for LageZoneTyp {
-    type Error = String;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        LageZoneTyp::parse(&s).ok_or_else(|| format!("Ungültiger LageZoneTyp: {s}"))
-    }
-}
+impl LageZoneTyp {}
 
-/// Geometrie-Typ (GeoJSON-Geometry-`type`) — Validierungs-Enum für den Request-Guard.
-/// Bewusst OHNE Serialize/ToSchema: das DTO-Feld `geometrie_typ` bleibt `String` (kein
-/// OpenAPI-Anker → Typisierung wäre kein Codegen-No-Op).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GeometrieTyp {
-    Polygon,
-    LineString,
-}
-impl GeometrieTyp {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            GeometrieTyp::Polygon => "Polygon",
-            GeometrieTyp::LineString => "LineString",
-        }
-    }
-    pub fn parse(s: &str) -> Option<GeometrieTyp> {
-        match s {
-            "Polygon" => Some(GeometrieTyp::Polygon),
-            "LineString" => Some(GeometrieTyp::LineString),
-            _ => None,
-        }
+wire_enum! {
+    #[wire(ohne_serde)]
+    /// Geometrie-Typ (GeoJSON-Geometry-`type`) — Validierungs-Enum für den Request-Guard.
+    /// Bewusst OHNE Serialize/ToSchema: das DTO-Feld `geometrie_typ` bleibt `String` (kein
+    /// OpenAPI-Anker → Typisierung wäre kein Codegen-No-Op).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum GeometrieTyp {
+        Polygon => "Polygon",
+        LineString => "LineString",
     }
 }
+impl GeometrieTyp {}
 
 /// Eine freie Lage-Zone (Gefahren-/Absperrzone). Eigenständige Entität — kein Fachobjekt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -139,18 +104,16 @@ pub fn validiere_neu(
     geometrie: &str,
 ) -> Result<(), crate::error::AppError> {
     use crate::error::AppError;
-    if LageZoneTyp::parse(typ).is_none() {
-        return Err(AppError::Validation(format!(
-            "Unbekannter Zonen-Typ: {}",
-            typ
-        )));
-    }
-    if GeometrieTyp::parse(geometrie_typ).is_none() {
-        return Err(AppError::Validation(format!(
-            "Unbekannter Geometrie-Typ: {}",
-            geometrie_typ
-        )));
-    }
+    parse_enum(
+        LageZoneTyp::parse,
+        typ,
+        format!("Unbekannter Zonen-Typ: {}", typ),
+    )?;
+    parse_enum(
+        GeometrieTyp::parse,
+        geometrie_typ,
+        format!("Unbekannter Geometrie-Typ: {}", geometrie_typ),
+    )?;
     if !geometrie_klasse_passt(typ, geometrie_typ) {
         return Err(AppError::UnprocessableEntity(format!(
             "Typ {} ist mit Geometrie {} nicht zulässig",

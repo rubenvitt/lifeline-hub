@@ -5,7 +5,9 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::fahrzeug::status_repo::{self, StatusDaten, StatusPatch};
 use crate::fahrzeug::{FahrzeugStatus, StatusKategorie};
-use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
+use crate::routes::support::{
+    deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, trimme, trimme_tri,
+};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -42,13 +44,12 @@ impl Normalisiert {
 }
 
 fn normalisiere(body: StatusBody) -> Result<Normalisiert, AppError> {
-    let label = body.label.trim().to_string();
-    if label.is_empty() {
-        return Err(AppError::Validation("Label darf nicht leer sein".into()));
-    }
-    if StatusKategorie::parse(&body.kategorie).is_none() {
-        return Err(AppError::Validation("Ungültige Kategorie".into()));
-    }
+    let label = pflicht(&body.label, "Label")?;
+    parse_enum(
+        StatusKategorie::parse,
+        &body.kategorie,
+        "Ungültige Kategorie",
+    )?;
     if let Some(f) = body.fms_anker {
         if !(0..=9).contains(&f) {
             return Err(AppError::Validation(
@@ -113,19 +114,16 @@ impl PatchNormalisiert {
 fn normalisiere_patch(body: PatchStatus) -> Result<PatchNormalisiert, AppError> {
     let label = match body.label {
         Some(l) => {
-            let l = l.trim().to_string();
-            if l.is_empty() {
-                return Err(AppError::Validation("Label darf nicht leer sein".into()));
-            }
+            let l = pflicht(&l, "Label")?;
             Some(l)
         }
         None => None,
     };
-    if let Some(k) = &body.kategorie {
-        if StatusKategorie::parse(k).is_none() {
-            return Err(AppError::Validation("Ungültige Kategorie".into()));
-        }
-    }
+    parse_enum_opt(
+        StatusKategorie::parse,
+        body.kategorie.as_deref(),
+        "Ungültige Kategorie",
+    )?;
     // Bereichsprüfung NUR beim gesendeten Wert. `Some(None)` ist der Leerwunsch (NULL),
     // `None` ist „nicht gesendet" — beide haben keinen Wert zu prüfen.
     if let Some(Some(f)) = body.fms_anker {

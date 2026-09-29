@@ -1,50 +1,34 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::einstellungen::etb_startwert;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Gefahrenzonen;
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
-use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "gefahrenzonen";
-use crate::error::AppError;
 use crate::gefahr::repo::{self as gefahr_repo, BewertungDaten};
 use crate::gefahr::{self, GefahrBewertungAnzeige, GefahrengebietAnzeige};
-use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
+use crate::live::LiveEvent;
+use crate::routes::support::{deserialize_optional_field, parse_enum, trimme, trimme_tri};
 use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 
 /// SSE-Notify: die Gefahrenmatrix eines Gebiets hat sich geändert. Event-Tag `gefahr`.
 fn sse_gefahr(state: &AppState, einsatz_id: i64, gefahrengebiet_id: i64) {
-    let data =
-        serde_json::json!({ "einsatz_id": einsatz_id, "gefahrengebiet_id": gefahrengebiet_id })
-            .to_string();
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::Gefahr, data);
+    state.live.publiziere_objekt(
+        einsatz_id,
+        LiveEvent::Gefahr,
+        "gefahrengebiet_id",
+        gefahrengebiet_id,
+    );
 }
 
 /// GET /api/einsaetze/{id}/gefahrengebiete — alle Gefahrengebiete (Übersicht/Karten-Styling).
 pub async fn gebiete(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Gefahrenzonen>,
 ) -> Result<Json<Vec<GefahrengebietAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
         gefahr_repo::gebiete_liste(&state.pool, einsatz_id).await?,
     ))
@@ -53,20 +37,10 @@ pub async fn gebiete(
 /// GET /api/einsaetze/{id}/gefahrengebiete/{gid}/matrix — gesetzte Zellen eines Gebiets.
 pub async fn matrix(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, gid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLesezugriff<Gefahrenzonen>,
+    PfadParam((_eid, gid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<Vec<GefahrBewertungAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     // Ownership-Gate: Gebiet muss zum Einsatz gehören (sonst NotFound).
     gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?;
     Ok(Json(gefahr_repo::liste(&state.pool, gid).await?))
@@ -84,44 +58,30 @@ pub struct BewertungBody {
 /// PUT /api/einsaetze/{id}/gefahrengebiete/{gid}/matrix/bewertung — Zelle setzen (UPSERT).
 pub async fn bewerten(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, gid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Gefahrenzonen>,
+    PfadParam((_eid, gid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<BewertungBody>,
 ) -> Result<Json<GefahrBewertungAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+    let einsatz_id = ctx.einsatz.id;
     let gebiet = gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?; // Ownership-Gate
 
     // Unbekannter Enum-Wert = das Feld ist für sich unbrauchbar → 400 (LFH-305).
     // Die Kombinationsprüfung darunter bewertet erst den Zusammenhang → bleibt 422.
-    if gefahr::Gefahrentyp::parse(&body.gefahrentyp).is_none() {
-        return Err(AppError::Validation(format!(
-            "Unbekannter Gefahrentyp: {}",
-            body.gefahrentyp
-        )));
-    }
-    if gefahr::Schutzobjekt::parse(&body.schutzobjekt).is_none() {
-        return Err(AppError::Validation(format!(
-            "Unbekanntes Schutzobjekt: {}",
-            body.schutzobjekt
-        )));
-    }
-    if gefahr::Warnstufe::parse(&body.warnstufe).is_none() {
-        return Err(AppError::Validation(format!(
-            "Unbekannte Warnstufe: {}",
-            body.warnstufe
-        )));
-    }
+    parse_enum(
+        gefahr::Gefahrentyp::parse,
+        &body.gefahrentyp,
+        format!("Unbekannter Gefahrentyp: {}", body.gefahrentyp),
+    )?;
+    parse_enum(
+        gefahr::Schutzobjekt::parse,
+        &body.schutzobjekt,
+        format!("Unbekanntes Schutzobjekt: {}", body.schutzobjekt),
+    )?;
+    parse_enum(
+        gefahr::Warnstufe::parse,
+        &body.warnstufe,
+        format!("Unbekannte Warnstufe: {}", body.warnstufe),
+    )?;
     if !gefahr::kombination_gueltig(&body.gefahrentyp, &body.schutzobjekt) {
         return Err(AppError::UnprocessableEntity(format!(
             "Kombination {} × {} ist nicht zulässig",
@@ -142,9 +102,7 @@ pub async fn bewerten(
     // Warnstufen-Änderung, aus der frisch geschriebenen Zelle (`z`) berechnet (der
     // Read-Vergleich gegen `alt` bleibt bewusst VOR der Tx — nur das Schreibpaar ist atomar).
     // SSE erst nach dem Commit (Reinheits-Kontrakt).
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let z = crate::write_retry!(&state.pool, |conn| {
         let z = gefahr_repo::upsert_bewertung_tx(
             conn,
@@ -155,7 +113,7 @@ pub async fn bewerten(
                 warnstufe: &body.warnstufe,
                 beschreibung: beschreibung.as_deref(),
                 gemeldet_von: gemeldet_von.as_deref(),
-                aktualisiert_von: benutzer.id,
+                aktualisiert_von: ctx.benutzer.id,
             },
         )
         .await?;
@@ -167,7 +125,8 @@ pub async fn bewerten(
                 gid,
                 z.warnstufe,
             );
-            crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
         }
         Ok(z)
     })?;
@@ -188,22 +147,11 @@ pub struct UmbenennenBody {
 /// PATCH /api/einsaetze/{id}/gefahrengebiete/{gid} — Label des Gefahrengebiets ändern.
 pub async fn umbenennen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, gid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Gefahrenzonen>,
+    PfadParam((_eid, gid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<UmbenennenBody>,
 ) -> Result<Json<GefahrengebietAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+    let einsatz_id = ctx.einsatz.id;
     gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?; // Ownership-Gate
     let label = trimme_tri(body.label);
     let g = gefahr_repo::gebiet_umbenennen(

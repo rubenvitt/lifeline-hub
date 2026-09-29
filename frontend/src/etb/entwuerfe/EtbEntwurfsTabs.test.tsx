@@ -6,19 +6,14 @@ import { StrictMode, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../api/client';
 import type { NeuerEintrag } from '../../api/etb';
-import type { EinsatzAnzeige, EtbBaustein } from '../../api/types';
+import type { EtbBaustein } from '../../api/types';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests, entwurfSpeichern } from './entwurfStore';
 import EtbEntwurfsTabs from './EtbEntwurfsTabs';
+import { einsatzFixture } from '../../test/fixtures';
 
-const einsatz = {
-  id: 7,
-  bezeichnung: 'Test',
-  stichwort: null,
-  leitstellen_nr: null,
-  einsatzort: null,
-} as unknown as EinsatzAnzeige;
+const einsatz = einsatzFixture({ id: 7, bezeichnung: 'Test' });
 
 beforeEach(async () => {
   await entwuerfeLeerenFuerTests();

@@ -1,4 +1,3 @@
-// frontend/src/command-palette/CommandPalette.test.tsx
 import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { act, fireEvent, screen } from '@testing-library/react';
@@ -113,11 +112,9 @@ describe('CommandPalette', () => {
 });
 
 /**
- * Der Korpus trägt die ECHTEN Schlagworte der Schnellaktion (befehle.ts: `SCHNELLAKTIONEN`).
- * Gemessen gegen fuse.js 7.5.0 bewertet Fuse für 'etb' den Modulbefehl mit 8.60e-9 und die
- * Schnellaktion mit 5.77e-1 — letzteres ist Rauschen (weder Label noch Schlagwort hat mit ETB
- * zu tun). Weil `schnellaktionen` in `GRUPPEN_REIHENFOLGE` vor `module` steht, stand das
- * Rauschen bis A3 an erster Stelle.
+ * Der Korpus trägt die ECHTEN Schlagworte der Schnellaktion. Fuse bewertet für 'etb' den
+ * Modulbefehl weit besser als die Schnellaktion (Rauschen); in Gruppenreihenfolge stünde das
+ * Rauschen vorn, weil `schnellaktionen` vor `module` steht.
  */
 const rangKorpus: Befehl[] = [
   {
@@ -154,17 +151,16 @@ describe('CommandPalette · Rangfolge bei aktiver Suche (LFH-391 · A3)', () => 
 
     await u.type(screen.getByRole('combobox'), 'etb');
 
-    // Eine Gruppenüberschrift über einer score-sortierten Liste behauptete eine Ordnung,
-    // die es dann nicht mehr gibt — die Treffer stehen quer zu den Gruppen.
+    // Eine Gruppenüberschrift über einer score-sortierten Liste behauptete eine Ordnung, die es
+    // nicht gibt.
     expect(screen.queryAllByRole('group')).toHaveLength(0);
   });
 });
 
 describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
   it('stellt bei leerer Suche eine Schnellaktion an die erste Stelle', () => {
-    // OHNE Tastatur-Aktionen: die Gruppe `aktionen` (TASTATUR_AKTIONEN) steht
-    // unverändert vor `schnellaktionen` und wäre sonst die erste — das Ticket
-    // verlangt nur `schnellaktionen` vor `module`, `aktionen` bleibt unangetastet.
+    // OHNE Tastatur-Aktionen: die Gruppe `aktionen` stünde sonst vor `schnellaktionen` an erster
+    // Stelle.
     const befehle: Befehl[] = [
       { id: 'modul:etb', gruppe: 'module', label: 'Einsatztagebuch', ausfuehren: () => {} },
       {
@@ -181,7 +177,7 @@ describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
   });
 
   it('läuft mit ArrowDown geschlossen über die Gruppengrenze hinweg', async () => {
-    // B7: die Gruppierung ist Darstellung, die Navigation bleibt EINE flache Liste.
+    // Die Gruppierung ist Darstellung, die Navigation bleibt EINE flache Liste.
     const befehle: Befehl[] = [
       { id: 'modul:etb', gruppe: 'module', label: 'Einsatztagebuch', ausfuehren: () => {} },
       {
@@ -199,10 +195,8 @@ describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
   });
 
   /**
-   * Die GEGENAUSSAGE zur Score-Ordnung (LFH-391 · A3): bei leerer Suche gilt weiterhin
-   * `GRUPPEN_REIHENFOLGE`. Ohne diese Hälfte gäbe A3 die kuratierte Startansicht still auf
-   * statt bewusst — und sie ist die schärfere: `ordneTreffer` mit leerer Suche zu prüfen
-   * wäre ein toter Pfad, die Produktion ruft die Funktion dann nie.
+   * Gegenaussage zur Score-Ordnung: bei leerer Suche gilt `GRUPPEN_REIHENFOLGE`. `ordneTreffer`
+   * mit leerer Suche zu prüfen wäre ein toter Pfad, die Produktion ruft es dann nie.
    */
   it('behält bei leerer Suche die Gruppenrahmen', () => {
     renderMitProviders(<CommandPalette befehle={rangKorpus} schliesse={() => {}} />);
@@ -215,10 +209,8 @@ describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
       { id: 'modul:etb', gruppe: 'module', label: 'Einsatztagebuch', ausfuehren: () => {} },
     ];
     renderMitProviders(<CommandPalette befehle={befehle} schliesse={() => {}} />);
-    // jsdom rechnet kein Layout — prüfbar ist der gesetzte WERT, nicht die Pixelhöhe.
-    // Gegen den Inline-Wert, nicht `toHaveStyle`: das vergleicht mit `getComputedStyle`,
-    // und jsdom 30 löst Längen dort in px auf (gemessen `460.8px` = 60vh bei 768 px
-    // Fensterhöhe). Die Aussage „relativ gedeckelt" wäre dann nicht mehr prüfbar.
+    // jsdom rechnet kein Layout: geprüft wird der gesetzte Inline-WERT. `toHaveStyle` vergliche mit
+    // `getComputedStyle`, das jsdom in px auflöst; „relativ gedeckelt“ wäre dann nicht prüfbar.
     const liste = document.getElementById('cmd-liste');
     expect(liste).not.toBeNull();
     expect(liste!.style.maxHeight).toBe('min(60vh, 480px)');
@@ -226,11 +218,9 @@ describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
 });
 
 /**
- * Der label-gleiche Zwilling (LFH-391 · A3, Review-Befund). `baueBefehle` erzeugt für ein
- * zuletzt besuchtes Modul ZWEI Befehle mit gleichem Label, gleicher Ikone und gleichem
- * Ziel — im Gruppenzweig trennen sie die Überschriften „Zuletzt" und „Module", flach nicht
- * mehr. Beide Hälften gehören zusammen: die Startansicht MUSS die Dopplung behalten
- * (sie ist dort die Abkürzung, LFH-337 · H12), die Trefferliste darf sie nicht zeigen.
+ * Der label-gleiche Zwilling: `baueBefehle` erzeugt für ein zuletzt besuchtes Modul ZWEI Befehle
+ * mit gleichem Label, Ikone und Ziel. Die Startansicht MUSS die Dopplung behalten (Abkürzung),
+ * die Trefferliste darf sie nicht zeigen.
  */
 const zwillingsKorpus: Befehl[] = [
   { id: 'zuletzt:lagekarte', gruppe: 'zuletzt', label: 'Lagekarte', ausfuehren: () => {} },
@@ -274,9 +264,8 @@ const modusKorpus: Befehl[] = [
 ];
 
 /**
- * Der LESBARE Text einer Option — ohne `aria-hidden`-Beiwerk. Seit dem Neuentwurf trägt die
- * aktive Zeile eine Enter-Marke und Moduloptionen einen Kontext; beides ist Darstellung,
- * nicht der Name der Option.
+ * Der LESBARE Text einer Option ohne `aria-hidden`-Beiwerk (Enter-Marke, Kontext); beides ist
+ * Darstellung, nicht der Name.
  */
 function optionsText(o: HTMLElement): string | null {
   const kopie = o.cloneNode(true) as HTMLElement;
@@ -288,9 +277,8 @@ const modusZeile = () => document.querySelector('[data-lfh="palette-modus"]');
 
 describe('CommandPalette · Präfixmodus „>" (LFH-391 · A4)', () => {
   /**
-   * Die TRAGENDE Hälfte ist die positive: „genau diese zwei Gruppen sind übrig". Die
-   * Abwesenheit der Modul-Option allein wäre trivial grün — für die Eingabe '>' fand die
-   * Palette auch vorher nichts und zeigte „Keine Treffer".
+   * Die TRAGENDE Hälfte ist die positive („genau diese zwei Gruppen“); die Abwesenheit der
+   * Modul-Option allein wäre trivial grün.
    */
   it('lässt bei nacktem „>" genau die Aktions- und die Schnellaktionsgruppe stehen', async () => {
     const u = userEvent.setup();
@@ -299,8 +287,7 @@ describe('CommandPalette · Präfixmodus „>" (LFH-391 · A4)', () => {
     await u.type(screen.getByRole('combobox'), '>');
 
     expect(optionsTexte()).toEqual(['Speichern', 'Neue Person erfassen']);
-    // Der Rest ist leer, also gilt weiter die kuratierte Startansicht MIT Rahmen —
-    // eingeschränkt, nicht umsortiert.
+    // Der Rest ist leer, also gilt die Startansicht MIT Rahmen, eingeschränkt, nicht umsortiert.
     expect(screen.getAllByRole('group').map((g) => g.getAttribute('aria-label'))).toEqual([
       'Aktionen',
       'Schnellaktionen',
@@ -323,8 +310,8 @@ describe('CommandPalette · Präfixmodus „>" (LFH-391 · A4)', () => {
     expect(optionsTexte()).toEqual(['Neue Person erfassen']);
   });
 
-  /** Und die Gegenprobe mit demselben Suchwort: ohne Präfix trifft es beide. Erst dieses
-   *  Paar zeigt, dass der Modus filtert und nicht der Suchbegriff. */
+  /** Gegenprobe mit demselben Suchwort ohne Präfix: erst das Paar zeigt, dass der Modus filtert
+   *  und nicht der Suchbegriff. */
   it('findet dasselbe Suchwort ohne Präfix auch im Modul', async () => {
     const u = userEvent.setup();
     renderMitProviders(<CommandPalette befehle={modusKorpus} schliesse={() => {}} />);
@@ -336,32 +323,26 @@ describe('CommandPalette · Präfixmodus „>" (LFH-391 · A4)', () => {
 });
 
 /**
- * Die Modusanzeige (LFH-391 · A4).
- *
- * Sie ist die Antwort auf zwei Fragen zugleich: WIE komme ich in den Modus (Legende, solange
- * das Feld leer ist) und BIN ich gerade drin (Moduswortlaut, solange er aktiv ist). Ohne die
- * zweite Hälfte ist ein Modus, der eine Liste um zwei Drittel kürzt, von einem kaputten
- * Filter nicht zu unterscheiden — die Palette ist seit LFH-335 auch der Berührungs- und
- * Handschuhweg zu 42+ Befehlen, und dort sieht niemand die getippte Zeile als Syntax.
+ * Die Modusanzeige beantwortet, OB man im Modus ist; ohne sie wäre ein Modus, der die Liste um
+ * zwei Drittel kürzt, von einem kaputten Filter nicht zu unterscheiden. Auf dem Berührungsweg
+ * sieht niemand die getippte Zeile als Syntax.
  */
 describe('CommandPalette · Modusanzeige (LFH-391 · A4)', () => {
   it('zeigt die Legende mit dem Präfixzeichen als Marke dauerhaft in der Fußzeile', () => {
     renderMitProviders(<CommandPalette befehle={modusKorpus} schliesse={() => {}} />);
 
-    // Neuentwurf (S2): die Legende „wie komme ich hinein" steht in der Fußzeile, die
-    // Modusanzeige oben nennt nur noch den AKTIVEN Modus — bei leerem Feld also keine.
+    // Die Legende steht in der Fußzeile; die Modusanzeige oben nennt nur den AKTIVEN Modus, bei
+    // leerem Feld also keinen.
     const fuss = document.querySelector('[data-lfh="palette-fuss"]');
     expect(fuss).toHaveTextContent('zeigt nur Aktionen');
     expect(fuss).toHaveTextContent('sucht im Einsatztagebuch');
     expect(fuss).toHaveTextContent('öffnen');
-    // Nur, was funktioniert: kein „im Panel" aus dem Entwurf (LFH-645), und die Koordinate
-    // nur dort, wo es einen Sprung gibt — ohne `koordinatenSprung` (ausserhalb eines
-    // Einsatzes) wäre der Hinweis eine Einladung ins Leere.
+    // Nur, was funktioniert: kein „im Panel“, und die Koordinate nur mit `koordinatenSprung`
+    // (außerhalb eines Einsatzes wäre der Hinweis eine Einladung ins Leere).
     expect(fuss).not.toHaveTextContent('Koordinate');
     expect(fuss).not.toHaveTextContent('Panel');
     expect(modusZeile()).toBeNull();
-    // Ein sichtbares Kürzel ist eine Marke, kein Satzzeichen im Fließtext (CLAUDE.md,
-    // Nacharbeit zu LFH-335): ein nacktes '>' im Text hätte weder Rahmen noch Abstand.
+    // Ein sichtbares Kürzel ist eine Marke, kein Satzzeichen im Fließtext.
     expect(screen.getByText('>', { selector: 'kbd' })).toBeInTheDocument();
   });
 
@@ -374,8 +355,7 @@ describe('CommandPalette · Modusanzeige (LFH-391 · A4)', () => {
     expect(modusZeile()).toHaveTextContent('Nur Aktionen');
   });
 
-  /** Gegenaussage: bei gewöhnlicher Suche kostet die Zeile keine der rund sieben Zeilen,
-   *  die der Fükw-Schirm zeigt. */
+  /** Gegenaussage: bei gewöhnlicher Suche kostet die Zeile keinen Platz. */
   it('verschwindet bei gewöhnlicher Suche ohne Präfix', async () => {
     const u = userEvent.setup();
     renderMitProviders(<CommandPalette befehle={modusKorpus} schliesse={() => {}} />);
@@ -388,14 +368,9 @@ describe('CommandPalette · Modusanzeige (LFH-391 · A4)', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 /**
- * Datensatz-Treffer kommen als FERTIGE `Treffer` herein, nicht als `Befehl` (LFH-391 · C3).
- *
- * Der Plan hatte sie in die `befehle`-Prop gemischt und `filtereBefehle` einen
- * Durchreich-Zweig gegeben. Das geht seit Etappe A nicht mehr: die Trefferstufe
- * (`Treffer.stufe`) ist die Achse, auf der ein exakter Nummerntreffer vor Fuzzy-Rauschen
- * steht — sie entsteht in `baueDatensatzTreffer` und ist aus dem Label NICHT
- * zurückzurechnen. Ein Umweg über `Befehl[]` verlöre sie still, und mit ihr das zentrale
- * Akzeptanzkriterium des Tickets.
+ * Datensatz-Treffer kommen als FERTIGE `Treffer` herein, nicht als `Befehl`: ihre `stufe`
+ * entsteht in `baueDatensatzTreffer` und ist aus dem Label nicht zurückzurechnen; ein Umweg über
+ * `Befehl[]` verlöre sie still.
  */
 const datensatz = (
   id: string,
@@ -444,11 +419,8 @@ describe('CommandPalette · Datensatz-Treffer (LFH-391 · C3)', () => {
   });
 
   /**
-   * Die GEGENAUSSAGE, und sie deckt einen echten Zwischenzustand ab: der entprellte Rest
-   * hinkt der Eingabe um bis zu 300 ms hinterher. Wer das Feld leert, sieht die Palette
-   * sofort wieder in der Startansicht — die Treffer des vorigen Begriffs stehen zu dem
-   * Zeitpunkt noch als Prop an. Sie dort zu rendern hiesse, die kuratierte Startansicht
-   * (LFH-337 · M11) für eine Drittelsekunde durch eine Datenhalde zu ersetzen.
+   * Gegenaussage für den Zwischenzustand: nach dem Leeren des Feldes stehen die Treffer des vorigen
+   * Begriffs noch als Prop an (Entprellung). Die Startansicht bleibt trotzdem kuratiert.
    */
   it('zeigt bei leerer Suche keinen Datensatz-Treffer, auch wenn noch welche anstehen', () => {
     renderMitProviders(
@@ -466,14 +438,12 @@ describe('CommandPalette · Datensatz-Treffer (LFH-391 · C3)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('CommandPalette · Präfixmodi „#" und „@" (LFH-391 · C3)', () => {
   /**
-   * PAAR: Die statischen Befehle fallen weg (`gruppen: []`), die Datensatz-Treffer bleiben.
-   * Die erste Hälfte allein wäre auch grün, wenn der Modus ALLES verwürfe — dann wäre das
-   * Präfix eine Sackgasse statt einer Abkürzung.
+   * PAAR: die statischen Befehle fallen weg (`gruppen: []`), die Datensatz-Treffer bleiben. Die
+   * erste Hälfte allein wäre auch grün, wenn der Modus alles verwürfe.
    *
-   * Der Treffer je Zeile stammt aus einer Quelle, die der Modus WIRKLICH führt (Befund 5):
-   * ein Personen-Treffer unter '#' entsteht in der Produktion nie — dort holt `useDatensaetze`
-   * nur den ETB —, er wäre ausschliesslich ein Nachläufer aus dem warmen Cache, und genau den
-   * hält die Anzeige jetzt zurück. Mit ihm als Fixtur prüfte die Zeile das Gegenteil.
+   * Der Treffer je Zeile stammt aus einer Quelle, die der Modus WIRKLICH führt: ein
+   * Personen-Treffer unter '#' wäre nur ein Nachläufer aus dem Cache, und den hält die Anzeige
+   * zurück.
    */
   it.each([
     ['#', 'Nur Einsatztagebuch', 'datensatz:etb:7', 'Einsatztagebuch · #12 · Person gemeldet'],
@@ -515,10 +485,8 @@ describe('CommandPalette · Präfixmodi „#" und „@" (LFH-391 · C3)', () => 
   });
 
   /**
-   * Ein Datensatz-Modus mit einem einzigen Zeichen läuft per Konstruktion in eine LEERE
-   * Liste: die statischen Befehle sind ausgefiltert, die Queries feuern erst ab zwei
-   * Zeichen. „Keine Treffer" wäre dort von „kaputt" nicht zu unterscheiden — und auf dem
-   * Berührungsweg sieht niemand die getippte Zeile als Syntax.
+   * Ein Datensatz-Modus mit einem Zeichen läuft per Konstruktion in eine LEERE Liste; „Keine
+   * Treffer“ wäre dort von „kaputt“ nicht zu unterscheiden.
    */
   it('sagt im Datensatz-Modus, dass ein Zeichen zu wenig ist', async () => {
     const u = userEvent.setup();
@@ -530,8 +498,7 @@ describe('CommandPalette · Präfixmodi „#" und „@" (LFH-391 · C3)', () => 
     expect(screen.queryByText('Keine Treffer')).not.toBeInTheDocument();
   });
 
-  /** Gegenaussage: ab dem zweiten Zeichen ist die Aufforderung weg — sonst stünde sie
-   *  dauerhaft da und sagte nichts mehr. */
+  /** Gegenaussage: ab dem zweiten Zeichen ist die Aufforderung weg. */
   it('nimmt die Aufforderung ab dem zweiten Zeichen zurück', async () => {
     const u = userEvent.setup();
     renderMitProviders(
@@ -551,24 +518,18 @@ describe('CommandPalette · Präfixmodi „#" und „@" (LFH-391 · C3)', () => 
 
 // ─────────────────────────────────────────────────────────────────────────────
 /**
- * Die Riegel an der ANZEIGE, nicht nur am Abruf (Review-Befunde 4, 5 und 8 zu Etappe C).
- *
- * Alle drei haben dieselbe Ursache: eine `useQuery` mit `enabled: false` FEUERT nicht,
- * LIEFERT aber weiterhin ihre zwischengespeicherte Antwort — und der Stand, aus dem die
- * Treffer gebaut wurden, hinkt der Eingabe ohnehin um die Entprellungsfrist hinterher. Eine
- * anstehende Trefferliste ist deshalb kein Beleg dafür, dass die aktuelle Eingabe sie
- * rechtfertigt; die Prop wird hier bewusst FESTGEHALTEN, während sich die Eingabe ändert —
- * genau das ist der Zwischenzustand aus dem Betrieb.
+ * Die Riegel an der ANZEIGE, nicht nur am Abruf. Eine `useQuery` mit `enabled: false` liefert
+ * weiter ihre zwischengespeicherte Antwort, und der Trefferstand hinkt der Eingabe nach. Die
+ * Prop wird hier bewusst FESTGEHALTEN, während sich die Eingabe ändert; genau das ist der
+ * Zwischenzustand aus dem Betrieb.
  */
 describe('CommandPalette · Riegel an der Anzeige (LFH-391 · C, Review)', () => {
   const personTreffer = [datensatz('datensatz:personen:7', 'Personen · R-042 · Meier')];
 
   /**
-   * BEFUND 4, als PAAR in einem Lauf: '@meier' zeigt den Treffer, das Zurücknehmen auf '@m'
-   * nimmt ihn WIEDER WEG. Gemessen stand dort bis zu eine Viertelstunde alte Cache-Ausbeute:
-   * im Kräfte-Modus sind die statischen Befehle ausgefiltert, die Liste bestand also
-   * ausschliesslich aus einer Ein-Zeichen-Suche über den warmen Cache — und die Aufforderung,
-   * die genau das erklären sollte, erschien nicht, weil sie am leeren Zweig hängt.
+   * PAAR in einem Lauf: '@meier' zeigt den Treffer, das Kürzen auf '@m' nimmt ihn WIEDER WEG. Sonst
+   * bestünde die Liste im Kräfte-Modus nur aus einer Ein-Zeichen-Suche über den warmen Cache, und
+   * die Aufforderung erschiene nicht, weil sie am leeren Zweig hängt.
    */
   it('nimmt beim Kürzen auf ein Zeichen die anstehenden Datensatz-Treffer zurück', async () => {
     const u = userEvent.setup();
@@ -590,12 +551,9 @@ describe('CommandPalette · Riegel an der Anzeige (LFH-391 · C, Review)', () =>
   });
 
   /**
-   * BEFUND 5: derselbe Nachläufer im AKTIONEN-Modus. Er ist dort nicht bloss überzählig,
-   * sondern führt aus dem Modus heraus — markierbar und per Enter ausführbar landet man auf
-   * einer Personen-Detailseite, während die Marke „Nur Aktionen" darüber steht.
-   *
-   * PAAR mit demselben Suchwort ohne Präfix, sonst misst die Zeile die Schwelle statt des
-   * Modus. `befehle={[]}`, damit kein Fuzzy-Rauschen auf 'meier' die Aussage trübt.
+   * Derselbe Nachläufer im AKTIONEN-Modus führte aus dem Modus heraus (per Enter auf eine
+   * Personen-Detailseite unter der Marke „Nur Aktionen“). PAAR mit demselben Suchwort ohne Präfix;
+   * `befehle={[]}`, damit kein Fuzzy-Rauschen die Aussage trübt.
    */
   it('zeigt im Aktionen-Modus keinen anstehenden Datensatz-Treffer, ohne Präfix denselben schon', async () => {
     const u = userEvent.setup();
@@ -615,9 +573,8 @@ describe('CommandPalette · Riegel an der Anzeige (LFH-391 · C, Review)', () =>
   });
 
   /**
-   * Dieselbe Achse zwischen ZWEI Datensatz-Modi: '#' führt den ETB, nicht die Personen. Der
-   * Riegel ist deshalb nicht „Modus zeigt überhaupt Datensätze", sondern die QUELLENMENGE
-   * des Modus — sonst überlebte ein Nachläufer jeden Wechsel innerhalb der Datensatz-Modi.
+   * Dieselbe Achse zwischen ZWEI Datensatz-Modi: der Riegel ist die QUELLENMENGE des Modus, sonst
+   * überlebte ein Nachläufer jeden Wechsel innerhalb der Datensatz-Modi.
    */
   it('lässt unter „#" den ETB-Nachläufer stehen und den Personen-Nachläufer nicht', async () => {
     const u = userEvent.setup();
@@ -638,8 +595,8 @@ describe('CommandPalette · Riegel an der Anzeige (LFH-391 · C, Review)', () =>
   });
 
   /**
-   * BEFUND 8: das nackte Präfix. Wer es aus der Legende übernimmt, hat noch keine Suche
-   * gestellt — „Keine Treffer" beantwortet dort eine Frage, die niemand gestellt hat.
+   * Das nackte Präfix: wer es aus der Legende übernimmt, hat noch keine Suche gestellt; „Keine
+   * Treffer“ beantwortete eine Frage, die niemand gestellt hat.
    */
   it.each(['@', '#'])(
     'fordert bei nacktem „%s" zum Weitertippen auf, statt Treffer zu verneinen',
@@ -655,9 +612,8 @@ describe('CommandPalette · Riegel an der Anzeige (LFH-391 · C, Review)', () =>
   );
 
   /**
-   * Gegenaussage zur Zeile darüber, und sie trägt: '>' ist KEIN Datensatz-Modus. Ohne sie
-   * wäre auch eine Aufforderung grün, die in jedem leeren Zustand steht — dort ist die Liste
-   * wirklich leer und nicht bloss zu kurz gefragt.
+   * Gegenaussage: '>' ist KEIN Datensatz-Modus. Ohne sie wäre auch eine Aufforderung grün, die in
+   * jedem leeren Zustand steht.
    */
   it('bleibt bei nacktem „>" ohne passende Aktion bei „Keine Treffer"', async () => {
     const u = userEvent.setup();
@@ -672,23 +628,16 @@ describe('CommandPalette · Riegel an der Anzeige (LFH-391 · C, Review)', () =>
 
 // ─────────────────────────────────────────────────────────────────────────────
 /**
- * BEFUND 7: die Leerzustandszeile erreicht assistive Technik nur aus einer Region, die
- * SCHON DA WAR (Bauform `components/Erfassung.tsx:352` — dort steht die Ansage-Zeile im
- * Serienmodus immer, weil eine `aria-live`-Region nur Änderungen an bereits vorhandenem
- * Inhalt meldet).
- *
- * Ohne sie meldete die Combobox nur den Wechsel auf `aria-expanded=false`: es gibt keine
- * Option und keinen Live-Bereich, aus dem der Satz vorgelesen würde — für Vorlesende ist
- * „zu kurz" damit von „nichts gefunden" nicht zu unterscheiden, also genau die
- * Ununterscheidbarkeit, gegen die die Zeile gebaut wurde.
+ * Die Leerzustandszeile erreicht assistive Technik nur aus einer Region, die SCHON DA WAR:
+ * `aria-live` meldet nur Änderungen an vorhandenem Inhalt. Ohne sie wäre für Vorlesende „zu
+ * kurz“ von „nichts gefunden“ nicht zu unterscheiden.
  */
 describe('CommandPalette · Leerzustand als Live-Region (LFH-391 · C, Review)', () => {
   const region = () => document.querySelector('[data-lfh="palette-leerzustand"]');
 
   /**
-   * DIE TRAGENDE HÄLFTE ist die erste: die Region steht im Baum, BEVOR es etwas zu melden
-   * gibt. Eine Region, die zusammen mit ihrem Text eingehängt wird, sagt nichts an — und ein
-   * Test, der nur das `aria-live` am sichtbaren Text prüft, sähe das nicht.
+   * Die tragende Hälfte: die Region steht im Baum, BEVOR es etwas zu melden gibt. Ein Test, der
+   * nur `aria-live` am sichtbaren Text prüft, sähe eine zusammen eingehängte Region nicht.
    */
   it('hält die Region schon bereit, während noch Treffer stehen, und meldet dann darin', async () => {
     const u = userEvent.setup();
@@ -709,7 +658,7 @@ describe('CommandPalette · Leerzustand als Live-Region (LFH-391 · C, Review)',
     expect(region()).toHaveTextContent(/Mindestens 2 Zeichen/);
   });
 
-  /** Und derselbe Ort trägt die zweite Meldung — nicht ein zweiter Zweig daneben. */
+  /** Derselbe Ort trägt die zweite Meldung, kein zweiter Zweig daneben. */
   it('meldet „Keine Treffer" in derselben Region', async () => {
     const u = userEvent.setup();
     renderMitProviders(<CommandPalette befehle={modusKorpus} schliesse={() => {}} />);
@@ -722,17 +671,9 @@ describe('CommandPalette · Leerzustand als Live-Region (LFH-391 · C, Review)',
 
 // ─────────────────────────────────────────────────────────────────────────────
 /**
- * Die Auswahl hängt an der Befehls-ID, nicht am Listenindex (LFH-391 · C3).
- *
- * Datensatz-Treffer treffen ASYNCHRON ein — 300 ms Entprellung plus Netz. Ein
- * Nummerntreffer trägt die Stufe 0 und steht damit VOR jedem Modultreffer; die markierte
- * Zeile rückt unter dem Cursor nach unten. Mit einem Index-State markiert die Palette dann
- * eine andere Zeile, ohne dass jemand etwas gedrückt hat — derselbe Vertrag wie
- * „Live-Updates springen nicht unter dem Cursor" (WCAG 3.2.5).
- *
- * MIT AKTIVER SUCHE geprüft, und nur so: bei leerer Suche gibt es per Konstruktion nie
- * Datensatz-Treffer (die Queries laufen erst ab zwei Zeichen), das Szenario käme in der
- * Produktion nicht vor.
+ * Die Auswahl hängt an der Befehls-ID: nachrückende Datensatz-Treffer auf Stufe 0 schieben die
+ * markierte Zeile nach unten, ein Index markierte dann ohne Zutun eine andere (WCAG 3.2.5). Mit
+ * AKTIVER Suche geprüft, weil es nur dort Datensatz-Treffer gibt.
  */
 describe('CommandPalette · Auswahl beim Nachrücken (LFH-391 · C3)', () => {
   const module = [
@@ -764,7 +705,7 @@ describe('CommandPalette · Auswahl beim Nachrücken (LFH-391 · C3)', () => {
       />,
     );
 
-    // Die zwei Nummerntreffer stehen jetzt VOR den Modulzeilen — die Marke wandert mit.
+    // Die zwei Nummerntreffer stehen jetzt VOR den Modulzeilen; die Marke wandert mit.
     expect(optionsTexte().slice(0, 2)).toEqual([
       'Personen · R-042 · Lage Nord',
       'Schäden · S-042 · Lagerhalle',
@@ -775,8 +716,7 @@ describe('CommandPalette · Auswahl beim Nachrücken (LFH-391 · C3)', () => {
     );
   });
 
-  /** Gegenaussage: ein neuer Suchbegriff setzt die Auswahl sehr wohl auf die erste Zeile
-   *  zurück — ein Merker, der das überlebte, markierte eine Zeile aus der alten Liste. */
+  /** Gegenaussage: ein neuer Suchbegriff setzt die Auswahl auf die erste Zeile zurück. */
   it('setzt die Auswahl bei einem neuen Suchbegriff auf die erste Zeile zurück', async () => {
     const u = userEvent.setup();
     renderMitProviders(
@@ -798,17 +738,11 @@ describe('CommandPalette · Auswahl beim Nachrücken (LFH-391 · C3)', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 /**
- * Die Entprellung der Meldung nach aussen (LFH-391 · C3).
+ * Die Entprellung der Meldung nach außen, Bauform und Frist wie in `etb/EtbFilterleiste.tsx`. Sie
+ * liegt am Eingabefeld: Text und Fuzzy-Filter reagieren SOFORT, nur die Meldung wartet.
  *
- * Bauform und Frist wörtlich aus `etb/EtbFilterleiste.tsx` (ENTPRELLUNG_MS = 300, samt
- * `clearTimeout` im Abbau-Effekt) — ein zweiter Entprellungsmechanismus wäre eine zweite
- * Wahrheit. Sie liegt HIER und nicht im `PaletteHost`, weil nur die Stelle am Eingabefeld
- * die zwei Achsen unterscheidet: der sichtbare Text und der Fuzzy-Filter über die
- * statischen Befehle sind kostenlos und müssen SOFORT reagieren, nur die Meldung wartet.
- *
- * Tippen läuft unter Fake-Timern über `fireEvent.change` — `userEvent.type` kommt dort
- * gemessen nicht voran und endet im Timeout statt in einer Aussage (Kommentar in
- * `EtbFilterleiste.test.tsx`).
+ * Tippen unter Fake-Timern über `fireEvent.change`: `userEvent.type` kommt dort nicht voran und
+ * endet im Timeout.
  */
 function tippe(feld: HTMLElement, text: string) {
   let bisher = '';
@@ -827,8 +761,8 @@ describe('CommandPalette · Entprellung nach aussen (LFH-391 · C3)', () => {
         <CommandPalette befehle={modusKorpus} onSucheEntprellt={melde} schliesse={() => {}} />,
       );
       tippe(screen.getByRole('combobox'), 'brandausbruch');
-      // Vor Ablauf der Frist ist nichts hinausgegangen — sonst wäre die Entprellung bloss
-      // eine Verzögerung des LETZTEN Zeichens und die Zahl bliebe bei 13.
+      // Vor Ablauf der Frist ist nichts hinausgegangen; sonst wäre die Entprellung bloß eine
+      // Verzögerung des LETZTEN Zeichens.
       expect(melde).not.toHaveBeenCalled();
 
       act(() => {
@@ -842,8 +776,7 @@ describe('CommandPalette · Entprellung nach aussen (LFH-391 · C3)', () => {
     }
   });
 
-  /** Die Gegenaussage: die sichtbare Liste hängt NICHT an der Frist. Hinge sie daran, sähe
-   *  die Bedienung aus wie ein hängendes Feld — der Fehler, gegen den M80 gebaut wurde. */
+  /** Gegenaussage: die sichtbare Liste hängt NICHT an der Frist, sonst wirkte das Feld hängend. */
   it('filtert die sichtbare Liste sofort, ohne auf die Frist zu warten', () => {
     vi.useFakeTimers();
     try {
@@ -860,9 +793,7 @@ describe('CommandPalette · Entprellung nach aussen (LFH-391 · C3)', () => {
     }
   });
 
-  /** Das Präfix wird EINMAL zerlegt: nach aussen geht das Paar, nicht die rohe Eingabe.
-   *  Ein zweiter Parser im `PaletteHost` wäre eine zweite Wahrheit darüber, was „der
-   *  Suchbegriff" ist. */
+  /** Das Präfix wird EINMAL zerlegt: nach außen geht das Paar, nicht die rohe Eingabe. */
   it('meldet Modus und Rest getrennt, nicht die rohe Eingabe', () => {
     vi.useFakeTimers();
     try {
@@ -885,9 +816,9 @@ describe('CommandPalette · Entprellung nach aussen (LFH-391 · C3)', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 /**
- * Koordinatensprung (LFH-619). Die Palette bekommt eine FUNKTION über den lebenden Rest —
- * nicht eine fertige Zeile —, weil der entprellte Stand hinter der Eingabe herhinkt. Die
- * Aussagen hier sind die der Anzeige: wo die Zeile steht, wann sie fehlt, was Enter tut.
+ * Koordinatensprung: die Palette bekommt eine FUNKTION über den lebenden Rest, weil der
+ * entprellte Stand nachhinkt. Geprüft wird die Anzeige: wo die Zeile steht, wann sie fehlt, was
+ * Enter tut.
  */
 describe('CommandPalette · Koordinatensprung (LFH-619)', () => {
   const karte = vi.fn();
@@ -908,7 +839,7 @@ describe('CommandPalette · Koordinatensprung (LFH-619)', () => {
       <CommandPalette
         // Ein Modul, dessen Label die getippte Zahl enthält — es darf die Zeile nicht verdrängen.
         befehle={[befehl('m', 'Messpunkt 52.52, 13.41')]}
-        // Ein gewöhnlicher Texttreffer (Stufe 3) — ein exakter stünde zu Recht vorn, siehe unten.
+        // Ein gewöhnlicher Texttreffer (Stufe 3); ein exakter stünde zu Recht vorn, siehe unten.
         datensatzTreffer={[datensatz('datensatz:personen:1', 'Person 52.52, 13.41', () => {}, 3)]}
         koordinatenSprung={sprung}
         schliesse={() => {}}
@@ -923,8 +854,8 @@ describe('CommandPalette · Koordinatensprung (LFH-619)', () => {
   });
 
   it('ein exakter Datensatztreffer (Stufe 0) steht VOR der Kartenzeile', async () => {
-    // Review-Befund zu LFH-619: mit Score 0 verdrängte die Kartenzeile jeden bewerteten
-    // Stufe-0-Treffer. Die Eingabe, die genau einen Datensatz benennt, meint den Datensatz.
+    // Eine Eingabe, die genau einen Datensatz benennt, meint den Datensatz; die Kartenzeile steht
+    // dahinter.
     const u = userEvent.setup();
     renderMitProviders(
       <CommandPalette
@@ -969,7 +900,7 @@ describe('CommandPalette · Koordinatensprung (LFH-619)', () => {
     );
     const fuss = document.querySelector('[data-lfh="palette-fuss"]');
     expect(fuss).toHaveTextContent('Koordinate → Lagekarte');
-    // `#` bleibt das ETB-Präfix — der Entwurf hatte dort „# Koordinate".
+    // `#` bleibt das ETB-Präfix.
     expect(fuss).toHaveTextContent('sucht im Einsatztagebuch');
     expect(fuss).not.toHaveTextContent('Panel');
   });

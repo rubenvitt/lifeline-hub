@@ -1,4 +1,3 @@
-// frontend/src/command-palette/useDatensaetze.ts
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
@@ -25,49 +24,31 @@ import {
 } from './typen';
 
 /**
- * Die BESCHAFFUNG des Datensatz-Finders (LFH-391 · C2) — der Gegenpart zum reinen Kern in
- * `datensaetze.ts`, der aus den hier geholten Listen die Treffer macht.
+ * Die BESCHAFFUNG des Datensatz-Finders, Gegenpart zum reinen Kern in `datensaetze.ts`.
  *
- * ALLES IST LAZY, und das ist keine Sparsamkeit, sondern die Bedingung dafür, dass die
- * Palette überhaupt eine Datenquelle bekommen darf: sie rendert ihren Inhalt erst beim
- * Öffnen (`{offen && <PaletteHost/>}` in `CommandPaletteProvider.tsx`), jede hier angehängte
- * Query feuert also im Moment des Tastendrucks. Warm ist ohne Zutun nur, was die aktuelle
- * Seite selbst geladen hat — die Modulzähler im `EinsatzLayout` laufen seit LFH-612 über ein
- * eigenes Fach (`einsatzKeys.modulZaehler`) und wärmen keine Liste mehr vor. Sonst wären es
- * bis zu vierzehn kalte Abrufe für eine Palette, die vielleicht nur „Dunkel" sucht.
+ * ALLES IST LAZY: die Palette rendert ihren Inhalt erst beim Öffnen, jede Query hier feuert im
+ * Moment des Tastendrucks; ohne Riegel wären es bis zu vierzehn kalte Abrufe. Muster ist der
+ * Sachbezug-Picker in `pages/ChatPage.tsx`.
  *
- * MUSTER ist `pages/ChatPage.tsx` (Sachbezug-Picker, dort mit derselben Begründung:
- * „vermeidet 6 eager Requests bei jedem Chat-Öffnen") — übernommen, nicht neu erfunden.
+ * VIER RIEGEL VOR JEDEM `enabled` (die ersten drei in {@link datensatzAbrufAktiv}):
+ *  1. **Einsatzkontext**: ohne `einsatzId` keine Liste.
+ *  2. **Schwelle**: erst ab `DATENSATZ_MINDESTZEICHEN` Zeichen im Rest hinter dem Präfix.
+ *  3. **Modus**: was der Modus nicht anzeigt, wird nicht geholt (`PALETTE_MODI[…].quellen`).
+ *  4. **Recht**: `istModulFreigegeben` JE MODUL.
  *
- * VIER RIEGEL VOR JEDEM `enabled`, jeder mit einem eigenen Grund — die ersten drei gebündelt
- * in {@link datensatzAbrufAktiv}:
- *  1. **Einsatzkontext** — ohne `einsatzId` gibt es keine Liste.
- *  2. **Schwelle** — erst ab `DATENSATZ_MINDESTZEICHEN` Zeichen im REST hinter dem Präfix.
- *  3. **Modus** — der `>`-Modus zeigt nur Aktionen, '#' nur den ETB, '@' nur die vier
- *     Namensquellen; was der Modus nicht anzeigt, wird auch nicht geholt
- *     (`PALETTE_MODI[…].quellen`).
- *  4. **Recht** — `istModulFreigegeben` JE MODUL, siehe unten.
- *
- * DIE ENTPRELLUNG LIEGT NICHT HIER. Der Hook bekommt einen bereits entprellten Rest; die
- * Frist gehört ans Eingabefeld, weil nur dort die zwei Achsen unterscheidbar sind — der
- * sichtbare Text und der Fuzzy-Filter über die statischen Befehle sind kostenlos und müssen
- * SOFORT reagieren, nur die Meldung nach aussen wartet. Bauform und Wert stehen in
- * `etb/EtbFilterleiste.tsx` (`ENTPRELLUNG_MS = 300` samt `clearTimeout` im Abbau-Effekt);
- * ein zweiter Entprellungsmechanismus wäre eine zweite Wahrheit.
- *
- * KEINE ADRESSE ENTSTEHT HIER VON HAND — `routing/inlinePfade.guard.test.ts` ist auf
- * `command-palette/` gescopt und trifft mit `/einsaetze/<klammer>` auch API-Adressen. Jeder
- * Abruf läuft über die Clients in `api/*.ts`, jeder Schlüssel über `api/queryKeys.ts`.
+ * Die Entprellung liegt am Eingabefeld (`CommandPalette.tsx`), der Hook bekommt einen entprellten
+ * Rest. Keine Adresse entsteht hier von Hand (`routing/inlinePfade.guard.test.ts` trifft auch
+ * API-Adressen); Abrufe über `api/*.ts`, Schlüssel über `api/queryKeys.ts`.
  */
 
-// `FRISCH_MS` und `ETB_SUCH_GC_MS` stehen seit LFH-664 in `datensatzAbfrage.ts` — die
-// Vorschau je Sorte liest dieselben Fächer mit derselben Frische (Begründung dort).
+// `FRISCH_MS` und `ETB_SUCH_GC_MS` stehen in `datensatzAbfrage.ts`: die Vorschau liest dieselben
+// Fächer mit derselben Frische.
 
 /** Trefferdeckel des ETB-Volltextzweigs — geht als `limit` MIT in den Request (5 statt 100). */
 const ETB_TEXT_DECKEL = 5;
 
 export interface DatensatzAbruf {
-  /** Aus dem Pfad gezogen; `null` ausserhalb eines Einsatzes. */
+  /** Aus dem Pfad gezogen; `null` außerhalb eines Einsatzes. */
   einsatzId: number | null;
   modus: PaletteModus;
   /** Der Rest hinter dem Präfix, BEREITS ENTPRELLT — nicht die rohe Eingabe. */
@@ -75,12 +56,9 @@ export interface DatensatzAbruf {
 }
 
 /**
- * Die drei Riegel vor jedem `enabled`, an EINER Stelle (LFH-391 · C3).
- *
- * Rein und exportiert, weil zwei Hooks sie brauchen: `useDatensaetze` für seine vierzehn Abrufe
- * UND `useDatensatzTreffer` für den Sichtbarkeits-Abruf darunter. Zwei Kopien wären zwei
- * Bedingungen, und die Overrides liefen dann in einem Zustand los, in dem keine einzige
- * Liste folgt — ein Request für eine Ansicht ohne Datensatzzeile.
+ * Die drei Riegel vor jedem `enabled`, an EINER Stelle: `useDatensaetze` und
+ * `useDatensatzTreffer` brauchen sie beide, sonst liefen die Overrides in einem Zustand los, in
+ * dem keine Liste folgt.
  */
 export function datensatzAbrufAktiv({ einsatzId, modus, suche }: DatensatzAbruf): boolean {
   return (
@@ -93,63 +71,50 @@ export function datensatzAbrufAktiv({ einsatzId, modus, suche }: DatensatzAbruf)
 /**
  * Cache-Fach des ETB-Volltextzweigs.
  *
- * DAS `limit` IM SCHLÜSSEL IST DIE TRENNUNG, NICHT SCHMUCK: `pages/EtbPage.tsx` belegt
- * denselben Prefix `einsatzKeys.etbListe(einsatzId, filter)` mit einer `useInfiniteQuery`,
- * wobei `filter` aus `parseEtbFilter` kommt und deshalb NUR q/typ/von/bis tragen kann. Ohne
- * das `limit` wäre `{ q }` strukturgleich, beide Abfragen lägen in EINEM Fach — dort einmal
- * `{ pages, pageParams }` und einmal ein nacktes Array, und `data.pages.flat()` auf der
- * ETB-Seite liefe auf ein Array. Kein Guard sieht das, kein roter Test, kein Fehlerbild.
+ * DAS `limit` IM SCHLÜSSEL IST DIE TRENNUNG: `pages/EtbPage.tsx` belegt denselben Prefix mit
+ * einer `useInfiniteQuery`, deren Filter nur q/typ/von/bis trägt. Ohne `limit` lägen beide in
+ * EINEM Fach, einmal `{ pages, pageParams }` und einmal ein Array; kein Guard sähe das.
  *
- * Als Funktion exportiert, damit der Test auf die PRODUKTIVE Schlüsselbildung zeigt statt
- * sie nachzubauen — ein nachgebauter Schlüssel prüfte sich gegen sich selbst.
+ * Exportiert, damit der Test die produktive Schlüsselbildung nutzt statt sie nachzubauen.
  */
 export function etbSuchSchluessel(einsatzId: number, q: string) {
   return einsatzKeys.etbListe(einsatzId, { q, limit: ETB_TEXT_DECKEL });
 }
 
-/** Cache-Fach des ETB-Zahlenzweigs — seit LFH-664 in `datensatzAbfrage.ts`, hier weitergereicht. */
+/** Cache-Fach des ETB-Zahlenzweigs, aus `datensatzAbfrage.ts` weitergereicht. */
 export { etbNummerSchluessel } from './datensatzAbfrage';
 
 /**
- * Cache-Fach der ETB-Zählung (LFH-619). Unter dem ETB-Prefix, damit jedes `etb`-Live-Ereignis
- * die Zahl mit invalidiert; das `anzahl: true` trennt das Fach von der Liste der ETB-Seite
- * und vom Volltextfach oben — eine Zahl und ein Array unter einem Schlüssel wären derselbe
- * stille Fehler wie in {@link etbSuchSchluessel} beschrieben.
+ * Cache-Fach der ETB-Zählung, unter dem ETB-Prefix, damit jedes `etb`-Ereignis die Zahl mit
+ * invalidiert. `anzahl: true` trennt das Fach von Liste und Volltextfach (siehe
+ * {@link etbSuchSchluessel}).
  */
 export function etbAnzahlSchluessel(einsatzId: number, q: string) {
   return einsatzKeys.etbListe(einsatzId, { q, anzahl: true });
 }
 
 /**
- * Holt die Listen, aus denen `baueDatensatzTreffer` seine Treffer baut.
- *
- * Rückgabe ist bewusst `DatensatzQuellen` und keine fertige Trefferliste: die Trennung
- * „Beschaffung hier, Entscheidung im reinen Kern" ist der Grund, warum die Fachaussagen
- * (Zahlenzweig, Rechte, Beschriftung, Deckel) ohne Netz, Mocks und Render prüfbar sind.
+ * Holt die Listen, aus denen `baueDatensatzTreffer` seine Treffer baut. Rückgabe ist
+ * `DatensatzQuellen`, keine Trefferliste: die Fachaussagen im reinen Kern bleiben so ohne Netz
+ * und Render prüfbar.
  */
 export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): DatensatzQuellen {
   const { benutzer } = useAuth();
   const rest = suche.trim();
-  // `?? 0` ist nie eine echte Einsatz-id; der Schlüssel wird ohne Einsatz nie abgerufen,
-  // weil `datensatzAbrufAktiv` dann false liefert. Ein nullbarer Schlüssel wie bei
-  // `modulOverrides` ist hier nicht nötig — dieses Fach teilt es sich mit den Modulseiten.
+  // `?? 0` ist nie eine echte Einsatz-id; ohne Einsatz liefert `datensatzAbrufAktiv` false, der
+  // Schlüssel wird nie abgerufen.
   const id = einsatzId ?? 0;
   /**
-   * Einsatzkontext, Schwelle und Modus in EINEM Riegel — er steht schon HIER und nicht erst
-   * je Quelle, weil sonst der Sichtbarkeitsabruf darunter im `>`-Modus als einziger doch
-   * noch liefe: ein Request für eine Ansicht ohne Datensatzzeile, gemessen beim Bauen.
+   * Einsatzkontext, Schwelle und Modus in EINEM Riegel schon HIER, sonst liefe im `>`-Modus der
+   * Sichtbarkeitsabruf darunter als einziger doch.
    */
   const aktiv = datensatzAbrufAktiv({ einsatzId, modus, suche });
   /** Quellen dieses Modus; `null` = keine Einschränkung. */
   const erlaubterModus = PALETTE_MODI[modus].quellen;
 
   /**
-   * Die Overrides tragen die Sichtbarkeitsachse und werden deshalb VOR den Listen geholt.
-   *
-   * Sie hängen an derselben Schwelle wie alles andere: ohne getippten Begriff schweigt der
-   * Hook vollständig, und genau das hält die Bestands-Palettentests grün, die `useBefehle`
-   * durch eine Attrappe ersetzen (dort gibt es keinen Handler für diesen Abruf). Im Betrieb
-   * kostet das nichts — `useBefehle` fordert dasselbe Fach im Einsatzkontext ohnehin an,
+   * Die Overrides tragen die Sichtbarkeitsachse und kommen VOR den Listen, an derselben Schwelle:
+   * ohne Begriff schweigt der Hook vollständig. `useBefehle` fordert dasselbe Fach ohnehin an,
    * TanStack führt beide Beobachter zusammen.
    */
   const overridesQuery = useQuery({
@@ -160,14 +125,10 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
   });
 
   /**
-   * Erst wenn die Sichtbarkeit beantwortet ist, dürfen die Listen los. Ohne dieses Warten
-   * liefen sie in der Ladelücke mit `overrides === undefined` — der Registry-Default sagt
-   * dort „sichtbar", der Einsatz aber möglicherweise „ausgeblendet": ein Request, den es
-   * nicht geben darf, und einer, der bei warmem Cache wieder verschwindet.
-   *
-   * `isFetched` statt `isSuccess`: ein Fehlschlag darf die Suche nicht dauerhaft stilllegen.
-   * Dann gilt der Registry-Default — dieselbe Annahme, die `useBefehle` mit `overrides ===
-   * undefined` ohnehin trifft.
+   * Erst wenn die Sichtbarkeit beantwortet ist, dürfen die Listen los; sonst liefen sie in der
+   * Ladelücke gegen den Registry-Default „sichtbar“, obwohl der Einsatz ein Modul ausblenden kann.
+   * `isFetched` statt `isSuccess`: ein Fehlschlag darf die Suche nicht stilllegen, dann gilt der
+   * Registry-Default wie in `useBefehle`.
    */
   const rechteBekannt = overridesQuery.isFetched;
   const overrides = overridesQuery.data;
@@ -180,11 +141,9 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
   }
 
   /**
-   * Die acht ungefilterten Listen hängen an den ARGUMENTLOSEN Bestands-Accessoren — genau
-   * den Fächern, die `ChatPage`, `LageDashboardPage` und die Modulseiten selbst füllen. Die
-   * Palette teilt sich den Cache mit ihnen, statt ein zweites Fach mit denselben Bytes
-   * anzulegen; auf einer warmen Seite löst das Öffnen damit null zusätzliche Requests aus.
-   * Deshalb auch kein Filterargument in den Abrufen: ein `?status=…` wäre ein eigenes Fach.
+   * Die ungefilterten Listen hängen an den ARGUMENTLOSEN Bestands-Accessoren, denselben Fächern wie
+   * die Modulseiten: auf einer warmen Seite kostet das Öffnen null Requests. Deshalb auch kein
+   * Filterargument (ein `?status=…` wäre ein eigenes Fach).
    */
   const personenQuery = useQuery({
     ...datensatzAbfrage.personen(id),
@@ -218,7 +177,7 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
     ...datensatzAbfrage.einheiten(id),
     enabled: darfLaden('einheiten'),
   });
-  // LFH-619 — dieselben geteilten Fächer wie Lageberichte-, Gefahren- und Abschnittsseite.
+  // Dieselben geteilten Fächer wie Lageberichte-, Gefahren- und Abschnittsseite.
   const lageberichteQuery = useQuery({
     ...datensatzAbfrage.lageberichte(id),
     enabled: darfLaden('lageberichte'),
@@ -233,23 +192,16 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
   });
 
   /**
-   * Der ETB ist die einzige serverseitig gefilterte Quelle — und die einzige mit ZWEI
-   * Abfragewegen, die sich gegenseitig ausschliessen:
+   * Der ETB ist die einzige serverseitig gefilterte Quelle, mit ZWEI sich ausschließenden
+   * Abfragewegen:
    *
-   *  - eine gedruckte Kennung ('42', '#42') geht über den Cursor. Ein gebundener
-   *    Sortenbuchstabe ('R-42' = Person, 'S-42' = Schaden) schliesst den ETB dagegen aus:
-   *    dort ist die Sorte bereits beantwortet.
-   *  - alles andere geht über den Volltext. NICHT beides: `fts_query` quotet jedes Token zu
-   *    einer Phrase und sucht über inhalt/von/an/veranlassung, nicht über die laufende
-   *    Nummer — '42' fände jeden Eintrag, in dessen Text die Zahl vorkommt.
+   *  - eine gedruckte Kennung ('42', '#42') geht über den Cursor. Ein Sortenbuchstabe ('R-42',
+   *    'S-42') schließt den ETB aus.
+   *  - alles andere geht über den Volltext; `fts_query` sucht nicht über die laufende Nummer.
    *
-   * DRITTER RIEGEL AM VOLLTEXT (Review-Befund 6): eine Eingabe ohne ein einziges
-   * alphanumerisches Token lässt `fts_query` leer laufen, und der Aufrufer im Backend nimmt
-   * den MATCH-Filter dann GANZ heraus — die Antwort auf '??' waren gemessen die fünf
-   * jüngsten Einträge, ungefiltert. Der Riegel steht im Frontend, weil die Route ihren
-   * Vertrag hält: für die ETB-Seite (Blättern ohne Suchbegriff) ist genau das richtig.
-   * Bedingung und Begründung liegen im reinen Kern, damit Abruf und Anzeige nicht zwei
-   * Meinungen darüber haben, was der ETB beantworten kann.
+   * Dritter Riegel am Volltext: ohne alphanumerisches Token nimmt das Backend den MATCH-Filter ganz
+   * heraus und liefert die jüngsten Einträge. Bedingung und Begründung liegen im reinen Kern
+   * (`etbVolltextMoeglich`), damit Abruf und Anzeige übereinstimmen.
    */
   const zahl = zahlAusSuche(rest);
   const nummerGesucht = zahl !== null && zahl.sorte === null ? zahl.nummer : null;
@@ -266,9 +218,8 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
     gcTime: ETB_SUCH_GC_MS,
   });
   /**
-   * Die Zahl hinter dem Sammeltreffer (LFH-619) — an denselben Riegeln wie der Volltext:
-   * keine Nummer, mindestens ein alphanumerisches Token. Ohne `q` zählte die Route das ganze
-   * Tagebuch, und die Zeile hiesse „Alle Einträge zu ??".
+   * Die Zahl hinter dem Sammeltreffer, an denselben Riegeln wie der Volltext; ohne `q` zählte die
+   * Route das ganze Tagebuch.
    */
   const etbAnzahlQuery = useQuery({
     queryKey: etbAnzahlSchluessel(id, rest),
@@ -279,9 +230,7 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
   });
 
   /**
-   * Über die Datenreferenzen memoisiert, nicht je Render frisch gebaut: das Ergebnis
-   * geht in ein `useMemo` des Aufrufers, und ein je Render neues Objekt machte das dort
-   * wirkungslos.
+   * Über die Datenreferenzen memoisiert: das Ergebnis geht in ein `useMemo` des Aufrufers.
    */
   return useMemo<DatensatzQuellen>(
     () => ({
@@ -320,18 +269,10 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
 }
 
 /**
- * Beschaffung UND reiner Kern in einem Griff — das, was der `PaletteHost` wirklich braucht
- * (LFH-391 · C3).
- *
- * Er liegt HIER und nicht im Provider, aus einem gemessenen Grund: der reine Kern braucht
- * neben den Listen auch die SICHTBARKEITS-Overrides, und deren Abruf muss an denselben drei
- * Riegeln hängen wie die Listen (`datensatzAbrufAktiv`). Im Provider gebaut wäre es ein
- * zweiter Ort mit derselben Bedingung; ohne die Riegel feuerte er auf jeder Modulseite beim
- * blossen Öffnen der Palette — `pages/SchaedenPage.palette.test.tsx` (Etappe B) fährt MSW
- * mit `onUnhandledRequest: 'error'` und hätte den Bruch sofort gezeigt.
- *
- * Der zweite Beobachter auf `modulOverrides` kostet keinen zweiten Request: gleicher
- * Schlüssel, gleiches `enabled`, TanStack führt sie zusammen.
+ * Beschaffung UND reiner Kern in einem Griff, für den `PaletteHost`. HIER statt im Provider, weil
+ * auch der Abruf der Sichtbarkeits-Overrides an `datensatzAbrufAktiv` hängen muss; ohne die
+ * Riegel feuerte er beim bloßen Öffnen der Palette auf jeder Modulseite. Der zweite Beobachter
+ * auf `modulOverrides` kostet keinen zweiten Request.
  */
 export function useDatensatzTreffer({
   einsatzId,
@@ -352,9 +293,8 @@ export function useDatensatzTreffer({
     staleTime: FRISCH_MS,
   });
 
-  // `aktuellerModulKey` gehört NICHT in `DatensatzAbruf`: er entscheidet nichts über den
-  // Abruf, nur über die Rangfolge (LFH-391 · C4). Stünde er dort, hinge das `enabled` der
-  // vierzehn Abrufe an ihm, und ein Modulwechsel bei offener Palette startete sie neu.
+  // `aktuellerModulKey` gehört NICHT in `DatensatzAbruf`: er entscheidet nur die Rangfolge. Dort
+  // hinge das `enabled` der Abrufe an ihm, und ein Modulwechsel startete sie neu.
   return useMemo(
     () =>
       einsatzId == null
@@ -374,8 +314,7 @@ export function useDatensatzTreffer({
 }
 
 /**
- * EIN Leer-Array für alle Runden ohne Einsatz. Ein `[]` im Rückgabeausdruck wäre je Render
- * eine neue Identität und machte das `useMemo` im Aufrufer wirkungslos — dieselbe Falle, die
- * schon `useBefehle` mit `useDichte()` getreten hat.
+ * EIN Leer-Array für alle Runden ohne Einsatz; ein `[]` im Rückgabeausdruck wäre je Render eine
+ * neue Identität und machte das `useMemo` im Aufrufer wirkungslos.
  */
 const LEER: Treffer[] = [];

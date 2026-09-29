@@ -26,20 +26,16 @@ export const queryClientDefaults = {
   mutations: { retry: 0 },
 } satisfies DefaultOptions;
 
-/** Globaler Fehler-Seam für Queries UND Mutationen (LFH-268/F24).
+/** Globaler Fehler-Seam für Queries UND Mutationen.
  *
- *  Behandelt bewusst **nur 401** und schweigt sonst. Grund: in react-query v5 feuert
- *  `MutationCache.onError` ZUSÄTZLICH zum mutationseigenen `onError` (query-core
- *  `mutation.js:148` vor `:159`, getrennte try/catch), und `QueryCache.onError` feuert
- *  unbedingt bei jedem Query-Fehler inklusive stiller Hintergrund-Refetches
- *  (`query.js:323-331`). Ein generischer Toast an dieser Stelle stünde also neben jeder der
- *  98 lokalen Fehlermeldungen — und bei Refetches ohne jeden Nutzeranlass.
+ *  Behandelt bewusst **nur 401**. In react-query v5 feuert `MutationCache.onError` ZUSÄTZLICH
+ *  zum mutationseigenen `onError`, und `QueryCache.onError` bei jedem Query-Fehler inklusive
+ *  stiller Hintergrund-Refetches; ein generischer Toast stünde neben jeder lokalen
+ *  Fehlermeldung.
  *
- *  Ein `ApiError` ≠ 401 ist eine vom Server verstandene fachliche Ablehnung; für die ist der
- *  lokale Handler zuständig, der den Kontext kennt (Formularfeld, Überschreiben-Dialog,
- *  Offline-Queue). Ein `NetzFehler` ist ebenfalls ein erwarteter Betriebszustand und
- *  wird lokal bzw. in der Betriebszeile erklärt. Nur sonstige Fehler sind unerwartet
- *  (beispielsweise Programmierfehler) und werden protokolliert. */
+ *  Ein `ApiError` ≠ 401 ist eine fachliche Ablehnung, die der lokale Handler mit Kontext meldet;
+ *  ein `NetzFehler` ist ein erwarteter Betriebszustand. Nur sonstige Fehler (etwa
+ *  Programmierfehler) werden protokolliert. */
 function behandleFehler(fehler: unknown): void {
   if (fehler instanceof ApiError) {
     if (fehler.status === 401) meldeSitzungAbgelaufen();
@@ -89,9 +85,8 @@ function raeumeNachRechteentzug(
   });
 }
 
-/** Einziger Bauplan für den QueryClient — von `main.tsx` UND `test/utils.tsx` genutzt.
- *  Ohne diese geteilte Fabrik wäre der globale Handler in keinem Test sichtbar (der
- *  Produktions-Client aus `main.tsx` wird von 0 Testdateien importiert). */
+/** Einziger Bauplan für den QueryClient, von `main.tsx` UND `test/utils.tsx` genutzt, damit der
+ *  globale Handler auch in Tests wirkt. */
 export function erzeugeQueryClient(
   defaultOptions: DefaultOptions = queryClientDefaults,
 ): QueryClient {

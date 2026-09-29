@@ -4,16 +4,16 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { act, type ReactElement } from 'react';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { neuerQueryClient, renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
 import { sendeBreitenAenderung, setzeViewportBreite } from '../test/viewport';
-import { AuthProvider } from '../auth/AuthContext';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
 import { queueEinreihen, queueLeerenFuerTests } from '../offline/queue';
 import EtbPage from './EtbPage';
 import type { EtbEintragAnzeige } from '../api/types';
+import { adminFixture } from '../test/fixtures';
 
 function renderMitProviders(
   ui: ReactElement,
@@ -37,15 +37,7 @@ beforeEach(async () => {
   localStorage.clear();
 });
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const admin = adminFixture();
 const einsatz = {
   id: 7,
   bezeichnung: 'Hochwasser Nord',
@@ -115,7 +107,7 @@ function OrtSpy() {
 
 function setupMSW() {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/etb', () => HttpResponse.json([eintrag])),
     zaehlung({ meldung: 1 }),
@@ -134,12 +126,12 @@ function setup(route = '/einsaetze/7/etb', zusatz: RequestHandler[] = []) {
   // Nach den Vorgaben: `server.use` stellt voran, der zuletzt gesetzte Handler gewinnt.
   server.use(...zusatz);
   return renderMitProviders(
-    <AuthProvider>
+    <>
       <Routes>
         <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
       </Routes>
       <OrtSpy />
-    </AuthProvider>,
+    </>,
     { route },
   );
 }
@@ -178,11 +170,9 @@ describe('EtbPage', () => {
         ),
       );
       renderMitProviders(
-        <AuthProvider>
-          <Routes>
-            <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
-          </Routes>
-        </AuthProvider>,
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>,
         { route: '/einsaetze/7/etb' },
       );
       await screen.findByText('Erste Meldung');
@@ -248,11 +238,9 @@ describe('EtbPage', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+      </Routes>,
       { route: '/einsaetze/7/etb' },
     );
     const user = userEvent.setup();
@@ -364,7 +352,7 @@ describe('EtbPage', () => {
     }));
     const ziel = { ...eintrag, id: 5, lfd_nr: 1, inhalt: 'Ziel-Eintrag' };
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/etb', ({ request }) => {
         const url = new URL(request.url);
@@ -376,12 +364,12 @@ describe('EtbPage', () => {
       http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(
-      <AuthProvider>
+      <>
         <Routes>
           <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
         </Routes>
         <OrtSpy />
-      </AuthProvider>,
+      </>,
       { route: '/einsaetze/7/etb?eintrag=5' },
     );
     // Der Ziel-Eintrag liegt erst auf Seite 2 → muss automatisch nachgeladen werden.
@@ -401,7 +389,7 @@ describe('EtbPage', () => {
   it('räumt ?eintrag= ohne Highlight, wenn der Eintrag nicht existiert (Pagination erschöpft, kein Endlos-Fetch)', async () => {
     let folgeSeiten = 0;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/etb', ({ request }) => {
         if (new URL(request.url).searchParams.has('before_lfd_nr')) folgeSeiten += 1;
@@ -413,12 +401,12 @@ describe('EtbPage', () => {
       http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(
-      <AuthProvider>
+      <>
         <Routes>
           <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
         </Routes>
         <OrtSpy />
-      </AuthProvider>,
+      </>,
       { route: '/einsaetze/7/etb?eintrag=999' },
     );
     await screen.findByText('Erste Meldung');
@@ -535,12 +523,12 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     setupMSW();
     server.use(...zusatz);
     return renderMitProviders(
-      <AuthProvider>
+      <>
         <Routes>
           <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
         </Routes>
         <OrtSpy />
-      </AuthProvider>,
+      </>,
       { route },
     );
   }
@@ -815,12 +803,12 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
+      <>
         <Routes>
           <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
         </Routes>
         <OrtSpy />
-      </AuthProvider>,
+      </>,
       { route: '/einsaetze/7/etb?einheit_id=5' },
     );
     await screen.findByText('Erste Meldung');
@@ -845,12 +833,12 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
      */
     setupMSW();
     renderMitProviders(
-      <AuthProvider>
+      <>
         <Routes>
           <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
         </Routes>
         <OrtSpy />
-      </AuthProvider>,
+      </>,
       { route: '/einsaetze/7/etb' },
     );
     await screen.findByText('Erste Meldung');

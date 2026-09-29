@@ -1,19 +1,14 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::einstellungen::etb_startwert;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Material;
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "material";
-use crate::error::AppError;
 use crate::material::disposition_repo::{self, AdhocDaten};
 use crate::material::{EinsatzMaterialAnzeige, MaterialStatus};
-use crate::routes::support::{trimme, trimme_tri};
+use crate::routes::support::{deserialize_optional_field, pflicht, trimme, trimme_tri};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -22,32 +17,20 @@ use serde::Deserialize;
 /// SSE-Notify (Lage-Karte/Meldebild): Material-Disposition hat sich geändert.
 /// Wird unbedingt nach jeder Mutation gesendet — auch bei reinen Bemerkungs-/
 /// UHS-Zuordnungs-Änderungen, die keinen ETB-Eintrag schreiben (LFH-66).
-fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "material_id": em_id }).to_string();
+pub(super) fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Material, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Material, "material_id", em_id);
 }
 
 /// GET /api/einsaetze/{id}/material — disponiertes Material (aufgelöst). Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Material>,
 ) -> Result<Json<Vec<EinsatzMaterialAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
-        disposition_repo::liste(&state.pool, einsatz_id, einsatz.ist_aktiv()).await?,
+        disposition_repo::liste(&state.pool, einsatz_id, ctx.einsatz.ist_aktiv()).await?,
     ))
 }
 
@@ -70,23 +53,10 @@ pub struct DisponierenBody {
 /// Schreibberechtigt + aktiver Einsatz. Schreibt ETB-Eintrag (inkl. Menge).
 pub async fn disponieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Material>,
     JsonBody(body): JsonBody<DisponierenBody>,
 ) -> Result<(StatusCode, Json<EinsatzMaterialAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let menge = body.menge.unwrap_or(1);
     if menge < 1 {
         return Err(AppError::Validation("Menge muss mindestens 1 sein".into()));
@@ -106,12 +76,7 @@ pub async fn disponieren(
     let ziel = match (body.material_id, body.adhoc) {
         (Some(material_id), None) => Ziel::Stamm(material_id),
         (None, Some(adhoc)) => {
-            bezeichnung_owned = adhoc.bezeichnung.trim().to_string();
-            if bezeichnung_owned.is_empty() {
-                return Err(AppError::Validation(
-                    "Bezeichnung darf nicht leer sein".into(),
-                ));
-            }
+            bezeichnung_owned = pflicht(&adhoc.bezeichnung, "Bezeichnung")?;
             kategorie_owned = trimme(adhoc.kategorie);
             bestandsnummer_owned = trimme(adhoc.bestandsnummer);
             traeger_owned = trimme(adhoc.traegerorganisation);
@@ -133,32 +98,36 @@ pub async fn disponieren(
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige (bei Stamm-
     // Material stammt die Bezeichnung erst aus dem Snapshot des INSERT) für ETB-Text UND
     // Response. SSE erst nach dem Commit.
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let anzeige = crate::write_retry!(&state.pool, |conn| {
         let em_id = match &ziel {
             Ziel::Stamm(material_id) => {
                 disposition_repo::disponiere_stamm_tx(
                     conn,
                     einsatz_id,
-                    einsatz.org_id,
+                    ctx.einsatz.org_id,
                     *material_id,
                     menge,
-                    benutzer.id,
+                    ctx.benutzer.id,
                 )
                 .await?
             }
             Ziel::Adhoc(daten) => {
-                disposition_repo::disponiere_adhoc_tx(conn, einsatz_id, *daten, menge, benutzer.id)
-                    .await?
+                disposition_repo::disponiere_adhoc_tx(
+                    conn,
+                    einsatz_id,
+                    *daten,
+                    menge,
+                    ctx.benutzer.id,
+                )
+                .await?
             }
         };
         let anzeige = disposition_repo::laden_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             startwert,
             &crate::material::etb_text_disponiert(&anzeige.bezeichnung, anzeige.menge),
         )
@@ -174,15 +143,9 @@ pub struct DispoPatchBody {
     pub menge: Option<i64>,
     pub status: Option<String>,
     /// Tri-State (F12-c/LFH-266): fehlend = unverändert, `null`/`""` = leeren, Wert = setzen.
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub bemerkung: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub uhs_id: Option<Option<i64>>,
 }
 
@@ -191,23 +154,11 @@ pub struct DispoPatchBody {
 /// Bemerkungsänderung schreibt keinen.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, em_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Material>,
+    PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<DispoPatchBody>,
 ) -> Result<Json<EinsatzMaterialAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if let Some(menge) = body.menge {
         if menge < 1 {
             return Err(AppError::Validation("Menge muss mindestens 1 sein".into()));
@@ -234,9 +185,7 @@ pub async fn aktualisieren(
     // EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload (`nachher`) liefert die frischen
     // Werte für ETB-Texte UND Response; ein Menge-Wechsel und ein Status-Wechsel schreiben je
     // einen Eintrag (eine reine Bemerkungsänderung keinen). SSE erst nach dem Commit.
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let nachher = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::aktualisiere_tx(
             conn,
@@ -253,7 +202,7 @@ pub async fn aktualisieren(
             crate::etb::system_audit_tx(
                 conn,
                 einsatz_id,
-                benutzer.id,
+                ctx.benutzer.id,
                 startwert,
                 &format!(
                     "Material «{}»: Menge {} → {}",
@@ -266,7 +215,7 @@ pub async fn aktualisieren(
             crate::etb::system_audit_tx(
                 conn,
                 einsatz_id,
-                benutzer.id,
+                ctx.benutzer.id,
                 startwert,
                 &format!(
                     "Material «{}»: Status «{}» → «{}»",
@@ -286,22 +235,10 @@ pub async fn aktualisieren(
 /// DELETE /api/einsaetze/{id}/material/{em_id} — aus dem Einsatz entfernen. Schreibt ETB-Eintrag.
 pub async fn entfernen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, em_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Material>,
+    PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, em_id, true).await?;
 
     // F06/LFH-244 Tier-A: Löschung + System-ETB-Eintrag atomar in EINER Tx (BEGIN IMMEDIATE +
@@ -311,12 +248,10 @@ pub async fn entfernen(
         "Material «{}» aus dem Einsatz entfernt",
         anzeige.bezeichnung
     );
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         disposition_repo::entferne_tx(conn, einsatz_id, em_id).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(())
     })?;
     sse_material(&state, einsatz_id, em_id);

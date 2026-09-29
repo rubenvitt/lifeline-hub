@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { QueryClient, dehydrate } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -15,6 +15,7 @@ import {
   meldeSitzungAbgelaufen,
   sitzungsMeldungZuruecksetzen,
 } from './sitzungsEvent';
+import { adminFixture } from '../test/fixtures';
 
 afterEach(() => sitzungsMeldungZuruecksetzen());
 
@@ -30,15 +31,7 @@ function Anzeige() {
   );
 }
 
-const adminBody = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const adminBody = adminFixture();
 
 describe('AuthContext', () => {
   it('zeigt anonym, wenn /me 401 liefert', async () => {
@@ -68,7 +61,7 @@ describe('AuthContext', () => {
 
   it('meldet lokal ab, auch wenn der Server-Logout scheitert (LFH-268)', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(adminBody)),
+      meHandler(adminBody),
       // session::loeschen propagiert seinen AppError (src/routes/auth.rs:226) — ein
       // SQLITE_BUSY unter Last reicht für einen 5xx.
       http.post('/api/auth/logout', () =>

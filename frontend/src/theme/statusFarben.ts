@@ -36,73 +36,36 @@ import type {
 import type { HochwasserKlasse, LuftqualitaetKlasse, OdlStufe } from '../api/fachebenen';
 
 /**
- * Statusfarb-Vertrag (LFH-328 · A2). EINE Quelle für „welche Bedeutung hat welche
- * Statusfarbe" — vorher lagen dieselben Abbildungen in bis zu fünf Dateien parallel.
+ * Statusfarb-Vertrag (LFH-328 · A2): EINE Quelle für „welche Bedeutung hat welche Statusfarbe“.
  *
  * DIESE DATEI TRÄGT KEINEN FARBWERT. Sie bildet Domänen-Enums auf **Rollen** ab
- * (`alarm`/`achtung`/`normal`/`neutral`/`bedien`/`marke`); die Werte stehen
- * ausschließlich in `tokens.ts` bzw. `rollen.css`. {@link rollenFarbe} ist die einzige
- * Übersetzung Rolle → Farbwert, und sie liest den aktiven Modus aus dem antd-Token.
+ * (`alarm`/`achtung`/`normal`/`neutral`/`bedien`/`marke`); die Werte stehen ausschließlich in
+ * `tokens.ts` bzw. `rollen.css`. {@link rollenFarbe} ist die einzige Übersetzung Rolle →
+ * Farbwert und liest den aktiven Modus aus dem antd-Token.
  *
- * JEDER EINTRAG TRÄGT EINEN ZWEITEN KANAL. `label` ist Pflichtfeld, nicht optional
- * (WCAG 1.4.1, A1 Festlegung 5): ein Eintrag, der nur eine Farbe liefert, bricht den
- * Typcheck. `Record<Enum, StatusDarstellung>` bricht zusätzlich bei einer neuen
- * Enum-Variante — beides ist Absicht, nicht Strenge um ihrer selbst willen.
+ * JEDER EINTRAG TRÄGT EINEN ZWEITEN KANAL: `label` ist Pflichtfeld (WCAG 1.4.1).
+ * `Record<Enum, StatusDarstellung>` bricht zusätzlich bei einer neuen Enum-Variante den
+ * Typcheck.
  *
- * ── DIE GRENZE DES VERTRAGS, und sie ist Teil des Vertrags ──────────────────────
+ * ── DIE GRENZE DES VERTRAGS ──
  *
- * Für Fahrzeug- und Personalstatus kommt die Farbe NICHT von hier, sondern **aus der
- * Datenbank**: `status_farbe` (`types.generated.ts:598/694`, `status_farbe?: string | null`)
- * wird im Backend (`src/routes/fahrzeug_status.rs`, `src/routes/personal_status.rs`) nur
- * getrimmt — **keine Wertevalidierung, kein Enum, kein Hex-Format-Check**. Es ist
- * mandantengepflegter Freitext aus den Stammdaten-Tabs, und ein getypter `Record` kann
- * das nicht einfangen: der Tag rendert am Ende einen beliebigen String.
+ * Für Fahrzeug- und Personalstatus kommt die Farbe aus der DATENBANK: `status_farbe` ist
+ * mandantengepflegter Freitext, den das Backend nur trimmt (kein Enum, kein Format-Check). Dieser
+ * Vertrag deckt nur die Fallback-Achse ({@link statusKategorie}); die DB-Achse bleibt draußen.
+ * Ebenfalls draußen: Farb-/Label-Maps anderer Achsen (`kommunikation/phase.ts`, `TierePage`,
+ * `clusterDonut.ts`, `taktischesZeichen.ts` u. a.). Sichtung ist ein eigener Vertrag: eine
+ * fachliche Farbkennzeichnung, keine A0-Statusrolle.
  *
- * Dieser Vertrag deckt deshalb die **Fallback-Achse** ({@link statusKategorie}, früher
- * `KATEGORIE_FALLBACK` in `FahrzeugePage`/`PersonalPage`, byte-identisch dupliziert) —
- * **die DB-Achse bleibt draußen.** Ohne diesen Satz behauptet die Exhaustivität etwas,
- * das nicht gilt. Dass die DB-Farbe gegen die Rollen validiert werden sollte, ist ein
- * eigener Befund mit eigenem Ticket, nicht Teil von A2.
+ * ── DRITTE DARSTELLUNGSSORTE: FLÄCHE ──
  *
- * Ebenfalls bewusst draußen: die rund 20 Farb-/Label-Maps außerhalb der hier gelisteten
- * Enums (`kommunikation/phase.ts`, `TierePage`, `clusterDonut.ts`, `taktischesZeichen.ts` u. a.).
- * Sie hineinzuziehen wäre der Bestands-Sweep, den A2 ausdrücklich verbietet.
- * Der Materialstatus (`pages/MaterialPage.tsx`) stand bis LFH-341/C6 in dieser Liste —
- * seither trägt er seine Karte HIER ({@link materialStatus}), nicht mehr draußen.
- * LFH-455 nimmt Personenstatus, Schadensstatus und Schadensausmaß auf. Sichtung liegt
- * hier als eigener Vertrag: eine fachliche Farbkennzeichnung, keine A0-Statusrolle.
- * LFH-358 holt die zwei Karten herein, die den Vertragstyp {@link StatusDarstellung}
- * schon trugen und trotzdem draußen lagen ({@link einsatzStatus},
- * {@link dringlichkeit}) — beide mit derselben, inzwischen eingelösten Begründung.
+ * {@link warnstufeFlaeche} bildet Stufen auf die Füllungsrollen aus `tokens.ts` ab,
+ * {@link flaechenFarbe} löst sie je Modus auf. Eigener Typ ({@link Flaechendarstellung}), weil
+ * eine Füllung keine {@link Statusrolle} ist. Wer eine VIERTE Sorte braucht, benennt sie hier.
  *
- * ── DIE DRITTE DARSTELLUNGSSORTE: FLÄCHE (aufgelöst mit LFH-368 · B5h) ──────────
- *
- * Bis B5h lag sie außerhalb dieses Vertrags: `pages/gefahren/gefahrenSchema.ts`
- * hielt vier Pastell-Hex für die Matrixzellen — begründet (ein gesättigter Rollenton
- * macht den Zellinhalt unlesbar), aber am falschen Ort und OHNE Nachtmodus-Gegenwert.
- * Beides ist erledigt: {@link warnstufeFlaeche} bildet die Stufen auf die
- * Füllungsrollen aus `tokens.ts` ab, {@link flaechenFarbe} löst sie je Modus auf.
- *
- * Die Sorte bleibt getrennt, der Ort nicht mehr: „eine Quelle für Statusfarbe" gilt
- * jetzt für Etikett UND Fläche, und die Fläche kommt mit einem eigenen Typ
- * ({@link Flaechendarstellung}), weil eine Füllung keine {@link Statusrolle} ist.
- * Wer eine VIERTE Sorte braucht, benennt sie hier — still danebenzubauen ist der
- * Fehler, nicht das Danebenbauen selbst.
- *
- * Gefunden im Code-Review zu LFH-328: `pages/lagekarte/ZonenInspector.tsx` benutzte
- * `warnstufeFarbe` für ein Status-Etikett und ist auf {@link warnstufeKarte} gezogen
- * worden. LFH-368 hat denselben Fehlgriff in `pages/gefahren/GefahrenPage.tsx`
- * gefunden und behandelt ihn im selben Umbau.
- *
- * ── DIE GRENZEN SIND SEIT LFH-358 MASCHINELL, NICHT MEHR NUR AUFGESCHRIEBEN ─────
- *
- * `theme/statusVertrag.guard.test.ts` trägt beide Hälften: keine
- * `Record<…, StatusDarstellung>` außerhalb DIESER DATEI — nicht bloß außerhalb des
- * Verzeichnisses, denn ein Geschwistermodul exportiert nichts über sie und liefe am
- * selbst ableitenden Abdeckungstest in `statusFarben.test.ts` genauso vorbei —, und kein
- * `<Tag color={…}>`, das ein Vertrags-Enum einfärbt — dafür ist
- * `components/StatusTag.tsx` da. Beide Guards listen ihre blinden Flecken im
- * Kopfkommentar mit gemessener Fundstelle; das ist Teil des Vertrags, nicht Beiwerk.
+ * `theme/statusVertrag.guard.test.ts` hält die Grenzen maschinell: keine
+ * `Record<…, StatusDarstellung>` außerhalb DIESER DATEI (nicht bloß des Verzeichnisses) und kein
+ * `<Tag color={…}>`, das ein Vertrags-Enum einfärbt (dafür `components/StatusTag.tsx`). Die
+ * blinden Flecken stehen im Kopf des Guards.
  */
 
 /** Eine A0-Statusrolle. Farbwerte stehen ausschließlich in `tokens.ts`/`rollen.css`. */
@@ -117,43 +80,21 @@ export interface StatusDarstellung {
 }
 
 /**
- * Status eines Einsatzes (LFH-328 · A2 als Zuordnung, LFH-345 · C10 raus aus der Seite,
- * LFH-358 herauf in den Vertrag).
- *
- * DER UMWEG IST DIE GESCHICHTE DIESES EINTRAGS, und er gehört hierher, weil er die
- * Regel erklärt: die Karte lag zuerst als modul-lokale Konstante in `EinsaetzePage`.
- * Der zweite Leser (`EinsatzdatenPage`) hatte sie NICHT — dort stand `{einsatz.status}`
- * roh im Titel-Tag, also der Wire-Wert klein geschrieben. C10 hat sie deshalb nach
- * `einsatz/einsatzStatus.ts` gezogen, aber bewusst NICHT hierher: der Abdeckungstest
- * zählte gegen ein `toHaveLength`, ein Eintrag mehr wäre eine Vertragsänderung gewesen
- * und damit eine eigene Entscheidung. LFH-358 ist diese Entscheidung.
- *
- * Sie war nötig, weil die Zwischenstation genau das Loch offen ließ, gegen das der
- * Vertrag gebaut ist: eine Karte AUSSERHALB dieser Datei lief am selbst
- * ableitenden Abdeckungstest vorbei — und während sie draußen stand, malten ZEHN
- * Seiten weiter `<Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>` mit
- * dem rohen Wire-Wert darin. Also derselbe Befund wie an `EinsatzdatenPage`, zehnmal,
- * gemessen am 12.09.2026. Der Umzug allein hatte ihn nicht geschlossen; die zwei
- * Guards in `statusVertrag.guard.test.ts` schließen ihn.
- *
- * Die Zuordnung selbst ist nicht hier entschieden, sondern zitiert (A0-Spec §6,
- * Prüflistenzeile 7: `aktiv` → `normal`, `abgeschlossen` → `neutral`).
+ * Status eines Einsatzes. Zuordnung nach A0-Spec §6, Prüflistenzeile 7
+ * (`aktiv` → `normal`, `abgeschlossen` → `neutral`).
  */
 export const einsatzStatus: Record<EinsatzStatus, StatusDarstellung> = {
-  // Großgeschrieben, weil es eine BESCHRIFTUNG ist und kein Enum-Wert. Der Bestand
-  // gab hier den Schlüssel selbst zurück — dann ist der zweite Kanal formal erfüllt und
-  // sagt trotzdem nur, wie das Feld in der Datenbank heißt.
+  // Großgeschrieben, weil es eine BESCHRIFTUNG ist: der Wire-Wert als Label erfüllte den
+  // zweiten Kanal nur formal.
   aktiv: { rolle: 'normal', label: 'Aktiv' },
   abgeschlossen: { rolle: 'neutral', label: 'Abgeschlossen' },
 };
 
 /**
- * Lagezustand eines Einsatzabschnitts (LFH-608) — die Kante der Abschnittszeile im
- * Führungs-Überblick. Drei Stufen auf drei A0-Rollen, ohne Umweg: planmäßig ist `normal`
- * (grün), angespannt `achtung`, kritisch `alarm`. „Nicht beurteilt" hat KEINEN Eintrag —
- * das Feld ist dann leer, und eine erfundene Neutralstufe behauptete eine Beurteilung,
- * die niemand getroffen hat. Der Entwurf färbt die UHS-Zeile blau; das ist keine
- * Lagestufe, sondern Blau als Bedienrolle, und wird deshalb nicht übernommen.
+ * Lagezustand eines Einsatzabschnitts (LFH-608), die Kante der Abschnittszeile im
+ * Führungs-Überblick. „Nicht beurteilt“ hat KEINEN Eintrag: das Feld ist dann leer, eine
+ * Neutralstufe behauptete eine Beurteilung. Das Blau der UHS-Zeile im Entwurf ist Bedienrolle,
+ * keine Lagestufe.
  */
 export const abschnittLagezustand: Record<AbschnittLagezustand, StatusDarstellung> = {
   planmaessig: { rolle: 'normal', label: 'planmäßig' },
@@ -207,23 +148,15 @@ export const sichtung: Record<Sichtungskategorie, SichtungsDarstellung> = {
   unverletzt: { label: 'unverletzt', farbe: null },
 };
 
-/**
- * Kräfte-Statuskategorie. Vereint fünf bisher getrennt gepflegte Maps:
- * `KAT_FARBE` (`KraefteuebersichtPage`), `KATEGORIE_FARBEN` (`StatusKatalogTab`,
- * `PersonalStatusTab`) und `KATEGORIE_FALLBACK` (`FahrzeugePage`, `PersonalPage`).
- *
- * DIVERGENZ AUFGELÖST: `gebunden` war in `KraefteuebersichtPage` `'gold'`, in den vier
- * anderen `'orange'` — zwei Farben für einen Zustand. Hier ist es EINE Zeile.
- */
+/** Kräfte-Statuskategorie (Fallback-Achse für Fahrzeug- und Personalstatus). */
 export const statusKategorie: Record<StatusKategorie, StatusDarstellung> = {
   verfuegbar: { rolle: 'normal', label: 'verfügbar' },
   gebunden: { rolle: 'achtung', label: 'gebunden' },
   nicht_verfuegbar: { rolle: 'alarm', label: 'nicht verfügbar' },
 };
 
-/** Verfügbarkeit eines UHS-Platzes (früher `VERF_FARBE`, `pages/uhs/Grundriss.tsx`).
- *  `gesperrt` war dort Grau — die A0-Entsprechung ist `neutral`, nicht `alarm`:
- *  ein gesperrter Platz ist ein bewusster Zustand, keine Gefahr. */
+/** Verfügbarkeit eines UHS-Platzes. `gesperrt` ist `neutral`, nicht `alarm`: ein bewusster
+ *  Zustand, keine Gefahr. */
 export const verfuegbarkeit: Record<Verfuegbarkeit, StatusDarstellung> = {
   frei: { rolle: 'normal', label: 'frei' },
   defekt: { rolle: 'alarm', label: 'defekt' },
@@ -233,21 +166,11 @@ export const verfuegbarkeit: Record<Verfuegbarkeit, StatusDarstellung> = {
 };
 
 /**
- * ETB-Eintragstyp (früher `TYP_FARBE`/`TYP_LABEL`, `etb/typFarben.ts`) — als ETIKETT.
+ * ETB-Eintragstyp als ETIKETT (`StatusTag`) und Quelle des Wortlauts (`label`).
  *
- * Diese Karte trägt Wortlaut und eine Statusrolle für die Etikett-Darstellung
- * (`StatusTag`). Seit dem Neuentwurf „Instrumententafel" (21.09.2026, Entscheidung 2 des
- * Auftraggebers) ist die Zieldarstellung aber eine andere: farbige KANTE plus TYPWORT in
- * Typfarbe, nicht mehr ein Etikett — Meldung blau, Anordnung orange, Entscheidung
- * violett, Lage cyan, Berichtigung rot, System neutral. Die Typfarbe liefert
- * {@link etbTypFarbe}, der Wortlaut bleibt HIER (`label`).
- *
- * Damit ist der frühere „bewusste Auflösungsverlust" (`lage`/`entscheidung` → `neutral`)
- * für die Kante aufgehoben — nicht über eine neue {@link Statusrolle}, sondern über eine
- * eigene Palette: ein Eintragstyp ist eine KATEGORIE, keine Dringlichkeit, und gehört
- * deshalb nicht auf die Statusachse. Die Rollen unten bleiben stehen, solange das
- * Etikett noch Konsumenten hat — die ETB-Zeitachse (`etb/EtbZeitachse.tsx`, Nachfolgerin
- * der früheren `EtbTabelle`) liest heute nur `label`; die Karte selbst bleibt im Vertrag.
+ * Die Zeitachse zeigt den Typ als farbige KANTE plus TYPWORT; diese Farbe liefert
+ * {@link etbTypFarbe} aus einer eigenen Palette, weil ein Eintragstyp eine Kategorie ist und
+ * keine Dringlichkeit. Die Rollen hier gelten nur für die Etikett-Darstellung.
  */
 export const etbTyp: Record<EtbTyp, StatusDarstellung> = {
   meldung: { rolle: 'bedien', label: 'Meldung' },
@@ -258,17 +181,15 @@ export const etbTyp: Record<EtbTyp, StatusDarstellung> = {
   berichtigung: { rolle: 'alarm', label: 'Berichtigung' },
 };
 
-/** Status einer Unfallhilfsstelle (früher `STATUS_META`, `pages/UnfallhilfsstellenPage.tsx`). */
+/** Status einer Unfallhilfsstelle. */
 export const uhsStatus: Record<UhsStatus, StatusDarstellung> = {
   geplant: { rolle: 'neutral', label: 'geplant' },
   aktiv: { rolle: 'normal', label: 'aktiv' },
   aufgeloest: { rolle: 'alarm', label: 'aufgelöst' },
 };
 
-/** Typ einer Unfallhilfsstelle. Im Bestand gab es dafür NUR Labels
- *  (`UHS_TYP_LABEL`), nie eine Farbe — der Typ ist eine Kategorie, keine Lage.
- *  Er bleibt deshalb durchgängig `neutral`; unterschieden wird über den Text und
- *  über das taktische Zeichen (`pages/lagekarte/taktischesZeichen.ts`). */
+/** Typ einer Unfallhilfsstelle: eine Kategorie, keine Lage, deshalb durchgängig `neutral`;
+ *  unterschieden wird über den Text und das taktische Zeichen. */
 export const uhsTyp: Record<UhsTyp, StatusDarstellung> = {
   patientenablage: { rolle: 'neutral', label: 'Patientenablage' },
   behandlungsplatz: { rolle: 'neutral', label: 'Behandlungsplatz' },
@@ -277,27 +198,10 @@ export const uhsTyp: Record<UhsTyp, StatusDarstellung> = {
 };
 
 /**
- * Status eines Einsatzmaterials (früher `STATUS_META`, `pages/MaterialPage.tsx`).
- *
- * ── DIE FRAGE, DIE C4 OFFEN GELASSEN HAT, IST HIER BEANTWORTET (LFH-341 · C6) ────
- *
- * LFH-339/C4 hat für diesen Katalog bewusst KEINE Rolle vergeben und den Grund
- * hingeschrieben: `im_einsatz` war Blau, „Rot bedient nichts, `bedien` ist blau" —
- * also schien es für diesen Zustand keine ehrliche Rolle zu geben. C4 hat daraus
- * nicht „nie" gemacht, sondern „eine eigene Entscheidung, kein Nebenprodukt".
- *
- * Die Entscheidung ist getroffen, und sie erfindet nichts: `bedien` ist in DIESER
- * Datei bereits dreimal Kategoriefarbe für eine aktive Beziehung — `verfuegbarkeit
- * .reserviert`, `belegungsArt.wechsel`, `etbTyp.meldung`. Material im Einsatz ist
- * derselbe Zustand, nicht ein neuer. Die Rolle war da, sie war nur nicht erkannt.
- *
- * `defekt` und `verbraucht` teilen sich `alarm` — dasselbe Muster wie bei
- * {@link warnstufeKarte}, wo fünf Stufen auf drei Rollen fallen. Der zweite Kanal ist
- * das Pflichtfeld `label`; eine sechste Farbe gibt es dafür nicht.
- *
- * EIN Behandlungsweg für dieses Enum: `pages/MaterialPage.tsx` (Kräfte) und
- * `pages/uhs/MaterialTab.tsx` (UHS) lesen beide von hier. Zwei Farbbehandlungen
- * desselben Enums wären der Fehlerfall, nicht der Kompromiss.
+ * Status eines Einsatzmaterials. `im_einsatz` ist `bedien`: die Rolle steht in dieser Datei
+ * schon für aktive Beziehungen (`verfuegbarkeit.reserviert`, `belegungsArt.wechsel`,
+ * `etbTyp.meldung`). `defekt` und `verbraucht` teilen sich `alarm`, unterschieden über `label`.
+ * `pages/MaterialPage.tsx` und `pages/uhs/MaterialTab.tsx` lesen beide von hier.
  */
 export const materialStatus: Record<MaterialStatus, StatusDarstellung> = {
   einsatzbereit: { rolle: 'normal', label: 'einsatzbereit' },
@@ -307,16 +211,14 @@ export const materialStatus: Record<MaterialStatus, StatusDarstellung> = {
   desinfektion_noetig: { rolle: 'achtung', label: 'Desinfektion nötig' },
 };
 
-/** Status eines Bereitstellungsraums (früher `STATUS_META`,
- *  `pages/bereitstellungsraum/BereitstellungsraeumePage.tsx`). */
+/** Status eines Bereitstellungsraums. */
 export const brStatus: Record<BrStatus, StatusDarstellung> = {
   geplant: { rolle: 'neutral', label: 'geplant' },
   aktiv: { rolle: 'normal', label: 'aktiv' },
   aufgeloest: { rolle: 'alarm', label: 'aufgelöst' },
 };
 
-/** Bewegungsart einer UHS-Belegung (früher `ART_FARBE`/`ART_LABEL`,
- *  `pages/uhs/BewegungenTab.tsx`). */
+/** Bewegungsart einer UHS-Belegung. */
 export const belegungsArt: Record<BelegungsArt, StatusDarstellung> = {
   eintritt: { rolle: 'normal', label: 'Eintritt' },
   wechsel: { rolle: 'bedien', label: 'Wechsel' },
@@ -324,35 +226,16 @@ export const belegungsArt: Record<BelegungsArt, StatusDarstellung> = {
 };
 
 /**
- * Warnstufe als **Objektsignatur auf der Karte** (früher `WARNSTUFE_KARTE`,
- * `pages/lagekarte/zonenStil.ts`).
+ * Warnstufe als **Objektsignatur auf der Karte**.
  *
- * `keine` ist bewusst `alarm`: ein Gefahrengebiet ohne gesetzte Warnstufe wird
- * vorsichtshalber als Gefahr dargestellt, nicht „ruhiger" als `niedrig`. Wer hier auf
- * `normal` zieht, dreht eine Sicherheitsentscheidung zurück — die Gegenlesart steht als
- * {@link warnstufeKennzahl} daneben, nicht statt dessen.
+ * `keine` ist bewusst `alarm`: ein Gefahrengebiet ohne gesetzte Warnstufe wird vorsichtshalber
+ * als Gefahr dargestellt. Die Gegenlesart steht als {@link warnstufeKennzahl} daneben.
  *
- * AUFLÖSUNGSVERLUST: der Bestand hatte fünf verschiedene Rot-/Gelbtöne, A0 hat drei
- * Statusrollen. `niedrig`/`mittel` fallen damit auf dieselbe Rolle, ebenso
- * `keine`/`hoch`/`akut` — die Farbe unterscheidet ZWEI Stufen, nicht fünf. Eine sechste
- * Farbe gibt es dafür weiterhin nicht.
- *
- * DIE A2-BEGRÜNDUNG DAZU WAR FALSCH; LFH-357 hat sie eingelöst statt sie umzuschreiben.
- * Sie lautete „wer die fünf Stufen unterscheiden muss, nutzt `label` (immer vorhanden)
- * oder `form`" — auf der Kartenfläche hielt keine der beiden Hälften:
- *
- * - `label` stand dort NICHT: `pages/lagekarte/kartenLayer.ts` beschriftete eine Zone mit
- *   ihrem NAMEN, und `ZoneStil` hat kein Feld für Text oder Form. Operativ sahen damit
- *   `niedrig` und `mittel` identisch aus, ebenso `hoch`, `akut` und ein Gebiet ohne Stufe.
- * - `form` kann es grundsätzlich nicht: es trägt DREI Zeichen (`FORM_ZEICHEN`,
- *   `components/StatusTag.tsx`) für fünf Stufen. Es ist in diesem Vertrag an keinem
- *   Eintrag gesetzt, und LFH-357 ändert daran nichts — ein dritter Kanal, der die
- *   Auflösung gar nicht herstellen kann, wird nicht gesetzt, bloss weil es ihn gibt.
- *
- * Der tragende zweite Kanal auf der Karte ist deshalb der TEXT, und er steht jetzt wirklich
- * dort: `pages/lagekarte/zonenStil.ts:zonenBeschriftung` setzt „Warnstufe: <label>" unter
- * den Zonennamen und liest `label` VON HIER. Wer ein Wort in dieser Map ändert, ändert die
- * Kartenbeschriftung mit — das ist Absicht, nicht Nebenwirkung.
+ * Fünf Stufen auf zwei Rollen (`niedrig`/`mittel` → `achtung`, `keine`/`hoch`/`akut` →
+ * `alarm`); die Farbe unterscheidet also nur zwei. Der tragende zweite Kanal auf der Karte ist
+ * der TEXT: `pages/lagekarte/zonenStil.ts:zonenBeschriftung` liest `label` von hier. Wer ein
+ * Wort ändert, ändert die Kartenbeschriftung mit. `form` bleibt ungesetzt: es trägt nur drei
+ * Zeichen für fünf Stufen.
  */
 export const warnstufeKarte: Record<Warnstufe, StatusDarstellung> = {
   keine: { rolle: 'alarm', label: 'keine' },
@@ -363,17 +246,12 @@ export const warnstufeKarte: Record<Warnstufe, StatusDarstellung> = {
 };
 
 /**
- * Warnstufe als **Kennzahl im Lagebild** (Werte aus `WARNSTUFE_STUFE`,
- * `pages/lage-dashboard/lagebild.ts`).
+ * Warnstufe als **Kennzahl im Lagebild**.
  *
- * `keine` ist hier `normal` — und das widerspricht {@link warnstufeKarte} mit Absicht:
- * die Karte zeigt ein OBJEKT (dieses eine Gebiet ist unbewertet ⇒ vorsichtshalber
- * Gefahr), das Dashboard eine KENNZAHL (nichts gemeldet ⇒ kein Alarmbeitrag). Beide
- * Lesarten sind für ihren Kontext richtig; sie stehen deshalb als zwei benannte Exporte
- * nebeneinander statt als eine stille Mehrheitsentscheidung.
- *
- * Die Werte sind hier KOPIERT, nicht importiert: `theme/` darf nicht von `pages/`
- * abhängen. Die Gegenrichtung — `lagebild.ts` liest von hier — ist der Zielzustand.
+ * `keine` ist hier `normal`, im Widerspruch zu {@link warnstufeKarte} mit Absicht: die Karte
+ * zeigt ein Objekt (unbewertet ⇒ vorsichtshalber Gefahr), das Dashboard eine Kennzahl (nichts
+ * gemeldet ⇒ kein Alarmbeitrag). Die Werte sind kopiert, weil `theme/` nicht von `pages/`
+ * abhängen darf.
  */
 export const warnstufeKennzahl: Record<Warnstufe, StatusDarstellung> = {
   keine: { rolle: 'normal', label: 'keine' },
@@ -386,28 +264,13 @@ export const warnstufeKennzahl: Record<Warnstufe, StatusDarstellung> = {
 /**
  * Hochwasserklasse eines LHP-Pegels auf der Lagekarte (LFH-77).
  *
- * DIESELBE AUFLÖSUNGSVERENGUNG WIE BEI {@link warnstufeKarte}, und aus demselben Grund:
- * das Portal führt vier Meldeklassen in vier eigenen Tönen (gelb/orange/rot/violett),
- * A0 hat drei Statusrollen. `klein`/`mittel` fallen damit auf `achtung`,
- * `gross`/`sehr_gross` auf `alarm` — die Farbe unterscheidet ZWEI Stufen, nicht vier.
- * Eine fünfte Farbe gibt es dafür nicht.
+ * Vier Meldeklassen auf zwei Rollen: `klein`/`mittel` → `achtung`, `gross`/`sehr_gross` →
+ * `alarm`. „Ohne Daten“ und „unklassifiziert“ sind beide `neutral` (das Portal malt sie grau
+ * bzw. blau, Blau ist hier aber `bedien`); unterschieden über `label`.
  *
- * DIE ZWEI NEUTRALEN SIND EINE ENTSCHEIDUNG, KEIN RESTPOSTEN. Das Portal malt einen
- * Pegel ohne Daten grau und einen unklassifizierten blau. Blau ist hier `bedien` und
- * bezeichnet eine aktive Beziehung, keinen Zustand; es dafür zu vergeben hieße, die
- * benannte Sichtungs-Ausnahme (SK IV) ein zweites Mal zu erfinden. Beide Klassen sagen
- * operativ dasselbe — dieser Pegel trägt zum Hochwasserlagebild nichts bei —, also
- * tragen sie dieselbe Rolle und werden über das Pflichtfeld `label` unterschieden.
- *
- * DER ZWEITE KANAL AUF DER KARTE IST DER PUNKTDURCHMESSER, nicht nur der Text: ein
- * Kreis trägt keine Beschriftung. `pages/lagekarte/hochwasserStil.ts` staffelt den
- * Radius, und eine gemeldete Klasse ist dort sichtbar größer als eine nicht gemeldete.
- * Die feine Staffelung ÜBER die vier Meldeklassen ist dabei eine eigene Entscheidung und
- * NICHT die des Portals: dessen `getRadiusPegel` (`js/lage-basics.js`) kennt bei Zoom ≥ 8
- * nur drei Größen — unklassifiziert 4, `-1`/`0` 6, und jede Klasse 1–4 einheitlich 7. Das
- * Portal trennt also gemeldet von nicht gemeldet und sonst nichts; hier muss der Radius
- * mehr leisten, weil die Rollenverengung vier Klassen auf zwei Farben legt. Das Wort
- * steht im Inspector.
+ * Zweiter Kanal auf der Karte ist der Punktdurchmesser (`pages/lagekarte/hochwasserStil.ts`),
+ * im Inspector das Wort. Die Staffelung über die vier Klassen ist eine eigene: das Portal
+ * trennt nur gemeldet von nicht gemeldet.
  */
 export const hochwasserKlasse: Record<HochwasserKlasse, StatusDarstellung> = {
   keine_daten: { rolle: 'neutral', label: 'keine Daten' },
@@ -422,20 +285,10 @@ export const hochwasserKlasse: Record<HochwasserKlasse, StatusDarstellung> = {
 /**
  * Stufe des UBA-Luftqualitätsindex einer Messstation auf der Lagekarte (LFH-79).
  *
- * DIE ACHTZEHNTE VERTRAGSKARTE (nach `odlStufe`, LFH-78), und das ist eine Entscheidung, kein
- * Nebenprodukt: die Stufe ist eine Domänen-Achse mit Zustandsbedeutung wie
- * {@link hochwasserKlasse}, und eine Karte außerhalb dieser Datei liefe am Abdeckungstest
- * vorbei (LFH-358).
- *
- * FÜNF STUFEN AUF DREI ROLLEN — dieselbe Verengung wie bei {@link warnstufeKarte}.
- * `sehr_gut`/`gut` → `normal`; `maessig` → `achtung`, weil das UBA ab „mäßig" Wirkungen bei
- * Langzeit- und Kombinationsexposition nicht mehr ausschließt; `schlecht`/`sehr_schlecht`
- * → `alarm`, ab dort rät das UBA empfindlichen Gruppen von Aktivität im Freien ab. Kein
- * Blau: `bedien` bezeichnet eine Beziehung, keinen Zustand. `keine_daten` ist `neutral` —
- * die Station sagt gerade nichts, das ist etwas anderes als „gute Luft".
- *
- * DER ZWEITE KANAL auf der Karte ist der Punktdurchmesser (`pages/lagekarte/luftqualitaetStil.ts`),
- * im Inspector das Wort. Die zusammengefassten Stufen trennt `label`.
+ * `sehr_gut`/`gut` → `normal`; `maessig` → `achtung` (das UBA schließt ab „mäßig“ Wirkungen bei
+ * Langzeitexposition nicht mehr aus); `schlecht`/`sehr_schlecht` → `alarm`. `keine_daten` ist
+ * `neutral`, nicht „gute Luft“. Zweiter Kanal: Punktdurchmesser
+ * (`pages/lagekarte/luftqualitaetStil.ts`), im Inspector das Wort.
  */
 export const luftqualitaetIndex: Record<LuftqualitaetKlasse, StatusDarstellung> = {
   keine_daten: { rolle: 'neutral', label: 'keine Daten' },
@@ -447,21 +300,12 @@ export const luftqualitaetIndex: Record<LuftqualitaetKlasse, StatusDarstellung> 
 };
 
 /**
- * Bewertungsstufe einer ODL-Sonde des BfS auf der Lagekarte (LFH-78) — die siebzehnte
- * Vertragskarte, als eigene Entscheidung in `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`
- * (Entscheidung 4) getroffen.
+ * Bewertungsstufe einer ODL-Sonde des BfS auf der Lagekarte (LFH-78).
  *
- * DIE STUFEN SIND EINE PROJEKT-EINTEILUNG, KEINE BfS-SCHWELLE — und zwar eine von ZWEI:
- * relativ zum Standort-Grundpegel der Sonde (LFH-598) oder, solange keiner vorliegt, nach
- * absoluten Bändern am natürlichen Bereich (LFH-78). Die Labels müssen deshalb für BEIDE
- * stimmen und nennen keinen Maßstab („erhöht", nicht „über natürlichem Bereich" — eine Sonde
- * mit 0,19 µSv/h und Faktor 3,2 liegt im natürlichen Bereich und ist trotzdem stark erhöht).
- * Den Maßstab nennt der Inspector je Sonde. Die Labels beschreiben eine Auffälligkeit, KEINE
- * Gefährdung; Regen hebt Werte kurzzeitig bis Faktor 3, eine `achtung`-Sonde ist also zuerst
- * ein Anlass hinzusehen, kein Befund.
- *
- * Der zweite Kanal auf der Karte ist wie bei {@link hochwasserKlasse} der Punktdurchmesser
- * (`pages/lagekarte/odlStil.ts`); Wort und Messwert stehen im Inspector.
+ * Die Stufen sind eine Projekt-Einteilung, keine BfS-Schwelle: relativ zum Grundpegel der
+ * Sonde oder, solange keiner vorliegt, nach absoluten Bändern. Die Labels nennen deshalb keinen
+ * Maßstab (den nennt der Inspector) und beschreiben eine Auffälligkeit, keine Gefährdung; Regen
+ * hebt Werte kurzzeitig bis Faktor 3. Zweiter Kanal: Punktdurchmesser (`pages/lagekarte/odlStil.ts`).
  */
 export const odlStufe: Record<OdlStufe, StatusDarstellung> = {
   keine_messung: { rolle: 'neutral', label: 'keine Messung' },
@@ -471,11 +315,9 @@ export const odlStufe: Record<OdlStufe, StatusDarstellung> = {
 };
 
 /**
- * Einstufung einer laufenden Ablösungsschicht (LFH-635). Drei Stufen, nicht mehr
- * (EEMUA 191/ISA-18.2: ≤ 3 Eskalationsstufen). „planmäßig" ist `neutral`, nicht `normal`:
- * dass eine Einheit noch nicht abgelöst werden muss, ist kein Gutzustand, den man grün
- * hervorheben müsste — es ist der Ruhezustand der Liste. Das Wort trägt den zweiten Kanal;
- * die Uhrzeit der Fälligkeit steht immer daneben.
+ * Einstufung einer laufenden Ablösungsschicht (LFH-635). Drei Stufen (EEMUA 191: ≤ 3
+ * Eskalationsstufen). „planmäßig“ ist `neutral`, nicht `normal`: es ist der Ruhezustand der
+ * Liste, kein hervorzuhebender Gutzustand. Die Uhrzeit der Fälligkeit steht immer daneben.
  */
 export const abloesungEinstufung: Record<AbloesungEinstufung, StatusDarstellung> = {
   planmaessig: { rolle: 'neutral', label: 'planmäßig' },
@@ -484,24 +326,18 @@ export const abloesungEinstufung: Record<AbloesungEinstufung, StatusDarstellung>
 };
 
 /**
- * Deckung eines Verpflegungszeitfensters (LFH-634, design.md D3). Die Einstufung rechnet
- * `verpflegung/deckung.ts` im Client gegen die Uhr — das Backend liefert nur die Fehlmenge.
- * „offen" ist `neutral`, nicht `achtung`: eine Fehlmenge vor Beginn ist Planungsstand, kein
- * Befund; die Zahl steht trotzdem immer daneben. „Unterdeckung" ist erst nach Beginn `alarm`.
- * Das Wort trägt den zweiten Kanal (WCAG 1.4.1).
+ * Deckung eines Verpflegungszeitfensters (LFH-634). Die Einstufung rechnet
+ * `verpflegung/deckung.ts` im Client gegen die Uhr, das Backend liefert nur die Fehlmenge.
+ * „offen“ ist `neutral`: eine Fehlmenge vor Beginn ist Planungsstand. „Unterdeckung“ gilt erst
+ * nach Beginn und ist `alarm`.
  */
 export type VerpflegungDeckung = 'gedeckt' | 'offen' | 'unterdeckung';
 
 /**
- * Aufbewahrungszustand eines abgeschlossenen Einsatzes (LFH-23, design.md D4). Die Karte
- * gibt es, weil der Zustand Handlungsdruck trägt — nur während `vorgemerkt` ist
- * Wiederherstellen möglich — und weil er an zwei Stellen erscheint (Übersicht und Akte), die
- * ohne gemeinsame Karte auseinanderliefen.
- *
- * `ohne_frist`, `frist_laeuft` und `geschwaerzt` sind Ruhezustände (`neutral`); `faellig` und
- * `vorgemerkt` teilen sich `achtung` und werden über das Pflichtwort unterschieden;
- * `schwaerzung_ausstehend` ist `alarm`, weil dort jede Rücknahme verloren ist. KEIN `bedien`:
- * Wiederherstellen ist eine Aktion, kein Zustand.
+ * Aufbewahrungszustand eines abgeschlossenen Einsatzes (LFH-23). Erscheint in Übersicht und
+ * Akte. `faellig` und `vorgemerkt` teilen sich `achtung` (nur während `vorgemerkt` ist
+ * Wiederherstellen möglich); `schwaerzung_ausstehend` ist `alarm`, weil dort jede Rücknahme
+ * verloren ist. Kein `bedien`: Wiederherstellen ist eine Aktion, kein Zustand.
  */
 export const aufbewahrungZustand: Record<AufbewahrungZustand, StatusDarstellung> = {
   ohne_frist: { rolle: 'neutral', label: 'ohne Frist' },
@@ -519,14 +355,9 @@ export const verpflegungDeckung: Record<VerpflegungDeckung, StatusDarstellung> =
 };
 
 /**
- * Räumungszustand eines Evakuierungsbezirks (LFH-639, design.md D8). „angeordnet" und
- * „läuft" teilen sich `achtung` — beide sind Handlungsbedarf, die Räumung ist nicht
- * abgeschlossen; unterschieden wird über das Pflichtwort. „geräumt" ist der erreichte
- * Sollzustand (`normal`), „aufgehoben" ist beendet (`neutral`) und zählt auch in der
- * Kennzahl nicht mehr mit.
- *
- * KEIN `bedien`: nach A2 trägt die Rolle eine aktive Beziehung (Übergabe, Reservierung,
- * Verortung), keinen Zustand der Entität selbst.
+ * Räumungszustand eines Evakuierungsbezirks (LFH-639). „angeordnet“ und „läuft“ teilen sich
+ * `achtung`; „geräumt“ ist der Sollzustand (`normal`), „aufgehoben“ ist beendet (`neutral`) und
+ * zählt in der Kennzahl nicht mehr mit. Kein `bedien`: das ist eine Beziehung, kein Zustand.
  */
 export const raeumungszustand: Record<Raeumungszustand, StatusDarstellung> = {
   angeordnet: { rolle: 'achtung', label: 'angeordnet' },
@@ -536,13 +367,9 @@ export const raeumungszustand: Record<Raeumungszustand, StatusDarstellung> = {
 };
 
 /**
- * Betriebsstatus einer Betreuungsstelle (LFH-639, design.md D8). Präzedenz `uhsStatus`
- * (`geplant` → `neutral`, `aktiv` → `normal`) — mit einer bewussten Abweichung:
- * „geschlossen" ist `neutral`, nicht `alarm` wie `uhsStatus.aufgeloest`. Eine Stelle
- * lässt sich wieder öffnen (design.md D4); ein umkehrbarer Zustand ist kein Alarm.
- *
- * Die ART der Stelle (Anlaufstelle … Notunterkunft) bekommt keine Karte: sie ist eine
- * Kategorie, kein Zustand — derselbe Schluss wie bei {@link uhsTyp}, nur ohne Einträge.
+ * Betriebsstatus einer Betreuungsstelle (LFH-639). Wie `uhsStatus`, aber „geschlossen“ ist
+ * `neutral`: eine Stelle lässt sich wieder öffnen, ein umkehrbarer Zustand ist kein Alarm. Die
+ * ART der Stelle ist eine Kategorie und bekommt keine Karte.
  */
 export const betreuungsstelleStatus: Record<BetreuungsstelleStatus, StatusDarstellung> = {
   vorbereitet: { rolle: 'neutral', label: 'vorbereitet' },
@@ -551,22 +378,15 @@ export const betreuungsstelleStatus: Record<BetreuungsstelleStatus, StatusDarste
 };
 
 /**
- * Auslastung einer Betreuungsstelle (LFH-639, design.md D8) — eine BERECHNETE Einstufung,
- * keine Karte über einem Enum. Deshalb eine Funktion und kein exportiertes Objekt: der
- * Abdeckungstest leitet die Vertragskarten aus den Objekt-Exporten ab, eine Stufentabelle
- * hier daneben zählte dort als dreiundzwanzigste Karte.
+ * Auslastung einer Betreuungsstelle (LFH-639), eine BERECHNETE Einstufung. Deshalb eine
+ * Funktion: der Abdeckungstest leitet die Vertragskarten aus den Objekt-Exporten ab.
  *
- *  - **Keine Kapazität → `null`.** Ohne Kapazität gibt es nichts, wogegen man messen könnte
- *    (und keine Zahl freier Plätze).
- *  - **Keine Meldung → `null`.** Keine Meldung ist nicht 0 und nicht „leer".
- *  - **Unter 90 % → `null`.** Für diesen Bereich nennt D8 kein Wort, und eine Farbe ohne
- *    Wort bräche den zweiten Kanal (WCAG 1.4.1).
- *  - **Ab 90 % `achtung` „fast voll", genau 100 % `alarm` „voll", darüber `alarm`
- *    „überbelegt".** Eine Belegung über der Kapazität ist erlaubt (Spec „Überbelegung").
+ *  - Keine Kapazität, keine Meldung oder unter 90 % → `null` (ohne Wort keine Farbe).
+ *  - Ab 90 % `achtung` „fast voll“, genau 100 % `alarm` „voll“, darüber `alarm`
+ *    „überbelegt“ (Überbelegung ist erlaubt).
  *
- * Verglichen wird GANZZAHLIG (`belegt · 10 ≥ kapazität · 9`), nicht über einen Quotienten:
- * bei Kapazität 150 liegt die Schwelle genau auf 135, und ein Gleitkomma-Quotient darf an
- * einer solchen Kante nicht entscheiden. Rein.
+ * Verglichen wird ganzzahlig (`belegt · 10 ≥ kapazität · 9`), damit an der Kante kein
+ * Gleitkomma-Quotient entscheidet.
  */
 export function auslastung(
   belegt: number | null | undefined,
@@ -580,16 +400,10 @@ export function auslastung(
 }
 
 /**
- * Amtliche DWD-Warnstufe einer Wetterwarnung am Einsatzort (LFH-633, Modul „Wetter & Pegel").
- *
- * DIESELBE VERENGUNG WIE {@link hochwasserKlasse}: der DWD führt vier Stufen in vier Tönen
- * (gelb/orange/rot/violett), A0 hat drei Statusrollen. `gering`/`maessig` fallen auf
- * `achtung`, `schwer`/`extrem` auf `alarm`; unterschieden werden sie über die amtlichen
- * Bezeichnungen im Pflichtfeld `label` (WCAG 1.4.1).
- *
- * `gering` ist NICHT `neutral`: eine amtliche Warnung ist kein Ruhezustand. Und keine Stufe
- * ist Blau — der `FachebenenInspector` der Lagekarte legte „Minor" auf Blau, das ist
- * `bedien` und bezeichnet eine aktive Beziehung, keine Gefahr (Folgeticket zur Kartenebene).
+ * Amtliche DWD-Warnstufe einer Wetterwarnung am Einsatzort (LFH-633).
+ * `gering`/`maessig` → `achtung`, `schwer`/`extrem` → `alarm`, unterschieden über die amtlichen
+ * Bezeichnungen in `label`. `gering` ist nicht `neutral` (eine Warnung ist kein Ruhezustand),
+ * und keine Stufe ist Blau (`bedien`).
  */
 export const dwdWarnstufe: Record<WetterWarnstufe, StatusDarstellung> = {
   gering: { rolle: 'achtung', label: 'Wetterwarnung' },
@@ -599,43 +413,19 @@ export const dwdWarnstufe: Record<WetterWarnstufe, StatusDarstellung> = {
 };
 
 /**
- * Die drei Rollen, die eine Kennzahl **stufen** können — bewusst eine VERENGUNG von
- * {@link Statusrolle}, kein Alias (LFH-328 · A2, hierher mit LFH-358).
- *
- * `Extract<>` statt einer zweiten Literalliste: die Werte bleiben dieselben drei, aber
- * eine Umbenennung im Vertrag bricht die Konsumenten im Typcheck, statt still
- * auseinanderzulaufen.
- *
- * Warum nicht alle sechs Rollen? Ursprünglich, weil das Lage-Dashboard den Wert in einen
- * KLASSENNAMEN einsetzte (`lfh-plakette--${stufe}`) und `theme/sprache.css` genau für
- * diese drei eine Regel hatte. Diese Klassen sind mit dem Neuentwurf entfallen (22.09.2026);
- * die Verengung bleibt trotzdem richtig: die Karte {@link dringlichkeit} trägt Wort UND
- * Form je Stufe, und eine vierte Stufe bräuchte ein viertes Formzeichen, das es nicht gibt.
- * Die Verengung ist damit das Ehrlichere, nicht das Bequemere.
+ * Die drei Rollen, die eine Kennzahl **stufen** können, als VERENGUNG von {@link Statusrolle}.
+ * `Extract<>` statt einer zweiten Literalliste, damit eine Umbenennung im Vertrag die
+ * Konsumenten im Typcheck bricht. Drei, weil {@link dringlichkeit} je Stufe ein Formzeichen
+ * trägt und es kein viertes gibt.
  */
 export type Dringlichkeit = Extract<Statusrolle, 'alarm' | 'achtung' | 'normal'>;
 
 /**
  * Der ZWEITE KANAL des Dringlichkeitsmarkers (LFH-395, WCAG 1.4.1).
  *
- * Die einzige Karte dieses Vertrags, deren Schlüssel KEIN Domänen-Enum ist, sondern
- * eine {@link Statusrolle}: sie beschriftet die Stufe selbst. `form` ist dabei kein
- * neu erfundenes Vokabular — {@link StatusDarstellung} führt den Slot seit LFH-328 als
- * „optional zusätzlich", er hatte nur nie einen Konsumenten. Wer einen zweiten
- * braucht, nimmt dieselben drei Werte, statt eine vierte Form danebenzustellen.
- *
- * SIE LAG BIS LFH-358 IN `pages/lage-dashboard/lagebild.ts`, mit derselben Begründung
- * wie `einsatzStatus`: der Abdeckungstest zählte gegen ein `toHaveLength`, ein
- * elfter Eintrag wäre eine Vertragsänderung gewesen. Beide Begründungen sind mit
- * diesem Ticket eingelöst statt fortgeschrieben — eine Karte, die den Vertragstyp
- * trägt und trotzdem draußen liegt, ist genau der Präzedenzfall, der die Aussage des
- * Abdeckungstests untergräbt.
- *
- * `label` benennt die STUFE, nicht ihren Anlass — und das ist erzwungen, nicht
- * gewählt: derselbe `alarm` entsteht an der Auftrags- wie an der Meldungszeile aus
- * `ist_ueberfaellig`, `achtung` aber nur an der Meldungszeile (Status `neu`) und an
- * der Auftragszeile gar nicht. Ein Wort je Anlass bräuchte also eine Map je Liste;
- * ein Wort je Stufe trägt beide.
+ * Die einzige Karte, deren Schlüssel eine {@link Statusrolle} statt eines Domänen-Enums ist:
+ * sie beschriftet die Stufe selbst. `label` benennt die STUFE, nicht ihren Anlass, weil dieselbe
+ * Stufe an Auftrags- und Meldungszeile aus verschiedenen Anlässen entsteht.
  */
 export const dringlichkeit: Record<Dringlichkeit, StatusDarstellung> = {
   alarm: { rolle: 'alarm', label: 'dringend', form: 'dreieck' },
@@ -646,22 +436,14 @@ export const dringlichkeit: Record<Dringlichkeit, StatusDarstellung> = {
 /**
  * Übersetzt eine Rolle in den Farbwert des aktiven Modus.
  *
- * Vier Rollen liegen als antd-Token vor, weil `antdToken()` sie dorthin ableitet.
- * `neutral` hat keine eigene Farbrolle — es ist der gedämpfte Grauwert, den antd aus
- * der Textskala liefert. `marke` dagegen kennt antd gar nicht (`tokens.ts`: „Was antd
- * nicht kennt (Marke, …), lebt allein in `rollen.css`") und darf NICHT auf `colorError`
- * ausweichen: `alarm` trüge dann Gefahr UND Ortssignatur, und „eine Farbe = eine
- * Bedeutung" wäre verletzt. Der Wert kommt deshalb direkt aus den Rollen.
+ * Vier Rollen liegen als antd-Token vor (`antdToken()` leitet sie ab); `neutral` ist der
+ * gedämpfte Grauwert aus antds Textskala. `marke` kennt antd nicht und darf NICHT auf
+ * `colorError` ausweichen, sonst trüge `alarm` Gefahr UND Ortssignatur; der Wert kommt direkt aus
+ * den Rollen.
  *
- * Den Modus erkennen wir über die Helligkeit von `colorBgBase` (`#fff` hell, `#000`
- * dunkel). NICHT über einen Vergleich mit `farbenDunkel.bedien`: `colorPrimary` ist ein
- * Seed-Token, und der `darkAlgorithm` rechnet es um — gemessen wird aus dem gesetzten
- * `#6fb4ec` ein `#619ccc`, aus `alarm` `#ff7a7f` ein `#dc6b6f`. Ein Gleichheitstest auf
- * die Rollenwerte schlägt dort also immer fehl. (Seit dem Neuentwurf hält
- * `antdAlgorithmus` in `tokens.ts` die Signalfarben nachts auf dem Rollenwert — die Probe
- * über die Basisfläche bleibt trotzdem richtig: sie hängt an keinem Algorithmus und
- * keinem Aufrufer, der den Provider nachbaut.) Ein fremdes Theme (z. B. blanker
- * `ConfigProvider` im Test) landet damit im Hellmodus, statt zu werfen.
+ * Den Modus erkennt {@link istDunklerModus} über die Helligkeit von `colorBgBase`, nicht über
+ * einen Vergleich mit Rollenwerten: der `darkAlgorithm` rechnet Seed-Tokens um. Ein fremdes
+ * Theme (z. B. blanker `ConfigProvider` im Test) landet im Hellmodus, statt zu werfen.
  */
 export function rollenFarbe(rolle: Statusrolle, token: GlobalToken): string {
   switch (rolle) {
@@ -704,12 +486,8 @@ export type Fuellungsrolle =
   | 'normalFuellung';
 
 /**
- * Die dritte Darstellungssorte: eine FLÄCHE, kein Etikett.
- *
- * Eigener Typ statt {@link StatusDarstellung}, weil eine Füllung keine
- * {@link Statusrolle} ist. Sie in `rolle` zu pressen hätte den Kanal-Vertrag der
- * Etikett-Maps verwässert und `rollenFarbe` einen Fall gegeben, den es nicht
- * bedienen kann (`antdToken()` bildet die Füllungsrollen nicht ab).
+ * Die dritte Darstellungssorte: eine FLÄCHE, kein Etikett. Eigener Typ, weil eine Füllung keine
+ * {@link Statusrolle} ist und `rollenFarbe` sie nicht auflösen kann.
  */
 export interface Flaechendarstellung {
   /** `null` = keine Fläche. Kein `'transparent'` als Rollenname — das ist ein Wert. */
@@ -721,18 +499,11 @@ export interface Flaechendarstellung {
 }
 
 /**
- * Warnstufe als **Fläche der Gefahrenmatrix** (LFH-368 · B5h; früher
- * `pages/gefahren/gefahrenSchema.ts:warnstufeFarbe`).
+ * Warnstufe als **Fläche der Gefahrenmatrix**. Fünf Stufen über die INTENSITÄT derselben Rolle
+ * plus {@link Flaechendarstellung.kuerzel}, ohne sechste Farbe.
  *
- * FÜNF STUFEN AUF DREI FARBTÖNE, unterschieden durch die INTENSITÄT derselben Rolle
- * und durch {@link Flaechendarstellung.kuerzel}. Damit hält die Festlegung bei
- * {@link warnstufeKarte} („nicht eine sechste Farbe") auch hier, wo fünf Flächen
- * gebraucht werden.
- *
- * `keine` ist leer und NICHT `alarm` wie auf der Karte: dort steht ein unbewertetes
- * Gebiet (⇒ vorsichtshalber Gefahr), hier bedeutet die Stufe ausdrücklich „für dieses
- * Schutzobjekt besteht keine Gefahr". Eine Matrix, in der 58 unbewertete Zellen rot
- * stehen, zeigt nichts an.
+ * `keine` ist leer und NICHT `alarm` wie auf der Karte: hier heißt die Stufe ausdrücklich „für
+ * dieses Schutzobjekt besteht keine Gefahr“, und eine Matrix voller roter Zellen zeigte nichts an.
  */
 export const warnstufeFlaeche: Record<Warnstufe, Flaechendarstellung> = {
   keine: { fuellung: null, label: 'keine', kuerzel: '–' },
@@ -743,13 +514,8 @@ export const warnstufeFlaeche: Record<Warnstufe, Flaechendarstellung> = {
 };
 
 /**
- * Fläche → Farbwert des aktiven Modus.
- *
- * Folgt dem `marke`-Zweig in {@link rollenFarbe}, nicht dem antd-Zweig: `antdToken()`
- * bildet die Füllungsrollen auf KEINEN antd-Token ab, ein `token.colorXxx` gibt es
- * hier also nicht. Der Modus kommt deshalb über {@link istDunklerModus} — dieselbe
- * Helligkeitsprobe, mit demselben Verhalten bei fremdem Theme (Rückfall auf Hell,
- * statt zu werfen).
+ * Fläche → Farbwert des aktiven Modus. Wie der `marke`-Zweig in {@link rollenFarbe}: für
+ * Füllungsrollen gibt es keinen antd-Token, der Modus kommt über {@link istDunklerModus}.
  */
 export function flaechenFarbe(w: Warnstufe, token: GlobalToken): string {
   const rolle = warnstufeFlaeche[w].fuellung;
@@ -758,14 +524,8 @@ export function flaechenFarbe(w: Warnstufe, token: GlobalToken): string {
 }
 
 /**
- * ETB-Typfarbe des aktiven Modus: Kante (2 px) und Typwort (Neuentwurf, Entscheidung 2).
- *
- * Der Wortlaut kommt aus {@link etbTyp} — diese Funktion liefert NUR Farbe, der zweite
- * Kanal ist das Typwort selbst. Modus wie bei {@link flaechenFarbe} über die Helligkeit
- * der Basisfläche; ein fremdes Theme fällt auf Hell zurück.
- *
- * Die Zuordnung ist exhaustiv: `Record<EtbTyp, …>` bricht bei einer neuen Variante des
- * Wire-Enums den Typcheck, statt einen Typ still ohne Farbe zu lassen.
+ * ETB-Typfarbe des aktiven Modus: Kante (2 px) und Typwort. Nur Farbe; der Wortlaut kommt aus
+ * {@link etbTyp}. Modus wie bei {@link flaechenFarbe}. Exhaustiv über `EtbTyp`.
  */
 const ETB_TYP_TON: Record<EtbTyp, EtbTypTon> = {
   meldung: 'meldung',
@@ -781,9 +541,8 @@ export function etbTypFarbe(typ: EtbTyp, token: GlobalToken): EtbTypFarbe {
 }
 
 /**
- * Balkenfarbe einer Warnstufe (Gefahrenmatrix, Neuentwurf S3) im aktiven Modus.
- * `keine` hat keinen Balken (`null`). Die Fläche der Matrixzelle bleibt
- * {@link flaechenFarbe} — Balken und Fläche sind zwei Darstellungssorten, nicht eine.
+ * Balkenfarbe einer Warnstufe (Gefahrenmatrix) im aktiven Modus; `keine` hat keinen Balken.
+ * Die Zellfläche bleibt {@link flaechenFarbe}.
  */
 const WARNSTUFE_BALKEN: Record<Warnstufe, WarnstufeBalken | null> = {
   keine: null,

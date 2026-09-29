@@ -37,23 +37,20 @@ interface Props {
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
   /**
    * Sperrt die Eingabe, ohne den Fokus zu nehmen (`readOnly`, nicht `disabled`): die
-   * ETB-Schnellerfassung hält so den Wortlaut fest, während ein Versand läuft — was in der
-   * Zeit getippt würde, löschte das Leeren nach dem Erfolg still (LFH-117).
+   * ETB-Schnellerfassung hält so den Wortlaut fest, während ein Versand läuft (LFH-117).
    */
   readOnly?: boolean;
   /**
-   * Nur `toggle`: rendert bei geschlossener Vorschau zusätzlich eine gerenderte Fassung, die
-   * ausschließlich der Druck zeigt (`.markdown-editor__druck`, am Bildschirm `display: none`).
-   * Ohne sie trüge dort nur das Textfeld den Text — auf Papier eine `<textarea>` in
-   * Bildschirmhöhe mit Rohtext, langer Text abgeschnitten (LFH-71). Opt-in, weil jede Fassung
-   * einen Markdown-Render je Tastenanschlag kostet: die ETB-Schnellerfassung druckt nicht.
+   * Nur `toggle`: rendert bei geschlossener Vorschau zusätzlich eine gerenderte Fassung, die nur
+   * der Druck zeigt (`.markdown-editor__druck`). Sonst trüge auf Papier eine `<textarea>` mit
+   * abgeschnittenem Rohtext (LFH-71). Opt-in, weil sie einen Markdown-Render je Anschlag kostet.
    */
   druckfassung?: boolean;
   /**
-   * Nur `toggle`: der Aufrufer führt den Vorschau-Umschalter selbst (LFH-373). Der eigene
-   * Knopf unter dem Feld entfällt, die Vorschau folgt {@link vorschauOffen}. Gebraucht von der
-   * ETB-Erfassung, wo die eigene Knopfzeile im Handschuh-Betrieb eine volle Steuerhöhe der
-   * angepinnten Leiste kostete.
+   * Nur `toggle`: der Aufrufer führt den Vorschau-Umschalter selbst (LFH-373); der eigene Knopf
+   * unter dem Feld entfällt, die Vorschau folgt {@link vorschauOffen}. Für die ETB-Erfassung, wo
+   * eine eigene Knopfzeile im Handschuh-Betrieb eine volle Steuerhöhe der angepinnten Leiste
+   * kostete.
    */
   umschalterAussen?: boolean;
   /** Nur mit {@link umschalterAussen}: ob die Vorschau offen ist. */
@@ -63,10 +60,9 @@ interface Props {
 /**
  * Eingabefeld, das den getippten Markdown direkt als Vorschau spiegelt.
  *
- * Bewusst KEIN WYSIWYG: gespeichert wird exakt der getippte Markdown-String
- * (kein verlustbehafteter Roundtrip), und als controlled `value`/`onChange`-
- * Komponente bleibt sie mit extern gesetztem `value` (z.B. Baustein-Einsetzen)
- * voll kompatibel. Die Vorschau nutzt die XSS-sichere `Markdown`-Komponente.
+ * Bewusst KEIN WYSIWYG: gespeichert wird exakt der getippte Markdown-String, und als
+ * controlled `value`/`onChange`-Komponente bleibt sie mit extern gesetztem `value` (z. B.
+ * Baustein-Einsetzen) kompatibel. Die Vorschau nutzt die XSS-sichere `Markdown`-Komponente.
  */
 const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
   {

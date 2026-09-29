@@ -1,44 +1,20 @@
 pub mod belegung_repo;
 pub mod repo;
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Status eines Bereitstellungsraums. String = CHECK-Constraint in
-/// `migrations/0060_bereitstellungsraum.sql`. `aufgeloest` ist terminal.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum BrStatus {
-    Geplant,
-    Aktiv,
-    Aufgeloest,
-}
-
-impl BrStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            BrStatus::Geplant => "geplant",
-            BrStatus::Aktiv => "aktiv",
-            BrStatus::Aufgeloest => "aufgeloest",
-        }
+wire_enum! {
+    /// Status eines Bereitstellungsraums. String = CHECK-Constraint in
+    /// `migrations/0060_bereitstellungsraum.sql`. `aufgeloest` ist terminal.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BrStatus {
+        Geplant => "geplant",
+        Aktiv => "aktiv",
+        Aufgeloest => "aufgeloest",
     }
-
-    pub fn parse(s: &str) -> Option<BrStatus> {
-        match s {
-            "geplant" => Some(BrStatus::Geplant),
-            "aktiv" => Some(BrStatus::Aktiv),
-            "aufgeloest" => Some(BrStatus::Aufgeloest),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for BrStatus {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        BrStatus::parse(&s).ok_or_else(|| format!("Ungültiger BrStatus: {s}"))
-    }
+    try_from = |s| format!("Ungültiger BrStatus: {s}");
 }
 
 /// Ob ein BR-Status-Übergang `von → nach` erlaubt ist. Status-Maschine:
@@ -60,75 +36,27 @@ pub fn darf_uebergehen(von: &str, nach: &str) -> bool {
     }
 }
 
-/// Typ des belegenden Objekts. String = CHECK-Constraint in
-/// `migrations/0061_br_belegung.sql`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ObjektTyp {
-    Einheit,
-    Fahrzeug,
+wire_enum! {
+    /// Typ des belegenden Objekts. String = CHECK-Constraint in
+    /// `migrations/0061_br_belegung.sql`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum ObjektTyp {
+        Einheit => "einheit",
+        Fahrzeug => "fahrzeug",
+    }
+    try_from = |s| format!("Ungültiger ObjektTyp: {s}");
 }
 
-impl ObjektTyp {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ObjektTyp::Einheit => "einheit",
-            ObjektTyp::Fahrzeug => "fahrzeug",
-        }
+wire_enum! {
+    /// Art eines BR-Belegungs-Events. String = CHECK-Constraint in
+    /// `migrations/0061_br_belegung.sql`. Append-only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BrBelegungsArt {
+        Eintritt => "eintritt",
+        Wechsel => "wechsel",
+        Austritt => "austritt",
     }
-
-    pub fn parse(s: &str) -> Option<ObjektTyp> {
-        match s {
-            "einheit" => Some(ObjektTyp::Einheit),
-            "fahrzeug" => Some(ObjektTyp::Fahrzeug),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for ObjektTyp {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        ObjektTyp::parse(&s).ok_or_else(|| format!("Ungültiger ObjektTyp: {s}"))
-    }
-}
-
-/// Art eines BR-Belegungs-Events. String = CHECK-Constraint in
-/// `migrations/0061_br_belegung.sql`. Append-only.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum BrBelegungsArt {
-    Eintritt,
-    Wechsel,
-    Austritt,
-}
-
-impl BrBelegungsArt {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            BrBelegungsArt::Eintritt => "eintritt",
-            BrBelegungsArt::Wechsel => "wechsel",
-            BrBelegungsArt::Austritt => "austritt",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<BrBelegungsArt> {
-        match s {
-            "eintritt" => Some(BrBelegungsArt::Eintritt),
-            "wechsel" => Some(BrBelegungsArt::Wechsel),
-            "austritt" => Some(BrBelegungsArt::Austritt),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for BrBelegungsArt {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        BrBelegungsArt::parse(&s).ok_or_else(|| format!("Ungültige BrBelegungsArt: {s}"))
-    }
+    try_from = |s| format!("Ungültige BrBelegungsArt: {s}");
 }
 
 /// Serialisierbare BR-Anzeige (1:1 zur Tabelle `bereitstellungsraum`).

@@ -3,6 +3,7 @@
 //! Kommunikations-Module (Chat, Erinnerung, künftig Aufträge/Meldungen).
 pub mod repo;
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -28,112 +29,38 @@ pub const VOLLZUG_OFFEN: &str = "offen";
 pub const VOLLZUG_IN_ARBEIT: &str = "in_arbeit";
 pub const VOLLZUG_VOLLZOGEN: &str = "vollzogen";
 
-/// Geteilte Priorität für Auftrag/Meldung/Nachforderung (Schema-Anker für die OpenAPI-Union,
-/// LFH-120; TS: `AuftragPrioritaet`/`MeldungPrioritaet`/`NachforderungPrioritaet`). Wire == `prioritaet`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Prioritaet {
-    Sofort,
-    Dringend,
-    Normal,
+wire_enum! {
+    /// Geteilte Priorität für Auftrag/Meldung/Nachforderung (Schema-Anker für die OpenAPI-Union,
+    /// LFH-120; TS: `AuftragPrioritaet`/`MeldungPrioritaet`/`NachforderungPrioritaet`). Wire == `prioritaet`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Prioritaet {
+        Sofort => "sofort",
+        Dringend => "dringend",
+        Normal => "normal",
+    }
+    try_from = |s| format!("Ungültige Prioritaet: {s}");
 }
 
-impl Prioritaet {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Prioritaet::Sofort => "sofort",
-            Prioritaet::Dringend => "dringend",
-            Prioritaet::Normal => "normal",
-        }
+wire_enum! {
+    /// Geteilte Richtung für Auftrag/Meldung (Schema-Anker für die OpenAPI-Union, LFH-120).
+    /// Wire == `richtung`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Richtung {
+        Intern => "intern",
+        Extern => "extern",
     }
-
-    /// Parst einen gespeicherten/übergebenen Prioritätswert; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<Prioritaet> {
-        match s {
-            "sofort" => Some(Prioritaet::Sofort),
-            "dringend" => Some(Prioritaet::Dringend),
-            "normal" => Some(Prioritaet::Normal),
-            _ => None,
-        }
-    }
+    try_from = |s| format!("Ungültige Richtung: {s}");
 }
 
-impl TryFrom<String> for Prioritaet {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Prioritaet::parse(&s).ok_or_else(|| format!("Ungültige Prioritaet: {s}"))
-    }
-}
-
-/// Geteilte Richtung für Auftrag/Meldung (Schema-Anker für die OpenAPI-Union, LFH-120).
-/// Wire == `richtung`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Richtung {
-    Intern,
-    Extern,
-}
-
-impl Richtung {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Richtung::Intern => "intern",
-            Richtung::Extern => "extern",
-        }
-    }
-
-    /// Parst einen gespeicherten/übergebenen Richtungswert; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<Richtung> {
-        match s {
-            "intern" => Some(Richtung::Intern),
-            "extern" => Some(Richtung::Extern),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for Richtung {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Richtung::parse(&s).ok_or_else(|| format!("Ungültige Richtung: {s}"))
-    }
-}
-
-/// Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
-/// (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AdressatKategorie {
-    Leitstelle,
-    NachbarEa,
-    Uebergeordnet,
-    AndereBos,
-}
-
-impl AdressatKategorie {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            AdressatKategorie::Leitstelle => "leitstelle",
-            AdressatKategorie::NachbarEa => "nachbar_ea",
-            AdressatKategorie::Uebergeordnet => "uebergeordnet",
-            AdressatKategorie::AndereBos => "andere_bos",
-        }
-    }
-
-    /// Parst einen gespeicherten/übergebenen Kategoriewert; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<AdressatKategorie> {
-        match s {
-            "leitstelle" => Some(AdressatKategorie::Leitstelle),
-            "nachbar_ea" => Some(AdressatKategorie::NachbarEa),
-            "uebergeordnet" => Some(AdressatKategorie::Uebergeordnet),
-            "andere_bos" => Some(AdressatKategorie::AndereBos),
-            _ => None,
-        }
+wire_enum! {
+    /// Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
+    /// (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AdressatKategorie {
+        Leitstelle => "leitstelle",
+        NachbarEa => "nachbar_ea",
+        Uebergeordnet => "uebergeordnet",
+        AndereBos => "andere_bos",
     }
 }
 

@@ -207,3 +207,54 @@ impl<M: ModulMarker> Deref for EinsatzSchreibfreigabe<M> {
         &self.0
     }
 }
+
+/// Wie [`EinsatzSchreibzugriff`], nur mit `fordere_einsatzleitung` statt
+/// `fordere_schreibrecht`: Org-Floor → Einsatzleitung → Modul-Gate `M` → `fordere_aktiv`.
+/// Für Aktionen, die allein der Einsatzleitung zustehen und einen aktiven Einsatz verlangen.
+/// Ein eigener Typ statt Schreibzugriff plus Prüfung im Rumpf, weil sonst Führungspersonal an
+/// einem abgeschlossenen Einsatz 409 statt 403 bekäme.
+pub struct EinsatzLeitungszugriff<M: ModulMarker = OhneModul>(pub EinsatzKontext, PhantomData<M>);
+
+impl<M: ModulMarker> FromRequestParts<AppState> for EinsatzLeitungszugriff<M> {
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
+        let ctx = EinsatzKontext::from_request_parts(parts, state).await?;
+        ctx.fordere_einsatzleitung()?;
+        if let Some(key) = M::KEY {
+            ctx.fordere_modul_zugriff(&state.pool, key).await?;
+        }
+        ctx.fordere_aktiv()?;
+        Ok(Self(ctx, PhantomData))
+    }
+}
+
+impl<M: ModulMarker> Deref for EinsatzLeitungszugriff<M> {
+    type Target = EinsatzKontext;
+    fn deref(&self) -> &EinsatzKontext {
+        &self.0
+    }
+}
+
+/// Gate der Kopfdaten- und Einstellungs-Routen: Org-Floor → `fordere_schreibrecht_oder_admin`
+/// → `fordere_aktiv`. Anders als [`EinsatzSchreibzugriff`] darf hier auch ein System-Admin ohne
+/// Mitgliedschaft schreiben; ein Modul-Gate gibt es nicht.
+pub struct EinsatzVerwaltungszugriff(pub EinsatzKontext);
+
+impl FromRequestParts<AppState> for EinsatzVerwaltungszugriff {
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
+        let ctx = EinsatzKontext::from_request_parts(parts, state).await?;
+        ctx.fordere_schreibrecht_oder_admin()?;
+        ctx.fordere_aktiv()?;
+        Ok(Self(ctx))
+    }
+}
+
+impl Deref for EinsatzVerwaltungszugriff {
+    type Target = EinsatzKontext;
+    fn deref(&self) -> &EinsatzKontext {
+        &self.0
+    }
+}

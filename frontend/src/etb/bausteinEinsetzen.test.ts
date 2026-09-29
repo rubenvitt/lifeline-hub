@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EtbBaustein, EinsatzAnzeige } from '../api/types';
 import { ermittlePlatzhalter, setzeBausteinEin } from './bausteinEinsetzen';
+import { einsatzFixture } from '../test/fixtures';
 
 function baustein(p: Partial<EtbBaustein>): EtbBaustein {
   return {
@@ -15,12 +16,12 @@ function baustein(p: Partial<EtbBaustein>): EtbBaustein {
   };
 }
 
-const einsatz = {
+const einsatz = einsatzFixture({
   bezeichnung: 'Hochwasser Altstadt',
   stichwort: 'THL groß',
   leitstellen_nr: 'LS-2026-042',
   einsatzort: 'Marktplatz 1',
-} as unknown as EinsatzAnzeige;
+});
 
 describe('ermittlePlatzhalter', () => {
   it('listet nur manuelle Platzhalter (Auto-Kontext ausgenommen), eindeutig und in Reihenfolge', () => {

@@ -153,9 +153,7 @@ pub async fn ablegen(
     benutzer_id: i64,
     ablage: &Ablage<'_>,
 ) -> Result<(i64, i64), AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let inhalt = format!(
         "Dokument abgelegt: {} ({})",
         ablage.titel,
@@ -212,9 +210,7 @@ pub async fn entfernen(
     id: i64,
     benutzer_id: i64,
 ) -> Result<i64, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     crate::write_retry!(pool, |conn| {
         let (titel, kategorie): (String, String) = sqlx::query_as(
             "SELECT titel, kategorie FROM einsatz_dokument \

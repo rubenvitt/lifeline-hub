@@ -1,4 +1,3 @@
-// frontend/src/command-palette/befehle.ts
 import {
   TbList,
   TbUser,
@@ -39,33 +38,23 @@ import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
 import type { Koordinatenformat } from '../api/types';
 
-/** Kontext einer Moduloption: der volle Kategoriename (Neuentwurf, Sprungpalette S2). */
+/** Kontext einer Moduloption: der volle Kategoriename. */
 function kategorieKontext(key: KategorieKey): string | undefined {
   return kategorien.find((k) => k.key === key)?.label;
 }
 
 /**
  * Die Ziele stehen als **Builder** aus `routing/deeplinks.ts` in der Tabelle, nicht als
- * Routenstück, das unten zu einem Vorlagentext zusammengesetzt wird (LFH-331 · B3).
+ * Routenstück: die Unfallhilfsstellen liegen unter `/unfallhilfsstellen/liste`, der bare
+ * Modulpfad zeigt auf eine Seite, die `?neu=1` nicht liest.
  *
- * Der Unterschied war an einer Zeile messbar und ein echter Fehler: die Unfallhilfsstellen
- * liegen unter `/unfallhilfsstellen/liste`, während der bare Modulpfad auf
- * `UnfallhilfsstellenDefault` zeigt — eine Seite, die `?neu=1` nicht liest. Die
- * Schnellaktion lief damit ins Leere. Ein Routenstück nur für diese eine Zeile
- * auszunehmen hätte zwei Wahrheiten für dieselbe Sache stehen lassen; deshalb tragen
- * alle Zeilen den Builder.
+ * DIE REIHENFOLGE IST EINE ERFASSUNGSHÄUFIGKEIT, bewusst nicht die Registry-Reihenfolge (die ist
+ * die Navigations-Rangfolge); sonst sortierte eine Umsortierung der Navigation still die Palette
+ * um. Der `toEqual`-Pin in `befehle.test.ts` ist Absicht.
  *
- * DIE REIHENFOLGE IST EINE ERFASSUNGSHÄUFIGKEIT und bewusst NICHT die Registry-Reihenfolge
- * (LFH-391 · A1). Die Registry ordnet nach Kategorie — das ist die NAVIGATIONS-Rangfolge,
- * gelesen von `erstesFreigegebenesModul`/`moduleNachKategorie`, und sie stellte `etb` vor
- * `personen`. Beide Ordnungen an dieselbe Liste zu binden machte aus einer Umsortierung der
- * Navigation still eine Umsortierung der Palette. Wer hier „aufräumt", färbt den `toEqual`-Pin
- * in `befehle.test.ts` rot, ohne dass fachlich etwas kaputt wäre — der Pin ist Absicht.
- *
- * EXPORTIERT für `schnellaktionen.guard.test.ts`: der prüft je Zeile Trägermodul, Ziel und
- * die Deckung gegen die Seiten, die `?neu=1` wirklich lesen. Die Tabelle bleibt bewusst HIER
- * und wandert nicht in die `modulRegistry` — die ist heute frei von Router-/Deeplink-Bezügen,
- * ein `pfad`-Closure zöge `routing/deeplinks.ts` in jeden Test, der sie anfasst.
+ * Exportiert für `schnellaktionen.guard.test.ts` (Trägermodul, Ziel, Deckung gegen die Seiten,
+ * die `?neu=1` lesen). Die Tabelle bleibt hier statt in der `modulRegistry`, die frei von
+ * Router-/Deeplink-Bezügen ist.
  */
 export const SCHNELLAKTIONEN: {
   modulKey: string;
@@ -98,17 +87,15 @@ export const SCHNELLAKTIONEN: {
     schlagworte: ['schaden', 'objekt'],
   },
   {
-    // LFH-543: ans ENDE — die Tabelle ordnet nach Erfassungshäufigkeit, eine Lagebesprechung
-    // fällt seltener an als Person, ETB-Eintrag, UHS oder Schaden. Leser: `pages/StabPage.tsx`.
+    // Ans ENDE: eine Lagebesprechung fällt seltener an als Person, ETB-Eintrag, UHS oder Schaden.
+    // Leser: `pages/StabPage.tsx`.
     modulKey: 'stab',
     pfad: (id) => stabPfad(id, { neu: true }),
     label: 'Lagebesprechung abschließen',
     schlagworte: ['lagebesprechung', 'entschluss', 'stab', 'führungsvorgang'],
   },
   {
-    // LFH-632: ans ENDE, hinter die Lagebesprechung — die Erfassungshäufigkeit einer Ablage
-    // ist nicht gemessen, und eine neue Zeile ordnet die Bestandszeilen nicht um (der
-    // `toEqual`-Pin in `befehle.test.ts` ist Absicht). Leser: `pages/DokumentePage.tsx`.
+    // Ans ENDE: eine neue Zeile ordnet die Bestandszeilen nicht um. Leser: `pages/DokumentePage.tsx`.
     modulKey: 'dokumente',
     pfad: (id) => dokumentePfad(id, { neu: true }),
     label: 'Dokument ablegen',
@@ -122,11 +109,9 @@ const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: IconT
   { id: 'theme:dark', label: 'Darstellung: Dunkel', modus: 'dark', icon: TbMoon },
 ];
 
-/** Bediendichte über die Palette (LFH-329 · B1) — der zweite Bedienweg neben der
- *  Umschaltgruppe im Benutzermenü. Seit LFH-392 ist der Kopfzeilen-Umschalter fort,
- *  auf JEDER Breite; die Palette ist damit die schnelle Abkürzung, nicht der
- *  Ersatz. Sie kann das auch nicht sein: ein `Befehl` (`typen.ts`) trägt kein
- *  Zustandsfeld, die Palette zeigt also nicht an, welche Stufe gerade gilt. */
+/** Bediendichte über die Palette, die schnelle Abkürzung neben der Umschaltgruppe im
+ *  Benutzermenü. Kein Ersatz: ein `Befehl` trägt kein Zustandsfeld, die Palette zeigt die
+ *  aktive Stufe nicht an. */
 const DICHTE_BEFEHLE: { id: string; label: string; stufe: Dichte; icon: IconType }[] = [
   { id: 'dichte:kompakt', label: 'Dichte: Kompakt', stufe: 'kompakt', icon: TbArrowsMinimize },
   {
@@ -165,14 +150,9 @@ interface TastaturAktionDefinition {
 }
 
 /**
- * EIN exhaustives Verzeichnis je Aktion (LFH-391 · B3) statt des früheren Arrays.
- *
- * Der Wechsel schließt einen stillen Anzeigefehler: ein Array kann keine Vollständigkeit
- * behaupten, eine neue `TastaturAktionId` ohne Zeile erschien schlicht NIE in der Palette
- * — ohne Typfehler und ohne roten Test. Das Record bricht dafür den Typcheck (TS2741).
- * Das Kürzel liegt am selben Eintrag, weil der zweite stille Fehler genau dort saß:
- * `kuerzelFuerTastaturAktion` fiel für jede unbekannte Id auf „Strg + Rücktaste" durch und
- * beschriftete damit eine ungebundene Aktion mit dem Kürzel des Filter-Zurücksetzens.
+ * EIN exhaustives Verzeichnis je Aktion: eine neue `TastaturAktionId` ohne Eintrag bricht den
+ * Typcheck (TS2741), statt still nie in der Palette zu erscheinen. Das Kürzel liegt am selben
+ * Eintrag, damit keine ungebundene Aktion das Kürzel einer anderen trägt.
  */
 export const TASTATUR_AKTIONEN: Record<TastaturAktionId, TastaturAktionDefinition> = {
   speichern: {
@@ -203,13 +183,9 @@ export const TASTATUR_AKTIONEN: Record<TastaturAktionId, TastaturAktionDefinitio
 };
 
 /**
- * Die Reihenfolge der Gruppe „Aktionen" in der Palette. Sie steht getrennt, weil ein
- * Record keine vertragliche Ordnung hat — vorher trug sie die Einfügereihenfolge des
- * Arrays. Dass sie jede Id genau einmal führt, prüft der Guard in `befehle.test.ts`; das
- * ist die einzige Hälfte dieses Vertrags, die von Hand gepflegt wird.
- *
- * Die drei Aktionen mit Tastenweg bleiben vorn: sie sind die Antwort auf „was kann ich
- * hier gerade tun", und ihre Reihenfolge ist von `befehle.test.ts` gepinnt.
+ * Die Reihenfolge der Gruppe „Aktionen“; getrennt, weil ein Record keine vertragliche Ordnung
+ * hat. Dass sie jede Id genau einmal führt, prüft `befehle.test.ts`. Die drei Aktionen mit
+ * Tastenweg bleiben vorn.
  */
 export const TASTATUR_AKTION_REIHENFOLGE: readonly TastaturAktionId[] = [
   'speichern',
@@ -232,19 +208,16 @@ export function tastaturAktionFuerEreignis(e: TastaturEreignis): TastaturAktionI
 }
 
 /**
- * Sichtbarer Gegenpart zur Ereignisauflösung; der User-Agent ist absichtlich ein
- * Parameter, damit beide Plattformzweige ohne Manipulation globaler Browserwerte testbar
- * sind. `null` heißt „diese Aktion hat keinen Tastenweg" — der frühere Rest-Zweig, der
- * jede unbekannte Id mit dem Filter-Kürzel beschriftete, ist ersatzlos entfallen.
+ * Sichtbarer Gegenpart zur Ereignisauflösung; der User-Agent ist ein Parameter, damit beide
+ * Plattformzweige ohne globale Browserwerte testbar sind. `null` heißt „kein Tastenweg“.
  */
 export function kuerzelFuerTastaturAktion(id: TastaturAktionId, userAgent: string): string | null {
   return TASTATUR_AKTIONEN[id].kuerzel(istApplePlattform(userAgent));
 }
 
 /**
- * EINE Plattformweiche für alle sichtbaren Kürzel — die Palette liest sie seit LFH-645 auch
- * für „⌘ ↵ / Strg + ↵ neuer Tab". Zwei Ausdrücke wären zwei Stellen, an denen ein iPad mit
- * Tastatur einmal ⌘ und einmal Strg angezeigt bekäme.
+ * EINE Plattformweiche für alle sichtbaren Kürzel (auch „⌘ ↵ / Strg + ↵ neuer Tab“), damit ein
+ * iPad mit Tastatur nicht einmal ⌘ und einmal Strg angezeigt bekommt.
  */
 export function istApplePlattform(userAgent: string): boolean {
   return /Mac|iPhone|iPad|iPod/.test(userAgent);
@@ -273,17 +246,11 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
 
   // 2. bis 4. gelten nur im Einsatz-Kontext.
   if (k.einsatzId != null) {
-    // 2. Zuletzt besucht — Freigabe fragt `istModulFreigegeben` (fertig, sichtbar, nicht
-    //    rollen-gesperrt), dieselbe Funktion wie die Modul-Schleife darunter und der
-    //    Navigationsrahmen. Ein seit dem Besuch entzogenes Modul verschwindet damit aus
-    //    der Abkürzung, statt in eine gesperrte Seite zu führen.
-    //    Eigenes id-Präfix: derselbe Registry-Eintrag steht hier UND unter „Module", und
-    //    zwei gleiche `id` machten `aria-activedescendant` mehrdeutig.
-    //    DAS AKTUELLE MODUL FÄLLT HERAUS (LFH-391 · C4): ein Sprung auf die Seite, auf der
-    //    man steht, verkürzt keinen Weg und kostet einen der drei Plätze. (Die frühere
-    //    Panel-Gruppe „Zuletzt" im Navigationsrahmen fuhr dieselbe Regel und zusätzlich
-    //    einen Kategorie-Ausschluss; sie ist seit 13.09.2026 entfernt, Begründung an
-    //    `einsatz/ModulPanel.tsx`. Hier ist die Palette die einzige Zuletzt-Fläche.)
+    // 2. Zuletzt besucht. Freigabe über `istModulFreigegeben` wie in der Modul-Schleife und im
+    //    Navigationsrahmen: ein entzogenes Modul verschwindet aus der Abkürzung.
+    //    Eigenes id-Präfix: derselbe Eintrag steht auch unter „Module“, gleiche `id` machten
+    //    `aria-activedescendant` mehrdeutig.
+    //    Das aktuelle Modul fällt heraus: ein Sprung auf die eigene Seite kostet einen der Plätze.
     for (const key of k.zuletztModulKeys ?? []) {
       if (key === k.aktuellerModulKey) continue;
       const m = modulRegistry.find((x) => x.key === key);
@@ -314,11 +281,9 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       });
     }
 
-    // 4. Schnellaktionen — nur wenn der User schreiben darf (kein Beobachter, aktiver Einsatz)
-    //    Der Modulfilter ist die LESEACHSE `istModulFreigegeben` (LFH-391 · A1b), dieselbe
-    //    Funktion wie in 2. und 3. — vorher stand hier die zweiteilige Fassung ohne
-    //    `status === 'fertig'`, und eine Schnellaktion konnte auf ein unfertiges Modul zeigen,
-    //    dessen Navigationseintrag daneben gar nicht existiert.
+    // 4. Schnellaktionen, nur mit Schreibrecht (kein Beobachter, aktiver Einsatz). Modulfilter ist
+    //    die LESEACHSE `istModulFreigegeben` wie in 2. und 3., sonst zeigte eine Schnellaktion auf
+    //    ein unfertiges Modul.
     if (k.darfSchreibenImEinsatz) {
       for (const a of SCHNELLAKTIONEN) {
         const m = modulRegistry.find((x) => x.key === a.modulKey);
@@ -396,10 +361,8 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     icon: TbUser,
     ...sprungZu('/profil', k.navigate),
   });
-  // Zwei Stufen, bewusst getrennt (LFH-328/M8): Verwaltungsbereich und Stammdaten hängen am
-  // AdminLayout-Gate `darfVerwaltung` — vorher standen sie unter `system_rolle === 'admin'`
-  // allein, weshalb eine Führungskraft „Verwaltung" in der Topbar sah und die Route betreten
-  // durfte, den Eintrag hier aber nicht fand.
+  // Verwaltungsbereich und Stammdaten hängen am AdminLayout-Gate `darfVerwaltung`, wie Topbar und
+  // Route.
   if (darfVerwaltung(k.benutzer)) {
     befehle.push({
       id: 'nav:stammdaten',
@@ -417,7 +380,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     });
   }
   // Die Benutzerverwaltung bleibt strenger: `/benutzer` leitet auf `/admin/benutzer`, und
-  // AdminLayout zeigt diesen Menüpunkt nur System-Admins. Sie mitzuziehen wäre eine Ausweitung.
+  // AdminLayout zeigt den Punkt nur System-Admins.
   if (k.benutzer?.system_rolle === 'admin') {
     befehle.push({
       id: 'nav:benutzer',
@@ -427,11 +390,8 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       ...sprungZu('/benutzer', k.navigate),
     });
   }
-  // `nichtMerkbar`: der einzige Befehl der Palette ohne Rückweg. Merkbar stünde er nach der
-  // ersten Benutzung dauerhaft als erste, VORAUSGEWÄHLTE Zeile der Startansicht — `Strg/⌘+K`
-  // + Enter beendete dann die Sitzung statt den erwarteten Kontextbefehl auszulösen
-  // (Review-Befund zu Etappe D). Die Gruppe `navigation` bleibt merkbar; die Ausnahme ist
-  // dieser Befehl, nicht seine Nachbarschaft.
+  // `nichtMerkbar`: der einzige Befehl ohne Rückweg. Gemerkt stünde er als erste, VORAUSGEWÄHLTE
+  // Zeile der Startansicht, und `Strg/⌘+K` + Enter beendete die Sitzung.
   befehle.push({
     id: 'nav:abmelden',
     gruppe: 'navigation',
@@ -441,54 +401,41 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     ausfuehren: () => k.logout(),
   });
 
-  // 8. Gedächtnis (LFH-391 · Etappe D) — ZULETZT, weil beide Hälften die FERTIGE Liste
-  //    brauchen: die Meldung hängt an jedem merkbaren Befehl, und die Auflösung greift auf
-  //    genau die Befehle zu, die es in dieser Runde wirklich gibt.
-  //    Die Position im ARRAY sagt nichts über die Position in der Palette: die
-  //    Startansicht rendert über `GRUPPEN_REIHENFOLGE`, und dort steht `ausgefuehrt` vorn.
+  // 8. Gedächtnis, ZULETZT, weil beide Hälften die FERTIGE Liste brauchen. Die Position im Array
+  //    sagt nichts über die Palette: die Startansicht rendert über `GRUPPEN_REIHENFOLGE`.
   return mitGedaechtnis(befehle, k);
 }
 
 /**
- * Darf dieser Befehl ins Gedächtnis (LFH-391 · Etappe D)? KONJUNKTION aus dem exhaustiven
- * Gruppenurteil und dem Einzel-Opt-out — beides gilt, keins ersetzt das andere.
- *
- * EINE Funktion für BEIDE Seiten, und das ist die Aussage: der Riegel gilt beim Schreiben
- * (welcher Befehl meldet sich überhaupt) UND beim Lesen (der Serverstand kann von einem
- * älteren Client stammen, der die Regel noch nicht kannte). Zwei getrennte Ausdrücke wären
- * zwei Stellen, an denen ein künftiges `nichtMerkbar` vergessen werden kann — und die
- * Leseseite ist genau die, die den Bestandsschaden aufräumt.
+ * Darf dieser Befehl ins Gedächtnis? KONJUNKTION aus Gruppenurteil und Einzel-Opt-out. EINE
+ * Funktion für Schreib- UND Leseseite: der Serverstand kann von einem älteren Client stammen,
+ * die Leseseite räumt ihn auf.
  */
 function istMerkbar(b: Befehl): boolean {
   return GRUPPE_MERKBAR[b.gruppe] && !b.nichtMerkbar;
 }
 
-/** Id-Präfix der Gedächtniszeilen. Eigenes Präfix aus demselben Grund wie bei `zuletzt:` —
- *  dieselbe `id` zweimal im Baum macht `aria-activedescendant` mehrdeutig. */
+/** Id-Präfix der Gedächtniszeilen, wie bei `zuletzt:`: dieselbe `id` zweimal im Baum machte
+ *  `aria-activedescendant` mehrdeutig. */
 const AUSGEFUEHRT_PRAEFIX = 'ausgefuehrt:';
 
 /**
- * Hängt das Gedächtnis an eine fertige Befehlsliste (LFH-391 · Etappe D). Rein: alles, was
- * nach aussen wirkt, kommt über `k.merkeBefehl` bzw. `k.zuletztBefehlIds` herein.
+ * Hängt das Gedächtnis an eine fertige Befehlsliste; rein, alles nach außen kommt über
+ * `k.merkeBefehl` bzw. `k.zuletztBefehlIds`.
  *
- * ERST wickeln, DANN klonen — die Reihenfolge ist tragend. Die Gedächtniszeile erbt damit
- * die Meldung ihres Originals, und weil die Wicklung `b.id` des Originals eingeschlossen
- * hat, meldet ein Griff ins Gedächtnis `nav:profil` und nicht `ausgefuehrt:nav:profil`.
- * Andersherum wüchse bei jedem Griff ein weiteres Präfix an, das beim nächsten Aufbau gegen
- * nichts mehr auflöst: das Gedächtnis vergässe genau die Befehle, die man am häufigsten
- * benutzt.
+ * ERST wickeln, DANN klonen: die Gedächtniszeile erbt die Meldung ihres Originals mit dessen
+ * `b.id`. Andersherum wüchse bei jedem Griff ein Präfix an, das beim nächsten Aufbau nicht mehr
+ * auflöst.
  */
 function mitGedaechtnis(befehle: Befehl[], k: BefehlKontext): Befehl[] {
-  // OHNE Callback bleibt die Liste unangetastet — kein Wrapper, keine neue Identität. Das
-  // ist kein Sonderfall ohne Fall: `useBefehle` wird auch ausserhalb der Palette gerendert,
-  // und die Prop ist wie `merkeModulBesuch` optional.
+  // OHNE Callback bleibt die Liste unangetastet (kein Wrapper, keine neue Identität):
+  // `useBefehle` wird auch außerhalb der Palette gerendert.
   const merkend = k.merkeBefehl
     ? befehle.map((b) =>
         istMerkbar(b)
           ? {
               ...b,
-              // Die Öffnungsart geht durch (LFH-645): ein Griff mit Strg/⌘+↵ merkt sich den
-              // Befehl genauso wie ein ↵, und die Kopie im Gedächtnis erbt diese Wicklung.
+              // Die Öffnungsart geht durch: ein Griff mit Strg/⌘+↵ merkt sich den Befehl wie ein ↵.
               ausfuehren: (oeffnung?: Oeffnung) => {
                 k.merkeBefehl?.(b.id);
                 b.ausfuehren(oeffnung);
@@ -501,9 +448,8 @@ function mitGedaechtnis(befehle: Befehl[], k: BefehlKontext): Befehl[] {
   const ausgefuehrt: Befehl[] = [];
   for (const id of k.zuletztBefehlIds ?? []) {
     const treffer = merkend.find((b) => b.id === id);
-    // DER RIEGEL GILT AUCH BEIM LESEN, nicht nur beim Schreiben: der Stand kommt vom
-    // Server und kann von einem älteren Client stammen, der `GRUPPE_MERKBAR` noch nicht
-    // kannte. Ohne diese Zeile stünde ein Modul zum DRITTEN Mal in der Liste.
+    // DER RIEGEL GILT AUCH BEIM LESEN: ein älterer Client kann `GRUPPE_MERKBAR` nicht gekannt
+    // haben, sonst stünde ein Modul zum DRITTEN Mal in der Liste.
     if (!treffer || !istMerkbar(treffer)) continue;
     ausgefuehrt.push({
       ...treffer,

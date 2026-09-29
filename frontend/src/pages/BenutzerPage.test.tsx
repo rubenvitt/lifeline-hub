@@ -3,37 +3,24 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import BenutzerPage from './BenutzerPage';
+import { adminFixture } from '../test/fixtures';
 
-function benutzer(over: Partial<Record<string, unknown>> = {}) {
-  return {
-    id: 1,
-    anzeigename: 'Admin',
-    benutzername: 'admin',
-    system_rolle: 'admin',
-    org_rolle: 'keine',
-    aktiv: true,
-    erstellt_at: '2026-05-23 10:00:00',
-    ...over,
-  };
-}
+const benutzer = adminFixture;
 
 describe('BenutzerPage', () => {
   it('listet Benutzer', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
     // Benutzername-Zelle (@admin) ist eindeutig — der Name „Admin" kollidiert sonst mit dem Rollen-Tag.
@@ -43,7 +30,7 @@ describe('BenutzerPage', () => {
   it('legt einen neuen Benutzer an', async () => {
     let angelegt = false;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () =>
         HttpResponse.json(
           angelegt
@@ -67,12 +54,10 @@ describe('BenutzerPage', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Benutzer anlegen' }));
@@ -87,7 +72,7 @@ describe('BenutzerPage', () => {
     let patchBody: Record<string, unknown> | null = null;
     let bearbeitet = false;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () =>
         HttpResponse.json([
           benutzer(),
@@ -108,12 +93,10 @@ describe('BenutzerPage', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
 
@@ -134,7 +117,7 @@ describe('BenutzerPage', () => {
     let patchBody: Record<string, unknown> | null = null;
     let reaktiviert = false;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () =>
         HttpResponse.json([
           benutzer(),
@@ -156,12 +139,10 @@ describe('BenutzerPage', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
 
@@ -185,7 +166,7 @@ describe('BenutzerPage', () => {
       freigeben = () => res();
     });
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () =>
         HttpResponse.json([
           benutzer(),
@@ -212,12 +193,10 @@ describe('BenutzerPage', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
 
@@ -238,7 +217,7 @@ describe('BenutzerPage', () => {
    */
   it('zeigt den Ladezustand beim Deaktivieren NUR an der geklickten Zeile', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () =>
         HttpResponse.json([
           benutzer(),
@@ -249,12 +228,10 @@ describe('BenutzerPage', () => {
       http.post('/api/benutzer/:id/deaktivieren', () => new Promise(() => {})),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
 
@@ -277,7 +254,7 @@ describe('BenutzerPage', () => {
   // schiebt eine verborgene Messzeile als erste Körperzeile ein, deshalb `tr.ant-table-row`.
   it('sucht, sortiert und filtert die Benutzerliste', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () =>
         HttpResponse.json([
           benutzer(),
@@ -292,12 +269,10 @@ describe('BenutzerPage', () => {
       ),
     );
     const { container } = renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
     await screen.findByText('@eva');
@@ -338,16 +313,14 @@ describe('BenutzerPage', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
 
@@ -357,16 +330,14 @@ describe('BenutzerPage', () => {
 
   it('zeigt bei leerem Katalog den Leertext und KEINEN Fehler', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () => HttpResponse.json([])),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
 
@@ -376,18 +347,16 @@ describe('BenutzerPage', () => {
 
   it('leitet Nicht-Admins weg von der Benutzerverwaltung', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json({ ...benutzer(), system_rolle: 'keiner' })),
+      meHandler(benutzer({ system_rolle: 'keiner' })),
       http.get('/api/benutzer', () =>
         HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
       ),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
     expect(await screen.findByText('Einsatz-Liste')).toBeInTheDocument();
@@ -416,7 +385,7 @@ describe('BenutzerPage', () => {
    */
   function renderMitZwei() {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () =>
         HttpResponse.json([
           benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner' }),
@@ -425,12 +394,10 @@ describe('BenutzerPage', () => {
       ),
     );
     return renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
   }
@@ -490,7 +457,7 @@ describe('BenutzerPage', () => {
    */
   it('zeigt beim Wechsel von Benutzer A zu Benutzer B wirklich B', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () =>
         HttpResponse.json([
           benutzer({
@@ -511,12 +478,10 @@ describe('BenutzerPage', () => {
       ),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
 
@@ -549,19 +514,17 @@ describe('BenutzerPage', () => {
    */
   it('lässt nach einer Ablehnung den Anlegen-Dialog samt Wortlaut stehen', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
       http.post('/api/benutzer', () =>
         HttpResponse.json({ error: 'Benutzername bereits vergeben' }, { status: 422 }),
       ),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
 
@@ -586,7 +549,7 @@ describe('BenutzerPage', () => {
   it('schickt die Rollen-Vorgaben mit, auch wenn niemand aufklappt', async () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
       http.post('/api/benutzer', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
@@ -594,11 +557,9 @@ describe('BenutzerPage', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
 
@@ -625,7 +586,7 @@ describe('BenutzerPage', () => {
   it('eine aufgeklappt gewählte Rolle kommt gewählt an', async () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      meHandler(benutzer()),
       http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
       http.post('/api/benutzer', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
@@ -633,11 +594,9 @@ describe('BenutzerPage', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/admin/benutzer" element={<BenutzerPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+      </Routes>,
       { route: '/admin/benutzer' },
     );
 

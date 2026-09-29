@@ -17,10 +17,9 @@ import type {
 } from './types';
 
 /**
- * Fachmodul Betreuung (LFH-639): Evakuierungsbezirke mit Standmeldungen, Betreuungsstellen
- * mit Belegungsmeldungen. Zeiten gehen als UTC `YYYY-MM-DD HH:mm:ss` auf den Draht — hin über
- * `alsBackendZeit`, zurück über `alsOrtszeit` (`etb/filterZeit.ts`), nie über `dayjs(s)`
- * (design.md D2).
+ * Fachmodul Betreuung: Evakuierungsbezirke mit Standmeldungen, Betreuungsstellen mit
+ * Belegungsmeldungen. Zeiten gehen als UTC `YYYY-MM-DD HH:mm:ss` auf den Draht, hin über
+ * `alsBackendZeit`, zurück über `alsOrtszeit` (`etb/filterZeit.ts`), nie über `dayjs(s)`.
  */
 const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/betreuung`;
 
@@ -30,9 +29,9 @@ export function ladeBetreuung(einsatzId: number): Promise<BetreuungUebersicht> {
 }
 
 /**
- * Kopfzahl „in Betreuung" zum Stichtag (LFH-634); ohne `zeitpunkt` gilt „jetzt". Der Wert
- * wird kodiert: der Wire-String trägt ein Leerzeichen, ein Zonenversatz ein `+`, das roh als
- * Leerzeichen ankäme.
+ * Kopfzahl „in Betreuung“ zum Stichtag; ohne `zeitpunkt` gilt „jetzt“. Der Wert wird kodiert:
+ * der Wire-String trägt ein Leerzeichen, ein Zonenversatz ein `+`, das roh als Leerzeichen
+ * ankäme.
  */
 export function ladeBelegungKopfzahl(
   einsatzId: number,
@@ -43,8 +42,8 @@ export function ladeBelegungKopfzahl(
 }
 
 /**
- * Standreihe eines Bezirks samt zurückgenommener Meldungen (LFH-676), in der Ordnung, in der
- * der Server „aktuell“ bestimmt (jüngster Zeitpunkt zuerst). Fremder/unbekannter Bezirk: 404.
+ * Standreihe eines Bezirks samt zurückgenommener Meldungen, in der Ordnung, in der der Server
+ * „aktuell“ bestimmt (jüngster Zeitpunkt zuerst). Fremder/unbekannter Bezirk: 404.
  */
 export function ladeStandVerlauf(
   einsatzId: number,
@@ -53,7 +52,7 @@ export function ladeStandVerlauf(
   return apiGet<StandVerlaufEintrag[]>(`${basis(einsatzId)}/bezirke/${bezirkId}/staende`);
 }
 
-/** Belegungsreihe einer Stelle (LFH-676), wie {@link ladeStandVerlauf}. */
+/** Belegungsreihe einer Stelle, wie {@link ladeStandVerlauf}. */
 export function ladeBelegungVerlauf(
   einsatzId: number,
   stelleId: number,
@@ -85,7 +84,7 @@ export function storniereBezirk(einsatzId: number, bezirkId: number): Promise<Ev
   );
 }
 
-/** Mit `client_id` idempotent (LFH-675): ein Replay liefert die gespeicherte Meldung. */
+/** Mit `client_id` idempotent: ein Replay liefert die gespeicherte Meldung. */
 export function meldeStand(
   einsatzId: number,
   bezirkId: number,

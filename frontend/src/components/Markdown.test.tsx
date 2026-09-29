@@ -9,10 +9,9 @@ describe('Markdown', () => {
   });
 
   /*
-   * Die Ebene nennt der EINBAUORT (LFH-621), nicht eine feste Konstante: `unterEbene` ist die
-   * Ebene der nächsten Überschrift über dem Text, `#` wird die Ebene darunter. Vorher rückte
-   * alles pauschal um drei Stufen — im ETB, wo über dem Eintrag nur der Tageskopf steht,
-   * fielen damit `###`, `####` und tiefer ohne Not alle auf `h6` zusammen.
+   * Die Ebene nennt der EINBAUORT (LFH-621): `unterEbene` ist die Ebene der nächsten Überschrift
+   * über dem Text, `#` wird die Ebene darunter. Ein fester Versatz ließe `###` und tiefer ohne Not
+   * auf `h6` zusammenfallen.
    */
   it('setzt `#` eine Ebene unter die Überschrift des Einbauorts — nie ein zweites h1', () => {
     render(

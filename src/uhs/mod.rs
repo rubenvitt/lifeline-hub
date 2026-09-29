@@ -5,43 +5,27 @@ pub mod repo;
 
 pub use hooks::{auto_austritt, AutoAustrittEffekt};
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Typ einer Unfallhilfsstelle. String = CHECK-Constraint in
-/// `migrations/0027_uhs.sql`.
-///
-/// LFH-120: `rename_all` richtet die (bislang ungenutzte) Serde-Serialisierung an
-/// den `as_str()`-Wire-Werten aus, damit das utoipa-Schema die snake_case-Union trifft.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum UhsTyp {
-    Patientenablage,
-    Behandlungsplatz,
-    Verletztensammelstelle,
-    Sonstige,
+wire_enum! {
+    /// Typ einer Unfallhilfsstelle. String = CHECK-Constraint in
+    /// `migrations/0027_uhs.sql`.
+    ///
+    /// LFH-120: `rename_all` richtet die (bislang ungenutzte) Serde-Serialisierung an
+    /// den `as_str()`-Wire-Werten aus, damit das utoipa-Schema die snake_case-Union trifft.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum UhsTyp {
+        Patientenablage => "patientenablage",
+        Behandlungsplatz => "behandlungsplatz",
+        Verletztensammelstelle => "verletztensammelstelle",
+        Sonstige => "sonstige",
+    }
+    try_from = |s| format!("Ungültiger UhsTyp: {s}");
 }
 
 impl UhsTyp {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            UhsTyp::Patientenablage => "patientenablage",
-            UhsTyp::Behandlungsplatz => "behandlungsplatz",
-            UhsTyp::Verletztensammelstelle => "verletztensammelstelle",
-            UhsTyp::Sonstige => "sonstige",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<UhsTyp> {
-        match s {
-            "patientenablage" => Some(UhsTyp::Patientenablage),
-            "behandlungsplatz" => Some(UhsTyp::Behandlungsplatz),
-            "verletztensammelstelle" => Some(UhsTyp::Verletztensammelstelle),
-            "sonstige" => Some(UhsTyp::Sonstige),
-            _ => None,
-        }
-    }
-
     /// Anzeigelabel (für pseudonyme ETB-Texte, z. B. „BHP 50 (Behandlungsplatz) in Betrieb genommen").
     pub fn anzeige_label(&self) -> &'static str {
         match self {
@@ -53,48 +37,15 @@ impl UhsTyp {
     }
 }
 
-impl TryFrom<String> for UhsTyp {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        UhsTyp::parse(&s).ok_or_else(|| format!("Ungültiger UhsTyp: {s}"))
+wire_enum! {
+    /// Status einer UHS. String = CHECK-Constraint. `aufgeloest` ist terminal.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum UhsStatus {
+        Geplant => "geplant",
+        Aktiv => "aktiv",
+        Aufgeloest => "aufgeloest",
     }
-}
-
-/// Status einer UHS. String = CHECK-Constraint. `aufgeloest` ist terminal.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum UhsStatus {
-    Geplant,
-    Aktiv,
-    Aufgeloest,
-}
-
-impl UhsStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            UhsStatus::Geplant => "geplant",
-            UhsStatus::Aktiv => "aktiv",
-            UhsStatus::Aufgeloest => "aufgeloest",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<UhsStatus> {
-        match s {
-            "geplant" => Some(UhsStatus::Geplant),
-            "aktiv" => Some(UhsStatus::Aktiv),
-            "aufgeloest" => Some(UhsStatus::Aufgeloest),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for UhsStatus {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        UhsStatus::parse(&s).ok_or_else(|| format!("Ungültiger UhsStatus: {s}"))
-    }
+    try_from = |s| format!("Ungültiger UhsStatus: {s}");
 }
 
 /// Ob ein UHS-Status-Übergang `von → nach` erlaubt ist. Status-Maschine:
@@ -116,47 +67,24 @@ pub fn darf_uebergehen(von: &str, nach: &str) -> bool {
     }
 }
 
-/// Typ eines Platzes innerhalb einer UHS. String = CHECK-Constraint in
-/// `migrations/0028_uhs_platz.sql`. „Eingang"/„Inbox" ist KEIN Typ — die
-/// Inbox ist implizit über `platz_id = NULL` in der Belegung modelliert.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum PlatzTyp {
-    Wartebereich,
-    Behandlungsplatz,
-    Bett,
-    Intensivplatz,
-    Trage,
-    TransportBereitstellung,
-    Sonstige,
+wire_enum! {
+    /// Typ eines Platzes innerhalb einer UHS. String = CHECK-Constraint in
+    /// `migrations/0028_uhs_platz.sql`. „Eingang"/„Inbox" ist KEIN Typ — die
+    /// Inbox ist implizit über `platz_id = NULL` in der Belegung modelliert.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum PlatzTyp {
+        Wartebereich => "wartebereich",
+        Behandlungsplatz => "behandlungsplatz",
+        Bett => "bett",
+        Intensivplatz => "intensivplatz",
+        Trage => "trage",
+        TransportBereitstellung => "transport_bereitstellung",
+        Sonstige => "sonstige",
+    }
+    try_from = |s| format!("Ungültiger PlatzTyp: {s}");
 }
 
 impl PlatzTyp {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            PlatzTyp::Wartebereich => "wartebereich",
-            PlatzTyp::Behandlungsplatz => "behandlungsplatz",
-            PlatzTyp::Bett => "bett",
-            PlatzTyp::Intensivplatz => "intensivplatz",
-            PlatzTyp::Trage => "trage",
-            PlatzTyp::TransportBereitstellung => "transport_bereitstellung",
-            PlatzTyp::Sonstige => "sonstige",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<PlatzTyp> {
-        match s {
-            "wartebereich" => Some(PlatzTyp::Wartebereich),
-            "behandlungsplatz" => Some(PlatzTyp::Behandlungsplatz),
-            "bett" => Some(PlatzTyp::Bett),
-            "intensivplatz" => Some(PlatzTyp::Intensivplatz),
-            "trage" => Some(PlatzTyp::Trage),
-            "transport_bereitstellung" => Some(PlatzTyp::TransportBereitstellung),
-            "sonstige" => Some(PlatzTyp::Sonstige),
-            _ => None,
-        }
-    }
-
     /// Anzeige-Label, Basis für automatisch generierte Platz-Bezeichnungen
     /// („Bett 1", „Intensivplatz 1", …) bei der Typ-basierten Bulk-Anlage (LFH-16).
     pub fn anzeige_label(&self) -> &'static str {
@@ -172,93 +100,31 @@ impl PlatzTyp {
     }
 }
 
-impl TryFrom<String> for PlatzTyp {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        PlatzTyp::parse(&s).ok_or_else(|| format!("Ungültiger PlatzTyp: {s}"))
+wire_enum! {
+    /// Verfügbarkeit eines Platzes (getrennt von Belegung). String = CHECK in
+    /// `migrations/0028_uhs_platz.sql`. `reserviert` ist im DB-CHECK an
+    /// `reserviert_fuer_person_id IS NOT NULL` gekoppelt.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Verfuegbarkeit {
+        Frei => "frei",
+        Defekt => "defekt",
+        Aufbereitung => "aufbereitung",
+        Gesperrt => "gesperrt",
+        Reserviert => "reserviert",
     }
+    try_from = |s| format!("Ungültige Verfügbarkeit: {s}");
 }
 
-/// Verfügbarkeit eines Platzes (getrennt von Belegung). String = CHECK in
-/// `migrations/0028_uhs_platz.sql`. `reserviert` ist im DB-CHECK an
-/// `reserviert_fuer_person_id IS NOT NULL` gekoppelt.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Verfuegbarkeit {
-    Frei,
-    Defekt,
-    Aufbereitung,
-    Gesperrt,
-    Reserviert,
-}
-
-impl Verfuegbarkeit {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Verfuegbarkeit::Frei => "frei",
-            Verfuegbarkeit::Defekt => "defekt",
-            Verfuegbarkeit::Aufbereitung => "aufbereitung",
-            Verfuegbarkeit::Gesperrt => "gesperrt",
-            Verfuegbarkeit::Reserviert => "reserviert",
-        }
+wire_enum! {
+    /// Art eines Belegungs-Events. String = CHECK in
+    /// `migrations/0029_person_uhs_belegung.sql`. Append-only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BelegungsArt {
+        Eintritt => "eintritt",
+        Wechsel => "wechsel",
+        Austritt => "austritt",
     }
-
-    pub fn parse(s: &str) -> Option<Verfuegbarkeit> {
-        match s {
-            "frei" => Some(Verfuegbarkeit::Frei),
-            "defekt" => Some(Verfuegbarkeit::Defekt),
-            "aufbereitung" => Some(Verfuegbarkeit::Aufbereitung),
-            "gesperrt" => Some(Verfuegbarkeit::Gesperrt),
-            "reserviert" => Some(Verfuegbarkeit::Reserviert),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for Verfuegbarkeit {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Verfuegbarkeit::parse(&s).ok_or_else(|| format!("Ungültige Verfügbarkeit: {s}"))
-    }
-}
-
-/// Art eines Belegungs-Events. String = CHECK in
-/// `migrations/0029_person_uhs_belegung.sql`. Append-only.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum BelegungsArt {
-    Eintritt,
-    Wechsel,
-    Austritt,
-}
-
-impl BelegungsArt {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            BelegungsArt::Eintritt => "eintritt",
-            BelegungsArt::Wechsel => "wechsel",
-            BelegungsArt::Austritt => "austritt",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<BelegungsArt> {
-        match s {
-            "eintritt" => Some(BelegungsArt::Eintritt),
-            "wechsel" => Some(BelegungsArt::Wechsel),
-            "austritt" => Some(BelegungsArt::Austritt),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for BelegungsArt {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        BelegungsArt::parse(&s).ok_or_else(|| format!("Ungültige BelegungsArt: {s}"))
-    }
+    try_from = |s| format!("Ungültige BelegungsArt: {s}");
 }
 
 /// Serialisierbare UHS-Anzeige (1:1 zur Tabelle, ohne abgeleitete Felder).

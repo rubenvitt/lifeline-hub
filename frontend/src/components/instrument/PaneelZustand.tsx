@@ -21,12 +21,11 @@ interface PaneelZustandProps {
   titel: string;
   leerText: string;
   /**
-   * Beschriftung der Aktion im Leerzustand („Meldung erfassen"). Fehlt sie, steht nur der
-   * Satz da (LFH-21). Das ist richtig, wenn es keinen Ausweg gibt (ohne Schreibrecht führte
-   * eine Aktion ins Leere) ODER wenn der Ausweg an anderer Stelle steht, etwa als Aktion im
-   * Paneelkopf — zwei gleichnamige Ziele mit derselben Wirkung wären für Vorlesende nicht
-   * unterscheidbar (Schaden-Anhänge, Review C2). Ein Leerzustand ohne jeden Ausweg für jemanden,
-   * der schreiben darf, bleibt eine Sackgasse.
+   * Beschriftung der Aktion im Leerzustand („Meldung erfassen"). Fehlt sie, steht nur der Satz
+   * da: richtig, wenn es keinen Ausweg gibt (ohne Schreibrecht führte eine Aktion ins Leere) ODER
+   * wenn der Ausweg anderswo steht, etwa im Paneelkopf — zwei gleichnamige Ziele mit derselben
+   * Wirkung wären für Vorlesende nicht unterscheidbar. Für jemanden, der schreiben darf, bleibt
+   * ein Leerzustand ohne jeden Ausweg eine Sackgasse.
    */
   leerAktion?: string;
   onLeerAktion?: () => void;
@@ -35,19 +34,16 @@ interface PaneelZustandProps {
 }
 
 /**
- * PaneelZustand — Laden · Fehler · Leer im Körper eines `Paneel` (Neuentwurf, aus dem
- * Lage-Dashboard übernommen am 22.09.2026). Drei Zustände, drei Erscheinungen (LFH-331 · B3):
- * der Sweep-Befund lautete „Fehler sieht aus wie leer" — eine tote Abfrage renderte denselben
- * Leerzustand wie „nichts vorhanden", und wer in dem Moment ans Funkgerät geht, meldet eine
- * falsche Lage. Deshalb:
+ * PaneelZustand — Laden · Fehler · Leer im Körper eines `Paneel`. Drei Zustände, drei
+ * Erscheinungen (LFH-331 · B3): sähe ein Fehler aus wie leer, meldete jemand am Funkgerät eine
+ * falsche Lage.
  *
  * - `laden` → Skelett mit `aria-busy` und benanntem Ladezustand,
  * - `fehler` → `role="alert"`, Titel in `alarm`, „Stand unbekannt", Knopf „Erneut abrufen",
  * - `leer` → gedämpfter Satz plus eine AKTION (ein Leerzustand ohne Ausweg ist eine Sackgasse),
  * - `daten` → die Kinder, unverändert.
  *
- * Die Knöpfe sind antd-`Button` und erben `controlHeight` vom `ConfigProvider` — keine
- * eigene Größenangabe (Dichte-Staffel 30 / 48 / 72).
+ * Die Knöpfe sind antd-`Button` und erben `controlHeight` vom `ConfigProvider`.
  */
 export default function PaneelZustand({
   zustand,
@@ -102,8 +98,8 @@ export default function PaneelZustand({
 }
 
 /**
- * Link-Knopf „… ↗" für den Paneelkopf (`Paneel aktion`). Der Pfeil ist Zeichen
- * (Entscheidung 2 des Auftraggebers) und `aria-hidden`: der zugängliche Name ist das Wort.
+ * Link-Knopf „… ↗" für den Paneelkopf (`Paneel aktion`). Der Pfeil ist Zeichen und
+ * `aria-hidden`: der zugängliche Name ist das Wort.
  */
 export function PaneelLink({ label, onKlick }: { label: string; onKlick: () => void }) {
   const { token } = useRollen();
