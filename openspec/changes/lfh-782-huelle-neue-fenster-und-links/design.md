@@ -102,8 +102,9 @@ der Maske gehören nicht ins Nebenfenster. `lade_server` schließt vor dem Laden
 
 ### D4 Systemprogramm über `tauri-plugin-opener`, nur Rust-seitig
 
-`tauri_plugin_opener::open_url(url, None::<&str>)`. Das Plugin wird initialisiert, bekommt
-aber keine Permission in einer Capability. Die Seite kann es also nicht selbst aufrufen.
+`tauri_plugin_opener::open_url(url, None::<&str>)`, die freie Rust-Funktion der Crate. Das
+Plugin wird **nicht** im Builder registriert. Die Seite hat damit keinen eigenen Weg zum
+Öffnen, auch nicht über eine vergessene Permission.
 Schlägt das Öffnen fehl, steht es im Protokoll (ohne Query). Die Seite bekommt kein Signal.
 
 ### D5 Chat-Anhänge auf `DownloadAnker`

@@ -2,7 +2,7 @@
 
 ## 1. Reine Link-Entscheidung (Hülle)
 
-- [ ] 1.1 `src-tauri/src/links.rs` mit `Ziel`, `entscheide_neues_fenster`, `entscheide_navigation`
+- [x] 1.1 `src-tauri/src/links.rs` mit `Ziel`, `entscheide_neues_fenster`, `entscheide_navigation`
   per TDD nach der Tabelle in design.md D1. Die Tests pinnen: eigene Origin → `Nebenfenster`;
   `/api/einsaetze/1/anhaenge/7` → `Download` (neues Fenster und Navigation);
   `/api/auth/oidc/start` und `/api/auth/oidc/callback` → `Huelle`/`Nebenfenster`, nie
@@ -13,18 +13,18 @@
 
 ## 2. Verdrahtung in der Hülle
 
-- [ ] 2.1 `tauri-plugin-opener` in `src-tauri/Cargo.toml` aufnehmen und in `main.rs`
-  initialisieren, ohne Permission in einer Capability. Nachweis: `cargo build -p
+- [x] 2.1 `tauri-plugin-opener` in `src-tauri/Cargo.toml` aufnehmen. Nur die freie Funktion
+  `open_url` wird genutzt, das Plugin nicht im Builder registriert (design.md D4). Nachweis: `cargo build -p
   lifeline-desktop`, `scripts/check-deps.sh` grün.
-- [ ] 2.2 `baue_fenster(app, label, url)` aus dem Fensterbau in `setup` herauslösen (Titel,
+- [x] 2.2 `baue_fenster(app, label, url)` aus dem Fensterbau in `setup` herauslösen (Titel,
   Größen, `on_page_load`, `on_download`, macOS-Drosselung und Druckskript). Das Hauptfenster
   entsteht darüber. Nachweis: `cargo test -p lifeline-desktop` grün, Hülle startet unverändert.
-- [ ] 2.3 `on_new_window` und `on_navigation` in `baue_fenster` an `links.rs` anbinden:
+- [x] 2.3 `on_new_window` und `on_navigation` in `baue_fenster` an `links.rs` anbinden:
   `Nebenfenster` baut `neben-<n>` (Zähler im `Zustand`), `System` ruft den Opener, `Download`
   führt den Anker per `eval` aus (URL über `serde_json::to_string`), `Verwerfen` protokolliert
   über `fuers_protokoll`. Der Server wird bei jedem Aufruf gelesen. Nachweis: ein Test für den
   Skripttext (Kodierung eines Anführungszeichens und von `</script>` in der URL), `cargo test`.
-- [ ] 2.4 `server_freigeben` gibt `drucken` für `main` und `neben-*` frei, und `lade_server`
+- [x] 2.4 `server_freigeben` gibt `drucken` für `main` und `neben-*` frei, und `lade_server`
   schließt alle `neben-*`-Fenster vor dem Laden. Nachweis: Test, dass die Fensterliste der
   Capability beide Muster trägt; `capabilities/lokal.json` bleibt bei `main`.
 
