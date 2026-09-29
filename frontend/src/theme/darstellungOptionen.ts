@@ -1,8 +1,16 @@
 import { FiMaximize, FiMinimize, FiMonitor, FiMoon, FiSun } from 'react-icons/fi';
-import { TbHandStop } from 'react-icons/tb';
+import {
+  TbBrightnessDown,
+  TbBrightnessHalf,
+  TbHandStop,
+  TbSun,
+  TbSunHigh,
+  TbSunLow,
+} from 'react-icons/tb';
 import type { IconType } from 'react-icons';
 import type { ThemeModus } from './ThemeModeProvider';
 import type { Dichte } from './tokens';
+import type { Helligkeit } from './helligkeit';
 
 /**
  * Die Stufen der zwei Darstellungsachsen (Modus, Dichte) mit Beschriftung und Symbol, an einem
@@ -34,3 +42,21 @@ export const DARSTELLUNG_OPTIONEN: Darstellungsstufe<ThemeModus>[] =
   Object.values(DARSTELLUNG_INDEX);
 
 export const DICHTE_OPTIONEN: Darstellungsstufe<Dichte>[] = Object.values(DICHTE_INDEX);
+
+/**
+ * Die Helligkeitsstufen (LFH-397), nach derselben Regel: der Index ist die Quelle, die
+ * Liste seine Ableitung. Die Einfügereihenfolge der Zahlenschlüssel ist hier NICHT die
+ * hingeschriebene — Ganzzahl-Schlüssel ordnet JavaScript aufsteigend —, deshalb wird die
+ * Liste absteigend sortiert: hell oben, dunkel unten, wie im Menü gelesen.
+ */
+const HELLIGKEIT_INDEX: Record<Helligkeit, Darstellungsstufe<Helligkeit>> = {
+  100: { wert: 100, titel: '100 %', Icon: TbSunHigh },
+  80: { wert: 80, titel: '80 %', Icon: TbSun },
+  60: { wert: 60, titel: '60 %', Icon: TbBrightnessHalf },
+  40: { wert: 40, titel: '40 %', Icon: TbSunLow },
+  20: { wert: 20, titel: '20 %', Icon: TbBrightnessDown },
+};
+
+export const HELLIGKEIT_OPTIONEN: Darstellungsstufe<Helligkeit>[] = Object.values(
+  HELLIGKEIT_INDEX,
+).sort((a, b) => b.wert - a.wert);

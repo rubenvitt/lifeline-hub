@@ -26,6 +26,26 @@
         }
       })();
     </script>
+    <!-- Helligkeit synchron vor dem React-Mount setzen (LFH-397), sonst blitzt der
+         abgedunkelte Fükw beim Laden auf voller Helligkeit auf. Gespiegelt aus
+         `theme/helligkeit.ts` + ThemeModeProvider (Pin: `helligkeit.test.ts`). Eine
+         Warnsperre kennt dieses Skript nicht — die setzt der Provider nach dem Mount. -->
+    <script>
+      (function () {
+        try {
+          var stufen = ['100', '80', '60', '40', '20'];
+          var h = localStorage.getItem('lifeline-hub.helligkeit');
+          if (stufen.indexOf(h) === -1) h = '100';
+          document.documentElement.dataset.helligkeit = h;
+          document.documentElement.style.setProperty(
+            '--lfh-abdunkelung',
+            String((100 - Number(h)) / 100),
+          );
+        } catch (e) {
+          /* localStorage gesperrt o. Ä. – keine Abdunklung, der Provider übernimmt. */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

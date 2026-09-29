@@ -43,6 +43,7 @@ function kontext(over: Partial<BefehlKontext> = {}): BefehlKontext {
     navigate: vi.fn(),
     setThemeModus: vi.fn(),
     setDichte: vi.fn(),
+    setHelligkeit: vi.fn(),
     setKoordinaten: vi.fn(),
     logout: vi.fn(),
     ...over,
@@ -212,6 +213,22 @@ describe('baueBefehle — Schnelleinstellungen', () => {
     expect(k.setDichte).toHaveBeenCalledWith('handschuh');
     // Die Achsen bleiben getrennt: ein Dichte-Befehl rührt das Farbschema nicht an.
     expect(k.setThemeModus).not.toHaveBeenCalled();
+  });
+
+  it('Schnelleinstellung Helligkeit ruft setHelligkeit mit der Stufe (LFH-397)', () => {
+    // Setzt die WAHL; die Warnsperre sitzt an der wirksamen Stufe im Provider und gilt
+    // deshalb auch auf diesem Weg.
+    const k = kontext();
+    const b = baueBefehle(k);
+    for (const s of [100, 80, 60, 40, 20]) {
+      const treffer = b.find((x) => x.id === `helligkeit:${s}`);
+      expect(treffer, String(s)).toBeDefined();
+      expect(treffer!.gruppe, String(s)).toBe('einstellungen');
+      expect(treffer!.label, String(s)).toBe(`Helligkeit: ${s} %`);
+    }
+    b.find((x) => x.id === 'helligkeit:40')!.ausfuehren();
+    expect(k.setHelligkeit).toHaveBeenCalledWith(40);
+    expect(k.setDichte).not.toHaveBeenCalled();
   });
 });
 

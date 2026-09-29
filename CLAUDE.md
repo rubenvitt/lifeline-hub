@@ -365,6 +365,15 @@ anwendbar), „nicht geprüft" ist keins.
   einen **zweiten Kanal** (WCAG 1.4.1). Farbwerte nur aus `theme/tokens.ts`/`theme/rollen.css`.
   Flächen (`warnstufeFlaeche`/`flaechenFarbe`) sind die dritte Darstellungssorte; eine vierte wird
   in `statusFarben.ts` benannt, nicht in `pages/`.
+- **Helligkeit: ein Regler, eine Sperre** (LFH-397, Kriterium 8,
+  `openspec/changes/lfh-397-helligkeitsregler-warnsperre/design.md`): dritte Achse im
+  `ThemeModeProvider` (`useHelligkeit`, Stufen 100/80/60/40/20, `lifeline-hub.helligkeit`,
+  **gespiegelt in `index.html`**), wirkt nur über die Deckschicht `html::after` in `rollen.css`
+  (`--lfh-abdunkelung`, `@media screen`), nie über Paletten. Bei aktiver Warnung
+  (`einsatz/aktiveWarnung.ts`: Warnstufe mit Rolle `alarm` oder
+  `meldungen.bestaetigung_ueberfaellig`) gilt `HELLIGKEIT_BODEN_WARNUNG` (abgeleitet über
+  Kriterium 5, Guard `theme/helligkeit.test.ts`); Quellen melden sich nur über `useWarnsperre`
+  (heute allein `EinsatzLayout`). Die Sperre ändert nie die Wahl.
 - **Rot steht nicht bündig neben Neutralem:** `<Space>` mit `danger` und weiterer Aktion trägt
   `size="middle"` (`aktionsabstand.guard.test.ts`).
 - **Destruktiv ist nicht gleich destruktiv** (LFH-363): Umkehrbares („Außer Dienst",

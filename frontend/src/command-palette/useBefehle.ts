@@ -3,7 +3,7 @@ import { useLocation } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useDichte, useThemeMode } from '../theme/ThemeModeProvider';
+import { useDichte, useHelligkeit, useThemeMode } from '../theme/ThemeModeProvider';
 import { listeEinsaetze, ladeModulOverrides, ladeEinsatz } from '../api/einsaetze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { setzeOverride } from '../anzeige/koordinatenSystemStore';
@@ -38,6 +38,8 @@ export function useBefehle(
   const { benutzer, logout } = useAuth();
   const { setModus } = useThemeMode();
   const { setDichte } = useDichte();
+  // Wie `setDichte`: der Setter ist identitätsstabil, das Objekt von `useHelligkeit()` nicht.
+  const { setHelligkeit } = useHelligkeit();
   const { pathname } = useLocation();
   const einsatzId = einsatzIdAusPfad(pathname);
   /**
@@ -101,6 +103,7 @@ export function useBefehle(
         navigate,
         setThemeModus: setModus,
         setDichte,
+        setHelligkeit,
         setKoordinaten: setzeOverride,
         logout: () => {
           void logout();
@@ -119,6 +122,7 @@ export function useBefehle(
       navigate,
       setModus,
       setDichte,
+      setHelligkeit,
       logout,
       tastaturAktionen,
       zuletztModulKeys,

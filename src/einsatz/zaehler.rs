@@ -27,11 +27,15 @@ pub struct MengenZaehler {
     pub gesamt: i64,
 }
 
-/// Meldungen: offen (Status ≠ erledigt), davon noch nicht gesichtet (Status „neu").
+/// Meldungen: offen (Status ≠ erledigt), davon noch nicht gesichtet (Status „neu"), und die
+/// Meldungen mit überfälliger Bestätigungspflicht.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct MeldungsZaehler {
     pub offen: i64,
     pub ungesehen: i64,
+    /// Pflichtig, unbestätigt und Frist abgelaufen oder eskaliert — über ALLE Meldungen, nicht
+    /// nur die offenen (LFH-397). Speist die Warnsperre des Helligkeitsreglers im Frontend.
+    pub bestaetigung_ueberfaellig: i64,
 }
 
 /// Aufträge: offen (offen/in Arbeit), davon überfällig.
@@ -145,6 +149,16 @@ pub async fn berechne(
         z.meldungen = Some(MeldungsZaehler {
             offen: offen.clone().count() as i64,
             ungesehen: offen.filter(|m| m.status == MeldungStatus::Neu).count() as i64,
+            // Dieselbe Regel wie `istAlarmiert` in `frontend/src/meldungen/meldungKennzahlen.ts`
+            // — wer eine ändert, ändert beide.
+            bestaetigung_ueberfaellig: liste
+                .iter()
+                .filter(|m| {
+                    m.bestaetigung_pflicht
+                        && !m.ist_bestaetigt
+                        && (m.ist_ueberfaellig || m.eskaliert)
+                })
+                .count() as i64,
         });
     }
     if erlaubt.contains("auftraege") {
@@ -193,6 +207,7 @@ mod tests {
             meldungen: Some(MeldungsZaehler {
                 offen: 1,
                 ungesehen: 0,
+                bestaetigung_ueberfaellig: 0,
             }),
             auftraege: Some(AuftragsZaehler {
                 offen: 1,
