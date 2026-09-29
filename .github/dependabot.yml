@@ -42,6 +42,12 @@ updates:
       # Der Playwright-Browser-Cache im Gate hängt am Lockfile-Hash; ein Bump ohne neuen
       # Browser-Download endet in „Executable doesn't exist". Bewusst von Hand.
       - dependency-name: '@playwright/test'
+      # jsdom 30.1 legt die Impl hinter ein privates Klassenfeld; Vitests jsdom-Umgebung
+      # (`makeCompatBlob`) findet sie nicht mehr, und jeder FormData-/Blob-Body wirft
+      # („reading '_bytes'"). Gemessen am Logo-Upload in `OrganisationTab.test.tsx`.
+      # Der Halt fällt, wenn eine Vitest-Version vitest-dev/vitest#11336 behebt.
+      - dependency-name: jsdom
+        versions: ['>=30.1.0']
 
   # Das Werkzeug-Paket im Repo-Root (semantic-release). Getrennt von /frontend, weil es eine
   # eigene package.json und ein eigenes Lockfile hat.
