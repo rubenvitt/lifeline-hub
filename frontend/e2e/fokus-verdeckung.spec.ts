@@ -5,7 +5,7 @@ import {
   kopfFelder,
   zuordnungsKarte,
 } from './einheit-fixture';
-import { pruefeFokusVerdeckung } from './fokus-kern';
+import { pruefeFokusVerdeckung, type Verdeckungsbefund } from './fokus-kern';
 
 /**
  * Prüflisten-Zeile Z13 der Bedien-Leitlinie — WCAG 2.4.11 „Focus Not Obscured (Minimum)":
@@ -121,7 +121,9 @@ test('Selbstbeweis (LFH-811): `beschnitt` meldet ein ganz abgeschnittenes Ziel �
       const huelle = Object.assign(document.createElement('div'), {
         style: 'overflow:hidden;height:0',
       });
-      huelle.append(Object.assign(document.createElement('button'), { textContent: 'Attrappe' }));
+      const knopf = Object.assign(document.createElement('button'), { textContent: 'Attrappe' });
+      knopf.setAttribute('data-e2e-fokus', 'attrappe');
+      huelle.append(knopf);
       document.body.prepend(huelle);
       (document.activeElement as HTMLElement | null)?.blur();
     });
@@ -130,7 +132,9 @@ test('Selbstbeweis (LFH-811): `beschnitt` meldet ein ganz abgeschnittenes Ziel �
 
   const ohne = await laufMitAttrappe();
   const mit = await laufMitAttrappe({ beschnitt: true });
-  expect(mit.stoppsGesamt, 'Vorbedingung: der Durchlauf muss irgendwo landen').toBe(1);
+  // Vorbedingung für BEIDE Hälften: der eine Tab landet auf der Attrappe.
+  expect(ohne.besuchteZiele, 'ohne: der Tab landet auf der Attrappe').toEqual(['attrappe']);
+  expect(mit.besuchteZiele, 'mit: der Tab landet auf der Attrappe').toEqual(['attrappe']);
   expect(mit.verdeckt.join('\n'), 'mit `beschnitt` findet der Kern die Attrappe').toMatch(
     /Attrappe.*abgeschnitten/,
   );
@@ -1115,8 +1119,9 @@ test('Personenliste (LFH-373): kein Fokusziel verschwindet hinter der stehenden 
 // Unter `lg` trägt während eines Kartenmodus ein Band im Kartenfuß die Bedienung
 // (`ZeichnenSteuerung`, `PlatzierSteuerung`, `MessSteuerung`), gestapelt mit der ausgeklappten
 // Zeitachse. Zwei Wege, ein Fokusziel zu verlieren, und der Kern sieht beide nur per Opt-in:
-//  - Überdeckung durch Knopfblock, linke Überlagerung oder ein anderes Band — alle
-//    `position: absolute`, also über `zusatzKandidaten` (`KARTEN_AUFBAUTEN`).
+//  - Überdeckung durch Knopfblock, linke Überlagerung oder ein anderes Band. Die Bänder sind
+//    Flow-Geschwister im absolut positionierten Fuß (nie selbst absolut, LFH-355), weder
+//    `sticky` noch `fixed` — deshalb über `zusatzKandidaten` (`KARTEN_AUFBAUTEN`).
 //  - Abschneiden: die Zeitachse gibt Höhe ab und rollt in sich (`bandStil(…, nachgiebig)`), der
 //    Fuß endet an der Karte — also `beschnitt`.
 // Dichte `handschuh`: die höchsten Bänder, die meiste Stauchung.
@@ -1130,6 +1135,14 @@ const MODUS_PNG = Buffer.from(
 /** Tabulaturziel: aktiv und nicht per `tabindex="-1"` ausgenommen (Segmentleiste: roving). */
 const TABSTOPP =
   'button:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), [tabindex="0"]';
+/** Kleinster sichtbarer Anteil über beide Richtungen, als „sichtbar/Zielhöhe px“. */
+function rest(...laeufe: Verdeckungsbefund[]): string {
+  const reste = laeufe.flatMap((l) => (l.kleinsterRestInRegion ? [l.kleinsterRestInRegion] : []));
+  if (reste.length === 0) return '—';
+  const r = reste.reduce((a, b) => (b.sichtbar / b.ziel < a.sichtbar / a.ziel ? b : a));
+  return `${Math.round(r.sichtbar)}/${Math.round(r.ziel)} px`;
+}
+
 /** Das Modusband: jedes Kind des Fußes außer Zeitachse und Maßstab. */
 const MODUSBAND =
   '[data-lfh="karten-fuss"] > :not([data-lfh="zeitachse"]):not([data-lfh="massstab"])';
@@ -1278,7 +1291,7 @@ for (const viewport of [
           region: '[data-lfh="zeitachse"]',
           beschnitt: true,
         };
-        const alleBandStopps = Array.from({ length: bandStopps }, (_, i) => `band-${i}`);
+        const alleBandStopps = Array.from({ length: bandStopps }, (_, i) => `band-${i}`).sort();
 
         // Vorwärts ab dem Knopfblock: der Fuß steht im DOM dahinter.
         await page
@@ -1286,7 +1299,7 @@ for (const viewport of [
           .getByRole('button', { name: 'Hineinzoomen', exact: true })
           .focus();
         const vor = await pruefeFokusVerdeckung(page, 30, 'Tab', optionen);
-        expect(vor.besuchteZiele.sort(), 'vorwärts: jedes Ziel im Modusband besucht').toEqual(
+        expect([...vor.besuchteZiele].sort(), 'vorwärts: jedes Ziel im Modusband besucht').toEqual(
           alleBandStopps,
         );
         expect(vor.stoppsInRegion, 'vorwärts: durch die Zeitachse').toBeGreaterThan(0);
@@ -1298,9 +1311,10 @@ for (const viewport of [
           stopps[stopps.length - 1].focus();
         }, TABSTOPP);
         const rueck = await pruefeFokusVerdeckung(page, 30, 'Shift+Tab', optionen);
-        expect(rueck.besuchteZiele.sort(), 'rückwärts: jedes Ziel im Modusband besucht').toEqual(
-          alleBandStopps,
-        );
+        expect(
+          [...rueck.besuchteZiele].sort(),
+          'rückwärts: jedes Ziel im Modusband besucht',
+        ).toEqual(alleBandStopps);
         expect(rueck.stoppsInRegion, 'rückwärts: durch die Zeitachse').toBeGreaterThan(0);
         expect(rueck.verdeckt, `rückwärts:\n${rueck.verdeckt.join('\n')}`).toEqual([]);
 
@@ -1309,7 +1323,8 @@ for (const viewport of [
           description:
             `${viewport.width}×${viewport.height}/handschuh ${modus.name}: Karte ${hoehen.karte} px, ` +
             `Zeitachse ${hoehen.zeitachse} px, Band ${hoehen.bandOben} px unter der Kartenoberkante, ` +
-            `${bandStopps} Bandziele, ${vor.stoppsInRegion}/${rueck.stoppsInRegion} Zeitachsenstopps vor/rück, frei`,
+            `${bandStopps} Bandziele, ${vor.stoppsInRegion}/${rueck.stoppsInRegion} Zeitachsenstopps vor/rück, ` +
+            `kleinster sichtbarer Rest eines Zeitachsenziels ${rest(vor, rueck)}, keines ganz verdeckt`,
         });
       });
     }
