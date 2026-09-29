@@ -450,9 +450,10 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   await waehler.setFiles({ name: 'Einsatzbefehl 3.pdf', mimeType: 'application/pdf', buffer: PDF });
   await expect(dialog.getByLabel('Titel')).toHaveValue('Einsatzbefehl 3');
 
-  // Nach der Wahl sind Listeneintrag und „Datei entfernen" Tab-Stopps. Wo der Fokus direkt
-  // nach `setFiles` steht, ist keine Produktmessung (Playwright fängt den Dialog ab); gezählt
-  // wird nur der Weg bis zur Kategorie.
+  // Nach der Wahl ist „Datei entfernen" ein Tab-Stopp, der Dateiname nicht: ohne Vorschau
+  // bedient er nichts (antd ≥ 6.6.5 gibt ihm dann weder `role="button"` noch `tabIndex`). Wo
+  // der Fokus direkt nach `setFiles` steht, ist keine Produktmessung (Playwright fängt den
+  // Dialog ab); gezählt wird nur der Weg bis zur Kategorie.
   const nachWahl: string[] = [];
   const kategorie = dialog.getByRole('combobox', { name: 'Kategorie' });
   for (
@@ -463,7 +464,8 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
     await page.keyboard.press('Tab');
     nachWahl.push(await beschreibe());
   }
-  expect(nachWahl.slice(-3)).toEqual(['Einsatzbefehl 3.pdf', 'Datei entfernen', 'Kategorie']);
+  expect(nachWahl.slice(-2)).toEqual(['Datei entfernen', 'Kategorie']);
+  expect(nachWahl, 'der Dateiname ist kein Tab-Stopp').not.toContain('Einsatzbefehl 3.pdf');
   await expect(kategorie).toBeFocused();
   await page.keyboard.type('Befehl');
   // Erst Enter, wenn die Liste auf den einen Treffer gefiltert ist — sonst wählt Enter unter
