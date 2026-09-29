@@ -16,16 +16,13 @@ interface StatusTagProps {
   /** Zusatzinformation als Tooltip-Attribut (z. B. Stand der Meldung). */
   title?: string;
   /**
-   * Mandantengepflegte Zusatzfarbe — für Kataloge AUSSERHALB
-   * des A2-Vertrags (`fahrzeug_status.status_farbe`, `personal_status.status_farbe`;
-   * das Backend trimmt sie nur, es validiert sie nicht).
+   * Mandantengepflegte Zusatzfarbe — für Kataloge AUSSERHALB des A2-Vertrags
+   * (`fahrzeug_status.status_farbe`, `personal_status.status_farbe`; das Backend trimmt sie nur,
+   * es validiert sie nicht).
    *
-   * LFH-446: nur ein dekorativer Farbpunkt. Freitext wie `transparent` darf weder den
-   * Wortlaut noch den tragenden Rahmen ausblenden. Beides ist durch den Rollenvertrag
-   * bestimmt; der zusätzliche Punkt trägt keine eigene Information und ist aria-hidden.
-   *
-   * Leerer String und `null` zählen als „nicht gepflegt": das Backend trimmt, ein
-   * getrimmtes Nichts ist keine Farbe.
+   * Nur ein dekorativer Farbpunkt (LFH-446, aria-hidden): Freitext wie `transparent` darf weder
+   * Wortlaut noch tragenden Rahmen ausblenden. Leerer String und `null` zählen als „nicht
+   * gepflegt".
    */
   farbe?: string | null;
   /**
@@ -51,41 +48,31 @@ export function wirksameDarstellungsart(
 /**
  * Einheitliche Statusanzeige über dem Statusfarb-Vertrag (LFH-328 · A2).
  *
- * ── NEUENTWURF „INSTRUMENTENTAFEL" (21.09.2026): DIE FLÄCHE IST DIE VORGABE ─────────
+ * ── DIE FLÄCHE IST DIE VORGABE ──────────────────────────────────────────────────────
  *
- * Entscheidung 2 des Auftraggebers hebt „Statusfarbe nie als Textfläche" für
- * ROLLENfarben auf: der Status steht als getönte Fläche mit getöntem Text da („Ampel als
- * Fläche, Zahl bleibt lesbar"). Die Werte und ihre Kontrastrechnung liegen an EINER
- * Stelle, `components/instrument/statusFlaeche.ts` — dieselbe Übersetzung tragen
- * `StatusChip` und `StatusZelle`. Die Böden aus Kriterium 5 (`e2e/*kontrast*.spec.ts`:
- * Tag ≥ 7, Nacht ≥ 5) halten in jeder Rolle; `achtung`/`alarm` beschriften dafür mit
- * ihren Textrollen `achtungText`/`alarmText` (Tag 8,02 / 7,31, LFH-618), die Füllfarbe
- * allein fiele am Tag darunter. Der 1-px-Rand bleibt in der Rollenfarbe stehen, weil
- * `kraefte-kontrast.spec.ts` ihn als tragende Kante misst (≥ 3 : 1 gegen den Grund).
+ * Für ROLLENfarben steht der Status als getönte Fläche mit getöntem Text. Werte und
+ * Kontrastrechnung liegen an EINER Stelle, `components/instrument/statusFlaeche.ts`, die auch
+ * `StatusChip` und `StatusZelle` tragen. Die Kontrastböden (Tag ≥ 7, Nacht ≥ 5) halten in jeder
+ * Rolle; `achtung`/`alarm` beschriften dafür mit `achtungText`/`alarmText`. Der 1-px-Rand bleibt
+ * in der Rollenfarbe, weil `kraefte-kontrast.spec.ts` ihn als tragende Kante misst (≥ 3 : 1).
  *
- * DIE RAND-FORM BLEIBT für zwei Fälle, und das ist Vertrag, nicht Übergang:
- *  · **Mandantenfarbe gesetzt** (`farbe`): die Zeile kommt aus einem Katalog mit
- *    ungeprüftem Freitext (`status_farbe`). Eine Fläche neben einem frei gewählten Punkt
- *    wäre die Kombination, deren Kontrast niemand zusichern kann.
+ * DIE RAND-FORM BLEIBT für zwei Fälle, und das ist Vertrag:
+ *  · **Mandantenfarbe gesetzt** (`farbe`): ungeprüfter Freitext; den Kontrast einer Fläche neben
+ *    einem frei gewählten Punkt kann niemand zusichern.
  *  · **Rolle `marke`**: Signatur, kein Zustand — es gibt keine Markenfläche.
  * Wer die Rand-Form ausdrücklich will, setzt `darstellungsart="rand"`.
  *
- * ── DIE RAND-FORM (LFH-446), unverändert: ───────────────────────────────────────────
+ * ── DIE RAND-FORM (LFH-446) ─────────────────────────────────────────────────────────
  *
- * Nimmt eine {@link StatusDarstellung} statt Farbe + Text getrennt — damit ist der
- * zweite Kanal (WCAG 1.4.1) nicht Disziplin, sondern Typ: einen Tag ohne Text kann
- * man hier gar nicht bauen.
+ * Nimmt eine {@link StatusDarstellung} statt Farbe + Text getrennt — der zweite Kanal
+ * (WCAG 1.4.1) ist Typ, nicht Disziplin.
  *
- * BEWUSST OHNE antds `color`-Prop: antd 6 berechnet für Nicht-Presets ein statisches
- * Farbpaar aus der Zeichenkette (bei `filled` mit HSL-Helligkeit 0.95 am Grund),
- * unabhängig vom aktiven Modus. Stattdessen die
- * Umrissform der A0-Formensprache: Rollenfarbe an Rahmen/Formzeichen, lesbarer Wortlaut
- * aus `colorText`. LFH-446 maß für farbigen Text im Hellmodus nur 4,88–6,94:1 statt 7:1.
- * Nebeneffekt, der Tests trägt: es entsteht keine mehrdeutige
+ * BEWUSST OHNE antds `color`-Prop: antd 6 berechnet für Nicht-Presets ein statisches Farbpaar
+ * unabhängig vom Modus. Stattdessen Rollenfarbe an Rahmen/Formzeichen, Wortlaut aus `colorText`
+ * (farbiger Text hielt im Hellmodus 7 : 1 nicht). Nebeneffekt: keine mehrdeutige
  * `.ant-tag-*`-Farbklasse, an der ein Test sich festhalten könnte.
  *
- * Keine Klein-Variante am Steuerelement (A1 Gate 4) — die Höhe kommt aus der
- * Dichte-Staffel am `ConfigProvider`.
+ * Keine Klein-Variante am Steuerelement — die Höhe kommt aus der Dichte-Staffel.
  */
 export default function StatusTag({
   darstellung,

@@ -7,20 +7,9 @@ import {
 } from './typen';
 
 /**
- * Was der TYP nicht sehen kann (LFH-391 · A2).
- *
- * Seit `BefehlGruppe` aus `GRUPPEN_REIHENFOLGE` abgeleitet ist, kann eine Gruppe nicht
- * mehr existieren, ohne in der Reihenfolge zu stehen — das erzwingt `tsc`, nicht dieser
- * Test. Eine DUBLETTE dagegen ist typkorrekt: `(typeof ['a','b','a'])[number]` ist
- * dieselbe Union wie ohne die Wiederholung. Gerendert wird die Gruppe dann zweimal,
- * jede Option trägt ihre `cmd-<id>` doppelt — womit `aria-activedescendant` auf zwei
- * Knoten zeigt. Genau die Mehrdeutigkeit, gegen die `befehle.ts` die `zuletzt:`-Ids
- * schon einmal mit eigenem Präfix versehen hat.
- *
- * Reine, exportierte Hilfe nach dem Muster von `basenameKollisionen`
- * (`test/dateinamen.guard.test.ts`): nur so ist der Selbst-Beweis an einer erfundenen
- * Liste möglich — die Aussage über den Bestand ist heute grün und für sich allein
- * nicht rot-fähig.
+ * Was der TYP nicht sehen kann: eine DUBLETTE in `GRUPPEN_REIHENFOLGE` ist typkorrekt, würde die
+ * Gruppe aber zweimal rendern, und `aria-activedescendant` zeigte auf zwei Knoten. Rein und
+ * exportiert, damit der Selbstbeweis an einer erfundenen Liste möglich ist.
  */
 export function dubletten(reihenfolge: readonly string[]): string[] {
   const gesehen = new Set<string>();
@@ -51,23 +40,18 @@ describe('Palette-Gruppen', () => {
 });
 
 /**
- * Was die beiden exhaustiven Gruppen-Records nicht selbst behaupten können (LFH-391 · D).
- *
- * `tsc` erzwingt, dass JEDE Gruppe in beiden Records eine Zeile hat (TS2741) — nicht aber,
- * dass die beiden Zeilen zueinander passen.
+ * `tsc` erzwingt, dass jede Gruppe in beiden Gruppen-Records steht, nicht aber, dass die Zeilen
+ * zueinander passen.
  */
 describe('Gedächtnis-Gruppe „ausgefuehrt"', () => {
   it('steht bei leerer Suche zuoberst', () => {
-    // Die Startansicht rendert AUSSCHLIESSLICH über dieses Tupel; „zuoberst" ist damit
-    // Index 0 und keine Meinung.
+    // Die Startansicht rendert AUSSCHLIESSLICH über dieses Tupel; „zuoberst“ ist Index 0.
     expect(GRUPPEN_REIHENFOLGE[0]).toBe('ausgefuehrt');
   });
 
   /**
-   * Eine Gruppe, die zugleich merkbar UND eine reine Ordnungskopie ist, merkte sich ihre
-   * eigenen Kopien: aus `ausgefuehrt:nav:profil` würde `ausgefuehrt:ausgefuehrt:nav:profil`,
-   * das beim nächsten Aufbau gegen nichts mehr auflöst. Das Gedächtnis vergässe genau die
-   * Befehle, die am häufigsten benutzt werden.
+   * Eine Gruppe, die merkbar UND Ordnungskopie ist, merkte sich ihre eigenen Kopien
+   * (`ausgefuehrt:ausgefuehrt:…`), die beim nächsten Aufbau nicht mehr auflösen.
    */
   it('ist keine Gruppe zugleich merkbar und Ordnungskopie', () => {
     const beides = (Object.keys(GRUPPE_MERKBAR) as BefehlGruppe[]).filter(
@@ -76,8 +60,8 @@ describe('Gedächtnis-Gruppe „ausgefuehrt"', () => {
     expect(beides).toEqual([]);
   });
 
-  /** Die zwei Kopien-Gruppen sind benannt, nicht abgeleitet — sonst wäre die Zeile darüber
-   *  trivial grün, weil beide Records dieselbe Aussage träfen. */
+  /** Die Kopien-Gruppen sind benannt, nicht abgeleitet; sonst wäre die Zeile darüber trivial
+   *  grün. */
   it('führt genau die beiden Gedächtnisgruppen als Ordnungskopie', () => {
     const kopien = (Object.keys(GRUPPE_NUR_ORDNUNG) as BefehlGruppe[]).filter(
       (g) => GRUPPE_NUR_ORDNUNG[g],

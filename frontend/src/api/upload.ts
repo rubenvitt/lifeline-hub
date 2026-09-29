@@ -1,10 +1,7 @@
 /**
- * Geteilte Upload-Konstanten (LFH-21) für alle Datei-Uploads: Dokumentenablage, ETB-Anhänge,
- * Schaden-Anhänge. Vorher hießen sie `DOKUMENT_*` und lagen in `api/dokumente.ts` — ein
- * Schaden-Upload mit „Dokument“-Konstanten wäre ein Name, der lügt.
- *
- * **Kein Codegen:** die Werte spiegeln das Backend. Server ändern → hier ändern
- * (`upload.test.ts` pinnt sie literal).
+ * Geteilte Upload-Konstanten für alle Datei-Uploads (Dokumentenablage, ETB-Anhänge,
+ * Schaden-Anhänge). Kein Codegen: die Werte spiegeln das Backend (`upload.test.ts` pinnt sie
+ * literal).
  */
 
 /**
@@ -14,7 +11,7 @@
  */
 export const UPLOAD_MAX_GROESSE = 25 * 1024 * 1024;
 
-/** 25 MiB + clamd-Scan über eine Mobilfunkstrecke: 15 s reichen nicht (LFH-632). */
+/** 25 MiB + clamd-Scan über eine Mobilfunkstrecke: 15 s reichen nicht. */
 export const UPLOAD_TIMEOUT_MS = 120_000;
 
 /**

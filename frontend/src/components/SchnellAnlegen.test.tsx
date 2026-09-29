@@ -7,10 +7,8 @@ import SchnellAnlegen from './SchnellAnlegen';
 /**
  * Die Zusicherungen von `SchnellAnlegen` (LFH-332 · B4).
  *
- * Was hier NICHT geprueft wird: Hoehen und Trefflaechen. `renderMitProviders`
- * montiert ein nacktes `ConfigProvider` ohne das Theme des Projekts — eine
- * Zusicherung auf Pixel bewiese dort etwas ueber antds Voreinstellung, nicht
- * ueber die Dichte-Staffel.
+ * Keine Höhen und Trefflächen: `renderMitProviders` montiert ein nacktes `ConfigProvider`, eine
+ * Pixel-Zusicherung bewiese nur antds Voreinstellung.
  */
 
 function renderZeile(
@@ -30,9 +28,8 @@ function renderZeile(
   );
 }
 
-/** Das Feld wird ueber SEINE BESCHRIFTUNG gegriffen — das prueft die Verdrahtung
- *  `<label for>` ↔ `id` gleich mit. Ein Griff per Platzhalter waere auch dann
- *  gruen, wenn das Feld gar keinen zugaenglichen Namen haette. */
+/** Das Feld wird über SEINE BESCHRIFTUNG gegriffen — das prüft `<label for>` ↔ `id` mit. Ein
+ *  Griff per Platzhalter wäre auch ohne zugänglichen Namen grün. */
 const feld = () => screen.getByLabelText('Neue Qualifikation');
 
 describe('SchnellAnlegen', () => {
@@ -40,8 +37,7 @@ describe('SchnellAnlegen', () => {
     const anlegen = vi.fn().mockResolvedValue(undefined);
     renderZeile(anlegen);
 
-    // Die Leerzeichen sind Teil der Zusicherung: der Aufrufer bekommt den
-    // beschnittenen Wert, muss also selbst nicht mehr trimmen.
+    // Die Leerzeichen sind Teil der Zusicherung: der Aufrufer bekommt den beschnittenen Wert.
     await userEvent.type(feld(), '  Sanitäter  {Enter}');
 
     await waitFor(() => expect(anlegen).toHaveBeenCalledWith('Sanitäter'));
@@ -63,8 +59,8 @@ describe('SchnellAnlegen', () => {
 
     // Erst gar nichts …
     await userEvent.click(screen.getByRole('button', { name: 'Qualifikation anlegen' }));
-    // … dann Leerzeichen, ueber BEIDE Wege. Ohne den Enter-Zweig bliebe die
-    // Pruefung gruen, wenn nur der Klick-Zweig den Wert beschnitte.
+    // … dann Leerzeichen, über BEIDE Wege: sonst bliebe die Prüfung grün, wenn nur der Klick-Zweig
+    // den Wert beschnitte.
     await userEvent.type(feld(), '   {Enter}');
     await userEvent.click(screen.getByRole('button', { name: 'Qualifikation anlegen' }));
 
@@ -76,8 +72,8 @@ describe('SchnellAnlegen', () => {
     renderZeile(anlegen);
 
     await userEvent.type(feld(), 'Sanitäter');
-    // Ueber den KNOPF, nicht ueber Enter: nur so verlaesst der Fokus das Feld
-    // ueberhaupt. Mit Enter waere die Fokus-Zusicherung trivial gruen.
+    // Über den KNOPF: nur so verlässt der Fokus das Feld, mit Enter wäre die Fokus-Zusicherung
+    // trivial grün.
     await userEvent.click(screen.getByRole('button', { name: 'Qualifikation anlegen' }));
 
     await waitFor(() => expect(feld()).toHaveValue(''));
@@ -85,8 +81,7 @@ describe('SchnellAnlegen', () => {
   });
 
   it('nach abgelehntem Speichern bleibt der Text stehen', async () => {
-    // Die eigentliche Begruendung fuer den `mutateAsync`-Vertrag: haette das
-    // Primitiv nach dem Aufruf blind geleert, waere die Eingabe weg, obwohl der
+    // Der Grund für den `mutateAsync`-Vertrag: blind geleert, wäre die Eingabe weg, obwohl der
     // Eintrag nie ankam.
     const anlegen = vi.fn().mockRejectedValue(new Error('Speichern fehlgeschlagen'));
     renderZeile(anlegen);
@@ -99,9 +94,8 @@ describe('SchnellAnlegen', () => {
   });
 
   it('leert nicht, wenn waehrend des Speicherns weitergetippt wurde', async () => {
-    // Der Minutentakt-Fall aus dem Dateikopf: das Speichern haengt noch, die
-    // naechste Eingabe steht schon im Feld. Ein unbedingtes Leeren im Erfolgsfall
-    // — so macht es das Vorbild — friesse sie.
+    // Das Speichern hängt noch, die nächste Eingabe steht schon im Feld; ein unbedingtes Leeren im
+    // Erfolgsfall fräße sie.
     let aufloesen!: () => void;
     const anlegen = vi.fn().mockReturnValue(
       new Promise<void>((r) => {
@@ -124,16 +118,14 @@ describe('SchnellAnlegen', () => {
   it('waehrend der Mutation zeigt der Knopf eine Ladeanzeige', async () => {
     const { container } = renderZeile(vi.fn().mockResolvedValue(undefined), true);
 
-    // antd haengt die Ladeanzeige als Klasse an den Knopf; ein Rollen-Griff
-    // saehe sie nicht.
+    // antd hängt die Ladeanzeige als Klasse an den Knopf; ein Rollen-Griff sähe sie nicht.
     expect(container.querySelector('.ant-btn-loading')).not.toBeNull();
   });
 
   /**
-   * `gesperrt` (LFH-346, Nacharbeit zu Befund M45). Die Zeile VERSCHWINDET nicht mehr,
-   * wenn das Recht fehlt — sie steht gesperrt da. Beide Haelften gehoeren zusammen: ohne
-   * die Sperr-Aussage waere „legt nichts an" auch mit einer versteckten Zeile gruen, und
-   * ohne „legt nichts an" waere die Sperre eine reine Faerbung.
+   * `gesperrt` (LFH-346): die Zeile steht gesperrt da, statt zu verschwinden. Beide Hälften
+   * gehören zusammen: ohne die Sperr-Aussage wäre „legt nichts an" auch mit versteckter Zeile
+   * grün, ohne „legt nichts an" wäre die Sperre eine reine Färbung.
    */
   it('gesperrt: Feld UND Knopf sind gesperrt', () => {
     renderZeile(vi.fn().mockResolvedValue(undefined), false, true);
@@ -144,12 +136,9 @@ describe('SchnellAnlegen', () => {
 
   it('gesperrt legt auf KEINEM der beiden Wege an', async () => {
     const anlegen = vi.fn().mockResolvedValue(undefined);
-    // Erst OFFEN rendern und tippen, dann sperren. Der Umweg ist noetig, damit die
-    // Pruefung ueberhaupt scheitern KANN: in ein gesperrtes Feld laesst sich nichts
-    // tippen, und bei leerem Text steigt `anlegen()` schon an der Leer-Bedingung aus —
-    // eine Zusicherung, die gegen ein leeres Feld prueft, waere ohne den Riegel ebenso
-    // gruen (gemessen). Der Fall ist zudem echt: das Recht kann waehrend des Tippens
-    // wegfallen, wenn `auth/me` neu geladen wird.
+    // Erst OFFEN rendern und tippen, dann sperren — sonst KANN die Prüfung nicht scheitern: in ein
+    // gesperrtes Feld lässt sich nichts tippen, und bei leerem Text steigt `anlegen()` schon an der
+    // Leer-Bedingung aus. Der Fall ist echt: das Recht kann beim Neuladen von `auth/me` wegfallen.
     const { rerender } = renderZeile(anlegen);
     await userEvent.type(feld(), 'Sanitäter');
     rerender(
@@ -164,17 +153,14 @@ describe('SchnellAnlegen', () => {
     expect(feld()).toHaveValue('Sanitäter');
 
     // Weg 1, der Knopf. `pointerEventsCheck: 0`, weil antd einem gesperrten Knopf
-    // `pointer-events: none` gibt und userEvent den Klick sonst gar nicht erst absetzt.
+    // `pointer-events: none` gibt und userEvent den Klick sonst nicht absetzt.
     await userEvent.click(screen.getByRole('button', { name: 'Qualifikation anlegen' }), {
       pointerEventsCheck: 0,
     });
 
-    // Weg 2, Enter im Feld — und der ist der Grund, warum der Riegel in `anlegen()`
-    // sitzt und nicht am Knopf: `onPressEnter` haengt am `keydown` des Feldes, und ein
-    // zugestellter Tastendruck erreicht dessen React-Handler. Per Mutationsprobe
-    // belegt: mit auskommentiertem `if (gesperrt)` wird GENAU diese Zeile rot,
-    // waehrend der Knopf-Weg oben gruen bleibt (ein gesperrter Knopf verwirft den
-    // Klick schon von sich aus) — die Enter-Haelfte ist also die tragende.
+    // Weg 2, Enter im Feld — der tragende: `onPressEnter` hängt am `keydown` des Feldes und
+    // erreicht den React-Handler auch gesperrt, während ein gesperrter Knopf den Klick schon selbst
+    // verwirft. Deshalb sitzt der Riegel in `anlegen()`.
     fireEvent.keyDown(feld(), { key: 'Enter', code: 'Enter', keyCode: 13 });
 
     expect(anlegen).not.toHaveBeenCalled();

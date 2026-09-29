@@ -3,21 +3,13 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { ModulOverrides } from '../api/types';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { useModulZaehler } from './useModulZaehler';
+import { benutzerFixture } from '../test/fixtures';
 
-const benutzer: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'E',
-  benutzername: 'e',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-08-06 10:00:00',
-  totp_aktiviert: false,
-};
+const benutzer = benutzerFixture({ anzeigename: 'E' });
 
 function wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={neuerQueryClient()}>{children}</QueryClientProvider>;

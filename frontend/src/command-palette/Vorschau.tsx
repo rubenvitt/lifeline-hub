@@ -1,4 +1,3 @@
-// frontend/src/command-palette/Vorschau.tsx
 import PersonVorschau from '../personen/PersonVorschau';
 import EtbEintragVorschau from '../etb/EtbEintragVorschau';
 import MeldungVorschau from '../meldungen/MeldungVorschau';
@@ -14,14 +13,11 @@ import AbschnittVorschau from '../pages/einsatzabschnitte/AbschnittVorschau';
 import type { VorschauZiel } from './typen';
 
 /**
- * Der Inhalt der Palettenvorschau (LFH-645, Taste →; alle Datensatzsorten seit LFH-664) — je
- * Sorte das Lese-Bauteil, das auch außerhalb der Palette steht oder dessen Inhalt mit der
- * Fachseite geteilt ist. Die Palette selbst kennt keine Sorte; sie rendert, was hier
- * herauskommt, in ihrer Vorschau-Region.
+ * Der Inhalt der Palettenvorschau (Taste →): je Sorte das Lese-Bauteil, das auch außerhalb der
+ * Palette steht oder seinen Inhalt mit der Fachseite teilt. Die Palette selbst kennt keine Sorte.
  *
- * EXHAUSTIV über `art`: der `never`-Zweig bricht den Typcheck, sobald `VorschauZiel` eine
- * Sorte bekommt, die hier keinen Zweig hat. Ohne ihn fiele eine neue Sorte still auf
- * `undefined` — die Palette zeigte eine leere Vorschau, und kein Test sähe es.
+ * EXHAUSTIV über `art`: der `never`-Zweig bricht den Typcheck, sonst fiele eine neue Sorte still
+ * auf eine leere Vorschau.
  */
 export function Vorschau({ ziel }: { ziel: VorschauZiel }) {
   const { einsatzId, id } = ziel;

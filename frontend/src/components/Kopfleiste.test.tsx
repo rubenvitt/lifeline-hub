@@ -87,7 +87,7 @@ describe('Kopfgruppen — der Einsatzname vor dem Suchfeld (22.09.2026)', () => 
   it('lässt ab lg die Namensgruppe stärker wachsen als die Suche', () => {
     const name = teile(KOPF_NAME_FLEX);
     const suche = teile(KOPF_SUCHE_FLEX);
-    // Vorher je 1 — bei 1440 px blieben dem Namen gemessen 92 px, der Suche 451 px.
+    // Der Name wächst stärker als die Suche, sonst bliebe ihm bei 1440 px kaum Platz.
     expect(name.grow).toBeGreaterThan(suche.grow);
     // Beide dürfen schrumpfen, sonst läuft die Kopfzeile über statt umzubrechen (Gate 1).
     expect(name.shrink).toBeGreaterThan(0);
@@ -101,9 +101,8 @@ describe('Kopfgruppen — der Einsatzname vor dem Suchfeld (22.09.2026)', () => 
   });
 
   it('bricht nicht früher um als vorher — die Summe der Basen bleibt 520 px', () => {
-    // Vorher 240 + 280. Eine größere Summe kostete das Führungs-Tablet (1024–1280 px) eine
-    // zweite Kopfzeile; eine kleinere hielte bei 992 px alles einzeilig und drückte den
-    // Namen auf 0 px (gemessen).
+    // Eine größere Summe kostete das Führungs-Tablet (1024–1280 px) eine zweite Kopfzeile; eine
+    // kleinere hielte bei 992 px alles einzeilig und drückte den Namen auf 0 px.
     expect(teile(KOPF_NAME_FLEX).basis + teile(KOPF_SUCHE_FLEX).basis).toBe(520);
   });
 

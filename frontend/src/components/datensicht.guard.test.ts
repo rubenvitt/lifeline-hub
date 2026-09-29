@@ -6,152 +6,78 @@ import { describe, expect, it } from 'vitest';
 /**
  * Guard des Datensicht-Primitivs (LFH-330 · B2).
  *
- * Zwei Hälften mit zwei verschiedenen Bauarten, aus einem Grund: die Zusicherungen ÜBER
- * `Datensicht.tsx` wirken ab dem ersten Tag, die über seine Konsumenten haben am ersten Tag
- * noch keinen Gegenstand.
+ * ── HÄLFTE 1: das Primitiv selbst ──
  *
- * ── HÄLFTE 1: das Primitiv selbst ───────────────────────────────────────────────
+ * Tragend ist die POSITIVE Marke `<KatalogTabelle`: ohne sie bestünde ein `Datensicht.tsx`, das
+ * ein rohes antd-Tabellenelement ohne Bildlauf-Prop rendert, jede Verbotsprüfung und nähme allen
+ * Konsumenten Bildlauf, stehende Kopfzeile und fixierte Kennung.
  *
- * Tragend ist die POSITIVE Marke `<KatalogTabelle`. Ohne sie bestünde ein `Datensicht.tsx`,
- * das ein rohes antd-Tabellenelement ohne Bildlauf-Prop rendert, jede negative Prüfung —
- * und nähme allen künftigen Konsumenten still waagerechten Bildlauf, stehende Kopfzeile und
- * fixierte Kennungsspalte. Eine reine Verbotsliste kann das nicht sehen.
+ * ── HÄLFTE 2: die Konsumenten, ABGELEITET **und** handgepflegt ──
  *
- * ── HÄLFTE 2: die Konsumenten, ABGELEITET **und** handgepflegt ──────────────────
+ * Die aus der Marke `<Datensicht` erschnüffelte Menge wird gegen {@link KONSUMENTEN} gestellt: ein
+ * rein abgeleitetes Inventar sähe eine Datei nicht, die still herausfällt; ein rein
+ * handgepflegtes müsste jedes Folgebündel editieren.
  *
- * Beides, gegeneinander geprüft — weil jede Hälfte für sich blind ist. Die Menge wird aus
- * der Marke `<Datensicht` ERSCHNÜFFELT und gegen das handgeschriebene {@link KONSUMENTEN}
- * gestellt: ein rein abgeleitetes Inventar sähe eine Datei nicht, die still aus dem
- * Primitiv herausfällt (es hätte sich mitverkleinert), ein rein handgepflegtes müsste von
- * jedem Folgebündel editiert werden — genau die Kollision, die für
- * `katalogTabelle.guard.test.ts` einen benannten Eigentümer nötig gemacht hat.
+ * ── DIE FÜNF GEPFLEGTEN LISTEN ──
  *
- * Die Falsch-Positiv-Sorge, die dessen 13er-Inventar handgepflegt macht („Modals, Listen,
- * Untertabellen"), existiert für die abgeleitete Hälfte nicht: die Menge ist durch das
- * Vorkommen der Marke definiert, nicht durch eine Einschätzung.
+ * Drei Ausnahmemengen ({@link KARTEN_EIGENBAU}, {@link NUR_KARTE}, {@link NUR_TABELLE}), eine
+ * Pflichtmenge ({@link VOLLMENGE_PFLICHT}) und eine Schuldmenge ({@link REITERSCHLUESSEL_OFFEN}).
+ * Alle sind auf ihre Länge gepinnt und werden auf tote Einträge geprüft.
  *
- * ── DIE FÜNF GEPFLEGTEN LISTEN ──────────────────────────────────────────────────
+ * ── ZWEI SCHLÜSSELREGELN für zwei Gestalten desselben Fehlers ──
  *
- * Drei SEMANTISCHE Ausnahmemengen ({@link KARTEN_EIGENBAU} — leer, {@link NUR_KARTE} — drei,
- * {@link NUR_TABELLE} — zwei), eine PFLICHTMENGE ({@link VOLLMENGE_PFLICHT} — eine) und eine
- * SCHULDMENGE ({@link REITERSCHLUESSEL_OFFEN} — seit Bündel T LEER, der eine Eintrag wurde
- * getilgt statt fortgeschrieben). Alle fünf sind auf ihre Länge gepinnt und werden auf tote
- * Einträge geprüft: wer eine Datei einträgt, ohne sie umzubauen, fällt am
- * Anwesenheits-Gegentest auf — ein toter Eintrag wird gemeldet, nicht geduldet.
+ * 1. {@link schluesselBefunde}: MEHRERE Sichten, EINE Baumstelle; ab zwei `<Datensicht>` je
+ *    Datei distinkte `key`.
+ * 2. {@link reiterBefunde}: EINE Sicht, MEHRERE Reiter; für Regel 1 unsichtbar (eine Datei mit
+ *    einer Sicht fällt dort heraus).
  *
- * ── DIE ZWEI SCHLÜSSELREGELN, und warum es zwei sein müssen ─────────────────────
+ * Regel 2 nähert „ein Schlüssel trägt eine Reiterachse“ an, verankert an drei Stellen:
+ * · die ACHSE kommt aus dem Attribut eines {@link SICHTSCHALTER}-Elements
+ *   (`activeKey=`/`value=`), nicht aus einer Namenskonvention;
+ * · gemeldet wird nur, wenn `daten` an der Achse hängt und der `key` NICHT;
+ * · der Weg von `daten` zur Achse läuft über lokale `const`-Initialisierer (Tiefe 3), weil die
+ *   reale Form `daten={tiere}` mit `const tiere = filterTiere(alle, { sicht })` ist.
+ * Dass die Regel noch etwas FINDET, belegt der Selbstbeweis (a) auf synthetischer Quelle.
  *
- * Sie fangen ZWEI verschiedene Gestalten desselben Fehlers, und keine sieht die andere.
+ * ── WIE ER SEINE EIGENE PROSA NICHT MITZÄHLT ──
  *
- * 1. {@link schluesselBefunde} — MEHRERE Sichten, EINE Baumstelle. Greift ab zwei
- *    `<Datensicht>` je Datei und verlangt distinkte `key`. Gemessen an `PersonenPage`.
- * 2. {@link reiterBefunde} — EINE Sicht, MEHRERE Reiter. Die häufigere Gestalt, und für
- *    Regel 1 grundsätzlich unsichtbar: eine Datei mit genau einem `<Datensicht>` fällt aus
- *    deren Filter (`stellen.length < 2`) heraus, bevor irgendetwas geprüft wird. Genau so
- *    sah der Fehler aus, gegen den dieser Guard gebaut wurde — ein Element, fünf Reiter,
- *    fünf Datenmengen.
+ * 1. Kommentar-Stripper mit Blockzustand vor jeder VERBOTS-Zählung, samt Selbstbeweis.
+ * 2. Die verbotenen Marken stehen in den gescannten Dateien nirgends als Prosa; der Dateikopf
+ *    von `Datensicht.tsx` umschreibt sie („kein Bildlauf-Prop“). Wer ihn ergänzt, schreibt keine
+ *    Marke aus.
+ * 3. Testdateien werden nicht gescannt.
+ * Der Stripper ist aus `theme/gate5.guard.test.ts` kopiert: ein Import aus einer `*.test.ts`
+ * registrierte deren `describe`-Blöcke doppelt. Die Schlüsselprüfung liest den AST und braucht
+ * ihn nicht.
  *
- * Regel 2 kann „ein Schlüssel trägt eine Reiterachse" nicht beweisen; das ist statisch nicht
- * sicher entscheidbar. Sie nähert an, und die Näherung ist an DREI Stellen verankert, die im
- * Quelltext nachweisbar sind statt geraten:
+ * ── WAS DER GUARD NICHT SIEHT (Teil des Vertrags) ──
  *
- * · Die ACHSE kommt aus dem Attribut, das ein {@link SICHTSCHALTER}-Element bindet
- *   (`activeKey=`/`value=`) — nicht aus einer Namenskonvention wie `useState<Sicht>`. Das
- *   Attribut ist die Stelle, an der die Achse nachweislich hängt; ein Typname ist ein Vorschlag.
- * · GEMELDET wird nur, wenn `daten` an der Achse hängt und der `key` NICHT. Ein konstanter
- *   Schlüssel über achsunabhängigen Daten ist richtig, nicht verdächtig.
- * · Der Weg von `daten` zur Achse läuft über die lokalen `const`-Initialisierer der Datei
- *   (Tiefe 3), weil die reale Form `daten={tiere}` mit `const tiere = filterTiere(alle,
- *   { sicht })` eine Stufe entfernt liegt und eine direkte Prüfung sie verfehlte.
- *
- * GEMESSEN am Baum dieses Bündels, und das ist die Begründung für „bauen" statt „nur
- * dokumentieren": 9 Konsumenten, davon 2 mit Schalterachse, zusammen 3 Sichtstellen → bei
- * Auslieferung 1 Meldung, 0 Fehlalarme. Beide Sichten von `PersonenPage` bleiben still, und
- * zwar aus dem richtigen Grund: `key="patienten"` steht über `alle.filter(istPatient)`
- * (achsunabhängig, also kein Befund), `` key={`liste-${sicht}`} `` über
- * `filterPersonen(alle, sicht)` (Achse im Schlüssel). Die eine Meldung galt `TierePage` und
- * ist in Bündel T behoben — die Seite trägt jetzt `key={sicht}`, der Baum meldet 0. Dass die
- * Regel überhaupt noch etwas FINDET, hängt seither allein am Selbstbeweis (a) auf
- * synthetischer Quelle; ohne ihn wäre ein abgestumpfter Scanner still grün.
- * Zur künftigen Reichweite ehrlich: repoweit tragen 13 Dateien eine Schalterachse — die Regel
- * ist an 2 gemessen, nicht an 13.
- *
- * ── WIE ER SEINE EIGENE PROSA NICHT MITZÄHLT — dreifach ─────────────────────────
- *
- * Zweifach ist im Vorläuferpaket zweimal gerissen, deshalb drei Verteidigungen:
- * 1. **Kommentar-Stripper mit Blockzustand über Zeilengrenzen** vor jeder VERBOTS-Zählung,
- *    plus ein Selbstbeweis, dass eine verbotene Form im Kommentar genau 0 Treffer liefert.
- * 2. **Die verbotenen Marken stehen in den gescannten Dateien nirgends als Prosa.** Der
- *    Dateikopf von `Datensicht.tsx` umschreibt sie durchgehend („kein Bildlauf-Prop", „die
- *    Kartenform ist `Liste`, nicht …"). Wer den Kopf ergänzt, schreibt keine Marke aus.
- * 3. **Der Guard scannt sich selbst nicht** — Testdateien sind aus allen Mengen ausgenommen.
- *
- * Der Kommentar-Stripper ist aus `theme/gate5.guard.test.ts` BEWUSST kopiert statt
- * importiert: ein Import aus einer anderen `*.test.ts` registriert deren `describe`-Blöcke
- * ein zweites Mal.
- *
- * Die SCHLÜSSELPRÜFUNG ({@link sichtstellen}) braucht die ersten beiden nicht: sie liest den
- * AST, und Kommentare sind dort keine Knoten — auch ein ausgeschriebenes `<Datensicht` in
- * einer Prosa-Zeile ist kein JSX-Element. Die dritte gilt weiter, nur anders begründet: sie
- * läuft ausschließlich über {@link KONSUMENTEN} und kommt deshalb an keine Testdatei.
- *
- * ── WAS DER GUARD NICHT SIEHT, und das ist Teil des Vertrags ────────────────────
- *
- * · **Ob hinter einem Slot-Schlüssel überhaupt eine Spalte steht.** Das kann nur
- *   `pruefeKartenplan` zur Laufzeit und `tsc` bei intaktem `const K`.
- * · **Einen Konsumenten, der gar nichts von `Datensicht` weiß** — eine neue Einsatzliste,
- *   die wieder ein rohes antd-Tabellenelement einbindet, fällt hier nicht auf. Dagegen
- *   steht das Inventar in `katalogTabelle.guard.test.ts`, nicht dieser Guard.
- * · **Jede Aussage über Layout.** jsdom rechnet keines (`vite.config.ts`, `css: false`);
- *   Trefflächen, Überlauf und Fokusverdeckung gehören nach `frontend/e2e/`.
- * · **Dynamisch zusammengesetzte Bezeichner.** Wie in `useViewport.guard.test.ts` bewusst
- *   nicht abgedeckt.
- * · **Die Gleichheit zweier Schlüssel misst der QUELLTEXT, nicht der Laufzeitwert.** Zwei
- *   gleich geschriebene Ausdrücke gelten als Dublette, auch wenn sie zur Laufzeit
- *   auseinanderlaufen; zwei verschieden geschriebene, die denselben Wert liefern, fallen
- *   nicht auf. Ein `key` in einem `{...spread}` wird nicht gesucht — es steht nicht am
- *   Element.
- * · **Die Achsverfolgung von {@link reiterBefunde} ist eine Näherung, an fünf benannten
- *   Stellen.** (a) bis (e) — die Zahl stand vorher auf „vier" und zählte (e) nicht mit.
- *   (a) Sie misst QUELLTEXT: `haengtAnAchse` sucht Bezeichner per Regex, ein
- *   Achsenname in einem Zeichenkettenliteral zählt also mit — bei `daten` zu scharf, beim
- *   `key` zu milde. (b) Die Initialisierer-Karte ist FLACH über die ganze Datei, ohne
- *   Gültigkeitsbereiche: zwei gleichnamige lokale Bindungen fallen zusammen. Wie hart (a) und
- *   (b) zusammen sein können, ist in Bündel T bei der Mutationsprobe an `TierePage`
- *   herausgefallen: `key="tiere"` blieb STILL. Der Weg dahin ist (a) plus (b) — `BEZEICHNER`
- *   zieht `tiere` aus dem Zeichenkettenliteral HERAUS, und die flache Initialisierer-Karte
- *   löst diesen Namen anschließend über die gleichnamige lokale Bindung
- *   `const tiere = filterTiere(alle, { sicht, … })` zur Achse auf. Nicht das Attribut wird
- *   aufgelöst, sondern der Bezeichner in seinem Text. Dieselbe Stelle mit `key="liste"`
- *   meldete sofort. Ein konstanter
- *   Schlüssel, der zufällig den Namen einer achsabhängigen lokalen Bindung trägt, kommt also
- *   durch. (c) Aus dem Schalter-Attribut werden nur echte BEZEICHNER zur Achse, und zwar
- *   die links vom Punkt: `activeKey={filter.reiter}` liefert `filter`, nicht `reiter`.
- *   Zeichenketten und Property-Namen sind ausgeschlossen (Begründung an
- *   {@link achsenBezeichner}) — ein `value={x ? 'alle' : 'abschnitte'}` steuert also nur
- *   `x` bei. Wer eine Achse ausschliesslich über einen Property-Namen bindet, wird nicht
- *   gesehen; im Bestand gibt es diese Form nicht. (c′) Die RICHTUNG erkennt die Regel
- *   nicht: sie sieht „Schalterwert und Zeilenmenge teilen einen Bezeichner", nicht „die
- *   Zeilenmenge hängt vom Schalter ab". Ein Schalter, der die Daten LIEST — etwa ein
- *   Aufklapp-Umschalter, dessen Zustand aus der Vollzähligkeit des Baums folgt — meldet
- *   deshalb fälschlich, wenn der Vergleich im Attribut steht. Abhilfe an der Fundstelle ist
- *   eine benannte Zwischenvariable (`KraefteuebersichtPage.tsx`, `alleAufgeklappt`), die
- *   die Richtung ohnehin lesbarer macht; ein `key` am Element wäre hier die FALSCHE
- *   Behebung und verwürfe Sortierung, Spaltenwahl und Zeilenschleuse bei jedem Schalten. (d) Als Schalter gelten nur die drei Tags in {@link SICHTSCHALTER};
- *   eine handgebaute Reiterleiste aus `<Button>`n ist keiner. (e) Der EINGANG der Regel ist
- *   das `daten`-Attribut am Element — eine Sicht, die ihre Zeilen aus einem `{...spread}`
- *   bezieht, hat für den Guard keine Daten und wird stillschweigend übersprungen. Dieselbe
- *   Spread-Grenze wie beim `key` eine Zeile höher, hier aber folgenreicher: beim `key` fehlt
- *   dann eine Angabe, hier fällt die ganze Prüfung aus. Die Näherung ist gemessen
- *   (0 Fehlalarme auf 3 Sichtstellen), nicht bewiesen.
- * · **Ob ein Reiterwechsel den Zustand überhaupt zurücksetzen SOLL.** Der Guard verlangt nur,
- *   dass die Entscheidung im Schlüssel steht. Wer den Zustand bewusst mitnimmt, trägt sie
- *   nicht dort ein und braucht einen Eintrag in {@link REITERSCHLUESSEL_OFFEN} mit Begründung.
- * · **Die vier Marken aus {@link VERBOTEN_BEI_VOLLMENGE} treffen nur die wörtliche Form.**
- *   Ein `filter: WERTE_FILTER` aus einer Konstanten, ein durch einen Wrapper gereichtes
- *   `suche={props.suche}` oder ein `{...datensichtProps}` mit einer dieser Angaben darin
- *   kommen durch. Dieselbe Lücke wie bei jedem Regex-Gate des Repos — hier benannt, weil
- *   diese Liste Teil des Vertrags ist und nicht später entdeckt werden soll.
+ * · Ob hinter einem Slot-Schlüssel eine Spalte steht (das können `pruefeKartenplan` und `tsc`).
+ * · Einen Konsumenten, der `Datensicht` nicht kennt und wieder eine rohe antd-Tabelle einbindet
+ *   (dagegen steht `katalogTabelle.guard.test.ts`).
+ * · Layout: jsdom rechnet keines; Trefflächen, Überlauf und Fokusverdeckung gehören nach
+ *   `frontend/e2e/`.
+ * · Dynamisch zusammengesetzte Bezeichner.
+ * · Die Gleichheit zweier Schlüssel misst den QUELLTEXT, nicht den Laufzeitwert; ein `key` in
+ *   einem `{...spread}` wird nicht gesucht.
+ * · Die Achsverfolgung von {@link reiterBefunde} ist eine Näherung an fünf Stellen:
+ *   (a) sie misst QUELLTEXT per Regex, ein Achsenname in einem Zeichenkettenliteral zählt mit;
+ *   (b) die Initialisierer-Karte ist FLACH, gleichnamige Bindungen fallen zusammen. Zusammen
+ *   lassen (a) und (b) einen konstanten Schlüssel durch, der zufällig wie eine achsabhängige
+ *   Bindung heißt (`key="tiere"` neben `const tiere = filterTiere(…)`);
+ *   (c) aus dem Schalter-Attribut zählen nur BEZEICHNER links vom Punkt, keine Zeichenketten
+ *   und Property-Namen (siehe {@link achsenBezeichner});
+ *   (c′) die RICHTUNG erkennt die Regel nicht: ein Schalter, der die Daten LIEST, meldet
+ *   fälschlich, wenn der Vergleich im Attribut steht. Abhilfe ist eine benannte
+ *   Zwischenvariable (`KraefteuebersichtPage.tsx`, `alleAufgeklappt`), kein `key`, der
+ *   Sortierung, Spaltenwahl und Zeilenschleuse bei jedem Schalten verwürfe;
+ *   (d) Schalter sind nur die Tags in {@link SICHTSCHALTER}, keine handgebaute Reiterleiste;
+ *   (e) Eingang ist das `daten`-Attribut; eine Sicht mit Zeilen aus `{...spread}` wird
+ *   übersprungen.
+ * · Ob ein Reiterwechsel den Zustand zurücksetzen SOLL: wer ihn bewusst mitnimmt, braucht einen
+ *   Eintrag in {@link REITERSCHLUESSEL_OFFEN} mit Begründung.
+ * · Die Marken aus {@link VERBOTEN_BEI_VOLLMENGE} treffen nur die wörtliche Form (keine
+ *   Konstante, kein durchgereichtes Prop, kein Spread).
  */
 
 /** Wurzel des Scans: `frontend/src`, über `process.cwd()` aufgelöst (siehe gate5.guard). */
@@ -169,145 +95,81 @@ const ENDUNGEN = /\.(ts|tsx)$/;
 const BEZEICHNER = /[A-Za-z_$][\w$]*/g;
 
 /**
- * Dateien, die `art: 'eigen'` im Kartenplan setzen dürfen.
+ * Dateien, die `art: 'eigen'` im Kartenplan setzen dürfen. LEER: das Tagebuch, der frühere
+ * einzige Eintrag, ist eine Zeitachse außerhalb der `Datensicht`.
  *
- * Am Tag 1 LEER, und das war der Unterschied zu Entwurf 2, dessen Ausnahme schon am ersten
- * Tag belegt war und über das Band auf etwa fünf gewachsen wäre. Die UHS-Zeitleiste läuft
- * über den Plan-Modus, weil `Liste` mit ihren Trennlinien bereits die Struktur von
- * `personen/PersonVerlauf.tsx` liefert.
- *
- * ── WIEDER LEER, UND WARUM (Neuentwurf S4, 21.09.2026) ─────────────────────────
- *
- * Der erste und einzige Eintrag war von LFH-342 · C7 bis zum Neuentwurf die
- * ETB-Chronologie (`etb/EtbTabelle.tsx`): fünf Kopffelder, ein Markdown-Block über die
- * volle Breite und drei Zeilenaktionen passten nicht in den Plan-Modus (Titel + Status +
- * drei Sekundärfelder + eine Primäraktion). Mit dem Neuentwurf ist das Tagebuch auf ALLEN
- * Breiten eine Zeitachse (Entscheidung 3 des Auftraggebers) und läuft gar nicht mehr über
- * `Datensicht` — es wird gelesen, nicht verglichen, und hat weder Sortierung noch
- * Spaltenfilter noch Spaltenauswahl. `etb/EtbZeitachse.tsx` baut die Einträge aus dem
- * Instrument-Baustein `Zeitachseneintrag`; damit ist die Ausnahme erloschen, nicht
- * verlagert.
- *
- * Die Lehre für einen künftigen Eintrag bleibt stehen: das Primitiv legt beim Eigenbau
- * keinen Wrapper um `karte.render(...)`. Der Eigenbau trägt `data-lfh="datensicht-karte"`
- * (sonst findet `scrolleZurZeile` die Karte nicht) und die Zeilenklasse (sonst gilt sie nur
- * im Tabellenzweig) selbst — die Zeitachse tut das weiterhin, obwohl sie keine Datensicht
- * mehr ist, weil der Deeplink `?eintrag=` über genau diese Marke springt.
+ * Für einen künftigen Eintrag: das Primitiv legt beim Eigenbau keinen Wrapper um
+ * `karte.render(...)`. Der Eigenbau trägt `data-lfh="datensicht-karte"` (sonst findet
+ * `scrolleZurZeile` die Karte nicht) und die Zeilenklasse selbst.
  */
 const KARTEN_EIGENBAU: string[] = [];
 
 /**
- * Dateien, die `form="karte"` tragen MÜSSEN — Module, die heute schon kartenbasiert gelesen
- * werden (Befehle, Lageberichte). Dort ist die Tabelle der Befund, nicht der Zielzustand.
+ * Dateien, die `form="karte"` tragen MÜSSEN: Module, die kartenbasiert gelesen werden.
  */
 const NUR_KARTE: string[] = [
   '/src/auftraege/BefehlListe.tsx',
-  // LFH-639 (design.md D7): ein Evakuierungsbezirk wird GELESEN („was ist mit diesem
-  // Bezirk?"), nicht verglichen — Karten in jeder Breite, Plan-Modus mit gebündeltem Menü.
+  // Ein Evakuierungsbezirk wird GELESEN („was ist mit diesem Bezirk?“), nicht verglichen.
   '/src/betreuung/EvakuierungBlock.tsx',
   '/src/pages/LageberichtePage.tsx',
-  // Die Lagemeldungen standen hier von LFH-348 · C13 bis zum Neuentwurf (22.09.2026).
-  // Seitdem sind sie eine Zeitachse außerhalb der Datensicht (`lagemeldungen/zeitachse.ts`,
-  // Begründung im Dateikopf von `pages/LagemeldungenPage.tsx`) — dieselbe Bewegung wie das ETB.
 ];
 
 /**
- * Dateien, die `form="tabelle"` tragen MÜSSEN — Vergleichsflächen, die Kriterium 14
- * ausdrücklich nicht in Karten auflösen darf.
- *
- * WARUM DIESE ZWEI LISTEN ÜBERHAUPT: eine Datei mit `form="karte"` bleibt bei `<Table` = 0
- * grün, AUCH wenn sie eine Tabelle rendert — das Tabellenelement liegt in
- * `KatalogTabelle.tsx`. Die Verbotsmarke allein kann die Formwahl also nicht prüfen; nur die
- * Anwesenheit des Literals kann es.
+ * Dateien, die `form="tabelle"` tragen MÜSSEN: Vergleichsflächen (Kriterium 14). Die Listen sind
+ * nötig, weil eine Datei mit `form="karte"` bei `<Table` = 0 grün bliebe, auch wenn sie eine
+ * Tabelle rendert (das Element liegt in `KatalogTabelle.tsx`); nur das Literal prüft die Form.
  */
 const NUR_TABELLE: string[] = [
-  // LFH-23 (design.md D8): Aufbewahrungsübersicht, Vergleichsfläche in jeder Breite.
+  // Aufbewahrungsübersicht, Vergleichsfläche in jeder Breite.
   '/src/aufbewahrung/AufbewahrungUebersicht.tsx',
-  // LFH-639 (design.md D7): Betreuungsstellen werden VERGLICHEN („welche hat noch Platz?") —
-  // Tabelle in jeder Breite, nicht erst ab `md`.
+  // Betreuungsstellen werden VERGLICHEN („welche hat noch Platz?“), Tabelle in jeder Breite.
   '/src/betreuung/StellenBlock.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
 ];
 
 /**
- * Dateien, deren `Datensicht` die ZEILENMENGE nicht antasten darf — keine Freitextsuche,
- * kein Spaltenfilter, keine Sortierung IM PRIMITIV.
+ * Dateien, deren `Datensicht` die ZEILENMENGE nicht antasten darf: keine Freitextsuche, kein
+ * Spaltenfilter, keine Sortierung IM PRIMITIV. Die Aggregate der Elternzeilen werden stromaufwärts
+ * über die VOLLMENGE kumuliert (`addKategorie`); fiele im Primitiv eine Zeile weg, lögen die
+ * Ampelzahlen still.
  *
- * Die Gegenzeile zu {@link NUR_TABELLE}: dort steht, welche Form das Meldebild trägt, hier,
- * was es nicht tun darf. Der Grund ist die Rechenrichtung — die Aggregate der Elternzeilen
- * werden stromaufwärts über die VOLLMENGE kumuliert (`addKategorie`), während
- * `filtereKraefte` die Rohlisten filtert und den Baum neu baut. Fiele im Primitiv eine Zeile
- * weg, behielten die Eltern Zahlen über nicht mehr sichtbare Kinder: die Ampelzahlen lügen
- * still, ohne Fehler und ohne roten Test.
- *
- * WARUM STATISCH, obwohl `pruefeKartenplan` zwei der vier Marken kennt: dessen Prüfung
- * greift nur, SOLANGE `baum` gesetzt ist, kennt die Sortierung gar nicht — und sie ist ein
- * `console.warn` hinter `import.meta.env.DEV` (`Datensicht.tsx`, gemessen bei Zeile 971).
- * Sie färbt keinen Test rot.
- *
- * `Input.Search` ist hier ausdrücklich ERLAUBT: die Filter-Card der Seite liegt AUSSERHALB
- * der Datensicht und filtert die Rohlisten, aus denen die Aggregate danach neu entstehen.
- * Diese Liste ist deshalb dateibezogen und KEINE repoweite Zusicherung.
+ * Statisch, weil `pruefeKartenplan` nur mit gesetztem `baum` greift, die Sortierung nicht kennt
+ * und nur in DEV warnt. `Input.Search` ist ERLAUBT: die Filter-Card liegt außerhalb der
+ * Datensicht und filtert die Rohlisten. Die Liste ist dateibezogen.
  */
 const VOLLMENGE_PFLICHT: string[] = ['/src/pages/KraefteuebersichtPage.tsx'];
 
 /**
- * Dateien mit einer Reiterachse, deren Sicht den Reiter NICHT im Schlüssel trägt.
- *
- * KEINE Ausnahmemenge, sondern eine SCHULDMENGE: die vier Listen oben sagen „so ist es
- * richtig", diese sagt „so ist es, und es ist falsch". Deshalb steht in ihrem Gegentest die
- * umgekehrte Erwartung — ein Eintrag muss WEITERHIN GEMELDET WERDEN. Verschwindet die
- * Meldung, ist entweder die Datei repariert (Eintrag löschen) oder die Regel kaputt.
- *
- * LEER, und das ist die Aussage. Der eine Eintrag bei Auslieferung des Guards war
- * `pages/TierePage.tsx`: vier Reiter (`aktiv`/`vermisst`/`abgeschlossen`/`alle`) über
- * `filterTiere(alle, { sicht, spezies })` auf die Zeilenmenge, dafür EINE `<Datensicht>` ohne
- * `key` — Wort für Wort die an `PersonenPage` gemessene Falle. Bündel T hat ihn behoben
- * (`key={sicht}`) statt fortgeschrieben, und damit ist die Schuld getilgt, nicht verwaltet.
- *
- * Ein neuer Eintrag ist deshalb kein Vermerk, sondern eine zweite Seite mit demselben Fehler
- * — er gehört behoben. Wer trotzdem einen braucht, weil der Zustand über den Reiter hinweg
- * bewusst stehen bleiben soll, schreibt die Begründung daneben (Regel im Kopfkommentar).
+ * Dateien mit einer Reiterachse, deren Sicht den Reiter NICHT im Schlüssel trägt: eine
+ * SCHULDMENGE („so ist es, und es ist falsch“). Ihr Gegentest erwartet, dass ein Eintrag
+ * WEITERHIN gemeldet wird. LEER; ein neuer Eintrag ist eine zweite Seite mit demselben Fehler und
+ * gehört behoben, außer der Zustand soll bewusst über den Reiter hinweg stehen bleiben (dann mit
+ * Begründung).
  */
 const REITERSCHLUESSEL_OFFEN: string[] = [];
 
 /**
- * Das Konsumenteninventar von LFH-330 · B2, handgeschrieben — nicht aus dem Scan abgeleitet.
- *
- * Der Scan sagt, WER heute konsumiert; diese Liste sagt, wer es SOLL. Beides gegeneinander
- * zu prüfen ist der einzige Weg, zwei verschiedene Fehler zu fangen: eine Datei, die still
- * aus dem Primitiv herausfällt (steht hier, fehlt im Scan), und eine, die ungeplant
- * hinzukommt (steht im Scan, fehlt hier). Ein abgeleitetes Inventar kann das erste nicht
- * sehen — es hätte sich einfach mitverkleinert.
+ * Das Konsumenteninventar, handgeschrieben: der Scan sagt, WER konsumiert, diese Liste, wer es
+ * SOLL. Nur gegeneinander fangen sie eine still herausgefallene und eine ungeplant hinzugekommene
+ * Datei.
  */
 const KONSUMENTEN = [
   '/src/auftraege/BefehlListe.tsx',
-  // LFH-23 (design.md D8): die Aufbewahrungsübersicht der Verwaltung — verglichen wird
-  // („welcher Einsatz läuft als nächstes ab, welcher ist noch zu retten?"), also Tabelle.
+  // Die Aufbewahrungsübersicht: verglichen wird („welcher Einsatz läuft als nächstes ab?“).
   '/src/aufbewahrung/AufbewahrungUebersicht.tsx',
-  // LFH-639: die Betreuungsseite trägt ZWEI Sichten in zwei Dateien — Bezirke als Karten,
-  // Stellen als Tabelle. Getrennte Dateien statt zweier Sichten in einer, damit jede ihre
-  // eigene Formbegründung und ihr eigenes Spaltenregister hat.
+  // Die Betreuungsseite trägt ZWEI Sichten in zwei Dateien (Bezirke als Karten, Stellen als
+  // Tabelle), je mit eigener Formbegründung und eigenem Spaltenregister.
   '/src/betreuung/EvakuierungBlock.tsx',
   '/src/betreuung/StellenBlock.tsx',
-  // Die ETB-Chronologie (`etb/EtbTabelle.tsx`) war von LFH-342 · C7 bis zum Neuentwurf
-  // (S4, 21.09.2026) die elfte Konsumentin. Seitdem ist das Tagebuch auf allen Breiten eine
-  // Zeitachse (`etb/EtbZeitachse.tsx`) und kein Konsument mehr — begründet an
-  // KARTEN_EIGENBAU oben.
-  // LFH-632: die Dokumentenablage. Titel als nativer Download-Anker aus dem Spalten-`render`
-  // (kein `titel.ziel` — das wäre eine Client-Navigation), Begründung im Dateikopf.
+  // Die Dokumentenablage: Titel als nativer Download-Anker aus dem Spalten-`render` (kein
+  // `titel.ziel`, das wäre eine Client-Navigation).
   '/src/pages/DokumentePage.tsx',
   '/src/pages/FahrzeugePage.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
   '/src/pages/LageberichtePage.tsx',
-  // Die Lagemeldungen waren von LFH-348 · C13 bis zum Neuentwurf (22.09.2026) die zwölfte
-  // Konsumentin; seitdem sind sie wie das ETB eine Zeitachse und kein Konsument mehr.
   '/src/pages/MaterialPage.tsx',
   '/src/pages/PersonalPage.tsx',
   '/src/pages/PersonenPage.tsx',
-  // Zehnter seit LFH-340 · C5: die Schadensliste war die letzte der drei Betroffenen-Listen
-  // auf einer handgebauten `KatalogTabelle` — ohne Karten-Fallback, ohne Zeitachse, ohne
-  // Sortierung, und mit drei eigenen Filterelementen über der Tabelle.
   '/src/pages/SchaedenPage.tsx',
   '/src/pages/TierePage.tsx',
   '/src/pages/uhs/BewegungenTab.tsx',
@@ -328,8 +190,8 @@ function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, str
 }
 
 /**
- * Blendet Kommentarinhalt aus, Blockzustand über Zeilengrenzen getragen.
- * Kopie aus `theme/gate5.guard.test.ts` — Begründung im Dateikopf.
+ * Blendet Kommentarinhalt aus, Blockzustand über Zeilengrenzen getragen (Kopie aus
+ * `theme/gate5.guard.test.ts`).
  */
 function ohneKommentare(inhalt: string): string {
   const zeilen: string[] = [];
@@ -409,13 +271,9 @@ function attributVon(
 }
 
 /**
- * Elemente, die eine Sicht-/Reiterachse schalten, je mit dem Attribut, das die AKTIVE Achse
- * trägt.
- *
- * Nur diese drei — eine handgebaute Reiterleiste aus `<Button>`n erkennt der Guard nicht
- * (im Kopf benannt). Der Bezeichner kommt aus dem ATTRIBUT, nicht aus einer Namenskonvention:
- * `useState<Sicht>` heißt anderswo `modus` oder `tab`, aber `activeKey={…}` ist die Stelle,
- * an der die Achse nachweislich gebunden wird.
+ * Elemente, die eine Sicht-/Reiterachse schalten, je mit dem Attribut der AKTIVEN Achse. Nur diese
+ * drei; der Bezeichner kommt aus dem ATTRIBUT, weil `activeKey={…}` die Stelle ist, an der die
+ * Achse nachweislich gebunden wird.
  */
 const SICHTSCHALTER: Readonly<Record<string, string>> = {
   Tabs: 'activeKey',
@@ -424,23 +282,13 @@ const SICHTSCHALTER: Readonly<Record<string, string>> = {
 };
 
 /**
- * Die Bezeichner, die ein Schalter-Attribut als ACHSE beisteuert — aus dem AST, nicht per
- * Regex über den Attributtext.
+ * Die Bezeichner, die ein Schalter-Attribut als ACHSE beisteuert, aus dem AST.
  *
- * Gemessen an LFH-338: `<Segmented value={expandedKeys.length > 0 ? 'alle' : 'abschnitte'} />`
- * lieferte über {@link BEZEICHNER} vier Achsen — `expandedKeys`, `length`, **`alle`** und
- * **`abschnitte`**. Die letzten beiden sind der Inhalt von ZEICHENKETTEN, und `abschnitte`
- * kommt in fast jeder Einsatz-Seite als Variable vor: der Guard meldete daraufhin eine
- * Reiterachse an einer Fläche, die gar keinen Reiter hat, nur einen Aufklapp-Umschalter.
- *
- * Ein Gate, das an einem Zeichenkettenwert anschlägt, ist von einem kaputten nicht zu
- * unterscheiden — und die naheliegende „Behebung" (dem `Datensicht` einen Schlüssel geben,
- * der am Umschalter hängt) wäre ein echter Schaden: sie hängte die Sicht bei jedem
- * Aufklappen neu ein und verwürfe Sortierung, Spaltenwahl und Zeilenschleuse.
- *
- * Ausgeschlossen wird deshalb beides: Zeichenketten (sie sind keine Bezeichner) und
- * PROPERTY-Namen (`x.length` steuert `x` bei, nicht `length`) — ein Property-Name ist im
- * Zielausdruck ein anderer Namensraum und träfe dort zufällig gleichnamige Felder.
+ * Ausgeschlossen sind Zeichenketten und PROPERTY-Namen: aus
+ * `<Segmented value={expandedKeys.length > 0 ? 'alle' : 'abschnitte'} />` würde sonst `abschnitte`
+ * zur Achse, ein Name fast jeder Einsatz-Seite, und die Regel meldete einen Reiter an einem
+ * Aufklapp-Umschalter. Die naheliegende „Behebung“ (ein `key` am Umschalter) verwürfe bei jedem
+ * Aufklappen Sortierung, Spaltenwahl und Zeilenschleuse.
  */
 function achsenBezeichner(
   knoten: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
@@ -474,16 +322,10 @@ export interface Dateilage {
 }
 
 /**
- * Ein Durchlauf, drei Ausbeuten — AST statt Regex, nach dem Muster von `api/queryKeyScan.ts`.
- *
- * Der Grund ist gemessen: die Vorgängerform zählte jedes `key=` der ganzen DATEI gegen die
- * Zahl der Sichten, und die Treffer stammen überwiegend aus Spalten-Renderern
- * (`<Tag key={w}>` in einer `.map()`). Damit blieben genau die zwei Fälle unsichtbar, gegen
- * die die Zusicherung überhaupt gebaut wurde: zwei Sichten OHNE eigenen Schlüssel und zwei
- * mit DEMSELBEN.
- *
- * `ohneKommentare` läuft hier NICHT: Kommentare sind keine AST-Knoten, und das Strippen
- * verschöbe nur die Zeilennummern der Meldung.
+ * Ein Durchlauf, drei Ausbeuten, per AST (Muster `api/queryKeyScan.ts`): ein Zählen aller `key=`
+ * der Datei träfe vor allem Spalten-Renderer (`<Tag key={w}>`) und übersähe zwei Sichten ohne
+ * Schlüssel oder mit demselben. `ohneKommentare` läuft hier nicht, Kommentare sind keine
+ * AST-Knoten.
  */
 export function leseDatei(pfad: string, quelltext: string): Dateilage {
   const quelle = ts.createSourceFile(
@@ -527,9 +369,8 @@ export function sichtstellen(pfad: string, quelltext: string): Sichtstelle[] {
 }
 
 /**
- * Befunde der Schlüsselregel: ab ZWEI Sichten in einer Datei trägt jede einen `key`, und
- * die Schlüssel sind paarweise verschieden. Rein und exportiert, damit die Selbstbeweise
- * sie ohne Dateisystem prüfen können — Bauform aus `useViewport.guard.test.ts`.
+ * Befunde der Schlüsselregel: ab ZWEI Sichten in einer Datei trägt jede einen `key`, paarweise
+ * verschieden. Rein und exportiert, damit die Selbstbeweise ohne Dateisystem prüfen.
  */
 export function schluesselBefunde(
   dateien: Record<string, string>,
@@ -562,13 +403,9 @@ export function schluesselBefunde(
 }
 
 /**
- * Hängt ein Ausdruck an einem der Achsen-Bezeichner — direkt oder über lokale `const`?
- *
- * Die Tiefe ist der Grund, warum die Regel überhaupt greift: die reale Form ist nicht
- * `daten={f(sicht)}`, sondern `daten={tiere}` mit `const tiere = filterTiere(alle, { sicht })`
- * eine Stufe darüber. Bei Tiefe 0 wäre der einzige gemessene Befund unsichtbar (per Probe
- * belegt: Tiefe 0 → 0 Meldungen). Drei Stufen, weil die Kette in der Praxis eine ist und die
- * Reserve billig ist; unbegrenzt wäre sie es nicht, `gesehen` bricht Zyklen ohnehin ab.
+ * Hängt ein Ausdruck an einem der Achsen-Bezeichner, direkt oder über lokale `const`? Die Tiefe
+ * braucht die reale Form `daten={tiere}` mit `const tiere = filterTiere(alle, { sicht })`. Drei
+ * Stufen als billige Reserve; `gesehen` bricht Zyklen ab.
  */
 export function haengtAnAchse(
   ausdruck: string,
@@ -595,14 +432,9 @@ export function haengtAnAchse(
 }
 
 /**
- * Befunde der Reiterregel: hängt die Zeilenmenge einer Sicht an der Reiterachse, muss der
- * `key` es auch tun. Rein und exportiert wie {@link schluesselBefunde} — Bauform aus
- * `useViewport.guard.test.ts`.
- *
- * Was hier NICHT gemeldet wird, ist so wichtig wie was gemeldet wird: eine Datei ohne
- * Schalterachse, und eine Sicht mit konstantem Schlüssel über achsunabhängigen Daten. Sonst
- * schlüge die Regel an `PersonenPage`s `key="patienten"` an — richtig geschrieben, weil
- * `alle.filter(istPatient)` nicht am Reiter hängt.
+ * Befunde der Reiterregel: hängt die Zeilenmenge einer Sicht an der Reiterachse, muss der `key`
+ * es auch tun. NICHT gemeldet: eine Datei ohne Schalterachse und ein konstanter Schlüssel über
+ * achsunabhängigen Daten (`key="patienten"` über `alle.filter(istPatient)`).
  */
 export function reiterBefunde(dateien: Record<string, string>, nur: readonly string[]): string[] {
   const gefunden: string[] = [];
@@ -642,11 +474,8 @@ const VERBOTEN_IM_PRIMITIV: readonly { muster: RegExp; grund: string }[] = [
     grund: 'die Kartenform ist Liste/ListenEintrag — ein Rahmen doppelt die li-Trennlinie',
   },
   {
-    // Bewusster Doppelgurt neben `dichte.guard.test.ts` (LFH-362), das dieselbe Norm
-    // repoweit trägt: jenes greift nur an INTERAKTIVEN Elementen, dieses hier an
-    // jedem. Im Primitiv ist das enger gemeint — auch eine Fläche darf ihre
-    // Polsterung nicht festnageln, weil sie die Kartenhöhe aller Konsumenten setzt.
-    // Entfällt dieser Eintrag, sinkt die Abdeckung; er ist keine Dublette.
+    // Bewusster Doppelgurt neben `dichte.guard.test.ts`: jenes greift nur an INTERAKTIVEN Elementen,
+    // dieses im Primitiv an jedem, weil auch eine Fläche hier die Kartenhöhe aller Konsumenten setzt.
     muster: /size="small"/g,
     grund: 'neue Klein-Varianten auf interaktiven Elementen sind verboten',
   },
@@ -654,21 +483,16 @@ const VERBOTEN_IM_PRIMITIV: readonly { muster: RegExp; grund: string }[] = [
 ];
 
 /**
- * Die Anwesenheitsmarken der schriftlichen Begründung.
- *
- * WICHTIG: sie werden am ROHTEXT gemessen, nicht am kommentarfreien — sie STEHEN im
- * Dateikopf, also in einem Kommentar. Und Anwesenheitsprüfungen sind hier bewusst gewählt:
- * eine solche Marke kann ihr eigenes Gate nicht auslösen, im Gegensatz zu einer Verbotszählung.
+ * Die Anwesenheitsmarken der schriftlichen Begründung, am ROHTEXT gemessen: sie STEHEN im
+ * Dateikopf, also in einem Kommentar. Eine Anwesenheitsmarke kann ihr eigenes Gate nicht
+ * auslösen.
  */
 const BEGRUENDUNG = ['KARTEN-AUSNAHME', 'TRENNLINIE'];
 
 /**
- * Verbotene Formen je Konsumentendatei.
- *
- * `<Card` steht hier BEWUSST NICHT: gemessen zwei legitime Treffer (Kennzahlen- und
- * Filter-Card in `pages/KraefteuebersichtPage.tsx`), und die Filter-Card ist genau der
- * Grund, aus dem {@link VOLLMENGE_PFLICHT} dort gelten darf. Ein Verbot wäre am Liefertag
- * rot. Im PRIMITIV bleibt `<Card` verboten — dort doppelt der Rahmen die li-Trennlinie.
+ * Verbotene Formen je Konsumentendatei. `<Card` fehlt bewusst: die Kennzahlen- und Filter-Card
+ * in `pages/KraefteuebersichtPage.tsx` sind legitim. Im PRIMITIV bleibt `<Card` verboten, dort
+ * doppelte der Rahmen die li-Trennlinie.
  */
 const VERBOTEN_BEIM_KONSUMENTEN: readonly { muster: RegExp; grund: string }[] = [
   { muster: elementMuster('Table'), grund: 'die Tabelle kommt aus Datensicht/KatalogTabelle' },
@@ -688,8 +512,8 @@ const VERBOTEN_BEIM_KONSUMENTEN: readonly { muster: RegExp; grund: string }[] = 
 ];
 
 /**
- * Verbotene Formen in einer Datei aus {@link VOLLMENGE_PFLICHT} — alles, was das Primitiv
- * Zeilen entziehen oder umordnen ließe. Begründung dort.
+ * Verbotene Formen in einer Datei aus {@link VOLLMENGE_PFLICHT}: alles, was das Primitiv Zeilen
+ * entziehen oder umordnen ließe.
  */
 const VERBOTEN_BEI_VOLLMENGE: readonly { muster: RegExp; grund: string }[] = [
   {
@@ -710,8 +534,7 @@ const VERBOTEN_BEI_VOLLMENGE: readonly { muster: RegExp; grund: string }[] = [
 ];
 
 /**
- * Beide Hälften in EINER Befundliste. Exportiert und rein, damit die Selbstbeweise sie ohne
- * Dateisystem prüfen können — Bauform aus `useViewport.guard.test.ts`.
+ * Beide Hälften in EINER Befundliste, rein und exportiert für die Selbstbeweise.
  */
 export function befunde(
   dateien: Record<string, string>,
@@ -742,7 +565,7 @@ export function befunde(
       if (anzahl > 0) gefunden.push(`${PRIMITIV}: ${anzahl}× ${muster.source} — ${grund}`);
     }
     for (const marke of BEGRUENDUNG) {
-      // Am ROHTEXT: die Begründung steht im Dateikopf und damit in einem Kommentar.
+      // Am ROHTEXT: die Begründung steht im Dateikopf, also in einem Kommentar.
       if (!roh.includes(marke)) {
         gefunden.push(
           `${PRIMITIV}: die schriftliche Begründung "${marke}" fehlt — die Karten-Ausnahme ` +
@@ -770,8 +593,8 @@ export function befunde(
       const anzahl = treffer(rein, muster);
       if (anzahl > 0) gefunden.push(`${pfad}: ${anzahl}× ${muster.source} — ${grund}`);
     }
-    // Schließt das `const K`-Widening: eine annotierte Spaltenliste weitet K auf `string`
-    // und der Kartenplan nimmt danach jeden Tippfehler an. Der Typ kann das nicht sehen.
+    // Schließt das `const K`-Widening: eine annotierte Spaltenliste weitet K auf `string`, der Typ
+    // sieht das nicht.
     if (!/\bspaltenFuer\b/.test(rein)) {
       gefunden.push(
         `${pfad}: die Marke spaltenFuer fehlt — eine annotierte Spaltenliste weitet die ` +
@@ -787,9 +610,8 @@ export function befunde(
     if (ausnahmen.nurTabelle.includes(pfad) && !/form="tabelle"/.test(rein)) {
       gefunden.push(`${pfad}: steht in NUR_TABELLE, trägt aber kein form="tabelle".`);
     }
-    // Die NEGATIVE Hälfte der Gegenzeile: NUR_TABELLE sagt, welche Form; das hier, was die
-    // Sicht nicht tun darf. `Input.Search` bleibt unangetastet — die Muster greifen nur
-    // Props/Spaltenschlüssel des Primitivs.
+    // Die negative Hälfte zu NUR_TABELLE: was die Sicht nicht tun darf. Die Muster greifen nur
+    // Props/Spaltenschlüssel des Primitivs, `Input.Search` bleibt unangetastet.
     if (ausnahmen.vollmenge.includes(pfad)) {
       for (const { muster, grund } of VERBOTEN_BEI_VOLLMENGE) {
         const anzahl = treffer(rein, muster);
@@ -798,8 +620,7 @@ export function befunde(
     }
   }
 
-  // Tote Ausnahmeeinträge melden — sonst veraltet die Liste still, wie in
-  // `useViewport.guard.test.ts` begründet.
+  // Tote Ausnahmeeinträge melden, sonst veraltet die Liste still.
   for (const [name, liste] of [
     ['KARTEN_EIGENBAU', ausnahmen.eigenbau],
     ['NUR_KARTE', ausnahmen.nurKarte],
@@ -840,19 +661,15 @@ const AUSNAHMEN = {
 describe('Datensicht-Guard (LFH-330 · B2)', () => {
   it('das Primitiv kennt keinen eigenen Umbruchpunkt mehr (tabelleAb) — auto bricht bei md', () => {
     /*
-     * LFH-464 hatte der ETB-Chronologie als EINZIGER Konsumentin `tabelleAb="xl"` erlaubt
-     * (gemessener 1024-px-Engpass). Seit dem Neuentwurf (S4) ist das Tagebuch auf allen
-     * Breiten eine Zeitachse und keine Datensicht mehr; am 22.09.2026 fiel die Prop deshalb
-     * ganz. Ein Konsument, der sie setzt, bricht jetzt im Typcheck — die Aussage hier hält
-     * die DEKLARATION fern: wer sie zurückholt, braucht wieder eine Browsermessung wie
-     * LFH-464, nicht bloß den Verweis darauf.
+     * Die Prop `tabelleAb` ist gefallen; ein Konsument, der sie setzt, bricht im Typcheck. Hier wird
+     * die DEKLARATION ferngehalten: wer sie zurückholt, braucht wieder eine Browsermessung.
      */
     const primitiv = ohneKommentare(dateien[PRIMITIV] ?? '');
     expect(primitiv, 'Datensicht.tsx gelesen').toContain('export default function Datensicht');
     expect(primitiv).not.toMatch(/\btabelleAb\b/);
-    // Der Auto-Zweig steht fest auf md — LITERAL, damit ein stiller Wechsel rot wird.
+    // Der Auto-Zweig steht fest auf md, als LITERAL, damit ein stiller Wechsel rot wird.
     expect(primitiv).toMatch(/form === 'auto' && abBreite\('md'\)/);
-    // Und die Zeitachse ist wirklich keine Datensicht mehr.
+    // Die Zeitachse ist keine Datensicht mehr.
     expect(konsumentenVon(dateien)).not.toContain('/src/etb/EtbZeitachse.tsx');
   });
 
@@ -866,30 +683,21 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
   });
 
   it('die fünf gepflegten Listen stehen auf dem entschiedenen Stand', () => {
-    // WIEDER LEER seit dem Neuentwurf (S4): die ETB-Chronologie, der einzige Eintrag seit
-    // LFH-342 · C7, ist eine Zeitachse außerhalb der Datensicht geworden. Wer einen neuen
-    // einträgt, begründet wie über der Liste beschrieben — sonst wächst die Ausnahme über
-    // das Band und der Kartenplan wäre nur noch ein Vorschlag.
+    // LEER. Wer einträgt, begründet wie über der Liste beschrieben, sonst wäre der Kartenplan nur
+    // ein Vorschlag.
     expect(KARTEN_EIGENBAU).toHaveLength(0);
-    // Drei Kartenmodule (Befehle, Lageberichte, Evakuierungsbezirke seit LFH-639 — die
-    // Lagemeldungen sind seit dem Neuentwurf eine Zeitachse), drei Vergleichsflächen
-    // (Meldebild, Betreuungsstellen seit LFH-639, Aufbewahrung seit LFH-23). Wer einträgt, ohne umzubauen, fällt am
-    // Anwesenheits-Gegentest oben auf; wer umbaut, ohne einzutragen, an der Formprüfung.
+    // Drei Kartenmodule, drei Vergleichsflächen. Wer einträgt, ohne umzubauen, fällt am
+    // Anwesenheits-Gegentest auf; wer umbaut, ohne einzutragen, an der Formprüfung.
     expect(NUR_KARTE).toHaveLength(3);
     expect(NUR_TABELLE).toHaveLength(3);
-    // Die vierte ist keine Ausnahme, sondern eine PFLICHT — und sie ist ausdrücklich
-    // dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild
-    // (Aggregate stromaufwärts über die Vollmenge), nicht bloß den Verweis hierauf.
+    // Eine PFLICHT, dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild.
     expect(VOLLMENGE_PFLICHT).toHaveLength(1);
-    // Die fünfte ist eine SCHULD, keine Ausnahme — sie sollte schrumpfen, und sie ist auf 0
-    // geschrumpft: der eine Eintrag (`TierePage`) wurde behoben, nicht fortgeschrieben. Ein
-    // Eintrag hier ist kein Vermerk, sondern eine zweite Seite mit demselben Fehler.
+    // Eine SCHULD, auf 0 geschrumpft. Ein Eintrag wäre eine zweite Seite mit demselben Fehler.
     expect(REITERSCHLUESSEL_OFFEN).toHaveLength(0);
   });
 
   it('Sentinel: der Scan sieht das Primitiv und mehr als 200 Dateien', () => {
-    // Ohne diesen Fall wäre ein kaputtes Scan-Muster (falsche Wurzel, falsche Endung) still
-    // grün — der Guard fände dann schlicht nichts mehr und meldete Erfolg.
+    // Ohne diesen Fall wäre ein kaputtes Scan-Muster still grün.
     expect(Object.keys(dateien).length).toBeGreaterThan(200);
     expect(dateien[PRIMITIV] ?? '').not.toBe('');
     expect(dateien[PRIMITIV]).toContain('KatalogTabelle');
@@ -897,29 +705,18 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
 
   it('der Scan sieht genau die geplanten Konsumenten (seit LFH-23: dreizehn)', () => {
     /**
-     * Die Gleichheit prüft BEIDE Richtungen: eine Datei, die still aus dem Primitiv
-     * herausfällt, verschwindet aus dem Scan und bleibt in {@link KONSUMENTEN} stehen; eine
-     * ungeplant hinzukommende steht im Scan und fehlt in der Liste. Ein rein abgeleitetes
-     * Inventar sähe den ersten Fall nie — es hätte sich stillschweigend mitverkleinert.
+     * Die Gleichheit prüft BEIDE Richtungen: eine still herausgefallene Datei bleibt in
+     * {@link KONSUMENTEN} stehen, eine ungeplant hinzugekommene fehlt dort.
      */
     expect([...konsumentenVon(dateien)].sort()).toEqual([...KONSUMENTEN].sort());
   });
 
   it('mehrere Sichten in einer Datei tragen distinkte key-Angaben', () => {
     /**
-     * Die teuerste gemessene Falle dieses Pakets, und sie erzeugt keinen Fehler:
-     * zwei `Datensicht` in den Zweigen eines Ternärs stehen an DERSELBEN Baumstelle mit
-     * DEMSELBEN Komponententyp. React montiert dann nicht neu, sondern reicht die Instanz
-     * weiter — samt Sortierung, Suchbegriff, Spaltenauswahl und Zeilenschleuse. Gemessen an
-     * `pages/PersonenPage.tsx`: der Patienten-Reiter behielt die Sortierung der Listen-Sicht,
-     * die eigene Voreinstellung griff nie. Keine Warnung, kein roter Test — sichtbar wurde es
-     * nur, weil zufällig eine Sortierbehauptung auf dem zweiten Zweig lag.
-     *
-     * Gelesen wird der `key` AM ELEMENT, aus dem AST ({@link sichtstellen}). Die
-     * Vorgängerform zählte stattdessen jedes `key=` der ganzen DATEI gegen die Zahl der
-     * Sichten — und die Treffer stammen überwiegend aus Spalten-Renderern. Für sie waren
-     * beide Fehler unsichtbar, gegen die die Zusicherung gebaut ist: zwei Sichten ohne
-     * jeden Schlüssel, und zwei mit demselben.
+     * Zwei `Datensicht` in den Zweigen eines Ternärs stehen an DERSELBEN Baumstelle mit demselben
+     * Komponententyp; React reicht die Instanz weiter, samt Sortierung, Suchbegriff, Spaltenauswahl
+     * und Zeilenschleuse. Keine Warnung, kein roter Test. Gelesen wird der `key` AM ELEMENT, aus dem
+     * AST ({@link sichtstellen}).
      */
     expect(
       schluesselBefunde(dateien, KONSUMENTEN),
@@ -930,11 +727,8 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
 
   it('eine reiterabhängige Sicht trägt den Reiter im Schlüssel', () => {
     /**
-     * Die ZWEITE Gestalt desselben Fehlers, und die häufigere: nicht zwei Sichten in einem
-     * Ternär, sondern EINE Sicht über mehreren Reitern. Die Regel darüber sieht sie
-     * grundsätzlich nicht — sie steigt bei `stellen.length < 2` aus, und eine Seite mit einem
-     * einzigen `<Datensicht>` kommt nie an ihre Zusicherung heran. Genau so sah der an
-     * `PersonenPage` behobene Fehler aus: ein Element, fünf Reiter, fünf Datenmengen.
+     * Die zweite, häufigere Gestalt: EINE Sicht über mehreren Reitern. Die Regel darüber steigt bei
+     * `stellen.length < 2` aus und sieht sie nicht.
      */
     const gemeldet = reiterBefunde(dateien, KONSUMENTEN);
     const istOffen = (b: string): boolean =>
@@ -945,19 +739,12 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
         'reicht React beim Wechsel dieselbe Instanz samt Suchbegriff und Spaltenfilter weiter.',
     ).toEqual([]);
 
-    // Der Gegentest der SCHULDMENGE steht umgekehrt zu dem der vier Ausnahmelisten: dort ist
-    // ein Eintrag tot, wenn er NICHT mehr zutrifft — hier, wenn er nicht mehr GEMELDET wird.
-    // Beides fängt dieselbe zwei Fehler, aber nur so herum: die Anwesenheitsprüfung oben
-    // (`konsumenten.includes`) bliebe grün, sobald eine Seite ihren Schlüssel bekommt.
-    //
-    // Die Schleife läuft seit Bündel T LEER — genau weil `TierePage` ihn bekommen hat — und
-    // beweist damit nichts mehr; sie steht für den nächsten Eintrag. Der positive Beleg, dass
-    // `reiterBefunde` überhaupt noch etwas findet, liegt seither allein beim Selbstbeweis (a)
-    // unten auf synthetischer Quelle. Fällt der weg, ist die erste Behauptung dieses Tests
-    // wertlos grün.
+    // Der Gegentest der SCHULDMENGE steht umgekehrt zu dem der Ausnahmelisten: ein Eintrag ist tot,
+    // wenn er nicht mehr GEMELDET wird. Die Schleife läuft derzeit leer; dass `reiterBefunde` etwas
+    // findet, belegt der Selbstbeweis (a) unten.
     for (const eintrag of REITERSCHLUESSEL_OFFEN) {
-      // Die Datei-Existenz zuerst und GETRENNT: sonst behauptete die Meldung unten bei einer
-      // gelöschten oder umbenannten Datei eine von zwei Ursachen, von denen keine zutrifft.
+      // Die Datei-Existenz zuerst und GETRENNT, sonst nennte die Meldung bei einer gelöschten Datei
+      // eine falsche Ursache.
       expect(
         dateien[eintrag] != null,
         `tote Ausnahme in REITERSCHLUESSEL_OFFEN: ${eintrag} gibt es nicht mehr — ` +
@@ -978,8 +765,8 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     const lauf = (zeilen: string[]): string[] =>
       reiterBefunde({ '/src/pages/R.tsx': zeilen.join('\n') }, ['/src/pages/R.tsx']);
 
-    // (a) Der Befund: Achse gesetzt, Daten hängen daran — über eine lokale const, also eine
-    // Stufe entfernt, wie in der echten Datei —, der Schlüssel fehlt.
+    // (a) Der Befund: Achse gesetzt, Daten hängen daran (über eine lokale const, wie in der echten
+    // Datei), der Schlüssel fehlt.
     const getroffen = lauf([
       ...reiter,
       'const zeilen = filterTiere(alle, { sicht });',
@@ -988,8 +775,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     expect(getroffen).toHaveLength(1);
     expect(getroffen[0]).toContain('der key (fehlt) nicht');
 
-    // (b) Derselbe Aufbau MIT Reiter im Schlüssel ist still — das ist die Behebung, und der
-    // Test wäre wertlos, wenn er sie nicht von (a) unterscheiden könnte.
+    // (b) Derselbe Aufbau MIT Reiter im Schlüssel ist still; das ist die Behebung.
     expect(
       lauf([
         ...reiter,
@@ -998,8 +784,8 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
       ]),
     ).toEqual([]);
 
-    // (c) KONSTANTER Schlüssel über achsunabhängigen Daten ist richtig, nicht verdächtig —
-    // die Form von `key="patienten"`. Ohne diese Zeile wäre die Regel an PersonenPage rot.
+    // (c) KONSTANTER Schlüssel über achsunabhängigen Daten ist richtig (die Form von
+    // `key="patienten"`).
     expect(
       lauf([
         ...reiter,
@@ -1007,21 +793,13 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
       ]),
     ).toEqual([]);
 
-    // (d) Ohne Schalterachse gibt es keinen Reiter, den ein Schlüssel tragen könnte. Ohne
-    // diesen Ausstieg meldete die Regel jede schlüssellose Sicht des Repos.
+    // (d) Ohne Schalterachse gibt es keinen Reiter; sonst meldete die Regel jede schlüssellose Sicht.
     expect(lauf(['const y = <Datensicht daten={filterTiere(alle, { sicht })} />;'])).toEqual([]);
 
     /**
-     * (e) EIN ZEICHENKETTENWERT IM SCHALTER IST KEINE ACHSE (gemessen an LFH-338).
-     *
-     * Der Umschalter „Alles aufklappen / Nur Abschnitte" der Kräfteübersicht trägt seine
-     * beiden Zustände als Zeichenketten im `value`. Über einen Regex-Scan des Attributtexts
-     * wurde daraus die Achse `abschnitte` — ein Bezeichner, den fast jede Einsatz-Seite
-     * führt —, und die Regel meldete eine Reiterachse an einer Fläche ohne jeden Reiter.
-     *
-     * Die naheliegende „Behebung" wäre ein Schlüssel gewesen, der am Umschalter hängt: die
-     * Sicht hinge bei jedem Aufklappen neu ein und verlöre Sortierung, Spaltenwahl und
-     * Zeilenschleuse. Ein Gate, das zu so einer Änderung drängt, ist schlimmer als keins.
+     * (e) EIN ZEICHENKETTENWERT IM SCHALTER IST KEINE ACHSE: der Aufklapp-Umschalter der
+     * Kräfteübersicht trägt seine Zustände als Zeichenketten im `value`. Die „Behebung“ per `key` am
+     * Umschalter verwürfe bei jedem Aufklappen Sortierung, Spaltenwahl und Zeilenschleuse.
      */
     expect(
       lauf([
@@ -1031,9 +809,8 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
       'ein Zeichenkettenwert im Schalter darf keine Achse werden',
     ).toEqual([]);
 
-    // (f) …und die Gegenprobe zu (e): steht im selben Schalter ein echter Bezeichner, an dem
-    // die Daten hängen, meldet die Regel weiter. Ohne diese Zeile hätte (e) den Scanner auch
-    // ganz abschalten können.
+    // (f) Gegenprobe zu (e): ein echter Bezeichner im selben Schalter, an dem die Daten hängen,
+    // meldet weiter.
     expect(
       lauf([
         "const s = <Segmented value={sicht === 'alle' ? 'alle' : 'eng'} />;",
@@ -1041,9 +818,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
       ]),
     ).toHaveLength(1);
 
-    // (g) Ein PROPERTY-Name ist ebenfalls keine Achse: `offen.length` steuert `offen` bei,
-    // nicht `length`. Sonst träfe die Regel jede Datenmenge, in deren Ausdruck irgendwo ein
-    // `.length` steht — und das ist praktisch jede.
+    // (g) Ein PROPERTY-Name ist keine Achse: `offen.length` steuert `offen` bei, nicht `length`.
     expect(
       lauf([
         'const s = <Segmented value={offen.length} />;',
@@ -1054,14 +829,9 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
   });
 
   it('Sentinel: der Schlüssel-Scan sieht die zwei Sichten von PersonenPage', () => {
-    // Ein Scanner, der überall [] liefert (falsche ScriptKind, danebengreifender tagName,
-    // geschluckter Parse-Fehler), meldete „keine Datei hat ≥ 2 Sichten" und wäre still grün.
-    // Gepinnt gegen den echten Baum — samt des Block-Kommentars, der IM öffnenden Element
-    // vor `key="patienten"` steht: Kommentare sind Trivia, das Attribut bleibt sichtbar.
-    // BEWUSST nicht auf die Schlüsselwerte gepinnt: die Seite gehört einem anderen Bündel.
-    // Ein Pin auf `"patienten"` ginge bei einer legitimen Umbenennung rot, und der nächste
-    // repariert dann den Guard statt die Seite. Wogegen der Sentinel steht — ein Scanner,
-    // der überall nichts findet — belegen Anzahl und Anwesenheit vollständig.
+    // Ein Scanner, der überall [] liefert, meldete „keine Datei hat ≥ 2 Sichten“ und wäre still grün.
+    // Gepinnt gegen den echten Baum, samt Block-Kommentar im öffnenden Element (Trivia). Bewusst nicht
+    // auf die Schlüsselwerte gepinnt, die Seite gehört einem anderen Bündel.
     const pfad = '/src/pages/PersonenPage.tsx';
     const stellen = sichtstellen(pfad, dateien[pfad] ?? '');
     expect(stellen).toHaveLength(2);
@@ -1069,9 +839,8 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
   });
 
   it('Selbstbeweis: fremde key= aus Zellen-Renderern decken fehlende Sichtschlüssel nicht zu', () => {
-    // Der Blindfleck der Vorgängerform als Fixture: zwei Sichten OHNE Schlüssel, dazu zwei
-    // `key=` aus Renderern. Zählend („2 key= ≥ 2 Sichten") war das grün — und genau diese
-    // Konstellation ist der Normalfall einer Listenseite, nicht der Sonderfall.
+    // Zwei Sichten OHNE Schlüssel plus zwei `key=` aus Renderern: zählend wäre das grün, und es ist
+    // der Normalfall einer Listenseite.
     const datei = [
       'const zellen = werte.map((w) => <Tag key={w}>{w}</Tag>);',
       'const kopf = spalten.map((s) => <th key={s.key}>{s.title}</th>);',
@@ -1091,9 +860,8 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     expect(
       schluesselBefunde({ '/src/pages/Doppelt.tsx': verschieden }, ['/src/pages/Doppelt.tsx']),
     ).toEqual([]);
-    // Dieselbe Regel für den AUSDRUCKS-Schlüssel (`key={…}`, die Form von PersonenPage):
-    // gemessen wird der Quelltext, nicht der Laufzeitwert — zweimal derselbe Ausdruck ist
-    // eine Dublette, zwei verschiedene sind es nicht.
+    // Auch für den AUSDRUCKS-Schlüssel (`key={…}`) gilt: gemessen wird der Quelltext, zweimal
+    // derselbe Ausdruck ist eine Dublette.
     const gleicherAusdruck =
       'const x = offen ? <Datensicht key={`liste-${sicht}`} /> : <Datensicht key={`liste-${sicht}`} />;';
     expect(
@@ -1104,8 +872,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     expect(
       schluesselBefunde({ '/src/pages/Dyn.tsx': andereAusdruecke }, ['/src/pages/Dyn.tsx']),
     ).toEqual([]);
-    // Eine EINZELNE Sicht braucht keinen Schlüssel: ohne Geschwister an derselben Baumstelle
-    // gibt es nichts, womit React sie verwechseln könnte.
+    // Eine EINZELNE Sicht braucht keinen Schlüssel: ohne Geschwister gibt es keine Verwechslung.
     expect(
       schluesselBefunde({ '/src/pages/Eine.tsx': 'const x = <Datensicht daten={d} />;' }, [
         '/src/pages/Eine.tsx',
@@ -1152,9 +919,8 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     };
     const gemeldet = befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] });
     const eigene = gemeldet.filter((b) => b.startsWith('/src/pages/Schlampig.tsx'));
-    // Sechs Verbotsmarken (Table, scroll, sorter, filters, responsive, defaultSortOrder) plus
-    // die fehlende spaltenFuer-Marke. Die Zahl ist der Mutationsbeweis jedes einzelnen
-    // Musters: fällt eines weg, fällt sie auf 6.
+    // Sechs Verbotsmarken plus die fehlende spaltenFuer-Marke; fällt ein Muster weg, fällt die Zahl
+    // auf 6.
     expect(eigene).toHaveLength(7);
     expect(eigene.some((b) => b.includes('spaltenFuer'))).toBe(true);
     expect(eigene.some((b) => b.includes('defaultSortOrder'))).toBe(true);
@@ -1184,17 +950,15 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
       vollmenge: ['/src/pages/Meldebild.tsx'],
     });
     expect(mitPflicht).toHaveLength(4);
-    // Dieselbe Datei OHNE Eintrag ist sauber. Das ist die Aussage der Liste: sie ist
-    // dateibezogen, keine repoweite Zusicherung — Suche und Filter sind das Normale.
+    // Dieselbe Datei OHNE Eintrag ist sauber: die Liste ist dateibezogen.
     expect(befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] })).toEqual(
       [],
     );
   });
 
   it('Selbstbeweis: Input.Search bleibt in einer Vollmengen-Pflichtdatei erlaubt', () => {
-    // Die Filter-Card liegt AUSSERHALB der Datensicht und filtert die Rohlisten, aus denen
-    // die Aggregate danach neu entstehen. Ein Verbot von Input.Search wäre am Liefertag rot —
-    // und würde die einzige Stelle treffen, an der das Meldebild überhaupt filtern DARF.
+    // Die Filter-Card liegt AUSSERHALB der Datensicht und filtert die Rohlisten; ein Verbot von
+    // Input.Search träfe die einzige Stelle, an der das Meldebild filtern darf.
     const baum = {
       [PRIMITIV]: 'KARTEN-AUSNAHME TRENNLINIE\nconst a = <KatalogTabelle columns={c} />;',
       '/src/pages/Meldebild.tsx': [
@@ -1240,8 +1004,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
   });
 
   it('Selbstbeweis: eine Formliste ohne das passende Literal fällt auf', () => {
-    // Der Grund für diese Liste: eine Datei mit form="karte" bleibt bei <Table = 0 grün,
-    // AUCH wenn sie eine Tabelle rendert — das Element liegt in KatalogTabelle.tsx.
+    // Eine Datei mit form="karte" bleibt bei <Table = 0 grün, auch wenn sie eine Tabelle rendert.
     const baum = {
       [PRIMITIV]: 'KARTEN-AUSNAHME TRENNLINIE\nconst a = <KatalogTabelle columns={c} />;',
       '/src/pages/Befehle.tsx': 'const x = <Datensicht spaltenFuer form="auto" />;',
@@ -1267,7 +1030,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
         vollmenge: [],
       }),
     ).toEqual(['tote Ausnahme in NUR_KARTE: /src/pages/Weg.tsx']);
-    // Auch die vierte Liste rottet nicht still: ein Eintrag ohne Datei fällt genauso auf.
+    // Auch die vierte Liste rottet nicht still: ein Eintrag ohne Datei fällt auf.
     expect(
       befunde(baum, {
         eigenbau: [],
@@ -1288,9 +1051,8 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
         'const a = <KatalogTabelle columns={c} />;',
       ].join('\n'),
     };
-    // Die Verbotsformen liegen im Kommentar → 0 Befunde. Die BEGRÜNDUNG liegt ebenfalls im
-    // Kommentar und wird trotzdem gefunden, weil sie am Rohtext gemessen wird — genau diese
-    // Asymmetrie ist der Grund für die zwei Textquellen.
+    // Verbotsformen im Kommentar → 0 Befunde; die BEGRÜNDUNG im Kommentar wird trotzdem gefunden
+    // (Rohtext). Diese Asymmetrie ist der Grund für die zwei Textquellen.
     expect(befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] })).toEqual(
       [],
     );

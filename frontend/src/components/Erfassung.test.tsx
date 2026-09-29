@@ -35,9 +35,8 @@ interface Werte {
 }
 
 /**
- * Zwei Textfelder plus eine Textarea — die Textarea steht am Ende, weil genau
- * sie NICHT an der Formularübermittlung teilnimmt (dort bleibt Enter ein
- * Zeilenumbruch). „Letztes Eingabefeld" meint deshalb `Melder`.
+ * Zwei Textfelder plus eine Textarea am Ende, weil genau sie NICHT an der Formularübermittlung
+ * teilnimmt. „Letztes Eingabefeld" meint deshalb `Melder`.
  */
 function Harness(props: {
   onErfassen: (w: Werte) => Promise<unknown>;
@@ -174,16 +173,14 @@ describe('ErfassungsFormular — Enter sendet ab', () => {
   });
 
   it('Enter in der Textarea sendet NICHT ab, sondern bricht um', async () => {
-    // Der Beleg für Zusicherung 1: die eingebaute Übermittlung übergeht
-    // mehrzeilige Felder. Ohne diesen Fall wäre „Enter sendet" die Behauptung,
-    // Enter sende ÜBERALL — und ein Notizfeld wäre unbenutzbar.
+    // Beleg für Zusicherung 1: die eingebaute Übermittlung übergeht mehrzeilige Felder, sonst
+    // wäre ein Notizfeld unbenutzbar.
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(<Harness onErfassen={onErfassen} />);
     const nutzer = userEvent.setup();
 
-    // Erst den Mount-Fokus abwarten, dann tippen. Käme der Fokus dazwischen,
-    // spränge der Cursor mitten im Wortlaut ins erste Feld — genau der Fehler,
-    // den dieser Fall in der vollen Suite einmal aufgedeckt hat.
+    // Erst den Mount-Fokus abwarten, dann tippen — sonst spränge der Cursor mitten im Wortlaut ins
+    // erste Feld.
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Ort')));
     await nutzer.type(screen.getByLabelText('Notiz'), 'Zeile 1{Enter}Zeile 2');
 
@@ -223,11 +220,10 @@ describe('ErfassungsFormular — Serienmodus', () => {
   });
 
   it('eine gescheiterte Prüfung färbt das nächste reguläre Absenden nicht zum Serienlauf', async () => {
-    // Der zweite Review-Fund: die Serien-Marke wird im Klick gesetzt und nur in
-    // `onFinish` verbraucht. Scheitert die Prüfung, läuft `onFinish` nie — ohne
-    // `onFinishFailed` bliebe die Marke stehen, und der nächste „Erfassen"-Klick
-    // meldete kein `onFertig`. Die Person drückt dann ein zweites Mal und legt den
-    // Datensatz doppelt an; genau diese Folge prüft der letzte Aufruf mit.
+    // Die Serien-Marke wird im Klick gesetzt und nur in `onFinish` verbraucht. Scheitert die
+    // Prüfung, läuft `onFinish` nie; ohne `onFinishFailed` bliebe die Marke stehen, der nächste
+    // „Erfassen"-Klick meldete kein `onFertig`, und ein zweiter Druck legte doppelt an. Diese Folge
+    // prüft der letzte Aufruf mit.
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     const onFertig = vi.fn();
     renderMitProviders(<PflichtHarness onErfassen={onErfassen} onFertig={onFertig} />);
@@ -324,8 +320,7 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
     await nutzer.keyboard('{Control>}{Enter}{/Control}');
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
-    // Der Serienlauf schliesst NICHT — sonst wäre es der Primär-Knopf mit
-    // Umweg über die Tastatur.
+    // Der Serienlauf schließt NICHT — sonst wäre es der Primär-Knopf mit Umweg über die Tastatur.
     expect(onFertig).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
   });
@@ -436,9 +431,9 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
   });
 
   it('sendet bei gehaltener Taste nicht doppelt', async () => {
-    // Die Zusage bleibt offen, bis der Test sie einlöst — genau das Fenster, in
-    // dem eine Tastenwiederholung ein zweites Mal absenden würde. Der Knopf ist
-    // in diesem Fenster `loading` und damit klicktaub; die Tastatur ist es nicht.
+    // Die Zusage bleibt offen, bis der Test sie einlöst — das Fenster, in dem eine
+    // Tastenwiederholung ein zweites Mal absenden würde. Der Knopf ist dann `loading`, die Tastatur
+    // nicht.
     let einloesen: () => void = () => {};
     const onErfassen = vi.fn(
       () =>
@@ -460,10 +455,8 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
   });
 
   it('zeigt das Kürzel, ohne den zugänglichen Namen des Knopfes zu verändern', () => {
-    // Der sichtbare Zusatz steht `aria-hidden` IM Knopf. Wäre er es nicht, hiesse der
-    // Knopf „Speichern und nächste Strg + ↵" — und die rund zehn Aufrufstellen, die ihn
-    // über genau diesen Namen suchen, fänden ihn nicht mehr. `toHaveAccessibleName`
-    // prüft exakt und ist damit strenger als die `getByRole`-Abfrage, die ihn findet.
+    // Der sichtbare Zusatz steht `aria-hidden` IM Knopf; sonst hieße er „Speichern und nächste
+    // Strg + ↵", und die Aufrufstellen fänden ihn nicht mehr. `toHaveAccessibleName` prüft exakt.
     renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} serie />);
     const knopf = screen.getByRole('button', { name: 'Speichern und nächste' });
     expect(knopf).toHaveAccessibleName('Speichern und nächste');
@@ -472,8 +465,7 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
   });
 
   it('beschriftet das Kürzel nach der Plattform', () => {
-    // jsdom ist kein Mac, deshalb über die reine Funktion — sonst bliebe der Zweig,
-    // den der Nutzer auf dem Mac tatsächlich sieht, ungeprüft.
+    // jsdom ist kein Mac, deshalb über die reine Funktion.
     expect(serienKuerzel('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')).toBe('⌘ ↵');
     expect(serienKuerzel('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('Strg + ↵');
   });
@@ -674,8 +666,8 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
   });
 
   it('lässt den Wortlaut stehen, wenn das Speichern abgelehnt wird', async () => {
-    // Der teuerste Einzelfehler der Bestandsmasken: dort läuft `resetFields()`
-    // synchron neben `mutate()`, der Text ist also auch bei einem 422 weg.
+    // `resetFields()` synchron neben `mutate()` kostete bei einem 422 den Wortlaut; die Hülle lässt
+    // die Felder stehen, wenn die Zusage bricht.
     const onErfassen = vi.fn().mockRejectedValue(new Error('abgelehnt'));
     const onFertig = vi.fn();
     renderMitProviders(<Harness onErfassen={onErfassen} onFertig={onFertig} />);
@@ -762,11 +754,9 @@ describe('ErfassungsModal', () => {
   });
 
   it('leert die Felder auch über Escape und das Schliesskreuz, nicht nur über den Knopf', async () => {
-    // Der Fehler, den der Review gefunden hat: `onCancel` roh durchgereicht deckte
-    // nur den Abbrechen-KNOPF ab. `destroyOnHidden` rettet das nicht — es hängt die
-    // Kinder ab, aber der Speicher von rc-field-form überlebt und gewinnt beim
-    // nächsten Öffnen gegen `initialValues`. Beide Wege einzeln, weil sie im Modal
-    // an verschiedenen Stellen hängen.
+    // `onCancel` roh durchgereicht deckte nur den Abbrechen-KNOPF. `destroyOnHidden` rettet das
+    // nicht: der Speicher von rc-field-form überlebt und gewinnt beim nächsten Öffnen gegen
+    // `initialValues`. Beide Wege einzeln, weil sie im Modal an verschiedenen Stellen hängen.
     for (const weg of ['escape', 'kreuz'] as const) {
       const { unmount } = renderMitProviders(
         <ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />,
@@ -850,8 +840,8 @@ describe('ErfassungsModal', () => {
   });
 
   it('trägt keine eigene antd-Fusszeile — der Absende-Knopf liegt im Formular', () => {
-    // Zusicherung 1: läge der Knopf in `footer`, stünde er als DOM-Geschwister
-    // ausserhalb des `<form>` und Enter wäre wieder tot.
+    // Zusicherung 1: läge der Knopf in `footer`, stünde er außerhalb des `<form>`, und Enter wäre
+    // tot.
     const { container } = renderMitProviders(
       <ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />,
     );

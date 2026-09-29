@@ -3,12 +3,13 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
-import { server } from '../../test/server';
+import { meHandler, server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { einsatzKeys } from '../../api/queryKeys';
-import { AuthProvider } from '../../auth/AuthContext';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../../offline/queue';
 import AufnahmePage from './AufnahmePage';
+import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
+import { FakeEventSource } from '../../test/eventSource';
 
 /**
  * Vollseiten-Aufnahme. Die Maske selbst prüft `personen/AufnahmeFelder.test.tsx`; hier geht es um
@@ -20,18 +21,6 @@ function merkeRequest({ request }: { request: Request }) {
   if (request.method === 'POST') schreibrequests.push(new URL(request.url).pathname);
 }
 
-class FakeEventSource {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {
-    this.closed = true;
-  }
-}
 beforeEach(async () => {
   vi.stubGlobal('EventSource', FakeEventSource);
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
@@ -45,36 +34,9 @@ afterEach(() => {
   server.events.removeListener('request:start', merkeRequest);
 });
 
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  benutzername: 'nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-27 10:00:00',
-};
-const einsatzAktiv = {
-  id: 1,
-  bezeichnung: 'Hochwasser',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '2026-05-27 08:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '2026-05-27 08:00:00',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-};
-const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
+const nutzer = benutzerFixture();
+const einsatzAktiv = einsatzFixture();
+const einsatzBeobachter = einsatzFixture({ meine_rolle: 'beobachter' });
 
 const angelegt = {
   id: 10,
@@ -123,13 +85,13 @@ function render(
   route = '/einsaetze/1/personen/aufnahme',
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
   );
   if (extra.length > 0) server.use(...extra);
   return renderMitProviders(
-    <AuthProvider>
+    <>
       <LocationProbe />
       <Routes>
         <Route path="/einsaetze/:id/personen" element={<div>PERSONENLISTE</div>} />
@@ -137,7 +99,7 @@ function render(
         {/* Rückweg des UHS-Auftrags — Marker statt echter UhsDetailPage. */}
         <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<div>UHS-DETAIL</div>} />
       </Routes>
-    </AuthProvider>,
+    </>,
     { route },
   );
 }

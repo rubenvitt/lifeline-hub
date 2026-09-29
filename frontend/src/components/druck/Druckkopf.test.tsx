@@ -1,30 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { server } from '../../test/server';
+import { meHandler, server } from '../../test/server';
 import { neuerQueryClient, renderMitProviders } from '../../test/utils';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../../api/queryKeys';
 import Druckkopf from './Druckkopf';
+import { adminFixture } from '../../test/fixtures';
 
 /**
  * Der gemeinsame Druckkopf (LFH-22, design.md D2). Er macht ein Blatt ohne Bildschirm
  * zuordenbar: Organisation, Dokument, Einsatz, Stand/Auswahl, druckende Person, Druckzeitpunkt.
  */
 
-const BENUTZER = {
-  id: 1,
-  anzeigename: 'Erika Einsatzleiterin',
-  benutzername: 'erika',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const BENUTZER = adminFixture({ anzeigename: 'Erika Einsatzleiterin' });
 
 function mitOrganisation(name = 'DRK Kreisverband Musterstadt') {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(BENUTZER)),
+    meHandler(BENUTZER),
     http.get('/api/organisation', () => HttpResponse.json({ id: 1, name, tz_organisation: null })),
   );
 }
@@ -60,8 +53,7 @@ describe('Druckkopf', () => {
     expect(k.getByText('Hochwasser Nord (E-2026-0007)')).toBeInTheDocument();
     expect(k.getByText('freigegeben, Version 2')).toBeInTheDocument();
     expect(k.getByText('Abschnitt: Nord')).toBeInTheDocument();
-    // Die Person ist die DRUCKENDE (Spec „Gemeinsamer Druckkopf"), nicht die Urheberin des
-    // Dokuments — „Erstellt von" läse sich auf Befehl und Lagebericht als Urheberschaft.
+    // Die DRUCKENDE Person, nicht die Urheberin — „Erstellt von" läse sich als Urheberschaft.
     const person = await k.findByText('Erika Einsatzleiterin');
     expect(person.previousElementSibling).toHaveTextContent(/^Gedruckt von$/);
     expect(k.getByText('Gedruckt am')).toBeInTheDocument();
@@ -117,9 +109,9 @@ describe('Druckkopf', () => {
 
   /**
    * Zwischen Öffnen der Seite und Strg+P können Stunden liegen: `beforeprint` erneuert den
-   * Druckzeitpunkt. Geprüft SYNCHRON direkt nach dem Ereignis und OHNE `act`/`fireEvent` —
-   * der Browser friert das Druckbild unmittelbar nach den Listenern ein. Ohne `flushSync`
-   * im Listener stünde das Update hier noch aus (Mutationsprobe).
+   * Druckzeitpunkt. Geprüft SYNCHRON direkt nach dem Ereignis und OHNE `act`/`fireEvent` — der
+   * Browser friert das Druckbild unmittelbar nach den Listenern ein. Ohne `flushSync` im Listener
+   * stünde das Update hier noch aus.
    */
   it('erneuert den Druckzeitpunkt bei beforeprint, synchron vor dem Druckbild', async () => {
     mitOrganisation();

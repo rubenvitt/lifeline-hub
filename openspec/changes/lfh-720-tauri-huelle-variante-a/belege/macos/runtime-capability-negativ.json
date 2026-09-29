@@ -1,0 +1,4 @@
+{
+  "ergebnis": "diag_melden not allowed on window \"main\", webview \"main\", URL: https://localhost:8443/login\n\nallowed on: [windows: \"main\", URL: local], [windows: \"main\", URL: local], [windows: \"main\", URL: https://elw.local:8443/*]\n\nreferenced by: capability: erststart, permission: allow-diag-melden || capability: remote-elw.local, permission: allow-diag-melden || capability: remote-elw.local, permission: allow-diag-melden",
+  "name": "neg1"
+}

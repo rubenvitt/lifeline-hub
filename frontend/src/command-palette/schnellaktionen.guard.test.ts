@@ -1,4 +1,3 @@
-// frontend/src/command-palette/schnellaktionen.guard.test.ts
 import { describe, expect, it } from 'vitest';
 import * as ts from 'typescript';
 import { SCHNELLAKTIONEN } from './befehle';
@@ -6,54 +5,27 @@ import { modulRegistry, modulZielRoute } from '../einsatz/modulRegistry';
 import { einsatzModulPfad } from '../routing/deeplinks';
 
 /**
- * Guard (LFH-391 · A1): die Schnellaktionen der Kommandopalette zeigen auf Seiten, die
- * `?neu=1` auch WIRKLICH lesen — und auf ein fertiges Modul der Registry.
+ * Guard: die Schnellaktionen der Kommandopalette zeigen auf ein fertiges Modul der Registry und
+ * auf Seiten, die `?neu=1` WIRKLICH lesen. Eine Schnellaktion ins Leere macht keinen Test rot:
+ * die Zielseite ignoriert den Parameter, und die Person steht auf einer Liste statt in der
+ * Erfassung.
  *
- * Warum überhaupt ein Guard: eine Schnellaktion, die ins Leere läuft, macht keinen Test rot
- * und wirft keinen Fehler. Sie navigiert, die Zielseite ignoriert den Parameter, und die
- * Person steht auf einer Liste statt in der Erfassung. Genau das war einmal live — die
- * Unfallhilfsstellen liegen unter `/unfallhilfsstellen/liste`, der bare Modulpfad zeigt auf
- * `UnfallhilfsstellenDefault` (LFH-331 · B3, siehe Doc an der Tabelle in `befehle.ts`).
+ * Erkennung per TS-AST (Muster `api/queryKeyScan.ts`): ein Grep auf `neu=1` träfe auch Kommentare
+ * und Builder. Die Deckung ist eine ZUORDNUNG, kein Zählvergleich: je Eintrag muss es einen Leser
+ * SEINES Trägermoduls geben, zugeordnet über den DATEINAMEN (`PersonenPage.tsx` → `personen`,
+ * gegen Schlüssel und Route des Registry-Eintrags).
  *
- * ERKENNUNG: TS-AST, nicht Regex (Muster `api/queryKeyScan.ts`). Gemessen: ein naives Grep
- * auf `neu=1` über die Nicht-Test-Quellen liefert ACHT Dateien mit VIER Fehlalarmen aus
- * Kommentaren und Buildern (`pages/LagekartePage.tsx`, `pages/schaeden/SchadenErfassenModal.tsx`,
- * `command-palette/befehle.ts`, `routing/deeplinks.ts`); das AST-Prädikat findet exakt die vier
- * Leser. Kommentare sind strukturell keine Knoten, der Quote-Stil ist egal, und ein Aufruf über
- * mehrere Zeilen bleibt sichtbar.
+ * ── WAS DIESER GUARD NICHT SIEHT ──
  *
- * DIE DECKUNGSAUSSAGE IST EINE ZUORDNUNG, KEIN ZÄHLVERGLEICH. „vier Einträge, vier Leser"
- * wäre zu schwach: eine fünfte Schnellaktion auf ein Modul ganz ohne Leser bliebe grün,
- * sobald irgendeine unbeteiligte Datei ein `searchParams.get('neu')` bekommt. Geprüft wird
- * deshalb je Eintrag, dass es einen Leser SEINES Trägermoduls gibt. Die Zuordnung
- * Leser-Datei → Modul läuft über den DATEINAMEN (`PersonenPage.tsx` → `personen`, verglichen
- * gegen Schlüssel und Route des Registry-Eintrags), nicht über die Routenauflösung.
- *
- * ─────────────────────────────────────────────────────────────────────────────────────────
- * WAS DIESER GUARD NICHT SIEHT — bewusste Grenzen, damit die nächste Session nicht raten muss:
- *
- *  1. ER LÖST KEINE ROUTEN AUF. Dass die Datei mit dem Leser tatsächlich unter dem Zielpfad
- *     hängt, ist NICHT geprüft — die UHS-Divergenz `/unfallhilfsstellen/liste` trägt weiterhin
- *     allein der Literal-Pin in `befehle.test.ts` („baut die Schnellaktions-Ziele über die
- *     Deeplink-Registry"). Die Auflösung über `App.tsx` wäre machbar, kostete aber einen
- *     zweiten Scanner samt eigenem Selbstbeweis; sie gehört in die Etappe, die eine fünfte
- *     Zeile tatsächlich anlegt.
- *  2. INDIREKTION — und die ist keine blosse Lücke, sondern eine FALLE. Erfasst wird
- *     `X.get('neu')` / `X.has('neu')` mit dem Schlüssel als LITERAL. Zieht jemand ihn in
- *     eine Konstante (`const NEU = 'neu'; …get(NEU)`) oder hinter einen Helfer
- *     (`useQueryParamSelektion('neu', …)`), verschwindet der Leser nicht still — der Guard
- *     wird ROT und meldet „KEINE Seite dieses Moduls liest ?neu=1", obwohl sie es tut.
- *     Der Deeplink funktioniert dabei unverändert; gemessen an `PersonenPage`.
- *     Der Guard erzwingt damit implizit ein Literal im Produktivcode. Das ist der Preis
- *     dafür, ohne Routenauflösung auszukommen — wer es ändern will, ändert den Scanner,
- *     nicht die Seite: eine Änderung, die den Deeplink nicht anfasst, darf kein Gate brechen.
- *  3. OB DER GEFUNDENE LESER DEN PARAMETER VERWERTET. Ein toter Zweig zählt mit.
- *  4. TESTDATEIEN werden gar nicht gescannt — ein Leser in einer `.test.tsx` ist per
- *     Konstruktion unsichtbar, nicht bloß erlaubt.
- *  5. DIE ZUORDNUNG HÄNGT AM DATEINAMEN. Ein Leser in einer Datei, deren Name keinen
- *     Registry-Eintrag trifft, ist keinem Modul zuordenbar — der Guard meldet das (statt ihn
- *     still zu schlucken), aber er kann die Zugehörigkeit nicht selbst herstellen.
- * ─────────────────────────────────────────────────────────────────────────────────────────
+ *  1. ER LÖST KEINE ROUTEN AUF. Dass die Datei mit dem Leser unter dem Zielpfad hängt, trägt der
+ *     Literal-Pin in `befehle.test.ts` (UHS-Listenroute).
+ *  2. INDIREKTION, und das ist eine FALLE: erfasst wird `X.get('neu')` / `X.has('neu')` mit dem
+ *     Schlüssel als LITERAL. Hinter einer Konstante oder einem Helfer wird der Guard ROT, obwohl
+ *     der Deeplink funktioniert. Wer das ändern will, ändert den Scanner, nicht die Seite.
+ *  3. OB DER LESER DEN PARAMETER VERWERTET; ein toter Zweig zählt mit.
+ *  4. TESTDATEIEN werden gar nicht gescannt.
+ *  5. DIE ZUORDNUNG HÄNGT AM DATEINAMEN; ein Leser ohne passenden Registry-Eintrag wird gemeldet,
+ *     nicht zugeordnet.
  */
 
 /** Eine Fundstelle `X.get('neu')` / `X.has('neu')`. */
@@ -64,13 +36,10 @@ interface NeuLeser {
 }
 
 /**
- * Findet die Stellen, an denen ein Suchparameter namens `neu` gelesen wird.
- *
- * Prädikat: CallExpression, deren Callee ein PropertyAccess auf `get`/`has` ist und deren
- * erstes Argument das String-Literal `'neu'` ist. Bewusst OHNE Typprüfung des Empfängers —
- * ein `useSearchParams()`-Destructuring aufzulösen bräuchte das Typprogramm; der Preis wäre
- * eine Analyse, deren Fehlerfälle niemand mehr überblickt. Der Selbstbeweis unten misst,
- * was das Prädikat trennt.
+ * Findet die Stellen, an denen ein Suchparameter namens `neu` gelesen wird: CallExpression mit
+ * PropertyAccess auf `get`/`has` und dem String-Literal `'neu'` als erstem Argument. Ohne
+ * Typprüfung des Empfängers (das bräuchte das Typprogramm); der Selbstbeweis unten misst, was das
+ * Prädikat trennt.
  */
 export function findeNeuLeser(pfad: string, quelltext: string): NeuLeser[] {
   const quelle = ts.createSourceFile(
@@ -103,15 +72,14 @@ export function findeNeuLeser(pfad: string, quelltext: string): NeuLeser[] {
   return funde;
 }
 
-// Alle Quelldateien als Rohtext (Vite). Das Glob bleibt HIER im Guard und nicht in einer
-// Produktivdatei — sonst landete der komplette Quelltext des Frontends im App-Bundle.
+// Das Glob bleibt HIER im Guard, sonst landete der Quelltext des Frontends im App-Bundle.
 const dateien = import.meta.glob('/src/**/*.{ts,tsx}', {
   query: '?raw',
   import: 'default',
   eager: true,
 }) as Record<string, string>;
 
-/** `.typetest.ts` zählt mit: es endet NICHT auf `.test.ts` (vor „test" steht ein „e"). */
+/** `.typetest.ts` zählt mit: es endet NICHT auf `.test.ts`. */
 const istTestdatei = (pfad: string): boolean => /\.(type)?test\.tsx?$/.test(pfad);
 
 const LESER: NeuLeser[] = Object.entries(dateien)
@@ -122,11 +90,9 @@ const LESER: NeuLeser[] = Object.entries(dateien)
 const normal = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /**
- * Modulschlüssel zu einer Leser-Datei über ihren Dateinamen.
- *
- * `pages/PersonenPage.tsx` → `personenpage` → ohne Endsilbe `personen` → Registry-Eintrag
- * `personen`. Verglichen wird gegen Schlüssel UND Route, weil beide auseinanderfallen können
- * (`gefahrenzonen` hat die Route `gefahren`, und `GefahrenPage.tsx` folgt der Route).
+ * Modulschlüssel zu einer Leser-Datei über ihren Dateinamen (`pages/PersonenPage.tsx` →
+ * `personen`). Verglichen gegen Schlüssel UND Route, weil beide auseinanderfallen können
+ * (`gefahrenzonen` hat die Route `gefahren`).
  */
 export function modulZuLeserDatei(pfad: string): string[] {
   const basis = normal((pfad.split('/').pop() ?? '').replace(/\.tsx?$/, '')).replace(/page$/, '');
@@ -146,10 +112,8 @@ for (const l of LESER) {
 const zeige = (l: NeuLeser): string => `${l.pfad}:${l.zeile}`;
 
 /**
- * LEERLAUF-SCHUTZ. Die Deckungsaussage unten hat die Form „für jeden Eintrag existiert ein
- * Leser". Über einer leeren Tabelle wäre sie trivial wahr, über einer leeren Fundmenge
- * dagegen trivial falsch — der teure Fall ist ein kaputtes Glob mit gleichzeitig leerer
- * Tabelle. Beide Enden werden deshalb hier festgenagelt.
+ * LEERLAUF-SCHUTZ: über einer leeren Tabelle wäre die Deckung trivial wahr, über einer leeren
+ * Fundmenge trivial falsch; beide Enden werden festgenagelt.
  */
 describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
   it('scannt die Quellen und findet Leser', () => {
@@ -165,9 +129,8 @@ describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
   });
 
   /**
-   * SELBSTBEWEIS. Ein Guard, der nur per Konstruktion grün ist, sagt nichts aus — und die
-   * Trennschärfe gegen den Kommentarfall ist der ganze Grund für den AST: genau daran
-   * scheitert das naive Regex (gemessen 8 Dateien statt 4).
+   * SELBSTBEWEIS: die Trennschärfe gegen Kommentar, Text und fremden Schlüssel ist der Grund für
+   * den AST.
    */
   it('findet den echten Aufruf und NICHT Kommentar, Text oder fremden Schlüssel', () => {
     const quelle = `
@@ -191,8 +154,8 @@ describe('Schnellaktionen-Guard: Trägermodul', () => {
         m,
         `Schnellaktion „${a.label}" nennt das unbekannte Modul '${a.modulKey}'`,
       ).toBeDefined();
-      // Spiegel des Freigabefilters in `baueBefehle`: ein unfertiges Trägermodul liefert dort
-      // ohnehin keine Schnellaktion, die Zeile wäre also tote Tabelle.
+      // Spiegel des Freigabefilters in `baueBefehle`: ein unfertiges Trägermodul liefert dort keine
+      // Schnellaktion.
       expect(
         m!.status,
         `Trägermodul '${a.modulKey}' ist nicht 'fertig' — die Zeile kann nie erscheinen`,
@@ -213,9 +176,7 @@ describe('Schnellaktionen-Guard: Ziel', () => {
         pfadTeil === basis || pfadTeil.startsWith(`${basis}/`),
         `„${a.label}" zeigt auf ${ziel}, liegt aber nicht unter dem Modulpfad ${basis}`,
       ).toBe(true);
-      // Über `URLSearchParams` statt per String-Vergleich: `?q=x&neu=1` und `?neu=1` sind
-      // dieselbe Aussage, ein `endsWith('neu=1')` wäre an der Parameterreihenfolge hängen
-      // geblieben.
+      // Über `URLSearchParams`, damit die Parameterreihenfolge keine Rolle spielt.
       expect(new URLSearchParams(query).get('neu'), `„${a.label}" (${ziel}) trägt kein neu=1`).toBe(
         '1',
       );
@@ -224,9 +185,7 @@ describe('Schnellaktionen-Guard: Ziel', () => {
 });
 
 describe('Schnellaktionen-Guard: Deckung', () => {
-  /**
-   * DIE tragende Aussage. Sie ist eine ZUORDNUNG, kein Zählvergleich — siehe Kopfkommentar.
-   */
+  /** DIE tragende Aussage, eine ZUORDNUNG (siehe Kopfkommentar). */
   it('hat je Eintrag eine Seite seines Trägermoduls, die ?neu=1 wirklich liest', () => {
     for (const a of SCHNELLAKTIONEN) {
       expect(
@@ -239,11 +198,9 @@ describe('Schnellaktionen-Guard: Deckung', () => {
   });
 
   /**
-   * Gegenstück zur Zuordnung: sie hängt am Dateinamen, und eine Namensdrift machte die
-   * Aussage oben still schwächer (ein Leser zählte dann für gar kein Modul mehr). Die
-   * UMKEHRUNG „jeder Leser gehört zu einer Schnellaktion" wird bewusst NICHT behauptet — eine
-   * Seite darf `?neu=1` lesen, ohne dass die Palette dafür eine Zeile führt (LFH-506 legt
-   * genau solche Leser an, bevor die Zeilen dazukommen).
+   * Gegenstück: eine Namensdrift schwächte die Zuordnung oben still. Die Umkehrung „jeder Leser
+   * gehört zu einer Schnellaktion“ gilt bewusst NICHT: eine Seite darf `?neu=1` lesen, ohne dass
+   * die Palette eine Zeile führt.
    */
   it('ordnet jeden gefundenen Leser einem Registry-Modul zu', () => {
     const verwaist = LESER.filter((l) => modulZuLeserDatei(l.pfad).length === 0);

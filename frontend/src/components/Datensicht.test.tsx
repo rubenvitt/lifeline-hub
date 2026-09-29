@@ -38,11 +38,9 @@ function renderMitProviders(
 /**
  * Prüfungen des Datensicht-Primitivs (LFH-330 · B2).
  *
- * Die reinen Funktionen werden DIREKT gerufen, ohne Rendern — dieselbe Bauform, die
- * `useViewport.guard.test.ts` mit seinem exportierten `verstoesse()` vorgibt. Für
- * `pruefeKartenplan` ist das nicht bloß bequem: über einen `console.warn`-Spion müsste man
- * die eigenen Meldungen gegen antds Fremdwarnungen abgrenzen, und jede neue
- * Bibliothekswarnung machte den Test flatterhaft.
+ * Die reinen Funktionen werden direkt gerufen, ohne Rendern. Für `pruefeKartenplan` heißt das:
+ * kein `console.warn`-Spion, der die eigenen Meldungen gegen antds Fremdwarnungen abgrenzen
+ * müsste.
  */
 
 interface Fahrzeug {
@@ -117,16 +115,9 @@ const OHNE_FILTER = {} as Readonly<Record<string, readonly string[]>>;
 describe('zelle()', () => {
   it('packt eine RenderedCell auf children aus, ein React-Element aber NICHT', () => {
     /**
-     * Antds `render` darf `{ props, children }` liefern (`@rc-component/table`
-     * `interface.d.ts`, `RenderedCell`). React-Elemente tragen ebenfalls `props`.
-     *
-     * GEMESSEN, und es korrigiert die Formulierung der Entscheidung: die Reihenfolge
-     * `isValidElement` vor `'children' in x` ist NICHT die trennende Eigenschaft — ein
-     * React-Element hat gar kein `children` auf oberster Ebene (nur `props.children`),
-     * beide Reihenfolgen verhalten sich gleich. Die Falle ist die ANDERE Erkennungsmarke:
-     * wer die Zellbeschreibung an `'props' in x` erkennt, packt jedes `<Space>` aus und
-     * liefert `undefined` — die Kartenzelle bleibt leer. Genau dagegen greift dieser Fall
-     * (per Mutationsprobe belegt); `isValidElement` steht zuerst als zweite Sicherung.
+     * Antds `render` darf `{ props, children }` liefern (`RenderedCell`). React-Elemente tragen
+     * ebenfalls `props`: wer die Zellbeschreibung an `'props' in x` erkennt, packt jedes `<Space>`
+     * aus und liefert `undefined`, die Kartenzelle bliebe leer. Dagegen greift dieser Fall.
      */
     const alsZelle: DatensichtSpalte<Fahrzeug> = {
       key: 'x',
@@ -178,8 +169,8 @@ describe('etikettVon()', () => {
   });
 
   it('ein Funktions-title ohne etikett ergibt undefined und genau eine DEV-Warnung', () => {
-    // antds `title` ist `ReactNode | ((props) => ReactNode)` — ohne diesen Fall wäre die
-    // Funktionsvariante unabgedeckt und `etikettVon` gäbe still ein Objekt als „Text".
+    // antds `title` kann eine Funktion sein; ohne diesen Fall gäbe `etikettVon` still ein Objekt
+    // als „Text".
     const spion = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(etikettVon({ key: 'a', title: () => <b>Funkrufname</b> })).toBeUndefined();
     expect(spion.mock.calls.filter((c) => String(c[0]).includes('[Spaltenschalter]'))).toHaveLength(
@@ -200,10 +191,9 @@ describe('effektiveDaten()', () => {
 
   it('gibt im Baummodus die Rohdaten REFERENZGLEICH zurück', () => {
     /**
-     * `toBe`, nicht `toEqual`: nur Referenzgleichheit belegt, dass gar nicht angefasst
-     * wurde. Die Aggregate der Meldebild-Elternzeilen sind stromaufwärts über die
-     * VOLLMENGE kumuliert (`kraefte/kraeftebild.ts`) — fiele hier eine Zeile weg, behielten
-     * die Eltern Zahlen über nicht mehr sichtbare Kinder und lögen still.
+     * `toBe`, nicht `toEqual`: nur Referenzgleichheit belegt, dass nichts angefasst wurde. Die
+     * Aggregate der Meldebild-Elternzeilen sind über die VOLLMENGE kumuliert
+     * (`kraefte/kraeftebild.ts`); fiele hier eine Zeile weg, lögen die Eltern still.
      */
     const ergebnis = effektiveDaten({
       daten,
@@ -241,9 +231,8 @@ describe('effektiveDaten()', () => {
 
   it('Zahlen im Text sortieren nach ihrem WERT: Florian 2 vor Florian 10', () => {
     /**
-     * Der Funkrufname ist die menschenlesbare Kennung der Bedien-Leitlinie und die
-     * Standardsortierung der Fahrzeug- und Personalliste. Ein reiner Zeichenvergleich legt
-     * dort „Florian 10" vor „Florian 2" — im Einsatz die falsche Zeile unter dem Finger.
+     * Ein reiner Zeichenvergleich legt „Florian 10" vor „Florian 2" — im Einsatz die falsche Zeile
+     * unter dem Finger.
      */
     const flotte = [F(1, 'Florian 10'), F(2, 'Florian 2'), F(3, 'Florian 1')];
     const auf = effektiveDaten({
@@ -268,8 +257,7 @@ describe('effektiveDaten()', () => {
   });
 
   it('null und undefined landen HINTEN — in BEIDEN Richtungen', () => {
-    // Ohne diese Zusicherung sortiert `undefined` je nach Vergleichsfunktion irgendwohin,
-    // und „kein Wert" wandert bei einem Richtungswechsel an den Anfang der Liste.
+    // Sonst wanderte „kein Wert" bei einem Richtungswechsel an den Anfang der Liste.
     const mitLuecken = [
       F(1, 'A', { besatzung: 6 }),
       F(2, 'B', { besatzung: null }),
@@ -309,8 +297,8 @@ describe('effektiveDaten()', () => {
   });
 
   it('die Gruppenachse ist die FÜHRENDE Sortierachse', () => {
-    // Sonst lägen die Gruppen nicht zusammenhängend, und der Tabellenzweig — der keine
-    // synthetischen Gruppenzeilen bekommt — zeigte eine Gruppierung, die man nicht sieht.
+    // Sonst lägen die Gruppen nicht zusammenhängend, und der Tabellenzweig (ohne Gruppenzeilen)
+    // zeigte eine Gruppierung, die man nicht sieht.
     const ergebnis = effektiveDaten({
       daten,
       spalten,
@@ -328,8 +316,7 @@ describe('effektiveDaten()', () => {
   });
 
   it('die Suche trifft NUR Spalten mit suchText', () => {
-    // `traeger` hat keinen `suchText`. Ohne diesen Fall wäre „Freitextsuche über alle
-    // Spalten mit suchText" eine Behauptung statt einer Zusicherung.
+    // `traeger` hat keinen `suchText`: belegt „Freitextsuche nur über Spalten mit suchText".
     const nachTyp = effektiveDaten({
       daten,
       spalten,
@@ -405,8 +392,7 @@ describe('gruppiere()', () => {
   });
 
   it('eine leere Gruppe aus der Reihenfolge erscheint NICHT', () => {
-    // `'THW'` steht in der Reihenfolge, hat aber keine Zeile. Ein leerer Gruppenkopf mit
-    // „· 0" wäre Rauschen und würde die Zählerstreifen der Werkzeugzeile aufblähen.
+    // `'THW'` steht in der Reihenfolge, hat aber keine Zeile: kein leerer Gruppenkopf „· 0".
     expect(gruppiere(daten, achse).map((g) => g.wert)).not.toContain('THW');
   });
 });
@@ -416,10 +402,9 @@ describe('sichtbareSpalten()', () => {
 
   it('Index 0 ist NIE entfernbar — nicht per Hand, nicht per Breite, nicht per beides', () => {
     /**
-     * `KatalogTabelle` fixiert, was als Spalte 0 ANKOMMT, nicht eine benannte. Fällt Spalte
-     * 0 weg, wird still eine ANDERE Spalte die fixierte Kennung: kein Fehler, kein roter
-     * Test, nur eine falsche Fixierung. `immerSichtbar` allein genügt dafür nicht — es ist
-     * ein Flag, das jemand vergisst. Die Invariante gehört hierher.
+     * `KatalogTabelle` fixiert, was als Spalte 0 ankommt. Fällt Spalte 0 weg, wird still eine
+     * ANDERE Spalte die fixierte Kennung. `immerSichtbar` allein ist ein Flag, das man vergisst;
+     * die Invariante gehört hierher.
      */
     const perHand = sichtbareSpalten({
       spalten,
@@ -444,9 +429,8 @@ describe('sichtbareSpalten()', () => {
 
   it('zählt Handauswahl UND abBreite in EINEM Zähler', () => {
     /**
-     * Ein Zähler, der „0 ausgeblendet" meldet, während zwei Spalten fehlen, verfehlt genau
-     * das Kriterium (14), für das er existiert. Deshalb sind antds `responsive` und `hidden`
-     * am Spaltentyp amputiert — sie verbärgen Spalten, die dieser Zähler nicht kennt.
+     * Ein Zähler, der „0 ausgeblendet" meldet, während zwei Spalten fehlen, verfehlt Kriterium 14.
+     * Deshalb sind antds `responsive` und `hidden` am Spaltentyp gesperrt.
      */
     const ergebnis = sichtbareSpalten({
       spalten,
@@ -491,9 +475,8 @@ describe('pruefeKartenplan()', () => {
   });
 
   it('meldet einen Titel-Slot ohne Spalte', () => {
-    // Das ist der Fang für das `const K`-Widening, das der Typ NICHT schließt: wer die
-    // Spaltenliste als `readonly DatensichtSpalte<Fahrzeug>[]` annotiert statt sie durch
-    // `spaltenFuer` zu führen, weitet K auf `string` und der Plan nimmt jeden Tippfehler an.
+    // Fängt das `const K`-Widening, das der Typ NICHT schließt: eine als
+    // `readonly DatensichtSpalte<Fahrzeug>[]` annotierte Spaltenliste weitet K auf `string`.
     const befunde = pruefeKartenplan(
       { spalten, karte: { ...karte, titel: { spalte: 'funkrufnaem' as FahrzeugKey } } },
       'Fahrzeuge',
@@ -517,8 +500,7 @@ describe('pruefeKartenplan()', () => {
   });
 
   it('meldet eine sekundaer-Spalte ohne Etikett', () => {
-    // Ohne Etikett hätte das Kartenfeld keine Beschriftung — die Karte zeigte einen Wert
-    // ohne Bedeutung. Nur die Sekundärfelder brauchen es, der Titel steht für sich.
+    // Ohne Etikett zeigte die Karte einen Wert ohne Bedeutung. Nur Sekundärfelder brauchen es.
     const spion = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const ohneEtikett = spaltenFuer<Fahrzeug>()([
       { key: 'funkrufname', title: 'Funkrufname', dataIndex: 'funkrufname' },
@@ -594,10 +576,8 @@ describe('pruefeKartenplan()', () => {
   });
 
   /**
-   * Seit LFH-338 · C3 klappt im Baummodus die ganze Zeile auf. Damit ist der Zeilenklick
-   * belegt — ein zusätzliches `onZeileKlick` wäre eine zweite Wirkung auf demselben Klick,
-   * und welche einträte, hinge an der Reihenfolge im DOM. Ein solcher Widerspruch gehört
-   * gemeldet, nicht ausprobiert.
+   * Im Baummodus klappt die ganze Zeile auf (LFH-338 · C3). Ein zusätzliches `onZeileKlick` wäre
+   * eine zweite Wirkung auf demselben Klick und wird gemeldet.
    */
   it('meldet baum zusammen mit onZeileKlick', () => {
     const baum = { kinder: 'kinder' as never, aufgeklappt: [], onAufgeklappt: () => {} };
@@ -610,8 +590,7 @@ describe('pruefeKartenplan()', () => {
   });
 
   it('meldet eine Spaltengruppe mit sortWert', () => {
-    // Eine Gruppe ist keine Blattspalte; ein `sortWert` daran wäre wirkungslos und die
-    // Sortierauswahl zeigte einen Eintrag, der nichts tut.
+    // Eine Gruppe ist keine Blattspalte; ein `sortWert` daran wäre wirkungslos.
     const gruppe = [
       { key: 'kennung' as FahrzeugKey, title: 'Kennung', dataIndex: 'funkrufname' },
       {
@@ -639,15 +618,12 @@ describe('Konstanten', () => {
 /**
  * Die Typgrenze — gepinnt im TYPECHECK, nicht zur Laufzeit.
  *
- * GEMESSEN und der Grund für `NoInfer<K>` an jeder K-Position außer `spalten`: ohne das
- * wird `K` aus dem Kartenplan MITINFERIERT. Ein Tippfehler weitet `K` dann einfach um sein
- * eigenes Literal (`'reg' | 'name' | 'regg'`), weil `DatensichtSpalte<T, K>` in `K`
- * kovariant ist — und die ganze Literalbewahrung, die `spaltenFuer` und `const K` kosten,
- * wäre wirkungslos. Ein Testlauf hätte das nie gezeigt.
+ * `NoInfer<K>` an jeder K-Position außer `spalten`: ohne das wird `K` aus dem Kartenplan
+ * mitinferiert, ein Tippfehler weitet `K` um sein eigenes Literal, und die Literalbewahrung
+ * wäre wirkungslos.
  *
- * Diese Blöcke fallen NUR über `tsc --noEmit`. Wird `NoInfer` entfernt, greifen die
- * `@ts-expect-error`-Direktiven nicht mehr und TypeScript meldet sie als ungenutzt (TS2578)
- * — das Gate bricht also in beide Richtungen.
+ * Diese Blöcke fallen NUR über `tsc --noEmit`. Ohne `NoInfer` meldet TypeScript die
+ * `@ts-expect-error`-Direktiven als ungenutzt (TS2578) — das Gate bricht in beide Richtungen.
  */
 describe('Typgrenzen (nur tsc)', () => {
   it('Slot-Tippfehler und der vierte Sekundärslot brechen den Typcheck', () => {
@@ -750,9 +726,8 @@ describe('Datensicht · Formachse', () => {
 
   it('bei 1024 px genau EIN Zweig: Tabelle, keine Karte', () => {
     /**
-     * Die Gegenprobe zum Schmal-Fall ist Pflicht, nicht Zierde: ohne sie wäre der
-     * Schmal-Test auch grün, wenn die Weiche bei JEDER Breite in den Kartenzweig kippt.
-     * Die Lehre steht im Repo als Kommentar in `einsatz/EinsatzLayout.test.tsx`.
+     * Die Gegenprobe zum Schmal-Fall ist Pflicht: ohne sie wäre der Schmal-Test auch grün, wenn die
+     * Weiche bei JEDER Breite in den Kartenzweig kippt.
      */
     const { container } = rendere();
     expect(tabellen(container)).toHaveLength(1);
@@ -760,9 +735,8 @@ describe('Datensicht · Formachse', () => {
   });
 
   it('unter md genau EIN Zweig: Karten, keine Tabelle', () => {
-    // `setzeViewportBreite` VOR dem Render: antds Beobachter ruft seinen Zuhörer beim
-    // Abonnieren synchron auf und liest dabei nur `matches`. Und `abBreiteAus` liest
-    // „unbekannt" als BREIT — eine nachträglich gesetzte Breite erreicht ihn nicht mehr.
+    // `setzeViewportBreite` VOR dem Render: antds Beobachter liest `matches` beim Abonnieren, und
+    // `abBreiteAus` liest „unbekannt" als BREIT.
     setzeViewportBreite(390);
     const { container } = rendere();
     expect(tabellen(container)).toHaveLength(0);
@@ -770,8 +744,7 @@ describe('Datensicht · Formachse', () => {
   });
 
   it('form="tabelle" bleibt bei 390 px eine Tabelle', () => {
-    // Das Meldebild der Kräfteübersicht: Prüflisten-Kriterium 14 verbietet dort die
-    // Auflösung in Karten ausdrücklich, das ist kein Ermessen.
+    // Meldebild der Kräfteübersicht: Kriterium 14 verbietet dort die Auflösung in Karten.
     setzeViewportBreite(390);
     const { container } = rendere({ form: 'tabelle' });
     expect(tabellen(container)).toHaveLength(1);
@@ -786,15 +759,11 @@ describe('Datensicht · Formachse', () => {
 
   it('die md-Schwelle sitzt bei 768: 767 px Karten, 768 px Tabelle', () => {
     /**
-     * Das Akzeptanzkriterium nennt `md` — die beiden Zweigtests oben messen aber 390 und
-     * 1024 px, und damit wäre JEDE Schwelle dazwischen grün. Erst dieses Grenzpaar pinnt
-     * die Zahl (antds `screenMD` = 768, `theme/util/alias.js`); gemessen: kippt die Weiche
-     * auf `abBreite('lg')`, wird die 768er Hälfte rot, während 1024 grün bleibt.
+     * Das Grenzpaar pinnt die Schwelle `md` (antds `screenMD` = 768); die Zweigtests oben (390 und
+     * 1024 px) wären bei jeder Schwelle dazwischen grün.
      *
-     * `useViewport` ist bewusst NICHT gemockt: die Breite kommt über den
-     * matchMedia-Stub aus `test/viewport.ts` durch den echten Hook. Ein Mock des Hooks
-     * pinnte die Schwelle im Mock statt im Produktivcode, und eine Regression in
-     * `abBreiteAus` bliebe unsichtbar.
+     * `useViewport` ist bewusst NICHT gemockt: die Breite kommt über den matchMedia-Stub durch den
+     * echten Hook, sonst pinnte der Test die Schwelle im Mock statt im Produktivcode.
      */
     setzeViewportBreite(767);
     const schmal = rendere();
@@ -809,8 +778,7 @@ describe('Datensicht · Formachse', () => {
   });
 
   it('trägt eine ansprechbare Region mit der Bezeichnung', () => {
-    // `<section aria-label>` — ein nacktes `div` mit `aria-label` hat keine Rolle und
-    // `getByRole('region')` griffe dort nicht.
+    // `<section aria-label>`: ein nacktes `div` mit `aria-label` hat keine Rolle.
     rendere();
     expect(screen.getByRole('region', { name: 'Fahrzeuge im Einsatz' })).toBeInTheDocument();
   });
@@ -819,9 +787,8 @@ describe('Datensicht · Formachse', () => {
 describe('Datensicht · Kartenzweig', () => {
   it('die Titelzelle ist in BEIDEN Zweigen ein echter Link', () => {
     /**
-     * `ListenEintrag` ist ein nacktes `<div onClick>` (kein `role`, kein `tabIndex`, kein
-     * `onKeyDown`). Ein Zeilenklick darauf wäre maus-/tippgebunden und für die
-     * Trefflächenmessung unsichtbar — das Tastaturziel der Zeile ist deshalb der Titel-Link.
+     * `ListenEintrag` ist ein nacktes `<div onClick>` ohne Tastaturweg. Das Tastaturziel der Zeile
+     * ist deshalb der Titel-Link.
      */
     setzeViewportBreite(390);
     const schmal = rendere();
@@ -847,8 +814,7 @@ describe('Datensicht · Kartenzweig', () => {
   });
 
   it('genau eine Primäraktion, mit Rückfrage bei gesetzter bestaetigung', async () => {
-    // Die drei Bestands-„Entfernen" hängen an einem `Popconfirm`. Ohne `bestaetigung`
-    // feuerte die Aktion im Kartenzweig ohne Rückfrage — Prüflisten-Kriterium 4.
+    // Ohne `bestaetigung` feuerte die Aktion im Kartenzweig ohne Rückfrage (Kriterium 4).
     setzeViewportBreite(390);
     const onKlick = vi.fn();
     const { container } = rendere({
@@ -908,9 +874,8 @@ describe('Datensicht · Kartenzweig', () => {
   });
 
   it('weitere Aktionen: EIN Menü-Auslöser je Zeile, mit der Zeilenkennung im Namen (LFH-639)', async () => {
-    // Plan-Modus trägt genau EINE Primäraktion; alles Weitere wird gebündelt (LFH-365).
-    // Der Auslöser ist icon-only, sein Name trägt die Zeilenkennung — sonst lieferten
-    // n Karten n gleichnamige Knöpfe.
+    // Plan-Modus trägt genau EINE Primäraktion; alles Weitere wird gebündelt (LFH-365). Der
+    // icon-only Auslöser trägt die Zeilenkennung im Namen.
     setzeViewportBreite(390);
     const onWahl = vi.fn();
     rendere({
@@ -965,16 +930,15 @@ describe('Datensicht · Kartenzweig', () => {
   });
 
   it('der Statusslot rendert ein Etikett MIT Text, nicht nur eine Farbe', () => {
-    // `label` ist am `StatusDarstellung`-Typ Pflichtfeld und damit der erzwungene zweite
-    // Kanal (WCAG 1.4.1). Ein Slot, der nur eine Rolle liefert, bricht den Typcheck.
+    // `label` ist am `StatusDarstellung`-Typ Pflicht und damit der zweite Kanal (WCAG 1.4.1).
     setzeViewportBreite(390);
     rendere({ karte: { ...karte, status: () => ({ rolle: 'normal', label: 'verfügbar' }) } });
     expect(screen.getAllByText('verfügbar')).toHaveLength(3);
   });
 
   it('ohne statusBedienung bleibt das Etikett reine Anzeige — kein Auslöser', () => {
-    // Die Gegenaussage zum Test darunter. Ohne sie wäre „der Slot ist bedienbar" auch dann
-    // grün, wenn JEDES Etikett zum Knopf würde.
+    // Gegenaussage zum Test darunter: sonst wäre „der Slot ist bedienbar" auch grün, wenn JEDES
+    // Etikett zum Knopf würde.
     setzeViewportBreite(390);
     const { container } = rendere({
       karte: { ...karte, status: () => ({ rolle: 'normal', label: 'verfügbar' }) },
@@ -985,9 +949,8 @@ describe('Datensicht · Kartenzweig', () => {
   });
 
   it('mit statusBedienung wird das Statusetikett zum Auslöser der Statuswahl', async () => {
-    // Der Bedienweg sitzt am STATUS-Slot, nicht am Aktions-Slot: `Datensicht` sichert
-    // genau EINE Primäraktion zu, und die ist auf den drei Kräfteseiten mit „Entfernen"
-    // belegt. Bedient wird deshalb dort, wo der Status schon steht (LFH-339 · C4, Z3).
+    // Der Bedienweg sitzt am STATUS-Slot: der Aktions-Slot trägt genau EINE Primäraktion, auf den
+    // Kräfteseiten „Entfernen" (LFH-339 · C4).
     setzeViewportBreite(390);
     const onWaehlen = vi.fn();
     rendere({
@@ -1039,9 +1002,8 @@ describe('Datensicht · Kartenzweig', () => {
 
 describe('Datensicht · Aufklappbereich (LFH-676)', () => {
   /**
-   * Ein beschrifteter Auslöser mit der Zeilenkennung im Namen, in BEIDEN Zweigen gleich —
-   * statt des 16-px-Symbols von antd, dessen Name aus der Locale in jeder Zeile gleich ist.
-   * Der Inhalt entsteht erst beim Aufklappen: der Betreuungsverlauf lädt beim Mount.
+   * Ein beschrifteter Auslöser mit der Zeilenkennung im Namen, in BEIDEN Zweigen gleich. Der
+   * Inhalt entsteht erst beim Aufklappen: der Betreuungsverlauf lädt beim Mount.
    */
   const aufklappenMit = (inhalt: (f: Fahrzeug) => ReactElement | string) => ({
     etikett: 'Verlauf',
@@ -1084,9 +1046,8 @@ describe('Datensicht · Aufklappbereich (LFH-676)', () => {
   );
 
   it('tabelle: der Auslöser sitzt in der angehefteten Kennungszelle, ohne eigene Aufklappspalte', () => {
-    // Gemessen in Gate 1 bei 390 px: eine eigene Spalte HINTER der fixierten Kennung glitt beim
-    // waagerechten Scrollen unter sie und war nicht mehr klickbar; VOR ihr stünden zwei
-    // angeheftete Spalten. In der Kennungszelle ist er immer erreichbar und kostet keine Breite.
+    // Eine eigene Spalte HINTER der fixierten Kennung glitte bei 390 px unter sie, VOR ihr stünden
+    // zwei angeheftete Spalten. In der Kennungszelle ist er immer erreichbar.
     const { container } = rendere({
       form: 'tabelle',
       aufklappen: aufklappenMit((f) => `Reihe von ${f.funkrufname}`),
@@ -1132,9 +1093,8 @@ describe('Datensicht · Aufklappbereich (LFH-676)', () => {
 
 describe('Datensicht · Tabellenzweig', () => {
   /**
-   * LFH-340 · C5. Der Titel-Link und `onZeileKlick` liegen übereinander: ein Klick auf den
-   * Anker löste beide aus. Die Paarung ist Absicht — der erste Fall allein wäre auch grün,
-   * wenn `onZeileKlick` gar nicht mehr feuerte.
+   * LFH-340 · C5: Titel-Link und `onZeileKlick` liegen übereinander. Die Paarung ist Absicht —
+   * der erste Fall allein wäre auch grün, wenn `onZeileKlick` gar nicht mehr feuerte.
    */
   it('ein Klick auf einen Link in der Zeile löst NICHT zusätzlich onZeileKlick aus', async () => {
     const zeileGeklickt = vi.fn();
@@ -1162,10 +1122,9 @@ describe('Datensicht · Tabellenzweig', () => {
 
   it('blättert NICHT und bringt genau EIN Suchfeld mit', () => {
     /**
-     * `Datensicht` gibt `KatalogTabelle` explizit `pagination={false}` und setzt dessen
-     * `suche` NICHT — sonst blätterte die Tabelle unter der Zeilenschleuse weg, und das
-     * Suchfeld des Primitivs stünde als zweites neben dem eigenen. Der Guard sieht das
-     * nicht (er zählt nur `<KatalogTabelle` ≥ 1), deshalb steht es hier.
+     * `Datensicht` gibt `KatalogTabelle` `pagination={false}` und setzt deren `suche` NICHT — sonst
+     * blätterte die Tabelle unter der Zeilenschleuse weg, und zwei Suchfelder stünden da. Der Guard
+     * sieht das nicht.
      */
     const viele = Array.from({ length: 60 }, (_, i) => F(i + 1, `Florian ${i + 1}`));
     const { container } = rendere({ daten: viele, suche: { platzhalter: 'Funkrufname' } });
@@ -1176,9 +1135,8 @@ describe('Datensicht · Tabellenzweig', () => {
 
   it('abBreite streicht die Spalte und der Schalter meldet den Zähler als TEXT', async () => {
     /**
-     * Der Zähler steht als Text im Namen, NICHT als `Badge`: ein `count`-Badge rendert ohne
-     * `color` auf `token.colorError` — Rot für einen Spaltenzähler bricht „Rot bedient
-     * nichts" und Kriterium 7.
+     * Der Zähler steht als Text im Namen, NICHT als `Badge`: ein `count`-Badge ist ohne `color` rot,
+     * und Rot bedient nichts.
      */
     const { container } = rendere({ spaltenAusVoreinstellung: ['traeger'] });
     const kopfzellen = [...container.querySelectorAll('th.ant-table-cell')].map(
@@ -1201,10 +1159,9 @@ describe('Datensicht · Tabellenzweig', () => {
 
   it('zeigt genau EINEN Spaltenschalter, obwohl das Primitiv darunter selbst einen kann', () => {
     /**
-     * `KatalogTabelle` trägt seit LFH-374 einen eigenen Schalter als Opt-in. `Datensicht`
-     * rendert durch sie und bringt seinen Schalter selbst mit — setzte es zusätzlich
-     * `spaltenSchalter`, stünden zwei Knöpfe mit zwei Zuständen da (D5). Der Guard in
-     * `katalogTabelle.guard.test.ts` hält das Attribut aus der Quelle, dieser Fall das Bild.
+     * `KatalogTabelle` trägt einen eigenen Schalter als Opt-in; setzte `Datensicht` ihn zusätzlich,
+     * stünden zwei Knöpfe mit zwei Zuständen da. Der Guard hält das Attribut aus der Quelle, dieser
+     * Fall das Bild.
      */
     rendere({ form: 'tabelle' });
     expect(screen.getAllByRole('button', { name: /^Spalten/ })).toHaveLength(1);
@@ -1212,10 +1169,8 @@ describe('Datensicht · Tabellenzweig', () => {
 
   it('eine per Breite weggefallene Spalte steht OHNE Häkchen im Menü und lässt sich zurückholen', async () => {
     /**
-     * LFH-374 · D9, gemessen am Bestand: das Häkchen las `!aus.includes(key)` statt der
-     * wirklichen Sichtbarkeit. „Besatzung" (`abBreite: 'xl'`) fehlte bei 1024 px in der
-     * Tabelle, stand im Menü aber ANGEHAKT da, und ein Klick änderte sichtbar nichts — die
-     * Behauptung „einblendbar" aus LFH-342 hielt nicht.
+     * LFH-374 · D9: das Häkchen zeigt die wirkliche Sichtbarkeit. Eine per `abBreite`
+     * weggefallene Spalte steht nicht angehakt im Menü, und ein Klick holt sie zurück.
      */
     const { container } = rendere();
     const kopf = () =>
@@ -1230,9 +1185,8 @@ describe('Datensicht · Tabellenzweig', () => {
     expect(kopf()).toContain('Besatzung');
     const knopf = screen.getByRole('button', { name: /^Spalten —/ });
 
-    // Neu öffnen und im OFFENEN Overlay greifen: der Klick auf den Eintrag schließt das Menü,
-    // und das abgehende Overlay (`ant-slide-up-leave`, jsdom feuert kein `transitionend`)
-    // zeigt eingefrorenen Inhalt — dort stünde das Häkchen noch auf dem Stand VOR dem Klick.
+    // Neu öffnen und im OFFENEN Overlay greifen: das abgehende Overlay zeigt eingefrorenen Inhalt
+    // (jsdom feuert kein `transitionend`).
     await userEvent.click(knopf);
     const menue = await waitFor(() => {
       const m = document.querySelector<HTMLElement>(
@@ -1254,9 +1208,8 @@ describe('Datensicht · Tabellenzweig', () => {
     });
     expect(namen(container)).toEqual(['Florian 1', 'Florian 3', 'Rotkreuz 2']);
 
-    // Sortiert wird im Primitiv; die Tabelle bekommt nur `sorter: true` für den Pfeil.
-    // Antds Zyklus ist aufsteigend → absteigend → keine Sortierung; die dritte Stufe ist
-    // hier deshalb wieder die Serverordnung, nicht ein erneutes Aufsteigend.
+    // Sortiert wird im Primitiv; die Tabelle bekommt nur `sorter: true` für den Pfeil. Antds Zyklus
+    // endet in „keine Sortierung", also wieder der Serverordnung.
     await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
     expect(namen(container)).toEqual(['Rotkreuz 2', 'Florian 3', 'Florian 1']);
     await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
@@ -1270,8 +1223,7 @@ describe('Datensicht · Tabellenzweig', () => {
   });
 
   it('kontrollierte Sortierung meldet nach außen und rendert die Vorgabe', async () => {
-    // Sortierung wird von zwei Nachbartasks gelesen (B6-Sammelbanner, B7-Palette) und ist
-    // Kandidat für ein späteres `?sort=` — deshalb hat sie eine kontrollierte Form.
+    // Sortierung hat eine kontrollierte Form (Kandidat für ein späteres `?sort=`).
     const onSortierung = vi.fn();
     const { container } = rendere({
       sortierung: { spalte: 'funkrufname', richtung: 'auf' },
@@ -1290,9 +1242,8 @@ describe('Datensicht · Tabellenzweig', () => {
   });
 
   it('Spaltenfilter stehen in der Werkzeugzeile und wirken auf die Zeilenmenge', async () => {
-    // `filters`/`onFilter` sind am Spaltentyp amputiert, weil antd deren Zustand INTERN
-    // hält — der Kartenzweig könnte ihn nicht lesen und zeigte still eine andere Menge.
-    // Also steht der Filter in der Werkzeugzeile, nicht im Spaltentrichter.
+    // `filters`/`onFilter` sind am Spaltentyp gesperrt, weil antd deren Zustand intern hält und der
+    // Kartenzweig ihn nicht lesen könnte. Der Filter steht in der Werkzeugzeile.
     const { container } = rendere();
     expect(container.querySelector('.ant-table-filter-trigger')).toBeNull();
 
@@ -1350,31 +1301,23 @@ describe('Datensicht · Tabellenzweig', () => {
 
   it('ein Filter wirkt NICHT mehr, sobald seine Spalte ausgeblendet ist — und wieder, wenn sie zurückkommt', async () => {
     /**
-     * Das Bedienelement hing schon immer an den GEZEIGTEN Spalten, die Wirkung aber an
-     * allen: wer die gefilterte Spalte ausblendete, behielt eine gefilterte Liste ohne
-     * sichtbaren Grund und ohne Rückweg. Geprüft wird die Zeilenmenge, nicht der Zustand —
-     * ein Test auf `filterWerte` bliebe grün, obwohl der Benutzer Zeilen vermisst.
+     * Wer die gefilterte Spalte ausblendet, darf keine gefilterte Liste ohne sichtbaren Grund
+     * behalten. Geprüft wird die Zeilenmenge, nicht der Zustand.
      */
     const { container } = rendere();
     const namen = () =>
       [...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
 
     /**
-     * Immer über das GEÖFFNETE Menü, nie über einen freien `findByRole`-Griff: antd lässt die
-     * Portale geschlossener Dropdowns im Baum stehen, und ein Griff nach der Beschriftung
-     * kann dann ein totes Kästchen erwischen. Das ist einmal zugeschlagen — der Test war
-     * grün gefahren und fiel erst im Sammellauf um.
+     * Immer über das GEÖFFNETE Menü: antd lässt die Portale geschlossener Dropdowns im Baum stehen,
+     * ein freier Griff kann ein totes Kästchen erwischen.
      */
     const koepfe = () =>
       [...container.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
     /**
-     * Öffnet den Schalter und gibt das OFFENE Menü zurück — notfalls mit einem zweiten Klick.
-     *
-     * Gemessen: liegt die Auswahlliste des Spaltenfilters noch offen, verbraucht sie den
-     * ersten Klick als Außenklick und das Menü bleibt zu. Sie eigens zu schließen gelingt in
-     * jsdom auf keinem Weg (Esc-Taste, zweiter Klick auf die Combobox, Klick auf
-     * `document.body` — alle drei probiert, `aria-expanded` blieb `true`). Ein Bediener
-     * klickt in dieser Lage ebenfalls einfach noch einmal.
+     * Öffnet den Schalter und gibt das OFFENE Menü zurück, notfalls mit einem zweiten Klick: eine
+     * noch offene Auswahlliste des Spaltenfilters verbraucht den ersten Klick als Außenklick, und
+     * sie zu schließen gelingt in jsdom auf keinem Weg.
      */
     const oeffneMenue = async (): Promise<HTMLElement> => {
       const knopf = screen.getByRole('button', { name: /Spalten/ });
@@ -1390,9 +1333,8 @@ describe('Datensicht · Tabellenzweig', () => {
     const schalteSpalte = async (etikett: string, danach: 'weg' | 'da') => {
       const menue = await oeffneMenue();
       await userEvent.click(within(menue).getByRole('checkbox', { name: etikett }));
-      // Auf die WIRKUNG warten, nicht auf den Klick: ohne diesen Halt prüfte die nächste
-      // Zusicherung gegen einen Baum, der die Umschaltung noch nicht verarbeitet hat — im
-      // Sammellauf gemessen, allein gefahren nie.
+      // Auf die WIRKUNG warten, nicht auf den Klick — sonst prüfte die nächste Zusicherung gegen
+      // einen Baum, der die Umschaltung noch nicht verarbeitet hat.
       await waitFor(() =>
         danach === 'weg'
           ? expect(koepfe()).not.toContain(etikett)
@@ -1405,12 +1347,8 @@ describe('Datensicht · Tabellenzweig', () => {
     await waitFor(() => expect(namen()).toEqual(['Florian 1', 'Florian 3']));
 
     /*
-     * Die geöffnete Auswahlliste wird bewusst NICHT eigens geschlossen. Drei Wege dafür sind
-     * gemessen und tragen alle nicht: die Esc-Taste lässt `aria-expanded` in jsdom auf `true`
-     * (der Fokus liegt nach der Optionswahl woanders), ein zweiter Klick auf die Combobox
-     * ebenso, und ein Klick auf `document.body` räumt das Portal nicht ab. Der Öffnungsklick
-     * auf den Spaltenschalter kommt trotzdem an — was den Test trägt, sind die beiden
-     * Wartestellen in `schalteSpalte`.
+     * Die geöffnete Auswahlliste wird bewusst NICHT eigens geschlossen (in jsdom trägt kein Weg);
+     * den Test tragen die beiden Wartestellen in `schalteSpalte`.
      */
 
     await schalteSpalte('Träger', 'weg');
@@ -1419,8 +1357,7 @@ describe('Datensicht · Tabellenzweig', () => {
       'Rotkreuz 2',
       'Florian 3',
     ]);
-    // Und das Bedienelement ist mit der Spalte verschwunden — sonst stünde ein Filter da,
-    // der nichts tut.
+    // Das Bedienelement ist mit der Spalte verschwunden.
     expect(screen.queryByRole('combobox', { name: 'Träger' })).toBeNull();
 
     // Erneut öffnen: das Menü schließt nach jedem Umschalten.
@@ -1484,18 +1421,15 @@ describe('Datensicht · Tabellenzweig', () => {
         karte={{ art: 'plan', titel: { spalte: 'bez' } }}
       />,
     );
-    // Der Druckpfad der Kräfteübersicht setzt hier alle Schlüssel von außen. Ein Primitiv
-    // mit internem Aufklappzustand hätte diesen Pfad lautlos stillgelegt.
+    // Der Druckpfad der Kräfteübersicht setzt hier alle Schlüssel von außen; ein interner
+    // Aufklappzustand hätte ihn lautlos stillgelegt.
     expect(auf.getByText('Einheit 1')).toBeInTheDocument();
   });
 
   /**
-   * Die ganze Zeile klappt auf, nicht nur das Symbol (LFH-338 · C3, Befund H7).
-   *
-   * Das Aufklapp-Symbol ist rund 16 px breit — im Handschuh-Betrieb ist das kein
-   * Bedienziel, und die Dichte-Staffel kann daran nichts ändern (antd zeichnet es fest).
-   * Statt eines seitenlokalen `onRow` gehört das ins Primitiv: `baum` hat heute genau einen
-   * Konsumenten, aber die Regel „die Zeile ist das Ziel" gilt für jeden weiteren.
+   * Die ganze Zeile klappt auf, nicht nur das Symbol (LFH-338 · C3). Das rund 16 px breite
+   * Aufklapp-Symbol ist im Handschuh-Betrieb kein Bedienziel. Die Regel gehört ins Primitiv, nicht
+   * in ein seitenlokales `onRow`.
    */
   it('klappt beim Klick auf die ZEILE auf, nicht nur am Aufklapp-Symbol', async () => {
     interface Zeile {
@@ -1526,8 +1460,7 @@ describe('Datensicht · Tabellenzweig', () => {
       />,
     );
 
-    // Die TEXTZELLE, nicht `.ant-table-row-expand-icon` — sonst prüfte der Test den Weg,
-    // den es vorher schon gab.
+    // Die TEXTZELLE, nicht `.ant-table-row-expand-icon`.
     await userEvent.click(screen.getByText('Abschnitt Nord'));
     expect(onAufgeklappt).toHaveBeenCalledWith(['a']);
   });
@@ -1542,8 +1475,8 @@ describe('Datensicht · Zeilenschleuse', () => {
 
   it('die Werkzeugzeile existiert AUCH ohne Suche, Filter, Schalter und Banner', () => {
     /**
-     * Sonst schiebt die erste eintreffende Zeile den Inhalt nach unten und das Sammelbanner
-     * arbeitet gegen sein eigenes Ziel — die Sticky-Reserve-Lehre aus B1.
+     * Sonst schiebt die erste eintreffende Zeile den Inhalt nach unten, und das Sammelbanner
+     * arbeitet gegen sein eigenes Ziel.
      */
     const { container } = rendere({ spalten: spalten.slice(0, 1) });
     expect(container.querySelector('input[type="search"]')).toBeNull();
@@ -1552,21 +1485,16 @@ describe('Datensicht · Zeilenschleuse', () => {
 
   it('die LEERE Ladeansicht friert nicht ein — und schärft sich beim nächsten Fokuseintritt nach', () => {
     /**
-     * Die Werkzeugzeile steht auch ohne Daten im Baum (Test darüber). Wer den Fokus vor der
-     * ersten Antwort ins Suchfeld setzt, fror damit eine LEERE Folge ein: die gesamte erste
-     * Lieferung landete hinter dem Sammelbanner statt in der Liste — gemessen 0 Zeilen und
-     * „3 neue Einträge", bevor `betreten` die Null-Zeilen-Bedingung bekam.
+     * Fokus im Suchfeld vor der ersten Antwort darf keine LEERE Folge einfrieren — sonst landete die
+     * ganze erste Lieferung hinter dem Sammelbanner.
      *
-     * DREI Fallen in diesem Test, alle scharf:
-     *  - `suche` muss in JEDEM Render stehen. Fehlt es beim Nachziehen, meldet sich das
-     *    Suchfeld ab, der Fokus fällt auf den Body, die Schleuse taut von selbst auf — und
-     *    der Test wäre auch OHNE die Bedingung grün.
-     *  - „3 Zeilen, kein Banner" allein ist auch grün, wenn `betreten` überhaupt nicht mehr
-     *    einfriert. Die Gegenprobe dazu ist der Nachbar-Test „mit Fokus in der Sicht bleibt
-     *    die Zeilenmenge stehen und ein Banner erscheint" — und die zweite Hälfte hier.
-     *  - `ladend` ist NICHT die Bedingung im Produktivcode: ein Query, der auf `[]` auflöst
-     *    und erst per SSE Zeilen bekommt, hat `ladend === false` bei leerer Menge. Es steht
-     *    hier nur, weil die acht betroffenen Konsumenten es so übergeben.
+     * Drei Fallen in diesem Test:
+     *  - `suche` muss in JEDEM Render stehen. Fehlt es, meldet sich das Suchfeld ab, der Fokus fällt
+     *    auf den Body, die Schleuse taut von selbst auf, und der Test wäre ohne die Bedingung grün.
+     *  - „3 Zeilen, kein Banner" allein ist auch grün, wenn `betreten` gar nicht mehr einfriert. Die
+     *    Gegenprobe ist der Nachbartest „mit Fokus in der Sicht …" und die zweite Hälfte hier.
+     *  - `ladend` ist NICHT die Bedingung im Produktivcode: ein Query, der auf `[]` auflöst und erst
+     *    per SSE Zeilen bekommt, hat `ladend === false` bei leerer Menge.
      */
     const suche = { platzhalter: 'Funkrufname' };
     const sicht = (daten: Fahrzeug[], ladend: boolean) => (
@@ -1582,8 +1510,8 @@ describe('Datensicht · Zeilenschleuse', () => {
     );
 
     const { container, rerender } = renderMitProviders(sicht([], true));
-    // antd rendert für die leere Menge `ant-table-placeholder`, keine `ant-table-row` —
-    // der Startpunkt ist damit nachweislich 0 und nicht bloß „noch nichts gemessen".
+    // antd rendert für die leere Menge `ant-table-placeholder`, keine `ant-table-row`: der
+    // Startpunkt ist nachweislich 0.
     expect(zeilenZahl(container)).toBe(0);
 
     container.querySelector<HTMLInputElement>('input[type="search"]')!.focus();
@@ -1592,11 +1520,8 @@ describe('Datensicht · Zeilenschleuse', () => {
     expect(zeilenZahl(container)).toBe(3);
     expect(screen.queryByRole('button', { name: /neue/ })).toBeNull();
 
-    // Der benannte Rest: die Schleuse ist jetzt OFFEN. Sie schärft sich beim nächsten
-    // Fokuseintritt nach — `onFocus` läuft über `focusin` und bubbelt, der Sprung vom
-    // Suchfeld auf einen Zeilenlink derselben Sicht genügt also; die Sicht ganz zu
-    // verlassen ist nicht nötig. Das belegt zugleich, dass die neue Bedingung NUR den
-    // Null-Zeilen-Fall ausnimmt.
+    // Die Schleuse ist jetzt OFFEN und schärft sich beim nächsten Fokuseintritt nach (`focusin`
+    // bubbelt). Belegt zugleich, dass die Bedingung NUR den Null-Zeilen-Fall ausnimmt.
     screen.getByRole('link', { name: 'Florian 1' }).focus();
     rerender(sicht([...DREI, F(4, 'Florian 4')], false));
     expect(zeilenZahl(container)).toBe(3);
@@ -1629,22 +1554,15 @@ describe('Datensicht · Zeilenschleuse', () => {
 
   it('der Spaltenschalter ist eine Benutzeraktion — die freigegebene Zeile steht sofort da', async () => {
     /**
-     * DER REGRESSIONSTEST zu einem echten Bedienfehler: `setzeSpaltenAus` war die einzige
-     * Aktion der Werkzeugzeile, die {@link nachBenutzeraktion} NICHT rief. Sortierung
-     * (Datensicht.tsx:802), Suche und Filter tun es seit jeher.
+     * Regressionstest: `setzeSpaltenAus` muss wie Sortierung, Suche und Filter
+     * {@link nachBenutzeraktion} rufen. Sonst zählte die durch den unwirksam gewordenen Filter
+     * freigegebene Zeile bei gefrorener Schleuse als ZUFLUSS und landete hinter dem Sammelbanner.
      *
-     * Folge bei gefrorener Schleuse: blendet man die gefilterte Spalte aus, wird ihr Filter
-     * unwirksam — die dadurch freigegebene Zeile zählte als ZUFLUSS und landete hinter dem
-     * Sammelbanner. Der Bediener sah eine kurze Liste und daneben „1 neuer Eintrag" für eine
-     * Zeile, die längst da war.
+     * Zwei Hälften, beide Pflicht: „3 Zeilen" allein wäre auch grün ohne Einfrieren, „kein Banner"
+     * allein auch, wenn die Zeile ganz verschwände.
      *
-     * ZWEI HÄLFTEN, beide Pflicht: „3 Zeilen" allein wäre auch grün, wenn die Schleuse gar
-     * nicht mehr einfriert; „kein Banner" allein auch, wenn die Zeile ganz verschwände.
-     *
-     * `fireEvent` statt `userEvent` ist hier NICHT Kosmetik, sondern trägt den Test:
-     * `userEvent` zieht den Fokus ins Dropdown-Portal, `pruefeVerlassen` taut die Schleuse
-     * auf, und der Test wird auch OHNE den Fix zeitweise grün. Genau daran hat der
-     * Bestandstest :915 bisher gewürfelt (gemessen 1 von 5 Läufen grün).
+     * `fireEvent` statt `userEvent` trägt den Test: `userEvent` zieht den Fokus ins Dropdown-Portal,
+     * `pruefeVerlassen` taut auf, und der Test würde auch ohne den Fix zeitweise grün.
      */
     const { container } = rendere();
     const namen = () =>
@@ -1656,8 +1574,7 @@ describe('Datensicht · Zeilenschleuse', () => {
     await userEvent.click(await screen.findByTitle('Feuerwehr'));
     await waitFor(() => expect(namen()).toEqual(['Florian 1', 'Florian 3']));
 
-    // Menü öffnen, BEVOR eingefroren wird — der Öffnungsklick selbst ist eine Mausaktion
-    // und würde den Fokus ohnehin verschieben.
+    // Menü öffnen, BEVOR eingefroren wird: der Öffnungsklick verschiebt den Fokus ohnehin.
     const knopf = screen.getByRole('button', { name: /Spalten/ });
     let menue: HTMLElement | null = null;
     for (let i = 0; i < 3 && !menue; i += 1) {
@@ -1669,16 +1586,13 @@ describe('Datensicht · Zeilenschleuse', () => {
     expect(menue, 'der Spaltenschalter ließ sich in drei Klicks nicht öffnen').not.toBeNull();
 
     /**
-     * Antds Dropdown zieht den Fokus per `autoFocus` ins Menü — und zwar NACHGELAGERT.
-     * Käme das erst nach dem `focus()` unten, wanderte der Fokus aus der Wurzel ins Portal,
-     * `pruefeVerlassen` taute die Schleuse auf, und der Test wäre auch ohne den Fix grün.
-     * Gemessen war er ohne dieses Abwarten selbst flaky (1 von 3 Mutationsläufen grün) —
-     * also genau die Krankheit, die er heilen soll. Erst warten, bis der Fokus im Menü
-     * angekommen ist, DANN einfrieren.
+     * Antds Dropdown zieht den Fokus per `autoFocus` NACHGELAGERT ins Menü. Käme das nach dem
+     * `focus()` unten, taute `pruefeVerlassen` die Schleuse auf, und der Test wäre ohne den Fix grün.
+     * Erst warten, bis der Fokus im Menü ist, DANN einfrieren.
      */
     await waitFor(() => expect(menue!.contains(document.activeElement)).toBe(true));
 
-    // JETZT einfrieren: Fokus nachweislich auf einem Zeilen-Link in der Sicht.
+    // JETZT einfrieren: Fokus auf einem Zeilen-Link in der Sicht.
     screen.getByRole('link', { name: 'Florian 1' }).focus();
     expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Florian 1' }));
 
@@ -1698,9 +1612,9 @@ describe('Datensicht · Zeilenschleuse', () => {
 
   it('Zellinhalte laufen weiter, während die Zeilen stehen', () => {
     /**
-     * DIE PFLICHTHÄLFTE. „Die Zeilenzahl ist nicht gewachsen" ist auch dann grün, wenn die
-     * Komponente die neuen Daten KOMPLETT ignoriert. Ein Statuswechsel muss sofort sichtbar
-     * sein — nur die Zeile darf nicht wandern.
+     * Die Pflichthälfte: „die Zeilenzahl ist nicht gewachsen" ist auch grün, wenn die Komponente
+     * neue Daten KOMPLETT ignoriert. Ein Statuswechsel muss sofort sichtbar sein, nur die Zeile darf
+     * nicht wandern.
      */
     const { container, rerender } = rendere();
     screen.getByRole('link', { name: 'Florian 1' }).focus();
@@ -1721,9 +1635,8 @@ describe('Datensicht · Zeilenschleuse', () => {
 
   it('auch die REIHENFOLGE steht, nicht nur die Menge', () => {
     /**
-     * Ohne diesen Fall wäre die Schleuse auch dann grün, wenn sie nur „Schlüssel ∈ Menge"
-     * filtert: die überlebenden Zeilen bekämen dann die NEUE Reihenfolge, und genau das ist
-     * der Sprung unter dem Cursor, den Kriterium 12 verbietet.
+     * Sonst wäre die Schleuse auch grün, wenn sie nur „Schlüssel ∈ Menge" filtert: die Zeilen
+     * bekämen die NEUE Reihenfolge — der Sprung unter dem Cursor, den Kriterium 12 verbietet.
      */
     const namen = (c: HTMLElement) =>
       [...c.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
@@ -1745,9 +1658,8 @@ describe('Datensicht · Zeilenschleuse', () => {
 
   it('ein Fokuswechsel INNERHALB der Sicht taut nicht auf', () => {
     /**
-     * `focusout` feuert auch beim Sprung von der Titelzelle zum Aktionsknopf derselben
-     * Sicht. Ein naiver Zuhörer taute dort auf und schöbe die Zeilen unter dem Finger weg —
-     * genau in der Sekunde, in der jemand bedient. Deshalb `!wurzel.contains(relatedTarget)`.
+     * `focusout` feuert auch beim Sprung innerhalb derselben Sicht; ein naiver Zuhörer taute dort
+     * auf. Deshalb `!wurzel.contains(relatedTarget)`.
      */
     const onSortierung = vi.fn();
     const { container, rerender } = rendere({
@@ -1772,8 +1684,8 @@ describe('Datensicht · Zeilenschleuse', () => {
     nachziehen();
     expect(zeilenZahl(container)).toBe(3);
 
-    // Fokus wandert auf das Suchfeld DERSELBEN Sicht — jsdom setzt `relatedTarget` dabei
-    // wie ein Browser (am Stub gemessen), der Fall braucht kein handgereichtes Ereignis.
+    // Fokus wandert auf das Suchfeld DERSELBEN Sicht; jsdom setzt `relatedTarget` dabei wie ein
+    // Browser.
     container.querySelector<HTMLInputElement>('input[type="search"]')!.focus();
     nachziehen();
     expect(zeilenZahl(container)).toBe(3);
@@ -1813,8 +1725,7 @@ describe('Datensicht · Zeilenschleuse', () => {
   });
 
   it('eine ENTFALLENE Zeile verschwindet sofort, auch mit Fokus in der Sicht', () => {
-    // Eine nicht mehr vorhandene Zeile kann man nicht rendern. Die Schleuse hält nur
-    // Zuwachs zurück; dass eine verschwindende Zeile den Fokus mitnimmt, bleibt B7.
+    // Die Schleuse hält nur Zuwachs zurück; eine nicht mehr vorhandene Zeile kann man nicht rendern.
     const { container, rerender } = rendere();
     screen.getByRole('link', { name: 'Florian 1' }).focus();
     rerender(
@@ -1867,14 +1778,11 @@ describe('Datensicht · Zeilenschleuse', () => {
 
   it('die eingefrorene Sicht hält auch die GRUPPENZUGEHÖRIGKEIT — die Karte wandert nicht unter einen anderen Kopf', () => {
     /**
-     * Die Zusicherung des Dateikopfs lautet „nur die Zeile darf nicht wandern", ohne
-     * Einschränkung auf die Reihenfolge. Ohne eingefrorene Gruppenachse bestimmt
-     * `gruppiere` die Gruppe aus den FRISCHEN Daten: ein Statuswechsel per Live-Ereignis
-     * hängt die Karte im Kartenzweig unter einen anderen Kopf um, während jemand in der
-     * Sicht arbeitet — dieselbe Bewegung, nur eine Achse weiter.
+     * „Nur die Zeile darf nicht wandern" gilt auch für die Gruppe: ohne eingefrorene Gruppenachse
+     * hinge ein Statuswechsel die Karte im Kartenzweig unter einen anderen Kopf um.
      *
-     * Der Zellinhalt muss den neuen Wert trotzdem sofort zeigen; beides steht deshalb im
-     * selben Test, sonst wäre „eingefroren" auch durch stehengebliebene Inhalte erfüllt.
+     * Der Zellinhalt zeigt den neuen Wert trotzdem sofort; beides steht im selben Test, sonst wäre
+     * „eingefroren" auch durch stehengebliebene Inhalte erfüllt.
      */
     setzeViewportBreite(390);
     const gruppen = {

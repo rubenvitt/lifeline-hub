@@ -1,0 +1,27 @@
+Ereignistypen: ['etb']
+takt  1 A-sichtbar               Latenz_ms=3
+takt  2 A-sichtbar               Latenz_ms=4
+takt  3 A-sichtbar               Latenz_ms=-3
+takt  4 A-sichtbar               Latenz_ms=1
+takt  5 A-sichtbar               Latenz_ms=-1
+takt  6 B-minimiert              Latenz_ms=0
+takt  7 B-minimiert              Latenz_ms=-32
+takt  8 B-minimiert              Latenz_ms=-21
+takt  9 B-minimiert              Latenz_ms=-10
+takt 10 B-minimiert              Latenz_ms=4
+takt 11 B-minimiert              Latenz_ms=-10
+takt 12 D-vm-suspendiert         Latenz_ms=128622
+takt 13 D-vm-suspendiert         Latenz_ms=98544
+takt 14 D-vm-suspendiert         Latenz_ms=68471
+takt 15 D-vm-suspendiert         Latenz_ms=38401
+takt 16 E-vm-fortgesetzt         Latenz_ms=8326
+takt 17 E-vm-fortgesetzt         Latenz_ms=-1
+takt 18 E-vm-fortgesetzt         Latenz_ms=-28
+takt 19 E-vm-fortgesetzt         Latenz_ms=-19
+takt 20 E-vm-fortgesetzt         Latenz_ms=-24
+06:57:09 C-wiederhergestellt sse-fehler  0
+06:59:24 E-vm-fortgesetzt sse-offen  
+ticks A-sichtbar n= 8 min/median/max 14994 15000 15008
+ticks B-minimiert n= 12 min/median/max 14996 15000 15005
+ticks C-wiederhergestellt n= 2 min/median/max 14999 15000 15000
+ticks E-vm-fortgesetzt n= 16 min/median/max 14970 15005 142665

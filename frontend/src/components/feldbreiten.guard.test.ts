@@ -5,31 +5,24 @@ import { describe, expect, it } from 'vitest';
 /**
  * Feldbreiten-Guard der Verwaltungsseiten (LFH-329 · B1).
  *
- * Ein Eingabefeld mit fester Pixelbreite ragt am schmalen Schirm über den Rand hinaus
- * und drückt die Seite waagerecht breit — sichtbar erst unterhalb der Feldbreite, also
- * nie am Entwicklerschirm. Der Bestand trug vierzehn solcher Felder in acht Dateien.
- * Ersetzt sind sie durch die fluide Form (volle Breite bis zu einer Obergrenze), die
- * am Fükw-Schirm identisch aussieht und am Telefon mitgeht.
+ * Ein Eingabefeld mit fester Pixelbreite ragt am schmalen Schirm über den Rand und drückt die
+ * Seite waagerecht breit — sichtbar erst unterhalb der Feldbreite. Die fluide Form (volle Breite
+ * bis zu einer Obergrenze) sieht am Fükw gleich aus und geht am Telefon mit.
  *
- * Der Guard pinnt das NEGATIV: eine feste Zahlbreite in diesen vier Bereichen ist ein
- * Fehler, ausser an den zwei ausdrücklich zugelassenen Stellen. Beide sind KEINE
- * Eingabefelder und dürfen ihre Zahl behalten:
+ * Der Guard pinnt das NEGATIV: eine feste Zahlbreite in diesen vier Bereichen ist ein Fehler,
+ * außer an zwei zugelassenen Stellen, die KEINE Eingabefelder sind:
  *
- * - die Spaltenbreite einer Tabellenspalte (sie steuert die Spaltenverteilung, nicht
- *   die Seitenbreite — die Tabelle scrollt seit diesem Paket in sich),
- * - der Fortschrittsbalken eines Kartendownloads (ein Anzeigeelement fester Grösse).
+ * - die Breite einer Tabellenspalte (steuert die Spaltenverteilung; die Tabelle scrollt in
+ *   sich),
+ * - der Fortschrittsbalken eines Kartendownloads (Anzeigeelement fester Größe).
  *
  * ── BEKANNTE GRENZEN ────────────────────────────────────────────────────────────
  *
- * 1. Der Scan sieht nur die Zahlform. Eine Breite über eine benannte Konstante
- *    (`width: ROLLEN_BREITE`) oder als Zeichenkette (`width: '200px'`) entgeht ihm.
- *    Beides ist im Bestand nicht die übliche Schreibweise; ein Wert-auflösender
- *    Scanner wäre der teurere Weg zu derselben Aussage.
- * 2. Grossgeschriebene Verwandte (`maxWidth`, `minWidth`) sind bewusst nicht erfasst —
- *    eine Obergrenze ist genau die gewünschte Form, keine feste Breite.
- * 3. Der Scan hört an den vier Bereichen auf. Ausserhalb (Einsatzmodule, Lagekarte)
- *    gilt die Regel ebenso, wird hier aber nicht erzwungen: diese Bereiche gehören
- *    anderen Arbeitspaketen des Bandes.
+ * 1. Der Scan sieht nur die Zahlform. `width: ROLLEN_BREITE` oder `width: '200px'` entgehen ihm;
+ *    ein wertauflösender Scanner wäre der teurere Weg zu derselben Aussage.
+ * 2. `maxWidth`/`minWidth` sind bewusst nicht erfasst — eine Obergrenze ist die gewünschte Form.
+ * 3. Der Scan hört an den vier Bereichen auf. Außerhalb gilt die Regel ebenso, wird hier aber
+ *    nicht erzwungen.
  */
 
 const SRC = (() => {
@@ -113,8 +106,8 @@ describe('Feldbreiten im Verwaltungsteil', () => {
 
     expect(mitFesterBreite.sort()).toEqual(ZUGELASSEN.map((z) => z.pfad).sort());
 
-    // …und an den zugelassenen Stellen bleibt es bei GENAU einer, damit die Ausnahme
-    // nicht zur Einfallstür für neue feste Feldbreiten in derselben Datei wird.
+    // An den zugelassenen Stellen bleibt es bei GENAU einer, damit die Ausnahme keine Einfallstür
+    // wird.
     for (const { pfad } of ZUGELASSEN) {
       const quelle = QUELLEN.find((q) => q.pfad === pfad)!;
       const anzahl = quelle.text.split('\n').filter((z) => FESTE_BREITE.test(z)).length;
@@ -123,9 +116,8 @@ describe('Feldbreiten im Verwaltungsteil', () => {
   });
 
   it('die vierzehn umgestellten Felder (plus seither neue) tragen eine Obergrenze statt einer Festbreite', () => {
-    // Felder, die NACH B1 in diesen Bereichen dazugekommen sind und die fluide Form von
-    // Anfang an tragen. Sie stehen hier namentlich, damit die Vierzehn im Testnamen die
-    // Zahl der UMGESTELLTEN bleibt und nicht still mitwächst.
+    // Felder, die später in diesen Bereichen dazukamen und die fluide Form von Anfang an tragen.
+    // Namentlich, damit die Vierzehn im Testnamen die Zahl der UMGESTELLTEN bleibt.
     const neuSeitB1 = [
       // LFH-610: Rückmeldefrist, gleich in der fluiden Form gebaut.
       'pages/einstellungen/EinsatzDefaults.tsx',
@@ -139,11 +131,8 @@ describe('Feldbreiten im Verwaltungsteil', () => {
       'stammdaten/PersonalStatusTab.tsx': 1,
       'stammdaten/EinheitTypenTab.tsx': 1,
       'stammdaten/StatusKatalogTab.tsx': 2,
-      // Die Tragenkapazität ist mit LFH-346 · A7 aus `FahrzeugFormModal` auf
-      // `FahrzeugDetailPage` gewandert (elf Felder passen nicht in ein Modal). Die
-      // Obergrenze ist MITGEZOGEN, nicht verschwunden — die Summe unten bleibt 14. Ein
-      // Eintrag ohne Fund färbte den Guard rot, ein stillschweigend gestrichener liesse
-      // die Zahl im Testnamen unbelegt.
+      // Die Tragenkapazität steht auf `FahrzeugDetailPage` (LFH-346 · A7); die Obergrenze ist
+      // mitgezogen, die Summe unten bleibt 14.
       'stammdaten/FahrzeugDetailPage.tsx': 1,
       'karten/OnlineQuelleFormModal.tsx': 1,
     };
@@ -152,13 +141,11 @@ describe('Feldbreiten im Verwaltungsteil', () => {
       const quelle = QUELLEN.find((q) => q.pfad === pfad);
       if (!quelle) throw new Error(`Feldbreiten-Guard: ${pfad} nicht im Scan`);
       gemessen[pfad] = quelle.text.match(OBERGRENZE)?.length ?? 0;
-      // Exakt, nicht „mindestens": bei `>=` trüge die Zahl in der Erwartungsmap
-      // keine Aussage mehr, und die Summe darunter zählte nur noch sich selbst.
+      // Exakt, nicht „mindestens": bei `>=` trüge die Zahl keine Aussage mehr.
       expect(gemessen[pfad], pfad).toBe(anzahl);
     }
-    // Summiert wird das GEMESSENE, nicht die Erwartungsmap. Sonst verglich diese
-    // Zeile eine hartkodierte Zahl mit einer hartkodierten Zahl und belegte über
-    // den Quellbaum nichts — die vierzehn im Testnamen wäre nirgends erzwungen.
+    // Summiert wird das GEMESSENE, nicht die Erwartungsmap — sonst wäre die Vierzehn im Testnamen
+    // nirgends erzwungen.
     expect(Object.values(gemessen).reduce((a, b) => a + b, 0)).toBe(14 + neuSeitB1.length);
   });
 
