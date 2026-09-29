@@ -107,11 +107,27 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
   it('bereitstellungsraeumeListePfad', () => {
     expect(bereitstellungsraeumeListePfad(3)).toBe('/einsaetze/3/bereitstellungsraeume/liste');
   });
+  /**
+   * Die Schnellerfassung zeigt auf die LISTEN-Route (LFH-506): der bare Modulpfad trägt
+   * `BereitstellungsraeumeDefault`, das `?neu=1` nicht liest — dieselbe Falle wie bei den UHS.
+   */
+  it('bereitstellungsraeumeListePfad mit ?neu=1 zeigt auf die Listen-Route', () => {
+    expect(bereitstellungsraeumeListePfad(E, { neu: true })).toBe(
+      '/einsaetze/5/bereitstellungsraeume/liste?neu=1',
+    );
+    expect(bereitstellungsraeumeListePfad(E, { neu: false })).toBe(
+      '/einsaetze/5/bereitstellungsraeume/liste',
+    );
+  });
   it('lageberichtePfad', () => {
     expect(lageberichtePfad(E)).toBe('/einsaetze/5/lageberichte');
   });
   it('tierePfad (Liste / NaN-Redirect-Ziel)', () => {
     expect(tierePfad(E)).toBe('/einsaetze/5/tiere');
+  });
+  it('tierePfad mit ?neu=1', () => {
+    expect(tierePfad(E, { neu: true })).toBe('/einsaetze/5/tiere?neu=1');
+    expect(tierePfad(E, { neu: false })).toBe('/einsaetze/5/tiere');
   });
   it('erinnerungenPfad zeigt auf die Erinnerungen-Liste', () => {
     expect(erinnerungenPfad(7)).toBe('/einsaetze/7/erinnerungen');
@@ -341,6 +357,10 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(einsatzabschnittePfad(E, { abschnitt: 2 })).toBe(
       '/einsaetze/5/einsatzabschnitte?abschnitt=2',
     );
+  });
+  it('einsatzabschnittePfad mit ?neu=1', () => {
+    expect(einsatzabschnittePfad(E, { neu: true })).toBe('/einsaetze/5/einsatzabschnitte?neu=1');
+    expect(einsatzabschnittePfad(E, { neu: false })).toBe('/einsaetze/5/einsatzabschnitte');
   });
   it('meldungenPfad mit ?meldung=', () => {
     expect(meldungenPfad(E, { meldung: 11 })).toBe('/einsaetze/5/meldungen?meldung=11');

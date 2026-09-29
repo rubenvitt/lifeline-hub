@@ -75,6 +75,9 @@ describe('baueBefehle — Schnellaktionen folgen der Leseachse', () => {
       'aktion:schaeden',
       'aktion:stab',
       'aktion:dokumente',
+      'aktion:tiere',
+      'aktion:bereitstellungsraeume',
+      'aktion:einsatzabschnitte',
     ]);
   });
 });
