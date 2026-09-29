@@ -33,15 +33,13 @@ function abstandText(faelligAt: string, jetzt: Dayjs): string {
 }
 
 /**
- * Eine Schicht (LFH-635). Der linke Rand trägt die Einstufung — EINE Farbe, Gefahr gewinnt
- * (Regel aus LFH-343 · C8): überfällig rot, Vorwarnung gelb, sonst die Linienfarbe. Der zweite
- * Kanal ist das Wort im Etikett (WCAG 1.4.1), die Uhrzeit steht immer daneben. Nichts blinkt.
+ * Eine Schicht. Der linke Rand trägt die Einstufung — EINE Farbe, Gefahr gewinnt: überfällig
+ * rot, Vorwarnung gelb, sonst Linienfarbe. Zweiter Kanal ist das Wort im Etikett (WCAG 1.4.1).
+ * Nichts blinkt.
  *
- * Aktionen: „Ablösung vollziehen" ist die eine sichtbare Kartenaktion. „Ablösende Einheit
- * planen" und „Rhythmus ändern" liegen im Dreipunkt-Menü — mit der Kartenaktion sind es drei,
- * und ab drei wird gebündelt (LFH-365). Ohne Schreibrecht fällt die Aktionszeile ganz weg
- * (C11: n Karten × gesperrte Knöpfe kosten Platz für null Handlungsmöglichkeit; der Grund
- * steht einmal im Seitenkopf).
+ * „Ablösung vollziehen" ist die sichtbare Kartenaktion, „Ablösende Einheit planen" und
+ * „Rhythmus ändern" liegen im Dreipunkt-Menü (ab drei Aktionen wird gebündelt). Ohne
+ * Schreibrecht fällt die Aktionszeile ganz weg; den Grund nennt der Seitenkopf.
  */
 export default function AbloesungKarte({
   schicht: s,
@@ -126,12 +124,11 @@ export default function AbloesungKarte({
           )}
         </Space>
         {darfSchreiben && laufend && (
-          // `marginSM` = 7 / 11 / 16 px: im Handschuh-Betrieb der Abstand ≥ 16 px zwischen zwei
-          // Zielen (MIL-STD-1472F Fig. 24, Prüfliste Kriterium 2), gemessen in Gate 3.
+          // `marginSM` = 7 / 11 / 16 px: im Handschuh-Betrieb ≥ 16 px zwischen zwei Zielen
+          // (MIL-STD-1472F Fig. 24).
           <Flex justify="flex-end" gap={token.marginSM} style={{ marginTop: token.marginXS }}>
             {onVollziehen && (
-              // Kein `type="primary"`: die EINE Primäraktion der Seite steht im Kopf
-              // („Schicht beginnen", LFH-340 · C5); n blaue Kartenknöpfe gleichen Gewichts
+              // Kein `type="primary"`: die eine Primäraktion der Seite steht im Kopf; n blaue Kartenknöpfe
               // nähmen der Einstufung am Rand die Aufmerksamkeit.
               <Button onClick={() => onVollziehen(s)}>Ablösung vollziehen</Button>
             )}

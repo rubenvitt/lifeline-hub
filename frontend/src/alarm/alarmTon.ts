@@ -1,10 +1,9 @@
 /**
- * Akustische Alarmtöne (LFH-97/118). EIN Per-User-Mute via localStorage für ALLE Alarmtöne;
- * abgestufte Dringlichkeit: 'alarm' (Sofortmeldung/Eskalation) vs. 'dezent' (fällige Erinnerung).
+ * Akustische Alarmtöne. EIN Per-User-Mute via localStorage für ALLE Alarmtöne; Stufen
+ * 'alarm' (Sofortmeldung/Eskalation) und 'dezent' (fällige Erinnerung).
  *
- * Web-Audio statt Audiodatei: kein Asset, kein Netz. Der AudioContext startet wegen der
- * Autoplay-Policy ggf. erst nach der ersten User-Geste — schlägt das Abspielen fehl, bleibt es
- * still (die visuelle Spur trägt).
+ * Web-Audio statt Audiodatei: kein Asset, kein Netz. Scheitert das Abspielen an der
+ * Autoplay-Policy, bleibt es still (die visuelle Spur trägt).
  */
 type AlarmStufe = 'dezent' | 'alarm';
 export type AlarmTonStatus = 'bereit' | 'blockiert';
@@ -13,8 +12,8 @@ export type AlarmTonStatus = 'bereit' | 'blockiert';
 export const ALARM_TON_STATUS_EVENT = 'lfh:alarm-ton-status';
 
 const MUTE_KEY = 'lfh:alarm:mute';
-// LFH-118: alter Sofort-Mute-Key als einmaliger Fallback, damit eine bestehende Stummschaltung
-// beim Umstieg auf den globalen Mute nicht verlorengeht.
+// Alter Sofort-Mute-Key als einmaliger Fallback, damit eine bestehende Stummschaltung
+// nicht verlorengeht.
 const ALT_MUTE_KEY = 'lfh:sofortmeldung:mute';
 
 export function istAlarmGemutet(): boolean {
@@ -119,7 +118,7 @@ function starteTon(context: AudioContext, stufe: AlarmStufe): void {
 
   const t = context.currentTime;
   if (stufe === 'alarm') {
-    // Zwei kurze, höhere Beeps (unübersehbar) — wie der bisherige Sofort-Alarm.
+    // Zwei kurze, höhere Beeps.
     osc.frequency.value = 880;
     gain.gain.setValueAtTime(0.07, t);
     gain.gain.setValueAtTime(0, t + 0.15);
@@ -152,8 +151,8 @@ export function spieleAlarmTon(stufe: AlarmStufe): void {
       return;
     }
 
-    // Resume ist asynchron. Erst NACH dem Promise erneut auf `state` prüfen — ein
-    // aufgelöstes Promise allein belegt nicht, dass die Autoplay-Sperre gefallen ist.
+    // Erst NACH dem Promise erneut auf `state` prüfen — ein aufgelöstes `resume()` belegt nicht,
+    // dass die Autoplay-Sperre gefallen ist.
     void context
       .resume()
       .then(() => {

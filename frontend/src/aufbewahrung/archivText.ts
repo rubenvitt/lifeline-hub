@@ -1,8 +1,8 @@
 import type { AufbewahrungZustand, EtbTyp, VerbleibArt, VerbleibStatus } from '../api/types';
 
 /**
- * Wörter der Archivakte (LFH-23), die es an keiner exportierten Stelle gibt. Exhaustiv über die
- * generierten Unions: eine neue Variante bricht den Typcheck, statt still zu fehlen.
+ * Wörter der Archivakte, die es an keiner exportierten Stelle gibt. Exhaustiv über die
+ * generierten Unions: eine neue Variante bricht den Typcheck.
  */
 
 export const VERBLEIB_ART: Record<VerbleibArt, string> = {
@@ -53,9 +53,10 @@ export const ETB_TYPEN: readonly EtbTyp[] = (Object.keys(ETB_TYP_RANG) as EtbTyp
   (a, b) => ETB_TYP_RANG[a] - ETB_TYP_RANG[b],
 );
 
-/** Welche EINE Primäraktion die Akte im Kopf trägt (design.md D8). Nach Karenz-Ende und nach
- *  der Schwärzung gibt es keine: der Server lehnt dort mit 409 ab, und ein Knopf, der nur
- *  abgelehnt werden kann, ist schlechter als keiner. */
+/**
+ * Welche EINE Primäraktion die Akte im Kopf trägt. Nach Karenz-Ende und Schwärzung keine:
+ * ein Knopf, der nur mit 409 abgelehnt werden kann, ist schlechter als keiner.
+ */
 type AktePrimaeraktion = 'frist' | 'wiederherstellen' | null;
 
 export function primaeraktion(zustand: AufbewahrungZustand): AktePrimaeraktion {

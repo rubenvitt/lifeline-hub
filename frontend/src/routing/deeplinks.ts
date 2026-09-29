@@ -1,29 +1,18 @@
 /**
- * Zentrale, typsichere Deeplink-/URL-Builder für den Einsatz-Workspace (LFH-25).
+ * Zentrale, typsichere Deeplink-/URL-Builder für den Einsatz-Workspace (LFH-25) — Routen,
+ * Param-Namen und Query-Konventionen an EINER Stelle, statt inline Template-Literals.
  *
- * Maßgebliche Quelle der Wahrheit für modulübergreifende Pfade und der Zielzustand für
- * alle Einsatz-Deeplinks: statt inline Template-Literals (`/einsaetze/${id}/...`) über die
- * Codebasis verstreut bauen Komponenten ihre Links hierüber — das hält Routen-Strings,
- * Param-Namen und Query-Konventionen an EINER Stelle und macht sie unit-testbar.
+ * Bare `/einsaetze/:id`-Breadcrumbs und dynamische Modul-Navigation (`modulZielRoute`) bleiben
+ * inline; bei Routenänderungen auch nach Inline-Literalen suchen.
  *
- * Hinweis: Bare `/einsaetze/:id`-Breadcrumbs und dynamische Modul-Basis-Navigationen
- * (`modulZielRoute(...)`) bleiben bewusst inline (kein passender Builder). Bei Routen-/
- * Param-Änderungen daher auch nach Inline-Literalen suchen, nicht nur hier ändern.
- *
- * Muster (siehe docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-design.md
- * und die UI-Form-Leitlinie in CLAUDE.md):
- *  - **Item-Route** `/einsaetze/:id/<modul>/:<modul>Id` → Vollseiten-Detail (uhs, br,
- *    lagebericht, befehl, person, tier, schaden).
- *  - **Query-Param** `?<modul>=<id>` → Selektion auf der Modul-/Listenseite, wenn das
- *    Modul (noch) keine eigene Detail-Route hat (einheit, fahrzeug, personal,
- *    abschnitt, meldung, auftrag, gefahrengebiet) bzw. ein Eintrag in einer Liste
- *    adressiert wird (etb).
+ * Muster:
+ *  - **Item-Route** `/einsaetze/:id/<modul>/:<modul>Id` → Vollseiten-Detail.
+ *  - **Query-Param** `?<modul>=<id>` → Selektion auf der Listenseite, wenn es keine
+ *    Detail-Route gibt bzw. ein Eintrag einer Liste adressiert wird (etb).
  *  - **`?neu=1`** → Schnellerfassung auf der Listenseite fokussieren.
  *
- * Die Builder sind reine String-Funktionen und gehen von gültigen, positiven
- * Integer-IDs aus. ID-Validierung von URL-Parametern macht `parseRouteId`; Link-Render-
- * Stellen mit potenziell fehlender ID guarden vor dem Aufruf (kein doppelter Guard im
- * Builder).
+ * Die Builder gehen von gültigen, positiven Integer-IDs aus; URL-Parameter validiert
+ * `parseRouteId`, Render-Stellen mit möglicherweise fehlender ID guarden vor dem Aufruf.
  */
 import type { EtbFilterWerte } from '../api/etb';
 import type { EtbTyp } from '../api/types';
@@ -46,15 +35,11 @@ export function einsatzModulPfad(einsatzId: number, modulRoute: string): string 
 
 function mitQuery(pfad: string, params: Record<string, string | number | undefined>): string {
   const qs = Object.entries(params)
-    // Der leere String fällt seit LFH-342 mit heraus: die ETB-Filterachse leert ihre
-    // Felder auf `''`, und `?q=` wäre ein gesetzter Filter auf nichts — `parseEtbFilter`
-    // müsste ihn wieder wegwerfen, und die URL zeigte einen Filter, den es nicht gibt.
+    // Leere Strings fallen heraus: `?q=` wäre ein gesetzter Filter auf nichts.
     .filter(([, v]) => v !== undefined && v !== '')
     /*
-     * Kodiert seit LFH-342 · C7. Der ETB-Suchbegriff ist Freitext und darf `&`, `=` und
-     * Leerzeichen tragen; unkodiert machte ein `&` aus einem Suchbegriff zwei Parameter.
-     * Für alle Bestandswerte (Zahlen, `1`, Modulschlüssel) ist die Kodierung die
-     * Identität — deshalb ändert sich an den Bestandspins nichts.
+     * Kodiert, weil der ETB-Suchbegriff Freitext mit `&`, `=` und Leerzeichen sein darf. Für
+     * Zahlen und Schlüssel ist die Kodierung die Identität.
      */
     .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
     .join('&');
@@ -94,12 +79,9 @@ export function schadenDetailPfad(einsatzId: number, schadenId: number): string 
 // ── Listen-Routes (auch NaN-Redirect-Ziele) ──────────────────────────────────
 
 /**
- * Die UHS-Listenroute. `opts.neu` nachgetragen (LFH-331 · B3): `UnfallhilfsstellenPage`
- * liest `?neu=1` seit je, der Builder konnte den Param aber nicht bauen — Aufrufer
- * mussten ihn danebenschreiben, was die Registry an genau dieser Stelle umging.
- *
- * Achtung beim Kürzen: die Liste liegt unter `/unfallhilfsstellen/liste`. Der bare
- * Modulpfad zeigt auf `UnfallhilfsstellenDefault`, das `?neu=1` gar nicht liest.
+ * Die UHS-Listenroute; `UnfallhilfsstellenPage` liest `?neu=1`.
+ * Die Liste liegt unter `/unfallhilfsstellen/liste`; der bare Modulpfad zeigt auf
+ * `UnfallhilfsstellenDefault`, das `?neu=1` nicht liest.
  */
 export function unfallhilfsstellenListePfad(
   einsatzId: number,
@@ -114,8 +96,8 @@ export function bereitstellungsraeumePfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'bereitstellungsraeume');
 }
 
-/** Tabellenansicht aller Bereitstellungsräume — der Modul-Index springt seit LFH-347 · M56
- *  direkt in den zuletzt gewählten BR (wie `unfallhilfsstellen/liste`). */
+/** Tabellenansicht aller Bereitstellungsräume; der Modul-Index springt direkt in den zuletzt
+    gewählten BR (wie `unfallhilfsstellen/liste`). */
 export function bereitstellungsraeumeListePfad(einsatzId: number): string {
   return `${einsatzModulPfad(einsatzId, 'bereitstellungsraeume')}/liste`;
 }
@@ -125,21 +107,16 @@ export function lageberichtePfad(einsatzId: number): string {
 }
 
 /**
- * Führungsüberblick eines Einsatzes — seit dem Neuentwurf (21.09.2026) die Startseite, auf
- * die `/einsaetze/:id` umleitet (`redirectZiel` in `einsatz/modulRegistry.ts`).
+ * Führungsüberblick eines Einsatzes — die Startseite, auf die `/einsaetze/:id` umleitet
+ * (`redirectZiel` in `einsatz/modulRegistry.ts`).
  */
 export function ueberblickPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'ueberblick');
 }
 
 /**
- * Aggregierende Kräfteübersicht (Meldebild) eines Einsatzes. Seit dem Neuentwurf heißt das
- * Modul in der Navigation „Meldebild" und steht unter Kräfte & Mittel; der Routenschlüssel
- * bleibt, damit bestehende Deeplinks tragen.
- *
- * Der Routenschlüssel ist der aus `einsatz/modulRegistry.ts` und `App.tsx` — die Seite gab
- * es längst, sie war nur von keiner der vier Kräfte-Modulseiten aus erreichbar
- * (LFH-338 · C3, Befund H21).
+ * Aggregierende Kräfteübersicht, in der Navigation „Meldebild". Der Routenschlüssel
+ * `kraefteuebersicht` bleibt, damit bestehende Deeplinks tragen.
  */
 export function kraefteuebersichtPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'kraefteuebersicht');
@@ -165,10 +142,9 @@ export function personenPfad(
     person?: number;
     neu?: boolean;
     /**
-     * Sichtvorgabe (LFH-620): die Seite übernimmt sie beim Ankommen und räumt die Parameter
-     * (apply-then-clean wie `?neu=1`). Die Sicht selbst bleibt Seitenzustand — die URL
-     * trägt einen AUFTRAG, keinen gespiegelten Filter. Anspringer sind die Sprungmarken
-     * „Patienten" und „Vermisste" im Modulpanel (`einsatz/sprungmarken.ts`).
+     * Sichtvorgabe: die Seite übernimmt sie beim Ankommen und räumt die Parameter
+     * (apply-then-clean). Die URL trägt einen AUFTRAG, keinen gespiegelten Filter. Anspringer
+     * sind die Sprungmarken „Patienten" und „Vermisste" (`einsatz/sprungmarken.ts`).
      */
     filter?: PersonenFilter;
     ansicht?: PersonenAnsicht;
@@ -183,13 +159,8 @@ export function personenPfad(
 }
 
 /**
- * Erlaubte Werte der Personen-Sichtvorgabe — exhaustive Records aus demselben Grund wie
- * {@link ETB_TYP_ERLAUBT}: eine neue Variante bricht den Typcheck, statt zur Laufzeit
- * still verworfen zu werden.
- *
- * Bewusst KEIN `'patienten'`: „Patient" ist kein Personenstatus, sondern eine
- * Darstellung (`ansicht: 'raster'`, `personen/personenFilter.ts`). Ein sechster
- * Filterwert vermengte die beiden Achsen wieder, die der Neuentwurf getrennt hat.
+ * Erlaubte Werte der Personen-Sichtvorgabe — exhaustive Records wie {@link ETB_TYP_ERLAUBT}.
+ * Bewusst KEIN `'patienten'`: „Patient" ist eine Darstellung (`ansicht: 'raster'`), kein Status.
  */
 const PERSONEN_FILTER_ERLAUBT: Record<PersonenFilter, true> = {
   alle: true,
@@ -205,9 +176,8 @@ const PERSONEN_ANSICHT_ERLAUBT: Record<PersonenAnsicht, true> = {
 };
 
 /**
- * Umkehr der Sichtvorgabe von {@link personenPfad} (LFH-620). Je Achse wird ein
- * unbekannter Wert GANZ verworfen (Regel aus `parsePlatzierenAuftrag`/`parseEtbFilter`);
- * die andere Achse bleibt davon unberührt, weil beide unabhängig sind.
+ * Umkehr der Sichtvorgabe von {@link personenPfad}. Je Achse wird ein unbekannter Wert GANZ
+ * verworfen; die andere Achse bleibt unberührt.
  */
 export function parsePersonenSicht(params: URLSearchParams): {
   filter?: PersonenFilter;
@@ -226,19 +196,10 @@ export function parsePersonenSicht(params: URLSearchParams): {
 }
 
 /**
- * Vollseiten-Aufnahme für Personen (LFH-340 · C5).
- *
- * Eine eigene Route, obwohl die Schnellerfassung dieselben Felder im Dialog zeigt: sie ist
- * die ANSPRING-Adresse für andere Module — ein Modal hat keine. Beide Wege tragen dasselbe
- * Bauteil (`personen/AufnahmeFelder`), es gibt also nur eine Maske.
- *
- * **Der Konsument ist da (LFH-341 · C6):** die UHS-Kopfzeile springt hierher. Der
- * optionale `uhs`-Auftrag reist im Query-Param, nicht im Router-State — er überlebt
- * damit einen Neuladen, und genau dafür gibt es diese Route statt eines Dialogs.
- * Die Aufnahmeseite bucht nach dem Anlegen den Eintritt in den Wartebereich.
- *
- * Statisches Segment vor `personen/:personId` — React Router rankt statisch über dynamisch,
- * die Reihenfolge in `App.tsx` entscheidet also nicht, aber ein Leser muss das nicht prüfen.
+ * Vollseiten-Aufnahme für Personen — die ANSPRING-Adresse für andere Module (ein Modal hat
+ * keine); beide Wege tragen dasselbe Bauteil `personen/AufnahmeFelder`.
+ * Der optionale `uhs`-Auftrag (von der UHS-Kopfzeile) reist im Query-Param und überlebt damit
+ * einen Neuladen; die Aufnahmeseite bucht nach dem Anlegen den Eintritt in den Wartebereich.
  */
 export function personenAufnahmePfad(einsatzId: number, opts: { uhs?: number } = {}): string {
   return mitQuery(`${einsatzModulPfad(einsatzId, 'personen')}/aufnahme`, { uhs: opts.uhs });
@@ -250,42 +211,39 @@ export function schaedenPfad(einsatzId: number, opts: { neu?: boolean } = {}): s
   });
 }
 
-/** Dokumentenablage (LFH-632): Listenseite, `?neu=1` fokussiert die Ablage-Erfassung. */
+/** Dokumentenablage: Listenseite, `?neu=1` fokussiert die Ablage-Erfassung. */
 export function dokumentePfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'dokumente'), {
     neu: opts.neu ? 1 : undefined,
   });
 }
 
-/** Ablösungs-Modul (LFH-635): Schichten und fällige Ablösungen je Einheit. */
+/** Ablösungs-Modul: Schichten und fällige Ablösungen je Einheit. */
 export function abloesungPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'abloesung');
 }
 
-/** Verpflegungs-Modul (LFH-634): Zeitfenster mit Bedarf, Ausgaben und Deckung. */
+/** Verpflegungs-Modul: Zeitfenster mit Bedarf, Ausgaben und Deckung. */
 export function verpflegungPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'verpflegung');
 }
 
-/** Fachmodul „Wetter & Pegel" (LFH-633): Pegel mit Verlauf, DWD-Warnungen, Vorhersage. */
+/** Fachmodul „Wetter & Pegel": Pegel mit Verlauf, DWD-Warnungen, Vorhersage. */
 export function wetterPegelPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'wetter-pegel');
 }
 
 /**
- * Ziel eines Pegel-Verweises (Dashboard-Kennzahl, Überblick-Marke): die Modulseite, wenn sie
- * für die Person frei ist, sonst die Pflege in Einstellungen › Pegel (LFH-633). Die Frage
- * „frei?" beantwortet der Aufrufer (`istKeyFreigegeben`), damit diese Datei keine Registry
- * und keinen Benutzer kennen muss.
+ * Ziel eines Pegel-Verweises: die Modulseite, wenn sie für die Person frei ist, sonst
+ * Einstellungen › Pegel. „Frei?" beantwortet der Aufrufer (`istKeyFreigegeben`).
  */
 export function pegelZielPfad(einsatzId: number, modulFrei: boolean): string {
   return modulFrei ? wetterPegelPfad(einsatzId) : einsatzEinstellungenPfad(einsatzId, 'pegel');
 }
 
 /**
- * Betreuungs-Modul (LFH-639). Keine Detailroute (design.md D7) — ein Bezirk bzw. eine
- * Betreuungsstelle wird deshalb per Query-Param selektiert (LFH-25): `?bezirk=<id>` /
- * `?stelle=<id>`, stabile DB-`id`, die Seite scrollt auf die Zeile.
+ * Betreuungs-Modul. Keine Detailroute — Bezirk bzw. Stelle per Query-Param (`?bezirk=<id>` /
+ * `?stelle=<id>`), die Seite scrollt auf die Zeile.
  */
 export function betreuungPfad(
   einsatzId: number,
@@ -297,10 +255,7 @@ export function betreuungPfad(
   });
 }
 
-/**
- * Stab-Modul (LFH-46). `?neu=1` wird ab ST5 (LFH-543) von der Seite gelesen und geräumt
- * (Abschluss der Lagebesprechung, apply-then-clean wie ETB/Schäden).
- */
+/** Stab-Modul. `?neu=1` liest und räumt die Seite (Abschluss der Lagebesprechung). */
 export function stabPfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'stab'), {
     neu: opts.neu ? 1 : undefined,
@@ -310,15 +265,9 @@ export function stabPfad(einsatzId: number, opts: { neu?: boolean } = {}): strin
 /**
  * Erlaubte Werte des ETB-Typfilters.
  *
- * Ein **exhaustiver Record**, kein Array: fehlt hier eine Variante von `EtbTyp`, bricht
- * der Typcheck (TS2739), statt dass `parseEtbFilter` sie zur Laufzeit still verwirft und
- * ein aus der URL geladener Filter ohne Meldung leer bliebe. Dasselbe Muster wie beim
- * Enum-Wire-Kontrakt im Backend — der exhaustive Match ist die Zusicherung, nicht der
- * Assert daneben.
- *
- * Bewusst NICHT `Object.keys(etbTyp)` aus `theme/statusFarben`: das zöge die Theme- und
- * Token-Schicht in ein reines String-Modul (und in dessen Test). Der Typimport oben
- * verschwindet dagegen beim Übersetzen vollständig.
+ * Ein **exhaustiver Record**, kein Array: fehlt eine Variante von `EtbTyp`, bricht der
+ * Typcheck, statt dass `parseEtbFilter` sie still verwirft. Bewusst nicht aus
+ * `theme/statusFarben` abgeleitet: das zöge die Theme-Schicht in ein reines String-Modul.
  */
 const ETB_TYP_ERLAUBT: Record<EtbTyp, true> = {
   meldung: true,
@@ -334,12 +283,12 @@ export function etbPfad(
   opts: {
     eintrag?: number;
     neu?: boolean;
-    /** Filterachse (LFH-342 · C7). Leere Werte fallen in `mitQuery` heraus. */
+    /** Filterachse. Leere Werte fallen in `mitQuery` heraus. */
     q?: string;
     typ?: EtbTyp;
     von?: string;
     bis?: string;
-    /** „Betrifft Einheit" (LFH-616) — der Knopf „ETB ↗" an der Einheit auf der Lagekarte. */
+    /** „Betrifft Einheit" — der Knopf „ETB ↗" an der Einheit auf der Lagekarte. */
     einheit_id?: number;
   } = {},
 ): string {
@@ -355,10 +304,8 @@ export function etbPfad(
 }
 
 /**
- * Druckansicht des Tagebuchs (LFH-22, design.md D5): `/einsaetze/:id/etb/druck` mit
- * derselben Filterachse wie {@link etbPfad}. Der Rückweg ist {@link parseEtbFilter} — eine
- * Umkehr für beide Adressen, damit die Druckansicht genau die Auswahl druckt, die das
- * Tagebuch zeigte.
+ * Druckansicht des Tagebuchs mit derselben Filterachse wie {@link etbPfad}; eine Umkehr
+ * ({@link parseEtbFilter}) für beide Adressen, damit genau die gezeigte Auswahl gedruckt wird.
  */
 export function etbDruckPfad(
   einsatzId: number,
@@ -374,17 +321,11 @@ export function etbDruckPfad(
 }
 
 /**
- * Umkehr der Filterachse von {@link etbPfad} (LFH-342 · C7).
+ * Umkehr der Filterachse von {@link etbPfad}.
  *
- * Verwirft Unbrauchbares GANZ statt halb zu übernehmen — dieselbe Regel wie bei
- * {@link parsePlatzierenAuftrag} (LFH-340 · C5): ein unbekannter Typ ergibt keinen Filter
- * auf diesen Typ, sondern gar keinen. Ein halb gefüllter Filter erzeugte sonst einen
- * Query-Key, den der Server mit 400 quittiert, während die Leiste einen gültigen Stand
- * anzeigt.
- *
- * Die Zeitwerte gehen ungeprüft durch: sie sind Wire-Strings, und ihre Umkehr in einen
- * anzeigbaren Zeitpunkt macht `etb/filterZeit.ts` — dort fällt ein unbrauchbarer Wert auf
- * `undefined`, statt hier als `Invalid Date` in den `DatePicker` zu geraten.
+ * Verwirft Unbrauchbares GANZ: ein unbekannter Typ ergibt gar keinen Filter, sonst entstünde
+ * ein Query-Key, den der Server mit 400 quittiert, während die Leiste einen gültigen Stand
+ * zeigt. Die Zeitwerte gehen ungeprüft durch; ihre Umkehr macht `etb/filterZeit.ts`.
  */
 export function parseEtbFilter(params: URLSearchParams): EtbFilterWerte {
   const werte: EtbFilterWerte = {};
@@ -398,8 +339,7 @@ export function parseEtbFilter(params: URLSearchParams): EtbFilterWerte {
   if (von) werte.von = von;
   const bis = params.get('bis');
   if (bis) werte.bis = bis;
-  // Dieselbe Prüfung wie `parseRouteId`: `abc` oder `0` ergäben am Server 400 bzw. einen
-  // Filter auf nichts — dann lieber gar keiner.
+  // Wie `parseRouteId`: `abc` oder `0` ergäben am Server 400 bzw. einen Filter auf nichts.
   const einheit = parseRouteId(params.get('einheit_id') ?? undefined);
   if (einheit != null) werte.einheit_id = einheit;
   return werte;
@@ -414,35 +354,22 @@ export function einheitenPfad(einsatzId: number, opts: { einheit?: number } = {}
 }
 
 /**
- * Vollseiten-Detail je Einheit (LFH-339 · C4).
- *
- * Die Einheit ist damit vom Query-Param- auf das Item-Route-Muster gewechselt: sie hat
- * seit C4 eine eigene Detailansicht, und die Faustregel dieses Moduls lautet
- * „Vollseiten-Detail vorhanden → Item-Route".
- *
- * Der Grund ist LFH-19, nicht Symmetrie: die Kopfdaten sind neun Felder, dazu kommen drei
- * sofort wirkende Zuordnungslisten. Das ist keine Auswahl in einer Listenhälfte mehr.
- *
- * `einheitenPfad(id, { einheit })` bleibt bestehen und ist NICHT tot: Bestands-Deeplinks
- * aus anderen Modulen zeigen darauf, und die Listenseite leitet sie auf diese Route weiter.
+ * Vollseiten-Detail je Einheit (Kopfdaten plus drei Zuordnungslisten, zu viel für eine
+ * Listenhälfte). `einheitenPfad(id, { einheit })` bleibt für Bestands-Deeplinks; die
+ * Listenseite leitet sie hierher weiter.
  */
 export function einheitDetailPfad(einsatzId: number, einheitId: number): string {
   return `${einsatzModulPfad(einsatzId, 'einheiten')}/${einheitId}`;
 }
 
 /**
- * Darstellung der Fahrzeugseite (LFH-642): die Tabelle oder das FMS-Tableau. Das Tableau
- * ist eine ANSICHT dieses Moduls und kein eigenes Modul — Endpunkte und Live-Ereignis
- * hängen am Schlüssel `fahrzeuge`, ein eigener Schlüssel wäre getrennt schaltbar und
- * endete in 403 ohne Live-Updates. Anspringer ist die Sprungmarke „FMS-Tableau"
- * (`einsatz/sprungmarken.ts`).
+ * Darstellung der Fahrzeugseite: Tabelle oder FMS-Tableau. Das Tableau ist eine ANSICHT dieses
+ * Moduls, kein eigenes: Endpunkte und Live-Ereignis hängen am Schlüssel `fahrzeuge`, ein eigener
+ * Schlüssel endete in 403 ohne Live-Updates. Anspringer ist die Sprungmarke „FMS-Tableau".
  */
 export type FahrzeugeAnsicht = 'liste' | 'tableau';
 
-/**
- * `ansicht` ist wie bei {@link personenPfad} ein AUFTRAG: die Seite übernimmt ihn beim
- * Ankommen und räumt den Parameter (apply-then-clean); die Ansicht bleibt Seitenzustand.
- */
+/** `ansicht` ist ein AUFTRAG wie bei {@link personenPfad} (apply-then-clean). */
 export function fahrzeugePfad(
   einsatzId: number,
   opts: { fahrzeug?: number; ansicht?: FahrzeugeAnsicht } = {},
@@ -479,8 +406,8 @@ export function meldungenPfad(einsatzId: number, opts: { meldung?: number } = {}
 }
 
 /**
- * Vorbelegung der Nachforderungs-Erfassung (LFH-634, D9) — z. B. „Nachfordern" aus einer
- * Unterdeckung der Verpflegung. Keine Personenangaben: die Werte sind Bezeichnungen und Zahlen.
+ * Vorbelegung der Nachforderungs-Erfassung (z. B. „Nachfordern" aus der Verpflegung). Keine
+ * Personenangaben: nur Bezeichnungen und Zahlen.
  */
 export interface NachforderungVorbelegung {
   art: string;
@@ -491,10 +418,9 @@ export interface NachforderungVorbelegung {
 }
 
 /**
- * Nachforderungsseite. `?neu=1` öffnet die Erfassung; eine `vorbelegung` setzt `neu=1`
- * selbst und hängt `art`, `bezeichnung`, `anzahl` und `begruendung` an (kodiert über
- * `mitQuery`, Freitext darf `&` und `=` tragen). Die Seite räumt alles nach dem Lesen
- * (apply-then-clean).
+ * Nachforderungsseite. `?neu=1` öffnet die Erfassung; eine `vorbelegung` setzt `neu=1` selbst
+ * und hängt `art`, `bezeichnung`, `anzahl` und `begruendung` kodiert an. Die Seite räumt alles
+ * nach dem Lesen.
  */
 export function nachforderungenPfad(
   einsatzId: number,
@@ -521,16 +447,12 @@ export const NACHFORDERUNG_VORBELEGUNG_PARAMS = [
 /**
  * Liest die Vorbelegung aus `?art=…&bezeichnung=…&anzahl=…&begruendung=…` zurück.
  *
- * Wie `parsePlatzierenAuftrag`: Unbrauchbares wird GANZ verworfen, nicht halb übernommen —
- * eine Erfassung mit Art „Verpflegung", aber ohne die Fehlmenge sähe vorbelegt aus und
- * forderte das Falsche nach. `anzahl` muss eine positive Ganzzahl in Dezimalschreibweise
- * sein; `Number()` allein nähme auch `1e2` und ` 5` an. `art` und `bezeichnung` dürfen
- * nicht leer sein (dieselbe Regel wie die Pflichtfelder des Formulars), `begruendung` ist
- * optional und fällt leer weg.
+ * Unbrauchbares wird GANZ verworfen: eine vorbelegte Erfassung ohne Fehlmenge forderte das
+ * Falsche nach. `anzahl` muss eine positive Ganzzahl in Dezimalschreibweise sein (`Number()`
+ * nähme auch `1e2`), `art` und `bezeichnung` nicht leer; `begruendung` ist optional.
  *
- * `neu` liest dieser Parser bewusst NICHT: das ist Sache der Seite, und ein
- * `get('neu')`-Leser in dieser Datei wäre für `schnellaktionen.guard.test.ts` keinem Modul
- * zuordenbar.
+ * `neu` liest dieser Parser bewusst NICHT: ein `get('neu')`-Leser in dieser Datei wäre für
+ * `schnellaktionen.guard.test.ts` keinem Modul zuordenbar.
  */
 export function parseNachforderungVorbelegung(
   params: URLSearchParams,
@@ -554,9 +476,8 @@ export function gefahrenPfad(einsatzId: number, opts: { gefahrengebiet?: number 
 }
 
 /**
- * Lagekarte, optional mit vorselektiertem Gefahrengebiet (Reverse-Deeplink von der
- * GefahrenPage, LFH-155). Query-Param statt Item-Route: die Karte selektiert das Gebiet
- * und fliegt es an — sie hat keine Vollseiten-Detailansicht je Gefahrengebiet.
+ * Lagekarte, optional mit vorselektiertem Gefahrengebiet: die Karte selektiert das Gebiet und
+ * fliegt es an (keine Detailseite je Gebiet).
  */
 export function lagekartePfad(
   einsatzId: number,
@@ -571,17 +492,15 @@ export function lagekartePfad(
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'lagekarte'), {
     gefahrengebiet: opts.gefahrengebiet,
-    // Bezirksfläche (LFH-673): die Karte wählt eine Zone dieses Bezirks, fliegt hin und räumt
-    // den Parameter — dasselbe Muster wie `gefahrengebiet`.
+    // Bezirksfläche: die Karte wählt eine Zone des Bezirks, fliegt hin und räumt den Parameter.
     evakuierungsbezirk: opts.evakuierungsbezirk,
     ansicht: opts.ansicht,
-    // Historien-Modus (C/LFH-321): ?snapshot=<id> zeigt den eingefrorenen Stand (schreibgeschützt).
+    // Historien-Modus: ?snapshot=<id> zeigt den eingefrorenen Stand (schreibgeschützt).
     snapshot: opts.snapshot,
-    // Platzier-Auftrag (LFH-340 · C5): die Karte geht in den Platzier-Modus für genau
-    // dieses Objekt, der nächste Klick auf die Karte setzt seine Koordinate.
+    // Platzier-Auftrag: der nächste Klick auf die Karte setzt die Koordinate dieses Objekts.
     platzieren: opts.platzieren ? `${opts.platzieren.typ}:${opts.platzieren.id}` : undefined,
-    // Kartenmittelpunkt (LFH-619, Koordinatensprung der Sprungpalette): die Karte fliegt
-    // die Stelle an und räumt den Parameter. Fünf Nachkommastellen ≙ rund 1 m.
+    // Kartenmittelpunkt (Koordinatensprung der Sprungpalette): die Karte fliegt hin und räumt den
+    // Parameter. Fünf Nachkommastellen ≙ rund 1 m.
     zentrum: opts.zentrum ? `${runde5(opts.zentrum.lat)},${runde5(opts.zentrum.lon)}` : undefined,
   });
 }
@@ -598,10 +517,8 @@ function runde5(x: number): string {
 }
 
 /**
- * Liest den Kartenmittelpunkt aus `?zentrum=<lat>,<lon>` zurück (LFH-619).
- *
- * Wie `parsePlatzierenAuftrag`: Unbrauchbares wird GANZ verworfen, nicht halb gefüllt — eine
- * halbe Koordinate liefe mit `NaN` oder `0` in `flyTo` und schickte die Karte auf den
+ * Liest den Kartenmittelpunkt aus `?zentrum=<lat>,<lon>` zurück.
+ * Unbrauchbares wird GANZ verworfen — eine halbe Koordinate schickte die Karte auf den
  * Nullmeridian. Der Wertebereich wird mitgeprüft, weil der Parameter ein Fremd-Link sein kann.
  */
 export function parseKartenzentrum(wert: string | null | undefined): Kartenzentrum | null {
@@ -615,11 +532,9 @@ export function parseKartenzentrum(wert: string | null | undefined): Kartenzentr
 }
 
 /**
- * Objekttypen, die von außen zum Verorten auf die Karte geschickt werden können.
- *
- * Bewusst eine EIGENE, engere Menge als der karteninterne `PlatzierenPunktTyp`: was hier
- * steht, muss die Karte auch aus einem Fremd-Link heraus platzieren können. Wer den Typ
- * erweitert, prüft `pages/LagekartePage.tsx` mit — dort wird der Wert zurückgelesen.
+ * Objekttypen, die von außen zum Verorten auf die Karte geschickt werden können — bewusst
+ * enger als der karteninterne `PlatzierenPunktTyp`. Wer erweitert, prüft
+ * `pages/LagekartePage.tsx` mit.
  */
 type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person' | 'betreuungsstelle';
 
@@ -627,18 +542,16 @@ type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person' | 'betreuungsstelle';
 const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
   schaden: true,
   uhs: true,
-  // Fundort-Koordinate einer Person (LFH-613, „Auf Lagekarte verorten" der Detailseite).
+  // Fundort-Koordinate einer Person („Auf Lagekarte verorten" der Detailseite).
   person: true,
-  // Betreuungsstelle (LFH-673, „Auf Karte verorten" der Betreuungsseite).
+  // Betreuungsstelle („Auf Karte verorten" der Betreuungsseite).
   betreuungsstelle: true,
 };
 
 /**
- * Liest den Platzier-Auftrag aus `?platzieren=<typ>:<id>` zurück.
- *
- * Strenger als ein `split(':')`: ein unbekannter Typ oder eine unbrauchbare Id liefern
- * `null`, nicht ein halb gefülltes Objekt. Der Aufrufer räumt den Parameter danach ohnehin —
- * ein stehengebliebener Auftrag schickte die Karte bei jedem Neuladen erneut in den Modus.
+ * Liest den Platzier-Auftrag aus `?platzieren=<typ>:<id>` zurück: ein unbekannter Typ oder eine
+ * unbrauchbare Id liefern `null`, kein halb gefülltes Objekt. Der Aufrufer räumt den Parameter,
+ * sonst ginge die Karte bei jedem Neuladen erneut in den Modus.
  */
 export function parsePlatzierenAuftrag(
   wert: string | null | undefined,
@@ -653,10 +566,8 @@ export function parsePlatzierenAuftrag(
 // ── Route-Param-Robustheit ───────────────────────────────────────────────────
 
 /**
- * Parst einen URL-Route-Parameter zu einer gültigen Entitäts-ID oder `null`.
- * Strenger als nur `Number.isNaN`: akzeptiert ausschließlich positive Ganzzahlen
- * (fängt zusätzlich `''` → 0, Dezimal-, Negativ- und Nicht-Zahl-Werte ab).
- * Backend-Entitäts-IDs sind immer > 0, daher ist `<= 0` ebenfalls ungültig.
+ * Parst einen Route-Parameter zu einer gültigen Entitäts-ID oder `null`: nur positive
+ * Ganzzahlen (`''`, Dezimal-, Negativ- und Nicht-Zahl-Werte fallen weg).
  */
 export function parseRouteId(param: string | undefined): number | null {
   if (param == null || param.trim() === '') return null;
@@ -664,37 +575,28 @@ export function parseRouteId(param: string | undefined): number | null {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-// ── Sektions-Routen der Einsatz-Einstellungen (LFH-345 · C10) ────────────────
+// ── Sektions-Routen der Einsatz-Einstellungen ────────────────────────────────
 
-/** Die fünf Sektionen von `/einsaetze/:id/einstellungen` (`pegel` seit LFH-606). */
+/** Die Sektionen von `/einsaetze/:id/einstellungen`. */
 export type EinstellungenSektion = 'allgemein' | 'verhalten' | 'aufbewahrung' | 'module' | 'pegel';
 
 /**
- * Sektionen in Bedienreihenfolge — EINE Wahrheit für das Tab-Band, die Routentabelle und
- * das Ziel des baren Modulpfades.
- *
- * Der Grund für die Liste statt dreier Stellen mit denselben Strings ist derselbe wie bei
- * `adminNav` (LFH-284): ein Tab ohne Route ist ein toter Klick, eine Route ohne Tab ist eine
- * unerreichbare Seite, und beide Fehler sind vom Bildschirm aus nicht zu sehen, solange man
- * nicht genau diesen einen Reiter anfasst.
- *
- * Die **erste** Sektion ist das Redirect-Ziel des baren Pfades (Muster `ersteSektionPfad`
- * aus `admin/adminNav`); die Reihenfolge ist deshalb gepinnt, nicht Geschmack.
+ * Sektionen in Bedienreihenfolge — EINE Wahrheit für Tab-Band, Routentabelle und das Ziel des
+ * baren Modulpfades: ein Tab ohne Route wäre ein toter Klick, eine Route ohne Tab unerreichbar.
+ * Die **erste** Sektion ist das Redirect-Ziel; die Reihenfolge ist deshalb gepinnt.
  */
 export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; label: string }[] = [
   { key: 'allgemein', label: 'Allgemein' },
   { key: 'verhalten', label: 'Verhalten & Automatik' },
   { key: 'aufbewahrung', label: 'Aufbewahrung' },
   { key: 'module', label: 'Module' },
-  // LFH-606: hinten angehängt, nicht vorn — die erste Sektion ist das Redirect-Ziel.
+  // Hinten angehängt: die erste Sektion ist das Redirect-Ziel.
   { key: 'pegel', label: 'Pegel' },
 ];
 
 /**
- * Sektions-Route der Einsatz-Einstellungen (LFH-345 · C10, H15/M15).
- *
- * Ohne Sektion zeigt sie auf den Einstieg: der bare Modulpfad `…/einstellungen` (den die
- * Modul-Navigation aus `modulZielRoute` baut) leitet genau dorthin um.
+ * Sektions-Route der Einsatz-Einstellungen. Ohne Sektion der bare Modulpfad, der auf die erste
+ * Sektion umleitet.
  */
 export function einsatzEinstellungenPfad(
   einsatzId: number,

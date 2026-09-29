@@ -87,15 +87,14 @@ export function erkenneSlashTrigger(text: string, caret: number): SlashTrigger {
   return erkenneTrigger(text, caret, '/');
 }
 
-/** `@` am Wortanfang: Funkrufname für Von bzw. An (Neuentwurf S4). */
+/** `@` am Wortanfang: Funkrufname für Von bzw. An. */
 export function erkenneAtTrigger(text: string, caret: number): SlashTrigger {
   return erkenneTrigger(text, caret, '@');
 }
 
 /**
- * Steht der Auslöser am ZEILENANFANG? Nur dort wählt `/` auch den Typ (Neuentwurf S4:
- * `/anordnung …` am Beginn der Zeile). Mitten im Satz bleibt `/` bei Feldern und
- * Bausteinen — „Lage /von" soll nicht plötzlich den Typ anbieten.
+ * Steht der Auslöser am ZEILENANFANG? Nur dort wählt `/` auch den Typ (`/anordnung …`).
+ * Mitten im Satz bleibt `/` bei Feldern und Bausteinen — „Lage /von" soll nicht den Typ anbieten.
  */
 export function amZeilenanfang(text: string, start: number): boolean {
   return start === 0 || (start > 0 && text[start - 1] === '\n');

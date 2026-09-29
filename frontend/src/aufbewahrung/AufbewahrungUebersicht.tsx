@@ -18,22 +18,16 @@ import { aufbewahrungZustand } from '../theme/statusFarben';
 import { ZUSTAENDE, ZUSTAND_RANG } from './archivText';
 
 /**
- * Aufbewahrungsübersicht der Verwaltung (LFH-23, design.md D8) — `/admin/aufbewahrung`.
+ * Aufbewahrungsübersicht der Verwaltung — `/admin/aufbewahrung`, nur System-Admin (sonst
+ * Rückleitung in die Verwaltung).
  *
- * FORM: Tabelle (`form="tabelle"`) in JEDER Breite — hier wird VERGLICHEN („welcher Einsatz
- * läuft als nächstes ab, welcher ist noch zu retten?"). Fixierte Kennung ist die
- * Einsatznummer, nie die DB-`id`. Über der Tabelle eine `Segmentleiste` nach Zustand; der
- * Zustand selbst steht als `StatusTag` aus der Vertragskarte `aufbewahrungZustand` mit Wort.
+ * Tabelle in JEDER Breite: hier wird verglichen („welcher läuft als nächstes ab?"). Fixierte
+ * Kennung ist die Einsatznummer, nie die DB-`id`. Die Übersicht trägt KEINE Aktion; Frist
+ * ändern und Wiederherstellen stehen in der Akte.
  *
- * Die Übersicht trägt KEINE Aktion (Spec „Frist am Einsatz anzeigen und ändern"): Frist ändern
- * und Wiederherstellen stehen in der Akte, in die die Zeile führt. Sie ist dem System-Admin
- * vorbehalten; ohne dieses Recht leitet die Seite in die Verwaltung zurück (der Server
- * antwortet ohnehin 403).
- *
- * Breiten (LFH-523): die Bezeichnung FLIESST (`mindestBreite`), alle übrigen Spalten tragen
- * eine Zahlbreite — sonst bliebe das Opt-in wirkungslos und warnte nur. Der Zustand steht
- * direkt neben der fixierten Nummer: am Handschirm (390 px) ist er damit ohne Querscrollen
- * lesbar (im Durchstich gemessen — als dritte Spalte lag er außerhalb der Sicht).
+ * Die Bezeichnung fließt (`mindestBreite`), alle übrigen Spalten tragen eine Zahlbreite, sonst
+ * bliebe das Opt-in wirkungslos. Der Zustand steht neben der fixierten Nummer, damit er bei
+ * 390 px ohne Querscrollen lesbar ist.
  */
 
 type Filter = AufbewahrungZustand | 'alle';
@@ -41,10 +35,9 @@ type Filter = AufbewahrungZustand | 'alle';
 const leer = '—';
 
 /**
- * Menschenlesbare Kennung der fixierten Spalte. Altbestand trägt keine Einsatznummer
- * (`migrations/0115`: „bleibt ohne Nummer“) — gerade diese Einsätze sind Aufbewahrungsfälle.
- * Dann steht die Bezeichnung dort, nie „—“: die Zelle ist der Link in die Akte, und n Links
- * namens „—“ wären nicht zu unterscheiden. Derselbe Rückfall wie in der Akte.
+ * Kennung der fixierten Spalte. Altbestand ohne Einsatznummer (gerade die Aufbewahrungsfälle)
+ * zeigt die Bezeichnung, nie „—": die Zelle ist der Link in die Akte, n Links „—" wären nicht
+ * zu unterscheiden.
  */
 function kennung(e: Pick<AufbewahrungEintrag, 'einsatznummer_intern' | 'bezeichnung'>) {
   return e.einsatznummer_intern ?? `ohne Nr. · ${e.bezeichnung}`;
@@ -120,10 +113,9 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
 type Spalte = (typeof spalten)[number]['key'];
 
 /**
- * Kartenplan. Auch in der Tabellenform NICHT wirkungslos: `titel.ziel` macht die Kennungszelle
- * in BEIDEN Zweigen zum echten `<Link>` (`Datensicht.tsx`, Dateikopf Punkt 4) — das ist das
- * Tastaturziel der Zeile; `onZeileKlick` bedient nur Maus und Tippen. Nicht streichen.
- * Status und Sekundärfelder greifen erst, falls die Form je auf `auto` wechselt.
+ * Kartenplan — auch in der Tabellenform nötig: `titel.ziel` macht die Kennungszelle zum
+ * echten `<Link>` und damit zum Tastaturziel der Zeile (`onZeileKlick` bedient nur Maus und
+ * Tippen). Nicht streichen.
  */
 const KARTE: Kartenplan<AufbewahrungEintrag, Spalte> = {
   art: 'plan',

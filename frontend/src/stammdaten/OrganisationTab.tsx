@@ -34,9 +34,9 @@ const MAX_LOGO_BYTES = 1024 * 1024;
 const LOGO_TYPEN = ['image/png', 'image/jpeg'];
 
 /**
- * Vorprüfung eines Logos im Client (LFH-22). Spart den Weg zum Server für die zwei
- * häufigen Fehler; MASSGEBLICH bleibt der Server, der den Typ am Inhalt erkennt (ein
- * umbenanntes SVG besteht diese Prüfung und scheitert dort). `null` = in Ordnung.
+ * Vorprüfung eines Logos im Client. Spart den Weg zum Server für die zwei häufigen Fehler;
+ * MASSGEBLICH bleibt der Server, der den Typ am Inhalt erkennt (ein umbenanntes SVG besteht
+ * diese Prüfung und scheitert dort). `null` = in Ordnung.
  */
 function logoVorpruefung(datei: File): string | null {
   if (!LOGO_TYPEN.includes(datei.type)) return 'Nur PNG oder JPEG als Logo.';
@@ -58,10 +58,8 @@ const ORG_OPTIONEN = [
 
 export default function OrganisationTab() {
   /**
-   * Diese Sektion hatte als EINZIGE der elf gar kein Rechte-Gate (LFH-346 · A2, M45) —
-   * `PATCH /api/organisation` lehnt zwar serverseitig ab, aber die Absage kam erst nach
-   * dem Klick und verschwand als Toast wieder. Jetzt: Formular und Knopf gesperrt, der
-   * Grund steht im Hinweis-Slot.
+   * Rechte-Gate: `PATCH /api/organisation` lehnt zwar serverseitig ab, aber erst nach dem
+   * Klick. Formular und Knopf sind deshalb gesperrt, der Grund steht im Hinweis-Slot.
    */
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
@@ -85,24 +83,21 @@ export default function OrganisationTab() {
       qc.invalidateQueries({ queryKey: globalKeys.organisation() });
     },
     /**
-     * KEIN `onError` mehr (derselbe Befund wie LFH-345 · C10 / H14, eine Datei weiter):
-     * nach rund drei Sekunden war der Toast weg, das ausgefüllte Formular stand unverändert
-     * da und wirkte gespeichert. Der Fehler hängt jetzt als Alert an SEINEM PANEEL
-     * („Taktische Zeichen") und räumt sich beim nächsten Absenden selbst
-     * weg — react-query setzt `error` beim Übergang nach `pending` zurück. Der ERFOLG
-     * bleibt beim Toast: er quittiert eine abgeschlossene Handlung.
+     * KEIN `onError`: ein Toast wäre nach drei Sekunden weg, und das unveränderte Formular wirkte
+     * gespeichert. Der Fehler hängt als Alert an SEINEM PANEEL und räumt sich beim nächsten
+     * Absenden selbst weg (react-query setzt `error` beim Übergang nach `pending` zurück). Der
+     * ERFOLG bleibt beim Toast.
      */
   });
 
-  // ── Name (LFH-22, design.md D9) ──────────────────────────────────────────────
+  // ── Name (LFH-22) ─────────────────────────────────────────────────────────────
   const [nameForm] = Form.useForm<NameWerte>();
   const serverName = orgQuery.data?.name;
   /**
    * Hat die Person am Namen getippt, seit er zuletzt gespeichert wurde? Ein EIGENER Merker,
-   * nicht `isFieldTouched` (LFH-342 · C7 (2)): antd setzt `touched` beim Speichern nie zurück,
-   * das Feld folgte dem Serverstand nach der ersten Eingabe für den ganzen Besuch nicht mehr —
-   * ein getrimmter Name blieb mit Leerzeichen stehen, eine fremde Umbenennung kam nicht an
-   * und ein erneutes Speichern schrieb still den alten lokalen Wert zurück.
+   * nicht `isFieldTouched`: antd setzt `touched` beim Speichern nie zurück, das Feld folgte dem
+   * Serverstand sonst für den ganzen Besuch nicht mehr — eine fremde Umbenennung käme nicht an,
+   * und ein erneutes Speichern schriebe still den alten lokalen Wert zurück.
    */
   const [nameGeaendert, setNameGeaendert] = useState(false);
   useEffect(() => {
@@ -117,20 +112,19 @@ export default function OrganisationTab() {
   const nameSpeichern = useMutation({
     mutationFn: (werte: NameWerte) => setzeOrgName(werte.name.trim()),
     onSuccess: (antwort, werte) => {
-      // ERST den Cache auf die Antwort setzen (sie ist die volle `OrganisationAnzeige`),
-      // DANN den Merker zurücknehmen: sonst übernahm der Sync-Effekt den noch ALTEN Namen
-      // aus dem Cache, bis der Refetch kam — und scheiterte der, blieb er stehen, und ein
-      // zweites „Namen speichern" machte die Umbenennung still rückgängig.
+      // ERST den Cache auf die Antwort setzen (sie ist die volle `OrganisationAnzeige`), DANN den
+      // Merker zurücknehmen: sonst übernähme der Sync-Effekt den noch ALTEN Namen aus dem Cache, und
+      // scheiterte der Refetch, machte ein zweites „Namen speichern" die Umbenennung rückgängig.
       qc.setQueryData(globalKeys.organisation(), antwort);
       // Wer während des Speicherns weitertippt, behält seinen Stand.
       if (nameForm.getFieldValue('name') === werte.name) setNameGeaendert(false);
       message.success('Name gespeichert');
       qc.invalidateQueries({ queryKey: globalKeys.organisation() });
     },
-    // Kein `onError`: der Grund steht am Paneel (H14), siehe `speichern`.
+    // Kein `onError`: der Grund steht am Paneel, siehe `speichern`.
   });
 
-  // ── Logo (LFH-22, design.md D9) ──────────────────────────────────────────────
+  // ── Logo (LFH-22) ─────────────────────────────────────────────────────────────
   const logo = orgQuery.data?.logo ?? null;
   const [vorpruefung, setVorpruefung] = useState<string | null>(null);
   // Ein Logo, das nicht lädt, fällt weg statt als kaputter Bildrahmen zu stehen (wie im
@@ -156,21 +150,18 @@ export default function OrganisationTab() {
   });
 
   return (
-    /* KEIN `aktionen`-Slot (LFH-346 · A3): der Speichern-Knopf gehört INS `<form>` und
-       trägt `htmlType="submit"` — der Kopf-Slot von `AdminPage` liegt außerhalb jedes
-       `<form>` und könnte nichts übermitteln (Erfassungs-Norm B4/LFH-332). */
+    /* KEIN `aktionen`-Slot: der Speichern-Knopf gehört INS `<form>` und trägt
+       `htmlType="submit"` — der Kopf-Slot von `AdminPage` liegt außerhalb jedes `<form>`. */
     <AdminPage
       titel="Organisation"
       breite="schmal"
       hinweis={
-        /* Nur der Rechte-Hinweis gilt für die ganze Seite. Speicherfehler stehen an IHREM
-           Paneel (Review Welle B): drei unabhängige Speicherwege, und eine Kette `a ?? b ?? c`
-           zeigte nur den ersten einer festen Rangfolge — ein späterer Fehler blieb unsichtbar. */
+        /* Nur der Rechte-Hinweis gilt für die ganze Seite. Speicherfehler stehen an IHREM Paneel:
+           drei unabhängige Speicherwege, eine Kette `a ?? b ?? c` zeigte nur den ersten. */
         <SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />
       }
     >
-      {/* NAME (LFH-22): eigenes `<form>`, damit Enter nur den Namen sendet und der Knopf
-          darin liegt (Erfassungs-Norm B4). Der Name steht im Druckkopf jedes Ausdrucks. */}
+      {/* NAME: eigenes `<form>`, damit Enter nur den Namen sendet und der Knopf darin liegt. */}
       <Form<NameWerte>
         form={nameForm}
         layout="vertical"
@@ -287,8 +278,8 @@ export default function OrganisationTab() {
         onOk={() => logoEntfernen.mutate()}
         onCancel={() => setEntfernenOffen(false)}
       >
-        {/* Scheitert das Entfernen, bleibt der Dialog offen — der Grund steht deshalb HIER,
-            nicht hinter seiner Maske an der Seite (LFH-535, Bauform `FreigabeDialog`). */}
+        {/* Scheitert das Entfernen, bleibt der Dialog offen — der Grund steht deshalb HIER, nicht
+           hinter seiner Maske an der Seite (Bauform `FreigabeDialog`). */}
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           <Typography.Paragraph style={{ margin: 0 }}>
             Das Logo wird gelöscht und steht danach auf keinem Ausdruck mehr. Das lässt sich nicht
@@ -298,9 +289,9 @@ export default function OrganisationTab() {
         </Space>
       </Modal>
 
-      {/* `disabled` am Formular sperrt die Felder, `disabled` am Knopf den Absendeweg —
-          der Knopf VERSCHWINDET nicht (M16). Neuentwurf: Feldgruppe als Paneel, der Knopf in
-          der sticky Leiste IM `<form>` wie auf den Einstellungsseiten. */}
+      {/* `disabled` am Formular sperrt die Felder, `disabled` am Knopf den Absendeweg — der Knopf
+         VERSCHWINDET nicht. Der Knopf steht in der sticky Leiste IM `<form>` wie auf den
+         Einstellungsseiten. */}
       <Form<FormWerte>
         form={form}
         layout="vertical"

@@ -9,8 +9,8 @@ import type { OnlineQuelle } from '../api/onlineQuellen';
 import OnlineQuelleFormModal from './OnlineQuelleFormModal';
 
 /**
- * LFH-346/A6 — die Online-Quellen-Maske auf `ErfassungsModal`. Kein Serienmodus:
- * eine Instanz führt eine Handvoll Basemap-Quellen, keinen Erfassungsstrom.
+ * Die Online-Quellen-Maske auf `ErfassungsModal`. Kein Serienmodus: eine Instanz führt eine
+ * Handvoll Quellen.
  */
 
 const quelle: OnlineQuelle = {
@@ -72,13 +72,9 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * LFH-376 — die Zusicherung, wegen der die Maske auf der Hülle steht (Befund H69
-   * aus LFH-332/B4): Enter in einem einzeiligen Feld sendet ab. Die Strukturprobe
-   * oben (Knopf im `<form>`) ist nur die Ursache; dieser Test belegt die Wirkung.
-   * Die Attribution ist Pflicht und muss vor dem Enter stehen; sie wird ZUERST
-   * getippt, weil der Absende-Weg nicht über sie laufen kann — sie ist eine
-   * Textarea, Enter bricht dort um. Der Typ bleibt auf seiner Vorgabe, ein `Select`
-   * schluckt Enter selbst (CLAUDE.md, Erfassungs-Norm). Abgesendet wird aus der URL.
+   * Enter in einem einzeiligen Feld sendet ab — die Wirkung, nicht nur die Struktur. Die
+   * Attribution (Pflicht, Textarea) wird ZUERST getippt, der Typ bleibt auf der Vorgabe (ein
+   * `Select` schluckt Enter); abgesendet wird aus der URL.
    */
   it('Enter im URL-Feld legt die Quelle an', async () => {
     let rumpf: Record<string, unknown> | null = null;
@@ -111,10 +107,8 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Die Gegenprobe: in der Textarea bricht Enter um und sendet NICHT ab. Belegt wird
-   * das über den Knopf danach — genau EIN Request, und er trägt den Umbruch. Ein
-   * „nicht aufgerufen" direkt nach dem Tippen wäre zu früh gefragt: die Prüfung der
-   * Hülle läuft asynchron, ein Absenden durch Enter käme erst danach an.
+   * Gegenprobe: in der Textarea bricht Enter um. Belegt über den Knopf danach — genau EIN Request
+   * mit dem Umbruch; die Prüfung der Hülle läuft asynchron.
    */
   it('Enter in der Attribution bricht um und sendet nicht ab', async () => {
     const rumpfe: Record<string, unknown>[] = [];
@@ -141,18 +135,15 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Die Vorgaben des früheren Anlegen-Zweigs stehen jetzt als `initialValues` an der
-   * Hülle — inklusive der von aussen gereichten `naechsteSortier`. Der Beleg ist der
-   * Weg über eine bearbeitete Quelle: ohne `initialValues` stünde hier deren
-   * Sortierung 2 statt der nächsten freien 7.
+   * Die Vorgaben stehen als `initialValues` an der Hülle, inklusive `naechsteSortier`. Beleg über
+   * eine bearbeitete Quelle: ohne `initialValues` stünde deren Sortierung 2 statt der nächsten 7.
    */
   it('nach dem Bearbeiten startet das nächste Anlegen mit den Vorgabewerten', async () => {
     handler();
     const nutzer = userEvent.setup();
     renderMitProviders(<Harness bestand={quelle} />);
     expect(await screen.findByLabelText('Name')).toHaveValue('OpenStreetMap');
-    // Die Sortierung liegt seit LFH-346 · A8 unter „Weitere Angaben"; die Vorbelegung
-    // muss sie trotzdem erreichen, obwohl das Feld beim Öffnen noch nicht montiert ist.
+    // Die Sortierung liegt unter „Weitere Angaben"; die Vorbelegung muss sie trotzdem erreichen.
     await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     expect(await screen.findByLabelText('Sortierung')).toHaveValue('2');
 
@@ -168,14 +159,9 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * LFH-346 · A8, Befund N20. Die tragende Prüfung des Collapse-Umbaus — nicht die
-   * Zählung darunter: beide Hälften der Zählung stünden grün, während jedes Speichern
-   * drei Felder still zurücksetzt.
-   *
-   * `OnlineQuelleBody` ist Vollersatz. Ohne `forceRender` sind Sortierung, Aktiv und
-   * Proxy nicht montiert, und `onFinish` liefert nur montierte Felder — ein
-   * `onErfassen`, das seine Werte von dort nimmt, schickte `sortier: 0` und den
-   * Vorgabe-Proxy an eine Quelle, an der niemand etwas davon angefasst hat.
+   * Die tragende Prüfung des Collapse: `OnlineQuelleBody` ist Vollersatz, und ohne
+   * `forceRender` liefert `onFinish` nur montierte Felder — ein Speichern setzte Sortierung,
+   * Aktiv und Proxy still zurück, obwohl niemand sie angefasst hat.
    */
   it('behält Sortierung, Aktiv und Proxy, wenn niemand aufklappt', async () => {
     let rumpf: Record<string, unknown> | null = null;
@@ -205,9 +191,8 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Die Gegenprobe: ein aufgeklappt UMGELEGTER Schalter kommt auch umgelegt an. Ein
-   * Rückfall auf `quelle?.proxy` bestünde die Prüfung darüber und fiele hier — er
-   * kann „nie montiert" nicht von „aufgeklappt und bewusst geändert" unterscheiden.
+   * Gegenprobe: ein aufgeklappt UMGELEGTER Schalter kommt umgelegt an. Ein Rückfall auf
+   * `quelle?.proxy` bestünde die Prüfung darüber und fiele hier.
    */
   it('ein aufgeklappt umgelegter Schalter kommt umgelegt an', async () => {
     let rumpf: Record<string, unknown> | null = null;
@@ -229,22 +214,16 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Das Feldbudget (LFH-346 · A8): VIER sichtbare Felder statt sieben.
-   *
-   * Vier, nicht die drei der Plan-Tabelle: `attribution` ist `required` und
-   * serverseitig erzwungen, hat also keinen brauchbaren Vorgabewert und darf nach
-   * LFH-343 · H49 nicht hinter den Collapse. Begründung im Dateikopf der Komponente.
-   *
-   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — der Typ ist ein
-   * `Select` und fehlte in der Rollenzählung. Die zweite Hälfte ist Pflicht:
-   * „höchstens vier" allein erfüllte auch ein Dialog ganz ohne Felder.
+   * Feldbudget: VIER sichtbare Felder statt sieben. Vier, weil `attribution` Pflicht ohne
+   * brauchbare Vorgabe ist und nicht hinter den Collapse darf.
+   * Gezählt werden `.ant-form-item`-Knoten (der Typ ist ein `Select`, keine textbox). „Höchstens
+   * vier" allein erfüllte auch ein leerer Dialog.
    */
   it('zeigt vier Felder und deckt drei weitere erst beim Aufklappen auf', async () => {
     handler();
     const nutzer = userEvent.setup();
     renderMitProviders(<Harness />);
-    // Gegriffen wird der Dialog, NICHT `container`: antds Modal hängt in einem Portal
-    // an `document.body`, `container.querySelectorAll` zählte dort gemessen null.
+    // Gegriffen wird der Dialog, NICHT `container`: antds Modal hängt im Portal an `document.body`.
     const dialog = await screen.findByRole('dialog');
 
     expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(4);
@@ -254,10 +233,8 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Der Erklär-Alert zum Proxy ist weg — er erklärte ein FELD, nicht einen Zustand der
-   * Seite, und steht seit LFH-346 · A8 als Tooltip an dessen `Form.Item`. Geprüft wird
-   * die Abwesenheit des Alerts UND die Anwesenheit der Erklärung am Feld: ohne die
-   * zweite Hälfte wäre „Alert weg" auch dann grün, wenn die Erklärung ersatzlos fiele.
+   * Der Proxy wird als Tooltip am Feld erklärt, nicht als Alert über dem Formular. Geprüft wird
+   * beides: Alert weg UND Erklärung am Feld.
    */
   it('erklärt den Proxy am Feld statt in einem Alert über dem Formular', async () => {
     handler();

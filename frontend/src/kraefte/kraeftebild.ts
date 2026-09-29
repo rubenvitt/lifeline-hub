@@ -61,7 +61,7 @@ interface Kraeftebild {
 export const OHNE_ABSCHNITT_KEY = 'ab-ohne';
 export const OHNE_EINHEIT_KEY_PREFIX = 'eh-ohne';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helfer ───────────────────────────────────────────────────────────────────
 
 // Person ohne Stärke-Position zählt als Mannschaft, damit die Summe der Köpfe
 // stets der Personenzahl entspricht (Stärkenachweis-Invariante).
@@ -108,7 +108,7 @@ function addVerteilung(z: StatusVerteilung, q: StatusVerteilung): void {
   z.ohne += q.ohne;
 }
 
-/** Converts a backend Staerke (F/UF/M, no gesamt) to StaerkeSumme. */
+/** Backend-Stärke (F/UF/M, ohne gesamt) → StaerkeSumme. */
 function staerkeAusBackend(s: Staerke): StaerkeSumme {
   return {
     fuehrer: s.fuehrer,
@@ -128,7 +128,7 @@ function addSoll(acc: StaerkeSumme | null, add: StaerkeSumme): StaerkeSumme {
   };
 }
 
-// ── Core aggregation ──────────────────────────────────────────────────────────
+// ── Aggregation ───────────────────────────────────────────────────────────────
 
 interface EinheitResult {
   zeile: MeldebildZeile;
@@ -136,9 +136,8 @@ interface EinheitResult {
 }
 
 /**
- * Build a single Einheit tree node (including child-Einheiten and mittel rows).
- * Returns the completed MeldebildZeile plus the accumulated Soll from this unit
- * and all descendants.
+ * Baut einen Einheiten-Knoten (samt Untereinheiten und Mittelzeilen); liefert die Zeile plus
+ * das kumulierte Soll dieser Einheit und aller Nachfahren.
  */
 function baueEinheitZeile(
   einheit: Einheit,
@@ -154,7 +153,6 @@ function baueEinheitZeile(
 
   const children: MeldebildZeile[] = [];
 
-  // Personal-Mittel rows for this Einheit
   const ownPersonal = personalByEinheit.get(einheit.id) ?? [];
   for (const ep of ownPersonal) {
     const ps = leereStaerke();
@@ -178,7 +176,6 @@ function baueEinheitZeile(
     });
   }
 
-  // Fahrzeug-Mittel rows
   const ownFahrzeuge = fahrzeugeByEinheit.get(einheit.id) ?? [];
   for (const ef of ownFahrzeuge) {
     addKategorie(fahrzeugVert, ef.status_kategorie);
@@ -198,7 +195,6 @@ function baueEinheitZeile(
     });
   }
 
-  // Material-Mittel rows
   const ownMaterial = materialByEinheit.get(einheit.id) ?? [];
   for (const em of ownMaterial) {
     children.push({
@@ -217,7 +213,6 @@ function baueEinheitZeile(
     });
   }
 
-  // Recurse into child Einheiten
   let gesammeltesSoll: StaerkeSumme | null = null;
   for (const kindEinheit of childEinheiten) {
     const kindChildren = childrenByEinheit.get(kindEinheit.id) ?? [];
@@ -238,7 +233,6 @@ function baueEinheitZeile(
     children.push(kindResult.zeile);
   }
 
-  // Soll for this unit
   const eigenesSoll = einheit.soll != null ? staerkeAusBackend(einheit.soll) : null;
   if (eigenesSoll !== null) {
     gesammeltesSoll = addSoll(gesammeltesSoll, eigenesSoll);
@@ -253,8 +247,8 @@ function baueEinheitZeile(
     bezeichnung: einheit.name,
     detail,
     staerke,
-    // Bewusst das eigene Soll der Einheit (nicht kumuliert): die UI v1 zeigt am
-    // Knoten nur das eigene Soll; das kumulierte Soll fließt in die Verdichtung.
+    // Bewusst das eigene Soll (nicht kumuliert): der Knoten zeigt nur das eigene; das kumulierte
+    // fließt in die Verdichtung.
     soll: eigenesSoll,
     statusKategorie: null,
     statusLabel: null,
@@ -267,9 +261,7 @@ function baueEinheitZeile(
   return { zeile, gesammeltesSoll };
 }
 
-/**
- * Build a section (Abschnitt) node recursively.
- */
+/** Baut einen Abschnitts-Knoten rekursiv. */
 function baueAbschnittZeile(
   abschnitt: Einsatzabschnitt,
   kindAbschnitte: Einsatzabschnitt[],
@@ -286,7 +278,6 @@ function baueAbschnittZeile(
   const children: MeldebildZeile[] = [];
   let gesammeltesSoll: StaerkeSumme | null = null;
 
-  // Top-level Einheiten belonging to this Abschnitt
   const topEinheiten = topEinheitenByAbschnitt.get(abschnitt.id) ?? [];
   for (const einheit of topEinheiten) {
     const kindEinheiten = childrenByEinheit.get(einheit.id) ?? [];
@@ -307,7 +298,6 @@ function baueAbschnittZeile(
     children.push(result.zeile);
   }
 
-  // Child Abschnitte
   for (const kindAbschnitt of kindAbschnitte) {
     const kindAbschnittKinder = abschnittKinderMap.get(kindAbschnitt.id) ?? [];
     const result = baueAbschnittZeile(
@@ -348,7 +338,7 @@ function baueAbschnittZeile(
   return { zeile, gesammeltesSoll };
 }
 
-// ── Filter API ────────────────────────────────────────────────────────────────
+// ── Filter ────────────────────────────────────────────────────────────────────
 
 export interface Rohdaten {
   abschnitte: Einsatzabschnitt[];
@@ -369,9 +359,8 @@ export function filtereKraefte(roh: Rohdaten, f: FilterWerte): Rohdaten {
   const s = f.suche.trim().toLowerCase();
   const treffer = (txt: (string | null | undefined)[]) =>
     !s || txt.some((t) => t?.toLowerCase().includes(s));
-  // v1-Annahme: Untereinheiten tragen die `abschnitt_id` ihrer Elterneinheit. Sonst würden
-  // Kräfte einer Untereinheit ohne eigene `abschnitt_id` beim Abschnitts-Filter herausfallen
-  // (echtes Sub-Section-roll-in ist v2).
+  // Annahme: Untereinheiten tragen die `abschnitt_id` ihrer Elterneinheit; sonst fielen ihre
+  // Kräfte beim Abschnitts-Filter heraus.
   const einheitErlaubt = (e: Einheit) => f.abschnittId == null || e.abschnitt_id === f.abschnittId;
   const erlaubteEinheiten = new Set(roh.einheiten.filter(einheitErlaubt).map((e) => e.id));
   const abschnittOk = (einheit_id: number | null | undefined) =>
@@ -400,7 +389,7 @@ export function filtereKraefte(roh: Rohdaten, f: FilterWerte): Rohdaten {
         x.fahrzeugtyp,
       ]),
     ),
-    // Material hat keine `status_kategorie` (eigene Achse) → NICHT der Kategorie-Filterung unterwerfen.
+    // Material hat keine `status_kategorie` (eigene Achse) → nicht nach Kategorie filtern.
     material: roh.material.filter(
       (x) =>
         abschnittOk(x.einheit_id) && traegerOk(x.traegerorganisation) && treffer([x.bezeichnung]),
@@ -418,17 +407,10 @@ export function staerkeText(s: StaerkeSumme): string {
 // ── Markdown-Renderer ─────────────────────────────────────────────────────────
 
 /**
- * Die Art des Mittels als KURZWORT, nicht als Emoji.
- *
- * Hier standen drei Emoji. Das Ziel dieses Markdowns ist ein Lagebericht — er wird
- * gedruckt, in Textform weitergegeben und in Ausgabeketten gelesen, die keine
- * Farbschrift führen; ein Emoji trägt dort nichts und fällt im schlechtesten Fall auf ein
- * Ersatzkästchen zurück. Die Kürzel folgen dem Präfix, das die Kennzahlenzeile der Seite
- * schon führt („Mtl. defekt" in `MAT_STATUS_ANZEIGE`).
- *
- * Als Konstante und nicht dreimal inline: so hat die Marke EINEN Ort. Der Test pinnt sie
- * trotzdem als LITERAL (`- Pers. `) und nicht über diese Konstante — sonst prüfte er sie
- * gegen sich selbst und bliebe grün, wenn hier wieder ein Bildzeichen einzöge.
+ * Die Art des Mittels als KURZWORT, nicht als Emoji: der Markdown landet in einem Lagebericht,
+ * der gedruckt und als Text weitergegeben wird, wo ein Emoji nichts trägt. Die Kürzel folgen
+ * der Kennzahlenzeile („Mtl. defekt"). Der Test pinnt sie als LITERAL, nicht über diese
+ * Konstante.
  */
 const MITTEL_MARKE = { person: 'Pers.', fahrzeug: 'Fzg.', material: 'Mtl.' } as const;
 
@@ -447,7 +429,6 @@ function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): st
       `${einzug}- **${zeile.bezeichnung}**${detail} — Stärke: ${staerkeText(zeile.staerke)}`,
     );
   } else {
-    // mittel
     const einzug = '  '.repeat(Math.max(0, tiefe - 1));
     if (zeile.mittelArt === 'person') {
       const detail = zeile.detail ? ` (${zeile.detail})` : '';
@@ -479,10 +460,7 @@ function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): st
   return zeilen.join('\n');
 }
 
-/**
- * Rendert ein Kraeftebild als lesbares Markdown. Deterministisch — keine Date-Aufrufe.
- * Der `stand`-String wird von außen übergeben.
- */
+/** Rendert ein Kraeftebild als Markdown. Deterministisch — `stand` kommt von außen. */
 export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): string {
   const v = bild.verdichtung;
   const zeilen: string[] = [];
@@ -492,7 +470,6 @@ export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): stri
   zeilen.push(`**Stand:** ${stand}`);
   zeilen.push('');
 
-  // Verdichtungsblock
   zeilen.push('## Lagebild gesamt');
   zeilen.push('');
   zeilen.push(`**Gesamtstärke (F/UF/M//Ges):** ${staerkeText(v.staerke)}`);
@@ -515,7 +492,6 @@ export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): stri
   }
   zeilen.push('');
 
-  // Baum
   if (bild.baum.length > 0) {
     zeilen.push('## Kräftegliederung');
     zeilen.push('');
@@ -528,23 +504,16 @@ export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): stri
   return zeilen.join('\n');
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── Öffentliche API ───────────────────────────────────────────────────────────
 
 /** Verdichtung ohne `soll` — der Teil, der sich allein aus den drei Mittel-Listen ergibt. */
 type Kurzverdichtung = Omit<Verdichtung, 'soll'>;
 
 /**
- * Kopfzahlen aus den ROHLISTEN, nicht aus dem Baum.
- *
- * Herausgelöst (LFH-338 · C3), weil dieselbe Rechnung dreimal gebraucht wird: gefiltert für
- * die Kopfzahlen der Kräfteübersicht, UNGEFILTERT als Bezugswert daneben — ohne ihn
- * verschwindet die Gesamtstärke des Einsatzes in dem Moment, in dem jemand einen Abschnitt
- * anwählt, und genau dann wird sie an die übergeordnete Führungsstelle gemeldet — und ein
- * drittes Mal in der Verdichtungszeile der vier Kräfte-Modulseiten.
- *
- * `soll` bleibt DRAUSSEN und ist deshalb kein Feld von `Kurzverdichtung`: es kumuliert über
- * den Einheitenbaum (`gesammeltesSoll` unten) und ist aus den drei Listen allein nicht
- * bestimmbar. Wer es hier vermisst, braucht `baueKraeftebild`.
+ * Kopfzahlen aus den ROHLISTEN, nicht aus dem Baum — gefiltert für die Kopfzahlen der
+ * Kräfteübersicht, UNGEFILTERT als Bezugswert daneben (die Gesamtstärke darf beim Anwählen
+ * eines Abschnitts nicht verschwinden) und in der Verdichtungszeile der Kräfte-Modulseiten.
+ * `soll` fehlt bewusst: es kumuliert über den Einheitenbaum und braucht `baueKraeftebild`.
  */
 export function verdichte(
   personal: EinsatzPersonal[],
@@ -593,7 +562,7 @@ export function baueKraeftebild(
   fahrzeuge: EinsatzFahrzeug[],
   material: EinsatzMaterial[],
 ): Kraeftebild {
-  // ── Index: group by einheit_id ──────────────────────────────────────────
+  // ── Index nach einheit_id ─────────────────────────────────────────────────
   const personalByEinheit = new Map<number | null, EinsatzPersonal[]>();
   for (const ep of personal) {
     const key = ep.einheit_id ?? null;
@@ -615,30 +584,26 @@ export function baueKraeftebild(
     materialByEinheit.get(key)!.push(em);
   }
 
-  // ── Einheiten index ──────────────────────────────────────────────────────
-  // Children by ueber_einheit_id (only top-level = ueber_einheit_id===null are exposed per abschnitt)
+  // ── Einheiten-Index ───────────────────────────────────────────────────────
+  // Kinder je `ueber_einheit_id`; oberste Einheiten je Abschnitt.
   const childrenByEinheit = new Map<number, Einheit[]>();
-  // Top-level Einheiten per Abschnitt (ueber_einheit_id===null)
   const topEinheitenByAbschnitt = new Map<number | null, Einheit[]>();
 
   for (const e of einheiten) {
     if (e.ueber_einheit_id != null) {
-      // child of another Einheit
       if (!childrenByEinheit.has(e.ueber_einheit_id)) childrenByEinheit.set(e.ueber_einheit_id, []);
       childrenByEinheit.get(e.ueber_einheit_id)!.push(e);
     } else {
-      // top-level: belongs to an Abschnitt (or null → "Ohne Abschnitt")
       const key = e.abschnitt_id ?? null;
       if (!topEinheitenByAbschnitt.has(key)) topEinheitenByAbschnitt.set(key, []);
       topEinheitenByAbschnitt.get(key)!.push(e);
     }
   }
 
-  // ── Abschnitte index ─────────────────────────────────────────────────────
-  // Ein Abschnitt ist Wurzel, wenn er keinen Eltern-Abschnitt hat ODER sein
-  // Eltern-Abschnitt nicht in der Eingabeliste vorhanden ist (Waisen-Promotion).
-  // Das hält Tabelle↔Kopf konsistent, wenn der Filter nur einen Unter-Abschnitt
-  // durchlässt, und härtet generell gegen dangling ueber_abschnitt_id-Referenzen.
+  // ── Abschnitte-Index ──────────────────────────────────────────────────────
+  // Wurzel ist ein Abschnitt ohne Eltern-Abschnitt ODER dessen Eltern nicht in der Liste stehen
+  // (Waisen-Promotion): das hält Tabelle und Kopf konsistent, wenn der Filter nur einen
+  // Unter-Abschnitt durchlässt.
   const abschnittIdSet = new Set<number>();
   for (const a of abschnitte) abschnittIdSet.add(a.id);
 
@@ -655,7 +620,7 @@ export function baueKraeftebild(
     }
   }
 
-  // ── Build tree ───────────────────────────────────────────────────────────
+  // ── Baum ─────────────────────────────────────────────────────────────────
   const baum: MeldebildZeile[] = [];
   let gesammeltesSoll: StaerkeSumme | null = null;
 
@@ -677,10 +642,9 @@ export function baueKraeftebild(
     baum.push(result.zeile);
   }
 
-  // ── Catch-all: "Ohne Abschnitt" ──────────────────────────────────────────
-  // Einheiten with abschnitt_id===null (and ueber_einheit_id===null already top-level)
+  // ── Auffangknoten „Ohne Abschnitt" ───────────────────────────────────────
   const ohneAbschnittEinheiten = topEinheitenByAbschnitt.get(null) ?? [];
-  // Mittel with einheit_id===null: pseudo-Einheit "Ohne Einheit"
+  // Mittel ohne `einheit_id`: Pseudo-Einheit „Ohne Einheit".
   const ohneEinheitPersonal = personalByEinheit.get(null) ?? [];
   const ohneEinheitFahrzeuge = fahrzeugeByEinheit.get(null) ?? [];
   const ohneEinheitMaterial = materialByEinheit.get(null) ?? [];
@@ -697,7 +661,6 @@ export function baueKraeftebild(
     const ohneAbschnittFahrzeugVert = leereVert();
     const ohneAbschnittChildren: MeldebildZeile[] = [];
 
-    // Real Einheiten without Abschnitt
     for (const einheit of ohneAbschnittEinheiten) {
       const kindEinheiten = childrenByEinheit.get(einheit.id) ?? [];
       const result = baueEinheitZeile(
@@ -717,7 +680,6 @@ export function baueKraeftebild(
       ohneAbschnittChildren.push(result.zeile);
     }
 
-    // Pseudo-Einheit "Ohne Einheit" for mittel with einheit_id===null
     if (
       ohneEinheitPersonal.length > 0 ||
       ohneEinheitFahrzeuge.length > 0 ||
@@ -822,10 +784,8 @@ export function baueKraeftebild(
     });
   }
 
-  // ── Verdichtung: aus den ROHLISTEN, nicht aus dem Baum ────────────────────
-  // Die Rechnung selbst steht in `verdichte` (oben, exportiert): sie wird außerhalb dieser
-  // Funktion ein zweites Mal über die UNGEFILTERTEN Listen gebraucht. `soll` kommt hier dazu,
-  // weil nur der Baumaufbau es kumulieren kann.
+  // Verdichtung aus den ROHLISTEN (`verdichte`); `soll` kommt dazu, weil nur der Baumaufbau es
+  // kumulieren kann.
   return {
     baum,
     verdichtung: { ...verdichte(personal, fahrzeuge, material), soll: gesammeltesSoll },

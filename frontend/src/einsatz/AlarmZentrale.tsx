@@ -29,12 +29,10 @@ import { useViewport } from '../components/useViewport';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 
 /**
- * Farbe eines Alarm-Knopfs in der Kommandoleiste (Neuentwurf „Instrumententafel").
- *
- * Die Leiste ist in beiden Modi dunkel — die Werte kommen deshalb aus den NACHTrollen, nicht
- * aus dem Modus-Token und nicht mehr aus `#fff`. Ein auffälliger Zustand („stumm", „blockiert")
- * steht in `achtung`: er verzögert eine Alarmierung, er ist selbst keine. Der zweite Kanal
- * ist das Wort im Knopf (WCAG 1.4.1) — die Farbe ergänzt, sie trägt nicht allein.
+ * Farbe eines Alarm-Knopfs in der Kommandoleiste. Die Leiste ist in beiden Modi dunkel, die
+ * Werte kommen deshalb aus den NACHTrollen. Ein auffälliger Zustand
+ * („stumm", „blockiert") steht in `achtung`: er verzögert eine Alarmierung, ist selbst keine.
+ * Der zweite Kanal ist das Wort im Knopf (WCAG 1.4.1).
  */
 function alarmKnopfFarbe(auffaellig: boolean): string {
   return auffaellig ? farbenDunkel.achtung : rahmenFarben.gedaempft;
@@ -42,7 +40,7 @@ function alarmKnopfFarbe(auffaellig: boolean): string {
 
 dayjs.extend(utc);
 
-/** Payload des Scheduler-Hinweises `abloesung` (LFH-635, `src/erinnerung/scheduler.rs`). */
+/** Payload des Scheduler-Hinweises `abloesung` (`src/erinnerung/scheduler.rs`). */
 type AbloesungAlarmDetail = {
   abloesung_id?: number;
   art?: 'vorwarnung' | 'faellig';
@@ -105,12 +103,12 @@ function desktopZustand(permission: NotificationPermission | 'unsupported'): Des
 }
 
 /**
- * Einsatzweite Alarm-Zentrale (LFH-97/118): lauscht auf die window-CustomEvents
- * `lfh:sofortmeldung` und `lfh:erinnerung-alarm` (von useEinsatzLiveStream ausgelöst) und zeigt
- * unübersehbare, NICHT selbst-schließende Toasts mit Deeplink zur Quelle — plus optional eine
- * Desktop-Benachrichtigung bei Hintergrund-Tab. EIN globaler Mute-Toggle (Per-User, localStorage)
- * schaltet ALLE Alarmtöne. Im Layout-Header montiert → wirkt seitenunabhängig.
- * Toasts über App.useApp().notification (kein statischer Import — sonst Kontext-Leak in Tests).
+ * Einsatzweite Alarm-Zentrale: lauscht auf `lfh:sofortmeldung`, `lfh:erinnerung-alarm` und die
+ * Ablösungshinweise (von useEinsatzLiveStream ausgelöst) und zeigt NICHT selbst-schließende
+ * Toasts mit Deeplink zur Quelle, optional eine Desktop-Benachrichtigung bei Hintergrund-Tab.
+ * EIN globaler Mute (Per-User, localStorage) schaltet ALLE Alarmtöne. Im Layout-Kopf montiert,
+ * wirkt also seitenunabhängig. Toasts über `App.useApp().notification` (kein statischer Import,
+ * sonst Kontext-Leak in Tests).
  */
 export default function AlarmZentrale() {
   const { notification } = App.useApp();
@@ -121,9 +119,8 @@ export default function AlarmZentrale() {
   const [gemutet, setGemutet] = useState(istAlarmGemutet());
   const [permission, setPermission] = useState(desktopPermission());
   const [tonStatus, setTonStatus] = useState<AlarmTonStatus>(alarmTonStatus() ?? 'blockiert');
-  // Jede Komponenteninstanz verwaltet pro Einsatz einen eigenen Scope. Damit können
-  // langlebige Notices beim Einsatzwechsel gezielt abgeräumt werden, ohne fremde
-  // AntD-Notifications oder den neuen Einsatz anzutasten.
+  // Jede Instanz verwaltet pro Einsatz einen eigenen Scope, damit langlebige Notices beim
+  // Einsatzwechsel gezielt abgeräumt werden können, ohne fremde Notifications anzutasten.
   const alarmScope = useMemo<AlarmScope>(() => {
     const keyPrefix = `alarm-${einsatzId}-${instanzId}`;
     return {
@@ -222,10 +219,9 @@ export default function AlarmZentrale() {
   }, [alarmScope, alleToastsSchliessen, navigate, notification, zielPfad]);
 
   /**
-   * Maximal drei sichtbare Notices ohne Abhängigkeit von der globalen AntApp-Konfiguration:
-   * Beim vierten Ereignis werden die drei vorherigen Einzeltoasts zusammengefasst und
-   * der neueste bleibt einzeln sichtbar. Danach wandert bei jedem neuen Ereignis der
-   * bisher neueste Einzeltoast ebenfalls in die Zusammenfassung.
+   * Höchstens drei sichtbare Notices, unabhängig von der globalen AntApp-Konfiguration: beim
+   * vierten Ereignis werden die drei vorherigen zusammengefasst und der neueste bleibt einzeln;
+   * danach wandert je neuem Ereignis der bisher neueste in die Zusammenfassung.
    */
   const zeigeAlarmToast = useCallback(
     (toast: AlarmToast) => {
@@ -281,11 +277,11 @@ export default function AlarmZentrale() {
     [alarmScope, notification, zeigeZusammenfassung],
   );
 
-  // duration: 0-Notices überleben sonst ihre Komponente. Bei Logout/Unmount und vor
-  // dem nächsten Einsatz werden deshalb ausschließlich die Keys dieses Scopes zerstört.
+  // `duration: 0`-Notices überleben sonst ihre Komponente. Bei Logout/Unmount und vor dem nächsten
+  // Einsatz werden deshalb nur die Keys dieses Scopes zerstört.
   useEffect(() => {
-    // React.StrictMode führt in Entwicklung Setup → Cleanup → Setup aus. Der zweite
-    // Setup-Durchlauf muss denselben Scope wieder für Events und Aktionen freigeben.
+    // StrictMode führt Setup → Cleanup → Setup aus; der zweite Setup muss denselben Scope wieder
+    // freigeben.
     alarmScope.aktiv = true;
     return () => {
       alarmScope.aktiv = false;
@@ -310,8 +306,8 @@ export default function AlarmZentrale() {
     };
   }, []);
 
-  // Browser-Einstellungen können außerhalb der App geändert werden. Beim Zurückkehren
-  // in den Tab den dauerhaft sichtbaren Tri-State deshalb erneut aus der API lesen.
+  // Browser-Einstellungen können außerhalb der App geändert werden; beim Zurückkehren in den Tab
+  // wird der Tri-State neu gelesen.
   useEffect(() => {
     const aktualisieren = () => setPermission(desktopPermission());
     window.addEventListener('focus', aktualisieren);
@@ -322,7 +318,7 @@ export default function AlarmZentrale() {
     };
   }, []);
 
-  // Sofortmeldung (LFH-97).
+  // Sofortmeldung.
   useEffect(() => {
     const onSofort = (ev: Event) => {
       const detail = (ev as CustomEvent<{ meldung_id?: number }>).detail ?? {};
@@ -359,7 +355,7 @@ export default function AlarmZentrale() {
     return () => window.removeEventListener('lfh:sofortmeldung', onSofort);
   }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
 
-  // Fällige Erinnerung / Auftrags-Eskalation (LFH-118).
+  // Fällige Erinnerung / Auftrags-Eskalation.
   useEffect(() => {
     const onErinnerung = (ev: Event) => {
       const detail = (ev as CustomEvent<ErinnerungDetail>).detail ?? {};
@@ -408,11 +404,9 @@ export default function AlarmZentrale() {
     return () => window.removeEventListener('lfh:erinnerung-alarm', onErinnerung);
   }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
 
-  // Fällige oder anstehende Ablösung (LFH-635). Läuft durch DENSELBEN Budget-Weg
-  // (`zeigeAlarmToast`: höchstens drei sichtbar, der Rest gebündelt) — ein eigener Zähler
-  // hebelte das Budget aus, das gerade über alle Quellen gemeinsam gilt. Vorwarnung und
-  // Fälligkeit derselben Schicht sind zwei Hinweise (eigener Key je Art), aber jeder genau
-  // einmal: der Scheduler löst je Frist einmal aus.
+  // Fällige oder anstehende Ablösung — durch DENSELBEN Budget-Weg (`zeigeAlarmToast`), ein
+  // eigener Zähler hebelte das gemeinsame Budget aus. Vorwarnung und Fälligkeit sind zwei
+  // Hinweise (eigener Key je Art), der Scheduler löst je Frist einmal aus.
   useEffect(() => {
     const onAbloesung = (ev: Event) => {
       const detail = (ev as CustomEvent<AbloesungAlarmDetail>).detail ?? {};
@@ -466,18 +460,11 @@ export default function AlarmZentrale() {
     setGemutet(true);
   };
 
-  // Die Breitenfrage stellt ausschliesslich `useViewport` (erzwungen von
-  // `useViewport.guard.test.ts`). `istSchmal` ist `< md` (768 px) — bei 768 px
-  // und darüber trägt die Kopfzeile beide Knöpfe mühelos, eng wird es erst auf
-  // dem Handschirm.
-  //
-  // ZWISCHEN `md` UND `xl` (Führungs-Tablet, 22.09.2026) bleiben es zwei Knöpfe mit je
-  // einem Tipper, aber der RUHEZUSTAND steht nur als Ikone: „Ton bereit" und „Desktop
-  // aus/erlaubt" kosteten dort zusammen gut 200 px und brachen die Kopfzeile bei 1024 px
-  // auf zwei Zeilen (52 → 104 px). Eine STÖRUNG — „Ton stumm/blockiert", „Desktop
-  // blockiert" — trägt ihr Wort weiter auf jeder Breite (LFH-392: das darf nicht nur über
-  // eine Ikone laufen); Wort und Warnfarbe hängen deshalb an derselben Bedingung. Der
-  // Ruhezustand bleibt über Ikonenform, `aria-label`/`aria-pressed` und den Tooltip lesbar.
+  // Die Breitenfrage stellt `useViewport`. Unter `md` bündelt die Zentrale zu EINEM Ziel (siehe
+  // unten). Zwischen `md` und `xl` (Führungs-Tablet) bleiben es zwei Knöpfe, der RUHEZUSTAND steht
+  // aber nur als Ikone — die Wörter brachen die Kopfzeile bei 1024 px auf zwei Zeilen. Eine
+  // STÖRUNG („Ton stumm/blockiert", „Desktop blockiert") trägt ihr Wort auf jeder Breite; Wort und
+  // Warnfarbe hängen an derselben Bedingung.
   const { istSchmal, abBreite } = useViewport();
   const knapp = !abBreite('xl');
 
@@ -505,15 +492,10 @@ export default function AlarmZentrale() {
       ? 'Alarmton durch Klick entsperren'
       : 'Alarmton stummschalten';
 
-  // Einmal abgeleitet, von BEIDEN Bauformen benutzt: die schmale zeigt dieselbe
-  // Ikone wie der Knopf, den sie vertritt — sonst hiesse dasselbe Zeichen an
-  // zwei Orten Verschiedenes.
-  // `aria-hidden` ist hier Pflicht, nicht Kosmetik: ein `@ant-design/icons`-Knoten
-  // setzt unbedingt `role="img"` samt ENGLISCHEM `aria-label` aus seinem Namen
-  // (`AntdIcon.js`), und antds Menü hängt nirgends ein `aria-hidden` davor. Ohne
-  // das hiesse der Menüeintrag vorgelesen „stop Desktop blockiert" — derselbe
-  // Fall, den CLAUDE.md aus LFH-366 als „delete Bild entfernen" führt. Am breiten
-  // Knopf fiel es nicht auf, weil dort ein eigenes `aria-label` den Namen setzt.
+  // Einmal abgeleitet, von BEIDEN Bauformen benutzt, damit dasselbe Zeichen an zwei Orten dasselbe
+  // heißt. `aria-hidden` ist Pflicht: ein `@ant-design/icons`-Knoten setzt `role="img"` mit
+  // ENGLISCHEM `aria-label`, und antds Menü hängt kein `aria-hidden` davor — der Eintrag hieße
+  // sonst „stop Desktop blockiert".
   const desktopIkone =
     desktop === 'erlaubt' ? (
       <CheckCircleOutlined aria-hidden />
@@ -532,35 +514,18 @@ export default function AlarmZentrale() {
     );
 
   if (istSchmal) {
-    // ── EIN Ziel statt zwei (LFH-511) ────────────────────────────────────────
-    // Auf 390 px bekommt die Aktionsreihe 180 px; zwei beschriftete Knöpfe
-    // brauchen 286. Bis hierher löste das der Browser selbst, indem er beide in
-    // ihrem gemeinsamen `.ant-space-item` UMBRACH — waagerecht unauffällig,
-    // senkrecht 144 px Inhalt in einem 96 px hohen Kopf, oben und unten
-    // angeschnitten (gemessen, `e2e/kopfzeile-schmal.spec.ts`).
+    // ── EIN Ziel statt zwei auf dem Handschirm ────────────────────────────────
+    // Auf 390 px bekommt die Aktionsreihe 180 px, zwei beschriftete Knöpfe brauchen 286 und brächen
+    // um. Nur-Ikone ist gesperrt („blockiert"/„stumm" muss benannt bleiben), `nowrap` ebenso. Also
+    // bündeln: die Marke NENNT den Zustand, beide Steuerungen liegen beschriftet im Menü.
     //
-    // Die naheliegende Abhilfe ist gesperrt: „blockiert"/„stumm" darf im Einsatz
-    // nicht nur über eine Ikone laufen (CLAUDE.md, LFH-392). Ein blosses
-    // `nowrap` ebenso — LFH-392 hat es gemessen, die Kopfzeile wuchs auf 486 px.
-    // Bleibt die Bündelung: die Marke NENNT den Zustand, der genannt werden
-    // muss, beide Steuerungen liegen vollständig beschriftet im Menü.
+    // Der hörbare Kanal geht vor: ein stummer Alarm ist schwerer zu bemerken als eine fehlende
+    // Desktop-Meldung. Sind beide unauffällig, nennt sie trotzdem einen Zustand („Ton bereit").
+    // Eine Zeile trägt EINEN Zustand: sind Ton UND Desktop auffällig, steht der Desktop-Zustand nur
+    // im Menü (`desktopHinweis`).
     //
-    // WELCHEN Zustand sie nennt, ist keine Geschmacksfrage: ein stummer Alarm
-    // ist im Einsatz schwerer zu bemerken als eine fehlende Desktop-Meldung —
-    // der hörbare Kanal geht vor. Sind beide unauffällig, nennt sie trotzdem
-    // einen Zustand („Ton bereit") statt eines erfundenen Sammelworts.
-    //
-    // EINE ZEILE TRÄGT EINEN ZUSTAND, NICHT ZWEI — das ist die bewusste Grenze
-    // dieser Bauform. Sind Ton UND Desktop auffällig, nennt die Marke nur den
-    // Ton; der Desktop-Zustand steht dann ausschliesslich im Menü (deshalb dort
-    // `desktopHinweis` als Etikett, das ihn ausspricht). Beide nebeneinander
-    // wären wieder 286 px — genau der Überlauf, den diese Bauform behebt.
-    //
-    // ZWEI EINTRÄGE SIND HIER KEIN VERSTOSS gegen „ab drei Aktionen bündeln"
-    // (CLAUDE.md/LFH-366). Diese Regel wehrt das Bündeln aus BEQUEMLICHKEIT ab —
-    // hier bündelt die Breite, nicht die Wahl: zwei beschriftete Ziele passen
-    // nachweislich nicht. Der Preis ist echt und benannt: Stummschalten kostet
-    // auf dem Handschirm zwei Tipper statt einem.
+    // Zwei Einträge verstoßen nicht gegen „ab drei bündeln": hier bündelt die Breite, nicht die
+    // Bequemlichkeit. Der Preis: Stummschalten kostet auf dem Handschirm zwei Tipper.
     const tonAuffaellig = gemutet || tonStatus !== 'bereit';
     const zeigtTon = tonAuffaellig || desktop === 'erlaubt';
     const sammelText = zeigtTon ? tonText : desktopText;
@@ -570,28 +535,20 @@ export default function AlarmZentrale() {
         trigger={['click']}
         menu={{
           autoFocus: true,
-          // DIE EINTRÄGE TRAGEN DIE HANDLUNG, NICHT DEN ZUSTAND — der Auslöser
-          // trägt den Zustand. Ein Eintrag „Ton bereit", der beim Antippen stumm
-          // schaltet, liest sich als das Gegenteil dessen, was er tut; „Desktop
-          // aus" fordert sogar die Berechtigung AN. Die breite Bauform hatte die
-          // Handlung im Tooltip und im `aria-label` — und ausgerechnet der
-          // Handschirm ist der einzige Kontext OHNE Hover, also ohne Tooltip.
-          // `desktopHinweis`/`tonHinweis` benennen Handlung UND Zustand in einem
-          // Satz; dadurch steht der Desktop-Zustand hier auch dann, wenn die
-          // Marke oben gerade den Ton nennt.
+          // Die Einträge tragen die HANDLUNG, der Auslöser den Zustand: „Ton bereit" als Eintrag, der
+          // stummschaltet, läse sich als Gegenteil — und auf dem Handschirm gibt es keinen Tooltip.
+          // `desktopHinweis`/`tonHinweis` benennen Handlung UND Zustand in einem Satz.
           items: [
             {
               key: 'desktop',
               icon: desktopIkone,
               label: desktopHinweis,
-              // Gleiche Regel wie am breiten Knopf: nur `aus` ist vom Browser
-              // aus überhaupt änderbar.
+              // Wie am breiten Knopf: nur `aus` ist vom Browser aus änderbar.
               disabled: desktop !== 'aus',
             },
             { key: 'ton', icon: tonIkone, label: tonHinweis },
           ],
-          // Die Zuordnung hängt am MENÜ, nicht je Eintrag (CLAUDE.md) — ein Ort
-          // für einen etwaigen Riegel statt zweier.
+          // Die Zuordnung hängt am MENÜ, nicht je Eintrag — ein Ort für einen etwaigen Riegel.
           onClick: ({ key }) => {
             if (key === 'desktop') desktopAktivieren();
             else void tonUmschalten();
@@ -600,9 +557,7 @@ export default function AlarmZentrale() {
       >
         <Button
           type="text"
-          // Der zugängliche Name trägt die Gruppe UND den Zustand: „Alarmzentrale"
-          // allein sagte nicht, was gerade los ist, der sichtbare Text allein
-          // nicht, wozu der Knopf gehört.
+          // Der zugängliche Name trägt Gruppe UND Zustand.
           aria-label={`Alarmzentrale: ${sammelText}`}
           icon={zeigtTon ? tonIkone : desktopIkone}
           style={{

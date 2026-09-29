@@ -13,9 +13,9 @@ import type {
 export const OFFLINE_QUEUE_EVENT = 'lfh:offline-queue-geaendert';
 
 /**
- * Stand- und Belegungsmeldungen (LFH-675) tragen neben Ziel-ID und Body die `bezeichnung` —
- * nur für die Anzeige im Wiederherstellungs-Drawer, gesendet wird sie nicht. Neue Varianten
- * liegen als Wert im bestehenden Store; eine DB-Version braucht es dafür nicht (design.md D7).
+ * Stand- und Belegungsmeldungen tragen zusätzlich die `bezeichnung` — nur für die Anzeige im
+ * Wiederherstellungs-Drawer, gesendet wird sie nicht. Neue Varianten liegen als Wert im
+ * bestehenden Store und brauchen keine DB-Version.
  */
 export type OfflineSchreibaktion =
   | { art: 'person'; daten: PersonAnlegenEingabe }
@@ -68,9 +68,10 @@ export interface AusstehenderEintrag {
   erstellt_at: string;
 }
 
-/** Endgültig fachlich abgelehnter Offline-Eintrag. Persistent (eigener Store), damit
- *  der Verlust nach einem Reload sichtbar bleibt und der Nutzer ihn bewusst verwerfen
- *  oder neu erfassen kann — statt still in flüchtigem React-State zu verschwinden. */
+/**
+ * Endgültig fachlich abgelehnter Offline-Eintrag. Persistent (eigener Store), damit der
+ * Verlust nach einem Reload sichtbar bleibt, statt in flüchtigem React-State zu verschwinden.
+ */
 export interface AbgelehnterEintrag extends AusstehenderEintrag {
   grund: string;
   abgelehnt_at: string;
@@ -127,16 +128,11 @@ let dbPromise: Promise<IDBPDatabase<OfflineDB>> | null = null;
 
 function db(): Promise<IDBPDatabase<OfflineDB>> {
   if (!dbPromise) {
-    // v2 (F03/LFH-261): `abgelehnt`-Store dazugenommen. v3 (LFH-334/B6):
-    // Personen-/Meldungs-Schreibaktionen getrennt ergänzt; die ETB-Stores bleiben
-    // byte-kompatibel, damit bestehende Offline-Tagebucheinträge erhalten bleiben.
-    // v4 bindet alle vier Stores an die global eindeutige Benutzer-ID. Legacy-Zeilen
-    // besitzen kein `benutzer_id` und erscheinen deshalb in keinem neuen Index: Sie
-    // werden bewusst nie automatisch unter einer späteren Sitzung versendet.
-    // v5 ergänzt dauerhafte, benutzer-/einsatzgebundene Personen-Erfolgsquittungen.
-    // Jeder Store wird versionsgeguardet
-    // angelegt, damit der upgrade-Callback auf einer Bestands-v1-DB nicht createObjectStore
-    // für `ausstehend` erneut aufruft (das würde werfen).
+    // v2: `abgelehnt`-Store. v3: Personen-/Meldungs-Schreibaktionen; die ETB-Stores bleiben
+    // byte-kompatibel. v4 bindet alle Stores an die Benutzer-ID; Legacy-Zeilen ohne `benutzer_id`
+    // erscheinen in keinem Index und werden nie automatisch unter einer späteren Sitzung versendet.
+    // v5: Personen-Erfolgsquittungen. Jeder Store wird versionsgeguardet angelegt, sonst würfe
+    // `createObjectStore` auf einer Bestands-DB.
     dbPromise = openDB<OfflineDB>('lifeline-offline', 5, {
       upgrade(d, oldVersion, _newVersion, tx) {
         if (oldVersion < 1) {
@@ -209,9 +205,8 @@ export async function queueEinreihen(
   eintrag: NeuerEintrag,
 ): Promise<void> {
   const d = await db();
-  // Idempotenzschlüssel garantieren: der Hook mintet ihn schon beim Online-Versuch und reicht
-  // ihn durch (damit online↔flush dieselbe Id tragen); fehlt er dennoch, minten wir hier als
-  // Fallback — aber wir überschreiben NIE einen vorhandenen.
+  // Idempotenzschlüssel: der Hook mintet ihn schon beim Online-Versuch, damit online und Flush
+  // dieselbe Id tragen; hier nur Fallback, ein vorhandener wird NIE überschrieben.
   const mitId: NeuerEintrag = {
     ...eintrag,
     client_id: eintrag.client_id ?? crypto.randomUUID(),

@@ -25,15 +25,9 @@ const uhsNamen: Record<number, string> = { 7: 'Weserstadion' };
 const personenSpalten = spaltenFabrik((id) => uhsNamen[id]);
 
 /**
- * Register- und Helferprüfungen der Personenspalten (LFH-330 · B2, Bündel I).
- *
- * Zwei Sorten Zusicherung, bewusst getrennt:
- *  · **reine Funktionen** (`seitWert`) — ohne Rendern, damit die Wertregel „Sichtung vor
- *    Erfassung" nicht an einer Zellendarstellung hängt.
- *  · **Registerform** — dass die `seit`-Spalte existiert, ihr `sortWert` DIESELBE Regel
- *    benutzt und der Kartenplan gegen das Register aufgeht. Letzteres über einen DIREKTEN
- *    Aufruf von `pruefeKartenplan`, wie in der API-Entscheidung vorgesehen: kein
- *    console-Spion, keine Abgrenzung gegen antd-Fremdwarnungen.
+ * Register- und Helferprüfungen der Personenspalten: reine Funktionen (`seitWert`) ohne
+ * Rendern, und die Registerform — `seit`-Spalte, derselbe `sortWert`, Kartenplan gegen das
+ * Register über einen DIREKTEN Aufruf von `pruefeKartenplan`.
  */
 
 const basis: Person = {
@@ -52,9 +46,7 @@ const basis: Person = {
   notiz: null,
   erfasst_at: '2026-05-27 09:00:00',
   erfasst_von: 1,
-  // ABSICHTLICH ungleich `erfasst_at`. Im Bestand sind beide Felder in allen Fixtures
-  // byte-gleich; ein Umbau von `erfasst_at` auf `geaendert_at` — fachlich falsch, weil
-  // `geaendert_at` bei jeder Notiz weiterläuft — wäre darauf gemessen grün geblieben.
+  // ABSICHTLICH ungleich `erfasst_at`: sonst bliebe ein falscher Umbau auf `geaendert_at` grün.
   geaendert_at: '2026-05-27 11:22:00',
   geaendert_von: 1,
   storniert_at: null,
@@ -80,8 +72,8 @@ describe('seitWert', () => {
   });
 
   it('liefert nie einen Leerwert — erfasst_at ist Pflichtfeld von PersonAnzeige', () => {
-    // Gepinnt gegen einen späteren Umbau auf `geaendert_at` o. ä.: eine leere Zeitangabe
-    // rendert als '' und wäre in der Spalte unsichtbar, statt aufzufallen.
+    // Gepinnt gegen einen Umbau auf `geaendert_at` o. ä.: eine leere Zeitangabe wäre in der
+    // Spalte unsichtbar.
     for (const p of [basis, { ...basis, aktuelle_sichtung_at: null }]) {
       expect(seitWert(p)).toBeTruthy();
     }
@@ -106,8 +98,7 @@ describe('nameText', () => {
   });
 
   it('ist LEERWERTIG, wenn kein Name bekannt ist — nicht „unbekannt"', () => {
-    // Sonst fände die Freitextsuche nach „unbekannt" jede namenlose Person als Namenstreffer.
-    // Der Anzeigetext „unbekannt" gehört ins `render`, nicht in den Suchbeitrag.
+    // Sonst träfe die Suche nach „unbekannt" jede namenlose Person.
     expect(nameText({ ...basis, name: null, vorname: null })).toBeNull();
   });
 
@@ -284,9 +275,8 @@ describe('Zustand-Spalte (LFH-613)', () => {
 
   it('zeigt während des Speicherns den GETIPPTEN Wert mit Ladeanzeige, nicht wieder den Platzhalter (LFH-650)', async () => {
     /**
-     * Befund Tabelle 1, Nr. 3 der LFH-613-Prüfliste: bis zur Serverantwort stand bei einem
-     * vorher leeren Feld wieder „Zustand hinzufügen" da — die Eingabe wirkte verworfen. Die
-     * Antwort wird hier festgehalten, damit der Zwischenzustand überhaupt beobachtbar ist.
+     * Bis zur Serverantwort darf bei vorher leerem Feld nicht wieder „Zustand hinzufügen" stehen;
+     * die Antwort wird festgehalten, damit der Zwischenzustand beobachtbar ist.
      */
     let freigeben!: () => void;
     const gehalten = new Promise<void>((r) => (freigeben = r));
@@ -311,11 +301,9 @@ describe('Zustand-Spalte (LFH-613)', () => {
 
   it('hält den Laufzustand über die Serverantwort hinaus, bis der Refetch steht — kein Zurückspringen (Review LFH-650)', async () => {
     /**
-     * `onSuccess` GIBT die Invalidierung zurück; react-query hält `isPending`, bis sie
-     * aufgelöst ist. Ohne das käme zwischen PATCH-Antwort und Refetch eine Runde mit dem ALTEN
-     * Wert — bei leerem Feld wieder „Zustand hinzufügen". Hier wird die Invalidierung
-     * festgehalten: die Antwort ist längst da, die Zelle muss trotzdem den getippten Wert
-     * zeigen. Mutationsprobe: ohne `return` fällt sie sofort auf den Platzhalter zurück.
+     * `onSuccess` GIBT die Invalidierung zurück, react-query hält `isPending` bis zum Refetch. Hier
+     * wird die Invalidierung festgehalten: die Antwort ist da, die Zelle muss trotzdem den
+     * getippten Wert zeigen.
      */
     const koerper: unknown[] = [];
     server.use(
@@ -340,8 +328,8 @@ describe('Zustand-Spalte (LFH-613)', () => {
     expect(knopf).toHaveTextContent('gehfähig');
     expect(knopf).toHaveClass('ant-btn-loading');
     freigeben();
-    // Gegenhälfte: steht der Refetch, endet der Laufzustand (hier ohne neue Daten: der
-    // statische Prop bleibt leer, also kehrt der Platzhalter zurück).
+    // Gegenhälfte: steht der Refetch, endet der Laufzustand (ohne neue Daten kehrt der
+    // Platzhalter zurück).
     expect(
       await screen.findByRole('button', { name: 'Zustand zu R-001 hinzufügen' }),
     ).toBeInTheDocument();
@@ -349,10 +337,8 @@ describe('Zustand-Spalte (LFH-613)', () => {
 
   it('meldet einen Fehler AN DER ZELLE statt als Toast, und der nächste Versuch räumt ihn (LFH-650)', async () => {
     /**
-     * Befund Tabelle 1, Nr. 9: der Fehler war nur `message.error` — am oberen Rand, nach drei
-     * Sekunden weg, während der Wert still auf den alten zurücksprang. Jetzt trägt die Zelle
-     * die Marke (`data-fehler`, Muster LFH-345 · H15) und einen Satz mit Grund. Die zweite
-     * Hälfte ist die Zusicherung, dass die Marke nicht stehen bleibt.
+     * Ein Fehler steht an der Zelle (`data-fehler`) mit Grund, kein Toast; die zweite Hälfte: die
+     * Marke bleibt nicht stehen.
      */
     let scheitern = true;
     server.use(
@@ -425,9 +411,8 @@ describe('Zustand-Spalte (LFH-613)', () => {
 
 describe('personenKarte', () => {
   it('geht gegen das Register auf — inklusive Abgleichspalte', () => {
-    // DIREKTER Aufruf, kein console-Spion: `pruefeKartenplan` fängt genau das
-    // `const K`-Widening, das der Typ nicht sehen kann, wenn eine Spaltenliste annotiert
-    // statt durch `spaltenFuer` geführt wird.
+    // DIREKTER Aufruf, kein console-Spion: `pruefeKartenplan` fängt das `const K`-Widening, das der
+    // Typ nicht sieht, wenn eine Spaltenliste annotiert statt durch `spaltenFuer` geführt wird.
     expect(
       pruefeKartenplan({ spalten: personenSpalten, karte: personenKarte(1) }, 'Personen'),
     ).toEqual([]);
@@ -450,9 +435,8 @@ describe('personenKarte', () => {
   });
 
   it('führt Person, Sichtung und Zeit als Sekundärfelder, den Status im Status-Slot', () => {
-    // `seit` gemessen als Lücke: ohne diese Zeile blieb das Register grün, während die Zeit
-    // aus dem Kartenplan verschwand. `person` trägt im Kartenzweig den Lückenvermerk — ohne
-    // sie hinge die Lückentönung dort ohne Wort.
+    // Ohne `seit` blieb das Register grün, während die Zeit aus dem Kartenplan verschwand. `person`
+    // trägt im Kartenzweig den Lückenvermerk.
     const karte = personenKarte(1);
     if (karte.art !== 'plan') throw new Error('personenKarte ist ein Plan, kein Eigenbau');
     expect(karte.sekundaer).toEqual(['person', 'sk', 'seit']);

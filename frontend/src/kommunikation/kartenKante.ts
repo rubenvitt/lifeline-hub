@@ -5,9 +5,8 @@ import type { KommPhase, KommPrio } from './phase';
 type KantenZustand = 'alarm' | 'unbearbeitet' | 'keine';
 
 /**
- * Der linke Kartenrand der Kommunikations-Karten (LFH-343 · C8, Befund H47) — EINE Farbe,
- * und Gefahr gewinnt: `alarm` vor `unbearbeitet`, sonst die Rahmenlinie. Rein, damit der
- * Vorrang ohne Rendern prüfbar ist.
+ * Der linke Kartenrand der Kommunikations-Karten — EINE Farbe, Gefahr gewinnt: `alarm` vor
+ * `unbearbeitet`, sonst die Rahmenlinie. Rein, damit der Vorrang ohne Rendern prüfbar ist.
  */
 export function kartenKante(
   rollen: Pick<Farbrollen, 'alarm' | 'achtung' | 'linie'>,
@@ -19,13 +18,9 @@ export function kartenKante(
 }
 
 /**
- * Phase der Kommunikations-Achse → Ton der Statusfläche (Neuentwurf „Status als getönte
- * Fläche"). `in_arbeit` ist eine aktive Beziehung und trägt deshalb `bedien` — dieselbe
- * Lesart wie `verfuegbarkeit.reserviert`/`etbTyp.meldung` in `theme/statusFarben.ts`;
- * `ausnahme` (abgelehnt) ist `alarm`, abgeschlossen `normal`, offen neutral.
- *
- * Der Eingangszustand (`unbearbeitet`) schlägt die Phase und wird `achtung` — derselbe
- * Vorrang wie am Kartenrand.
+ * Phase → Ton der Statusfläche. `in_arbeit` ist eine aktive Beziehung und trägt `bedien` (wie
+ * `verfuegbarkeit.reserviert` in `theme/statusFarben.ts`); `ausnahme` ist `alarm`,
+ * abgeschlossen `normal`, offen neutral. Der Eingangszustand schlägt die Phase und wird `achtung`.
  */
 export function phaseTon(phase: KommPhase, unbearbeitet = false): StatusTon {
   if (unbearbeitet) return 'achtung';

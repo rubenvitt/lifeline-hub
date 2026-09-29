@@ -3,43 +3,24 @@ import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
 import type { StatusVerteilung } from './kraeftebild';
 
 /**
- * Die EINE Statusachse der Kräfte-Module (LFH-330 · B2, Bündel IV).
+ * Die EINE Statusachse der Kräfte-Module (Fahrzeuge, Personal, Meldebild, Filterleiste der
+ * Kräfteübersicht): „welche Statuskategorie, und wie viele davon?".
  *
- * Vier Seiten stellen dieselbe Frage — Fahrzeuge, Personal, Meldebild und die
- * Filterleiste der Kräfteübersicht: „welche Statuskategorie, und wie viele davon?".
- * Vor diesem Modul stand die Antwort dreimal getrennt im Code: die drei
- * handgeschriebenen Filteroptionen der Kräfteübersicht, die Abkürzungen der
- * Statusspalte und implizit die Gruppenachse, die es noch nicht gab.
+ * VIER EIMER, NICHT DREI: `StatusKategorie` hat drei Werte, `status_kategorie` ist aber
+ * nullable, und `null` ist der Normalfall einer frisch disponierten Kraft. `'ohne'` ist deshalb
+ * ein Eimer, aber NICHT im Vertrag — die Abwesenheit eines Status, Rolle `neutral`.
  *
- * ── WARUM VIER EIMER UND NICHT DREI ─────────────────────────────────────────────
- *
- * `theme/statusFarben.ts` bildet `StatusKategorie` ab und hat genau DREI Schlüssel —
- * das ist richtig, denn das Enum hat drei Varianten. Die DATEN haben aber vier
- * Zustände: `status_kategorie` ist an beiden DTOs `StatusKategorie | null`, und `null`
- * ist der Normalfall einer frisch disponierten Kraft. Wer nur die drei
- * Vertragswerte gruppiert oder filtert, verliert diese Zeilen lautlos.
- *
- * `'ohne'` ist deshalb hier ein Eimer und NICHT im Vertrag: es ist die ABWESENHEIT
- * eines Status, keine vierte Kategorie. Deshalb trägt {@link OHNE_STATUS} die Rolle
- * `neutral` (kein Signal) und nicht eine der drei Statusrollen.
- *
- * ── WARUM DIE ZAHL EINEN KURZTEXT BRAUCHT ───────────────────────────────────────
- *
- * Die Ampelzeile der Kräfteübersicht codiert über `.lfh-feld--alarm .lfh-zahl` NUR
- * Textfarbe — Farbe allein trägt keine Bedeutung (WCAG 1.4.1, Kriterium 6). Jedes
- * {@link AmpelFeld} führt darum ein `etikett` (Kurztext, sichtbar) UND einen `titel`
- * (Volltext, als `title`-Attribut). Die Abkürzungen bleiben kurz, weil `.lfh-etikett`
- * versal und gesperrt setzt und lange Wörter dort noch breiter werden.
+ * Jedes {@link AmpelFeld} trägt ein `etikett` (Kurztext, sichtbar) und einen `titel` (Volltext):
+ * Farbe allein trägt keine Bedeutung (WCAG 1.4.1). Die Abkürzungen bleiben kurz, weil
+ * `.lfh-etikett` versal und gesperrt setzt.
  */
 
 /** Statuskategorie ODER die Abwesenheit einer solchen. Vier Eimer, siehe Dateikopf. */
 export type KategorieOderOhne = StatusKategorie | 'ohne';
 
 /**
- * Feste Folge der vier Eimer — Gruppenreihenfolge UND Filterreihenfolge.
- *
- * Von verfügbar nach nicht verfügbar, „ohne Status" hinten: die dringlichste Zeile
- * steht damit nicht am Rand, und die Folge ist über alle vier Seiten dieselbe.
+ * Feste Folge der vier Eimer — Gruppen- UND Filterreihenfolge, von verfügbar nach nicht
+ * verfügbar, „ohne Status" hinten.
  */
 export const KATEGORIE_REIHENFOLGE: readonly KategorieOderOhne[] = [
   'verfuegbar',
@@ -49,11 +30,9 @@ export const KATEGORIE_REIHENFOLGE: readonly KategorieOderOhne[] = [
 ];
 
 /**
- * „kein Status" als Darstellung. `neutral` heißt: kein Signal, nicht „noch nicht zugeordnet".
- *
- * Steht VOR {@link kategorieEtikett}, weil `KATEGORIE_WERTE` beim Modulaufbau bereits durch
- * `kategorieEtikett` läuft — eine spätere `const` liefe dort in ihre eigene Deklarationslücke
- * und wäre ein Laufzeitfehler beim Import.
+ * „kein Status" als Darstellung. Steht VOR {@link kategorieEtikett}, weil `KATEGORIE_WERTE`
+ * beim Modulaufbau schon durch `kategorieEtikett` läuft — später deklariert wäre es ein
+ * Laufzeitfehler beim Import.
  */
 export const OHNE_STATUS: StatusDarstellung = { rolle: 'neutral', label: 'ohne Status' };
 
@@ -64,8 +43,8 @@ export function kategorieEtikett(wert: string): string {
 }
 
 /**
- * Der Filter-/Gruppenschlüssel einer Zeile mit optionaler Statuskategorie.
- * EINE Stelle, damit `gruppen.schluessel` und `filter.trifft` nicht auseinanderlaufen.
+ * Der Filter-/Gruppenschlüssel einer Zeile — eine Stelle, damit `gruppen.schluessel` und
+ * `filter.trifft` nicht auseinanderlaufen.
  */
 export function kategorieVon(kat: StatusKategorie | null | undefined): KategorieOderOhne {
   return kat ?? 'ohne';
@@ -92,11 +71,8 @@ interface AmpelFeld {
 }
 
 /**
- * Die vier Zählfelder einer Statusverteilung, in FESTER Folge — auch bei 0.
- *
- * Feste Folge, weil zwei übereinanderliegende Zeilen einer Vergleichstabelle nur dann
- * vergleichbar sind, wenn die Zahlen fluchten. Und `stufe` nur bei `wert > 0`, weil
- * eine rot gefärbte 0 das Gegenteil dessen meldet, was sie bedeutet.
+ * Die vier Zählfelder einer Statusverteilung in FESTER Folge — auch bei 0, damit die Zahlen
+ * zweier Zeilen fluchten. `stufe` nur bei `wert > 0`: eine rote 0 meldete das Gegenteil.
  */
 export function verteilungFelder(v: StatusVerteilung | null): readonly AmpelFeld[] {
   if (!v) return [];

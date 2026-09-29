@@ -19,22 +19,19 @@ import {
 } from './fristModell';
 
 /**
- * Aufbewahrungsfrist am Einsatz anzeigen und ändern (LFH-23, design.md D8).
+ * Aufbewahrungsfrist am Einsatz anzeigen und ändern.
  *
- * Die Frist gehört NICHT zu den eingefrorenen Einstellungen: Einsatzleitung und System-Admin
- * setzen, verlängern und heben sie auch nach dem Abschluss auf, über ihren eigenen Endpunkt
- * (`PUT …/aufbewahrungsfrist`) und mit eigener Mutation. Deshalb steht das Paneel in der
- * Einstellungs-Sektion ÜBER und AUSSERHALB des Vollersatz-`<Form>` — ein Frist-PUT trägt
- * keinen Einstellungs-Payload, und ein Einstellungs-PUT keine Frist.
+ * Die Frist gehört NICHT zu den eingefrorenen Einstellungen: sie wird auch nach dem Abschluss
+ * über `PUT …/aufbewahrungsfrist` gesetzt. Deshalb steht das Paneel ÜBER und AUSSERHALB des
+ * Vollersatz-`<Form>` der Einstellungen.
  *
- * **Umkehrbarkeit entscheidet die Rückfrage (LFH-363):** Verlängern und Aufheben schieben die
- * Sperre hinaus und fragen nicht. Eine Verkürzung — dazu zählt das erstmalige Setzen an einem
- * Einsatz ohne Frist — verlegt die Sperre vor; vor ihr steht eine Rückfrage mit `danger`, die
- * alten und neuen Zeitpunkt nennt, und erst dann geht `bestaetigt: true` hinaus. Die 409 des
- * Servers bleibt Sicherheitsnetz und erscheint als Text, sie wird nicht ausgewertet.
+ * **Umkehrbarkeit entscheidet die Rückfrage:** Verlängern und Aufheben fragen nicht. Eine
+ * Verkürzung (auch das erstmalige Setzen) verlegt die Sperre vor; vor ihr steht eine
+ * `danger`-Rückfrage mit altem und neuem Zeitpunkt, erst dann geht `bestaetigt: true` hinaus.
+ * Die 409 des Servers bleibt Sicherheitsnetz.
  *
- * **Fehler an der Stelle, an der die Person steht (LFH-345/535):** im Dialog, solange er offen
- * ist, sonst am Paneel. Kein Fehler-Toast; der Erfolg quittiert per Toast.
+ * **Fehler dort, wo die Person steht:** im Dialog, solange er offen ist, sonst am Paneel. Kein
+ * Fehler-Toast; der Erfolg quittiert per Toast.
  */
 
 type FristEinsatz = Pick<EinsatzAnzeige, 'status' | 'meine_rolle' | 'retention_bis'>;
@@ -78,8 +75,8 @@ export function useFristAenderung(
   const [form] = Form.useForm<FristFormWerte>();
   const [offen, setOffen] = useState(false);
   const [rueckfrage, setRueckfrage] = useState<Rueckfrage | null>(null);
-  // Die Vergleichsbasis wird beim ÖFFNEN eingefroren (LFH-303): ein Refetch während des
-  // Dialogs verschöbe sonst still, was als Verkürzung gilt.
+  // Die Vergleichsbasis wird beim ÖFFNEN eingefroren: ein Refetch verschöbe sonst still, was
+  // als Verkürzung gilt.
   const [basis, setBasis] = useState<string | null | undefined>(alt);
 
   const mutation = useMutation({
@@ -105,17 +102,15 @@ export function useFristAenderung(
     setOffen(false);
   };
 
-  // Vorbelegen zum Bearbeiten per `setFieldsValue` beim Öffnen (Erfassungs-Norm), nicht über
-  // `initialValues`: die Formularinstanz lebt im Hook, und rc-field-form behält ihren
-  // Speicher über das Abhängen des Dialogs hinweg — beim nächsten Öffnen gewönne sonst der
-  // Wert der VORIGEN Öffnung, und ein Absenden nähme eine inzwischen bestätigte Verkürzung
-  // still zurück (Review-Befund, `FristPaneel.test.tsx`).
+  // Vorbelegen per `setFieldsValue` beim Öffnen, nicht über `initialValues`: rc-field-form
+  // behält seinen Speicher über das Abhängen des Dialogs hinweg, und der Wert der VORIGEN
+  // Öffnung nähme eine inzwischen bestätigte Verkürzung still zurück.
   useEffect(() => {
     if (offen) form.setFieldsValue({ frist: alsOrtszeit(basis ?? undefined) ?? null });
   }, [offen, basis, form]);
 
-  /** Fragt bei einer Verkürzung zurück; die Zusage lehnt ab, wenn abgebrochen wird — die
-   *  Erfassungshülle lässt die Felder dann stehen und sendet nichts. */
+  /** Fragt bei einer Verkürzung zurück; bei Abbruch lehnt die Zusage ab, die Hülle lässt die
+      Felder stehen und sendet nichts. */
   const bestaetigt = (neu: string) =>
     new Promise<boolean>((resolve, reject) => {
       if (!istFristverkuerzung(basis, neu)) {

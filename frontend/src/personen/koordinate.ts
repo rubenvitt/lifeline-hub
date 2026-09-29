@@ -1,16 +1,11 @@
 /**
- * Die EINE Schreibweise der Fundort-Koordinate (LFH-613, Design D6): `52.2691/9.1342`.
+ * Die EINE Schreibweise der Fundort-Koordinate: `52.2691/9.1342` — Schnellerfassung, Maske und
+ * Detailseite lesen über dieselbe Funktion. Rein.
  *
- * Schnellerfassung (`#52.2691/9.1342`), Maske und Detailseite lesen über dieselbe Funktion —
- * eine Schreibweise, ein Prüfweg, ein Textfeld statt zweier Zahlenfelder. Rein, ohne Render
- * prüfbar.
- *
- *  · Das `/` trennt Breite und Länge. Ein Komma gilt als DEUTSCHES Dezimalzeichen
- *    (`52,2691/9,1342`), nie als Trenner — sonst wäre `52,2691` mehrdeutig.
- *  · Ein führendes `#` (das Kürzel der Schnellerfassung) wird übergangen.
- *  · Minus ist erlaubt, der Bereich ist WGS84: Breite ±90, Länge ±180. Das Backend prüft
- *    denselben Bereich (422); hier wird er vorher gemeldet, damit nichts Unbrauchbares
- *    abgeschickt wird.
+ *  · Das `/` trennt Breite und Länge. Ein Komma ist DEUTSCHES Dezimalzeichen
+ *    (`52,2691/9,1342`), nie Trenner.
+ *  · Ein führendes `#` (Kürzel der Schnellerfassung) wird übergangen.
+ *  · Minus ist erlaubt, Bereich WGS84 (±90/±180) wie im Backend (422) — hier vorher gemeldet.
  */
 
 type KoordinatenErgebnis = { ok: true; lat: number; lon: number } | { ok: false; grund: string };
@@ -47,7 +42,7 @@ export function formatKoordinate(lat: number, lon: number): string {
 
 /**
  * Trägt die Person eine VOLLSTÄNDIGE Koordinate? Die eine Regel für Lücke, Anzeige und
- * Bearbeiten — ein halbes Paar (das das Backend mit 422 ablehnt) zählt nirgends als Fundort.
+ * Bearbeiten — ein halbes Paar zählt nirgends als Fundort.
  */
 export function hatKoordinate(p: {
   antreff_lat?: number | null;

@@ -24,23 +24,19 @@ import { KOSTFORM_LABEL, KOSTFORMEN, sonderkostText, uhrzeit, zitat } from './ve
 dayjs.extend(utc);
 
 /**
- * Die Erfassungsmasken des Fachmoduls Verpflegung (LFH-634, design.md D7), beide auf
- * `ErfassungsModal` (Erfassungs-Norm LFH-332): Absende-Knopf im `<form>`, Fokus im ersten
- * Feld, Zurücksetzen auf jedem Weg hinaus, `onErfassen` lehnt bei Ablehnung ab und die Felder
- * bleiben stehen. Server-Gründe (400/422) stehen IM Dialog (`SpeicherFehler`).
+ * Die Erfassungsmasken des Fachmoduls Verpflegung, beide auf `ErfassungsModal`;
+ * Server-Gründe (400/422) stehen IM Dialog (`SpeicherFehler`).
  *
- * FELDBUDGET (LFH-19): „Zeitfenster" zeigt VIER Felder — eins über dem Richtwert, bewusst
- * (D7): die beiden Bedarfsteile tragen je einen Vorschlag mit Herkunft, und eingeklappt wären
- * genau diese Vorschläge unsichtbar. „Ausgabe" zeigt drei. Der Rest liegt in einem `Collapse`
- * mit `forceRender` — nur so kommen die eingeklappten Werte in `onFinish` an.
+ * FELDBUDGET: „Zeitfenster" zeigt bewusst VIER Felder, weil die beiden Bedarfsteile je einen
+ * Vorschlag mit Herkunft tragen, der eingeklappt unsichtbar wäre; „Ausgabe" drei. Der Rest liegt
+ * in einem `Collapse` mit `forceRender`, sonst fehlen die Werte in `onFinish`.
  *
- * ZEIT (D2): Wire-Zeiten sind UTC ohne Zone. Hinaus über `alsBackendZeit`, herein über
- * `alsOrtszeit` — nie `dayjs(s)`, das verschöbe still um den Zonenversatz. Ein LEERER
- * Ausgabezeitpunkt lässt den Schlüssel weg: „jetzt" setzt der Server, nicht die Client-Uhr.
+ * ZEIT: Wire-Zeiten sind UTC ohne Zone — hinaus über `alsBackendZeit`, herein über
+ * `alsOrtszeit`, nie `dayjs(s)`. Ein LEERER Ausgabezeitpunkt lässt den Schlüssel weg: „jetzt"
+ * setzt der Server.
  *
- * PATCH (D4): zweiwertig — Schlüssel fehlt = unverändert, es gibt kein `null`. Gesendet werden
- * nur geänderte Schlüssel; ein geleertes optionales Zahlfeld (weitere Personen, eine Kostform)
- * heißt 0. Ein leerer PATCH wird nicht gesendet, der Dialog schließt, als wäre gespeichert.
+ * PATCH: Schlüssel fehlt = unverändert, kein `null`. Gesendet werden nur geänderte Schlüssel;
+ * ein geleertes optionales Zahlfeld heißt 0. Ein leerer PATCH wird nicht gesendet.
  */
 
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
@@ -178,8 +174,7 @@ interface DialogBasis {
 
 /**
  * Feldhilfe eines Bedarfsfelds. Beim ANLEGEN steht der Vorschlag im Feld, die Hilfe nennt nur
- * die Herkunft. Beim BEARBEITEN überschreibt der Vorschlag nichts — die Hilfe nennt deshalb
- * die Zahl mit (Risiko „gespeicherter Bedarf veraltet", D8).
+ * die Herkunft; beim BEARBEITEN überschreibt der Vorschlag nichts, die Hilfe nennt die Zahl mit.
  */
 function vorschlagHilfe(v: Vorschlag, anlegen: boolean): string | undefined {
   if (v.hinweis == null) return undefined;
@@ -220,12 +215,12 @@ export function ZeitfensterDialog({
   const anlegen = modus.art === 'anlegen';
   const vorher = modus.art === 'bearbeiten' ? modus.zeitfenster : null;
 
-  // Der Beginn geht als Wire-String in den Query-Key der Kopfzahl: stabil, solange die Person
-  // den Zeitraum nicht ändert — nie ein je Render neu gerechnetes „jetzt".
+  // Der Beginn geht als Wire-String in den Query-Key der Kopfzahl — nie ein je Render neu
+  // gerechnetes „jetzt".
   const zeitraum = Form.useWatch('zeitraum', form) as [Dayjs | null, Dayjs | null] | undefined;
   const beginn = zeitraum?.[0];
   // Im ersten Render ist `useWatch` noch leer — beim Bearbeiten gilt bis dahin der gespeicherte
-  // Beginn, sonst ginge eine Kopfzahl-Anfrage „jetzt" hinaus und der Hinweis spränge kurz um.
+  // Beginn, sonst ginge eine Kopfzahl-Anfrage „jetzt" hinaus.
   const vonAt =
     beginn && beginn.isValid()
       ? alsBackendZeit(beginn)
@@ -234,17 +229,16 @@ export function ZeitfensterDialog({
         : undefined;
   const vorschlag = useBedarfsvorschlag({ einsatzId, vonAt, benutzer, overrides, jetzt });
 
-  // Eigener Merker „hat die Person das Feld angefasst?" statt `isFieldTouched`: auch eine
-  // Vorbelegung per `setFieldValue` wäre sonst von der Hand der Person nicht zu trennen, und
-  // ein Vorschlag, der nach einem geänderten Beginn nachzieht, überschriebe ihre Zahl (D8).
+  // Eigener Merker statt `isFieldTouched`: eine Vorbelegung per `setFieldValue` wäre sonst von der
+  // Hand der Person nicht zu trennen, und ein nachziehender Vorschlag überschriebe ihre Zahl.
   const beruehrt = useRef<Record<Bedarfsfeld, boolean>>({
     bedarf_kraefte: false,
     bedarf_betreute: false,
   });
   const { wert: kraefteWert, hinweis: kraefteHinweis } = vorschlag.kraefte;
   const { wert: betreuteWert, hinweis: betreuteHinweis } = vorschlag.betreute;
-  // Nur beim ANLEGEN, und nur wenn die Quelle geantwortet hat (`hinweis`): während sie lädt,
-  // ist `wert` ebenfalls `null`, und ein Leeren dabei ließe die Zahl flackern.
+  // Nur beim ANLEGEN, und nur wenn die Quelle geantwortet hat (`hinweis`): während sie lädt, ist
+  // `wert` ebenfalls `null`, und ein Leeren ließe die Zahl flackern.
   useEffect(() => {
     if (!anlegen || kraefteHinweis == null || beruehrt.current.bedarf_kraefte) return;
     form.setFieldValue('bedarf_kraefte', kraefteWert ?? undefined);
@@ -360,8 +354,8 @@ export interface NachforderungOption {
 interface AusgabeDialogProps extends DialogBasis {
   zeitfenster: VerpflegungZeitfenster;
   /**
-   * Nachforderungen zur Auswahl. `null` = das Modul Nachforderungen ist für die Person nicht
-   * bedienbar — dann gibt es das Feld nicht (D4: keine Angaben eines fremden Moduls).
+   * Nachforderungen zur Auswahl. `null` = Modul für die Person nicht bedienbar, dann gibt es das
+   * Feld nicht.
    */
   nachforderungen: readonly NachforderungOption[] | null;
   onErfassen: (body: AusgabeEingabe) => Promise<unknown>;
@@ -387,8 +381,8 @@ export function AusgabeDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      {/* Normaltext, nicht `secondary`: die Zeile ist im Dialog die einzige Angabe der Fehlmenge
-          und damit tragend — als Tertiärtext hielt sie nachts nur 4,81 : 1 (Kontrast-Spec). */}
+      {/* Normaltext, nicht `secondary`: die Zeile ist die einzige Angabe der Fehlmenge im Dialog, und
+         Tertiärtext hält nachts den Kontrastboden nicht. */}
       <Typography.Paragraph style={{ fontVariantNumeric: 'tabular-nums' }}>
         Bedarf {zf.bedarf.gesamt} · ausgegeben {zf.ausgegeben.gesamt} · fehlt {zf.fehlmenge.gesamt}{' '}
         EP
@@ -437,9 +431,8 @@ export function AusgabeDialog({
 // ── Rückfragen ──────────────────────────────────────────────────────────────────────────
 
 /**
- * Rückfrage vor einer unumkehrbaren Aktion (LFH-363): eigenes `Modal` mit rotem
- * Bestätigungsknopf, kein `Popconfirm` (LFH-365). Der Aufrufer rendert EINEN Dialog außerhalb
- * der Karten, nicht je Zeile einen.
+ * Rückfrage vor einer unumkehrbaren Aktion: eigenes `Modal` mit rotem Bestätigungsknopf, kein
+ * `Popconfirm`. Der Aufrufer rendert EINEN Dialog außerhalb der Karten.
  */
 function Rueckfrage({
   titel,
@@ -475,7 +468,7 @@ function Rueckfrage({
   );
 }
 
-/** Rücknahme einer Ausgabe aus der Liste heraus — endgültig, deshalb mit Rückfrage (Spec). */
+/** Rücknahme einer Ausgabe — endgültig, deshalb mit Rückfrage. */
 export function RuecknahmeDialog({
   ausgabe: a,
   zeitfenster,
@@ -507,7 +500,7 @@ export function RuecknahmeDialog({
   );
 }
 
-/** Löschen eines Zeitfensters ohne gültige Ausgabe — unumkehrbar, mit Rückfrage (D7). */
+/** Löschen eines Zeitfensters ohne gültige Ausgabe — unumkehrbar, mit Rückfrage. */
 export function LoeschenDialog({
   zeitfenster,
   ...rest

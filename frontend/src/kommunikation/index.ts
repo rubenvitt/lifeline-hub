@@ -1,6 +1,6 @@
 /**
- * Geteilte Kommunikations-Schicht (LFH-112) — dünne Primitive für die fünf
- * Module Chat/Erinnerung/Auftrag/Meldung/Nachforderung. Aufträge sind das Vorbild.
+ * Geteilte Kommunikations-Schicht — dünne Primitive für Chat, Erinnerung, Auftrag, Meldung und
+ * Nachforderung.
  */
 export {
   AUFTRAG_STATUS,

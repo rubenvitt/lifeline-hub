@@ -21,22 +21,14 @@ import {
 } from './personenBilanz';
 
 /**
- * Rechte Seitenleiste der Betroffenen-Seite (Neuentwurf S7): „Sichtungsbild", „Verbleib",
- * „Offene Felder". Alle Zahlen kommen aus `personen/personenBilanz.ts` über DIESELBE Menge
- * wie die Liste — über einem Ladefehler steht sie deshalb nicht (die Seite rendert sie im
- * Datenzweig), sonst meldete sie Nullen, die niemand erhoben hat.
+ * Rechte Seitenleiste der Betroffenen-Seite: „Sichtungsbild", „Verbleib", „Offene Felder". Alle
+ * Zahlen aus `personen/personenBilanz.ts` über DIESELBE Menge wie die Liste; über einem
+ * Ladefehler steht sie nicht, sonst meldete sie Nullen, die niemand erhoben hat.
  *
- * ── SICHTUNG IN BBK-FARBEN, NICHT IN DESIGNFARBEN ───────────────────────────────────────
- *
- * Der Entwurf färbt SK II orange, SK III gelb, SK IV grau — das ist ausdrücklich NICHT
- * übernommen (umsetzung.md, Entscheidung 2). Die Farbfelder lesen `sichtungsfarben` über
- * `sichtung[k].farbe` wie `SichtungsTag`; „unverletzt" und „ohne Sichtung" haben keine
- * Fachfarbe und stehen als leeres Feld bzw. neutrale Spur.
- *
- * DER BALKEN IST DER BAUSTEIN `Aufgliederung` mit Umrandung je Segment (seit 22.09.2026;
- * vorher ein lokaler Nachbau): das schwarze Feld für „tot" verschwände sonst auf dem
- * Nachtgrund, Gelb auf hellem — dieselbe Begründung wie am Farbfeld des `SichtungsTag`.
- * Zugänglich ist er als EIN Bild mit ausgeschriebenem Wortlaut über ALLE Kategorien, auch
+ * Sichtung in BBK-Farben, nicht in den Entwurfsfarben (umsetzung.md, Entscheidung 2): die
+ * Farbfelder lesen `sichtung[k].farbe` wie `SichtungsTag`.
+ * Der Balken ist `Aufgliederung` mit Umrandung je Segment (das schwarze „tot" verschwände
+ * sonst nachts, Gelb am Tag). Zugänglich als EIN Bild mit Wortlaut über ALLE Kategorien, auch
  * die leeren; die Liste darunter ist der zweite Kanal.
  */
 
@@ -86,8 +78,7 @@ export default function BetroffenenSeitenleiste({
   const bild = sichtungsbild(alle);
   const verbleib = verbleibZaehlung(alle, uhsName);
   const offen = offeneFelder(alle);
-  // Alle Kategorien, auch die leeren: der zugängliche Name zählt sie vollständig auf, die
-  // Fläche zeichnet der Baustein ohnehin nur für positive Werte.
+  // Alle Kategorien, auch die leeren: der zugängliche Name zählt sie vollständig auf.
   const segmente: Segment[] = SICHTUNGSBILD_REIHE.map((k) => ({
     label: k === 'ohne' ? 'ohne Sichtung' : kuerzel(k),
     wert: bild.je[k],
@@ -200,8 +191,7 @@ export default function BetroffenenSeitenleiste({
                 }. Die Zeilen sind markiert („offen") und über die Detailseite ergänzbar.`}
           </p>
           <Button
-            // Umschalter: der Name bleibt stehen, der Zustand steht in `aria-pressed` und in
-            // der Füllung — ein wechselnder Name UND ein Zustand wären zwei Wahrheiten.
+            // Umschalter: der Name bleibt, der Zustand steht in `aria-pressed` und der Füllung.
             aria-pressed={nurLuecken}
             type={nurLuecken ? 'primary' : 'default'}
             onClick={() => onNurLuecken(!nurLuecken)}

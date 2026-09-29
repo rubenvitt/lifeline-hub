@@ -7,15 +7,13 @@ import { renderMitProviders } from '../test/utils';
 import StichworteTab from './StichworteTab';
 import { adminFixture } from '../test/fixtures';
 
-// Deckt das Admin-Gating der Stichwort-Sektion ab (früher via StammdatenPage.test, das mit
-// der Sidebar-Umstellung entfällt — StichworteTab hatte keinen eigenen Test).
+// Deckt das Admin-Gating der Stichwort-Sektion ab.
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
 
-// Voreinstellung bleibt EINE Zeile: die Bestandsprüfungen unten greifen „Löschen" per
-// `getByRole` (Einzahl), eine zweite Zeile brächte zwei gleichnamige Schaltflächen und
-// ließe sie an der Mehrdeutigkeit scheitern statt an der Sache.
+// Voreinstellung bleibt EINE Zeile: die Prüfungen unten greifen „Löschen" per `getByRole`
+// (Einzahl), eine zweite Zeile machte sie mehrdeutig.
 function renderTab(benutzer: typeof admin, vorschlaege = [{ id: 1, text: 'H1' }]) {
   server.use(
     meHandler(benutzer),
@@ -38,12 +36,10 @@ describe('StichworteTab', () => {
   });
 
   /**
-   * Zwei Zuschnitte, nicht einer (LFH-346, Nacharbeit zu Befund M45). Die PRIMÄRAKTION
-   * steht gesperrt — sie zu verstecken machte „kein Recht" von „diese Seite kann das gar
-   * nicht" ununterscheidbar; den Grund nennt der Hinweis darüber. Die ZEILENAKTIONEN
-   * entfallen weiterhin ganz: n Zeilen mal zwei gesperrte Knöpfe kosten Platz für null
-   * Handlungsmöglichkeit. Beide Hälften gehören in dieselbe Aussage, sonst liest sich die
-   * eine als Versehen der anderen.
+   * Zwei Zuschnitte (LFH-346): die PRIMÄRAKTION steht gesperrt — versteckt wäre „kein Recht"
+   * von „diese Seite kann das nicht" nicht zu unterscheiden; den Grund nennt der Hinweis. Die
+   * ZEILENAKTIONEN entfallen: n Zeilen × 2 gesperrte Knöpfe kosteten Platz für null
+   * Handlungsmöglichkeit.
    */
   it('Nicht-Admin: Hinzufügen GESPERRT (samt Feld), Löschen weg', async () => {
     renderTab(nichtAdmin);
@@ -56,13 +52,12 @@ describe('StichworteTab', () => {
   });
 
   /**
-   * Die EINZIGE unumkehrbare Aktion der Stammdaten (LFH-363 · B5c): überall sonst heißt
-   * die destruktive Aktion „Außer Dienst"/„Deaktivieren" und hat ihre Umkehrung als
-   * Knopf daneben. Ein gelöschter Vorschlag ist weg.
+   * Die EINZIGE unumkehrbare Aktion der Stammdaten (LFH-363): sonst heißt die destruktive
+   * Aktion „Außer Dienst"/„Deaktivieren" mit ihrer Umkehrung daneben. Ein gelöschter Vorschlag
+   * ist weg.
    *
-   * Die erste Hälfte ist die eigentliche Aussage — ohne sie wäre die zweite auch mit
-   * einem Knopf ganz ohne Blase grün: der Klick auf „Löschen" allein darf die Mutation
-   * NICHT auslösen.
+   * Die erste Hälfte ist die eigentliche Aussage: der Klick auf „Löschen" allein darf die
+   * Mutation NICHT auslösen — sonst wäre die zweite auch ohne Rückfrage grün.
    */
   it('Löschen fragt zurück, bevor es löscht', async () => {
     let geloescht: number | null = null;
@@ -83,13 +78,11 @@ describe('StichworteTab', () => {
   });
 
   /**
-   * LFH-346 · A1: der Ladezustand gehört GENAU der gelöschten Zeile. Vorher hing
-   * `loading` an `loeschenMutation.isPending` und drehte damit in JEDER Zeile einen
-   * Spinner — ein Fortschritt, der etwas über einen fremden Datensatz behauptet.
+   * Der Ladezustand gehört GENAU der gelöschten Zeile (LFH-346) — ein Spinner an jeder Zeile
+   * behauptete einen Fortschritt an fremden Datensätzen.
    *
-   * Die zweite Zeile ist die eigentliche Aussage: ohne den Zeilenvergleich ist sie
-   * ladend, obwohl an ihr nichts läuft. Die Rückfrage trägt hier `okText="Ja"`
-   * (anders als in Fahrzeuge/Material/Personal, wo antds Vorgabe „OK" steht).
+   * Die zweite Zeile ist die eigentliche Aussage. Die Rückfrage trägt hier `okText="Ja"`
+   * (anders als in Fahrzeuge/Material/Personal mit antds „OK").
    */
   it('zeigt den Ladezustand NUR an der gelöschten Zeile', async () => {
     const { container } = renderTab(admin, [
@@ -114,27 +107,21 @@ describe('StichworteTab', () => {
 
   it('die Leitspalte sortiert numerisch, ohne die Serverreihenfolge zu verdrängen', async () => {
     /**
-     * Der Vorrat ist nach EINER Regel gewählt, und nur sie macht alle drei Aussagen
-     * dieser Prüfung tötbar:
+     * Der Vorrat folgt EINER Regel:
      *
      *   lexikografisch aufsteigend == Serverreihenfolge,
      *   numerisch aufsteigend      != Serverreihenfolge.
      *
-     * `H10` vor `H2` erfüllt beides. Daraus folgt Stück für Stück:
+     * `H10` vor `H2` erfüllt beides. Daraus folgt:
      *
-     * 1. Die erste Erwartung pinnt, dass KEIN `defaultSortOrder` gesetzt ist — ein
-     *    aufsteigender Default zöge `H2` nach oben. (Das Backend liefert
-     *    `ORDER BY sortier, text`, und `sortier` steht der Antwort nicht bei; einmal
+     * 1. Die erste Erwartung pinnt, dass KEIN `defaultSortOrder` gesetzt ist. (Das Backend
+     *    liefert `ORDER BY sortier, text`, und `sortier` steht der Antwort nicht bei; einmal
      *    weggeworfen, wäre die fachliche Reihenfolge nicht wiederherstellbar.)
-     * 2. Die zweite pinnt den `sorter` überhaupt: ohne ihn trüge der Kopf keinen
-     *    Auslöser, und der benannte Griff darunter fiele statt eines null-Zugriffs.
-     * 3. Sie pinnt zugleich `{ numeric: true }` — rein lexikografisch stünde `H10`
-     *    weiter vorn und die Reihenfolge bliebe unverändert. Gemessen: mit dem alten
-     *    Vorrat `H2`/`H1` lief genau diese Mutation grün durch, weil an einstelligen
-     *    Nummern beide Kollationen dasselbe Ergebnis liefern.
+     * 2. Die zweite pinnt den `sorter`: ohne ihn fiele schon der Griff auf den Sortierkopf.
+     * 3. Sie pinnt zugleich `{ numeric: true }` — rein lexikografisch stünde `H10` weiter vorn.
+     *    An einstelligen Nummern liefern beide Kollationen dasselbe, daher `H10`.
      *
-     * Die beiden Texte überlappen als Teilzeichenketten nicht („H10Löschen" enthält kein
-     * „H2", „H2Löschen" kein „H10") — mit `H1` statt `H2` wäre `toContain` blind.
+     * Die Texte überlappen als Teilzeichenketten nicht — mit `H1` statt `H2` wäre `toContain` blind.
      */
     const { container } = renderTab(admin, [
       { id: 1, text: 'H10' },
@@ -147,8 +134,8 @@ describe('StichworteTab', () => {
 
     expect(ersteZeile()).toContain('H10');
 
-    // Erst der Griff, dann der Klick: sonst meldet die Probe (`sorter` entfernt) einen
-    // null-Zugriff statt den fehlenden Sortierkopf — dasselbe Muster wie beim Filter.
+    // Erst der Griff, dann der Klick: sonst meldete ein fehlender `sorter` einen null-Zugriff
+    // statt den fehlenden Sortierkopf.
     const kopf = container.querySelector<HTMLElement>('th.ant-table-column-has-sorters');
     expect(kopf, 'die Leitspalte muss sortierbar sein').not.toBeNull();
     await userEvent.click(kopf!);
@@ -157,13 +144,11 @@ describe('StichworteTab', () => {
 
   it('die Freitextsuche verkleinert die Zeilenmenge', async () => {
     /**
-     * Gemessen wird die WIRKUNG, nicht die Anwesenheit des `suche`-Props: ohne das Prop
-     * rendert `KatalogTabelle` gar keine Werkzeugzeile, der Griff aufs Feld fällt dann
-     * schon am `null`, bevor eine Zeile gezählt wird.
+     * Gemessen wird die WIRKUNG, nicht die Anwesenheit des `suche`-Props: ohne das Prop gibt es
+     * kein Suchfeld, und der Griff fällt schon am `null`.
      *
-     * `input[type="search"]` ist hier eindeutig, obwohl die Seite ein zweites Eingabefeld
-     * trägt: die Schnellerfassung unten ist ein blankes `Input` (`type="text"`). Der
-     * Platzhalter sichert die Zuordnung zusätzlich ab.
+     * `input[type="search"]` ist eindeutig: die Schnellerfassung unten ist ein `type="text"`.
+     * Der Platzhalter sichert die Zuordnung zusätzlich ab.
      */
     const { container } = renderTab(admin, [
       { id: 1, text: 'H1' },
@@ -182,10 +167,9 @@ describe('StichworteTab', () => {
     expect(zeilen()[0].textContent).toContain('B2');
   });
   /**
-   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
-   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
-   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
-   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   * Partnerpaar zu AK4 (LFH-331): die negative Hälfte allein wäre auch im Leerfall trivial
+   * grün; erst die positive darunter mit demselben Literal macht sie zu einer Aussage über die
+   * Zustandsweiche.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(

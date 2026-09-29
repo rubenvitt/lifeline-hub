@@ -20,7 +20,7 @@ interface BearbeiterOption {
   anzeigename: string;
 }
 
-// Modul-spezifische Labels (kein gemeinsames Primitiv) — bleiben lokal.
+// Modul-spezifische Labels.
 const ART_LABEL: Record<string, string> = {
   lagemeldung: 'Lagemeldung',
   sofortmeldung: 'Sofortmeldung',
@@ -43,21 +43,19 @@ interface MeldungKarteProps {
   einsatzId: number;
   darfSchreiben?: boolean;
   mitglieder?: BearbeiterOption[];
-  /** Deeplink-Hervorhebung (?meldung=, LFH-153): markierte Karte + scroll-adressierbar. */
+  /** Deeplink-Hervorhebung (?meldung=): markierte Karte, scroll-adressierbar. */
   hervorgehoben?: boolean;
   onStatus?: (meldungId: number, status: MeldungStatus) => void;
   onZuweisen?: (meldungId: number, bearbeiterId: number | null) => void;
   onLagerelevant?: (meldungId: number) => void;
   onBestaetigen?: (meldungId: number) => void;
-  /** Öffnet das Auftrags-Formular zur Meldung→Auftrag-Erteilung (LFH-113). */
+  /** Öffnet das Auftrags-Formular zur Meldung → Auftrag-Erteilung. */
   onAuftragErteilen?: (m: Meldung) => void;
 }
 
 /**
- * Bestätigungs-Achse (LFH-97) — die Kenntnisnahme-Achse der Sofortmeldung, ORTHOGONAL
- * zum Triage-Status. Bestätigt → gemeinsamer QuittungIndikator; unbestätigt mit
- * Frist/Eskalation → eigener Alarm-/Achtung-Chip (Frist-Read-back, den der Indikator
- * nicht abbildet).
+ * Bestätigungs-Achse der Sofortmeldung, ORTHOGONAL zum Triage-Status. Bestätigt →
+ * QuittungIndikator; unbestätigt mit Frist/Eskalation → eigener Chip mit Frist.
  */
 function bestaetigungsAchse(m: Meldung): ReactNode {
   if (!m.bestaetigung_pflicht) return null;
@@ -77,12 +75,7 @@ function bestaetigungsAchse(m: Meldung): ReactNode {
   );
 }
 
-/**
- * Meldungs-Karte (LFH-112): Karten-Look analog AuftragKarte. Alarm-Hervorhebung der
- * unbestätigten überfälligen/eskalierten Sofortmeldung ist dark-safe über Theme-Tokens
- * (colorErrorBg/colorError) statt hartkodiertem Rosa. Die Bestätigungs-Achse bleibt
- * orthogonal zum Triage-Status (LFH-97).
- */
+/** Meldungs-Karte. Die Bestätigungs-Achse bleibt orthogonal zum Triage-Status. */
 export default function MeldungKarte({
   meldung: m,
   ansicht = 'offen',
@@ -98,35 +91,22 @@ export default function MeldungKarte({
 }: MeldungKarteProps) {
   const { rollen } = useRollen();
   const status = MELDUNG_STATUS[m.status] ?? MELDUNG_STATUS.neu;
-  // Unübersehbare Hervorhebung (AK1/AK3): unbestätigte überfällige/eskalierte Sofortmeldung.
-  // Dieselbe Regel zählt das Kennzahlenband der Seite (`meldungKennzahlen.ts`).
+  // Hervorhebung einer unbestätigten überfälligen/eskalierten Sofortmeldung; dieselbe Regel
+  // zählt das Kennzahlenband (`meldungKennzahlen.ts`).
   const alarmiert = istAlarmiert(m);
-  // Eingangszustand (LFH-343 · C8, Befund H47): eine neue Meldung sah exakt aus wie
-  // eine bereits gesichtete — beide `phase: 'offen'`, zwei graue Tags, drei
-  // Buchstaben Unterschied. Der Akzent liegt auf DEMSELBEN linken Rand wie der
-  // Alarm; der kann nur eine Farbe tragen, und Gefahr schlägt Eingangszustand.
-  // Das ETIKETT bleibt davon unberührt (`status.unbearbeitet` roh weitergereicht) —
-  // vergeben ist nur der Rand.
+  // Eingangszustand: Akzent auf demselben linken Rand wie der Alarm; Gefahr schlägt
+  // Eingangszustand. Das ETIKETT bleibt unberührt (`status.unbearbeitet` roh weitergereicht).
   const unbearbeitet = !!status.unbearbeitet && !alarmiert;
 
-  // Aktionsbündelung (LFH-372/B5k, Nachtrag zu LFH-364/B5d): die sechs Aktionen dieser
-  // Karte schliessen sich NICHT aus — eine neue, bestätigungspflichtige, noch nicht
-  // lagerelevante Meldung ohne Auftrag hatte sie alle gleichzeitig, auf `handschuh`
-  // (72 px) also bis zu sechs Knopfzeilen. Sichtbar bleiben deshalb genau zwei:
-  // „Bestätigen" (die dringlichste Aktion der Karte, Kenntnisnahme einer Sofortmeldung)
-  // und die EINE sinnvolle Vorwärtsbewegung des Triage-Status. Alles Weitere hängt an
-  // einem ⋮-Menü (Muster: `chat/NachrichtenStrom.tsx`, `pages/lagekarte/Sidebar.tsx`).
+  // Aktionsbündelung: die sechs Aktionen schließen sich nicht aus. Sichtbar bleiben genau zwei:
+  // „Bestätigen" (die dringlichste) und die EINE sinnvolle Vorwärtsbewegung des Triage-Status;
+  // alles Weitere hängt am ⋮-Menü.
   //
-  // Rückfragen (LFH-378: erst die Umkehrbarkeit, dann die Rückfrage):
-  //  • „Sichten"/„In Bearbeitung" haben ihre verloren — `src/meldung/repo.rs:223` setzt
-  //    jeden Status frei zurück, der Schritt ist folgenlos.
-  //  • „Erledigt" behält eine: es räumt die Karte aus der Offen-Ansicht, und die
-  //    Abgeschlossen-Ansicht trägt keine Aktion zurück. Sie ist ein `<Modal>` mit eigenem
-  //    State und KEIN `Popconfirm` (LFH-366) — im Menü-Label überlebte der nur mit
-  //    `stopPropagation` das Auto-Schliessen. Bewusst DERSELBE Pfad, egal ob „Erledigt"
-  //    gerade sichtbar oder im Menü steht: zwei Bauformen für eine Aktion wären ein
-  //    Unterschied ohne Bedeutung.
-  //  • „Bestätigen" behält seinen `Popconfirm` — sichtbarer Knopf, keine Menü-Falle.
+  // Rückfragen nach Umkehrbarkeit:
+  //  • „Sichten"/„In Bearbeitung" ohne — `setze_status` nimmt jeden Status zurück.
+  //  • „Erledigt" mit — die Abgeschlossen-Ansicht trägt keine Aktion zurück. Als `<Modal>` mit
+  //    eigenem State, kein `Popconfirm`, und derselbe Pfad, ob sichtbar oder im Menü.
+  //  • „Bestätigen" behält seinen `Popconfirm` (sichtbarer Knopf, einmalig).
   const [erledigtOffen, setErledigtOffen] = useState(false);
 
   const kannBestaetigen = !!(
@@ -135,10 +115,8 @@ export default function MeldungKarte({
     !m.ist_bestaetigt &&
     onBestaetigen
   );
-  // Je Status genau eine Vorwärtsbewegung. `erledigt` hat keine.
-  // Der `darfSchreiben`-Riegel steht HIER und nicht erst am Rendern: `MeldungenPage`
-  // übergibt `onStatus` auch einem Beobachter, dessen Vorhandensein ist also kein
-  // Rechtebeleg (gemessen — ohne den Riegel sah der Beobachter „Sichten").
+  // Je Status genau eine Vorwärtsbewegung; `erledigt` hat keine. Der `darfSchreiben`-Riegel steht
+  // HIER: `MeldungenPage` übergibt `onStatus` auch Beobachtern, der Callback ist kein Rechtebeleg.
   const naechster: { ziel: MeldungStatus; label: string } | null = !(darfSchreiben && onStatus)
     ? null
     : m.status === 'neu'
@@ -151,9 +129,8 @@ export default function MeldungKarte({
 
   const weitere: { key: string; label: string; onClick: () => void }[] = darfSchreiben
     ? [
-        // Was der Primär-Knopf gerade NICHT zeigt, bleibt über das Menü erreichbar —
-        // sonst verlöre eine neue Meldung den Direktsprung auf „Erledigt", den der
-        // Bestand hatte (`m.status !== 'erledigt'`).
+        // Was der Primär-Knopf gerade nicht zeigt, bleibt über das Menü erreichbar (z. B. der
+        // Direktsprung auf „Erledigt" bei einer neuen Meldung).
         ...(m.status === 'neu' && onStatus
           ? [
               {
@@ -166,8 +143,7 @@ export default function MeldungKarte({
         ...(m.status !== 'erledigt' && m.status !== 'in_bearbeitung' && onStatus
           ? [{ key: 'er', label: 'Erledigt', onClick: () => setErledigtOffen(true) }]
           : []),
-        // An die Lage übergeben (LFH-95/113) und Meldung→Auftrag (LFH-113) öffnen jeweils
-        // ein Formular-Modal — sie tragen ihre Bestätigung also selbst.
+        // Lage-Übergabe und Auftrag öffnen je ein Formular-Modal und tragen ihre Bestätigung selbst.
         ...(!m.lagerelevant && onLagerelevant
           ? [{ key: 'lr', label: 'An Lage übergeben', onClick: () => onLagerelevant(m.id) }]
           : []),
@@ -177,18 +153,15 @@ export default function MeldungKarte({
       ]
     : [];
 
-  // Gebündelt wird ERST AB DREI Aktionen, und gezählt wird NACH der Sichtbarkeits- und
-  // Rechteprüfung (LFH-366): fällt die Menge darunter, ist ein Menü keine Bündelung,
-  // sondern ein Umweg. Der Fall ist echt und nicht konstruiert — eine erledigte Meldung
-  // ohne Bestätigungspflicht hat weder eine Vorwärtsbewegung noch etwas zu bestätigen und
-  // stünde sonst mit einem ⋮-Trigger da, hinter dem zwei Einträge und sonst nichts liegen.
+  // Gebündelt wird ERST AB DREI Aktionen, gezählt NACH Sichtbarkeits- und Rechteprüfung —
+  // darunter wäre ein Menü ein Umweg.
   const gesamt = (kannBestaetigen ? 1 : 0) + (naechster ? 1 : 0) + weitere.length;
   const buendeln = gesamt >= 3;
   const menuItems: MenuProps['items'] = buendeln ? weitere : [];
 
   return (
-    // Zeitachsen-Optik (Neuentwurf): die Ereigniszeit führt links in Mono, darunter die
-    // laufende Nummer. Der linke Rand ist der Kartenrand-Vertrag aus C8/H47 (`KommKarte`).
+    // Die Ereigniszeit führt links in Mono, darunter die laufende Nummer; der Rand folgt dem
+    // Kartenrand-Vertrag von `KommKarte`.
     <KommKarte
       data-meldung-id={m.id}
       alarm={alarmiert}
@@ -224,9 +197,7 @@ export default function MeldungKarte({
         </Space>
       </Flex>
 
-      {/* M69: Absender und Empfänger sind Metadaten der Meldung, nicht ihr Inhalt —
-          sie fallen auf Metazeilen-Größe zurück. Vorher trug der Absender mit
-          15 px strong den größten Schriftgrad der Karte. */}
+      {/* Absender und Empfänger sind Metadaten, nicht Inhalt — Metazeilen-Größe. */}
       <Space size={6} wrap style={{ marginBottom: 6 }}>
         <Text type="secondary" style={{ fontSize: 12 }}>
           {m.absender}
@@ -270,16 +241,12 @@ export default function MeldungKarte({
         )}
       </Flex>
 
-      {/* M69: der Wortlaut ist der Grund, warum die Karte existiert — er trägt den
-          größten Schriftgrad. Muster ist die Schwesterkarte `AuftragKarte.tsx`
-          (`auftrag_text`, 15 px). Die Zeilenhöhe 1.5 statt 1.4, weil dieser Text im
-          Gegensatz zum Auftragstext regelmäßig mehrzeilig ist. */}
+      {/* Der Wortlaut ist der Grund der Karte und trägt den größten Schriftgrad (wie `AuftragKarte`);
+         Zeilenhöhe 1.5, weil er regelmäßig mehrzeilig ist. */}
       <Text style={{ fontSize: 15, lineHeight: 1.5, display: 'block' }}>{m.inhalt}</Text>
 
-      {/* `<Space size="middle">` statt `<Flex gap={8}>` (LFH-363): „Bestätigen" ist `danger`
-          und steht neben mindestens einer weiteren Aktion — der Vorgabeabstand wäre
-          `abstand.xs` = 3/5/7 px je Dichtestufe und damit im Handschuh-Betrieb keine
-          Trennung. Gepinnt in `components/aktionsabstand.guard.test.ts`. */}
+      {/* `<Space size="middle">`: „Bestätigen" ist `danger` und braucht Abstand zur Nachbaraktion
+         (gepinnt in `components/aktionsabstand.guard.test.ts`). */}
       {gesamt > 0 && (
         <Space
           size="middle"

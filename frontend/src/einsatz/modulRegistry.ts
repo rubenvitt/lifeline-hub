@@ -38,8 +38,8 @@ export type ModulStatus = 'fertig' | 'geplant' | 'wip';
 export type KategorieKey =
   'fuehrung' | 'kraefte' | 'erfassung' | 'lage' | 'kommunikation' | 'einstellungen';
 export type BenoetigteRolle = 'admin' | 'fuehrungskraft';
-/** Module mit Navigationszähler, die der SERVER zählt (LFH-612). Die Bedeutung je Quelle
- *  legt `src/einsatz/zaehler.rs` fest — nur für Module, deren Zahl aus dem Entwurf belegt ist. */
+/** Module mit Navigationszähler, die der SERVER zählt; die Bedeutung je Quelle legt
+    `src/einsatz/zaehler.rs` fest. */
 export type ServerZaehlerQuelle =
   | 'etb'
   | 'personen'
@@ -49,9 +49,10 @@ export type ServerZaehlerQuelle =
   | 'auftraege'
   | 'erinnerungen'
   | 'chat';
-/** Module, deren Zähler der BROWSER aus der eigenen Modulliste rechnet (LFH-632, LFH-635,
- *  LFH-639). `abloesung` hängt an der Uhr (Vorwarnzeit), ein Server-Schnappschuss trüge das
- *  nicht; `betreuung` teilt sich die Übersicht mit Seite und Kennzahl. */
+/**
+ * Module, deren Zähler der BROWSER aus der eigenen Modulliste rechnet: `abloesung` hängt an der
+ * Uhr (Vorwarnzeit), `betreuung` teilt sich die Übersicht mit Seite und Kennzahl.
+ */
 export type ClientZaehlerQuelle = 'dokumente' | 'abloesung' | 'betreuung';
 export type ModulZaehlerQuelle = ServerZaehlerQuelle | ClientZaehlerQuelle;
 
@@ -60,18 +61,14 @@ export interface Kategorie {
   /** Voller Name — zugänglicher Name des Rail-Ziels, Kopf des Modulpanels, Drawer-Zeile. */
   label: string;
   /**
-   * Sichtbares Kurzetikett unter der Rail-Ikone (Neuentwurf „Instrumententafel",
-   * `docs/design/2026-09-21-neuentwurf/shell.dc.html`): 9 px Versalien in 60 px Breite
-   * tragen „Kommunikation" nicht. Der volle Name bleibt `aria-label` und `title` —
-   * die Namensabfrage der Tests und der Screenreader hängen an `label`, nicht hieran.
+   * Sichtbares Kurzetikett unter der Rail-Ikone: 9 px Versalien in 60 px tragen „Kommunikation"
+   * nicht. Der volle Name bleibt `aria-label` und `title`.
    */
   kurz: string;
   icon: IconType;
   /**
-   * Steht abgesetzt am FUSS der Rail statt in der Kategorienreihe (Neuentwurf: „Einstellungen
-   * unten abgesetzt"). Bewusst ein Flag und keine zweite Liste: `kategorien` bleibt die EINE
-   * Aufzählung, über die Rail, Drawer-Akkordeon, Rahmen und Kommandopalette iterieren — eine
-   * herausgelöste Einstellungs-Kategorie müsste jeder dieser Leser einzeln wieder einsammeln.
+   * Steht abgesetzt am FUSS der Rail. Ein Flag statt einer zweiten Liste: `kategorien` bleibt die
+   * EINE Aufzählung für Rail, Drawer, Rahmen und Kommandopalette.
    */
   fuss?: true;
 }
@@ -89,19 +86,18 @@ export interface ModulEintrag {
   /** Fehlt sie, ist das Modul für alle frei. */
   benoetigteRolle?: BenoetigteRolle;
   /**
-   * Deep-Link: Statt einer eigenen Seite leitet das Modul auf die `route` eines
-   * anderen Moduls um (Eintrag bleibt zur Auffindbarkeit in der Navigation).
-   * Aktuell von keinem Eintrag genutzt — als generische Infrastruktur für
-   * künftige Module erhalten (vgl. LFH-74).
+   * Deep-Link: das Modul leitet auf die `route` eines anderen Moduls um. Heute von keinem Eintrag
+   * genutzt, als Infrastruktur erhalten.
    */
   verweistAuf?: string;
   /** Optionale, berechtigungsgesteuerte Quelle für den neutralen Navigationszähler. */
   zaehlerQuelle?: ModulZaehlerQuelle;
 }
 
-/** Reihenfolge der Icon-Rail (eine Zeile je Kategorie; `fuss` steht abgesetzt unten).
- *  Ikonen nach dem Neuentwurf (Tabler: hierarchy-2, truck, clipboard-text, map-2, message,
- *  settings). */
+/**
+ * Reihenfolge der Icon-Rail (eine Zeile je Kategorie; `fuss` unten abgesetzt). Ikonen: Tabler
+ * hierarchy-2, truck, clipboard-text, map-2, message, settings.
+ */
 export const kategorien: Kategorie[] = [
   { key: 'fuehrung', label: 'Führung', kurz: 'Führung', icon: TbHierarchy2 },
   { key: 'kraefte', label: 'Kräfte & Mittel', kurz: 'Kräfte', icon: TbTruck },
@@ -118,9 +114,8 @@ export const kategorien: Kategorie[] = [
 ];
 
 export const modulRegistry: ModulEintrag[] = [
-  // Führung — neu gedacht mit dem Neuentwurf (21.09.2026): der Überblick ist die Startseite
-  // eines Einsatzes, und die Aufträge/Befehle stehen hier statt unter Kommunikation —
-  // Anordnungen sind ein Führungsmittel, kein Nachrichtenkanal.
+  // Führung — der Überblick ist die Startseite eines Einsatzes; Aufträge/Befehle stehen hier,
+  // weil Anordnungen ein Führungsmittel sind, kein Nachrichtenkanal.
   {
     key: 'ueberblick',
     kategorie: 'fuehrung',
@@ -178,9 +173,8 @@ export const modulRegistry: ModulEintrag[] = [
     beschreibung: 'Abgelegte Dateien des Einsatzes: Lagepläne, Befehle, Formulare, Fotos.',
     zaehlerQuelle: 'dokumente',
   },
-  // Kräfte & Mittel — das Meldebild (bis 21.09.2026 „Kräfteübersicht" unter Lage) steht
-  // vorn: es ist die Verdichtung der Kategorie. Route und Schlüssel bleiben, damit
-  // Deeplinks und gespeicherte Standard-Module nicht brechen.
+  // Kräfte & Mittel — das Meldebild steht vorn als Verdichtung der Kategorie. Route und Schlüssel
+  // `kraefteuebersicht` bleiben, damit Deeplinks und gespeicherte Standard-Module nicht brechen.
   {
     key: 'kraefteuebersicht',
     kategorie: 'kraefte',
@@ -228,9 +222,8 @@ export const modulRegistry: ModulEintrag[] = [
     beschreibung: 'Material und Verbrauchsgüter im Einsatz.',
   },
   {
-    // LFH-634: Bedarf und Ausgabe von Essensportionen je Zeitfenster, Unterdeckung als
-    // Zustand auf der Seite. Bewusst KEIN Zähler (design.md, Non-Goals): Unterdeckung ist
-    // kein Alarmereignis. Reihenfolge wie `MODUL_KEYS` im Backend (`src/einsatz/modul.rs`).
+    // Essensportionen je Zeitfenster. Bewusst KEIN Zähler: Unterdeckung ist kein Alarmereignis.
+    // Reihenfolge wie `MODUL_KEYS` im Backend.
     key: 'verpflegung',
     kategorie: 'kraefte',
     label: 'Verpflegung',
@@ -250,8 +243,8 @@ export const modulRegistry: ModulEintrag[] = [
     beschreibung: 'Bereitstellungsräume: bereitgestellte Einheiten und Fahrzeuge.',
   },
   {
-    // LFH-635: Schichten und fällige Ablösungen je Einheit. Der Zähler nennt die Schichten
-    // in der Vorwarnzeit oder überfällig — was jetzt Handlung braucht, nicht die Gesamtzahl.
+    // Schichten und fällige Ablösungen. Der Zähler nennt die Schichten in der Vorwarnzeit oder
+    // überfällig — was Handlung braucht.
     key: 'abloesung',
     kategorie: 'kraefte',
     label: 'Ablösung',
@@ -294,10 +287,9 @@ export const modulRegistry: ModulEintrag[] = [
       'Behandlungs-/Sammelstellen als Örtlichkeiten mit Plätzen, Belegung und Material.',
   },
   {
-    // LFH-639: Evakuierung und Unterbringung als MENGEN mit Zeitbezug, nicht über einzeln
-    // erfasste Personen. Der Zähler nennt die aktiven Evakuierungsbezirke; dieselbe Übersicht
-    // speist die Kennzahl „Evakuiert N · von M geplant" (`betreuung/evakuierungKennzahl.ts`).
-    // Reihenfolge wie `MODUL_KEYS` im Backend (`src/einsatz/modul.rs`).
+    // Evakuierung und Unterbringung als MENGEN mit Zeitbezug. Der Zähler nennt die aktiven
+    // Evakuierungsbezirke; dieselbe Übersicht speist die Kennzahl „Evakuiert".
+    // Reihenfolge wie `MODUL_KEYS` im Backend.
     key: 'betreuung',
     kategorie: 'erfassung',
     label: 'Betreuung',
@@ -446,19 +438,11 @@ export function modulZielRoute(modul: ModulEintrag): string {
 }
 
 /**
- * Die Umkehrung von {@link ModulEintrag.route} — Registry-Eintrag zu einem Routen-Segment
- * (LFH-391 · C4).
- *
- * Sie stand vorher ZWEIMAL wörtlich im Bestand: `EinsatzLayout` leitet daraus die
- * Hervorhebung in Rail und Panel ab, `ModulStub` die Beschriftung seines Rückwegs. Der
- * Modulschlüssel der Kommandopalette (Rangvorteil des Moduls, in dem man steht) wäre die
- * dritte Kopie geworden — gehoben, bevor sie entsteht.
- *
- * Gesucht wird über `route`, NICHT über `key`: die beiden fallen nicht überall zusammen
- * ('gefahren' ist der Bestandsfall). Und nicht über {@link modulZielRoute} — ein
- * `verweistAuf`-Eintrag zeigt auf die Route eines ANDEREN Moduls, ihn hier mitzumatchen
- * lieferte zwei Einträge für dieselbe Adresse. Heute nutzt kein Eintrag das Feld; die
- * Entscheidung fällt damit, bevor sie beobachtbar wird.
+ * Die Umkehrung von {@link ModulEintrag.route} — Registry-Eintrag zu einem Routen-Segment, eine
+ * Stelle für Rahmen, `ModulStub` und Kommandopalette.
+ * Gesucht wird über `route`, NICHT über `key` (bei 'gefahren' weichen sie ab), und nicht über
+ * {@link modulZielRoute} — ein `verweistAuf`-Eintrag lieferte sonst zwei Einträge für dieselbe
+ * Adresse.
  */
 export function modulZuRoute(
   route: string | null | undefined,
@@ -469,16 +453,10 @@ export function modulZuRoute(
 }
 
 /**
- * Das Modul, in dem ein Pfad liegt — `/einsaetze/:id/<route>/…`, sonst `null`.
- *
- * Das Segment NACH der Einsatz-ID, nicht das letzte: sonst verlöre jede Sub-Route (Liste,
- * Detail) ihr Modul, und die Navigation ihre Hervorhebung.
- *
- * Der Bezug zum Router ist eine Zeichenketten-Zerlegung, kein Import — die Registry bleibt
- * damit frei von `routing/deeplinks.ts` (siehe die Begründung an `SCHNELLAKTIONEN` in
- * `command-palette/befehle.ts`). Das Geschwister für die ID ist
- * `command-palette/einsatzPfad.ts`; es bleibt dort, weil ausser der Palette niemand sie aus
- * dem Pfad zieht — jede andere Stelle hat `useParams`.
+ * Das Modul, in dem ein Pfad liegt — `/einsaetze/:id/<route>/…`, sonst `null`. Das Segment NACH
+ * der Einsatz-ID, nicht das letzte, sonst verlöre jede Sub-Route ihr Modul.
+ * Eine Zeichenketten-Zerlegung statt eines Imports, damit die Registry frei von
+ * `routing/deeplinks.ts` bleibt.
  */
 export function modulAusPfad(
   pathname: string,
@@ -490,10 +468,7 @@ export function modulAusPfad(
   return modulZuRoute(teile[2], register);
 }
 
-/**
- * Module, die nicht ausgeblendet werden dürfen (Spiegel des Backends
- * `src/einsatz/modul.rs::NICHT_AUSBLENDBAR`): Stammdaten + Einstellungen selbst.
- */
+/** Module, die nicht ausgeblendet werden dürfen (Spiegel von `NICHT_AUSBLENDBAR` im Backend). */
 const NICHT_AUSBLENDBARE_MODULE = ['einsatzdaten', 'einsatz-einstellungen'] as const;
 
 /** Ob ein Modul ausgeblendet werden darf (alle außer den nicht-ausblendbaren). */
@@ -502,10 +477,8 @@ export function istModulAusblendbar(key: string): boolean {
 }
 
 /**
- * Grundsatz „disabled statt versteckt" (Rollen-Schranke): liefert, ob das Modul für
- * den Benutzer rollen-gesperrt ist. Berücksichtigt den Override-Kontext (LFH-132):
- * die effektive benötigte Rolle ist die des Overrides, sonst der Registry-Default.
- * Admin ist nie gesperrt (Admin-Mindest-Guard).
+ * „Disabled statt versteckt": ist das Modul für den Benutzer rollen-gesperrt? Die effektive
+ * Rolle ist die des Overrides, sonst der Registry-Default. Admin ist nie gesperrt.
  */
 export function istModulGesperrt(
   modul: ModulEintrag,
@@ -513,8 +486,8 @@ export function istModulGesperrt(
   overrides?: ModulOverrides,
 ): boolean {
   if (benutzer?.system_rolle === 'admin') return false;
-  // Nicht-ausblendbare Module sind nie sperrbar (Selbst-Aussperr-Schutz, beide
-  // Dimensionen) — spiegelt das Backend fordere_modul_zugriff.
+  // Nicht-ausblendbare Module sind nie sperrbar (Selbst-Aussperr-Schutz, wie
+  // `fordere_modul_zugriff` im Backend).
   if (!istModulAusblendbar(modul.key)) return false;
   const benoetigt = overrides?.[modul.key]?.benoetigte_rolle ?? modul.benoetigteRolle ?? null;
   if (!benoetigt) return false;
@@ -523,10 +496,8 @@ export function istModulGesperrt(
 }
 
 /**
- * Sichtbarkeit eines Moduls im Einsatz (Override-Kontext, LFH-132): nicht-ausblendbare
- * Module sind immer sichtbar; sonst ist ein Modul versteckt, wenn sein Override
- * `sichtbar=false` setzt. Steuert das Rendern in der Navigation (versteckt = nicht
- * gerendert) — unabhängig vom Benutzer (Einsatz-Konfiguration).
+ * Sichtbarkeit eines Moduls im Einsatz: nicht-ausblendbare immer; sonst versteckt, wenn der
+ * Override `sichtbar=false` setzt. Unabhängig vom Benutzer.
  */
 export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides): boolean {
   if (!istModulAusblendbar(modul.key)) return true;
@@ -534,28 +505,11 @@ export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides
 }
 
 /**
- * „Ist dieses Modul bedienbar?" — die EINE fachliche Frage hinter dem dreiteiligen
- * Freigabe-Filter (LFH-337 · Fix-Welle, Befund B3).
- *
- * `status === 'fertig' && istModulSichtbar(...) && !istModulGesperrt(...)` stand vorher
- * viermal wörtlich da: in `erstesFreigegebenesModul` hier, in der „Zuletzt"-Ableitung des
- * Rahmens (seit 13.09.2026 mit der Panel-Gruppe entfernt) und zweimal in
- * `command-palette/befehle.ts`. Vier Kopien einer Bedingung driften
- * genau an der Stelle auseinander, die niemand testet.
- *
- * SEIT LFH-391 · A1b sind es DREI Stellen in `command-palette/befehle.ts`: der
- * Schnellaktions-Filter führte als einziger noch die ZWEITEILIGE Fassung ohne
- * `status === 'fertig'` — genau die vorhergesagte Drift, nur in der anderen Richtung. Sie
- * war im Bestand unbeobachtbar (alle vier Trägermodule sind `fertig`) und ist über einen
- * Registry-Stub in `command-palette/befehle.modulstatus.test.ts` beobachtbar gemacht.
- *
- * BEWUSST NICHT MIT UMGESTELLT: `useModulZaehler.ts` (`darfZaehlerZeigen`) führt die
- * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle elf
- * Module mit `zaehlerQuelle` (acht vom Server gezählt, `dokumente`, `abloesung` und
- * `betreuung` im Browser) sind `fertig`, beide Fassungen liefern also dasselbe. Ob ein Zähler auch an einem
- * UNFERTIGEN Modul stehen darf, ist eine fachliche Entscheidung und keine Aufräumarbeit; sie
- * steht offen. Wer sie trifft, zieht die Stelle nach oder schreibt hier hin, warum sie
- * eigenständig bleibt.
+ * „Ist dieses Modul bedienbar?" — die EINE Freigabe-Frage (fertig · sichtbar · nicht gesperrt),
+ * genutzt hier und in der Kommandopalette, damit die Bedingung nicht an mehreren Stellen driftet.
+ * Bewusst NICHT genutzt von `darfZaehlerZeigen` (`useModulZaehler.ts`), das ohne
+ * `status === 'fertig'` prüft. Heute unbeobachtbar (alle Module mit Zähler sind fertig); ob ein
+ * Zähler an einem unfertigen Modul stehen darf, ist eine offene fachliche Entscheidung.
  */
 export function istModulFreigegeben(
   modul: ModulEintrag,
@@ -570,11 +524,9 @@ export function istModulFreigegeben(
 }
 
 /**
- * {@link istModulFreigegeben} über den Modul-Key — für Verweise AUS anderen Seiten auf ein
- * Modul (LFH-633: Pegel-Kennzahl und Überblick-Marke → „Wetter & Pegel"). Ein unbekannter
- * Key ist nie frei: ein Link auf ein Modul, das es nicht gibt, wäre ein Sprung ins Leere.
- * Bewusst nicht `darfZaehlerZeigen` — das findet sein Modul über `zaehlerQuelle` und sagte
- * für jedes Modul ohne Zähler still `false`.
+ * {@link istModulFreigegeben} über den Modul-Key — für Verweise aus anderen Seiten. Ein
+ * unbekannter Key ist nie frei. Bewusst nicht `darfZaehlerZeigen`: das sagte für jedes Modul
+ * ohne Zähler still `false`.
  */
 export function istKeyFreigegeben(
   key: string,
@@ -586,9 +538,8 @@ export function istKeyFreigegeben(
 }
 
 /**
- * Ziel der Default-Route /einsaetze/:id: der Führungsüberblick (Neuentwurf, Entscheidung 3
- * des Auftraggebers: „Führung · Überblick ist die Startseite eines Einsatzes"), solange er
- * fertig ist, sonst der ETB-Fallback. Bis 21.09.2026 stand hier das Lage-Dashboard.
+ * Ziel der Default-Route /einsaetze/:id: der Führungsüberblick, solange er fertig ist, sonst
+ * der ETB-Fallback.
  */
 export function redirectZiel(register: ModulEintrag[] = modulRegistry): string {
   const start = register.find((m) => m.key === 'ueberblick');
@@ -596,10 +547,9 @@ export function redirectZiel(register: ModulEintrag[] = modulRegistry): string {
 }
 
 /**
- * Auflösung des Einsatz-Default-Moduls (LFH-131): liefert die Ziel-Route, wenn
- * `standardModul` auf einen existierenden Eintrag mit Status 'fertig' zeigt —
- * sonst den globalen `redirectZiel()`-Fallback. Pre-Mortem: kein Sprung auf
- * geplante/unbekannte Module (das würde ins Leere/auf einen Platzhalter führen).
+ * Auflösung des Einsatz-Default-Moduls: die Ziel-Route, wenn `standardModul` auf einen
+ * existierenden, fertigen Eintrag zeigt — sonst `redirectZiel()`. Kein Sprung auf geplante oder
+ * unbekannte Module.
  */
 export function aufloeseStandardModul(
   standardModul: string | null | undefined,
@@ -611,17 +561,9 @@ export function aufloeseStandardModul(
 }
 
 /**
- * Erstes bedienbares Modul einer Kategorie (LFH-337 · H12) — oder `null`.
- *
- * ABGRENZUNG ZU `aufloeseStandardModul`: das dort löst das EINSATZ-Default-Modul auf
- * (LFH-131) und fällt auf `redirectZiel()` zurück. Hier geht es um eine einzelne
- * Kategorie, und ein Fallback wäre falsch: er führte beim Klick auf „Lage" in ein Modul
- * einer anderen Kategorie. Die Verweigerung ist die richtige Antwort, der Aufrufer
- * entscheidet dann, nur das Panel zu öffnen.
- *
- * Freigabe fragt {@link istModulFreigegeben} — dieselbe Funktion wie die Kommandopalette.
- * Registry-Reihenfolge ist die Rangfolge — sie ist im Bestand
- * bewusst gepflegt (Kommentar `// Führung` u. a.).
+ * Erstes bedienbares Modul einer Kategorie — oder `null`. Anders als `aufloeseStandardModul`
+ * ohne Fallback: der führte beim Klick auf „Lage" in eine andere Kategorie; der Aufrufer öffnet
+ * dann nur das Panel. Die Registry-Reihenfolge ist die Rangfolge (`// Führung` u. a.).
  */
 export function erstesFreigegebenesModul(
   kategorie: KategorieKey,

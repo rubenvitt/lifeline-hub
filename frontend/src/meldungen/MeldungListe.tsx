@@ -15,21 +15,17 @@ interface MeldungListeProps {
   einsatzId: number;
   darfSchreiben?: boolean;
   mitglieder?: BearbeiterOption[];
-  /** Hervorzuhebende Meldung (?meldung=-Deeplink, LFH-153). */
+  /** Hervorzuhebende Meldung (?meldung=-Deeplink). */
   highlightId?: number | null;
   onStatus?: (meldungId: number, status: MeldungStatus) => void;
   onZuweisen?: (meldungId: number, bearbeiterId: number | null) => void;
   onLagerelevant?: (meldungId: number) => void;
   onBestaetigen?: (meldungId: number) => void;
-  /** Öffnet das Auftrags-Formular zur Meldung→Auftrag-Erteilung (LFH-113). */
+  /** Öffnet das Auftrags-Formular zur Meldung → Auftrag-Erteilung. */
   onAuftragErteilen?: (m: Meldung) => void;
 }
 
-/**
- * Meldungs-Liste (LFH-112): rendert je Meldung eine MeldungKarte (Karten-Look analog
- * AuftragListe). Die frühere List.Item-/Tag-Darstellung samt lokaler STATUS/PRIO-Tags
- * ist in die Karte gewandert.
- */
+/** Meldungs-Liste: je Meldung eine MeldungKarte. */
 export default function MeldungListe({
   meldungen,
   ansicht = 'offen',

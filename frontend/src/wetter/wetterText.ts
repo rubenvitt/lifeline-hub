@@ -1,8 +1,6 @@
 /**
- * Reine Textbausteine der Wetter-Paneele (LFH-633). Jede Angabe trägt ihre Einheit, und ein
- * Wert, den die Quelle nicht liefert, erscheint als Strich — nie als 0 (Spec „Fehlender
- * Einzelwert"). Zahlen mit deutschem Komma, negatives Vorzeichen als echtes Minus (U+2212)
- * wie beim Pegel.
+ * Reine Textbausteine der Wetter-Paneele. Jede Angabe trägt ihre Einheit, ein fehlender Wert
+ * erscheint als Strich — nie als 0. Deutsches Komma, Minus als U+2212.
  */
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
 import { standZeit } from '../pegel/pegelKennzahl';
@@ -63,9 +61,8 @@ export function niederschlagText(
 }
 
 /**
- * „aus S 11 km/h · Böen 19 km/h" — Richtung als Wort (Herkunft), kein Pfeil-Bildzeichen.
- * Das „aus" trägt die Richtung auch dann, wenn sie fehlt: „aus —" ist als fehlend lesbar,
- * ein nackter Strich vor der Zahl läse sich wie ein Minus.
+ * „aus S 11 km/h · Böen 19 km/h" — Richtung als Wort, kein Pfeil. „aus —" bleibt als fehlend
+ * lesbar; ein nackter Strich vor der Zahl läse sich wie ein Minus.
  */
 export function windText(
   kmh: number | null | undefined,

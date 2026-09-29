@@ -11,40 +11,33 @@ import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import { einsatzDauer } from './einsatzDauer';
 import { fussFokusabstandStil, useFussFokusabstand } from './fussFokusabstand';
 
-/** Breite des Modulpanels (Neuentwurf, `shell.dc.html`). Layoutmaß, keine Dichte-Angabe. */
+/** Breite des Modulpanels. Layoutmaß, keine Dichte-Angabe. */
 const PANEL_BREITE = 208;
 
-/** Höhe des Panelkopfs mit der Augenbraue (Entwurf: 42 px). Layoutmaß. */
+/** Höhe des Panelkopfs mit der Augenbraue. Layoutmaß. */
 const PANEL_KOPF = 42;
 
-/** Aktive Modulmarke: 2 × 16 px in `bedien` (Entwurf). Markermaß, keine Dichte-Angabe. */
+/** Aktive Modulmarke: 2 × 16 px in `bedien`. Markermaß. */
 const MARKE = { breite: 2, hoehe: 16 } as const;
 
 interface ListeProps {
   module: ModulEintrag[];
   benutzer: BenutzerAnzeige | null;
-  /** Modul-Overrides des Einsatzes (LFH-132); steuert Sichtbarkeit + Rollen-Schranke. */
+  /** Modul-Overrides des Einsatzes; steuern Sichtbarkeit und Rollen-Schranke. */
   overrides?: ModulOverrides;
   aktiverModulKey: string | null;
   onModulKlick: (modul: ModulEintrag) => void;
   /**
-   * Zusätzlicher Trefflächen-BODEN in Pixeln, der die Dichtestufe anhebt — nie senkt.
-   *
-   * Die Zeilenhöhe kommt seit LFH-370 · B5j aus `controlHeight` (30 / 48 / 72), also aus
-   * der Staffel; ohne diesen Prop bleibt es dabei. Der Navigations-Drawer ist der
-   * Berührungsfall und setzt hier zusätzlich das A1-Maß: das ist eine Trefffläche, keine
-   * Dichte-Angabe.
-   *
-   * Deshalb `Math.max` und NICHT `??`: mit `??` deckelte die Drawer-Trefffläche 48 die
-   * Handschuh-Stufe auf 48 statt 72 — die Prop drehte die Staffel dort zurück, statt sie
-   * zu ergänzen.
+   * Zusätzlicher Trefflächen-BODEN in Pixeln, der die Dichtestufe anhebt — nie senkt. Die
+   * Zeilenhöhe kommt aus `controlHeight`; der Navigations-Drawer setzt hier zusätzlich 48 px.
+   * `Math.max` und NICHT `??`: mit `??` deckelte 48 die Handschuh-Stufe statt 72.
    */
   mindestTrefflaeche?: number;
   /** Bereits berechnete, berechtigungsgesteuerte Zähler je Registry-Quelle. */
   zaehler?: ModulZaehlerMap;
   /**
-   * Sprungmarken dieser Kategorie (LFH-620, `sprungmarken.ts`). Sie erben Sichtbarkeit und
-   * Sperre ihres Zielmoduls und sind nie `aria-current`.
+   * Sprungmarken dieser Kategorie. Sie erben Sichtbarkeit und Sperre ihres Zielmoduls und sind
+   * nie `aria-current`.
    */
   sprungmarken?: Sprungmarke[];
   onSprungKlick?: (marke: Sprungmarke) => void;
@@ -57,25 +50,16 @@ type ModulZeilenFarben = Pick<
 >;
 
 /**
- * Zeilenstil eines Modulknopfes — REIN und exportiert, damit die Zusicherung über die
- * Dichtestufen prüfbar ist, OHNE zu rendern.
+ * Zeilenstil eines Modulknopfes — rein und exportiert, damit über die Dichtestufen prüfbar:
+ * `test/utils.tsx` hat kein Theme (`controlHeight: 32`), und jsdom rechnet kein Layout.
  *
- * `test/utils.tsx:31` montiert ein nacktes `ConfigProvider` ohne unser Theme: `useToken()`
- * liefert dort den antd-Seed (`controlHeight: 32`), also KEINE der Stufen 30/48/72. Ein
- * gerenderter Wert belegte antd-Vorgaben statt der Staffel — und jsdom rechnet ohnehin kein
- * Layout. Präzedenz: `pages/lagekarte/Sidebar.tsx` (`bedienzielStil`).
+ * ZWEI Angaben: `minHeight` aus `controlHeight` PLUS mitziehende Polsterung; der Boden ist die
+ * Staffel, nicht die 34 px des Entwurfs.
  *
- * ZWEI Angaben, nicht eine (Konvention aus LFH-365): `minHeight` aus `controlHeight` PLUS
- * die mitziehende Polsterung. Die 34 px des Entwurfs sind Skizze; der Boden ist die Staffel.
- *
- * NEUENTWURF (21.09.2026): aktiv trägt die Zeile `flaeche3` und `text`, inaktiv
- * `gedaempft` — keine blaue Fläche mehr. Der Entwurf nennt `flaeche2`; die liegt am Tag bei
- * 1,01 : 1 auf `paneel` und ist dort schlicht nicht da (LFH-618), nachts trennt beide
- * Stufen nur 1,02 : 1. Die Bedienfarbe steckt allein in der 2 × 16-px-Marke
- * ({@link modulMarkeStil}); sie ist der ZWEITE Kanal neben der Fläche (WCAG 1.4.1), und
- * `aria-current` der dritte.
- *
- * Aufgelöste Tokens, nie `var(--lfh-*)` — die Arbeitsteilung steht in `theme/rollen.css`.
+ * Aktiv: `flaeche3` und `text`, inaktiv `gedaempft`. Nicht `flaeche2` — die läge am Tag bei
+ * 1,01 : 1 auf `paneel`. Die Bedienfarbe steckt allein in der Marke ({@link modulMarkeStil}),
+ * dem zweiten Kanal (WCAG 1.4.1); `aria-current` ist der dritte. Aufgelöste Tokens, nie
+ * `var(--lfh-*)`.
  */
 export function modulZeilenStil(
   token: {
@@ -110,8 +94,8 @@ export function modulZeilenStil(
 }
 
 /**
- * Die aktive Marke links in der Zeile. Inaktiv bleibt sie als transparenter Platzhalter
- * stehen — sonst spränge das Etikett beim Aktivieren um die Markenbreite.
+ * Die aktive Marke links in der Zeile. Inaktiv bleibt sie als transparenter Platzhalter stehen,
+ * sonst spränge das Etikett beim Aktivieren.
  */
 export function modulMarkeStil(farben: Pick<Farbrollen, 'bedien'>, aktiv: boolean): CSSProperties {
   return {
@@ -123,10 +107,8 @@ export function modulMarkeStil(farben: Pick<Farbrollen, 'bedien'>, aktiv: boolea
 }
 
 /**
- * Stil der Knopfspalte. Rein und exportiert aus demselben Grund wie {@link modulZeilenStil}.
- *
- * Die Zeilen stehen ohne Zwischenraum (Entwurf) — die Liste trägt nur oben und unten Luft,
- * aus `token.marginXS` und damit mit der Dichte.
+ * Stil der Knopfspalte, rein und exportiert. Die Zeilen stehen ohne Zwischenraum; Luft nur oben
+ * und unten aus `token.marginXS`.
  */
 export function modulListenStil(token: { marginXS: number }): CSSProperties {
   return {
@@ -138,13 +120,9 @@ export function modulListenStil(token: { marginXS: number }): CSSProperties {
 }
 
 /**
- * KEINE „Zuletzt"-Gruppe mehr (entfernt 13.09.2026, war LFH-337 · H12). Sie war in der
- * Bedienung nicht zu verstehen, und das folgte aus ihrer eigenen Filterung: der zuletzt
- * gewählte Eintrag ist per Konstruktion das aktuelle Modul und fiel damit immer heraus,
- * die offene Kategorie ebenso — wer innerhalb einer Kategorie arbeitete, sah die Gruppe
- * nie, beim Kategoriewechsel erschien sie mit Einträgen, die niemand vorhersagen konnte,
- * in derselben Knopfgestalt wie die Liste darunter. Der Speicher (`zuletztModule.ts`)
- * bleibt: die Kommandopalette trägt ihre Gruppe „Zuletzt besucht" daraus.
+ * Keine „Zuletzt"-Gruppe: der zuletzt gewählte Eintrag ist per Konstruktion das aktuelle Modul
+ * und fiel immer heraus, beim Kategoriewechsel erschienen unvorhersehbare Einträge. Der Speicher
+ * (`zuletztModule.ts`) bleibt für die Kommandopalette („Zuletzt besucht").
  */
 interface Props extends ListeProps {
   titel: string;
@@ -153,14 +131,9 @@ interface Props extends ListeProps {
 }
 
 /**
- * Die Modulknöpfe einer Kategorie — ohne Rahmen, ohne Titel, ohne feste Breite.
- *
- * Eigener Export, weil es zwei Träger gibt: das {@link ModulPanel} im inline-
- * Rahmen und das Akkordeon im Navigations-Drawer unter antds `lg`-Schwelle
- * (LFH-329 · B1/H11). Die Sichtbarkeits- und Sperrlogik samt der Regel, dass die
- * drei Marker (in Arbeit / Verweis / gesperrt) reine Dekoration in `aria-hidden`-
- * Hüllen bleiben, darf es nur EINMAL geben — zwei Kopien driften genau an der
- * Stelle auseinander, die niemand testet.
+ * Die Modulknöpfe einer Kategorie — ohne Rahmen, Titel und feste Breite. Eigener Export für
+ * zwei Träger: das {@link ModulPanel} und das Akkordeon im Navigations-Drawer. Sichtbarkeits-
+ * und Sperrlogik samt `aria-hidden`-Markern darf es nur EINMAL geben.
  */
 export function ModulListe({
   module,
@@ -175,10 +148,9 @@ export function ModulListe({
 }: ListeProps) {
   const { token } = theme.useToken();
   const farben = useModusFarben();
-  // Ausgeblendete Module nicht rendern (nicht-ausblendbare bleiben immer sichtbar).
-  // Beide Aufrufer — das Panel und das `ModulAkkordeon` — reichen die Kategorieliste
-  // roh aus `moduleNachKategorie` herein; der Filter gehört deshalb hierher. Die
-  // Anordnung mit den Sprungmarken fällt VOR dem Filter (`navZeilen`).
+  // Ausgeblendete Module nicht rendern (nicht-ausblendbare bleiben). Beide Aufrufer reichen die
+  // Kategorieliste roh herein, der Filter gehört deshalb hierher. Die Anordnung mit den
+  // Sprungmarken fällt VOR dem Filter (`navZeilen`).
   const zeilen = navZeilen(module, sprungmarken);
   return (
     <div style={modulListenStil(token)}>
@@ -196,8 +168,8 @@ export function ModulListe({
               data-lfh="modul-sprungmarke"
               disabled={gesperrt}
               title={gesperrt ? 'Keine Berechtigung' : `Springt zu ${marke.hinweis}`}
-              // Das Ziel gehört in den Namen: sichtbar steht nur „Entscheidungen", und wer
-              // vorliest, soll vor dem Klick wissen, dass er im ETB landet.
+              // Das Ziel gehört in den Namen: sichtbar steht nur „Entscheidungen", wer vorliest, soll vorher
+              // wissen, dass er im ETB landet.
               aria-label={`${marke.label}, springt zu ${marke.hinweis}`}
               onClick={() => !gesperrt && onSprungKlick?.(marke)}
               style={{
@@ -207,8 +179,7 @@ export function ModulListe({
             >
               <span aria-hidden="true" style={modulMarkeStil(farben, false)} />
               <span style={{ minWidth: 0, flex: 1 }}>{marke.label}</span>
-              {/* Dieselbe Ikone wie am `verweistAuf`-Eintrag unten (LFH-370: Ikone statt
-                  Zeichen). Dekoration in `aria-hidden`-Hülle — das Ziel steht im Namen. */}
+              {/* Dieselbe Ikone wie am `verweistAuf`-Eintrag; Dekoration in `aria-hidden`-Hülle. */}
               {!gesperrt && (
                 <span
                   aria-hidden
@@ -237,25 +208,22 @@ export function ModulListe({
             type="button"
             disabled={gesperrt}
             title={gesperrt ? 'Keine Berechtigung' : undefined}
-            // Der aktive Zustand war bis LFH-370 NUR optisch und für Screenreader unsichtbar.
             aria-current={aktiv ? 'true' : undefined}
             aria-label={zaehlerSichtbar ? `${m.label}, ${modulZaehler.beschreibung}` : undefined}
             onClick={() => !gesperrt && onModulKlick(m)}
-            // Fokusabstand zum klebenden Einsatzdauer-Fuß (WCAG 2.4.11, `fussFokusabstand.ts`)
-            // neben, nicht in `modulZeilenStil`: der ist die Dichte-Zusicherung.
+            // Fokusabstand zum klebenden Einsatzdauer-Fuß (WCAG 2.4.11) neben, nicht in
+            // `modulZeilenStil`: der ist die Dichte-Zusicherung.
             style={{
               ...modulZeilenStil(token, farben, { aktiv, gesperrt, mindestTrefflaeche }),
               ...fussFokusabstandStil,
             }}
           >
-            {/* KEINE Modulikone mehr (Neuentwurf): die Zeile trägt Marke · Etikett · Zähler.
-                Die Ikonen bleiben in der Kommandopalette, wo sie zwischen Modulen, Aktionen
-                und Datensätzen unterscheiden. */}
+            {/* Keine Modulikone: die Zeile trägt Marke · Etikett · Zähler. Die Ikonen bleiben in der
+               Kommandopalette, wo sie Module, Aktionen und Datensätze unterscheiden. */}
             <span aria-hidden="true" style={modulMarkeStil(farben, aktiv)} />
             <span style={{ minWidth: 0, flex: 1 }}>{m.label}</span>
-            {/* Zähler als Mono-Zahl rechts statt Badge-Pille (Entwurf). Neutral: er zählt
-                offene Vorgänge, er alarmiert nicht — die Alarmierung trägt die
-                Alarmzentrale. Die Bedeutung steht im zugänglichen Namen des Knopfes. */}
+            {/* Zähler als Mono-Zahl rechts, neutral: er zählt offene Vorgänge, er alarmiert nicht. Die
+               Bedeutung steht im zugänglichen Namen des Knopfes. */}
             {zaehlerSichtbar && (
               <span
                 aria-hidden="true"
@@ -272,11 +240,9 @@ export function ModulListe({
                 {modulZaehler.wert > 999 ? '999+' : modulZaehler.wert}
               </span>
             )}
-            {/* Dekoration neben dem Label. `aria-hidden` an der HÜLLE ist Pflicht, nicht
-                Kosmetik: ein `@ant-design/icons`-Knoten bringt `role="img"` mit eigenem
-                ENGLISCHEM `aria-label` mit („tool"/„lock") und landete sonst im Accessible
-                Name des Knopfes. Ikone statt Emoji seit der Regel „Ein Emoji ist keine
-                Ikone" (30.07.2026). */}
+            {/* Dekoration; `aria-hidden` an der HÜLLE ist Pflicht: ein `@ant-design/icons`-Knoten bringt
+               `role="img"` mit englischem `aria-label` („tool"/„lock") und landete sonst im Namen des
+               Knopfes. */}
             {m.status === 'wip' && (
               <span title="In Arbeit" aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
                 <ToolOutlined />
@@ -291,8 +257,8 @@ export function ModulListe({
                 <ExportOutlined />
               </span>
             )}
-            {/* Ebenfalls Dekoration, und bewusst OHNE `title`: die Sperre trägt der Knopf
-                selbst über `disabled` und `title="Keine Berechtigung"`. */}
+            {/* Ebenfalls Dekoration, OHNE `title`: die Sperre trägt der Knopf über `disabled` und
+               `title="Keine Berechtigung"`. */}
             {gesperrt && (
               <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
                 <LockOutlined />
@@ -306,11 +272,9 @@ export function ModulListe({
 }
 
 /**
- * Liste der Module einer Kategorie im inline-Rahmen (Ebene 2), 208 px auf `paneel`.
- *
- * Kopf 42 px mit Augenbraue und Haarlinie; Fuß „Einsatzdauer" in Mono 18, live je Minute
- * (bei abgeschlossenem Einsatz bis `abgeschlossen_at`). Der Fuß entfällt, solange der
- * Einsatz nicht geladen ist oder keinen lesbaren Beginn hat — erfunden wird nichts.
+ * Liste der Module einer Kategorie im inline-Rahmen, 208 px auf `paneel`. Kopf 42 px mit
+ * Augenbraue; Fuß „Einsatzdauer" in Mono, live je Minute (abgeschlossen: bis
+ * `abgeschlossen_at`). Ohne geladenen Einsatz oder lesbaren Beginn entfällt der Fuß.
  */
 export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   const { token } = theme.useToken();
@@ -322,11 +286,9 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   return (
     <div
       ref={wurzelRef}
-      // Testanker für den e2e-Trefflächennachweis (AK2). Der inline-Rahmen hat als einziger
-      // der drei Navigationsträger keine Landmark — die IconRail trägt `<nav
-      // aria-label="Kategorien">`, das Akkordeon `<nav aria-label="Einsatz-Navigation">`.
-      // Eine zweite Landmark hier machte `getByRole('navigation')` ohne Namen mehrdeutig,
-      // deshalb ein Datenmerkmal. Präzedenz: `data-lfh="datensicht-karte"` in Datensicht.tsx.
+      // Testanker für den e2e-Trefflächennachweis. Der inline-Rahmen hat als einziger
+      // Navigationsträger keine Landmark — eine zweite machte `getByRole('navigation')` ohne Namen
+      // mehrdeutig —, deshalb ein Datenmerkmal.
       data-lfh="modul-panel"
       style={{
         width: PANEL_BREITE,
@@ -351,8 +313,8 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
       </div>
       <ModulListe {...liste} />
       {dauer && (
-        // `sticky; bottom: 0` aus demselben Grund wie der Rail-Fuß (`IconRail.tsx`): die Seite
-        // scrollt im Dokument, der Fuß hängt so am Fensterrand statt am Seitenende.
+        // `sticky; bottom: 0` wie der Rail-Fuß: die Seite scrollt im Dokument, der Fuß hängt so am
+        // Fensterrand statt am Seitenende.
         <div
           ref={fussRef}
           data-lfh="modul-panel-fuss"

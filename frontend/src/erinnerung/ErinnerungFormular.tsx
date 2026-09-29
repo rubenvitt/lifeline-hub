@@ -20,34 +20,27 @@ interface FormWerte {
   empfaenger: string;
 }
 
-/**
- * Wiederholfelder einer Erinnerungs-Serie (LFH-343 · C8, Befund H52). Wer mehrere
- * Erinnerungen hintereinander setzt, adressiert meist dieselbe Funktion im selben
- * Takt; der ANLASS wechselt und wird geleert.
- */
+/** Wiederholfelder einer Serie: meist dieselbe Funktion im selben Takt; der Anlass wechselt. */
 const UEBERNAHME: (keyof FormWerte & string)[] = ['empfaenger', 'intervall'];
 
 interface Props {
   senden: boolean;
   /**
-   * Anlegen. **Muss bei Ablehnung ablehnen** (`mutateAsync`, nicht `mutate`) —
-   * die Erfassungshülle lässt die Eingabe nur dann stehen, wenn sie den
-   * Fehlschlag sieht (LFH-332/B4).
+   * Anlegen. **Muss bei Ablehnung ablehnen** (`mutateAsync`) — nur dann lässt die
+   * Erfassungshülle die Eingabe stehen.
    */
   onAnlegen: (daten: NeueErinnerung) => Promise<unknown>;
-  /** Umschließendes Paneel mit Titel rendern. `false` für Inline-/Modal-Einbettung,
-   *  wo der Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
+  /** Umschließendes Paneel mit Titel rendern. `false`, wo der Container den Titel schon liefert. */
   card?: boolean;
 }
 
 export default function ErinnerungFormular({ senden, onAnlegen, card = true }: Props) {
   const [form] = Form.useForm<FormWerte>();
 
-  // Das `return` ist tragend: die Hülle wartet auf diese Zusage und lässt die
-  // Felder stehen, wenn sie bricht (LFH-332/B4).
+  // Das `return` ist tragend: die Hülle lässt die Felder stehen, wenn die Zusage bricht.
   const absenden = (w: FormWerte) => {
-    // Durch die Pflicht-Rule abgedeckt; hier nur Typ-Guard. Ablehnen statt still
-    // zurückkehren, sonst räumte die Hülle ein Formular, das nichts gespeichert hat.
+    // Typ-Guard (die Pflicht-Rule deckt es ab). Ablehnen statt zurückkehren, sonst räumte die
+    // Hülle ein Formular, das nichts gespeichert hat.
     if (!w.faellig) return Promise.reject(new Error('Keine Fälligkeit'));
     return onAnlegen({
       titel: w.titel.trim(),
@@ -69,9 +62,7 @@ export default function ErinnerungFormular({ senden, onAnlegen, card = true }: P
         empfaenger: '',
       }}
       onErfassen={absenden}
-      // Das Inline-Formular schliesst sich nach dem Anlegen NICHT — Zuklappen ist
-      // ausdrückliche Nutzeraktion über den Kopf-Umschalter oder das Kreuz an der
-      // Card (LFH-332/B4, angewandt in LFH-343 · C8).
+      // Das Inline-Formular schließt nach dem Anlegen NICHT — Zuklappen ist ausdrückliche Nutzeraktion.
       onFertig={() => {}}
       laeuft={senden}
       erfassenText="Anlegen"

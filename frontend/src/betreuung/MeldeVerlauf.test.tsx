@@ -8,11 +8,8 @@ import { renderMitProviders } from '../test/utils';
 import MeldeVerlauf from './MeldeVerlauf';
 
 /**
- * Meldeverlauf (LFH-676, Spec „Verlauf auf der Betreuungsseite“, „Kennzeichnung im
- * Verlauf“, „Zurücknehmen aus dem Verlauf“).
- *
- * Die Anzeigezone ist hier Asia/Kolkata (UTC+5:30): ein Versatz mit halber Stunde macht eine
- * als Ortszeit gelesene UTC-Zeit sofort sichtbar — 10:30 UTC wird 1600, nie 1030.
+ * Meldeverlauf. Die Anzeigezone ist Asia/Kolkata (UTC+5:30): der halbstündige Versatz macht eine
+ * als Ortszeit gelesene UTC-Zeit sofort sichtbar.
  */
 vi.mock('../anzeige/AnzeigeKonventionenContext', async () => {
   const format = await import('../anzeige/format');
@@ -274,7 +271,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
     ).toBeInTheDocument();
     expect(within(dialog).getByText('Rücknahme fehlgeschlagen')).toBeInTheDocument();
     // Gezählt wird die Message-Queue selbst: stünde der Grund zusätzlich im Toast, fände die
-    // Abfrage im Dialog ihn trotzdem (CLAUDE.md, LFH-535).
+    // Abfrage im Dialog ihn trotzdem.
     const toasts = document.querySelector('.ant-message');
     expect(toasts?.textContent ?? '').not.toContain('bereits zurückgenommen');
     expect(dialog.closest('.ant-zoom-leave')).toBeNull();

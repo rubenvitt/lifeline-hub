@@ -18,8 +18,8 @@ describe('StaerkeAnzeige', () => {
     expect(screen.getByText('0/0/0//0')).toBeInTheDocument();
   });
 
-  // KRITISCH: kein umschließendes Element — sonst splitten zusammengesetzte Tag-Zeilen
-  // (z. B. "kumuliert 1/0/2//3" in EinheitenPage) und deren getByText-Substring-Matches brechen.
+  // Kein umschließendes Element — sonst zerfallen zusammengesetzte Tag-Zeilen in mehrere
+  // Textknoten und deren `getByText`-Substring-Matches brechen.
   it('rendert kein Wrapper-Element (Substring-Match in zusammengesetztem Text)', () => {
     render(
       <div>

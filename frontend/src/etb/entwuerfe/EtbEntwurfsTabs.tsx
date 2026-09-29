@@ -1,4 +1,3 @@
-// frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx
 import { Spin, Tabs } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../api/client';
@@ -21,9 +20,9 @@ interface EtbEntwurfsTabsProps {
   werteBehalten: boolean;
   onWerteBehaltenChange: (b: boolean) => void;
   /**
-   * Meldet, ob gerade ein Entwurf sendet (LFH-117, Review C1). `EtbPage` sperrt damit
-   * „Berichtigen": die Berichtigung ersetzt diesen Container, und ein laufender Versand
-   * verlöre dabei seinen sichtbaren Zustand.
+   * Meldet, ob gerade ein Entwurf sendet. `EtbPage` sperrt damit „Berichtigen": die
+   * Berichtigung ersetzt diesen Container, und ein laufender Versand verlöre dabei seinen
+   * sichtbaren Zustand.
    */
   onSendetChange?: (sendet: boolean) => void;
   /** Gewählte Anhänge je Entwurf; fehlt es, führt der Container sie selbst. */
@@ -56,44 +55,38 @@ export default function EtbEntwurfsTabs({
   } = useEtbEntwuerfe(einsatzId, einsatz.meine_fuehrungsstelle, kontextLaedt);
 
   /**
-   * Wertübernahme über die Remount-Grenze (LFH-332/H61).
+   * Wertübernahme über die Remount-Grenze (LFH-332).
    *
-   * Nach erfolgreichem Erfassen schliesst dieser Container den Entwurfs-Tab; das `key`-Prop
-   * an `Schnellerfassung` erzwingt dabei einen Remount. Deshalb liegen die übernommenen
-   * Werte HIER und nicht in der Schnellerfassung — ein `useState` unterhalb der
-   * Remount-Grenze überlebt das nicht. Bewusst kein Modul-Global (macht Tests
-   * reihenfolgeabhängig) und kein `localStorage` (die Übernahme gilt für die laufende
+   * Nach erfolgreichem Erfassen schließt dieser Container den Entwurfs-Tab; das `key`-Prop an
+   * `Schnellerfassung` erzwingt dabei einen Remount. Deshalb liegen die übernommenen Werte HIER
+   * — ein `useState` unterhalb der Remount-Grenze überlebt das nicht. Kein Modul-Global (macht
+   * Tests reihenfolgeabhängig) und kein `localStorage` (die Übernahme gilt für die laufende
    * Erfassung, nicht für die nächste Sitzung).
    *
-   * **Der SCHALTER liegt noch eine Ebene höher, in `EtbPage`** — und zwar aus demselben
-   * Grund, eine Grenze weiter: `EtbPage` rendert bei einer Berichtigung eine eigene
-   * `Schnellerfassung` STATT dieser Tabs, dieser Container verschwindet dabei also ganz.
-   * Läge der Schalter hier, stünde eine bewusst abgewählte Wertübernahme nach jeder
-   * Berichtigung wieder auf AN — ohne Nutzeraktion und ohne Hinweis. Die übernommenen
-   * WERTE dürfen dabei fallen (eine Berichtigung unterbricht die Erfassungsreihe
-   * ohnehin); die Entscheidung darf es nicht.
+   * **Der SCHALTER liegt noch eine Ebene höher, in `EtbPage`**: bei einer Berichtigung rendert
+   * `EtbPage` eine eigene `Schnellerfassung` STATT dieser Tabs. Läge der Schalter hier, stünde
+   * eine bewusst abgewählte Wertübernahme nach jeder Berichtigung wieder auf AN. Die
+   * übernommenen WERTE dürfen dabei fallen; die Entscheidung darf es nicht.
    */
   const [uebernahme, setUebernahme] = useState<MetadatenWerte>({});
 
-  // Gewählte Anhänge je Entwurf (LFH-117, D9): nur der aktive Tab ist montiert, also liegen
-  // sie nicht in der Schnellerfassung. Vorzugsweise vom Aufrufer geführt (`EtbPage`), damit sie
-  // auch eine Berichtigung überleben — s. `useEntwurfsDateien`.
+  // Gewählte Anhänge je Entwurf: nur der aktive Tab ist montiert, also liegen sie nicht in der
+  // Schnellerfassung. Vorzugsweise vom Aufrufer geführt (`EtbPage`), damit sie auch eine
+  // Berichtigung überleben — s. `useEntwurfsDateien`.
   const eigeneDateien = useEntwurfsDateien();
   const dateien = dateienVonAussen ?? eigeneDateien;
   const dateienVerwerfen = dateien.verwerfen;
 
   /**
-   * Sendezustand je Entwurf (LFH-117, Review C1) — aus demselben Grund hier wie die Dateien:
-   * nur der aktive Tab ist montiert. Ein Tabwechsel während des Uploads montierte sonst eine
-   * entsperrte Schnellerfassung, deren Eingaben der laufende Versand bei seinem Erfolg still
-   * verwarf. Ein Eintrag im Ruhezustand fällt weg, damit geschlossene Entwürfe nicht liegen
-   * bleiben.
+   * Sendezustand je Entwurf — aus demselben Grund hier wie die Dateien: ein Tabwechsel während
+   * des Uploads montierte sonst eine entsperrte Schnellerfassung, deren Eingaben der laufende
+   * Versand still verwarf. Ein Eintrag im Ruhezustand fällt weg, damit geschlossene Entwürfe
+   * nicht liegen bleiben.
    */
   const [versandJe, setVersandJe] = useState<Record<string, Versand>>({});
   /**
-   * Umgezogene Entwurfs-ids (alt → neu, Review C1): der laufende Versand schreibt seinen
-   * Zustand aus einer alten Closure unter der ALTEN id weiter — nach einem 409 gehört er dem
-   * Entwurf unter seiner neuen.
+   * Umgezogene Entwurfs-ids (alt → neu): der laufende Versand schreibt seinen Zustand aus einer
+   * alten Closure unter der ALTEN id weiter — nach einem 409 gehört er dem Entwurf unter der neuen.
    */
   const umgezogen = useRef(new Map<string, string>());
   const versandAendern = useCallback((idAlt: string, aenderung: Partial<Versand>) => {
@@ -150,10 +143,9 @@ export default function EtbEntwurfsTabs({
             try {
               await erfassen(eintrag); // wirft bei fachlicher Ablehnung → Entwurf bleibt
             } catch (err) {
-              // 409 (Review C1): die Entwurfs-id steht als client_id schon für einen anderen
-              // Eintrag — ein zweiter Browser-Tab hat diesen Entwurf gesendet. Wortlaut und
-              // Dateien bleiben, der Entwurf bekommt eine neue id; mit der alten käme er nie
-              // mehr durch. Den Grund setzt die Schnellerfassung an die Erfassung.
+              // 409: die Entwurfs-id steht als client_id schon für einen anderen Eintrag (ein zweiter
+              // Browser-Tab hat diesen Entwurf gesendet). Wortlaut und Dateien bleiben, der Entwurf bekommt
+              // eine neue id. Den Grund setzt die Schnellerfassung an die Erfassung.
               if (err instanceof ApiError && err.status === 409) {
                 const neu = await entwurfNeuAusweisen(e.id);
                 if (neu) {
@@ -175,7 +167,7 @@ export default function EtbEntwurfsTabs({
             // sonst tauchten alte Werte beim Wiedereinschalten wieder auf.
             const naechsteMetadaten = werteBehalten ? nurUebernahme(eintrag) : {};
             setUebernahme(naechsteMetadaten);
-            // Die Dateien sind jetzt am Eintrag — sie gehen mit dem Entwurf (LFH-117).
+            // Die Dateien sind jetzt am Eintrag — sie gehen mit dem Entwurf.
             dateienVerwerfen(e.id);
             // Nur ein NEUER Folgeentwurf erhält die Übernahme. Ein bestehender Entwurf
             // bleibt auch mit bewusst leerem An maßgeblich (LFH-461).

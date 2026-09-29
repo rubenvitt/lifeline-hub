@@ -60,26 +60,22 @@ async function alleSeiten(
  * Lädt ALLE Einträge einer ETB-Auswahl für die Druckansicht (LFH-22, design.md D4).
  *
  * Über die bestehende Liste (`listeEtb`), nicht über einen eigenen Endpunkt: Gates und
- * Filterbedingung sind damit per Konstruktion dieselben wie am Bildschirm, und es gibt
- * genau EINE Abbildung Filter → Query (`api/etb.ts:filterParameter`). 1 200 Einträge sind
- * drei Anfragen.
+ * Filterbedingung sind per Konstruktion dieselben wie am Bildschirm, und es gibt genau EINE
+ * Abbildung Filter → Query (`api/etb.ts:filterParameter`).
  *
  * SCHNAPPSCHUSS: Die Schleife geht nach unten; neuere Einträge haben höhere Nummern und
  * kommen nicht dazu. `lfd_nr` wird nie nachträglich vergeben, der Stand ist konsistent.
  *
- * Scheitert eine Seite, wirft die Funktion — ein Teilergebnis gibt es nicht, denn ein
- * Teilausdruck eines Tagebuchs wäre eine falsche Beweisunterlage.
+ * Scheitert eine Seite, wirft die Funktion — ein Teilausdruck eines Tagebuchs wäre eine
+ * falsche Beweisunterlage.
  *
- * BERICHTIGUNGS-DURCHGANG: Ist ein Filter aktiv (und zielt nicht selbst auf
- * Berichtigungen), fehlen einem gedruckten Eintrag sonst die Berichtigungen, die außerhalb
- * der Auswahl liegen — „berichtigt durch Nr. m" ginge verloren.
+ * BERICHTIGUNGS-DURCHGANG: Ist ein Filter aktiv (und zielt nicht selbst auf Berichtigungen),
+ * fehlte einem gedruckten Eintrag sonst „berichtigt durch Nr. m" von außerhalb der Auswahl.
  *
- * BEKANNTE UNSCHÄRFE, bewusst hingenommen (Review Welle B): der Durchgang läuft NACH der
- * Hauptschleife. Wird dazwischen eine Berichtigung geschrieben, kann ein gedruckter Eintrag
- * „berichtigt durch Nr. m" tragen, obwohl der Kopf „bis Nr. X" mit X < m nennt. Falsch ist
- * das nicht — die Berichtigung existiert, und sie ist neuer als der Stand der Liste —, der
- * Kopf deckt sie nur nicht ab. Eine Kappung auf X verschwiege eine vorhandene Berichtigung
- * auf einer Beweisunterlage; das wiegt schwerer als die Unschärfe im Kopf.
+ * BEKANNTE UNSCHÄRFE, bewusst hingenommen: der Durchgang läuft NACH der Hauptschleife. Eine
+ * dazwischen geschriebene Berichtigung kann „berichtigt durch Nr. m" tragen, obwohl der Kopf
+ * „bis Nr. X" mit X < m nennt. Eine Kappung auf X verschwiege eine vorhandene Berichtigung auf
+ * einer Beweisunterlage; das wiegt schwerer als die Unschärfe im Kopf.
  */
 export async function ladeEtbVollstaendig(
   einsatzId: number,

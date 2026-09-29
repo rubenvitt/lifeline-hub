@@ -5,19 +5,13 @@ import { kartenKante } from './kartenKante';
 type Hueller = Omit<HTMLAttributes<HTMLElement>, 'children' | 'style'>;
 
 /**
- * Karte der vier Kommunikations-Module (Meldung, Auftrag, Erinnerung, Nachforderung) im
- * Neuentwurf „Instrumententafel" — ersetzt antds `Card`. Rahmen `linie`, Grund `paneel`,
- * Radius 0; links optional die ZEITSPALTE eines Zeitachsen-Eintrags (Zeit Mono 13/500,
- * darunter die Nummer Mono 10), dann der Inhalt.
+ * Karte der vier Kommunikations-Module (Meldung, Auftrag, Erinnerung, Nachforderung): Rahmen
+ * `linie`, Grund `paneel`, Radius 0; links optional die Zeitspalte, dann der Inhalt.
  *
- * DER LINKE KARTENRAND IST VERTRAG (LFH-343 · C8, Befund H47), nicht Dekoration: 3 px,
- * EINE Farbe, Gefahr gewinnt — `alarm` (rot) vor `unbearbeitet` (gelb) vor nichts. Die
- * Entscheidung trifft {@link kartenKante} (rein, getestet); die Karte trägt sie zusätzlich
- * als `data-alarm` / `data-unbearbeitet`, damit der Zustand ohne Farbrechnung prüfbar ist.
- * Das ETIKETT in der Karte bleibt davon unberührt — vergeben ist der Rand, nicht die Aussage.
- *
- * Eine alarmierte Karte steht zusätzlich auf der getönten Alarmfläche (`alarmFlaeche`,
- * Neuentwurf „Ampel als Fläche"); vorher war das antds `colorErrorBg`.
+ * DER LINKE KARTENRAND IST VERTRAG: 3 px, EINE Farbe, Gefahr gewinnt — `alarm` vor
+ * `unbearbeitet` vor nichts ({@link kartenKante}). Zusätzlich als `data-alarm` /
+ * `data-unbearbeitet` prüfbar. Das Etikett bleibt davon unberührt. Eine alarmierte Karte steht
+ * außerdem auf der getönten Alarmfläche.
  */
 export default function KommKarte({
   alarm = false,

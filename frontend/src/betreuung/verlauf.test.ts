@@ -9,7 +9,7 @@ import {
   standZeile,
 } from './verlauf';
 
-/** Reine Hilfen des Meldeverlaufs (LFH-676). */
+/** Reine Hilfen des Meldeverlaufs. */
 
 const STAND: StandVerlaufEintrag = {
   id: 7,

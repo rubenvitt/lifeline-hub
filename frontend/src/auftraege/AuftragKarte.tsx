@@ -12,7 +12,7 @@ import { etbPfad } from '../routing/deeplinks';
 
 const { Text } = Typography;
 
-/** Höchstzahl quittierter Empfänger-Chips; der Rest steht als „+n ✓" (LFH-371). */
+/** Höchstzahl quittierter Empfänger-Chips; der Rest steht als „+n ✓". */
 const QUITTIERT_CHIP_GRENZE = 3;
 
 /** Befehlsschema-Felder für die Read-back-Detailansicht (Reihenfolge = Anzeige). */
@@ -27,8 +27,7 @@ const SCHEMA_FELDER: { key: keyof Auftrag; label: string; zeit?: boolean }[] = [
   { key: 'erteilt_at', label: 'Erteilt am', zeit: true },
 ];
 
-/** Liefert die gesetzten (nicht-null/nicht-leer) Schemafelder eines Auftrags.
- *  erteilt_at ist ein UTC-Zeitstempel → lokal über formatZeit. */
+/** Die gesetzten Schemafelder eines Auftrags; `erteilt_at` über formatZeit. */
 function gefuellteFelder(a: Auftrag): { label: string; wert: string }[] {
   return SCHEMA_FELDER.map(({ key, label, zeit }) => {
     const roh = (a[key] ?? '') as string;
@@ -42,7 +41,7 @@ interface AuftragKarteProps {
   ansicht?: 'offen' | 'abgeschlossen';
   einsatzId?: number;
   darfSchreiben?: boolean;
-  /** Deeplink-Hervorhebung (?auftrag=, LFH-153): markierte Karte + scroll-adressierbar. */
+  /** Deeplink-Hervorhebung (?auftrag=): markierte Karte, scroll-adressierbar. */
   hervorgehoben?: boolean;
   quittierungLaeuft?: boolean;
   quittierungZiel?: { auftragId: number; empfaengerId: number } | null;
@@ -52,11 +51,7 @@ interface AuftragKarteProps {
   onAbnehmen?: (auftragId: number) => void;
 }
 
-/**
- * Auftrags-Karte (LFH-112): Karten-Look mit klarer Hierarchie. Ersetzt die frühere
- * List.Item-/Collapse-Darstellung. Überfällig-Hervorhebung ist dark-safe über Theme-Tokens
- * (colorErrorBg/colorError) statt hartkodiertem Rosa.
- */
+/** Auftrags-Karte. */
 export default function AuftragKarte({
   auftrag: a,
   ansicht = 'offen',
@@ -73,17 +68,13 @@ export default function AuftragKarte({
   const { rollen } = useRollen();
   const status = AUFTRAG_STATUS[a.bearbeitungsstatus] ?? AUFTRAG_STATUS.offen;
   const ueberfaellig = a.ist_ueberfaellig;
-  // Eingangszustand (LFH-343 · C8, Befund H47) — derselbe Fall wie
-  // `MELDUNG_STATUS.neu`: ein Auftrag, den noch niemand angefasst hat, trug
-  // dasselbe graue Etikett wie einer in Bearbeitung. Der linke Rand ist schon vom
-  // Überfällig-Alarm belegt; Gefahr gewinnt, das Etikett bleibt davon unberührt.
+  // Eingangszustand (wie `MELDUNG_STATUS.neu`): der linke Rand ist vom Überfällig-Alarm belegt,
+  // Gefahr gewinnt; das Etikett bleibt unberührt.
   const unbearbeitet = !!status.unbearbeitet && !ueberfaellig;
   const details = gefuellteFelder(a);
-  // LFH-372/B5k: der Statuschip zeigt nur QUITTIERTE Empfänger. Offene standen nach
-  // LFH-364 doppelt — einmal als Chip, einmal in der Zeile „Quittung offen:" — und
-  // kosteten bei drei Empfängern auf `handschuh` eine ganze Kartenzeile. Die Zeile selbst
-  // hängt bewusst NICHT am Schreibrecht, nur ihr Knopf: sonst verlöre ein Beobachter mit
-  // dem Chip zugleich den Namen des offenen Empfängers.
+  // Der Statuschip zeigt nur QUITTIERTE Empfänger; offene stehen in der Zeile „Quittung offen:".
+  // Die Zeile hängt NICHT am Schreibrecht, nur ihr Knopf — sonst verlöre ein Beobachter den Namen
+  // des offenen Empfängers.
   const istQuittierungZiel = (empfaengerId: number) =>
     !!quittierungLaeuft &&
     quittierungZiel?.auftragId === a.id &&
@@ -93,31 +84,23 @@ export default function AuftragKarte({
   // sind serialisiert und damit gesperrt.
   const quittierteEmpf = a.empfaenger.filter((e) => e.quittiert_at && !istQuittierungZiel(e.id));
   const offeneEmpf = a.empfaenger.filter((e) => !e.quittiert_at || istQuittierungZiel(e.id));
-  // LFH-371: die Anzeigegrenze schneidet nur noch die QUITTIERTEN Chips — Quittiertes ist
-  // Lesestoff und darf hinter „+n" stehen, Offenes ist Arbeit und steht immer da. Vorher
-  // schnitt `slice(0, 3)` die ganze Liste, BEVOR getrennt wurde: waren die ersten drei
-  // quittiert, verschwand die Zeile „Quittung offen:", der vierte Empfänger hatte keinen
-  // Knopf, `empfaenger_anzahl == quittiert_anzahl` in `src/routes/auftrag.rs` wurde nie
-  // wahr und die Auto-Frist-Erinnerung aus LFH-118 schloss nie. Die Zeile wächst mit der
-  // Zahl OFFENER Empfänger und schrumpft mit jeder Quittung.
+  // Die Anzeigegrenze schneidet nur QUITTIERTE Chips: Quittiertes ist Lesestoff, Offenes ist
+  // Arbeit und steht immer da. Schnitte sie die ganze Liste, verlöre ein offener Empfänger seinen
+  // Knopf, und die Auto-Frist-Erinnerung schlösse nie.
   const sichtbareQuittierte = quittierteEmpf.slice(0, QUITTIERT_CHIP_GRENZE);
   const restQuittierte = quittierteEmpf.length - sichtbareQuittierte.length;
   const darfQuittieren = !!(darfSchreiben && onQuittieren);
 
   const aktionen: ReactNode[] = darfSchreiben
     ? [
-        // EIN Klick (LFH-343 · C8, Befund H50): der Rückfrage-Dialog, der hier stand,
-        // kostete die häufigste Routine-Aktion der Karte zwei. Der Rückweg steht
-        // im Rückgängig-Toast der Seite; `POST …/vollzug` nimmt seit derselben
-        // Änderung `status: 'offen'` an — aber NUR aus `in_arbeit`.
-        // „Abnehmen" (unten) behält seine Rückfrage: die Abnahme ist der
-        // fachliche Schlusspunkt und hat keinen Rückweg.
+        // EIN Klick; der Rückweg steht im Rückgängig-Toast (`POST …/vollzug` mit `status: 'offen'`, nur
+        // aus `in_arbeit`). „Abnehmen" behält seine Rückfrage: die Abnahme hat keinen Rückweg.
         a.bearbeitungsstatus === 'offen' && onInArbeit ? (
           <Button key="ia" onClick={() => onInArbeit(a.id)}>
             In Bearbeitung
           </Button>
         ) : null,
-        // „Vollzug melden" öffnet das Modal (= eigene Bestätigung) → kein Popconfirm.
+        // „Vollzug melden" öffnet ein Modal (eigene Bestätigung).
         (a.bearbeitungsstatus === 'offen' || a.bearbeitungsstatus === 'in_arbeit') &&
         onVollzugMelden ? (
           <Button key="vm" onClick={() => onVollzugMelden(a.id)}>
@@ -141,8 +124,7 @@ export default function AuftragKarte({
     : [];
 
   return (
-    // Zeitachsen-Optik (Neuentwurf): Erteilungszeit links in Mono, darunter die Nummer.
-    // Der linke Rand ist der Kartenrand-Vertrag aus C8/H47 — überfällig schlägt „offen".
+    // Erteilungszeit links in Mono, darunter die Nummer; überfällig schlägt „offen" am Rand.
     <KommKarte
       data-auftrag-id={a.id}
       data-ueberfaellig={ueberfaellig ? 'true' : undefined}
@@ -206,14 +188,9 @@ export default function AuftragKarte({
         </Space>
       </Flex>
 
-      {/* Quittungs-Aktionen in EIGENER Zeile (LFH-364/B5d, Weg (a) des Elterntickets).
-          Der zweite Weg — den Empfänger-Chip komplett antippbar machen — ist verworfen:
-          derselbe Chip trägt oben auch den reinen Statuszustand (grün + ✓). Antippbar und
-          nicht-antippbar sähen dann gleich aus, die Bedienbarkeit hinge allein an der
-          Farbe und der zweite Kanal fehlte (WCAG 1.4.1).
-          Der Knopftext bleibt wörtlich „quittieren"; wer für WEN quittiert, steht im
-          zugänglichen Namen — bei mehreren offenen Empfängern wären sonst mehrere
-          gleichnamige Knöpfe nicht auseinanderzuhalten. */}
+      {/* Quittungs-Aktionen in EIGENER Zeile, nicht als antippbarer Chip: derselbe Chip trägt auch den
+         reinen Statuszustand, die Bedienbarkeit hinge sonst allein an der Farbe. Wer für WEN
+         quittiert, steht im zugänglichen Namen. */}
       {offeneEmpf.length > 0 && (
         <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
           <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>

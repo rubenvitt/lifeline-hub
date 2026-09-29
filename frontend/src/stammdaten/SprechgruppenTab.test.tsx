@@ -26,10 +26,9 @@ const sprechgruppe = {
 /**
  * Das Paar für die Korpus- und die Filterprobe: eine aktive, eine deaktivierte Zeile.
  *
- * ALLE drei Spalten mit Datenbezug (Bezeichnung, Betriebsart, Hinweis) sind hier ausdrücklich
- * überschrieben, keine erbt aus `sprechgruppe`. Grund ist gemessen: dessen Hinweis
- * „Führungskanal" trägt BEIDE Suchfragmente der Probe — „ru" in F-üh-ru-ng und „al" in kan-al —
- * und machte die Zusicherung stumpf. `hinweis: null` hält die Zeilen frei von Zufallstreffern.
+ * ALLE drei Spalten mit Datenbezug sind ausdrücklich überschrieben: der Hinweis
+ * „Führungskanal" aus `sprechgruppe` trägt BEIDE Suchfragmente der Probe („ru", „al") und
+ * machte die Zusicherung stumpf. `hinweis: null` hält die Zeilen frei von Zufallstreffern.
  */
 const aktivPaar = [
   {
@@ -88,15 +87,14 @@ describe('SprechgruppenTab', () => {
   it('filtert nach Betriebsart und engt per Suche ein', async () => {
     const dmo = { ...sprechgruppe, id: 2, bezeichnung: '208_D_DRK', betriebsart: 'DMO' };
     // Die dritte Gruppe unterscheidet die numerische Kollation von der zeichenweisen: ohne
-    // `numeric: true` sortiert 42_… hinter 412_… (gemessen mit localeCompare('de')).
+    // `numeric: true` sortiert 42_… hinter 412_….
     const kurz = { ...sprechgruppe, id: 3, bezeichnung: '42_F_DRK' };
     const { container } = render(admin, [sprechgruppe, dmo, kurz]);
     await screen.findByText('412_F_DRK');
     expect(bezeichnungen(container)).toEqual(['412_F_DRK', '208_D_DRK', '42_F_DRK']);
 
-    // Erst die Suche — sie lässt sich leeren; die Filterauswahl käme danach nur über die
-    // „Reset"-Schaltfläche zurück, und die ist nach dem Anwenden deaktiviert (gemessen:
-    // user-event bricht dort mit `pointer-events: none` ab).
+    // Erst die Suche — sie lässt sich leeren; die Filterauswahl käme nur über die
+    // „Reset"-Schaltfläche zurück, und die ist nach dem Anwenden deaktiviert.
     const feld = screen.getByPlaceholderText(/Bezeichnung/);
     await userEvent.type(feld, '412');
     await waitFor(() => expect(bezeichnungen(container)).toEqual(['412_F_DRK']));
@@ -120,13 +118,12 @@ describe('SprechgruppenTab', () => {
   });
 
   /**
-   * Die Aktiv-Spalte darf NICHTS zum Suchkorpus des Primitivs beitragen, das die ROHWERTE der
-   * Spalten mit `dataIndex` liest. Gemessen mit `dataIndex: 'aktiv'`: „al" traf jede INAKTIVE
-   * Zeile (Rohwert `false`), „ru" jede aktive (`true`) — Treffer ohne jede Entsprechung im
-   * Sichtbaren.
+   * Die Aktiv-Spalte darf NICHTS zum Suchkorpus beitragen, der die ROHWERTE der Spalten mit
+   * `dataIndex` liest: mit `dataIndex: 'aktiv'` träfe „al" jede inaktive Zeile (`false`), „ru"
+   * jede aktive (`true`) — Treffer ohne Entsprechung im Sichtbaren.
    *
-   * Die Kontrollsuche steht vorweg und ist nicht Zierde: ohne sie wäre die leere Erwartung auch
-   * dann grün, wenn das Feld gar nicht gefunden oder der Platzhalter vertippt wäre.
+   * Die Kontrollsuche vorweg ist nötig: ohne sie wäre die leere Erwartung auch grün, wenn das
+   * Feld gar nicht gefunden oder der Platzhalter vertippt wäre.
    */
   it('die Aktiv-Spalte trägt nichts zum Suchkorpus bei', async () => {
     const { container } = render(admin, aktivPaar);
@@ -148,11 +145,9 @@ describe('SprechgruppenTab', () => {
   });
 
   /**
-   * Die zweite Filterachse, eigens geprüft, weil ihre Filterwerte BOOLEANS sind. Antds
-   * `React.Key | boolean`-Typisierung nimmt auch die Zeichenkette `'false'` an: der Vertipper
-   * compiliert, matcht aber nie — er fällt ausschließlich über die Zeilenmenge auf, nicht über
-   * `tsc` (gemessen). Vorher war die Achse ganz ungeprüft: ein `onFilter: () => true` ließ die
-   * Datei grün.
+   * Die zweite Filterachse, eigens geprüft, weil ihre Filterwerte BOOLEANS sind. antds
+   * `React.Key | boolean`-Typisierung nimmt auch `'false'` an: der Vertipper kompiliert, matcht
+   * aber nie und fällt nur über die Zeilenmenge auf.
    */
   it('der Aktiv-Filter verengt auf die deaktivierten Zeilen', async () => {
     const { container } = render(admin, aktivPaar);
@@ -171,11 +166,9 @@ describe('SprechgruppenTab', () => {
   });
 
   /**
-   * Die Primäraktion ist seit LFH-346 · A3 SICHTBAR UND GESPERRT, die Zeilenaktionsspalte
-   * bleibt weg. Zwei Zuschnitte, bewusst: der eine Knopf im Kopf soll den Grund nennen
-   * können (M16 — ein fehlender Knopf ist von „diese Seite kann das gar nicht" nicht zu
-   * unterscheiden), n Zeilen × 2 Knöpfe wären dagegen eine Spalte toter Knöpfe, die
-   * waagerechten Platz für null Handlungsmöglichkeit kostet.
+   * Primäraktion SICHTBAR UND GESPERRT, Zeilenaktionsspalte weg (LFH-346): der Knopf im Kopf
+   * nennt über den Hinweis den Grund, n Zeilen × 2 gesperrte Knöpfe kosteten Platz für null
+   * Handlungsmöglichkeit.
    */
   it('Nicht-Admin sieht die Primäraktion gesperrt und keine Zeilenaktionen', async () => {
     render(nichtAdmin);
@@ -185,15 +178,12 @@ describe('SprechgruppenTab', () => {
   });
 
   /**
-   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
-   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
-   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
-   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   * Partnerpaar zu AK4 (LFH-331): die negative Hälfte allein wäre auch im Leerfall trivial
+   * grün; erst die positive darunter mit demselben Literal macht sie zu einer Aussage über die
+   * Zustandsweiche.
    *
-   * Der lokale `render`-Helfer taugt für die Fehlerhälfte nicht: er verdrahtet
-   * `/api/sprechgruppen` fest auf `HttpResponse.json(liste)`. Die Handler stehen deshalb
-   * hier inline — zwei statt der drei im Fahrzeug-Vorbild, weil dieser Tab keinen
-   * Vorschläge-Endpunkt abruft.
+   * Der lokale `render`-Helfer verdrahtet `/api/sprechgruppen` fest auf die Liste, die Handler
+   * stehen deshalb inline.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
@@ -215,11 +205,10 @@ describe('SprechgruppenTab', () => {
 });
 
 /**
- * Freitext-Spalte begrenzen (LFH-346 · A4, Befund N13). Warum die Kappung an der ZELLE
- * sitzt und nicht an der Spalte, steht ausführlich und im Browser gemessen in
- * `karten/OnlineQuellenVerwaltung.test.tsx` — kurz: `KatalogTabelle` fährt unter
- * `scroll={{ x: 'max-content' }}` mit `table-layout: auto`, und dort ist eine Spaltenbreite
- * wirkungslos.
+ * Freitext-Spalte begrenzen (LFH-346). Die Kappung sitzt an der ZELLE, nicht an der Spalte:
+ * `KatalogTabelle` fährt unter `scroll={{ x: 'max-content' }}` mit `table-layout: auto`, und
+ * dort ist eine Spaltenbreite wirkungslos (Herleitung in
+ * `karten/OnlineQuellenVerwaltung.test.tsx`).
  */
 describe('SprechgruppenTab — Freitext-Spalte (LFH-346 · A4)', () => {
   const langerHinweis = `${'Führungskanal des Abschnitts, nur nach Freigabe belegen. '.repeat(4)}Ende`;

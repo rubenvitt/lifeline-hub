@@ -98,14 +98,13 @@ interface BetreuungsZiel {
 }
 
 /**
- * Gemeinsamer Ablauf für Stand- und Belegungsmeldungen (LFH-675). Die `client_id` wird
- * EINMAL gesetzt, bevor irgendetwas gesendet wird: Online-Versuch und vorgemerkte Kopie tragen
- * denselben Schlüssel, ein Timeout nach dem Commit wird beim Flush zum Replay.
+ * Gemeinsamer Ablauf für Stand- und Belegungsmeldungen. Die `client_id` wird EINMAL vor dem
+ * Senden gesetzt: Online-Versuch und vorgemerkte Kopie tragen denselben Schlüssel, ein Timeout
+ * nach dem Commit wird beim Flush zum Replay.
  *
- * Nur die vorgemerkte Kopie bekommt den Erfassungszeitpunkt (design.md D6), und nur wenn die
- * Person keinen eingetragen hat. Ohne ihn stempelte der Server beim Flush „jetzt“, und eine um
- * 10:00 erfasste Zahl verdrängte eine inzwischen gemeldete neuere. Online bleibt die
- * Serveruhr — eine vorgehende Tablet-Uhr machte sonst schon Online-Meldungen zu 400.
+ * Nur die vorgemerkte Kopie bekommt den Erfassungszeitpunkt (falls keiner eingetragen ist):
+ * sonst stempelte der Server beim Flush „jetzt“, und eine ältere Zahl verdrängte eine neuere.
+ * Online gilt die Serveruhr — eine vorgehende Tablet-Uhr machte sonst Meldungen zu 400.
  */
 async function betreuungsmeldungOfflineFaehig<
   E extends { client_id?: string; zeitpunkt_at?: string },
@@ -136,7 +135,7 @@ async function betreuungsmeldungOfflineFaehig<
   }
 }
 
-/** Standmeldung senden oder mit Erfassungszeitpunkt vormerken (LFH-675). */
+/** Standmeldung senden oder mit Erfassungszeitpunkt vormerken. */
 export function erfasseStandOfflineFaehig(
   benutzerId: number,
   einsatzId: number,
@@ -152,7 +151,7 @@ export function erfasseStandOfflineFaehig(
   );
 }
 
-/** Belegungsmeldung senden oder mit Erfassungszeitpunkt vormerken (LFH-675). */
+/** Belegungsmeldung senden oder mit Erfassungszeitpunkt vormerken. */
 export function erfasseBelegungOfflineFaehig(
   benutzerId: number,
   einsatzId: number,

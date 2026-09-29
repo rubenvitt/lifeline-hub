@@ -23,7 +23,7 @@ import {
   type VerbleibFormWerte,
 } from './verbleibErfassungKern';
 
-/** Registry-Eintrag des Moduls „Betreuung" — Grenze der Stellen-Auswahl (LFH-674). */
+/** Registry-Eintrag des Moduls „Betreuung" — Grenze der Stellen-Auswahl. */
 const BETREUUNG_MODUL = modulRegistry.find((m) => m.key === 'betreuung');
 
 interface VerbleibErfassungProps {
@@ -35,25 +35,19 @@ interface VerbleibErfassungProps {
 }
 
 /**
- * „Verbleib erfassen" auf `ErfassungsModal` (Erfassungs-Norm, LFH-674 design.md D6). Vorher
- * ein handgebautes `<Modal onOk={form.submit}>`: der Knopf lag außerhalb des Formulars, Enter
- * sendete nicht ab.
+ * „Verbleib erfassen" auf `ErfassungsModal`.
  *
- * Montiert = offen (die Seite rendert `{offen && …}`), dadurch hat jede Öffnung eine frische
- * Mutation ohne alten Fehler. Fehler stehen IM Dialog (`SpeicherFehler`, LFH-535): die Mutation
- * hat kein `onError`, `mutateAsync` lehnt ab, die Hülle lässt die Felder stehen.
+ * Montiert = offen, jede Öffnung hat eine frische Mutation. Fehler stehen IM Dialog; die
+ * Mutation hat kein `onError`, `mutateAsync` lehnt ab, die Hülle lässt die Felder stehen.
  *
- * Felder je Art hält das Budget (≤ 3 sichtbar): Transportmittel nur beim Transport, die
+ * Felder je Art halten das Budget (≤ 3): Transportmittel nur beim Transport, die
  * Betreuungsstelle nur bei der Notunterkunft UND mit Lesezugriff auf das Modul Betreuung — die
- * Grenze sitzt an der Datenquelle wie auf der Lagekarte (`betreuungZugriffVon`): ohne Zugriff
- * kein Abruf, und ein 403 kippt still auf „keine Auswahl". Die Notiz steht unter „Weitere
- * Angaben". Ohne `forceRender`: sie hat keine Vorbelegung, zugeklappt gibt es also nichts, was
- * verloren ginge, und ein einmal aufgeklapptes Panel bleibt eingehängt (antds Vorgabe). So
- * bleibt das Budget „≤ 3 sichtbar" widerlegbar — mit `forceRender` stünde die Notiz immer im
- * DOM und jede Zählung wäre trivial.
+ * Grenze sitzt an der Datenquelle (ohne Zugriff kein Abruf, ein 403 heißt „keine Auswahl").
+ * Die Notiz liegt unter „Weitere Angaben", OHNE `forceRender` (sie hat keine Vorbelegung, und
+ * nur so bleibt „≤ 3 sichtbar" widerlegbar).
  *
- * Die Stellenwahl belegt „Ziel" sichtbar und änderbar mit dem Namen vor (Entscheidung
- * 24.09.2026); gespeichert wird, was dort steht. Der Server kopiert keinen Namen.
+ * Die Stellenwahl belegt „Ziel" sichtbar und änderbar mit dem Namen vor; gespeichert wird, was
+ * dort steht.
  */
 export default function VerbleibErfassung({
   einsatzId,
@@ -91,8 +85,8 @@ export default function VerbleibErfassung({
   const stellen = betreuungQuery.data?.stellen ?? [];
   const felder = sichtbareVerbleibFelder(art, zugriff === 'frei');
 
-  // Die zuletzt gewählte Stelle — nur so erkennt die Vorbelegung, ob „Ziel" noch unverändert
-  // ihren Namen trägt (dann darf ein Stellenwechsel es ersetzen) oder eigener Text ist.
+  // Die zuletzt gewählte Stelle — nur so erkennt die Vorbelegung, ob „Ziel" noch ihren Namen
+  // trägt oder eigener Text ist.
   const gewaehlt = useRef<Betreuungsstelle | undefined>(undefined);
 
   const mutation = useMutation({
@@ -133,8 +127,8 @@ export default function VerbleibErfassung({
         <Form.Item
           label="Betreuungsstelle (optional)"
           name="betreuungsstelle_id"
-          // Nur ein 403 heißt „keine Auswahl" (dann steht das Feld gar nicht da). Jeder andere
-          // Fehler ist ein Ausfall der Quelle und sagt sich, statt ein leeres Feld zu zeigen.
+          // Nur ein 403 heißt „keine Auswahl" (dann fehlt das Feld). Jeder andere Fehler ist ein Ausfall
+          // der Quelle und sagt sich.
           extra={
             betreuungQuery.isError
               ? 'Stellen konnten nicht geladen werden — Ziel als Freitext eintragen.'

@@ -24,37 +24,24 @@ import {
 } from './personenBilanz';
 
 /**
- * Das EINE Spaltenregister der Betroffenen-Listen (LFH-330 · B2; Neuentwurf S7) — reine
- * Anzeige, ohne Aktionen. Speist Zeilen- und Rasteransicht und über den Kartenplan beide
- * Darstellungsformen.
+ * Das EINE Spaltenregister der Betroffenen-Listen — reine Anzeige, ohne Aktionen; speist
+ * Zeilen- und Rasteransicht und über den Kartenplan beide Darstellungsformen.
  *
- * Spalten nach dem Entwurf: Nr. · Person (Name + Geschlecht/Alter) · Sichtung · Zustand ·
- * Status · Fundort · Verbleib · Vermerk · Zeit. Der Personenstatus steht zusätzlich als
- * echte Spalte (`StatusTag`, A2-Vertrag).
+ * Spalten: Nr. · Person (Name + Geschlecht/Alter) · Sichtung · Zustand · Status · Fundort ·
+ * Verbleib · Vermerk · Zeit.
  *
- * **„Zustand"** (LFH-613) ist inline bearbeitbar über `BemerkungZelle` — dieselbe
- * Affordanz wie die optionale Bemerkung der Kräfte-Listen (LFH-369: leeres Feld sagt
- * „Zustand hinzufügen", Zeilenkennung `R-042` im zugänglichen Namen), PATCH nur mit dem
- * einen Feld und Wertgleichheits-Riegel im Primitiv. Die Zelle fängt ihren Klick ab: die
- * Zeile navigiert sonst per `onZeileKlick` auf die Detailseite, und der Riegel des Primitivs
- * greift nur für Anker.
+ * „Zustand" ist inline bearbeitbar über `BemerkungZelle` (Zeilenkennung `R-042` im
+ * zugänglichen Namen, PATCH nur mit dem einen Feld). Die Zelle fängt ihren Klick ab, sonst
+ * navigierte die Zeile per `onZeileKlick` auf die Detailseite.
+ * „Fundort" zeigt Freitext UND darunter die Koordinate in Mono; eine der beiden schließt die
+ * Fundort-Lücke.
  *
- * **Fundort** zeigt Freitext UND darunter die Koordinate in Mono; eine der beiden schließt
- * die Fundort-Lücke (`personenBilanz.ts`).
+ * Eine FABRIK, kein Wert: die Verbleib-Spalte braucht die UHS-Liste der Seite, die
+ * Zustand-Spalte Einsatz und Schreibrecht. Durch `spaltenFuer<Person>()` geführt, NIE annotiert
+ * — eine Annotation weitete die Schlüssel auf `string`, und der Kartenplan nähme Tippfehler an.
  *
- * Eine FABRIK, kein Wert: die Verbleib-Spalte nennt die Unfallhilfsstelle beim Namen, und
- * den kennt nur die UHS-Liste der Seite; die Zustand-Spalte braucht Einsatz und
- * Schreibrecht. Durch `spaltenFuer<Person>()` geführt, NIE
- * annotiert — eine Annotation weitet die Schlüssel auf `string`, und der Kartenplan nähme
- * danach jeden Tippfehler unbemerkt an.
- *
- * ── DER ZWEITE KANAL DER LÜCKENTÖNUNG ───────────────────────────────────────────────────
- *
- * Eine Zeile ohne Verbleib/Fundort trägt `lueckeZeile` (Seite, `zeilenKlasse`). Die Farbe
- * allein wäre ein Ein-Kanal-Signal (WCAG 1.4.1), deshalb steht das WORT in der
- * Personenzelle („Verbleib offen") — und zwar dort, weil die Personenzelle in BEIDEN
- * Zweigen steht: im Kartenzweig gibt es keine Fundort-/Verbleib-Spalte, dort hinge eine
- * Tönung sonst ohne Wort. Die Fundort-/Verbleib-Zellen selbst zeigen „—" in `achtung`.
+ * Zweiter Kanal der Lückentönung: eine Zeile ohne Verbleib/Fundort trägt `lueckeZeile`; das
+ * WORT („Verbleib offen") steht in der Personenzelle, weil nur sie in BEIDEN Zweigen steht.
  */
 
 /** Alter-Anzeige: Geburtsdatum > geschätztes Alter (mit Tilde — das Feld IST geschätzt). */
@@ -73,19 +60,17 @@ export function geschlechtAlter(p: Person): string | null {
 }
 
 /**
- * Der Zeitpunkt, seit dem eine Person in ihrem aktuellen Zustand ist — die
- * Vergleichsgrundlage der Dringlichkeit. `aktuelle_sichtung_at` VOR `erfasst_at`: für „wer
- * wartet am längsten auf die nächste Bewertung" zählt die letzte Sichtung. `geaendert_at`
- * wäre falsch — es läuft bei jeder Notiz weiter.
+ * Der Zeitpunkt, seit dem eine Person in ihrem aktuellen Zustand ist — Grundlage der
+ * Dringlichkeit. `aktuelle_sichtung_at` VOR `erfasst_at`; `geaendert_at` wäre falsch, es läuft
+ * bei jeder Notiz weiter.
  */
 export function seitWert(p: Person): string {
   return p.aktuelle_sichtung_at ?? p.erfasst_at;
 }
 
 /**
- * Namenstext einer Person, oder `null`. Der Leerwert ist die Pointe: „unbekannt" gehört ins
- * `render`, NICHT in den Suchbeitrag — sonst fände die Suche nach „unbekannt" jede
- * namenlose Person als Namenstreffer.
+ * Namenstext einer Person, oder `null`. „unbekannt" gehört ins `render`, NICHT in den
+ * Suchbeitrag — sonst träfe die Suche nach „unbekannt" jede namenlose Person.
  */
 export function nameText(p: Pick<Person, 'name' | 'vorname'>): string | null {
   if (!p.name && !p.vorname) return null;
@@ -152,24 +137,14 @@ interface ZustandBedienung {
 }
 
 /**
- * Schreibzweig der Zustand-Zelle: PATCH mit NUR `zustand` — ein Key, keine Formular-Lesart,
- * also kann `patchBody` kein anderes Feld leeren. Kein `basis_geaendert_at`: ein einzelnes
- * Kurzfeld überschreibt bewusst blind (wie die Bemerkung der Kräfte-Listen); ein
- * Konfliktdialog für „gehfähig" wäre Reibung ohne Schutzgut.
- *
- * **Laufzustand und Fehler an der Zeile (LFH-650).** Bis dahin rief die Zelle `mutate` ohne
- * Rückkanal: der neue Wert erschien erst nach der Invalidierung, bei einem vorher leeren Feld
- * stand bis dahin wieder „Zustand hinzufügen" da, und ein Fehler war ein Toast am oberen Rand,
- * nach drei Sekunden weg — während der Wert still auf den alten zurücksprang (LFH-613-Prüfliste,
- * Tabelle 1, Nr. 3 und 9). Jetzt:
+ * Schreibzweig der Zustand-Zelle: PATCH mit NUR `zustand`, also kann `patchBody` kein anderes
+ * Feld leeren. Kein `basis_geaendert_at`: ein Kurzfeld überschreibt bewusst blind.
  *
  * - Während der Mutation zeigt die Zelle den GETIPPTEN Wert mit Ladeanzeige (`variables`).
  * - `onSuccess` gibt die Invalidierung ZURÜCK: react-query hält `isPending`, bis der neue Stand
- *   in der Liste steht. Ohne das gäbe es zwischen Antwort und Refetch eine Runde mit dem alten
- *   Wert — genau das Zurückspringen, das hier weg soll.
- * - Ein Fehler steht AN DER ZELLE (`data-fehler`, linker Rand aus `colorError`, Satz in
- *   `alarmText`) nach dem Muster aus LFH-345 · H14/H15, kein Toast. Er geht beim nächsten
- *   Versuch von selbst (react-query setzt `error` beim Übergang nach `pending` zurück).
+ *   in der Liste steht — sonst spränge der Wert eine Runde lang auf den alten zurück.
+ * - Ein Fehler steht AN DER ZELLE (`data-fehler`, Rand aus `colorError`, Satz in `alarmText`),
+ *   kein Toast. Er geht beim nächsten Versuch von selbst.
  */
 function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
   const qc = useQueryClient();
@@ -217,8 +192,7 @@ function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
 
 function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: ZustandBedienung }) {
   const { rollen } = useRollen();
-  // Der Zustand beschreibt eine ANGETROFFENE Person — einer vermissten wird er nicht
-  // angeboten (dieselbe Regel wie in `AufnahmeFelder` und auf der Detailseite).
+  // Der Zustand beschreibt eine ANGETROFFENE Person — einer vermissten wird er nicht angeboten.
   if (!bedienung?.darfSchreiben || !istAngetroffen(p)) {
     return p.zustand ? (
       <span style={{ fontSize: 12, color: rollen.text2 }}>{p.zustand}</span>
@@ -227,8 +201,8 @@ function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: ZustandBedienun
     );
   }
   return (
-    // Der Klick gehört der Zelle: ohne den Riegel öffnete der Platzhalter die Bearbeitung
-    // UND die Zeile navigierte auf die Detailseite (`onZeileKlick` greift nur Anker ab).
+    // Der Klick gehört der Zelle, sonst navigierte die Zeile zusätzlich auf die Detailseite
+    // (`onZeileKlick` greift nur Anker ab).
     <div onClick={(e) => e.stopPropagation()}>
       <ZustandSchreiben p={p} einsatzId={bedienung.einsatzId} />
     </div>
@@ -243,8 +217,8 @@ export function verbleibText(
   const k = verbleibKlasse(p);
   if (k === 'offen') return null;
   if (k === 'uhs') return `UHS ${uhsName(p.aktuelle_uhs_id!) ?? ''}`.trim();
-  // Art und Kurzform sind getrennte Felder: fehlt die Kurzform, steht das Wort der Art —
-  // sonst zeigte eine Person MIT Verbleib ein neutrales „—" und keine Lücke.
+  // Fehlt die Kurzform, steht das Wort der Art — sonst zeigte eine Person MIT Verbleib „—" und
+  // keine Lücke.
   return p.aktueller_verbleib || verbleibLabel(k);
 }
 
@@ -284,8 +258,8 @@ export function personenSpalten(
     {
       title: 'Zustand',
       key: 'zustand',
-      // Feste Breite (Entwurf S7: 118 px, hier mit Platz für den Platzhalter-Knopf) — KEINE
-      // weitere Fließspalte neben Person und Vermerk (`fliessBreite` in `KatalogTabelle`).
+      // Feste Breite mit Platz für den Platzhalter-Knopf — KEINE weitere Fließspalte neben Person
+      // und Vermerk.
       width: 140,
       suchText: (p) => p.zustand,
       render: (_, p) => <ZustandZelle p={p} bedienung={zustand} />,
@@ -333,10 +307,8 @@ export function personenSpalten(
       align: 'right',
       zahl: true,
       /**
-       * Taktische DTG `DDHHmm` statt reiner Uhrzeit: ein Einsatz dauert über Mitternacht,
-       * und „14:19" von gestern sähe aus wie von heute. `taktischeDtg` ist eine reine
-       * Funktion des Wire-Strings — `kurz` läse die Wanduhr, jede Aussage darüber hinge am
-       * Ausführungszeitpunkt.
+       * Taktische DTG `DDHHmm` statt reiner Uhrzeit: ein Einsatz dauert über Mitternacht.
+       * `taktischeDtg` ist rein; `kurz` läse die Wanduhr.
        */
       sortWert: seitWert,
       render: (_, p) => <ZeitAnzeige wert={seitWert(p)} format="dtg" />,
@@ -354,8 +326,8 @@ export type PersonenSpaltenKey = ReturnType<typeof personenSpalten>[number]['key
 type KartenPlanZweig<T, K extends string> = Extract<Kartenplan<T, K>, { art: 'plan' }>;
 
 /**
- * Kartenplan: Nr. als Titel-Link, Personenstatus im Status-Slot (A2-Vertrag), Person
- * (samt Lückenvermerk), Sichtung und Zeit als Sekundärfelder.
+ * Kartenplan: Nr. als Titel-Link, Personenstatus im Status-Slot, Person (samt Lückenvermerk),
+ * Sichtung und Zeit als Sekundärfelder.
  */
 export const personenKarte = (einsatzId: number): KartenPlanZweig<Person, PersonenSpaltenKey> => ({
   art: 'plan',
@@ -365,9 +337,8 @@ export const personenKarte = (einsatzId: number): KartenPlanZweig<Person, Person
 });
 
 /**
- * Zusatzspalte „Abgleich vorschlagen" (nur Vermisst-Filter mit Schreibrecht). Die feste
- * Breite trägt auf einer 390-px-Karte nicht; der Kartenzweig ersetzt das Auswahlfeld durch
- * einen Knopf plus Dialog (Aktions-Deskriptor der Seite).
+ * Zusatzspalte „Abgleich vorschlagen" (nur Vermisst-Filter mit Schreibrecht). Im Kartenzweig
+ * ersetzt ein Knopf plus Dialog das Auswahlfeld, das auf 390 px nicht trägt.
  */
 export function abgleichSpalten(
   gefundene: readonly Person[],

@@ -64,7 +64,7 @@ describe('lagebesprechungZustand', () => {
     );
   });
 
-  /** Ruling 12: unter einer Minute sagte „in 0 min"/„seit 0 min überfällig" nichts Lesbares. */
+  /** Unter einer Minute sagte „in 0 min"/„seit 0 min überfällig" nichts Lesbares. */
   it('genau am Termin „jetzt fällig" (achtung) — eine Sekunde davor „in < 1 min" (neutral)', () => {
     expect(lagebesprechungZustand(wire('2026-09-13T10:00:00Z'), jetzt)).toEqual({
       rolle: 'achtung',
@@ -98,12 +98,9 @@ describe('lagebesprechungZustand', () => {
 
 /**
  * Beidseits beider Sommerzeitgrenzen (29.03.2026 und 25.10.2026, je 01:00Z).
- *
- * Vitest setzt KEIN `TZ` (`vite.config.ts`, test-Block): in einer UTC-Umgebung ist ein lokaler
- * Parse (`dayjs(s)` statt `dayjs.utc(s)`) vom richtigen nicht zu unterscheiden. Die tragende
- * Zeile ist deshalb der Vergleich gegen den ABSOLUTEN Zeitpunkt (Muster `etb/filterZeit.test.ts`);
- * auf einer Maschine in Europe/Berlin wird ein lokaler Parse hier rot. Im Gate ist das
- * zugesichert: `scripts/check-all.sh` setzt `TZ=Europe/Berlin` (Ruling 2, LFH-543-Ledger).
+ * Vitest setzt KEIN `TZ`: in UTC wäre ein lokaler Parse vom richtigen nicht zu unterscheiden.
+ * Tragend ist deshalb der Vergleich gegen den ABSOLUTEN Zeitpunkt; `scripts/check-all.sh` setzt
+ * `TZ=Europe/Berlin`, dort wird ein lokaler Parse rot.
  */
 describe('lagebesprechungZustand an den Sommerzeitgrenzen', () => {
   it.each([

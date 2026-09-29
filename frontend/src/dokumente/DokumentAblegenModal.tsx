@@ -54,23 +54,15 @@ function zuAblage(werte: AblageFormular): DokumentAblage {
 }
 
 /**
- * Ablegen-Dialog der Dokumentenablage (LFH-632) auf der Erfassungs-Hülle (LFH-332 · B4).
+ * Ablegen-Dialog der Dokumentenablage auf der Erfassungs-Hülle.
  *
- * FELDBUDGET: drei sichtbare Felder — Datei, Kategorie, Titel. Alle drei sind Pflicht und
- * stehen deshalb nie hinter dem Collapse (LFH-343 · H49). Der Bezug ist optional und liegt
- * eingeklappt, mit `forceRender`, damit die Zählung „3" nicht trivial erfüllt ist.
+ * Drei sichtbare Pflichtfelder — Datei, Kategorie, Titel. Der optionale Bezug liegt
+ * eingeklappt mit `forceRender`. Die Kategorie hat KEINE Vorbelegung: ein Foto, das als
+ * „Sonstiges" durchrutscht, findet später niemand. Der Titel wird aus dem Dateinamen
+ * vorbelegt, überschreibt aber keinen getippten Titel.
  *
- * Die Kategorie hat KEINE Vorbelegung: ein Foto, das als „Sonstiges" durchrutscht, findet
- * später niemand über den Filter. Der Titel wird aus dem Dateinamen vorbelegt, aber nur, wenn
- * er noch leer ist — einen getippten Titel überschreibt die Dateiwahl nicht.
- *
- * `mutateAsync`: eine Ablehnung (Dateityp, fremdes Bezugsziel → 400) muss die Felder stehen
- * lassen; die Hülle erkennt das an der abgelehnten Zusage. Der Fehlertext steht als
- * `SpeicherFehler` IM Dialog (LFH-345 · H14) — ein Toast wäre nach drei Sekunden weg, und
- * der gefüllte Dialog sähe danach aus wie „gleich fertig".
- *
- * Die ETB-Einträge lädt der Dialog erst, wenn der Bezug aufgeklappt ist: das Tagebuch ist
- * die längste Liste des Einsatzes, und die meisten Ablagen haben keinen Bezug.
+ * `mutateAsync`, damit eine Ablehnung die Felder stehen lässt; der Fehler steht als
+ * `SpeicherFehler` im Dialog. Die ETB-Einträge lädt der Dialog erst beim Aufklappen des Bezugs.
  */
 export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }: Props) {
   const { message } = App.useApp();

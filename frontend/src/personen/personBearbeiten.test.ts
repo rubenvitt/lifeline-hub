@@ -61,11 +61,11 @@ describe('bearbeitenWerteAus / bearbeitenZuPatch (LFH-613)', () => {
 
 describe('verortenLinkStil', () => {
   it('trägt beide Angaben des handgebauten Bedienziels und folgt der Dichtestufe', () => {
-    // Literale Böden (LFH-365): kompakt 30, Handschuh 72.
+    // Literale Böden: kompakt 30, Handschuh 72.
     expect(verortenLinkStil({ controlHeight: 30, paddingSM: 12 }, '#164f86')).toMatchObject({
       minHeight: 30,
       paddingInline: 12,
-      // Die übergebene Textrolle, nicht antds `colorLink` (LFH-650).
+      // Die übergebene Textrolle, nicht antds `colorLink`.
       color: '#164f86',
     });
     expect(verortenLinkStil({ controlHeight: 72, paddingSM: 12 }, '#164f86').minHeight).toBe(72);

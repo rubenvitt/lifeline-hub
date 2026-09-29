@@ -56,10 +56,9 @@ function Maske({ feld }: { feld?: string }) {
 
 describe('Einstiegsfokus', () => {
   it('setzt den Fokus in das benannte Abschnittsfeld', () => {
-    // Die tragende Mechanik-Aussage: `form.getFieldInstance` liefert die Ref des Kindes,
-    // und `MarkdownEditor` reicht sie per `forwardRef` an antds `Input.TextArea` durch. Im
-    // Repo gab es für diesen Weg vorher keinen Konsumenten — ohne den Test wäre die
-    // Annahme „das Feld nimmt einen `focus()` an" ungeprüft.
+    // `form.getFieldInstance` liefert die Ref des Kindes, und `MarkdownEditor` reicht sie per
+    // `forwardRef` an antds `Input.TextArea` durch — ohne den Test wäre „das Feld nimmt `focus()`
+    // an" ungeprüft.
     render(<Maske feld="eigene_lage" />);
     expect(screen.getByLabelText('Eigene Lage')).toHaveFocus();
   });
@@ -70,10 +69,9 @@ describe('Einstiegsfokus', () => {
   });
 
   it('STIEHLT keinen Fokus, der schon woanders liegt', async () => {
-    // Beide Seiten zeigen bis zum Eintreffen der Daten einen `<Spin>`; das Formular — und
-    // damit dieser Effekt — entsteht also Runden nach dem Seitenaufbau. Wer in dieser Zeit
-    // die Kopfzeile anfasst, darf nicht aus seinem Ziel gerissen werden. Der Schalter
-    // bildet genau diese Abfolge nach: erst Fokus, dann hängt das Formular ein.
+    // Beide Seiten zeigen bis zum Eintreffen der Daten einen `<Spin>`; wer in der Zeit die
+    // Kopfzeile anfasst, darf nicht aus seinem Ziel gerissen werden. Erst Fokus, dann hängt das
+    // Formular ein.
     function Spaet() {
       const [da, setDa] = useState(false);
       return (
@@ -93,12 +91,9 @@ describe('Einstiegsfokus', () => {
   });
 
   it('friert das Ziel am Mount ein — eine neue Prop holt den Fokus NICHT zurück', () => {
-    // Sonst spränge der Fokus weiter, sobald der erste Autosave den Serverstand ändert: der
-    // eben befüllte Abschnitt ist dann nicht mehr der erste leere.
-    //
-    // GEMESSEN: der Fokus muss dafür ZWISCHENDURCH auf `<body>` fallen (jemand hat sein
-    // Feld verlassen). Bleibt er im Feld, deckt schon der Diebstahl-Riegel den Fall ab —
-    // ein Test ohne dieses `blur()` bleibt auch OHNE das Einfrieren grün und belegt nichts.
+    // Sonst spränge der Fokus weiter, sobald der erste Autosave den Serverstand ändert. Der Fokus
+    // muss dafür zwischendurch auf `<body>` fallen — bleibt er im Feld, deckt schon der
+    // Diebstahl-Riegel den Fall, und der Test belegte das Einfrieren nicht.
     const { rerender } = render(<Maske feld="auftrag" />);
     const auftrag = screen.getByLabelText('Auftrag');
     expect(auftrag).toHaveFocus();

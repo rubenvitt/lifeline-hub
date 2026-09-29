@@ -1,0 +1,4 @@
+{
+  "ergebnis": "{\"host\":\"localhost\",\"create\":{\"ok\":false,\"name\":\"NotAllowedError\",\"msg\":\"The document is not focused.\"},\"createMs\":2,\"get\":{\"ok\":false,\"name\":\"NotAllowedError\",\"msg\":\"The document is not focused.\"},\"getMs\":0}",
+  "name": "p1"
+}

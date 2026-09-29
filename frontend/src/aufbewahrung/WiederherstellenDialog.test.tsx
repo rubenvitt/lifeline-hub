@@ -12,7 +12,7 @@ import WiederherstellenDialog from './WiederherstellenDialog';
 
 dayjs.extend(customParseFormat);
 
-/** Wiederherstellen-Dialog (LFH-23, tasks.md 6.10). */
+/** Wiederherstellen-Dialog. */
 
 const GRUND = 'Die Karenz ist abgelaufen — eine Wiederherstellung ist nicht mehr möglich';
 let gesendet: Record<string, unknown>[];

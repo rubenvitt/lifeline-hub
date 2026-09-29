@@ -11,43 +11,24 @@ import { formatKoordinate } from './koordinate';
 import { loeseBefehl, loeseUhsAuf, parsePersonBefehl, type BefehlTeil } from './personBefehl';
 
 /**
- * Die Betroffenen-Schnellerfassungszeile (Neuentwurf S7 „Das Formular wird zur Zeile").
+ * Die Betroffenen-Schnellerfassungszeile: EINE Eingabe, die per Kürzel parst
+ * (`personen/personBefehl.ts`), etwa „Kowalski, Anna w 34 sk3 @Weserstadion #52.2691/9.1342".
+ * Erkannte Teile stehen darunter als Marken, die Sichtung als `SichtungsTag`. Enter erfasst,
+ * das Feld leert sich, der Fokus bleibt, rechts steht die Quittung „Zuletzt: …".
  *
- * EINE Eingabe, die per Kürzel parst (`personen/personBefehl.ts`): „Kowalski, Anna w 34
- * sk3 @Weserstadion #52.2691/9.1342". Erkannte Teile stehen darunter als Marken — die Sichtung als
- * `SichtungsTag` (BBK-Kennzeichnung, LFH-455), nie als Designfarbe. Enter erfasst, das Feld
- * leert sich, der Fokus bleibt, die Quittung „Zuletzt: …" steht rechts daneben.
- *
- * ── WARUM NICHT `ErfassungsFormular` ────────────────────────────────────────────────────
- *
- * Die Erfassungs-Norm verlangt für MASKEN die Hülle aus `components/Erfassung.tsx`. Geprüft
- * und verworfen, an drei Stellen gemessen:
- *  1. Die Hülle rendert ihre Aktionsreihe SELBST — Trennlinie, „Erfassen"-Knopf, im
- *     Serienmodus Zähler und „Speichern und nächste". Unter einer Kommandozeile stünde
- *     damit eine zweite Knopfreihe; abschaltbar ist sie nicht.
- *  2. Sie fokussiert ihr erstes Feld beim MONTIEREN. Hier steht die Zeile dauerhaft über
- *     einer Liste: jeder Besuch der Seite zöge den Fokus aus der Liste — und am Handschirm
- *     die Bildschirmtastatur auf.
- *  3. Enter ohne Serienmodus leert UND ruft `onFertig` (schließen); die Zeile ist immer
- *     Serie. Das Serien-Kürzel Strg+Enter wäre hier ein zweiter Weg zum selben Ziel.
- *
- * Die Bauform folgt deshalb `components/SchnellAnlegen.tsx` — das Primitiv, das CLAUDE.md
- * für Ein-Feld-Erfassung nennt, und das aus demselben Grund KEIN `<form>` trägt (ein
- * verschachteltes Formular lädt beim Absenden die Seite neu). Dessen Hülle (Label über
- * dem Feld, `Space.Compact`) passt nicht in die Instrumenten-Zeile; übernommen sind seine
- * VIER Zusicherungen, jede mit Test:
- *  · Enter im Feld und der Knopf gehen durch DIESELBE Funktion, mit Riegel gegen doppeltes
- *    Absenden (`sendetRef` — ein gehaltenes Enter erreicht einen `loading`-Knopf nie).
- *  · `onErfassen` MUSS bei Ablehnung ablehnen; dann bleibt der Wortlaut stehen und der
- *    Fehler (400/422 mit Wortlaut des Servers) steht an der Zeile, nicht in einem Toast.
- *  · Geleert wird nur, wenn im Feld noch der abgeschickte Text steht — wer weitertippt,
- *    während der vorige Datensatz unterwegs ist, verliert nichts.
+ * Nicht `ErfassungsFormular`: die Hülle rendert eine eigene Aktionsreihe (unter einer
+ * Kommandozeile eine zweite Knopfreihe), fokussiert beim MONTIEREN (die Zeile steht dauerhaft
+ * über der Liste; am Handschirm ginge jedes Mal die Tastatur auf) und schließt ohne
+ * Serienmodus. Die Bauform folgt `components/SchnellAnlegen.tsx` (kein `<form>`) mit dessen
+ * vier Zusicherungen, jede getestet:
+ *  · Enter und Knopf gehen durch DIESELBE Funktion, mit Riegel `sendetRef`.
+ *  · `onErfassen` MUSS bei Ablehnung ablehnen; dann bleibt der Wortlaut und der Fehler steht an
+ *    der Zeile, nicht in einem Toast.
+ *  · Geleert wird nur, wenn noch der abgeschickte Text im Feld steht.
  *  · Der Fokus kehrt im nächsten Bild ins Feld zurück.
  *
- * Die Anlage selbst läuft über die OFFLINEFÄHIGE Mutation der Seite
- * (`erfassePersonOfflineFaehig`: `client_id`, Sichtung, `uhs_id` und Koordinate im SELBEN
- * POST). Die
- * Zeile kennt keinen Transport.
+ * Die Anlage läuft über die offlinefähige Mutation der Seite (`client_id`, Sichtung, `uhs_id`
+ * und Koordinate im SELBEN POST).
  */
 
 interface BetroffeneZeileProps {
@@ -151,12 +132,10 @@ export default function BetroffeneZeile({
   }
 
   const leer = befehl.leer;
-  // Kürzel-Hinweis und „erkannt: …" liegen GESTAPELT in derselben Rasterzelle (LFH-650):
-  // der Hinweis bleibt beim Tippen im Baum und wird nur unsichtbar, die Zeile behält also
-  // seine Höhe. Vorher wich er der kürzeren Erkennungszeile, und bei 390 px sprang der Inhalt
-  // darunter mit dem ersten Zeichen gemessen 40 px nach oben (`e2e/betroffene-layout.spec.ts`).
-  // `visibility: hidden` nimmt ihn zugleich aus der Beschreibung des Feldes
-  // (`aria-describedby`): unsichtbarer Text zählt für den Beschreibungstext nicht.
+  // Kürzel-Hinweis und „erkannt: …" liegen GESTAPELT in derselben Rasterzelle: der Hinweis bleibt
+  // im Baum und wird nur unsichtbar, die Zeile behält also ihre Höhe (sonst sprang bei 390 px
+  // der Inhalt darunter beim ersten Zeichen). `visibility: hidden` nimmt ihn zugleich aus
+  // `aria-describedby`.
   const stapel = { gridArea: '1 / 1' } as const;
   const hinweiszeile = (
     <>
@@ -178,7 +157,7 @@ export default function BetroffeneZeile({
           </span>
           <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
           <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
-          {/* Wortlaut des Entwurfs (S7); das Format zeigt der Platzhalter nicht, also hier. */}
+          {/* Das Format zeigt der Platzhalter nicht, also hier. */}
           <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
           <span style={{ color: rollen.gedaempft }}>@UHS</span>
         </span>
@@ -233,8 +212,8 @@ export default function BetroffeneZeile({
         aria-describedby={hinweisId}
         placeholder="Kowalski, Anna w 34 sk3"
         enterKeyHint="send"
-        // Füllt die Zeile neben dem Knopf; ohne `minWidth: 0` schrumpfte ein Flex-Kind
-        // nicht unter seine Inhaltsbreite und drückte am Handschirm den Knopf hinaus.
+        // Ohne `minWidth: 0` schrumpfte das Flex-Kind nicht unter seine Inhaltsbreite und drückte am
+        // Handschirm den Knopf hinaus.
         style={{ flex: '1 1 auto', minWidth: 0 }}
         autoComplete="off"
         spellCheck={false}

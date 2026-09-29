@@ -2,10 +2,9 @@ import type { Meldung } from '../api/types';
 import { MELDUNG_STATUS, istAbgeschlossen } from '../kommunikation';
 
 /**
- * Alarmzustand einer Meldung — dieselbe Regel, die `MeldungKarte` für ihren roten Rand
- * fährt: eine bestätigungspflichtige, noch unbestätigte Sofortmeldung, deren Frist
- * abgelaufen oder die eskaliert ist. Rein, damit Karte und Kennzahl nicht zwei Regeln
- * haben.
+ * Alarmzustand einer Meldung — dieselbe Regel wie der rote Rand von `MeldungKarte`:
+ * bestätigungspflichtige, unbestätigte Sofortmeldung, deren Frist abgelaufen oder die eskaliert
+ * ist. Rein, damit Karte und Kennzahl eine Regel haben.
  */
 export function istAlarmiert(m: Meldung): boolean {
   return !!(m.bestaetigung_pflicht && !m.ist_bestaetigt && (m.ist_ueberfaellig || m.eskaliert));

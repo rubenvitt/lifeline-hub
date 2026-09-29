@@ -1,4 +1,3 @@
-// src/etb/SlashMenu.test.tsx
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
@@ -151,18 +150,13 @@ describe('SlashMenu', () => {
 });
 
 /**
- * Die Zeilen des Menüs folgen der Dichte (LFH-365 · B5e). Sie trugen `padding: '6px 12px'`
- * und keine Höhe — im Handschuh-Betrieb also grob 16 px plus Zeilenbox gegen einen Boden
- * von 72 px, während jedes antd-Steuerelement daneben mitzog.
+ * Die Zeilen des Menüs folgen der Dichte (LFH-365).
  *
- * WAS DIESE DATEI BELEGT UND WAS NICHT: geprüft wird der INLINE-STYLE, also die Absicht.
- * Die tatsächlich gerenderte Zeilenhöhe (Polsterung plus Zeilenbox der Schrift) rechnet
- * jsdom nicht aus; wer sie belegen will, braucht Playwright mit `boundingBox()`. Wer hier
- * mehr hineinliest, liest falsch.
+ * Geprüft wird der INLINE-STYLE, also die Absicht. Die gerenderte Zeilenhöhe rechnet jsdom
+ * nicht aus; wer sie belegen will, braucht Playwright mit `boundingBox()`.
  *
  * NICHT `renderMitProviders`: `test/utils.tsx` mountet ein nacktes `ConfigProvider` ohne
- * Theme. Jeder Token wäre dort eine antd-Vorgabe und die Zusicherung eine Attrappe.
- * Schablone ist `components/Liste.test.tsx:139-161`.
+ * Theme, jeder Token wäre dort eine antd-Vorgabe. Schablone ist `components/Liste.test.tsx`.
  */
 function masse(dichte: Dichte) {
   const { container, unmount } = render(
@@ -196,14 +190,10 @@ describe('SlashMenu — die Zeilen folgen der Dichte (LFH-365 · B5e)', () => {
   });
 
   /**
-   * Dasselbe für die HÖHE — und diese Zeile ist nicht überflüssig neben dem Boden-Fall
-   * unten, sondern erst zusammen mit ihm beweiskräftig.
-   *
-   * Gemessen: ein dichteblindes `minHeight: 72` passiert alle Boden-Zusicherungen, weil
-   * 72 jeden der drei Böden erfüllt. Eine Schranke bleibt eine Schranke; sie kann nicht
-   * belegen, dass der Wert aus der Stufe kommt. Genau diese Wertklasse — eine feste Zahl,
-   * die zufällig konform ist — ist die, für deren Abbau B5e existiert: in der kompakten
-   * Fükw-Stufe wären das 72 px pro Menüzeile statt 30.
+   * Dasselbe für die HÖHE — erst zusammen mit dem Boden-Fall unten beweiskräftig: ein
+   * dichteblindes `minHeight: 72` erfüllte jeden der drei Böden. Eine Schranke kann nicht
+   * belegen, dass der Wert aus der Stufe kommt; in der kompakten Stufe wären das 72 px pro
+   * Menüzeile statt 30.
    */
   it('zieht die Höhe bei einer Dichteumschaltung mit', () => {
     expect(masse('handschuh').minHeight).not.toBe(masse('kompakt').minHeight);
@@ -222,11 +212,9 @@ describe('SlashMenu — die Zeilen folgen der Dichte (LFH-365 · B5e)', () => {
   });
 
   /**
-   * Der Sektionskopf („Felder" / „Bausteine") zieht die Polsterung mit, bekommt aber
-   * bewusst KEINE Mindesthöhe: er ist eine Beschriftung, keine Bedienfläche. Das ist
-   * dieselbe Trennlinie, die der Dichte-Guard zwischen interaktiven Elementen und
-   * Flächen wie `Card`/`Descriptions` zieht — eine Trefffläche für etwas, das niemand
-   * antippt, vergrößert nur das Menü.
+   * Der Sektionskopf („Felder" / „Bausteine") zieht die Polsterung mit, bekommt aber bewusst
+   * KEINE Mindesthöhe: er ist eine Beschriftung, keine Bedienfläche (dieselbe Trennlinie wie im
+   * Dichte-Guard bei `Card`/`Descriptions`).
    */
   it('zieht den Sektionskopf mit, ohne ihm eine Trefffläche zu geben', () => {
     expect(masse('handschuh').kopfPadding).not.toBe(masse('kompakt').kopfPadding);

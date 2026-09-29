@@ -7,21 +7,12 @@ import { AUFTRAG_STATUS, istAbgeschlossen } from '../kommunikation';
 import AuftragKarte from './AuftragKarte';
 
 /**
- * Lese-Vorschau eines Auftrags in der Sprungpalette (LFH-664, Design Entscheidung 5).
+ * Lese-Vorschau eines Auftrags in der Sprungpalette: DIE Karte der Auftragsseite. Ohne
+ * `darfSchreiben` und Callbacks rendert sie keine Aktion (die Zeile „Quittung offen:" bleibt
+ * samt Namen, nur der Knopf fehlt). Das Befehlsschema bleibt wie auf der Seite eingeklappt.
  *
- * Kein eigener Lese-Inhalt, sondern DIE Karte der Auftragsseite — gleicher Datensatz, gleiche
- * Gestalt. Ohne `darfSchreiben` und ohne Callbacks rendert sie keine Aktion: kein
- * „quittieren" (die Zeile „Quittung offen:" bleibt samt Namen stehen, nur der Knopf fehlt),
- * kein „In Bearbeitung", „Vollzug melden" oder „Abnehmen". Belegt in `AuftragVorschau.test.tsx`.
- *
- * Das Befehlsschema bleibt hinter „Befehlsdetails" eingeklappt, wie auf der Seite: das
- * Aufklappen ändert keinen Datensatz, und eine eigene Prop für eine offene Vorschau wäre ein
- * Unterschied zwischen zwei Darstellungen desselben Auftrags ohne Not.
- *
- * `einsatzId` geht mit, obwohl die Karte sie als optional führt — ohne sie fiele der
- * Rückverweis „↗ ETB-Eintrag" still weg. Die `ansicht` folgt dem Datensatz, wie die Seite sie
- * wählt (`AuftraegeListe`): ein abgeschlossener Auftrag zeigt Vollzug, Abnahme und Vermerk.
- *
+ * `einsatzId` geht mit, sonst fiele der Rückverweis „↗ ETB-Eintrag" still weg. Die `ansicht`
+ * folgt dem Datensatz wie auf der Seite.
  * Daten aus dem Listenfach der Palette ({@link datensatzAbfrage}), per `select` auf die `id`.
  */
 export default function AuftragVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {

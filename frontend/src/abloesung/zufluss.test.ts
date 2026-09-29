@@ -101,9 +101,8 @@ describe('eingefrorene Folge — eine fremde Änderung der Fälligkeit ordnet ni
   });
 
   it('bei GLEICHER eingefrorener Fälligkeit entscheidet die Id wie beim Server, nicht dessen neue Folge', () => {
-    // Im Browser gemessen: in derselben Sekunde begonnene Schichten tragen dieselbe Fälligkeit.
-    // Ein stabiles Sortieren nach dem Schlüssel allein fiele bei Gleichstand auf die NEUE
-    // Server-Folge zurück und ließe die fremd vorgezogene Karte doch springen.
+    // In derselben Sekunde begonnene Schichten tragen dieselbe Fälligkeit; nach dem Schlüssel allein
+    // fiele ein stabiles Sortieren auf die NEUE Server-Folge zurück und die Karte spränge doch.
     const gleich = stand([1, 2, 3]);
     const r = teileZufluss([schicht(2, '2026-09-22 12:20:00'), schicht(1), schicht(3)], gleich);
     expect(ids(r.sichtbar)).toEqual([1, 2, 3]);
@@ -213,8 +212,7 @@ describe('zuflussText', () => {
   it('Einzahl, Mehrzahl und fällige Zurückgehaltene', () => {
     expect(zuflussText([schicht(1)], jetzt)).toBe('1 neue Schicht');
     expect(zuflussText([schicht(1), schicht(2)], jetzt)).toBe('2 neue Schichten');
-    // Eine zurückgehaltene fällige Schicht darf nicht still hinter dem Banner warten
-    // (Prüfliste Kriterium 9): das Banner nennt sie.
+    // Eine zurückgehaltene fällige Schicht darf nicht still hinter dem Banner warten.
     expect(zuflussText([schicht(1, '2026-09-22 11:50:00'), schicht(2)], jetzt)).toBe(
       '2 neue Schichten, davon 1 fällig',
     );
@@ -247,7 +245,7 @@ describe('zuflussText', () => {
     expect(zuflussText([schicht(9)], jetzt, [schicht(1), schicht(2)])).toBe(
       '1 neue Schicht · Reihenfolge geändert',
     );
-    // Ohne Umordnung bleibt der Wortlaut aus LFH-647 byte-gleich.
+    // Ohne Umordnung bleibt der Wortlaut unverändert.
     expect(zuflussText([schicht(9)], jetzt, null)).toBe('1 neue Schicht');
   });
 });

@@ -35,8 +35,8 @@ export default function EtbBausteinFormModal({
   const qc = useQueryClient();
   const { message } = App.useApp();
 
-  // VORBELEGUNG, kein Zurücksetzen — Begründung in `FahrzeugFormModal` (LFH-346/A6).
-  // Die Vorgabewerte des Anlegen-Zweigs stehen jetzt als `initialValues` an der Hülle.
+  // VORBELEGUNG, kein Zurücksetzen — Begründung in `FahrzeugFormModal`. Die Vorgabewerte stehen
+  // als `initialValues` an der Hülle.
   useEffect(() => {
     if (!offen || !baustein) return;
     form.setFieldsValue({
@@ -61,7 +61,7 @@ export default function EtbBausteinFormModal({
       };
       return baustein ? aktualisiereBaustein(baustein.id, daten) : legeBausteinAn(daten);
     },
-    // Kein `onClose()` mehr: das Schliessen macht `onFertig`, das Leeren die Hülle.
+    // Kein `onClose()`: das Schließen macht `onFertig`, das Leeren die Hülle.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.etbBausteine() });
     },
@@ -76,19 +76,17 @@ export default function EtbBausteinFormModal({
       erfassenText="Speichern"
       laeuft={mutation.isPending}
       initialValues={{ typ: 'meldung', sortier: 0 }}
-      // `mutateAsync`: bei Ablehnung muss die Zusage brechen (LFH-332).
+      // `mutateAsync`: bei Ablehnung muss die Zusage brechen.
       //
-      // Der Formularspeicher statt der `onFinish`-Werte (LFH-346 · A8): ohne
-      // `forceRender` sind Meldeweg, Veranlassung und Sortierung nicht montiert, und
-      // `onFinish` liefert nur montierte Felder. `BausteinEingabe` ist Vollersatz —
-      // ein bearbeiteter Baustein verlöre seinen Meldeweg und seine Reihenfolge bei
-      // jedem Speichern, an dem niemand aufgeklappt hat. Ein Rückfall auf
-      // `baustein?.meldeweg` wäre die falsche Reparatur: er kann „nie montiert" nicht
-      // von „aufgeklappt und bewusst geleert" unterscheiden — und der Meldeweg-Select
-      // trägt `allowClear`, das Leeren ist also ein vorgesehener Weg.
+      // Der Formularspeicher statt der `onFinish`-Werte: ohne `forceRender` sind Meldeweg,
+      // Veranlassung und Sortierung nicht montiert, und `onFinish` liefert nur montierte Felder.
+      // `BausteinEingabe` ist Vollersatz — ein bearbeiteter Baustein verlöre Meldeweg und
+      // Reihenfolge bei jedem Speichern ohne Aufklappen. Ein Rückfall auf `baustein?.meldeweg` wäre
+      // die falsche Reparatur: er kann „nie montiert" nicht von „bewusst geleert" unterscheiden, und
+      // der Meldeweg-Select trägt `allowClear`.
       //
-      // Beachten: `getFieldsValue(true)` ist bei antd `any`-typisiert — die Feldnamen
-      // prüft nicht dieser Aufruf, sondern der Parametertyp von `mutationFn`.
+      // `getFieldsValue(true)` ist bei antd `any`-typisiert — die Feldnamen prüft der Parametertyp
+      // von `mutationFn`.
       onErfassen={() => mutation.mutateAsync(form.getFieldsValue(true))}
       onFertig={onClose}
       onAbbrechen={onClose}
@@ -118,14 +116,12 @@ export default function EtbBausteinFormModal({
       >
         <Input.TextArea rows={2} placeholder="Vorlagentext mit {platzhalter}" />
       </Form.Item>
-      {/* FELDBUDGET (LFH-346 · A8, Befund N20): drei sichtbare Felder, drei eingeklappt.
-          Label, Typ und Inhalt sind die Pflichtwerte und bleiben oben; Meldeweg und
-          Veranlassung sind ausdrücklich optional, die Sortierung hat mit 0 einen
-          brauchbaren Vorgabewert — kein Pflichtfeld wandert (LFH-343 · H49).
+      {/* FELDBUDGET: drei sichtbare Felder, drei eingeklappt. Label, Typ und Inhalt sind die
+         Pflichtwerte und bleiben oben; Meldeweg und Veranlassung sind optional, die Sortierung hat
+         mit 0 einen brauchbaren Vorgabewert (LFH-343).
 
-          Bewusst OHNE `forceRender` (wie `AuftragFormular`) — sonst wäre „im
-          Ausgangszustand drei Felder" nicht prüfbar. Begründung und Gegenmittel am
-          `onErfassen` oben. */}
+         Bewusst OHNE `forceRender` (wie `AuftragFormular`) — sonst wäre „im Ausgangszustand drei
+         Felder" nicht prüfbar. Gegenmittel am `onErfassen` oben. */}
       <Collapse
         ghost
         style={{ marginInline: -8 }}

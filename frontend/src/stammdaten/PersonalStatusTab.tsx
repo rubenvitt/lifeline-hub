@@ -29,9 +29,8 @@ const spalten: TableColumnsType<PersonalStatus> = [
     dataIndex: 'label',
     key: 'label',
     /**
-     * Leitspalte: an ihr sucht ein Mensch den Status. Kein `defaultSortOrder` — die
-     * fachliche Reihenfolge ist `sortier` und kommt vom Server
-     * (`src/personal/status_repo.rs:42` — `ORDER BY sortier, id`); sie bleibt der
+     * Leitspalte: an ihr sucht ein Mensch den Status. Kein `defaultSortOrder` — die fachliche
+     * Reihenfolge ist `sortier` und kommt vom Server (`ORDER BY sortier, id`); sie bleibt der
      * Einstieg, das Alphabet ist ein Angebot.
      */
     sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
@@ -41,12 +40,10 @@ const spalten: TableColumnsType<PersonalStatus> = [
     dataIndex: 'kategorie',
     key: 'kategorie',
     /**
-     * Die Filterwerte kommen aus derselben Quelle wie die Anzeige (`theme/statusFarben`),
-     * damit eine neue Kategorie nicht an zwei Stellen nachgetragen werden muss. Der
-     * gefilterte Wert ist der DRAHTWERT (`nicht_verfuegbar`), der angezeigte Text sein
-     * Label — genau deshalb ist die Kategorie hier ein Filter und steht nicht im
-     * Suchplatzhalter: die Freitextsuche des Primitivs liest Rohwerte, „nicht verfügbar"
-     * fände dort nichts.
+     * Die Filterwerte kommen aus derselben Quelle wie die Anzeige (`theme/statusFarben`). Der
+     * gefilterte Wert ist der DRAHTWERT (`nicht_verfuegbar`), der angezeigte sein Label — deshalb
+     * ist die Kategorie ein Filter und steht nicht im Suchplatzhalter: die Freitextsuche liest
+     * Rohwerte, „nicht verfügbar" fände dort nichts.
      */
     filters: kategorien.map((k) => ({ text: statusKategorie[k].label, value: k })),
     onFilter: (wert, s) => s.kategorie === wert,

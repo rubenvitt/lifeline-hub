@@ -11,16 +11,12 @@ import LageberichtText from './LageberichtText';
 import { vorlage } from './vorlagen';
 
 /**
- * Lese-Vorschau eines Lageberichts in der Sprungpalette (LFH-664).
+ * Lese-Vorschau eines Lageberichts in der Sprungpalette.
  *
- * Quelle ist die Lageberichtsliste — das Fach der Palette, live über den SSE-Fan-out. Sie
- * trägt die Abschnittstexte (`src/lagebericht/repo.rs:liste` liest dasselbe `SELECT` samt
- * `abschnitte` wie `laden`), ein Einzel-GET wäre ein zweites Fach für dieselben Bytes.
- *
- * Der Titel steht schon im Kopf der Palette und wird nicht wiederholt. Status, Vorlage und
- * Fassung wie im Seitenkopf der Detailseite, dazu Zeitstand, Ersteller und — nur wenn
- * freigegeben — die Freigabe; darunter der Berichtstext aus demselben Bauteil wie der
- * Lesezweig der Seite.
+ * Quelle ist die Lageberichtsliste (das Fach der Palette); sie trägt die Abschnittstexte, ein
+ * Einzel-GET wäre ein zweites Fach für dieselben Bytes. Der Titel steht schon im Kopf der
+ * Palette. Darunter Status, Vorlage, Fassung, Zeitstand, Ersteller, ggf. Freigabe und der
+ * Berichtstext aus demselben Bauteil wie der Lesezweig der Seite.
  */
 export default function LageberichtVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {
   const select = useCallback((liste: LageberichtAnzeige[]) => liste.find((b) => b.id === id), [id]);

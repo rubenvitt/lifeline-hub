@@ -8,12 +8,10 @@ import type { EtbZeile } from './etbZeile';
 type EtbTypZaehler = EtbZaehler['je_typ'];
 
 /**
- * Reine Ableitungen der ETB-Zeitachse (Neuentwurf S4, 21.09.2026) — ohne Darstellung,
- * ohne Hook, ohne Render prüfbar.
+ * Reine Ableitungen der ETB-Zeitachse — ohne Darstellung, ohne Hook, ohne Render prüfbar.
  *
- * Der Dateiname trägt das Suffix `Modell`: `EtbZeitachse.tsx` liegt daneben, und ein
- * gleichlautender Basename schattete unter Vite (`.ts` vor `.tsx`) still die Komponente
- * (CLAUDE.md, `direkteinstiegKern`).
+ * Das Suffix `Modell` ist Pflicht: `EtbZeitachse.tsx` liegt daneben, und ein gleichlautender
+ * Basename schattete unter Vite (`.ts` vor `.tsx`) still die Komponente.
  */
 
 // ── Stundengruppen ──────────────────────────────────────────────────────────────────
@@ -38,19 +36,15 @@ export function stundenEtikett(schluessel: string): string {
 
 /**
  * Ein Kopf je angefangener Stunde, Tag UND Stunde im Schlüssel — sonst fielen „gestern
- * 14 Uhr" und „heute 14 Uhr" zusammen, und ein Tagebuch über Mitternacht ist der
- * Normalfall.
+ * 14 Uhr" und „heute 14 Uhr" zusammen.
  *
  * Der Schlüssel entsteht in der ANZEIGEZONE (`stundeVon`, vom Aufrufer aus den
- * Anzeigekonventionen gebaut). Die Vorgängerin schnitt ihn aus dem UTC-Wirestring und
- * beschriftete ihn als Ortsstunde: die Köpfe standen um den Zonenversatz neben den
- * Uhrzeiten darunter.
+ * Anzeigekonventionen gebaut); aus dem UTC-Wirestring geschnitten stünden die Köpfe um den
+ * Zonenversatz neben den Uhrzeiten darunter.
  *
- * Gruppen erscheinen in Antreffreihenfolge — die ist die Serverordnung (neueste zuerst).
- * Eine Zeile, deren Stunde schon einmal vorkam, aber nicht direkt davor, eröffnet
- * bewusst eine NEUE Gruppe statt in die alte zurückzuspringen: die Reihenfolge der
- * Beweiskette gewinnt gegen die Gruppierung (ein Nachtrag mit alter Ereigniszeit steht
- * dort, wo der Server ihn einordnet).
+ * Gruppen erscheinen in Antreffreihenfolge (Serverordnung, neueste zuerst). Eine Zeile, deren
+ * Stunde schon einmal vorkam, aber nicht direkt davor, eröffnet bewusst eine NEUE Gruppe: die
+ * Reihenfolge der Beweiskette gewinnt gegen die Gruppierung.
  */
 export function gruppiereNachStunde(
   zeilen: readonly EtbZeile[],
@@ -86,10 +80,10 @@ interface Berichtigungsindex {
 /**
  * Beide Richtungen der Verknüpfung „berichtigt Nr. n" ↔ „berichtigt durch Nr. m".
  *
- * Die Richtung Berichtigung → Grundeintrag steht im Eintrag selbst
- * (`berichtigt_eintrag_id`) und gilt deshalb auch, wenn der Grundeintrag auf einer noch
- * nicht geladenen Seite liegt — nur seine laufende Nummer fehlt dann (`lfd_nr: null`),
- * und der Aufrufer darf sie nicht erfinden. Die Gegenrichtung kennt nur, was geladen ist.
+ * Die Richtung Berichtigung → Grundeintrag steht im Eintrag selbst (`berichtigt_eintrag_id`)
+ * und gilt auch, wenn der Grundeintrag noch nicht geladen ist — dann fehlt nur seine Nummer
+ * (`lfd_nr: null`), und der Aufrufer darf sie nicht erfinden. Die Gegenrichtung kennt nur,
+ * was geladen ist.
  */
 export function berichtigungsindex(eintraege: readonly EtbEintragAnzeige[]): Berichtigungsindex {
   const lfdNrVonId = new Map(eintraege.map((e) => [e.id, e.lfd_nr]));
@@ -149,10 +143,9 @@ export function typBilanz(jeTyp: EtbTypZaehler): BilanzZeile[] {
 }
 
 /**
- * Seitenkopf-Meta: die exakte Zahl vom Server (LFH-612) — „n Einträge" für das ganze
- * Tagebuch, „n Treffer" unter einem Filter. Ohne Zählung (lädt, gescheitert) steht dort
- * NICHTS: eine Zahl aus dem geladenen Fenster behauptete eine Vollständigkeit, die es nicht
- * gibt.
+ * Seitenkopf-Meta: die exakte Zahl vom Server (LFH-612) — „n Einträge" ohne, „n Treffer" unter
+ * einem Filter. Ohne Zählung (lädt, gescheitert) steht NICHTS: eine Zahl aus dem geladenen
+ * Fenster behauptete eine Vollständigkeit, die es nicht gibt.
  */
 export function kopfMeta(args: {
   gesamt: number | undefined;
@@ -191,10 +184,9 @@ export function pufferZustand(
 export type TypSegment = EtbTyp | 'alle';
 
 /**
- * Die Segmente der Typleiste. `system` hat kein eigenes Segment (Entwurf S4: Alle ·
- * Meldung · Anordnung · Entscheidung · Lage · Berichtigung) — System-Einträge stehen
- * unter „Alle". Steht `typ=system` trotzdem in der URL (Deeplink, Hand), bekommt die
- * Leiste das Segment dazu: sonst zeigte sie „Alle" gewählt über einer gefilterten Liste.
+ * Die Segmente der Typleiste. `system` hat kein eigenes Segment — System-Einträge stehen unter
+ * „Alle". Steht `typ=system` trotzdem in der URL, bekommt die Leiste das Segment dazu: sonst
+ * zeigte sie „Alle" gewählt über einer gefilterten Liste.
  */
 export function typSegmente(aktiv: EtbTyp | undefined): TypSegment[] {
   const basis: TypSegment[] = [
@@ -218,12 +210,10 @@ export function filterMitTyp(filter: EtbFilterWerte, segment: TypSegment): EtbFi
 /**
  * Führt eine Teiländerung in den bestehenden Filter und wirft leere Werte heraus.
  *
- * Der Grund für die Funktion ist ein Wettlauf über eine Komponentengrenze: die
- * Filterleiste meldet ihre Suche entprellt (300 ms), die Typleiste sofort. Meldete die
- * Leiste den GANZEN Filter aus ihrer eigenen Kopie, überschriebe ein Nachläufer der
- * Suchfrist den eben gewählten Typ. Sie meldet deshalb nur ihre eigenen Schlüssel, und
- * zusammengeführt wird hier — gegen den AKTUELLEN Stand, nicht gegen den, den eine
- * Schließung beim Start der Frist gesehen hat.
+ * Grund ist ein Wettlauf über eine Komponentengrenze: die Filterleiste meldet ihre Suche
+ * entprellt, die Typleiste sofort. Meldete die Leiste den GANZEN Filter aus ihrer eigenen
+ * Kopie, überschriebe ein Nachläufer der Suchfrist den eben gewählten Typ. Sie meldet deshalb
+ * nur ihre eigenen Schlüssel, zusammengeführt wird hier gegen den AKTUELLEN Stand.
  */
 export function filterZusammenfuehren(
   aktuell: EtbFilterWerte,
@@ -251,21 +241,19 @@ export interface Einfrierstand {
 
 /**
  * Live-Zufluss, der nicht unter dem Cursor springt (Bedien-Leitlinie Festlegung 6,
- * WCAG 3.2.5): solange die Zeitachse eingefroren ist, bleiben NEUE fremde Einträge — über
- * der Wassermarke — zurück und werden gezählt. Alles andere steht sofort:
+ * WCAG 3.2.5): solange die Zeitachse eingefroren ist, bleiben NEUE fremde Einträge — über der
+ * Wassermarke — zurück und werden gezählt. Alles andere steht sofort:
  *
- * - **Ältere** (unter der Wassermarke): eine nachgeladene Seite, etwa weil der Deeplink
- *   `?eintrag=` einen Grundeintrag sucht. Die Vorgängerin hielt jede Zeile außerhalb des
- *   Einfrier-Satzes zurück — das Banner meldete die alten Einträge als „neu", und der
- *   Sprung fand seine Zeile nicht (Review 22.09.2026, Befund A).
- * - **Eigene** (`erfasser_id` = angemeldete Person): der eben gesendete Eintrag wechselt
- *   den Schlüssel (`ausstehend-<queueId>` → `eintrag-<dbId>`); zurückgehalten wäre er in
- *   diesem Moment nirgends zu sehen — der teuerste Fehlermodus (Befund B).
+ * - **Ältere** (unter der Wassermarke): eine nachgeladene Seite, etwa für den Deeplink
+ *   `?eintrag=`. Zurückgehalten meldete das Banner sie als „neu", und der Sprung fände seine
+ *   Zeile nicht.
+ * - **Eigene** (`erfasser_id` = angemeldete Person): der eben gesendete Eintrag wechselt den
+ *   Schlüssel (`ausstehend-<queueId>` → `eintrag-<dbId>`); zurückgehalten wäre er in diesem
+ *   Moment nirgends zu sehen.
  * - **Gepufferte**: sie sind die eigenen, noch nicht gesendeten.
  *
- * Entfallene fallen sofort weg (eine nicht mehr vorhandene Zeile kann man nicht zeigen).
- * Die Reihenfolge bleibt die frische: neue Einträge kommen oben an, die gezeigten
- * behalten ihre relative Folge, also wandert unter dem Cursor nichts.
+ * Entfallene fallen sofort weg. Die Reihenfolge bleibt die frische: neue Einträge kommen oben
+ * an, die gezeigten behalten ihre relative Folge, also wandert unter dem Cursor nichts.
  */
 export function teileZufluss(
   zeilen: readonly EtbZeile[],
@@ -311,20 +299,19 @@ export function zuflussText(anzahl: number): string {
 
 /**
  * Ein Textverweis (↗) in der Hinweiszeile ist ein handgebautes Bedienziel: ein `<a>` erbt
- * keine Steuerhöhe (LFH-396, gemessen 17 px in jeder Stufe). Er bekommt deshalb den Boden
- * aus `controlHeight` (30 / 48 / 72) — `inline-flex`, damit er im Fließtext der Zeile
- * bleibt. Rein und exportiert nach dem Muster von `bedienzielStil`.
+ * keine Steuerhöhe (LFH-396). Er bekommt deshalb den Boden aus `controlHeight` —
+ * `inline-flex`, damit er im Fließtext bleibt. Rein und exportiert wie `bedienzielStil`.
  */
 export function verweisStil(token: { controlHeight: number }): CSSProperties {
   return { display: 'inline-flex', alignItems: 'center', minHeight: token.controlHeight };
 }
 
 /**
- * Trägt der Eintrag einen gekoppelten Verweis — rückwärts (Befehl, Lagebericht, Auftrag,
- * der ihn erzeugt hat) oder vorwärts (Folgeaufträge, LFH-636)? EINE Stelle für die Frage,
- * weil `EtbZeitachse` den Verweisblock nur bei `true` einhängt und `EtbBacklinkBadges` sonst
- * nichts rendert: zwei getrennt gepflegte Bedingungen liessen die Folgeaufträge einer
- * Entscheidung ohne Rückverweis still aus der Zeitachse fallen (so gemessen beim Bau).
+ * Trägt der Eintrag einen gekoppelten Verweis — rückwärts (Befehl, Lagebericht, Auftrag, der
+ * ihn erzeugt hat) oder vorwärts (Folgeaufträge, LFH-636)? EINE Stelle für die Frage, weil
+ * `EtbZeitachse` den Verweisblock nur bei `true` einhängt und `EtbBacklinkBadges` sonst nichts
+ * rendert: zwei getrennt gepflegte Bedingungen ließen Folgeaufträge ohne Rückverweis still
+ * aus der Zeitachse fallen.
  */
 export function hatVerknuepfung(
   e: Pick<EtbEintragAnzeige, 'befehl_id' | 'lagebericht_id' | 'auftrag_id' | 'folgeauftraege'>,

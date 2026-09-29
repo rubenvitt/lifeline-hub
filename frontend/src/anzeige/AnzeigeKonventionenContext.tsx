@@ -1,11 +1,7 @@
 /**
- * Einsatzweiter Context für Anzeige-Konventionen (LFH-136). Der Provider lädt die
- * Einsatz-Einstellungen über den GETEILTEN queryKey `['einsatz-einstellungen', id]`
- * (React-Query dedupliziert/teilt den Cache mit Settings-Seite & Layout — keine
- * zweite Query) und stellt an die Konventionen gebundene Formatter bereit.
- *
- * Ohne Provider liefert der Hook bewusst die Defaults (kein Throw) → jede
- * Out-of-Provider-Anzeige bleibt byte-identisch zum Alt-Verhalten.
+ * Einsatzweiter Context für Anzeige-Konventionen. Der Provider lädt die Einsatz-Einstellungen
+ * über den geteilten Query-Key (kein zweiter Abruf neben Settings-Seite und Layout) und stellt
+ * an die Konventionen gebundene Formatter bereit. Ohne Provider liefert der Hook die Defaults.
  */
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -57,7 +53,6 @@ export function EinsatzAnzeigeProvider({
   einsatzId: number;
   children: ReactNode;
 }) {
-  // Geteilter queryKey mit Settings-Seite/Layout — keine zweite Query.
   const { data } = useQuery({
     queryKey: einsatzKeys.einstellungen(einsatzId),
     queryFn: () => ladeEinstellungen(einsatzId),
@@ -66,9 +61,8 @@ export function EinsatzAnzeigeProvider({
   const override = useKoordinatenSystemOverride();
 
   const wert = useMemo<AnzeigeKonventionenHook>(() => {
-    // Effektivwert je Konvention: Einsatz-Override sticht den globalen Org-Default, dieser
-    // den hartkodierten Fallback (null). Spiegelt den Backend-Resolver `effektive_*`, damit
-    // ein org-weit gesetzter Default auch ohne Einsatz-Override in der Anzeige greift.
+    // Effektivwert je Konvention: Einsatz-Override vor Org-Default vor Fallback (null) — wie der
+    // Backend-Resolver `effektive_*`.
     const konventionen: AnzeigeKonventionen = {
       zeitzone: data?.zeitzone ?? data?.org_defaults?.zeitzone ?? null,
       zeitformat: data?.zeitformat ?? data?.org_defaults?.zeitformat ?? null,

@@ -2,14 +2,11 @@ import type { VerbleibEingabe } from '../api/einsatzPerson';
 import type { Betreuungsstelle, VerbleibArt } from '../api/types';
 
 /**
- * Reiner Kern des Verbleib-Dialogs (`VerbleibErfassung.tsx`, LFH-674 design.md D6), ohne
- * Rendern prüfbar. Der Dialog zeigt Felder je Art, damit das Feldbudget (Modal ≤ ~3 sichtbar)
- * hält: Transportmittel nur beim Transport, die Betreuungsstelle nur bei der Notunterkunft
- * und nur mit Lesezugriff auf das Modul Betreuung.
- *
+ * Reiner Kern des Verbleib-Dialogs (`VerbleibErfassung.tsx`). Felder je Art halten das Budget:
+ * Transportmittel nur beim Transport, die Betreuungsstelle nur bei der Notunterkunft und nur
+ * mit Lesezugriff auf das Modul Betreuung.
  * Das Suffix `Kern` ist Pflicht: `verbleibErfassung.ts` kollidierte case-insensitiv mit der
- * Komponente, und der Import `./VerbleibErfassung` traf still diese Datei (gemessen: „Element
- * type is invalid", CLAUDE.md zu LFH-347).
+ * Komponente, und `./VerbleibErfassung` träfe still diese Datei.
  */
 
 export interface VerbleibFormWerte {
@@ -40,9 +37,8 @@ export function sichtbareVerbleibFelder(
 }
 
 /**
- * Auswahl der Stellen: stornierte fallen weg (der Server lehnt sie mit 409 ab), geschlossene
- * bleiben WÄHLBAR und tragen den Zusatz im Label — ein Verbleib wird oft nachgetragen, und die
- * Person kann dort gewesen sein, bevor die Stelle schloss (Entscheidung 24.09.2026).
+ * Auswahl der Stellen: stornierte fallen weg (409), geschlossene bleiben WÄHLBAR mit Zusatz im
+ * Label — ein Verbleib wird oft nachgetragen.
  */
 export function stellenOptionen(stellen: Betreuungsstelle[]): { value: number; label: string }[] {
   return stellen
@@ -54,10 +50,9 @@ export function stellenOptionen(stellen: Betreuungsstelle[]): { value: number; l
 }
 
 /**
- * Ziel nach einer Stellenwahl. Der Name der Stelle wird VORBELEGT, sichtbar und änderbar
- * (Entscheidung 24.09.2026) — der Server kopiert keinen Namen. Überschrieben wird nur ein
- * leeres Ziel oder eine noch unveränderte Vorbelegung der zuvor gewählten Stelle; eigener Text
- * der Person bleibt stehen.
+ * Ziel nach einer Stellenwahl: der Name wird sichtbar und änderbar vorbelegt (der Server kopiert
+ * keinen Namen). Überschrieben wird nur ein leeres Ziel oder die unveränderte Vorbelegung der
+ * zuvor gewählten Stelle; eigener Text bleibt.
  */
 export function zielNachStellenwahl(a: {
   ziel: string | undefined;
@@ -71,9 +66,8 @@ export function zielNachStellenwahl(a: {
 }
 
 /**
- * Ziel nach einem Artwechsel. Wer von der Notunterkunft mit gewählter Stelle auf eine andere
- * Art wechselt, hätte sonst den Stellennamen als Transportziel im Feld — sichtbar, aber eine
- * Einladung zum Fehler (Review LFH-674). Geleert wird nur die UNVERÄNDERTE Vorbelegung.
+ * Ziel nach einem Artwechsel: sonst stünde der Stellenname als Transportziel im Feld. Geleert
+ * wird nur die UNVERÄNDERTE Vorbelegung.
  */
 export function zielNachArtwechsel(a: {
   art: VerbleibArt | undefined;
@@ -85,11 +79,9 @@ export function zielNachArtwechsel(a: {
 }
 
 /**
- * Request-Body. Felder, die nicht sichtbar sind, gehen nicht mit: ein nach dem Artwechsel
- * liegengebliebener Stellen-Verweis wäre ein 422, einer nach verlorenem Betreuungszugriff ein
- * 403 — beides Ablehnungen, die die Person im Dialog nicht beheben kann. antd hält den Wert
- * eines ausgeblendeten Feldes im Speicher (`preserve`), deshalb entscheidet `stelleSichtbar`,
- * nicht das Vorhandensein des Werts.
+ * Request-Body. Unsichtbare Felder gehen nicht mit: ein liegengebliebener Stellen-Verweis wäre
+ * 422, einer nach verlorenem Betreuungszugriff 403. antd hält ausgeblendete Werte im Speicher
+ * (`preserve`), deshalb entscheidet `stelleSichtbar`, nicht das Vorhandensein des Werts.
  */
 export function verbleibBody(
   w: VerbleibFormWerte & { art: VerbleibArt },
