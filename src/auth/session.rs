@@ -77,7 +77,10 @@ pub async fn benutzer_id_zu_token(pool: &SqlitePool, token: &str) -> Option<i64>
 }
 
 /// Löst eine gültige (nicht abgelaufene) Session zu einem aktiven Benutzer auf.
-pub(crate) async fn benutzer_aus_token(pool: &SqlitePool, token: &str) -> Result<Benutzer, AppError> {
+pub(crate) async fn benutzer_aus_token(
+    pool: &SqlitePool,
+    token: &str,
+) -> Result<Benutzer, AppError> {
     let benutzer = sqlx::query_as::<_, Benutzer>(
         "SELECT b.id, b.org_id, b.anzeigename, b.benutzername, b.passwort_hash, \
                 b.system_rolle, b.org_rolle, b.aktiv, b.erstellt_at \

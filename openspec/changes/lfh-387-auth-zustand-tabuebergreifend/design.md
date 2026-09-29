@@ -72,10 +72,17 @@ Benutzerdaten — jeder Empfänger prüft selbst per `me()` (D6). Zusätzlich pr
 `visibilitychange` → sichtbar; das deckt eingefrorene/verworfene Tabs und Browser ohne Kanal.
 *Alternative:* `storage`-Ereignis über `localStorage` — funktioniert, ist aber ein Umweg und
 hinterlässt Schlüssel; `BroadcastChannel` ist in allen Zielbrowsern vorhanden.
+*Nachtrag Umsetzung:* Senden und Empfangen laufen über EIN Kanalobjekt je Tab. Ein
+`BroadcastChannel` stellt sich selbst nichts zu, ein zweites Objekt desselben Tabs dagegen
+schon; mit getrennten Objekten prüfte sich der meldende Tab nach jedem Login selbst (im Vitest
+rollte das einen frischen Login zurück). Folge für Tests: zwei `AuthProvider` im selben Realm
+hören einander nicht — der zweite Tab wird im Vitest als eigenes Kanalobjekt simuliert, echte
+zwei Tabs prüft e2e.
 
 **D6 — Eine Prüfroutine `pruefe()` im AuthProvider** mit der Ergebnistabelle aus der Spec.
 Läuft nur nach dem Erstladen (`laedt === false`), Aufrufe werden zu einem laufenden
-zusammengefasst (ein `useRef<Promise>`). 401 → `abmeldenLokal()` + `meldeSitzungAbgelaufen()`
+zusammengefasst (ein `useRef<Promise>`) — mit genau einem Nachlauf, wenn während des Laufs ein
+weiterer Anstoß kam: der Lauf kann eine Antwort von vor dem gemeldeten Wechsel bekommen haben. 401 → `abmeldenLokal()` + `meldeSitzungAbgelaufen()`
 (bestehende Wache leitet mit Rückkehr-URL um). Netzfehler → nichts. Der Konflikt steht als
 `konflikt: { bisher, jetzt } | null` im Context; `erwarteterBenutzer` bleibt auf `bisher`.
 `weiterAls()` übernimmt `jetzt`, räumt `konflikt`.
@@ -87,6 +94,12 @@ zusammengefasst (ein `useRef<Promise>`). 401 → `abmeldenLokal()` + `meldeSitzu
   `logout()` — der Server-Logout nach 401 traf in der Lücke „401 → Logout“ eine inzwischen
   neue Sitzung.
 - `login`/`aktualisiere` melden `angemeldet`.
+
+**D7a — Anmeldeseite folgt einer Übernahme.** Übernimmt der Provider eine Anmeldung aus einem
+anderen Tab, verlässt `LoginPage` die Maske zum Rückkehrziel — nur beim Übergang „anonym →
+angemeldet“. Wer angemeldet `/login` öffnet, um den Benutzer zu wechseln, bleibt dort; genau
+dieser Weg erzeugt den Konflikt in den übrigen Tabs. `BenutzerMenu` navigiert nur, wenn
+`logout()` `true` liefert.
 
 **D8 — Konfliktdialog im Sitzungs-Layout.** `auth/BenutzerKonfliktDialog.tsx` neben
 `useSitzungsWache` (dort sind `QueryClient`, Router und `AntApp` verfügbar). antd `Modal` mit
@@ -106,7 +119,8 @@ nicht `Erfassung.tsx`.
   Wache ruft keinen Server-Logout), Dialog (nicht schließbar, eine Primäraktion, räumt Cache).
 - e2e `e2e/sitzung-mehrere-tabs.spec.ts`: **zwei Seiten im selben Browserkontext** (geteiltes
   Cookie, geteilter Kanal). Zweiter Benutzer per `POST /api/benutzer`. Fälle: (a) schneller
-  Wechsel A→B über die Oberfläche in Tab 2 → Tab 1 zeigt den Dialog; (b) gleichzeitige
+  Wechsel A→B über die Oberfläche in Tab 2 (Anmeldeseite, ohne vorheriges Abmelden) → Tab 1
+  zeigt den Dialog; (b) gleichzeitige
   Mutation: B meldet sich per `context.request` an (kein App-Code, also keine Meldung),
   Tab 1 sendet einen ETB-Eintrag → Antwort 412, kein Eintrag, Dialog, B bleibt angemeldet;
   (c) Sitzungsablauf: Logout per `context.request`, Tab 1 schreibt → Anmeldung mit

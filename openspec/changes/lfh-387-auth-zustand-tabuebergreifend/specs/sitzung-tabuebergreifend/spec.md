@@ -61,8 +61,16 @@ abgelehnt wurde. Das Ergebnis der Prüfung MUST ohne manuelles Neuladen wirken:
 - **THEN** zeigt Tab 1 ohne Neuladen die Anmeldung
 
 #### Scenario: Anmelden in einem anderen Tab
-- **WHEN** Tab 1 steht auf der Anmeldung und in Tab 2 meldet sich A an
-- **THEN** zeigt Tab 1 ohne Neuladen A als angemeldet
+- **WHEN** Tab 1 steht ohne Benutzer auf der Anmeldung und in Tab 2 meldet sich A an
+- **THEN** zeigt Tab 1 ohne Neuladen A als angemeldet und verlässt die Anmeldeseite zum Rückkehrziel
+
+#### Scenario: Benutzerwechsel über die Anmeldeseite bleibt möglich
+- **WHEN** eine angemeldete Person die Anmeldeseite aufruft
+- **THEN** bleibt die Anmeldeseite stehen, und eine Anmeldung als anderer Benutzer ist möglich
+
+#### Scenario: Anstoß während einer laufenden Prüfung
+- **WHEN** ein Tab gerade prüft und währenddessen ein weiterer Wechsel gemeldet wird
+- **THEN** prüft der Tab nach dem laufenden Lauf genau einmal erneut
 
 #### Scenario: Offline bleibt der Tab stehen
 - **WHEN** Tab 1 zeigt A, ist offline und erhält eine Wechselmeldung
@@ -79,8 +87,12 @@ er steht, MUST jede Schreibanfrage des Tabs weiter die Kennung des bisherigen Be
 Eine Ablehnung mit 412 MUST NOT zur Abmeldung führen.
 
 #### Scenario: Konflikt nach schnellem Wechsel
-- **WHEN** Tab 1 zeigt A und in Tab 2 wird schnell von A auf B gewechselt
+- **WHEN** Tab 1 zeigt A und in Tab 2 meldet sich B an, ohne dass A sich vorher abmeldet
 - **THEN** zeigt Tab 1 ohne Neuladen den Konfliktdialog mit A und B
+
+#### Scenario: Abmelden, dann Anmelden in einem anderen Tab
+- **WHEN** Tab 1 zeigt A, in Tab 2 meldet sich A ab und danach B an
+- **THEN** folgt Tab 1 beiden Schritten: erst zur Anmeldung, dann angemeldet als B
 
 #### Scenario: Weiterarbeiten als neuer Benutzer
 - **WHEN** im Konfliktdialog „Als B weiterarbeiten“ gewählt wird

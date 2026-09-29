@@ -154,8 +154,15 @@ async fn etb_schreibt_und_replayt_nur_unter_dem_erwarteten_benutzer() {
     assert_eq!(status, StatusCode::PRECONDITION_FAILED);
     assert_eq!(anzahl(&app, &admin, &etb).await, vorher);
 
-    let (status, _) =
-        anfrage_erwartet(&app, "POST", &etb, &admin, Some(body), &admin_id.to_string()).await;
+    let (status, _) = anfrage_erwartet(
+        &app,
+        "POST",
+        &etb,
+        &admin,
+        Some(body),
+        &admin_id.to_string(),
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(anzahl(&app, &admin, &etb).await, vorher + 1);
 

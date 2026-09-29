@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { ReactNode } from 'react';
 import type { BenutzerAnzeige } from '../api/types';
 import { ApiError, setzeErwartetenBenutzer } from '../api/client';
@@ -111,43 +119,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    *  EINEN Nachlauf aus — zusammengefasst, aber nicht verschluckt: der Lauf kann eine Antwort
    *  von vor dem Wechsel bekommen haben, den der spätere Anstoß meldet. Vor dem Erstladen wird
    *  nicht geprüft — das Erstladen IST die Prüfung. */
-  const pruefe = useCallback(function pruefeSelbst(): Promise<void> {
-    if (laedtRef.current) return Promise.resolve();
-    if (laufendePruefung.current) {
-      nachlaufNoetig.current = true;
-      return laufendePruefung.current;
-    }
-    const lauf = (async () => {
-      let aufServer: BenutzerAnzeige;
-      try {
-        aufServer = await authApi.me();
-      } catch (e) {
-        // Keine gültige Sitzung: lokal abmelden, die Sitzungswache leitet mit Rückkehrziel zur
-        // Anmeldung. Server nicht erreichbar (offline) oder sonstiger Fehler: nichts ändern.
-        if (e instanceof ApiError && e.status === 401 && benutzerRef.current) {
-          abmeldenLokal();
-          meldeSitzungAbgelaufen();
+  const pruefe = useCallback(
+    function pruefeSelbst(): Promise<void> {
+      if (laedtRef.current) return Promise.resolve();
+      if (laufendePruefung.current) {
+        nachlaufNoetig.current = true;
+        return laufendePruefung.current;
+      }
+      const lauf = (async () => {
+        let aufServer: BenutzerAnzeige;
+        try {
+          aufServer = await authApi.me();
+        } catch (e) {
+          // Keine gültige Sitzung: lokal abmelden, die Sitzungswache leitet mit Rückkehrziel zur
+          // Anmeldung. Server nicht erreichbar (offline) oder sonstiger Fehler: nichts ändern.
+          if (e instanceof ApiError && e.status === 401 && benutzerRef.current) {
+            abmeldenLokal();
+            meldeSitzungAbgelaufen();
+          }
+          return;
         }
-        return;
-      }
-      const lokal = benutzerRef.current;
-      if (!lokal) {
-        // In einem anderen Tab angemeldet, dieser Tab war anonym: übernehmen.
-        uebernimm(aufServer);
-        sitzungsMeldungZuruecksetzen();
-        return;
-      }
-      setKonflikt(lokal.id === aufServer.id ? null : { bisher: lokal, jetzt: aufServer });
-    })().finally(() => {
-      laufendePruefung.current = null;
-      if (nachlaufNoetig.current) {
-        nachlaufNoetig.current = false;
-        void pruefeSelbst();
-      }
-    });
-    laufendePruefung.current = lauf;
-    return lauf;
-  }, [abmeldenLokal, uebernimm]);
+        const lokal = benutzerRef.current;
+        if (!lokal) {
+          // In einem anderen Tab angemeldet, dieser Tab war anonym: übernehmen.
+          uebernimm(aufServer);
+          sitzungsMeldungZuruecksetzen();
+          return;
+        }
+        setKonflikt(lokal.id === aufServer.id ? null : { bisher: lokal, jetzt: aufServer });
+      })().finally(() => {
+        laufendePruefung.current = null;
+        if (nachlaufNoetig.current) {
+          nachlaufNoetig.current = false;
+          void pruefeSelbst();
+        }
+      });
+      laufendePruefung.current = lauf;
+      return lauf;
+    },
+    [abmeldenLokal, uebernimm],
+  );
 
   useEffect(() => {
     const anstossen = () => void pruefe();

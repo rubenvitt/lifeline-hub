@@ -35,6 +35,11 @@ function schreibKoepfe(): Record<string, string> {
     : { [ERWARTETER_BENUTZER_HEADER]: String(erwarteterBenutzer) };
 }
 
+/** `undefined` statt eines leeren Objekts — ein Upload ohne Kopf bleibt wie bisher kopflos. */
+function oderNichts(koepfe: Record<string, string>): Record<string, string> | undefined {
+  return Object.keys(koepfe).length > 0 ? koepfe : undefined;
+}
+
 const NETZFEHLER_TEXT = 'Keine Verbindung — die Aktion wurde NICHT abgeschickt';
 
 /** Fehler einer API-Antwort mit Nicht-2xx-Status. Trägt den Statuscode und die
@@ -132,7 +137,7 @@ export async function apiUpload<T>(
     const res = await fetch(pfad, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: schreibKoepfe(),
+      headers: oderNichts(schreibKoepfe()),
       body: formData,
       signal: AbortSignal.timeout(optionen.timeoutMs ?? 15_000),
     });
@@ -158,7 +163,7 @@ export async function apiSend<T>(
     const res = await fetch(pfad, {
       method: methode,
       credentials: 'same-origin',
-      headers: Object.keys(headers).length > 0 ? headers : undefined,
+      headers: oderNichts(headers),
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(15_000),
     });

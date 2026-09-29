@@ -3,6 +3,7 @@ import { Fragment, lazy, Suspense } from 'react';
 import type { ReactElement } from 'react';
 import RequireAuth from './routes/RequireAuth';
 import { useSitzungsWache } from './auth/useSitzungsWache';
+import BenutzerKonfliktDialog from './auth/BenutzerKonfliktDialog';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 import EinsaetzePage from './pages/EinsaetzePage';
@@ -191,7 +192,13 @@ export default function App() {
 
 function SitzungsLayout() {
   useSitzungsWache();
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      {/* Benutzerwechsel in einem anderen Tab (LFH-387) — neben der Wache, über jeder Route. */}
+      <BenutzerKonfliktDialog />
+    </>
+  );
 }
 
 /** Eine Routenquelle für Browser und Integrationstests; keine nachgelagerten Routes. */

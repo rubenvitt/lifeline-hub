@@ -24,12 +24,13 @@
 
 ## 4. Frontend: Konfliktdialog
 
-- [ ] 4.1 `auth/BenutzerKonfliktDialog.tsx` nach D8, eingehängt im Sitzungs-Layout neben `useSitzungsWache`; verifizieren: `BenutzerKonfliktDialog.test.tsx` — nennt beide Anzeigenamen, Escape/Maske schließen nicht, genau ein Primärknopf, Klick räumt den QueryClient, übernimmt B und navigiert zur Startseite
+- [x] 4.1 `auth/BenutzerKonfliktDialog.tsx` nach D8, eingehängt im Sitzungs-Layout neben `useSitzungsWache`; verifizieren: `BenutzerKonfliktDialog.test.tsx` — nennt beide Anzeigenamen, Escape/Maske schließen nicht, genau ein Primärknopf, Klick räumt den QueryClient, übernimmt B und navigiert zur Startseite
 
 ## 5. e2e und Doku
 
-- [ ] 5.1 `e2e/sitzung-mehrere-tabs.spec.ts` mit den drei Fällen aus D9 (schneller Wechsel, gleichzeitige Mutation mit 412 und ohne Eintrag, Sitzungsablauf in beiden Tabs); verifizieren: `pnpm e2e -- sitzung-mehrere-tabs` grün
-- [ ] 5.2 CLAUDE.md: Absatz „Sitzung über mehrere Tabs (LFH-387)“ (Kopf + `CurrentUser`, Logout-412, Wache meldet nur lokal ab, Kanal ist Komfort, Server ist Wahrheit); verifizieren: Absatz verweist auf dieses `design.md`
+- [x] 5.1 `e2e/sitzung-mehrere-tabs.spec.ts` mit den drei Fällen aus D9 (schneller Wechsel, gleichzeitige Mutation mit 412 und ohne Eintrag, Sitzungsablauf in beiden Tabs); verifizieren: `pnpm e2e -- sitzung-mehrere-tabs` grün
+- [x] 5.2 CLAUDE.md: Absatz „Sitzung über mehrere Tabs (LFH-387)“ (Kopf + `CurrentUser`, Logout-412, Wache meldet nur lokal ab, Kanal ist Komfort, Server ist Wahrheit); verifizieren: Absatz verweist auf dieses `design.md`
+- [x] 5.3 Prüfliste Einsatztauglichkeit für den Konfliktdialog als `pruefliste.md`, jede Zeile mit Verdikt; verifizieren: keine Zeile „nicht geprüft“
 
 ## 6. Integration
 

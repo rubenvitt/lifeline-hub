@@ -242,7 +242,7 @@ describe('useZuletztBefehle · Schichtwechsel ohne Neuladen', () => {
 
   async function wechsle(result: {
     current: {
-      auth: { logout: () => Promise<void>; login: (a: string, b: string) => Promise<unknown> };
+      auth: { logout: () => Promise<unknown>; login: (a: string, b: string) => Promise<unknown> };
     };
   }) {
     await act(async () => {

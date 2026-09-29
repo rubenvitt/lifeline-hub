@@ -221,9 +221,12 @@ describe('erwarteter Benutzer (LFH-387)', () => {
   it('löst bei 412 eine Benutzerprüfung aus und wirft den ApiError unverändert', async () => {
     server.use(
       http.post('/api/ding', () =>
-        HttpResponse.json({ error: 'Die Sitzung gehört inzwischen einem anderen Benutzer' }, {
-          status: 412,
-        }),
+        HttpResponse.json(
+          { error: 'Die Sitzung gehört inzwischen einem anderen Benutzer' },
+          {
+            status: 412,
+          },
+        ),
       ),
     );
     const pruefen = vi.fn();
