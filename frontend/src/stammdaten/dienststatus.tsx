@@ -1,7 +1,6 @@
 import { Button, Space, type TableColumnsType } from 'antd';
 import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import StatusTag from '../components/StatusTag';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import type { Dienststatus } from '../api/types';
 import { dienststatus } from '../theme/statusFarben';
 
@@ -10,19 +9,29 @@ interface DienststatusVariablen {
   inDienst: boolean;
 }
 
-/** In/außer Dienst setzen und danach den Stammdaten-Katalog (`queryKey`) invalidieren. */
+/**
+ * In/außer Dienst setzen und danach den Stammdaten-Katalog (`queryKey`) invalidieren.
+ *
+ * KEIN `onError` (LFH-473): ein Toast wäre nach drei Sekunden weg, danach sagte nichts mehr, dass
+ * und warum der Wechsel scheiterte. Der Fehler bleibt an `mutation.error` und steht im
+ * `SeitenHinweise`-Slot der Seite, Titel und Ersatztext aus {@link DIENSTSTATUS_FEHLER}.
+ */
 export function useDienststatusMutation(
   setze: (id: number, inDienst: boolean) => Promise<unknown>,
   queryKey: QueryKey,
 ) {
   const qc = useQueryClient();
-  const fehler = useFehlerMeldung();
   return useMutation({
     mutationFn: (v: DienststatusVariablen) => setze(v.id, v.inDienst),
     onSuccess: () => qc.invalidateQueries({ queryKey }),
-    onError: fehler,
   });
 }
+
+/** Wortlaut des stehenden Hinweises; für `<SeitenHinweise {...DIENSTSTATUS_FEHLER} />`. */
+export const DIENSTSTATUS_FEHLER = {
+  fehlerTitel: 'Dienststatus nicht geändert',
+  fehlerFallback: 'Statuswechsel fehlgeschlagen',
+} as const;
 
 type DienststatusMutation = ReturnType<typeof useDienststatusMutation>;
 

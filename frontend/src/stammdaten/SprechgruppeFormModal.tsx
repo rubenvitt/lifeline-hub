@@ -53,6 +53,8 @@ export default function SprechgruppeFormModal({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.sprechgruppenAlle() });
     },
+    // Toast bleibt (LFH-473): nach der Ablehnung stehen Dialog und Wortlaut offen, nichts wirkt
+    // gespeichert; der Seiten-Slot läge hinter der Maske.
     onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 

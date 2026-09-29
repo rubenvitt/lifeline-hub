@@ -6,6 +6,8 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import StichworteTab from './StichworteTab';
 import { adminFixture } from '../test/fixtures';
+import { offeneRueckfrage } from '../test/rueckfrage';
+import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
 
 // Deckt das Admin-Gating der Stichwort-Sektion ab.
 
@@ -187,5 +189,55 @@ describe('StichworteTab', () => {
 
     expect(await screen.findByText('Noch keine Stichworte')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Fehlschläge stehen an der SEITE, nicht im Toast (LFH-473). Der Slot ist EINER für zwei
+ * Handlungen (Hinzufügen und Löschen); wer eine auslöst, räumt auch den Fehler der
+ * anderen — sonst stünde nach dem nächsten Versuch ein alter Grund über der Seite.
+ */
+describe('StichworteTab — Fehlschläge als stehender Hinweis (LFH-473)', () => {
+  it('Löschen: der Hinweis steht und geht beim nächsten Absenden', async () => {
+    let versuch = 0;
+    server.use(
+      http.delete('/api/stichwort-vorschlaege/:id', () => {
+        versuch += 1;
+        if (versuch > 1) return new Promise<never>(() => {});
+        return HttpResponse.json({ error: 'Stichwort wird gerade verwendet' }, { status: 409 });
+      }),
+    );
+    renderTab(admin);
+    await screen.findByText('H1');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Löschen' })[0]);
+    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'Ja' }));
+    const hinweis = await stehenderFehler('Stichwort wird gerade verwendet');
+    expect(hinweis).toHaveTextContent('Nicht gelöscht');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Löschen' })[0]);
+    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'Ja' }));
+    await keinStehenderFehler('Stichwort wird gerade verwendet');
+    expect(versuch).toBe(2);
+  });
+
+  it('Hinzufügen: der Hinweis steht, das Feld behält den Text, Löschen räumt ihn', async () => {
+    server.use(
+      http.post('/api/stichwort-vorschlaege', () =>
+        HttpResponse.json({ error: 'Stichwort gibt es schon' }, { status: 409 }),
+      ),
+      http.delete('/api/stichwort-vorschlaege/:id', () => new Promise<never>(() => {})),
+    );
+    renderTab(admin);
+    await screen.findByText('H1');
+
+    await userEvent.type(screen.getByLabelText('Neues Stichwort'), 'H1{Enter}');
+    const hinweis = await stehenderFehler('Stichwort gibt es schon');
+    expect(hinweis).toHaveTextContent('Nicht angelegt');
+    expect(screen.getByLabelText('Neues Stichwort')).toHaveValue('H1');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Löschen' })[0]);
+    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'Ja' }));
+    await keinStehenderFehler('Stichwort gibt es schon');
   });
 });

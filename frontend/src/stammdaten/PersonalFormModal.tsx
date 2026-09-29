@@ -84,6 +84,8 @@ export default function PersonalFormModal({
       qc.invalidateQueries({ queryKey: globalKeys.personal() });
       qc.invalidateQueries({ queryKey: globalKeys.personalVorschlaege() });
     },
+    // Toast bleibt (LFH-473): nach der Ablehnung stehen Dialog und Wortlaut offen, nichts wirkt
+    // gespeichert; der Seiten-Slot läge hinter der Maske.
     onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 

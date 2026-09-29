@@ -6,6 +6,7 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import PersonalTab from './PersonalTab';
 import { adminFixture } from '../test/fixtures';
+import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
@@ -274,5 +275,37 @@ describe('PersonalTab', () => {
 
     expect(await screen.findByText('Noch kein Personal')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Ein gescheiterter Statuswechsel steht an der SEITE, nicht im Toast (LFH-473): nach drei
+ * Sekunden wäre der Toast weg und mit ihm der Grund. Die zweite Hälfte der Zusicherung:
+ * das nächste Absenden räumt den Hinweis (react-query setzt `error` beim Übergang nach `pending`
+ * zurück) — deshalb hängt der zweite Versuch, statt zu gelingen.
+ */
+describe('PersonalTab — Fehlschlag des Statuswechsels (LFH-473)', () => {
+  it('hinterlässt einen stehenden Hinweis, den das nächste Absenden räumt', async () => {
+    let versuch = 0;
+    server.use(
+      http.post('/api/personal/:id/ausser-dienst', () => {
+        versuch += 1;
+        if (versuch > 1) return new Promise<never>(() => {});
+        return HttpResponse.json(
+          { error: 'Person ist einem laufenden Einsatz zugeordnet' },
+          { status: 409 },
+        );
+      }),
+    );
+    render(admin);
+    await screen.findByText('Thomas Müller');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Außer Dienst' }));
+    const hinweis = await stehenderFehler('Person ist einem laufenden Einsatz zugeordnet');
+    expect(hinweis).toHaveTextContent('Dienststatus nicht geändert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Außer Dienst' }));
+    await keinStehenderFehler('Person ist einem laufenden Einsatz zugeordnet');
+    expect(versuch).toBe(2);
   });
 });

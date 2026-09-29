@@ -1,4 +1,4 @@
-import { App, Button, Popconfirm, Typography, type TableColumnsType } from 'antd';
+import { Button, Popconfirm, Typography, type TableColumnsType } from 'antd';
 import AdminPage from '../components/AdminPage';
 import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -6,7 +6,6 @@ import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
-import { fehlerText } from '../api/client';
 import {
   legeStichwortVorschlagAn,
   listeStichwortVorschlaege,
@@ -20,7 +19,6 @@ export default function StichworteTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
-  const { message } = App.useApp();
 
   const vorschlaegeQuery = useQuery({
     queryKey: globalKeys.stichwortVorschlaege(),
@@ -33,14 +31,32 @@ export default function StichworteTab() {
     // Feld noch der abgeschickte Text steht. Ein unbedingtes Leeren fräße die nächste Eingabe,
     // wenn jemand weitertippt, während der vorherige Eintrag noch unterwegs ist.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.stichwortVorschlaege() }),
-    onError: (e) => message.error(fehlerText(e, 'Hinzufügen fehlgeschlagen')),
   });
 
   const loeschenMutation = useMutation({
     mutationFn: (id: number) => loescheStichwortVorschlag(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.stichwortVorschlaege() }),
-    onError: (e) => message.error(fehlerText(e, 'Löschen fehlgeschlagen')),
   });
+
+  /**
+   * Beide Mutationen OHNE `onError` (LFH-473): ein Toast wäre nach drei Sekunden weg, danach sagte
+   * nichts mehr, dass und warum die Handlung scheiterte. Der Fehler steht im `SeitenHinweise`-Slot.
+   *
+   * EIN Slot, zwei Handlungen: wer eine auslöst, räumt den Fehler der anderen (`reset`). Sonst
+   * stünde nach dem nächsten Versuch ein alter Grund über der Seite, denn react-query räumt
+   * `error` nur beim eigenen `mutate()`.
+   */
+  const seitenFehler = loeschenMutation.error
+    ? {
+        fehler: loeschenMutation.error,
+        titel: 'Nicht gelöscht',
+        fallback: 'Löschen fehlgeschlagen',
+      }
+    : {
+        fehler: anlegenMutation.error,
+        titel: 'Nicht angelegt',
+        fallback: 'Hinzufügen fehlgeschlagen',
+      };
 
   const vorschlaege = vorschlaegeQuery.data ?? [];
 
@@ -79,7 +95,10 @@ export default function StichworteTab() {
                 okText="Ja"
                 cancelText="Abbrechen"
                 okButtonProps={{ danger: true }}
-                onConfirm={() => loeschenMutation.mutate(v.id)}
+                onConfirm={() => {
+                  anlegenMutation.reset();
+                  loeschenMutation.mutate(v.id);
+                }}
               >
                 {/* Der Lauf gehört GENAU der gelöschten Zeile (LFH-346): an `isPending` drehte der Spinner in
                    JEDER Zeile. `variables` ist hier die nackte id. */}
@@ -99,7 +118,15 @@ export default function StichworteTab() {
   return (
     <AdminPage
       titel="Einsatz-Stichworte"
-      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
+      hinweis={
+        <SeitenHinweise
+          fehler={seitenFehler.fehler}
+          fehlerTitel={seitenFehler.titel}
+          fehlerFallback={seitenFehler.fallback}
+          rechteFehlt={!istAdmin}
+          rechteText={STAMMDATEN_RECHTE_TEXT}
+        />
+      }
     >
       {/* KEIN `aktionen`-Slot: der Anlegen-Weg ist die Schnellerfassungszeile am Inhalt. Ein zweiter
          Knopf im Kopf wären zwei Primäraktionen für dieselbe Sache. */}
@@ -142,7 +169,10 @@ export default function StichworteTab() {
         // Beispiel. „Neues Stichwort" stünde sonst zweimal übereinander.
         platzhalter="z. B. H1Y"
         knopfText="Hinzufügen"
-        onAnlegen={(text) => anlegenMutation.mutateAsync(text)}
+        onAnlegen={(text) => {
+          loeschenMutation.reset();
+          return anlegenMutation.mutateAsync(text);
+        }}
         laeuft={anlegenMutation.isPending}
         gesperrt={!istAdmin}
       />
