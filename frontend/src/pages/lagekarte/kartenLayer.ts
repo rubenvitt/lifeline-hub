@@ -5,6 +5,7 @@ import { wendeKartenDatenAn } from './kartenDaten';
 import { sorgeFuerFachebeneLayer, setzeFachebeneDaten } from './fachebenenLayer';
 import type { FachebeneDef } from './fachebenen';
 import type { FeatureCollection } from '../../api/fachebenen';
+import type { ZoneTyp } from '../../api/types';
 import { synchronisiereBildLayer, type BildOverlay } from './bildLayer';
 import { reAnlegenMarker, type MarkerFeatureCollection } from './markerLayer';
 import { farbenDunkel } from '../../theme/tokens';
@@ -29,6 +30,8 @@ export interface ZoneFeature {
   id: number;
   geometrie: GeoJsonGeometry;
   label: string | null;
+  /** Zonentyp — Kennung im Flächen-Auswahlmenü, wenn die Zone keine Bezeichnung trägt (LFH-812). */
+  typ?: ZoneTyp;
   stil: ZoneStil;
   /** Gefahrenzone: Umriss gestrichelt. Nur Darstellung. */
   gestrichelt?: boolean;
@@ -57,6 +60,8 @@ export type ZonenFeatureCollection = {
     properties: {
       id: number;
       label: string;
+      /** Zonentyp oder leer (LFH-812). */
+      typ: string;
       fillColor: string;
       fillOpacity: number;
       lineColor: string;
@@ -94,6 +99,7 @@ export function baueZonenFc(zonen: ZoneFeature[] | undefined): ZonenFeatureColle
         properties: {
           id: z.id,
           label: z.label ?? '',
+          typ: z.typ ?? '',
           fillColor: z.stil.fillColor,
           fillOpacity: z.stil.fillOpacity,
           lineColor: z.stil.lineColor,
