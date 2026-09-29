@@ -42,4 +42,4 @@
 - [x] 5.2 Sichtprüfung im Browser (Dev-Stack, Demo-Einsatz) in Tag- und Nachtmodus: Karte mit Einheit, Fahrzeug, Führungskraft, Abschnitt, UHS, Betreuungsstelle, Schaden und Einsatzort, dazu die Inspector-Kachel und die Spalte „TZ“ im Meldebild. Screenshots liegen im Change-Ordner.
 - [x] 5.3 Prüfliste Einsatztauglichkeit (15 Kriterien) für Lagekarte und Meldebild als `pruefliste.md` im Change-Ordner, jede Zeile mit Verdikt.
 - [x] 5.4 Bundle messen: `vite build`, Größe des neuen Chunks und Precache-Summe vorher/nachher in `pruefliste.md` notiert. `e2e/lagekarte-offline-precache.spec.ts` ist grün.
-- [ ] 5.5 `./scripts/check-all.sh` ist grün, mit eigenem `CARGO_TARGET_DIR`.
+- [x] 5.5 `./scripts/check-all.sh` ist grün, mit eigenem `CARGO_TARGET_DIR`. Stand 29.09.2026 mit @einsatzzeichen 3.0.0: 11 von 12 Schritten grün. In Schritt 7 (e2e) sind 347 von 348 Tests grün. Rot ist allein `kraefte-kontrast.spec.ts:140`, eine Flake, die auf `origin/alpha` ebenso auftritt (mindestens 3 Fehlschläge in 15 Wiederholungen) und die Seiten ohne taktische Zeichen betrifft → LFH-843.
