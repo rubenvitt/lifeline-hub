@@ -6,7 +6,10 @@ import { http, HttpResponse } from 'msw';
 import { offeneRueckfrage } from '../../test/rueckfrage';
 import { renderMitProviders, neuerQueryClient } from '../../test/utils';
 import { server } from '../../test/server';
+import { renderSvg } from '@einsatzzeichen/core';
+import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import Inspector from './Inspector';
+import { KACHEL_SVG_OPTIONEN } from './markerIcons';
 import type { KarteMarker } from './marker';
 import type { AuswahlRoh } from './leistenDaten';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
@@ -620,5 +623,42 @@ describe('Inspector „Verortung löschen" — Rückfrage nur, wo sie unumkehrba
     await userEvent.click(screen.getByRole('button', { name: 'Verortung löschen' }));
     expect(onVerortungLoeschen).toHaveBeenCalledTimes(1);
     expect(document.querySelector('.ant-popconfirm')).toBeNull();
+  });
+});
+
+describe('Inspector Symbolkachel (LFH-835)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
+    );
+  });
+
+  function kachelMit(tz: KarteMarker['tz'], typ: KarteMarker['typ'] = 'einheit') {
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={{ ...marker, schluessel: `${typ}-7`, typ, id: 7, tz }}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
+    );
+    return document.querySelector<HTMLElement>('[data-lfh="auswahl-kachel"]')!;
+  }
+
+  it('zeigt für ein Fachobjekt das Zeichen nach @einsatzzeichen', () => {
+    const tz = { grundzeichen: 'taktische-formation', organisation: 'thw' } as const;
+    const bild = kachelMit(tz).querySelector('img');
+    expect(bild).not.toBeNull();
+    const svg = decodeURIComponent(bild!.src.replace(/^data:image\/svg\+xml;charset=utf-8,/, ''));
+    expect(svg).toBe(renderSvg(fachobjektZeichen(tz)!.drawing, KACHEL_SVG_OPTIONEN));
+  });
+
+  it('zeigt bei nicht darstellbarem Zeichen das Kürzel statt abzustürzen', () => {
+    const kachel = kachelMit({ grundzeichen: 'gibt-es-nicht' as 'person' });
+    expect(kachel.querySelector('img')).toBeNull();
+    expect(kachel).toHaveTextContent('TZ');
   });
 });

@@ -1,6 +1,8 @@
 // Barrel über die aus Rust generierten Schemas (`types.generated.ts`, LFH-120). Nicht von Hand
 // pflegen: Response-Typen ändern sich über die Rust-Structs + `scripts/check-typ-codegen.sh`.
 // FE-lokale Typen (Eingabe-Bodies, Record-Maps) sind unten als „kein Backend-Schema“ markiert.
+// ID-Typen der freien Zeichen (`NeuesFreiesZeichen`/`FreiesZeichenUpdate`) aus dem Altpaket, bis
+// LFH-836 sie auf @einsatzzeichen umstellt.
 import type {
   EinheitId,
   FachaufgabeId,

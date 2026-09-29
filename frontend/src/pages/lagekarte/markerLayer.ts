@@ -6,7 +6,7 @@ import type {
   SymbolLayerSpecification,
 } from 'maplibre-gl';
 import { FREIES_ZEICHEN_ERSATZLABEL, type KarteMarker, type MarkerTyp } from './marker';
-import { tzIconKey } from './markerIcons';
+import { markerIconKey } from './markerIcons';
 import { SK_DRINGLICHKEIT, clusterTypProperties, skFarbe } from './clusterDonut';
 import { SK_KURZZEICHEN } from '../../personen/personenKarte';
 import { farbenDunkel } from '../../theme/tokens';
@@ -75,7 +75,8 @@ function beschriftungVon(mk: KarteMarker): string | undefined {
 
 function toFeature(mk: KarteMarker, plakette: Plakette): MarkerFeature {
   const properties: MarkerProps = { schluessel: mk.schluessel, typ: mk.typ, farbe: mk.farbe };
-  if (mk.tz) properties.icon = tzIconKey(mk.tz);
+  const icon = markerIconKey(mk);
+  if (icon) properties.icon = icon;
   if (mk.statusFarbe) properties.statusFarbe = mk.statusFarbe;
   if (mk.kurzzeichen) properties.kurzzeichen = mk.kurzzeichen;
   if (mk.trefferDurchmesser) properties.treffer = mk.trefferDurchmesser;

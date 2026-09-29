@@ -1,7 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 // Namespace-Import: maplibre-gl ab 6 ist ESM ohne Default-Export. Kein named-Import der Klassen:
-// `Map` beschattete den globalen `Map`, den die tzRegistry als `useRef<Map<string, TzProps>>`
-// nutzt. `import * as ns, { type X }` ist kein gültiges ES, daher zwei Zeilen.
+// `Map` beschattete den globalen `Map`, den die Zeichen-Registry als
+// `useRef<Map<string, ZeichenQuelle>>` nutzt. `import * as ns, { type X }` ist kein gültiges ES,
+// daher zwei Zeilen.
 import * as maplibregl from 'maplibre-gl';
 import type { LngLatLike, StyleSpecification, GeoJSONSource } from 'maplibre-gl';
 // Der Worker muss explizit verdrahtet werden, mit `?worker&url`, nicht `?url`: maplibre 6 baut die
@@ -10,6 +11,8 @@ import type { LngLatLike, StyleSpecification, GeoJSONSource } from 'maplibre-gl'
 // eine Datei, die ihre Geschwisterdatei `maplibre-gl-shared.mjs` importiert und daran stirbt.
 // `?worker&url` bündelt self-contained und landet im Workbox-Precache (offline da).
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+import { addSymbolImage } from '@einsatzzeichen/maplibre';
+// Nur noch für freie Zeichen (`tz|`), bis LFH-836 sie auf @einsatzzeichen umstellt.
 import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -31,9 +34,13 @@ import {
   type MarkerProps,
 } from './markerLayer';
 import { baueSpiderFc, SPIDER_CAP, type SpiderProjektor } from './spiderfy';
-import { tzIconKey } from './markerIcons';
+import {
+  baueZeichenRegistry,
+  kartenPixelRatio,
+  ZEICHEN_KARTEN_PX,
+  type ZeichenQuelle,
+} from './markerIcons';
 import { baueClusterDonut, setzeHuelleDurchlaessig } from './clusterDonut';
-import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { werteFachebenenKlickAus } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus, type ZeichenStand } from './zeichnen';
@@ -332,8 +339,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   });
   // Eigenposition: zuletzt gezeichnete Daten + Farbe, nach setStyle re-angelegt.
   const eigenpositionRef = useRef({ daten: eigenpositionFc(null), farbe: rollen.bedien });
-  // Image-Key → TzProps; der styleimagemissing-Handler erzeugt daraus lazy die Karten-Icons.
-  const tzRegistryRef = useRef<Map<string, TzProps>>(new Map());
+  // Image-Key → Zeichenquelle; Resolver (`ez|`) und styleimagemissing-Handler (`tz|`) erzeugen
+  // daraus lazy die Karten-Icons.
+  const zeichenRegistryRef = useRef<Map<string, ZeichenQuelle>>(new Map());
   // Cluster-DOM-Donut-Marker (`clusterSchluessel` → Marker): alle bekannten bzw. aktuell auf der
   // Karte. Nur für `marker-cluster` — Personen-Cluster sind WebGL-Layer, damit sie unter den
   // Kräften liegen.
@@ -502,6 +510,25 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       }
       synchronisiereBildLayer(map, bilderRef.current, 'abschnitte-fill');
     });
+    // Fachobjekte (@einsatzzeichen, LFH-835) über den Resolver, NICHT über `styleimagemissing`:
+    // MapLibre 6 baut die Bildantwort einer Kachel, bevor es das Event feuert — ein dort angelegtes
+    // Bild fehlte im laufenden Layout und erschiene erst beim nächsten Neu-Layout (nach einem
+    // Stilwechsel ohne neue Daten: nie). Den Resolver wartet MapLibre ab, und er überlebt
+    // `setStyle`. Synchron über Canvas, in Bildschirmschärfe, alle gleich groß (der Statusring in
+    // markerLayer.ts ist auf ZEICHEN_KARTEN_PX abgestimmt).
+    map.setMissingStyleImageResolver((id) => {
+      if (!id.startsWith('ez|')) return;
+      const quelle = zeichenRegistryRef.current.get(id);
+      if (quelle?.art !== 'ez' || map.hasImage(id)) return;
+      try {
+        addSymbolImage(map, id, quelle.drawing, {
+          size: ZEICHEN_KARTEN_PX,
+          pixelRatio: kartenPixelRatio(window.devicePixelRatio),
+        });
+      } catch {
+        // Kein Bild ist besser als ein Fehler im Resolver; der Marker bleibt klickbar.
+      }
+    });
     // Taktische Zeichen lazy als Karten-Icons: MapLibre meldet fehlende icon-image-IDs, wir rendern
     // on-demand. Race-Guard, weil das Event während des asynchronen Ladens mehrfach für dieselbe ID
     // feuern kann (sonst wirft addImage "image already exists").
@@ -519,8 +546,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       }
       if (!id.startsWith('tz|')) return; // fremde IDs ignorieren
       if (map.hasImage(id) || ladendeIcons.has(id)) return;
-      const tz = tzRegistryRef.current.get(id);
-      if (!tz) return;
+      const quelle = zeichenRegistryRef.current.get(id);
+      if (quelle?.art !== 'tz') return;
+      const tz = quelle.tz;
       // `erzeugeTaktischesZeichen` kann bei nicht DV-102-konformen Werten synchron werfen. Zuerst
       // erzeugen, dann zu `ladendeIcons` hinzufügen — sonst bliebe die id bei einem Throw dauerhaft
       // im Guard und der Fehler flöge ungefangen aus dem MapLibre-Callback.
@@ -903,13 +931,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const einsatzort = baueEinsatzortFc(markers, markerPlakette);
     markerDatenRef.current = marker;
     einsatzortDatenRef.current = einsatzort;
-    // Registry für styleimagemissing (Key → TzProps). `tzIconKey` ist die eine Quelle der
+    // Registry für styleimagemissing (Key → Zeichenquelle). `markerIconKey` ist die eine Quelle der
     // Key-Bildung, identisch zum icon-Property aus `baueMarkerFc`.
-    const registry = new Map<string, TzProps>();
-    for (const mk of markers) {
-      if (mk.tz) registry.set(tzIconKey(mk.tz), mk.tz);
-    }
-    tzRegistryRef.current = registry;
+    zeichenRegistryRef.current = baueZeichenRegistry(markers);
     wendeKartenDatenAn(map, () =>
       reAnlegenMarker(map, markerDatenRef.current, einsatzortDatenRef.current),
     );

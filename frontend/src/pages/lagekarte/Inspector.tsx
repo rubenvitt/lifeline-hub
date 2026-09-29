@@ -1,6 +1,9 @@
 import { Button, Popconfirm, Space, Typography } from 'antd';
 import { useId, useMemo } from 'react';
+import { renderSvg } from '@einsatzzeichen/core';
+// Nur noch für freie Zeichen, bis LFH-836 sie auf @einsatzzeichen umstellt.
 import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
+import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import { Select } from '../../components/Select';
 import FeldLabel from '../../components/FeldLabel';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
@@ -8,6 +11,7 @@ import { Link } from 'react-router';
 import { etbPfad } from '../../routing/deeplinks';
 import type { KarteMarker, MarkerTyp } from './marker';
 import { markerToUrl } from './markerToUrl';
+import { KACHEL_SVG_OPTIONEN } from './markerIcons';
 import { geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
@@ -100,12 +104,18 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
 }
 
 /**
- * Das taktische Zeichen als Bild-URL für die Symbol-Kachel — wie die Karten-Icons in
- * `Kartenflaeche.tsx`. `null`, wenn es sich nicht bauen lässt (nicht DV-102-konforme Werte werfen
- * synchron); dann trägt die Kachel das Kürzel.
+ * Das taktische Zeichen als Bild-URL für die Symbol-Kachel — aus derselben Quelle wie die
+ * Karten-Icons (`markerIconKey`): Fachobjekte über @einsatzzeichen (LFH-835), freie Zeichen bis
+ * LFH-836 über das Altpaket. `null`, wenn es sich nicht bauen lässt; dann trägt die Kachel das Kürzel.
  */
-function tzBildUrl(tz: TzProps | undefined): string | null {
+function markerBildUrl(typ: MarkerTyp, tz: TzProps | undefined): string | null {
   if (!tz) return null;
+  if (typ !== 'freies_zeichen') {
+    const zeichen = fachobjektZeichen(tz);
+    if (!zeichen) return null;
+    const svg = renderSvg(zeichen.drawing, KACHEL_SVG_OPTIONEN);
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
   try {
     return erzeugeTaktischesZeichen(tz).dataUrl;
   } catch {
@@ -161,7 +171,7 @@ export default function Inspector({
   const modulLink = markerToUrl(marker, einsatzId);
   // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig.
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
-  const bild = useMemo(() => tzBildUrl(marker.tz), [marker.tz]);
+  const bild = useMemo(() => markerBildUrl(marker.typ, marker.tz), [marker.typ, marker.tz]);
   const raster = auswahlRaster(marker, roh, formatZeitKurz);
   const letzte = letzteMeldungBlock(marker, roh, formatZeitKurz);
 

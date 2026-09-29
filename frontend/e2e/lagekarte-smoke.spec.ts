@@ -25,8 +25,13 @@ interface MapHaken {
   getStyle(): { sources?: Record<string, unknown> } | undefined;
   isSourceLoaded(id: string): boolean;
   loaded(): boolean;
+  isStyleLoaded(): boolean;
   getZoom(): number;
   getCenter(): { lng: number; lat: number };
+  listImages(): string[];
+  getImage(id: string): { data: { width: number; height: number } } | null | undefined;
+  setStyle(style: unknown, opts: { diff: boolean }): void;
+  queryRenderedFeatures(o: { layers: string[] }): Array<{ properties: { typ?: string } }>;
 }
 
 async function anmelden(page: Page) {
@@ -45,6 +50,31 @@ async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   return Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
+}
+
+/** Setzt die Einsatzort-Koordinate. Der Kopf-PATCH ist ein VOLLERSATZ (`KopfdatenUpdate`) — deshalb
+ *  aus dem Bestand gebaut. */
+async function einsatzortSetzen(page: Page, eid: number, ort: { lat: number; lon: number }) {
+  const e = (await (await page.request.get(`/api/einsaetze/${eid}`)).json()) as Record<
+    string,
+    unknown
+  >;
+  const antwort = await page.request.patch(`/api/einsaetze/${eid}`, {
+    data: {
+      bezeichnung: e.bezeichnung,
+      stichwort: e.stichwort ?? null,
+      einsatzart: e.einsatzart,
+      leitstellen_nr: e.leitstellen_nr ?? null,
+      einsatzort: e.einsatzort ?? null,
+      einsatzort_lat: ort.lat,
+      einsatzort_lon: ort.lon,
+      meldende_stelle: e.meldende_stelle ?? null,
+      sachverhalt: e.sachverhalt ?? null,
+      anzahl_betroffene_initial: e.anzahl_betroffene_initial ?? null,
+      begonnen_at: e.begonnen_at,
+    },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
 }
 
 /**
@@ -176,27 +206,7 @@ test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht
   await anmelden(page);
   const eid = await einsatzAnlegenUndOeffnen(page);
   const ort = { lat: 49.3519, lon: 9.1457 };
-  // Der Kopf-PATCH ist ein VOLLERSATZ (`KopfdatenUpdate`) — deshalb aus dem Bestand gebaut.
-  const e = (await (await page.request.get(`/api/einsaetze/${eid}`)).json()) as Record<
-    string,
-    unknown
-  >;
-  const antwort = await page.request.patch(`/api/einsaetze/${eid}`, {
-    data: {
-      bezeichnung: e.bezeichnung,
-      stichwort: e.stichwort ?? null,
-      einsatzart: e.einsatzart,
-      leitstellen_nr: e.leitstellen_nr ?? null,
-      einsatzort: e.einsatzort ?? null,
-      einsatzort_lat: ort.lat,
-      einsatzort_lon: ort.lon,
-      meldende_stelle: e.meldende_stelle ?? null,
-      sachverhalt: e.sachverhalt ?? null,
-      anzahl_betroffene_initial: e.anzahl_betroffene_initial ?? null,
-      begonnen_at: e.begonnen_at,
-    },
-  });
-  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  await einsatzortSetzen(page, eid, ort);
   const stand = await page.request.post(`/api/einsaetze/${eid}/lage-snapshots`, {
     data: { bezeichnung: 'Stand vor Ort' },
   });
@@ -326,4 +336,102 @@ test('Lagekarte: Messwerkzeug misst Strecke und Fläche und schließt mit Escape
   await expect(knopf).toHaveAttribute('aria-pressed', 'false');
 
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
+});
+
+// LFH-835: Fachobjekt-Zeichen kommen aus @einsatzzeichen, synchron über Canvas gerastert —
+// jsdom hat kein Canvas, das belegt nur der Browser. Pixeldichte 2 → 34 CSS-px = 68 Gerätepixel.
+test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  test('Einsatzort-Zeichen in Bildschirmschärfe, auch nach einem Stilwechsel', async ({ page }) => {
+    await anmelden(page);
+    const eid = await einsatzAnlegenUndOeffnen(page);
+    await einsatzortSetzen(page, eid, { lat: 49.3519, lon: 9.1457 });
+    await page.goto(`/einsaetze/${eid}/lagekarte`);
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+    );
+
+    const zeichenBilder = () =>
+      page.evaluate(() => {
+        const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+        // Während eines Stilwechsels wirft `listImages` („Style is not done loading“): weiterpollen.
+        if (!map?.isStyleLoaded()) return null;
+        return map
+          .listImages()
+          .filter((id) => id.startsWith('ez|'))
+          .map((id) => ({
+            id,
+            breite: map.getImage(id)?.data.width,
+            // Registriert ist nicht gezeichnet: das Symbol muss im Layer stehen.
+            gezeichnet: map.queryRenderedFeatures({ layers: ['marker-einsatzort-symbol'] }).length,
+          }));
+      });
+
+    await expect
+      .poll(zeichenBilder, { timeout: 15_000, message: 'kein @einsatzzeichen-Bild auf der Karte' })
+      .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68, gezeichnet: 1 }]);
+
+    // Ein Grundkarten-/Themenwechsel setzt den Stil neu (`diff: false`) und wirft alle Bilder weg.
+    await page.evaluate(() => {
+      const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte!;
+      map.setStyle(map.getStyle(), { diff: false });
+    });
+    await expect
+      .poll(zeichenBilder, { timeout: 15_000, message: 'Zeichen nach Stilwechsel nicht zurück' })
+      .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68, gezeichnet: 1 }]);
+  });
+
+  // Gezählt wird, was GEZEICHNET ist, nicht, was registriert ist: MapLibre 6 baut die Bildantwort
+  // einer Kachel, bevor es `styleimagemissing` feuert — ein erst dort angelegtes Bild fehlte im
+  // laufenden Layout, und nach einem Stilwechsel kommt ohne neue Daten kein weiteres Layout.
+  test('jedes Schadenszeichen ist gezeichnet, auch nach einem Stilwechsel', async ({ page }) => {
+    await anmelden(page);
+    const eid = await einsatzAnlegenUndOeffnen(page);
+    const ort = { lat: 49.3519, lon: 9.1457 };
+    await einsatzortSetzen(page, eid, ort);
+    // Je ein Quadrant um den Einsatzort: im Bild bei Zoom 14, und weit genug auseinander, dass
+    // nichts zum Cluster zusammenfällt (clusterRadius 45 px).
+    const lagen = [
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1],
+    ];
+    for (const [i, ausmass] of ['gering', 'mittel', 'gross', 'katastrophal'].entries()) {
+      const r = await page.request.post(`/api/einsaetze/${eid}/schaeden`, {
+        data: {
+          typ: 'sachschaden',
+          ausmass,
+          ort: `Schadenstelle ${i + 1}`,
+          lat: ort.lat + 0.0028 * lagen[i][0],
+          lon: ort.lon + 0.004 * lagen[i][1],
+        },
+      });
+      expect(r.ok(), await r.text()).toBeTruthy();
+    }
+    await page.goto(`/einsaetze/${eid}/lagekarte`);
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+    );
+    const gezeichnet = () =>
+      page.evaluate(() => {
+        const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+        if (!map) return null;
+        return map
+          .queryRenderedFeatures({ layers: ['marker-symbol'] })
+          .filter((f) => f.properties.typ === 'schaden').length;
+      });
+    await expect
+      .poll(gezeichnet, { timeout: 10_000, message: 'nicht jedes Schadenszeichen ist gezeichnet' })
+      .toBe(4);
+
+    await page.evaluate(() => {
+      const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte!;
+      map.setStyle(map.getStyle(), { diff: false });
+    });
+    await expect
+      .poll(gezeichnet, { timeout: 10_000, message: 'nach dem Stilwechsel fehlen Zeichen' })
+      .toBe(4);
+  });
 });
