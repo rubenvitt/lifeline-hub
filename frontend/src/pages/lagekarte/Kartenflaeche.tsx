@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 // Namespace-Import: maplibre-gl ab 6 ist ESM ohne Default-Export. Kein named-Import der Klassen:
 // `Map` beschattete den globalen `Map`, den die tzRegistry als `useRef<Map<string, TzProps>>`
 // nutzt. `import * as ns, { type X }` ist kein gültiges ES, daher zwei Zeilen.
@@ -69,8 +69,11 @@ import {
   ZONEN_KLICK_LAYER,
   entscheideKlickziel,
   ordneKlickebene,
+  type Flaechenziel,
   type Klickziel,
 } from './klickziel';
+import { fachebeneQuelleVon, flaechenKennung } from './flaechenwahl';
+import FlaechenwahlMenue from './FlaechenwahlMenue';
 import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './bildLayer';
 import { eckenInitialPixel, type Punkt } from './bildGeometrie';
 import { erzeugeBildHandles, type BildHandles } from './bildHandles';
@@ -173,6 +176,11 @@ export interface KartenflaecheProps {
   onZeichnenStandAenderung?: (stand: ZeichenStand) => void;
   /** Klick auf eine Zone → Inspector. */
   onZoneKlick?: (id: number) => void;
+  /**
+   * Liegen am Tipppunkt mehrere Flächen, öffnet sich ein Auswahlmenü (LFH-812). Aus in einem
+   * exklusiven Modus (Zeichnen, Messen, Platzieren) — dort gehört der Tipp dem Modus. Vorgabe aus.
+   */
+  flaechenwahl?: boolean;
   /** Messwerkzeug: aktive Form oder `null`. */
   messen?: MessForm | null;
   /** Laufender bzw. abgeschlossener Messentwurf; `null` = nichts gesetzt. */
@@ -287,6 +295,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     zoneZeichnenNonce,
     onZoneGezeichnet,
     onZoneKlick,
+    flaechenwahl = false,
     messen,
     onMessung,
     onZeichnenStandAenderung,
@@ -720,6 +729,79 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       if (src) src.setData(flaechenDatenRef.current as never);
     });
   }, [flaechen]);
+
+  // Flächen-Auswahlmenü (LFH-812): Liegen am Tipppunkt mehrere Flächen, gewinnt keiner der
+  // Flächen-Hörer (`klickzielAm` → `mehrdeutig`); dieser Hörer öffnet stattdessen das Menü. Die
+  // Wahl läuft über dieselben Callbacks wie der direkte Tipp. Alles über Refs, damit ein neuer
+  // Callback oder Moduswechsel die Hörer nicht neu bindet.
+  const [offeneWahl, setOffeneWahl] = useState<{
+    nr: number;
+    x: number;
+    y: number;
+    lngLat: { lng: number; lat: number };
+    flaechen: Flaechenziel<maplibregl.MapGeoJSONFeature>[];
+  } | null>(null);
+  const flaechenwahlRef = useRef(flaechenwahl);
+  flaechenwahlRef.current = flaechenwahl;
+  const flaechenKlickRef = useRef({ onZoneKlick, onFlaecheKlick, onFachebeneKlick });
+  flaechenKlickRef.current = { onZoneKlick, onFlaecheKlick, onFachebeneKlick };
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    let nr = 0;
+    const klick = (e: maplibregl.MapMouseEvent) => {
+      const ziel = klickzielAm(map, e);
+      if (ziel?.art !== 'mehrdeutig' || !flaechenwahlRef.current) return;
+      nr += 1;
+      setOffeneWahl({
+        nr,
+        x: e.point.x,
+        y: e.point.y,
+        lngLat: { lng: e.lngLat.lng, lat: e.lngLat.lat },
+        flaechen: ziel.flaechen,
+      });
+    };
+    // Der Anker sitzt in Pixeln; bei jeder Kartenbewegung schließt das Menü (wie das Auffächern).
+    const schliesse = () => setOffeneWahl(null);
+    map.on('click', klick);
+    map.on('movestart', schliesse);
+    return () => {
+      map.off('click', klick);
+      map.off('movestart', schliesse);
+    };
+  }, []);
+  // Ein exklusiver Modus beginnt: ein offenes Menü gehört nicht mehr dazu.
+  useEffect(() => {
+    if (!flaechenwahl) setOffeneWahl(null);
+  }, [flaechenwahl]);
+
+  const waehleFlaeche = (
+    ziel: Flaechenziel<maplibregl.MapGeoJSONFeature>,
+    lngLat: {
+      lng: number;
+      lat: number;
+    },
+  ) => {
+    const {
+      onZoneKlick: zone,
+      onFlaecheKlick: abschnitt,
+      onFachebeneKlick: fachebene,
+    } = flaechenKlickRef.current;
+    const id = ziel.merkmal.properties?.id;
+    if (ziel.art === 'zone') {
+      if (id != null) zone?.(Number(id));
+      return;
+    }
+    if (ziel.art === 'abschnitt') {
+      if (id != null) abschnitt?.(Number(id));
+      return;
+    }
+    const quelle = fachebeneQuelleVon(ziel.merkmal.layer.id);
+    const fe = fachebenenRef.current.find((f) => f.def.key === quelle);
+    if (!quelle || !fe) return;
+    const aus = werteFachebenenKlickAus(ziel.merkmal, lngLat, fe.daten);
+    fachebene?.(aus.props, quelle, aus.geometrie);
+  };
 
   // Klick auf eine Fläche → Inspector, wenn der Tipp ihr gehört (`klickzielAm`).
   useEffect(() => {
@@ -1276,8 +1358,34 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platzierBild?.ecken]);
 
+  // Die Hülle ist der Bezugsrahmen des Menü-Ankers: `e.point` zählt ab der Kartenecke.
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%' }} data-testid="kartenflaeche" />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div
+        ref={containerRef}
+        style={{ width: '100%', height: '100%' }}
+        data-testid="kartenflaeche"
+      />
+      <FlaechenwahlMenue
+        key={offeneWahl?.nr}
+        wahl={
+          offeneWahl && {
+            x: offeneWahl.x,
+            y: offeneWahl.y,
+            eintraege: offeneWahl.flaechen.map((f, i) => ({
+              schluessel: String(i),
+              text: flaechenKennung(f).text,
+            })),
+          }
+        }
+        onWaehlen={(schluessel) => {
+          const ziel = offeneWahl?.flaechen[Number(schluessel)];
+          if (ziel && offeneWahl) waehleFlaeche(ziel, offeneWahl.lngLat);
+        }}
+        onSchliessen={() => setOffeneWahl(null)}
+        fokusZiel={() => mapRef.current?.getCanvas() ?? null}
+      />
+    </div>
   );
 });
 

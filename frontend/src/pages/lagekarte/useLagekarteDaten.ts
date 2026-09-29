@@ -380,6 +380,7 @@ export function useLagekarteDaten({
             id: z.id,
             geometrie: g,
             label: beschriftung,
+            typ: z.typ,
             stil,
             // Gefahrenzonen gestrichelt — reine Darstellung am Zonentyp.
             gestrichelt: z.typ === 'gefahrengebiet',

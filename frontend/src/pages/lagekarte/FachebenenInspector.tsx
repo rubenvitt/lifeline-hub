@@ -12,6 +12,7 @@ import GeoKennzahlen from '../../components/GeoKennzahlen';
 import StatusTag from '../../components/StatusTag';
 import { rollenFarbe } from '../../theme/statusFarben';
 import { FACHEBENEN } from './fachebenen';
+import { alsText as s, fachebeneTitel, pick } from './fachebeneTitel';
 import { kategorieLabel } from './fachebenenLayer';
 import { geoKennzahlen } from './geo';
 import { hochwasserDarstellung } from './hochwasserStil';
@@ -33,22 +34,6 @@ interface FachebenenInspectorProps {
   pegelBezug?: { einsatzId: number; darfSchreiben: boolean };
 }
 
-/** Wert als getrimmter String oder null (akzeptiert auch Zahlen). */
-function s(v: unknown): string | null {
-  if (typeof v === 'string') return v.trim() || null;
-  if (typeof v === 'number') return String(v);
-  return null;
-}
-
-/** Erstes nicht-leeres Feld aus mehreren möglichen Property-Namen. */
-function pick(p: Record<string, unknown>, ...keys: string[]): string | null {
-  for (const k of keys) {
-    const v = s(p[k]);
-    if (v) return v;
-  }
-  return null;
-}
-
 /** Nur http(s) zulassen. Die Werte kommen aus fremden Quellen (OSM-Tags, Autobahn-API);
  *  ein `javascript:`-URI in `href`/`src` wäre XSS. */
 function nurWeb(v: string | null): string | null {
@@ -60,13 +45,6 @@ function fmtZeit(v: string | null): string | null {
   if (!v) return null;
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? v : taktischeDtgVoll(v);
-}
-
-/** „DAUERREGEN" / „STARKES GEWITTER" → „Dauerregen" / „Starkes Gewitter". */
-function titelCase(v: string): string {
-  return v
-    .toLocaleLowerCase('de-DE')
-    .replace(/(^|\s|-)([\p{L}])/gu, (_, sep, ch) => sep + ch.toLocaleUpperCase('de-DE'));
 }
 
 /** Emoji-Icon zum Wetter-Ereignis (DWD EC_GROUP / EVENT). */
@@ -685,17 +663,14 @@ export default function FachebenenInspector({
   // Fläche/Umfang/Länge rein clientseitig aus der (auch Multi-*) Geometrie.
   const kennzahlen = geometrie ? geoKennzahlen(geometrie) : null;
 
-  let titel: string;
-  if (istWarnung) {
-    const event = pick(p, 'EVENT', 'event');
-    if (quelle === 'dwd') {
-      titel = `${wetterIcon(pick(p, 'EC_GROUP'), event)} ${event ? titelCase(event) : 'Wetterwarnung'}`;
-    } else {
-      titel = '⚠️ Amtliche Warnung';
-    }
-  } else {
-    titel = pick(p, 'titel', 'name') ?? FACHEBENEN[quelle].label;
-  }
+  // Der Text kommt aus `fachebeneTitel` (auch für das Flächen-Auswahlmenü); nur hier ein Zeichen.
+  const titelText = fachebeneTitel(quelle, p);
+  const titel =
+    quelle === 'dwd'
+      ? `${wetterIcon(pick(p, 'EC_GROUP'), pick(p, 'EVENT', 'event'))} ${titelText}`
+      : quelle === 'nina'
+        ? `⚠️ ${titelText}`
+        : titelText;
 
   return (
     <KartenDetailCard

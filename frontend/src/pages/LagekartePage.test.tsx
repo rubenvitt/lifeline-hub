@@ -74,6 +74,7 @@ vi.mock('./lagekarte/Kartenflaeche', async () => {
           {/* Messen: welche Form die Karte bekommt, und ein Auslöser, der eine abgeschlossene
               Strecke von ~111 m meldet wie terra-draw beim Doppelklick. */}
           <div data-testid="messen">{props.messen ?? 'aus'}</div>
+          <div data-testid="flaechenwahl">{props.flaechenwahl ? 'an' : 'aus'}</div>
           {props.messen && (
             <button
               onClick={() =>
@@ -946,6 +947,17 @@ describe('LagekartePage', () => {
     await user.keyboard('{Escape}');
     expect(screen.getByTestId('messen')).toHaveTextContent('aus');
     expect(document.querySelector('[data-lfh="mess-steuerung"]')).toBeNull();
+  });
+
+  it('LFH-812: das Flächen-Auswahlmenü ist im exklusiven Modus aus', async () => {
+    basisHandler([]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Messen' }));
+    expect(screen.getByTestId('flaechenwahl')).toHaveTextContent('aus');
+    await user.keyboard('{Escape}');
+    expect(screen.getByTestId('messen')).toHaveTextContent('aus');
+    expect(screen.getByTestId('flaechenwahl')).toHaveTextContent('an');
   });
 
   it('platziert eine Einheit: wählen → Karten-Klick → PATCH /position mit lat/lon', async () => {

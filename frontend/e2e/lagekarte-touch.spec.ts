@@ -1126,3 +1126,273 @@ async function bildEcken(page: Page, saat: Modussaat): Promise<string> {
   ).json()) as { id: number; ecken_json: string }[];
   return bilder.find((b) => b.id === saat.bildId)?.ecken_json ?? '';
 }
+
+/** Achsenparalleles Rechteck als GeoJSON-Polygon (West, Süd, Ost, Nord). */
+function rechteck(w: number, s: number, o: number, n: number) {
+  return {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [w, s],
+        [o, s],
+        [o, n],
+        [w, n],
+        [w, s],
+      ],
+    ],
+  };
+}
+
+// LFH-812: Liegen am Tipppunkt mehrere Flächen, wählt der Mensch im Auswahlmenü. Punktziele und
+// Trefferzonen behalten die feste Rangfolge.
+test.describe('Flächen-Auswahlmenü am Führungs-Tablet (LFH-812)', () => {
+  test.use({ hasTouch: true, viewport: { width: 1024, height: 768 } });
+
+  test('mehrere Flächen öffnen ein Menü, der Ring eines Markers nicht', async ({ page }) => {
+    test.setTimeout(180_000);
+    const seitenFehler: Error[] = [];
+    page.on('pageerror', (f) => seitenFehler.push(f));
+    // Handschuh: Einträge müssen 72 px halten.
+    await page.addInitScript(
+      ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
+      [DICHTE_SCHLUESSEL, 'handschuh'] as const,
+    );
+    // Hermetisch: eine DWD-Warnfläche über der Osthälfte der Zone.
+    const [lng, lat] = EINZEL;
+    await page.route('**/api/karte/fachebenen/dwd**', (route) =>
+      route.fulfill({
+        json: {
+          quelle: 'dwd',
+          status: 'ok',
+          attribution: '© Deutscher Wetterdienst',
+          features: {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                geometry: rechteck(lng + 0.002, lat - 0.003, lng + 0.008, lat + 0.003),
+                properties: { EVENT: 'STURMBÖEN', HEADLINE: 'Amtliche Warnung vor Sturmböen' },
+              },
+            ],
+          },
+        },
+      }),
+    );
+    await anmelden(page);
+    const einsatzId = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E Flächenwahl ${Date.now()}`,
+    });
+    await einheitAn(page, einsatzId, 'Pumpe Ost', EINZEL);
+    // Zone um das Zeichen, Abschnitt über ihrer Westhälfte samt Zeichen.
+    const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
+      data: {
+        typ: 'absperrbereich',
+        geometrie_typ: 'Polygon',
+        geometrie: JSON.stringify(rechteck(lng - 0.01, lat - 0.005, lng + 0.01, lat + 0.005)),
+        label: 'Sperrzone Probe',
+      },
+    });
+    expect(zone.ok(), await zone.text()).toBeTruthy();
+    const abschnittId = await post(page, `/api/einsaetze/${einsatzId}/abschnitte`, {
+      name: 'Deichwache Probe',
+    });
+    const flaeche = await page.request.patch(
+      `/api/einsaetze/${einsatzId}/abschnitte/${abschnittId}/flaeche`,
+      {
+        data: {
+          flaeche_geojson: JSON.stringify(
+            rechteck(lng - 0.008, lat - 0.003, lng + 0.001, lat + 0.003),
+          ),
+        },
+      },
+    );
+    expect(flaeche.ok(), await flaeche.text()).toBeTruthy();
+
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+    await ruhe(page);
+    await springe(page, EINZEL, 15);
+
+    const layerAm = (ll: [number, number]) =>
+      page.evaluate((c) => {
+        const k = (window as unknown as { __lfhKarte: KarteLfh764 }).__lfhKarte;
+        const p = k.project(c);
+        return k.queryRenderedFeatures([p.x, p.y]).map((f) => f.layer.id);
+      }, ll);
+    const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+    const eintraege = menue.getByRole('menuitem');
+    const auswahl = page.locator('[data-lfh="auswahl"] h3');
+    // Die Leiste liegt links über der Karte: vor jedem Tipp den Punkt in die Mitte holen.
+    const tippAuf = async (ll: [number, number], wo: string) => {
+      await springe(page, ll, 15);
+      const p = await aufSchirm(page, ll);
+      await aufKarte(page, [p], wo);
+      await page.waitForTimeout(600); // kein Doppeltipp-Zoom mit dem Tipp davor
+      await tippe(page, p);
+    };
+
+    // 1. Zone und Abschnitt übereinander: Menü mit beiden. Abseits der Mitte des Abschnitts, dort
+    // steht sein Befehlsstellen-Zeichen (ein Punktziel).
+    const west: [number, number] = [lng - 0.007, lat + 0.002];
+    await springe(page, west, 15);
+    await expect
+      .poll(() => layerAm(west), { message: 'Zone und Abschnitt liegen im Westen übereinander' })
+      .toEqual(expect.arrayContaining(['zonen-fill', 'abschnitte-fill']));
+    const amWest = await layerAm(west);
+    expect(
+      amWest.filter((id) => /^(marker|spider|personen)-/.test(id)),
+      `im Westen kein Punktziel und keine Trefferzone: ${amWest.join(', ')}`,
+    ).toEqual([]);
+    await tippAuf(west, 'Überschneidung Zone/Abschnitt');
+    await expect(menue).toBeVisible();
+    await expect(menue).toHaveAttribute('aria-label', 'Fläche wählen');
+    const texte = await eintraege.allTextContents();
+    expect(texte).toHaveLength(2);
+    expect(texte).toEqual(
+      expect.arrayContaining(['Absperrbereich: Sperrzone Probe', 'Abschnitt: Deichwache Probe']),
+    );
+    await expect(auswahl).toHaveCount(0);
+    // Die Einblendung skaliert von 0.8 hoch: gemessen wird der eingeschwungene Stand.
+    await expect
+      .poll(
+        async () =>
+          Math.min(
+            ...(await Promise.all((await eintraege.all()).map((e) => e.boundingBox()))).map(
+              (b) => b!.height,
+            ),
+          ),
+        { message: 'Eintrag hält die Handschuh-Höhe' },
+      )
+      .toBeGreaterThanOrEqual(72);
+    // Klicken, nicht nur sehen: der Eintrag nimmt den Tipp.
+    await eintraege.filter({ hasText: 'Abschnitt: Deichwache Probe' }).tap();
+    await expect(menue).toHaveCount(0);
+    await expect(auswahl).toHaveText(['Deichwache Probe']);
+
+    // 2. Tastatur: Esc schließt ohne Wahl, der Fokus geht an die Karte.
+    await page
+      .getByRole('button', { name: /schließen/i })
+      .first()
+      .click();
+    await expect(auswahl).toHaveCount(0);
+    await tippAuf(west, 'Überschneidung Zone/Abschnitt (Esc)');
+    await expect(menue).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(menue).toHaveCount(0);
+    await expect(auswahl).toHaveCount(0);
+    await expect(page.locator('canvas.maplibregl-canvas')).toBeFocused();
+    // Pfeil und Enter wählen den zweiten Eintrag.
+    await tippAuf(west, 'Überschneidung Zone/Abschnitt (Pfeile)');
+    await expect(menue).toBeVisible();
+    const zweiter = (await eintraege.allTextContents())[1];
+    // `autoFocus` legt den Fokus ins Menü, sobald es steht; erst dann gehören die Tasten ihm.
+    await expect
+      .poll(() => page.evaluate(() => Boolean(document.activeElement?.closest('[role="menu"]'))), {
+        message: 'Fokus liegt im Menü',
+      })
+      .toBe(true);
+    // Beim Öffnen steht der erste Eintrag schon aktiv; ein Pfeil führt zum zweiten.
+    const aktiv = menue.locator('li.ant-dropdown-menu-item-active');
+    await expect(aktiv).toHaveText([(await eintraege.allTextContents())[0]]);
+    await page.keyboard.press('ArrowDown');
+    await expect(aktiv).toHaveText([zweiter]);
+    // Enter klickt das Element mit dem DOM-Fokus; rc-menu zieht ihn der Hervorhebung erst einen
+    // Takt später nach (gemessen: sofortiges Enter traf in 2 von 6 Läufen den ersten Eintrag).
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.textContent ?? ''), {
+        message: 'Fokus folgt der Hervorhebung',
+      })
+      .toBe(zweiter);
+    await page.keyboard.press('Enter');
+    await expect(menue).toHaveCount(0);
+    await expect(auswahl).toHaveText([zweiter.replace(/^[^:]+: /, '')]);
+    await expect(page.locator('canvas.maplibregl-canvas')).toBeFocused();
+    await page
+      .getByRole('button', { name: /schließen/i })
+      .first()
+      .click();
+
+    // 3. Eine Kartenbewegung schließt das Menü, ohne dass antd davon weiß; der Fokus fällt
+    // trotzdem nicht auf `body`.
+    await tippAuf(west, 'Überschneidung Zone/Abschnitt (Bewegung)');
+    await expect(menue).toBeVisible();
+    await springe(page, EINZEL, 15.2);
+    await expect(menue).toHaveCount(0);
+    await expect(page.locator('canvas.maplibregl-canvas')).toBeFocused();
+    await springe(page, EINZEL, 15);
+
+    // 3a. Im exklusiven Modus (Messen) gehört der Tipp dem Modus: kein Menü, Esc beendet ihn.
+    await page.getByRole('button', { name: 'Messen' }).tap();
+    await expect(page.getByRole('button', { name: 'Messen' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    // Der Messwert steht im Fuß über der Kartenmitte: den Punkt in die freie Fläche darüber holen.
+    await springe(page, west, 15);
+    const frei = await kartenMitte(page);
+    const jetzt = await aufSchirm(page, west);
+    await page.evaluate(
+      (d) =>
+        (
+          window as unknown as { __lfhKarte: { panBy(o: [number, number], a: object): void } }
+        ).__lfhKarte.panBy([d.x, d.y], { duration: 0 }),
+      { x: jetzt.x - frei.x, y: jetzt.y - frei.y },
+    );
+    await ruhe(page);
+    expect(await layerAm(west)).toEqual(expect.arrayContaining(['zonen-fill', 'abschnitte-fill']));
+    const messTipp = await aufSchirm(page, west);
+    await aufKarte(page, [messTipp], 'Überschneidung Zone/Abschnitt (Messen)');
+    await tippe(page, messTipp);
+    await page.waitForTimeout(600);
+    await expect(menue).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: 'Messen' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+
+    await springe(page, EINZEL, 15);
+
+    // 4. Zone unter einer DWD-Warnfläche: eigene Fläche zuerst, dann die Warnung.
+    await paneelAuf(page, 'fachebenen');
+    await page.getByRole('switch', { name: 'Wetterwarnungen (DWD)' }).click();
+    const ost: [number, number] = [lng + 0.005, lat];
+    await expect
+      .poll(() => layerAm(ost), { timeout: 20_000, message: 'DWD-Fläche liegt über der Zone' })
+      .toEqual(expect.arrayContaining(['zonen-fill', 'fachebene-dwd-fill']));
+    await tippAuf(ost, 'Zone unter DWD');
+    await expect(menue).toBeVisible();
+    await expect(eintraege).toHaveText([
+      'Absperrbereich: Sperrzone Probe',
+      'Wetterwarnungen (DWD): Sturmböen',
+    ]);
+    await eintraege.filter({ hasText: 'Sturmböen' }).tap();
+    await expect(menue).toHaveCount(0);
+    await expect(auswahl).toContainText(['Sturmböen']);
+    await page
+      .getByRole('button', { name: /schließen/i })
+      .first()
+      .click();
+
+    // 5. Im Ring des Markers, über Zone UND Abschnitt: der Marker, kein Menü.
+    await springe(page, EINZEL, 15);
+    const ring = await page.evaluate((ll) => {
+      const k = (window as unknown as { __lfhKarte: KarteLfh764 }).__lfhKarte;
+      const p = k.project(ll);
+      // Nördlich: östlich steht die eigene Namensplakette, westlich die des Abschnitts.
+      const o = k.unproject([p.x, p.y - 30]);
+      return [o.lng, o.lat] as [number, number];
+    }, EINZEL);
+    const amRing = await layerAm(ring);
+    expect(amRing, `am Ring: ${amRing.join(', ')}`).toEqual(
+      expect.arrayContaining(['marker-treffer', 'zonen-fill', 'abschnitte-fill']),
+    );
+    expect(
+      amRing.filter((id) => /^(marker|spider|personen)-/.test(id) && !id.endsWith('-treffer')),
+    ).toEqual([]);
+    await tippAuf(ring, 'Ring des Markers');
+    await expect(auswahl).toHaveText(['Pumpe Ost']);
+    await expect(menue).toHaveCount(0);
+    expect(seitenFehler.map((f) => f.message)).toEqual([]);
+  });
+});

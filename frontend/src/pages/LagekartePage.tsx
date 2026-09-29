@@ -884,6 +884,7 @@ export default function LagekartePage() {
         zoneZeichnen={zoneEntwurf ? zoneEntwurf.modus : null}
         zoneZeichnenNonce={zoneZeichnenNonce}
         onZoneKlick={onZoneKlick}
+        flaechenwahl={!exklusiverModusAktiv}
         onZoneGezeichnet={onZoneGezeichnet}
         onZeichnenStandAenderung={setZeichenStand}
         messen={messForm}
