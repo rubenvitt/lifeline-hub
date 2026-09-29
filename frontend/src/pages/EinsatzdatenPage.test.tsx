@@ -620,12 +620,16 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
     setup({ einsatz: { einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 } });
     const user = userEvent.setup();
     await technikAufklappen(user);
-    for (const name of ['Koordinate', 'Einsatzleitung', 'Einsatznummer', 'Angelegt am (techn.)']) {
-      expect(
-        screen.queryByRole('button', {
-          name: new RegExp(`^${name.replace(/[.()]/g, '\\$&')} (bearbeiten|eintragen)$`),
-        }),
-      ).toBeNull();
+    // Exakte Namen statt eines gebauten RegExp: die Etiketten tragen Punkt und Klammern.
+    for (const angabe of [
+      'Koordinate',
+      'Einsatzleitung',
+      'Einsatznummer',
+      'Angelegt am (techn.)',
+    ]) {
+      for (const aufforderung of ['bearbeiten', 'eintragen']) {
+        expect(screen.queryByRole('button', { name: `${angabe} ${aufforderung}` })).toBeNull();
+      }
     }
     // Gegenprobe: die inline bearbeitbaren Angaben daneben tragen eine.
     expect(screen.getByRole('button', { name: 'Leitstellen-Nr. eintragen' })).toBeInTheDocument();
