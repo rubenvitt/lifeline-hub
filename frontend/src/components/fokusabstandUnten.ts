@@ -6,12 +6,15 @@ import { useCallback } from 'react';
  *
  * Beim Vorwärtstabben rollt der Browser ein Ziel an den UNTEREN Rand des Fensters — genau
  * dorthin, wo eine angepinnte Fußleiste steht. Wie die Variable verbraucht wird, entscheidet
- * die Seite, und die zwei Seiten entscheiden verschieden, beide gemessen:
+ * die Seite, und die Seiten entscheiden verschieden, jede gemessen:
  *  - Befehlsentwurf (LFH-465): `scroll-padding-block-end` am Dokument
  *    (`pages/befehlAktionsleiste.css`); `scroll-margin` an den Formularfeldern blieb dort
  *    wirkungslos.
  *  - ETB (LFH-373): `scroll-margin-block-end` an den Zielen der Zeitachse (`index.css`); die
  *    Scrollport-Variante rollte dort bei jedem Fokus IN der Leiste die Seite ans Ende.
+ *  - Speicherleiste der Formularseiten (LFH-475, `useSpeicherLeiste`): `scroll-padding` am
+ *    Dokument, gescopt über `:has` (`index.css`); `scroll-margin` an den Feldern blieb auch dort
+ *    wirkungslos, ein Tab auf „Speichern" rollt die Seite gemessen nicht.
  * Deshalb EINE Messung, aber je Seite eine eigene Variable — eine gemeinsame hätte die Regel
  * der einen Seite auf die andere übertragen.
  *
@@ -20,6 +23,8 @@ import { useCallback } from 'react';
  */
 export const FOKUSABSTAND_BEFEHL = '--lfh-befehl-fokusabstand';
 export const FOKUSABSTAND_ETB = '--lfh-etb-fokusabstand';
+/** Speicherleiste der Formularseiten (LFH-475): `scroll-margin` an den Feldern (`index.css`). */
+export const FOKUSABSTAND_SPEICHERLEISTE = '--lfh-speicherleiste-fokusabstand';
 
 /**
  * Callback-Ref-Körper: misst die Leiste, schreibt Höhe + `abstand` als `variable` an `<html>`

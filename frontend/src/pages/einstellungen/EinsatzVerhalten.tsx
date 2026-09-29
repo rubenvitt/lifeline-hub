@@ -17,7 +17,7 @@ import {
   zuUpdate,
   type FormWerteVerhalten,
 } from './einsatzEinstellungenForm';
-import { speicherLeisteStil } from '../../components/speicherLeiste';
+import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import { Formularpaneel } from '../../components/instrument';
 
 /** Tristate-Optionen für automatische ETB-Einträge (leer = erbt Org, true = An, false = Aus).
@@ -39,6 +39,7 @@ export default function EinsatzVerhalten() {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerteVerhalten>();
   const { token } = theme.useToken();
+  const speicherLeiste = useSpeicherLeiste();
   const { abBreite } = useViewport();
   const daten = useEinstellungenDaten(einsatzId);
 
@@ -204,7 +205,7 @@ export default function EinsatzVerhalten() {
           </div>
         </Formularpaneel>
 
-        <div style={speicherLeisteStil(token)}>
+        <div {...speicherLeiste}>
           <Button type="primary" htmlType="submit" loading={speichern.isPending}>
             Speichern
           </Button>

@@ -300,6 +300,136 @@ test('Einstellungen: Tabulaturdurchlauf unter der sticky Speicherleiste', async 
   });
 });
 
+/**
+ * LFH-475 (Nachzug N2 aus LFH-346 · C11): die zwei sticky Speicherleisten, die C11 gebaut hat.
+ * Dieselbe Stilfunktion wie oben (`speicherLeisteStil`) belegt nur die GEOMETRIE der Leiste,
+ * nicht die Tabulaturordnung über DIESEN Formularen — deshalb je Route ein eigener Lauf.
+ *
+ * Drei Vorbedingungen, ohne die „0 verdeckte Ziele" trivial wahr ist, und jede bricht den Test:
+ * Bildlaufreserve > 0 (sonst klebt die Leiste am Seitenende statt über dem Inhalt), die Leiste
+ * steht `sticky` im Baum, ≥ 8 Tabulator-Stopps IM Formular (Stopps der Navigation zählen nicht).
+ * Zusätzlich muss jedes Bedienziel des Formulars besucht werden, auch das Speichern selbst.
+ *
+ * Bei 390 px war der Lauf auf BEIDEN Routen rot (ein Feld ganz hinter der Leiste), bis
+ * `useSpeicherLeiste` den Fokusabstand mitbrachte (`components/speicherLeiste.ts`).
+ */
+async function speicherleisteFokusBereit(page: Page, ersteFeld: string) {
+  const leiste = page
+    .locator('form [data-lfh="speicherleiste"]')
+    .filter({ has: page.getByRole('button', { name: 'Speichern', exact: true }) });
+  await expect(leiste, 'Vorbedingung: die Speicherleiste steht im Formular').toHaveCount(1);
+  await expect(leiste, 'Vorbedingung: die Speicherleiste muss stehen').toHaveCSS(
+    'position',
+    'sticky',
+  );
+  await leiste.evaluate((el) => el.classList.add('e2e-speicherleiste'));
+
+  // Jedes Bedienziel des Formulars trägt eine Kennung; `besuchteZiele` belegt den Besuch.
+  const formular = leiste.locator('xpath=ancestor::form[1]');
+  await expect(formular).toHaveCount(1);
+  const ziele = await formular.evaluate((form) => {
+    form.classList.add('e2e-formular');
+    const kennungen: string[] = [];
+    const kandidaten = form.querySelectorAll<HTMLElement>(
+      'input:not([type="hidden"]), textarea, button, [tabindex]',
+    );
+    for (const el of Array.from(kandidaten)) {
+      const r = el.getBoundingClientRect();
+      if (el.tabIndex < 0 || (el as HTMLInputElement).disabled) continue;
+      if (r.width === 0 && r.height === 0) continue;
+      const kennung = `${kennungen.length}:${(el.getAttribute('aria-label') ?? el.id) || el.tagName}`;
+      el.setAttribute('data-e2e-fokus', kennung);
+      kennungen.push(kennung);
+    }
+    return kennungen;
+  });
+
+  const reserve = await page.evaluate(
+    () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+  );
+  expect(
+    reserve,
+    'Vorbedingung: die Seite muss scrollen, sonst klebt die Leiste am Seitenende',
+  ).toBeGreaterThan(0);
+
+  // Start unmittelbar VOR dem ersten Feld: `Tab` führt dann in das Formular hinein, statt die
+  // Schritte in der Navigation zu verbrauchen.
+  await page.getByLabel(ersteFeld, { exact: true }).focus();
+  // Die Leiste steht während der Eingabe tatsächlich über dem Inhalt, nicht erst am Seitenende.
+  await expect(leiste, 'Vorbedingung: die Leiste steht beim ersten Feld im Bild').toBeInViewport();
+  await page.keyboard.press('Shift+Tab');
+  return { ziele, reserve };
+}
+
+for (const { name, feld, seite } of [
+  {
+    name: 'Fahrzeug-Detailseite',
+    feld: 'Funkrufname',
+    seite: async (page: Page) => {
+      const antwort = await page.request.post('/api/fahrzeuge', {
+        data: { funkrufname: `E2E-FOKUS ${Date.now()}`, fahrzeugtyp: 'LF 20' },
+      });
+      expect(
+        antwort.ok(),
+        `Seeding Fahrzeug: ${antwort.status()} ${await antwort.text()}`,
+      ).toBeTruthy();
+      const { id } = (await antwort.json()) as { id: number };
+      return `/admin/stammdaten/fahrzeuge/${id}`;
+    },
+  },
+  {
+    name: 'Einsatz-Defaults',
+    feld: 'Aufbewahrungs-Dauer (Tage)',
+    seite: async () => '/admin/einstellungen/einsatz',
+  },
+]) {
+  for (const viewport of [
+    { width: 390, height: 420 },
+    { width: 1366, height: 520 },
+  ]) {
+    test(`${name} (LFH-475): Tabulaturdurchlauf unter der sticky Speicherleiste bei ${viewport.width}px`, async ({
+      page,
+    }) => {
+      await anmelden(page);
+      const pfad = await seite(page);
+      await page.setViewportSize(viewport);
+      await page.goto(pfad);
+      await expect(page.getByLabel(feld, { exact: true })).toBeVisible();
+
+      const { ziele, reserve } = await speicherleisteFokusBereit(page, feld);
+      const befund = await pruefeFokusVerdeckung(page, ziele.length + 4, 'Tab', {
+        region: '.e2e-formular',
+      });
+
+      expect(
+        befund.fixierteKandidaten,
+        'Vorbedingung: mindestens ein sticky Knoten im Baum',
+      ).toBeGreaterThanOrEqual(1);
+      expect(
+        befund.stoppsInRegion,
+        `Vorbedingung: ≥ 8 Tabulator-Stopps im Formular (${befund.stoppsGesamt} gesamt)`,
+      ).toBeGreaterThanOrEqual(8);
+      expect(
+        befund.besuchteZiele.sort(),
+        'jedes Bedienziel des Formulars, das Speichern eingeschlossen, muss per Tab besucht werden',
+      ).toEqual([...ziele].sort());
+
+      expect(
+        befund.verdeckt,
+        `Fokusziele vollständig verdeckt:\n${befund.verdeckt.join('\n')}`,
+      ).toEqual([]);
+
+      test.info().annotations.push({
+        type: 'messwert',
+        description:
+          `${name} ${viewport.width}×${viewport.height}: ${befund.stoppsInRegion} Stopps im ` +
+          `Formular (${ziele.length} Ziele), ${befund.stoppsBeruehrt} an einem sticky Knoten, ` +
+          `${befund.fixierteKandidaten} fixierte Knoten, Reserve ${reserve}px`,
+      });
+    });
+  }
+}
+
 /** Besuchsnachweise gehören zur Route, allgemeine Stopps zählen auch die Navigation. */
 async function einheitFokusBereit(page: Page, dichte: string) {
   await anmelden(page);

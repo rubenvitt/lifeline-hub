@@ -28,7 +28,7 @@ import {
 import { globalKeys } from '../api/queryKeys';
 // Die Speicherleiste wird WIEDERVERWENDET, nicht nachgebaut: `speicherLeiste` ist die eine
 // Stelle, an der „sticky am unteren Rand, im Formular" begründet und geprüft ist.
-import { speicherLeisteStil } from '../components/speicherLeiste';
+import { useSpeicherLeiste } from '../components/speicherLeiste';
 import { leerZuNull } from '../api/patchTriState';
 import { parseRouteId } from '../routing/deeplinks';
 import type { Fahrzeug, Staerke } from '../api/types';
@@ -77,6 +77,7 @@ export default function FahrzeugDetailPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token } = theme.useToken();
+  const speicherLeiste = useSpeicherLeiste();
 
   const fahrzeugeQuery = useQuery({
     queryKey: globalKeys.fahrzeugeListe('alle'),
@@ -288,7 +289,7 @@ export default function FahrzeugDetailPage() {
           {/* Sticky am unteren Rand und IM `<form>`: nur dort trägt der Knopf `htmlType="submit"`, und
              Enter sendet über die eingebaute Formularübermittlung ab. Ein Knopf im Kopf-Slot von
              `AdminPage` läge außerhalb des Formulars. */}
-          <div style={speicherLeisteStil(token)}>
+          <div {...speicherLeiste}>
             <Button type="primary" htmlType="submit" loading={speichern.isPending}>
               Speichern
             </Button>

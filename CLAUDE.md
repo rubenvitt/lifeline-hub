@@ -441,8 +441,11 @@ anwendbar), „nicht geprüft" ist keins.
   `einsatzEinstellungenPfad`) schicken über `einstellungen/einsatzEinstellungenForm.ts`
   (`zuUpdate`) immer alle Felder mit, auch `basemap_modus`, `karten_zoom_start`,
   `fachebenen_sichtbar`. Jede Sektion stellt ihre Queries selbst (kein `useOutletContext`).
-  Speichern-Leiste sticky im `<form>` (`htmlType="submit"`); `speicherLeisteStil`/
-  `feldrasterStil` rein, die Breite liest der Aufrufer aus `useViewport`.
+  Speichern-Leiste sticky im `<form>` (`htmlType="submit"`), gebaut nur über
+  `<div {...useSpeicherLeiste()}>` (`components/speicherLeiste.ts`) — sie bringt den Fokusabstand
+  mit (LFH-475, `scroll-padding` über `:root:has(...)` in `index.css`, Nachweis
+  `e2e/fokus-verdeckung.spec.ts`); `speicherLeisteStil`/`feldrasterStil` rein, die Breite liest
+  der Aufrufer aus `useViewport`.
 - Ein Collapse-Kopf im Formular ist kein Übermittlungsknopf (`MaterialFormModal.test.tsx`).
 - **Direkteinstieg** (LFH-347, `components/Direkteinstieg.tsx`,
   `components/EinstiegSwitcher.tsx`, `components/direkteinstiegKern.ts`; Tabelle unter `…/liste`;
