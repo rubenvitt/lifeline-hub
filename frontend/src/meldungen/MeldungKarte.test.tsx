@@ -45,9 +45,8 @@ function renderKarte(ui: React.ReactElement) {
 }
 
 /**
- * Greift das GEÖFFNETE Dropdown-Portal. antd lässt die Portale geschlossener Dropdowns
- * im Baum stehen, und ein verlassendes Portal bekommt in jsdom nie `hidden` — deshalb
- * zusätzlich über `pointerEvents` filtern und genau einen Treffer verlangen.
+ * Greift das GEÖFFNETE Dropdown-Portal: antd lässt geschlossene Portale im Baum, und ein
+ * verlassendes bekommt in jsdom nie `hidden` — daher Filter über `pointerEvents`.
  */
 async function oeffneAktionsmenue(lfdNr = 1): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Meldung ${lfdNr}` }));
@@ -60,8 +59,8 @@ async function oeffneAktionsmenue(lfdNr = 1): Promise<HTMLElement> {
   return menue;
 }
 
-/** Die Worst-Case-Meldung aus dem AK: neu · bestätigungspflichtig unbestätigt ·
- *  nicht lagerelevant · kein Auftrag → alle sechs Aktionen stehen zur Verfügung. */
+/** Worst Case: neu, bestätigungspflichtig unbestätigt, nicht lagerelevant, kein Auftrag → alle
+    sechs Aktionen stehen zur Verfügung. */
 const schlimmstenfalls = () =>
   meldung({
     status: 'neu',
@@ -129,7 +128,7 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
     const cb = alleCallbacks();
     renderKarte(<MeldungKarte meldung={schlimmstenfalls()} einsatzId={7} {...cb} />);
     await userEvent.click(screen.getByRole('button', { name: 'Sichten' }));
-    // Kein Popconfirm mehr (LFH-378, umkehrbar): der Klick schaltet unmittelbar.
+    // Kein Popconfirm (umkehrbar): der Klick schaltet unmittelbar.
     expect(cb.onStatus).toHaveBeenCalledWith(1, 'gesichtet');
   });
 
@@ -183,11 +182,8 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
   });
 
   /**
-   * Gegenprobe zur Bündelung (LFH-366: „gezählt wird NACH der Rechteprüfung"). Der Fall
-   * ist echt: eine erledigte Meldung ohne Bestätigungspflicht hat weder eine
-   * Vorwärtsbewegung noch etwas zu bestätigen — bliebe sie gebündelt, stünde da ein
-   * ⋮-Trigger mit zwei Einträgen und sonst nichts. Zusammen mit dem Worst-Case-Test oben
-   * ist das das Paar, das die Bündelung überhaupt prüfbar macht.
+   * Gegenprobe zur Bündelung (gezählt NACH der Rechteprüfung): eine erledigte Meldung ohne
+   * Bestätigungspflicht hat nur zwei Aktionen und darf nicht gebündelt werden.
    */
   it('bündelt NICHT, wenn nach der Filterung nur zwei Aktionen übrig sind', async () => {
     const cb = alleCallbacks();
@@ -227,10 +223,8 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
 });
 
 /**
- * Befund H47 (LFH-343 · C8): eine neue Meldung sah exakt aus wie eine bereits
- * gesichtete — beide `phase: 'offen'`, zwei graue Tags, drei Buchstaben Unterschied.
- * Wer 20–40 Karten quer scannt, konnte „hat noch niemand angefasst" nicht von
- * „ist erledigt gesichtet" trennen.
+ * Eingangszustand: „neu" und „gesichtet" liegen beide auf Phase `offen` und müssen trotzdem
+ * beim Querscannen unterscheidbar sein.
  */
 describe('MeldungKarte · Eingangszustand', () => {
   it('gibt der neuen Meldung einen eigenen Akzent, der gesichteten keinen', () => {
@@ -261,8 +255,7 @@ describe('MeldungKarte · Eingangszustand', () => {
   });
 
   it('lässt den Alarm den Neu-Akzent schlagen', () => {
-    // Eine unbestätigte überfällige Sofortmeldung ist BEIDES. Der linke Rand kann
-    // nur eine Farbe tragen — Gefahr gewinnt, sonst färbte C8 einen Alarm gelb.
+    // Eine unbestätigte überfällige Sofortmeldung ist BEIDES; der Rand trägt eine Farbe, Gefahr gewinnt.
     const { container } = renderKarte(
       <MeldungKarte
         meldung={meldung({
@@ -293,8 +286,7 @@ describe('MeldungKarte · Eingangszustand', () => {
     );
     const inhalt = screen.getByText('Wasser im Keller');
     const absender = screen.getByText('Florian 1');
-    // Vorher war der Wortlaut mit 13 px der KLEINSTE Text der Karte und der
-    // Absender mit 15 px strong der größte — genau verkehrt herum.
+    // Der Wortlaut ist der größte Text der Karte, nicht der Absender.
     expect(parseFloat(inhalt.style.fontSize)).toBeGreaterThanOrEqual(15);
     expect(inhalt.style.lineHeight).toBe('1.5');
     expect(parseFloat(absender.style.fontSize)).toBeLessThan(parseFloat(inhalt.style.fontSize));

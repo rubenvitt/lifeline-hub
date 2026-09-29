@@ -1,4 +1,3 @@
-// src/etb/BausteinPlatzhalterModal.formbindung.test.tsx
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EtbBaustein } from '../api/types';
 import { renderMitProviders } from '../test/utils';
@@ -6,16 +5,15 @@ import BausteinPlatzhalterModal from './BausteinPlatzhalterModal';
 import { einsatzFixture } from '../test/fixtures';
 
 /**
- * LFH-624: Die ETB-Seite meldete „Instance created by `useForm` is not connected to any
- * Form element". Ursache war dieses Modal: es rief beim Einhängen `form.resetFields()`,
- * obwohl der Dialog geschlossen ist und antds `Modal` sein `<Form>` erst beim ersten
- * Öffnen rendert. rc-field-form prüft einen Makrotask später, ob die Instanz an einem
- * `<Form>` hängt, und warnt sonst.
+ * LFH-624: „Instance created by `useForm` is not connected to any Form element". Das Modal
+ * darf beim Einhängen nicht `form.resetFields()` rufen: antds `Modal` rendert sein `<Form>`
+ * erst beim ersten Öffnen, und rc-field-form prüft einen Makrotask später, ob die Instanz an
+ * einem `<Form>` hängt.
  *
  * **Eigene Datei, und das ist Absicht:** `@rc-component/util` gibt dieselbe Warnung je
- * Modulinstanz nur EINMAL aus (`warningOnce`). In einer Datei mit weiteren Tests hätte
- * ein früherer Test sie schon verbraucht, und dieser Test bliebe auch mit dem Fehler grün.
- * Vitest isoliert die Module je Testdatei; hier ist dieser Test der erste Auslöser.
+ * Modulinstanz nur EINMAL aus (`warningOnce`). In einer Datei mit weiteren Tests hätte ein
+ * früherer Test sie schon verbraucht, und dieser bliebe auch mit dem Fehler grün. Vitest
+ * isoliert die Module je Testdatei.
  */
 
 const einsatz = einsatzFixture({ bezeichnung: 'Test' });

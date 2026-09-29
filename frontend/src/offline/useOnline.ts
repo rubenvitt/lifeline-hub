@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Online-Zustand des Browsers (`navigator.onLine` plus `online`/`offline`-Ereignisse).
- *
- * Aus `components/Kopfleiste.tsx` gezogen (LFH-117), weil die ETB-Schnellerfassung dieselbe
- * Frage stellt („Anhang" ist ohne Netz gesperrt) — eine zweite Kopie hätte zwei Stellen
- * ergeben, die den Zustand verschieden lesen könnten.
+ * Online-Zustand des Browsers (`navigator.onLine` plus `online`/`offline`-Ereignisse) —
+ * eine Quelle für Kopfleiste und ETB-Schnellerfassung.
  */
 export function useOnline(): boolean {
   const [online, setOnline] = useState(() =>

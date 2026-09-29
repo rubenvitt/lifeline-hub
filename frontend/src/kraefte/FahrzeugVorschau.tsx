@@ -9,20 +9,13 @@ import { VorschauZustand } from '../command-palette/VorschauZustand';
 import { fahrzeugStatusDarstellung } from './mittelStatus';
 
 /**
- * Lese-Vorschau eines disponierten Fahrzeugs in der Sprungpalette (LFH-664).
+ * Lese-Vorschau eines disponierten Fahrzeugs in der Sprungpalette.
  *
- * DATEN: das Listenfach der Palette (`datensatzAbfrage.fahrzeuge`) mit `select` auf die `id` —
- * dasselbe Fach, dieselbe Abruffunktion, dieselbe Frische. Nach einem Treffer ist es warm
- * (kein Abruf) und hängt am Live-Stream: ein Statuswechsel von anderer Stelle kommt ohne
- * Neuöffnen an.
- *
- * NUR LESEN: der Status steht als `StatusTag` mit Wort, nicht als `StatusWahl` der Seite. Die
- * Mandantenfarbe (`status_farbe`) geht an `farbe` und erzwingt damit die Rand-Form.
- *
- * WEGGELASSEN, weil die Liste es nicht trägt oder es nur über einen weiteren Abruf ginge:
- * die Einheit (nur `einheit_id`, der Name stünde erst in der Einheitenliste), die
- * Ist-Besatzung (zählt die Personalliste), die Position auf der Karte. Leere optionale Angaben
- * fehlen ganz, statt als Platzhalter dazustehen.
+ * DATEN: das Listenfach der Palette mit `select` auf die `id` — nach einem Treffer warm und am
+ * Live-Stream, ein Statuswechsel kommt ohne Neuöffnen an.
+ * NUR LESEN: Status als `StatusTag` mit Wort; die Mandantenfarbe erzwingt die Rand-Form.
+ * WEGGELASSEN, was die Liste nicht trägt (Einheitsname, Ist-Besatzung, Position). Leere
+ * optionale Angaben fehlen ganz.
  */
 export default function FahrzeugVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {
   const select = useCallback((liste: EinsatzFahrzeug[]) => liste.find((f) => f.id === id), [id]);

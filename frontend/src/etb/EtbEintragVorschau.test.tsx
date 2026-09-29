@@ -164,9 +164,9 @@ describe('EtbEintragVorschau (LFH-664)', () => {
   });
 
   /**
-   * Zwischen den beiden Frischen (Review-Befund): ein Fach, 30 s alt, ist für die Palette
-   * (`FRISCH_MS` = 60 s) frisch, für die globale Vorgabe (10 s) nicht. Nur dieser Fall trennt
-   * „teilt die Frische der Palette" von „nimmt die Vorgabe" — mit „jetzt" wären beide grün.
+   * Zwischen den beiden Frischen: ein Fach, 30 s alt, ist für die Palette (`FRISCH_MS` = 60 s)
+   * frisch, für die globale Vorgabe (10 s) nicht. Nur dieser Fall trennt „teilt die Frische der
+   * Palette" von „nimmt die Vorgabe".
    */
   it('holt ein 30 s altes Fach nicht neu — es gilt die Frische der Palette', () => {
     const zaehler = { n: 0 };
@@ -183,9 +183,9 @@ describe('EtbEintragVorschau (LFH-664)', () => {
   });
 
   /**
-   * Eine Berichtigung sagt, WAS sie berichtigt (Review-Befund): sonst liest jemand in der
-   * Vorschau einen Eintrag, ohne zu erfahren, dass er einen älteren ersetzt. Die Nummer des
-   * Grundeintrags steht am Datensatz nicht — der Verweis führt deshalb über die `id`.
+   * Eine Berichtigung sagt, WAS sie berichtigt: sonst liest jemand einen Eintrag, ohne zu
+   * erfahren, dass er einen älteren ersetzt. Die Nummer des Grundeintrags steht am Datensatz
+   * nicht — der Verweis führt deshalb über die `id`.
    */
   it('verweist bei einer Berichtigung auf den Grundeintrag', async () => {
     etbHandler([eintrag({ typ: 'berichtigung', berichtigt_eintrag_id: 33 })]);

@@ -2,35 +2,21 @@ import type { Person, Sichtungskategorie, VerbleibArt } from '../api/types';
 import { hatKoordinate } from './koordinate';
 
 /**
- * Die Ableitungen der Betroffenen-Seitenleiste (Neuentwurf S7: „Sichtungsbild",
- * „Verbleib", „Offene Felder") und der Lücken-Markierung der Zeilen. Rein — ohne Render
- * prüfbar. Grundmenge ist immer die gelieferte Liste; stornierte Personen liefert
- * `GET …/personen` gar nicht erst (`src/person/repo.rs`, `storniert_at IS NULL`).
+ * Ableitungen der Betroffenen-Seitenleiste („Sichtungsbild", „Verbleib", „Offene Felder") und
+ * der Lücken-Markierung der Zeilen. Rein. Stornierte Personen liefert `GET …/personen` nicht.
  *
  * ── WAS EINE LÜCKE IST ──────────────────────────────────────────────────────────────────
- *
- * Offen ist ein Feld nur bei einer ANGETROFFENEN Person (erfasst, betroffen, verstorben).
- * Eine vermisste Person hat naturgemäß weder Fundort noch Verbleib — sie als Lücke zu
- * zählen, meldete genau die Fälle als Versäumnis, in denen niemand etwas versäumt hat.
- * Abgemeldete sind abgeschlossen; eine Lücke dort ist keine Aufgabe mehr.
- *
- *  · ohne Verbleib — keine Verbleib-Art UND keine aktuelle Unfallhilfsstelle. Wer in einer
- *    UHS liegt, ist verortet; „Verbleib offen" hieße dort „wir wissen nicht, wo die Person
- *    ist", und das stimmt nicht.
- *  · ohne Fundort  — weder `antreff_ort` (Freitext) noch eine Fundort-Koordinate. Eine der
- *    beiden genügt: die Koordinate aus `#52.2691/9.1342` IST der Fundort, auch ohne Wort.
+ * Offen ist ein Feld nur bei einer ANGETROFFENEN Person (erfasst, betroffen, verstorben). Eine
+ * vermisste hat naturgemäß weder Fundort noch Verbleib; Abgemeldete sind abgeschlossen.
+ *  · ohne Verbleib — keine Verbleib-Art UND keine aktuelle UHS. Wer in einer UHS liegt, ist
+ *    verortet.
+ *  · ohne Fundort  — weder `antreff_ort` noch eine Fundort-Koordinate; eine genügt.
  *
  * ── VERBLEIB IST STRUKTUR, NICHT DIE KURZFORM ───────────────────────────────────────────
- *
- * Gezählt wird nach `aktuelle_verbleib_art` (LFH-613, Cache des jüngsten Verbleib-Ereignisses,
- * in derselben Transaktion gepflegt). Die Kurzform `aktueller_verbleib` bleibt Anzeigetext
- * und wird hier NICHT mehr zurückgeparst — ein Ziel mit „→" oder eine neue Art hätte den
- * Parser still auf „sonstiger" fallen lassen. Das Ziel (Klinik, Unterkunft) ist gespeichert,
- * wird aber bewusst nicht aufgegliedert: die Zählung beantwortet „wohin", nicht „in welches
- * Haus".
- *
- * Präzedenz je Person: Verbleib-Art vor Unfallhilfsstelle vor „offen" — trägt eine Person
- * beides (etwa „vor Ort" und noch eine UHS-Belegung), zählt die Art.
+ * Gezählt wird nach `aktuelle_verbleib_art`; die Kurzform `aktueller_verbleib` bleibt
+ * Anzeigetext und wird nicht zurückgeparst. Das Ziel (Klinik, Unterkunft) wird nicht
+ * aufgegliedert: die Zählung beantwortet „wohin", nicht „in welches Haus".
+ * Präzedenz je Person: Verbleib-Art vor UHS vor „offen".
  */
 
 /** Angetroffen = eine Person, bei der Fundort und Verbleib erwartbar sind. */
@@ -112,9 +98,9 @@ export interface VerbleibPosten {
 }
 
 /**
- * Zählung „Verbleib" über die angetroffenen Personen. Eine UHS erscheint mit ihrer
- * Bezeichnung (je Stelle ein Posten), die Verbleib-Arten mit ihrem Wort, „offen" zuletzt
- * und IMMER — eine fehlende Zeile „offen 0" sähe aus wie „nicht erhoben".
+ * Zählung „Verbleib" über die angetroffenen Personen: je UHS ein Posten, die Verbleib-Arten mit
+ * ihrem Wort, „offen" zuletzt und IMMER — eine fehlende Zeile „offen 0" sähe aus wie „nicht
+ * erhoben".
  */
 export function verbleibZaehlung(
   alle: readonly Person[],
@@ -144,13 +130,10 @@ export function verbleibZaehlung(
 }
 
 /**
- * „Transportiert / offen" (Lage-Dashboard, Fuß des Sichtungspaneels; Neuentwurf S3).
- *
- *  · transportiert — angetroffen, Verbleib-Art `transport` und Status NICHT `angemeldet`.
- *    Eine Voranmeldung an der Klinik ist kein erledigter Transport; ohne Statusangabe
- *    zählt der Transport (das Ereignis ist erfasst, nur nicht fortgeschrieben).
- *  · offen — dieselbe Lücke „Verbleib offen" wie auf der Betroffenen-Seite
- *    ({@link lueckenVon}): angetroffen, ohne Verbleib-Art und ohne Unfallhilfsstelle.
+ * „Transportiert / offen" (Lage-Dashboard, Fuß des Sichtungspaneels).
+ *  · transportiert — angetroffen, Verbleib-Art `transport`, Status NICHT `angemeldet` (eine
+ *    Voranmeldung ist kein erledigter Transport; ohne Status zählt der Transport).
+ *  · offen — dieselbe Lücke „Verbleib offen" wie auf der Betroffenen-Seite ({@link lueckenVon}).
  */
 export function transportBilanz(
   alle: readonly Pick<

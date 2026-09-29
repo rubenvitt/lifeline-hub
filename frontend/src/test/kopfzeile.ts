@@ -1,25 +1,14 @@
 import { screen, within } from '@testing-library/react';
 
 /**
- * Zählt die Bedienziele in der Kopfzeile (LFH-392).
+ * Zählt die Bedienziele in der Kopfzeile.
  *
- * WARUM NICHT `getAllByRole('button')`: antds `Segmented` rendert je Stufe ein
- * `<input type="radio">` in einem `<label>` — KEINEN Knopf. Ein Knopf-Zähler sah
- * die sechs Umschalter deshalb gar nicht und stand vor wie nach dem Umbau auf
- * derselben Zahl; er hätte die Behauptung „belegt gesunken" trivial erfüllt.
- * Gemessen am Bestand: `button` = 5, `radio` = 6 in der Einsatz-Kopfzeile.
- *
- * WARUM NICHT `querySelectorAll('[role="radio"]')`: die Rolle ist IMPLIZIT aus
- * dem Elementtyp. Als CSS-Attributselektor gemessen: 0 Treffer. Nur RTLs
+ * Nicht `getAllByRole('button')`: antds `Segmented` rendert je Stufe ein
+ * `<input type="radio">`, keinen Knopf — ein Knopf-Zähler sähe die Umschalter nicht.
+ * Nicht `querySelectorAll('[role="radio"]')`: die Rolle ist implizit, nur RTLs
  * Rollenabfrage rechnet sie aus.
- *
- * WARUM DIE `banner`-LANDMARKE als Container: antds `Layout.Header` rendert ein
- * `<header>` (gemessen: genau eine `banner`-Rolle im Dokument), es braucht also
- * keinen erfundenen `data-`Marker, den nur der Test liest. Wer den Container
- * änderte, ohne den Zähler zu ändern, bekäme sofort eine andere Zahl.
- *
- * `link` ist mitgezählt, weil die globale Kopfzeile links zwei echte Anker trägt
- * (Marke, Verwaltung) — sie sind Bedienziele wie jeder Knopf.
+ * Container ist die `banner`-Landmarke (antds `Layout.Header` rendert ein `<header>`), ohne
+ * eigenen `data-`Marker. `link` zählt mit: die globale Kopfzeile trägt zwei echte Anker.
  */
 export function zaehleBedienziele(): number {
   const kopf = screen.getByRole('banner');
@@ -30,22 +19,16 @@ export function zaehleBedienziele(): number {
 }
 
 /**
- * Die Umschalt-Ziele in der Kopfzeile — die einzige WIDERLEGBARE Form der
- * Nullaussage „die Umschalter sind fort" (LFH-392).
- *
- * Der naheliegende Weg wäre `queryByRole('radiogroup', { name: 'Farbschema
- * wählen' })`. Der taugt hier nicht: das Etikett kam mit `ThemeToggle.tsx` fort
- * und steht im ganzen Repo nirgends mehr. Eine Null darauf ist durch KEINE
- * Änderung am Produktivcode rot zu bekommen — sie behauptete eine Deckung, die
- * sie nicht hat. Diese Zählung schlägt an, sobald irgendein `Segmented` oder
- * `Radio` in die Kopfzeile zurückkehrt, gleich wie beschriftet.
+ * Die Umschalt-Ziele in der Kopfzeile — die einzige WIDERLEGBARE Form der Nullaussage „die
+ * Umschalter sind fort". Eine Abfrage nach einem Etikett, das es nirgends mehr gibt, wäre
+ * durch keine Änderung rot zu bekommen; diese Zählung schlägt an, sobald irgendein
+ * `Segmented` oder `Radio` zurückkehrt.
  */
 export function radiosImKopf(): number {
   return within(screen.getByRole('banner')).queryAllByRole('radio').length;
 }
 
-/** Aufschlüsselung für die Diagnose — ein reiner Zahlenvergleich sagt beim
- *  Fehlschlag nicht, WELCHE Sorte Ziel dazugekommen ist. */
+/** Aufschlüsselung für die Diagnose — welche Sorte Ziel dazugekommen ist. */
 export function bedienzieleNachRolle(): Record<string, number> {
   const kopf = screen.getByRole('banner');
   return Object.fromEntries(

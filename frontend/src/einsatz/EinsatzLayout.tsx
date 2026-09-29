@@ -50,35 +50,28 @@ import { useModulZaehler } from './useModulZaehler';
 const { Header, Content } = Layout;
 
 /**
- * 48 px ist die Trefffläche aus A1 Festlegung 4 (Material 48 dp) — dieselbe Zahl,
- * die die Rail trägt. Sie ist der BODEN für den Hamburger und den Schließen-Knopf, den
- * der Drawer selbst mitbringt: der ist von Haus aus kleiner, und ein Knopf, den
- * man auf dem Handschirm nicht trifft, ist keiner. Gelesen wird nur {@link navGriffMass}.
+ * 48 px (Material 48 dp) — Boden für den Hamburger und den Schließen-Knopf des Drawers, der
+ * von Haus aus kleiner ist. Gelesen wird nur {@link navGriffMass}.
  */
 const TREFFLAECHE = 48;
 
 /**
- * Kantenmaß der zwei Griffe des Drawer-Zweigs (Hamburger, Drawer-Schließer): der A1-Boden,
- * darüber die Staffel — 48 / 48 / 72. `Math.max`, nie eine feste 48: die unterschritt in
- * `handschuh` die Stufe um 24 px (LFH-384). REIN und exportiert, damit die Zusicherung ohne
- * Rendern prüfbar ist.
+ * Kantenmaß der zwei Griffe des Drawer-Zweigs (Hamburger, Drawer-Schließer): A1-Boden, darüber
+ * die Staffel — 48 / 48 / 72; eine feste 48 unterschritt `handschuh` um 24 px (LFH-384). Rein
+ * und exportiert, damit die Zusicherung ohne Rendern prüfbar ist.
  */
 export function navGriffMass(token: { controlHeight: number }): number {
   return Math.max(TREFFLAECHE, token.controlHeight);
 }
 
 /**
- * Die Kommandoleiste (Neuentwurf „Instrumententafel", `shell.dc.html`): 52 px auf dem
- * modusunabhängig dunklen Rahmengrund, Haarlinie unten, Zellen statt Abständen.
- *
- * `flexWrap` bleibt: auf dem Handschirm bricht die rechte Zellgruppe als GANZES in eine
- * zweite Zeile (LFH-460 erlaubt zwei), statt waagerecht überzulaufen. `height: auto` und
- * `lineHeight: normal`, weil antds `Header` sonst seine Tokenhöhe als Textzeile reserviert.
- * Die 52 px sind ein Boden — in `handschuh` wachsen die Ziele auf 72 px, die Leiste mit.
- *
- * Die Seiten-Polsterung der Leiste selbst ist 0: die Zellen tragen ihren Rand. Die
- * Kopf-Polsterung (`--lfh-kopf-polsterung`, LFH-329 · B1/M12) sitzt an der Suchzelle — sie
- * ist die eine Stelle, deren Luft mit dem Viewport wachsen soll.
+ * Die Kommandoleiste: 52 px auf dem modusunabhängig dunklen Rahmengrund, Haarlinie unten,
+ * Zellen statt Abständen.
+ * `flexWrap` bleibt: auf dem Handschirm bricht die rechte Zellgruppe als GANZES in eine zweite
+ * Zeile, statt überzulaufen. `height: auto` und `lineHeight: normal`, weil antds `Header` sonst
+ * seine Tokenhöhe als Textzeile reserviert. Die 52 px sind ein Boden (in `handschuh` 72).
+ * Die Seiten-Polsterung ist 0, die Zellen tragen ihren Rand; die Kopf-Polsterung sitzt an der
+ * Suchzelle, der einen Stelle, deren Luft mit dem Viewport wachsen soll.
  */
 const KOPF_STIL = {
   display: 'flex',
@@ -94,20 +87,15 @@ const KOPF_STIL = {
 } as const;
 
 /**
- * Der Einsatzname bekommt die Restbreite — und nur die.
- *
- * `flexBasis: 0` ist tragend: mit `auto` bemäße sich der Rahmen am Inhalt, und
- * eine 60-Zeichen-Bezeichnung schöbe die Zellen rechts aus der Kopfzeile
- * heraus. `minWidth: 0` ebenso — ohne die Aufhebung der Mindestbreite kürzt ein
- * Flex-Kind nicht, sondern wächst über seinen Rahmen hinaus. Die andere Hälfte
- * der Kürzung (Ellipsis, `title`) sitzt im `EinsatzSwitcher`: der Name steht in
- * einem antd-Knopf, und der kürzt ohne eigenes `overflow` nicht.
+ * Der Einsatzname bekommt die Restbreite — und nur die. `flexBasis: 0` und `minWidth: 0` sind
+ * tragend: sonst schöbe ein langer Name die Zellen rechts hinaus. Die Ellipsis sitzt im
+ * `EinsatzSwitcher` (ein antd-Knopf kürzt ohne eigenes `overflow` nicht).
  */
 const REST_STIL = { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } as const;
 
 /**
- * Die Einsatznummer im Kopf: die interne Nummer, sonst die Leitstellennummer, sonst KEINE
- * (Neuentwurf, Entscheidung 4: nichts erfinden — die Datenbank-`id` ist keine Einsatznummer).
+ * Die Einsatznummer im Kopf: die interne, sonst die Leitstellennummer, sonst KEINE — die
+ * Datenbank-`id` ist keine Einsatznummer.
  */
 export function einsatzKennung(
   einsatz: Pick<EinsatzAnzeige, 'einsatznummer_intern' | 'leitstellen_nr'> | undefined,
@@ -119,9 +107,8 @@ export function einsatzKennung(
 }
 
 /**
- * Statuspunkt vor der Einsatznummer: `normal` bei aktivem Einsatz, sonst neutral. Die
- * Farbe ist nie allein — das Wort steht als zugänglicher Name (`role="img"`) und `title`
- * am Punkt (WCAG 1.4.1). Die Zuordnung liest `einsatzStatus` aus dem Statusvertrag.
+ * Statuspunkt vor der Einsatznummer: `normal` bei aktivem Einsatz, sonst neutral. Das Wort
+ * steht als zugänglicher Name (`role="img"`) und `title` am Punkt (WCAG 1.4.1).
  */
 function StatusPunkt({ status }: { status: EinsatzAnzeige['status'] }) {
   const darstellung = einsatzStatus[status];
@@ -137,12 +124,9 @@ function StatusPunkt({ status }: { status: EinsatzAnzeige['status'] }) {
 }
 
 /**
- * Ebene 2: Einsatz-Workspace mit Switcher-Header, Icon-Rail und Modul-Panel.
- *
- * BREITENWEICHE AN antds `lg` (992 px, LFH-329 · B1/H11): darüber steht der
- * Rahmen inline wie bisher, darunter liegt die Navigation hinter dem Hamburger
- * in einem Drawer. Die Frage stellt ausschließlich `useViewport` — eine zweite,
- * handgeschriebene Breitenabfrage driftet still von antds Schwellen weg
+ * Ebene 2: Einsatz-Workspace mit Kopfleiste, Icon-Rail und Modul-Panel.
+ * Breitenweiche an antds `lg`: darüber steht der Rahmen inline, darunter liegt die Navigation
+ * hinter dem Hamburger in einem Drawer. Die Frage stellt ausschließlich `useViewport`
  * (erzwungen von `components/useViewport.guard.test.ts`).
  */
 export default function EinsatzLayout() {
@@ -152,53 +136,41 @@ export default function EinsatzLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  // EINE SSE-Verbindung für den gesamten Einsatz-Workspace (hier gehoistet, NICHT pro Page),
-  // damit die Alarm-Zentrale seitenunabhängig auflöst und das HTTP/1.1-6-Verbindungslimit
-  // sicher eingehalten wird (siehe useEinsatzLiveStream-Doku).
+  // EINE SSE-Verbindung für den ganzen Einsatz-Workspace (hier gehoistet, NICHT pro Seite),
+  // damit die Alarm-Zentrale seitenunabhängig auflöst und das HTTP/1.1-Verbindungslimit hält.
   useEinsatzLiveStream(einsatzId);
 
-  // Die 401-Brücke (F14/LFH-263) saß bis LFH-268 hier und war damit einsatz-lokal: /admin,
-  // /profil, Stammdaten und die Einsatzliste hatten gar keine Behandlung. Sie liegt jetzt als
-  // `useSitzungsWache` in `App` und bedient SSE und HTTP über denselben Kanal.
-
-  // Modul-Segment ist der Pfad-Teil direkt nach der Einsatz-ID
-  // (…/einsaetze/:id/<route>/…) — nicht das letzte Segment, sonst verliert das
-  // Menü auf Sub-Routen (Detail, Liste) die Hervorhebung. Die Zerlegung wohnt seit
-  // LFH-391 · C4 in der Registry: `ModulStub` und die Kommandopalette fragen dasselbe.
+  // Modul-Segment ist der Pfad-Teil direkt nach der Einsatz-ID, nicht das letzte Segment — sonst
+  // verlöre das Menü auf Sub-Routen die Hervorhebung.
   const aktuellesModul = modulAusPfad(pathname);
   const aktiveKategorie: KategorieKey | null = aktuellesModul?.kategorie ?? null;
 
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
   const mittel = abBreite('md');
-  // Ab `xl` (1200 px) trägt der Kopf alle Wörter; darunter — Führungs-Tablet 1024–1199 —
-  // stehen Ruhezustände nur als Ikone, damit er einzeilig bleibt (gemessen 52 statt 104 px).
+  // Ab `xl` trägt der Kopf alle Wörter; darunter (Führungs-Tablet) stehen Ruhezustände nur als
+  // Ikone, damit er einzeilig bleibt.
   const weit = abBreite('xl');
   const { token } = theme.useToken();
-  // Unter `md` rücken die Zellen zusammen: mit der vollen Staffel-Polsterung (18 px je Seite
-  // in `komfortabel`) bräche die rechte Zellgruppe auf 390 px in eine dritte Zeile um.
+  // Unter `md` rücken die Zellen zusammen, sonst bräche die rechte Gruppe auf 390 px in eine
+  // dritte Zeile.
   const zellToken = mittel ? token : { padding: token.paddingXS };
 
   const [offeneKategorie, setOffeneKategorie] = useState<KategorieKey | null>(aktiveKategorie);
   /**
-   * ZWEITER Zustand neben `offeneKategorie`, bewusst getrennt: jene sagt WELCHE
-   * Kategorie offen ist, dieser OB das Panel überhaupt steht. Der Effekt darunter
-   * gleicht nur die erste Frage an die Route an und fasst diese hier NICHT an —
-   * sonst klappte ein zugeklapptes Panel beim ersten Modulwechsel wieder auf, und
-   * die Persistenz wäre wirkungslos. Lazy-Initialisierer: ein Lesevorgang, kein
-   * Effekt.
+   * ZWEITER Zustand neben `offeneKategorie`: jene sagt WELCHE Kategorie offen ist, dieser OB das
+   * Panel steht. Der Effekt darunter gleicht nur die erste an die Route an — sonst klappte ein
+   * zugeklapptes Panel beim ersten Modulwechsel wieder auf.
    */
   const [panelEingeklappt, setPanelEingeklappt] = useState(leseNavEingeklappt);
   const [navOffen, setNavOffen] = useState(false);
 
-  // Panel an die aktuelle Modul-Kategorie angleichen (auch nach Default-Redirect, der kein Remount auslöst).
+  // Panel an die aktuelle Modul-Kategorie angleichen (auch nach dem Default-Redirect).
   useEffect(() => {
     setOffeneKategorie(aktiveKategorie);
   }, [aktiveKategorie]);
 
-  // Wird der Schirm breit, steht der Rahmen wieder inline — ein gemerktes „Drawer
-  // offen" darf dann nicht auf die Rückkehr zum Handschirm warten. `breit` ist ein
-  // Primitiv, damit ist die Dependency-Regel strukturell erfüllt.
+  // Wird der Schirm breit, steht der Rahmen inline; ein gemerktes „Drawer offen" wird geräumt.
   useEffect(() => {
     if (breit) setNavOffen(false);
   }, [breit]);
@@ -209,8 +181,7 @@ export default function EinsatzLayout() {
   });
   const einsatz = einsatzQuery.data;
 
-  // Modul-Overrides (LFH-132) für die Nav-Reflexion; geteilter queryKey wie die
-  // Einstellungen (Hot-Path, einmal gecacht je Einsatz).
+  // Modul-Overrides für die Navigation; geteilter Query-Key wie die Einstellungen.
   const modulOverridesQuery = useQuery({
     queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId),
@@ -219,24 +190,11 @@ export default function EinsatzLayout() {
   const modulZaehler = useModulZaehler({ einsatzId, benutzer, overrides: modulOverrides });
 
   /**
-   * FRÜHER AUSSTIEG, VOR dem Haupt-JSX — nicht als Meldung innerhalb der Schale
-   * (LFH-331 · B3).
-   *
-   * Die Kindseite im `Outlet` liest denselben Einsatz aus demselben
-   * Zwischenspeicher. Bliebe der Rahmen stehen, stellte sie ihre eigene
-   * Fehlermeldung daneben, und die Einsatzkraft sähe zwei konkurrierende Aussagen
-   * über dieselbe Ursache. Deshalb die Großform statt eines Banners: hinter einem
-   * kaputten Einsatz steht nichts mehr, die dreißig Türen der Navigation führen
-   * alle ins Leere.
-   *
-   * Angesetzt wird ausschließlich an `isError`, ausdrücklich NICHT zusätzlich an
-   * „keine Daten": während des Abrufs ist `einsatz` regulär leer, und ein Ausstieg
-   * an dieser Stelle nähme dem Rahmen jeden Ladezustand — und machte nebenbei jede
-   * Prüfung „unter `lg` steht die Navigation nicht im Layout" trivial wahr.
-   *
-   * Der Rückweg ist als Literal geschrieben: `routing/deeplinks.ts` baut
-   * Einsatz-BINNEN-Pfade und führt die nackte Liste laut eigenem Dateikopf bewusst
-   * nicht (kein passender Builder); `LageDashboardPage` verlinkt sie ebenso direkt.
+   * FRÜHER AUSSTIEG vor dem Haupt-JSX: die Kindseite liest denselben Einsatz aus demselben Cache
+   * und stellte sonst eine zweite Fehlermeldung daneben. Hinter einem kaputten Einsatz führt die
+   * ganze Navigation ins Leere, deshalb die Großform statt eines Banners.
+   * Nur an `isError`, NICHT an „keine Daten": während des Abrufs ist `einsatz` regulär leer.
+   * Der Rückweg ist ein Literal (`routing/deeplinks.ts` führt keinen Builder für die nackte Liste).
    */
   if (einsatzQuery.isError) {
     return (
@@ -250,27 +208,13 @@ export default function EinsatzLayout() {
   }
 
   /**
-   * Rail-Klick im inline-Rahmen.
-   *
-   * SELBSTKLICK = ZUKLAPPEN, FREMDKLICK = SPRUNG (LFH-337 · H12, Entscheidung im Plan).
-   * Derselbe Kategorie-Knopf klappt das Panel zu und merkt das; ein anderer öffnet es und
-   * führt zugleich in das erste freigegebene Modul der Kategorie — vorher lag jedes der
-   * 24 Module exakt zwei Klicks tief.
-   *
-   * WARUM NICHT IMMER NAVIGIEREN: Navigieren ändert `aktuellesModul`, der Effekt oben
-   * setzt daraufhin `offeneKategorie` — ein bedingungsloser Sprung höbe das persistierte
-   * Zuklappen aus LFH-329/B1 in derselben Runde wieder auf. Die Rail behält ihre
-   * Hervorhebung, weil sie `offeneKategorie ?? aktiveKategorie` bekommt.
-   *
-   * Hat die Kategorie kein freigegebenes Modul (alles geplant, ausgeblendet oder
-   * entzogen), bleibt es beim reinen Aufklappen: ein Sprung ins Leere wäre schlechter
-   * als keiner.
-   *
-   * DIESER SPRUNG WIRD NICHT GEMERKT (Fix-Welle, Befund B4). Das Ziel hat niemand
-   * ausgewählt, es ist nur das erste freigegebene Modul der Kategorie — bei drei Plätzen
-   * und sechs Kategorien überschrieben drei Rail-Klicks sonst die ganze „Zuletzt"-Liste
-   * (heute die Gruppe „Zuletzt besucht" der Kommandopalette).
-   * Die Aufzeichnung sitzt deshalb in `onModulKlick`, dem Weg der bewussten Wahl.
+   * Rail-Klick im inline-Rahmen: SELBSTKLICK = ZUKLAPPEN, FREMDKLICK = SPRUNG in das erste
+   * freigegebene Modul der Kategorie.
+   * Nicht immer navigieren: der Angleich-Effekt höbe sonst das persistierte Zuklappen in
+   * derselben Runde auf. Die Rail behält ihre Hervorhebung über
+   * `offeneKategorie ?? aktiveKategorie`. Ohne freigegebenes Modul nur aufklappen.
+   * Dieser Sprung wird NICHT gemerkt: sein Ziel hat niemand gewählt, und drei Rail-Klicks
+   * überschrieben sonst die ganze „Zuletzt"-Liste. Gemerkt wird in `onModulKlick`.
    */
   function onKategorieKlick(key: KategorieKey) {
     if (offeneKategorie === key) {
@@ -287,33 +231,20 @@ export default function EinsatzLayout() {
   }
 
   /**
-   * Kopfzeilen-Klick im Drawer: nur auf- und zuklappen. Das gemerkte Flag gehört
-   * ausschließlich zum inline-Rahmen — sonst trüge derselbe Schalter in zwei
-   * Darstellungen zwei Bedeutungen.
+   * Kopfzeilen-Klick im Drawer: nur auf- und zuklappen. Das gemerkte Flag gehört ausschließlich
+   * zum inline-Rahmen.
    */
   function onDrawerKategorieKlick(key: KategorieKey) {
     setOffeneKategorie((aktuell) => (aktuell === key ? null : key));
   }
 
   /**
-   * Modulklick — der Weg, auf dem der „Zuletzt"-Speicher gefüllt wird. Panel UND
-   * Drawer-Akkordeon laufen hier durch. Gelesen wird der Speicher nur noch von der
-   * Kommandopalette; die Panel-Gruppe „Zuletzt" ist entfernt (Begründung an `ModulPanel`).
-   *
-   * GEMERKT WIRD, WAS JEMAND GEWÄHLT HAT (LFH-337 · Fix-Welle, Befund B4). Bis dahin hing
-   * die Aufzeichnung an einem Effekt auf den Routenwechsel. Seit der Rail-Klick eine echte
-   * Navigation auslöst, genügten damit DREI Klicks auf fremde Kategorien, um alle drei
-   * Plätze mit „erstes Modul der Kategorie X" zu überschreiben — die Abkürzung erodierte
-   * durch die Bedienung, die im selben Zug dazukam.
-   *
-   * KONSEQUENZ, die kein Fehler ist: ein Deep-Link von außen (Lesezeichen, Verlinkung auf
-   * `/einsaetze/7/personen`) läuft nicht mehr in den Speicher. Das ist gewollt — der
-   * Speicher trägt Wahlen, keine Ankünfte. Wer das später „repariert", holt sich die
-   * Rail-Erosion zurück, denn deren Sprung ist genau so eine Ankunft.
-   *
-   * VOR `navigate`, nicht danach: der Routenwechsel löst den Render aus, der den Speicher
-   * wieder liest. `Number.isFinite`, weil `einsatzId` aus `useParams` stammt — auf einer
-   * Route ohne gültige ID legte der Speicher sonst einen Eintrag unter `…:NaN` an.
+   * Modulklick — der einzige Weg, auf dem der „Zuletzt"-Speicher (gelesen von der
+   * Kommandopalette) gefüllt wird. Gemerkt wird, was jemand GEWÄHLT hat, keine Ankünfte: ein
+   * Deep-Link von außen läuft bewusst nicht hinein, sonst käme die Erosion durch Rail-Sprünge
+   * zurück.
+   * VOR `navigate`, weil der Routenwechsel den lesenden Render auslöst. `Number.isFinite`, weil
+   * `einsatzId` aus `useParams` stammt (sonst ein Eintrag unter `…:NaN`).
    */
   function onModulKlick(modul: ModulEintrag) {
     if (Number.isFinite(einsatzId)) merkeModulBesuch(einsatzId, modul.key);
@@ -322,9 +253,8 @@ export default function EinsatzLayout() {
   }
 
   /**
-   * Klick auf eine Sprungmarke (LFH-620). Bewusst NICHT im „Zuletzt"-Speicher: der trägt
-   * Modulschlüssel, und eine Marke ist keins — ihr Zielmodul zu merken hieße, eine Wahl
-   * aufzuschreiben, die so niemand getroffen hat.
+   * Klick auf eine Sprungmarke — NICHT im „Zuletzt"-Speicher: der trägt Modulschlüssel, und eine
+   * Marke ist keins.
    */
   function onSprungKlick(marke: Sprungmarke) {
     navigate(marke.pfad(einsatzId));
@@ -334,10 +264,9 @@ export default function EinsatzLayout() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={KOPF_STIL}>
-        {/* LINKE GRUPPE: Marke (bzw. Griff unter `lg`), Wortmarke, Einsatzkennung. Sie
-            bleibt zusammen; bei Platzmangel bricht die rechte Gruppe um, statt den
-            Einsatznamen auf null zu drücken. Sie wächst stärker als die Suche
-            (`KOPF_NAME_FLEX`), damit der Name erst kürzt, wenn es wirklich eng ist. */}
+        {/* LINKE GRUPPE: Marke (bzw. Griff unter `lg`), Wortmarke, Einsatzkennung. Bei Platzmangel
+           bricht die rechte Gruppe um; die linke wächst stärker als die Suche, damit der Name erst
+           spät kürzt. */}
         <div
           style={{
             display: 'flex',
@@ -353,10 +282,8 @@ export default function EinsatzLayout() {
               <Button
                 type="text"
                 aria-label="Navigation öffnen"
-                // `flexShrink: 0` ist nicht Kosmetik: ohne die Sperre drückt der Inhalt
-                // daneben den Knopf auf dem Handschirm auf gut die halbe Trefffläche
-                // zusammen (gemessen: 26 px). Die Farbe folgt dem dunklen Rahmengrund,
-                // nicht dem Modus — sonst verschwände der Griff im Tagmodus.
+                // `flexShrink: 0`: sonst drückt der Inhalt daneben den Knopf auf dem Handschirm auf die halbe
+                // Trefffläche. Die Farbe folgt dem dunklen Rahmengrund, nicht dem Modus.
                 style={{
                   width: navGriffMass(token),
                   height: navGriffMass(token),
@@ -402,8 +329,8 @@ export default function EinsatzLayout() {
             </div>
           </div>
         </div>
-        {/* SUCHZELLE ab `lg`: das Suchfeld (max. 520 px) als Auslöser der Palette. Sie trägt
-            die Kopf-Polsterung (`kopfpolsterung.guard.test.ts` zählt genau diese Stelle). */}
+        {/* SUCHZELLE ab `lg`: das Suchfeld als Auslöser der Palette. Sie trägt die Kopf-Polsterung
+           (`kopfpolsterung.guard.test.ts` zählt genau diese Stelle). */}
         {breit && (
           <div
             data-lfh="kopf-suche"
@@ -418,12 +345,9 @@ export default function EinsatzLayout() {
             <CommandPaletteTrigger />
           </div>
         )}
-        {/* RECHTE GRUPPE: Zellen mit Haarlinien. Die Alarmzentrale behält ihren Platz im
-            Kopf und steht in EIGENER Zelle — sie ZEIGT einen Zustand (Ton, Desktop) und
-            ist damit von den Zielen daneben abgesetzt (LFH-392); die Haarlinie der Zelle
-            ersetzt den früheren Trenner. Sie bleibt auf JEDER Breite stehen und nennt
-            ihren Zustand im Text: „blockiert" oder „stumm" darf im Einsatz nicht nur über
-            eine Ikone laufen. */}
+        {/* RECHTE GRUPPE: Zellen mit Haarlinien. Die Alarmzentrale steht in EIGENER Zelle — sie ZEIGT
+           einen Zustand — auf JEDER Breite und nennt ihn im Text: „blockiert" oder „stumm" darf im
+           Einsatz nicht nur über eine Ikone laufen. */}
         <KopfRechts>
           <div data-lfh="kopf-alarm" style={kopfZelleStil(zellToken)}>
             <AlarmZentrale />
@@ -442,13 +366,9 @@ export default function EinsatzLayout() {
           </div>
         </KopfRechts>
       </Header>
-      {/* Warnung, keine Sackgasse: der Einsatz bleibt vollständig bedienbar, nur die
-          Navigation zeigt womöglich mehr, als konfiguriert ist. `istModulSichtbar`
-          (`einsatz/modulRegistry.ts`) prüft `sichtbar !== false` und fällt ohne
-          Overrides also nach OFFEN — jedes per LFH-132 ausgeblendete Modul stünde
-          stumm wieder in der Nav. Ein stiller Fehlschlag wäre hier schlimmer als ein
-          lauter: er sieht aus wie eine Einsatzkonfiguration, die niemand so gesetzt
-          hat. Rot bleibt der Gefahr vorbehalten (Bedien-Leitlinie), deshalb `warning`. */}
+      {/* Warnung, keine Sackgasse: ohne Overrides fällt `istModulSichtbar` nach OFFEN, jedes
+         ausgeblendete Modul stünde stumm wieder in der Navigation. Ein stiller Fehlschlag sähe aus wie
+         eine Konfiguration, die niemand gesetzt hat. `warning`, weil Rot der Gefahr vorbehalten ist. */}
       {modulOverridesQuery.isError && (
         <Alert
           type="warning"
@@ -460,10 +380,8 @@ export default function EinsatzLayout() {
           }
         />
       )}
-      {/* Das Seitenspalten-Attribut unten ist tragend, in BEIDEN Zweigen: weder
-          die Rail (`<nav>`) noch das Panel (`<div>`) ist eine antd-Seitenspalte,
-          antd erkennt also von selbst keine — nur dieses Attribut erzwingt die
-          waagerechte Achse. Ohne es stapeln die Spalten untereinander. */}
+      {/* `hasSider` ist tragend: weder Rail noch Panel ist eine antd-Seitenspalte, ohne das Attribut
+         stapelten die Spalten untereinander. */}
       <Layout hasSider>
         {breit && (
           <IconRail
@@ -492,17 +410,13 @@ export default function EinsatzLayout() {
           </EinsatzAnzeigeProvider>
         </Content>
       </Layout>
-      {/* Nur im Schmal-Zweig überhaupt vorhanden, und bewusst OHNE Vorab-Rendern
-          des Inhalts: sonst stünden die Navigationsknoten doppelt im Baum und
-          jede Aussage über den ausgeblendeten Rahmen wäre bedeutungslos.
-          `destroyOnHidden`, weil das Panel sonst nach dem Schließen im DOM
-          stehenbleibt und ein „ist zu"-Assert nichts mehr belegt. */}
+      {/* Nur im Schmal-Zweig vorhanden und OHNE Vorab-Rendern, sonst stünde die Navigation doppelt im
+         Baum. `destroyOnHidden`, damit ein „ist zu"-Assert etwas belegt. */}
       {!breit && (
         <Drawer
           placement="left"
           title="Navigation"
-          // `size`, nicht `width`: letzteres ist in antd 6 abgekündigt und
-          // meldet sich im Entwicklungsmodus als Konsolen-Warnung.
+          // `size`, nicht `width` (in antd 6 abgekündigt).
           size={navDrawerBreite}
           open={navOffen}
           onClose={() => setNavOffen(false)}

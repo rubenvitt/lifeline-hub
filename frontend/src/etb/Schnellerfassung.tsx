@@ -51,35 +51,31 @@ interface Props {
   initialWerte?: EntwurfWerte;
   onWerteChange?: (werte: EntwurfWerte) => void;
   /**
-   * Zustand des Schalters „Werte behalten" (LFH-332/H61). Er liegt bewusst beim
-   * Aufrufer: `EtbEntwurfsTabs` schliesst nach erfolgreichem Erfassen den Entwurfs-Tab
-   * und erzwingt über `key` einen Remount — ein Zustand im `useState` dieser Komponente
-   * überlebte das nicht.
+   * Zustand des Schalters „Werte behalten". Er liegt beim Aufrufer: `EtbEntwurfsTabs`
+   * remountet nach erfolgreichem Erfassen über `key`, ein lokaler `useState` überlebte das nicht.
    */
   werteBehalten?: boolean;
   /** Fehlt der Callback, rendert die Steuerzeile den Schalter nicht (Berichtigung, Bestandsaufrufer). */
   onWerteBehaltenChange?: (behalten: boolean) => void;
   /**
-   * Gewählte Anhänge, optional von außen geführt (LFH-117, design.md D9): `EtbEntwurfsTabs`
-   * montiert nur den aktiven Tab und hält die Dateien je Entwurf, damit sie einen Tabwechsel
-   * überleben. Fehlt das Paar, führt die Schnellerfassung die Liste selbst (Berichtigung).
-   * Dateien gehen nie in den Entwurfsspeicher — der ist JSON.
+   * Gewählte Anhänge, optional von außen geführt: `EtbEntwurfsTabs` montiert nur den aktiven
+   * Tab und hält die Dateien je Entwurf, damit sie einen Tabwechsel überleben. Fehlt das Paar,
+   * führt die Schnellerfassung die Liste selbst (Berichtigung). Dateien gehen nie in den
+   * Entwurfsspeicher — der ist JSON.
    */
   dateien?: File[];
   onDateienChange?: (dateien: File[]) => void;
   /**
-   * Idempotenzschlüssel dieses Entwurfs (LFH-117, Review). `EtbEntwurfsTabs` reicht die
-   * Entwurfs-id: sie überlebt den Remount beim Tabwechsel, und ein zweites Absenden desselben
-   * Entwurfs, während das erste noch läuft, dedupliziert der Server. Fehlt sie, hält die
-   * Schnellerfassung eine eigene bis zum Erfolg (Berichtigung).
+   * Idempotenzschlüssel dieses Entwurfs. `EtbEntwurfsTabs` reicht die Entwurfs-id: sie überlebt
+   * den Remount beim Tabwechsel, und ein zweites Absenden desselben Entwurfs dedupliziert der
+   * Server. Fehlt sie, hält die Schnellerfassung eine eigene bis zum Erfolg (Berichtigung).
    */
   clientId?: string;
   /**
-   * Sendezustand, optional von außen geführt (LFH-117, Review C1). Nur der aktive Entwurfs-Tab
-   * ist montiert; läge der Zustand hier, stünde nach einem Tabwechsel während eines Uploads
-   * eine frische, ENTSPERRTE Schnellerfassung da — und was man dort tippte, verwarf der noch
-   * laufende Versand still. `EtbEntwurfsTabs` hält ihn deshalb je Entwurf. Fehlt das Paar,
-   * führt die Schnellerfassung ihn selbst (Berichtigung).
+   * Sendezustand, optional von außen geführt. Nur der aktive Entwurfs-Tab ist montiert; läge
+   * der Zustand hier, stünde nach einem Tabwechsel während eines Uploads eine ENTSPERRTE
+   * Erfassung da, deren Eingaben der laufende Versand still verwarf. Fehlt das Paar, führt die
+   * Schnellerfassung ihn selbst (Berichtigung).
    */
   versand?: Versand;
   onVersandChange?: (aenderung: Partial<Versand>) => void;
@@ -96,12 +92,10 @@ export interface Versand {
 export const VERSAND_RUHE: Versand = { sendet: false, fortschritt: null, hinweis: null };
 
 /**
- * Welche Datei schon oben liegt (LFH-117, design.md D9): bei einem Teilausfall — Datei 1
- * oben, Datei 2 gescheitert — lädt der nächste Versuch nur Datei 2. Auf Modulebene, weil
- * `EtbEntwurfsTabs` die Schnellerfassung beim Tabwechsel neu montiert; ein `WeakMap` nach
- * `File` hält keine Datei fest, die niemand mehr kennt. Lehnt der Server den Eintrag
- * fachlich ab, werden die Zuordnungen dieses Versuchs verworfen: die ID könnte die Ursache
- * sein (etwa ein inzwischen weggeräumter Anhang).
+ * Welche Datei schon oben liegt: nach einem Teilausfall lädt der nächste Versuch nur den
+ * Rest. Auf Modulebene, weil der Tabwechsel die Schnellerfassung neu montiert; ein `WeakMap`
+ * nach `File` hält keine Datei fest, die niemand mehr kennt. Lehnt der Server fachlich ab,
+ * werden die Zuordnungen dieses Versuchs verworfen, weil die ID die Ursache sein könnte.
  */
 const hochgeladeneIds = new WeakMap<File, number>();
 
@@ -110,10 +104,10 @@ const ANHANG_ZU_GROSS = `ist zu groß (${UPLOAD_MAX_GROESSE / 1024 / 1024} MiB e
 const ANHANG_GRENZE = `Höchstens ${ETB_ANHAENGE_MAX} Anhänge je Eintrag.`;
 
 /**
- * Dieselbe Datei, neu gewählt (LFH-117, Review C1): jede Dateiwahl liefert NEUE `File`-Objekte,
- * ein Vergleich der Identität griff also nie. Name, Größe und Änderungszeit trennen zwei
- * Dateien hinreichend — ein Foto zweimal am Eintrag liesse sich wegen der Unveränderlichkeit
- * nicht mehr entfernen.
+ * Dieselbe Datei, neu gewählt: jede Dateiwahl liefert NEUE `File`-Objekte, ein
+ * Identitätsvergleich griffe nie. Name, Größe und Änderungszeit trennen zwei Dateien
+ * hinreichend — ein Foto zweimal am Eintrag ließe sich wegen der Unveränderlichkeit nicht
+ * mehr entfernen.
  */
 function gleicheDatei(a: File, b: File): boolean {
   return a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
@@ -127,28 +121,23 @@ const TYP_MENUE = ERFASSBARE_TYPEN.map((t) => ({ key: t, label: etbTyp[t].label 
 const ENTER_HINWEIS =
   'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden';
 /**
- * Kurzform für den Handschirm (LFH-373, Checkpoint 25.09.2026): nur der Tastaturvertrag.
- * Befehle und `@ Einheit` stehen schon im Platzhalter; der Vertrag stand NUR in der
- * Hinweiszeile und bleibt deshalb stehen — genau einmal (Erfassungs-Norm, LFH-335).
- * Cmd/Strg+Enter entfällt: auf einem Handschirm gibt es die Taste nicht.
+ * Kurzform für den Handschirm: nur der Tastaturvertrag, der genau einmal steht
+ * (Erfassungs-Norm). Cmd/Strg+Enter entfällt, die Taste gibt es dort nicht.
  */
 const ENTER_HINWEIS_KURZ = 'Enter sendet · Shift+Enter neue Zeile';
 
 /**
  * Platzhalter: sagt, WAS in das Feld gehört (der Tastaturvertrag steht in der Hinweiszeile).
- * Unter `md` die Kurzform (LFH-373, in der CI gemessen): der volle Wortlaut brach in den
- * Linux-Schriften bei 390 px in eine zweite Zeile, das mitwachsende Feld misst den Platzhalter
- * mit, und die Leiste riss im Handschuh-Betrieb den 50-%-Deckel (435 von 844 px; unter macOS
- * blieben 9 px Luft). „/" öffnet Typ, Felder und Bausteine gemeinsam — „Befehle" sagt dasselbe.
+ * Unter `md` die Kurzform: der volle Wortlaut brach bei 390 px um, das mitwachsende Feld misst
+ * den Platzhalter mit, und die angepinnte Leiste riss den 50-%-Deckel (LFH-373).
  */
 const PLATZHALTER = 'Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )';
 const PLATZHALTER_KURZ = 'Inhalt … ( / für Befehle · @ für Einheit )';
 
 /**
- * Eigener Wortlaut, nicht der aus `components/Erfassung.tsx`: hier gibt es keinen
- * Knopf „Speichern und nächste", auf den er sich beziehen könnte — im ETB erfasst
- * jedes Absenden in Serie. Genannt werden die Felder, weil `nurUebernahme` genau
- * drei kennt und die Auswahl sonst geraten werden müsste.
+ * Eigener Wortlaut, nicht der aus `components/Erfassung.tsx`: hier gibt es keinen Knopf
+ * „Speichern und nächste" — im ETB erfasst jedes Absenden in Serie. Genannt werden die
+ * Felder, die `nurUebernahme` kennt.
  */
 const UEBERNAHME_ERKLAERUNG =
   'Von, An und Meldeweg bleiben nach dem Erfassen für den nächsten Eintrag stehen. ' +
@@ -156,14 +145,12 @@ const UEBERNAHME_ERKLAERUNG =
 
 /**
  * Die Wiederholfelder, die ein Absenden überleben, solange „Werte behalten" an ist
- * (LFH-332/H61: eine Standard-Funkmeldung kostete 19 Tastenanschläge reines Gerüst,
- * weil Von/An/Meldeweg nach jedem Senden verworfen wurden).
+ * (Von/An/Meldeweg sind das Gerüst einer Funkmeldung).
  *
- * `veranlassung` und `ereigniszeit` gehören ABSICHTLICH nicht dazu — die sind je Eintrag
- * verschieden, eine stehengebliebene Ereigniszeit wäre eine falsche Tatsachenbehauptung.
+ * `veranlassung` und `ereigniszeit` gehören ABSICHTLICH nicht dazu — eine stehengebliebene
+ * Ereigniszeit wäre eine falsche Tatsachenbehauptung.
  *
- * Die Funktion ist der einzige Ort, der diese Auswahl trifft; `EtbEntwurfsTabs` reicht
- * denselben Filter über die Remount-Grenze.
+ * Einziger Ort dieser Auswahl; `EtbEntwurfsTabs` reicht denselben Filter über die Remount-Grenze.
  */
 export function nurUebernahme(
   quelle: Pick<MetadatenWerte, 'von' | 'an' | 'meldeweg'>,
@@ -173,9 +160,9 @@ export function nurUebernahme(
 
 /**
  * Rollt eine waagerecht rollende Zeile so, dass `ziel` darin ganz sichtbar ist — NUR
- * waagerecht, nie das Dokument (LFH-373). Die Chip-Eingabe fokussiert mit `preventScroll`
- * (`MetaChip`); in der einzeiligen Chip-Zeile unter `md` stünde ein neuer Chip sonst hinter
- * dem rechten Rand. `scrollIntoView` wäre hier falsch: es rollte auch die Seite.
+ * waagerecht, nie das Dokument. Die Chip-Eingabe fokussiert mit `preventScroll`; in der
+ * einzeiligen Chip-Zeile unter `md` stünde ein neuer Chip sonst hinter dem rechten Rand.
+ * `scrollIntoView` rollte auch die Seite.
  */
 export function rolleWaagerechtInsBild(zeile: HTMLElement, ziel: Element): void {
   const z = zeile.getBoundingClientRect();
@@ -187,10 +174,9 @@ export function rolleWaagerechtInsBild(zeile: HTMLElement, ziel: Element): void 
 /**
  * Die Chip-Zeile unter der Eingabe (gesetzte Felder, „Feld", „Werte behalten").
  *
- * Unter `md` EINZEILIG mit waagerechtem Bildlauf (LFH-373, Vorbild `standLeisteStil` der
- * Zeitachse): gemessen kostete sonst im Handschuh-Betrieb jeder gesetzte Chip eine eigene
- * Reihe (+81 px), bei drei Chips belegte die angepinnte Leiste 578 von 844 px. Die Leistenhöhe
- * hängt damit nicht mehr an der Zahl der Felder. Rein und exportiert, prüfbar ohne Layout.
+ * Unter `md` EINZEILIG mit waagerechtem Bildlauf: sonst kostete jeder gesetzte Chip im
+ * Handschuh-Betrieb eine eigene Reihe, und die angepinnte Leiste wüchse mit der Zahl der
+ * Felder (LFH-373). Rein und exportiert, prüfbar ohne Layout.
  */
 export function chipZeileStil(schmal: boolean, token: { marginXS: number }): CSSProperties {
   return {
@@ -222,8 +208,8 @@ export default function Schnellerfassung({
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
   const online = useOnline();
-  // Unter `md` steht das Feld auf eigener Zeile (LFH-373): zwischen Typ-Präfix und „Erfassen"
-  // blieb es gemessen auf 158 von 366 px, und die angepinnte Leiste wuchs auf 59 % des Fensters.
+  // Unter `md` steht das Feld auf eigener Zeile: zwischen Typ-Präfix und „Erfassen" bliebe es
+  // zu schmal, und die angepinnte Leiste wüchse über die Hälfte des Fensters (LFH-373).
   const { istSchmal } = useViewport();
   const [vorschauOffen, setVorschauOffen] = useState(false);
   const chipZeileRef = useRef<HTMLDivElement>(null);
@@ -261,9 +247,8 @@ export default function Schnellerfassung({
         : {}),
   );
   const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
-  // Einzeilige Chip-Zeile unter `md` (LFH-373): den gerade bearbeiteten Chip waagerecht ins
-  // Bild holen. Die Eingabe hat sich beim Einhängen schon selbst fokussiert (`MetaChip`).
-  // Ist kein Chip in Bearbeitung, steht die Zeile wieder am Anfang, wo „Feld" wartet.
+  // Einzeilige Chip-Zeile unter `md`: den gerade bearbeiteten Chip waagerecht ins Bild holen
+  // (die Eingabe fokussiert sich selbst). Ohne Chip in Bearbeitung steht die Zeile am Anfang.
   useEffect(() => {
     const zeile = chipZeileRef.current;
     if (!istSchmal || !zeile) return;
@@ -289,11 +274,9 @@ export default function Schnellerfassung({
   // Freitext bleibt Fallback (AC#1).
   const funkrufnamen = useFunkrufnamen(einsatz.id);
 
-  // onWerteChange in einer Ref halten: Der Autosave-Effekt darf NUR auf echte
-  // Wertänderungen (inhalt/typ/metadaten) feuern — nicht, wenn der Container bei
-  // jedem Render eine neue Callback-Referenz liefert. Stünde onWerteChange in den
-  // Effekt-Deps, triggerte jedes Container-Re-Render (das entwurfAktualisieren
-  // auslöst) den Effekt erneut → Re-Trigger-/Endlosschleife.
+  // onWerteChange in einer Ref: der Autosave-Effekt feuert NUR auf echte Wertänderungen.
+  // In den Deps triggerte jede neue Callback-Referenz des Containers den Effekt erneut
+  // (Endlosschleife über entwurfAktualisieren).
   const onWerteChangeRef = useRef(onWerteChange);
   useEffect(() => {
     onWerteChangeRef.current = onWerteChange;
@@ -315,14 +298,12 @@ export default function Schnellerfassung({
   }, []);
 
   /**
-   * Klick daneben schliesst das Menü. Vorher gab es ohne Auswahl überhaupt keinen Weg
-   * hinaus ausser Escape oder einem zweiten Druck auf denselben Knopf.
+   * Klick daneben schließt das Menü.
    *
-   * Zwei Ausnahmen, beide notwendig: Das **Menü selbst**, weil seine Einträge über
-   * `onMouseDown` wählen und `pointerdown` davor läuft — würde hier geschlossen, wäre
-   * der Eintrag beim Klick schon weg und die Auswahl per Maus tot. Und der
-   * **Feld-Knopf**, der selbst umschaltet: sonst schlösse dieser Effekt zuerst und der
-   * Klick öffnete danach wieder, der Knopf könnte also nie schliessen.
+   * Zwei Ausnahmen, beide notwendig: das **Menü selbst**, weil seine Einträge über
+   * `onMouseDown` wählen und `pointerdown` davor läuft — sonst wäre die Mausauswahl tot. Und
+   * der **Feld-Knopf**, der selbst umschaltet: sonst schlösse dieser Effekt zuerst und der
+   * Klick öffnete danach wieder.
    */
   useEffect(() => {
     if (!menuOffen) return;
@@ -372,19 +353,16 @@ export default function Schnellerfassung({
       return;
     }
     setInhalt(neu);
-    // Caret-Position aus dem nativen textarea über die antd-Ref.
-    // Falls der Ref-Pfad nicht verfügbar ist (ältere antd-Version), Fallback auf Textende.
+    // Caret-Position aus dem nativen textarea über die antd-Ref, sonst Textende.
     const caret = textRef.current?.resizableTextArea?.textArea?.selectionStart ?? neu.length;
     aktualisiereTrigger(neu, caret);
   }
 
   /**
-   * Entfernt NUR den „/…"-Text, der das Menü ausgelöst hat. Schliesst bewusst nicht
-   * mit — das tut `waehleEintrag`. Bis zum 30.07.2026 hing das Schliessen hier mit
-   * drin, hinter dem frühen Ausstieg: wer das Menü über den Feld-Knopf öffnete, hatte
-   * `triggerStart === -1` (es gibt keinen Trigger-Text), und das Menü blieb nach der
-   * Auswahl stehen. Es liegt absolut über der Chip-Leiste und verdeckte damit genau
-   * den Chip-Editor, der gerade aufgegangen war.
+   * Entfernt NUR den „/…"-Text, der das Menü ausgelöst hat, und schließt bewusst nicht mit —
+   * das tut `waehleEintrag`. Über den Feld-Knopf geöffnet gibt es keinen Trigger-Text
+   * (`triggerStart === -1`); ein Schließen hinter diesem frühen Ausstieg ließe das Menü über
+   * dem gerade geöffneten Chip-Editor stehen.
    */
   function entferneTriggerText() {
     if (triggerStart < 0) return;
@@ -394,10 +372,9 @@ export default function Schnellerfassung({
   }
 
   /*
-   * Während des Sendens nimmt die Erfassung keine Änderung an (LFH-117, Review C1): der Eintrag
-   * ist beim Absenden gebildet, was danach an Typ, Feldern oder Baustein geändert würde, ginge
-   * nicht mit und fiele nach dem Erfolg still weg. Die Bedienelemente sind gesperrt; die
-   * frühen Ausstiege hier halten die Wege, die an keinem Knopf hängen (Menü, Modal, Tastatur).
+   * Während des Sendens nimmt die Erfassung keine Änderung an: der Eintrag ist beim Absenden
+   * gebildet, spätere Änderungen gingen nicht mit und fielen nach dem Erfolg still weg. Die
+   * frühen Ausstiege halten die Wege, die an keinem Knopf hängen (Menü, Modal, Tastatur).
    */
   function waehleEintrag(e: SlashEintrag) {
     if (sendet) return;
@@ -506,11 +483,10 @@ export default function Schnellerfassung({
 
   async function absenden() {
     if (sendet || inhalt.trim() === '') return;
-    // Nur der UPLOAD braucht Netz (design.md D10). Mit Dateien in der Liste wird ohne
-    // Verbindung abgewiesen, ohne etwas zu leeren — ein Eintrag ohne die gewählten Dateien
-    // wäre eine stille Auslassung.
-    // Über der Höchstzahl gar nicht erst hochladen: das Erfassen scheiterte danach mit 400,
-    // und alle Dateien lägen bis zum Aufräumlauf verwaist oben.
+    // Nur der UPLOAD braucht Netz. Mit Dateien in der Liste wird ohne Verbindung abgewiesen, ohne
+    // etwas zu leeren — ein Eintrag ohne die gewählten Dateien wäre eine stille Auslassung.
+    // Über der Höchstzahl gar nicht erst hochladen: das Erfassen scheiterte mit 400, und die
+    // Dateien lägen bis zum Aufräumlauf verwaist oben.
     if (dateien.length > ETB_ANHAENGE_MAX) {
       setAnhangHinweis(`${ANHANG_GRENZE} Entferne ${dateien.length - ETB_ANHAENGE_MAX}.`);
       return;
@@ -522,8 +498,8 @@ export default function Schnellerfassung({
       );
       return;
     }
-    // Die Zeit gilt ab dem Absenden, nicht ab dem Ende des Uploads — sonst verschöbe ein
-    // langer Upload Ereigniszeit und `erfasst_lokal_at` (Review LFH-117).
+    // Die Zeit gilt ab dem Absenden, nicht ab dem Ende des Uploads — sonst verschöbe ein langer
+    // Upload Ereigniszeit und `erfasst_lokal_at`.
     const jetztIso = new Date().toISOString();
     aendereVersand({ sendet: true, hinweis: null });
     try {
@@ -550,11 +526,10 @@ export default function Schnellerfassung({
         if (e instanceof ApiError && (e.status === 400 || e.status === 422)) {
           for (const d of dateien) hochgeladeneIds.delete(d);
         }
-        // 409 aus dem Erfassen (Review C1): die client_id steht schon für einen anderen
-        // Eintrag (zweiter Browser-Tab) — oder der Einsatz ist abgeschlossen. Der Wortlaut
-        // bleibt, der Grund steht AN der Erfassung, und der nächste Versuch nimmt einen neuen
-        // Schlüssel; mit dem alten liefe er in denselben Konflikt. Mit Aufrufer-id gibt
-        // `EtbEntwurfsTabs` dem Entwurf eine neue.
+        // 409: die client_id steht schon für einen anderen Eintrag (zweiter Browser-Tab), oder der
+        // Einsatz ist abgeschlossen. Der Wortlaut bleibt, der Grund steht AN der Erfassung, und der
+        // nächste Versuch nimmt einen neuen Schlüssel; mit Aufrufer-id gibt `EtbEntwurfsTabs` dem
+        // Entwurf eine neue.
         if (e instanceof ApiError && e.status === 409) {
           eigeneClientId.current = crypto.randomUUID();
           setAnhangHinweis(e.message);
@@ -585,11 +560,10 @@ export default function Schnellerfassung({
   }
 
   /*
-   * DER PRÄFIX IST DER TYPWÄHLER (Neuentwurf S4: `/anordnung` in der Befehlszelle). Er
-   * zeigt den gewählten Typ als Befehl und öffnet auf Klick die Typen als Menü — der Weg
-   * für Maus und Handschuh; die Tastatur nimmt `/typ` am Zeilenanfang. Das frühere `Select`
-   * unter dem Feld ist damit entfallen: zwei Wähler für denselben Wert wären zwei Stellen,
-   * an denen er stehen kann. Im Berichtigungsmodus ist der Typ fest und der Präfix Text.
+   * DER PRÄFIX IST DER TYPWÄHLER (`/anordnung` in der Befehlszelle): er zeigt den gewählten Typ
+   * und öffnet auf Klick die Typen als Menü — der Weg für Maus und Handschuh; die Tastatur nimmt
+   * `/typ` am Zeilenanfang. Einen zweiten Wähler für denselben Wert gibt es bewusst nicht. Im
+   * Berichtigungsmodus ist der Typ fest und der Präfix Text.
    *
    * Der zugängliche Name enthält den sichtbaren Befehl (WCAG 2.5.3 „Label in Name").
    */
@@ -623,14 +597,12 @@ export default function Schnellerfassung({
   );
 
   /*
-   * DIE HINWEISZEILE trägt den Tastaturvertrag — EINMAL (Nacharbeit zu LFH-335): nicht im
-   * Platzhalter, nicht zusätzlich als „↵ eintragen" in der Zeile. Genannt wird nur, was es
-   * gibt: `# Koordinate` des Entwurfs hat keinen Weg in den Eintrag und fehlt deshalb;
-   * „⧖ Nachtrag" steht, weil `/zeit` eine zurückliegende Ereigniszeit setzt und der
-   * Eintrag dann als nachgetragen erscheint.
+   * DIE HINWEISZEILE trägt den Tastaturvertrag — EINMAL: nicht im Platzhalter, nicht zusätzlich
+   * als „↵ eintragen". Genannt wird nur, was es gibt: `# Koordinate` des Entwurfs hat keinen Weg
+   * in den Eintrag; „⧖ Nachtrag" steht, weil `/zeit` eine zurückliegende Ereigniszeit setzt.
    */
-  // „Werte behalten": ab `md` rechts in der Chip-Zeile, darunter in der Hinweiszeile (Review
-  // LFH-373) — in der einzeilig rollenden Chip-Zeile lag er sonst hinter dem Bildlauf.
+  // „Werte behalten": ab `md` rechts in der Chip-Zeile, darunter in der Hinweiszeile — in der
+  // einzeilig rollenden Chip-Zeile läge er sonst hinter dem Bildlauf.
   const schalter = zeigeSchalter ? (
     <Tooltip title={UEBERNAHME_ERKLAERUNG}>
       {/* Gesperrt beim Senden: der laufende Versand hat die Übernahme schon gelesen. */}
@@ -644,8 +616,7 @@ export default function Schnellerfassung({
     </Tooltip>
   ) : null;
 
-  // Unter `md` die Kurzform (LFH-373): die volle Zeile brach auf dem Handschirm auf drei
-  // Zeilen um und trieb die angepinnte Leiste über die Hälfte des Fensters.
+  // Unter `md` die Kurzform: die volle Zeile bräche auf dem Handschirm dreizeilig um.
   const hinweiszeile = istSchmal ? (
     <>
       <span>{ENTER_HINWEIS_KURZ}</span>
@@ -687,13 +658,13 @@ export default function Schnellerfassung({
     </Button>
   );
 
-  // „Anhang" (LFH-117) steht bei „Feld": ab `md` hinter den Chips, darunter vorn (LFH-373).
+  // „Anhang" steht bei „Feld": ab `md` hinter den Chips, darunter vorn.
   const anGrenze = dateien.length >= ETB_ANHAENGE_MAX;
   const anhangTeil = (
     <>
-      {/* „Anhang" (LFH-117): ein antd-Knopf plus unsichtbare Dateieingabe statt antds
-            `Upload` — der wickelte den Knopf in ein zweites `role="button"` mit eigenem
-            Tabstopp. So bleibt EIN Bedienziel, und die Höhe kommt aus `controlHeight`. */}
+      {/* „Anhang": ein antd-Knopf plus unsichtbare Dateieingabe statt antds `Upload` — der wickelte
+         den Knopf in ein zweites `role="button"` mit eigenem Tabstopp. So bleibt EIN Bedienziel,
+         und die Höhe kommt aus `controlHeight`. */}
       <Button
         type="dashed"
         disabled={!online || sendet || anGrenze}
@@ -716,18 +687,17 @@ export default function Schnellerfassung({
         data-lfh="etb-anhang-eingabe"
         onChange={(e) => dateienGewaehlt(e.target.files)}
       />
-      {/* Zweiter Kanal neben dem Grau (WCAG 1.4.1): der Grund steht als Satz daneben. In
-            `text2`, nicht als `Typography` „secondary": dessen Ton hielt am Tag gemessen nur
-            5,58 : 1 auf dem Grund der Erfassung (Boden 7, e2e `etb-anhang-pruefliste`). */}
+      {/* Zweiter Kanal neben dem Grau (WCAG 1.4.1): der Grund steht als Satz daneben. In `text2`,
+         nicht `Typography` „secondary": der hält am Tag den 7 : 1-Boden auf dem Grund der
+         Erfassung nicht (e2e `etb-anhang-pruefliste`). */}
       {!online && <span style={{ color: rollen.text2 }}>{ANHANG_OFFLINE}</span>}
       {online && anGrenze && <span style={{ color: rollen.text2 }}>{ANHANG_GRENZE}</span>}
     </>
   );
 
   return (
-    // `etb-erfassung-card` trägt keine CSS-Regel mehr (den Rahmen zeichnet die
-    // Schnellerfassungszeile), bleibt aber stehen: `e2e/seitenrinne.spec.ts` misst an ihr,
-    // dass der Inhalt der Leiste auf der Seitenrinne steht.
+    // `etb-erfassung-card` trägt keine CSS-Regel, bleibt aber: `e2e/seitenrinne.spec.ts` misst an
+    // ihr, dass der Inhalt der Leiste auf der Seitenrinne steht.
     <div className="etb-erfassung-card" data-lfh="etb-erfassung">
       {berichtigungZu && (
         <Alert
@@ -749,9 +719,8 @@ export default function Schnellerfassung({
           gestapelt={istSchmal}
           praefix={praefix}
           hinweis={
-            // „Vorschau" neben „Erfassen" statt auf eigener Zeile unter dem Feld (LFH-373): die
-            // eigene Knopfzeile kostete im Handschuh-Betrieb eine volle Steuerhöhe der
-            // angepinnten Leiste (gemessen 440 px = 57 % des Fükw-Fensters).
+            // „Vorschau" neben „Erfassen" statt auf eigener Zeile: eine eigene Knopfzeile kostete im
+            // Handschuh-Betrieb eine volle Steuerhöhe der angepinnten Leiste.
             <div style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
               <Button
                 type="text"
@@ -804,17 +773,15 @@ export default function Schnellerfassung({
         />
       </div>
 
-      {/* Chip-Leiste: die gesetzten Felder, der Weg zu weiteren — und rechts, abgesetzt,
-          die EINSTELLUNG „Werte behalten". Sie steht nicht neben „Erfassen" (die Aktion
-          wohnt in der Zeile darüber) und nicht zwischen Aktionen; ein Umschalter in einer
-          Knopfreihe gilt als wirkungslos (30.07.2026, `components/Erfassung.tsx`). */}
+      {/* Chip-Leiste: die gesetzten Felder, der Weg zu weiteren — und rechts, abgesetzt, die
+         EINSTELLUNG „Werte behalten". Nicht neben „Erfassen" und nicht zwischen Aktionen: ein
+         Umschalter in einer Knopfreihe wirkt wirkungslos (`components/Erfassung.tsx`). */}
       <div ref={chipZeileRef} style={chipZeileStil(istSchmal, token)}>
-        {/* `flexShrink: 0` unter `md`: als Flex-Kind der einzeiligen Zeile schrumpfte die Gruppe
-            sonst auf die Zeilenbreite, und die Chips brachen ihren Text IN sich um — gemessen
-            wuchs die Leiste mit drei Chips von 373 auf 531 px, trotz einzeiliger Zeile. */}
+        {/* `flexShrink: 0` unter `md`: sonst schrumpfte die Gruppe auf die Zeilenbreite, und die Chips
+           brächen ihren Text IN sich um — die Leiste wüchse trotz einzeiliger Zeile. */}
         <Space wrap={!istSchmal} style={istSchmal ? { flexShrink: 0 } : undefined}>
-          {/* Unter `md` steht „Feld" VORN (LFH-373): in der einzeilig rollenden Zeile rutschte
-              er sonst hinter die gesetzten Chips aus dem Bild. */}
+          {/* Unter `md` steht „Feld" VORN: in der einzeilig rollenden Zeile rutschte er sonst hinter die
+             gesetzten Chips aus dem Bild. */}
           {istSchmal && feldKnopf}
           {istSchmal && anhangTeil}
           {gesetzteFelder.map((feld) => (
@@ -857,8 +824,8 @@ export default function Schnellerfassung({
           {!istSchmal && feldKnopf}
           {!istSchmal && anhangTeil}
           {!berichtigungZu && typ === 'lage' && (
-            // Gesperrt beim Senden: der Sprung hängte die Erfassung ab, der Versand liefe
-            // unsichtbar weiter und ein Upload-Fehler stünde nirgends (Review C1).
+            // Gesperrt beim Senden: der Sprung hängte die Erfassung ab, der Versand liefe unsichtbar
+            // weiter und ein Upload-Fehler stünde nirgends.
             <Button
               type="link"
               disabled={sendet}

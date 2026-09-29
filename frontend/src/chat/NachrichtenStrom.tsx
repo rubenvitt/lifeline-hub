@@ -20,15 +20,10 @@ import type { BezugKurzinfo } from './bezug';
 import { formatGroesse } from '../karten/formatGroesse';
 
 /**
- * Restweg zum unteren Rand, der noch als „der Lesende steht unten" gilt (LFH-466).
- *
- * Die tragende Schranke ist „deutlich KLEINER als eine Nachrichtenzeile": eine
- * Zeile aus Autor, Zeit und Text misst in der kompaktesten Dichtestufe grob 50 px.
- * Wäre die Toleranz größer, bekäme jemand, der genau eine Nachricht zurückgeblättert
- * hat, wieder den bedingungslosen Sprung — also exakt den Fehler, den dieses Ticket
- * behebt. Nach unten braucht es trotzdem Luft: Subpixel-Rundung (Zoomstufe,
- * `devicePixelRatio`) macht aus einem tatsächlich erreichten Boden sonst einen
- * Restweg von einem Bruchteil eines Pixels.
+ * Restweg zum unteren Rand, der noch als „der Lesende steht unten" gilt.
+ * Deutlich KLEINER als eine Nachrichtenzeile (kompakt ~50 px), sonst bekäme, wer eine
+ * Nachricht zurückgeblättert hat, wieder den Sprung; etwas Luft braucht es gegen
+ * Subpixel-Rundung.
  */
 const TOLERANZ_UNTEN = 24;
 
@@ -54,17 +49,13 @@ interface Props {
   /** Liefert die Kurzinfo für das Bezug-Popover; `null`, wenn das Objekt nicht
    *  (mehr) geladen/verfügbar ist. Ohne diesen Callback bleibt der Tag statisch. */
   bezugInfo?: (typ: BezugTyp, id: number) => BezugKurzinfo | null;
-  /** Zähler der EIGENEN Absendungen (LFH-466). Jede Erhöhung holt die Sicht ans Ende
-   *  zurück, auch wenn gerade weiter oben gelesen wurde — siehe Effekt unten. */
+  /** Zähler der EIGENEN Absendungen. Jede Erhöhung holt die Sicht ans Ende zurück. */
   eigeneSendungen?: number;
 }
 
 /**
- * Lesebreite einer Nachricht (22.09.2026). Seit der Seitenrahmen die volle Inhaltsbreite
- * nimmt, liefen lange Nachrichten auf dem Fükw-Schirm über 200 Zeichen je Zeile — jenseits
- * jeder Lesbarkeit (übliche Obergrenze 60–80 Zeichen). Begrenzt wird der TEXT, nicht die
- * Seite: die Kanalspalte daneben und der Scroll-Container des Stroms (Höhenkette H51,
- * Stick-to-bottom) bleiben unberührt, und die Aktion bleibt am Zeilenende.
+ * Lesebreite einer Nachricht: begrenzt wird der TEXT (übliche Obergrenze 60–80 Zeichen), nicht
+ * die Seite; Kanalspalte und Scroll-Container bleiben unberührt.
  */
 const NACHRICHT_LESEBREITE = '72ch';
 
@@ -84,33 +75,24 @@ export default function NachrichtenStrom({
 }: Props) {
   const behaelter = useRef<HTMLDivElement>(null);
   const { token } = theme.useToken();
-  // Die id der JÜNGSTEN Nachricht — sie unterscheidet die beiden Wachstumsrichtungen
-  // (Begründung am Effekt unten). `nachrichten` ist aufsteigend sortiert.
+  // Die id der JÜNGSTEN Nachricht unterscheidet die beiden Wachstumsrichtungen (siehe Effekt
+  // unten). `nachrichten` ist aufsteigend sortiert.
   const juengsteId = nachrichten.length > 0 ? nachrichten[nachrichten.length - 1].id : null;
 
   /**
-   * „Steht der Lesende unten?" — als REF, gepflegt vom Scroll-Handler (LFH-466).
-   *
-   * Die Messung darf NICHT im Effekt an der jüngsten id stattfinden: der läuft nach
-   * dem Commit, `scrollHeight` ist dann bereits um die Höhe der neuen Nachricht
-   * gewachsen. Wer exakt unten stand, wäre in dem Moment eine Zeilenhöhe vom Boden
-   * entfernt — die Pille erschiene also genau in dem Fall, in dem der Strom
-   * mitspringen soll. Scroll-Ereignisse feuern dagegen nur beim Bewegen der Sicht,
-   * nicht beim Wachsen des Inhalts, und tragen damit die Aussage über den Zustand
-   * VOR dem Zuwachs.
-   *
-   * Ein Ref und kein State: der Wert wird synchron im Effekt gelesen und soll pro
-   * Scroll-Ereignis kein Rendern auslösen. Startwert `true`, damit der erste Aufbau
-   * und der Kanalwechsel weiter ans Ende springen (Zusicherung aus LFH-343 · C8).
+   * „Steht der Lesende unten?" — als REF, gepflegt vom Scroll-Handler.
+   * Nicht im Effekt an der jüngsten id messen: der läuft nach dem Commit, `scrollHeight` ist dann
+   * schon gewachsen, und wer exakt unten stand, bekäme die Pille statt des Sprungs.
+   * Scroll-Ereignisse tragen den Zustand VOR dem Zuwachs. Ein Ref, weil synchron im Effekt
+   * gelesen und ohne Rendern je Scroll. Startwert `true`: erster Aufbau und Kanalwechsel
+   * springen ans Ende.
    */
   const amBodenRef = useRef(true);
 
   /**
    * Die id, ab der gezählt wird — gesetzt an der Flanke „unten → nicht unten".
-   *
-   * Über die ID und nicht über einen Zähler, den man hochzählt: „Ältere laden" hängt
-   * vorne an, und jeder Refetch ersetzt das ganze Array. Ein `n.id > markeId` ist
-   * gegen beides immun, ein Inkrement wäre es nicht.
+   * Über die ID statt eines Zählers: „Ältere laden" hängt vorne an und jeder Refetch ersetzt das
+   * Array; `n.id > markeId` ist gegen beides immun.
    */
   const [markeId, setMarkeId] = useState<number | null>(null);
   const neueAnzahl = markeId === null ? 0 : nachrichten.filter((n) => n.id > markeId).length;
@@ -134,18 +116,11 @@ export default function NachrichtenStrom({
   }
 
   /**
-   * Die eigene Absendung holt die Sicht zurück (LFH-466).
-   *
-   * Wer weiter oben liest, kann trotzdem tippen: die Eingabe liegt als Geschwister
-   * AUSSERHALB dieses Scroll-Containers. Ohne diesen Effekt bekäme man für den
-   * eigenen Satz eine Pille — in jedem gängigen Chatprogramm springt die Sicht dabei
-   * ans Ende. Unterschieden wird die eigene ABSENDUNG, nicht der Autor: ein Riegel am
-   * Autor führte bei jeder fremden Nachricht desselben Kontos zum Sprung und machte
-   * die Pille in einer Ein-Benutzer-Prüfung unbelegbar.
-   *
-   * Der Effekt steht VOR dem Sprung-Effekt: laufen beide in derselben Commit-Runde
-   * (die Absendung invalidiert, die neue Nachricht trifft mit ein), entscheidet die
-   * Reihenfolge der Deklaration — der Merker muss stehen, bevor der Sprung ihn liest.
+   * Die eigene Absendung holt die Sicht zurück (die Eingabe liegt außerhalb des
+   * Scroll-Containers). Unterschieden wird die ABSENDUNG, nicht der Autor: ein Riegel am Autor
+   * spränge bei jeder fremden Nachricht desselben Kontos.
+   * Der Effekt steht VOR dem Sprung-Effekt: laufen beide in derselben Commit-Runde, muss der
+   * Merker stehen, bevor der Sprung ihn liest.
    */
   useEffect(() => {
     if (eigeneSendungen === 0) return;
@@ -154,31 +129,18 @@ export default function NachrichtenStrom({
   }, [eigeneSendungen]);
 
   /**
-   * „Stick to bottom" — aber nur nach unten (LFH-343 · C8, Befund H51).
-   *
-   * Der Strom wächst an ZWEI Enden: hinten durch neue Nachrichten und den
-   * Kanalwechsel, vorne durch „Ältere laden". Ein Effekt auf `nachrichten.length`
-   * träfe beide und risse den Lesenden beim Nachladen aus dem, was er gerade
-   * liest. Die jüngste id wächst nur im ersten Fall — beim Anbau vorne bleibt sie
-   * gleich, obwohl die Länge steigt.
-   *
-   * Der Sprung greift aber nur, wenn der Lesende gerade unten steht (LFH-466).
-   * Wer weiter oben im Verlauf liest, behält seine Stelle und bekommt stattdessen
-   * die Pille unten im Container.
-   *
-   * `scrollTo` wird optional gerufen: jsdom kennt die Methode auf Elementen nicht
-   * (dieselbe Vorsichtsmaßnahme wie bei `scrollIntoView` in `MeldungenPage`).
+   * „Stick to bottom" — aber nur nach unten.
+   * Der Strom wächst an zwei Enden: hinten durch neue Nachrichten, vorne durch „Ältere laden".
+   * Ein Effekt auf `nachrichten.length` risse den Lesenden beim Nachladen aus seiner Stelle; die
+   * jüngste id wächst nur im ersten Fall. Gesprungen wird nur, wenn der Lesende unten steht,
+   * sonst erscheint die Pille. `scrollTo` optional, weil jsdom es auf Elementen nicht kennt.
    */
   useEffect(() => {
     if (juengsteId === null) return;
     const el = behaelter.current;
-    // Ohne Überlauf gibt es keine Lesestelle zu bewahren — und dann kann auch kein
-    // Scroll-Ereignis mehr feuern, das den Merker zurückstellt: `scrollTop` steht
-    // bereits auf 0 und bleibt es. Ohne diese Rückstellung bliebe eine Pille stehen,
-    // nachdem das Fenster breiter wurde und alles sichtbar ist. Der Einwand gegen
-    // Messen IM Effekt (`scrollHeight` ist hier schon gewachsen) greift für diese
-    // eine Frage nicht: sie ist eine Ja/Nein-Frage nach Überlauf, keine nach der
-    // Entfernung zum Boden.
+    // Ohne Überlauf gibt es keine Lesestelle und kein Scroll-Ereignis mehr, das den Merker
+    // zurückstellt — ohne Rückstellung bliebe die Pille stehen. Hier ist Messen im Effekt richtig:
+    // gefragt ist nur, ob es Überlauf gibt.
     if (el && el.scrollHeight <= el.clientHeight) {
       amBodenRef.current = true;
       setMarkeId(null);
@@ -192,10 +154,8 @@ export default function NachrichtenStrom({
       ref={behaelter}
       onScroll={beiScroll}
       data-testid="nachrichten-strom"
-      // Der eigene Scroll-Container ist der Kern von H51: ohne ihn wächst der
-      // Strom die Seite lang, und die Eingabe darunter wandert aus dem Bild.
-      // `minHeight: 0` ist tragend — ein Flex-Kind schrumpft ohne die Aufhebung
-      // seiner Mindestgröße nicht unter seinen Inhalt, und dann scrollt nichts.
+      // Eigener Scroll-Container, sonst wächst der Strom die Seite lang und die Eingabe wandert aus
+      // dem Bild. `minHeight: 0` ist tragend: ein Flex-Kind schrumpft sonst nicht unter seinen Inhalt.
       style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
     >
       <Liste<ChatNachricht>
@@ -207,8 +167,7 @@ export default function NachrichtenStrom({
           const heraufgestuft = n.etb_eintrag_id !== null;
           const heraufgestuftZuAuftrag = n.auftrag_id !== null;
           const hatBezug = n.bezug_typ !== null && n.bezug_id !== null;
-          // Aktionen kompakt in ein „⋯"-Dropdown gruppieren statt als Reihe von
-          // type=link-Buttons. Geloeschte/Tombstone-Nachrichten zeigen keine Aktionen.
+          // Aktionen im „⋯"-Dropdown; gelöschte Nachrichten zeigen keine.
           const menuItems: MenuProps['items'] = geloescht
             ? []
             : [
@@ -239,8 +198,8 @@ export default function NachrichtenStrom({
                       {
                         key: 'del',
                         danger: true,
-                        // Lösch-Bestätigung: Popconfirm im Label, das Klick-Event stoppt das
-                        // Auto-Schließen des Menüs, damit die Bestätigungsblase erscheint.
+                        // Lösch-Bestätigung: Popconfirm im Label; das gestoppte Klick-Event hält das Menü offen, damit
+                        // die Bestätigungsblase erscheint.
                         label: (
                           <Popconfirm
                             title="Nachricht wirklich löschen?"
@@ -284,8 +243,7 @@ export default function NachrichtenStrom({
                         </span>
                       </Tooltip>
                     )}
-                    {/* Heraufstufung ist eine aktive Beziehung zu einem anderen Datensatz →
-                        Ton `bedien` (Neuentwurf „Status als getönte Fläche"). */}
+                    {/* Heraufstufung ist eine aktive Beziehung → Ton `bedien`. */}
                     {heraufgestuft && <StatusChip ton="bedien" wort="heraufgestuft zu ETB" />}
                     {heraufgestuftZuAuftrag && (
                       <StatusChip ton="bedien" wort="heraufgestuft zu Auftrag" />
@@ -367,18 +325,9 @@ export default function NachrichtenStrom({
           );
         }}
       />
-      {/* Die Pille klebt am unteren Rand des Scroll-Containers, solange der Lesende
-          weiter oben steht. `position: sticky` statt `fixed`: sie gehört in den
-          Strom, nicht auf die Seite — unter ihr liegt die Eingabe als Geschwister.
-          Der Wrapper ist reine Positionierschale und deshalb KEIN Bedienziel; er
-          lässt Zeiger durch, damit die schmale Leiste links und rechts der Pille
-          keine Klicks auf den Text darunter abfängt.
-
-          Die Pille selbst ist ein echter antd-`Button` und kein `<div onClick>` —
-          damit kommen Trefflächenboden (`controlHeight`, 30 / 48 / 72), Fokusring
-          und Tastaturweg vom `ConfigProvider`, und sie schuldet nicht die zwei
-          Angaben, die LFH-365 einem HANDGEBAUTEN Ziel auferlegt. Dieselbe
-          Entscheidung wie beim Platzhalter in `components/BemerkungZelle.tsx`. */}
+      {/* Die Pille klebt am unteren Rand des Scroll-Containers (`sticky`, sie gehört in den Strom).
+         Der Wrapper ist reine Positionierschale und lässt Zeiger durch. Die Pille ist ein echter
+         antd-`Button`, damit Trefffläche, Fokusring und Tastaturweg vom `ConfigProvider` kommen. */}
       {neueAnzahl > 0 && (
         <div
           style={{

@@ -21,11 +21,9 @@ const spalten: TableColumnsType<Qualifikation> = [
     dataIndex: 'label',
     key: 'label',
     /**
-     * Leitspalte: an ihr sucht ein Mensch die Qualifikation. Kein `defaultSortOrder` —
-     * die fachliche Reihenfolge ist `sortier` und kommt vom Server
-     * (`src/personal/qualifikation_repo.rs:55` — `ORDER BY sortier, id`); sie bleibt der
-     * Einstieg, das Alphabet ist ein Angebot. Antds dritter Klick auf den Kopf schaltet
-     * die Sortierung wieder ab und stellt damit genau diese Reihenfolge her.
+     * Leitspalte: an ihr sucht ein Mensch die Qualifikation. Kein `defaultSortOrder` — die
+     * fachliche Reihenfolge ist `sortier` (`ORDER BY sortier, id`); sie bleibt der Einstieg, das
+     * Alphabet ist ein Angebot. Antds dritter Kopfklick stellt sie wieder her.
      */
     sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
   },

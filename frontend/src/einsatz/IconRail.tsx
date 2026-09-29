@@ -12,37 +12,24 @@ interface Props {
 }
 
 /**
- * Zeilenhöhe einer Kategorie im Entwurf (`shell.dc.html`: 62 px). Sie ist zugleich der
- * Boden unter der Dichte-Staffel: in `handschuh` (72) wächst die Zeile mit, sonst trägt sie
- * die Entwurfshöhe — und liegt damit über dem A1-Boden von 48 px, den die Rail seit LFH-329
- * zusichert.
+ * Zeilenhöhe einer Kategorie laut Entwurf (62 px) — zugleich Boden unter der Dichte-Staffel: in
+ * `handschuh` (72) wächst die Zeile mit, und sie liegt über dem 48-px-Boden der Rail.
  */
 const RAIL_ZEILE = 62;
 
-/** Breite der aktiven Marke am linken Rand (Entwurf: 2 px). Markermaß, keine Dichte. */
+/** Breite der aktiven Marke am linken Rand. Markermaß, keine Dichte. */
 const MARKE_BREITE = 2;
 
 /**
- * Stil eines Kategorie-Ziels — REIN und exportiert, damit die Dichte-Zusicherung ohne
- * Rendern prüfbar ist.
+ * Stil eines Kategorie-Ziels — rein und exportiert, damit die Dichte-Zusicherung ohne Rendern
+ * prüfbar ist (`test/utils.tsx` hat kein Theme, jsdom kein Layout).
  *
- * `test/utils.tsx:31` montiert ein nacktes `ConfigProvider` ohne unser Theme: `useToken()`
- * liefert dort den antd-Seed (`controlHeight: 32`), also KEINE der Stufen 30/48/72. Ein
- * gerenderter Wert belegte antd-Vorgaben statt der Staffel — und jsdom rechnet ohnehin
- * kein Layout. Präzedenzen: `ModulPanel.modulZeilenStil`, `Sidebar.bedienzielStil`.
+ * `Math.max` und NICHT `??`: die Staffel darf den Boden heben, nie senken. ZWEI Angaben:
+ * `minHeight` PLUS Polsterung; aufgelöste Tokens, nie `var(--lfh-*)`.
  *
- * `Math.max` und NICHT `??`: die Staffel darf den Boden heben, nie senken.
- *
- * ZWEI Angaben, nicht eine (LFH-365): `minHeight` PLUS Polsterung. Aufgelöste Tokens,
- * nie `var(--lfh-*)` — die Arbeitsteilung steht in `theme/rollen.css`.
- *
- * DIE AKTIVE MARKE IST ROT — Entscheidung des Auftraggebers zum Neuentwurf (21.09.2026,
- * `docs/design/2026-09-21-neuentwurf/umsetzung.md`, Entscheidung 2): 2 px in `marke` am
- * linken Rand. Das ist KEINE rote Bedienfläche: die Fläche des aktiven Ziels ist `flaeche3`
- * (neutral), das Etikett hell — Rot markiert den Ort, es bedient nichts. Vorher (LFH-328/A2)
- * trug der aktive Zustand eine blaue Vollfläche; die ist mit dem Entwurf entfallen.
- * Die Marke sitzt als `boxShadow` innen, nicht als Rand: ein Rand verschöbe Ikone und
- * Etikett beim Aktivieren um 2 px.
+ * DIE AKTIVE MARKE IST ROT (umsetzung.md, Entscheidung 2): 2 px in `marke` am linken Rand. Sie
+ * bedient nichts — die Fläche des aktiven Ziels ist `flaeche3` (neutral). Als `boxShadow`
+ * innen, weil ein Rand Ikone und Etikett beim Aktivieren verschöbe.
  */
 export function railZielStil(
   token: { controlHeight: number; paddingXS: number },
@@ -80,17 +67,11 @@ const ETIKETT_STIL: CSSProperties = {
 };
 
 /**
- * Schmale vertikale Kategorie-Rail (Ebene 2), 60 px nach dem Neuentwurf.
+ * Schmale vertikale Kategorie-Rail, 60 px.
  *
- * DAS ETIKETT STEHT SICHTBAR, NICHT IM TOOLTIP (LFH-337 · Befund H8): auf dem
- * Führungs-Tablet gibt es kein Hover. Seit dem Neuentwurf ist es das KURZETIKETT
- * (`Kategorie.kurz`, „Kräfte", „Komm.") — 9 px Versalien in 60 px Breite tragen
- * „Kommunikation" nicht. Der volle Name bleibt `aria-label` (Namensabfrage der Tests,
- * Screenreader) und `title` (Zeiger).
- *
- * „Einstellungen" (`fuss`) steht abgesetzt unten mit Haarlinie — sie ist Konfiguration,
- * keine Arbeitskategorie. Es bleiben SECHS Ziele in EINER Landmarke: die Zahl prüfen die
- * e2e-Suiten, und eine zweite Landmarke für ein Ziel wäre Lärm.
+ * Das Etikett steht SICHTBAR, nicht im Tooltip: auf dem Führungs-Tablet gibt es kein Hover. Es
+ * ist das Kurzetikett (`Kategorie.kurz`); der volle Name bleibt `aria-label` und `title`.
+ * „Einstellungen" (`fuss`) steht abgesetzt unten. Es bleiben SECHS Ziele in EINER Landmarke.
  */
 export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick }: Props) {
   const { token } = theme.useToken();
@@ -110,9 +91,8 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
         // Fokusabstand zum klebenden Fuß (WCAG 2.4.11) — neben, nicht in `railZielStil`.
         style={{ ...railZielStil(token, { aktiv }), ...fussFokusabstandStil }}
       >
-        {/* `flexShrink: 0`, weil sonst die Ikone statt des Etiketts nachgibt — dieselbe
-            gemessene Falle wie in `ModulPanel`. Hülle mit `aria-hidden`: der Name steht am
-            Knopf, die Ikone ist Dekoration. */}
+        {/* `flexShrink: 0`, sonst gibt die Ikone statt des Etiketts nach. `aria-hidden`: der Name steht
+           am Knopf. */}
         <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
           <Icon size={20} />
         </span>
@@ -144,11 +124,9 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
     >
       {haupt.map(ziel)}
       {fuss.length > 0 && (
-        // `sticky; bottom: 0`: die Seite scrollt im Dokument, nicht in einem eigenen
-        // Container — auf einer langen Seite stünde der Fuß sonst am Seitenende. So hängt er
-        // am unteren Fensterrand, solange die Spalte reicht; auf kurzen Seiten schiebt ihn
-        // `marginTop: auto` ans Spaltenende. Der Grund ist nötig, weil darunter Ziele vorbei-
-        // scrollen.
+        // `sticky; bottom: 0`: die Seite scrollt im Dokument, sonst stünde der Fuß auf einer langen
+        // Seite am Seitenende. Auf kurzen Seiten schiebt ihn `marginTop: auto` ans Spaltenende. Der
+        // Grund ist nötig, weil darunter Ziele vorbeiscrollen.
         <div
           ref={fussRef}
           data-lfh="rail-fuss"

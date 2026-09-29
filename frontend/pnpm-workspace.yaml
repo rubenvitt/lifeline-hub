@@ -122,6 +122,9 @@ overrides:
   # Advisory bewegt sich darunter weg. Wer hier etwas ändert, prüft BEIDE Grenzen — die
   # Untergrenze des Bereichs UND die Zielversion.
   #
-  # ^3.3.18 bleibt ein Same-Major-Patch; verifiziert durch den Frontend-Produktionsbuild und
-  # die Vitest-Suite in check-all.sh.
-  nanoid@>=3.0.0 <3.3.18: ^3.3.18
+  # ENTFALLEN 2026-09-29 (LFH-394): postcss 8.5.28 fordert selbst `nanoid ^3.3.18`, und
+  # postcss ist der einzige Weg, auf dem nanoid hereinkommt. Die Kette hebt die Version
+  # jetzt ohne Hilfe; ein Override, der nichts mehr erzwingt, wäre eine stille Altlast.
+  # Der Kommentar bleibt als Beleg für das Muster, auf das js-yaml und fast-uri oben
+  # verweisen. Kehrt der Fund zurück (neue Schwelle über postcss' Range), wird der Override
+  # mit BEIDEN Grenzen neu gesetzt.

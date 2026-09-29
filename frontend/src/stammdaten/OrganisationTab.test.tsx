@@ -18,8 +18,8 @@ describe('OrganisationTab', () => {
   it('lädt Org-Default und speichert Änderung', async () => {
     let patched: unknown = null;
     server.use(
-      // Seit LFH-346 · A2 hat diese Sektion ein Rechte-Gate: ohne Admin sind Feld und
-      // Knopf gesperrt. Der MSW-Default liefert 401 → benutzer=null → kein Admin.
+      // Die Sektion hat ein Rechte-Gate: ohne Admin sind Feld und Knopf gesperrt. Der MSW-Default
+      // liefert 401 → benutzer=null → kein Admin.
       meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
@@ -41,10 +41,9 @@ describe('OrganisationTab', () => {
   });
 
   /**
-   * LFH-346 · A2 (M45): die einzige Sektion ohne Gate. Geprüft wird der KNOPF, nicht die
-   * Abwesenheit des Knopfs — ein fehlender Knopf ist von „diese Seite kann das gar nicht"
-   * nicht zu unterscheiden (M16), und „ausgegraut" allein ist eine Ein-Kanal-Aussage
-   * (WCAG 1.4.1). Deshalb steht die Textzusicherung daneben.
+   * Geprüft wird der gesperrte KNOPF samt Grund, nicht seine Abwesenheit: ein fehlender Knopf
+   * ist von „diese Seite kann das gar nicht" nicht zu unterscheiden, und „ausgegraut" allein
+   * ist eine Ein-Kanal-Aussage (WCAG 1.4.1).
    */
   it('Nicht-Admin: Knopf gesperrt, Grund genannt, kein Speichern', async () => {
     let gerufen = 0;
@@ -68,10 +67,8 @@ describe('OrganisationTab', () => {
   });
 
   /**
-   * Der Speicherfehler steht an der SEITE (seit Review Welle B: an seinem Paneel), nicht im
-   * Toast (H14, LFH-345 · C10). Die zweite
-   * Hälfte — er verschwindet beim nächsten Absenden — ist die, die einen stehenbleibenden
-   * Alert auffliegen lässt; ohne sie wäre ein Alert, der nie geht, genauso grün.
+   * Der Speicherfehler steht an seinem Paneel, nicht im Toast (LFH-345). Die zweite Hälfte —
+   * er verschwindet beim nächsten Absenden — lässt einen stehenbleibenden Alert auffliegen.
    */
   it('zeigt einen Speicherfehler dauerhaft an der Seite und räumt ihn beim nächsten Versuch', async () => {
     let scheitern = true;
@@ -105,12 +102,11 @@ describe('OrganisationTab', () => {
 });
 
 /**
- * ── NAME UND LOGO (LFH-22, design.md D9) ────────────────────────────────────────
+ * ── NAME UND LOGO (LFH-22) ────────────────────────────────────────────────────────
  *
- * Der Name steht im Druckkopf jedes Ausdrucks; das Logo daneben. Beide pflegt der Admin
- * hier. Der Name speichert im eigenen `<form>` (Enter sendet), sein Fehler steht an der
- * Seite; das Logo hat eine Vorprüfung im Client (maßgeblich bleibt der Server) und eine
- * Rückfrage vor dem Entfernen, weil Entfernen unumkehrbar ist (LFH-363).
+ * Name und Logo stehen im Druckkopf jedes Ausdrucks. Der Name speichert im eigenen `<form>`
+ * (Enter sendet), sein Fehler steht an der Seite; das Logo hat eine Vorprüfung im Client
+ * (maßgeblich bleibt der Server) und eine Rückfrage vor dem unumkehrbaren Entfernen (LFH-363).
  */
 describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   const MIT_LOGO = {
@@ -185,9 +181,8 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   });
 
   /**
-   * Ein Logo, das nicht lädt (Datei weg, Abruf gescheitert), stand als kaputter Bildrahmen
-   * da. Wie im Druckkopf fällt das Bild weg — hier aber mit Hinweis, weil die Verwaltung der
-   * Ort ist, an dem man es behebt. Hochladen/Ersetzen und Entfernen bleiben bedienbar.
+   * Ein Logo, das nicht lädt, fällt weg wie im Druckkopf — hier aber mit Hinweis, weil die
+   * Verwaltung der Ort ist, an dem man es behebt. Hochladen und Entfernen bleiben bedienbar.
    */
   it('nimmt ein Logo, das nicht lädt, weg und sagt es', async () => {
     server.use(
@@ -204,11 +199,9 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   });
 
   it('lädt ein PNG als Multipart-Feld `datei` hoch und invalidiert die Organisation', async () => {
-    // Roh gelesen statt über `request.formData()`: undicis Multipart-Parser lehnt die
-    // jsdom-`File` ab (gemessen: ERR_ASSERTION in `multipartFormDataParser`), und undici
-    // serialisiert sie ohne Dateinamen. Geprüft wird hier deshalb nur Feldname und
-    // Multipart-Form; dass genau die gewählte Datei im Feld `datei` steht, belegt
-    // `api/organisation.test.ts` am `FormData` selbst.
+    // Roh gelesen statt über `request.formData()`: undicis Multipart-Parser lehnt die jsdom-`File`
+    // ab und serialisiert sie ohne Dateinamen. Geprüft werden deshalb nur Feldname und
+    // Multipart-Form; die Datei im Feld `datei` belegt `api/organisation.test.ts` am `FormData`.
     let koerper = '';
     let typ = '';
     server.use(
@@ -284,8 +277,8 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
 
   /**
    * Ein gescheitertes Entfernen hält den Dialog offen — der Grund gehört IN den Dialog, nicht
-   * hinter seine Maske (LFH-535, Bauform `FreigabeDialog`). Und kein Toast: der wäre nach drei
-   * Sekunden weg. Gezählt wird die Message-Queue selbst, nicht nur „im Dialog steht es".
+   * hinter seine Maske (Bauform `FreigabeDialog`), und nicht in einen Toast. Gezählt wird die
+   * Message-Queue selbst.
    */
   it('zeigt den Grund eines gescheiterten Entfernens im Dialog und räumt ihn beim nächsten Öffnen', async () => {
     server.use(
@@ -311,9 +304,8 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   });
 
   /**
-   * Drei unabhängige Paneele, drei Speicherwege: jeder Fehler steht an SEINEM Paneel. Vorher
-   * zeigte die Seite nur den ersten einer festen Rangfolge — scheiterte erst der Name und
-   * dann das Logo, blieb der Logo-Grund unsichtbar.
+   * Drei unabhängige Paneele, drei Speicherwege: jeder Fehler steht an SEINEM Paneel. Eine feste
+   * Rangfolge zeigte nur den ersten, und der Logo-Grund bliebe nach einem Namensfehler unsichtbar.
    */
   it('zeigt jeden Fehler an seinem Paneel, auch wenn zwei Speicherwege nacheinander scheitern', async () => {
     server.use(
@@ -343,16 +335,15 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     expect(within(namePaneel).getByText('Name abgelehnt')).toBeInTheDocument();
     expect(within(logoPaneel).queryByText('Name abgelehnt')).toBeNull();
     expect(within(namePaneel).queryByText('Kein gültiges PNG')).toBeNull();
-    // Und kein zweiter Ort daneben (die frühere Seiten-Kette zeigte den Namensfehler doppelt).
+    // Und kein zweiter Ort daneben.
     expect(screen.getAllByText('Name abgelehnt')).toHaveLength(1);
     expect(screen.getAllByText('Kein gültiges PNG')).toHaveLength(1);
   });
 
   /**
-   * Der Serverstand erreicht das Namensfeld nach dem Speichern wieder (LFH-342 · C7 (2)):
-   * antd setzt `touched` beim Speichern nicht zurück, ein Riegel daran hielt das Feld für den
-   * ganzen Besuch fest. Der schärfere Fall: der Server bleibt beim SELBEN Namen (nur
-   * Leerzeichen getippt) — dann ändert sich der Serverwert gar nicht.
+   * Der Serverstand erreicht das Namensfeld nach dem Speichern wieder: antd setzt `touched`
+   * beim Speichern nicht zurück, ein Riegel daran hielte das Feld für den ganzen Besuch fest.
+   * Der schärfere Fall: der Server bleibt beim SELBEN Namen (nur Leerzeichen getippt).
    */
   it('übernimmt nach dem Speichern wieder den Serverstand ins Namensfeld (auch bei gleichem Namen)', async () => {
     server.use(
@@ -414,10 +405,9 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   });
 
   /**
-   * Die PATCH-Antwort IST der neue Serverstand (volle `OrganisationAnzeige`). Wird nur
-   * invalidiert, hält der Cache bis zum Refetch den ALTEN Namen — und sobald der Merker
-   * fällt, springt das Feld darauf zurück. Kommt der Refetch nie (hier: er hängt), bleibt
-   * der alte Name stehen. Geprüft wird deshalb der Stand OHNE Refetch, nicht der Endzustand.
+   * Die PATCH-Antwort IST der neue Serverstand. Nur invalidiert hielte der Cache bis zum
+   * Refetch den ALTEN Namen, und sobald der Merker fällt, spränge das Feld darauf zurück.
+   * Geprüft wird deshalb der Stand OHNE Refetch (er hängt hier).
    */
   it('zeigt nach „Namen speichern" sofort den gespeicherten Namen, auch wenn der Refetch nicht kommt', async () => {
     let gespeichert = false;

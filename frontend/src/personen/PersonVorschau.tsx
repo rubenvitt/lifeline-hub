@@ -9,17 +9,10 @@ import PersonVerlauf from './PersonVerlauf';
 import { SeitenFehler } from '../components/SeitenZustand';
 
 /**
- * NUR-LESEN-Inhalt einer Person: Identität, Status, Sichtung und medizinischer Verlauf.
- *
- * EIN Bauteil für ZWEI Rahmen (LFH-645): den schlanken `PersonDetailDrawer` (Klick auf einen
- * Patienten im UHS-Grundriss) und die Vorschau der Sprungpalette (Taste →). Zwei Kopien
- * wären zwei Stellen, an denen ein Feld fehlen kann. Der Rahmen — Titel, „Vollständig
- * öffnen", Rückweg — bleibt beim Aufrufer; das Bearbeiten (Sichtung/Verbleib/Storno) bleibt
- * der Personen-Seite vorbehalten.
- *
- * Derselbe Query-Key wie die Personen-Liste und der Drawer-Titel (`einsatzKeys.person`):
- * der Cache wird geteilt, Live-Invalidierungen greifen für alle, ein zweiter Rahmen kostet
- * keinen zweiten Request.
+ * NUR-LESEN-Inhalt einer Person: Identität, Status, Sichtung und medizinischer Verlauf — ein
+ * Bauteil für `PersonDetailDrawer` und die Vorschau der Sprungpalette. Der Rahmen bleibt beim
+ * Aufrufer, das Bearbeiten bei der Personen-Seite.
+ * Derselbe Query-Key wie Liste und Drawer-Titel (`einsatzKeys.person`): ein Cache-Fach.
  */
 export default function PersonVorschau({
   einsatzId,

@@ -28,7 +28,7 @@ import {
 
 const { Text } = Typography;
 
-/** Ton der Fehlmenge — er folgt der Einstufung, nicht bloß „fehlt etwas?" (Spec: offen ohne Alarm). */
+/** Ton der Fehlmenge — folgt der Einstufung („offen" ohne Alarm). */
 const FEHLT_TON: Record<VerpflegungDeckung, KennzahlTon> = {
   gedeckt: 'normal',
   offen: 'neutral',
@@ -40,9 +40,8 @@ export interface ZeitfensterKarteProps {
   jetzt: Dayjs;
   darfSchreiben: boolean;
   /**
-   * Modul Nachforderungen für die Person bedienbar (und die Overrides bekannt). Ohne: kein
-   * „Nachfordern" und am Verweis nur „Nachforderung #n" (D4 — keine Angaben eines Moduls, das
-   * die Person nicht sieht).
+   * Modul Nachforderungen für die Person bedienbar (und Overrides bekannt). Ohne: kein
+   * „Nachfordern" und am Verweis nur „Nachforderung #n".
    */
   nachforderungenFrei: boolean;
   /** Aufgelöster Name einer Nachforderung — nur bei freiem Modul befragt. */
@@ -63,21 +62,18 @@ interface Aktion {
 }
 
 /**
- * Ein Verpflegungszeitfenster (LFH-634, design.md D7).
+ * Ein Verpflegungszeitfenster.
  *
- * EINSTUFUNG mit zwei Kanälen (WCAG 1.4.1): das Wort im `StatusTag` und die Farbe am linken
- * Rand — EINE Farbe, bei Unterdeckung `alarm` (Regel aus LFH-343 · C8). Die Fehlmenge steht
- * IMMER als Zahl da, auch bei „offen"; ihr Ton folgt der Einstufung, der Text läuft bei
- * Unterdeckung über `alarmText` (LFH-618, Regel 1). Nichts blinkt.
+ * Einstufung mit zwei Kanälen: Wort im `StatusTag` und EINE Randfarbe (`alarm` bei
+ * Unterdeckung). Die Fehlmenge steht IMMER als Zahl da; bei Unterdeckung über `alarmText`.
+ * Nichts blinkt.
  *
- * SONDERKOST: nur belegte Kostformen. Fehlt eine Kostform, nennt die Zeile sie ausdrücklich
- * („fehlt 3 vegan") — sonst stünde „Unterdeckung" an einem Zeitfenster, dessen Gesamtzahl
- * gedeckt aussieht (Risiko in design.md).
+ * Sonderkost: nur belegte Kostformen. Eine fehlende Kostform wird ausdrücklich genannt
+ * („fehlt 3 vegan"), sonst sähe eine Unterdeckung bei gedeckter Gesamtzahl gedeckt aus.
  *
- * AKTIONEN (LFH-365): „Ausgabe erfassen" ist die sichtbare Kartenaktion. Sind es nach der
- * Rechteprüfung drei oder mehr, liegen die übrigen im Dreipunkt-Menü, „Löschen" rot hinter dem
- * Trenner. Ohne Schreibrecht fällt die Aktionszeile ganz weg, ebenso „Zurücknehmen" an den
- * Ausgaben (C11). Jeder zugängliche Name trägt die Zeilenkennung (Bezeichnung + Zeitraum).
+ * Aktionen: „Ausgabe erfassen" ist sichtbar; ab drei Aktionen nach der Rechteprüfung liegen die
+ * übrigen im Dreipunkt-Menü, „Löschen" rot hinter dem Trenner. Ohne Schreibrecht fällt die
+ * Aktionszeile weg. Jeder zugängliche Name trägt die Zeilenkennung (Bezeichnung + Zeitraum).
  */
 export default function ZeitfensterKarte({
   zeitfenster: zf,
@@ -281,8 +277,7 @@ export default function ZeitfensterKarte({
       )}
 
       {(erfassen || weitere.length > 0) && (
-        // `marginSM` = 7 / 11 / 16 px: im Handschuh-Betrieb der Abstand ≥ 16 px zwischen zwei
-        // Zielen (Prüfliste Kriterium 2), wie an der Ablösungskarte.
+        // `marginSM` = 7 / 11 / 16 px: im Handschuh-Betrieb ≥ 16 px zwischen zwei Zielen.
         <Flex
           justify="flex-end"
           wrap

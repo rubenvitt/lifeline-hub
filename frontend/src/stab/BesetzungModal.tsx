@@ -29,13 +29,10 @@ interface BesetzungModalProps {
 }
 
 /**
- * „Besetzung ändern" — zwei Felder: Art und je nach Art Person oder Bezeichnung (Spec 10).
- *
+ * „Besetzung ändern" — zwei Felder: Art und je nach Art Person oder Bezeichnung.
  * Die Seite montiert die Maske nur, solange sie offen ist, mit `key={sachgebiet}`: jede Öffnung
- * bekommt einen frischen Formularspeicher, `initialValues` ist also wirklich der aktuelle
- * Zustand (der rc-field-form-Store überlebte sonst das Schliessen, Erfassungs-Norm B4).
- *
- * Umkehrbar (erneut setzen) → keine Rückfrage. Kein Serienmodus — Einzelvorgang.
+ * bekommt einen frischen Formularspeicher (der rc-field-form-Store überlebte sonst das
+ * Schließen). Umkehrbar → keine Rückfrage. Kein Serienmodus.
  */
 export default function BesetzungModal({
   einsatzId,
@@ -44,10 +41,9 @@ export default function BesetzungModal({
   onSchliessen,
 }: BesetzungModalProps) {
   const qc = useQueryClient();
-  // Stand beim ÖFFNEN einfrieren (LFH-303): `zeile` kommt live aus der Query, `initialValues`
-  // liest rc-field-form nur beim Montieren. Verglichen gegen den Live-Stand löschte ein
-  // unverändertes „Übernehmen" eine fremd gesetzte Besetzung (DELETE) oder setzte eine fremd
-  // geänderte zurück (PUT). Die Seite montiert je Öffnung mit `key`, Montieren = Öffnen.
+  // Stand beim ÖFFNEN einfrieren: `zeile` kommt live aus der Query. Gegen den Live-Stand
+  // verglichen löschte ein unverändertes „Übernehmen" eine fremd gesetzte Besetzung oder setzte
+  // eine fremd geänderte zurück. Montieren = Öffnen.
   const [basis] = useState(zeile);
   const [form] = Form.useForm<BesetzungFormWerte>();
   const art = Form.useWatch('art', form);
@@ -114,10 +110,8 @@ export default function BesetzungModal({
               loading={personalQuery.isLoading}
               onChange={(wert) => {
                 if (wert === ADHOC) {
-                  // `null`, nicht `undefined`: rc-select fiele bei `undefined` auf seinen inneren
-                  // Wert zurück und zeigte „Ad-hoc-Person anlegen …" weiter an, obwohl der
-                  // Speicher leer ist. `null` zeigt den Platzhalter; `required` weist beide ab
-                  // (Ruling 4: ein Abbruch lässt die Person leer).
+                  // `null`, nicht `undefined`: rc-select fiele bei `undefined` auf seinen inneren Wert zurück und
+                  // zeigte „Ad-hoc-Person anlegen …" weiter an. `null` zeigt den Platzhalter; `required` weist beide ab.
                   form.setFieldValue('personal_id', null);
                   setAdhocOffen(true);
                 }
@@ -137,9 +131,8 @@ export default function BesetzungModal({
             <Input placeholder={art === 'extern' ? 'Name' : 'z. B. Leitstelle'} />
           </Form.Item>
         )}
-        {/* Ein abgelehnter PUT/DELETE (409 abgeschlossen, 422) steht IN der Maske, nicht nur
-            im Toast; die Hülle lässt die Felder stehen, weil `mutateAsync` ablehnt. Ohne
-            Fehler rendert das Primitiv nichts. */}
+        {/* Ein abgelehnter PUT/DELETE steht IN der Maske; die Hülle lässt die Felder stehen, weil
+           `mutateAsync` ablehnt. */}
         <SpeicherFehler fehler={mutation.error} />
       </ErfassungsModal>
       <AdhocPersonModal

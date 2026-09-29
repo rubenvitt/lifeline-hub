@@ -19,8 +19,8 @@ interface Props {
   onBestaetigen: (typ: BezugTyp, zielId: number) => void;
 }
 
-/** Dialog zum nachträglichen Setzen/Ändern des polymorphen Sachbezugs (LFH-103):
- *  Typ wählen, dann ein Objekt dieses Typs. Muster: HeraufstufenModal. */
+/** Dialog zum nachträglichen Setzen/Ändern des polymorphen Sachbezugs: Typ wählen, dann ein
+    Objekt dieses Typs. */
 export default function BezugDialog({
   offen,
   nachricht,

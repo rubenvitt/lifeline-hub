@@ -36,8 +36,7 @@ describe('einstufungVon — dieselben Grenzfälle wie im Backend', () => {
     expect(einstufungVon(f, t('2026-09-22 14:59:59'))).toBe('planmaessig');
   });
   it('liest die Wire-Zeit als UTC, nicht als Ortszeit', () => {
-    // Ein Ortszeit-Lesen verschöbe um den Zonenversatz — gegen einen absoluten Zeitpunkt
-    // geprüft, sonst wäre ein Fehler, der beide Seiten gleich verschiebt, grün.
+    // Gegen einen absoluten Zeitpunkt geprüft: ein Ortszeit-Lesen verschöbe sonst beide Seiten gleich.
     expect(einstufungVon(f, dayjs('2026-09-22T15:29:00Z'))).toBe('vorwarnung');
   });
   it('unlesbar gilt als überfällig', () => {

@@ -8,11 +8,9 @@ dayjs.extend(utc);
 /**
  * Die Zeitachse der ETB-Filterleiste, beide Richtungen.
  *
- * Warum das einen eigenen Test bekommt und nicht bloß mitläuft: der Fehlermodus der
- * Rückrichtung ist eine STILLE Verschiebung um den Zonenversatz. Kein roter Test, kein
- * Fehlerbild — nur ein falscher Zeitraum in einer beweissichernden Unterlage. Der
- * Dateikopf von `EtbFilterleiste.tsx` hat diesen Test als Vorbedingung benannt, bevor
- * jemand die Leiste hydriert (LFH-331 · B3).
+ * Eigener Test, weil der Fehlermodus der Rückrichtung eine STILLE Verschiebung um den
+ * Zonenversatz ist — kein roter Test, kein Fehlerbild, nur ein falscher Zeitraum in einer
+ * beweissichernden Unterlage.
  */
 describe('filterZeit', () => {
   it('Round-Trip erhält den Zeitpunkt — auch beidseits der Sommerzeit-Grenzen', () => {

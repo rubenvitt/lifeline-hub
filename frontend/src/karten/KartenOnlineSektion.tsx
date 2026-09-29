@@ -3,8 +3,8 @@ import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
 import OnlineQuellenVerwaltung from './OnlineQuellenVerwaltung';
 
-/** Admin-Sektion `/admin/karten/online` — Online-Basemap-Quellen (LFH-180). Schreiben nur
- *  System-Admin; Führungskräfte sehen read-only (Hinweis-Banner). */
+/** Admin-Sektion `/admin/karten/online` — Online-Basemap-Quellen. Schreiben nur System-Admin;
+    Führungskräfte sehen read-only. */
 export default function KartenOnlineSektion() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';

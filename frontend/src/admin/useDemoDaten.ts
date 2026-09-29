@@ -7,20 +7,15 @@ import { useAuth } from '../auth/AuthContext';
 import { istAdmin } from '../einsatz/schreibrecht';
 
 /**
- * Stand der Demo-Daten für die Oberfläche (LFH-690, design.md D2/D13).
+ * Stand der Demo-Daten für die Oberfläche.
  *
  * EINE Quelle für Verwaltungsmenü, Sektion und Einsatzliste: `GET /api/demo-daten`. 404 heißt
- * „nicht freigeschaltet“ (das Backend registriert die Routen ohne `--demo-daten` gar nicht),
- * 200 liefert den Status. Es gibt bewusst kein zweites Signal daneben.
+ * „nicht freigeschaltet“ (ohne `--demo-daten` sind die Routen nicht registriert), 200 liefert
+ * den Status.
  *
- * Abgefragt wird NUR für den System-Admin (`enabled`): für jede andere Rolle geht keine
- * Anfrage hinaus, auch keine, die das Backend mit 403 beantworten würde. `retry: false`,
- * damit ein 404 kein Fehlerbild und keine Wiederholungen auslöst — der Produktions-Client
- * wiederholt ohnehin nur Netzfehler (`api/queryClient.ts`), die Angabe macht die Absicht hier
- * aber unabhängig von dieser Vorgabe.
- *
- * Der Hook liegt bewusst NICHT in `api/`: der Response-Typen-Guard
- * (`apiResponseTypen.guard.test.ts`) verlangt dort für jeden exportierten Objekt-Typ ein
+ * Abgefragt wird NUR für den System-Admin (`enabled`). `retry: false`, damit ein 404 kein
+ * Fehlerbild und keine Wiederholungen auslöst — unabhängig von der Client-Vorgabe.
+ * Nicht in `api/`: der Response-Typen-Guard verlangt dort für jeden exportierten Objekt-Typ ein
  * generiertes Gegenstück, und {@link DemoDatenStand} ist eine reine Oberflächenform.
  */
 export interface DemoDatenStand {
@@ -47,8 +42,8 @@ export function useDemoDatenStatus(): DemoDatenStand {
     retry: false,
   });
   const abgeschaltet = aktiv && abfrage.error instanceof ApiError && abfrage.error.status === 404;
-  // Ein Hintergrund-Abruf, der auf 404 fällt, lässt `data` stehen. Der Zustand ist dann trotzdem
-  // „aus“: die Freischaltung hängt am jüngsten Befund, nicht am zuletzt gelungenen.
+  // Ein Hintergrund-Abruf, der auf 404 fällt, lässt `data` stehen; die Freischaltung hängt
+  // trotzdem am jüngsten Befund.
   const freigeschaltet = aktiv && !abgeschaltet && abfrage.data !== undefined;
   return {
     freigeschaltet,
@@ -61,18 +56,14 @@ export function useDemoDatenStatus(): DemoDatenStand {
 }
 
 /**
- * Was nach Import, Neu-Import und Entfernen veraltet ist (design.md D13, Spec „Invalidierung
- * nach Import und Entfernen“): die Einsatzliste, der Demo-Status, die Stammdaten-Kataloge samt
- * der aus ihnen abgeleiteten Vorschläge, und jede Abfrage der betroffenen Demo-Einsätze — des
- * alten (vor dem Vorgang) wie des neuen (aus der Antwort).
+ * Was nach Import, Neu-Import und Entfernen veraltet ist: Einsatzliste, Demo-Status,
+ * Stammdaten-Kataloge samt abgeleiteter Vorschläge und jede Abfrage der betroffenen
+ * Demo-Einsätze (alt und neu).
  *
  * Nur `invalidateQueries`, kein `removeQueries`: ein offener Tab des alten Demo-Einsatzes lädt
- * neu und landet auf 404, statt still auf leerem Cache zu stehen. Das Backend schickt diesem
- * Tab zusätzlich ein `lagged` (block-5-report), für den neuen Einsatz gibt es kein Signal, weil
- * ihn niemand abonniert haben kann.
- *
- * Die Fahrzeug-/Personal-STATUS-Kataloge, Qualifikationen und Einheitstypen fehlen bewusst:
- * der Import benutzt sie nur mit und legt dort nichts an (design.md D8).
+ * neu und landet auf 404, statt still auf leerem Cache zu stehen.
+ * Status-Kataloge, Qualifikationen und Einheitstypen fehlen bewusst: der Import benutzt sie nur
+ * mit und legt dort nichts an.
  */
 export function invalidiereNachDemoVorgang(
   qc: QueryClient,

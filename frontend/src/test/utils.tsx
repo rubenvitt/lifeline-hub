@@ -6,9 +6,10 @@ import type { ReactElement, ReactNode } from 'react';
 import { AuthProvider } from '../auth/AuthContext';
 import { erzeugeQueryClient } from '../api/queryClient';
 
-/** Frischer QueryClient ohne Retries/Cache-Wiederverwendung — deterministische Tests.
- *  Nutzt bewusst dieselbe Fabrik wie `main.tsx`, damit der globale 401-Seam (LFH-268)
- *  in Tests dieselbe Wirkung hat wie in Produktion. */
+/**
+ * Frischer QueryClient ohne Retries/Cache-Wiederverwendung. Dieselbe Fabrik wie `main.tsx`,
+ * damit der globale 401-Seam in Tests wie in Produktion wirkt.
+ */
 export function neuerQueryClient(): QueryClient {
   return erzeugeQueryClient({
     queries: { retry: false, gcTime: 0 },
@@ -30,10 +31,9 @@ export function renderMitProviders(ui: ReactElement, options: ProviderOptions = 
       <QueryClientProvider client={client}>
         <ConfigProvider>
           <AntApp>
-            {/* AuthProvider hier, seit die Einsatz-Seiten via schreibrecht.ts/useAuth den
-                Benutzer lesen (LFH-234, admin-global). Default-`/api/auth/me` (401 → benutzer=null)
-                liegt im MSW-Server; Tests, die einen konkreten Benutzer brauchen, setzen ihn per
-                server.use(). */}
+            {/* AuthProvider, weil die Einsatz-Seiten den Benutzer über `useAuth` lesen. Default-
+               `/api/auth/me` (401 → anonym) liegt im MSW-Server; einen konkreten Benutzer setzt
+               `server.use()`. */}
             <AuthProvider>
               <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
             </AuthProvider>

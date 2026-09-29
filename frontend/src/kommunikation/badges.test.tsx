@@ -15,7 +15,7 @@ describe('StatusBadge', () => {
   it('rendert das Label als Statusfläche im Ton der Phase', () => {
     render(<StatusBadge phase="in_arbeit" label="In Bearbeitung" />);
     expect(screen.getByText('In Bearbeitung')).toBeInTheDocument();
-    // Aktive Bearbeitung ist eine aktive Beziehung → `bedien` (Neuentwurf).
+    // Aktive Bearbeitung ist eine aktive Beziehung → `bedien`.
     expect(chip('In Bearbeitung')).toHaveAttribute('data-ton', 'bedien');
     expect(chip('In Bearbeitung').closest('[data-phase]')).toHaveAttribute(
       'data-phase',
@@ -37,8 +37,7 @@ describe('StatusBadge', () => {
 
     rerender(<StatusBadge phase="offen" label="Gesichtet" />);
     const gesichtet = chip('Gesichtet') as HTMLElement;
-    // Der Kern von H47: beide tragen die Phase `offen`. Ohne die Marke wären sie
-    // an demselben Ton und demselben Gewicht nicht zu unterscheiden.
+    // Beide tragen die Phase `offen`; ohne die Marke wären sie nicht zu unterscheiden.
     expect(gesichtet).toHaveAttribute('data-ton', 'neutral');
     expect(gesichtet.style.fontWeight).toBe('');
   });

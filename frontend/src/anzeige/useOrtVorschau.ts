@@ -11,9 +11,8 @@ function runde(n: number): number {
 }
 
 /**
- * Debounced Ort-Vorschau (Peilung + ggf. Ortsname). Ruft den Endpoint erst ~debounceMs
- * nach der letzten Koordinaten-Änderung (kein Per-Tastenanschlag, Nominatim-ToS).
- * `enabled` nur bei gültiger Koordinate; Query-Key inkl. gerundeter Koordinate.
+ * Debounced Ort-Vorschau (Peilung + ggf. Ortsname): Abruf erst ~debounceMs nach der letzten
+ * Änderung (Nominatim-ToS). Nur bei gültiger Koordinate.
  */
 export function useOrtVorschau(
   einsatzId: number,
@@ -23,8 +22,7 @@ export function useOrtVorschau(
 ) {
   const [debounced, setDebounced] = useState<LatLon | null>(null);
 
-  // lat/lon als Primitive ziehen: der Effekt soll auf Wertänderung reagieren, nicht auf die
-  // Objekt-Identität von `koord` (die sonst jedes Render das Debounce zurücksetzen würde).
+  // lat/lon als Primitive, sonst setzte die Objekt-Identität von `koord` je Render den Debounce zurück.
   const lat = koord?.lat;
   const lon = koord?.lon;
   useEffect(() => {
@@ -61,8 +59,7 @@ export function useOrtVorschau(
       }
     },
     enabled: Number.isFinite(einsatzId) && debounced != null,
-    // Peilung bleibt live (Marker ändern sich) — KEIN Infinity. Der Ortsname ist über den
-    // persistenten Local-Store ohnehin dauerhaft.
+    // Peilung bleibt live (Marker ändern sich); der Ortsname ist über den Local-Store ohnehin dauerhaft.
     staleTime: 30_000,
   });
 }

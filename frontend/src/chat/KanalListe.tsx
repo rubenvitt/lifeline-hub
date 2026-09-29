@@ -44,17 +44,12 @@ export function sortiereKanaele(kanaele: ChatKanal[]): ChatKanal[] {
 }
 
 /**
- * Kanalliste des Chats (Neuentwurf): ein `Paneel` mit Augenbraue „Kanäle", Zähler rechts im
- * Kopf und der Anlage als Kopfaktion — sie ÖFFNET einen Dialog, sendet also nichts ab
- * (Kopf-Slot-Regel LFH-346 · C11).
+ * Kanalliste des Chats: ein `Paneel` mit Zähler im Kopf und der Anlage als Kopfaktion (sie
+ * öffnet einen Dialog, sendet nichts ab).
  *
- * Die aktive Zeile trägt die 2-px-Marke in `bedien` wie das Modulpanel und `aria-current`;
- * die Zahl der ungelesenen Nachrichten steht als Mono-Zahl in `bedien` — Zahl UND Wort
- * („2 ungelesen" für Vorleser), nicht bloß ein Farbpunkt (WCAG 1.4.1).
- *
- * Die Anlage läuft über die `ErfassungsModal`-Hülle (Erfassungs-Norm B4): der Absende-Knopf
- * liegt im `<form>`, Enter sendet, und jeder Weg hinaus setzt zurück. Vorher stand hier ein
- * handgebautes `<Modal onOk={form.submit}>` — Enter war dort tot.
+ * Die aktive Zeile trägt die 2-px-Marke in `bedien` und `aria-current`; Ungelesenes steht als
+ * Zahl UND Wort („2 ungelesen" für Vorleser), nicht bloß als Farbpunkt (WCAG 1.4.1).
+ * Die Anlage läuft über die `ErfassungsModal`-Hülle.
  */
 export default function KanalListe({
   kanaele,
@@ -87,9 +82,9 @@ export default function KanalListe({
             return (
               <ListenEintrag
                 onClick={() => onWechsel(k.id)}
-                // Am Element mit `role="button"`, nicht an der inneren Zeile (LFH-621).
+                // Am Element mit `role="button"`, nicht an der inneren Zeile.
                 aria-current={aktiv ? 'true' : undefined}
-                // Handgebautes Bedienziel: ZWEI Angaben (LFH-365) — Boden plus Polsterung.
+                // Handgebautes Bedienziel: Boden plus Polsterung.
                 style={{
                   cursor: 'pointer',
                   minHeight: token.controlHeight,

@@ -7,12 +7,11 @@ import {
 } from './stammdatenDetail';
 
 /**
- * Der Vertrag dieser Datei sind die vier Pfade — mehr trägt sie nicht.
+ * Der Vertrag dieser Datei sind die vier Pfade.
  *
- * `parseRouteId` wird hier bewusst NICHT geprüft: die Funktion lebt in
- * `routing/deeplinks.ts` und ist dort seit LFH-25 gepinnt (`'0'`/`'abc'`/`'42'` und mehr,
- * `deeplinks.test.ts:235`). Sie hier ein zweites Mal zu messen behauptete einen eigenen
- * Vertrag, den dieses Modul nicht hat — es importiert sie nur.
+ * `parseRouteId` wird hier bewusst NICHT geprüft: die Funktion lebt in `routing/deeplinks.ts`
+ * und ist dort gepinnt; hier ein zweites Mal gemessen, behauptete sie einen eigenen Vertrag,
+ * den dieses Modul nicht hat.
  */
 describe('stammdatenDetail — Admin-Detailpfade', () => {
   it('baut die Detailpfade unter der Stammdaten-Sektion', () => {

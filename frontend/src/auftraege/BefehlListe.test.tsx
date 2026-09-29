@@ -15,23 +15,12 @@ import { einsatzKeys } from '../api/queryKeys';
 vi.mock('../api/befehle');
 
 /**
- * Befehlsliste als Kartensicht (LFH-330 · B2, Bündel III).
+ * Befehlsliste als Kartensicht.
  *
- * Bewusst rohes `render` statt `renderMitProviders`: die Datei mockt `../api/befehle`
- * modulweit, und `renderMitProviders` zöge `AuthProvider` samt MSW
- * (`onUnhandledRequest: 'error'`) in einen Test, der gar keinen Netzverkehr will. Für die
- * Kartensicht ist das unschädlich — `theme.useToken()` fällt ohne `ConfigProvider` auf
- * antds Default zurück, und `useAnzeigeKonventionen` wirft ohne Provider nicht. Die
- * BREITENachse hängt nicht am Provider, sondern an `useViewport`; sie wird über
- * `setzeViewportBreite` gestellt (siehe „in jeder Breite Karten").
- *
- * AUSNAHME seit LFH-350 (H60): die Fassungszeile formatiert `zeitstand` über `ZeitAnzeige`,
- * und die Zone kommt aus dem `EinsatzAnzeigeProvider`. Der eine Test dazu (`renderMitZone`
- * unten) hängt den Provider ein und braucht dafür genau EINEN MSW-Handler
- * (`/api/einsaetze/1/einstellungen`) — ohne ihn liefe die Einstellungs-Abfrage in
- * `onUnhandledRequest: 'error'`, die Konventionen fielen still auf die LOKALE Maschinenzone
- * zurück und die Behauptung wäre nur auf einem Berliner Rechner richtig. Alle übrigen Tests
- * der Datei bleiben netzfrei.
+ * Rohes `render` statt `renderMitProviders`: die Datei mockt `../api/befehle` und will keinen
+ * Netzverkehr (MSW mit `onUnhandledRequest: 'error'`). Die Breite stellt `setzeViewportBreite`.
+ * Ausnahme `renderMitZone`: die Fassungszeile braucht die Zone aus dem
+ * `EinsatzAnzeigeProvider` und dafür genau einen MSW-Handler.
  */
 
 const BASIS = {
@@ -48,15 +37,9 @@ const BASIS = {
 };
 
 /**
- * FORTSCHREIBUNGSKETTE, nicht drei unabhängige Befehle: `befehl_repo::fortschreiben` legt
- * eine NEUE Zeile mit `version + 1` und demselben Titel an, der Vorgänger bleibt
- * freigegeben liegen. Die Liste enthält deshalb legitim zwei Zeilen mit identischem Titel,
- * und die v-Nummer ist das EINZIGE Merkmal, das sie unterscheidet.
- *
- * ABSICHTLICH AUFSTEIGEND, also GEGEN die Serverordnung (`ORDER BY zeitstand DESC, id
- * DESC`): eine Fixture in Serverordnung macht jede Sortierbehauptung unfälschbar grün, und
- * `standardSortierung` wäre damit ungeprüft. So beweist die Reihenfolge der gerenderten
- * Karten, dass innerhalb der Gruppe absteigend nach Zeitstand sortiert wird.
+ * FORTSCHREIBUNGSKETTE: `fortschreiben` legt eine neue Zeile mit `version + 1` und gleichem
+ * Titel an; die v-Nummer ist das EINZIGE Unterscheidungsmerkmal.
+ * ABSICHTLICH AUFSTEIGEND, gegen die Serverordnung: sonst wäre `standardSortierung` ungeprüft.
  */
 const KETTE = [
   {
@@ -120,30 +103,25 @@ describe('BefehlListe', () => {
       '/einsaetze/1/auftraege/befehle/9',
       '/einsaetze/1/auftraege/befehle/7',
     ]);
-    // Der Titel-Link darf keinen zweiten Anker enthalten: das `render` der Titelspalte
-    // verlinkt NICHT, der Link entsteht in `karte.titel.ziel`. Verschachtelte Links wären
-    // nur im DOM sichtbar — der Accessible Name bliebe unverändert.
+    // Der Titel-Link darf keinen zweiten Anker enthalten (den Link setzt `karte.titel.ziel`).
     links.forEach((l) => expect(l.querySelector('a')).toBeNull());
 
     expect(sicht).toHaveTextContent('v2');
     expect(sicht).toHaveTextContent('v1');
-    // Exakter Text, nicht `toHaveTextContent`: der Schemawert steht in einem eigenen Knoten
-    // neben seinem Etikett. Zwei Treffer, weil das Schema ein Merkmal der KETTE ist — die
-    // Fortschreibung kopiert die Vorlage unverändert.
+    // Exakter Text: der Schemawert steht in eigenem Knoten. Zwei Treffer, weil das Schema ein
+    // Merkmal der Kette ist.
     expect(screen.getAllByText('Befehl LAD (vereinfacht)')).toHaveLength(2);
     expect(screen.getByText('Einzelauftrag (EA/ZMW)')).toBeInTheDocument();
 
-    // Gruppenköpfe mit Zähler, Entwürfe zuerst (`gruppen.reihenfolge`). Trennzeichen und
-    // Zählerform gehören dem Primitiv, deshalb `[·(]` und `toHaveTextContent` auf der
-    // Region statt `getByText` auf einem Knoten.
+    // Gruppenköpfe mit Zähler, Entwürfe zuerst. Trennzeichen und Zählerform gehören dem Primitiv,
+    // deshalb `[·(]` auf der Region.
     expect(sicht).toHaveTextContent(/Entwürfe\s*[·(]\s*1/);
     expect(sicht).toHaveTextContent(/Freigegeben\s*[·(]\s*2/);
     const text = sicht.textContent ?? '';
     expect(text.indexOf('Entwürfe')).toBeLessThan(text.indexOf('Freigegeben'));
 
-    // Gruppenachse führend, INNERHALB der Gruppe absteigend nach Zeitstand
-    // (`standardSortierung`). Nur an der aufsteigenden Fixture belegt das etwas: 7 (10:00)
-    // muss vor 4 (09:00) stehen, obwohl 4 zuerst geliefert wird.
+    // Innerhalb der Gruppe absteigend nach Zeitstand: 7 (10:00) vor 4 (09:00), obwohl 4 zuerst
+    // geliefert wird.
     expect(
       within(sicht)
         .getAllByRole('link')
@@ -156,9 +134,7 @@ describe('BefehlListe', () => {
   });
 
   it('bleibt in jeder Breite eine Kartensicht (form="karte", kein Breakpoint-Rückfall)', async () => {
-    // Der tragende Punkt des Bündels: Befehle werden GELESEN, nicht verglichen. Ein
-    // reiner Breakpoint-Rückfall (`form="auto"`) zeigte ab `md` wieder eine Tabelle —
-    // genau der Befund, der behoben wird.
+    // Befehle werden GELESEN, nicht verglichen: auch ab `md` Karten, keine Tabelle.
     setzeViewportBreite(390);
     const schmal = renderListe();
     await screen.findByRole('region', { name: 'Befehle' });
@@ -175,8 +151,7 @@ describe('BefehlListe', () => {
     renderListe();
     await screen.findByRole('region', { name: 'Befehle' });
 
-    // `EA/ZMW` steht NUR im Schema-Label, nicht im Titel — ein nur auf den Titel
-    // gelegter `suchText` wäre hier rot.
+    // `EA/ZMW` steht NUR im Schema-Label — ein nur auf den Titel gelegter `suchText` wäre rot.
     await userEvent.type(screen.getByPlaceholderText('Titel oder Schema'), 'EA/ZMW');
 
     expect(screen.queryAllByRole('link', { name: 'Befehl A' })).toHaveLength(0);
@@ -192,18 +167,12 @@ describe('BefehlListe', () => {
 
   it('zeigt "Befehl erteilen" bei Schreibrecht — mit exaktem Namen', async () => {
     renderListe();
-    // EXAKT, nicht als Regex: antds Icon rendert `<span role="img" aria-label="plus">`
-    // und schiebt sein Etikett in den berechneten Namen. Ein Regex-Teiltreffer ließe das
-    // durchgehen; `pages/AuftraegePage.test.tsx` fragt exakt und wäre dann rot.
+    // EXAKT, nicht als Regex: antds Icon schiebt sein Etikett („plus") in den berechneten Namen.
     expect(await screen.findByRole('button', { name: 'Befehl erteilen' })).toBeInTheDocument();
   });
 
   it('zeigt den Leerzustand ohne eigenen Leer-Knoten', async () => {
-    // WÄCHTER, kein Treiber: beide Zusicherungen waren auch mit der alten Tabelle grün.
-    // Der Riss entsteht erst, wenn `leerText` WEGGELASSEN wird — dann greift der
-    // Fallback in `Liste.tsx` und rendert einen `.ant-empty`-Knoten (probiert, siehe
-    // Mutationsproben im Bericht). Deshalb darf `leerText` nicht fehlen (LFH-331/B3
-    // verlangt null solcher Knoten).
+    // Wächter: fehlt `leerText`, rendert `Liste.tsx` einen `.ant-empty`-Knoten.
     vi.mocked(befehleApi.listeBefehle).mockResolvedValue([] as never);
     const { container } = renderListe();
 
@@ -213,19 +182,10 @@ describe('BefehlListe', () => {
 });
 
 /**
- * ── ZEITSTAND DER FASSUNGSZEILE (LFH-350 · H60) ─────────────────────────────────
- *
- * `zeitstand` ist ein UTC-Wirestring ohne Zonenkennung; roh ausgegeben stand die Zeile um
- * den Zonenversatz falsch. `sortWert` bleibt der Wirestring (lexikografisch korrekt), nur
- * die Anzeige läuft über `ZeitAnzeige`.
- *
- * Die Zone wird AUSDRÜCKLICH gestellt und der Cache dafür VORBELEGT — beides ist gemessen
- * nötig: (1) ohne Provider fällt `useAnzeigeKonventionen` auf `DEFAULT_KONVENTIONEN` und
- * damit auf die LOKALE Zone der ausführenden Maschine zurück; (2) nur den Provider
- * einzuhängen genügt nicht, weil die Einstellungs-Abfrage ERST NACH dem ersten Render
- * auflöst — die Behauptung hat dann längst getroffen, und auf einem Berliner Rechner wäre
- * der Test auch mit `zeitzone: 'UTC'` grün geblieben (Gegenprobe gefahren). `setQueryData`
- * stellt die Zone vor dem ersten Render; der MSW-Handler bedient nur den Refetch.
+ * Zeitstand der Fassungszeile: UTC-Wirestring, angezeigt über `ZeitAnzeige`, sortiert roh.
+ * Die Zone wird ausdrücklich gestellt UND im Cache vorbelegt: ohne Provider gälte die lokale
+ * Maschinenzone, und die Einstellungs-Abfrage löst erst nach dem ersten Render auf — der Test
+ * wäre auf einem Berliner Rechner auch mit falscher Zone grün.
  */
 function renderMitZone() {
   server.use(

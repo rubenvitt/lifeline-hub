@@ -1,47 +1,26 @@
 /**
- * Die Pegel-Kennzahl (LFH-606) — reine Ableitung aus der Liste der maßgeblichen Pegel.
- *
- * EINE Quelle für zwei Leser: das Kennzahlenband des Lage-Dashboards (Platz 1, lange Notiz)
- * und die Warnstufen-Kennzahl des Überblicks (kurze Notiz „Pegel 6,84 m steigend"). Die Datei
- * liegt deshalb weder unter `lage-dashboard/` noch unter `fuehrung/`: eine Seite, die aus dem
- * Verzeichnis einer anderen Seite importiert, wäre eine neue Querabhängigkeit.
- *
- * Leitpegel ist der ERSTE in der Reihenfolge (`reihenfolge` 0, das Backend liefert sortiert).
+ * Die Pegel-Kennzahl — reine Ableitung aus der Liste der maßgeblichen Pegel, für das
+ * Kennzahlenband des Lage-Dashboards und die Warnstufen-Kennzahl des Überblicks (deshalb
+ * außerhalb beider Seitenverzeichnisse). Leitpegel ist der ERSTE (Backend liefert sortiert).
  *
  * Festlegungen, jede in `pegelKennzahl.test.ts` gepinnt:
  *
- *  - **Wert in Metern, zwei Nachkommastellen, deutsches Komma** („6,84"). Die W-Reihe der
- *    Quelle ist in cm; eine Kennzahl liest man als Meter an der Pegellatte. Die Einheit bleibt
- *    auch unter `einheiten: 'imperial'` Meter: das Einheiten-System der Anzeige-Konventionen
- *    gilt für abgeleitete Strecken (Distanzen), nicht für einen amtlichen Messwert, dessen
- *    Meldestufen in Metern/Zentimetern geführt werden — ein Pegel in Fuß wäre mit keiner
- *    Hochwassermeldung vergleichbar.
- *  - **Trend auf ganze cm/h gerundet**, Richtung als WORT (zweiter Kanal, WCAG 1.4.1):
- *    „steigend +9 cm/h", „fallend −3 cm/h" (echtes Minuszeichen U+2212), „gleichbleibend"
- *    bei |Trend| < 1 cm/h, „Trend unbekannt" ohne Trend. Das Backend rundet auf eine
- *    Nachkommastelle; Zehntel-Zentimeter je Stunde sind in einer Kennzahl Rauschen, und die
- *    Rundung auf ganze Zahlen passt zur Schwelle für „gleichbleibend".
- *  - **Datenstand** „Stand HH:MM" in der Anzeigezone, an einem anderen Tag als `jetzt` mit
- *    Tag davor („Stand 21. 23:50", {@link standZeit}). `zeitpunkt` ist RFC 3339 MIT Versatz —
- *    `inZone` liest ihn über `dayjs.utc`, das den Versatz auswertet; das Alter rechnet `Date.parse`, NICHT
- *    `wireAlsEpoche` (die hängt ein `Z` an und liefert für einen Versatz `NaN`).
- *  - **Älter als 60 min → „veraltet"**: Wort in der Notiz plus Ton `achtung` (Kante als
- *    zweiter Kanal). Die Quelle misst im 15-min-Raster; eine Stunde ohne neue Messung heißt,
- *    dass der Abruf scheitert und der Cache den alten Stand ausliefert.
- *  - **Ausfall** (festgelegt, aber keine Messung): Wert „—", Notiz „Stand unbekannt", Ton
- *    `achtung` — ein fehlender Pegel ist nicht harmloser als ein veralteter.
- *  - **Keiner festgelegt**: Wert „—", Notiz „kein Pegel festgelegt", Ton `neutral` — das ist
- *    kein Messzustand, sondern eine offene Einrichtung. Seit LFH-640 steht die Kennzahl im
- *    Lage-Dashboard nur bei festgelegtem Pegel; dieser Zweig greift dort nur noch, wenn der
- *    gehaltene Zuschnitt den Pegel zeigt, während er anderswo schon entfernt wurde.
+ *  - **Meter, zwei Nachkommastellen, deutsches Komma** („6,84"), auch unter
+ *    `einheiten: 'imperial'`: ein amtlicher Messwert in Fuß wäre mit keiner Hochwassermeldung
+ *    vergleichbar.
+ *  - **Trend auf ganze cm/h**, Richtung als WORT (WCAG 1.4.1): „steigend +9 cm/h",
+ *    „fallend −3 cm/h" (U+2212), „gleichbleibend" bei |Trend| < 1, „Trend unbekannt".
+ *  - **Datenstand** „Stand HH:MM" in der Anzeigezone, an anderem Tag mit Tag davor.
+ *    `zeitpunkt` ist RFC 3339 MIT Versatz: das Alter rechnet `Date.parse`, NICHT
+ *    `wireAlsEpoche` (die hängt ein `Z` an und liefert `NaN`).
+ *  - **Älter als 60 min → „veraltet"** plus Ton `achtung`: die Quelle misst im 15-min-Raster,
+ *    eine Stunde ohne Messung heißt, der Abruf scheitert.
+ *  - **Ausfall**: „—", „Stand unbekannt", Ton `achtung`.
+ *  - **Keiner festgelegt**: „—", „kein Pegel festgelegt", Ton `neutral` (offene Einrichtung).
  *  - **Mehrere**: Zusatz „+n weitere".
- *  - **Prognose** (LFH-628): trägt der Leitpegel einen erwarteten Höchststand, dessen
- *    Zeitpunkt noch vor `jetzt` liegt, steht er als eigener Teil „Prognose 7,10 m bis 18:00"
- *    hinter dem Datenstand — auch bei Ausfall der Messung, die Prognose ist eine eigene
- *    Angabe. Eine **abgelaufene** Prognose fällt aus der Kennzahl weg (Entscheidung des
- *    Auftraggebers vom 22.09.2026: vorbei ist nicht „überfällig"); in den Einstellungen steht
- *    sie als abgelaufen, bis jemand sie löscht oder erneuert. **Ohne Prognose ist die Notiz
- *    byte-gleich zur LFH-606-Fassung** — die Bestandstests pinnen das.
+ *  - **Prognose**: ein noch offener erwarteter Höchststand steht als „Prognose 7,10 m bis
+ *    18:00" hinter dem Datenstand, auch bei Ausfall. Eine abgelaufene fällt weg (vorbei ist
+ *    nicht „überfällig"). Ohne Prognose ist die Notiz byte-gleich zur Fassung ohne sie.
  */
 import type { PegelAnzeige, PegelPrognose } from '../api/types';
 import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzeige/format';
@@ -66,8 +45,7 @@ const METER = new Intl.NumberFormat('de-DE', {
 /** Wasserstand in cm → Meter mit zwei Nachkommastellen („684" → „6,84"). Rein. */
 export function wasserstandMeter(cm: number): string {
   const text = METER.format(cm / 100);
-  // `-0,00` gibt es nicht; ein negativer Pegelstand (Pegelnull über der Sohle) trägt das
-  // echte Minuszeichen wie der Trend.
+  // `-0,00` gibt es nicht; ein negativer Pegelstand trägt das echte Minuszeichen.
   if (/^-0,00$/.test(text)) return '0,00';
   return text.replace(/^-/, MINUS);
 }
@@ -91,10 +69,8 @@ export function trendText(t: number | null | undefined): string {
 }
 
 /**
- * Uhrzeit des Datenstands in der Anzeigezone: `HH:mm` am selben Tag wie `jetzt`, sonst
- * `DD. HH:mm`. Dasselbe Format wie `formatUhrzeitMitTag`, aber gegen `jetzt` statt gegen die
- * Maschinenuhr — sonst hinge das Tag-Präfix einer reinen Funktion an der echten Uhr und wäre
- * nicht pinnbar. Die Tagesgrenze liegt in derselben Zone wie die Formatierung. Rein.
+ * Uhrzeit des Datenstands: `HH:mm` am selben Tag wie `jetzt`, sonst `DD. HH:mm`. Gegen
+ * `jetzt` statt gegen die Maschinenuhr, damit die reine Funktion pinnbar bleibt. Rein.
  */
 export function standZeit(
   zeitpunkt: string,
@@ -123,10 +99,7 @@ export function prognoseOffen(p: PegelPrognose, jetzt: number): boolean {
   return Number.isFinite(t) && t > jetzt;
 }
 
-/**
- * „Prognose 7,10 m bis 18:00" — am anderen Tag mit Tag davor („bis 23. 06:00"), in der
- * Anzeigezone wie der Datenstand. Rein.
- */
+/** „Prognose 7,10 m bis 18:00" — an anderem Tag mit Tag davor. Rein. */
 export function prognoseText(
   p: PegelPrognose,
   jetzt: number,
@@ -176,10 +149,9 @@ function leitmessung(leit: PegelAnzeige, jetzt: number): Leitmessung | null {
 }
 
 /**
- * Eine Station für sich (Modulseite „Wetter & Pegel“, LFH-633): dieselben Regeln wie die
- * Kennzahl — Meter, Trendwort, Stand, „veraltet“ ab 60 min, „Stand unbekannt“ bei Ausfall,
- * Prognose nur solange offen —, aber je Pegel statt nur für den Leitpegel. Die Kennzahl baut
- * auf dieser Ableitung auf, damit die Schwellen an genau einer Stelle stehen.
+ * Eine Station für sich (Modulseite „Wetter & Pegel“): dieselben Regeln wie die Kennzahl, je
+ * Pegel statt nur für den Leitpegel. Die Kennzahl baut darauf auf, damit die Schwellen an einer
+ * Stelle stehen.
  */
 export interface PegelZeile {
   fall: Exclude<PegelFall, 'keiner'>;
@@ -277,10 +249,9 @@ export function pegelKennzahl(
 }
 
 /**
- * Kurze Notiz für die Warnstufen-Kennzahl des Überblicks: „Pegel 6,84 m steigend".
- * Ohne festgelegten Pegel `null` (keine Notiz), bei Ausfall „Pegel: Stand unbekannt". Ein
- * veralteter Stand trägt „· veraltet" — das Wort ist hier der einzige Kanal, die Kennzahl
- * gehört der Warnstufe und färbt sich nicht nach dem Pegel. Rein.
+ * Kurze Notiz für die Warnstufen-Kennzahl des Überblicks: „Pegel 6,84 m steigend". Ohne Pegel
+ * `null`, bei Ausfall „Pegel: Stand unbekannt". „· veraltet" ist hier der einzige Kanal, weil
+ * die Kennzahl der Warnstufe gehört. Rein.
  */
 export function pegelNotizKurz(pegel: readonly PegelAnzeige[], jetzt: number): string | null {
   const leit = pegel[0];

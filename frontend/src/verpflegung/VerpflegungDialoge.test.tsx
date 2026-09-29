@@ -48,7 +48,7 @@ const LEER = { wert: null, hinweis: null };
 const K_HINWEIS = 'Vorschlag: Personal im Einsatz, Stand 09:58';
 const B_HINWEIS = 'Vorschlag: in Betreuung, Stand jetzt, nicht zum Beginn';
 
-/** Zählt die BEDIENBAREN Felder — Muster `betreuung/BetreuungDialoge.test.tsx`. */
+/** Zählt die BEDIENBAREN Felder. */
 function sichtbareFelder(dialog: HTMLElement): number {
   const rollen = ['textbox', 'spinbutton', 'combobox', 'checkbox', 'radio', 'switch'] as const;
   const felder = new Set<Element>();
@@ -399,8 +399,8 @@ describe('ZeitfensterDialog — bearbeiten', () => {
     ).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Einsatzkräfte (EP)')).toHaveValue('180');
     expect(within(dialog).getByLabelText('Betreute (EP)')).toHaveValue('70');
-    // Der Beginn des Zeitfensters geht als Wire in den Hook — wie gespeichert, schon im ersten
-    // Render (sonst ginge eine Kopfzahl-Anfrage „jetzt" hinaus).
+    // Der Beginn geht schon im ersten Render als Wire in den Hook, sonst ginge eine
+    // Kopfzahl-Anfrage „jetzt" hinaus.
     expect(vorschlag.aufrufe.map((x) => x.vonAt)).not.toContain(undefined);
     expect(letzterAufruf().vonAt).toBe('2026-09-24 10:00:00');
   });

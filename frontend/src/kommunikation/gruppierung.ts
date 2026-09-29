@@ -1,8 +1,4 @@
-/**
- * Fälligkeits-Gruppierung der Kommunikations-Module (LFH-112).
- *
- * Gruppiert offene Einträge nach Frist in Überfällig → Heute → Später → Ohne Frist.
- */
+/** Fälligkeits-Gruppierung der Kommunikations-Module: Überfällig → Heute → Später → Ohne Frist. */
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 

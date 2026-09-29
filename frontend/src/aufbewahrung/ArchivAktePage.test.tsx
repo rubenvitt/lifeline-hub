@@ -9,7 +9,7 @@ import { renderMitProviders } from '../test/utils';
 import ArchivAktePage, { archivHinweis, berichtigungText } from './ArchivAktePage';
 import { adminFixture } from '../test/fixtures';
 
-/** Archivakte (LFH-23, tasks.md 6.9). */
+/** Archivakte. */
 
 const ME_ADMIN = adminFixture();
 

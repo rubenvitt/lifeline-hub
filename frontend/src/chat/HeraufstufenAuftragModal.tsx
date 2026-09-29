@@ -12,9 +12,10 @@ interface Props {
   onAnlegen: (d: NeuerAuftrag) => Promise<unknown>;
 }
 
-/** Heraufstufung Chat-Nachricht → Auftrag (LFH-101): wiederverwendetes Auftragsformular,
- *  mit dem Nachrichtentext vorbelegt. `destroyOnHidden` remountet das Formular bei jedem
- *  Öffnen, sodass `initialText` frisch greift. */
+/**
+ * Heraufstufung Chat-Nachricht → Auftrag: das Auftragsformular, mit dem Nachrichtentext
+ * vorbelegt. `destroyOnHidden` remountet es je Öffnen, damit `initialText` frisch greift.
+ */
 export default function HeraufstufenAuftragModal({
   offen,
   nachricht,
@@ -41,9 +42,8 @@ export default function HeraufstufenAuftragModal({
         initialText={nachricht?.inhalt ?? ''}
         zitat={
           nachricht && (
-            // Read-only Wortlaut der Quellnachricht (LFH-343 · C8, Befund H49) —
-            // dieselbe Begründung wie im Meldungs-Zwilling: der vorbelegte
-            // Auftragstext wird beim Formulieren überschrieben.
+            // Read-only Wortlaut der Quellnachricht: der vorbelegte Auftragstext wird beim Formulieren
+            // überschrieben.
             <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
               <Typography.Text strong>{nachricht.autor_name}:</Typography.Text> {nachricht.inhalt}
             </Typography.Paragraph>

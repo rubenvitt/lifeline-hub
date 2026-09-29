@@ -13,22 +13,17 @@ import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 import type { ModulZaehlerMap } from './useModulZaehler';
 
 /**
- * Die Einsatz-Navigation als flaches Akkordeon in EINER Spalte (LFH-329 · B1/H11).
+ * Die Einsatz-Navigation als flaches Akkordeon in EINER Spalte (LFH-329).
  *
- * WARUM NICHT RAIL + MODUL-SPALTE IM DRAWER: die beiden nebeneinander brauchen
- * mehr Breite, als der Drawer trägt (`navDrawerBreite`), und ein entsprechend
- * verbreiterter Drawer belegte auf dem Handschirm (~390 px) über vier Fünftel
- * der Fläche. Hier steht deshalb je Kategorie eine Kopfzeile, und nur unter der
- * offenen stehen ihre Module.
+ * Rail und Modul-Spalte nebeneinander bräuchten mehr Breite, als der Drawer trägt; auf dem
+ * Handschirm belegte er sonst über vier Fünftel der Fläche. Je Kategorie steht deshalb eine
+ * Kopfzeile, und nur unter der offenen stehen ihre Module.
  *
- * DIE KOPFZEILE IST DER UMSCHALTER — im Drawer gibt es kein zusätzliches
- * Einklappen. Das gemerkte „Panel eingeklappt" (`navPersistenz`) gehört
- * ausschließlich zum inline-Rahmen; sonst trüge derselbe Schalter in zwei
- * Darstellungen zwei Bedeutungen.
+ * DIE KOPFZEILE IST DER UMSCHALTER. Das gemerkte „Panel eingeklappt" (`navPersistenz`) gehört
+ * nur zum inline-Rahmen, sonst trüge derselbe Schalter zwei Bedeutungen.
  *
- * Der Name der Landmarke ist bewusst NICHT „Kategorien": so heißt die
- * {@link IconRail}. Zwei gleichnamige Landmarken machten jede Abfrage danach
- * mehrdeutig, sobald beide gleichzeitig im Baum stehen.
+ * Die Landmarke heißt bewusst NICHT „Kategorien" wie die {@link IconRail}: zwei gleichnamige
+ * Landmarken machten jede Abfrage mehrdeutig.
  */
 interface Props {
   kategorien: Kategorie[];
@@ -45,11 +40,8 @@ interface Props {
 }
 
 /**
- * 48 px ist die Trefffläche aus A1 Festlegung 4 (Material 48 dp) — dieselbe Zahl,
- * die die Rail schon trägt. Der Drawer ist der Berührungsfall; das ist eine
- * Trefffläche, keine Dichte-Angabe an einem Steuerelement — und deshalb ein BODEN unter der
- * Staffel, nie ihr Deckel: Kopf und Modulzeilen rechnen `Math.max(48, controlHeight)` und
- * halten in `handschuh` 72 (LFH-537, abgeschlossen mit LFH-384).
+ * 48 px ist die Trefffläche des Berührungsfalls (Material 48 dp), dieselbe Zahl wie an der
+ * Rail — ein BODEN unter der Staffel, nie ihr Deckel: `handschuh` hält 72 (LFH-384).
  */
 const TREFFLAECHE = 48;
 
@@ -77,11 +69,9 @@ export default function ModulAkkordeon({
               type="button"
               aria-expanded={offen}
               onClick={() => onKategorieKlick(k.key)}
-              // Optisch an die Rail angeglichen (Neuentwurf): aufgeklappt `flaeche3` mit
-              // heller Schrift und der 2-px-Ortsmarke in `marke`, zu gedämpft. Die Marke ist
-              // Ort, nicht Bedienung — die Fläche bleibt neutral („Rot bedient nichts").
-              // `Math.max(48, controlHeight)`: 48 ist der A1-Boden des Berührungsfalls, in
-              // `handschuh` wächst die Kopfzeile auf 72 mit (Befund LFH-537 für diese Stelle).
+              // An die Rail angeglichen: aufgeklappt `flaeche3` mit heller Schrift und der 2-px-Ortsmarke
+              // in `marke`, zu gedämpft. Die Marke ist Ort, nicht Bedienung („Rot bedient nichts").
+              // `Math.max(48, controlHeight)`: 48 ist der Boden, in `handschuh` wächst die Kopfzeile auf 72.
               style={{
                 display: 'flex',
                 alignItems: 'center',

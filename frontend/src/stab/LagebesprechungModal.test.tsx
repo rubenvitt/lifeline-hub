@@ -14,10 +14,7 @@ import { zeigeAbschlussToast } from './abschlussToast';
 
 /**
  * Nur `Date` steht still (`toFake`): `userEvent`, MSW und antds Animationen laufen auf echten
- * Timern weiter. Mit voll gefälschten Timern hinge `findBy*` (CLAUDE.md, Deeplink-Abschnitt).
- * Rückfallweg, falls `toFake` in dieser Vitest-Version nicht greift: das Muster aus
- * `etb/WiedervorlageModal.test.tsx` (`shouldAdvanceTime` + `userEvent.setup({ advanceTimers })`)
- * — dann vergleichen die Zeit-Pins auf Minuten statt Sekunden.
+ * Timern weiter; mit voll gefälschten Timern hinge `findBy*`.
  */
 const JETZT = new Date('2026-09-13T10:00:00Z');
 const wireAb = (minuten: number) =>
@@ -118,10 +115,8 @@ function feld(dialog: HTMLElement, label: string): HTMLInputElement {
 }
 
 /**
- * Zählt die BEDIENBAREN Felder — wörtlich aus `pages/MaterialPage.test.tsx`. Die Rollen-Abfrage
- * blendet aus, was im Barrierefreiheitsbaum nicht steht, und genau das ist der eingeklappte
- * Bereich: `forceRender` lässt sein Feld im Baum, `CSSMotion` legt `display: none` DIREKT ans
- * Element. Deshalb hält die Zählung in jsdom.
+ * Zählt die BEDIENBAREN Felder: die Rollen-Abfrage blendet den eingeklappten Bereich aus
+ * (`forceRender` hält sein Feld im Baum, `CSSMotion` setzt `display: none` direkt ans Element).
  */
 function sichtbareFelder(dialog: HTMLElement): number {
   const rollen = ['textbox', 'spinbutton', 'combobox', 'checkbox', 'radio', 'switch'] as const;
@@ -135,7 +130,7 @@ function sichtbareFelder(dialog: HTMLElement): number {
   return felder.size;
 }
 
-/** Siehe `pages/LageberichtDetailPage.test.tsx` — gezählt wird die Message-Queue selbst. */
+/** Gezählt wird die Message-Queue selbst. */
 function toastsMit(wortlaut: string) {
   return [...document.querySelectorAll<HTMLElement>('.ant-message')].filter((n) =>
     n.textContent?.includes(wortlaut),
@@ -151,8 +146,8 @@ async function absenden(dialog: HTMLElement, entschluss = 'Lage unverändert') {
 }
 
 describe('LagebesprechungModal · Erfassungs-Norm', () => {
-  /** Das erste Feld ist eine TextArea — dort bleibt Enter ein Zeilenumbruch. Geprüft wird die
-   *  Struktur, aus der „Enter sendet" folgt (Muster `components/Erfassung.test.tsx`). */
+  /** Das erste Feld ist eine TextArea (Enter bleibt Zeilenumbruch); geprüft wird die Struktur, aus
+      der „Enter sendet" folgt. */
   it('keine Modal-Fusszeile, Absende-Knopf im <form>, Fokus im Entschluss', async () => {
     const dialog = await zeige();
     expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
@@ -166,8 +161,8 @@ describe('LagebesprechungModal · Erfassungs-Norm', () => {
 describe('LagebesprechungModal · Feldbudget', () => {
   it('zeigt zwei Felder; der Zeitpunkt liegt eingeklappt IM Baum', async () => {
     const dialog = await zeige();
-    // Vorbedingung: die DatePicker-Eingabe wird von der Rollenliste erfasst — sonst wäre die
-    // Zahl unten aus dem falschen Grund richtig.
+    // Vorbedingung: die DatePicker-Eingabe wird von der Rollenliste erfasst — sonst wäre die Zahl
+    // unten aus dem falschen Grund richtig.
     expect(within(dialog).getAllByRole('textbox')).toContain(
       feld(dialog, 'Nächste Lagebesprechung'),
     );
@@ -205,9 +200,8 @@ describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
   });
 
   /**
-   * I3: `stab` wird live invalidiert, die Maske friert beim ÖFFNEN ein (LFH-303). Neu gerendert
-   * wird mit einem NEUEN Element — dasselbe Element-Objekt liesse React den Teilbaum
-   * überspringen, und der Test wäre ohne jedes Einfrieren grün.
+   * `stab` wird live invalidiert, die Maske friert beim ÖFFNEN ein. Neu gerendert wird mit einem
+   * NEUEN Element, sonst übersprünge React den Teilbaum und der Test wäre trivial grün.
    */
   it('friert den Termin beim Öffnen ein: ein live geänderter Stand ändert weder Feld noch Body', async () => {
     const routen = (daten: Stab) => (
@@ -252,15 +246,14 @@ describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
   });
 
   /**
-   * M2 (Ruling 12): Bezug der Schnellwahl ist der SPÄTERE von Zeitpunkt der Besprechung und
-   * jetzt. Die drei Fälle unterscheiden sich nur im Zeitpunkt — jeder trennt eine andere
-   * Fehlrechnung ab (nur Zeitpunkt · nur Wanduhr).
+   * Bezug der Schnellwahl ist der SPÄTERE von Zeitpunkt der Besprechung und jetzt. Jeder der drei
+   * Fälle trennt eine andere Fehlrechnung ab (nur Zeitpunkt · nur Wanduhr).
    */
   async function setzeZeitpunkt(dialog: HTMLElement, minuten: number) {
     const u = userEvent.setup();
     await u.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
-    // Kein `toBeVisible` als Wartebedingung: jsdom beendet die Aufklapp-Bewegung von `CSSMotion`
-    // nicht, das Feld bliebe dafür „unsichtbar". Getragen wird die Aussage vom gesendeten Body.
+    // Kein `toBeVisible` als Wartebedingung: jsdom beendet die Aufklapp-Bewegung nicht. Die Aussage
+    // trägt der gesendete Body.
     const eingabe = feld(dialog, 'Zeitpunkt der Besprechung');
     await u.click(eingabe);
     await u.clear(eingabe);
@@ -269,8 +262,8 @@ describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
 
   it('Schnellwahl: der Zeitpunkt liegt zurück (eingefroren, die Wanduhr läuft) → ab jetzt', async () => {
     const dialog = await zeige();
-    // Die Wanduhr läuft zehn Minuten weiter, der eingefrorene Zeitpunkt nicht. Ab dem Zeitpunkt
-    // gerechnet käme wireAb(60) an — ein Termin, der schon zehn Minuten näher liegt als gewählt.
+    // Die Wanduhr läuft zehn Minuten weiter, der eingefrorene Zeitpunkt nicht; ab dem Zeitpunkt
+    // gerechnet läge der Termin zehn Minuten näher als gewählt.
     vi.setSystemTime(new Date(JETZT.getTime() + 10 * 60_000));
     await userEvent.click(within(dialog).getByRole('button', { name: '+1 h' }));
     await absenden(dialog);
@@ -349,12 +342,7 @@ describe('LagebesprechungModal · Fehler im Modal, Erfolg im Toast', () => {
     expect(feld(dialog, 'Entschluss')).toHaveValue('Lage unverändert');
   });
 
-  /**
-   * Gegenaussage zur Zählung oben (die Queue IST zählbar) und Messauftrag aus
-   * Controller-Entscheidung 3: der Klick im Toast wechselt die Route wirklich.
-   * Rückfallweg, falls die Route hier NICHT wechselt: der Toast bleibt Text ohne Knopf, und der
-   * Beleg-Link der Zeile „Letzte" (Task 5) trägt den Deeplink allein — kein `window.location`.
-   */
+  /** Der Klick im Toast wechselt die Route wirklich (Gegenaussage zur Queue-Zählung oben). */
   it('quittiert per Toast und führt über ihn zum eigenen ETB-Eintrag', async () => {
     const dialog = await zeige();
     const u = await absenden(dialog);

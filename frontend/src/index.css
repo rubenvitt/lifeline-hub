@@ -1,21 +1,14 @@
-/* Globaler Reset: ohne dies bleibt das Browser-Default `body { margin: 8px }`
-   stehen und zeigt den weißen Body-Hintergrund als Rahmen um jede Vollbild-
-   Seite – zusätzlich treibt es `min-height: 100vh` über den Viewport hinaus
-   und erzeugt äußere Scrollbars. */
+/* Globaler Reset: ohne ihn bleibt `body { margin: 8px }` als weißer Rahmen stehen und
+   `min-height: 100vh` erzeugt äußere Scrollbars. */
 html,
 body {
   margin: 0;
   padding: 0;
 }
 
-/* Cross-Modul-Deeplink-Highlight (LFH-25): eine per ?<modul>=<id> angesteuerte Zeile dezent
-   hervorheben, damit das Zielobjekt nach dem Sprung auffindbar ist.
-
-   ZWEI SELEKTOREN, weil `Datensicht` unter `md` KARTEN statt Zeilen rendert (LFH-330/B2).
-   Die Klasse landet dort auf der Karte, die keine `td`-Kinder hat — die Hervorhebung fiel
-   still aus, genau auf dem schmalen Schirm, auf dem eine lange Liste am unübersichtlichsten
-   ist. Beim Tabellenzweig muss die Farbe weiterhin an die `td` (antd färbt die Zellen, ein
-   Hintergrund am `tr` bliebe verdeckt). */
+/* Deeplink-Highlight einer per ?<modul>=<id> angesteuerten Zeile (LFH-25).
+   Zwei Selektoren, weil `Datensicht` unter `md` Karten statt Zeilen rendert. Im Tabellenzweig
+   muss die Farbe an die `td` (antd färbt die Zellen, ein Hintergrund am `tr` bliebe verdeckt). */
 .zeile-hervorgehoben > td,
 [data-lfh='datensicht-karte'].zeile-hervorgehoben {
   background-color: #fffbe6;
@@ -27,20 +20,10 @@ body {
   background-color: #2b2611;
 }
 
-/* ETB-Erfassung als angepinnte Leiste am FUSS der Zeitachse (Neuentwurf S4, 21.09.2026):
-   Eingabe unten wie in einem Funkprotokoll, neueste Einträge oben. Die Begründung und der
-   Umgang mit dem eigenen neuen Eintrag stehen in `pages/EtbPage.tsx`
-   (`erfassenMitMeldung`). Die berichtigte Zeile tönt seit der Zeitachse der Baustein
-   selbst (`berichtigungZeile`), ihre frühere Tabellenregel ist entfallen.
-
-   Negative Seitenränder ziehen die Leiste randlos über die Seitenrinne des
-   Content-Bereichs, damit beim Blättern keine Zeile seitlich durchscheint — und der
-   eigene Innenrand nimmt dieselbe Rinne wieder auf, damit der Text der Leiste auf einer
-   Flucht mit dem Seiteninhalt steht. Beide Maße lesen deshalb dieselbe Custom-Property
-   aus `theme/rollen.css`; ein festes Pixelmaß würde auf schmalem Schirm verrutschen.
-   Der untere Außenrand nimmt die Rinne ebenfalls zurück: am Seitenende schließt die
-   Leiste bündig mit dem Fenster ab, statt über einem Streifen Seitengrund zu schweben.
-   Grund `kopf`, Rahmen oben `linie-stark` (Entwurf: Erfassungsleiste). */
+/* ETB-Erfassung als angepinnte Leiste am Fuß der Zeitachse (Begründung in `pages/EtbPage.tsx`).
+   Negative Seitenränder ziehen sie randlos über die Seitenrinne, der Innenrand nimmt dieselbe
+   Rinne wieder auf, damit der Text mit dem Seiteninhalt fluchtet; beide lesen dieselbe
+   Custom-Property aus `theme/rollen.css`. Der untere Außenrand schließt bündig mit dem Fenster ab. */
 .etb-erfassung-sticky {
   position: sticky;
   bottom: 0;
@@ -51,15 +34,13 @@ body {
   border-top: 1px solid var(--lfh-linie-stark);
 }
 
-/* Neben der Seitenleiste (ab `xl`) endet die Leiste an der Zeitachsenspalte. Seit LFH-373 hängt
-   sie auch dort als Seitenfuß an der Wurzel (`EtbPage`); den rechten Außenrand in Breite der
-   Bilanzspalte setzt deshalb die Seite inline, hier fällt nur die rechte Polsterung weg. */
+/* Ab `xl` endet die Leiste an der Zeitachsenspalte; den rechten Außenrand in Breite der
+   Bilanzspalte setzt die Seite inline, hier fällt nur die rechte Polsterung weg. */
 .etb-erfassung-sticky--neben-leiste {
   padding-inline-end: 0;
 }
 
-/* Die Entwurfs-Reiter über der Zeile sitzen dicht an ihr — ein Reiterband mit vollem
-   Abstand drückte die Leiste am Fuß unnötig hoch. */
+/* Entwurfs-Reiter dicht an der Zeile, sonst drückte das Reiterband die Leiste unnötig hoch. */
 .etb-erfassung-sticky .ant-tabs-nav {
   margin-bottom: 8px;
 }
@@ -68,41 +49,22 @@ body {
   max-height: 28vh;
 }
 
-/* Radio-Knopf (Knopfform): Text in `bedienText` (LFH-677, Regel aus LFH-650). antd schreibt
-   den Text des gewählten Knopfs und jedes Knopfs unter dem Zeiger in `colorPrimary` — am Tag
-   `bedien` auf Weiß, gemessen 6,59 : 1 unter dem Tagesboden 7 : 1. Nur der TEXT: Rand,
-   Scheibe und Flächen bleiben auf `bedien` (ein Komponenten-Token hätte sie mitgefärbt).
-   HIER und nicht in `theme/sprache.css`: die Regel gilt app-weit, `sprache.css` lädt aber nur
-   mit den Bausteinen, die es importieren (der Prod-Build teilt CSS je Chunk).
-   Nur `-outline`: im Stil `solid` steht der Text auf satter `bedien`-Fläche, dort wäre
-   `bedienText` unlesbar. `.ant-radio-group-outline` davor hebt die Spezifität über antds
-   (0,3,0) — sonst entschiede die Einfügereihenfolge der CSS-in-JS-Stile. */
+/* Radio-Knopf (Knopfform): antd schreibt den Text gewählt und unter dem Zeiger in
+   `colorPrimary`, am Tag unter 7 : 1 — deshalb nur der TEXT auf `bedienText`; Rand, Scheibe und
+   Flächen bleiben `bedien` (ein Komponenten-Token hätte sie mitgefärbt).
+   Hier statt in `theme/sprache.css`, weil die Regel app-weit gilt und `sprache.css` nur mit den
+   importierenden Bausteinen lädt. Nur `-outline`: bei `solid` stünde der Text auf `bedien`-Fläche.
+   `.ant-radio-group-outline` hebt die Spezifität über antds (0,3,0). */
 .ant-radio-group-outline .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
 .ant-radio-group-outline .ant-radio-button-wrapper:not(.ant-radio-button-wrapper-disabled):hover {
   color: var(--lfh-bedien-text);
 }
 
-/* ETB: Fokusabstand der Zeitachse zur angepinnten Erfassungsleiste (LFH-373, WCAG 2.4.11).
-
-   GEMESSEN VOR DEM FIX: beim Vorwärtstabben rollte der Browser jeden Zeilenauslöser an den
-   unteren Fensterrand, und jeder zweite bis jeder lag VOLLSTÄNDIG hinter der Leiste (390 und
-   1366 px, kompakt und handschuh). `e2e/fokus-verdeckung.spec.ts` wird ohne diese Regel rot.
-
-   `scroll-margin` an den ZIELEN der Zeitachse, NICHT `scroll-padding` am Dokument wie auf der
-   Befehlsseite (LFH-465): die Scrollport-Variante zählt auch die Ziele IN der Leiste zum
-   verdeckten Streifen. Gemessen: jeder Fokus in der Erfassung (Knopf „Feld", Chip-Eingabe,
-   Rücksprung ins Textfeld) rollte die Seite dann weiter, beim Setzen dreier Felder von 0 bis
-   2593 px ans Ende. Mit dem Zielrand bleibt die Leiste unberührt. Ein negativer Rand an den
-   Leistenkindern hebt die Scrollport-Regel NICHT auf (gemessen, Chromium ignoriert ihn).
-   Die Höhe setzt `components/fokusabstandUnten.ts` aus der gemessenen Leiste.
-
-   ALLE Ziele von Seitenkopf und Inhalt, nicht nur die Zeitachse (Review LFH-373, gemessen):
-   seit die Leiste als Seitenfuß an der Wurzel von `EinsatzSeite` hängt, klebt sie über der
-   ganzen Seite — unter `xl` auch über der Bilanz, und ganz oben über Seitenkopf und Filter. Bei
-   390 × 600 im Handschuh-Betrieb lagen Bilanz-Links, „Einsatz abschließen" und Filterfelder
-   vollständig darunter. Die Leiste selbst steht NEBEN `seiten-inhalt`, ist also ausgenommen.
-   Die Variable gibt es nur, solange das ETB eingehängt ist; auf jeder anderen Seite greift der
-   Rückfall `0px`. */
+/* ETB: Fokusabstand zur angepinnten Erfassungsleiste (LFH-373, WCAG 2.4.11).
+   `scroll-margin` an den ZIELEN von Seitenkopf und Inhalt, NICHT `scroll-padding` am Dokument:
+   die Scrollport-Variante zählt auch die Ziele IN der Leiste zum verdeckten Streifen und rollt
+   bei jedem Fokus dort die Seite ans Ende. Die Leiste steht neben `seiten-inhalt` und ist damit
+   ausgenommen. Die Höhe setzt `components/fokusabstandUnten.ts`; ohne ETB greift `0px`. */
 [data-lfh='seitenkopf'] *,
 [data-lfh='seiten-inhalt'] * {
   scroll-margin-block-end: var(--lfh-etb-fokusabstand, 0px);

@@ -34,29 +34,15 @@ const URL_PLATZHALTER: Record<OnlineStyleTyp, string> = {
 };
 
 /**
- * Schlanke Schnellerfassung/Bearbeitung einer Online-Quelle als Form-in-Modal
- * (CLAUDE.md-Leitlinie: kurzes Formular → Modal, kein Drawer).
+ * Schnellerfassung/Bearbeitung einer Online-Quelle als Form-in-Modal.
  *
- * FELDBUDGET (LFH-346 · A8, Befund N20): sieben Felder waren zu viele. Sichtbar
- * bleiben die VIER Pflichtwerte — Name, Typ, URL und Attribution —, eingeklappt
- * sind Sortierung, Aktiv und Proxy.
+ * Feldbudget: sichtbar sind die VIER Pflichtwerte — Name, Typ, URL und Attribution —,
+ * eingeklappt Sortierung, Aktiv und Proxy. `attribution` ist Pflicht, serverseitig erzwungen
+ * und ohne brauchbare Vorgabe (Urheber und Lizenz je Quelle verschieden); hinter dem Collapse
+ * käme eine Ablehnung von einem unsichtbaren Feld.
  *
- * **Vier statt der drei, die der Plan vorsah, und das ist Absicht.** Die
- * Plan-Tabelle schickt `attribution` hinter den Collapse (und nennt daneben
- * „Zoom-Grenzen", ein Feld, das diese Maske nie hatte — die Zeile ist gegen einen
- * veralteten Stand geschrieben). `attribution` ist aber `required` und wird
- * serverseitig erzwungen; es hat keinen brauchbaren Vorgabewert, weil Urheber und
- * Lizenz je Quelle verschieden sind. Ein Pflichtfeld hinter dem Collapse hiesse:
- * Dialog ausfüllen, Speichern drücken, Ablehnung von einem Feld kassieren, das man
- * nicht sieht. LFH-343 · H49 verbietet genau das, und der Fliesstext desselben
- * Plan-Abschnitts sagt es auch („Bei allen drei Masken sind genau die Pflichtwerte
- * die sichtbaren") — nur seine Tabelle nicht. Präzedenz für vier sichtbare Felder:
- * die Ad-hoc-Disposition in `pages/FahrzeugePage.tsx` und `AuftragFormular`.
- *
- * Der frühere Erklär-Alert über dem Formular ist weg: er erklärte ein FELD (den
- * Proxy-Schalter), nicht einen Zustand der Seite, und steht deshalb als `tooltip`
- * an dessen `Form.Item`. Der Teil, der die URL betrifft (Schlüssel gehört in die
- * URL, nicht ins Frontend → LFH-182), hängt am URL-Feld.
+ * Der Proxy-Schalter wird per `tooltip` an seinem `Form.Item` erklärt, der URL-Hinweis
+ * (Schlüssel gehört in die URL, nicht ins Frontend) hängt am URL-Feld.
  */
 export default function OnlineQuelleFormModal({
   offen,
@@ -74,10 +60,9 @@ export default function OnlineQuelleFormModal({
   const { message } = App.useApp();
   const typ = Form.useWatch('typ', form) ?? 'vektor';
 
-  // VORBELEGUNG, kein Zurücksetzen — Begründung in `FahrzeugFormModal` (LFH-346/A6).
-  // Die Vorgaben des Anlegen-Zweigs stehen jetzt als `initialValues` an der Hülle;
-  // von dort holt sie jedes `resetFields` wieder, inklusive der aktuellen
-  // `naechsteSortier` (das Literal wird bei jedem Rendern neu übergeben).
+  // Vorbelegung, kein Zurücksetzen (siehe `FahrzeugFormModal`). Die Anlegen-Vorgaben stehen als
+  // `initialValues` an der Hülle, jedes `resetFields` holt sie wieder — inklusive der aktuellen
+  // `naechsteSortier`.
   useEffect(() => {
     if (!offen || !quelle) return;
     form.setFieldsValue({
@@ -100,12 +85,12 @@ export default function OnlineQuelleFormModal({
         attribution: werte.attribution.trim(),
         sortier: werte.sortier ?? 0,
         aktiv: werte.aktiv ?? true,
-        // Default-an (LFH-190).
+        // Default-an.
         proxy: werte.proxy ?? true,
       };
       return quelle ? aktualisiereOnlineQuelle(quelle.id, body) : legeOnlineQuelleAn(body);
     },
-    // Kein `onClose()` mehr: das Schliessen macht `onFertig`, das Leeren die Hülle.
+    // Das Schließen macht `onFertig`, das Leeren die Hülle.
     onSuccess: () => {
       invalidiereKarte(qc);
     },
@@ -119,20 +104,17 @@ export default function OnlineQuelleFormModal({
       form={form}
       erfassenText="Speichern"
       laeuft={mutation.isPending}
-      // LFH-190: Proxy ist Default-an (key-frei + serverseitig gecacht).
+      // Proxy ist Default-an (key-frei + serverseitig gecacht).
       initialValues={{ typ: 'vektor', sortier: naechsteSortier, aktiv: true, proxy: true }}
-      // `mutateAsync`: bei Ablehnung muss die Zusage brechen (LFH-332).
+      // `mutateAsync`: bei Ablehnung muss die Zusage brechen.
       //
-      // Der Formularspeicher statt der `onFinish`-Werte (LFH-346 · A8): ohne
-      // `forceRender` sind Sortierung, Aktiv und Proxy nicht montiert, und `onFinish`
-      // liefert nur montierte Felder. `OnlineQuelleBody` ist Vollersatz — eine
-      // bearbeitete Quelle fiele sonst bei jedem Speichern ohne Aufklappen auf
-      // Sortierung 0 zurück und der Proxy-Schalter auf seinen Vorgabewert. Ein
-      // Rückfall auf `quelle?.proxy` wäre die falsche Reparatur: er kann „nie
-      // montiert" nicht von „aufgeklappt und bewusst umgelegt" unterscheiden.
-      //
-      // Beachten: `getFieldsValue(true)` ist bei antd `any`-typisiert — die Feldnamen
-      // prüft nicht dieser Aufruf, sondern der Parametertyp von `mutationFn`.
+      // Der Formularspeicher statt der `onFinish`-Werte: ohne `forceRender` sind Sortierung, Aktiv
+      // und Proxy nicht montiert, und `onFinish` liefert nur montierte Felder. `OnlineQuelleBody` ist
+      // Vollersatz — eine Quelle fiele sonst beim Speichern auf Sortierung 0 und den Vorgabe-Proxy
+      // zurück. Ein Rückfall auf `quelle?.proxy` unterschiede „nie montiert" nicht von „bewusst
+      // umgelegt".
+      // `getFieldsValue(true)` ist `any`-typisiert; die Feldnamen prüft der Parametertyp von
+      // `mutationFn`.
       onErfassen={() => mutation.mutateAsync(form.getFieldsValue(true))}
       onFertig={onClose}
       onAbbrechen={onClose}
@@ -167,9 +149,8 @@ export default function OnlineQuelleFormModal({
       >
         <Input.TextArea rows={2} placeholder="© OpenStreetMap-Mitwirkende" />
       </Form.Item>
-      {/* Bewusst OHNE `forceRender` (wie `AuftragFormular`): nur wenn die
-          eingeklappten Felder gar nicht im DOM stehen, ist „im Ausgangszustand vier
-          Felder" prüfbar. Begründung und Gegenmittel am `onErfassen` oben. */}
+      {/* Bewusst OHNE `forceRender`: nur so ist „im Ausgangszustand vier Felder" prüfbar; das
+         Gegenmittel steht am `onErfassen` oben. */}
       <Collapse
         ghost
         style={{ marginInline: -8 }}
@@ -194,9 +175,7 @@ export default function OnlineQuelleFormModal({
                 >
                   <Switch />
                 </Form.Item>
-                {/* Der Tooltip trägt, was bis LFH-346 · A8 als Alert über dem ganzen
-                  Formular stand: ein Alert erklärt einen Zustand der Seite, ein
-                  Tooltip erklärt ein Feld. */}
+                {/* Ein Alert erklärt einen Zustand der Seite, ein Tooltip ein Feld. */}
                 <Form.Item
                   label="Über Server proxen"
                   name="proxy"

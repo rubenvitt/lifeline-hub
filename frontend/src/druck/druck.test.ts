@@ -4,17 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Die gemeinsame Druckmechanik (LFH-71, design.md D1/D3 des Changes `lfh-22-druck-export`).
- *
- * Geprüft wird die CSS-QUELLE, nicht ein gerechneter Stil — jsdom lädt keine CSS-Datei und
- * kennt kein `@media print` (Bauform von `pages/lageberichtPrint.test.ts`). Anders als dort
- * reicht hier kein flaches Regelmuster: `@page { @bottom-right { … } }` ist verschachtelt,
- * und ein flacher Parser läse den Randfeld-Block als Regel mit dem Selektor
- * `@page { margin: …; @bottom-right`. Der Parser unten baut deshalb einen Baum.
- *
- * Ob die Regeln im Browser WIRKEN, belegt `e2e/druck-fluss.spec.ts` — ein Selektor mit
- * Tippfehler steht auch da. Dieser Test sichert die Form: woran die Regeln hängen, was sie
- * NICHT tun (kein `visibility`), und dass das Randfeld keinen freien Text trägt.
+ * Die gemeinsame Druckmechanik, geprüft an der CSS-QUELLE (jsdom kennt kein `@media print`).
+ * `@page { @bottom-right { … } }` ist verschachtelt, deshalb baut der Parser unten einen Baum.
+ * Ob die Regeln im Browser wirken, belegt `e2e/druck-fluss.spec.ts`; hier geht es um die Form:
+ * woran die Regeln hängen, was sie NICHT tun (kein `visibility`), und dass das Randfeld keinen
+ * freien Text trägt.
  */
 const HIER = dirname(fileURLToPath(import.meta.url));
 const roh = readFileSync(join(HIER, 'druck.css'), 'utf8');
@@ -141,10 +135,8 @@ describe('druck.css — Aufbau', () => {
   });
 
   /**
-   * `@page` hängt an keinem Selektor und gilt für JEDEN Ausdruck der App, auch ohne Wurzel
-   * (Review Welle B: der Test oben filterte `@page` still heraus und hieß „ohne Wurzel
-   * druckt Strg+P wie bisher"). Das ist die benannte Ausnahme: ohne Wurzel ändern sich
-   * genau Seitenrand und Seitenzählung, sonst nichts. Kommt etwas dazu, wird es hier rot.
+   * `@page` gilt für JEDEN Ausdruck der App, auch ohne Wurzel: die benannte Ausnahme darf nur
+   * Seitenrand und Seitenzählung tragen.
    */
   it('die Ausnahme `@page` trägt nur Seitenrand und Seitenzählung', () => {
     const seitenRegeln = regeln.filter((r) => r.kontext.some((k) => k.startsWith('@page')));
@@ -228,9 +220,8 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
   });
 
   /**
-   * Im ENTWURF ist der Abschnittstitel keine Überschrift: beim Lagebericht der Kopf des
-   * Akkordeons (`.ant-collapse-header`), beim Befehl das Feldetikett (`.ant-form-item-label`).
-   * Eine Regel nur an h1–h6 ließe dort einen Titel allein am Seitenende stehen.
+   * Im ENTWURF ist der Abschnittstitel keine Überschrift; eine Regel nur an h1–h6 ließe dort
+   * einen Titel allein am Seitenende stehen.
    */
   it('hält auch den Abschnittstitel des Entwurfs bei seinem Text', () => {
     const sel = mitDeklaration(/break-after:\s*avoid/);
@@ -238,11 +229,7 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
     expect(sel).toContain('.ant-form-item-label');
   });
 
-  /**
-   * `.markdown pre` trägt am Bildschirm `overflow-x: auto` bei `white-space: pre`. Auf Papier
-   * gibt es keinen Bildlauf: eine lange Codezeile wäre rechts abgeschnitten. Schon ein um vier
-   * Leerzeichen eingerückter Absatz im Lagebericht wird zum Codeblock.
-   */
+  /** Auf Papier gibt es keinen Bildlauf: eine lange Codezeile wäre rechts abgeschnitten. */
   it('bricht Codeblöcke im Druck um, statt sie abzuschneiden', () => {
     const r = regelFuer(`${WURZEL} .markdown pre`);
     expect(r, 'keine pre-Regel').toBeDefined();

@@ -9,16 +9,10 @@ import {
 } from './viewport';
 
 /**
- * Testet die Testinfrastruktur (LFH-329 · B1/H24) — und zwar genau die Eigenschaft, die
- * der Vorgänger-Stub NICHT hatte: er lieferte für jede Abfrage `matches: false`, wodurch
- * jede Breakpoint-Behauptung eines Geschwisterpakets eine Attrappe gewesen wäre.
- *
- * Der Stub hängt an der GESAMTEN Suite (er wird global installiert), deshalb prüft diese
- * Datei auch die unscheinbaren Dinge: dass die Nicht-Breiten-Abfragen unberührt falsch
- * bleiben (sonst kippt die Theme-Weiche), dass das Ergebnisobjekt alle sieben Bauteile
- * einer Medienabfrage trägt (`ThemeModeProvider` ruft `addEventListener`/`removeEventListener`
- * darauf auf — fehlt eines, wirft jeder Seitentest) und dass eine gesetzte Breite nicht in
- * den nächsten Test leckt.
+ * Testet den global installierten matchMedia-Stub: Nicht-Breiten-Abfragen bleiben falsch
+ * (sonst kippt die Theme-Weiche), das Ergebnisobjekt trägt alle sieben Bauteile
+ * (`ThemeModeProvider` meldet sich darauf an und ab) und eine gesetzte Breite leckt nicht in
+ * den nächsten Test.
  */
 
 describe('matchMedia-Stub (LFH-329 · H24)', () => {
@@ -37,8 +31,7 @@ describe('matchMedia-Stub (LFH-329 · H24)', () => {
   });
 
   it('matchMedia-Stub: wertet die Dezimalschwelle 991.98px aus, nicht bloß Ganzzahlen', () => {
-    // antds `xs`-Abfrage und Layout.Sider nutzen gebrochene Schwellen; ein Integer-Parser
-    // läse hier 991 und läge bei genau 991 px falsch.
+    // antds Abfragen nutzen gebrochene Schwellen; ein Integer-Parser läge bei genau 991 px falsch.
     const abfrage = baueMatchMedia();
 
     setzeViewportBreite(900);
@@ -103,8 +96,8 @@ describe('matchMedia-Stub (LFH-329 · H24)', () => {
   });
 
   it('matchMedia-Stub: global installiert, Default ist die Fükw-Breite', () => {
-    // Der Grund, aus dem die Layout-Suiten nicht in den Schmal-Zweig kippen: ohne jedes
-    // Zutun ist der Stub breit (1024 ≥ lg 992 ≥ md 768).
+    // Ohne Zutun ist der Stub breit (1024 ≥ lg 992 ≥ md 768), die Layout-Suiten kippen nicht in
+    // den Schmal-Zweig.
     expect(VIEWPORT_STANDARD).toBe(1024);
     expect(window.matchMedia('(min-width: 992px)').matches).toBe(true);
     expect(window.matchMedia('(min-width: 768px)').matches).toBe(true);
@@ -119,9 +112,8 @@ describe('matchMedia-Stub (LFH-329 · H24)', () => {
   });
 
   it('matchMedia-Stub: die gesetzte Breite leckt nicht in den nächsten Test (Teil 2: wieder breit)', () => {
-    // Ohne den Reset im globalen afterEach stünde hier noch die 390 aus Teil 1 — der Stub
-    // wird per Object.defineProperty gesetzt, nicht per Spy, `vi.restoreAllMocks()` holt
-    // ihn also nicht zurück.
+    // Ohne den Reset im globalen afterEach stünde hier noch die 390 aus Teil 1 —
+    // `vi.restoreAllMocks()` holt einen per `defineProperty` gesetzten Stub nicht zurück.
     expect(window.matchMedia('(min-width: 768px)').matches).toBe(true);
     expect(window.matchMedia('(min-width: 992px)').matches).toBe(true);
     expect(window.matchMedia('(pointer: coarse)').matches).toBe(false);
