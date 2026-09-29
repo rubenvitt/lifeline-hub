@@ -1,73 +1,14 @@
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
 use serde_json::Value;
 use tower::ServiceExt;
 
 mod common;
 use common::{
     anfrage, anfrage_mit_offline_queue_benutzer, benutzer_anlegen, einsatz_anlegen, login_cookie,
-    rolle_setzen, setup,
+    person_anlegen, rolle_setzen, setup, setup_mit_pool, setup_mit_pool_und_live,
+    system_etb_inhalte,
 };
-
-// ---------- Harness (identisch zu tests/einsatz_material.rs) ----------
-
-/// Wie `setup`, liefert aber zusätzlich den Pool (für Direktquery-Verifikation).
-/// `SqlitePool` ist billig klonbar und teilt dieselbe In-Memory-DB.
-async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let router = build_router(AppState {
-        pool: pool.clone(),
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, pool)
-}
-
-// ---------- Zusatz-Helfer ----------
-
-/// Liefert die ETB-Einträge mit typ='system' als Vec der Inhalte.
-async fn system_etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {
-    let (_, json) = anfrage(
-        app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
-        cookie,
-        None,
-    )
-    .await;
-    json.as_array()
-        .unwrap()
-        .iter()
-        .filter(|e| e["typ"] == "system")
-        .map(|e| e["inhalt"].as_str().unwrap().to_string())
-        .collect()
-}
-
-/// Legt eine Person an und liefert ihre id.
-async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> i64 {
-    let (status, json) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
-        cookie,
-        Some(body),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED);
-    json["id"].as_i64().unwrap()
-}
 
 // ---------- Cross-cutting: ETB-Leak + SSE-Payload ----------
 
@@ -124,21 +65,7 @@ async fn etb_enthaelt_keine_identitaet_und_keinen_befundtext() {
 
 #[tokio::test]
 async fn sse_person_event_enthaelt_nur_ids_keinen_befundtext() {
-    let pool = lifeline_hub::db::test_pool().await;
-    lifeline_hub::auth::bootstrap::bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let live = lifeline_hub::live::LiveHub::new();
-    let app = lifeline_hub::app::build_router(lifeline_hub::app::AppState {
-        pool: pool.clone(),
-        live: live.clone(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let p = person_anlegen(&app, &admin, e, r#"{"name":"Mustermann"}"#).await;

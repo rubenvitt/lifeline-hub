@@ -1,13 +1,9 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
-// LFH-673: Betreuung auf der Lagekarte — Durchstich im echten Renderer.
-//
-// Warum im Browser: `LagekartePage.test.tsx` stubbt die Kartenfläche weg. Ob eine verortete
-// Stelle wirklich in der Marker-Quelle landet, ob der Platziermodus aus dem Modul heraus
-// ankommt, ob eine zweite Karte den Marker ohne Neuladen bekommt (Verortung schreibt kein
-// ETB, verteilt aber live) und was die Bezirksfläche als Beschriftung trägt, sieht nur ein
-// echter Renderer. Geprüft wird die Quelle (`querySourceFeatures`), die Bilder unter
-// `test-results/` sind Sichtbelege für die Prüfliste.
+// Betreuung auf der Lagekarte — Durchstich im echten Renderer: landet eine verortete Stelle
+// in der Marker-Quelle, kommt der Platziermodus aus dem Modul an, bekommt eine zweite Karte
+// den Marker ohne Neuladen (Verortung schreibt kein ETB, verteilt aber live), und was trägt
+// die Bezirksfläche als Beschriftung? Geprüft wird die Quelle (`querySourceFeatures`).
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -226,8 +222,8 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
     .poll(() => zonenLabel(page), { timeout: 30_000 })
     .toContain('Uferstraße 12–40 · Räumung: läuft');
 
-  // Tagmodus: dieselbe Fläche als Sichtbeleg. Nachtbetrieb ist die Vorgabe und folgt nicht
-  // `prefers-color-scheme` — umgeschaltet wird über den gespeicherten Modus.
+  // Tagmodus als Sichtbeleg. Nachtbetrieb ist die Vorgabe und folgt nicht
+  // `prefers-color-scheme` — umgeschaltet über den gespeicherten Modus.
   await page.evaluate(() => localStorage.setItem('lifeline-hub.theme', 'light'));
   await page.goto(`/einsaetze/${e}/lagekarte?evakuierungsbezirk=${bid}`);
   await karteBereit(page);

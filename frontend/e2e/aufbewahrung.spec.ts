@@ -3,26 +3,18 @@ import { DatabaseSync } from 'node:sqlite';
 import { kontrast, randKontrast } from './kontrast-kern';
 
 /**
- * Aufbewahrung in der Verwaltung und am Einsatz (LFH-23, tasks.md 6.11 und 8.2).
+ * Aufbewahrung in der Verwaltung und am Einsatz.
  *
- * ── WARUM EIN DIREKTER DATENBANKGRIFF ───────────────────────────────────────────────────
+ * DIREKTER DATENBANKGRIFF: Vormerkung und Schwärzung setzt ausschließlich der Purge-Lauf
+ * (Takt 600 s), einen Sofort-Auslöser darf es nicht geben — auch keinen nur für Tests. Die
+ * Suite läuft auf einer eigenen Temp-Datenbank je Lauf (`LIFELINE_E2E_LAUF`); die Tombstones
+ * setzt sie per `node:sqlite`, wie die Integrationstests per `sqlx`. Alles andere läuft über
+ * die API.
  *
- * Vormerkung und Schwärzung setzt ausschließlich der Purge-Lauf (Takt 600 s, kein
- * Sofort-Auslöser — das ist Spec: „Einen manuellen Sofort-Auslöser … MUST es nicht geben").
- * Ein Endpunkt nur für den Test wäre genau so ein Auslöser, in Produktion erreichbar oder
- * hinter einem Flag, das die Suite anders fährt als den Betrieb. Die Suite läuft dagegen auf
- * einer eigenen Temp-Datenbank je Lauf (`playwright.config.ts`, `LIFELINE_E2E_LAUF`); die
- * Tombstones werden dort per `node:sqlite` gesetzt, genau wie die Integrationstests es mit
- * `sqlx` tun. Alles andere — Anlegen, Abschließen, Frist — läuft über die API.
+ * Der echte Purge-Lauf läuft im e2e-Backend mit und kann gesetzte Zustände weiterschalten; die
+ * Kontrastmessung setzt sie deshalb vor jeder Anzeige neu (`uebersichtImGesetztenStand`).
  *
- * Der echte Purge-Lauf läuft im e2e-Backend mit (erster Tick beim Start, dann alle 600 s) und
- * kann gesetzte Zustände weiterschalten. Die Kontrastmessung setzt sie deshalb vor jeder
- * Anzeige neu und misst erst den gesetzten Stand (`uebersichtImGesetztenStand`).
- *
- * ── WAS GEKLICKT WIRD ───────────────────────────────────────────────────────────────────
- *
- * Menüeintrag, Tabellenzeile, Kopfaktion „Wiederherstellen", Absenden im Dialog: jeder Schritt
- * ist ein Klick bzw. ein Enter, kein `toBeVisible()` als Ersatz (CLAUDE.md, LFH-355).
+ * Jeder Schritt ist ein Klick bzw. Enter, kein `toBeVisible()` als Ersatz.
  */
 
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -112,8 +104,8 @@ test.describe('Aufbewahrung (LFH-23)', () => {
     const ziel = new Date(Date.now() + 90 * 86_400_000);
     const lokal = `${ziel.getFullYear()}-${String(ziel.getMonth() + 1).padStart(2, '0')}-${String(ziel.getDate()).padStart(2, '0')} 12:00`;
     await eingabe.fill(lokal);
-    // Enter im Feld übernimmt den Wert UND übermittelt das Formular (Erfassungs-Norm: der
-    // Knopf liegt im `<form>`) — ein zusätzlicher Klick träfe den schon schließenden Dialog.
+    // Enter übernimmt den Wert UND übermittelt das Formular (der Knopf liegt im `<form>`) —
+    // ein zusätzlicher Klick träfe den schon schließenden Dialog.
     await eingabe.press('Enter');
 
     await expect(page.getByText('Einsatz wiederhergestellt')).toBeVisible();
@@ -123,8 +115,8 @@ test.describe('Aufbewahrung (LFH-23)', () => {
     await expect(paneel).toContainText('Frist läuft');
     await expect(kopf.getByRole('button', { name: 'Frist ändern' })).toBeVisible();
 
-    // Zurück in der Übersicht steht der Einsatz im neuen Zustand, und die Einsatzleitung
-    // (hier der Admin als Ersteller) liest ihn wieder über die reguläre Route.
+    // Zurück in der Übersicht steht der Einsatz im neuen Zustand, und die Einsatzleitung (der
+    // Admin als Ersteller) liest ihn wieder über die reguläre Route.
     await page.getByRole('menuitem', { name: 'Aufbewahrung' }).click();
     await expect(zeile(page, e.nummer)).toContainText('Frist läuft');
     const detail = await page.request.get(`/api/einsaetze/${e.id}`);
@@ -173,11 +165,10 @@ test.describe('Aufbewahrung (LFH-23)', () => {
         geschwaerzt: await abgeschlossen(page, `Kontrast schwarz ${stempel}`, utc(-70)),
       };
       /*
-       * Die Zustände werden VOR JEDER Anzeige neu gesetzt: das e2e-Backend fährt den echten
-       * Purge-Lauf (erster Tick beim Start, dann alle 600 s). Fiele ein Tick zwischen
-       * Anlegen und Messen, würde aus `faellig` `vorgemerkt` und aus
-       * `schwaerzung_ausstehend` `geschwaerzt` — ohne Codeänderung. Die Etikettprüfung
-       * setzt deshalb erneut und lädt neu, bis der gesetzte Stand gemessen wird.
+       * Die Zustände werden VOR JEDER Anzeige neu gesetzt: fiele ein Purge-Tick zwischen
+       * Anlegen und Messen, würde aus `faellig` `vorgemerkt` und aus `schwaerzung_ausstehend`
+       * `geschwaerzt`. Die Etikettprüfung setzt deshalb erneut und lädt neu, bis der gesetzte
+       * Stand gemessen wird.
        */
       const zustaendeSetzen = () => {
         tombstones(faelle.faellig.id, { frist: utc(-1), geloescht: null, geschwaerzt: null });
@@ -222,8 +213,8 @@ test.describe('Aufbewahrung (LFH-23)', () => {
       for (const [zustand, f] of Object.entries(faelle) as [keyof typeof woerter, Angelegt][]) {
         const etikett = zeile(page, f.nummer).locator('.ant-tag');
         await expect(etikett).toHaveText(woerter[zustand]);
-        // Erst den eingeschwungenen Stand messen: während eines Nachladens liegt die Tabelle
-        // unter antds Lade-Schleier (Opacity-Gruppe), die der Messkern bewusst ablehnt.
+        // Erst den eingeschwungenen Stand messen: beim Nachladen liegt die Tabelle unter antds
+        // Lade-Schleier (Opacity), den der Messkern ablehnt.
         await expect(async () => {
           const text = await kontrast(etikett);
           messwerte[zustand] = text;
@@ -253,8 +244,8 @@ test.describe('Aufbewahrung (LFH-23)', () => {
         await page.setViewportSize({ width: breite, height: breite === 390 ? 844 : 800 });
         await uebersichtImGesetztenStand();
         await expect(zeile(page, faelle.vorgemerkt.nummer)).toBeVisible();
-        // Der Zustand steht neben der fixierten Nummer und ist auch am Handschirm ohne
-        // Querscrollen im Blick (Kriterium 9) — `toBeInViewport`, nicht `toBeVisible`.
+        // Der Zustand steht neben der fixierten Nummer auch am Handschirm ohne Querscrollen im
+        // Blick — `toBeInViewport`, nicht `toBeVisible`.
         await expect(zeile(page, faelle.vorgemerkt.nummer).locator('.ant-tag')).toBeInViewport();
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
           breite,

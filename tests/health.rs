@@ -1,23 +1,16 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
+use lifeline_hub::app::build_router;
 use lifeline_hub::db;
 use lifeline_hub::live::LiveHub;
 use tower::ServiceExt; // stellt `oneshot` bereit
 
+mod common;
+
 #[tokio::test]
 async fn health_endpoint_returns_ok() {
     let pool = db::test_pool().await;
-    let app = build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
+    let app = build_router(common::test_state(&pool, &LiveHub::new()));
 
     let response = app
         .oneshot(
@@ -45,16 +38,7 @@ async fn health_endpoint_returns_ok() {
 async fn health_endpoint_reports_degraded_when_db_down() {
     let pool = db::test_pool().await;
     pool.close().await; // DB-Verbindung schließen → Query schlägt fehl
-    let app = build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
+    let app = build_router(common::test_state(&pool, &LiveHub::new()));
 
     let response = app
         .oneshot(

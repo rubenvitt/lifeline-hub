@@ -79,14 +79,9 @@ test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten
   const dialog = page.getByRole('dialog', { name: 'Ungespeicherte Änderungen' });
   await expect(dialog).toBeVisible();
   for (const name of ['Verwerfen', 'Bleiben', 'Speichern und weiter']) {
-    // KEIN `exact: true` an diesem Namen: antds `loading` hängt ein
-    // `role="img" aria-label="loading"` in den Knopf, und damit ändert sich sein
-    // ZUGÄNGLICHER Name, während der Textinhalt gleich bleibt (in jsdom gemessen:
-    // 0 exakte Treffer). „Speichern und weiter" trägt `loading={speichert}`, und genau
-    // in diesem Augenblick läuft der Blur-Autosave — in CI einmal rot mit
-    // „element(s) not found", während die zwei Geschwister ohne `loading` gefunden
-    // wurden (LFH-358, PR #59). Der erste Test dieser Datei schützt sich gegen denselben
-    // Zustand bereits über `not.toHaveClass(/ant-btn-loading/)`.
+    // KEIN `exact: true`: antds `loading` hängt ein `role="img" aria-label="loading"` in den
+    // Knopf und ändert damit den zugänglichen Namen. „Speichern und weiter" trägt
+    // `loading={speichert}`, und genau jetzt läuft der Blur-Autosave.
     const knopf = dialog.getByRole('button', { name: new RegExp(`${name}$`) });
     await expect(knopf).toBeVisible();
     // Modal-Zoom animiert zunächst die gesamte Trefffläche mit; erst den Endzustand messen.

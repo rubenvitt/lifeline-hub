@@ -1,35 +1,23 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Lagebericht am Fükw-Maß und am schmalen Schirm (LFH-348 · C13).
+ * Lagebericht am Fükw-Maß und am schmalen Schirm: Seitenhöhe der Detailseite und
+ * waagerechter Überlauf der beiden Listen.
  *
- * WARUM HIER UND NICHT IN VITEST: jsdom rechnet kein Layout. Die Seitenhöhe der
- * Detailseite und der waagerechte Überlauf der beiden Listen sind reine Layoutaussagen.
+ * `MAX_HOEHE` ist gemessen, keine Setzung: die halbe Höhe der Seite mit acht offenen
+ * Split-Editoren ohne Navigation. Gemessen wird `document.body.scrollHeight` — die
+ * Scrollstrecke, die die Person am 13"-Schirm zurücklegt.
  *
- * DIE SCHWELLE `MAX_HOEHE` IST EINE GEMESSENE ZAHL, keine Setzung: der Bestand vor C13
- * (acht Split-Editoren à acht Zeilen, keine Navigation) ist mit genau diesem Test gemessen
- * worden — der Wert steht in der Prüfliste
- * (`docs/superpowers/specs/2026-08-28-lfh-348-pruefliste.md`) —, und das Ticket verlangt
- * mindestens die Halbierung. Gemessen wird `document.body.scrollHeight`, nicht die Höhe des
- * Formulars: die Scrollstrecke ist, was die Person am 13"-Schirm zurücklegt.
- *
- * BEWUSST KEIN Device-Descriptor: `devices['iPhone …']` zöge webkit nach, und ein
- * Browser-Download ist im Repo nirgends abgesichert (gleichlautend in den Bestands-Specs).
- * Anmelden und Anlegen laufen am Fükw-Maß, erst danach wird umgestellt.
- *
- * SEEDING PER `page.request`: die Session ist Cookie-basiert, `page.request` teilt den
- * Cookie-Jar des Kontexts (Vorgehen aus `datensicht-schmal.spec.ts`).
+ * Kein Device-Descriptor; Anmelden und Anlegen am Fükw-Maß, erst danach umstellen. Seeding per
+ * `page.request`.
  */
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 /**
- * Halbe Bestandshöhe. Gemessen am Stand VOR C13 (Commit f184da4c, 28.08.2026, zweimal
- * identisch): `body.scrollHeight` = **2108 px**, Formular 1833 px, ein Textfeld 180 px.
- * Das Ticket verlangt mindestens die Halbierung → 1054. Nach dem Umbau (Akkordeon, ein
- * offener Editor): 938 px. Der Körper hat einen Boden von `100vh` = 768 px
- * (`AppLayout`/`EinsatzLayout`, `minHeight`) — darunter kann keine Seite fallen.
+ * Halbe Bestandshöhe: ohne Akkordeon maß die Seite 2108 px. Der Körper hat einen Boden von
+ * `100vh` = 768 px — darunter kann keine Seite fallen.
  */
 const MAX_HOEHE = 1054;
 
@@ -77,7 +65,7 @@ async function lagemeldungAnlegen(page: Page, einsatzId: string) {
   expect(l.ok(), await l.text()).toBe(true);
 }
 
-// Erster Lauf je Datei zahlt den Vite-Kaltstart der Detail- und Listenrouten mit (gemessen: 31 s).
+// Erster Lauf je Datei zahlt den Vite-Kaltstart der Detail- und Listenrouten mit.
 test.setTimeout(90_000);
 
 /** `body.scrollHeight`, sobald drei Messungen im Abstand von 250 ms gleich sind. */
@@ -112,9 +100,7 @@ test('Detailseite „Lagevortrag zur Entscheidung" bleibt bei 1366 px unter der 
   await expect(page.getByLabel('Auftrag')).toBeVisible();
   await expect(page.getByLabel('Vorschlag der besten Möglichkeit')).toBeAttached();
 
-  // Erst messen, wenn die Höhe STEHT: `autoSize` misst die Textfelder nach dem Einhängen
-  // nach, ein Griff davor liest die Seite ohne ausgewachsene Felder (gemessen 1324 gegen
-  // 1931 px auf demselben Stand).
+  // Erst messen, wenn die Höhe STEHT: `autoSize` misst die Textfelder nach dem Einhängen nach.
   const hoehe = await stabileHoehe(page);
   const detail = await page.evaluate(() => ({
     form: document.querySelector('form')?.getBoundingClientRect().height ?? -1,
@@ -138,7 +124,7 @@ for (const pfad of ['lageberichte', 'lagemeldungen'] as const) {
     if (pfad === 'lagemeldungen') await lagemeldungAnlegen(page, einsatzId!);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/einsaetze/${einsatzId}/${pfad}`);
-    // Seitenkopf des Neuentwurfs: der Titel ist das h1 der `EinsatzSeite`-Kopfleiste.
+    // Der Titel ist das h1 der `EinsatzSeite`-Kopfleiste.
     await expect(
       page.getByRole('heading', {
         level: 1,

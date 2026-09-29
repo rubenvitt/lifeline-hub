@@ -1,16 +1,9 @@
 import { expect, test, type Page, type Locator, type Response } from '@playwright/test';
 
 /**
- * Das Befehls-Gedächtnis der Kommandopalette (LFH-391 · Etappe D) gegen den ECHTEN Server.
- *
- * Was jsdom nicht beantworten kann, und genau deshalb steht dieser Fall hier: die
- * Vitest-Naht (`CommandPaletteProvider.gedaechtnis.test.tsx`) fährt gegen MSW und beweist
- * die Verdrahtung — nicht aber, dass der Stand einen NEULADEN überlebt. Das wörtliche
- * Akzeptanzkriterium lautet „pro Benutzer persistiert"; erst ein frisch geladener Client mit
- * leerem Query-Cache, der den Eintrag vom Server zurückbekommt, belegt es.
- *
- * Harness wie `command-palette.spec.ts`: Backend und Vite startet playwright.config.ts
- * selbst, Login gegen eine Temp-DB je Lauf.
+ * Das Befehls-Gedächtnis der Kommandopalette gegen den echten Server: die Vitest-Naht fährt
+ * gegen MSW und belegt die Verdrahtung, aber nicht, dass der Stand einen NEULADEN überlebt.
+ * Erst ein frisch geladener Client mit leerem Query-Cache belegt „pro Benutzer persistiert".
  */
 
 const ADMIN = 'admin';
@@ -50,23 +43,19 @@ test('merkt einen ausgeführten Befehl am Benutzer und zeigt ihn nach dem Neulad
 }) => {
   const ersterStand = standGeladen(page);
   await anmelden(page);
-  // AUF DIE ANTWORT WARTEN, statt sofort zu öffnen — und das ist keine Test-Bequemlichkeit,
-  // sondern die gemessene Kehrseite des Standbilds: `PaletteHost` friert den Stand beim
-  // Öffnen ein, damit die oberste Gruppe nicht unter dem Cursor nachklappt (WCAG 3.2.5).
-  // Wer die Palette schneller öffnet, als der erste Abruf zurückkommt, sieht das Gedächtnis
-  // erst beim nächsten Öffnen. Im Betrieb liegen dazwischen Sekunden, im Test Millisekunden.
+  // Auf die Antwort warten statt sofort zu öffnen: `PaletteHost` friert den Stand beim Öffnen
+  // ein, damit die oberste Gruppe nicht unter dem Cursor nachklappt (WCAG 3.2.5).
   await ersterStand;
 
-  // Ausgangslage festhalten: der e2e-Benutzer teilt sich die Temp-DB mit den übrigen
-  // Palette-Fällen, „die Gruppe ist da" allein wäre also keine Aussage über DIESEN Befehl.
+  // Ausgangslage festhalten: die Temp-DB ist mit den übrigen Palette-Fällen geteilt, „die
+  // Gruppe ist da" allein sagte nichts über DIESEN Befehl.
   await oeffnePalette(page);
   await expect(page.getByRole('option', { name: 'Profil', exact: true })).toBeVisible();
   await expect(gedaechtnis(page).getByRole('option', { name: 'Profil', exact: true })).toHaveCount(
     0,
   );
 
-  // Ausführen — die Palette schliesst sich dabei selbst, VOR der Ausführung. Genau deshalb
-  // hängt der Schreibweg am Provider und nicht an ihr.
+  // Die Palette schließt sich VOR der Ausführung — deshalb hängt der Schreibweg am Provider.
   const geschrieben = page.waitForResponse(
     (r) => r.url().includes(FACH) && r.request().method() === 'PUT',
   );
@@ -85,15 +74,14 @@ test('merkt einen ausgeführten Befehl am Benutzer und zeigt ihn nach dem Neulad
     gedaechtnis(page).getByRole('option', { name: 'Profil', exact: true }),
   ).toBeVisible();
 
-  // ZUOBERST heisst: erste Gruppe im Kasten. Die Startansicht ist kuratiert (LFH-337 · M11),
-  // und das Gedächtnis ist der Grund, aus dem sie diese Reihenfolge hat.
+  // ZUOBERST heißt: erste Gruppe im Kasten.
   await expect(page.getByRole('listbox').getByRole('group').first()).toHaveAttribute(
     'aria-label',
     'Zuletzt ausgeführt',
   );
 
   // Bei AKTIVER Suche entfällt die Gruppe — der Befehl steht dann genau einmal in der
-  // flachen Trefferliste, nicht zweimal mit gleichem Label und gleichem Ziel.
+  // Trefferliste.
   await paletteInput(page).fill('Profil');
   await expect(gedaechtnis(page)).toHaveCount(0);
   await expect(page.getByRole('option', { name: 'Profil', exact: true })).toHaveCount(1);

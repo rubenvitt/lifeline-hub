@@ -1,38 +1,18 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
- * Die Betroffenen-Module am Handschirm (LFH-340 · C5, AK 5).
+ * Die Betroffenen-Module am Handschirm: geprüft wird die WEICHE — bei 390 px der Kartenzweig,
+ * bei 1366 px die Tabelle — und dass der Body in keinem Fall waagerecht überläuft.
  *
- * Bis C5 trug keine der drei Listen einen Breakpoint: `personenSpalten` vergab 320 von
- * 342 px fest, die Schadensliste rannte in eine handgebaute Tabelle. Geprüft wird deshalb
- * die WEICHE, nicht die Kosmetik — bei 390 px steht der Kartenzweig, bei 1366 px die
- * Tabelle, und der Body läuft in keinem der beiden Fälle waagerecht über.
+ * AN- UND ABWESENHEIT, JE MIT GEGENPROBE: „kein `.ant-table` bei 390 px" erfüllt auch ein
+ * Lade-, Leer- oder Redirect-Zustand; erst das Paar mit demselben gesäten Datensatz als Anker
+ * schließt das aus.
  *
- * ── AN- UND ABWESENHEIT, JE MIT GEGENPROBE ──────────────────────────────────────────────
+ * Dazu die Treffflächen über zwei Dichtestufen (Titel-Links bei 390 px, Spaltenschalter bei
+ * 1366 px) gegen die Staffel 48 / 72 als Literale — ein fester Wert von 48 px fällt erst im
+ * Handschuh-Durchgang durch.
  *
- * „kein `.ant-table` bei 390 px" allein belegt nichts: eine Seite, die aus irgendeinem
- * anderen Grund keine Tabelle rendert — Ladezustand, Leerzustand, Redirect — erfüllt das
- * ebenso. Erst das Paar aus Abwesenheit unten und Anwesenheit oben, mit demselben gesäten
- * Datensatz als Anker in beiden, schließt das aus. Dieselbe Begründung steht in
- * `datensicht-schmal.spec.ts`, das die Weiche am Primitiv misst; hier geht es um die drei
- * Modulrouten, die sie konsumieren.
- *
- * LFH-454 ergänzt die gerenderten Treffflächen über zwei Dichtestufen: Titel-Links der
- * Karten bei 390 px, Spaltenschalter bei 1366 px. Die Schwelle ist die Staffel 48 / 72,
- * nicht 44 px — sonst bliebe eine Regression auf 44–47 px unbemerkt. Ein fester Wert
- * von 48 px fällt erst im Handschuh-Durchgang durch. Die Sollwerte bleiben Literale,
- * damit der Test nicht einen importierten Produktiv-Token gegen sich selbst prüft.
- *
- * ── WAS HIER BEWUSST NICHT GEMESSEN WIRD ────────────────────────────────────────────────
- *
- * Kein `waitForLoadState('networkidle')`: auf Einsatzrouten bleibt ein SSE-Strom offen, die
- * Bedingung „500 ms keine Netzwerkaktivität" tritt dort nie sauber ein (in
- * `trefflaeche-tablet.spec.ts` gemessen, als LFH-385 erfasst). Die Zusicherungen warten von
- * sich aus und sind inhaltlich statt netzwerklich.
- *
- * Kein Device-Descriptor und kein zweites Playwright-Projekt — ein `devices['iPhone …']`
- * zöge webkit nach, und ein Browser-Download ist im Repo nirgends abgesichert
- * (gleichlautend in sechs Bestands-Specs begründet).
+ * Kein `networkidle` (SSE-Strom), kein Device-Descriptor.
  */
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -50,8 +30,6 @@ const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 /** Subpixel-Spielraum: Chromium rechnet unter Last anders als im Einzellauf. */
 const SUBPIXEL = 0.5;
 
-// Login-/Anlege-Helfer kopiert — es gibt (noch) kein geteiltes e2e-Hilfsmodul
-// (gleichlautend in sechs Bestands-Specs vermerkt).
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -75,11 +53,8 @@ async function seede(page: Page, einsatzId: string, pfad: string, data: unknown,
 }
 
 /**
- * Je Modul ein Datensatz mit einem Wortlaut, der erst MIT den Daten erscheint.
- *
- * Der Anker ist nicht Zierde: eine Messung vor dem Inhalt prüft den Ladezustand, und ohne
- * Zeilen gibt es keinen Überlauf — der Test wäre grün, während die Seite in Wirklichkeit
- * überliefe. Dieselbe teuer gelernte Lehre steht in `kraefte-schmal.spec.ts`.
+ * Je Modul ein Datensatz mit einem Wortlaut, der erst MIT den Daten erscheint — ohne Zeilen
+ * gibt es keinen Überlauf, eine Messung vor dem Inhalt prüfte den Ladezustand.
  */
 const MODULE = [
   { route: 'personen', anker: /R-\d{3}/, was: 'Person' },
@@ -113,8 +88,8 @@ async function stelleDichte(page: Page, dichte: string) {
 async function haeltStufe(page: Page, ziel: Locator, dichte: string, soll: number, name: string) {
   await expect(ziel, `${name}: genau ein Bedienziel`).toHaveCount(1);
   await expect(ziel, `${name}: Bedienziel sichtbar`).toBeVisible();
-  // Vor JEDER Messung, auch nach einem Routenwechsel: „Stufe nicht angekommen" muss
-  // von „Ziel zu klein" unterscheidbar bleiben.
+  // Vor JEDER Messung, auch nach einem Routenwechsel: „Stufe nicht angekommen" muss von
+  // „Ziel zu klein" unterscheidbar bleiben.
   await expect(page.locator('html'), `${name}: aktive Dichtestufe`).toHaveAttribute(
     'data-dichte',
     dichte,
@@ -171,9 +146,8 @@ test('bei 390 px steht auf allen drei Listen die Karte statt der Tabelle, ohne Q
 });
 
 test('bei 1366 px steht auf allen drei Listen die Tabelle statt der Karte', async ({ page }) => {
-  // Die Gegenprobe. Ohne sie wäre der Fall oben auch grün, wenn die Weiche bei JEDER Breite
-  // in den Kartenzweig kippt — also gerade dann, wenn der Fükw seine Vergleichsansicht
-  // verliert.
+  // Die Gegenprobe: sonst wäre der Fall oben auch grün, wenn die Weiche bei JEDER Breite in
+  // den Kartenzweig kippt.
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Betroffene breit ${Date.now()}`);
   await seedeAlles(page, einsatzId);
@@ -197,8 +171,8 @@ test('bei 1366 px steht auf allen drei Listen die Tabelle statt der Karte', asyn
 });
 
 test.describe('LFH-454: Treffflächen der Betroffenen-Routen', () => {
-  // Nur die Breite zu ändern erzeugt kein `pointer: coarse`. Der Touch-Kontext gilt
-  // für beide Breiten; die gespeicherte Wahl bestimmt darin die jeweilige Stufe.
+  // Nur die Breite zu ändern erzeugt kein `pointer: coarse`; die gespeicherte Wahl bestimmt
+  // die Stufe.
   test.use({ hasTouch: true });
 
   for (const { dichte, soll } of STAFFEL) {

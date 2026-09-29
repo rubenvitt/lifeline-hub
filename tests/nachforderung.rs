@@ -1,16 +1,7 @@
 use axum::http::StatusCode;
 
 mod common;
-use common::{anfrage, einsatz_anlegen, login_cookie, rolle_setzen, setup};
-
-async fn benutzer_anlegen(app: &axum::Router, admin: &str, name: &str) -> i64 {
-    let body = format!(
-        r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"keine"}}"#
-    );
-    let (status, json) = anfrage(app, "POST", "/api/benutzer", admin, Some(&body)).await;
-    assert_eq!(status, StatusCode::CREATED, "{json:?}");
-    json["id"].as_i64().unwrap()
-}
+use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
 
 fn body() -> String {
     serde_json::json!({
@@ -202,7 +193,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let erika = benutzer_anlegen(&app, &admin, "erika").await;
+    let erika = benutzer_anlegen(&app, &admin, "erika", "keine").await;
     rolle_setzen(&app, &admin, e, erika, "beobachter").await;
     let erika_c = login_cookie(&app, "erika", "erikapw1").await;
     let (status, _) = anfrage(

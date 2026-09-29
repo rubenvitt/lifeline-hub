@@ -1,137 +1,16 @@
-use axum::body::{to_bytes, Body};
-use axum::http::{header, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
+use axum::http::StatusCode;
 use serde_json::{json, Value};
-use tower::ServiceExt;
 
 mod common;
-use common::login_cookie;
-
-// ---------- Harness ----------
-
-async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let router = build_router(AppState {
-        pool: pool.clone(),
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, pool)
-}
-
-async fn setup() -> axum::Router {
-    setup_mit_pool().await.0
-}
-
-async fn anfrage(
-    app: &axum::Router,
-    method: &str,
-    uri: &str,
-    cookie: &str,
-    body: Option<&Value>,
-) -> (StatusCode, Value) {
-    let mut req = Request::builder()
-        .method(method)
-        .uri(uri)
-        .header(header::COOKIE, cookie);
-    let body = match body {
-        Some(b) => {
-            req = req.header(header::CONTENT_TYPE, "application/json");
-            Body::from(b.to_string())
-        }
-        None => Body::empty(),
-    };
-    let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
-    let status = resp.status();
-    let bytes = to_bytes(resp.into_body(), 1024 * 1024).await.unwrap();
-    let value = if bytes.is_empty() {
-        Value::Null
-    } else {
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
-    };
-    (status, value)
-}
+use common::{
+    anfrage_json, benutzer_anlegen, einsatz_anlegen, login_cookie, person_anlegen, rolle_setzen,
+    setup, setup_mit_pool, system_etb_inhalte,
+};
 
 // ---------- Domänen-Helfer ----------
 
-async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
-    let (s, v) = anfrage(
-        app,
-        "POST",
-        "/api/einsaetze",
-        cookie,
-        Some(&json!({"bezeichnung":"Lage"})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED);
-    v["id"].as_i64().unwrap()
-}
-
-async fn benutzer_anlegen(
-    app: &axum::Router,
-    admin_cookie: &str,
-    name: &str,
-    org_rolle: &str,
-) -> i64 {
-    let (s, v) = anfrage(
-        app,
-        "POST",
-        "/api/benutzer",
-        admin_cookie,
-        Some(&json!({
-            "anzeigename": name, "benutzername": name,
-            "passwort": format!("{name}pw1"), "org_rolle": org_rolle
-        })),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED, "benutzer_anlegen: {v:?}");
-    v["id"].as_i64().unwrap()
-}
-
-async fn rolle_setzen(
-    app: &axum::Router,
-    leit_cookie: &str,
-    einsatz: i64,
-    benutzer_id: i64,
-    rolle: &str,
-) {
-    let (s, _) = anfrage(
-        app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"),
-        leit_cookie,
-        Some(&json!({ "einsatz_rolle": rolle })),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-}
-
-async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
-    let (s, v) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
-        cookie,
-        Some(&json!({})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED);
-    v["id"].as_i64().unwrap()
-}
-
 async fn schaden_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &Value) -> i64 {
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/schaeden"),
@@ -145,7 +24,7 @@ async fn schaden_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &
 
 /// Disponiert eine Ad-hoc-Einsatzkraft in den Einsatz und liefert deren einsatz_personal-id.
 async fn personal_disponieren(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         app,
         "POST",
         &format!("/api/einsaetze/{einsatz}/personal"),
@@ -155,24 +34,6 @@ async fn personal_disponieren(app: &axum::Router, cookie: &str, einsatz: i64, na
     .await;
     assert_eq!(s, StatusCode::CREATED, "personal_disponieren: {v:?}");
     v["id"].as_i64().unwrap()
-}
-
-/// ETB-Einträge mit typ='system' als Vec der Inhalte.
-async fn system_etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {
-    let (_, json) = anfrage(
-        app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
-        cookie,
-        None,
-    )
-    .await;
-    json.as_array()
-        .unwrap()
-        .iter()
-        .filter(|e| e["typ"] == "system")
-        .map(|e| e["inhalt"].as_str().unwrap().to_string())
-        .collect()
 }
 
 fn gueltig() -> Value {
@@ -186,7 +47,7 @@ async fn anlegen_vergibt_s_nummer_und_status_offen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -207,7 +68,7 @@ async fn registriernr_fortlaufend_je_einsatz() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let _ = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (_, v2) = anfrage(
+    let (_, v2) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -229,7 +90,7 @@ async fn anlegen_ohne_pflichtfelder_ist_400() {
         json!({"typ":"sachschaden","ort":"X"}),
         json!({"typ":"sachschaden","ausmass":"gering"}),
     ] {
-        let (s, v) = anfrage(
+        let (s, v) = anfrage_json(
             &app,
             "POST",
             &format!("/api/einsaetze/{e}/schaeden"),
@@ -260,7 +121,7 @@ async fn anlegen_mit_leerem_pflichtfeld_ist_400() {
         json!({"typ":"sachschaden","ausmass":"gering","ort":"   "}),
         json!({"typ":"","ausmass":"gering","ort":"X"}),
     ] {
-        let (s, v) = anfrage(
+        let (s, v) = anfrage_json(
             &app,
             "POST",
             &format!("/api/einsaetze/{e}/schaeden"),
@@ -286,7 +147,7 @@ async fn anlegen_mit_unbekanntem_enum_ist_400() {
         json!({"typ":"quatsch","ausmass":"gering","ort":"X"}),
         json!({"typ":"sachschaden","ausmass":"quatsch","ort":"X"}),
     ] {
-        let (s, v) = anfrage(
+        let (s, v) = anfrage_json(
             &app,
             "POST",
             &format!("/api/einsaetze/{e}/schaeden"),
@@ -312,7 +173,7 @@ async fn anlegen_meldung_trennt_fehlenden_und_leeren_ort() {
     let e = einsatz_anlegen(&app, &admin).await;
     let u = format!("/api/einsaetze/{e}/schaeden");
 
-    let (s_fehlt, v_fehlt) = anfrage(
+    let (s_fehlt, v_fehlt) = anfrage_json(
         &app,
         "POST",
         &u,
@@ -320,7 +181,7 @@ async fn anlegen_meldung_trennt_fehlenden_und_leeren_ort() {
         Some(&json!({"typ":"sachschaden","ausmass":"gering"})),
     )
     .await;
-    let (s_leer, v_leer) = anfrage(
+    let (s_leer, v_leer) = anfrage_json(
         &app,
         "POST",
         &u,
@@ -347,7 +208,7 @@ async fn anlegen_mit_status_ungleich_offen_ist_422() {
     let e = einsatz_anlegen(&app, &admin).await;
     let mut body = gueltig();
     body["status"] = json!("abgeschlossen");
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -364,7 +225,7 @@ async fn uebergeben_setzt_status_und_adressat() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/uebergeben"),
@@ -388,7 +249,7 @@ async fn uebergeben_ohne_adressat_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/uebergeben"),
@@ -411,7 +272,7 @@ async fn uebergeben_mit_leerem_adressat_ist_400() {
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
     let u = format!("/api/einsaetze/{e}/schaeden/{sid}/uebergeben");
 
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &u,
@@ -426,7 +287,7 @@ async fn uebergeben_mit_leerem_adressat_ist_400() {
     assert_eq!(s, StatusCode::BAD_REQUEST, "{v:?}");
 
     // Positiv-Zweig: gültiger Adressat wird getrimmt gespeichert.
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &u,
@@ -444,7 +305,7 @@ async fn uebergeben_aus_abgeschlossen_ist_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    anfrage(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"),
@@ -452,7 +313,7 @@ async fn uebergeben_aus_abgeschlossen_ist_422() {
         Some(&json!({"abschluss_grund":"behoben"})),
     )
     .await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/uebergeben"),
@@ -469,7 +330,7 @@ async fn abschliessen_aus_offen_und_aus_uebergeben_ok() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let s1 = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (a1, v1) = anfrage(
+    let (a1, v1) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{s1}/abschliessen"),
@@ -480,7 +341,7 @@ async fn abschliessen_aus_offen_und_aus_uebergeben_ok() {
     assert_eq!(a1, StatusCode::OK);
     assert_eq!(v1["status"], "abgeschlossen");
     let s2 = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    anfrage(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{s2}/uebergeben"),
@@ -488,7 +349,7 @@ async fn abschliessen_aus_offen_und_aus_uebergeben_ok() {
         Some(&json!({"uebergeben_an":"Bauhof"})),
     )
     .await;
-    let (a2, _) = anfrage(
+    let (a2, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{s2}/abschliessen"),
@@ -509,7 +370,7 @@ async fn abschliessen_ohne_grund_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"),
@@ -528,7 +389,7 @@ async fn abschliessen_mit_leerem_grund_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"),
@@ -549,7 +410,7 @@ async fn abschliessen_mit_unbekanntem_grund_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"),
@@ -567,7 +428,7 @@ async fn abschliessen_aus_abgeschlossen_ist_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    anfrage(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"),
@@ -575,7 +436,7 @@ async fn abschliessen_aus_abgeschlossen_ist_422() {
         Some(&json!({"abschluss_grund":"behoben"})),
     )
     .await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"),
@@ -594,7 +455,7 @@ async fn abschliessen_haengt_notiz_an_beschreibung_an() {
     let mut body = gueltig();
     body["beschreibung"] = json!("Erstbefund");
     let sid = schaden_anlegen(&app, &admin, e, &body).await;
-    anfrage(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"),
@@ -602,7 +463,7 @@ async fn abschliessen_haengt_notiz_an_beschreibung_an() {
         Some(&json!({"abschluss_grund":"behoben","notiz":"vor Ort erledigt"})),
     )
     .await;
-    let (_, v) = anfrage(
+    let (_, v) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -622,11 +483,11 @@ async fn geschaedigt_beide_felder_ist_422() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let p = person_anlegen(&app, &admin, e).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
     let mut body = gueltig();
     body["geschaedigt_person_id"] = json!(p);
     body["geschaedigt_kontakt"] = json!("Herr Meier");
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -642,11 +503,11 @@ async fn geschaedigt_fk_auf_storniert_person_bleibt_zulaessig() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let p = person_anlegen(&app, &admin, e).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
     let mut body = gueltig();
     body["geschaedigt_person_id"] = json!(p);
     let sid = schaden_anlegen(&app, &admin, e, &body).await;
-    let (s_del, _) = anfrage(
+    let (s_del, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/personen/{p}"),
@@ -655,7 +516,7 @@ async fn geschaedigt_fk_auf_storniert_person_bleibt_zulaessig() {
     )
     .await;
     assert!(s_del == StatusCode::NO_CONTENT || s_del == StatusCode::OK);
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -677,7 +538,7 @@ async fn patch_loescht_uebergeben_an_bei_status_uebergeben_ist_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    anfrage(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/uebergeben"),
@@ -685,7 +546,7 @@ async fn patch_loescht_uebergeben_an_bei_status_uebergeben_ist_422() {
         Some(&json!({"uebergeben_an":"Stadtwerke"})),
     )
     .await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -705,11 +566,11 @@ async fn patch_geschaedigt_xor_effektivzustand_ist_422() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let p = person_anlegen(&app, &admin, e).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
     let mut body = gueltig();
     body["geschaedigt_kontakt"] = json!("Herr Meier");
     let sid = schaden_anlegen(&app, &admin, e, &body).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -726,7 +587,7 @@ async fn soft_delete_blendet_aus_und_doppelt_ist_409() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s1, _) = anfrage(
+    let (s1, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -735,7 +596,7 @@ async fn soft_delete_blendet_aus_und_doppelt_ist_409() {
     )
     .await;
     assert_eq!(s1, StatusCode::NO_CONTENT);
-    let (_, liste) = anfrage(
+    let (_, liste) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -748,7 +609,7 @@ async fn soft_delete_blendet_aus_und_doppelt_ist_409() {
         0,
         "storniert nicht in Default-Liste"
     );
-    let (_, liste2) = anfrage(
+    let (_, liste2) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/schaeden?inkl_storniert=true"),
@@ -761,7 +622,7 @@ async fn soft_delete_blendet_aus_und_doppelt_ist_409() {
         1,
         "mit inkl_storniert sichtbar"
     );
-    let (s2, _) = anfrage(
+    let (s2, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -778,7 +639,7 @@ async fn patch_auf_storniertem_schaden_ist_409() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    anfrage(
+    anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -786,7 +647,7 @@ async fn patch_auf_storniertem_schaden_ist_409() {
         None,
     )
     .await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -816,7 +677,7 @@ async fn liste_filtert_nach_status_typ_ausmass() {
         &json!({"typ":"sachschaden","ausmass":"gering","ort":"B"}),
     )
     .await;
-    let (_, nur_umwelt) = anfrage(
+    let (_, nur_umwelt) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/schaeden?typ=umweltschaden"),
@@ -825,7 +686,7 @@ async fn liste_filtert_nach_status_typ_ausmass() {
     )
     .await;
     assert_eq!(nur_umwelt.as_array().unwrap().len(), 1);
-    let (_, nur_gross) = anfrage(
+    let (_, nur_gross) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/schaeden?ausmass=gross"),
@@ -873,7 +734,7 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let p = person_anlegen(&app, &admin, e).await; // FK-Geschädigter (R-001)
+    let p = person_anlegen(&app, &admin, e, "{}").await; // FK-Geschädigter (R-001)
     let sid = schaden_anlegen(
         &app,
         &admin,
@@ -884,7 +745,7 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
         }),
     )
     .await;
-    anfrage(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/uebergeben"),
@@ -892,7 +753,7 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
         Some(&json!({"uebergeben_an":"Bauhof"})),
     )
     .await;
-    anfrage(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"),
@@ -900,7 +761,7 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
         Some(&json!({"abschluss_grund":"behoben","notiz":"GEHEIM_NOTIZ"})),
     )
     .await;
-    anfrage(
+    anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -951,7 +812,7 @@ async fn beobachter_kann_lesen_nicht_schreiben() {
     rolle_setzen(&app, &admin, e, beob_id, "beobachter").await;
     schaden_anlegen(&app, &admin, e, &gueltig()).await;
     let beob = login_cookie(&app, "beobachter", "beobachterpw1").await;
-    let (s_get, _) = anfrage(
+    let (s_get, _) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -960,7 +821,7 @@ async fn beobachter_kann_lesen_nicht_schreiben() {
     )
     .await;
     assert_eq!(s_get, StatusCode::OK);
-    let (s_post, _) = anfrage(
+    let (s_post, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -978,7 +839,7 @@ async fn fremder_einsatz_ohne_mitgliedschaft_ist_403() {
     benutzer_anlegen(&app, &admin, "fremder", "keine").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let fremd = login_cookie(&app, "fremder", "fremderpw1").await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -995,10 +856,10 @@ async fn geschaedigt_aus_fremdem_einsatz_ist_404() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e1 = einsatz_anlegen(&app, &admin).await;
     let e2 = einsatz_anlegen(&app, &admin).await;
-    let p_fremd = person_anlegen(&app, &admin, e2).await;
+    let p_fremd = person_anlegen(&app, &admin, e2, "{}").await;
     let mut body = gueltig();
     body["geschaedigt_person_id"] = json!(p_fremd);
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e1}/schaeden"),
@@ -1019,7 +880,7 @@ async fn abgeschlossener_einsatz_ist_read_only() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    anfrage(
+    anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/abschliessen"),
@@ -1027,7 +888,7 @@ async fn abgeschlossener_einsatz_ist_read_only() {
         Some(&json!({})),
     )
     .await;
-    let (s_get, _) = anfrage(
+    let (s_get, _) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -1040,7 +901,7 @@ async fn abgeschlossener_einsatz_ist_read_only() {
         StatusCode::OK,
         "Lesen bleibt erlaubt (Nachlauffrist)"
     );
-    let (s_post, _) = anfrage(
+    let (s_post, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -1053,7 +914,7 @@ async fn abgeschlossener_einsatz_ist_read_only() {
         StatusCode::CONFLICT,
         "Schreiben auf abgeschlossenem Einsatz → 409"
     );
-    let (s_del, _) = anfrage(
+    let (s_del, _) = anfrage_json(
         &app,
         "DELETE",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -1104,7 +965,7 @@ async fn fremde_org_lesen_fuehrungskraft_403_admin_serverweit() {
         .bind(e2).bind(u2).bind(u2).execute(&pool).await.unwrap();
 
     // LESEN als Org-Führungskraft (org 1) auf fremde Org 2 → 403 (geschlossene Lücke, LFH-115).
-    let (s_get_fk, _) = anfrage(
+    let (s_get_fk, _) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e2}/schaeden"),
@@ -1119,7 +980,7 @@ async fn fremde_org_lesen_fuehrungskraft_403_admin_serverweit() {
     );
 
     // LESEN als System-Admin → 200 (serverweiter Carve-out bleibt bewusst erhalten).
-    let (s_get_admin, v) = anfrage(
+    let (s_get_admin, v) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e2}/schaeden"),
@@ -1139,7 +1000,7 @@ async fn fremde_org_lesen_fuehrungskraft_403_admin_serverweit() {
     );
 
     // SCHREIBEN als Admin: IMMER 403 — Schreib-Gate kennt keinen Bypass (admin ist nicht Mitglied von e2).
-    let (s_post, _) = anfrage(
+    let (s_post, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e2}/schaeden"),
@@ -1160,7 +1021,7 @@ async fn anlegen_mit_geschaedigt_einsatzkraft_ist_201_mit_name() {
     let ep = personal_disponieren(&app, &admin, e, "Einsatzkraft Alpha").await;
     let mut body = gueltig();
     body["geschaedigt_personal_id"] = json!(ep);
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -1186,7 +1047,7 @@ async fn anlegen_mit_geschaedigt_einsatzkraft_aus_fremdem_einsatz_ist_404() {
     let ep_fremd = personal_disponieren(&app, &admin, e2, "Fremde Kraft").await;
     let mut body = gueltig();
     body["geschaedigt_personal_id"] = json!(ep_fremd);
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e1}/schaeden"),
@@ -1210,7 +1071,7 @@ async fn anlegen_mit_geschaedigt_organisation_erzwingt_eigene_org() {
     // und IMMER die eigene Org des Einsatzes setzen.
     let mut body = gueltig();
     body["geschaedigt_organisation_id"] = json!(99999);
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -1236,11 +1097,11 @@ async fn anlegen_mit_zwei_geschaedigt_quellen_ist_422() {
     let e = einsatz_anlegen(&app, &admin).await;
     let ep = personal_disponieren(&app, &admin, e, "Kraft").await;
     // person + personal
-    let p = person_anlegen(&app, &admin, e).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
     let mut body = gueltig();
     body["geschaedigt_person_id"] = json!(p);
     body["geschaedigt_personal_id"] = json!(ep);
-    let (s1, _) = anfrage(
+    let (s1, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -1257,7 +1118,7 @@ async fn anlegen_mit_zwei_geschaedigt_quellen_ist_422() {
     let mut body2 = gueltig();
     body2["geschaedigt_personal_id"] = json!(ep);
     body2["geschaedigt_organisation_id"] = json!(1);
-    let (s2, _) = anfrage(
+    let (s2, _) = anfrage_json(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden"),
@@ -1283,7 +1144,7 @@ async fn patch_geschaedigt_personal_auf_kontakt_effektivzustand_ist_422() {
     body["geschaedigt_kontakt"] = json!("Stadtwerke");
     let sid = schaden_anlegen(&app, &admin, e, &body).await;
     // ... dann per PATCH eine Einsatzkraft setzen OHNE den Kontakt zu löschen → 422 (nicht 500).
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -1306,7 +1167,7 @@ async fn patch_geschaedigt_organisation_erzwingt_eigene_org() {
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
     // Bewusst eine unsinnige/fremde Org-id senden — der Server muss sie ignorieren
     // und IMMER die eigene Org des Einsatzes setzen.
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -1315,7 +1176,7 @@ async fn patch_geschaedigt_organisation_erzwingt_eigene_org() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "PATCH mit bogus Org-id: erwartet 200");
-    let (s_get, v) = anfrage(
+    let (s_get, v) = anfrage_json(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -1347,13 +1208,14 @@ async fn anlegen_koordinaten_speichert_paar_samt_grenzwerten() {
         let mut body = gueltig();
         body["lat"] = json!(lat);
         body["lon"] = json!(lon);
-        let (status, schaden) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
+        let (status, schaden) = anfrage_json(&app, "POST", &pfad, &admin, Some(&body)).await;
         assert_eq!(status, StatusCode::CREATED, "{body}: {schaden}");
         assert_eq!(schaden["lat"].as_f64(), Some(lat));
         assert_eq!(schaden["lon"].as_f64(), Some(lon));
 
         let id = schaden["id"].as_i64().unwrap();
-        let (status, geladen) = anfrage(&app, "GET", &format!("{pfad}/{id}"), &admin, None).await;
+        let (status, geladen) =
+            anfrage_json(&app, "GET", &format!("{pfad}/{id}"), &admin, None).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(geladen["lat"].as_f64(), Some(lat), "muss persistiert sein");
         assert_eq!(geladen["lon"].as_f64(), Some(lon), "muss persistiert sein");
@@ -1371,7 +1233,7 @@ async fn anlegen_koordinaten_sind_optional_auch_bei_explizitem_null() {
         body.as_object_mut()
             .unwrap()
             .extend(koordinaten.as_object().unwrap().clone());
-        let (status, schaden) = anfrage(
+        let (status, schaden) = anfrage_json(
             &app,
             "POST",
             &format!("/api/einsaetze/{e}/schaeden"),
@@ -1411,7 +1273,7 @@ async fn anlegen_koordinaten_unvollstaendig_oder_ausserhalb_range_ist_422_ohne_w
         body.as_object_mut()
             .unwrap()
             .extend(koordinaten.as_object().unwrap().clone());
-        let (status, antwort) = anfrage(
+        let (status, antwort) = anfrage_json(
             &app,
             "POST",
             &format!("/api/einsaetze/{e}/schaeden"),
@@ -1452,7 +1314,7 @@ async fn schaden_verorten_setzt_lat_lon() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -1471,7 +1333,7 @@ async fn schaden_verorten_nur_lon_ist_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -1492,7 +1354,7 @@ async fn schaden_verorten_nur_lat_ist_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -1513,7 +1375,7 @@ async fn schaden_verorten_ausserhalb_range_ist_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -1522,7 +1384,7 @@ async fn schaden_verorten_ausserhalb_range_ist_422() {
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -1539,7 +1401,7 @@ async fn schaden_verorten_loeschen_setzt_null() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s, _) = anfrage(
+    let (s, _) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -1548,7 +1410,7 @@ async fn schaden_verorten_loeschen_setzt_null() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "PATCH",
         &format!("/api/einsaetze/{e}/schaeden/{sid}"),
@@ -1577,11 +1439,11 @@ async fn filter_unbekannter_enum_ist_400() {
     let basis = format!("/api/einsaetze/{e}/schaeden");
 
     for q in ["status=quatsch", "typ=quatsch", "ausmass=quatsch"] {
-        let (s, v) = anfrage(&app, "GET", &format!("{basis}?{q}"), &admin, None).await;
+        let (s, v) = anfrage_json(&app, "GET", &format!("{basis}?{q}"), &admin, None).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "Filter «{q}»: {v:?}");
     }
 
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "GET",
         &format!("{basis}?status=offen&typ=sachschaden&ausmass=gering"),
@@ -1618,11 +1480,11 @@ async fn patch_unbekannter_enum_ist_400() {
         json!({"ausmass": "quatsch"}),
         json!({"abschluss_grund": "quatsch"}),
     ] {
-        let (s, v) = anfrage(&app, "PATCH", &u, &admin, Some(&body)).await;
+        let (s, v) = anfrage_json(&app, "PATCH", &u, &admin, Some(&body)).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "Body {body}: {v:?}");
     }
 
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "PATCH",
         &u,
@@ -1643,10 +1505,10 @@ async fn patch_leerer_ort_ist_400() {
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
     let u = format!("/api/einsaetze/{e}/schaeden/{sid}");
 
-    let (s, v) = anfrage(&app, "PATCH", &u, &admin, Some(&json!({"ort": "   "}))).await;
+    let (s, v) = anfrage_json(&app, "PATCH", &u, &admin, Some(&json!({"ort": "   "}))).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{v:?}");
 
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "PATCH",
         &u,
@@ -1658,7 +1520,7 @@ async fn patch_leerer_ort_ist_400() {
     assert_eq!(v["ort"], "Nebenstr. 2");
 
     // Feld ganz weglassen lässt den Ort unangetastet — der Gegenfall zum leeren String.
-    let (s, v) = anfrage(
+    let (s, v) = anfrage_json(
         &app,
         "PATCH",
         &u,

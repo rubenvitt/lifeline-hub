@@ -1,18 +1,14 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
- * Sprungpalette, LFH-619 — die zwei Wege, deren Wirkung erst im Browser sichtbar ist.
+ * Sprungpalette — die zwei Wege, deren Wirkung erst im Browser sichtbar ist:
  *
- * 1. **Koordinatensprung.** Vitest belegt Erkennung, Zeile und Pfad (`koordinatenSprung.test.ts`,
- *    `LagekartePage.test.tsx` mit Kartenattrappe). Ob die ECHTE Karte danach auf der Stelle
- *    steht, hängt an MapLibre und am Zusammenspiel von Anflug und Startansicht
- *    (`startAufKarteRef` in `Kartenflaeche.tsx`) — gemessen wird deshalb der Kartenmittelpunkt
- *    über den DEV-Haken `window.__lfhKarte`, nicht die URL.
- * 2. **ETB-Sammeltreffer.** Die Zahl kommt von der Zählroute und muss zur gefilterten
- *    ETB-Seite passen, auf die der Treffer springt.
+ * 1. Koordinatensprung: ob die ECHTE Karte danach auf der Stelle steht, hängt an MapLibre und
+ *    am Zusammenspiel von Anflug und Startansicht — gemessen wird der Kartenmittelpunkt über
+ *    den DEV-Haken `window.__lfhKarte`, nicht die URL.
+ * 2. ETB-Sammeltreffer: die Zahl der Zählroute muss zur gefilterten ETB-Seite passen.
  *
- * Seeding per `page.request` (teilt den Cookie-Jar); kein `networkidle` — auf Einsatzrouten
- * bleibt der SSE-Strom offen (LFH-385).
+ * Seeding per `page.request`; kein `networkidle` (SSE-Strom).
  */
 
 const ADMIN = 'admin';
@@ -31,7 +27,6 @@ function paletteInput(page: Page): Locator {
   return page.getByPlaceholder(/Suchen: Module/);
 }
 
-// Login-/Anlege-Helfer wie in `palette-datensaetze.spec.ts` — es gibt kein geteiltes Modul.
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -65,9 +60,8 @@ test('eine getippte Koordinate springt auf die Lagekarte, und die Karte steht do
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Koordinate ${Date.now()}`);
 
-  // Einsatzort setzen: ohne ihn fiele die Startansicht auf nichts, und „die Karte steht auf
-  // dem Ziel" wäre von „die Karte stand schon da" nicht sicher zu trennen.
-  // Der Kopf-PATCH ist ein VOLLERSATZ (`KopfdatenUpdate`) — Bauform aus `lagekarte-smoke.spec.ts`.
+  // Einsatzort setzen: sonst wäre „die Karte steht auf dem Ziel" von „stand schon da" nicht
+  // sicher zu trennen. Der Kopf-PATCH ist ein VOLLERSATZ (`KopfdatenUpdate`).
   const e = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as Record<
     string,
     unknown
@@ -101,8 +95,8 @@ test('eine getippte Koordinate springt auf die Lagekarte, und die Karte steht do
   await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
     1,
   );
-  // Der Anflug ist animiert und die Startansicht (Einsatzort) lädt parallel — gepollt wird,
-  // bis der Mittelpunkt steht. Gewänne die Startansicht, stünde die Karte in München.
+  // Der Anflug ist animiert und die Startansicht lädt parallel — gepollt, bis der Mittelpunkt
+  // steht. Gewänne die Startansicht, stünde die Karte in München.
   await expect
     .poll(
       () =>
@@ -123,7 +117,7 @@ test('der ETB-Sammeltreffer nennt die Trefferzahl und springt auf die gefilterte
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Sammeltreffer ${Date.now()}`);
 
-  // Sequentiell: `lfd_nr` wird per MAX+1 vergeben (siehe `palette-datensaetze.spec.ts`).
+  // Sequentiell: `lfd_nr` wird per MAX+1 vergeben.
   for (const inhalt of ['Deich Nord durchfeuchtet', 'Sandsäcke an den Deich', 'Lage ruhig']) {
     const r = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
       data: { typ: 'meldung', inhalt },
