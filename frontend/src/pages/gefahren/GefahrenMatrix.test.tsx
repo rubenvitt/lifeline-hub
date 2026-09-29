@@ -27,19 +27,13 @@ const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
 });
 
 /**
- * Der Eintrag wird IMMER über das geöffnete Menü gegriffen: antd lässt die Portale
- * geschlossener Dropdowns im Baum stehen, ein globales getByText träfe auch sie.
- * Muster aus `etb/EtbZeitachse.test.tsx` (vorher `EtbTabelle`, LFH-365 · B5e); in einer Matrix mit 58
- * Auslösern liegt je bereits geöffneter Zelle ein eigenes totes Portal herum.
+ * Der Eintrag wird immer über das geöffnete Menü gegriffen: antd lässt die Portale geschlossener
+ * Dropdowns im Baum stehen.
  *
- * `:not(.ant-dropdown-hidden)` allein GENÜGT HIER NICHT — gemessen an genau dem Fall,
- * der zwei Zellen nacheinander öffnet. In jsdom läuft keine Bewegung zu Ende, das
- * verlassende Portal bekommt seine `ant-dropdown-hidden`-Klasse also nie und bleibt in
- * `ant-slide-up-leave-active` stehen. Der Baum trug dann zwei „offene" Dropdowns; der
- * erste Treffer war das TOTE, und `userEvent` scheiterte an dessen `pointer-events:
- * none` statt am Testgegenstand. Genau dieser Inline-Stil ist das verlässliche
- * Unterscheidungsmerkmal, deshalb filtert er hier — und die Zählung ist streng, damit
- * eine falsche Annahme laut wird statt still das falsche Menü zu greifen.
+ * `:not(.ant-dropdown-hidden)` genügt hier nicht: in jsdom läuft keine Bewegung zu Ende, ein
+ * verlassendes Portal bleibt in `ant-slide-up-leave-active` ohne `ant-dropdown-hidden` stehen.
+ * Verlässliches Merkmal ist sein `pointer-events: none`. Die Zählung ist streng, damit eine falsche
+ * Annahme laut wird.
  */
 function imMenue() {
   const offen = Array.from(
@@ -60,10 +54,11 @@ const PFLICHT: GefahrenMatrixProps = {
   onDetailsSpeichern: async () => {},
 };
 
-/** Ein Ort für die Pflichtprops. Ohne den trägt jeder der neun Fälle vier Zeilen
- *  Gerüst, und eine neue Prop hieße neun Änderungen. Getrennt vom Rendern, weil zwei
- *  Fälle dasselbe Element mit geänderter `matrix` NACHREICHEN müssen (`rerender`) —
- *  das ist der Weg, auf dem ein Nachladen unter einem offenen Dialog eintrifft. */
+/**
+ * Ein Ort für die Pflichtprops. Getrennt vom Rendern, weil zwei Fälle dasselbe Element mit
+ * geänderter `matrix` per `rerender` nachreichen — so trifft ein Nachladen unter einem offenen
+ * Dialog ein.
+ */
 function matrixElement(over: Partial<GefahrenMatrixProps> = {}) {
   return <GefahrenMatrix {...PFLICHT} {...over} />;
 }
@@ -86,9 +81,7 @@ describe('GefahrenMatrix', () => {
     rendereMatrix();
     expect(screen.getAllByText('Brand')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Ertrinken')[0]).toBeInTheDocument();
-    // Zeuge der fünften SPALTE. Vorher stand hier „Einsatzkräfte" — das volle Wort
-    // steht seit dem Kopfumbau nur noch im Tooltip, und den hängt antd erst beim
-    // Zeigen ein. Die Kurzform ist der Text, der im Baum steht.
+    // Zeuge der fünften Spalte: das volle Wort steht nur im Tooltip, im Baum steht die Kurzform.
     expect(screen.getAllByText('Kraft')[0]).toBeInTheDocument();
   });
 
@@ -98,8 +91,8 @@ describe('GefahrenMatrix', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
     );
-    // Regex mit `i`: der Eintrag heißt „H · Hoch", der Vorgabe-Normalisierer von
-    // Testing Library trimmt und faltet Leerraum, aber er kleinschreibt nicht.
+    // Regex mit `i`: der Normalisierer von Testing Library faltet Leerraum, schreibt aber nicht
+    // klein.
     await userEvent.click(imMenue().getByRole('menuitem', { name: /hoch/i }));
     await waitFor(() =>
       expect(onSetzen).toHaveBeenCalledWith({
@@ -148,9 +141,7 @@ describe('GefahrenMatrix', () => {
 
   it('sperrt beim laufenden PUT NUR die betroffene Zelle, nicht die anderen 57', () => {
     rendereMatrix({ laufendeZelle: 'brand×menschen' });
-    // antd klont den Auslöser mit `disabled` (`antd/es/dropdown/dropdown.js:125`:
-    // `disabled: child.props.disabled ?? disabled`) — die Prop am Dropdown erreicht
-    // also wirklich den Knopf, nicht nur das Popup.
+    // antd klont den Auslöser mit `disabled` — die Prop am Dropdown erreicht wirklich den Knopf.
     expect(
       screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
     ).toBeDisabled();
@@ -170,28 +161,16 @@ describe('GefahrenMatrix', () => {
     await userEvent.type(feld, 'Dachstuhl brennt');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onDetailsSpeichern).toHaveBeenCalled());
-    // Zugesichert ist NUR: nicht geleert. Der Wortlaut ist teurer als der Klick.
-    // „Nicht geschlossen" stünde hier zu Unrecht — in jsdom läuft keine
-    // Verlass-Bewegung, `.ant-modal-wrap` bleibt auch nach ERFOLGREICHEM Speichern im
-    // Baum. Ein Schliesszustand ist hier also gar nicht beobachtbar; der Nachweis
-    // gehört nach Playwright.
+    // Zugesichert ist nur: nicht geleert. „Nicht geschlossen" ist in jsdom nicht beobachtbar
+    // (`.ant-modal-wrap` bleibt auch nach erfolgreichem Speichern im Baum).
     expect(await screen.findByLabelText('Beschreibung')).toHaveValue('Dachstuhl brennt');
   });
 
   /**
-   * Die Vorbelegung selbst — und sie war bis zum Review von KEINEM Fall gedeckt.
-   *
-   * Gemessen (Review-Mutationsprobe): vertauscht man die beiden Effekte in
-   * `GefahrenZelleDetails`, liest der Vorbeleg-Effekt beim Öffnen eine noch leere Ref,
-   * die Felder bleiben leer — und die Suite blieb trotzdem 20/20 grün. Fehlerbild in
-   * der Bedienung: der Bediener öffnet „Details …", sieht ein leeres Feld statt des
-   * Bestands, tippt den Meldeweg nach und speichert — die vorhandene Beschreibung ist
-   * weg. Stiller Datenverlust ohne roten Test.
-   *
-   * Warum die Nachbarfälle das NICHT fangen: „lässt den getippten Wortlaut stehen"
-   * tippt seinen Text selbst (ein `clear` auf ein bereits leeres Feld ist ein No-op),
-   * und „speichert die AKTUELLE Warnstufe" liest die Stufe aus `matrix`, nie aus dem
-   * Formular.
+   * Die Vorbelegung selbst. Vertauscht man die beiden Effekte in `GefahrenZelleDetails`, liest der
+   * Vorbeleg-Effekt eine leere Ref — der Bediener sähe ein leeres Feld, tippte nach und
+   * überschriebe die vorhandene Beschreibung. Die Nachbarfälle fangen das nicht: sie tippen ihren
+   * Text selbst bzw. lesen die Stufe aus `matrix`.
    */
   it('belegt den Dialog mit dem Bestand vor', async () => {
     rendereMatrix({
@@ -203,14 +182,9 @@ describe('GefahrenMatrix', () => {
   });
 
   /**
-   * Die Gegenrichtung: eine Zelle OHNE Bestand darf nicht den Rest der vorigen tragen.
-   *
-   * Was dieser Fall NICHT belegt: dass `kennung` in den Abhängigkeiten des
-   * Vorbeleg-Effekts steht. Über die Matrix ist ein Zellwechsel nur mit Schliessen
-   * dazwischen erreichbar, `offen` springt dabei um, und das allein löst den Effekt
-   * schon aus — gemessen: ohne `kennung` in den Abhängigkeiten bleibt diese Datei
-   * vollständig grün. Den Beleg dafür trägt `GefahrenZelleDetails.test.tsx` an der
-   * Vertragsgrenze der Komponente.
+   * Gegenrichtung: eine Zelle ohne Bestand trägt nicht den Rest der vorigen. Dass `kennung` in den
+   * Abhängigkeiten des Vorbeleg-Effekts steht, belegt `GefahrenZelleDetails.test.tsx` — über die
+   * Matrix ist ein Zellwechsel nur mit Schließen dazwischen erreichbar.
    */
   it('leert die Felder beim Wechsel auf eine Zelle ohne Bestand', async () => {
     rendereMatrix({
@@ -228,15 +202,9 @@ describe('GefahrenMatrix', () => {
   });
 
   /**
-   * Das verlorene Update. Der Dialog zeigt die Warnstufe NICHT an, schickt sie aber
-   * mit — hielte er den Zell-Datensatz als Momentaufnahme aus dem Augenblick des
-   * Menüklicks, schriebe „Speichern" eine inzwischen gesetzte Stufe still zurück.
-   * Zwei erreichbare Wege dorthin: ein zweiter Bediener am selben Gefahrengebiet
-   * (`GefahrenPage` invalidiert die Matrix nach jedem erfolgreichen PUT), und derselbe
-   * Bediener, der eine Stufe setzt und sofort „Details …" öffnet.
-   *
-   * Der `rerender` IST der Nachladefall: eine neue `matrix`-Prop unter einem bereits
-   * offenen Dialog.
+   * Das verlorene Update: der Dialog zeigt die Warnstufe nicht, schickt sie aber mit. Hielte er die
+   * Zelle als Momentaufnahme vom Menüklick, schriebe „Speichern" eine inzwischen gesetzte Stufe
+   * still zurück. Der `rerender` ist der Nachladefall unter offenem Dialog.
    */
   it('speichert die AKTUELLE Warnstufe, nicht die beim Öffnen gesehene', async () => {
     const onDetailsSpeichern = vi.fn().mockResolvedValue(undefined);
@@ -259,11 +227,8 @@ describe('GefahrenMatrix', () => {
   });
 
   /**
-   * Die Kehrseite des Falls darüber, und ohne sie wäre der Fix eine Verschlechterung:
-   * die Zelle wird jetzt bei JEDEM Render frisch abgeleitet, hat also nach jedem
-   * Nachladen eine neue Objektidentität. Ein Vorbeleg-Effekt, der an dieser Identität
-   * hinge, liefe mitten im Tippen los und ersetzte den Wortlaut durch den Serverstand.
-   * Der Effekt hängt deshalb an der Öffnung und an der stabilen Kennung.
+   * Kehrseite des Falls darüber: die Zelle hat nach jedem Nachladen eine neue Identität. Ein
+   * Vorbeleg-Effekt daran liefe mitten im Tippen los; er hängt deshalb an Öffnung und Kennung.
    */
   it('lässt den getippten Wortlaut stehen, wenn die Matrix unter dem offenen Dialog nachlädt', async () => {
     const { rerender } = rendereMatrix({
@@ -282,32 +247,13 @@ describe('GefahrenMatrix', () => {
 });
 
 /**
- * Die KURZE ACHSE des Zell-Auslösers folgt der Dichte (LFH-368 · B5h).
+ * Die kurze Achse des Zell-Auslösers folgt der Dichte. Der Knopf trägt nur einen Buchstaben; ohne
+ * `minWidth: token.controlHeight` fiele die Breite unter den WCAG-2.5.8-Boden.
  *
- * WARUM ES DIESEN BLOCK GIBT: die Prüfliste begründet ihr „erfüllt" bei Kriterium 1
- * ausdrücklich mit `style={{ minWidth: token.controlHeight }}` — WCAG 2.5.8 fordert
- * 24 × 24 px, nicht 24 hoch, und der Inhalt des Knopfes ist ein EINZELNER Buchstabe
- * („N", „M", „H", „A"). Ohne die Angabe fällt die Breite auf die Textbreite plus
- * Polsterung und damit unter den Boden. Gemessen im Abschluss-Review: die Zeile ließ
- * sich streichen, ohne dass ein einziger der 59 Fälle in `pages/gefahren/` und den
- * beiden Guards rot wurde. Eine Zusicherung in Prosa ist keine.
- *
- * WARUM NICHT AM QUELLTEXT wie die `sticky`-Zusicherung in
- * `components/katalogTabelle.guard.test.ts`: dort gibt es kein gerendertes Gegenstück,
- * `position: sticky` hat in jsdom keine Wirkung. Ein INLINE-STYLE dagegen steht im Baum
- * und ist lesbar. Der Quelltext-Weg wäre hier zudem SCHWÄCHER — ein dichteblindes
- * `minWidth: 30` bestünde jedes Muster, das nach der Zeile sucht, und wäre in der
- * Handschuh-Stufe genau der Fehler, für dessen Abbau B5h existiert. Deshalb steht die
- * Ungleichheit über zwei Stufen neben den Böden; die Schablone ist
- * `etb/SlashMenu.test.tsx:92-122` (LFH-365 · B5e).
- *
- * WAS ER BELEGT UND WAS NICHT: die ABSICHT, nicht das Pixel. jsdom rechnet kein Layout;
- * die tatsächlich gerenderte Trefffläche misst Playwright mit `boundingBox()`
- * (`e2e/gate3-trefflaeche.spec.ts`, „Gefahrenmatrix (LFH-373)", kurze Achse aller 58 Zellen).
- * Wer hier mehr hineinliest, liest falsch.
- *
- * NICHT `renderMitProviders`: `test/utils.tsx` mountet ein nacktes `ConfigProvider` ohne
- * Theme, jeder Token wäre dort eine antd-Vorgabe und die Zusicherung eine Attrappe.
+ * Geprüft am gerenderten Inline-Style statt am Quelltext: ein dichteblindes `minWidth: 30` bestünde
+ * jedes Quelltext-Muster. Belegt ist die Absicht, nicht das Pixel — die Trefffläche misst
+ * `e2e/gate3-trefflaeche.spec.ts`. Nicht `renderMitProviders`: dessen nacktes `ConfigProvider`
+ * liefert nur antd-Vorgaben.
  */
 function ausloeserBreite(dichte: Dichte): string {
   const { container, unmount } = render(
@@ -324,18 +270,16 @@ function ausloeserBreite(dichte: Dichte): string {
 
 describe('GefahrenMatrix — die kurze Achse des Zell-Auslösers folgt der Dichte (LFH-368 · B5h)', () => {
   /**
-   * Ein hartkodiertes `minWidth: 30` bliebe über beide Stufen byte-gleich. Diese Zeile ist
-   * neben den Böden unten nicht überflüssig, sondern macht sie erst beweiskräftig: eine
-   * Schranke kann nicht belegen, dass der Wert AUS DER STUFE kommt.
+   * Ein hartkodiertes `minWidth: 30` bliebe über beide Stufen gleich — erst dieser Fall belegt,
+   * dass der Wert aus der Stufe kommt.
    */
   it('zieht die Breite bei einer Dichteumschaltung mit', () => {
     expect(ausloeserBreite('handschuh')).not.toBe(ausloeserBreite('kompakt'));
   });
 
   /**
-   * Die Dichte-Staffel als Literale hingeschrieben — NICHT aus `token.controlHeight`
-   * zurückgelesen, sonst prüfte die Zusicherung den Token gegen sich selbst. Jede der
-   * drei Stufen liegt damit zugleich über dem WCAG-2.5.8-Boden von 24 px.
+   * Die Staffel als Literale, nicht aus `token.controlHeight` zurückgelesen — sonst prüfte der
+   * Token sich selbst. Jede Stufe liegt über dem WCAG-Boden von 24 px.
    */
   it.each([
     ['kompakt', 30],
@@ -357,8 +301,8 @@ describe('GefahrenMatrix — Warnstufenbalken (Neuentwurf)', () => {
     const bewertet = container.querySelector<HTMLElement>('td[data-warnstufe="hoch"]');
     expect(bewertet, 'die bewertete Zelle trägt ihre Stufe').not.toBeNull();
     expect(bewertet!.style.boxShadow).toMatch(/^inset 0(px)? -3px 0(px)? 0(px)? /);
-    // Gegenprobe: ohne Warnstufe kein Balken — sonst wäre die erste Aussage auch mit
-    // einem unbedingten Schatten wahr.
+    // Gegenprobe: ohne Warnstufe kein Balken — sonst wäre die erste Aussage auch mit einem
+    // unbedingten Schatten wahr.
     const leer = container.querySelector<HTMLElement>('td[data-warnstufe="keine"]');
     expect(leer).not.toBeNull();
     expect(leer!.style.boxShadow).toBe('');
@@ -367,13 +311,9 @@ describe('GefahrenMatrix — Warnstufenbalken (Neuentwurf)', () => {
 
 describe('GefahrenMatrix — Fokusabstand zur fixierten Spalte (LFH-373)', () => {
   /**
-   * Der Scrollcontainer der Matrix hält beim Fokus-Scroll die Breite der fixierten Spalte
-   * frei (`scroll-padding-inline-start`, `gefahrenMatrix.css`), sonst tabbt eine Zelle beim
-   * Zeilenwechsel vollständig darunter — gemessen in `e2e/fokus-verdeckung.spec.ts`.
-   *
-   * GEMESSEN, NICHT AUS DER KONSTANTE: die Spalte ist mit `max-content` breiter als ihre
-   * bevorzugten 180 px, sobald die Dichte steigt. Ein erster Fix las die Konstante und blieb
-   * im Browser bei 1024 px/`handschuh` rot. Geprüft wird hier die Messfunktion selbst.
+   * Beim Fokus-Scroll hält der Scrollcontainer die Breite der fixierten Spalte frei
+   * (`scroll-padding-inline-start`, `gefahrenMatrix.css`). Die Breite wird gemessen, nicht aus der
+   * Konstante gelesen: mit `max-content` wächst die Spalte mit der Dichte.
    */
   it('setzeSpaltenFreiraum schreibt die gemessene Breite der fixierten Kopfzelle', () => {
     const wurzel = document.createElement('div');
@@ -404,11 +344,9 @@ describe('GefahrenMatrix — Fokusabstand zur fixierten Spalte (LFH-373)', () =>
   });
 
   /**
-   * Rückwärts getabbt rollt der Browser eine Zelle an den OBEREN Rand — unter die stehende
-   * Kopfzeile (gemessen: vollständig verdeckt bei 390 × 400). Die Matrix nimmt dafür dieselbe
-   * Mechanik wie `KatalogTabelle` (LFH-677): gemessene Kopfhöhe als `--lfh-tabellenkopf-hoehe`
-   * an der Tabellenwurzel, `scroll-margin-top` an den Zielen. jsdom misst 0 px — geprüft wird,
-   * dass die Variable überhaupt gesetzt wird, nicht ihr Wert.
+   * Rückwärts getabbt rollt der Browser eine Zelle unter die stehende Kopfzeile; die Matrix nutzt
+   * dieselbe Mechanik wie `KatalogTabelle` (`--lfh-tabellenkopf-hoehe` + `scroll-margin-top`).
+   * jsdom misst 0 px — geprüft wird, dass die Variable gesetzt wird.
    */
   it('setzt den Kopf-Freiraum an der Tabellenwurzel', () => {
     const { container } = render(

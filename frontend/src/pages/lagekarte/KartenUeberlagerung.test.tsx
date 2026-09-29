@@ -172,9 +172,8 @@ describe('KartenUeberlagerung — Eigenposition (LFH-712)', () => {
     const beschreibung = document.getElementById(knopf.getAttribute('aria-describedby') ?? '');
     expect(beschreibung).toHaveTextContent(GRUND);
 
-    // Sichtbar gesperrt, nicht nur für Vorlesende (Review LFH-712): Farbe und Zeiger trägt die
-    // Regel `.lfh-kartenknopf[aria-disabled]` (LFH-715). Ein Inline-Wert schlüge sie — also darf
-    // der gesperrte Knopf keinen tragen.
+    // Sichtbar gesperrt: Farbe und Zeiger trägt `.lfh-kartenknopf[aria-disabled]`; ein Inline-Wert
+    // schlüge die Regel.
     expect(knopf.style.color).toBe('');
     expect(knopf.style.cursor).toBe('');
     expect(knopf).toHaveAccessibleDescription(GRUND);

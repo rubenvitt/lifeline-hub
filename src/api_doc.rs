@@ -1,15 +1,10 @@
-//! LFH-120: OpenAPI-Dokument als Wahrheitsquelle der Frontend-Typen. Nur components/schemas
-//! (kein Pfad-/Operations-Contract in v1 — additiv nachrüstbar).
+//! OpenAPI-Dokument als Wahrheitsquelle der Frontend-Typen (LFH-120). Nur components/schemas,
+//! kein Pfad-/Operations-Contract.
 use utoipa::OpenApi;
 
-// `info.version` erbt BEWUSST NICHT die Crate-Version (LFH-527, gemessen an Lauf 34505861153).
-// Ohne die Angabe nimmt utoipa `CARGO_PKG_VERSION` — und `cargo set-version` hebt im
-// Release-Lauf genau die an, ohne die Spec neu zu schreiben. Folge: `openapi_spec_aktuell` ist
-// nach JEDEM Release rot, und zwar auf dem Kanal-Branch selbst, wo es niemandem auffällt (der
-// Release-Commit trägt `[skip ci]`) — die Rechnung stellt der nächste Pull Request.
-// Der Preis dafür wäre null Information: `info` wertet weder openapi-typescript noch sonst ein
-// Konsument im Repo aus. Die Version des Programms steht in Cargo.toml, die des Dokuments im
-// Commit. Die HTTP-Schnittstelle trägt keine Version im Pfad, deshalb hier eine feste 1.
+// `info.version` ist fest und erbt NICHT die Crate-Version: `cargo set-version` hebt diese im
+// Release-Lauf, ohne die Spec neu zu schreiben, und `openapi_spec_aktuell` wäre danach rot.
+// `info` wertet kein Konsument aus.
 #[derive(OpenApi)]
 #[openapi(
     info(version = "1"),

@@ -1,22 +1,10 @@
-//! Kurzlebiger, prozessweiter State-Store für die beiden WebAuthn-Zeremonien
-//! (LFH-275, Increment 4): hält den `PasskeyRegistration`- bzw.
-//! `PasskeyAuthentication`-Zwischenzustand zwischen `.../start` (Speichern) und
-//! `.../finish` (Entnehmen) vor (Task 5/6).
+//! Kurzlebiger, prozessweiter State-Store für die WebAuthn-Zeremonien (LFH-275): hält den
+//! Zwischenzustand zwischen `…/start` und `…/finish`. Dasselbe Muster wie `oidc/state.rs`
+//! (TTL, Einmal-Nutzung, opportunistischer Sweep), rein im Speicher.
 //!
-//! Analog zu `oidc/state.rs` (LFH-41) — 1:1 dasselbe Muster (TTL, Einmal-Nutzung,
-//! Guard-sync-only, Poison-safe-Lock, opportunistischer Sweep). Bewusst als reiner
-//! In-Memory-Wert (KEIN `serde`) — beide `webauthn-rs`-Typen sind zwar serde-fähig,
-//! aber dieses Modul serialisiert nichts: der Zustand lebt nur zwischen zwei
-//! Requests desselben Prozesses und muss nie über die Prozessgrenze hinaus.
-//!
-//! **MUST — !Send-Disziplin** (Global Constraint des Plans
-//! `2026-07-14-auth-provider-increment-4-webauthn.md`, „Guard-drop-vor-await"):
-//! `entnehme` lockt den std-`Mutex`, `remove`t den Eintrag und gibt den
-//! `MutexGuard` SOFORT frei — die Funktion endet, BEVOR der Aufrufer
-//! `session::anlegen().await` (Task 6) ausführt. Dieses Modul selbst enthält daher
-//! kein einziges `.await`. Ein std-`Mutex`-Guard, der über ein `.await` gehalten
-//! wird, macht den umschließenden axum-Handler `!Send` — und current-thread-Tests
-//! fangen das nicht ab (Memory: mutex-guard-await-send-axum).
+//! **!Send-Disziplin:** `entnehme` gibt den std-`MutexGuard` frei, bevor der Aufrufer
+//! `session::anlegen().await` ausführt; dieses Modul enthält kein `.await`. Ein Guard über
+//! `.await` machte den axum-Handler `!Send`, und current-thread-Tests fangen das nicht ab.
 
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
@@ -26,56 +14,36 @@ use webauthn_rs::prelude::{
     DiscoverableAuthentication, PasskeyAuthentication, PasskeyRegistration,
 };
 
-/// Lebensdauer eines Ceremony-State-Eintrags. Nach Ablauf liefert `entnehme` `None`,
-/// selbst wenn der Eintrag noch physisch in der Map steht (aufgeräumt wird er beim
-/// nächsten `entnehme`-Versuch für genau diesen Key bzw. opportunistisch beim
-/// nächsten `speichere`).
+/// Lebensdauer eines Zeremonie-Eintrags. Abgelaufene Einträge liefert `entnehme` nicht mehr.
 const TTL: Duration = Duration::from_secs(5 * 60);
 
-/// Prozessweiter State-Store. Bewusst KEIN `AppState`-Feld (siehe Plan) — die
-/// Zeremonie ist kurzlebig und pro-Prozess, kein Persistenzbedarf.
+/// Prozessweiter State-Store; kurzlebig, ohne Persistenzbedarf.
 static STORE: LazyLock<Mutex<HashMap<String, (CeremonyZustand, Instant)>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// Der Zwischenzustand EINER laufenden WebAuthn-Zeremonie: eine Registrierung
-/// (`register/start` → `register/finish`, Task 5), eine benutzergebundene
-/// Authentifizierung (`auth/start` → `auth/finish`, Task 6) oder eine discoverable/
-/// usernameless Authentifizierung (`discoverable/start` → `discoverable/finish`,
-/// LFH-313). Alle inneren Typen stammen aus `webauthn-rs` und werden hier als reiner
-/// In-Memory-Wert gehalten.
+/// Zwischenzustand EINER laufenden Zeremonie: Registrierung, benutzergebundene oder
+/// discoverable (usernameless) Authentifizierung.
 pub enum CeremonyZustand {
     Registrierung(PasskeyRegistration),
     Authentifizierung(PasskeyAuthentication),
-    /// Discoverable/usernameless Login (LFH-313). Der Client entdeckt den Benutzer
-    /// selbst (leere `allowCredentials`); der `finish`-Handler löst ihn über den
-    /// vom Authenticator gelieferten User-Handle auf.
+    /// Discoverable Login (LFH-313): der Client entdeckt den Benutzer selbst, `finish` löst ihn
+    /// über den User-Handle des Authenticators auf.
     AuthentifizierungDiscoverable(DiscoverableAuthentication),
 }
 
-/// Speichert `zustand` unter `key` mit einer Ablaufzeit von `TTL` ab jetzt. Ein
-/// evtl. vorhandener Eintrag unter demselben Key wird überschrieben.
-///
-/// Räumt vor dem Einfügen opportunistisch alle bereits abgelaufenen Einträge auf
-/// — verhindert unbegrenztes Wachstum der Map durch abgebrochene (`.../start` ohne
-/// folgenden `.../finish`) oder gespammte Zeremonie-Starts.
+/// Speichert `zustand` unter `key` mit Ablauf `TTL`; ein vorhandener Eintrag wird
+/// überschrieben. Räumt vorher abgelaufene Einträge weg, damit abgebrochene oder gespammte
+/// Starts die Map nicht unbegrenzt wachsen lassen.
 pub fn speichere(key: String, zustand: CeremonyZustand) {
     let jetzt = Instant::now();
     let ablauf = jetzt + TTL;
     let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
-    // Opportunistisch abgelaufene Einträge aufräumen — verhindert unbegrenztes
-    // Wachstum durch nie abgeholte (abgebrochene/gespammte) .../start-Flows.
     store.retain(|_, (_, entry_ablauf)| *entry_ablauf > jetzt);
     store.insert(key, (zustand, ablauf));
 }
 
-/// Entnimmt den Eintrag zu `key` — **einmalig**: der Eintrag wird beim Zugriff aus
-/// der Map entfernt, ein zweiter `entnehme`-Aufruf mit demselben Key liefert daher
-/// `None`. Liefert ebenso `None`, wenn der Key unbekannt ist oder der Eintrag
-/// bereits abgelaufen ist.
-///
-/// Lockt den Store, `remove`t den Eintrag und gibt den `MutexGuard` frei, bevor die
-/// Funktion zurückkehrt — der Aufrufer darf danach beliebig `.await`en, ohne dass
-/// ein Guard über die Await-Grenze hinweg gehalten wird.
+/// Entnimmt den Eintrag zu `key` **einmalig**; ein zweiter Aufruf liefert `None`, ebenso ein
+/// unbekannter oder abgelaufener Key. Der Guard ist bei der Rückkehr freigegeben.
 pub fn entnehme(key: &str) -> Option<CeremonyZustand> {
     let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
     let (zustand, ablauf) = store.remove(key)?;
@@ -87,9 +55,8 @@ pub fn entnehme(key: &str) -> Option<CeremonyZustand> {
     Some(zustand)
 }
 
-/// Test-only: fügt einen Eintrag mit einer explizit vorgegebenen Ablaufzeit ein —
-/// erlaubt es, einen bereits abgelaufenen Eintrag zu konstruieren, ohne in echten
-/// Tests 5 Minuten warten zu müssen. Nicht außerhalb von Tests exponiert.
+/// Test-only: Eintrag mit vorgegebener Ablaufzeit, um einen abgelaufenen Eintrag ohne Warten zu
+/// erzeugen.
 #[cfg(test)]
 fn speichere_mit_ablauf(key: String, zustand: CeremonyZustand, ablauf: Instant) {
     let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
@@ -102,10 +69,7 @@ mod tests {
     use uuid::Uuid;
     use webauthn_rs::prelude::{Url, WebauthnBuilder};
 
-    /// Baut ein minimales, aber ECHTES `Webauthn` (keine gefälschten Zustandswerte)
-    /// nur zum Anstoßen der beiden Zeremonie-„start"-Hälften — genau wie in der
-    /// Task-Anleitung beschrieben. Netz/Discovery ist dafür nicht nötig
-    /// (`WebauthnBuilder` baut rein lokal aus rp_id/rp_origin).
+    /// Minimales, echtes `Webauthn` zum Anstoßen der „start“-Hälften; baut rein lokal.
     fn test_webauthn() -> webauthn_rs::Webauthn {
         WebauthnBuilder::new("localhost", &Url::parse("https://localhost").unwrap())
             .unwrap()
@@ -121,16 +85,14 @@ mod tests {
     }
 
     fn authentifizierung() -> PasskeyAuthentication {
-        // Leere Credential-Liste ist für die START-Hälfte zulässig — die
-        // Policy wird von `start_passkey_authentication` fix auf „Required"
-        // gesetzt (kein Rückgriff auf `creds.first()`), ein Authenticator wird
-        // erst in der (hier nicht getesteten) `finish`-Hälfte gebraucht.
+        // Eine leere Credential-Liste ist für die start-Hälfte zulässig; ein Authenticator wird
+        // erst in
+        // `finish` gebraucht.
         test_webauthn().start_passkey_authentication(&[]).unwrap().1
     }
 
     fn authentifizierung_discoverable() -> DiscoverableAuthentication {
-        // Discoverable-Start nimmt KEINE Credential-Liste — der Client entdeckt den
-        // Benutzer selbst. Reine Challenge-Erzeugung, kein Authenticator nötig.
+        // Discoverable-Start nimmt keine Credential-Liste.
         test_webauthn()
             .start_discoverable_authentication()
             .unwrap()
@@ -200,11 +162,9 @@ mod tests {
     #[test]
     fn abgelaufener_eintrag_liefert_none() {
         let key = "ceremony-abgelaufen".to_string();
-        // Bewusst kein `Instant::now() - Duration::from_secs(...)`: `Instant`s
-        // `Sub` panickt bei Unterlauf, was auf einem Host mit <1h Monotonic-
-        // Uptime zuschlagen kann. `entnehme` prüft `jetzt >= ablauf` — ein
-        // `ablauf` von "jetzt" liest sich einen Moment später bereits als
-        // abgelaufen, ganz ohne Subtraktion.
+        // Kein `Instant::now() - …`: das panickt bei Unterlauf auf Hosts mit kurzer Uptime. Ein
+        // Ablauf
+        // von „jetzt“ ist einen Moment später bereits abgelaufen.
         let ablauf_in_der_vergangenheit = Instant::now();
         speichere_mit_ablauf(
             key.clone(),

@@ -67,9 +67,8 @@ vi.mock('../api/erinnerungen', () => {
     legeErinnerungAn: vi.fn(),
     erledigeErinnerung: vi.fn(),
     quittiereErinnerung: vi.fn(),
-    // Rückweg der beiden Abschluss-Aktionen (LFH-343 · C8). Fehlte der Eintrag,
-    // wäre der Import zur Laufzeit `undefined` — und der Bruch fiele erst auf,
-    // wenn jemand tatsächlich auf „Rückgängig" klickt.
+    // Rückweg der beiden Abschluss-Aktionen. Fehlte der Eintrag, wäre der Import zur Laufzeit
+    // `undefined`, und der Bruch fiele erst beim Klick auf „Rückgängig" auf.
     oeffneErinnerung: vi.fn(),
   };
 });
@@ -109,12 +108,7 @@ describe('ErinnerungenPage', () => {
     expect(screen.queryByText('Lagemeldung')).not.toBeInTheDocument();
   });
 
-  /**
-   * Befund H50 (LFH-343 · C8): beide Abschluss-Aktionen kosteten zwei Klicks
-   * (Knopf + Popconfirm-Bestätigung). Seither schaltet der erste Klick, und der
-   * Rückweg steht im Toast — er ist erst seit derselben Änderung baubar, vorher
-   * kannte das Backend keine Rücknahme.
-   */
+  /** Beide Abschluss-Aktionen schalten mit dem ersten Klick; der Rückweg steht im Toast. */
   it('erledigt mit einem Klick und nimmt es über den Rückgängig-Knopf zurück', async () => {
     vi.mocked(erledigeErinnerung).mockResolvedValue(
       {} as Awaited<ReturnType<typeof erledigeErinnerung>>,

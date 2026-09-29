@@ -2,8 +2,8 @@ use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// Passwort-Wert, dessen `Debug`-Ausgabe maskiert ist, damit das Klartext-
-/// Passwort nicht versehentlich (z.B. via `{config:?}`) ins Log gelangt.
+/// Passwort-Wert mit maskierter `Debug`-Ausgabe, damit der Klartext nicht (etwa via
+/// `{config:?}`) ins Log gelangt.
 #[derive(Clone)]
 pub struct GeheimesPasswort(pub String);
 
@@ -60,22 +60,15 @@ pub struct OnlineStyle {
     pub hinweis: Option<String>,
 }
 
-/// Eingebaute, schlüsselfreie Default-Shortlist (alle ohne API-Key, MapLibre-GL-tauglich).
-/// Dient als kuratierter Vorschlagskatalog (`GET /api/karte/online-quellen/katalog`) — NICHT
-/// als automatischer Seed; die DB-Registry startet leer (LFH-179: ENV-Kartenkonfig + Seeding
-/// entfernt). Die ersten fünf sind behördlich/kommerziell nutzbar (Stand Recherche 30.05.2026).
+/// Eingebaute, schlüsselfreie Vorschlagsliste (`GET /api/karte/online-quellen/katalog`), kein
+/// Seed — die DB-Registry startet leer. Die ersten fünf sind behördlich/kommerziell nutzbar.
 ///
-/// **Die eine Ausnahme ist „Satellit (Esri)"** (LFH-616, Umschalter „Satellit" aus dem
-/// Neuentwurf S5). Ein kostenloses, hochauflösendes Luftbild mit sauberer Lizenz für ganz
-/// Deutschland gibt es nicht: die Landes-DOP sind frei, aber je Bundesland verschieden (und
-/// teils nur als WMS-bbox, die der Proxy nicht kennt); Sentinel-2 cloudless (EOX) ist in der
-/// freien Fassung 2016 mit 10 m zu grob für eine Lagekarte. Esri World Imagery ist ohne
-/// Schlüssel abrufbar, laut Esri-Nutzungsbedingungen verlangt ein **Produktivbetrieb** aber
-/// ein ArcGIS-Konto — die Übernahme aus dem Katalog ist deshalb eine bewusste
-/// Betreiberentscheidung, kein stiller Vorgabewert. Übernommen läuft sie über den Proxy
-/// (`AusKatalogModal` setzt `proxy: true`); ein Schlüssel bliebe damit serverseitig.
-/// Offline ist Satellit begründet ausgenommen: Luftbildkacheln sind je Zoomstufe um
-/// Größenordnungen schwerer als Vektorkacheln, ein Offline-Paket wäre nicht lieferbar.
+/// **Ausnahme „Satellit (Esri)“** (LFH-616): ein kostenloses, hochauflösendes Luftbild mit
+/// sauberer Lizenz für ganz Deutschland gibt es nicht (Landes-DOP je Land verschieden, teils nur
+/// WMS; Sentinel-2 zu grob). Esri World Imagery ist ohne Schlüssel abrufbar, verlangt im
+/// **Produktivbetrieb** aber ein ArcGIS-Konto — die Übernahme ist deshalb eine bewusste
+/// Betreiberentscheidung. Übernommen läuft sie über den Proxy (`proxy: true`). Offline ist
+/// Satellit ausgenommen, weil Luftbildkacheln um Größenordnungen schwerer sind.
 pub fn default_online_styles() -> Vec<OnlineStyle> {
     vec![
         OnlineStyle {
@@ -130,28 +123,23 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
     ]
 }
 
-/// Geteilter Offline-Katalog-Typ + Merge-/Validierungslogik — ausgelagert ins eigene
-/// Workspace-Crate `karten-katalog` (LFH-201, Grundstein für den späteren karten-service).
+/// Offline-Katalog-Typ und Merge-/Validierungslogik aus dem Workspace-Crate `karten-katalog`.
 pub use karten_katalog::{
     eintrag_ist_lieferbar, merge_offline_katalog, remote_eintrag_ist_gueltig, OfflineKatalogEintrag,
 };
 
-/// Kuratierter Offline-Karten-Katalog (`GET /api/karte/offline-karten/katalog`) — analog zum
-/// Online-Vorschlagskatalog `default_online_styles`. Eigenbau (`karten-build`, Planetiler-
-/// Shortbread, z0–14, ODbL): ein gesamtdeutscher Shortbread-MBTiles-Eintrag, als GitHub-Release
-/// des eigenen Build-Projekts gehostet (LFH-195: Community-Katalog vorheriger Bauart entfällt).
+/// Kuratierter Offline-Karten-Katalog (`GET /api/karte/offline-karten/katalog`): Eigenbau
+/// (`karten-build`, Planetiler-Shortbread, z0–14, ODbL), als GitHub-Release des Build-Projekts
+/// gehostet.
 pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
-    // >>> OPERATOR-PIN (LFH-197/199) <<< — je Eintrag beim karten-build-Release genau drei Felder
-    // ersetzen (README karten-build): `url` (Host-URL), `groesse` (gemessene Bytes), `sha256` (aus
-    // out/result/osm*.mbtiles.sha256, lowercase-hex). Bis dahin klar erkennbare, aber gültige
-    // https-Platzhalter. Der Pin ist eine reine Config-Änderung; die Konsistenzprüfung
-    // (katalog_eintrag_sha256_pin_konsistent) trägt Platzhalter wie echten Pin. Alternativ füllt
-    // das Remote-Manifest (LFH-199) die echten Einträge ohne App-Release.
+    // >>> OPERATOR-PIN <<< — je Eintrag beim karten-build-Release genau drei Felder ersetzen
+    // (README karten-build): `url`, `groesse` (gemessene Bytes), `sha256` (aus
+    // out/result/osm*.mbtiles.sha256, lowercase-hex). Bis dahin erkennbare, aber gültige
+    // https-Platzhalter; `katalog_eintrag_sha256_pin_konsistent` trägt beide Zustände. Alternativ
+    // füllt das Remote-Manifest die echten Einträge ohne App-Release.
     //
-    // Kuratierte Regionen (~5–20, grob): DE gesamt, einzelne Bundesländer. DACH ist kein
-    // einzelner Geofabrik-Extrakt (v1) und wird nicht kompiliert; Regionen kommen ggf. dynamisch
-    // übers Remote-Manifest (LFH-199). `gruppe` steuert die geführte UX-Auswahl. Neue Region =
-    // Zeile ergänzen (Slug = karten-build-Dateiname).
+    // `gruppe` steuert die geführte Auswahl. Neue Region = Zeile ergänzen (Slug =
+    // karten-build-Dateiname).
     fn platzhalter(
         name: &str,
         region: &str,
@@ -171,10 +159,9 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
             gruppe: Some(gruppe.into()),
         }
     }
-    // Deckungsgleich mit dem karten-service-Regionssatz (karten-service/src/regions.rs): DE, alle
-    // 16 Bundesländer, alle 9 Nachbarländer. Rein Offline-Erststart-Baseline — live kommt der Katalog
-    // übers Remote-Manifest (jeder echte Pin überschreibt hier per `name`). `ca_gb` ist eine grobe
-    // Schätzung, nach dem Bau durch die gemessene Größe ersetzt.
+    // Deckungsgleich mit dem Regionssatz des karten-service (`karten-service/src/regions.rs`): DE,
+    // alle 16 Bundesländer, alle 9 Nachbarländer. Nur Erststart-Baseline — jeder echte Pin aus dem
+    // Remote-Manifest überschreibt per `name`. `ca_gb` ist eine grobe Schätzung.
     vec![
         platzhalter(
             "Deutschland (Shortbread)",
@@ -251,9 +238,8 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
     ]
 }
 
-/// Lokales Daten-Verzeichnis für Offline-Karten, abgeleitet aus dem DB-Pfad
-/// (`<Verzeichnis von db_path>/karten`). Bewusst KEINE eigene ENV/CLI-Option (LFH-179: ENV
-/// für die Karte entfällt) — der Pfad folgt dem DB-Pfad; angelegt wird er beim Serverstart.
+/// Lokales Verzeichnis für Offline-Karten: `<Verzeichnis von db_path>/karten`. Keine eigene
+/// Option — der Pfad folgt dem DB-Pfad; angelegt wird er beim Serverstart.
 pub fn default_karten_dir(db_path: &str) -> std::path::PathBuf {
     std::path::Path::new(db_path)
         .parent()
@@ -500,23 +486,16 @@ pub enum Command {
 mod tests {
     use super::*;
 
-    /// Serialisiert die Env-Manipulation in [`parse_hermetisch`] — `remove_var`/`set_var`
-    /// wirken prozessweit, parallel laufende Tests würden sich sonst die Umgebung
-    /// unter den Füßen wegziehen.
+    /// Serialisiert die Env-Manipulation in [`parse_hermetisch`]; `remove_var`/`set_var` wirken
+    /// prozessweit.
     static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     /// Parst die Config so, als stünde **keine** `LIFELINE_*`-Variable in der Umgebung.
     ///
-    /// Jedes Feld mit `#[arg(env = "…")]` macht einen Default-Test sonst davon abhängig,
-    /// was gerade im Prozess-Env steht — und über `mise.local.toml` + `.env` ist das im
-    /// Entwickler-Alltag eine Menge. Genau daran ist die Suite rot geworden
-    /// (LFH-235/F17): `LIFELINE_OIDC_*` aus der `.env` ließ
-    /// `oidc_config_defaults_sind_none` fallen, obwohl am Code nichts falsch war.
-    /// Der Leak reicht bis in frische Worktrees ohne eigene `.env`, weil mise die
-    /// Elternverzeichnisse mitliest.
-    ///
-    /// Ein `env -u` im Gate würde nur den Gate-Lauf heilen; ein direkter `cargo test`
-    /// bliebe rot. Deshalb ist die Isolation hier im Test statt im Wrapper.
+    /// Jedes Feld mit `#[arg(env = "…")]` machte einen Default-Test sonst vom Prozess-Env abhängig,
+    /// und über `mise.local.toml`/`.env` (auch aus Elternverzeichnissen) ist dort viel gesetzt. Die
+    /// Isolation steht im Test statt im Gate-Wrapper, damit auch ein direkter `cargo test` grün
+    /// bleibt.
     fn parse_hermetisch<I, T>(args: I) -> Config
     where
         I: IntoIterator<Item = T>,
@@ -555,9 +534,9 @@ mod tests {
         config
     }
 
-    /// Wie [`parse_mit_env`], aber über `try_parse_from`: ein Parse-Fehler kommt als `Err`
-    /// zurück, statt über `process::exit` das ganze Test-Binary zu beenden. Die Umgebung
-    /// wird auch im Fehlerfall wiederhergestellt.
+    /// Wie [`parse_mit_env`], aber über `try_parse_from`: ein Parse-Fehler kommt als `Err` zurück,
+    /// statt per `process::exit` das Test-Binary zu beenden. Die Umgebung wird auch im Fehlerfall
+    /// wiederhergestellt.
     fn try_parse_mit_env(k: &str, v: &str, args: &[&str]) -> Result<Config, clap::Error> {
         let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let gesichert: Vec<(String, String)> = std::env::vars()
@@ -575,11 +554,10 @@ mod tests {
         ergebnis
     }
 
-    /// Jeder Parse in diesen Tests läuft über die drei Helfer oben, also unter `ENV_LOCK`.
-    /// Ein direkter `Config::parse_from` liest das Prozess-Env OHNE Sperre — setzt ein
-    /// paralleler Test gerade `LIFELINE_DEMO_DATEN=1` (ungültig, siehe unten), meldet clap
-    /// den Fehler und beendet mit `process::exit(2)` das GANZE Test-Binary. So in der CI
-    /// gesehen (PR #159, `error: invalid value '1' for '--demo-daten'`), lokal selten.
+    /// Jeder Parse in diesen Tests läuft über die drei Helfer oben, also unter `ENV_LOCK`. Ein
+    /// direkter `Config::parse_from` liest das Env ohne Sperre; setzt ein paralleler Test gerade
+    /// `LIFELINE_DEMO_DATEN=1` (ungültig), beendet clap per `process::exit(2)` das ganze
+    /// Test-Binary.
     #[test]
     fn parse_nur_ueber_die_gesperrten_helfer() {
         let quelle = include_str!("config.rs");
@@ -596,9 +574,8 @@ mod tests {
         );
     }
 
-    /// LFH-690 (D1): der Demo-Import ist per Vorgabe aus und über Flag oder Env zuschaltbar.
-    /// Die Env nimmt nur `true`/`false` — `1` bricht den Start laut ab, statt still als
-    /// „aus“ gelesen zu werden (dasselbe Verhalten wie `LIFELINE_TLS`).
+    /// Der Demo-Import ist per Vorgabe aus und über Flag oder Env zuschaltbar. Die Env nimmt nur
+    /// `true`/`false` — `1` bricht den Start laut ab (wie `LIFELINE_TLS`).
     #[test]
     fn demo_daten_vorgabe_aus_und_zuschaltbar() {
         assert!(!parse_hermetisch(["lifeline-hub"]).demo_daten);
@@ -611,7 +588,7 @@ mod tests {
         );
     }
 
-    /// LFH-83: der KRITIS-Import ist Default-an und auf beiden Wegen abschaltbar.
+    /// Der KRITIS-Import ist per Vorgabe an und auf beiden Wegen abschaltbar.
     #[test]
     fn kritis_extrakt_default_an_und_abschaltbar() {
         let c = parse_hermetisch(["lifeline-hub"]);
@@ -702,14 +679,13 @@ mod tests {
 
     #[test]
     fn katalog_eintrag_sha256_pin_konsistent_und_serialisiert() {
-        // Pin-Konsistenz (LFH-197): jeder Katalog-Eintrag ist ENTWEDER ein noch ungepinnter
-        // Platzhalter (sha256 None) ODER vollständig gepinnt (64-stelliger lowercase-hex-Hash +
-        // echte, nicht-TODO-URL). So bleibt der Test grün, wenn der Operator beim ersten
-        // karten-build-Release pinnt — ohne halb-gepinnte Zwischenzustände durchzulassen.
+        // Pin-Konsistenz: jeder Eintrag ist ENTWEDER ungepinnter Platzhalter (sha256 None) ODER
+        // vollständig gepinnt (64-stelliger lowercase-hex-Hash + echte URL). Halb gepinnte Zustände
+        // fallen durch.
         for e in default_offline_katalog() {
-            // Bikonditional: ein Eintrag ist GENAU DANN gepinnt (sha256 gesetzt), wenn seine URL
-            // kein TODO-Platzhalter mehr ist. Fängt beide Halb-Pin-Richtungen: echte URL ohne Hash
-            // (download.rs lädt dann ungeprüft, erwartet_sha256=None) und Hash bei Platzhalter-URL.
+            // Gepinnt GENAU DANN, wenn die URL kein TODO-Platzhalter ist. Fängt beide Richtungen:
+            // echte URL
+            // ohne Hash (download.rs lüde ungeprüft) und Hash bei Platzhalter-URL.
             assert_eq!(
                 e.sha256.is_some(),
                 !e.url.contains("TODO"),
@@ -742,7 +718,7 @@ mod tests {
         assert!(j.contains("\"sha256\":\"abc123\""), "sha256 im JSON: {j}");
     }
 
-    // Test-Helfer für die Merge-Tests (LFH-199).
+    // Test-Helfer für die Merge-Tests.
     fn eintrag(name: &str, url: &str, sha256: Option<String>) -> OfflineKatalogEintrag {
         OfflineKatalogEintrag {
             name: name.into(),
@@ -988,8 +964,8 @@ mod tests {
         );
     }
 
-    /// LFH-616: der Umschalter „Satellit" braucht eine Raster-Quelle im Katalog, und zwar in
-    /// einer Form, die der Proxy annimmt — nur `{z}`/`{x}`/`{y}`, kein WMS-bbox.
+    /// Der Umschalter „Satellit“ braucht eine Raster-Quelle, die der Proxy annimmt — nur
+    /// `{z}`/`{x}`/`{y}`, kein WMS-bbox.
     #[test]
     fn katalog_bietet_satellit_als_proxy_taugliches_raster() {
         let styles = default_online_styles();
@@ -1004,8 +980,9 @@ mod tests {
             "nur Platzhalter, die der Proxy kennt"
         );
         assert!(s.attribution.as_deref().unwrap_or("").contains("Esri"));
-        // Die Lizenzauflage steht am Eintrag, nicht nur im Quelltext-Kommentar — und nur dort:
-        // ein Hinweis an jedem Eintrag wäre keiner mehr.
+        // Die Lizenzauflage steht am Eintrag, und nur dort — ein Hinweis an jedem Eintrag wäre
+        // keiner
+        // mehr.
         assert!(s.hinweis.as_deref().unwrap_or("").contains("ArcGIS"));
         assert_eq!(styles.iter().filter(|s| s.hinweis.is_some()).count(), 1);
     }
@@ -1030,14 +1007,10 @@ mod tests {
         assert_eq!(s.attribution.as_deref(), Some("© BKG"));
     }
 
-    /// LFH-265, Wire-Vertrag der Serialisierungsrichtung. EHRLICHE EINORDNUNG: an der heutigen
-    /// API-Oberfläche ist `attribution: None` UNBEOBACHTBAR — `GET
-    /// /api/karte/online-quellen/katalog` liefert `default_online_styles()` (alle mit
-    /// `Some`), und der DB-Schreibpfad hinter `/api/karte/config` erzwingt Attribution als
-    /// Pflicht (`routes/karte.rs`: „Attribution ist Pflicht (Lizenzauflage)"). Ein
-    /// Endpunkt-Test ist damit unschreibbar; dieser Unit-Test ist der einzig mögliche Beleg.
-    /// `contains_key` statt `v["…"] == Value::Null`: serde_json liefert für einen FEHLENDEN
-    /// Key beim Index-Zugriff ebenfalls `Null` — die naheliegende Assertion wäre blind.
+    /// Wire-Vertrag der Serialisierungsrichtung. `attribution: None` ist an der API heute
+    /// unbeobachtbar (Katalog liefert immer `Some`, der DB-Pfad erzwingt Attribution), deshalb ist
+    /// dieser Unit-Test der einzige Beleg. `contains_key` statt `== Value::Null`: ein fehlender Key
+    /// liefert beim Index-Zugriff ebenfalls `Null`.
     #[test]
     fn online_style_serialisiert_attribution_absent_und_typ_immer() {
         let v = serde_json::to_value(OnlineStyle {
@@ -1053,8 +1026,9 @@ mod tests {
             !o.contains_key("attribution"),
             "attribution muss ABSENT sein, nicht present-null"
         );
-        // Deckt die `#[schema(required)]`-Behauptung gegen die Realität ab: `typ` wird trotz
-        // `#[serde(default)]` immer serialisiert — auch beim Default-Wert `vektor`.
+        // `typ` wird trotz `#[serde(default)]` immer serialisiert, auch beim Default `vektor` —
+        // deckt
+        // `#[schema(required)]` ab.
         assert_eq!(o.get("typ").and_then(|t| t.as_str()), Some("vektor"));
     }
 }

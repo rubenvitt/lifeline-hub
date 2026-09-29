@@ -324,10 +324,8 @@ describe('punktInPolygon / Rückfall', () => {
   });
 });
 
-// LFH-282: zwei an der Klickstelle ÜBERLAPPENDE Warnflächen verschiedener Größe — etwa eine
-// Gewitterwarnung über dem Landkreis und eine kleinere Dauerregenwarnung darin. Die Kennzahlen
-// müssen zu DEM Feature gehören, dessen Properties das Panel zeigt, nicht zum ersten, das den
-// Punkt enthält.
+// Zwei an der Klickstelle überlappende Warnflächen verschiedener Größe: die Kennzahlen müssen zu
+// dem Feature gehören, dessen Properties das Panel zeigt, nicht zum ersten, das den Punkt enthält.
 describe('geometrieZumKlickFeature (LFH-282)', () => {
   const GROSS: GeoJsonPolygon = {
     type: 'Polygon',
@@ -351,8 +349,8 @@ describe('geometrieZumKlickFeature (LFH-282)', () => {
       { type: 'Feature' as const, geometry: KLEIN, properties: DAUERREGEN },
     ],
   };
-  // Dieselben Warnungen nach einem Nachladen in umgekehrter Reihenfolge — NINA baut die Liste
-  // über `buffer_unordered`, die Reihenfolge ist also von Abruf zu Abruf nicht stabil.
+  // Dieselben Warnungen nach einem Nachladen in umgekehrter Reihenfolge — NINA baut die Liste über
+  // `buffer_unordered`.
   const umsortiert = { ...fc, features: [fc.features[1], fc.features[0]] };
   const IM_UEBERLAPP = { lng: 8.005, lat: 50.005 };
   const NUR_IN_GROSS = { lng: 8.05, lat: 50.05 };
@@ -364,8 +362,8 @@ describe('geometrieZumKlickFeature (LFH-282)', () => {
 
   it('veralteter Index nach dem Umsortieren führt nicht zur fremden Fläche', () => {
     // Der Klick trifft noch das alte Rendering (Index 0 = Gewitter), die Collection ist schon neu
-    // (Index 0 = Dauerregen). Beide Flächen enthalten den Punkt — die Punkt-Prüfung am Index
-    // allein hielte das nicht auf; der Abgleich der Properties tut es.
+    // (Index 0 = Dauerregen). Die Punkt-Prüfung am Index hielte das nicht auf, der
+    // Properties-Abgleich schon.
     expect(
       geometrieZumKlickFeature({ id: 0, properties: GEWITTER }, IM_UEBERLAPP, umsortiert),
     ).toBe(GROSS);

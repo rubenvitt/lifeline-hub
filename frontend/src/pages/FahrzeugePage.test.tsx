@@ -10,8 +10,8 @@ import { einsatzKeys } from '../api/queryKeys';
 import { AuthProvider } from '../auth/AuthContext';
 import FahrzeugePage from './FahrzeugePage';
 
-// Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
-// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+// Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
+// schreibrecht.test.ts ab.
 const nutzer = {
   id: 1,
   anzeigename: 'Nutzer',
@@ -119,11 +119,9 @@ function render(
 }
 
 /**
- * Öffnet das Statusmenü einer Zeile und liefert das GEÖFFNETE Menü-Portal.
- *
- * antd lässt die Portale geschlossener Dropdowns im Baum stehen, und ein verlassendes
- * Portal bekommt in jsdom nie `hidden` — deshalb zusätzlich über `pointerEvents` filtern
- * und genau einen Treffer verlangen (Muster `meldungen/MeldungKarte.test.tsx`).
+ * Öffnet das Statusmenü einer Zeile und liefert das geöffnete Menü-Portal. antd lässt die Portale
+ * geschlossener Dropdowns im Baum stehen, und ein verlassendes Portal bekommt in jsdom nie `hidden`
+ * — deshalb zusätzlich über `pointerEvents` filtern und genau einen Treffer verlangen.
  */
 async function oeffneStatusmenue(zeile: HTMLElement, funkrufname: string): Promise<HTMLElement> {
   await userEvent.click(
@@ -140,12 +138,8 @@ async function oeffneStatusmenue(zeile: HTMLElement, funkrufname: string): Promi
 
 describe('FahrzeugePage', () => {
   /**
-   * Der Weg zur aggregierenden Kräfteübersicht (LFH-338 · C3, Befund H21).
-   *
-   * Die Übersicht war von KEINER der vier Kräfte-Modulseiten verlinkt — die Verdichtung,
-   * für die es eine eigene Seite gibt, war von der Pflegefläche aus unsichtbar. Geprüft
-   * wird das `href` und nicht bloß die Existenz eines Links: ein Inline-Pfad neben dem
-   * Builder wäre sonst von ihm nicht zu unterscheiden.
+   * Der Weg zum Meldebild von der Pflegefläche. Geprüft wird das `href`: ein Inline-Pfad neben dem
+   * Builder wäre sonst nicht zu unterscheiden.
    */
   it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
     render(einsatz());
@@ -160,12 +154,9 @@ describe('FahrzeugePage', () => {
 
   it('bedient den Status am Etikett, nicht über ein Auswahlfeld in der Zelle', async () => {
     /**
-     * Befund H19 (LFH-339 · C4). Der Statuswechsel sass in einem `Select` mit fester
-     * `minWidth: 150` mitten in der Zeile — die Zahl, an der die 390-px-Karte scheiterte.
-     *
-     * Geprüft werden BEIDE Hälften: das Auswahlfeld ist weg UND der Auslöser trägt die
-     * Zeilenkennung. Die erste allein wäre auch grün, wenn gar kein Bedienweg mehr da
-     * wäre.
+     * Kein `Select` mit fester Mindestbreite in der Zeile (die 390-px-Karte scheiterte daran).
+     * Beide Hälften: das Auswahlfeld ist weg und der Auslöser trägt die Zeilenkennung — die erste
+     * allein wäre auch ohne Bedienweg grün.
      */
     const { container } = render(einsatz());
     await screen.findByText('Florian 1');
@@ -176,8 +167,8 @@ describe('FahrzeugePage', () => {
       within(zeile).getByRole('button', { name: 'Status von Florian 1 ändern' }),
     ).toBeInTheDocument();
 
-    // Der ganze Katalog steht im Menü — senkrecht, weil zehn Werte in keine waagerechte
-    // Reihe passen (Zielform-Spec §3).
+    // Der ganze Katalog steht im Menü — senkrecht, weil zehn Werte in keine waagerechte Reihe
+    // passen.
     const menue = await oeffneStatusmenue(zeile, 'Florian 1');
     for (const s of stati) {
       expect(
@@ -208,11 +199,10 @@ describe('FahrzeugePage', () => {
     await waitFor(() => {
       expect(client.getQueryData<(typeof ef)[]>(einsatzKeys.fahrzeuge(7))?.[0].status_id).toBe(3);
     });
-    // Der neue Wert steht VOR der Server-Antwort in der ANSICHT, nicht bloß im
-    // Zwischenspeicher — das ist die Aussage des AK, und sie ist eine andere.
+    // Der neue Wert steht vor der Server-Antwort in der Ansicht, nicht bloß im Zwischenspeicher.
     expect(zeile.textContent).toContain('vor_ort');
-    // Der Riegel sperrt zeilenübergreifend: solange eine Statusmutation läuft, nimmt KEINE
-    // Zeile eine zweite an.
+    // Der Riegel sperrt zeilenübergreifend: solange eine Statusmutation läuft, nimmt keine Zeile
+    // eine zweite an.
     expect(within(zeile).getByRole('button', { name: /Status von Florian 1/ })).toBeDisabled();
     expect(
       within(container.querySelector('[data-row-key="11"]') as HTMLElement).getByRole('button', {
@@ -301,15 +291,15 @@ describe('FahrzeugePage', () => {
     const crew = person({ id: 100, name: 'Anna', fahrzeug_id: 10, staerke_position: 'fuehrer' });
     const { container } = render(einsatz(), [crew]);
     await screen.findByText('Florian 1');
-    // Besatzungs-Spalte dauerhaft sichtbar. Ist 1/0/0//1 < Soll 0/1/8//9 (UF/M fehlen) →
-    // unterbesetzt: roter Badge, Soll als Klammer-Kontext (zugleich nicht-farbliches Signal).
+    // Besatzungs-Spalte dauerhaft sichtbar. Ist 1/0/0//1 < Soll 0/1/8//9 → unterbesetzt: roter
+    // Badge, Soll als Klammer-Kontext (zugleich nicht-farbliches Signal).
     expect(screen.getByRole('columnheader', { name: 'Besatzung' })).toBeInTheDocument();
     expect(container.querySelector('.ant-tag-red')).toHaveTextContent('1/0/0//1 (Soll 0/1/8//9)');
   });
 
   it('zählt Besatzung ohne Stärke-Position als Mannschaft (BOS-Σ ist Kopfzahl)', async () => {
-    // LFH-9: Eine Kraft ist physisch auf dem Fahrzeug und gehört zur Stärke, auch ohne
-    // explizite F/UF-Position. Sammeltopf in der BOS-Schreibweise ist die Mannschaft.
+    // Eine Kraft auf dem Fahrzeug gehört zur Stärke, auch ohne F/UF-Position; Sammeltopf in der
+    // BOS-Schreibweise ist die Mannschaft.
     const fuehrer = person({ id: 100, name: 'Anna', fahrzeug_id: 10, staerke_position: 'fuehrer' });
     const ohnePosition = person({
       id: 101,
@@ -328,10 +318,9 @@ describe('FahrzeugePage', () => {
     const crew = person({ id: 100, name: 'Anna', fahrzeug_id: 10, staerke_position: 'fuehrer' });
     render(einsatz(), [crew], sollKlein);
     await screen.findByText('Florian 1');
-    // Ist 1/0/0//1 ≥ Soll 1/0/0//1 in jeder Position → grün, ohne redundanten Soll-Text.
-    // Über den Stärke-Text wählen (der grüne Einsatz-Status „aktiv" wäre sonst ein zweiter ant-tag-green).
-    // Seit LFH-338 · C3 steht DIESELBE Stärke auch in der Verdichtungszeile über der Tabelle
-    // (Befund H21) — der Text allein ist damit mehrdeutig, gemeint ist die Marke der Zeile.
+    // Ist ≥ Soll in jeder Position → grün, ohne redundanten Soll-Text. Über den Stärke-Text wählen
+    // (der Einsatz-Status wäre ein zweiter grüner Tag); dieselbe Stärke steht auch in der
+    // Verdichtungszeile, gemeint ist die Marke der Zeile.
     const badge = screen.getByText('1/0/0//1', { selector: '.ant-tag' });
     expect(badge).toHaveClass('ant-tag-green');
     expect(badge).not.toHaveTextContent('Soll');
@@ -345,8 +334,8 @@ describe('FahrzeugePage', () => {
     ];
     render(einsatz(), crew, sollKlein);
     await screen.findByText('Florian 1');
-    // Ist 1/0/1//2 ≥ Soll 1/0/0//1 in jeder Position (Mannschaft über Soll) → erfüllt.
-    // Wie oben: der reine Text steht seit C3 auch in der Verdichtungszeile.
+    // Ist 1/0/1//2 ≥ Soll 1/0/0//1 in jeder Position (Mannschaft über Soll) → erfüllt. Der reine
+    // Text steht auch in der Verdichtungszeile.
     expect(screen.getByText('1/0/1//2', { selector: '.ant-tag' })).toHaveClass('ant-tag-green');
   });
 
@@ -399,18 +388,15 @@ describe('FahrzeugePage', () => {
     expect(screen.getByText('andere Einheit')).toBeInTheDocument();
   });
 
-  // ── Datensicht (LFH-330 · B2) ───────────────────────────────────────────────────
+  // ── Datensicht ──
 
   /**
-   * ZWEI Zeilen, deren gruppengeführte Reihenfolge sich beim Statuswechsel UMDREHT.
-   *
-   * Eine einzeilige Fixture wäre hier wertlos: `expect(reihenfolge).toEqual(vorher)` ist
-   * über einem Einelement-Array auch ohne Schleuse, auch mit `zufluss="sofort"` und auch
-   * bei kaputter Sortierung grün. Hier gilt:
+   * Zwei Zeilen, deren gruppengeführte Reihenfolge sich beim Statuswechsel umdreht. Eine einzeilige
+   * Fixture wäre wertlos: `toEqual(vorher)` über einem Einelement-Array ist immer grün.
    *   Serverordnung  [10 Florian 1 (gebunden), 11 Florian 9 (verfügbar)]
    *   gerendert      [11, 10]  (Gruppenachse führt: verfügbar vor gebunden)
    *   nach dem Flip  [10, 11]  (beide verfügbar → nach Funkrufname)
-   * Die gerenderte Ausgangsfolge ist damit WEDER die Serverordnung noch die Zielordnung.
+   * Die gerenderte Ausgangsfolge ist weder Server- noch Zielordnung.
    */
   const efGebunden = { ...ef, id: 10, funkrufname: 'Florian 1' };
   const efVerfuegbar = {
@@ -427,11 +413,11 @@ describe('FahrzeugePage', () => {
   it('gruppiert nach Statuskategorie, mit Zähler im Etikett', async () => {
     const { container } = render(einsatz(), [], [efGebunden, efVerfuegbar]);
     await screen.findByText('Florian 1');
-    // EIN Textknoten, nicht zwei: sonst würfe dieselbe Abfrage später mit einer
-    // Mehrfachtreffer-Verletzung, sobald ein Zähler daneben steht.
+    // Ein Textknoten, nicht zwei: sonst würfe dieselbe Abfrage später mit Mehrfachtreffern, sobald
+    // ein Zähler daneben steht.
     expect(screen.getByText('verfügbar · 1')).toBeInTheDocument();
     expect(screen.getByText('gebunden · 1')).toBeInTheDocument();
-    // Und die Gruppenachse führt wirklich: verfügbar (Florian 9) steht VOR gebunden.
+    // Und die Gruppenachse führt wirklich: verfügbar (Florian 9) steht vor gebunden.
     expect(zeilenFolge(container)).toEqual(['11', '10']);
   });
 
@@ -441,12 +427,12 @@ describe('FahrzeugePage', () => {
     const vorher = zeilenFolge(container);
     expect(vorher).toEqual(['11', '10']);
 
-    // Fokus auf den Statusauslöser DERSELBEN Zeile, die gleich wandern würde.
+    // Fokus auf den Statusauslöser derselben Zeile, die gleich wandern würde.
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
     const auswahl = within(zeile).getByRole('button', { name: /Status von Florian 1/ });
     act(() => auswahl.focus());
-    // Die Schleuse hängt an Fokus-CONTAINMENT. Das wird gemessen, nicht angenommen —
-    // ein Test, der grün ist, weil nichts umsortiert wurde, sieht sonst identisch aus.
+    // Die Schleuse hängt an Fokus-Containment. Das wird gemessen — ein Test, der grün ist, weil
+    // nichts umsortiert wurde, sähe sonst identisch aus.
     const sicht = screen.getByRole('region', { name: 'Fahrzeuge im Einsatz' });
     expect(sicht.contains(document.activeElement)).toBe(true);
 
@@ -457,20 +443,17 @@ describe('FahrzeugePage', () => {
       ]);
     });
 
-    // Zellinhalt AKTUALISIERT: der Auslöser der Zeile zeigt den neuen Status. Über
-    // `textContent` statt `getByText`, weil derselbe Wortlaut zugleich als Menüeintrag im
-    // Portal stehen kann und eine Einzeltreffer-Abfrage dort wirft.
+    // Zellinhalt aktualisiert: der Auslöser zeigt den neuen Status. Über `textContent` statt
+    // `getByText`, weil derselbe Wortlaut zugleich als Menüeintrag im Portal stehen kann.
     await waitFor(() => expect(zeile.textContent).toContain('vor_ort'));
-    // Reihenfolge EINGEFROREN: die Zeile wandert nicht unter dem offenen Auswahlfeld weg.
+    // Reihenfolge eingefroren: die Zeile wandert nicht unter dem offenen Auswahlfeld weg.
     expect(zeilenFolge(container)).toEqual(vorher);
 
     /**
-     * DIE GEMESSENE ABWEICHUNG von Plan §0.2 (a), hier als Regressionsanker statt als
-     * Prosa: der Zählerstreifen rechnet über die FRISCHEN Zeilenobjekte in der gefrorenen
-     * Folge (`gruppiere(sichtbareZeilen, …)` in `Datensicht`), also nicht eingefroren. Und
-     * weil der Statuswechsel keinen Schlüssel ändert, ist `zufluessig === 0` und ein
-     * Sammelbanner erscheint NIE — es gibt keine zweite Bannerursache „Reihenfolge
-     * veraltet". Beides gehört dem Primitiv (Bündel F); geändert wird es nicht hier.
+     * Regressionsanker: der Zählerstreifen rechnet über die frischen Zeilenobjekte in der
+     * gefrorenen Folge (`gruppiere(sichtbareZeilen, …)` in `Datensicht`), ist also nicht
+     * eingefroren. Und weil der Statuswechsel keinen Schlüssel ändert, ist `zufluessig === 0`, ein
+     * Sammelbanner erscheint nie. Beides gehört dem Primitiv.
      */
     expect(screen.getByText('verfügbar · 2')).toBeInTheDocument();
     expect(screen.queryByText(/^gebunden · /)).toBeNull();
@@ -479,19 +462,14 @@ describe('FahrzeugePage', () => {
 
   it('ein Fokuswechsel INS Statusmenü taut die Schleuse nicht auf', async () => {
     /**
-     * Die Hälfte von Kriterium 12, die der Umbau von LFH-339 überhaupt erst nötig macht:
-     * das Menü liegt in einem PORTAL an `document.body`, also außerhalb der Sicht-Wurzel.
-     * `pruefeVerlassen` in `Datensicht` taut auf, sobald der Fokus die Wurzel verlässt —
-     * und antds `autoFocus` schiebt ihn beim Öffnen genau dorthin. Ohne den
-     * Overlay-Zweig dort wanderte die Zeile weg, während jemand das Menü offen hält.
+     * Das Menü liegt in einem Portal an `document.body`, außerhalb der Sicht-Wurzel.
+     * `pruefeVerlassen` in `Datensicht` taut auf, sobald der Fokus die Wurzel verlässt — und antds
+     * `autoFocus` schiebt ihn beim Öffnen genau dorthin. Ohne den Overlay-Zweig dort wanderte die
+     * Zeile weg, während das Menü offen ist.
      *
-     * ── WARUM DER FOKUS HIER VON HAND GESETZT WIRD ──────────────────────────────────
-     *
-     * GEMESSEN am 17.08.2026: in jsdom verschiebt `autoFocus` den Fokus NICHT ins Portal
-     * — der aktive Knoten bleibt der Auslöser selbst (`ant-dropdown-trigger`,
-     * `sicht.contains(...) === true`). Ein Test, der bloß das Menü öffnet und dann die
-     * Reihenfolge prüft, ist deshalb auch OHNE den Zweig grün und belegt nichts. Geprüft
-     * wird darum der Handler direkt: ein `focusout`, dessen `relatedTarget` im Menü liegt.
+     * In jsdom verschiebt `autoFocus` den Fokus nicht ins Portal; ein Test, der bloß das Menü
+     * öffnet, wäre auch ohne den Zweig grün. Geprüft wird deshalb der Handler direkt: ein
+     * `focusout`, dessen `relatedTarget` im Menü liegt.
      */
     const { container, client } = render(einsatz(), [], [efGebunden, efVerfuegbar]);
     await screen.findByText('Florian 1');
@@ -520,8 +498,8 @@ describe('FahrzeugePage', () => {
   });
 
   it('Gegenprobe: ein Fokuswechsel AUS der Sicht heraus taut sie weiterhin auf', async () => {
-    // Ohne diese Gegenprobe belegt der Test darüber nichts über den Overlay-Zweig — ein
-    // `pruefeVerlassen`, das NIE auftaut, wäre dort ebenfalls grün.
+    // Gegenprobe zum Overlay-Zweig: ein `pruefeVerlassen`, das nie auftaut, wäre oben ebenfalls
+    // grün.
     const { container, client } = render(einsatz(), [], [efGebunden, efVerfuegbar]);
     await screen.findByText('Florian 1');
     expect(zeilenFolge(container)).toEqual(['11', '10']);
@@ -542,8 +520,7 @@ describe('FahrzeugePage', () => {
   });
 
   it('Gegenprobe: OHNE Fokus in der Sicht ordnet sich die Liste sofort neu', async () => {
-    // Ohne diese Gegenprobe belegt der Test oben nichts über die Fokusbedingung — eine
-    // Sicht, die IMMER einfriert, wäre dort ebenfalls grün.
+    // Gegenprobe zur Fokusbedingung: eine Sicht, die immer einfriert, wäre oben ebenfalls grün.
     const { container, client } = render(einsatz(), [], [efGebunden, efVerfuegbar]);
     await screen.findByText('Florian 1');
     expect(zeilenFolge(container)).toEqual(['11', '10']);
@@ -560,14 +537,11 @@ describe('FahrzeugePage', () => {
 
   it('eingeschaltete Bemerkungsspalte trägt bei leerem Wert einen benannten Auslöser', async () => {
     /**
-     * Befund M21 (LFH-369 · B5i) an der Fahrzeugseite. Wie bei Personal ist die Spalte per
-     * Voreinstellung abgewählt (`FahrzeugePage.tsx:527`); die Vorprüfung auf „kein Auslöser"
-     * macht die zweite Hälfte erst aussagekräftig.
+     * Leeres Bemerkungsfeld an der Fahrzeugseite. Die Spalte ist per Voreinstellung abgewählt; die
+     * Vorprüfung auf „kein Auslöser" macht die zweite Hälfte aussagekräftig.
      *
-     * Der Zähler ist hier die empfindlichere Stelle, weil diese Seite zusätzlich
-     * `kennzeichen` per `abBreite: 'lg'` führt: nach dem Einschalten der Bemerkung muss er
-     * bei 1024 px auf „nichts ausgeblendet" fallen. Täte er das nicht, wäre die
-     * Voreinstellungs-Entscheidung durch diesen Umbau verschoben worden.
+     * Der Zähler ist hier empfindlicher, weil die Seite `kennzeichen` per `abBreite: 'lg'` führt:
+     * nach dem Einschalten der Bemerkung muss er bei 1024 px auf „nichts ausgeblendet" fallen.
      */
     const { container } = render(einsatz());
     await screen.findByText('Florian 1');
@@ -585,10 +559,9 @@ describe('FahrzeugePage', () => {
 
   it('der Spaltenschalter zählt Handauswahl UND Breitenausblendung in EINEM Zähler', async () => {
     /**
-     * Gate 2 verlangt den Zähler ausgeblendeter Spalten. Er darf nicht aus `aus.length`
-     * kommen: bei 1024 px ist genau `bemerkung` per Voreinstellung abgewählt (1), bei
-     * 800 px fällt `kennzeichen` über `abBreite: 'lg'` zusätzlich weg (2). Ein Zähler, der
-     * nur die Handauswahl kennt, meldete beide Male „1".
+     * Gate 2 verlangt den Zähler ausgeblendeter Spalten, nicht `aus.length`: bei 1024 px ist nur
+     * `bemerkung` abgewählt (1), bei 800 px fällt `kennzeichen` über `abBreite: 'lg'` zusätzlich
+     * weg (2). Ein Zähler, der nur die Handauswahl kennt, meldete beide Male „1".
      */
     const { unmount } = render(einsatz());
     await screen.findByText('Florian 1');
@@ -607,8 +580,8 @@ describe('FahrzeugePage', () => {
       setzeViewportBreite(390);
       const { container } = render(einsatz());
       expect(await screen.findByText('Florian 1')).toBeInTheDocument();
-      // `findByText('Florian 1')` allein ist in BEIDEN Zweigen grün und als Zweignachweis
-      // wertlos — es zählt die Abwesenheit der Tabelle.
+      // `findByText('Florian 1')` ist in beiden Zweigen grün — es zählt die Abwesenheit der
+      // Tabelle.
       expect(container.querySelector('.ant-table')).toBeNull();
       expect(container.querySelectorAll('[data-lfh="datensicht-karte"]')).toHaveLength(1);
     });
@@ -619,8 +592,8 @@ describe('FahrzeugePage', () => {
       await screen.findByText('Florian 1');
       const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
       const knopf = within(karte).getByRole('button', { name: 'Entfernen' });
-      // Rot bedient nichts: die kritische Aktion trägt KEINEN Gefahren-Anstrich, sondern
-      // eine Rückfrage als zweiten Handgriff.
+      // Rot bedient nichts: die kritische Aktion trägt keinen Gefahren-Anstrich, sondern eine
+      // Rückfrage.
       expect(knopf).not.toHaveClass('ant-btn-dangerous');
       fireEvent.click(knopf);
       expect(await screen.findByText('Aus Einsatz entfernen?')).toBeInTheDocument();
@@ -628,8 +601,8 @@ describe('FahrzeugePage', () => {
   });
 
   it('Gegenprobe: ab md steht die Tabelle', async () => {
-    // Ohne diese Gegenprobe wäre der Schmal-Test auch grün, wenn die Weiche bei JEDER
-    // Breite auf Karten fiele.
+    // Gegenprobe: sonst wäre der Schmal-Test auch grün, wenn die Weiche bei jeder Breite auf Karten
+    // fiele.
     const { container } = render(einsatz());
     await screen.findByText('Florian 1');
     expect(container.querySelector('.ant-table')).not.toBeNull();
@@ -638,23 +611,14 @@ describe('FahrzeugePage', () => {
 });
 
 /**
- * Datenzustände der Fahrzeugseite (LFH-331 · B3).
+ * Datenzustände der Fahrzeugseite. Drei Quellen fallen unabhängig aus, jede mit eigener Antwort:
+ * die Dispositionsliste (tauscht die Datensicht gegen die Fehlermeldung), der Statuskatalog (Banner
+ * über der Tabelle) und der Stamm-Pool (Ausfall im Auswahlfeld statt „Keine freien Fahrzeuge").
  *
- * Drei Quellen können hier unabhängig voneinander ausfallen, und jede hat eine eigene
- * sichtbare Antwort: die **Dispositionsliste** (tauscht die Datensicht gegen die
- * Fehlermeldung), der **Statuskatalog** (Banner über der Tabelle — ohne ihn ist kein
- * Statuswechsel möglich) und der **Stamm-Pool** (der Ausfall steht im Auswahlfeld statt
- * eines stumm leeren „Keine freien Fahrzeuge").
- *
- * ZWEI REGELN, an denen diese Tests hängen:
- *
- * 1. Je Zusicherung „X nicht im DOM" steht eine Partnerzusicherung „X IST im DOM" mit
- *    BYTE-GLEICHEM Literal daneben. Ohne sie wäre die negative Hälfte nach jeder
- *    Umformulierung des Leertexts trivial grün — und belegte über die Zustandsweiche
- *    nichts.
- * 2. In jedem Fall scheitert GENAU EINE Query. Ein pauschaler 500er stellte mehrere
- *    „Erneut abrufen" nebeneinander und ließe den Griff darauf an der Mehrdeutigkeit
- *    scheitern statt an der Sache.
+ * 1. Je Zusicherung „X nicht im DOM" steht eine Partnerzusicherung „X ist im DOM" mit gleichem
+ *    Literal, sonst wäre die negative Hälfte nach jeder Umformulierung trivial grün.
+ * 2. In jedem Fall scheitert genau eine Query; mehrere „Erneut abrufen" nebeneinander machten den
+ *    Griff mehrdeutig.
  */
 describe('FahrzeugePage · Datenzustände', () => {
   const gruenerBoden = () => [
@@ -667,9 +631,8 @@ describe('FahrzeugePage · Datenzustände', () => {
   ];
 
   function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
-    // Die Abweichung steht VORN: `server.use` reiht in der übergebenen Reihenfolge ein und
-    // der erste Treffer gewinnt. Andersherum hätte der grüne Boden jede Abweichung
-    // verschluckt — gemessen, ein Fehlschlag sah dann nach fehlenden Daten aus.
+    // Die Abweichung steht vorn: `server.use` reiht in der übergebenen Reihenfolge ein und der
+    // erste Treffer gewinnt. Andersherum schluckte der grüne Boden jede Abweichung.
     server.use(...abweichungen, ...gruenerBoden());
     return renderMitProviders(
       <AuthProvider>
@@ -694,16 +657,12 @@ describe('FahrzeugePage · Datenzustände', () => {
   });
 
   /**
-   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
-   * nicht `isStale`.
+   * Veralteter Stand = `isError` mit Zeilen im Zwischenspeicher — nicht `isFetching`, nicht
+   * `isStale`. Der Ablauf ist der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung; die Zeilen müssen stehen bleiben.
    *
-   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
-   * Aktualisierung. Vor dem Umbau verdrängte der Fehler die Zeilen — die Einsatzkraft verlor
-   * eine Disposition, die sie eben noch gelesen hatte.
-   *
-   * Assertiert wird der Banner-TEXT, nicht der Knopf „Erneut abrufen": den tragen
-   * `SeitenStandVeraltet`, `SeitenFehler` UND das Statuskatalog-Banner. Über den Knopf
-   * gemessen wäre die Zusicherung mehrdeutig und im schlimmsten Fall trivial grün.
+   * Assertiert wird der Banner-Text, nicht der Knopf „Erneut abrufen": den tragen
+   * `SeitenStandVeraltet`, `SeitenFehler` und das Statuskatalog-Banner.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
     const { client } = zeige(http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])));
@@ -717,7 +676,7 @@ describe('FahrzeugePage · Datenzustände', () => {
     expect(
       await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
     ).toBeInTheDocument();
-    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
+    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('Florian 1')).toBeInTheDocument();
     expect(
       screen.queryByText('Disponierte Fahrzeuge konnten nicht geladen werden'),
@@ -764,10 +723,8 @@ describe('FahrzeugePage · Datenzustände', () => {
   });
 
   /**
-   * Der Besatzungs-Pool ist derselbe Fehlermodus eine Ebene tiefer: scheitert die
-   * Personalliste, filtert `personal.filter(p => p.fahrzeug_id == null)` auf die leere
-   * Menge, und das Auswahlfeld behauptet „Keine freien Kräfte" — obwohl niemand weiß,
-   * ob es welche gibt.
+   * Derselbe Fehlermodus eine Ebene tiefer: scheitert die Personalliste, filtert der
+   * Besatzungs-Pool auf die leere Menge und behauptete „Keine freien Kräfte".
    */
   it('gescheiterte Personalliste: der Besatzungs-Pool nennt den Ausfall', async () => {
     const { container } = zeige(
@@ -794,27 +751,20 @@ describe('FahrzeugePage · Datenzustände', () => {
 });
 
 /**
- * Ad-hoc-Schnellerfassung (LFH-332 · B4).
+ * Ad-hoc-Schnellerfassung.
  *
- * Zwei Zusicherungen, die BEIDE eine Falle haben:
+ * 1. **Feldbudget.** Ein Zählvergleich „4 eingeklappt / 5 aufgeklappt" belegt das `forceRender`
+ *    nicht — ohne das Flag rendert der Klapp-Bereich sein Feld nicht, und die Zahlen sind
+ *    dieselben. Ein Nutzlast-Vergleich hilft auch nicht: antds `Form` hält mit `preserve` den Wert
+ *    eines ausgehängten Feldes. Unterscheidend ist allein die DOM-Anwesenheit im eingeklappten
+ *    Zustand — deshalb die `OPTA`-Zusicherung zwischen den Zählungen.
+ * 2. **Serienmodus.** „Der Dialog ist noch offen" wäre auch bei still gescheitertem POST grün.
+ *    Gemessen wird zuerst der Zähler der Hülle, der erst nach aufgelöstem `mutateAsync` steigt.
  *
- * 1. **Feldbudget.** Ein reiner Zählvergleich „4 eingeklappt / 5 aufgeklappt" belegt das
- *    `forceRender` NICHT — ohne das Flag rendert der Klapp-Bereich sein Feld gar nicht und
- *    die Zahlen sind dieselben. Ein Nutzlast-Vergleich hilft ebenfalls nicht: antds `Form`
- *    hält mit `preserve` (Default) auch den Wert eines ausgehängten Feldes. Was das Flag
- *    unterscheidbar macht, ist allein die DOM-Anwesenheit im eingeklappten Zustand —
- *    deshalb steht die `OPTA`-Zusicherung zwischen den beiden Zählungen.
- * 2. **Serienmodus.** „Der Dialog ist noch offen" ist für sich trivial grün: bei einem
- *    still gescheiterten POST steht er ebenfalls noch da. Gemessen wird deshalb zuerst der
- *    Zähler der Hülle — er steigt erst, nachdem `mutateAsync` aufgelöst hat.
- *
- * Sichtbarkeit wird über die POSITIVE Klasse `ant-collapse-panel-active` entschieden, nicht über
- * eine Verborgen-Klasse: welchen Namen rc-motion dem geschlossenen Zustand gibt, ist eine
- * Implementierungsfrage der Animation. `toBeVisible()` scheidet aus — antd v6 schreibt
- * `:where()`-Selektoren, und jsdoms berechneter Stil ist dort kein verlässlicher Zeuge.
- * (Gemessen: antd v6 rendert `ant-collapse-panel` + `-active`/`-inactive`, NICHT das aus v5
- * bekannte `ant-collapse-content` — ein Filter darauf ließ alle fünf Felder als sichtbar
- * durchgehen und den Test still danebengreifen.)
+ * Sichtbarkeit über die positive Klasse `ant-collapse-panel-active`: der Name des geschlossenen
+ * Zustands ist eine Implementierungsfrage der Animation, und `toBeVisible()` ist bei antds
+ * `:where()`-Selektoren in jsdom kein verlässlicher Zeuge. (antd v6 rendert `ant-collapse-panel` +
+ * `-active`/`-inactive`, nicht `ant-collapse-content` wie v5.)
  */
 describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
   /** Beschriftungen der Felder, die der Bediener gerade wirklich sieht. */
@@ -842,13 +792,13 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
       'Trägerorganisation',
       'Kennzeichen',
     ]);
-    // Das `forceRender`-Beweisstück: eingeklappt UND trotzdem da, damit ein eingetragener
-    // Wert beim Absenden mitgeht und das Feld für Tastatur und Prüfung existiert.
+    // Das `forceRender`-Beweisstück: eingeklappt und trotzdem da, damit ein eingetragener Wert beim
+    // Absenden mitgeht.
     expect(within(dialog).getByLabelText('OPTA')).toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByText('Weitere Angaben'));
-    // `waitFor`: rc-motion sieht in jsdom kein `transitionend`, der Klassenwechsel kommt
-    // trotzdem — nur nicht zwingend im selben Zug wie der Klick.
+    // `waitFor`: rc-motion sieht in jsdom kein `transitionend`, der Klassenwechsel kommt trotzdem,
+    // nur nicht im selben Zug wie der Klick.
     await waitFor(() => expect(sichtbareFelder(dialog)).toHaveLength(5));
     expect(sichtbareFelder(dialog)).toContain('OPTA');
   });
@@ -868,15 +818,14 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
       }),
     );
     const dialog = await oeffneAdhoc();
-    // Der Schalter steht per Vorgabe AUS (30.07.2026) — ohne ihn gäbe es keine Übernahme.
+    // Der Schalter steht per Vorgabe aus — ohne ihn gäbe es keine Übernahme.
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
     await userEvent.type(within(dialog).getByLabelText('Funkrufname'), 'Florian Nachbarstadt 44/1');
     await userEvent.type(within(dialog).getByLabelText('Fahrzeugtyp'), 'LF 20');
     await userEvent.type(within(dialog).getByLabelText('Trägerorganisation'), 'FF Nachbarstadt');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
 
-    // Der Zähler steigt erst NACH der aufgelösten Mutation — er ist hier der Beleg, dass
-    // wirklich gespeichert wurde, nicht bloß nichts passiert ist.
+    // Der Zähler steigt erst nach der aufgelösten Mutation — der Beleg, dass gespeichert wurde.
     expect(await within(dialog).findByText('Erfasst: 1')).toBeInTheDocument();
     expect(gesendet).toEqual([
       {
@@ -905,7 +854,7 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
     );
     const dialog = await oeffneAdhoc();
     await userEvent.type(within(dialog).getByLabelText('Funkrufname'), 'Florian 44/2');
-    // Aufklappen, eintragen, WIEDER zuklappen — der Weg, auf dem ein ohne `forceRender`
+    // Aufklappen, eintragen, wieder zuklappen — der Weg, auf dem ein ohne `forceRender`
     // ausgehängtes Feld seinen Wert lautlos verlöre.
     await userEvent.click(within(dialog).getByText('Weitere Angaben'));
     await userEvent.type(await within(dialog).findByLabelText('OPTA'), 'FL RD 44/2');
@@ -917,13 +866,12 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
   });
 
   /**
-   * Gegenprobe zum Serienmodus: ohne sie wäre „der Dialog bleibt offen" auch dann grün,
-   * wenn er NIE zuginge — `onFertig` also gar nicht verdrahtet ist.
+   * Gegenprobe zum Serienmodus: sonst wäre „der Dialog bleibt offen" auch grün, wenn er nie
+   * zuginge.
    *
-   * Gemessen wird der Schließ-VORGANG, nicht das Verschwinden: rc-motion sieht in jsdom nie
-   * ein `transitionend`, die Abgang-Animation läuft deshalb nie zu Ende und antd lässt die
-   * Hülle samt `role="dialog"` und ihren Feldern im Baum stehen (gemessen, auch nach 800 ms
-   * und trotz `destroyOnHidden`). Beweiskräftig ist der Abgangszustand am Dialogknoten.
+   * Gemessen wird der Schließvorgang, nicht das Verschwinden: rc-motion sieht in jsdom nie ein
+   * `transitionend`, antd lässt die Hülle samt `role="dialog"` im Baum stehen (auch mit
+   * `destroyOnHidden`). Beweiskräftig ist der Abgangszustand am Dialogknoten.
    */
   it('Gegenprobe: „Disponieren" fährt den Dialog zu', async () => {
     server.use(
@@ -940,9 +888,9 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
 });
 
 /**
- * FMS-Tableau (LFH-642): eine ANSICHT dieser Seite, angesprungen über `?ansicht=tableau`
- * (Sprungmarke). Die Ansicht selbst prüft `kraefte/FmsTableau.test.tsx`; hier steht, was
- * nur die Seite weiß — Auftrag aus der URL, Umschalter, Mutationsweg, Einheiten-Ausfall.
+ * FMS-Tableau (LFH-642): eine Ansicht dieser Seite über `?ansicht=tableau`. Die Ansicht selbst
+ * prüft `kraefte/FmsTableau.test.tsx`; hier steht, was nur die Seite weiß — Auftrag aus der URL,
+ * Umschalter, Mutationsweg, Einheiten-Ausfall.
  */
 describe('FahrzeugePage — FMS-Tableau', () => {
   function Ort() {
@@ -956,8 +904,8 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     route = '/einsaetze/7/fahrzeuge?ansicht=tableau',
   ) {
     const patches: unknown[] = [];
-    // Der Serverstand wandert mit dem PATCH — sonst holte der Refetch nach `onSettled` den
-    // alten Status zurück, und der Test prüfte den Handler statt der Seite.
+    // Der Serverstand wandert mit dem PATCH — sonst holte der Refetch nach `onSettled` den alten
+    // Status zurück.
     let stand: Record<string, unknown> = {
       ...ef,
       einheit_id: 1,
@@ -1101,12 +1049,9 @@ describe('FahrzeugePage — FMS-Tableau', () => {
 });
 
 /**
- * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext.
- *
- * NICHT per Klick auf den Platzhalter selbst: der `.ant-select-placeholder`-Knoten trägt
- * `pointer-events: none`, und `userEvent` bricht dort mit „element has pointer-events:
- * none" ab (gemessen). Gegriffen wird deshalb das Feld über seinen Text und darin die
- * Combobox — der Knoten, den auch eine Tastaturbedienung fokussiert.
+ * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den Platzhalter:
+ * `.ant-select-placeholder` trägt `pointer-events: none`, und `userEvent` bricht dort ab. Gegriffen
+ * wird die Combobox im Feld — der Knoten, den auch die Tastatur fokussiert.
  */
 async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
   const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>

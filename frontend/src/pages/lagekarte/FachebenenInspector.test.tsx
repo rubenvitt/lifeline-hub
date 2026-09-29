@@ -57,8 +57,8 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('in Betrieb')).toBeInTheDocument();
     // Ortsnamen sind nicht eindeutig — die Kennung ist der Schlüssel für den Abgleich mit ODL-Info.
     expect(screen.getByText('DEZ3068')).toBeInTheDocument();
-    // Spec „Die Einteilung gibt sich als Projekt-Einteilung zu erkennen" — ohne `bewertung`
-    // gilt der Bänder-Maßstab, und der Satz sagt, warum (LFH-598).
+    // Ohne `bewertung` gilt der Bänder-Maßstab, und der Satz sagt, warum (Einteilung gibt sich als
+    // Projekt-Einteilung zu erkennen).
     expect(screen.getByText(/noch kein Grundpegel vor/)).toBeInTheDocument();
     expect(screen.getByText(/natürlichen Bereich \(0,05–0,2\s+µSv\/h\)/)).toBeInTheDocument();
     expect(screen.getByText(/kein amtlicher Schwellenwert/)).toBeInTheDocument();
@@ -89,9 +89,8 @@ describe('FachebenenInspector', () => {
     // Stand als taktische DTG in der Anzeigezone: 12:00 UTC = 14:00 MESZ.
     expect(screen.getByText('0,060 µSv/h (Stand 211400SEP2026)')).toBeInTheDocument();
     expect(screen.getByText('3,17 ×')).toBeInTheDocument();
-    // Die Schwellen als LITERALE — sie stehen im Backend (`FAKTOR_ERHOEHT`/`FAKTOR_STARK`)
-    // und in der Spec; zurückgelesen aus einer Konstante prüfte der Test sich selbst.
-    // „über", nicht „ab": genau 1,5 × ist noch `normal`, genau 3 × noch `erhoeht` (Spec).
+    // Die Schwellen als Literale (Backend `FAKTOR_ERHOEHT`/`FAKTOR_STARK`), sonst prüfte der Test
+    // sich selbst. „über", nicht „ab": genau 1,5 × ist noch `normal`, genau 3 × noch `erhoeht`.
     expect(screen.getByText(/über 1,5 × erhöht, über 3 × stark erhöht/)).toBeInTheDocument();
     expect(screen.getByText(/kein amtlicher Schwellenwert/i)).toBeInTheDocument();
     // Der Bänder-Maßstab gilt für diese Sonde NICHT und wird deshalb nicht genannt.
@@ -147,8 +146,7 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('kein Messwert')).toBeInTheDocument();
     expect(screen.getByText('defekt')).toBeInTheDocument();
     expect(screen.getByText('keine Messung')).toBeInTheDocument();
-    // Gezielt auf einen FORMATIERTEN Messwert: ein bloßes /µSv\/h/ träfe auch den Hinweissatz
-    // mit dem natürlichen Bereich „0,05–0,2 µSv/h".
+    // Gezielt auf einen formatierten Messwert: ein bloßes /µSv\/h/ träfe auch den Hinweissatz.
     expect(screen.queryByText(/^\d+,\d{3} µSv\/h$/)).not.toBeInTheDocument();
     expect(screen.queryByText('Messende')).not.toBeInTheDocument();
   });
@@ -162,8 +160,7 @@ describe('FachebenenInspector', () => {
       />,
     );
     expect(screen.getByText('Wittenberge / Elbe')).toBeInTheDocument();
-    // Das WORT ist der zweite Kanal (WCAG 1.4.1): auf der Karte trennt nur Farbe und
-    // Punktgröße die Klassen, hier muss dastehen, welche es ist.
+    // Das Wort ist der zweite Kanal (WCAG 1.4.1): auf der Karte trennen nur Farbe und Punktgröße.
     expect(screen.getByText('großes Hochwasser')).toBeInTheDocument();
     expect(screen.getByText('BB_503050')).toBeInTheDocument();
   });
@@ -203,10 +200,10 @@ describe('FachebenenInspector', () => {
       />,
     );
     expect(screen.getByText('Potsdam-Zentrum')).toBeInTheDocument();
-    // Das WORT trägt die Stufe (WCAG 1.4.1) — auf der Karte nur Farbe und Größe.
+    // Das Wort trägt die Stufe — auf der Karte nur Farbe und Größe.
     expect(screen.getByText('schlecht')).toBeInTheDocument();
     // Der Leitschadstoff gehört ins Label-Paar „Leitschadstoff: NO₂" — ein bloßes
-    // `getAllByText('NO₂')` fände auch die Messwertzeile und bliebe ohne die Angabe grün.
+    // `getAllByText('NO₂')` fände auch die Messwertzeile.
     const leitLabel = screen.getByText('Leitschadstoff');
     expect(leitLabel.closest('tr')?.textContent).toContain('NO₂');
     expect(screen.getByText('145 µg/m³')).toBeInTheDocument();
@@ -219,7 +216,7 @@ describe('FachebenenInspector', () => {
   });
 
   it('Luftqualität: der Leitschadstoff steht auch ohne eigenen Messwert da', () => {
-    // Trennscharf: Leitschadstoff O₃, aber kein `wert_o3` — die O₃-Angabe kann nur aus der
+    // Trennscharf: Leitschadstoff O₃ ohne `wert_o3` — die O₃-Angabe kann nur aus der
     // Leitschadstoff-Zeile stammen.
     render(
       <FachebenenInspector
@@ -232,8 +229,7 @@ describe('FachebenenInspector', () => {
   });
 
   it('Luftqualität: der Kartenakzent trägt die Stufe der Station, nicht die Ebenenfarbe', () => {
-    // Sonst öffnete eine „sehr schlecht"-Station eine Karte mit dem Akzent der Ebene
-    // neben einem Alarm-Tag — eine Farbe mit zwei Bedeutungen (Prüfliste Kriterium 7).
+    // Sonst stünde neben einem Alarm-Tag der Akzent der Ebene — eine Farbe mit zwei Bedeutungen.
     const akzent = (klasse: string) => {
       const { container, unmount } = render(
         <FachebenenInspector
@@ -430,17 +426,14 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
     expect(screen.getByText('NRW')).toBeInTheDocument();
     const livebild = screen.getByRole('link', { name: /Livebild/ });
     expect(livebild).toHaveAttribute('href', 'https://www.blitzvideoserver.de/player.html');
-    // Eigenständige Aktion ⇒ Bedienziel. Geprüft wird die STRUKTUR, aus der die Höhe folgt:
-    // ein antd-Knopf erbt `controlHeight` vom `ConfigProvider` (30/48/72), ein nackter `<a>`
-    // bliebe auf Zeilenhöhe. Ein Pixelmaß taugt hier nicht — jsdom rechnet kein Layout, und
-    // `test/utils.tsx` rendert ein ConfigProvider OHNE Theme (CLAUDE.md, Erfassungs-Norm).
+    // Eigenständige Aktion ⇒ Bedienziel. Geprüft wird die Struktur: ein antd-Knopf erbt
+    // `controlHeight`, ein nackter `<a>` bliebe auf Zeilenhöhe. Ein Pixelmaß taugt in jsdom nicht.
     expect(livebild).toHaveClass('ant-btn');
   });
 
   it('Autobahn/Webcam: ein zweites Feature bekommt sein Standbild, auch nach einem Fehler', () => {
-    // Der Inspector tauscht beim Klick auf ein anderes Feature nur die Props — die
-    // Komponenteninstanz bleibt stehen. Ein Fehler-`boolean` überlebte den Wechsel und
-    // verschluckte das nächste Standbild, ohne es je zu laden.
+    // Der Inspector tauscht beim Klick auf ein anderes Feature nur die Props; ein Fehler-`boolean`
+    // überlebte den Wechsel und verschluckte das nächste Standbild.
     const props = (bild: string) => ({
       quelle: 'autobahn' as const,
       properties: { titel: 'A1 | X', kategorie: 'webcam', bild },
@@ -456,9 +449,7 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
       'https://b.example/2.jpg',
     );
 
-    // Und zurück auf A: auch der Rückweg beginnt mit einem frischen Versuch. Ein Merker, der
-    // nur die zuletzt gescheiterte URL vergleicht, bliebe hier auf „nicht abrufbar" stehen,
-    // obwohl die Verbindung inzwischen wieder da sein kann.
+    // Und zurück auf A: auch der Rückweg beginnt mit einem frischen Versuch.
     rerender(<FachebenenInspector {...props('https://a.example/1.jpg')} />);
     expect(screen.getByRole('img', { name: /Webcam-Standbild/ })).toHaveAttribute(
       'src',
@@ -724,10 +715,8 @@ describe('FachebenenInspector — Energieanlagen (LFH-81)', () => {
 });
 
 /**
- * ── SCHNELLWEG „ALS MASSGEBLICHEN PEGEL FESTLEGEN" (LFH-606) ─────────────────────────
- *
- * Nur mit `pegelBezug` hängt der Inspektor an Abfrage und Mutation — die Bestandstests oben
- * rendern ihn nackt, ohne QueryClient, und bleiben so gültig.
+ * ── Schnellweg „Als maßgeblichen Pegel festlegen" ── Nur mit `pegelBezug` hängt der Inspektor an
+ * Abfrage und Mutation; die Tests oben rendern ihn ohne QueryClient.
  */
 describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
   const UUID = '47174d8f-1b8e-4599-8a59-b580dd55bc87';

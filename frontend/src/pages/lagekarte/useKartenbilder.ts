@@ -38,19 +38,21 @@ interface KartenbilderArgs {
   kartenRef: RefObject<KartenHandle | null>;
   /** Aktuell zu platzierendes Bild (FSM-State aus useKartenInteraktion); null = kein Platzier-Modus. */
   bildPlatzierenId: number | null;
-  /** Aktive Ansicht (B/LFH-320): filtert die sichtbaren Bilder client-seitig und stempelt Uploads. */
+  /** Aktive Ansicht: filtert die sichtbaren Bilder client-seitig und stempelt Uploads. */
   aktiveAnsichtId?: number;
-  /** Datenquelle (C/LFH-321): im Snapshot-Modus kommen die Bild-Metadaten aus dem eingefrorenen
-   *  Dokument; die Blob-Bytes werden weiterhin live geladen (ein gelöschtes Bild → Hinweis). */
+  /**
+   * Datenquelle: im Snapshot-Modus kommen die Bild-Metadaten aus dem eingefrorenen Dokument; die
+   * Blob-Bytes werden live geladen (ein gelöschtes Bild → Hinweis).
+   */
   quelle?: Standquelle;
   /** Stabiler Fehler-Handler (useCallback über App.useApp-message). */
   fehler: (e: unknown) => void;
 }
 
 /**
- * Kartenbilder-Leg der Lagekarte: Bilder-Query, Blob-URL-Lifecycle (byte-genau erhalten,
- * LFH-166/LFH-35), Overlay-Ableitung und die CRUD-/Platzier-Handler. `bildPlatzierenId`
- * kommt als FSM-Parameter herein — die Reset-Logik liegt in useKartenInteraktion.
+ * Kartenbilder-Leg der Lagekarte: Bilder-Query, Blob-URL-Lifecycle, Overlay-Ableitung und
+ * CRUD-/Platzier-Handler. `bildPlatzierenId` kommt als FSM-Parameter herein; die Reset-Logik liegt
+ * in useKartenInteraktion.
  */
 export function useKartenbilder({
   einsatzId,
@@ -62,8 +64,8 @@ export function useKartenbilder({
 }: KartenbilderArgs) {
   const qc = useQueryClient();
   const [blobUrls, setBlobUrls] = useState<Record<number, string>>({});
-  // Spiegelt blobUrls als Ref, damit der Cleanup-Return des Blob-URL-Effekts beim
-  // Unmount alle aktuellen URLs revoken kann (Leak-Schutz) — ohne Stale-Closure.
+  // Spiegelt blobUrls als Ref, damit der Unmount-Cleanup alle aktuellen URLs revoken kann, ohne
+  // Stale-Closure.
   const blobUrlsRef = useRef<Record<number, string>>({});
 
   const istSnapshot = quelle.typ === 'snapshot';
@@ -74,8 +76,8 @@ export function useKartenbilder({
     queryFn: () => listeHintergrundbilder(einsatzId),
     enabled: !istSnapshot,
   });
-  // Im Snapshot-Modus die eingefrorenen Bild-Metadaten aus dem Dokument (gleicher queryKey wie
-  // useLagekarteDaten → Cache-geteilt, kein zweiter Fetch). Blob-Bytes lädt der Effekt live.
+  // Im Snapshot-Modus die eingefrorenen Bild-Metadaten (gleicher queryKey wie useLagekarteDaten →
+  // kein zweiter Fetch). Blob-Bytes lädt der Effekt live.
   const snapQuery = useQuery({
     queryKey: einsatzKeys.lageSnapshotDokument(einsatzId, snapshotId as number),
     queryFn: () => ladeLageSnapshot(einsatzId, snapshotId as number),
@@ -88,14 +90,11 @@ export function useKartenbilder({
   const invalidiereBilder = () =>
     qc.invalidateQueries({ queryKey: einsatzKeys.kartenbilder(einsatzId) });
 
-  // Blob-URLs für Kartenbilder laden (und bei entfernten Bildern inkrementell revoken).
-  // blobUrls bewusst NICHT in den deps: das Map-Objekt würde den Effekt endlos neu auslösen.
-  // WICHTIG: Hier KEIN pauschales revoke aller URLs im Cleanup — React führt den Cleanup
-  // vor JEDEM Re-Run aus (jedes Refetch der Bilderliste, z. B. via SSE/Upload/Toggle/Move).
-  // Ein pauschales revoke würde bestehende, weiterhin aktive URLs unbrauchbar machen, ohne
-  // den Ref zu leeren → der Guard unten verhindert ein Neuladen → Bilder bleiben blank
-  // (spätestens nach Theme-/Basemap-Wechsel mit Source-Neuaufbau). Der Unmount-Leak-Schutz
-  // liegt deshalb in einem separaten, leeren-deps-Effekt weiter unten.
+  // Blob-URLs laden und bei entfernten Bildern inkrementell revoken. blobUrls bewusst nicht in den
+  // Deps: das Map-Objekt löste den Effekt endlos aus. Kein pauschales revoke im Cleanup: React ruft
+  // ihn vor jedem Re-Run (jeder Refetch der Bilderliste), das machte aktive URLs unbrauchbar, und
+  // der Guard unten verhinderte das Neuladen — die Bilder blieben blank. Der Unmount-Leak-Schutz
+  // liegt deshalb in einem eigenen Effekt weiter unten.
   useEffect(() => {
     const bilder = bilderRoh ?? [];
     let abgebrochen = false;
@@ -109,13 +108,13 @@ export function useKartenbilder({
             }
           })
           .catch((e) => {
-            // Lade-Fehler sichtbar machen statt lautlos schlucken (maskierte sonst C1).
+            // Lade-Fehler sichtbar machen statt schlucken.
             if (!abgebrochen) fehler(e);
           });
       }
     }
-    // Entfernte Bilder (z. B. gelöscht, oder Einsatzwechsel/Listen-Swap) inkrementell
-    // freigeben — das deckt den Leak ab, ohne aktive URLs zu treffen.
+    // Entfernte Bilder (gelöscht, Einsatzwechsel) inkrementell freigeben — deckt den Leak ab, ohne
+    // aktive URLs zu treffen.
     const aktiveIds = new Set(bilder.map((b) => b.id));
     for (const idStr of Object.keys(blobUrlsRef.current)) {
       const id = Number(idStr);
@@ -130,12 +129,10 @@ export function useKartenbilder({
     return () => {
       abgebrochen = true;
     };
-    // `fehler` ist ein stabiler useCallback-Handler → als ehrliche Dep aufgenommen, ohne
-    // den Effekt neu auszulösen (kein Disable mehr nötig, LFH-166).
+    // `fehler` ist ein stabiler useCallback-Handler und löst den Effekt nicht neu aus.
   }, [bilderRoh, einsatzId, fehler]);
 
-  // Unmount-only: beim Verlassen der Karte alle dann noch aktuellen Blob-URLs freigeben.
-  // Separater Effekt mit leeren deps → läuft NUR beim Unmount, nicht bei jedem Refetch.
+  // Unmount-only: beim Verlassen der Karte alle dann aktuellen Blob-URLs freigeben.
   useEffect(
     () => () => {
       Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL);
@@ -143,16 +140,15 @@ export function useKartenbilder({
     [],
   );
 
-  // Ansichts-Filter (B/LFH-320, client-seitig): Bilder der aktiven Ansicht PLUS die
-  // ansichtslosen (`ansicht_id == null`, auf allen Ansichten). `== null` fängt sowohl `null`
-  // als auch das per skip_serializing_if weggelassene Feld (`undefined`).
+  // Ansichts-Filter (client-seitig): Bilder der aktiven Ansicht plus die ansichtslosen. `== null`
+  // fängt `null` und das per skip_serializing_if weggelassene Feld.
   const sichtbareBilder = useMemo(
     () => (bilderRoh ?? []).filter((b) => b.ansicht_id == null || b.ansicht_id === aktiveAnsichtId),
     [bilderRoh, aktiveAnsichtId],
   );
 
-  // Memoisiert: ohne useMemo entsteht pro Render eine neue Array-Identität (+ JSON.parse),
-  // was den bilder-Effekt der Kartenflaeche bei jedem Render unnötig feuert.
+  // Memoisiert: sonst feuerte der bilder-Effekt der Kartenflaeche bei jedem Render (neue
+  // Array-Identität + JSON.parse).
   const bildOverlays = useMemo<BildOverlay[]>(
     () =>
       sichtbareBilder
@@ -188,7 +184,7 @@ export function useKartenbilder({
     await loescheHintergrundbild(einsatzId, id);
     invalidiereBilder();
   };
-  // Verschieben auf eine andere Ansicht bzw. auf alle (`null`) — Teil-Patch (B/LFH-320).
+  // Verschieben auf eine andere Ansicht bzw. auf alle (`null`) — Teil-Patch.
   const onBildVerschieben = async (id: number, ansichtId: number | null) => {
     await aktualisiereHintergrundbild(einsatzId, id, { ansicht_id: ansichtId });
     invalidiereBilder();
@@ -236,10 +232,8 @@ export function useKartenbilder({
     return { lat, lon: lng };
   }, [aktivesPlatzierBild]);
 
-  // Fehlerzustand der Bilderliste (LFH-331 · B3). Er wandert an die Sidebar-Sektion, weil ein
-  // gescheiterter Abruf hier bisher wie „keine Bilder hinterlegt" aussah — und ein Lageplan,
-  // von dem niemand weiß, dass er existiert, ist derselbe Schaden wie keiner.
-  // Die Quellen-Weiche spiegelt die oben: im Historien-Modus trägt das Dokument die Bilder.
+  // Fehlerzustand der Bilderliste für die Sidebar-Sektion: ein gescheiterter Abruf sähe sonst aus
+  // wie „keine Bilder hinterlegt". Im Historien-Modus trägt das Dokument die Bilder.
   const aktiveBilderQuery = istSnapshot ? snapQuery : bilderQuery;
 
   return {

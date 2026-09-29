@@ -48,9 +48,9 @@ interface LayerSpec {
 }
 
 /**
- * Wertet den Teil der MapLibre-Filtersprache aus, den die Fachebenen benutzen (`any`, `all`,
- * `!`, `has`). Ohne Auswertung prüfte ein Test nur die Schreibweise des Filters — ein
- * vertauschtes `any`/`all` sähe im Vergleich mit einem ebenso vertauschten Literal grün aus.
+ * Wertet den Teil der MapLibre-Filtersprache aus, den die Fachebenen nutzen (`any`, `all`, `!`,
+ * `has`). Ohne Auswertung prüfte der Test nur die Schreibweise — ein vertauschtes `any`/`all` sähe
+ * gegen ein ebenso vertauschtes Literal grün aus.
  */
 function passt(filter: unknown, props: Record<string, unknown>): boolean {
   if (filter === undefined) return true;
@@ -69,8 +69,7 @@ function passt(filter: unknown, props: Record<string, unknown>): boolean {
   }
 }
 
-// Die drei Feature-Arten, die in der KRITIS-Source vorkommen (Spec „Viele Objekte werden
-// serverseitig verdichtet" + Client-Bündel von MapLibre).
+// Die drei Feature-Arten der KRITIS-Source (Server-Sammelpunkt, Client-Bündel, Einzelobjekt).
 const clientBuendel = { cluster: true, cluster_id: 7, point_count: 3, anzahl: 1203 };
 const sammelpunkt = { sammelpunkt: true, anzahl: 1200 };
 const einzelobjekt = { titel: 'Klinikum', kategorie: 'krankenhaus' };
@@ -90,9 +89,8 @@ describe('fachebenenLayer', () => {
   });
 
   it('lässt MapLibre die Feature-ID aus dem Index vergeben (LFH-282)', () => {
-    // Ohne `generateId` trägt das Klick-Feature keine ID; der Klick fiele still auf den
-    // Punkt-in-Polygon-Rückfall zurück und überlappende Warnungen zeigten wieder keine oder
-    // fremde Kennzahlen — ohne dass irgendwo etwas rot wird.
+    // Ohne `generateId` trägt das Klick-Feature keine ID; überlappende Warnungen zeigten dann keine
+    // oder fremde Kennzahlen, ohne dass etwas rot wird.
     const m = fakeMap();
     sorgeFuerFachebeneLayer(m as never, FACHEBENEN.dwd, leer as never);
     expect(m.addSource).toHaveBeenCalledWith(
@@ -108,11 +106,9 @@ describe('fachebenenLayer', () => {
   });
 
   it('lässt das Feature über Farbe und Radius bestimmen, mit der Ebenenfarbe als Rückfall', () => {
-    // Die Hochwasserebene (LFH-77) staffelt beides je Pegelklasse und backt die Werte in
-    // die Properties (`hochwasserStil.ts`). Ein fester `circle-color`/`circle-radius`
-    // würde diese Werte stillschweigend verwerfen — die Ebene sähe einfarbig aus, ohne
-    // dass irgendwo etwas rot wird. Ebenen ohne die Properties fallen auf ihre Farbe
-    // zurück, deshalb steht der Rückfall hier mit in der Zusicherung.
+    // Die Hochwasserebene backt Farbe und Radius je Pegelklasse in die Properties. Ein fester
+    // `circle-color`/`circle-radius` verwürfe sie still; Ebenen ohne die Properties fallen auf ihre
+    // Farbe zurück.
     const m = fakeMap();
     sorgeFuerFachebeneLayer(m as never, FACHEBENEN.pegelonline, leer as never);
     const paint = m._specs.get('fachebene-pegelonline-circle')?.paint;
@@ -125,10 +121,9 @@ describe('fachebenenLayer', () => {
   });
 
   it('zeichnet größere Punkte über kleinere — eine erhöhte Sonde verschwindet nicht (LFH-78)', () => {
-    // Ohne Sortierschlüssel folgt die Zeichenreihenfolge der Quellreihenfolge: bei ~1 600
-    // dicht stehenden ODL-Sonden legte sich ein später gezeichneter kleiner Nachbar samt
-    // weißem Rand über einen großen `stark_erhoeht`-Punkt. Der Radius IST die Stufe (je
-    // höher, desto größer), also sortiert er auch — MapLibre zeichnet höhere Schlüssel oben.
+    // Ohne Sortierschlüssel legte sich bei dicht stehenden ODL-Sonden ein später gezeichneter
+    // kleiner Nachbar über einen großen `stark_erhoeht`-Punkt. Der Radius ist die Stufe, also
+    // sortiert er auch.
     const m = fakeMap();
     sorgeFuerFachebeneLayer(m as never, FACHEBENEN.odl, leer as never);
     const layout = m._specs.get('fachebene-odl-circle')?.layout;
@@ -138,16 +133,14 @@ describe('fachebenenLayer', () => {
   it('legt KRITIS als gebündelte Source an, die Sammelpunkte mit Gewicht zählt (LFH-83)', () => {
     const m = fakeMap();
     sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never);
-    // Zweiter Lauf (z. B. Re-Anlage nach setStyle): Source-Optionen greifen NUR beim
-    // Anlegen — eine einmal ungebündelt angelegte Source bliebe es für immer.
+    // Zweiter Lauf (Re-Anlage nach setStyle): Source-Optionen greifen nur beim Anlegen.
     sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never);
     expect(m.addSource).toHaveBeenCalledTimes(1);
     const opt = m._sourceOptionen.get(fachebeneSourceId('kritis'));
     expect(opt).toMatchObject({ type: 'geojson', cluster: true, clusterMaxZoom: 14 });
     expect(opt?.clusterRadius).toBeGreaterThanOrEqual(40);
     expect(opt?.clusterRadius).toBeLessThanOrEqual(60);
-    // Ein Server-Sammelpunkt zählt mit seiner `anzahl`, ein Einzelobjekt mit 1 — sonst
-    // zeigte ein Bündel aus drei Sammelpunkten „3" statt der tausenden Objekte darin.
+    // Ein Server-Sammelpunkt zählt mit seiner `anzahl`, ein Einzelobjekt mit 1.
     expect(opt?.clusterProperties).toEqual({
       anzahl: ['+', ['coalesce', ['get', 'anzahl'], 1]],
     });
@@ -169,8 +162,8 @@ describe('fachebenenLayer', () => {
     expect(kreis.type).toBe('circle');
     expect(zahl.type).toBe('symbol');
     expect(einzel.type).toBe('circle');
-    // Ein allein stehender Server-Sammelpunkt ist KEIN MapLibre-Bündel (kein point_count),
-    // muss aber genauso als Bündel gezeichnet werden.
+    // Ein allein stehender Server-Sammelpunkt ist kein MapLibre-Bündel, wird aber genauso
+    // gezeichnet.
     for (const props of [clientBuendel, sammelpunkt]) {
       expect(passt(kreis.filter, props)).toBe(true);
       expect(passt(zahl.filter, props)).toBe(true);
@@ -186,9 +179,8 @@ describe('fachebenenLayer', () => {
     sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never);
     const zahl = m._specs.get('fachebene-kritis-buendel-zahl')!;
     const feld = JSON.stringify(zahl.layout?.['text-field']);
-    // `anzahl` trägt beides: die Clustersumme (clusterProperties) und die Zahl eines
-    // Server-Sammelpunkts. `point_count` wäre beim Sammelpunkt gar nicht da und zählte beim
-    // Client-Bündel Sammelpunkte als 1.
+    // `anzahl` trägt Clustersumme und Zahl eines Sammelpunkts; `point_count` fehlte beim
+    // Sammelpunkt.
     expect(feld).toContain('"anzahl"');
     // Die einzige Schrift, die der Offline-Style ausliefert (assets/karten/fonts/).
     expect(zahl.layout?.['text-font']).toEqual(['Noto Sans Regular']);
@@ -262,8 +254,8 @@ describe('entscheideFachebeneKlick', () => {
     expect(entscheideFachebeneKlick(einzelobjekt)).toEqual({ art: 'einzel' });
   });
   it('fällt bei einem Bündel ohne lesbare Cluster-ID auf den Sammelpunkt-Weg zurück', () => {
-    // Zoomen bleibt richtig, nur die exakte Stufe fehlt — besser als ein Detail-Panel für
-    // ein Bündel.
+    // Zoomen bleibt richtig, nur die exakte Stufe fehlt — besser als ein Detail-Panel für ein
+    // Bündel.
     expect(entscheideFachebeneKlick({ cluster: true, point_count: 4 }).art).toBe('sammelpunkt');
   });
 });

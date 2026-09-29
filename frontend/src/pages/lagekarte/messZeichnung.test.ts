@@ -3,7 +3,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 
 /**
  * Nachbau des terra-draw-Ausschnitts, den `createMessung` benutzt: Features im Speicher,
- * `change`/`finish` feuert der Test selbst — so ist prüfbar, WAS gemeldet wird, ohne Karte.
+ * `change`/`finish` feuert der Test selbst.
  */
 type Feature = { id: number; geometry: { type: string; coordinates: unknown } };
 const td = vi.hoisted(() => ({

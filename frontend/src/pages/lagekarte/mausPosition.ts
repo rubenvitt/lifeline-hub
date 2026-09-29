@@ -7,15 +7,10 @@ export interface ZeigerLage {
 }
 
 /**
- * Kleiner Zustandsträger für die Zeigerkoordinate (Neuentwurf S5, Koordinatenanzeige).
- *
- * WARUM KEIN `useState` IN DER SEITE: `mousemove` feuert im Bildtakt. Läge die Lage im State
- * von `LagekartePage`, renderte jede Mausbewegung die ganze Seite neu — samt Leiste, allen
- * Inspektoren und der Karten-Props, deren neue Identitäten Effekte in `Kartenflaeche`
- * auslösen. Die Karte MELDET hier, nur die Anzeige ABONNIERT (`useSyncExternalStore`) und
- * rendert als einzige mit.
- *
- * Rein und ohne Karte prüfbar: `melde`/`abonniere`/`lies` sind gewöhnliche Funktionen.
+ * Zustandsträger für die Zeigerkoordinate. Kein `useState` in der Seite: `mousemove` feuert im
+ * Bildtakt, und jede Mausbewegung renderte sonst `LagekartePage` samt Leiste, Inspektoren und
+ * Karten-Props neu (deren neue Identitäten Effekte in `Kartenflaeche` auslösen). Die Karte meldet,
+ * nur die Anzeige abonniert (`useSyncExternalStore`). Rein und ohne Karte prüfbar.
  */
 export interface ZeigerQuelle {
   melde: (lage: ZeigerLage | null) => void;

@@ -49,9 +49,9 @@ fn funkrufname_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
     Err(e.into())
 }
 
-/// Lädt ein Fahrzeug der eigenen Org; `NotFound`, falls unbekannt oder fremde Org.
-/// Executor-generisch (Pool oder offene Verbindung), damit [`anlegen_tx`] den frisch
-/// angelegten Datensatz in derselben Transaktion zurücklesen kann (LFH-690).
+/// Lädt ein Fahrzeug der eigenen Org; `NotFound`, falls unbekannt oder fremd.
+/// Executor-generisch, damit [`anlegen_tx`] den neuen Datensatz in derselben Transaktion
+/// zurückliest.
 pub async fn laden(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     org_id: i64,
@@ -86,9 +86,8 @@ pub async fn liste(
         .map_err(Into::into)
 }
 
-/// DISTINCT-Werte einer Spalte (org-weit, nicht-leer, sortiert) für die AutoComplete.
-/// `spalte` wird in die Query interpoliert und darf daher AUSSCHLIESSLICH mit
-/// festen Literalen aufgerufen werden (keine Nutzereingabe).
+/// DISTINCT-Werte einer Spalte (org-weit, nicht leer, sortiert) für die AutoComplete. `spalte`
+/// wird interpoliert und darf AUSSCHLIESSLICH ein festes Literal sein.
 async fn distinct_werte(
     pool: &SqlitePool,
     org_id: i64,
@@ -115,9 +114,8 @@ pub async fn vorschlaege(pool: &SqlitePool, org_id: i64) -> Result<FahrzeugVorsc
     })
 }
 
-/// Legt ein Fahrzeug an. Dublette Funkrufname (unter aktiven) → `Conflict`.
-/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, die Statements laufen
-/// im Autocommit einer geliehenen Verbindung.
+/// Legt ein Fahrzeug an; Funkrufname-Dublette (unter aktiven) → `Conflict`. Pool-Hülle um
+/// [`anlegen_tx`] ohne eigene Transaktion.
 pub async fn anlegen(
     pool: &SqlitePool,
     org_id: i64,
@@ -127,9 +125,8 @@ pub async fn anlegen(
     anlegen_tx(&mut conn, org_id, &daten).await
 }
 
-/// Legt ein Fahrzeug auf einer offenen Verbindung/Transaktion an und liest es dort zurück
-/// (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet selbst nichts.
-/// Dublette Funkrufname (unter aktiven) → `Conflict`.
+/// Legt ein Fahrzeug auf einer offenen Verbindung an und liest es dort zurück (Demo-Import in
+/// EINER Transaktion). Öffnet und committet nichts. Funkrufname-Dublette → `Conflict`.
 pub async fn anlegen_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -167,13 +164,11 @@ pub async fn anlegen_tx(
     laden(&mut *conn, org_id, id).await
 }
 
-/// Teil-Patch der editierbaren Stammfelder (LFH-306, Tri-State): die äußere `Option` sagt
-/// „im Patch enthalten?" — `None` lässt die Spalte unverändert. Bei den nullable Spalten
-/// trägt der Wert selbst noch eine `Option`: `Some(None)` setzt sie auf NULL.
+/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“; bei nullable Spalten setzt
+/// `Some(None)` NULL.
 ///
-/// Das Stärke-Trio liegt hier bewusst als **drei einzelne Spalten** (nicht als
-/// `Option<Staerke>`): nur so lässt sich eine einzelne Soll-Spalte patchen. Die Invariante
-/// „alle drei oder keiner" prüft der Handler gegen den Effektivzustand.
+/// Das Stärke-Trio liegt als drei einzelne Spalten vor, damit sich eine einzelne Soll-Spalte
+/// patchen lässt; „alle drei oder keiner“ prüft der Handler gegen den Effektivzustand.
 #[derive(Debug, Default)]
 pub struct FahrzeugPatch<'a> {
     pub funkrufname: Option<&'a str>,
@@ -191,10 +186,9 @@ pub struct FahrzeugPatch<'a> {
     pub bemerkung: Option<Option<&'a str>>,
 }
 
-/// Rohes Soll-Stärke-Trio eines Fahrzeugs (org-scoped) für die Effektivzustands-Prüfung im
-/// PATCH-Handler; `NotFound` bei fremder/unbekannter id. Bewusst NICHT `Option<Staerke>` —
-/// die Prüfung braucht die drei Spalten einzeln, `staerke()` würde ein halbes Trio
-/// (theoretisch, historisch) zu `None` glätten. Vorlage: `einheit/typ_repo.rs::soll_roh`.
+/// Rohes Soll-Stärke-Trio (org-scoped) für die Effektivzustands-Prüfung im PATCH-Handler;
+/// `NotFound` bei fremder/unbekannter id. Nicht `Option<Staerke>`, weil `staerke()` ein halbes
+/// Trio zu `None` glättete.
 pub async fn staerke_roh(
     pool: &SqlitePool,
     org_id: i64,
@@ -211,19 +205,16 @@ pub async fn staerke_roh(
     .ok_or(AppError::NotFound)
 }
 
-/// Teil-Patch der editierbaren Felder (org-scoped). `NotFound` bei fremder Org,
-/// `Conflict` bei Funkrufname-Dublette — beides unverändert gegenüber dem Vollersatz.
+/// Teil-Patch der editierbaren Felder (org-scoped); `NotFound` bei fremder Org, `Conflict` bei
+/// Funkrufname-Dublette.
 ///
-/// Flag/Wert-Paare statt COALESCE (LFH-266/F12, Vorlage `personal/status_repo.rs`): erst so
-/// lässt sich eine nullable Spalte über die API wieder auf NULL setzen, und ein nicht
-/// gesendetes Feld fasst seine Spalte nicht an. Die Parameter sind **nummeriert** — das ist
-/// hier die längste Flag/Wert-Kette des Bestands (13 Spalten = 26 Parameter), und eine um
-/// eine Position verschobene Kette würde gleichtypige Nachbarspalten (`opta`↔`standort`,
-/// `staerke_fuehrer`↔`staerke_unterfuehrer`) STILL vertauschen — ohne Compile- und ohne
-/// Laufzeitfehler. Abgesichert von `patche_setzt_jede_spalte_an_ihren_platz`.
+/// Flag/Wert-Paare statt COALESCE: so lässt sich eine nullable Spalte wieder auf NULL setzen,
+/// und ein nicht gesendetes Feld bleibt stehen. Die Parameter sind nummeriert — mit 13 Spalten
+/// die längste Kette im Bestand; eine verschobene Kette vertauschte gleichtypige Nachbarn
+/// (`opta`↔`standort`, `staerke_fuehrer`↔`staerke_unterfuehrer`) still
+/// (`patche_setzt_jede_spalte_an_ihren_platz`).
 ///
-/// Geschrieben wird **nur der Patch**, nie das im Handler gemergte Stärke-Trio — sonst wäre
-/// es wieder ein Vollersatz.
+/// Geschrieben wird nur der Patch, nie das im Handler gemergte Stärke-Trio.
 pub async fn patche(
     pool: &SqlitePool,
     org_id: i64,
@@ -288,12 +279,10 @@ pub async fn patche(
     laden(pool, org_id, id).await
 }
 
-/// Vollersatz der editierbaren Felder (org-scoped). `NotFound` bei fremder Org,
-/// `Conflict` bei Funkrufname-Dublette.
+/// Vollersatz der editierbaren Felder (org-scoped).
 ///
-/// **Nicht mehr im Produktivpfad** — die PATCH-Route nutzt seit LFH-306 [`patche`].
-/// Bleibt stehen, weil die co-lokierten Tests von `fahrzeug/disposition_repo.rs` sie als
-/// Stamm-Änderungs-Werkzeug (Snapshot-vs-Live) aufrufen.
+/// Nicht im Produktivpfad (die PATCH-Route nutzt [`patche`]); die Tests von
+/// `fahrzeug/disposition_repo.rs` ändern damit den Stamm (Snapshot vs. Live).
 pub async fn aktualisiere(
     pool: &SqlitePool,
     org_id: i64,
@@ -489,8 +478,8 @@ mod tests {
         assert_eq!(g.staerke(), None);
     }
 
-    /// Alle 13 editierbaren Spalten liegen distinkt gefüllt vor — Ausgangspunkt der
-    /// Bind-Reihenfolge- und Nicht-Anfassen-Tests.
+    /// Alle 13 editierbaren Spalten distinkt gefüllt — Ausgangspunkt der Bind-Reihenfolge- und
+    /// Nicht-Anfassen-Tests.
     fn volle_daten(funkrufname: &str) -> FahrzeugDaten<'_> {
         FahrzeugDaten {
             funkrufname,
@@ -507,10 +496,8 @@ mod tests {
         }
     }
 
-    /// Bind-Reihenfolge der längsten Flag/Wert-Kette im Bestand: alle 13 Spalten in EINEM
-    /// Patch auf distinkte Werte setzen und einzeln prüfen. Eine um eine Position
-    /// verschobene Kette würde gleichtypige Nachbarspalten (`opta`↔`standort`,
-    /// `staerke_fuehrer`↔`staerke_unterfuehrer`) still vertauschen.
+    /// Bind-Reihenfolge der längsten Kette: alle 13 Spalten in EINEM Patch auf distinkte Werte
+    /// setzen und einzeln prüfen.
     #[tokio::test]
     async fn patche_setzt_jede_spalte_an_ihren_platz() {
         let pool = crate::db::test_pool().await;
@@ -553,8 +540,8 @@ mod tests {
         assert_eq!(g.bemerkung.as_deref(), Some("bemerkung-wert"));
     }
 
-    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an. Der
-    /// `Default`-Patch (alle Felder absent) darf die Zeile Byte für Byte so lassen.
+    /// Ein Patch fasst NUR die gesendeten Spalten an; der `Default`-Patch lässt die Zeile
+    /// unverändert.
     #[tokio::test]
     async fn patche_laesst_nicht_gesendete_spalten_stehen() {
         let pool = crate::db::test_pool().await;
@@ -598,9 +585,9 @@ mod tests {
         assert_eq!(u.staerke().unwrap().anzeige(), "1/2/5//8");
     }
 
-    /// `Some(None)` ist der Leerwunsch und muss von „absent" unterscheidbar sein;
-    /// `Some(false)` ist beim NOT-NULL-Bool der Setz-Wunsch und darf nicht als „absent"
-    /// durchrutschen (das Flag ist `?15 IS NULL`, nicht der Wert selbst).
+    /// `Some(None)` ist der Leerwunsch und von „absent“ unterscheidbar; `Some(false)` ist beim
+    /// NOT-NULL-Bool ein Setz-Wunsch und darf nicht als „absent“ durchrutschen (das Flag ist
+    /// `?15 IS NULL`, nicht der Wert).
     #[tokio::test]
     async fn patche_none_loescht_und_sondersignal_false_setzt() {
         let pool = crate::db::test_pool().await;

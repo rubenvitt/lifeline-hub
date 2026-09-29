@@ -68,8 +68,6 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (bid, eid) = fixture(&pool).await;
         // Eine verortete UHS und eine UNverortete (lat/lon NULL → muss fehlen).
-        // Hinweis: 'pa' ist kein gültiger UHS-Typ; CHECK erlaubt nur
-        // 'patientenablage'|'behandlungsplatz'|'verletztensammelstelle'|'bereitstellungsraum'|'sonstige'.
         sqlx::query(
             "INSERT INTO uhs (einsatz_id, typ, bezeichnung, status, erfasst_von, geaendert_von, lat, lon) \
              VALUES (?, 'patientenablage', 'PA 1', 'geplant', ?, ?, 51.2, 10.2)",

@@ -9,8 +9,8 @@ use axum::response::IntoResponse;
 use chrono::Local;
 use tokio::io::AsyncReadExt;
 
-/// Lesepuffer je Stream-Chunk. Die Sicherung wächst mit der Einsatzlage (BLOB-Anhänge
-/// liegen in der Kern-DB, LFH-248) — sie darf nicht als Ganzes in den RAM.
+/// Lesepuffer je Stream-Chunk; die Sicherung (mit BLOB-Anhängen) darf nicht als Ganzes in den
+/// RAM.
 const CHUNK: usize = 64 * 1024;
 
 /// GET /api/backup — konsistente Sicherung der Datenbank als Download. Admin-only.
@@ -36,9 +36,8 @@ pub async fn download(
         .map_err(|e| AppError::Internal(format!("Sicherung messen fehlgeschlagen: {e}")))?
         .len();
 
-    // Das TempDir-Handle wandert in den Stream-Zustand: das Verzeichnis wird damit erst
-    // gelöscht, wenn der letzte Chunk gesendet ist — nicht schon beim Verlassen dieser
-    // Funktion. Sonst hinge die Auslieferung an der Unlink-Semantik des Dateisystems.
+    // Das TempDir-Handle wandert in den Stream-Zustand, damit das Verzeichnis erst nach dem
+    // letzten Chunk gelöscht wird, nicht beim Verlassen der Funktion.
     let stream = futures::stream::try_unfold((datei, dir), |(mut datei, dir)| async move {
         let mut puffer = vec![0u8; CHUNK];
         let gelesen = datei.read(&mut puffer).await?;
@@ -58,8 +57,8 @@ pub async fn download(
         header::CONTENT_TYPE,
         HeaderValue::from_static("application/octet-stream"),
     );
-    // Ein gestreamter Body ist per Default chunked und meldet keine Größe — ohne diesen
-    // Header verlöre der Browser die Fortschrittsanzeige des Sicherungs-Downloads.
+    // Ein gestreamter Body meldet keine Größe; ohne diesen Header fehlte dem Browser die
+    // Fortschrittsanzeige.
     headers.insert(header::CONTENT_LENGTH, HeaderValue::from(groesse));
     headers.insert(
         header::CONTENT_DISPOSITION,

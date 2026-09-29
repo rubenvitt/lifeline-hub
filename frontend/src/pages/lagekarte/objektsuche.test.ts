@@ -58,8 +58,8 @@ describe('suchbareMarker — Modulsperren (LFH-716, D1)', () => {
   });
 
   it('lässt eine Person, die fälschlich in der allgemeinen Liste steht, ohne Recht ebenfalls weg', () => {
-    // Die Prüfung hängt am Typ, nicht an der Herkunftsliste — eine Datenquelle, die eine
-    // Person in `verortet` mischte, bräche die Sperre sonst still.
+    // Die Prüfung hängt am Typ, nicht an der Herkunftsliste — sonst bräche eine Person in
+    // `verortet` die Sperre still.
     const liste = namen({
       ...basis,
       verortet: [UHS, PERSON],
@@ -83,7 +83,7 @@ describe('gruppiereTreffer', () => {
   });
 
   it('findet auch über die Objektart — ein unbenanntes Zeichen heißt überall gleich', () => {
-    // Browserbefund LFH-716: „(freies Zeichen)" war unter „takt" nicht zu finden.
+    // „(freies Zeichen)" ist unter „takt" zu finden.
     const marker = [
       m('freies_zeichen', 1, '(freies Zeichen)'),
       m('fahrzeug', 2, 'Florian 11-1'),

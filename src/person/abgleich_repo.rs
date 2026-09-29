@@ -24,9 +24,8 @@ const SELECT_ABGLEICH: &str = "\
            erstellt_at, erstellt_von, entschieden_at, entschieden_von \
     FROM person_abgleich";
 
-/// Legt einen Verdachts-Link an (Status `verdacht`). Die fachliche Validierung
-/// (Status der beteiligten Personen, gleicher Einsatz, nicht dieselbe Person)
-/// ist Handler-Aufgabe (Task 12).
+/// Legt einen Verdachts-Link an (Status `verdacht`). Die fachliche Validierung (Status der
+/// Personen, gleicher Einsatz, nicht dieselbe Person) macht der Handler.
 pub async fn anlegen_verdacht(
     pool: &SqlitePool,
     einsatz_id: i64,

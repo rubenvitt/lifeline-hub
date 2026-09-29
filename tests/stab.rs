@@ -1,6 +1,4 @@
-//! Integrationstests der Führungsorganisation (LFH-46 · ST1): Besetzung S1–S6.
-//!
-//! Spec: `docs/superpowers/specs/2026-09-12-lfh-46-stab-s1-s6-design.md`, Abschnitt 9.5.
+//! Integrationstests der Führungsorganisation (LFH-46): Besetzung S1–S6.
 
 use axum::http::StatusCode;
 
@@ -118,12 +116,9 @@ async fn beobachter_darf_lesen_aber_nicht_schreiben() {
 
 /// Fremde Organisation: der Zugriff wird auf JEDER Route abgewiesen.
 ///
-/// **Gemessen ist das 403, nicht 404** — Abschnitt 9.2 der Spec schreibt „404 aus dem
-/// Extractor", aber `fordere_org_zugehoerigkeit` liefert `AppError::Forbidden`
-/// (`src/einsatz/berechtigung.rs:150-160`); 404 entsteht erst bei einem Einsatz, den es
-/// GAR NICHT gibt (`einsatz_repo::laden`). Geprüft wird wie im Bestand (`tests/cross_org.rs:93`)
-/// gegen „403 oder 404": beide leaken nichts, und welcher der beiden es ist, soll dieser Test
-/// nicht festnageln.
+/// `fordere_org_zugehoerigkeit` liefert 403; 404 entsteht erst bei einem Einsatz, den es gar
+/// nicht gibt. Geprüft wird wie in `tests/cross_org.rs` gegen „403 oder 404": beide verraten
+/// nichts, und welcher es ist, soll dieser Test nicht festnageln.
 #[tokio::test]
 async fn fremde_org_wird_auf_allen_routen_abgewiesen() {
     let (app, pool) = setup_mit_pool().await;
@@ -197,7 +192,7 @@ async fn einsatzleitung_setzen_schreibt_etb_mit_vorherstand() {
 }
 
 /// Ein Upsert trägt den VORHERSTAND in den ETB-Text — sonst ist der Wechsel nicht
-/// rekonstruierbar, und genau das ersetzt die fehlende Besetzungshistorie (Entscheidung 7).
+/// rekonstruierbar; das ETB ersetzt die fehlende Besetzungshistorie.
 #[tokio::test]
 async fn upsert_setzt_vorherstand_in_den_etb_text() {
     let app = setup().await;
@@ -315,7 +310,7 @@ async fn snap_name_ueberlebt_das_entfernen_der_disposition() {
     );
 }
 
-// ---------- Statuscodes (Abschnitt 9.2) ----------
+// ---------- Statuscodes ----------
 
 #[tokio::test]
 async fn unbekanntes_sachgebiet_im_pfad_ist_400() {
@@ -438,7 +433,7 @@ async fn ausgeblendetes_modul_sperrt_lesen_und_schreiben() {
     assert_eq!(status, StatusCode::FORBIDDEN, "Schreiben gesperrt");
 }
 
-// ---------- DELETE-Idempotenz (die Setzung aus 9.2) ----------
+// ---------- DELETE-Idempotenz ----------
 
 /// Das **Paar**, das die Idempotenz überhaupt prüfbar macht: auf besetzter Zeile
 /// 204 + ETB-Eintrag + SSE, auf leerer Zeile 204 + **kein** ETB-Eintrag + **kein** SSE.
@@ -797,7 +792,7 @@ async fn schwaerzung_nullt_namen_nur_im_betroffenen_einsatz() {
     assert_eq!(art, "rueckwaertig");
 }
 
-// ---------- Lagebesprechung (ST2) ----------
+// ---------- Lagebesprechung ----------
 
 fn besprechungen_pfad(einsatz: i64) -> String {
     format!("/api/einsaetze/{einsatz}/{PFAD}/lagebesprechungen")
@@ -874,7 +869,7 @@ async fn abschluss_schreibt_etb_entscheidung_zeile_und_termin() {
         1
     );
 
-    // Und der Termin steht auch am Einsatzkopf (EINE Wahrheit, Entscheidung 11).
+    // Und der Termin steht auch am Einsatzkopf (EINE Wahrheit).
     let (_, kopf) = anfrage(
         &app,
         "GET",
@@ -1070,9 +1065,6 @@ async fn beobachter_darf_historie_lesen_aber_nicht_abschliessen() {
 /// `UPDATE … WHERE id = ? AND status = 'aktiv'` und rollt bei `rows_affected == 0` zurück.
 /// Gerufen wird die Repo-Funktion **direkt**, weil `fordere_aktiv` den Zweig auf der Route
 /// verdeckt.
-///
-/// **Mutationsprobe gefahren:** die eine Transaktion durch drei Einzelaufrufe ersetzt →
-/// dieser Test wird rot (der ETB-Eintrag bleibt dann stehen).
 #[tokio::test]
 async fn abschluss_rollt_bei_inaktivem_einsatz_vollstaendig_zurueck() {
     let (app, pool) = setup_mit_pool().await;
@@ -1208,12 +1200,10 @@ async fn schwaerzung_laesst_den_entschluss_stehen() {
     );
 }
 
-/// **Der Fall, den der Termin-Schlüssel bisher verdeckt hat** (Codex-Review zu PR #60, P2).
-///
-/// Ohne `naechste_at` lief der Abschluss durch die Transaktion, ohne den Zustand des
-/// Einsatzes je zu prüfen — `fordere_aktiv` im Extractor liest einen Stand von VOR der
-/// Transaktion. Ein ETB-Eintrag vom Typ `entscheidung` ist append-only und gehört nicht in
-/// einen abgeschlossenen Einsatz.
+/// Abschluss OHNE Termin auf einem inaktiven Einsatz: `fordere_aktiv` im Extractor liest einen
+/// Stand von VOR der Transaktion, der Riegel in der Transaktion muss also auch ohne
+/// Termin-Update greifen. Ein ETB-Eintrag vom Typ `entscheidung` ist append-only und gehört
+/// nicht in einen abgeschlossenen Einsatz.
 ///
 /// Das **Paar** zu `abschluss_rollt_bei_inaktivem_einsatz_vollstaendig_zurueck`: dort MIT
 /// Termin, hier OHNE. Nur zusammen belegen sie, dass der Riegel unbedingt greift und nicht
@@ -1239,7 +1229,7 @@ async fn abschluss_ohne_termin_rollt_bei_inaktivem_einsatz_ebenfalls_zurueck() {
         &lifeline_hub::stab::repo::AbschlussEingabe {
             entschluss: "Darf nicht bestehen bleiben".into(),
             abgehalten_at: "2026-09-12 18:00:00".into(),
-            // KEIN Termin — genau der Pfad, der vorher ungeprüft durchlief.
+            // KEIN Termin — der Pfad, der ohne eigenen Riegel ungeprüft durchliefe.
             naechste_at: None,
         },
     )
@@ -1274,13 +1264,13 @@ async fn abschluss_ohne_termin_rollt_bei_inaktivem_einsatz_ebenfalls_zurueck() {
 ///
 /// Der System-ETB-Eintrag ist bedingt: nur bei fachlicher Änderung. Ohne den Riegel schriebe
 /// ein Doppelklick im Modal oder ein Retry nach verlorener Antwort „Besetzung → Müller
-/// (vorher: Müller)" ins Tagebuch — und weil Entscheidung 7 bewusst KEINE Besetzungshistorie
-/// führt, ist das ETB der einzige Nachweis des Verlaufs; eine Dublette dort ist von einem
-/// echten Wechsel nicht zu unterscheiden.
+/// (vorher: Müller)" ins Tagebuch — und weil es bewusst KEINE Besetzungshistorie gibt, ist
+/// das ETB der einzige Nachweis des Verlaufs; eine Dublette dort ist von einem echten Wechsel
+/// nicht zu unterscheiden.
 ///
 /// Die Zeile selbst wird trotzdem geschrieben (`gesetzt_at` hält den Klick fest) und das
-/// `stab`-Ereignis trotzdem gefeuert — dieselbe Aufteilung wie an den vier Bestandsstellen
-/// mit bedingtem System-ETB (`einsatz_fahrzeug`, `einsatz_personal`, `einsatz_material`,
+/// `stab`-Ereignis trotzdem gefeuert — dieselbe Aufteilung wie an den anderen Stellen mit
+/// bedingtem System-ETB (`einsatz_fahrzeug`, `einsatz_personal`, `einsatz_material`,
 /// `einsatz_einheit`).
 #[tokio::test]
 async fn zweimal_setzen_mit_gleichem_wert_schreibt_einen_etb_eintrag() {
@@ -1390,7 +1380,7 @@ async fn wertgleicher_put_schreibt_die_zeile_trotzdem() {
     assert_eq!(etb_events, 0, "es gibt keinen ETB-Eintrag zu melden");
 }
 
-/// **Der Lebenszyklus-Riegel gilt auch für die Besetzung** (Codex-Review zu `39131a4`).
+/// **Der Lebenszyklus-Riegel gilt auch für die Besetzung.**
 ///
 /// `fordere_aktiv` läuft im Extractor und liest einen Stand von VOR der Transaktion;
 /// `write_retry!` wartet bei BUSY am `BEGIN IMMEDIATE`, der Retry-Pfad verbreitert das

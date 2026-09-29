@@ -1,9 +1,8 @@
-//! Repo-Tests des Löschwegs `entfernen_tx` (LFH-690, design.md D7) gegen die voll migrierte DB.
+//! Repo-Tests des Löschwegs `entfernen_tx` (LFH-690) gegen die voll migrierte DB.
 //!
-//! Kopf und Marken entstehen hier von Hand, nicht über den Import: der Löschweg muss sich an
-//! Kopf und Marke halten, gleich wer sie geschrieben hat. Deshalb stehen auch Kopf-Zustände
-//! im Test, die der Import nie erzeugt (Kopf auf einem fremden Einsatz, Marke auf einer
-//! fremden Zeile).
+//! Kopf und Marken entstehen hier von Hand: der Löschweg muss sich an Kopf und Marke halten,
+//! gleich wer sie geschrieben hat. Deshalb stehen auch Zustände im Test, die der Import nie
+//! erzeugt (Kopf auf einem fremden Einsatz, Marke auf einer fremden Zeile).
 
 use sqlx::SqlitePool;
 
@@ -442,10 +441,8 @@ async fn demo_fahrzeug_im_echten_einsatz_bleibt_und_verliert_die_marke() {
     erwarte_zeile(&bericht, DemoStammdatenArt::Material, 1, 0);
 }
 
-/// Die Qualifikationen einer Demo-Person werden im Savepoint der Person gelöscht. Scheitert die
-/// Person an einer Disposition, kommen sie mit dem `ROLLBACK TO` zurück. Ohne diesen Test
-/// fiele eine Löschung außerhalb des Savepoints nicht auf: die Person stünde, ihre
-/// Qualifikationen wären still weg.
+/// Die Qualifikationen einer Demo-Person liegen im Savepoint der Person: scheitert die Person an
+/// einer Disposition, kommen sie mit dem `ROLLBACK TO` zurück, statt still zu verschwinden.
 #[tokio::test]
 async fn demo_person_im_echten_einsatz_bleibt_samt_qualifikation() {
     let pool = crate::db::test_pool().await;
@@ -605,8 +602,8 @@ async fn zweites_entfernen_ist_409() {
 // (f) soft-gelöschter bzw. geschwärzter Demo-Einsatz wird entfernt
 // ---------------------------------------------------------------------------------------------
 
-/// Abschluss mit abgelaufener Aufbewahrungsfrist: `soft_delete_einsatz` prüft die
-/// Fälligkeit seit LFH-23 im UPDATE selbst, ohne Frist merkte er nichts vor.
+/// Abschluss mit abgelaufener Aufbewahrungsfrist: `soft_delete_einsatz` prüft die Fälligkeit im
+/// UPDATE selbst, ohne Frist merkte er nichts vor.
 async fn abschliessen(pool: &SqlitePool, einsatz_id: i64) {
     sqlx::query(
         "UPDATE einsatz SET status = 'abgeschlossen', abgeschlossen_at = datetime('now'), \
@@ -706,13 +703,11 @@ async fn geschwaerzter_demo_einsatz_wird_entfernt() {
 // (g) Kopf zeigt auf einen echten Einsatz einer anderen Org
 // ---------------------------------------------------------------------------------------------
 
-/// Die Org im WHERE des Einsatz-DELETE ist die letzte Sperre: ein Kopf, dessen `einsatz_id`
-/// auf einen echten Einsatz einer anderen Org zeigt, löscht ihn nicht. Der Import erzeugt so
-/// einen Kopf nie; der Test prüft, dass der Löschweg sich nicht darauf verlässt.
+/// Die Org im WHERE des Einsatz-DELETE ist die letzte Sperre: ein Kopf mit `einsatz_id` eines
+/// echten Einsatzes einer anderen Org löscht ihn nicht. Der Import erzeugt so einen Kopf nie;
+/// der Löschweg verlässt sich nicht darauf.
 ///
-/// Festgelegt: der Kopf wird trotzdem geschlossen. Er trägt keinen eigenen Einsatz, ein
-/// offener Kopf sperrte den nächsten Import für immer. Die ID bleibt gesperrt, was bei einem
-/// bestehenden Einsatz nichts ändert.
+/// Der Kopf wird trotzdem geschlossen, sonst sperrte er den nächsten Import für immer.
 #[tokio::test]
 async fn kopf_auf_fremdem_einsatz_loescht_ihn_nicht() {
     let pool = crate::db::test_pool().await;
@@ -750,9 +745,8 @@ async fn kopf_auf_fremdem_einsatz_loescht_ihn_nicht() {
     }
 }
 
-/// Auch das Stammdaten-DELETE trägt die Org: eine Marke, die auf eine Zeile einer fremden Org
-/// zeigt, löscht sie nicht. Festgelegt: die Marke fällt, der Bericht zählt die Zeile weder als
-/// entfernt noch als behalten — sie war nie ein Demo-Datensatz dieser Org.
+/// Auch das Stammdaten-DELETE trägt die Org: eine Marke auf einer fremden Zeile löscht sie
+/// nicht. Die Marke fällt, der Bericht zählt die Zeile weder als entfernt noch als behalten.
 #[tokio::test]
 async fn marke_auf_fremder_stammdatenzeile_loescht_sie_nicht() {
     let pool = crate::db::test_pool().await;
@@ -996,10 +990,9 @@ async fn aufgeschobene_fremdschluessel_brechen_den_loeschweg_ab() {
     );
 }
 
-/// Nur ein Fremdschlüsselfehler heißt „behalten“. Jeder andere Fehler mitten im Löschen der
-/// Stammdaten bricht den ganzen Vorgang ab, und der Aufrufer rollt ALLES zurück, auch den
-/// schon gelöschten Einsatz. Der Fehler hier ist echt: ein Trigger, der das Löschen von
-/// Material mit `RAISE(ABORT)` verweigert (SQLite-Code 1811, kein FK).
+/// Nur ein Fremdschlüsselfehler heißt „behalten“. Jeder andere Fehler bricht den ganzen Vorgang
+/// ab, und der Aufrufer rollt alles zurück, auch den gelöschten Einsatz. Hier ein echter Fehler:
+/// ein Trigger mit `RAISE(ABORT)` (SQLite-Code 1811, kein FK).
 #[tokio::test]
 async fn anderer_fehler_bricht_den_ganzen_vorgang_ab() {
     let pool = crate::db::test_pool().await;

@@ -31,15 +31,14 @@ pub async fn lesen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
 ) -> Result<Json<OrganisationAnzeige>, AppError> {
-    // Die EIGENE Organisation (F05/LFH-232), nicht `ORDER BY id LIMIT 1`: sonst sähe ein
-    // Nutzer der zweiten Org die Stammdaten der ersten — inkl. `tz_organisation`, das die
-    // taktischen Zeichen der gesamten Oberfläche steuert.
+    // Die EIGENE Organisation, nicht `ORDER BY id LIMIT 1`: sonst sähe ein Nutzer der zweiten
+    // Org die Stammdaten der ersten, inkl. `tz_organisation`, das die taktischen Zeichen steuert.
     Ok(Json(lade_anzeige(&state.pool, benutzer.org_id).await?))
 }
 
-/// Lädt die Stammdaten einer Organisation samt Logo-Metadaten (ohne BLOB). Eine Quelle
-/// für GET, PATCH und den Logo-Upload, damit jede Antwort dieselbe Form trägt — sonst
-/// verlöre ein Client, der seinen Cache aus der PATCH-Antwort setzt, das Logo still.
+/// Stammdaten einer Organisation samt Logo-Metadaten (ohne BLOB). Eine Quelle für GET, PATCH
+/// und Logo-Upload, damit jede Antwort dieselbe Form trägt — sonst verlöre ein Client, der
+/// seinen Cache aus der PATCH-Antwort setzt, das Logo.
 async fn lade_anzeige(pool: &SqlitePool, org_id: i64) -> Result<OrganisationAnzeige, AppError> {
     let mut org = sqlx::query_as::<_, OrganisationAnzeige>(
         "SELECT id, name, tz_organisation FROM organisation WHERE id = ?",
@@ -51,8 +50,7 @@ async fn lade_anzeige(pool: &SqlitePool, org_id: i64) -> Result<OrganisationAnze
     Ok(org)
 }
 
-/// PATCH-Body (LFH-22, design.md D7): beide Felder optional, aber mindestens eines muss
-/// kommen. Der bisherige Aufruf `{ tz_organisation }` des Frontends bleibt gültig.
+/// PATCH-Body: beide Felder optional, mindestens eines muss kommen.
 #[derive(Debug, Deserialize)]
 pub struct OrgPatch {
     pub name: Option<String>,
@@ -86,8 +84,8 @@ pub async fn aktualisieren(
             "Kein änderbares Feld angegeben (name, tz_organisation)".into(),
         ));
     }
-    // Erst ALLE Felder prüfen, dann schreiben: ein ungültiger Name neben einer gültigen
-    // Vorgabe darf die Vorgabe nicht halb übernehmen.
+    // Erst alle Felder prüfen, dann schreiben: ein ungültiger Name darf eine gültige Vorgabe nicht
+    // halb übernehmen.
     let name = match body.name.as_deref().map(str::trim) {
         None => None,
         Some("") => return Err(AppError::Validation("Name darf nicht leer sein".into())),
@@ -98,16 +96,14 @@ pub async fn aktualisieren(
         }
         Some(n) => Some(n.to_string()),
     };
-    // Allowlist-Prüfung eines Einzelfelds — enum-artig, scheitert am Feld selbst → 400
-    // (LFH-305).
+    // Allowlist-Prüfung eines Einzelfelds → 400.
     if let Some(tz) = body.tz_organisation.as_deref() {
         if !ERLAUBTE_ORG.contains(&tz) {
             return Err(AppError::Validation("Unbekannte Organisation".into()));
         }
     }
-    // Der Admin pflegt seine EIGENE Organisation (F05/LFH-232). Er ist zwar serverweit
-    // berechtigt, aber „welche Org" darf nicht von der Zeilenreihenfolge abhängen.
-    // `COALESCE` lässt ein nicht geliefertes Feld stehen (ein Statement, statisches SQL).
+    // Der Admin pflegt seine EIGENE Organisation; „welche Org“ hängt nicht an der
+    // Zeilenreihenfolge. `COALESCE` lässt ein nicht geliefertes Feld stehen.
     sqlx::query(
         "UPDATE organisation SET name = COALESCE(?, name), \
          tz_organisation = COALESCE(?, tz_organisation) WHERE id = ?",
@@ -120,10 +116,10 @@ pub async fn aktualisieren(
     Ok(Json(lade_anzeige(&state.pool, benutzer.org_id).await?))
 }
 
-// --- Logo (LFH-22, design.md D8) ------------------------------------------------------
+// --- Logo ------------------------------------------------------------------------------
 //
-// Alle drei Routen lesen die Organisation aus `benutzer.org_id` (LFH-232) und nehmen
-// keine Org-Kennung entgegen: ein Admin ändert immer nur das Logo seiner eigenen Org.
+// Alle drei Routen lesen die Organisation aus `benutzer.org_id` und nehmen keine Org-Kennung
+// entgegen: ein Admin ändert nur das Logo seiner eigenen Org.
 
 /// POST /api/organisation/logo — Logo setzen oder ersetzen. Nur Admin. Multipart-Feld
 /// `datei`; PNG oder JPEG (am Inhalt erkannt), 1 Byte bis 1 MiB, vor dem Speichern
@@ -149,8 +145,8 @@ pub async fn logo_hochladen(
     }
     let bytes = bytes.ok_or_else(|| AppError::Validation("Keine Datei im Upload".into()))?;
 
-    // Reihenfolge: leer/zu groß → Typ am Inhalt (SVG fällt hier durch) → Virenscan. Alles
-    // vor dem Schreiben: ein abgelehnter Upload lässt das bisherige Logo stehen.
+    // Reihenfolge: leer/zu groß → Typ am Inhalt (SVG fällt hier durch) → Virenscan. Alles vor dem
+    // Schreiben, damit ein abgelehnter Upload das bisherige Logo stehen lässt.
     logo::pruefe_groesse(bytes.len())?;
     let mime = crate::karte_hintergrundbild::erkenne_bild_mime(&bytes)?;
     crate::anhang::scan(crate::anhang::scan_config(), &bytes).await?;
@@ -159,11 +155,10 @@ pub async fn logo_hochladen(
     Ok(Json(lade_anzeige(&state.pool, benutzer.org_id).await?))
 }
 
-/// GET /api/organisation/logo — die Bytes des eigenen Logos. Jede angemeldete Person.
-/// Erst die Metadaten ohne BLOB: passt `If-None-Match`, antwortet die Route 304 ohne den
-/// BLOB zu lesen. Sonst Typ, Prüfsumme und Bytes in EINER Abfrage (`logo::inhalt`) — die
-/// Kopfzeilen der Antwort kommen aus derselben Zeile wie die Bytes, auch wenn zwischen
-/// beiden Abfragen ein Ersetzen lag. Kein Logo → 404.
+/// GET /api/organisation/logo — die Bytes des eigenen Logos, für jede angemeldete Person. Passt
+/// `If-None-Match` zu den Metadaten, antwortet die Route 304, ohne den BLOB zu lesen. Sonst
+/// kommen Typ, Prüfsumme und Bytes in EINER Abfrage, damit Kopfzeilen und Bytes auch bei einem
+/// parallelen Ersetzen zusammenpassen. Kein Logo → 404.
 pub async fn logo_lesen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,

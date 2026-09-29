@@ -1,10 +1,10 @@
 //! ETB-Lesemarke je Benutzer und Einsatz (LFH-611): „14 neue Einträge seit Ihrer letzten
-//! Sichtung um 13:04 · alle als gesichtet markieren" (Neuentwurf S4).
+//! Sichtung um 13:04 · alle als gesichtet markieren".
 //!
 //! Die Marke vergleicht über `lfd_nr`, nicht über eine Zeit: `lfd_nr` wächst je Einsatz
 //! streng mit dem EINGANG, `ereigniszeit` kann nachgetragen sein. Ein Zeitschnitt ließe einen
-//! nachgetragenen Eintrag still unter die Marke rutschen — `nachgetragener_eintrag_zaehlt_als_neu`
-//! pinnt genau das.
+//! nachgetragenen Eintrag still unter die Marke rutschen —
+//! `nachgetragener_eintrag_zaehlt_als_neu` pinnt genau das.
 
 use axum::http::StatusCode;
 use serde_json::Value;
@@ -80,7 +80,7 @@ async fn ohne_marke_zaehlt_alles_fremde_und_traegt_keine_sichtung() {
     assert_eq!(v["neue_anzahl"].as_i64().unwrap(), vorher + 1);
     assert_eq!(v["hoechste_lfd_nr"].as_i64().unwrap(), hoechste);
     // Presence, nicht `== Null`: ein fehlender Key und `null` sind über den Index-Zugriff
-    // nicht zu unterscheiden (CLAUDE.md, Optionalität ehrlich machen).
+    // nicht zu unterscheiden.
     let obj = v.as_object().unwrap();
     assert!(!obj.contains_key("gesichtet_lfd_nr"), "{v:?}");
     assert!(!obj.contains_key("gesichtet_at"), "{v:?}");

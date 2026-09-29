@@ -19,9 +19,8 @@
 //! **Kein Allowlist-Bedarf:** Der Scan ist auf `src/routes/` begrenzt. `src/extract.rs`
 //! (der Wrapper selbst) und `src/einsatz/kontext.rs` (die keyed `Path<HashMap>`-Extraktion des
 //! `EinsatzKontext`, schon via `AppError::NotFound` im Envelope) liegen außerhalb — durch
-//! Konstruktion ausgenommen, nicht durch eine pflegebedürftige Liste. Ein Vorabscan
-//! (`rg -l "Path<" src`) hat bestätigt: außerhalb von `src/routes/` gibt es keinen weiteren
-//! id-nehmenden Handler, nur jene eine legitime Extractor-interne Stelle.
+//! Konstruktion ausgenommen, nicht durch eine pflegebedürftige Liste. Außerhalb von
+//! `src/routes/` gibt es keinen weiteren id-nehmenden Handler.
 
 use std::fs;
 

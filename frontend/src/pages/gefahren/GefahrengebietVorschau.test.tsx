@@ -60,9 +60,8 @@ describe('GefahrengebietVorschau (LFH-664)', () => {
   });
 
   /**
-   * „keine" heißt „keine Stufe gesetzt", nicht „unbewertet": das Backend rechnet die höchste
-   * Stufe über ein Severity-MAX, in dem `keine` und gar keine Bewertung denselben Rang haben
-   * (CLAUDE.md, LFH-357). Ein Wort, das die beiden Fälle trennt, behauptete zu viel.
+   * „keine" heißt „keine Stufe gesetzt", nicht „unbewertet": im Severity-MAX des Backends haben
+   * `keine` und gar keine Bewertung denselben Rang (LFH-357).
    */
   it('nennt „keine" als „keine Stufe gesetzt", ohne „unbewertet" zu behaupten', async () => {
     liefere([gebiet({ hoechste_warnstufe: 'keine' })], () => HttpResponse.json([]));
@@ -103,7 +102,7 @@ describe('GefahrengebietVorschau (LFH-664)', () => {
     ).toBeInTheDocument();
   });
 
-  /** Die Matrix ist die benannte Ausnahme der Spec (die Trefferliste trägt sie nicht). */
+  /** Die Matrix ist die benannte Ausnahme (die Trefferliste trägt sie nicht). */
   it('liest das geladene Gebiet ohne Abruf der Gebietsliste', async () => {
     const abrufe = liefere([]);
     const client = new QueryClient();

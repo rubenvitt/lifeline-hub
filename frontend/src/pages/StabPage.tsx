@@ -30,16 +30,15 @@ import { einsatzStatus } from '../theme/statusFarben';
 /**
  * Modul „Stab" (LFH-46): Lagebesprechung und Führungsorganisation S1–S6.
  *
- * UI-Form (Spec Entscheidung 16): eine Vollseite, zwei Sektionen, zwei Masken. Die Besetzung ist
- * eine `Liste` mit sechs festen Zeilen — hier wird nichts verglichen (LFH-330/B2). Die Zeile ist
- * kein Klickziel; genau eine Aktion „Besetzung ändern" je Zeile, ohne Schreibrecht entfällt sie
- * und ein Satz nennt den Grund (LFH-346 · C11).
+ * Eine Vollseite, zwei Sektionen, zwei Masken. Die Besetzung ist eine `Liste` mit sechs festen
+ * Zeilen — hier wird nichts verglichen. Die Zeile ist kein Klickziel; genau eine Aktion „Besetzung
+ * ändern" je Zeile, ohne Schreibrecht entfällt sie und ein Satz nennt den Grund.
  *
- * Der Kopf trägt genau eine Primäraktion „Lagebesprechung abschließen" (LFH-543). Sie ÖFFNET ein
- * Modal und gehört deshalb in den Kopf; ohne Schreibrecht steht sie gesperrt da (C10/M16), und
- * `neueZeile` der Kommandopalette trägt denselben Riegel. Die Lücken-Kennzahlen folgen in ST6.
+ * Der Kopf trägt genau eine Primäraktion „Lagebesprechung abschließen". Sie öffnet ein Modal und
+ * gehört deshalb in den Kopf; ohne Schreibrecht steht sie gesperrt da, und `neueZeile` der
+ * Kommandopalette trägt denselben Riegel.
  *
- * Live: das `stab`-Ereignis invalidiert `einsatz-stab` samt Historie (Bestand).
+ * Live: das `stab`-Ereignis invalidiert `einsatz-stab` samt Historie.
  */
 export default function StabPage() {
   const { id } = useParams();
@@ -65,28 +64,26 @@ export default function StabPage() {
     queryFn: () => ladeModulOverrides(einsatzId),
   });
 
-  // VOR den frühen Returns (Hook-Reihenfolge): der `?neu=1`-Leser darunter braucht das Recht,
-  // bevor der Einsatz sicher geladen ist. `darfImEinsatzSchreiben` liefert für `undefined` false
-  // (Muster `SchaedenPage.tsx:210`).
+  // Vor den frühen Returns (Hook-Reihenfolge): der `?neu=1`-Leser darunter braucht das Recht, bevor
+  // der Einsatz sicher geladen ist. `darfImEinsatzSchreiben` liefert für `undefined` false.
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
   const stabDa = stabQuery.data != null;
-  // Ohne Stand fehlte der bestehende Termin zur Vorbelegung — ein unverändertes Absenden
-  // schickte `naechste_at: null` und löschte ihn (Plan-Abweichung 7).
+  // Ohne Stand fehlte der bestehende Termin zur Vorbelegung — ein unverändertes Absenden schickte
+  // `naechste_at: null` und löschte ihn.
   const abschlussErlaubt = darfSchreiben && stabDa;
   const oeffneAbschluss = useCallback(() => setAbschlussOffen(true), []);
 
-  // Fällt das Recht (oder der Stand) bei offener Maske weg, hängt der Render sie aus — der
-  // Merker bliebe aber stehen, und kämen die Rechte zurück, stünde die Maske ungefragt wieder
-  // auf (Ruling 13). Deshalb auch den Merker räumen.
+  // Fällt das Recht (oder der Stand) bei offener Maske weg, hängt der Render sie aus — der Merker
+  // bliebe aber stehen, und kämen die Rechte zurück, stünde die Maske ungefragt wieder auf. Deshalb
+  // auch den Merker räumen.
   useEffect(() => {
     if (abschlussOffen && !abschlussErlaubt) setAbschlussOffen(false);
   }, [abschlussOffen, abschlussErlaubt]);
 
-  // Schnellaktion: ?neu=1 öffnet den Abschluss der Lagebesprechung (Kommandopalette, LFH-543).
-  // Das LITERAL `searchParams.get('neu')` muss in DIESER Datei stehen:
-  // `schnellaktionen.guard.test.ts` ordnet den Leser über den Dateinamen dem Modul zu.
-  // Warten, bis Einsatz UND Stand geladen sind; Parameter immer räumen (apply-then-clean),
-  // die Maske nur mit Schreibrecht und Stand öffnen.
+  // Schnellaktion: ?neu=1 öffnet den Abschluss der Lagebesprechung (Kommandopalette). Das Literal
+  // `searchParams.get('neu')` muss in dieser Datei stehen: `schnellaktionen.guard.test.ts` ordnet
+  // den Leser über den Dateinamen dem Modul zu. Warten, bis Einsatz und Stand geladen sind;
+  // Parameter immer räumen (apply-then-clean), die Maske nur mit Schreibrecht und Stand öffnen.
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading || stabQuery.isLoading) return;
@@ -114,8 +111,8 @@ export default function StabPage() {
   }
   const einsatz = einsatzQuery.data;
 
-  // Fehler ≠ leer (LFH-331 · B3): ohne Daten tritt der Fehler an die Stelle der Liste — sechs
-  // „nicht vergeben" wären sonst eine Aussage über eine Menge, die nie ankam.
+  // Fehler ≠ leer: ohne Daten tritt der Fehler an die Stelle der Liste — sechs „nicht vergeben"
+  // wären sonst eine Aussage über eine Menge, die nie ankam.
   const stabGescheitert = stabQuery.isError && !stabQuery.data;
   const standVeraltet = stabQuery.isError && stabQuery.data != null;
   const offenerEintrag = SACHGEBIETE.find((s) => s.sachgebiet === offenFuer);
@@ -140,7 +137,7 @@ export default function StabPage() {
           ]}
         />
       }
-      // Gesperrt statt versteckt (C10/M16): der Hinweis darunter nennt den Grund.
+      // Gesperrt statt versteckt: der Hinweis darunter nennt den Grund.
       aktionen={
         <Button type="primary" disabled={!abschlussErlaubt} onClick={oeffneAbschluss}>
           Lagebesprechung abschließen
@@ -148,15 +145,15 @@ export default function StabPage() {
       }
       // Derselbe Riegel wie am Knopf — die Palette ist ein zweiter Weg auf dieselbe Aktion.
       neueZeile={abschlussErlaubt ? oeffneAbschluss : undefined}
-      // Bedingt übergeben, nicht über `sichtbar` allein: `EinsatzSeite` rendert den Slot, sobald
-      // er truthy ist — ein JSX-Element ist das immer, auch wenn es `null` zurückgibt, und
-      // hinterliesse mit Schreibrecht ein leeres `div` mit Aussenabstand (Muster `SchaedenPage`).
+      // Bedingt übergeben, nicht über `sichtbar` allein: `EinsatzSeite` rendert den Slot, sobald er
+      // truthy ist — ein JSX-Element ist das immer, auch wenn es `null` zurückgibt, und hinterließe
+      // ein leeres `div` mit Außenabstand.
       hinweis={
         !darfSchreiben && <RechteHinweis sichtbar text={besetzungRechteText(einsatz.status)} />
       }
     >
-      {/* Paneele statt Sektionskopf + `<section>`: das Paneel IST die benannte Region
-          (`aria-labelledby` auf seine Augenbraue), der Name bleibt „Lagebesprechung". */}
+      {/* Paneele statt Sektionskopf + `<section>`: das Paneel ist die benannte Region
+          (`aria-labelledby` auf seine Augenbraue). */}
       <Paneel titel="Lagebesprechung" koerperPolster style={{ marginBottom: token.margin }}>
         <Flex vertical gap={token.margin}>
           {stabGescheitert ? (
@@ -168,7 +165,7 @@ export default function StabPage() {
           ) : stabQuery.data ? (
             <LagebesprechungStand einsatzId={einsatzId} stab={stabQuery.data} />
           ) : (
-            // Vor dem Laden wird kein Termin behauptet (Ruling 1).
+            // Vor dem Laden wird kein Termin behauptet.
             <Skeleton title={false} paragraph={{ rows: 3 }} />
           )}
           <LagebesprechungHistorie einsatzId={einsatzId} />
@@ -201,9 +198,8 @@ export default function StabPage() {
                 return (
                   <ListenEintrag
                     actions={
-                      // Erst mit Daten: vor dem Laden belegte die Maske „nicht vergeben" vor —
-                      // dieselbe Mengenaussage, die der Tag unterdrückt (Ruling 1). Die Tastatur
-                      // erreicht den Knopf auch unter dem Ladeindikator.
+                      // Erst mit Daten: vor dem Laden belegte die Maske „nicht vergeben" vor. Die
+                      // Tastatur erreicht den Knopf auch unter dem Ladeindikator.
                       darfSchreiben && stabQuery.data
                         ? [
                             <Button
@@ -222,8 +218,8 @@ export default function StabPage() {
                         <Space wrap>
                           {`${s.kuerzel} · ${s.label}`}
                           {/* Solange nichts angekommen ist, wird nichts über die Besetzung
-                              behauptet (LFH-331 · B3/D4) — „nicht vergeben" vor dem Laden wäre
-                              eine Aussage über eine Menge, die noch gar nicht da ist. */}
+                              behauptet — „nicht vergeben" vor dem Laden wäre eine Aussage über
+                              eine Menge, die noch nicht da ist. */}
                           {stabQuery.data && (
                             <StatusTag darstellung={besetzungDarstellung(zeile)} />
                           )}
@@ -271,7 +267,7 @@ export default function StabPage() {
       )}
       {/* Montiert = offen: die Maske friert Vorbelegung und Basis beim Montieren ein, und jede
           Öffnung hat eine frische Mutation ohne alten Fehler. Der Toast nimmt das `navigate`
-          DIESER Seite — `<AntApp>` liegt außerhalb des Routers. */}
+          dieser Seite — `<AntApp>` liegt außerhalb des Routers. */}
       {abschlussOffen && darfSchreiben && stabQuery.data && (
         <LagebesprechungModal
           einsatzId={einsatzId}

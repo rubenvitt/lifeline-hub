@@ -1,7 +1,7 @@
 import type { AbschlussGrund, Spezies, Tier, TierStatus } from '../../api/types';
 import type { StatusTon } from '../../components/instrument';
 
-/** Tierart als Wort — die EINE Zuordnung für Liste, Detailseite und Archivakte (LFH-23). */
+/** Tierart als Wort — die eine Zuordnung für Liste, Detailseite und Archivakte. */
 export const SPEZIES_META: Record<Spezies, string> = {
   hund: 'Hund',
   katze: 'Katze',
@@ -12,7 +12,7 @@ export const SPEZIES_META: Record<Spezies, string> = {
   sonstige: 'Sonstige',
 };
 
-/** Abschlussgrund eines Tiers als Wort — Detailseite und Archivakte (LFH-23). */
+/** Abschlussgrund eines Tiers als Wort — Detailseite und Archivakte. */
 export const TIER_ABSCHLUSS: Record<AbschlussGrund, string> = {
   uebergabe_halter: 'Übergabe an Halter',
   uebergabe_tierarzt: 'Übergabe an Tierarzt',
@@ -23,10 +23,9 @@ export const TIER_ABSCHLUSS: Record<AbschlussGrund, string> = {
 };
 
 /**
- * Tierstatus als Wort + Ton der Statusfläche (Neuentwurf: „Status als getönte Fläche").
- * Die EINE Zuordnung für Liste und Detailseite — vorher stand dieselbe Map zweimal, mit
- * antd-Tag-Farbnamen. `vermisst` ist `achtung` wie beim Personenstatus (CLAUDE.md, LFH-455),
- * `abgeschlossen` neutral. Das Wort ist Pflicht: der Ton ist nie der einzige Kanal.
+ * Tierstatus als Wort + Ton der Statusfläche, die eine Zuordnung für Liste und Detailseite.
+ * `vermisst` ist `achtung` wie beim Personenstatus, `abgeschlossen` neutral. Das Wort ist Pflicht:
+ * der Ton ist nie der einzige Kanal.
  */
 export const TIER_STATUS: Record<TierStatus, { label: string; ton: StatusTon }> = {
   aktiv: { label: 'aktiv', ton: 'normal' },
@@ -35,22 +34,15 @@ export const TIER_STATUS: Record<TierStatus, { label: string; ton: StatusTon }> 
 };
 
 /**
- * Filterkette der Tierliste als reine Funktion (LFH-330 · B2, Muster
- * `pages/schaeden/schadenHelfer.tsx`).
- *
- * Kein Suchanteil: die Freitextsuche hängt am `suchText` der Spalten und läuft im
- * `Datensicht`-Primitiv. Der Spezies-Filter bleibt dagegen eine SEITEN-Steuerung neben den
- * Reitern (und wird nicht zu einem Spalten-`filter`), weil er zusammen mit der Statusachse
- * gelesen wird — wie die Filterkarte der Kräfteübersicht außerhalb ihrer Sicht liegt.
+ * Filterkette der Tierliste als reine Funktion. Die Freitextsuche läuft im `Datensicht`-Primitiv
+ * (`suchText` der Spalten); der Spezies-Filter ist eine Seiten-Steuerung neben den Reitern, weil er
+ * zusammen mit der Statusachse gelesen wird.
  */
 
 /** Status-Sichten: 'alle' = kein Filter; sonst Status-Filter. */
 export type TiereSicht = 'aktiv' | 'vermisst' | 'abgeschlossen' | 'alle';
 
-/**
- * Zeilenmenge aus Statussicht UND Spezies — eine SCHNITTMENGE, keine Vereinigung: wer
- * „vermisste Katzen" wählt, will nicht auch alle vermissten Hunde sehen.
- */
+/** Zeilenmenge aus Statussicht UND Spezies — Schnittmenge, keine Vereinigung. */
 export function filterTiere(
   alle: readonly Tier[],
   opts: { sicht: TiereSicht; spezies?: Spezies },

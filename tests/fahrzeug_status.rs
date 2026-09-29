@@ -160,13 +160,13 @@ async fn status_voll(app: &axum::Router, admin: &str, label: &str) -> i64 {
 
 /// **Der unterscheidende Test.** Zusammen mit `patch_farbe_null_loescht_die_farbe` bildet er
 /// das Paar, das den Tri-State beweist: HIER sind `farbe`/`fms_anker` nicht im Body und
-/// müssen stehen bleiben, DORT steht `null` im Body und muss löschen. Unter dem alten
-/// Vollersatz-Verhalten war beides ununterscheidbar — das fehlende Feld nullte die Spalte.
+/// müssen stehen bleiben, DORT steht `null` im Body und muss löschen. Ein Vollersatz könnte
+/// beides nicht unterscheiden — das fehlende Feld nullte die Spalte.
 ///
-/// Der Body ist bewusst **unter HEAD gültig** (`label`/`kategorie`/`sortier` alle da, nur
-/// die nullable Felder fehlen): so schlägt der Test gegen HEAD mit dem echten Datenverlust
-/// fehl (200 + `farbe`/`fms_anker` auf `null`) statt am Extractor — ein 400 wäre ein
-/// Fehlschlag aus dem falschen Grund.
+/// Der Body wäre bewusst auch als Vollersatz gültig (`label`/`kategorie`/`sortier` alle da,
+/// nur die nullable Felder fehlen): so scheitert ein Rückfall am echten Datenverlust (200 +
+/// `farbe`/`fms_anker` auf `null`) statt am Extractor — ein 400 wäre ein Fehlschlag aus dem
+/// falschen Grund.
 #[tokio::test]
 async fn patch_ohne_farbe_laesst_farbe_stehen() {
     let app = setup().await;
@@ -211,13 +211,13 @@ async fn patch_farbe_null_loescht_die_farbe() {
     assert_eq!(json["label"], "Reserve", "Nachbarfeld unberührt");
 }
 
-/// Der schärfste Test gegen HEAD: `sortier` ist NOT NULL und trug am alten Body ein
-/// `#[serde(default)]` — ein PATCH ohne `sortier` setzte die Spalte still auf 0 und
-/// verschob den Eintrag in der Katalogliste.
+/// Der schärfste Test: `sortier` ist NOT NULL; ein Vollersatz-Body mit `#[serde(default)]`
+/// setzte die Spalte bei einem PATCH ohne `sortier` still auf 0 und verschob den Eintrag in
+/// der Katalogliste.
 ///
-/// Der Body ist bewusst **unter HEAD gültig** (alle Pflichtfelder da, nur `sortier` fehlt):
-/// nur so schlägt der Test gegen HEAD mit dem echten Datenverlust fehl (200 + `sortier: 0`)
-/// statt am Extractor — ein 400 wäre ein Fehlschlag aus dem falschen Grund.
+/// Der Body wäre bewusst auch als Vollersatz gültig (alle Pflichtfelder da, nur `sortier`
+/// fehlt): nur so scheitert ein Rückfall am echten Datenverlust (200 + `sortier: 0`) statt am
+/// Extractor — ein 400 wäre ein Fehlschlag aus dem falschen Grund.
 #[tokio::test]
 async fn patch_ohne_sortier_laesst_sortier_stehen() {
     let app = setup().await;

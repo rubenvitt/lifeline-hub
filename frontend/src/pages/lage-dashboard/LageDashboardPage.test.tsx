@@ -53,7 +53,7 @@ const einsatz = {
   meine_rolle: 'einsatzleitung',
   org_id: 1,
   org_name: 'THW Musterstadt',
-  // Ein Hochwasser mit festgelegtem Pegel (LFH-640): Platz 1 trägt den Pegel.
+  // Ein Hochwasser mit festgelegtem Pegel: Platz 1 trägt den Pegel.
   lagekennzahlen: ['pegel'],
 };
 
@@ -230,25 +230,29 @@ interface Daten {
   gefahrenStatus?: number;
   personenStatus?: number;
   etbStatus?: number;
-  /** Maßgebliche Pegel (LFH-606) und ein erzwungener Fehlerstatus ihres Abrufs. */
+  /** Maßgebliche Pegel und ein erzwungener Fehlerstatus ihres Abrufs. */
   pegel?: unknown[];
   pegelStatus?: number;
-  /** Modul-Overrides des Einsatzes (LFH-633: entscheidet das Ziel der Pegel-Kennzahl). */
+  /** Modul-Overrides des Einsatzes (entscheiden das Ziel der Pegel-Kennzahl). */
   overrides?: Record<string, unknown>;
   /** Zählt die gelieferten Override-Antworten (Test wartet auf die Entscheidung). */
   overridesGeliefert?: { n: number };
-  /** Der Einsatz-Abruf bleibt hängen — der einzige Zustand, in dem `baueLagebild`
-   *  noch gar nichts liefert und das Kennzahlenband seine Plätze selbst stellen muss. */
+  /**
+   * Der Einsatz-Abruf bleibt hängen — der einzige Zustand, in dem `baueLagebild` nichts liefert und
+   * das Band seine Plätze selbst stellen muss.
+   */
   einsatzLaedt?: boolean;
-  /** Aktive Lagekennzahlen am Einsatz (LFH-640), zur Anfragezeit gelesen — ein Test kann sie
-   *  zwischen zwei Abrufen ändern. Vorgabe: die des Fixtures (`['pegel']`). */
+  /**
+   * Aktive Lagekennzahlen am Einsatz, zur Anfragezeit gelesen — ein Test kann sie zwischen zwei
+   * Abrufen ändern. Vorgabe: die des Fixtures (`['pegel']`).
+   */
   lagekennzahlen?: string[];
-  /** Evakuierungsbezirke der Betreuungs-Übersicht (LFH-607) und ein erzwungener Fehlerstatus. */
+  /** Evakuierungsbezirke der Betreuungs-Übersicht und ein erzwungener Fehlerstatus. */
   bezirke?: unknown[];
   betreuungStatus?: number;
   /** Zählt die Abrufe der Betreuungs-Übersicht (ohne Modulrecht: keiner). */
   betreuungAbrufe?: { n: number };
-  /** Overrides-Abruf hängt bzw. scheitert (LFH-607: Freigaben unbekannt). */
+  /** Overrides-Abruf hängt bzw. scheitert (Freigaben unbekannt). */
   overridesLaedt?: boolean;
   overridesStatus?: number;
 }
@@ -296,8 +300,8 @@ function mockEndpunkte(d: Daten) {
         ? new HttpResponse(null, { status: d.betreuungStatus })
         : HttpResponse.json({ bezirke: d.bezirke ?? [], stellen: [] });
     }),
-    // LFH-633: ohne diesen Handler scheiterte die Abfrage in jedem Test, und die Kennzahl
-    // bliebe auf der Pflege stehen — die href-Aussagen belegten dann nur den Fehlerpfad.
+    // Ohne diesen Handler scheiterte die Abfrage in jedem Test, und die href-Aussagen belegten nur
+    // den Fehlerpfad.
     http.get('/api/einsaetze/1/modul-overrides', async () => {
       if (d.overridesLaedt) await delay('infinite');
       if (d.overridesGeliefert) d.overridesGeliefert.n += 1;
@@ -321,8 +325,8 @@ function render() {
 }
 
 /**
- * Die gepinnten Kennzahlreihen (LFH-640) — handgeschrieben, NICHT aus `kennzahlReihe`
- * gelesen: sonst prüfte der Pin die Ableitung gegen sich selbst.
+ * Die gepinnten Kennzahlreihen — handgeschrieben, nicht aus `kennzahlReihe` gelesen, sonst prüfte
+ * der Pin die Ableitung gegen sich selbst.
  */
 /** Ein festgelegter Pegel ohne Messung (Ausfall) — trägt Gewässer und Name, kein Wert. */
 const PEGEL_AUSFALL = {
@@ -350,10 +354,10 @@ const REIHE_OHNE_AUSLOESER = [
   'Einsatzdauer',
 ];
 
-/** Reihe eines Hochwassers mit Pegel und Evakuierung — Entwurf S3 (LFH-607). */
+/** Reihe eines Hochwassers mit Pegel und Evakuierung (Entwurf S3). */
 const REIHE_S3 = ['Pegel', 'Betroffene', 'Evakuiert', 'Kräfte', 'Vermisste', 'Einsatzdauer'];
 
-/** Ein aktiver Evakuierungsbezirk der Übersicht (LFH-639), nur mit den gelesenen Feldern. */
+/** Ein aktiver Evakuierungsbezirk der Übersicht, nur mit den gelesenen Feldern. */
 const bezirk = (plan: number, stand: number | null) => ({
   id: Math.floor(Math.random() * 1e9),
   einsatz_id: 1,
@@ -395,9 +399,8 @@ function kennzahl(etikett: string, band?: string): HTMLElement {
 }
 
 /**
- * Wartesignal „Daten sind da" (LFH-331 · B3): die Plätze stehen schon WÄHREND des
- * Einsatz-Abrufs, ein Griff aufs Etikett erfüllte sich also sofort am Platzhalter.
- * Angesetzt wird deshalb am LINK, den erst das Lagebild baut — ein Platzhalter ist keiner.
+ * Wartesignal „Daten sind da": die Plätze stehen schon während des Einsatz-Abrufs, deshalb am Link
+ * ansetzen, den erst das Lagebild baut.
  */
 function kennzahlGeladen(etikett: string): Promise<HTMLElement> {
   return waitFor(() => {
@@ -420,8 +423,8 @@ function kante(el: HTMLElement): number {
 
 describe('LageDashboardPage — Kennzahlenband', () => {
   it('sechs Plätze, Kern fest: mit festgelegtem Pegel steht er auf Platz 1', async () => {
-    // Prüfliste Kriterium 9: dieselbe Größe an derselben Stelle, nie nach Dringlichkeit
-    // umsortiert. Seit LFH-640 bestimmt der Einsatz die zwei Lageplätze (1 und 3).
+    // Prüfliste Kriterium 9: dieselbe Größe an derselben Stelle, nie nach Dringlichkeit umsortiert.
+    // Der Einsatz bestimmt die zwei Lageplätze (1 und 3).
     mockEndpunkte({ personen: [person('sk1')] });
     render();
     await kennzahlGeladen('Betroffene');
@@ -442,9 +445,8 @@ describe('LageDashboardPage — Kennzahlenband', () => {
   });
 
   it('stellt schon während des Einsatz-Abrufs sechs Plätze — ohne Beschriftung, Ziel und Stand', async () => {
-    // Prüfliste Kriterium 12 (CLS): ohne die Plätze sprängen sechs Zellen später herein. Die
-    // Beschriftung fehlt bewusst — welche Kennzahl auf die Lageplätze kommt, sagt erst der
-    // Einsatz; das geschützte Leerzeichen hält die Zeilenhöhe.
+    // Kriterium 12 (CLS): ohne die Plätze sprängen sechs Zellen später herein. Die Beschriftung
+    // fehlt bewusst — welche Kennzahl auf die Lageplätze kommt, sagt erst der Einsatz.
     mockEndpunkte({ einsatzLaedt: true });
     render();
     const plaetze = zellen();
@@ -458,8 +460,8 @@ describe('LageDashboardPage — Kennzahlenband', () => {
   });
 
   it('ein neuer Zuschnitt beim erneuten Abruf wird GEHALTEN und per Sammelbanner angeboten', async () => {
-    // Spec LFH-640, „Wechsel während der Betrachtung": die Reihe tauscht nicht unter dem
-    // Blick (Kriterium 9/12), sie wechselt erst auf „übernehmen".
+    // Wechsel während der Betrachtung: die Reihe tauscht nicht unter dem Blick, sie wechselt erst
+    // auf „übernehmen".
     const daten: Daten = { lagekennzahlen: [] };
     mockEndpunkte(daten);
     const { client } = render();
@@ -596,9 +598,8 @@ describe('LageDashboardPage — Kennzahlenband', () => {
   });
 
   it('FEHLER SIEHT NICHT AUS WIE LEER: der Gefahren-Ausfall zeigt einen Fehler, nicht „keine Gefahr"', async () => {
-    // Der Bestandsfall aus LFH-331 · B3, seit LFH-606 ohne eigene Warnstufen-Kennzahl: die
-    // Warnstufe steht im Kopf-Hinweis und in der Gefahrenmatrix. Beide dürfen einen toten
-    // Abruf nicht als „keine Gefahr" ausgeben.
+    // Die Warnstufe steht im Kopf-Hinweis und in der Gefahrenmatrix; beide dürfen einen toten Abruf
+    // nicht als „keine Gefahr" ausgeben.
     mockEndpunkte({ personen: [person('sk1')], gefahrenStatus: 500 });
     render();
     await kennzahlGeladen('Betroffene');
@@ -613,8 +614,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
   });
 
   it('Warnstufe „niedrig" bleibt still; „hoch" steht als Hinweis im Seitenkopf', async () => {
-    // Entscheidung des Vertrags, hier festgenagelt: `niedrig` ist kein Alarmbeitrag
-    // (EEMUA 191 / ISA-18.2). Ein stilles Umhängen auf `achtung` färbte app-weit um.
+    // Festgenagelt: `niedrig` ist kein Alarmbeitrag (EEMUA 191 / ISA-18.2).
     expect(warnstufeKennzahl.niedrig.rolle).toBe('normal');
 
     mockEndpunkte({ gefahren: [gebiet(1, 'niedrig')] });
@@ -626,8 +626,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     expect(document.querySelector('[data-lfh="warnstufe-hinweis"]')).toBeNull();
     erster.unmount();
 
-    // Seit LFH-606 ist der Kopf-Hinweis der Ort der Warnstufe auf dieser Seite — das Band
-    // trägt sie nicht mehr.
+    // Der Kopf-Hinweis ist der Ort der Warnstufe auf dieser Seite, das Band trägt sie nicht.
     mockEndpunkte({ gefahren: [gebiet(1, 'hoch')] });
     render();
     const hinweis = await waitFor(() => {
@@ -679,7 +678,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     );
     expect(notiz).not.toContain('veraltet');
     expect(zelle.getAttribute('data-ton')).toBe('neutral');
-    // Modul „Wetter & Pegel" frei (keine Overrides) → die Kennzahl führt dorthin (LFH-633).
+    // Modul „Wetter & Pegel" frei (keine Overrides) → die Kennzahl führt dorthin.
     await waitFor(() => expect(zelle).toHaveAttribute('href', '/einsaetze/1/wetter-pegel'));
   });
 
@@ -1078,9 +1077,8 @@ describe('LageDashboardPage — Sichtung', () => {
 
   it('„Ohne Sichtung" steht auch bei 0 — die Zeile springt nicht mit dem Wert (LFH-650)', async () => {
     /**
-     * Vorher nur bei `> 0` gerendert: der erste ungesichtete Zugang schob die Transport-Zeile
-     * und das Paneel nach unten (Prüfliste LFH-613, Tabelle 5, Nr. 12). Die Gegenhälfte, dass
-     * der Wert bei > 0 stimmt, trägt der Test oben.
+     * Die Zeile „Ohne Sichtung" steht immer, auch mit 0 — sonst schob der erste ungesichtete Zugang
+     * das Paneel nach unten.
      */
     mockEndpunkte({ personen: [person('sk1'), person('sk3')] });
     render();
@@ -1160,10 +1158,8 @@ describe('LageDashboardPage — Meldungsstrom', () => {
   });
 
   /*
-   * Review 22.09.2026: `angezeigtBis` hing an der Seiteninstanz, nicht am Einsatz. Beim
-   * Wechsel auf einen anderen Einsatz in DERSELBEN Instanz (gleiche Route, andere `:id`)
-   * galt die Marke des alten weiter — der neue zeigte nur seine Einträge bis zur alten
-   * Nummer und meldete den Rest als „neu".
+   * Die Wassermarke gehört zum Einsatz, nicht zur Seiteninstanz: beim Wechsel der `:id` zeigte der
+   * neue Einsatz sonst nur Einträge bis zur alten Nummer.
    */
   it('setzt die Wassermarke beim Einsatzwechsel in derselben Instanz zurück', async () => {
     mockEndpunkte({ etb: [1, 2, 3, 4, 5].map((n) => etb(n)) });
@@ -1173,7 +1169,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
         HttpResponse.json([1, 2, 3, 4, 5, 6, 7].map((n) => etb(n, { id: 2000 + n }))),
       ),
       http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
-      // Die Betreuungs-Übersicht ist ein Objekt, keine Liste (LFH-607).
+      // Die Betreuungs-Übersicht ist ein Objekt, keine Liste.
       http.get('/api/einsaetze/2/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
     );
@@ -1199,7 +1195,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
   });
 
   it('ein Einsatzwechsel in derselben Instanz übernimmt den neuen Zuschnitt OHNE Banner', async () => {
-    // Die gehaltene Reihe gehört zu EINEM Einsatz (LFH-640) — wie die Wassermarke oben.
+    // Die gehaltene Reihe gehört zu einem Einsatz — wie die Wassermarke oben.
     mockEndpunkte({ lagekennzahlen: [] });
     let zweiter = ['pegel'];
     server.use(
@@ -1207,7 +1203,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
         HttpResponse.json({ ...einsatz, id: 2, lagekennzahlen: zweiter }),
       ),
       http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
-      // Die Betreuungs-Übersicht ist ein Objekt, keine Liste (LFH-607).
+      // Die Betreuungs-Übersicht ist ein Objekt, keine Liste.
       http.get('/api/einsaetze/2/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
     );
@@ -1229,8 +1225,8 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     await waitFor(() => expect(etiketten()).toEqual(REIHE_MIT_PEGEL));
     expect(screen.queryByText(/Kennzahlreihe geändert/)).toBeNull();
 
-    // Und für den NEUEN Einsatz wird wieder gehalten (Review LFH-640): ohne das tauschte eine
-    // fremde Entscheidung nach jedem Wechsel die Reihe unter dem Blick.
+    // Und für den neuen Einsatz wird wieder gehalten: sonst tauschte eine fremde Entscheidung nach
+    // jedem Wechsel die Reihe unter dem Blick.
     zweiter = [];
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(2) }));
     expect(
@@ -1240,8 +1236,8 @@ describe('LageDashboardPage — Meldungsstrom', () => {
   });
 
   it('die EIGENE Entscheidung, deren Abruf beim Aufbau noch läuft, gilt ohne Banner', async () => {
-    // Spec LFH-640: wer in den Einstellungen einen Pegel festlegt und sofort zurückwechselt,
-    // findet im Speicher noch den alten Einsatz. Gehalten wird erst nach dem laufenden Abruf.
+    // Wer in den Einstellungen einen Pegel festlegt und sofort zurückwechselt, findet im Speicher
+    // noch den alten Einsatz. Gehalten wird erst nach dem laufenden Abruf.
     mockEndpunkte({ lagekennzahlen: ['pegel'] });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     client.setQueryData(einsatzKeys.einsatz(1), { ...einsatz, lagekennzahlen: [] });
@@ -1345,8 +1341,7 @@ describe('LageDashboardPage — Führungsstand', () => {
   });
 
   it('während der Einsatz-Abruf hängt, behauptet der Führungsstand keinen Stand', async () => {
-    // I2 (LFH-336-Review), übertragen: die Aufträge-Abfrage löst auf, der Einsatz hängt.
-    // Ohne Lagebild darf keine Zelle „0" melden.
+    // Die Aufträge-Abfrage löst auf, der Einsatz hängt: ohne Lagebild darf keine Zelle „0" melden.
     mockEndpunkte({ einsatzLaedt: true, auftraege: [auftrag({ id: 1 })] });
     const { client } = render();
     await waitFor(() =>
@@ -1367,8 +1362,6 @@ describe('LageDashboardPage — Führungsstand', () => {
 
 describe('Deeplinks des Dashboards (LFH-336 · AK3)', () => {
   const hier = dirname(fileURLToPath(import.meta.url));
-  // `PaneelZustand.tsx` lag bis 22.09.2026 hier; seit dem Umzug nach
-  // `components/instrument/` wird es dort mitgeprüft — es baut ohnehin keine Pfade.
   const quellen = [
     join(hier, 'LageDashboardPage.tsx'),
     join(hier, 'LagePaneele.tsx'),
@@ -1387,14 +1380,10 @@ describe('Deeplinks des Dashboards (LFH-336 · AK3)', () => {
 });
 
 /**
- * ── STAND DES LAGEBERICHTS (LFH-350 · H60) ──────────────────────────────────────
- *
- * `bericht.stand` ist `zeitstand` — ein UTC-Wirestring ohne Zonenkennung. Roh ausgegeben
- * stand er um den Zonenversatz falsch. Formatiert wird in der SEITE (Zone am Provider).
- *
- * Die Zone wird AUSDRÜCKLICH gestellt und der Cache dafür VORBELEGT — beides gemessen
- * nötig: ohne Provider fällt `useAnzeigeKonventionen` auf die LOKALE Zone der Maschine
- * zurück, und die Einstellungs-Abfrage löst erst NACH dem ersten Render auf.
+ * Stand des Lageberichts: `bericht.stand` ist ein UTC-Wirestring ohne Zonenkennung und wird in der
+ * Seite formatiert. Die Zone wird ausdrücklich gestellt und der Cache vorbelegt: ohne Provider
+ * fiele `useAnzeigeKonventionen` auf die Zone der Maschine zurück, und die Einstellungs-Abfrage
+ * löst erst nach dem ersten Render auf.
  */
 function renderMitZone() {
   server.use(
@@ -1402,8 +1391,8 @@ function renderMitZone() {
       HttpResponse.json({ einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } }),
     ),
   );
-  // Bewusst NICHT `neuerQueryClient()`: dessen `gcTime: 0` räumt einen per `setQueryData`
-  // gesetzten, noch unbeobachteten Eintrag beim ersten `await` weg (CLAUDE.md).
+  // Nicht `neuerQueryClient()`: dessen `gcTime: 0` räumt einen unbeobachteten
+  // `setQueryData`-Eintrag beim ersten `await` weg.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(einsatzKeys.einstellungen(1), {
     einsatz_id: 1,

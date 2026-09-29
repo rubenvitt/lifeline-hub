@@ -11,9 +11,9 @@ import type { TastaturAktionen } from '../command-palette/typen';
 import StabPage from './StabPage';
 
 /**
- * „Neue Zeile" der Stab-Seite (LFH-543) mit DEMSELBEN Rechte-Riegel wie die Kopfaktion.
- * Eigene Datei aus denselben Gründen wie `SchaedenPage.palette.test.tsx`: `vi.mock` hoistet
- * dateiweit, und das echte `useBefehle` fordert `/api/einsaetze` an.
+ * „Neue Zeile" der Stab-Seite mit demselben Rechte-Riegel wie die Kopfaktion. Eigene Datei aus
+ * denselben Gründen wie `SchaedenPage.palette.test.tsx`: `vi.mock` hoistet dateiweit, und das echte
+ * `useBefehle` fordert `/api/einsaetze` an.
  */
 vi.mock('../command-palette/useBefehle', () => ({
   useBefehle: (aktionen: TastaturAktionen = {}) =>
@@ -100,23 +100,23 @@ describe('StabPage · „Neue Zeile" in der Kommandopalette', () => {
     render({ ...einsatzAktiv, meine_rolle: 'beobachter' });
     await standGeladen();
     await u.keyboard('{Control>}k{/Control}');
-    // Positivhälfte: die Palette IST offen (ihr Eingabefeld trägt `role="combobox"`,
-    // `CommandPalette.tsx:299`) — sonst belegte das `null` unten nur eine geschlossene Palette.
+    // Positivhälfte: die Palette ist offen (ihr Eingabefeld trägt `role="combobox"`) — sonst
+    // belegte das `null` unten nur eine geschlossene Palette.
     expect(await screen.findByRole('combobox')).toBeInTheDocument();
     expect(document.getElementById('cmd-tastatur:neue-zeile')).toBeNull();
   });
 
-  /** Ruling 4 / Plan-Abweichung 7: ohne Stand fehlte der Termin zur Vorbelegung. */
+  /** Ohne Stand fehlte der Termin zur Vorbelegung. */
   it('bietet sie NICHT an, solange der Stand lädt', async () => {
     const u = userEvent.setup();
     render(einsatzAktiv, () => new Promise<never>(() => {}));
     const sektion = await screen.findByRole('region', { name: 'Lagebesprechung' });
-    // Schreibrecht besteht (kein Rechte-Hinweis) und der Stand lädt (kein Termin behauptet) —
-    // sonst fehlte der Eintrag aus dem falschen Grund.
+    // Schreibrecht besteht (kein Rechte-Hinweis) und der Stand lädt — sonst fehlte der Eintrag aus
+    // dem falschen Grund.
     await waitFor(() => expect(screen.queryByText(/Nur Einsatzleitung/)).toBeNull());
     expect(within(sektion).queryByText('kein Termin')).toBeNull();
     await u.keyboard('{Control>}k{/Control}');
-    // Positivhälfte: die Palette IST offen.
+    // Positivhälfte: die Palette ist offen.
     expect(await screen.findByRole('combobox')).toBeInTheDocument();
     expect(document.getElementById('cmd-tastatur:neue-zeile')).toBeNull();
   });

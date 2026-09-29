@@ -12,7 +12,7 @@ function config(over: Partial<KarteServerConfig> = {}): KarteServerConfig {
     offline_verfuegbar: false,
     offline_tiles_url: null,
     offline_attribution: null,
-    // LFH-265: Pflichtfeld im generierten Schema — leere Liste = keine Region bereit.
+    // Pflichtfeld im generierten Schema — leere Liste = keine Region bereit.
     offline_regionen: [],
     karten_bau_verfuegbar: false,
     ...over,

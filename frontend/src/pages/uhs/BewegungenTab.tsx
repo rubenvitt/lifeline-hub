@@ -21,10 +21,8 @@ interface Props {
 const KEINE_PERSONEN: readonly Person[] = [];
 
 /**
- * Genau der Text, den die Personenzelle ANZEIGT — und damit auch der Suchtext.
- *
- * Eine Quelle für beides: `render` und `suchText` dürfen nicht auseinanderlaufen, sonst
- * findet die Suche etwas, das nirgends steht, oder findet Sichtbares nicht.
+ * Genau der Text, den die Personenzelle anzeigt — und damit der Suchtext. `render` und `suchText`
+ * dürfen nicht auseinanderlaufen.
  */
 function personEtikett(personId: number, personenById: ReadonlyMap<number, Person>): string {
   const person = personenById.get(personId);
@@ -35,9 +33,8 @@ function personEtikett(personId: number, personenById: ReadonlyMap<number, Perso
 }
 
 /**
- * Die Bewegungsarten als Filterwerte — aus `belegungsArt` ABGELEITET, nicht abgetippt.
- * Eine vierte Art erscheint damit von selbst, und `theme/statusFarben.ts` bleibt
- * unangetastet (die Karte dort ist von LFH-328/A2 gepinnt). Muster: `etb/EtbFilterleiste`.
+ * Die Bewegungsarten als Filterwerte, aus `belegungsArt` abgeleitet — eine vierte Art erscheint von
+ * selbst.
  */
 const ART_WERTE = (Object.keys(belegungsArt) as BelegungsArt[]).map((art) => ({
   text: belegungsArt[art].label,
@@ -55,14 +52,11 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
   const plaetzeById = useMemo(() => new Map(uhs.plaetze.map((pl) => [pl.id, pl])), [uhs.plaetze]);
 
   /**
-   * Die Spaltenliste läuft durch `spaltenFuer<T>()` und wird NICHT annotiert: eine
-   * Annotation weitet die Schlüsselliterale auf `string`, und der Kartenplan nähme danach
-   * jeden Tippfehler in seinen Slots widerspruchslos an.
+   * Die Spaltenliste läuft durch `spaltenFuer<T>()` und wird nicht annotiert: eine Annotation
+   * weitete die Schlüssel auf `string`, und der Kartenplan nähme jeden Tippfehler an.
    *
-   * `immerSichtbar` steht an ALLEN fünf Spalten, und das ist keine Aktionsspalten-Marke:
-   * das Protokoll hat fünf Spalten und keine, die man sinnvoll abwählt. Ohne die Marken
-   * erschiene ein Spaltenschalter samt Zähler — und weil hier auch kein `abBreite` steht,
-   * wäre das ein Bedienelement für eine Entscheidung, die niemand treffen muss.
+   * `immerSichtbar` an allen fünf Spalten: keine lässt sich sinnvoll abwählen, ein Spaltenschalter
+   * wäre Rauschen.
    */
   const spalten = useMemo(
     () =>
@@ -74,7 +68,7 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
           dataIndex: 'zeitpunkt_at',
           // Lexikographisch ordnungstreu für `'2026-06-23 10:00:00'` — kein Datumsparser nötig.
           sortWert: (b) => b.zeitpunkt_at,
-          // Mono an der AUFRUFSTELLE: `ZeitAnzeige` rendert bewusst ein Fragment.
+          // Mono an der Aufrufstelle: `ZeitAnzeige` rendert ein Fragment.
           render: (v: string) => (
             <span style={monoStil(12)}>
               <ZeitAnzeige wert={v} format="dtgVoll" />
@@ -86,18 +80,17 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
           immerSichtbar: true,
           title: 'Person',
           dataIndex: 'person_id',
-          // Der Suchraum ist FESTGELEGT: gesucht wird, was angezeigt wird. Nur diese Spalte
-          // trägt `suchText`, also findet 'Klinik' aus einer Notiz nichts.
+          // Der Suchraum ist festgelegt: gesucht wird, was angezeigt wird; nur diese Spalte trägt
+          // `suchText`.
           suchText: (b) => personEtikett(b.person_id, personenById),
           render: (personId: number) => {
             const etikett = personEtikett(personId, personenById);
-            // Aufgelöste Person → Deeplink auf die Detailseite (LFH-25). Unbekannte/nicht
-            // geladene Person bleibt unverlinkter Fallback (#id, kein garantiertes Ziel).
+            // Aufgelöste Person → Deeplink auf die Detailseite; unbekannte Person bleibt unverlinkt
+            // (#id).
             //
-            // Der Link bleibt HIER und wandert NICHT in `karte.titel.ziel`: `ziel` müsste
-            // für jede Zeile eines liefern und verlinkte damit auch Personen, die es nicht
-            // gibt. Weil `ziel` ungesetzt ist, trägt `zelle()` diesen Knoten unverändert in
-            // die Kartentitelzeile — verschachtelte Links entstehen nicht.
+            // Der Link bleibt hier und nicht in `karte.titel.ziel`: `ziel` verlinkte jede Zeile,
+            // auch unbekannte Personen. Ohne `ziel` trägt `zelle()` diesen Knoten unverändert in
+            // die Kartentitelzeile.
             if (!personenById.has(personId)) return etikett;
             return <Link to={personDetailPfad(uhs.einsatz_id, personId)}>{etikett}</Link>;
           },
@@ -116,9 +109,7 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
           title: 'Platz',
           dataIndex: 'platz_id',
           render: (platzId: number | null) => {
-            // Bewusst NICHT aufgeräumt: „kein Platz" und „Platz gesetzt, aber nicht in
-            // `uhs.plaetze`" liefern beide 'Inbox'. Bekannter Ist-Zustand, eigenes Thema —
-            // eine Verhaltensänderung mitten in einer Formmigration wäre nicht trennbar.
+            // Bekannt: „kein Platz" und „Platz nicht in `uhs.plaetze`" liefern beide 'Inbox'.
             if (platzId == null) return 'Inbox';
             const platz = plaetzeById.get(platzId);
             return platz ? platz.bezeichnung : 'Inbox';
@@ -137,14 +128,9 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
 
   return (
     /**
-     * `form` bleibt ungesetzt (Default `'auto'`): das chronologische Protokoll wird
-     * GELESEN, nicht verglichen (A1, Festlegung 2), damit greift die Karten-Ausnahme des
-     * Primitivs. Ihre schriftliche Begründung steht im Dateikopf von `Datensicht.tsx`.
-     *
-     * Ebenfalls ungesetzt, jeweils mit Grund: `karte.aktion` (die Sicht ist read-only,
-     * Belegungen entstehen im Grundriss), `abBreite` (siehe Spaltenliste), `zufluss`
-     * (Default `'sammelbanner'` ist hier richtig), `gruppen`/`baum`/`aufklappzeile`/
-     * `zeilenKlasse`/`werkzeuge`/`onZeileKlick`.
+     * `form` bleibt `'auto'`: das Protokoll wird gelesen, nicht verglichen — damit greift die
+     * Karten-Ausnahme des Primitivs (Begründung im Dateikopf von `Datensicht.tsx`). Ohne
+     * `karte.aktion`: die Sicht ist read-only, Belegungen entstehen im Grundriss.
      */
     <>
       <Datenstand
@@ -157,17 +143,13 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
         zeilenSchluessel="id"
         ladend={personenQuery.isLoading}
         leerText="Keine Bewegungen erfasst"
-        // Spiegelt die Backend-Ordnung (`ORDER BY zeitpunkt_at DESC`), ist aber nicht deren
-        // Wiederholung: die Reihenfolge entsteht jetzt im Primitiv und übersteht eine
-        // unsortiert gelieferte Menge.
+        // Spiegelt die Backend-Ordnung, übersteht aber auch eine unsortiert gelieferte Menge.
         standardSortierung={{ spalte: 'zeitpunkt_at', richtung: 'ab' }}
         suche={{ platzhalter: 'Person oder R-Nr.' }}
         karte={{
           art: 'plan',
-          // Kartentitel ist die PERSON (die Karte wird gelesen: wer hat sich bewegt),
-          // Tabellenspalte 0 bleibt die Zeit (die Tabelle wird chronologisch verglichen).
-          // Die Rollen sind orthogonal zur Spaltenreihenfolge — wer das „harmonisiert",
-          // verliert eine der beiden Aussagen.
+          // Kartentitel ist die Person (wer hat sich bewegt), Tabellenspalte 0 die Zeit
+          // (chronologisch verglichen). Die Rollen sind unabhängig von der Spaltenreihenfolge.
           titel: { spalte: 'person_id' },
           status: (b) => belegungsArt[b.art],
           sekundaer: ['zeitpunkt_at', 'platz_id', 'notiz'],

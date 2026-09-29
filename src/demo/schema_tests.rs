@@ -1,7 +1,5 @@
-//! Schema-Zusicherungen der Demo-Daten (LFH-690, design.md D4/D7) gegen die voll migrierte DB.
-//!
-//! Hier steht bewusst keine Import-Logik: die Tests prüfen nur, was die Migration
-//! `0123_demo_daten.sql` und das übrige Schema dem späteren Import und Löschweg zusichern.
+//! Schema-Zusicherungen der Demo-Daten (LFH-690) gegen die voll migrierte DB: was
+//! `0123_demo_daten.sql` und das übrige Schema dem Import und Löschweg zusichern.
 
 use sqlx::SqlitePool;
 
@@ -28,9 +26,9 @@ fn ist_unique_verletzung(fehler: &sqlx::Error) -> bool {
     matches!(fehler, sqlx::Error::Database(e) if e.is_unique_violation())
 }
 
-/// Höchstens ein aktiver Import je Organisation (Spec „Herkunftsmarke“): der partielle
-/// UNIQUE-Index hält das Rennen zweier gleichzeitiger Importe. Ein entfernter Kopf bleibt als
-/// Historie stehen und sperrt keinen neuen Import, und eine zweite Organisation ist frei.
+/// Höchstens ein aktiver Import je Organisation: der partielle UNIQUE-Index hält das Rennen
+/// zweier gleichzeitiger Importe. Ein entfernter Kopf sperrt keinen neuen Import, und eine
+/// zweite Organisation ist frei.
 #[tokio::test]
 async fn zweiter_aktiver_import_je_org_scheitert_am_partiellen_index() {
     let pool = crate::db::test_pool().await;
@@ -90,16 +88,14 @@ async fn eingehende_stammdaten_fks(pool: &SqlitePool) -> Vec<StammdatenFk> {
     .unwrap()
 }
 
-/// ON-DELETE-Aktionen, bei denen das Löschen einer noch verwiesenen Zeile SCHEITERT. Nur darauf
-/// baut der Savepoint-Löschweg aus D7 (SQLite-Code 787 → „behalten“).
+/// ON-DELETE-Aktionen, bei denen das Löschen einer noch verwiesenen Zeile scheitert. Nur darauf
+/// baut der Savepoint-Löschweg (SQLite-Code 787 → „behalten“).
 const LOESCHEN_SCHEITERT: [&str; 2] = ["NO ACTION", "RESTRICT"];
 
-/// Was der Löschweg aus D7 nicht verträgt: ein Fremdschlüssel auf eine Stammdatentabelle mit
-/// einer anderen ON-DELETE-Aktion als `NO ACTION`/`RESTRICT` und ein aufgeschobener
-/// Fremdschlüssel irgendwo im Schema. Mit `CASCADE`, `SET NULL` oder `SET DEFAULT` gelänge das
-/// Löschen einer noch verwiesenen Demo-Stammdatenzeile und löschte oder änderte dabei still
-/// eine Zeile eines fremden, echten Einsatzes. Mit einem aufgeschobenen Fremdschlüssel käme der
-/// Fehler erst beim COMMIT, und der Savepoint je Zeile griffe nicht.
+/// Was der Löschweg nicht verträgt: ein Fremdschlüssel auf eine Stammdatentabelle mit einer
+/// anderen ON-DELETE-Aktion als `NO ACTION`/`RESTRICT` (dann löschte oder änderte das Entfernen
+/// still Zeilen echter Einsätze) und ein aufgeschobener Fremdschlüssel irgendwo im Schema (dann
+/// käme der Fehler erst beim COMMIT).
 async fn loeschweg_verstoesse(pool: &SqlitePool) -> Vec<String> {
     let mut verstoesse: Vec<String> = eingehende_stammdaten_fks(pool)
         .await
@@ -132,15 +128,12 @@ async fn loeschweg_verstoesse(pool: &SqlitePool) -> Vec<String> {
     verstoesse
 }
 
-/// LFH-690 D7: Jeder Fremdschlüssel auf `fahrzeug`/`personal`/`material` trägt `ON DELETE
-/// NO ACTION` oder `RESTRICT` (kein `CASCADE`, `SET NULL`, `SET DEFAULT`), und keiner im Schema
-/// ist aufgeschoben. Nur dann scheitert das Löschen einer noch verwiesenen Stammdatenzeile, und
-/// der Savepoint je Zeile erkennt „wird noch verwiesen“ zuverlässig über SQLite-Code 787, ohne
-/// handgepflegte Verweisliste.
+/// Jeder Fremdschlüssel auf `fahrzeug`/`personal`/`material` trägt `ON DELETE NO ACTION` oder
+/// `RESTRICT`, und keiner im Schema ist aufgeschoben. Nur dann erkennt der Savepoint je Zeile
+/// „wird noch verwiesen“ über Code 787, ohne handgepflegte Verweisliste.
 ///
-/// Die Positivkontrolle darunter hält den Guard ehrlich: fände die Abfrage gar keine
-/// eingehenden Fremdschlüssel (Tippfehler im Tabellennamen, Quoting), bliebe er für immer grün.
-/// Umgekehrt färbte eine abweichende Schreibweise der Aktion im PRAGMA den Guard rot, nicht grün.
+/// Die Positivkontrolle hält den Guard ehrlich: fände die Abfrage gar keine eingehenden
+/// Fremdschlüssel (Tippfehler, Quoting), bliebe er für immer grün.
 #[tokio::test]
 async fn kein_fk_kaskadiert_in_stammdaten() {
     let pool = crate::db::test_pool().await;

@@ -6,12 +6,12 @@
 //! das Frontend fällt dann auf ein generisches „Serverfehler (status)" zurück, statt die
 //! deutsche Fachmeldung anzuzeigen.
 //!
-//! Der Guard deckt alle heutigen und künftigen Routen ab, ohne eine einzige zu feuern —
-//! das ist der Grund, warum der Wrapper distinkt `JsonBody` heißt und nicht als `Json`
-//! importiert wird: sonst wären Wrapper und Rohform im Quelltext ununterscheidbar.
+//! Der Guard deckt alle heutigen und künftigen Routen ab — das ist der Grund, warum der
+//! Wrapper distinkt `JsonBody` heißt und nicht als `Json` importiert wird: sonst wären
+//! Wrapper und Rohform im Quelltext ununterscheidbar.
 //!
-//! Parst Quelltext per Klammer-Tiefenzähler, bewusst ohne `regex`-Dependency (das Projekt
-//! hält die Abhängigkeiten schlank) — dasselbe Vorgehen wie `tests/einsatz_kontext_guard.rs`.
+//! Parst Quelltext per Klammer-Tiefenzähler, bewusst ohne `regex`-Dependency — dasselbe
+//! Vorgehen wie `tests/einsatz_kontext_guard.rs`.
 
 use std::fs;
 

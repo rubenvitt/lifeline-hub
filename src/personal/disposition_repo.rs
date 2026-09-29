@@ -5,8 +5,8 @@ use crate::katalog::{StatusKategorie, DIENSTSTATUS_IN_DIENST, KATEGORIE_GEBUNDEN
 use sqlx::{SqliteConnection, SqlitePool};
 
 /// SELECT mit aufgelöster Live-Identität (LEFT JOIN personal), Live-Funktion (geordnete
-/// Subquery über aktive Qualifikationen — identisch zu `qualifikation_repo::funktion_text`)
-/// und Status (LEFT JOIN personal_status). Live vs. Snapshot wählt `zu_anzeige`.
+/// Subquery über aktive Qualifikationen, identisch zu `qualifikation_repo::funktion_text`) und
+/// Status. Live oder Snapshot wählt `zu_anzeige`.
 const SELECT_AUFGELOEST: &str = "\
     SELECT ep.id, ep.einsatz_id, ep.personal_id, ep.einheit_id, ep.fahrzeug_id, ep.status_id, \
            ep.staerke_position AS ep_staerke_position, \
@@ -50,9 +50,9 @@ struct Row {
     status_farbe: Option<String>,
 }
 
-/// Auflösungsregel für Identität/Funktion: Live nur, wenn Stamm-Bezug besteht, der
-/// Einsatz aktiv ist UND die Person in Dienst ist. Sonst Snapshot. Die Stärke-Position
-/// wird IMMER live aufgelöst (Dispo-Override vor Stamm-Default, kein Snapshot-Feld).
+/// Auflösungsregel: Identität/Funktion live nur mit Stamm-Bezug, aktivem Einsatz UND Person in
+/// Dienst, sonst Snapshot. Die Stärke-Position wird IMMER live aufgelöst (Dispo-Override vor
+/// Stamm-Default).
 fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzPersonalAnzeige {
     let live = row.personal_id.is_some()
         && einsatz_aktiv
@@ -140,9 +140,8 @@ pub async fn laden_anzeige(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
-/// Wie [`laden_anzeige`], aber auf einer offenen Connection/Transaktion (für den In-Tx-Reload
-/// beim atomaren Status-Update, F06/LFH-244 Tier-A — liefert die frische, aufgelöste Anzeige
-/// für ETB-Text UND Response in EINER Tx).
+/// Wie [`laden_anzeige`], auf einer offenen Verbindung — für ETB-Text und Response aus EINER
+/// Transaktion beim atomaren Status-Update.
 pub async fn laden_anzeige_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -160,14 +159,12 @@ pub async fn laden_anzeige_tx(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
-/// Disponiert eine Stamm-Person. Prüft Org-Zugehörigkeit + Dienststatus, friert den
-/// Identitäts-Schnappschuss ein (`snap_funktion` aus den aktiven Qualifikationen) und
-/// setzt den ersten `gebunden`-Status. `staerke_position` ist der optionale Dispo-Override.
-/// `NotFound` bei fremder/unbek. Person, `Validation` bei außer Dienst, `Conflict` bei
-/// Doppel-Disposition. Liefert die neue `ep_id`.
+/// Disponiert eine Stamm-Person: prüft Org und Dienststatus, friert den Identitäts-Snapshot ein
+/// (`snap_funktion` aus den aktiven Qualifikationen) und setzt den ersten `gebunden`-Status.
+/// `staerke_position` ist der optionale Override. `NotFound` bei fremder/unbekannter Person,
+/// `Validation` bei außer Dienst, `Conflict` bei Doppel-Disposition. Liefert die `ep_id`.
 ///
-/// Pool-Hülle um [`disponiere_stamm_tx`]: wie bisher ohne eigene Transaktion, Prüfungen und
-/// Insert laufen im Autocommit einer geliehenen Verbindung.
+/// Pool-Hülle um [`disponiere_stamm_tx`] ohne eigene Transaktion.
 pub async fn disponiere_stamm(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -188,11 +185,10 @@ pub async fn disponiere_stamm(
     .await
 }
 
-/// Disponiert eine Stamm-Person auf einer offenen Verbindung/Transaktion (LFH-690,
-/// Demo-Import in EINER Transaktion). Person, Funktionstext und erster `gebunden`-Status
-/// werden auf derselben Verbindung gelesen, sehen also auch Stammdaten, die dieselbe offene
-/// Transaktion gerade angelegt hat. Öffnet und committet selbst nichts. Fehlerfälle wie
-/// [`disponiere_stamm`]. Liefert die neue `ep_id`.
+/// Disponiert eine Stamm-Person auf einer offenen Verbindung (Demo-Import in EINER
+/// Transaktion). Person, Funktionstext und Status werden auf derselben Verbindung gelesen und
+/// sehen so auch gerade angelegte Stammdaten. Öffnet und committet nichts; Fehler wie
+/// [`disponiere_stamm`].
 pub async fn disponiere_stamm_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -245,8 +241,8 @@ pub async fn disponiere_stamm_tx(
     }
 }
 
-/// Disponiert eine Ad-hoc-externe Person (`personal_id = NULL`); `snap_*` sind die
-/// eigentlichen Daten. Initial-Status = erster `gebunden`. Liefert die neue `ep_id`.
+/// Disponiert eine Ad-hoc-externe Person (`personal_id = NULL`); `snap_*` sind die eigentlichen
+/// Daten. Initialstatus ist der erste `gebunden`. Liefert die `ep_id`.
 pub async fn disponiere_adhoc(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -273,11 +269,10 @@ pub async fn disponiere_adhoc(
     Ok(id)
 }
 
-/// Aktualisiert Status, Stärke-Position und/oder Bemerkung. `status_id` nutzt COALESCE
-/// (`None` = unverändert). `staerke_position` und `bemerkung` sind Drei-Zustands (wie
-/// `PositionPatch`): `None` = unverändert, `Some(None)` = explizit auf NULL, `Some(Some(x))`
-/// = setzen. Getrimmt/leer-kollabiert wird in der Route (F12-c/LFH-266), nicht hier.
-/// `NotFound`, falls die Zeile nicht zum Einsatz gehört.
+/// Aktualisiert Status, Stärke-Position und/oder Bemerkung. `status_id` per COALESCE (`None` =
+/// unverändert). `staerke_position` und `bemerkung` sind Tri-State: `None` = unverändert,
+/// `Some(None)` = NULL, `Some(Some(x))` = setzen. Getrimmt wird in der Route. `NotFound`, falls
+/// die Zeile nicht zum Einsatz gehört.
 pub async fn aktualisiere_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -308,7 +303,7 @@ pub async fn aktualisiere_tx(
     Ok(())
 }
 
-/// Pool-Wrapper (eigene Tx): delegiert an [`aktualisiere_tx`].
+/// Pool-Wrapper mit eigener Transaktion.
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -329,15 +324,11 @@ pub async fn aktualisiere(
     .await
 }
 
-/// Entfernt eine Dispositionszeile aus dem Einsatz (der Stamm bleibt). `NotFound`,
-/// falls nicht zum Einsatz gehörend.
+/// Entfernt eine Dispositionszeile (der Stamm bleibt); `NotFound`, falls nicht zum Einsatz.
 ///
-/// Transaktional (LFH-237/F08): vor dem DELETE werden die Führungsrollen der Person
-/// freigegeben (`einsatz_einheit.fuehrer_id` / `einsatzabschnitt.leiter_id` → NULL), sonst
-/// scheitert das DELETE am blockierenden FK. Der Auftrag-Empfänger-Bezug
-/// (`auftrag_empfaenger.person_id`) wird von der DB per ON DELETE SET NULL abgeräumt
-/// (Migration 0088). Schlägt das DELETE auf `NotFound` durch (fremde/unbekannte Person),
-/// rollt die TX die Freigabe zurück.
+/// Vor dem DELETE werden die Führungsrollen freigegeben (`fuehrer_id`/`leiter_id` → NULL),
+/// sonst blockierte der FK. `auftrag_empfaenger.person_id` räumt ON DELETE SET NULL ab. Ein
+/// `NotFound` rollt die Freigabe mit zurück.
 pub async fn entferne_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -368,9 +359,8 @@ pub async fn entferne_tx(
     Ok(())
 }
 
-/// Pool-Wrapper: fährt die Pre-Clean-Freigabe + DELETE in EINER (deferred) Tx. Der atomare
-/// Handler-Pfad (F06/LFH-244) nutzt stattdessen [`entferne_tx`] direkt im `write_retry!`-Block,
-/// um zusätzlich den System-ETB-Eintrag in dieselbe Tx zu ziehen.
+/// Pool-Wrapper: Freigabe und DELETE in EINER Transaktion. Der Handler nutzt [`entferne_tx`]
+/// direkt in `write_retry!`, um den System-ETB-Eintrag in dieselbe Transaktion zu ziehen.
 pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ep_id: i64) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
     entferne_tx(&mut tx, einsatz_id, ep_id).await?;
@@ -378,10 +368,9 @@ pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ep_id: i64) -> Result<
     Ok(())
 }
 
-/// Dedizierter Lesepfad für die Karte: ALLE disponierten Personen des Einsatzes mit ihrer
-/// Position (LFH-276 — vormals auf Einheitsführer/Abschnittsleiter beschränkt). Führungsrollen
-/// bleiben als Flags (`ist_einheitsfuehrer`/`ist_abschnittsleiter`) kenntlich. Bewusst getrennt
-/// vom allgemeinen `liste`-Pfad (der KEIN lat/lon liefert).
+/// Lesepfad für die Karte: ALLE disponierten Personen des Einsatzes mit Position;
+/// Führungsrollen als Flags (`ist_einheitsfuehrer`/`ist_abschnittsleiter`). Getrennt vom
+/// `liste`-Pfad, der kein lat/lon liefert.
 pub async fn liste_fuehrungskraefte(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -401,8 +390,8 @@ pub async fn liste_fuehrungskraefte(
     Ok(rows)
 }
 
-/// PATCH-Daten für die Führungskraft-Position. Drei-Zustands-Semantik je Feld:
-/// `None` = unverändert, `Some(None)` = explizit auf NULL, `Some(Some(x))` = setzen.
+/// PATCH-Daten der Position, Tri-State je Feld: `None` = unverändert, `Some(None)` = NULL,
+/// `Some(Some(x))` = setzen.
 #[derive(Debug, Default)]
 pub struct PositionPatch<'a> {
     pub lat: Option<Option<f64>>,
@@ -411,9 +400,8 @@ pub struct PositionPatch<'a> {
     pub tz_organisation: Option<Option<&'a str>>,
 }
 
-/// Aktualisiert lat/lon/tz_* einer Person des Einsatzes (Drei-Zustands-PATCH; siehe
-/// `PositionPatch`). `NotFound`, falls die Zeile nicht zum Einsatz gehört. Liefert die
-/// frische Karten-Sicht der Person (jede disponierte Person ist verortbar, LFH-276).
+/// Aktualisiert lat/lon/tz_* einer Person des Einsatzes (s. `PositionPatch`); `NotFound`, falls
+/// die Zeile nicht zum Einsatz gehört. Liefert die frische Karten-Sicht.
 pub async fn aktualisiere_position(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -505,9 +493,9 @@ mod tests {
         }
     }
 
-    /// Seed: Org/Benutzer/Einsatz + 3 `einsatz_personal` (roh, nur snap_name) und eine
-    /// `einsatz_einheit` mit `fuehrer_id = p1` sowie ein `einsatzabschnitt` mit
-    /// `leiter_id = p2`. #3 bleibt ohne Führungsrolle. Liefert (einsatz, p1, p2, p3).
+    /// Org/Benutzer/Einsatz, drei `einsatz_personal` (nur snap_name), eine Einheit mit
+    /// `fuehrer_id = p1` und ein Abschnitt mit `leiter_id = p2`; p3 ohne Führungsrolle. Liefert
+    /// (einsatz, p1, p2, p3).
     async fn seed_personal_mit_fuehrung(pool: &SqlitePool) -> (i64, i64, i64, i64) {
         let (_benutzer, einsatz) = setup(pool).await;
         let mut ids = Vec::new();
@@ -536,10 +524,9 @@ mod tests {
         (einsatz, p1, p2, p3)
     }
 
-    /// LFH-690: Stamm-Person, Qualifikation, Personalstatus und Disposition in EINER
-    /// Transaktion. Die Disposition muss Person, Funktionstext und ersten `gebunden`-Status auf
-    /// der Verbindung lesen; über den Pool fände sie die Person nicht bzw. schriebe still
-    /// `snap_funktion`/`status_id = NULL`.
+    /// Stamm-Person, Qualifikation, Personalstatus und Disposition in EINER Transaktion: die
+    /// Disposition liest auf der Verbindung; über den Pool fände sie die Person nicht bzw. schriebe
+    /// still `snap_funktion`/`status_id = NULL`.
     #[tokio::test]
     async fn disponiere_stamm_mit_stammdaten_aus_derselben_transaktion() {
         let (_dir, pool) = crate::db::test_pool_datei().await;
@@ -595,8 +582,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (einsatz_id, p1, p2, p3) = seed_personal_mit_fuehrung(&pool).await;
 
-        // LFH-276: Die Liste liefert ALLE disponierten Personen des Einsatzes (nicht nur
-        // Führung); Führungsrollen bleiben als Flags kenntlich.
+        // Die Liste liefert ALLE disponierten Personen; Führungsrollen bleiben als Flags kenntlich.
         let liste = liste_fuehrungskraefte(&pool, einsatz_id).await.unwrap();
         let ids: Vec<i64> = liste.iter().map(|f| f.id).collect();
         assert_eq!(liste.len(), 3);
@@ -618,7 +604,7 @@ mod tests {
         let f3 = liste.iter().find(|f| f.id == p3).unwrap();
         assert!(!f3.ist_einheitsfuehrer && !f3.ist_abschnittsleiter);
 
-        // Nicht-Führungskraft (#3) ist verortbar → früher 404 am Re-list-`.find`, jetzt Ok.
+        // Auch eine Nicht-Führungskraft ist verortbar.
         aktualisiere_position(
             &pool,
             einsatz_id,
@@ -841,8 +827,8 @@ mod tests {
 
     #[tokio::test]
     async fn funktion_komposition_identisch() {
-        // snap_funktion (beim Disponieren) und Live-Funktion (in der Anzeige) MÜSSEN
-        // dieselbe Komposition liefern. Pinnt beide Pfade auf dieselbe Ausgabe.
+        // `snap_funktion` (beim Disponieren) und Live-Funktion (in der Anzeige) liefern dieselbe
+        // Komposition.
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let san = qualifikation_repo::anlegen(&pool, 1, "Sanitäter", 10)
@@ -894,7 +880,7 @@ mod tests {
             None
         );
 
-        // Direkt einer Einheit zuordnen (Mitglied-Repo kommt später; hier roh).
+        // Direkt einer Einheit zuordnen (roh).
         let einheit: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Trupp') RETURNING id",
         )
@@ -975,8 +961,8 @@ mod tests {
         ));
     }
 
-    /// LFH-4 P1: Drei-Zustands-Semantik von `staerke_position` auf der rohen Override-Spalte
-    /// (umgeht die `.or(live)`-Auflösung der Anzeige).
+    /// Tri-State von `staerke_position` auf der rohen Override-Spalte (ohne die
+    /// `.or(live)`-Auflösung der Anzeige).
     #[tokio::test]
     async fn aktualisiere_staerke_position_tri_state() {
         let pool = crate::db::test_pool().await;
@@ -1028,8 +1014,8 @@ mod tests {
         );
     }
 
-    /// LFH-9: Die Besatzungs-FK `fahrzeug_id` wird in die Anzeige serialisiert (sonst zeigt
-    /// der Frei-Pool-Picker bereits einem Fahrzeug zugeteilte Kräfte). NULL → `None`.
+    /// Die Besatzungs-FK `fahrzeug_id` wird serialisiert (sonst zeigte der Frei-Pool-Picker bereits
+    /// zugeteilte Kräfte). NULL → `None`.
     #[tokio::test]
     async fn fahrzeug_id_wird_serialisiert() {
         let pool = crate::db::test_pool().await;
@@ -1073,10 +1059,9 @@ mod tests {
         );
     }
 
-    /// LFH-237/F08: Eine Person, die Einheitsführer bzw. Abschnittsleiter ist und als
-    /// Auftrag-Empfänger referenziert wird, muss sich entfernen lassen. Die Führungsrollen
-    /// werden per Pre-Clean in der Lösch-Tx freigegeben; der Empfänger-Bezug per ON DELETE
-    /// SET NULL (Migration 0088), snap_anzeige bleibt.
+    /// Eine Person, die Einheitsführer bzw. Abschnittsleiter und Auftrag-Empfänger ist, lässt sich
+    /// entfernen: Führungsrollen werden in der Lösch-Tx freigegeben, der Empfänger-Bezug per ON
+    /// DELETE SET NULL, `snap_anzeige` bleibt.
     #[tokio::test]
     async fn entferne_gibt_fuehrungsrollen_frei_und_setzt_empfaenger_null() {
         let pool = crate::db::test_pool().await;

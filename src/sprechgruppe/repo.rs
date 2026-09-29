@@ -93,10 +93,8 @@ pub async fn anlegen_katalog(
     laden(pool, org_id, id).await
 }
 
-/// Teil-Patch der editierbaren Felder einer Katalog-Sprechgruppe (LFH-306, Tri-State):
-/// die äußere `Option` sagt „im Patch enthalten?" — `None` lässt die Spalte unverändert.
-/// Bei der nullable Spalte `hinweis` trägt der Wert selbst noch eine `Option`:
-/// `Some(None)` setzt sie auf NULL.
+/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“; bei der nullable Spalte `hinweis`
+/// setzt `Some(None)` NULL.
 #[derive(Debug, Default)]
 pub struct KatalogPatch<'a> {
     pub bezeichnung: Option<&'a str>,
@@ -105,17 +103,13 @@ pub struct KatalogPatch<'a> {
     pub sortier: Option<i64>,
 }
 
-/// Teil-Patch der editierbaren Felder einer Katalog-Sprechgruppe (org-scoped,
-/// `einsatz_id IS NULL`). `NotFound` bei fremder Org oder einsatz-lokaler Sprechgruppe,
-/// `Conflict` bei Bezeichnung-/Betriebsart-Dublette.
+/// Teil-Patch einer Katalog-Sprechgruppe (org-scoped, `einsatz_id IS NULL`). `NotFound` bei
+/// fremder Org oder einsatz-lokaler Sprechgruppe, `Conflict` bei Dublette.
 ///
-/// Flag/Wert-Paare statt Vollersatz (LFH-306): erst so lässt sich `hinweis` über die API
-/// wieder auf NULL setzen, und ein nicht gesendetes Feld fasst seine Spalte nicht an — das
-/// beseitigt den stillen `sortier`-Reset, den das Frontend-Formular auslöste (es sendet
-/// `{bezeichnung, betriebsart, hinweis}` ohne `sortier`). Die Parameter sind nummeriert,
-/// weil eine um eine Position verschobene Bind-Kette gleichtypige Nachbarspalten
-/// (`bezeichnung`↔`betriebsart`) STILL vertauschen würde — abgesichert von
-/// `patche_katalog_setzt_jede_spalte_an_ihren_platz`.
+/// Flag/Wert-Paare statt Vollersatz: so lässt sich `hinweis` wieder auf NULL setzen, und ein
+/// nicht gesendetes Feld (etwa `sortier`, das das Formular nicht mitschickt) bleibt stehen.
+/// Nummerierte Parameter, damit eine verschobene Bind-Kette `bezeichnung`↔`betriebsart` nicht
+/// still vertauscht (`patche_katalog_setzt_jede_spalte_an_ihren_platz`).
 pub async fn patche_katalog(
     pool: &SqlitePool,
     org_id: i64,
@@ -153,9 +147,8 @@ pub async fn patche_katalog(
     laden(pool, org_id, id).await
 }
 
-/// Legt eine einsatz-lokale Sprechgruppe an — idempotent: trifft die Zeile
-/// bereits den Unique-Index `(einsatz_id, betriebsart, bezeichnung)`, wird der
-/// vorhandene Eintrag zurückgegeben statt ein Fehler ausgelöst.
+/// Legt eine einsatz-lokale Sprechgruppe an, idempotent: trifft die Zeile den Unique-Index
+/// `(einsatz_id, betriebsart, bezeichnung)`, kommt der vorhandene Eintrag zurück.
 pub async fn anlegen_einsatz_lokal(
     pool: &SqlitePool,
     org_id: i64,
@@ -342,10 +335,9 @@ pub async fn lade_einheit_sprechgruppen(
     .map_err(Into::into)
 }
 
-/// Sprechgruppen ALLER Einheiten eines Einsatzes in EINER Abfrage (kein N+1,
-/// LFH-225/F23), gruppiert je `einheit_id`. Einheiten ohne Zuordnung fehlen in der Map.
-/// Das globale `ORDER BY betriebsart, sortier, bezeichnung` erhält die Sortierung
-/// innerhalb jeder Gruppe exakt so, wie sie `lade_einheit_sprechgruppen` liefert.
+/// Sprechgruppen ALLER Einheiten eines Einsatzes in EINER Abfrage, je `einheit_id`; Einheiten
+/// ohne Zuordnung fehlen. Das globale `ORDER BY` erhält die Sortierung je Gruppe wie
+/// `lade_einheit_sprechgruppen`.
 pub async fn lade_einheit_sprechgruppen_map(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -368,9 +360,8 @@ pub async fn lade_einheit_sprechgruppen_map(
     Ok(gruppiere(zeilen))
 }
 
-/// Sprechgruppen ALLER Abschnitte eines Einsatzes in EINER Abfrage (kein N+1,
-/// LFH-225/F23), gruppiert je `abschnitt_id`. Sortierung wie in
-/// `lade_abschnitt_sprechgruppen`.
+/// Sprechgruppen ALLER Abschnitte eines Einsatzes in EINER Abfrage, je `abschnitt_id`;
+/// Sortierung wie `lade_abschnitt_sprechgruppen`.
 pub async fn lade_abschnitt_sprechgruppen_map(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -393,8 +384,8 @@ pub async fn lade_abschnitt_sprechgruppen_map(
     Ok(gruppiere(zeilen))
 }
 
-/// Gruppiert die Sammelzeilen je Bezug und wandelt in die Anzeige — in Ergebnis-
-/// reihenfolge, damit das `ORDER BY` der Abfrage je Gruppe erhalten bleibt.
+/// Gruppiert die Sammelzeilen je Bezug in Ergebnisreihenfolge, damit das `ORDER BY` je Gruppe
+/// erhalten bleibt.
 fn gruppiere(zeilen: Vec<SprechgruppeMitBezug>) -> HashMap<i64, Vec<SprechgruppeAnzeige>> {
     let mut map: HashMap<i64, Vec<SprechgruppeAnzeige>> = HashMap::new();
     for z in zeilen {
@@ -616,9 +607,8 @@ mod tests {
             0
         );
     }
-    /// LFH-225/F23: Die Sprechgruppen-Sammelabfragen müssen je Einheit/Abschnitt exakt
-    /// das liefern, was die Einzelabfragen liefern — inklusive der Sortierung nach
-    /// `betriebsart, sortier, bezeichnung`. Koppelt beide Fassungen gegen Drift.
+    /// Die Sammelabfragen liefern je Einheit/Abschnitt exakt das, was die Einzelabfragen liefern,
+    /// inklusive Sortierung.
     #[tokio::test]
     async fn sammelabfragen_sind_deckungsgleich_mit_den_einzelabfragen() {
         let pool = crate::db::test_pool().await;
@@ -724,8 +714,7 @@ mod tests {
             );
         }
 
-        // Der Vergleich oben muss etwas zu vergleichen haben — und die erwartete
-        // Sortierung explizit festhalten.
+        // Der Vergleich braucht Inhalt, und die erwartete Sortierung steht explizit da.
         assert_eq!(
             einheit_map[&einheiten[0]]
                 .iter()
@@ -799,8 +788,7 @@ mod tests {
             .await
             .is_ok());
     }
-    /// Patch-Variante des früheren `aktualisieren_ersetzt_felder` (LFH-306): dieselbe
-    /// fachliche Zusage — gesendete Felder landen in ihren Spalten und `laden` sieht sie.
+    /// Gesendete Felder landen in ihren Spalten, und `laden` sieht sie.
     #[tokio::test]
     async fn patche_katalog_ersetzt_gesendete_felder() {
         let pool = crate::db::test_pool().await;
@@ -831,9 +819,7 @@ mod tests {
         assert_eq!(geladen.sortier, 5);
     }
 
-    /// Bind-Reihenfolge der Flag/Wert-Kette: eine um eine Position verschobene Kette würde
-    /// `bezeichnung`↔`betriebsart` still vertauschen — ohne Compile- und ohne Laufzeitfehler.
-    /// Deshalb hier alle vier Spalten distinkt und einzeln geprüft.
+    /// Bind-Reihenfolge: alle vier Spalten distinkt setzen und einzeln prüfen.
     #[tokio::test]
     async fn patche_katalog_setzt_jede_spalte_an_ihren_platz() {
         let pool = crate::db::test_pool().await;
@@ -860,7 +846,7 @@ mod tests {
         assert_eq!(g.sortier, 7);
     }
 
-    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an.
+    /// Ein Patch fasst NUR die gesendeten Spalten an.
     #[tokio::test]
     async fn patche_katalog_laesst_nicht_gesendete_spalten_stehen() {
         let pool = crate::db::test_pool().await;
@@ -901,8 +887,7 @@ mod tests {
         assert_eq!(unveraendert.sortier, 5);
     }
 
-    /// `Some(None)` ist der Leerwunsch und muss von „absent" unterscheidbar sein —
-    /// grenzt gegen `patche_katalog_laesst_nicht_gesendete_spalten_stehen` ab.
+    /// `Some(None)` ist der Leerwunsch und von „absent“ unterscheidbar.
     #[tokio::test]
     async fn patche_katalog_hinweis_none_loescht_die_spalte() {
         let pool = crate::db::test_pool().await;
@@ -935,8 +920,7 @@ mod tests {
         assert_eq!(g.sortier, 5, "Nachbarfeld unberührt");
     }
 
-    /// Migriert aus `aktualisieren_auf_geschwister_ist_conflict` — die Conflict-Zusage des
-    /// Unique-Index bleibt am Teil-Patch bestehen.
+    /// Die Conflict-Zusage des Unique-Index gilt auch am Teil-Patch.
     #[tokio::test]
     async fn patche_katalog_auf_geschwister_ist_conflict() {
         let pool = crate::db::test_pool().await;
@@ -964,7 +948,7 @@ mod tests {
         ));
     }
 
-    /// Migriert aus `aktualisieren_fremde_org_ist_notfound` — Mandantengrenze.
+    /// Mandantengrenze.
     #[tokio::test]
     async fn patche_katalog_fremde_org_ist_notfound() {
         let pool = crate::db::test_pool().await;
@@ -989,8 +973,7 @@ mod tests {
         ));
     }
 
-    /// Migriert aus `aktualisieren_trifft_einsatz_lokale_zeile_nicht` — der
-    /// `einsatz_id IS NULL`-Guard trennt Katalog von einsatz-lokalen Zeilen.
+    /// Der `einsatz_id IS NULL`-Guard trennt Katalog von einsatz-lokalen Zeilen.
     #[tokio::test]
     async fn patche_katalog_trifft_einsatz_lokale_zeile_nicht() {
         let pool = crate::db::test_pool().await;

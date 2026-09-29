@@ -1,5 +1,5 @@
 //! LFH-608: Lagezustand, Abschnittsauftrag, Fortschritt und Kurzbezeichnung je
-//! Einsatzabschnitt — die Datenquelle für die Abschnittszeile im Führungs-Überblick (S2).
+//! Einsatzabschnitt — die Datenquelle für die Abschnittszeile im Führungs-Überblick.
 
 use axum::http::StatusCode;
 use serde_json::Value;
@@ -273,8 +273,8 @@ async fn anlegen_mit_lagezustand_nennt_ihn_im_etb() {
 
 #[tokio::test]
 async fn lagewechsel_bleibt_dokumentiert_wenn_die_sprechgruppen_zuordnung_scheitert() {
-    // Review LFH-608: das Formular schickt `sprechgruppe_ids` bei JEDEM Speichern mit. Scheitert
-    // die Zuordnung, darf der schon gespeicherte Lagewechsel nicht ohne ETB-Eintrag bleiben.
+    // Das Formular schickt `sprechgruppe_ids` bei JEDEM Speichern mit. Scheitert die
+    // Zuordnung, darf der schon gespeicherte Lagewechsel nicht ohne ETB-Eintrag bleiben.
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;

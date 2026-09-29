@@ -100,9 +100,8 @@ describe('baueEinsatzortFc', () => {
 });
 
 /**
- * LFH-622: Namensplaketten an den Markern (Neuentwurf S5). Beschriftet wird, was einen Namen
- * trägt — Lagemeldungen („Meldung #412") und der Ersatztext unbenannter freier Zeichen sind
- * keine Namen und blieben als Dichte ohne Aussage auf der Karte.
+ * Namensplaketten an den Markern. Beschriftet wird, was einen Namen trägt — Lagemeldungen („Meldung
+ * #412") und der Ersatztext unbenannter freier Zeichen sind keine Namen.
  */
 describe('Marker-Beschriftung', () => {
   it('trägt den Namen, die Plakettenfarben und einen Rang für die Platzvergabe', () => {
@@ -145,8 +144,7 @@ describe('Marker-Beschriftung', () => {
       'Sperre B6',
       undefined,
     ]);
-    // Ohne Beschriftung auch kein Plakettenbild: der Label-Filter prüft `beschriftung`,
-    // ein verwaistes Bild würde trotzdem angefordert.
+    // Ohne Beschriftung kein Plakettenbild: ein verwaistes Bild würde sonst angefordert.
     expect(fc.features[0].properties.plakette).toBeUndefined();
   });
 
@@ -223,7 +221,8 @@ describe('sorgeFuerMarkerLayer', () => {
     sorgeFuerMarkerLayer(map as never, leer, leer);
     const symbol = layers.get('marker-symbol') as { filter: unknown };
     const kreis = layers.get('marker-kreis') as { filter: unknown };
-    // Beide Einzelmarker-Layer MÜSSEN die Cluster-Aggregate ausschließen (Negation '!' + point_count).
+    // Beide Einzelmarker-Layer müssen die Cluster-Aggregate ausschließen (Negation '!' +
+    // point_count).
     for (const f of [symbol.filter, kreis.filter]) {
       expect(JSON.stringify(f)).toContain('"!"');
       expect(JSON.stringify(f)).toContain('point_count');
@@ -235,13 +234,11 @@ describe('sorgeFuerMarkerLayer', () => {
   it('pinnt Marker- UND Spider-Layer nach oben (Beinchen unter den Leaf-Symbolen)', () => {
     const { map, moves } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
-    // Jeder Layer wird per moveLayer (ohne beforeId) ans Ende = nach oben geschoben, in Mal-Reihenfolge.
-    // Marker zuerst, dann der transiente Spider darüber (Beinchen unter den Leaf-Symbolen). Cluster = DOM-Marker.
-    // Die Plaketten liegen UNTER den Zeichen: MapLibre vergibt Platz von oben nach unten, die
-    // Zeichen (allow-overlap) belegen ihn also zuerst, und keine Plakette deckt ein Zeichen zu.
+    // Jeder Layer wird per moveLayer ans Ende geschoben, in Mal-Reihenfolge: Marker, dann der
+    // transiente Spider darüber; Cluster sind DOM-Marker. Die Plaketten liegen unter den Zeichen:
+    // MapLibre vergibt Platz von oben nach unten, die Zeichen (allow-overlap) belegen ihn zuerst.
     expect(moves).toEqual([
-      // Betroffene auf der Lagekarte (LFH-648) GANZ unten: sie liegen unter jedem Kräfte-/
-      // Objektzeichen — auch ihre CLUSTER, deshalb sind die WebGL-Layer und kein DOM-Donut.
+      // Betroffene ganz unten — auch ihre Cluster, deshalb WebGL-Layer statt DOM-Donut.
       'personen-cluster-kante',
       'personen-cluster-kreis',
       'personen-cluster-zahl',
@@ -251,7 +248,7 @@ describe('sorgeFuerMarkerLayer', () => {
       'personen-kurz',
       'personen-label',
       'marker-treffer',
-      // Der Einsatzort hat eine eigene, ungeclusterte Quelle und damit eine eigene Zone (LFH-711).
+      // Der Einsatzort hat eine eigene, ungeclusterte Quelle und damit eine eigene Zone.
       'marker-einsatzort-treffer',
       'marker-status-ring',
       'marker-kante',
@@ -282,7 +279,7 @@ describe('sorgeFuerMarkerLayer', () => {
         paint: Record<string, unknown>;
       };
       expect(layer.type).toBe('circle');
-      // Ohne `treffer` keine Zone: die Eigenschaft bringt der Marker mit (Builder, LFH-711).
+      // Ohne `treffer` keine Zone: die Eigenschaft bringt der Marker aus dem Builder mit.
       expect(JSON.stringify(layer.filter)).toContain('["has","treffer"]');
       expect(layer.paint['circle-opacity']).toBe(0);
       // Radius = halber Durchmesser aus der Feature-Eigenschaft, keine feste Zahl.
@@ -291,8 +288,7 @@ describe('sorgeFuerMarkerLayer', () => {
     expect(MARKER_KLICK_LAYER).toContain('marker-treffer');
     expect(MARKER_KLICK_LAYER).toContain('marker-einsatzort-treffer');
     expect(SPIDER_KLICK_LAYER).toContain('spider-treffer');
-    // Die Einsatzort-Zone hängt an SEINER Quelle: an `marker-cluster` hinge sie nie an einem
-    // Feature, denn der Einsatzort steht dort nicht (`baueMarkerFc` nimmt ihn aus).
+    // Die Einsatzort-Zone hängt an seiner Quelle — in `marker-cluster` steht der Einsatzort nicht.
     expect((layers.get('marker-einsatzort-treffer') as { source: string }).source).toBe(
       'marker-einsatzort',
     );
@@ -315,8 +311,8 @@ describe('sorgeFuerMarkerLayer', () => {
   it('legt alle in MARKER_KLICK_LAYER referenzierten Layer real an (Konstanten-Kopplung)', () => {
     const { map, layers } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
-    // Schützt vor stillen Klick-Toten: eine Layer-ID-Umbenennung ohne Nachziehen der Konstante
-    // bände den Klick-Handler an einen nicht existierenden Layer — hier rot statt unbemerkt.
+    // Eine Layer-ID-Umbenennung ohne Nachziehen der Konstante bände den Klick-Handler an einen
+    // nicht existierenden Layer — hier rot statt unbemerkt.
     for (const id of MARKER_KLICK_LAYER) expect(layers.has(id)).toBe(true);
   });
 });
@@ -516,8 +512,8 @@ describe('Eigene Cluster-Quelle der Betroffenen (LFH-648)', () => {
         label: 'R-042 · SK II',
         clusterQuelle: 'personen',
       }),
-      // Betroffenen-Karte (LFH-650): ohne `clusterQuelle` bleibt die Person in `marker-cluster`
-      // und bekommt dort ihren Sichtungs-Donut.
+      // Betroffenen-Karte: ohne `clusterQuelle` bleibt die Person in `marker-cluster` und bekommt
+      // dort ihren Sichtungs-Donut.
       mk({ schluessel: 'person-12', typ: 'person', kurzzeichen: 'I', label: 'R-043 · SK I' }),
     ]);
     reAnlegenMarker(map as never, marker, leer);
@@ -556,8 +552,8 @@ describe('Eigene Cluster-Quelle der Betroffenen (LFH-648)', () => {
   });
 
   it('Personen-Cluster sind WebGL-Layer der Personen-Quelle — kein DOM-Donut über den Kräften', () => {
-    // Review-Befund: ein DOM-Donut hängt über dem Canvas, deckte ein Fahrzeugzeichen zu und
-    // fing dessen Klick ab. Der Donut-Sync läuft deshalb nur über `marker-cluster`.
+    // Ein DOM-Donut hinge über dem Canvas und fing Klicks auf Fahrzeugzeichen ab — der Donut-Sync
+    // läuft deshalb nur über `marker-cluster`.
     const { map, layers } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
     const kreis = layers.get('personen-cluster-kreis') as { source: string; filter: unknown };
@@ -582,8 +578,8 @@ describe('Eigene Cluster-Quelle der Betroffenen (LFH-648)', () => {
   });
 
   it('clusterSchluessel trennt gleiche cluster_id aus zwei Quellen', () => {
-    // cluster_id ist nur je Quelle eindeutig: ohne Quellen-Präfix überschriebe der
-    // Personen-Donut 7 den Kräfte-Donut 7 im DOM-Sync.
+    // `cluster_id` ist nur je Quelle eindeutig: ohne Quellen-Präfix überschriebe Personen-Donut 7
+    // den Kräfte-Donut 7.
     expect(clusterSchluessel(MARKER_CLUSTER_QUELLE, 7)).not.toBe(
       clusterSchluessel(PERSONEN_CLUSTER_QUELLE, 7),
     );
@@ -622,10 +618,9 @@ describe('personenClusterTreffer (LFH-648)', () => {
     expect(personenClusterTreffer([])).toBeNull();
   });
 
-  // Review LFH-711: seit jeder Kräfte-/Objektmarker eine unsichtbare Zone trägt, liegt sie in
-  // der Mal-Reihenfolge ÜBER den Personen-Clustern. Zählte sie als „oberstes Feature", nähme ein
-  // Einsatzort oder RTW im Umkreis von 24–36 px (komfortabel/handschuh) dem sichtbaren Cluster
-  // den Tipp weg — genau in den Berührungsstufen, für die die Zone gebaut ist.
+  // Die unsichtbare Zone jedes Kräfte-/Objektmarkers liegt über den Personen-Clustern. Zählte sie
+  // als „oberstes Feature", nähme ein Marker im Umkreis von 24–36 px dem sichtbaren Cluster den
+  // Tipp weg — genau in den Berührungsstufen.
   const zone = (id: string, schluessel: string) => ({
     layer: { id },
     properties: { schluessel, treffer: 72 },

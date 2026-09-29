@@ -43,12 +43,10 @@ function renderAt(bid: number | string) {
     ...ergebnis,
     router,
     /**
-     * Stellt den Serverstand um und löst denselben Weg aus wie der SSE-Listener:
-     * Invalidierung → Refetch → neues `befehlQuery.data`.
-     *
-     * Ein `vi.fn()`-Ersatz oder ein bloßes `rerender` träfe den Fall NICHT — der
-     * gemessene Fehlermodus entsteht genau dann, wenn ein FRISCHER Datensatz eine
-     * Runde später eintrifft, während im Formular schon getippt wurde.
+     * Stellt den Serverstand um und löst denselben Weg aus wie der SSE-Listener: Invalidierung →
+     * Refetch → neues `befehlQuery.data`. Ein `vi.fn()`-Ersatz oder bloßes `rerender` träfe den
+     * Fall nicht — er entsteht, wenn ein frischer Datensatz eine Runde später eintrifft, während
+     * getippt wurde.
      */
     rerenderMitBefehl: async (neu: object) => {
       const vorher = vi.mocked(befehleApi.ladeBefehl).mock.calls.length;
@@ -57,11 +55,9 @@ function renderAt(bid: number | string) {
         await qc.invalidateQueries();
       });
       /*
-       * Auf den ABGESCHLOSSENEN Refetch warten, nicht bloß auf das Invalidieren.
-       * Ohne das besteht ein nachfolgendes `waitFor(… 'Meine Fassung')` beim ERSTEN
-       * Versuch — der alte Wert steht ja noch da —, und die Zusicherung wäre grün,
-       * auch wenn der Refetch das Feld gleich darauf überschriebe (gemessen: der
-       * Test war ohne diese Zeile grün, bevor es einen Riegel gab).
+       * Auf den abgeschlossenen Refetch warten, nicht bloß auf das Invalidieren; sonst bestünde ein
+       * folgendes `waitFor(… 'Meine Fassung')` beim ersten Versuch, auch wenn der Refetch das Feld
+       * gleich darauf überschriebe.
        */
       await waitFor(() =>
         expect(vi.mocked(befehleApi.ladeBefehl).mock.calls.length).toBeGreaterThan(vorher),
@@ -97,17 +93,15 @@ function befehl(status: 'entwurf' | 'freigegeben') {
 }
 
 /**
- * ── EINSTIEGSFOKUS (LFH-495, Nachzug C13/N3) ───────────────────────────────────
+ * ── Einstiegsfokus (LFH-495) ──
  *
- * Die Bedienentscheidung ist der ERSTE LEERE Abschnitt; Mechanik und Begründungen stehen in
- * `entwurf/Einstiegsfokus.tsx` samt eigenem Test. Hier steht, dass die SEITE das Ziel aus dem
- * SERVERSTAND ableitet und nicht aus den Formularwerten — die sind beim Mount noch leer, der
- * Sync-Effekt füllt sie erst danach. Eine Ableitung aus dem Formular träfe deshalb immer den
- * ersten Abschnitt und wäre von der richtigen Wahl nicht zu unterscheiden.
+ * Mechanik und Begründungen stehen in `entwurf/Einstiegsfokus.tsx`. Hier steht, dass die Seite das
+ * Ziel aus dem Serverstand ableitet, nicht aus den Formularwerten — die sind beim Mount noch leer,
+ * eine Ableitung daraus träfe immer den ersten Abschnitt.
  *
- * Anders als im Lagebericht gibt es hier kein Akkordeon: alle fünf Editoren stehen gestapelt,
- * der Fokus scrollt die Seite bis zu seinem Ziel (die verankerte Aktionsleiste hält es über
- * `scroll-padding-block-end` frei, LFH-465).
+ * Anders als im Lagebericht gibt es kein Akkordeon: alle fünf Editoren stehen gestapelt, der Fokus
+ * scrollt bis zu seinem Ziel (die verankerte Aktionsleiste hält es über `scroll-padding-block-end`
+ * frei).
  */
 describe('BefehlDetailPage — Einstiegsfokus (LFH-495)', () => {
   it('fokussiert den ersten LEEREN Abschnitt des Serverstands', async () => {
@@ -145,8 +139,8 @@ describe('BefehlDetailPage', () => {
     expect(screen.getByText(/a\. Allgemeine Lage/)).toBeInTheDocument();
   });
 
-  // LFH-621: die Überschriftenebene nennt der Einbauort. Lesend steht der Text unter dem
-  // Abschnittskopf (h3) → `#` wird h4; im Entwurf unter dem Paneel „Entwurf" (h2) → h3.
+  // Die Überschriftenebene nennt der Einbauort: lesend unter dem Abschnittskopf (h3) → `#` wird h4;
+  // im Entwurf unter dem Paneel „Entwurf" (h2) → h3.
   it('setzt eine Markdown-Überschrift lesend unter den Abschnittskopf (h4)', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
       ...befehl('freigegeben'),
@@ -190,21 +184,17 @@ describe('BefehlDetailPage', () => {
   });
 
   /**
-   * Der Kopf trägt die Phasenfarbe der gemeinsamen Achse, nicht das Preset-Grün
-   * (LFH-493). Die Farbe ist hier die einzige im DOM sichtbare Hälfte der
-   * Umstellung: der Wortlaut ist vorher wie nachher „Freigegeben" — dass er
-   * GELESEN statt abgeschrieben wird, pinnt `kommunikation/kopfStatus.guard.test.ts`.
+   * Der Kopf trägt die Phasenfarbe der gemeinsamen Achse, nicht das Preset-Grün. Dass der Wortlaut
+   * gelesen statt abgeschrieben wird, pinnt `kommunikation/kopfStatus.guard.test.ts`.
    *
-   * Der Entwurfs-Zustand ist bewusst NICHT die Probe: `PHASE_META.offen.color` ist
-   * `'default'` und damit byte-gleich zum abgelösten Preset — ein Test darauf bliebe
-   * auch ohne den Fix grün.
+   * Der Entwurfs-Zustand ist bewusst nicht die Probe: `PHASE_META.offen.color` ist `'default'` und
+   * damit gleich dem abgelösten Preset.
    */
   it('malt den freigegebenen Status in der Phasenfarbe, nicht im Preset-Grün', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
     renderAt(7);
-    // Neuentwurf: die Phase trägt eine getönte Statusfläche (`StatusChip`), kein antd-Tag.
-    // Die Aussage bleibt dieselbe — die Farbe kommt aus der Phasenachse (`abgeschlossen` →
-    // Ton `normal`), nicht aus einem handgeschriebenen Grün, und es gibt kein Tag-Preset.
+    // Die Phase trägt eine getönte Statusfläche (`StatusChip`); die Farbe kommt aus der Phasenachse
+    // (`abgeschlossen` → Ton `normal`), nicht aus einem handgeschriebenen Grün.
     const etikett = (await screen.findByText('Freigegeben')).closest('[data-lfh="status-chip"]');
     expect(etikett).toHaveAttribute('data-ton', 'normal');
     expect(etikett!.closest('[data-phase]')).toHaveAttribute('data-phase', 'abgeschlossen');
@@ -213,19 +203,13 @@ describe('BefehlDetailPage', () => {
 });
 
 /**
- * Verlustschutz am Befehlsentwurf (LFH-342 · C7, Befund N18).
- *
- * Ein Befehl entsteht in mehreren Minuten Schreibarbeit, und der Entwurf lag bis hierher
- * ausschließlich im Formularspeicher: kein Autosave, kein Verlassen-Schutz — und der
- * SSE-Refetch schrieb bei jeder Invalidierung den Serverstand über das, was gerade
- * getippt wurde.
+ * Verlustschutz am Befehlsentwurf (LFH-342): Autosave, Verlassen-Schutz, und der SSE-Refetch
+ * überschreibt nicht, was gerade getippt wird.
  */
 describe('BefehlDetailPage — Verlustschutz (LFH-342 · C7, Befund N18)', () => {
   beforeEach(() => {
-    // `mockClear` ist hier nicht Kosmetik: die Suite läuft ohne `clearMocks`, und die
-    // Aufrufzählungen dieses Blocks sind die Zusicherung. Ohne das Räumen zählte
-    // „speichert nichts" die Aufrufe des vorigen Falls mit und wäre rot, ohne dass am
-    // Produktivcode etwas falsch ist (gemessen).
+    // `mockClear` ist nötig: die Suite läuft ohne `clearMocks`, und die Aufrufzählungen dieses
+    // Blocks sind die Zusicherung.
     vi.mocked(befehleApi.aktualisiereBefehl).mockClear();
     vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(befehl('entwurf') as never);
   });
@@ -241,20 +225,17 @@ describe('BefehlDetailPage — Verlustschutz (LFH-342 · C7, Befund N18)', () =>
     await rerenderMitBefehl({ ...befehl('entwurf'), titel: 'Fremde Fassung' });
 
     /*
-     * ZUERST warten, bis der neue Stand nachweislich ANGEKOMMEN ist — die Überschrift
-     * kommt aus `befehlQuery.data` und nicht aus dem Formular, sie ist also der
-     * unabhängige Zeuge. Ohne diesen Schritt bestünde die Zusicherung darunter beim
-     * ersten Versuch (der alte Wert steht ja noch im Feld) und wäre auch ohne jeden
-     * Riegel grün — gemessen.
+     * Zuerst warten, bis der neue Stand angekommen ist — die Überschrift kommt aus
+     * `befehlQuery.data`, nicht aus dem Formular, und ist der unabhängige Zeuge. Ohne diesen
+     * Schritt bestünde die Zusicherung darunter auch ohne Riegel.
      */
     await screen.findByRole('heading', { name: 'Fremde Fassung' });
     expect(screen.getByLabelText('Titel')).toHaveValue('Meine Fassung');
   });
 
   it('übernimmt den Serverstand weiterhin, solange nichts berührt wurde', async () => {
-    // Die Gegenaussage, und sie ist die eigentliche Prüfung: ein Riegel, der IMMER
-    // blockiert, machte die Seite still veraltet — und wäre mit dem Test darüber
-    // allein nicht davon zu unterscheiden.
+    // Die Gegenaussage ist die eigentliche Prüfung: ein Riegel, der immer blockiert, machte die
+    // Seite still veraltet.
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
     const { rerenderMitBefehl } = renderAt(7);
     await screen.findByLabelText('Titel');
@@ -279,8 +260,8 @@ describe('BefehlDetailPage — Verlustschutz (LFH-342 · C7, Befund N18)', () =>
         vi.advanceTimersByTime(31_000);
       });
       await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalled());
-      // Und der Zeitstempel sagt es sichtbar — ein Autosave, den niemand sieht,
-      // ist von „nicht gespeichert" nicht zu unterscheiden.
+      // Der Zeitstempel sagt es sichtbar — ein unsichtbarer Autosave ist von „nicht gespeichert"
+      // nicht zu unterscheiden.
       expect(await screen.findByText(/zuletzt gespeichert \d{2}:\d{2}/)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -295,8 +276,8 @@ describe('BefehlDetailPage — Verlustschutz (LFH-342 · C7, Befund N18)', () =>
       act(() => {
         vi.advanceTimersByTime(120_000);
       });
-      // Ein Autosave ohne Änderung erzeugte alle 30 s ein PATCH samt Invalidierung
-      // und Live-Ereignis — für nichts.
+      // Ein Autosave ohne Änderung erzeugte alle 30 s ein PATCH samt Invalidierung und
+      // Live-Ereignis.
       expect(befehleApi.aktualisiereBefehl).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -308,9 +289,9 @@ describe('BefehlDetailPage — Verlustschutz (LFH-342 · C7, Befund N18)', () =>
     renderAt(7);
     const titel = await screen.findByLabelText('Titel');
     await userEvent.type(titel, 'x');
-    // Ein verlassenes Feld ist der Moment, in dem ein Abschnitt fertig gedacht ist —
-    // und der Griff, der einem In-App-Seitenwechsel IMMER vorausgeht: der Klick auf
-    // die Brotkrume blurrt das Feld zuerst.
+    // Ein verlassenes Feld ist der Moment, in dem ein Abschnitt fertig gedacht ist — und der Griff,
+    // der einem In-App-Seitenwechsel vorausgeht: der Klick auf die Brotkrume blurrt das Feld
+    // zuerst.
     await userEvent.tab();
     await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalled());
   });
@@ -327,8 +308,8 @@ describe('BefehlDetailPage — Verlustschutz (LFH-342 · C7, Befund N18)', () =>
   });
 
   it('warnt NICHT, wenn nichts offen ist', async () => {
-    // Die Gegenaussage: ein Warner, der immer hängt, macht jeden Reload zur Rückfrage
-    // und wird nach dem dritten Mal weggeklickt, ohne gelesen zu werden.
+    // Gegenaussage: ein Warner, der immer hängt, macht jeden Reload zur Rückfrage und wird
+    // ungelesen weggeklickt.
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
     renderAt(7);
     await screen.findByLabelText('Titel');
@@ -340,18 +321,13 @@ describe('BefehlDetailPage — Verlustschutz (LFH-342 · C7, Befund N18)', () =>
 });
 
 /**
- * ── ZEITSTAND IN DER ANZEIGEZONE (LFH-350 · H60) ────────────────────────────────
+ * ── Zeitstand in der Anzeigezone (LFH-350) ──
  *
- * Gleiche Sache wie auf der Lagebericht-Detailseite: `zeitstand` ist ein UTC-Wirestring
- * ohne Zonenkennung und stand roh ausgegeben um den Zonenversatz falsch.
- *
- * Die Zone wird AUSDRÜCKLICH gestellt und der Cache dafür VORBELEGT — beides ist gemessen
- * nötig: (1) ohne Provider fällt `useAnzeigeKonventionen` auf `DEFAULT_KONVENTIONEN` und
- * damit auf die LOKALE Zone der ausführenden Maschine zurück; (2) nur den Provider
- * einzuhängen genügt nicht, weil die Einstellungs-Abfrage ERST NACH dem ersten Render
- * auflöst — `findByText` hat dann längst getroffen, und auf einem Berliner Rechner wäre der
- * Test auch mit `zeitzone: 'UTC'` grün geblieben (Gegenprobe gefahren: 4 von 5 Tests
- * blieben es). `setQueryData` stellt die Zone vor dem ersten Render.
+ * `zeitstand` ist ein UTC-Wirestring ohne Zonenkennung. Die Zone wird ausdrücklich gestellt und der
+ * Cache vorbelegt: ohne Provider fiele `useAnzeigeKonventionen` auf die lokale Zone der Maschine
+ * zurück, und nur den Provider einzuhängen genügt nicht, weil die Einstellungs-Abfrage erst nach
+ * dem ersten Render auflöst — auf einem Berliner Rechner bliebe der Test sonst auch mit `zeitzone:
+ * 'UTC'` grün. `setQueryData` stellt die Zone vor dem ersten Render.
  */
 function renderMitZone(bid: number) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -494,15 +470,10 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
   });
 
   /**
-   * Der Grund muss IM Dialog stehen, nicht auf der Seite dahinter (LFH-494, Review-Befund).
-   *
-   * Der Blocker-Dialog trägt `mask={{ closable: false }}`: alles hinter ihm ist abgedunkelt
-   * und unbedienbar. Solange der Fehler über `message.error` lief, war genau das der Kanal,
-   * der über einem offenen Modal funktioniert — beim Umbau auf den Seiten-Alert wäre diese
-   * eine Stelle sonst ohne jede Rückmeldung geblieben: `loading` fällt, der Dialog steht
-   * unverändert da. Das ist die H14-Diagnose, die dieses Ticket schliesst, an einem Pfad
-   * wieder aufgemacht. Anders als im Freigabe-Flow kann die Seite hier nicht „beides"
-   * melden — `autosaveJetzt()` liefert `void`, es gibt nichts zum Awaiten.
+   * Der Grund muss im Dialog stehen, nicht auf der Seite dahinter: der Blocker-Dialog trägt
+   * `mask={{ closable: false }}`, alles dahinter ist abgedunkelt. Ohne Grund im Dialog fiele nur
+   * `loading`, und der Dialog stünde unverändert da. `autosaveJetzt()` liefert `void`, die Seite
+   * kann nicht selbst melden.
    */
   it('zeigt den Grund eines gescheiterten „Speichern und weiter" IM Dialog', async () => {
     const save = halteSpeichernAn();
@@ -644,17 +615,14 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
 });
 
 /**
- * Verankerte Aktionsleiste unterhalb des Tablet-Breakpoints (LFH-465, Nachzug aus
- * LFH-343 · C8, Prüflisten-Zeile 13).
+ * Verankerte Aktionsleiste unterhalb des Tablet-Breakpoints (LFH-465).
  *
- * WAS HIER FÄLLT UND WAS NICHT: die STRUKTUR — ein Aktionsblock, zwei Orte, der
- * Autosave-Beleg geht mit. Die GEOMETRIE (klebt die Leiste wirklich unten, verdeckt sie
- * ein Fokusziel) kann jsdom nicht beantworten, es rechnet kein Layout; die trägt
+ * Geprüft wird die Struktur — ein Aktionsblock, zwei Orte, der Autosave-Beleg geht mit. Die
+ * Geometrie (klebt die Leiste, verdeckt sie ein Fokusziel) kann jsdom nicht beantworten; die trägt
  * `e2e/befehl-aktionsleiste.spec.ts`.
  *
- * DIE UNGLEICHHEIT IST DIE AUSSAGE. Ein Bau, der die Leiste in jeder Breite verankert,
- * erfüllte „bei 390 px verankert" ebenfalls und wäre trotzdem falsch — oberhalb der
- * Schwelle gehören dieselben Aktionen in den Kopf. Beide Zweige stehen deshalb als Paar.
+ * Beide Zweige stehen als Paar: ein Bau, der die Leiste in jeder Breite verankert, erfüllte „bei
+ * 390 px verankert" ebenfalls.
  */
 describe('BefehlDetailPage — verankerte Aktionsleiste (LFH-465)', () => {
   beforeEach(() => {
@@ -684,10 +652,9 @@ describe('BefehlDetailPage — verankerte Aktionsleiste (LFH-465)', () => {
   });
 
   /**
-   * Genau EINE Kopie, in beiden Breiten. Der naheliegende Fehlbau — beide Orte rendern,
-   * einer per CSS versteckt — liefert zwei gleichnamige Knöpfe im Baum: die
-   * Vorlesereihenfolge bekäme „Freigeben" doppelt, und der Tabulaturdurchlauf des
-   * Verdeckungsnachweises liefe auf ein unsichtbares Ziel.
+   * Genau eine Kopie in beiden Breiten. Beide Orte rendern und einen per CSS verstecken lieferte
+   * zwei gleichnamige Knöpfe: „Freigeben" doppelt vorgelesen, und der Tabulaturdurchlauf liefe auf
+   * ein unsichtbares Ziel.
    */
   it.each([390, 1024])('rendert die Aktionen bei %ipx genau einmal', async (breite) => {
     setzeViewportBreite(breite);
@@ -698,10 +665,8 @@ describe('BefehlDetailPage — verankerte Aktionsleiste (LFH-465)', () => {
   });
 
   /**
-   * Der Autosave-Beleg (LFH-342 · C7) muss sichtbar bleiben, WO IMMER die Knöpfe landen —
-   * das ist der zweite Aufzählungspunkt des Tickets. Ein Beleg, der oben im Kopf
-   * stehenbliebe, während die Knöpfe unten kleben, wäre auf 390 px aus dem Bild gescrollt,
-   * genau während man tippt.
+   * Der Autosave-Beleg bleibt sichtbar, wo immer die Knöpfe landen; oben im Kopf wäre er auf 390 px
+   * aus dem Bild gescrollt, während man tippt.
    */
   it.each([390, 1024])(
     'trägt den Autosave-Beleg bei %ipx im selben Block wie die Knöpfe',
@@ -715,14 +680,13 @@ describe('BefehlDetailPage — verankerte Aktionsleiste (LFH-465)', () => {
 });
 
 /**
- * ── SPEICHERFEHLER IN DER SEITE (LFH-494, Nachzug C13/N2) ──────────────────────
+ * ── Speicherfehler in der Seite (LFH-494) ──
  *
- * Der Zwilling der Probe in `LageberichtePage.test.tsx`. Beide Entwurfsseiten teilen sich
- * den Verlustschutz-Hook — wer nur eine umstellt, öffnet die Divergenz wieder, die C13 mit
- * dem gemeinsamen Hook geschlossen hat.
+ * Zwilling der Probe in `LageberichtePage.test.tsx`: beide Entwurfsseiten teilen den
+ * Verlustschutz-Hook.
  *
- * Die `.ant-message`-Abgrenzung trägt die Aussage: antds Toast rendert INNERHALB des
- * RTL-Containers, ein blosses `findByText` bliebe mit zurückgedrehtem Umbau grün.
+ * Die `.ant-message`-Abgrenzung trägt die Aussage: antds Toast rendert innerhalb des
+ * RTL-Containers, ein bloßes `findByText` bliebe auch mit Toast grün.
  */
 describe('BefehlDetailPage — Speicherfehler in der Seite (LFH-494)', () => {
   it('lässt den Grund eines gescheiterten Autosave in der Seite stehen, nicht nur im Toast', async () => {
@@ -757,9 +721,8 @@ describe('BefehlDetailPage — Speicherfehler in der Seite (LFH-494)', () => {
   });
 
   it('behandelt das Verlassen des Editors nicht als Speicherfehler', async () => {
-    // `speichern` bricht noch nicht gestartete Aufträge mit einem `AbortError` ab. Ein
-    // Alert dafür behauptete einen Verlust, den es nicht gab — und stünde auf der Seite,
-    // die man gerade verlassen hat.
+    // `speichern` bricht noch nicht gestartete Aufträge mit einem `AbortError` ab. Ein Alert dafür
+    // behauptete einen Verlust, den es nicht gab — auf der Seite, die man gerade verlassen hat.
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
     vi.mocked(befehleApi.aktualisiereBefehl).mockRejectedValue(
       new DOMException('Editor verlassen', 'AbortError'),
@@ -773,25 +736,20 @@ describe('BefehlDetailPage — Speicherfehler in der Seite (LFH-494)', () => {
 });
 
 /**
- * ── GESCHEITERTE FREIGABE (LFH-535, Nachzug N5 aus LFH-348 · C13) ──────────────
+ * ── Gescheiterte Freigabe (LFH-535) ──
  *
- * Dieselbe H14-Diagnose wie beim Speichern, nur am Zustandsübergang: schlägt
- * `POST …/freigeben` fehl, bleibt der Bestätigungsdialog stehen — und solange der Grund
- * nur im Toast stand, war er nach rund drei Sekunden weg und der unveränderte Dialog von
- * „nichts passiert" nicht zu unterscheiden. Der Dialog trägt `mask={{ closable: false }}`,
- * ein Seiten-Alert dahinter wäre unsichtbar.
+ * Schlägt `POST …/freigeben` fehl, bleibt der Bestätigungsdialog stehen; ein Toast wäre nach drei
+ * Sekunden weg und der Dialog von „nichts passiert" nicht zu unterscheiden. Der Dialog trägt
+ * `mask={{ closable: false }}`, ein Seiten-Alert dahinter wäre unsichtbar.
  *
- * Die Zusicherung hat zwei Hälften, und die zweite trägt sie: der Grund steht IM Dialog
- * UND nicht in der Message-Queue. Ohne `closest('.ant-message')` bliebe der Test grün,
- * wenn der Toast zurückkäme.
+ * Zwei Hälften: der Grund steht im Dialog und nicht in der Message-Queue. Ohne
+ * `closest('.ant-message')` bliebe der Test grün, wenn der Toast zurückkäme.
  */
 describe('BefehlDetailPage — gescheiterte Freigabe (LFH-535)', () => {
   beforeEach(() => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
     vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(befehl('entwurf') as never);
-    // Die Suite fährt ohne `clearMocks`: der Zähler liefe sonst über die Tests dieser
-    // Datei weiter, und „nicht aufgerufen" wäre nach dem ersten Test nie wieder grün
-    // (gemessen: 2 Aufrufe aus den Tests darüber).
+    // Die Suite fährt ohne `clearMocks`: der Zähler liefe sonst über die Tests der Datei weiter.
     vi.mocked(befehleApi.gibBefehlFrei).mockClear();
   });
 
@@ -801,14 +759,12 @@ describe('BefehlDetailPage — gescheiterte Freigabe (LFH-535)', () => {
   }
 
   /**
-   * Die Message-Queue nach diesem Wortlaut absuchen — die Hälfte der Zusicherung, die den
-   * Umbau trägt.
+   * Die Message-Queue nach diesem Wortlaut absuchen.
    *
-   * `within(dialog).findByText(...)` allein belegt sie NICHT: käme der Toast zurück,
-   * stünde der Wortlaut an ZWEI Stellen, und die Abfrage im Dialog fände ihren Alert
-   * weiter. Ein `getAllByText(...)`-Zähler taugt ebenfalls nicht überall — beim
-   * gescheiterten Speicher-Vorlauf steht der Grund zu Recht doppelt (Dialog UND
-   * Seiten-Alert, der das Schliessen überlebt). Gezählt wird deshalb genau die Queue.
+   * `within(dialog).findByText(...)` allein belegt es nicht: käme der Toast zurück, stünde der
+   * Wortlaut an zwei Stellen. Ein `getAllByText`-Zähler taugt auch nicht überall — beim
+   * gescheiterten Speicher-Vorlauf steht der Grund zu Recht doppelt (Dialog und Seiten-Alert).
+   * Gezählt wird deshalb genau die Queue.
    */
   function toastsMit(wortlaut: string) {
     return [...document.querySelectorAll('.ant-message')].filter((n) =>
@@ -828,9 +784,9 @@ describe('BefehlDetailPage — gescheiterte Freigabe (LFH-535)', () => {
     expect(treffer.closest('.ant-message')).toBeNull();
     expect(toastsMit('Abschnitt „Auftrag" ist leer')).toHaveLength(0);
     expect(within(dialog).getByText('Freigabe fehlgeschlagen')).toBeInTheDocument();
-    // „Offen" heisst in jsdom „nicht in der Verlassen-Bewegung": antds Modal räumt seinen
-    // Knoten erst am Ende der Zoom-Animation ab, und jsdom feuert kein `transitionend`
-    // (gemessen, `MaterialPage.test.tsx:556`). `queryByRole('dialog')` wäre hier blind.
+    // „Offen" heißt in jsdom „nicht in der Verlassen-Bewegung": antds Modal räumt seinen Knoten
+    // erst am Ende der Zoom-Animation ab, und jsdom feuert kein `transitionend`.
+    // `queryByRole('dialog')` wäre hier blind.
     expect(dialog).not.toHaveClass('ant-zoom-leave');
   });
 
@@ -845,9 +801,9 @@ describe('BefehlDetailPage — gescheiterte Freigabe (LFH-535)', () => {
   });
 
   /**
-   * Der Speicher-Vorlauf ist die ERSTE Fehlerquelle des Flows: `/freigeben` prüft den
-   * persistierten Stand. Scheitert er, darf die Freigabe gar nicht erst laufen — und der
-   * Grund trägt eine andere Überschrift, weil er der Person etwas anderes sagt.
+   * Der Speicher-Vorlauf ist die erste Fehlerquelle: `/freigeben` prüft den persistierten Stand.
+   * Scheitert er, läuft die Freigabe nicht, und der Grund trägt eine andere Überschrift, weil er
+   * Anderes sagt.
    */
   it('hält die Freigabe zurück, wenn schon der Speicher-Vorlauf scheitert', async () => {
     vi.mocked(befehleApi.aktualisiereBefehl).mockRejectedValue(
@@ -865,9 +821,8 @@ describe('BefehlDetailPage — gescheiterte Freigabe (LFH-535)', () => {
   });
 
   /**
-   * react-query hält `error` bis zum nächsten `mutate()`. Ohne `reset()` beim Öffnen trüge
-   * ein abgebrochener Versuch seinen Grund in den nächsten, frisch geöffneten Dialog —
-   * eine Meldung über etwas, das gerade gar nicht passiert ist.
+   * react-query hält `error` bis zum nächsten `mutate()`. Ohne `reset()` beim Öffnen trüge ein
+   * abgebrochener Versuch seinen Grund in den nächsten Dialog.
    */
   it('öffnet nach Abbrechen ohne den Grund des vorigen Versuchs', async () => {
     vi.mocked(befehleApi.gibBefehlFrei).mockRejectedValue(
@@ -888,12 +843,11 @@ describe('BefehlDetailPage — gescheiterte Freigabe (LFH-535)', () => {
 });
 
 /**
- * ── DRUCKWURZEL (LFH-71) ─────────────────────────────────────────────────────────
+ * ── Druckwurzel (LFH-71) ──
  *
- * `druck/druck.css` blendet im Druck ALLES aus, was nicht in der Druckwurzel liegt
- * (`display: none`). Was außerhalb steht, fehlt also auf Papier — der Guard hier hält fest,
- * dass die Seite genau EINE Wurzel trägt und die gedruckten Teile in ihr liegen. Ob die
- * Regeln wirken, misst `e2e/druck-fluss.spec.ts`; jsdom kennt kein `@media print`.
+ * `druck/druck.css` blendet im Druck alles außerhalb der Druckwurzel aus (`display: none`). Der
+ * Guard hält fest, dass die Seite genau eine Wurzel trägt und die gedruckten Teile in ihr liegen.
+ * Ob die Regeln wirken, misst `e2e/druck-fluss.spec.ts`.
  */
 describe('BefehlDetailPage — Druckwurzel (LFH-71)', () => {
   function wurzel(): HTMLElement {
@@ -928,12 +882,11 @@ describe('BefehlDetailPage — Druckwurzel (LFH-71)', () => {
 });
 
 /**
- * ── DRUCKKOPF UND DRUCKKNOPF (LFH-22) ───────────────────────────────────────────
+ * ── Druckkopf und Druckknopf (LFH-22) ──
  *
  * Der gemeinsame Druckkopf steht in der Druckwurzel über dem Inhalt und ist am Bildschirm
- * per Klasse verborgen (dort trägt der Seitenkopf dieselben Angaben). „Drucken / als PDF"
- * öffnet den Dialog erst, wenn die Organisation geladen ist — sonst fehlte ihr Name auf
- * dem Blatt.
+ * verborgen. „Drucken / als PDF" öffnet den Dialog erst, wenn die Organisation geladen ist — sonst
+ * fehlte ihr Name auf dem Blatt.
  */
 describe('BefehlDetailPage — Druckkopf (LFH-22)', () => {
   it('trägt den Druckkopf in der Wurzel: „Befehl – Titel", Stand, am Schirm verborgen', async () => {
