@@ -2,8 +2,8 @@
 
 ## 1. Abhängigkeiten
 
-- [ ] 1.1 `@einsatzzeichen/core`, `schema`, `react` und `maplibre` exakt `2.1.0` in `frontend/package.json` aufnehmen, per `mise exec -- pnpm -C <abs>/frontend install`. Prüfen mit `pnpm why @einsatzzeichen/core`: genau eine Version im Baum.
-- [ ] 1.2 Vitest-Guard `zeichen/einsatzzeichenVersionen.guard.test.ts`: Alle `@einsatzzeichen/*` in `package.json` tragen dieselbe exakte Version ohne Bereichszeichen. Der Test ist grün und wird rot, wenn ein Paket testweise auf `^2.1.0` steht (Mutationsprobe).
+- [x] 1.1 `@einsatzzeichen/core`, `schema`, `react` und `maplibre` exakt `2.1.0` in `frontend/package.json` aufnehmen, per `mise exec -- pnpm -C <abs>/frontend install`. Prüfen mit `pnpm why @einsatzzeichen/core`: genau eine Version im Baum.
+- [x] 1.2 Vitest-Guard `zeichen/einsatzzeichenVersionen.guard.test.ts`: Alle `@einsatzzeichen/*` in `package.json` tragen dieselbe exakte Version ohne Bereichszeichen. Der Test ist grün und wird rot, wenn ein Paket testweise auf `^2.1.0` steht (Mutationsprobe).
 
 ## 2. Adapter Hub-Vokabular → SymbolSpec (TDD)
 

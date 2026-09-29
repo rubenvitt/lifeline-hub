@@ -2,6 +2,15 @@ allowBuilds:
   esbuild: true
   msw: true
 
+# Eigene Bibliothek (github.com/rubenvitt/einsatzzeichen, npm per Trusted Publisher/OIDC):
+# die Karenzzeit für frisch veröffentlichte Versionen gilt ihr nicht, weil Hub und Bibliothek
+# im Gleichschritt veröffentlichen (LFH-505). Nur exakte Versionen, keine Scope-Freigabe.
+minimumReleaseAgeExclude:
+  - '@einsatzzeichen/core@2.1.0'
+  - '@einsatzzeichen/maplibre@2.1.0'
+  - '@einsatzzeichen/react@2.1.0'
+  - '@einsatzzeichen/schema@2.1.0'
+
 # ═══════════════════════════════════════════════════════════════════════════════════
 # DIES IST DAS FRONTEND-GEGENSTÜCK ZU .cargo/audit.toml (LFH-354).
 #
