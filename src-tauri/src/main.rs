@@ -282,8 +282,9 @@ fn herunterladen(app: &AppHandle, label: &str, ziel: &Url) {
 
 /// Fremde Seite im Standardbrowser, `mailto:`/`tel:` im zuständigen Programm.
 fn im_system_oeffnen(ziel: &Url) {
-    if let Err(fehler) = tauri_plugin_opener::open_url(ziel.as_str(), None::<&str>) {
-        log::warn!("{} nicht geöffnet: {fehler}", fuers_protokoll(ziel));
+    match tauri_plugin_opener::open_url(ziel.as_str(), None::<&str>) {
+        Ok(()) => log::info!("An das System übergeben: {}", fuers_protokoll(ziel)),
+        Err(fehler) => log::warn!("{} nicht geöffnet: {fehler}", fuers_protokoll(ziel)),
     }
 }
 

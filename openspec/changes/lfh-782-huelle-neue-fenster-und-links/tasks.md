@@ -30,22 +30,22 @@
 
 ## 3. Frontend: Chat-Anhänge
 
-- [ ] 3.1 `chat/NachrichtenStrom.tsx`: Anhänge über `DownloadAnker` (`href`, `dateiname`,
+- [x] 3.1 `chat/NachrichtenStrom.tsx`: Anhänge über `DownloadAnker` (`href`, `dateiname`,
   `groesse`, zugänglicher Name mit Absender und Zeit), kein `target`. Test zuerst: der Anker
   trägt `download` mit dem Dateinamen, kein `target`, die Route
   `/api/einsaetze/{id}/anhaenge/{aid}` und den zugänglichen Namen. Nachweis: Vitest des
   Chat-Stroms; volle Vitest-Suite und `pnpm lint` grün.
-- [ ] 3.2 Den Dateikopf von `components/DownloadAnker.tsx` um die Chat-Ausnahme (n:m,
+- [x] 3.2 Den Dateikopf von `components/DownloadAnker.tsx` um die Chat-Ausnahme (n:m,
   generische Route) ergänzen. Nachweis: Kommentar widerspricht keinem Aufrufer mehr (Grep nach
   `DownloadAnker` in `chat/`).
 
 ## 4. Doku und Nachweis in der Hülle
 
-- [ ] 4.1 `docs/betrieb/desktop-app.md`: LFH-782 aus „Grenzen (offen)“ streichen, das Verhalten
+- [x] 4.1 `docs/betrieb/desktop-app.md`: LFH-782 aus „Grenzen (offen)“ streichen, das Verhalten
   (Nebenfenster, Systembrowser, Download) beschreiben, fremde Navigation ohne Rückweg als
   Grenze nennen. In `CLAUDE.md` unter „Desktop-Hülle“ eine Zeile zu `links.rs`: Server zur
   Laufzeit, `/api/auth/` als Ausnahme. Nachweis: Grep nach `LFH-782` in beiden Dateien.
-- [ ] 4.2 Handprobe in der gebauten Hülle auf macOS gegen einen lokalen https-Server: Chat-Anhang
+- [x] 4.2 Handprobe in der gebauten Hülle auf macOS gegen einen lokalen https-Server: Chat-Anhang
   (PDF) lädt herunter und die App bleibt, Inspector-Link öffnet den Standardbrowser,
   Palette Strg/⌘+↵ öffnet ein angemeldetes Nebenfenster, Druck im Nebenfenster erreicht den
   Dialog, Navigation auf eine Anhang-URL ersetzt die App nicht, OIDC-Anmeldung läuft durch

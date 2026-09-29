@@ -1,0 +1,7 @@
+{
+  "nicht_gemessen": [
+    "Echte Mausklicks (Probe per Skript; window.open lief in WKWebView auch ohne Geste)",
+    "OIDC-Anmeldung im Fenster mit /api/auth/-Ausnahme (Anbieter lokal nicht bedient; abgesichert durch Test anmelderouten_laufen_im_fenster)",
+    "Windows/WebView2 (kein Gerät)"
+  ]
+}

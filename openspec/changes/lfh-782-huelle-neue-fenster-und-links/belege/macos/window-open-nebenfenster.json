@@ -1,0 +1,13 @@
+{
+  "datum": "2026-09-29",
+  "plattform": "macOS 27.0 (WKWebView), Debug-Build lifeline-desktop",
+  "server": "https://localhost:8543 (lifeline-hub --tls, dev-seeds, mkcert)",
+  "anhang": "/api/einsaetze/1/anhaenge/1 (Lagebild Übersicht.pdf, 125 B, Content-Disposition attachment)",
+  "ausloeser": "Init-Skript nur im Probe-Lauf (Umgebungsvariable, nicht committet); Ergebnisse aus dem Hüllen-Protokoll ~/Library/Logs/dev.rubeen.lifeline.desktop",
+  "schritt": "window.open('/einsaetze/1/chat#neben', '_blank', 'noopener') nach Anmeldung im Hauptfenster",
+  "protokoll": [
+    "17:05:19 Seite geladen: /einsaetze/1/chat",
+    "17:06:54 Seite geladen: /probe/neben-me-200-druck-erlaubt"
+  ],
+  "ergebnis": "Zweites Fenster „Lifeline Hub“ zeigt den Chat angemeldet (/api/auth/me 200, Sitzung geteilt), der Chat-Anhang erscheint als Download-Anker. invoke('drucken') im Nebenfenster öffnet den macOS-Druckdialog und löst nach dem Schließen auf: Druckfreigabe gilt für neben-*. Hauptfenster blieb auf seiner Seite."
+}
