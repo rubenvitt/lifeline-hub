@@ -132,7 +132,8 @@ export const CLUSTER_QUELLEN = [MARKER_CLUSTER_QUELLE, PERSONEN_CLUSTER_QUELLE] 
 /**
  * Klickziele der Personen-Cluster. Bewusst WebGL-Layer und kein DOM-Donut: ein DOM-Marker hängt
  * über dem Canvas und fing Klicks auf Fahrzeugzeichen ab. Kein Teil von `MARKER_KLICK_LAYER` — ein
- * Klick fächert auf, er wählt nichts für den Inspector aus.
+ * Klick fächert auf, er wählt nichts für den Inspector aus. Wem ein Tipp gehört, entscheidet
+ * `klickziel.ts` (ein sichtbarer Cluster geht jeder bloßen Trefferzone vor).
  */
 export const PERSONEN_CLUSTER_KLICK_LAYER = [
   'personen-cluster-kreis',
@@ -142,36 +143,6 @@ type ClusterQuelle = (typeof CLUSTER_QUELLEN)[number];
 /** Schlüssel eines Clusters über alle Quellen: `cluster_id` ist nur je Quelle eindeutig. */
 export function clusterSchluessel(quelle: ClusterQuelle, clusterId: number | string): string {
   return `${quelle}:${clusterId}`;
-}
-/** Die unsichtbaren Trefferzonen — Klickziel, aber keine Zeichnung. */
-function istTrefferzone(layerId: string): boolean {
-  return layerId.endsWith('-treffer');
-}
-/**
- * Entscheidet einen Karten-Klick für die Personen-Cluster: ist das oberste gezeichnete Feature ein
- * Personen-Cluster, wird er aufgefächert; liegt ein anderes Zeichen darüber, gehört der Klick ihm
- * („Personen verdecken keine Kräfte"). Trefferzonen zählen nicht — ein sichtbarer Cluster darf
- * nicht von einem unsichtbaren Kreis daneben verdeckt werden. Rein; `features` kommt von
- * `queryRenderedFeatures` (oben zuerst).
- */
-export function personenClusterTreffer(
-  features: readonly {
-    layer: { id: string };
-    properties: Record<string, unknown> | null;
-    geometry: { type: string; coordinates?: unknown };
-  }[],
-): { clusterId: number; center: [number, number]; anzahl: number } | null {
-  const oben = features.find((f) => !istTrefferzone(f.layer.id));
-  if (!oben || !(PERSONEN_CLUSTER_KLICK_LAYER as readonly string[]).includes(oben.layer.id)) {
-    return null;
-  }
-  if (oben.geometry.type !== 'Point') return null;
-  const props = oben.properties ?? {};
-  return {
-    clusterId: Number(props.cluster_id),
-    center: oben.geometry.coordinates as [number, number],
-    anzahl: Number(props.point_count ?? 0),
-  };
 }
 export const MARKER_EINSATZORT_QUELLE = 'marker-einsatzort';
 export const SPIDER_LEAVES_QUELLE = 'spider-leaves';

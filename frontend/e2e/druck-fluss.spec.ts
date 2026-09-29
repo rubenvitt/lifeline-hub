@@ -337,3 +337,190 @@ test('Befehl (freigegeben) druckt im normalen Fluss über mehrere Seiten', async
   await expect(page.locator('.markdown p', { hasText: ENDMARKE })).toBeAttached();
   await pruefeDruckImFluss(page, 'Befehl lesend');
 });
+
+/**
+ * LFH-498: der Entwurf der Vorlage mit ACHT Abschnitten (`lagebeurteilung`). Jeder Abschnitt
+ * trägt eine eigene Marke; einer davon (zugeklappt, im Akkordeon weit hinten) langen
+ * Fließtext mit Markdown-Auszeichnung — Überschrift, Fettung, Liste — und die Endmarke.
+ */
+const LAGEBEURTEILUNG_ABSCHNITTE = [
+  'auftrag',
+  'anlass',
+  'beurteilung_schadenlage',
+  'beurteilung_eigene_lage',
+  'gemeinsame_elemente',
+  'entschlussvorschlaege',
+  'abwaegen',
+  'vorschlag_beste',
+];
+const AUSGEZEICHNET = 6;
+
+const abschnittsMarke = (i: number) => `ABSCHNITTSMARKE-${i + 1}-ENDE`;
+
+function ausgezeichneterText(): string {
+  return [
+    abschnittsMarke(AUSGEZEICHNET),
+    '## Lageskizze Nordost',
+    'Der **Deichbruch bei Kilometer 4** bestimmt die Lage.',
+    '- erste Möglichkeit: Sandsackverbau\n- zweite Möglichkeit: Räumung',
+    langerText('abwaegen', 8, ENDMARKE),
+  ].join('\n\n');
+}
+
+async function lagebeurteilungSaeen(page: Page, einsatzId: string): Promise<number> {
+  const neu = await mitWiederholung(() =>
+    page.request.post(`/api/einsaetze/${einsatzId}/lageberichte`, {
+      data: { vorlage: 'lagebeurteilung', titel: 'Lagebeurteilung Druckprobe' },
+    }),
+  );
+  expect(neu.ok(), await neu.text()).toBe(true);
+  const id = (await neu.json()).id as number;
+  const patch = await mitWiederholung(() =>
+    page.request.patch(`/api/einsaetze/${einsatzId}/lageberichte/${id}`, {
+      data: {
+        abschnitte: LAGEBEURTEILUNG_ABSCHNITTE.map((schluessel, i) => ({
+          schluessel,
+          text:
+            i === AUSGEZEICHNET
+              ? ausgezeichneterText()
+              : `${abschnittsMarke(i)}\n\nKurzer Text im Abschnitt ${schluessel}.`,
+        })),
+      },
+    }),
+  );
+  expect(patch.ok(), await patch.text()).toBe(true);
+  return id;
+}
+
+/**
+ * Was das Papier von der Druckwurzel zeigt. `innerText` folgt dem berechneten Stil des
+ * aktuellen Mediums: verborgene Teilbäume fehlen, und der Wert einer `<textarea>` zählt nie
+ * mit — genau der Text, den ein Leser auf dem Blatt sieht.
+ */
+async function papierText(page: Page) {
+  return page.evaluate((endmarke) => {
+    const wurzel = document.querySelector('[data-lfh="druckwurzel"]') as HTMLElement;
+    const sichtbar = (el: Element) => el.getClientRects().length > 0;
+    const endAbsatz = Array.from(wurzel.querySelectorAll('.markdown p')).find(
+      (p) => p.textContent?.includes(endmarke) && sichtbar(p),
+    );
+    // Vollständig heißt: kein Vorfahr mit eigenem Überlauf schneidet die Endmarke ab.
+    let abgeschnittenVon = '';
+    if (endAbsatz) {
+      const unten = endAbsatz.getBoundingClientRect().bottom;
+      for (let el = endAbsatz.parentElement; el && el !== wurzel; el = el.parentElement) {
+        if (getComputedStyle(el).overflowY === 'visible') continue;
+        if (unten > el.getBoundingClientRect().bottom + 1) {
+          abgeschnittenVon = el.className || el.tagName;
+          break;
+        }
+      }
+    }
+    return {
+      text: wurzel.innerText,
+      textfelder: Array.from(wurzel.querySelectorAll('textarea')).filter(sichtbar).length,
+      ueberschrift: Array.from(wurzel.querySelectorAll('.markdown :is(h2,h3,h4,h5,h6)')).filter(
+        (h) => h.textContent?.includes('Lageskizze Nordost') && sichtbar(h),
+      ).length,
+      fett: Array.from(wurzel.querySelectorAll('.markdown strong')).filter(
+        (s) => s.textContent?.includes('Deichbruch') && sichtbar(s),
+      ).length,
+      listenpunkte: Array.from(wurzel.querySelectorAll('.markdown li')).filter(
+        (li) => li.textContent?.includes('Möglichkeit') && sichtbar(li),
+      ).length,
+      endmarke: endAbsatz ? 1 : 0,
+      abgeschnittenVon,
+    };
+  }, ENDMARKE);
+}
+
+function vorkommen(text: string, teil: string): number {
+  return text.split(teil).length - 1;
+}
+
+async function pruefeLesefassung(page: Page, fall: string) {
+  await page.setViewportSize({ width: NUTZ_BREITE, height: 900 });
+  await page.emulateMedia({ media: 'print' });
+  const papier = await papierText(page);
+  expect(papier.textfelder, `${fall}: kein Eingabefeld auf Papier`).toBe(0);
+  LAGEBEURTEILUNG_ABSCHNITTE.forEach((schluessel, i) => {
+    expect(
+      vorkommen(papier.text, abschnittsMarke(i)),
+      `${fall}: Abschnitt ${i + 1} (${schluessel}) steht genau einmal auf Papier`,
+    ).toBe(1);
+  });
+  expect(papier.text, `${fall}: keine Markdown-Überschriftszeichen`).not.toContain('##');
+  expect(papier.text, `${fall}: keine Markdown-Fettung`).not.toContain('**');
+  expect(papier.ueberschrift, `${fall}: Überschrift gerendert`).toBe(1);
+  expect(papier.fett, `${fall}: Fettung gerendert`).toBe(1);
+  expect(papier.listenpunkte, `${fall}: Liste gerendert`).toBe(2);
+  expect(papier.endmarke, `${fall}: Endmarke des langen Abschnitts gerendert`).toBe(1);
+  expect(papier.abgeschnittenVon, `${fall}: der lange Abschnitt wird nicht abgeschnitten`).toBe('');
+  await page.emulateMedia({ media: null });
+}
+
+/** Am Bildschirm bleibt der Entwurf ein Eingabeformular: Textfeld sichtbar, Druckfassung nicht. */
+async function pruefeBildschirm(page: Page, fall: string) {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(
+    page.locator('textarea:visible').first(),
+    `${fall}: Textfeld am Bildschirm`,
+  ).toBeVisible();
+  await expect(
+    page.locator('.markdown-editor__druck:visible'),
+    `${fall}: Druckfassung am Bildschirm verborgen`,
+  ).toHaveCount(0);
+}
+
+test.describe('Lagebericht-Entwurf druckt die Lesefassung (LFH-498)', () => {
+  test('Vorgabe (Toggle, Vorschau zu): acht Abschnitte je einmal, gerendert, vollständig', async ({
+    page,
+  }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E LFH-498 Toggle ${Date.now()}`);
+    const id = await lagebeurteilungSaeen(page, einsatzId);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
+    await expect(page.getByRole('checkbox', { name: 'Vorschau neben dem Text' })).not.toBeChecked();
+    await expect(page.locator('.markdown-editor--toggle')).toHaveCount(8);
+    await expect(page.locator('.markdown-editor__druck')).toHaveCount(8);
+    await pruefeBildschirm(page, 'Toggle');
+    await pruefeLesefassung(page, 'Toggle, Vorschau zu');
+  });
+
+  test('Toggle mit geöffneter Vorschau im offenen Abschnitt: kein Abschnitt doppelt', async ({
+    page,
+  }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E LFH-498 Toggle offen ${Date.now()}`);
+    const id = await lagebeurteilungSaeen(page, einsatzId);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
+    // Zugeklappte Abschnitte sind verborgen, `getByRole` findet nur den Knopf im offenen.
+    await page
+      .locator('.markdown-editor--toggle')
+      .getByRole('button', { name: /Vorschau/ })
+      .first()
+      .click();
+    // Der offene Abschnitt trägt jetzt seine Vorschau statt der Druckfassung.
+    await expect(page.locator('.markdown-editor--toggle .markdown-editor__vorschau')).toHaveCount(
+      1,
+    );
+    await expect(page.locator('.markdown-editor__druck')).toHaveCount(7);
+    await pruefeLesefassung(page, 'Toggle, eine Vorschau offen');
+  });
+
+  test('Split (Vorschau neben dem Text): acht Abschnitte je einmal, gerendert, vollständig', async ({
+    page,
+  }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E LFH-498 Split ${Date.now()}`);
+    const id = await lagebeurteilungSaeen(page, einsatzId);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
+    await page.getByRole('checkbox', { name: 'Vorschau neben dem Text' }).check();
+    await expect(page.locator('.markdown-editor--split')).toHaveCount(8);
+    await pruefeBildschirm(page, 'Split');
+    await pruefeLesefassung(page, 'Split');
+  });
+});

@@ -39,7 +39,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle fünfundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle sechsundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten“, nicht „Enums“: `dringlichkeit` ist über eine Statusrolle geschlüsselt und
     // beschriftet die Stufe selbst.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
@@ -49,6 +49,7 @@ describe('Statusfarb-Vertrag', () => {
       'belegungsArt',
       'betreuungsstelleStatus',
       'brStatus',
+      'dienststatus',
       'dringlichkeit',
       'dwdWarnstufe',
       'einsatzStatus',
@@ -88,6 +89,13 @@ describe('Statusfarb-Vertrag', () => {
   it('nutzt keine gesättigte Farbe für den Normalzustand (ASM, A1 Festlegung 5)', () => {
     expect(sf.uhsStatus.aktiv.rolle).toBe('normal');
     expect(sf.statusKategorie.verfuegbar.rolle).toBe('normal');
+  });
+
+  it('übersetzt den Dienststatus der Stammdaten an EINER Stelle (LFH-476)', () => {
+    // Ein Stammdatum außer Dienst ist ein bewusster Zustand, keine Gefahr — wie
+    // `verfuegbarkeit.gesperrt`. Die Katalog-Tabs lesen von hier (`stammdaten/dienststatus.tsx`).
+    expect(sf.dienststatus.in_dienst).toEqual({ rolle: 'normal', label: 'in Dienst' });
+    expect(sf.dienststatus.ausser_dienst).toEqual({ rolle: 'neutral', label: 'außer Dienst' });
   });
 
   it('löst die Divergenz `gebunden` (gold vs. orange) zu EINER Rolle auf', () => {
@@ -172,7 +180,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // Eine Fläche ist keine Statusrolle und gehört deshalb nicht in `ALLE_MAPS`.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(25);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(26);
   });
 });
 

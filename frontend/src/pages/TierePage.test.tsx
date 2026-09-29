@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useNavigate } from 'react-router';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
@@ -96,19 +96,27 @@ async function warteBisDialogWeg(timeout?: number) {
   );
 }
 
-function render(einsatzObj: typeof einsatzAktiv, tiere: Tier[]) {
+/** Macht den Query-String sichtbar — der Beleg, dass `?neu=1` verbraucht wurde. */
+function SuchAnzeige() {
+  return <span data-testid="suche">{useLocation().search}</span>;
+}
+
+function render(einsatzObj: typeof einsatzAktiv, tiere: Tier[], route = '/einsaetze/1/tiere') {
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json(tiere)),
   );
   return renderMitProviders(
-    <Routes>
-      <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
-      <Route path="/einsaetze/:id/tiere/:tierId" element={<div>DETAIL-SEITE</div>} />
-      <Route path="/einsaetze/:id/personen" element={<div>Personen-Modul</div>} />
-    </Routes>,
-    { route: '/einsaetze/1/tiere' },
+    <>
+      <Routes>
+        <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
+        <Route path="/einsaetze/:id/tiere/:tierId" element={<div>DETAIL-SEITE</div>} />
+        <Route path="/einsaetze/:id/personen" element={<div>Personen-Modul</div>} />
+      </Routes>
+      <SuchAnzeige />
+    </>,
+    { route },
   );
 }
 
@@ -231,6 +239,36 @@ describe('TierePage', () => {
     render(einsatzBeobachter, [tierBasis]);
     await screen.findByText('T-001');
     expect(screen.queryByRole('button', { name: 'Schnellerfassung' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Schnellaktion der Sprungpalette (LFH-506). Als Paar: ohne den Parameter bleibt die Maske zu —
+   * sonst belegte die Positivaussage auch eine Seite, die die Maske immer öffnet.
+   */
+  it('?neu=1 öffnet die Schnellerfassung und räumt den Parameter', async () => {
+    render(einsatzAktiv, [], '/einsaetze/1/tiere?neu=1');
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Schnellerfassung')).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+  });
+
+  it('ohne ?neu=1 bleibt die Erfassung zu', async () => {
+    render(einsatzAktiv, [tierBasis]);
+    await screen.findByText('T-001');
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(document.querySelector('.ant-modal')).toBeNull();
+  });
+
+  it('?neu=1 öffnet die Erfassung NICHT für Beobachter', async () => {
+    render(einsatzBeobachter, [tierBasis], '/einsaetze/1/tiere?neu=1');
+    // Synchronisationspunkt ist das Räumen des Parameters — erst danach hat der Effekt entschieden.
+    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(document.querySelector('.ant-modal')).toBeNull();
   });
 
   it('Schnellerfassung schickt status=aktiv + spezies', async () => {

@@ -192,10 +192,16 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   rundet vorsichtshalber auf `keine`/Alarm); „keine" = keine Stufe gesetzt. Kollision des
   `zonen-label` ist nicht abgesichert (eigene Entscheidung).
 - **Trefferzone `controlHeight`** an jedem Marker (`KarteMarker.trefferDurchmesser`,
-  `marker-einsatzort-treffer`); Personen zusätzlich 2 px schwarze Außenkante; Zone schlägt keinen
-  Personen-Cluster (`istTrefferzone`, `personenClusterAm`). Bild-Ziehgriffe
+  `marker-einsatzort-treffer`); Personen zusätzlich 2 px schwarze Außenkante. Bild-Ziehgriffe
   (`pages/lagekarte/bildGriffe.ts`) in `max(controlHeight, 44)`, je Modus scharf, Moduswechsel
-  wartet auf `dragend`.
+  wartet auf `dragend`; in „Größe" Ecken immer, eine Kante nur ohne Überlappung mit Ecke oder
+  Kante (`scharfeGriffe`, neu bei `move`/`dragend`/`setzeEcken`, nie im Zug; LFH-764).
+- **Ein Tipp gehört genau einem Ziel** (LFH-764,
+  `openspec/changes/lfh-764-lagekarte-griffe-klickwege/design.md`): jeder Karten-Klickhörer fragt
+  `klickzielAm` (`Kartenflaeche.tsx`, ein Urteil je Originalereignis) → `entscheideKlickziel`
+  (`pages/lagekarte/klickziel.ts`): gezeichnetes Punktziel > Trefferzone > eigene Fläche (Zone,
+  Abschnitt) > Fachebenen-Fläche. Eine neue Klickebene braucht eine Rolle in `ordneKlickebene`
+  (Guard in `klickziel.test.ts`); Auswahlmenü für übereinanderliegende Flächen: LFH-812.
 - **Betreuung auf der Karte** (LFH-673, `openspec/changes/archive/2026-09-29-lfh-673-betreuung-auf-der-lagekarte/design.md`):
   Marker-Ebene wie UHS (`alleVerortet`, `?platzieren=betreuungsstelle:<id>`), Sperre an der
   **Datenquelle** (`pages/lagekarte/betreuungEbene.ts`);
@@ -212,9 +218,14 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   Flow-Geschwister mit `bandStil(…)` (`'auto'`, nie `position: 'absolute'`). Der Fuß endet vor der
   Knopfspalte (`fussStil(knopfKante)`) und oben an der Karte; kein `overflow` am Rahmen.
 - **Die Karte kippt nicht** (`touchPitch: false` **und** `maxPitch: 0` in `Kartenflaeche.tsx`).
-  Unter `lg` schließt eine Zonen-/Abschnittszeichnung die Leiste für die Sitzung
-  (`karteFreigeben` in `LagekartePage.tsx`, `verberge` in `lagekarte/leistenWahl.ts`; Rest
-  LFH-765).
+- **Unter `lg` gibt jeder Kartenmodus die Karte frei** (LFH-765,
+  `openspec/changes/lfh-765-lagekarte-modi-karte-freigeben/design.md`): abgeleitet aus
+  `exklusiverModusAktiv` in `leisteSichtbar` (`lagekarte/leistenWahl.ts`), nie per Aufruf je
+  Startweg; nach dem Modus gilt wieder der vorherige Zustand (Entscheidung 29.09.2026).
+  „Leiste einblenden" im Modus ist `umschalteImModus` (nie gespeichert). Die Bedienung der
+  Leistenmodi (Platzieren, Taktisches Zeichen, Bild) steht unter `lg` im Fuß-Band
+  `PlatzierSteuerung`, die Sidebar zeigt dann nur einen Hinweis (`modusBedienungImFuss`) — je
+  Breite genau ein Knopf je Handlung. Ab `lg` erzwingen die Leistenmodi die Leiste wie bisher.
 - Nachweise: `e2e/lagekarte-smoke.spec.ts`, `e2e/gate1-ueberlauf.spec.ts`,
   `e2e/lagekarte-touch.spec.ts` (LFH-713, `hasTouch`, Trefferwache `elementFromPoint`), `fokus-verdeckung.spec.ts`; Kartenaufbauten sieht
   `e2e/fokus-kern.ts` nur über `zusatzKandidaten`.
@@ -357,7 +368,7 @@ anwendbar), „nicht geprüft" ist keins.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`pruefeVerlassen`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in
-  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 25 am 25.09.2026); jede weitere
+  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 26 am 29.09.2026); jede weitere
   Karte ist eine begründete Entscheidung (Beispiele: `odlStufe` in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`, `aufbewahrungZustand` in
   `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
@@ -441,8 +452,11 @@ anwendbar), „nicht geprüft" ist keins.
   `einsatzEinstellungenPfad`) schicken über `einstellungen/einsatzEinstellungenForm.ts`
   (`zuUpdate`) immer alle Felder mit, auch `basemap_modus`, `karten_zoom_start`,
   `fachebenen_sichtbar`. Jede Sektion stellt ihre Queries selbst (kein `useOutletContext`).
-  Speichern-Leiste sticky im `<form>` (`htmlType="submit"`); `speicherLeisteStil`/
-  `feldrasterStil` rein, die Breite liest der Aufrufer aus `useViewport`.
+  Speichern-Leiste sticky im `<form>` (`htmlType="submit"`), gebaut nur über
+  `<div {...useSpeicherLeiste()}>` (`components/speicherLeiste.ts`) — sie bringt den Fokusabstand
+  mit (LFH-475, `scroll-padding` über `:root:has(...)` in `index.css`, Nachweis
+  `e2e/fokus-verdeckung.spec.ts`); `speicherLeisteStil`/`feldrasterStil` rein, die Breite liest
+  der Aufrufer aus `useViewport`.
 - Ein Collapse-Kopf im Formular ist kein Übermittlungsknopf (`MaterialFormModal.test.tsx`).
 - **Direkteinstieg** (LFH-347, `components/Direkteinstieg.tsx`,
   `components/EinstiegSwitcher.tsx`, `components/direkteinstiegKern.ts`; Tabelle unter `…/liste`;
@@ -477,6 +491,29 @@ anwendbar), „nicht geprüft" ist keins.
 - **Live-Updates springen nicht unter dem Cursor:** Sammelbanner statt Einschieben (CLS ≤ 0,1,
   WCAG 3.2.5); Alarmbudget EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Stufen. **Kein Blinken auf
   lesbarem Text.**
+
+## Frontend — Keine Arbeitsplatzachse (LFH-456)
+
+Neben Form (LFH-19) und Kontext (LFH-327) gibt es **keine dritte Bedienachse „Arbeitsplatz“**
+(Entscheidung 29.09.2026, `openspec/changes/archive/2026-09-29-lfh-456-keine-arbeitsplatzachse/design.md`,
+Spec `bedien-arbeitsplatz`).
+- **Einstieg statt Achse:** Eine Fläche für einen Arbeitsplatz ist ein Einzelfall. Sie wird
+  über einen Einstieg in einer bestehenden Fläche erreicht (Primäraktion im Seitenkopf,
+  Sprungmarke, Leeraktion eines Paneels, Sprungpalette) und hat eine Adresse, die als Lesezeichen
+  taugt. Was je Standort verschieden ist, trägt die Kontext-Achse **am Gerät**; „Fükw-Arbeitsplatz“
+  in `ThemeModeProvider.tsx` meint das Gerät. Keine Wahl einer „Arbeitsweise“, keine Vorbelegung
+  von Startziel, Primäraktion, Modulreihenfolge oder Dichte je Person; `standard_modul` gilt für
+  den ganzen Einsatz. Je Person liegt nur das Palettengedächtnis „Zuletzt“
+  (`benutzer_einstellungen::BEKANNTE_SCHLUESSEL`, geschlossener Schlüsselraum).
+- **Nicht zuständig für Rechte:** Sichtbarkeit und Schreibrecht kommen allein aus `EinsatzRolle`,
+  Systemrolle und Modulfreigabe (`einsatz/schreibrecht.ts`, `berechtigung::erlaubte_module`); ein
+  Einstieg ist keine Freigabe, die Zielseite prüft selbst. Stabsfunktionen S1–S6 ebenso (LFH-46).
+- **Aufnahme** (`personenAufnahmePfad`): Einstiege sind die UHS-Kopfzeile „Patient aufnehmen“
+  (LFH-341/C6, nur `aktiv` und mit Schreibrecht) und die Leeraktion des Sichtungspaneels. Die
+  Palette führt „Neue Person erfassen“ auf Liste + Modal und **keinen** Aufnahme-Befehl.
+- **Wiedervorlage** einer wählbaren Arbeitsweise nur mit Feldbefund (Personenwechsel zwischen
+  Arbeitsplätzen auf einem geteilten Gerät, dem Lesezeichen und Einstiege nicht genügen) oder bei
+  einem dritten Einstieg in dieselbe Fläche. Transport hat keine eigene Fläche (Lücke, kein Anlass).
 
 ## Frontend — Erfassungs-Norm (LFH-332/B4)
 
@@ -651,6 +688,12 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   (`prod_bundle_bereitstellen`; Service Worker für `e2e/lagekarte-offline-precache.spec.ts`,
   ausgeliefert vom e2e-Backend über `src/static_files.rs`).
 - **Kein `| tail` um Gate-Kommandos.** Testgüte belegen Mutationsproben, nicht Abdeckung.
+- **Ein Layout-Gate misst jeden rollenabhängigen Zustand auch nicht-privilegiert** (LFH-435):
+  Beobachter, Org-Führungskraft bzw. Führungspersonal über `e2e/rollen-kern.ts` (Seeding als
+  Admin, Wechsel im selben Kontext). Der Rollenzweig ist VOR der Messung Vorbedingung
+  (Hinweis steht, Aktion gesperrt oder abwesend), die Mutationsprobe macht nur den
+  Nicht-Admin rot. Freistellungen in Gate 1 nennen die Rolle. Inventar:
+  `openspec/changes/lfh-435-e2e-gates-nicht-privilegiert/pruefliste.md`.
 - **e2e wartet nie auf `networkidle`** (LFH-385): der SSE-Strom der Einsatzrouten lässt das Netz
   nie ruhen (parallel rot, `--workers=1` grün). Gewartet wird auf einen Inhaltsanker; Riegel
   `no-restricted-syntax` für `e2e/**` in `frontend/eslint.config.js`.

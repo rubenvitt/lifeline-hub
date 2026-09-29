@@ -48,7 +48,9 @@
      `display: none` aus `MarkdownEditor.css`). Berichtigt (Review Welle B): vorher wich das
      Textfeld nur bei offener Vorschau; in der Vorgabe kam die `<textarea>` aufs Papier,
      Rohtext in Bildschirmhöhe, langer Text abgeschnitten. Die Seite MUSS `druckfassung`
-     setzen, sonst druckte ein Abschnitt leer — `lageberichtPrint.test.ts` prüft beides. */
+     setzen, sonst druckte ein Abschnitt leer — `lageberichtPrint.test.ts` prüft beides.
+     Am gerenderten Blatt belegt es `e2e/druck-fluss.spec.ts` (LFH-498): acht Abschnitte je
+     genau einmal, ohne `##`/`**`, nicht abgeschnitten — Toggle zu, Toggle offen, Split. */
   .lagebericht-print-root .markdown-editor--toggle textarea {
     display: none !important;
   }

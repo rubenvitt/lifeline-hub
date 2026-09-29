@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router';
@@ -160,6 +160,64 @@ describe('LageberichtDetailPage — Zeitstand (LFH-350 · H60)', () => {
     expect(await screen.findByText('Zeitstand: 251400JUL2026')).toBeInTheDocument();
     // Gegenaussage: der Wirestring ist nirgends sichtbar.
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
+  });
+});
+
+/**
+ * ── Entwurfs-Riegel am Zeitstand-Absatz (LFH-499) ──
+ *
+ * Im Entwurf mit Schreibrecht trägt das Picker-Feld den Zeitstand; ein zweiter Absatz zeigte zwei
+ * Uhrzeiten für denselben Wert. Ohne Schreibrecht gibt es kein Picker-Feld, der Absatz muss stehen.
+ * Das Paar pinnt `!(istEntwurf && darfSchreiben)` in beide Richtungen — die Fixtures der übrigen
+ * Blöcke sind freigegeben und sähen den Riegel nie.
+ */
+describe('LageberichtDetailPage — Zeitstand im Entwurf (LFH-499)', () => {
+  // Der Picker zeigt Ortszeit des Geräts (`alsOrtszeit`). Läuft der Test auf einer UTC-Maschine,
+  // wären Ortszeit und Wirestring gleich und die Aussage blind — die Prozesszone wird gestellt.
+  const tzVorher = process.env.TZ;
+  afterEach(() => {
+    if (tzVorher === undefined) delete process.env.TZ;
+    else process.env.TZ = tzVorher;
+  });
+
+  beforeEach(() => {
+    process.env.TZ = 'Europe/Berlin';
+    vi.mocked(einsaetzeApi.ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1,
+      zeitzone: 'Europe/Berlin',
+      org_defaults: { org_id: 1 },
+    } as never);
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({ status: 'entwurf', zeitstand: '2026-07-25 12:00:00' }) as never,
+    );
+  });
+
+  it('mit Schreibrecht: kein Absatz, der Picker trägt den Zeitstand in Ortszeit', async () => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+    renderMitZone('/einsaetze/1/lageberichte/9');
+
+    const picker = await screen.findByLabelText('Zeitstand');
+    // 12:00 UTC → 14:00 Ortszeit (Berlin, Sommerzeit). Der Wert kommt per Effekt nach dem Laden.
+    await waitFor(() => expect(picker).toHaveValue('25.07.2026 14:00'));
+    expect(screen.queryByText(/^Zeitstand: /)).toBeNull();
+  });
+
+  it('ohne Schreibrecht (Beobachter): der Absatz steht mit der taktischen DTG (Gegenaussage)', async () => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'beobachter',
+      bezeichnung: 'Übung',
+    } as never);
+    renderMitZone('/einsaetze/1/lageberichte/9');
+
+    expect(await screen.findByText('Zeitstand: 251400JUL2026')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Zeitstand')).toBeNull();
   });
 });
 

@@ -17,7 +17,7 @@ import { listeQualifikationen } from '../api/qualifikationen';
 import { listeBenutzer } from '../api/benutzer';
 import { globalKeys } from '../api/queryKeys';
 // Wiederverwendet statt nachgebaut — siehe Kopf von `FahrzeugDetailPage`.
-import { speicherLeisteStil } from '../components/speicherLeiste';
+import { useSpeicherLeiste } from '../components/speicherLeiste';
 import { leerZuNull } from '../api/patchTriState';
 import { parseRouteId } from '../routing/deeplinks';
 import type { Personal, StaerkePosition } from '../api/types';
@@ -56,6 +56,7 @@ export default function PersonalDetailPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token } = theme.useToken();
+  const speicherLeiste = useSpeicherLeiste();
 
   const personalQuery = useQuery({
     queryKey: globalKeys.personalListe('alle'),
@@ -240,7 +241,7 @@ export default function PersonalDetailPage() {
             </Form.Item>
           </Formularpaneel>
 
-          <div style={speicherLeisteStil(token)}>
+          <div {...speicherLeiste}>
             <Button type="primary" htmlType="submit" loading={speichern.isPending}>
               Speichern
             </Button>

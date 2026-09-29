@@ -16,7 +16,7 @@ import {
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { Formularpaneel, Paneel } from '../components/instrument';
-import { speicherLeisteStil } from '../components/speicherLeiste';
+import { useSpeicherLeiste } from '../components/speicherLeiste';
 
 interface FormWerte {
   tz_organisation: string;
@@ -67,6 +67,7 @@ export default function OrganisationTab() {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerte>();
   const { token } = theme.useToken();
+  const speicherLeiste = useSpeicherLeiste();
 
   const orgQuery = useQuery({ queryKey: globalKeys.organisation(), queryFn: ladeOrganisation });
 
@@ -311,7 +312,7 @@ export default function OrganisationTab() {
           </Form.Item>
           <SpeicherFehler fehler={speichern.error} />
         </Formularpaneel>
-        <div style={speicherLeisteStil(token)}>
+        <div {...speicherLeiste}>
           <Button
             type="primary"
             htmlType="submit"

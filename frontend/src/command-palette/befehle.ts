@@ -21,14 +21,17 @@ import {
 } from '../einsatz/modulRegistry';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import {
+  bereitstellungsraeumeListePfad,
   dokumentePfad,
   einsaetzePfad,
+  einsatzabschnittePfad,
   einsatzModulPfad,
   einsatzPfad,
   etbPfad,
   personenPfad,
   schaedenPfad,
   stabPfad,
+  tierePfad,
   unfallhilfsstellenListePfad,
 } from '../routing/deeplinks';
 import type { IconType } from 'react-icons';
@@ -46,8 +49,12 @@ function kategorieKontext(key: KategorieKey): string | undefined {
 
 /**
  * Die Ziele stehen als **Builder** aus `routing/deeplinks.ts` in der Tabelle, nicht als
- * Routenstück: die Unfallhilfsstellen liegen unter `/unfallhilfsstellen/liste`, der bare
- * Modulpfad zeigt auf eine Seite, die `?neu=1` nicht liest.
+ * Routenstück: Unfallhilfsstellen und Bereitstellungsräume liegen unter `…/liste`, der bare
+ * Modulpfad zeigt jeweils auf eine Seite, die `?neu=1` nicht liest.
+ *
+ * GEFAHREN FEHLEN BEWUSST (LFH-506): die Gefahrenmatrix hat keine Erfassungsmaske — ein
+ * Gefahrengebiet entsteht durch Zeichnen auf der Lagekarte. Eine Zeile hierher zeigte ins Leere;
+ * ein Einstieg bräuchte einen Zeichnen-Deeplink auf die Karte (eigenes Ticket).
  *
  * DIE REIHENFOLGE IST EINE ERFASSUNGSHÄUFIGKEIT, bewusst nicht die Registry-Reihenfolge (die ist
  * die Navigations-Rangfolge); sonst sortierte eine Umsortierung der Navigation still die Palette
@@ -101,6 +108,27 @@ export const SCHNELLAKTIONEN: {
     pfad: (id) => dokumentePfad(id, { neu: true }),
     label: 'Dokument ablegen',
     schlagworte: ['datei', 'hochladen', 'foto', 'lageplan', 'formular'],
+  },
+  // Ans ENDE (LFH-506), untereinander nach Erfassungshäufigkeit. Leser: `pages/TierePage.tsx`,
+  // `pages/bereitstellungsraum/BereitstellungsraeumePage.tsx` (Listenroute, nicht der bare
+  // Modulpfad), `pages/EinsatzabschnittePage.tsx`.
+  {
+    modulKey: 'tiere',
+    pfad: (id) => tierePfad(id, { neu: true }),
+    label: 'Neues Tier erfassen',
+    schlagworte: ['tier', 'hund', 'katze', 'haustier', 'nutztier'],
+  },
+  {
+    modulKey: 'bereitstellungsraeume',
+    pfad: (id) => bereitstellungsraeumeListePfad(id, { neu: true }),
+    label: 'Neuen Bereitstellungsraum anlegen',
+    schlagworte: ['br', 'bereitstellung', 'sammelraum', 'kräfte'],
+  },
+  {
+    modulKey: 'einsatzabschnitte',
+    pfad: (id) => einsatzabschnittePfad(id, { neu: true }),
+    label: 'Neuen Einsatzabschnitt anlegen',
+    schlagworte: ['abschnitt', 'unterabschnitt', 'gliederung', 'ea'],
   },
 ];
 
@@ -296,7 +324,8 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
           label: a.label,
           icon: TbPlus,
           schlagworte: a.schlagworte,
-          ...sprungZu(ziel, k.navigate),
+          // Gemerkt wird das MODUL der Aktion (LFH-436): ein Griff, ein Modul.
+          ...sprungZu(ziel, k.navigate, () => k.merkeModulBesuch?.(a.modulKey)),
         });
       }
     }

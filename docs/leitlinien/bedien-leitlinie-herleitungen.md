@@ -251,6 +251,13 @@ darüber steht. LFH-367/B5g hatte dasselbe `Popconfirm` noch **gehärtet statt e
 bewusst, weil das Entfernen einer bestehenden Rückfrage eine Bedienentscheidung ist und nicht
 ins AK eines Härtungs-Tickets gehört. Wer eine Rückfrage anfasst, entscheidet also zuerst die
 Umkehrbarkeit; `okButtonProps` ist die Antwort auf die zweite Frage, nicht auf die erste.
+**Die zweite Anwendung** (LFH-477): „Außer Dienst" in Fahrzeuge/Personal/Material
+(`stammdaten/dienststatus.tsx`, eine Spalte für alle drei Tabs) hat seine Rückfrage ebenfalls
+verloren. Geprüft: der Server setzt nur `dienststatus`, löst keine Disposition; laufende
+Einsatzzuordnungen fallen solange auf ihren Snapshot und kehren mit „Wieder in Dienst" zur
+Stammansicht zurück. Der Rückweg hat eine Bedingung (409, wenn die Kennung inzwischen aktiv neu
+vergeben ist). Die entsteht aber erst durch eine eigene spätere Anlage, nie durch den Fehlklick,
+gegen den eine Rückfrage schützen würde.
 **Ein gedeckelter Abstand war die Übergangslösung** (LFH-378, abgelöst durch LFH-359/LFH-379):
 `aktionsabstand()` nahm `token.marginSM` als **Obergrenze** (7 / 0 / 0), weil die vier
 icon-only-Knöpfe (`width: controlHeightSM`, 24 / 48 / 72) ab `komfortabel` schon ohne Lücke breiter

@@ -33,7 +33,12 @@ function br(over: Partial<Bereitstellungsraum> = {}): Bereitstellungsraum {
   };
 }
 
-function renderPage() {
+/** Macht den Query-String sichtbar — der Beleg, dass `?neu=1` verbraucht wurde. */
+function SuchAnzeige() {
+  return <span data-testid="suche">{useLocation().search}</span>;
+}
+
+function renderPage(route = '/einsaetze/1/bereitstellungsraeume/liste') {
   return renderMitProviders(
     <CommandPaletteProvider>
       <Routes>
@@ -42,8 +47,9 @@ function renderPage() {
           element={<BereitstellungsraeumePage />}
         />
       </Routes>
+      <SuchAnzeige />
     </CommandPaletteProvider>,
-    { route: '/einsaetze/1/bereitstellungsraeume/liste' },
+    { route },
   );
 }
 
@@ -193,6 +199,49 @@ describe('BereitstellungsraeumePage', () => {
     expect(
       screen.queryByText('Bereitstellungsräume konnten nicht geladen werden'),
     ).not.toBeInTheDocument();
+  });
+
+  /**
+   * Schnellaktion der Sprungpalette (LFH-506). Die Route ist die LISTEN-Route, die
+   * `bereitstellungsraeumeListePfad` baut — der Pin dazu steht in `routing/deeplinks.test.ts`.
+   * Als Paar: ohne den Parameter bleibt der Drawer zu.
+   */
+  describe('Schnellerfassung per ?neu=1', () => {
+    function mitListe(e: EinsatzAnzeige = einsatz()) {
+      server.use(
+        http.get('/api/einsaetze/1', () => HttpResponse.json(e)),
+        http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([br()])),
+      );
+    }
+
+    it('?neu=1 öffnet den Anlege-Drawer und räumt den Parameter', async () => {
+      mitListe();
+      renderPage('/einsaetze/1/bereitstellungsraeume/liste?neu=1');
+      expect(await screen.findByPlaceholderText('z. B. BR Ost')).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    });
+
+    it('ohne ?neu=1 bleibt der Drawer zu', async () => {
+      mitListe();
+      renderPage();
+      await screen.findByText('BR Ost');
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+      expect(screen.queryByPlaceholderText('z. B. BR Ost')).not.toBeInTheDocument();
+    });
+
+    it('?neu=1 öffnet den Drawer NICHT für Beobachter', async () => {
+      mitListe(einsatz({ meine_rolle: 'beobachter' }));
+      renderPage('/einsaetze/1/bereitstellungsraeume/liste?neu=1');
+      // Synchronisationspunkt ist das Räumen des Parameters — erst danach hat der Effekt
+      // entschieden.
+      await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+      expect(screen.queryByPlaceholderText('z. B. BR Ost')).not.toBeInTheDocument();
+    });
   });
 
   it('fokussiert Bezeichnung und legt per Enter aus diesem Feld an', async () => {

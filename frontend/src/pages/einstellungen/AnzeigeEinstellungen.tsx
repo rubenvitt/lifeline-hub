@@ -1,4 +1,4 @@
-import { App, AutoComplete, Button, Form, Input, theme } from 'antd';
+import { App, AutoComplete, Button, Form, Input } from 'antd';
 import { Select } from '../../components/Select';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,7 +19,7 @@ import {
   normalisiereAnzeige,
   zuUpdate,
 } from './orgEinstellungenForm';
-import { speicherLeisteStil } from '../../components/speicherLeiste';
+import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import { Formularpaneel } from '../../components/instrument';
 import { teilwortSuche } from '../../components/teilwortSuche';
 
@@ -34,7 +34,7 @@ export default function AnzeigeEinstellungen() {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerteAnzeige>();
   const istAdmin = benutzer?.system_rolle === 'admin';
-  const { token } = theme.useToken();
+  const speicherLeiste = useSpeicherLeiste();
 
   const einstellungenQuery = useQuery({
     queryKey: globalKeys.orgEinstellungen(),
@@ -137,7 +137,7 @@ export default function AnzeigeEinstellungen() {
             />
           </Form.Item>
         </Formularpaneel>
-        <div style={speicherLeisteStil(token)}>
+        <div {...speicherLeiste}>
           <Button
             type="primary"
             htmlType="submit"

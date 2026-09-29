@@ -1,4 +1,4 @@
-import { App, AutoComplete, Button, Form, theme } from 'antd';
+import { App, AutoComplete, Button, Form } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { Select } from '../../components/Select';
@@ -23,7 +23,7 @@ import {
   zuUpdate,
   type FormWerteAllgemein,
 } from './einsatzEinstellungenForm';
-import { speicherLeisteStil } from '../../components/speicherLeiste';
+import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import { teilwortSuche } from '../../components/teilwortSuche';
 
 /**
@@ -40,7 +40,7 @@ export default function EinsatzAllgemein() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerteAllgemein>();
-  const { token } = theme.useToken();
+  const speicherLeiste = useSpeicherLeiste();
   const daten = useEinstellungenDaten(einsatzId);
 
   // Kein `onError`-Toast: der Fehler steht als Alert über dem Formular, bis der nächste Versuch
@@ -149,7 +149,7 @@ export default function EinsatzAllgemein() {
           </Form.Item>
         </Formularpaneel>
 
-        <div style={speicherLeisteStil(token)}>
+        <div {...speicherLeiste}>
           <Button type="primary" htmlType="submit" loading={speichern.isPending}>
             Speichern
           </Button>

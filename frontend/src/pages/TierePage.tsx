@@ -1,7 +1,7 @@
 import { Alert, Breadcrumb, Button, Form, Input, Space, Tag, Typography } from 'antd';
 import { Augenbraue, Segmentleiste, StatusChip } from '../components/instrument';
 import { Select } from '../components/Select';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -215,6 +215,20 @@ export default function TierePage() {
     const ort = liesErfassungsSitzungswert(einsatzId, 'tier', 'antreff_ort');
     form.setFieldValue('antreff_ort', ort);
   }, [aktuellerModus, einsatzId, form]);
+
+  // Schnellaktion: ?neu=1 öffnet die Schnellerfassung (Sprungpalette, LFH-506). Warten bis der
+  // Einsatz geladen ist; Param immer löschen, Maske nur bei Schreibrecht. Eine Kopie statt
+  // In-place-Mutation, sonst sähe der zweite StrictMode-Durchlauf den Parameter nicht mehr.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  useEffect(() => {
+    if (searchParams.get('neu') !== '1') return;
+    if (einsatzQuery.isLoading) return;
+    if (darfSchreibenRoh) setModus({ einsatzId, wert: 'schnell' });
+    const naechste = new URLSearchParams(searchParams);
+    naechste.delete('neu');
+    setSearchParams(naechste, { replace: true });
+  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh, einsatzId]);
 
   const fehler = useFehlerMeldung();
 

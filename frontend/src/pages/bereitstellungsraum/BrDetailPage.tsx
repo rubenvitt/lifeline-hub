@@ -165,7 +165,9 @@ export default function BrDetailPage() {
   return (
     <EinsatzSeite
       titel={
-        <Space>
+        // `wrap`: bei langem Namen rutscht der Status unter den Namen, statt auf 390 px
+        // über den Rand zu ragen (gemessen 11 px, LFH-435).
+        <Space wrap>
           <BrSwitcher einsatzId={einsatzId} aktuellerBr={br} />
           <StatusTag darstellung={brStatus[br.status]} />
         </Space>

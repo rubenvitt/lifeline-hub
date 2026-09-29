@@ -6,7 +6,6 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import MaterialTab from './MaterialTab';
 import { adminFixture } from '../test/fixtures';
-import { offeneRueckfrage } from '../test/rueckfrage';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
 
 const admin = adminFixture();
@@ -60,8 +59,8 @@ describe('MaterialTab', () => {
    * dem Klick auf Zeile B wandert `variables` dorthin, Zeile A verliert ihre Ladeanzeige. Alle
    * A-Zusicherungen stehen deshalb VOR dem zweiten Klick.
    *
-   * Zeile 2 steht auf `ausser_dienst`: ihre Aktion ist dann „Wieder in Dienst" ohne Rückfrage —
-   * sonst stünde ein zweites „OK" neben dem offenen Portal der ersten.
+   * Zeile 2 steht auf `ausser_dienst`, damit beide Richtungen des Wechsels in einem Test laufen.
+   * Keine der beiden fragt zurück (LFH-477) — ein „OK"-Dialog wäre hier der Fehlerfall.
    */
   it('sperrt beim Dienststatuswechsel NUR die betroffene Zeile', async () => {
     const gerufen: string[] = [];
@@ -89,8 +88,10 @@ describe('MaterialTab', () => {
     const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
     const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
 
+    // Keine Rückfrage (LFH-477): „Außer Dienst" ist umkehrbar, der Klick setzt sofort.
     await userEvent.click(within(erste).getByRole('button', { name: 'Außer Dienst' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'OK' }));
+    expect(screen.queryByRole('button', { name: 'OK' })).not.toBeInTheDocument();
+    await waitFor(() => expect(gerufen).toEqual(['ausser-dienst/1']));
 
     // Die eigene Zeile ist gesperrt und zeigt den Lauf …
     expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toBeDisabled();
@@ -266,12 +267,10 @@ describe('MaterialTab — Fehlschlag des Statuswechsels (LFH-473)', () => {
     await screen.findByText('Wolldecke');
 
     await userEvent.click(screen.getByRole('button', { name: 'Außer Dienst' }));
-    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
     const hinweis = await stehenderFehler('Material ist einem laufenden Einsatz zugeordnet');
     expect(hinweis).toHaveTextContent('Dienststatus nicht geändert');
 
     await userEvent.click(screen.getByRole('button', { name: 'Außer Dienst' }));
-    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
     await keinStehenderFehler('Material ist einem laufenden Einsatz zugeordnet');
     expect(versuch).toBe(2);
   });
