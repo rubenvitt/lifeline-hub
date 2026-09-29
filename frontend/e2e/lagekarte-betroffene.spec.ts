@@ -1,17 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// LFH-648: Ebene „Betroffene" auf der Lagekarte.
+// Ebene „Betroffene" auf der Lagekarte. Ob Personen in IHRER Quelle `marker-personen` landen,
+// dort untereinander clustern statt Kräfte-Marker zu schlucken, und ob ein Personen-Donut
+// auffächert, sieht nur ein echter Renderer (die Unit-Tests stubben die Kartenfläche).
+// Geprüft wird die Quelle (`querySourceFeatures`), nicht die Optik.
 //
-// Warum im Browser: `LagekartePage.test.tsx` stubbt die Kartenfläche weg, `markerLayer.test.ts`
-// arbeitet mit einer Attrappe. Ob Personen wirklich in IHRER Quelle `marker-personen` landen,
-// ob sie dort untereinander clustern, statt Kräfte-Marker zu schlucken, und ob ein
-// Personen-Donut auffächert, sieht nur ein echter Renderer. Geprüft wird die Quelle
-// (`querySourceFeatures`), nicht die Optik.
-//
-// Als NICHT-Admin: ein Admin ist nie gesperrt (`istModulGesperrt`, Admin-Mindest-Guard im
-// Backend). Die Aussage „ohne Modulzugriff keine Personen" wäre als Admin nicht widerlegbar.
-// Die geteilte Ansicht trägt die Ebene ausdrücklich EINGESCHALTET — die Zugriffsgrenze muss an
-// den Daten sitzen, nicht am Schalter.
+// Als NICHT-Admin: ein Admin ist nie gesperrt, „ohne Modulzugriff keine Personen" wäre als
+// Admin nicht widerlegbar. Die geteilte Ansicht trägt die Ebene EINGESCHALTET — die
+// Zugriffsgrenze muss an den Daten sitzen, nicht am Schalter.
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -99,10 +95,9 @@ async function klickeAuf(page: Page, ll: [number, number]) {
   await page.mouse.click(p.x, p.y);
 }
 
-// Ort der Lage: eine Einheit mitten in dreißig Betroffenen; drei weitere Betroffene rund
-// 100 km entfernt als kleine Gruppe, die unterhalb der Spider-Grenze (12) auffächert. Der
-// Abstand hält die Traube bei Zoom 12 sicher aus den geladenen Kacheln — sonst stünde ihr
-// Donut als zweiter DOM-Marker neben dem, der geklickt werden soll.
+// Eine Einheit mitten in dreißig Betroffenen; drei weitere rund 100 km entfernt als kleine
+// Gruppe unter der Spider-Grenze (12). Der Abstand hält die ferne Traube bei Zoom 12 aus den
+// geladenen Kacheln — sonst stünde ihr Donut als zweiter DOM-Marker daneben.
 const MITTE: [number, number] = [9.9937, 53.5511];
 const FERN: [number, number] = [11.5, 53.55];
 
@@ -162,8 +157,7 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
       betreuungsstelle: true,
     },
   });
-  // Ohne `system_rolle`/`org_rolle` fällt das Backend auf „keiner"/„keine" zurück — ein
-  // gewöhnliches Mitglied ohne Sonderrechte.
+  // Ohne `system_rolle`/`org_rolle` gilt „keiner"/„keine" — ein Mitglied ohne Sonderrechte.
   const { id: nutzerId } = await senden(page, 'post', '/api/benutzer', {
     anzeigename: `E2E Betroffene ${LAUF}`,
     benutzername: NUTZER,
@@ -188,18 +182,16 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
   await expect
     .poll(async () => personenIn(await features(page, 'marker-personen')), { timeout: 30_000 })
     .toBe(30);
-  // … als Cluster, nicht als dreißig lose Punkte (Vorbedingung: sonst prüfte der Test kein
-  // Clustering, sondern nur die Zuordnung). Gewartet, nicht einmal gelesen: unmittelbar nach
-  // dem Sprung kann die Quelle die 30 Punkte schon tragen, aber noch ungeclustert (LFH-741).
+  // … als Cluster, nicht als dreißig lose Punkte (sonst prüfte der Test kein Clustering).
+  // Gewartet: direkt nach dem Sprung kann die Quelle die Punkte noch ungeclustert tragen.
   await expect
     .poll(async () => (await features(page, 'marker-personen')).some((p) => p.cluster), {
       timeout: 30_000,
     })
     .toBe(true);
-  // Die Einheit steht mitten in der Traube und bleibt trotzdem ein Einzel-Feature ihrer
-  // eigenen Quelle — kein Personen-Cluster hat sie geschluckt.
-  // Die Kräfte-Quelle füllt sich unabhängig von `marker-personen`; ohne eigenes Warten war sie
-  // unter Last beim Lesen noch leer (`[]`, in der CI von PR #158 gemessen, LFH-741).
+  // Die Einheit mitten in der Traube bleibt ein Einzel-Feature ihrer eigenen Quelle — kein
+  // Personen-Cluster hat sie geschluckt. Eigenes Warten: die Kräfte-Quelle füllt sich
+  // unabhängig und war unter Last beim Lesen noch leer.
   await expect
     .poll(async () => (await features(page, 'marker-cluster')).map((p) => p.schluessel), {
       timeout: 30_000,
@@ -210,11 +202,10 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
   expect(personenIn(kraefte)).toBe(0);
   // Legende steht bei eingeschalteter Ebene.
   await expect(page.getByRole('list', { name: 'Sichtungslegende' })).toBeVisible();
-  // Personen-Cluster sind WebGL-Layer UNTER den Kräften, kein DOM-Donut über dem Canvas:
-  // hier gibt es nur Personen-Cluster und eine einzelne Einheit, also keinen Donut.
+  // Personen-Cluster sind WebGL-Layer UNTER den Kräften, kein DOM-Donut — hier also keiner.
   await expect(page.locator('.maplibregl-marker')).toHaveCount(0);
-  // Und die Einheit mitten in der Traube bleibt anwählbar — der Klick gehört dem Zeichen
-  // obenauf, nicht dem Personen-Cluster darunter (Review-Befund: ein DOM-Donut fing ihn ab).
+  // Und die Einheit mitten in der Traube bleibt anwählbar: der Klick gehört dem Zeichen
+  // obenauf, nicht dem Cluster darunter.
   const ausgewaehlt = page.locator('[data-paneel="ausgewaehlt"]');
   await expect(async () => {
     await klickeAuf(page, MITTE);
@@ -233,8 +224,8 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
   await expect
     .poll(
       async () =>
-        // Verschiedene Schlüssel zählen: eine ungeclusterte Quelle liefert einen Punkt nahe
-        // einer Kachelkante über mehrere Kacheln (gemessen: 10 Treffer für 3 Personen).
+        // Verschiedene Schlüssel zählen: ein Punkt nahe einer Kachelkante kommt über mehrere
+        // Kacheln.
         new Set(
           (await features(page, 'spider-leaves'))
             .map((p) => String(p.schluessel))
@@ -271,11 +262,10 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
   await expect(page.getByRole('list', { name: 'Sichtungslegende' })).toHaveCount(0);
 });
 
-// Review LFH-711: seit Kräfte- und Objektmarker eine unsichtbare Trefferzone tragen, liegt sie
-// in der Mal-Reihenfolge ÜBER den Personen-Clustern. Zählte sie als „oberstes Feature", nähme
-// eine Einheit knapp neben einem Cluster diesem den Tipp weg: statt aufzufächern öffnete der
-// Inspector der Einheit. Gemessen in `handschuh` (Zone 72, Radius 36) mit der Einheit rund
-// 34 px neben der Clustermitte: die Mitte liegt in ihrer Zone, aber nicht unter ihrem Zeichen.
+// Die unsichtbare Trefferzone der Kräftemarker liegt in der Mal-Reihenfolge ÜBER den
+// Personen-Clustern. Zählte sie als „oberstes Feature", nähme eine Einheit knapp neben einem
+// Cluster diesem den Tipp weg. Gemessen in `handschuh` (Radius 36) mit der Einheit rund 34 px
+// neben der Clustermitte: die Mitte liegt in ihrer Zone, aber nicht unter ihrem Zeichen.
 test('Betroffene (LFH-711): die Trefferzone einer Einheit daneben nimmt dem Personen-Cluster den Tipp nicht', async ({
   page,
 }) => {
@@ -294,7 +284,7 @@ test('Betroffene (LFH-711): die Trefferzone einer Einheit daneben nimmt dem Pers
   }
   const mitte: [number, number] = [ort[0], ort[1] + 0.0002];
   const { id: einheitId } = await senden(page, 'post', `${basis}/einheiten`, { name: 'Zug Rand' });
-  // Rund 34 px östlich bei Zoom 12 — nachgemessen und nachgestellt unten.
+  // Rund 34 px östlich bei Zoom 12 — unten nachgemessen und nachgestellt.
   await senden(page, 'patch', `${basis}/einheiten/${einheitId}/position`, {
     lat: mitte[1],
     lon: mitte[0] + 0.0117,
@@ -324,9 +314,8 @@ test('Betroffene (LFH-711): die Trefferzone einer Einheit daneben nimmt dem Pers
       timeout: 30_000,
     })
     .toContain(`einheit-${einheitId}`);
-  // Zoom so, dass die Einheit 30 px neben der Clustermitte steht: in der Zone (Radius 36),
-  // ihr ≤ 34-px-Zeichen (halbe Kante 17) aber nicht über der Mitte. Bis Zoom 14 bleibt die
-  // Dreiergruppe (rund 44 m) ein Cluster.
+  // Zoom so, dass die Einheit 30 px neben der Clustermitte steht: in der Zone (Radius 36), ihr
+  // Zeichen (halbe Kante 17) aber nicht über der Mitte. Bis Zoom 14 bleibt die Gruppe ein Cluster.
   const zoom = await page.evaluate(
     ({ a, b }) => {
       const k = (window as unknown as { __lfhKarte: MapHaken & { getZoom(): number } }).__lfhKarte;

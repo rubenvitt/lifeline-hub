@@ -30,8 +30,8 @@ while [ $# -gt 0 ]; do
 done
 
 echo "==> 1/3 Alten Embed-Inhalt entfernen"
-# Der Platzhalter .gitkeep bleibt stehen (LFH-242/F19): rust-embed braucht den
-# Ordner zur Compile-Zeit, und ohne ihn ist der Arbeitsbaum hinterher dirty.
+# Der Platzhalter .gitkeep bleibt stehen: rust-embed braucht den Ordner zur Compile-Zeit,
+# und ohne ihn ist der Arbeitsbaum hinterher dirty.
 find frontend/dist -mindepth 1 ! -name '.gitkeep' -delete
 
 echo "==> 2/3 Frontend bauen (frontend/dist)"
@@ -45,31 +45,26 @@ if [ ! -f frontend/dist/index.html ]; then
 fi
 
 echo "==> 3/3 Backend im Release-Modus bauen${TARGET:+ (Ziel: $TARGET)} (bettet frontend/dist ein)"
-# Cargo kennt die Dateien unter frontend/dist NICHT als Abhängigkeit (rust-embed
-# taucht in der Dep-Info nicht auf). Nach einer reinen Frontend-Änderung würde
-# cargo das Modul deshalb gar nicht neu übersetzen und still den alten Stand
-# einbetten — genau der Versions-Skew aus LFH-242/F19. Das touch erzwingt es.
+# Cargo kennt die Dateien unter frontend/dist NICHT als Abhängigkeit (rust-embed taucht in
+# der Dep-Info nicht auf) und bettete nach einer reinen Frontend-Änderung still den alten
+# Stand ein. Das touch erzwingt die Neuübersetzung.
 touch src/static_files.rs
 cargo build --release ${TARGET:+--target "$TARGET"}
 
-# Cargo baut nicht zwingend nach ./target — ein globales build.target-dir (z. B. ein
-# gemeinsames Verzeichnis über alle Worktrees, ~/.cargo/config.toml) verschiebt es.
-# Deshalb den Pfad von Cargo selbst erfragen statt ihn zu raten.
-# JSON mit dem ohnehin benötigten Node lesen; jq ist keine Projektvoraussetzung.
+# Cargo baut nicht zwingend nach ./target (globales build.target-dir) — den Pfad deshalb von
+# Cargo erfragen; das JSON liest Node (jq ist keine Projektvoraussetzung).
 TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | mise exec node@26.7.0 -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
 
-# Mit --target schiebt Cargo eine Ebene ein: target/<triple>/release/ statt target/release/.
-# Und Windows-Binaries tragen .exe — ohne das Suffix zeigt der Pfad ins Leere und die
-# Erfolgsmeldung am Ende log eine Datei, die es nicht gibt.
+# Mit --target schiebt Cargo eine Ebene ein (target/<triple>/release/), und Windows-Binaries
+# tragen .exe.
 AUSGABE_DIR="$TARGET_DIR${TARGET:+/$TARGET}/release"
 case "$TARGET" in
   *windows*) BINARY="$AUSGABE_DIR/lifeline-hub.exe" ;;
   *)         BINARY="$AUSGABE_DIR/lifeline-hub" ;;
 esac
 
-# Läuft das Gebaute auf DIESEM Rechner? Nur dann dürfen die Schritte unten es starten.
-# Ein Cross-Build-Artefakt auszuführen endet je nach Plattform in „Exec format error" oder
-# — schlimmer — in einem stillen Fehlschlag, der als fehlende SQLite-Version durchginge.
+# Läuft das Gebaute auf DIESEM Rechner? Nur dann dürfen die Schritte unten es starten — ein
+# Cross-Build-Artefakt endet sonst in „Exec format error" oder einem stillen Fehlschlag.
 HOST_TRIPLE="$(rustc -vV | sed -n 's/^host: //p')"
 if [ -z "$TARGET" ] || [ "$TARGET" = "$HOST_TRIPLE" ]; then
   AUF_HOST_LAUFFAEHIG=1
@@ -78,33 +73,18 @@ else
 fi
 
 echo "==> SBOM erzeugen (LFH-253/G01)"
-# Wozu: ohne Inventar des ausgelieferten Artefakts lässt sich im Advisory-Fall nicht
-# beantworten, ob und wo man betroffen ist. Deterministisch und offline — deshalb darf
-# das hier am Release hängen, anders als der netzabhängige Advisory-Scan
-# (scripts/check-deps.sh), der bewusst NICHT im Release-Pfad steht.
-# Neben dem Binary, nicht neben dem Host-Build: mit --target liegt die Ausgabe eine Ebene
-# tiefer. Stünde hier weiter $TARGET_DIR/release, schriebe der Cross-Build sein SBOM an eine
-# Stelle, an der es niemand sucht — und der Einsammelschritt in .github/workflows/artefakte.yml
-# fände nichts vor. Der prüft seit LFH-527 auf INHALT statt auf das bloße Vorhandensein des
-# Verzeichnisses; die frühere `[ -d … ]`-Zeile ließ ein leeres SBOM still durchgehen.
-# BEIDE WERKZEUGAUFRUFE UNTEN SIND TOLERANT, BEWERTET WIRD AM GUARD.
-# Das sieht aus wie das `|| true`, das der Cargo-Zweig gerade LOSGEWORDEN ist, ist aber das
-# Gegenteil: dort verschluckte es einen Fehlschlag, ohne dass irgendwer danach nachsah. Hier
-# folgt unmittelbar eine Prüfung auf die erzeugte Datei, und sie ist die einzige Instanz, die
-# über vollständig/unvollständig entscheidet.
-# Ohne die Toleranz räumt `set -e` den ganzen Build ab, sobald ein Werkzeug zwar im PATH liegt,
-# aber nicht läuft (gemessen mit einem mise-Shim ohne gesetzte Version). Genau der Fall, den
-# der else-Zweig auffangen soll — nur dass `command -v` ihn nicht sieht, weil die Datei ja da
-# ist. Ein lokaler Build sähe dann statt einer Warnung einen Abbruch.
-# Die Fehlerausgabe der Werkzeuge bleibt sichtbar (nur stdout geht nach /dev/null): der Guard
-# nennt WAS fehlt, die Werkzeugmeldung darüber WARUM.
+# Ohne Inventar des ausgelieferten Artefakts lässt sich im Advisory-Fall nicht beantworten,
+# ob man betroffen ist. Deterministisch und offline — anders als der netzabhängige
+# Advisory-Scan (scripts/check-deps.sh), der bewusst nicht im Release-Pfad steht. Das SBOM
+# liegt neben dem Binary (mit --target eine Ebene tiefer), dort sammelt artefakte.yml es ein.
+#
+# Die Werkzeugaufrufe unten sind tolerant (`|| true`), BEWERTET WIRD AM GUARD: unmittelbar
+# danach folgt die Prüfung auf die erzeugte Datei. Ohne Toleranz räumte `set -e` den Build ab,
+# wenn ein Werkzeug im PATH liegt, aber nicht läuft (mise-Shim ohne Version). stderr bleibt
+# sichtbar: der Guard nennt WAS fehlt, die Werkzeugmeldung WARUM.
 SBOM_DIR="$AUSGABE_DIR/sbom"
-# ERST LEEREN, DANN FÜLLEN — wie beim Embed-Inhalt oben, und aus demselben Grund.
-# Gemessen bei der Mutationsprobe zu LFH-527: mit bloßem `mkdir -p` überleben die Dateien
-# des vorigen Laufs. Der Inhalts-Guard unten sieht sie, wird grün — und das Zip trägt eine
-# Stückliste, die zu einem ANDEREN Stand gehört als das ausgelieferte Binary. Genau die
-# Aussage, für die ein SBOM im Advisory-Fall existiert, wäre dann falsch. Auf einem frischen
-# CI-Runner fällt das nie auf; lokal ist es der Normalfall.
+# ERST LEEREN, DANN FÜLLEN: mit bloßem `mkdir -p` überlebten Dateien des vorigen Laufs, der
+# Guard würde grün, und das Zip trüge eine Stückliste zu einem anderen Stand.
 rm -rf "$SBOM_DIR"
 mkdir -p "$SBOM_DIR"
 sbom_fehlend=()
@@ -113,43 +93,26 @@ if command -v cargo-cyclonedx >/dev/null 2>&1; then
   cargo cyclonedx --format json --all >/dev/null || true
   # cargo-cyclonedx legt die Dateien neben den Manifesten ab — einsammeln.
   #
-  # DAS MUSTER IST `*.cdx.json`, NICHT `bom.json`. Gemessen an 0.5.7 (der Version, die
-  # artefakte.yml pinnt): das Werkzeug benennt seine Ausgabe nach dem Crate und legt bei
-  # `--all` je Workspace-Member eine Datei an — `lifeline-hub.cdx.json`,
-  # `karten-katalog.cdx.json`, `karten-service.cdx.json`. Der frühere `find` auf `bom.json`
-  # fand deshalb NICHTS, und zwar ohne Fehler und ohne roten Build: `cargo cyclonedx` endet
-  # mit 0, `find` ohne Treffer ebenso, und `|| true` hätte auch einen echten Fehlschlag
-  # verschluckt. Im Release v1.0.0-alpha.2 lag statt der Stückliste nur die SQLite-Version
-  # im Zip (Lauf 34513044748).
-  #
-  # Kein `2>/dev/null || true` mehr: ein fehlschlagendes `mv` soll auffallen. Und
-  # `node_modules` ist ausgeschlossen — ein Paket, das seine eigene Stammliste mitliefert,
-  # hätte sonst eine fremde Datei in unsere Stückliste geschoben.
+  # Das Muster ist `*.cdx.json`, nicht `bom.json`: cargo-cyclonedx benennt seine Ausgabe nach
+  # dem Crate und legt bei `--all` je Workspace-Member eine Datei an. `node_modules` ist
+  # ausgeschlossen, sonst schöbe ein Paket seine eigene Stückliste in unsere.
   find . -name '*.cdx.json' \
     -not -path './target/*' \
     -not -path './frontend/node_modules/*' \
     -exec mv {} "$SBOM_DIR"/ \;
-  # Das Werkzeug lief — lieferte es auch? Begründung beim Guard unten.
+  # Das Werkzeug lief — lieferte es auch?
   [ -n "$(find "$SBOM_DIR" -name '*.cdx.json' -print -quit)" ] \
     || sbom_fehlend+=("Cargo-Stückliste: cargo-cyclonedx lief, legte aber keine *.cdx.json ab")
 else
   sbom_fehlend+=("cargo-cyclonedx  →  cargo install cargo-cyclonedx")
 fi
 
-# cdxgen, NICHT @cyclonedx/cyclonedx-npm — gemessen, nicht Geschmack (LFH-527).
-# Der frühere Zweig hier verlangte `cyclonedx-npm`, und dessen Remediation-Zeile schickte
-# jeden Leser in eine Sackgasse: das Werkzeug ermittelt den Abhängigkeitsbaum über `npm ls`
-# und bricht in einem pnpm-Baum mit „missing: …, required by …" ab, ohne eine Datei zu
-# schreiben. Es war also nie bloß nicht installiert — es hätte hier auch installiert nichts
-# geliefert. cdxgen liest `pnpm-lock.yaml` und kennt den Paketmanager (`-t pnpm`).
+# cdxgen, NICHT @cyclonedx/cyclonedx-npm: letzteres ermittelt den Baum über `npm ls` und
+# bricht in einem pnpm-Baum ab, ohne eine Datei zu schreiben. cdxgen liest `pnpm-lock.yaml`.
 #
-# MIT PFADARGUMENT, OHNE `cd`: der Kopf dieses Skripts setzt mit `cd "$(dirname "$0")/.."`
-# den Bezugspunkt, an dem jeder Pfad darunter hängt (`frontend/dist`, das `find .` oben).
-# Ein `cd frontend` hier verschöbe ihn für alles Folgende.
-#
-# `--no-recurse`: gefragt ist die Stückliste DIESES Pakets samt seiner transitiven
-# Abhängigkeiten (gemessen 848 Komponenten, CycloneDX 1.6) — nicht ein Streifzug durch
-# verschachtelte Projekte unterhalb von frontend/, der die Ausgabe mit Fremdbäumen füllte.
+# Mit Pfadargument, ohne `cd`: jeder Pfad darunter hängt am `cd` im Kopf dieses Skripts.
+# `--no-recurse`: gefragt ist die Stückliste DIESES Pakets samt transitiver Abhängigkeiten,
+# nicht verschachtelter Projekte unterhalb von frontend/.
 if command -v cdxgen >/dev/null 2>&1; then
   cdxgen -t pnpm --no-recurse -o "$SBOM_DIR/bom-frontend.json" frontend >/dev/null || true
   [ -s "$SBOM_DIR/bom-frontend.json" ] \
@@ -158,9 +121,8 @@ else
   sbom_fehlend+=("@cyclonedx/cdxgen  →  npm install -g @cyclonedx/cdxgen")
 fi
 
-# Die eingebackene SQLite-Version (LFH-233/G02): sie steckt als C-Amalgamation im Binary
-# und wird von KEINEM System-Update erreicht — im Advisory-Fall ist sie die Zahl, die man
-# braucht. Aus dem laufenden Binary gelesen, nicht aus einer gepflegten Konstante.
+# Die eingebackene SQLite-Version: sie steckt als C-Amalgamation im Binary und erreicht kein
+# System-Update — im Advisory-Fall die Zahl, die man braucht. Aus dem Binary gelesen.
 if [ "$AUF_HOST_LAUFFAEHIG" = 1 ]; then
   if SQLITE_VERSION="$("$BINARY" sqlite-version 2>/dev/null)"; then
     echo "$SQLITE_VERSION" > "$SBOM_DIR/eingebettete-sqlite-version.txt"
@@ -172,19 +134,11 @@ else
   echo "    .github/workflows/artefakte.yml, Job 'windows-smoke'."
 fi
 
-# ZUSICHERUNG AUF INHALT, NICHT AUF EXISTENZ (LFH-527).
+# ZUSICHERUNG AUF INHALT, NICHT AUF EXISTENZ: das Verzeichnis legt `mkdir -p` oben selbst an.
 #
-# Der frühere Aufbau konnte nicht rot werden: die fehlende Frontend-Stückliste war eine
-# bloße Warnung, der verfehlte Cargo-`find` wurde gar nicht bemerkt, und der Einsammelschritt
-# in .github/workflows/artefakte.yml prüfte danach nur `[ -d … ]` — das Verzeichnis legt
-# `mkdir -p` oben ja selbst an. Drei Prüfungen hintereinander, von denen keine den
-# tatsächlichen Mangel sehen konnte; genau so ist ein hohles SBOM-Zip ins Release gegangen.
-#
-# Hart bricht es nur mit SBOM_PFLICHT=1. Den setzt artefakte.yml für den EINEN Matrix-Eintrag,
-# der die Stückliste ausliefert. Auf den anderen drei Runnern ist cargo-cyclonedx nicht
-# installiert — dort zu brechen nähme dem Release seine Binaries für ein Artefakt, das jener
-# Lauf gar nicht beisteuert. Lokale Builds bleiben aus demselben Grund bei der Warnung: wer
-# eine Testbinary baut, soll nicht an einer fehlenden Stückliste scheitern.
+# Hart bricht es nur mit SBOM_PFLICHT=1 — gesetzt von artefakte.yml für den EINEN
+# Matrix-Eintrag, der die Stückliste ausliefert. Auf den übrigen Runnern und lokal bleibt es
+# bei der Warnung: dort fehlt cargo-cyclonedx, und das Release verlöre sonst seine Binaries.
 if [ ${#sbom_fehlend[@]} -gt 0 ]; then
   if [ -n "${SBOM_PFLICHT:-}" ]; then
     echo "    FEHLER: SBOM unvollständig — dieser Lauf liefert die Stückliste aus:" >&2

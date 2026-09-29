@@ -3,32 +3,8 @@ use axum::http::StatusCode;
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup,
-    system_etb_anzahl,
+    stammpersonal_disponieren, system_etb_anzahl,
 };
-
-async fn person_anlegen(app: &axum::Router, admin: &str, einsatz: i64, name: &str) -> i64 {
-    // Stamm anlegen + in den Einsatz disponieren → liefert die einsatz_personal.id.
-    let (s1, stamm) = anfrage(
-        app,
-        "POST",
-        "/api/personal",
-        admin,
-        Some(&format!(r#"{{"name":"{name}"}}"#)),
-    )
-    .await;
-    assert_eq!(s1, StatusCode::CREATED);
-    let pid = stamm["id"].as_i64().unwrap();
-    let (s2, dispo) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
-        admin,
-        Some(&format!(r#"{{"personal_id":{pid}}}"#)),
-    )
-    .await;
-    assert_eq!(s2, StatusCode::CREATED);
-    dispo["id"].as_i64().unwrap()
-}
 
 #[tokio::test]
 async fn anlegen_schreibt_etb_und_liste_zeigt_abschnitt() {
@@ -63,7 +39,7 @@ async fn leiter_setzen_und_aufloesen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let leiter = person_anlegen(&app, &admin, einsatz, "Leiter Nord").await;
+    let leiter = stammpersonal_disponieren(&app, &admin, einsatz, "Leiter Nord").await;
     // Snapshot vor den Abschnitt-Aktionen (person_anlegen schreibt ebenfalls System-ETB).
     let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
     let (s, json) = anfrage(
@@ -374,7 +350,7 @@ async fn patch_nur_name_laesst_leiter_und_erreichbarkeit_stehen() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
     let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
-    let ep = person_anlegen(&app, &admin, einsatz, "Leiter").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Leiter").await;
     let pfad = format!("/api/einsaetze/{einsatz}/abschnitte/{a}");
     anfrage(
         &app,
@@ -438,7 +414,7 @@ async fn patch_leiter_id_null_entfernt_leiter_absent_laesst_ihn_stehen() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
     let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
-    let ep = person_anlegen(&app, &admin, einsatz, "Leiter").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Leiter").await;
     let pfad = format!("/api/einsaetze/{einsatz}/abschnitte/{a}");
 
     let (_, json) = anfrage(

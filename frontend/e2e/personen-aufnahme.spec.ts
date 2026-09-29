@@ -1,26 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Der Aufnahmeweg für Personen (LFH-340 · C5, AK 2 und AK 3).
+ * Der Aufnahmeweg für Personen: die Sichtungskategorie geht mit der Anlage mit.
  *
- * Der Ausgangsbefund war eine Zahl: **9 Interaktionen und 2 Vollseiten-Wechsel** je
- * gesichteter Person, weil die Sichtungskategorie in der Schnellerfassung fehlte — anlegen,
- * Detailseite öffnen, sichten. Diese Datei misst die Zahl, nicht das Gefühl.
+ *  1. ≤ 4 Interaktionen, kein Seitenwechsel — gemessen am Modal der Liste, belegt über
+ *     dieselbe URL vor und nach dem Erfassen. Die Aufnahme-ROUTE ist die Anspring-Adresse für
+ *     andere Module und damit selbst ein Seitenwechsel.
+ *  2. Serie: nach „Speichern und nächste" ist die Maske leer, der Fokus steht im ersten Feld,
+ *     der Zähler ist gestiegen, und es wurde kein Dialog neu geöffnet.
  *
- * ── DIE ZWEI AKs, UND WARUM SIE ZWEI SIND ───────────────────────────────────────────────
- *
- *  1. **AK 2 — ≤ 4 Interaktionen, kein Seitenwechsel.** Gemessen am Modal der Liste. Die
- *     URL vor und nach dem Erfassen ist dieselbe; das ist die belastbare Fassung von „ohne
- *     Seitenwechsel". Die Aufnahme-ROUTE erfüllt dieses AK bewusst nicht — sie ist die
- *     Anspring-Adresse für andere Module, und eine angesprungene Route IST ein
- *     Seitenwechsel. Der Widerspruch im Ticket ist damit aufgelöst, nicht umbenannt.
- *  2. **AK 3 — Serie.** Nach „Speichern und nächste" ist die Maske leer, der Fokus steht im
- *     ersten Feld, der Zähler ist gestiegen, und es wurde kein Dialog neu geöffnet.
- *
- * ── KEIN `waitForLoadState('networkidle')` ──────────────────────────────────────────────
- *
- * Auf Einsatzrouten bleibt ein SSE-Strom offen; die Bedingung tritt nie sauber ein
- * (LFH-385). Die Zusicherungen warten inhaltlich.
+ * Kein `networkidle` (SSE-Strom).
  */
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -42,18 +31,9 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 }
 
 /**
- * Die Sichtungs-Gruppe — über die Feld-Id, NICHT über `getByRole('radiogroup')`.
- *
- * Bis LFH-392 stand hier als Grund, die Kopfzeile trage zwei WEITERE Radiogruppen
- * („Farbschema wählen", „Bediendichte wählen", beides `Segmented`), ein blankes
- * `getByRole('radiogroup')` breche also im Strict-Modus. Diese zwei Gruppen sind fort —
- * der Grund ist damit hinfällig, die Wahl des Selektors aber NICHT.
- *
- * Er bleibt, weil er an den richtigen Vertrag bindet: die Id kommt aus `name="sichtung"`
- * am `Form.Item`, also an denselben Namen, der abgesendet wird. Auf
- * `getByRole('radiogroup')` umzustellen koppelte diesen Test wieder daran, wie viele
- * Radiogruppen sonst noch auf der Seite stehen — genau die Zahl, die LFH-392 gerade
- * beweglich gemacht hat.
+ * Die Sichtungs-Gruppe über die Feld-Id, nicht über `getByRole('radiogroup')`: die Id kommt aus
+ * `name="sichtung"` am `Form.Item` und bindet an den abgesendeten Namen statt an die Zahl der
+ * Radiogruppen auf der Seite.
  */
 function sichtung(page: Page) {
   return page.locator('#sichtung');
@@ -85,8 +65,7 @@ test('AK 2: eine gesichtete Person in ≤ 4 Interaktionen und ohne Seitenwechsel
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
   interaktionen += 1;
 
-  // Die Quittung trägt BEIDES: die vergebene Registriernummer (Befund H30) und die
-  // Kategorie — der Beleg, dass die Sichtung in derselben Anlage angekommen ist.
+  // Die Quittung trägt Registriernummer UND Kategorie — die Sichtung kam in derselben Anlage an.
   await expect(page.getByText(/Erfasst als R-\d{3} · SK II/)).toBeVisible();
   expect(interaktionen, 'AK 2: höchstens vier Interaktionen').toBeLessThanOrEqual(4);
   expect(page.url(), 'AK 2: kein Seitenwechsel').toBe(vorher);
@@ -110,7 +89,7 @@ test('AK 3: „Speichern und nächste" leert, fokussiert zurück und zählt hoch
   const gewaehlt = sichtung(page).getByRole('radio', { checked: true });
   await expect(gewaehlt, 'die Sichtung wird je Person neu erhoben').toHaveCount(0);
 
-  // Fokus zurück im ersten Feld: das ist seit C5 die erste Auswahlfläche der Sichtung.
+  // Fokus zurück im ersten Feld, der ersten Auswahlfläche der Sichtung.
   const ersteFlaeche = sichtung(page).getByRole('radio').first();
   await expect(ersteFlaeche).toBeFocused();
 
@@ -120,8 +99,8 @@ test('AK 3: „Speichern und nächste" leert, fokussiert zurück und zählt hoch
 });
 
 test('die Aufnahme-Route zeigt dieselbe Maske und erfasst in Serie', async ({ page }) => {
-  // Sie ist die Anspring-Adresse für andere Module (C6). Geprüft wird, dass die Route
-  // existiert und trägt — die Interaktionszahl misst der Fall oben am Modal.
+  // Die Anspring-Adresse für andere Module: existiert und trägt. Die Interaktionszahl misst
+  // der Fall oben am Modal.
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Aufnahmeroute ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/personen/aufnahme`);
@@ -136,9 +115,8 @@ test('die Aufnahme-Route zeigt dieselbe Maske und erfasst in Serie', async ({ pa
 });
 
 test('S7: die Erfassungszeile erfasst per Kürzel in Serie, ohne Dialog', async ({ page }) => {
-  // Das Formular wird zur Zeile (Neuentwurf S7): EINE Eingabe, Enter erfasst, das Feld ist
-  // danach leer und fokussiert, die Quittung steht an der Zeile und kommt aus der ANTWORT
-  // (Registriernummer + Sichtung aus derselben Anlage).
+  // Die Kurzeingabe: EINE Eingabe, Enter erfasst, das Feld ist danach leer und fokussiert, die
+  // Quittung steht an der Zeile und kommt aus der ANTWORT.
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Zeile ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/personen`);

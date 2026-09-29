@@ -2,18 +2,13 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { pruefe } from './kontrast-kern';
 
 /**
- * Browser-Nachweise für das Fachmodul „Wetter & Pegel" (LFH-633,
- * `docs/superpowers/specs/2026-09-23-lfh-633-pruefliste.md`).
+ * Browser-Nachweise für „Wetter & Pegel": „Stand unbekannt" ist wirklich SICHTBAR und die
+ * Pegelwerte bleiben daneben stehen, kein Querlauf auf 1366/1024/390 px (Gate 1), Trefflächen
+ * über die Dichte-Staffel (Gate 3) und Kontrast der Warnstufen-Chips in beiden Modi
+ * (Tag ≥ 7 : 1, Nacht ≥ 5 : 1).
  *
- * Gemessen wird, was jsdom nicht rechnet: dass „Stand unbekannt" wirklich SICHTBAR ist und
- * die Pegelwerte daneben stehen bleiben (AK), kein Querlauf auf 1366/1024/390 px (Gate 1),
- * Trefflächen über die Dichte-Staffel (Gate 3) und der Kontrast der Warnstufen-Chips in
- * beiden Modi (Kriterium 5: Tag ≥ 7 : 1, Nacht ≥ 5 : 1).
- *
- * HERMETISCH: Pegel, Verlauf und Wetter kommen per `page.route` aus Literalen. Ohne das ginge
- * das Backend an PEGELONLINE und Bright Sky — ein Nachweis, der am Netz eines Fremddienstes
- * hängt, misst dessen Erreichbarkeit, nicht die Oberfläche. Die Wire-Form ist dieselbe, die
- * `api/types.generated.ts` beschreibt.
+ * HERMETISCH: Pegel, Verlauf und Wetter kommen per `page.route` aus Literalen in der Wire-Form
+ * von `api/types.generated.ts` — sonst ginge das Backend an PEGELONLINE und Bright Sky.
  */
 
 const ADMIN = 'admin';

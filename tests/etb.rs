@@ -1,58 +1,14 @@
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
 use serde_json::Value;
 use std::time::Duration;
 use tower::ServiceExt;
 
 mod common;
-use common::{anfrage_mit_offline_queue_benutzer, benutzer_anlegen, login_cookie, rolle_setzen};
-
-/// Router + Bootstrap-Admin (admin / startpw12); liefert zusätzlich den LiveHub,
-/// damit Tests direkt am Broadcast-Kanal lauschen können.
-async fn setup() -> (axum::Router, LiveHub) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let live = LiveHub::new();
-    let router = build_router(AppState {
-        pool,
-        live: live.clone(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, live)
-}
-
-async fn einsatz_anlegen(app: &axum::Router, cookie: &str, bezeichnung: &str) -> i64 {
-    let body = format!(r#"{{"bezeichnung":"{bezeichnung}"}}"#);
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/einsaetze")
-                .header(header::CONTENT_TYPE, "application/json")
-                .header(header::COOKIE, cookie.to_string())
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::CREATED);
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
-        .as_i64()
-        .unwrap()
-}
+use common::{
+    anfrage_mit_offline_queue_benutzer, benutzer_anlegen, einsatz_anlegen_mit, login_cookie,
+    rolle_setzen, setup_mit_live,
+};
 
 /// Erfasst einen Eintrag mit gegebenem JSON-Body; liefert (Status, JSON).
 async fn eintrag_erfassen(
@@ -141,9 +97,9 @@ fn auftrag_body(text: &str) -> String {
 
 #[tokio::test]
 async fn etb_auftrag_beobachter_ist_403() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let (_, etb) = eintrag_erfassen(
         &app,
         &admin,
@@ -173,10 +129,10 @@ async fn etb_auftrag_beobachter_ist_403() {
 
 #[tokio::test]
 async fn etb_auftrag_cross_einsatz_ist_404() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let a = einsatz_anlegen(&app, &admin, "Lage A").await;
-    let b = einsatz_anlegen(&app, &admin, "Lage B").await;
+    let a = einsatz_anlegen_mit(&app, &admin, "Lage A").await;
+    let b = einsatz_anlegen_mit(&app, &admin, "Lage B").await;
     let (_, etb) = eintrag_erfassen(&app, &admin, a, r#"{"typ":"meldung","inhalt":"Lage"}"#).await;
     let etb_id_a = etb["id"].as_i64().unwrap();
 
@@ -193,9 +149,9 @@ async fn etb_auftrag_cross_einsatz_ist_404() {
 
 #[tokio::test]
 async fn etb_auftrag_happy_path_setzt_quellbezug() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let (_, etb) = eintrag_erfassen(
         &app,
         &admin,
@@ -234,9 +190,9 @@ async fn etb_auftrag_happy_path_setzt_quellbezug() {
 async fn etb_auftrag_mehrfach_aus_einem_eintrag_erlaubt() {
     // Anders als Meldung→Auftrag (1:1, 409): aus einem ETB-Eintrag dürfen mehrere
     // Aufträge erteilt werden — kein Rückverweis-Lock am Eintrag.
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let (_, etb) = eintrag_erfassen(
         &app,
         &admin,
@@ -268,9 +224,9 @@ async fn etb_auftrag_mehrfach_aus_einem_eintrag_erlaubt() {
 async fn etb_liste_fuehrt_folgeauftraege_am_quell_eintrag() {
     // LFH-636: der Quell-Eintrag trägt seine Folgeaufträge auf dem Wire; jeder andere
     // Eintrag trägt das Feld ebenfalls — als leere Liste, nicht als fehlender Key.
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let (status, etb) = eintrag_erfassen(
         &app,
         &admin,
@@ -336,9 +292,9 @@ async fn get_auftraege(app: &axum::Router, cookie: &str, einsatz: i64) -> (Statu
 
 #[tokio::test]
 async fn einsatzleitung_erfasst_eintrag() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let (status, json) = eintrag_erfassen(
         &app,
@@ -357,9 +313,9 @@ async fn einsatzleitung_erfasst_eintrag() {
 
 #[tokio::test]
 async fn beobachter_darf_nicht_erfassen() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let erika_id = benutzer_anlegen(&app, &admin, "erika", "keine").await;
 
     // Erika als Beobachterin zuweisen.
@@ -390,9 +346,9 @@ async fn beobachter_darf_nicht_erfassen() {
 
 #[tokio::test]
 async fn nicht_mitglied_darf_nicht_erfassen() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     benutzer_anlegen(&app, &admin, "fremd", "keine").await;
 
     let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
@@ -403,9 +359,9 @@ async fn nicht_mitglied_darf_nicht_erfassen() {
 
 #[tokio::test]
 async fn system_typ_wird_abgelehnt() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let (status, _) =
         eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"system","inhalt":"X"}"#).await;
@@ -414,9 +370,9 @@ async fn system_typ_wird_abgelehnt() {
 
 #[tokio::test]
 async fn leerer_inhalt_wird_abgelehnt() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let (status, _) =
         eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"   "}"#).await;
@@ -425,9 +381,9 @@ async fn leerer_inhalt_wird_abgelehnt() {
 
 #[tokio::test]
 async fn berichtigung_verknuepft_und_validiert() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let (_, original) = eintrag_erfassen(
         &app,
@@ -459,9 +415,9 @@ async fn berichtigung_verknuepft_und_validiert() {
 
 #[tokio::test]
 async fn berichtigt_eintrag_id_ohne_berichtigungstyp_ist_400() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let (_, e1) =
         eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"A"}"#).await;
     let id = e1["id"].as_i64().unwrap();
@@ -473,9 +429,9 @@ async fn berichtigt_eintrag_id_ohne_berichtigungstyp_ist_400() {
 
 #[tokio::test]
 async fn erfassen_in_abgeschlossenem_einsatz_ist_409() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     app.clone()
         .oneshot(
@@ -496,9 +452,9 @@ async fn erfassen_in_abgeschlossenem_einsatz_ist_409() {
 
 #[tokio::test]
 async fn erfassen_ohne_session_ist_401() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let resp = app
         .oneshot(
@@ -516,9 +472,9 @@ async fn erfassen_ohne_session_ist_401() {
 
 #[tokio::test]
 async fn erfasster_eintrag_wird_live_publiziert() {
-    let (app, live) = setup().await;
+    let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let mut rx = live.abonniere(einsatz);
     let (status, _) = eintrag_erfassen(
@@ -555,9 +511,9 @@ async fn erfasster_eintrag_wird_live_publiziert() {
 async fn erfassung_mit_client_id_ist_idempotent() {
     // F03/LFH-261: derselbe Offline-Eintrag (client_id) darf beim Retry / Doppel-Flush
     // keine Dublette und kein zweites Live-Event erzeugen.
-    let (app, live) = setup().await;
+    let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let mut rx = live.abonniere(einsatz);
     let body = r#"{"typ":"meldung","inhalt":"Deich instabil","client_id":"offline-uuid-1"}"#;
@@ -598,9 +554,9 @@ async fn erfassung_mit_client_id_ist_idempotent() {
 
 #[tokio::test]
 async fn etb_client_id_replay_nach_abschluss_aber_neuer_insert_409() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let body =
         r#"{"typ":"meldung","inhalt":"Bereits committed","client_id":"offline-etb-abgeschlossen"}"#;
     let (status, original) = eintrag_erfassen(&app, &admin, einsatz, body).await;
@@ -655,9 +611,9 @@ async fn etb_client_id_replay_nach_abschluss_aber_neuer_insert_409() {
 
 #[tokio::test]
 async fn etb_offline_replay_mit_falschem_queue_besitzer_ist_412() {
-    let (app, _) = setup().await;
+    let (app, _) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let e = einsatz_anlegen(&app, &admin, "Queue-Owner").await;
+    let e = einsatz_anlegen_mit(&app, &admin, "Queue-Owner").await;
     let body = r#"{"typ":"meldung","inhalt":"Besitzgebunden","client_id":"owner-etb-1"}"#;
     assert_eq!(
         eintrag_erfassen(&app, &admin, e, body).await.0,
@@ -683,9 +639,9 @@ async fn leere_client_id_dedupliziert_nicht() {
     // F03/LFH-261: leere/Whitespace-client_id -> None (bereinige), sonst landeten fachlich
     // VERSCHIEDENE Eintraege beide mit "" im partiellen UNIQUE-Index und der zweite wuerde
     // als idempotenter Replay des ersten kurzgeschlossen -> stiller Verlust.
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let (s1, j1) = eintrag_erfassen(
         &app,
@@ -719,9 +675,9 @@ async fn leere_client_id_dedupliziert_nicht() {
 #[tokio::test]
 async fn zu_lange_client_id_wird_abgelehnt() {
     // F03/LFH-261: Laengenguard (>64 Zeichen -> Validation). 64 ist die Grenze (erlaubt).
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let lang = "x".repeat(65);
     let (status, _) = eintrag_erfassen(
@@ -750,9 +706,9 @@ async fn zu_lange_client_id_wird_abgelehnt() {
 
 #[tokio::test]
 async fn liste_zeigt_eintraege_neueste_zuerst() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     eintrag_erfassen(
         &app,
         &admin,
@@ -778,9 +734,9 @@ async fn liste_zeigt_eintraege_neueste_zuerst() {
 
 #[tokio::test]
 async fn liste_nur_fuer_mitglieder() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     benutzer_anlegen(&app, &admin, "fremd", "keine").await;
     let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
 
@@ -792,11 +748,11 @@ async fn liste_nur_fuer_mitglieder() {
 async fn admin_nicht_mitglied_darf_etb_lesen() {
     // Höhere Berechtigung (System-Admin) darf das ETB jedes Einsatzes lesen,
     // auch ohne Mitgliedschaft. Eine Führungskraft legt den Einsatz an.
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     benutzer_anlegen(&app, &admin, "frieda", "fuehrungskraft").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
-    let einsatz = einsatz_anlegen(&app, &frieda, "Friedas Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &frieda, "Friedas Lage").await;
     eintrag_erfassen(
         &app,
         &frieda,
@@ -817,11 +773,11 @@ async fn admin_nicht_mitglied_darf_etb_lesen() {
 
 #[tokio::test]
 async fn admin_nicht_mitglied_darf_stream_abonnieren() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     benutzer_anlegen(&app, &admin, "frieda", "fuehrungskraft").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
-    let einsatz = einsatz_anlegen(&app, &frieda, "Friedas Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &frieda, "Friedas Lage").await;
 
     let resp = app
         .oneshot(
@@ -842,9 +798,9 @@ async fn admin_nicht_mitglied_darf_stream_abonnieren() {
 
 #[tokio::test]
 async fn beobachter_darf_lesen() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     eintrag_erfassen(
         &app,
         &admin,
@@ -881,9 +837,9 @@ async fn beobachter_darf_lesen() {
 
 #[tokio::test]
 async fn liste_volltextsuche_filtert() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     eintrag_erfassen(
         &app,
         &admin,
@@ -908,9 +864,9 @@ async fn liste_volltextsuche_filtert() {
 
 #[tokio::test]
 async fn liste_typ_filter() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"m"}"#).await;
     eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"anordnung","inhalt":"a"}"#).await;
 
@@ -923,9 +879,9 @@ async fn liste_typ_filter() {
 
 #[tokio::test]
 async fn liste_cursor_pagination() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     for i in 1..=3 {
         let body = format!(r#"{{"typ":"meldung","inhalt":"e{i}"}}"#);
         eintrag_erfassen(&app, &admin, einsatz, &body).await;
@@ -976,9 +932,9 @@ fn inhalte(json: &Value) -> Vec<String> {
 /// eine andere Einheit und ein bloß im Text genannter Name nicht.
 #[tokio::test]
 async fn liste_einheit_filter_ueber_auftrag_und_von_an() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let einheiten = format!("/api/einsaetze/{einsatz}/einheiten");
     let zug = anlegen_id(
         &app,
@@ -1028,10 +984,10 @@ async fn liste_einheit_filter_ueber_auftrag_und_von_an() {
 /// Eine Einheit aus einem FREMDEN Einsatz trifft nichts — auch wenn der Name gleich ist.
 #[tokio::test]
 async fn liste_einheit_filter_fremder_einsatz_ist_leer() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
-    let fremd = einsatz_anlegen(&app, &admin, "Fremd").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let fremd = einsatz_anlegen_mit(&app, &admin, "Fremd").await;
     let fremde_einheit = anlegen_id(
         &app,
         &admin,
@@ -1060,9 +1016,9 @@ async fn liste_einheit_filter_fremder_einsatz_ist_leer() {
 
 #[tokio::test]
 async fn liste_einheit_filter_nicht_numerisch_ist_400() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let (status, _) = etb_abrufen(&app, &admin, einsatz, "einheit_id=abc").await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -1070,9 +1026,9 @@ async fn liste_einheit_filter_nicht_numerisch_ist_400() {
 
 #[tokio::test]
 async fn liste_ungueltiger_typ_filter_ist_400() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let (status, _) = etb_abrufen(&app, &admin, einsatz, "typ=unsinn").await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -1080,9 +1036,9 @@ async fn liste_ungueltiger_typ_filter_ist_400() {
 
 #[tokio::test]
 async fn stream_fuer_mitglied_liefert_event_stream() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let resp = app
         .oneshot(
@@ -1110,9 +1066,9 @@ async fn stream_fuer_mitglied_liefert_event_stream() {
 
 #[tokio::test]
 async fn stream_fuer_beobachter_ist_200() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let beob_id = benutzer_anlegen(&app, &admin, "beobi", "keine").await;
 
     let zuweisung = app
@@ -1150,9 +1106,9 @@ async fn stream_fuer_beobachter_ist_200() {
 
 #[tokio::test]
 async fn stream_fuer_nicht_mitglied_ist_403() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     benutzer_anlegen(&app, &admin, "fremd", "keine").await;
     let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
 
@@ -1171,7 +1127,7 @@ async fn stream_fuer_nicht_mitglied_ist_403() {
 
 #[tokio::test]
 async fn stream_unbekannter_einsatz_ist_404() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
 
     let resp = app
@@ -1189,9 +1145,9 @@ async fn stream_unbekannter_einsatz_ist_404() {
 
 #[tokio::test]
 async fn stream_ohne_session_ist_401() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let resp = app
         .oneshot(

@@ -6,47 +6,23 @@
 //! `lage_zone` bei POST/PATCH/DELETE und reguläre Org-Isolation (Fremd-Nutzer ohne
 //! Mitgliedschaft, org_rolle="keine").
 //!
-//! Harness 1:1 aus tests/einsatzabschnitt.rs (+ etb.rs); `setup()` liefert zusätzlich
+//! Harness aus tests/common; `setup_mit_live()` liefert zusätzlich
 //! den LiveHub-Klon (teilt den inneren Arc mit dem AppState), damit der SSE-Test direkt
 //! via `live.abonniere(einsatz_id)` mithören kann.
 
 use axum::http::StatusCode;
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::{LiveHub, LiveNachricht};
 use serde_json::{json, Value};
 use std::time::Duration;
-use tokio::sync::broadcast::Receiver;
 
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, karten_ansicht_anlegen, login_cookie,
-    standard_ansicht_id,
+    recv_until_tag, setup_mit_live, standard_ansicht_id, system_etb_inhalte,
 };
 
 const POLY: &str =
     r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
 const LINE: &str = r#"{"type":"LineString","coordinates":[[8.6,50.1],[8.7,50.2]]}"#;
-
-async fn setup() -> (axum::Router, LiveHub) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let live = LiveHub::new();
-    let router = build_router(AppState {
-        pool,
-        live: live.clone(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, live)
-}
 
 /// Fremder Nutzer ohne Einsatz-Mitgliedschaft und ohne höhere Berechtigung
 /// (org_rolle="keine") — liefert dessen Login-Cookie. Vorbild: Org-Isolations-Test
@@ -56,42 +32,9 @@ async fn fremder_nutzer(app: &axum::Router, admin: &str) -> String {
     login_cookie(app, "fremd", "fremdpw1").await
 }
 
-async fn system_etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {
-    let (_, json) = anfrage(
-        app,
-        "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
-        cookie,
-        None,
-    )
-    .await;
-    json.as_array()
-        .unwrap()
-        .iter()
-        .filter(|e| e["typ"] == "system")
-        .map(|e| e["inhalt"].as_str().unwrap().to_string())
-        .collect()
-}
-
-async fn recv_until_tag(
-    rx: &mut Receiver<LiveNachricht>,
-    tag: &str,
-    timeout: Duration,
-) -> LiveNachricht {
-    loop {
-        let n = tokio::time::timeout(timeout, rx.recv())
-            .await
-            .unwrap_or_else(|_| panic!("Timeout: kein '{tag}'-Event empfangen"))
-            .expect("Broadcast-Kanal geschlossen");
-        if n.event.as_str() == tag {
-            return n;
-        }
-    }
-}
-
 #[tokio::test]
 async fn anlegen_setzt_zone_und_schreibt_etb_eingerichtet() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
@@ -133,7 +76,7 @@ async fn anlegen_setzt_zone_und_schreibt_etb_eingerichtet() {
 /// Datei nicht pauschal auf einen der beiden Codes gekippt wird (LFH-305).
 #[tokio::test]
 async fn ungueltiger_typ_ist_400_kombination_bleibt_422() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
@@ -185,7 +128,7 @@ async fn ungueltiger_typ_ist_400_kombination_bleibt_422() {
 /// Enum-Prüfung kommt und nicht aus einem vorgelagerten Gate (Auth/Einsatz-Zugriff).
 #[tokio::test]
 async fn unbekannter_geometrie_typ_ist_400() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let u = format!("/api/einsaetze/{einsatz}/zonen");
@@ -207,7 +150,7 @@ async fn unbekannter_geometrie_typ_ist_400() {
 /// ist der Wert selbst keine bekannte Variante (Feld isoliert → 400).
 #[tokio::test]
 async fn patch_unbekannter_typ_ist_400() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let body =
@@ -234,7 +177,7 @@ async fn patch_unbekannter_typ_ist_400() {
 
 #[tokio::test]
 async fn patch_typ_oder_label_schreibt_etb_geaendert_notiz_und_farbe_nicht() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let body = json!({"typ":"freie_skizze","geometrie_typ":"Polygon","geometrie":POLY,"label":"A","farbe":"#00ff00"}).to_string();
@@ -299,7 +242,7 @@ async fn patch_typ_oder_label_schreibt_etb_geaendert_notiz_und_farbe_nicht() {
 
 #[tokio::test]
 async fn patch_typ_weg_von_freie_skizze_nullt_farbe() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     // Freie Skizze (Polygon) mit Farbe; gefahrengebiet ist ebenfalls Polygon → Typ-Wechsel zulässig.
@@ -335,7 +278,7 @@ async fn patch_typ_weg_von_freie_skizze_nullt_farbe() {
 
 #[tokio::test]
 async fn patch_typ_inkompatibel_zur_geometrie_ist_422() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let body =
@@ -362,7 +305,7 @@ async fn patch_typ_inkompatibel_zur_geometrie_ist_422() {
 
 #[tokio::test]
 async fn delete_schreibt_etb_aufgehoben() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let body =
@@ -404,7 +347,7 @@ async fn delete_schreibt_etb_aufgehoben() {
 
 #[tokio::test]
 async fn sse_feuert_bei_post_patch_delete() {
-    let (app, live) = setup().await;
+    let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mut rx = live.abonniere(einsatz);
@@ -447,7 +390,7 @@ async fn sse_feuert_bei_post_patch_delete() {
 
 #[tokio::test]
 async fn org_isolation_fremder_nutzer_kann_zonen_nicht_lesen_oder_schreiben() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let body =
@@ -520,7 +463,7 @@ async fn org_isolation_fremder_nutzer_kann_zonen_nicht_lesen_oder_schreiben() {
 
 #[tokio::test]
 async fn anlegen_gefahrengebiet_erzeugt_gruppe() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let body =
@@ -552,7 +495,7 @@ async fn anlegen_gefahrengebiet_erzeugt_gruppe() {
 
 #[tokio::test]
 async fn merge_haengt_zone_um_und_raeumt_leere_gruppe_auf() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let body =
@@ -603,7 +546,7 @@ async fn merge_haengt_zone_um_und_raeumt_leere_gruppe_auf() {
 
 #[tokio::test]
 async fn merge_zone_adoptiert_ziel_matrix() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let body =
@@ -661,7 +604,7 @@ async fn merge_zone_adoptiert_ziel_matrix() {
 
 #[tokio::test]
 async fn split_legt_neue_gruppe_an() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let body =
@@ -723,7 +666,7 @@ async fn split_legt_neue_gruppe_an() {
 
 #[tokio::test]
 async fn delete_letzter_zone_entfernt_gebiet_und_matrix() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let body =
@@ -774,7 +717,7 @@ async fn delete_letzter_zone_entfernt_gebiet_und_matrix() {
 
 #[tokio::test]
 async fn merge_ziel_aus_fremdem_einsatz_ist_notfound() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let a = einsatz_anlegen(&app, &admin).await;
     let b = einsatz_anlegen(&app, &admin).await;
@@ -812,7 +755,7 @@ async fn merge_ziel_aus_fremdem_einsatz_ist_notfound() {
 
 #[tokio::test]
 async fn gefahrengebiet_id_an_nicht_gefahrengebiet_zone_ist_422() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let gbody =
@@ -850,7 +793,7 @@ async fn gefahrengebiet_id_an_nicht_gefahrengebiet_zone_ist_422() {
 
 #[tokio::test]
 async fn merge_feuert_gefahr_event() {
-    let (app, live) = setup().await;
+    let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let body =
@@ -918,7 +861,7 @@ async fn zone_anlegen(
 /// POST mit `ansicht_id` stempelt die Zugehörigkeit; die Antwort trägt die id.
 #[tokio::test]
 async fn anlegen_mit_ansicht_id_stempelt_zugehoerigkeit() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let aid = standard_ansicht_id(&app, &admin, einsatz).await;
@@ -944,7 +887,7 @@ async fn anlegen_mit_ansicht_id_stempelt_zugehoerigkeit() {
 /// Listen-SQL entfernen → dieser Test wird rot.
 #[tokio::test]
 async fn liste_ansicht_filtert_fremde_aus_haelt_null() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let x = standard_ansicht_id(&app, &admin, einsatz).await;
@@ -980,7 +923,7 @@ async fn liste_ansicht_filtert_fremde_aus_haelt_null() {
 /// PATCH `{ansicht_id}` verschiebt die Zone; `null` gibt sie auf alle Ansichten frei.
 #[tokio::test]
 async fn patch_verschiebt_zwischen_ansichten() {
-    let (app, _live) = setup().await;
+    let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let x = standard_ansicht_id(&app, &admin, einsatz).await;
@@ -1074,7 +1017,7 @@ async fn flaechen(app: &axum::Router, cookie: &str, einsatz: i64, bezirk: i64) -
 
 #[tokio::test]
 async fn evakuierungsbezirk_ist_flaeche_mit_eigenem_etb_wort() {
-    let (app, _) = setup().await;
+    let (app, _) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let (s, z) = bezirksflaeche(&app, &admin, e, None).await;
@@ -1109,7 +1052,7 @@ async fn evakuierungsbezirk_ist_flaeche_mit_eigenem_etb_wort() {
 
 #[tokio::test]
 async fn zwei_teilflaechen_an_einem_bezirk_und_flaechen_zaehlt_mit() {
-    let (app, live) = setup().await;
+    let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let ufer = bezirk_anlegen(&app, &admin, e, "Uferstraße 12–40").await;
@@ -1174,7 +1117,7 @@ async fn zwei_teilflaechen_an_einem_bezirk_und_flaechen_zaehlt_mit() {
 
 #[tokio::test]
 async fn typwechsel_weg_vom_bezirk_loescht_die_zuordnung() {
-    let (app, live) = setup().await;
+    let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let ufer = bezirk_anlegen(&app, &admin, e, "Uferstraße 12–40").await;
@@ -1202,7 +1145,7 @@ async fn typwechsel_weg_vom_bezirk_loescht_die_zuordnung() {
 
 #[tokio::test]
 async fn zuordnung_statuscodes_422_404_409() {
-    let (app, _) = setup().await;
+    let (app, _) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let e2 = einsatz_anlegen(&app, &admin).await;
@@ -1256,7 +1199,7 @@ async fn zuordnung_statuscodes_422_404_409() {
 
 #[tokio::test]
 async fn zuordnung_ohne_modul_betreuung_ist_403_loesen_bleibt_erlaubt() {
-    let (app, _) = setup().await;
+    let (app, _) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let ufer = bezirk_anlegen(&app, &admin, e, "Uferstraße 12–40").await;
@@ -1324,7 +1267,7 @@ async fn zuordnung_ohne_modul_betreuung_ist_403_loesen_bleibt_erlaubt() {
 
 #[tokio::test]
 async fn bezirk_storno_meldet_jede_geloeste_flaeche_als_lage_zone() {
-    let (app, live) = setup().await;
+    let (app, live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let ufer = bezirk_anlegen(&app, &admin, e, "Uferstraße 12–40").await;

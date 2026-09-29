@@ -1,17 +1,9 @@
 import type { Page } from '@playwright/test';
 
 /**
- * Messkern für Cumulative Layout Shift — geteiltes e2e-Modul (LFH-373).
- *
- * WARUM EIGENES MODUL: der Beobachter entstand in `einsatzauswahl-cls.spec.ts` (LFH-514) und
- * wird seit LFH-373 auch von `leisten-flaeche.spec.ts` gebraucht. Präzedenz für den Umzug:
- * `fokus-kern.ts` (LFH-465). Der Inhalt ist ein REINER MOVE; die Tests der Ursprungsdatei
- * bleiben unverändert und belegen damit weiterhin denselben Kern. Die Kommentare nennen
- * „Test 3" — gemeint ist der Refetch-Test in `einsatzauswahl-cls.spec.ts`.
- *
- * Nicht mitgezogen sind die lokalen Kopien in `pegel-pruefliste.spec.ts` und
- * `betroffene-layout.spec.ts`; sie rechnen mit einer Marke statt eines Zurücksetzens und
- * bleiben bis zu einem eigenen Umbau, wo sie sind (design.md D9 des Changes LFH-373).
+ * Messkern für Cumulative Layout Shift, geteilt von mehreren Specs. `pegel-pruefliste` und
+ * `betroffene-layout` führen eigene Kopien, die mit einer Marke statt eines Zurücksetzens
+ * rechnen.
  */
 
 /** Ein Shift-Eintrag, wie ihn der Beobachter im Dokument sammelt. */
@@ -29,17 +21,12 @@ export interface Messung {
 }
 
 /**
- * Registriert den `layout-shift`-Beobachter VOR jedem Dokument-Script.
+ * Registriert den `layout-shift`-Beobachter VOR jedem Dokument-Script (`addInitScript`;
+ * `evaluate` bräuchte ein schon geladenes Dokument).
  *
- * `addInitScript` statt `evaluate` nach dem Laden: ein nachträglich registrierter
- * Beobachter verpasst zwar dank `buffered: true` keine Einträge, aber `evaluate` selbst
- * braucht ein geladenes Dokument — die Registrierung käme dann frühestens nach dem ersten
- * Rendern, und der Akkumulator müsste über die Navigation hinweg gerettet werden.
- *
- * Der Akkumulator lebt PRO DOKUMENT: jede echte Navigation setzt ihn zurück. Das ist die
- * gewünschte Semantik — die Shifts der Login-Seite gehören nicht in die Messung der
- * Einsatzauswahl. Aus demselben Grund navigiert jeder Test nach `anmelden()` noch einmal
- * per `page.goto`: der Login schickt per React Router weiter, also IM SELBEN Dokument.
+ * Der Akkumulator lebt PRO DOKUMENT, jede echte Navigation setzt ihn zurück. Deshalb
+ * navigiert jeder Test nach `anmelden()` noch einmal per `page.goto`: der Login leitet per
+ * React Router IM SELBEN Dokument weiter, dessen Shifts gehörten sonst mit in die Messung.
  */
 export async function beobachteShifts(page: Page) {
   await page.addInitScript(() => {
@@ -48,11 +35,8 @@ export async function beobachteShifts(page: Page) {
       eintraege: { wert: number; zeit: number; quellen: string[] }[];
       lauf: string;
     }
-    // Die Kennung entsteht EINMAL je Dokument. Lädt die Seite unbemerkt neu, läuft dieses
-    // Script erneut und vergibt eine neue — daran erkennt Test 3 eine Messung, die über
-    // einen Dokumentwechsel hinweg lief und damit nichts belegt (gemessen: bei einem
-    // solchen Reload stand die Ladephase mit ihrer eigenen `startTime` wieder im frisch
-    // angelegten Akkumulator, und die Summe sah aus wie ein Refetch-Shift).
+    // Die Kennung entsteht EINMAL je Dokument. Ein unbemerkter Reload vergibt eine neue;
+    // daran erkennt ein Test eine Messung, die über einen Dokumentwechsel lief und nichts belegt.
     const zustand: Zustand = {
       summe: 0,
       eintraege: [],
@@ -61,8 +45,7 @@ export async function beobachteShifts(page: Page) {
     (window as unknown as { __lfhShift: Zustand }).__lfhShift = zustand;
 
     // Knotenbeschreibung statt Knoten: ein roter Test soll sagen, WAS sich bewegt hat.
-    // `className` ist bei SVG-Knoten ein `SVGAnimatedString` und kein String — deshalb die
-    // Typprüfung statt eines blinden `.split`.
+    // `className` ist bei SVG-Knoten ein `SVGAnimatedString`, daher die Typprüfung.
     const beschreibe = (knoten: Node | null): string => {
       if (!knoten || !(knoten instanceof Element)) return '(kein Element)';
       const testid = knoten.getAttribute('data-testid');
@@ -91,8 +74,7 @@ export async function beobachteShifts(page: Page) {
         zustand.eintraege.push({
           wert: shift.value,
           zeit: Math.round(shift.startTime),
-          // Lage vorher → nachher (y/Höhe): ohne sie sagt ein roter Test nur WAS sich bewegt
-          // hat, nicht WIE WEIT — und damit nicht, welcher Nachbar es geschoben hat.
+          // Lage vorher → nachher: zeigt, WIE WEIT es sich bewegt hat und welcher Nachbar schob.
           quellen: (shift.sources ?? []).map(
             (q) =>
               `${beschreibe(q.node)} y${Math.round(q.previousRect.y)}→${Math.round(q.currentRect.y)} h${Math.round(q.previousRect.height)}→${Math.round(q.currentRect.height)}`,
@@ -100,9 +82,7 @@ export async function beobachteShifts(page: Page) {
         });
       }
     });
-    // `buffered: true` liefert auch die Einträge nach, die vor dieser Zeile entstanden
-    // sind — hier zwar keine, aber ohne das Flag hinge die Messung an der Reihenfolge
-    // zweier Frames.
+    // Ohne `buffered: true` hinge die Messung an der Reihenfolge zweier Frames.
     beobachter.observe({ type: 'layout-shift', buffered: true });
   });
 }
@@ -117,13 +97,9 @@ export async function leseShifts(page: Page): Promise<Messung> {
 }
 
 /**
- * Setzt den Akkumulator zurück, ohne den Beobachter neu zu registrieren.
- *
- * Test 3 braucht die Shifts AB einem Zeitpunkt, nicht seit dem Dokumentanfang. Eine
- * Differenz zweier Ruhelagen täte es nicht: ein Nachzügler-Shift aus dem Seitenaufbau
- * (nachgeladene Schrift, verspätetes Bild) landete dann im Delta und machte den Test
- * flaky — genau das ist am 11.09.2026 in einem Lauf passiert. Nach dem Zurücksetzen ist
- * die Aussage absolut: „ab hier bewegt sich nichts mehr".
+ * Setzt den Akkumulator zurück, ohne den Beobachter neu zu registrieren. Eine Differenz
+ * zweier Ruhelagen täte es nicht: ein Nachzügler-Shift aus dem Seitenaufbau landete im Delta
+ * und machte den Test flaky. Nach dem Zurücksetzen gilt absolut „ab hier bewegt sich nichts".
  */
 export async function setzeShiftsZurueck(page: Page) {
   await page.evaluate(() => {
@@ -141,22 +117,13 @@ const STILLE_RUNDEN = 4;
 const LESE_ABSTAND = 150;
 
 /**
- * Wartet, bis der Akkumulator zur Ruhe kommt — `STILLE_RUNDEN` gleiche Lesungen in Folge.
+ * Wartet, bis der Akkumulator zur Ruhe kommt — `STILLE_RUNDEN` gleiche Lesungen in Folge
+ * (450 ms Stille). Kein fester Timeout: unter Volllast der Suite wäre er zu knapp und der
+ * Test grün durch zu frühes Hinsehen; aus demselben Grund reichen zwei Lesungen nicht, ein
+ * Nachzügler bei +300 ms bliebe ungesehen.
  *
- * KEIN fester Timeout: ein `waitForTimeout(1000)` wäre lokal großzügig und unter Volllast
- * der Suite (drei Worker, Vite übersetzt nebenher) zu knapp — der Test würde dann eine
- * Ruhelage messen, die noch gar nicht eingetreten ist, und wäre grün durch zu frühes
- * Hinsehen.
- *
- * VIER Lesungen, nicht zwei (Review-Befund): mit zwei genügte EIN stilles Fenster von
- * 100 ms, um „Ruhe" zu melden. Ein Nachzügler bei +300 ms — nachgeladene Schrift,
- * verspätete Style-Injektion, Reflow unter Last — wäre nie gesehen worden, die Summe zu
- * klein und JEDE Summen-Zusicherung dieser Datei grün durch zu frühes Hinsehen. Genau das,
- * wogegen die Schleife gebaut ist. Vier Runden à 150 ms sind 450 ms Stille.
- *
- * Und die Schleife WIRFT, wenn sie das Fenster nie erreicht: „kommt nicht zur Ruhe" ist von
- * „ist ruhig" sonst nicht zu unterscheiden, und ein Zwischenwert kann zufällig unter der
- * Grenze liegen — ein stiller Falsch-Grün.
+ * Wirft, wenn die Ruhe nie eintritt: ein Zwischenwert unter der Grenze wäre ein stiller
+ * Falsch-Grün.
  */
 export async function ruheShifts(page: Page, runden = 60): Promise<Messung> {
   let vorher = Number.NaN;

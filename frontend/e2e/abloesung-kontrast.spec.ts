@@ -2,47 +2,26 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { kontrast, randKontrast } from './kontrast-kern';
 
 /**
- * Kriterium 5 der Prüfliste Einsatztauglichkeit für `/einsaetze/:id/abloesung` (LFH-646,
- * Nachzug zu LFH-635): Kontrast der ZUSAMMENGESETZTEN Paare in Tag und Nacht.
+ * Kriterium 5 der Prüfliste für `/einsaetze/:id/abloesung`: Kontrast der ZUSAMMENGESETZTEN
+ * Paare in Tag und Nacht. Die Seite nutzt nur Tokens — entlastend, aber kein Beleg: ein Token,
+ * der auf `paneel` trägt, muss auf `alarmFlaeche` nicht tragen. Gemessen mit dem geteilten
+ * Messkern (`kontrast-kern.ts`), ohne Farbwerte aus dem Produkt.
  *
- * Die Seite nutzt nur Tokens — das ist entlastend, aber kein Beleg: ein Token, der auf
- * `paneel` trägt, muss auf `alarmFlaeche` nicht tragen. Gemessen wird deshalb im Browser mit
- * dem geteilten Messkern (`kontrast-kern.ts`), ohne Farbwerte aus dem Produkt zu importieren.
+ * GESÄT: je Einstufung eine Schicht — überfällig, Vorwarnung, planmäßig — und eine vollzogene
+ * mit ablösender Einheit (deren Folgeschicht ist die vierte laufende Karte, sie selbst steht
+ * unter „Abgelöst").
  *
- * GESÄT: je Einstufung eine Schicht über `beginn_at` + `rhythmus_minuten` — überfällig (seit
- * 40 min), Vorwarnung (in 15 min, Vorwarnzeit 30 min), planmäßig (in 6 h) — und eine
- * vollzogene Schicht mit ablösender Einheit. Deren Folgeschicht ist die vierte laufende Karte,
- * sie selbst steht unter „Abgelöst" mit Augenbraue, „Abgelöst durch …" und Rücknahme-Knopf.
+ * SCHRANKEN (Literale): Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1 für JEDEN Text im Inhalt, über den
+ * Textbaum gefunden (eine Selektorliste übersähe das nächste Textstück). Zustandstragende
+ * Kartenränder gegen Seitengrund und Kartenfläche sowie Etikettränder ≥ 3 : 1 (WCAG 1.4.11).
  *
- * SCHRANKEN (Literale; Kriterium 5 und WCAG 1.4.11):
- *  · Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1 — für JEDEN Text im Seiteninhalt, gefunden über den
- *    Textbaum statt über eine Selektorliste: die übersähe das nächste Textstück;
- *  · der linke Rand der Karte, wo er einen Zustand trägt (überfällig, Vorwarnung), gegen den
- *    Seitengrund, vor dem er als Kante steht, und gegen die eigene Kartenfläche: ≥ 3 : 1;
- *  · der Rand des Etiketts gegen die Kartenfläche und gegen seine eigene Tönung: ≥ 3 : 1.
+ * ZWEI BENANNTE AUSNAHMEN (geteilte Rollen; bis dahin 4,5 : 1, Zielwert in jeder Meldung):
+ *  · Tertiärtext (`schwach`) → LFH-643, beide Modi;
+ *  · Weiß auf `bedien` im Primärknopf → LFH-661, nur am Tag.
+ * Fallen die Ausnahmen, wenn LFH-643/LFH-661 landen.
  *
- * ZWEI BENANNTE AUSNAHMEN, beide keine Eigenheit dieser Seite, sondern Eigenschaften
- * geteilter Rollen bzw. Primitive — dort liegt jeweils das Ticket, hier gilt bis dahin die
- * absolute Untergrenze 4,5 : 1 aus Kriterium 5, der Zielwert steht in jeder Meldung:
- *  · TERTIÄRTEXT (`schwach`: Augenbrauen, `Typography type="secondary"` samt „Stand",
- *    Feldhilfe, Platzhalter, Ortspfad im Seitenkopf bis auf das letzte Glied) — Tag 5,33
- *    auf `grund`, 5,84 auf `paneel`, hier zuerst gemessen 5,20 auf `alarmFlaeche` und 6,37
- *    als Platzhalter auf Weiß; nachts 4,81 auf der Dialogfläche.
- *    Welcher Boden für diese Textstufe gilt, entscheidet LFH-643; die Prüfliste von LFH-618
- *    hat die Frage ausdrücklich dorthin gelegt („eine globale Textstufe gehört nicht neben
- *    einen Rollen-Fix"). Gilt in BEIDEN Modi.
- *  · WEISS AUF `bedien` in jedem Primärknopf (Kopfaktion, Absende-Knopf der Dialoge) — Tag
- *    6,59 (`theme/tokens.ts`), nachts hält er. → LFH-661. Nur am Tag.
- * Jeder andere Text — Einheit, Etikett, Abstand, Zeit, Nebenknöpfe, Feldbeschriftungen,
- * Seitentitel und Kopf-Meta — trägt den vollen Boden. FALLEN DIE AUSNAHMEN, wenn
- * LFH-643/LFH-661 landen.
- *
- * DER RAND DER PLANMÄSSIGEN UND DER ABGELÖSTEN KARTE ist KEIN Zustandsträger: planmäßig heißt
- * „nichts zu tun", die Karte trägt dort die Linienfarbe (Kopfkommentar `AbloesungKarte`,
- * `abloesungEinstufung.planmaessig` bewusst `neutral`). 1.4.11 ist auf ihn nicht anwendbar —
- * gemessen und angehängt wird er trotzdem, und zugesichert wird, dass er sich von den beiden
- * Zustandsrändern UNTERSCHEIDET: fiele er mit einem zusammen, trüge er eine Bedeutung, die er
- * nicht hat.
+ * Der Rand der planmäßigen und der abgelösten Karte trägt keinen Zustand (Linienfarbe) —
+ * gemessen und angehängt, und zugesichert, dass er sich von den Zustandsrändern unterscheidet.
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
@@ -50,8 +29,7 @@ const TEXT = { light: 7, dark: 5 } as const;
 const BODEN = 4.5;
 const ZUSTAND = 3;
 
-/** Tertiärtext: die Augenbraue der Zeitspalte, antds Sekundärtext, die Paneel-Augenbraue,
- *  Feldhilfe und Platzhalter. Enumeriert, damit JEDER andere Text den vollen Boden trägt. */
+/** Tertiärtext, enumeriert, damit JEDER andere Text den vollen Boden trägt. */
 const TERTIAER = [
   '[data-lfh="abloesung-zeit"] + span',
   '.ant-typography-secondary',
@@ -59,8 +37,7 @@ const TERTIAER = [
   // Die Feldhilfe der Dialoge („Leer: jetzt") — antds `colorTextDescription`.
   '.ant-form-item-extra',
   '.ant-select-placeholder',
-  // Der Ortspfad im Seitenkopf bis auf sein letztes Glied (`EinsatzSeite`: `itemColor`/
-  // `linkColor`/`separatorColor` = `schwach`, `lastItemColor` = `text2`).
+  // Der Ortspfad im Seitenkopf bis auf sein letztes Glied (`schwach`; das letzte ist `text2`).
   '.lfh-seitenkopf__pfad li:not(:last-child)',
 ].join(', ');
 
@@ -98,8 +75,8 @@ interface Textknoten {
   primaer: boolean;
 }
 
-/** Jedes Element unter `wurzel` mit eigenem, sichtbarem Text — als Locator über eine
- *  Messmarke, dazu ob es zu einer der Ausnahmen (Tertiärtext, Primärknopf) gehört. */
+/** Jedes Element unter `wurzel` mit eigenem, sichtbarem Text, als Locator über eine
+ *  Messmarke, dazu ob es zu einer Ausnahme gehört. */
 async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
   const funde = await wurzel.evaluate((w, tertiaer) => {
     // Marken eines früheren Aufrufs räumen, sonst träfe dieselbe Nummer zwei Knoten.
@@ -234,8 +211,7 @@ for (const modus of ['light', 'dark'] as const) {
     ) => {
       await page.mouse.move(0, 0);
       const knoten = await textknoten(wurzel);
-      // Ein Dialog blendet mit Opacity ein; der Messkern lehnt das ab, statt scheinpräzise
-      // zu rechnen. Erst messen, wenn der erste Knoten eben steht.
+      // Ein Dialog blendet mit Opacity ein; erst messen, wenn der erste Knoten steht.
       await expect(async () => {
         await kontrast(knoten[0].ziel);
       }).toPass({ timeout: 10_000 });
@@ -258,8 +234,7 @@ for (const modus of ['light', 'dark'] as const) {
     await messeTexte(kopf, 'kopf', 'laufend');
     await messeTexte(inhalt, 'inhalt', 'laufend');
 
-    // (3) Die Erfassungsdialoge (Prüfliste Fläche 2) — zwei stellvertretend, beide auf der
-    // `ErfassungsModal`-Hülle: „Schicht beginnen" aus dem Kopf und der Vollzug mit Feldhilfe.
+    // (3) Zwei Erfassungsdialoge stellvertretend, beide auf der `ErfassungsModal`-Hülle.
     for (const [ausloeser, titel] of [
       [kopf.getByRole('button', { name: 'Schicht beginnen', exact: true }), 'Schicht beginnen'],
       [
@@ -283,9 +258,8 @@ for (const modus of ['light', 'dark'] as const) {
     messwerte.push({ modus, karte: 'abgeloest', art: 'kartenrand', ...randAbgeloest });
     await messeTexte(inhalt, 'inhalt', 'abgelöst');
 
-    // Die Probe hat die Texte wirklich gesehen — sonst wäre ein grüner Lauf leer. Und die
-    // tragenden liefen OHNE Ausnahme: eine zu weit gefasste Ausnahme-Liste senkte sonst still
-    // den Boden für genau die Paare, um die es geht.
+    // Die Probe hat die Texte wirklich gesehen, und die tragenden liefen OHNE Ausnahme — eine
+    // zu weit gefasste Ausnahme-Liste senkte sonst still den Boden.
     const pruefeGesehen = (pflicht: string | RegExp, tragend: boolean) => {
       const treffer = [...gemessen].filter(([t]) =>
         typeof pflicht === 'string' ? t === pflicht : pflicht.test(t),

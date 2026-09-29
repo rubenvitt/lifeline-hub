@@ -3,37 +3,12 @@ use axum::http::{header, Request, StatusCode};
 use tower::ServiceExt;
 
 mod common;
-use common::setup;
-
-/// Loggt einen Benutzer ein und liefert den Session-Cookie-Wert.
-async fn login(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
-    let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/auth/login")
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let cookie = resp
-        .headers()
-        .get(header::SET_COOKIE)
-        .unwrap()
-        .to_str()
-        .unwrap();
-    cookie.split(';').next().unwrap().to_string()
-}
+use common::{login_cookie, setup};
 
 #[tokio::test]
 async fn admin_kann_backup_herunterladen() {
     let app = setup().await;
-    let cookie = login(&app, "admin", "startpw12").await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
 
     let resp = app
         .clone()
@@ -93,7 +68,7 @@ async fn admin_kann_backup_herunterladen() {
 async fn backup_download_enthaelt_keine_sessions() {
     let app = setup().await;
     // Der Login legt eine echte Session in der DB an — sie darf im Export nicht landen.
-    let cookie = login(&app, "admin", "startpw12").await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
 
     let resp = app
         .clone()
@@ -145,7 +120,7 @@ async fn backup_download_enthaelt_keine_sessions() {
 #[tokio::test]
 async fn backup_download_meldet_content_length() {
     let app = setup().await;
-    let cookie = login(&app, "admin", "startpw12").await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
 
     let resp = app
         .clone()
@@ -196,7 +171,7 @@ async fn backup_ohne_session_ist_401() {
 async fn backup_als_nicht_admin_ist_403() {
     let app = setup().await;
 
-    let admin_cookie = login(&app, "admin", "startpw12").await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
     let resp = app
         .clone()
         .oneshot(
@@ -214,7 +189,7 @@ async fn backup_als_nicht_admin_ist_403() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
 
-    let bea_cookie = login(&app, "bea", "passwort1").await;
+    let bea_cookie = login_cookie(&app, "bea", "passwort1").await;
     let resp = app
         .oneshot(
             Request::builder()

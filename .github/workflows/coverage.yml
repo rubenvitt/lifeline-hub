@@ -1,26 +1,15 @@
-# Coverage (LFH-522/LFH-528) — Rust- und Frontend-Abdeckung für Codecov.
+# Coverage — Rust- und Frontend-Abdeckung für Codecov.
 #
-# EIN EIGENER WORKFLOW, NICHT MEHR EIN JOB IN ci.yml — und der Grund ist die
-# Nebenläufigkeitsgruppe, nicht die Ordnung. ci.yml bricht Läufe auf einem Kanal-Branch
-# bewusst NICHT ab (am selben Lauf hängt der Release-Job, Begründung dort). Solange Coverage
-# in diesem Lauf stand, galt die Gruppe bis zum Ende des LÄNGSTEN Jobs: das Gate war nach
-# rund 14 Minuten grün, Coverage lief ~66 Minuten weiter, und der Lauf des nächsten Pushes
-# auf `alpha` stand die ganze Zeit auf „pending". Eine Nebenläufigkeit auf Job-Ebene hätte
-# daran nichts geändert — die Workflow-Gruppe gibt erst frei, wenn der ganze Lauf endet,
-# und der neue Lauf, dessen Coverage-Job den alten abbrechen sollte, startet vorher gar nicht.
+# EIN EIGENER WORKFLOW wegen der Nebenläufigkeitsgruppe: ci.yml bricht Kanal-Läufe bewusst
+# nicht ab, und ein langer Coverage-Job darin hielte jeden Folge-Push auf „pending" (die Gruppe
+# gibt erst frei, wenn der ganze Lauf endet). Hier darf abgebrochen werden, weil nichts daran
+# hängt — kein Release, kein Required Check; Codecov vergleicht dann gegen den letzten
+# gemessenen Vorfahren, was für eine informative Zahl genügt.
 #
-# Hier darf abgebrochen werden, weil nichts daran hängt: kein Release, kein Tag, kein
-# Required Check. Ein neuerer Commit auf dem Kanal macht die Zahl des älteren wertlos, bevor
-# sie fertig ist. Der Preis ist ein Verlauf mit Lücken bei schnell aufeinanderfolgenden
-# Merges — Codecov vergleicht dann gegen den letzten gemessenen Vorfahren, was für eine
-# informative Zahl (codecov.yml: `informational: true`) genügt.
+# NUR AUF PUSH: der längste Lauf des Repos, für eine Zahl, die sich zwischen zwei Commits kaum
+# bewegt.
 #
-# NUR AUF PUSH, nicht auf jedem Pull Request: mit ~66 Minuten ist das der längste Lauf des
-# Repos und belegt vier Viertelstunden Runner für eine Zahl, die sich zwischen zwei Commits
-# kaum bewegt.
-#
-# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar), wie in ci.yml; Dependabot hält
-# die Pins aktuell.
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar), wie in ci.yml.
 name: Coverage
 
 on:
@@ -40,34 +29,26 @@ env:
   # llvm-cov braucht Zeileninfo, mehr nicht; volle Debug-Symbole kosten mehrere GB Platte
   # (Begründung ausführlich in ci.yml).
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
-  # Der Runner läuft in UTC, die Zielumgebung dieses Systems nicht. scripts/check-all.sh setzt
-  # die Zone selbst; dieser Workflow fährt das Skript aber nicht und braucht sie deshalb hier.
-  # Ohne sie wird jeder Test rot, der eine Ortszeit-Umrechnung festschreibt.
+  # Der Runner läuft in UTC; dieser Workflow fährt check-all.sh nicht, das die Zone sonst setzt.
   TZ: Europe/Berlin
 
 jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    # 90 statt 45: `cargo llvm-cov` baut den gesamten Workspace ein ZWEITES Mal, instrumentiert
-    # und in einem eigenen Target-Verzeichnis — es teilt sich nichts mit den Gate-Jobs in ci.yml.
+    # `cargo llvm-cov` baut den ganzen Workspace ein ZWEITES Mal, instrumentiert und in einem
+    # eigenen Target-Verzeichnis.
     timeout-minutes: 90
-    # Bewusst KEIN Required Check: `cargo llvm-cov` ersetzt `cargo test` durch einen
-    # instrumentierten Lauf, im Gate wäre das ein zweiter kompletter Durchlauf. Und ein
-    # Coverage-Werkzeug darf das Gate nie rot färben — es misst, es urteilt nicht.
+    # Bewusst KEIN Required Check: ein Coverage-Werkzeug darf das Gate nie rot färben — es
+    # misst, es urteilt nicht.
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # PLATTENPLATZ — GEMESSEN NÖTIG, NICHT VORSORGLICH (erster CI-Lauf, PR #26).
-      # Beide Jobs starben mitten im Build an „No space left on device"; der Runner konnte
-      # zuletzt nicht einmal mehr sein eigenes Log schreiben. Ein ubuntu-latest-Runner hat
-      # rund 14 GB frei, und dieses Projekt braucht mehr: Debug-Build des ganzen Workspace
-      # samt Integrationstests, dazu OpenSSL aus Quelle (seit LFH-522), aws-lc-sys,
-      # gebündeltes SQLite, node_modules und ein Chromium.
-      # Die drei Verzeichnisse unten sind vorinstallierte Toolchains, die dieses Projekt
-      # nirgends anfasst; allein das Android-SDK trägt zweistellige GB. `df` steht davor und
-      # danach, damit beim nächsten Engpass nicht wieder geraten werden muss.
+      # PLATTENPLATZ: der Debug-Build des ganzen Workspace samt OpenSSL aus Quelle, aws-lc-sys,
+      # gebündeltem SQLite, node_modules und Chromium passte nicht auf einen Standard-Runner.
+      # Die Verzeichnisse unten sind vorinstallierte Toolchains, die dieses Projekt nicht
+      # anfasst. `df` davor und danach, damit man beim nächsten Engpass nicht raten muss.
       - name: Plattenplatz schaffen
         run: |
           df -h /
@@ -84,9 +65,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          # Eigener Schlüssel, KEIN shared-key: `cargo llvm-cov` baut instrumentiert in ein
-          # eigenes Target-Verzeichnis. Diese Artefakte in den geteilten Eintrag zu mischen
-          # machte ihn für alle anderen Jobs unbrauchbar.
+          # Eigener Schlüssel, KEIN shared-key: instrumentierte Artefakte im geteilten Eintrag
+          # machten ihn für die anderen Jobs unbrauchbar.
           key: coverage-openssl-vendored
           cache-on-failure: true
 
@@ -113,21 +93,14 @@ jobs:
       - name: Rust-Coverage
         run: cargo llvm-cov --workspace --lcov --output-path lcov.info
 
-      # Die Instrumentierung macht die Suite spürbar langsamer, und auf zwei vCPU reicht der
-      # Vorgabe-Testtimeout von 10 s dann nicht mehr — gemessen: mehrere Tests liefen in
-      # „Test timed out in 10000ms", die im Gate-Job (uninstrumentiert) grün sind. Das ist
-      # keine Regression, sondern die bekannte Flakiness unter Last; die Antwort ist mehr Zeit
-      # und weniger Parallelität, nicht ein abgeschalteter Test.
-      # `pnpm run test:coverage -- <flags>` hat die Flags NICHT durchgereicht — gemessen: die
-      # Fehlermeldungen nannten weiter „timed out in 10000ms", also den Config-Wert. Deshalb
-      # `exec vitest` direkt; damit landen die Flags nachweislich an Vitest.
+      # Die Instrumentierung macht die Suite auf zwei vCPU so langsam, dass der
+      # Vorgabe-Timeout von 10 s nicht reicht — mehr Zeit und weniger Parallelität statt
+      # abgeschalteter Tests. `exec vitest` direkt, weil `pnpm run test:coverage -- <flags>`
+      # die Flags nicht durchreichte.
       #
-      # `--retry=1` ist hier großzügiger als im Gate-Job und darf es sein: dieser Job MISST,
-      # er urteilt nicht (continue-on-error), und unter der Instrumentierung kippen auf zwei
-      # vCPU auch Tests, die sonst grün sind — gemessen waren es fünf, darunter zwei
-      # Race-Conditions statt reiner Timeouts. Bleibt der Job trotzdem rot, ist die richtige
-      # Antwort, die Frontend-Coverage ganz herauszunehmen und nur Rust zu messen, statt die
-      # Schrauben weiter zu lockern.
+      # `--retry=1` ist großzügiger als im Gate und darf es sein: dieser Job misst nur
+      # (continue-on-error). Bleibt er trotzdem rot, gehört die Frontend-Coverage ganz heraus,
+      # statt weiter Schrauben zu lockern.
       - name: Frontend-Coverage
         run: >-
           mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend exec vitest run --coverage

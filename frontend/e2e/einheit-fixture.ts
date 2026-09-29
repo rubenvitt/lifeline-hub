@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
-/** LFH-446: dieselben belegten Zuordnungen für Fokus- und Treffflächenmessung. */
+/** Dieselben belegten Zuordnungen für Fokus- und Treffflächenmessung. */
 export async function einheitMitZuordnungen(page: Page) {
   async function post(pfad: string, data: unknown): Promise<number> {
     const antwort = await page.request.post(pfad, { data });
