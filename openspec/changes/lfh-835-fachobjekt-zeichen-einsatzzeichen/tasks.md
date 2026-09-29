@@ -31,7 +31,7 @@
 
 ## 4. Meldebild
 
-- [ ] 4.1 `zeichen/EinsatzZeichen.tsx` (Adapter + `Einsatzzeichen` + `useId`-Präfix, leer bei `null`) und `kraefte/EinheitZeichen.tsx` darauf umstellen.
+- [x] 4.1 `zeichen/EinsatzZeichen.tsx` (Adapter + `Einsatzzeichen` + `useId`-Präfix, leer bei `null`) und `kraefte/EinheitZeichen.tsx` darauf umstellen.
   - Test: Eine Einheit mit gültigen Werten rendert genau ein `svg`. Eine Einheit mit `tz_fachaufgabe='gibt-es-nicht'` rendert ohne Wurf.
   - Zwei Zeichen in einer Liste haben keine doppelten `id`.
   - `KraefteuebersichtPage.test.tsx` und `meldebildRaster.test.ts` sind grün.

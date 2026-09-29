@@ -1,14 +1,14 @@
-import TaktischesZeichen from 'taktische-zeichen-react';
 import { baueTzProps } from '../pages/lagekarte/taktischesZeichen';
 import { useRollen } from '../components/instrument';
+import EinsatzZeichen from '../zeichen/EinsatzZeichen';
 import type { TzEinheit } from './meldebildRaster';
 
 /**
  * Der Symbolplatz „TZ" der Einheitenzeile: das taktische Zeichen der Einheit, 26 × 26 px.
- * Dieselbe Ableitung wie auf der Lagekarte (`baueTzProps`). Der Organisations-Vorgabewert der
- * Karte fehlt bewusst — eine weitere Query für einen Zierrahmen wäre zu teuer.
- * Reine Zierde, `aria-hidden`: die Bezeichnung daneben benennt die Einheit, und die Bibliothek
- * stellte sonst ein Bildziel mit englischem Namen in jede Zeile.
+ * Dieselbe Ableitung wie auf der Lagekarte (`baueTzProps`) und dieselbe Zeichnung
+ * (`EinsatzZeichen`, @einsatzzeichen, LFH-835). Der Organisations-Vorgabewert der Karte fehlt
+ * bewusst — eine weitere Query für einen Zierrahmen wäre zu teuer.
+ * Reine Zierde, `aria-hidden`: die Bezeichnung daneben benennt die Einheit.
  */
 export default function EinheitZeichen({ tz }: { tz: TzEinheit | null }) {
   const { rollen } = useRollen();
@@ -27,14 +27,14 @@ export default function EinheitZeichen({ tz }: { tz: TzEinheit | null }) {
       }}
     >
       {tz && (
-        <TaktischesZeichen
-          {...baueTzProps({
+        <EinsatzZeichen
+          tz={baueTzProps({
             objekttyp: 'einheit',
             einheitTypLabel: tz.typLabel,
             fachaufgabe: tz.fachaufgabe,
             organisation: tz.organisation,
           })}
-          style={{ width: 22, height: 22 }}
+          size={22}
         />
       )}
     </span>
