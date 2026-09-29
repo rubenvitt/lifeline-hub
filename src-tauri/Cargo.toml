@@ -20,6 +20,9 @@ tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-updater = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-process = "2"
+# Protokoll ins Log-Verzeichnis der App (macOS ~/Library/Logs/<id>, Windows %LOCALAPPDATA%\<id>\logs):
+# eine installierte Hülle hat keine Konsole.
+tauri-plugin-log = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 url = "2"
