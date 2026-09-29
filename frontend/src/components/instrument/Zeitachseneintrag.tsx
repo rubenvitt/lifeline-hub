@@ -26,8 +26,8 @@ import { monoStil, useRollen } from './rollenwerte';
  * `data-lfh="datensicht-karte"` und ihre Zeilenklasse, sonst findet `scrolleZurZeile` sie nicht.
  */
 
-export type Zeilentoenung = 'berichtigung' | 'luecke' | 'problem';
-export type HinweisTon = 'schwach' | 'bedien' | 'alarm';
+type Zeilentoenung = 'berichtigung' | 'luecke' | 'problem';
+type HinweisTon = 'schwach' | 'bedien' | 'alarm';
 
 const TOENUNG: Record<Zeilentoenung, keyof Farbrollen> = {
   berichtigung: 'berichtigungZeile',
@@ -61,7 +61,7 @@ export function zeitachsenRinne(token: { padding: number; paddingSM: number }, s
 
 type Hueller = Omit<HTMLAttributes<HTMLElement>, 'children' | 'style'>;
 
-export interface ZeitachseneintragProps extends Hueller {
+interface ZeitachseneintragProps extends Hueller {
   zeit: ReactNode;
   /** Laufende Nummer („Nr. 409"). */
   nr?: ReactNode;

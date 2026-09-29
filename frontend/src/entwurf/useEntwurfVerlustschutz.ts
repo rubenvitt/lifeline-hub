@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 /** Frist des stillen Autosave. */
 export const AUTOSAVE_MS = 30_000;
 
-export interface VerlustschutzArgs<D, W extends object> {
+interface VerlustschutzArgs<D, W extends object> {
   /** Serverstand (Query-Data). `undefined`, solange nichts geladen ist. */
   daten: D | undefined;
   /** Nur im Entwurf läuft die Autosave-Uhr. */
@@ -19,7 +19,7 @@ export interface VerlustschutzArgs<D, W extends object> {
   onGespeichert?: () => void;
 }
 
-export interface Verlustschutz<W extends object> {
+interface Verlustschutz<W extends object> {
   /** Gibt es eine Fassung im Formular, die noch nicht auf dem Server steht? */
   ungespeichert: boolean;
   /** `HH:mm` des letzten erfolgreichen Speicherns (Autosave oder Knopf), sonst `null`. */

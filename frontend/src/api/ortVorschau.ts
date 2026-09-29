@@ -4,9 +4,6 @@ import type { components } from './types.generated';
 
 type S = components['schemas'];
 
-/** Peilung zum nächsten bekannten verorteten Punkt des Einsatzes. Rust: `PeilungAntwort`. */
-export type Peilung = S['PeilungAntwort'];
-
 /** Antwort von GET /api/einsaetze/:id/ort-vorschau. Rust: `OrtVorschauAntwort`. Beide Felder
  *  degradieren und FEHLEN dann (statt `null`); Konsumenten prüfen truthy, nicht `=== null`. */
 export type OrtVorschau = S['OrtVorschauAntwort'];

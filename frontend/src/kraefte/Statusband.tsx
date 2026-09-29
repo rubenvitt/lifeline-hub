@@ -50,7 +50,7 @@ function Auffuellung({ anzahl, spalten }: { anzahl: number; spalten: number }) {
   );
 }
 
-export interface StatusbandProps {
+interface StatusbandProps {
   einheiten: readonly BandZelle[];
   /**
    * Sichtbarer Zusatz, wenn Filter nur die MITTEL treffen: das Einheitenband zählt alle Einheiten

@@ -2,12 +2,12 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import type { Meldung, MeldungStatus } from '../api/types';
 import MeldungKarte from './MeldungKarte';
 
-export interface BearbeiterOption {
+interface BearbeiterOption {
   benutzer_id: number;
   anzeigename: string;
 }
 
-export interface MeldungListeProps {
+interface MeldungListeProps {
   meldungen: Meldung[];
   /** Steuert die Abschluss-Spalte (Erledigt-Zeitpunkt) der Karte. */
   ansicht?: 'offen' | 'abgeschlossen';

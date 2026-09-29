@@ -21,7 +21,7 @@ import { gruppiereTreffer } from './objektsuche';
  * Welche Objekte hier stehen, entscheidet der Aufrufer über `suchbareMarker` (`objektsuche.ts`),
  * dort sitzen die Modulsperren. Keine Entprellung: gefiltert wird lokal.
  */
-export interface MarkerSucheProps {
+interface MarkerSucheProps {
   marker: KarteMarker[];
   onMarkerWaehlen: (schluessel: string) => void;
   /** Eine Lagebild-Quelle ist ausgefallen — dann steht „—" statt einer Zahl und keine Leere. */

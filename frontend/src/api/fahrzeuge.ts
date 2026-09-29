@@ -35,7 +35,7 @@ export function ladeFahrzeugVorschlaege(): Promise<FahrzeugVorschlaege> {
  * Anlegen: nur `funkrufname` ist Pflicht (`FahrzeugBody` in `src/routes/fahrzeug.rs`). Die
  * Schnellerfassung schickt ihre vier Felder und sonst nichts.
  */
-export type FahrzeugNeu = { funkrufname: string } & Partial<Omit<FahrzeugEingabe, 'funkrufname'>>;
+type FahrzeugNeu = { funkrufname: string } & Partial<Omit<FahrzeugEingabe, 'funkrufname'>>;
 
 /**
  * PATCH ist ein ECHTER Teil-Patch: fehlender Key = unverändert, `null` = leeren. `Partial` ist der
@@ -43,7 +43,7 @@ export type FahrzeugNeu = { funkrufname: string } & Partial<Omit<FahrzeugEingabe
  * trüge für jedes nicht gezeigte Feld ein `null`. Die Detailseite schickt alle Felder, sie zeigt
  * sie auch alle.
  */
-export type FahrzeugPatch = Partial<FahrzeugEingabe>;
+type FahrzeugPatch = Partial<FahrzeugEingabe>;
 
 export function legeFahrzeugAn(daten: FahrzeugNeu): Promise<Fahrzeug> {
   return apiSend<Fahrzeug>('/api/fahrzeuge', 'POST', daten);

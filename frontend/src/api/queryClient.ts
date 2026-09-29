@@ -5,7 +5,7 @@ import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
 /** Produktionsdefaults an einem importierbaren Seam statt versteckt in `main.tsx`.
  *  Nur reine Query-Pfade dürfen einen Leitungsfehler zweimal wiederholen; fachliche
  *  Serverantworten und sämtliche Mutationen werden nie automatisch erneut gesendet. */
-export const queryClientDefaults = {
+const queryClientDefaults = {
   queries: {
     retry: (fehlversuche: number, fehler: unknown) =>
       fehler instanceof NetzFehler && fehlversuche < 2,

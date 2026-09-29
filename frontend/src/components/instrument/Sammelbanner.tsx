@@ -20,7 +20,7 @@ import { monoStil, useRollen } from './rollenwerte';
  * Bedienziels (LFH-365). Die Ikone steht in einer `aria-hidden`-Hülle — antds Ikonen
  * bringen ein eigenes englisches `aria-label` mit.
  */
-export interface SammelbannerProps {
+interface SammelbannerProps {
   /** Die Mitteilung („14 neue Einträge seit 13:04"). */
   children: ReactNode;
   /** Die eine Aktion rechts („anzeigen", „alle als gesichtet markieren"). */

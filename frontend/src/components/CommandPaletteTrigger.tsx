@@ -9,7 +9,7 @@ import { useViewport } from './useViewport';
 const TREFFLAECHE = 48;
 
 /** Größte Breite des Suchfelds in der Kommandoleiste (Neuentwurf, `shell.dc.html`). */
-export const SUCHFELD_MAX_BREITE = 520;
+const SUCHFELD_MAX_BREITE = 520;
 
 /**
  * Sichtbarer Text im Suchfeld. „Koordinate" aus dem Entwurf steht bewusst NICHT darin: die

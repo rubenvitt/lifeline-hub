@@ -1,7 +1,7 @@
 import { apiGet, apiSend, mitParametern } from './client';
 import type { Auftrag, NeuerAuftrag } from './types';
 
-export interface AuftragFilter {
+interface AuftragFilter {
   status?: string;
   richtung?: string;
   abschnittId?: number;

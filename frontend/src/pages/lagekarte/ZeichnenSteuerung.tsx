@@ -4,9 +4,9 @@ import { monoStil } from '../../components/instrument';
 import { bandStil } from './KartenFuss';
 import './lagekarte.css';
 
-export type ZeichnenPhase = 'zeichnen' | 'bestaetigen';
+type ZeichnenPhase = 'zeichnen' | 'bestaetigen';
 
-export interface ZeichnenSteuerungProps {
+interface ZeichnenSteuerungProps {
   aktiv: boolean;
   /** z. B. "Gefahrengebiet · Fläche" oder "Abschnitt". */
   titel: string;

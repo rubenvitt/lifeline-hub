@@ -10,7 +10,7 @@ import { sitzungsMeldungZuruecksetzen } from './sitzungsEvent';
  * `LoginPage` auf die Code-Eingabe umschaltet. `benutzer` bleibt dann `null`: es gibt noch
  * keine Session.
  */
-export type LoginErgebnis = { status: 'ok' } | { status: 'mfa_erforderlich' };
+type LoginErgebnis = { status: 'ok' } | { status: 'mfa_erforderlich' };
 
 interface AuthWert {
   benutzer: BenutzerAnzeige | null;

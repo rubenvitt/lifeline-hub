@@ -7,9 +7,9 @@ dayjs.extend(utc);
 
 export type MetaFeld = 'ereigniszeit' | 'von' | 'an' | 'meldeweg' | 'veranlassung';
 
-export type EditorTyp = 'zeit' | 'text' | 'meldeweg';
+type EditorTyp = 'zeit' | 'text' | 'meldeweg';
 
-export interface MetaFeldDef {
+interface MetaFeldDef {
   feld: MetaFeld;
   label: string;
   /** Kleingeschriebene Filter-Stichwörter für das /-Menü. */
@@ -57,7 +57,7 @@ export const MELDEWEG_OPTIONEN: { value: MeldeWeg; label: string }[] = [
   { value: 'sonstige', label: 'Sonstige' },
 ];
 
-export interface SlashTrigger {
+interface SlashTrigger {
   aktiv: boolean;
   filter: string;
   start: number;
@@ -111,7 +111,7 @@ export interface SlashEintrag {
   gesetzt?: boolean;
 }
 
-export interface SlashTreffer {
+interface SlashTreffer {
   /** Leer, solange der Aufrufer die Typen nicht anbietet (nur am Zeilenanfang). */
   typen: SlashEintrag[];
   felder: SlashEintrag[];
@@ -152,7 +152,7 @@ export function filterSlashEintraege(
   return { typen, felder, bausteine: treffer };
 }
 
-export interface EintragArgs {
+interface EintragArgs {
   inhalt: string;
   typ: EtbTyp;
   metadaten: MetadatenWerte;

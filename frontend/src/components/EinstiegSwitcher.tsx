@@ -3,7 +3,7 @@ import { DownOutlined } from '@ant-design/icons';
 import StatusTag from './StatusTag';
 import type { StatusDarstellung } from '../theme/statusFarben';
 
-export interface SwitcherEintrag {
+interface SwitcherEintrag {
   id: number;
   bezeichnung: string;
   darstellung: StatusDarstellung;

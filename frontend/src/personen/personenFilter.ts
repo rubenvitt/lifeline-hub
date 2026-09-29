@@ -46,7 +46,7 @@ export const FILTER_OPTIONEN: readonly { wert: PersonenFilter; label: string }[]
 ];
 
 /** Trifft der Statusfilter die Person? */
-export function trifftFilter(p: Pick<Person, 'status'>, filter: PersonenFilter): boolean {
+function trifftFilter(p: Pick<Person, 'status'>, filter: PersonenFilter): boolean {
   return filter === 'alle' || p.status === filter;
 }
 

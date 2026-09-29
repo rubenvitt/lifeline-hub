@@ -9,7 +9,7 @@ export function ladeLagebericht(einsatzId: number, id: number): Promise<Lageberi
   return apiGet<LageberichtAnzeige>(`/api/einsaetze/${einsatzId}/lageberichte/${id}`);
 }
 
-export interface NeuerLagebericht {
+interface NeuerLagebericht {
   vorlage: LageberichtVorlageKey;
   titel: string;
   zeitstand?: string;
@@ -22,7 +22,7 @@ export function legeLageberichtAn(
   return apiSend<LageberichtAnzeige>(`/api/einsaetze/${einsatzId}/lageberichte`, 'POST', daten);
 }
 
-export interface LageberichtPatch {
+interface LageberichtPatch {
   titel?: string;
   zeitstand?: string;
   abschnitte?: LageberichtAbschnitt[];

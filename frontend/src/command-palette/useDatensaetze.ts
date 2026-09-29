@@ -47,7 +47,7 @@ import {
 /** Trefferdeckel des ETB-Volltextzweigs — geht als `limit` MIT in den Request (5 statt 100). */
 const ETB_TEXT_DECKEL = 5;
 
-export interface DatensatzAbruf {
+interface DatensatzAbruf {
   /** Aus dem Pfad gezogen; `null` außerhalb eines Einsatzes. */
   einsatzId: number | null;
   modus: PaletteModus;
@@ -60,7 +60,7 @@ export interface DatensatzAbruf {
  * `useDatensatzTreffer` brauchen sie beide, sonst liefen die Overrides in einem Zustand los, in
  * dem keine Liste folgt.
  */
-export function datensatzAbrufAktiv({ einsatzId, modus, suche }: DatensatzAbruf): boolean {
+function datensatzAbrufAktiv({ einsatzId, modus, suche }: DatensatzAbruf): boolean {
   return (
     einsatzId != null &&
     suche.trim().length >= DATENSATZ_MINDESTZEICHEN &&
@@ -89,7 +89,7 @@ export { etbNummerSchluessel } from './datensatzAbfrage';
  * invalidiert. `anzahl: true` trennt das Fach von Liste und Volltextfach (siehe
  * {@link etbSuchSchluessel}).
  */
-export function etbAnzahlSchluessel(einsatzId: number, q: string) {
+function etbAnzahlSchluessel(einsatzId: number, q: string) {
   return einsatzKeys.etbListe(einsatzId, { q, anzahl: true });
 }
 

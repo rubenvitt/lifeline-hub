@@ -469,7 +469,7 @@ export function modulAusPfad(
 }
 
 /** Module, die nicht ausgeblendet werden dürfen (Spiegel von `NICHT_AUSBLENDBAR` im Backend). */
-export const NICHT_AUSBLENDBARE_MODULE = ['einsatzdaten', 'einsatz-einstellungen'] as const;
+const NICHT_AUSBLENDBARE_MODULE = ['einsatzdaten', 'einsatz-einstellungen'] as const;
 
 /** Ob ein Modul ausgeblendet werden darf (alle außer den nicht-ausblendbaren). */
 export function istModulAusblendbar(key: string): boolean {

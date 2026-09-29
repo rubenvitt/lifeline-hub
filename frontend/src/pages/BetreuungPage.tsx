@@ -53,7 +53,7 @@ import { erfasseBelegungOfflineFaehig, erfasseStandOfflineFaehig } from '../offl
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 
 /** Grund der fehlenden Schreibberechtigung als ganzer Satz. */
-export function betreuungRechteText(status: EinsatzStatus): string {
+function betreuungRechteText(status: EinsatzStatus): string {
   return status !== 'aktiv'
     ? 'Der Einsatz ist abgeschlossen — Bezirke und Betreuungsstellen sind nur noch lesbar.'
     : 'Nur Einsatzleitung und Führungspersonal können Bezirke und Betreuungsstellen anlegen und Meldungen erfassen.';

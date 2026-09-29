@@ -112,7 +112,7 @@ const AKTIONEN_MAX = 4;
  * > 124 und damit die Kartenform — wer in Vitest die Knopfzeile erwartet, rendert im App-Theme
  * `kompakt` (`antdToken(farbenDunkel, 'kompakt')`, Muster in `Grundriss.test.tsx`).
  */
-export type PlatzBedienform = { form: 'zeile'; abstand: number } | { form: 'karte' };
+type PlatzBedienform = { form: 'zeile'; abstand: number } | { form: 'karte' };
 export function platzBedienform(token: {
   controlHeightSM: number;
   marginSM: number;
@@ -127,7 +127,7 @@ export function platzBedienform(token: {
  * Lage einer Platzkarte, aus der ihr Menü folgt. Setzt Schreibrecht voraus: ohne gibt es in keiner
  * Form ein Menü.
  */
-export interface PlatzMenueLage {
+interface PlatzMenueLage {
   form: PlatzBedienform['form'];
   belegt: boolean;
   /** Unbelegt, mit Schreibrecht, nicht im Bearbeiten-Modus — die Bedingung des Wurzelklicks. */

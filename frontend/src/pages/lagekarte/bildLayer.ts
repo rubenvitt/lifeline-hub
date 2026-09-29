@@ -53,12 +53,7 @@ export function setzeBildGeometrie(map: MapLibreMap, id: number, ecken: Ecken) {
   );
 }
 
-export function setzeBildOpazitaet(
-  map: MapLibreMap,
-  id: number,
-  opazitaet: number,
-  sichtbar: boolean,
-) {
+function setzeBildOpazitaet(map: MapLibreMap, id: number, opazitaet: number, sichtbar: boolean) {
   const lid = bildLayerId(id);
   if (map.getLayer(lid)) {
     map.setPaintProperty(lid, 'raster-opacity', sichtbar ? opazitaet / 100 : 0);

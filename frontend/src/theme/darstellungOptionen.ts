@@ -9,7 +9,7 @@ import type { Dichte } from './tokens';
  * Ort neben `ThemeModeProvider` und `tokens`, damit Benutzermenü und Kommandopalette dieselben
  * Stufen zeigen.
  */
-export type Darstellungsstufe<W> = { wert: W; titel: string; Icon: IconType };
+type Darstellungsstufe<W> = { wert: W; titel: string; Icon: IconType };
 
 /**
  * Die Vollständigkeit hängt an dem Objekt, aus dem die Anzeige entsteht: der Index ist die

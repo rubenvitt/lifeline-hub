@@ -55,7 +55,7 @@ export function faerbeOdl(fc: FeatureCollection, token: GlobalToken): FeatureCol
 }
 
 /** Grundlage der Stufe einer Sonde, aus den Properties gelesen. */
-export type OdlGrundlage =
+type OdlGrundlage =
   | {
       art: Extract<OdlBewertung, 'standort'>;
       grundpegel: number;

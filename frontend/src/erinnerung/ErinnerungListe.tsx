@@ -2,7 +2,7 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import type { Erinnerung } from '../api/types';
 import ErinnerungKarte from './ErinnerungKarte';
 
-export interface ErinnerungListeProps {
+interface ErinnerungListeProps {
   erinnerungen: Erinnerung[];
   /** Steuert die Abschluss-Spalten (Erledigt/Quittiert-Zeitpunkt) in der Abgeschlossen-Ansicht. */
   ansicht?: 'offen' | 'abgeschlossen';

@@ -16,7 +16,7 @@ import { zeigerIstGrob } from '../components/useViewport';
 /** Vom Nutzer wählbarer Modus. `system` folgt der OS-Einstellung. */
 export type ThemeModus = 'system' | 'light' | 'dark';
 /** Tatsächlich angewandtes Theme nach Auflösung von `system`. */
-export type EffektivesTheme = 'light' | 'dark';
+type EffektivesTheme = 'light' | 'dark';
 
 const SPEICHER_SCHLUESSEL = 'lifeline-hub.theme';
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';

@@ -2,8 +2,6 @@ import type { EinsatzPersonal, FuehrungskraftKarte, StaerkePosition } from './ty
 import { apiGet, apiSend } from './client';
 import type { PositionPatch } from './einheiten';
 
-export type { PositionPatch } from './einheiten';
-
 export interface AdhocEingabe {
   name: string;
   funktion?: string | null;

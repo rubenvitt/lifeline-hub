@@ -4,7 +4,7 @@ export interface AbschnittDef {
   schluessel: string;
   label: string;
 }
-export interface VorlageDef {
+interface VorlageDef {
   schluessel: LageberichtVorlageKey;
   label: string;
   abschnitte: AbschnittDef[];
@@ -51,9 +51,4 @@ export const VORLAGEN: VorlageDef[] = [
 
 export function vorlage(schluessel: LageberichtVorlageKey): VorlageDef | undefined {
   return VORLAGEN.find((v) => v.schluessel === schluessel);
-}
-
-/** Leeres Abschnitts-Skelett (lokaler Editor-Startzustand). */
-export function leereAbschnitte(v: VorlageDef): { schluessel: string; text: string }[] {
-  return v.abschnitte.map((a) => ({ schluessel: a.schluessel, text: '' }));
 }

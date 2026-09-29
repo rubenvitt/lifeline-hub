@@ -7,8 +7,6 @@ import {
 } from '../pages/lagekarte/geo';
 import { schrift } from '../theme/tokens';
 
-export type { GeoKennzahlenWerte };
-
 interface KennzahlZeileProps {
   /** Beschriftung links, in der gedämpften Metadaten-Stimme. */
   label: string;
@@ -46,7 +44,7 @@ export function KennzahlZeile({ label, wert, zahl = true }: KennzahlZeileProps) 
   );
 }
 
-export interface GeoKennzahlenProps {
+interface GeoKennzahlenProps {
   /** Kennzahlen aus `geoKennzahlen()`; `null`, wenn die Geometrie keine hergibt. */
   kennzahlen: GeoKennzahlenWerte | null;
   /**

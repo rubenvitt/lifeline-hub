@@ -54,7 +54,7 @@ export const TYP_REIHENFOLGE: readonly MarkerTyp[] = [
   'person',
 ];
 
-export interface MarkerGruppe {
+interface MarkerGruppe {
   typ: MarkerTyp;
   label: string;
   treffer: KarteMarker[];

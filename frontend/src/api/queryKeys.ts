@@ -455,20 +455,18 @@ export const GLOBAL_KEYS = {
   fachebene: 'fachebene',
 } as const;
 
-export type GlobalKey = (typeof GLOBAL_KEYS)[keyof typeof GLOBAL_KEYS];
-
 /**
  * Dienstfilter der Stammdaten-Listen (`personal` / `fahrzeuge` / `material`). String-Union
  * statt boolean, weil der Wert als Key-Element auf der Wire liegt. Eingefroren: ein Umbau auf
  * ein Filter-Objekt änderte jeden Cache-Key dieser drei Listen.
  */
-export type Dienstfilter = 'alle' | 'im-dienst';
+type Dienstfilter = 'alle' | 'im-dienst';
 
 /** Die zwei adressierten Bereiche unter dem `aufbewahrung`-Prefix. */
-export type AufbewahrungBereich = 'akte' | 'etb';
+type AufbewahrungBereich = 'akte' | 'etb';
 
 /** Die sieben Bereiche unter dem `admin-karte`-Prefix. */
-export type AdminKarteBereich =
+type AdminKarteBereich =
   | 'katalog'
   | 'bau-status'
   | 'offline-karten'

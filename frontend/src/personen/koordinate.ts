@@ -8,8 +8,7 @@
  *  · Minus ist erlaubt, Bereich WGS84 (±90/±180) wie im Backend (422) — hier vorher gemeldet.
  */
 
-export type KoordinatenErgebnis =
-  { ok: true; lat: number; lon: number } | { ok: false; grund: string };
+type KoordinatenErgebnis = { ok: true; lat: number; lon: number } | { ok: false; grund: string };
 
 const ZAHL = /^-?\d{1,3}(?:[.,]\d+)?$/;
 
