@@ -27,6 +27,9 @@ interface MapHaken {
   loaded(): boolean;
   getZoom(): number;
   getCenter(): { lng: number; lat: number };
+  listImages(): string[];
+  getImage(id: string): { data: { width: number; height: number } } | null | undefined;
+  setStyle(style: unknown, opts: { diff: boolean }): void;
 }
 
 async function anmelden(page: Page) {
@@ -45,6 +48,31 @@ async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   return Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
+}
+
+/** Setzt die Einsatzort-Koordinate. Der Kopf-PATCH ist ein VOLLERSATZ (`KopfdatenUpdate`) — deshalb
+ *  aus dem Bestand gebaut. */
+async function einsatzortSetzen(page: Page, eid: number, ort: { lat: number; lon: number }) {
+  const e = (await (await page.request.get(`/api/einsaetze/${eid}`)).json()) as Record<
+    string,
+    unknown
+  >;
+  const antwort = await page.request.patch(`/api/einsaetze/${eid}`, {
+    data: {
+      bezeichnung: e.bezeichnung,
+      stichwort: e.stichwort ?? null,
+      einsatzart: e.einsatzart,
+      leitstellen_nr: e.leitstellen_nr ?? null,
+      einsatzort: e.einsatzort ?? null,
+      einsatzort_lat: ort.lat,
+      einsatzort_lon: ort.lon,
+      meldende_stelle: e.meldende_stelle ?? null,
+      sachverhalt: e.sachverhalt ?? null,
+      anzahl_betroffene_initial: e.anzahl_betroffene_initial ?? null,
+      begonnen_at: e.begonnen_at,
+    },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
 }
 
 /**
@@ -176,27 +204,7 @@ test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht
   await anmelden(page);
   const eid = await einsatzAnlegenUndOeffnen(page);
   const ort = { lat: 49.3519, lon: 9.1457 };
-  // Der Kopf-PATCH ist ein VOLLERSATZ (`KopfdatenUpdate`) — deshalb aus dem Bestand gebaut.
-  const e = (await (await page.request.get(`/api/einsaetze/${eid}`)).json()) as Record<
-    string,
-    unknown
-  >;
-  const antwort = await page.request.patch(`/api/einsaetze/${eid}`, {
-    data: {
-      bezeichnung: e.bezeichnung,
-      stichwort: e.stichwort ?? null,
-      einsatzart: e.einsatzart,
-      leitstellen_nr: e.leitstellen_nr ?? null,
-      einsatzort: e.einsatzort ?? null,
-      einsatzort_lat: ort.lat,
-      einsatzort_lon: ort.lon,
-      meldende_stelle: e.meldende_stelle ?? null,
-      sachverhalt: e.sachverhalt ?? null,
-      anzahl_betroffene_initial: e.anzahl_betroffene_initial ?? null,
-      begonnen_at: e.begonnen_at,
-    },
-  });
-  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  await einsatzortSetzen(page, eid, ort);
   const stand = await page.request.post(`/api/einsaetze/${eid}/lage-snapshots`, {
     data: { bezeichnung: 'Stand vor Ort' },
   });
@@ -326,4 +334,43 @@ test('Lagekarte: Messwerkzeug misst Strecke und Fläche und schließt mit Escape
   await expect(knopf).toHaveAttribute('aria-pressed', 'false');
 
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
+});
+
+// LFH-835: Fachobjekt-Zeichen kommen aus @einsatzzeichen, synchron über Canvas gerastert —
+// jsdom hat kein Canvas, das belegt nur der Browser. Pixeldichte 2 → 34 CSS-px = 68 Gerätepixel.
+test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  test('Einsatzort-Zeichen in Bildschirmschärfe, auch nach einem Stilwechsel', async ({ page }) => {
+    await anmelden(page);
+    const eid = await einsatzAnlegenUndOeffnen(page);
+    await einsatzortSetzen(page, eid, { lat: 49.3519, lon: 9.1457 });
+    await page.goto(`/einsaetze/${eid}/lagekarte`);
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+    );
+
+    const zeichenBilder = () =>
+      page.evaluate(() => {
+        const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+        if (!map) return null;
+        return map
+          .listImages()
+          .filter((id) => id.startsWith('ez|'))
+          .map((id) => ({ id, breite: map.getImage(id)?.data.width }));
+      });
+
+    await expect
+      .poll(zeichenBilder, { timeout: 15_000, message: 'kein @einsatzzeichen-Bild auf der Karte' })
+      .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68 }]);
+
+    // Ein Grundkarten-/Themenwechsel setzt den Stil neu (`diff: false`) und wirft alle Bilder weg.
+    await page.evaluate(() => {
+      const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte!;
+      map.setStyle(map.getStyle(), { diff: false });
+    });
+    await expect
+      .poll(zeichenBilder, { timeout: 15_000, message: 'Zeichen nach Stilwechsel nicht zurück' })
+      .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68 }]);
+  });
 });

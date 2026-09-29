@@ -1,3 +1,7 @@
+// Hub-Vokabular der taktischen Zeichen: Ableitung aus App-Feldern (`baueTzProps`) und Fest-Specs.
+// Gezeichnet werden die Fachobjekte über @einsatzzeichen (`zeichen/fachobjektZeichen.ts`, LFH-835).
+// Die Importe aus dem Altpaket bleiben für die Kennungstypen und das accepts-Gating der freien
+// Zeichen stehen, bis LFH-836 auch diese umstellt.
 import { grundzeichen as grundzeichenKatalog } from 'taktische-zeichen-react';
 import type {
   ComponentType,

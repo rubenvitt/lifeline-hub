@@ -25,9 +25,9 @@
 ## 3. Lagekarte
 
 - [x] 3.1 `markerIcons.ts`: `markerIconKey(mk)` nach D5. Tests: freies Zeichen → `tz|…`, Fachobjekt → `ez|…`, gleiche wirksame Spec → gleicher Schlüssel, ohne `tz` → `undefined`. `markerLayer.ts` nutzt `markerIconKey`, `markerLayer.test.ts` ist grün.
-- [ ] 3.2 `Kartenflaeche.tsx`: Registry `{art:'ez', drawing} | {art:'tz', tz}`. Der `ez|`-Zweig im `styleimagemissing` läuft über `addSymbolImage` (size 34, `pixelRatio = max(1, ceil(devicePixelRatio))`, `hasImage`-Guard, `try/catch`). Der `tz|`-Zweig bleibt unverändert. Belegt über den e2e aus 3.4.
+- [x] 3.2 `Kartenflaeche.tsx`: Registry `{art:'ez', drawing} | {art:'tz', tz}`. Der `ez|`-Zweig im `styleimagemissing` läuft über `addSymbolImage` (size 34, `pixelRatio = max(1, ceil(devicePixelRatio))`, `hasImage`-Guard, `try/catch`). Der `tz|`-Zweig bleibt unverändert. Belegt über den e2e aus 3.4.
 - [x] 3.3 `Inspector.tsx`: Die Kachel zeigt für Fachobjekte die Data-URL aus `renderSvg`, für freie Zeichen den bisherigen Weg. In `Inspector.test.tsx` ist die Kachel `img` für eine Einheit vorhanden, und ein nicht darstellbares Zeichen bringt den Inspector nicht zum Absturz.
-- [ ] 3.4 e2e `lagekarte-smoke.spec.ts` erweitern: Nach dem Laden trägt die Karte ein Bild mit Präfix `ez|`, und `__lfhKarte.getImage(id)` hat die Breite `34 × ceil(devicePixelRatio)`. Nach einem Grundkartenwechsel ist das Bild wieder da. Grün lokal. `gate3-trefflaeche.spec.ts` (UHS-Marker) ist grün.
+- [x] 3.4 e2e `lagekarte-smoke.spec.ts` erweitern: Nach dem Laden trägt die Karte ein Bild mit Präfix `ez|`, und `__lfhKarte.getImage(id)` hat die Breite `34 × ceil(devicePixelRatio)`. Nach einem Grundkartenwechsel ist das Bild wieder da. Grün lokal. `gate3-trefflaeche.spec.ts` (UHS-Marker) ist grün.
 
 ## 4. Meldebild
 
@@ -38,7 +38,7 @@
 
 ## 5. Nachweise und Abschluss
 
-- [ ] 5.1 Keine Fachobjekt-Datei importiert mehr aus `taktische-zeichen-react`. Prüfen per `grep` in `marker.ts`, `markerIcons.ts`, `EinheitZeichen.tsx`, `Inspector.tsx` (außer im Zweig für freie Zeichen) und `taktischesZeichen.ts` (außer `grundzeichenAkzeptiert` und den Typen). Die verbleibenden Importe stehen mit Verweis auf LFH-836 im Dateikopf.
+- [x] 5.1 Keine Fachobjekt-Datei importiert mehr aus `taktische-zeichen-react`. Prüfen per `grep` in `marker.ts`, `markerIcons.ts`, `EinheitZeichen.tsx`, `Inspector.tsx` (außer im Zweig für freie Zeichen) und `taktischesZeichen.ts` (außer `grundzeichenAkzeptiert` und den Typen). Die verbleibenden Importe stehen mit Verweis auf LFH-836 im Dateikopf.
 - [ ] 5.2 Sichtprüfung im Browser (Dev-Stack, Demo-Einsatz) in Tag- und Nachtmodus: Karte mit Einheit, Fahrzeug, Führungskraft, Abschnitt, UHS, Betreuungsstelle, Schaden und Einsatzort, dazu die Inspector-Kachel und die Spalte „TZ“ im Meldebild. Screenshots liegen im Change-Ordner.
 - [ ] 5.3 Prüfliste Einsatztauglichkeit (15 Kriterien) für Lagekarte und Meldebild als `pruefliste.md` im Change-Ordner, jede Zeile mit Verdikt.
 - [ ] 5.4 Bundle messen: `vite build`, Größe des neuen Chunks und Precache-Summe vorher/nachher in `pruefliste.md` notiert. `e2e/lagekarte-offline-precache.spec.ts` ist grün.
