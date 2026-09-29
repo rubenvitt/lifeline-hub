@@ -27,12 +27,18 @@ pub struct LoginRequest {
 
 /// Baut das Session-Cookie; `Secure` folgt dem Transport. Pur, damit beide Zweige ohne den
 /// prozessweiten OnceLock testbar sind.
+///
+/// Persistent mit `Max-Age` = Sitzungsdauer (LFH-779): ohne Ablaufangabe verwerfen Webviews
+/// (Tauri-Hülle) und Browser das Cookie beim Prozessende, und nach jedem Neustart stünde der
+/// Login da. Widerruf bleibt serverseitig (Abmelden, Konto sperren, Passwortwechsel löschen die
+/// Sitzung); ein übrig gebliebenes Cookie läuft dann in 401.
 fn session_cookie(token: String, secure: bool) -> Cookie<'static> {
     Cookie::build((SESSION_COOKIE, token))
         .http_only(true)
         .same_site(SameSite::Lax)
         .secure(secure)
         .path("/")
+        .max_age(time::Duration::days(session::SITZUNG_TAGE))
         .build()
 }
 
@@ -1181,6 +1187,15 @@ mod tests {
         // Beide Zweige, ohne OnceLock.
         assert_eq!(session_cookie("t".into(), true).secure(), Some(true));
         assert_ne!(session_cookie("t".into(), false).secure(), Some(true));
+    }
+
+    #[test]
+    fn session_cookie_lebt_so_lange_wie_die_serversitzung() {
+        // LFH-779: ohne Max-Age verwirft eine Webview das Cookie beim Neustart.
+        assert_eq!(
+            session_cookie("t".into(), false).max_age(),
+            Some(time::Duration::days(7))
+        );
     }
 
     #[test]

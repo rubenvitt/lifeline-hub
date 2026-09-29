@@ -42,6 +42,20 @@ async fn login_erfolgreich_setzt_httponly_cookie() {
     assert!(cookie.to_lowercase().contains("httponly"));
 }
 
+/// LFH-779: Das Cookie ist persistent und lebt genau so lange wie die Serversitzung (7 Tage).
+/// Ohne `Max-Age` verwerfen Webviews (Tauri-Hülle) und Browser es beim Prozessende.
+#[tokio::test]
+async fn login_cookie_lebt_so_lange_wie_die_serversitzung() {
+    let app = setup().await;
+    let (status, cookie) = login(&app, "admin", "startpw12").await;
+    assert_eq!(status, StatusCode::OK);
+    let cookie = cookie.expect("Set-Cookie erwartet");
+    assert!(
+        cookie.contains("Max-Age=604800"),
+        "Max-Age = 7 Tage erwartet: {cookie}"
+    );
+}
+
 #[tokio::test]
 async fn login_mit_falschem_passwort_ist_401() {
     let app = setup().await;
@@ -121,6 +135,17 @@ async fn logout_invalidiert_session() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    // Das persistente Cookie (LFH-779) muss der Logout aktiv verfallen lassen.
+    let geraeumt = resp
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("Logout räumt das Cookie")
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(geraeumt.starts_with("lifeline_sid=;"), "{geraeumt}");
+    assert!(geraeumt.contains("Max-Age=0"), "{geraeumt}");
+    assert!(geraeumt.contains("Path=/"), "{geraeumt}");
 
     // Dieselbe Session ist danach ungültig.
     let resp = app
