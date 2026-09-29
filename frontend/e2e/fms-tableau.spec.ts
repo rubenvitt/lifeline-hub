@@ -1,18 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * FMS-Tableau (LFH-642) im echten Browser — zwei Aussagen, die jsdom nicht tragen kann:
+ * FMS-Tableau im echten Browser:
+ *  1. Kein waagerechter Querlauf auf 390, 1024 und 1366 px (Raster
+ *     `minmax(min(100%, 208px), 1fr)`).
+ *  2. Die Ziffer setzt den Status gegen das echte Backend, und der Wechsel überlebt das
+ *     Neuladen — derselbe PATCH wie das Menü.
  *
- *  1. **Kein waagerechter Querlauf** auf 390, 1024 und 1366 px. Das Kachelraster rechnet
- *     mit `minmax(min(100%, 208px), 1fr)` — ob das am Handschirm eine Spalte ergibt statt
- *     zu überlaufen, ist Layout und in jsdom unsichtbar.
- *  2. **Die Ziffer setzt den Status gegen das echte Backend** und der Wechsel überlebt das
- *     Neuladen: der Beschleuniger schreibt denselben PATCH wie das Menü.
- *
- * Die Wache vor jeder Messung zeigt auf einen Wortlaut, der erst MIT den Daten erscheint
- * (Lehre aus `kraefte-schmal.spec.ts`: `body` ist immer sichtbar, eine Messung davor
- * prüft den Ladebildschirm). Kein `networkidle` — auf Einsatzrouten bleibt der SSE-Strom
- * offen (LFH-385).
+ * Die Wache vor jeder Messung zeigt auf einen Wortlaut, der erst MIT den Daten erscheint. Kein
+ * `networkidle` (SSE-Strom).
  */
 
 const ADMIN = 'admin';
@@ -24,8 +20,6 @@ const FAHRZEUG_FREI = 'Florian Tableau 2';
 const EINHEIT = 'Tableauzug';
 const ABSCHNITT = 'EA Tableau';
 
-// Login-/Anlege-Helfer kopiert — es gibt (noch) kein geteiltes e2e-Hilfsmodul
-// (gleichlautend in den Bestands-Specs vermerkt).
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -103,8 +97,7 @@ test('Ziffern setzen den Status der fokussierten Kachel nacheinander, und er üb
   await expect(knopf).toContainText('Am Einsatzort');
 
   // Während der Mutation ist der Knopf `disabled`, und der Browser wirft den Fokus auf
-  // <body> (Review LFH-642). Das Tableau gibt ihn danach zurück — sonst ginge die zweite
-  // Ziffer ins Leere. Das ist die Aussage, die jsdom nicht tragen kann.
+  // <body>. Das Tableau gibt ihn zurück — sonst ginge die zweite Ziffer ins Leere.
   await expect(knopf).toBeFocused();
   await page.keyboard.press('5');
   await expect(knopf).toContainText('S5');

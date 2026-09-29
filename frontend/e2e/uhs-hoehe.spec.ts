@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// LFH-459: Eine feste Reserve verschenkt Platz oder schiebt die Unterkante aus dem
-// Fenster. Echte Layout-Messung; jsdom kann diesen Fehler nicht nachweisen.
+// Eine feste Reserve verschenkt Platz oder schiebt die Unterkante aus dem Fenster. Echte
+// Layout-Messung; jsdom kann diesen Fehler nicht nachweisen.
 async function aufbauen(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill('admin');
@@ -50,7 +50,7 @@ test('UHS mit langem Kopf erhält eine nutzbare Arbeitsfläche vor den nachfolge
   await page.goto(pfad);
   await expect(page.getByText('Bett 2', { exact: true })).toBeVisible();
   const grundriss = page.getByTestId('grundriss-rahmen');
-  // Die bisherige Mindest-Arbeitsfläche war 380px; sie ist kein Kopf-Abzug.
+  // Die Mindest-Arbeitsfläche des Grundrisses ist 380 px; sie ist kein Kopf-Abzug.
   expect((await grundriss.boundingBox())!.height).toBeGreaterThanOrEqual(380);
   const reihenfolge = await grundriss.evaluate((el) => {
     const material = [...document.querySelectorAll('[role="tab"]')].find(
@@ -83,8 +83,8 @@ async function fuelltArbeitsflaeche(page: Page) {
     .poll(
       async () => {
         const m = await grundrissMessen(page);
-        // LFH-462: Bei 390 × 844 und Handschuh-Dichte bleiben nach dem Kopf weniger
-        // als 380px. Der bestehende Mindestboden verlangt dann Dokument-Scroll.
+        // Bei 390 × 844 und Handschuh-Dichte bleiben nach dem Kopf weniger als 380 px; der
+        // Mindestboden verlangt dann Dokument-Scroll.
         const unterkante = Math.max(m.fenster - m.polster, m.oben + 380);
         return Math.abs(m.unten - unterkante);
       },
@@ -142,11 +142,9 @@ for (const breite of [1366, 1024, 390]) {
     await bewegungen.scrollIntoViewIfNeeded();
     await expect(bewegungen).toBeInViewport();
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-    // Resize NACH Scroll: viewport-relatives top allein würde die Höhe aufblasen.
-    // Bei 390 px soll der Resize den BODEN-Zweig erzwingen (Resthöhe < 380 px). Bis zum
-    // Neuentwurf reichte dafür 844 px Fensterhöhe; seit dem 44-px-Seitenkopf bleiben dort
-    // gemessen 449 px, der Boden wäre unerreicht und die Aussage unten leer. 600 px stellt
-    // die Vorbedingung wieder her — die Schwelle 380 bleibt, verschoben ist nur das Fenster.
+    // Resize NACH Scroll: viewport-relatives top allein würde die Höhe aufblasen. Bei 390 px
+    // erzwingt eine Fensterhöhe von 600 px den BODEN-Zweig (Resthöhe < 380 px); bei 844 px
+    // bliebe mehr, und die Aussage unten wäre leer.
     await page.setViewportSize({ width: breite, height: breite === 390 ? 600 : 844 });
     const verkleinert = await fuelltArbeitsflaeche(page);
     if (breite === 390) {

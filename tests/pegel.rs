@@ -10,8 +10,6 @@
 //! und in spätere Läufe.
 
 use axum::http::StatusCode;
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::karte::cache;
 use lifeline_hub::pegel::trend::Messpunkt;
 use serde_json::Value;
@@ -60,21 +58,12 @@ async fn stumme_basis() -> String {
 }
 
 async fn setup_mit_pegel_basis(basis: &str) -> Umgebung {
-    let pool = lifeline_hub::db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
     let dir = tempfile::tempdir().unwrap();
-    let app = build_router(AppState {
-        pool: pool.clone(),
-        live: lifeline_hub::live::LiveHub::new(),
-        karten_dir: dir.path().to_path_buf(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu().mit_pegel_basis_url(basis),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
+    let (app, pool) = setup_mit_state(|s| {
+        s.karten_dir = dir.path().to_path_buf();
+        s.fachebenen = lifeline_hub::karte::FachebenenState::neu().mit_pegel_basis_url(basis);
+    })
+    .await;
     Umgebung { app, pool, dir }
 }
 

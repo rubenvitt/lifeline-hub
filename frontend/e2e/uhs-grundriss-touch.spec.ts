@@ -1,53 +1,22 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
- * UHS-Grundriss unter Berührungsbedienung (LFH-341 · C6, AK 1 und AK 2).
+ * UHS-Grundriss unter Berührungsbedienung.
  *
- * ── WARUM DER DRAG BEI 1024 UND DER KLICKWEG BEI 390 PX GEPRÜFT WIRD ────────────────────
+ * DRAG BEI 1024, KLICKWEG BEI 390 PX: unter `lg` bricht `pages/uhs/Grundriss.tsx` in drei
+ * Reiter um, mit `destroyOnHidden` — ohne die Prop bliebe eine einmal besuchte Pane montiert.
+ * Personenliste (Quelle) und Platzkarte (Ziel) liegen dann in verschiedenen Reitern, das
+ * Droppable existiert nicht, während die Quelle sichtbar ist. Ein Drag-Test bei 390 px wäre
+ * ein Test gegen eine bewusste Entwurfsentscheidung.
  *
- * Das ist keine Bequemlichkeit, sondern folgt aus dem Bau. Unter `lg` (992 px) bricht
- * `pages/uhs/Grundriss.tsx` in drei Reiter um — „Fläche | Wartebereich | Transport", die
- * Fläche voran — und zwar mit **`destroyOnHidden`**: der inaktive Reiter steht wirklich nicht
- * im Baum. Die Prop ist dafür nötig und nicht bloss Zierde (gemessen im Abschluss-Review):
- * antds Vorgabe reicht `destroyOnHidden ?? destroyInactiveTabPane` durch, beide `undefined`
- * ergeben `removeOnLeave: false` — eine einmal BESUCHTE Pane bliebe montiert, nur mit
- * `display: none`. Damit liegen bei 390 px die Personenliste (Quelle) und die Platzkarte
- * (Ziel) in verschiedenen Reitern; das Droppable existiert gar nicht, während die Quelle
- * sichtbar ist.
+ * POINTER-EVENTS VON HAND: Playwright kann per `touchscreen` nur tippen, ein Drag über
+ * `page.mouse` wäre `pointerType: 'mouse'`. dnd-kits `PointerSensor` hört auf Pointer Events,
+ * also werden sie einzeln mit `pointerType: 'touch'` abgesetzt. FALLE: dnd-kit vermisst seine
+ * Droppables in einem Effekt NACH dem Drag-Start und rechnet die Kollision nur bei einer
+ * Koordinatenänderung neu — kommen alle Bewegungen in einem Tick, bleibt `over` null und es
+ * fliegt kein Request. Deshalb je Schritt ein doppeltes `requestAnimationFrame`.
  *
- * Ein Drag-Test bei 390 px könnte deshalb **nicht grün werden** — nicht weil etwas kaputt
- * wäre, sondern weil die Geste dort strukturell keine ist. Wer ihn dennoch hinzufügt,
- * schreibt einen Test gegen eine bewusste Entwurfsentscheidung.
- *
- * Deshalb die Aufteilung:
- *   * **1024 px** (Kontext „Führungs-Tablet") — dort stehen beide Spalten nebeneinander,
- *     dort ist der Drag der gemeinte Weg, dort wird er unter Touch belegt.
- *   * **390 px** (Kontext „mobil") — dort ist der Klickweg aus LFH-367/B5g der einzige Weg,
- *     dort wird er unter echtem Touch-Tap belegt, samt Rückweg über das Platzaktionen-Menü.
- *
- * ── WARUM DIE POINTER-EVENTS VON HAND KOMMEN ────────────────────────────────────────────
- *
- * Playwright hat keine Touch-Drag-API: `page.touchscreen` kann tippen, nicht ziehen. Ein
- * Drag über `page.mouse` wäre `pointerType: 'mouse'` und belegte genau das nicht, was hier
- * zu belegen ist. dnd-kits `PointerSensor` hört auf Pointer Events — die drei Ereignisse
- * werden deshalb einzeln mit `pointerType: 'touch'` abgesetzt.
- *
- * GEMESSEN, und die Falle, an der der erste Anlauf hing: die Bewegungen dürfen NICHT in
- * einem synchronen Rutsch kommen. dnd-kit vermisst seine Droppables (`MeasuringStrategy`)
- * in einem Effekt NACH dem Drag-Start und rechnet die Kollision nur bei einer
- * Koordinatenänderung neu. Feuern alle Bewegungen in einem Tick, ist beim letzten
- * `pointermove` noch nichts vermessen, danach ändert sich nichts mehr — `over` bleibt
- * `null`, `onDragEnd` kehrt früh zurück und es fliegt kein einziger Request. Der Test war
- * rot, obwohl der Drag lief (das Overlay stand). Deshalb liegt zwischen den Schritten je
- * ein doppeltes `requestAnimationFrame`. Ein Maus-Drag über `page.mouse.move(..., {steps})`
- * hat das Problem nicht, weil Playwright die Schritte ohnehin über Frames verteilt.
- *
- * ── SEEDING PER `page.request` ──────────────────────────────────────────────────────────
- *
- * Die Session ist Cookie-basiert (`api/client.ts`, `credentials: 'same-origin'`, kein
- * CSRF-Header), `page.request` teilt den Cookie-Jar des Kontexts. Der Scroll-Fall braucht
- * gut vierzig Personen — über die Schnellerfassung wären das ~80 Interaktionen und der Test
- * bestünde zu neun Zehnteln aus Aufbau. Muster aus `betroffene-schmal.spec.ts`.
+ * Seeding per `page.request`: der Scroll-Fall braucht gut vierzig Personen.
  */
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -57,15 +26,13 @@ const TABLET = { width: 1024, height: 900 };
 /** Mobil: ~390 px, einhändig. Hier greift die Reiter-Weiche. */
 const HANDSCHIRM = { width: 390, height: 844 };
 
-/** Der Belegungs-Endpunkt. `uhs-belegung`, NICHT `belegung` — s. `api/einsatzUhs.ts`. */
+/** Der Belegungs-Endpunkt: `uhs-belegung`, NICHT `belegung`. */
 const BELEGUNG = /\/api\/einsaetze\/\d+\/personen\/\d+\/uhs-belegung$/;
 /** Die Personen-LISTE. Das `(\?|$)` grenzt sie gegen `…/personen/7/uhs-belegung` ab. */
 const PERSONEN_LISTE = /\/api\/einsaetze\/\d+\/personen(\?|$)/;
 
-// Touch-Kontext für die ganze Datei: erst mit `hasTouch` erlaubt Playwright `tap()`.
-// Nebenwirkung, gemessen und beabsichtigt: `matchMedia('(pointer: coarse)')` trifft damit
-// zu, `useViewport.zeigerIstGrob` belegt die Dichtestufe also auf „komfortabel" vor —
-// genau der Kontext, für den diese Datei geschrieben ist.
+// Touch-Kontext: erst mit `hasTouch` erlaubt Playwright `tap()`. Damit trifft
+// `(pointer: coarse)` zu, und die Dichte ist per Vorgabe „komfortabel" — gewollt.
 test.use({ hasTouch: true });
 
 async function anmelden(page: Page) {
@@ -91,13 +58,10 @@ interface Aufbau {
 }
 
 /**
- * Legt Einsatz, Person(en), eine aktive UHS und einen freien Platz „Bett 1" an und öffnet
- * die UHS-Detailseite. Die benannte Person bleibt bewusst UNZUGEORDNET („Noch nicht
- * aufgenommen") — sie ist Quelle sowohl des Drags als auch des Klickwegs.
- *
- * `fuellPersonen` erzeugt zusätzliche namenlose Personen; sie dienen allein dazu, die linke
- * Spalte über ihre sichtbare Höhe hinauswachsen zu lassen (Scroll-Fall). Die benannte
- * Person wird ZUERST angelegt und steht deshalb oben in der Liste — sichtbar ohne Scrollen.
+ * Legt Einsatz, Person(en), eine aktive UHS und einen freien Platz „Bett 1" an und öffnet die
+ * UHS-Detailseite. Die benannte Person bleibt UNZUGEORDNET — Quelle von Drag und Klickweg —
+ * und steht als erste angelegte oben in der Liste. `fuellPersonen` lässt die linke Spalte
+ * über ihre Höhe wachsen (Scroll-Fall).
  */
 async function setupPatientUndPlatz(page: Page, fuellPersonen = 0): Promise<Aufbau> {
   await anmelden(page);
@@ -213,21 +177,11 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await page.setViewportSize(TABLET);
     const { personName } = await setupPatientUndPlatz(page);
 
-    // ZUSATZAUFTRAG (aus Task 6 weitergereicht): das optimistische Update des
-    // DRAG-Aufrufers von `belegMut` ist in jsdom nicht belegbar — der Personen-Drop
-    // braucht ein `over` aus dnd-kits Kollisionserkennung, und die beruht auf
-    // `getBoundingClientRect`, das in jsdom immer {0,0,0,0} liefert. Im Browser geht es,
-    // indem der Serverruf angehalten wird: in diesem Fenster muss die Karte bereits am
-    // Zielplatz stehen.
-    //
-    // ZURÜCKGEHALTEN WIRD DIE ANFRAGE, NICHT DIE ANTWORT — und das ist der Unterschied
-    // zwischen einem Beweis und einer Attrappe. Gemessen: mit bloß verzögerter ANTWORT
-    // (`route.fetch()`, warten, `fulfill`) blieb dieser Test grün, obwohl `onMutate` in
-    // `belegMut` abgeschaltet war. Denn `route.fetch()` schickt die Anfrage sofort los, der
-    // Server schreibt die Belegung und sein Live-Ereignis (SSE) treibt eine Nachladung an —
-    // die Karte steht dann am Zielplatz, ohne dass je optimistisch etwas geschehen wäre.
-    // Solange die Anfrage den Server nicht erreicht, kann NUR das optimistische Update sie
-    // dorthin gebracht haben.
+    // Das optimistische Update des Drag-Aufrufers ist in jsdom nicht belegbar (dnd-kits
+    // Kollision braucht echte Rechtecke). Hier wird die ANFRAGE zurückgehalten, nicht die
+    // Antwort: mit `route.fetch()` erreichte die Anfrage den Server, dessen SSE-Ereignis lud
+    // nach, und der Test blieb auch ohne `onMutate` grün. Solange die Anfrage den Server nicht
+    // erreicht, kann nur das optimistische Update die Karte an den Zielplatz gebracht haben.
     let anfrageDurchgelassen = false;
     await page.route(BELEGUNG, async (route) => {
       await new Promise((fertig) => setTimeout(fertig, 2500));
@@ -241,8 +195,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
 
     await ziehePerTouch(page, page.getByText(personName).first(), platz);
 
-    // Der Drop traf den PLATZ, nicht Wartebereich oder Transport: `platz_id` ist der
-    // einzige Unterscheider — `art` ist auf allen Wegen eine Zeichenkette und bewiese nichts.
+    // Der Drop traf den PLATZ: `platz_id` ist der einzige Unterscheider.
     const req = await belegung;
     const koerper = JSON.parse(req.postData() ?? '{}') as { platz_id?: number | null };
     expect(typeof koerper.platz_id, 'der Drop traf die Platzkarte').toBe('number');
@@ -264,12 +217,11 @@ test.describe('UHS-Grundriss unter Touch', () => {
     const { personName } = await setupPatientUndPlatz(page);
 
     let abgelehnt = false;
-    // Die Ablehnung kommt VERZÖGERT, damit der optimistische Zustand lange genug steht,
-    // um ihn überhaupt behaupten zu können.
+    // Die Ablehnung kommt VERZÖGERT, damit der optimistische Zustand lange genug steht.
     await page.route(BELEGUNG, async (route) => {
       await new Promise((fertig) => setTimeout(fertig, 1200));
-      // Die Marke MUSS vor dem Ausliefern stehen: sonst schlüpft die von `onSettled`
-      // ausgelöste Nachladung an der Bremse unten vorbei.
+      // Die Marke MUSS vor dem Ausliefern stehen, sonst schlüpft die Nachladung aus
+      // `onSettled` an der Bremse unten vorbei.
       abgelehnt = true;
       await route.fulfill({
         status: 422,
@@ -277,23 +229,17 @@ test.describe('UHS-Grundriss unter Touch', () => {
         body: JSON.stringify({ error: 'E2E: Zuordnung abgelehnt' }),
       });
     });
-    // DIE BREMSE, und sie ist der Kern dieser Zusicherung: `belegMut` hängt ein
-    // `onSettled: invalidate` an, das die Personenliste neu lädt. Ohne diese Bremse wäre
-    // der Test auch dann grün, wenn das Zurückrollen in `onError` GELÖSCHT wäre — der
-    // Refetch stellte den Serverstand ohnehin wieder her, und die Zusicherung prüfte den
-    // Refetch statt das Rollback. Mit angehaltener Nachladung kann nur das Rollback selbst
-    // die Karte zurückbringen. (`uhsDetail` lädt weiterhin frei nach; die Belegung wird
-    // aus der PERSONENLISTE abgeleitet — `belegtAn` liest `personenInUhs`.)
+    // DIE BREMSE ist der Kern: `belegMut` lädt in `onSettled` die Personenliste nach, und ein
+    // Refetch stellte den Serverstand auch ohne Rollback in `onError` wieder her. Mit
+    // angehaltener Nachladung kann nur das Rollback die Karte zurückbringen (die Belegung
+    // wird aus der Personenliste abgeleitet).
     let nachladungDurchgelassen = false;
     await page.route(PERSONEN_LISTE, async (route) => {
       if (!abgelehnt || route.request().method() !== 'GET') {
         await route.continue();
         return;
       }
-      // 3000, nicht mehr: Playwright wartet beim Kontextabbau auf laufende Route-Handler,
-      // eine Bremse, die den Test überlebt, kostet jeden Lauf Leerlauf und kann ein
-      // `route.continue()` gegen eine geschlossene Seite werfen. Die Zusicherungen unten
-      // laufen mit 2500 ms — die Aussage trägt genauso.
+      // Nicht länger: Playwright wartet beim Kontextabbau auf laufende Route-Handler.
       await new Promise((fertig) => setTimeout(fertig, 3000));
       nachladungDurchgelassen = true;
       await route.continue();
@@ -307,10 +253,8 @@ test.describe('UHS-Grundriss unter Touch', () => {
 
     // Erst optimistisch am Ziel …
     await expect(platz, 'optimistisch am Zielplatz').toContainText(personName, { timeout: 1000 });
-    // … dann zurück, weil der Server abgelehnt hat. Die Fristen sind KURZ und mit Absicht:
-    // sie müssen unter der Bremse oben liegen. Gemessen — mit der Vorgabefrist (10 s) blieb
-    // dieser Test grün, obwohl das Rückrollen in `onError` gelöscht war: die Zusicherung
-    // wartete die Bremse einfach aus und prüfte dann die Nachladung.
+    // … dann zurück. Die Fristen liegen mit Absicht unter der Bremse: mit der Vorgabefrist
+    // wartete die Zusicherung die Bremse aus und prüfte die Nachladung statt des Rollbacks.
     await expect(platz, 'nach der Ablehnung nicht mehr am Zielplatz').not.toContainText(
       personName,
       { timeout: 2500 },
@@ -326,8 +270,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
 
   test('Führungs-Tablet: die Warteliste scrollt bei ANGEHALTENEM Drag weiter', async ({ page }) => {
     await page.setViewportSize(TABLET);
-    // Vierzig Füllpersonen: ohne Überlänge gibt es nichts zu scrollen, und die Zusicherung
-    // wäre nicht widerlegbar.
+    // Vierzig Füllpersonen: ohne Überlänge gibt es nichts zu scrollen.
     const { personName } = await setupPatientUndPlatz(page, 40);
 
     const spalte = page.getByTestId('warteliste-scroll');
@@ -343,53 +286,29 @@ test.describe('UHS-Grundriss unter Touch', () => {
       el.scrollTop = 0;
     });
 
-    // Das AK verlangt den Scroll WÄHREND des Drags. Ein Scrolltest ohne laufenden Drag
-    // prüft etwas anderes — und `touchAction !== 'none'` allein halten die beiden
-    // Bestands-Zusicherungen aus B5g in `Grundriss.test.tsx` schon billiger.
-    // Deshalb: pointerdown + Bewegungen, dann scrollen, ERST DANACH beenden.
-    //
-    // ZWEI GEMESSENE FALLEN, beide am Ort des Drags — wer hier Koordinaten ändert, liest
-    // erst weiter:
-    //
-    //  1. **Der Auto-Scroller.** dnd-kit scrollt selbsttätig, sobald die gezogene Karte im
-    //     äußeren Fünftel eines Scrollcontainers steht (Default-Schwelle 0.2, hier also
-    //     120 px). Der erste Anlauf hielt den Drag 83 px unter der Oberkante: der
-    //     Auto-Scroller zog unablässig nach oben und klemmte `scrollTop` auf 0. Deshalb
-    //     liegen BEIDE Punkte unten im mittleren Drittel.
-    //  2. **Das DragOverlay schluckt das Rad.** Es ist `position: fixed` und trägt
-    //     dnd-kits eigenes `touchAction: 'none'`; liegt es unter dem Zeiger, hittestet
-    //     Chromium das Rad auf ein fixiertes Element, dessen Scrollkette an der Liste
-    //     VORBEI direkt aufs Dokument führt — gemessen: Spalte 0, Dokument 241. Und weil
-    //     das Overlay dem Zeiger folgt, zieht ein `page.mouse.move` an die Radposition es
-    //     genau dorthin. Deshalb wird die Maus ZUERST gesetzt und der Touch-Drag danach
-    //     woanders angehalten; die synthetischen Ereignisse bewegen den echten Zeiger nicht.
-    // Die beiden Abstände sind aus der Spaltenhöhe bei `TABLET` hergeleitet: der Grundriss
-    // steht in `calc(100vh - 300px)`, bei 900 px Fensterhöhe also 600 px. Beide Punkte
-    // liegen damit im mittleren Drittel. Wer `TABLET.height` ändert, rechnet sie nach —
-    // die beiden Gegenproben unten melden es sonst, aber erst zur Laufzeit.
+    // Gescrollt wird WÄHREND eines laufenden Drags: pointerdown + Bewegungen, dann scrollen,
+    // erst danach beenden. Zwei Fallen am Ort des Drags:
+    //  1. Der Auto-Scroller von dnd-kit scrollt, sobald die Karte im äußeren Fünftel des
+    //     Containers steht, und klemmte `scrollTop` auf 0. Deshalb liegen beide Punkte im
+    //     mittleren Drittel (hergeleitet aus der Spaltenhöhe bei `TABLET`, `calc(100vh - 300px)`).
+    //  2. Das DragOverlay (`position: fixed`, `touchAction: 'none'`) schluckt das Rad, wenn es
+    //     unter dem Zeiger liegt — die Scrollkette führt dann aufs Dokument. Deshalb wird die
+    //     Maus ZUERST gesetzt und der Touch-Drag woanders angehalten.
     const kasten = (await spalte.boundingBox())!;
     const radPunkt = { x: kasten.x + kasten.width / 2, y: kasten.y + 300 };
     const haltePunkt = { x: kasten.x + kasten.width / 2, y: kasten.y + 420 };
     await page.mouse.move(radPunkt.x, radPunkt.y);
     await starteTouchDrag(page.getByText(personName).first(), haltePunkt);
 
-    // Der Drag LÄUFT — ohne diesen Beleg fiele der Test auf den billigen Scrolltest
-    // zurück. Das Overlay steht nur zwischen `onDragStart` und `onDragEnd`/`onDragCancel`.
+    // Der Drag LÄUFT (das Overlay steht nur zwischen Start und Ende) — sonst wäre das der
+    // billige Scrolltest.
     await expect(page.getByTestId('drag-overlay'), 'der Drag läuft wirklich').toBeVisible();
 
-    // (a) DIE TOUCH-SEITE. Kein Knoten von der gezogenen Karte bis zum Scrollcontainer
-    //     sperrt den Finger. Das ist die eigentliche Aussage der B5g-Entscheidung gegen
-    //     `touch-action: 'none'` — und die einzige, die überhaupt etwas über den FINGER
-    //     sagt: Chromium fährt kein Compositor-Scrolling aus untrusted Touch-Events, ein
-    //     synthetischer Wisch bewegte also nichts, was ein echter nicht auch bewegte.
-    //     (dnd-kit setzt `touchAction: 'none'` sehr wohl — aber auf sein eigenes
-    //     DragOverlay, das `position: fixed` neben der Liste schwebt und nicht in dieser
-    //     Kette liegt.)
-    // Der Startknoten hängt am NAMEN, nicht an der ersten Personenmarke im Container: die
-    // gezogene Person steht heute zufällig oben (sie wird zuerst angelegt), und ein
-    // `querySelector` auf die erste Marke wäre damit von der Anlagereihenfolge abhängig statt
-    // von der Aussage. Die Mutationsprobe deckt das nicht auf — sie trifft nur das obere Ende
-    // der Kette. Gegriffen wird über `data-lfh`, nicht über eine antd-Klasse (LFH-621).
+    // (a) DIE TOUCH-SEITE: kein Knoten von der gezogenen Karte bis zum Scrollcontainer sperrt
+    //     den Finger (`touch-action: none`). Chromium scrollt nicht aus untrusted Touch-Events,
+    //     ein synthetischer Wisch bewiese also nichts. dnd-kits eigenes `none` am DragOverlay
+    //     liegt nicht in dieser Kette. Der Startknoten hängt am NAMEN, nicht an der ersten
+    //     Personenmarke — sonst hinge die Aussage an der Anlagereihenfolge.
     const gesperrt = await spalte.evaluate((container, name) => {
       const start = Array.from(
         container.querySelectorAll<HTMLElement>('[data-lfh="personenkarte"]'),
@@ -406,11 +325,9 @@ test.describe('UHS-Grundriss unter Touch', () => {
     }, personName);
     expect(gesperrt, 'kein Knoten der Warteliste schaltet natives Scrollen ab').toEqual([]);
 
-    // (b) DIE SCROLL-SEITE: der Container ist mitten im Drag noch ein lebender Scroller.
-    //     Gemessen per Rad, weil das der einzige Scrollweg ist, den Playwright
-    //     vertrauenswürdig auslösen kann. Davor stehen die Gegenproben zu den beiden
-    //     Fallen oben — ohne sie wäre nicht zu unterscheiden, ob das Rad gescrollt hat
-    //     oder der Auto-Scroller, und ob überhaupt die Liste gemeint war.
+    // (b) DIE SCROLL-SEITE: der Container ist mitten im Drag noch ein lebender Scroller,
+    //     per Rad gemessen. Die Gegenproben davor trennen Rad von Auto-Scroller und Liste von
+    //     Dokument.
     expect(await spalte.evaluate((el) => el.scrollTop), 'vor dem Rad steht die Liste still').toBe(
       0,
     );
@@ -422,9 +339,8 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await page.mouse.wheel(0, 300);
     await expect.poll(async () => spalte.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
 
-    // Drag ABBRECHEN statt loslassen: ein Loslassen über der Warteliste träfe deren
-    // Droppable und buchte eine Zuordnung, die dieser Test nie wollte. dnd-kits
-    // PointerSensor hört auf Escape.
+    // Drag ABBRECHEN statt loslassen — ein Loslassen über der Warteliste buchte eine
+    // Zuordnung. dnd-kits PointerSensor hört auf Escape.
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('drag-overlay')).toHaveCount(0);
   });
@@ -435,14 +351,14 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await page.setViewportSize(HANDSCHIRM);
     const { personName } = await setupPatientUndPlatz(page);
 
-    // AK 2: kein waagerechter Überlauf. Gemessen am Dokument, nicht am Augenschein — und
-    // VOR dem Öffnen eines Dialogs, dessen Hülle ihren eigenen Scrollrahmen mitbringt.
+    // Kein waagerechter Überlauf, am Dokument gemessen — vor dem Öffnen eines Dialogs mit
+    // eigenem Scrollrahmen.
     const ueberlauf = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(ueberlauf, 'AK 2: die Seite läuft nicht waagerecht über').toBeLessThanOrEqual(1);
 
-    // AK 2: die Seitenspalten sind Reiter, nicht Nachbarn — und die Fläche steht vorn.
+    // Die Seitenspalten sind Reiter, nicht Nachbarn — und die Fläche steht vorn.
     await expect(page.getByRole('tab', { name: 'Fläche' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Wartebereich' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Transport' })).toBeVisible();
@@ -450,18 +366,14 @@ test.describe('UHS-Grundriss unter Touch', () => {
       'aria-selected',
       'true',
     );
-    // Die Gegenprobe zur Reiter-Weiche: mit `destroyOnHidden` steht der Wartebereich
-    // WIRKLICH nicht im Baum — genau deshalb ist ein Drag hier keine Geste mehr.
+    // Mit `destroyOnHidden` steht der Wartebereich WIRKLICH nicht im Baum.
     await expect(
       page.getByTestId('warteliste-scroll'),
       'kein zweiter, verborgener Zweig',
     ).toHaveCount(0);
 
-    // AK 1: der Klickweg, hier per echtem Touch-Tap. Diese Datei läuft mit `hasTouch` und
-    // damit in der Stufe „komfortabel" (Dateikopf) — dort ist die Karte seit LFH-359 das
-    // EINE Bedienziel und öffnet ihr Aktionsmenü; zugewiesen wird über den ersten Eintrag.
-    // Getippt wird auf die Kartenmitte: die Karte hat in dieser Form keine Aktionszeile mehr,
-    // die einen Tipp abfangen könnte.
+    // Der Klickweg per echtem Touch-Tap. In „komfortabel" ist die Karte das EINE Bedienziel
+    // und öffnet ihr Aktionsmenü; zugewiesen wird über den ersten Eintrag.
     await bett1(page).tap();
     await page.getByRole('menuitem', { name: /Patient zuweisen/ }).tap();
 
@@ -469,17 +381,14 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await expect(dialog).toContainText('Patient zuweisen');
     await dialog.getByRole('combobox').tap();
     await page.locator('.ant-select-item-option').filter({ hasText: personName }).tap();
-    // Die Beschriftung ist „Erfassen", nicht „Zuweisen": `Grundriss.tsx` übergibt kein
-    // `erfassenText`, und der Vorgabewert der Hülle ist `'Erfassen'`
-    // (`components/Erfassung.tsx`). Auf den Dialog eingegrenzt, weil dieselbe Beschriftung
-    // auch an der Schnellerfassung hängt.
+    // „Erfassen" ist der Vorgabetext der Erfassungshülle. Auf den Dialog eingegrenzt, weil
+    // dieselbe Beschriftung auch an der Schnellerfassung hängt.
     await dialog.getByRole('button', { name: 'Erfassen', exact: true }).tap();
 
     await expect(bett1(page), 'der Klickweg hat zugewiesen').toContainText(personName);
 
-    // AK 1, Rückweg: unter `lg` ist der Drag zurück in den Wartebereich strukturell weg
-    // (das Droppable liegt in einem anderen Reiter). Der Ersatz ist der Menüeintrag — in der
-    // Kartenform über einen Tipp auf die Karte selbst.
+    // Rückweg: unter `lg` gibt es keinen Drag in den Wartebereich; der Ersatz ist der
+    // Menüeintrag.
     await bett1(page).tap();
     await page.getByRole('menuitem', { name: /Zurück in den Wartebereich/ }).tap();
     await expect(bett1(page), 'der Platz ist wieder frei').not.toContainText(personName);
@@ -488,10 +397,9 @@ test.describe('UHS-Grundriss unter Touch', () => {
   });
 
   /**
-   * LFH-359 + LFH-379: in den Berührungsstufen ist die Karte das eine Ziel und öffnet das
-   * Aktionsmenü. Gemessen wird die echte `boundingBox()` — Karte UND jeder Menüeintrag halten
-   * die Steuerhöhe der Stufe. Geöffnet wird PER TIPP, nicht über `toBeVisible()` auf einem
-   * Knopf (ein sichtbares Ziel ist noch kein bedienbares, CLAUDE.md zu LFH-355).
+   * In den Berührungsstufen ist die Karte das eine Ziel und öffnet das Aktionsmenü. Karte UND
+   * jeder Menüeintrag halten die Steuerhöhe der Stufe (echte `boundingBox()`); geöffnet wird
+   * PER TIPP — ein sichtbares Ziel ist noch kein bedienbares.
    */
   for (const [dichte, soll] of [
     ['komfortabel', 48],
@@ -512,14 +420,14 @@ test.describe('UHS-Grundriss unter Touch', () => {
       const karte = bett1(page);
       await expect(karte).toHaveAttribute('role', 'button');
       await expect(karte).toHaveAttribute('aria-haspopup', 'menu');
-      // Gegenprobe: keine Knopfzeile mehr in der Karte (LFH-379: sie lief über).
+      // Gegenprobe: keine Knopfzeile in der Karte.
       await expect(karte.getByRole('button')).toHaveCount(0);
 
       const kasten = await karte.boundingBox();
       expect(kasten, 'Karte steht im Layout').not.toBeNull();
       expect(kasten!.width, 'Kartenbreite').toBeGreaterThanOrEqual(soll);
       expect(kasten!.height, 'Kartenhöhe').toBeGreaterThanOrEqual(soll);
-      // Die Kartengröße ist dichteunabhängig (Spec: Raster und Layout bleiben).
+      // Die Kartengröße ist dichteunabhängig.
       expect(Math.round(kasten!.width)).toBe(140);
       expect(Math.round(kasten!.height)).toBe(116);
 
@@ -530,10 +438,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
       await expect(eintraege.first()).toContainText('Patient zuweisen');
       const zahl = await eintraege.count();
       expect(zahl, 'Zuweisen + vier Verfügbarkeiten').toBeGreaterThanOrEqual(5);
-      // ERST NACH DER EINBLENDUNG MESSEN (gemessen): antds `slide-up`-Bewegung startet mit
-      // `scaleY(0.8)`, die `boundingBox()` davor liest 0,8 × die Endhöhe — 38,4 statt 48 und
-      // 57,6 statt 72 px, bei korrekt berechnetem Stil (`paddingBlock` + `lineHeight` =
-      // `controlHeight`). Gewartet wird auf das Ende der Bewegungsklassen am Popup.
+      // Erst nach der Einblendung messen: antds `slide-up` startet mit `scaleY(0.8)`.
       await expect(page.locator('.ant-dropdown:not(.ant-dropdown-hidden)')).not.toHaveClass(
         /ant-slide-up-(enter|appear)/,
       );
@@ -545,10 +450,9 @@ test.describe('UHS-Grundriss unter Touch', () => {
       // Ein Tipp hat NUR das Menü geöffnet, keinen Zuweisungsdialog.
       await expect(page.getByRole('dialog')).toHaveCount(0);
 
-      // Tastaturweg (Spec „Tastatur"): Esc schließt, Enter auf der fokussierten Karte öffnet
-      // erneut, und der Fokus steht dann auf dem ERSTEN Eintrag — gemessen: ohne das
-      // `autoFocus` am Dropdown bliebe er auf der Karte (`menu.autoFocus` allein reicht nicht).
-      // Ein zweites Enter löst den Eintrag aus.
+      // Tastaturweg: Esc schließt, Enter auf der Karte öffnet erneut, und der Fokus steht auf
+      // dem ERSTEN Eintrag (ohne `autoFocus` am Dropdown bliebe er auf der Karte). Ein zweites
+      // Enter löst den Eintrag aus.
       await page.keyboard.press('Escape');
       await expect(karte).toHaveAttribute('aria-expanded', 'false');
       // Esc gibt den Fokus an die Karte zurück (rc-dropdown), ohne dass der Test nachhilft.
@@ -562,11 +466,9 @@ test.describe('UHS-Grundriss unter Touch', () => {
   }
 
   /**
-   * Spec „Gesten bleiben Zusatzwege" (LFH-359): in der Kartenform ist die Karte zugleich
-   * Menü-Auslöser, Drop-Ziel und — im Bearbeiten-Modus — Zug-Quelle. Ein Zug darf dabei kein
-   * Menü öffnen: der Klick, der am Ende eines Zuges im Browser noch feuern kann, ginge sonst
-   * an den Auslöser. Gezogen wird mit der Maus (`page.mouse`): die Frage ist, ob der
-   * abschließende `click` den Auslöser erreicht, nicht die Zeigerart.
+   * In der Kartenform ist die Karte zugleich Menü-Auslöser, Drop-Ziel und im Bearbeiten-Modus
+   * Zug-Quelle. Der Klick, der am Ende eines Zuges noch feuern kann, darf kein Menü öffnen.
+   * Gezogen wird mit der Maus: die Frage ist der abschließende `click`, nicht die Zeigerart.
    */
   test('Kartenform (komfortabel): Layout-Zug und Personen-Zug öffnen kein Menü', async ({
     page,
@@ -578,8 +480,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'komfortabel');
     const offenesMenue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
 
-    // 1) Personen-Zug: erst belegen (per API, der Weg ist nicht die Frage), dann die Marke
-    //    aus der Karte in den Wartebereich ziehen.
+    // 1) Personen-Zug: per API belegen, dann die Marke in den Wartebereich ziehen.
     const personen = (await (
       await page.request.get(`/api/einsaetze/${einsatzId}/personen`)
     ).json()) as { id: number; name: string | null }[];
@@ -631,10 +532,9 @@ test.describe('UHS-Grundriss unter Touch', () => {
   });
 
   /**
-   * Gemessen bei 1024 × 900: ein belegter Platz trägt im Handschuh acht Einträge à 72 px —
-   * mehr, als unter oder über der Karte Platz hat. Mit antds Vorgabe (nur umklappen) stand das
-   * Menü nach oben aus dem Fenster, und die Primäraktion war nicht erreichbar. Zugesichert
-   * wird deshalb: JEDER Eintrag liegt vollständig im Fenster.
+   * Ein belegter Platz trägt im Handschuh acht Einträge à 72 px — mehr, als über oder unter
+   * der Karte Platz hat; mit antds Vorgabe stand das Menü aus dem Fenster. Zugesichert: JEDER
+   * Eintrag liegt vollständig im Fenster.
    */
   test('Handschuh, belegter Platz: alle Menüeinträge liegen im Fenster', async ({ page }) => {
     await page.setViewportSize(TABLET);
@@ -656,8 +556,8 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await page.reload();
     await expect(bett1(page)).toContainText(personName);
 
-    // Kein Ziel IN der belegten Karte: dnd-kit setzt an der ziehbaren Personenmarke auch bei
-    // `disabled` `role="button"` und `tabIndex` — die Kartenform nimmt beides zurück.
+    // Kein Ziel IN der belegten Karte: dnd-kit setzt an der Personenmarke auch bei `disabled`
+    // `role="button"` und `tabIndex`, die Kartenform nimmt beides zurück.
     await expect(bett1(page).getByRole('button')).toHaveCount(0);
     await expect(bett1(page).locator('[tabindex]:not([tabindex="-1"])')).toHaveCount(0);
 

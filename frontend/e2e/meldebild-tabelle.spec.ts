@@ -1,69 +1,33 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Die zwei Nachweise des Meldebilds, die NUR im Browser gehen (LFH-330 · B2, Bündel V).
+ * Die Nachweise des Meldebilds, die NUR im Browser gehen (jsdom rechnet kein Layout und
+ * wertet `@media print` nicht aus).
  *
- * WARUM HIER UND NICHT IN VITEST: jsdom rechnet kein Layout (`vite.config.ts` fährt
- * `css: false`), und `@media print` wertet es gar nicht aus. Beide Aussagen unten sind
- * reine Layoutaussagen — in Vitest wären sie strukturell unfähig, rot zu werden.
+ * NACHWEIS 1 — fixierte erste Spalte × Aufklapp-Symbol. Das Meldebild ist ein Statusraster
+ * mit einer Zeile je Einheit und den Mitteln als aufklappbarem Detail. Die Bedien-Leitlinie
+ * verbietet dort Karten, also MUSS das Aufklappen in der fixierten Tabelle bedienbar sein —
+ * auch auf 390 px.
  *
- * NACHWEIS 1 — fixierte erste Spalte × Aufklapp-Symbol. Seit dem Neuentwurf (S6,
- * 21.09.2026) ist das Meldebild ein Statusraster: EINE Zeile je Einheit, die Mittel hängen
- * als aufklappbares Detail darunter. Der Baum ist damit flacher (eine Aufklapp-Ebene statt
- * zwei), die Kombination „Spalte 0 fixiert + `expandable`" bleibt dieselbe: die
- * Bedien-Leitlinie verbietet dort die Auflösung in Karten, also MUSS das Aufklappen in der
- * fixierten Tabelle bedienbar sein — auch auf 390 px.
+ * NACHWEIS 2 — der Druckpfad durch den Bildlaufcontainer: die Neutralisierer in
+ * `pages/kraefteuebersichtPrint.css` WIRKEN, nicht bloß „stehen da" (eine Regel mit
+ * Tippfehler im Selektor steht auch da). Gemessen wird, dass der Inhalt bei A4-Breite
+ * vollständig in der Druckwurzel liegt; nicht die Seitenhöhe. Kein echter Druckdialog —
+ * `emulateMedia` liefert das Layout; den Knopf prüft NACHWEIS 2b mit einem `window.print`-Stub.
  *
- * NACHWEIS 2 — der Druckpfad durch den Bildlaufcontainer. `pages/kraefteuebersichtPrint.css`
- * schaltete bis B2 nur `visibility` (seit LFH-71 blendet `druck/druck.css` per `display: none`
- * aus); `KatalogTabelle` bringt seit B1 einen waagerechten
- * Bildlaufcontainer, eine stehende Kopfzeile (zwei getrennte Tabellen plus Halter) und
- * `position: sticky` an Spalte 0 mit. Bündel IV hat die Neutralisierer geschrieben und per
- * TEXT-Prüfung belegt, dass sie dastehen — nicht, dass sie wirken. Der Unterschied ist
- * genau der Punkt: eine Regel mit einem Tippfehler im Selektor steht auch da.
- *
- * WAS NACHWEIS 2 BEWEIST UND WAS NICHT: gemessen wird „der Inhalt liegt vollständig innerhalb
- * des Druck-Wurzelknotens bei der nutzbaren Breite von A4 hoch" (Herleitung an
- * {@link A4_DRUCKBREITE}). NICHT gemessen werden hier die Seitenhöhe und der Umbruch über
- * mehrere Blätter. Die Voraussetzung der Kopfwiederholung je Blatt (Kopf und Körper in EINER
- * Tabelle) belegt NACHWEIS 2b weiter unten.
- *
- * MUTATIONSPROBE ZU NACHWEIS 2, protokolliert weil eine Zusicherung ohne Gegenprobe eine
- * Behauptung ist (Beweisform aus `katalogtabelle-schmal.spec.ts:90-98`):
- *  - ganzer Neutralisierer-Block aus `kraefteuebersichtPrint.css` entfernt → rot bei (a),
- *    `overflow-x` bleibt `auto` statt `visible`.
- *  - NUR die eine Regel `.ant-table-body table { width: 100% }` entfernt, alles andere
- *    unverändert → rot bei (b) mit **340 px** Überhang im Druck. Die Nutzlast-Hälfte hängt
- *    also nachweislich an einer einzelnen Regel und ist nicht durch (a) mitgemeint.
- * Beide Male zurückgedreht und byte-gleich verglichen.
- *
- * WARUM NACHWEIS 2 NICHT ÜBER DEN KNOPF: ein echter Druckdialog im Headless-Chromium ist
- * kein Nachweis, sondern ein Aufhänger. `emulateMedia` liefert das Layout, und das Aufklappen
- * erledigen die Symbole aus Nachweis 1 — derselbe Weg, den ein Benutzer nimmt. Den Knopf
- * („Drucken / als PDF" → `useDrucken` → `window.print()`) prüft NACHWEIS 2b mit einem Stub
- * für `window.print`.
- *
- * WARUM `page.request`-Seeding: ein frischer Einsatz hat 0 Kräfte, und ein Meldebild ohne
- * Zeilen hat keinen Baum, keinen Bildlaufweg und keine letzte Spaltenzelle — jede Messung
- * unten wäre grün durch Nichtstun. Die Session ist Cookie-basiert (`api/client.ts:35/46/56`
- * `credentials: 'same-origin'`, kein CSRF-Header), und `page.request` teilt den Cookie-Jar
- * des Kontexts. 8 Kräfte per Anlege-Modal wären 40 Aktionen ohne Erkenntnisgewinn.
+ * Seeding per `page.request`: ein Meldebild ohne Zeilen hat keinen Baum und keinen
+ * Bildlaufweg, jede Messung wäre grün durch Nichtstun.
  */
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-/** Handschirm aus A1, Gate 1. Bewusst per `setViewportSize` und kein Device-Descriptor:
- *  ein `devices['iPhone …']` zöge webkit nach, und ein Browser-Download ist im Repo
- *  nirgends abgesichert (gleichlautend in vier Bestands-Specs begründet). */
+/** Handschirm aus A1, Gate 1. Per `setViewportSize`: ein Device-Descriptor zöge webkit nach. */
 const HANDSCHIRM = { width: 390, height: 844 };
 
-/** Subpixel-Spielraum für JEDEN Maßvergleich (`nav-schmal.spec.ts:26-39`: dreimal
- *  zugeschlagen, jedes Mal nur im vollen Sammel-Gate). */
+/** Subpixel-Spielraum für JEDEN Maßvergleich. */
 const SUBPIXEL = 0.5;
 
-// Login-/Anlege-Helfer aus `kernfluss.spec.ts` kopiert — es gibt (noch) kein geteiltes
-// e2e-Hilfsmodul (gleichlautend in fünf Bestands-Specs vermerkt).
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -81,13 +45,10 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 }
 
 /**
- * Ad-hoc-Kräfte ohne Einheit. Das erzeugt die Sammelzeile „Ohne Einheit" mit n
- * Personenzeilen als Kindern (`kraefte/meldebildRaster.ts`, `OHNE_EINHEIT_SCHLUESSEL`) —
- * eine Aufklapp-Ebene aus einem einzigen Endpunkt, ohne Einheiten- und Abschnittsanlage.
- *
- * ABSICHTLICH LANGE WERTE: die Bezeichnungsspalte trägt keine `width`, sie wächst mit dem
- * Inhalt. Kurze Namen ließen den waagerechten Bildlaufweg auf 390 px schrumpfen, und die
- * Halte-Messung der fixierten Spalte hätte nichts zu halten.
+ * Ad-hoc-Kräfte ohne Einheit erzeugen die Sammelzeile „Ohne Einheit" mit n Kindern — eine
+ * Aufklapp-Ebene aus einem einzigen Endpunkt. ABSICHTLICH LANGE WERTE: die
+ * Bezeichnungsspalte wächst mit dem Inhalt, sonst hätte die fixierte Spalte keinen
+ * Bildlaufweg zu halten.
  */
 async function seedeKraefte(page: Page, einsatzId: string, anzahl: number) {
   for (let i = 0; i < anzahl; i += 1) {
@@ -108,15 +69,9 @@ async function seedeKraefte(page: Page, einsatzId: string, anzahl: number) {
 }
 
 /**
- * Maße des Aufklapp-Symbols der ERSTEN Datenzeile, RELATIV zum Bildlaufcontainer.
- *
- * Relativ und nicht in Sichtfeld-Koordinaten, aus dem in `katalogtabelle-schmal.spec.ts:38-45`
- * protokollierten Grund: absolut gemessen wanderte der Container zwischen zwei Messungen um
- * 10,8 px, und die tadellose Fixierung fiel durch. Die Fixierung sagt „die Zelle bleibt am
- * linken Rand IHRES Containers stehen".
- *
- * Gemessen wird an der Körperzelle (`td`), nicht am Kopf: mit `sticky` zieht antd Kopf und
- * Körper in zwei getrennte Bildlaufbereiche und gleicht sie per Skript ab.
+ * Maße des Aufklapp-Symbols der ersten Datenzeile, RELATIV zum Bildlaufcontainer — absolut
+ * gemessen wanderte der Container zwischen zwei Messungen, und die Fixierung fiel grundlos
+ * durch. Gemessen an der Körperzelle: mit `sticky` trennt antd Kopf und Körper.
  */
 async function symbolLage(page: Page) {
   return page.evaluate(() => {
@@ -151,9 +106,8 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
   const bereich = page.getByRole('region', { name: 'Meldebild' });
   await expect(bereich).toHaveCount(1);
 
-  // (a) `form="tabelle"` wirkt: auf 390 px steht hier eine Tabelle, KEIN Kartenzweig.
-  //     Das ist die Zusicherung, die Prüflisten-Kriterium 14 an dieser Seite verlangt —
-  //     eine Vergleichsfläche wird angepasst, nicht in Karten aufgelöst.
+  // (a) `form="tabelle"` wirkt: auf 390 px steht eine Tabelle, KEIN Kartenzweig
+  //     (Prüflisten-Kriterium 14: eine Vergleichsfläche wird angepasst, nicht aufgelöst).
   await expect(page.locator('.ant-table')).toHaveCount(1);
   await expect(page.locator('[data-lfh="datensicht-karte"]')).toHaveCount(0);
 
@@ -162,48 +116,34 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
   await expect(fixierte).toHaveCount(1);
   await expect(fixierte).toHaveCSS('position', 'sticky');
 
-  // (c) Die Sammelzeile steht, und das Raster startet ZUGEKLAPPT (die Mittel sind Detail,
-  //     die Einheitenzeile trägt Stärke und Verteilung selbst). Ohne diesen Anker misst der
-  //     Rest einen Leerzustand.
+  // (c) Die Sammelzeile steht, und das Raster startet ZUGEKLAPPT.
   await expect(page.getByText('Ohne Einheit', { exact: true })).toHaveCount(1);
   const zeilen = page.locator('tr.ant-table-row');
   await expect(zeilen).toHaveCount(1);
 
-  // (d) Das Symbol liegt IN der fixierten Zelle — nicht daneben, nicht in einer eigenen
-  //     Spalte. Genau das ist die unbelegte Kombination: antd rendert den Auslöser in die
-  //     erste Spalte, und die ist hier unbedingt fixiert.
-  //
-  //     JE ZEILE VERENGT, nicht seitenweit: gemessen rendert antd auch an BLATT-Zeilen
-  //     einen Knoten mit derselben Klasse (`…-expand-icon-spaced`, ein Platzhalter, der die
-  //     Einrückung hält). Ein seitenweiter Locator löste nach dem Aufklappen auf zehn
-  //     Elemente auf und brach im strict mode — und ein `.first()`-Pflaster hätte ab da
-  //     stillschweigend irgendeine Zeile gemessen.
+  // (d) Das Symbol liegt IN der fixierten Zelle (antd rendert den Auslöser in Spalte 0).
+  //     JE ZEILE verengt: antd rendert auch an Blatt-Zeilen einen Platzhalter mit derselben
+  //     Klasse, ein seitenweiter Locator bräche im strict mode.
   const symbolIn = (index: number) =>
     zeilen.nth(index).locator('td.ant-table-cell-fix-start .ant-table-row-expand-icon');
   const symbol = symbolIn(0);
   await expect(symbol).toHaveCount(1);
 
-  // (e) FUNKTIONSHÄLFTE. `toBeVisible` belegt nicht, dass ein Element klickbar ist —
-  //     `click()` prüft das Trefferziel und schlägt fehl, wenn ein anderer Knoten den
-  //     Punkt abfängt. Ein Symbol, das rendert, aber nicht feuert, ist der Fehlermodus,
-  //     den eine Sichtbarkeitsprüfung durchwinkt.
+  // (e) FUNKTIONSHÄLFTE: `click()` prüft das Trefferziel; `toBeVisible` winkte ein Symbol
+  //     durch, das rendert, aber nicht feuert.
   await symbol.click();
   await expect(zeilen, 'Aufklappen bringt die 8 gesäten Kräfte').toHaveCount(9);
 
-  // Gemessen wird AUFGEKLAPPT: erst die langen Personennamen geben der Tabelle den
-  // waagerechten Bildlaufweg, den die Halte-Messung braucht.
+  // AUFGEKLAPPT gemessen: erst die langen Personennamen geben den waagerechten Bildlaufweg.
   const vor = await symbolLage(page);
-  // Vorbedingung: ohne waagerechten Bildlaufweg hätte die Halte-Messung unten nichts zu
-  // halten und wäre trivial grün (dieselbe Vorbedingung wie
-  // `katalogtabelle-schmal.spec.ts:135`).
+  // Vorbedingung: ohne Bildlaufweg wäre die Halte-Messung trivial grün.
   expect(
     vor.restweg,
     `Vorbedingung: das Meldebild braucht waagerechten Bildlaufweg (gemessen ${vor.restweg}px)`,
   ).toBeGreaterThan(50);
 
-  // (f) HALTE-HÄLFTE nach echtem waagerechtem Bildlauf. Beide Teile sind nötig: ohne „die
-  //     nicht-fixierte Zelle ist gewandert" wäre ein stillschweigend nicht ausgeführter
-  //     Bildlauf grün und die Halte-Zusicherung leer.
+  // (f) HALTE-HÄLFTE nach echtem Bildlauf. Dazu „die nicht-fixierte Zelle ist gewandert",
+  //     sonst wäre ein nicht ausgeführter Bildlauf grün.
   await page.locator('.ant-table-body').evaluate((el) => el.scrollTo(200, 0));
   const nach = await symbolLage(page);
   expect(nach.nichtFixX, 'nicht-fixierte Zelle muss mitwandern').toBeLessThan(vor.nichtFixX - 100);
@@ -212,33 +152,20 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
     `Aufklapp-Symbol hält seine x-Position (${vor.symbolX} → ${nach.symbolX})`,
   ).toBeLessThanOrEqual(1);
 
-  // (g′) BEFUND, mitgemessen weil er genau hier auffällt: der Platzhalter an einer
-  //      BLATT-Zeile trägt dieselbe Klasse und ein `aria-label` („Zeile erweitern"), obwohl
-  //      es nichts zu erweitern gibt. Ob er ein Fokusziel ist, entscheidet seine
-  //      Sichtbarkeit — `visibility: hidden` nimmt ihn aus der Tabulatorfolge. Der Wert
-  //      wird protokolliert, nicht bewertet: er ist antd-Bestand, kein B2-Erzeugnis.
+  // (g′) Der Platzhalter an einer Blatt-Zeile trägt ein `aria-label` („Zeile erweitern");
+  //      ob er Fokusziel ist, entscheidet seine Sichtbarkeit. Protokolliert, nicht bewertet
+  //      (antd-Bestand).
   const platzhalterSichtbarkeit = await symbolIn(1).evaluate(
     (el) => getComputedStyle(el).visibility,
   );
 
-  // (h) …und wieder zu, WÄHREND die Tabelle waagerecht verschoben ist — das Symbol ist dort
-  //     also noch bedienbar. Ein Auslöser, der nur in eine Richtung schaltet, ist halb kaputt.
+  // (h) …und wieder zu, WÄHREND die Tabelle verschoben ist.
   await symbol.click();
   await expect(zeilen, 'Zuklappen nimmt den ganzen Unterbaum mit').toHaveCount(1);
 
-  // (i) TREFFFLÄCHE DES SYMBOLS — gemessen, nicht geschätzt, und ausdrücklich über die
-  //     Dichtestufen. Es ist der EINZIGE Auslöser dieser Fläche: das Meldebild läuft mit
-  //     `form="tabelle"` auch auf 390 px, der Baum lässt sich also nur hierüber öffnen.
-  //     Gate 3 gilt damit unmittelbar.
-  //
-  //     Die Zahl wird PROTOKOLLIERT und nicht zugesichert: das Symbol ist antd-Bestand,
-  //     `Datensicht` reicht `expandable` nur durch und setzt dort keine Höhe. Eine
-  //     Zusicherung hier wäre ein rot geborenes Gate an fremdem Code; das Verdikt gehört in
-  //     die Prüfliste und das Zielticket ist B5 (LFH-333), das die Dichte-Staffel führt.
-  //
-  //     Der zweite Wert ist der eigentliche Befund: folgt das Symbol der HANDSCHUH-Stufe?
-  //     Wenn nicht, ist die Baumfläche mit Einsatzhandschuh nicht bedienbar, egal welche
-  //     Stufe der Benutzer wählt.
+  // (i) Trefffläche des Symbols über die Dichtestufen — es ist der EINZIGE Auslöser des
+  //     Baums. Protokolliert, nicht zugesichert: antd-Bestand, `Datensicht` setzt dort keine
+  //     Höhe. Der Befund ist, ob es der Handschuh-Stufe folgt.
   const symbolKompakt = `${vor.symbolBreite}×${vor.symbolHoehe}`;
   await page.evaluate(() => window.localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
   await page.reload();
@@ -257,15 +184,9 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
 });
 
 /**
- * Computed-Style- und Geometriewerte des Meldebilds im aktuellen Medium.
- *
- * Alles über `evaluate` und `getBoundingClientRect`, NICHT über `toBeVisible`: die
- * Aussagen unten sind Computed-Style-Werte (`overflow`, `position`, `display`), und
- * `toBeVisible` sagt über sie nichts. Seit LFH-71 blendet `druck/druck.css` alles außerhalb
- * der Druckwurzel per `display: none` aus (vorher `body * { visibility: hidden }` in
- * `kraefteuebersichtPrint.css`); die Messung liest nur Knoten INNERHALB der Wurzel und ist
- * von der Umstellung deshalb nicht berührt — die Neutralisierer der Tabelle stehen
- * unverändert in `kraefteuebersichtPrint.css`.
+ * Computed-Style- und Geometriewerte des Meldebilds im aktuellen Medium, per `evaluate` —
+ * `toBeVisible` sagt über `overflow`/`position`/`display` nichts. Gelesen werden nur Knoten
+ * innerhalb der Druckwurzel.
  */
 async function druckLage(page: Page) {
   return page.evaluate(() => {
@@ -274,9 +195,7 @@ async function druckLage(page: Page) {
     const halter = document.querySelector('.ant-table-sticky-holder');
     const werkzeuge = document.querySelector('[data-lfh="datensicht-werkzeuge"]')!;
     const fixZelle = document.querySelector('tr.ant-table-row td.ant-table-cell-fix-start')!;
-    // Die erste DATENZEILE, nicht das erste `tr`: antd schiebt bei `scroll.x` eine
-    // `ant-table-measure-row` voran, und ein `tr.ant-table-row:first-of-type` traf deshalb
-    // gar nichts — die Zellenliste war leer und die Messung lief in ein `undefined`.
+    // Die erste DATENZEILE: antd schiebt bei `scroll.x` eine `ant-table-measure-row` voran.
     const zellen = Array.from(
       document.querySelector('tr.ant-table-row')!.querySelectorAll(':scope > td'),
     ) as HTMLElement[];
@@ -297,27 +216,13 @@ async function druckLage(page: Page) {
 }
 
 /**
- * A4-Hochformat, nutzbare Breite in CSS-Pixeln — die Breite, mit der Chromium den Ausdruck
- * WIRKLICH umbricht.
+ * A4-Hochformat, nutzbare Breite in CSS-Pixeln. `emulateMedia` schaltet nur die
+ * Medienabfrage, die Layoutbreite bleibt die des Sichtfelds — ein Druck-Layoutbeweis muss das
+ * Sichtfeld auf die Papierbreite stellen.
  *
- * `emulateMedia({ media: 'print' })` schaltet nur die Medienabfrage; die Layoutbreite bleibt
- * die des Sichtfelds. Beim echten Druck ist sie dagegen die des Seitenkastens. Ein
- * Druck-Layoutbeweis MUSS deshalb das Sichtfeld auf die Papierbreite stellen — sonst prüft er
- * eine Breite, die nie gedruckt wird.
- *
- * [abgeleitet], Eingaben genannt: A4-Breite 210 mm ÷ 25,4 mm/in × 96 px/in = 793,7 px,
- * minus den Seitenrand aus `@page { margin: 15mm }` in `src/druck/druck.css` (seit LFH-71,
- * gilt für jeden Ausdruck): 2 × 15 mm = 30 mm ≙ 113,4 px → 680,3 px. Abgerundet: 680 px, die
- * ENGERE Annahme — dieselbe Zahl wie `NUTZ_BREITE` in `druck-fluss.spec.ts`. Berichtigt
- * (Review Welle B): hier stand 717 px aus Chromiums Standardrand von 1 cm, der seit dem
- * eigenen `@page`-Rand nicht mehr gilt; eine Tabelle zwischen 680 und 717 px wäre grün
- * geblieben und im echten Druck abgeschnitten worden.
- *
- * GEMESSEN, damit niemand die Zahl für Willkür hält: die Mindest-Inhaltsbreite der
- * Meldebild-Tabelle ist 645 px (Druckmedium bei 390 px Sichtfeld, wo `width: 100%` nichts
- * mehr zu verteilen hat). 645 < 680, der Ausdruck passt also — mit nur noch 35 px Reserve.
- * Bei 390 px Sichtfeld ragt er um 255 px heraus — das ist KEIN Druckbefund, sondern die
- * Folge davon, dass 390 px keine Papierbreite ist. Wer diese Zahl „behebt", behebt nichts.
+ * [abgeleitet]: 210 mm ÷ 25,4 × 96 = 793,7 px minus 2 × 15 mm `@page`-Rand (113,4 px)
+ * = 680,3 px, abgerundet — dieselbe Zahl wie `NUTZ_BREITE` in `druck-fluss.spec.ts`. Bei
+ * 390 px Sichtfeld ragt die Tabelle heraus; das ist kein Druckbefund.
  */
 const A4_DRUCKBREITE = 680;
 
@@ -333,9 +238,7 @@ test('Druckpfad des Meldebilds: die Neutralisierer WIRKEN, und keine Spalte ragt
   await page.waitForLoadState('networkidle');
   await expect(page.getByText('Ohne Einheit', { exact: true })).toHaveCount(1);
 
-  // Aufklappen wie `handleDrucken` es tut — über das Symbol, nicht über `window.print()`.
-  // Das Raster startet zugeklappt; der Klick bringt die Mittelzeilen, deren lange Namen den
-  // Überhang erst erzeugen.
+  // Aufklappen über das Symbol: erst die Mittelzeilen erzeugen mit ihren langen Namen den Überhang.
   const zeilen = page.locator('tr.ant-table-row');
   const symbolIn = (index: number) =>
     zeilen.nth(index).locator('td.ant-table-cell-fix-start .ant-table-row-expand-icon');
@@ -357,24 +260,15 @@ test('Druckpfad des Meldebilds: die Neutralisierer WIRKEN, und keine Spalte ragt
   await page.emulateMedia({ media: 'print' });
   const druck = await druckLage(page);
 
-  // (a) DIE NEUTRALISIERER WIRKEN — nicht: „sie stehen da". Eine Regel mit einem
-  //     Tippfehler im Selektor steht auch da, und genau das hat die Textprüfung von
-  //     Bündel IV nicht ausgeschlossen. Vier Regeln, vier gemessene Umschläge.
+  // (a) DIE NEUTRALISIERER WIRKEN — vier Regeln, vier gemessene Umschläge.
   expect(druck.koerperOverflowX, 'Bildlaufcontainer im Druck auf visible').toBe('visible');
   expect(druck.halterPosition, 'Kopfhalter im Druck auf static').toBe('static');
   expect(druck.fixPosition, 'Kennungsspalte im Druck auf static').toBe('static');
   expect(druck.werkzeugeDisplay, 'Werkzeugzeile im Druck ausgeblendet').toBe('none');
 
-  // (b) DIE NUTZLAST — der eigentliche Layoutbeweis. Zwei Hälften, beide nötig.
-  //
-  //     Erstens: der Bildlaufcontainer hält keinen Inhalt mehr zurück. Am Bildschirm liegen
-  //     bei dieser Breite gemessene 205 px im Bildlauf — auf Papier gibt es keinen Bildlauf,
-  //     verborgener Inhalt wäre schlicht weg. Diese Hälfte ist damit die diskriminierende:
-  //     ohne den `overflow`-Neutralisierer steht hier ein Wert > 0.
-  //
-  //     Zweitens: die LETZTE Spaltenzelle der ersten Datenzeile liegt vollständig innerhalb
-  //     der Druckwurzel. Ohne diese Hälfte wäre (a) nur die Beobachtung, dass vier
-  //     CSS-Regeln greifen — nicht, dass der Ausdruck dadurch vollständig wird.
+  // (b) DIE NUTZLAST, zwei Hälften: der Bildlaufcontainer hält keinen Inhalt mehr zurück
+  //     (die diskriminierende Hälfte — auf Papier wäre verborgener Inhalt weg), und die
+  //     LETZTE Spaltenzelle liegt vollständig in der Druckwurzel.
   expect(
     druck.koerperUeberhang,
     `im Druck darf nichts mehr im Bildlauf verborgen liegen (gemessen ${druck.koerperUeberhang}px Überhang bei ${druck.letzteSpalten} Spalten)`,
@@ -392,33 +286,20 @@ test('Druckpfad des Meldebilds: die Neutralisierer WIRKEN, und keine Spalte ragt
       `Überhang screen ${bildschirm.koerperUeberhang}px → print ${druck.koerperUeberhang}px`,
   });
 
-  // Medium zurückstellen, damit ein Folgeschritt im selben Kontext nicht im Druckmodus
-  // weiterläuft.
+  // Medium zurückstellen, damit ein Folgeschritt nicht im Druckmodus weiterläuft.
   await page.emulateMedia({ media: null });
 });
 
 /**
- * NACHWEIS 2b — der Tabellenkopf steht im Druck in DERSELBEN Tabelle wie der Körper, und der
- * Seitenkopf fehlt (LFH-71, Review Welle B).
+ * NACHWEIS 2b — im Druck steht der Tabellenkopf in DERSELBEN Tabelle wie der Körper. Mit
+ * `sticky` legt rc-table den Kopf in einen eigenen Halter, und die Kopfwiederholung je Blatt
+ * griffe nicht; das Primitiv schaltet `sticky` bei `beforeprint` ab (`useDruckModus`).
  *
- * DER BEFUND: `KatalogTabelle` rendert am Bildschirm mit `sticky`. Dann legt rc-table den Kopf
- * in eine eigene Tabelle im Sticky-Halter; die Körpertabelle, die über die Blätter läuft, hat
- * kein `thead`, und `thead { display: table-header-group }` aus `druck.css` wiederholte
- * nichts — ab Blatt 2 standen die Spalten unbeschriftet da. Das Primitiv schaltet `sticky`
- * jetzt bei `beforeprint` ab und bei `afterprint` wieder an (`useDruckModus`).
- *
- * WARUM DAS EREIGNIS VON HAND: weder `emulateMedia` noch `page.pdf()` feuern `beforeprint`.
- * Geprüft werden deshalb beide Wege, auf denen es im Betrieb kommt:
- *  - der KNOPF: `window.print` wird durch einen Stub ersetzt, der wie der Browser `beforeprint`
- *    synchron feuert (und keinen modalen Dialog öffnet). Das belegt zugleich, dass
- *    `useDrucken` den Druck außerhalb des React-Effekts auslöst — aus dem Effekt heraus
- *    rendert das `flushSync` des Listeners nicht, und der Kopf stünde weiter im Halter;
- *  - Strg+P: der Browser feuert `beforeprint` selbst, hier per `dispatchEvent`.
- * Nach `afterprint` steht die Kopfzeile wieder im Halter (LFH-330 am Bildschirm unverändert).
- *
- * NICHT BELEGT: die Wiederholung selbst auf dem PDF-Blatt — der PDF-Text ist komprimiert
- * (siehe `druck-fluss.spec.ts`). Belegt ist die Voraussetzung, an der sie hing: EINE Tabelle
- * mit `thead` als `table-header-group` und den Datenzeilen.
+ * Weder `emulateMedia` noch `page.pdf()` feuern `beforeprint`; geprüft werden beide
+ * Betriebswege: der KNOPF (Stub für `window.print`, der wie der Browser synchron
+ * `beforeprint` feuert — belegt zugleich, dass `useDrucken` außerhalb des React-Effekts
+ * druckt) und Strg+P (`dispatchEvent`). Nach `afterprint` steht der Kopf wieder im Halter.
+ * Die Wiederholung auf dem PDF-Blatt selbst ist nicht belegt (PDF-Text komprimiert).
  */
 async function kopfLage(page: Page) {
   return page.evaluate(() => {
@@ -451,15 +332,13 @@ test('Druck des Meldebilds: Kopf und Körper in EINER Tabelle, kein Seitenkopf �
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
   await expect(page.locator('tr.ant-table-row')).toHaveCount(1);
 
-  // Vorbedingung am Bildschirm (LFH-330): Kopf im Halter, Körper ohne `thead`.
+  // Vorbedingung am Bildschirm: Kopf im Halter, Körper ohne `thead`.
   const schirm = await kopfLage(page);
   expect(schirm.halter, 'Vorbedingung: stehende Kopfzeile am Bildschirm').toBe(true);
   expect(schirm.koerperHatKopf, 'Vorbedingung: Körpertabelle ohne eigenen Kopf').toBe(false);
 
-  // ── KNOPF: `window.print` feuert `beforeprint` synchron, wie der Browser, und hält den
-  // DOM-Stand IN DIESEM MOMENT fest — danach friert der Browser das Druckbild ein. Später zu
-  // messen belegte nichts: ein liegengebliebenes Update wäre bis dahin nachgerendert
-  // (gemessen: mit `window.print()` direkt aus dem Effekt blieb die Nachmessung grün).
+  // ── KNOPF: der Stub hält den DOM-Stand IM Moment von `beforeprint` fest — später gemessen,
+  // wäre ein liegengebliebenes Update bis dahin nachgerendert.
   await page.evaluate(() => {
     const w = window as unknown as { gedruckt: number; halterBeimDruck: boolean[] };
     w.gedruckt = 0;
@@ -513,20 +392,11 @@ test('Druck des Meldebilds: Kopf und Körper in EINER Tabelle, kein Seitenkopf �
 });
 
 /**
- * NACHWEIS 3 — das Statusband bricht um, statt waagerecht zu scrollen
- * (LFH-338 · C3, Befund H6; seit dem Neuentwurf S6 das Statusband statt der Kennzahlen-Card).
+ * NACHWEIS 3 — das Statusband bricht um, statt waagerecht zu scrollen. Gemessen bei 1024 px,
+ * wo die Inhaltsbreite unter 950 px liegt (eigens zugesichert).
  *
- * WARUM HIER: „passt ohne Bildlauf auf einen Führungsschirm" ist eine reine Layoutaussage.
- * In Vitest wäre sie strukturell unfähig, rot zu werden — jsdom rechnet kein Layout.
- *
- * Gemessen auf dem Führungs-Tablet (1024 px Sichtfeld), wo die Inhaltsbreite UNTER 950 px
- * liegt — der Test sichert das eigens zu. Wer bei weniger als 950 px nicht scrollt, scrollt
- * bei 950 px erst recht nicht.
- *
- * WARUM GESEEDET WIRD: ohne Kräfte zeigt das Band nur den Leerzustand. Gesät werden Personal
- * UND Einheiten mit je einem Fahrzeug, damit beide Gruppen stehen; die Einheiten tragen den
- * aus dem Default-Status neuer Dispositionen abgeleiteten Status (LFH-609). Weil keine von
- * ihnen je zurückgemeldet hat, steht zusätzlich die Gruppe „keine Rückmeldung" (LFH-610).
+ * Gesät werden Personal UND Einheiten mit je einem Fahrzeug, damit beide Gruppen stehen; weil
+ * keine Einheit je zurückgemeldet hat, steht zusätzlich „keine Rückmeldung".
  */
 test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
@@ -538,7 +408,7 @@ test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async (
       data: { adhoc: { funkrufname: `Florian Musterstadt-Nordwest 3/44-${i}` } },
     });
     expect(antwort.ok(), `Seeding Fahrzeug ${i}: ${antwort.status()}`).toBeTruthy();
-    // Das Band zählt seit LFH-609 Einheiten — das Fahrzeug trägt den Status seiner Einheit.
+    // Das Band zählt Einheiten — das Fahrzeug trägt den Status seiner Einheit.
     const ef = ((await antwort.json()) as { id: number }).id;
     const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
       data: { name: `Einsatzeinheit Musterstadt-Nordwest ${i}` },
@@ -569,21 +439,18 @@ test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async (
     `Band scrollt waagerecht: ${mass.scrollWidth}px Inhalt in ${mass.clientWidth}px Fläche`,
   ).toBeLessThanOrEqual(mass.clientWidth + SUBPIXEL);
 
-  // Jede Zelle ohne Bildlauf erreichbar — die Hälfte, die der reine Bildlaufvergleich NICHT
-  // abdeckt: ein Band, das eine Zelle gar nicht rendert, scrollt ebenfalls nicht.
+  // Jede Zelle ohne Bildlauf erreichbar: ein Band, das eine Zelle gar nicht rendert, scrollt
+  // ebenfalls nicht.
   const zellen = band.locator('[data-lfh="kennzahl"]');
   const anzahl = await zellen.count();
   expect(anzahl, 'mindestens eine Fahrzeug- und eine Personalzelle').toBeGreaterThanOrEqual(2);
   for (let i = 0; i < anzahl; i += 1) await expect(zellen.nth(i)).toBeInViewport();
-  // Fugenraster (Nacharbeit 22.09.2026): bei 1024 px drei Spalten (6 ab xl, 3 ab md, 2
-  // darunter), beide Gruppen in derselben Geometrie. Die Spuren teilen sich die Breite zu
-  // gleichen Teilen — ein Band, das nur einen Teil der Breite nutzte (Auto-Fit mit wenigen
-  // Zellen), hätte hier eine andere Spurzahl.
+  // Fugenraster: bei 1024 px drei Spalten, alle Gruppen in derselben Geometrie. Ein Band, das
+  // nur einen Teil der Breite nutzte, hätte eine andere Spurzahl.
   const spuren = await band
     .locator('[data-lfh="kennzahlenband"]')
     .evaluateAll((els) => els.map((el) => getComputedStyle(el).gridTemplateColumns.split(' ')));
-  // Drei Gruppen: die gesäten Einheiten haben nie zurückgemeldet, also steht die Kachel
-  // „keine Rückmeldung" als eigene Gruppe daneben (LFH-610) — in derselben Geometrie.
+  // Drei Gruppen: „keine Rückmeldung" steht als eigene Gruppe daneben.
   await expect(band.getByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeVisible();
   expect(spuren.map((s) => s.length)).toEqual([3, 3, 3]);
   expect(spuren[1], 'Personal in derselben Spaltengeometrie wie Fahrzeuge').toEqual(spuren[0]);

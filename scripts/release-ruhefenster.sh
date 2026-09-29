@@ -1,67 +1,44 @@
 #!/usr/bin/env bash
-# Ruhefenster vor dem Release — entscheidet, OB dieser Lauf releasen darf.
+# Ruhefenster vor dem Release — entscheidet, OB dieser Lauf releasen darf. Gewollt ist EINE
+# Version je Arbeitsschub, nicht eine je Merge. Die Regel ist zweiteilig:
 #
-# DAS PROBLEM, DAS ES LÖST: bis hierher hing `release` als `needs`-Job an jedem grünen
-# Push-Lauf von ci.yml. Jeder gemergte Pull Request erzeugte damit sein eigenes Release —
-# bei drei Merges kurz hintereinander drei Vorabversionen, deren Notizen je eine Handvoll
-# Commits tragen. Gewollt ist EINE Version je Arbeitsschub, nicht eine je Merge.
-#
-# DIE REGEL IST BEWUSST NICHT „WARTE X MINUTEN", SONDERN ZWEITEILIG:
-#
-#   1. ÜBERHOLT — liegt auf dem Kanal bereits ein neuerer Commit als der, für den dieser
-#      Lauf gestartet ist, tut dieser Lauf gar nichts. Der Lauf des neueren Commits macht
-#      das eine Sammel-Release, und dessen Notizen enthalten unsere Commits mit. Das ist
-#      die Hälfte, die bei schnellen Merges wirkt: n Merges innerhalb einer Gate-Dauer
-#      ergeben 1 Release statt n.
+#   1. ÜBERHOLT — liegt auf dem Kanal bereits ein neuerer Commit als der, für den dieser Lauf
+#      gestartet ist, tritt er zurück. Der Lauf des neueren Commits macht das Sammel-Release,
+#      dessen Notizen unsere Commits enthalten.
 #   2. RUHEFENSTER — ist niemand nachgekommen, muss der jüngste Commit trotzdem eine
-#      Mindestzeit alt sein. Das fängt den Fall, in dem das Gate SCHNELLER ist als der
-#      Abstand zwischen zwei Merges: ohne diese Hälfte releaste ein Lauf, der nach acht
-#      Minuten grün ist, bevor der Merge zwei Minuten später überhaupt sichtbar wird.
-#      Gewartet wird nur die DIFFERENZ zum Fenster — das Gate hat die Zeit meist schon
-#      verbraucht, der Regelfall ist also gar keine Wartezeit.
+#      Mindestzeit alt sein; das fängt ein Gate, das schneller ist als der Abstand zwischen
+#      zwei Merges. Gewartet wird nur die Differenz zum Fenster, meist also gar nicht.
 #
-# WARUM NICHT `cancel-in-progress` AUF DEM RELEASE-JOB: ein Abbruch träfe den Lauf
-# möglicherweise ZWISCHEN dem Push des Versions-Commits und dem Anlegen des GitHub-Releases.
-# Zurück bliebe ein Tag ohne Release, und weil artefakte.yml an `release: published` hängt,
-# entstünden für dieses Tag nie Binaries — kein roter Lauf, nur ein fehlendes Release. Die
-# Begründung steht ausführlich im Nebenläufigkeits-Kommentar von ci.yml. Deshalb entscheidet
-# ein Lauf hier VOR der ersten schreibenden Handlung selbst, ob er zurücktritt.
+# Kein `cancel-in-progress` auf dem Release-Job: ein Abbruch zwischen dem Push des
+# Versions-Commits und dem Anlegen des GitHub-Releases hinterließe ein Tag ohne Release (und
+# ohne Binaries, artefakte.yml hängt an `release: published`). Deshalb entscheidet der Lauf
+# hier VOR der ersten schreibenden Handlung selbst.
 #
-# RELEASE-COMMITS ZÄHLEN NICHT ALS „NEUER COMMIT", und das ist kein Detail, sondern der
-# Unterschied zwischen „sammelt" und „released nie wieder": semantic-release pusht
-# `chore(release): <version> [skip ci]` auf denselben Kanal. Dieser Commit IST danach
-# HEAD. Ein naiver Vergleich „HEAD == mein Commit?" wäre für jeden folgenden Lauf falsch —
-# er sähe immer einen neueren Commit, träte immer zurück, und es entstünde kein Release
-# mehr. Gefiltert wird am Betreff-Präfix, nicht am Autor: der Autor ist über
-# GIT_AUTHOR_NAME konfigurierbar, das Präfix steht in release.config.mjs im
-# `message`-Feld von @semantic-release/git und ist dieselbe Zeichenkette, die den Tag
-# erzeugt.
+# RELEASE-COMMITS ZÄHLEN NICHT ALS „NEUER COMMIT": semantic-release pusht
+# `chore(release): <version> [skip ci]` auf denselben Kanal, der danach HEAD ist. Ein naiver
+# Vergleich „HEAD == mein Commit?" ließe jeden folgenden Lauf zurücktreten — es entstünde nie
+# wieder ein Release. Gefiltert wird am Betreff-Präfix (das `message`-Feld in
+# release.config.mjs), nicht am konfigurierbaren Autor.
 #
-# NEBENEFFEKT, DER EINEN BESTEHENDEN FEHLERFALL SCHLIESST: läuft ein Release, während der
-# Kanal schon weitergewandert ist, scheitert der Push von @semantic-release/git als
-# non-fast-forward — und zwar NACH Changelog und Versions-Bump, also an der teuren Stelle.
-# Genau diese Lage ist jetzt die Abbruchbedingung 1, und sie kostet nichts.
+# Nebeneffekt: ein Release gegen einen weitergewanderten Kanal scheiterte sonst erst beim Push
+# (non-fast-forward), nach Changelog und Versions-Bump.
 #
-# AUFRUF (die CI ruft nur das hier, sie stellt sich nichts selbst zusammen):
+# AUFRUF (die CI ruft nur das hier):
 #   scripts/release-ruhefenster.sh --branch alpha --sha "$GITHUB_SHA"
 # Ergebnis auf stdout als `freigabe=true|false`, zusätzlich nach $GITHUB_OUTPUT, wenn gesetzt.
-# Exit-Code 0 in beiden Fällen — „ich trete zurück" ist kein Fehler; ein roter Lauf wäre
-# hier die falsche Aussage und würde als kaputte Pipeline gelesen.
+# Exit-Code 0 in beiden Fällen — „ich trete zurück" ist kein Fehler.
 set -euo pipefail
 
-# 15 Minuten. Die Zahl ist am Gate ausgerichtet, nicht geraten: der Push-Lauf von ci.yml
-# braucht gemessen rund 14 Minuten (grüner Lauf 34636145213, warme Caches). Ein Fenster
-# darunter wäre wirkungslos — es wäre beim Erreichen dieses Skripts immer schon abgelaufen.
-# Ein deutlich größeres verschöbe jedes Release um Leerlauf, den niemand nutzt. Praktisch
-# wartet dieser Schritt damit selten mehr als ein bis zwei Minuten.
+# 15 Minuten, am Gate ausgerichtet (der Push-Lauf von ci.yml braucht rund 14 Minuten): ein
+# kürzeres Fenster wäre beim Erreichen dieses Skripts immer schon abgelaufen, ein längeres
+# verschöbe jedes Release um Leerlauf.
 FENSTER_SEK="${RUHEFENSTER_SEK:-900}"
-# Obergrenze für die Summe aller Wartezeiten. Sie schützt gegen zwei Fälle, in denen die
-# Rechnung oben nicht terminiert: eine versehentlich sehr große Fenster-Angabe und eine
-# Uhr, die dem Commit-Zeitstempel hinterherläuft. Wird sie erreicht, wird RELEASED, nicht
-# abgebrochen — ein fehlendes Release ist der teurere Ausgang als ein zu frühes.
+# Obergrenze für die Summe aller Wartezeiten (gegen eine versehentlich große Fenster-Angabe
+# oder eine nachgehende Uhr). Wird sie erreicht, wird RELEASED — ein fehlendes Release ist
+# teurer als ein zu frühes.
 DECKEL_SEK="${RUHEFENSTER_DECKEL_SEK:-1800}"
-# Länge eines Schlafs. Kürzer als das Fenster, damit ein Commit, der während des Wartens
-# eintrifft, den Rücktritt noch auslöst, statt erst nach dem vollen Fenster gesehen zu werden.
+# Länge eines Schlafs, kürzer als das Fenster: ein während des Wartens eintreffender Commit
+# löst den Rücktritt so noch aus.
 TAKT_SEK="${RUHEFENSTER_TAKT_SEK:-60}"
 
 # Muss zum `message` von @semantic-release/git in release.config.mjs passen.
@@ -89,29 +66,24 @@ REF="${REF:-origin/$BRANCH}"
 
 jetzt() { date +%s; }
 
-# Der Stand des Kanals, frisch vom Remote. Die explizite Refspec statt eines nackten
-# `git fetch origin "$BRANCH"`: actions/checkout steht auf einem losgelösten HEAD, und nur
-# mit der Refspec ist `refs/remotes/origin/<branch>` danach sicher vorhanden.
+# Der Stand des Kanals, frisch vom Remote. Explizite Refspec: actions/checkout steht auf einem
+# losgelösten HEAD, nur so ist `refs/remotes/origin/<branch>` danach sicher vorhanden.
 kanal_holen() {
   [ "$OHNE_FETCH" -eq 1 ] && return 0
   git fetch --quiet origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
 }
 
-# Anzahl der Commits, die auf dem Kanal NACH unserem Stand liegen — Release-Commits
-# ausgenommen (Begründung im Kopf). awk statt grep, weil grep bei null Treffern mit 1
-# endet und das unter `set -e` als Fehler durchschlüge.
+# Anzahl der Commits, die auf dem Kanal NACH unserem Stand liegen, Release-Commits
+# ausgenommen. awk statt grep: grep endet bei null Treffern mit 1, unter `set -e` ein Fehler.
 neuere_commits() {
-  # Bewusst OHNE `2>/dev/null`: scheitert git hier (fehlende Ref, kaputter Checkout), soll
-  # der Lauf laut rot werden. `set -o pipefail` trägt den Fehlschlag aus der Pipe heraus.
-  # Still auf 0 zu fallen hieße „niemand ist nachgekommen" — also releasen, obwohl die
-  # Grundlage der Entscheidung fehlt.
+  # Bewusst OHNE `2>/dev/null`: scheitert das Kommando hier, soll der Lauf laut rot werden —
+  # still auf 0 zu fallen hieße releasen, obwohl die Grundlage der Entscheidung fehlt.
   git log --format=%s "$SHA..$REF" |
     awk -v p="$RELEASE_PRAEFIX" 'index($0, p) != 1 { n++ } END { print n + 0 }'
 }
 
-# Zeitstempel des jüngsten NICHT-Release-Commits auf dem Kanal. Auch hier ist die Filterung
-# tragend: stünde ein frischer Release-Commit an der Spitze, wartete die Rechnung sonst das
-# volle Fenster auf einen Commit, der selbst aus dem letzten Release stammt.
+# Zeitstempel des jüngsten NICHT-Release-Commits: stünde ein frischer Release-Commit an der
+# Spitze, wartete die Rechnung sonst das volle Fenster auf ihn.
 letzter_commit_ts() {
   local ts
   ts="$(git log --format='%ct%x09%s' "$REF" |

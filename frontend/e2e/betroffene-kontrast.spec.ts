@@ -89,8 +89,8 @@ for (const modus of ['light', 'dark'] as const) {
       ['schaeden', schaeden],
     ] as const) {
       await page.goto(`${basis}/${modul}`);
-      // Schäden filtern seit dem Neuentwurf über eine Segmentleiste (`radio`), Personen ggf.
-      // noch über Reiter — der Griff nimmt beide Rollen.
+      // Schäden filtern über eine Segmentleiste (`radio`), Personen ggf. über Reiter — der
+      // Griff nimmt beide Rollen.
       await page
         .getByRole('tab', { name: 'Alle', exact: true })
         .or(page.getByRole('radio', { name: 'Alle', exact: true }))
@@ -113,16 +113,13 @@ for (const modus of ['light', 'dark'] as const) {
   });
 }
 
-// ─── LFH-650: die neuen Flächen aus LFH-613 ──────────────────────────────────────────
+// ─── Weitere Betroffenen-Flächen ─────────────────────────────────────────────────────
 //
-// Nachzug zur LFH-613-Prüfliste (Tabellen 1–5, Nr. 5): Zustand-Knopf, Zustandswert,
-// Koordinate, Fehler an der Zeile, `#…`-Marke, Verorten-Link, Feldmeldungen, Kartenhinweis,
-// Leerzustand, Cluster-Kern, Dashboard-Fuß — Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1. Dazu die
-// KANTE der Marker gegen den Kartengrund (WCAG 1.4.11, ≥ 3 : 1), gemessen an Pixeln: WebGL
-// hat keine berechneten Stile, die `kontrast()` lesen könnte.
-//
-// Gemessen wird die ZUSAMMENGESETZTE Paarung (`kontrast-kern.ts`), nicht der Token —
-// „keine Farbwerte aus dem Produkt importieren: eine schlechte Palette muss rot werden".
+// Zustand-Knopf und -wert, Koordinate, Fehler an der Zeile, `#…`-Marke, Verorten-Link,
+// Feldmeldungen, Kartenhinweis, Leerzustand, Cluster-Kern, Dashboard-Fuß — Text Tag ≥ 7 : 1,
+// Nacht ≥ 5 : 1. Dazu die KANTE der Marker gegen den Kartengrund (WCAG 1.4.11, ≥ 3 : 1) aus
+// Pixeln, weil WebGL keine berechneten Stile hat. Gemessen wird die zusammengesetzte
+// Paarung (`kontrast-kern.ts`), nicht der Token.
 
 /** Misst, sichert den Boden und gibt den Wert für die Anmerkung zurück. */
 async function misst(tag: Locator, minimum: number, name: string, werte: string[]) {
@@ -222,11 +219,10 @@ async function markerKante(page: Page, ll: [number, number]) {
 }
 
 /**
- * Kurzzeichen im Kreis (Tabelle 4, Nr. 6): wirklich GEZEICHNET, nicht nur in der Quelle.
- * `queryRenderedFeatures` auf `marker-kurz` liefert nur, was MapLibre platziert hat — ein
- * Symbol, das bei Kollision wiche oder am Mindestzoom hinge, fehlte hier. Die Lesbarkeit
- * selbst ist die Paarung Schwarz auf weißem Hof (21 : 1, `KURZ_PAINT`) [abgeleitet]: 9-px-
- * Glyphen mit Kantenglättung ergeben keinen belastbaren Pixelwert.
+ * Kurzzeichen im Kreis: wirklich GEZEICHNET, nicht nur in der Quelle — `queryRenderedFeatures`
+ * auf `marker-kurz` liefert nur, was MapLibre platziert hat. Die Lesbarkeit selbst ist die
+ * Paarung Schwarz auf weißem Hof (21 : 1) [abgeleitet]; 9-px-Glyphen mit Kantenglättung
+ * ergeben keinen belastbaren Pixelwert.
  */
 async function kurzzeichenGezeichnet(page: Page, ll: [number, number]): Promise<string | null> {
   return page.evaluate((ziel) => {
@@ -335,9 +331,8 @@ for (const modus of ['light', 'dark'] as const) {
       .filter({ has: koordinate })
       .locator('.ant-form-item-explain-error');
     await expect(grund).toHaveCount(1);
-    // Feldmeldungen färbt antd mit `colorError` — app-weit in JEDEM Formular. Gemessen am Tag
-    // 5,67 : 1, unter dem Tagesboden; das gehört nicht in diesen Nachzug, sondern nach
-    // LFH-667. Gesichert wird bis dahin nur der absolute Boden 4,5 : 1.
+    // Feldmeldungen färbt antd app-weit mit `colorError`; am Tag unter dem Tagesboden
+    // (LFH-667). Gesichert bis dahin nur der absolute Boden 4,5 : 1.
     await misst(grund, 4.5, `${modus}/Koordinatengrund (LFH-667)`, werte);
 
     // ── Modal „Vermisst melden": Hinweis und Zukunftsgrenze ──
@@ -345,8 +340,7 @@ for (const modus of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: 'Vermisst melden' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
-    // `extra` steht in `colorTextDescription` = `schwach` — der Befund von LFH-643 (dort
-    // auch der Nachtwert). Gesichert nur der absolute Boden 4,5 : 1.
+    // `extra` steht in `colorTextDescription` = `schwach` (LFH-643). Nur der absolute Boden.
     await misst(
       dialog.getByText('Ohne Angabe gilt der Zeitpunkt der Meldung.'),
       4.5,
@@ -381,9 +375,8 @@ for (const modus of ['light', 'dark'] as const) {
       `${modus}/Leerzustand Titel`,
       werte,
     );
-    // Der Hinweissatz kommt aus dem GETEILTEN Primitiv `SeitenLeer` in `colorTextDescription`
-    // (= `schwach`) — derselbe Befund wie LFH-618 Nr. 8 (Tag 5,33 auf `grund`), app-weit
-    // zugeordnet an LFH-643. Gemessen und notiert, gesichert nur der absolute Boden 4,5 : 1.
+    // Der Hinweissatz kommt aus dem geteilten `SeitenLeer` in `schwach` (LFH-643). Gemessen
+    // und notiert, gesichert nur der absolute Boden 4,5 : 1.
     await misst(
       page.getByText(/Eine Koordinate lässt sich/),
       4.5,

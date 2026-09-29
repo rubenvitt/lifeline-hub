@@ -8,114 +8,16 @@
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, HeaderMap, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
 use serde_json::Value;
 use tower::ServiceExt;
 
 mod common;
-use common::{karten_ansicht_anlegen, login_cookie, standard_ansicht_id};
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, karten_ansicht_anlegen, login_cookie, rolle_setzen,
+    setup, standard_ansicht_id,
+};
 
 // ---------- Harness ----------
-
-async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let router = build_router(AppState {
-        pool: pool.clone(),
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, pool)
-}
-
-async fn setup() -> axum::Router {
-    setup_mit_pool().await.0
-}
-
-async fn json_anfrage(
-    app: &axum::Router,
-    methode: &str,
-    uri: &str,
-    cookie: &str,
-    body: Option<&str>,
-) -> (StatusCode, Value) {
-    let mut req = Request::builder()
-        .method(methode)
-        .uri(uri)
-        .header(header::COOKIE, cookie.to_string());
-    let body = match body {
-        Some(b) => {
-            req = req.header(header::CONTENT_TYPE, "application/json");
-            Body::from(b.to_string())
-        }
-        None => Body::empty(),
-    };
-    let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
-    let status = resp.status();
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    let value = if bytes.is_empty() {
-        Value::Null
-    } else {
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
-    };
-    (status, value)
-}
-
-async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
-    let (s, v) = json_anfrage(
-        app,
-        "POST",
-        "/api/einsaetze",
-        cookie,
-        Some(r#"{"bezeichnung":"Lage"}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED, "einsatz_anlegen: {v:?}");
-    v["id"].as_i64().unwrap()
-}
-
-async fn benutzer_anlegen(
-    app: &axum::Router,
-    admin_cookie: &str,
-    name: &str,
-    org_rolle: &str,
-) -> i64 {
-    let body = format!(
-        r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
-    );
-    let (s, v) = json_anfrage(app, "POST", "/api/benutzer", admin_cookie, Some(&body)).await;
-    assert_eq!(s, StatusCode::CREATED, "benutzer_anlegen: {v:?}");
-    v["id"].as_i64().unwrap()
-}
-
-async fn rolle_setzen(
-    app: &axum::Router,
-    leit_cookie: &str,
-    einsatz: i64,
-    benutzer_id: i64,
-    rolle: &str,
-) {
-    let body = format!(r#"{{"einsatz_rolle":"{rolle}"}}"#);
-    let (s, _) = json_anfrage(
-        app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"),
-        leit_cookie,
-        Some(&body),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-}
 
 /// Baut einen Multipart-Body mit den Feldern `datei` (Bildbytes) und `ecken` (JSON-String).
 /// Optional kann ein `name`-Feld übergeben werden.
@@ -256,7 +158,7 @@ async fn upload_liste_download_roundtrip() {
     assert_eq!(bild["ecken_json"].as_str(), Some(ECKEN));
 
     // Liste: genau 1 Eintrag
-    let (s, liste) = json_anfrage(
+    let (s, liste) = anfrage(
         &app,
         "GET",
         &format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder"),
@@ -526,7 +428,7 @@ async fn liste_ansicht_filtert_fremde_aus_haelt_null() {
         bnull["id"].as_i64().unwrap(),
     );
 
-    let (s, liste) = json_anfrage(
+    let (s, liste) = anfrage(
         &app,
         "GET",
         &format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder?ansicht={x}"),

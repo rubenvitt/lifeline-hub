@@ -2,25 +2,18 @@
 
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
+use lifeline_hub::app::build_router;
 use lifeline_hub::db;
 use lifeline_hub::dev::seed::dev_seed;
 use lifeline_hub::live::LiveHub;
 use tower::ServiceExt; // stellt `oneshot` bereit
 
+mod common;
+
 async fn setup() -> axum::Router {
     let pool = db::test_pool().await;
     dev_seed(&pool).await.unwrap();
-    build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    })
+    build_router(common::test_state(&pool, &LiveHub::new()))
 }
 
 #[tokio::test]
