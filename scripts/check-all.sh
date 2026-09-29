@@ -193,13 +193,16 @@ schritt_7() {
 }
 
 schritt_8() {
-  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster und KI-Notizen (Selbsttests)"
+  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest (Selbsttests)"
   # Im `schnell`-Bündel: prüft nicht das Release, sondern die Entscheidung, ob ein Lauf
   # releasen darf — die ist in beide Richtungen still.
   "$ROOT/scripts/release-ruhefenster.test.sh"
   # Dasselbe Werkzeug für die Release-Notizen: ein Fehlschlag fällt auf die konventionellen
   # Notizen zurück, CHANGELOG und GitHub-Release tragen denselben Text. Braucht nur Node.
   mise exec -- node --test "$ROOT/scripts/release/ki-notizen.test.mjs"
+  # Das Update-Manifest der Desktop-Hülle (LFH-721): ein falscher Eintrag lässt jede installierte
+  # Hülle ins Leere laden oder bietet ein Update an, das keins ist — beides still.
+  mise exec -- node --test "$ROOT/scripts/release/desktop-manifest.test.mjs"
 }
 
 schritt_9() {
