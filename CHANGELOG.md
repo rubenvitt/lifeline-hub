@@ -1,3 +1,49 @@
+## [1.0.0-alpha.52](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.51...v1.0.0-alpha.52) (2026-09-29)
+
+### Wichtige Änderungen
+
+- **Navigationsrahmen**: Alle interaktiven Elemente im Navigationsrahmen (Rail, Drawer, Akkordeon-Köpfe) folgen jetzt durchgängig der gewählten Handschuh-Stufe – ohne Ausnahme. Die Rail-Spalte wächst in der Handschuh-Einstellung mit, um die Zielflächen von 72 px zu gewährleisten.
+
+- **Node- und pnpm-Versionen**: Werkzeugversionen werden zentral über `mise.toml` gesteuert. Bei Installation aus dem Quellcode muss mise eingesetzt werden.
+
+### Bedienung und Darstellung
+
+- **Helligkeitsregler mit Warnsperre**: Neue Darstellungsachse mit fünf Helligkeitsstufen (100 % bis 20 %), gespeicherte Wahl je Benutzer, Bootstrap direkt beim Laden. Bei aktiven Warnungen (Gefahrengebiet mit Alarmstufe oder überfällige Meldungsbestätigung) gilt automatisch ein Helligkeitsboden von 80 %, um die Sichtbarkeit zu sichern. Bedienung über das Benutzermenü und die Sprungpalette.
+
+- **Dateiname in Upload-Liste**: Nach Update auf aktuelle Bibliotheksversion ist der Dateiname in der Upload-Liste ohne Vorschau kein Tab-Stopp mehr (entspricht dem Verhalten ohne anklickbare Funktion).
+
+### Lagebild ohne Netz
+
+- **Offline-Fähigkeit**: Das Lagebild (Einsatztagebuch, Kräfte und Mittel, Betroffene, Schäden, Tiere, Gefahren, Bereitstellungsräume, Unterkünfte, Lagekarte) kann ohne Netzverbindung gelesen werden. Der Stand wird automatisch auf dem Gerät gespeichert und bis zu 24 Stunden nach der letzten Serverbestätigung vorgehalten. Der Verbindungszustand und die Uhrzeit des letzten Serverstands werden im Seitenkopf und auf der Lagekarte angezeigt.
+
+- **Offline-Anmeldung**: Anmeldung mit den Zugangsdaten des zuletzt angemeldeten Benutzers ist ohne Netz möglich, wenn ein gültiger Lagebild-Stand vorliegt.
+
+- **Rechteentzug**: Bei Rechteentzug auf einen Einsatz oder ein Modul wird der betroffene Bereich sofort aus dem lokalen Speicher entfernt und nicht mehr angezeigt.
+
+### Authentifizierung und Sitzungen
+
+- **Benutzerwechsel in mehreren Tabs**: Schreibanfragen sind an den angezeigten Benutzer gebunden. Wechselt der Benutzer in einem anderen Tab, wird ein Konfliktdialog angezeigt, der die Wahl zwischen Übernahme oder Abmeldung bietet. Parallel geöffnete Tabs gleichen An- und Abmeldungen automatisch ab.
+
+### Qualität und Stabilität
+
+- **End-to-End-Tests**: Zahlreiche Stabilisierungen der automatischen Testläufe – unter anderem warten Tests jetzt auf vollständige Datenladezustände statt auf Netzstille, UHS-Grundriss-Tests warten auf abgeschlossene Belegungen, Zeitprüfungen laufen unabhängig von der lokalen Zeitzone.
+
+- **Abhängigkeiten**: Sicherheitsaktualisierungen für Build-Zeit-Abhängigkeiten (utoipa 6, antd 6.6.5, maplibre-gl 6.11.2, Fast-URI auf 3.1.7, weitere Minor- und Patch-Updates).
+
+- **Prüfabläufe**: Das Sammel-Gate bricht nicht mehr nach dem ersten roten Schritt ab, sondern läuft alle Prüfungen durch und meldet den Gesamtstatus.
+
+### Betrieb und Installation
+
+- **Doppel-Storno**: Gleichzeitige Stornierungen derselben Entität (Person, Tier, Schaden, Unterkunft, Bereitstellungsraum, Platz) werden jetzt atomar im Datenbankupdate abgewiesen, sodass nur ein Storno-Nachweis entsteht.
+
+- **Desktop-Hülle**: Messprotokoll für Tauri-2-basierte Desktop-Anwendung (macOS und Windows) liegt vor. Service Worker, Offline-Queue, Karte, Up-/Download und Deeplinks laufen auf beiden Plattformen.
+
+### Dokumentation und Code-Pflege
+
+- **Kommentare**: Code-Kommentare im gesamten Repository auf den heute tragenden Grund gekürzt – Ticket-Historie, Messanekdoten und Alternativerzählungen entfallen.
+
+- **Aufräumarbeiten**: Toten Code, redundante Helfer, ungenutzte Exporte und doppelte Test-Hilfsfunktionen entfernt. Gemeinsame Muster (Katalogverwaltung, Vorlagendokumente, Anlegen-Dialoge, optimistische Updates, Fehlerbehandlung) zentralisiert.
+
 ## [1.0.0-alpha.51](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.50...v1.0.0-alpha.51) (2026-09-28)
 
 ### Lagekarte
