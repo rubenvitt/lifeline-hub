@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rahmenFarben } from './tokens';
+import { farbenDunkel, rahmenFarben } from './tokens';
 
 /**
  * Kontrast auf dem dauerdunklen Rahmen (LFH-434), GERECHNET statt behauptet (WCAG-Formel).
@@ -36,6 +36,17 @@ describe('Rahmen — Kontrast bei Tageslicht (LFH-434)', () => {
     },
   );
 
+  // Text im Rahmen, der nicht aus den Textstufen kommt: Einsatzname und Initialen (`text2`,
+  // `EinsatzSwitcher`, `BenutzerMenu`), Zustandswörter der SYNC-Zelle und der Alarmzentrale
+  // (`achtung`, `rahmenFarben.alarm`). Ein Zustandswort ist Text und hält dieselbe Schwelle.
+  it.each([
+    ['farbenDunkel.text2', farbenDunkel.text2],
+    ['farbenDunkel.achtung', farbenDunkel.achtung],
+    ['rahmenFarben.alarm', rahmenFarben.alarm],
+  ])('Zustands- und Namenstext %s hält auf dem Leistengrund ≥ 7 : 1', (_name, farbe) => {
+    expect(kontrast(farbe, rahmenFarben.grund)).toBeGreaterThanOrEqual(7);
+  });
+
   it('„gesperrt“ hält den Boden ≥ 4,5 : 1 auf dem Leistengrund', () => {
     expect(kontrast(rahmenFarben.gesperrt, rahmenFarben.grund)).toBeGreaterThanOrEqual(4.5);
   });
@@ -48,7 +59,7 @@ describe('Rahmen — Kontrast bei Tageslicht (LFH-434)', () => {
   it('kennt keine Textrolle unterhalb der Tag-Schwelle außer „gesperrt“', () => {
     // Eine neue schwache Textstufe im Rahmen ist eine Entscheidung gegen LFH-434, kein Nachtrag.
     expect(Object.keys(rahmenFarben).sort()).toEqual(
-      ['aktiv', 'feld', 'gedaempft', 'gesperrt', 'grund', 'linie', 'marke', 'text'].sort(),
+      ['aktiv', 'alarm', 'feld', 'gedaempft', 'gesperrt', 'grund', 'linie', 'marke', 'text'].sort(),
     );
   });
 });

@@ -217,7 +217,8 @@ export const farbenDunkel: Farbrollen = {
  * Der RAHMEN (Kommandoleiste 52 px, Rail 60 px) bleibt in BEIDEN Modi dunkel. Deshalb eine
  * modusunabhängige Palette statt weiterer `Farbrollen`: dort müsste der Nachtblock sie
  * wertgleich doppeln, und diese Redundanz verbietet `rollen.guard.test.ts`. Die Werte zeigen
- * auf die Nachtpalette statt sie zu kopieren. Rot ist hier nur `marke` (aktive Rail-Kategorie).
+ * auf die Nachtpalette statt sie zu kopieren. Rot ist hier `marke` (aktive Rail-Kategorie) und
+ * `alarm` (Störungswort der SYNC-Zelle).
  *
  * Kontrast (LFH-434): der Rahmen wird auch bei Tageslicht gelesen, deshalb hält bedienbarer Text
  * die TAG-Schwelle ≥ 7 : 1 auf jedem Rahmengrund (`grund` · `feld` · `aktiv`): text 16,15 ·
@@ -241,6 +242,11 @@ export const rahmenFarben = {
   gedaempft: '#a0a8b1',
   /** NUR für gesperrte Einträge, nie für bedienbaren Text (LFH-434). */
   gesperrt: farbenDunkel.schwach,
+  /**
+   * Störungswort (GETRENNT/OFFLINE/PRÜFEN). Eigener Wert statt `farbenDunkel.alarm` (`#ff6b6b`,
+   * 6,96 auf `grund`): hier 7,18 (LFH-434).
+   */
+  alarm: '#ff7070',
   marke: farbenDunkel.marke,
 } as const;
 
