@@ -83,6 +83,21 @@ export function aktualisiereEinsatz(id: number, felder: KopfdatenUpdate): Promis
   return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}`, 'PATCH', felder);
 }
 
+/**
+ * Teil der Kopfdaten (LFH-472): fehlender Schlüssel = unverändert, `null` = leeren — so liest der
+ * Server den Body (`routes/einsatz.rs:KopfdatenPatch`, Tri-State seit LFH-306).
+ */
+export type KopfdatenPatch = Partial<KopfdatenUpdate>;
+
+/**
+ * Einzelfeld-Weg der Zeilenbearbeitung (LFH-472). Er schickt nur die übergebenen Schlüssel: ein
+ * mitgeschicktes fremdes Feld aus einem älteren Seitenstand überschriebe die gleichzeitige
+ * Änderung einer anderen Person.
+ */
+export function patcheEinsatz(id: number, patch: KopfdatenPatch): Promise<EinsatzAnzeige> {
+  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}`, 'PATCH', patch);
+}
+
 /** Einsatz-Einstellungen laden (LFH-131); existiert keine Zeile → Defaults (alle null). */
 export function ladeEinstellungen(id: number): Promise<EinsatzEinstellungen> {
   return apiGet<EinsatzEinstellungen>(`/api/einsaetze/${id}/einstellungen`);

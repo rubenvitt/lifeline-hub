@@ -34,18 +34,21 @@ import {
   aktualisiereEinsatz,
   ladeEinsatz,
   ladeMitglieder,
+  patcheEinsatz,
+  type KopfdatenPatch,
   type KopfdatenUpdate,
 } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { InlineAngabe } from '../components/InlineAngabe';
 import { useAuth } from '../auth/AuthContext';
 import {
   darfImEinsatzSchreiben,
   darfEinsatzLeiten,
   istEinsatzLeitung,
 } from '../einsatz/schreibrecht';
-import type { Einsatzart } from '../api/types';
+import type { EinsatzAnzeige, Einsatzart } from '../api/types';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
@@ -71,6 +74,112 @@ export function wireZuPicker(wire: string): Dayjs {
 /** Lokale Picker-Zeit → UTC-Wireformat 'YYYY-MM-DD HH:mm:ss' (rein, testbar). */
 export function pickerZuWire(d: Dayjs): string {
   return d.utc().format('YYYY-MM-DD HH:mm:ss');
+}
+
+/**
+ * Zeitpunkte gleich, wenn derselbe Instant (LFH-472, D5) — nicht dasselbe Objekt: jeder Render
+ * baut über `wireZuPicker` ein frisches Dayjs, und ein Neuabruf zwischen Öffnen und Speichern
+ * machte sonst aus „unverändert" einen PATCH.
+ */
+export function gleicherZeitpunkt(a: Dayjs | null, b: Dayjs | null): boolean {
+  return a === null || b === null ? a === b : a.valueOf() === b.valueOf();
+}
+
+/** Leer ist ein Text, der nach dem Trimmen nichts übrig lässt — wie `leerZuNull` beim Senden. */
+function leererText(w: string): boolean {
+  return w.trim() === '';
+}
+
+/**
+ * Speichert EIN Feld der Kopfdaten (LFH-472). `etikett` nennt die Angabe in der Erfolgsmeldung;
+ * der Patch trägt genau einen Schlüssel.
+ */
+type FeldSpeichern = (etikett: string, patch: KopfdatenPatch) => Promise<EinsatzAnzeige>;
+
+/** Eine freie Textangabe als Zeile (Stichwort ausgenommen: es hat Vorschläge). */
+function TextAngabe({
+  etikett,
+  wert,
+  darfSchreiben,
+  mono,
+  mehrzeilig,
+  speichern,
+  zuPatch,
+}: {
+  etikett: string;
+  wert: string | null | undefined;
+  darfSchreiben: boolean;
+  mono?: boolean;
+  mehrzeilig?: boolean;
+  speichern: FeldSpeichern;
+  zuPatch: (w: string | null) => KopfdatenPatch;
+}) {
+  const text = wert ?? '';
+  return (
+    <InlineAngabe<string>
+      etikett={etikett}
+      wert={text}
+      anzeige={mono ? <span style={monoStil(13)}>{text}</span> : text}
+      leer={leererText}
+      gleich={(a, b) => a.trim() === b.trim()}
+      darfSchreiben={darfSchreiben}
+      mehrzeilig={mehrzeilig}
+      onSpeichern={(w) => speichern(etikett, zuPatch(leerZuNull(w)))}
+      eingabe={({ feld, value, onChange }) =>
+        mehrzeilig ? (
+          <Input.TextArea
+            {...feld}
+            rows={3}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        ) : (
+          <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
+        )
+      }
+    />
+  );
+}
+
+/** Ein Zeitpunkt als Zeile. Hin und zurück über `wireZuPicker`/`pickerZuWire`, keine zweite Wandlung. */
+function ZeitpunktAngabe({
+  etikett,
+  wire,
+  pflicht,
+  darfSchreiben,
+  speichern,
+  zuPatch,
+}: {
+  etikett: string;
+  wire: string | null | undefined;
+  pflicht?: boolean;
+  darfSchreiben: boolean;
+  speichern: FeldSpeichern;
+  zuPatch: (wire: string | null) => KopfdatenPatch;
+}) {
+  return (
+    <InlineAngabe<Dayjs | null>
+      etikett={etikett}
+      wert={wire ? wireZuPicker(wire) : null}
+      anzeige={wire ? <ZeitAnzeige wert={wire} format="dtgVoll" /> : null}
+      leer={(d) => d === null}
+      gleich={gleicherZeitpunkt}
+      pflicht={pflicht}
+      darfSchreiben={darfSchreiben}
+      onSpeichern={(d) => speichern(etikett, zuPatch(d ? pickerZuWire(d) : null))}
+      eingabe={({ feld, popup, value, onChange }) => (
+        <DatePicker
+          {...feld}
+          {...popup}
+          showTime
+          format="YYYY-MM-DD HH:mm:ss"
+          style={{ width: '100%' }}
+          value={value}
+          onChange={(d) => onChange(d ?? null)}
+        />
+      )}
+    />
+  );
 }
 
 /** Werte des Bearbeiten-Formulars (begonnen_at als lokale Picker-Zeit vor der UTC-Wandlung). */
@@ -198,6 +307,23 @@ export default function EinsatzdatenPage() {
       message.success('Einsatzdaten gespeichert');
     },
   });
+
+  // Zeilenweg (LFH-472): EIN Feld je PATCH. Der Fehler geht an die Zeile (`mutateAsync` lehnt ab,
+  // `InlineAngabe` zeigt ihn), deshalb auch hier kein `onError`-Toast.
+  const feldMutation = useMutation({
+    mutationFn: ({ patch }: { etikett: string; patch: KopfdatenPatch }) =>
+      patcheEinsatz(einsatzId, patch),
+    onSuccess: (aktualisiert, { etikett }) => {
+      // Erst in den Cache, dann erfüllen: die Zeile zeigt den neuen Wert in derselben Runde, in der
+      // sie die Eingabe schließt, und die Fokusrückgabe trifft den frischen Wertknopf.
+      qc.setQueryData(einsatzKeys.einsatz(einsatzId), aktualisiert);
+      qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
+      qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
+      message.success(`${etikett} gespeichert`);
+    },
+  });
+  const feldSpeichern: FeldSpeichern = (etikett, patch) =>
+    feldMutation.mutateAsync({ etikett, patch });
 
   if (einsatzQuery.isLoading) {
     return <SeitenSkeleton />;
@@ -362,28 +488,101 @@ export default function EinsatzdatenPage() {
               marginBottom: token.margin,
             }}
           >
-            <KopfAngabe etikett="Einsatzstichwort" wert={einsatz.stichwort ?? '—'} />
+            <KopfAngabe
+              etikett="Einsatzstichwort"
+              wert={
+                <InlineAngabe<string>
+                  etikett="Einsatzstichwort"
+                  wert={einsatz.stichwort ?? ''}
+                  anzeige={einsatz.stichwort}
+                  leer={leererText}
+                  gleich={(a, b) => a.trim() === b.trim()}
+                  darfSchreiben={darfBearbeiten}
+                  onSpeichern={(w) =>
+                    feldSpeichern('Einsatzstichwort', { stichwort: leerZuNull(w) })
+                  }
+                  eingabe={({ feld, popup, value, onChange }) => (
+                    <AutoComplete
+                      {...feld}
+                      {...popup}
+                      options={stichwortOptionen}
+                      allowClear
+                      placeholder="z. B. H1, MANV …"
+                      value={value}
+                      onChange={(v?: string) => onChange(v ?? '')}
+                    />
+                  )}
+                />
+              }
+            />
             <KopfAngabe
               etikett="Alarmzeit"
               mono
-              wert={<ZeitAnzeige wert={einsatz.begonnen_at} format="dtgVoll" />}
+              wert={
+                <ZeitpunktAngabe
+                  etikett="Alarmzeit"
+                  wire={einsatz.begonnen_at}
+                  pflicht
+                  darfSchreiben={darfBearbeiten}
+                  speichern={feldSpeichern}
+                  // Pflicht: `null` erreicht `zuPatch` nie, `InlineAngabe` lehnt leer vorher ab.
+                  zuPatch={(wire) => ({ begonnen_at: wire ?? einsatz.begonnen_at })}
+                />
+              }
             />
-            <KopfAngabe etikett="Einsatzort" wert={einsatz.einsatzort ?? '—'} />
+            <KopfAngabe
+              etikett="Einsatzort"
+              wert={
+                <TextAngabe
+                  etikett="Einsatzort"
+                  wert={einsatz.einsatzort}
+                  darfSchreiben={darfBearbeiten}
+                  speichern={feldSpeichern}
+                  zuPatch={(w) => ({ einsatzort: w })}
+                />
+              }
+            />
             <KopfAngabe etikett="Einsatzleitung" wert={leitung || '—'} />
           </div>
 
           <Paneel titel="Lagedaten">
             <Angaben
               zeilen={[
-                { etikett: 'Einsatzart', wert: EINSATZART_LABELS[einsatz.einsatzart] },
+                {
+                  etikett: 'Einsatzart',
+                  wert: (
+                    <InlineAngabe<Einsatzart>
+                      etikett="Einsatzart"
+                      wert={einsatz.einsatzart}
+                      anzeige={EINSATZART_LABELS[einsatz.einsatzart]}
+                      // Pflicht, aber ein `Select` ohne `allowClear` kann nicht leer werden.
+                      leer={() => false}
+                      darfSchreiben={darfBearbeiten}
+                      onSpeichern={(art) => feldSpeichern('Einsatzart', { einsatzart: art })}
+                      eingabe={({ feld, popup, value, onChange }) => (
+                        <Select<Einsatzart>
+                          {...feld}
+                          {...popup}
+                          options={EINSATZART_OPTIONEN}
+                          value={value}
+                          onChange={onChange}
+                        />
+                      )}
+                    />
+                  ),
+                },
                 {
                   etikett: 'Nächste Lagebesprechung',
-                  wert: einsatz.naechste_lagebesprechung_at ? (
+                  wert: (
                     <span style={monoStil(13)}>
-                      <ZeitAnzeige wert={einsatz.naechste_lagebesprechung_at} format="dtgVoll" />
+                      <ZeitpunktAngabe
+                        etikett="Nächste Lagebesprechung"
+                        wire={einsatz.naechste_lagebesprechung_at}
+                        darfSchreiben={darfBearbeiten}
+                        speichern={feldSpeichern}
+                        zuPatch={(wire) => ({ naechste_lagebesprechung_at: wire })}
+                      />
                     </span>
-                  ) : (
-                    '—'
                   ),
                 },
                 {
@@ -400,12 +599,58 @@ export default function EinsatzdatenPage() {
                       '—'
                     ),
                 },
-                { etikett: 'Meldende Stelle', wert: einsatz.meldende_stelle ?? '—' },
-                { etikett: 'Sachverhalt / Meldebild', wert: einsatz.sachverhalt ?? '—' },
+                {
+                  etikett: 'Meldende Stelle',
+                  wert: (
+                    <TextAngabe
+                      etikett="Meldende Stelle"
+                      wert={einsatz.meldende_stelle}
+                      darfSchreiben={darfBearbeiten}
+                      speichern={feldSpeichern}
+                      zuPatch={(w) => ({ meldende_stelle: w })}
+                    />
+                  ),
+                },
+                {
+                  etikett: 'Sachverhalt / Meldebild',
+                  wert: (
+                    <TextAngabe
+                      etikett="Sachverhalt / Meldebild"
+                      wert={einsatz.sachverhalt}
+                      mehrzeilig
+                      darfSchreiben={darfBearbeiten}
+                      speichern={feldSpeichern}
+                      zuPatch={(w) => ({ sachverhalt: w })}
+                    />
+                  ),
+                },
                 {
                   etikett: 'Anzahl Betroffene (initial)',
                   wert: (
-                    <span style={monoStil(13)}>{einsatz.anzahl_betroffene_initial ?? '—'}</span>
+                    <InlineAngabe<number | null>
+                      etikett="Anzahl Betroffene (initial)"
+                      wert={einsatz.anzahl_betroffene_initial ?? null}
+                      anzeige={
+                        <span style={monoStil(13)}>{einsatz.anzahl_betroffene_initial}</span>
+                      }
+                      leer={(n) => n === null}
+                      darfSchreiben={darfBearbeiten}
+                      onSpeichern={(n) =>
+                        feldSpeichern('Anzahl Betroffene (initial)', {
+                          anzahl_betroffene_initial: n,
+                        })
+                      }
+                      eingabe={({ feld, value, onChange }) => (
+                        <InputNumber<number>
+                          {...feld}
+                          min={0}
+                          precision={0}
+                          style={{ width: 180 }}
+                          value={value}
+                          onChange={(n) => onChange(n ?? null)}
+                        />
+                      )}
+                    />
                   ),
                 },
               ]}
@@ -433,7 +678,16 @@ export default function EinsatzdatenPage() {
                       },
                       {
                         etikett: 'Leitstellen-Nr.',
-                        wert: <span style={monoStil(13)}>{einsatz.leitstellen_nr ?? '—'}</span>,
+                        wert: (
+                          <TextAngabe
+                            etikett="Leitstellen-Nr."
+                            wert={einsatz.leitstellen_nr}
+                            mono
+                            darfSchreiben={darfBearbeiten}
+                            speichern={feldSpeichern}
+                            zuPatch={(w) => ({ leitstellen_nr: w })}
+                          />
+                        ),
                       },
                       {
                         etikett: 'Angelegt am (techn.)',
