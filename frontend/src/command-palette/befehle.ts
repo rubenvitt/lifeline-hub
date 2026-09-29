@@ -296,7 +296,8 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
           label: a.label,
           icon: TbPlus,
           schlagworte: a.schlagworte,
-          ...sprungZu(ziel, k.navigate),
+          // Gemerkt wird das MODUL der Aktion (LFH-436): ein Griff, ein Modul.
+          ...sprungZu(ziel, k.navigate, () => k.merkeModulBesuch?.(a.modulKey)),
         });
       }
     }

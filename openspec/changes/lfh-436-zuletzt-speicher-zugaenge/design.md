@@ -55,7 +55,8 @@ nichts. Das ist kein Fehlerfall, denn zu diesem Zeitpunkt ist der Einsatz-Rahmen
 bedienbar.
 
 **D3 Ein Helfer je Seite: `useModulWahl()`** in `einsatz/useModulWahl.ts`. Er liest
-`einsatzId` aus `useParams` und `benutzer` aus `useAuth` und liefert:
+`benutzer` aus `useAuth`; den Einsatz nimmt er aus dem ZIEL (`einsatzIdAusPfad`), nicht aus der
+aktuellen Route, denn gemerkt wird in dem Einsatz, in den die Wahl führt. Er liefert:
 
 - `merkeZiel(pfad)` löst den Pfad ohne Query über `modulAusPfad` auf. Liefert das kein Modul
   (etwa die Brotkrume `/einsaetze`), passiert nichts.
@@ -78,7 +79,12 @@ in `befehle.ts`, wie bei den Gruppen „Module" und „Zuletzt".
 
 **D5 Bestehende Schreiber** (`EinsatzLayout.onModulKlick`, `useBefehle.merkeBesuch`) reichen
 `benutzer.id` mit durch. Das Lesen in `useBefehle` bleibt beim Render, der Memo-Schlüssel wird
-um den Benutzer erweitert.
+um den Benutzer erweitert. Der Hinweis in `ModulPanel.tsx` („der Speicher bleibt für die
+Kommandopalette") stimmt weiter und bleibt.
+
+**D6 Hülle mit `display: contents`.** Der Fänger sitzt an einem `<div>` um `EinsatzSeite`. Mit
+`display: contents` erzeugt die Hülle keine Box und ändert das Layout nicht; ein Prop an
+`EinsatzSeite` hätte die geteilte Seitenhülle für zwei Aufrufer erweitert.
 
 ## Risks / Trade-offs
 

@@ -245,15 +245,16 @@ export default function EinsatzLayout() {
   }
 
   /**
-   * Modulklick — der einzige Weg, auf dem der „Zuletzt"-Speicher (gelesen von der
-   * Kommandopalette) gefüllt wird. Gemerkt wird, was jemand GEWÄHLT hat, keine Ankünfte: ein
-   * Deep-Link von außen läuft bewusst nicht hinein, sonst käme die Erosion durch Rail-Sprünge
-   * zurück.
+   * Modulklick — einer der Wege, auf denen der „Zuletzt"-Speicher (gelesen von der
+   * Kommandopalette) gefüllt wird; die Übersicht aller Zugänge steht in `zuletztModule.ts`.
+   * Gemerkt wird, was jemand GEWÄHLT hat, keine Ankünfte: der Rail-Sprung und ein Deep-Link von
+   * außen laufen bewusst nicht hinein, sonst käme die Erosion durch Rail-Sprünge zurück.
    * VOR `navigate`, weil der Routenwechsel den lesenden Render auslöst. `Number.isFinite`, weil
-   * `einsatzId` aus `useParams` stammt (sonst ein Eintrag unter `…:NaN`).
+   * `einsatzId` aus `useParams` stammt (sonst ein Eintrag unter `…:NaN`); ohne Benutzer (Sitzung
+   * lädt noch) kein Eintrag.
    */
   function onModulKlick(modul: ModulEintrag) {
-    if (Number.isFinite(einsatzId)) merkeModulBesuch(einsatzId, modul.key);
+    if (benutzer && Number.isFinite(einsatzId)) merkeModulBesuch(benutzer.id, einsatzId, modul.key);
     navigate(einsatzModulPfad(einsatzId, modulZielRoute(modul)));
     setNavOffen(false);
   }

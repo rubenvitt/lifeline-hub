@@ -17,8 +17,8 @@ Code. Vitest aus `frontend/` über `mise exec -- pnpm -C <abs>/frontend vitest r
   „einziger Weg" (`EinsatzLayout.tsx`) und den Hinweis in `ModulPanel.tsx` berichtigen.
   `EinsatzLayout.test.tsx` (Panel-Klick merkt, Rail-Sprung merkt NICHT, Sprungmarke merkt nicht)
   sowie `befehle.test.ts`/`zuletztBefehle.test.ts` auf die neue Signatur umstellen und grün sehen.
-- [ ] 1.4 Test in `EinsatzLayout.test.tsx`: ein anderer Benutzer im selben Browser sieht die
-  Einträge nicht (Speicher von Benutzer A vorbelegt, Palette bzw. `leseZuletztModule` für B leer)
+- [ ] 1.4 Test in `useBefehle.test.tsx` (dem Leser): ein anderer Benutzer im selben Browser sieht
+  die Einträge nicht (Speicher von Benutzer A vorbelegt, Zuletzt-Gruppe für B ohne sie)
 
 ## 2. Schnellaktionen der Palette
 

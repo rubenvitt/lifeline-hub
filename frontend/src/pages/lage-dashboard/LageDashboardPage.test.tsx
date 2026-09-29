@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
 import { QueryClient } from '@tanstack/react-query';
-import { server } from '../../test/server';
+import { meHandler, server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { einsatzKeys } from '../../api/queryKeys';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
@@ -15,7 +15,8 @@ import { setzeLiveStatusFuerTest } from '../../live/liveStatusStore';
 import LageDashboardPage from './LageDashboardPage';
 import type { Auftrag, EtbEintragAnzeige, GefahrBewertung, Meldung } from '../../api/types';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
-import { einsatzFixture } from '../../test/fixtures';
+import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
+import { leseZuletztModule } from '../../einsatz/zuletztModule';
 import { FakeEventSource } from '../../test/eventSource';
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
@@ -1395,5 +1396,52 @@ describe('LageDashboardPage — Stand des Lageberichts (LFH-350 · H60)', () => 
     });
     expect(zelle).toHaveTextContent('Freigegeben · Lage 14:00');
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
+  });
+});
+
+/**
+ * Das Lage-Dashboard ist wie der Überblick eine Seite mit Modulzielen: jede Wahl darauf füllt die
+ * Palettengruppe „Zuletzt besucht" (LFH-436). Vorbedingung je Test: das Laden allein merkt nichts.
+ * Der Schlüssel des Gefahren-Moduls ist `gefahrenzonen`, die Route `gefahren` — der Test belegt
+ * damit auch die Auflösung über die Route.
+ */
+describe('LageDashboardPage — „Zuletzt"-Speicher (LFH-436)', () => {
+  const ICH = benutzerFixture({ id: 9, org_rolle: 'fuehrungskraft' });
+  const gemerkt = () => leseZuletztModule(ICH.id, 1);
+
+  beforeEach(() => {
+    localStorage.clear();
+    server.use(meHandler(ICH));
+  });
+
+  it('die Kennzahl „Betroffene" merkt Personen', async () => {
+    mockEndpunkte({ personen: [person('sk1')] });
+    render();
+    const link = await kennzahlGeladen('Betroffene');
+    expect(gemerkt()).toEqual([]);
+    await userEvent.click(link);
+    expect(await screen.findByText('PERSONEN-MODUL')).toBeInTheDocument();
+    expect(gemerkt()).toEqual(['personen']);
+  });
+
+  it('der Paneel-Link „Gefahren" merkt das Gefahren-Modul', async () => {
+    mockEndpunkte({});
+    render();
+    const box = paneel('Gefahrenmatrix');
+    await within(box).findByText('Noch keine Gefahrengebiete angelegt.');
+    expect(gemerkt()).toEqual([]);
+    await userEvent.click(within(box).getByRole('button', { name: 'Gefahren' }));
+    expect(await screen.findByText('GEFAHREN-MODUL')).toBeInTheDocument();
+    expect(gemerkt()).toEqual(['gefahrenzonen']);
+  });
+
+  it('die Leer-Aktion „Gefahren bewerten" merkt das Gefahren-Modul', async () => {
+    mockEndpunkte({});
+    render();
+    const box = paneel('Gefahrenmatrix');
+    const knopf = await within(box).findByRole('button', { name: 'Gefahren bewerten' });
+    await userEvent.click(knopf);
+    expect(await screen.findByText('GEFAHREN-MODUL')).toBeInTheDocument();
+    expect(gemerkt()).toEqual(['gefahrenzonen']);
   });
 });

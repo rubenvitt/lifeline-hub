@@ -35,7 +35,7 @@
  * / `fehler` / `leer` sichtbar; fällt die Gefahrenmatrix aus, bleibt der Rest lesbar.
  */
 import { useMemo, useState, useSyncExternalStore, useEffect } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Alert, Breadcrumb } from 'antd';
 import { TbAlertTriangle } from 'react-icons/tb';
@@ -58,6 +58,7 @@ import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore'
 import { ladeEinsatz, ladeModulOverrides } from '../../api/einsaetze';
 import { useAuth } from '../../auth/AuthContext';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
+import { useModulWahl } from '../../einsatz/useModulWahl';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listeSchaeden } from '../../api/einsatzSchaden';
@@ -138,7 +139,7 @@ function useJetzt(taktMs: number): number {
 export default function LageDashboardPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const navigate = useNavigate();
+  const { waehle, beiLinkKlick } = useModulWahl();
   const { token, rollen } = useRollen();
   const { abBreite } = useViewport();
   const { konventionen: konv } = useAnzeigeKonventionen();
@@ -405,211 +406,217 @@ export default function LageDashboardPage() {
     lagebild ? alsKennzahlZustand(zustandVon(q)) : 'laden';
 
   return (
-    <EinsatzSeite
-      titel={`Lagebild ${lagebildZeit(jetzt, konv)}`}
-      breadcrumb={
-        <Breadcrumb
-          items={[
-            { title: <Link to="/einsaetze">Einsätze</Link> },
-            { title: einsatz?.bezeichnung ?? '…' },
-            { title: 'Lage-Dashboard' },
-          ]}
-        />
-      }
-      // Der rechte Slot trägt hier Meta, keinen Knopf.
-      aktionen={
-        <span
-          data-lfh="lagebild-meta"
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            gap: token.padding,
-            ...monoStil(11),
-            color: rollen.schwach,
-          }}
-        >
-          <span data-lfh="datenstand">{standText(datenstand, jetzt, konv)}</span>
-          {warnTon !== 'neutral' && lagebild && (
-            <span
-              data-lfh="warnstufe-hinweis"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                color: warnTon === 'alarm' ? rollen.alarmText : rollen.achtungText,
-              }}
-            >
-              <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                <TbAlertTriangle size={14} />
-              </span>
-              Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
-            </span>
-          )}
-        </span>
-      }
-    >
-      <div
-        data-lfh="lagebild"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 1,
-          background: rollen.linie,
-          border: `1px solid ${rollen.linie}`,
-        }}
-      >
-        {wechsel && (
-          <Sammelbanner
-            aktion={{
-              label: 'übernehmen',
-              onKlick: () =>
-                serverReiheSchluessel != null &&
-                setZuschnitt({ einsatzId, schluessel: serverReiheSchluessel }),
+    // Jeder Link der Seite ist eine Modulwahl für „Zuletzt besucht" (LFH-436, `useModulWahl`).
+    // `display: contents`: die Hülle trägt nur den Fänger und nimmt am Layout nicht teil.
+    <div style={{ display: 'contents' }} onClickCapture={beiLinkKlick}>
+      <EinsatzSeite
+        titel={`Lagebild ${lagebildZeit(jetzt, konv)}`}
+        breadcrumb={
+          <Breadcrumb
+            items={[
+              { title: <Link to="/einsaetze">Einsätze</Link> },
+              { title: einsatz?.bezeichnung ?? '…' },
+              { title: 'Lage-Dashboard' },
+            ]}
+          />
+        }
+        // Der rechte Slot trägt hier Meta, keinen Knopf.
+        aktionen={
+          <span
+            data-lfh="lagebild-meta"
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: token.padding,
+              ...monoStil(11),
+              color: rollen.schwach,
             }}
           >
-            Kennzahlreihe geändert: {wechsel}
-          </Sammelbanner>
-        )}
-        {/* Die sechs Plätze stehen auch vor dem ersten Einsatz-Abruf (Kriterium 12, CLS), als
-            Ladezelle ohne Ziel und ohne Beschriftung — welche Kennzahl auf die Lageplätze kommt,
-            steht erst mit dem Einsatz fest. Das geschützte Leerzeichen hält die Zeilenhöhe. */}
-        <Kennzahlenband
-          beschriftung="Lage in Zahlen"
-          spalten={bandSpalten}
-          style={{ border: 'none' }}
-        >
-          {lagebild == null
-            ? Array.from({ length: KENNZAHL_PLAETZE }, (_, i) => (
-                <Kennzahl key={i} titel={'\u00a0'} wert="" zustand="laden" />
-              ))
-            : lagebild.kennzahlen.map((k) => (
-                <Kennzahl
-                  key={k.etikett}
-                  titel={k.etikett}
-                  wert={k.wert}
-                  einheit={k.einheit}
-                  notiz={k.notiz}
-                  ton={k.ton}
-                  zustand={alsKennzahlZustand(kennzahlZustand[k.etikett])}
-                  ziel={
-                    k.ohneZiel ? undefined : (k.zielPfad ?? einsatzModulPfad(einsatzId, k.route))
-                  }
-                />
-              ))}
-        </Kennzahlenband>
-
+            <span data-lfh="datenstand">{standText(datenstand, jetzt, konv)}</span>
+            {warnTon !== 'neutral' && lagebild && (
+              <span
+                data-lfh="warnstufe-hinweis"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: warnTon === 'alarm' ? rollen.alarmText : rollen.achtungText,
+                }}
+              >
+                <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                  <TbAlertTriangle size={14} />
+                </span>
+                Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
+              </span>
+            )}
+          </span>
+        }
+      >
         <div
-          data-lfh="lagebild-paneele"
+          data-lfh="lagebild"
           style={{
-            display: 'grid',
-            gridTemplateColumns: breit
-              ? 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr)'
-              : 'minmax(0, 1fr)',
+            display: 'flex',
+            flexDirection: 'column',
             gap: 1,
+            background: rollen.linie,
+            border: `1px solid ${rollen.linie}`,
           }}
         >
-          <GefahrenmatrixPaneel
-            zustand={zMatrix}
-            zeilen={matrix.zeilen}
-            unbewertet={matrix.unbewertet}
-            gebiete={anzahlGebiete}
-            onNeuladen={() => {
-              void gefahrenQuery.refetch();
-              for (const q of matrixQueries) void q.refetch();
-            }}
-            onGefahren={() => navigate(gefahrenPfad(einsatzId))}
-          />
-          <SichtungsPaneel
-            zustand={
-              zBetroffene === 'daten' && (personenQuery.data ?? []).length === 0
-                ? 'leer'
-                : zBetroffene
-            }
-            zeilen={lagebild ? sichtungsZeilen(lagebild.sk) : []}
-            erfasst={lagebild?.betroffeneGesamt ?? 0}
-            ohneSichtung={lagebild?.sk.ohne ?? 0}
-            transport={transportBilanz(personenQuery.data ?? [])}
-            onNeuladen={() => void personenQuery.refetch()}
-            onPersonen={() => navigate(personenPfad(einsatzId))}
-            onAufnehmen={() => navigate(personenAufnahmePfad(einsatzId))}
-          />
-          <MeldungsstromPaneel
-            zustand={zStrom}
-            sichtbar={strom.sichtbar}
-            neu={strom.neu}
-            neuMindestens={strom.neuMindestens}
-            liveStatus={liveStatus}
-            konv={konv}
-            onAnzeigen={() => setAngezeigtBis(strom.hoechste)}
-            onNeuladen={() => void etbQuery.refetch()}
-            onEtb={() => navigate(etbPfad(einsatzId))}
-            onErfassen={() => navigate(etbPfad(einsatzId, { neu: true }))}
-          />
-        </div>
+          {wechsel && (
+            <Sammelbanner
+              aktion={{
+                label: 'übernehmen',
+                onKlick: () =>
+                  serverReiheSchluessel != null &&
+                  setZuschnitt({ einsatzId, schluessel: serverReiheSchluessel }),
+              }}
+            >
+              Kennzahlreihe geändert: {wechsel}
+            </Sammelbanner>
+          )}
+          {/* Die sechs Plätze stehen auch vor dem ersten Einsatz-Abruf (Kriterium 12, CLS), als
+            Ladezelle ohne Ziel und ohne Beschriftung — welche Kennzahl auf die Lageplätze kommt,
+            steht erst mit dem Einsatz fest. Das geschützte Leerzeichen hält die Zeilenhöhe. */}
+          <Kennzahlenband
+            beschriftung="Lage in Zahlen"
+            spalten={bandSpalten}
+            style={{ border: 'none' }}
+          >
+            {lagebild == null
+              ? Array.from({ length: KENNZAHL_PLAETZE }, (_, i) => (
+                  <Kennzahl key={i} titel={'\u00a0'} wert="" zustand="laden" />
+                ))
+              : lagebild.kennzahlen.map((k) => (
+                  <Kennzahl
+                    key={k.etikett}
+                    titel={k.etikett}
+                    wert={k.wert}
+                    einheit={k.einheit}
+                    notiz={k.notiz}
+                    ton={k.ton}
+                    zustand={alsKennzahlZustand(kennzahlZustand[k.etikett])}
+                    ziel={
+                      k.ohneZiel ? undefined : (k.zielPfad ?? einsatzModulPfad(einsatzId, k.route))
+                    }
+                  />
+                ))}
+          </Kennzahlenband>
 
-        {/* Führungsstand (siehe Dateikopf). Die Überfällig-Zahlen sind Alarmbeiträge und
+          <div
+            data-lfh="lagebild-paneele"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: breit
+                ? 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr)'
+                : 'minmax(0, 1fr)',
+              gap: 1,
+            }}
+          >
+            <GefahrenmatrixPaneel
+              zustand={zMatrix}
+              zeilen={matrix.zeilen}
+              unbewertet={matrix.unbewertet}
+              gebiete={anzahlGebiete}
+              onNeuladen={() => {
+                void gefahrenQuery.refetch();
+                for (const q of matrixQueries) void q.refetch();
+              }}
+              onGefahren={() => waehle(gefahrenPfad(einsatzId))}
+            />
+            <SichtungsPaneel
+              zustand={
+                zBetroffene === 'daten' && (personenQuery.data ?? []).length === 0
+                  ? 'leer'
+                  : zBetroffene
+              }
+              zeilen={lagebild ? sichtungsZeilen(lagebild.sk) : []}
+              erfasst={lagebild?.betroffeneGesamt ?? 0}
+              ohneSichtung={lagebild?.sk.ohne ?? 0}
+              transport={transportBilanz(personenQuery.data ?? [])}
+              onNeuladen={() => void personenQuery.refetch()}
+              onPersonen={() => waehle(personenPfad(einsatzId))}
+              onAufnehmen={() => waehle(personenAufnahmePfad(einsatzId))}
+            />
+            <MeldungsstromPaneel
+              zustand={zStrom}
+              sichtbar={strom.sichtbar}
+              neu={strom.neu}
+              neuMindestens={strom.neuMindestens}
+              liveStatus={liveStatus}
+              konv={konv}
+              onAnzeigen={() => setAngezeigtBis(strom.hoechste)}
+              onNeuladen={() => void etbQuery.refetch()}
+              onEtb={() => waehle(etbPfad(einsatzId))}
+              onErfassen={() => waehle(etbPfad(einsatzId, { neu: true }))}
+            />
+          </div>
+
+          {/* Führungsstand (siehe Dateikopf). Die Überfällig-Zahlen sind Alarmbeiträge und
             behalten ihren Ton. */}
-        <Kennzahlenband
-          beschriftung="Führungsstand"
-          spalten={abBreite('md') ? 4 : 2}
-          style={{ border: 'none' }}
-        >
-          <Kennzahl
-            titel="Aufträge offen"
-            groesse="klein"
-            wert={fuehrung?.auftraegeOffen ?? ''}
-            notiz={
-              (fuehrung?.auftraegeUeberfaellig ?? 0) > 0
-                ? `${fuehrung?.auftraegeUeberfaellig} überfällig`
-                : 'keiner überfällig'
-            }
-            ton={(fuehrung?.auftraegeUeberfaellig ?? 0) > 0 ? 'alarm' : 'neutral'}
-            zustand={zFuehrung(auftraegeQuery)}
-            ziel={auftraegePfad(einsatzId)}
-          />
-          <Kennzahl
-            titel="Meldungen offen"
-            groesse="klein"
-            wert={fuehrung?.meldungenOffen ?? ''}
-            notiz={
-              `${fuehrung?.meldungenNeu ?? 0} neu` +
-              ((fuehrung?.meldungenUeberfaellig ?? 0) > 0
-                ? ` · ${fuehrung?.meldungenUeberfaellig} überfällig`
-                : '')
-            }
-            ton={(fuehrung?.meldungenUeberfaellig ?? 0) > 0 ? 'alarm' : 'neutral'}
-            zustand={zFuehrung(meldungenQuery)}
-            ziel={meldungenPfad(einsatzId)}
-          />
-          <Kennzahl
-            titel="Lagebericht"
-            groesse="klein"
-            // `stand` ist ein UTC-Wirestring ohne Zonenkennung; formatiert wird hier, weil die Zone
-            // am Provider hängt.
-            wert={fuehrung?.bericht ? formatUhrzeitMitTag(fuehrung.bericht.stand, konv) : 'keiner'}
-            notiz={
-              fuehrung?.bericht
-                ? `${fuehrung.bericht.statusLabel} · ${fuehrung.bericht.titel}`
-                : 'noch nicht erstellt'
-            }
-            zustand={zFuehrung(lageberichteQuery)}
-            ziel={
-              fuehrung?.bericht
-                ? lageberichtDetailPfad(einsatzId, fuehrung.bericht.id)
-                : lageberichtePfad(einsatzId)
-            }
-          />
-          <Kennzahl
-            titel="UHS aktiv"
-            groesse="klein"
-            wert={fuehrung?.uhsAktiv ?? ''}
-            notiz={`${fuehrung?.uhsGeplant ?? 0} geplant`}
-            zustand={zFuehrung(uhsQuery)}
-            ziel={unfallhilfsstellenListePfad(einsatzId)}
-          />
-        </Kennzahlenband>
-      </div>
-    </EinsatzSeite>
+          <Kennzahlenband
+            beschriftung="Führungsstand"
+            spalten={abBreite('md') ? 4 : 2}
+            style={{ border: 'none' }}
+          >
+            <Kennzahl
+              titel="Aufträge offen"
+              groesse="klein"
+              wert={fuehrung?.auftraegeOffen ?? ''}
+              notiz={
+                (fuehrung?.auftraegeUeberfaellig ?? 0) > 0
+                  ? `${fuehrung?.auftraegeUeberfaellig} überfällig`
+                  : 'keiner überfällig'
+              }
+              ton={(fuehrung?.auftraegeUeberfaellig ?? 0) > 0 ? 'alarm' : 'neutral'}
+              zustand={zFuehrung(auftraegeQuery)}
+              ziel={auftraegePfad(einsatzId)}
+            />
+            <Kennzahl
+              titel="Meldungen offen"
+              groesse="klein"
+              wert={fuehrung?.meldungenOffen ?? ''}
+              notiz={
+                `${fuehrung?.meldungenNeu ?? 0} neu` +
+                ((fuehrung?.meldungenUeberfaellig ?? 0) > 0
+                  ? ` · ${fuehrung?.meldungenUeberfaellig} überfällig`
+                  : '')
+              }
+              ton={(fuehrung?.meldungenUeberfaellig ?? 0) > 0 ? 'alarm' : 'neutral'}
+              zustand={zFuehrung(meldungenQuery)}
+              ziel={meldungenPfad(einsatzId)}
+            />
+            <Kennzahl
+              titel="Lagebericht"
+              groesse="klein"
+              // `stand` ist ein UTC-Wirestring ohne Zonenkennung; formatiert wird hier, weil die Zone
+              // am Provider hängt.
+              wert={
+                fuehrung?.bericht ? formatUhrzeitMitTag(fuehrung.bericht.stand, konv) : 'keiner'
+              }
+              notiz={
+                fuehrung?.bericht
+                  ? `${fuehrung.bericht.statusLabel} · ${fuehrung.bericht.titel}`
+                  : 'noch nicht erstellt'
+              }
+              zustand={zFuehrung(lageberichteQuery)}
+              ziel={
+                fuehrung?.bericht
+                  ? lageberichtDetailPfad(einsatzId, fuehrung.bericht.id)
+                  : lageberichtePfad(einsatzId)
+              }
+            />
+            <Kennzahl
+              titel="UHS aktiv"
+              groesse="klein"
+              wert={fuehrung?.uhsAktiv ?? ''}
+              notiz={`${fuehrung?.uhsGeplant ?? 0} geplant`}
+              zustand={zFuehrung(uhsQuery)}
+              ziel={unfallhilfsstellenListePfad(einsatzId)}
+            />
+          </Kennzahlenband>
+        </div>
+      </EinsatzSeite>
+    </div>
   );
 }
