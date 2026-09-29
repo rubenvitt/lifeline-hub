@@ -81,21 +81,6 @@ pub async fn belege(
     laden(pool, einsatz_id, event_id).await
 }
 
-/// Belegungs-Verlauf eines BR (neueste zuerst).
-pub async fn liste_je_br(
-    pool: &SqlitePool,
-    br_id: i64,
-) -> Result<Vec<BrBelegungAnzeige>, AppError> {
-    Ok(
-        sqlx::query_as::<_, BrBelegungAnzeige>(sqlx::AssertSqlSafe(format!(
-            "{SELECT_ALLE} WHERE br_id = ? ORDER BY zeitpunkt_at DESC, id DESC"
-        )))
-        .bind(br_id)
-        .fetch_all(pool)
-        .await?,
-    )
-}
-
 /// Lädt ein einzelnes Belegungs-Event; `NotFound` außerhalb des Einsatzes.
 pub async fn laden(
     pool: &SqlitePool,
@@ -445,7 +430,12 @@ mod tests {
         belege(&pool, e, br, "einheit", einheit, "eintritt", None, b)
             .await
             .unwrap();
-        assert_eq!(br_repo::aktive_belegungen(&pool, br).await.unwrap(), 1);
+        assert_eq!(
+            br_repo::aktive_belegungen_tx(&mut *pool.acquire().await.unwrap(), br)
+                .await
+                .unwrap(),
+            1
+        );
 
         let ev = belege(&pool, e, br, "einheit", einheit, "austritt", None, b)
             .await
@@ -454,7 +444,12 @@ mod tests {
         assert_eq!(cache_einheit(&pool, einheit).await, None);
 
         // WICHTIG: nach Austritt muss BR auflösbar sein
-        assert_eq!(br_repo::aktive_belegungen(&pool, br).await.unwrap(), 0);
+        assert_eq!(
+            br_repo::aktive_belegungen_tx(&mut *pool.acquire().await.unwrap(), br)
+                .await
+                .unwrap(),
+            0
+        );
         br_repo::setze_status(&pool, e, br, "aufgeloest", b)
             .await
             .unwrap();
@@ -571,7 +566,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(cache_fahrzeug(&pool, fz).await, None);
-        assert_eq!(br_repo::aktive_belegungen(&pool, br).await.unwrap(), 0);
+        assert_eq!(
+            br_repo::aktive_belegungen_tx(&mut *pool.acquire().await.unwrap(), br)
+                .await
+                .unwrap(),
+            0
+        );
     }
 
     // ─── Validierungs-Tests ─────────────────────────────────────────────────
@@ -700,30 +700,6 @@ mod tests {
             matches!(err, AppError::Conflict(_)),
             "Austritt ohne aktive Belegung → Conflict"
         );
-    }
-
-    #[tokio::test]
-    async fn liste_je_br_gibt_neueste_zuerst() {
-        let pool = test_pool().await;
-        let (b, e) = basis_setup(&pool).await;
-        let br = aktiven_br(&pool, e, b, "BR Liste").await;
-        let br2 = aktiven_br(&pool, e, b, "BR 2").await;
-        let einheit = neue_einheit(&pool, e).await;
-
-        belege(&pool, e, br, "einheit", einheit, "eintritt", None, b)
-            .await
-            .unwrap();
-        belege(&pool, e, br2, "einheit", einheit, "wechsel", None, b)
-            .await
-            .unwrap();
-
-        let liste = liste_je_br(&pool, br).await.unwrap();
-        assert_eq!(liste.len(), 1, "nur Events für br, nicht br2");
-        assert_eq!(liste[0].art, BrBelegungsArt::Eintritt);
-
-        let liste2 = liste_je_br(&pool, br2).await.unwrap();
-        assert_eq!(liste2.len(), 1);
-        assert_eq!(liste2[0].art, BrBelegungsArt::Wechsel);
     }
 
     #[tokio::test]

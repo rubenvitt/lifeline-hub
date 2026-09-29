@@ -14,49 +14,30 @@
 //!
 //! Spec: `docs/superpowers/specs/2026-09-12-lfh-46-stab-s1-s6-design.md`
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
 pub mod repo;
 
-/// Sachgebiet der Führungsorganisation (FwDV 100 Anlage 2). Wire == `as_str()`.
-///
-/// Die Reihenfolge ist die der Anlage 2 und zugleich die Anzeigereihenfolge — sie ist
-/// Teil des Vertrags, nicht Dekoration (`ALLE` speist die sechs festen Zeilen).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Sachgebiet {
-    S1,
-    S2,
-    S3,
-    S4,
-    S5,
-    S6,
+wire_enum! {
+    /// Sachgebiet der Führungsorganisation (FwDV 100 Anlage 2). Wire == `as_str()`.
+    ///
+    /// Die Reihenfolge ist die der Anlage 2 und zugleich die Anzeigereihenfolge — sie ist
+    /// Teil des Vertrags, nicht Dekoration (`ALLE` speist die sechs festen Zeilen).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
+    pub enum Sachgebiet {
+        S1 => "s1",
+        S2 => "s2",
+        S3 => "s3",
+        S4 => "s4",
+        S5 => "s5",
+        S6 => "s6",
+    }
+    try_from = |s| format!("Ungültiges Sachgebiet: {s}");
 }
 
 impl Sachgebiet {
-    /// Alle sechs Sachgebiete in Anlage-2-Reihenfolge.
-    pub const ALLE: [Sachgebiet; 6] = [
-        Sachgebiet::S1,
-        Sachgebiet::S2,
-        Sachgebiet::S3,
-        Sachgebiet::S4,
-        Sachgebiet::S5,
-        Sachgebiet::S6,
-    ];
-
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Sachgebiet::S1 => "s1",
-            Sachgebiet::S2 => "s2",
-            Sachgebiet::S3 => "s3",
-            Sachgebiet::S4 => "s4",
-            Sachgebiet::S5 => "s5",
-            Sachgebiet::S6 => "s6",
-        }
-    }
-
     /// Bezeichnung des Sachgebiets nach FwDV 100 Anlage 2 (S. 54–60).
     ///
     /// Liegt im Backend, weil der System-ETB-Eintrag sie trägt („S2 Lage: Besetzung → …") —
@@ -78,85 +59,27 @@ impl Sachgebiet {
     pub fn kurz_mit_label(&self) -> String {
         format!("{} {}", self.as_str().to_uppercase(), self.label())
     }
-
-    /// Parst einen gespeicherten/übergebenen Wert; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<Sachgebiet> {
-        match s {
-            "s1" => Some(Sachgebiet::S1),
-            "s2" => Some(Sachgebiet::S2),
-            "s3" => Some(Sachgebiet::S3),
-            "s4" => Some(Sachgebiet::S4),
-            "s5" => Some(Sachgebiet::S5),
-            "s6" => Some(Sachgebiet::S6),
-            _ => None,
-        }
-    }
 }
 
-impl TryFrom<String> for Sachgebiet {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Sachgebiet::parse(&s).ok_or_else(|| format!("Ungültiges Sachgebiet: {s}"))
+wire_enum! {
+    /// Besetzungszustand eines Sachgebiets (Entscheidung 3 der Spec). Wire == `as_str()`.
+    ///
+    /// **Keine Zeile = „nicht vergeben"** — das ist der im Fükw der Führungsstufe B
+    /// dokumentierte Normalzustand von S1/S4/S5/S6 und deshalb *kein* eigener Enum-Wert.
+    /// Der Unterschied zu [`BesetzungArt::Einsatzleitung`] ist die Anregungsfunktion
+    /// („haben wir S4 bedacht?").
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BesetzungArt {
+        /// Liegt bewusst bei der Einsatzleitung (Zusammenlegung, Anlage 2 S. 54).
+        Einsatzleitung => "einsatzleitung",
+        /// Eine disponierte Person (`einsatz_personal`).
+        Personal => "personal",
+        /// Person ohne Disposition (Freitext-Name).
+        Extern => "extern",
+        /// Rückwärtige Stelle, z. B. Leitstelle/FEZ (Abschn. 3.2.2.2 S. 16).
+        Rueckwaertig => "rueckwaertig",
     }
-}
-
-/// Besetzungszustand eines Sachgebiets (Entscheidung 3 der Spec). Wire == `as_str()`.
-///
-/// **Keine Zeile = „nicht vergeben"** — das ist der im Fükw der Führungsstufe B
-/// dokumentierte Normalzustand von S1/S4/S5/S6 und deshalb *kein* eigener Enum-Wert.
-/// Der Unterschied zu [`BesetzungArt::Einsatzleitung`] ist die Anregungsfunktion
-/// („haben wir S4 bedacht?").
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum BesetzungArt {
-    /// Liegt bewusst bei der Einsatzleitung (Zusammenlegung, Anlage 2 S. 54).
-    Einsatzleitung,
-    /// Eine disponierte Person (`einsatz_personal`).
-    Personal,
-    /// Person ohne Disposition (Freitext-Name).
-    Extern,
-    /// Rückwärtige Stelle, z. B. Leitstelle/FEZ (Abschn. 3.2.2.2 S. 16).
-    Rueckwaertig,
-}
-
-impl BesetzungArt {
-    /// Alle Varianten in kanonischer Reihenfolge.
-    pub const ALLE: [BesetzungArt; 4] = [
-        BesetzungArt::Einsatzleitung,
-        BesetzungArt::Personal,
-        BesetzungArt::Extern,
-        BesetzungArt::Rueckwaertig,
-    ];
-
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            BesetzungArt::Einsatzleitung => "einsatzleitung",
-            BesetzungArt::Personal => "personal",
-            BesetzungArt::Extern => "extern",
-            BesetzungArt::Rueckwaertig => "rueckwaertig",
-        }
-    }
-
-    /// Parst einen gespeicherten/übergebenen Wert; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<BesetzungArt> {
-        match s {
-            "einsatzleitung" => Some(BesetzungArt::Einsatzleitung),
-            "personal" => Some(BesetzungArt::Personal),
-            "extern" => Some(BesetzungArt::Extern),
-            "rueckwaertig" => Some(BesetzungArt::Rueckwaertig),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<String> for BesetzungArt {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        BesetzungArt::parse(&s).ok_or_else(|| format!("Ungültige Besetzungsart: {s}"))
-    }
+    try_from = |s| format!("Ungültige Besetzungsart: {s}");
 }
 
 /// Maximale Länge von `bezeichnung` (extern/rückwärtig) — wie `fuehrungsstelle`

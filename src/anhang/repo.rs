@@ -352,9 +352,7 @@ pub async fn linker_stand(pool: &SqlitePool, anhang_id: i64) -> Result<LinkerSta
 /// Tests `sweep_verwaiste_haelt_{dokument,etb,schaden}_gebundene_anhaenge` pinnen das.
 /// Ein soft-gelöschtes Dokument ist bewusst KEIN Orphan (Beweissicherung, LFH-632 E1).
 pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<u64, AppError> {
-    let grenze = (jetzt - Duration::hours(VERWAISTE_KARENZ_STUNDEN))
-        .format("%Y-%m-%d %H:%M:%S")
-        .to_string();
+    let grenze = crate::zeit::formatiere_utc(jetzt - Duration::hours(VERWAISTE_KARENZ_STUNDEN));
     let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
         "DELETE FROM anhang \
          WHERE erstellt_at < ? \
@@ -458,9 +456,7 @@ mod tests {
     }
 
     fn t(s: &str) -> DateTime<Utc> {
-        chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-            .unwrap()
-            .and_utc()
+        crate::zeit::parse_utc(s).unwrap()
     }
 
     /// Verwaisten Anhang mit kontrolliertem `erstellt_at` direkt einfügen (umgeht

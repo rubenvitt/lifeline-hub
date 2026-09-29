@@ -1,40 +1,23 @@
 pub mod repo;
 
 use crate::sprechgruppe::SprechgruppeAnzeige;
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Lagezustand eines Abschnitts (LFH-608), Wire == `lagezustand`. Die Beurteilung trifft
-/// die Führung; ohne Beurteilung bleibt das Feld leer — „nicht beurteilt" ist KEIN
-/// planmäßig. Die Farbe liegt im Frontend-Vertrag (`theme/statusFarben.ts`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AbschnittLagezustand {
-    Planmaessig,
-    Angespannt,
-    Kritisch,
+wire_enum! {
+    /// Lagezustand eines Abschnitts (LFH-608), Wire == `lagezustand`. Die Beurteilung trifft
+    /// die Führung; ohne Beurteilung bleibt das Feld leer — „nicht beurteilt" ist KEIN
+    /// planmäßig. Die Farbe liegt im Frontend-Vertrag (`theme/statusFarben.ts`).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AbschnittLagezustand {
+        Planmaessig => "planmaessig",
+        Angespannt => "angespannt",
+        Kritisch => "kritisch",
+    }
 }
 
 impl AbschnittLagezustand {
-    /// DB-/API-Stringrepräsentation.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            AbschnittLagezustand::Planmaessig => "planmaessig",
-            AbschnittLagezustand::Angespannt => "angespannt",
-            AbschnittLagezustand::Kritisch => "kritisch",
-        }
-    }
-
-    /// Parst einen gespeicherten/übergebenen Wert; `None` bei unbekanntem Wert.
-    pub fn parse(s: &str) -> Option<AbschnittLagezustand> {
-        match s {
-            "planmaessig" => Some(AbschnittLagezustand::Planmaessig),
-            "angespannt" => Some(AbschnittLagezustand::Angespannt),
-            "kritisch" => Some(AbschnittLagezustand::Kritisch),
-            _ => None,
-        }
-    }
-
     /// Wortlaut für den ETB — lesbar, nicht der Wire-Wert.
     pub fn wort(&self) -> &'static str {
         match self {

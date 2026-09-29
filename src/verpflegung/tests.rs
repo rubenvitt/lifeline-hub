@@ -7,9 +7,7 @@ use crate::einsatz::nummer::{zone_oder_vorgabe, ZEITZONE_VORGABE};
 use axum::http::StatusCode;
 
 fn utc(s: &str) -> DateTime<Utc> {
-    chrono::NaiveDateTime::parse_from_str(s, DRAHT)
-        .unwrap()
-        .and_utc()
+    crate::zeit::parse_utc(s).unwrap()
 }
 
 fn berlin(von: &str, bis: &str) -> String {

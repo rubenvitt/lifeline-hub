@@ -299,18 +299,16 @@ pub async fn storniere(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<(), Ap
             "Platz ist aktuell belegt — Storno nicht möglich".into(),
         ));
     }
-    let ergebnis = sqlx::query(
-        "UPDATE uhs_platz SET storniert_at = strftime('%Y-%m-%d %H:%M:%S','now') \
-         WHERE id = ? AND uhs_id = ? AND storniert_at IS NULL",
+    crate::storno::storniere(
+        &mut *pool.acquire().await?,
+        "uhs_platz",
+        "uhs_id",
+        uhs_id,
+        id,
+        crate::storno::Vermerk::Keiner,
+        None,
     )
-    .bind(id)
-    .bind(uhs_id)
-    .execute(pool)
-    .await?;
-    if ergebnis.rows_affected() == 0 {
-        return Err(AppError::NotFound);
-    }
-    Ok(())
+    .await
 }
 
 #[cfg(test)]

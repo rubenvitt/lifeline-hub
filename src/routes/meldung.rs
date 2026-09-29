@@ -12,33 +12,29 @@ use crate::meldung::{
     repo, MeldungAnzeige, ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN,
     PRIO_NORMAL, PRIO_SOFORT, RICHTUNG_INTERN,
 };
+use crate::routes::support::{parse_enum, pflicht};
+use crate::zeit::jetzt;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
-use chrono::{Duration, NaiveDateTime};
-use serde::Deserialize;
 
-/// Kanonischer Zeitstempel „jetzt" (UTC) im DB-Format.
-fn jetzt() -> String {
-    chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
-}
+use serde::Deserialize;
 
 /// SSE-Notify: Meldungen des Einsatzes haben sich geändert (Tag `meldung`).
 fn sse(state: &AppState, einsatz_id: i64) {
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Meldung,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Meldung);
 }
 
 /// SSE-Notify: unübersehbares Sofort-Highlight (Tag `sofortmeldung`, LFH-97). Läuft über
 /// dieselbe eine EventSource pro Einsatz; der Client löst Alarm (visuell + Ton) aus.
 fn sse_sofort(state: &AppState, einsatz_id: i64, meldung_id: i64) {
-    state.live.publiziere_event(
+    state.live.publiziere_objekt(
         einsatz_id,
         LiveEvent::Sofortmeldung,
-        serde_json::json!({ "einsatz_id": einsatz_id, "meldung_id": meldung_id }).to_string(),
+        "meldung_id",
+        meldung_id,
     );
 }
 
@@ -244,17 +240,13 @@ pub async fn anlegen(
     ctx.fordere_aktiv()?;
 
     // Mindestfelder: Absender, Inhalt, Meldeweg.
-    let absender = req.absender.trim();
-    let inhalt = req.inhalt.trim();
-    if absender.is_empty() {
-        return Err(AppError::Validation("Absender darf nicht leer sein".into()));
-    }
-    if inhalt.is_empty() {
-        return Err(AppError::Validation("Inhalt darf nicht leer sein".into()));
-    }
-    if crate::meldung::MeldeWeg::parse(req.meldeweg.trim()).is_none() {
-        return Err(AppError::Validation("Ungültiger Meldeweg".into()));
-    }
+    let absender = pflicht(&req.absender, "Absender")?;
+    let inhalt = pflicht(&req.inhalt, "Inhalt")?;
+    parse_enum(
+        crate::meldung::MeldeWeg::parse,
+        req.meldeweg.trim(),
+        "Ungültiger Meldeweg",
+    )?;
     let meldungsart = req
         .meldungsart
         .as_deref()
@@ -311,13 +303,7 @@ pub async fn anlegen(
     let frist_at: Option<String> = if pflicht {
         // `eingang` ist im DB-Format; bei (theoretisch unmöglichem) Parse-Fehler defensiv keine
         // Frist statt 500 (vgl. patch-xor: 422/None statt Panik).
-        NaiveDateTime::parse_from_str(&eingang, "%Y-%m-%d %H:%M:%S")
-            .ok()
-            .map(|n| {
-                (n + Duration::minutes(frist_min))
-                    .format("%Y-%m-%d %H:%M:%S")
-                    .to_string()
-            })
+        crate::zeit::plus_minuten(&eingang, frist_min)
     } else {
         None
     };
@@ -328,10 +314,10 @@ pub async fn anlegen(
         ctx.benutzer.id,
         client_id,
         repo::MeldungDaten {
-            absender,
+            absender: &absender,
             empfaenger: trimme(&req.empfaenger),
             meldeweg: req.meldeweg.trim(),
-            inhalt,
+            inhalt: &inhalt,
             meldungsart,
             prioritaet,
             richtung,
@@ -530,11 +516,9 @@ pub async fn auftrag_erteilen(
             state.live.publiziere(einsatz_id, etb_id);
         }
     }
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Auftrag,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Auftrag);
     sse(&state, einsatz_id);
 
     let m = repo::laden(&state.pool, meldung_id, &now).await?;
@@ -571,13 +555,7 @@ pub async fn rueckmeldungen(
 /// parsebarer Altwert fällt auf die Ereigniszeit selbst zurück — die Einheit gilt dann
 /// sofort als überfällig, was auffällt, statt still als rechtzeitig durchzugehen.
 fn faellig_at(ereigniszeit: &str, frist_min: i64) -> String {
-    NaiveDateTime::parse_from_str(ereigniszeit, "%Y-%m-%d %H:%M:%S")
-        .map(|n| {
-            (n + Duration::minutes(frist_min))
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string()
-        })
-        .unwrap_or_else(|_| ereigniszeit.to_string())
+    crate::zeit::plus_minuten(ereigniszeit, frist_min).unwrap_or_else(|| ereigniszeit.to_string())
 }
 
 /// GET /api/einsaetze/{id}/lage/meldungen — Lageobjekte aus Meldungen (Lese-Oberfläche, LFH-95).
