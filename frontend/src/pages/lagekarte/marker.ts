@@ -23,6 +23,7 @@ import {
   type TzProps,
 } from './taktischesZeichen';
 import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
+import { registrierNummer } from '../../anzeige/registrierNummer';
 
 export type MarkerTyp =
   | 'einsatzort'
@@ -112,10 +113,6 @@ export interface NichtVerortet {
 const EINSATZORT_ROLLE = 'marke' as const;
 const UHS_ROLLE = 'bedien' as const;
 
-function schadenLabel(registrierNr: number): string {
-  return `S-${String(registrierNr).padStart(3, '0')}`;
-}
-
 /** Leitet verortete Marker + Nicht-verortet-Liste aus den geladenen Objekten ab. */
 export function baueMarker(
   einsatz: EinsatzAnzeige | undefined,
@@ -167,13 +164,17 @@ export function baueMarker(
         id: s.id,
         lat: s.lat,
         lon: s.lon,
-        label: schadenLabel(s.registrier_nr),
+        label: registrierNummer('S', s.registrier_nr),
         farbe: tz.farbe,
         tz,
         trefferDurchmesser: token.controlHeight,
       });
     } else {
-      nichtVerortet.push({ typ: 'schaden', id: s.id, label: schadenLabel(s.registrier_nr) });
+      nichtVerortet.push({
+        typ: 'schaden',
+        id: s.id,
+        label: registrierNummer('S', s.registrier_nr),
+      });
     }
   }
 

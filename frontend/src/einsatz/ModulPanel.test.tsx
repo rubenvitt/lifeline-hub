@@ -6,7 +6,8 @@ import { dichten, farbenDunkel } from '../theme/tokens';
 import ModulPanel, { modulListenStil, modulMarkeStil, modulZeilenStil } from './ModulPanel';
 import type { ModulEintrag } from './modulRegistry';
 import type { Sprungmarke } from './sprungmarken';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { ModulOverrides } from '../api/types';
+import { benutzerFixture } from '../test/fixtures';
 
 const ueberschreibung = (
   modulKey: string,
@@ -23,16 +24,7 @@ const ueberschreibung = (
   },
 });
 
-const ohne: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'E',
-  benutzername: 'e',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-  totp_aktiviert: false,
-};
+const ohne = benutzerFixture({ anzeigename: 'E' });
 
 const basis = (over: Partial<ModulEintrag>): ModulEintrag => ({
   key: 'k',

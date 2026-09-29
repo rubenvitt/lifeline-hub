@@ -2,9 +2,9 @@
 //!
 //! Bündelt die zuvor 9–18-fach wörtlich kopierten Infrastruktur-Helfer an EINER Stelle,
 //! damit ein Fix (z. B. an der Tri-State-PATCH-Semantik oder am lagged-Resync) alle
-//! Routen zugleich erreicht, statt zwischen byte-identischen Kopien zu driften. Die
-//! modul-spezifischen `sse_*`-Notify-Wrapper bleiben bewusst lokal (unterscheiden sich in
-//! Event-Name und Payload-Keys).
+//! Routen zugleich erreicht, statt zwischen byte-identischen Kopien zu driften. Die Payload
+//! der `sse_*`-Wrapper baut `LiveHub::publiziere_objekt` / `publiziere_einsatz`; jeder
+//! Wrapper steht einmal, im Modul, dem das Ereignis gehört.
 
 use crate::anhang;
 use crate::error::AppError;
@@ -148,6 +148,65 @@ pub fn pruefe_kommunikationsmittel(wert: Option<&str>) -> Result<(), AppError> {
 /// (leerer/Whitespace-only-Input zählt als „nicht gesetzt").
 pub fn trimme(s: Option<String>) -> Option<String> {
     s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+}
+
+/// Getrimmtes Pflichtfeld; leer → 400 „{feld} darf nicht leer sein" (LFH-267: das Feld
+/// scheitert für sich, nicht am Zusammenhang).
+pub fn pflicht(wert: &str, feld: &str) -> Result<String, AppError> {
+    let w = wert.trim();
+    if w.is_empty() {
+        return Err(AppError::Validation(format!("{feld} darf nicht leer sein")));
+    }
+    Ok(w.to_string())
+}
+
+/// [`pflicht`] für ein PATCH-Feld: ein absentes Feld ist kein Wunsch und bleibt `None`.
+pub fn pflicht_tri(wert: Option<&str>, feld: &str) -> Result<Option<String>, AppError> {
+    wert.map(|w| pflicht(w, feld)).transpose()
+}
+
+/// Liest einen Enum-Wert über dessen `parse`; unbekannt → 400 mit `meldung` (LFH-267).
+pub fn parse_enum<T>(
+    parse: impl FnOnce(&str) -> Option<T>,
+    wert: &str,
+    meldung: impl Into<String>,
+) -> Result<T, AppError> {
+    parse(wert).ok_or_else(|| AppError::Validation(meldung.into()))
+}
+
+/// [`parse_enum`] für einen optionalen Wert: `None` ist immer zulässig.
+pub fn parse_enum_opt<T>(
+    parse: impl FnOnce(&str) -> Option<T>,
+    wert: Option<&str>,
+    meldung: impl Into<String>,
+) -> Result<Option<T>, AppError> {
+    wert.map(|w| parse_enum(parse, w, meldung)).transpose()
+}
+
+/// Koordinate als Paar: beide gesetzt oder beide leer, Breite −90…90, Länge −180…180. Beides
+/// ist ein Zusammenhang bzw. Wertebereich → 422. Die Feldnamen stehen im Wortlaut.
+pub fn pruefe_koordinate(
+    lat: Option<f64>,
+    lon: Option<f64>,
+    lat_feld: &str,
+    lon_feld: &str,
+) -> Result<(), AppError> {
+    if lat.is_some() != lon.is_some() {
+        return Err(AppError::UnprocessableEntity(format!(
+            "{lat_feld} und {lon_feld} müssen gemeinsam gesetzt oder gemeinsam leer sein"
+        )));
+    }
+    if lat.is_some_and(|la| !(-90.0..=90.0).contains(&la)) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "{lat_feld} muss zwischen -90 und 90 liegen"
+        )));
+    }
+    if lon.is_some_and(|lo| !(-180.0..=180.0).contains(&lo)) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "{lon_feld} muss zwischen -180 und 180 liegen"
+        )));
+    }
+    Ok(())
 }
 
 /// Wie [`trimme`], aber für Tri-State-PATCH-Felder (LFH-266/F12).

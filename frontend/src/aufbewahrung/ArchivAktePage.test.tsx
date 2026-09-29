@@ -4,13 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import type { ArchivAkte, ArchivEtbEintrag, AufbewahrungZustand } from '../api/types';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import ArchivAktePage, { archivHinweis, berichtigungText } from './ArchivAktePage';
+import { adminFixture } from '../test/fixtures';
 
 /** Archivakte (LFH-23, tasks.md 6.9). */
 
-const ME_ADMIN = { id: 1, anzeigename: 'Admin', system_rolle: 'admin', org_rolle: 'keine' };
+const ME_ADMIN = adminFixture();
 
 function akte(zustand: AufbewahrungZustand): ArchivAkte {
   return {
@@ -78,7 +79,7 @@ function zeige(
   ];
   const liste = seiten ?? vorgabe;
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(ME_ADMIN)),
+    meHandler(ME_ADMIN),
     http.get('/api/aufbewahrung/einsaetze/7', () => HttpResponse.json(akte(zustand))),
     http.get('/api/aufbewahrung/einsaetze/7/etb', ({ request }) => {
       const url = new URL(request.url);

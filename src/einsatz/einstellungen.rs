@@ -5,78 +5,72 @@
 //! DB-CHECK (sqlx-sqlite 0.8.6 kann CHECK nicht per Rebuild ändern).
 
 use crate::error::AppError;
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
-/// Gültige Basemap-Modi (Validierung in Rust statt DB-CHECK).
-pub const BASEMAP_MODI: [&str; 3] = ["online", "offline", "blind"];
-
-/// Ob `s` ein gültiger Basemap-Modus ist (für die Eingabe-Validierung).
+/// Ob `s` ein gültiger Basemap-Modus ist (Validierung in Rust statt DB-CHECK).
 pub fn ist_gueltiger_basemap_modus(s: &str) -> bool {
-    BASEMAP_MODI.contains(&s)
+    BasemapModus::parse(s).is_some()
 }
 
 // Anzeige-Konventionen (LFH-136) — Whitelist-Validierung in Rust statt DB-CHECK.
 
-/// Gültige Zeitformate.
-pub const ZEITFORMATE: [&str; 2] = ["24h", "12h"];
-/// Gültige Einheiten-Systeme.
-pub const EINHEITEN_SYSTEME: [&str; 2] = ["metrisch", "imperial"];
-/// Gültige Koordinatenformate.
-pub const KOORDINATENFORMATE: [&str; 5] = ["wgs84", "dms", "utm", "mgrs", "gk"];
-
 /// Ob `s` ein gültiges Zeitformat ist.
 pub fn ist_gueltiges_zeitformat(s: &str) -> bool {
-    ZEITFORMATE.contains(&s)
+    Zeitformat::parse(s).is_some()
 }
 
 /// Ob `s` ein gültiges Einheiten-System ist.
 pub fn ist_gueltiges_einheiten_system(s: &str) -> bool {
-    EINHEITEN_SYSTEME.contains(&s)
+    EinheitenSystem::parse(s).is_some()
 }
 
-/// Basemap-Modus (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `basemap_modus`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum BasemapModus {
-    Online,
-    Offline,
-    Blind,
+wire_enum! {
+    /// Basemap-Modus (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `basemap_modus`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BasemapModus {
+        Online => "online",
+        Offline => "offline",
+        Blind => "blind",
+    }
 }
 
-/// Zeitformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitformat`
-/// (per-Variante, `rename_all` trifft die Ziffern-Kürzel nicht).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-pub enum Zeitformat {
-    #[serde(rename = "24h")]
-    VierundzwanzigStunden,
-    #[serde(rename = "12h")]
-    ZwoelfStunden,
+wire_enum! {
+    /// Zeitformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitformat`
+    /// (per-Variante, `rename_all` trifft die Ziffern-Kürzel nicht).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Zeitformat {
+        VierundzwanzigStunden => "24h",
+        ZwoelfStunden => "12h",
+    }
 }
 
-/// Einheiten-System (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `einheiten_system`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EinheitenSystem {
-    Metrisch,
-    Imperial,
+wire_enum! {
+    /// Einheiten-System (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `einheiten_system`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum EinheitenSystem {
+        Metrisch => "metrisch",
+        Imperial => "imperial",
+    }
 }
 
-/// Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Koordinatenformat {
-    Wgs84,
-    Dms,
-    Utm,
-    Mgrs,
-    Gk,
+wire_enum! {
+    /// Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Koordinatenformat {
+        Wgs84 => "wgs84",
+        Dms => "dms",
+        Utm => "utm",
+        Mgrs => "mgrs",
+        Gk => "gk",
+    }
 }
 
 /// Ob `s` ein gültiges Koordinatenformat ist.
 pub fn ist_gueltiges_koordinatenformat(s: &str) -> bool {
-    KOORDINATENFORMATE.contains(&s)
+    Koordinatenformat::parse(s).is_some()
 }
 
 /// Geocoder-Basis-URL: nur http/https, nicht leer. Bewusst leichtgewichtig (kein
@@ -314,6 +308,16 @@ pub async fn laden_oder_default(
     .fetch_optional(executor)
     .await?;
     Ok(row.unwrap_or_else(|| EinsatzEinstellungen::leer(einsatz_id)))
+}
+
+/// Startwert der ETB-Nummernfolge des Einsatzes (Default aus [`laden_oder_default`]).
+pub async fn etb_startwert(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+) -> Result<i64, AppError> {
+    Ok(laden_oder_default(executor, einsatz_id)
+        .await?
+        .etb_startwert())
 }
 
 /// Eingabe für `speichern`; bereits vom Handler getrimmt/validiert.

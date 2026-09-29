@@ -5,7 +5,6 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import { BENUTZER_PRUEFEN } from '../auth/sitzungsEvent';
 import LoginPage from './LoginPage';
 
@@ -18,11 +17,7 @@ function setup() {
   server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
   // Default: keine Provider-Konfiguration → Passwort-Login bleibt sichtbar (Fallback).
   server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
-  return renderMitProviders(
-    <AuthProvider>
-      <LoginPage />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<LoginPage />);
 }
 
 describe('LoginPage', () => {
@@ -67,11 +62,7 @@ describe('LoginPage', () => {
       ),
     );
     server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
-    renderMitProviders(
-      <AuthProvider>
-        <LoginPage />
-      </AuthProvider>,
-    );
+    renderMitProviders(<LoginPage />);
 
     const knopf = await screen.findByRole('button', { name: /Administrator/ });
     await userEvent.click(knopf);
@@ -88,11 +79,7 @@ describe('LoginPage', () => {
       ),
     );
     server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
-    renderMitProviders(
-      <AuthProvider>
-        <LoginPage />
-      </AuthProvider>,
-    );
+    renderMitProviders(<LoginPage />);
 
     expect(await screen.findByLabelText('Benutzername')).toBeInTheDocument();
     expect(screen.queryByText('Dev-Schnellanmeldung')).not.toBeInTheDocument();
@@ -108,11 +95,7 @@ describe('LoginPage', () => {
         ]),
       ),
     );
-    renderMitProviders(
-      <AuthProvider>
-        <LoginPage />
-      </AuthProvider>,
-    );
+    renderMitProviders(<LoginPage />);
 
     expect(await screen.findByLabelText('Passwort')).toBeInTheDocument();
   });
@@ -125,11 +108,7 @@ describe('LoginPage', () => {
         HttpResponse.json([{ id: 'dev', typ: 'dev', anzeigename: 'Dev', aktiviert: true }]),
       ),
     );
-    renderMitProviders(
-      <AuthProvider>
-        <LoginPage />
-      </AuthProvider>,
-    );
+    renderMitProviders(<LoginPage />);
 
     // Das Formular ist initial sichtbar (provider.length === 0, bevor der Effect greift) und
     // verschwindet erst nach geladener Provider-Liste.
@@ -146,11 +125,7 @@ describe('LoginPage', () => {
         ]),
       ),
     );
-    renderMitProviders(
-      <AuthProvider>
-        <LoginPage />
-      </AuthProvider>,
-    );
+    renderMitProviders(<LoginPage />);
 
     // provider.length === 1 (der Safe-Default über leeres Array greift nicht): nur `&& p.aktiviert`
     // verhindert das Rendern. Fiele es weg, bliebe das Passwort-Feld sichtbar.
@@ -186,11 +161,7 @@ describe('LoginPage', () => {
           ]),
         ),
       );
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       const knopf = await screen.findByRole('button', { name: 'Mit PocketID anmelden' });
       await userEvent.click(knopf);
@@ -204,12 +175,7 @@ describe('LoginPage', () => {
       );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-        { route: '/login?fehler=oidc' },
-      );
+      renderMitProviders(<LoginPage />, { route: '/login?fehler=oidc' });
 
       expect(
         await screen.findByText('Die Anmeldung über Single Sign-On ist fehlgeschlagen'),
@@ -228,11 +194,7 @@ describe('LoginPage', () => {
           ]),
         ),
       );
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       await screen.findByLabelText('Passwort');
       expect(screen.queryByRole('button', { name: /PocketID/ })).not.toBeInTheDocument();
@@ -319,11 +281,7 @@ describe('LoginPage', () => {
         };
       });
 
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       // Kein Benutzername: usernameless Login. Der Passkey-Knopf erscheint erst mit geladener
       // Provider-Liste (webauthn aktiv) → `findByRole` wartet.
@@ -380,11 +338,7 @@ describe('LoginPage', () => {
       // beobachtbar.
       startAuthenticationMock.mockImplementation(() => new Promise(() => {}));
 
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       // Kein Benutzername nötig. Beide Provider aktiv → „Anmelden" und Passkey-Knopf sind da; nur
       // der Passkey-Knopf darf während der Ceremony laden.
@@ -403,11 +357,7 @@ describe('LoginPage', () => {
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(http.get('/api/auth/providers', () => HttpResponse.json(webauthnProvider)));
 
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       await screen.findByLabelText('Benutzername');
       expect(
@@ -429,11 +379,7 @@ describe('LoginPage', () => {
         ),
       );
 
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       await screen.findByLabelText('Benutzername');
       await waitFor(() =>
@@ -478,11 +424,7 @@ describe('LoginPage', () => {
         }),
       );
 
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
@@ -519,11 +461,7 @@ describe('LoginPage', () => {
         }),
       );
 
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
@@ -555,11 +493,7 @@ describe('LoginPage', () => {
         }),
       );
 
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
@@ -590,11 +524,7 @@ describe('LoginPage', () => {
         http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })),
       );
 
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
@@ -619,11 +549,7 @@ describe('LoginPage', () => {
         }),
       );
 
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
@@ -651,11 +577,7 @@ describe('LoginPage', () => {
         http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })),
       );
 
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
@@ -681,11 +603,7 @@ describe('LoginPage', () => {
       server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
       server.use(http.post('/api/auth/login', () => HttpResponse.json(adminBody)));
 
-      renderMitProviders(
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>,
-      );
+      renderMitProviders(<LoginPage />);
 
       await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
@@ -714,23 +632,26 @@ describe('LoginPage', () => {
 
     function zeigeLoginMitZiel(angemeldet: boolean) {
       let sitzung: typeof anna | null = angemeldet ? anna : null;
+      const zaehler = { me: 0 };
       server.use(
-        http.get('/api/auth/me', () =>
-          sitzung ? HttpResponse.json(sitzung) : HttpResponse.json({ error: 'x' }, { status: 401 }),
-        ),
+        http.get('/api/auth/me', () => {
+          zaehler.me++;
+          return sitzung
+            ? HttpResponse.json(sitzung)
+            : HttpResponse.json({ error: 'x' }, { status: 401 });
+        }),
         http.get('/api/dev/users', () => HttpResponse.json([])),
         http.get('/api/auth/providers', () => HttpResponse.json([])),
       );
+      // Der AuthProvider kommt aus `renderMitProviders` — genau einer, wie in der App.
       renderMitProviders(
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/einsaetze" element={<div>Einsatzliste</div>} />
-          </Routes>
-        </AuthProvider>,
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/einsaetze" element={<div>Einsatzliste</div>} />
+        </Routes>,
         { route: '/login' },
       );
-      return { anmelden: () => (sitzung = anna) };
+      return { anmelden: () => (sitzung = anna), zaehler };
     }
 
     it('übernimmt eine Anmeldung aus einem anderen Tab und verlässt die Anmeldeseite', async () => {
@@ -742,10 +663,13 @@ describe('LoginPage', () => {
     });
 
     it('lässt eine schon angemeldete Person auf der Anmeldeseite (Benutzerwechsel bleibt möglich)', async () => {
-      zeigeLoginMitZiel(true);
+      const { zaehler } = zeigeLoginMitZiel(true);
       await screen.findByLabelText('Benutzername');
+      await waitFor(() => expect(zaehler.me).toBe(1));
       act(() => void window.dispatchEvent(new Event(BENUTZER_PRUEFEN)));
-      await new Promise((r) => setTimeout(r, 30));
+      // Die Prüfung ist tatsächlich gelaufen — erst danach belegt die Abwesenheit etwas.
+      await waitFor(() => expect(zaehler.me).toBe(2));
+      await new Promise((r) => setTimeout(r, 20));
       expect(screen.queryByText('Einsatzliste')).not.toBeInTheDocument();
       expect(screen.getByLabelText('Benutzername')).toBeInTheDocument();
     });

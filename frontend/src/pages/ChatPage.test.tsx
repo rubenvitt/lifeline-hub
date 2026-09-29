@@ -3,50 +3,19 @@ import { http, HttpResponse } from 'msw';
 import { Link, Route, Routes } from 'react-router';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import ChatPage from './ChatPage';
-import type { ChatKanal, ChatNachricht, EinsatzAnzeige } from '../api/types';
+import type { ChatKanal, ChatNachricht } from '../api/types';
+import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 
 afterEach(() => vi.restoreAllMocks());
 
 // Normaler Benutzer (kein System-Admin): die Rollen-Tests prüfen die Einsatz-Rolle; admin-global
 // deckt schreibrecht.test.ts ab.
-const nutzer = {
-  id: 1,
-  anzeigename: 'A',
-  benutzername: 'a',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-06-02 10:00:00',
-};
+const nutzer = benutzerFixture({ anzeigename: 'A' });
 
-const einsatz: EinsatzAnzeige = {
-  id: 7,
-  bezeichnung: 'Hochwasser Nord',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '2026-06-02 09:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '2026-06-02 09:00:00',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-  org_id: 1,
-  org_name: 'Orga',
-  meine_sachgebiete: [],
-  lagekennzahlen: [],
-};
+const einsatz = einsatzFixture({ id: 7, bezeichnung: 'Hochwasser Nord' });
 
 const kanal: ChatKanal = {
   id: 1,
@@ -80,7 +49,7 @@ const nachricht: ChatNachricht = {
 function setup(ungelesen = 0, onGelesen?: () => void) {
   const nachrichten: ChatNachricht[] = [nachricht];
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/chat/kanaele', () =>
       HttpResponse.json([
@@ -103,11 +72,9 @@ function setup(ungelesen = 0, onGelesen?: () => void) {
     }),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+    </Routes>,
     { route: '/einsaetze/7/chat' },
   );
 }
@@ -166,7 +133,7 @@ describe('ChatPage', () => {
     }));
     let zweiteSeiteAngefragtMit: string | null = null;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', ({ request }) => {
@@ -179,11 +146,9 @@ describe('ChatPage', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+      </Routes>,
       { route: '/einsaetze/7/chat' },
     );
 
@@ -210,7 +175,7 @@ describe('ChatPage', () => {
         return HttpResponse.json([]);
       });
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
@@ -222,11 +187,9 @@ describe('ChatPage', () => {
       spy('auftraege'),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+      </Routes>,
       { route: '/einsaetze/7/chat' },
     );
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
@@ -238,7 +201,7 @@ describe('ChatPage', () => {
     let gesetzt: { typ: string; ziel_id: number } | null = null;
     const nachrichten: ChatNachricht[] = [nachricht];
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
@@ -257,11 +220,9 @@ describe('ChatPage', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+      </Routes>,
       { route: '/einsaetze/7/chat' },
     );
 
@@ -283,7 +244,7 @@ describe('ChatPage', () => {
     let bearbeitet: { inhalt: string } | null = null;
     const nachrichten: ChatNachricht[] = [nachricht];
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
@@ -298,11 +259,9 @@ describe('ChatPage', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+      </Routes>,
       { route: '/einsaetze/7/chat' },
     );
 
@@ -325,7 +284,7 @@ describe('ChatPage', () => {
 
   it('zeigt bei abgeschlossenem Einsatz einen Read-only-Hinweis statt der Eingabe', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz, status: 'abgeschlossen' }),
       ),
@@ -333,11 +292,9 @@ describe('ChatPage', () => {
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+      </Routes>,
       { route: '/einsaetze/7/chat' },
     );
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
@@ -347,7 +304,7 @@ describe('ChatPage', () => {
 
   it('zeigt ohne Führungsrolle einen Read-only-Hinweis (Einsatz aktiv)', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' }),
       ),
@@ -355,11 +312,9 @@ describe('ChatPage', () => {
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+      </Routes>,
       { route: '/einsaetze/7/chat' },
     );
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
@@ -373,7 +328,7 @@ describe('ChatPage', () => {
     let gesendet: { inhalt: string; anhang_ids: number[] } | null = null;
     const nachrichten: ChatNachricht[] = [nachricht];
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
@@ -401,11 +356,9 @@ describe('ChatPage', () => {
       }),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+      </Routes>,
       { route: '/einsaetze/7/chat' },
     );
 
@@ -436,7 +389,7 @@ describe('ChatPage', () => {
     ]);
 
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/:einsatzId', ({ params }) => {
         const zielId = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatz, id: zielId, bezeichnung: `Einsatz ${zielId}` });
@@ -469,12 +422,12 @@ describe('ChatPage', () => {
     );
 
     renderMitProviders(
-      <AuthProvider>
+      <>
         <Link to="/einsaetze/8/chat">Zu Einsatz B</Link>
         <Routes>
           <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
         </Routes>
-      </AuthProvider>,
+      </>,
       { route: '/einsaetze/7/chat' },
     );
 

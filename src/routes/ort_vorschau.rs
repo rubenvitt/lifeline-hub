@@ -6,11 +6,8 @@
 //! Auth/Scope wie andere /api/einsaetze/:id/*-Routen (Einsatz-Mitglied, Lesezugriff).
 
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::fordere_lesezugriff;
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::EinsatzLesezugriff;
 use crate::error::AppError;
-use crate::extract::PfadParam;
 use crate::geocoding::{self, marker, peilung};
 use crate::org::einstellungen as org_einst;
 use axum::extract::{Query, State};
@@ -53,14 +50,10 @@ fn parse_exclude(s: &str) -> Option<(String, i64)> {
 
 pub async fn vorschau(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff,
     Query(params): Query<OrtVorschauParams>,
 ) -> Result<Json<OrtVorschauAntwort>, AppError> {
-    // Auth/Scope: Einsatz existiert + Lesezugriff (Mitgliedschaft/Retention).
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let einsatz_id = ctx.einsatz.id;
 
     // Koordinaten-Plausibilität (400 bei out-of-range).
     if !(-90.0..=90.0).contains(&params.lat) || !(-180.0..=180.0).contains(&params.lon) {
@@ -85,7 +78,7 @@ pub async fn vorschau(
     });
 
     // Org-Einstellungen laden (DB-Fehler hier = echter 500; das `?` ist KEIN Geocoder-Fehlerpfad).
-    let org = org_einst::laden_oder_default(&state.pool, einsatz.org_id).await?;
+    let org = org_einst::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
     let base = org
         .geocoder_url
         .as_deref()

@@ -30,28 +30,21 @@ import { screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import BenutzerMenu from './BenutzerMenu';
+import { adminFixture } from '../test/fixtures';
 
 /** Zwei Wörter, damit die Initialen (erstes + letztes Wort) prüfbar sind. */
 const ANZEIGENAME = 'Chef Dienst';
 const INITIALEN = 'CD';
 
-const benutzer = {
-  id: 1,
-  anzeigename: ANZEIGENAME,
-  benutzername: 'chef',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const benutzer = adminFixture({ anzeigename: ANZEIGENAME });
 
 function zeige() {
-  server.use(http.get('/api/auth/me', () => HttpResponse.json(benutzer)));
+  server.use(meHandler(benutzer));
   return renderMitProviders(
     <ThemeModeProvider>
       <BenutzerMenu />
@@ -89,7 +82,7 @@ describe('BenutzerMenu — ab xl', () => {
   });
 
   it('der Trigger trägt die Funktion statt des Namens, wenn sie bekannt ist (Neuentwurf)', async () => {
-    server.use(http.get('/api/auth/me', () => HttpResponse.json(benutzer)));
+    server.use(meHandler(benutzer));
     renderMitProviders(
       <ThemeModeProvider>
         <BenutzerMenu funktion="S2 Lage" />
@@ -115,7 +108,7 @@ describe('BenutzerMenu — Führungs-Tablet zwischen lg und xl', () => {
   beforeEach(() => setzeViewportBreite(1024));
 
   it('der Trigger trägt nur die Initialen — die Funktion steht im zugänglichen Namen nicht', async () => {
-    server.use(http.get('/api/auth/me', () => HttpResponse.json(benutzer)));
+    server.use(meHandler(benutzer));
     renderMitProviders(
       <ThemeModeProvider>
         <BenutzerMenu funktion="S2 Lage" />
@@ -167,7 +160,7 @@ describe('BenutzerMenu — unter lg', () => {
 describe('Abmelden', () => {
   function zeigeMitAnmeldeseite(logoutStatus: number) {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+      meHandler(benutzer),
       http.post('/api/auth/logout', () =>
         logoutStatus === 204
           ? new HttpResponse(null, { status: 204 })

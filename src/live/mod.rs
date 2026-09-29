@@ -1,123 +1,53 @@
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, RwLock};
 use tokio::sync::broadcast;
 use utoipa::ToSchema;
 
-/// SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;
-/// die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum LiveEvent {
-    Uhs,
-    Schaden,
-    Fahrzeug,
-    Material,
-    Tier,
-    LageZone,
-    FreiesZeichen,
-    Gefahr,
-    Einheit,
-    Abschnitt,
-    Person,
-    Personal,
-    Lagebericht,
-    Chat,
-    Erinnerung,
-    Auftrag,
-    Nachforderung,
-    Meldung,
-    Bereitstellungsraum,
-    KarteBild,
-    Etb,
-    Befehl,
-    Stab,
-    Dokument,
-    Abloesung,
-    Betreuung,
-    Verpflegung,
-    KartenAnsicht,
-    LageSnapshot,
-    Sofortmeldung,
-    Lagged,
+// `as_str()` ist der load-bearing SSE-Wire-Tag: das Frontend filtert exakt auf diesen String
+// (`EINSATZ_STREAM_EVENTS` in `queryKeys.ts`); Änderungen bricht der Cross-Language-
+// Kontrakttest (`live_event_wire` + FE `liveEvent.contract.test.ts`).
+wire_enum! {
+    /// SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;
+    /// die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum LiveEvent {
+        Uhs => "uhs",
+        Schaden => "schaden",
+        Fahrzeug => "fahrzeug",
+        Material => "material",
+        Tier => "tier",
+        LageZone => "lage_zone",
+        FreiesZeichen => "freies_zeichen",
+        Gefahr => "gefahr",
+        Einheit => "einheit",
+        Abschnitt => "abschnitt",
+        Person => "person",
+        Personal => "personal",
+        Lagebericht => "lagebericht",
+        Chat => "chat",
+        Erinnerung => "erinnerung",
+        Auftrag => "auftrag",
+        Nachforderung => "nachforderung",
+        Meldung => "meldung",
+        Bereitstellungsraum => "bereitstellungsraum",
+        KarteBild => "karte_bild",
+        Etb => "etb",
+        Befehl => "befehl",
+        Stab => "stab",
+        Dokument => "dokument",
+        Abloesung => "abloesung",
+        Betreuung => "betreuung",
+        Verpflegung => "verpflegung",
+        KartenAnsicht => "karten_ansicht",
+        LageSnapshot => "lage_snapshot",
+        Sofortmeldung => "sofortmeldung",
+        Lagged => "lagged",
+    }
 }
 
 impl LiveEvent {
-    /// Alle Varianten in kanonischer Reihenfolge — Anker für den Wire-Kontrakt-Guard
-    /// (`tests/enum_wire_kontrakt.rs`) und die Exhaustiveness-Prüfung.
-    pub const ALLE: [LiveEvent; 31] = [
-        LiveEvent::Uhs,
-        LiveEvent::Schaden,
-        LiveEvent::Fahrzeug,
-        LiveEvent::Material,
-        LiveEvent::Tier,
-        LiveEvent::LageZone,
-        LiveEvent::FreiesZeichen,
-        LiveEvent::Gefahr,
-        LiveEvent::Einheit,
-        LiveEvent::Abschnitt,
-        LiveEvent::Person,
-        LiveEvent::Personal,
-        LiveEvent::Lagebericht,
-        LiveEvent::Chat,
-        LiveEvent::Erinnerung,
-        LiveEvent::Auftrag,
-        LiveEvent::Nachforderung,
-        LiveEvent::Meldung,
-        LiveEvent::Bereitstellungsraum,
-        LiveEvent::KarteBild,
-        LiveEvent::Etb,
-        LiveEvent::Befehl,
-        LiveEvent::Stab,
-        LiveEvent::Dokument,
-        LiveEvent::Abloesung,
-        LiveEvent::Betreuung,
-        LiveEvent::Verpflegung,
-        LiveEvent::KartenAnsicht,
-        LiveEvent::LageSnapshot,
-        LiveEvent::Sofortmeldung,
-        LiveEvent::Lagged,
-    ];
-
-    /// Der load-bearing SSE-Wire-Tag. Das Frontend filtert exakt auf diesen String
-    /// (`EINSATZ_STREAM_EVENTS` in `queryKeys.ts`); Änderungen bricht der Cross-Language-
-    /// Kontrakttest (`live_event_wire` + FE `liveEvent.contract.test.ts`).
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            LiveEvent::Uhs => "uhs",
-            LiveEvent::Schaden => "schaden",
-            LiveEvent::Fahrzeug => "fahrzeug",
-            LiveEvent::Material => "material",
-            LiveEvent::Tier => "tier",
-            LiveEvent::LageZone => "lage_zone",
-            LiveEvent::FreiesZeichen => "freies_zeichen",
-            LiveEvent::Gefahr => "gefahr",
-            LiveEvent::Einheit => "einheit",
-            LiveEvent::Abschnitt => "abschnitt",
-            LiveEvent::Person => "person",
-            LiveEvent::Personal => "personal",
-            LiveEvent::Lagebericht => "lagebericht",
-            LiveEvent::Chat => "chat",
-            LiveEvent::Erinnerung => "erinnerung",
-            LiveEvent::Auftrag => "auftrag",
-            LiveEvent::Nachforderung => "nachforderung",
-            LiveEvent::Meldung => "meldung",
-            LiveEvent::Bereitstellungsraum => "bereitstellungsraum",
-            LiveEvent::KarteBild => "karte_bild",
-            LiveEvent::Etb => "etb",
-            LiveEvent::Befehl => "befehl",
-            LiveEvent::Stab => "stab",
-            LiveEvent::Dokument => "dokument",
-            LiveEvent::Abloesung => "abloesung",
-            LiveEvent::Betreuung => "betreuung",
-            LiveEvent::Verpflegung => "verpflegung",
-            LiveEvent::KartenAnsicht => "karten_ansicht",
-            LiveEvent::LageSnapshot => "lage_snapshot",
-            LiveEvent::Sofortmeldung => "sofortmeldung",
-            LiveEvent::Lagged => "lagged",
-        }
-    }
-
     /// Die Module, deren Daten dieses Event betrifft — die Gate-Menge des
     /// Live-Filters (F01/LFH-227). Ein Abonnent erhält das Event, wenn er MINDESTENS
     /// EINES dieser Module sehen darf; eine leere Menge heißt „bewusst ungated".
@@ -384,6 +314,27 @@ impl LiveHub {
             einsatz_id,
             LiveEvent::Etb,
             format!(r#"{{"einsatz_id":{einsatz_id},"etb_id":{etb_id}}}"#),
+        );
+    }
+
+    /// Modul-Ereignis mit der üblichen ID-only-Payload `{"einsatz_id": …, <schluessel>: id}`.
+    pub fn publiziere_objekt(&self, einsatz_id: i64, event: LiveEvent, schluessel: &str, id: i64) {
+        let mut data = serde_json::Map::new();
+        data.insert("einsatz_id".into(), einsatz_id.into());
+        data.insert(schluessel.into(), id.into());
+        self.publiziere_event(
+            einsatz_id,
+            event,
+            serde_json::Value::Object(data).to_string(),
+        );
+    }
+
+    /// Modul-Ereignis ohne Objekt-Kennung: Payload `{"einsatz_id": …}` (Listen-Refresh).
+    pub fn publiziere_einsatz(&self, einsatz_id: i64, event: LiveEvent) {
+        self.publiziere_event(
+            einsatz_id,
+            event,
+            serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
         );
     }
 

@@ -1,5 +1,5 @@
 // LFH-265 (Teil A, Frontend): Response-Typen sind Re-Exporte der aus Rust generierten Schemas.
-import { apiGet } from './client';
+import { apiGet, mitParametern } from './client';
 import type { components } from './types.generated';
 
 type S = components['schemas'];
@@ -19,7 +19,7 @@ export function ladeOrtVorschau(
   lon: number,
   exclude?: string,
 ): Promise<OrtVorschau> {
-  const p = new URLSearchParams({ lat: String(lat), lon: String(lon) });
-  if (exclude) p.set('exclude', exclude);
-  return apiGet<OrtVorschau>(`/api/einsaetze/${einsatzId}/ort-vorschau?${p.toString()}`);
+  return apiGet<OrtVorschau>(
+    mitParametern(`/api/einsaetze/${einsatzId}/ort-vorschau`, { lat, lon, exclude }),
+  );
 }

@@ -8,24 +8,19 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::kommunikation::VOLLZUG_IN_ARBEIT;
 use crate::live::LiveEvent;
+use crate::routes::support::pflicht;
+use crate::zeit::jetzt;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::Utc;
-use serde::Deserialize;
 
-/// Kanonischer Zeitstempel „jetzt" (UTC) im DB-Format.
-fn jetzt() -> String {
-    Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
-}
+use serde::Deserialize;
 
 /// SSE-Notify: Aufträge des Einsatzes haben sich geändert (Tag `auftrag`).
 fn sse(state: &AppState, einsatz_id: i64) {
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Auftrag,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Auftrag);
 }
 
 #[derive(Debug, Deserialize)]
@@ -240,14 +235,10 @@ pub async fn vollzug(
             .await?;
         }
         "vollzogen" => {
-            let text = req
-                .vollzugsmeldung
-                .as_deref()
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .ok_or_else(|| {
-                    AppError::Validation("Vollzugsmeldung darf nicht leer sein".into())
-                })?;
+            let text = pflicht(
+                req.vollzugsmeldung.as_deref().unwrap_or_default(),
+                "Vollzugsmeldung",
+            )?;
             // Doppel-Vollzug verhindern → sonst zweite ETB-Meldung (append-only).
             if repo::laden(&state.pool, auftrag_id, &now)
                 .await?
@@ -265,7 +256,7 @@ pub async fn vollzug(
                 einsatz_id,
                 auftrag_id,
                 ctx.benutzer.id,
-                text,
+                &text,
                 &now,
             )
             .await?;

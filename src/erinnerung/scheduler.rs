@@ -7,31 +7,19 @@ use crate::erinnerung::faelligkeit::naechste_faelligkeit;
 use crate::erinnerung::repo;
 use crate::live::LiveEvent;
 use crate::live::LiveHub;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 use std::time::Duration;
 
 /// Pollintervall des Schedulers.
 const TICK_SEKUNDEN: u64 = 30;
 
-/// Formatiert einen UTC-Zeitpunkt im kanonischen DB-Format.
-fn fmt(t: DateTime<Utc>) -> String {
-    t.format("%Y-%m-%d %H:%M:%S").to_string()
-}
-
-/// Parst einen DB-Zeitstempel; bei Unparsbarkeit `None` (defensiv).
-fn parse(s: &str) -> Option<DateTime<Utc>> {
-    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-        .ok()
-        .map(|n| n.and_utc())
-}
-
 /// Ein Scheduler-Durchlauf für den Zeitpunkt `jetzt`. Publiziert je fälliger
 /// Erinnerung ein SSE-Event `erinnerung` (Payload `{einsatz_id, erinnerung_id,
 /// bezug_typ, bezug_id}`) und schreibt wiederkehrende per skip-forward fort.
 /// Async + injiziertes `jetzt` = deterministisch testbar.
 pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>) -> usize {
-    let jetzt_s = fmt(jetzt);
+    let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let faellige = match repo::faellige_zum_ausloesen(pool, &jetzt_s).await {
         Ok(v) => v,
         Err(e) => {
@@ -61,8 +49,10 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
                 }
             }
         }
-        let neu = match (f.intervall_minuten, parse(&f.faellig_at)) {
-            (Some(iv), Some(fa)) if iv > 0 => Some(fmt(naechste_faelligkeit(fa, iv, jetzt))),
+        let neu = match (f.intervall_minuten, crate::zeit::parse_utc(&f.faellig_at)) {
+            (Some(iv), Some(fa)) if iv > 0 => Some(crate::zeit::formatiere_utc(
+                naechste_faelligkeit(fa, iv, jetzt),
+            )),
             _ => None, // einmalig oder unparsbar → nur als ausgelöst markieren
         };
         if let Err(e) = repo::markiere_ausgeloest(pool, f.id, neu.as_deref(), &jetzt_s).await {
@@ -94,9 +84,11 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
             // Die Fälligkeit der Schicht, nicht die der Vorwarn-Frist: der Hinweis nennt die
             // Uhrzeit, zu der abgelöst werden muss.
             let faellig_at = match art {
-                "vorwarnung" => parse(&f.faellig_at)
+                "vorwarnung" => crate::zeit::parse_utc(&f.faellig_at)
                     .map(|v| {
-                        fmt(v + chrono::Duration::minutes(crate::abloesung::VORWARNUNG_MINUTEN))
+                        crate::zeit::formatiere_utc(
+                            v + chrono::Duration::minutes(crate::abloesung::VORWARNUNG_MINUTEN),
+                        )
                     })
                     .unwrap_or_else(|| f.faellig_at.clone()),
                 _ => f.faellig_at.clone(),
@@ -116,11 +108,7 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
         }
         // Re-Highlight nur bei frischer Eskalation (ein Event, kein Spam auf Folge-Ticks).
         if let Some(mid) = eskaliert_mid {
-            live.publiziere_event(
-                f.einsatz_id,
-                LiveEvent::Sofortmeldung,
-                serde_json::json!({ "einsatz_id": f.einsatz_id, "meldung_id": mid }).to_string(),
-            );
+            live.publiziere_objekt(f.einsatz_id, LiveEvent::Sofortmeldung, "meldung_id", mid);
         }
         ausgeloest += 1;
     }
@@ -145,9 +133,7 @@ mod tests {
     use crate::erinnerung::repo::ErinnerungDaten;
 
     fn t(s: &str) -> DateTime<Utc> {
-        NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-            .unwrap()
-            .and_utc()
+        crate::zeit::parse_utc(s).unwrap()
     }
 
     async fn setup(pool: &SqlitePool) -> (i64, i64) {

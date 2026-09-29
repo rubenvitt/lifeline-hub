@@ -13,10 +13,11 @@ import {
 import type { MenuProps } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
-import { formatZeit, formatZeitKurz } from '../kommunikation';
+import { formatZeit, formatZeitKurz } from '../anzeige/format';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { StatusChip, monoStil } from '../components/instrument';
 import type { BezugKurzinfo } from './bezug';
+import { formatGroesse } from '../karten/formatGroesse';
 
 /**
  * Restweg zum unteren Rand, der noch als „der Lesende steht unten" gilt (LFH-466).
@@ -34,13 +35,6 @@ const TOLERANZ_UNTEN = 24;
 /** Steht die Sicht (innerhalb der Toleranz) am unteren Rand des Stroms? */
 function istAmBoden(el: HTMLElement): boolean {
   return el.scrollTop + el.clientHeight >= el.scrollHeight - TOLERANZ_UNTEN;
-}
-
-/** Menschlich lesbare Dateigröße. */
-function formatGroesse(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 interface Props {
@@ -361,7 +355,7 @@ export default function NachrichtenStrom({
                         >
                           <PaperClipOutlined /> {a.dateiname}{' '}
                           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                            ({formatGroesse(a.groesse)})
+                            ({formatGroesse(a.groesse, 0)})
                           </Typography.Text>
                         </Typography.Link>
                       ))}

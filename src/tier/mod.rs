@@ -1,34 +1,17 @@
 pub mod repo;
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Status-Maschine eines Tiers (E‑4). Bewusst schlank — keine Sichtungskette wie
-/// bei Personen. String = CHECK-Constraint in `migrations/0031_einsatz_tier.sql`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum TierStatus {
-    Aktiv,
-    Vermisst,
-    Abgeschlossen,
-}
-
-impl TierStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            TierStatus::Aktiv => "aktiv",
-            TierStatus::Vermisst => "vermisst",
-            TierStatus::Abgeschlossen => "abgeschlossen",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<TierStatus> {
-        match s {
-            "aktiv" => Some(TierStatus::Aktiv),
-            "vermisst" => Some(TierStatus::Vermisst),
-            "abgeschlossen" => Some(TierStatus::Abgeschlossen),
-            _ => None,
-        }
+wire_enum! {
+    /// Status-Maschine eines Tiers (E‑4). Bewusst schlank — keine Sichtungskette wie
+    /// bei Personen. String = CHECK-Constraint in `migrations/0031_einsatz_tier.sql`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum TierStatus {
+        Aktiv => "aktiv",
+        Vermisst => "vermisst",
+        Abgeschlossen => "abgeschlossen",
     }
 }
 
@@ -59,46 +42,22 @@ where
     }
 }
 
-/// Spezies-Enum. String = CHECK-Constraint. `etb_label` ist die pseudonyme
-/// Anzeige in der ETB-Spur (z. B. "Hund").
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Spezies {
-    Hund,
-    Katze,
-    Grosstier,
-    Nutzgefluegel,
-    Kleintier,
-    Wildtier,
-    Sonstige,
+wire_enum! {
+    /// Spezies-Enum. String = CHECK-Constraint. `etb_label` ist die pseudonyme
+    /// Anzeige in der ETB-Spur (z. B. "Hund").
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Spezies {
+        Hund => "hund",
+        Katze => "katze",
+        Grosstier => "grosstier",
+        Nutzgefluegel => "nutzgefluegel",
+        Kleintier => "kleintier",
+        Wildtier => "wildtier",
+        Sonstige => "sonstige",
+    }
 }
 
 impl Spezies {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Spezies::Hund => "hund",
-            Spezies::Katze => "katze",
-            Spezies::Grosstier => "grosstier",
-            Spezies::Nutzgefluegel => "nutzgefluegel",
-            Spezies::Kleintier => "kleintier",
-            Spezies::Wildtier => "wildtier",
-            Spezies::Sonstige => "sonstige",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Spezies> {
-        match s {
-            "hund" => Some(Spezies::Hund),
-            "katze" => Some(Spezies::Katze),
-            "grosstier" => Some(Spezies::Grosstier),
-            "nutzgefluegel" => Some(Spezies::Nutzgefluegel),
-            "kleintier" => Some(Spezies::Kleintier),
-            "wildtier" => Some(Spezies::Wildtier),
-            "sonstige" => Some(Spezies::Sonstige),
-            _ => None,
-        }
-    }
-
     /// Pseudonyme ETB-Beschriftung (Spec-Tabelle: "Tier T-007 (Hund) erfasst").
     pub fn etb_label(&self) -> &'static str {
         match self {
@@ -136,31 +95,13 @@ where
     }
 }
 
-/// Optionale Geschlechtsangabe des Tiers (kein `divers`, anders als bei Personen).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum TierGeschlecht {
-    Maennlich,
-    Weiblich,
-    Unbekannt,
-}
-
-impl TierGeschlecht {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            TierGeschlecht::Maennlich => "maennlich",
-            TierGeschlecht::Weiblich => "weiblich",
-            TierGeschlecht::Unbekannt => "unbekannt",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<TierGeschlecht> {
-        match s {
-            "maennlich" => Some(TierGeschlecht::Maennlich),
-            "weiblich" => Some(TierGeschlecht::Weiblich),
-            "unbekannt" => Some(TierGeschlecht::Unbekannt),
-            _ => None,
-        }
+wire_enum! {
+    /// Optionale Geschlechtsangabe des Tiers (kein `divers`, anders als bei Personen).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum TierGeschlecht {
+        Maennlich => "maennlich",
+        Weiblich => "weiblich",
+        Unbekannt => "unbekannt",
     }
 }
 
@@ -190,42 +131,18 @@ where
     }
 }
 
-/// Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.
-/// `etb_label` erscheint in Klammern in der ETB-Spur (Spec: "abgeschlossen
-/// (uebergabe_tierarzt)") — daher identisch zum DB-String.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AbschlussGrund {
-    UebergabeHalter,
-    UebergabeTierarzt,
-    UebergabeTierheim,
-    Verstorben,
-    Freilauf,
-    Sonstiges,
-}
-
-impl AbschlussGrund {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            AbschlussGrund::UebergabeHalter => "uebergabe_halter",
-            AbschlussGrund::UebergabeTierarzt => "uebergabe_tierarzt",
-            AbschlussGrund::UebergabeTierheim => "uebergabe_tierheim",
-            AbschlussGrund::Verstorben => "verstorben",
-            AbschlussGrund::Freilauf => "freilauf",
-            AbschlussGrund::Sonstiges => "sonstiges",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<AbschlussGrund> {
-        match s {
-            "uebergabe_halter" => Some(AbschlussGrund::UebergabeHalter),
-            "uebergabe_tierarzt" => Some(AbschlussGrund::UebergabeTierarzt),
-            "uebergabe_tierheim" => Some(AbschlussGrund::UebergabeTierheim),
-            "verstorben" => Some(AbschlussGrund::Verstorben),
-            "freilauf" => Some(AbschlussGrund::Freilauf),
-            "sonstiges" => Some(AbschlussGrund::Sonstiges),
-            _ => None,
-        }
+wire_enum! {
+    /// Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.
+    /// `etb_label` erscheint in Klammern in der ETB-Spur (Spec: "abgeschlossen
+    /// (uebergabe_tierarzt)") — daher identisch zum DB-String.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AbschlussGrund {
+        UebergabeHalter => "uebergabe_halter",
+        UebergabeTierarzt => "uebergabe_tierarzt",
+        UebergabeTierheim => "uebergabe_tierheim",
+        Verstorben => "verstorben",
+        Freilauf => "freilauf",
+        Sonstiges => "sonstiges",
     }
 }
 

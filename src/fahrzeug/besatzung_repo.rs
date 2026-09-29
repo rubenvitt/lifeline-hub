@@ -5,7 +5,7 @@
 //! Einheiten-Mitgliedschaft.
 
 use crate::error::AppError;
-use sqlx::{SqliteConnection, SqlitePool};
+use sqlx::SqliteConnection;
 
 /// Prüft (auf offener Connection/Transaktion), ob ein Fahrzeug zum Einsatz gehört.
 /// `NotFound` sonst.
@@ -51,17 +51,6 @@ pub async fn ordne_besatzung_zu_tx(
     Ok(name)
 }
 
-/// Pool-Wrapper: ordnet Besatzung in eigener Transaktion zu.
-pub async fn ordne_besatzung_zu(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    ef_id: i64,
-    ep_id: i64,
-) -> Result<String, AppError> {
-    let mut conn = pool.acquire().await?;
-    ordne_besatzung_zu_tx(&mut conn, einsatz_id, ef_id, ep_id).await
-}
-
 /// Gibt eine Personal-Dispozeile aus ihrem Fahrzeug frei (`fahrzeug_id = NULL`), auf einer
 /// offenen Connection/Transaktion (F06/LFH-244 Tier-A). `NotFound`, falls die Kraft nicht
 /// gerade diesem Fahrzeug zugeordnet ist (die WHERE-Klausel verifiziert die Ist-Zuordnung).
@@ -86,20 +75,10 @@ pub async fn gib_besatzung_frei_tx(
     Ok(name)
 }
 
-/// Pool-Wrapper: gibt Besatzung in eigener Transaktion frei.
-pub async fn gib_besatzung_frei(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    ef_id: i64,
-    ep_id: i64,
-) -> Result<String, AppError> {
-    let mut conn = pool.acquire().await?;
-    gib_besatzung_frei_tx(&mut conn, einsatz_id, ef_id, ep_id).await
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sqlx::SqlitePool;
 
     /// Org(1) + Einsatz + zwei disponierte Fahrzeuge; liefert (einsatz, fz_a, fz_b).
     async fn setup(pool: &SqlitePool) -> (i64, i64, i64) {
@@ -147,18 +126,24 @@ mod tests {
         let ep = person(&pool, einsatz, "Anna").await;
 
         assert_eq!(
-            ordne_besatzung_zu(&pool, einsatz, a, ep).await.unwrap(),
+            ordne_besatzung_zu_tx(&mut *pool.acquire().await.unwrap(), einsatz, a, ep)
+                .await
+                .unwrap(),
             "Anna"
         );
         assert_eq!(fahrzeug_von(&pool, ep).await, Some(a));
 
         // Wechsel zu B (exklusiv): A verliert sie.
-        ordne_besatzung_zu(&pool, einsatz, b, ep).await.unwrap();
+        ordne_besatzung_zu_tx(&mut *pool.acquire().await.unwrap(), einsatz, b, ep)
+            .await
+            .unwrap();
         assert_eq!(fahrzeug_von(&pool, ep).await, Some(b));
 
         // Freigeben.
         assert_eq!(
-            gib_besatzung_frei(&pool, einsatz, b, ep).await.unwrap(),
+            gib_besatzung_frei_tx(&mut *pool.acquire().await.unwrap(), einsatz, b, ep)
+                .await
+                .unwrap(),
             "Anna"
         );
         assert_eq!(fahrzeug_von(&pool, ep).await, None);
@@ -169,10 +154,14 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (einsatz, a, b) = setup(&pool).await;
         let ep = person(&pool, einsatz, "Anna").await;
-        ordne_besatzung_zu(&pool, einsatz, a, ep).await.unwrap();
+        ordne_besatzung_zu_tx(&mut *pool.acquire().await.unwrap(), einsatz, a, ep)
+            .await
+            .unwrap();
         // Freigeben aus B (gehört aber zu A) → NotFound, Zuordnung bleibt bestehen.
         assert!(matches!(
-            gib_besatzung_frei(&pool, einsatz, b, ep).await.unwrap_err(),
+            gib_besatzung_frei_tx(&mut *pool.acquire().await.unwrap(), einsatz, b, ep)
+                .await
+                .unwrap_err(),
             AppError::NotFound
         ));
         assert_eq!(fahrzeug_von(&pool, ep).await, Some(a));
@@ -190,7 +179,7 @@ mod tests {
         .unwrap();
         let fremder_ep = person(&pool, fremd, "Fremd").await;
         assert!(matches!(
-            ordne_besatzung_zu(&pool, einsatz, a, fremder_ep)
+            ordne_besatzung_zu_tx(&mut *pool.acquire().await.unwrap(), einsatz, a, fremder_ep)
                 .await
                 .unwrap_err(),
             AppError::NotFound
@@ -212,7 +201,7 @@ mod tests {
         let ep = person(&pool, einsatz, "Anna").await;
         // Fahrzeug gehört zu anderem Einsatz → NotFound (Org-/Einsatz-Isolation).
         assert!(matches!(
-            ordne_besatzung_zu(&pool, einsatz, fremdes_fz, ep)
+            ordne_besatzung_zu_tx(&mut *pool.acquire().await.unwrap(), einsatz, fremdes_fz, ep)
                 .await
                 .unwrap_err(),
             AppError::NotFound

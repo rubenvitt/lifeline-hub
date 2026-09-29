@@ -6,7 +6,7 @@ import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import {
   legeStichwortVorschlagAn,
   listeStichwortVorschlaege,
@@ -35,13 +35,13 @@ export default function StichworteTab() {
     // naechste Eingabe, wenn jemand weitertippte, waehrend der vorherige Eintrag
     // noch unterwegs war.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.stichwortVorschlaege() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Hinzufügen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Hinzufügen fehlgeschlagen')),
   });
 
   const loeschenMutation = useMutation({
     mutationFn: (id: number) => loescheStichwortVorschlag(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.stichwortVorschlaege() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Löschen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Löschen fehlgeschlagen')),
   });
 
   const vorschlaege = vorschlaegeQuery.data ?? [];

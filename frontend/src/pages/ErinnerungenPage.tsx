@@ -6,7 +6,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import {
   erledigeErinnerung,
@@ -29,6 +28,7 @@ import ErinnerungListe from '../erinnerung/ErinnerungListe';
 import ErinnerungFormular from '../erinnerung/ErinnerungFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /** Schluessel-Zeitstempel der Abgeschlossen-Ansicht: erledigt ODER quittiert ODER Anlage. */
 function abschlussZeit(e: Erinnerung): string {
@@ -57,8 +57,7 @@ export default function ErinnerungenPage() {
     queryFn: () => listeErinnerungen(einsatzId, false),
   });
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.erinnerungen(einsatzId) });
 
   const anlegenMutation = useMutation({
