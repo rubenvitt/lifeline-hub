@@ -299,7 +299,7 @@ betroffen.
 | Kriterium | Verdikt | Beleg / Zielticket |
 |---|---|---|
 | Ein `main`-Release erzeugt installierbare Pakete und ein Update-Manifest | **offen → nach dem Merge** | Matrix, Einsammeln und Manifest lokal mit Attrappen belegt (actionlint grün); der erste echte Lauf ist der Dispatch mit `desktop: true` nach dem Merge und dem Setzen der Secrets, Windows ist bis dahin unbelegt |
-| Eine installierte App aktualisiert sich auf das nächste Release | **offen** — macOS belegt nur für den Ablauf VOR dem Zwei-Schritt-Umbau (Review), Windows **offen → Dispatch-Lauf** | Nachweis oben mit `download_and_install` in einem Schritt; der heutige Ablauf (`download` → Neustart-Frage → `install`) ist neu zu belegen. Die Befürchtung aus LFH-722 (ohne Signierung praktisch unbenutzbar) traf das Update selbst nicht, nur den Gatekeeper-Erststart |
+| Eine installierte App aktualisiert sich auf das nächste Release | **erfüllt (macOS)**, Windows **offen → Dispatch-Lauf** | Zweiter Lauf mit dem heutigen Ablauf (Testpaar vom Stand `a628d630`, ad-hoc signiert): „Laden“ → Archiv geladen 20:25:15 → „Jetzt neu starten“ → läuft 20:25:19 als 1.0.1 (`CFBundleShortVersionString`). Die Befürchtung aus LFH-722 (ohne Signierung praktisch unbenutzbar) trifft das Update nicht, nur den Gatekeeper-Erststart |
 | `check-all.sh` bleibt die einzige Wahrheit | **erfüllt** | Manifest-Selbsttest in Schritt 8; die CI bekommt nur Umgebung (apt-Pakete), keinen eigenen Schritt |
 
 **Gate-Lauf 29.09.2026:** Schritt 4 nach der Trennung grün (Server 1910 Tests, Hülle 24); die
@@ -308,8 +308,9 @@ Frontend unverändert gegenüber `alpha`); e2e 345 grün, `e2e/kraefte-kontrast.
 3 von 4 Läufen rot (Mandantenpunkt mit Breite 0) — **Ursache offen**, der e2e-Lauf am PR entscheidet.
 
 **Noch von Hand zu bestätigen** (an der Test-App vorbereitet, nicht automatisierbar ohne
-Bedienfreigabe): „Später“ läuft ohne Neustart weiter; ein manipuliertes Archiv wird abgelehnt
-(Fehlermeldung, Version bleibt); Menü „Server wechseln…“ mit Vorbelegung und „Abbrechen“;
+Bedienfreigabe; bewusst offen gelassen am 29.09.2026): „Später“ im Neustart-Dialog läuft ohne
+Neustart weiter; ein manipuliertes Archiv wird beim Laden abgelehnt (Fehlermeldung, Version
+bleibt — gesichert durch die Signaturprüfung in `tauri-plugin-updater` `download`); Menü „Server wechseln…“ mit Vorbelegung und „Abbrechen“;
 http-Meldung in der Maske; Bestätigungsdialog beim Deeplink auf eine andere Adresse; `afterprint`
 beim Schließen des Druckdialogs; ⌘C/⌘V in der Maske. Live-Ereignisse im minimierten Fenster sind
 nicht neu gemessen — die Einstellung (`background_throttling` aus) ist die aus LFH-720, Lauf 2.
