@@ -5,27 +5,27 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development` (erst rot, dann 
 
 ## 1. Server: Modulzähler und reine Zählregeln
 
-- [ ] 1.1 In `src/einsatz/zaehler.rs` die reinen Funktionen `zaehle_auftraege` und
+- [x] 1.1 In `src/einsatz/zaehler.rs` die reinen Funktionen `zaehle_auftraege` und
   `zaehle_meldungen` über die Prädikatsfelder herauslösen; `berechne` ruft sie. Beleg: Die
   bestehenden Unit-Tests und `tests/modul_zaehler.rs` bleiben grün.
-- [ ] 1.2 `AuftragsZaehler.in_arbeit` ergänzen: davon mit Bearbeitungsstatus „in Arbeit“. Beleg:
+- [x] 1.2 `AuftragsZaehler.in_arbeit` ergänzen: davon mit Bearbeitungsstatus „in Arbeit“. Beleg:
   Die Spec-Szenarien „Aufträge in Arbeit“ und „Vollzogener Auftrag ist nicht überfällig im
   Zähler“ stehen als Fälle in `tests/modul_zaehler.rs`, zuerst rot.
-- [ ] 1.3 In `src/einheit/repo.rs` die reine Funktion `kumuliere(eigene, kinder, wurzel)`
+- [x] 1.3 In `src/einheit/repo.rs` die reine Funktion `kumuliere(eigene, kinder, wurzel)`
   herauslösen (zyklussicher). `Anreicherung::ist_kumuliert` ruft sie. Beleg: Die bestehenden
   Einheiten-Tests bleiben grün, und ein Unit-Test deckt den Zyklus ab.
-- [ ] 1.4 `scripts/check-typ-codegen.sh` laufen lassen, `openapi.json` und `types.generated.ts`
+- [x] 1.4 `scripts/check-typ-codegen.sh` laufen lassen, `openapi.json` und `types.generated.ts`
   mitcommitten. Beleg: Das Skript ist grün, und der Diff zeigt nur `in_arbeit`.
 
 ## 2. Gemeinsames Fixture — Handlungsmengen
 
-- [ ] 2.1 `tests/fixtures/verdichtung/regeln.json` mit den Abschnitten `auftraege` und
+- [x] 2.1 `tests/fixtures/verdichtung/regeln.json` mit den Abschnitten `auftraege` und
   `meldungen` anlegen. Die Fälle: vollzogen mit Quittungslücke, in Arbeit überfällig, eskaliert
   vor Frist, bestätigt nach Frist, erledigt und neu. Beleg: Die Datei parst in beiden Suiten.
-- [ ] 2.2 Rust-Test `tests/verdichtung_fixture.rs`: Er liest die Datei per `include_str!` und prüft
+- [x] 2.2 Rust-Test `tests/verdichtung_fixture.rs`: Er liest die Datei per `include_str!` und prüft
   `zaehle_auftraege` und `zaehle_meldungen`. Beleg: Grün. Mutationsprobe: `ist_offen` um
   `Vollzogen` erweitern macht ihn rot.
-- [ ] 2.3 Vitest `frontend/src/lage/verdichtungFixture.test.ts` (`readFileSync` wie
+- [x] 2.3 Vitest `frontend/src/lage/verdichtungFixture.test.ts` (`readFileSync` wie
   `test/huelle.ts`) prüft das Überblick-`istOffen` und `meldungKennzahlen.istAlarmiert` gegen
   dieselbe Datei. Den Kommentar „wer eine ändert, ändert beide“ in `zaehler.rs` durch einen
   Verweis auf das Fixture ersetzen. Beleg: Grün. Mutationsprobe: `eskaliert` aus `istAlarmiert`
@@ -33,43 +33,43 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development` (erst rot, dann 
 
 ## 3. Stärke: eine Summe, eine Formatierung
 
-- [ ] 3.1 Das Fixture um den Abschnitt `staerke` erweitern: Einheiten, Abschnitte, BR-Mengen und
+- [x] 3.1 Das Fixture um den Abschnitt `staerke` erweitern: Einheiten, Abschnitte, BR-Mengen und
   die erwarteten Werte. Den Rust-Test um `ist_kumuliert` je Einheit gegen `kumuliere` ergänzen.
   Beleg: Grün.
-- [ ] 3.2 `summiereStaerke` addiert nur Wurzeln der übergebenen Menge.
+- [x] 3.2 `summiereStaerke` addiert nur Wurzeln der übergebenen Menge.
   `abschnittStaerken` übergibt nur Unterstellungswurzeln des Einsatzes (Waisen wie
   `baueKraeftebild`). Beleg:
   - Vitest-Fixture-Test: `abschnittStaerken`, `summiereStaerke` (BR) und die Abschnittsstärke von
     `baueKraeftebild` treffen dieselben Erwartungen; vorher rot für „gleicher Abschnitt“.
   - `abschnittStaerke.test.ts` und `anzeige/staerke.test.ts` um die Spec-Szenarien ergänzt.
-- [ ] 3.3 `BrDetailPage.tsx` prüfen: Die Summe läuft über die neue Regel, und die
+- [x] 3.3 `BrDetailPage.tsx` prüfen: Die Summe läuft über die neue Regel, und die
   Unvollständigkeitsriegel bleibt. Beleg: Ein Test „BR mit Einheit und Untereinheit zählt einmal“.
-- [ ] 3.4 `staerkeText` zusammenlegen: Die Formatierung bleibt nur in `anzeige/staerke.ts`,
+- [x] 3.4 `staerkeText` zusammenlegen: Die Formatierung bleibt nur in `anzeige/staerke.ts`,
   `kraeftebild.ts` importiert sie (Aufrufer in `lagebild.ts`, `ueberblickDaten.ts`,
   `Verdichtungszeile.tsx`, `meldebildRaster.test.ts` umstellen). Beleg: `grep -rn "function
   staerkeText" frontend/src` findet genau eine Stelle; Vitest ist grün.
 
 ## 4. Sichtung: eine Zählung
 
-- [ ] 4.1 `verdichtePersonen` (`lageVerdichtung.ts`) zählt die SK über
+- [x] 4.1 `verdichtePersonen` (`lageVerdichtung.ts`) zählt die SK über
   `personenBilanz.sichtungsbild` und bildet nur die Schlüssel ab. Beleg: `lageVerdichtung.test.ts`
   und `personenBilanz.test.ts` bleiben unverändert grün; ein neuer Test belegt die Gleichheit
   beider Verteilungen für dieselbe Liste.
 
 ## 5. Eine Heimat für die Handlungsmengen: Dashboard und Überblick
 
-- [ ] 5.1 `pages/lage-dashboard/useLagebild.ts` aus `LageDashboardPage` herauslösen: Abfragen,
-  `baueLagebild`, Zustand je Quelle, Modulzähler, ältester Stand. Die Abfragen `auftraege` und
+- [x] 5.1 `pages/lage-dashboard/useLagebild.ts` aus `LageDashboardPage` herauslösen: Abfragen,
+  Zustand je Quelle, Modulzähler, Basis für `baueLagebild`, ältester Stand (`standDer`). Die Abfragen `auftraege` und
   `meldungen` entfallen. Beleg:
   - `LageDashboardPage.test.tsx` bleibt grün.
   - Ein Hook-Test belegt: gesperrte Quelle ergibt `gesperrt`, Stand ist der älteste
     `dataUpdatedAt`.
-- [ ] 5.2 Der Führungsstand liest Aufträge und Meldungen aus dem Modulzähler. Notizen: „N
+- [x] 5.2 Der Führungsstand liest Aufträge und Meldungen aus dem Modulzähler. Notizen: „N
   überfällig“ bzw. „N neu · N Bestätigung überfällig“. Fehlt das Modul, heißt es „nicht
   freigegeben“; beim Laden oder Scheitern steht kein Wert. `Lagebild.fuehrung` behält nur Bericht
   und UHS. Beleg: Tests zu den Spec-Szenarien von „Handlungsmengen kommen vom Modulzähler“,
   einschließlich „vollzogen mit Quittungslücke“ und „eskaliert“.
-- [ ] 5.3 Die Kennzahl „Offene Aufträge“ des Führungsüberblicks liest `auftraege` aus dem
+- [x] 5.3 Die Kennzahl „Offene Aufträge“ des Führungsüberblicks liest `auftraege` aus dem
   Modulzähler (offen, `in_arbeit`, überfällig). `auftraegeKennzahl` entfällt oder wird zur reinen
   Darstellung. Beleg: `ueberblickDaten.test.ts` und `UeberblickPage.test.tsx` zu gleichen Werten
   wie der Führungsstand.
@@ -78,27 +78,27 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development` (erst rot, dann 
 
 ## 6. Vorbereitung der Lagebesprechung
 
-- [ ] 6.1 Die reine Funktion `stab/vorbereitung.ts: vorbereitungsZeilen(...)` liefert Zeilen mit
+- [x] 6.1 Die reine Funktion `stab/vorbereitung.ts: vorbereitungsZeilen(...)` liefert Zeilen mit
   Titel, Wert, Notiz, Quelle und Zustand in der festen Reihenfolge aus D8. Beleg: Unit-Tests zu
   „Gleiche Zahlen wie das Dashboard“ (dasselbe `Lagebild` als Eingabe), „Quellenangabe“ und
   „Betroffene gesperrt“; eine fehlende Quelle zeigt „—“ und nie 0.
-- [ ] 6.2 `vorbereitungMarkdown(zeilen, stand, konv)`: Stand in der Kopfzeile, Quelle je Zeile,
+- [x] 6.2 `vorbereitungMarkdown(zeilen, stand, konv)`: Stand in der Kopfzeile, Quelle je Zeile,
   Herkunftsfußzeile, Namen und Titel maskiert wie im Funkplan. Beleg: Unit-Test mit Literalen,
   darunter ein Berichtstitel mit Markdown-Zeichen.
-- [ ] 6.3 Paneel `stab/VorbereitungPaneel.tsx` auf der Stab-Seite unter „Lagebesprechung“, über
+- [x] 6.3 Paneel `stab/VorbereitungPaneel.tsx` auf der Stab-Seite unter „Lagebesprechung“, über
   `useLagebild`. Darstellung über `PaneelZeile`, Mono mit `tabular-nums` für Zahlen, „Stand
   HH:MM“ im `meta`. Beleg: `StabPage.test.tsx`; eine neue Meldung per Invalidierung erhöht den
   Wert ohne Neuladen.
-- [ ] 6.4 „In Lagebericht übernehmen“: Ein Aufruf `POST …/lageberichte` (`freitext`, `text`),
+- [x] 6.4 „In Lagebericht übernehmen“: Ein Aufruf `POST …/lageberichte` (`freitext`, `text`),
   Titel „Vorbereitung Lagebesprechung <DTG>“. Gesperrt, solange eine Quelle lädt; ohne
   Schreibrecht oder Lageberichtsfreigabe fehlt die Aktion; nach Erfolg öffnet sich der Bericht,
   ein Fehler steht per `SpeicherFehler` an der Seite. Beleg: Komponententests zu „Übernahme
   gelingt“, „Ohne Schreibrecht“ und „Übernahme scheitert“ (kein zweiter Request, kein Toast bei
   Fehler).
-- [ ] 6.5 „Nichts wird eingefroren“: Das Abschließen der Lagebesprechung bleibt unverändert. Beleg:
+- [x] 6.5 „Nichts wird eingefroren“: Das Abschließen der Lagebesprechung bleibt unverändert. Beleg:
   `LagebesprechungModal.test.tsx` und `lagebesprechungAbschluss.test.ts` unverändert grün; im
   Diff keine Änderung an `src/stab/`.
-- [ ] 6.6 e2e `frontend/e2e/stab-vorbereitung.spec.ts`:
+- [x] 6.6 e2e `frontend/e2e/stab-vorbereitung.spec.ts`:
   - Als Admin: Die Werte der Vorbereitung stimmen mit dem Dashboard überein, und die Übernahme
     erzeugt einen Bericht.
   - Als Beobachter über `e2e/rollen-kern.ts`: Die Aktion fehlt, und der Lagestand steht.
@@ -110,7 +110,7 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development` (erst rot, dann 
 
 ## 7. Doku und Abschluss
 
-- [ ] 7.1 In `CLAUDE.md` eine Regelzeile „Eine Heimat je Zahl (LFH-550)“ ergänzen: die Tabelle aus
+- [x] 7.1 In `CLAUDE.md` eine Regelzeile „Eine Heimat je Zahl (LFH-550)“ ergänzen: die Tabelle aus
   D1 in Kurzform, den Verweis auf das Fixture und den Archivpfad dieser Change. Den Nachzug zum
   Warnton des überfälligen Termins als ClickUp-Ticket anlegen (`clickup-task-anlegen`). Beleg:
   Die Zeile steht, und die Ticketnummer steht im Design unter Non-Goals.

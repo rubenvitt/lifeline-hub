@@ -46,8 +46,8 @@ Bestand am 30.09.2026:
   „Lagebesprechung-Vorbereitung“, kein Vortragsschema (LFH-46 §2.3, §5).
 - Keine neue Lagebericht-Vorlage; die Übernahme nimmt „freitext“ (LFH-46 §5, L317).
 - **Nicht angeglichen wird der Warnton eines überfälligen Termins.** Die Stab-Seite zeigt
-  `achtung`, die Fristenliste im Überblick `alarm`. Das ist eine Ton-Frage, keine Zahl. Sie wird
-  als eigenes Ticket erfasst und nicht hier entschieden.
+  `achtung`, die Fristenliste im Überblick `alarm`. Das ist eine Ton-Frage, keine Zahl. Sie steht
+  als [LFH-859](https://app.clickup.com/t/123zgec60yw) und wird nicht hier entschieden.
 - Keine Änderung an den Kennzahlen des Kennzahlenbands (LFH-640). Die Lageplätze bleiben Sache
   des Einsatzes.
 
@@ -94,20 +94,24 @@ kenntlich.
 
 ### D4 — Ein Hook `useLagebild` für Dashboard und Vorbereitung
 
-- Die Abfragen und das `useMemo` um `baueLagebild` wandern aus `LageDashboardPage` in
-  `pages/lage-dashboard/useLagebild.ts`. Der Hook liefert:
-  - das `Lagebild`;
-  - den Abrufzustand je Quelle (`abrufZustand`: daten, laden, fehler, gesperrt);
-  - den Modulzähler;
-  - den ältesten `dataUpdatedAt` als Stand.
+- Die Abfragen wandern aus `LageDashboardPage` in `pages/lage-dashboard/useLagebild.ts`. Der
+  Hook liefert:
+  - die Abfragen (`q`), darunter den Modulzähler;
+  - den Abrufzustand je Quelle (`zustand`, über `abrufZustand`: daten, laden, fehler, gesperrt);
+  - die `basis` für `baueLagebild` (Rohdaten ohne die Seitenteile Pegel-Ziel und Evakuierung).
+
+  Das Lagebild baut jede Seite selbst mit `baueLagebild`, der einen Funktion. Das Dashboard gibt
+  seine gehaltene Kennzahlreihe mit. Die Vorbereitung nimmt die Reihe ohne Lagekennzahlen
+  (`kennzahlReihe([])`), denn sie zeigt keine Lageplätze; die Kern-Kennzahlen sind dieselben. Den
+  Stand rechnet `standDer(...)` (ältester `dataUpdatedAt`).
 - Dashboard und Stab-Vorbereitung rufen denselben Hook. Gleiche Werte sind damit durch
   Konstruktion gesichert und nicht durch einen Vergleichstest.
 - Die Listen `auftraege` und `meldungen` verlassen den Hook. Der Führungsstand liest
   `modulZaehler`, damit entfallen zwei Abfragen. Das Feld `Lagebild.fuehrung` behält nur Bericht
   und UHS; Aufträge und Meldungen kommen als eigene, schmale Ableitung aus dem Zähler.
 - **Kosten:** Die Stab-Seite stellt dieselben Abfragen wie das Dashboard. Die Schlüssel sind
-  geteilt, also greift der Cache, und die Live-Invalidierung trifft beide. Der Stab rechnet
-  zusätzlich die Pegel-Abfrage (5 min) nur, wenn die Lagekennzahl `pegel` gesetzt ist.
+  geteilt, also greift der Cache, und die Live-Invalidierung trifft beide. Die Pegel-Abfrage
+  (5 min) läuft nur auf dem Dashboard (`mitPegel`).
 - **Verworfen:** eine Vorbereitung mit eigenen Abfragen, die dieselben Funktionen aufruft. Das
   wäre derselbe Code, aber zwei Zusammenstellungen der Eingaben, und genau dort driftet es.
 
@@ -116,10 +120,14 @@ kenntlich.
 - `summiereStaerke(einheiten)` addiert `ist_kumuliert` nur für Einheiten, deren
   `ueber_einheit_id` nicht in der übergebenen Menge liegt. Das ist die Regel für den
   Bereitstellungsraum: Wer dort mit seiner Untereinheit steht, zählt einmal.
-- `abschnittStaerken` übergibt nur die **Unterstellungswurzeln** des Einsatzes, also Einheiten ohne
-  Elterneinheit oder mit einer Elterneinheit, die nicht in der Einsatzliste steht (Waise, wie
-  `baueKraeftebild`). Damit zählt eine unterstellte Einheit beim Abschnitt ihrer obersten Einheit,
-  genau wie im Meldebaum.
+- `abschnittStaerken` übergibt nur die **obersten Einheiten** (`ueber_einheit_id` leer), genau
+  wie `baueKraeftebild` seine Abschnitte bestückt. Damit zählt eine unterstellte Einheit beim
+  Abschnitt ihrer obersten Einheit, wie im Meldebaum. Verwaiste Einheiten gibt es nicht: Der
+  Fremdschlüssel `ueber_einheit_id` hat kein `ON DELETE` (Migration 0016), eine Elterneinheit
+  mit Unterstellten lässt sich nicht löschen.
+- Hat ein Abschnitt zugeordnete Einheiten, aber keine oberste, ist seine Stärke 0/0/0 und nicht
+  „—“: Eine Einheit steht dort, ihre Kräfte zählen beim Abschnitt ihrer obersten Einheit. „—“
+  bleibt „keine Einheit zugeordnet“.
 - **Verworfen:** „jede Einheit bei ihrem eigenen Abschnitt, mit ihrer eigenen Stärke `ist`“. Das
   wiche vom Meldebild und von der kumulierten Server-Stärke ab, also eine dritte Zuordnung.
 
@@ -176,8 +184,8 @@ kenntlich.
   - Die Primäraktion im Kopf bleibt „Lagebesprechung abschließen“. „In Lagebericht übernehmen“
     steht als sekundärer Knopf im Paneel.
 - **Aufbau:**
-  - Die Zeilen entstehen aus der reinen Funktion `stab/vorbereitung.ts: vorbereitungsZeilen(lagebild,
-    zustaende, zaehler, stab)`. Jede Zeile trägt `titel`, `wert`, `notiz`, `quelle` und `zustand`.
+  - Die Zeilen entstehen aus der reinen Funktion `stab/vorbereitung.ts:
+    vorbereitungsZeilen(quellen, konv)` (Lagebild, Zustand je Quelle, Zählstände, Stab). Jede Zeile trägt `titel`, `wert`, `notiz`, `quelle` und `zustand`.
     Die Funktion formatiert nur; jede Zahl liest sie aus dem Lagebild oder dem Zähler.
   - Die Reihenfolge ist fest: Kennzahlenband des Dashboards (ohne Einsatzdauer und die
     Lageplätze), dann der Führungsstand. Danach folgen letzte Besprechung und nächster Termin.
@@ -205,8 +213,8 @@ kenntlich.
   kommen kurz nacheinander an. → Das kann einen Takt lang abweichen; derselbe Fall besteht schon
   heute zwischen Modulpanel und Liste.
 - **[Last auf der Stab-Seite]** Die Stab-Seite stellt etwa 14 Abfragen. → Die Schlüssel sind mit
-  dem Dashboard geteilt und über SSE live; es gibt kein Polling. Die Pegel-Abfrage läuft nur bei
-  gesetzter Lagekennzahl.
+  dem Dashboard geteilt und über SSE live; es gibt kein Polling. Die Pegel-Abfrage läuft auf der
+  Stab-Seite nicht.
 - **[Vitest liest außerhalb von `frontend/`]** → Es gibt einen Vorgänger (`test/huelle.ts`), und
   der Pfad ist relativ zu `import.meta.url`. Die CI hat das ganze Repo ausgecheckt.
 - **[Stärke-Umstellung ändert gezeigte Werte]** Betroffen sind nur Einsätze mit unterstellten

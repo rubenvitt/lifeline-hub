@@ -2,6 +2,7 @@ import { App, Breadcrumb, Button, Flex, Skeleton, Space, Typography, theme } fro
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { abrufZustand } from '../api/abrufZustand';
 import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
@@ -20,6 +21,7 @@ import BesetzungModal from '../stab/BesetzungModal';
 import LagebesprechungHistorie from '../stab/LagebesprechungHistorie';
 import LagebesprechungModal from '../stab/LagebesprechungModal';
 import LagebesprechungStand from '../stab/LagebesprechungStand';
+import VorbereitungPaneel from '../stab/VorbereitungPaneel';
 import { zeigeAbschlussToast } from '../stab/abschlussToast';
 import { besetzungDarstellung, besetzungRechteText, zeileFuer } from '../stab/besetzung';
 import { SACHGEBIETE } from '../stab/sachgebiete';
@@ -30,8 +32,11 @@ import { einsatzStatus } from '../theme/statusFarben';
 /**
  * Modul „Stab" (LFH-46): Lagebesprechung und Führungsorganisation S1–S6.
  *
- * Eine Vollseite, zwei Sektionen, zwei Masken. Die Besetzung ist eine `Liste` mit sechs festen
- * Zeilen — hier wird nichts verglichen. Die Zeile ist kein Klickziel; genau eine Aktion „Besetzung
+ * Eine Vollseite, drei Sektionen, zwei Masken. Die dritte ist die Vorbereitung der
+ * Lagebesprechung (LFH-550, `stab/VorbereitungPaneel.tsx`): der Lagestand aus denselben Zahlen wie
+ * das Lage-Dashboard, mit Quelle je Zeile; sie speichert nichts.
+ *
+ * Die Besetzung ist eine `Liste` mit sechs festen Zeilen — hier wird nichts verglichen. Die Zeile ist kein Klickziel; genau eine Aktion „Besetzung
  * ändern" je Zeile, ohne Schreibrecht entfällt sie und ein Satz nennt den Grund.
  *
  * Der Kopf trägt genau eine Primäraktion „Lagebesprechung abschließen". Sie öffnet ein Modal und
@@ -171,6 +176,16 @@ export default function StabPage() {
           <LagebesprechungHistorie einsatzId={einsatzId} />
         </Flex>
       </Paneel>
+
+      <VorbereitungPaneel
+        einsatzId={einsatzId}
+        einsatz={einsatz}
+        benutzer={benutzer}
+        overrides={overridesQuery.data}
+        stab={stabQuery.data}
+        stabZustand={abrufZustand(stabQuery)}
+        stabStand={stabQuery.dataUpdatedAt}
+      />
 
       <Paneel
         titel="Besetzung S1–S6"

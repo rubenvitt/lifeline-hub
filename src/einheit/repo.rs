@@ -213,28 +213,9 @@ struct Anreicherung {
 }
 
 impl Anreicherung {
-    /// Kumulierte Ist-Stärke (eigene + alle unterstellten Einheiten), vollständig im Speicher.
-    /// Iterativ mit Visited-Set statt `WITH RECURSIVE`, damit korrupte Zyklen terminieren. Summiert
-    /// nur `staerken`.
+    /// Kumulierte Ist-Stärke (eigene + alle unterstellten Einheiten), über [`kumuliere`].
     fn ist_kumuliert(&self, wurzel_id: i64) -> Staerke {
-        let mut summe = Staerke::neu(0, 0, 0);
-        let mut stack = vec![wurzel_id];
-        let mut besucht: HashSet<i64> = HashSet::new();
-        while let Some(id) = stack.pop() {
-            if !besucht.insert(id) {
-                continue;
-            }
-            let s = self.eigene(id);
-            summe = Staerke::neu(
-                summe.fuehrer.saturating_add(s.fuehrer),
-                summe.unterfuehrer.saturating_add(s.unterfuehrer),
-                summe.mannschaft.saturating_add(s.mannschaft),
-            );
-            if let Some(cs) = self.kinder.get(&id) {
-                stack.extend(cs.iter().copied());
-            }
-        }
-        summe
+        kumuliere(&self.staerken, &self.kinder, wurzel_id)
     }
 
     /// Eigene Ist-Stärke einer Einheit; ohne Kräfte `0/0/0`.
@@ -244,6 +225,39 @@ impl Anreicherung {
             .copied()
             .unwrap_or(Staerke::neu(0, 0, 0))
     }
+}
+
+/// Kumulierte Ist-Stärke einer Einheit: eigene plus alle unterstellten, rein im Speicher.
+/// `eigene` sind die eigenen Ist-Stärken (fehlender Eintrag = keine wertbaren Kräfte), `kinder`
+/// die unmittelbar unterstellten Einheiten je Einheit.
+///
+/// Iterativ mit Visited-Set statt `WITH RECURSIVE`, damit korrupte Zyklen terminieren. Die
+/// Regel steht im gemeinsamen Fixture `tests/fixtures/verdichtung/regeln.json` (LFH-550): der
+/// Client summiert Abschnitte und Bereitstellungsräume über genau diese Werte.
+pub fn kumuliere(
+    eigene: &HashMap<i64, Staerke>,
+    kinder: &HashMap<i64, Vec<i64>>,
+    wurzel_id: i64,
+) -> Staerke {
+    let mut summe = Staerke::neu(0, 0, 0);
+    let mut stack = vec![wurzel_id];
+    let mut besucht: HashSet<i64> = HashSet::new();
+    while let Some(id) = stack.pop() {
+        if !besucht.insert(id) {
+            continue;
+        }
+        if let Some(s) = eigene.get(&id) {
+            summe = Staerke::neu(
+                summe.fuehrer.saturating_add(s.fuehrer),
+                summe.unterfuehrer.saturating_add(s.unterfuehrer),
+                summe.mannschaft.saturating_add(s.mannschaft),
+            );
+        }
+        if let Some(cs) = kinder.get(&id) {
+            stack.extend(cs.iter().copied());
+        }
+    }
+    summe
 }
 
 /// Lädt die Anreicherung eines ganzen Einsatzes in konstant vielen Abfragen (6).
@@ -887,6 +901,21 @@ mod tests {
     }
 
     use crate::katalog::StatusKategorie::{Gebunden, NichtVerfuegbar, Verfuegbar};
+
+    #[test]
+    fn kumuliere_summiert_unterstellte_und_terminiert_im_zyklus() {
+        let eigene = HashMap::from([
+            (1, Staerke::neu(1, 1, 2)),
+            (2, Staerke::neu(0, 1, 3)),
+            (3, Staerke::neu(0, 0, 1)),
+        ]);
+        // 1 → 2 → 3 → 1: ein korrupter Zyklus; jede Einheit zählt trotzdem genau einmal.
+        let kinder = HashMap::from([(1, vec![2]), (2, vec![3]), (3, vec![1])]);
+        assert_eq!(kumuliere(&eigene, &kinder, 1), Staerke::neu(1, 2, 6));
+        assert_eq!(kumuliere(&eigene, &HashMap::new(), 2), Staerke::neu(0, 1, 3));
+        // Ohne eigenen Eintrag: keine wertbaren Kräfte.
+        assert_eq!(kumuliere(&eigene, &kinder, 99), Staerke::neu(0, 0, 0));
+    }
 
     #[test]
     fn ohne_fahrzeug_gilt_der_handstatus() {

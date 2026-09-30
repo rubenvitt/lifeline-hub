@@ -11,7 +11,14 @@
 //! **Die Kommunikationszähler zählen über die Listenfunktionen**, nicht über ein eigenes
 //! `COUNT`: `ist_offen`, `ist_ueberfaellig`, `ist_faellig` und `ungelesen_anzahl` rechnet der
 //! Server dort je Zeile, und ein zweites Prädikat wiche bei der nächsten Änderung still ab.
+//!
+//! **Eine Heimat je Zahl (LFH-550):** Lage-Dashboard und Führungsüberblick zeigen Aufträge und
+//! Meldungen aus diesem Zähler, nicht aus eigener Zählung. Die Zählregeln über den Zeilen stehen
+//! als reine Funktionen ([`zaehle_auftraege`], [`zaehle_meldungen`]); das gemeinsame Fixture
+//! `tests/fixtures/verdichtung/regeln.json` bindet sie an die Client-Regeln
+//! (`tests/verdichtung_fixture.rs` und `frontend/src/lage/verdichtungFixture.test.ts`).
 
+use crate::auftrag::AuftragBearbeitungsstatus;
 use crate::auth::Benutzer;
 use crate::erinnerung::STATUS_OFFEN as ERINNERUNG_OFFEN;
 use crate::error::AppError;
@@ -38,11 +45,82 @@ pub struct MeldungsZaehler {
     pub bestaetigung_ueberfaellig: i64,
 }
 
-/// Aufträge: offen (offen/in Arbeit), davon überfällig.
+/// Aufträge: offen (offen/in Arbeit), davon in Arbeit, davon überfällig.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct AuftragsZaehler {
     pub offen: i64,
+    /// Davon mit Bearbeitungsstatus „in Arbeit" (LFH-550, „davon in Arbeit" im Überblick).
+    pub in_arbeit: i64,
+    /// Davon überfällig — nur unter den offenen: ein vollzogener Auftrag mit Quittungslücke
+    /// zählt nicht (LFH-550).
     pub ueberfaellig: i64,
+}
+
+/// Was an einem Auftrag gezählt wird. Die Flags rechnet die Liste je Zeile
+/// (`auftrag::repo::ANZEIGE_SELECT`); gezählt wird darüber in [`zaehle_auftraege`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AuftragsMerkmale {
+    pub bearbeitungsstatus: AuftragBearbeitungsstatus,
+    pub ist_ueberfaellig: bool,
+}
+
+/// Was an einer Meldung gezählt wird. Die Flags rechnet die Liste je Zeile
+/// (`meldung::repo`); gezählt wird darüber in [`zaehle_meldungen`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MeldungsMerkmale {
+    pub status: MeldungStatus,
+    pub ist_offen: bool,
+    pub bestaetigung_pflicht: bool,
+    pub ist_bestaetigt: bool,
+    pub ist_ueberfaellig: bool,
+    pub eskaliert: bool,
+}
+
+fn anzahl(n: usize) -> i64 {
+    i64::try_from(n).unwrap_or(i64::MAX)
+}
+
+/// Zählregel der Aufträge: offen = `ist_offen()` der Phase; davon in Arbeit; davon überfällig.
+pub fn zaehle_auftraege(auftraege: &[AuftragsMerkmale]) -> AuftragsZaehler {
+    let offen: Vec<_> = auftraege
+        .iter()
+        .filter(|a| a.bearbeitungsstatus.ist_offen())
+        .collect();
+    AuftragsZaehler {
+        offen: anzahl(offen.len()),
+        in_arbeit: anzahl(
+            offen
+                .iter()
+                .filter(|a| a.bearbeitungsstatus == AuftragBearbeitungsstatus::InArbeit)
+                .count(),
+        ),
+        ueberfaellig: anzahl(offen.iter().filter(|a| a.ist_ueberfaellig).count()),
+    }
+}
+
+/// Zählregel der Meldungen: offen, davon ungesehen (Status „neu"), und die überfällige
+/// Bestätigungspflicht über ALLE Meldungen (LFH-397). Die letzte Regel kennt auch der Client
+/// (`istAlarmiert` in `frontend/src/meldungen/meldungKennzahlen.ts`); das gemeinsame Fixture
+/// hält beide gleich.
+pub fn zaehle_meldungen(meldungen: &[MeldungsMerkmale]) -> MeldungsZaehler {
+    let offen: Vec<_> = meldungen.iter().filter(|m| m.ist_offen).collect();
+    MeldungsZaehler {
+        offen: anzahl(offen.len()),
+        ungesehen: anzahl(
+            offen
+                .iter()
+                .filter(|m| m.status == MeldungStatus::Neu)
+                .count(),
+        ),
+        bestaetigung_ueberfaellig: anzahl(
+            meldungen
+                .iter()
+                .filter(|m| {
+                    m.bestaetigung_pflicht && !m.ist_bestaetigt && (m.ist_ueberfaellig || m.eskaliert)
+                })
+                .count(),
+        ),
+    }
 }
 
 /// Erinnerungen: fällig und noch offen.
@@ -145,31 +223,29 @@ pub async fn berechne(
     }
     if erlaubt.contains("meldungen") {
         let liste = crate::meldung::repo::liste(pool, einsatz_id, None, None, jetzt).await?;
-        let offen = liste.iter().filter(|m| m.ist_offen);
-        z.meldungen = Some(MeldungsZaehler {
-            offen: offen.clone().count() as i64,
-            ungesehen: offen.filter(|m| m.status == MeldungStatus::Neu).count() as i64,
-            // Dieselbe Regel wie `istAlarmiert` in `frontend/src/meldungen/meldungKennzahlen.ts`
-            // — wer eine ändert, ändert beide.
-            bestaetigung_ueberfaellig: liste
-                .iter()
-                .filter(|m| {
-                    m.bestaetigung_pflicht
-                        && !m.ist_bestaetigt
-                        && (m.ist_ueberfaellig || m.eskaliert)
-                })
-                .count() as i64,
-        });
+        let merkmale: Vec<_> = liste
+            .iter()
+            .map(|m| MeldungsMerkmale {
+                status: m.status,
+                ist_offen: m.ist_offen,
+                bestaetigung_pflicht: m.bestaetigung_pflicht,
+                ist_bestaetigt: m.ist_bestaetigt,
+                ist_ueberfaellig: m.ist_ueberfaellig,
+                eskaliert: m.eskaliert,
+            })
+            .collect();
+        z.meldungen = Some(zaehle_meldungen(&merkmale));
     }
     if erlaubt.contains("auftraege") {
         let liste = crate::auftrag::repo::liste(pool, einsatz_id, None, None, None, jetzt).await?;
-        let offen = liste
+        let merkmale: Vec<_> = liste
             .iter()
-            .filter(|d| d.auftrag.bearbeitungsstatus.ist_offen());
-        z.auftraege = Some(AuftragsZaehler {
-            offen: offen.clone().count() as i64,
-            ueberfaellig: offen.filter(|d| d.auftrag.ist_ueberfaellig).count() as i64,
-        });
+            .map(|d| AuftragsMerkmale {
+                bearbeitungsstatus: d.auftrag.bearbeitungsstatus,
+                ist_ueberfaellig: d.auftrag.ist_ueberfaellig,
+            })
+            .collect();
+        z.auftraege = Some(zaehle_auftraege(&merkmale));
     }
     if erlaubt.contains("erinnerungen") {
         let liste = crate::erinnerung::repo::liste(pool, einsatz_id, false, jetzt).await?;
@@ -194,7 +270,6 @@ pub async fn berechne(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::auftrag::AuftragBearbeitungsstatus;
     use crate::einsatz::modul::MODUL_KEYS;
 
     #[test]
@@ -211,6 +286,7 @@ mod tests {
             }),
             auftraege: Some(AuftragsZaehler {
                 offen: 1,
+                in_arbeit: 0,
                 ueberfaellig: 0,
             }),
             erinnerungen: Some(ErinnerungsZaehler { faellig: 1 }),

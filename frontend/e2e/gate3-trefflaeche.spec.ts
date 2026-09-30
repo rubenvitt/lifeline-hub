@@ -1060,9 +1060,16 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern" und Kopfaktion folg
     await expect(kopfaktion).toBeEnabled();
     const kopf = await haeltStufe(kopfaktion, soll, `Kopfaktion (${dichte})`);
 
+    // (5) Die Übernahme der Vorbereitung (LFH-550): erst freigegeben (alle Quellen geladen).
+    const uebernahme = page
+      .getByRole('region', { name: 'Vorbereitung', exact: true })
+      .getByRole('button', { name: 'In Lagebericht übernehmen', exact: true });
+    await expect(uebernahme).toBeEnabled();
+    const vorbereitung = await haeltStufe(uebernahme, soll, `Übernahme (${dichte})`);
+
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Werkzeug-Link ${werkzeug}, ` +
-        `Besetzung ändern ${knopf}, Kopfaktion ${kopf}`,
+        `Besetzung ändern ${knopf}, Kopfaktion ${kopf}, Übernahme ${vorbereitung}`,
     );
   }
 

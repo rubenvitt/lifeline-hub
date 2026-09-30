@@ -346,11 +346,20 @@ export interface components {
             quittiert_von_id?: number | null;
             snap_anzeige: string;
         };
-        /** @description Aufträge: offen (offen/in Arbeit), davon überfällig. */
+        /** @description Aufträge: offen (offen/in Arbeit), davon in Arbeit, davon überfällig. */
         AuftragsZaehler: {
+            /**
+             * Format: int64
+             * @description Davon mit Bearbeitungsstatus „in Arbeit" (LFH-550, „davon in Arbeit" im Überblick).
+             */
+            in_arbeit: number;
             /** Format: int64 */
             offen: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Davon überfällig — nur unter den offenen: ein vollzogener Auftrag mit Quittungslücke
+             *     zählt nicht (LFH-550).
+             */
             ueberfaellig: number;
         };
         /** @description Eine Ausgabe gegen ein Zeitfenster. Von der Nachforderung trägt sie NUR die Kennung. */

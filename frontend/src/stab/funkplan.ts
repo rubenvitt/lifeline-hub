@@ -306,8 +306,9 @@ export const GEGENSTELLE_HINWEIS = 'Eigene Gegenstelle (Führungsstelle)';
 /**
  * Entschärft, was `components/Markdown.tsx` (remark-gfm) als Auszeichnung läse: Backslash,
  * Backtick, Stern, Unterstrich, eckige Klammern und die Tilde (GFM streicht schon `~x~` durch).
+ * Auch die Vorbereitung der Lagebesprechung (`stab/vorbereitung.ts`) maskiert hierüber.
  */
-function md(text: string): string {
+export function md(text: string): string {
   return text.replace(/[\\`*_[\]~]/g, (z) => `\\${z}`);
 }
 
