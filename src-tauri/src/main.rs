@@ -381,31 +381,22 @@ fn im_browser_starten(
     ziel: Url,
     nummer: u32,
 ) -> Result<(), String> {
-    let ns_window = fenster.ns_window().map_err(|e| e.to_string())? as usize;
-    let fuer_ende = app.clone();
-    let starten = move || {
-        aswas::starten(
-            ns_window as *mut std::ffi::c_void,
-            ziel.as_str(),
-            deeplink::SCHEMA,
-            // Geteilte Browsersitzung; gegen die Sitzung einer anderen Person steht die
-            // Bestätigungsseite mit Namen (Design LFH-818, Entscheidung 7).
-            false,
-            move |ergebnis| anmeldung_abschliessen(&fuer_ende, nummer, ergebnis),
-        )
-    };
-    // Synchrone Commands laufen auf dem Hauptthread; falls nicht, dorthin weiterreichen.
-    if objc2::MainThreadMarker::new().is_some() {
-        return starten();
+    // Synchrone Commands laufen auf dem Hauptthread; AppKit verlangt ihn. Kein Weiterreichen mit
+    // rohem Fensterzeiger: das Fenster könnte dazwischen geschlossen sein.
+    if objc2::MainThreadMarker::new().is_none() {
+        return Err("Die Anmeldung im Browser muss auf dem Hauptthread starten.".to_string());
     }
-    let fuer_fehler = app.clone();
-    app.run_on_main_thread(move || {
-        if let Err(fehler) = starten() {
-            log::warn!("Anmeldung im Browser nicht gestartet: {fehler}");
-            anmeldung_abschliessen(&fuer_fehler, nummer, Err((0, fehler)));
-        }
-    })
-    .map_err(|e| e.to_string())
+    let ns_window = fenster.ns_window().map_err(|e| e.to_string())?;
+    let fuer_ende = app.clone();
+    aswas::starten(
+        ns_window,
+        ziel.as_str(),
+        deeplink::SCHEMA,
+        // Geteilte Browsersitzung; gegen die Sitzung einer anderen Person steht die
+        // Bestätigungsseite mit Namen (Design LFH-818, Entscheidung 7).
+        false,
+        move |ergebnis| anmeldung_abschliessen(&fuer_ende, nummer, ergebnis),
+    )
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -419,7 +410,7 @@ fn im_browser_starten(
 }
 
 /// Ende einer Sitzung: nur der aktuelle Vorgang zählt. Eingelöst wird nur im startenden Fenster
-/// und nur, wenn es eine Seite desselben Servers zeigt.
+/// und nur auf der Anmeldeseite desselben Servers; Meldungen gehen nur an Seiten des Servers.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn anmeldung_abschliessen(app: &AppHandle, nummer: u32, ergebnis: Result<String, (isize, String)>) {
     let zustand = app.state::<Zustand>();

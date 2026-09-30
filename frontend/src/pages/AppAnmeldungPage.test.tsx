@@ -67,7 +67,30 @@ describe('AppAnmeldungPage (LFH-818)', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'In der App anmelden' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mit anderem Konto' })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Bestätige nur, wenn du gerade in der Mac-App auf „Im Browser anmelden“ geklickt hast.',
+      ),
+    ).toBeInTheDocument();
     expect(ausgestellt).not.toHaveBeenCalled();
+  });
+
+  it('fordert bei einem schnellen Doppelklick nur einen Code an', async () => {
+    angemeldet();
+    const ausgestellt = vi.fn();
+    server.use(
+      http.post('/api/auth/app-code', async () => {
+        ausgestellt();
+        await new Promise((r) => setTimeout(r, 30));
+        return HttpResponse.json({ code: CODE });
+      }),
+    );
+    const navigiere = setup(`/app-anmeldung?challenge=${CHALLENGE}`);
+    const knopf = await screen.findByRole('button', { name: 'In der App anmelden' });
+    knopf.click();
+    knopf.click();
+    await waitFor(() => expect(navigiere).toHaveBeenCalledTimes(1));
+    expect(ausgestellt).toHaveBeenCalledTimes(1);
   });
 
   it('fordert nach der Zustimmung den Code an und springt zurück in die App', async () => {

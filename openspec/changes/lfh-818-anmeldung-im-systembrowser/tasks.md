@@ -6,7 +6,8 @@
   - `pkce.rs`: Formprüfung von `challenge` und `verifier`, `challenge_aus(verifier)`,
     Vergleich in konstanter Zeit.
   - `state.rs`: Code-Speicher nach dem Muster von `oidc/state.rs`, TTL 60 s, `speichere`,
-    `entnehme`, `speichere_mit_ablauf` nur unter `cfg(test)`.
+    `entnehme`, `speichere_mit_ablauf` als `doc(hidden)`-Test-Hook (auch die Integrationstests
+    brauchen ihn, `cfg(test)` reicht dort nicht).
 
   Nachweis: Unit-Tests für den RFC-7636-Vektor (Anhang B), die Formgrenzen (42/43/128/129
   Zeichen, fremde Zeichen) sowie für einmaliges Entnehmen, Ablauf und unbekannten Code
@@ -61,8 +62,9 @@
   - Hört auf `lifeline:app-anmeldung`:
     - `angemeldet` → `aktualisiere()` und `navigate(zielPfad)`,
     - `abgelehnt`/`fehler` → Hinweis an der Seite,
-    - `abgebrochen` → Signal ohne Wirkung auf den Knopf.
+    - `abgebrochen` → Hinweis „abgebrochen“, Knopf frei.
   - Doppelklick-Riegel nur, solange der `invoke` läuft.
+  - `abgebrochen` zeigt einen sachlichen Hinweis ohne Fehlerfarbe (Spec).
   - Der Passkey-Knopf bleibt in der Hülle aus.
 
   Nachweis: Vitest mit `starteMacHuelle()` für jeden Zweig und die Gegenprobe im Browser (kein
@@ -99,12 +101,13 @@
   dazu die bestehenden `verbinden`-Tests grün.
 - [x] 3.4 `src-tauri/src/anmeldung.rs`:
   - `einloese_skript(origin, code, verifier)` (rein, JSON-Literale, innere Origin-Prüfung,
-    `CustomEvent` ohne Geheimnisse) und `abbruch_skript()`,
-  - `origin_passt(fenster_url, server)` und `folge(ergebnis, seite, server)` (Einlösen, Melden
-    oder Nichts).
+    `CustomEvent` ohne Geheimnisse) und `meldung_skript(ergebnis)`,
+  - `origin_passt(fenster_url, server)` und `folge(ergebnis, seite, server)` (Einlösen nur auf
+    `/login` des Servers, Melden nur an Seiten des Servers, sonst Nichts),
+  - `Lauf<T>` mit Generation, damit der Handler einer ersetzten Sitzung die neue nicht beendet.
 
   Nachweis: Unit-Tests für diese drei Fälle:
-  - Anführungszeichen und `</script>` im Code brechen das Literal nicht,
+  - Anführungszeichen und Backslashes im Code brechen das Literal nicht (`eval`, kein HTML),
   - das Ereignis trägt weder Code noch `verifier`,
   - die Origin-Prüfung lehnt einen fremden Host und einen anderen Port ab.
 - [x] 3.5 `src-tauri/src/aswas.rs` (nur macOS): `ASWebAuthenticationSession` mit Anker
@@ -158,3 +161,8 @@
      im Protokoll.
   5. Zweites Einlösen desselben Codes (per `curl`) ergibt 401.
   6. `auth_audit` enthält `login_ok`/`systembrowser`.
+  7. Erneuter Klick auf „Im Browser anmelden“, während das Browserfenster noch offen ist: die
+     neue Sitzung läuft durch, die alte endet ohne Wirkung.
+  8. Bestätigungslink auf einem Gerät ohne Mac-App (Firefox, Safari, Chromium): Was zeigt der
+     Browser beim Sprung auf `lifeline://`? Steht der Code irgendwo lesbar, wird aus dem
+     Warnsatz eine Sperre (Rückfrage an die Entscheidung).

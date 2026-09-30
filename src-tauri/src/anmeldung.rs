@@ -11,6 +11,9 @@ use url::Url;
 
 use crate::deeplink::SCHEMA;
 
+/// Pfad der Anmeldeseite, auf der die Hülle einlöst.
+pub const ANMELDESEITE: &str = "/login";
+
 /// Pfad der Bestätigungsseite im Browser.
 pub const BESTAETIGUNG: &str = "/app-anmeldung";
 
@@ -81,13 +84,19 @@ pub enum Folge {
     Einloesen(String),
     /// Nur ein Ergebnis melden, ohne Geheimnis.
     Melden(&'static str),
-    /// Nichts tun: das Fenster zeigt keine Seite des Servers, Code und `verifier` bleiben draußen.
+    /// Nichts tun: das Fenster zeigt keine Seite des Servers (bzw. beim Einlösen nicht die
+    /// Anmeldeseite), Code und `verifier` bleiben draußen.
     Nichts,
 }
 
 /// Entscheidet über das Ende der Sitzung. `ergebnis` ist die Rücksprung-URL oder, ob die Person
 /// abgebrochen hat; `seite` die aktuelle Seite des startenden Fensters.
 pub fn folge(ergebnis: Result<&str, bool>, seite: Option<&Url>, server: &Url) -> Folge {
+    // Weder Code noch Meldung an eine fremde Seite; eine Meldung ohne Geheimnis darf auf jede
+    // Seite des Servers, eingelöst wird nur auf der Anmeldeseite.
+    let Some(seite) = seite.filter(|seite| origin_passt(seite, server)) else {
+        return Folge::Nichts;
+    };
     let ruecksprung = match ergebnis {
         Err(true) => return Folge::Melden("abgebrochen"),
         Err(false) => return Folge::Melden("fehler"),
@@ -100,9 +109,56 @@ pub fn folge(ergebnis: Result<&str, bool>, seite: Option<&Url>, server: &Url) ->
     else {
         return Folge::Melden("fehler");
     };
-    match seite {
-        Some(seite) if origin_passt(seite, server) => Folge::Einloesen(code),
-        _ => Folge::Nichts,
+    // Nur dort hört die Seite auf das Ergebnis. Wer inzwischen auf anderem Weg angemeldet
+    // weitergearbeitet hat, verliert seine Sitzung nicht an einen späten Rücksprung.
+    if seite.path() == ANMELDESEITE {
+        Folge::Einloesen(code)
+    } else {
+        Folge::Nichts
+    }
+}
+
+/// Die laufende Sitzung mit ihrer Generation. Ein Handler beendet nur „seine“ Sitzung: der
+/// Handler einer ersetzten Sitzung kann nach dem Start der neuen eintreffen und darf diese nicht
+/// verwerfen (Review LFH-818).
+#[derive(Debug)]
+pub struct Lauf<T> {
+    generation: u64,
+    laufend: Option<(u64, T)>,
+}
+
+impl<T> Default for Lauf<T> {
+    fn default() -> Self {
+        Self {
+            generation: 0,
+            laufend: None,
+        }
+    }
+}
+
+impl<T> Lauf<T> {
+    /// Nächste Generation, bevor die Sitzung gebaut wird (ihr Handler braucht sie).
+    pub fn naechste(&mut self) -> u64 {
+        self.generation += 1;
+        self.generation
+    }
+
+    /// Merkt sich die gestartete Sitzung unter `generation`.
+    pub fn merke(&mut self, generation: u64, wert: T) {
+        self.laufend = Some((generation, wert));
+    }
+
+    /// Nimmt die laufende Sitzung heraus, gleich welcher Generation (zum Abbrechen).
+    pub fn nimm(&mut self) -> Option<T> {
+        self.laufend.take().map(|(_, wert)| wert)
+    }
+
+    /// Nimmt die Sitzung nur heraus, wenn sie zu `generation` gehört.
+    pub fn beende(&mut self, generation: u64) -> Option<T> {
+        match &self.laufend {
+            Some((g, _)) if *g == generation => self.nimm(),
+            _ => None,
+        }
     }
 }
 
@@ -187,10 +243,26 @@ mod tests {
     }
 
     #[test]
+    fn ein_alter_handler_beendet_die_neue_sitzung_nicht() {
+        let mut lauf = Lauf::default();
+        let alt = lauf.naechste();
+        lauf.merke(alt, "alt");
+        // Neuer Start: die alte Sitzung wird abgebrochen, die neue gemerkt.
+        assert_eq!(lauf.nimm(), Some("alt"));
+        let neu = lauf.naechste();
+        lauf.merke(neu, "neu");
+        // Der Abbruch-Handler der alten Sitzung trifft danach ein.
+        assert_eq!(lauf.beende(alt), None);
+        assert_eq!(lauf.beende(neu), Some("neu"));
+        assert_eq!(lauf.beende(neu), None);
+    }
+
+    #[test]
     fn folge_nach_dem_ende_der_sitzung() {
         let server = url("https://elw.local:8443/");
         let seite = url("https://elw.local:8443/login");
         let fremd = url("https://id.rubeen.dev/login");
+        let andere_seite = url("https://elw.local:8443/einsaetze");
         let ruecksprung = format!("lifeline://anmeldung?code={CODE}");
 
         assert_eq!(
@@ -202,6 +274,15 @@ mod tests {
             Folge::Nichts
         );
         assert_eq!(folge(Ok(&ruecksprung), None, &server), Folge::Nichts);
+        // Eingelöst wird nur auf der Anmeldeseite: dort hört die Seite auf das Ergebnis, und eine
+        // inzwischen anders angemeldete Seite verliert ihre Sitzung nicht.
+        assert_eq!(
+            folge(Ok(&ruecksprung), Some(&andere_seite), &server),
+            Folge::Nichts
+        );
+        // Auch Meldungen gehen nur an eine Seite des Servers.
+        assert_eq!(folge(Err(true), Some(&fremd), &server), Folge::Nichts);
+        assert_eq!(folge(Err(false), None, &server), Folge::Nichts);
         assert_eq!(
             folge(
                 Ok("lifeline://anmeldung?code=kaputt"),

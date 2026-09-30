@@ -1,5 +1,5 @@
 import { Alert, Button, Space, Typography } from 'antd';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import { appCodeAusstellen } from '../api/auth';
 import { fehlerText } from '../api/client';
@@ -31,9 +31,12 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [zurueck, setZurueck] = useState(false);
+  /** Riegel gegen zwei Codes bei schnellem Doppelklick (State greift erst nach dem Rendern). */
+  const sendetRef = useRef(false);
 
   async function inDerAppAnmelden() {
-    if (laeuft) return;
+    if (sendetRef.current) return;
+    sendetRef.current = true;
     setLaeuft(true);
     setFehler(null);
     try {
@@ -43,6 +46,7 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
     } catch (e) {
       setFehler(fehlerText(e, 'Die Anmeldung für die Mac-App ist fehlgeschlagen.'));
     } finally {
+      sendetRef.current = false;
       setLaeuft(false);
     }
   }
@@ -72,6 +76,14 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
           Die Mac-App wird mit diesem Konto ({benutzer?.benutzername}) angemeldet. Bist das nicht
           du, melde dich mit deinem eigenen Konto an.
         </Typography.Paragraph>
+        {/* Gegen untergeschobene Links: der Code geht an die Mac-App auf DIESEM Gerät, eine
+            Bestätigung ohne eigenen Anstoß aus der App meldet womöglich eine fremde App an. */}
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title="Bestätige nur, wenn du gerade in der Mac-App auf „Im Browser anmelden“ geklickt hast."
+        />
         {fehler && <Alert type="error" showIcon title={fehler} style={{ marginBottom: 16 }} />}
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           <Button type="primary" size="large" block loading={laeuft} onClick={inDerAppAnmelden}>

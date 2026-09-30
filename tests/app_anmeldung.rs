@@ -330,3 +330,41 @@ async fn gesperrte_adresse_bekommt_429_nach_fehlversuchen() {
     .await;
     assert_eq!(a.status, StatusCode::TOO_MANY_REQUESTS);
 }
+
+#[tokio::test]
+async fn gesperrte_adresse_verbraucht_den_code_nicht() {
+    let (app, _pool) = setup_mit_pool().await;
+    let browser = login_cookie(&app, "admin", "startpw12").await;
+    let code = code_ausstellen(&app, &browser, CHALLENGE).await;
+    let gesperrt: SocketAddr = "203.0.113.82:40000".parse().unwrap();
+    for i in 0..10 {
+        post(
+            &app,
+            "/api/auth/app-code/einloesen",
+            None,
+            &json!({ "code": format!("{i:064x}"), "verifier": VERIFIER }),
+            Some(gesperrt),
+        )
+        .await;
+    }
+    let a = post(
+        &app,
+        "/api/auth/app-code/einloesen",
+        None,
+        &json!({ "code": code, "verifier": VERIFIER }),
+        Some(gesperrt),
+    )
+    .await;
+    assert_eq!(a.status, StatusCode::TOO_MANY_REQUESTS);
+    // Von einer anderen Adresse gilt derselbe Code noch.
+    let frei: SocketAddr = "203.0.113.83:40000".parse().unwrap();
+    let b = post(
+        &app,
+        "/api/auth/app-code/einloesen",
+        None,
+        &json!({ "code": code, "verifier": VERIFIER }),
+        Some(frei),
+    )
+    .await;
+    assert_eq!(b.status, StatusCode::NO_CONTENT);
+}

@@ -6,7 +6,8 @@
 //!
 //! Alles hier läuft auf dem Hauptthread (AppKit). Die laufende Sitzung hält ein Thread-Local,
 //! damit ein neuer Start die alte abbrechen kann. Der Anker (Präsentationskontext) ist eine
-//! schwache Eigenschaft der Sitzung und liegt deshalb mit ihr im Thread-Local.
+//! schwache Eigenschaft der Sitzung und liegt deshalb mit ihr im Thread-Local. Jede Sitzung trägt
+//! eine Generation (`anmeldung::Lauf`): der Handler einer ersetzten Sitzung beendet nie die neue.
 
 use std::cell::RefCell;
 
@@ -21,6 +22,8 @@ use objc2_authentication_services::{
     ASWebAuthenticationSession,
 };
 use objc2_foundation::{NSError, NSString, NSURL};
+
+use crate::anmeldung::Lauf;
 
 /// `ASWebAuthenticationSessionErrorCodeCanceledLogin`: die Person hat das Fenster geschlossen.
 pub const ABGEBROCHEN: isize = 1;
@@ -53,9 +56,10 @@ impl Anker {
     }
 }
 
+type Sitzung = (Retained<ASWebAuthenticationSession>, Retained<Anker>);
+
 thread_local! {
-    static LAUFEND: RefCell<Option<(Retained<ASWebAuthenticationSession>, Retained<Anker>)>> =
-        const { RefCell::new(None) };
+    static LAUFEND: RefCell<Lauf<Sitzung>> = RefCell::new(Lauf::default());
 }
 
 /// Ergebnis einer Sitzung: die Rücksprung-URL oder (Fehlercode, Text).
@@ -76,8 +80,13 @@ pub fn starten(
     let url = NSURL::URLWithString(&NSString::from_str(adresse)).ok_or("Adresse ungültig")?;
 
     abbrechen();
+    let generation = LAUFEND.with(|l| l.borrow_mut().naechste());
 
     let block = RcBlock::new(move |ruecksprung: *mut NSURL, fehler: *mut NSError| {
+        debug_assert!(
+            MainThreadMarker::new().is_some(),
+            "Handler der Anmeldesitzung außerhalb des Hauptthreads"
+        );
         let ergebnis = if let Some(url) = unsafe { ruecksprung.as_ref() } {
             Ok(url
                 .absoluteString()
@@ -88,9 +97,11 @@ pub fn starten(
         } else {
             Err((0, "Sitzung ohne Ergebnis beendet".to_string()))
         };
-        // Die Sitzung ist vorbei; ein späteres `abbrechen` hätte nichts mehr zu tun.
-        LAUFEND.with(|l| l.borrow_mut().take());
+        // Nur die eigene Sitzung beenden, und erst nach `fertig` freigeben: sie hält den Block,
+        // der gerade läuft.
+        let beendet = LAUFEND.with(|l| l.borrow_mut().beende(generation));
         fertig(ergebnis);
+        drop(beendet);
     });
     // Der Initialisierer kopiert den Block; `block` darf danach fallen.
     #[allow(deprecated)]
@@ -110,13 +121,16 @@ pub fn starten(
     if !unsafe { sitzung.start() } {
         return Err("Die Anmeldung im Browser ließ sich nicht starten.".to_string());
     }
-    LAUFEND.with(|l| *l.borrow_mut() = Some((sitzung, anker)));
+    LAUFEND.with(|l| l.borrow_mut().merke(generation, (sitzung, anker)));
     Ok(())
 }
 
 /// Bricht eine laufende Sitzung ab (deren Handler meldet dann den Abbruch).
 pub fn abbrechen() {
-    if let Some((sitzung, _anker)) = LAUFEND.with(|l| l.borrow_mut().take()) {
+    // Außerhalb der Borrow-Klammer abbrechen: meldet `cancel` den Abbruch synchron, greift der
+    // Handler selbst auf `LAUFEND` zu.
+    let laufend = LAUFEND.with(|l| l.borrow_mut().nimm());
+    if let Some((sitzung, _anker)) = laufend {
         unsafe { sitzung.cancel() };
     }
 }

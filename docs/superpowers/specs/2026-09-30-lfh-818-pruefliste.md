@@ -37,8 +37,8 @@ Begründung). Gerechnetes und aus dem Quelltext Geschlossenes trägt **[abgeleit
 | 3 | **Rückmeldung vor der Serverantwort** | **erfüllt** | Der Knopf lädt sofort (`loading`). Danach folgt der Satz „Du kannst dieses Fenster schließen“ | — |
 | 4 | **Kritische Aktion hat eine zweite Handlung** | **erfüllt** | Die Anmeldung der App ist die zweite Handlung: Der Anstoß kam aus der App, die Seite bestätigt mit Namen („In der Mac-App anmelden als …“), erst der Klick stellt den Code aus | — |
 | 5 | **Kontrast in beiden Modi** | **erfüllt** | Login-Karte mit Rollenfarben wie `/login`. Neue Texte laufen über antd `Typography` (Rollen) | — |
-| 6 | **Kein Status allein über Farbe** | **erfüllt** | Fehler als `Alert` mit Text und Ikone | — |
-| 7 | **Eine Farbe = eine Bedeutung** | **erfüllt** | Primärknopf blau (Bedienung), Fehler rot nur für den Fehler | — |
+| 6 | **Kein Status allein über Farbe** | **erfüllt** | Fehler und Warnsatz („Bestätige nur, wenn …“) als `Alert` mit Text und Ikone | — |
+| 7 | **Eine Farbe = eine Bedeutung** | **erfüllt** | Primärknopf blau (Bedienung), Warnsatz in der Achtung-Farbe, Fehler rot nur für den Fehler | — |
 | 8 | **Helligkeits-/Kontrastregler** | **nicht anwendbar** | Die Seite läuft im Systembrowser, der Regler der App (LFH-397) greift dort wie auf `/login` | — |
 | 9 | **Kritische Anzeigen im Blickfeld** | **erfüllt** | Name und Knöpfe mittig in der Karte, oberes Drittel | — |
 | 10 | **Alarmbudget** | **nicht anwendbar** | Die Seite erzeugt keine Alarme | — |
@@ -57,7 +57,7 @@ Begründung). Gerechnetes und aus dem Quelltext Geschlossenes trägt **[abgeleit
 | 3 | **Rückmeldung vor der Serverantwort** | **erfüllt** | Der Knopf lädt, solange die Hülle startet. Danach öffnet macOS das Anmeldeblatt. Das Ergebnis meldet die Seite als Hinweis oder durch den Wechsel zum Ziel | — |
 | 4 | **Kritische Aktion hat eine zweite Handlung** | **nicht anwendbar** | Anmelden ist nicht kritisch im Sinn der Liste (weder Storno noch Löschen noch Alarmierung) | — |
 | 5 | **Kontrast in beiden Modi** | **erfüllt** | `.login-hinweis` 7,71 : 1 Tag, 7,59 : 1 Nacht [abgeleitet] | — |
-| 6 | **Kein Status allein über Farbe** | **erfüllt** | Ergebnisse als `Alert` mit Text | — |
+| 6 | **Kein Status allein über Farbe** | **erfüllt** | Ergebnisse als `Alert` mit Text; der Abbruch als sachlicher Hinweis (`info`), nicht als Fehler | — |
 | 7 | **Eine Farbe = eine Bedeutung** | **erfüllt** | Neuer Knopf umrandet (sekundär), keine neue Farbe | — |
 | 8 | **Helligkeits-/Kontrastregler** | **erfüllt** | Unverändert, der Regler der App gilt (LFH-397) | — |
 | 9 | **Kritische Anzeigen im Blickfeld** | **erfüllt** | Fehlerhinweis oben in der Karte wie bisher | — |

@@ -40,6 +40,8 @@ export default function LoginPage() {
   // Der OIDC-Callback leitet jeden Fehlschlag generisch auf `/login?fehler=oidc` (bewusst ohne
   // IdP-Detail) — ohne diese Auswertung sähe ein gescheiterter SSO-Login aus, als wäre nichts
   // passiert.
+  // Sachlicher Hinweis ohne Fehlerfarbe (Abbruch der Anmeldung im Browser, LFH-818).
+  const [hinweis, setHinweis] = useState<string | null>(null);
   const [fehler, setFehler] = useState<string | null>(() =>
     new URLSearchParams(location.search).get('fehler') === 'oidc'
       ? 'Die Anmeldung über Single Sign-On ist fehlgeschlagen'
@@ -94,6 +96,7 @@ export default function LoginPage() {
   useEffect(() => {
     function ergebnis(ereignis: Event) {
       const art = (ereignis as CustomEvent<{ ergebnis?: AppAnmeldungErgebnis }>).detail?.ergebnis;
+      setHinweis(null);
       if (art === 'angemeldet') {
         setFehler(null);
         aktualisiere()
@@ -105,8 +108,11 @@ export default function LoginPage() {
         setFehler('Die Anmeldung aus dem Browser ist nicht mehr gültig. Bitte erneut anmelden.');
       } else if (art === 'fehler') {
         setFehler('Die Anmeldung aus dem Browser ist fehlgeschlagen.');
+      } else if (art === 'abgebrochen') {
+        // Die Person hat das Browserfenster geschlossen: kein Fehler, aber die Seite sagt es.
+        setFehler(null);
+        setHinweis('Die Anmeldung im Browser wurde abgebrochen.');
       }
-      // `abgebrochen`: die Person hat das Browserfenster geschlossen, nichts zu melden.
     }
     window.addEventListener(APP_ANMELDUNG_EREIGNIS, ergebnis);
     return () => window.removeEventListener(APP_ANMELDUNG_EREIGNIS, ergebnis);
@@ -155,6 +161,7 @@ export default function LoginPage() {
   async function imBrowserStarten() {
     if (!imBrowserAnmelden) return;
     setFehler(null);
+    setHinweis(null);
     setLaedt('browser');
     try {
       await imBrowserAnmelden();
@@ -171,6 +178,7 @@ export default function LoginPage() {
 
   async function absenden(werte: FormWerte) {
     setFehler(null);
+    setHinweis(null);
     setLaedt('passwort');
     try {
       const ergebnis = await login(werte.benutzername, werte.passwort);
@@ -272,6 +280,7 @@ export default function LoginPage() {
           <p className="login-marke__untertitel">Einsatzführung &amp; Einsatztagebuch</p>
         </div>
         {fehler && <Alert type="error" title={fehler} style={{ marginBottom: 20 }} showIcon />}
+        {hinweis && <Alert type="info" title={hinweis} style={{ marginBottom: 20 }} showIcon />}
         {mfaAktiv ? (
           <Form
             layout="vertical"

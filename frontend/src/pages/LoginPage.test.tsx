@@ -589,13 +589,16 @@ describe('LoginPage', () => {
       ).toBeInTheDocument();
     });
 
-    it('bleibt bei „abgebrochen“ still', async () => {
+    it('sagt bei „abgebrochen“, dass die Anmeldung abgebrochen wurde, ohne Fehler', async () => {
       starteMacHuelle({ invoke: vi.fn().mockResolvedValue(undefined) });
       zeige(passwortUndPasskey);
       await screen.findByRole('button', { name: /Im Browser anmelden/ });
       melden('abgebrochen');
-      await new Promise((r) => setTimeout(r, 20));
-      expect(screen.queryByRole('alert')).toBeNull();
+      expect(
+        await screen.findByText('Die Anmeldung im Browser wurde abgebrochen.'),
+      ).toBeInTheDocument();
+      expect(document.querySelector('.ant-alert-error')).toBeNull();
+      expect(screen.getByRole('button', { name: /Im Browser anmelden/ })).toBeEnabled();
     });
 
     it('meldet, wenn die Hülle den Start ablehnt', async () => {

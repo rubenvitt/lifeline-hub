@@ -94,6 +94,11 @@ Es gibt keine Umleitung am Ende jedes Anmeldewegs. Stattdessen gibt es eine eige
     Person unbemerkt in die App wandert (siehe Entscheidung 7).
 - **Alternative: Umleitung in jedem Anmelde-Handler.** Fünf Stellen, TOTP als Zwischenstufe,
   ungemessener 303. Verworfen.
+- Gegen untergeschobene Bestätigungslinks (jemand schickt einer angemeldeten Person
+  `/app-anmeldung?challenge=<eigene>`) steht auf der Seite der Satz „Bestätige nur, wenn du
+  gerade in der Mac-App auf ‚Im Browser anmelden‘ geklickt hast.“ Der Code geht nur an
+  `lifeline://` auf dem Gerät der Person. Was ein Browser ohne Handler für das Schema dabei
+  anzeigt, prüft die Abnahme (5.2).
 - Die `challenge` reist in der Seiten-URL, nicht im Cookie. Sie ist kein Geheimnis. Ein Angreifer,
   der eine Person mit eigener `challenge` auf die Seite lockt und sie zustimmen lässt, bekommt
   den Code nicht zu sehen. Der Code geht an `lifeline://` auf dem Gerät der Person, und deren
@@ -138,8 +143,9 @@ Der Ablauf, in dieser Reihenfolge:
 
 **Scheitern:**
 - Unbekannter, abgelaufener, verbrauchter oder falsch gebundener Code und ein deaktiviertes
-  Konto geben einheitlich **401** mit demselben Text („Die Anmeldung aus dem Browser ist nicht
-  mehr gültig. Bitte erneut anmelden.“).
+  Konto geben einheitlich **401** mit demselben Text (`AppError::Unauthorized`, „Nicht
+  angemeldet“). Den verständlichen Satz („Die Anmeldung aus dem Browser ist nicht mehr gültig.
+  Bitte erneut anmelden.“) zeigt die Anmeldeseite, sie bekommt vom Skript nur `abgelehnt`.
 - Dazu kommen `login_fehlgeschlagen` (Anbieter `systembrowser`) und `rate_limit::fehlversuch`.
 
 **Warum 401 statt 422/409:** Das Ticket nennt „400/422/409 nach Konvention“.
@@ -172,10 +178,20 @@ auf das Ereignis:
 
 - `angemeldet`: `aktualisiere()` und `navigate(zielPfad)`, wie nach dem Passkey.
 - `abgelehnt` oder `fehler`: ein Hinweis an der Seite (`SpeicherHinweis`-Muster).
-- `abgebrochen`: nur ein Signal. Den Knopf sperrt die Seite ohnehin nur, solange der
+- `abgebrochen`: ein sachlicher Hinweis ohne Fehlerfarbe („Die Anmeldung im Browser wurde
+  abgebrochen.“, Spec: „… und einen Hinweis zeigen“). Den Knopf sperrt die Seite nur, solange der
   `invoke` läuft, also bis die Sitzung gestartet ist. Ob Chromium beim Schließen den Abbruch
   meldet, ist nicht gemessen. Ein erneuter Klick startet einen neuen Vorgang, der den alten
   ersetzt.
+
+Nachgeschärft nach dem Review (30.09.2026):
+- Eingelöst wird nur, wenn das startende Fenster **die Anmeldeseite** (`/login`) des Servers
+  zeigt. Nur dort hört die Seite auf das Ergebnis, und wer inzwischen auf anderem Weg angemeldet
+  weiterarbeitet, verliert seine Sitzung nicht an einen späten Rücksprung. Meldungen ohne
+  Geheimnis gehen nur an Seiten des Servers (`anmeldung::folge`).
+- Die laufende `ASWebAuthenticationSession` trägt eine Generation (`anmeldung::Lauf`). Der
+  Handler einer ersetzten Sitzung, der nach dem Start der neuen eintrifft, beendet nur sich
+  selbst, nie die neue. Die Sitzung wird erst nach dem Aufruf von `fertig` freigegeben.
 
 - **Warum:** Nur der Webview hat den Cookie-Speicher, in dem die Sitzung entstehen muss. Die
   Hülle setzt keine Cookies selbst (WKHTTPCookieStore wäre Anwendungslogik in der Hülle). Die
