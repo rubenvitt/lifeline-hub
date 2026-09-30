@@ -23,12 +23,16 @@ werden, wenn mindestens einer dieser Gründe zutrifft:
   einer Arbeitsanleitung unter `.claude/`.
 - **E3 Breite:** Der Task berührt mehr als ein Subsystem. Subsysteme sind: Backend (`src/`,
   `migrations/`, `tests/`), Frontend (`frontend/`), Desktop-Hülle (`src-tauri/`), Gate und CI
-  (`scripts/`, `.github/`), Arbeitsanleitungen (`.claude/`, `CLAUDE.md`). E3 gilt nicht für einen
-  Bugfix, der vorhandenes Verhalten wiederherstellt.
+  (`scripts/`, `.github/`), Arbeitsanleitungen (`.claude/`, `CLAUDE.md`). Pfade außerhalb dieser
+  Liste zählen zu keinem Subsystem. E3 gilt nicht für einen Bugfix, der vorhandenes Verhalten
+  wiederherstellt, und nicht für eine reine Text- oder Tippfehlerkorrektur.
 
 Für die Routen „trivial“, „Bug, Ursache unklar“ und „klare Spec“ MUST keine Change entstehen.
 Die Route „Anforderung unklar“ MUST zuerst `/opsx:explore` durchlaufen und danach neu geroutet
-werden. Erst das Ergebnis entscheidet über eine Change.
+werden. Erst das Ergebnis entscheidet über eine Change. Führt die gefundene Ursache auf der
+Route „Bug, Ursache unklar“ auf E1 oder E2, MUST der Task auf „Entwurf“ wechseln. Sein
+Board-Status bleibt dabei vorwärts gerichtet, und der Freigabe-Checkpoint MUST trotzdem vor
+`/opsx:apply` gelten.
 
 #### Scenario: Feature über Backend und Frontend
 - **WHEN** ein Task laut Scope-Map Dateien unter `src/` und `frontend/` ändert
@@ -41,8 +45,15 @@ werden. Erst das Ergebnis entscheidet über eine Change.
   `superpowers:test-driven-development`
 
 #### Scenario: Textänderung
-- **WHEN** ein Task nur einen Tippfehler oder einen Anzeigetext korrigiert
+- **WHEN** ein Task nur einen Tippfehler oder einen Anzeigetext korrigiert, auch wenn der Text
+  in `src/` und in `frontend/` steht
 - **THEN** entsteht keine Change
+
+#### Scenario: Bug, dessen Ursache eine Entscheidung verlangt
+- **WHEN** ein Task auf `bug-unklar` beim Debuggen zeigt, dass die Behebung eine Wahl zwischen
+  zwei vertretbaren Wegen verlangt (E1)
+- **THEN** wechselt er auf „Entwurf“, `/opsx:propose` läuft im Main-Loop, der Status bleibt auf
+  `in development`, und `/opsx:apply` beginnt erst nach der Freigabe
 
 #### Scenario: Neue Projektregel in einem Subsystem
 - **WHEN** ein Task nur `.claude/` und `CLAUDE.md` ändert, dabei aber eine neue Regel festlegt
@@ -97,9 +108,16 @@ Für jeden Task auf der Route „Entwurf“ MUST der Main-Loop `/opsx:propose` m
 dabei den Map-Eintrag übergeben: Zusammenfassung, berührte Dateien, Entwurfsgründe und die am
 Checkpoint beantworteten Fragen. `/opsx:propose` MUST den Eintrag als Ausgangspunkt nehmen und die
 Stellen trotzdem selbst lesen. Grundsatz ist eine Change je Task. Ändern zwei oder mehr Subtasks
-desselben Parents dieselbe Fähigkeit (gleicher Eintrag unter `openspec/specs/` oder dieselbe neue
-Fähigkeit), MUST es eine gemeinsame Change geben. Sie trägt die `custom_id` des Parents, und ihre
-`tasks.md` gliedert nach Subtask samt `custom_id`.
+**auf der Route „Entwurf“** desselben Parents dieselbe Fähigkeit (gleicher Eintrag unter
+`openspec/specs/` oder dieselbe neue Fähigkeit, deren Anforderungen sie ändern oder anlegen), MUST
+es eine gemeinsame Change geben. Sie trägt die `custom_id` des Parents, und ihre `tasks.md`
+gliedert nach Subtask samt `custom_id`. Ein Subtask auf einer anderen Route MUST ohne Change
+bleiben, auch wenn er dieselbe Fähigkeit berührt. Subtasks einer gemeinsamen Change MUST NOT
+parallel im autonomen Dev-Modus laufen, weil sie dieselbe `tasks.md` abhaken.
+
+Ruft der Orchestrierungs-Skill `dev-clickup-ausfuehren` für einen Task auf, MUST die bestätigte
+Route der Scope-Map gelten. Ein Task mit freigegebener Change MUST direkt in `/opsx:apply`
+einsteigen, ohne zweites `/opsx:propose`.
 
 #### Scenario: Einzelner Subtask
 - **WHEN** Subtask `LFH-701` „Status-Filter Einheiten“ auf „Entwurf“ steht und keine Fähigkeit
@@ -107,10 +125,20 @@ Fähigkeit), MUST es eine gemeinsame Change geben. Sie trägt die `custom_id` de
 - **THEN** entsteht die Change `openspec/changes/lfh-701-status-filter-einheiten/`
 
 #### Scenario: Zwei Subtasks, dieselbe Fähigkeit
-- **WHEN** die Map für `LFH-701` und `LFH-702` (Parent `LFH-700`) dieselbe Fähigkeit
-  `modul-zaehler` nennt
+- **WHEN** die Map für `LFH-701` und `LFH-702` (Parent `LFH-700`), beide auf „Entwurf“, dieselbe
+  Fähigkeit `modul-zaehler` nennt
 - **THEN** entsteht genau eine Change `lfh-700-<slug>`, deren `tasks.md` Abschnitte für
-  `LFH-701` und `LFH-702` hat
+  `LFH-701` und `LFH-702` hat, und beide Subtasks laufen in Phase 3 nicht parallel autonom
+
+#### Scenario: Gleiche Fähigkeit, nur einer auf „Entwurf“
+- **WHEN** `LFH-701` auf „Entwurf“ und `LFH-703` auf „klare Spec“ dieselbe Fähigkeit nennen
+- **THEN** bekommt nur `LFH-701` eine Change, und `LFH-703` bleibt ohne Change
+
+#### Scenario: Freigegebene Change im sequenziellen Dev-Modus
+- **WHEN** der Orchestrierungs-Skill `dev-clickup-ausfuehren` für einen Task aufruft, dessen
+  Change in Phase 2 freigegeben wurde
+- **THEN** beginnt die Arbeit mit `/opsx:apply`, ohne erneute Routenschätzung und ohne zweites
+  `/opsx:propose`
 
 ### Requirement: Kein Workflow überfährt den Freigabe-Checkpoint
 Ein Workflow MUST NOT `/opsx:explore`, `/opsx:propose`, `/opsx:update`, `/opsx:apply` oder

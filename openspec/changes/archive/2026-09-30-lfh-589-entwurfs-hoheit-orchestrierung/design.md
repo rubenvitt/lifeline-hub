@@ -63,8 +63,15 @@ Workflow-Agent den Skill nicht selbst liest.
 Warum „Subsystem“ und nicht „mehrere Dateien“: Mehrere Dateien hat fast jede Änderung, auch
 jeder Bugfix mit Test. Ein Subsystemwechsel lässt sich an den Pfaden der Scope-Map ablesen und
 trifft, was das Archiv zeigt: Changes entstanden für Features über Backend und Frontend und für
-neue Regeln. Die Bugfix-Ausnahme bei E3 verhindert, dass ein Fix über Backend und Frontend eine
-Spec-Zeremonie auslöst, obwohl keine Regel neu entsteht.
+neue Regeln. Die Ausnahmen bei E3 (Bugfix, der Bestehendes wiederherstellt, und reine
+Textkorrektur) verhindern, dass ein Fix oder ein Label über Backend und Frontend eine
+Spec-Zeremonie auslöst, obwohl keine Regel neu entsteht. Pfade außerhalb der Liste (`docs/`,
+`openspec/`, Wurzeldateien) zählen zu keinem Subsystem. So bleibt E3 an der Liste ablesbar.
+
+Die Route bleibt nach Phase 1 fest, damit `dev-clickup-ausfuehren` im orchestrierten Lauf nicht
+neu schätzt und einen Task zweimal entwirft. Einzige Ausnahme: `bug-unklar` → `entwurf`, wenn
+die gefundene Ursache eine Entscheidung (E1) oder Regel (E2) verlangt. Der Status bleibt dann
+auf `in development` (nur vorwärts), der Freigabe-Halt gilt trotzdem.
 
 Verworfen: „Change, wenn eine SHALL-Anforderung entsteht“ allein. Das verfehlt Entscheidungen
 ohne neue Anforderung (E1) und macht die Frage „ist das eine Anforderung?“ zur Einzelfall-Debatte.
@@ -72,9 +79,12 @@ ohne neue Anforderung (E1) und macht die Frage „ist das eine Anforderung?“ z
 ### D3 — Scope-Map bekommt `route`, `entwurfsgruende`, `faehigkeiten`
 `complexity` wird ersetzt durch `route: trivial | klar | bug-unklar | unklar | entwurf`, das sind
 die fünf Zeilen des Routings. Dazu kommen `entwurfsgruende: ('E1'|'E2'|'E3')[]` (leer, außer bei
-`entwurf`) und `faehigkeiten: string[]`, die berührten oder neuen Pfade unter `openspec/specs/`.
-Aus `faehigkeiten` ergibt sich die gemeinsame Change (Spec, „Die Scope-Map ist die Eingabe der
-Change“): Überschneiden sich zwei Subtasks dort, entsteht eine Change am Parent. Die Route bleibt
+`entwurf`) und `faehigkeiten: string[]`, die Pfade unter `openspec/specs/`, deren Anforderungen
+der Subtask ändert oder neu anlegt. Bloßes Berühren zählt nicht, sonst führten zwei
+`klar`-Subtasks im selben Bereich über die Hintertür zu einer Change. Aus `faehigkeiten` ergibt
+sich die gemeinsame Change (Spec, „Die Scope-Map ist die Eingabe der Change“): Überschneiden
+sich dort zwei Subtasks **auf `entwurf`**, entsteht eine Change am Parent. Solche Subtasks
+laufen nie parallel autonom, weil sie dieselbe `tasks.md` abhaken. Die Route bleibt
 ein Vorschlag des Readers. Bestätigt wird sie am Phase-1-Checkpoint, der dafür ohnehin besteht.
 
 Verworfen: ein zusätzliches Feld `braucht_change: boolean`. Es wäre redundant zu

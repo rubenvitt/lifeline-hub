@@ -32,7 +32,8 @@ Skill `clickup-task-anlegen`.
   `openspec/changes/archive/2026-09-30-lfh-589-entwurfs-hoheit-orchestrierung/design.md`):
   Workflows besitzen die Menge (Scope-Scan, Judge-Panel als Zulieferer), OpenSpec den einzelnen
   Task. Eine Change entsteht **genau** auf der Route `entwurf` (E1 Entscheidung · E2 Regel ·
-  E3 mehr als ein Subsystem, nicht bei einem Bugfix, der Bestehendes wiederherstellt; Liste in
+  E3 mehr als ein Subsystem, nicht bei einem Bugfix, der Bestehendes wiederherstellt, oder
+  einer reinen Textkorrektur; Liste in
   `dev-clickup-ausfuehren`, Schritt 3), nie bei `trivial`/`klar`/`bug-unklar`. **Kein
   Workflow ruft `/opsx:*` oder schreibt unter `openspec/changes/`.**
 - **Vier Ablageorte, keine Überschneidung:** `openspec/changes/<name>/` (laufende Änderung, hier

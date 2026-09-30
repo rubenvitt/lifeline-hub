@@ -116,14 +116,24 @@ zutrifft, und geht dann den übrigen Zeilen vor:
   Arbeitsanleitung unter `.claude/`.
 - **E3 Breite:** Der Task berührt mehr als ein Subsystem. Subsysteme sind: Backend (`src/`,
   `migrations/`, `tests/`), Frontend (`frontend/`), Desktop-Hülle (`src-tauri/`), Gate und CI
-  (`scripts/`, `.github/`), Arbeitsanleitungen (`.claude/`, `CLAUDE.md`). **Ausnahme:** Ein
-  Bugfix, der vorhandenes Verhalten wiederherstellt, löst E3 nicht aus, auch wenn er über
-  mehrere Subsysteme reicht.
+  (`scripts/`, `.github/`), Arbeitsanleitungen (`.claude/`, `CLAUDE.md`). Pfade außerhalb
+  dieser Liste (etwa `docs/`, `openspec/`, Wurzeldateien wie `Cargo.toml` oder `mise.toml`)
+  zählen zu keinem Subsystem. **Ausnahmen:** Ein Bugfix, der vorhandenes Verhalten
+  wiederherstellt, und eine reine Text- oder Tippfehlerkorrektur lösen E3 nicht aus, auch wenn
+  sie über mehrere Subsysteme reichen.
 
 Auf den Routen `trivial`, `bug-unklar` und `klar` entsteht **ausdrücklich keine** Change. Das
 gilt auch, wenn mehrere Dateien berührt sind. `unklar` entscheidet noch nichts: erst
 `/opsx:explore`, danach neu routen. Führt `bug-unklar` nach dem Finden der Ursache auf E1 oder
-E2, wechselt der Task auf `entwurf`.
+E2, wechselt der Task auf `entwurf`. Dann `/opsx:propose` im Main-Loop. Der Board-Status bleibt
+auf `in development` (nur vorwärts), aber der Freigabe-Checkpoint gilt trotzdem: `/opsx:apply`
+erst nach Freigabe.
+
+**Aufruf durch `dev-clickup-orchestrieren`:** Dann schätzt dieser Skill die Route **nicht**
+selbst. Es gilt die am Phase-1-Checkpoint bestätigte `route` der Scope-Map. Liegt für den Task
+schon eine in Phase 2 freigegebene Change vor, steigt er direkt bei `/opsx:apply` ein, ohne
+zweites `/opsx:propose`. Ein in Phase 1 geklärter `unklar`-Task bekommt kein zweites
+`/opsx:explore`. Einzige Ausnahme ist der Wechsel `bug-unklar` → `entwurf` oben.
 
 **Der Checkpoint auf der Route `entwurf` ist Pflicht, kein Stilmittel.** `/opsx:propose` trägt
 die *planning boundary*: es erzeugt `proposal.md`, Delta-Spec, `design.md` und `tasks.md`

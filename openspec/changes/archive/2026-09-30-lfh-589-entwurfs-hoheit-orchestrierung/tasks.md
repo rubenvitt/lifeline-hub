@@ -48,8 +48,8 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `npx @fission-ai/openspec validate lfh-589-entwurfs-hoheit-orchestrierung --strict`
+- [x] 5.1 `npx @fission-ai/openspec validate lfh-589-entwurfs-hoheit-orchestrierung --strict`
   grün. Querlesen der vier geänderten Dateien auf Widersprüche zueinander (Routennamen gleich
   geschrieben, Subsystemliste gleich).
-- [ ] 5.2 `/opsx:archive` im selben Branch (Spec-Sync nach `openspec/specs/entwurfs-hoheit/`,
+- [x] 5.2 `/opsx:archive` im selben Branch (Spec-Sync nach `openspec/specs/entwurfs-hoheit/`,
   Verweis in `CLAUDE.md` auf den Archivpfad), danach `scripts/check-openspec-archiv.sh` grün.

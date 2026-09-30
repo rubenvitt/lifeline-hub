@@ -41,7 +41,7 @@ const SCOPE = {
     depends_on: { type: 'array', items: { type: 'string' } }, // custom_ids
     route: { enum: ['trivial', 'klar', 'bug-unklar', 'unklar', 'entwurf'] },
     entwurfsgruende: { type: 'array', items: { enum: ['E1', 'E2', 'E3'] } }, // leer außer bei 'entwurf'
-    faehigkeiten: { type: 'array', items: { type: 'string' } }, // Pfade unter openspec/specs/ (bestehend oder neu)
+    faehigkeiten: { type: 'array', items: { type: 'string' } }, // Pfade unter openspec/specs/, deren Anforderungen der Subtask ändert oder neu anlegt
     open_questions: { type: 'array', items: { type: 'string' } },
     summary: { type: 'string' },
   },
@@ -54,14 +54,16 @@ const ROUTEN =
   'E1 mehr als ein vertretbarer Weg, Wahl soll begründet bleiben; ' +
   'E2 führt eine Regel ein oder ändert sie, die über den Task hinaus gilt (Fähigkeits-Anforderung, CLAUDE.md, .claude/); ' +
   'E3 mehr als ein Subsystem — Backend (src/, migrations/, tests/), Frontend (frontend/), Hülle (src-tauri/), ' +
-  'Gate/CI (scripts/, .github/), Arbeitsanleitungen (.claude/, CLAUDE.md); E3 nicht bei einem Bugfix, ' +
-  'der vorhandenes Verhalten wiederherstellt.'
+  'Gate/CI (scripts/, .github/), Arbeitsanleitungen (.claude/, CLAUDE.md); Pfade außerhalb dieser Liste ' +
+  'zählen zu keinem Subsystem; E3 nicht bei einem Bugfix, der vorhandenes Verhalten wiederherstellt, ' +
+  'und nicht bei einer reinen Text-/Tippfehlerkorrektur.'
 const map = await parallel(SUBTASKS.map(st => () =>
   agent(
     `Scope subtask ${st.custom_id} "${st.name}" against this codebase.\n` +
     `Beschreibung:\n${st.description}\n\n` +
     `Finde: berührte Files, Abhängigkeiten zu anderen Subtasks (${SUBTASKS.map(s => s.custom_id).join(', ')}), ` +
-    `berührte Fähigkeiten unter openspec/specs/, offene Fragen, und schlage die Route vor.\n${ROUTEN}\n` +
+    `Fähigkeiten unter openspec/specs/, deren Anforderungen der Subtask ändert oder neu anlegt (bloßes Berühren zählt nicht), ` +
+    `offene Fragen, und schlage die Route vor.\n${ROUTEN}\n` +
     `Nichts ändern — nur lesen. Kein /opsx:* ausführen.`,
     { label: `scope:${st.custom_id}`, phase: 'Scope', schema: SCOPE }
   )
@@ -77,8 +79,9 @@ Im Main-Loop danach:
   Phase-3-Modus) oder eine strittige Route → **Checkpoint**. Sonst Map samt Routen kurz
   zusammenfassen und weiter.
 - Die Einträge mit `route: 'entwurf'` sind die Eingabe für Phase 2 (`/opsx:propose` je Task).
-  Überschneiden sich zwei Subtasks in `faehigkeiten`, bekommen sie eine gemeinsame Change am
-  Parent.
+  Überschneiden sich zwei Subtasks **auf `entwurf`** in `faehigkeiten`, bekommen sie eine
+  gemeinsame Change am Parent. Ein Subtask auf einer anderen Route bleibt ohne Change.
+  Subtasks einer gemeinsamen Change laufen in Phase 3 nie parallel autonom.
 
 ---
 

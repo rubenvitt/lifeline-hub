@@ -84,7 +84,8 @@ Task mehrdeutig oder keine Subtasks auffindbar → kurz beim User rückfragen, n
 
 **Mechanismus: der Scope-Workflow.** Er lässt pro Subtask (und pro berührtem Subsystem) einen
 Reader-Agent parallel laufen: was berührt der Subtask, welche Files, welche Abhängigkeiten zu
-anderen Subtasks, welche offenen Fragen, welche Fähigkeiten unter `openspec/specs/`. Jeder
+anderen Subtasks, welche offenen Fragen, welche Fähigkeiten unter `openspec/specs/` er ändert
+oder neu anlegt (`faehigkeiten`; bloßes Berühren zählt nicht). Jeder
 Reader **schlägt eine Route vor** (`trivial` · `klar` · `bug-unklar` · `unklar` · `entwurf`,
 bei `entwurf` mit den zutreffenden Gründen E1–E3). Ergebnis ist eine **strukturierte Map**
 (Skelett in `references/workflow-bausteine.md` → „Scope-Fan-out“). `/opsx:explore` läuft hier
@@ -121,10 +122,11 @@ Plan-Workflow „je Subtask“ gibt es nicht mehr, denn die `tasks.md` der Chang
 - **Eingabe:** Der Map-Eintrag geht als Argument an `/opsx:propose`: Zusammenfassung, Files,
   Entwurfsgründe und die am Phase-1-Checkpoint beantworteten Fragen. `/opsx:propose` nimmt ihn
   als Ausgangspunkt und liest die Stellen trotzdem selbst.
-- **Eine Change je Task.** Nennen zwei oder mehr Subtasks desselben Parents dieselbe
-  Fähigkeit (`faehigkeiten` der Map: gleicher Pfad unter `openspec/specs/` oder dieselbe neue
-  Fähigkeit), gibt es **eine** gemeinsame Change mit der `custom_id` des Parents. Ihre
-  `tasks.md` gliedert nach Subtask samt `custom_id`.
+- **Eine Change je Task.** Nennen zwei oder mehr Subtasks **auf `entwurf`** desselben Parents
+  dieselbe Fähigkeit (`faehigkeiten` der Map: gleicher Pfad unter `openspec/specs/` oder
+  dieselbe neue Fähigkeit), gibt es **eine** gemeinsame Change mit der `custom_id` des
+  Parents. Ihre `tasks.md` gliedert nach Subtask samt `custom_id`. Ein Subtask auf einer
+  anderen Route bleibt ohne Change, auch wenn er dieselbe Fähigkeit nennt.
 
 **Judge-Panel nur als Zulieferer.** Ist der Lösungsraum weit (E1 mit mehr als zwei ernsthaften
 Wegen), bewertet vorher ein Workflow konkurrierende Entwürfe (Skelett:
@@ -148,7 +150,10 @@ erst danach beginnt Phase 3 mit `/opsx:apply`. Kein Workflow darf diesen Halt er
   **`dev-clickup-ausfuehren`** auf — das routet im Main-Loop in die Arbeitsdisziplin von
   Superpowers (TDD/Debugging/…) und in den OpenSpec-Änderungszyklus (`/opsx:explore`,
   `/opsx:propose`, `/opsx:apply`) und führt den Board-Status pro Subtask mit. Die Route aus
-  Phase 1 gilt dabei weiter, sie wird nicht neu geschätzt. Ein Subtask auf `entwurf`, dessen
+  Phase 1 gilt dabei weiter, sie wird nicht neu geschätzt. Die einzige Ausnahme ist der
+  Wechsel `bug-unklar` → `entwurf`, wenn die gefundene Ursache auf E1 oder E2 führt. Dann folgt
+  `/opsx:propose` im Main-Loop und ein eigener Halt vor `/opsx:apply` (Status bleibt
+  `in development`, nur vorwärts). Ein Subtask auf `entwurf`, dessen
   Change in Phase 2 freigegeben wurde, steigt direkt bei `/opsx:apply` ein und bekommt **kein
   zweites** `/opsx:propose`. Ein in Phase 1 geklärter `unklar`-Task bekommt kein zweites
   `/opsx:explore`. Wähle das,
@@ -156,6 +161,8 @@ erst danach beginnt Phase 3 mit `/opsx:apply`. Kein Workflow darf diesen Halt er
   Umsetzung interaktive Entscheidungen zu erwarten sind.
 - **Autonom / „automode":** nur wenn die Subtasks **nachweislich unabhängig** sind
   (disjunkte File-Mengen, keine Reihenfolge-Abhängigkeit) **und** die Spec eindeutig ist.
+  Subtasks **derselben gemeinsamen Change** gelten immer als abhängig, weil sie dieselbe
+  `tasks.md` abhaken. Sie laufen nie parallel autonom.
   Dann fan-out per **Workflow mit `isolation: 'worktree'`**: jeder Agent implementiert+testet
   einen Subtask autonom. Schnell, aber ohne interaktives TDD/Review und mit Konfliktrisiko
   bei geteilten Files — deshalb die harte Unabhängigkeits-Bedingung. Ein Subtask auf

@@ -59,3 +59,7 @@ Versuch nahe, sie in einen Workflow zu wickeln, und der Pflicht-Checkpoint aus L
 - Kein Projektcode, keine Tests, keine CI-Schritte. Die bestehende Wache
   `scripts/check-openspec-archiv.sh` bleibt unverändert und gilt für diese Change wie für jede.
 - Laufende Arbeit: keine. Unter `openspec/changes/` liegt heute keine aktive Change.
+- **Bewusst nicht angefasst:** der Codex-Spiegel unter `.agents/skills/dev-clickup-*`. Er lag
+  schon vor diesem Ticket hinter LFH-588 zurück (kein OpenSpec, Basis `main`) und beschreibt
+  noch „Plan je Subtask“ und `complexity`. Das Nachziehen ist der Folgetask LFH-853 auf dem
+  Entwicklungsboard.
