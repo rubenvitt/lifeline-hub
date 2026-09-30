@@ -5,17 +5,17 @@ Code). Vor jedem „fertig“ gelten `verification-before-completion` und `reque
 
 ## 1. Datenmodell und Perioden-Kern
 
-- [ ] 1.1 Migration `0127_kraefte_zeitachse.sql` anlegen (Tabelle `einsatz_kraft_zeitachse` mit CHECKs auf Art, Quelle und genau eine Kraft; Indizes; `zeitachse_marke` an `fahrzeug_status` und `personal_status`). Nachweis: `scripts/check-migrationen.sh` grün gegen `origin/alpha`, und ein DB-Test belegt, dass eine Zeile mit beiden oder keiner Kraft am CHECK scheitert.
-- [ ] 1.2 Enums `ZeitachseArt`, `ZeitachseQuelle`, `ZeitachseMarke` mit Wire-Namen in `src/zeitachse/mod.rs`. Nachweis: Einträge in `tests/enum_wire_kontrakt.rs` grün.
-- [ ] 1.3 Reine Perioden-Funktion `perioden::bilde` und `perioden::pruefe_einfuegen`/`pruefe_streichen` über einer sortierten Folge. Nachweis: Unit-Tests für jedes Szenario der Requirements „Einsatzperioden“ und „Einsatzdauer und Ruhezeit“ (Anker Alarmierung vor Eintreffen, zwei Perioden, Ende ohne Periode, Alarmierung nach Eintreffen, Nachtrag, der eine frühere Periode zerbräche).
-- [ ] 1.4 Schwärzungsregel für `einsatz_kraft_zeitachse` (`notiz`, `streichgrund` schwärzen, Rest retain). Nachweis: die bestehenden Registry-Guards und `jede_archivspalte_ist_retain` sind grün.
+- [x] 1.1 Migration `0127_kraefte_zeitachse.sql` anlegen (Tabelle `einsatz_kraft_zeitachse` mit CHECKs auf Art, Quelle und genau eine Kraft; Indizes; `zeitachse_marke` an `fahrzeug_status` und `personal_status`). Nachweis: `scripts/check-migrationen.sh` grün gegen `origin/alpha`, und ein DB-Test belegt, dass eine Zeile mit beiden oder keiner Kraft am CHECK scheitert.
+- [x] 1.2 Enums `ZeitachseArt`, `ZeitachseQuelle`, `ZeitachseMarke` mit Wire-Namen in `src/zeitachse/mod.rs`. Nachweis: Einträge in `tests/enum_wire_kontrakt.rs` grün.
+- [x] 1.3 Reine Perioden-Funktion `perioden::bilde` und `perioden::pruefe_einfuegen`/`pruefe_streichen` über einer sortierten Folge. Nachweis: Unit-Tests für jedes Szenario der Requirements „Einsatzperioden“ und „Einsatzdauer und Ruhezeit“ (Anker Alarmierung vor Eintreffen, zwei Perioden, Ende ohne Periode, Alarmierung nach Eintreffen, Nachtrag, der eine frühere Periode zerbräche).
+- [x] 1.4 Schwärzungsregel für `einsatz_kraft_zeitachse` (`notiz`, `streichgrund` schwärzen, Rest retain). Nachweis: die bestehenden Registry-Guards und `jede_archivspalte_ist_retain` sind grün.
 
 ## 2. Schreibpfad, Fan-out und Streichung
 
-- [ ] 2.1 `zeitachse::repo::schreibe_tx` mit Perioden-Prüfung und Ergebnis `Geschrieben | Ausgelassen`. Nachweis: Repo-Tests für Schreiben, Auslassen und die Reihenfolge nach Zeitpunkt.
-- [ ] 2.2 Fan-out auf die zugeordneten Personen in derselben Transaktion (`quelle = einheit`, `ursprung_id`). Nachweis: Tests „Einheit trifft ein“, „Person schon eingetroffen“, „Nachträglich zugeordnet“.
-- [ ] 2.3 `zeitachse::repo::streiche_tx` samt Fan-out-Kette und Perioden-Prüfung. Nachweis: Tests für Streichung mit Kette, doppelte Streichung (422) und einen Streich-Verstoß gegen die Perioden (422).
-- [ ] 2.4 Append-only-Guard: Ein Test liest den Quelltext von `src/zeitachse/repo.rs` und schlägt bei jedem `DELETE` oder bei einem `UPDATE`, das nicht die Streich-Spalten setzt, an. Nachweis: eine Mutationsprobe mit einem eingefügten `UPDATE … SET art` macht ihn rot.
+- [x] 2.1 `zeitachse::repo::schreibe_tx` mit Perioden-Prüfung und Ergebnis `Geschrieben | Ausgelassen`. Nachweis: Repo-Tests für Schreiben, Auslassen und die Reihenfolge nach Zeitpunkt.
+- [x] 2.2 Fan-out auf die zugeordneten Personen in derselben Transaktion (`quelle = einheit`, `ursprung_id`). Nachweis: Tests „Einheit trifft ein“, „Person schon eingetroffen“, „Nachträglich zugeordnet“.
+- [x] 2.3 `zeitachse::repo::streiche_tx` samt Fan-out-Kette und Perioden-Prüfung. Nachweis: Tests für Streichung mit Kette, doppelte Streichung (422) und einen Streich-Verstoß gegen die Perioden (422).
+- [x] 2.4 Append-only-Guard: Ein Test liest den Quelltext von `src/zeitachse/repo.rs` und schlägt bei jedem `DELETE` oder bei einem `UPDATE`, das nicht die Streich-Spalten setzt, an. Nachweis: eine Mutationsprobe mit einem eingefügten `UPDATE … SET art` macht ihn rot.
 
 ## 3. Ereignisse aus Statuswechseln
 
