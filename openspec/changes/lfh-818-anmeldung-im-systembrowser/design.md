@@ -222,12 +222,12 @@ kommt als eigenes Ticket. Es ist kein Teil dieses Changes.
 
 ### 10. Globaler Deeplink `anmeldung`: verwerfen, ohne Query protokollieren
 
-`deeplink::deute` liefert künftig eine Art (`Verbinden(Url)`, `Anmeldung`, `Unbekannt`).
-`Anmeldung` bewirkt über den globalen Weg nichts. Den Rücksprung der Sitzung liest eine eigene
-reine Funktion (`anmeldecode_aus`), die nur `lifeline://anmeldung?code=<64 hex>` akzeptiert.
+`deeplink::deute` bleibt auf `verbinden` beschränkt. Ein `lifeline://anmeldung`, der über den
+globalen Weg kommt, ergibt dort nichts. Den Rücksprung der Sitzung liest eine eigene reine
+Funktion (`anmeldung::anmeldecode_aus`), die nur `lifeline://anmeldung?code=<64 hex>` akzeptiert.
 
-`deeplinks_verarbeiten` protokolliert verworfene Links nur mit Schema und Host. Das schließt
-nebenbei das heutige Leck der Query im Protokoll.
+`deeplinks_verarbeiten` protokolliert verworfene Links über `fuers_protokoll`, also nur mit Schema,
+Host und Pfad. Das schließt nebenbei das heutige Leck der Query im Protokoll.
 
 ### 11. Anmeldeseite und Profil in der Hülle
 

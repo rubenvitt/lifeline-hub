@@ -49,7 +49,7 @@
 - [ ] 2.3 Prüfen, dass OIDC (`?von=` über `ziel_pfad_aus_query`), Passwort, TOTP und Passkey
   auf `/app-anmeldung?challenge=…` zurückführen. Nachweis: Vitest der `LoginPage` mit
   `location.state.von` inklusive Query, dazu ein Rust-Test `ziel_pfad_aus_query` mit Query.
-- [ ] 2.4 `huelle/faehigkeiten.ts` um `huelleAnmeldungImBrowser()` erweitern, einzige
+- [x] 2.4 `huelle/faehigkeiten.ts` um `huelleAnmeldungImBrowser()` erweitern, einzige
   Lesestelle. Nachweis: Vitest gegen das ausgelieferte `faehigkeiten.js` (`test/huelle.ts`,
   `__TAURI_INTERNALS__` als Stub) für diese drei Fälle:
   - Browser liefert `null`.
@@ -86,28 +86,29 @@
   - für alle: `sha2`, `base64`, `getrandom`.
 
   Nachweis: `cargo build -p lifeline-desktop` und `scripts/check-deps.sh` grün.
-- [ ] 3.2 `src-tauri/src/pkce.rs` (rein): `neuer_verifier()`, `challenge_aus(verifier)`.
+- [x] 3.2 `src-tauri/src/pkce.rs` (rein): `neuer_verifier()`, `challenge_aus(verifier)`.
   Nachweis: RFC-7636-Vektor, Länge 43, zwei Aufrufe liefern verschiedene `verifier`.
-- [ ] 3.3 `deeplink.rs` umbauen:
-  - `deute` gibt eine Art zurück (`Verbinden`/`Anmeldung`/`Unbekannt`),
-  - `anmeldecode_aus(url)` akzeptiert nur `lifeline://anmeldung?code=<64 hex>`,
-  - `fuers_protokoll(url)` gibt Schema und Host ohne Query zurück,
-  - `deeplinks_verarbeiten` verwirft `Anmeldung` wirkungslos und protokolliert ohne Query.
-
-  Nachweis: Unit-Tests für diese Punkte und die bestehenden `verbinden`-Tests grün.
-- [ ] 3.4 `src-tauri/src/anmeldung.rs`:
+- [x] 3.3 Deeplink: `deute` bleibt auf `verbinden` beschränkt, ein `lifeline://anmeldung` von
+  außen ergibt also nichts. `anmeldecode_aus(url)` in `anmeldung.rs` akzeptiert nur
+  `lifeline://anmeldung?code=<64 hex>` und liest ausschließlich den Rücksprung der Sitzung.
+  `deeplinks_verarbeiten` protokolliert verworfene Links über `fuers_protokoll`, ohne Query.
+  Nachweis: Unit-Tests `anmeldung_von_aussen_bewirkt_nichts`,
+  `verworfener_anmeldelink_landet_ohne_code_im_protokoll` und `code_nur_aus_dem_anmelde_ruecksprung`,
+  dazu die bestehenden `verbinden`-Tests grün.
+- [x] 3.4 `src-tauri/src/anmeldung.rs`:
   - `einloese_skript(origin, code, verifier)` (rein, JSON-Literale, innere Origin-Prüfung,
     `CustomEvent` ohne Geheimnisse) und `abbruch_skript()`,
-  - `origin_passt(fenster_url, server)`.
+  - `origin_passt(fenster_url, server)` und `folge(ergebnis, seite, server)` (Einlösen, Melden
+    oder Nichts).
 
   Nachweis: Unit-Tests für diese drei Fälle:
   - Anführungszeichen und `</script>` im Code brechen das Literal nicht,
   - das Ereignis trägt weder Code noch `verifier`,
   - die Origin-Prüfung lehnt einen fremden Host und einen anderen Port ab.
-- [ ] 3.5 `src-tauri/src/aswas.rs` (nur macOS): `ASWebAuthenticationSession` mit Anker
+- [x] 3.5 `src-tauri/src/aswas.rs` (nur macOS): `ASWebAuthenticationSession` mit Anker
   Hauptfenster, `callbackURLScheme = "lifeline"`, Schalter für ephemer, Completion-Handler als
   Rust-Closure. Nachweis: `cargo build -p lifeline-desktop` auf macOS. Das Verhalten prüft 5.2.
-- [ ] 3.6 Command `anmeldung_im_browser` in `main.rs`:
+- [x] 3.6 Command `anmeldung_im_browser` in `main.rs`:
   - im Zustand `Mutex<Option<Ausstehend>>` mit `verifier` und Label des aufrufenden Fensters,
     ein neuer Start ersetzt den alten,
   - Ziel `<gespeicherter Server>/app-anmeldung?challenge=…`,
@@ -119,7 +120,7 @@
   `server_freigeben`, `generate_handler!`. Nachweis: `cargo test -p lifeline-desktop` grün, dazu
   ein Test, dass das autogenerierte Permission-File existiert und `lokal.json` den Command nicht
   enthält.
-- [ ] 3.7 `faehigkeiten.js` um `anmeldungImBrowser` erweitern, eingefroren, per
+- [x] 3.7 `faehigkeiten.js` um `anmeldungImBrowser` erweitern, eingefroren, per
   `__TAURI_INTERNALS__.invoke`. Nachweis: die Vitest-Fälle aus 2.4 und 2.5, die das
   ausgelieferte Skript ausführen.
 
