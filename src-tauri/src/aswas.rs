@@ -4,7 +4,10 @@
 //! die Sitzung gibt an den Standardbrowser ab, dort tragen Passkeys für Lifeline und den IdP,
 //! und der Rücksprung erreicht nur den Completion-Handler, nicht Launch Services.
 //!
-//! Alles hier läuft auf dem Hauptthread (AppKit). Die laufende Sitzung hält ein Thread-Local,
+//! Gestartet wird auf dem Hauptthread (AppKit). Den Completion-Handler ruft macOS dagegen auf
+//! einer XPC-Queue im Hintergrund auf (gemessen 30.09.2026: eine Hauptthread-Annahme im Handler
+//! riss die App beim Rücksprung ab). Der Handler liest deshalb nur das Ergebnis aus und reicht es
+//! über `auf_hauptthread` weiter; alles Weitere läuft dort. Die laufende Sitzung hält ein Thread-Local,
 //! damit ein neuer Start die alte abbrechen kann. Der Anker (Präsentationskontext) ist eine
 //! schwache Eigenschaft der Sitzung und liegt deshalb mit ihr im Thread-Local. Jede Sitzung trägt
 //! eine Generation (`anmeldung::Lauf`): der Handler einer ersetzten Sitzung beendet nie die neue.
@@ -65,14 +68,19 @@ thread_local! {
 /// Ergebnis einer Sitzung: die Rücksprung-URL oder (Fehlercode, Text).
 pub type Ergebnis = Result<String, (isize, String)>;
 
+/// Aufgabe, die der Handler auf den Hauptthread schickt.
+pub type Aufgabe = Box<dyn FnOnce() + Send>;
+
 /// Startet eine Sitzung für `adresse` mit Rücksprung-Schema `schema`, verankert an `ns_window`.
-/// Eine laufende Sitzung wird vorher abgebrochen. `fertig` läuft auf dem Hauptthread.
+/// Eine laufende Sitzung wird vorher abgebrochen. `auf_hauptthread` bringt das Ende der Sitzung
+/// auf den Hauptthread; dort läuft `fertig`.
 pub fn starten(
     ns_window: *mut std::ffi::c_void,
     adresse: &str,
     schema: &str,
     ephemer: bool,
-    fertig: impl Fn(Ergebnis) + 'static,
+    auf_hauptthread: impl Fn(Aufgabe) + Send + Sync + 'static,
+    fertig: impl Fn(Ergebnis) + Send + Sync + 'static,
 ) -> Result<(), String> {
     let mtm = MainThreadMarker::new().ok_or("nicht auf dem Hauptthread")?;
     let fenster: Retained<NSObject> =
@@ -82,11 +90,9 @@ pub fn starten(
     abbrechen();
     let generation = LAUFEND.with(|l| l.borrow_mut().naechste());
 
+    let fertig = std::sync::Arc::new(fertig);
+    // Läuft auf einer XPC-Queue: nur NSURL/NSError lesen, dann an den Hauptthread abgeben.
     let block = RcBlock::new(move |ruecksprung: *mut NSURL, fehler: *mut NSError| {
-        debug_assert!(
-            MainThreadMarker::new().is_some(),
-            "Handler der Anmeldesitzung außerhalb des Hauptthreads"
-        );
         let ergebnis = if let Some(url) = unsafe { ruecksprung.as_ref() } {
             Ok(url
                 .absoluteString()
@@ -97,11 +103,15 @@ pub fn starten(
         } else {
             Err((0, "Sitzung ohne Ergebnis beendet".to_string()))
         };
-        // Nur die eigene Sitzung beenden, und erst nach `fertig` freigeben: sie hält den Block,
-        // der gerade läuft.
-        let beendet = LAUFEND.with(|l| l.borrow_mut().beende(generation));
-        fertig(ergebnis);
-        drop(beendet);
+        let fertig = std::sync::Arc::clone(&fertig);
+        auf_hauptthread(Box::new(move || {
+            debug_assert!(MainThreadMarker::new().is_some());
+            // Nur die eigene Sitzung beenden (ein ersetzter Handler trifft die neue nicht), und
+            // erst nach `fertig` freigeben.
+            let beendet = LAUFEND.with(|l| l.borrow_mut().beende(generation));
+            fertig(ergebnis);
+            drop(beendet);
+        }));
     });
     // Der Initialisierer kopiert den Block; `block` darf danach fallen.
     #[allow(deprecated)]

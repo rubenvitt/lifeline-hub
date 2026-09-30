@@ -192,6 +192,10 @@ Nachgeschärft nach dem Review (30.09.2026):
 - Die laufende `ASWebAuthenticationSession` trägt eine Generation (`anmeldung::Lauf`). Der
   Handler einer ersetzten Sitzung, der nach dem Start der neuen eintrifft, beendet nur sich
   selbst, nie die neue. Die Sitzung wird erst nach dem Aufruf von `fertig` freigegeben.
+- Der Completion-Handler von `ASWebAuthenticationSession` läuft auf einer **XPC-Queue im
+  Hintergrund**, nicht auf dem Hauptthread (gemessen in der Abnahme am 30.09.2026: eine
+  Hauptthread-Prüfung im Handler beendete die App beim Rücksprung). Der Handler liest nur
+  Rücksprung bzw. Fehler aus und übergibt das Ende per `run_on_main_thread`.
 
 - **Warum:** Nur der Webview hat den Cookie-Speicher, in dem die Sitzung entstehen muss. Die
   Hülle setzt keine Cookies selbst (WKHTTPCookieStore wäre Anwendungslogik in der Hülle). Die

@@ -387,7 +387,7 @@ fn im_browser_starten(
         return Err("Die Anmeldung im Browser muss auf dem Hauptthread starten.".to_string());
     }
     let ns_window = fenster.ns_window().map_err(|e| e.to_string())?;
-    let fuer_ende = app.clone();
+    let (fuer_hauptthread, fuer_ende) = (app.clone(), app.clone());
     aswas::starten(
         ns_window,
         ziel.as_str(),
@@ -395,6 +395,12 @@ fn im_browser_starten(
         // Geteilte Browsersitzung; gegen die Sitzung einer anderen Person steht die
         // Bestätigungsseite mit Namen (Design LFH-818, Entscheidung 7).
         false,
+        // Der Handler der Sitzung läuft auf einer XPC-Queue; das Ende gehört auf den Hauptthread.
+        move |aufgabe| {
+            if let Err(fehler) = fuer_hauptthread.run_on_main_thread(aufgabe) {
+                log::warn!("Ende der Anmeldung nicht an den Hauptthread übergeben: {fehler}");
+            }
+        },
         move |ergebnis| anmeldung_abschliessen(&fuer_ende, nummer, ergebnis),
     )
 }
