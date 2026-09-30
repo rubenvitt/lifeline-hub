@@ -89,7 +89,7 @@ fehlt "3 zweites Kommando läuft nicht" '^zweites-kommando$'
 rc=0; fahren 'schritt_1() { false | true; }' 0 1 || rc=$?
 pruefe "4 rote Pipe-Stufe → Schritt rot" 1 "$rc"
 
-# 5 — `exit` im Schritt (schritt_7 bei nicht ausführbarem PW_BINAER) beendet nur den Schritt.
+# 5 — `exit` im Schritt beendet nur den Schritt.
 rc=0; fahren 'schritt_1() { exit 3; }; schritt_2() { echo lief-2; }' 0 1 2 || rc=$?
 pruefe "5 exit im Schritt → Exit 1" 1 "$rc"
 enthaelt "5 Läufer überlebt exit, Schritt 2 läuft" '^lief-2$'

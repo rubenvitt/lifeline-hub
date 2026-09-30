@@ -10,9 +10,11 @@ import { fileURLToPath } from 'node:url';
 
 const frontendVerzeichnis = fileURLToPath(new URL('.', import.meta.url));
 /*
- * Der Pfad zum Backend-Binary — über `cargo metadata`, weil `CARGO_TARGET_DIR` es außerhalb
- * des Worktrees ablegen kann (dieselbe Wahrheit, die check-all.sh befragt; das Ziel je Checkout
- * legt `.cargo/config.toml` fest, LFH-520).
+ * Der Pfad zum Backend-Binary — über `cargo metadata`, weil `build.target-dir` bzw.
+ * `CARGO_TARGET_DIR` es außerhalb des Worktrees ablegen kann (LFH-518). Dieselbe Frage stellt
+ * `scripts/lib/backend-binaer.sh`; im Sammel-Gate kommt ihre Antwort als `PW_BINAER` hier an,
+ * sodass Gate und Suite dasselbe Binary nehmen. Gefragt wird hier nur beim alleinstehenden Lauf.
+ * Das Ziel je Checkout (`<worktree>/target`) legt `.cargo/config.toml` fest (LFH-520).
  *
  * `PW_BINAER` übersteuert das: ein e2e-Shard der CI lädt das Binary als Artefakt und bräuchte
  * sonst die ganze Rust-Toolchain. Der Präfix `PW_` ist Absicht — ein `LIFELINE_`-Name fiele

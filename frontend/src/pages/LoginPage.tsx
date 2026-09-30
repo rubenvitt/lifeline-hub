@@ -14,6 +14,7 @@ import {
 } from '../api/webauthn';
 import type { AuthProvider } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+import { huelleSperrtPasskey } from '../huelle/faehigkeiten';
 import './LoginPage.css';
 
 interface FormWerte {
@@ -102,8 +103,10 @@ export default function LoginPage() {
   const ssoProvider = provider.filter((p) => p.typ === 'oidc' && p.aktiviert);
   // Passkey-Login nur bei aktivem webauthn-Provider und Secure Context — WebAuthn verlangt
   // https/localhost, der Knopf wäre sonst ohne Funktion.
+  // In der macOS-Hülle scheitert jeder Passkey, die Hülle sagt es selbst (LFH-817).
   const webauthnAktiv = provider.some((p) => p.typ === 'webauthn' && p.aktiviert);
-  const passkeyAktiv = webauthnAktiv && window.isSecureContext;
+  const passkeyGesperrt = huelleSperrtPasskey();
+  const passkeyAktiv = webauthnAktiv && window.isSecureContext && !passkeyGesperrt;
   // Der Passkey-Login ist usernameless. Der Formular-Container bleibt sichtbar, sobald Passwort-
   // oder Passkey-Login aktiv ist; die Benutzername-/Passwort-Felder hängen an `passwortAktiv`,
   // damit im reinen Passkey-Betrieb kein leeres Feld übrig bleibt.
@@ -309,6 +312,15 @@ export default function LoginPage() {
                   </Button>
                 ))}
               </Space>
+            )}
+            {/* Nur Passkey aktiv, und die Hülle kann ihn nicht: ohne diesen Satz bliebe die Karte
+                leer (LFH-817). Bleibt Passwort oder OIDC, fehlt der Passkey still. */}
+            {passkeyGesperrt && webauthnAktiv && !formSichtbar && ssoProvider.length === 0 && (
+              <Alert
+                type="info"
+                showIcon
+                title="Die Anmeldung per Passkey geht in der Mac-App nicht. Melde dich im Browser an."
+              />
             )}
             {ssoProvider.length > 0 && formSichtbar && <Divider>oder</Divider>}
             {formSichtbar && (

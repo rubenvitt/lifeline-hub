@@ -47,6 +47,7 @@ import MarkerSuche from './MarkerSuche';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
 import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
+import { istLatLon, type KoordinatenWert } from '../../anzeige/koordinatenWert';
 import type { Hintergrundbild } from '../../api/kartenbilder';
 import type { KartenAnsicht } from '../../api/types';
 import AnsichtSwitcher from './AnsichtSwitcher';
@@ -557,7 +558,8 @@ export default function Sidebar(props: SidebarProps) {
     paneele.setze(k, !paneele.zustand[k]);
   // Ein Paneel mit Fehler-Slot steht offen, egal wie es zuletzt stand: ein zugeklappter Fehler wäre
   // von „nichts da" nicht zu unterscheiden.
-  const [koord, setKoord] = useState<LatLon | null>(null);
+  // Ungültige Eingabe ist kein Ziel (LFH-517): „Übernehmen“ nimmt nur ein gültiges Paar.
+  const [koord, setKoord] = useState<KoordinatenWert>(null);
   // Freies-Zeichen-Schnellerfassung: der Picker erscheint erst auf Klick, der Entwurf bleibt über
   // Platzierungen erhalten.
   const [zeichenPickerOffen, setZeichenPickerOffen] = useState(false);
@@ -588,7 +590,7 @@ export default function Sidebar(props: SidebarProps) {
     ? filtereNichtVerortet(nichtVerortet, nvBegriff, null).length
     : nichtVerortet.length;
   // Entwurfswert der numerischen Mittelpunkt-Eingabe im Bild-Platzier-Modus.
-  const [bildMitte, setBildMitte] = useState<LatLon | null>(null);
+  const [bildMitte, setBildMitte] = useState<KoordinatenWert>(null);
   /**
    * Bild, dessen Entfernen bestätigt werden soll — ein Dialog für die ganze Liste, nicht je Zeile
    * (n Dialoge wären n gleichnamige Knöpfe).
@@ -656,9 +658,9 @@ export default function Sidebar(props: SidebarProps) {
           </div>
           <div style={{ marginTop: token.marginXS }}>
             <Button
-              disabled={!koord}
+              disabled={!istLatLon(koord)}
               onClick={() => {
-                if (koord) {
+                if (istLatLon(koord)) {
                   props.onKoordinateEingeben(koord.lat, koord.lon);
                   setKoord(null);
                 }
@@ -1270,9 +1272,9 @@ export default function Sidebar(props: SidebarProps) {
                       }}
                     >
                       <Button
-                        disabled={!bildMitte}
+                        disabled={!istLatLon(bildMitte)}
                         onClick={() => {
-                          if (bildMitte) {
+                          if (istLatLon(bildMitte)) {
                             props.onBildMittelpunkt(bildMitte.lat, bildMitte.lon);
                             setBildMitte(null);
                           }

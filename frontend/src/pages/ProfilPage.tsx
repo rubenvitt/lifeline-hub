@@ -22,6 +22,7 @@ import { webauthnRegistrierungAbschliessen, webauthnRegistrierungStarten } from 
 import type { AuthProvider } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import PasswortAendernDialog from '../auth/PasswortAendernDialog';
+import { huelleSperrtPasskey } from '../huelle/faehigkeiten';
 
 interface TotpCodeWerte {
   code: string;
@@ -98,7 +99,11 @@ export default function ProfilPage() {
   // WebAuthn verlangt einen Secure Context (https/localhost); ohne ihn scheiterte
   // `navigator.credentials.create`, bevor eine Ceremony beginnt. Der Knopf erscheint nur, wenn er
   // funktionieren kann.
-  const passkeySichtbar = window.isSecureContext && webauthnAktiv;
+  const passkeyMoeglich = window.isSecureContext && webauthnAktiv;
+  // Die macOS-Hülle kann keinen Passkey ausführen und sagt es selbst (LFH-817): statt der
+  // Einrichtung steht dort ein Satz, wo es geht.
+  const passkeyGesperrt = passkeyMoeglich && huelleSperrtPasskey();
+  const passkeySichtbar = passkeyMoeglich && !passkeyGesperrt;
   // Dieselbe Frage für die Zwischenablage: `navigator.clipboard` ist ein Secure-Context-Feature und
   // dort sonst gar nicht vorhanden. Die Fähigkeit wird gefragt, nicht geraten; ein Knopf, der
   // nichts tut, ist schlimmer als keiner.
@@ -208,6 +213,20 @@ export default function ProfilPage() {
                   offen={passwortDialogOffen}
                   onSchliessen={() => setPasswortDialogOffen(false)}
                 />
+              </section>
+            )}
+
+            {passkeyGesperrt && (
+              <section style={{ maxWidth: 480 }}>
+                <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
+                  Passkey
+                </Augenbraue>
+                {/* Nicht versprechen, dass ein im Browser eingerichteter Passkey danach in der
+                    Mac-App trägt: das kommt erst mit der Anmeldung im Systembrowser (LFH-818). */}
+                <Typography.Paragraph type="secondary">
+                  Passkeys richtest du im Browser ein und meldest dich dort damit an, in der Mac-App
+                  gehen sie nicht.
+                </Typography.Paragraph>
               </section>
             )}
 

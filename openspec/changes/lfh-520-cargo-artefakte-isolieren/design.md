@@ -84,9 +84,9 @@ erwarten und `.gitignore` ihn schon ausblendet.
 
 ### D3 — Prüfung im Gate als Bibliotheksfunktion vor Schritt 3, 4 und 7, nicht als 13. Schritt
 
-`scripts/lib/bauziel.sh` ermittelt `target_directory` über `cargo metadata`. Dieselbe Quelle
-verwenden schon Schritt 7 und `playwright.config.ts`, das hält die Pfadlogik von LFH-518
-beisammen. Die Funktion vergleicht mit `$ROOT/target`:
+`scripts/lib/bauziel.sh` ermittelt `target_directory` über `cargo metadata`, dieselbe Quelle wie
+die Binary-Suche aus LFH-518 (`scripts/lib/backend-binaer.sh`) und `playwright.config.ts`. Die
+Funktion vergleicht mit `$ROOT/target`:
 
 - gleich → still weiter;
 - abweichend und `CARGO_TARGET_DIR`/`CARGO_BUILD_TARGET_DIR` gesetzt → Ausgabe
@@ -101,8 +101,10 @@ Pfad über `env!("CARGO_MANIFEST_DIR")` ein; ein fremdes Testbinary prüfte oder
 (Review-Befund).
 
 `PW_BINAER` bleibt eine eigene, schon vorhandene Übersteuerung für Schritt 7. Mit gesetztem
-`PW_BINAER` wird nicht geprüft; ein relativer Wert wird gegen die Repo-Wurzel aufgelöst und
-absolut an Playwright weitergereicht, damit Gate und Playwright dasselbe Binary nennen.
+`PW_BINAER` wird nicht geprüft. Pfadermittlung, Auflösung eines relativen `PW_BINAER` und die
+Übergabe an Playwright leistet seit LFH-518 `backend-binaer.sh`; `bauziel_pruefen` steht davor.
+Die zweite `cargo metadata`-Abfrage in Schritt 7 (Prüfung und Suche je eine) ist hingenommen:
+Sie kostet Zehntelsekunden, und beide Bibliotheken bleiben einzeln testbar.
 
 Der Selbsttest `scripts/bauziel.test.sh` spielt die Fälle mit Wegwerf-Crates durch. Die
 „globale“ Konfiguration steht dabei als `.cargo/config.toml` über den Checkouts, nicht in einem

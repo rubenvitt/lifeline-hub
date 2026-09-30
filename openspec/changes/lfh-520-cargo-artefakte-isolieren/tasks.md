@@ -64,4 +64,7 @@
       nur `lagekarte-marker-plaketten.spec.ts:82`. Das ist vorbestehend (LFH-844): einzeln
       3/6 rot, auch mit der `playwright.config.ts` von `alpha`. Nach den Review-Fixes liefen
       Schritt 3 (`--nur=schnell` grün, ohne Repo-Datei rot) und Schritt 7 (Anteil 85/85 mit
-      relativem `PW_BINAER`, beide Zeilen gleich) erneut. Offen bis LFH-844 behoben ist.
+      relativem `PW_BINAER`, beide Zeilen gleich) erneut. Nach dem Merge von `alpha` (LFH-518)
+      ist Schritt 11 lokal rot, und zwar durch `backend-binaer.test.sh` aus LFH-518: eigenes
+      `CARGO_HOME` löst unter mise eine Rust-Neuinstallation aus, auch auf reinem `alpha` →
+      LFH-847. `bauziel.test.sh` ist grün. Offen bis LFH-844 und LFH-847 behoben sind.
