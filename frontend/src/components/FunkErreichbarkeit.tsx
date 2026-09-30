@@ -1,3 +1,4 @@
+import { IkoneTelefon } from '../ikonen';
 import { Space, Tag, Typography } from 'antd';
 import type { Sprechgruppe } from '../api/types';
 import { kommunikationsmittelLabel, teileSprechgruppen } from './kommunikationsmittel';
@@ -15,7 +16,7 @@ interface FunkErreichbarkeitProps {
 
 /**
  * Kompakte Lese-Darstellung der Funk-/Kommunikationsdaten als Tag-Zeile
- * (TMO/DMO-Sprechgruppen · Kommunikationsmittel · ☎ Erreichbarkeit). Geteilt von
+ * (TMO/DMO-Sprechgruppen · Kommunikationsmittel · Telefon-Erreichbarkeit). Geteilt von
  * Einsatzabschnitt (LFH-86/107) und Einheit (LFH-108), damit die Anzeige an einer Stelle lebt.
  */
 export default function FunkErreichbarkeit({
@@ -45,7 +46,7 @@ export default function FunkErreichbarkeit({
           </Tag>
         ))}
         {kommunikationsmittel && <Tag>{kommunikationsmittelLabel(kommunikationsmittel)}</Tag>}
-        {erreichbarkeit && <Tag>☎ {erreichbarkeit}</Tag>}
+        {erreichbarkeit && <Tag icon={<IkoneTelefon />}>{erreichbarkeit}</Tag>}
       </Space>
     </div>
   );

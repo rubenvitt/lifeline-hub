@@ -1,16 +1,16 @@
+import {
+  IkoneFadenkreuz,
+  IkoneKompass,
+  IkoneLineal,
+  IkoneMinus,
+  IkonePlus,
+  IkoneSeitenleisteAuf,
+  IkoneSeitenleisteZu,
+  IkoneStandortZiel,
+  IkoneStift,
+} from '../../ikonen';
 import { useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { Popover } from 'antd';
-import {
-  TbCompass,
-  TbCrosshair,
-  TbCurrentLocation,
-  TbLayoutSidebarRightCollapse,
-  TbLayoutSidebarRightExpand,
-  TbMinus,
-  TbPencil,
-  TbPlus,
-  TbRulerMeasure,
-} from 'react-icons/tb';
 import { naechsterIndex, monoStil, segmentStil, useRollen } from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { useZeigerLage, type ZeigerQuelle } from './mausPosition';
@@ -167,7 +167,7 @@ function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
       }}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>
-        <TbCrosshair size={14} />
+        <IkoneFadenkreuz size={14} />
       </span>
       {lage ? formatKoordinate(lage.lat, lage.lon) : '—'}
     </div>
@@ -333,7 +333,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           kante={kante}
           farbe={rollen.gedaempft}
         >
-          <TbPlus size={16} />
+          <IkonePlus size={16} />
         </Kartenknopf>
         <Kartenknopf
           beschriftung="Herauszoomen"
@@ -341,7 +341,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           kante={kante}
           farbe={rollen.gedaempft}
         >
-          <TbMinus size={16} />
+          <IkoneMinus size={16} />
         </Kartenknopf>
         <Kartenknopf
           beschriftung="Nach Norden ausrichten"
@@ -349,7 +349,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           kante={kante}
           farbe={rollen.gedaempft}
         >
-          <TbCompass size={16} />
+          <IkoneKompass size={16} />
         </Kartenknopf>
         {/* Eigenposition gehört zur Navigation (wohin schaue ich?), deshalb vor den Werkzeugen. */}
         {props.eigenposition && (
@@ -361,7 +361,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             gedrueckt={props.eigenposition.an}
             sperrGrund={props.eigenposition.sperrGrund}
           >
-            <TbCurrentLocation size={16} />
+            <IkoneStandortZiel size={16} />
           </Kartenknopf>
         )}
         {/* Reihenfolge wie im Entwurf S5: Lineal vor Stift. */}
@@ -373,7 +373,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             farbe={props.messenAktiv ? rollen.bedien : rollen.gedaempft}
             gedrueckt={props.messenAktiv ?? false}
           >
-            <TbRulerMeasure size={16} />
+            <IkoneLineal size={16} />
           </Kartenknopf>
         )}
         {props.onZeichnen && (
@@ -383,7 +383,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             kante={kante}
             farbe={rollen.bedien}
           >
-            <TbPencil size={16} />
+            <IkoneStift size={16} />
           </Kartenknopf>
         )}
         {props.leiste && (
@@ -397,9 +397,9 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             sperrGrund={props.leiste.sperrGrund}
           >
             {props.leiste.sichtbar ? (
-              <TbLayoutSidebarRightCollapse size={16} />
+              <IkoneSeitenleisteZu size={16} />
             ) : (
-              <TbLayoutSidebarRightExpand size={16} />
+              <IkoneSeitenleisteAuf size={16} />
             )}
           </Kartenknopf>
         )}

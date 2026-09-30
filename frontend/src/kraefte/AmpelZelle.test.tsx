@@ -23,8 +23,8 @@ describe('AmpelZelle', () => {
     // stünde es in jeder Tabellenzeile als eigenes Ziel.
     expect(within(gruppe).queryByRole('img')).toBeNull();
     const zierde = container.querySelector('[aria-hidden="true"]');
-    // Ein `@ant-design/icons`-Knoten mit echtem SVG — rot, wenn die Zierde wieder als Zeichenkette
-    // käme ODER die Hülle fehlte.
+    // Eine Ikone des Satzes mit echtem SVG (Hülle `anticon`, LFH-595) — rot, wenn die Zierde
+    // wieder als Zeichenkette käme ODER die Hülle fehlte.
     expect(zierde?.querySelector('.anticon svg')).not.toBeNull();
     expect(zierde?.textContent).toBe('');
   });

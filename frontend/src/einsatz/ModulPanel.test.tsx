@@ -62,7 +62,7 @@ describe('ModulPanel', () => {
     expect(geheim).toBeDisabled();
     // Das Schloss trägt bewusst KEINEN Titel (er verdrängte den des Knopfes), deshalb der
     // antd-Klassenselektor.
-    expect(geheim.querySelector('.anticon-lock')).not.toBeNull();
+    expect(geheim.querySelector('[data-ikone="schloss"]')).not.toBeNull();
   });
 
   // Der WIP-Marker ist Dekoration und darf nicht im Accessible Name des Knopfes landen,

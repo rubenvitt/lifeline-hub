@@ -1,4 +1,4 @@
-import { MoreOutlined } from '@ant-design/icons';
+import { IkonePunkteSenkrecht } from '../ikonen';
 import { Button, Dropdown, Flex, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import type { Dayjs } from 'dayjs';
@@ -303,7 +303,7 @@ export default function ZeitfensterKarte({
               <Button
                 type="text"
                 aria-label={`Aktionen zu Zeitfenster ${kennung}`}
-                icon={<MoreOutlined />}
+                icon={<IkonePunkteSenkrecht />}
               />
             </Dropdown>
           ) : (

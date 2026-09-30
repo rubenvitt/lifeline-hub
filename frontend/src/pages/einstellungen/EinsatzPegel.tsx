@@ -1,12 +1,12 @@
+import {
+  IkoneMuelleimer,
+  IkonePfeilHoch,
+  IkonePfeilRunter,
+  IkonePunkteSenkrecht,
+  IkoneStift,
+} from '../../ikonen';
 import { useId, useMemo, useState } from 'react';
 import { Alert, App, Button, Dropdown, Tag, Typography } from 'antd';
-import {
-  ArrowDownOutlined,
-  ArrowUpOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  MoreOutlined,
-} from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { Formularpaneel, useRollen } from '../../components/instrument';
@@ -288,27 +288,27 @@ export default function EinsatzPegel() {
                           items: [
                             {
                               key: 'hoch',
-                              icon: <ArrowUpOutlined />,
+                              icon: <IkonePfeilHoch />,
                               label: 'Nach oben',
                               disabled: index === 0,
                             },
                             {
                               key: 'runter',
-                              icon: <ArrowDownOutlined />,
+                              icon: <IkonePfeilRunter />,
                               label: 'Nach unten',
                               disabled: index === liste.length - 1,
                             },
                             { type: 'divider' as const },
                             {
                               key: 'prognose',
-                              icon: <EditOutlined />,
+                              icon: <IkoneStift />,
                               label: p.prognose ? 'Prognose ändern …' : 'Prognose erfassen …',
                             },
                             ...(p.prognose
                               ? [
                                   {
                                     key: 'prognose-loeschen',
-                                    icon: <DeleteOutlined />,
+                                    icon: <IkoneMuelleimer />,
                                     label: 'Prognose löschen',
                                     danger: true,
                                   },
@@ -317,7 +317,7 @@ export default function EinsatzPegel() {
                             { type: 'divider' as const },
                             {
                               key: 'entfernen',
-                              icon: <DeleteOutlined />,
+                              icon: <IkoneMuelleimer />,
                               label: 'Entfernen',
                               danger: true,
                             },
@@ -339,7 +339,7 @@ export default function EinsatzPegel() {
                         {/* Der Name trägt die Zeilenkennung. Kein `size`. */}
                         <Button
                           type="text"
-                          icon={<MoreOutlined />}
+                          icon={<IkonePunkteSenkrecht />}
                           aria-label={`Aktionen zu Pegel ${p.name}`}
                         />
                       </Dropdown>,

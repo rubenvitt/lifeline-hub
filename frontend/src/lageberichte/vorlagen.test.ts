@@ -3,7 +3,7 @@ import { VORLAGEN, vorlage } from './vorlagen';
 
 describe('Lagebericht-Vorlagen', () => {
   it('hat die drei Backend-Vorlagen mit erwarteter Abschnittszahl', () => {
-    expect(vorlage('lagebericht')?.abschnitte.length).toBe(7);
+    expect(vorlage('lagebericht')?.abschnitte.length).toBe(8);
     expect(vorlage('lagebeurteilung')?.abschnitte.length).toBe(8);
     expect(vorlage('freitext')?.abschnitte.length).toBe(1);
     expect(vorlage('unsinn' as never)).toBeUndefined();
@@ -24,6 +24,7 @@ describe('Lagebericht-Vorlagen', () => {
       'lageentwicklung',
       'fuehrungsprobleme',
       'antraege_vorschlaege',
+      'medienlage',
       'zusammenfassung',
     ]);
     expect(vorlage('lagebeurteilung')?.abschnitte.map((a) => a.schluessel)).toEqual([

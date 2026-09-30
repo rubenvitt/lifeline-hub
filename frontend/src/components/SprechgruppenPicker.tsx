@@ -1,6 +1,6 @@
+import { IkonePlus } from '../ikonen';
 import { App, Button, Input, Space, theme } from 'antd';
 import { Select } from './Select';
-import { PlusOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
@@ -90,7 +90,7 @@ export default function SprechgruppenPicker({
       {!anlegenOffen && (
         <Button
           type="link"
-          icon={<PlusOutlined />}
+          icon={<IkonePlus />}
           style={{ padding: 0, marginTop: token.marginSM }}
           onClick={() => setAnlegenOffen(true)}
         >

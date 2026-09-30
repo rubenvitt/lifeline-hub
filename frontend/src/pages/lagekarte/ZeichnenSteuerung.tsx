@@ -1,5 +1,5 @@
+import { IkonePfeilZurueckGebogen } from '../../ikonen';
 import { Button, Card, Space, Switch, Typography, theme } from 'antd';
-import { TbArrowBackUp } from 'react-icons/tb';
 import { monoStil } from '../../components/instrument';
 import { bandStil } from './KartenFuss';
 import './lagekarte.css';
@@ -149,7 +149,7 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
                   title="Letzten Punkt zurück"
                   icon={
                     <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                      <TbArrowBackUp size={18} />
+                      <IkonePfeilZurueckGebogen size={18} />
                     </span>
                   }
                   disabled={props.punktZurueckMoeglich === false}

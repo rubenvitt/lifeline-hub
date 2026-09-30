@@ -1113,19 +1113,26 @@
       },
       "AuftragsZaehler": {
         "type": "object",
-        "description": "Aufträge: offen (offen/in Arbeit), davon überfällig.",
+        "description": "Aufträge: offen (offen/in Arbeit), davon in Arbeit, davon überfällig.",
         "required": [
           "offen",
+          "in_arbeit",
           "ueberfaellig"
         ],
         "properties": {
+          "in_arbeit": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon mit Bearbeitungsstatus „in Arbeit\" (LFH-550, „davon in Arbeit\" im Überblick)."
+          },
           "offen": {
             "type": "integer",
             "format": "int64"
           },
           "ueberfaellig": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "Davon überfällig — nur unter den offenen: ein vollzogener Auftrag mit Quittungslücke\nzählt nicht (LFH-550)."
           }
         }
       },
@@ -5420,6 +5427,103 @@
           }
         }
       },
+      "InfotelefonAnliegen": {
+        "type": "string",
+        "description": "Anliegen eines Anrufs. Wire == `as_str()`.",
+        "enum": [
+          "vermisstensuche",
+          "auskunft_lage",
+          "hinweis",
+          "hilfeangebot",
+          "beschwerde",
+          "presse",
+          "sonstiges"
+        ]
+      },
+      "InfotelefonAnrufAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung eines Anrufs.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "anliegen",
+          "status",
+          "eingang_at",
+          "angelegt_von_id",
+          "angelegt_at"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string"
+          },
+          "angelegt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "anliegen": {
+            "$ref": "#/components/schemas/InfotelefonAnliegen"
+          },
+          "anrufer_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eingang_at": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erledigt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "erledigt_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "erledigt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rueckruf": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/InfotelefonStatus"
+          }
+        }
+      },
+      "InfotelefonStatus": {
+        "type": "string",
+        "description": "Status eines Anrufs. Wire == `as_str()`.",
+        "enum": [
+          "offen",
+          "erledigt"
+        ]
+      },
       "KarteConfigAntwort": {
         "type": "object",
         "description": "Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —\nNICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,\n`frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.",
@@ -6115,6 +6219,8 @@
           "abloesung",
           "betreuung",
           "verpflegung",
+          "presse",
+          "infotelefon",
           "karten_ansicht",
           "lage_snapshot",
           "sofortmeldung",
@@ -6186,6 +6292,126 @@
           "defekt",
           "verbraucht",
           "desinfektion_noetig"
+        ]
+      },
+      "MedienkontaktAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung eines Medienkontakts.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "art",
+          "medium",
+          "thema",
+          "eingang_at",
+          "status",
+          "angelegt_von_id",
+          "angelegt_at"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string"
+          },
+          "angelegt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "antwort": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Die gegebene Antwort. Bleibt bei einer Rücknahme nach `offen` stehen."
+          },
+          "art": {
+            "$ref": "#/components/schemas/MedienkontaktArt"
+          },
+          "bearbeitet_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bearbeitet_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Wer den Status zuletzt gesetzt hat, und wann."
+          },
+          "bearbeitet_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eingang_at": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "freigabe_durch": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wer die Aussage freigegeben hat (Freitext, etwa „EL mündlich 14:20“)."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kontakt_erreichbarkeit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kontakt_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "medium": {
+            "type": "string"
+          },
+          "pressemitteilung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Freigegebene Pressemitteilung desselben Einsatzes, auf die die Antwort verweist."
+          },
+          "status": {
+            "$ref": "#/components/schemas/MedienkontaktStatus"
+          },
+          "thema": {
+            "type": "string"
+          }
+        }
+      },
+      "MedienkontaktArt": {
+        "type": "string",
+        "description": "Art eines Medienkontakts. Wire == `as_str()`.",
+        "enum": [
+          "anfrage",
+          "abstimmung",
+          "termin"
+        ]
+      },
+      "MedienkontaktStatus": {
+        "type": "string",
+        "description": "Status eines Medienkontakts. Wire == `as_str()`.",
+        "enum": [
+          "offen",
+          "beantwortet",
+          "abgelehnt",
+          "erledigt"
         ]
       },
       "MeldeWeg": {
@@ -8110,6 +8336,136 @@
             "$ref": "#/components/schemas/Sonderkost"
           }
         }
+      },
+      "PressemitteilungAbschnitt": {
+        "type": "object",
+        "description": "Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element).",
+        "required": [
+          "schluessel",
+          "text"
+        ],
+        "properties": {
+          "schluessel": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "PressemitteilungAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Anzeige einer Pressemitteilung.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "vorlage",
+          "titel",
+          "zeitstand",
+          "status",
+          "abschnitte",
+          "version",
+          "ersteller_id",
+          "ersteller_name",
+          "erstellt_at",
+          "aktualisiert_at"
+        ],
+        "properties": {
+          "abschnitte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PressemitteilungAbschnitt"
+            }
+          },
+          "aktualisiert_at": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ersteller_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ersteller_name": {
+            "type": "string"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "etb_eintrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "freigegeben_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "freigegeben_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "freigegeben_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PressemitteilungStatus"
+          },
+          "titel": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vorgaenger_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "vorlage": {
+            "$ref": "#/components/schemas/PressemitteilungVorlage"
+          },
+          "zeitstand": {
+            "type": "string"
+          }
+        }
+      },
+      "PressemitteilungStatus": {
+        "type": "string",
+        "description": "Status einer Pressemitteilung (Schema-Anker für die OpenAPI-Union). Wire == `status`.",
+        "enum": [
+          "entwurf",
+          "freigegeben"
+        ]
+      },
+      "PressemitteilungVorlage": {
+        "type": "string",
+        "description": "Vorlage einer Pressemitteilung (Schema-Anker für die OpenAPI-Union). Wire == `vorlage`.",
+        "enum": [
+          "erstinformation",
+          "folgeinformation",
+          "bevoelkerungshinweis",
+          "freitext"
+        ]
       },
       "Prioritaet": {
         "type": "string",

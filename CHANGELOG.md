@@ -1,3 +1,71 @@
+## [1.0.0-alpha.59](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.58...v1.0.0-alpha.59) (2026-09-30)
+
+### Benutzeroberfläche
+
+Die gesamte Anwendung verwendet nun einen einheitlichen Ikonensatz (Icons8 iOS 27) für alle Symbole und Bedienelemente. Dadurch wirkt die Oberfläche konsistenter und professioneller. Die Navigation, Kopfleiste, Formulare und alle Funktionsbereiche zeigen jetzt durchgängig denselben visuellen Stil.
+
+In der Seitenleiste wird die aktuell aktive Kategorie durch ein gefülltes Symbol hervorgehoben, wodurch die Orientierung in der Anwendung erleichtert wird.
+
+Die Verbindungsanzeige in der Kopfleiste zeigt den Netzwerkstatus nun klarer mit WLAN-Symbol und entsprechenden Status-Symbolen (Haken für verbunden, Kreuz für getrennt).
+
+## [1.0.0-alpha.58](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.57...v1.0.0-alpha.58) (2026-09-30)
+
+### Wichtige Änderungen
+
+- **Neue Datenbank-Migrationen:** Funktionskatalog für Führungsfunktionen und Checkliste Arbeitsaufnahme der Führungseinheit erfordern beim Update automatische Datenbank-Migrationen
+- **Cargo-Build-Ziel:** Bei Entwicklungs- und Build-Umgebungen wird das Build-Ziel nun pro Checkout isoliert, um Konflikte zwischen parallelen Arbeitsständen zu vermeiden
+
+### Führung und Stab
+
+- **Funktionskatalog:** Führungsfunktionen (Einsatzleitung, S1–S7, Führungshilfspersonal, Fachberater) können zentral verwaltet und mit Personen besetzt werden. Bei Aufträgen, Erinnerungen und Führungsstellen kann aus dem Katalog gewählt werden, wobei die aktuelle Besetzung angezeigt wird (z.B. "S2 – Lage (Müller)")
+- **Checkliste Arbeitsaufnahme:** Auf der Stabseite steht eine Checkliste mit sieben festen Punkten zur Arbeitsaufnahme der Führungseinheit bereit. Erledigte Punkte können abgehakt und mit Bemerkungen versehen werden. Die Meldung der Einsatzbereitschaft an die Leitstelle wird automatisch im Einsatztagebuch dokumentiert
+- **Funkplan (S6):** Unter der neuen Seite "Funkplan" wird eine tabellarische Übersicht aller Einheiten mit Rufnamen, Leitern, Funkkanälen und Erreichbarkeit aus den vorhandenen Daten abgeleitet. Der Funkplan kann gedruckt und in Lageberichte übernommen werden
+- **Vorbereitung der Lagebesprechung:** Auf der Stabseite werden unter "Vorbereitung" die aktuellen Zahlen zu Aufträgen, Meldungen, Kräften und Abschnitten zusammengestellt. Diese können mit einem Klick in den Lagebericht übernommen werden
+- **Live-Aktualisierung Einsatzkopf:** Änderungen am Termin der Lagebesprechung werden auf allen offenen Seiten automatisch aktualisiert, ohne dass neu geladen werden muss
+
+### Lagekarte
+
+- **Fachebenen-Farben:** Die Farben der Fachebenen (KRITIS, Pegel, Luftqualität etc.) passen sich jetzt dem Hell-/Dunkelmodus an und bleiben beim Moduswechsel konsistent lesbar
+- **Legenden für Klassenebenen:** Fachebenen mit farbkodierten Klassen (Hochwasser, ODL, Luftqualität) zeigen im Bedienfeld eine Legende mit Farbpunkt und Bedeutung an
+- **Optimierte Datenübertragung:** Fachebenen werden nur noch übertragen, wenn sich ihre Daten tatsächlich geändert haben, was bei stabilen Lagen die Netzlast deutlich reduziert
+- **Robustere Kartengrundlage:** Wenn eine Online-Kartengrundlage nicht erreichbar ist, wechselt die Karte automatisch zur Offline-Grundlage, statt ohne Kartenhintergrund dazustehen
+
+### Einsatztagebuch
+
+- **Zuverlässigere Entwurfsspeicherung:** Entwürfe im Einsatztagebuch bleiben auch bei Seitenneuladen oder Tab-Schließen während des Speichervorgangs erhalten
+- **Vorbelegung von Absender/Empfänger:** Bei Führungsstellen wird das eigene Sachgebiet (falls vorhanden) automatisch als Absender vorgeschlagen
+
+### Anmeldung und Desktop-Anwendung
+
+- **macOS-Anmeldung im Systembrowser:** Die macOS-Desktop-Anwendung bietet jetzt einen Weg zur Anmeldung über den Systembrowser an. Dies ist besonders für Passkey-Nutzer relevant, da Passkeys im eingebetteten Webview nicht funktionieren
+- **Passkey-Hinweis in macOS-App:** In der macOS-Anwendung wird der Passkey-Anmeldeknopf ausgeblendet, da diese Funktion dort nicht unterstützt wird. Bei reinen Passkey-Konten erscheint ein Hinweis, wie die Anmeldung über den Browser erfolgen kann
+
+### Betroffene und Kräfte
+
+- **Bessere Koordinaten-Validierung:** Ungültige Koordinateneingaben werden erkannt und verhindern das Speichern, statt still eine falsche oder gelöschte Koordinate zu übernehmen
+- **Kontraststärkere Statusanzeigen:** Die Statuszahlen in der Kräfte-Verdichtungszeile (frei, gebunden, nicht verfügbar) sind jetzt besser lesbar und erfüllen die Barrierefreiheitsanforderungen auch am Tag
+
+### Bedienung und Oberfläche
+
+- **Zuverlässigere Menüauswahl:** Nach dem Verschieben von Elementen (z.B. auf der Lagekarte) kann das Kontextmenü beim ersten Klick geöffnet werden, ohne dass ein zweiter Klick nötig ist
+- **Status setzen in Sprungpalette:** Der Befehl "Status setzen" in der Sprungpalette wirkt auf die aktuell fokussierte Zeile, auch wenn mehrere Einträge ausgewählt sind
+- **Akkordeon-Bedienung:** Die Kopfzeile des Navigations-Drawers ist auch auf kleinen Bildschirmen und bei der Handschuh-Dichtestufe ausreichend groß für eine sichere Bedienung
+- **Alarmton-Anzeige:** Die Glocke in der Kopfleiste zeigt keinen irreführenden roten Punkt mehr, wenn der Alarmton funktioniert. Der Status wird weiterhin über das Symbol (durchgestrichen bei Störung) und den Menüeintrag klar kommuniziert
+
+### App-Symbol und Marke
+
+- **Neue Bildmarke "Lebenslinie":** Die Anwendung hat ein neues App-Symbol mit der stilisierten Lebenslinie erhalten, das in allen Desktop- und PWA-Umgebungen sowie in der Kopfleiste angezeigt wird
+
+### Betrieb und Installation
+
+- **Lagekarte bei mobilen Auflösungen:** Die Lagekarte gibt auf mobilen Geräten den gesamten Bildschirm frei, wenn die Kartenleiste unter die Karte wandert. Die Zeitachse verdeckt die Karte nicht mehr
+- **Dokumentation:** Verbesserungen in der Betriebsdokumentation zur Desktop-Anwendung und zu bekannten Grenzen (z.B. Passkeys in macOS-Hülle)
+
+### Planung und Dokumentation
+
+- **OpenSpec-Changes werden beim Merge archiviert:** Umgesetzte Spezifikationsänderungen werden vor dem Merge archiviert, um die aktiven Planungsartefakte übersichtlich zu halten
+- **Aufgeteilte Entwicklungsdokumentation:** Die zentrale Entwicklungsdokumentation wurde in bereichsspezifische Dateien aufgeteilt, um die Navigation und Wartbarkeit zu verbessern
+
 ## [1.0.0-alpha.57](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.56...v1.0.0-alpha.57) (2026-09-30)
 
 ### Kräfte und Mittel

@@ -60,6 +60,10 @@ export const EINSATZ_KEYS = {
   kraefteZeitachse: 'einsatz-kraefte-zeitachse',
   betreuung: 'einsatz-betreuung',
   verpflegung: 'einsatz-verpflegung',
+  // Presse- und Medienarbeit S5 (LFH-554): Presse-Log und Pressemitteilungen unter EINEM Prefix,
+  // das Informationstelefon unter einem eigenen. Beide NICHT im Lagebild offline (Personenbezug).
+  presse: 'einsatz-presse',
+  infotelefon: 'einsatz-infotelefon',
   // Einsatzkopf, live über das `einsatz`-Ereignis (LFH-555).
   einsatz: 'einsatz',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
@@ -201,6 +205,10 @@ export const EINSATZ_STREAM_EVENTS = {
   // Terminwahrheit, zwei Caches. Die benutzerbezogenen Kopffelder (`meine_*`) und
   // `lagekennzahlen` lösen das Ereignis nicht aus; sie werden beim nächsten Abruf frisch.
   einsatz: [EINSATZ_KEYS.einsatz, EINSATZ_KEYS.stab],
+  // Medienkontakte, Pressemitteilungen und ihre Details unter EINEM Prefix. Die Freigabe schreibt
+  // den ETB-Snapshot; der kommt über das eigene `etb`-Ereignis.
+  presse: [EINSATZ_KEYS.presse],
+  infotelefon: [EINSATZ_KEYS.infotelefon],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -381,6 +389,15 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.betreuung, einsatzId, 'verlauf', art, id] as const,
   // Verpflegung: ein Abruf trägt alle Zeitfenster samt Deckung und Ausgaben.
   verpflegung: (einsatzId: number) => [EINSATZ_KEYS.verpflegung, einsatzId] as const,
+  // Presse S5 (LFH-554): argumentlos = Invalidierungs-Prefix; Listen und Detail als Sub-Keys.
+  presse: (einsatzId: number) => [EINSATZ_KEYS.presse, einsatzId] as const,
+  medienkontakte: (einsatzId: number) =>
+    [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte'] as const,
+  pressemitteilungen: (einsatzId: number) =>
+    [EINSATZ_KEYS.presse, einsatzId, 'mitteilungen'] as const,
+  pressemitteilung: (einsatzId: number, mitteilungId: number) =>
+    [EINSATZ_KEYS.presse, einsatzId, 'mitteilung', mitteilungId] as const,
+  infotelefon: (einsatzId: number) => [EINSATZ_KEYS.infotelefon, einsatzId] as const,
   /** Historie der Lagebesprechungen als Sub-Key unter DEMSELBEN Prefix (Spec 9.3). */
   stabLagebesprechungen: (einsatzId: number) =>
     [EINSATZ_KEYS.stab, einsatzId, 'lagebesprechungen'] as const,
@@ -621,7 +638,9 @@ export const globalKeys = {
  *
  * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit, Chat, Dokumente,
  * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys, der
- * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst).
+ * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), dazu S5
+ * (Presse-Log, Pressemitteilungen, Informationstelefon: Kontaktdaten und Rückrufnummern,
+ * LFH-554 design.md D8, offen mit LFH-767).
  * `lagebildOffline.guard.test.ts` vergleicht die Liste mit JEDEM verwalteten Prefix.
  */
 export const LAGEBILD_OFFLINE = {

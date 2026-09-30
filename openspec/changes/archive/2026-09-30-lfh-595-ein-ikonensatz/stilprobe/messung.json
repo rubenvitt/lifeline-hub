@@ -1,0 +1,1088 @@
+{
+  "390-dark-kompakt": [
+    {
+      "ikone": "menue",
+      "breite": 22,
+      "hoehe": 22,
+      "kontrast": 16.15
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "lupe",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 16.15
+    },
+    {
+      "ikone": "plus",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 6.19
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 16.37
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 16.37
+    }
+  ],
+  "1024-dark-kompakt": [
+    {
+      "ikone": "lupe",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 7.47
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "hierarchie",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "lkw",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "klemmbrett",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "karte",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "sprechblase.gefuellt",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 14.74
+    },
+    {
+      "ikone": "zahnrad",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "plus",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 6.19
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 16.37
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 16.37
+    }
+  ],
+  "1440-dark-kompakt": [
+    {
+      "ikone": "lupe",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 7.47
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "chevron-runter",
+      "breite": 10,
+      "hoehe": 10,
+      "kontrast": null,
+      "grund": "Error: locator.evaluate: Error: Nicht unterstützte Komposition an SPAN.anticon lfh-ikone: none, opacity=0.65, blend=normal"
+    },
+    {
+      "ikone": "hierarchie",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "lkw",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "klemmbrett",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "karte",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "sprechblase.gefuellt",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 14.74
+    },
+    {
+      "ikone": "zahnrad",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "plus",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 6.19
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 16.37
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 16.37
+    }
+  ],
+  "390-dark-komfortabel": [
+    {
+      "ikone": "menue",
+      "breite": 22,
+      "hoehe": 22,
+      "kontrast": 16.15
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "lupe",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 16.15
+    },
+    {
+      "ikone": "plus",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 6.19
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.37
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.37
+    }
+  ],
+  "1024-dark-komfortabel": [
+    {
+      "ikone": "lupe",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 7.47
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "hierarchie",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "lkw",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "klemmbrett",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "karte",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "sprechblase.gefuellt",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 14.74
+    },
+    {
+      "ikone": "zahnrad",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "plus",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 6.19
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.37
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.37
+    }
+  ],
+  "1440-dark-komfortabel": [
+    {
+      "ikone": "lupe",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 7.47
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "chevron-runter",
+      "breite": 10,
+      "hoehe": 10,
+      "kontrast": null,
+      "grund": "Error: locator.evaluate: Error: Nicht unterstützte Komposition an SPAN.anticon lfh-ikone: none, opacity=0.65, blend=normal"
+    },
+    {
+      "ikone": "hierarchie",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "lkw",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "klemmbrett",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "karte",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "sprechblase.gefuellt",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 14.74
+    },
+    {
+      "ikone": "zahnrad",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "plus",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 6.19
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.37
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.37
+    }
+  ],
+  "390-dark-handschuh": [
+    {
+      "ikone": "menue",
+      "breite": 22,
+      "hoehe": 22,
+      "kontrast": 16.15
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "lupe",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 16.15
+    },
+    {
+      "ikone": "plus",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 6.19
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.37
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.37
+    }
+  ],
+  "1024-dark-handschuh": [
+    {
+      "ikone": "lupe",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 7.47
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "hierarchie",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "lkw",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "klemmbrett",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "karte",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "sprechblase.gefuellt",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 14.74
+    },
+    {
+      "ikone": "zahnrad",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "plus",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 6.19
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.37
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.37
+    }
+  ],
+  "1440-dark-handschuh": [
+    {
+      "ikone": "lupe",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 7.47
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "chevron-runter",
+      "breite": 10,
+      "hoehe": 10,
+      "kontrast": null,
+      "grund": "Error: locator.evaluate: Error: Nicht unterstützte Komposition an SPAN.anticon lfh-ikone: none, opacity=0.65, blend=normal"
+    },
+    {
+      "ikone": "hierarchie",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "lkw",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "klemmbrett",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "karte",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "sprechblase.gefuellt",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 14.74
+    },
+    {
+      "ikone": "zahnrad",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "plus",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 6.19
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.37
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.37
+    }
+  ],
+  "390-light-kompakt": [
+    {
+      "ikone": "menue",
+      "breite": 22,
+      "hoehe": 22,
+      "kontrast": 16.15
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "lupe",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 16.15
+    },
+    {
+      "ikone": "plus",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 6.59
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 16.93
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 16.93
+    }
+  ],
+  "1024-light-kompakt": [
+    {
+      "ikone": "lupe",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 7.47
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "hierarchie",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "lkw",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "klemmbrett",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "karte",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "sprechblase.gefuellt",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 14.74
+    },
+    {
+      "ikone": "zahnrad",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "plus",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 6.59
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 16.93
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 16.93
+    }
+  ],
+  "1440-light-kompakt": [
+    {
+      "ikone": "lupe",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 7.47
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "chevron-runter",
+      "breite": 10,
+      "hoehe": 10,
+      "kontrast": null,
+      "grund": "Error: locator.evaluate: Error: Nicht unterstützte Komposition an SPAN.anticon lfh-ikone: none, opacity=0.65, blend=normal"
+    },
+    {
+      "ikone": "hierarchie",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "lkw",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "klemmbrett",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "karte",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "sprechblase.gefuellt",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 14.74
+    },
+    {
+      "ikone": "zahnrad",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "plus",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 6.59
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 16.93
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 13.5,
+      "hoehe": 13.5,
+      "kontrast": 16.93
+    }
+  ],
+  "390-light-komfortabel": [
+    {
+      "ikone": "menue",
+      "breite": 22,
+      "hoehe": 22,
+      "kontrast": 16.15
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "lupe",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 16.15
+    },
+    {
+      "ikone": "plus",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 6.59
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.93
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.93
+    }
+  ],
+  "1024-light-komfortabel": [
+    {
+      "ikone": "lupe",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 7.47
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "hierarchie",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "lkw",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "klemmbrett",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "karte",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "sprechblase.gefuellt",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 14.74
+    },
+    {
+      "ikone": "zahnrad",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "plus",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 6.59
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.93
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.93
+    }
+  ],
+  "1440-light-komfortabel": [
+    {
+      "ikone": "lupe",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 7.47
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "chevron-runter",
+      "breite": 10,
+      "hoehe": 10,
+      "kontrast": null,
+      "grund": "Error: locator.evaluate: Error: Nicht unterstützte Komposition an SPAN.anticon lfh-ikone: none, opacity=0.65, blend=normal"
+    },
+    {
+      "ikone": "hierarchie",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "lkw",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "klemmbrett",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "karte",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "sprechblase.gefuellt",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 14.74
+    },
+    {
+      "ikone": "zahnrad",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "plus",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 6.59
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.93
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.93
+    }
+  ],
+  "390-light-handschuh": [
+    {
+      "ikone": "menue",
+      "breite": 22,
+      "hoehe": 22,
+      "kontrast": 16.15
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "lupe",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 16.15
+    },
+    {
+      "ikone": "plus",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 6.59
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.93
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.93
+    }
+  ],
+  "1024-light-handschuh": [
+    {
+      "ikone": "lupe",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 7.47
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "hierarchie",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "lkw",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "klemmbrett",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "karte",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "sprechblase.gefuellt",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 14.74
+    },
+    {
+      "ikone": "zahnrad",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "plus",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 6.59
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.93
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.93
+    }
+  ],
+  "1440-light-handschuh": [
+    {
+      "ikone": "lupe",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 7.47
+    },
+    {
+      "ikone": "funkbalken",
+      "breite": 16,
+      "hoehe": 16,
+      "kontrast": 8.53
+    },
+    {
+      "ikone": "chevron-runter",
+      "breite": 10,
+      "hoehe": 10,
+      "kontrast": null,
+      "grund": "Error: locator.evaluate: Error: Nicht unterstützte Komposition an SPAN.anticon lfh-ikone: none, opacity=0.65, blend=normal"
+    },
+    {
+      "ikone": "hierarchie",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "lkw",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "klemmbrett",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "karte",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "sprechblase.gefuellt",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 14.74
+    },
+    {
+      "ikone": "zahnrad",
+      "breite": 20,
+      "hoehe": 20,
+      "kontrast": 8.04
+    },
+    {
+      "ikone": "plus",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 6.59
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.93
+    },
+    {
+      "ikone": "punkte-senkrecht",
+      "breite": 15,
+      "hoehe": 15,
+      "kontrast": 16.93
+    }
+  ]
+}

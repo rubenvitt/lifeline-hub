@@ -1000,6 +1000,116 @@ mod tests {
         assert_eq!(nachher.bedarf.gesamt, 250);
     }
 
+    /// LFH-554, Spec-Szenarien „Schwärzung“ von Presse-Log und Informationstelefon:
+    /// Ansprechperson, Erreichbarkeit, Anrufername und Notiz leer, eine gesetzte Rückrufnummer
+    /// ersetzt (ein CHECK verlangt sie bei offenem Rückruf); Medium, Thema, Antwort, Anliegen und
+    /// Status bleiben. Ein offener Rückruf bricht die Schwärzung nicht.
+    #[tokio::test]
+    async fn schwaerzung_presse_und_infotelefon_leert_personenbezug_und_haelt_nachweis() {
+        use crate::infotelefon::repo as tel;
+        use crate::infotelefon::{InfotelefonAnliegen, InfotelefonStatus};
+        use crate::presse::repo as presse;
+        use crate::presse::{MedienkontaktArt, MedienkontaktStatus};
+
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let nutzer: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1,'Leit','leit','h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, abgeschlossen_von, \
+                retention_bis, geloescht_at) \
+             VALUES (1,'Hochwasser','abgeschlossen','2026-01-01 00:00:00', ?, \
+                '2026-02-01 00:00:00','2026-02-15 00:00:00') RETURNING id",
+        )
+        .bind(nutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let mut tx = pool.begin().await.unwrap();
+        let kontakt = presse::anlegen_tx(
+            &mut tx,
+            e,
+            nutzer,
+            &presse::KontaktEingabe {
+                art: MedienkontaktArt::Anfrage,
+                medium: "NDR 1".into(),
+                thema: "Zahl der Evakuierten".into(),
+                kontakt_name: Some("Maria Beispiel".into()),
+                kontakt_erreichbarkeit: Some("+49 511 1234567".into()),
+                eingang_at: "2026-01-01 10:00:00".into(),
+            },
+        )
+        .await
+        .unwrap();
+        presse::status_tx(
+            &mut tx,
+            e,
+            kontakt,
+            nutzer,
+            &presse::StatusWechsel {
+                ziel: MedienkontaktStatus::Beantwortet,
+                antwort: Some("240 Personen".into()),
+                freigabe_durch: Some("EL".into()),
+                pressemitteilung_id: None,
+            },
+        )
+        .await
+        .unwrap();
+        let mut anrufe = Vec::new();
+        for (noetig, nummer) in [(true, Some("0171 7654321")), (false, None)] {
+            anrufe.push(
+                tel::anlegen_tx(
+                    &mut tx,
+                    e,
+                    nutzer,
+                    &tel::AnrufEingabe {
+                        anliegen: InfotelefonAnliegen::Vermisstensuche,
+                        notiz: Some("sucht Vater, Deichstraße 4".into()),
+                        anrufer_name: Some("Klaus Meyer".into()),
+                        rueckruf: nummer.map(str::to_string),
+                        rueckruf_noetig: noetig,
+                        eingang_at: "2026-01-01 11:00:00".into(),
+                    },
+                )
+                .await
+                .unwrap(),
+            );
+        }
+        tx.commit().await.unwrap();
+
+        assert!(
+            super::repo::schwaerze_einsatz(&pool, e, "2026-06-01 12:00:00")
+                .await
+                .unwrap()
+        );
+
+        let k = presse::laden(&pool, e, kontakt).await.unwrap();
+        assert_eq!((k.kontakt_name, k.kontakt_erreichbarkeit), (None, None));
+        assert_eq!(
+            (k.medium.as_str(), k.thema.as_str(), k.antwort.as_deref()),
+            ("NDR 1", "Zahl der Evakuierten", Some("240 Personen"))
+        );
+        assert_eq!(k.status, MedienkontaktStatus::Beantwortet);
+
+        let offen = tel::laden(&pool, e, anrufe[0]).await.unwrap();
+        assert_eq!((offen.anrufer_name, offen.notiz), (None, None));
+        assert_ne!(offen.rueckruf.as_deref(), Some("0171 7654321"));
+        assert!(offen.rueckruf.is_some(), "Platzhalter statt NULL");
+        assert_eq!(offen.status, InfotelefonStatus::Offen);
+        assert_eq!(offen.anliegen, InfotelefonAnliegen::Vermisstensuche);
+        let ohne = tel::laden(&pool, e, anrufe[1]).await.unwrap();
+        assert_eq!(ohne.rueckruf, None, "eine leere Nummer bleibt leer");
+    }
+
     #[tokio::test]
     async fn soft_geloescht_vor_karenz_wird_nicht_geschwaerzt() {
         // Phase B greift erst nach KARENZ_TAGE. Direkt nach dem Soft-Delete (gleicher

@@ -10,7 +10,9 @@
  *    eingeschoben).
  * 3. Führungsstand: Aufträge offen, Meldungen offen, Lagebericht, UHS aktiv. Er steht hier, weil an
  *    ihm die Alarmbeiträge überfälliger Aufträge und Meldungen hängen — eine überfällige
- *    Sofortmeldung soll auf dieser Seite rot stehen.
+ *    Sofortmeldung soll auf dieser Seite rot stehen. Aufträge und Meldungen kommen aus dem
+ *    Modulzähler, nicht aus eigener Zählung (LFH-550, `fuehrungsZahlen.ts`): dieselbe Zahl wie im
+ *    Modulpanel und im Führungsüberblick.
  *
  * Die Warnstufe hat keine eigene Kennzahl: sie steht als Hinweis im Seitenkopf und je Gefahrentyp
  * in der Matrix. Der Verbindungszustand steht in der SYNC-Anzeige der Kopfleiste und als Meta des
@@ -34,11 +36,11 @@
  * Datenzustände: jede Kennzahl und jedes Paneel hängt an seinen Abfragen und unterscheidet `laden`
  * / `fehler` / `leer` sichtbar; fällt die Gefahrenmatrix aus, bleibt der Rest lesbar.
  */
+import { IkoneWarndreieck } from '../../ikonen';
 import { useMemo, useState, useSyncExternalStore, useEffect } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Alert, Breadcrumb } from 'antd';
-import { TbAlertTriangle } from 'react-icons/tb';
 import { einsatzKeys } from '../../api/queryKeys';
 import {
   auftraegePfad,
@@ -55,24 +57,12 @@ import {
   unfallhilfsstellenListePfad,
 } from '../../routing/deeplinks';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
-import { ladeEinsatz, ladeModulOverrides } from '../../api/einsaetze';
+import { ladeModulOverrides } from '../../api/einsaetze';
 import { useAuth } from '../../auth/AuthContext';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { useModulWahl } from '../../einsatz/useModulWahl';
-import { listePersonen } from '../../api/einsatzPerson';
-import { listeUhs } from '../../api/einsatzUhs';
-import { listeSchaeden } from '../../api/einsatzSchaden';
-import { ladeGefahrengebiete, ladeMatrix } from '../../api/gefahren';
-import { listeLageberichte } from '../../api/lageberichte';
-import { listeAuftraege } from '../../api/auftraege';
-import { listeMeldungen } from '../../api/meldungen';
-import { listeEinheiten } from '../../api/einheiten';
-import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
-import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
-import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
-import { listeAbschnitte } from '../../api/einsatzabschnitte';
+import { ladeMatrix } from '../../api/gefahren';
 import { listeEtb } from '../../api/etb';
-import { pegelAbfrage } from '../../api/pegel';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag } from '../../anzeige/format';
 import EinsatzSeite from '../../components/EinsatzSeite';
@@ -107,6 +97,15 @@ import { GefahrenmatrixPaneel, MeldungsstromPaneel, SichtungsPaneel } from './La
 import { transportBilanz } from '../../personen/personenBilanz';
 import { useEvakuierungKennzahl } from '../../betreuung/useEvakuierungKennzahl';
 import { darfZaehlerZeigen } from '../../einsatz/useModulZaehler';
+import {
+  NICHT_FREIGEGEBEN,
+  auftraegeNotiz,
+  auftragsStand,
+  meldungenNotiz,
+  meldungsStand,
+  type Zaehlstand,
+} from './fuehrungsZahlen';
+import { useLagebild } from './useLagebild';
 
 /**
  * Verdichtet mehrere Queries auf einen Zustand. Fehler schlägt Laden: ein halb geladener Block mit
@@ -146,58 +145,24 @@ export default function LageDashboardPage() {
   const jetzt = useJetzt(TAKT_MS);
   const liveStatus = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
 
-  const einsatzQuery = useQuery({
-    queryKey: einsatzKeys.einsatz(einsatzId),
-    queryFn: () => ladeEinsatz(einsatzId),
-  });
-  const personenQuery = useQuery({
-    queryKey: einsatzKeys.personen(einsatzId),
-    queryFn: () => listePersonen(einsatzId),
-  });
-  const uhsQuery = useQuery({
-    queryKey: einsatzKeys.uhs(einsatzId),
-    queryFn: () => listeUhs(einsatzId),
-  });
-  const schaedenQuery = useQuery({
-    queryKey: einsatzKeys.schaeden(einsatzId),
-    queryFn: () => listeSchaeden(einsatzId),
-  });
-  const gefahrenQuery = useQuery({
-    queryKey: einsatzKeys.gefahrengebiete(einsatzId),
-    queryFn: () => ladeGefahrengebiete(einsatzId),
-  });
-  const lageberichteQuery = useQuery({
-    queryKey: einsatzKeys.lageberichte(einsatzId),
-    queryFn: () => listeLageberichte(einsatzId),
-  });
-  const einheitenQuery = useQuery({
-    queryKey: einsatzKeys.einheiten(einsatzId),
-    queryFn: () => listeEinheiten(einsatzId),
-  });
-  const personalQuery = useQuery({
-    queryKey: einsatzKeys.personal(einsatzId),
-    queryFn: () => listeEinsatzPersonal(einsatzId),
-  });
-  const fahrzeugeQuery = useQuery({
-    queryKey: einsatzKeys.fahrzeuge(einsatzId),
-    queryFn: () => listeEinsatzFahrzeuge(einsatzId),
-  });
-  const materialQuery = useQuery({
-    queryKey: einsatzKeys.material(einsatzId),
-    queryFn: () => listeEinsatzMaterial(einsatzId),
-  });
-  const abschnitteQuery = useQuery({
-    queryKey: einsatzKeys.abschnitte(einsatzId),
-    queryFn: () => listeAbschnitte(einsatzId),
-  });
-  const auftraegeQuery = useQuery({
-    queryKey: einsatzKeys.auftraege(einsatzId),
-    queryFn: () => listeAuftraege(einsatzId),
-  });
-  const meldungenQuery = useQuery({
-    queryKey: einsatzKeys.meldungen(einsatzId),
-    queryFn: () => listeMeldungen(einsatzId),
-  });
+  // Die Quellen des Lagebilds teilt sich die Seite mit der Vorbereitung der Lagebesprechung
+  // (LFH-550): eine Zusammenstellung, ein `baueLagebild`.
+  const { q: quellen, basis } = useLagebild(einsatzId, { mitPegel: true });
+  const {
+    einsatz: einsatzQuery,
+    personen: personenQuery,
+    uhs: uhsQuery,
+    schaeden: schaedenQuery,
+    gefahren: gefahrenQuery,
+    lageberichte: lageberichteQuery,
+    einheiten: einheitenQuery,
+    personal: personalQuery,
+    fahrzeuge: fahrzeugeQuery,
+    material: materialQuery,
+    abschnitte: abschnitteQuery,
+    pegel: pegelQuery,
+    zaehler: zaehlerQuery,
+  } = quellen;
   // Die Matrix je Gefahrengebiet unter demselben Key wie die Gefahrenseite: Cache geteilt, das
   // Live-Event `gefahr` invalidiert beide.
   const matrixQueries = useQueries({
@@ -212,8 +177,6 @@ export default function LageDashboardPage() {
     queryKey: einsatzKeys.etbListe(einsatzId, { limit: STROM_ABRUF }),
     queryFn: () => listeEtb(einsatzId, { limit: STROM_ABRUF }),
   });
-  // Maßgebliche Pegel: kein Live-Ereignis, 5-min-Nachfrage aus `pegelAbfrage`.
-  const pegelQuery = useQuery(pegelAbfrage(einsatzId));
   // Die Pegel-Kennzahl führt auf „Wetter & Pegel", wenn das Modul frei ist, sonst auf die Pflege.
   // Bis die Overrides da sind, gilt die Pflege — sonst ein Sprung ins womöglich ausgeblendete
   // Modul.
@@ -283,53 +246,9 @@ export default function LageDashboardPage() {
       : null;
 
   const lagebild = useMemo(() => {
-    if (!einsatz || !reihe) return null;
-    return baueLagebild(
-      {
-        einsatz,
-        personen: personenQuery.data ?? [],
-        uhs: uhsQuery.data ?? [],
-        schaeden: schaedenQuery.data ?? [],
-        gefahren: gefahrenQuery.data ?? [],
-        lageberichte: lageberichteQuery.data ?? [],
-        einheiten: einheitenQuery.data ?? [],
-        personal: personalQuery.data ?? [],
-        fahrzeuge: fahrzeugeQuery.data ?? [],
-        material: materialQuery.data ?? [],
-        abschnitte: abschnitteQuery.data ?? [],
-        auftraege: auftraegeQuery.data ?? [],
-        meldungen: meldungenQuery.data ?? [],
-        pegel: pegelQuery.data ?? [],
-        pegelZiel,
-        evakuierung,
-        evakuierungZiel,
-      },
-      jetzt,
-      konv,
-      reihe,
-    );
-  }, [
-    einsatz,
-    reihe,
-    jetzt,
-    konv,
-    personenQuery.data,
-    uhsQuery.data,
-    schaedenQuery.data,
-    gefahrenQuery.data,
-    lageberichteQuery.data,
-    einheitenQuery.data,
-    personalQuery.data,
-    fahrzeugeQuery.data,
-    materialQuery.data,
-    abschnitteQuery.data,
-    auftraegeQuery.data,
-    meldungenQuery.data,
-    pegelQuery.data,
-    pegelZiel,
-    evakuierung,
-    evakuierungZiel,
-  ]);
+    if (!basis || !reihe) return null;
+    return baueLagebild({ ...basis, pegelZiel, evakuierung, evakuierungZiel }, jetzt, konv, reihe);
+  }, [basis, reihe, jetzt, konv, pegelZiel, evakuierung, evakuierungZiel]);
 
   // ── Meldungsstrom: Wassermarke statt Einschieben ──
   const [angezeigtBis, setAngezeigtBis] = useState<number | null>(null);
@@ -388,8 +307,7 @@ export default function LageDashboardPage() {
     gefahrenQuery.dataUpdatedAt,
     schaedenQuery.dataUpdatedAt,
     einheitenQuery.dataUpdatedAt,
-    auftraegeQuery.dataUpdatedAt,
-    meldungenQuery.dataUpdatedAt,
+    zaehlerQuery.dataUpdatedAt,
     etbQuery.dataUpdatedAt,
   );
 
@@ -404,6 +322,12 @@ export default function LageDashboardPage() {
   const fuehrung = lagebild?.fuehrung;
   const zFuehrung = (q: UseQueryResult<unknown>): KennzahlZustand =>
     lagebild ? alsKennzahlZustand(zustandVon(q)) : 'laden';
+  // Aufträge und Meldungen aus dem Modulzähler (LFH-550): dieselbe Zahl wie im Modulpanel. Ein
+  // fehlendes Modul steht als „—" mit Grund da, nie als 0.
+  const auftraege = auftragsStand(zaehlerQuery);
+  const meldungen = meldungsStand(zaehlerQuery);
+  const zZaehlstand = (z: Zaehlstand<unknown>): KennzahlZustand =>
+    !lagebild || z.zustand === 'laden' ? 'laden' : z.zustand === 'fehler' ? 'fehler' : 'daten';
 
   return (
     // Jeder Link der Seite ist eine Modulwahl für „Zuletzt besucht" (LFH-436, `useModulWahl`).
@@ -445,7 +369,7 @@ export default function LageDashboardPage() {
                 }}
               >
                 <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                  <TbAlertTriangle size={14} />
+                  <IkoneWarndreieck size={14} />
                 </span>
                 Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
               </span>
@@ -562,29 +486,52 @@ export default function LageDashboardPage() {
             <Kennzahl
               titel="Aufträge offen"
               groesse="klein"
-              wert={fuehrung?.auftraegeOffen ?? ''}
-              notiz={
-                (fuehrung?.auftraegeUeberfaellig ?? 0) > 0
-                  ? `${fuehrung?.auftraegeUeberfaellig} überfällig`
-                  : 'keiner überfällig'
+              wert={
+                auftraege.zustand === 'daten'
+                  ? auftraege.zahl.offen
+                  : auftraege.zustand === 'gesperrt'
+                    ? '—'
+                    : ''
               }
-              ton={(fuehrung?.auftraegeUeberfaellig ?? 0) > 0 ? 'alarm' : 'neutral'}
-              zustand={zFuehrung(auftraegeQuery)}
-              ziel={auftraegePfad(einsatzId)}
+              notiz={
+                auftraege.zustand === 'daten'
+                  ? auftraegeNotiz(auftraege.zahl)
+                  : auftraege.zustand === 'gesperrt'
+                    ? NICHT_FREIGEGEBEN
+                    : ''
+              }
+              ton={
+                auftraege.zustand === 'daten' && auftraege.zahl.ueberfaellig > 0
+                  ? 'alarm'
+                  : 'neutral'
+              }
+              zustand={zZaehlstand(auftraege)}
+              ziel={auftraege.zustand === 'gesperrt' ? undefined : auftraegePfad(einsatzId)}
             />
             <Kennzahl
               titel="Meldungen offen"
               groesse="klein"
-              wert={fuehrung?.meldungenOffen ?? ''}
-              notiz={
-                `${fuehrung?.meldungenNeu ?? 0} neu` +
-                ((fuehrung?.meldungenUeberfaellig ?? 0) > 0
-                  ? ` · ${fuehrung?.meldungenUeberfaellig} überfällig`
-                  : '')
+              wert={
+                meldungen.zustand === 'daten'
+                  ? meldungen.zahl.offen
+                  : meldungen.zustand === 'gesperrt'
+                    ? '—'
+                    : ''
               }
-              ton={(fuehrung?.meldungenUeberfaellig ?? 0) > 0 ? 'alarm' : 'neutral'}
-              zustand={zFuehrung(meldungenQuery)}
-              ziel={meldungenPfad(einsatzId)}
+              notiz={
+                meldungen.zustand === 'daten'
+                  ? meldungenNotiz(meldungen.zahl)
+                  : meldungen.zustand === 'gesperrt'
+                    ? NICHT_FREIGEGEBEN
+                    : ''
+              }
+              ton={
+                meldungen.zustand === 'daten' && meldungen.zahl.bestaetigung_ueberfaellig > 0
+                  ? 'alarm'
+                  : 'neutral'
+              }
+              zustand={zZaehlstand(meldungen)}
+              ziel={meldungen.zustand === 'gesperrt' ? undefined : meldungenPfad(einsatzId)}
             />
             {/* Kein `ton` (LFH-532): der Status folgt der Phasenachse (`LAGEBERICHT_STATUS`), ein
               Entwurf ist kein Warnzustand. Beschriftet wird mit dessen `label`, nie mit dem

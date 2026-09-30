@@ -267,7 +267,12 @@ describe('NachforderungenPage', () => {
     it('Schließen und erneutes Öffnen zeigt eine leere Erfassung', async () => {
       renderPage(deeplink);
       expect(await screen.findByLabelText('Art')).toHaveValue('Verpflegung');
-      await userEvent.click(screen.getByRole('button', { name: 'Formular schließen' }));
+      // Zwei Knöpfe schließen die Erfassung: der im Seitenkopf und das Kreuz am Paneel. Bis
+      // LFH-595 schob antds Ikone `aria-label="up"` in den Namen des Kopfknopfs; die Ikonen des
+      // Satzes sind `aria-hidden`, beide heißen jetzt gleich. Geklickt wird der Kopfknopf.
+      const schliessen = screen.getAllByRole('button', { name: 'Formular schließen' });
+      expect(schliessen).toHaveLength(2);
+      await userEvent.click(schliessen[0]);
       await waitFor(() => expect(screen.queryByLabelText('Art')).not.toBeInTheDocument());
       await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
       expect(await screen.findByLabelText('Art')).toHaveValue('');

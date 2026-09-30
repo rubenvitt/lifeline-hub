@@ -1,5 +1,5 @@
+import { IkoneOrtsmarke, IkonePlus } from '../ikonen';
 import { Alert, App, AutoComplete, Button, DatePicker, Form, Input, Tag, theme } from 'antd';
-import { EnvironmentOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useLinkClickHandler, useNavigate } from 'react-router';
@@ -287,7 +287,7 @@ export default function EinsaetzePage() {
           {e.einsatzort && (
             <span data-testid="einsatz-ort" style={{ color: rollen.text2 }}>
               <span aria-hidden="true">
-                <EnvironmentOutlined />{' '}
+                <IkoneOrtsmarke />{' '}
               </span>
               {e.einsatzort}
             </span>
@@ -376,7 +376,7 @@ export default function EinsaetzePage() {
             {darfAnlegen && (
               <Button
                 type="dashed"
-                icon={<PlusOutlined aria-hidden />}
+                icon={<IkonePlus />}
                 onClick={() => setDialogOffen(true)}
                 style={{ height: '100%', width: '100%', minHeight: KACHEL_MIN_HOEHE }}
               >

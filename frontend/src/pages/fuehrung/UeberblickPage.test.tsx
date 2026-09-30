@@ -173,10 +173,15 @@ const volleDaten = {
   ],
   /** Maßgebliche Pegel — im Grundbestand keiner festgelegt. */
   pegel: [] as unknown[],
+  /**
+   * Modulzähler des Servers (LFH-550): die Kennzahl „Offene Aufträge" liest ihn, nicht die Liste.
+   * Passend zur Liste darüber — zwei offen (21, 22), davon einer überfällig.
+   */
+  zaehler: { auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 1 } } as object,
 };
 
-/** Rückmeldungen sind optional: ohne Angabe liefert der Server eine leere Menge. */
-type Daten = typeof volleDaten & { rueckmeldungen?: object };
+/** Rückmeldungen und Zähler sind optional: ohne Angabe liefert der Server eine leere Menge. */
+type Daten = Omit<typeof volleDaten, 'zaehler'> & { rueckmeldungen?: object; zaehler?: object };
 const KEINE_RUECKMELDUNGEN = { frist_min: 60, einheiten: [], abschnitte: [] };
 
 /** Ein Leitpegel mit frischer Messung (relativ zur echten Uhr, wie die Seite rechnet). */
@@ -202,6 +207,10 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     http.get('/api/einsaetze/1/abschnitte', json(d.abschnitte)),
     http.get('/api/einsaetze/1/gefahrengebiete', json(d.gefahren)),
     http.get('/api/einsaetze/1/auftraege', json(d.auftraege)),
+    http.get(
+      '/api/einsaetze/1/modul-zaehler',
+      json(d.zaehler ?? { auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 } }),
+    ),
     http.get('/api/einsaetze/1/erinnerungen', json(d.erinnerungen)),
     http.get(
       '/api/einsaetze/1/meldungen/rueckmeldungen',
@@ -779,8 +788,12 @@ describe('UeberblickPage', () => {
   });
 
   it('Fehler ist nicht leer: ausgefallene Aufträge zeigen „Stand unbekannt", der Rest bleibt', async () => {
+    // Liste und Zähler fallen aus: das Paneel und die Kennzahl sagen es je für sich.
     stelleBereit(volleDaten, [
       http.get('/api/einsaetze/1/auftraege', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+      http.get('/api/einsaetze/1/modul-zaehler', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);

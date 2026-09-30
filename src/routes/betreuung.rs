@@ -8,7 +8,7 @@
 //! offline erfasste und schon gespeicherte Meldung kommt auch nach Einsatzende zurück.
 //! Bodies nur über `JsonBody`, Sub-IDs nur über `PfadParam`.
 //!
-//! **Statuscodes** nach der Konvention in `src/error.rs` (CLAUDE.md „Statuscode-Konvention“,
+//! **Statuscodes** nach der Konvention in `src/error.rs` (src/AGENTS.md „Statuscode-Konvention“,
 //! design.md D3):
 //! - **400** — das Feld für sich: fehlendes Pflichtfeld, unbekannter Enum-Wert, leere
 //!   Bezeichnung, Plangröße/Kapazität < 1, Anzahl < 0, Zeitpunkt unlesbar oder mehr als
@@ -499,7 +499,7 @@ pub struct StelleAendern {
     notiz: Option<Option<String>>,
     /// Koordinate auf der Lagekarte (LFH-673), tri-state je Wert: fehlt = unverändert,
     /// `null` = entfernen. Halbes Paar oder Wert außerhalb des Bereichs → **422**, wie an der
-    /// UHS (`einsatz_uhs.rs`, von CLAUDE.md als legitimes 422 geführt): das Paar ist ein
+    /// UHS (`einsatz_uhs.rs`, von src/AGENTS.md als legitimes 422 geführt): das Paar ist ein
     /// Zusammenhang zweier Felder. Bewusste Abweichung von der 400-Linie für Feldfehler
     /// dieses Moduls (LFH-639 D3), damit alle Verortungswege gleich antworten.
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]

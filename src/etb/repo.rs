@@ -238,7 +238,7 @@ async fn pruefe_anhaenge(
     anhang_ids: &[i64],
 ) -> Result<(), AppError> {
     for &aid in anhang_ids {
-        // Die Bindung kommt aus dem Linker-Register `anhang::repo::MODUL_LINKER` (CLAUDE.md
+        // Die Bindung kommt aus dem Linker-Register `anhang::repo::MODUL_LINKER` (src/AGENTS.md
         // „ETB-Anhänge", LFH-21) plus dem Chat: ein neuer Linker braucht dort einen Eintrag,
         // sonst bände das ETB dessen Dateien ein zweites Mal — der Registerguard macht das rot.
         let stand: Option<(bool, i64)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(

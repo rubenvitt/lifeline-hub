@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type {
-  Auftrag,
-  EinsatzAnzeige,
-  Gefahrengebiet,
-  Meldung,
-  PegelAnzeige,
-  Person,
-} from '../../api/types';
+import type { EinsatzAnzeige, Gefahrengebiet, PegelAnzeige, Person } from '../../api/types';
 import {
   VERMISST_LANG_MS,
   langeVermisst,
@@ -49,8 +42,6 @@ const roh = (over: Partial<Rohdaten> = {}): Rohdaten => ({
   fahrzeuge: [],
   material: [],
   abschnitte: [],
-  auftraege: [],
-  meldungen: [],
   pegel: [],
   evakuierung: { zustand: 'daten', kennzahl: null },
   ...over,
@@ -332,26 +323,9 @@ describe('baueLagebild', () => {
     expect(etiketten).not.toContain('Pegel');
   });
 
-  it('Führungsstand: Überfälligkeit ist vom Bearbeitungsstatus unabhängig', () => {
-    const a = (bearbeitungsstatus: Auftrag['bearbeitungsstatus'], ist_ueberfaellig = false) =>
-      ({ bearbeitungsstatus, ist_ueberfaellig }) as Auftrag;
-    const m = (status: Meldung['status'], ist_offen: boolean, ist_ueberfaellig = false) =>
-      ({ status, ist_offen, ist_ueberfaellig }) as Meldung;
-    const { fuehrung } = baueLagebild(
-      roh({
-        auftraege: [a('offen'), a('vollzogen', true), a('abgenommen')],
-        meldungen: [m('neu', true), m('erledigt', false, true)],
-      }),
-      JETZT,
-    );
-    expect(fuehrung).toMatchObject({
-      auftraegeOffen: 1,
-      auftraegeUeberfaellig: 1,
-      meldungenOffen: 1,
-      meldungenNeu: 1,
-      meldungenUeberfaellig: 1,
-      bericht: null,
-    });
+  it('Führungsstand: Aufträge und Meldungen zählt das Lagebild nicht (LFH-550, Modulzähler)', () => {
+    const { fuehrung } = baueLagebild(roh(), JETZT);
+    expect(Object.keys(fuehrung).sort()).toEqual(['bericht', 'uhsAktiv', 'uhsGeplant']);
   });
 });
 

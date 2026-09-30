@@ -290,7 +290,7 @@ pub async fn anlegen_mit_anhaengen(
             // Modulgebundene Anhänge (Dokument LFH-632, ETB LFH-117, Schaden LFH-21) sind nicht
             // verknüpfbar: sie gehören ihrem Modul, ein zweiter Linker würde deren Lösch-/
             // Rechte-Semantik aushebeln („eine Datei, ein Lebenszyklus"). Die Bedingung kommt
-            // aus dem Linker-Register `anhang::repo::MODUL_LINKER` (CLAUDE.md „ETB-Anhänge"):
+            // aus dem Linker-Register `anhang::repo::MODUL_LINKER` (src/AGENTS.md „ETB-Anhänge"):
             // ein neuer Linker braucht dort einen Eintrag, hier keine Handarbeit.
             let treffer: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
                 "SELECT 1 FROM anhang a WHERE a.id = ? AND a.einsatz_id = ? AND NOT {}",

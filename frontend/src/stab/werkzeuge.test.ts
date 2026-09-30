@@ -1,5 +1,5 @@
+import { IkoneHaus } from '../ikonen';
 import { describe, expect, it } from 'vitest';
-import { TbHome } from 'react-icons/tb';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 import type { ModulEintrag } from '../einsatz/modulRegistry';
 import { werkzeugeFuer } from './werkzeuge';
@@ -12,7 +12,7 @@ const stub = (over: Partial<ModulEintrag>): ModulEintrag => ({
   key: 'x',
   kategorie: 'fuehrung',
   label: 'X',
-  icon: TbHome,
+  icon: IkoneHaus,
   route: 'x',
   status: 'fertig',
   ...over,

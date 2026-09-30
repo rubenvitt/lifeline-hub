@@ -1,7 +1,7 @@
+import { IkoneChevronRechts, IkoneChevronRunter, IkonePunkteSenkrecht } from '../ikonen';
 import { Button, Dropdown, Popconfirm, Space, Typography, theme } from 'antd';
 import type { Key, ReactNode } from 'react';
 import type { MenuProps, TableColumnType } from 'antd';
-import { DownOutlined, MoreOutlined, RightOutlined } from '@ant-design/icons';
 import {
   isValidElement,
   useCallback,
@@ -882,7 +882,7 @@ export default function Datensicht<T extends object, const K extends string>(
           // antds Ikone bringt `role="img"` mit englischem Namen mit; die Hülle nimmt sie aus dem
           // Vorlesebaum.
           <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-            {offen ? <DownOutlined /> : <RightOutlined />}
+            {offen ? <IkoneChevronRunter /> : <IkoneChevronRechts />}
           </span>
         }
       >
@@ -1369,7 +1369,7 @@ export default function Datensicht<T extends object, const K extends string>(
             aria-label={weitere.zugaenglicherName(zeile)}
             icon={
               <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                <MoreOutlined />
+                <IkonePunkteSenkrecht />
               </span>
             }
           />

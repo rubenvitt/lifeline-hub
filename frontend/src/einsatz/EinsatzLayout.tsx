@@ -1,6 +1,6 @@
+import { IkoneMenue } from '../ikonen';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
-import { TbMenu2 } from 'react-icons/tb';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
@@ -304,7 +304,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                   flexShrink: 0,
                   color: rahmenFarben.text,
                 }}
-                icon={<TbMenu2 size={22} aria-hidden />}
+                icon={<IkoneMenue size={22} />}
                 onClick={() => setNavOffen(true)}
               />
             </div>

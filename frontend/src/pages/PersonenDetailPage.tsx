@@ -1,3 +1,4 @@
+import { IkonePunkteSenkrecht } from '../ikonen';
 import { useRollen } from '../components/instrument/rollenwerte';
 import { bezugsDarstellung } from '../theme/statusFarben';
 import StatusTag from '../components/StatusTag';
@@ -23,7 +24,6 @@ import {
   type MenuProps,
   type TableColumnsType,
 } from 'antd';
-import { MoreOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -1142,7 +1142,7 @@ export default function PersonenDetailPage() {
                 <Button
                   type="text"
                   loading={laeuftStatus}
-                  icon={<MoreOutlined />}
+                  icon={<IkonePunkteSenkrecht />}
                   // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs lieferten n
                   // gleichnamige Knöpfe kein Ziel.
                   aria-label={`Weitere Aktionen zu Person ${registrierAnzeige(p.registrier_nr)}`}

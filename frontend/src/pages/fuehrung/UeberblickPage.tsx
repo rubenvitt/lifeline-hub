@@ -1,8 +1,8 @@
+import { IkoneBericht, IkonePlus } from '../../ikonen';
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Breadcrumb, Button } from 'antd';
-import { TbFileText, TbPlus } from 'react-icons/tb';
 import dayjs, { type Dayjs } from 'dayjs';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { RechteHinweis } from '../../components/SpeicherHinweis';
@@ -35,6 +35,8 @@ import { listeAuftraege } from '../../api/auftraege';
 import { listeErinnerungen } from '../../api/erinnerungen';
 import { listeEtb } from '../../api/etb';
 import { holeRueckmeldungen } from '../../api/meldungen';
+import { ladeModulZaehler } from '../../api/modulZaehler';
+import { NICHT_FREIGEGEBEN, auftragsStand } from '../lage-dashboard/fuehrungsZahlen';
 import { pegelAbfrage } from '../../api/pegel';
 import { PEGEL_STAND_UNBEKANNT, pegelNotizKurz } from '../../pegel/pegelKennzahl';
 import { listeAbloesungen } from '../../api/abloesungen';
@@ -238,6 +240,12 @@ export default function UeberblickPage() {
     queryKey: einsatzKeys.auftraege(einsatzId),
     queryFn: () => listeAuftraege(einsatzId),
   });
+  // Die Kennzahl „Offene Aufträge" zählt der Server (LFH-550): derselbe Cache wie das Modulpanel.
+  // Die Liste darüber speist nur das Paneel und die Fristen.
+  const zaehlerQ = useQuery({
+    queryKey: einsatzKeys.modulZaehler(einsatzId),
+    queryFn: () => ladeModulZaehler(einsatzId),
+  });
   const erinnerungenQ = useQuery({
     queryKey: einsatzKeys.erinnerungen(einsatzId),
     queryFn: () => listeErinnerungen(einsatzId, false),
@@ -305,7 +313,9 @@ export default function UeberblickPage() {
           : null,
     [pegelQ.isError, pegel, jetzt],
   );
-  const auftragszahl = useMemo(() => auftraegeKennzahl(auftraege ?? []), [auftraege]);
+  const auftragsstand = auftragsStand(zaehlerQ);
+  const auftragszahl =
+    auftragsstand.zustand === 'daten' ? auftraegeKennzahl(auftragsstand.zahl) : null;
   const offene = useMemo(() => offeneAuftraege(auftraege ?? []), [auftraege]);
   const zeilen = useMemo(
     () =>
@@ -370,7 +380,7 @@ export default function UeberblickPage() {
     m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
 
   const ueberfaelligMeta =
-    zAuftraege === 'daten' ? (
+    zAuftraege === 'daten' && auftragszahl ? (
       <span
         style={{
           color: auftragszahl.ueberfaellig > 0 ? rollen.achtungText : rollen.schwach,
@@ -414,7 +424,7 @@ export default function UeberblickPage() {
             <Button
               icon={
                 <Ikone>
-                  <TbFileText size={14} />
+                  <IkoneBericht size={14} />
                 </Ikone>
               }
               onClick={() => waehle(lageberichtePfad(einsatzId))}
@@ -427,7 +437,7 @@ export default function UeberblickPage() {
               disabled={!darfSchreiben}
               icon={
                 <Ikone>
-                  <TbPlus size={14} />
+                  <IkonePlus size={14} />
                 </Ikone>
               }
               onClick={() => waehle(etbPfad(einsatzId, { neu: true }))}
@@ -469,18 +479,26 @@ export default function UeberblickPage() {
             <Kennzahl
               titel="Offene Aufträge"
               groesse="gross"
-              zustand={zAuftraege}
-              ton={auftragszahl.ton}
-              wert={auftragszahl.offen}
+              zustand={
+                auftragsstand.zustand === 'laden' || auftragsstand.zustand === 'fehler'
+                  ? auftragsstand.zustand
+                  : 'daten'
+              }
+              ton={auftragszahl?.ton ?? 'neutral'}
+              wert={auftragszahl?.offen ?? '—'}
               einheit={
-                auftragszahl.ueberfaellig > 0 ? `davon ${auftragszahl.ueberfaellig} ü.` : undefined
+                auftragszahl && auftragszahl.ueberfaellig > 0
+                  ? `davon ${auftragszahl.ueberfaellig} ü.`
+                  : undefined
               }
               notiz={
-                auftragszahl.ueberfaellig > 0
-                  ? `${auftragszahl.inArbeit} in Arbeit`
-                  : `keine über Frist · ${auftragszahl.inArbeit} in Arbeit`
+                !auftragszahl
+                  ? NICHT_FREIGEGEBEN
+                  : auftragszahl.ueberfaellig > 0
+                    ? `${auftragszahl.inArbeit} in Arbeit`
+                    : `keine über Frist · ${auftragszahl.inArbeit} in Arbeit`
               }
-              ziel={auftraegePfad(einsatzId)}
+              ziel={auftragsstand.zustand === 'gesperrt' ? undefined : auftraegePfad(einsatzId)}
             />
             <Kennzahl
               titel="Einsatzabschnitte"

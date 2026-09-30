@@ -703,6 +703,67 @@ fn zeitachse_marke_wire() {
     } in lifeline_hub::zeitachse::ZeitachseMarke::ALLE);
 }
 
+/// LFH-554: Presse und Medienarbeit S5. Art, Status und Anliegen tragen die DB-CHECK-Werte aus
+/// `migrations/0129_presse.sql`; Vorlage und Status der Pressemitteilung sind Schema-Anker wie
+/// beim Lagebericht.
+#[test]
+fn medienkontakt_art_wire() {
+    enum_wire!(lifeline_hub::presse::MedienkontaktArt {
+        Anfrage => "anfrage",
+        Abstimmung => "abstimmung",
+        Termin => "termin",
+    } in lifeline_hub::presse::MedienkontaktArt::ALLE);
+}
+
+#[test]
+fn medienkontakt_status_wire() {
+    enum_wire!(lifeline_hub::presse::MedienkontaktStatus {
+        Offen => "offen",
+        Beantwortet => "beantwortet",
+        Abgelehnt => "abgelehnt",
+        Erledigt => "erledigt",
+    } in lifeline_hub::presse::MedienkontaktStatus::ALLE);
+}
+
+#[test]
+fn infotelefon_anliegen_wire() {
+    enum_wire!(lifeline_hub::infotelefon::InfotelefonAnliegen {
+        Vermisstensuche => "vermisstensuche",
+        AuskunftLage => "auskunft_lage",
+        Hinweis => "hinweis",
+        Hilfeangebot => "hilfeangebot",
+        Beschwerde => "beschwerde",
+        Presse => "presse",
+        Sonstiges => "sonstiges",
+    } in lifeline_hub::infotelefon::InfotelefonAnliegen::ALLE);
+}
+
+#[test]
+fn infotelefon_status_wire() {
+    enum_wire!(lifeline_hub::infotelefon::InfotelefonStatus {
+        Offen => "offen",
+        Erledigt => "erledigt",
+    } in lifeline_hub::infotelefon::InfotelefonStatus::ALLE);
+}
+
+#[test]
+fn pressemitteilung_vorlage_wire() {
+    enum_wire!(lifeline_hub::presse::mitteilung::PressemitteilungVorlage {
+        Erstinformation => "erstinformation",
+        Folgeinformation => "folgeinformation",
+        Bevoelkerungshinweis => "bevoelkerungshinweis",
+        Freitext => "freitext",
+    });
+}
+
+#[test]
+fn pressemitteilung_status_wire() {
+    enum_wire!(lifeline_hub::presse::mitteilung::PressemitteilungStatus {
+        Entwurf => "entwurf",
+        Freigegeben => "freigegeben",
+    });
+}
+
 /// LFH-639: Betreuung. Die vier Enums tragen die DB-CHECK-Werte aus
 /// `migrations/0117_betreuung.sql` und sind hier gegen die Literale gepinnt.
 #[test]
@@ -795,6 +856,8 @@ fn live_event_wire() {
         Abloesung => "abloesung",
         Betreuung => "betreuung",
         Verpflegung => "verpflegung",
+        Presse => "presse",
+        Infotelefon => "infotelefon",
         KartenAnsicht => "karten_ansicht",
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",

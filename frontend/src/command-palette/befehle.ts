@@ -1,17 +1,18 @@
 import {
-  TbList,
-  TbUser,
-  TbSettings,
-  TbLogout,
-  TbPlus,
-  TbSun,
-  TbMoon,
-  TbDeviceDesktop,
-  TbWorld,
-  TbArrowsMinimize,
-  TbArrowsMaximize,
-  TbHandStop,
-} from 'react-icons/tb';
+  IkoneAbmelden,
+  IkoneGlobus,
+  IkoneHandStopp,
+  IkoneListe,
+  IkoneMond,
+  IkoneMonitor,
+  IkonePerson,
+  IkonePfeileAuswaerts,
+  IkonePfeileEinwaerts,
+  IkonePlus,
+  IkoneSonne,
+  IkoneZahnrad,
+  type Ikone,
+} from '../ikonen';
 import {
   kategorien,
   modulRegistry,
@@ -34,7 +35,6 @@ import {
   tierePfad,
   unfallhilfsstellenListePfad,
 } from '../routing/deeplinks';
-import type { IconType } from 'react-icons';
 import { GRUPPE_MERKBAR, sprungZu } from './typen';
 import type { Befehl, BefehlKontext, Oeffnung, TastaturAktionId } from './typen';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
@@ -132,24 +132,24 @@ export const SCHNELLAKTIONEN: {
   },
 ];
 
-const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: IconType }[] = [
-  { id: 'theme:system', label: 'Darstellung: System', modus: 'system', icon: TbDeviceDesktop },
-  { id: 'theme:light', label: 'Darstellung: Hell', modus: 'light', icon: TbSun },
-  { id: 'theme:dark', label: 'Darstellung: Dunkel', modus: 'dark', icon: TbMoon },
+const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: Ikone }[] = [
+  { id: 'theme:system', label: 'Darstellung: System', modus: 'system', icon: IkoneMonitor },
+  { id: 'theme:light', label: 'Darstellung: Hell', modus: 'light', icon: IkoneSonne },
+  { id: 'theme:dark', label: 'Darstellung: Dunkel', modus: 'dark', icon: IkoneMond },
 ];
 
 /** Bediendichte über die Palette, die schnelle Abkürzung neben der Umschaltgruppe im
  *  Benutzermenü. Kein Ersatz: ein `Befehl` trägt kein Zustandsfeld, die Palette zeigt die
  *  aktive Stufe nicht an. */
-const DICHTE_BEFEHLE: { id: string; label: string; stufe: Dichte; icon: IconType }[] = [
-  { id: 'dichte:kompakt', label: 'Dichte: Kompakt', stufe: 'kompakt', icon: TbArrowsMinimize },
+const DICHTE_BEFEHLE: { id: string; label: string; stufe: Dichte; icon: Ikone }[] = [
+  { id: 'dichte:kompakt', label: 'Dichte: Kompakt', stufe: 'kompakt', icon: IkonePfeileEinwaerts },
   {
     id: 'dichte:komfortabel',
     label: 'Dichte: Komfortabel',
     stufe: 'komfortabel',
-    icon: TbArrowsMaximize,
+    icon: IkonePfeileAuswaerts,
   },
-  { id: 'dichte:handschuh', label: 'Dichte: Handschuh', stufe: 'handschuh', icon: TbHandStop },
+  { id: 'dichte:handschuh', label: 'Dichte: Handschuh', stufe: 'handschuh', icon: IkoneHandStopp },
 ];
 
 const KOORD_BEFEHLE: { format: Koordinatenformat; label: string }[] = [
@@ -332,7 +332,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
           id: `aktion:${a.modulKey}`,
           gruppe: 'schnellaktionen',
           label: a.label,
-          icon: TbPlus,
+          icon: IkonePlus,
           schlagworte: a.schlagworte,
           // Gemerkt wird das MODUL der Aktion (LFH-436): ein Griff, ein Modul.
           ...sprungZu(ziel, k.navigate, () => k.merkeModulBesuch?.(a.modulKey)),
@@ -348,7 +348,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       id: `einsatz:${e.id}`,
       gruppe: 'einsaetze',
       label: e.bezeichnung,
-      icon: TbList,
+      icon: IkoneListe,
       schlagworte: e.stichwort ? [e.stichwort] : undefined,
       ...sprungZu(einsatzPfad(e.id), k.navigate),
     });
@@ -391,7 +391,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       id: `koord:${c.format}`,
       gruppe: 'einstellungen',
       label: `Koordinaten: ${c.label}`,
-      icon: TbWorld,
+      icon: IkoneGlobus,
       schlagworte: ['koordinaten', 'format', c.format],
       ausfuehren: () => k.setKoordinaten(c.format),
     });
@@ -402,14 +402,14 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     id: 'nav:einsaetze',
     gruppe: 'navigation',
     label: 'Alle Einsätze',
-    icon: TbList,
+    icon: IkoneListe,
     ...sprungZu(einsaetzePfad(), k.navigate),
   });
   befehle.push({
     id: 'nav:profil',
     gruppe: 'navigation',
     label: 'Profil',
-    icon: TbUser,
+    icon: IkonePerson,
     ...sprungZu('/profil', k.navigate),
   });
   // Verwaltungsbereich und Stammdaten hängen am AdminLayout-Gate `darfVerwaltung`, wie Topbar und
@@ -419,14 +419,14 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       id: 'nav:stammdaten',
       gruppe: 'navigation',
       label: 'Stammdaten',
-      icon: TbList,
+      icon: IkoneListe,
       ...sprungZu('/stammdaten', k.navigate),
     });
     befehle.push({
       id: 'nav:admin',
       gruppe: 'navigation',
       label: 'Administration',
-      icon: TbSettings,
+      icon: IkoneZahnrad,
       ...sprungZu('/admin', k.navigate),
     });
   }
@@ -437,7 +437,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       id: 'nav:benutzer',
       gruppe: 'navigation',
       label: 'Benutzerverwaltung',
-      icon: TbUser,
+      icon: IkonePerson,
       ...sprungZu('/benutzer', k.navigate),
     });
   }
@@ -447,7 +447,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     id: 'nav:abmelden',
     gruppe: 'navigation',
     label: 'Abmelden',
-    icon: TbLogout,
+    icon: IkoneAbmelden,
     nichtMerkbar: true,
     ausfuehren: () => k.logout(),
   });

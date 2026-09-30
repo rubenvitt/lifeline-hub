@@ -2,6 +2,7 @@ import { App, Breadcrumb, Button, Flex, Skeleton, Space, Typography, theme } fro
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { abrufZustand } from '../api/abrufZustand';
 import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
@@ -15,32 +16,41 @@ import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components
 import StatusTag from '../components/StatusTag';
 import { modulZielRoute } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { einsatzModulPfad, funkplanPfad } from '../routing/deeplinks';
+import { einsatzModulPfad } from '../routing/deeplinks';
 import BesetzungModal from '../stab/BesetzungModal';
 import ChecklistePaneel from '../stab/ChecklistePaneel';
 import LagebesprechungHistorie from '../stab/LagebesprechungHistorie';
 import LagebesprechungModal from '../stab/LagebesprechungModal';
 import LagebesprechungStand from '../stab/LagebesprechungStand';
+import VorbereitungPaneel from '../stab/VorbereitungPaneel';
 import { zeigeAbschlussToast } from '../stab/abschlussToast';
 import { besetzungDarstellung, besetzungRechteText, zeileFuer } from '../stab/besetzung';
 import { mitWirksamemLabel } from '../stab/sachgebiete';
 import { ladeFuehrungsfunktionen } from '../api/fuehrungsfunktionen';
 import { werkzeugeFuer } from '../stab/werkzeuge';
+import { unterseitenFuer } from '../stab/unterseiten';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { einsatzStatus } from '../theme/statusFarben';
 
 /**
  * Modul „Stab" (LFH-46): Lagebesprechung und Führungsorganisation S1–S6.
  *
- * Eine Vollseite, zwei Sektionen, zwei Masken. Die Besetzung ist eine `Liste` mit sechs festen
- * Zeilen — hier wird nichts verglichen. Die Zeile ist kein Klickziel; genau eine Aktion „Besetzung
- * ändern" je Zeile, ohne Schreibrecht entfällt sie und ein Satz nennt den Grund.
+ * Eine Vollseite, vier Sektionen, zwei Masken. Reihenfolge: Lagebesprechung, Vorbereitung,
+ * Besetzung, Arbeitsaufnahme.
+ *
+ * Die Vorbereitung der Lagebesprechung (LFH-550, `stab/VorbereitungPaneel.tsx`) steht direkt unter
+ * der Lagebesprechung: der Lagestand aus denselben Zahlen wie das Lage-Dashboard, mit Quelle je
+ * Zeile; sie speichert nichts.
+ *
+ * Die Besetzung ist eine `Liste` mit sechs festen Zeilen — hier wird nichts verglichen. Die Zeile
+ * ist kein Klickziel; genau eine Aktion „Besetzung ändern" je Zeile, ohne Schreibrecht entfällt sie
+ * und ein Satz nennt den Grund.
  *
  * Der Kopf trägt genau eine Primäraktion „Lagebesprechung abschließen". Sie öffnet ein Modal und
  * gehört deshalb in den Kopf; ohne Schreibrecht steht sie gesperrt da, und `neueZeile` der
  * Kommandopalette trägt denselben Riegel.
  *
- * Das dritte Paneel „Arbeitsaufnahme" (LFH-551) steht UNTER den beiden bestehenden: die Checkliste
+ * Das Paneel „Arbeitsaufnahme" (LFH-551) steht ganz unten: die Checkliste
  * ist nach zehn Minuten erledigt und soll dann weder Lagebesprechung noch Besetzung nach unten
  * drücken. Eigene Abfrage, eigener Endpunkt — die Stab-Antwort bleibt unberührt.
  *
@@ -185,6 +195,16 @@ export default function StabPage() {
         </Flex>
       </Paneel>
 
+      <VorbereitungPaneel
+        einsatzId={einsatzId}
+        einsatz={einsatz}
+        benutzer={benutzer}
+        overrides={overridesQuery.data}
+        stab={stabQuery.data}
+        stabZustand={abrufZustand(stabQuery)}
+        stabStand={stabQuery.dataUpdatedAt}
+      />
+
       <Paneel
         titel="Besetzung S1–S6"
         meta={stabQuery.data ? `${vergeben}/${sachgebiete.length} vergeben` : undefined}
@@ -208,11 +228,11 @@ export default function StabPage() {
               renderItem={(s) => {
                 const zeile = zeileFuer(stabQuery.data, s.sachgebiet);
                 const werkzeuge = werkzeugeFuer(s.werkzeuge, benutzer, overridesQuery.data);
-                // Das Arbeitsergebnis der S6 (LFH-548): ein Einstieg in eine Unterroute des
-                // Stabs, kein Modul. Deshalb nicht über `werkzeugeFuer`, und es bleibt stehen,
-                // wenn die Modul-Werkzeuge der Zeile ausgeblendet sind; die Sperre erbt es vom
-                // Stab selbst.
-                const funkplan = s.sachgebiet === 's6';
+                // Arbeitsergebnisse als Unterroute des Stabs, kein Modul (S6 Funkplan LFH-548,
+                // S5 Pressearbeit und Informationstelefon LFH-554). Deshalb nicht über
+                // `werkzeugeFuer`, und sie bleiben stehen, wenn die Modul-Werkzeuge der Zeile
+                // ausgeblendet sind; die Sperre erben sie vom Stab selbst.
+                const unterseiten = unterseitenFuer(s.sachgebiet);
                 return (
                   <ListenEintrag
                     actions={
@@ -251,16 +271,17 @@ export default function StabPage() {
                               (FwDV 100 Anl. 2, S. {s.seite})
                             </Typography.Text>
                           </span>
-                          {(werkzeuge.length > 0 || funkplan) && (
+                          {(werkzeuge.length > 0 || unterseiten.length > 0) && (
                             <Flex wrap role="group" aria-label={`Werkzeuge ${s.kuerzel}`}>
-                              {funkplan && (
+                              {unterseiten.map((u) => (
                                 <Link
-                                  to={funkplanPfad(einsatzId)}
+                                  key={u.key}
+                                  to={u.pfad(einsatzId)}
                                   style={stabZeilenzielStil(token)}
                                 >
-                                  Funkplan
+                                  {u.label}
                                 </Link>
-                              )}
+                              ))}
                               {werkzeuge.map((m) => (
                                 <Link
                                   key={m.key}

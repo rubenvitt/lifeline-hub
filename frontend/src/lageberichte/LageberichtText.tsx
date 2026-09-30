@@ -1,7 +1,7 @@
 import { Typography, theme } from 'antd';
 import Markdown from '../components/Markdown';
 import type { LageberichtAnzeige } from '../api/types';
-import { vorlage } from './vorlagen';
+import { vorlage, type AbschnittDef } from './vorlagen';
 
 /** Ebene der Überschrift über dem Berichtstext; Titel und `#` im Text rücken eine darunter. */
 type BerichtUnterEbene = 1 | 2 | 3 | 4;
@@ -21,13 +21,34 @@ export default function LageberichtText({
   bericht: LageberichtAnzeige;
   unterEbene: BerichtUnterEbene;
 }) {
+  return (
+    <AbschnittsText
+      gliederung={vorlage(bericht.vorlage)?.abschnitte ?? []}
+      abschnitte={bericht.abschnitte}
+      unterEbene={unterEbene}
+    />
+  );
+}
+
+/**
+ * Der Lesetext eines Vorlagendokuments aus Gliederung und gefüllten Abschnitten. Geteilt von
+ * Lagebericht und Pressemitteilung (LFH-554); die Gliederung liefert die Vorlage der Art.
+ */
+export function AbschnittsText({
+  gliederung,
+  abschnitte,
+  unterEbene,
+}: {
+  gliederung: readonly AbschnittDef[];
+  abschnitte: readonly { schluessel: string; text: string }[];
+  unterEbene: BerichtUnterEbene;
+}) {
   const { token } = theme.useToken();
   const abschnittEbene = (unterEbene + 1) as 2 | 3 | 4 | 5;
-  const v = vorlage(bericht.vorlage);
   return (
     <>
-      {v?.abschnitte.map((a) => {
-        const text = bericht.abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
+      {gliederung.map((a) => {
+        const text = abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
         return (
           <section key={a.schluessel} style={{ marginBottom: 16 }}>
             {/* Eine Ebene unter dem Rahmen; Satz bleibt der von h5. */}

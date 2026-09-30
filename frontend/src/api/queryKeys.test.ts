@@ -31,6 +31,8 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.kraefteZeitachse).toBe('einsatz-kraefte-zeitachse');
     expect(EINSATZ_KEYS.betreuung).toBe('einsatz-betreuung');
     expect(EINSATZ_KEYS.verpflegung).toBe('einsatz-verpflegung');
+    expect(EINSATZ_KEYS.presse).toBe('einsatz-presse');
+    expect(EINSATZ_KEYS.infotelefon).toBe('einsatz-infotelefon');
     expect(EINSATZ_KEYS.schadenAnhaenge).toBe('einsatz-schaden-anhaenge');
   });
 });
@@ -109,6 +111,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     expect(EINSATZ_STREAM_EVENTS.karte_bild).toEqual([EINSATZ_KEYS.kartenbilder]);
     // Das DTO trägt keine Nachforderungsdaten, also kein Fan-out.
     expect(EINSATZ_STREAM_EVENTS.verpflegung).toEqual([EINSATZ_KEYS.verpflegung]);
+    expect(EINSATZ_STREAM_EVENTS.presse).toEqual(['einsatz-presse']);
+    expect(EINSATZ_STREAM_EVENTS.infotelefon).toEqual(['einsatz-infotelefon']);
   });
 
   // Ablegen und Entfernen einer Datei verteilen `schaden`.
@@ -326,6 +330,12 @@ describe('einsatzKeys (Factory-Output)', () => {
       9,
     ]);
     expect(einsatzKeys.verpflegung(1)).toEqual(['einsatz-verpflegung', 1]);
+    // Presse S5: Listen und Detail als Sub-Keys unter EINEM Prefix, das `presse`-Ereignis trifft alle.
+    expect(einsatzKeys.presse(1)).toEqual(['einsatz-presse', 1]);
+    expect(einsatzKeys.medienkontakte(1)).toEqual(['einsatz-presse', 1, 'medienkontakte']);
+    expect(einsatzKeys.pressemitteilungen(1)).toEqual(['einsatz-presse', 1, 'mitteilungen']);
+    expect(einsatzKeys.pressemitteilung(1, 4)).toEqual(['einsatz-presse', 1, 'mitteilung', 4]);
+    expect(einsatzKeys.infotelefon(1)).toEqual(['einsatz-infotelefon', 1]);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
     // Lesemarke UNTER dem ETB-Prefix: das `etb`-Ereignis invalidiert sie mit.
     expect(einsatzKeys.etbLesemarke(1)).toEqual(['etb', 1, 'lesemarke']);

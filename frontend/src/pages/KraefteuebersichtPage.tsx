@@ -1,5 +1,5 @@
+import { IkonePlus, IkoneTrichter } from '../ikonen';
 import { App as AntApp, Button, Input, Segmented, Space, Tag, theme } from 'antd';
-import { TbFilter, TbPlus } from 'react-icons/tb';
 import dayjs, { type Dayjs } from 'dayjs';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -30,11 +30,11 @@ import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
 import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import { ankerText, dauerText, kraftDauern, type LaufendeDauer } from '../kraefte/zeitachse';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
+import { staerkeText } from '../anzeige/staerke';
 import {
   baueKraeftebild,
   filtereKraefte,
   rendereMeldebildMarkdown,
-  staerkeText,
   verdichte,
   type FilterWerte,
   type Rohdaten,
@@ -896,7 +896,7 @@ export default function KraefteuebersichtPage() {
               placeholder="Abschnitt"
               prefix={
                 <span aria-hidden style={{ display: 'inline-flex' }}>
-                  <TbFilter />
+                  <IkoneTrichter />
                 </span>
               }
               allowClear
@@ -913,7 +913,7 @@ export default function KraefteuebersichtPage() {
                 type="primary"
                 icon={
                   <span aria-hidden style={{ display: 'inline-flex' }}>
-                    <TbPlus />
+                    <IkonePlus />
                   </span>
                 }
                 title="Einheit anlegen (Einheiten-Seite)"

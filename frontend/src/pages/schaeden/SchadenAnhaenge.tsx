@@ -1,6 +1,6 @@
+import { IkoneHochladen, IkoneMuelleimer } from '../../ikonen';
 import { useEffect, useRef, useState } from 'react';
 import { App, Button, Popconfirm, Space } from 'antd';
-import { DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   entferneSchadenAnhang,
@@ -151,7 +151,7 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
                 aria-label={`Datei ${a.dateiname} von Schaden ${nr} entfernen`}
                 icon={
                   <span aria-hidden="true">
-                    <DeleteOutlined />
+                    <IkoneMuelleimer />
                   </span>
                 }
               />
@@ -173,7 +173,7 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
             onClick={() => setAblegenOffen(true)}
             icon={
               <span aria-hidden="true">
-                <UploadOutlined />
+                <IkoneHochladen />
               </span>
             }
           >

@@ -40,6 +40,10 @@ wire_enum! {
         Abloesung => "abloesung",
         Betreuung => "betreuung",
         Verpflegung => "verpflegung",
+        /// Presse-Log und Pressemitteilungen des Sachgebiets S5 (LFH-554).
+        Presse => "presse",
+        /// Anrufe am Informationstelefon (LFH-554).
+        Infotelefon => "infotelefon",
         KartenAnsicht => "karten_ansicht",
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",
@@ -137,6 +141,11 @@ impl LiveEvent {
             // die Oberfläche aus der Nachforderungs-Query auf, und die frischt deren eigenes
             // Ereignis auf (design.md D6). Der ETB-Nachweis läuft über `etb`.
             LiveEvent::Verpflegung => &["verpflegung"],
+            // Nur `stab`: Medienkontakte, Pressemitteilungen und Anrufe sind Datenobjekte der
+            // S5-Seiten unter dem Stab (LFH-554), deren Routen die Stab-Sperre erben. Der
+            // ETB-Nachweis einer freigegebenen Mitteilung läuft über `etb`.
+            LiveEvent::Presse => &["stab"],
+            LiveEvent::Infotelefon => &["stab"],
             // Die Kartenansicht-Konfiguration lebt auf der Lage-Karte; wer `lagekarte`
             // sehen darf, darf ihre Änderung erfahren (Cache-Invalidierung des Switchers).
             LiveEvent::KartenAnsicht => &["lagekarte"],
@@ -531,6 +540,8 @@ mod tests {
             (LiveEvent::Abloesung, &["abloesung"]),
             (LiveEvent::Betreuung, &["betreuung"]),
             (LiveEvent::Verpflegung, &["verpflegung"]),
+            (LiveEvent::Presse, &["stab"]),
+            (LiveEvent::Infotelefon, &["stab"]),
             (LiveEvent::KartenAnsicht, &["lagekarte"]),
             (LiveEvent::LageSnapshot, &["lagekarte"]),
             (LiveEvent::Sofortmeldung, &["meldungen"]),

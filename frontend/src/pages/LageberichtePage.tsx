@@ -1,5 +1,5 @@
+import { IkonePlus } from '../ikonen';
 import { Breadcrumb, Button, DatePicker, Form, Input, Spin, Typography, theme } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { Select } from '../components/Select';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,7 +11,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { legeLageberichtAn, listeLageberichte } from '../api/lageberichte';
-import type { LageberichtVorlageKey } from '../api/types';
+import type { LageberichtAnzeige, LageberichtVorlageKey } from '../api/types';
 import { VORLAGEN } from '../lageberichte/vorlagen';
 import { kettenKoepfe, type KettenKopf } from '../lageberichte/ketten';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
@@ -44,7 +44,7 @@ function vorlageLabel(schluessel: LageberichtVorlageKey | string): string {
  * Typangabe weitete `K` auf `string`, und der Kartenplan nähme Slot-Tippfehler an.
  */
 function lageberichtSpalten(einsatzId: number) {
-  return spaltenFuer<KettenKopf>()([
+  return spaltenFuer<KettenKopf<LageberichtAnzeige>>()([
     {
       key: 'titel',
       title: 'Titel',
@@ -216,7 +216,7 @@ export default function LageberichtePage() {
           // („plus Neuer Bericht").
           <Button
             type="primary"
-            icon={<PlusOutlined />}
+            icon={<IkonePlus />}
             aria-label="Neuer Bericht"
             onClick={() => {
               anlegenMutation.reset();

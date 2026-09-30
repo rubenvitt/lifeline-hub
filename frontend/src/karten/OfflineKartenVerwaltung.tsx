@@ -1,7 +1,7 @@
+import { IkoneChevronRunter, IkoneLadekreis } from '../ikonen';
 import { App, Button, Dropdown, Popconfirm, Progress, Space, Tag, Typography } from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
-import { DownOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -220,7 +220,7 @@ export default function OfflineKartenVerwaltung() {
         const label = s === 'laedt' ? 'lädt' : 'aktualisiert';
         return (
           <Space size={8}>
-            <Tag icon={<LoadingOutlined spin />} color="processing" style={{ marginInlineEnd: 0 }}>
+            <Tag icon={<IkoneLadekreis drehen />} color="processing" style={{ marginInlineEnd: 0 }}>
               {label}
             </Tag>
             {prozent != null ? (
@@ -350,7 +350,7 @@ export default function OfflineKartenVerwaltung() {
             }}
           >
             <Button>
-              Erweitert <DownOutlined />
+              Erweitert <IkoneChevronRunter />
             </Button>
           </Dropdown>
         </Space>
