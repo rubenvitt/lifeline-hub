@@ -628,8 +628,8 @@ describe('LoginPage', () => {
         [{ id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true }],
         '/app-anmeldung?challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
       );
-      await userEvent.type(await screen.findByLabelText('Benutzername'), 'gerda');
-      await userEvent.type(screen.getByLabelText('Passwort'), 'gerdapw1');
+      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
+      await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
       expect(await screen.findByText('Bestätigung')).toBeInTheDocument();
     });
