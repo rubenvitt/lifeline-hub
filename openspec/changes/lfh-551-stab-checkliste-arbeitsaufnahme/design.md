@@ -122,7 +122,7 @@ Besetzung. Ein erneutes „erledigt“ auf einen erledigten Punkt schreibt nicht
 Live-Kurzruf fürs ETB. Die Bemerkung geht **nicht** in den ETB-Text ein, weil sie Freitext am
 Arbeitsmittel ist, kein Nachweis.
 
-**Offene Entscheidung E1: Was geschieht beim Entfernen dieses Hakens?**
+**Entscheidung E1 (30.09.2026, User: Option A): Was geschieht beim Entfernen dieses Hakens?**
 
 | Option | Wirkung | Bewertung |
 | --- | --- | --- |
@@ -130,7 +130,7 @@ Arbeitsmittel ist, kein Nachweis.
 | B — Nur der Haken belegt | Entfernen schreibt nichts, erneutes Abhaken schreibt wieder | Wörtlich „höchstens einer“ je Übergang. Nach einem Fehlklick steht im ETB „gemeldet“, obwohl es niemand gemeldet hat, und ein zweiter Haken erzeugt eine scheinbare zweite Meldung. |
 | C — Einmalig | Nur der erste Haken je Einsatz schreibt, danach nie wieder | Kein Rauschen, aber auch hier behauptet das ETB nach einem Fehlklick eine Meldung, die es nicht gab. |
 
-Mit A bleibt der Haken ohne Rückfrage (LFH-363: Umkehrbares ohne Rückfrage). Die Umkehr ist ja
+Gewählt ist A. Damit bleibt der Haken ohne Rückfrage (LFH-363: Umkehrbares ohne Rückfrage). Die Umkehr ist ja
 selbst belegt.
 
 ### D5 — Rechte, Lebenszyklus, Live
@@ -183,7 +183,7 @@ Führungsnachweis, und der eine Nachweis steht im ETB.
 - **Lehrmeinung als Code.** Die sieben Punkte können vom Feld abweichen. Die Gegenmaßnahme ist die
   Quelle je Punkt, und die Punkte bleiben frei von Fälligkeit und Zwang. Wird ein Punkt im Feld
   nicht gebraucht, bleibt er offen, und das kostet nichts.
-- **Ein Korrektureintrag im ETB** (bei E1 = A) ist sichtbar. Das ist gewollt: Das ETB soll
+- **Ein Korrektureintrag im ETB** (E1 = A) ist sichtbar. Das ist gewollt: Das ETB soll
   zeigen, dass eine Meldung zurückgenommen wurde.
 - **Zwei Schirme, gleicher Punkt.** Der letzte Schreiber gewinnt je Feld. Das ist harmlos, denn
   beide wollen denselben Zustand herstellen, und das Live-Ereignis gleicht an.

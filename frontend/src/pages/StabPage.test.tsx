@@ -55,6 +55,7 @@ function rendere({
         : HttpResponse.json({ error: 'kaputt' }, { status: stabStatus }),
     ),
     http.get('/api/einsaetze/1/stab/lagebesprechungen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/stab/checkliste', () => HttpResponse.json([])),
     http.post('/api/einsaetze/1/stab/lagebesprechungen', () => post()),
     http.get('/api/einsaetze/1/modul-overrides', () => {
       overrideAufrufe += 1;
@@ -112,6 +113,22 @@ describe('StabPage', () => {
       ]),
     );
     expect(within(sektion).getAllByText('nicht vergeben')).toHaveLength(6);
+  });
+
+  it('hängt die Arbeitsaufnahme als drittes Paneel UNTER die bestehenden (LFH-551)', async () => {
+    rendere();
+    await screen.findByRole('region', { name: 'Arbeitsaufnahme' });
+    const regionen = screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby'));
+    const namen = regionen.map((id) => document.getElementById(id ?? '')?.textContent);
+    expect(namen).toEqual(['Lagebesprechung', 'Besetzung S1–S6', 'Arbeitsaufnahme']);
+  });
+
+  it('sperrt die Haken der Arbeitsaufnahme ohne Schreibrecht; der Kopf nennt den Grund', async () => {
+    rendere({ einsatzObj: einsatz({ meine_rolle: 'beobachter' }) });
+    const r = await screen.findByRole('region', { name: 'Arbeitsaufnahme' });
+    await waitFor(() => expect(within(r).getAllByRole('checkbox')).toHaveLength(7));
+    for (const b of within(r).getAllByRole('checkbox')) expect(b).toBeDisabled();
+    expect(within(r).queryByRole('alert')).toBeNull();
   });
 
   it('nennt die Besetzung beim Wort', async () => {

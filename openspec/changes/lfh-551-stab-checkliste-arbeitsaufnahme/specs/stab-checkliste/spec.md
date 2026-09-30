@@ -62,7 +62,7 @@ Das Setzen oder Entfernen eines Hakens MUST NOT einen ETB-Eintrag erzeugen, mit 
 Wird der Punkt „Einsatzbereitschaft an die Leitstelle gemeldet“ von offen auf erledigt gesetzt,
 SHALL in derselben Transaktion genau ein System-ETB-Eintrag entstehen, der diese Meldung belegt.
 Wird der Haken dieses Punkts entfernt, SHALL in derselben Transaktion genau ein System-ETB-Eintrag
-die Rücknahme belegen (Entscheidung E1, Option A, vorbehaltlich der Freigabe). Ein Aufruf ohne
+die Rücknahme belegen (Entscheidung E1, Option A). Ein Aufruf ohne
 Zustandswechsel MUST NOT ins ETB schreiben. Die Bemerkung MUST NOT in den ETB-Text eingehen.
 
 #### Scenario: Andere Punkte

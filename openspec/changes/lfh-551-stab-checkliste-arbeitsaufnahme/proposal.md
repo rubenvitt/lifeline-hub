@@ -34,8 +34,8 @@ Führungsnachweis. Einzige Ausnahme ist der Punkt, den die FwDV 100 selbst dokum
   setzt `erledigt` und/oder `bemerkung`. Der Aufruf ist idempotent und umkehrbar, ohne Rückfrage.
   Rechte wie der übrige Stab (Lesen: alle Mitglieder; Schreiben: Schreibrecht im aktiven Einsatz).
 - **Kein System-ETB-Eintrag je Haken.** Einzige Ausnahme ist Punkt 7. Wird er erledigt, entsteht
-  ein System-ETB-Eintrag in derselben Transaktion (FwDV 100 Anlage 5, S. 64). Wie die Rücknahme
-  dieses Hakens belegt wird, ist offene Entscheidung E1 in `design.md`.
+  ein System-ETB-Eintrag in derselben Transaktion (FwDV 100 Anlage 5, S. 64). Die Rücknahme
+  dieses Hakens wird ebenso belegt (Entscheidung E1 = A, `design.md` D4).
 - **Neue Fläche auf der Stabseite:** ein drittes Paneel „Arbeitsaufnahme“ unter den beiden
   bestehenden, mit Zähler „n/7 erledigt“. Sieben Zeilen in `components/Liste.tsx`. Jede Zeile ist
   ein `<label>` mit antd-`Checkbox`, Text und Quelle und trägt die zwei Angaben eines handgebauten
@@ -67,6 +67,6 @@ bekommt kein neues Feld (Akzeptanzkriterium „ohne Einfluss auf die Stab-v1-Sub
 - **Frontend, neu:** `stab/checkliste.ts` (Vorlage + Zeilenstil), `stab/ChecklistePaneel.tsx`,
   API in `api/stab.ts`, Key `einsatzKeys.stabCheckliste`.
 - **Frontend, geändert:** `pages/StabPage.tsx` (drittes Paneel).
-- **e2e:** Gate 3 (Trefffläche der Zeilen 30/48/72, auch als Beobachter), Gate 1 deckt die
-  Stabseite schon ab.
+- **e2e:** Gate 3 (Trefffläche der Zeilen 30/48/72, auch als Beobachter), Gate 1 neu mit der
+  Route `stab`, dazu `e2e/stab-checkliste.spec.ts` (Klickweg und ETB-Beleg).
 - **Keine** Änderung an Rechten, Modulfreigaben, Modulzählern, Live-Ereignissen oder `StabAnzeige`.
