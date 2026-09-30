@@ -1,5 +1,5 @@
+import { IkoneUhr } from '../ikonen';
 import { Button, Collapse, Descriptions, Flex, Popconfirm, Space, Typography } from 'antd';
-import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { Auftrag } from '../api/types';
@@ -152,7 +152,7 @@ export default function AuftragKarte({
           {ueberfaellig && (
             <Text type="danger" strong style={{ fontSize: 12 }}>
               <span aria-hidden="true">
-                <ClockCircleOutlined />
+                <IkoneUhr />
               </span>{' '}
               Überfällig
             </Text>

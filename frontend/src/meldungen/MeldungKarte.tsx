@@ -1,7 +1,7 @@
+import { IkonePunkteSenkrecht, IkoneUhr } from '../ikonen';
 import { Button, Dropdown, Flex, Modal, Popconfirm, Space, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { Select } from '../components/Select';
-import { ClockCircleOutlined, MoreOutlined } from '@ant-design/icons';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { auftraegePfad } from '../routing/deeplinks';
@@ -188,7 +188,7 @@ export default function MeldungKarte({
           {alarmiert && (
             <Text type="danger" strong style={{ fontSize: 12 }}>
               <span aria-hidden="true">
-                <ClockCircleOutlined />
+                <IkoneUhr />
               </span>{' '}
               Alarm
             </Text>
@@ -278,7 +278,7 @@ export default function MeldungKarte({
                   <Button
                     type="text"
                     aria-label={`Aktionen zu Meldung ${m.lfd_nr}`}
-                    icon={<MoreOutlined />}
+                    icon={<IkonePunkteSenkrecht />}
                   />
                 </Dropdown>
               )

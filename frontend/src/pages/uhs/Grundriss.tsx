@@ -1,4 +1,16 @@
 import {
+  IkoneAbmelden,
+  IkoneAuto,
+  IkoneHakenKreis,
+  IkoneKreispfeile,
+  IkoneMuelleimer,
+  IkonePerson,
+  IkonePersonPlus,
+  IkonePfeilZurueckGebogen,
+  IkoneSchloss,
+  IkoneSchraubenschluessel,
+} from '../../ikonen';
+import {
   App,
   Button,
   Dropdown,
@@ -13,18 +25,6 @@ import {
   type MenuProps,
 } from 'antd';
 import { Select } from '../../components/Select';
-import {
-  CarOutlined,
-  CheckCircleOutlined,
-  DeleteOutlined,
-  LockOutlined,
-  LogoutOutlined,
-  RollbackOutlined,
-  SyncOutlined,
-  ToolOutlined,
-  UserAddOutlined,
-  UserOutlined,
-} from '@ant-design/icons';
 import {
   DndContext,
   DragOverlay,
@@ -140,10 +140,10 @@ interface PlatzMenueLage {
 }
 
 const VERFUEGBARKEIT_EINTRAEGE = [
-  { key: 'frei', label: 'als frei markieren', icon: <CheckCircleOutlined /> },
-  { key: 'defekt', label: 'als defekt markieren', icon: <ToolOutlined /> },
-  { key: 'aufbereitung', label: 'als in Aufbereitung markieren', icon: <SyncOutlined /> },
-  { key: 'gesperrt', label: 'als gesperrt markieren', icon: <LockOutlined /> },
+  { key: 'frei', label: 'als frei markieren', icon: <IkoneHakenKreis /> },
+  { key: 'defekt', label: 'als defekt markieren', icon: <IkoneSchraubenschluessel /> },
+  { key: 'aufbereitung', label: 'als in Aufbereitung markieren', icon: <IkoneKreispfeile /> },
+  { key: 'gesperrt', label: 'als gesperrt markieren', icon: <IkoneSchloss /> },
 ];
 
 /**
@@ -171,7 +171,7 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
         {
           key: 'zuweisen',
           label: 'Patient zuweisen',
-          icon: <UserAddOutlined />,
+          icon: <IkonePersonPlus />,
           disabled: belegungLaeuft,
         },
       ]
@@ -182,13 +182,13 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
           {
             key: 'verbleib',
             label: 'Verbleib / Entlassung erfassen',
-            icon: <CarOutlined />,
+            icon: <IkoneAuto />,
             disabled: belegungLaeuft,
           },
         ]
       : [];
   const person =
-    karte && belegt ? [{ key: 'person', label: 'Person öffnen', icon: <UserOutlined /> }] : [];
+    karte && belegt ? [{ key: 'person', label: 'Person öffnen', icon: <IkonePerson /> }] : [];
   // Rückweg in den Wartebereich: der Drag auf `drop-inbox` ist unter `lg` strukturell weg (anderer
   // Reiter, `destroyOnHidden`).
   const rueckweg = wartebereich
@@ -196,7 +196,7 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
         {
           key: 'wartebereich',
           label: 'Zurück in den Wartebereich',
-          icon: <RollbackOutlined />,
+          icon: <IkonePfeilZurueckGebogen />,
           disabled: belegungLaeuft,
         },
       ]
@@ -207,14 +207,14 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
           {
             key: 'zurueckweisen',
             label: 'zurückweisen',
-            icon: <LogoutOutlined />,
+            icon: <IkoneAbmelden />,
             danger: true,
             disabled: belegungLaeuft,
           },
         ]
       : []),
     ...(bearbeitbar
-      ? [{ key: 'storno', label: 'Platz löschen', icon: <DeleteOutlined />, danger: true }]
+      ? [{ key: 'storno', label: 'Platz löschen', icon: <IkoneMuelleimer />, danger: true }]
       : []),
   ];
   const kopf = [...zuweisen, ...verbleib, ...person, ...rueckweg];
@@ -608,7 +608,7 @@ function PlatzKarte({
                 <Button
                   size="small"
                   aria-label="Verbleib / Entlassung erfassen"
-                  icon={<CarOutlined />}
+                  icon={<IkoneAuto />}
                   disabled={belegungLaeuft}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={onTransport}
@@ -619,7 +619,7 @@ function PlatzKarte({
                   size="small"
                   danger
                   aria-label="zurückweisen"
-                  icon={<LogoutOutlined />}
+                  icon={<IkoneAbmelden />}
                   disabled={belegungLaeuft}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={onAustritt}
@@ -634,7 +634,7 @@ function PlatzKarte({
               <Button
                 size="small"
                 aria-label="als frei markieren"
-                icon={<CheckCircleOutlined />}
+                icon={<IkoneHakenKreis />}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => onVerfuegbarkeit('frei')}
               />
@@ -748,7 +748,7 @@ function PersonenSpalte({
                   aria-label={`Verbleib / Entlassung erfassen — ${personLabel(p)}`}
                   icon={
                     <span aria-hidden="true">
-                      <CarOutlined />
+                      <IkoneAuto />
                     </span>
                   }
                   onClick={() => onVerbleib(p)}

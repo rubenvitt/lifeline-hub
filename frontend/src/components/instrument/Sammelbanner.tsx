@@ -1,4 +1,4 @@
-import { ArrowDownOutlined } from '@ant-design/icons';
+import { IkonePfeilRunter } from '../../ikonen';
 import { Button } from 'antd';
 import type { CSSProperties, ReactNode } from 'react';
 import { monoStil, useRollen } from './rollenwerte';
@@ -47,7 +47,7 @@ export default function Sammelbanner({ children, aktion, style }: SammelbannerPr
       }}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>
-        <ArrowDownOutlined />
+        <IkonePfeilRunter />
       </span>
       <span style={{ flex: '1 1 auto', minWidth: 0, fontSize: 12, color: rollen.bedienText }}>
         {children}

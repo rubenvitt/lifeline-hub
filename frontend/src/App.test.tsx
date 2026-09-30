@@ -70,6 +70,9 @@ function renderApp(route: string) {
   };
 }
 
+/** Titel der Platzhalterseite (LFH-595: Ikone „Baustelle“ statt 🚧 im Text). */
+const platzhalterTitel = () => document.querySelector('[data-lfh="platzhalter-titel"]');
+
 describe('App-Routing', () => {
   it('kehrt nach Login zur vollständigen URL zurück und hält Auth beim Routenwechsel', async () => {
     let pruefungen = 0;
@@ -89,7 +92,7 @@ describe('App-Routing', () => {
     await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
     await userEvent.type(screen.getByLabelText('Passwort'), 'test-passwort');
     await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
-    await screen.findByText(/🚧 WIP-Probe/);
+    await waitFor(() => expect(platzhalterTitel()).toHaveTextContent('WIP-Probe'));
     expect(router.state.location).toMatchObject({
       pathname: '/einsaetze/7/wip-probe',
       search: '?ansicht=detail',
@@ -115,7 +118,7 @@ describe('App-Routing', () => {
     await act(async () => {
       await router.navigate(ziel);
     });
-    await screen.findByText(/🚧 WIP-Probe/);
+    await waitFor(() => expect(platzhalterTitel()).toHaveTextContent('WIP-Probe'));
     act(() => window.dispatchEvent(new Event(SITZUNG_ABGELAUFEN)));
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
     expect(router.state.location.state).toMatchObject({ von: ziel });
@@ -178,7 +181,7 @@ describe('App-Routing', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     );
     renderApp('/einsaetze/7/wip-probe');
-    await waitFor(() => expect(screen.getByText(/🚧 WIP-Probe/)).toBeInTheDocument());
+    await waitFor(() => expect(platzhalterTitel()).toHaveTextContent('WIP-Probe'));
   });
 
   it('gefahren-Route rendert die Gefahrenmatrix statt auf die Lagekarte umzuleiten', async () => {
@@ -250,7 +253,7 @@ describe('App-Routing', () => {
     await waitFor(() =>
       expect(screen.getByRole('heading', { level: 1, name: 'Betreuung' })).toBeInTheDocument(),
     );
-    expect(screen.queryByText(/🚧/)).not.toBeInTheDocument();
+    expect(platzhalterTitel()).toBeNull();
   });
 
   it('verpflegung-Route rendert die VerpflegungPage statt Stub (LFH-634)', async () => {
@@ -265,7 +268,7 @@ describe('App-Routing', () => {
       expect(screen.getByRole('heading', { level: 1, name: 'Verpflegung' })).toBeInTheDocument(),
     );
     // Der Stub trägt denselben Titel — unterschieden wird am Platzhalter selbst.
-    expect(screen.queryByText(/🚧/)).not.toBeInTheDocument();
+    expect(platzhalterTitel()).toBeNull();
     expect(screen.queryByText(/Dieser Bereich ist geplant/)).not.toBeInTheDocument();
   });
 
@@ -283,6 +286,6 @@ describe('App-Routing', () => {
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: /Fahrzeuge/ })).toBeInTheDocument(),
     );
-    expect(screen.queryByText(/🚧/)).not.toBeInTheDocument();
+    expect(platzhalterTitel()).toBeNull();
   });
 });

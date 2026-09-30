@@ -1,5 +1,5 @@
+import { IkoneAnmelden, IkoneGlobus, IkoneSchluessel } from '../ikonen';
 import { Alert, Button, Divider, Form, Input, Space, Tag } from 'antd';
-import { GlobalOutlined, KeyOutlined, LoginOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { startAuthentication } from '@simplewebauthn/browser';
@@ -370,7 +370,7 @@ export default function LoginPage() {
                     key={p.id}
                     size="large"
                     block
-                    icon={<LoginOutlined aria-hidden />}
+                    icon={<IkoneAnmelden />}
                     onClick={starteOidcAnmeldung}
                   >
                     Mit {p.anzeigename} anmelden
@@ -434,7 +434,7 @@ export default function LoginPage() {
                   <Button
                     size="large"
                     block
-                    icon={<KeyOutlined aria-hidden />}
+                    icon={<IkoneSchluessel />}
                     style={passwortAktiv ? { marginTop: 12 } : undefined}
                     loading={laedt === 'passkey'}
                     onClick={mitPasskeyAnmelden}
@@ -450,7 +450,7 @@ export default function LoginPage() {
                 <Button
                   size="large"
                   block
-                  icon={<GlobalOutlined aria-hidden />}
+                  icon={<IkoneGlobus />}
                   loading={laedt === 'browser'}
                   disabled={laedt !== null && laedt !== 'browser'}
                   onClick={imBrowserStarten}

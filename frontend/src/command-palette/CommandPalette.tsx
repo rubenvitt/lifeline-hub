@@ -1,7 +1,7 @@
+import { IkoneChevronRechts, IkoneLupe, IkonePfeilLinks } from '../ikonen';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Button, Modal, Input, theme, type InputRef } from 'antd';
-import { TbArrowLeft, TbChevronRight, TbSearch } from 'react-icons/tb';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { schrift } from '../theme/tokens';
@@ -452,7 +452,7 @@ export function CommandPalette({
               color: istAktiv ? token.colorPrimary : farben.schwach,
             }}
           >
-            <TbChevronRight size={16} />
+            <IkoneChevronRechts size={16} />
           </span>
         )}
       </div>
@@ -497,7 +497,7 @@ export function CommandPalette({
           }}
         >
           <span aria-hidden="true" style={{ display: 'inline-flex', color: token.colorPrimary }}>
-            <TbSearch size={18} />
+            <IkoneLupe size={18} />
           </span>
           <Input
             ref={inputRef}
@@ -566,7 +566,7 @@ export function CommandPalette({
                 borderBottom: `1px solid ${token.colorBorderSecondary}`,
               }}
             >
-              <Button type="text" icon={<TbArrowLeft aria-hidden />} onClick={zurueckZurListe}>
+              <Button type="text" icon={<IkonePfeilLinks />} onClick={zurueckZurListe}>
                 Zurück
               </Button>
               <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{vorschau.label}</span>

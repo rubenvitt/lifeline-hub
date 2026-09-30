@@ -1,13 +1,12 @@
-import { FiMaximize, FiMinimize, FiMonitor, FiMoon, FiSun } from 'react-icons/fi';
 import {
-  TbBrightnessDown,
-  TbBrightnessHalf,
-  TbHandStop,
-  TbSun,
-  TbSunHigh,
-  TbSunLow,
-} from 'react-icons/tb';
-import type { IconType } from 'react-icons';
+  IkoneHandStopp,
+  IkoneMond,
+  IkoneMonitor,
+  IkonePfeileAuswaerts,
+  IkonePfeileEinwaerts,
+  IkoneSonne,
+  type Ikone,
+} from '../ikonen';
 import type { ThemeModus } from './ThemeModeProvider';
 import type { Dichte } from './tokens';
 import type { Helligkeit } from './helligkeit';
@@ -17,7 +16,7 @@ import type { Helligkeit } from './helligkeit';
  * Ort neben `ThemeModeProvider` und `tokens`, damit Benutzermenü und Kommandopalette dieselben
  * Stufen zeigen.
  */
-type Darstellungsstufe<W> = { wert: W; titel: string; Icon: IconType };
+type Darstellungsstufe<W> = { wert: W; titel: string; Icon: Ikone };
 
 /**
  * Die Vollständigkeit hängt an dem Objekt, aus dem die Anzeige entsteht: der Index ist die
@@ -27,15 +26,15 @@ type Darstellungsstufe<W> = { wert: W; titel: string; Icon: IconType };
  * `Object.values` erhält die Einfügereihenfolge, das ist die Reihenfolge im Menü.
  */
 const DARSTELLUNG_INDEX: Record<ThemeModus, Darstellungsstufe<ThemeModus>> = {
-  system: { wert: 'system', titel: 'System', Icon: FiMonitor },
-  light: { wert: 'light', titel: 'Hell', Icon: FiSun },
-  dark: { wert: 'dark', titel: 'Dunkel', Icon: FiMoon },
+  system: { wert: 'system', titel: 'System', Icon: IkoneMonitor },
+  light: { wert: 'light', titel: 'Hell', Icon: IkoneSonne },
+  dark: { wert: 'dark', titel: 'Dunkel', Icon: IkoneMond },
 };
 
 const DICHTE_INDEX: Record<Dichte, Darstellungsstufe<Dichte>> = {
-  kompakt: { wert: 'kompakt', titel: 'Kompakt', Icon: FiMinimize },
-  komfortabel: { wert: 'komfortabel', titel: 'Komfortabel', Icon: FiMaximize },
-  handschuh: { wert: 'handschuh', titel: 'Handschuh', Icon: TbHandStop },
+  kompakt: { wert: 'kompakt', titel: 'Kompakt', Icon: IkonePfeileEinwaerts },
+  komfortabel: { wert: 'komfortabel', titel: 'Komfortabel', Icon: IkonePfeileAuswaerts },
+  handschuh: { wert: 'handschuh', titel: 'Handschuh', Icon: IkoneHandStopp },
 };
 
 export const DARSTELLUNG_OPTIONEN: Darstellungsstufe<ThemeModus>[] =
@@ -50,11 +49,11 @@ export const DICHTE_OPTIONEN: Darstellungsstufe<Dichte>[] = Object.values(DICHTE
  * Liste absteigend sortiert: hell oben, dunkel unten, wie im Menü gelesen.
  */
 const HELLIGKEIT_INDEX: Record<Helligkeit, Darstellungsstufe<Helligkeit>> = {
-  100: { wert: 100, titel: '100 %', Icon: TbSunHigh },
-  80: { wert: 80, titel: '80 %', Icon: TbSun },
-  60: { wert: 60, titel: '60 %', Icon: TbBrightnessHalf },
-  40: { wert: 40, titel: '40 %', Icon: TbSunLow },
-  20: { wert: 20, titel: '20 %', Icon: TbBrightnessDown },
+  100: { wert: 100, titel: '100 %', Icon: IkoneSonne },
+  80: { wert: 80, titel: '80 %', Icon: IkoneSonne },
+  60: { wert: 60, titel: '60 %', Icon: IkoneSonne },
+  40: { wert: 40, titel: '40 %', Icon: IkoneSonne },
+  20: { wert: 20, titel: '20 %', Icon: IkoneSonne },
 };
 
 export const HELLIGKEIT_OPTIONEN: Darstellungsstufe<Helligkeit>[] = Object.values(

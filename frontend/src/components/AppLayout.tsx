@@ -1,6 +1,6 @@
+import { IkoneSchloss } from '../ikonen';
 import { Layout, Tag, Typography, theme } from 'antd';
 import type { CSSProperties } from 'react';
-import { TbLock } from 'react-icons/tb';
 import { Link, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
@@ -78,7 +78,7 @@ function GlobalLink({
         {/* Die Sperre trägt auf JEDER Breite ein Zeichen ohne Farbe (LFH-434, WCAG 1.4.1):
             `cursor: not-allowed` sieht auf Touch niemand, und der Tag steht erst ab `lg`. */}
         <span aria-hidden="true" data-lfh="sperr-schloss" style={{ display: 'inline-flex' }}>
-          <TbLock size={13} />
+          <IkoneSchloss size={13} />
         </span>
         {label}
         {/* Der Grund steht als TEXT da, nicht nur im `title`: auf dem Führungs-Tablet gibt es kein

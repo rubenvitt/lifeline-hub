@@ -1,7 +1,7 @@
 {
   "name": "lifeline-hub-frontend",
   "private": true,
-  "version": "1.0.0-alpha.57",
+  "version": "1.0.0-alpha.58",
   "type": "module",
   "packageManager": "pnpm@11.10.0",
   "engines": {
@@ -21,7 +21,6 @@
     "e2e": "playwright test"
   },
   "dependencies": {
-    "@ant-design/icons": "^6.3.4",
     "@dnd-kit/core": "^6.3.1",
     "@einsatzzeichen/core": "3.0.0",
     "@einsatzzeichen/maplibre": "3.0.0",
@@ -40,7 +39,6 @@
     "qrcode.react": "^4.2.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-icons": "^5.7.0",
     "react-markdown": "^10.1.0",
     "react-router": "^8.4.0",
     "remark-gfm": "^4.0.1",

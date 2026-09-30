@@ -1,5 +1,5 @@
+import { IkonePlus } from '../ikonen';
 import { Breadcrumb, Button, DatePicker, Form, Input, Spin, Typography, theme } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { Select } from '../components/Select';
 import { useEffect, useMemo, useState } from 'react';
@@ -216,7 +216,7 @@ export default function LageberichtePage() {
           // („plus Neuer Bericht").
           <Button
             type="primary"
-            icon={<PlusOutlined />}
+            icon={<IkonePlus />}
             aria-label="Neuer Bericht"
             onClick={() => {
               anlegenMutation.reset();

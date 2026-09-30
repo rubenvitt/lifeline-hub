@@ -1,6 +1,6 @@
 // Sprachbausteine werden dort eingebunden, wo sie gebraucht werden, nicht global.
+import { IkoneAuto, IkonePerson } from '../ikonen';
 import '../theme/sprache.css';
-import { CarOutlined, UserOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import { verteilungFelder } from './statusAchse';
 import type { StatusVerteilung } from './kraeftebild';
@@ -8,12 +8,12 @@ import type { StatusVerteilung } from './kraeftebild';
 /**
  * Die Zierde je Achse — ein Piktogramm, KEIN Emoji (Zeichnung, Farbe und Breite eines Emojis
  * kommen aus der Systemschrift). Die Zuordnung liegt HIER über das String-Union der Achse: eine
- * Prop, die eine Zeichenkette nimmt, nähme auch wieder ein Emoji. `UserOutlined`, weil die
+ * Prop, die eine Zeichenkette nimmt, nähme auch wieder ein Emoji. `IkonePerson`, weil die
  * Spalte einzelne Kräfte zählt.
  */
 const IKONE: Record<'Personal' | 'Fahrzeuge', ReactNode> = {
-  Personal: <UserOutlined />,
-  Fahrzeuge: <CarOutlined />,
+  Personal: <IkonePerson />,
+  Fahrzeuge: <IkoneAuto />,
 };
 
 /**
@@ -23,10 +23,9 @@ const IKONE: Record<'Personal' | 'Fahrzeuge', ReactNode> = {
  * Zweiter Kanal: `.lfh-feld--alarm .lfh-zahl` färbt nur die ZAHL, deshalb ist jedes Feld ein
  * Verbund aus `.lfh-etikett` (Kurztext) und `.lfh-zahl`.
  *
- * Die Ikone ist Zierde und trägt eine `aria-hidden`-Hülle: ein `@ant-design/icons`-Element
- * bringt `role="img"` mit englischem `aria-label` („user"/„car") mit und stünde sonst in jeder
- * Tabellenzeile als eigenes Vorleseziel. Der Test prüft, dass in der Gruppe keine `img`-Rolle
- * überlebt.
+ * Die Ikone ist Zierde: die Ikone des Satzes ist selbst `aria-hidden` (LFH-595), die Hülle bleibt
+ * als zweite Sicherung (früher brachte antd `role="img"` mit englischem `aria-label` mit). Der
+ * Test prüft, dass in der Gruppe keine `img`-Rolle überlebt.
  *
  * `.lfh-ampel` statt `.lfh-felder`: dieselben Felder ohne Raster und Rahmen, passend für eine
  * Tabellenzelle.

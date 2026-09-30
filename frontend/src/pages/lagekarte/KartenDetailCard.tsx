@@ -1,5 +1,5 @@
+import { IkoneKreuz } from '../../ikonen';
 import { Button } from 'antd';
-import { TbX } from 'react-icons/tb';
 import type { ReactNode } from 'react';
 import { monoStil, useRollen } from '../../components/instrument';
 
@@ -98,7 +98,7 @@ export default function KartenDetailCard({
           aria-label="Schließen"
           icon={
             <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-              <TbX size={16} />
+              <IkoneKreuz size={16} />
             </span>
           }
         />

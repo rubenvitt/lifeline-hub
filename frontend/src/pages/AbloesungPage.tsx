@@ -1,5 +1,5 @@
+import { IkoneStift } from '../ikonen';
 import { Alert, App, Breadcrumb, Button, Flex, Spin, Typography } from 'antd';
-import { EditOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -437,7 +437,7 @@ export default function AbloesungPage() {
                 {darfSchreiben && (
                   <Button
                     type="text"
-                    icon={<EditOutlined />}
+                    icon={<IkoneStift />}
                     aria-label={`Rhythmus-Vorgabe ${v.abschnitt_name} ändern`}
                     onClick={() => {
                       vorgabeMut.reset();

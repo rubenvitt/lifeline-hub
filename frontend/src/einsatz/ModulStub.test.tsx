@@ -48,8 +48,9 @@ function rendern() {
 describe('ModulStub', () => {
   it('rendert Label und Beschreibung des Moduls mit WIP-Marker', () => {
     renderMitProviders(<ModulStub modul={wipModul} />);
-    expect(screen.getByText(/🚧 WIP-Probe/)).toBeInTheDocument();
-    expect(screen.getByText(/🚧/)).toBeInTheDocument();
+    const kopf = document.querySelector('[data-lfh="platzhalter-titel"]');
+    expect(kopf).toHaveTextContent('WIP-Probe');
+    expect(kopf?.querySelector('[data-ikone="baustelle"]')).not.toBeNull();
     expect(screen.getByText(wipModul.beschreibung!)).toBeInTheDocument();
   });
 

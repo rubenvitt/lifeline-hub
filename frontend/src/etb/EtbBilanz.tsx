@@ -1,4 +1,4 @@
-import { CheckOutlined } from '@ant-design/icons';
+import { IkoneHaken } from '../ikonen';
 import { Link } from 'react-router';
 import type { EtbEintragAnzeige, EtbZaehler } from '../api/types';
 import {
@@ -201,7 +201,7 @@ function Pufferanzeige({ puffer }: { puffer: PufferZustand }) {
         style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}
       >
         <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.normalText }}>
-          <CheckOutlined />
+          <IkoneHaken />
         </span>
         <span style={{ fontSize: 11, color: rollen.gedaempft }}>Alle Einträge übertragen</span>
       </span>

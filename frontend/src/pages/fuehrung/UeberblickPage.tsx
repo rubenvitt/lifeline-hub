@@ -1,8 +1,8 @@
+import { IkoneBericht, IkonePlus } from '../../ikonen';
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Breadcrumb, Button } from 'antd';
-import { TbFileText, TbPlus } from 'react-icons/tb';
 import dayjs, { type Dayjs } from 'dayjs';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { RechteHinweis } from '../../components/SpeicherHinweis';
@@ -424,7 +424,7 @@ export default function UeberblickPage() {
             <Button
               icon={
                 <Ikone>
-                  <TbFileText size={14} />
+                  <IkoneBericht size={14} />
                 </Ikone>
               }
               onClick={() => waehle(lageberichtePfad(einsatzId))}
@@ -437,7 +437,7 @@ export default function UeberblickPage() {
               disabled={!darfSchreiben}
               icon={
                 <Ikone>
-                  <TbPlus size={14} />
+                  <IkonePlus size={14} />
                 </Ikone>
               }
               onClick={() => waehle(etbPfad(einsatzId, { neu: true }))}

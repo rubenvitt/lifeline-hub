@@ -136,9 +136,9 @@ describe('BenutzerMenu — unter lg', () => {
     // Die Gruppen kommen HINZU, sie ersetzen nichts.
     zeige();
     await oeffne();
-    // Regex, nicht exakt: antds Symbol-Span trägt ein eigenes `aria-label` (`user`, `logout`). Die
-    // Einträge der zwei Gruppen nutzen react-icons ohne Beschriftung und dürfen exakt geprüft
-    // werden.
+    // Regex, nicht exakt: aus der Zeit, als antds Symbol-Span ein eigenes `aria-label` (`user`,
+    // `logout`) trug. Die Ikonen des Satzes sind `aria-hidden` (LFH-595); die Einträge der zwei
+    // Gruppen werden exakt geprüft.
     expect(await screen.findByRole('menuitem', { name: /Profil/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Abmelden/ })).toBeInTheDocument();
   });

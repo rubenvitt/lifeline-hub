@@ -1,3 +1,14 @@
+import {
+  IkoneGewitterwolke,
+  IkoneNebel,
+  IkoneRegen,
+  IkoneSchneeflocke,
+  IkoneSonne,
+  IkoneThermometer,
+  IkoneWarndreieck,
+  IkoneWind,
+  type Ikone,
+} from '../../ikonen';
 import { useState } from 'react';
 import { App, Button, Descriptions, Tag, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -53,17 +64,21 @@ function fmtZeit(v: string | null): string | null {
   return Number.isNaN(d.getTime()) ? v : taktischeDtgVoll(v);
 }
 
-/** Emoji-Icon zum Wetter-Ereignis (DWD EC_GROUP / EVENT). */
-function wetterIcon(group: string | null, event: string | null): string {
+/**
+ * Ikone zum Wetter-Ereignis (DWD EC_GROUP / EVENT) aus dem Ikonensatz (LFH-595; vorher Emojis,
+ * die kein Ikonensatz sind und je System anders aussehen). Unbekanntes Ereignis: Warndreieck.
+ */
+function wetterIkone(group: string | null, event: string | null): Ikone {
   const t = `${group ?? ''} ${event ?? ''}`.toUpperCase();
-  if (/GEWITTER|THUNDER/.test(t)) return '⛈️';
-  if (/REGEN|RAIN/.test(t)) return '🌧️';
-  if (/STURM|ORKAN|WIND|BÖ/.test(t)) return '💨';
-  if (/SCHNEE|SNOW|GLATT|GLÄTTE|EIS|GLAZE|ICE|FROST|TAUWETTER|THAW/.test(t)) return '❄️';
-  if (/NEBEL|FOG/.test(t)) return '🌫️';
-  if (/HITZE|HEAT/.test(t)) return '🌡️';
-  if (/UV/.test(t)) return '☀️';
-  return '⚠️';
+  if (/GEWITTER|THUNDER/.test(t)) return IkoneGewitterwolke;
+  if (/REGEN|RAIN/.test(t)) return IkoneRegen;
+  if (/STURM|ORKAN|WIND|BÖ/.test(t)) return IkoneWind;
+  if (/SCHNEE|SNOW|GLATT|GLÄTTE|EIS|GLAZE|ICE|FROST|TAUWETTER|THAW/.test(t))
+    return IkoneSchneeflocke;
+  if (/NEBEL|FOG/.test(t)) return IkoneNebel;
+  if (/HITZE|HEAT/.test(t)) return IkoneThermometer;
+  if (/UV/.test(t)) return IkoneSonne;
+  return IkoneWarndreieck;
 }
 
 const SCHWERE: Record<string, { label: string; color: string }> = {
@@ -670,14 +685,22 @@ export default function FachebenenInspector({
   // Fläche/Umfang/Länge rein clientseitig aus der (auch Multi-*) Geometrie.
   const kennzahlen = geometrie ? geoKennzahlen(geometrie) : null;
 
-  // Der Text kommt aus `fachebeneTitel` (auch für das Flächen-Auswahlmenü); nur hier ein Zeichen.
+  // Der Text kommt aus `fachebeneTitel` (auch für das Flächen-Auswahlmenü); nur hier eine Ikone.
   const titelText = fachebeneTitel(quelle, p);
-  const titel =
+  const TitelIkone =
     quelle === 'dwd'
-      ? `${wetterIcon(pick(p, 'EC_GROUP'), pick(p, 'EVENT', 'event'))} ${titelText}`
+      ? wetterIkone(pick(p, 'EC_GROUP'), pick(p, 'EVENT', 'event'))
       : quelle === 'nina'
-        ? `⚠️ ${titelText}`
-        : titelText;
+        ? IkoneWarndreieck
+        : null;
+  const titel = TitelIkone ? (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
+      <TitelIkone />
+      {titelText}
+    </span>
+  ) : (
+    titelText
+  );
 
   return (
     <KartenDetailCard

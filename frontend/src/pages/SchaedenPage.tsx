@@ -1,3 +1,4 @@
+import { IkoneOrtsmarke } from '../ikonen';
 import StatusTag from '../components/StatusTag';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -5,7 +6,6 @@ import { useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad } from '../routing/deeplinks';
 import { Alert, Breadcrumb, Button, Space, Tag, Typography } from 'antd';
 import { Segmentleiste, monoStil } from '../components/instrument';
-import { EnvironmentOutlined } from '@ant-design/icons';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -129,9 +129,8 @@ const schaedenSpalten = (einsatzId: number) =>
       /**
        * Welche Schäden stehen auf der Karte? Die Frage, mit der man vor der Karte sitzt.
        *
-       * Als Ikone, nicht als Emoji; die `aria-hidden`-Hülle ist Pflicht — ein
-       * `@ant-design/icons`-Knoten bringt ein englisches `aria-label` („environment") mit, das
-       * sonst in jeder Zeile vorgelesen würde.
+       * Als Ikone, nicht als Emoji. Die Ikone des Satzes ist selbst `aria-hidden` (LFH-595); die
+       * Hülle bleibt als zweite Sicherung gegen ein Vorleseziel in jeder Zeile.
        *
        * Filterachse statt Sortierung: „zeig mir die Unverorteten" ist die Arbeitsfrage.
        */
@@ -146,7 +145,7 @@ const schaedenSpalten = (einsatzId: number) =>
       render: (_, s) =>
         s.lat != null && s.lon != null ? (
           <span aria-label="verortet" role="img">
-            <EnvironmentOutlined aria-hidden />
+            <IkoneOrtsmarke />
           </span>
         ) : (
           <Typography.Text type="secondary" aria-label="nicht verortet" role="img">

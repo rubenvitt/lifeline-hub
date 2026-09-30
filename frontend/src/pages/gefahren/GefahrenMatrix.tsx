@@ -1,7 +1,13 @@
+import {
+  IkoneGebaeudegruppe,
+  IkonePersonen,
+  IkonePfote,
+  IkoneSchild,
+  IkoneSpross,
+  type Ikone,
+} from '../../ikonen';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Button, Dropdown, Space, Table, Tooltip, Typography, theme } from 'antd';
-import { TbBuildingCommunity, TbPaw, TbPlant2, TbShieldHalf, TbUsers } from 'react-icons/tb';
-import type { IconType } from 'react-icons';
 import type { GlobalToken, TableColumnsType, TableRef } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';
 import type { BewertungEingabe } from '../../api/gefahren';
@@ -66,12 +72,12 @@ interface Zellkennung {
  * Symbol + Kurzform je Schutzobjekt; das Kurzwort ist der zweite Kanal. Exportiert für den
  * Matrixauszug der Palettenvorschau.
  */
-export const SPALTENKOPF: Record<Schutzobjekt, { icon: IconType; kurz: string }> = {
-  menschen: { icon: TbUsers, kurz: 'Mensch' },
-  tiere: { icon: TbPaw, kurz: 'Tier' },
-  umwelt: { icon: TbPlant2, kurz: 'Umwelt' },
-  sachwerte: { icon: TbBuildingCommunity, kurz: 'Sache' },
-  einsatzkraefte: { icon: TbShieldHalf, kurz: 'Kraft' },
+export const SPALTENKOPF: Record<Schutzobjekt, { icon: Ikone; kurz: string }> = {
+  menschen: { icon: IkonePersonen, kurz: 'Mensch' },
+  tiere: { icon: IkonePfote, kurz: 'Tier' },
+  umwelt: { icon: IkoneSpross, kurz: 'Umwelt' },
+  sachwerte: { icon: IkoneGebaeudegruppe, kurz: 'Sache' },
+  einsatzkraefte: { icon: IkoneSchild, kurz: 'Kraft' },
 };
 
 /** Balken einer Matrixzelle — rein; ohne Warnstufe kein Balken. */
