@@ -13,11 +13,14 @@ export type AbrufZustand = 'daten' | 'laden' | 'fehler' | 'gesperrt';
 export function abrufZustand(q: {
   error: unknown;
   isError: boolean;
-  isLoading: boolean;
+  isPending: boolean;
 }): AbrufZustand {
   if (q.error instanceof ApiError && q.error.status === 403) return 'gesperrt';
   if (q.isError) return 'fehler';
-  if (q.isLoading) return 'laden';
+  // `isPending`, nicht `isLoading`: in TanStack v5 ist `isLoading = isPending && isFetching`. Eine
+  // pausierte Abfrage (offline, nie geladen) hätte sonst „Daten“, nämlich keine, und jede Zählung
+  // daraus behauptete „0“ (LFH-548, Review).
+  if (q.isPending) return 'laden';
   return 'daten';
 }
 

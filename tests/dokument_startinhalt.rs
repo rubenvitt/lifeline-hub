@@ -144,3 +144,49 @@ async fn ohne_startinhalt_bleibt_das_leere_skelett() {
     assert_eq!(abschnitte.len(), 7);
     assert!(abschnitte.iter().all(|a| a["text"] == ""));
 }
+
+/// Das Bearbeiten teilt die Schlüsselprüfung mit dem Anlegen: ein doppelter Schlüssel ist auch
+/// beim PATCH 400, und der Entwurf bleibt unverändert. Gegenprobe: zwei verschiedene sind 200.
+#[tokio::test]
+async fn patch_mit_doppeltem_schluessel_ist_400_und_aendert_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, bf) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/befehle"),
+        &admin,
+        Some(r#"{"vorlage":"befehl_lad","titel":"B"}"#),
+    )
+    .await;
+    let pfad = format!("/api/einsaetze/{einsatz}/befehle/{}", bf["id"]);
+
+    let (status, antwort) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(
+            r#"{"abschnitte":[{"schluessel":"lage","text":"a"},{"schluessel":"lage","text":"b"}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{antwort:?}");
+    let (_, danach) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert!(danach["abschnitte"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|a| a["text"] == ""));
+
+    let (status, antwort) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"abschnitte":[{"schluessel":"lage","text":"a"},{"schluessel":"auftrag","text":"b"}]}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Gegenprobe: {antwort:?}");
+}

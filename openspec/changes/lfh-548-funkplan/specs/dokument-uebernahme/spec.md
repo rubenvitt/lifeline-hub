@@ -19,6 +19,8 @@ von Abschnitten mit Schlüssel und Text.
 - Abschnitte der Vorlage, die der Startinhalt nicht nennt, MUST leer angelegt werden.
 - Ohne Startinhalt MUST sich das Anlegen verhalten wie bisher: leeres Skelett der Vorlage.
 - Der neue Entwurf MUST denselben Live-Hinweis auslösen wie bisher, und zwar genau einmal.
+- Beim Bearbeiten eines Entwurfs MUST dieselbe Schlüsselprüfung gelten, auch für doppelte
+  Schlüssel (400, der Entwurf bleibt unverändert).
 
 #### Scenario: Freitext-Lagebericht mit Inhalt
 - **WHEN** ein Lagebericht mit Vorlage „freitext“, Titel „Funkplan 301200Sep26“ und dem

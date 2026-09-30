@@ -264,13 +264,51 @@ export const ZUSTAND_GRUND: Record<Exclude<AbrufZustand, 'daten'>, string> = {
   laden: 'lädt',
 };
 
+/** Die Quellen, deren Fehlen eine Ebene oder Spalte leert — mit ihrem Namen für Seite und Bericht. */
+export const QUELLEN_NAME: Record<Exclude<keyof FunkplanQuellen, 'sprechgruppen'>, string> = {
+  abschnitte: 'Abschnitte',
+  einheiten: 'Einheiten',
+  fahrzeuge: 'Fahrzeuge',
+  personal: 'Personal (Fahrzeugführer)',
+};
+
+export interface FehlendeQuelle {
+  quelle: keyof typeof QUELLEN_NAME;
+  name: string;
+  zustand: Exclude<AbrufZustand, 'daten'>;
+}
+
+/**
+ * Quellen ohne Daten (gesperrt, gescheitert, noch ladend), in fester Reihenfolge. Was hier steht,
+ * fehlt im Plan; Seite und Bericht nennen es, statt eine leere Ebene als Bestand auszugeben.
+ */
+export function fehlendeQuellen(q: FunkplanQuellen): FehlendeQuelle[] {
+  return (Object.keys(QUELLEN_NAME) as (keyof typeof QUELLEN_NAME)[]).flatMap((quelle) => {
+    const { zustand } = q[quelle];
+    return zustand === 'daten' ? [] : [{ quelle, name: QUELLEN_NAME[quelle], zustand }];
+  });
+}
+
+/** Sind Abschnitte, Einheiten und Fahrzeuge geladen? Erst dann heißt „keine Zeile“ „kein Bestand“. */
+export function strukturVollstaendig(q: FunkplanQuellen): boolean {
+  return (
+    q.abschnitte.zustand === 'daten' &&
+    q.einheiten.zustand === 'daten' &&
+    q.fahrzeuge.zustand === 'daten'
+  );
+}
+
 /** Der feste Hinweis auf die fehlende eigene Gegenstelle (kein Feld am Einsatz, D6). */
 export const GEGENSTELLE_HINWEIS = 'Eigene Gegenstelle (Führungsstelle)';
 
 // ── Markdown für den Lagebericht ───────────────────────────────────────────────────────────────
 
+/**
+ * Entschärft, was `components/Markdown.tsx` (remark-gfm) als Auszeichnung läse: Backslash,
+ * Backtick, Stern, Unterstrich, eckige Klammern und die Tilde (GFM streicht schon `~x~` durch).
+ */
 function md(text: string): string {
-  return text.replace(/[\\`*_[\]]/g, (z) => `\\${z}`);
+  return text.replace(/[\\`*_[\]~]/g, (z) => `\\${z}`);
 }
 
 function leitungMarkdown(z: FunkplanZeile): string | null {
@@ -309,7 +347,23 @@ export function rendereFunkplanMarkdown(
   zeilen: readonly FunkplanZeile[],
   stand: string,
   luecken: FunkplanLuecken,
+  quellen: FunkplanQuellen,
 ): string {
+  const fehlend = fehlendeQuellen(quellen);
+  // Der Bericht geht bei Freigabe unveränderlich ins ETB: was fehlt, steht darin, sonst läse
+  // sich eine gesperrte Ebene später als „keine Fahrzeuge“.
+  const quellenAbschnitt =
+    fehlend.length > 0
+      ? [
+          '## Quellen',
+          '',
+          ...fehlend.map((f) => `- ${f.name}: ${ZUSTAND_GRUND[f.zustand]} — diese Angaben fehlen`),
+          '',
+        ]
+      : [];
+  const leer = strukturVollstaendig(quellen)
+    ? '_(keine Kräfte erfasst)_'
+    : '_(keine Zeilen: Quellen fehlen, siehe oben)_';
   return [
     '# Funkplan',
     '',
@@ -335,11 +389,10 @@ export function rendereFunkplanMarkdown(
     ),
     `- ${GEGENSTELLE_HINWEIS}: nicht erfasst`,
     '',
+    ...quellenAbschnitt,
     '## Gliederung',
     '',
-    ...(zeilen.length > 0
-      ? zeilen.flatMap((z) => zeileMarkdown(z, 0))
-      : ['_(keine Kräfte erfasst)_']),
+    ...(zeilen.length > 0 ? zeilen.flatMap((z) => zeileMarkdown(z, 0)) : [leer]),
     '',
   ].join('\n');
 }

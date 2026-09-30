@@ -36,6 +36,8 @@ import {
 import {
   GEGENSTELLE_HINWEIS,
   ZUSTAND_GRUND,
+  fehlendeQuellen,
+  strukturVollstaendig,
   aufklappbareSchluessel,
   baueFunkplan,
   funkplanLuecken,
@@ -74,7 +76,7 @@ function useQuelle<T>(q: {
   data: T[] | undefined;
   error: unknown;
   isError: boolean;
-  isLoading: boolean;
+  isPending: boolean;
 }): Quelle<T> {
   const zustand: AbrufZustand = q.data != null ? 'daten' : abrufZustand(q);
   const { data } = q;
@@ -247,12 +249,23 @@ function LueckenZeile<T>({
   );
 }
 
-const QUELLEN_NAME: Record<Exclude<keyof FunkplanQuellen, 'sprechgruppen'>, string> = {
-  abschnitte: 'Abschnitte',
-  einheiten: 'Einheiten',
-  fahrzeuge: 'Fahrzeuge',
-  personal: 'Personal (Fahrzeugführer)',
-};
+/**
+ * Leertext der Tabelle: „kein Bestand“ nur, wenn alle drei Strukturquellen geladen sind. Sonst
+ * steht der Grund da, gruppiert nach Grund („Abschnitte, Einheiten: nicht freigegeben“).
+ */
+function leerTextFuer(quellen: FunkplanQuellen): string {
+  if (strukturVollstaendig(quellen))
+    return 'Weder Abschnitte noch Einheiten noch Fahrzeuge im Einsatz';
+  const struktur = fehlendeQuellen(quellen).filter((f) => f.quelle !== 'personal');
+  const jeGrund = new Map<string, string[]>();
+  for (const f of struktur) {
+    const grund = ZUSTAND_GRUND[f.zustand];
+    jeGrund.set(grund, [...(jeGrund.get(grund) ?? []), f.name]);
+  }
+  return `Keine Zeilen darstellbar — ${[...jeGrund]
+    .map(([grund, namen]) => `${namen.join(', ')}: ${grund}`)
+    .join(' · ')}`;
+}
 
 /** Was der Seitenkopf zählt; eine gesperrte Liste zählt nicht mit (keine „0"). */
 const UMFANG: { quelle: 'abschnitte' | 'einheiten' | 'fahrzeuge'; wort: string }[] = [
@@ -329,7 +342,9 @@ export default function FunkplanPage() {
       const lb = await legeLageberichtAn(einsatzId, {
         vorlage: 'freitext',
         titel: `Funkplan ${stand}`,
-        abschnitte: [{ schluessel: 'text', text: rendereFunkplanMarkdown(zeilen, stand, luecken) }],
+        abschnitte: [
+          { schluessel: 'text', text: rendereFunkplanMarkdown(zeilen, stand, luecken, quellen) },
+        ],
       });
       return lb.id;
     },
@@ -349,7 +364,21 @@ export default function FunkplanPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  if (overridesQuery.data && !istKeyFreigegeben('stab', benutzer, overridesQuery.data)) {
+  // Fail-closed: kein Endpunkt dieser Seite prüft den Stab, die Freigabe ist die einzige Sperre.
+  // Ohne ermittelte Freigabe wird nichts gezeigt (Review LFH-548).
+  if (overridesQuery.data == null) {
+    if (overridesQuery.isError) {
+      return (
+        <SeitenFehler
+          text="Freigabe des Stabs nicht ermittelbar — der Funkplan bleibt verborgen"
+          ursache={overridesQuery.error}
+          onWiederholen={() => void overridesQuery.refetch()}
+        />
+      );
+    }
+    return <SeitenSkeleton />;
+  }
+  if (!istKeyFreigegeben('stab', benutzer, overridesQuery.data)) {
     return (
       <SeitenSackgasse
         titel="Funkplan nicht verfügbar"
@@ -358,7 +387,12 @@ export default function FunkplanPage() {
       />
     );
   }
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  // Die Übernahme legt einen Lagebericht an: Schreibrecht im Einsatz UND das Modul Lageberichte
+  // freigegeben. Solange eine Quelle lädt, stünde „lädt“ im unveränderlichen Bericht.
+  const darfUebernehmen =
+    darfImEinsatzSchreiben(einsatz, benutzer) &&
+    istKeyFreigegeben('lageberichte', benutzer, overridesQuery.data);
+  const quellenLaden = Object.values(quellen).some((q) => q.zustand === 'laden');
 
   const datenstand = gemeinsamerDatenstand(
     abschnitteQuery.dataUpdatedAt,
@@ -372,14 +406,8 @@ export default function FunkplanPage() {
     .map((u) => `${quellen[u.quelle].daten.length} ${u.wort}`)
     .join(' · ');
 
-  const fehlend = (Object.keys(QUELLEN_NAME) as (keyof typeof QUELLEN_NAME)[])
-    .map((k) => ({ k, zustand: quellen[k].zustand }))
-    .filter(
-      (
-        q,
-      ): q is { k: keyof typeof QUELLEN_NAME; zustand: Exclude<AbrufZustand, 'daten' | 'laden'> } =>
-        q.zustand === 'gesperrt' || q.zustand === 'fehler',
-    );
+  // Nur Gescheitertes und Gesperrtes: Ladendes kündigt die Tabelle selbst an.
+  const fehlend = fehlendeQuellen(quellen).filter((f) => f.zustand !== 'laden');
 
   const abschnittZiel = (aid: number) => einsatzabschnittePfad(einsatzId, { abschnitt: aid });
 
@@ -456,15 +484,20 @@ export default function FunkplanPage() {
 
         {fehlend.length > 0 && (
           <Typography.Paragraph data-lfh="funkplan-quellen" style={{ color: rollen.gedaempft }}>
-            {fehlend.map((q) => `${QUELLEN_NAME[q.k]}: ${ZUSTAND_GRUND[q.zustand]}`).join(' · ')}
+            {fehlend.map((f) => `${f.name}: ${ZUSTAND_GRUND[f.zustand]}`).join(' · ')}
             {' — diese Angaben fehlen im Funkplan.'}
           </Typography.Paragraph>
         )}
 
         {/* ── Werkzeugzeile ── außerhalb des Primitivs, nur hier trägt `.funkplan-no-print`. */}
         <Space className="funkplan-no-print" wrap style={{ marginBlockEnd: token.margin }}>
-          {darfSchreiben && (
-            <Button loading={uebernehmen.isPending} onClick={() => uebernehmen.mutate()}>
+          {darfUebernehmen && (
+            <Button
+              loading={uebernehmen.isPending}
+              disabled={quellenLaden}
+              title={quellenLaden ? 'Erst wenn alle Angaben geladen sind' : undefined}
+              onClick={() => uebernehmen.mutate()}
+            >
               In Lagebericht übernehmen
             </Button>
           )}
@@ -488,8 +521,12 @@ export default function FunkplanPage() {
           spalten={spalten}
           daten={zeilen}
           zeilenSchluessel="key"
-          ladend={abschnitteQuery.isLoading || einheitenQuery.isLoading}
-          leerText="Weder Abschnitte noch Einheiten noch Fahrzeuge im Einsatz"
+          ladend={
+            quellen.abschnitte.zustand === 'laden' ||
+            quellen.einheiten.zustand === 'laden' ||
+            quellen.fahrzeuge.zustand === 'laden'
+          }
+          leerText={leerTextFuer(quellen)}
           baum={{
             kinder: 'children',
             aufgeklappt,

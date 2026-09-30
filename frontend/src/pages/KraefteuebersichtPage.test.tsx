@@ -829,9 +829,10 @@ describe('KraefteuebersichtPage — Druck', () => {
 
   it('der Druck neutralisiert Bildlaufcontainer, Sticky-Kopf, fixierte Spalte und Werkzeugzeile', () => {
     // jsdom rechnet kein `@media print` — eine Text-Prüfung der Regeldatei, als reguläre Ausdrücke
-    // (der Quote-Stil ist Formatierung, keine Aussage).
+    // (der Quote-Stil ist Formatierung, keine Aussage). Seit LFH-548 stehen die Neutralisierer
+    // für jede Druckwurzel in `druck/druck.css`; das Meldebild ist eine.
     const hier = dirname(fileURLToPath(import.meta.url));
-    const css = readFileSync(join(hier, 'kraefteuebersichtPrint.css'), 'utf-8');
+    const css = readFileSync(join(hier, '..', 'druck', 'druck.css'), 'utf-8');
     const druckblock = css.slice(css.indexOf('@media print'));
     for (const marke of [
       /\.ant-table-body\b/,

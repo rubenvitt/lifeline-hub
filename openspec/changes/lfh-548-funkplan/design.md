@@ -268,6 +268,28 @@ Datenstand zeigt `EinsatzSeite` über `gemeinsamerDatenstand`, wie im Meldebild.
     - Übernahme in einem Aufruf
 - Prüfliste Einsatztauglichkeit (15 Kriterien) als `pruefliste.md` in dieser Change.
 
+### D12 · Nachtrag aus der Review (30.09.2026)
+
+Eine adversarial verifizierte Review hat elf Befunde bestätigt. Alle sind umgesetzt:
+
+- **Pausierte Abfrage ist „lädt“:** `abrufZustand` liest `isPending` statt `isLoading`. In
+  TanStack v5 gilt `isLoading = isPending && isFetching`, eine ohne Netz pausierte Abfrage hätte
+  sonst „0“ Lücken gemeldet. Das gilt auch für das Meldebild.
+- **Stab-Sperre fail-closed:** Ohne ermittelte Freigabe zeigt die Seite ein Skelett, bei einem
+  Fehler `SeitenFehler`. Die Overrides darf jede Person mit Lesezugriff lesen, damit sperrt das
+  niemanden zu Unrecht aus.
+- **Nichts als leerer Bestand:** Der Leertext nennt fehlende Quellen. Der Bericht erhält einen
+  Abschnitt „Quellen“ (`fehlendeQuellen`, `strukturVollstaendig` in `stab/funkplan.ts`).
+- **Übernahme:** Sie ist gesperrt, solange eine Quelle lädt, und fehlt ohne Freigabe des Moduls
+  Lageberichte. Ohne Schreibrecht fehlt sie weiterhin (sekundäre Aktion, keine Primäraktion
+  nach M16).
+- **Markdown:** Auch die Tilde wird maskiert. Ein Rundlauftest durch `components/Markdown.tsx`
+  prüft, dass kein `del`, `em`, `a` oder `code` entsteht.
+- **Baum-Riegel:** Der Riegel greift auch für Knöpfe, Felder und Portal-Klicks. Der
+  `StatusWahl`-Knopf im Meldebild klappte vorher die Einheit zu. Blattzeile und Aufklappsymbol
+  sind jetzt durch Tests abgesichert.
+- **Tests:** Rollensperre mit Admin-Gegenprobe. Doppelter Schlüssel beim PATCH.
+
 ## Risks / Trade-offs
 
 - [Umzug der Druck-Neutralisierer ändert den Ausdruck des Meldebilds] →

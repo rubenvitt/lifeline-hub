@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { render } from '@testing-library/react';
+import Markdown from '../components/Markdown';
 import type {
   Einheit,
   EinsatzFahrzeug,
@@ -68,7 +70,7 @@ function person(id: number, p: Partial<EinsatzPersonal> = {}): EinsatzPersonal {
   };
 }
 
-const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
+const daten = <T,>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 
 function quellen(p: Partial<FunkplanQuellen> = {}): FunkplanQuellen {
   return {
@@ -334,7 +336,7 @@ describe('rendereFunkplanMarkdown', () => {
     personal: { zustand: 'gesperrt', daten: [] },
     sprechgruppen: daten([sg(9, 'DMO', 'DMO 999', true)]),
   });
-  const md = rendereFunkplanMarkdown(baueFunkplan(q), '301200Sep26', funkplanLuecken(q));
+  const md = rendereFunkplanMarkdown(baueFunkplan(q), '301200Sep26', funkplanLuecken(q), q);
 
   it('trägt Überschrift und Stand', () => {
     expect(md.startsWith('# Funkplan\n')).toBe(true);
@@ -362,7 +364,7 @@ describe('rendereFunkplanMarkdown', () => {
 
   it('schreibt „—“ mit Grund statt einer Zahl, wenn eine Quelle fehlt', () => {
     const ohne = quellen({ einheiten: { zustand: 'gesperrt', daten: [] } });
-    const text = rendereFunkplanMarkdown(baueFunkplan(ohne), 'X', funkplanLuecken(ohne));
+    const text = rendereFunkplanMarkdown(baueFunkplan(ohne), 'X', funkplanLuecken(ohne), ohne);
     expect(text).toContain('- Einheiten ohne Sprechgruppe: — (nicht freigegeben)');
     expect(text).toContain('- Einsatzlokale Sprechgruppen ohne Zuordnung: — (nicht freigegeben)');
   });
@@ -377,12 +379,81 @@ describe('rendereFunkplanMarkdown', () => {
     expect(md).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 
+  it('nennt fehlende Quellen im Bericht, statt sie zu verschweigen', () => {
+    const ohneFahrzeuge = quellen({
+      abschnitte: daten([abschnitt(1)]),
+      fahrzeuge: { zustand: 'gesperrt', daten: [] },
+      personal: { zustand: 'fehler', daten: [] },
+    });
+    const text = rendereFunkplanMarkdown(
+      baueFunkplan(ohneFahrzeuge),
+      'X',
+      funkplanLuecken(ohneFahrzeuge),
+      ohneFahrzeuge,
+    );
+    expect(text).toContain('## Quellen');
+    expect(text).toContain('- Fahrzeuge: nicht freigegeben — diese Angaben fehlen');
+    expect(text).toContain('- Personal (Fahrzeugführer): nicht geladen — diese Angaben fehlen');
+    // Mit allen Quellen gibt es den Abschnitt nicht.
+    const voll = quellen({ abschnitte: daten([abschnitt(1)]) });
+    expect(
+      rendereFunkplanMarkdown(baueFunkplan(voll), 'X', funkplanLuecken(voll), voll),
+    ).not.toContain('## Quellen');
+  });
+
+  it('behauptet „keine Kräfte erfasst“ nur, wenn alle drei Strukturquellen geladen sind', () => {
+    const gesperrt = quellen({
+      abschnitte: { zustand: 'gesperrt', daten: [] },
+      einheiten: { zustand: 'gesperrt', daten: [] },
+      fahrzeuge: { zustand: 'gesperrt', daten: [] },
+    });
+    const text = rendereFunkplanMarkdown(
+      baueFunkplan(gesperrt),
+      'X',
+      funkplanLuecken(gesperrt),
+      gesperrt,
+    );
+    expect(text).not.toContain('keine Kräfte erfasst');
+    expect(text).toContain('_(keine Zeilen: Quellen fehlen, siehe oben)_');
+    const leer = quellen();
+    expect(rendereFunkplanMarkdown([], 'X', funkplanLuecken(leer), leer)).toContain(
+      '_(keine Kräfte erfasst)_',
+    );
+  });
+
   it('entschärft Markdown-Zeichen in Namen', () => {
     const q2 = quellen({
       abschnitte: daten([abschnitt(1, { name: 'A*B_C', sprechgruppen: [sg(1, 'TMO', '1')] })]),
     });
-    expect(rendereFunkplanMarkdown(baueFunkplan(q2), 'X', funkplanLuecken(q2))).toContain(
+    expect(rendereFunkplanMarkdown(baueFunkplan(q2), 'X', funkplanLuecken(q2), q2)).toContain(
       '**A\\*B\\_C**',
     );
+  });
+
+  it('Rundlauf durch den Renderer: Sonderzeichen in allen Feldern bleiben Text (auch ~)', () => {
+    const roh = {
+      abschnitt: 'A*B_C [x] \\ `code` ~1~',
+      leiter: 'Meier~Schulz',
+      einheit: 'Zug ~2~ [Reserve]',
+      sg: 'TMO 412_F_DRK',
+      typ: 'HLF ~20~',
+    };
+    const q3 = quellen({
+      abschnitte: daten([
+        abschnitt(1, {
+          name: roh.abschnitt,
+          leiter_name: roh.leiter,
+          sprechgruppen: [sg(1, 'TMO', roh.sg)],
+        }),
+      ]),
+      einheiten: daten([einheit(10, { name: roh.einheit, abschnitt_id: 1 })]),
+      fahrzeuge: daten([fahrzeug(100, { einheit_id: 10, fahrzeugtyp: roh.typ })]),
+    });
+    const text = rendereFunkplanMarkdown(baueFunkplan(q3), 'X', funkplanLuecken(q3), q3);
+    const { container } = render(<Markdown unterEbene={2}>{text}</Markdown>);
+    for (const wert of Object.values(roh)) {
+      expect(container.textContent, wert).toContain(wert);
+    }
+    expect(container.querySelectorAll('del, em, a, code')).toHaveLength(0);
   });
 });

@@ -175,6 +175,19 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   Übernahmeweg).
   - Nachweis: `scripts/check-fmt.sh` grün.
 
+## 8a. Review-Befunde (Phase 4, adversarial verifiziert)
+
+- [x] 8a.1 `abrufZustand` über `isPending` (Test „pausierte Abfrage“), Meldebild-Drucktest auf
+  `druck.css` umgestellt.
+- [x] 8a.2 Funkplan: Stab-Sperre fail-closed, Rollensperre und Admin-Gegenprobe, Leertext mit
+  Grund, Übernahme gesperrt beim Laden und ohne Lageberichte-Freigabe, fehlende Quellen im
+  Bericht.
+  - Nachweis: `FunkplanPage.test.tsx` und `stab/funkplan.test.tsx` grün.
+- [x] 8a.3 Markdown: Tilde maskiert, Rundlauf durch `Markdown`.
+- [x] 8a.4 `Datensicht`-Baum: Riegel für Knöpfe, Felder und Portal. Tests für Blattzeile,
+  Aufklappsymbol (Maus und Tastatur) sowie Knopf und Portal.
+- [x] 8a.5 Rust: PATCH mit doppeltem Schlüssel → 400 und keine Änderung, Gegenprobe 200.
+
 ## 9. Integration
 
 - [ ] 9.1 `./scripts/check-all.sh` grün (bzw. die CI des PRs), vorher `openspec validate

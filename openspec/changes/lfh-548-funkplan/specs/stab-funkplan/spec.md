@@ -24,9 +24,17 @@ Sichtbarkeit und Sperre des Stab-Moduls.
 - **WHEN** die Adresse des Funkplans direkt aufgerufen wird
 - **THEN** erscheint der Funkplan ohne Umweg über die Stabseite
 
+Weil keine Quelle des Funkplans den Stab selbst prüft, MUST die Seite die Freigabe des Stabs
+ermitteln, bevor sie Daten zeigt. Solange sie nicht ermittelt ist, zeigt die Seite keine Daten.
+Scheitert die Ermittlung, zeigt sie einen Fehler mit Wiederholen, nicht den Funkplan.
+
 #### Scenario: Stab gesperrt
-- **WHEN** das Stab-Modul für die Person ausgeblendet oder gesperrt ist
+- **WHEN** das Stab-Modul für die Person ausgeblendet oder für ihre Rolle gesperrt ist
 - **THEN** ist auch der Funkplan nicht erreichbar, so wie jede andere Seite des Moduls
+
+#### Scenario: Freigabe nicht ermittelbar
+- **WHEN** der Abruf der Modulfreigaben scheitert
+- **THEN** zeigt die Seite einen Fehler mit Wiederholen und weder Tabelle noch Übernahme
 
 ### Requirement: Zeilen als Baum Abschnitt → Einheit → Fahrzeug
 Der Funkplan SHALL eine Tabelle mit einer Zeile je Abschnitt, je Einheit und je Fahrzeug im
@@ -89,7 +97,15 @@ Eindruck erwecken, das Fahrzeug habe keinen Führer.
 Der Funkplan SHALL jede Quellliste (Abschnitte, Einheiten, Fahrzeuge, Personal, Sprechgruppen)
 einzeln laden. Wird eine Liste abgelehnt (403) oder scheitert ihr Abruf, MUST die Seite das an der
 betroffenen Stelle mit Grund sagen: „nicht freigegeben“ bzw. „nicht geladen“. Die übrigen Ebenen
-MUST sie weiter zeigen. Die Seite MUST NOT eine fehlende Ebene als leeren Bestand darstellen.
+MUST sie weiter zeigen. Die Seite MUST NOT eine fehlende Ebene als leeren Bestand darstellen: Eine
+Liste, die noch nie Daten hatte (auch eine ohne Netz pausierte), gilt als „lädt“, nicht als leer.
+Die leere Tabelle sagt „kein Bestand“ nur, wenn Abschnitte, Einheiten und Fahrzeuge geladen sind,
+sonst nennt sie den Grund.
+
+#### Scenario: Alle Strukturquellen gesperrt
+- **WHEN** Abschnitte, Einheiten und Fahrzeuge mit 403 abgelehnt werden
+- **THEN** sagt die leere Tabelle „Abschnitte, Einheiten, Fahrzeuge: nicht freigegeben“ und nicht
+  „Weder Abschnitte noch Einheiten noch Fahrzeuge im Einsatz“
 
 #### Scenario: Fahrzeuge gesperrt
 - **WHEN** die Fahrzeugliste mit 403 abgelehnt wird
@@ -175,7 +191,13 @@ der Capability `druck-dokumente` gelten unverändert.
 ### Requirement: In Lagebericht übernehmen
 Personen mit Schreibrecht im Einsatz SHALL den aktuellen Funkplan mit einer Aktion in einen neuen
 Lagebericht (Vorlage Freitext) mit dem Titel „Funkplan <DTG>“ übernehmen können.
-- Der Inhalt MUST den Baum mit allen Spalten außer der Erreichbarkeit wiedergeben.
+- Der Inhalt MUST den Baum mit allen Spalten außer der Erreichbarkeit wiedergeben. Fehlt eine
+  Quelle (gesperrt, nicht geladen), MUST der Bericht sie mit Grund nennen. „Keine Kräfte erfasst“
+  MUST er nur schreiben, wenn Abschnitte, Einheiten und Fahrzeuge geladen sind.
+- Namen und Kennungen MUST als Text erscheinen, nie als Auszeichnung des Renderers (etwa `~x~`
+  als Durchstreichung).
+- Die Aktion MUST gesperrt sein, solange eine Quelle noch lädt. Sie MUST fehlen, wenn das Modul
+  Lageberichte für die Person nicht freigegeben ist.
 - Die Übernahme MUST in einem einzigen Schritt geschehen, nach `dokument-uebernahme`.
 - Nach dem Erfolg SHALL der neue Lagebericht geöffnet werden.
 - Scheitert die Übernahme, MUST der Fehler an der Seite stehen, und es MUST kein leerer Entwurf

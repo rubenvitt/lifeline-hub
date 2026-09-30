@@ -1245,12 +1245,19 @@ export default function Datensicht<T extends object, const K extends string>(
             ? (zeile) => ({
                 /**
                  * Derselbe Riegel für den Baum (LFH-548): die ganze Zeile klappt auf, außer der
-                 * Klick galt einem Anker. antds `expandRowByClick` kennt keinen Riegel, ein Klick
-                 * auf den Titel-Link klappte sonst mit um, beim Strg-Klick sogar in der Seite, die
-                 * stehen bleibt. Das Aufklappsymbol selbst stoppt die Weitergabe (rc-table).
+                 * Klick galt einem Bedienziel der Zeile oder kam aus einem Portal. antds
+                 * `expandRowByClick` kennt keinen Riegel: ein Klick auf den Titel-Link klappte
+                 * sonst mit um, beim Strg-Klick sogar in der Seite, die stehen bleibt; ein
+                 * Statusknopf klappte die Einheit zu, während sein Menü aufging. Das
+                 * Aufklappsymbol selbst stoppt die Weitergabe (rc-table, im Test gepinnt).
                  */
                 onClick: (event) => {
-                  if ((event.target as HTMLElement).closest('a')) return;
+                  const ziel = event.target as HTMLElement;
+                  // Ein React-Portal (Menü eines Zeilenknopfs) reicht seinen Klick an die Zeile
+                  // weiter, liegt im DOM aber woanders: er gehört nicht der Zeile.
+                  if (!event.currentTarget.contains(ziel)) return;
+                  // Eigene Bedienziele in der Zeile (Link, Knopf, Feld) bedienen den Klick allein.
+                  if (ziel.closest('a, button, input, select, textarea, [role="button"]')) return;
                   const kinder = zeile[baum.kinder] as readonly T[] | undefined;
                   if (!kinder || kinder.length === 0) return;
                   const k = schluessel(zeile);

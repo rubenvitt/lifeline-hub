@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
+import { createPortal } from 'react-dom';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -1895,6 +1896,68 @@ describe('Datensicht · Baum mit Titel-Link (LFH-548)', () => {
     const zeile = container.querySelector('tr[data-row-key="a"] td') as HTMLElement;
     await userEvent.click(zeile);
     expect(onAufgeklappt).toHaveBeenCalledWith(['a']);
+  });
+
+  it('ein Klick auf eine Blattzeile schaltet nichts um', async () => {
+    const onAufgeklappt = vi.fn();
+    const { container } = renderMitProviders(
+      <Datensicht<Knoten, 'stelle'>
+        bezeichnung="Baum"
+        form="tabelle"
+        spalten={knotenSpalten}
+        daten={BAUM}
+        zeilenSchluessel="key"
+        baum={{ kinder: 'kinder', aufgeklappt: ['a'], onAufgeklappt }}
+        karte={{ art: 'plan', titel: { spalte: 'stelle' }, sekundaer: [] }}
+      />,
+    );
+    await userEvent.click(container.querySelector('tr[data-row-key="e"] td') as HTMLElement);
+    expect(onAufgeklappt).not.toHaveBeenCalled();
+  });
+
+  it('das Aufklappsymbol schaltet genau einmal um, per Maus und per Tastatur', async () => {
+    const onAufgeklappt = vi.fn();
+    const { container } = rendereBaum(onAufgeklappt);
+    const symbol = container.querySelector(
+      'tr[data-row-key="a"] .ant-table-row-expand-icon',
+    ) as HTMLElement;
+    await userEvent.click(symbol);
+    expect(onAufgeklappt).toHaveBeenCalledTimes(1);
+    expect(onAufgeklappt).toHaveBeenLastCalledWith(['a']);
+    symbol.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(onAufgeklappt).toHaveBeenCalledTimes(2);
+  });
+
+  it('ein Knopf in der Zeile und ein Klick aus einem Portal-Menü schalten nichts um', async () => {
+    const onAufgeklappt = vi.fn();
+    const mitKnopf = spaltenFuer<Knoten>()([
+      { title: 'Stelle', key: 'stelle', dataIndex: 'name', immerSichtbar: true },
+      {
+        title: 'Aktion',
+        key: 'aktion',
+        render: (_t, k) => (
+          <>
+            <button type="button">Status {k.name}</button>
+            {createPortal(<div role="menuitem">Menü {k.name}</div>, document.body)}
+          </>
+        ),
+      },
+    ]);
+    renderMitProviders(
+      <Datensicht<Knoten, 'stelle' | 'aktion'>
+        bezeichnung="Baum"
+        form="tabelle"
+        spalten={mitKnopf}
+        daten={BAUM}
+        zeilenSchluessel="key"
+        baum={{ kinder: 'kinder', aufgeklappt: [], onAufgeklappt }}
+        karte={{ art: 'plan', titel: { spalte: 'stelle' }, sekundaer: [] }}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Status Abschnitt Nord' }));
+    await userEvent.click(screen.getByText('Menü Abschnitt Nord'));
+    expect(onAufgeklappt).not.toHaveBeenCalled();
   });
 
   it('eine Zeile, deren Ziel null ist, trägt keinen Link, sondern nur ihren Text', () => {

@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route } from 'react-router';
+import { http, HttpResponse } from 'msw';
 import { renderMitProviders } from '../test/utils';
+import { server } from '../test/server';
 import FunkplanPage from './FunkplanPage';
 import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
@@ -333,5 +335,99 @@ describe('FunkplanPage — Sperre des Stabs', () => {
     ).toBeInTheDocument();
     expect(container.querySelector('.ant-table')).toBeNull();
     expect(screen.queryByRole('region', { name: 'Lücken' })).toBeNull();
+  });
+
+  it('ist gesperrt, wenn der Stab eine Rolle verlangt, die die Person nicht hat', async () => {
+    vi.mocked(ladeModulOverrides).mockResolvedValue({
+      stab: {
+        sichtbar: true,
+        benoetigte_rolle: 'fuehrungskraft',
+        einsatz_id: 1,
+        modul_key: 'stab',
+      },
+    });
+    const { container } = setup();
+    expect(
+      await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
+    ).toBeInTheDocument();
+    expect(container.querySelector('.ant-table')).toBeNull();
+  });
+
+  it('Gegenprobe: der System-Admin sieht den Funkplan trotz Rollensperre', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({
+          id: 1,
+          anzeigename: 'Anna Admin',
+          benutzername: 'anna',
+          system_rolle: 'admin',
+          org_rolle: 'keine',
+          aktiv: true,
+          erstellt_at: '2026-05-23 10:00:00',
+        }),
+      ),
+    );
+    vi.mocked(ladeModulOverrides).mockResolvedValue({
+      stab: {
+        sichtbar: true,
+        benoetigte_rolle: 'fuehrungskraft',
+        einsatz_id: 1,
+        modul_key: 'stab',
+      },
+    });
+    setup();
+    expect(await screen.findByText('Florian 1/42-1')).toBeInTheDocument();
+  });
+
+  it('zeigt nichts, solange die Freigabe nicht ermittelt ist, und bei deren Fehler einen Fehler', async () => {
+    vi.mocked(ladeModulOverrides).mockRejectedValue(new ApiError(500, 'kaputt'));
+    const { container } = setup();
+    expect(await screen.findByText(/Freigabe des Stabs nicht ermittelbar/)).toBeInTheDocument();
+    expect(container.querySelector('.ant-table')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
+  });
+});
+
+describe('FunkplanPage — nichts wird als leerer Bestand behauptet', () => {
+  it('nennt den Grund statt „Weder Abschnitte …“, wenn Quellen gesperrt sind', async () => {
+    vi.mocked(listeAbschnitte).mockRejectedValue(new ApiError(403, 'verboten'));
+    vi.mocked(listeEinheiten).mockRejectedValue(new ApiError(403, 'verboten'));
+    vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new ApiError(403, 'verboten'));
+    setup();
+    const tabelle = await screen.findByRole('region', { name: 'Funkplan' });
+    await waitFor(() =>
+      expect(
+        within(tabelle).getByText(/Abschnitte, Einheiten, Fahrzeuge: nicht freigegeben/),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/Weder Abschnitte/)).toBeNull();
+  });
+
+  it('sperrt die Übernahme, solange eine Quelle noch lädt', async () => {
+    vi.mocked(listeEinsatzSprechgruppen).mockReturnValue(new Promise(() => {}));
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    expect(screen.getByRole('button', { name: 'In Lagebericht übernehmen' })).toBeDisabled();
+  });
+
+  it('bietet keine Übernahme an, wenn das Modul Lageberichte nicht freigegeben ist', async () => {
+    vi.mocked(ladeModulOverrides).mockResolvedValue({
+      lageberichte: { sichtbar: false, einsatz_id: 1, modul_key: 'lageberichte' },
+    });
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    expect(screen.queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
+  });
+
+  it('schreibt fehlende Quellen in den Lagebericht, statt sie zu verschweigen', async () => {
+    vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new ApiError(403, 'verboten'));
+    setup();
+    await screen.findByText('1. Zug', { selector: 'a' });
+    const knopf = screen.getByRole('button', { name: 'In Lagebericht übernehmen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    fireEvent.click(knopf);
+    await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
+    const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text;
+    expect(text).toContain('Fahrzeuge: nicht freigegeben');
   });
 });
