@@ -18,6 +18,7 @@ import { useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import KraftZeitachse from '../kraefte/KraftZeitachse';
 import { useAuth } from '../auth/AuthContext';
 import { listeEinheitTypen } from '../api/einheitTypen';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -547,6 +548,18 @@ export default function EinheitDetailPage() {
             Jede Handlung hier wirkt sofort, es gibt nichts zu speichern. Der Hinweis in jedem
             Paneel sagt es zusätzlich in Worten, weil die Trennung allein durch Position eine
             Vermutung bliebe. */}
+        {/* Kräfte-Zeitachse (LFH-552): Einsatzdauer und Ereignisse der Einheit; ein Nachtrag
+            gilt per Fan-out auch für ihre Personen. */}
+        <Paneel titel="Zeitachse" koerperPolster>
+          <KraftZeitachse
+            einsatzId={einsatzId}
+            art="einheit"
+            id={einheitId}
+            kennung={aktuell.name}
+            darfSchreiben={darfSchreiben}
+          />
+        </Paneel>
+
         <Paneel titel="Personal" meta={aktuell.personal_mitglieder.length} koerperPolster>
           <p style={{ margin: 0, marginBottom: token.marginXS, color: rollen.gedaempft }}>
             Zuordnungen wirken sofort — hier gibt es nichts zu speichern.

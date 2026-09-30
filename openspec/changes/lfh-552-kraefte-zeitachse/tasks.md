@@ -43,7 +43,7 @@ Code). Vor jedem „fertig“ gelten `verification-before-completion` und `reque
 
 ## 7. Frontend: Anzeige
 
-- [ ] 7.1 Meldebild: Spalte „Im Einsatz“ (Mono, `tabular-nums`, Anker als zugängliche Beschreibung, „—“ ohne Periode), auch im Druck. Nachweis: Vitest „Meldebild ohne Ereignisse“ (Abwesenheit einer Zahl) und „Meldebild mit laufender Periode“, dazu `kraefteuebersichtPrint.test.ts` mit der Spalte.
+- [ ] 7.1 Meldebild: Spalte „Im Einsatz“ (Mono, `tabular-nums`, Anker als zugängliche Beschreibung, „—“ ohne Periode), auch im Druck. Nachweis: Vitest „Meldebild ohne Ereignisse“ (Abwesenheit einer Zahl) und „Meldebild mit laufender Periode“, dazu der Nachweis, dass die Spalte kein `abBreite` trägt und damit aufs Meldeblatt geht (Test „bleibt auch am schmalen Schirm stehen“ mit Mutationsprobe; `kraefteuebersichtPrint.test.ts` prüft nur CSS und bleibt unverändert).
 - [ ] 7.2 Zeitachsen-Bauteil (Liste von `Zeitachseneintrag`, gestrichen durchgestrichen mit Grund, Herkunftswort) und Nachtrag-Modal über `ErfassungsModal` (drei Felder) mit `SpeicherFehler`. Nachweis: Komponententests „Herkunft sichtbar“, Enter sendet, und eine 422 steht an der Seite, nicht im Toast.
 - [ ] 7.3 Einheit-Detailseite: Paneel „Zeitachse“ mit Nachtrag und Streichen (Aktionsmenü, Rückfrage mit `danger`, Grund Pflicht). Ohne Schreibrecht erscheint `RechteHinweis`, und die Aktionen sind gesperrt sichtbar. Nachweis: Seitentests für Schreib- und Leserolle.
 - [ ] 7.4 Personal-Seite: Spalten „Einsatzdauer“ und „Ruhe“ und aufklappbare Zeitachse über `Datensicht.aufklappen` mit Nachtrag. Nachweis: Seitentests, der Spaltenschalter zählt die neuen Spalten, und `datensicht.guard.test.ts` ist grün.

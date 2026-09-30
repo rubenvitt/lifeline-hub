@@ -27,6 +27,8 @@ import {
 } from '../meldungen/rueckmeldung';
 import { ApiError } from '../api/client';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
+import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
+import { ankerText, dauerText, kraftDauern, type LaufendeDauer } from '../kraefte/zeitachse';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import {
   baueKraeftebild,
@@ -194,11 +196,22 @@ interface StatusKontext {
   handStatus: ((z: RasterZeile) => React.ReactNode) | null;
 }
 
+/**
+ * Spalte „Im Einsatz" (LFH-552): laufende Einsatzdauer je Einheit aus der Kräfte-Zeitachse.
+ * `gesperrt` (403) nimmt die Spalte weg; solange die Perioden laden oder scheitern, bleibt die
+ * Zelle leer — ein „—" behauptete sonst „nicht im Einsatz" für eine ungeprüfte Lage.
+ */
+interface ImEinsatzSpalte {
+  zustand: AbrufZustand;
+  jeEinheit: ReadonlyMap<number, LaufendeDauer>;
+}
+
 function rasterSpalten(
   einsatzId: number,
   auftraegeZustand: AbrufZustand,
   kontext: StatusKontext,
   rueckmeldung: RueckmeldungSpalte,
+  imEinsatz: ImEinsatzSpalte,
 ) {
   return spaltenFuer<RasterZeile>()([
     {
@@ -243,6 +256,25 @@ function rasterSpalten(
           <span style={monoStil(12)}>{z.seit ? kontext.zeit(z.seit) : '—'}</span>
         ) : null,
     },
+    // Kein `abBreite`: die Einsatzdauer gehört zum Einsatzwert im Lagevortrag und auf das
+    // Meldeblatt (Druck).
+    ...(imEinsatz.zustand === 'gesperrt'
+      ? []
+      : [
+          {
+            title: 'Im Einsatz',
+            key: 'im_einsatz',
+            width: 96,
+            render: (_t: unknown, z: RasterZeile) =>
+              z.art === 'einheit' && z.einheitId != null ? (
+                <ImEinsatzZelle
+                  zustand={imEinsatz.zustand}
+                  dauer={imEinsatz.jeEinheit.get(z.einheitId) ?? null}
+                  zeit={kontext.zeit}
+                />
+              ) : null,
+          },
+        ]),
     // Die Mittelverteilung ist Zusatz zum Einheitenstatus, keine Vergleichsachse — sie weicht auf
     // schmalem Schirm zuerst (Zähler im Spaltenschalter).
     {
@@ -280,6 +312,36 @@ function rasterSpalten(
           },
         ]),
   ]);
+}
+
+/** Nur für Screenreader: der Anker der Dauer, sehend steht er im `title`. */
+const NUR_VORGELESEN: React.CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+};
+
+function ImEinsatzZelle({
+  zustand,
+  dauer,
+  zeit,
+}: {
+  zustand: AbrufZustand;
+  dauer: LaufendeDauer | null;
+  zeit: (utc: string) => string;
+}) {
+  if (zustand !== 'daten') return null;
+  if (!dauer) return <span style={monoStil(12)}>—</span>;
+  const anker = ankerText(dauer.anker, zeit(dauer.beginnAt));
+  return (
+    <span data-lfh="im-einsatz" title={anker} style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
+      {dauerText(dauer.minuten)}
+      <span style={NUR_VORGELESEN}>, {anker}</span>
+    </span>
+  );
 }
 
 function EinheitZelle({ zeile: z }: { zeile: RasterZeile }) {
@@ -554,6 +616,12 @@ export default function KraefteuebersichtPage() {
     queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId),
     queryFn: () => holeRueckmeldungen(einsatzId),
   });
+  // Vierter Zusatzabruf (LFH-552): Perioden je Einheit für „Im Einsatz". Scheitert er, fehlt nur
+  // die Dauer.
+  const periodenQuery = useQuery({
+    queryKey: einsatzKeys.kraefteZeitachseEinheiten(einsatzId),
+    queryFn: () => listeEinheitenPerioden(einsatzId),
+  });
 
   const traeger = useMemo(
     () =>
@@ -651,6 +719,16 @@ export default function KraefteuebersichtPage() {
   );
 
   const auftraegeZustand = abrufZustand(auftraegeQuery);
+  const periodenZustand = abrufZustand(periodenQuery);
+  const jetztMs = jetzt.valueOf();
+  const imEinsatzJeEinheit = useMemo(() => {
+    const m = new Map<number, LaufendeDauer>();
+    for (const e of periodenQuery.data ?? []) {
+      const d = kraftDauern(e.perioden, jetztMs).laufend;
+      if (d) m.set(e.einheit_id, d);
+    }
+    return m;
+  }, [periodenQuery.data, jetztMs]);
   const darfSchreibenFrueh = einsatzQuery.data
     ? darfImEinsatzSchreiben(einsatzQuery.data, benutzer)
     : false;
@@ -701,6 +779,7 @@ export default function KraefteuebersichtPage() {
         auftraegeZustand,
         { zeit: (utc) => formatUhrzeitMitTag(utc, konventionen), handStatus },
         { zustand: rueckmeldungZustand, jeZeile: rueckmeldungJeZeile },
+        { zustand: periodenZustand, jeEinheit: imEinsatzJeEinheit },
       ),
     [
       einsatzId,
@@ -709,6 +788,8 @@ export default function KraefteuebersichtPage() {
       handStatus,
       rueckmeldungZustand,
       rueckmeldungJeZeile,
+      periodenZustand,
+      imEinsatzJeEinheit,
     ],
   );
 
