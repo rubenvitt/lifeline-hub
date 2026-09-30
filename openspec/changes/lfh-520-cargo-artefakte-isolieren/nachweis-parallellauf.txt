@@ -1,0 +1,22 @@
+LFH-520 – paralleler Nachweis, 30.09.2026 11:06 (cargo 1.98.1)
+A = dieser Worktree, HEAD d2582bbf (Abweisung vermisst+UHS aktiv)
+B = git-archive-Export desselben Stands, Handler Zeile 209 mit 'if false && …' (Abweisung aus),
+    alle Quellen von B auf 01.09.2026 zurückdatiert (älter als jeder Bau von A).
+Globale Nutzerkonfiguration: target-dir = "/Users/rubeen/.cache/cargo-target"
+B Zeile 209: if false && body.uhs_id.is_some() && matches!(status_enum, PersonStatus::Vermisst) {
+Ziel A: /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-719-1b1519/target
+Ziel B: /private/tmp/claude-501/-Users-rubeen-dev-personal-lifeline-hub--claude-worktrees-lfh-719-1b1519/99bc5cd7-51da-42b3-b9a1-fc3737043cfe/scratchpad/b-stand/target
+--- beide gleichzeitig: cargo test --test person_aufnahme_uhs
+A:    Compiling lifeline-hub v1.0.0-alpha.56 (<A>)
+A:      Running tests/person_aufnahme_uhs.rs (target/debug/deps/person_aufnahme_uhs-77a78146d006cd0a)
+A: test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+B:      Running tests/person_aufnahme_uhs.rs (target/debug/deps/person_aufnahme_uhs-77a78146d006cd0a)
+B: thread 'aufnahme_vermisst_inaktiv_unbekannt_und_fremder_einsatz_sind_abgewiesen' (15172290) panicked at tests/person_aufnahme_uhs.rs:158:9:
+B: test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+--- Lesart
+Beide Testbinaries tragen denselben Namen (person_aufnahme_uhs-77a78146d006cd0a): Der Hash
+hängt nicht am absoluten Pfad. Sie liegen aber in verschiedenen Zielen. B kompiliert hier
+nicht neu, weil sein EIGENES Ziel Bs früheren Bau trägt und Bs Quellen älter sind. Es führt
+also seinen eigenen Stand aus und scheitert am ausgeschalteten Abweisungsfall.
+Gegenprobe vom selben Tag (design.md, Context): Im gemeinsamen Ziel meldete B unter
+derselben Lage 6/6, weil es As Binary ausführte.

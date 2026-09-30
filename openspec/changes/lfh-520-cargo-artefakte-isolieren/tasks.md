@@ -53,7 +53,7 @@
 
 ## 5. Integrationsnachweis
 
-- [ ] 5.1 Paralleler Projektnachweis mit zwei Checkouts: dieser Worktree und ein Export von
+- [x] 5.1 Paralleler Projektnachweis mit zwei Checkouts: dieser Worktree und ein Export von
       HEAD mit ausgeschalteter Abweisung von `vermisst` + UHS, dessen Quellen älter sind.
       Gleichzeitig laufen `cargo test --test person_aufnahme_uhs`. Verifikation: A 6/6, B
       genau ein Fehlschlag in `aufnahme_vermisst_…_abgewiesen`. Das Log wird außerhalb des
