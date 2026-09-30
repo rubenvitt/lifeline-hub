@@ -10,7 +10,7 @@
 //! rechnet der Client gegen seine Uhr. Nichts davon wird gespeichert, und es gibt keine
 //! Grenzwerte.
 //!
-//! Spec: `openspec/changes/lfh-552-kraefte-zeitachse/`
+//! Spec: `openspec/changes/archive/2026-09-30-lfh-552-kraefte-zeitachse/`
 
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
