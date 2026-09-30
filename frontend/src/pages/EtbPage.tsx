@@ -240,8 +240,9 @@ export default function EtbPage() {
   function oeffneWiedervorlage(eintrag: EtbEintragAnzeige) {
     const kontext = { eintrag };
     setWiedervorlageZu(kontext);
-    // Einsatz-Kopfdaten sind nicht live. Nur ein frischer Abruf darf die absolute
-    // Schnellwahl anbieten; bei Fehler bleiben die relativen Vorgaben bedienbar.
+    // Der Einsatzkopf ist live (LFH-555), doch bei gestörtem Strom steht der Cache. Nur ein
+    // frischer Abruf darf die absolute Schnellwahl anbieten; bei Fehler bleiben die relativen
+    // Vorgaben bedienbar.
     // Die Identität schützt vor Antworten nach Schließen oder erneutem Öffnen.
     void ladeEinsatz(einsatzId).then(
       (frisch) =>

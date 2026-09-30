@@ -56,8 +56,9 @@ export const EINSATZ_KEYS = {
   abloesungen: 'einsatz-abloesungen',
   betreuung: 'einsatz-betreuung',
   verpflegung: 'einsatz-verpflegung',
-  // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
+  // Einsatzkopf, live über das `einsatz`-Ereignis (LFH-555).
   einsatz: 'einsatz',
+  // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einstellungen: 'einsatz-einstellungen',
   mitglieder: 'einsatz-mitglieder',
   sprechgruppen: 'einsatz-sprechgruppen',
@@ -172,6 +173,11 @@ export const EINSATZ_STREAM_EVENTS = {
   // Zeitfenster samt Deckung und Ausgaben unter EINEM Prefix. Kein Fan-out von `nachforderung`:
   // das DTO trägt nur die Kennung.
   verpflegung: [EINSATZ_KEYS.verpflegung],
+  // Einsatzkopf (LFH-555). Der Stab-GET liefert den Termin der nächsten Lagebesprechung aus
+  // derselben Spalte mit (LFH-46, Entscheidung 11), deshalb hängt er hier mit dran: eine
+  // Terminwahrheit, zwei Caches. Die benutzerbezogenen Kopffelder (`meine_*`) und
+  // `lagekennzahlen` lösen das Ereignis nicht aus; sie werden beim nächsten Abruf frisch.
+  einsatz: [EINSATZ_KEYS.einsatz, EINSATZ_KEYS.stab],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -181,7 +187,8 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  * `queryKeys.guard.test.ts` verlangt, dass jeder Key aus {@link EINSATZ_KEYS} entweder in
  * {@link EINSATZ_STREAM_EVENTS} auftaucht ODER hier steht.
  *
- * - `einsatz`/`einstellungen`/`mitglieder`/`sprechgruppen`: selten geändert, kein Live-Event.
+ * - `einstellungen`/`mitglieder`/`sprechgruppen`: selten geändert, kein Live-Event. Der
+ *   Einsatzkopf `einsatz` ist seit LFH-555 live.
  * - `uhsDetail`/`person`/`personAudit`/`tier`/`schaden`: Singular-Detail-Keys, die der
  *   Listen-Prefix-Match nicht erreicht.
  * - `modulOverrides`: das Backend kennt kein LiveEvent dafür (`LiveEvent::ALLE`); ein Override
@@ -196,7 +203,6 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  *   `etb` zöge ihn das `etb`-Ereignis per Präfix mit.
  */
 export const NICHT_LIVE_KEYS = [
-  EINSATZ_KEYS.einsatz,
   EINSATZ_KEYS.einstellungen,
   EINSATZ_KEYS.mitglieder,
   EINSATZ_KEYS.sprechgruppen,

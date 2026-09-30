@@ -43,6 +43,7 @@ wire_enum! {
         KartenAnsicht => "karten_ansicht",
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",
+        Einsatz => "einsatz",
         Lagged => "lagged",
     }
 }
@@ -50,7 +51,11 @@ wire_enum! {
 impl LiveEvent {
     /// Die Module, deren Daten dieses Event betrifft — die Gate-Menge des
     /// Live-Filters (F01/LFH-227). Ein Abonnent erhält das Event, wenn er MINDESTENS
-    /// EINES dieser Module sehen darf; eine leere Menge heißt „bewusst ungated".
+    /// EINES dieser Module sehen darf. Eine leere Menge heißt „gehört keinem Modul — erreicht
+    /// jeden, der die Tür des Stroms passiert" (`EinsatzLesezugriff` ohne Modul, `routes/live.rs`).
+    /// Sie steht nur zwei Events zu: dem Kontroll-Event `lagged` und dem Einsatzkopf `einsatz`,
+    /// dessen GET hinter genau derselben Tür liegt (LFH-555). Gepinnt von
+    /// `ungegatet_sind_nur_lagged_und_einsatz`.
     ///
     /// **Füll-Regel (sicherheitstragend):** hier steht das Modul, zu dessen Datenobjekt
     /// das Event gehört — NICHT das Modul der Route, die es ausgelöst hat. Ein
@@ -107,8 +112,9 @@ impl LiveEvent {
             // NICHT `einsatzdaten`, obwohl der Lagebesprechungs-Abschluss
             // `einsatz.naechste_lagebesprechung_at` mitschreibt (Entscheidung 11): ein
             // `einsatzdaten`-Leser ohne Stab-Recht erführe sonst, DASS eine Besprechung
-            // stattgefunden hat. Der Einsatzkopf bleibt FE-seitig NICHT_LIVE und wird beim
-            // nächsten Abruf frisch — der dokumentierte Nachlauf, kein Fehler.
+            // stattgefunden hat. Den neuen Termin erfährt jeder Kopf-Leser über das eigene
+            // `einsatz`-Event — und das feuert nur, wenn sich der Termin TATSÄCHLICH ändert
+            // (LFH-555, design.md D3): mehr als der Kopf-GET ohnehin zeigt, verrät es nicht.
             LiveEvent::Stab => &["stab"],
             // Nur `dokumente`: das Dokument ist ein Datenobjekt der Dokumentenablage; der
             // ETB-Nachweis läuft über das eigene `etb`-Ereignis.
@@ -138,6 +144,12 @@ impl LiveEvent {
             // sehen darf, darf die Anlage/Änderung/Löschung eines Standes erfahren.
             LiveEvent::LageSnapshot => &["lagekarte"],
             LiveEvent::Sofortmeldung => &["meldungen"],
+            // Einsatzkopf (LFH-555): gehört keinem Modul. `GET /api/einsaetze/{id}` liegt hinter
+            // derselben Tür wie der Strom (`EinsatzLesezugriff` ohne Modul) — wer den Strom
+            // öffnen darf, darf den Kopf lesen und damit auch erfahren, dass er sich geändert
+            // hat. Ein Modul-Key hier (etwa `einsatzdaten`) ließe genau die Kopf-Leser ohne
+            // dieses Modul mit einem stehenden Cache zurück. Nutzlast nur die Einsatzkennung.
+            LiveEvent::Einsatz => &[],
             // Kontroll-Event ohne Fachbezug: muss JEDEN Abonnenten erreichen, sonst
             // hängt der Resync nach Ring-Overflow/Neustart.
             LiveEvent::Lagged => &[],
@@ -468,16 +480,19 @@ mod tests {
         }
     }
 
-    /// Genau die Kontroll-Events sind ungegatet. Rutschte ein Fach-Event versehentlich
-    /// auf `&[]`, liefe es an JEDEM Modul-Gate vorbei — die Lücke, die F01 schließt.
+    /// Ungegatet sind genau das Kontroll-Event `lagged` und der Einsatzkopf `einsatz`
+    /// (LFH-555): beide gehören keinem Modul und erreichen jeden, der die Tür des Stroms
+    /// passiert. Rutschte ein Fach-Event versehentlich auf `&[]`, liefe es an JEDEM
+    /// Modul-Gate vorbei — die Lücke, die F01 schließt.
     #[test]
-    fn nur_kontroll_events_sind_ungegatet() {
-        let ungegatet: Vec<&str> = LiveEvent::ALLE
+    fn ungegatet_sind_nur_lagged_und_einsatz() {
+        let mut ungegatet: Vec<&str> = LiveEvent::ALLE
             .iter()
             .filter(|ev| ev.modul_keys().is_empty())
             .map(|ev| ev.as_str())
             .collect();
-        assert_eq!(ungegatet, vec!["lagged"]);
+        ungegatet.sort_unstable();
+        assert_eq!(ungegatet, vec!["einsatz", "lagged"]);
     }
 
     /// Pinnt die Gate-Menge JEDES Events (nicht nur „nicht leer"). Eine Verbreiterung ist
@@ -519,6 +534,7 @@ mod tests {
             (LiveEvent::KartenAnsicht, &["lagekarte"]),
             (LiveEvent::LageSnapshot, &["lagekarte"]),
             (LiveEvent::Sofortmeldung, &["meldungen"]),
+            (LiveEvent::Einsatz, &[]),
             (LiveEvent::Lagged, &[]),
         ];
         for (ev, keys) in erwartet {
@@ -543,6 +559,8 @@ mod tests {
         assert!(!LiveEvent::Chat.sichtbar_fuer(&nur_etb));
         // Kontroll-Event passiert auch eine leere Erlaubnis-Menge.
         assert!(LiveEvent::Lagged.sichtbar_fuer(&HashSet::new()));
+        // Einsatzkopf (LFH-555): erreicht auch ein Mitglied ohne jede Modulfreigabe.
+        assert!(LiveEvent::Einsatz.sichtbar_fuer(&HashSet::new()));
         // Dual gegatetes Event: EIN passendes Modul genügt.
         let nur_lage: HashSet<&'static str> = HashSet::from(["lagemeldungen"]);
         assert!(LiveEvent::Meldung.sichtbar_fuer(&nur_lage));
