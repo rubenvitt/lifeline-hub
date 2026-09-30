@@ -1296,6 +1296,143 @@ pub async fn totp_finish(
     Ok((jar, Json(benutzer.anzeige(true))))
 }
 
+/// Body von `POST /api/auth/app-code` (LFH-818).
+#[derive(Debug, Deserialize)]
+pub struct AppCodeAnfrage {
+    pub challenge: String,
+}
+
+/// Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AppCode {
+    pub code: String,
+}
+
+/// Body von `POST /api/auth/app-code/einloesen` (LFH-818).
+#[derive(Debug, Deserialize)]
+pub struct AppCodeEinloesen {
+    pub code: String,
+    pub verifier: String,
+}
+
+/// POST /api/auth/app-code — stellt aus der bestehenden Browsersitzung einen Einmalcode aus,
+/// gebunden an die `challenge` der macOS-Hülle (LFH-818). Die Webanwendung ruft das erst nach
+/// der ausdrücklichen Bestätigung auf `/app-anmeldung` auf. Ohne Sitzung 401, `challenge` in
+/// falscher Form 400.
+pub async fn app_code_ausstellen(
+    CurrentUser(benutzer): CurrentUser,
+    JsonBody(req): JsonBody<AppCodeAnfrage>,
+) -> Result<Json<AppCode>, AppError> {
+    if !crate::auth::huelle::pkce::challenge_gueltig(&req.challenge) {
+        return Err(AppError::Validation(
+            "challenge muss aus 43 base64url-Zeichen bestehen".to_string(),
+        ));
+    }
+    let code = session::neuer_token();
+    crate::auth::huelle::state::speichere(
+        code.clone(),
+        crate::auth::huelle::state::CodeEintrag {
+            benutzer_id: benutzer.id,
+            challenge: req.challenge,
+        },
+    );
+    Ok(Json(AppCode { code }))
+}
+
+/// POST /api/auth/app-code/einloesen — löst einen Einmalcode mit dem `verifier` ein und legt im
+/// anfragenden Cookie-Speicher (Webview der Hülle) eine eigene Sitzung an (LFH-818).
+///
+/// Reihenfolge: Form (400) → Sperre der Adresse (429) → Code entnehmen (damit verbraucht, gleich
+/// wie es ausgeht) → `verifier` und aktives Konto. Jedes Scheitern danach ist einheitlich 401,
+/// damit die Antwort keinen Grund verrät (unbekannt, abgelaufen, verbraucht, falsch gebunden,
+/// deaktiviert); Herleitung: `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`,
+/// Entscheidung 5.
+pub async fn app_code_einloesen(
+    State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
+    jar: CookieJar,
+    JsonBody(req): JsonBody<AppCodeEinloesen>,
+) -> Result<(CookieJar, StatusCode), AppError> {
+    use crate::auth::huelle::{pkce, state as codes, PROVIDER};
+
+    if !codes::code_gueltig(&req.code) || !pkce::verifier_gueltig(&req.verifier) {
+        return Err(AppError::Validation(
+            "code oder verifier hat nicht die erwartete Form".to_string(),
+        ));
+    }
+    if let Some(ip) = peer_ip {
+        if crate::auth::rate_limit::ist_gesperrt(ip) {
+            return Err(AppError::TooManyRequests(
+                "Zu viele fehlgeschlagene Anmeldeversuche. Bitte kurz warten.".to_string(),
+            ));
+        }
+    }
+
+    // Synchron entnommen, der Guard ist vor dem ersten `.await` frei.
+    let eintrag = codes::entnehme(&req.code);
+    let gebunden = eintrag
+        .as_ref()
+        .filter(|e| pkce::passt(&req.verifier, &e.challenge));
+    let benutzer = match gebunden {
+        Some(e) => {
+            sqlx::query_as::<_, Benutzer>(
+                "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, \
+             org_rolle, aktiv, erstellt_at FROM benutzer WHERE id = ? AND aktiv = 1",
+            )
+            .bind(e.benutzer_id)
+            .fetch_optional(&state.pool)
+            .await?
+        }
+        None => None,
+    };
+    let Some(benutzer) = benutzer else {
+        if let Some(ip) = peer_ip {
+            crate::auth::rate_limit::fehlversuch(ip);
+        }
+        tracing::warn!(peer_ip = ?peer_ip, "Anmeldung aus dem Browser abgewiesen");
+        crate::auth::audit::schreibe(
+            &state.pool,
+            crate::auth::audit::AuditEintrag {
+                ereignis: crate::auth::audit::Ereignis::LoginFehlgeschlagen,
+                benutzername: None,
+                benutzer_id: eintrag.map(|e| e.benutzer_id),
+                peer_ip: peer_ip.map(|ip| ip.to_string()),
+                provider: PROVIDER,
+            },
+        )
+        .await;
+        return Err(AppError::Unauthorized);
+    };
+
+    if let Some(ip) = peer_ip {
+        crate::auth::rate_limit::erfolg(ip);
+    }
+    // Eine übrig gebliebene Sitzung im Webview würde sonst verwaist in der Tabelle stehen.
+    if let Some(alt) = jar.get(SESSION_COOKIE) {
+        session::loeschen(&state.pool, alt.value()).await?;
+    }
+    let token = session::anlegen(&state.pool, benutzer.id).await?;
+    let jar = jar.add(session_cookie(token, session::cookie_secure()));
+    tracing::info!(
+        benutzer_id = benutzer.id,
+        benutzername = %benutzer.benutzername,
+        peer_ip = ?peer_ip,
+        "Anmeldung aus dem Browser eingelöst"
+    );
+    crate::auth::audit::schreibe(
+        &state.pool,
+        crate::auth::audit::AuditEintrag {
+            ereignis: crate::auth::audit::Ereignis::LoginOk,
+            benutzername: Some(&benutzer.benutzername),
+            benutzer_id: Some(benutzer.id),
+            peer_ip: peer_ip.map(|ip| ip.to_string()),
+            provider: PROVIDER,
+        },
+    )
+    .await;
+    Ok((jar, StatusCode::NO_CONTENT))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1324,6 +1461,14 @@ mod tests {
         );
         assert_eq!(ziel_pfad_aus_query(Some("/uhs/5".to_string())), "/uhs/5");
         assert_eq!(ziel_pfad_aus_query(Some("/".to_string())), "/");
+    }
+
+    /// Die Bestätigung für die Mac-App (LFH-818) trägt ihre `challenge` als Query; OIDC muss sie
+    /// unverändert zurückführen.
+    #[test]
+    fn ziel_pfad_aus_query_behaelt_die_query() {
+        let ziel = "/app-anmeldung?challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
+        assert_eq!(ziel_pfad_aus_query(Some(ziel.to_string())), ziel);
     }
 
     #[test]

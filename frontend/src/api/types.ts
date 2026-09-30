@@ -17,6 +17,7 @@ type S = components['schemas'];
 
 // ============================== Auth ==============================
 export type AuthProvider = S['AuthProviderAnzeige'];
+export type AppCode = S['AppCode'];
 // TOTP-Enroll-DTOs (`/api/auth/totp/enroll/start|finish`).
 export type TotpEnrollStart = S['TotpEnrollStart'];
 export type TotpEnrollFinish = S['TotpEnrollFinish'];
@@ -362,6 +363,15 @@ export type Stabsfunktion = S['StabsfunktionAnzeige'];
 export type Lagebesprechung = S['LagebesprechungAnzeige'];
 export type Sachgebiet = S['Sachgebiet'];
 export type BesetzungArt = S['BesetzungArt'];
+export type ChecklistenEintrag = S['ChecklistenEintrag'];
+export type ChecklistenPunkt = S['ChecklistenPunkt'];
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `PUT …/stab/checkliste/{punkt}` (LFH-551), FE-lokal.
+ * Beide Felder optional, mindestens eines Pflicht (sonst 400). `bemerkung: ''` oder `null` löscht.
+ * Ein Bedienziel schickt genau SEIN Feld — der Server lässt das andere unverändert.
+ */
+export type ChecklistenPunktBody = { erledigt: boolean } | { bemerkung: string | null };
 
 /**
  * Kein Backend-Schema: Eingabe-Body von `PUT …/stab/besetzung/{sachgebiet}`, FE-lokal.

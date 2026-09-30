@@ -3,13 +3,22 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { VitePWA } from 'vite-plugin-pwa';
+import { VitePWA, type ManifestOptions } from 'vite-plugin-pwa';
 
 const frontendVersion = (
   JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
     version: string;
   }
 ).version;
+
+// PWA-Manifest (LFH-837) als JSON neben der Bildmarke, damit `src/marke/marke.guard.test.ts` es
+// lesen kann, ohne diese Konfiguration zu laden. Ein TS-Modul ginge nicht: `tsc -b` legte seine
+// `.js`-Ausgabe daneben, und Vite löst `.js` vor `.ts` auf. Titelleiste und Startbildschirm sind
+// Kopf-Schwarz, im Tag- wie im Nachtbetrieb (der Rahmen ist in beiden dunkel, LFH-434). Die
+// Symbole 192/512 dienen „any“, ein eigenes „maskable“; erzeugt von `scripts/marke/`.
+const pwaManifest = JSON.parse(
+  readFileSync(new URL('./src/marke/pwaManifest.json', import.meta.url), 'utf8'),
+) as Partial<ManifestOptions>;
 
 // `frontend/dist` muss zur Compile-Zeit existieren, sonst bricht rust-embed
 // (src/static_files.rs) den Backend-Build — deshalb ist die .gitkeep dort getrackt.
@@ -43,7 +52,7 @@ export default defineConfig(({ mode }) => {
       gitkeepBewahren(),
       VitePWA({
         registerType: 'prompt',
-        includeAssets: ['favicon.svg'],
+        includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
         workbox: {
           // Der Haupt-Chunk überschreitet das 2-MiB-Precache-Limit, solange es kein Code-Splitting gibt.
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
@@ -52,19 +61,7 @@ export default defineConfig(({ mode }) => {
           // `index.html`, und der Login endet stumm wieder auf der Login-Seite.
           navigateFallbackDenylist: [/^\/api\//],
         },
-        manifest: {
-          name: 'lifeline-hub',
-          short_name: 'lifeline',
-          description: 'Elektronisches Einsatztagebuch',
-          theme_color: '#a8071a',
-          background_color: '#ffffff',
-          display: 'standalone',
-          start_url: '/',
-          icons: [
-            { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
-            { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
-          ],
-        },
+        manifest: pwaManifest,
       }),
     ],
     define: {

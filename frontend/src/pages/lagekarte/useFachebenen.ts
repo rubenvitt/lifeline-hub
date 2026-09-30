@@ -17,9 +17,6 @@ import {
   NENNUNG_TRENNER,
 } from './fachebenen';
 import type { FachebenenSichtbar } from './fachebenenAuswahl';
-import { faerbeHochwasser } from './hochwasserStil';
-import { faerbeLuftqualitaet } from './luftqualitaetStil';
-import { faerbeOdl } from './odlStil';
 import type { AktiveFachebene } from './kartenLayer';
 import { globalKeys } from '../../api/queryKeys';
 
@@ -190,20 +187,18 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
       const aktiveFachebenen: AktiveFachebene[] = fachebeneKeys()
         .filter((k) => fachebenenSichtbar[k])
         .map((k) => {
-          // Energie aus ihrer Sammlung; Hochwasser, ODL und Luftqualität mit eingebackener Farbe
-          // und Punktgröße; übrige Quellen direkt aus der Query.
+          // Energie aus ihrer Sammlung; Ebenen mit Klassenfarben (Hochwasser, ODL, Luftqualität)
+          // mit eingebackener Farbe und Punktgröße — über dieselbe Eigenschaft, die im Panel die
+          // Legende trägt (LFH-592); übrige Quellen direkt aus der Query.
+          const def = FACHEBENEN[k];
           const roh = byKey[k].data?.features ?? leerFc;
           const daten =
             k === 'energie'
               ? energieAkku
-              : k === 'hochwasser'
-                ? faerbeHochwasser(roh, token)
-                : k === 'odl'
-                  ? faerbeOdl(roh, token)
-                  : k === 'luftqualitaet'
-                    ? faerbeLuftqualitaet(roh, token)
-                    : roh;
-          return { def: FACHEBENEN[k], daten };
+              : def.klassenfarben
+                ? def.klassenfarben.faerbe(roh, token)
+                : roh;
+          return { def, daten };
         });
 
       const fachebenenStatus: Partial<Record<FachebeneQuelle, FachebeneStatus>> = {};

@@ -36,6 +36,7 @@ import {
   type BetreuungEbenenAngabe,
 } from './leistenDaten';
 import Sichtungslegende from './Sichtungslegende';
+import Klassenlegende from './Klassenlegende';
 import './lagekarte.css';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
@@ -1046,7 +1047,13 @@ export default function Sidebar(props: SidebarProps) {
                 {/* Marke, Beschriftung und Statuswort sind ein Umbruchteil: das Farbquadrat geht
                     mit seinem Wort. */}
                 <span style={namensteilStil(token)}>
-                  <span style={{ color: def.farbe }} aria-hidden="true">
+                  {/* Eine Ebene mit Klassenfarben zeichnet nie in `farbe` — statt eines Punkts,
+                      den die Karte nicht kennt, steht unter dem Namen ihre Legende (LFH-592). Das
+                      Quadrat bleibt unsichtbar als Platzhalter, damit die Namen bündig stehen. */}
+                  <span
+                    style={def.klassenfarben ? { visibility: 'hidden' } : { color: def.farbe }}
+                    aria-hidden="true"
+                  >
                     ■
                   </span>
                   {/* Der Geltungsbereich steht als Zeile, nicht als Tooltip: auf dem Tablet gibt
@@ -1062,6 +1069,14 @@ export default function Sidebar(props: SidebarProps) {
                         steht nur für einen Zustand, und „offline“ und Stand gelten zusammen. */}
                     {sichtbar && (
                       <FachebeneStand quelle={key} abgerufen={props.fachebenenAbgerufen?.[key]} />
+                    )}
+                    {/* Nur eingeschaltet: ausgeschaltet zeichnet die Ebene nichts, und das Panel
+                        ist unter `lg` knapp. */}
+                    {sichtbar && def.klassenfarben && (
+                      <Klassenlegende
+                        bezeichnung={def.label}
+                        eintraege={def.klassenfarben.legende}
+                      />
                     )}
                   </span>
                   {laedt ? (

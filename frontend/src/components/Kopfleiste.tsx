@@ -4,6 +4,7 @@ import { TbAntennaBars5, TbAntennaBarsOff } from 'react-icons/tb';
 import { Link } from 'react-router';
 import dayjs from 'dayjs';
 import { useAuth } from '../auth/AuthContext';
+import { Bildmarke } from '../marke/Bildmarke';
 import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
 import type { LiveVerbindungsStatus } from '../live/useEinsatzLiveStream';
 import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
@@ -25,6 +26,8 @@ import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
  * mit — die Markenzelle folgt der Rail-Spalte ({@link railBreite}, LFH-384).
  */
 export const KOPF_HOEHE = 52;
+/** Höhe der Bildmarke in der Markenzelle (LFH-837; vorher ein 14-px-Quadrat). */
+export const MARKENZELLE_BILDMARKE_HOEHE = 22;
 
 /**
  * Breite der Rail und damit der Markenzelle links oben — beide fluchten im Entwurf. Die
@@ -96,7 +99,10 @@ export const KOPF_NAME_FLEX = '3 1 340px';
 export const KOPF_NAME_FLEX_SCHMAL = '1 1 240px';
 export const KOPF_SUCHE_FLEX = '1 1 180px';
 
-/** Markenzelle: 14-px-Quadrat in `marke`, in Rail-Breite. Reine Dekoration. */
+/**
+ * Markenzelle: Bildmarke „Lebenslinie“ (LFH-837) in der Textfarbe des Rahmens, in Rail-Breite.
+ * Reine Dekoration; den Namen trägt die Wortmarke daneben.
+ */
 export function Markenzelle() {
   const { token } = theme.useToken();
   const breite = railBreite(token);
@@ -114,7 +120,7 @@ export function Markenzelle() {
         borderInlineEnd: `1px solid ${rahmenFarben.linie}`,
       }}
     >
-      <div style={{ width: 14, height: 14, background: rahmenFarben.marke }} />
+      <Bildmarke hoehe={MARKENZELLE_BILDMARKE_HOEHE} linienFarbe={rahmenFarben.text} />
     </div>
   );
 }

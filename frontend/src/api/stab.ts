@@ -1,6 +1,9 @@
 import { apiGet, apiSend } from './client';
 import type {
   BesetzungBody,
+  ChecklistenEintrag,
+  ChecklistenPunkt,
+  ChecklistenPunktBody,
   Lagebesprechung,
   LagebesprechungAbschlussBody,
   Sachgebiet,
@@ -40,4 +43,25 @@ export function schliesseLagebesprechungAb(
   daten: LagebesprechungAbschlussBody,
 ): Promise<Stab> {
   return apiSend<Stab>(`/api/einsaetze/${einsatzId}/stab/lagebesprechungen`, 'POST', daten);
+}
+
+/** Gespeicherte Punkte der Checkliste Arbeitsaufnahme (LFH-551); fehlend = offen. */
+export function ladeCheckliste(einsatzId: number): Promise<ChecklistenEintrag[]> {
+  return apiGet<ChecklistenEintrag[]>(`/api/einsaetze/${einsatzId}/stab/checkliste`);
+}
+
+/**
+ * Setzt Haken ODER Bemerkung eines Punkts; die Antwort ist die ganze Checkliste nach dem Commit.
+ * Aufrufer schicken genau das Feld ihres Bedienziels (Design D3).
+ */
+export function setzeChecklistenPunkt(
+  einsatzId: number,
+  punkt: ChecklistenPunkt,
+  daten: ChecklistenPunktBody,
+): Promise<ChecklistenEintrag[]> {
+  return apiSend<ChecklistenEintrag[]>(
+    `/api/einsaetze/${einsatzId}/stab/checkliste/${punkt}`,
+    'PUT',
+    daten,
+  );
 }
