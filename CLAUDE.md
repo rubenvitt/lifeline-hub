@@ -235,6 +235,11 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   Flow-Geschwister mit `bandStil(…)` (`'auto'`, nie `position: 'absolute'`). Der Fuß endet vor der
   Knopfspalte (`fussStil(knopfKante)`) und oben an der Karte; kein `overflow` am Rahmen.
 - **Die Karte kippt nicht** (`touchPitch: false` **und** `maxPitch: 0` in `Kartenflaeche.tsx`).
+- **Fachebenen antworten bedingt** (LFH-594, `fachebene_antwort` in `routes/karte.rs`): ETag =
+  Hash der ausgelieferten Bytes (nicht `gespeichert_at`), `private, no-cache`, 304 ohne Body;
+  `If-None-Match` vergleicht schwach (`support::if_none_match_matcht`). Das 304 löst der
+  HTTP-Cache des Browsers auf — `apiGet` setzt **keine** `cache`-Option. Nachweis auf der
+  Leitung per CDP: `e2e/fachebenen-bedingt.spec.ts` (Playwrights `status()` meldet 200).
 - **Unter `lg` gibt jeder Kartenmodus die Karte frei** (LFH-765,
   `openspec/changes/archive/2026-09-30-lfh-765-lagekarte-modi-karte-freigeben/design.md`): abgeleitet aus
   `exklusiverModusAktiv` in `leisteSichtbar` (`lagekarte/leistenWahl.ts`), nie per Aufruf je

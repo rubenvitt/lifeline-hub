@@ -137,6 +137,10 @@ function netzFehlerWerfen(e: unknown): never {
 
 export async function apiGet<T>(pfad: string): Promise<T> {
   try {
+    // Bewusst ohne `cache`-Option: bedingte Abrufe (ETag → `If-None-Match` → 304, LFH-594)
+    // erledigt der HTTP-Cache des Browsers und reicht die gespeicherte Antwort als 200 durch.
+    // `no-store`/`reload` machten jeden Fachebenen-Poll wieder zur vollen Nutzlast
+    // (`e2e/fachebenen-bedingt.spec.ts`).
     const res = await fetch(pfad, {
       credentials: 'same-origin',
       signal: AbortSignal.timeout(15_000),
