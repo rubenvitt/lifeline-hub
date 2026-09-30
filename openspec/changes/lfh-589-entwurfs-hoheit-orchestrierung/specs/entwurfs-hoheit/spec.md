@@ -10,8 +10,10 @@ gegen Hintergrund-Workflows gesichert ist.
 ## ADDED Requirements
 
 ### Requirement: Eine Change entsteht genau auf der Route „Entwurf“
-Ein (Sub)Task MUST genau dann eine OpenSpec-Change bekommen, wenn das Routing von
-`dev-clickup-ausfuehren` für ihn die Route „Entwurf“ wählt. Die Route „Entwurf“ MUST gewählt
+Das Routing von `dev-clickup-ausfuehren` kennt fünf Routen mit festen Schlüsseln: `trivial`
+(„trivial“), `unklar` („Anforderung unklar“), `bug-unklar` („Bug, Ursache unklar“), `klar`
+(„klare Spec“) und `entwurf` („Entwurf“). Ein (Sub)Task MUST genau dann eine OpenSpec-Change
+bekommen, wenn das Routing für ihn die Route „Entwurf“ wählt. Die Route „Entwurf“ MUST gewählt
 werden, wenn mindestens einer dieser Gründe zutrifft:
 
 - **E1 Entscheidung:** Es gibt mehr als einen vertretbaren Weg, und die Wahl soll begründet
