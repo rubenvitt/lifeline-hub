@@ -25,6 +25,33 @@ async function einsatzAnlegenUndOeffnen(page: Page, name: string): Promise<strin
   return id;
 }
 
+/** Steht ein Entwurf mit genau diesem Inhalt im Entwurfsspeicher (`etb/entwuerfe/entwurfStore.ts`)? */
+async function entwurfGesichert(page: Page, inhalt: string): Promise<boolean> {
+  return page.evaluate(
+    (gesucht) =>
+      new Promise<boolean>((fertig) => {
+        const anfrage = indexedDB.open('lifeline-etb-entwuerfe');
+        // Gibt es die Datenbank noch nicht, legte `open` sie leer an, und die App bekäme ihren
+        // Speicher nie: den Anlegeschritt abbrechen, das verwirft die leere Datenbank wieder.
+        anfrage.onupgradeneeded = () => anfrage.transaction?.abort();
+        anfrage.onerror = () => fertig(false);
+        anfrage.onsuccess = () => {
+          const db = anfrage.result;
+          const lesen = db.transaction('entwuerfe').objectStore('entwuerfe').getAll();
+          lesen.onsuccess = () => {
+            db.close();
+            fertig((lesen.result as { inhalt: string }[]).some((e) => e.inhalt === gesucht));
+          };
+          lesen.onerror = () => {
+            db.close();
+            fertig(false);
+          };
+        };
+      }),
+    inhalt,
+  );
+}
+
 test('ETB-Entwurf-Tab: Eintrag erfassen landet in der Zeitachse, Entwurf-Tab wird wieder leer', async ({
   page,
 }) => {
@@ -61,6 +88,17 @@ test('ETB-Entwurf-Autosave: getippter Entwurf überlebt einen Reload', async ({ 
 
   const entwurf = `Angefangen, nicht gesendet ${Date.now()}`;
   await page.getByPlaceholder('Inhalt …').fill(entwurf);
+
+  /*
+   * Erst neu laden, wenn der Entwurf in IndexedDB steht (LFH-536). Der Autosave schreibt ohne
+   * Verzögerung, aber asynchron, und ein Reload direkt nach `fill` kam ihm zuvor: in rund 4 von
+   * 25 CI-Läufen war das Feld danach leer. Gemessen mit 6-fach gedrosselter CPU: 4 von 10 rot,
+   * und jedes Mal war der Entwurfsspeicher nach dem Reload leer. Das Schreiben kam also nie an.
+   * Kein Mensch lädt binnen Millisekunden nach dem letzten Tastendruck neu. Das Tor liest
+   * deshalb den gespeicherten Stand selbst. Das Tab-Label wäre kein Beleg, es spiegelt nur den
+   * React-State.
+   */
+  await expect.poll(() => entwurfGesichert(page, entwurf)).toBe(true);
 
   // Reload: der lokal (IndexedDB) gesicherte Entwurf muss im Eingabefeld erhalten bleiben.
   await page.reload();

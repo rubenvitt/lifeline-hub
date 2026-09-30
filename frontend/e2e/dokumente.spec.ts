@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type FileChooser, type Locator, type Page } from '@playwright/test';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
 
@@ -395,6 +395,19 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   await page.goto(`/einsaetze/${einsatzId}/dokumente`);
   await expect(page.getByText('Noch keine Dokumente abgelegt.')).toBeVisible();
 
+  /*
+   * Den Dateiwähler abfangen, BEVOR der Tastaturweg beginnt (LFH-687, LFH-536). Playwrights
+   * Client schaltet das Abfangen mit dem ersten `filechooser`-Hörer ein, schickt die Nachricht
+   * aber ohne auf sie zu warten (`updateSubscription(...).catch(() => {})`). Stand der Hörer erst
+   * neben dem Enter, überholte der Tastendruck sie (in rund 11 von 25 CI-Läufen): rc-upload rief
+   * `input.click()`, Chromium öffnete den nicht abgefangenen Dialog, und kein Ereignis kam an.
+   * Scharf ist das Abfangen hier, lange bevor Enter fällt: dazwischen liegen Dutzende
+   * Rundreisen (Dialog, Tab-Reihe). Eine Bestätigung bietet Playwright nicht.
+   */
+  let waehlerGeoeffnet!: (waehler: FileChooser) => void;
+  const waehlerKommt = new Promise<FileChooser>((fertig) => (waehlerGeoeffnet = fertig));
+  page.once('filechooser', (waehler) => waehlerGeoeffnet(waehler));
+
   await page.getByRole('button', { name: 'Dokument ablegen' }).focus();
   await page.keyboard.press('Enter');
   const dialog = ablegenDialog(page);
@@ -443,10 +456,8 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   await expect(dateiKnopf, 'zurück am ersten Ziel').toBeFocused();
 
   // Enter auf dem Knopf öffnet den Dateidialog — genau EIN `input.click()` je Tastendruck.
-  const [waehler] = await Promise.all([
-    page.waitForEvent('filechooser'),
-    page.keyboard.press('Enter'),
-  ]);
+  await page.keyboard.press('Enter');
+  const waehler = await waehlerKommt;
   await waehler.setFiles({ name: 'Einsatzbefehl 3.pdf', mimeType: 'application/pdf', buffer: PDF });
   await expect(dialog.getByLabel('Titel')).toHaveValue('Einsatzbefehl 3');
 
