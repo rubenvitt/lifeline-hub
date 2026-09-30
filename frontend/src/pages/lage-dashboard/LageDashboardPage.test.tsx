@@ -1397,6 +1397,25 @@ describe('LageDashboardPage — Stand des Lageberichts (LFH-350 · H60)', () => 
     expect(zelle).toHaveTextContent('Freigegeben · Lage 14:00');
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
+
+  // LFH-532: der Status folgt der Phasenachse (`LAGEBERICHT_STATUS`) — ein Entwurf ist kein
+  // Warnzustand, und beschriftet wird mit dem Fachlabel, nie mit dem Wire-Wert.
+  it('führt einen Entwurf neutral und mit Fachlabel', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      lageberichte: [{ ...lagebericht, status: 'entwurf' }],
+    });
+    renderMitZone();
+    await kennzahlGeladen('Betroffene');
+    const zelle = await waitFor(() => {
+      const z = kennzahl('Lagebericht', 'Führungsstand');
+      expect(z.querySelector('[data-lfh="kennzahl-notiz"]')?.textContent).toBe(
+        'Entwurf · Lage 14:00',
+      );
+      return z;
+    });
+    expect(zelle.getAttribute('data-ton')).toBe('neutral');
+  });
 });
 
 /**

@@ -586,6 +586,9 @@ export default function LageDashboardPage() {
               zustand={zFuehrung(meldungenQuery)}
               ziel={meldungenPfad(einsatzId)}
             />
+            {/* Kein `ton` (LFH-532): der Status folgt der Phasenachse (`LAGEBERICHT_STATUS`), ein
+              Entwurf ist kein Warnzustand. Beschriftet wird mit dessen `label`, nie mit dem
+              Wire-Wert. Eine abweichende Kennzahl-Lesart gehört benannt nach `statusFarben.ts`. */}
             <Kennzahl
               titel="Lagebericht"
               groesse="klein"
