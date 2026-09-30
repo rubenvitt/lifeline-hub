@@ -1,5 +1,6 @@
+import type { CSSProperties } from 'react';
 import { theme } from 'antd';
-import { form } from '../theme/tokens';
+import { form, type Farbrollen } from '../theme/tokens';
 import { useModusFarben } from '../components/rahmenStil';
 import { ModulListe } from './ModulPanel';
 import {
@@ -40,10 +41,49 @@ interface Props {
 }
 
 /**
- * 48 px ist die Trefffläche des Berührungsfalls (Material 48 dp), dieselbe Zahl wie an der
- * Rail — ein BODEN unter der Staffel, nie ihr Deckel: `handschuh` hält 72 (LFH-384).
+ * 48 px ist die Trefffläche des Berührungsfalls (Material 48 dp) — ein BODEN unter der Staffel,
+ * nie ihr Deckel: `handschuh` hält 72 (LFH-384, LFH-537). So trägt die Rail seit LFH-337 ihren
+ * Boden (`railZielStil`), und so rechnen Hamburger und Drawer-Schließer (`navGriffMass`).
  */
 const TREFFLAECHE = 48;
+
+/** Die Farbrollen, die eine Kopfzeile liest — als Ausschnitt, damit der Test sie setzen kann. */
+type KopfFarben = Pick<Farbrollen, 'flaeche3' | 'marke' | 'text' | 'gedaempft'>;
+
+/**
+ * Stil einer Kategorie-Kopfzeile — rein und exportiert, damit die Dichte-Zusicherung ohne
+ * Rendern prüfbar ist: `test/utils.tsx` hat kein Theme (`controlHeight: 32`), dort sähe der
+ * Knopf 48 mit und ohne Staffel (LFH-537). Bauform wie `railZielStil` (`IconRail.tsx`).
+ *
+ * `Math.max` und NICHT `??`: die Staffel darf den Boden heben, nie senken. ZWEI Angaben:
+ * `minHeight` PLUS Polsterung; aufgelöste Tokens, nie `var(--lfh-*)`.
+ *
+ * An die Rail angeglichen: aufgeklappt `flaeche3` mit heller Schrift und der 2-px-Ortsmarke in
+ * `marke`, zu gedämpft. Die Marke ist Ort, nicht Bedienung („Rot bedient nichts").
+ */
+export function akkordeonKopfStil(
+  token: { controlHeight: number; padding: number; marginSM: number },
+  farben: KopfFarben,
+  zustand: { offen: boolean },
+): CSSProperties {
+  const { offen } = zustand;
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: token.marginSM,
+    width: '100%',
+    minHeight: Math.max(TREFFLAECHE, token.controlHeight),
+    padding: `0 ${token.padding}px`,
+    border: 'none',
+    borderRadius: form.radiusSteuer,
+    textAlign: 'left',
+    cursor: 'pointer',
+    fontWeight: offen ? 600 : 400,
+    background: offen ? farben.flaeche3 : 'transparent',
+    boxShadow: offen ? `inset 2px 0 0 ${farben.marke}` : 'none',
+    color: offen ? farben.text : farben.gedaempft,
+  };
+}
 
 export default function ModulAkkordeon({
   kategorien,
@@ -69,25 +109,7 @@ export default function ModulAkkordeon({
               type="button"
               aria-expanded={offen}
               onClick={() => onKategorieKlick(k.key)}
-              // An die Rail angeglichen: aufgeklappt `flaeche3` mit heller Schrift und der 2-px-Ortsmarke
-              // in `marke`, zu gedämpft. Die Marke ist Ort, nicht Bedienung („Rot bedient nichts").
-              // `Math.max(48, controlHeight)`: 48 ist der Boden, in `handschuh` wächst die Kopfzeile auf 72.
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: token.marginSM,
-                width: '100%',
-                minHeight: Math.max(TREFFLAECHE, token.controlHeight),
-                padding: `0 ${token.padding}px`,
-                border: 'none',
-                borderRadius: form.radiusSteuer,
-                textAlign: 'left',
-                cursor: 'pointer',
-                fontWeight: offen ? 600 : 400,
-                background: offen ? farben.flaeche3 : 'transparent',
-                boxShadow: offen ? `inset 2px 0 0 ${farben.marke}` : 'none',
-                color: offen ? farben.text : farben.gedaempft,
-              }}
+              style={akkordeonKopfStil(token, farben, { offen })}
             >
               <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
                 <Icon size={20} />
