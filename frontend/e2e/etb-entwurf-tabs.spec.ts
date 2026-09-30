@@ -66,3 +66,84 @@ test('ETB-Entwurf-Autosave: getippter Entwurf überlebt einen Reload', async ({ 
   await page.reload();
   await expect(page.getByPlaceholder('Inhalt …')).toHaveValue(entwurf);
 });
+
+/**
+ * LFH-521: Speicherung beim Reload nachweislich AUSSTEHEND. Die IndexedDB-Transaktion des
+ * Entwurfs wird offen gehalten (Leseanfragen in Schleife), bis das Neuladen sie abbricht — der
+ * Verlustpfad aus dem Sammel-Gate von LFH-460, hier ohne Zufall. Der Schalter lebt nur im
+ * Fenster vor dem Reload; die neue Seite schreibt ungehindert.
+ */
+async function entwurfsSpeicherungAnhalten(page: Page) {
+  await page.addInitScript(() => {
+    const fenster = window as typeof window & { __lfhHalten?: boolean; __lfhGehalten?: number };
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (this: IDBObjectStore, ...args) {
+      const anfrage = put.apply(this, args as Parameters<IDBObjectStore['put']>);
+      if (fenster.__lfhHalten && this.name === 'entwuerfe') {
+        const halten = (ereignis: Event) => {
+          const laufend = (ereignis.target as IDBRequest).source as IDBObjectStore;
+          laufend.count().onsuccess = halten;
+        };
+        anfrage.addEventListener('success', halten);
+        fenster.__lfhGehalten = (fenster.__lfhGehalten ?? 0) + 1;
+      }
+      return anfrage;
+    } as IDBObjectStore['put'];
+  });
+}
+
+test('ETB-Entwurf-Autosave: Entwurf mit ausstehender Speicherung überlebt den Reload (LFH-521)', async ({
+  page,
+}) => {
+  await entwurfsSpeicherungAnhalten(page);
+  await anmelden(page);
+  await einsatzAnlegenUndOeffnen(page, `E2E Autosave ausstehend ${Date.now()}`);
+  const feld = page.getByPlaceholder('Inhalt …');
+  await expect(feld).toBeVisible();
+  await page.evaluate(() => {
+    (window as typeof window & { __lfhHalten?: boolean }).__lfhHalten = true;
+  });
+
+  const entwurf = `Ausstehend, nicht gesendet ${Date.now()}`;
+  await feld.fill(entwurf);
+  // Vorbedingung, kein Speicher-Wartepunkt: der Schreibauftrag ist erteilt und hängt.
+  await page.waitForFunction(
+    () => ((window as typeof window & { __lfhGehalten?: number }).__lfhGehalten ?? 0) > 0,
+  );
+
+  await page.reload();
+  await expect(page.getByPlaceholder('Inhalt …')).toHaveValue(entwurf);
+});
+
+test('ETB-Entwurf-Autosave: bereits gespeicherter Entwurf kommt nach dem Reload vollständig zurück (LFH-521)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  await einsatzAnlegenUndOeffnen(page, `E2E Autosave gespeichert ${Date.now()}`);
+
+  const entwurf = `Gespeichert, nicht gesendet ${Date.now()}`;
+  await page.getByPlaceholder('Inhalt …').fill(entwurf);
+  // Hier IST der Wartepunkt die Aussage: der Entwurf liegt auf der Platte, und kein Vorlauf
+  // (LFH-521) steht mehr aus — die Wiederherstellung trägt allein die IndexedDB.
+  await page.waitForFunction(async (text) => {
+    if (localStorage.getItem('lifeline-etb-entwuerfe-ausstehend') !== null) return false;
+    const db = await new Promise<IDBDatabase>((ok, fehler) => {
+      const anfrage = indexedDB.open('lifeline-etb-entwuerfe');
+      anfrage.onsuccess = () => ok(anfrage.result);
+      anfrage.onerror = () => fehler(anfrage.error);
+    });
+    try {
+      const alle = await new Promise<{ inhalt: string }[]>((ok, fehler) => {
+        const anfrage = db.transaction('entwuerfe').objectStore('entwuerfe').getAll();
+        anfrage.onsuccess = () => ok(anfrage.result as { inhalt: string }[]);
+        anfrage.onerror = () => fehler(anfrage.error);
+      });
+      return alle.some((e) => e.inhalt === text);
+    } finally {
+      db.close();
+    }
+  }, entwurf);
+
+  await page.reload();
+  await expect(page.getByPlaceholder('Inhalt …')).toHaveValue(entwurf);
+});
