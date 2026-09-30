@@ -597,10 +597,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Style wechseln (Basemap-Umschalter / Theme). Kein Zurücksetzen des Geladen-Zustands: ein
-  // Ladefehler nach manuellem Wechsel wird nicht über `onStyleFehler` gemeldet (sonst zählten
-  // transiente Tile-Errors). `stilAngewandt()` schärft nur die eine Abstufung je Style neu, die
-  // Kette online → offline → blind bleibt erhalten.
+  // Style wechseln (Basemap-Umschalter / Theme / Hydrierung der Ansicht). `stilAngewandt()` öffnet
+  // das Abstufungsfenster bis zum `style.load` DIESES Styles, auch nach einem Wechsel von Hand:
+  // die Karte entsteht mit dem Blindstil, der Online-Style der Ansicht kommt erst hier an, und
+  // sein Ladefehler muss abstufen (LFH-558). Kachel-Fehler zählen nie (`stilFehlerWaechter.ts`).
   //
   // `diff: false` ist Pflicht: per Vorgabe difft setStyle bei URL-/Vektor-Styles asynchron, in
   // diesem Fenster meldet `isStyleLoaded()` den alten Style als geladen, der Poll liefe zu früh,
@@ -1006,7 +1006,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const aktualisiere = () => {
       // Solange Kacheln nachladen, bleiben die stehenden Donuts — sonst flackerten sie bei jedem
       // Zoom.
-      if (!map.isSourceLoaded(MARKER_CLUSTER_QUELLE)) return;
+      // Nach `setStyle` fehlt die Quelle, bis die Neuanlage läuft; `isSourceLoaded` würfe dann, und
+      // MapLibre meldete das als `error` ohne `tile` — im Abstufungsfenster eine falsche Abstufung.
+      if (!map.getSource(MARKER_CLUSTER_QUELLE) || !map.isSourceLoaded(MARKER_CLUSTER_QUELLE))
+        return;
       const neu: Record<string, maplibregl.Marker> = {};
       for (const f of map.querySourceFeatures(MARKER_CLUSTER_QUELLE)) {
         const props = f.properties as Record<string, unknown>;
