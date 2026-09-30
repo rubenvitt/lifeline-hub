@@ -284,7 +284,8 @@ test('„Status setzen“ öffnet das Statusmenü der Fokuszeile UND legt den Fo
   // obwohl die Seite Zeilen mit Statuswechsel zeigt.
   await page.getByRole('button', { name: 'Suchen' }).click();
   await expect(paletteInput(page)).toBeFocused();
-  await expect(page.getByRole('option', { name: 'Neue Zeile', ...AKTION })).toBeVisible();
+  // Positivhälfte: der Anzeige-Fallback greift (die Werkzeugzeile der Datensicht meldet „Spalten“).
+  await expect(page.getByRole('option', { name: 'Spalten', ...AKTION })).toBeVisible();
   await expect(page.getByRole('option', { name: 'Status setzen', ...AKTION })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(paletteInput(page)).toBeHidden();
