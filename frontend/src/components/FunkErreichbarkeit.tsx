@@ -1,20 +1,9 @@
 import { Space, Tag, Typography } from 'antd';
 import type { Sprechgruppe } from '../api/types';
+import { kommunikationsmittelLabel, teileSprechgruppen } from './kommunikationsmittel';
 
-/**
- * Schlüssel → Anzeige-Label für das Kommunikationsmittel (Abschnitt LFH-86, Einheit LFH-108).
- * Die Schlüssel prüft das Backend (`KOMMUNIKATIONSMITTEL` in src/routes/support.rs, LFH-140):
- * ein neuer Schlüssel hier braucht dort denselben Eintrag, sonst endet das Speichern in 400.
- */
-const KOMMUNIKATIONSMITTEL_LABEL: Record<string, string> = {
-  digitalfunk: 'Digitalfunk',
-  mobil: 'Mobil',
-  festnetz: 'Festnetz',
-};
-
-export const KOMMUNIKATIONSMITTEL_OPTIONEN = Object.entries(KOMMUNIKATIONSMITTEL_LABEL).map(
-  ([value, label]) => ({ value, label }),
-);
+// Die Optionen leben im reinen Kern; der Re-Export hält die bestehenden Importe stabil.
+export { KOMMUNIKATIONSMITTEL_OPTIONEN } from './kommunikationsmittel';
 
 interface FunkErreichbarkeitProps {
   sprechgruppen?: Sprechgruppe[] | null;
@@ -35,8 +24,7 @@ export default function FunkErreichbarkeit({
   erreichbarkeit,
   leerText,
 }: FunkErreichbarkeitProps) {
-  const tmo = (sprechgruppen ?? []).filter((s) => s.betriebsart === 'TMO');
-  const dmo = (sprechgruppen ?? []).filter((s) => s.betriebsart === 'DMO');
+  const { tmo, dmo } = teileSprechgruppen(sprechgruppen);
   const hatDaten = tmo.length > 0 || dmo.length > 0 || !!kommunikationsmittel || !!erreichbarkeit;
 
   if (!hatDaten) {
@@ -56,9 +44,7 @@ export default function FunkErreichbarkeit({
             DMO: {s.bezeichnung}
           </Tag>
         ))}
-        {kommunikationsmittel && (
-          <Tag>{KOMMUNIKATIONSMITTEL_LABEL[kommunikationsmittel] ?? kommunikationsmittel}</Tag>
-        )}
+        {kommunikationsmittel && <Tag>{kommunikationsmittelLabel(kommunikationsmittel)}</Tag>}
         {erreichbarkeit && <Tag>☎ {erreichbarkeit}</Tag>}
       </Space>
     </div>

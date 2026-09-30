@@ -8,7 +8,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 1. Breite vor dem Bau messen (Akzeptanzkriterium, D4)
 
-- [ ] 1.1 Messspec `e2e/funkplan-breite.spec.ts` (vorläufig, geht später in 7.2 auf):
+- [x] 1.1 Messspec `e2e/funkplan-breite.spec.ts` (vorläufig, geht später in 7.2 auf):
   - Bei 1366 × 768 mit offenem Modulpanel die Contentbreite von `[data-lfh="seiten-inhalt"]`
     unter `stab` messen.
   - Die Breite des längsten gesäten Funkrufnamens bzw. der längsten Kurzbezeichnung in Mono
@@ -20,15 +20,16 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 2. Backend: Anlegen mit Startinhalt (D9, Spec `dokument-uebernahme`)
 
-- [ ] 2.1 Test zuerst in `tests/` für Lagebericht und Befehl (neue Datei oder neben den
+- [x] 2.1 Test zuerst in `tests/` für Lagebericht und Befehl (neue Datei oder neben den
   bestehenden Tests):
   - POST mit `abschnitte: [{schluessel:'text', text:'…'}]` → 201, der Text steht im Entwurf.
   - Unbekannter Schlüssel → 400, danach ist die Liste unverändert (kein Entwurf).
   - Doppelter Schlüssel → 400.
   - Ohne `abschnitte` → leeres Skelett wie bisher.
   - Ein Live-Hinweis.
-  - Nachweis: rot belegt.
-- [ ] 2.2 Umsetzung:
+  - Nachweis: rot belegt. Der Build lief erst nach der Umsetzung durch, deshalb ersatzweise per
+    Mutationsprobe: Startinhalt ignoriert → 2 rot, Schlüsselprüfung beim Anlegen entfernt → 2 rot.
+- [x] 2.2 Umsetzung:
   - `AnlegenBody<A>` mit `#[serde(default)] abschnitte`
   - `pruefe_abschnitts_schluessel::<T>` in `routes/vorlagendokument.rs`, gerufen in `anlegen`
     und `aktualisieren`
@@ -43,23 +44,23 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 3. Meldebild auf einen Aufruf umstellen (D9, Spec `dokument-uebernahme`)
 
-- [ ] 3.1 `KraefteuebersichtPage.test.tsx` zuerst:
+- [x] 3.1 `KraefteuebersichtPage.test.tsx` zuerst:
   - Die Übernahme ruft `legeLageberichtAn` genau einmal mit `abschnitte: [{schluessel:'text'}]`
     und nie `aktualisiereLagebericht`.
   - Bei Ablehnung steht der Fehler an der Seite (`SpeicherFehler`), `.ant-message` zählt 0.
   - Nachweis: rot belegt.
-- [ ] 3.2 Umsetzung:
+- [x] 3.2 Umsetzung:
   - `uebernehmen` mit einem Aufruf
-  - `onError`-Toast raus, `SpeicherFehler` an der Werkzeugzeile
-  - `reset()` beim Start
+  - `onError`-Toast raus, `SpeicherFehler` unter der Werkzeugzeile (den Fehler räumt react-query
+    beim nächsten `mutate()` selbst, ein eigenes `reset()` braucht es nicht)
   - Nachweis: Tests aus 3.1 und der Rest von `KraefteuebersichtPage.test.tsx` grün.
-- [ ] 3.3 `abrufZustand` nach `api/abrufZustand.ts` ziehen, mit eigenem Vitest (403 →
+- [x] 3.3 `abrufZustand` nach `api/abrufZustand.ts` ziehen, mit eigenem Vitest (403 →
   `gesperrt`, Fehler, Laden, Daten). Das Meldebild importiert von dort.
   - Nachweis: Vitest grün, `pnpm lint` grün.
 
 ## 4. Reine Ableitungen (D3, D6, Spec `stab-funkplan`)
 
-- [ ] 4.1 `stab/funkplan.test.ts` zuerst, gegen `baueFunkplan`:
+- [x] 4.1 `stab/funkplan.test.ts` zuerst, gegen `baueFunkplan`:
   - Baum Abschnitt → Unterabschnitt → Einheit → Untereinheit → Fahrzeug
   - verwaister Unterabschnitt an der Wurzel
   - Einheit ohne Abschnitt und Fahrzeug ohne Einheit im Knoten `sammel` (als letzter)
@@ -69,14 +70,14 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - fehlende Quelle → Ebene fehlt
   - Schlüssel eindeutig über alle Ebenen
   - Nachweis: rot belegt, dann grün.
-- [ ] 4.2 `stab/luecken.test.ts` zuerst, gegen die vier Lückenfunktionen:
+- [x] 4.2 `stab/luecken.test.ts` zuerst, gegen die vier Lückenfunktionen:
   - Treffer
   - Leerfall mit Zahl 0 nur bei `daten`
   - Zustände `laden`/`fehler`/`gesperrt` bringen keine Zahl
   - „ohne Zuordnung“ nimmt den schlechtesten Zustand von drei Quellen
   - nur `einsatz_lokal`
   - Nachweis: rot belegt, dann grün.
-- [ ] 4.3 `rendereFunkplanMarkdown(zeilen, stand, luecken)`, Tests zuerst in
+- [x] 4.3 `rendereFunkplanMarkdown(zeilen, stand, luecken)`, Tests zuerst in
   `stab/funkplan.test.ts`:
   - Überschrift „# Funkplan“, Stand
   - eingerückte Liste in Baumreihenfolge mit Rufname/OPTA, Leiter/Führer, TMO, DMO,
@@ -85,16 +86,18 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - **keine Erreichbarkeit** (gesäter Wert taucht nicht auf)
   - kein `\p{Extended_Pictographic}`
   - Nachweis: grün.
-- [ ] 4.4 `kommunikationsmittelLabel` aus `components/FunkErreichbarkeit.tsx` exportieren.
+- [x] 4.4 `kommunikationsmittelLabel` (und `teileSprechgruppen`) exportieren, als reiner Kern in
+  `components/kommunikationsmittel.ts`. `FunkErreichbarkeit.tsx` nutzt ihn und exportiert
+  `KOMMUNIKATIONSMITTEL_OPTIONEN` für die bestehenden Importe weiter.
   - Nachweis: bestehende Tests von `FunkErreichbarkeit` grün, neuer Vitest für die drei Schlüssel
     und für Unbekanntes.
 
 ## 5. Seite, Route, Einstieg (D1, D2, D4, D5, D7)
 
-- [ ] 5.1 `funkplanPfad(einsatzId)` in `routing/deeplinks.ts`.
+- [x] 5.1 `funkplanPfad(einsatzId)` in `routing/deeplinks.ts`.
   - Nachweis: Vitest in der Deeplink-Testdatei (Pfad `/einsaetze/7/stab/funkplan`), und
     `inlinePfade.guard.test.ts` grün.
-- [ ] 5.2 `pages/FunkplanPage.test.tsx` zuerst, Rendering mit gemockten APIs:
+- [x] 5.2 `pages/FunkplanPage.test.tsx` zuerst, Rendering mit gemockten APIs:
   - Zeilen und Spalten
   - Kennung „Stelle“ menschenlesbar
   - Lücken-Paneel mit Zahlen und Verweisen
@@ -106,7 +109,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Fehler an der Seite
   - Verweis in der Stelle-Zelle navigiert, ohne den Knoten umzuschalten (D7)
   - Nachweis: rot belegt.
-- [ ] 5.3 `pages/FunkplanPage.tsx` bauen:
+- [x] 5.3 `pages/FunkplanPage.tsx` bauen:
   - `EinsatzSeite` (Titel „Funkplan“, `h1`), Lücken-`Paneel`
   - `Datensicht form="tabelle" baum={…}` mit `spaltenFuer<FunkplanZeile>()` und
     `karte.titel.ziel`
@@ -116,22 +119,22 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Nachweis: Tests aus 5.2 grün. Falls der Knoten beim Verweisklick umschaltet, bekommt
     `Datensicht` den Riegel `closest('a')` im Baumzweig, mit eigenem Test in
     `Datensicht.test.tsx`.
-- [ ] 5.4 Route `stab/funkplan` in `App.tsx` (Geschwister von `etb/druck`, lazy wie das Meldebild)
+- [x] 5.4 Route `stab/funkplan` in `App.tsx` (Geschwister von `etb/druck`, lazy wie das Meldebild)
   und Verweis „Funkplan“ in der S6-Zeile von `pages/StabPage.tsx` (`stabZeilenzielStil`).
   - Nachweis: Vitest in `StabPage.test.tsx`, dass die Zeile S6 den Verweis auf
     `funkplanPfad(id)` trägt und andere Zeilen nicht; App-Routentest, dass der Stab in der
     Navigation aktiv ist.
-- [ ] 5.5 `datensicht.guard.test.ts`: `FunkplanPage.tsx` in `KONSUMENTEN` und `NUR_TABELLE`
+- [x] 5.5 `datensicht.guard.test.ts`: `FunkplanPage.tsx` in `KONSUMENTEN` und `NUR_TABELLE`
   (Pin 3 → 4, Begründung als Kommentar).
   - Nachweis: Guard grün; Gegenprobe mit `form="auto"` → rot.
 
 ## 6. Druck (D5, D8)
 
-- [ ] 6.1 Formtest zuerst (`druck/druck.test.ts`): Die Tabellen-Neutralisierer stehen unter
+- [x] 6.1 Formtest zuerst (`druck/druck.test.ts`): Die Tabellen-Neutralisierer stehen unter
   `[data-lfh='druckwurzel']` in `druck.css`, nicht mehr in `kraefteuebersichtPrint.css`
   (`kraefteuebersichtPrint.test.ts` angepasst).
   - Nachweis: rot, dann nach dem Umzug grün.
-- [ ] 6.2 `pages/funkplanPrint.css` mit den Eigenheiten des Funkplans:
+- [x] 6.2 `pages/funkplanPrint.css` mit den Eigenheiten des Funkplans:
   - `.funkplan-no-print`
   - Seitenkopf aus
   - Druckwurzel `funkplan-print-root`
@@ -140,10 +143,10 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 7. e2e und Gates (D11)
 
-- [ ] 7.1 `e2e/gate1-ueberlauf.spec.ts`: Route `stab/funkplan` mit Datenanker in `gate1Routen`
+- [x] 7.1 `e2e/gate1-ueberlauf.spec.ts`: Route `stab/funkplan` mit Datenanker in `gate1Routen`
   aufnehmen.
   - Nachweis: grün bei 1366/1024/768/390, als Admin und als Beobachter.
-- [ ] 7.2 `e2e/funkplan.spec.ts` (übernimmt die Messspec aus 1.1), mit Seeding per API und langen
+- [x] 7.2 `e2e/funkplan.spec.ts` (übernimmt die Messspec aus 1.1), mit Seeding per API und langen
   Werten:
   - Lücken im ersten Bild bei 1366 × 768 mit offenem Panel (`toBeInViewport`)
   - Fixspalte bei 390 px
@@ -152,18 +155,22 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Übernahme: genau ein POST auf `…/lageberichte`, kein PATCH, danach Lagebericht offen
   - Klick auf den Verweis einer Einheit öffnet ihre Detailseite
   - Nachweis: grün; Mutationsprobe „Erreichbarkeit im Druck mit `abBreite`“ → rot, Befund in 8.1.
-- [ ] 7.3 `e2e/meldebild-tabelle.spec.ts` nach dem Umzug der Druck-Neutralisierer erneut fahren.
+- [x] 7.4 (beim Bau ergänzt) `e2e/gate3-trefflaeche.spec.ts`: Funkplan-Route als Admin und
+  Beobachter (Titel-Links, Lücken-Verweise, Übernahme, Drucken über 30/48/72 px). Die Stab-Tests
+  zählen jetzt 15 Werkzeug-Links (mit „Funkplan“).
+  - Nachweis: 4/4 grün (Stab und Funkplan, je Admin und Beobachter).
+- [x] 7.3 `e2e/meldebild-tabelle.spec.ts` nach dem Umzug der Druck-Neutralisierer erneut fahren.
   - Nachweis: grün.
 
 ## 8. Prüfliste, Doku, Folgeticket
 
-- [ ] 8.1 `openspec/changes/lfh-548-funkplan/pruefliste.md`: 15 Kriterien der
+- [x] 8.1 `openspec/changes/lfh-548-funkplan/pruefliste.md`: 15 Kriterien der
   Einsatztauglichkeit, je Zeile ein Verdikt (erfüllt / offen → Ticket / nicht anwendbar),
   Mutationsprobe aus 7.2, Messwerte aus 1.1.
-- [ ] 8.2 Folgeticket „Eigene Gegenstelle (Führungsstelle) am Einsatz erfassen“ über
+- [x] 8.2 Folgeticket „Eigene Gegenstelle (Führungsstelle) am Einsatz erfassen“ über
   `clickup-task-anlegen`; die Ticketnummer als Kommentar am Gegenstellen-Hinweis in
   `FunkplanPage.tsx`.
-- [ ] 8.3 `CLAUDE.md`: kurzer Eintrag zum Funkplan (Ort `stab/funkplan`, Ableitung ohne Endpunkt,
+- [x] 8.3 `CLAUDE.md`: kurzer Eintrag zum Funkplan (Ort `stab/funkplan`, Ableitung ohne Endpunkt,
   Erreichbarkeit Druck ja/Lagebericht nein, `AnlegenBody.abschnitte` als einziger
   Übernahmeweg).
   - Nachweis: `scripts/check-fmt.sh` grün.

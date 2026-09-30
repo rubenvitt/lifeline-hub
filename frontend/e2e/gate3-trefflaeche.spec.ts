@@ -977,8 +977,11 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
 
 /** Zwei abgeschlossene Lagebesprechungen → Stand „Letzte" + zwei Historien-Einträge. */
 const STAB_ETB_LINKS = 3;
-/** 3 + 3 + 3 + 3 + 0 + 2 Registry-Schlüssel aus `stab/sachgebiete.ts`, alle `fertig`. */
-const STAB_WERKZEUG_LINKS = 14;
+/**
+ * 3 + 3 + 3 + 3 + 0 + 2 Registry-Schlüssel aus `stab/sachgebiete.ts`, alle `fertig`, dazu der
+ * Einstieg „Funkplan“ in der S6-Zeile (LFH-548, kein Modul, gleicher Stil).
+ */
+const STAB_WERKZEUG_LINKS = 15;
 /** S5 trägt keine Werkzeuge und rendert deshalb keine Gruppe. */
 const STAB_WERKZEUG_GRUPPEN = 5;
 /** Sechs feste Sachgebietszeilen, je ein Knopf. */
@@ -1134,6 +1137,129 @@ test('Stab (Beobachter): ETB-Links, Werkzeug-Links und die gesperrte Kopfaktion 
     );
   }
 
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+// ── Funkplan (LFH-548) ──────────────────────────────────────────────────────────────────
+//
+// Handgebaute Ziele: die Titel-Links der Baumtabelle (`Datensicht`, `minHeight`
+// `controlHeight`) und die Verweise der Lücken (`stabZeilenzielStil`). Dazu die antd-Knöpfe der
+// Werkzeugzeile. Gesät wird je Ebene eine Zeile und je Lücke ein Treffer mit Verweis.
+
+/** Abschnitt, Einheit und Fahrzeug: drei Titel-Links in der Tabelle. */
+const FUNKPLAN_TITEL_LINKS = 3;
+/** Abschnitt ohne Sprechgruppe, Einheit ohne Sprechgruppe, Einheit ohne Erreichbarkeit. */
+const FUNKPLAN_LUECKEN_LINKS = 3;
+
+async function funkplanSaeen(page: Page, einsatzId: string) {
+  const post = async (pfad: string, data: unknown) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    expect(
+      antwort.ok(),
+      `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return ((await antwort.json()) as { id: number }).id;
+  };
+  const abschnitt = await post('abschnitte', { name: 'Abschnitt Nord' });
+  const einheit = await post('einheiten', { name: '1. Zug', abschnitt_id: abschnitt });
+  const fahrzeug = await post('fahrzeuge', { adhoc: { funkrufname: 'Florian 1/42-1' } });
+  const zuordnung = await page.request.put(
+    `/api/einsaetze/${einsatzId}/einheiten/${einheit}/fahrzeug/${fahrzeug}`,
+  );
+  expect(zuordnung.ok(), `Zuordnung: ${await zuordnung.text()}`).toBeTruthy();
+}
+
+test('Funkplan: Titel-Links, Lücken-Verweise und Werkzeugknöpfe folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Funkplan`);
+  await funkplanSaeen(page, einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/stab/funkplan`);
+    await stelleDichte(page, dichte);
+    const tabelle = page.getByRole('region', { name: 'Funkplan', exact: true });
+    const luecken = page.getByRole('region', { name: 'Lücken', exact: true });
+    // Datenanker: das Fahrzeug steht erst, wenn alle drei Ebenen geladen sind.
+    await expect(tabelle.getByRole('link', { name: 'Florian 1/42-1' })).toHaveCount(1);
+
+    const titel = await alleHaltenStufe(
+      tabelle.locator('tr.ant-table-row').getByRole('link'),
+      soll,
+      `Titel-Link (${dichte})`,
+      FUNKPLAN_TITEL_LINKS,
+    );
+    const verweise = await alleHaltenStufe(
+      luecken.getByRole('link'),
+      soll,
+      `Lücken-Verweis (${dichte})`,
+      FUNKPLAN_LUECKEN_LINKS,
+    );
+    const uebernahme = await haeltStufe(
+      page.getByRole('button', { name: 'In Lagebericht übernehmen', exact: true }),
+      soll,
+      `Übernahme (${dichte})`,
+    );
+    const druck = await haeltStufe(
+      page.getByRole('button', { name: /Drucken/ }),
+      soll,
+      `Drucken (${dichte})`,
+    );
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Titel-Link ${titel}, Lücken-Verweis ${verweise}, ` +
+        `Übernahme ${uebernahme}, Drucken ${druck}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Funkplan (Beobachter): Titel-Links, Lücken-Verweise und Drucken folgen der Staffel, die Übernahme fehlt', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Funkplan Lesend`);
+  await funkplanSaeen(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/stab/funkplan`);
+    await stelleDichte(page, dichte);
+    const tabelle = page.getByRole('region', { name: 'Funkplan', exact: true });
+    await expect(tabelle.getByRole('link', { name: 'Florian 1/42-1' })).toHaveCount(1);
+    // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
+    await expect(
+      page.getByRole('button', { name: 'In Lagebericht übernehmen' }),
+      'Vorbedingung: ohne Schreibrecht keine Übernahme',
+    ).toHaveCount(0);
+
+    const titel = await alleHaltenStufe(
+      tabelle.locator('tr.ant-table-row').getByRole('link'),
+      soll,
+      `Titel-Link (${dichte})`,
+      FUNKPLAN_TITEL_LINKS,
+    );
+    const verweise = await alleHaltenStufe(
+      page.getByRole('region', { name: 'Lücken', exact: true }).getByRole('link'),
+      soll,
+      `Lücken-Verweis (${dichte})`,
+      FUNKPLAN_LUECKEN_LINKS,
+    );
+    const druck = await haeltStufe(
+      page.getByRole('button', { name: /Drucken/ }),
+      soll,
+      `Drucken (${dichte})`,
+    );
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Titel-Link ${titel}, Lücken-Verweis ${verweise}, Drucken ${druck}`,
+    );
+  }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 

@@ -10,8 +10,8 @@ import { expect, test, type Page } from '@playwright/test';
  * auch auf 390 px.
  *
  * NACHWEIS 2 — der Druckpfad durch den Bildlaufcontainer: die Neutralisierer in
- * `pages/kraefteuebersichtPrint.css` WIRKEN, nicht bloß „stehen da" (eine Regel mit
- * Tippfehler im Selektor steht auch da). Gemessen wird, dass der Inhalt bei A4-Breite
+ * `druck/druck.css` (seit LFH-548 dort, vorher `pages/kraefteuebersichtPrint.css`) WIRKEN,
+ * nicht bloß „stehen da" (eine Regel mit Tippfehler im Selektor steht auch da). Gemessen wird, dass der Inhalt bei A4-Breite
  * vollständig in der Druckwurzel liegt; nicht die Seitenhöhe. Kein echter Druckdialog —
  * `emulateMedia` liefert das Layout; den Knopf prüft NACHWEIS 2b mit einem `window.print`-Stub.
  *

@@ -127,4 +127,58 @@
     white-space: pre-wrap !important;
     overflow-wrap: anywhere;
   }
+
+  /* ── Tabellen des Primitivs (LFH-330 · B2, seit LFH-548 hier) ───────────────────────────
+     `KatalogTabelle` setzt unbedingt einen waagerechten Bildlaufcontainer, eine stehende
+     Kopfzeile (zwei getrennte Tabellen plus Sticky-Holder) und `position: sticky` an Spalte 0.
+     Ohne diese Regeln wäre der Ausdruck rechts abgeschnitten, die Kopfzeile verrutscht und die
+     Kennungsspalte über den Text geschoben — und jeder Vitest bliebe grün, weil jsdom kein
+     Layout rechnet. Der Layoutbeweis steht in `e2e/meldebild-tabelle.spec.ts` und
+     `e2e/funkplan.spec.ts`. Standen bis LFH-548 nur unter `.kraefte-print-root`; der Funkplan
+     braucht dieselben, und Mechanik gehört hierher, nicht in ein Seitenblatt. */
+  [data-lfh='druckwurzel'] .ant-table-body,
+  [data-lfh='druckwurzel'] .ant-table-content {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  /* Beide Bildlaufhüllen: mit `sticky` (Druck ohne `beforeprint`, etwa `page.pdf()`) liegt die
+     Tabelle in `.ant-table-body`, ohne `sticky` (`useDruckModus`, der echte Druckweg) in
+     `.ant-table-content`. Dort trägt sie inline die Bildschirmbreite `scroll.x`; ohne diese
+     Regel ragte der Funkplan auf A4 340 px über den Rand (LFH-548, `e2e/funkplan.spec.ts`). */
+  [data-lfh='druckwurzel'] .ant-table-body table,
+  [data-lfh='druckwurzel'] .ant-table-content table {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+  /* Auf Papier gibt es keinen Bildlauf, die Tabelle muss ins Blatt. Zwei Dinge hielten sie
+     breiter (LFH-548, gemessen in `e2e/funkplan.spec.ts`: 80 px Überhang auf A4):
+     - antds unsichtbare Messzeile wiederholt jeden Spaltenkopf fett in Bildschirmgröße und setzt
+       damit die Mindestbreite jeder Spalte, an allen Druckregeln vorbei. Sie misst nur für den
+       Bildschirm und fällt im Druck weg.
+     - Lange Werte (Funkrufnamen, OPTA) dürfen umbrechen. `!important`, weil antds Zellregel
+       (`overflow-wrap: break-word`) spezifischer ist. */
+  [data-lfh='druckwurzel'] .ant-table-measure-row {
+    display: none !important;
+  }
+  [data-lfh='druckwurzel'] .ant-table-cell {
+    overflow-wrap: anywhere !important;
+  }
+  [data-lfh='druckwurzel'] .ant-table-sticky-holder {
+    position: static !important;
+  }
+  [data-lfh='druckwurzel'] .ant-table-sticky-scroll {
+    display: none !important;
+  }
+  [data-lfh='druckwurzel'] .ant-table-cell-fix-start,
+  [data-lfh='druckwurzel'] .ant-table-cell-fix-end {
+    position: static !important;
+  }
+
+  /* Die Werkzeugzeile des Primitivs liegt INNERHALB von `Datensicht` und ist nicht über eine
+     Seitenklasse markierbar (`DatensichtProps` nimmt kein `className`). Ihr Datenattribut ist
+     der Griff, sonst stünde der Spaltenschalter im Ausdruck. */
+  [data-lfh='druckwurzel'] [data-lfh='datensicht-werkzeuge'] {
+    display: none !important;
+  }
 }

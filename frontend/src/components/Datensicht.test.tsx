@@ -1848,3 +1848,58 @@ describe('Datensicht · DEV-Diagnose', () => {
     spion.mockRestore();
   });
 });
+
+describe('Datensicht · Baum mit Titel-Link (LFH-548)', () => {
+  interface Knoten {
+    key: string;
+    name: string;
+    kinder?: Knoten[];
+  }
+  const BAUM: Knoten[] = [
+    { key: 'a', name: 'Abschnitt Nord', kinder: [{ key: 'e', name: '1. Zug' }] },
+    { key: 's', name: 'Sammel', kinder: [{ key: 'f', name: 'Florian ELW' }] },
+  ];
+  const knotenSpalten = spaltenFuer<Knoten>()([
+    { title: 'Stelle', key: 'stelle', dataIndex: 'name', immerSichtbar: true },
+  ]);
+
+  function rendereBaum(onAufgeklappt: (k: React.Key[]) => void) {
+    return renderMitProviders(
+      <Datensicht<Knoten, 'stelle'>
+        bezeichnung="Baum"
+        form="tabelle"
+        spalten={knotenSpalten}
+        daten={BAUM}
+        zeilenSchluessel="key"
+        baum={{ kinder: 'kinder', aufgeklappt: [], onAufgeklappt }}
+        karte={{
+          art: 'plan',
+          titel: { spalte: 'stelle', ziel: (k) => (k.key === 's' ? null : `/ziel/${k.key}`) },
+          sekundaer: [],
+        }}
+      />,
+    );
+  }
+
+  it('ein Klick auf den Titel-Link klappt den Knoten NICHT um (auch nicht beim Strg-Klick)', async () => {
+    const onAufgeklappt = vi.fn();
+    rendereBaum(onAufgeklappt);
+    await userEvent.click(screen.getByRole('link', { name: 'Abschnitt Nord' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Abschnitt Nord' }), { ctrlKey: true });
+    expect(onAufgeklappt).not.toHaveBeenCalled();
+  });
+
+  it('ein Klick daneben klappt den Knoten weiter auf', async () => {
+    const onAufgeklappt = vi.fn();
+    const { container } = rendereBaum(onAufgeklappt);
+    const zeile = container.querySelector('tr[data-row-key="a"] td') as HTMLElement;
+    await userEvent.click(zeile);
+    expect(onAufgeklappt).toHaveBeenCalledWith(['a']);
+  });
+
+  it('eine Zeile, deren Ziel null ist, trägt keinen Link, sondern nur ihren Text', () => {
+    rendereBaum(vi.fn());
+    expect(screen.queryByRole('link', { name: 'Sammel' })).toBeNull();
+    expect(screen.getByText('Sammel')).toBeInTheDocument();
+  });
+});

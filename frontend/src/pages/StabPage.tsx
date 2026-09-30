@@ -15,7 +15,7 @@ import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components
 import StatusTag from '../components/StatusTag';
 import { modulZielRoute } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { einsatzModulPfad } from '../routing/deeplinks';
+import { einsatzModulPfad, funkplanPfad } from '../routing/deeplinks';
 import BesetzungModal from '../stab/BesetzungModal';
 import LagebesprechungHistorie from '../stab/LagebesprechungHistorie';
 import LagebesprechungModal from '../stab/LagebesprechungModal';
@@ -195,6 +195,11 @@ export default function StabPage() {
               renderItem={(s) => {
                 const zeile = zeileFuer(stabQuery.data, s.sachgebiet);
                 const werkzeuge = werkzeugeFuer(s.werkzeuge, benutzer, overridesQuery.data);
+                // Das Arbeitsergebnis der S6 (LFH-548): ein Einstieg in eine Unterroute des
+                // Stabs, kein Modul. Deshalb nicht über `werkzeugeFuer`, und es bleibt stehen,
+                // wenn die Modul-Werkzeuge der Zeile ausgeblendet sind; die Sperre erbt es vom
+                // Stab selbst.
+                const funkplan = s.sachgebiet === 's6';
                 return (
                   <ListenEintrag
                     actions={
@@ -233,8 +238,16 @@ export default function StabPage() {
                               (FwDV 100 Anl. 2, S. {s.seite})
                             </Typography.Text>
                           </span>
-                          {werkzeuge.length > 0 && (
+                          {(werkzeuge.length > 0 || funkplan) && (
                             <Flex wrap role="group" aria-label={`Werkzeuge ${s.kuerzel}`}>
+                              {funkplan && (
+                                <Link
+                                  to={funkplanPfad(einsatzId)}
+                                  style={stabZeilenzielStil(token)}
+                                >
+                                  Funkplan
+                                </Link>
+                              )}
                               {werkzeuge.map((m) => (
                                 <Link
                                   key={m.key}

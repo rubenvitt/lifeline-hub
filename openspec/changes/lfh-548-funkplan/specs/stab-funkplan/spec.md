@@ -53,8 +53,10 @@ Die Tabelle SHALL diese Spalten führen: Stelle, Rufname/OPTA, Leiter/Führer, T
 DMO-Sprechgruppen, Kommunikationsmittel, Erreichbarkeit.
 - Die Spalte „Stelle“ MUST beim waagerechten Bildlauf stehen bleiben und MUST NOT ausblendbar
   sein. Sie MUST eine menschenlesbare Kennung tragen, nie eine Datenbank-Kennung: beim Abschnitt
-  Kurzbezeichnung und Name, bei der Einheit Funkrufname und Name, beim Fahrzeug den Funkrufnamen.
-- Die OPTA MUST beim Fahrzeug erscheinen, wenn sie erfasst ist.
+  und bei der Einheit den Namen, beim Fahrzeug den Funkrufnamen.
+- Die Spalte „Rufname/OPTA“ MUST beim Abschnitt die Kurzbezeichnung, bei der Einheit den
+  Funkrufnamen und beim Fahrzeug die OPTA zeigen, jeweils nur, wenn sie erfasst sind. Ein
+  fehlender Wert MUST NOT aus anderen Angaben erraten werden.
 - Sprechgruppen MUST aus den Zuordnungen stammen, getrennt nach Betriebsart. Die eingefrorenen
   Altfelder der Sprechgruppen MUST NOT verwendet werden.
 - Rufnamen, OPTA und Sprechgruppen MUST in Festbreitenschrift mit gleich breiten Ziffern stehen.

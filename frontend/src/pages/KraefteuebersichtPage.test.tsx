@@ -746,25 +746,40 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
     expect(screen.getByRole('button', { name: /Drucken/i })).toBeInTheDocument();
   });
 
-  it('ruft legeLageberichtAn und aktualisiereLagebericht beim Klick auf Übernahme-Button auf', async () => {
+  it('übernimmt das Meldebild in EINEM Aufruf mit Startinhalt, ohne nachgeschobenen PATCH', async () => {
+    vi.mocked(legeLageberichtAn).mockClear();
+    vi.mocked(aktualisiereLagebericht).mockClear();
     setup();
     const btn = await screen.findByRole('button', { name: /In Lagebericht übernehmen/i });
     fireEvent.click(btn);
     await waitFor(() =>
       expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({ vorlage: 'freitext' }),
-      ),
-    );
-    await waitFor(() =>
-      expect(vi.mocked(aktualisiereLagebericht)).toHaveBeenCalledWith(
-        1,
-        99,
         expect.objectContaining({
-          abschnitte: expect.arrayContaining([expect.objectContaining({ schluessel: 'text' })]),
+          vorlage: 'freitext',
+          abschnitte: [
+            expect.objectContaining({
+              schluessel: 'text',
+              text: expect.stringContaining('# Kräftemeldebild'),
+            }),
+          ],
         }),
       ),
     );
+    expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(aktualisiereLagebericht)).not.toHaveBeenCalled();
+    await waitFor(() => expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/lageberichte/99'));
+  });
+
+  it('zeigt eine gescheiterte Übernahme an der Seite, nicht als Toast', async () => {
+    vi.mocked(legeLageberichtAn).mockRejectedValueOnce(
+      new ApiError(422, 'Einsatz ist abgeschlossen'),
+    );
+    const { container } = setup();
+    fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
+    expect(await screen.findByText('Einsatz ist abgeschlossen')).toBeInTheDocument();
+    expect(container.ownerDocument.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    expect(navigiere).not.toHaveBeenCalled();
   });
 
   it('die Statusfilter-Optionen kommen aus der einen Statusachse — ohne den vierten Eimer', async () => {

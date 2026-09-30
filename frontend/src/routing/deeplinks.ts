@@ -273,6 +273,15 @@ export function stabPfad(einsatzId: number, opts: { neu?: boolean } = {}): strin
 }
 
 /**
+ * Funkplan des Sachgebiets S6 (LFH-548): eine Unterroute des Stabs, kein eigenes Modul. Die
+ * Navigation markiert den Stab (`modulAusPfad` liest das Segment nach der Einsatz-ID), Sperre und
+ * Sichtbarkeit erbt die Seite vom Stab.
+ */
+export function funkplanPfad(einsatzId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'stab')}/funkplan`;
+}
+
+/**
  * Erlaubte Werte des ETB-Typfilters.
  *
  * Ein **exhaustiver Record**, kein Array: fehlt eine Variante von `EtbTyp`, bricht der

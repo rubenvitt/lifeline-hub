@@ -98,23 +98,58 @@ pub async fn detail<T: DokumentRoute>(
     ))
 }
 
+/// Anlegen. `abschnitte` ist der optionale Startinhalt (LFH-548): damit entsteht der Entwurf in
+/// EINEM Schritt mit Text, statt als leeres Skelett, das ein zweiter PATCH füllt und bei dessen
+/// Scheitern leer stehen bliebe (die Übernahme aus Meldebild und Funkplan).
 #[derive(Debug, Deserialize)]
-pub struct AnlegenBody {
+pub struct AnlegenBody<A> {
     pub vorlage: String,
     pub titel: String,
     pub zeitstand: Option<String>,
+    #[serde(default = "Option::default")]
+    pub abschnitte: Option<Vec<A>>,
+}
+
+/// Jeder Schlüssel gehört zur Vorlage und kommt höchstens einmal vor. Enum-artig: der Schlüssel
+/// wird gegen die feste Schlüsselmenge der Vorlage geprüft, scheitert also am Feld selbst → 400
+/// (LFH-305). Geteilt von Anlegen (Startinhalt) und Bearbeiten.
+fn pruefe_abschnitts_schluessel<A: Abschnittsart>(
+    v: &crate::vorlagendokument::VorlageDef,
+    abschnitte: &[A],
+) -> Result<(), AppError> {
+    for (i, a) in abschnitte.iter().enumerate() {
+        if !v.abschnitte.iter().any(|d| d.schluessel == a.schluessel()) {
+            return Err(AppError::Validation(format!(
+                "Unbekannter Abschnitts-Schlüssel «{}»",
+                a.schluessel()
+            )));
+        }
+        if abschnitte[..i]
+            .iter()
+            .any(|b| b.schluessel() == a.schluessel())
+        {
+            return Err(AppError::Validation(format!(
+                "Abschnitts-Schlüssel «{}» doppelt",
+                a.schluessel()
+            )));
+        }
+    }
+    Ok(())
 }
 
 pub async fn anlegen<T: DokumentRoute>(
     state: &AppState,
     benutzer: &Benutzer,
     einsatz_id: i64,
-    body: AnlegenBody,
+    body: AnlegenBody<T::Abschnitt>,
 ) -> Result<(StatusCode, Json<T::Anzeige>), AppError> {
     fordere_schreiben::<T>(state, benutzer, einsatz_id).await?;
 
-    if vorlage::<T>(&body.vorlage).is_none() {
+    let Some(v) = vorlage::<T>(&body.vorlage) else {
         return Err(AppError::Validation("Unbekannte Vorlage".into()));
+    };
+    if let Some(abs) = &body.abschnitte {
+        pruefe_abschnitts_schluessel(v, abs)?;
     }
     let titel = pflicht(&body.titel, "Titel")?;
     let zeitstand = match body.zeitstand.as_deref() {
@@ -129,6 +164,7 @@ pub async fn anlegen<T: DokumentRoute>(
         &titel,
         &zeitstand,
         benutzer.id,
+        body.abschnitte.as_deref(),
     )
     .await?;
     sse::<T>(state, einsatz_id, dok.id);
@@ -167,16 +203,7 @@ pub async fn aktualisieren<T: DokumentRoute>(
     if let Some(abs) = &body.abschnitte {
         let v = vorlage::<T>(&vorher.vorlage)
             .ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
-        for a in abs {
-            // Enum-artig: der Schlüssel wird gegen die feste Schlüsselmenge der Vorlage
-            // geprüft, scheitert also am Feld selbst → 400 (LFH-305).
-            if !v.abschnitte.iter().any(|d| d.schluessel == a.schluessel()) {
-                return Err(AppError::Validation(format!(
-                    "Unbekannter Abschnitts-Schlüssel «{}»",
-                    a.schluessel()
-                )));
-            }
-        }
+        pruefe_abschnitts_schluessel(v, abs)?;
     }
 
     let dok = dok_repo::aktualisiere::<T>(

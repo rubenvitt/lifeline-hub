@@ -125,6 +125,30 @@ Die Spalten entstehen über `spaltenFuer<FunkplanZeile>()`, in dieser Reihenfolg
   `kommunikationsmittelLabel` in `FunkErreichbarkeit.tsx`. `KOMMUNIKATIONSMITTEL_LABEL` ist heute
   privat.
 
+**Nachtrag: Messung vor dem Bau (30.09.2026, `e2e/funkplan-breite.spec.ts`).** Gemessen unter
+`/einsaetze/:id/stab` bei 1366 × 768 mit offenem Modulpanel, Chromium:
+
+| Größe | Wert |
+|---|---|
+| Contentbreite (`seiten-inhalt` ohne Polster) | 1050 px |
+| Zellpolster links + rechts (`KatalogTabelle`, kompakt) | 22 px |
+| Mono 12: Kurzbezeichnung „EA-NORD-2“ | 63 px |
+| Mono 12: Einheits-Funkrufname „Florian Musterstadt 1/10“ | 168 px |
+| Mono 12: Fahrzeug-Funkrufname „Florian Musterstadt-Nordwest 1/42-1“ | 245 px |
+| Mono 12: OPTA „FW MST 1/42-1“ | 91 px |
+| Mono 12: Sprechgruppe „412_F_DRK_MST“ | 91 px |
+| Grundschrift: Name „Kirchgassner-Wohlfahrt, Maximiliane“ | 244 px |
+| Grundschrift: „Digitalfunk“ | 74 px |
+| Grundschrift: Erreichbarkeit „+49 171 1234567“ | 114 px |
+
+Daraus die Spaltenbreiten: Stelle 240, Rufname/OPTA 150, TMO 110, DMO 110,
+Kommunikationsmittel 110, Erreichbarkeit 140, Leiter/Führer fließend mit `mindestBreite` 160.
+Summe 1020 px, 30 px unter der Contentbreite: am Fükw kein waagerechter Bildlauf, auch mit der
+Erreichbarkeit (1366 ≥ `xl`). Die Rufname-Spalte (150) fasst die Kurzbezeichnung, die OPTA und
+eine Sprechgruppe mit Polster (≤ 113 px). Ein extrem langer Einheits-Funkrufname (168 + 22) bricht
+um, statt die Summe zu sprengen. In der Stelle-Spalte bricht der längste Fahrzeug-Funkrufname
+samt Einrückung um. Das ist gewollt, denn die Kennung wird gelesen und nicht verglichen.
+
 ### D5 · Erreichbarkeit: `abBreite` hängt am Druckmodus
 
 `abBreite` misst die Fensterbreite, nicht `@media print`. Die Spaltenfabrik bekommt deshalb
@@ -178,6 +202,20 @@ Meldebild und Funkplan. ETB-Druck, Lagebericht und Befehl rendern keine antd-Tab
 `kraefteuebersichtPrint.test.ts` ziehen mit. Die Regression im Meldebild deckt
 `e2e/meldebild-tabelle.spec.ts` ab (Druckpfad A4).
 
+**Nachtrag (Befund beim Bau, 30.09.2026).** Der echte Druckweg (`beforeprint`, also ohne
+`sticky`) legt die Tabelle in `.ant-table-content`, nicht in `.ant-table-body`. Dort trug sie ihre
+Bildschirmbreite `scroll.x` (1020 px) und ragte auf A4 um 340 px über den Rand. Das Meldebild-e2e
+hatte das nicht gesehen, weil es nur `emulateMedia` ohne `beforeprint` prüft. Drei zusätzliche
+Regeln in `druck.css`, jede per e2e belegt:
+- Die Breitenregel gilt für beide Hüllen (`.ant-table-content table` mit `min-width: 0`).
+- antds unsichtbare `ant-table-measure-row` wiederholt die Spaltenköpfe fett in Bildschirmgröße
+  und setzte damit die Mindestbreiten. Im Druck fällt sie weg (`display: none`).
+- Zellen brechen lange Werte um (`overflow-wrap: anywhere`). Ohne diese Regel blieben 67 px
+  Überhang, ohne die Messzeilen-Regel 80 px.
+
+Nicht gewirkt haben: das Zurücksetzen der `<col>`-Breiten und schmaleres Zellpolster. Beide sind
+nicht übernommen.
+
 Verworfen: die Regeln für den Funkplan zu kopieren. Zwei Kopien laufen auseinander, und die
 Kopie widerspräche „Mechanik nur in `druck.css`“.
 
@@ -198,7 +236,8 @@ Kopie widerspräche „Mechanik nur in `druck.css`“.
 Request-DTOs sind handgepflegt (LFH-120). `NeuerLagebericht` und `NeuerBefehl` bekommen
 `abschnitte?`. Das Meldebild ruft nur noch `legeLageberichtAn(…, { …, abschnitte })`. Den Fehler
 zeigt `SpeicherFehler` an der Seite, statt `message.error` („Speicherfehler an die Seite“). Der
-Fehler verschwindet beim nächsten Absenden (`mutation.reset()` beim Start).
+Fehler verschwindet beim nächsten Absenden, das räumt react-query beim Übergang nach `pending`
+selbst.
 
 Verworfen:
 - Ein eigener Endpunkt `…/lageberichte/uebernahme`: ein zweiter Anlegeweg mit eigener
