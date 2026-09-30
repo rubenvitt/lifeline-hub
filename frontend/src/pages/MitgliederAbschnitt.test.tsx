@@ -1,12 +1,29 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ConfigProvider } from 'antd';
 import { server } from '../test/server';
 import { einsatzKeys } from '../api/queryKeys';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
+
+// Katalog und Besetzung stehen fest, statt über das Netz zu kommen (LFH-549).
+vi.mock('../fuehrung/useFunktionsVorschlaege', async () => ({
+  useFunktionsVorschlaege: (await import('../test/fuehrungsfunktionen')).vorschlaegeFuer,
+}));
+
+/** Das Auswahlfeld der Führungsstelle (ein Wert: Katalogwahl oder Freitext, LFH-549). */
+function stellenFeld(): HTMLElement {
+  return screen.getByRole('combobox', { name: 'Führungsstelle' });
+}
+
+/** Der gewählte Wert im offenen Dialog. */
+function stellenWert(): string | null | undefined {
+  return within(screen.getByRole('dialog')).queryByText(
+    (_, el) => el?.classList.contains('ant-select-selection-item') ?? false,
+  )?.textContent;
+}
 
 function mitglied(over: Partial<Record<string, unknown>> = {}) {
   return {
@@ -34,18 +51,17 @@ describe('MitgliederAbschnitt', () => {
       name: 'Führungsstelle für Eva Einsatz bearbeiten',
     });
     await userEvent.click(ausloeser);
-    const feld = screen.getByRole('textbox', { name: 'Führungsstelle' });
-    await waitFor(() => expect(feld).toHaveFocus());
-    await userEvent.clear(feld);
-    await userEvent.type(feld, 'Verworfene Eingabe');
+    await waitFor(() => expect(stellenFeld()).toHaveFocus());
+    expect(stellenWert()).toBe('Gespeicherte Stelle');
+    // Eine neue Eingabe ersetzt den gespeicherten Wert (EIN Wert je Feld).
+    await userEvent.type(stellenFeld(), 'Verworfene Eingabe', { skipClick: true });
+    // Verlassen übernimmt den Tipptext (Tags-Modus), wie ein Klick auf „Speichern“.
+    await userEvent.tab();
+    expect(stellenWert()).toBe('Verworfene Eingabe');
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     await userEvent.click(ausloeser);
-    expect(screen.getByRole('textbox', { name: 'Führungsstelle' })).toHaveValue(
-      'Gespeicherte Stelle',
-    );
-    await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: 'Führungsstelle' })).toHaveFocus(),
-    );
+    expect(stellenWert()).toBe('Gespeicherte Stelle');
+    await waitFor(() => expect(stellenFeld()).toHaveFocus());
   });
 
   it('LFH-461 Review: verspäteter Speicherabschluss aktualisiert nur den ursprünglichen Einsatz', async () => {
@@ -77,7 +93,7 @@ describe('MitgliederAbschnitt', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
     );
-    await userEvent.type(screen.getByRole('textbox', { name: 'Führungsstelle' }), 'Stelle 7');
+    await userEvent.type(stellenFeld(), 'Stelle 7{Enter}');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await anfrage;
     try {
@@ -85,7 +101,8 @@ describe('MitgliederAbschnitt', () => {
       await userEvent.click(
         await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
       );
-      await userEvent.type(screen.getByRole('textbox', { name: 'Führungsstelle' }), 'Eingabe 8');
+      await userEvent.type(stellenFeld(), 'Eingabe 8');
+      await userEvent.tab();
     } finally {
       freigeben();
     }
@@ -95,7 +112,7 @@ describe('MitgliederAbschnitt', () => {
       ]),
     );
     expect(client.getQueryData(einsatzKeys.mitglieder(8))).toEqual([mitglied()]);
-    expect(screen.getByRole('textbox', { name: 'Führungsstelle' })).toHaveValue('Eingabe 8');
+    expect(stellenWert()).toBe('Eingabe 8');
   });
 
   it('LFH-461: ein offener Dialog wird beim Einsatzwechsel geschlossen', async () => {
@@ -112,10 +129,7 @@ describe('MitgliederAbschnitt', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
     );
-    await userEvent.type(
-      screen.getByRole('textbox', { name: 'Führungsstelle' }),
-      'Stelle in Einsatz 7',
-    );
+    await userEvent.type(stellenFeld(), 'Stelle in Einsatz 7{Enter}');
     rerender(ansicht(8));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
@@ -144,10 +158,9 @@ describe('MitgliederAbschnitt', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
     );
-    await userEvent.type(
-      screen.getByRole('textbox', { name: 'Führungsstelle' }),
-      'Florian Leitung',
-    );
+    // Ohne Enter: der getippte Freitext wird beim Verlassen des Feldes übernommen, der Klick auf
+    // „Speichern“ verliert ihn nicht.
+    await userEvent.type(stellenFeld(), 'Florian Leitung');
     // Native Formularübermittlung statt eines Modal-Fußknopfs.
     const speichern = screen.getByRole('button', { name: 'Speichern' });
     expect(speichern.closest('form')).not.toBeNull();
@@ -155,16 +168,24 @@ describe('MitgliederAbschnitt', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(gespeichert).toEqual([
-      { einsatz_rolle: 'fuehrungspersonal', fuehrungsstelle: 'Florian Leitung' },
+      {
+        einsatz_rolle: 'fuehrungspersonal',
+        fuehrungsfunktion: null,
+        fuehrungsstelle: 'Florian Leitung',
+      },
     ]);
     expect(screen.getByText('Florian Leitung')).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
     );
-    await userEvent.clear(screen.getByRole('textbox', { name: 'Führungsstelle' }));
+    await userEvent.type(stellenFeld(), '{Backspace}');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(gespeichert).toHaveLength(2));
-    expect(gespeichert[1]).toEqual({ einsatz_rolle: 'fuehrungspersonal', fuehrungsstelle: null });
+    expect(gespeichert[1]).toEqual({
+      einsatz_rolle: 'fuehrungspersonal',
+      fuehrungsfunktion: null,
+      fuehrungsstelle: null,
+    });
   });
 
   it('LFH-461: ohne Verwaltungsrecht ist die Führungsstelle nur lesbar', async () => {
@@ -198,13 +219,44 @@ describe('MitgliederAbschnitt', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
     );
-    await userEvent.type(
-      screen.getByRole('textbox', { name: 'Führungsstelle' }),
-      'Florian Leitung',
-    );
+    await userEvent.type(stellenFeld(), 'Florian Leitung{Enter}');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Einsatz abgeschlossen');
-    expect(screen.getByRole('textbox', { name: 'Führungsstelle' })).toHaveValue('Florian Leitung');
+    expect(stellenWert()).toBe('Florian Leitung');
+  });
+
+  it('LFH-549: setzt S2 als Katalogwert und zeigt das Label', async () => {
+    let zeile = mitglied();
+    const gespeichert: unknown[] = [];
+    server.use(
+      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([zeile])),
+      http.get('/api/benutzer', () => HttpResponse.json([])),
+      http.put('/api/einsaetze/7/mitglieder/2', async ({ request }) => {
+        gespeichert.push(await request.json());
+        zeile = mitglied({ fuehrungsfunktion: 's2', fuehrungsstelle_anzeige: 'S2 Lage' });
+        return HttpResponse.json([zeile]);
+      }),
+    );
+    renderMitProviders(
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />
+      </ConfigProvider>,
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
+    );
+    // Der Vorrang vor der Ableitung steht an der Maske (Stab-Spec, Entscheidung 13).
+    expect(screen.getByText(/Vorrang vor dem eigenen Sachgebiet/)).toBeInTheDocument();
+    await userEvent.click(stellenFeld());
+    await userEvent.click(await screen.findByTitle('S2 – Lage (Müller)'));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(gespeichert).toEqual([
+      { einsatz_rolle: 'fuehrungspersonal', fuehrungsfunktion: 's2', fuehrungsstelle: null },
+    ]);
+    expect(
+      screen.getByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
+    ).toHaveTextContent('S2 Lage');
   });
 
   it('zeigt vorhandene Mitglieder', async () => {

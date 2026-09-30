@@ -288,6 +288,25 @@
           "andere_bos"
         ]
       },
+      "AktuelleBesetzung": {
+        "type": "object",
+        "description": "Die aktuelle Besetzung eines Sachgebiets, zur Lesezeit.",
+        "required": [
+          "zustand"
+        ],
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Person bzw. Stelle; fehlt bei „nicht vergeben“, „bei der Einsatzleitung“ und nach der\nSchwärzung."
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/BesetzungsZustand"
+          }
+        }
+      },
       "AnhangAnzeige": {
         "type": "object",
         "description": "Öffentliche Darstellung eines Anhangs — ohne die Bytes (`daten`), die nur\nüber den Download-Endpoint ausgeliefert werden.",
@@ -996,6 +1015,17 @@
             ],
             "format": "int64"
           },
+          "aktuelle_besetzung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AktuelleBesetzung",
+                "description": "Aktuelle Besetzung des Sachgebiets zur Lesezeit (nur s1–s6, nur mit Stab-Recht,\nLFH-549). `snap_anzeige` bleibt die historische Wahrheit."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "auftrag_id": {
             "type": "integer",
             "format": "int64"
@@ -1034,11 +1064,23 @@
             ],
             "format": "int64"
           },
+          "funktion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Fuehrungsfunktion",
+                "description": "Katalogcode (LFH-549); fehlt bei Freitext und anderen Empfängertypen."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "funktion_text": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Freitext — oder Bezeichnung bei `funktion` Führungshilfspersonal/Fachberater (LFH-549)."
           },
           "id": {
             "type": "integer",
@@ -1071,19 +1113,26 @@
       },
       "AuftragsZaehler": {
         "type": "object",
-        "description": "Aufträge: offen (offen/in Arbeit), davon überfällig.",
+        "description": "Aufträge: offen (offen/in Arbeit), davon in Arbeit, davon überfällig.",
         "required": [
           "offen",
+          "in_arbeit",
           "ueberfaellig"
         ],
         "properties": {
+          "in_arbeit": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon mit Bearbeitungsstatus „in Arbeit\" (LFH-550, „davon in Arbeit\" im Überblick)."
+          },
           "offen": {
             "type": "integer",
             "format": "int64"
           },
           "ueberfaellig": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "Davon überfällig — nur unter den offenen: ein vollzogener Auftrag mit Quittungslücke\nzählt nicht (LFH-550)."
           }
         }
       },
@@ -1656,6 +1705,17 @@
         "type": "string",
         "description": "Besetzungszustand eines Sachgebiets (Entscheidung 3 der Spec). Wire == `as_str()`.\n\n**Keine Zeile = „nicht vergeben\"** — das ist der im Fükw der Führungsstufe B\ndokumentierte Normalzustand von S1/S4/S5/S6 und deshalb *kein* eigener Enum-Wert.\nDer Unterschied zu [`BesetzungArt::Einsatzleitung`] ist die Anregungsfunktion\n(„haben wir S4 bedacht?\").",
         "enum": [
+          "einsatzleitung",
+          "personal",
+          "extern",
+          "rueckwaertig"
+        ]
+      },
+      "BesetzungsZustand": {
+        "type": "string",
+        "description": "Besetzungszustand eines Sachgebiets aus Sicht eines Empfängers. Anders als\n[`BesetzungArt`] mit „nicht vergeben“ als eigenem Wert — hier ist die Abwesenheit einer\nZeile eine Auskunft, kein fehlendes Feld.",
+        "enum": [
+          "nicht_vergeben",
           "einsatzleitung",
           "personal",
           "extern",
@@ -3145,7 +3205,7 @@
               "string",
               "null"
             ],
-            "description": "Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung."
+            "description": "Eigene Führungsstelle in diesem Einsatz als Vorbelegungstext der ETB-Erfassung\n(LFH-549): Kürzel eines Katalogwerts („S2“), „Fachberater: THW“ oder der Freitext."
           },
           "meine_funktion": {
             "type": [
@@ -4037,6 +4097,17 @@
           "vollzug_status"
         ],
         "properties": {
+          "aktuelle_besetzung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AktuelleBesetzung",
+                "description": "Aktuelle Besetzung des Sachgebiets zur Lesezeit (nur s1–s6, nur mit Stab-Recht)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "beschreibung": {
             "type": [
               "string",
@@ -4060,10 +4131,29 @@
             "type": "integer",
             "format": "int64"
           },
+          "empfaenger_anzeige": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeige des Empfängers: Katalogwert mit wirksamem Label („S3 Einsatz“, „Fachberater:\nTHW“) oder der Freitext. Fehlt ohne Empfänger."
+          },
           "empfaenger_funktion": {
             "type": [
               "string",
               "null"
+            ],
+            "description": "Freitext-Empfänger — oder, bei `empfaenger_funktion_code` Führungshilfspersonal/\nFachberater, dessen Bezeichnung (Doppelrolle, LFH-549)."
+          },
+          "empfaenger_funktion_code": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Fuehrungsfunktion",
+                "description": "Katalogcode des Empfängers (LFH-549); fehlt bei Freitext."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "erledigt_at": {
@@ -4895,6 +4985,58 @@
           }
         }
       },
+      "Fuehrungsfunktion": {
+        "type": "string",
+        "description": "Führungsfunktion aus dem Katalog. Wire == `as_str()`.\n\nDie Reihenfolge ist die Anzeigereihenfolge des Katalogs (Teil des Vertrags). Die\nCHECK-Listen in `migrations/0128_fuehrungsfunktion.sql` spiegeln `ALLE`\n(Guard `check_listen_entsprechen_dem_katalog`).",
+        "enum": [
+          "el",
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5",
+          "s6",
+          "s7",
+          "fuehrungshilfspersonal",
+          "fachberater"
+        ]
+      },
+      "FuehrungsfunktionAnzeige": {
+        "type": "object",
+        "description": "Ein Katalogeintrag, wie ihn `GET /api/fuehrungsfunktionen` liefert.",
+        "required": [
+          "funktion",
+          "label",
+          "standard_label",
+          "art",
+          "bezeichnung_pflicht"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/FunktionsArt"
+          },
+          "bezeichnung_pflicht": {
+            "type": "boolean"
+          },
+          "funktion": {
+            "$ref": "#/components/schemas/Fuehrungsfunktion"
+          },
+          "kuerzel": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "„EL“, „S3“; fehlt bei Führungshilfspersonal und Fachberater."
+          },
+          "label": {
+            "type": "string",
+            "description": "Wirksames Label (Mandantenlabel oder Standard)."
+          },
+          "standard_label": {
+            "type": "string"
+          }
+        }
+      },
       "FuehrungskraftKarte": {
         "type": "object",
         "description": "Schlanke Karten-Sicht einer Führungskraft (Einheits- oder Abschnittsführung).",
@@ -4957,6 +5099,16 @@
             ]
           }
         }
+      },
+      "FunktionsArt": {
+        "type": "string",
+        "description": "Art der Führungsfunktion nach FwDV 100 Anlage 1 (Nr. 1.1.4/1.1.5). Aus dem Code\nabgeleitet, nie gespeichert und nie vom Client gesetzt.",
+        "enum": [
+          "leitung",
+          "sachgebiet",
+          "fuehrungshilfspersonal",
+          "fachberater"
+        ]
       },
       "GefahrBewertungAnzeige": {
         "type": "object",
@@ -5909,6 +6061,7 @@
           "karten_ansicht",
           "lage_snapshot",
           "sofortmeldung",
+          "einsatz",
           "lagged"
         ]
       },
@@ -6262,11 +6415,30 @@
           "einsatz_rolle": {
             "$ref": "#/components/schemas/EinsatzRolle"
           },
+          "fuehrungsfunktion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Fuehrungsfunktion",
+                "description": "Katalogcode der Führungsstelle (LFH-549); fehlt bei Freitext."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "fuehrungsstelle": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Führungsstelle als Freitext — oder, bei `fuehrungsfunktion` Führungshilfspersonal/\nFachberater, deren Bezeichnung (Doppelrolle, LFH-549)."
+          },
+          "fuehrungsstelle_anzeige": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeige der Führungsstelle: „S2 Lage“, „Fachberater: THW“ oder der Freitext."
           },
           "zugewiesen_at": {
             "type": "string"
@@ -8391,7 +8563,7 @@
       },
       "StabAnzeige": {
         "type": "object",
-        "description": "Die Führungsorganisation eines Einsatzes.\n\n`besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen\nZeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu\nschicken hiesse, „nicht vergeben\" als Datensatz zu erfinden.\n\n`naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**, damit der\nCountdown auf beiden Fahrzeugschirmen live ist, obwohl der Einsatzkopf FE-seitig im\n`NICHT_LIVE`-Fach bleibt (Entscheidung 11). Kein zweiter Speicherort.",
+        "description": "Die Führungsorganisation eines Einsatzes.\n\n`besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen\nZeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu\nschicken hiesse, „nicht vergeben\" als Datensatz zu erfinden.\n\n`naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**\n(Entscheidung 11). Kein zweiter Speicherort: ändert sich der Termin, frischt das\nLive-Ereignis `einsatz` Kopf und Stab-Anzeige gemeinsam auf (LFH-555).",
         "required": [
           "besetzung",
           "anzahl_lagebesprechungen"

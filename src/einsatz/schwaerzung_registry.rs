@@ -808,6 +808,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("benutzer_id", G_FK),
             retain("einsatz_rolle", G_ENUM),
             scrub("fuehrungsstelle", Strategie::NullSetzen),
+            // Katalogcode (LFH-549) — kein Personenbezug; die Bezeichnung steht in
+            // `fuehrungsstelle` und wird oben genullt.
+            retain("fuehrungsfunktion", G_ENUM),
             retain("zugewiesen_at", G_ZEIT),
         ],
     },
@@ -1323,6 +1326,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("person_id", G_FK),
             retain("fahrzeug_id", G_FK),
             retain("funktion_text", G_FUEHRUNG),
+            // Katalogcode (LFH-549) — kein Personenbezug.
+            retain("funktion", G_ENUM),
             retain("extern_kategorie", G_ENUM),
             // REVIEW: externer Empfänger-Klartext (Auftrags-Adressierung, Führungs-Doku;
             // kann externen Namen tragen) — im ETB gesnapshottet.
@@ -1483,6 +1488,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Freitext-Empfänger ohne FK, kann einen Personennamen tragen — kein reines
             // Funktionslabel.
             scrub("empfaenger_funktion", Strategie::NullSetzen),
+            // Katalogcode (LFH-549) — kein Personenbezug, überlebt die Schwärzung.
+            retain("empfaenger_funktion_code", G_ENUM),
             retain("bezug_typ", G_POLY),
             retain("bezug_id", G_POLY),
             retain("quelle", G_ENUM),

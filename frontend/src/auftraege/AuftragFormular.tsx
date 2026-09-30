@@ -2,7 +2,7 @@ import { App, Col, Collapse, DatePicker, Form, Input, Row } from 'antd';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular } from '../components/Erfassung';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import dayjs from 'dayjs';
 import type {
   AdressatKategorie,
@@ -11,6 +11,12 @@ import type {
   NeuerEmpfaenger,
   Richtung,
 } from '../api/types';
+import {
+  dekodiere,
+  funktionsOptionen,
+  type FunktionsVorschlaege,
+} from '../fuehrung/funktionsOptionenKern';
+import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 
 const EXTERN_OPTIONEN: { value: AdressatKategorie; label: string }[] = [
   { value: 'leitstelle', label: 'Leitstelle' },
@@ -29,10 +35,10 @@ export interface ZielOption {
 /** Werte des Formulars (lokale Picker-Zeiten, vor der UTC-Wandlung). */
 interface FormWerte {
   /**
-   * EIN Empfängerfeld für beide Sorten: strukturierte Ziele tragen den Präfix
-   * `abschnitt:`/`einheit:`, alles andere ist freier Funktionstext (`mode="tags"`). Zwei Felder
-   * sprengten das Budget, und der Freitext darf nicht hinter den Collapse: ohne gepflegte
-   * Abschnitte/Einheiten ist er der EINZIGE Weg zum Pflicht-Empfänger.
+   * EIN Empfängerfeld für alle Sorten: strukturierte Ziele tragen den Präfix
+   * `abschnitt:`/`einheit:`/`funktion:` (Katalog, LFH-549), alles andere ist freier Funktionstext
+   * (`mode="tags"`). Zwei Felder sprengten das Budget, und der Freitext darf nicht hinter den
+   * Collapse: ohne gepflegte Abschnitte/Einheiten ist er ein Weg zum Pflicht-Empfänger.
    */
   empfaenger: string[];
   externKategorie: AdressatKategorie;
@@ -58,9 +64,13 @@ function dayjsZuWire(d: dayjs.Dayjs | null): string | undefined {
 
 /**
  * Wandelt die Werte des Empfängerfeldes in Empfänger-DTOs: `abschnitt:<id>`/`einheit:<id>`
- * stammen aus den Optionen, alles andere wird Funktionstext.
+ * stammen aus den Optionen, `funktion:<code>` aus dem Katalog (LFH-549), alles andere wird
+ * Funktionstext — ohne Rückschluss von „S3“ auf den Code (`fuehrung/funktionsOptionenKern.ts`).
  */
-function baueEmpfaenger(werte: string[]): NeuerEmpfaenger[] {
+function baueEmpfaenger(
+  werte: string[],
+  katalog: FunktionsVorschlaege['katalog'],
+): NeuerEmpfaenger[] {
   return werte.flatMap((wert): NeuerEmpfaenger[] => {
     const trenner = wert.indexOf(':');
     const typ = trenner === -1 ? '' : wert.slice(0, trenner);
@@ -71,8 +81,17 @@ function baueEmpfaenger(werte: string[]): NeuerEmpfaenger[] {
     if (typ === 'einheit' && Number.isFinite(id)) {
       return [{ empfaenger_typ: 'einheit', einheit_id: id }];
     }
-    const funktion_text = wert.trim();
-    return funktion_text ? [{ empfaenger_typ: 'funktion', funktion_text }] : [];
+    const angabe = dekodiere(wert, katalog);
+    if (angabe.funktion) {
+      return [
+        {
+          empfaenger_typ: 'funktion',
+          funktion: angabe.funktion,
+          ...(angabe.text ? { funktion_text: angabe.text } : {}),
+        },
+      ];
+    }
+    return angabe.text ? [{ empfaenger_typ: 'funktion', funktion_text: angabe.text }] : [];
   });
 }
 
@@ -92,10 +111,17 @@ export default function AuftragFormular({
   serie = false,
   onFertig,
   card = true,
+  einsatzId,
 }: {
   senden: boolean;
   abschnitte: ZielOption[];
   einheiten: ZielOption[];
+  /**
+   * Einsatz für die Katalogauswahl samt lesbarer Besetzung (LFH-549,
+   * `fuehrung/useFunktionsVorschlaege.ts`). Ohne Angabe bleibt nur der Freitext. Geladen wird erst,
+   * wenn das Formular steht — die Modale hängen es per `destroyOnHidden` nur geöffnet ein.
+   */
+  einsatzId?: number;
   /**
    * Speichern. **Muss bei Ablehnung ablehnen** (`mutateAsync`) — nur dann lässt die
    * Erfassungshülle den Wortlaut stehen.
@@ -122,6 +148,9 @@ export default function AuftragFormular({
   const [form] = Form.useForm<FormWerte>();
   // Richtung steuert die Sichtbarkeit der externen Adressat-Felder.
   const richtung = Form.useWatch('richtung', form);
+  // Tipptext des Empfängerfelds: speist „Fachberater: <Text>“/„Führungshilfspersonal: <Text>“.
+  const [suche, setSuche] = useState('');
+  const funktionen: FunktionsVorschlaege = useFunktionsVorschlaege(einsatzId);
 
   // initialText kann verzögert eintreffen (z. B. Heraufstufung) → ins Feld spiegeln.
   useEffect(() => {
@@ -133,7 +162,7 @@ export default function AuftragFormular({
    * fehlende Empfänger LEHNT AB, sonst räumte die Hülle ein Formular, das nichts gespeichert hat.
    */
   const absenden = (w: FormWerte) => {
-    const empfaenger = baueEmpfaenger(w.empfaenger ?? []);
+    const empfaenger = baueEmpfaenger(w.empfaenger ?? [], funktionen.katalog);
     // Externer Adressat: bei Richtung extern als Empfänger-Zeile ergänzen.
     if (w.richtung === 'extern' && (w.externBezeichnung ?? '').trim()) {
       empfaenger.push({
@@ -172,6 +201,7 @@ export default function AuftragFormular({
       label: 'Einheiten',
       options: einheiten.map((e) => ({ value: `einheit:${e.id}`, label: e.name })),
     },
+    { label: 'Funktionen', options: funktionsOptionen(funktionen, suche) },
   ];
 
   /**
@@ -312,6 +342,8 @@ export default function AuftragFormular({
               placeholder="Abschnitt, Einheit oder Funktion (z. B. S3)"
               allowClear
               tokenSeparators={[',']}
+              onSearch={setSuche}
+              onBlur={() => setSuche('')}
             />
           </Form.Item>
         </Col>

@@ -357,6 +357,19 @@ export type WetterWarnstufe = S['WetterWarnstufe'];
 export type Dokument = S['DokumentAnzeige'];
 export type DokumentKategorie = S['DokumentKategorie'];
 
+// ============================== LFH-549 Funktionskatalog ==============================
+export type Fuehrungsfunktion = S['Fuehrungsfunktion'];
+export type FuehrungsfunktionEintrag = S['FuehrungsfunktionAnzeige'];
+export type AktuelleBesetzung = S['AktuelleBesetzung'];
+
+/** Kein Backend-Schema: Eingabe-Body von `PUT /api/org-fuehrungsfunktionen/{funktion}`. */
+export interface FuehrungsfunktionUpdate {
+  /** Leer = Standardlabel. */
+  label?: string | null;
+  /** Nur für `s7`. */
+  aktiv?: boolean;
+}
+
 // ============================== LFH-46 Stab (S1–S6) ==============================
 export type Stab = S['StabAnzeige'];
 export type Stabsfunktion = S['StabsfunktionAnzeige'];
@@ -602,7 +615,10 @@ export interface NeueErinnerung {
   /** 'YYYY-MM-DD HH:MM' (UTC). */
   faellig_at: string;
   intervall_minuten?: number;
+  /** Freitext — oder die Bezeichnung bei Führungshilfspersonal/Fachberater (LFH-549). */
   empfaenger_funktion?: string;
+  /** Katalogcode (LFH-549). */
+  empfaenger_funktion_code?: Fuehrungsfunktion;
   /** Generischer Sachbezug (z. B. 'etb' + ETB-Eintrag-ID); both-or-neither. */
   bezug_typ?: string;
   bezug_id?: number;
@@ -622,7 +638,10 @@ export interface NeuerEmpfaenger {
   einheit_id?: number;
   person_id?: number;
   fahrzeug_id?: number;
+  /** Freitext — oder die Bezeichnung bei Führungshilfspersonal/Fachberater (LFH-549). */
   funktion_text?: string;
+  /** Katalogcode beim Funktionsempfänger (LFH-549). */
+  funktion?: Fuehrungsfunktion;
   extern_kategorie?: AdressatKategorie;
   extern_bezeichnung?: string;
 }

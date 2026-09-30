@@ -28,6 +28,14 @@ Skill `clickup-task-anlegen`.
   jedem „fertig" `verification-before-completion` und `requesting-code-review`.
 - **Pflicht-Checkpoint:** `/opsx:propose` hält nach den Artefakten an (kein Fehlschlag) —
   vorlegen, Freigabe abwarten, dann `ready for development` und `/opsx:apply`.
+- **Entwurfs-Hoheit** (LFH-589, Spec `entwurfs-hoheit`,
+  `openspec/changes/archive/2026-09-30-lfh-589-entwurfs-hoheit-orchestrierung/design.md`):
+  Workflows besitzen die Menge (Scope-Scan, Judge-Panel als Zulieferer), OpenSpec den einzelnen
+  Task. Eine Change entsteht **genau** auf der Route `entwurf` (E1 Entscheidung · E2 Regel ·
+  E3 mehr als ein Subsystem, nicht bei einem Bugfix, der Bestehendes wiederherstellt, oder
+  einer reinen Textkorrektur; Liste in
+  `dev-clickup-ausfuehren`, Schritt 3), nie bei `trivial`/`klar`/`bug-unklar`. **Kein
+  Workflow ruft `/opsx:*` oder schreibt unter `openspec/changes/`.**
 - **Vier Ablageorte, keine Überschneidung:** `openspec/changes/<name>/` (laufende Änderung, hier
   landet Neues) · `openspec/changes/archive/` (nach `/opsx:archive`) · `openspec/specs/`
   (Fähigkeits-Specs, SHALL/MUST, über `/opsx:sync`/`/opsx:archive`) · `docs/superpowers/`
@@ -54,7 +62,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `bannerGrund`/`bannerLinie`, Zeilentönungen. `rahmenFarben` ist modusunabhängig und keine
   `Farbrolle` (`rollen.guard.test.ts`). Eigene Paletten statt `Statusrolle`:
   `etbTypFarben{Dunkel,Hell}` (`etbTypFarbe()`), `warnstufeFarben{Dunkel,Hell}`
-  (`warnstufeBalkenFarbe()`).
+  (`warnstufeBalkenFarbe()`), `fachebeneFarben{Dunkel,Hell}` (`fachebeneFarbe()`, LFH-593:
+  Ebenen-Identität, keine Vertragskarte; `FachebeneDef` trägt keine Farbe).
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
   30/48/72 gilt, nicht die Entwurfsskizze.
@@ -91,6 +100,16 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Heimatplatz; Lageplätze nur per Entscheidung am Einsatz (`EinsatzAnzeige.lagekennzahlen`), nie
   per Messwert; Neuzuschnitt während der Betrachtung als Sammelbanner
   (`docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`).
+- **Eine Heimat je Zahl** (LFH-550,
+  `openspec/changes/archive/2026-09-30-lfh-550-lagebesprechung-eine-verdichtung/design.md`):
+  Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig)
+  nur aus dem Modulzähler (`pages/lage-dashboard/fuehrungsZahlen.ts`), nie aus einer Liste
+  gezählt; Betroffene/SK über `verdichtePersonen` (→ `sichtungsbild`), Kräfte über `verdichte`,
+  Warnstufe über `verdichteGefahrengebiete`. Stärke einer Menge nur über `summiereStaerke`
+  (Wurzeln der Menge; ein Abschnitt zählt seine obersten Einheiten wie das Meldebild), Formatierung
+  nur `anzeige/staerke.ts:staerkeText`. Dashboard und Stab-Vorbereitung teilen `useLagebild` +
+  `baueLagebild`. Regeln beider Sprachen pinnt `tests/fixtures/verdichtung/regeln.json`
+  (`tests/verdichtung_fixture.rs`, `lage/verdichtungFixture.test.ts`).
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 
@@ -246,6 +265,11 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   Veraltet ist eine Marke am `ok`, kein Status; Schwelle `veraltetNachMin` je Ebene
   (`lagekarte/fachebenen.ts`, Tabelle in `docs/fachebenen-quellen.md`), Anzeige nur über
   `lagekarte/FachebeneStand.tsx`, Takt `components/useMinutenTakt.ts`.
+- **Fachebenen antworten bedingt** (LFH-594, `fachebene_antwort` in `routes/karte.rs`): ETag =
+  Hash der ausgelieferten Bytes (nicht `gespeichert_at`), `private, no-cache`, 304 ohne Body;
+  `If-None-Match` vergleicht schwach (`support::if_none_match_matcht`). Das 304 löst der
+  HTTP-Cache des Browsers auf — `apiGet` setzt **keine** `cache`-Option. Nachweis auf der
+  Leitung per CDP: `e2e/fachebenen-bedingt.spec.ts` (Playwrights `status()` meldet 200).
 - **Unter `lg` gibt jeder Kartenmodus die Karte frei** (LFH-765,
   `openspec/changes/archive/2026-09-30-lfh-765-lagekarte-modi-karte-freigeben/design.md`): abgeleitet aus
   `exklusiverModusAktiv` in `leisteSichtbar` (`lagekarte/leistenWahl.ts`), nie per Aufruf je
@@ -254,6 +278,14 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   Leistenmodi (Platzieren, Taktisches Zeichen, Bild) steht unter `lg` im Fuß-Band
   `PlatzierSteuerung`, die Sidebar zeigt dann nur einen Hinweis (`modusBedienungImFuss`) — je
   Breite genau ein Knopf je Handlung. Ab `lg` erzwingen die Leistenmodi die Leiste wie bisher.
+- **Kartengrundlage** (LFH-558, Spec `lagekarte-kartengrundlage`, Herleitung D6 in
+  `openspec/changes/archive/2026-09-30-lfh-558-lagekarte-kartenpfade-fixture-basemap/design.md`):
+  die Karte entsteht mit dem Blindstil, der Style der Ansicht kommt per `setStyle`. Jeder
+  angewandte Style öffnet ein eigenes Abstufungsfenster bis zu seinem `style.load`
+  (`stilFehlerWaechter.ts`); darin zählt jeder Fehler ohne `tile`, also wirft die Karte dort
+  selbst keinen (`getSource` vor `isSourceLoaded`).
+  Browser-Nachweis mit der Fixture-Basemap (`e2e/kartenFixture.ts`, „gelesen“ = dekodiert):
+  `e2e/lagekarte-kartengrundlage.spec.ts`, `e2e/lagekarte-kachelpfad.spec.ts`.
 - Nachweise: `e2e/lagekarte-smoke.spec.ts`, `e2e/gate1-ueberlauf.spec.ts`,
   `e2e/lagekarte-touch.spec.ts` (LFH-713, `hasTouch`, Trefferwache `elementFromPoint`), `fokus-verdeckung.spec.ts`; Kartenaufbauten sieht
   `e2e/fokus-kern.ts` nur über `zusatzKandidaten`, das Abschneiden der nachgiebigen Zeitachse nur
@@ -275,13 +307,31 @@ jede Liste mit eigener Weiche (`api/abrufZustand.ts`), fehlend = „—“ mit G
 `stab/luecken.ts` (auch für ST6). Erreichbarkeit: Schirm ab `xl`, Druck immer (`useDruckModus`),
 Lagebericht nie. Eigene Gegenstelle fehlt als benannte Lücke (LFH-849).
 
+**Führungsfunktionen** (LFH-549, `openspec/changes/archive/2026-09-30-lfh-549-funktionskatalog/design.md`):
+geschlossener Katalog `fuehrung::Fuehrungsfunktion` (EL, S1–S7, Führungshilfspersonal, Fachberater;
+`art` abgeleitet), Mandantenlabels und S7-Schalter in `org_fuehrungsfunktion`, Client liest nur
+`GET /api/fuehrungsfunktionen` (keine zweite Labelliste). Erinnerung, Auftragsempfänger und
+Führungsstelle tragen eine **Codespalte neben dem Text** (Text = Freitext ohne Code bzw.
+Bezeichnung bei FHP/FB, Prüfung `fuehrung::pruefe_funktion`); **kein Rückschluss vom Freitext auf
+einen Code**, auch nicht „S3“ (Kodierung `funktion:<code>` nur über `fuehrung/funktionsOptionenKern.ts`).
+Der Snapshot trägt nur das Label, **nie einen Personennamen** (Retain vs. Scrub); die Besetzung löst
+der Server zur Lesezeit auf (`fuehrung::aufloesung`, nur mit Stab-Recht, `stab`-Ereignis invalidiert
+Aufträge und Erinnerungen). ETB-Vorbelegung „An“: Führungsstelle → erstes eigenes Sachgebiet → nichts
+(`anVorbelegung`); `etb_eintrag.von`/`an` bleiben Freitext.
+
 **Checkliste Arbeitsaufnahme** (LFH-551,
-`openspec/changes/archive/2026-09-30-lfh-551-stab-checkliste-arbeitsaufnahme/design.md`): drittes
+`openspec/changes/archive/2026-09-30-lfh-551-stab-checkliste-arbeitsaufnahme/design.md`): unterstes
 Paneel der Stabseite (`stab/ChecklistePaneel.tsx`), sieben feste Punkte als Code-Vorlage
 (`stab/checkliste.ts` ↔ `ChecklistenPunkt::ALLE`), eigene Tabelle, lazy (ein Aufruf ohne Wirkung
 legt keine Zeile an). `PUT …/stab/checkliste/{punkt}` mit Teilfeldern, jedes Bedienziel schickt
 genau SEIN Feld. Kein ETB je Haken; nur `leitstelle_gemeldet` belegt Haken **und** Rücknahme (E1).
 Mutation je Zeile und Bedienziel, überlappende Antworten über `useChecklistenAbgleich`.
+
+**Vorbereitung der Lagebesprechung** (LFH-550, `stab/VorbereitungPaneel.tsx`, `stab/vorbereitung.ts`):
+Paneel der Stab-Seite, rechnet keine Zahl selbst (Lagebild wie das Dashboard, Aufträge/Meldungen
+vom Modulzähler), Quelle je Zeile, Rechteweiche je Quelle („—“ mit Grund, nie 0). Reihenfolge wie
+das Dashboard, **kein Vortragsschema** (LFH-46 §2.3), nichts wird eingefroren; ein fester Stand
+nur über „In Lagebericht übernehmen“ (EIN Aufruf, Freitext).
 
 **Betreuung und Verpflegung**
 - **Verbleib → Betreuungsstelle** (LFH-674,
@@ -672,6 +722,11 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
 Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
 - `einsatzKeys` (`EINSATZ_KEYS`): jeder Key genau einmal klassifiziert — live über
   `EINSATZ_STREAM_EVENTS` oder `NICHT_LIVE_KEYS`. `globalKeys` (`GLOBAL_KEYS`) für alles darüber.
+- **Der Einsatzkopf ist live** (LFH-555, `openspec/changes/archive/2026-09-30-lfh-555-einsatzkopf-live/design.md`):
+  Ereignis `einsatz` mit leerer Gate-Menge (Tür des Stroms = Tür des Kopf-GET; leer steht nur
+  `einsatz` und `lagged` zu, Guard `ungegatet_sind_nur_lagged_und_einsatz`), invalidiert Kopf und
+  Stab-Anzeige. Es feuern PATCH, Abschluss, Frist und die Lagebesprechung **nur bei geändertem
+  Termin**; `meine_*` und `lagekennzahlen` lösen es nicht aus.
 - **Kein Inline-String-Array als Query-Key** (`queryKeys.guard.test.ts`, `queryKeyScan.ts`).
 - **Wire-Strings sind eingefroren** (`globalKeys.test.ts`, gegen handgeschriebene Literale).
 - Sub-Keys: String-Union-Token als zweites Element; der argumentlose Accessor ist der

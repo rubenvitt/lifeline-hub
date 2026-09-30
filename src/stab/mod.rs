@@ -39,7 +39,8 @@ wire_enum! {
 }
 
 impl Sachgebiet {
-    /// Bezeichnung des Sachgebiets nach FwDV 100 Anlage 2 (S. 54–60).
+    /// Standardbezeichnung des Sachgebiets nach FwDV 100 Anlage 2 (S. 54–60). Texte nehmen das
+    /// wirksame Mandantenlabel über `fuehrung::Labelkarte` (LFH-549), nicht diese Funktion direkt.
     ///
     /// Liegt im Backend, weil der System-ETB-Eintrag sie trägt („S2 Lage: Besetzung → …") —
     /// ein ETB-Text ist ein Führungsnachweis und darf nicht davon abhängen, welches
@@ -54,11 +55,6 @@ impl Sachgebiet {
             Sachgebiet::S5 => "Presse- und Medienarbeit",
             Sachgebiet::S6 => "Information und Kommunikation",
         }
-    }
-
-    /// Kurzform für Texte: „S2 Lage".
-    pub fn kurz_mit_label(&self) -> String {
-        format!("{} {}", self.as_str().to_uppercase(), self.label())
     }
 }
 
@@ -132,9 +128,9 @@ pub struct LagebesprechungAnzeige {
 /// Zeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu
 /// schicken hiesse, „nicht vergeben" als Datensatz zu erfinden.
 ///
-/// `naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**, damit der
-/// Countdown auf beiden Fahrzeugschirmen live ist, obwohl der Einsatzkopf FE-seitig im
-/// `NICHT_LIVE`-Fach bleibt (Entscheidung 11). Kein zweiter Speicherort.
+/// `naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**
+/// (Entscheidung 11). Kein zweiter Speicherort: ändert sich der Termin, frischt das
+/// Live-Ereignis `einsatz` Kopf und Stab-Anzeige gemeinsam auf (LFH-555).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct StabAnzeige {
     pub besetzung: Vec<StabsfunktionAnzeige>,

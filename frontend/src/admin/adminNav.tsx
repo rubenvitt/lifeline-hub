@@ -10,6 +10,7 @@ import EtbBausteineTab from '../stammdaten/EtbBausteineTab';
 import EinheitTypenTab from '../stammdaten/EinheitTypenTab';
 import OrganisationTab from '../stammdaten/OrganisationTab';
 import SprechgruppenTab from '../stammdaten/SprechgruppenTab';
+import FuehrungsfunktionenTab from '../stammdaten/FuehrungsfunktionenTab';
 import AnzeigeEinstellungen from '../pages/einstellungen/AnzeigeEinstellungen';
 import EinsatzDefaults from '../pages/einstellungen/EinsatzDefaults';
 import Anmeldeverfahren from '../pages/einstellungen/Anmeldeverfahren';
@@ -55,6 +56,11 @@ export const adminGruppen: AdminGruppe[] = [
       { key: 'einheit-typen', label: 'Einheitstypen', element: <EinheitTypenTab /> },
       { key: 'organisation', label: 'Organisation', element: <OrganisationTab /> },
       { key: 'sprechgruppen', label: 'Sprechgruppen', element: <SprechgruppenTab /> },
+      {
+        key: 'fuehrungsfunktionen',
+        label: 'Führungsfunktionen',
+        element: <FuehrungsfunktionenTab />,
+      },
     ],
   },
   {

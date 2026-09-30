@@ -56,8 +56,9 @@ export const EINSATZ_KEYS = {
   abloesungen: 'einsatz-abloesungen',
   betreuung: 'einsatz-betreuung',
   verpflegung: 'einsatz-verpflegung',
-  // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
+  // Einsatzkopf, live über das `einsatz`-Ereignis (LFH-555).
   einsatz: 'einsatz',
+  // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einstellungen: 'einsatz-einstellungen',
   mitglieder: 'einsatz-mitglieder',
   sprechgruppen: 'einsatz-sprechgruppen',
@@ -160,7 +161,15 @@ export const EINSATZ_STREAM_EVENTS = {
   lage_snapshot: [EINSATZ_KEYS.lageSnapshot],
   // Führungsorganisation (Besetzung S1–S6, Lagebesprechungen). Die Lagebesprechungs-Historie hängt
   // als Sub-Key unter DEMSELBEN Prefix, sonst entstünde die Lücke der Detail-Keys oben.
-  stab: [EINSATZ_KEYS.stab],
+  // Aufträge und Erinnerungen an ein Sachgebiet lösen zur Lesezeit auf die Besetzung auf
+  // (LFH-549): ein Besetzungswechsel ändert ihre Anzeige. Beide sind gezählte Listen, deshalb geht
+  // der Modulzähler mit (Regel aus `queryKeys.test.ts`), auch wenn sich die Zahl hier nicht ändert.
+  stab: [
+    EINSATZ_KEYS.stab,
+    EINSATZ_KEYS.auftraege,
+    EINSATZ_KEYS.erinnerungen,
+    EINSATZ_KEYS.modulZaehler,
+  ],
   // Der ETB-Nachweis kommt über das eigene `etb`-Ereignis.
   dokument: [EINSATZ_KEYS.dokumente],
   // Schichten und Rhythmus-Vorgaben hängen unter EINEM Prefix (Sub-Keys 'liste'/'vorgaben'). Trägt
@@ -172,6 +181,11 @@ export const EINSATZ_STREAM_EVENTS = {
   // Zeitfenster samt Deckung und Ausgaben unter EINEM Prefix. Kein Fan-out von `nachforderung`:
   // das DTO trägt nur die Kennung.
   verpflegung: [EINSATZ_KEYS.verpflegung],
+  // Einsatzkopf (LFH-555). Der Stab-GET liefert den Termin der nächsten Lagebesprechung aus
+  // derselben Spalte mit (LFH-46, Entscheidung 11), deshalb hängt er hier mit dran: eine
+  // Terminwahrheit, zwei Caches. Die benutzerbezogenen Kopffelder (`meine_*`) und
+  // `lagekennzahlen` lösen das Ereignis nicht aus; sie werden beim nächsten Abruf frisch.
+  einsatz: [EINSATZ_KEYS.einsatz, EINSATZ_KEYS.stab],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -181,7 +195,8 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  * `queryKeys.guard.test.ts` verlangt, dass jeder Key aus {@link EINSATZ_KEYS} entweder in
  * {@link EINSATZ_STREAM_EVENTS} auftaucht ODER hier steht.
  *
- * - `einsatz`/`einstellungen`/`mitglieder`/`sprechgruppen`: selten geändert, kein Live-Event.
+ * - `einstellungen`/`mitglieder`/`sprechgruppen`: selten geändert, kein Live-Event. Der
+ *   Einsatzkopf `einsatz` ist seit LFH-555 live.
  * - `uhsDetail`/`person`/`personAudit`/`tier`/`schaden`: Singular-Detail-Keys, die der
  *   Listen-Prefix-Match nicht erreicht.
  * - `modulOverrides`: das Backend kennt kein LiveEvent dafür (`LiveEvent::ALLE`); ein Override
@@ -196,7 +211,6 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  *   `etb` zöge ihn das `etb`-Ereignis per Präfix mit.
  */
 export const NICHT_LIVE_KEYS = [
-  EINSATZ_KEYS.einsatz,
   EINSATZ_KEYS.einstellungen,
   EINSATZ_KEYS.mitglieder,
   EINSATZ_KEYS.sprechgruppen,
@@ -452,6 +466,9 @@ export const GLOBAL_KEYS = {
   einheitTypen: 'einheit-typen',
   etbBausteine: 'etb-bausteine',
   stichwortVorschlaege: 'stichwort-vorschlaege',
+  // Katalog der Führungsfunktionen mit Mandantenlabels (LFH-549). Nicht im Lagebild: gelesen
+  // werden Snapshot und Auflösung, die im Auftrag stecken.
+  fuehrungsfunktionen: 'fuehrungsfunktionen',
 
   // Instanz / Betrieb — NICHT mandantenbezogen
   adminKarte: 'admin-karte',
@@ -524,6 +541,7 @@ export const globalKeys = {
   einheitTypen: () => [GLOBAL_KEYS.einheitTypen] as const,
   etbBausteine: () => [GLOBAL_KEYS.etbBausteine] as const,
   stichwortVorschlaege: () => [GLOBAL_KEYS.stichwortVorschlaege] as const,
+  fuehrungsfunktionen: () => [GLOBAL_KEYS.fuehrungsfunktionen] as const,
 
   // Dienstfilter-Listen: barer Prefix (= Invalidierung beider Fächer) + adressiertes Fach
   personal: () => [GLOBAL_KEYS.personal] as const,
@@ -576,7 +594,8 @@ export const globalKeys = {
  * Fahrzeugstatus-Katalog). Von den Meldungen nur die Rückmeldungen, nicht die Liste.
  *
  * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit, Chat, Dokumente,
- * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys.
+ * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys, der
+ * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst).
  * `lagebildOffline.guard.test.ts` vergleicht die Liste mit JEDEM verwalteten Prefix.
  */
 export const LAGEBILD_OFFLINE = {

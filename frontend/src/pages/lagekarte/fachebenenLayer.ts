@@ -20,11 +20,19 @@ const IST_EINZEL = ['all', ['!', ['has', 'point_count']], ['!', ['has', 'sammelp
  */
 const BUENDEL_RADIUS = ['step', ['get', 'anzahl'], 12, 10, 15, 100, 18, 1000, 22, 10000, 26];
 
-/** Idempotent: Source + (Polygon: fill/line | Punkt: circle)-Layer je Fachebene. */
+/** Ein Feature darf seine Farbe selbst mitbringen (`hochwasserStil.ts`); sonst die Ebenenfarbe. */
+const punktFarbe = (farbe: string) => ['coalesce', ['get', 'farbe'], farbe];
+
+/**
+ * Idempotent: Source + (Polygon: fill/line | Punkt: circle)-Layer je Fachebene. `farbe` ist die
+ * Ebenenfarbe des aktiven Modus (`fachebeneFarbe`, LFH-593); an schon bestehenden Layern wird sie
+ * nachgezogen, denn ein Moduswechsel ohne neuen Kartenstil legt keinen Layer neu an.
+ */
 export function sorgeFuerFachebeneLayer(
   map: MapLibreMap,
   def: FachebeneDef,
   daten: FeatureCollection,
+  farbe: string,
 ) {
   const src = fachebeneSourceId(def.key);
   if (!map.getSource(src)) {
@@ -58,7 +66,7 @@ export function sorgeFuerFachebeneLayer(
         type: 'fill',
         source: src,
         filter: ['==', ['geometry-type'], 'Polygon'],
-        paint: { 'fill-color': def.farbe, 'fill-opacity': 0.2 },
+        paint: { 'fill-color': farbe, 'fill-opacity': 0.2 },
       });
     }
     if (!map.getLayer(`fachebene-${def.key}-line`)) {
@@ -67,7 +75,7 @@ export function sorgeFuerFachebeneLayer(
         type: 'line',
         source: src,
         filter: ['==', ['geometry-type'], 'Polygon'],
-        paint: { 'line-color': def.farbe, 'line-width': 1.5 },
+        paint: { 'line-color': farbe, 'line-width': 1.5 },
       });
     }
   } else {
@@ -78,7 +86,7 @@ export function sorgeFuerFachebeneLayer(
         source: src,
         filter: IST_BUENDEL as never,
         paint: {
-          'circle-color': def.farbe,
+          'circle-color': farbe,
           'circle-radius': BUENDEL_RADIUS as never,
           'circle-stroke-color': farbenHell.flaeche,
           'circle-stroke-width': 2,
@@ -124,12 +132,29 @@ export function sorgeFuerFachebeneLayer(
           // Ein Feature darf Durchmesser und Farbe selbst mitbringen (`hochwasserStil.ts` backt die
           // aufgelösten Tokenwerte ein). Ohne Eigenangabe gilt die Ebenenfarbe.
           'circle-radius': ['coalesce', ['get', 'radius'], 5],
-          'circle-color': ['coalesce', ['get', 'farbe'], def.farbe],
+          'circle-color': punktFarbe(farbe) as never,
           'circle-stroke-color': '#fff',
           'circle-stroke-width': 1.5,
         },
       });
     }
+  }
+  zieheEbenenfarbeNach(map, def.key, farbe);
+}
+
+/**
+ * Setzt die Ebenenfarbe an jedem vorhandenen Layer der Ebene. Frisch angelegte tragen sie schon;
+ * MapLibre verwirft einen unveränderten Wert selbst, der Aufruf ist also billig.
+ */
+function zieheEbenenfarbeNach(map: MapLibreMap, key: FachebeneQuelle, farbe: string) {
+  const ziele: [string, 'fill-color' | 'line-color' | 'circle-color', unknown][] = [
+    [`fachebene-${key}-fill`, 'fill-color', farbe],
+    [`fachebene-${key}-line`, 'line-color', farbe],
+    [`fachebene-${key}-buendel`, 'circle-color', farbe],
+    [`fachebene-${key}-circle`, 'circle-color', punktFarbe(farbe)],
+  ];
+  for (const [id, eigenschaft, wert] of ziele) {
+    if (map.getLayer(id)) map.setPaintProperty(id, eigenschaft, wert as never);
   }
 }
 

@@ -47,6 +47,7 @@ import FreiesZeichenPicker from './FreiesZeichenPicker';
 import MarkerSuche from './MarkerSuche';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
 import FachebeneStand from './FachebeneStand';
+import { fachebeneFarbe } from '../../theme/statusFarben';
 import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
 import { istLatLon, type KoordinatenWert } from '../../anzeige/koordinatenWert';
@@ -1051,7 +1052,11 @@ export default function Sidebar(props: SidebarProps) {
                       den die Karte nicht kennt, steht unter dem Namen ihre Legende (LFH-592). Das
                       Quadrat bleibt unsichtbar als Platzhalter, damit die Namen bündig stehen. */}
                   <span
-                    style={def.klassenfarben ? { visibility: 'hidden' } : { color: def.farbe }}
+                    style={
+                      def.klassenfarben
+                        ? { visibility: 'hidden' }
+                        : { color: fachebeneFarbe(key, token) }
+                    }
                     aria-hidden="true"
                   >
                     ■

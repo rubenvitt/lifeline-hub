@@ -30,6 +30,10 @@ pub struct EmpfaengerEingabeReq {
     pub person_id: Option<i64>,
     pub fahrzeug_id: Option<i64>,
     pub funktion_text: Option<String>,
+    /// Katalogcode bei `empfaenger_typ = 'funktion'` (LFH-549); `funktion_text` ist dann die
+    /// Bezeichnung (Führungshilfspersonal/Fachberater) oder leer.
+    #[serde(default)]
+    pub funktion: Option<String>,
     pub extern_kategorie: Option<String>,
     pub extern_bezeichnung: Option<String>,
 }
@@ -64,7 +68,8 @@ async fn validiere_empfaenger(
         req.einheit_id.is_some(),
         req.person_id.is_some(),
         req.fahrzeug_id.is_some(),
-        trimme(&req.funktion_text).is_some(),
+        // Der Funktions-Slot ist belegt durch Code ODER Text (Code + Bezeichnung zählt einmal).
+        trimme(&req.funktion_text).is_some() || trimme(&req.funktion).is_some(),
         trimme(&req.extern_bezeichnung).is_some(),
     ]
     .iter()
@@ -137,7 +142,7 @@ async fn validiere_empfaenger(
             EMPF_FAHRZEUG
         }
         EMPF_FUNKTION => {
-            if trimme(&req.funktion_text).is_none() {
+            if trimme(&req.funktion_text).is_none() && trimme(&req.funktion).is_none() {
                 return Err(AppError::Validation("funktion_text fehlt".into()));
             }
             EMPF_FUNKTION
@@ -157,6 +162,27 @@ async fn validiere_empfaenger(
         _ => return Err(AppError::Validation("Ungültiger Empfänger-Typ".into())),
     };
 
+    // Katalogcode und Text in ihrer Doppelrolle (LFH-549). Nur am Funktionsempfänger; ein
+    // Code an einem anderen Typ ist ein zweites Ziel und oben schon als solches abgewiesen.
+    let angabe = if typ == EMPF_FUNKTION {
+        let s7_aktiv = {
+            let mut conn = pool.acquire().await?;
+            crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut conn, einsatz_id)
+                .await?
+                .s7_aktiv
+        };
+        crate::fuehrung::pruefe_funktion(
+            req.funktion.as_deref(),
+            req.funktion_text.as_deref(),
+            s7_aktiv,
+        )?
+    } else {
+        crate::fuehrung::Funktionsangabe {
+            funktion: None,
+            text: trimme(&req.funktion_text).map(str::to_string),
+        }
+    };
+
     let ist_extern = typ == EMPF_EXTERN;
     Ok(repo::EmpfaengerEingabe {
         empfaenger_typ: typ.to_string(),
@@ -164,7 +190,8 @@ async fn validiere_empfaenger(
         einheit_id: req.einheit_id,
         person_id: req.person_id,
         fahrzeug_id: req.fahrzeug_id,
-        funktion_text: trimme(&req.funktion_text).map(str::to_string),
+        funktion_text: angabe.text,
+        funktion: angabe.funktion,
         // extern_* nur bei externem Adressat übernehmen (sonst verirrte Werte an anderen Typen).
         extern_kategorie: ist_extern
             .then(|| trimme(&req.extern_kategorie).map(str::to_string))

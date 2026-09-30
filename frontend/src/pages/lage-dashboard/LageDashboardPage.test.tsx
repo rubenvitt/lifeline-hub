@@ -13,7 +13,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
 import { setzeLiveStatusFuerTest } from '../../live/liveStatusStore';
 import LageDashboardPage from './LageDashboardPage';
-import type { Auftrag, EtbEintragAnzeige, GefahrBewertung, Meldung } from '../../api/types';
+import type { EtbEintragAnzeige, GefahrBewertung } from '../../api/types';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
 import { leseZuletztModule } from '../../einsatz/zuletztModule';
@@ -60,75 +60,6 @@ const person = (
   aktuelle_uhs_id: null,
   aktueller_platz_id: null,
   ...extra,
-});
-
-const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
-  id: Math.floor(Math.random() * 1e9),
-  einsatz_id: 1,
-  auftrag_text: 'Deich sichern',
-  absicht: null,
-  lage: null,
-  ort: null,
-  zeit: null,
-  mittel: null,
-  verbindung: null,
-  sicherheit: null,
-  prioritaet: 'normal',
-  richtung: 'intern',
-  frist_at: null,
-  erteilt_at: '2026-06-11 09:00:00',
-  in_arbeit_at: null,
-  vollzugsmeldung: null,
-  abgenommen_at: null,
-  abgenommen_von_id: null,
-  etb_anordnung_id: 5,
-  quell_etb_eintrag_id: null,
-  erstellt_von_id: 1,
-  erstellt_at: '2026-06-11 09:00:00',
-  vollzug_status: 'offen',
-  vollzogen_at: null,
-  vollzogen_von_id: null,
-  empfaenger_anzahl: 1,
-  quittiert_anzahl: 0,
-  ist_ueberfaellig: false,
-  bearbeitungsstatus: 'offen',
-  empfaenger: [],
-  ...over,
-});
-
-const meldung = (over: Partial<Meldung> = {}): Meldung => ({
-  id: Math.floor(Math.random() * 1e9),
-  einsatz_id: 1,
-  lfd_nr: 1,
-  absender: 'Trupp 1',
-  empfaenger: null,
-  meldeweg: 'funk',
-  inhalt: 'Deich instabil',
-  meldungsart: 'lagemeldung',
-  prioritaet: 'normal',
-  richtung: 'intern',
-  status: 'neu',
-  bearbeiter_id: null,
-  bearbeiter_name: null,
-  lagerelevant: false,
-  ereigniszeit: '2026-06-11 09:00:00',
-  eingang_at: '2026-06-11 09:00:00',
-  etb_meldung_id: null,
-  auftrag_id: null,
-  erfasst_von_id: 1,
-  erstellt_at: '2026-06-11 09:00:00',
-  lage_meldung_id: null,
-  ist_offen: true,
-  erledigt_at: null,
-  bestaetigung_pflicht: false,
-  bestaetigung_frist_at: null,
-  eskaliert: false,
-  bestaetigt_at: null,
-  bestaetigt_von_id: null,
-  bestaetigt_von_name: null,
-  ist_bestaetigt: false,
-  ist_ueberfaellig: false,
-  ...over,
 });
 
 const etb = (lfd: number, over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeige => ({
@@ -198,8 +129,8 @@ interface Daten {
   fahrzeuge?: unknown[];
   material?: unknown[];
   abschnitte?: unknown[];
-  auftraege?: unknown[];
-  meldungen?: unknown[];
+  /** Antwort des Modulzählers (Aufträge, Meldungen; LFH-550). Vorgabe: beide erlaubt, alles 0. */
+  zaehler?: Record<string, unknown>;
   etb?: EtbEintragAnzeige[];
   gefahrenStatus?: number;
   personenStatus?: number;
@@ -260,8 +191,14 @@ function mockEndpunkte(d: Daten) {
     http.get('/api/einsaetze/1/fahrzeuge', () => json(d.fahrzeuge)),
     http.get('/api/einsaetze/1/material', () => json(d.material)),
     http.get('/api/einsaetze/1/abschnitte', () => json(d.abschnitte)),
-    http.get('/api/einsaetze/1/auftraege', () => json(d.auftraege)),
-    http.get('/api/einsaetze/1/meldungen', () => json(d.meldungen)),
+    http.get('/api/einsaetze/1/modul-zaehler', () =>
+      HttpResponse.json(
+        d.zaehler ?? {
+          auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
+          meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+        },
+      ),
+    ),
     http.get('/api/einsaetze/1/etb', () =>
       d.etbStatus ? new HttpResponse(null, { status: d.etbStatus }) : json(d.etb),
     ),
@@ -1273,17 +1210,10 @@ describe('LageDashboardPage — Meldungsstrom', () => {
 describe('LageDashboardPage — Führungsstand', () => {
   const FUEHRUNG = 'Führungsstand';
 
-  it('zählt offene Aufträge und hält Überfällige als Alarm fest — auch vollzogene', async () => {
-    // `ist_ueberfaellig` ist vom Bearbeitungsstatus unabhängig (src/auftrag/repo.rs): ein
-    // vollzogener Auftrag mit abgelaufener Frist bleibt ein Alarmbeitrag.
-    mockEndpunkte({
-      auftraege: [
-        auftrag({ bearbeitungsstatus: 'offen' }),
-        auftrag({ bearbeitungsstatus: 'in_arbeit' }),
-        auftrag({ bearbeitungsstatus: 'vollzogen', ist_ueberfaellig: true }),
-        auftrag({ bearbeitungsstatus: 'abgenommen' }),
-      ],
-    });
+  // Aufträge und Meldungen kommen aus dem Modulzähler (LFH-550), nicht aus den Listen: dieselbe
+  // Zahl wie im Modulpanel. „Überfällig" heißt „davon überfällig".
+  it('zeigt offene Aufträge aus dem Modulzähler, überfällige mit Alarmkante', async () => {
+    mockEndpunkte({ zaehler: { auftraege: { offen: 2, in_arbeit: 1, ueberfaellig: 1 } } });
     render();
     await kennzahlGeladen('Betroffene');
     const zelle = await waitFor(() => {
@@ -1295,31 +1225,59 @@ describe('LageDashboardPage — Führungsstand', () => {
     expect(kante(zelle)).toBe(6);
   });
 
-  it('zählt offene und neue Meldungen, überfällige mit Alarmkante', async () => {
+  it('zeigt offene und neue Meldungen; Bestätigung überfällig trägt die Alarmkante', async () => {
     mockEndpunkte({
-      meldungen: [
-        meldung({ status: 'neu', ist_offen: true }),
-        meldung({ status: 'gesichtet', ist_offen: true, ist_ueberfaellig: true }),
-        meldung({ status: 'erledigt', ist_offen: false }),
-      ],
+      zaehler: { meldungen: { offen: 2, ungesehen: 1, bestaetigung_ueberfaellig: 1 } },
     });
     render();
     await kennzahlGeladen('Betroffene');
     const zelle = await waitFor(() => {
       const z = kennzahl('Meldungen offen', FUEHRUNG);
-      expect(z).toHaveTextContent('1 neu · 1 überfällig');
+      expect(z).toHaveTextContent('1 neu · 1 Bestätigung überfällig');
       return z;
     });
     expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('2');
     expect(kante(zelle)).toBe(6);
   });
 
+  it('ein nicht freigegebenes Modul sagt das und zeigt keine 0', async () => {
+    mockEndpunkte({ zaehler: { auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 } } });
+    render();
+    await kennzahlGeladen('Betroffene');
+    const zelle = await waitFor(() => {
+      const z = kennzahl('Meldungen offen', FUEHRUNG);
+      expect(z).toHaveTextContent('nicht freigegeben');
+      return z;
+    });
+    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('—');
+    expect(zelle.querySelector('a')).toBeNull();
+  });
+
+  it('lädt keine Auftrags- oder Meldungsliste', async () => {
+    const listen: string[] = [];
+    mockEndpunkte({});
+    server.use(
+      http.get('/api/einsaetze/1/auftraege', () => {
+        listen.push('auftraege');
+        return HttpResponse.json([]);
+      }),
+      http.get('/api/einsaetze/1/meldungen', () => {
+        listen.push('meldungen');
+        return HttpResponse.json([]);
+      }),
+    );
+    render();
+    await kennzahlGeladen('Betroffene');
+    await waitFor(() => expect(kennzahl('Aufträge offen', FUEHRUNG)).toHaveTextContent('keiner'));
+    expect(listen).toEqual([]);
+  });
+
   it('während der Einsatz-Abruf hängt, behauptet der Führungsstand keinen Stand', async () => {
-    // Die Aufträge-Abfrage löst auf, der Einsatz hängt: ohne Lagebild darf keine Zelle „0" melden.
-    mockEndpunkte({ einsatzLaedt: true, auftraege: [auftrag({ id: 1 })] });
+    // Der Zähler löst auf, der Einsatz hängt: ohne Lagebild darf keine Zelle „0" melden.
+    mockEndpunkte({ einsatzLaedt: true });
     const { client } = render();
     await waitFor(() =>
-      expect(client.getQueryState(einsatzKeys.auftraege(1))?.status).toBe('success'),
+      expect(client.getQueryState(einsatzKeys.modulZaehler(1))?.status).toBe('success'),
     );
     for (const z of zellen(FUEHRUNG)) expect(z).toHaveTextContent('wird abgerufen');
   });

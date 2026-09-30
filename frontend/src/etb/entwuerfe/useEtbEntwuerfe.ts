@@ -27,6 +27,7 @@ function leererEntwurf(
 /** Der Aufrufer montiert je Einsatz neu (key=einsatzId). */
 export function useEtbEntwuerfe(
   einsatzId: number,
+  /** Vorbelegung „An“ nach der Vorrangregel (`fuehrung/funktionsOptionenKern.ts:anVorbelegung`). */
   fuehrungsstelle?: string | null,
   kontextLaedt = false,
 ) {

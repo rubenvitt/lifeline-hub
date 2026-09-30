@@ -27,15 +27,18 @@ for (const breite of [1280, 390]) {
       .getByRole('button', { name: `Führungsstelle für ${ich.anzeigename} bearbeiten` })
       .click();
     const dialog = page.getByRole('dialog');
-    await expect(
-      dialog.getByRole('textbox', { name: 'Führungsstelle', exact: true }),
-    ).toBeFocused();
+    // Seit LFH-549 eine Auswahl mit EINEM Wert: Katalogwahl oder Freitext.
+    const feld = dialog.getByRole('combobox', { name: 'Führungsstelle', exact: true });
+    await expect(feld).toBeFocused();
     expect(
       await dialog
         .getByRole('button', { name: 'Speichern', exact: true })
         .evaluate((knopf) => knopf.closest('form') !== null),
     ).toBe(true);
-    await dialog.getByRole('textbox', { name: 'Führungsstelle', exact: true }).fill('Florian A');
+    await feld.fill('Florian A');
+    // Enter übernimmt den Freitext in die Auswahl; gesendet wird über den Knopf im <form> (ein
+    // Select schluckt Enter, Erfassungs-Norm).
+    await feld.press('Enter');
     await page.screenshot({
       path: testInfo.outputPath('fuehrungsstelle-pflegen.png'),
       animations: 'disabled',
@@ -57,7 +60,7 @@ for (const breite of [1280, 390]) {
       await route.continue();
     });
     try {
-      await dialog.getByRole('textbox', { name: 'Führungsstelle', exact: true }).press('Enter');
+      await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
       await expect(dialog).not.toBeVisible();
       await expect(
         page.getByRole('button', { name: `Führungsstelle für ${ich.anzeigename} bearbeiten` }),

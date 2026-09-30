@@ -4,6 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import AuftragFormular from './AuftragFormular';
 
+// Katalog und Besetzung stehen fest, statt über das Netz zu kommen (LFH-549).
+vi.mock('../fuehrung/useFunktionsVorschlaege', async () => ({
+  useFunktionsVorschlaege: (await import('../test/fuehrungsfunktionen')).vorschlaegeFuer,
+}));
+
 /** Die sieben SKK-Schemafelder hinter dem Collapse. */
 const SKK = [
   'Absicht / Ziel',
@@ -87,6 +92,59 @@ describe('AuftragFormular — Feldbudget (LFH-343 · C8, Befund H49)', () => {
     expect(onAnlegen).toHaveBeenCalledWith(
       expect.objectContaining({
         empfaenger: [{ empfaenger_typ: 'abschnitt', abschnitt_id: 1 }],
+      }),
+    );
+  });
+});
+
+describe('AuftragFormular — Funktionskatalog (LFH-549)', () => {
+  it('macht aus der Wahl „S3 – Einsatz“ einen Katalogempfänger', async () => {
+    const onAnlegen = vi.fn();
+    rendern({ onAnlegen, einsatzId: 7 });
+
+    await userEvent.click(screen.getByLabelText('Empfänger'));
+    await userEvent.click(await screen.findByTitle('S3 – Einsatz'));
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({ empfaenger: [{ empfaenger_typ: 'funktion', funktion: 's3' }] }),
+    );
+  });
+
+  it('zeigt die Besetzung im Vorschlag', async () => {
+    rendern({ einsatzId: 7 });
+    await userEvent.click(screen.getByLabelText('Empfänger'));
+    expect(await screen.findByTitle('S2 – Lage (Müller)')).toBeInTheDocument();
+  });
+
+  it('lässt getipptes „S3“ + Enter Freitext bleiben, auch mit Katalog', async () => {
+    const onAnlegen = vi.fn();
+    rendern({ onAnlegen, einsatzId: 7 });
+
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'S3' }],
+      }),
+    );
+  });
+
+  it('bietet „Fachberater: <Tipptext>“ als ausdrückliche Wahl an', async () => {
+    const onAnlegen = vi.fn();
+    rendern({ onAnlegen, einsatzId: 7 });
+
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'THW');
+    await userEvent.click(await screen.findByTitle('Fachberater: THW'));
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Beraten');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        empfaenger: [{ empfaenger_typ: 'funktion', funktion: 'fachberater', funktion_text: 'THW' }],
       }),
     );
   });
