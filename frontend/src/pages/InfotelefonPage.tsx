@@ -12,6 +12,7 @@ import type { InfotelefonAnruf, InfotelefonStatus } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { HERVORGEHOBEN } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import {
   Kennzahl,
   Paneel,
@@ -77,6 +78,9 @@ export default function InfotelefonPage() {
   // Zufluss-Schleuse (Muster ETB-Zeitachse): eingefroren, solange der Fokus in der Liste liegt.
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
   const listeRef = useRef<HTMLDivElement>(null);
+  // Die Erfassung hängt angepinnt am Fuß: ihre Höhe hält den Fokus der Zeitachse frei
+  // (WCAG 2.4.11, dieselbe Regel wie im ETB, `index.css`).
+  const erfassungRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ETB);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -184,7 +188,7 @@ export default function InfotelefonPage() {
       }
       fuss={
         darfSchreiben ? (
-          <div className="etb-erfassung-sticky">
+          <div ref={erfassungRef} className="etb-erfassung-sticky">
             <AnrufErfassung
               onErfassen={(e) => erfassenMutation.mutateAsync(e)}
               laeuft={erfassenMutation.isPending}

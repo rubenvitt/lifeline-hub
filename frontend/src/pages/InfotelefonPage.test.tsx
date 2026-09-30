@@ -136,4 +136,15 @@ describe('InfotelefonPage (LFH-554)', () => {
     await screen.findByText('Sperrung B 3');
     expect(screen.queryByRole('button', { name: 'Erfassen' })).toBeNull();
   });
+
+  it('hält den Fokus der Zeitachse frei von der angepinnten Erfassung', async () => {
+    // Ohne den Abstand rollte ein Tab die Ziele der Zeitachse hinter die Leiste (WCAG 2.4.11).
+    const { unmount } = setup();
+    await screen.findByRole('button', { name: 'Erfassen' });
+    expect(document.documentElement.style.getPropertyValue('--lfh-etb-fokusabstand')).toMatch(
+      /^\d+(\.\d+)?px$/,
+    );
+    unmount();
+    expect(document.documentElement.style.getPropertyValue('--lfh-etb-fokusabstand')).toBe('');
+  });
 });

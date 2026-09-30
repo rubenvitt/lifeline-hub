@@ -57,13 +57,15 @@ import { medienkontaktStatus, pressemitteilungStatus } from '../theme/statusFarb
  *
  * - **Ort:** Unterroute des Stabs, Einstieg aus der S5-Zeile. Kein Modul; die Seite prüft die
  *   Stab-Freigabe selbst (`useStabFreigabe`, D1).
- * - **Medienlage:** oben, abgeleitet aus denselben Listen wie die Paneele darunter, ohne
- *   Personenbezug (`stab/medienlage.ts`, D7).
+ * - **Presse-Log:** oben, weil hier gearbeitet wird und „offene Anfragen“ ins erste Bild gehört.
+ *   Karten, weil die Frage „was ist mit diesem?“ lautet (D6). Der Status wird an der
+ *   Statusanzeige gewechselt; „beantwortet“ öffnet die Antwortmaske, weil der Übergang die Antwort
+ *   verlangt. Jede Rücknahme nach „offen“ ist möglich, deshalb keine Rückfrage, sondern ein
+ *   Rückgängig-Toast (LFH-343).
  * - **Pressemitteilungen:** Kettenköpfe wie beim Lagebericht; der Titel führt auf die Detailseite.
- * - **Presse-Log:** Karten, weil die Frage „was ist mit diesem?“ lautet (D6). Der Status wird an
- *   der Statusanzeige gewechselt; „beantwortet“ öffnet die Antwortmaske, weil der Übergang die
- *   Antwort verlangt. Jede Rücknahme nach „offen“ ist möglich, deshalb keine Rückfrage, sondern
- *   ein Rückgängig-Toast (LFH-343).
+ * - **Medienlage:** unten, abgeleitet aus denselben Listen wie die Paneele darüber, ohne
+ *   Personenbezug (`stab/medienlage.ts`, D7). Sie wächst live, deshalb steht sie unter der
+ *   Arbeitsliste und nicht darüber.
  */
 
 type Sicht = 'alle' | 'offen';
@@ -316,46 +318,8 @@ export default function PressePage() {
       hinweis={<RechteHinweis sichtbar={!darfSchreiben} text={presseRechteText(einsatz.status)} />}
     >
       <Flex vertical gap={token.margin}>
-        <Paneel titel="Medienlage" meta="ohne Personenbezug" koerperPolster>
-          <Markdown variante="dokument" unterEbene={2}>
-            {medienlageText}
-          </Markdown>
-        </Paneel>
-
-        <Paneel titel="Pressemitteilungen" meta={`${freigegeben.length} freigegeben`}>
-          <Liste
-            dataSource={ketten}
-            rowKey={(k) => k.kopf.id}
-            loading={mitteilungenQuery.isLoading}
-            emptyText="Noch keine Pressemitteilung"
-            renderItem={(k) => (
-              <ListenEintrag>
-                <ListenEintragMeta
-                  title={
-                    <Space wrap>
-                      <Link
-                        to={pressemitteilungPfad(einsatzId, k.kopf.id)}
-                        style={stabZeilenzielStil(token)}
-                      >
-                        {k.kopf.titel}
-                      </Link>
-                      <StatusTag darstellung={pressemitteilungStatus[k.kopf.status]} />
-                    </Space>
-                  }
-                  description={
-                    <span>
-                      {mitteilungVorlage(k.kopf.vorlage)?.label ?? k.kopf.vorlage}
-                      {` · v${k.kopf.version} · `}
-                      <ZeitAnzeige wert={k.kopf.freigegeben_at ?? k.kopf.zeitstand} />
-                      {k.vorgaenger.length > 0 && ` · ${k.vorgaenger.length} frühere Fassungen`}
-                    </span>
-                  }
-                />
-              </ListenEintrag>
-            )}
-          />
-        </Paneel>
-
+        {/* Die Arbeitsliste steht oben: was darunter live wächst (Pressemitteilungen, Medienlage),
+            schiebt sie nicht weg (Prüfliste, Kriterium 12). */}
         <Paneel titel="Presse-Log">
           <Flex vertical gap={token.marginSM} style={{ padding: token.paddingSM }}>
             <Kennzahl
@@ -427,6 +391,45 @@ export default function PressePage() {
             )}
             {statusMutation.error != null && <SpeicherFehler fehler={statusMutation.error} />}
           </Flex>
+        </Paneel>
+        <Paneel titel="Pressemitteilungen" meta={`${freigegeben.length} freigegeben`}>
+          <Liste
+            dataSource={ketten}
+            rowKey={(k) => k.kopf.id}
+            loading={mitteilungenQuery.isLoading}
+            emptyText="Noch keine Pressemitteilung"
+            renderItem={(k) => (
+              <ListenEintrag>
+                <ListenEintragMeta
+                  title={
+                    <Space wrap>
+                      <Link
+                        to={pressemitteilungPfad(einsatzId, k.kopf.id)}
+                        style={stabZeilenzielStil(token)}
+                      >
+                        {k.kopf.titel}
+                      </Link>
+                      <StatusTag darstellung={pressemitteilungStatus[k.kopf.status]} />
+                    </Space>
+                  }
+                  description={
+                    <span>
+                      {mitteilungVorlage(k.kopf.vorlage)?.label ?? k.kopf.vorlage}
+                      {` · v${k.kopf.version} · `}
+                      <ZeitAnzeige wert={k.kopf.freigegeben_at ?? k.kopf.zeitstand} />
+                      {k.vorgaenger.length > 0 && ` · ${k.vorgaenger.length} frühere Fassungen`}
+                    </span>
+                  }
+                />
+              </ListenEintrag>
+            )}
+          />
+        </Paneel>
+
+        <Paneel titel="Medienlage" meta="ohne Personenbezug" koerperPolster>
+          <Markdown variante="dokument" unterEbene={2}>
+            {medienlageText}
+          </Markdown>
         </Paneel>
       </Flex>
 
