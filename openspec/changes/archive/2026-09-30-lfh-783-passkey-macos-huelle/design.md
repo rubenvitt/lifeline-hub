@@ -3,7 +3,7 @@
 ## Kontext
 
 LFH-128 Phase 1, Variante A: Der Tauri-Webview lädt die https-Adresse des Servers. Der Spike
-LFH-720 (`openspec/changes/lfh-720-tauri-huelle-variante-a/design.md`, Abschnitt „Passkey
+LFH-720 (`openspec/changes/archive/2026-09-29-lfh-720-tauri-huelle-variante-a/design.md`, Abschnitt „Passkey
 (macOS)“) hat gemessen:
 
 - `navigator.credentials.get` für RP `elw.local` scheitert im WKWebView nach 4 ms mit

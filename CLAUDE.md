@@ -200,12 +200,12 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   wartet auf `dragend`; in „Größe" Ecken immer, eine Kante nur ohne Überlappung mit Ecke oder
   Kante (`scharfeGriffe`, neu bei `move`/`dragend`/`setzeEcken`, nie im Zug; LFH-764).
 - **Ein Tipp gehört genau einem Ziel** (LFH-764,
-  `openspec/changes/lfh-764-lagekarte-griffe-klickwege/design.md`): jeder Karten-Klickhörer fragt
+  `openspec/changes/archive/2026-09-30-lfh-764-lagekarte-griffe-klickwege/design.md`): jeder Karten-Klickhörer fragt
   `klickzielAm` (`Kartenflaeche.tsx`, ein Urteil je Originalereignis) → `entscheideKlickziel`
   (`pages/lagekarte/klickziel.ts`): gezeichnetes Punktziel > Trefferzone > Fläche. Eine neue
   Klickebene braucht eine Rolle in `ordneKlickebene` (Guard in `klickziel.test.ts`).
   **Mehrere Flächen am Punkt wählt der Mensch** (LFH-812,
-  `openspec/changes/lfh-812-lagekarte-flaechen-auswahlmenue/design.md`): erst entdoppeln (Zone
+  `openspec/changes/archive/2026-09-30-lfh-812-lagekarte-flaechen-auswahlmenue/design.md`): erst entdoppeln (Zone
   über Füllung + Umriss zählt einmal), ab zwei `mehrdeutig` → `FlaechenwahlMenue` am Tipppunkt,
   eigene vor Fachebenen, Kennung aus `flaechenwahl.ts`; Wahl über dieselben Callbacks, aus im
   exklusiven Modus (Prop `flaechenwahl`). Geschlossen wird nur über `onOpenChange`.
@@ -226,7 +226,7 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   Knopfspalte (`fussStil(knopfKante)`) und oben an der Karte; kein `overflow` am Rahmen.
 - **Die Karte kippt nicht** (`touchPitch: false` **und** `maxPitch: 0` in `Kartenflaeche.tsx`).
 - **Unter `lg` gibt jeder Kartenmodus die Karte frei** (LFH-765,
-  `openspec/changes/lfh-765-lagekarte-modi-karte-freigeben/design.md`): abgeleitet aus
+  `openspec/changes/archive/2026-09-30-lfh-765-lagekarte-modi-karte-freigeben/design.md`): abgeleitet aus
   `exklusiverModusAktiv` in `leisteSichtbar` (`lagekarte/leistenWahl.ts`), nie per Aufruf je
   Startweg; nach dem Modus gilt wieder der vorherige Zustand (Entscheidung 29.09.2026).
   „Leiste einblenden" im Modus ist `umschalteImModus` (nie gespeichert). Die Bedienung der
@@ -670,7 +670,7 @@ draußen gelassen werden.
   am Prod-Bundle baut mit `vite build`, nicht mit `pnpm build`: Dessen `tsc -b` bricht an
   einem ungenutzten Import ab, und `dist` bleibt still der alte Stand.
 - **Offen:** die übrigen personenbezogenen Daten auf dem Gerät (LFH-767). Herleitung und
-  Prüfspur: `openspec/changes/lfh-723-lagebild-offline-lesen/design.md`, Prüfliste
+  Prüfspur: `openspec/changes/archive/2026-09-30-lfh-723-lagebild-offline-lesen/design.md`, Prüfliste
   `docs/superpowers/specs/2026-09-28-lfh-723-pruefliste.md`.
 
 ## Frontend — Lint-Disziplin
@@ -711,7 +711,7 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   Admin, Wechsel im selben Kontext). Der Rollenzweig ist VOR der Messung Vorbedingung
   (Hinweis steht, Aktion gesperrt oder abwesend), die Mutationsprobe macht nur den
   Nicht-Admin rot. Freistellungen in Gate 1 nennen die Rolle. Inventar:
-  `openspec/changes/lfh-435-e2e-gates-nicht-privilegiert/pruefliste.md`.
+  `openspec/changes/archive/2026-09-30-lfh-435-e2e-gates-nicht-privilegiert/pruefliste.md`.
 - **e2e wartet nie auf `networkidle`** (LFH-385): der SSE-Strom der Einsatzrouten lässt das Netz
   nie ruhen (parallel rot, `--workers=1` grün). Gewartet wird auf einen Inhaltsanker; Riegel
   `no-restricted-syntax` für `e2e/**` in `frontend/eslint.config.js`.

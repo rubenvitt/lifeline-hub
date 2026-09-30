@@ -62,17 +62,50 @@ Aufruf auf den nativen Druck des Webviews umleiten.
 
 ### Requirement: Neue Fenster und fremde Links laufen nicht ins Leere
 Die Hülle MUST Anfragen nach einem neuen Fenster (`window.open`, `target="_blank"`) behandeln:
-Ziele auf der konfigurierten Origin MUST in der Hülle geöffnet werden, fremde Origins MUST im
-Standardbrowser des Systems geöffnet werden. Eine Hauptframe-Navigation auf eine
-Dateiantwort MUST als Download behandelt werden und MUST die Anwendung nicht ersetzen.
+Ziele auf der Origin des verbundenen Servers MUST in einem weiteren Fenster der Hülle geöffnet
+werden, das dieselbe Sitzung, denselben Druckweg und dieselbe Link-Behandlung hat. Das
+bestehende Fenster MUST dabei erhalten bleiben. Ziele mit `http`, `https`, `mailto` oder `tel`
+auf einer fremden Origin MUST im Standardbrowser bzw. im zuständigen Systemprogramm geöffnet
+werden. Alle anderen Ziele MUST verworfen und ohne Query protokolliert werden.
+
+Eine Navigation oder ein neues Fenster auf eine Dateiroute der eigenen Origin (`/api/…`) MUST
+als Download behandelt werden und MUST die Anwendung nicht ersetzen. Ausgenommen sind die
+Anmelderouten (`/api/auth/…`), die im Fenster laufen MUST. Eine Navigation auf eine fremde
+`http(s)`-Origin im Fenster MUST erlaubt bleiben, weil die Anmeldung beim Identitätsanbieter
+dort stattfindet. `mailto:`- und `tel:`-Navigationen MUST an das Systemprogramm gehen.
+
+Wechselt die Hülle den Server, MUST sie die weiteren Fenster schließen.
 
 #### Scenario: Chat-Anhang mit `target="_blank"`
 - **WHEN** jemand im Chat einen Anhang-Link anklickt
-- **THEN** öffnet oder lädt die Hülle die Datei, und die Anwendung bleibt bedienbar
+- **THEN** lädt die Hülle die Datei in den Download-Ordner, und die Anwendung bleibt bedienbar
+
+#### Scenario: Datei-Link ohne `download` im selben Fenster
+- **WHEN** eine Seite im Hauptfenster auf `/api/einsaetze/1/anhaenge/7` der eigenen Origin
+  navigiert
+- **THEN** lädt die Hülle die Datei herunter, und die zuvor angezeigte Seite bleibt stehen
 
 #### Scenario: Externer Link
 - **WHEN** jemand im Fachebenen-Inspector einen Link auf eine fremde Website anklickt
-- **THEN** öffnet der Standardbrowser die Seite
+- **THEN** öffnet der Standardbrowser die Seite, und die Hülle bleibt auf der Anwendung
+
+#### Scenario: Sprungpalette „in neuem Tab öffnen“
+- **WHEN** jemand in der Sprungpalette mit Strg/⌘+↵ einen Treffer öffnet
+- **THEN** öffnet die Hülle ein weiteres Fenster mit dem Ziel, angemeldet, und das
+  bisherige Fenster bleibt auf seiner Seite
+
+#### Scenario: Anmeldung über OIDC
+- **WHEN** jemand im Hauptfenster die Anmeldung über einen Identitätsanbieter startet
+- **THEN** führt das Fenster über `/api/auth/oidc/start` zum Anbieter und über
+  `/api/auth/oidc/callback` zurück in die Anwendung, ohne Download und ohne Systembrowser
+
+#### Scenario: Unerlaubtes Schema
+- **WHEN** eine Seite ein neues Fenster mit `file:`- oder `javascript:`-Ziel anfordert
+- **THEN** öffnet die Hülle nichts und vermerkt das Ziel ohne Query im Protokoll
+
+#### Scenario: Serverwechsel mit offenem Nebenfenster
+- **WHEN** ein weiteres Fenster offen ist und die Hülle auf einen anderen Server wechselt
+- **THEN** schließt die Hülle das weitere Fenster
 
 ### Requirement: Live-Updates laufen im Hintergrund weiter
 Die Hülle MUST auf macOS `background_throttling` so setzen, dass WKWebView den Webview eines
@@ -92,7 +125,6 @@ Namensgleichheit eine vorhandene Datei nicht überschreiben.
 #### Scenario: Zweimal dieselbe Datei
 - **WHEN** jemand denselben Anhang zweimal herunterlädt
 - **THEN** liegen zwei Dateien im Download-Ordner, die zweite mit Zählzusatz
-
 
 ### Requirement: Ohne gespeicherte Serveradresse erscheint die Erststart-Maske
 Hat die Hülle keine gültige Serveradresse gespeichert, MUST sie beim Start eine lokale Maske
@@ -143,3 +175,28 @@ zweites Hauptfenster MUST NOT entstehen.
 #### Scenario: Deeplink bei laufender Hülle
 - **WHEN** die Hülle läuft und jemand einen `lifeline://verbinden?…`-Link öffnet
 - **THEN** kommt das vorhandene Fenster nach vorn und verarbeitet den Link, und es entsteht kein zweites Fenster
+
+### Requirement: Die Hülle meldet, ob sie Passkeys ausführen kann
+Die Hülle MUST der geladenen Anwendung vor dem ersten Skript der Seite mitteilen, ob der
+Webview Passkeys (WebAuthn) ausführen kann. Auf macOS MUST sie „nicht möglich“ melden, solange
+keine Verknüpfung per Associated Domains besteht. Die Anwendung MUST diese Meldung der
+Feature-Erkennung des Webviews vorziehen, weil WKWebView dort Fähigkeiten meldet, die es in
+der Hülle nicht einlöst. Ohne Meldung (Browser) MUST die Anwendung sich verhalten wie heute.
+
+#### Scenario: macOS-Hülle
+- **WHEN** die macOS-Hülle die Anmeldeseite lädt
+- **THEN** meldet sie „Passkey nicht möglich“, und die Seite bietet keine Passkey-Anmeldung an
+
+#### Scenario: Browser ohne Hülle
+- **WHEN** dieselbe Seite in einem Browser geöffnet wird
+- **THEN** fehlt die Meldung, und die Passkey-Anmeldung steht wie bisher zur Verfügung
+
+### Requirement: Die macOS-Hülle bietet keinen Passkey an, den sie nicht ausführen kann
+Meldet die Hülle „Passkey nicht möglich“, MUST die Anwendung weder die Passkey-Anmeldung noch
+die Einrichtung eines Passkeys anbieten. An der Stelle der Einrichtung MUST sie in einem Satz
+sagen, dass Passkeys im Browser eingerichtet werden. Passwort- und OIDC-Anmeldung MUST
+unverändert angeboten werden.
+
+#### Scenario: Profil in der macOS-Hülle
+- **WHEN** jemand in der macOS-Hülle das Profil öffnet
+- **THEN** fehlt „Passkey einrichten“, und ein Hinweis nennt den Browser als Weg

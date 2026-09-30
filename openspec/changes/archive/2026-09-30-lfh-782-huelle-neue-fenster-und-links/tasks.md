@@ -50,6 +50,6 @@
   Palette Strg/⌘+↵ öffnet ein angemeldetes Nebenfenster, Druck im Nebenfenster erreicht den
   Dialog, Navigation auf eine Anhang-URL ersetzt die App nicht, OIDC-Anmeldung läuft durch
   (falls ein Anbieter lokal verfügbar ist, sonst als offen vermerkt). Belege als JSON unter
-  `openspec/changes/lfh-782-huelle-neue-fenster-und-links/belege/macos/`. Windows als offen
+  `openspec/changes/archive/2026-09-30-lfh-782-huelle-neue-fenster-und-links/belege/macos/`. Windows als offen
   vermerken, falls kein Gerät bereitsteht.
 - [x] 4.3 `./scripts/check-all.sh` grün (Log auf `ÜBERSPRUNGEN` prüfen). In der CI von #234 durchgehend grün; lokal unter Last schwankten `e2e/uhs-grundriss-touch.spec.ts:478` (1 von 3 isoliert) und `palette-oeffnung.spec.ts:338` (isoliert 3 von 3 grün), beide ohne Bezug zum Diff.

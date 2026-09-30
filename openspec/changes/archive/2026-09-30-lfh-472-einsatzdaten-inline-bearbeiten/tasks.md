@@ -27,5 +27,5 @@
 
 - [x] 4.1 Prüfliste Einsatztauglichkeit (15 Kriterien) für die umgebaute Seite ausfüllen, je Zeile Verdikt (erfüllt / offen → Zielticket / nicht anwendbar); Ablage in diesem Change als `pruefliste.md`, weil `docs/superpowers/` eingefrorenes Archiv ist; zusätzlich `e2e/einsatzdaten-inline.spec.ts` für den Browser-Weg (DatePicker-Enter, Zone Europe/Berlin)
 - [x] 4.2 Nachzug-Ticket „Vollformular Einsatzdaten sendet nur geänderte Felder" über `clickup-task-anlegen` anlegen und in `design.md` D4 eintragen (LFH-839)
-- [ ] 4.3 `./scripts/check-all.sh` grün (mindestens Prettier, `pnpm lint`, Vitest, betroffene e2e: `gate3-trefflaeche.spec.ts`)
+- [x] 4.3 `./scripts/check-all.sh` grün (mindestens Prettier, `pnpm lint`, Vitest, betroffene e2e: `gate3-trefflaeche.spec.ts`) Belegt beim Archivieren (30.09.2026): CI des Merge-PR rubenvitt/lifeline-hub#233 vollständig grün (`ci.yml` ruft `check-all.sh`).
 - [x] 4.4 CLAUDE.md: Absatz „Ein leeres Feld muss sagen, dass man es schreiben kann" um `InlineAngabe` (Pflichtangaben, andere Eingabearten) ergänzen
