@@ -40,6 +40,9 @@ const einsatzAktiv = {
   meine_rolle: 'einsatzleitung',
   meine_sachgebiete: [],
   org_id: 5,
+  begonnen_at: '2026-06-11 05:00:00',
+  abgeschlossen_at: null,
+  lagekennzahlen: [],
 };
 
 function render(
@@ -52,7 +55,22 @@ function render(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/stab', stab),
     http.get('/api/einsaetze/1/stab/lagebesprechungen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/stab/checkliste', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
+    // Quellen der Vorbereitung (LFH-550) — leer; diese Tests prüfen die Palette.
+    ...[
+      'personen',
+      'personal',
+      'uhs',
+      'schaeden',
+      'gefahrengebiete',
+      'lageberichte',
+      'einheiten',
+      'fahrzeuge',
+      'material',
+      'abschnitte',
+    ].map((l) => http.get(`/api/einsaetze/1/${l}`, () => HttpResponse.json([]))),
+    http.get('/api/einsaetze/1/modul-zaehler', () => HttpResponse.json({})),
   );
   return renderMitProviders(
     <CommandPaletteProvider>

@@ -463,6 +463,106 @@ async fn fachebenen_autobahn_liefert_gecachte_antwort() {
     );
 }
 
+// ===== Bedingte Anfragen am Fachebenen-Endpunkt (LFH-594) =====
+
+/// GET mit `If-None-Match` — der Browser schickt ihn selbst, sobald er eine Antwort mit ETag
+/// im HTTP-Cache hält.
+async fn anfrage_bedingt(app: &axum::Router, uri: &str, etag: &str) -> Response {
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(uri)
+                .header(header::IF_NONE_MATCH, etag)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+}
+
+fn autobahn_stand(titel: &str) -> lifeline_hub::karte::typen::FachebeneAntwort {
+    lifeline_hub::karte::typen::FachebeneAntwort::ok(
+        "autobahn",
+        "Autobahn GmbH des Bundes",
+        None,
+        serde_json::json!({ "type": "FeatureCollection", "features": [
+            { "type": "Feature",
+              "geometry": { "type": "Point", "coordinates": [6.86, 50.98] },
+              "properties": { "titel": titel, "kategorie": "baustelle" } }
+        ]}),
+    )
+}
+
+fn etag_aus(res: &Response) -> String {
+    res.headers()
+        .get(header::ETAG)
+        .expect("Fachebenen-Antwort trägt einen ETag")
+        .to_str()
+        .unwrap()
+        .to_string()
+}
+
+/// Kern von LFH-594: der zweite Abruf ohne neuen Stand kostet keinen Body. Erst damit darf
+/// `pollMs` unter die TTL, ohne die 1,3 MB der Autobahn-Ebene je Poll neu zu übertragen.
+#[tokio::test]
+async fn fachebenen_zweiter_abruf_ohne_neuen_stand_ist_304_ohne_body() {
+    let dir = lifeline_hub::db::test_karten_dir();
+    let cache = lifeline_hub::cache_db::cache_pool(&dir).await.unwrap();
+    assert!(lifeline_hub::karte::cache::setze(&cache, "autobahn", &autobahn_stand("A1")).await);
+    let app = app_mit(pool().await, dir);
+
+    let erst = anfrage(&app, "GET", "/api/karte/fachebenen/autobahn", None, None).await;
+    assert_eq!(erst.status(), StatusCode::OK);
+    let etag = etag_aus(&erst);
+    // Der Browser darf speichern, muss aber jedes Mal fragen — sonst sähe ein Poll den neuen
+    // Stand erst nach einer geratenen Frische. `private`: kein geteilter Proxy-Cache dazwischen.
+    assert_eq!(
+        erst.headers().get(header::CACHE_CONTROL).unwrap(),
+        "private, no-cache"
+    );
+
+    let zweit = anfrage_bedingt(&app, "/api/karte/fachebenen/autobahn", &etag).await;
+    assert_eq!(zweit.status(), StatusCode::NOT_MODIFIED);
+    assert_eq!(etag_aus(&zweit), etag, "304 wiederholt den gültigen ETag");
+    let rumpf = to_bytes(zweit.into_body(), usize::MAX).await.unwrap();
+    assert!(rumpf.is_empty(), "304 überträgt keinen Body");
+}
+
+/// Gegenprobe: ein neu geschriebener Stand ändert den ETag, und der nächste Abruf mit dem
+/// alten ETag bekommt 200 mit den neuen Daten — kein 304 auf veraltetem Stand.
+#[tokio::test]
+async fn fachebenen_neuer_stand_aendert_etag_und_liefert_200() {
+    let dir = lifeline_hub::db::test_karten_dir();
+    let cache = lifeline_hub::cache_db::cache_pool(&dir).await.unwrap();
+    assert!(lifeline_hub::karte::cache::setze(&cache, "autobahn", &autobahn_stand("A1")).await);
+    let app = app_mit(pool().await, dir);
+
+    let alt = etag_aus(&anfrage(&app, "GET", "/api/karte/fachebenen/autobahn", None, None).await);
+    assert!(lifeline_hub::karte::cache::setze(&cache, "autobahn", &autobahn_stand("A3")).await);
+
+    let res = anfrage_bedingt(&app, "/api/karte/fachebenen/autobahn", &alt).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_ne!(etag_aus(&res), alt, "neuer Stand, neuer ETag");
+    let v = json(res).await;
+    assert_eq!(v["features"]["features"][0]["properties"]["titel"], "A3");
+}
+
+/// Ein komprimierender Vorschaltserver (nginx, Traefik) macht aus einem starken einen
+/// schwachen ETag; der Browser schickt dann `W/"…"` zurück. `If-None-Match` vergleicht
+/// schwach (RFC 9110 §13.1.2) — sonst wäre hinter einem solchen Proxy jeder Poll ein 200.
+#[tokio::test]
+async fn fachebenen_304_auch_bei_schwachem_etag_des_vorschaltservers() {
+    let dir = lifeline_hub::db::test_karten_dir();
+    let cache = lifeline_hub::cache_db::cache_pool(&dir).await.unwrap();
+    assert!(lifeline_hub::karte::cache::setze(&cache, "autobahn", &autobahn_stand("A1")).await);
+    let app = app_mit(pool().await, dir);
+
+    let etag = etag_aus(&anfrage(&app, "GET", "/api/karte/fachebenen/autobahn", None, None).await);
+    let res = anfrage_bedingt(&app, "/api/karte/fachebenen/autobahn", &format!("W/{etag}")).await;
+    assert_eq!(res.status(), StatusCode::NOT_MODIFIED);
+}
+
 /// Gegenprobe zur Zeile darüber: ohne `bbox` ist NUR kritis ein 400 — die Autobahn-Ebene
 /// ist nicht bbox-abhängig. Ohne dieses Paar bliebe der Test oben auch dann grün, wenn die
 /// Quelle versehentlich in den bbox-Zweig geriete.

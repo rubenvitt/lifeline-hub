@@ -9,6 +9,7 @@ import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
+import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 
 const { Text } = Typography;
 
@@ -177,7 +178,11 @@ export default function AuftragKarte({
         </Text>
         <Space size={4} wrap>
           {sichtbareQuittierte.map((e) => (
-            <StatusChip key={e.id} ton="normal" wort={`${e.snap_anzeige} ✓`} />
+            <StatusChip
+              key={e.id}
+              ton="normal"
+              wort={`${mitBesetzung(e.snap_anzeige, e.aktuelle_besetzung)} ✓`}
+            />
           ))}
           {/* „+n" zählt nur verborgene QUITTIERTE — das ✓ sagt es ohne Farbe (WCAG 1.4.1). */}
           {restQuittierte > 0 && (
@@ -198,7 +203,9 @@ export default function AuftragKarte({
           </Text>
           {offeneEmpf.map((e) => (
             <Space key={e.id} size={4}>
-              <Text style={{ fontSize: 13 }}>{e.snap_anzeige}</Text>
+              <Text style={{ fontSize: 13 }}>
+                {mitBesetzung(e.snap_anzeige, e.aktuelle_besetzung)}
+              </Text>
               {darfQuittieren && (
                 <Popconfirm
                   title="Empfang/Kenntnis quittieren?"

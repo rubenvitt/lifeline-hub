@@ -80,4 +80,40 @@ describe('abschnittStaerken', () => {
       inklUnter: null,
     });
   });
+
+  describe('unterstellte Einheiten zählen einmal, beim Abschnitt ihrer obersten Einheit (LFH-550)', () => {
+    const unter = (
+      id: number,
+      abschnittId: number,
+      ueber: number,
+      f: number,
+      uf: number,
+      m: number,
+    ) => ({ ...einheit(id, abschnittId, f, uf, m), ueber_einheit_id: ueber }) as Einheit;
+    // A (1/1/2) im Abschnitt 5; B (0/1/3) ist A unterstellt. A kumuliert 1/2/5.
+    const a5 = [abschnitt(5, null), abschnitt(6, null)];
+    const oben = {
+      ...einheit(1, 5, 1, 1, 2),
+      ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 5 },
+    } as Einheit;
+
+    it('gleicher Abschnitt: 1/2/5, nicht 1/3/8', () => {
+      const s = abschnittStaerken(a5, [oben, unter(2, 5, 1, 0, 1, 3)], 5);
+      expect(s.eigene).toEqual({ fuehrer: 1, unterfuehrer: 2, mannschaft: 5 });
+      expect(s.inklUnter).toEqual({ fuehrer: 1, unterfuehrer: 2, mannschaft: 5 });
+    });
+
+    it('anderer Abschnitt: zählt bei der obersten Einheit; der eigene Abschnitt zeigt 0/0/0, nicht „—“', () => {
+      const e2 = [oben, unter(2, 6, 1, 0, 1, 3)];
+      expect(abschnittStaerken(a5, e2, 5).eigene).toEqual({
+        fuehrer: 1,
+        unterfuehrer: 2,
+        mannschaft: 5,
+      });
+      expect(abschnittStaerken(a5, e2, 6)).toEqual({
+        eigene: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+        inklUnter: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+      });
+    });
+  });
 });

@@ -64,15 +64,20 @@ pub fn etag_von(sha256: &str) -> String {
 }
 
 /// Ob der `If-None-Match`-Request-Header den ETag (oder `*`) enthält → 304-Kurzschluss.
-/// Toleriert die kommaseparierte Mehrfach-Liste des Headers.
+/// Toleriert die kommaseparierte Mehrfach-Liste des Headers und vergleicht **schwach**, wie
+/// RFC 9110 §13.1.2 es für `If-None-Match` vorschreibt: `W/"x"` trifft `"x"`. Ein
+/// komprimierender Vorschaltserver schwächt den ETag ab, und der Browser schickt ihn so zurück
+/// (LFH-594) — ein exakter Vergleich machte dort jeden bedingten Abruf zum 200.
 pub fn if_none_match_matcht(headers: &HeaderMap, etag: &str) -> bool {
+    let ohne_schwach = |t: &str| t.strip_prefix("W/").unwrap_or(t).to_owned();
+    let etag = ohne_schwach(etag);
     headers
         .get(header::IF_NONE_MATCH)
         .and_then(|v| v.to_str().ok())
         .is_some_and(|v| {
             v.split(',').any(|kandidat| {
                 let kandidat = kandidat.trim();
-                kandidat == "*" || kandidat == etag
+                kandidat == "*" || ohne_schwach(kandidat) == etag
             })
         })
 }
@@ -391,6 +396,20 @@ mod tests {
         assert!(!if_none_match_matcht(&inm("\"deadbeef\""), &etag));
         // Fehlender Header.
         assert!(!if_none_match_matcht(&HeaderMap::new(), &etag));
+    }
+
+    /// `If-None-Match` vergleicht schwach (RFC 9110 §13.1.2, LFH-594): ein komprimierender
+    /// Vorschaltserver schwächt den ETag ab, der Browser schickt `W/"…"` zurück.
+    #[test]
+    fn if_none_match_vergleicht_schwach() {
+        let etag = etag_von("b".repeat(64).as_str());
+        assert!(if_none_match_matcht(&inm(&format!("W/{etag}")), &etag));
+        assert!(if_none_match_matcht(
+            &inm(&format!("\"other\", W/{etag}")),
+            &etag
+        ));
+        // Schwach heißt nicht beliebig: ein anderer Wert bleibt kein Treffer.
+        assert!(!if_none_match_matcht(&inm("W/\"deadbeef\""), &etag));
     }
 
     #[test]

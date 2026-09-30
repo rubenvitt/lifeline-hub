@@ -314,6 +314,59 @@ export const warnstufeFarbenHell: Record<WarnstufeBalken, string> = {
   akut: '#a8071a',
 };
 
+/**
+ * Ebenenfarbe der Fachebenen (LFH-593): eine IDENTITÄT („dieser Punkt gehört zur Ebene X“), keine
+ * Statusrolle — Kartenpunkt, Panel-Quadrat und Inspector-Akzent. Der zweite Kanal ist der
+ * Ebenenname im Panel und der Titel im Inspector.
+ *
+ * Tag: die Bestandstöne, unverändert (überwiegend Stufe 7 der antd-Presetpalette). Nacht: dieselben
+ * Farbtöne auf Stufe 5 aufgehellt; die Tagtöne fielen auf dem dunklen Leistengrund zum Teil unter
+ * 3 : 1 (KRITIS 1,79). Nachts hält jeder Ton ≥ 3,8 : 1 auf `paneel` bis `flaeche3`, und kein Paar
+ * steht enger als das engste am Tag (ΔE 25,2) — gerechnet in `statusFarben.test.ts`.
+ *
+ * Bewusst nicht grün (`normal`, SK III): ein grüner Punkt läse sich als „in Ordnung“. Luftqualität
+ * ist entsättigt, weil ihre Stationen die Rollenfarbe je Indexstufe tragen. Hochwasser, ODL und
+ * Luftqualität färben auf der Karte ohnehin je Feature; ihr Ton ist dort nur Rückfall.
+ * `FachebeneTon` spiegelt `FachebeneQuelle`, damit diese Datei keine API-Typen zieht (wie
+ * {@link EtbTypTon}); die Abbildung steht exhaustiv in `statusFarben.ts`.
+ */
+export type FachebeneTon =
+  | 'nina'
+  | 'dwd'
+  | 'pegelonline'
+  | 'hochwasser'
+  | 'luftqualitaet'
+  | 'odl'
+  | 'autobahn'
+  | 'kritis'
+  | 'energie';
+
+export const fachebeneFarbenHell: Record<FachebeneTon, string> = {
+  nina: '#cf1322',
+  dwd: '#d48806',
+  pegelonline: '#096dd9',
+  // Nicht das Blau von `pegelonline`: beide stehen im Panel nebeneinander.
+  hochwasser: '#08979c',
+  luftqualitaet: '#5b6b82',
+  odl: '#7cb305',
+  autobahn: '#c41d7f',
+  kritis: '#531dab',
+  // Gelb liegt nah am DWD-Gold, ist aber unterscheidbar und war die letzte freie Tonlücke (LFH-81).
+  energie: '#d4b106',
+};
+
+export const fachebeneFarbenDunkel: Record<FachebeneTon, string> = {
+  nina: '#ff4d4f',
+  dwd: '#ffa940',
+  pegelonline: '#4096ff',
+  hochwasser: '#36cfc9',
+  luftqualitaet: '#8c9bb3',
+  odl: '#a0d911',
+  autobahn: '#f759ab',
+  kritis: '#9254de',
+  energie: '#fadb14',
+};
+
 /** Abstandsraster einer Dichtestufe. Komponenten importieren diese Werte, statt Pixel zu
  *  erfinden. */
 export interface Abstandsraster {

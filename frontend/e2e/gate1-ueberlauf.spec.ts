@@ -570,6 +570,27 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       anker: (p: Page) => p.getByText('Ohne Einheit', { exact: true }),
     },
     {
+      // Stab mit der Vorbereitung der Lagebesprechung (LFH-550). Anker ist die Sichtungszeile,
+      // sobald ihre Quelle feststeht — ihr Wert ist die längste Zeile und muss auf 390 px
+      // umbrechen.
+      pfad: `/einsaetze/${einsatzId}/stab`,
+      anker: (p: Page) =>
+        p.locator(
+          '[data-lfh="vorbereitung-zeile"][data-schluessel="sichtung"]:not([data-zustand="laden"])',
+        ),
+      lesend: {
+        anker: (p: Page) =>
+          p.locator(
+            '[data-lfh="vorbereitung-zeile"][data-schluessel="sichtung"]:not([data-zustand="laden"])',
+          ),
+        vorbedingung: (p: Page) =>
+          expect(
+            p.getByRole('button', { name: 'In Lagebericht übernehmen' }),
+            'Vorbedingung: ohne Schreibrecht keine Übernahme',
+          ).toHaveCount(0),
+      },
+    },
+    {
       // Funkplan S6 (LFH-548). Datenanker ist die gesäte Einheit mit langem Namen IN der Tabelle
       // (sie steht auch in den Lücken, deshalb auf die Sicht verengt); der Baum startet offen.
       pfad: `/einsaetze/${einsatzId}/stab/funkplan`,
@@ -587,6 +608,25 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
             p.getByRole('button', { name: 'In Lagebericht übernehmen' }),
             'Vorbedingung: ohne Schreibrecht keine Übernahme',
           ).toHaveCount(0),
+      },
+    },
+    {
+      // Stab mit der Arbeitsaufnahme (LFH-551): die sieben Zeilen tragen die längsten Texte der
+      // Seite (Punkt + Quelle + Bemerkung). Datenanker ist die letzte Zeile — sie steht erst,
+      // wenn die Checkliste geladen ist.
+      pfad: `/einsaetze/${einsatzId}/stab`,
+      anker: (p: Page) =>
+        p
+          .getByRole('region', { name: 'Arbeitsaufnahme' })
+          .getByRole('checkbox', { name: 'Einsatzbereitschaft an die Leitstelle gemeldet' }),
+      lesend: {
+        vorbedingung: (p: Page) =>
+          expect(
+            p
+              .getByRole('region', { name: 'Arbeitsaufnahme' })
+              .getByRole('checkbox', { name: 'Einsatzbereitschaft an die Leitstelle gemeldet' }),
+            'Vorbedingung: ohne Schreibrecht ist der Haken gesperrt',
+          ).toBeDisabled(),
       },
     },
     {

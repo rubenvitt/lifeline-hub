@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import FachebenenInspector from './FachebenenInspector';
-import { FACHEBENEN } from './fachebenen';
+import { fachebeneFarbenHell } from '../../theme/tokens';
 import { taktischeDtgVoll } from '../../anzeige/format';
 
 describe('FachebenenInspector', () => {
@@ -251,7 +251,8 @@ describe('FachebenenInspector', () => {
     };
     const ebene = (() => {
       const probe = document.createElement('div');
-      probe.style.color = FACHEBENEN.luftqualitaet.farbe;
+      // Der Test rendert ohne unser Theme, also im Tagmodus.
+      probe.style.color = fachebeneFarbenHell.luftqualitaet;
       return probe.style.color;
     })();
     expect(akzent('sehr_schlecht')).not.toBe(akzent('sehr_gut'));

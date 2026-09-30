@@ -2,12 +2,15 @@ import type { GlobalToken } from 'antd';
 import {
   etbTypFarbenDunkel,
   etbTypFarbenHell,
+  fachebeneFarbenDunkel,
+  fachebeneFarbenHell,
   farbenDunkel,
   farbenHell,
   warnstufeFarbenDunkel,
   warnstufeFarbenHell,
   type EtbTypFarbe,
   type EtbTypTon,
+  type FachebeneTon,
   type WarnstufeBalken,
   type sichtungsfarben,
 } from './tokens';
@@ -34,7 +37,12 @@ import type {
   Warnstufe,
   WetterWarnstufe,
 } from '../api/types';
-import type { HochwasserKlasse, LuftqualitaetKlasse, OdlStufe } from '../api/fachebenen';
+import type {
+  FachebeneQuelle,
+  HochwasserKlasse,
+  LuftqualitaetKlasse,
+  OdlStufe,
+} from '../api/fachebenen';
 
 /**
  * Statusfarb-Vertrag (LFH-328 · A2): EINE Quelle für „welche Bedeutung hat welche Statusfarbe“.
@@ -62,6 +70,12 @@ import type { HochwasserKlasse, LuftqualitaetKlasse, OdlStufe } from '../api/fac
  * {@link warnstufeFlaeche} bildet Stufen auf die Füllungsrollen aus `tokens.ts` ab,
  * {@link flaechenFarbe} löst sie je Modus auf. Eigener Typ ({@link Flaechendarstellung}), weil
  * eine Füllung keine {@link Statusrolle} ist. Wer eine VIERTE Sorte braucht, benennt sie hier.
+ *
+ * ── MODUSPALETTEN OHNE ROLLE ──
+ *
+ * {@link etbTypFarbe}, {@link warnstufeBalkenFarbe} und {@link fachebeneFarbe} (LFH-593) lösen je
+ * Modus aus eigenen Paletten in `tokens.ts` auf. Die Ebenenfarbe ist eine Identität, kein Status;
+ * sie steht hier, damit sie wie alles Übrige den Modus wechselt, nicht als Vertragskarte.
  *
  * `theme/statusVertrag.guard.test.ts` hält die Grenzen maschinell: keine
  * `Record<…, StatusDarstellung>` außerhalb DIESER DATEI (nicht bloß des Verzeichnisses) und kein
@@ -568,4 +582,27 @@ export function warnstufeBalkenFarbe(w: Warnstufe, token: GlobalToken): string |
   const stufe = WARNSTUFE_BALKEN[w];
   if (stufe === null) return null;
   return (istDunklerModus(token) ? warnstufeFarbenDunkel : warnstufeFarbenHell)[stufe];
+}
+
+/**
+ * Ebenenfarbe einer Fachebene im aktiven Modus (LFH-593): Kartenpunkt, Panel-Quadrat,
+ * Inspector-Akzent. Nur Farbe; der zweite Kanal ist der Ebenenname. Modus wie bei
+ * {@link flaechenFarbe}. Exhaustiv über `FachebeneQuelle`.
+ */
+const FACHEBENE_TON: Record<FachebeneQuelle, FachebeneTon> = {
+  nina: 'nina',
+  dwd: 'dwd',
+  pegelonline: 'pegelonline',
+  hochwasser: 'hochwasser',
+  luftqualitaet: 'luftqualitaet',
+  odl: 'odl',
+  autobahn: 'autobahn',
+  kritis: 'kritis',
+  energie: 'energie',
+};
+
+export function fachebeneFarbe(quelle: FachebeneQuelle, token: GlobalToken): string {
+  return (istDunklerModus(token) ? fachebeneFarbenDunkel : fachebeneFarbenHell)[
+    FACHEBENE_TON[quelle]
+  ];
 }

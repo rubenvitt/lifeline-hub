@@ -316,6 +316,7 @@ export default function AuftraegeListe({
             senden={anlegenMutation.isPending}
             abschnitte={abschnitte}
             einheiten={einheiten}
+            einsatzId={einsatzId}
             // Serienerfassung: an derselben Lage entstehen mehrere Aufträge hintereinander.
             serie
             // mutateAsync: die Hülle darf die Felder nur leeren, wenn der Auftrag angekommen ist.

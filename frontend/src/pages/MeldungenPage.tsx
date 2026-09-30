@@ -435,6 +435,7 @@ export default function MeldungenPage() {
         }}
       />
       <AuftragErteilenModal
+        einsatzId={einsatzId}
         meldung={auftragMeldung}
         abschnitte={auftragsZiele.abschnitte}
         einheiten={auftragsZiele.einheiten}

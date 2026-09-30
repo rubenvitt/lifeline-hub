@@ -162,7 +162,9 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
     )
     .await;
 
-    // Aufträge: einer mit abgelaufener Frist (überfällig), einer in Arbeit, einer vollzogen.
+    // Aufträge: einer mit abgelaufener Frist (überfällig), einer in Arbeit, einer vollzogen — mit
+    // abgelaufener Frist und unquittiertem Empfänger. Er zählt nirgends, auch nicht als
+    // überfällig (LFH-550: „davon überfällig“).
     let auftrag = |text: &str, frist: Option<&str>| {
         let mut b = json!({
             "auftrag_text": text,
@@ -191,7 +193,7 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
         &app,
         &admin,
         &format!("{basis}/auftraege"),
-        &auftrag("Sperrung", None),
+        &auftrag("Sperrung", Some("2026-06-01 11:00:00")),
     )
     .await;
     post(
@@ -243,17 +245,21 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
     let ist_offen =
         |a: &Value| a["bearbeitungsstatus"] == "offen" || a["bearbeitungsstatus"] == "in_arbeit";
     let offen = anzahl(&liste, ist_offen);
+    let in_arbeit = anzahl(&liste, |a| a["bearbeitungsstatus"] == "in_arbeit");
     let ueberfaellig = anzahl(&liste, |a| {
         ist_offen(a) && a["ist_ueberfaellig"] == json!(true)
     });
+    let vollzogen_ueberfaellig = anzahl(&liste, |a| {
+        a["bearbeitungsstatus"] == "vollzogen" && a["ist_ueberfaellig"] == json!(true)
+    });
     assert_eq!(
-        (offen, ueberfaellig),
-        (2, 1),
+        (offen, in_arbeit, ueberfaellig, vollzogen_ueberfaellig),
+        (2, 1, 1, 1),
         "Erwartung aus der Liste: {liste:?}"
     );
     assert_eq!(
         v["auftraege"],
-        json!({ "offen": offen, "ueberfaellig": ueberfaellig }),
+        json!({ "offen": offen, "in_arbeit": in_arbeit, "ueberfaellig": ueberfaellig }),
         "{v:?}"
     );
 
@@ -261,8 +267,9 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
     let faellig = anzahl(&liste, |e| {
         e["ist_faellig"] == json!(true) && e["status"] == "offen"
     });
-    // Zwei: die eigene plus die Quittierfrist, die der überfällige Auftrag selbst anlegt.
-    assert_eq!(faellig, 2, "Erwartung aus der Liste: {liste:?}");
+    // Drei: die eigene plus die Quittierfristen, die die beiden Aufträge mit abgelaufener Frist
+    // selbst anlegen (auch der vollzogene: seine Quittung fehlt noch).
+    assert_eq!(faellig, 3, "Erwartung aus der Liste: {liste:?}");
     assert_eq!(v["erinnerungen"], json!({ "faellig": faellig }), "{v:?}");
 }
 

@@ -9,7 +9,8 @@ use tower::ServiceExt;
 
 mod common;
 use common::{
-    benutzer_anlegen, einsatz_anlegen_mit, login_cookie, rolle_setzen, setup, sse_anfang_lesen,
+    anfrage, benutzer_anlegen, einsatz_anlegen_mit, login_cookie, rolle_setzen, setup,
+    sse_anfang_lesen,
 };
 
 // ----------------------------- Test-Harness -----------------------------
@@ -572,6 +573,136 @@ async fn versteckte_module_werden_aus_dem_live_feed_gefiltert() {
     assert!(
         !gelesen.contains("Geheime Lagemeldung"),
         "ETB-Volltext gehört nie in den Broadcast, gelesen: {gelesen:?}"
+    );
+}
+
+/// Der Einsatzkopf gehört keinem Modul (LFH-555, design.md D2/D3): `einsatz` erreicht auch
+/// ein Mitglied ohne Stab-Recht. Eine Lagebesprechung ohne Terminänderung verrät ihm nichts
+/// (weder `stab` noch `einsatz`); ändert sie den Termin, erfährt es genau das, was der
+/// Kopf-GET ohnehin zeigt, und `stab` bleibt draußen.
+#[tokio::test]
+async fn einsatzkopf_erreicht_auch_mitglieder_ohne_stab_recht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    assert_eq!(
+        override_setzen(&app, &admin, eid, "stab", false, None).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/stab")).await,
+        StatusCode::FORBIDDEN,
+        "Vorbedingung: Frieda sieht den Stab nicht"
+    );
+    let besprechungen = format!("/api/einsaetze/{eid}/stab/lagebesprechungen");
+    admin_post(
+        &app,
+        &admin,
+        &besprechungen,
+        r#"{"entschluss":"A","abgehalten_at":"2026-09-12 10:00:00","naechste_at":"2026-09-12 12:00:00"}"#,
+    )
+    .await;
+
+    // (a) Besprechung ohne Terminänderung: nichts für Frieda.
+    let feed = live_oeffnen(&app, &frieda, eid, None).await;
+    assert_eq!(feed.status(), StatusCode::OK);
+    admin_post(
+        &app,
+        &admin,
+        &besprechungen,
+        r#"{"entschluss":"B","abgehalten_at":"2026-09-12 11:00:00"}"#,
+    )
+    .await;
+    let gelesen = sse_anfang_lesen(feed.into_body(), 400).await;
+    // Positivkontrolle: der Feed liefert Frieda überhaupt etwas (den ETB-Beleg der Besprechung).
+    // Ohne sie wäre die Abwesenheit unten auch bei einem stummen Feed grün.
+    assert!(gelesen.contains("event: etb"), "Vorbedingung: {gelesen:?}");
+    assert!(!gelesen.contains("event: stab"), "{gelesen:?}");
+    assert!(
+        !gelesen.contains("event: einsatz"),
+        "ohne neuen Termin verrät der Kopf keine Besprechung: {gelesen:?}"
+    );
+
+    // (b) Neuer Termin aus der Besprechung, dann Kopfdaten per PATCH: je ein `einsatz`.
+    let feed = live_oeffnen(&app, &frieda, eid, None).await;
+    admin_post(
+        &app,
+        &admin,
+        &besprechungen,
+        r#"{"entschluss":"C","abgehalten_at":"2026-09-12 11:30:00","naechste_at":"2026-09-12 13:00:00"}"#,
+    )
+    .await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{eid}"),
+        &admin,
+        Some(r#"{"stichwort":"H 2"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let gelesen = sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(!gelesen.contains("event: stab"), "{gelesen:?}");
+    assert_eq!(
+        gelesen.matches("event: einsatz\n").count(),
+        2,
+        "Termin aus dem Stab und PATCH erreichen den Kopf-Leser: {gelesen:?}"
+    );
+}
+
+/// LFH-555: Auch ein Mitglied, dem JEDES ausblendbare Modul entzogen ist, erfährt die Änderung
+/// des Einsatzkopfs — den Kopf liest es per GET weiterhin (dieselbe Tür wie der Strom).
+#[tokio::test]
+async fn einsatzkopf_erreicht_ein_mitglied_ohne_ausblendbare_module() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    for key in MODUL_KEYS.iter().filter(|k| !NICHT_AUSBLENDBAR.contains(k)) {
+        assert_eq!(
+            override_setzen(&app, &admin, eid, key, false, None).await,
+            StatusCode::OK,
+            "Vorbedingung: {key} ausblenden"
+        );
+    }
+    assert_eq!(
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}")).await,
+        StatusCode::OK,
+        "Vorbedingung: den Kopf liest Frieda weiterhin"
+    );
+
+    let feed = live_oeffnen(&app, &frieda, eid, None).await;
+    assert_eq!(feed.status(), StatusCode::OK);
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/etb"),
+        r#"{"typ":"meldung","inhalt":"Nicht fuer Frieda"}"#,
+    )
+    .await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{eid}"),
+        &admin,
+        Some(r#"{"naechste_lagebesprechung_at":"2026-09-30 18:00:00"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let gelesen = sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(
+        !gelesen.contains("event: etb"),
+        "Vorbedingung: gesperrte Module bleiben draußen: {gelesen:?}"
+    );
+    assert!(
+        gelesen.contains("event: einsatz"),
+        "der Kopf erreicht auch ein Mitglied ohne Modul: {gelesen:?}"
     );
 }
 

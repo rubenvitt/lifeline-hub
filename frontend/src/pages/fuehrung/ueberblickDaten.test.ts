@@ -181,15 +181,14 @@ describe('Kennzahlen', () => {
     );
   });
 
-  it('Offene Aufträge: offen + in Arbeit, überfällige nur unter offenen, Ton alarm', () => {
-    const k = auftraegeKennzahl([
-      auftrag(),
-      auftrag({ bearbeitungsstatus: 'in_arbeit', ist_ueberfaellig: true }),
-      auftrag({ bearbeitungsstatus: 'vollzogen', ist_ueberfaellig: true }),
-      auftrag({ bearbeitungsstatus: 'abgenommen' }),
-    ]);
-    expect(k).toEqual({ offen: 2, inArbeit: 1, ueberfaellig: 1, ton: 'alarm' });
-    expect(auftraegeKennzahl([auftrag()]).ton).toBe('neutral');
+  it('Offene Aufträge: Zahlen des Modulzählers, Ton alarm bei Überfälligen (LFH-550)', () => {
+    expect(auftraegeKennzahl({ offen: 2, in_arbeit: 1, ueberfaellig: 1 })).toEqual({
+      offen: 2,
+      inArbeit: 1,
+      ueberfaellig: 1,
+      ton: 'alarm',
+    });
+    expect(auftraegeKennzahl({ offen: 1, in_arbeit: 0, ueberfaellig: 0 }).ton).toBe('neutral');
   });
 
   it('Abschnittsnamen in gepflegter Reihenfolge, ab dem fünften gezählt', () => {
@@ -228,6 +227,22 @@ describe('offeneAuftraege', () => {
       ),
     ).toBe('EA Nord, S2');
     expect(empfaengerText(auftrag())).toBeNull();
+  });
+
+  it('hängt die aufgelöste Besetzung eines Sachgebiets an (LFH-549)', () => {
+    expect(
+      empfaengerText(
+        auftrag({
+          empfaenger: [
+            empfaenger({
+              snap_anzeige: 'S3 Einsatz',
+              funktion: 's3',
+              aktuelle_besetzung: { zustand: 'extern', name: 'Schulz' },
+            }),
+          ],
+        }),
+      ),
+    ).toBe('S3 Einsatz · Schulz');
   });
 });
 

@@ -28,11 +28,11 @@ import {
 import { ApiError } from '../api/client';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
+import { staerkeText } from '../anzeige/staerke';
 import {
   baueKraeftebild,
   filtereKraefte,
   rendereMeldebildMarkdown,
-  staerkeText,
   verdichte,
   type FilterWerte,
   type Rohdaten,
