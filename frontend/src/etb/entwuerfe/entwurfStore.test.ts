@@ -133,11 +133,12 @@ describe('entwurfStore', () => {
         return anfrage;
       });
       const erster = entwurfSpeichern(entwurf({ id: 'a', inhalt: 'Ang' }));
+      // Der Handler hängt sofort: der zweite Schreibvorgang scheitert, bevor der erste endet.
       const zweiter = entwurfSpeichern(
         entwurf({ id: 'a', inhalt: 'Angefangen', geaendert_at: '2026-06-22T10:00:05.000Z' }),
-      );
+      ).catch(() => {});
       await erster;
-      await zweiter.catch(() => {});
+      await zweiter;
       spion.mockRestore();
 
       expect((await entwuerfeLaden(7)).map((e) => e.inhalt)).toEqual(['Angefangen']);
