@@ -27,7 +27,7 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
      Entscheidung violett, Lage cyan, Berichtigung rot, System neutral — als **farbige
      Kante + Typwort**, nicht als Etikett, **Glyphen ⧖ (nachgetragen) und ↗
      (Deeplink)** als Textzeichen. Betroffene Regeln, Guards und Tests werden
-     angepasst, CLAUDE.md wird fortgeschrieben.
+     angepasst, `frontend/AGENTS.md` wird fortgeschrieben.
    - Weiterhin gilt: **Rot bedient nichts** — primäre Schaltflächen sind blau
      (`#4d94d6`, Text `#08090b`). Zweiter Kanal (Wort/Zahl/Kürzel) bleibt Pflicht.
 3. **Die UI wird neu gedacht**, nicht nur umgefärbt:

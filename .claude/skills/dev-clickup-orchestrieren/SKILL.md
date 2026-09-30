@@ -40,7 +40,7 @@ Abschluss), damit der Mehrphasen-Lauf nachvollziehbar bleibt.
 
 | Phase | Wer | Werkzeug | Checkpoint? |
 |---|---|---|---|
-| 0 Laden & Statuskontext | Main-Loop | ClickUp-MCP, ggf. Worktree | — |
+| 0 Laden & Statuskontext | Main-Loop | ClickUp-Connector, ggf. Worktree | — |
 | 1 Scope/Verstehen | **Workflow** (Scan) + Main-Loop (`/opsx:explore` bei `unklar`) | parallele Reader über Subtasks/Subsysteme → Scope-Map mit `route` | **ja, bei Unklarheit; Route bestätigen** |
 | 2 Entwurf | **Main-Loop** (`/opsx:propose` je Task auf `entwurf`), optional Judge-Panel-**Workflow** als Zulieferer | eine Change je Task (bzw. je geteilter Fähigkeit) | **ja, Pflicht: Freigabe der Changes** |
 | 3 Dev (umsetzen) | Main-Loop **oder** Workflow | Moduswahl: sequenziell-interaktiv vs. autonom | nur bei Blocker |
@@ -68,7 +68,7 @@ Scope und Entwurf beantworten der Workflow und OpenSpec, aber **nie beide diesel
 
 ## Phase 0 — Laden & Statuskontext
 
-1. **Parent-Task + Subtasks laden** (`mcp__claude_ai_ClickUp__clickup_get_task`). Subtasks
+1. **Parent-Task + Subtasks laden** (`clickup_get_task` des ClickUp-Connectors). Subtasks
    über die `subtasks` der Antwort bzw. `clickup_filter_tasks` ermitteln. Pro (Sub)Task
    ziehen: `custom_id`, Name/Beschreibung, **aktueller Status**, Abhängigkeiten.
 2. **Statuskontext bilden:** Wo steht jeder (Sub)Task auf der Spur? (Spur und Regeln:

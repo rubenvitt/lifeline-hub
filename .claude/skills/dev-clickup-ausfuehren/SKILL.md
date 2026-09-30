@@ -37,7 +37,7 @@ orchestriert und ruft diesen Skill pro (Sub)Task auf.
 ## Board-Status mitführen
 
 Der Task soll auf dem Board zeigen, wo die Arbeit gerade steht. Status **automatisch**
-(keine Rückfrage) mit `mcp__claude_ai_ClickUp__clickup_update_task` setzen — `task_id` und
+(keine Rückfrage) mit `clickup_update_task` des ClickUp-Connectors setzen — `task_id` und
 `status` wörtlich (case-sensitive).
 
 Status-Spur des Boards:
@@ -55,7 +55,7 @@ Status-Spur des Boards:
 
 ## Schritt 1: Task laden
 
-`mcp__claude_ai_ClickUp__clickup_get_task` mit der genannten ID/URL. Daraus ziehen:
+`clickup_get_task` des ClickUp-Connectors mit der genannten ID/URL. Daraus ziehen:
 
 - **`custom_id`** (z.B. `LH-42`) — für Branch-Name und Commit-Referenzen
 - **Name + Beschreibung** — für Slug, Typ und Komplexität
@@ -112,11 +112,11 @@ zutrifft, und geht dann den übrigen Zeilen vor:
 - **E1 Entscheidung:** Es gibt mehr als einen vertretbaren Weg, und die Wahl soll begründet
   nachlesbar bleiben.
 - **E2 Regel:** Der Task führt eine Regel ein oder ändert eine, die über ihn hinaus gilt:
-  eine Anforderung einer Fähigkeit, eine Projektregel in `CLAUDE.md` oder eine Regel in einer
+  eine Anforderung einer Fähigkeit, eine Projektregel in einer `AGENTS.md` oder eine Regel in einer
   Arbeitsanleitung unter `.claude/`.
 - **E3 Breite:** Der Task berührt mehr als ein Subsystem. Subsysteme sind: Backend (`src/`,
   `migrations/`, `tests/`), Frontend (`frontend/`), Desktop-Hülle (`src-tauri/`), Gate und CI
-  (`scripts/`, `.github/`), Arbeitsanleitungen (`.claude/`, `CLAUDE.md`). Pfade außerhalb
+  (`scripts/`, `.github/`), Arbeitsanleitungen (`.claude/`, die `AGENTS.md`-Dateien). Pfade außerhalb
   dieser Liste (etwa `docs/`, `openspec/`, Wurzeldateien wie `Cargo.toml` oder `mise.toml`)
   zählen zu keinem Subsystem. **Ausnahmen:** Ein Bugfix, der vorhandenes Verhalten
   wiederherstellt, und eine reine Text- oder Tippfehlerkorrektur lösen E3 nicht aus, auch wenn
@@ -159,7 +159,7 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 - **OpenSpec-Change archivieren, BEVOR der PR entsteht** (Entscheidung 30.09.2026): Ist die
   `tasks.md` der Change abgehakt, läuft **`/opsx:archive <name>` im selben Branch** — Spec-Sync
   nach `openspec/specs/`, Verschieben nach `openspec/changes/archive/<datum>-<name>/`, Verweise
-  auf den alten Pfad (CLAUDE.md, Code-Kommentare, `docs/`) im selben Commit nachziehen. Nicht
+  auf den alten Pfad (`AGENTS.md`-Dateien, Code-Kommentare, `docs/`) im selben Commit nachziehen. Nicht
   „nach dem Merge“: das braucht einen zweiten PR, und der bleibt aus (am 30.09.2026 lagen zwölf
   umgesetzte Changes aktiv). Schritt 13 von `check-all.sh` (`scripts/check-openspec-archiv.sh`)
   macht eine abgehakte, nicht archivierte Change rot. Kästchen, die erst die CI des PRs belegt

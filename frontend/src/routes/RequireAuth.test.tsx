@@ -31,7 +31,7 @@ describe('RequireAuth', () => {
         </Routes>
       </MemoryRouter>,
     );
-    // `pathname` allein verlöre die Deeplink-Selektion des Query-Param-Musters (CLAUDE.md).
+    // `pathname` allein verlöre die Deeplink-Selektion des Query-Param-Musters (frontend/AGENTS.md).
     expect(getByTestId('von').textContent).toBe('/einsaetze/7/etb?eintrag=42#unten');
   });
 });
