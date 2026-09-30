@@ -12,7 +12,7 @@
 //! `stab/checkliste.ts` (Text und Quelle je Punkt); eine Leerzeile vom Server wäre ein
 //! erfundener Datensatz (Muster `StabAnzeige.besetzung`).
 //!
-//! Design: `openspec/changes/lfh-551-stab-checkliste-arbeitsaufnahme/design.md`
+//! Design: `openspec/changes/archive/2026-09-30-lfh-551-stab-checkliste-arbeitsaufnahme/design.md`
 
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};

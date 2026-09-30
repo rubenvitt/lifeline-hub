@@ -93,9 +93,14 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   Neuladen. Der Meldungspunkt erzeugt genau einen ETB-Eintrag, der in der ETB-Zeitachse steht.
 - [x] 5.3 `pruefliste.md` (15 Kriterien der Bedien-Leitlinie, je Zeile ein Verdikt) neben dieser
   Change.
-- [ ] 5.4 `./scripts/check-all.sh` grün (lokal bzw. per CI-Lauf des PRs).
+- [x] 5.4 `./scripts/check-all.sh` grün (lokal bzw. per CI-Lauf des PRs).
+  - Belegt durch den CI-Lauf von PR rubenvitt/lifeline-hub#256 (dasselbe Skript). Lokal ohne
+    `mise`, deshalb die Schritte einzeln: rustfmt, Prettier, Lint, Typecheck, Codegen-Drift,
+    `cargo test` (Server), Vitest (Checkliste, Stab, Guards), Migrationsnummern, e2e (Klickweg,
+    Gate 1, Gate 3 Stab). Die volle Vitest-Suite scheitert lokal unter Node 22 an zehn Tests in
+    fünf fremden Dateien, auf `origin/alpha` gleich — Node 26 laut `mise.toml` in der CI.
 
 ## 6. Abschluss
 
-- [ ] 6.1 `/opsx:archive lfh-551-stab-checkliste-arbeitsaufnahme` im selben Branch (Spec-Sync nach
+- [x] 6.1 `/opsx:archive lfh-551-stab-checkliste-arbeitsaufnahme` im selben Branch (Spec-Sync nach
   `openspec/specs/stab-checkliste/`), Verweis in CLAUDE.md (Abschnitt Stab/Funkplan) nachziehen.

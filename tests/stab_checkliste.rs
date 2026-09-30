@@ -1,6 +1,6 @@
 //! Integrationstests der Checkliste Arbeitsaufnahme (LFH-551).
 //!
-//! Spec: `openspec/changes/lfh-551-stab-checkliste-arbeitsaufnahme/specs/stab-checkliste/spec.md`.
+//! Spec: `openspec/changes/archive/2026-09-30-lfh-551-stab-checkliste-arbeitsaufnahme/specs/stab-checkliste/spec.md`.
 //! Die tragenden Aussagen sind die GEZÄHLTEN: kein ETB-Eintrag je Haken außer beim Punkt
 //! `leitstelle_gemeldet`, dort genau einer je wirksamem Übergang (E1 = A: auch die Rücknahme).
 

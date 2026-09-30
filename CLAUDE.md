@@ -264,6 +264,14 @@ jede Liste mit eigener Weiche (`api/abrufZustand.ts`), fehlend = „—“ mit G
 `stab/luecken.ts` (auch für ST6). Erreichbarkeit: Schirm ab `xl`, Druck immer (`useDruckModus`),
 Lagebericht nie. Eigene Gegenstelle fehlt als benannte Lücke (LFH-849).
 
+**Checkliste Arbeitsaufnahme** (LFH-551,
+`openspec/changes/archive/2026-09-30-lfh-551-stab-checkliste-arbeitsaufnahme/design.md`): drittes
+Paneel der Stabseite (`stab/ChecklistePaneel.tsx`), sieben feste Punkte als Code-Vorlage
+(`stab/checkliste.ts` ↔ `ChecklistenPunkt::ALLE`), eigene Tabelle, lazy (ein Aufruf ohne Wirkung
+legt keine Zeile an). `PUT …/stab/checkliste/{punkt}` mit Teilfeldern, jedes Bedienziel schickt
+genau SEIN Feld. Kein ETB je Haken; nur `leitstelle_gemeldet` belegt Haken **und** Rücknahme (E1).
+Mutation je Zeile und Bedienziel, überlappende Antworten über `useChecklistenAbgleich`.
+
 **Betreuung und Verpflegung**
 - **Verbleib → Betreuungsstelle** (LFH-674,
   `openspec/changes/archive/2026-09-29-lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`): nur die Kennung
