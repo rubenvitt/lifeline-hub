@@ -1,8 +1,8 @@
 import { Alert, Button, Form, Input, Modal, Space, Typography } from 'antd';
 import { useEffect } from 'react';
 import type { Meldung } from '../api/types';
-import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
-import type { LatLon } from '../anzeige/koordinaten';
+import KoordinatenFeld from '../anzeige/KoordinatenFeld';
+import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
 
 export interface LagerelevantDaten {
   text?: string;
@@ -21,7 +21,7 @@ interface Props {
 
 interface FormWerte {
   text?: string;
-  koord?: LatLon | null;
+  koord?: KoordinatenWert;
 }
 
 /**
@@ -46,7 +46,8 @@ export default function LagerelevantModal({
 
   function absenden(w: FormWerte) {
     const text = w.text?.trim() ? w.text.trim() : undefined;
-    onUebergeben({ text, lat: w.koord?.lat, lon: w.koord?.lon });
+    const koord = alsLatLon(w.koord);
+    onUebergeben({ text, lat: koord?.lat, lon: koord?.lon });
   }
 
   return (
@@ -65,9 +66,7 @@ export default function LagerelevantModal({
         <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
           Optional verorten — Koordinate setzt die Meldung als Marker auf die Lagekarte.
         </Typography.Text>
-        <Form.Item name="koord" label="Verortung (optional)">
-          <KoordinatenEingabe einsatzId={einsatzId} />
-        </Form.Item>
+        <KoordinatenFeld name="koord" label="Verortung (optional)" einsatzId={einsatzId} />
         <Alert
           type="info"
           showIcon
