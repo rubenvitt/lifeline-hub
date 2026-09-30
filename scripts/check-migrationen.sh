@@ -9,7 +9,7 @@
 # `db::tests::migrationsnummern_sind_eindeutig` sieht nur den eigenen Stand; zwei PRs, die je
 # für sich eine freie Nummer nehmen, machen `alpha` zusammen rot. Dieses Skript sieht beide.
 #
-# DIE REGELN (Begründung in CLAUDE.md, „Backend — Migrationsvergabe"):
+# DIE REGELN (Begründung in AGENTS.md, „Backend — Migrationsvergabe"):
 #   1. Unveränderlich: eine Migration, die es an der ABZWEIGUNG (merge-base) schon gab, wird
 #      weder geändert noch umbenannt noch gelöscht. Maßstab ist die Abzweigung, nicht die
 #      Basis: was die Basis seitdem neu hat, fehlt dem Branch nur.

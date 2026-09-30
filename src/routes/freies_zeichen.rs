@@ -184,7 +184,7 @@ pub async fn aufloesen(
 /// `grundzeichen` ist Pflicht: nach Trim non-empty, sonst 400. Liefert den getrimmten Wert.
 ///
 /// 400 und nicht 422, weil das Feld ISOLIERT unbrauchbar ist — die Konvention bewertet mit
-/// 422 erst den Zusammenhang (Feld-Kombination, Objekt-Zustand). Siehe CLAUDE.md, Abschnitt
+/// 422 erst den Zusammenhang (Feld-Kombination, Objekt-Zustand). Siehe src/AGENTS.md, Abschnitt
 /// „Backend — Statuscode-Konvention".
 fn grundzeichen_pflicht(roh: &str) -> Result<String, AppError> {
     let g = pflicht(&roh, "grundzeichen")?;

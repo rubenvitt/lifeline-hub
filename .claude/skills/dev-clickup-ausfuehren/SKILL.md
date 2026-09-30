@@ -127,7 +127,7 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 - **OpenSpec-Change archivieren, BEVOR der PR entsteht** (Entscheidung 30.09.2026): Ist die
   `tasks.md` der Change abgehakt, läuft **`/opsx:archive <name>` im selben Branch** — Spec-Sync
   nach `openspec/specs/`, Verschieben nach `openspec/changes/archive/<datum>-<name>/`, Verweise
-  auf den alten Pfad (CLAUDE.md, Code-Kommentare, `docs/`) im selben Commit nachziehen. Nicht
+  auf den alten Pfad (`AGENTS.md`-Dateien, Code-Kommentare, `docs/`) im selben Commit nachziehen. Nicht
   „nach dem Merge“: das braucht einen zweiten PR, und der bleibt aus (am 30.09.2026 lagen zwölf
   umgesetzte Changes aktiv). Schritt 13 von `check-all.sh` (`scripts/check-openspec-archiv.sh`)
   macht eine abgehakte, nicht archivierte Change rot. Kästchen, die erst die CI des PRs belegt

@@ -85,8 +85,8 @@ Wähle den kleinsten belastbaren Ablauf:
 | Feature/Bugfix mit klarer Spec | Test zuerst oder mindestens gleichzeitig mit der Änderung; kleinsten grünen Schritt implementieren | `in development` |
 | Mehrere Schritte oder Dateien | Codex-Plan anlegen, Tests und Risiken je Schritt nennen, dann schrittweise ausführen | `in design` → `ready for development` → `in development` |
 
-Beziehe `CLAUDE.md` als bestehende Projektkonvention ein, weil es die fachlichen und
-UI-bezogenen Entscheidungen dieses Repositories enthält. Verwende weitere projektlokale
+Beziehe die `AGENTS.md`-Dateien (Wurzel und Bereiche) als bestehende Projektkonvention ein, weil sie die fachlichen und
+UI-bezogenen Entscheidungen dieses Repositories enthalten. Verwende weitere projektlokale
 Skills, sobald deren Beschreibung passt, etwa `antd` bei Ant-Design-Arbeit.
 
 ## 5. Verifikation, Review und Abschluss

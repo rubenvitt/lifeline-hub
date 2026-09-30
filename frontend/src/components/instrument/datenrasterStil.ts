@@ -5,7 +5,7 @@ import type { Farbrollen } from '../../theme/tokens';
  * Stilfunktionen des Datenrasters — rein und exportiert (Muster `bedienzielStil`), damit
  * Fugenraster, Spaltendeckel und Mono-Wert ohne Render prüfbar sind. Eigene Datei mit
  * eigenem Basename: `datenraster.ts` neben `Datenraster.tsx` kollidierte case-insensitiv
- * (CLAUDE.md, `direkteinstiegKern`).
+ * (frontend/AGENTS.md, `direkteinstiegKern`).
  */
 
 /** Mindestbreite einer Zelle, bevor das Raster eine Spalte abgibt. */

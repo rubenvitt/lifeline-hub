@@ -166,7 +166,7 @@ export function BemerkungZelle({
       >
         <span id={wertId}>{wert}</span>
         {/* Ikone ohne eigenes Vorleseziel: `@ant-design/icons` bringt `role="img"` mit
-            englischem Namen („edit") mit (CLAUDE.md, „Ein Emoji ist keine Ikone"). */}
+            englischem Namen („edit") mit (frontend/AGENTS.md, „Ein Emoji ist keine Ikone"). */}
         {!laeuft && (
           <span aria-hidden="true" style={{ color: token.colorTextSecondary }}>
             <EditOutlined />

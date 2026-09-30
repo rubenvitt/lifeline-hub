@@ -335,7 +335,7 @@ fn zustand_text(art: Option<BesetzungArt>, name: Option<&str>) -> String {
 /// absichtlich, bis jenes committet hat, und schriebe danach in einen geschlossenen Einsatz.
 /// Der Retry-Pfad VERBREITERT das Fenster, statt es zu schliessen.
 ///
-/// 409 wie `fordere_aktiv` am Route-Gate (Lebenszyklus, CLAUDE.md) — zwei Codes für dieselbe
+/// 409 wie `fordere_aktiv` am Route-Gate (Lebenszyklus, src/AGENTS.md) — zwei Codes für dieselbe
 /// Tatsache, unterschieden nur durch Timing, könnte ein Client nicht auseinanderhalten.
 async fn fordere_aktiv_in_tx(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<(), AppError> {
     let aktiv: Option<i64> =

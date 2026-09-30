@@ -144,7 +144,7 @@ impl BetreuungsstelleStatus {
 pub const MAX_PERSONEN: i64 = 1_000_000;
 
 /// Liest einen Enum-Wert aus einer Eingabe. Ein unbekannter Wert scheitert am Feld für sich
-/// und ist deshalb **400** (CLAUDE.md „Statuscode-Konvention“, `src/error.rs`), nicht 422.
+/// und ist deshalb **400** (src/AGENTS.md „Statuscode-Konvention“, `src/error.rs`), nicht 422.
 pub fn enum_wert<T: TryFrom<String, Error = String>>(s: &str) -> Result<T, AppError> {
     T::try_from(s.to_string()).map_err(AppError::Validation)
 }

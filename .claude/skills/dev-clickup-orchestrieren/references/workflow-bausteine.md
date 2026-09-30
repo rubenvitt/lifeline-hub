@@ -114,7 +114,7 @@ export const meta = {
 const DIMENSIONS = [
   { key: 'bugs', prompt: 'Logikfehler, Race Conditions, Null/Boundary in den geänderten Files.' },
   { key: 'security', prompt: 'Org-Isolation/Berechtigung, Injection, Datenleck in den geänderten Files.' },
-  { key: 'konventionen', prompt: 'Abweichungen von den Projekt-Konventionen (CLAUDE.md, Nachbarschaftscode).' },
+  { key: 'konventionen', prompt: 'Abweichungen von den Projekt-Konventionen (AGENTS.md-Dateien, Nachbarschaftscode).' },
   { key: 'tests', prompt: 'Fehlende/zu schwache Tests für die neue Logik.' },
 ]
 const FINDINGS = {

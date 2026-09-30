@@ -44,7 +44,7 @@ const ERWARTUNGSHORIZONT_EINSATZ = ' Der Einsatz läuft davon unberührt weiter.
  * einen gibt — dem Rückweg als EINER Primäraktion. Die Breite ist gedeckelt
  * (`flaeche.seiteSchmal`), damit der Satz auf dem Fükw nicht über 1400 px läuft.
  *
- * DAS 🚧 IM TITEL BLEIBT vorerst, obwohl „Ein Emoji ist keine Ikone" (CLAUDE.md) es für
+ * DAS 🚧 IM TITEL BLEIBT vorerst, obwohl „Ein Emoji ist keine Ikone" (frontend/AGENTS.md) es für
  * Angefasstes abträgt: `App.test.tsx` und `einsatz/ModulStub.test.tsx` greifen die Seite über
  * genau dieses Zeichen. Der Abtrag gehört in denselben Commit wie die Umstellung jener Abfragen
  * auf `title`/Klasse.
