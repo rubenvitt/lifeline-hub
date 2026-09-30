@@ -14,7 +14,9 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
       await page.setViewportSize({ width: breite, height: 900 });
       await page.goto(`/einsaetze/${einsatzId}/etb`);
       await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
-      const wechsler = page.locator('header').getByRole('button', { name: /^A down$/ });
+      // Name = Einsatzname. Bis LFH-595 hängte antds DownOutlined sein `aria-label` („down“) an;
+      // die Ikonen des Satzes sind `aria-hidden`.
+      const wechsler = page.locator('header').getByRole('button', { name: 'A', exact: true });
       await expect(wechsler).toBeVisible();
       expect
         .soft((await wechsler.boundingBox())!.width, `${breite}px: kurzer Name`)
