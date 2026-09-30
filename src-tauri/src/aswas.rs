@@ -1,6 +1,6 @@
 //! `ASWebAuthenticationSession` für „Im Browser anmelden“ (LFH-818, nur macOS).
 //!
-//! Gemessen am 30.09.2026 (`openspec/changes/lfh-818-anmeldung-im-systembrowser/belege/`):
+//! Gemessen am 30.09.2026 (`openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/belege/`):
 //! die Sitzung gibt an den Standardbrowser ab, dort tragen Passkeys für Lifeline und den IdP,
 //! und der Rücksprung erreicht nur den Completion-Handler, nicht Launch Services.
 //!

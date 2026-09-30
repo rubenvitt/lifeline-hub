@@ -1,6 +1,6 @@
 //! „Im Browser anmelden“ (LFH-818): reine Schritte rund um den Rücksprung aus der
 //! `ASWebAuthenticationSession`. Herleitung und Entscheidungen:
-//! `openspec/changes/lfh-818-anmeldung-im-systembrowser/design.md`.
+//! `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`.
 //!
 //! Den Code löst die Seite des Servers im Webview ein, weil nur dort der Cookie-Speicher liegt,
 //! in dem die Sitzung entstehen muss. Die Hülle reicht Code und `verifier` als JSON-Literale in

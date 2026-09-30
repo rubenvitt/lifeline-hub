@@ -1345,7 +1345,7 @@ pub async fn app_code_ausstellen(
 /// Reihenfolge: Form (400) → Sperre der Adresse (429) → Code entnehmen (damit verbraucht, gleich
 /// wie es ausgeht) → `verifier` und aktives Konto. Jedes Scheitern danach ist einheitlich 401,
 /// damit die Antwort keinen Grund verrät (unbekannt, abgelaufen, verbraucht, falsch gebunden,
-/// deaktiviert); Herleitung: `openspec/changes/lfh-818-anmeldung-im-systembrowser/design.md`,
+/// deaktiviert); Herleitung: `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`,
 /// Entscheidung 5.
 pub async fn app_code_einloesen(
     State(state): State<AppState>,

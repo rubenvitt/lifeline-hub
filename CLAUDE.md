@@ -758,7 +758,7 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   bekommt zur Laufzeit genau für ihre Origin nur `SERVER_RECHTE` (`drucken`,
   `anmeldung_im_browser`; `server_freigeben`). Jeder neue Command steht im `AppManifest` von
   `build.rs`, sonst wäre er für jede Seite offen.
-- **Im Browser anmelden** (LFH-818, `openspec/changes/lfh-818-anmeldung-im-systembrowser/design.md`):
+- **Im Browser anmelden** (LFH-818, `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`):
   `ASWebAuthenticationSession` (`aswas.rs`), PKCE-`verifier` bleibt in der Hülle, Rücksprung nur
   aus der Sitzung (`anmeldung::folge`); eingelöst per `eval` im startenden Fenster mit doppelter
   Origin-Prüfung, Server `POST /api/auth/app-code[/einloesen]` (einheitlich 401, Audit

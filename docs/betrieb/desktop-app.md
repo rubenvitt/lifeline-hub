@@ -182,7 +182,7 @@ PocketID).
 Die Übergabe läuft über einen Einmalcode: 60 Sekunden gültig, nur einmal einlösbar und an ein
 Geheimnis gebunden, das nur die App kennt. Ein Code, den eine fremde Seite der App unterschiebt,
 ergibt keine Sitzung. Im Auth-Audit steht die Übergabe als `login_ok` mit dem Anbieter
-`systembrowser`. Herleitung: `openspec/changes/lfh-818-anmeldung-im-systembrowser/design.md`.
+`systembrowser`. Herleitung: `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`.
 
 ## Grenzen (offen)
 
@@ -197,6 +197,6 @@ ergibt keine Sitzung. Im Auth-Audit steht die Übergabe als `login_ok` mit dem A
   unverändert.
 - **Anmeldung im Browser, nicht gemessen:** mit Firefox oder Safari als Standardbrowser und mit
   signierter App (LFH-722). Gemessen ist Vivaldi als Standardbrowser (Chromium) sowie Safari
-  direkt (`openspec/changes/lfh-818-anmeldung-im-systembrowser/belege/macos/messung.md`).
+  direkt (`openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/belege/macos/messung.md`).
 - **Linux:** Die Hülle wird dort übersetzt (Tests), aber nicht ausgeliefert.
 - **App-Symbol:** Es ist aus dem Favicon abgeleitet, einem Platzhalter.

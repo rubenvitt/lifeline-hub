@@ -140,7 +140,7 @@
   Nachweis: Review gegen `messung.md` und dieses Design.
 - [x] 4.2 `CLAUDE.md`, Abschnitt Desktop-Hülle: der neue Command als zweite Freigabe der
   Serverseite (neben `drucken`) und die Einlösung per `eval` mit doppelter Origin-Prüfung, in
-  einer Zeile mit Verweis auf dieses Design. In `openspec/changes/lfh-783-passkey-macos-huelle/design.md`
+  einer Zeile mit Verweis auf dieses Design. In `openspec/changes/archive/2026-09-30-lfh-783-passkey-macos-huelle/design.md`
   bei Stufe 2 auf diesen Change verweisen. Nachweis: Verweise greppen, Pfade existieren.
 - [x] 4.3 Folgeticket für die fehlenden Audit-Einträge im Browser (OIDC, `totp_finish`,
   `webauthn_auth_finish`) über `clickup-task-anlegen`. Nachweis: Ticket-ID im PR. Angelegt als

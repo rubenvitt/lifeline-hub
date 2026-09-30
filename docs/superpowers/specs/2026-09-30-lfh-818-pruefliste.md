@@ -2,7 +2,7 @@
 
 Gate 7 der Bedien-Leitlinie (`2026-07-25-bedien-leitlinie-einsatzkontexte.md`, Festlegung 7)
 verlangt diese Liste an jeder neuen oder umgebauten Seite. Planung, Specs und Messung liegen in
-`openspec/changes/lfh-818-anmeldung-im-systembrowser/`.
+`openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/`.
 
 ## Geltungsbereich
 

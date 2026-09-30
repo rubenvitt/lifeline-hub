@@ -8,7 +8,7 @@ import './LoginPage.css';
 
 /**
  * Bestätigung „In der Mac-App anmelden als …“ (LFH-818,
- * `openspec/changes/lfh-818-anmeldung-im-systembrowser/design.md`, Entscheidung 2).
+ * `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`, Entscheidung 2).
  *
  * Die macOS-Hülle öffnet diese Seite im Systembrowser (`ASWebAuthenticationSession`) mit der
  * `challenge` ihres PKCE-Geheimnisses. Ohne Sitzung führt `RequireAuth` zur Anmeldung und mit der

@@ -86,7 +86,7 @@ ist für `.local` nicht belegt.
 
 ### Stufe 2 — Anmeldung im Systembrowser (LFH-818)
 
-> Umgesetzt in `openspec/changes/lfh-818-anmeldung-im-systembrowser/` (Messung, Entwurf,
+> Umgesetzt in `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/` (Messung, Entwurf,
 > Bestätigung am 30.09.2026). Abweichend von Schritt 2 unten leitet nicht der Server nach der
 > Anmeldung um: Eine Bestätigungsseite stellt den Code aus einer bestehenden Browsersitzung aus.
 
