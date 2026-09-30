@@ -1,4 +1,18 @@
+import type { GlobalToken } from 'antd';
 import type { FachebeneQuelle, FachebeneStatus, FeatureCollection } from '../../api/fachebenen';
+import {
+  hochwasserKlasse,
+  luftqualitaetIndex,
+  odlStufe,
+  type StatusDarstellung,
+} from '../../theme/statusFarben';
+import { faerbeHochwasser, hochwasserDarstellung, hochwasserRadius } from './hochwasserStil';
+import {
+  faerbeLuftqualitaet,
+  luftqualitaetDarstellung,
+  luftqualitaetRadius,
+} from './luftqualitaetStil';
+import { faerbeOdl, odlDarstellung, odlRadius } from './odlStil';
 
 type Feature = FeatureCollection['features'][number];
 
@@ -26,6 +40,48 @@ export function energieAusschnittPasst(bbox: string): boolean {
   if (t.length !== 4 || t.some((n) => Number.isNaN(n))) return true;
   const [w, s, e, n] = t;
   return e - w <= ENERGIE_MAX_SPANNE_GRAD && n - s <= ENERGIE_MAX_SPANNE_GRAD;
+}
+
+/** Eine Zeile der Panel-Legende: Wort und Rolle aus dem Vertrag, Durchmesser wie auf der Karte. */
+export interface KlassenEintrag {
+  schluessel: string;
+  darstellung: StatusDarstellung;
+  /** Kreisradius in px — derselbe Wert, den die Einfärbung ins Feature schreibt. */
+  radius: number;
+}
+
+/**
+ * Einfärbung je Klasse (LFH-592). Legende und Einfärbung hängen an EINER Eigenschaft: eine Ebene,
+ * die ihre Punkte je Feature färbt, zeigt im Panel ihre Legende statt des Ebenenpunkts — ihre
+ * Ebenenfarbe (`fachebeneFarbe`, LFH-593) käme auf der Karte nirgends vor.
+ */
+export interface Klassenfarben {
+  /** In der Reihenfolge des Vertrags (`theme/statusFarben.ts`). */
+  legende: readonly KlassenEintrag[];
+  /** Backt Rollenfarbe und Radius je Feature ein (`useFachebenen`). */
+  faerbe: (fc: FeatureCollection, token: GlobalToken) => FeatureCollection;
+}
+
+/** Schlüssel eines Vertrags in seiner Reihenfolge — die Reihenfolge der Legende. */
+function klassenVon<K extends string>(vertrag: Record<K, unknown>): K[] {
+  return Object.keys(vertrag) as K[];
+}
+
+/**
+ * Legende aus den Klassen eines Vertrags und den Lesefunktionen des Stilmoduls — nichts wird neu
+ * erfunden. Wort und Rolle kommen über dieselbe `…Darstellung`-Funktion, die auch der Inspector
+ * liest; die Karte selbst bleibt in `theme/statusFarben.ts` (Guard `statusVertrag.guard.test.ts`).
+ */
+function legendeAus<K extends string>(
+  klassen: readonly K[],
+  darstellung: (k: K) => StatusDarstellung,
+  radius: (k: K) => number,
+): KlassenEintrag[] {
+  return klassen.map((schluessel) => ({
+    schluessel,
+    darstellung: darstellung(schluessel),
+    radius: radius(schluessel),
+  }));
 }
 
 export interface FachebeneDef {
@@ -61,6 +117,12 @@ export interface FachebeneDef {
    * (heute Energie); KRITIS fragt in jeder Zoomstufe.
    */
   minZoom?: number;
+  /**
+   * Nur für Ebenen, deren Punkte die Karte je Klasse einfärbt (heute Hochwasser, ODL,
+   * Luftqualität). Dann ist die Ebenenfarbe bloß Rückfall für den Inspector-Akzent, und das Panel zeigt
+   * statt des Ebenenpunkts die Legende.
+   */
+  klassenfarben?: Klassenfarben;
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -91,6 +153,10 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     geometrieTyp: 'punkt',
     pollMs: 300_000,
     bboxAbhaengig: false,
+    klassenfarben: {
+      legende: legendeAus(klassenVon(hochwasserKlasse), hochwasserDarstellung, hochwasserRadius),
+      faerbe: faerbeHochwasser,
+    },
   },
   luftqualitaet: {
     key: 'luftqualitaet',
@@ -100,6 +166,14 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     pollMs: 900_000,
     bboxAbhaengig: false,
     geltung: 'Messstationen — keine Aussage zwischen den Stationen',
+    klassenfarben: {
+      legende: legendeAus(
+        klassenVon(luftqualitaetIndex),
+        luftqualitaetDarstellung,
+        luftqualitaetRadius,
+      ),
+      faerbe: faerbeLuftqualitaet,
+    },
   },
   odl: {
     key: 'odl',
@@ -109,6 +183,10 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     pollMs: 600_000,
     bboxAbhaengig: false,
     geltung: 'nur ortsfeste BfS-Sonden (Stundenwerte) — keine Einsatzmessungen',
+    klassenfarben: {
+      legende: legendeAus(klassenVon(odlStufe), odlDarstellung, odlRadius),
+      faerbe: faerbeOdl,
+    },
   },
   autobahn: {
     key: 'autobahn',

@@ -249,6 +249,8 @@ describe('einsatzKeys (Factory-Output)', () => {
     ]);
     // Sub-Key UNTER dem Stab-Prefix: das `stab`-Ereignis invalidiert ihn mit.
     expect(einsatzKeys.stabLagebesprechungen(1)).toEqual(['einsatz-stab', 1, 'lagebesprechungen']);
+    // LFH-551: unter demselben Prefix — das `stab`-Ereignis zieht die Checkliste mit.
+    expect(einsatzKeys.stabCheckliste(1)).toEqual(['einsatz-stab', 1, 'checkliste']);
     // Liste und Vorgaben UNTER dem Ablösungs-Prefix: das `abloesung`-Ereignis trifft beide.
     expect(einsatzKeys.abloesungen(1)).toEqual(['einsatz-abloesungen', 1]);
     expect(einsatzKeys.abloesungListe(1, 'laufend')).toEqual([

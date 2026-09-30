@@ -439,6 +439,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::stab::lagebesprechungen_liste)
                 .post(routes::stab::lagebesprechung_abschliessen),
         )
+        .route(
+            "/api/einsaetze/{id}/stab/checkliste",
+            get(routes::stab::checkliste_laden),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/checkliste/{punkt}",
+            put(routes::stab::checkliste_setzen),
+        )
         .route("/api/einsaetze/{id}/meldungen", get(routes::meldung::liste))
         .route(
             "/api/einsaetze/{id}/meldungen/rueckmeldungen",

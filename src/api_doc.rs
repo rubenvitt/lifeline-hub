@@ -231,6 +231,8 @@ use utoipa::OpenApi;
         crate::abloesung::AbloesungVorgabeAnzeige,
         crate::abloesung::Einstufung,
         crate::abloesung::RhythmusQuelle,
+        crate::stab::checkliste::ChecklistenEintrag,
+        crate::stab::checkliste::ChecklistenPunkt,
         crate::stab::BesetzungArt,
         crate::stab::LagebesprechungAnzeige,
         crate::stab::Sachgebiet,

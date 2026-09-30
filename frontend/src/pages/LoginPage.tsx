@@ -15,6 +15,7 @@ import {
 import type { AuthProvider } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { huelleSperrtPasskey } from '../huelle/faehigkeiten';
+import { Bildmarke } from '../marke/Bildmarke';
 import './LoginPage.css';
 
 interface FormWerte {
@@ -219,7 +220,7 @@ export default function LoginPage() {
       <div className="login-karte">
         <div className="login-marke">
           <div className="login-marke__zeile">
-            <span className="login-marke__quadrat" aria-hidden="true" />
+            <Bildmarke hoehe={20} linienFarbe="var(--lfh-text)" quadratFarbe="var(--lfh-marke)" />
             <h1 className="login-marke__name">lifeline-hub</h1>
           </div>
           <p className="login-marke__untertitel">Einsatzführung &amp; Einsatztagebuch</p>

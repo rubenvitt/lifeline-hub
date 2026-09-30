@@ -986,8 +986,20 @@ const STAB_WERKZEUG_LINKS = 15;
 const STAB_WERKZEUG_GRUPPEN = 5;
 /** Sechs feste Sachgebietszeilen, je ein Knopf. */
 const STAB_BESETZUNG_KNOEPFE = 6;
+/**
+ * Sieben feste Punkte der Arbeitsaufnahme (LFH-551), je ein Zeilen-Label um Box und Text. Die
+ * antd-Box selbst erbt keine Steuerhöhe; das Label trägt den Boden (`checklistenZeileStil`).
+ */
+const STAB_CHECKLISTE_ZEILEN = 7;
 
-test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern" und Kopfaktion folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+/** Die Zeilen-Labels der Arbeitsaufnahme — antd rendert Box und Text als EIN `<label>`. */
+function checklistenZeilen(page: Page): Locator {
+  return page
+    .getByRole('region', { name: 'Arbeitsaufnahme', exact: true })
+    .locator('label.ant-checkbox-wrapper');
+}
+
+test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern", Kopfaktion und Arbeitsaufnahme folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,
 }) => {
   // Drei Stufen mit je einem Neuladen und 24 gemessenen Knoten je Stufe.
@@ -1060,9 +1072,20 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern" und Kopfaktion folg
     await expect(kopfaktion).toBeEnabled();
     const kopf = await haeltStufe(kopfaktion, soll, `Kopfaktion (${dichte})`);
 
+    // (5) Die Zeilen der Arbeitsaufnahme (LFH-551): erst bedienbar, dann gemessen.
+    const zeilen = checklistenZeilen(page);
+    await expect(zeilen).toHaveCount(STAB_CHECKLISTE_ZEILEN);
+    await expect(zeilen.getByRole('checkbox').first()).toBeEnabled();
+    const checkliste = await alleHaltenStufe(
+      zeilen,
+      soll,
+      `Arbeitsaufnahme-Zeile (${dichte})`,
+      STAB_CHECKLISTE_ZEILEN,
+    );
+
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Werkzeug-Link ${werkzeug}, ` +
-        `Besetzung ändern ${knopf}, Kopfaktion ${kopf}`,
+        `Besetzung ändern ${knopf}, Kopfaktion ${kopf}, Arbeitsaufnahme-Zeile ${checkliste}`,
     );
   }
 
@@ -1132,8 +1155,23 @@ test('Stab (Beobachter): ETB-Links, Werkzeug-Links und die gesperrte Kopfaktion 
       `Kopfaktion gesperrt (${dichte})`,
     );
 
+    // Die Arbeitsaufnahme (LFH-551) steht lesend da: Vorbedingung gesperrte Boxen, dann die
+    // Zeilenhöhe — ein gesperrtes Ziel ist ein sichtbares Ziel.
+    const zeilen = checklistenZeilen(page);
+    await expect(zeilen).toHaveCount(STAB_CHECKLISTE_ZEILEN);
+    for (const box of await zeilen.getByRole('checkbox').all()) {
+      await expect(box, 'Vorbedingung: ohne Schreibrecht ist jeder Haken gesperrt').toBeDisabled();
+    }
+    const checkliste = await alleHaltenStufe(
+      zeilen,
+      soll,
+      `Arbeitsaufnahme-Zeile gesperrt (${dichte})`,
+      STAB_CHECKLISTE_ZEILEN,
+    );
+
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Werkzeug-Link ${werkzeug}, Kopfaktion gesperrt ${kopf}`,
+      `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Werkzeug-Link ${werkzeug}, Kopfaktion gesperrt ${kopf}, ` +
+        `Arbeitsaufnahme-Zeile gesperrt ${checkliste}`,
     );
   }
 

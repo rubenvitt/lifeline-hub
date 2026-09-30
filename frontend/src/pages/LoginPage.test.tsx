@@ -22,6 +22,20 @@ function setup() {
 }
 
 describe('LoginPage', () => {
+  it('zeigt die Bildmarke vor der Wortmarke, Linie in der Textfarbe der Betriebsart (LFH-837)', () => {
+    const { container } = setup();
+    const zeile = container.querySelector('.login-marke__zeile')!;
+    const marke = zeile.querySelector('svg[data-lfh="bildmarke"]');
+    expect(marke).not.toBeNull();
+    expect(marke).toHaveAttribute('aria-hidden', 'true');
+    expect(marke).toHaveAttribute('height', '20');
+    expect(marke!.querySelector('path')).toHaveAttribute('stroke', 'var(--lfh-text)');
+    expect(marke!.querySelector('rect')).toHaveAttribute('fill', 'var(--lfh-marke)');
+    expect(zeile.firstElementChild).toBe(marke);
+    expect(container.querySelector('.login-marke__quadrat')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'lifeline-hub' })).toBeInTheDocument();
+  });
+
   it('übersetzt den generischen 401 („Nicht angemeldet") in eine verständliche Login-Meldung', async () => {
     server.use(
       http.post('/api/auth/login', () =>
