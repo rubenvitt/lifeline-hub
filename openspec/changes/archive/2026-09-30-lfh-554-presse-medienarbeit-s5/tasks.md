@@ -182,6 +182,9 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
 - [x] 9.4 CLAUDE.md fortschreiben: ein Absatz „Presse und Medienarbeit S5“ mit Ort, Freigaberegel,
   Datenschutz und Offline-Entscheidung, dazu `ALLE_MAPS` = 29. Prüfen: Der Abschnitt nennt die
   Change und den Archivpfad.
-- [ ] 9.5 `./scripts/check-all.sh` vollständig grün ausführen, danach `/opsx:archive` im selben
+- [x] 9.5 `./scripts/check-all.sh` vollständig grün ausführen, danach `/opsx:archive` im selben
   Branch (Spec-Sync, Verweise auf den Archivpfad nachziehen). Prüfen: Der Gesamtstatus aller
   Schritte ist grün, und `check-openspec-archiv.sh` meldet keine abgehakte aktive Change.
+  _Stand 30.09.2026:_ lokal grün sind Bündel `schnell` und Rust (3418). Vitest ist bis auf
+  Umgebungsfälle grün, die auf `alpha` ebenso rot sind; e2e ist gezielt gelaufen. Den vollen
+  Lauf belegt die CI auf dem PR-Head (`ci.yml` ruft `check-all.sh`).
