@@ -113,7 +113,7 @@ describe('Zeitachseneintrag', () => {
 });
 
 describe('zeitachsenRinne', () => {
-  // Literale statt Rücklesen aus dem Token (CLAUDE.md): handschuh = 26 / 16.
+  // Literale statt Rücklesen aus dem Token (frontend/AGENTS.md): handschuh = 26 / 16.
   const handschuh = { padding: 26, paddingSM: 16 };
   it('unter md die kleine Rinne — der Text braucht die Breite', () => {
     expect(zeitachsenRinne(handschuh, true)).toBe(16);

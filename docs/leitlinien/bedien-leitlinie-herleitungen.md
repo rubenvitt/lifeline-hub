@@ -1,8 +1,9 @@
 # Bedien-Leitlinie — Herleitungen und Prüfspuren
 
 Ausgelagert aus `CLAUDE.md` (22.09.2026), weil die Datei das Zeichenlimit überschritt. Die
-Regeln stehen weiterhin in Kurzform in `CLAUDE.md`, Abschnitt „Frontend — Bedien-Leitlinie
-(Einsatzkontexte)"; hier steht der ungekürzte Wortlaut samt Messungen und Fallen.
+Regeln stehen weiterhin in Kurzform in `frontend/AGENTS.md` (bis LFH-556 `CLAUDE.md`), Abschnitt
+„Frontend — Bedien-Leitlinie (Einsatzkontexte)"; hier steht der ungekürzte Wortlaut samt
+Messungen und Fallen.
 
 ## Dichte-Staffel, Klein-Angaben und handgebaute Bedienziele
 

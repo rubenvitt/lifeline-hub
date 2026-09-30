@@ -2,7 +2,7 @@
 
 CodeQL läuft über GitHubs **Default Setup** — es gibt bewusst keine
 `.github/codeql/codeql-config.yml` und keine repoweite `query-filters`-Liste. Der Grund ist
-derselbe, aus dem `cargo clippy -D warnings` nicht im Gate steht (CLAUDE.md, „Qualitäts-Gates"):
+derselbe, aus dem `cargo clippy -D warnings` nicht im Gate steht (`AGENTS.md`, „Qualitäts-Gates"):
 **ein abgeschalteter Query ist von einem bestandenen nicht zu unterscheiden.** Wer
 `rust/insecure-cookie` repoweit ausfiltert, um zwölf begründete Fundstellen loszuwerden, ist
 gegen die dreizehnte blind — und zwar ohne roten Test und ohne Fehlerbild.

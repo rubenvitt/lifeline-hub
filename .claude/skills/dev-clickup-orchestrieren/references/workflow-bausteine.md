@@ -52,9 +52,9 @@ const ROUTEN =
   'Route: trivial (Typo/Text) · klar (Feature/Bugfix mit klarer Spec) · bug-unklar (Bug, Ursache unklar) · ' +
   'unklar (Anforderung unklar) · entwurf. entwurf gilt, sobald mindestens ein Grund zutrifft, und geht vor: ' +
   'E1 mehr als ein vertretbarer Weg, Wahl soll begründet bleiben; ' +
-  'E2 führt eine Regel ein oder ändert sie, die über den Task hinaus gilt (Fähigkeits-Anforderung, CLAUDE.md, .claude/); ' +
+  'E2 führt eine Regel ein oder ändert sie, die über den Task hinaus gilt (Fähigkeits-Anforderung, AGENTS.md-Dateien, .claude/); ' +
   'E3 mehr als ein Subsystem — Backend (src/, migrations/, tests/), Frontend (frontend/), Hülle (src-tauri/), ' +
-  'Gate/CI (scripts/, .github/), Arbeitsanleitungen (.claude/, CLAUDE.md); Pfade außerhalb dieser Liste ' +
+  'Gate/CI (scripts/, .github/), Arbeitsanleitungen (.claude/, AGENTS.md-Dateien); Pfade außerhalb dieser Liste ' +
   'zählen zu keinem Subsystem; E3 nicht bei einem Bugfix, der vorhandenes Verhalten wiederherstellt, ' +
   'und nicht bei einer reinen Text-/Tippfehlerkorrektur.'
 const map = await parallel(SUBTASKS.map(st => () =>
@@ -151,7 +151,7 @@ export const meta = {
 const DIMENSIONS = [
   { key: 'bugs', prompt: 'Logikfehler, Race Conditions, Null/Boundary in den geänderten Files.' },
   { key: 'security', prompt: 'Org-Isolation/Berechtigung, Injection, Datenleck in den geänderten Files.' },
-  { key: 'konventionen', prompt: 'Abweichungen von den Projekt-Konventionen (CLAUDE.md, Nachbarschaftscode).' },
+  { key: 'konventionen', prompt: 'Abweichungen von den Projekt-Konventionen (AGENTS.md-Dateien, Nachbarschaftscode).' },
   { key: 'tests', prompt: 'Fehlende/zu schwache Tests für die neue Logik.' },
 ]
 const FINDINGS = {

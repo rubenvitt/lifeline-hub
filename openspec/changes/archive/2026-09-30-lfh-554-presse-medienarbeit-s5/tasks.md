@@ -91,7 +91,7 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
   neue Hook-Test deckt Laden, Fehler, gesperrt und frei ab.
 - [x] 5.4 Statuskarten `medienkontaktStatus`, `infotelefonStatus` und `pressemitteilungStatus` in
   `theme/statusFarben.ts` anlegen (D6). Prüfen: `ALLE_MAPS` steigt von 26 auf 29, und
-  `statusVertrag.guard.test.ts` ist grün. Den Stand in CLAUDE.md nachziehen.
+  `statusVertrag.guard.test.ts` ist grün. Den Stand in `frontend/AGENTS.md` nachziehen (vormals CLAUDE.md).
 - [x] 5.5 Die S5-Zeile bekommt die Verweise „Pressearbeit“ und „Informationstelefon“ über die
   Tabelle `unterseiten` je Sachgebiet (D1). S6 zieht auf dieselbe Tabelle um. Die Routen gehen in
   `App.tsx`. Prüfen: Die Tests in `StabPage.test.tsx` belegen beide Verweise mit Ziel, dass S6
@@ -179,7 +179,8 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
 - [x] 9.3 Folgetickets auf dem Entwicklungsboard anlegen: serverseitige Zählung des
   Informationstelefons und Mandanten-Labels für S5. Außerdem die S5-Beobachtung in LFH-852
   ergänzen. Prüfen: Die Tickets sind verlinkt und im Design-Nachtrag genannt.
-- [x] 9.4 CLAUDE.md fortschreiben: ein Absatz „Presse und Medienarbeit S5“ mit Ort, Freigaberegel,
+- [x] 9.4 `frontend/src/stab/AGENTS.md` fortschreiben (vormals CLAUDE.md; `ALLE_MAPS` steht in
+  `frontend/AGENTS.md`): ein Absatz „Presse und Medienarbeit S5“ mit Ort, Freigaberegel,
   Datenschutz und Offline-Entscheidung, dazu `ALLE_MAPS` = 29. Prüfen: Der Abschnitt nennt die
   Change und den Archivpfad.
 - [x] 9.5 `./scripts/check-all.sh` vollständig grün ausführen, danach `/opsx:archive` im selben
