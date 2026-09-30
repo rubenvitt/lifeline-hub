@@ -101,6 +101,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 Liste/Karte (`components/Liste.tsx`, `Datensicht` `form="karte"`); Kachel nur für Überblick.
 Karten-Fallback unter `md` (`form="auto"`) ist begründungspflichtig (Dateikopf `Datensicht.tsx`,
 AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
+- **Kein Nutzerschalter Tabelle ↔ Karte** (LFH-507, `openspec/changes/lfh-507-palette-status-setzen/`):
+  die Form bleibt die begründete Entscheidung je Seite, auch in der Palette („Ansicht wechseln“
+  gibt es nicht). Wer einen Schalter will, schreibt zuerst diese Regel fort.
 - **FMS-Tableau** (LFH-642, `kraefte/FmsTableau.tsx`): Ansicht `?ansicht=tableau` der
   Fahrzeugseite, kein Modul; je Kachel genau ein Bedienziel (`StatusWahl`), Kachel selbst nicht
   klickbar; Sortierung Abschnitt → Einheit → Funkrufname, nie Status; `fms_anker` 0–9 nur
@@ -324,6 +327,10 @@ anwendbar), „nicht geprüft" ist keins.
   `command-palette/datensatzAbfrage.ts` (gleicher Schlüssel, `queryFn`, `FRISCH_MS`), kein
   Detailfach; ETB über `lfdNr` nur bei gleicher `id`; fehlt der Satz, sagt `VorschauZustand` es.
   Verweise in der Vorschau schließen die Palette.
+- **Fokuszeile** (LFH-507): „Status setzen“ öffnet das `StatusWahl`-Menü der Zeile, die den Fokus
+  hat. Die Ebene hängt am Primitiv, ihre Wurzel ist die Zeile (`[data-row-key]` bzw.
+  `datensicht-karte`), kein eigener Auswahlzustand. `nurMitFokus` hält zeilengebundene Aktionen aus
+  dem Anzeige-Fallback; der Leerfall ist die tragende Aussage (`StatusWahl.palette.test.tsx`).
 
 **Aktionen**
 - **Datensatz-Aktionen werden gebündelt** (LFH-365): ab drei (nach Rechteprüfung) ein

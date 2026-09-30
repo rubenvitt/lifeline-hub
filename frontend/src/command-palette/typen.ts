@@ -16,15 +16,17 @@ import type { DatensatzQuellen } from './datensaetze';
  * Die Aktionen, die eine Maske oder Seite an die Palette meldet.
  *
  * Nur `speichern`/`verwerfen`/`filter-zuruecksetzen` haben einen Tastenweg
- * (`tastaturAktionFuerEreignis`); `neue-zeile` und `spalten` sind nur über die Palette erreichbar,
- * ein weiteres globales Kürzel wäre eine neue Kollisionsfläche mit Browser und antd.
+ * (`tastaturAktionFuerEreignis`); `neue-zeile`, `spalten` und `status-setzen` sind nur über die
+ * Palette erreichbar, ein weiteres globales Kürzel wäre eine neue Kollisionsfläche mit Browser und
+ * antd. `status-setzen` wirkt auf die Fokuszeile (LFH-507) und meldet sich deshalb mit
+ * `nurMitFokus` an (`useTastaturEbene`).
  *
  * Wer die Union erweitert, trägt in `befehle.ts` BEIDES nach: den Eintrag im exhaustiven
  * `TASTATUR_AKTIONEN` (Typcheck) und die Position in `TASTATUR_AKTION_REIHENFOLGE` (Guard in
  * `befehle.test.ts`).
  */
 export type TastaturAktionId =
-  'speichern' | 'verwerfen' | 'filter-zuruecksetzen' | 'neue-zeile' | 'spalten';
+  'speichern' | 'verwerfen' | 'filter-zuruecksetzen' | 'neue-zeile' | 'spalten' | 'status-setzen';
 
 export type TastaturAktionen = Partial<Record<TastaturAktionId, () => void>>;
 

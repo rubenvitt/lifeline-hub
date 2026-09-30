@@ -320,6 +320,42 @@ describe('Tastaturaktionen', () => {
     // Gegenaussage: eine Aktion OHNE Tastenweg hat kein Kürzel.
     expect(kuerzelFuerTastaturAktion('neue-zeile', 'Mozilla/5.0 (X11; Linux x86_64)')).toBeNull();
     expect(kuerzelFuerTastaturAktion('spalten', 'Mozilla/5.0 (Macintosh)')).toBeNull();
+    expect(
+      kuerzelFuerTastaturAktion('status-setzen', 'Mozilla/5.0 (X11; Linux x86_64)'),
+    ).toBeNull();
+    expect(kuerzelFuerTastaturAktion('status-setzen', 'Mozilla/5.0 (Macintosh)')).toBeNull();
+  });
+
+  it.each([
+    { key: 'Escape', ctrlKey: false, metaKey: false },
+    { key: 's', ctrlKey: true, metaKey: false },
+    { key: 's', ctrlKey: false, metaKey: true },
+    { key: 'Enter', ctrlKey: true, metaKey: false },
+    { key: 'Enter', ctrlKey: false, metaKey: true },
+    { key: 'Backspace', ctrlKey: true, metaKey: false },
+    { key: 'Backspace', ctrlKey: false, metaKey: true },
+  ])('„Status setzen“ belegt keine der belegten Tasten (LFH-507): %o', (taste) => {
+    expect(
+      tastaturAktionFuerEreignis({ ...taste, defaultPrevented: false, repeat: false }),
+    ).not.toBe('status-setzen');
+  });
+
+  it('„Status setzen“ steht ohne Kürzel ganz hinten unter „Aktionen“ (LFH-507)', () => {
+    const b = baueBefehle(
+      kontext({
+        tastaturAktionen: { 'status-setzen': vi.fn(), 'neue-zeile': vi.fn(), spalten: vi.fn() },
+        userAgent: 'Mozilla/5.0 (Macintosh)',
+      }),
+    );
+    const aktionen = b.filter((x) => x.gruppe === 'aktionen');
+    expect(aktionen.map((x) => x.id)).toEqual([
+      'tastatur:neue-zeile',
+      'tastatur:spalten',
+      'tastatur:status-setzen',
+    ]);
+    const befehl = aktionen[aktionen.length - 1];
+    expect(befehl.label).toBe('Status setzen');
+    expect('kuerzel' in befehl).toBe(false);
   });
 
   it('erzeugt nur für registrierte Callbacks sichtbare Aktionsbefehle', () => {

@@ -248,3 +248,64 @@ test('„Spalten" öffnet die Spaltenwahl UND legt den Fokus hinein (Fokus-Renne
     .poll(() => fokusImOffenenMenue(page), { message: 'Fokus steht im geöffneten Spalten-Menü' })
     .toBe(true);
 });
+
+/**
+ * „Status setzen“ wirkt auf die FOKUSZEILE (LFH-507): die Ebene hängt am Primitiv `StatusWahl`,
+ * ihre Wurzel ist die umgebende Tabellenzeile. Zwei Fahrzeuge, damit „genau diese Zeile“
+ * widerlegbar ist; welche Zeile das Menü trägt, zeigt die Wahl darin.
+ */
+test('„Status setzen“ öffnet das Statusmenü der Fokuszeile UND legt den Fokus hinein (LFH-507)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Status setzen ${Date.now()}`);
+  const basis = `/api/einsaetze/${einsatzId}`;
+  const katalogAntwort = await page.request.get('/api/fahrzeug-status');
+  expect(katalogAntwort.ok(), await katalogAntwort.text()).toBeTruthy();
+  const katalog = (await katalogAntwort.json()) as { id: number; label: string }[];
+  const [start, ziel] = katalog;
+  expect(ziel, 'Katalog mit mindestens zwei Status').toBeDefined();
+  for (const funkrufname of ['Florian Palette 1', 'Florian Palette 2']) {
+    const r = await page.request.post(`${basis}/fahrzeuge`, { data: { adhoc: { funkrufname } } });
+    expect(r.ok(), await r.text()).toBeTruthy();
+    const { id } = (await r.json()) as { id: number };
+    const s = await page.request.patch(`${basis}/fahrzeuge/${id}`, {
+      data: { status_id: start.id },
+    });
+    expect(s.ok(), await s.text()).toBeTruthy();
+  }
+
+  await zumModul(page, einsatzId, 'fahrzeuge');
+  const ausloeser = (n: number) =>
+    page.getByRole('button', { name: `Status von Florian Palette ${n} ändern` });
+  await expect(ausloeser(2)).toBeVisible();
+
+  // Gegenprobe ZUERST: über den „Suchen“-Knopf liegt der Fokus in keiner Zeile, die Aktion fehlt,
+  // obwohl die Seite Zeilen mit Statuswechsel zeigt.
+  await page.getByRole('button', { name: 'Suchen' }).click();
+  await expect(paletteInput(page)).toBeFocused();
+  await expect(page.getByRole('option', { name: 'Neue Zeile', ...AKTION })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Status setzen', ...AKTION })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(paletteInput(page)).toBeHidden();
+
+  // Fokus in die Zeile von „Florian Palette 2“ (fokussiert, nicht geklickt: der Klick öffnete das
+  // Menü schon selbst), dann per Tastenweg öffnen, damit die Kette erhalten bleibt.
+  await ausloeser(2).focus();
+  await page.keyboard.press('Control+k');
+  await expect(paletteInput(page)).toBeVisible();
+  await page.getByRole('option', { name: 'Status setzen', ...AKTION }).click();
+  await expect(paletteInput(page)).toBeHidden();
+
+  const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+  await expect(menue).toHaveCount(1);
+  await expect(menue).toBeVisible();
+  // Dasselbe Fokus-Rennen wie bei „Spalten“: das schließende Modal gegen das `autoFocus` des Menüs.
+  await expect
+    .poll(() => fokusImOffenenMenue(page), { message: 'Fokus steht im geöffneten Statusmenü' })
+    .toBe(true);
+
+  await menue.getByRole('menuitem', { name: ziel.label, exact: true }).click();
+  await expect(ausloeser(2)).toContainText(ziel.label);
+  await expect(ausloeser(1)).toContainText(start.label);
+});

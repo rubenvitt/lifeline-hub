@@ -209,6 +209,15 @@ export const TASTATUR_AKTIONEN: Record<TastaturAktionId, TastaturAktionDefinitio
     schlagworte: ['spalten', 'ausblenden', 'einblenden', 'tabelle', 'ansicht'],
     kuerzel: () => null,
   },
+  /**
+   * Öffnet das Statusmenü der FOKUSZEILE (LFH-507): die Ebene hängt am Primitiv `StatusWahl`, ihre
+   * Wurzel ist die umgebende Zeile. Kein Kürzel, gewählt wird im Menü.
+   */
+  'status-setzen': {
+    label: 'Status setzen',
+    schlagworte: ['status', 'wechseln', 'ändern', 'fms', 'zustand'],
+    kuerzel: () => null,
+  },
 };
 
 /**
@@ -222,6 +231,7 @@ export const TASTATUR_AKTION_REIHENFOLGE: readonly TastaturAktionId[] = [
   'filter-zuruecksetzen',
   'neue-zeile',
   'spalten',
+  'status-setzen',
 ];
 
 /** Reine Auflösung der globalen Mutationskürzel. Bereits behandelte und wiederholte
