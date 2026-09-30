@@ -30,8 +30,9 @@ Stilwechsel-Tests fahren den Blindstil, dessen Style inline ist und sofort lädt
   sie mit anderem Layernamen und zwei Views nutzen kann. Weiterhin keine Kachel-Bibliothek und
   keine echten Kacheldaten im Repo.
 - Kein Produktcode ändert sich, solange die neuen Tests grün sind. Wird beim Fahren ein Fehler
-  sichtbar (etwa eine Abstufung bis `blind`, weil ein Offline-Nebenabruf scheitert), wird er in
-  diesem Task behoben oder als eigenes Ticket vertagt.
+  sichtbar, wird er in diesem Task behoben oder als eigenes Ticket vertagt. **Eingetreten** (design.md
+  D6): Eine nicht ladbare Online-Karte stufte nie ab, die Lagekarte blieb leer. Das ist hier behoben
+  (`stilFehlerWaechter.ts`, Cluster-Schleife in `Kartenflaeche.tsx`).
 
 ## Capabilities
 
@@ -50,8 +51,9 @@ Stilwechsel-Tests fahren den Blindstil, dessen Style inline ist und sofort lädt
 - Tests: neues `frontend/e2e/lagekarte-kartengrundlage.spec.ts` (zwei Tests), neues
   Hilfsmodul `frontend/e2e/kartenFixture.ts`, `frontend/e2e/lagekarte-kachelpfad.spec.ts` nutzt
   es.
-- Produktcode: voraussichtlich keiner (`pages/lagekarte/Kartenflaeche.tsx`,
-  `kartenLayer.ts`, `useKartenAnsicht.ts` sind die geprüften Stellen).
+- Produktcode: `pages/lagekarte/stilFehlerWaechter.ts` (ein Fenster je angewandtem Style),
+  `pages/lagekarte/Kartenflaeche.tsx` (Quellenwache der Cluster-Schleife, Kommentar am
+  `[style]`-Effekt), Unit-Test `stilFehlerWaechter.test.ts`.
 - Doku: Nachweis-Zeile im Lagekarten-Absatz von `CLAUDE.md`.
 - Kein Backend, keine API, keine Migration, kein neuer Netzbedarf der e2e-Suite. Laufzeit: zwei
   zusätzliche Tests, je ein Einsatz, keine Wartezeiten über das Laden der Fixture hinaus.

@@ -35,7 +35,7 @@ Motivation: proposal.md, „Why". Ausgangslage im Code:
 **Non-Goals:**
 
 - Keine Änderung am Kartenverhalten, außer ein neuer Test deckt einen Fehler auf (dann hier behoben
-  oder als eigenes Ticket vertagt, s. Risiken).
+  oder als eigenes Ticket vertagt, s. Risiken). Eingetreten: D6.
 - Keine Abdeckung der Stufe `offline → blind` im Browser: ein Offline-Style ist inline, sein
   `style.load` feuert sofort; ein Style-Fehler vor dem Laden ist dort nicht herstellbar, ohne den
   Produktcode zu verbiegen (so steht es auch im Kopf von `stilFehlerWaechter.ts`). Die Stufe bleibt
@@ -117,12 +117,42 @@ das Ergebnis steht in `tasks.md` am Kästchen.
 - Test 1: Aufruf `planeReAnlegenNachStyle` im `[style]`-Effekt entfernen; `tz|`-Zweig im
   `styleimagemissing`-Hörer früh verlassen; `diff: false` entfernen (erwartet rot laut Kommentar
   im Effekt — bleibt der Test grün, wird das dort vermerkt, nicht der Kommentar geglaubt).
-- Test 2: `onStyleFehler?.()` im `error`-Hörer auskommentieren; Wächter so ändern, dass er nach
-  `stilAngewandt()` nicht neu schärft, darf Test 2 **nicht** rot machen (Gegenprobe: nur eine
-  Stufe wird gefahren).
+- Test 2: `onStyleFehler?.()` im `error`-Hörer auskommentieren; das neue Fenster je Style (D6)
+  zurücknehmen; die Quellenwache der Cluster-Schleife (D6) zurücknehmen.
 - Bestehende Abdeckung: `spiderfyOffsets` auf konstanten Versatz → `spiderfy.test.ts` rot;
   Spider-Öffnen in `Kartenflaeche.tsx` unterdrücken → der Spider-Test in `lagekarte-touch.spec.ts`
   rot; Kantenwahl in `bildHandles.ts` (`scharfeGriffe`) umgehen → `bildHandles.test.ts` rot.
+
+### D6 — Befund beim Fahren: die Abstufung griff nie (behoben)
+
+Test 2 lief rot, und die Ursache lag im Produktcode, nicht im Test (gemessen mit
+Konsolenmitschnitt):
+
+1. Die Karte wird immer mit dem **Blindstil** konstruiert, weil `basemap` bis zur Hydrierung der
+   Kartenansicht auf `'blind'` steht. Die Annahme im Kopf von `stilFehlerWaechter.ts` („erst nach
+   dem Lade-Guard der Seite mit dem echten Kachel-Style konstruiert“) trug nicht; einen solchen
+   Guard gibt es nicht.
+2. Das `style.load` dieses Platzhalters setzte `geladen = true`. Der danach per `setStyle`
+   angewandte Online-Style bekam kein Fenster mehr, `stilAngewandt()` schärfte nur `abgestuft`.
+3. Sein 404 wurde verworfen. Die Karte blieb **ganz ohne Style** stehen: `isStyleLoaded()` wurde nie
+   `true`, der Render-Poller legte deshalb auch keine Lagedaten an. Im Feld heißt das: eine nicht
+   erreichbare Online-Karte ergibt eine leere Lagekarte, auch mit bereitstehender Offline-Karte.
+
+**Entscheidung:** Jeder angewandte Style öffnet ein eigenes Fenster bis zu seinem `style.load`
+(`stilAngewandt()` setzt auch `geladen` zurück). Das kehrt eine frühere Regel um: „ein Ladefehler
+nach manuellem Wechsel wird nicht gemeldet (sonst zählten transiente Tile-Errors)“. Deren Grund
+trägt nicht mehr, Kachel-Fehler sind über `e.tile` ausgenommen. Ohne die Umkehr hinterließe auch ein
+von Hand gewählter, nicht ladbarer Online-View eine leere Karte.
+
+Verworfen: die Karte erst nach der Hydrierung zu konstruieren (der Guard, den der Kommentar
+annahm). Das verschiebt den Kartenstart für jede Seite und berührt Startansicht und Offline-Lesen
+(LFH-723). Der Fehler beim Wechsel von Hand bliebe außerdem bestehen.
+
+**Zweiter Teil, sonst eine falsche Abstufung:** Mit dem offenen Fenster allein stufte schon der
+gesunde Wechsel aus Test 1 ab (gemessen). Die Cluster-Schleife (`render`-Hörer in
+`Kartenflaeche.tsx`) rief `isSourceLoaded('marker-cluster')`, bevor die Neuanlage die Quelle
+wieder angelegt hatte. MapLibre meldet die geworfene Ausnahme als `error`-Event ohne `tile`. Die
+Schleife fragt jetzt zuerst `getSource`. Test 1 ist die Wache dagegen, Mutationsprobe M6.
 
 ## Risks / Trade-offs
 
