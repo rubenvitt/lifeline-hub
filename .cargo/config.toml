@@ -1,0 +1,19 @@
+# Build-Ziel je Checkout (LFH-520): jeder Worktree baut nach `<worktree>/target`.
+#
+# Warum: Cargo bildet den Artefakt-Hash eines Workspace-Mitglieds aus dem Pfad RELATIV zur
+# Workspace-Wurzel und prüft die Frische per mtime. Teilen sich zwei Worktrees ein Ziel (etwa
+# über ein globales `build.target-dir` in `~/.cargo/config.toml`), teilen sie sich auch
+# Fingerprints, Testbinaries und `target/debug/lifeline-hub`. Sind die Quellen des einen älter
+# als der letzte Bau des anderen, meldet Cargo „Fresh“ und führt fremden Code aus.
+#
+# Vorrang: `CARGO_TARGET_DIR`/`CARGO_BUILD_TARGET_DIR` > diese Datei > globale Konfiguration.
+# Ein relativer Pfad gilt ab dem Ordner über `.cargo/`, also ab der Worktree-Wurzel. `target`
+# ist Absicht: CI, rust-cache und `.gitignore` erwarten genau diesen Pfad.
+#
+# Übergang: Ein älterer Worktree OHNE diese Datei, der unter einem Checkout MIT ihr liegt
+# (`.claude/worktrees/…` unter dem Main-Checkout), erbt deren Ziel und teilt sich
+# `<main>/target`. Das endet mit dem Vorziehen auf `alpha`.
+#
+# Nachweis: `scripts/bauziel.test.sh`; Prüfung im Sammel-Gate: `scripts/lib/bauziel.sh`.
+[build]
+target-dir = "target"

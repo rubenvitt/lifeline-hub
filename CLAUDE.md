@@ -692,7 +692,7 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
-`check-migrationen.sh` → `check-all.test.sh` → `check-toolversionen.sh` →
+`check-migrationen.sh` → `check-all.test.sh` + `bauziel.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh`.
 - **Das Skript ist die Wahrheit**; `.github/workflows/ci.yml` ruft es unverändert. Neue Schritte
   gehören ins Skript.
@@ -711,6 +711,16 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   prüft das und bricht an jedem harten `node@…`/`pnpm@…` in `scripts/`, `.github/`, README, Skills.
 - Env-Hygiene über `scripts/lib/dev-env.sh`, keine handgepflegte `env -u`-Liste; Isolation wo
   möglich im Test (`config::tests::parse_hermetisch`).
+- **Jeder Checkout baut in sein eigenes `target/`** (LFH-520, `.cargo/config.toml`, schlägt
+  das globale `build.target-dir`; `CARGO_TARGET_DIR` schlägt beide). In einem geteilten Ziel
+  teilen sich Worktrees Fingerprints und Binaries (Hash aus dem Pfad relativ zur
+  Workspace-Wurzel, Frische per mtime), und Tests liefen still gegen einen fremden Stand.
+  Schritt 3, 4 und 7 prüfen das vorab (`scripts/lib/bauziel.sh`, rot bei fremdem Ziel ohne
+  Umgebungsvariable), Selbsttest `scripts/bauziel.test.sh`; Gate und Playwright nennen das
+  gestartete `Backend-Binary:`. Kosten: ~3 min kalt, bis 19 GB je voll gebautem Worktree,
+  frei mit dem Worktree. Ein älterer Worktree ohne die Datei erbt unter einem Main-Checkout
+  mit ihr dessen Ziel, bis er auf `alpha` vorgezogen ist
+  (`openspec/changes/archive/2026-09-30-lfh-520-cargo-artefakte-isolieren/design.md`).
 - e2e ist selbsttragend, braucht aber das Debug-Binary; Schritt 7 baut bei Bedarf den Prod-Bundle
   (`prod_bundle_bereitstellen`; Service Worker für `e2e/lagekarte-offline-precache.spec.ts`,
   ausgeliefert vom e2e-Backend über `src/static_files.rs`).

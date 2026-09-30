@@ -15,6 +15,10 @@
 # Schritt 4 es ohnehin mit; der Guard schützt verkürzte Läufe und Einzelaufrufe. Schritt 7
 # stellt außerdem `frontend/dist` bereit — den Service Worker für
 # `e2e/lagekarte-offline-precache.spec.ts` gibt es nur im Prod-Bundle.
+#
+# Schritt 3, 4 und 7 prüfen vorab, dass das Cargo-Build-Ziel diesem Checkout gehört
+# (`.cargo/config.toml`, lib/bauziel.sh, LFH-520): In einem mit anderen Worktrees geteilten Ziel
+# liefen Tests und Backend still gegen einen fremden Stand.
 set -euo pipefail
 
 # Bündel-Auswahl für die parallele CI. OHNE Argument läuft alles — der Weg vor dem Merge.
@@ -57,6 +61,8 @@ cd "$ROOT"
 . "$ROOT/scripts/lib/schritte.sh"
 # shellcheck source=lib/backend-binaer.sh
 . "$ROOT/scripts/lib/backend-binaer.sh"
+# shellcheck source=lib/bauziel.sh
+. "$ROOT/scripts/lib/bauziel.sh"
 
 FE="$ROOT/frontend"
 # Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
@@ -92,6 +98,9 @@ schritt_2() {
 
 schritt_3() {
   echo "==> [3/$SCHRITTE] Typ-Drift Backend↔Frontend (enthält den Frontend-Typecheck)"
+  # Baut und startet `openapi_spec_aktuell`, das seinen Pfad per CARGO_MANIFEST_DIR einkompiliert:
+  # ein fremdes Testbinary prüfte die openapi.json des anderen Worktrees.
+  bauziel_pruefen "$ROOT"
   "$ROOT/scripts/check-typ-codegen.sh"
 }
 
@@ -101,6 +110,7 @@ schritt_4() {
   # und Hülle (LFH-721) — der Server würde mit einem Feature-Satz getestet, den sein Binary nie
   # hat (u. a. zwei rustls-Provider, woran `tls::tests::rcgen_pem_ist_per_rustls_ladbar` als
   # Stolperdraht absichtlich bricht). Jedes Produkt läuft mit seinem eigenen Feature-Satz.
+  bauziel_pruefen "$ROOT"
   ohne_dev_env cargo test --workspace --exclude lifeline-desktop
   ohne_dev_env cargo test -p lifeline-desktop
 }
@@ -164,6 +174,10 @@ schritt_7() {
   # PW_BINAER übersteuert (ein e2e-Shard der CI lädt das Binary als Artefakt). Der Präfix `PW_`
   # ist Absicht — `LIFELINE_`/`KS_`/`AWS_` räumt lib/dev-env.sh als Dev-Variablen weg.
   local binaer
+  # Ein vorgegebenes Binary (PW_BINAER, CI-Shard ohne Cargo) hat kein Build-Ziel zu prüfen.
+  if [ -z "${PW_BINAER:-}" ]; then
+    bauziel_pruefen "$ROOT"
+  fi
   binaer="$(backend_binaer_pfad "$ROOT")"
   # Fehlt es ungefragt, meldet der Schritt „übersprungen" (Gesamtstatus „OK mit Lücke"), nie
   # grün; fehlt es trotz PW_BINAER oder ohne Ausführbar-Bit, ist er rot.
@@ -217,13 +231,16 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Schrittläufer und Binary-Suche des Sammel-Gates (Selbsttests, LFH-386/LFH-518)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel (LFH-386/518/520)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
   # Die Binary-Suche entscheidet, ob Schritt 7 die Browsertests fährt oder überspringt — sucht
   # sie am falschen Ort, meldet das Gate OK mit Lücke, wo es hätte prüfen können.
   "$ROOT/scripts/backend-binaer.test.sh"
+  # Die Vorbedingung von Schritt 3, 4 und 7: das Build-Ziel je Checkout (LFH-520). Sie irrt
+  # ebenfalls still — ein geteiltes Ziel färbt kein Ergebnis rot, nur das falsche grün.
+  "$ROOT/scripts/bauziel.test.sh"
 }
 
 schritt_12() {
