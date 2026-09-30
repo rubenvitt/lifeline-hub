@@ -271,7 +271,9 @@ for (const modus of ['light', 'dark']) {
 //
 // (2) DIE VERDICHTUNGSZEILE der Kräfte-Modulseiten auf SEITENGRUND: der Ton auf dem Text,
 //     über die Textrollen (`verdichtungsTextfarbe` in `kraefte/Verdichtungszeile.tsx`,
-//     LFH-538). Auch hier gilt in BEIDEN Modi der Zielwert HART.
+//     LFH-538). Auch hier gilt in BEIDEN Modi der Zielwert HART. Mutationsprobe (30.09.2026):
+//     die Zeile zurück auf die Füllrollen (`rollenFarbe`) → Hellmodus rot mit 5,81 / 5,79 /
+//     5,67, Nachtmodus grün.
 //
 // `soft`, damit ein Lauf alle Werte meldet; die absolute Untergrenze steht in jeder Meldung.
 //
