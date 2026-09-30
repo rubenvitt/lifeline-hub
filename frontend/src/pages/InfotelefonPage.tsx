@@ -1,5 +1,5 @@
 import { App, Breadcrumb, Flex, Typography } from 'antd';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -16,6 +16,7 @@ import {
   Kennzahl,
   Paneel,
   PaneelZeile,
+  Sammelbanner,
   Segmentleiste,
   Zeitachseneintrag,
   monoStil,
@@ -29,6 +30,7 @@ import StatusTag from '../components/StatusTag';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import AnrufErfassung from '../infotelefon/AnrufErfassung';
+import { einfrieren, teileZufluss, zuflussText, type Einfrierstand } from '../infotelefon/zufluss';
 import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from '../presse/labels';
 import { infotelefonRechteText } from '../presse/rechteText';
 import { personenPfad, stabPfad } from '../routing/deeplinks';
@@ -72,6 +74,9 @@ export default function InfotelefonPage() {
   const frei = stabFreigabe.zustand === 'frei';
   const [sicht, setSicht] = useState<Sicht>('alle');
   const [hervorgehoben, setHervorgehoben] = useState<number | null>(null);
+  // Zufluss-Schleuse (Muster ETB-Zeitachse): eingefroren, solange der Fokus in der Liste liegt.
+  const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
+  const listeRef = useRef<HTMLDivElement>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -86,6 +91,7 @@ export default function InfotelefonPage() {
   useQueryParamSelektion('anruf', anrufeQuery.isSuccess, (aid) => {
     if (!(anrufeQuery.data ?? []).some((a) => a.id === aid)) return;
     setSicht('alle');
+    setGefroren(null);
     setHervorgehoben(aid);
   });
   useEffect(() => {
@@ -112,6 +118,20 @@ export default function InfotelefonPage() {
 
   const anrufe = useMemo(() => anrufeQuery.data ?? [], [anrufeQuery.data]);
   const offene = anrufe.filter((a) => a.status === 'offen');
+  const gefiltert = useMemo(
+    () => (sicht === 'offen' ? anrufe.filter((a) => a.status === 'offen') : anrufe),
+    [anrufe, sicht],
+  );
+  const betreten = useCallback(() => {
+    setGefroren((vorher) => vorher ?? einfrieren(gefiltert));
+  }, [gefiltert]);
+  const verlassen = useCallback((e: FocusEvent<HTMLDivElement>) => {
+    const ziel = e.relatedTarget as Node | null;
+    if (ziel != null && listeRef.current?.contains(ziel)) return;
+    // Ein Menü im Portal (Statuswahl) ist kein Verlassen.
+    if (ziel instanceof Element && ziel.closest('.ant-dropdown')) return;
+    setGefroren(null);
+  }, []);
   const jeAnliegen = useMemo(() => {
     const z = new Map<string, number>();
     for (const a of anrufe) z.set(a.anliegen, (z.get(a.anliegen) ?? 0) + 1);
@@ -140,7 +160,8 @@ export default function InfotelefonPage() {
     : anrufeQuery.isError
       ? 'fehler'
       : 'daten';
-  const sichtbar = sicht === 'offen' ? offene : anrufe;
+  // Kennzahlen zählen die ganze Menge; nur die Zeitachse hält Fremdes zurück.
+  const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, gefroren, benutzer?.id);
 
   return (
     <EinsatzSeite
@@ -216,53 +237,71 @@ export default function InfotelefonPage() {
             {sicht === 'offen' ? 'Keine offenen Rückrufe' : 'Noch keine Anrufe'}
           </Typography.Text>
         ) : (
-          <ol aria-label="Anrufprotokoll" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {sichtbar.map((a) => (
-              <Zeitachseneintrag
-                key={a.id}
-                als="li"
-                data-anruf={a.id}
-                data-lfh="datensicht-karte"
-                className={a.id === hervorgehoben ? HERVORGEHOBEN : undefined}
-                zeit={<ZeitAnzeige wert={a.eingang_at} />}
-                typwort={ANLIEGEN_LABEL[a.anliegen]}
-                meta={[a.anrufer_name, a.rueckruf].filter(Boolean).join(' · ') || undefined}
-                verfasser={
-                  a.anliegen === 'vermisstensuche' && personenFrei ? (
-                    <Link
-                      to={personenPfad(einsatzId, { ansicht: 'zeilen', filter: 'vermisst' })}
-                      style={stabZeilenzielStil(token)}
-                    >
-                      Vermisste <span aria-hidden>↗</span>
-                    </Link>
-                  ) : undefined
-                }
-                aktionen={
-                  <StatusWahl<InfotelefonStatus>
-                    darstellung={infotelefonStatus[a.status]}
-                    aktuell={a.status}
-                    optionen={statusOptionen(a).map((s) => ({
-                      wert: s,
-                      label: infotelefonStatus[s].label,
-                      darstellung: infotelefonStatus[s],
-                    }))}
-                    // Menschenlesbar und je Zeile verschieden: Anliegen plus Eingang (DTG).
-                    kennung={`Anruf ${ANLIEGEN_LABEL[a.anliegen]} ${taktischeDtgVoll(a.eingang_at, konventionen)}`}
-                    darfSchreiben={darfSchreiben && statusOptionen(a).length > 1}
-                    laeuft={statusMutation.isPending && statusMutation.variables?.id === a.id}
-                    gesperrt={statusMutation.isPending}
-                    onWaehlen={(s) => {
-                      if (s !== a.status && !statusMutation.isPending)
-                        statusMutation.mutate({ id: a.id, status: s });
-                    }}
-                    etikett={<StatusTag darstellung={infotelefonStatus[a.status]} />}
-                  />
-                }
-              >
-                {a.notiz ?? <Typography.Text type="secondary">—</Typography.Text>}
-              </Zeitachseneintrag>
-            ))}
-          </ol>
+          <div
+            ref={listeRef}
+            onFocus={betreten}
+            onBlur={verlassen}
+            style={{ position: 'relative' }}
+          >
+            {/* Überlagerung mit Nullhöhe: das Banner nimmt keinen Platz im Fluss. */}
+            <div style={{ position: 'sticky', top: 0, height: 0, zIndex: 5 }}>
+              {zurueckgehalten > 0 && (
+                <Sammelbanner
+                  aktion={{ label: 'anzeigen', onKlick: () => setGefroren(einfrieren(gefiltert)) }}
+                  style={{ position: 'absolute', insetInline: 0, top: 0 }}
+                >
+                  {zuflussText(zurueckgehalten)} — oben einsortiert
+                </Sammelbanner>
+              )}
+            </div>
+            <ol aria-label="Anrufprotokoll" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              {sichtbar.map((a) => (
+                <Zeitachseneintrag
+                  key={a.id}
+                  als="li"
+                  data-anruf={a.id}
+                  data-lfh="datensicht-karte"
+                  className={a.id === hervorgehoben ? HERVORGEHOBEN : undefined}
+                  zeit={<ZeitAnzeige wert={a.eingang_at} />}
+                  typwort={ANLIEGEN_LABEL[a.anliegen]}
+                  meta={[a.anrufer_name, a.rueckruf].filter(Boolean).join(' · ') || undefined}
+                  verfasser={
+                    a.anliegen === 'vermisstensuche' && personenFrei ? (
+                      <Link
+                        to={personenPfad(einsatzId, { ansicht: 'zeilen', filter: 'vermisst' })}
+                        style={stabZeilenzielStil(token)}
+                      >
+                        Vermisste <span aria-hidden>↗</span>
+                      </Link>
+                    ) : undefined
+                  }
+                  aktionen={
+                    <StatusWahl<InfotelefonStatus>
+                      darstellung={infotelefonStatus[a.status]}
+                      aktuell={a.status}
+                      optionen={statusOptionen(a).map((s) => ({
+                        wert: s,
+                        label: infotelefonStatus[s].label,
+                        darstellung: infotelefonStatus[s],
+                      }))}
+                      // Menschenlesbar und je Zeile verschieden: Anliegen plus Eingang (DTG).
+                      kennung={`Anruf ${ANLIEGEN_LABEL[a.anliegen]} ${taktischeDtgVoll(a.eingang_at, konventionen)}`}
+                      darfSchreiben={darfSchreiben && statusOptionen(a).length > 1}
+                      laeuft={statusMutation.isPending && statusMutation.variables?.id === a.id}
+                      gesperrt={statusMutation.isPending}
+                      onWaehlen={(s) => {
+                        if (s !== a.status && !statusMutation.isPending)
+                          statusMutation.mutate({ id: a.id, status: s });
+                      }}
+                      etikett={<StatusTag darstellung={infotelefonStatus[a.status]} />}
+                    />
+                  }
+                >
+                  {a.notiz ?? <Typography.Text type="secondary">—</Typography.Text>}
+                </Zeitachseneintrag>
+              ))}
+            </ol>
+          </div>
         )}
       </Flex>
     </EinsatzSeite>

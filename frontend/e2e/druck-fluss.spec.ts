@@ -260,6 +260,44 @@ async function pruefeDruckImFluss(page: Page, fall: string) {
   await page.emulateMedia({ media: null });
 }
 
+/** Abschnitte der Vorlage „Erstinformation“ (`presse/vorlagen.ts`), LFH-554. */
+const PRESSEMITTEILUNG_ABSCHNITTE = [
+  'sachverhalt',
+  'massnahmen',
+  'hinweise',
+  'naechste_information',
+  'rueckfragen',
+];
+
+async function pressemitteilungSaeen(
+  page: Page,
+  einsatzId: string,
+  freigeben: boolean,
+): Promise<number> {
+  const letzter = PRESSEMITTEILUNG_ABSCHNITTE.length - 1;
+  const neu = await mitWiederholung(() =>
+    page.request.post(`/api/einsaetze/${einsatzId}/stab/pressemitteilungen`, {
+      data: {
+        vorlage: 'erstinformation',
+        titel: 'Pressemitteilung Druckprobe',
+        abschnitte: PRESSEMITTEILUNG_ABSCHNITTE.map((schluessel, i) => ({
+          schluessel,
+          text: langerText(schluessel, 6, i === letzter ? ENDMARKE : ''),
+        })),
+      },
+    }),
+  );
+  expect(neu.ok(), await neu.text()).toBe(true);
+  const id = (await neu.json()).id as number;
+  if (freigeben) {
+    const frei = await mitWiederholung(() =>
+      page.request.post(`/api/einsaetze/${einsatzId}/stab/pressemitteilungen/${id}/freigeben`),
+    );
+    expect(frei.ok(), await frei.text()).toBe(true);
+  }
+  return id;
+}
+
 // Kaltstart der Detailrouten unter Vite plus PDF-Erzeugung.
 test.setTimeout(90_000);
 
@@ -276,6 +314,33 @@ test('Lagebericht (freigegeben) druckt im normalen Fluss über mehrere Seiten', 
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
   await expect(page.locator('.markdown p', { hasText: ENDMARKE })).toBeAttached();
   await pruefeDruckImFluss(page, 'Lagebericht lesend');
+});
+
+test('Pressemitteilung (freigegeben) druckt im normalen Fluss über mehrere Seiten', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss PM ${Date.now()}`);
+  const id = await pressemitteilungSaeen(page, einsatzId, true);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/stab/presse/mitteilungen/${id}`);
+  await expect(page.locator('.markdown p', { hasText: ENDMARKE })).toBeAttached();
+  await pruefeDruckImFluss(page, 'Pressemitteilung lesend');
+});
+
+test('Pressemitteilung (Entwurf) druckt jeden Abschnitt und trägt „Entwurf“ im Druckkopf', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss PM-Entwurf ${Date.now()}`);
+  const id = await pressemitteilungSaeen(page, einsatzId, false);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/stab/presse/mitteilungen/${id}`);
+  await expect(page.getByRole('button', { name: 'Entwurf speichern' })).toBeVisible();
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.getByText(/^Entwurf · Version 1$/)).toBeVisible();
+  await page.emulateMedia({ media: null });
+  await pruefeDruckImFluss(page, 'Pressemitteilung Entwurf');
 });
 
 /**

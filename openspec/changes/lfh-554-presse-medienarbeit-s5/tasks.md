@@ -168,7 +168,7 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
 
 ## 9. Nachweise und Abschluss
 
-- [ ] 9.1 Die drei Routen in `e2e/gate1-ueberlauf.spec.ts` (1366/1024/768/390 px) und
+- [x] 9.1 Die drei Routen in `e2e/gate1-ueberlauf.spec.ts` (1366/1024/768/390 px) und
   `e2e/gate3-trefflaeche.spec.ts` aufnehmen, jeweils als Admin und als Beobachtung
   (`e2e/rollen-kern.ts`, Rollenzweig als Vorbedingung). Den Druckfluss der Pressemitteilung mit
   ausgelöstem `beforeprint` in `e2e/druck-fluss.spec.ts` prüfen. Prüfen: `pnpm e2e` für diese

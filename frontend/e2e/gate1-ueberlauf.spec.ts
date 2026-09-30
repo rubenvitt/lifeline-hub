@@ -281,6 +281,41 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string) {
     },
     'Person',
   );
+  // Presse und Medienarbeit S5 (LFH-554): lange Medien-, Themen- und Notiztexte als Stoff für
+  // die Karten des Presse-Logs und die Zeitachse des Informationstelefons.
+  await anlegen(
+    'stab/medienkontakte',
+    {
+      art: 'anfrage',
+      medium: PRESSE_MEDIUM,
+      thema: PRESSE_THEMA,
+      kontakt_name: 'Redaktion Landespolitik, Maximiliane Kirchgassner-Wohlfahrt',
+      kontakt_erreichbarkeit: 'landespolitik.redaktion@rundfunkanstalt-musterstadt.example',
+    },
+    'Medienkontakt',
+  );
+  await anlegen(
+    'stab/infotelefon',
+    {
+      anliegen: 'vermisstensuche',
+      notiz: ANRUF_NOTIZ,
+      anrufer_name: 'Oberacher-Dreiszigmark, Wolfgang-Sebastian',
+      rueckruf: '+49 5141 123456789',
+      rueckruf_noetig: true,
+    },
+    'Anruf',
+  );
+  {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/stab/pressemitteilungen`, {
+      data: {
+        vorlage: 'erstinformation',
+        titel: PM_TITEL,
+        abschnitte: [{ schluessel: 'sachverhalt', text: ETB_STOFF }],
+      },
+    });
+    expect(antwort.ok(), `Seeding Pressemitteilung: ${antwort.status()}`).toBeTruthy();
+    PRESSEMITTEILUNG.set(einsatzId, ((await antwort.json()) as { id: number }).id);
+  }
   // Der Status-Default `aktiv` deckt sich mit dem Standardreiter der Tierseite.
   await anlegen(
     'tiere',
@@ -475,6 +510,14 @@ const ETB_STOFF =
   'Pegel Musterstadt-Nordwest steigt weiter, Deichverteidigung zwischen Kilometer 4,7 und 6,2 ' +
   'verstärken, Sandsackbefüllung am Bauhof Nordwestring anlaufen lassen';
 
+const PRESSE_MEDIUM = 'Norddeutscher Rundfunk Landesfunkhaus Niedersachsen Hörfunkredaktion';
+const PRESSE_THEMA = 'Zahl der Evakuierten im Abschnitt Deichverteidigung Nordwestring';
+const ANRUF_NOTIZ =
+  'Sucht den Vater, zuletzt gesehen am Bahnübergang Nordwestring Höhe Kilometer 4,7, Rückruf erbeten';
+const PM_TITEL = 'Hochwasser Musterstadt-Nordwest: Evakuierung Deichverteidigung Nordwestring';
+/** Kennung der gesäten Pressemitteilung je Einsatz (die Detailroute braucht sie). */
+const PRESSEMITTEILUNG = new Map<string, number>();
+
 type Gate1Route = {
   pfad: string;
   anker: (p: Page) => Locator;
@@ -587,6 +630,38 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
             p.getByRole('button', { name: 'In Lagebericht übernehmen' }),
             'Vorbedingung: ohne Schreibrecht keine Übernahme',
           ).toHaveCount(0),
+      },
+    },
+    {
+      // Pressearbeit S5 (LFH-554): die Karte des gesäten Medienkontakts im Presse-Log.
+      pfad: `/einsaetze/${einsatzId}/stab/presse`,
+      anker: (p: Page) => p.getByText(`${PRESSE_MEDIUM} · ${PRESSE_THEMA}`),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
+    },
+    {
+      // Detailseite der Pressemitteilung: Entwurf mit Editor bzw. Lesetext ohne Schreibrecht.
+      pfad: `/einsaetze/${einsatzId}/stab/presse/mitteilungen/${PRESSEMITTEILUNG.get(einsatzId)}`,
+      anker: (p: Page) => p.getByRole('heading', { level: 1, name: PM_TITEL }),
+      lesend: {
+        vorbedingung: (p: Page) =>
+          expect(
+            p.getByRole('button', { name: 'Entwurf speichern' }),
+            'Vorbedingung: ohne Schreibrecht kein Editor',
+          ).toHaveCount(0),
+      },
+    },
+    {
+      // Informationstelefon S5 (LFH-554): der gesäte Anruf in der Zeitachse.
+      pfad: `/einsaetze/${einsatzId}/stab/infotelefon`,
+      anker: (p: Page) => p.getByText(ANRUF_NOTIZ),
+      lesend: {
+        vorbedingung: async (p: Page) => {
+          await rechteHinweis(p, NUR_SCHREIBENDE);
+          await expect(
+            p.getByRole('button', { name: 'Erfassen' }),
+            'Vorbedingung: ohne Schreibrecht keine Erfassungsleiste',
+          ).toHaveCount(0);
+        },
       },
     },
     {
@@ -824,9 +899,10 @@ test.describe('Gate 1', () => {
     test(`Gate 1 · ${name} (${breite} px): keine tragende Route läuft waagerecht über`, async ({
       page,
     }) => {
-      // 17 Routen je Breite, jede mit `goto` und Inhaltsanker; `test.slow()` (90 s) reichte
-      // unter Last nicht mehr, seit der Überblick mitgemessen wird (LFH-435).
-      test.setTimeout(180_000);
+      // 20 Routen je Breite, jede mit `goto` und Inhaltsanker; `test.slow()` (90 s) reichte
+      // unter Last nicht mehr, seit der Überblick mitgemessen wird (LFH-435). Die drei
+      // S5-Seiten (LFH-554) kosten je Breite rund 10 s mehr.
+      test.setTimeout(240_000);
       const einsatzId = await gate1Vorbereiten(page);
       await gate1Messen(page, gate1Routen(einsatzId), 'admin', pruefbreite);
     });
@@ -834,7 +910,7 @@ test.describe('Gate 1', () => {
     test(`Gate 1 · ${name} (${breite} px) · Beobachter: auch ohne Schreibrecht läuft keine Route über`, async ({
       page,
     }) => {
-      test.setTimeout(180_000);
+      test.setTimeout(240_000);
       // Gesät wird als Admin; der Wechsel im selben Kontext behält den Wetter-Stub.
       const einsatzId = await gate1Vorbereiten(page);
       await wechsleZuRolle(page, 'beobachter', einsatzId);
