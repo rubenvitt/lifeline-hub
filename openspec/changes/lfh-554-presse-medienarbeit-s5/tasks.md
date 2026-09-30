@@ -5,17 +5,17 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
 
 ## 1. Datenmodell und Schwärzung
 
-- [ ] 1.1 Migration `0127_presse.sql` anlegen (D3):
+- [x] 1.1 Migration `0127_presse.sql` anlegen (D3):
   - Tabellen `medienkontakt`, `pressemitteilung` und `infotelefon_anruf` samt CHECKs und Indizes
   - `etb_eintrag.pressemitteilung_id`
   
   Prüfen: `scripts/check-migrationen.sh` gegen `origin/alpha` ist grün, und
   `db::tests::migrationsnummern_sind_eindeutig` ist grün.
-- [ ] 1.2 Regeln für die drei Tabellen und die neue ETB-Spalte in
+- [x] 1.2 Regeln für die drei Tabellen und die neue ETB-Spalte in
   `src/einsatz/schwaerzung_registry.rs` eintragen (D9). Prüfen: Die Guards
   `jede_einsatz_scoped_spalte_ist_klassifiziert`, `entdeckte_tabellen_gleich_registry_tabellen` und
   `fremde_fk_auf_scoped` sind grün.
-- [ ] 1.3 Schwärzungstests für `medienkontakt` und `infotelefon_anruf` in
+- [x] 1.3 Schwärzungstests für `medienkontakt` und `infotelefon_anruf` in
   `src/einsatz/purge_scheduler.rs` schreiben. Sie decken ab:
   - Kontaktdaten und Anrufdaten sind leer.
   - Medium, Antwort und Anliegen stehen noch da.
@@ -26,10 +26,10 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
 
 ## 2. Backend Presse-Log
 
-- [ ] 2.1 `src/presse/` anlegen: Typen, Enums (Art, Status) mit `wire_enum` und Repo `anlegen_tx`,
+- [x] 2.1 `src/presse/` anlegen: Typen, Enums (Art, Status) mit `wire_enum` und Repo `anlegen_tx`,
   `liste`, `patch_tx` und `status_tx`, mit der Art/Status-Prüfung als 422. Prüfen: Repo-Tests zu
   jedem erlaubten und verbotenen Übergang sowie zu Rücknahme mit stehender Antwort sind grün.
-- [ ] 2.2 Routen `…/stab/medienkontakte` in `src/routes/presse.rs` bauen (D2): `JsonBody`,
+- [x] 2.2 Routen `…/stab/medienkontakte` in `src/routes/presse.rs` bauen (D2): `JsonBody`,
   `PfadParam`, `EinsatzLese-/Schreibzugriff<Stab>`, `write_retry!`, `LiveEvent::Presse`.
   Registrierung in `app.rs`. Prüfen: `tests/stab_presse.rs` deckt ab:
   - 400: leeres Thema, unbekannte Art
@@ -40,17 +40,17 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
   - abgeschlossener Einsatz schreibgeschützt
   
   Dazu sind `json_extractor_guard`, `path_extractor_guard` und der `PFAD_KEY`-Guard grün.
-- [ ] 2.3 `LiveEvent::Presse` und `LiveEvent::Infotelefon` in `src/live/mod.rs` eintragen
+- [x] 2.3 `LiveEvent::Presse` und `LiveEvent::Infotelefon` in `src/live/mod.rs` eintragen
   (`modul_keys` → `stab`) und in `tests/enum_wire_kontrakt.rs` pinnen. Die neuen Enums laufen
   durch `jedes_toschema_enum_ist_gepinnt`. Prüfen: `cargo test --test enum_wire_kontrakt` ist grün.
 
 ## 3. Backend Pressemitteilung
 
-- [ ] 3.1 `DokumentRoute` um die Freigaberegel erweitern (`FREIGABE: Freigaberecht`, D4):
-  Lagebericht und Befehl bekommen `Schreibrecht`. Die Meldungstexte des Kerns neutral im Genus
-  formulieren. Prüfen: Die Paar-Tests sind grün (Führungspersonal gibt Lagebericht und Befehl frei),
-  und die bestehenden Tests `tests/lagebericht*.rs` und `tests/befehl*.rs` sind unverändert grün.
-- [ ] 3.2 `Dokumentart` für die Pressemitteilung umsetzen: vier Vorlagen, `ETB_TYP = meldung`,
+- [x] 3.1 Die Freigabe der Pressemitteilung über das Gate `EinsatzLeitungszugriff<Stab>` an der
+  Route regeln (D4, Nachtrag); den Kern um `NOMEN_MIT_ARTIKEL`/`IM_NOMEN` für das Genus erweitern.
+  Prüfen: Die Paar-Tests sind grün (Führungspersonal gibt Lagebericht und Befehl frei), und die
+  bestehenden Tests `tests/lagebericht*.rs` und `tests/befehl*.rs` sind unverändert grün.
+- [x] 3.2 `Dokumentart` für die Pressemitteilung umsetzen: vier Vorlagen, `ETB_TYP = meldung`,
   `ETB_VERWEIS = pressemitteilung_id`, `DokumentRoute` mit `MODUL_KEY = stab` und
   `FREIGABE = Einsatzleitung`. Die Routen `…/stab/pressemitteilungen` reichen an den Kern durch.
   Prüfen: `tests/stab_pressemitteilung.rs` deckt ab:
@@ -62,16 +62,16 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
   - leere Mitteilung → 422
   - Fortschreiben → Version 2
   - fremder Einsatz → 404
-- [ ] 3.3 Response-DTOs in `src/api_doc.rs` aufnehmen und `scripts/check-typ-codegen.sh`
+- [x] 3.3 Response-DTOs in `src/api_doc.rs` aufnehmen und `scripts/check-typ-codegen.sh`
   ausführen. `openapi.json` und `types.generated.ts` gehen mit in den Commit. Prüfen: Schritt 3
   von `check-all.sh` ist grün.
 
 ## 4. Backend Informationstelefon
 
-- [ ] 4.1 `src/infotelefon/` anlegen: Enum Anliegen (sieben Werte), Status, Repo `anlegen_tx`
+- [x] 4.1 `src/infotelefon/` anlegen: Enum Anliegen (sieben Werte), Status, Repo `anlegen_tx`
   (Status aus „Rückruf nötig“, 422 ohne Nummer), `liste` (Eingang absteigend) und `status_tx`
   (erledigen/öffnen mit Person und Zeit). Prüfen: Die Repo-Tests sind grün.
-- [ ] 4.2 Routen `…/stab/infotelefon` in `src/routes/infotelefon.rs` bauen, mit
+- [x] 4.2 Routen `…/stab/infotelefon` in `src/routes/infotelefon.rs` bauen, mit
   `LiveEvent::Infotelefon`. Prüfen: `tests/stab_infotelefon.rs` deckt ab: 400 bei unbekanntem
   Anliegen, 422 bei Rückruf ohne Nummer, 404 bei fremdem Einsatz, 403 für die Beobachtung,
   Modulsperre, abgeschlossenen Einsatz. `api_doc.rs` und Codegen wie in 3.3.

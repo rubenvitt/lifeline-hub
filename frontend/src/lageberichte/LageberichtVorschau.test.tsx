@@ -80,8 +80,8 @@ describe('LageberichtVorschau (LFH-664)', () => {
 
     expect(await screen.findByText('Entwurf')).toBeInTheDocument();
     expect(screen.getByText('Deich halten.')).toBeInTheDocument();
-    // Sieben Abschnitte in der Vorlage, einer befüllt — sechs Striche.
-    expect(screen.getAllByText('—')).toHaveLength(6);
+    // Acht Abschnitte in der Vorlage (mit Medienlage, LFH-554), einer befüllt — sieben Striche.
+    expect(screen.getAllByText('—')).toHaveLength(7);
     expect(screen.queryByText('Freigegeben von')).not.toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });

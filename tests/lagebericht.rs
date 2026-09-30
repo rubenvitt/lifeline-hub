@@ -19,7 +19,11 @@ async fn anlegen_und_liste() {
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(json["vorlage"], "lagebericht");
     assert_eq!(json["status"], "entwurf");
-    assert_eq!(json["abschnitte"].as_array().unwrap().len(), 7);
+    assert_eq!(
+        json["abschnitte"].as_array().unwrap().len(),
+        8,
+        "sieben Abschnitte + Medienlage (LFH-554)"
+    );
     let (_, liste) = anfrage(
         &app,
         "GET",

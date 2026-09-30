@@ -141,7 +141,7 @@ async fn ohne_startinhalt_bleibt_das_leere_skelett() {
     .await;
     assert_eq!(status, StatusCode::CREATED);
     let abschnitte = lb["abschnitte"].as_array().unwrap();
-    assert_eq!(abschnitte.len(), 7);
+    assert_eq!(abschnitte.len(), 8);
     assert!(abschnitte.iter().all(|a| a["text"] == ""));
 }
 

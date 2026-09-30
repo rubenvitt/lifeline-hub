@@ -87,6 +87,7 @@ const LAGEBERICHT_ABSCHNITTE = [
   'lageentwicklung',
   'fuehrungsprobleme',
   'antraege_vorschlaege',
+  'medienlage',
   'zusammenfassung',
 ];
 

@@ -51,16 +51,18 @@ Grund erscheinen, nie mit 0.
 ### Requirement: Abschnitt „Medienlage“ im Lagevortrag
 Die Lagebericht-Vorlage „Lagevortrag zur Information“ SHALL einen Abschnitt „Medienlage“
 unmittelbar vor der „Zusammenfassung“ führen. Bestehende Lageberichte ohne diesen Abschnitt MUST
-unverändert lesbar, bearbeitbar und freigebbar bleiben. Ein leerer Abschnitt MUST NOT im
-freigegebenen Snapshot erscheinen. Die übrigen Lagebericht-Vorlagen bleiben unverändert.
+lesbar und bearbeitbar bleiben; offene Entwürfe MUST freigebbar bleiben (sie bekommen den
+Abschnitt leer nachgetragen). Ein leerer Abschnitt erscheint im Snapshot wie jeder andere leere
+Abschnitt mit „(keine Angabe)“. Die übrigen Lagebericht-Vorlagen bleiben unverändert.
 
 #### Scenario: Alter Entwurf
 - **WHEN** ein vor dieser Änderung angelegter Entwurf geöffnet und gespeichert wird
 - **THEN** gelingt das Speichern, und der Abschnitt „Medienlage“ steht leer im Editor
 
-#### Scenario: Leer im Snapshot
-- **WHEN** ein Lagevortrag mit leerer Medienlage freigegeben wird
-- **THEN** enthält der ETB-Snapshot keine Überschrift „Medienlage“
+#### Scenario: Alter Entwurf wird freigegeben
+- **WHEN** ein vor dieser Änderung angelegter, gefüllter Entwurf ohne weitere Bearbeitung
+  freigegeben wird
+- **THEN** gelingt die Freigabe, und der Snapshot führt „Medienlage“ mit „(keine Angabe)“
 
 ### Requirement: Medienlage aus S5 übernehmen
 Im Abschnitt „Medienlage“ eines Lagevortrag-Entwurfs SHALL der Knopf „Aus S5 übernehmen“ stehen.

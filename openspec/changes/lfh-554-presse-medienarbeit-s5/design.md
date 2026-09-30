@@ -185,12 +185,18 @@ freigegeben“). Das ist eine Stelle im Kern, kein Zweig je Art.
   Pressetexten.
 - Nicht `lage`: Das ist der Typ des Lageberichts.
 
-**Freigaberegel:** `DokumentRoute` bekommt die Konstante `FREIGABE: Freigaberecht` mit den Werten
-`Schreibrecht` (Lagebericht, Befehl, unverändert) und `Einsatzleitung` (Pressemitteilung). Im
-Handler `freigeben` wird bei `Einsatzleitung` zusätzlich `darf_leiten` geprüft (Einsatzleitung
-oder System-Admin), sonst 403. Das Frontend liest dieselbe Regel über `darfEinsatzLeiten`.
-`FreigabeDialog` bekommt keinen Zweig: Die Detailseite sperrt den Knopf und zeigt den Grund aus
-`stammdaten/rechteText.ts`.
+**Freigaberegel:** Die Route der Freigabe trägt das Gate `EinsatzLeitungszugriff<Stab>` (nur die
+Einsatzleitung, 403 für Führungspersonal auch am abgeschlossenen Einsatz). Der Kern bleibt für
+alle Arten gleich; Lagebericht und Befehl behalten ihre Regel ohne eigenen Zweig. Das Frontend
+liest dieselbe Regel über `darfEinsatzLeiten`. `FreigabeDialog` bekommt keinen Zweig: Die
+Detailseite sperrt den Knopf und zeigt den Grund.
+
+_Nachtrag 30.09.2026 (Umsetzung):_ Ursprünglich war eine Konstante `FREIGABE: Freigaberecht` an
+`DokumentRoute` geplant. Das vorhandene Gate `EinsatzLeitungszugriff` trägt die Regel ohne
+Eingriff in den Kern und hält den Struktur-Guard (`tests/einsatz_kontext_guard.rs`) zufrieden, der
+für neue Routen einen typisierten Gate-Extractor verlangt. Für das Genus bekommt `Dokumentart`
+zwei Konstanten, `NOMEN_MIT_ARTIKEL` und `IM_NOMEN`; die Texte von Lagebericht und Befehl bleiben
+wortgleich.
 
 Verworfen: die Freigabe für alle Schreibenden, nur als Freitext dokumentiert, wer freigegeben hat.
 Die Freigabe von Presseinformationen ist die Kernaufgabe der Einsatzleitung, und das Ticket nennt
@@ -311,11 +317,16 @@ Die `TabellenRegel`n in `src/einsatz/schwaerzung_registry.rs`, Scoping `EinsatzI
 
 Dazu kommt `etb_eintrag.pressemitteilung_id` als `G_FK`.
 
-Der CHECK „offen nur mit `rueckruf`“ kollidiert mit dem Scrub eines offenen Anrufs. Deshalb setzt
-die Schwärzung `status` vorher auf `erledigt`: `PlatzhalterWennGesetzt` für `rueckruf` scheidet aus,
-und ein Scrub einer Pflichtangabe verbietet die Registry. Das wird am Schwärzungstest geprüft. Ist
-die Reihenfolge in der Registry nicht steuerbar, entfällt der CHECK. Die Regel steht dann nur im
-Repo, und der Nachtrag hier nennt das.
+Der CHECK „offen nur mit `rueckruf`“ bleibt in der Tabelle. Die Schwärzung ersetzt `rueckruf`
+mit `PlatzhalterWennGesetzt` (gesetzt → Platzhalter, leer → leer). Das ist dieselbe Lösung wie bei
+`einsatz_schaden.uebergeben_an`, und ein offener Rückruf bricht die Schwärzung nicht
+(_Nachtrag 30.09.2026_, belegt in `schwaerzung_presse_und_infotelefon_leert_personenbezug_und_haelt_nachweis`).
+
+**Migration offener Lagevortrag-Entwürfe (_Nachtrag 30.09.2026_):** Die Freigabe verlangt jeden
+Abschnitt der Vorlage (`validiere_freigabe`, gepinnt in
+`freigeben_gerendert_zweimal_ist_422_ohne_zweiten_snapshot`). Ein offener Entwurf von vor der
+Erweiterung ließe sich sonst nicht mehr freigeben. `0127_presse.sql` trägt „Medienlage“ deshalb in
+offene Entwürfe der Vorlage `lagebericht` leer nach; freigegebene Berichte bleiben unberührt.
 
 Schwärzungstests für beide Tabellen kommen nach `src/einsatz/purge_scheduler.rs`.
 
@@ -356,8 +367,9 @@ Change und trägt je Seite ein Verdikt.
   Befehl. → Paar-Tests: Führungspersonal gibt Lagebericht und Befehl weiter frei, eine
   Pressemitteilung nicht.
 - **Neuer Lagebericht-Abschnitt für alle.** Wer S5 nicht nutzt, sieht einen leeren Abschnitt
-  „Medienlage“. → Der Abschnitt ist optional, leer erscheint er nicht im Snapshot, und er steht
-  in der Gliederung des Lagevortrags.
+  „Medienlage“, im Snapshot mit „(keine Angabe)“ wie jeder leere Abschnitt. → Er steht in der
+  Gliederung des Lagevortrags; ein Weglassen leerer Abschnitte wäre eine Änderung für alle
+  Dokumentarten und ist nicht Teil dieser Change.
 
 ## Migration Plan
 

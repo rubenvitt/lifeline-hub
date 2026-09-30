@@ -1222,6 +1222,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("meldung_id", G_FK),
             retain("nachforderung_id", G_FK),
             retain("befehl_id", G_FK),
+            retain("pressemitteilung_id", G_FK),
         ],
     },
     TabellenRegel {
@@ -1361,6 +1362,78 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("freigegeben_von_id", G_FK),
             retain("freigegeben_at", G_ZEIT),
             retain("etb_eintrag_id", G_FK),
+        ],
+    },
+    // ---------- Presse- und Medienarbeit S5 (LFH-554) ----------
+    // Die Pressemitteilung ist ein veröffentlichter Text: RETAIN wie `lagebericht`/`befehl`.
+    TabellenRegel {
+        tabelle: "pressemitteilung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("vorlage", G_ENUM),
+            retain("titel", G_FUEHRUNG),
+            retain("zeitstand", G_FUEHRUNG),
+            retain("status", G_ENUM),
+            retain("abschnitte", G_FUEHRUNG),
+            retain("version", G_ZAEHLER),
+            retain("vorgaenger_id", G_FK),
+            retain("ersteller_id", G_FK),
+            retain("erstellt_at", G_ZEIT),
+            retain("aktualisiert_at", G_ZEIT),
+            retain("freigegeben_von_id", G_FK),
+            retain("freigegeben_at", G_ZEIT),
+            retain("etb_eintrag_id", G_FK),
+        ],
+    },
+    // Presse-Log: Ansprechperson und Erreichbarkeit sind personenbezogen. Medium (eine
+    // Redaktion, keine Person), Thema, Antwort und Freigabeangabe bleiben als Nachweis der
+    // Pressearbeit (dieselbe Abwägung wie beim Lagebericht, design.md D9).
+    TabellenRegel {
+        tabelle: "medienkontakt",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("art", G_ENUM),
+            retain("medium", G_FUEHRUNG),
+            retain("thema", G_FUEHRUNG),
+            scrub("kontakt_name", Strategie::NullSetzen),
+            scrub("kontakt_erreichbarkeit", Strategie::NullSetzen),
+            retain("eingang_at", G_ZEIT),
+            retain("status", G_ENUM),
+            retain("antwort", G_FUEHRUNG),
+            retain("freigabe_durch", G_FUEHRUNG),
+            retain("pressemitteilung_id", G_FK),
+            retain("bearbeitet_von_id", G_FK),
+            retain("bearbeitet_at", G_ZEIT),
+            retain("angelegt_von_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    // Informationstelefon: Name, Rückrufnummer und Notiz der Anrufenden sind personenbezogen.
+    // `rueckruf` nimmt den Platzhalter, weil ein CHECK ihn bei `status = 'offen'` verlangt.
+    TabellenRegel {
+        tabelle: "infotelefon_anruf",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("anliegen", G_ENUM),
+            scrub("notiz", Strategie::NullSetzen),
+            scrub("anrufer_name", Strategie::NullSetzen),
+            scrub("rueckruf", Strategie::PlatzhalterWennGesetzt),
+            retain("status", G_ENUM),
+            retain("eingang_at", G_ZEIT),
+            retain("erledigt_von_id", G_FK),
+            retain("erledigt_at", G_ZEIT),
+            retain("angelegt_von_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
         ],
     },
     TabellenRegel {
