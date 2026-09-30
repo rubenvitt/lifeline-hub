@@ -201,7 +201,7 @@ fn leer_ist_leer() {
     assert!(pruefe_funktion(Some(""), None, false).unwrap().ist_leer());
 }
 
-/// Die vier CHECK-Listen der Migration 0127 müssen genau `ALLE` tragen — sonst lehnt die DB
+/// Die vier CHECK-Listen der Migration 0128 müssen genau `ALLE` tragen — sonst lehnt die DB
 /// einen gültigen Code ab (oder nimmt einen ungültigen an).
 #[tokio::test]
 async fn check_listen_entsprechen_dem_katalog() {
