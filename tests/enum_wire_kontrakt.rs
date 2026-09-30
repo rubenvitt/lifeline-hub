@@ -548,6 +548,23 @@ fn einsatz_lagekennzahl_wire() {
     enum_wire_as_str!(lifeline_hub::einsatz::lagekennzahl::Lagekennzahl { Pegel, Evakuiert });
 }
 
+/// LFH-551: Checkliste Arbeitsaufnahme. Die Werte stehen als CHECK in
+/// `migrations/0127_stab_checkliste.sql`, das Frontend führt Text und Quelle je Wert in
+/// `stab/checkliste.ts`. Als Literal gepinnt, damit ein falscher `rename` hart auffällt; `ALLE`
+/// ist zugleich die Anzeigereihenfolge.
+#[test]
+fn stab_checklisten_punkt_wire() {
+    enum_wire!(lifeline_hub::stab::checkliste::ChecklistenPunkt {
+        Aufstellort => "aufstellort",
+        Einweisung => "einweisung",
+        Lageskizze => "lageskizze",
+        Funkarbeitsplaetze => "funkarbeitsplaetze",
+        Sprechgruppen => "sprechgruppen",
+        EtbEroeffnet => "etb_eroeffnet",
+        LeitstelleGemeldet => "leitstelle_gemeldet",
+    } in lifeline_hub::stab::checkliste::ChecklistenPunkt::ALLE);
+}
+
 #[test]
 fn stab_besetzung_art_wire() {
     enum_wire_as_str!(lifeline_hub::stab::BesetzungArt {
