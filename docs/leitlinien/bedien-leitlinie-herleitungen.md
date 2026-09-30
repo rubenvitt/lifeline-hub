@@ -110,9 +110,11 @@ Kommandopalette und der Drawer-Zweig auf 390 px); eine neue Route mit
 handgebauten Bedienzielen bekommt dort ihren Test — Böden als Literale, Mengen über
 `alleHaltenStufe` mit gesäter Mindestzahl, und die Mutationsprobe „Stufe festgenagelt →
 rot", die das Ticket verlangt. **Ein Boden ist nicht immer die Staffel**: der Rahmen trägt
-vier Verträge nebeneinander (30/48/72 · `Math.max(48, controlHeight)` an Rail, Hamburger,
-schmalem Suchzugang und den Drawer-Modulzeilen · `Math.max(40, …)` am Benutzermenü · zwei
-feste 48er im Drawer, gemessen in LFH-516 und als LFH-537 benannt). Wer eine Fläche
+drei Verträge nebeneinander (30/48/72 · `Math.max(48, controlHeight)` an Rail, Hamburger,
+schmalem Suchzugang, Akkordeon-Kopf, Drawer-Modulzeilen und Drawer-Schließer ·
+`Math.max(40, …)` am Benutzermenü). Die zwei festen 48er im Drawer, gemessen in LFH-516 und
+als LFH-537 benannt, folgen seit LFH-384 der Staffel; den Unit-Beleg über alle drei Stufen
+trägt `akkordeonKopfStil` bzw. `navGriffMass` (LFH-537). Wer eine Fläche
 aufnimmt, schreibt ihren Boden als eigenes Literal hin, statt sie unter die Staffel zu
 zwingen — `kompakt` prüfte sonst 30, wo der Code 48 garantiert, und die Zusicherung wäre
 schwächer als der Bestand. Der Boden ist die **Trefffläche, nicht der ganze

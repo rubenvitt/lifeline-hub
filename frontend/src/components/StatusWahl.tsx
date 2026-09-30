@@ -56,7 +56,7 @@ import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
  * ist damit kein eigener Zustand, sondern die Fokus-Kette des Providers. `nurMitFokus` hält die
  * Aktion aus dem Anzeige-Fallback (sonst wirkte sie auf eine beliebige Zeile). Außerhalb einer
  * Zeile (FMS-Tableau: eine Kachel ist keine Zeile) bleibt die Wurzel leer und die Ebene wirkungslos.
- * Herleitung: `openspec/changes/lfh-507-palette-status-setzen/design.md`.
+ * Herleitung: `openspec/changes/archive/2026-09-30-lfh-507-palette-status-setzen/design.md`.
  */
 
 /**

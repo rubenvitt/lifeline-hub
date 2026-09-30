@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -708,18 +708,34 @@ describe('LoginPage', () => {
 
     // Ein TOTP-Code ist serverseitig genau einmal gültig: ein zweiter Aufruf meldete „Code
     // ungültig" für einen Code, der gerade funktioniert hat.
-    it('schickt den Code auch dann nur EINMAL, wenn nach der sechsten Ziffer noch geklickt wird', async () => {
-      let aufrufe = 0;
+    //
+    // Geprüft wird der Riegel `sendetRef`, nicht die Sperre der Maske (LFH-508). Die frühere
+    // Fassung klickte nach der sechsten Ziffer auf den Knopf im Ladezustand: der Klick traf eine
+    // gesperrte Maske (`disabled` am `<Form>`), blieb ohne Riegel grün und flackerte am Namen des
+    // Knopfes. Ein Klick im selben Takt wie die sechste Ziffer bewiese ebenso wenig — zwei
+    // gleichzeitige Validierungen entdoppelt rc-field-form selbst (`lastValidatePromise`).
+    //
+    // Der Riegel trägt genau dann, wenn ein zweites Absenden eintrifft, während das erste LÄUFT.
+    // Die Antwort auf `totp/finish` hängt deshalb an einer Schranke, die der Test selbst öffnet
+    // (keine Frist, die auf langsamer Hardware reißt), und das zweite Absenden geht direkt an das
+    // `<form>` — unabhängig davon, ob und wie der Knopf gerade dasteht.
+    it('schickt den Code nur EINMAL, auch wenn während des Absendens ein zweites Absenden eintrifft', async () => {
+      const reihenfolge: string[] = [];
+      let schrankeOeffnen = () => {};
+      const schranke = new Promise<void>((r) => {
+        schrankeOeffnen = r;
+      });
       server.use(
+        http.get('/api/auth/me', () => {
+          reihenfolge.push('me');
+          return HttpResponse.json({ error: 'x' }, { status: 401 });
+        }),
         http.get('/api/dev/users', () => HttpResponse.json([])),
         http.get('/api/auth/providers', () => HttpResponse.json([])),
         http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })),
         http.post('/api/auth/totp/finish', async () => {
-          aufrufe += 1;
-          // Verzögert, damit der Klick den laufenden Absendevorgang trifft. Die Frist ist
-          // großzügig, weil `userEvent.click` auf langsamer Hardware (Coverage, zwei CI-Kerne)
-          // länger braucht; sie kostet nichts, der Test wartet ohnehin auf den Absendevorgang.
-          await new Promise((r) => setTimeout(r, 2000));
+          reihenfolge.push('totpFinish');
+          await schranke;
           return HttpResponse.json(adminBody);
         }),
       );
@@ -732,17 +748,21 @@ describe('LoginPage', () => {
 
       const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
       await userEvent.type(codeFeld, '123456');
-      // `getByRole` statt eines bedingten Klicks: verschwände der Knopf, degenerierte der Test
-      // still zu „ein Aufruf".
-      //
-      // Der Name ist ein Teilstring: die sechste Ziffer sendet selbst ab, der Knopf steht gerade
-      // auf `loading`, und antd hängt dem Ladeicon ein eigenes `aria-label` („loading") an — der
-      // Knopf heißt in diesem Moment „loading Anmelden". Ein exakter Name träfe ihn nur, solange
-      // der Ladezustand noch nicht gerendert ist.
-      await userEvent.click(screen.getByRole('button', { name: /Anmelden/ }));
 
-      await waitFor(() => expect(aufrufe).toBeGreaterThan(0));
-      expect(aufrufe).toBe(1);
+      // Das Auto-Absenden läuft: der Aufruf ist beim Server, die Maske ist gesperrt.
+      await waitFor(() => expect(reihenfolge).toContain('totpFinish'));
+      await waitFor(() => expect(codeFeld).toBeDisabled());
+
+      const formular = codeFeld.closest('form');
+      expect(formular).not.toBeNull();
+      fireEvent.submit(formular!);
+
+      // Ein zweiter Aufruf ginge VOR dem Öffnen der Schranke ab; `aktualisiere()` fragt `/me`
+      // erst danach. Das erste `/me` nach dem Öffnen markiert also das Ende des Vorgangs.
+      const vorher = reihenfolge.length;
+      schrankeOeffnen();
+      await waitFor(() => expect(reihenfolge.slice(vorher)).toContain('me'));
+      expect(reihenfolge.filter((schritt) => schritt === 'totpFinish')).toHaveLength(1);
     });
 
     it('richtet die Code-Eingabe auf Ziffern aus (inputMode, one-time-code, maxLength)', async () => {

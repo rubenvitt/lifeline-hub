@@ -10,17 +10,23 @@
 # ein rot geborenes Gate wird abgeschaltet statt befolgt.
 #
 # Schritt 7 (`pnpm e2e`, startet Backend und Vite selbst) läuft nur, wenn das Debug-Binary
-# daliegt, sonst laut übersprungen: die Suite kann es nicht selbst bauen. Im vollen Lauf baut
+# daliegt — dort, wo Cargo es hinlegt (lib/backend-binaer.sh) —, sonst laut übersprungen: die
+# Suite kann es nicht selbst bauen. Im vollen Lauf baut
 # Schritt 4 es ohnehin mit; der Guard schützt verkürzte Läufe und Einzelaufrufe. Schritt 7
 # stellt außerdem `frontend/dist` bereit — den Service Worker für
 # `e2e/lagekarte-offline-precache.spec.ts` gibt es nur im Prod-Bundle.
+#
+# Schritt 3, 4 und 7 prüfen vorab, dass das Cargo-Build-Ziel diesem Checkout gehört
+# (`.cargo/config.toml`, lib/bauziel.sh, LFH-520): In einem mit anderen Worktrees geteilten Ziel
+# liefen Tests und Backend still gegen einen fremden Stand.
 set -euo pipefail
 
 # Bündel-Auswahl für die parallele CI. OHNE Argument läuft alles — der Weg vor dem Merge.
 #   --nur schnell    rustfmt, Lint, Typ-Drift, Advisories,
 #                    Selbsttests der Gate-Skripte,
 #                    Migrationsnummern gegen origin/alpha,
-#                    Werkzeugversionen aus mise.toml         (Sekunden bis ~1:30)
+#                    Werkzeugversionen aus mise.toml,
+#                    fertige OpenSpec-Changes archiviert     (Sekunden bis ~1:30)
 #   --nur rust       cargo test (Workspace, Hülle getrennt)   (~17 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
@@ -53,12 +59,16 @@ cd "$ROOT"
 . "$ROOT/scripts/lib/dev-env.sh"
 # shellcheck source=lib/schritte.sh
 . "$ROOT/scripts/lib/schritte.sh"
+# shellcheck source=lib/backend-binaer.sh
+. "$ROOT/scripts/lib/backend-binaer.sh"
+# shellcheck source=lib/bauziel.sh
+. "$ROOT/scripts/lib/bauziel.sh"
 
 FE="$ROOT/frontend"
 # Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
 # Nachbarn der gepinnten Node-Version ausfallen. Hier steht bewusst KEINE Zahl.
 PNPM="mise exec -- pnpm"
-SCHRITTE=12
+SCHRITTE=13
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
@@ -72,7 +82,7 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die zwölf Schritte, je als Funktion ──────────────────────────────────────────────
+# ── Die dreizehn Schritte, je als Funktion ───────────────────────────────────────────
 # Funktionen, damit die CI sie auf mehreren Runnern einzeln ansprechen kann. Die Nummer in
 # der Ausgabe ist die Position im GESAMTgate, nicht im laufenden Teilstück.
 
@@ -88,6 +98,9 @@ schritt_2() {
 
 schritt_3() {
   echo "==> [3/$SCHRITTE] Typ-Drift Backend↔Frontend (enthält den Frontend-Typecheck)"
+  # Baut und startet `openapi_spec_aktuell`, das seinen Pfad per CARGO_MANIFEST_DIR einkompiliert:
+  # ein fremdes Testbinary prüfte die openapi.json des anderen Worktrees.
+  bauziel_pruefen "$ROOT"
   "$ROOT/scripts/check-typ-codegen.sh"
 }
 
@@ -97,6 +110,7 @@ schritt_4() {
   # und Hülle (LFH-721) — der Server würde mit einem Feature-Satz getestet, den sein Binary nie
   # hat (u. a. zwei rustls-Provider, woran `tls::tests::rcgen_pem_ist_per_rustls_ladbar` als
   # Stolperdraht absichtlich bricht). Jedes Produkt läuft mit seinem eigenen Feature-Satz.
+  bauziel_pruefen "$ROOT"
   ohne_dev_env cargo test --workspace --exclude lifeline-desktop
   ohne_dev_env cargo test -p lifeline-desktop
 }
@@ -155,46 +169,28 @@ prod_bundle_bereitstellen() {
 
 schritt_7() {
   echo "==> [7/$SCHRITTE] e2e-Suite (Playwright, LFH-309)${PW_SHARD:+ (Anteil $PW_SHARD)}"
-  # Cargo baut nicht zwingend nach ./target (globales build.target-dir) — den Pfad deshalb von
-  # Cargo erfragen, das JSON mit Node lesen (jq ist keine Voraussetzung).
-  local target_dir binaer
-  # PW_BINAER übersteuert die Abfrage (dieselbe Variable liest playwright.config.ts): ein
-  # e2e-Shard der CI lädt das Binary als Artefakt und hat kein Cargo-Target. Der Präfix `PW_`
+  # Pfad und Bereitschaft des Binarys: lib/backend-binaer.sh (LFH-518). Cargo baut nicht
+  # zwingend nach ./target (CARGO_TARGET_DIR, build.target-dir), deshalb wird Cargo gefragt;
+  # PW_BINAER übersteuert (ein e2e-Shard der CI lädt das Binary als Artefakt). Der Präfix `PW_`
   # ist Absicht — `LIFELINE_`/`KS_`/`AWS_` räumt lib/dev-env.sh als Dev-Variablen weg.
-  if [ -n "${PW_BINAER:-}" ]; then
-    binaer="$PW_BINAER"
-  else
-    target_dir="$(cargo metadata --format-version 1 --no-deps | mise exec -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
-    binaer="$target_dir/debug/lifeline-hub"
+  local binaer
+  # Ein vorgegebenes Binary (PW_BINAER, CI-Shard ohne Cargo) hat kein Build-Ziel zu prüfen.
+  if [ -z "${PW_BINAER:-}" ]; then
+    bauziel_pruefen "$ROOT"
   fi
-  if [ -x "$binaer" ]; then
-    # Die Suite startet Backend und Vite selbst auf freien Ports (auch je Shard); ein
-    # laufender Dev-Stack stört nicht. Die Env-Hygiene macht die Playwright-Config selbst,
-    # damit `pnpm e2e` auch ohne diesen Wrapper sauber läuft. Der Prod-Bundle wird erst hier
-    # gebaut: ohne Binary liefe keine Suite.
-    prod_bundle_bereitstellen
-    $PNPM -C "$FE" exec playwright test ${PW_SHARD:+--shard="$PW_SHARD"}
-  elif [ -n "${PW_BINAER:-}" ]; then
-    # Wer den Pfad ausdrücklich setzt, erwartet dort ein lauffähiges Binary — still zu
-    # überspringen meldete einen grünen e2e-Schritt, der nie lief. actions/upload-artifact
-    # verliert das Ausführbar-Bit.
-    echo "FEHLER: '$binaer' ist nicht ausführbar (PW_BINAER ist gesetzt)." >&2
-    if [ -e "$binaer" ]; then
-      echo "        Die Datei existiert, hat aber kein Ausführbar-Bit — nach einem" >&2
-      echo "        Artefakt-Download fehlt es immer. Abhilfe: chmod +x." >&2
-    else
-      echo "        Die Datei existiert nicht. Pfad prüfen." >&2
-    fi
-    exit 1
-  else
-    echo "    ÜBERSPRUNGEN: $binaer fehlt." >&2
-    echo "    Die e2e-Suite startet das Backend selbst und setzt einen Debug-Build voraus." >&2
-    echo "    Einmal 'cargo build' laufen lassen, dann deckt dieses Gate auch die Fehler-" >&2
-    echo "    klassen ab, die nur der echte Browser sieht (Layout, WebGL, StrictMode)." >&2
-    echo "    (Bewusst kein harter Fehler: auf einem frischen Checkout wäre das Gate sonst" >&2
-    echo "     von Tag eins rot — und ein rotes Gate wird abgeschaltet statt befolgt.)" >&2
-    return "$UEBERSPRUNGEN_RC"
-  fi
+  binaer="$(backend_binaer_pfad "$ROOT")"
+  # Fehlt es ungefragt, meldet der Schritt „übersprungen" (Gesamtstatus „OK mit Lücke"), nie
+  # grün; fehlt es trotz PW_BINAER oder ohne Ausführbar-Bit, ist er rot.
+  backend_binaer_pruefen "$binaer"
+  echo "    Backend-Binary: $binaer"
+  # Die Suite startet Backend und Vite selbst auf freien Ports (auch je Shard); ein laufender
+  # Dev-Stack stört nicht. Die Env-Hygiene macht die Playwright-Config selbst, damit `pnpm e2e`
+  # auch ohne diesen Wrapper sauber läuft. Der Prod-Bundle wird erst hier gebaut: ohne Binary
+  # liefe keine Suite.
+  prod_bundle_bereitstellen
+  # Den ermittelten Pfad weitergeben: die Suite nimmt genau das Binary, das hier geprüft wurde,
+  # statt Cargo ein zweites Mal (unter `mise exec`, womöglich mit anderer Umgebung) zu fragen.
+  PW_BINAER="$binaer" $PNPM -C "$FE" exec playwright test ${PW_SHARD:+--shard="$PW_SHARD"}
 }
 
 schritt_8() {
@@ -235,10 +231,16 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Schrittläufer des Sammel-Gates (Selbsttest, LFH-386)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel (LFH-386/518/520)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
+  # Die Binary-Suche entscheidet, ob Schritt 7 die Browsertests fährt oder überspringt — sucht
+  # sie am falschen Ort, meldet das Gate OK mit Lücke, wo es hätte prüfen können.
+  "$ROOT/scripts/backend-binaer.test.sh"
+  # Die Vorbedingung von Schritt 3, 4 und 7: das Build-Ziel je Checkout (LFH-520). Sie irrt
+  # ebenfalls still — ein geteiltes Ziel färbt kein Ergebnis rot, nur das falsche grün.
+  "$ROOT/scripts/bauziel.test.sh"
 }
 
 schritt_12() {
@@ -248,16 +250,25 @@ schritt_12() {
   "$ROOT/scripts/check-toolversionen.sh"
 }
 
+schritt_13() {
+  echo "==> [13/$SCHRITTE] Fertige OpenSpec-Changes sind vor dem Merge archiviert"
+  # Erst der Selbsttest, dann die Prüfung: der Wächter irrt in beide Richtungen still (ließe er
+  # eine fertige Change durch, bliebe ihr Spec-Sync aus; schlüge er auf eine laufende an, würde
+  # er abgeschaltet).
+  "$ROOT/scripts/check-openspec-archiv.test.sh"
+  "$ROOT/scripts/check-openspec-archiv.sh"
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Schritte bekommen je einen eigenen Runner.
-BUENDEL_schnell="1 2 3 6 8 9 10 11 12"
+BUENDEL_schnell="1 2 3 6 8 9 10 11 12 13"
 BUENDEL_rust="4"
 BUENDEL_frontend="5"
 BUENDEL_e2e="7"
-BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12"
+BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13"
 
-# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die zwölf Schritte, jeden einmal —
+# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die dreizehn Schritte, jeden einmal —
 # sonst fiele beim Umsortieren still ein Schritt aus der CI.
 _summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e | sort -n | tr '\n' ' ')"
 _soll="$(printf '%s\n' $BUENDEL_alle | sort -n | tr '\n' ' ')"

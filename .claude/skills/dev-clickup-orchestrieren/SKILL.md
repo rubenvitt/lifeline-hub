@@ -130,6 +130,9 @@ sequenziell — aber das nur, wenn der Schnitt sauber ist.
 
 ## Phase 5 — Abschluss & Status
 
+- **OpenSpec-Changes vor dem PR archivieren**, im selben Branch (`/opsx:archive`, Einzelheiten
+  in `dev-clickup-ausfuehren`, Schritt 4). Kein Archiv-PR nach dem Merge; Schritt 13 von
+  `check-all.sh` hält eine abgehakte, nicht archivierte Change rot.
 - Integration → `superpowers:finishing-a-development-branch`, und zwar **ohne Menü mit der
   stehenden Wahl „Push + PR gegen `alpha`"** (Festlegung des Users, 22.09.2026; Details in
   `dev-clickup-ausfuehren`). Worktree/Branch dem Harness überlassen (nicht manuell removen).

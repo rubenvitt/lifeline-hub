@@ -36,7 +36,6 @@ import {
   KeyboardSensor,
   useSensor,
   useSensors,
-  PointerSensor,
 } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
@@ -65,6 +64,7 @@ import { Augenbraue, Paneel, StatusChip, monoStil, useRollen } from '../../compo
 import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../theme/statusFarben';
 import { useViewport } from '../../components/useViewport';
 import { useFehlerMeldung } from '../../components/useFehlerMeldung';
+import { ZugPointerSensor } from '../../components/zugPointerSensor';
 
 // Feste Karten-Höhe: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
 // damit absolut platzierte Karten nicht überlappen, und groß genug für den Worst Case (2-zeiliger
@@ -841,10 +841,11 @@ export default function Grundriss({
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { rollen } = useRollen();
-  // PointerSensor mit 5-px-Aktivierungsdistanz (sonst löst jeder Klick einen Drag aus),
-  // KeyboardSensor für Tastatur und Tests.
+  // Zeiger-Sensor mit 5-px-Aktivierungsdistanz (sonst löst jeder Klick einen Drag aus),
+  // KeyboardSensor für Tastatur und Tests. `ZugPointerSensor` statt `PointerSensor`: sonst ging
+  // der erste Klick nach einem Drag unter Last verloren, etwa aufs Platzmenü (LFH-519).
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(ZugPointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor),
   );
   // Ab `lg` nebeneinander, darunter drei Reiter (Details am Rahmen-`div` unten).

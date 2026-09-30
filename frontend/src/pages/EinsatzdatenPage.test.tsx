@@ -240,6 +240,54 @@ describe('EinsatzdatenPage', () => {
     expect(patchBody.einsatzort_lon).toBeCloseTo(11.5678, 4);
   });
 
+  // LFH-517: ungültig ist nicht leer — kein PATCH, der die gespeicherte Koordinate löscht.
+  it('ungültige Koordinate speichert nicht; nach Korrektur geht das richtige Paar hinaus', async () => {
+    const patches: Record<string, unknown>[] = [];
+    setup({ einsatz: { einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 } });
+    server.use(
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        patches.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(basisEinsatz);
+      }),
+    );
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Koordinate' });
+    await user.clear(feld);
+    await user.type(feld, '48.5; 11.5');
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    expect(await screen.findByText('Ungültige Koordinate im Format WGS84 dezimal')).toBeVisible();
+    expect(feld).toHaveValue('48.5; 11.5');
+    expect(patches).toHaveLength(0);
+
+    await user.clear(feld);
+    await user.type(feld, '48.5, 11.5');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).toMatchObject({ einsatzort_lat: 48.5, einsatzort_lon: 11.5 });
+  });
+
+  it('Gegenprobe: eine bestehende Koordinate lässt sich bewusst leeren', async () => {
+    let patchBody: Record<string, unknown> = {};
+    setup({ einsatz: { einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 } });
+    server.use(
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(basisEinsatz);
+      }),
+    );
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Koordinate' }));
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(patchBody).toHaveProperty('einsatzort_lat', null));
+    expect(patchBody.einsatzort_lon).toBeNull();
+  });
+
   it('zeigt den Bearbeiten-Button für schreibberechtigten, aktiven Einsatz', async () => {
     setup();
     expect(await screen.findByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();

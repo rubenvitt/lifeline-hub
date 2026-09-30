@@ -23,8 +23,8 @@ import {
 } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
-import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
-import type { LatLon } from '../anzeige/koordinaten';
+import KoordinatenFeld from '../anzeige/KoordinatenFeld';
+import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
@@ -189,7 +189,7 @@ interface FormWerte {
   einsatzart: Einsatzart;
   leitstellen_nr?: string;
   einsatzort?: string;
-  einsatzort_koord?: LatLon | null;
+  einsatzort_koord?: KoordinatenWert;
   meldende_stelle?: string;
   sachverhalt?: string;
   anzahl_betroffene_initial?: number;
@@ -372,14 +372,15 @@ export default function EinsatzdatenPage() {
   }
 
   function speichern(werte: FormWerte) {
+    const koord = alsLatLon(werte.einsatzort_koord);
     const felder: KopfdatenUpdate = {
       bezeichnung: werte.bezeichnung.trim(),
       stichwort: leerZuNull(werte.stichwort),
       einsatzart: werte.einsatzart,
       leitstellen_nr: leerZuNull(werte.leitstellen_nr),
       einsatzort: leerZuNull(werte.einsatzort),
-      einsatzort_lat: werte.einsatzort_koord?.lat ?? null,
-      einsatzort_lon: werte.einsatzort_koord?.lon ?? null,
+      einsatzort_lat: koord?.lat ?? null,
+      einsatzort_lon: koord?.lon ?? null,
       meldende_stelle: leerZuNull(werte.meldende_stelle),
       sachverhalt: leerZuNull(werte.sachverhalt),
       anzahl_betroffene_initial: werte.anzahl_betroffene_initial ?? null,
@@ -454,9 +455,12 @@ export default function EinsatzdatenPage() {
             >
               <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item label="Koordinate" name="einsatzort_koord">
-              <KoordinatenEingabe einsatzId={einsatzId} exclude={`einsatzort:${einsatzId}`} />
-            </Form.Item>
+            <KoordinatenFeld
+              label="Koordinate"
+              name="einsatzort_koord"
+              einsatzId={einsatzId}
+              exclude={`einsatzort:${einsatzId}`}
+            />
             <Form.Item label="Meldende/anfordernde Stelle" name="meldende_stelle">
               <Input />
             </Form.Item>

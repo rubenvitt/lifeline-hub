@@ -1,4 +1,4 @@
-import { App, Badge, Button, Dropdown, Tooltip } from 'antd';
+import { App, Button, Dropdown, Tooltip } from 'antd';
 import { CheckCircleOutlined, DesktopOutlined, StopOutlined } from '@ant-design/icons';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { TbBell, TbBellOff } from 'react-icons/tb';
@@ -502,14 +502,11 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     ) : (
       <DesktopOutlined aria-hidden />
     );
+  // Die Glocke trägt KEINEN Marker (LFH-513): ein roter Punkt an „Ton bereit" verbrauchte die
+  // Alarmfarbe für eine Nichtmeldung. Die Störung trägt Form (durchgestrichen) und Wort, die
+  // Farbe erbt die Ikone vom Knopf (`alarmKnopfFarbe`) bzw. vom Menüeintrag.
   const tonIkone =
-    gemutet || tonStatus === 'blockiert' ? (
-      <TbBellOff aria-hidden />
-    ) : (
-      <Badge dot status="error">
-        <TbBell aria-hidden style={{ color: rahmenFarben.gedaempft }} />
-      </Badge>
-    );
+    gemutet || tonStatus === 'blockiert' ? <TbBellOff aria-hidden /> : <TbBell aria-hidden />;
 
   if (istSchmal) {
     // ── EIN Ziel statt zwei auf dem Handschirm ────────────────────────────────
