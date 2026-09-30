@@ -18,6 +18,8 @@ export { PLAKETTE_PRAEFIX, plakettenBild, plakettenBildId, zonenPlakette } from 
 export interface AktiveFachebene {
   def: FachebeneDef;
   daten: FeatureCollection;
+  /** Ebenenfarbe des aktiven Modus (`fachebeneFarbe`, LFH-593). */
+  farbe: string;
 }
 
 /**
@@ -221,7 +223,7 @@ export function reAnlegenAlles(
   sorgeFuerZonenLayer(map, zonen);
   (map.getSource('zonen') as GeoJSONSource | undefined)?.setData(zonen as never);
   for (const fe of fachebenen) {
-    sorgeFuerFachebeneLayer(map, fe.def, fe.daten);
+    sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe);
     setzeFachebeneDaten(map, fe.def.key, fe.daten);
   }
   // Marker zuletzt (= oberste Layer; sorgeFuerMarkerLayer pinnt sie zusätzlich nach oben).

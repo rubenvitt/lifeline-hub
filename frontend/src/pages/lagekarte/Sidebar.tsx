@@ -45,6 +45,7 @@ import { ZONE_TYPEN } from './zonenStil';
 import FreiesZeichenPicker from './FreiesZeichenPicker';
 import MarkerSuche from './MarkerSuche';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
+import { fachebeneFarbe } from '../../theme/statusFarben';
 import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
 import { istLatLon, type KoordinatenWert } from '../../anzeige/koordinatenWert';
@@ -1040,7 +1041,7 @@ export default function Sidebar(props: SidebarProps) {
                 {/* Marke, Beschriftung und Statuswort sind ein Umbruchteil: das Farbquadrat geht
                     mit seinem Wort. */}
                 <span style={namensteilStil(token)}>
-                  <span style={{ color: def.farbe }} aria-hidden="true">
+                  <span style={{ color: fachebeneFarbe(key, token) }} aria-hidden="true">
                     ■
                   </span>
                   {/* Der Geltungsbereich steht als Zeile, nicht als Tooltip: auf dem Tablet gibt

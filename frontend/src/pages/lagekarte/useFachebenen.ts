@@ -22,6 +22,7 @@ import { faerbeLuftqualitaet } from './luftqualitaetStil';
 import { faerbeOdl } from './odlStil';
 import type { AktiveFachebene } from './kartenLayer';
 import { globalKeys } from '../../api/queryKeys';
+import { fachebeneFarbe } from '../../theme/statusFarben';
 
 type Feature = FeatureCollection['features'][number];
 
@@ -203,7 +204,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
                   : k === 'luftqualitaet'
                     ? faerbeLuftqualitaet(roh, token)
                     : roh;
-          return { def: FACHEBENEN[k], daten };
+          return { def: FACHEBENEN[k], daten, farbe: fachebeneFarbe(k, token) };
         });
 
       const fachebenenStatus: Partial<Record<FachebeneQuelle, FachebeneStatus>> = {};

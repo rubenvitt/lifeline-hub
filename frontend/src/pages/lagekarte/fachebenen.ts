@@ -31,7 +31,8 @@ export function energieAusschnittPasst(bbox: string): boolean {
 export interface FachebeneDef {
   key: FachebeneQuelle;
   label: string;
-  farbe: string;
+  // Keine Farbe: die Ebenenfarbe hängt am Modus und steht im Farbvertrag
+  // (`fachebeneFarbe` in `theme/statusFarben.ts`, LFH-593).
   geometrieTyp: 'polygon' | 'punkt';
   /** Poll-Intervall in ms (Frontend refetchInterval). */
   pollMs: number;
@@ -66,7 +67,6 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   nina: {
     key: 'nina',
     label: 'Amtliche Warnungen (NINA)',
-    farbe: '#cf1322',
     geometrieTyp: 'polygon',
     pollMs: 90_000,
     bboxAbhaengig: false,
@@ -74,7 +74,6 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   dwd: {
     key: 'dwd',
     label: 'Wetterwarnungen (DWD)',
-    farbe: '#d48806',
     geometrieTyp: 'polygon',
     pollMs: 300_000,
     bboxAbhaengig: false,
@@ -82,7 +81,6 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   pegelonline: {
     key: 'pegelonline',
     label: 'Pegel / Hochwasser',
-    farbe: '#096dd9',
     geometrieTyp: 'punkt',
     pollMs: 300_000,
     bboxAbhaengig: false,
@@ -90,10 +88,6 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   hochwasser: {
     key: 'hochwasser',
     label: 'Hochwasser-Meldeklassen (LHP)',
-    // Die Ebenenfarbe ist nur Rückfall für Panel-Punkt und Inspector-Akzent — auf der Karte trägt
-    // jedes Feature seine Rollenfarbe je Meldeklasse (`hochwasserStil.ts`). Nicht das Blau von
-    // `pegelonline`: beide stehen im Panel nebeneinander.
-    farbe: '#08979c',
     geometrieTyp: 'punkt',
     pollMs: 300_000,
     bboxAbhaengig: false,
@@ -101,10 +95,6 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   luftqualitaet: {
     key: 'luftqualitaet',
     label: 'Luftqualität (UBA)',
-    // Nur der Panel-Punkt: auf der Karte trägt jede Station ihre Rollenfarbe
-    // (`luftqualitaetStil.ts`). Deshalb ein entsättigter Ton, der keine Rollenfarbe ist — Grün
-    // hieße dort schon „gute Luft".
-    farbe: '#5b6b82',
     geometrieTyp: 'punkt',
     // = serverseitige TTL (900 s); die Quelle liefert Stundenwerte mit ~2 h Verzug.
     pollMs: 900_000,
@@ -114,9 +104,6 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   odl: {
     key: 'odl',
     label: 'Strahlung / ODL (BfS)',
-    // Nur Rückfall für Panel-Punkt und Inspector-Akzent — auf der Karte trägt jede Sonde ihre
-    // Rollenfarbe (`odlStil.ts`).
-    farbe: '#7cb305',
     geometrieTyp: 'punkt',
     // = serverseitige TTL (600 s); die Quelle liefert Stundenwerte.
     pollMs: 600_000,
@@ -126,8 +113,6 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   autobahn: {
     key: 'autobahn',
     label: 'Autobahn-Lage (BAB)',
-    // Eigener Ton neben den Bestandsebenen, nicht das `#08979c` von `hochwasser`.
-    farbe: '#c41d7f',
     geometrieTyp: 'punkt',
     // = serverseitige TTL (600 s); die Ebene aggregiert 111 Autobahnen × 3 Dienste.
     pollMs: 600_000,
@@ -141,7 +126,6 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   kritis: {
     key: 'kritis',
     label: 'KRITIS / sensible Objekte',
-    farbe: '#531dab',
     geometrieTyp: 'punkt',
     // bbox-getrieben: neue Daten kommen mit jeder Kartenbewegung, nicht über einen Takt.
     pollMs: 0,
@@ -155,11 +139,6 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   energie: {
     key: 'energie',
     label: 'Energieanlagen',
-    // `theme/tokens.ts` führt keine Fachebenen-Palette (Sichtungs- und Rollenfarben tragen
-    // Bedeutung); die Bestandsfarben sind Stufe 7 der antd-Presetpalette. Gelb liegt nah am
-    // DWD-Gold, ist aber unterscheidbar und die letzte freie Tonlücke. Bewusst nicht `green-7`:
-    // Grün ist die Rolle `normal` und SK III, ein grüner Punkt läse sich als „in Ordnung".
-    farbe: '#d4b106',
     geometrieTyp: 'punkt',
     // Wie KRITIS: kein Hintergrund-Polling, Refetch nur über den Ausschnitt (serverseitig 24 h
     // frisch).
