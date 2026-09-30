@@ -108,6 +108,9 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
       const datenbank = join(mkdtempSync(join(tmpdir(), 'lifeline-e2e-')), 'lifeline.db');
       const neu = { backendPort, frontendPort, datenbank };
       process.env[ENV_SCHLUESSEL] = JSON.stringify(neu);
+      // Einmal im Hauptprozess, nicht je Worker: welches Backend der Lauf startet, steht damit im
+      // Log. Dieselbe Zeile gibt Schritt 7 des Sammel-Gates aus (LFH-520).
+      console.log(`Backend-Binary: ${binaer}`);
       return neu;
     })();
 

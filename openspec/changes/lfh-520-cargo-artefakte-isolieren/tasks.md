@@ -2,12 +2,12 @@
 
 ## 1. Build-Ziel je Checkout
 
-- [ ] 1.1 `.cargo/config.toml` mit `[build] target-dir = "target"` und einem Kopfkommentar
+- [x] 1.1 `.cargo/config.toml` mit `[build] target-dir = "target"` und einem Kopfkommentar
       anlegen. Der Kommentar nennt die Ursache (relativer Hash, mtime-Frische), den Vorrang
       (Umgebung > Repo > global) und die Übergangsschwäche bei verschachtelten Checkouts.
       Verifikation: `cargo metadata --no-deps --format-version 1` meldet
       `<worktree>/target` als `target_directory`.
-- [ ] 1.2 Hermetischen Selbsttest `scripts/bauziel.test.sh` schreiben (zuerst rot gegen einen
+- [x] 1.2 Hermetischen Selbsttest `scripts/bauziel.test.sh` schreiben (zuerst rot gegen einen
       Stand ohne Datei). Ein Wegwerf-Crate in zwei Kopien a/b, eine globale Konfiguration über
       ein eigenes `CARGO_HOME` mit gemeinsamem `target-dir`, die Quellen von b älter als der
       Bau von a. Geprüft wird: ohne Repo-Datei gibt b „A“ aus (Fehlerbeleg), mit Repo-Datei
@@ -16,12 +16,12 @@
 
 ## 2. Prüfung im Sammel-Gate
 
-- [ ] 2.1 `scripts/lib/bauziel.sh` mit `bauziel_pruefen` nach design.md D3 schreiben:
+- [x] 2.1 `scripts/lib/bauziel.sh` mit `bauziel_pruefen` nach design.md D3 schreiben:
       eigenes Ziel still, übersteuert mit Ausgabe, geerbt fremd rot mit Ziel und Hinweis.
       Die drei Fälle kommen in `scripts/bauziel.test.sh` dazu. Verifikation: Der Selbsttest
       deckt alle drei Ausgänge ab, jede Mutation (Vergleich umdrehen, Umgebungsvariable
       ignorieren) macht ihn rot.
-- [ ] 2.2 `bauziel_pruefen` am Anfang von `schritt_4` und `schritt_7` aufrufen (in Schritt 7
+- [x] 2.2 `bauziel_pruefen` am Anfang von `schritt_4` und `schritt_7` aufrufen (in Schritt 7
       nicht bei gesetztem `PW_BINAER`) und `scripts/bauziel.test.sh` in den Selbsttest-Schritt
       des `schnell`-Bündels hängen. Der Dateikopf von `check-all.sh` und die Kommentare in
       Schritt 7, die noch vom „globalen build.target-dir“ sprechen, werden nachgezogen.
@@ -38,17 +38,17 @@
 
 ## 4. Dokumentation
 
-- [ ] 4.1 In `CLAUDE.md` unter „Qualitäts-Gates“ einen Absatz ergänzen: Build-Ziel je Checkout
+- [x] 4.1 In `CLAUDE.md` unter „Qualitäts-Gates“ einen Absatz ergänzen: Build-Ziel je Checkout
       (LFH-520), Messwerte (~3 min kalt, bis 19 GB je voll gebautem Worktree), Übersteuerung,
       Übergang bei verschachtelten Checkouts, Verweis auf diesen Change. Verifikation: Der
       Absatz nennt nur Pfade und Funktionen, die es gibt (`git grep`).
-- [ ] 4.2 Memory `geteiltes-cargo-target-worktrees` und `e2e-geteiltes-cargo-target-fremdes-dist`
+- [x] 4.2 Memory `geteiltes-cargo-target-worktrees` und `e2e-geteiltes-cargo-target-fremdes-dist`
       nachziehen. Die Anweisung „`CARGO_TARGET_DIR` ins Scratchpad“ ist überholt, der
       Übergangshinweis bleibt. Dem Nutzer wird die Korrektur des Kommentars in
       `~/.cargo/config.toml` vorgeschlagen, die Datei selbst wird nicht angefasst.
       Verifikation: Die Memory-Dateien widersprechen dem neuen CLAUDE.md-Absatz nicht.
-- [ ] 4.3 Nachzug-Ticket „Debuginfo der Testbinaries verkleinern“ per `clickup-task-anlegen`
-      anlegen, mit den Messwerten aus design.md. Verifikation: Die Ticket-ID steht im
+- [x] 4.3 Nachzug-Ticket „Debuginfo der Testbinaries verkleinern“ per `clickup-task-anlegen`
+      anlegen, mit den Messwerten aus design.md (angelegt: LFH-845). Verifikation: Die Ticket-ID steht im
       PR-Text.
 
 ## 5. Integrationsnachweis

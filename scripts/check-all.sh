@@ -14,6 +14,10 @@
 # Schritt 4 es ohnehin mit; der Guard schützt verkürzte Läufe und Einzelaufrufe. Schritt 7
 # stellt außerdem `frontend/dist` bereit — den Service Worker für
 # `e2e/lagekarte-offline-precache.spec.ts` gibt es nur im Prod-Bundle.
+#
+# Schritt 4 und 7 prüfen vorab, dass das Cargo-Build-Ziel diesem Checkout gehört
+# (`.cargo/config.toml`, lib/bauziel.sh, LFH-520): In einem mit anderen Worktrees geteilten Ziel
+# liefen Tests und Backend still gegen einen fremden Stand.
 set -euo pipefail
 
 # Bündel-Auswahl für die parallele CI. OHNE Argument läuft alles — der Weg vor dem Merge.
@@ -53,6 +57,8 @@ cd "$ROOT"
 . "$ROOT/scripts/lib/dev-env.sh"
 # shellcheck source=lib/schritte.sh
 . "$ROOT/scripts/lib/schritte.sh"
+# shellcheck source=lib/bauziel.sh
+. "$ROOT/scripts/lib/bauziel.sh"
 
 FE="$ROOT/frontend"
 # Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
@@ -97,6 +103,7 @@ schritt_4() {
   # und Hülle (LFH-721) — der Server würde mit einem Feature-Satz getestet, den sein Binary nie
   # hat (u. a. zwei rustls-Provider, woran `tls::tests::rcgen_pem_ist_per_rustls_ladbar` als
   # Stolperdraht absichtlich bricht). Jedes Produkt läuft mit seinem eigenen Feature-Satz.
+  bauziel_pruefen "$ROOT"
   ohne_dev_env cargo test --workspace --exclude lifeline-desktop
   ohne_dev_env cargo test -p lifeline-desktop
 }
@@ -155,8 +162,8 @@ prod_bundle_bereitstellen() {
 
 schritt_7() {
   echo "==> [7/$SCHRITTE] e2e-Suite (Playwright, LFH-309)${PW_SHARD:+ (Anteil $PW_SHARD)}"
-  # Cargo baut nicht zwingend nach ./target (globales build.target-dir) — den Pfad deshalb von
-  # Cargo erfragen, das JSON mit Node lesen (jq ist keine Voraussetzung).
+  # Den Pfad von Cargo erfragen, nicht ./target annehmen: CARGO_TARGET_DIR darf ihn verlegen.
+  # Das JSON mit Node lesen (jq ist keine Voraussetzung).
   local target_dir binaer
   # PW_BINAER übersteuert die Abfrage (dieselbe Variable liest playwright.config.ts): ein
   # e2e-Shard der CI lädt das Binary als Artefakt und hat kein Cargo-Target. Der Präfix `PW_`
@@ -164,9 +171,11 @@ schritt_7() {
   if [ -n "${PW_BINAER:-}" ]; then
     binaer="$PW_BINAER"
   else
+    bauziel_pruefen "$ROOT"
     target_dir="$(cargo metadata --format-version 1 --no-deps | mise exec -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
     binaer="$target_dir/debug/lifeline-hub"
   fi
+  echo "    Backend-Binary: $binaer"
   if [ -x "$binaer" ]; then
     # Die Suite startet Backend und Vite selbst auf freien Ports (auch je Shard); ein
     # laufender Dev-Stack stört nicht. Die Env-Hygiene macht die Playwright-Config selbst,
@@ -235,10 +244,13 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Schrittläufer des Sammel-Gates (Selbsttest, LFH-386)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer (LFH-386), Build-Ziel (LFH-520)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
+  # Daneben die Vorbedingung, die Schritt 4 und 7 prüfen: das Build-Ziel je Checkout (LFH-520).
+  # Sie irrt ebenfalls still — ein geteiltes Ziel färbt kein Ergebnis rot, nur das falsche grün.
+  "$ROOT/scripts/bauziel.test.sh"
 }
 
 schritt_12() {
