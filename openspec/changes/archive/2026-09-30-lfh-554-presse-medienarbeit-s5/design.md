@@ -64,7 +64,8 @@ Stand im Code (Scope-Lauf vom 30.09.2026):
   `termin`.
 - Kein Abgleich von Anrufen mit Betroffenen oder der Personenauskunft, nur der Sprung „Vermisste ↗“.
 - Pressemitteilungs-Vorlagen, die je Organisation änderbar sind. Mandanten-Labels (THW
-  „Öffentlichkeitsarbeit“) kommen erst nach dem Feldbefund (LFH-46, Abschnitt 6).
+  „Öffentlichkeitsarbeit“) kommen erst nach dem Feldbefund (LFH-46, Abschnitt 6):
+  [LFH-863](https://app.clickup.com/t/123zgec62qg), wartet auf LFH-852.
 - Kein Modulzähler, keine Sprungmarke, kein Palettenbefehl, keine Offline-Schreibqueue.
 - Kein Druck von Presse-Log oder Anrufprotokoll. Nachweis ist die Datenhaltung. Die freigegebene
   Mitteilung steht zusätzlich im ETB.
@@ -101,6 +102,13 @@ Verworfen:
 - **Reiter auf einer Seite:** Das Bürgertelefon ist ein eigener Platz mit Serienerfassung. Ein
   Reiter wäre kein Lesezeichen und teilte die Fußleiste der Erfassung mit dem Presse-Log.
 
+_Nachtrag 30.09.2026 (Umsetzung):_ Die Tabelle steht in `stab/unterseiten.ts` (S6 → Funkplan,
+S5 → Pressearbeit und Informationstelefon), `StabPage` rendert sie ohne Sachgebietszweig. Der Hook
+heißt `useStabFreigabe` (`stab/useStabFreigabe.tsx`) und liefert einen Zustand (`laden`, `fehler`,
+`gesperrt`, `frei`); `stabFreigabeAnzeige` baut daraus die Seite für jeden Zustand außer `frei`.
+Funkplan, Presse, Pressemitteilung, Informationstelefon und der Knopf „Aus S5 übernehmen“ lesen
+denselben Hook.
+
 ### D2 · Backend: Endpunkte unter `…/stab/…`, Gate über den Stab
 
 Die Endpunkte:
@@ -128,7 +136,7 @@ Die Fehlercodes:
   Bezug auf eine nicht freigegebene Mitteilung
 - 404: fremder Einsatz
 
-### D3 · Datenmodell: Migration `0127_presse.sql`
+### D3 · Datenmodell: Migration `0129_presse.sql`
 
 - **`medienkontakt`**
   - `id`, `einsatz_id` FK
@@ -185,12 +193,18 @@ freigegeben“). Das ist eine Stelle im Kern, kein Zweig je Art.
   Pressetexten.
 - Nicht `lage`: Das ist der Typ des Lageberichts.
 
-**Freigaberegel:** `DokumentRoute` bekommt die Konstante `FREIGABE: Freigaberecht` mit den Werten
-`Schreibrecht` (Lagebericht, Befehl, unverändert) und `Einsatzleitung` (Pressemitteilung). Im
-Handler `freigeben` wird bei `Einsatzleitung` zusätzlich `darf_leiten` geprüft (Einsatzleitung
-oder System-Admin), sonst 403. Das Frontend liest dieselbe Regel über `darfEinsatzLeiten`.
-`FreigabeDialog` bekommt keinen Zweig: Die Detailseite sperrt den Knopf und zeigt den Grund aus
-`stammdaten/rechteText.ts`.
+**Freigaberegel:** Die Route der Freigabe trägt das Gate `EinsatzLeitungszugriff<Stab>` (nur die
+Einsatzleitung, 403 für Führungspersonal auch am abgeschlossenen Einsatz). Der Kern bleibt für
+alle Arten gleich; Lagebericht und Befehl behalten ihre Regel ohne eigenen Zweig. Das Frontend
+liest dieselbe Regel über `darfEinsatzLeiten`. `FreigabeDialog` bekommt keinen Zweig: Die
+Detailseite sperrt den Knopf und zeigt den Grund.
+
+_Nachtrag 30.09.2026 (Umsetzung):_ Ursprünglich war eine Konstante `FREIGABE: Freigaberecht` an
+`DokumentRoute` geplant. Das vorhandene Gate `EinsatzLeitungszugriff` trägt die Regel ohne
+Eingriff in den Kern und hält den Struktur-Guard (`tests/einsatz_kontext_guard.rs`) zufrieden, der
+für neue Routen einen typisierten Gate-Extractor verlangt. Für das Genus bekommt `Dokumentart`
+zwei Konstanten, `NOMEN_MIT_ARTIKEL` und `IM_NOMEN`; die Texte von Lagebericht und Befehl bleiben
+wortgleich.
 
 Verworfen: die Freigabe für alle Schreibenden, nur als Freitext dokumentiert, wer freigegeben hat.
 Die Freigabe von Presseinformationen ist die Kernaufgabe der Einsatzleitung, und das Ticket nennt
@@ -208,6 +222,15 @@ Ein Paar-Test pinnt Schlüssel und Reihenfolge auf beiden Seiten.
 Lagebericht davon hart verdrahtet hat (Queries, Pfade), wird per Prop hereingereicht und nicht
 kopiert. Wo das eine Umstellung der Lageberichtseite verlangt, gehört sie in dieselbe Aufgabe,
 samt ihren Tests.
+
+_Nachtrag 30.09.2026 (Umsetzung):_ `PressemitteilungDetailPage` ist ein **Zwilling** der
+Lagebericht-Detailseite, keine gemeinsame Hülle. Geteilt sind die Bauteile (`AbschnittsAkkordeon`,
+`useEntwurfVerlustschutz`, `EntwurfNavigationSchutz`, `Einstiegsfokus`, `FreigabeDialog`,
+`DruckKnopf`), dazu das Kettenmuster, das jetzt generisch ist (`lageberichte/ketten.ts`,
+`KettenKopf<T>`), und `AbschnittsText` aus `lageberichte/LageberichtText.tsx`. Die Seitenkörper
+von Lagebericht und Befehl verdrahten Queries, Pfade und Freigaberegel so eng, dass eine Hülle für
+alle drei ein eigener Umbau mit eigenem Risiko wäre, nicht Teil dieser Change. Die Abweichungen
+stehen im Dateikopf der Seite.
 
 ### D5 · Medienkontakt: Freigabeangabe als Freitext, Statusweg mit Rückweg
 
@@ -259,6 +282,11 @@ Die Erfassung eines Medienkontakts ist ein `ErfassungsModal` mit Serienmodus.
   
   Jede Karte trägt das Wort als zweiten Kanal.
 
+_Nachtrag 30.09.2026 (Prüfliste, Kriterium 12):_ Die Presseseite ordnet **Presse-Log, dann
+Pressemitteilungen, dann Medienlage** (nicht wie in D1 aufgezählt). Die Medienlage wächst mit
+jedem Kontakt live. Stünde sie oben, schöbe sie die Arbeitsliste unter dem Cursor weg. Unten
+stehend schiebt sie nichts, und „offene Anfragen“ steht im ersten Bild.
+
 ### D7 · Medienlage im Client, Übernahme in den Lagevortrag
 
 `stab/medienlage.ts` exportiert `baueMedienlage(quellen): Medienlage` und
@@ -299,6 +327,21 @@ Verworfen:
 - Neue Einträge erscheinen ohne Sprung. Die Zeitachse des Informationstelefons folgt dem
   Einschiebemuster des ETB (Sammelbanner bei neuen Einträgen außerhalb des Sichtbereichs).
 
+_Nachtrag 30.09.2026 (Umsetzung):_
+- **Offline:** `LAGEBILD_OFFLINE` ist eine **Allowlist**, es gibt keine Draußen-Liste. Neue Keys
+  bleiben also schon dadurch draußen, dass sie nicht aufgenommen werden. Der Guard setzt jeden
+  verwalteten Prefix und erwartet genau die Allowlist, damit ist die Abwesenheit von `presse` und
+  `infotelefon` gepinnt. Der Grund steht im Kommentar „Bewusst draußen“ in `api/queryKeys.ts`.
+- **Zufluss im Informationstelefon:** Die Zeitachse ist keine `Datensicht`, deshalb hat sie eine
+  eigene Schleuse (`infotelefon/zufluss.ts`, `einfrieren`/`teileZufluss`). Solange der Fokus in
+  der Liste liegt, hält sie fremde neue Anrufe zurück (id über der Wassermarke). Das Sammelbanner
+  liegt als Überlagerung mit Nullhöhe darüber, „anzeigen“ friert neu ein. Eigene Anrufe gehen
+  sofort durch, Portal-Menüs der Statuswahl zählen nicht als Verlassen. Die Kennzahlen zählen die
+  volle Menge.
+- **Fokus über der Erfassung:** Die angepinnte Erfassung misst ihre Höhe wie im ETB
+  (`useFokusabstandUnten`, `--lfh-etb-fokusabstand`). Nachweis in
+  `e2e/fokus-verdeckung.spec.ts`.
+
 ### D9 · Schwärzung
 
 Die `TabellenRegel`n in `src/einsatz/schwaerzung_registry.rs`, Scoping `EinsatzId`:
@@ -311,11 +354,16 @@ Die `TabellenRegel`n in `src/einsatz/schwaerzung_registry.rs`, Scoping `EinsatzI
 
 Dazu kommt `etb_eintrag.pressemitteilung_id` als `G_FK`.
 
-Der CHECK „offen nur mit `rueckruf`“ kollidiert mit dem Scrub eines offenen Anrufs. Deshalb setzt
-die Schwärzung `status` vorher auf `erledigt`: `PlatzhalterWennGesetzt` für `rueckruf` scheidet aus,
-und ein Scrub einer Pflichtangabe verbietet die Registry. Das wird am Schwärzungstest geprüft. Ist
-die Reihenfolge in der Registry nicht steuerbar, entfällt der CHECK. Die Regel steht dann nur im
-Repo, und der Nachtrag hier nennt das.
+Der CHECK „offen nur mit `rueckruf`“ bleibt in der Tabelle. Die Schwärzung ersetzt `rueckruf`
+mit `PlatzhalterWennGesetzt` (gesetzt → Platzhalter, leer → leer). Das ist dieselbe Lösung wie bei
+`einsatz_schaden.uebergeben_an`, und ein offener Rückruf bricht die Schwärzung nicht
+(_Nachtrag 30.09.2026_, belegt in `schwaerzung_presse_und_infotelefon_leert_personenbezug_und_haelt_nachweis`).
+
+**Migration offener Lagevortrag-Entwürfe (_Nachtrag 30.09.2026_):** Die Freigabe verlangt jeden
+Abschnitt der Vorlage (`validiere_freigabe`, gepinnt in
+`freigeben_gerendert_zweimal_ist_422_ohne_zweiten_snapshot`). Ein offener Entwurf von vor der
+Erweiterung ließe sich sonst nicht mehr freigeben. `0129_presse.sql` trägt „Medienlage“ deshalb in
+offene Entwürfe der Vorlage `lagebericht` leer nach; freigegebene Berichte bleiben unberührt.
 
 Schwärzungstests für beide Tabellen kommen nach `src/einsatz/purge_scheduler.rs`.
 
@@ -338,13 +386,15 @@ Change und trägt je Seite ein Verdikt.
 
 - **Kein Feldbefund, keine Stabsraum-Version.** Die Sperre im Ticket wurde vom User bewusst
   aufgehoben. → Der Schnitt bleibt klein: drei Tabellen, keine neue Achse, keine Stammdaten. Die
-  Aufgabe LFH-852 (Feldbefund Stab) nimmt eine S5-Beobachtung auf. Bleibt die Nutzung aus, lässt
+  Aufgabe [LFH-852](https://app.clickup.com/t/123zgec5zy7) (Feldbefund Stab) nimmt eine
+  S5-Beobachtung auf (_Nachtrag 30.09.2026:_ ergänzt um Zählpunkte je Seite und die Entscheidung
+  behalten/umschneiden/zurückbauen). Bleibt die Nutzung aus, lässt
   sich S5 zurückbauen, ohne dass andere Module etwas verlieren: Einstiege weg, Tabellen bleiben
   lesbar.
 - **Das Bürgertelefon wächst über die volle Liste hinaus.** Bei einer Großlage mit tausenden
   Anrufen trägt die Vollabfrage nicht mehr. → Die Kennzahlen rechnen aus derselben Menge wie die
   Liste. Die Umstellung auf eine serverseitige Zählung (Muster LFH-612) ist ein eigener Schritt
-  mit Zielticket.
+  mit Zielticket: [LFH-862](https://app.clickup.com/t/123zgec62qf).
 - **Personenbezug in Freitexten.** Thema und Antwort bleiben erhalten und könnten Namen tragen. →
   Das ist dieselbe Abwägung wie beim Lagebericht (`G_FUEHRUNG`): Nachweis der Pressearbeit. Die
   Medienlage und der Lagebericht übernehmen kein Thema.
@@ -356,12 +406,13 @@ Change und trägt je Seite ein Verdikt.
   Befehl. → Paar-Tests: Führungspersonal gibt Lagebericht und Befehl weiter frei, eine
   Pressemitteilung nicht.
 - **Neuer Lagebericht-Abschnitt für alle.** Wer S5 nicht nutzt, sieht einen leeren Abschnitt
-  „Medienlage“. → Der Abschnitt ist optional, leer erscheint er nicht im Snapshot, und er steht
-  in der Gliederung des Lagevortrags.
+  „Medienlage“, im Snapshot mit „(keine Angabe)“ wie jeder leere Abschnitt. → Er steht in der
+  Gliederung des Lagevortrags; ein Weglassen leerer Abschnitte wäre eine Änderung für alle
+  Dokumentarten und ist nicht Teil dieser Change.
 
 ## Migration Plan
 
-- Die Migration `0127_presse.sql` ist rein additiv: neue Tabellen und eine nullable Spalte am
+- Die Migration `0129_presse.sql` ist rein additiv: neue Tabellen und eine nullable Spalte am
   `etb_eintrag`. Sie wird nie geändert (Migrationsvergabe). Ein Rollback erfolgt per Revert des
   Codes. Die leeren Tabellen stören nicht.
 - Kein Datenumzug. Bestehende Lageberichte bleiben gültig (Teilbestand der Schlüssel).

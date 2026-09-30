@@ -55,6 +55,13 @@ pub const VORLAGEN: &[VorlageDef] = &[
                 schluessel: "antraege_vorschlaege",
                 label: "Anträge und Vorschläge",
             },
+            // LFH-554: Punkt III des Lagevortrags (DRK RLP), vor der Zusammenfassung. Ein
+            // älterer Entwurf ohne den Schlüssel bleibt gültig (Teilbestand), leer fehlt der
+            // Abschnitt im Snapshot. „Aus S5 übernehmen“ setzt die Medienlage im Client ein.
+            AbschnittDef {
+                schluessel: "medienlage",
+                label: "Medienlage",
+            },
             AbschnittDef {
                 schluessel: "zusammenfassung",
                 label: "Zusammenfassung",
@@ -121,6 +128,8 @@ impl Dokumentart for Lagebericht {
     const VORLAGEN: &'static [VorlageDef] = VORLAGEN;
     const NOMEN: &'static str = "Bericht";
     const NOMEN_PLURAL: &'static str = "Berichte";
+    const NOMEN_MIT_ARTIKEL: &'static str = "Der Bericht";
+    const IM_NOMEN: &'static str = "im Bericht";
 }
 
 /// Liefert die Vorlagendefinition zu einem Schlüssel, `None` bei Unbekanntem.
@@ -154,7 +163,7 @@ mod tests {
 
     #[test]
     fn vorlagen_haben_erwartete_abschnittszahl() {
-        assert_eq!(vorlage("lagebericht").unwrap().abschnitte.len(), 7);
+        assert_eq!(vorlage("lagebericht").unwrap().abschnitte.len(), 8);
         assert_eq!(vorlage("lagebeurteilung").unwrap().abschnitte.len(), 8);
         assert_eq!(vorlage("freitext").unwrap().abschnitte.len(), 1);
         assert!(vorlage("unsinn").is_none());

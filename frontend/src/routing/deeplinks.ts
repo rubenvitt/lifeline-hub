@@ -282,6 +282,28 @@ export function funkplanPfad(einsatzId: number): string {
 }
 
 /**
+ * Pressearbeit des Sachgebiets S5 (LFH-554): Presse-Log, Pressemitteilungen und Medienlage. Wie
+ * der Funkplan eine Unterroute des Stabs, kein eigenes Modul. `?kontakt=<id>` rollt zu einem
+ * Medienkontakt (Auslesen über `parseRouteId`).
+ */
+export function pressePfad(einsatzId: number, opts: { kontakt?: number } = {}): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'stab')}/presse`, { kontakt: opts.kontakt });
+}
+
+/** Detailseite einer Pressemitteilung (Item-Route unter der Presseseite). */
+export function pressemitteilungPfad(einsatzId: number, mitteilungId: number): string {
+  return `${pressePfad(einsatzId)}/mitteilungen/${mitteilungId}`;
+}
+
+/**
+ * Anrufprotokoll des Informationstelefons (S5, LFH-554), Unterroute des Stabs. `?anruf=<id>`
+ * rollt zu einem Anruf.
+ */
+export function infotelefonPfad(einsatzId: number, opts: { anruf?: number } = {}): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'stab')}/infotelefon`, { anruf: opts.anruf });
+}
+
+/**
  * Erlaubte Werte des ETB-Typfilters.
  *
  * Ein **exhaustiver Record**, kein Array: fehlt eine Variante von `EtbTyp`, bricht der

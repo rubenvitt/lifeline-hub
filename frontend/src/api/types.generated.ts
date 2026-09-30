@@ -1962,6 +1962,36 @@ export interface components {
             sichtbar: boolean;
         };
         /**
+         * @description Anliegen eines Anrufs. Wire == `as_str()`.
+         * @enum {string}
+         */
+        InfotelefonAnliegen: "vermisstensuche" | "auskunft_lage" | "hinweis" | "hilfeangebot" | "beschwerde" | "presse" | "sonstiges";
+        /** @description Öffentliche Darstellung eines Anrufs. */
+        InfotelefonAnrufAnzeige: {
+            angelegt_at: string;
+            /** Format: int64 */
+            angelegt_von_id: number;
+            anliegen: components["schemas"]["InfotelefonAnliegen"];
+            anrufer_name?: string | null;
+            eingang_at: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            erledigt_at?: string | null;
+            /** Format: int64 */
+            erledigt_von_id?: number | null;
+            erledigt_von_name?: string | null;
+            /** Format: int64 */
+            id: number;
+            notiz?: string | null;
+            rueckruf?: string | null;
+            status: components["schemas"]["InfotelefonStatus"];
+        };
+        /**
+         * @description Status eines Anrufs. Wire == `as_str()`.
+         * @enum {string}
+         */
+        InfotelefonStatus: "offen" | "erledigt";
+        /**
          * @description Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —
          *     NICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,
          *     `frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.
@@ -2235,7 +2265,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "dokument" | "abloesung" | "betreuung" | "verpflegung" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "dokument" | "abloesung" | "betreuung" | "verpflegung" | "presse" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
@@ -2255,6 +2285,49 @@ export interface components {
          * @enum {string}
          */
         MaterialStatus: "einsatzbereit" | "im_einsatz" | "defekt" | "verbraucht" | "desinfektion_noetig";
+        /** @description Öffentliche Darstellung eines Medienkontakts. */
+        MedienkontaktAnzeige: {
+            angelegt_at: string;
+            /** Format: int64 */
+            angelegt_von_id: number;
+            /** @description Die gegebene Antwort. Bleibt bei einer Rücknahme nach `offen` stehen. */
+            antwort?: string | null;
+            art: components["schemas"]["MedienkontaktArt"];
+            bearbeitet_at?: string | null;
+            /**
+             * Format: int64
+             * @description Wer den Status zuletzt gesetzt hat, und wann.
+             */
+            bearbeitet_von_id?: number | null;
+            bearbeitet_von_name?: string | null;
+            eingang_at: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Wer die Aussage freigegeben hat (Freitext, etwa „EL mündlich 14:20“). */
+            freigabe_durch?: string | null;
+            /** Format: int64 */
+            id: number;
+            kontakt_erreichbarkeit?: string | null;
+            kontakt_name?: string | null;
+            medium: string;
+            /**
+             * Format: int64
+             * @description Freigegebene Pressemitteilung desselben Einsatzes, auf die die Antwort verweist.
+             */
+            pressemitteilung_id?: number | null;
+            status: components["schemas"]["MedienkontaktStatus"];
+            thema: string;
+        };
+        /**
+         * @description Art eines Medienkontakts. Wire == `as_str()`.
+         * @enum {string}
+         */
+        MedienkontaktArt: "anfrage" | "abstimmung" | "termin";
+        /**
+         * @description Status eines Medienkontakts. Wire == `as_str()`.
+         * @enum {string}
+         */
+        MedienkontaktStatus: "offen" | "beantwortet" | "abgelehnt" | "erledigt";
         /**
          * @description Meldeweg eines Eintrags (optional).
          * @enum {string}
@@ -2974,6 +3047,48 @@ export interface components {
             gesamt: number;
             sonderkost: components["schemas"]["Sonderkost"];
         };
+        /** @description Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element). */
+        PressemitteilungAbschnitt: {
+            schluessel: string;
+            text: string;
+        };
+        /** @description Öffentliche Anzeige einer Pressemitteilung. */
+        PressemitteilungAnzeige: {
+            abschnitte: components["schemas"]["PressemitteilungAbschnitt"][];
+            aktualisiert_at: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** Format: int64 */
+            ersteller_id: number;
+            ersteller_name: string;
+            erstellt_at: string;
+            /** Format: int64 */
+            etb_eintrag_id?: number | null;
+            freigegeben_at?: string | null;
+            /** Format: int64 */
+            freigegeben_von_id?: number | null;
+            freigegeben_von_name?: string | null;
+            /** Format: int64 */
+            id: number;
+            status: components["schemas"]["PressemitteilungStatus"];
+            titel: string;
+            /** Format: int64 */
+            version: number;
+            /** Format: int64 */
+            vorgaenger_id?: number | null;
+            vorlage: components["schemas"]["PressemitteilungVorlage"];
+            zeitstand: string;
+        };
+        /**
+         * @description Status einer Pressemitteilung (Schema-Anker für die OpenAPI-Union). Wire == `status`.
+         * @enum {string}
+         */
+        PressemitteilungStatus: "entwurf" | "freigegeben";
+        /**
+         * @description Vorlage einer Pressemitteilung (Schema-Anker für die OpenAPI-Union). Wire == `vorlage`.
+         * @enum {string}
+         */
+        PressemitteilungVorlage: "erstinformation" | "folgeinformation" | "bevoelkerungshinweis" | "freitext";
         /**
          * @description Geteilte Priorität für Auftrag/Meldung/Nachforderung (Schema-Anker für die OpenAPI-Union,
          *     LFH-120; TS: `AuftragPrioritaet`/`MeldungPrioritaet`/`NachforderungPrioritaet`). Wire == `prioritaet`.

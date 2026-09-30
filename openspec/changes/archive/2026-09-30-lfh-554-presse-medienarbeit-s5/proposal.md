@@ -92,7 +92,7 @@ auch für die Pressemitteilung.
 
 ## Impact
 
-- **Migration** `0127_presse.sql` (nächste freie Nummer, vor dem Merge gegen `origin/alpha`
+- **Migration** `0129_presse.sql` (nächste freie Nummer, vor dem Merge gegen `origin/alpha`
   prüfen):
   - neue Tabellen `medienkontakt`, `pressemitteilung`, `infotelefon_anruf`
   - neue Spalte `etb_eintrag.pressemitteilung_id`

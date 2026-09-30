@@ -41,9 +41,9 @@ abgelehnt werden.
 - **THEN** antwortet das System mit 422, und der Inhalt bleibt unverändert
 
 ### Requirement: Freigabe nur durch die Einsatzleitung
-Die Freigabe einer Pressemitteilung MUST der Einsatzleitung des Einsatzes oder der
-System-Administration vorbehalten sein. Führungspersonal darf Entwürfe anlegen und bearbeiten, aber
-nicht freigeben. Der Versuch MUST mit 403 abgelehnt werden. Die Oberfläche MUST die gesperrte
+Die Freigabe einer Pressemitteilung MUST der Einsatzleitung des Einsatzes vorbehalten sein, nach
+derselben Regel wie die übrigen Leitungsaktionen. Führungspersonal darf Entwürfe anlegen und
+bearbeiten, aber nicht freigeben. Der Versuch MUST mit 403 abgelehnt werden. Die Oberfläche MUST die gesperrte
 Freigabe sichtbar lassen und den Grund nennen. Die Freigabe einer Pressemitteilung ohne gefüllten
 Abschnitt MUST mit 422 abgelehnt werden.
 

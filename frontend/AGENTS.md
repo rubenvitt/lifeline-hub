@@ -139,8 +139,9 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
 nie `aria-current`, Ziel im zugänglichen Namen, Pfad aus `routing/deeplinks.ts`;
 `parsePersonenSicht`/`sichtNachSprung` apply-then-clean. Kein Filterwert „patienten".
 
-**Stab** (Funkplan S6, Checkliste Arbeitsaufnahme, Vorbereitung der Lagebesprechung; auch
-`pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, `src/stab/`): `frontend/src/stab/AGENTS.md`.
+**Stab** (Funkplan S6, Checkliste Arbeitsaufnahme, Vorbereitung der Lagebesprechung, Presse und
+Medienarbeit S5; auch `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, die S5-Seiten, `src/stab/`,
+`src/presse/`, `src/infotelefon/`): `frontend/src/stab/AGENTS.md`.
 **Führungsfunktionen** (Katalog, Codespalte neben Freitext, Besetzung zur Lesezeit; auch
 `src/fuehrung/`): `frontend/src/fuehrung/AGENTS.md`. **Betreuung und Verpflegung** (auch
 `pages/VerpflegungPage.tsx`, `src/betreuung/`, `src/verpflegung/`): `frontend/src/betreuung/AGENTS.md`.
@@ -244,7 +245,7 @@ anwendbar), „nicht geprüft" ist keins.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`pruefeVerlassen`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in
-  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 26 am 29.09.2026); jede weitere
+  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 29 am 30.09.2026, LFH-554); jede weitere
   Karte ist eine begründete Entscheidung (Beispiele: `odlStufe` in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`, `aufbewahrungZustand` in
   `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb

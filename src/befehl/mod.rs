@@ -134,6 +134,8 @@ impl Dokumentart for Befehl {
     const VORLAGEN: &'static [VorlageDef] = VORLAGEN;
     const NOMEN: &'static str = "Befehl";
     const NOMEN_PLURAL: &'static str = "Befehle";
+    const NOMEN_MIT_ARTIKEL: &'static str = "Der Befehl";
+    const IM_NOMEN: &'static str = "im Befehl";
 }
 
 /// Liefert die Vorlagendefinition zu einem Schlüssel, `None` bei Unbekanntem.

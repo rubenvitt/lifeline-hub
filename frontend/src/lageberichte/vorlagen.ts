@@ -25,6 +25,8 @@ export const VORLAGEN: VorlageDef[] = [
       { schluessel: 'lageentwicklung', label: 'Lageentwicklung' },
       { schluessel: 'fuehrungsprobleme', label: 'Besondere (Führungs-)Probleme' },
       { schluessel: 'antraege_vorschlaege', label: 'Anträge und Vorschläge' },
+      // LFH-554: Punkt III des Lagevortrags; „Aus S5 übernehmen“ setzt die Medienlage ein.
+      { schluessel: 'medienlage', label: 'Medienlage' },
       { schluessel: 'zusammenfassung', label: 'Zusammenfassung' },
     ],
   },

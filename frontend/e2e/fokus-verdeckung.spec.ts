@@ -870,6 +870,94 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+/**
+ * Informationstelefon (LFH-554): dieselbe angepinnte Erfassung wie im ETB
+ * (`.etb-erfassung-sticky`), dieselbe Regel. Fokusziele der Zeitachse sind die Statusauslöser
+ * offener Rückrufe; ohne den gemessenen Abstand rollte Tab sie hinter die Leiste.
+ */
+test('Informationstelefon (LFH-554): kein Statusauslöser verschwindet beim Tabben hinter der Erfassung', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Fokus 554 Telefon ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  const ANZAHL = 16;
+  for (let n = 1; n <= ANZAHL; n += 1) {
+    const anruf = await page.request.post(`/api/einsaetze/${einsatzId}/stab/infotelefon`, {
+      data: {
+        anliegen: 'hinweis',
+        notiz: `Probe ${n}: Wasser im Keller`,
+        rueckruf: `0171 ${String(n).padStart(3, '0')}`,
+        rueckruf_noetig: true,
+      },
+    });
+    expect(anruf.ok(), await anruf.text()).toBeTruthy();
+  }
+
+  const gemessen: string[] = [];
+  const LEISTE = '.etb-erfassung-sticky';
+  for (const flaeche of [
+    { width: 390, height: 600 },
+    { width: 1366, height: 520 },
+  ]) {
+    await page.setViewportSize(flaeche);
+    for (const dichte of ['kompakt', 'handschuh']) {
+      const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
+      await page.goto(`/einsaetze/${einsatzId}/stab/infotelefon`);
+      await stelleDichte(page, dichte);
+      await expect(page.getByText(/^Probe \d+: Wasser im Keller$/)).toHaveCount(ANZAHL);
+      await expect(page.locator(LEISTE)).toHaveCSS('position', 'sticky');
+
+      const ausloeser = page.getByRole('button', { name: /^Status von Anruf Hinweis .* ändern$/ });
+      await expect(ausloeser).toHaveCount(ANZAHL);
+      await ausloeser.evaluateAll((els) =>
+        els.forEach((el, i) => el.setAttribute('data-e2e-fokus', `anruf ${i}`)),
+      );
+      const SCHRITTE = ANZAHL * 2 + 16;
+      const { reserve, leiste } = await page.evaluate((sel) => {
+        const l = document.querySelector(sel)!.getBoundingClientRect();
+        return {
+          reserve: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+          leiste: Math.round(l.height),
+        };
+      }, LEISTE);
+      expect(
+        reserve,
+        `${lauf}: Vorbedingung — die Bildlaufreserve (${reserve}px) muss die Leiste (${leiste}px) übersteigen`,
+      ).toBeGreaterThan(leiste);
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await ausloeser.first().focus();
+      const kern = await pruefeFokusVerdeckung(page, SCHRITTE);
+      expect(
+        kern.besuchteZiele.length,
+        `${lauf}: Vorbedingung — der Durchlauf muss die Zeitachse ablaufen`,
+      ).toBeGreaterThanOrEqual(ANZAHL - 1);
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await ausloeser.first().focus();
+      const streifen = await kleinsterStreifen(page, SCHRITTE, LEISTE);
+
+      expect(kern.verdeckt, `${lauf}: vollständig verdeckt:\n${kern.verdeckt.join('\n')}`).toEqual(
+        [],
+      );
+      expect(
+        streifen,
+        `${lauf}: kleinster freier Streifen Ziel ↔ Leiste ${streifen}px, Soll > 0`,
+      ).toBeGreaterThan(0);
+      gemessen.push(
+        `${lauf}: Leiste ${leiste}px, ${kern.besuchteZiele.length} Ziele, Streifen ≥ ${Math.round(streifen)}px`,
+      );
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 /** Einsatz mit zwei Gefahrengebieten per API (Karte braucht WebGL, `POST …/zonen` nicht). */
 async function matrixEinsatz(page: Page): Promise<number> {
   const antwort = await page.request.post('/api/einsaetze', {

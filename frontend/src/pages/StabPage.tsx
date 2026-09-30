@@ -16,7 +16,7 @@ import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components
 import StatusTag from '../components/StatusTag';
 import { modulZielRoute } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { einsatzModulPfad, funkplanPfad } from '../routing/deeplinks';
+import { einsatzModulPfad } from '../routing/deeplinks';
 import BesetzungModal from '../stab/BesetzungModal';
 import ChecklistePaneel from '../stab/ChecklistePaneel';
 import LagebesprechungHistorie from '../stab/LagebesprechungHistorie';
@@ -28,6 +28,7 @@ import { besetzungDarstellung, besetzungRechteText, zeileFuer } from '../stab/be
 import { mitWirksamemLabel } from '../stab/sachgebiete';
 import { ladeFuehrungsfunktionen } from '../api/fuehrungsfunktionen';
 import { werkzeugeFuer } from '../stab/werkzeuge';
+import { unterseitenFuer } from '../stab/unterseiten';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { einsatzStatus } from '../theme/statusFarben';
 
@@ -227,11 +228,11 @@ export default function StabPage() {
               renderItem={(s) => {
                 const zeile = zeileFuer(stabQuery.data, s.sachgebiet);
                 const werkzeuge = werkzeugeFuer(s.werkzeuge, benutzer, overridesQuery.data);
-                // Das Arbeitsergebnis der S6 (LFH-548): ein Einstieg in eine Unterroute des
-                // Stabs, kein Modul. Deshalb nicht über `werkzeugeFuer`, und es bleibt stehen,
-                // wenn die Modul-Werkzeuge der Zeile ausgeblendet sind; die Sperre erbt es vom
-                // Stab selbst.
-                const funkplan = s.sachgebiet === 's6';
+                // Arbeitsergebnisse als Unterroute des Stabs, kein Modul (S6 Funkplan LFH-548,
+                // S5 Pressearbeit und Informationstelefon LFH-554). Deshalb nicht über
+                // `werkzeugeFuer`, und sie bleiben stehen, wenn die Modul-Werkzeuge der Zeile
+                // ausgeblendet sind; die Sperre erben sie vom Stab selbst.
+                const unterseiten = unterseitenFuer(s.sachgebiet);
                 return (
                   <ListenEintrag
                     actions={
@@ -270,16 +271,17 @@ export default function StabPage() {
                               (FwDV 100 Anl. 2, S. {s.seite})
                             </Typography.Text>
                           </span>
-                          {(werkzeuge.length > 0 || funkplan) && (
+                          {(werkzeuge.length > 0 || unterseiten.length > 0) && (
                             <Flex wrap role="group" aria-label={`Werkzeuge ${s.kuerzel}`}>
-                              {funkplan && (
+                              {unterseiten.map((u) => (
                                 <Link
-                                  to={funkplanPfad(einsatzId)}
+                                  key={u.key}
+                                  to={u.pfad(einsatzId)}
                                   style={stabZeilenzielStil(token)}
                                 >
-                                  Funkplan
+                                  {u.label}
                                 </Link>
-                              )}
+                              ))}
                               {werkzeuge.map((m) => (
                                 <Link
                                   key={m.key}

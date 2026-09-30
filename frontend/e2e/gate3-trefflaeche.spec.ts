@@ -997,12 +997,13 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
 /** Zwei abgeschlossene Lagebesprechungen → Stand „Letzte" + zwei Historien-Einträge. */
 const STAB_ETB_LINKS = 3;
 /**
- * 3 + 3 + 3 + 3 + 0 + 2 Registry-Schlüssel aus `stab/sachgebiete.ts`, alle `fertig`, dazu der
- * Einstieg „Funkplan“ in der S6-Zeile (LFH-548, kein Modul, gleicher Stil).
+ * 3 + 3 + 3 + 3 + 0 + 2 Registry-Schlüssel aus `stab/sachgebiete.ts`, alle `fertig`, dazu die
+ * Unterseiten aus `stab/unterseiten.ts`: „Funkplan“ in der S6-Zeile (LFH-548) sowie
+ * „Pressearbeit“ und „Informationstelefon“ in der S5-Zeile (LFH-554), keine Module, gleicher Stil.
  */
-const STAB_WERKZEUG_LINKS = 15;
-/** S5 trägt keine Werkzeuge und rendert deshalb keine Gruppe. */
-const STAB_WERKZEUG_GRUPPEN = 5;
+const STAB_WERKZEUG_LINKS = 17;
+/** Jede Zeile trägt jetzt eine Gruppe; S5 durch ihre zwei Unterseiten (LFH-554). */
+const STAB_WERKZEUG_GRUPPEN = 6;
 /** Sechs feste Sachgebietszeilen, je ein Knopf. */
 const STAB_BESETZUNG_KNOEPFE = 6;
 /**
@@ -1210,6 +1211,145 @@ test('Stab (Beobachter): ETB-Links, Werkzeug-Links und die gesperrte Kopfaktion 
 // Handgebaute Ziele: die Titel-Links der Baumtabelle (`Datensicht`, `minHeight`
 // `controlHeight`) und die Verweise der Lücken (`stabZeilenzielStil`). Dazu die antd-Knöpfe der
 // Werkzeugzeile. Gesät wird je Ebene eine Zeile und je Lücke ein Treffer mit Verweis.
+
+// ── Presse und Informationstelefon S5 (LFH-554) ──────────────────────────────────────
+//
+// Gemessen werden die Ziele, die Vitest nur als Stil belegt: der Titel-Link der
+// Pressemitteilung (`stabZeilenzielStil`), der Sprung „Vermisste ↗“, die Statusanzeigen als
+// Auslöser (`StatusWahl`) und die antd-Knöpfe (Kopfaktionen, „Beantworten“, „Erfassen“).
+
+async function presseSaeen(page: Page, einsatzId: string) {
+  await anlegen(
+    page,
+    einsatzId,
+    'stab/medienkontakte',
+    { art: 'anfrage', medium: 'NDR 1', thema: 'Evakuierte' },
+    'Medienkontakt',
+  );
+  await anlegen(
+    page,
+    einsatzId,
+    'stab/pressemitteilungen',
+    { vorlage: 'freitext', titel: 'Hochwasser Musterstadt' },
+    'Pressemitteilung',
+  );
+  await anlegen(
+    page,
+    einsatzId,
+    'stab/infotelefon',
+    {
+      anliegen: 'vermisstensuche',
+      notiz: 'sucht Vater',
+      rueckruf: '0171 000',
+      rueckruf_noetig: true,
+    },
+    'Anruf',
+  );
+}
+
+test('Presse S5: Kopfaktionen, Titel-Link, Statusauslöser, „Beantworten“ und die Telefon-Erfassung folgen der Staffel', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Presse`);
+  await presseSaeen(page, einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/stab/presse`);
+    await stelleDichte(page, dichte);
+    await expect(page.getByText('NDR 1 · Evakuierte')).toHaveCount(1);
+    const kopf = page.locator('[data-lfh="seitenkopf-aktionen"]');
+    const aktionen = await alleHaltenStufe(
+      kopf.getByRole('button'),
+      soll,
+      `Kopfaktion (${dichte})`,
+      2,
+    );
+    const titel = await haeltStufe(
+      page.getByRole('link', { name: 'Hochwasser Musterstadt', exact: true }),
+      soll,
+      `Titel-Link (${dichte})`,
+    );
+    const status = await haeltStufe(
+      page.getByRole('button', { name: 'Status von NDR 1 · Evakuierte ändern' }),
+      soll,
+      `Statusauslöser (${dichte})`,
+    );
+    const beantworten = await haeltStufe(
+      page.getByRole('button', { name: 'Anfrage von NDR 1 beantworten' }),
+      soll,
+      `Beantworten (${dichte})`,
+    );
+
+    await page.goto(`/einsaetze/${einsatzId}/stab/infotelefon`);
+    await expect(page.getByText('sucht Vater')).toHaveCount(1);
+    const erfassen = await haeltStufe(
+      page.getByRole('button', { name: 'Erfassen', exact: true }),
+      soll,
+      `Erfassen (${dichte})`,
+    );
+    const anrufStatus = await haeltStufe(
+      page.getByRole('button', { name: /^Status von Anruf Vermisstensuche .* ändern$/ }),
+      soll,
+      `Anruf-Status (${dichte})`,
+    );
+    const vermisste = await haeltStufe(
+      page.getByRole('link', { name: /Vermisste/ }),
+      soll,
+      `Vermisste (${dichte})`,
+    );
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Kopf ${aktionen}, Titel ${titel}, Status ${status}, ` +
+        `Beantworten ${beantworten}, Erfassen ${erfassen}, Anruf-Status ${anrufStatus}, Vermisste ${vermisste}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Presse S5 (Beobachter): Titel-Link und „Vermisste ↗“ folgen der Staffel, Auslöser fehlen', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Presse Lesend`);
+  await presseSaeen(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/stab/presse`);
+    await stelleDichte(page, dichte);
+    await expect(page.getByText('NDR 1 · Evakuierte')).toHaveCount(1);
+    // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
+    await expect(
+      page.getByRole('button', { name: 'Anfrage von NDR 1 beantworten' }),
+      'Vorbedingung: ohne Schreibrecht kein „Beantworten“',
+    ).toHaveCount(0);
+    const titel = await haeltStufe(
+      page.getByRole('link', { name: 'Hochwasser Musterstadt', exact: true }),
+      soll,
+      `Titel-Link (${dichte})`,
+    );
+
+    await page.goto(`/einsaetze/${einsatzId}/stab/infotelefon`);
+    await expect(page.getByText('sucht Vater')).toHaveCount(1);
+    await expect(
+      page.getByRole('button', { name: 'Erfassen', exact: true }),
+      'Vorbedingung: ohne Schreibrecht keine Erfassung',
+    ).toHaveCount(0);
+    const vermisste = await haeltStufe(
+      page.getByRole('link', { name: /Vermisste/ }),
+      soll,
+      `Vermisste (${dichte})`,
+    );
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Titel ${titel}, Vermisste ${vermisste}`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
 
 /** Abschnitt, Einheit und Fahrzeug: drei Titel-Links in der Tabelle. */
 const FUNKPLAN_TITEL_LINKS = 3;

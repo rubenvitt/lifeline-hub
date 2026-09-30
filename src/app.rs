@@ -447,6 +447,45 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::stab::lagebesprechungen_liste)
                 .post(routes::stab::lagebesprechung_abschliessen),
         )
+        // LFH-554: Presse- und Medienarbeit S5; Stab-Sperre per Präfix (`PFAD_KEY`).
+        .route(
+            "/api/einsaetze/{id}/stab/medienkontakte",
+            get(routes::presse::medienkontakte_liste).post(routes::presse::medienkontakt_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/medienkontakte/{kid}",
+            patch(routes::presse::medienkontakt_aendern),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/medienkontakte/{kid}/status",
+            post(routes::presse::medienkontakt_status),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/pressemitteilungen",
+            get(routes::presse::pressemitteilungen_liste)
+                .post(routes::presse::pressemitteilung_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/pressemitteilungen/{mid}",
+            get(routes::presse::pressemitteilung_detail)
+                .patch(routes::presse::pressemitteilung_aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/pressemitteilungen/{mid}/freigeben",
+            post(routes::presse::pressemitteilung_freigeben),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/pressemitteilungen/{mid}/fortschreiben",
+            post(routes::presse::pressemitteilung_fortschreiben),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/infotelefon",
+            get(routes::infotelefon::liste).post(routes::infotelefon::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/infotelefon/{aid}/status",
+            post(routes::infotelefon::status_setzen),
+        )
         .route(
             "/api/einsaetze/{id}/stab/checkliste",
             get(routes::stab::checkliste_laden),

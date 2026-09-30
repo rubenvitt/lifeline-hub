@@ -51,9 +51,14 @@ pub trait Dokumentart: Send + Sync + 'static {
     const ETB_VERWEIS: &'static str;
     /// Vorlagen-Registry der Art.
     const VORLAGEN: &'static [VorlageDef];
-    /// Nomen in den Meldungen („Befehl"/„Bericht"; beide maskulin).
+    /// Nomen in den Meldungen („Befehl“, „Bericht“, „Pressemitteilung“).
     const NOMEN: &'static str;
     const NOMEN_PLURAL: &'static str;
+    /// Nomen mit bestimmtem Artikel im Nominativ („Der Bericht“, „Die Pressemitteilung“). Das
+    /// Genus steht je Art, weil die Pressemitteilung (LFH-554) als erste Art feminin ist.
+    const NOMEN_MIT_ARTIKEL: &'static str;
+    /// Nomen mit Präposition im Dativ („im Bericht“, „in der Pressemitteilung“).
+    const IM_NOMEN: &'static str;
 }
 
 /// Liefert die Vorlagendefinition zu einem Schlüssel, `None` bei Unbekanntem.
@@ -124,16 +129,16 @@ pub fn validiere_freigabe<T: Dokumentart>(
     for def in v.abschnitte {
         if !abschnitte.iter().any(|a| a.schluessel() == def.schluessel) {
             return Err(AppError::UnprocessableEntity(format!(
-                "Abschnitt «{}» fehlt im {}",
+                "Abschnitt «{}» fehlt {}",
                 def.label,
-                T::NOMEN
+                T::IM_NOMEN
             )));
         }
     }
     if abschnitte.iter().all(|a| a.text().trim().is_empty()) {
         return Err(AppError::UnprocessableEntity(format!(
-            "Der {} ist leer und kann nicht freigegeben werden",
-            T::NOMEN
+            "{} ist leer und kann nicht freigegeben werden",
+            T::NOMEN_MIT_ARTIKEL
         )));
     }
     Ok(())

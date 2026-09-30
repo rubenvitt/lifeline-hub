@@ -1,9 +1,14 @@
-import type { LageberichtAnzeige } from '../api/types';
+/** Was eine Kette braucht: Kennung und Vorgänger. Lagebericht, Befehl und Pressemitteilung
+ *  (LFH-554) teilen dieselbe Fortschreibung. */
+interface Glied {
+  id: number;
+  vorgaenger_id?: number | null;
+}
 
 /** Ein Fortschreibungsstrang: der jüngste Stand als Kopf, die Vorgänger jüngster zuerst. */
-export interface KettenKopf {
-  kopf: LageberichtAnzeige;
-  vorgaenger: LageberichtAnzeige[];
+export interface KettenKopf<T extends Glied> {
+  kopf: T;
+  vorgaenger: T[];
 }
 
 /**
@@ -11,11 +16,8 @@ export interface KettenKopf {
  * (gelöscht, anderer Einsatz, Datenfehler), beendet die Kette still; ein Zyklus ebenfalls —
  * `gesehen` ist der Abbruch, nicht eine Meldung.
  */
-function folgeKette(
-  kopf: LageberichtAnzeige,
-  nachId: ReadonlyMap<number, LageberichtAnzeige>,
-): KettenKopf {
-  const vorgaenger: LageberichtAnzeige[] = [];
+function folgeKette<T extends Glied>(kopf: T, nachId: ReadonlyMap<number, T>): KettenKopf<T> {
+  const vorgaenger: T[] = [];
   const gesehen = new Set<number>([kopf.id]);
   let v = kopf.vorgaenger_id == null ? undefined : nachId.get(kopf.vorgaenger_id);
   while (v && !gesehen.has(v.id)) {
@@ -36,7 +38,7 @@ function folgeKette(
  * angehängt, damit die Verwandtschaft sichtbar bleibt. Die Reihenfolge der echten Köpfe bleibt.
  * Ein Vorgänger, auf den zwei Berichte zeigen, erscheint in beiden Ketten.
  */
-export function kettenKoepfe(berichte: readonly LageberichtAnzeige[]): KettenKopf[] {
+export function kettenKoepfe<T extends Glied>(berichte: readonly T[]): KettenKopf<T>[] {
   const nachId = new Map(berichte.map((b) => [b.id, b]));
   const hatNachfolger = new Set(
     berichte.map((b) => b.vorgaenger_id).filter((id): id is number => id != null),

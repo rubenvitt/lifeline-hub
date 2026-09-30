@@ -303,6 +303,22 @@ describe('StabPage', () => {
     expect(screen.getAllByRole('link', { name: 'Funkplan' })).toHaveLength(1);
   });
 
+  it('die S5-Zeile führt zu Pressearbeit und Informationstelefon, keine andere Zeile (LFH-554)', async () => {
+    rendere();
+    await besetzungsSektion();
+    const s5 = await screen.findByRole('group', { name: 'Werkzeuge S5' });
+    expect(within(s5).getByRole('link', { name: 'Pressearbeit' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/stab/presse',
+    );
+    expect(within(s5).getByRole('link', { name: 'Informationstelefon' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/stab/infotelefon',
+    );
+    expect(screen.getAllByRole('link', { name: 'Pressearbeit' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'Informationstelefon' })).toHaveLength(1);
+  });
+
   it('der Funkplan-Verweis bleibt, auch wenn alle Modul-Werkzeuge der S6 ausgeblendet sind', async () => {
     rendere({ overrides: { chat: { sichtbar: false }, einsatzabschnitte: { sichtbar: false } } });
     await besetzungsSektion();
