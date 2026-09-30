@@ -69,7 +69,7 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
 | gedaempft | `#9aa2ab` | Sekundärtext, Mono-Meta |
 | schwach | `#5f676f` | Augenbrauen, Tertiärtext |
 | bedien | `#4d94d6` (Hover `#7db3e8`) | Primärknopf, Fokus, aktive Modulmarke, Links |
-| marke | `#a8071a` | Logo-Quadrat, aktive Rail-Marke, SK-I-Balken, akut |
+| marke | `#a8071a` | Quadrat der Bildmarke, aktive Rail-Marke, SK-I-Balken, akut |
 | alarm (Text) | `#ff6b6b` | überfällig, Ausfall |
 | achtung (Text) | `#e8cc3a` | Warnstufe hoch, Anfahrt |
 | normal | `#52c41a` / Text `#7ddc4a` | einsatzbereit, SYNC |
@@ -82,9 +82,19 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
 Werte, die in Nachtmodus- und Hellfassung existieren müssen, gehören als Rollen nach
 `theme/tokens.ts` + `theme/rollen.css` (Gate 5: keine Hex-Literale außerhalb `theme/`).
 
+## Bildmarke „Lebenslinie“ (LFH-837, Entscheidung 30.09.2026)
+
+Das Zeichen der App: eine helle Pulslinie, die in einem Quadrat in `marke` endet. Das
+14-px-Quadrat des Entwurfs ist damit abgelöst. Rot bleibt Akzent, die Linie trägt die Textfarbe
+ihres Grundes. Dieselbe Geometrie gilt für Kopfleiste, Anmeldeseite, Favicon, PWA- und
+Desktop-Symbole: `frontend/src/marke/bildmarkeGeometrie.ts`, Quellen und Erzeugung in
+`scripts/marke/`, Guard `frontend/src/marke/marke.guard.test.ts`. Titelleiste und Startbildschirm
+der PWA sind Kopf-Schwarz.
+
 ## Form & Typografie
 
-- Radius 0 überall. Trennung über Haarlinien; Raster aus Zellen mit `gap:1px` auf
+- Radius 0 überall (einzige Ausnahme: das macOS-Symbol der Desktop-Hülle folgt dem Raster der
+  Plattform, LFH-837). Trennung über Haarlinien; Raster aus Zellen mit `gap:1px` auf
   Linienfarbe („Fugenraster“).
 - Archivo 400/500/600, JetBrains Mono 400/500 (fehlende Schnitte lokal nachliefern, kein CDN).
 - Skala: Überschrift 30 · Seitentitel 14/600 · Datenwert 22–40 Mono 500 · Text 12–14 ·
@@ -94,7 +104,7 @@ Werte, die in Nachtmodus- und Hellfassung existieren müssen, gehören als Rolle
 
 ## Rahmen (shell.dc.html)
 
-- Kopf 52 px `#0c0e11`: Markenzelle 60 px (Quadrat 14 px marke) · Wortmarke
+- Kopf 52 px `#0c0e11`: Markenzelle 60 px (Bildmarke „Lebenslinie“ 22 px) · Wortmarke
   `lifeline-hub` Mono 12 · Statuspunkt + Einsatznummer (Mono) + Einsatzname ·
   Suchfeld (max 520, „Modul, Einheit, Meldung, Koordinate …“, ⌘K) · SYNC-Anzeige ·
   Uhr Mono 14 · Initialen + Funktion.
