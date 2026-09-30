@@ -90,6 +90,13 @@ ein einziger Renderer (resvg), und er ist ohnehin für die Hülle nötig.
    `apple-touch-icon.png` erzeugen, mit `-p 512` aus `symbol-maskable.svg` die Datei
    `pwa-maskable-512.png`.
 4. `symbol.svg` nach `frontend/public/favicon.svg` kopieren.
+5. Einen Stempel `scripts/marke/quellen.sha256` mit den Prüfsummen der drei Quellen schreiben.
+   Der Guard vergleicht ihn mit den Quellen und merkt so, wenn eine Quelle nach dem letzten Lauf
+   geändert wurde (Befund aus dem Review).
+
+Das Skript verlangt `tauri-cli 2.12.0`, dieselbe Version wie `artefakte.yml`. `icon.icns`
+ordnet seine Einträge nicht stabil; bei gleichen Bildern (Vergleich per `iconutil`) bleibt die
+vorhandene Datei stehen, damit ein zweiter Lauf keinen Diff erzeugt.
 
 Das Skript ist nicht Teil von `check-all.sh`. Die Ergebnisse werden eingecheckt, und der
 Guard-Test prüft sie.
@@ -138,7 +145,10 @@ keinen eigenen Kontrastanspruch. Die Form trägt, Rot ist der zweite Kanal.
   muss die Nenngröße aus ihrem Namen bzw. Manifest-Eintrag haben: `pwa-192` ist 192,
   `128x128@2x` ist 256, `Square44x44Logo` ist 44 usw.
 - Das Manifest hat die Einträge any/maskable, und seine Farben sind `#0c0e11`.
-- `favicon.svg` und die Quellen enthalten Pfad und Strichstärke aus `bildmarkeGeometrie.ts`.
+- `favicon.svg` und die Quellen enthalten Pfad, Strichstärke, Eckform und Gehrungsgrenze aus
+  `bildmarkeGeometrie.ts`; der Stempel passt zu den Quellen.
+- `MARKE_RAHMEN` wird analytisch aus Pfad und Strich nachgerechnet (±1), jede Ecke bleibt unter
+  der Gehrungsgrenze.
 - Maskierbar: Das umschließende Rechteck der Marke (aus Geometrie und Transformation der Quelle)
   liegt mit allen Ecken im Kreis mit Radius 0,4 · Kante.
 

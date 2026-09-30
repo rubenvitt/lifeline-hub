@@ -1,9 +1,17 @@
+import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { farbenDunkel } from '../theme/tokens';
-import { LINIE_PFAD, LINIE_STAERKE, MARKE_RAHMEN, QUADRAT } from './bildmarkeGeometrie';
+import {
+  LINIE_ECKE,
+  LINIE_GEHRUNGSGRENZE,
+  LINIE_PFAD,
+  LINIE_STAERKE,
+  MARKE_RAHMEN,
+  QUADRAT,
+} from './bildmarkeGeometrie';
 
 /**
  * Guard der Bildmarke „Lebenslinie“ (LFH-837, Design D6).
@@ -46,6 +54,49 @@ function nenngroesseHuelle(name: string): number | null {
   if (name === 'StoreLogo.png') return 50;
   if (name === 'icon.png') return 512;
   return null;
+}
+
+/**
+ * Umschließendes Rechteck der gezeichneten Marke, analytisch aus Pfad und Strich: stumpfe Enden,
+ * Gehrungsspitzen außen, Schnittpunkte innen, dazu das Quadrat. Prüft zugleich, dass jede Ecke
+ * unter der Gehrungsgrenze bleibt (sonst zeichnete der Renderer eine Fase).
+ */
+function gezeichneterRahmen() {
+  const punkte: [number, number][] = [];
+  for (const [, befehl, zahlen] of LINIE_PFAD.matchAll(/([MHL])([^MHL]*)/g)) {
+    const w = (zahlen.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    punkte.push(befehl === 'H' ? [w[0], punkte[punkte.length - 1][1]] : [w[0], w[1]]);
+  }
+  const halb = LINIE_STAERKE / 2;
+  const norm = ([x, y]: [number, number]): [number, number] => {
+    const l = Math.hypot(x, y);
+    return [x / l, y / l];
+  };
+  const umriss: [number, number][] = [];
+  for (const [p, q] of [
+    [punkte[0], punkte[1]],
+    [punkte[punkte.length - 1], punkte[punkte.length - 2]],
+  ]) {
+    const [dx, dy] = norm([q[0] - p[0], q[1] - p[1]]);
+    umriss.push([p[0] - dy * halb, p[1] + dx * halb], [p[0] + dy * halb, p[1] - dx * halb]);
+  }
+  for (let i = 1; i < punkte.length - 1; i++) {
+    const p = punkte[i];
+    const a = norm([punkte[i - 1][0] - p[0], punkte[i - 1][1] - p[1]]);
+    const b = norm([punkte[i + 1][0] - p[0], punkte[i + 1][1] - p[1]]);
+    const verhaeltnis = 1 / Math.sqrt((1 - (a[0] * b[0] + a[1] * b[1])) / 2);
+    expect(verhaeltnis, `Ecke ${p}`).toBeLessThanOrEqual(LINIE_GEHRUNGSGRENZE);
+    const [hx, hy] = norm([a[0] + b[0], a[1] + b[1]]);
+    const abstand = halb * verhaeltnis;
+    umriss.push(
+      [p[0] - hx * abstand, p[1] - hy * abstand],
+      [p[0] + hx * abstand, p[1] + hy * abstand],
+    );
+  }
+  umriss.push([QUADRAT.x, QUADRAT.y], [QUADRAT.x + QUADRAT.kante, QUADRAT.y + QUADRAT.kante]);
+  const xs = umriss.map(([x]) => x);
+  const ys = umriss.map(([, y]) => y);
+  return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
 }
 
 describe('Bildmarke — Nenngrößen (LFH-837)', () => {
@@ -98,7 +149,7 @@ describe('Bildmarke — Manifest (LFH-837)', () => {
 });
 
 describe('Bildmarke — eine Geometrie (LFH-837)', () => {
-  const linie = `<path d="${LINIE_PFAD}" fill="none" stroke="${farbenDunkel.text}" stroke-width="${LINIE_STAERKE}"`;
+  const linie = `<path d="${LINIE_PFAD}" fill="none" stroke="${farbenDunkel.text}" stroke-width="${LINIE_STAERKE}" stroke-linejoin="${LINIE_ECKE}" stroke-miterlimit="${LINIE_GEHRUNGSGRENZE}"/>`;
   const quadrat = `<rect x="${QUADRAT.x}" y="${QUADRAT.y}" width="${QUADRAT.kante}" height="${QUADRAT.kante}" fill="${farbenDunkel.marke}"/>`;
 
   it.each(QUELLEN)('%s zeichnet Linie und Quadrat der Oberfläche', (datei) => {
@@ -107,6 +158,33 @@ describe('Bildmarke — eine Geometrie (LFH-837)', () => {
     expect(svg).toContain(quadrat);
     expect(svg).toContain(`fill="${KOPF_SCHWARZ}"`);
     expect(svg).not.toContain('<text');
+  });
+
+  it('MARKE_RAHMEN umschließt die gezeichnete Marke samt Gehrungen (±1)', () => {
+    const r = gezeichneterRahmen();
+    expect(r.x0).toBeCloseTo(MARKE_RAHMEN.x, -0.3);
+    expect(r.y0).toBeCloseTo(MARKE_RAHMEN.y, -0.3);
+    expect(r.x1).toBeCloseTo(MARKE_RAHMEN.x + MARKE_RAHMEN.breite, -0.3);
+    expect(r.y1).toBeCloseTo(MARKE_RAHMEN.y + MARKE_RAHMEN.hoehe, -0.3);
+  });
+
+  it('die Rastergrafiken stammen aus den aktuellen Quellen (Prüfsummen-Stempel des Skripts)', () => {
+    const stempel = new Map(
+      readFileSync(join(quellen, 'quellen.sha256'), 'utf8')
+        .trim()
+        .split('\n')
+        .map((zeile) => {
+          const [summe, name] = zeile.split(/\s+/);
+          return [name, summe] as const;
+        }),
+    );
+    expect([...stempel.keys()].sort()).toEqual([...QUELLEN].sort());
+    for (const datei of QUELLEN) {
+      const summe = createHash('sha256')
+        .update(readFileSync(join(quellen, datei)))
+        .digest('hex');
+      expect(stempel.get(datei), `${datei} geändert, Skript nicht gelaufen`).toBe(summe);
+    }
   });
 
   it('favicon.svg ist die Quelle symbol.svg', () => {

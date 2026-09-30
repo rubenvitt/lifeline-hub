@@ -216,7 +216,7 @@ export default function LoginPage() {
       <div className="login-karte">
         <div className="login-marke">
           <div className="login-marke__zeile">
-            <Bildmarke hoehe={20} linienFarbe="var(--lfh-text)" />
+            <Bildmarke hoehe={20} linienFarbe="var(--lfh-text)" quadratFarbe="var(--lfh-marke)" />
             <h1 className="login-marke__name">lifeline-hub</h1>
           </div>
           <p className="login-marke__untertitel">Einsatzführung &amp; Einsatztagebuch</p>

@@ -30,6 +30,7 @@ describe('LoginPage', () => {
     expect(marke).toHaveAttribute('aria-hidden', 'true');
     expect(marke).toHaveAttribute('height', '20');
     expect(marke!.querySelector('path')).toHaveAttribute('stroke', 'var(--lfh-text)');
+    expect(marke!.querySelector('rect')).toHaveAttribute('fill', 'var(--lfh-marke)');
     expect(zeile.firstElementChild).toBe(marke);
     expect(container.querySelector('.login-marke__quadrat')).toBeNull();
     expect(screen.getByRole('heading', { level: 1, name: 'lifeline-hub' })).toBeInTheDocument();

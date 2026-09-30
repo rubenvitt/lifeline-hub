@@ -32,7 +32,7 @@
 - [x] 3.2 `Markenzelle` in `components/Kopfleiste.tsx` auf die Bildmarke umstellen (22 px,
       `rahmenFarben.text`) und den Dateikopf nachziehen. Prüfung: `Kopfleiste.test.tsx` prüft,
       dass die Bildmarke da ist und das 14-px-Quadrat fehlt (zuerst rot).
-- [ ] 3.3 Markenbereich der Anmeldeseite auf die Bildmarke umstellen (20 px,
+- [x] 3.3 Markenbereich der Anmeldeseite auf die Bildmarke umstellen (20 px,
       `var(--lfh-text)`), `.login-marke__quadrat` entfernen. Prüfung: `LoginPage.test.tsx`
       entsprechend (zuerst rot). Sichtprüfung im Tag- und Nachtbetrieb im Vite-Dev-Server.
 

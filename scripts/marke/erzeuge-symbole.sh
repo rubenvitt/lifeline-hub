@@ -12,7 +12,8 @@
 # Gerendert wird allein mit `cargo tauri icon` (resvg), damit alle Größen aus demselben
 # Renderer kommen. In src-tauri/icons/ landet nur, was dort schon versioniert ist; die
 # Standardausgabe android/ und ios/ fällt weg. Die Ergebnisse werden eingecheckt;
-# frontend/src/marke/marke.guard.test.ts prüft Nenngrößen und Geometrie.
+# frontend/src/marke/marke.guard.test.ts prüft Nenngrößen, Geometrie und den Stempel
+# scripts/marke/quellen.sha256 (Quellen seit dem letzten Lauf unverändert).
 set -euo pipefail
 
 wurzel="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -21,7 +22,10 @@ oeffentlich="$wurzel/frontend/public"
 huelle="$wurzel/src-tauri/icons"
 
 command -v cargo >/dev/null || { echo "cargo fehlt" >&2; exit 2; }
-cargo tauri --version >/dev/null 2>&1 || { echo "tauri-cli fehlt (cargo install tauri-cli)" >&2; exit 2; }
+# Dieselbe Version wie der Release-Build (artefakte.yml), sonst weichen die Bytes ab.
+TAURI_CLI='tauri-cli 2.12.0'
+cargo tauri --version 2>/dev/null | grep -qx "$TAURI_CLI" \
+  || { echo "$TAURI_CLI nötig (cargo install tauri-cli --locked --version ${TAURI_CLI#tauri-cli })" >&2; exit 2; }
 
 arbeit="$(mktemp -d)"
 trap 'rm -rf "$arbeit"' EXIT
@@ -46,9 +50,17 @@ for datei in "${versioniert[@]}"; do
   cp "$arbeit/huelle/$datei" "$huelle/$datei"
 done
 
-# 2. macOS nach dem Raster der Plattform: nur icon.icns.
+# 2. macOS nach dem Raster der Plattform: nur icon.icns. Die tauri-cli ordnet die Einträge
+#    nicht stabil; bei gleichen Bildern bleibt die Datei stehen, sonst gäbe jeder Lauf einen Diff.
 render "$quellen/symbol-macos.svg" -o "$arbeit/macos"
-cp "$arbeit/macos/icon.icns" "$huelle/icon.icns"
+icns_gleich() {
+  command -v iconutil >/dev/null || return 1
+  iconutil -c iconset "$1" -o "$arbeit/a.iconset" && iconutil -c iconset "$2" -o "$arbeit/b.iconset" \
+    && diff -rq "$arbeit/a.iconset" "$arbeit/b.iconset" >/dev/null
+}
+if [[ ! -f "$huelle/icon.icns" ]] || ! icns_gleich "$arbeit/macos/icon.icns" "$huelle/icon.icns"; then
+  cp "$arbeit/macos/icon.icns" "$huelle/icon.icns"
+fi
 
 # 3. PWA und Startbildschirm von iPad/iPhone.
 render "$quellen/symbol.svg" -p 192 -p 512 -p 180 -o "$arbeit/pwa"
@@ -60,5 +72,9 @@ cp "$arbeit/maskable/512x512.png" "$oeffentlich/pwa-maskable-512.png"
 
 # 4. Favicon ist die eckige Quelle selbst.
 cp "$quellen/symbol.svg" "$oeffentlich/favicon.svg"
+
+# 5. Stempel: Prüfsummen der Quellen, gegen die der Guard prüft, ob das Skript nach der letzten
+#    Quelländerung gelaufen ist.
+(cd "$quellen" && shasum -a 256 symbol.svg symbol-maskable.svg symbol-macos.svg) > "$quellen/quellen.sha256"
 
 echo "Symbole erzeugt. Prüfen: mise exec -- pnpm -C \"$wurzel/frontend\" vitest run src/marke"

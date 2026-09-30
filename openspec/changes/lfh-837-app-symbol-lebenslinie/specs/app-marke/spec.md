@@ -12,8 +12,8 @@ installierte PWA und als Desktop-App wiedererkennt, auch in kleiner Darstellung.
 Die App SHALL genau eine Bildmarke führen, die „Lebenslinie“. Sie besteht aus einer Pulslinie
 und einem Quadrat in der Farbe `marke`, in dem die Linie endet. Kopfleiste, Anmeldeseite,
 Browser-Tab, installierte PWA und Desktop-App MUST dieselbe Geometrie zeigen. Das Quadrat in
-`marke` MUST der einzige rote Anteil der Bildmarke sein. Die Linie trägt die helle Textfarbe
-ihres Grundes.
+`marke` MUST der einzige rote Anteil der Bildmarke sein. Die Linie trägt die Textfarbe ihres
+Grundes.
 
 #### Scenario: Kopfleiste zeigt die Bildmarke
 

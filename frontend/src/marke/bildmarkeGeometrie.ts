@@ -16,10 +16,13 @@
 /** Pulslinie: Grundlinie, Zacke hoch, Zacke tief, zurück, bis an das Quadrat. */
 export const LINIE_PFAD = 'M0 0H86L136-110L198 110L248 0H324';
 export const LINIE_STAERKE = 54;
+/** Harte Ecken (Radius 0); die Grenze liegt über dem Gehrungsverhältnis der Zacke (≈ 2,9). */
+export const LINIE_ECKE = 'miter';
+export const LINIE_GEHRUNGSGRENZE = 10;
 
 /** Das Quadrat in `marke`; die Linie endet stumpf an seiner linken Kante. */
 export const QUADRAT = { x: 324, y: -36, kante: 72 } as const;
 
-/** Enges Rechteck um die gezeichnete Marke samt Gehrungen (gemessen, s. o.). */
+/** Enges Rechteck um die gezeichnete Marke samt Gehrungen (gemessen, s. o.; der Guard rechnet nach). */
 export const MARKE_RAHMEN = { x: 0, y: -189, breite: 396, hoehe: 378 } as const;
 export const MARKE_VIEWBOX = `${MARKE_RAHMEN.x} ${MARKE_RAHMEN.y} ${MARKE_RAHMEN.breite} ${MARKE_RAHMEN.hoehe}`;
