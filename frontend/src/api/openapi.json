@@ -1113,19 +1113,26 @@
       },
       "AuftragsZaehler": {
         "type": "object",
-        "description": "Aufträge: offen (offen/in Arbeit), davon überfällig.",
+        "description": "Aufträge: offen (offen/in Arbeit), davon in Arbeit, davon überfällig.",
         "required": [
           "offen",
+          "in_arbeit",
           "ueberfaellig"
         ],
         "properties": {
+          "in_arbeit": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon mit Bearbeitungsstatus „in Arbeit\" (LFH-550, „davon in Arbeit\" im Überblick)."
+          },
           "offen": {
             "type": "integer",
             "format": "int64"
           },
           "ueberfaellig": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "Davon überfällig — nur unter den offenen: ein vollzogener Auftrag mit Quittungslücke\nzählt nicht (LFH-550)."
           }
         }
       },

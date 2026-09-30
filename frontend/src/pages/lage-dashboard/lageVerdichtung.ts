@@ -11,6 +11,7 @@ import type {
   Warnstufe,
 } from '../../api/types';
 import { GEFAHRENTYPEN } from '../gefahren/gefahrenSchema';
+import { sichtungsbild } from '../../personen/personenBilanz';
 
 export interface SkVerteilung {
   sk1: number;
@@ -137,7 +138,9 @@ export function sichtungsZeilen(sk: SkVerteilung): SichtungsZeile[] {
 }
 
 export function verdichtePersonen(personen: Person[]): BetroffeneVerdichtung {
-  const sk: SkVerteilung = { sk1: 0, sk2: 0, sk3: 0, sk4: 0, tot: 0, unverletzt: 0, ohne: 0 };
+  // Die SK-Verteilung zählt EINE Stelle (LFH-550): `sichtungsbild`, wie die Seitenleiste der
+  // Betroffenen. Hier nur die Übernahme der Schlüssel.
+  const sk: SkVerteilung = { ...sichtungsbild(personen).je };
   const status: PersonStatusVerteilung = {
     erfasst: 0,
     vermisst: 0,
@@ -145,11 +148,7 @@ export function verdichtePersonen(personen: Person[]): BetroffeneVerdichtung {
     verstorben: 0,
     abgemeldet: 0,
   };
-  for (const p of personen) {
-    if (p.aktuelle_sichtung == null) sk.ohne += 1;
-    else sk[p.aktuelle_sichtung] += 1;
-    status[p.status] += 1;
-  }
+  for (const p of personen) status[p.status] += 1;
   return {
     sk,
     status,

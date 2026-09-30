@@ -16,6 +16,7 @@ import {
 } from './lageVerdichtung';
 import { verdichteSchaeden, verdichteTiere, verdichteUhs } from './lageVerdichtung';
 import { sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
+import { sichtungsbild } from '../../personen/personenBilanz';
 
 function person(p: Partial<Person>): Person {
   return {
@@ -78,6 +79,17 @@ describe('verdichtePersonen', () => {
     expect(v.sk.ohne).toBe(1);
     expect(v.patienten).toBe(3);
     expect(v.gesamt).toBe(6);
+  });
+
+  it('dieselbe SK-Verteilung wie die Seitenleiste der Betroffenen (LFH-550)', () => {
+    const liste = [
+      person({ aktuelle_sichtung: 'sk2' }),
+      person({ aktuelle_sichtung: 'sk4' }),
+      person({ aktuelle_sichtung: 'sk4' }),
+      person({ aktuelle_sichtung: null, status: 'vermisst' }),
+      person({ aktuelle_sichtung: 'tot' }),
+    ];
+    expect(verdichtePersonen(liste).sk).toEqual(sichtungsbild(liste).je);
   });
 
   it('zählt Status-Verteilung und Vermisste', () => {

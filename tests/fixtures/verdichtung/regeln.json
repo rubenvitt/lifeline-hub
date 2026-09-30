@@ -1,0 +1,63 @@
+{
+  "_zweck": "LFH-550: Gemeinsames Fixture für Zählregeln, die Server UND Client anwenden. Gelesen von tests/verdichtung_fixture.rs (Rust) und frontend/src/lage/verdichtungFixture.test.ts (Vitest). Wer eine Regel ändert, ändert diese Datei — sonst wird eine der beiden Suiten rot. Die Zeilenflags (ist_offen, ist_ueberfaellig) sind EINGABEN: ihre SQL-Herleitung sichern die Repo-Tests; gepinnt wird die Schicht darüber.",
+  "auftraege": {
+    "faelle": [
+      { "name": "offen, Frist läuft", "bearbeitungsstatus": "offen", "ist_ueberfaellig": false, "offen": true, "ueberfaellig": false },
+      { "name": "offen, überfällig", "bearbeitungsstatus": "offen", "ist_ueberfaellig": true, "offen": true, "ueberfaellig": true },
+      { "name": "in Arbeit", "bearbeitungsstatus": "in_arbeit", "ist_ueberfaellig": false, "offen": true, "ueberfaellig": false },
+      { "name": "in Arbeit, überfällig", "bearbeitungsstatus": "in_arbeit", "ist_ueberfaellig": true, "offen": true, "ueberfaellig": true },
+      { "name": "vollzogen mit Quittungslücke nach Frist", "bearbeitungsstatus": "vollzogen", "ist_ueberfaellig": true, "offen": false, "ueberfaellig": false },
+      { "name": "abgenommen", "bearbeitungsstatus": "abgenommen", "ist_ueberfaellig": false, "offen": false, "ueberfaellig": false }
+    ],
+    "erwartet": { "offen": 4, "in_arbeit": 2, "ueberfaellig": 2 }
+  },
+  "meldungen": {
+    "faelle": [
+      { "name": "neu, ohne Pflicht", "status": "neu", "ist_offen": true, "bestaetigung_pflicht": false, "ist_bestaetigt": false, "ist_ueberfaellig": false, "eskaliert": false, "bestaetigung_ueberfaellig": false },
+      { "name": "neu, Pflicht, Frist abgelaufen", "status": "neu", "ist_offen": true, "bestaetigung_pflicht": true, "ist_bestaetigt": false, "ist_ueberfaellig": true, "eskaliert": false, "bestaetigung_ueberfaellig": true },
+      { "name": "in Bearbeitung, eskaliert vor Frist", "status": "in_bearbeitung", "ist_offen": true, "bestaetigung_pflicht": true, "ist_bestaetigt": false, "ist_ueberfaellig": false, "eskaliert": true, "bestaetigung_ueberfaellig": true },
+      { "name": "gesichtet, bestätigt", "status": "gesichtet", "ist_offen": true, "bestaetigung_pflicht": true, "ist_bestaetigt": true, "ist_ueberfaellig": false, "eskaliert": true, "bestaetigung_ueberfaellig": false },
+      { "name": "erledigt, Pflicht offen und Frist abgelaufen", "status": "erledigt", "ist_offen": false, "bestaetigung_pflicht": true, "ist_bestaetigt": false, "ist_ueberfaellig": true, "eskaliert": false, "bestaetigung_ueberfaellig": true },
+      { "name": "erledigt, ohne Pflicht", "status": "erledigt", "ist_offen": false, "bestaetigung_pflicht": false, "ist_bestaetigt": false, "ist_ueberfaellig": false, "eskaliert": false, "bestaetigung_ueberfaellig": false }
+    ],
+    "erwartet": { "offen": 4, "ungesehen": 2, "bestaetigung_ueberfaellig": 3 }
+  },
+  "staerke": {
+    "_regel": "ist_kumuliert = eigene + alle unterstellten (Server). Ein Abschnitt zählt die kumulierte Stärke seiner obersten Einheiten (ohne übergeordnete Einheit); eine unterstellte Einheit zählt beim Abschnitt ihrer obersten Einheit, wie im Meldebild. Ein Bereitstellungsraum zählt die Wurzeln seiner Menge: eine Einheit, von der irgendein Vorfahr (nicht nur der direkte) in der Menge steht, steckt schon in dessen Summe. Stärken als [F, UF, M].",
+    "einheiten": [
+      { "id": 1, "name": "A", "ueber_einheit_id": null, "abschnitt_id": 10, "eigene": [1, 1, 2] },
+      { "id": 2, "name": "B, A unterstellt, gleicher Abschnitt", "ueber_einheit_id": 1, "abschnitt_id": 10, "eigene": [0, 1, 3] },
+      { "id": 3, "name": "C, A unterstellt, anderer Abschnitt", "ueber_einheit_id": 1, "abschnitt_id": 11, "eigene": [0, 0, 2] },
+      { "id": 4, "name": "D, oberste Einheit im Unterabschnitt", "ueber_einheit_id": null, "abschnitt_id": 12, "eigene": [1, 0, 4] },
+      { "id": 5, "name": "E, ohne Abschnitt", "ueber_einheit_id": null, "abschnitt_id": null, "eigene": [0, 1, 1] },
+      { "id": 6, "name": "G, B unterstellt (dritte Ebene)", "ueber_einheit_id": 2, "abschnitt_id": 10, "eigene": [0, 0, 1] }
+    ],
+    "abschnitte": [
+      { "id": 10, "ueber_abschnitt_id": null },
+      { "id": 11, "ueber_abschnitt_id": null },
+      { "id": 12, "ueber_abschnitt_id": 10 }
+    ],
+    "erwartet_ist_kumuliert": {
+      "1": [1, 2, 8],
+      "2": [0, 1, 4],
+      "3": [0, 0, 2],
+      "4": [1, 0, 4],
+      "5": [0, 1, 1],
+      "6": [0, 0, 1]
+    },
+    "erwartet_abschnitte": {
+      "10": { "eigene": [1, 2, 8], "inkl_unter": [2, 2, 12] },
+      "11": { "eigene": [0, 0, 0], "inkl_unter": [0, 0, 0] },
+      "12": { "eigene": [1, 0, 4], "inkl_unter": [1, 0, 4] }
+    },
+    "bereitstellungsraeume": [
+      { "name": "A mit Untereinheit B", "einheiten": [1, 2], "erwartet": [1, 2, 8] },
+      { "name": "Untereinheit vor Einheit", "einheiten": [2, 1], "erwartet": [1, 2, 8] },
+      { "name": "nur B", "einheiten": [2], "erwartet": [0, 1, 4] },
+      { "name": "B und C ohne A", "einheiten": [2, 3], "erwartet": [0, 1, 6] },
+      { "name": "A und Enkel G ohne das Zwischenglied B", "einheiten": [1, 6], "erwartet": [1, 2, 8] },
+      { "name": "nur Enkel G", "einheiten": [6], "erwartet": [0, 0, 1] },
+      { "name": "leer", "einheiten": [], "erwartet": null }
+    ]
+  }
+}

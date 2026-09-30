@@ -17,7 +17,8 @@ import {
   type RasterEingabe,
   type RasterZeile,
 } from './meldebildRaster';
-import { verdichte, staerkeText } from './kraeftebild';
+import { staerkeText } from '../anzeige/staerke';
+import { verdichte } from './kraeftebild';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { rueckmeldungJeEinheit } from '../meldungen/rueckmeldung';

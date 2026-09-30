@@ -27,8 +27,23 @@ const einsatz = (over: object = {}) => ({
   meine_rolle: 'einsatzleitung',
   meine_sachgebiete: [],
   org_id: 5,
+  begonnen_at: '2026-06-11 05:00:00',
+  abgeschlossen_at: null,
+  lagekennzahlen: [],
   ...over,
 });
+
+/** Quellen der Vorbereitung (LFH-550): dieselben Listen wie das Lage-Dashboard, plus Zähler. */
+interface Lagequellen {
+  personen?: object[];
+  personenStatus?: number;
+  personal?: object[];
+  zaehler?: object;
+}
+const ZAEHLER = {
+  auftraege: { offen: 5, in_arbeit: 2, ueberfaellig: 1 },
+  meldungen: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 0 },
+};
 const leererStab = { anzahl_lagebesprechungen: 0, besetzung: [] };
 const label = (key: string) => modulRegistry.find((m) => m.key === key)!.label;
 const GRUND = 'Einsatz ist abgeschlossen und schreibgeschützt';
@@ -45,6 +60,7 @@ function rendere({
   overrides = {} as object,
   route = '/einsaetze/1/stab',
   post = () => HttpResponse.json(leererStab, { status: 201 }) as Response,
+  lage = {} as Lagequellen,
 } = {}) {
   server.use(
     meHandler(nutzer),
@@ -61,7 +77,18 @@ function rendere({
       overrideAufrufe += 1;
       return HttpResponse.json(overrides);
     }),
-    http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/personal', () => HttpResponse.json(lage.personal ?? [])),
+    http.get('/api/einsaetze/1/personen', () =>
+      lage.personenStatus
+        ? HttpResponse.json({ error: 'gesperrt' }, { status: lage.personenStatus })
+        : HttpResponse.json(lage.personen ?? []),
+    ),
+    ...['uhs', 'schaeden', 'gefahrengebiete', 'lageberichte', 'einheiten', 'fahrzeuge'].map((l) =>
+      http.get(`/api/einsaetze/1/${l}`, () => HttpResponse.json([])),
+    ),
+    http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/modul-zaehler', () => HttpResponse.json(lage.zaehler ?? ZAEHLER)),
   );
   return renderMitProviders(
     <Routes>
@@ -74,6 +101,7 @@ function rendere({
           </>
         }
       />
+      <Route path="/einsaetze/:id/lageberichte/:lbId" element={<Ort />} />
     </Routes>,
     { route },
   );
@@ -140,12 +168,17 @@ describe('StabPage', () => {
     expect(within(sektion).getAllByText('nicht vergeben')).toHaveLength(6);
   });
 
-  it('hängt die Arbeitsaufnahme als drittes Paneel UNTER die bestehenden (LFH-551)', async () => {
+  it('hängt die Arbeitsaufnahme als letztes Paneel UNTER die bestehenden (LFH-551, LFH-550)', async () => {
     rendere();
     await screen.findByRole('region', { name: 'Arbeitsaufnahme' });
     const regionen = screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby'));
     const namen = regionen.map((id) => document.getElementById(id ?? '')?.textContent);
-    expect(namen).toEqual(['Lagebesprechung', 'Besetzung S1–S6', 'Arbeitsaufnahme']);
+    expect(namen).toEqual([
+      'Lagebesprechung',
+      'Vorbereitung',
+      'Besetzung S1–S6',
+      'Arbeitsaufnahme',
+    ]);
   });
 
   it('sperrt die Haken der Arbeitsaufnahme ohne Schreibrecht; der Kopf nennt den Grund', async () => {
@@ -428,5 +461,113 @@ describe('StabPage · ?neu=1 (Schnellaktion)', () => {
     // Positiv zuerst: der Leser ist gelaufen. Sonst wäre das `null` unten trivial.
     await waitFor(() => expect(ort()).toHaveTextContent(/^\/einsaetze\/1\/stab$/));
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe('StabPage · Vorbereitung der Lagebesprechung (LFH-550)', () => {
+  const paneel = () => screen.findByRole('region', { name: 'Vorbereitung' });
+  const zeile = (p: HTMLElement, schluessel: string) =>
+    p.querySelector<HTMLElement>(
+      `[data-lfh="vorbereitung-zeile"][data-schluessel="${schluessel}"]`,
+    )!;
+  const person = (id: number, over: object = {}) => ({
+    id,
+    status: 'erfasst',
+    aktuelle_sichtung: null,
+    erfasst_at: '2026-06-11 06:00:00',
+    ...over,
+  });
+
+  it('zeigt den Lagestand mit Quelle je Zeile — Aufträge und Meldungen vom Modulzähler', async () => {
+    rendere({ lage: { personen: [person(1), person(2, { status: 'vermisst' })] } });
+    const p = await paneel();
+    await waitFor(() => expect(zeile(p, 'betroffene')).toHaveTextContent('2'));
+    expect(zeile(p, 'betroffene')).toHaveTextContent('Quelle: Personen');
+    expect(zeile(p, 'vermisste')).toHaveTextContent('1');
+    await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
+    expect(zeile(p, 'auftraege')).toHaveTextContent('1 überfällig');
+    expect(zeile(p, 'meldungen')).toHaveTextContent('3');
+    expect(zeile(p, 'meldungen')).toHaveTextContent('Quelle: Meldungen (eingehend)');
+  });
+
+  it('aktualisiert sich live, ohne Neuladen', async () => {
+    let offen = 3;
+    const { client } = rendere({});
+    server.use(
+      http.get('/api/einsaetze/1/modul-zaehler', () =>
+        HttpResponse.json({ ...ZAEHLER, meldungen: { ...ZAEHLER.meldungen, offen } }),
+      ),
+    );
+    const p = await paneel();
+    await waitFor(() => expect(zeile(p, 'meldungen')).toHaveTextContent('3'));
+    offen = 4;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.modulZaehler(1) }));
+    await waitFor(() => expect(zeile(p, 'meldungen')).toHaveTextContent('4'));
+  });
+
+  it('eine gesperrte Quelle steht als „—“ mit Grund, nie als 0; der Rest bleibt', async () => {
+    rendere({ lage: { personenStatus: 403 } });
+    const p = await paneel();
+    await waitFor(() => expect(zeile(p, 'betroffene')).toHaveTextContent('nicht freigegeben'));
+    expect(zeile(p, 'betroffene')).toHaveTextContent('—');
+    expect(zeile(p, 'betroffene')).not.toHaveTextContent(/\b0\b/);
+    await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
+  });
+
+  it('„In Lagebericht übernehmen“ legt EINEN Freitext-Bericht an und öffnet ihn', async () => {
+    const anfragen: Array<Record<string, unknown>> = [];
+    rendere({ lage: { personen: [person(1)] } });
+    server.use(
+      http.post('/api/einsaetze/1/lageberichte', async ({ request }) => {
+        anfragen.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ id: 77 }, { status: 201 });
+      }),
+    );
+    const p = await paneel();
+    const knopf = await within(p).findByRole('button', { name: 'In Lagebericht übernehmen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    await waitFor(() =>
+      expect(screen.getByRole('status', { name: 'Ort' })).toHaveTextContent(
+        '/einsaetze/1/lageberichte/77',
+      ),
+    );
+    expect(anfragen).toHaveLength(1);
+    expect(anfragen[0]).toMatchObject({ vorlage: 'freitext' });
+    expect(String(anfragen[0].titel)).toMatch(/^Vorbereitung Lagebesprechung \d{6}[A-Z]{3}\d{4}$/);
+    const text = (anfragen[0].abschnitte as Array<{ schluessel: string; text: string }>)[0];
+    expect(text.schluessel).toBe('text');
+    expect(text.text).toContain('**Stand:**');
+    expect(text.text).toContain('- **Betroffene:** 1');
+    expect(text.text).toContain('Quelle: Personen');
+  });
+
+  it('scheitert die Übernahme, steht der Fehler an der Seite, und es geht nicht weiter', async () => {
+    rendere({});
+    server.use(
+      http.post('/api/einsaetze/1/lageberichte', () =>
+        HttpResponse.json({ error: 'abgelehnt' }, { status: 422 }),
+      ),
+    );
+    const p = await paneel();
+    const knopf = await within(p).findByRole('button', { name: 'In Lagebericht übernehmen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    expect(await within(p).findByText('Nicht in den Lagebericht übernommen')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Ort' })).toHaveTextContent(/^\/einsaetze\/1\/stab$/);
+  });
+
+  it('ohne Schreibrecht: Lagestand ja, Übernahme nein', async () => {
+    rendere({ einsatzObj: einsatz({ meine_rolle: 'beobachter' }) });
+    const p = await paneel();
+    await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
+    expect(within(p).queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
+  });
+
+  it('ohne Freigabe der Lageberichte fehlt die Übernahme', async () => {
+    rendere({ overrides: { lageberichte: { sichtbar: false } } });
+    const p = await paneel();
+    await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
+    expect(within(p).queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
   });
 });

@@ -28,16 +28,30 @@ export interface AbschnittStaerken {
   inklUnter: Staerke | null;
 }
 
+const KEINE: Staerke = { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 };
+
+/**
+ * Stärke der Einheiten in einer Abschnittsmenge. Es zählen nur die OBERSTEN Einheiten (ohne
+ * übergeordnete) mit ihrer kumulierten Stärke — eine unterstellte Einheit zählt beim Abschnitt
+ * ihrer obersten Einheit, wie im Meldebild (`baueKraeftebild`, LFH-550). Steht im Abschnitt eine
+ * Einheit, aber keine oberste, ist die Stärke 0/0/0, nicht `null`: `null` heißt „keine Einheit
+ * zugeordnet".
+ */
+function staerkeIn(einheiten: Einheit[], abschnittIds: Set<number>): Staerke | null {
+  const zugeordnet = einheiten.filter(
+    (e) => e.abschnitt_id != null && abschnittIds.has(e.abschnitt_id),
+  );
+  if (zugeordnet.length === 0) return null;
+  return summiereStaerke(zugeordnet.filter((e) => e.ueber_einheit_id == null)) ?? KEINE;
+}
+
 export function abschnittStaerken(
   abschnitte: Einsatzabschnitt[],
   einheiten: Einheit[],
   abschnittId: number,
 ): AbschnittStaerken {
-  const menge = nachfahrenInkl(abschnitte, abschnittId);
   return {
-    eigene: summiereStaerke(einheiten.filter((e) => e.abschnitt_id === abschnittId)),
-    inklUnter: summiereStaerke(
-      einheiten.filter((e) => e.abschnitt_id != null && menge.has(e.abschnitt_id)),
-    ),
+    eigene: staerkeIn(einheiten, new Set([abschnittId])),
+    inklUnter: staerkeIn(einheiten, nachfahrenInkl(abschnitte, abschnittId)),
   };
 }

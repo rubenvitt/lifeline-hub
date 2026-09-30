@@ -9,6 +9,7 @@ import type {
   StaerkePosition,
   MaterialStatus,
 } from '../api/types';
+import { staerkeText } from '../anzeige/staerke';
 
 export interface StaerkeSumme {
   fuehrer: number;
@@ -399,10 +400,7 @@ export function filtereKraefte(roh: Rohdaten, f: FilterWerte): Rohdaten {
 
 // ── Formatierung ──────────────────────────────────────────────────────────────
 
-/** Formatiert eine Stärke als „F/UF/M//Ges" (BOS-Doppelstrich vor Gesamt; z. B. „1/0/5//6"). */
-export function staerkeText(s: StaerkeSumme): string {
-  return `${s.fuehrer}/${s.unterfuehrer}/${s.mannschaft}//${s.gesamt}`;
-}
+// „F/UF/M//Ges" kommt aus der EINEN Formatierung `anzeige/staerke.ts:staerkeText` (LFH-550).
 
 // ── Markdown-Renderer ─────────────────────────────────────────────────────────
 
