@@ -75,6 +75,12 @@ Outline/Filled, sonst eine Suche außerhalb von Icons8. Das entscheidet Ruben.
   Das Skript selbst geht nicht ins Netz. *Geändert 30.09.2026:* Ein eigenes Abrufskript mit
   persönlichem Schlüssel entfällt. Es wäre ohne Schlüssel in der Sitzung nicht prüfbar, und die
   eingecheckten Quellen machen den Betrieb ohnehin unabhängig vom Icons8-Zugang.
+- **Auswählen mit PNG, abrufen als SVG erst nach der Freigabe** (Ruben, 30.09.2026). Jeder
+  SVG-Abruf zählt gegen das Kontingent des Abos (100 je Stunde, 1.000 je Tag), die PNGs
+  (`img.icons8.com/?id=…&format=png`) sind frei. Kandidaten, Vergleichsbögen und Stilproben
+  entstehen deshalb aus PNGs. Ein SVG wird erst geholt, wenn die Ikone in der freigegebenen
+  Zuordnung steht und in den Code geht. Bis zu dieser Regel wurden 55 SVGs abgerufen, davon
+  29 ohne Verwendung (25 Windows 11 für den Plan-B-Vergleich, 4 ersetzte iOS-Quellen).
 - `scripts/ikonen/vergleiche-png.mjs` prüft jede Quelle gegen das PNG, das Icons8 frei und
   byte-genau ausliefert (Rendern in Chromium, Vergleich der Deckkraft). Der MCP liefert das SVG
   als Text in die Sitzung, abgelegt wird es durch Abschreiben, und ein vertauschtes Zeichen in
