@@ -28,6 +28,14 @@ Skill `clickup-task-anlegen`.
   jedem „fertig" `verification-before-completion` und `requesting-code-review`.
 - **Pflicht-Checkpoint:** `/opsx:propose` hält nach den Artefakten an (kein Fehlschlag) —
   vorlegen, Freigabe abwarten, dann `ready for development` und `/opsx:apply`.
+- **Entwurfs-Hoheit** (LFH-589, Spec `entwurfs-hoheit`,
+  `openspec/changes/archive/2026-09-30-lfh-589-entwurfs-hoheit-orchestrierung/design.md`):
+  Workflows besitzen die Menge (Scope-Scan, Judge-Panel als Zulieferer), OpenSpec den einzelnen
+  Task. Eine Change entsteht **genau** auf der Route `entwurf` (E1 Entscheidung · E2 Regel ·
+  E3 mehr als ein Subsystem, nicht bei einem Bugfix, der Bestehendes wiederherstellt, oder
+  einer reinen Textkorrektur; Liste in
+  `dev-clickup-ausfuehren`, Schritt 3), nie bei `trivial`/`klar`/`bug-unklar`. **Kein
+  Workflow ruft `/opsx:*` oder schreibt unter `openspec/changes/`.**
 - **Vier Ablageorte, keine Überschneidung:** `openspec/changes/<name>/` (laufende Änderung, hier
   landet Neues) · `openspec/changes/archive/` (nach `/opsx:archive`) · `openspec/specs/`
   (Fähigkeits-Specs, SHALL/MUST, über `/opsx:sync`/`/opsx:archive`) · `docs/superpowers/`

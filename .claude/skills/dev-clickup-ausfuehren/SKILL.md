@@ -94,17 +94,48 @@ Worktree.
 ## Schritt 3: Komplexität einschätzen → Routing
 
 Komplexität aus Task-Beschreibung selbst einschätzen und den passenden Skill wählen. Beim
-Start in den jeweiligen **Board-Status** wechseln (raus aus `backlog`):
+Start in den jeweiligen **Board-Status** wechseln (raus aus `backlog`). Die Spalte „Route“ ist
+der Schlüssel, den auch die Scope-Map von `dev-clickup-orchestrieren` führt (`route`):
 
-| Komplexität | Skill | Board-Status |
-|---|---|---|
-| Trivial (Typo, Text/Copy-Change) | Direkt, kein Sub-Skill | `in development` |
-| Anforderung unklar | **`/opsx:explore`** zuerst | `scoping` → danach `in design`/`in development` |
-| Bug, Ursache unklar | **`superpowers:systematic-debugging`** | `in development` |
-| Feature/Bugfix, klare Spec | **`superpowers:test-driven-development`** | `in development` |
-| Multi-Step / mehrere Files | **`/opsx:propose`** → ⟨Checkpoint⟩ → **`/opsx:apply`** | `in design` → `ready for development` → `in development` |
+| Route | Komplexität | Skill | Board-Status |
+|---|---|---|---|
+| `trivial` | Trivial (Typo, Text/Copy-Change) | Direkt, kein Sub-Skill | `in development` |
+| `unklar` | Anforderung unklar | **`/opsx:explore`** zuerst, danach neu routen | `scoping` → danach `in design`/`in development` |
+| `bug-unklar` | Bug, Ursache unklar | **`superpowers:systematic-debugging`** | `in development` |
+| `klar` | Feature/Bugfix, klare Spec | **`superpowers:test-driven-development`** | `in development` |
+| `entwurf` | Entwurf nötig (E1–E3, s. u.) | **`/opsx:propose`** → ⟨Checkpoint⟩ → **`/opsx:apply`** | `in design` → `ready for development` → `in development` |
 
-**Der Checkpoint in der letzten Zeile ist Pflicht, kein Stilmittel.** `/opsx:propose` trägt
+**Wann eine OpenSpec-Change entsteht — genau auf der Route `entwurf`** (LFH-589, Spec
+`entwurfs-hoheit`). Die Route `entwurf` gilt, sobald **mindestens einer** dieser Gründe
+zutrifft, und geht dann den übrigen Zeilen vor:
+
+- **E1 Entscheidung:** Es gibt mehr als einen vertretbaren Weg, und die Wahl soll begründet
+  nachlesbar bleiben.
+- **E2 Regel:** Der Task führt eine Regel ein oder ändert eine, die über ihn hinaus gilt:
+  eine Anforderung einer Fähigkeit, eine Projektregel in `CLAUDE.md` oder eine Regel in einer
+  Arbeitsanleitung unter `.claude/`.
+- **E3 Breite:** Der Task berührt mehr als ein Subsystem. Subsysteme sind: Backend (`src/`,
+  `migrations/`, `tests/`), Frontend (`frontend/`), Desktop-Hülle (`src-tauri/`), Gate und CI
+  (`scripts/`, `.github/`), Arbeitsanleitungen (`.claude/`, `CLAUDE.md`). Pfade außerhalb
+  dieser Liste (etwa `docs/`, `openspec/`, Wurzeldateien wie `Cargo.toml` oder `mise.toml`)
+  zählen zu keinem Subsystem. **Ausnahmen:** Ein Bugfix, der vorhandenes Verhalten
+  wiederherstellt, und eine reine Text- oder Tippfehlerkorrektur lösen E3 nicht aus, auch wenn
+  sie über mehrere Subsysteme reichen.
+
+Auf den Routen `trivial`, `bug-unklar` und `klar` entsteht **ausdrücklich keine** Change. Das
+gilt auch, wenn mehrere Dateien berührt sind. `unklar` entscheidet noch nichts: erst
+`/opsx:explore`, danach neu routen. Führt `bug-unklar` nach dem Finden der Ursache auf E1 oder
+E2, wechselt der Task auf `entwurf`. Dann `/opsx:propose` im Main-Loop. Der Board-Status bleibt
+auf `in development` (nur vorwärts), aber der Freigabe-Checkpoint gilt trotzdem: `/opsx:apply`
+erst nach Freigabe.
+
+**Aufruf durch `dev-clickup-orchestrieren`:** Dann schätzt dieser Skill die Route **nicht**
+selbst. Es gilt die am Phase-1-Checkpoint bestätigte `route` der Scope-Map. Liegt für den Task
+schon eine in Phase 2 freigegebene Change vor, steigt er direkt bei `/opsx:apply` ein, ohne
+zweites `/opsx:propose`. Ein in Phase 1 geklärter `unklar`-Task bekommt kein zweites
+`/opsx:explore`. Einzige Ausnahme ist der Wechsel `bug-unklar` → `entwurf` oben.
+
+**Der Checkpoint auf der Route `entwurf` ist Pflicht, kein Stilmittel.** `/opsx:propose` trägt
 die *planning boundary*: es erzeugt `proposal.md`, Delta-Spec, `design.md` und `tasks.md`
 und **hält dann an** — „Do not start implementation in the same response, even if the initial
 request asks for it. Wait for a new user request after the artifacts are presented; then
@@ -112,7 +143,8 @@ start the apply workflow." Der Stopp ist das erwartete Verhalten und **kein Fehl
 umgehen, nicht im selben Zug weiterimplementieren. Die Artefakte dem Menschen vorlegen und
 auf `in design` stehen bleiben; **erst mit seiner Freigabe** auf `ready for development`, dann
 `/opsx:apply` und `in development`. (Dieselbe Reihenfolge wie in `dev-clickup-orchestrieren`,
-Phase 2: „nach Plan-Freigabe `ready for development`".)
+Phase 2: „nach Freigabe `ready for development`“. Dort werden mehrere Changes eines Laufs
+gesammelt vorgelegt, aber auch dann gilt: kein Workflow ruft `/opsx:*`.)
 
 `/opsx:apply` arbeitet die `tasks.md` ab — die **Art zu arbeiten** bleibt davon unberührt:
 Aufgaben mit klarer Spec entstehen weiter per `superpowers:test-driven-development`, und
