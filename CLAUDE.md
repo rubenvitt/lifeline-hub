@@ -289,6 +289,16 @@ Lagebericht nie. Eigene Gegenstelle fehlt als benannte Lücke (LFH-849).
   Bedarf wird **erfasst**, Vorschläge ohne Quelle bleiben leer (nicht 0); Sonderkost ist Teilmenge
   der EP; Ausgabe verweist nur per `nachforderung_id`; Einstufung im Client
   (`verpflegung/deckung.ts`); ins ETB nur Zeitfenster und Bedarf (Org-Zeitzone); kein Modulzähler.
+- **Versorgung S4** (LFH-553, Entscheidung 30.09.2026,
+  `openspec/changes/archive/2026-09-30-lfh-553-versorgung-abgrenzung/design.md`, Spec
+  `stab-versorgung`): kein Modul „Versorgung“, keine Tabelle `versorgungsposten`. Träger:
+  Verpflegung → Modul Verpflegung, Einsatzmittel/Verbrauchsgüter/Betriebsstoffe → Nachforderung
+  mit **freier Art** (keine Liste; `tests/nachforderung.rs`
+  `betriebsstoff_ist_eine_nachforderung_mit_freier_art`), Materialerhaltung → Status am Material.
+  **Eine Mengenwahrheit:** Beschafftes steht nur als Nachforderung, andere Module verweisen per
+  Kennung. **Kräfte-Unterkunft ist eine Lücke, nie eine Betreuungsstelle** — deren Belegung
+  speist „in Betreuung“ und damit den Verpflegungsbedarf der Betreuten (Doppelzählung neben der
+  Personalstärke). Wiedervorlage nur mit Feldbefund aus einer Langzeitlage (> 1 Einsatztag).
 
 ## Frontend — Bedien-Leitlinie (Einsatzkontexte)
 
