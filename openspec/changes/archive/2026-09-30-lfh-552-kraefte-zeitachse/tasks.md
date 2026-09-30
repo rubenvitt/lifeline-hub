@@ -5,7 +5,7 @@ Code). Vor jedem „fertig“ gelten `verification-before-completion` und `reque
 
 ## 1. Datenmodell und Perioden-Kern
 
-- [x] 1.1 Migration `0129_kraefte_zeitachse.sql` anlegen (Tabelle `einsatz_kraft_zeitachse` mit CHECKs auf Art, Quelle und genau eine Kraft; Indizes; `zeitachse_marke` an `fahrzeug_status` und `personal_status`). Nachweis: `scripts/check-migrationen.sh` grün gegen `origin/alpha`, und ein DB-Test belegt, dass eine Zeile mit beiden oder keiner Kraft am CHECK scheitert.
+- [x] 1.1 Migration `0130_kraefte_zeitachse.sql` anlegen (Tabelle `einsatz_kraft_zeitachse` mit CHECKs auf Art, Quelle und genau eine Kraft; Indizes; `zeitachse_marke` an `fahrzeug_status` und `personal_status`). Nachweis: `scripts/check-migrationen.sh` grün gegen `origin/alpha`, und ein DB-Test belegt, dass eine Zeile mit beiden oder keiner Kraft am CHECK scheitert.
 - [x] 1.2 Enums `ZeitachseArt`, `ZeitachseQuelle`, `ZeitachseMarke` mit Wire-Namen in `src/zeitachse/mod.rs`. Nachweis: Einträge in `tests/enum_wire_kontrakt.rs` grün.
 - [x] 1.3 Reine Perioden-Funktion `perioden::bilde` und `perioden::pruefe_einfuegen`/`pruefe_streichen` über einer sortierten Folge. Nachweis: Unit-Tests für jedes Szenario der Requirements „Einsatzperioden“ und „Einsatzdauer und Ruhezeit“ (Anker Alarmierung vor Eintreffen, zwei Perioden, Ende ohne Periode, Alarmierung nach Eintreffen, Nachtrag, der eine frühere Periode zerbräche).
 - [x] 1.4 Schwärzungsregel für `einsatz_kraft_zeitachse` (`notiz`, `streichgrund` schwärzen, Rest retain). Nachweis: die bestehenden Registry-Guards und `jede_archivspalte_ist_retain` sind grün.

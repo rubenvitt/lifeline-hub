@@ -673,7 +673,7 @@ fn abloesung_einstufung_wire() {
 }
 
 /// LFH-552: Kräfte-Zeitachse. Art, Quelle und Marke tragen die DB-CHECK-Werte aus
-/// `migrations/0129_kraefte_zeitachse.sql`; das Frontend (`kraefte/zeitachse.ts`) liest sie.
+/// `migrations/0130_kraefte_zeitachse.sql`; das Frontend (`kraefte/zeitachse.ts`) liest sie.
 #[test]
 fn zeitachse_art_wire() {
     enum_wire!(lifeline_hub::zeitachse::ZeitachseArt {

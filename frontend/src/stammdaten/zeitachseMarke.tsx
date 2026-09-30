@@ -35,7 +35,7 @@ export const markeFeld = (
 
 /**
  * Hinweis, solange kein Eintrag eine Marke trägt: bestehende Kataloge bekommen keine Marke von
- * selbst (Migration 0129), und ohne sie bleibt die Zeitachse leer. Kein Hinweis bei leerem
+ * selbst (Migration 0130), und ohne sie bleibt die Zeitachse leer. Kein Hinweis bei leerem
  * Katalog — dann gibt es nichts zu markieren.
  */
 export function markeHinweis(eintraege: readonly { zeitachse_marke?: ZeitachseMarke | null }[]) {

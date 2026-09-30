@@ -58,7 +58,7 @@ und nicht aus einer zweiten Erfassung.
 
 ## Impact
 
-- **Datenbank:** Migration `0129` (geplant als `0127`, beim Merge umgelegt) mit der Tabelle `einsatz_kraft_zeitachse` und der Spalte
+- **Datenbank:** Migration `0130` (geplant als `0127`, beim Merge zweimal umgelegt) mit der Tabelle `einsatz_kraft_zeitachse` und der Spalte
   `zeitachse_marke` an `fahrzeug_status` und `personal_status`. Die Nummer wird vor dem Merge
   gegen `origin/alpha` geprüft.
 - **Backend:** neues Modul `src/zeitachse/`. Berührt werden die Statuswechsel in
