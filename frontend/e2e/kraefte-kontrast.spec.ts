@@ -5,6 +5,17 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  */
 async function kontrastVon(ziel: Locator) {
   await expect(ziel).toHaveCount(1);
+  // Erst messen, wenn laufende Übergänge fertig sind: ein abklingender Hovergrund (die Maus lag
+  // über der Zeile oder Karte) ergäbe sonst einen Zwischenwert. Endlose Animationen (Skelett)
+  // bleiben außen vor, auf sie zu warten hieße nie zu messen.
+  await ziel.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
   return ziel.evaluate((el) => {
     type Farbe = [number, number, number, number];
     const canvas = document.createElement('canvas');
