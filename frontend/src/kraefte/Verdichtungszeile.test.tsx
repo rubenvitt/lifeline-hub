@@ -2,8 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { Routes, Route } from 'react-router';
 import { renderMitProviders } from '../test/utils';
-import Verdichtungszeile, { verdichtungsLinkStil } from './Verdichtungszeile';
-import { dichten } from '../theme/tokens';
+import Verdichtungszeile, {
+  verdichtungsLinkStil,
+  verdichtungsTextfarbe,
+} from './Verdichtungszeile';
+import { dichten, farbenDunkel, farbenHell } from '../theme/tokens';
+import { statusKategorie } from '../theme/statusFarben';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
@@ -138,5 +142,63 @@ describe('Meldebild-Link — Bedienziel auf der Dichte-Staffel (LFH-515)', () =>
   /** `inline-flex`: ein `flex` risse den Link auf volle Breite. */
   it('bleibt ein Inline-Glied der Zeile', () => {
     expect(verdichtungsLinkStil(tokenFuer('kompakt')).display).toBe('inline-flex');
+  });
+});
+
+/**
+ * LFH-538: die drei Statuszahlen stehen als TEXT auf Seitengrund (`grund`). Die Füllrollen
+ * `normal`/`achtung`/`alarm` tragen dort den Tagesboden nicht (gemessen 5,80 / 5,78 / 5,66),
+ * deshalb die Textrollen. GERECHNET statt behauptet (WCAG-Formel), Böden aus Kriterium 5 als
+ * Literale: Tag ≥ 7, Nacht ≥ 5.
+ */
+describe('Verdichtungszeile — Kontrast der Statuszahlen (LFH-538)', () => {
+  function luminanz(hex: string): number {
+    const h = hex.replace('#', '');
+    const [r, g, b] = [0, 2, 4].map((i) => {
+      const s = Number.parseInt(h.slice(i, i + 2), 16) / 255;
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  function kontrast(a: string, b: string): number {
+    const [x, y] = [luminanz(a), luminanz(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  }
+  const KATEGORIEN = ['verfuegbar', 'gebunden', 'nicht_verfuegbar'] as const;
+
+  it.each(KATEGORIEN)('%s hält am Tag ≥ 7 : 1 auf Seitengrund', (kategorie) => {
+    const farbe = verdichtungsTextfarbe(farbenHell, statusKategorie[kategorie].rolle);
+    expect(kontrast(farbe, farbenHell.grund)).toBeGreaterThanOrEqual(7);
+  });
+
+  it.each(KATEGORIEN)('%s hält nachts ≥ 5 : 1 auf Seitengrund', (kategorie) => {
+    const farbe = verdichtungsTextfarbe(farbenDunkel, statusKategorie[kategorie].rolle);
+    expect(kontrast(farbe, farbenDunkel.grund)).toBeGreaterThanOrEqual(5);
+  });
+
+  it('die drei Rollen bleiben unterscheidbar (die Farbe ist ein Kanal, nicht Deko)', () => {
+    const farben = KATEGORIEN.map((k) =>
+      verdichtungsTextfarbe(farbenHell, statusKategorie[k].rolle),
+    );
+    expect(new Set(farben).size).toBe(3);
+  });
+
+  it('die gerenderte Zeile färbt mit genau dieser Textfarbe, nicht mit der Füllrolle', async () => {
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+      { status_kategorie: 'verfuegbar' },
+      { status_kategorie: 'gebunden' },
+      { status_kategorie: 'nicht_verfuegbar' },
+    ] as never);
+    setup();
+    // `test/utils` rendert ein nacktes (helles) Theme — also die Tagespalette.
+    for (const [text, kategorie] of [
+      ['1 frei', 'verfuegbar'],
+      ['1 gebunden', 'gebunden'],
+      ['1 n. verf.', 'nicht_verfuegbar'],
+    ] as const) {
+      expect(await screen.findByText(text)).toHaveStyle({
+        color: verdichtungsTextfarbe(farbenHell, statusKategorie[kategorie].rolle),
+      });
+    }
   });
 });
