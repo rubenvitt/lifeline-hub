@@ -1,6 +1,6 @@
+import { IkoneChevronHoch, IkoneChevronRunter } from '../ikonen';
 import { useState } from 'react';
 import { Button, ConfigProvider, Layout, Menu, Spin, theme } from 'antd';
-import { DownOutlined, UpOutlined } from '@ant-design/icons';
 import { Augenbraue, useRollen } from '../components/instrument';
 import type { MenuProps } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
@@ -154,7 +154,7 @@ export default function AdminLayout() {
               Verwaltung{aktuell ? `: ${aktuell}` : ''}
             </span>
             <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-              {navOffen ? <UpOutlined /> : <DownOutlined />}
+              {navOffen ? <IkoneChevronHoch /> : <IkoneChevronRunter />}
             </span>
           </Button>
           {navOffen && (

@@ -1,6 +1,6 @@
+import { IkoneStift } from '../ikonen';
 import { useId, useState, type CSSProperties } from 'react';
 import { Button, Typography } from 'antd';
-import { EditOutlined } from '@ant-design/icons';
 import { useRollen } from './instrument/rollenwerte';
 import { useFokusRueckgabe } from './useFokusRueckgabe';
 
@@ -165,11 +165,11 @@ export function BemerkungZelle({
         onClick={() => setBearbeitet(true)}
       >
         <span id={wertId}>{wert}</span>
-        {/* Ikone ohne eigenes Vorleseziel: `@ant-design/icons` bringt `role="img"` mit
-            englischem Namen („edit") mit (frontend/AGENTS.md, „Ein Emoji ist keine Ikone"). */}
+        {/* Ikone ohne eigenes Vorleseziel: die Ikone des Satzes ist selbst `aria-hidden`
+            (LFH-595), die Hülle bleibt als zweite Sicherung (früher: antds `role="img"` „edit"). */}
         {!laeuft && (
           <span aria-hidden="true" style={{ color: token.colorTextSecondary }}>
-            <EditOutlined />
+            <IkoneStift />
           </span>
         )}
       </Button>

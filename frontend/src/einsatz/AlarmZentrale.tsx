@@ -1,7 +1,12 @@
+import {
+  IkoneGlocke,
+  IkoneGlockeAus,
+  IkoneHakenKreis,
+  IkoneMonitor,
+  IkoneVerbotsschild,
+} from '../ikonen';
 import { App, Button, Dropdown, Tooltip } from 'antd';
-import { CheckCircleOutlined, DesktopOutlined, StopOutlined } from '@ant-design/icons';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
-import { TbBell, TbBellOff } from 'react-icons/tb';
 import { useNavigate } from 'react-router';
 import {
   ALARM_TON_STATUS_EVENT,
@@ -491,22 +496,21 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       : 'Alarmton stummschalten';
 
   // Einmal abgeleitet, von BEIDEN Bauformen benutzt, damit dasselbe Zeichen an zwei Orten dasselbe
-  // heißt. `aria-hidden` ist Pflicht: ein `@ant-design/icons`-Knoten setzt `role="img"` mit
-  // ENGLISCHEM `aria-label`, und antds Menü hängt kein `aria-hidden` davor — der Eintrag hieße
-  // sonst „stop Desktop blockiert".
+  // heißt. `aria-hidden` bleibt als zweite Sicherung, obwohl die Ikone des Satzes selbst
+  // `aria-hidden` ist (LFH-595): antds Menü hängt keins davor, und mit einem Namen hieße der
+  // Eintrag „stop Desktop blockiert".
   const desktopIkone =
     desktop === 'erlaubt' ? (
-      <CheckCircleOutlined aria-hidden />
+      <IkoneHakenKreis />
     ) : desktop === 'browser-blockiert' ? (
-      <StopOutlined aria-hidden />
+      <IkoneVerbotsschild />
     ) : (
-      <DesktopOutlined aria-hidden />
+      <IkoneMonitor />
     );
   // Die Glocke trägt KEINEN Marker (LFH-513): ein roter Punkt an „Ton bereit" verbrauchte die
   // Alarmfarbe für eine Nichtmeldung. Die Störung trägt Form (durchgestrichen) und Wort, die
   // Farbe erbt die Ikone vom Knopf (`alarmKnopfFarbe`) bzw. vom Menüeintrag.
-  const tonIkone =
-    gemutet || tonStatus === 'blockiert' ? <TbBellOff aria-hidden /> : <TbBell aria-hidden />;
+  const tonIkone = gemutet || tonStatus === 'blockiert' ? <IkoneGlockeAus /> : <IkoneGlocke />;
 
   if (istSchmal) {
     // ── EIN Ziel statt zwei auf dem Handschirm ────────────────────────────────

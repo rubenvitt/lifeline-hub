@@ -1,6 +1,6 @@
+import { IkoneLupe } from '../ikonen';
 import type { CSSProperties } from 'react';
 import { Button, theme } from 'antd';
-import { TbSearch } from 'react-icons/tb';
 import { useCommandPalette } from '../command-palette/CommandPaletteProvider';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 import Tastenkuerzel from './Tastenkuerzel';
@@ -84,7 +84,7 @@ export default function CommandPaletteTrigger() {
         type="text"
         aria-label="Suchen"
         aria-keyshortcuts={kuerzel === '⌘K' ? 'Meta+K' : 'Control+K'}
-        icon={<TbSearch size={20} aria-hidden />}
+        icon={<IkoneLupe size={20} />}
         onClick={toggle}
         style={{
           color: rahmenFarben.text,
@@ -107,7 +107,7 @@ export default function CommandPaletteTrigger() {
       style={suchfeldStil(token)}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
-        <TbSearch size={15} />
+        <IkoneLupe size={15} />
       </span>
       {/* Eine Flex-Zeile, kein Fragment: JSX verschluckt den Zeilenumbruch zwischen zwei
           Elementen ersatzlos — so stand bis zum 08.08.2026 „Suchen⌘K" in einem Zug. */}

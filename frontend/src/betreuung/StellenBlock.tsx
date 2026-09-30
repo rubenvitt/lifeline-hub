@@ -1,5 +1,5 @@
+import { IkonePunkteSenkrecht } from '../ikonen';
 import { Button, Dropdown, Space, Typography, theme } from 'antd';
-import { MoreOutlined } from '@ant-design/icons';
 import { useMemo, type CSSProperties } from 'react';
 import type {
   Betreuungsstelle,
@@ -217,7 +217,7 @@ const stellenSpalten = (
                     aria-label={`Aktionen zu Stelle ${s.bezeichnung}`}
                     icon={
                       <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                        <MoreOutlined />
+                        <IkonePunkteSenkrecht />
                       </span>
                     }
                   />

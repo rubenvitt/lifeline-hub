@@ -1,4 +1,4 @@
-import { PaperClipOutlined } from '@ant-design/icons';
+import { IkoneBueroklammer } from '../ikonen';
 import { Button, Input, Space, Upload } from 'antd';
 import type { UploadFile } from 'antd';
 import { useState } from 'react';
@@ -52,7 +52,7 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
         onChange={({ fileList }) => setDateien(fileList)}
         style={{ marginTop: 8 }}
       >
-        <Button type="text" icon={<PaperClipOutlined />}>
+        <Button type="text" icon={<IkoneBueroklammer />}>
           Anhang
         </Button>
       </Upload>

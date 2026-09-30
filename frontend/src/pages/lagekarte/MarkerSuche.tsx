@@ -1,6 +1,6 @@
+import { IkoneLupe } from '../../ikonen';
 import { useMemo, useState } from 'react';
 import { Input, theme } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
 /*
@@ -52,7 +52,7 @@ export default function MarkerSuche({
         // Die Hülle nimmt dem Icon sein englisches `aria-label` („search").
         prefix={
           <span aria-hidden="true">
-            <SearchOutlined />
+            <IkoneLupe />
           </span>
         }
         style={{ marginBottom: token.marginXS }}

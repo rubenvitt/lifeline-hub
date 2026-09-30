@@ -1,0 +1,22 @@
+/* LFH-595: Rest von antds `resetIcon` (`antd/es/style`), den der Inline-Stil der Hülle nicht trägt. */
+.lfh-ikone svg {
+  display: inline-block;
+  vertical-align: inherit;
+}
+
+/* LFH-595: Drehung der Ladeikone (`<Ikone drehen />`). Steht still, wer Bewegung abgeschaltet hat. */
+@keyframes lfh-ikone-drehen {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lfh-ikone-dreht svg {
+  animation: lfh-ikone-drehen 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lfh-ikone-dreht svg {
+    animation: none;
+  }
+}

@@ -15,7 +15,11 @@ describe('Platzhalter', () => {
   it('zeigt Titel, Bauarbeiter-Marker und Beschreibung', () => {
     renderMitProviders(<Platzhalter titel="Stab" beschreibung="Kommt später." />);
     expect(screen.getByText(/Stab/)).toBeInTheDocument();
-    expect(screen.getByText(/🚧/)).toBeInTheDocument();
+    // Der Marker ist die Ikone „Baustelle“ des Satzes, kein Emoji (LFH-595).
+    const kopf = document.querySelector('[data-lfh="platzhalter-titel"]');
+    expect(kopf).toHaveTextContent('Stab');
+    expect(kopf?.querySelector('[data-ikone="baustelle"]')).not.toBeNull();
+    expect(kopf?.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(screen.getByText('Kommt später.')).toBeInTheDocument();
   });
 

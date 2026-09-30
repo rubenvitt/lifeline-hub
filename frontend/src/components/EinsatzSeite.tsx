@@ -1,6 +1,6 @@
+import { IkoneChevronRechts } from '../ikonen';
 import { ConfigProvider, Typography, theme } from 'antd';
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
-import { TbChevronRight } from 'react-icons/tb';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import { flaeche, schrift, schriftskala, type Farbrollen } from '../theme/tokens';
 // Seiten unter diesem Primitiv benutzen die `.lfh-*`-Klassen aus `sprache.css`. Alle Selektoren
@@ -88,7 +88,7 @@ function Ortspfad({ children, farben }: { children: ReactNode; farben: Farbrolle
       breadcrumb={{
         separator: (
           <span aria-hidden="true" style={{ display: 'inline-flex', verticalAlign: 'middle' }}>
-            <TbChevronRight size={13} />
+            <IkoneChevronRechts size={13} />
           </span>
         ),
       }}

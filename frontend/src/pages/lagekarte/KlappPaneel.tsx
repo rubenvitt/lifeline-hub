@@ -1,5 +1,5 @@
+import { IkoneChevronRechts, IkoneChevronRunter } from '../../ikonen';
 import { useCallback, useId, useState, type CSSProperties, type ReactNode } from 'react';
-import { TbChevronDown, TbChevronRight } from 'react-icons/tb';
 import { augenbraueStil, monoStil, paneelKopfStil, useRollen } from '../../components/instrument';
 
 /**
@@ -116,7 +116,7 @@ export function KlappPaneel({
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.paddingSM }}>
             {meta != null && <span style={{ ...monoStil(11), color: rollen.schwach }}>{meta}</span>}
             <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.schwach }}>
-              {offen ? <TbChevronDown size={14} /> : <TbChevronRight size={14} />}
+              {offen ? <IkoneChevronRunter size={14} /> : <IkoneChevronRechts size={14} />}
             </span>
           </span>
         </button>

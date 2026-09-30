@@ -1,5 +1,5 @@
+import { IkoneHakenKreis, IkoneMinusKreis } from '../ikonen';
 import { Collapse, Typography, theme } from 'antd';
-import { CheckCircleOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { memo, type ReactNode } from 'react';
 import type { AbschnittDef } from './vorlagen';
 
@@ -102,7 +102,7 @@ export const AbschnittsAkkordeon = memo(function AbschnittsAkkordeon({
                 aria-hidden
                 style={{ color: voll ? token.colorSuccess : token.colorTextSecondary }}
               >
-                {voll ? <CheckCircleOutlined /> : <MinusCircleOutlined />}
+                {voll ? <IkoneHakenKreis /> : <IkoneMinusKreis />}
               </span>
               <Typography.Text strong={voll} type={voll ? undefined : 'secondary'}>
                 {a.label}

@@ -1,6 +1,6 @@
+import { IkonePerson, IkoneTelefon } from '../../ikonen';
 import { Space, theme } from 'antd';
 import { monoStil } from '../../components/instrument';
-import { PhoneOutlined, UserOutlined } from '@ant-design/icons';
 import type { Einsatzabschnitt, Staerke } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { rollenFarbe } from '../../theme/statusFarben';
@@ -49,7 +49,7 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
       {abschnitt.leiter_name && (
         <span style={{ color: token.colorTextSecondary }}>
           <span aria-hidden="true">
-            <UserOutlined />
+            <IkonePerson />
           </span>{' '}
           {abschnitt.leiter_name}
         </span>
@@ -60,7 +60,7 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
           title="Erreichbarkeit hinterlegt"
           style={{ color: token.colorTextSecondary }}
         >
-          <PhoneOutlined />
+          <IkoneTelefon />
         </span>
       )}
     </Space>

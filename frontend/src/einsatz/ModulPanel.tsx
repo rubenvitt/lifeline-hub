@@ -1,6 +1,6 @@
+import { IkoneExternPfeil, IkoneSchloss, IkoneSchraubenschluessel } from '../ikonen';
 import type { CSSProperties } from 'react';
 import { theme } from 'antd';
-import { ExportOutlined, LockOutlined, ToolOutlined } from '@ant-design/icons';
 import { istModulGesperrt, istModulSichtbar, type ModulEintrag } from './modulRegistry';
 import { navZeilen, sprungZiel, type Sprungmarke } from './sprungmarken';
 import { form, schrift, type Farbrollen } from '../theme/tokens';
@@ -185,12 +185,12 @@ export function ModulListe({
                   aria-hidden
                   style={{ display: 'inline-flex', flexShrink: 0, color: farben.schwach }}
                 >
-                  <ExportOutlined />
+                  <IkoneExternPfeil />
                 </span>
               )}
               {gesperrt && (
                 <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
-                  <LockOutlined />
+                  <IkoneSchloss />
                 </span>
               )}
             </button>
@@ -240,12 +240,12 @@ export function ModulListe({
                 {modulZaehler.wert > 999 ? '999+' : modulZaehler.wert}
               </span>
             )}
-            {/* Dekoration; `aria-hidden` an der HÜLLE ist Pflicht: ein `@ant-design/icons`-Knoten bringt
-               `role="img"` mit englischem `aria-label` („tool"/„lock") und landete sonst im Namen des
-               Knopfes. */}
+            {/* Dekoration; `aria-hidden` an der HÜLLE bleibt als zweite Sicherung, obwohl die Ikone
+               des Satzes selbst `aria-hidden` ist (LFH-595): im Namen des Knopfes hat sie nichts
+               verloren. */}
             {m.status === 'wip' && (
               <span title="In Arbeit" aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
-                <ToolOutlined />
+                <IkoneSchraubenschluessel />
               </span>
             )}
             {m.verweistAuf && (
@@ -254,14 +254,14 @@ export function ModulListe({
                 aria-hidden
                 style={{ display: 'inline-flex', flexShrink: 0 }}
               >
-                <ExportOutlined />
+                <IkoneExternPfeil />
               </span>
             )}
             {/* Ebenfalls Dekoration, OHNE `title`: die Sperre trägt der Knopf über `disabled` und
                `title="Keine Berechtigung"`. */}
             {gesperrt && (
               <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
-                <LockOutlined />
+                <IkoneSchloss />
               </span>
             )}
           </button>

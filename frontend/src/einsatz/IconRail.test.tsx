@@ -34,6 +34,38 @@ describe('IconRail', () => {
     expect(screen.getByRole('button', { name: 'Führung' })).not.toHaveAttribute('aria-current');
   });
 
+  // LFH-595 (Spec `ikonensatz`, „Aktiver Zustand über die gefüllte Ikone“): die Füllung ist ein
+  // ZUSÄTZLICHER Kanal neben Fläche und Marke. Geprüft über `data-ikone` (Registername, die
+  // gefüllte Fassung trägt `.gefuellt`), nicht über Pfaddaten.
+  it('zeigt die aktive Kategorie gefüllt und alle anderen als Umriss', () => {
+    renderMitProviders(
+      <IconRail kategorien={kategorien} aktiveKategorie="lage" onKategorieKlick={() => {}} />,
+    );
+    const ikoneIn = (name: string) =>
+      screen
+        .getByRole('button', { name })
+        .querySelector('[data-ikone]')
+        ?.getAttribute('data-ikone');
+    expect(ikoneIn('Lage')).toMatch(/\.gefuellt$/);
+    for (const k of kategorien.filter((k) => k.key !== 'lage')) {
+      expect(ikoneIn(k.label), k.label).toBeDefined();
+      expect(ikoneIn(k.label), k.label).not.toMatch(/\.gefuellt$/);
+    }
+  });
+
+  it('zeigt ohne aktive Kategorie nur Umrisse (Gegenprobe)', () => {
+    renderMitProviders(
+      <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={() => {}} />,
+    );
+    const namen = kategorien.map((k) =>
+      screen
+        .getByRole('button', { name: k.label })
+        .querySelector('[data-ikone]')
+        ?.getAttribute('data-ikone'),
+    );
+    expect(namen.every((n) => n && !n.endsWith('.gefuellt'))).toBe(true);
+  });
+
   // Die aktive Kategorie trägt eine 2-px-Marke in `marke` auf NEUTRALER Fläche; rot ist allein
   // die Ortsmarke („Rot bedient nichts"). Gepinnt, weil der Gate-5-Hexscan nur sieht, DASS kein
   // Literal dasteht, nicht welche Rolle gewählt wurde.

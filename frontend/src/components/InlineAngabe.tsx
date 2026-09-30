@@ -1,6 +1,6 @@
+import { IkoneStift } from '../ikonen';
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Button, Space } from 'antd';
-import { EditOutlined } from '@ant-design/icons';
 import { useRollen } from './instrument/rollenwerte';
 import { wertKnopfStil } from './BemerkungZelle';
 import { SpeicherFehler } from './SpeicherHinweis';
@@ -243,7 +243,7 @@ export function InlineAngabe<T>({
         <span id={wertId}>{anzeige}</span>
         {/* Ikone ohne eigenes Vorleseziel (frontend/AGENTS.md, „Ein Emoji ist keine Ikone"). */}
         <span aria-hidden="true" style={{ color: token.colorTextSecondary }}>
-          <EditOutlined />
+          <IkoneStift />
         </span>
       </Button>
       {hinweis}

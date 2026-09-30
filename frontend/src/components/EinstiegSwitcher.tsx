@@ -1,5 +1,5 @@
+import { IkoneChevronRunter } from '../ikonen';
 import { Button, Dropdown, Space, Typography, type MenuProps } from 'antd';
-import { DownOutlined } from '@ant-design/icons';
 import StatusTag from './StatusTag';
 import type { StatusDarstellung } from '../theme/statusFarben';
 
@@ -52,7 +52,7 @@ export default function EinstiegSwitcher({
     <Dropdown menu={{ items, onClick }} trigger={['click']}>
       <Button type="text" style={{ padding: 0, height: 'auto' }}>
         <Typography.Text strong style={{ fontSize: 20 }}>
-          {aktuell.bezeichnung} <DownOutlined style={{ fontSize: 14 }} />
+          {aktuell.bezeichnung} <IkoneChevronRunter style={{ fontSize: 14 }} />
         </Typography.Text>
       </Button>
     </Dropdown>

@@ -1,3 +1,4 @@
+import { IkonePerson } from '../ikonen';
 import {
   Alert,
   App,
@@ -12,7 +13,6 @@ import {
 } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Paneel, monoStil, useRollen } from '../components/instrument';
-import { UserOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import {
   SeitenFehler,
@@ -52,9 +52,8 @@ import { useFehlerMeldung } from '../components/useFehlerMeldung';
  * und macht die Gliederung deeplink-fähig. Ein `onSelect` am Baum allein wäre für die Tastatur ein
  * Umweg und für „im neuen Tab öffnen" gar kein Weg.
  *
- * Der Führer ist eine Ikone, kein Emoji. Die Hülle ist `aria-hidden`, weil ein
- * `@ant-design/icons`-Knoten sonst sein englisches `aria-label` („user") als Vorleseziel in jede
- * Zeile stellte.
+ * Der Führer ist eine Ikone, kein Emoji. Die Ikone des Satzes ist selbst `aria-hidden` (LFH-595);
+ * die Hülle bleibt als zweite Sicherung gegen ein Vorleseziel in jeder Zeile.
  */
 function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: string): TreeDataNode[] {
   const kinder = new Map<number | null, Einheit[]>();
@@ -84,7 +83,7 @@ function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: strin
           {e.fuehrer_name && (
             <span style={{ color: sekundaerFarbe }}>
               <span aria-hidden="true">
-                <UserOutlined />
+                <IkonePerson />
               </span>{' '}
               {e.fuehrer_name}
             </span>

@@ -80,7 +80,7 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
 
   const ziel = (k: Kategorie) => {
     const aktiv = k.key === aktiveKategorie;
-    const Icon = k.icon;
+    const Icon = aktiv ? k.ikone.gefuellt : k.ikone.umriss;
     return (
       <button
         key={k.key}
