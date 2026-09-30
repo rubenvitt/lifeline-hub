@@ -20,7 +20,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `bannerGrund`/`bannerLinie`, Zeilentönungen. `rahmenFarben` ist modusunabhängig und keine
   `Farbrolle` (`rollen.guard.test.ts`). Eigene Paletten statt `Statusrolle`:
   `etbTypFarben{Dunkel,Hell}` (`etbTypFarbe()`), `warnstufeFarben{Dunkel,Hell}`
-  (`warnstufeBalkenFarbe()`).
+  (`warnstufeBalkenFarbe()`), `fachebeneFarben{Dunkel,Hell}` (`fachebeneFarbe()`, LFH-593:
+  Ebenen-Identität, keine Vertragskarte; `FachebeneDef` trägt keine Farbe).
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
   30/48/72 gilt, nicht die Entwurfsskizze.
@@ -424,6 +425,11 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
 
 - `einsatzKeys` (`EINSATZ_KEYS`): jeder Key genau einmal klassifiziert — live über
   `EINSATZ_STREAM_EVENTS` oder `NICHT_LIVE_KEYS`. `globalKeys` (`GLOBAL_KEYS`) für alles darüber.
+- **Der Einsatzkopf ist live** (LFH-555, `openspec/changes/archive/2026-09-30-lfh-555-einsatzkopf-live/design.md`):
+  Ereignis `einsatz` mit leerer Gate-Menge (Tür des Stroms = Tür des Kopf-GET; leer steht nur
+  `einsatz` und `lagged` zu, Guard `ungegatet_sind_nur_lagged_und_einsatz`), invalidiert Kopf und
+  Stab-Anzeige. Es feuern PATCH, Abschluss, Frist und die Lagebesprechung **nur bei geändertem
+  Termin**; `meine_*` und `lagekennzahlen` lösen es nicht aus.
 - **Kein Inline-String-Array als Query-Key** (`queryKeys.guard.test.ts`, `queryKeyScan.ts`).
 - **Wire-Strings sind eingefroren** (`globalKeys.test.ts`, gegen handgeschriebene Literale).
 - Sub-Keys: String-Union-Token als zweites Element; der argumentlose Accessor ist der

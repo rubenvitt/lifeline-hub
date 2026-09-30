@@ -11,6 +11,7 @@ use crate::einsatz::{
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::live::LiveEvent;
 use crate::routes::support::{self, pflicht};
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -18,6 +19,14 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use utoipa::ToSchema;
+
+/// Meldet eine Änderung des Einsatzkopfs an alle Abonnenten (LFH-555). Nur nach dem Commit
+/// rufen; die Nutzlast trägt nur die Einsatzkennung, die Kopfdaten holt der GET.
+fn kopf_geaendert(state: &AppState, einsatz_id: i64) {
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Einsatz);
+}
 
 #[derive(Debug, Deserialize)]
 pub struct NeuerEinsatz {
@@ -121,6 +130,7 @@ pub async fn abschliessen(
     let id = ctx.einsatz.id;
 
     let aktualisiert = repo::abschliessen(&state.pool, id, ctx.benutzer.id).await?;
+    kopf_geaendert(&state, id);
     Ok(Json(aktualisiert.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
@@ -216,6 +226,7 @@ pub async fn aufbewahrungsfrist_setzen(
         &audit,
     )
     .await?;
+    kopf_geaendert(&state, id);
     let anzeige = aktualisiert.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
@@ -816,6 +827,7 @@ pub async fn aktualisieren(
         },
     )
     .await?;
+    kopf_geaendert(&state, id);
 
     Ok(Json(aktualisiert.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),

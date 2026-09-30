@@ -14,7 +14,7 @@ import Sidebar, {
 } from './Sidebar';
 import type { NichtVerortet } from './marker';
 import type { SidebarProps } from './Sidebar';
-import { dichten } from '../../theme/tokens';
+import { dichten, fachebeneFarbenHell } from '../../theme/tokens';
 import { hochwasserKlasse } from '../../theme/statusFarben';
 import { FACHEBENEN, fachebeneKeys } from './fachebenen';
 import { hochwasserRadius } from './hochwasserStil';
@@ -542,9 +542,10 @@ describe('Sidebar Bild-Hintergründe', () => {
       );
       for (const k of klassig) {
         const zeile = document.querySelector<HTMLElement>(`[data-fachebene="${k}"]`)!;
-        // Die Karte zeichnet diese Ebene nie in `farbe` (`hochwasserStil.ts` & Co. backen die
+        // Die Karte zeichnet diese Ebene nie in ihrer Ebenenfarbe (`hochwasserStil.ts` & Co. backen die
         // Rollenfarbe je Feature ein) — also steht der Ton auch im Panel nirgends.
-        expect(farbenIn(zeile)).not.toContain(normiert(FACHEBENEN[k].farbe));
+        // Die Tests rendern ohne unser Theme, also im Tagmodus (`fachebeneFarbe`, LFH-593).
+        expect(farbenIn(zeile)).not.toContain(normiert(fachebeneFarbenHell[k]));
         // Das Quadrat steht nur als unsichtbarer Platzhalter für die Bündigkeit der Namen.
         expect(within(zeile).getByText('■').style.visibility).toBe('hidden');
       }
@@ -589,7 +590,7 @@ describe('Sidebar Bild-Hintergründe', () => {
       />,
     );
     const zeile = fachebenenZeile('Amtliche Warnungen (NINA)');
-    expect(within(zeile).getByText('■').style.color).toBe(normiert(FACHEBENEN.nina.farbe));
+    expect(within(zeile).getByText('■').style.color).toBe(normiert(fachebeneFarbenHell.nina));
     expect(within(zeile).queryByRole('list')).not.toBeInTheDocument();
   });
 

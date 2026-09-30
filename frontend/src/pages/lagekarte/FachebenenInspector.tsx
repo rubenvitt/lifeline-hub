@@ -10,8 +10,7 @@ import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
 import type { EnergieAnlagenart, FachebeneQuelle } from '../../api/fachebenen';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
 import StatusTag from '../../components/StatusTag';
-import { rollenFarbe } from '../../theme/statusFarben';
-import { FACHEBENEN } from './fachebenen';
+import { fachebeneFarbe, rollenFarbe } from '../../theme/statusFarben';
 import { alsText as s, fachebeneTitel, pick } from './fachebeneTitel';
 import { kategorieLabel } from './fachebenenLayer';
 import { geoKennzahlen } from './geo';
@@ -680,7 +679,7 @@ export default function FachebenenInspector({
         // eine Farbe zwei Bedeutungen.
         quelle === 'luftqualitaet'
           ? rollenFarbe(luftqualitaetDarstellung(p.klasse).rolle, token)
-          : FACHEBENEN[quelle].farbe
+          : fachebeneFarbe(quelle, token)
       }
       onSchliessen={onSchliessen}
     >
