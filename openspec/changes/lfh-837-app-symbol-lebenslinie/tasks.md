@@ -2,25 +2,25 @@
 
 ## 1. Geometrie und Quellen
 
-- [ ] 1.1 `frontend/src/marke/bildmarkeGeometrie.ts` anlegen: Pfad, Strichstärke, Quadrat und
+- [x] 1.1 `frontend/src/marke/bildmarkeGeometrie.ts` anlegen: Pfad, Strichstärke, Quadrat und
       enger `viewBox` der Lebenslinie, Farben aus `theme/tokens.ts`. Den `viewBox` im Browser
       mit Strich messen (D1). Prüfung: Ein Render der Marke auf transparentem Grund schneidet
       an keiner Kante ab (Pixelgrenzen gegen `viewBox`).
-- [ ] 1.2 `scripts/marke/symbol.svg`, `symbol-macos.svg` und `symbol-maskable.svg` nach D2
+- [x] 1.2 `scripts/marke/symbol.svg`, `symbol-macos.svg` und `symbol-maskable.svg` nach D2
       anlegen. Sie enthalten nur Pfade und keinen `<text>`. Prüfung: Kontaktbogen der drei
       Quellen in 512/64/32/16 px, maskierbar mit eingezeichnetem sicheren Kreis.
 
 ## 2. Guard-Test und Erzeugung (TDD)
 
-- [ ] 2.1 `frontend/src/marke/marke.guard.test.ts` nach D6 zuerst rot schreiben. Prüfung: Der
+- [x] 2.1 `frontend/src/marke/marke.guard.test.ts` nach D6 zuerst rot schreiben. Prüfung: Der
       Test schlägt heute an den 1×1-PWA-Symbolen, am fehlenden maskierbaren Eintrag und am
       alten Favicon fehl.
-- [ ] 2.2 `frontend/src/marke/pwaManifest.ts` herauslösen, `vite.config.ts` importiert es.
+- [x] 2.2 `frontend/src/marke/pwaManifest.ts` herauslösen, `vite.config.ts` importiert es.
       Einträge any/maskable und Farben `#0c0e11` (D4). `includeAssets` um
       `apple-touch-icon.png` ergänzen, `index.html` um `apple-touch-icon` und `theme-color`.
       Prüfung: Die Manifest-Fälle des Guard-Tests sind grün, `vite build` erzeugt ein
       `manifest.webmanifest` mit drei Symbolen.
-- [ ] 2.3 `scripts/marke/erzeuge-symbole.sh` nach D3 schreiben und laufen lassen. Prüfung: Der
+- [x] 2.3 `scripts/marke/erzeuge-symbole.sh` nach D3 schreiben und laufen lassen. Prüfung: Der
       Guard-Test ist ganz grün. `git status` zeigt unter `src-tauri/icons/` nur geänderte,
       keine neuen Dateien. `file` meldet 192/512/180/512 px für die PWA-Dateien.
 
