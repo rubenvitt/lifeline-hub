@@ -26,10 +26,10 @@
 
 ## 3. Oberfläche
 
-- [ ] 3.1 `frontend/src/marke/Bildmarke.tsx` nach D5 (per TDD: `aria-hidden`, `focusable`,
+- [x] 3.1 `frontend/src/marke/Bildmarke.tsx` nach D5 (per TDD: `aria-hidden`, `focusable`,
       Pfad aus der Konstante, Quadrat in `marke`, Linienfarbe von außen). Prüfung: Eigener
       Komponententest ist grün.
-- [ ] 3.2 `Markenzelle` in `components/Kopfleiste.tsx` auf die Bildmarke umstellen (22 px,
+- [x] 3.2 `Markenzelle` in `components/Kopfleiste.tsx` auf die Bildmarke umstellen (22 px,
       `rahmenFarben.text`) und den Dateikopf nachziehen. Prüfung: `Kopfleiste.test.tsx` prüft,
       dass die Bildmarke da ist und das 14-px-Quadrat fehlt (zuerst rot).
 - [ ] 3.3 Markenbereich der Anmeldeseite auf die Bildmarke umstellen (20 px,
@@ -38,12 +38,12 @@
 
 ## 4. Dokumentation
 
-- [ ] 4.1 `docs/design/2026-09-21-neuentwurf/umsetzung.md`: Zeile `marke` („Logo-Quadrat“ →
+- [x] 4.1 `docs/design/2026-09-21-neuentwurf/umsetzung.md`: Zeile `marke` („Logo-Quadrat“ →
       Bildmarke) und Rahmen-Abschnitt (Markenzelle) nachziehen, macOS-Ausnahme vom Radius 0
       vermerken. CLAUDE.md, Abschnitt Neuentwurf: ein Punkt „Bildmarke“ mit der Quelle
       (`marke/bildmarkeGeometrie.ts`, `scripts/marke/`, Guard). Prüfung: `grep -n
       "Logo-Quadrat"` findet nichts mehr.
-- [ ] 4.2 `docs/betrieb/desktop-app.md`: Den Punkt „App-Symbol … Platzhalter“ aus den Grenzen
+- [x] 4.2 `docs/betrieb/desktop-app.md`: Den Punkt „App-Symbol … Platzhalter“ aus den Grenzen
       streichen und einen Satz zum Neuerzeugen (`scripts/marke/erzeuge-symbole.sh`) ergänzen.
       Prüfung: Die Doku nennt einen Befehl, der so läuft.
 

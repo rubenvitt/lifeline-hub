@@ -72,6 +72,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `flaeche.seiteBreit` fällt beim Umbau.
 - **Markdown** (`components/Markdown.tsx`, `MarkdownEditor`): Pflicht-Prop `unterEbene` (Ebene der
   nächsten Überschrift darüber, Boden `h6`, kein fester Versatz).
+- **Bildmarke „Lebenslinie“** (LFH-837): EINE Geometrie in `marke/bildmarkeGeometrie.ts` für
+  Markenzelle, Anmeldeseite, Favicon, PWA und Hülle; Symbole nur über
+  `scripts/marke/erzeuge-symbole.sh` (Guard `marke/marke.guard.test.ts`: Nenngrößen, Manifest,
+  Pfadgleichheit). PWA-Manifest in `marke/pwaManifest.json`, Farben Kopf-Schwarz.
 - **Rahmen:** Kopfleiste (`components/Kopfleiste.tsx`, `KOPF_HOEHE`) · Rail
   (`einsatz/IconRail.tsx`, Kurzetikett `kurz`, voller Name als `aria-label`, Einstellungen per
   `fuss: true`) · Modulpanel (`einsatz/ModulPanel.tsx`) · Sprungpalette
