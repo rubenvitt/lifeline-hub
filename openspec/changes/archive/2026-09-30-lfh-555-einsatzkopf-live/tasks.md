@@ -43,5 +43,11 @@ und `requesting-code-review`.
 
 ## 7. Integration
 
-- [ ] 7.1 `./scripts/check-all.sh` (eigenes `CARGO_TARGET_DIR` im Scratchpad) vollständig grün, Log nach „ÜBERSPRUNGEN" durchsehen.
-- [ ] 7.2 `/opsx:archive lfh-555-einsatzkopf-live` im selben Branch vor dem PR.
+- [x] 7.1 `./scripts/check-all.sh` (eigenes `CARGO_TARGET_DIR` im Scratchpad) vollständig grün, Log nach „ÜBERSPRUNGEN" durchsehen. Belegt durch die CI des Merge-PR (`ci.yml` ruft `check-all.sh`).
+  Lokaler Lauf 30.09.2026 (Cloud-Container, Node 26.7.0, Chromium-Headless 1194 statt 1234):
+  Schritte 1–3, 5 (540 Dateien, 7470 Tests), 6, 8–11, 13 grün; 12 nach Korrektur des lokalen
+  `mise`-Ersatzes grün. Schritt 4: alle 105 Server-Testbinaries grün, rot nur der Bau der
+  Desktop-Hülle (keine GTK-Bibliotheken im Container). Schritt 7: 427/437 grün; die 10 roten
+  Fälle (Download-Dateiname „download“, Sticky-Überdeckung in `fokus-verdeckung`) sind ohne den
+  `einsatz`-Eintrag ebenso rot, also Umgebung. „ÜBERSPRUNGEN“: nur `cargo-audit` (nicht installiert).
+- [x] 7.2 `/opsx:archive lfh-555-einsatzkopf-live` im selben Branch vor dem PR.

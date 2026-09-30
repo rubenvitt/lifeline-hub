@@ -1,7 +1,8 @@
 //! Das Live-Ereignis des Einsatzkopfs `einsatz` (LFH-555).
 //!
 //! Wer es feuert, wann es ausbleibt, was es trägt. Wer es empfängt (Modul-Filter des Feeds),
-//! prüft `modul_override.rs`. Spec: `openspec/changes/lfh-555-einsatzkopf-live/`.
+//! prüft `modul_override.rs`. Spec: `openspec/specs/einsatzkopf-live/`, Herleitung
+//! `openspec/changes/archive/2026-09-30-lfh-555-einsatzkopf-live/design.md`.
 
 use axum::http::StatusCode;
 use lifeline_hub::live::{LiveEvent, LiveNachricht};
