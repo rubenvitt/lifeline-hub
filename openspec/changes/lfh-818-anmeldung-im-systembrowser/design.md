@@ -148,7 +148,7 @@ Der Ablauf, in dieser Reihenfolge:
 - 409 ist Nebenläufigkeit oder Lebenszyklus, 422 ist ein Zusammenhang von Feldern. Beide würden
   einen Grund verraten („verbraucht“, „falscher verifier“) und damit ein Orakel bilden.
 - 400 bleibt der reinen Form vorbehalten.
-- **Am Checkpoint zu bestätigen:** Das weicht vom Wortlaut des Akzeptanzkriteriums ab.
+- **Bestätigt am 30.09.2026:** Das weicht bewusst vom Wortlaut des Akzeptanzkriteriums ab.
 
 **Ausstellen:** `POST /api/auth/app-code {challenge}` braucht `CurrentUser` und gibt 401 ohne
 Sitzung, 400 bei falscher Form. Die Antwort ist `{code}` als Response-DTO (`ToSchema`, Codegen).
@@ -194,7 +194,7 @@ Bestätigungsseite: Sie nennt den Namen und bietet „Mit anderem Konto“.
   und im Browser bliebe danach keine Sitzung zurück. Ob Chromium (Vivaldi) das Flag beachtet,
   ist **noch nicht gemessen** (Lauf `aswas-ephemer` steht aus).
 - Die Wahl ist ein Schalter an einer Stelle der Hülle und ändert weder Spec noch Server.
-- **Am Checkpoint zu bestätigen.**
+- **Bestätigt am 30.09.2026.**
 
 ### 8. Audit mit Anbieter `systembrowser`, Lücken der Browser-Wege separat
 
@@ -241,7 +241,7 @@ nebenbei das heutige Leck der Query im Protokoll.
 - **Lesart des Tickets:** „Ausblende-Schalter aus Stufe 1 zurücknehmen“ heißt, der Hinweis
   weicht dem Weg. Der Passkey-Knopf im WKWebView kommt nicht zurück, weil er dort weiter
   scheitert.
-- **Am Checkpoint zu bestätigen.**
+- **Bestätigt am 30.09.2026.**
 
 ## Risks / Trade-offs
 
