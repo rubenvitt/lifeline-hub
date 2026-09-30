@@ -13,7 +13,7 @@
  * frisch geladene Sitzung zeigte sonst den Stand vom letzten Klick — womöglich von gestern.
  *
  * Gemerkt wird, was jemand GEWÄHLT hat, nicht, wohin er geleitet wurde
- * (`openspec/changes/lfh-436-zuletzt-speicher-zugaenge/design.md`):
+ * (`openspec/changes/archive/2026-09-30-lfh-436-zuletzt-speicher-zugaenge/design.md`):
  *
  * | Zugang                                          | merkt | warum                                  |
  * |-------------------------------------------------|-------|----------------------------------------|

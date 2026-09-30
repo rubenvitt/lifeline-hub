@@ -2,7 +2,7 @@
 
 ## Context
 
-Motivation: siehe `proposal.md`. Stand nach LFH-764 (`openspec/changes/lfh-764-lagekarte-griffe-klickwege/design.md`, D4):
+Motivation: siehe `proposal.md`. Stand nach LFH-764 (`openspec/changes/archive/2026-09-30-lfh-764-lagekarte-griffe-klickwege/design.md`, D4):
 
 - `entscheideKlickziel(merkmale, punkt, projiziere)` in `pages/lagekarte/klickziel.ts` ist rein und
   liefert genau einen Gewinner. Im Flächenzweig nimmt er das erste Merkmal aus

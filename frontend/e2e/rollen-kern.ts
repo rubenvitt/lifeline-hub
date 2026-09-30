@@ -5,7 +5,8 @@ import { expect, type Page } from '@playwright/test';
  * freien Zweige der Oberfläche; die gesperrten (Rechtehinweis, Tag „Keine Berechtigung",
  * Sperrgrund) sind oft breiter und blieben ungeprüft — so entstand der Überlauf in LFH-337.
  *
- * Drei Rollen, jede deckt eine Achse (openspec/changes/lfh-435-…/design.md, D3):
+ * Drei Rollen, jede deckt eine Achse
+ * (openspec/changes/archive/2026-09-30-lfh-435-e2e-gates-nicht-privilegiert/design.md, D3):
  *  - `beobachter`: System `keiner`, Org `keine`, Einsatzrolle `beobachter` — weder
  *    Verwaltungs- noch Schreibrecht, also alle Nur-Lese-Zweige in einem Benutzer.
  *  - `fuehrungskraft`: Org-Rolle `fuehrungskraft` — kommt in die Verwaltung, ist dort aber kein

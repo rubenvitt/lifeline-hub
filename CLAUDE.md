@@ -33,6 +33,10 @@ Skill `clickup-task-anlegen`.
   (Fähigkeits-Specs, SHALL/MUST, über `/opsx:sync`/`/opsx:archive`) · `docs/superpowers/`
   (Herleitungen und Messprotokolle, **eingefrorenes Archiv**, wird nicht nach OpenSpec migriert).
   Wer dort etwas verschiebt, greppt zuerst die Verweise (sie brechen still).
+- **Archiviert wird vor dem Merge, im selben Branch** (Entscheidung 30.09.2026): ist die
+  `tasks.md` abgehakt, `/opsx:archive` samt Spec-Sync und Verweisen, dann erst der PR — kein
+  Archiv-PR danach. Wächter: `scripts/check-openspec-archiv.sh` (Schritt 13 von `check-all.sh`,
+  Bündel `schnell`) macht eine aktive Change ohne offenes Kästchen rot.
 
 ## Frontend — Gestaltungssprache Neuentwurf „Instrumententafel“ (22.09.2026)
 
@@ -101,7 +105,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 Liste/Karte (`components/Liste.tsx`, `Datensicht` `form="karte"`); Kachel nur für Überblick.
 Karten-Fallback unter `md` (`form="auto"`) ist begründungspflichtig (Dateikopf `Datensicht.tsx`,
 AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
-- **Kein Nutzerschalter Tabelle ↔ Karte** (LFH-507, `openspec/changes/lfh-507-palette-status-setzen/`):
+- **Kein Nutzerschalter Tabelle ↔ Karte** (LFH-507, `openspec/changes/archive/2026-09-30-lfh-507-palette-status-setzen/`):
   die Form bleibt die begründete Entscheidung je Seite, auch in der Palette („Ansicht wechseln“
   gibt es nicht). Wer einen Schalter will, schreibt zuerst diese Regel fort.
 - **FMS-Tableau** (LFH-642, `kraefte/FmsTableau.tsx`): Ansicht `?ansicht=tableau` der
@@ -200,12 +204,12 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   wartet auf `dragend`; in „Größe" Ecken immer, eine Kante nur ohne Überlappung mit Ecke oder
   Kante (`scharfeGriffe`, neu bei `move`/`dragend`/`setzeEcken`, nie im Zug; LFH-764).
 - **Ein Tipp gehört genau einem Ziel** (LFH-764,
-  `openspec/changes/lfh-764-lagekarte-griffe-klickwege/design.md`): jeder Karten-Klickhörer fragt
+  `openspec/changes/archive/2026-09-30-lfh-764-lagekarte-griffe-klickwege/design.md`): jeder Karten-Klickhörer fragt
   `klickzielAm` (`Kartenflaeche.tsx`, ein Urteil je Originalereignis) → `entscheideKlickziel`
   (`pages/lagekarte/klickziel.ts`): gezeichnetes Punktziel > Trefferzone > Fläche. Eine neue
   Klickebene braucht eine Rolle in `ordneKlickebene` (Guard in `klickziel.test.ts`).
   **Mehrere Flächen am Punkt wählt der Mensch** (LFH-812,
-  `openspec/changes/lfh-812-lagekarte-flaechen-auswahlmenue/design.md`): erst entdoppeln (Zone
+  `openspec/changes/archive/2026-09-30-lfh-812-lagekarte-flaechen-auswahlmenue/design.md`): erst entdoppeln (Zone
   über Füllung + Umriss zählt einmal), ab zwei `mehrdeutig` → `FlaechenwahlMenue` am Tipppunkt,
   eigene vor Fachebenen, Kennung aus `flaechenwahl.ts`; Wahl über dieselben Callbacks, aus im
   exklusiven Modus (Prop `flaechenwahl`). Geschlossen wird nur über `onOpenChange`.
@@ -226,7 +230,7 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   Knopfspalte (`fussStil(knopfKante)`) und oben an der Karte; kein `overflow` am Rahmen.
 - **Die Karte kippt nicht** (`touchPitch: false` **und** `maxPitch: 0` in `Kartenflaeche.tsx`).
 - **Unter `lg` gibt jeder Kartenmodus die Karte frei** (LFH-765,
-  `openspec/changes/lfh-765-lagekarte-modi-karte-freigeben/design.md`): abgeleitet aus
+  `openspec/changes/archive/2026-09-30-lfh-765-lagekarte-modi-karte-freigeben/design.md`): abgeleitet aus
   `exklusiverModusAktiv` in `leisteSichtbar` (`lagekarte/leistenWahl.ts`), nie per Aufruf je
   Startweg; nach dem Modus gilt wieder der vorherige Zustand (Entscheidung 29.09.2026).
   „Leiste einblenden" im Modus ist `umschalteImModus` (nie gespeichert). Die Bedienung der
@@ -674,7 +678,7 @@ draußen gelassen werden.
   am Prod-Bundle baut mit `vite build`, nicht mit `pnpm build`: Dessen `tsc -b` bricht an
   einem ungenutzten Import ab, und `dist` bleibt still der alte Stand.
 - **Offen:** die übrigen personenbezogenen Daten auf dem Gerät (LFH-767). Herleitung und
-  Prüfspur: `openspec/changes/lfh-723-lagebild-offline-lesen/design.md`, Prüfliste
+  Prüfspur: `openspec/changes/archive/2026-09-30-lfh-723-lagebild-offline-lesen/design.md`, Prüfliste
   `docs/superpowers/specs/2026-09-28-lfh-723-pruefliste.md`.
 
 ## Frontend — Lint-Disziplin
@@ -688,7 +692,8 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
-`check-migrationen.sh` → `check-all.test.sh` → `check-toolversionen.sh`.
+`check-migrationen.sh` → `check-all.test.sh` → `check-toolversionen.sh` →
+`check-openspec-archiv.sh`.
 - **Das Skript ist die Wahrheit**; `.github/workflows/ci.yml` ruft es unverändert. Neue Schritte
   gehören ins Skript.
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
@@ -715,7 +720,7 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   Admin, Wechsel im selben Kontext). Der Rollenzweig ist VOR der Messung Vorbedingung
   (Hinweis steht, Aktion gesperrt oder abwesend), die Mutationsprobe macht nur den
   Nicht-Admin rot. Freistellungen in Gate 1 nennen die Rolle. Inventar:
-  `openspec/changes/lfh-435-e2e-gates-nicht-privilegiert/pruefliste.md`.
+  `openspec/changes/archive/2026-09-30-lfh-435-e2e-gates-nicht-privilegiert/pruefliste.md`.
 - **e2e wartet nie auf `networkidle`** (LFH-385): der SSE-Strom der Einsatzrouten lässt das Netz
   nie ruhen (parallel rot, `--workers=1` grün). Gewartet wird auf einen Inhaltsanker; Riegel
   `no-restricted-syntax` für `e2e/**` in `frontend/eslint.config.js`.

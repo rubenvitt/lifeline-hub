@@ -334,3 +334,25 @@ nicht neu gemessen — die Einstellung (`background_throttling` aus) ist die aus
 | 13 | erfüllt | Nichts ist fixiert oder überlagert |
 | 14 | nicht anwendbar | Keine Tabelle |
 | 15 | erfüllt, soweit anwendbar | Label über dem Feld, Vorbelegung sichtbar und überschreibbar, Enter sendet (`<form>`), volle Tastaturbedienung; Serienerfassung und Sammelliste entfallen (ein Wert) |
+
+## Stand beim Archivieren (30.09.2026)
+
+Archiviert, weil Spec und Entwurf umgesetzt und gemergt sind. Die Kästchen in `tasks.md` sind
+bewusst nicht nachträglich gesetzt; hier steht je offene Aufgabe, was sie belegt oder was fehlt.
+Die Restpunkte trägt **LFH-721 auf dem Board** (bleibt vor `done`, bis der erste `main`-Release
+gelaufen ist), nicht LFH-722 (das ist nur die Signierung).
+
+| Aufgabe | Stand | Beleg |
+|---|---|---|
+| 3.1 Erststart-Maske, lokale Commands | umgesetzt, gemessen | `src-tauri/ui/index.html`, `verbinden` in `src-tauri/src/main.rs`; Tabelle „Nachweise“ (Erststart, Ablehnung der Serverseite) |
+| 3.3 Deeplink, Einzelinstanz | umgesetzt, gemessen | `deeplink.rs`, `tauri-plugin-deep-link`/`-single-instance`; „Nachweise“ (Deeplink, `pgrep` = 1) |
+| 3.4 Menü „Server wechseln…“ | umgesetzt, **Handbestätigung offen** | `src-tauri/src/menue.rs`; Vorbelegung und „Abbrechen“ stehen unter „Noch von Hand zu bestätigen“ |
+| 3.5 macOS-Throttling, Druck-Umleitung | umgesetzt, Druck gemessen | `background_throttling(Disabled)` in `main.rs`; „Nachweise“ (`window.print` → `drucken`, `beforeprint`); `afterprint` offen |
+| 4.2 Update-Prüfung im Hintergrund | umgesetzt, gemessen | `src-tauri/src/update.rs`; „Nachweise“ (Prüfung ohne Manifest still) |
+| 4.3 Update-Kette lokal | **macOS erfüllt**, Windows offen | „Nachweise“ (1.0.0 → 1.0.1); „Später“ und verfälschtes Archiv unter „Noch von Hand zu bestätigen“ |
+| 5.2 `artefakte.yml` | umgesetzt, **erster echter Lauf offen** | Ausgabe `desktop` in `artefakte.yml`; Prüfliste: „offen → nach dem Merge“ (Dispatch mit `desktop: true`, Secrets) |
+| 5.4 `ci.yml` (GTK/WebKit) | umgesetzt | `apt-get`-Zeile im Rust-Job; Rust-Suite der CI grün |
+| 6.3 Gate-Lauf, Prüfliste | Prüfliste steht; Gate-Lauf mit Befund | „Gate-Lauf 29.09.2026“ und „Prüfliste Akzeptanzkriterien“ oben |
+
+**Offen, getragen von LFH-721:** erster `main`-Release mit Paketen und `latest.json`
+(Windows damit erstmals belegt) sowie die Handbestätigungen aus „Noch von Hand zu bestätigen“.
