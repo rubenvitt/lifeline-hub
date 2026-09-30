@@ -215,6 +215,28 @@ describe('StabPage', () => {
     expect(within(s6).getByRole('link', { name: label('einsatzabschnitte') })).toBeInTheDocument();
   });
 
+  it('die S6-Zeile führt zum Funkplan, keine andere Zeile (LFH-548)', async () => {
+    rendere();
+    await besetzungsSektion();
+    const s6 = await screen.findByRole('group', { name: 'Werkzeuge S6' });
+    expect(within(s6).getByRole('link', { name: 'Funkplan' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/stab/funkplan',
+    );
+    expect(screen.getAllByRole('link', { name: 'Funkplan' })).toHaveLength(1);
+  });
+
+  it('der Funkplan-Verweis bleibt, auch wenn alle Modul-Werkzeuge der S6 ausgeblendet sind', async () => {
+    rendere({ overrides: { chat: { sichtbar: false }, einsatzabschnitte: { sichtbar: false } } });
+    await besetzungsSektion();
+    await waitFor(() => expect(overrideAufrufe).toBe(1));
+    const s6 = await screen.findByRole('group', { name: 'Werkzeuge S6' });
+    await waitFor(() =>
+      expect(within(s6).queryByRole('link', { name: label('einsatzabschnitte') })).toBeNull(),
+    );
+    expect(within(s6).getByRole('link', { name: 'Funkplan' })).toBeInTheDocument();
+  });
+
   it('„Besetzung ändern" öffnet die Maske der Zeile', async () => {
     rendere();
     const sektion = await besetzungsSektion();

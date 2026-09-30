@@ -13,6 +13,11 @@ interface NeuerLagebericht {
   vorlage: LageberichtVorlageKey;
   titel: string;
   zeitstand?: string;
+  /**
+   * Startinhalt (LFH-548): der Entwurf entsteht in EINEM Aufruf mit Text. Jeder Schlüssel gehört
+   * zur Vorlage und steht höchstens einmal da, sonst 400 ohne Entwurf.
+   */
+  abschnitte?: LageberichtAbschnitt[];
 }
 
 export function legeLageberichtAn(

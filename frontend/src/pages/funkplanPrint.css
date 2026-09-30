@@ -1,0 +1,13 @@
+/* Eigenheiten des Funkplans im Druck (LFH-548). Die Mechanik (Ausblenden des Rahmens, Fluss,
+   Papierfarben, Umbruch, Tabellen-Neutralisierer) liegt in `druck/druck.css`; `.funkplan-print-root`
+   trägt dafür `data-lfh="druckwurzel"`. */
+@media print {
+  .funkplan-no-print {
+    display: none !important;
+  }
+
+  /* Der Seitenkopf ist Bedienung: Titel, Meta und Datenstand stehen auf Papier im Druckkopf. */
+  .funkplan-print-root [data-lfh='seitenkopf'] {
+    display: none !important;
+  }
+}

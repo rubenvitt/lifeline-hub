@@ -124,6 +124,9 @@ const NUR_TABELLE: string[] = [
   '/src/aufbewahrung/AufbewahrungUebersicht.tsx',
   // Betreuungsstellen werden VERGLICHEN („welche hat noch Platz?“), Tabelle in jeder Breite.
   '/src/betreuung/StellenBlock.tsx',
+  // Der Funkplan (LFH-548) wird verglichen („welche Stelle funkt auf welcher Gruppe?“) und
+  // gedruckt; Tabelle in jeder Breite, auf schmalem Schirm angepasst.
+  '/src/pages/FunkplanPage.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
 ];
 
@@ -165,6 +168,8 @@ const KONSUMENTEN = [
   // `titel.ziel`, das wäre eine Client-Navigation).
   '/src/pages/DokumentePage.tsx',
   '/src/pages/FahrzeugePage.tsx',
+  // Der Funkplan S6 (LFH-548): abgeleiteter Baum Abschnitt → Einheit → Fahrzeug, schreibgeschützt.
+  '/src/pages/FunkplanPage.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
   '/src/pages/LageberichtePage.tsx',
   '/src/pages/MaterialPage.tsx',
@@ -686,10 +691,11 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // LEER. Wer einträgt, begründet wie über der Liste beschrieben, sonst wäre der Kartenplan nur
     // ein Vorschlag.
     expect(KARTEN_EIGENBAU).toHaveLength(0);
-    // Drei Kartenmodule, drei Vergleichsflächen. Wer einträgt, ohne umzubauen, fällt am
-    // Anwesenheits-Gegentest auf; wer umbaut, ohne einzutragen, an der Formprüfung.
+    // Drei Kartenmodule, vier Vergleichsflächen (seit LFH-548 mit dem Funkplan). Wer einträgt,
+    // ohne umzubauen, fällt am Anwesenheits-Gegentest auf; wer umbaut, ohne einzutragen, an der
+    // Formprüfung.
     expect(NUR_KARTE).toHaveLength(3);
-    expect(NUR_TABELLE).toHaveLength(3);
+    expect(NUR_TABELLE).toHaveLength(4);
     // Eine PFLICHT, dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild.
     expect(VOLLMENGE_PFLICHT).toHaveLength(1);
     // Eine SCHULD, auf 0 geschrumpft. Ein Eintrag wäre eine zweite Seite mit demselben Fehler.
@@ -703,7 +709,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     expect(dateien[PRIMITIV]).toContain('KatalogTabelle');
   });
 
-  it('der Scan sieht genau die geplanten Konsumenten (seit LFH-23: dreizehn)', () => {
+  it('der Scan sieht genau die geplanten Konsumenten (seit LFH-548: fünfzehn)', () => {
     /**
      * Die Gleichheit prüft BEIDE Richtungen: eine still herausgefallene Datei bleibt in
      * {@link KONSUMENTEN} stehen, eine ungeplant hinzugekommene fehlt dort.

@@ -242,7 +242,8 @@ export function menueEintraege(eintraege: readonly MenueEintrag[]): MenuProps['i
  */
 export interface TitelBezug<T, K extends string> {
   spalte: K;
-  ziel?: (zeile: T) => string;
+  /** `null`: diese Zeile hat kein Ziel (etwa ein Sammelknoten im Baum), der Titel bleibt Text. */
+  ziel?: (zeile: T) => string | null;
 }
 
 /** Kontext, den der Kartenzweig jedem Eintrag mitgibt (nur `art: 'eigen'`). */
@@ -1143,18 +1144,21 @@ export default function Datensicht<T extends object, const K extends string>(
          */
         if (karte.art === 'plan' && karte.titel.ziel && spalte.key === karte.titel.spalte) {
           const ziel = karte.titel.ziel;
-          gebaut.render = (_wert, zeile, index) => (
-            <Link
-              to={ziel(zeile)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                minHeight: token.controlHeight,
-              }}
-            >
-              {zelle(spalte, zeile, index)}
-            </Link>
-          );
+          gebaut.render = (_wert, zeile, index) => {
+            const nach = ziel(zeile);
+            const stil = {
+              display: 'inline-flex',
+              alignItems: 'center',
+              minHeight: token.controlHeight,
+            } as const;
+            return nach == null ? (
+              <span style={stil}>{zelle(spalte, zeile, index)}</span>
+            ) : (
+              <Link to={nach} style={stil}>
+                {zelle(spalte, zeile, index)}
+              </Link>
+            );
+          };
         }
 
         if (!sortWert) return gebaut;
@@ -1237,7 +1241,34 @@ export default function Datensicht<T extends object, const K extends string>(
                 onZeileKlick(zeile);
               },
             })
-          : undefined
+          : baum
+            ? (zeile) => ({
+                /**
+                 * Derselbe Riegel für den Baum (LFH-548): die ganze Zeile klappt auf, außer der
+                 * Klick galt einem Bedienziel der Zeile oder kam aus einem Portal. antds
+                 * `expandRowByClick` kennt keinen Riegel: ein Klick auf den Titel-Link klappte
+                 * sonst mit um, beim Strg-Klick sogar in der Seite, die stehen bleibt; ein
+                 * Statusknopf klappte die Einheit zu, während sein Menü aufging. Das
+                 * Aufklappsymbol selbst stoppt die Weitergabe (rc-table, im Test gepinnt).
+                 */
+                onClick: (event) => {
+                  const ziel = event.target as HTMLElement;
+                  // Ein React-Portal (Menü eines Zeilenknopfs) reicht seinen Klick an die Zeile
+                  // weiter, liegt im DOM aber woanders: er gehört nicht der Zeile.
+                  if (!event.currentTarget.contains(ziel)) return;
+                  // Eigene Bedienziele in der Zeile (Link, Knopf, Feld) bedienen den Klick allein.
+                  if (ziel.closest('a, button, input, select, textarea, [role="button"]')) return;
+                  const kinder = zeile[baum.kinder] as readonly T[] | undefined;
+                  if (!kinder || kinder.length === 0) return;
+                  const k = schluessel(zeile);
+                  baum.onAufgeklappt(
+                    baum.aufgeklappt.includes(k)
+                      ? baum.aufgeklappt.filter((x) => x !== k)
+                      : [...baum.aufgeklappt, k],
+                  );
+                },
+              })
+            : undefined
       }
       /**
        * Sortieren ist hier der EINZIGE Auslöser von `onChange`, also darf es die Sortierung auch
@@ -1262,7 +1293,9 @@ export default function Datensicht<T extends object, const K extends string>(
               onExpandedRowsChange: (schluessel) => baum.onAufgeklappt([...schluessel]),
               // Die ganze Zeile ist das Trefferziel, nicht das ~16 px breite Symbol (antd zeichnet es in fester
               // Größe). Im Primitiv, damit es für jeden Baum gilt; `onZeileKlick` ist im Baummodus gesperrt.
-              expandRowByClick: true,
+              // Nicht über antds `expandRowByClick`, sondern über `onRow` oben: nur dort sitzt der
+              // Anker-Riegel (LFH-548).
+              expandRowByClick: false,
             }
           : aufklappen
             ? {

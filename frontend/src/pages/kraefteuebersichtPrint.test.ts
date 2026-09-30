@@ -49,11 +49,8 @@ function mit(selektor: string): Regel | undefined {
 }
 
 describe('kraefteuebersichtPrint.css — Eigenheiten des Meldebilds bleiben', () => {
-  it('blendet die Bedienung aus (`kraefte-no-print`, Werkzeugzeile des Primitivs)', () => {
+  it('blendet die eigene Bedienung aus (`kraefte-no-print`)', () => {
     expect(mit('.kraefte-no-print')?.koerper).toMatch(/display:\s*none\s*!important/);
-    expect(mit(".kraefte-print-root [data-lfh='datensicht-werkzeuge']")?.koerper).toMatch(
-      /display:\s*none\s*!important/,
-    );
   });
 
   it('blendet den Seitenkopf im Druck aus — sonst stünden Titel und Umfang doppelt zum Druckkopf', () => {
@@ -62,22 +59,17 @@ describe('kraefteuebersichtPrint.css — Eigenheiten des Meldebilds bleiben', ()
     );
   });
 
-  it('neutralisiert Bildlaufcontainer, stehende Kopfzeile und fixierte Spalten der Tabelle', () => {
-    expect(mit('.kraefte-print-root .ant-table-body')?.koerper).toMatch(
-      /overflow:\s*visible\s*!important/,
-    );
-    expect(mit('.kraefte-print-root .ant-table-sticky-holder')?.koerper).toMatch(
-      /position:\s*static\s*!important/,
-    );
-    expect(mit('.kraefte-print-root .ant-table-sticky-scroll')?.koerper).toMatch(
-      /display:\s*none\s*!important/,
-    );
-    expect(mit('.kraefte-print-root .ant-table-cell-fix-start')?.koerper).toMatch(
-      /position:\s*static\s*!important/,
-    );
-    expect(mit('.kraefte-print-root .ant-table-body table')?.koerper).toMatch(
-      /width:\s*100%\s*!important/,
-    );
+  it('trägt die Tabellen-Neutralisierer nicht selbst — sie sind Mechanik in `druck.css` (LFH-548)', () => {
+    for (const teil of [
+      'ant-table-body',
+      'ant-table-content',
+      'ant-table-sticky-holder',
+      'ant-table-sticky-scroll',
+      'ant-table-cell-fix',
+      'datensicht-werkzeuge',
+    ]) {
+      expect(css, teil).not.toContain(teil);
+    }
   });
 });
 

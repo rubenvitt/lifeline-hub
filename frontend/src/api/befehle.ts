@@ -13,6 +13,8 @@ export interface NeuerBefehl {
   vorlage: BefehlVorlageKey;
   titel: string;
   zeitstand?: string;
+  /** Startinhalt (LFH-548), siehe `NeuerLagebericht.abschnitte`. */
+  abschnitte?: BefehlAbschnitt[];
 }
 
 export function legeBefehlAn(einsatzId: number, daten: NeuerBefehl): Promise<BefehlAnzeige> {

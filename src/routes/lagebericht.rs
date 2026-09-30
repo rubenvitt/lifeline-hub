@@ -49,7 +49,7 @@ pub async fn anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     PfadParam(einsatz_id): PfadParam<i64>,
-    JsonBody(body): JsonBody<AnlegenBody>,
+    JsonBody(body): JsonBody<AnlegenBody<Abschnitt>>,
 ) -> Result<(StatusCode, Json<LageberichtAnzeige>), AppError> {
     kern::anlegen::<Lagebericht>(&state, &benutzer, einsatz_id, body).await
 }

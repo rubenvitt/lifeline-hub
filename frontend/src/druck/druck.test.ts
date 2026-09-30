@@ -255,6 +255,56 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
   });
 });
 
+describe('druck.css — Tabellen des Primitivs (LFH-548, D8)', () => {
+  /**
+   * Die Neutralisierer der `KatalogTabelle` sind Mechanik, keine Eigenheit einer Seite: jede
+   * antd-Tabelle in einer Druckwurzel (Meldebild, Funkplan) braucht sie. Ohne sie wäre der
+   * Ausdruck rechts abgeschnitten, der Kopf verrutscht, die Kennungsspalte über dem Text. Ob sie
+   * WIRKEN, messen `e2e/meldebild-tabelle.spec.ts` und `e2e/funkplan.spec.ts`.
+   */
+  it('lässt Bildlaufcontainer auslaufen und die Tabelle die volle Breite nehmen', () => {
+    for (const sel of [`${WURZEL} .ant-table-body`, `${WURZEL} .ant-table-content`]) {
+      expect(regelFuer(sel)?.koerper, sel).toMatch(/overflow:\s*visible\s*!important/);
+      expect(regelFuer(sel)?.koerper, sel).toMatch(/max-height:\s*none\s*!important/);
+    }
+    // Beide Hüllen: `.ant-table-body` (mit sticky) und `.ant-table-content` (Druckmodus).
+    for (const sel of [`${WURZEL} .ant-table-body table`, `${WURZEL} .ant-table-content table`]) {
+      expect(regelFuer(sel)?.koerper, sel).toMatch(/(^|;\s*)width:\s*100%\s*!important/);
+      expect(regelFuer(sel)?.koerper, sel).toMatch(/min-width:\s*0\s*!important/);
+    }
+  });
+
+  it('löst stehende Kopfzeile und fixierte Spalten', () => {
+    expect(regelFuer(`${WURZEL} .ant-table-sticky-holder`)?.koerper).toMatch(
+      /position:\s*static\s*!important/,
+    );
+    expect(regelFuer(`${WURZEL} .ant-table-sticky-scroll`)?.koerper).toMatch(
+      /display:\s*none\s*!important/,
+    );
+    for (const sel of [
+      `${WURZEL} .ant-table-cell-fix-start`,
+      `${WURZEL} .ant-table-cell-fix-end`,
+    ]) {
+      expect(regelFuer(sel)?.koerper, sel).toMatch(/position:\s*static\s*!important/);
+    }
+  });
+
+  it('lässt Tabellenzellen auf Papier umbrechen und nimmt antds Messzeile heraus', () => {
+    expect(regelFuer(`${WURZEL} .ant-table-cell`)?.koerper).toMatch(
+      /overflow-wrap:\s*anywhere\s*!important/,
+    );
+    expect(regelFuer(`${WURZEL} .ant-table-measure-row`)?.koerper).toMatch(
+      /display:\s*none\s*!important/,
+    );
+  });
+
+  it('blendet die Werkzeugzeile des Primitivs (Spaltenschalter) aus', () => {
+    expect(regelFuer(`${WURZEL} [data-lfh='datensicht-werkzeuge']`)?.koerper).toMatch(
+      /display:\s*none\s*!important/,
+    );
+  });
+});
+
 describe('druck.css — Seitenzählung (D3)', () => {
   const seite = regeln.filter((r) => r.kontext.some((k) => k.startsWith('@page')));
 

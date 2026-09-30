@@ -41,6 +41,7 @@ import TiereDetailPage from './pages/TiereDetailPage';
 import SchaedenPage from './pages/SchaedenPage';
 import DokumentePage from './pages/DokumentePage';
 import StabPage from './pages/StabPage';
+import FunkplanPage from './pages/FunkplanPage';
 import AbloesungPage from './pages/AbloesungPage';
 import BetreuungPage from './pages/BetreuungPage';
 import VerpflegungPage from './pages/VerpflegungPage';
@@ -256,6 +257,9 @@ export const appRouten = createRoutesFromElements(
           <Route path="personen/aufnahme" element={<AufnahmePage />} />
           {/* ETB-Druckansicht (LFH-22), Filter aus der Adresse. */}
           <Route path="etb/druck" element={<EtbDruckPage />} />
+          {/* Funkplan S6 (LFH-548): Unterroute des Stabs, kein Modul; `modulAusPfad` markiert den
+              Stab, Sperre und Sichtbarkeit kommen vom Stab. */}
+          <Route path="stab/funkplan" element={<FunkplanPage />} />
           <Route path="personen/:personId" element={<PersonenDetailPage />} />
           <Route path="tiere/:tierId" element={<TiereDetailPage />} />
           <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />

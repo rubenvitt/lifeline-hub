@@ -570,6 +570,26 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       anker: (p: Page) => p.getByText('Ohne Einheit', { exact: true }),
     },
     {
+      // Funkplan S6 (LFH-548). Datenanker ist die gesäte Einheit mit langem Namen IN der Tabelle
+      // (sie steht auch in den Lücken, deshalb auf die Sicht verengt); der Baum startet offen.
+      pfad: `/einsaetze/${einsatzId}/stab/funkplan`,
+      anker: (p: Page) =>
+        p.getByRole('region', { name: 'Funkplan' }).getByRole('link', {
+          name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
+        }),
+      lesend: {
+        anker: (p: Page) =>
+          p.getByRole('region', { name: 'Funkplan' }).getByRole('link', {
+            name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
+          }),
+        vorbedingung: (p: Page) =>
+          expect(
+            p.getByRole('button', { name: 'In Lagebericht übernehmen' }),
+            'Vorbedingung: ohne Schreibrecht keine Übernahme',
+          ).toHaveCount(0),
+      },
+    },
+    {
       pfad: `/einsaetze/${einsatzId}/auftraege`,
       // Ohne `forceRender` ist die Befehlsliste nach `goto` nicht im Baum (Standardreiter
       // „Aufträge"); der Reiterwechsel läuft deshalb je Breite erneut.
