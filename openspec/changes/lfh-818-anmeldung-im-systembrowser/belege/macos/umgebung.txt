@@ -1,0 +1,6 @@
+ProductName:		macOS
+ProductVersion:		27.0
+BuildVersion:		26A428
+Safari: 27.0
+Vivaldi (Standardbrowser, com.vivaldi.vivaldi): 8.2.4133.76
+Hülle: unsigniert, Spike lfh-720-tauri-spike (Debug-Bundle), Rücksprung-Schema lifeline-spike

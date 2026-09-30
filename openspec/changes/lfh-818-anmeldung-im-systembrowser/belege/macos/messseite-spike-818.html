@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LFH-818 Messseite</title>
+<style>
+  body { font: 16px/1.4 -apple-system, sans-serif; margin: 24px; max-width: 720px; }
+  button, a.knopf { display: block; width: 100%; margin: 10px 0; padding: 14px; font-size: 17px; text-align: center; border: 1px solid #333; border-radius: 6px; background: #f2f2f2; color: #000; text-decoration: none; box-sizing: border-box; }
+  button.rueck { background: #0a58ca; color: #fff; }
+  pre { background: #111; color: #0f0; padding: 12px; white-space: pre-wrap; word-break: break-all; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>LFH-818 Messseite</h1>
+<p id="kontext"></p>
+<button id="create">1 · Passkey anlegen (create, RP dieses Hosts, Nutzer „spike818“)</button>
+<button id="get">2 · Passkey abfragen (get, RP dieses Hosts)</button>
+<a class="knopf" href="/api/auth/oidc/start?von=/spike-818.html">3 · Anmelden über PocketID (OIDC)</a>
+<button id="me">4 · Sitzung prüfen (/api/auth/me)</button>
+<button id="rueck" class="rueck">5 · Zurück in die App (Ergebnis mitnehmen)</button>
+<pre id="log"></pre>
+<script>
+  const erg = { host: location.host, ua: navigator.userAgent, schritte: [] };
+  const log = (o) => { erg.schritte.push(o); document.getElementById('log').textContent = JSON.stringify(erg, null, 2); };
+  const zufall = (n) => crypto.getRandomValues(new Uint8Array(n));
+  document.getElementById('kontext').textContent = location.origin + ' · secure: ' + isSecureContext;
+  // Merkt sich Ergebnisse über die OIDC-Umleitung hinweg.
+  try { const alt = JSON.parse(sessionStorage.getItem('lfh818') || 'null'); if (alt) erg.schritte = alt.schritte; } catch {}
+  const merken = () => { try { sessionStorage.setItem('lfh818', JSON.stringify(erg)); } catch {} };
+
+  async function messen(art, fn) {
+    const t0 = performance.now();
+    try { const r = await fn(); log({ art, ok: true, ms: Math.round(performance.now() - t0), ...r }); }
+    catch (e) { log({ art, ok: false, name: e.name, msg: String(e.message).slice(0, 200), ms: Math.round(performance.now() - t0) }); }
+    merken();
+  }
+  document.getElementById('get').onclick = () => messen('get', async () => {
+    const c = await navigator.credentials.get({ publicKey: { rpId: location.hostname, challenge: zufall(32), timeout: 60000, userVerification: 'required' } });
+    return { typ: c && c.type, authenticatorAttachment: c && c.authenticatorAttachment };
+  });
+  document.getElementById('create').onclick = () => messen('create', async () => {
+    const c = await navigator.credentials.create({ publicKey: {
+      rp: { id: location.hostname, name: 'LFH-818 Spike' },
+      user: { id: zufall(16), name: 'spike818', displayName: 'Spike 818' },
+      challenge: zufall(32), pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { residentKey: 'required', userVerification: 'required' }, timeout: 60000 } });
+    return { typ: c && c.type, authenticatorAttachment: c && c.authenticatorAttachment };
+  });
+  async function me() {
+    const r = await fetch('/api/auth/me', { credentials: 'include' });
+    let b = null; try { b = await r.json(); } catch {}
+    return { status: r.status, benutzer: b && (b.benutzername || (b.benutzer && b.benutzer.benutzername)) || null, sso: b && (b.auth_quelle || b.quelle || null) };
+  }
+  document.getElementById('me').onclick = () => messen('me', me);
+  document.getElementById('rueck').onclick = async () => {
+    await messen('me-vor-ruecksprung', me);
+    const kurz = erg.schritte.map(s => [s.art, s.ok, s.name || s.status || '', s.benutzer || '', s.ms].join(':')).join('|');
+    location.href = 'lifeline-spike://anmeldung?code=probe-' + Date.now() + '&erg=' + encodeURIComponent(kurz) + '&ua=' + encodeURIComponent(navigator.userAgent);
+  };
+  if (erg.schritte.length) log({ art: 'fortgesetzt' });
+</script>
+</body>
+</html>
