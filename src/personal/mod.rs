@@ -36,7 +36,7 @@ pub const PERSONAL_STATUS_STARTLISTE: [(&str, &str, i64); 6] = [
 ];
 
 /// Zeitachsen-Marken der Startliste (LFH-552): nur wo der Status die Art eindeutig benennt.
-/// Gilt nur für neu angelegte Organisationen; der Bestand bleibt ohne Marke (Migration 0127).
+/// Gilt nur für neu angelegte Organisationen; der Bestand bleibt ohne Marke (Migration 0129).
 pub const PERSONAL_STATUS_STARTMARKEN: [(&str, &str); 3] = [
     ("alarmiert", "alarmierung"),
     ("im Einsatz", "eintreffen"),

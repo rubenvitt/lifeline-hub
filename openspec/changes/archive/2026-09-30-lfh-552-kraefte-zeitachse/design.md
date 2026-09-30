@@ -233,9 +233,9 @@ Die Klassifikation entsteht über `klassifikation_von` und den Guard
 
 ## Migration Plan
 
-- Die Migration `0127_kraefte_zeitachse.sql` legt die Tabelle, ihre Indizes und die zwei
+- Die Migration `0129_kraefte_zeitachse.sql` legt die Tabelle, ihre Indizes und die zwei
   Katalogspalten an. Vor dem Merge läuft `scripts/check-migrationen.sh` gegen `origin/alpha`.
-  Ist `0127` belegt, wird mit `--umnummerieren` umgelegt.
+  Ist `0127` belegt, wird mit `--umnummerieren` umgelegt (geschehen: `alpha` belegte 0127/0128, die Migration heißt `0129_kraefte_zeitachse.sql`).
 - Es gibt keine Rückfüllung aus `disponiert_at`, `status_seit` oder ETB-Text. Das wäre ein
   erfundener Wert (dieselbe Begründung wie in `0108`).
 - Eine Down-Migration gibt es im Projekt nicht. Rückbau heißt Anzeige und Aufrufer entfernen.

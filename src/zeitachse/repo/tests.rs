@@ -782,7 +782,7 @@ async fn einheit_loeschen_laesst_personen_zeitachse_stehen() {
     assert_eq!(z.ereignisse[0].ursprung_id, None);
 }
 
-/// Spec „Bestand ohne Marke": Migration 0127 trifft auf eine Organisation mit bestehendem
+/// Spec „Bestand ohne Marke": Migration 0129 trifft auf eine Organisation mit bestehendem
 /// Katalog (auch mit „alarmiert"/„im Einsatz") und setzt keine Marke.
 #[tokio::test]
 async fn migration_laesst_bestand_ohne_marke() {
@@ -797,7 +797,7 @@ async fn migration_laesst_bestand_ohne_marke() {
         .unwrap();
     let alle = sqlx::migrate!("./migrations");
     let vorher = Migrator {
-        migrations: Cow::Owned(alle.iter().filter(|m| m.version < 127).cloned().collect()),
+        migrations: Cow::Owned(alle.iter().filter(|m| m.version < 129).cloned().collect()),
         ..Migrator::DEFAULT
     };
     vorher.run(&pool).await.unwrap();
