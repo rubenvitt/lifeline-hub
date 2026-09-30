@@ -115,20 +115,19 @@ test('UHS Grundriss: die Platzmenü-Auslöser überleben eine laufende Belegung'
   expect(tief).toBe(2);
 });
 
-// Der erste Klick nach einem Drag öffnet das Platzmenü (LFH-519). dnd-kit schluckte bis zu
+// Der erste Klick nach einem Drag öffnet das Platzmenü, und die Wahl wirkt (LFH-519). dnd-kit schluckte bis zu
 // seinem 50-ms-Timer JEDEN Klick; unter Last verhungert der Timer, und der nächste echte Klick
 // ging verloren. Hier fällt der Klick ohne Aktionsprüfung sofort nach dem Loslassen — in genau
 // dieses Fenster (mit dem nackten `PointerSensor` gemessen rot, 3 von 3). Die Koordinaten stehen
 // vor dem Zug fest, damit zwischen Loslassen und Klick kein Rundlauf liegt.
 test('UHS Grundriss: der erste Klick nach einem Drag öffnet das Platzmenü', async ({ page }) => {
   const personName = await grundrissMitZweiPlaetzen(page);
-  const ausloeser = page
-    .locator('[data-testid="platz-karte"]', { hasText: 'Behandlungsplatz 2' })
-    .locator('button[aria-label^="Platzaktionen"]');
-  const k = (await ausloeser.boundingBox())!;
+  const karte = page.locator('[data-testid="platz-karte"]', { hasText: 'Behandlungsplatz 2' });
+  const k = (await karte.locator('button[aria-label^="Platzaktionen"]').boundingBox())!;
 
   await ziehe(page, page.getByText(personName).first(), page.getByText('Behandlungsplatz 1'));
   await page.mouse.click(k.x + k.width / 2, k.y + k.height / 2);
 
-  await expect(page.getByRole('menuitem', { name: 'als in Aufbereitung markieren' })).toBeVisible();
+  await page.getByRole('menuitem', { name: 'als in Aufbereitung markieren' }).click();
+  await expect(karte.getByText('aufbereitung')).toBeVisible();
 });

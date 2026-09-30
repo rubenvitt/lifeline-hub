@@ -179,8 +179,6 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
   // CSS-Selektor auf das echte <button>: `getByRole` träfe den Karten-Div, den dnd-kit mit
   // `role="button"` versieht.
   //
-  // Ein Klick, kein Neu-Öffnen: der erste Klick nach dem Drag muss das Menü öffnen. Früher ging
-  // er unter Last an dnd-kits Klick-Stopper verloren (LFH-519, `components/zugPointerSensor.ts`).
   await bp2.locator('button[aria-label^="Platzaktionen"]').click();
   await page.getByRole('menuitem', { name: 'als in Aufbereitung markieren' }).click();
   await expect(bp2.getByText('aufbereitung')).toBeVisible();
