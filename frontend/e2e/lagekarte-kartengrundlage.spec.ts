@@ -340,7 +340,8 @@ test('Style-JSON der Online-Karte liefert 404: Anzeige weicht auf die Offline-Re
       .getByRole('radio', { name: ONLINE_KAPUTT.name }),
   ).toHaveAttribute('aria-checked', 'true');
   // Genau EINE Abstufung: stufte die Karte weiter (etwa an einem Nebenabruf des Offline-Styles),
-  // stünde dort eine zweite Warnung und die Offline-Quelle wäre weg.
+  // stünde dort eine zweite Warnung und die Offline-Quelle wäre weg. Eine spätere kann nicht mehr
+  // kommen: die dekodierte Offline-Quelle setzt das `style.load` voraus, das das Fenster schließt.
   expect(abstufungen).toHaveLength(1);
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
 });

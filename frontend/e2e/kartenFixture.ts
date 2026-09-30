@@ -89,8 +89,8 @@ export async function kartenConfigBeantworten(page: Page, config: FixtureKartenC
         karten_bau_verfuegbar: false,
         offline_regionen: regionen,
         offline_verfuegbar: regionen.length > 0,
-        // Ein Online-View macht `defaultModus` zu 'online' — die Karte konstruiert direkt mit dem
-        // ersten Kachel-Style.
+        // Ein Online-View macht `defaultModus` zu 'online'. Die Karte entsteht trotzdem mit dem
+        // Blindstil und bekommt den ersten Kachel-Style erst mit der Kartenansicht (`setStyle`).
         online_styles: config.online_styles ?? [],
       },
     }),
