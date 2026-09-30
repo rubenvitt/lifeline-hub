@@ -18,6 +18,7 @@ use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
+pub mod checkliste;
 pub mod repo;
 
 wire_enum! {

@@ -236,6 +236,8 @@ use utoipa::OpenApi;
         crate::fuehrung::Fuehrungsfunktion,
         crate::fuehrung::FuehrungsfunktionAnzeige,
         crate::fuehrung::FunktionsArt,
+        crate::stab::checkliste::ChecklistenEintrag,
+        crate::stab::checkliste::ChecklistenPunkt,
         crate::stab::BesetzungArt,
         crate::stab::LagebesprechungAnzeige,
         crate::stab::Sachgebiet,

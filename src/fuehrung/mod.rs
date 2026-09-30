@@ -29,7 +29,7 @@ wire_enum! {
     /// Führungsfunktion aus dem Katalog. Wire == `as_str()`.
     ///
     /// Die Reihenfolge ist die Anzeigereihenfolge des Katalogs (Teil des Vertrags). Die
-    /// CHECK-Listen in `migrations/0127_fuehrungsfunktion.sql` spiegeln `ALLE`
+    /// CHECK-Listen in `migrations/0128_fuehrungsfunktion.sql` spiegeln `ALLE`
     /// (Guard `check_listen_entsprechen_dem_katalog`).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, ToSchema)]
     pub enum Fuehrungsfunktion {

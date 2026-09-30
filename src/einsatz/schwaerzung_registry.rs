@@ -1019,6 +1019,25 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erfasst_at", G_ZEIT),
         ],
     },
+    // Checkliste Arbeitsaufnahme (LFH-551): ein Arbeitsmittel, kein Führungsnachweis. Die
+    // `bemerkung` ist Freitext und kann Namen tragen („Einweisung durch BI Müller“) → genullt;
+    // Punkt, Haken und Zeitpunkte bleiben als Skelett. Der eine Nachweis steht im ETB.
+    TabellenRegel {
+        tabelle: "einsatz_stab_checkliste",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("punkt", G_ENUM),
+            retain("erledigt", G_ENUM),
+            retain("erledigt_at", G_ZEIT),
+            retain("erledigt_von_id", G_FK),
+            scrub("bemerkung", Strategie::NullSetzen), // REVIEW: Freitext am Punkt
+            retain("geaendert_von_id", G_FK),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
     // Maßgebliche Pegel: Stationsname und Gewässer benennen eine WSV-Messstelle, keine Person.
     TabellenRegel {
         tabelle: "einsatz_pegel",
