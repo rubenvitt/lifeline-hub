@@ -134,6 +134,21 @@ describe('queryKeys-Guard (d): befehl-Wire-Event ist live (LFH-262/F13)', () => 
   });
 });
 
+describe('queryKeys-Guard (e): der Einsatzkopf ist live (LFH-555)', () => {
+  // Literale, nicht die Factory: der Wire-Name `einsatz` und die zwei Prefixe sind der Vertrag.
+  it('einsatz-Event invalidiert den Kopf und die Stab-Anzeige (eine Terminwahrheit, zwei Caches)', () => {
+    expect(EINSATZ_STREAM_EVENTS).toHaveProperty('einsatz');
+    expect((EINSATZ_STREAM_EVENTS as Record<string, readonly string[]>).einsatz).toEqual([
+      'einsatz',
+      'einsatz-stab',
+    ]);
+  });
+
+  it('der Einsatzkopf ist nicht mehr NICHT_LIVE', () => {
+    expect(NICHT_LIVE_KEYS as readonly string[]).not.toContain('einsatz');
+  });
+});
+
 /**
  * Guard (f): Allowlist statt Denylist für Inline-Query-Keys. Jeder Inline-Query-Key ist ein
  * Verstoß, es sei denn, er steht unten. Die Liste ist leer, und ein neues Prefix hinzuzufügen

@@ -727,6 +727,7 @@ fn live_event_wire() {
         KartenAnsicht => "karten_ansicht",
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",
+        Einsatz => "einsatz",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);
 }

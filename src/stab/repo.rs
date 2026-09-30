@@ -159,12 +159,23 @@ pub struct AbschlussEingabe {
     pub naechste_at: Option<Option<String>>,
 }
 
+/// Ergebnis eines Abschlusses: Nummer und ETB-Eintrag für Quittung und ETB-Kurzruf, dazu, ob
+/// der Termin am Einsatz sich TATSÄCHLICH geändert hat. Nur dann meldet die Route den
+/// Einsatzkopf live (LFH-555, design.md D3): ein Abschluss ohne neuen Termin verrät einem
+/// Kopf-Leser ohne Stab-Recht sonst, DASS eine Besprechung stattfand (Entscheidung 11).
+#[derive(Debug, Clone, Copy)]
+pub struct AbschlussErgebnis {
+    pub lfd_nr: i64,
+    pub etb_eintrag_id: i64,
+    pub termin_geaendert: bool,
+}
+
 /// Schliesst eine Lagebesprechung ab: ETB-Eintrag (`typ='entscheidung'`), Zeile mit
 /// Rückverweis und — bei gesetztem Schlüssel — der Einsatztermin, alles in **EINER**
 /// Transaktion (Entscheidung 9; FwDV 100 Abschn. 3.3.3.2, S. 42: „bei oder unmittelbar nach
 /// Erteilung dokumentieren").
 ///
-/// Liefert `(lfd_nr, etb_eintrag_id)` für die Quittung und den ETB-Kurzruf.
+/// Liefert [`AbschlussErgebnis`] für die Quittung, den ETB-Kurzruf und das Kopf-Ereignis.
 ///
 /// **Der Aktiv-Riegel nach den beiden Inserts ist der Rollback-Zweig dieser Transaktion** und
 /// damit der Träger der Atomaritäts-Zusicherung: schlägt er an, verwirft der Rollback
@@ -186,7 +197,7 @@ pub async fn lagebesprechung_abschliessen(
     einsatz_id: i64,
     benutzer_id: i64,
     eingabe: &AbschlussEingabe,
-) -> Result<(i64, i64), AppError> {
+) -> Result<AbschlussErgebnis, AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
 
     write_retry!(pool, |conn| {
@@ -275,16 +286,31 @@ pub async fn lagebesprechung_abschliessen(
 
         // 6. Der Einsatztermin — nur bei gesetztem Schlüssel (Tri-State). Ohne
         //    `status`-Prädikat: Schritt 5 hat es in derselben Transaktion bereits belegt, ein
-        //    zweites hier wäre ein Zweig, den kein Test mehr erreichen kann.
-        if let Some(wert) = &eingabe.naechste_at {
-            sqlx::query("UPDATE einsatz SET naechste_lagebesprechung_at = ? WHERE id = ?")
+        //    zweites hier wäre ein Zweig, den kein Test mehr erreichen kann. Das `IS NOT`-
+        //    Prädikat ist kein Riegel, sondern die Änderungserkennung für das Kopf-Ereignis
+        //    (LFH-555): ein gleicher Wert (auch NULL auf NULL) trifft keine Zeile. Die Route hat
+        //    die Zeit normalisiert, andere Schreibweisen desselben Zeitpunkts sind hier gleich.
+        let termin_geaendert = match &eingabe.naechste_at {
+            Some(wert) => {
+                sqlx::query(
+                    "UPDATE einsatz SET naechste_lagebesprechung_at = ?1 \
+                     WHERE id = ?2 AND naechste_lagebesprechung_at IS NOT ?1",
+                )
                 .bind(wert.as_deref())
                 .bind(einsatz_id)
                 .execute(&mut *conn)
-                .await?;
-        }
+                .await?
+                .rows_affected()
+                    == 1
+            }
+            None => false,
+        };
 
-        Ok((lfd_nr, etb_id))
+        Ok(AbschlussErgebnis {
+            lfd_nr,
+            etb_eintrag_id: etb_id,
+            termin_geaendert,
+        })
     })
 }
 

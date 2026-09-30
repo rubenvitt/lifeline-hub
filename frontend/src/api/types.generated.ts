@@ -2167,7 +2167,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "dokument" | "abloesung" | "betreuung" | "verpflegung" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "dokument" | "abloesung" | "betreuung" | "verpflegung" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
@@ -3112,9 +3112,9 @@ export interface components {
          *     Zeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu
          *     schicken hiesse, „nicht vergeben" als Datensatz zu erfinden.
          *
-         *     `naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**, damit der
-         *     Countdown auf beiden Fahrzeugschirmen live ist, obwohl der Einsatzkopf FE-seitig im
-         *     `NICHT_LIVE`-Fach bleibt (Entscheidung 11). Kein zweiter Speicherort.
+         *     `naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**
+         *     (Entscheidung 11). Kein zweiter Speicherort: ändert sich der Termin, frischt das
+         *     Live-Ereignis `einsatz` Kopf und Stab-Anzeige gemeinsam auf (LFH-555).
          */
         StabAnzeige: {
             /** Format: int64 */

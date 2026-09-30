@@ -705,3 +705,76 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
     },
   );
 });
+
+/**
+ * LFH-555: der Einsatzkopf ist live. Ein fremdes `einsatz`-Ereignis frischt den Kopf-Cache auf,
+ * während hier jemand tippt. Die Eingaben dieses Schirms dürfen dabei nicht verloren gehen.
+ * Nachgestellt über die Invalidierung, die der Live-Strom auslöst (`['einsatz', id]`).
+ */
+describe('EinsatzdatenPage · Live-Refetch des Kopfs (LFH-555)', () => {
+  function setupMitFremdAenderung() {
+    let stand: EinsatzAnzeige = { ...basisEinsatz };
+    let abrufe = 0;
+    const r = setup();
+    server.use(
+      http.get('/api/einsaetze/7', () => {
+        abrufe += 1;
+        return HttpResponse.json(stand);
+      }),
+    );
+    return {
+      ...r,
+      abrufe: () => abrufe,
+      fremdAendern: (teil: Partial<EinsatzAnzeige>) => {
+        stand = { ...stand, ...teil };
+      },
+    };
+  }
+
+  it('zeigt einen fremd gesetzten Termin nach dem Ereignis ohne Neuladen der Seite', async () => {
+    const { client, fremdAendern, abrufe } = setupMitFremdAenderung();
+    await screen.findByText('Nächste Lagebesprechung');
+    const vorher = abrufe();
+    fremdAendern({ naechste_lagebesprechung_at: '2026-09-30 16:00:00' });
+    await act(() => client.invalidateQueries({ queryKey: ['einsatz', 7] }));
+    await waitFor(() => expect(abrufe()).toBeGreaterThan(vorher));
+    expect(
+      await screen.findByRole('button', { name: /^Nächste Lagebesprechung bearbeiten/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('das offene Bearbeitungsformular behält die Eingaben', async () => {
+    const { client, fremdAendern, abrufe } = setupMitFremdAenderung();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const bezeichnung = await screen.findByLabelText('Bezeichnung');
+    await user.clear(bezeichnung);
+    await user.type(bezeichnung, 'Mein Entwurf');
+
+    const vorher = abrufe();
+    fremdAendern({
+      bezeichnung: 'Fremd geändert',
+      naechste_lagebesprechung_at: '2026-09-30 16:00:00',
+    });
+    await act(() => client.invalidateQueries({ queryKey: ['einsatz', 7] }));
+    await waitFor(() => expect(abrufe()).toBeGreaterThan(vorher));
+
+    expect(screen.getByLabelText('Bezeichnung')).toHaveValue('Mein Entwurf');
+  });
+
+  it('eine offene Zeile behält ihren Entwurf', async () => {
+    const { client, fremdAendern, abrufe } = setupMitFremdAenderung();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Technische Angaben/ }));
+    await user.click(await screen.findByRole('button', { name: 'Leitstellen-Nr. eintragen' }));
+    const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr.' });
+    await user.type(feld, 'LS-42');
+
+    const vorher = abrufe();
+    fremdAendern({ leitstellen_nr: 'LS-99' });
+    await act(() => client.invalidateQueries({ queryKey: ['einsatz', 7] }));
+    await waitFor(() => expect(abrufe()).toBeGreaterThan(vorher));
+
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveValue('LS-42');
+  });
+});

@@ -59,8 +59,8 @@ export default function LagebesprechungModal({
   const mutation = useMutation({
     mutationFn: (body: LagebesprechungAbschlussBody) => schliesseLagebesprechungAb(einsatzId, body),
     onSuccess: (antwort, body) => {
-      // Der Prefix trifft auch die Historie. `einsatz` ist Hygiene: die Einsatzdaten-Seite zeigt
-      // denselben Termin und ist nicht live.
+      // Der Prefix trifft auch die Historie. `einsatz` ist Hygiene für den eigenen Schirm: das
+      // Live-Ereignis `einsatz` (LFH-555) kommt nur bei geändertem Termin und erst über den Strom.
       void qc.invalidateQueries({ queryKey: einsatzKeys.stab(einsatzId) });
       void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       onAbgeschlossen(eigeneLagebesprechung(antwort, body));

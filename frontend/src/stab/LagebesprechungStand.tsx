@@ -24,7 +24,8 @@ function useJetzt(taktMs: number): Dayjs {
 /**
  * Kopfblock der Sektion „Lagebesprechung": Nächste · Letzte · Anzahl.
  * Der Countdown tickt alle 30 s OHNE Toast und ohne Blinken: nur der Wortlaut im `StatusTag`
- * ändert sich. Der Termin kommt aus `StabAnzeige`, nicht aus dem (nicht live) Einsatzkopf.
+ * ändert sich. Der Termin kommt aus `StabAnzeige`, die ihn aus der Spalte am Einsatz mitliefert;
+ * das Ereignis `einsatz` frischt sie mit dem Kopf zusammen auf (LFH-555).
  * „Letzte" zieht über die volle Breite (Nummer, Zeit, Entschluss und Link).
  */
 export default function LagebesprechungStand({

@@ -234,7 +234,7 @@ pub async fn lagebesprechung_abschliessen(
         }
     }
 
-    let (_lfd_nr, etb_id) = repo::lagebesprechung_abschliessen(
+    let ergebnis = repo::lagebesprechung_abschliessen(
         &state.pool,
         einsatz_id,
         ctx.benutzer.id,
@@ -248,8 +248,15 @@ pub async fn lagebesprechung_abschliessen(
 
     let stab = repo::laden(&state.pool, einsatz_id).await?;
     // Der ETB-Eintrag entstand im selben Commit → ETB-Kurzruf mitschicken.
-    state.live.publiziere(einsatz_id, etb_id);
+    state.live.publiziere(einsatz_id, ergebnis.etb_eintrag_id);
     sse(&state, einsatz_id);
+    // Den Einsatzkopf nur bei geändertem Termin (LFH-555, design.md D3): `einsatz` erreicht auch
+    // Leser ohne Stab-Recht und darf ihnen nicht mehr sagen, als der Kopf-GET ohnehin zeigt.
+    if ergebnis.termin_geaendert {
+        state
+            .live
+            .publiziere_einsatz(einsatz_id, LiveEvent::Einsatz);
+    }
     Ok((StatusCode::CREATED, Json(stab)))
 }
 
