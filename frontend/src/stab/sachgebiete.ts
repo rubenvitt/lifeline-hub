@@ -1,12 +1,14 @@
-import type { Sachgebiet } from '../api/types';
+import type { FuehrungsfunktionEintrag, Sachgebiet } from '../api/types';
 
 /**
  * Die sechs Sachgebiete als feste Zeilen.
  *
  * S1–S6 sind AUFGABENZUORDNUNGEN, keine Arbeitsplätze: eine Zeile je Sachgebiet, ein Kurztext
  * als Merkhilfe (FwDV 100 Anlage 2) und Deeplinks in die Arbeitsmodule.
- * `label` ist wortgleich mit `Sachgebiet::label` in `src/stab/mod.rs`, damit Zeile und
- * Führungsnachweis nicht auseinanderlaufen. `aufgaben` ist gekürzt, nicht zitiert.
+ * `label` ist wortgleich mit `Sachgebiet::label` in `src/stab/mod.rs` — das STANDARDlabel. Angezeigt
+ * wird das wirksame Mandantenlabel aus dem Funktionskatalog ({@link mitWirksamemLabel}, LFH-549),
+ * dasselbe, das der Server in den System-ETB schreibt; das Standardlabel ist nur der Rückfall,
+ * solange der Katalog nicht geladen ist. `aufgaben` ist gekürzt, nicht zitiert.
  * `werkzeuge` sind Registry-SCHLÜSSEL; die Freigabe entscheidet `stab/werkzeuge.ts` zur
  * Laufzeit. Höchstens drei je Zeile, damit sie im Fükw nicht umbricht.
  */
@@ -74,3 +76,16 @@ export const SACHGEBIETE: readonly SachgebietEintrag[] = [
     werkzeuge: ['einsatzabschnitte', 'chat'],
   },
 ];
+
+/**
+ * Die sechs Zeilen mit dem wirksamen Label der Organisation (THW: „Versorgung (Logistik)“,
+ * LFH-549). Ohne Katalogeintrag bleibt das Standardlabel.
+ */
+export function mitWirksamemLabel(
+  katalog: readonly FuehrungsfunktionEintrag[],
+): readonly SachgebietEintrag[] {
+  return SACHGEBIETE.map((s) => {
+    const eintrag = katalog.find((e) => e.funktion === s.sachgebiet);
+    return eintrag ? { ...s, label: eintrag.label } : s;
+  });
+}

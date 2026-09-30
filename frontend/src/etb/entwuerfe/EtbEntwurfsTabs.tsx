@@ -8,6 +8,7 @@ import type { MetadatenWerte } from '../schnellerfassungModell';
 import { entwurfLabel, zuWerte } from './entwurfModell';
 import { useEtbEntwuerfe } from './useEtbEntwuerfe';
 import { useEntwurfsDateien, type EntwurfsDateien } from './useEntwurfsDateien';
+import { anVorbelegung } from '../../fuehrung/funktionsOptionenKern';
 
 interface EtbEntwurfsTabsProps {
   einsatzId: number;
@@ -52,7 +53,7 @@ export default function EtbEntwurfsTabs({
     entwurfFesthalten,
     entwurfNeuAusweisen,
     aktivenSetzen,
-  } = useEtbEntwuerfe(einsatzId, einsatz.meine_fuehrungsstelle, kontextLaedt);
+  } = useEtbEntwuerfe(einsatzId, anVorbelegung(einsatz), kontextLaedt);
 
   /**
    * Wertübernahme über die Remount-Grenze (LFH-332).

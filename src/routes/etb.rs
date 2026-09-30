@@ -258,7 +258,15 @@ pub async fn auftrag_erteilen(
     )
     .await?;
 
-    let detail = crate::auftrag::repo::laden(&state.pool, auftrag_id, &now).await?;
+    let mut detail = crate::auftrag::repo::laden(&state.pool, auftrag_id, &now).await?;
+    crate::auftrag::anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        std::slice::from_mut(&mut detail),
+    )
+    .await?;
     // ETB-Anordnung entstand im selben Commit → ETB-Live-Event + Auftrag-Board-Event (SSE-Parität).
     if let Some(etb_id) = detail.auftrag.etb_anordnung_id {
         state.live.publiziere(einsatz_id, etb_id);

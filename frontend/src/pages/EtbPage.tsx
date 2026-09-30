@@ -700,6 +700,7 @@ export default function EtbPage() {
       )}
       {darfSchreiben && (
         <AuftragAusEtbModal
+          einsatzId={einsatzId}
           eintrag={auftragZu}
           abschnitte={(abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
           einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}

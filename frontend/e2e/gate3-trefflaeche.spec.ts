@@ -280,6 +280,25 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
 });
 
 // ── Einheiten-Detailroute ───────────────────────────────────────────────────────────
+// Verwaltung → Führungsfunktionen (LFH-549): das Label ist eine Inline-Angabe, ihr Bearbeiten-Knopf
+// ist das Bedienziel jeder Zeile. Gemessen wird er als Admin (nur dort ist er ein Ziel).
+test('Führungsfunktionen: der Bearbeiten-Knopf je Zeile hält 30 / 48 / 72 px', async ({ page }) => {
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto('/admin/stammdaten/fuehrungsfunktionen');
+    await stelleDichte(page, dichte);
+    const knoepfe = page
+      .getByRole('main')
+      .getByRole('button', { name: /^Bezeichnung .+ bearbeiten$/ });
+    // EL, S1–S6, Führungshilfspersonal, Fachberater — S7 ist ohne Schalter nicht bearbeitbar.
+    const kleinstes = await alleHaltenStufe(knoepfe, soll, `Bezeichnung bearbeiten (${dichte})`, 9);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): ${kleinstes}px`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // Sichtbare Feldhüllen, Zuordnungszeilen und Aktionsabstände, im Browser gemessen.
 
 test('Einheit: Formularfelder und Zuordnungszeilen halten 30 / 48 / 72 px und den Aktionsabstand', async ({

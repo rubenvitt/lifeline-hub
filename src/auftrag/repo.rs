@@ -17,7 +17,11 @@ pub struct EmpfaengerEingabe {
     pub einheit_id: Option<i64>,
     pub person_id: Option<i64>,
     pub fahrzeug_id: Option<i64>,
+    /// Freitext — oder, bei `funktion` Führungshilfspersonal/Fachberater, die Bezeichnung
+    /// (Doppelrolle, LFH-549).
     pub funktion_text: Option<String>,
+    /// Katalogcode bei `empfaenger_typ = 'funktion'` (LFH-549); `None` = Freitext.
+    pub funktion: Option<crate::fuehrung::Fuehrungsfunktion>,
     pub extern_kategorie: Option<String>,
     pub extern_bezeichnung: Option<String>,
 }
@@ -104,7 +108,8 @@ pub async fn empfaenger_von(
 ) -> Result<Vec<AuftragEmpfaengerAnzeige>, AppError> {
     sqlx::query_as::<_, AuftragEmpfaengerAnzeige>(
         "SELECT id, auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, \
-                funktion_text, extern_kategorie, extern_bezeichnung, snap_anzeige, quittiert_at, quittiert_von_id \
+                funktion_text, funktion, extern_kategorie, extern_bezeichnung, snap_anzeige, quittiert_at, \
+                quittiert_von_id \
          FROM auftrag_empfaenger WHERE auftrag_id = ? ORDER BY id",
     )
     .bind(auftrag_id)
@@ -266,14 +271,16 @@ pub async fn anlegen_tx(
     .fetch_one(&mut *tx)
     .await?;
 
+    // Wirksame Mandantenlabels für den Snapshot eines Katalogempfängers (LFH-549).
+    let karte = crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut *tx, einsatz_id).await?;
     for e in &daten.empfaenger {
         debug_assert!(empfaenger_typ_gueltig(&e.empfaenger_typ));
-        let snap = snap_anzeige_fuer(&mut *tx, e).await?;
+        let snap = snap_anzeige_fuer(&mut *tx, e, &karte).await?;
         sqlx::query(
             "INSERT INTO auftrag_empfaenger \
                (auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, funktion_text, \
-                extern_kategorie, extern_bezeichnung, snap_anzeige) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                funktion, extern_kategorie, extern_bezeichnung, snap_anzeige) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(auftrag_id)
         .bind(&e.empfaenger_typ)
@@ -282,6 +289,7 @@ pub async fn anlegen_tx(
         .bind(e.person_id)
         .bind(e.fahrzeug_id)
         .bind(e.funktion_text.as_deref())
+        .bind(e.funktion.map(|f| f.as_str()))
         .bind(e.extern_kategorie.as_deref())
         .bind(e.extern_bezeichnung.as_deref())
         .bind(&snap)
@@ -293,7 +301,7 @@ pub async fn anlegen_tx(
     // Auto-ETB-Schalter (LFH-133): bei abgeschaltetem Dual-Publish wird kein
     // ETB-Folgeeintrag erzeugt; etb_anordnung_id bleibt NULL.
     if auto_etb {
-        let an = empfaenger_klartext(&daten.empfaenger, &mut *tx).await?;
+        let an = empfaenger_klartext(&daten.empfaenger, &mut *tx, &karte).await?;
         let etb_id = crate::etb::repo::anlegen_tx(
             &mut *tx,
             einsatz_id,
@@ -401,10 +409,19 @@ pub async fn erteile_aus_etb_tx(
 
 /// Ermittelt den Anzeigenamen einer Empfänger-Zeile (snap zum Erfassungszeitpunkt).
 /// EA/Einheit/Person/Fahrzeug → Name aus der jeweiligen Tabelle; Funktion → Freitext.
+///
+/// Katalogfunktion (LFH-549) → „S3 Einsatz“/„Fachberater: THW“ mit wirksamem Label, **nie**
+/// der Name der Person, die die Funktion gerade besetzt: `snap_anzeige` ist Retain, der
+/// Besetzungsname Scrub — die aktuelle Besetzung kommt zur Lesezeit
+/// (`fuehrung::aufloesung`).
 async fn snap_anzeige_fuer(
     tx: &mut sqlx::SqliteConnection,
     e: &EmpfaengerEingabe,
+    karte: &crate::fuehrung::Labelkarte,
 ) -> Result<String, AppError> {
+    if let Some(f) = e.funktion {
+        return Ok(karte.anzeige(f, e.funktion_text.as_deref()));
+    }
     let name: Option<String> = match e.empfaenger_typ.as_str() {
         "abschnitt" => {
             sqlx::query_scalar("SELECT name FROM einsatzabschnitt WHERE id = ?")
@@ -443,10 +460,11 @@ async fn snap_anzeige_fuer(
 async fn empfaenger_klartext(
     empf: &[EmpfaengerEingabe],
     tx: &mut sqlx::SqliteConnection,
+    karte: &crate::fuehrung::Labelkarte,
 ) -> Result<String, AppError> {
     let mut teile = Vec::with_capacity(empf.len());
     for e in empf {
-        teile.push(snap_anzeige_fuer(&mut *tx, e).await?);
+        teile.push(snap_anzeige_fuer(&mut *tx, e, karte).await?);
     }
     Ok(teile.join(", "))
 }
@@ -680,6 +698,7 @@ mod tests {
             person_id: None,
             fahrzeug_id: None,
             funktion_text: Some(t.into()),
+            funktion: None,
             extern_kategorie: None,
             extern_bezeichnung: None,
         }
@@ -693,6 +712,7 @@ mod tests {
             person_id: None,
             fahrzeug_id: None,
             funktion_text: None,
+            funktion: None,
             extern_kategorie: Some(kat.into()),
             extern_bezeichnung: Some(bez.into()),
         }

@@ -1,4 +1,5 @@
 import type {
+  Fuehrungsfunktion,
   Einsatzart,
   EinsatzAnzeige,
   EinsatzRolle,
@@ -43,15 +44,25 @@ export function ladeMitglieder(id: number): Promise<MitgliedAnzeige[]> {
   return apiGet<MitgliedAnzeige[]>(`/api/einsaetze/${id}/mitglieder`);
 }
 
+/**
+ * Führungsstelle als Paar (LFH-549): Katalogcode und Text werden zusammen gesetzt — der Text ist
+ * Freitext ohne Code bzw. die Bezeichnung bei Führungshilfspersonal/Fachberater. `null` auf
+ * beiden leert die Stelle.
+ */
+export interface FuehrungsstelleUpdate {
+  fuehrungsfunktion: Fuehrungsfunktion | null;
+  fuehrungsstelle: string | null;
+}
+
 export function setzeMitglied(
   id: number,
   benutzerId: number,
   rolle: EinsatzRolle,
-  fuehrungsstelle?: string | null,
+  stelle?: FuehrungsstelleUpdate,
 ): Promise<MitgliedAnzeige[]> {
   return apiSend<MitgliedAnzeige[]>(`/api/einsaetze/${id}/mitglieder/${benutzerId}`, 'PUT', {
     einsatz_rolle: rolle,
-    ...(fuehrungsstelle !== undefined ? { fuehrungsstelle } : {}),
+    ...(stelle ?? {}),
   });
 }
 
