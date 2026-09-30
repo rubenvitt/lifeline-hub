@@ -155,7 +155,7 @@
   5f7102f3 rot (LFH-851), `lagekarte-touch:422` bekannt wackelig (Prüfliste LFH-812),
   `lagekarte-betreuung:105` 1/2 grün, `palette-oeffnung:338` im zweiten Nachlauf 2/2 grün.
   Keiner berührt Code von LFH-818 (die Oberfläche ändert sich nur in der macOS-Hülle).
-- [ ] 5.2 Abnahme von Hand auf dem Mac mit `https://elw.local:8443` und der echten Hülle
+- [x] 5.2 Abnahme von Hand auf dem Mac mit `https://elw.local:8443` und der echten Hülle
   (`cargo tauri build --debug`). Die Ergebnisse gehen als Belege nach
   `belege/macos/abnahme.md`:
   1. PocketID-Konto ohne Passwort kommt per „Im Browser anmelden“ hinein.
@@ -171,3 +171,6 @@
   8. Bestätigungslink auf einem Gerät ohne Mac-App (Firefox, Safari, Chromium): Was zeigt der
      Browser beim Sprung auf `lifeline://`? Steht der Code irgendwo lesbar, wird aus dem
      Warnsatz eine Sperre (Rückfrage an die Entscheidung).
+  Ergebnis 30.09.2026: Punkte 1–7 erfüllt, Belege in `belege/macos/abnahme.md`. Der erste
+  Durchgang deckte einen Absturz beim Rücksprung auf (Handler auf der XPC-Queue, behoben in
+  f8ba7b54). Punkt 8 ist nicht geprüft und steht als offenes Risiko im Design.
