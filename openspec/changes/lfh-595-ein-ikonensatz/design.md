@@ -147,6 +147,15 @@ und in den Dichten 30/48/72. Geprüft werden die Erkennbarkeit bei 16 und 20 px,
 bei dünner Linie auf dunklem Grund und die Ausrichtung in Knöpfen. Ruben gibt frei oder zieht
 Plan B (D1). Ohne Freigabe wird nicht weiter umgestellt.
 
+*Entscheidung Ruben, 30.09.2026: iOS 27 bleibt.* Grundlage waren die Aufnahmen und der
+Vergleichsbogen bisher ↔ iOS 27 ↔ Windows 11 (`stilprobe/`). Die dünnen Linien (0,8 px bei
+20 px) sind damit angenommen. Korrigiert wird innerhalb des Stils:
+- Die Chevrons nehmen die einfachen Striche `expand-arrow`, `collapse-arrow` und `forward` statt
+  der umrandeten `chevron-*`.
+- Die Verbindungsanzeige nimmt das Paar `wi-fi-connected`/`wi-fi-disconnected` (Haken bzw.
+  Kreuz), weil `no-connection` nur leere Balken ohne Durchstreichung zeigt.
+- Die drei Punkte bleiben Ringe, eine gefüllte Fassung gibt es im Outlined-Stil nicht.
+
 **D9 Emojis werden Ikonen oder Kurzwort.**
 - `wetterIcon()` liefert eine Ikone statt eines Zeichens (Gewitter, Regen, Wind, Schnee, Nebel,
   Thermometer, Sonne, Warnung). Der Titel des Inspektors wird `ReactNode`.

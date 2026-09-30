@@ -19,36 +19,20 @@
       "bedeutung": "Zuklappen",
       "herkunft": "icons8",
       "icons8": {
-        "id": "40023",
-        "commonName": "chevron-up"
-      }
+        "id": "2775",
+        "commonName": "collapse-arrow"
+      },
+      "notiz": "Einfacher Strich statt chevron-up (40023), Grund wie chevron-runter."
     },
     {
       "name": "chevron-runter",
       "bedeutung": "Aufklappen/Auswahlmenü öffnen",
       "herkunft": "icons8",
       "icons8": {
-        "id": "40026",
-        "commonName": "chevron-down"
-      }
-    },
-    {
-      "name": "funkbalken",
-      "bedeutung": "Live-Verbindung steht",
-      "herkunft": "icons8",
-      "icons8": {
-        "id": "24607",
-        "commonName": "high-connection"
-      }
-    },
-    {
-      "name": "funkbalken-aus",
-      "bedeutung": "Live-Verbindung getrennt",
-      "herkunft": "icons8",
-      "icons8": {
-        "id": "32248",
-        "commonName": "no-connection"
-      }
+        "id": "2760",
+        "commonName": "expand-arrow"
+      },
+      "notiz": "Einfacher Strich statt chevron-down (40026), das im Outlined-Stil als Umriss gezeichnet ist und bei 16 px doppelt wirkte (Stilprobe 30.09.2026)."
     },
     {
       "name": "hierarchie",
@@ -187,6 +171,26 @@
         "id": "34",
         "commonName": "clock"
       }
+    },
+    {
+      "name": "wlan-getrennt",
+      "bedeutung": "Live-Verbindung getrennt",
+      "herkunft": "ersatz",
+      "icons8": {
+        "id": "wo7f3jFSsno5",
+        "commonName": "wi-fi-disconnected"
+      },
+      "notiz": "Gegenstück zu wlan-verbunden, Grund dort."
+    },
+    {
+      "name": "wlan-verbunden",
+      "bedeutung": "Live-Verbindung steht",
+      "herkunft": "ersatz",
+      "icons8": {
+        "id": "oAN6-f02oQ7l",
+        "commonName": "wi-fi-connected"
+      },
+      "notiz": "Ersetzt Funkbalken (Tabler antenna-bars-5). In iOS 27 Outlined hat „keine Verbindung“ keine Durchstreichung (no-connection zeigt nur leere Balken, Stilprobe); das WLAN-Paar trägt den Zustand mit Haken/Kreuz."
     },
     {
       "name": "zahnrad",

@@ -1,4 +1,4 @@
-import { IkoneFunkbalken, IkoneFunkbalkenAus } from '../ikonen';
+import { IkoneWlanVerbunden, IkoneWlanGetrennt } from '../ikonen';
 import {
   useEffect,
   useState,
@@ -309,8 +309,9 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
 };
 
 /**
- * SYNC-Anzeige: Antennen-Ikone + Wort (Mono 11). Eine ANZEIGE, kein Bedienziel — die Handlungen
- * trägt die Betriebszeile (`LiveStatusBanner`) aus demselben Store (LFH-336 · M3).
+ * SYNC-Anzeige: WLAN-Ikone (Haken verbunden, Kreuz getrennt; LFH-595) + Wort (Mono 11). Eine
+ * ANZEIGE, kein Bedienziel — die Handlungen trägt die Betriebszeile (`LiveStatusBanner`) aus
+ * demselben Store (LFH-336 · M3).
  *
  * `liveErwartet`: nur der Einsatz-Workspace hält einen SSE-Strom. Auf der Einsatzliste erscheint
  * die Zelle nur bei Netzverlust oder offener Queue.
@@ -347,7 +348,7 @@ export function SyncAnzeige({
   const zustand = syncZustand({ online, live, liveErwartet, queue });
   if (zustand === 'ruhe') return null;
   const d = SYNC_DARSTELLUNG[zustand];
-  const Icon = d.getrennt ? IkoneFunkbalkenAus : IkoneFunkbalken;
+  const Icon = d.getrennt ? IkoneWlanGetrennt : IkoneWlanVerbunden;
   const satz = d.satz(queue);
   const wort = zustand === 'ausstehend' ? `${d.wort} ${queue.ausstehend}` : d.wort;
   return (

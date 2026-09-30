@@ -1,16 +1,15 @@
 # Zuordnung Bestand → iOS 27 Outlined (Aufgabe 4.1)
 
 Stand 30.09.2026. Jeder Import aus `@ant-design/icons` und `react-icons` (außer dem Typ `IconType`)
-und jedes Emoji als Ikone steht in genau einer Zeile (106 Begriffe: 102 direkt aus Icons8,
-3 Ersatz aus demselben Stil, 1 eigene Zeichnung). Name = Bildinhalt, nicht Verwendung.
+und jedes Emoji als Ikone steht in genau einer Zeile (106 Begriffe: 100 direkt aus Icons8,
+5 Ersatz aus demselben Stil, 1 eigene Zeichnung). Name = Bildinhalt, nicht Verwendung.
 Kennung = Icons8-ID im Stil `ios7`, bei „gefüllt“ im Stil `ios_filled`.
 
-**Gilt nur, wenn die Stilprobe iOS 27 Outlined freigibt (Aufgabe 3.4).** Wechselt der Stil
-(Plan B), werden Namen und Bedeutungen übernommen und nur die Kennungen neu gesucht.
+**Stil freigegeben (Aufgabe 3.4, Ruben, 30.09.2026): iOS 27 Outlined.** Aus der Stilprobe sind
+Chevrons (`expand-arrow`, `collapse-arrow`, `forward`) und die Verbindungsanzeige (WLAN-Paar)
+bereits nachgezogen, siehe design.md D8.
 
-**Vor der Freigabe zu prüfen (Aufgabe 4.2):** die Zeilen mit Ersatz, eigen oder Notiz; außerdem
-aus der Stilprobe: Chevrons und „weitere Aktionen“ sind im Outlined-Stil als Umriss gezeichnet
-(wirken doppelt), `funkbalken-aus` zeigt leere Balken statt einer Durchstreichung.
+**Vor der Freigabe zu prüfen (Aufgabe 4.2):** die Zeilen mit Ersatz, eigen oder Notiz.
 
 Freigabe: _offen_
 
@@ -26,16 +25,14 @@ Freigabe: _offen_
 | `besteck` | `TbToolsKitchen2` | Verpflegung | cutlery (4724) |   |
 | `blitz` | `ThunderboltOutlined` | Sofortmeldung vorbelegen | lightning-bolt (6703) |   |
 | `bueroklammer` | `PaperClipOutlined` | Anhang | attach (11321) |   |
-| `chevron-hoch` | `UpOutlined` | Zuklappen | chevron-up (40023) |   |
-| `chevron-rechts` | `RightOutlined`, `TbChevronRight` | Zugeklappt/weiter/Vorschau öffnen (Palette), Brotkrumen | chevron-right (40022) |   |
-| `chevron-runter` | `DownOutlined`, `TbChevronDown` | Aufklappen/Auswahlmenü öffnen | chevron-down (40026) |   |
+| `chevron-hoch` | `UpOutlined` | Zuklappen | collapse-arrow (2775) |  Einfacher Strich statt chevron-up (40023), Grund wie chevron-runter. |
+| `chevron-rechts` | `RightOutlined`, `TbChevronRight` | Zugeklappt/weiter/Vorschau öffnen (Palette), Brotkrumen | forward (61) |  Einfacher Strich statt chevron-right (40022), Grund wie chevron-runter. |
+| `chevron-runter` | `DownOutlined`, `TbChevronDown` | Aufklappen/Auswahlmenü öffnen | expand-arrow (2760) |  Einfacher Strich statt chevron-down (40026), das im Outlined-Stil als Umriss gezeichnet ist und bei 16 px doppelt wirkte (Stilprobe 30.09.2026). |
 | `dokument` | `TbFileDescription` | Einsatzdaten | document (1395) |   |
 | `dokumente` | `TbFiles` | Dokumente | documents (37930) |   |
 | `ebenen` | `TbLayersIntersect` | Kartenebenen | layers (727) |   |
 | `extern-pfeil` | `ExportOutlined` | Verweis auf anderes Modul (Sprungmarke) | external-link (742) |   |
 | `fadenkreuz` | `AimOutlined`, `TbCrosshair` | Auf der Karte platzieren; Zeiger-Koordinate in der Kartenüberlagerung | define-location (1304) |   |
-| `funkbalken` | `TbAntennaBars5` | Live-Verbindung steht | high-connection (24607) |   |
-| `funkbalken-aus` | `TbAntennaBarsOff` | Live-Verbindung getrennt | no-connection (32248) |   |
 | `gebaeudegruppe` | `TbBuildingCommunity` | Stab; Schutzgut 'Sache' | city-buildings (45075) |   |
 | `gewitterwolke` | `TbCloudStorm`, `emoji:⛈` | Wetter & Pegel; Gewitterwarnung | storm (670) |   |
 | `globus` | `TbWorld` | Organisation/global (Sprungpalette) | globe (3685) |   |
@@ -94,7 +91,7 @@ Freigabe: _offen_
 | `play-kreis` | `PlayCircleOutlined` | Wiedergabe starten (Zeitachse) | circled-play (25603) |   |
 | `plus` | `PlusOutlined`, `TbPlus` | Anlegen/hinzufügen; hineinzoomen | plus-math (11153) |  Icons8 'plus' (1501) ist eingekreist; 'plus-math' ist das nackte Kreuz |
 | `posteingang` | `TbInbox` | Lagemeldungen; Meldungen (eingehend) | inbox (2879) |   |
-| `punkte-senkrecht` | `MoreOutlined` | Weitere Aktionen (Zeilenmenü) | menu-2 (21618) |   |
+| `punkte-senkrecht` | `MoreOutlined` | Weitere Aktionen (Zeilenmenü) | menu-2 (21618) |  In iOS 27 Outlined sind die Punkte in jeder Fassung Ringe (menu-2, more); bleibt. |
 | `regen` | `emoji:🌧` | Wetterwarnung Regen | rain (656) |   |
 | `schild` | `TbShieldHalf` | Schutzgut 'Einsatzkräfte' | shield (852) |   |
 | `schloss` | `LockOutlined`, `TbLock` | Gesperrt (Modul, Platz, Leiste, Rahmen) | lock (94) |   |
@@ -121,4 +118,6 @@ Freigabe: _offen_
 | `vollbild-ecken` | `FullscreenOutlined` | Karte auf Hintergrundbild zentrieren | toggle-full-screen (54496) |  mehrdeutig: Bild ist 'Vollbild'; Alternative fit-to-page (59084) |
 | `warndreieck` | `TbAlertTriangle`, `emoji:⚠` | Gefahren; allgemeine Wetter-/NINA-Warnung | error (360) |  Icons8 nennt das Warndreieck 'error' |
 | `wind` | `emoji:💨` | Wetterwarnung Sturm/Wind | wind (31842) |   |
+| `wlan-getrennt` | `TbAntennaBarsOff` | Live-Verbindung getrennt | wi-fi-disconnected (wo7f3jFSsno5) | **Ersatz** Gegenstück zu wlan-verbunden. |
+| `wlan-verbunden` | `TbAntennaBars5` | Live-Verbindung steht | wi-fi-connected (oAN6-f02oQ7l) | **Ersatz** WLAN-Paar statt Funkbalken: iOS no-connection hat keine Durchstreichung. |
 | `zahnrad` | `TbSettings` | Einstellungen (Kategorie und Befehl) | settings (364); gefüllt settings (2969) |   |

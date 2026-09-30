@@ -46,7 +46,7 @@
   16 und 20 px, Kontrast der Ikonen gegen ihren Grund über `e2e/kontrast-kern.ts`. Ablage unter
   `openspec/changes/lfh-595-ein-ikonensatz/stilprobe/`. Nachweis: Aufnahmen liegen vor,
   Kontrastwerte stehen in `stilprobe/messung.md`.
-- [ ] 3.4 **Checkpoint:** Ruben gibt den Stil frei oder zieht Plan B (design.md D1). Nachweis:
+- [x] 3.4 **Checkpoint:** Ruben gibt den Stil frei oder zieht Plan B (design.md D1). Nachweis:
   Entscheidung mit Datum in design.md D8.
 
 ## 4. Zuordnungstabelle (Freigabe durch Ruben)
