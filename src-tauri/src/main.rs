@@ -57,6 +57,11 @@ const MASKE: &str = "tauri://localhost/index.html";
 #[cfg(target_os = "macos")]
 const DRUCK_SKRIPT: &str = include_str!("druck.js");
 
+/// Im WKWebView scheitert jeder Passkey, obwohl die Feature-Erkennung ihn meldet (LFH-783) — die
+/// macOS-Hülle sagt der Seite selbst, dass sie keinen ausführen kann (LFH-817).
+#[cfg(target_os = "macos")]
+const FAEHIGKEITEN_SKRIPT: &str = include_str!("faehigkeiten.js");
+
 /// Was die Maske beim Öffnen zeigt.
 #[derive(Clone, Default, Serialize)]
 struct Vorbelegung {
@@ -204,7 +209,8 @@ fn baue_fenster(app: &AppHandle, label: &str, start: WebviewUrl) -> tauri::Resul
         // WKWebView suspendiert ein verdecktes Fenster nach ~3 s, Live-Ereignisse
         // stauen sich dann minutenlang (LFH-720, Befund 7).
         .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
-        .initialization_script(DRUCK_SKRIPT);
+        .initialization_script(DRUCK_SKRIPT)
+        .initialization_script(FAEHIGKEITEN_SKRIPT);
     builder.build()
 }
 

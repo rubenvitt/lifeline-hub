@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { BENUTZER_PRUEFEN } from '../auth/sitzungsEvent';
+import { beendeHuelle, starteMacHuelle } from '../test/huelle';
 import LoginPage from './LoginPage';
 
 const { startAuthenticationMock } = vi.hoisted(() => ({ startAuthenticationMock: vi.fn() }));
@@ -387,6 +388,93 @@ describe('LoginPage', () => {
           screen.queryByRole('button', { name: 'Mit Passkey anmelden' }),
         ).not.toBeInTheDocument(),
       );
+    });
+  });
+
+  // Im WKWebView der macOS-Hülle scheitert jeder Passkey, obwohl die Feature-Erkennung ihn meldet
+  // (LFH-783). Die Hülle sagt es selbst; die Seite bietet ihn dann nicht an.
+  describe('macOS-Hülle ohne Passkey (LFH-817)', () => {
+    const urspruenglicheSecureContext = window.isSecureContext;
+
+    beforeEach(() => {
+      Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true });
+      expect(window.isSecureContext).toBe(true);
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+        http.get('/api/dev/users', () => HttpResponse.json([])),
+      );
+    });
+
+    afterEach(() => {
+      beendeHuelle();
+      Object.defineProperty(window, 'isSecureContext', {
+        configurable: true,
+        value: urspruenglicheSecureContext,
+      });
+    });
+
+    const alleVerfahren = [
+      { id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true },
+      { id: 'pocketid', typ: 'oidc', anzeigename: 'PocketID', aktiviert: true },
+      { id: 'webauthn', typ: 'webauthn', anzeigename: 'Passkey', aktiviert: true },
+    ];
+
+    it('zeigt ohne Kennung den Passkey-Knopf wie bisher (Gegenprobe)', async () => {
+      server.use(http.get('/api/auth/providers', () => HttpResponse.json(alleVerfahren)));
+      renderMitProviders(<LoginPage />);
+
+      expect(
+        await screen.findByRole('button', { name: 'Mit Passkey anmelden' }),
+      ).toBeInTheDocument();
+    });
+
+    it('zeigt in der Hülle keinen Passkey-Knopf, Passwort und OIDC bleiben', async () => {
+      starteMacHuelle();
+      server.use(http.get('/api/auth/providers', () => HttpResponse.json(alleVerfahren)));
+      renderMitProviders(<LoginPage />);
+
+      // Der OIDC-Knopf erscheint erst mit geladener Provider-Liste: danach ist die Abwesenheit des
+      // Passkey-Knopfs belastbar.
+      expect(await screen.findByRole('button', { name: 'Mit PocketID anmelden' })).toBeEnabled();
+      expect(screen.getByLabelText('Benutzername')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Mit Passkey anmelden' }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/in der Mac-App/)).not.toBeInTheDocument();
+    });
+
+    it('zeigt in der Hülle keinen Hinweis, solange OIDC ohne Passwort bleibt', async () => {
+      starteMacHuelle();
+      server.use(
+        http.get('/api/auth/providers', () =>
+          HttpResponse.json(alleVerfahren.filter((p) => p.typ !== 'passwort')),
+        ),
+      );
+      renderMitProviders(<LoginPage />);
+
+      expect(await screen.findByRole('button', { name: 'Mit PocketID anmelden' })).toBeEnabled();
+      expect(
+        screen.queryByRole('button', { name: 'Mit Passkey anmelden' }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/in der Mac-App/)).not.toBeInTheDocument();
+    });
+
+    it('erklärt, wenn in der Hülle kein Anmeldeweg übrig bleibt', async () => {
+      starteMacHuelle();
+      server.use(
+        http.get('/api/auth/providers', () =>
+          HttpResponse.json([
+            { id: 'webauthn', typ: 'webauthn', anzeigename: 'Passkey', aktiviert: true },
+          ]),
+        ),
+      );
+      renderMitProviders(<LoginPage />);
+
+      expect(await screen.findByText(/in der Mac-App/)).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Mit Passkey anmelden' }),
+      ).not.toBeInTheDocument();
     });
   });
 

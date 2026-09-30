@@ -169,7 +169,13 @@ trotzdem.
 - **Anmeldung über einen Neustart:** LFH-779/780. Nach jedem Neustart der App ist eine neue
   Anmeldung nötig.
 - **Passkey auf macOS:** entschieden in LFH-783 (gestaffelt). Im Mac-Fenster geht die Anmeldung
-  per Passwort und OIDC, nicht per Passkey; das Ausblenden des Passkeys in der Mac-Hülle folgt mit
-  LFH-817, die Anmeldung im Systembrowser mit LFH-818.
+  per Passwort und OIDC, nicht per Passkey. Seit LFH-817 bietet die Mac-App den Passkey gar nicht
+  erst an: kein Knopf „Mit Passkey anmelden“, im Profil statt der Einrichtung ein Hinweis auf den
+  Browser. Ist nur der Passkey als Anmeldeverfahren aktiv, sagt die Anmeldeseite, dass es im
+  Browser geht. Windows und der Browser bleiben unverändert.
+  **Bekannte Grenze:** Konten, die nur per SSO angelegt wurden (ohne eigenes Passwort), kommen in
+  der Mac-App nur hinein, wenn der Identitätsanbieter einen Weg ohne Passkey kennt. Ein Anbieter,
+  der ausschließlich Passkeys anbietet (etwa PocketID), sperrt sie dort aus. Das schließt erst die
+  Anmeldung im Systembrowser (LFH-818); bis dahin melden sich diese Konten im Browser an.
 - **Linux:** Die Hülle wird dort übersetzt (Tests), aber nicht ausgeliefert.
 - **App-Symbol:** Es ist aus dem Favicon abgeleitet, einem Platzhalter.
