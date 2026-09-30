@@ -15,6 +15,9 @@ import Sidebar, {
 import type { NichtVerortet } from './marker';
 import type { SidebarProps } from './Sidebar';
 import { dichten } from '../../theme/tokens';
+import { hochwasserKlasse } from '../../theme/statusFarben';
+import { FACHEBENEN, fachebeneKeys } from './fachebenen';
+import { hochwasserRadius } from './hochwasserStil';
 
 const basisProps: SidebarProps = {
   einsatzId: 1,
@@ -514,6 +517,80 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('eine ausgeschaltete Ebene zeigt keinen Zoom-Hinweis', () => {
     renderMitProviders(<Sidebar {...basisProps} zoomZuKlein={{ energie: true }} />);
     expect(screen.queryByText('näher heranzoomen')).not.toBeInTheDocument();
+  });
+
+  // Inline gesetzte Farben einer Zeile, wie jsdom sie normalisiert — `color` des Ebenenpunkts und
+  // `background` der Legendenpunkte.
+  const farbenIn = (el: HTMLElement) =>
+    [el, ...el.querySelectorAll<HTMLElement>('*')].flatMap((e) =>
+      [e.style.color, e.style.background, e.style.backgroundColor].filter(Boolean),
+    );
+  const normiert = (farbe: string) => {
+    const probe = document.createElement('span');
+    probe.style.color = farbe;
+    return probe.style.color;
+  };
+
+  it('keine klassenabhängige Ebene zeigt ihren Rückfallton im Panel, ein- wie ausgeschaltet (LFH-592)', () => {
+    const klassig = fachebeneKeys().filter((k) => FACHEBENEN[k].klassenfarben);
+    expect(klassig.length).toBeGreaterThan(0);
+    for (const an of [false, true]) {
+      const sichtbar = { ...basisProps.fachebenenSichtbar };
+      for (const k of klassig) sichtbar[k] = an;
+      const { unmount } = renderMitProviders(
+        <Sidebar {...basisProps} fachebenenSichtbar={sichtbar} />,
+      );
+      for (const k of klassig) {
+        const zeile = document.querySelector<HTMLElement>(`[data-fachebene="${k}"]`)!;
+        // Die Karte zeichnet diese Ebene nie in `farbe` (`hochwasserStil.ts` & Co. backen die
+        // Rollenfarbe je Feature ein) — also steht der Ton auch im Panel nirgends.
+        expect(farbenIn(zeile)).not.toContain(normiert(FACHEBENEN[k].farbe));
+        // Das Quadrat steht nur als unsichtbarer Platzhalter für die Bündigkeit der Namen.
+        expect(within(zeile).getByText('■').style.visibility).toBe('hidden');
+      }
+      unmount();
+    }
+  });
+
+  it('eingeschaltete Hochwasserebene erklärt jede Meldeklasse mit Punkt und Wort (LFH-592)', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, hochwasser: true }}
+      />,
+    );
+    const zeile = fachebenenZeile('Hochwasser-Meldeklassen (LHP)');
+    const legende = within(zeile).getByRole('list', {
+      name: 'Legende: Hochwasser-Meldeklassen (LHP)',
+    });
+    const eintraege = within(legende).getAllByRole('listitem');
+    // Wort und Rolle aus dem Vertrag, in seiner Reihenfolge — ablesbar ohne Klick auf einen Pegel.
+    expect(eintraege.map((e) => e.textContent)).toEqual(
+      Object.values(hochwasserKlasse).map((d) => d.label),
+    );
+    expect(
+      eintraege.map((e) => e.querySelector<HTMLElement>('[data-rolle]')?.dataset.rolle),
+    ).toEqual(Object.values(hochwasserKlasse).map((d) => d.rolle));
+    // Der Punkt trägt den Durchmesser der Karte (zweiter Kanal neben der Farbe).
+    const punkt = eintraege[eintraege.length - 1].querySelector<HTMLElement>('[data-rolle]')!;
+    expect(punkt.style.width).toBe(`${2 * hochwasserRadius('sehr_gross')}px`);
+  });
+
+  it('ausgeschaltet zeigt eine klassenabhängige Ebene keine Legende — sie zeichnet ja nichts (LFH-592)', () => {
+    renderMitProviders(<Sidebar {...basisProps} />);
+    expect(screen.queryByRole('list', { name: /^Legende: / })).not.toBeInTheDocument();
+  });
+
+  it('eine einfarbige Ebene behält ihren Ebenenpunkt in der Kartenfarbe (LFH-592)', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, nina: true }}
+      />,
+    );
+    const zeile = fachebenenZeile('Amtliche Warnungen (NINA)');
+    expect(within(zeile).getByText('■').style.color).toBe(normiert(FACHEBENEN.nina.farbe));
+    expect(within(zeile).queryByRole('list')).not.toBeInTheDocument();
   });
 
   it('öffnet den Zeichen-Picker und startet das Platzieren mit der Entwurfs-Spec (LFH-170)', () => {

@@ -337,7 +337,10 @@ fn zustand_text(art: Option<BesetzungArt>, name: Option<&str>) -> String {
 ///
 /// 409 wie `fordere_aktiv` am Route-Gate (Lebenszyklus, src/AGENTS.md) — zwei Codes für dieselbe
 /// Tatsache, unterschieden nur durch Timing, könnte ein Client nicht auseinanderhalten.
-async fn fordere_aktiv_in_tx(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<(), AppError> {
+pub(super) async fn fordere_aktiv_in_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<(), AppError> {
     let aktiv: Option<i64> =
         sqlx::query_scalar("SELECT 1 FROM einsatz WHERE id = ? AND status = 'aktiv'")
             .bind(einsatz_id)

@@ -128,7 +128,8 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
 nie `aria-current`, Ziel im zugänglichen Namen, Pfad aus `routing/deeplinks.ts`;
 `parsePersonenSicht`/`sichtNachSprung` apply-then-clean. Kein Filterwert „patienten".
 
-**Funkplan S6** (auch `pages/FunkplanPage.tsx`): `frontend/src/stab/AGENTS.md`. **Betreuung und Verpflegung** (auch
+**Funkplan S6 und Checkliste Arbeitsaufnahme** (auch `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`,
+`src/stab/`): `frontend/src/stab/AGENTS.md`. **Betreuung und Verpflegung** (auch
 `pages/VerpflegungPage.tsx`, `src/betreuung/`, `src/verpflegung/`): `frontend/src/betreuung/AGENTS.md`.
 
 ## Frontend — Bedien-Leitlinie (Einsatzkontexte)

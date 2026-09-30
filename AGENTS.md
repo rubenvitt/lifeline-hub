@@ -24,7 +24,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/druck/AGENTS.md` | Druck (LFH-71/LFH-22) |
 | `frontend/src/entwurf/AGENTS.md` | Entwürfe, Lagebericht-Akkordeon |
 | `frontend/src/personen/AGENTS.md` | Personen und Sichtung |
-| `frontend/src/stab/AGENTS.md` | Funkplan S6 |
+| `frontend/src/stab/AGENTS.md` | Stab: Funkplan S6, Checkliste Arbeitsaufnahme |
 | `frontend/e2e/AGENTS.md` | e2e-Suite |
 | `src/AGENTS.md` | Statuscodes, Typ-Codegen, Anhänge, Demo-Daten, Aufbewahrung, ClamAV |
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
