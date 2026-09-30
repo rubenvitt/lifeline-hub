@@ -1,6 +1,6 @@
 import { Button, DatePicker, Form, Input, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag } from '../anzeige/format';
@@ -93,6 +93,13 @@ export default function KraftZeitachse({
   const [nachtragForm] = Form.useForm<NachtragWerte>();
   const [streichForm] = Form.useForm<StreichWerte>();
 
+  // Vorbelegung „jetzt" bei JEDEM Öffnen, nach dem Einhängen des Dialogs (Muster
+  // `KatalogVerwaltung`). Nicht über `initialValues`: der Formularspeicher überlebt das Schließen
+  // und hielte sonst den Zeitpunkt des vorigen Nachtrags (Review LFH-552).
+  useEffect(() => {
+    if (nachtragOffen) nachtragForm.setFieldsValue({ zeitpunkt: dayjs() });
+  }, [nachtragOffen, nachtragForm]);
+
   const query = useQuery({
     queryKey: zeitachseKey(einsatzId, art, id),
     queryFn: () => ladeZeitachse(einsatzId, art, id),
@@ -174,7 +181,8 @@ export default function KraftZeitachse({
                 toenung={gestrichen ? 'berichtigung' : undefined}
                 hinweis={gestrichen ? `gestrichen: ${e.streichgrund ?? ''}` : undefined}
                 aktionen={
-                  !gestrichen && e.quelle !== 'abloesung' ? (
+                  // Nach der Art: auch die Kopie an einer Person streicht nur die Rücknahme der Ablösung.
+                  !gestrichen && e.art !== 'abloesung' ? (
                     <Button
                       danger
                       disabled={!darfSchreiben}
@@ -206,7 +214,6 @@ export default function KraftZeitachse({
         form={nachtragForm}
         erfassenText="Nachtragen"
         laeuft={nachtrag.isPending}
-        initialValues={{ zeitpunkt: dayjs() }}
         onErfassen={(w) =>
           nachtrag.mutateAsync({
             art: w.art,
@@ -250,6 +257,7 @@ export default function KraftZeitachse({
         titel="Ereignis streichen"
         form={streichForm}
         erfassenText="Streichen"
+        unumkehrbar
         laeuft={streichung.isPending}
         onErfassen={(w) =>
           streichung.mutateAsync({ ereignisId: streiche!.id, grund: w.grund.trim() })

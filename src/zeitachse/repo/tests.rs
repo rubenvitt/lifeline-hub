@@ -540,6 +540,54 @@ async fn handstatus_wirkt_an_der_einheit_mit_fanout() {
 
 // ── Ablösung ────────────────────────────────────────────────────────────────────────────────
 
+/// Review LFH-552: die Fan-out-Kopie der Ablösung an einer Person trägt `quelle = einheit`; auch
+/// sie lässt sich nur über die Rücknahme streichen, sonst öffnete sich die Periode der Person,
+/// während die Einheit abgelöst bleibt.
+#[tokio::test]
+async fn ablosungskopie_an_der_person_nur_ueber_ruecknahme() {
+    let w = welt().await;
+    schreibe(&w, Kraft::Einheit(w.f1), Eintreffen, "06:40", Q::Status).await;
+    let mut conn = w.pool.acquire().await.unwrap();
+    abloesung_vollzogen_tx(&mut conn, w.e, w.b, w.f1, &t("14:40"))
+        .await
+        .unwrap();
+    drop(conn);
+    let kopie = laden(&w.pool, w.e, Kraft::Person(w.p[0]))
+        .await
+        .unwrap()
+        .ereignisse
+        .into_iter()
+        .find(|e| e.art == Abloesung)
+        .unwrap();
+    assert_eq!(kopie.quelle, Q::Einheit);
+    let r = streiche(&w, Kraft::Person(w.p[0]), kopie.id, "x").await;
+    assert!(matches!(r, Err(AppError::UnprocessableEntity(_))), "{r:?}");
+}
+
+/// Spec `kraefte-zeitachse` „Rücknahme bricht eine spätere Folge": wurde eine Person nach dem
+/// Vollzug neu alarmiert, lässt die Rücknahme ihre Folge nicht zerbrechen — 422 mit Namen,
+/// nichts gestrichen.
+#[tokio::test]
+async fn ruecknahme_die_eine_spaetere_folge_braeche_ist_422() {
+    let w = welt().await;
+    schreibe(&w, Kraft::Einheit(w.f1), Eintreffen, "06:40", Q::Status).await;
+    let mut conn = w.pool.acquire().await.unwrap();
+    abloesung_vollzogen_tx(&mut conn, w.e, w.b, w.f1, &t("14:40"))
+        .await
+        .unwrap();
+    drop(conn);
+    schreibe(&w, Kraft::Person(w.p[0]), Alarmierung, "15:00", Q::Status).await;
+    let mut conn = w.pool.acquire().await.unwrap();
+    let r = abloesung_zurueckgenommen_tx(&mut conn, w.e, w.b, w.f1, &t("14:40")).await;
+    drop(conn);
+    match r {
+        Err(AppError::UnprocessableEntity(m)) => assert!(m.contains("Anna"), "{m}"),
+        andere => panic!("422 erwartet, war {andere:?}"),
+    }
+    let z = laden(&w.pool, w.e, Kraft::Einheit(w.f1)).await.unwrap();
+    assert_eq!(z.perioden[0].ende_art, Some(Abloesung), "nichts gestrichen");
+}
+
 #[tokio::test]
 async fn vollzug_und_ruecknahme() {
     let w = welt().await;

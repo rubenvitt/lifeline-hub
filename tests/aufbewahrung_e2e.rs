@@ -76,6 +76,25 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         spalte: "einsatz_personal.snap_name",
         begruendung: "Name ad-hoc externer Kräfte beim Statuswechsel",
     },
+    // LFH-552 Kräfte-Zeitachse: Nachtrag und Streichung nennen die Kraft und den Grund.
+    Ausnahme {
+        datei: "src/routes/zeitachse.rs",
+        funktion: "nachtragen",
+        spalte: "einsatz_personal.snap_name",
+        begruendung: "Name ad-hoc externer Kräfte im Nachtrag der Zeitachse (kraft_name_tx)",
+    },
+    Ausnahme {
+        datei: "src/routes/zeitachse.rs",
+        funktion: "streichen",
+        spalte: "einsatz_personal.snap_name",
+        begruendung: "Name ad-hoc externer Kräfte in der Streichung der Zeitachse",
+    },
+    Ausnahme {
+        datei: "src/routes/zeitachse.rs",
+        funktion: "streichen",
+        spalte: "einsatz_kraft_zeitachse.streichgrund",
+        begruendung: "Streichgrund im ETB-Eintrag der Streichung",
+    },
     Ausnahme {
         datei: "src/routes/einsatz_personal.rs",
         funktion: "entfernen",

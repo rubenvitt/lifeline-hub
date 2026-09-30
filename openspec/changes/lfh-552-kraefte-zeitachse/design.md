@@ -216,6 +216,17 @@ Die Klassifikation entsteht über `klassifikation_von` und den Guard
 - [Die Statuswechsel-Routen werden schwerer, weil Fan-out in derselben Transaktion läuft.] →
   Eine Einheit hat wenige Dutzend Personen, der Aufwand ist also ein Lesen und n Inserts. Die
   Transaktion läuft ohnehin unter `write_retry!`.
+- [Die Rücknahme scheitert, wenn eine Person nach dem Vollzug neu alarmiert wurde (die
+  Streichung der Ablösungskopie bräche ihre Folge).] → Gewollt: 422 mit Namen statt einer
+  still zerbrochenen Zeitachse. Wer zurücknehmen will, streicht zuerst die spätere Alarmierung.
+  Der Rückgängig-Toast kommt direkt nach dem Vollzug, der Fall ist dort selten (Review LFH-552).
+- [Ein Vollzug mit Zeitpunkt VOR dem Eintreffen (bei früh gesetztem Schichtbeginn) passt vor das
+  Eintreffen und teilt die Periode; die Einheit steht danach weiter „im Einsatz“.] → Hingenommen:
+  die Folge bleibt regelkonform, und der Nachweis steht in der Zeitachse; eine zusätzliche Sperre
+  am Vollzug wäre eine Änderung von `kraefte-abloesung` ohne Anlass aus dem Feld.
+- [Der Fan-out folgt der Zuordnung beim Schreiben, nicht der zum Ereigniszeitpunkt (keine
+  Zuordnungshistorie).] → In der Spec benannt; der Nachtrag an der Person und die Streichung sind
+  die Korrektur.
 - [Die Rücknahme findet das Ablösungsereignis über den Zeitpunkt statt über einen Schlüssel.] →
   Das ist eindeutig, solange je Einheit nur eine Schicht läuft (UNIQUE-Index). Ein Test
   sichert den Rückweg nach einer zweiten Ablösung derselben Einheit.

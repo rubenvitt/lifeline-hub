@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { Zeitachse } from '../api/types';
@@ -197,5 +197,83 @@ describe('KraftZeitachse (LFH-552)', () => {
     expect(screen.getByText(ZEITACHSE_RECHTE_TEXT)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Nachtragen' })).toBeDisabled();
     expect(screen.getByRole('button', { name: /^Alarmierung .* streichen$/ })).toBeDisabled();
+  });
+
+  describe('Vorbelegung des Zeitpunkts', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Review LFH-552: der zweite Nachtrag Stunden später trägt nicht die Zeit des ersten. */
+    it('setzt „jetzt" bei jedem Öffnen neu', async () => {
+      // Mitlaufend: eine stehende Uhr hielte die Schließanimation des Dialogs an.
+      vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+      vi.setSystemTime(new Date('2026-09-30T04:45:00Z'));
+      const ruempfe: Record<string, unknown>[] = [];
+      server.use(
+        http.post(PFAD, async ({ request }) => {
+          ruempfe.push((await request.json()) as Record<string, unknown>);
+          return HttpResponse.json(ZEITACHSE, { status: 201 });
+        }),
+      );
+      rendere();
+      await waitFor(() => expect(eintraege()).toHaveLength(3));
+      const laeufe = [
+        ['2026-09-30T04:45:00Z', 'Eintreffen'],
+        ['2026-09-30T07:00:00Z', 'Entlassung'],
+      ] as const;
+      for (const [i, [uhr, art]] of laeufe.entries()) {
+        vi.setSystemTime(new Date(uhr));
+        // Der Öffner steht im Dokument vor jedem Dialog (dessen Knopf heißt ebenso).
+        await userEvent.click(screen.getAllByRole('button', { name: 'Nachtragen' })[0]);
+        // Der zuletzt geöffnete Dialog; der vorige kann noch in seiner Schließanimation stehen.
+        const dialog = (await screen.findAllByRole('dialog')).at(-1)!;
+        await userEvent.click(within(dialog).getByRole('combobox', { name: 'Ereignis' }));
+        const option = await waitFor(() => {
+          const k = document.querySelector<HTMLElement>(
+            `.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option[title="${art}"]`,
+          );
+          expect(k).not.toBeNull();
+          return k!;
+        });
+        await userEvent.click(option);
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+        await waitFor(() => expect(ruempfe).toHaveLength(i + 1));
+      }
+      expect(ruempfe.map((r) => String(r.zeitpunkt_at).slice(0, 16))).toEqual([
+        '2026-09-30 04:45',
+        '2026-09-30 07:00',
+      ]);
+    });
+  });
+
+  it('eine Ablösung — auch die Kopie über die Einheit — trägt keinen Streichknopf', async () => {
+    rendere(true, {
+      ereignisse: [
+        {
+          id: 8,
+          art: 'abloesung',
+          zeitpunkt_at: '2026-09-30 12:40:00',
+          quelle: 'einheit',
+          ursprung_id: 4,
+          ursprung_einheit_name: 'Florian 1',
+          erfasst_von: 1,
+          erfasst_at: '2026-09-30 12:40:00',
+        },
+      ],
+      perioden: [],
+    });
+    await waitFor(() => expect(eintraege()).toHaveLength(1));
+    expect(within(eintraege()[0] as HTMLElement).queryByRole('button')).toBeNull();
+  });
+
+  it('die Rückfrage zum Streichen bestätigt rot (unumkehrbar)', async () => {
+    rendere();
+    await waitFor(() => expect(eintraege()).toHaveLength(3));
+    await userEvent.click(screen.getByRole('button', { name: /^Alarmierung .* streichen$/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ereignis streichen' });
+    expect(within(dialog).getByRole('button', { name: 'Streichen' })).toHaveClass(
+      'ant-btn-dangerous',
+    );
   });
 });

@@ -96,8 +96,11 @@ Statuswechsel MUST trotzdem gelingen. Ein Statuswechsel ohne Marke MUST kein Ere
 Entsteht an einer Einheit ein Ereignis, SHALL das System in derselben Transaktion für jede
 Person, die der Einheit in diesem Moment zugeordnet ist, ein Ereignis derselben Art und
 desselben Zeitpunkts schreiben, mit Quelle `einheit` und Verweis auf das Ereignis der Einheit.
-Für eine Person, deren Perioden-Regeln das Ereignis verletzen würde, MUST es ausgelassen werden.
-Eine später zugeordnete Person MUST keine früheren Ereignisse der Einheit erben.
+Maßgeblich ist die Zuordnung beim Schreiben, nicht zum Zeitpunkt des Ereignisses: eine
+Zuordnungshistorie gibt es nicht, ein Nachtrag in die Vergangenheit erreicht also die Personen,
+die beim Nachtrag zugeordnet sind. Für eine Person, deren Perioden-Regeln das Ereignis verletzen
+würde, MUST es ausgelassen werden. Eine Person, die erst nach dem Schreiben zugeordnet wird, MUST
+keine früheren Ereignisse der Einheit erben.
 
 #### Scenario: Einheit trifft ein
 - **WHEN** die Einheit „Florian 1“ mit drei zugeordneten Personen um 06:40 eintrifft
@@ -141,10 +144,12 @@ System-ETB-Eintrag schreiben, der Kraft, Art, Zeitpunkt und „nachgetragen“ n
 
 Das System SHALL ein nicht gestrichenes Ereignis mit Pflichtgrund streichen lassen. Die
 Streichung eines Einheit-Ereignisses MUST in derselben Transaktion alle noch nicht gestrichenen
-Ereignisse streichen, die per Fan-out daraus entstanden sind. Ein Ereignis mit Quelle
-`abloesung` MUST sich nur über die Rücknahme des Vollzugs streichen lassen (422). Jede Streichung
-MUST einen System-ETB-Eintrag schreiben, der Kraft, Art, Zeitpunkt und Grund nennt. Führt eine
-Streichung zu einer Ereignisfolge, die die Perioden-Regeln verletzt, MUST sie mit 422 scheitern.
+Ereignisse streichen, die per Fan-out daraus entstanden sind. Ein Ereignis der Art `abloesung`,
+auch seine Fan-out-Kopie an einer Person, MUST sich nur über die Rücknahme des Vollzugs streichen
+lassen (422). Jede Streichung von Hand MUST einen System-ETB-Eintrag schreiben, der Kraft, Art,
+Zeitpunkt und Grund nennt; die Streichung durch die Rücknahme weist die Berichtigung des Vollzugs
+nach. Führt eine Streichung bei der Kraft oder einer betroffenen Person zu einer Ereignisfolge,
+die die Perioden-Regeln verletzt, MUST sie mit 422 scheitern und die Person nennen.
 
 #### Scenario: Falsches Eintreffen streichen
 - **WHEN** das Eintreffen von „Florian 1“ um 06:40 mit Grund „Zeit verwechselt“ gestrichen wird
@@ -153,6 +158,10 @@ Streichung zu einer Ereignisfolge, die die Perioden-Regeln verletzt, MUST sie mi
 #### Scenario: Grund fehlt
 - **WHEN** eine Streichung ohne Grund abgeschickt wird
 - **THEN** antwortet das System mit 400
+
+#### Scenario: Ablösung an der Person
+- **WHEN** die Fan-out-Kopie einer Ablösung an einer Person direkt gestrichen werden soll
+- **THEN** antwortet das System mit 422
 
 #### Scenario: Doppelt gestrichen
 - **WHEN** ein bereits gestrichenes Ereignis erneut gestrichen werden soll
@@ -164,7 +173,10 @@ Vollzieht das System eine Ablösungsschicht einer Einheit, SHALL es in derselben
 Ereignis `abloesung` zum Vollzugszeitpunkt für diese Einheit schreiben (Quelle `abloesung`),
 samt Fan-out, sofern die Einheit eine offene Periode hat. Nimmt das System den Vollzug zurück,
 MUST es dieses Ereignis samt Fan-out in derselben Transaktion streichen, mit dem Grund
-„Ablösung zurückgenommen“. Die ablösende Einheit MUST durch den Vollzug kein Ereignis bekommen.
+„Ablösung zurückgenommen“. Würde diese Streichung die Folge der Einheit oder einer Person brechen,
+etwa weil die Person nach dem Vollzug neu alarmiert wurde, MUST die Rücknahme mit 422 scheitern,
+die Person nennen und nichts ändern. Die ablösende Einheit MUST durch den Vollzug kein Ereignis
+bekommen.
 
 #### Scenario: Vollzug beendet die Periode
 - **WHEN** die Schicht von „Florian 1“ um 14:40 vollzogen wird und die Einheit seit 06:40 eingetroffen ist
@@ -173,6 +185,10 @@ MUST es dieses Ereignis samt Fan-out in derselben Transaktion streichen, mit dem
 #### Scenario: Rücknahme öffnet die Periode wieder
 - **WHEN** dieser Vollzug zurückgenommen wird
 - **THEN** ist das Ablösungsereignis gestrichen, und die Periode ist wieder offen
+
+#### Scenario: Rücknahme bricht eine spätere Folge
+- **WHEN** eine Person der Einheit nach dem Vollzug neu alarmiert wurde und der Vollzug zurückgenommen werden soll
+- **THEN** antwortet das System mit 422, nennt die Person, und die Einheit bleibt abgelöst
 
 #### Scenario: Einheit ohne Periode
 - **WHEN** eine Einheit ohne offene Periode abgelöst wird
