@@ -1,5 +1,5 @@
+import { IkoneAbmelden, IkoneChevronRunter, IkonePerson } from '../ikonen';
 import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
-import { DownOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import type { IconType } from 'react-icons';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
@@ -198,8 +198,8 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
       }),
     },
     { type: 'divider' },
-    { key: 'profil', icon: <UserOutlined />, label: 'Profil' },
-    { key: 'abmelden', icon: <LogoutOutlined />, label: 'Abmelden', danger: true },
+    { key: 'profil', icon: <IkonePerson />, label: 'Profil' },
+    { key: 'abmelden', icon: <IkoneAbmelden />, label: 'Abmelden', danger: true },
   ];
 
   const onClick: MenuProps['onClick'] = ({ key }) => {
@@ -266,7 +266,7 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
             >
               {funktion ?? benutzer.anzeigename}
             </span>
-            <DownOutlined aria-hidden style={{ fontSize: 10, opacity: 0.65 }} />
+            <IkoneChevronRunter style={{ fontSize: 10, opacity: 0.65 }} />
           </>
         )}
       </Button>

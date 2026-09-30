@@ -66,7 +66,9 @@ interface IkonenMessung {
   ikone: string;
   breite: number;
   hoehe: number;
-  kontrast: number;
+  /** `null`, wenn der Messkern die Fläche nicht modelliert (Deckkraft, Verlauf) — mit Grund. */
+  kontrast: number | null;
+  grund?: string;
 }
 
 test('Stilprobe: Aufnahmen und Messwerte je Breite, Betriebsart und Dichte', async ({ page }) => {
@@ -98,12 +100,18 @@ test('Stilprobe: Aufnahmen und Messwerte je Breite, Betriebsart und Dichte', asy
           if (!(await ikone.isVisible())) continue;
           const kasten = await ikone.locator('svg').boundingBox();
           if (!kasten) continue;
-          messungen.push({
+          const messung: IkonenMessung = {
             ikone: (await ikone.getAttribute('data-ikone')) ?? '?',
             breite: Math.round(kasten.width * 10) / 10,
             hoehe: Math.round(kasten.height * 10) / 10,
-            kontrast: Math.round((await kontrast(ikone)).verhaeltnis * 100) / 100,
-          });
+            kontrast: null,
+          };
+          try {
+            messung.kontrast = Math.round((await kontrast(ikone)).verhaeltnis * 100) / 100;
+          } catch (fehler) {
+            messung.grund = String(fehler).split('\n')[0].slice(0, 160);
+          }
+          messungen.push(messung);
         }
         expect(messungen.length, `${name}: keine Ikone des Satzes sichtbar`).toBeGreaterThan(0);
         ergebnis[name] = messungen;

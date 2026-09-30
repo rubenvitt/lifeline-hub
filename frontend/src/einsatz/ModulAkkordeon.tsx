@@ -102,7 +102,9 @@ export default function ModulAkkordeon({
     <nav aria-label="Einsatz-Navigation" style={{ display: 'flex', flexDirection: 'column' }}>
       {kategorien.map((k) => {
         const offen = k.key === offeneKategorie;
-        const Icon = k.icon;
+        // Umriss auch aufgeklappt: „offen“ ist kein aktiver Zustand, die Füllung trägt allein die
+        // Rail (LFH-595, Spec `ikonensatz`).
+        const Icon = k.ikone.umriss;
         return (
           <div key={k.key}>
             <button

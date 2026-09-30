@@ -1,3 +1,4 @@
+import { IkoneFunkbalken, IkoneFunkbalkenAus } from '../ikonen';
 import {
   useEffect,
   useState,
@@ -6,7 +7,6 @@ import {
   type ReactNode,
 } from 'react';
 import { theme } from 'antd';
-import { TbAntennaBars5, TbAntennaBarsOff } from 'react-icons/tb';
 import { Link } from 'react-router';
 import dayjs from 'dayjs';
 import { useAuth } from '../auth/AuthContext';
@@ -347,7 +347,7 @@ export function SyncAnzeige({
   const zustand = syncZustand({ online, live, liveErwartet, queue });
   if (zustand === 'ruhe') return null;
   const d = SYNC_DARSTELLUNG[zustand];
-  const Icon = d.getrennt ? TbAntennaBarsOff : TbAntennaBars5;
+  const Icon = d.getrennt ? IkoneFunkbalkenAus : IkoneFunkbalken;
   const satz = d.satz(queue);
   const wort = zustand === 'ausstehend' ? `${d.wort} ${queue.ausstehend}` : d.wort;
   return (

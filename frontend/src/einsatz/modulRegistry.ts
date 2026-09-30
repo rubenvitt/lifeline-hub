@@ -1,6 +1,20 @@
 import type { IconType } from 'react-icons';
 import {
-  TbHierarchy2,
+  IkoneHierarchie,
+  IkoneHierarchieGefuellt,
+  IkoneKarte,
+  IkoneKarteGefuellt,
+  IkoneKlemmbrett,
+  IkoneKlemmbrettGefuellt,
+  IkoneLkw,
+  IkoneLkwGefuellt,
+  IkoneSprechblase,
+  IkoneSprechblaseGefuellt,
+  IkoneZahnrad,
+  IkoneZahnradGefuellt,
+  type IkonenPaar,
+} from '../ikonen';
+import {
   TbLayoutGrid,
   TbFileDescription,
   TbSitemap,
@@ -19,7 +33,6 @@ import {
   TbReport,
   TbListDetails,
   TbAlertTriangle,
-  TbMessage,
   TbMessageCircle,
   TbBell,
   TbClipboardList,
@@ -65,7 +78,8 @@ export interface Kategorie {
    * nicht. Der volle Name bleibt `aria-label` und `title`.
    */
   kurz: string;
-  icon: IconType;
+  /** Umriss inaktiv, Füllung aktiv (LFH-595, Spec `ikonensatz`). */
+  ikone: IkonenPaar;
   /**
    * Steht abgesetzt am FUSS der Rail. Ein Flag statt einer zweiten Liste: `kategorien` bleibt die
    * EINE Aufzählung für Rail, Drawer, Rahmen und Kommandopalette.
@@ -95,20 +109,45 @@ export interface ModulEintrag {
 }
 
 /**
- * Reihenfolge der Icon-Rail (eine Zeile je Kategorie; `fuss` unten abgesetzt). Ikonen: Tabler
- * hierarchy-2, truck, clipboard-text, map-2, message, settings.
+ * Reihenfolge der Icon-Rail (eine Zeile je Kategorie; `fuss` unten abgesetzt). Ikonen aus dem
+ * Satz (LFH-595): Hierarchie, Lkw, Klemmbrett, Karte, Sprechblase, Zahnrad — je als Paar.
  */
 export const kategorien: Kategorie[] = [
-  { key: 'fuehrung', label: 'Führung', kurz: 'Führung', icon: TbHierarchy2 },
-  { key: 'kraefte', label: 'Kräfte & Mittel', kurz: 'Kräfte', icon: TbTruck },
-  { key: 'erfassung', label: 'Erfassung', kurz: 'Erfassung', icon: TbClipboardText },
-  { key: 'lage', label: 'Lage', kurz: 'Lage', icon: TbMap2 },
-  { key: 'kommunikation', label: 'Kommunikation', kurz: 'Komm.', icon: TbMessage },
+  {
+    key: 'fuehrung',
+    label: 'Führung',
+    kurz: 'Führung',
+    ikone: { umriss: IkoneHierarchie, gefuellt: IkoneHierarchieGefuellt },
+  },
+  {
+    key: 'kraefte',
+    label: 'Kräfte & Mittel',
+    kurz: 'Kräfte',
+    ikone: { umriss: IkoneLkw, gefuellt: IkoneLkwGefuellt },
+  },
+  {
+    key: 'erfassung',
+    label: 'Erfassung',
+    kurz: 'Erfassung',
+    ikone: { umriss: IkoneKlemmbrett, gefuellt: IkoneKlemmbrettGefuellt },
+  },
+  {
+    key: 'lage',
+    label: 'Lage',
+    kurz: 'Lage',
+    ikone: { umriss: IkoneKarte, gefuellt: IkoneKarteGefuellt },
+  },
+  {
+    key: 'kommunikation',
+    label: 'Kommunikation',
+    kurz: 'Komm.',
+    ikone: { umriss: IkoneSprechblase, gefuellt: IkoneSprechblaseGefuellt },
+  },
   {
     key: 'einstellungen',
     label: 'Einstellungen',
     kurz: 'Einst.',
-    icon: TbSettings,
+    ikone: { umriss: IkoneZahnrad, gefuellt: IkoneZahnradGefuellt },
     fuss: true,
   },
 ];

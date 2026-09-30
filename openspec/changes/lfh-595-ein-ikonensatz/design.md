@@ -75,6 +75,11 @@ Outline/Filled, sonst eine Suche außerhalb von Icons8. Das entscheidet Ruben.
   Das Skript selbst geht nicht ins Netz. *Geändert 30.09.2026:* Ein eigenes Abrufskript mit
   persönlichem Schlüssel entfällt. Es wäre ohne Schlüssel in der Sitzung nicht prüfbar, und die
   eingecheckten Quellen machen den Betrieb ohnehin unabhängig vom Icons8-Zugang.
+- `scripts/ikonen/vergleiche-png.mjs` prüft jede Quelle gegen das PNG, das Icons8 frei und
+  byte-genau ausliefert (Rendern in Chromium, Vergleich der Deckkraft). Der MCP liefert das SVG
+  als Text in die Sitzung, abgelegt wird es durch Abschreiben, und ein vertauschtes Zeichen in
+  den Pfaddaten bliebe sonst unsichtbar. Die Gegenprobe (eine Koordinate um 6 verschoben) schlägt
+  an.
 
 *Verworfen:* SVGs zur Laufzeit von `img.icons8.com` laden (bricht offline und im Fükw ohne
 Netz), SVGR als neue Abhängigkeit (das Umformen ist eine Handvoll Zeilen Node ohne Paket).

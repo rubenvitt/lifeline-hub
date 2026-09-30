@@ -2,30 +2,31 @@
 
 ## 1. Vorbedingung: Abo und Zugang (Ruben)
 
-- [ ] 1.1 Icons8-Abo abschließen und den SVG-Abruf freischalten (MCP-API oder persönlicher
+- [x] 1.1 Icons8-Abo abschließen und den SVG-Abruf freischalten (MCP-API oder persönlicher
   Schlüssel). Nachweis: Ein Abruf der Trage (Kennung `6581`, iOS 27 Outlined) liefert ein SVG
   statt „account does not have MCP API access“.
-- [ ] 1.2 Lizenztext des Abos auf die Ablage der SVGs im Repo prüfen und die Grundlage (Abo,
+- [x] 1.2 Lizenztext des Abos auf die Ablage der SVGs im Repo prüfen und die Grundlage (Abo,
   Datum, Fundstelle im Lizenztext) im Kopf von `scripts/ikonen/ikonen.json` vermerken. Nachweis:
-  Vermerk steht, Ruben bestätigt.
-- [ ] 1.3 An einem abgerufenen SVG feststellen, ob der Stil Füllflächen oder Striche liefert,
+  Vermerk steht, Ruben bestätigt. *Erledigt 30.09.2026:* Der Lizenztext war aus der Sitzung nicht
+  abrufbar (403); Grundlage ist Rubens Aussage, vermerkt unter `lizenz` im Register.
+- [x] 1.3 An einem abgerufenen SVG feststellen, ob der Stil Füllflächen oder Striche liefert,
   und das Ergebnis in design.md unter „Open Questions“ als geklärt eintragen. Nachweis: Eintrag
   in design.md.
 
 ## 2. Werkzeug und Grundgerüst
 
-- [ ] 2.1 `frontend/src/ikonen/IkonenRahmen.tsx` mit Typ `Ikone`/`IkonenPaar` und `index.ts`
+- [x] 2.1 `frontend/src/ikonen/IkonenRahmen.tsx` mit Typ `Ikone`/`IkonenPaar` und `index.ts`
   per TDD anlegen: `1em` als Vorgabe, `size`, `currentColor`, `aria-hidden`, `focusable=false`,
   Hülle `lfh-ikone` mit antds Ausrichtung. Nachweis: `IkonenRahmen.test.tsx` grün, Gegenprobe
   (Farbe fest verdrahtet → rot).
-- [ ] 2.2 `scripts/ikonen/erzeuge-ikonen.mjs` schreiben: Register und Quellen einlesen,
+- [x] 2.2 `scripts/ikonen/erzeuge-ikonen.mjs` schreiben: Register und Quellen einlesen,
   `erzeugt.generated.ts` und `quellen.sha256` schreiben. Das Ergebnis ist Prettier-fest und
   deterministisch. Nachweis: zwei Läufe hintereinander ohne Diff, `pnpm lint` und
   `check-fmt.sh` grün.
-- [ ] 2.3 Abrufweg festhalten: Neue Quellen holt der Agent über den Icons8-MCP nach
+- [x] 2.3 Abrufweg festhalten: Neue Quellen holt der Agent über den Icons8-MCP nach
   `scripts/ikonen/quellen/` (design.md D2, geändert 30.09.2026, kein eigenes Abrufskript). Der
   Kopf von `erzeuge-ikonen.mjs` beschreibt den Weg. Nachweis: Kopf und D2 stimmen überein.
-- [ ] 2.4 `frontend/src/ikonen/ikonen.guard.test.ts` per TDD: (a) kein Import aus
+- [x] 2.4 `frontend/src/ikonen/ikonen.guard.test.ts` per TDD: (a) kein Import aus
   `@ant-design/icons`/`react-icons` außerhalb von `ikonen/`, Schuldmenge `OFFEN` = heutige
   74 Dateien, toter Eintrag rot; (b) Register ↔ Quellen ↔ Erzeugtes ↔ Stempel, keine
   unbenutzte Ikone, `eigen` trägt ihren Vermerk; (c) Emoji-Scan mit eigener Schuldmenge
@@ -35,13 +36,13 @@
 
 ## 3. Stilprobe (Freigabe durch Ruben)
 
-- [ ] 3.1 Probe-Ikonen ins Register und abrufen: die fünf Rail-Kategorien als Paar, Kopfleiste
+- [x] 3.1 Probe-Ikonen ins Register und abrufen: die fünf Rail-Kategorien als Paar, Kopfleiste
   (Menü, Suche, Benutzer), Zeilen-Aktionsmenü (Mehr), Seitenkopf (Plus). Nachweis:
   Guard (b) grün.
-- [ ] 3.2 `IconRail.tsx` auf `IkonenPaar` umstellen (gefüllt bei `aria-current`), dazu Kopfleiste,
+- [x] 3.2 `IconRail.tsx` auf `IkonenPaar` umstellen (gefüllt bei `aria-current`), dazu Kopfleiste,
   ein Zeilenmenü und einen Seitenkopf. `OFFEN` abtragen. Nachweis: `IconRail`-Test prüft
   gefüllt/umriss je Zustand, Gegenprobe rot. Bestehende Rail- und Kopfleisten-Tests grün.
-- [ ] 3.3 Aufnahmen per Playwright: 390/1024/1440 px × Tag/Nacht × Dichte 30/48/72, Ikonen bei
+- [x] 3.3 Aufnahmen per Playwright: 390/1024/1440 px × Tag/Nacht × Dichte 30/48/72, Ikonen bei
   16 und 20 px, Kontrast der Ikonen gegen ihren Grund über `e2e/kontrast-kern.ts`. Ablage unter
   `openspec/changes/lfh-595-ein-ikonensatz/stilprobe/`. Nachweis: Aufnahmen liegen vor,
   Kontrastwerte stehen in `stilprobe/messung.md`.
@@ -50,7 +51,7 @@
 
 ## 4. Zuordnungstabelle (Freigabe durch Ruben)
 
-- [ ] 4.1 Alle übrigen rund 110 Ikonen des Bestands (46 antd, 69 Tabler, 5 Feather, abzüglich
+- [x] 4.1 Alle übrigen rund 110 Ikonen des Bestands (46 antd, 69 Tabler, 5 Feather, abzüglich
   der Probe) einem Registernamen und einer Icons8-Kennung zuordnen, Ersatz und Eigenzeichnung
   kennzeichnen (u. a. `TbSitemap` → Hierarchy, `MinusCircleOutlined`, `TbHomeHeart` → eigen).
   Tabelle in `openspec/changes/lfh-595-ein-ikonensatz/zuordnung.md`. Nachweis: Jeder Import aus
