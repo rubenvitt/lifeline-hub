@@ -249,9 +249,10 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   Breite genau ein Knopf je Handlung. Ab `lg` erzwingen die Leistenmodi die Leiste wie bisher.
 - **Kartengrundlage** (LFH-558, Spec `lagekarte-kartengrundlage`, Herleitung D6 in
   `openspec/changes/archive/2026-09-30-lfh-558-lagekarte-kartenpfade-fixture-basemap/design.md`):
-  die Karte entsteht mit dem Blindstil, der Style der Ansicht kommt per `setStyle`. Jeder angewandte Style öffnet ein eigenes
-  Abstufungsfenster bis zu seinem `style.load` (`stilFehlerWaechter.ts`); darin zählt jeder Fehler
-  ohne `tile`, also wirft die Karte dort selbst keinen (`getSource` vor `isSourceLoaded`).
+  die Karte entsteht mit dem Blindstil, der Style der Ansicht kommt per `setStyle`. Jeder
+  angewandte Style öffnet ein eigenes Abstufungsfenster bis zu seinem `style.load`
+  (`stilFehlerWaechter.ts`); darin zählt jeder Fehler ohne `tile`, also wirft die Karte dort
+  selbst keinen (`getSource` vor `isSourceLoaded`).
   Browser-Nachweis mit der Fixture-Basemap (`e2e/kartenFixture.ts`, „gelesen“ = dekodiert):
   `e2e/lagekarte-kartengrundlage.spec.ts`, `e2e/lagekarte-kachelpfad.spec.ts`.
 - Nachweise: `e2e/lagekarte-smoke.spec.ts`, `e2e/gate1-ueberlauf.spec.ts`,
