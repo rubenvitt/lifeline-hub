@@ -116,7 +116,9 @@ pub fn zaehle_meldungen(meldungen: &[MeldungsMerkmale]) -> MeldungsZaehler {
             meldungen
                 .iter()
                 .filter(|m| {
-                    m.bestaetigung_pflicht && !m.ist_bestaetigt && (m.ist_ueberfaellig || m.eskaliert)
+                    m.bestaetigung_pflicht
+                        && !m.ist_bestaetigt
+                        && (m.ist_ueberfaellig || m.eskaliert)
                 })
                 .count(),
         ),

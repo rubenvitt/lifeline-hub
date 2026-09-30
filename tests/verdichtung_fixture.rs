@@ -25,7 +25,9 @@ fn zahl(v: &Value) -> i64 {
 }
 
 fn flag(v: &Value, feld: &str) -> bool {
-    v[feld].as_bool().unwrap_or_else(|| panic!("Flag {feld} fehlt: {v}"))
+    v[feld]
+        .as_bool()
+        .unwrap_or_else(|| panic!("Flag {feld} fehlt: {v}"))
 }
 
 fn staerke(v: &Value) -> Staerke {
@@ -69,7 +71,11 @@ fn auftraege_zaehlen_wie_das_fixture() {
         let z = zaehle_auftraege(&[auftrag(f)]);
         let name = f["name"].as_str().unwrap();
         assert_eq!(z.offen == 1, flag(f, "offen"), "offen: {name}");
-        assert_eq!(z.ueberfaellig == 1, flag(f, "ueberfaellig"), "überfällig: {name}");
+        assert_eq!(
+            z.ueberfaellig == 1,
+            flag(f, "ueberfaellig"),
+            "überfällig: {name}"
+        );
     }
 
     let merkmale: Vec<_> = faelle.iter().map(auftrag).collect();
@@ -125,7 +131,11 @@ fn ist_kumuliert_wie_das_fixture() {
         }
     }
     let erwartet = s["erwartet_ist_kumuliert"].as_object().unwrap();
-    assert_eq!(erwartet.len(), eigene.len(), "jede Einheit hat eine Erwartung");
+    assert_eq!(
+        erwartet.len(),
+        eigene.len(),
+        "jede Einheit hat eine Erwartung"
+    );
     for (id, soll) in erwartet {
         let id: i64 = id.parse().unwrap();
         assert_eq!(

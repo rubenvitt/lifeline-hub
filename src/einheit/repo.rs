@@ -912,7 +912,10 @@ mod tests {
         // 1 → 2 → 3 → 1: ein korrupter Zyklus; jede Einheit zählt trotzdem genau einmal.
         let kinder = HashMap::from([(1, vec![2]), (2, vec![3]), (3, vec![1])]);
         assert_eq!(kumuliere(&eigene, &kinder, 1), Staerke::neu(1, 2, 6));
-        assert_eq!(kumuliere(&eigene, &HashMap::new(), 2), Staerke::neu(0, 1, 3));
+        assert_eq!(
+            kumuliere(&eigene, &HashMap::new(), 2),
+            Staerke::neu(0, 1, 3)
+        );
         // Ohne eigenen Eintrag: keine wertbaren Kräfte.
         assert_eq!(kumuliere(&eigene, &kinder, 99), Staerke::neu(0, 0, 0));
     }
