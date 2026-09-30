@@ -69,13 +69,15 @@ test('LFH-555: die Einsatzdaten setzen den Termin, der offene Stab-Kopfblock fol
 }) => {
   const id = await anmeldenUndAnlegen(page);
   await oeffnenMitStrom(page, stabPfad(id), id);
-  await expect(page.getByText('kein Termin', { exact: true })).toBeVisible();
+  // Nur der Stand-Block: die Vorbereitung (LFH-550) zeigt den Termin ebenfalls.
+  const stand = page.getByLabel('Stand der Lagebesprechung');
+  await expect(stand.getByText('kein Termin', { exact: true })).toBeVisible();
 
   const patch = await page.request.patch(`/api/einsaetze/${id}`, {
     data: { naechste_lagebesprechung_at: terminInZweiStunden() },
   });
   expect(patch.ok()).toBeTruthy();
 
-  await expect(page.getByText(/^in (1 h 5\d|2 h 00) min$/)).toBeVisible();
-  await expect(page.getByText('kein Termin', { exact: true })).toHaveCount(0);
+  await expect(stand.getByText(/^in (1 h 5\d|2 h 00) min$/)).toBeVisible();
+  await expect(stand.getByText('kein Termin', { exact: true })).toHaveCount(0);
 });

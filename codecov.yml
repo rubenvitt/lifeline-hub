@@ -3,7 +3,7 @@
 # `informational: true` an beiden Zielen ist die tragende Einstellung: Coverage MELDET, sie
 # blockiert nicht. Ein Prozentwert, der einen Merge verhindert, erzeugt Tests, die die Zahl
 # heben und nichts prüfen — und dieses Projekt misst seine Testgüte ohnehin an Mutationsproben
-# (siehe CLAUDE.md), nicht an Abdeckung. Der Nutzen hier ist der Verlauf und die Sicht auf
+# (siehe AGENTS.md), nicht an Abdeckung. Der Nutzen hier ist der Verlauf und die Sicht auf
 # ungetestete neue Zeilen im Pull Request.
 coverage:
   status:

@@ -40,7 +40,7 @@
 
 - [x] 4.1 `docs/design/2026-09-21-neuentwurf/umsetzung.md`: Zeile `marke` („Logo-Quadrat“ →
       Bildmarke) und Rahmen-Abschnitt (Markenzelle) nachziehen, macOS-Ausnahme vom Radius 0
-      vermerken. CLAUDE.md, Abschnitt Neuentwurf: ein Punkt „Bildmarke“ mit der Quelle
+      vermerken. `frontend/AGENTS.md` (vormals CLAUDE.md), Abschnitt Neuentwurf: ein Punkt „Bildmarke“ mit der Quelle
       (`marke/bildmarkeGeometrie.ts`, `scripts/marke/`, Guard). Prüfung: `grep -n
       "Logo-Quadrat"` findet nichts mehr.
 - [x] 4.2 `docs/betrieb/desktop-app.md`: Den Punkt „App-Symbol … Platzhalter“ aus den Grenzen

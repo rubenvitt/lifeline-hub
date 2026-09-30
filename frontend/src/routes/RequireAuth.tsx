@@ -16,7 +16,7 @@ export default function RequireAuth() {
   }
   if (!benutzer) {
     // Vollständige URL: `pathname` allein verliert die Deeplink-Selektion des
-    // Query-Param-Musters (`?einheit=`, `?meldung=`, ETB `?eintrag=` — s. CLAUDE.md).
+    // Query-Param-Musters (`?einheit=`, `?meldung=`, ETB `?eintrag=` — s. frontend/AGENTS.md).
     const von = `${location.pathname}${location.search}${location.hash}`;
     return <Navigate to="/login" replace state={{ von }} />;
   }

@@ -7,7 +7,7 @@ description: Use when a task, follow-up, bug, tech-debt item, deferred work ("sp
 
 ## Überblick
 
-Tasks und Follow-ups werden **selbstständig** über den ClickUp-MCP angelegt — ohne
+Tasks und Follow-ups werden **selbstständig** über den ClickUp-Connector angelegt — ohne
 vorher um Erlaubnis oder nach der Liste zu fragen. Ziel ist immer das
 **Entwicklungsboard** (`901523554968`).
 
@@ -25,7 +25,7 @@ Sobald etwas auftaucht, das nicht jetzt erledigt wird, aber nicht verloren gehen
 
 ## So anlegen
 
-`mcp__claude_ai_ClickUp__clickup_create_task` mit:
+`clickup_create_task` des ClickUp-Connectors (Präfix je Umgebung, siehe `AGENTS.md`) mit:
 
 - `list_id`: **`901523554968`** (fix — nicht nach der Liste fragen)
 - `name`: kurzer, konkreter Titel auf Deutsch; BOS-/Fachsprache statt generischer Dev-Begriffe
