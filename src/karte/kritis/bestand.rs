@@ -253,12 +253,18 @@ async fn abfrage_roh(pool: &SqlitePool, b: &Bbox) -> Result<Option<FachebeneAntw
         sammelpunkte(pool, b).await?
     };
 
-    Ok(Some(FachebeneAntwort::ok(
-        "kritis",
-        KRITIS_ATTRIB,
-        Some(meta.stand),
-        json!({ "type": "FeatureCollection", "features": features }),
-    )))
+    // `stand` ist der Extrakt, `abgerufen` der letzte gelungene Abgleich mit ihm (LFH-591) — auch
+    // ein Lauf, der den Extrakt unverändert vorfand, schreibt `importiert_at` fort.
+    Ok(Some(FachebeneAntwort {
+        abgerufen: chrono::DateTime::from_timestamp(meta.importiert_at, 0)
+            .map(crate::karte::typen::zeitpunkt_utc),
+        ..FachebeneAntwort::ok(
+            "kritis",
+            KRITIS_ATTRIB,
+            Some(meta.stand),
+            json!({ "type": "FeatureCollection", "features": features }),
+        )
+    }))
 }
 
 /// Je berührter Rasterzelle ein Punkt (Koordinatenmittel) mit `anzahl`, aus den vorberechneten
@@ -385,6 +391,28 @@ mod tests {
         let m = meta(&p).await.unwrap();
         assert_eq!(m.anzahl, 2, "anzahl zählt die geschriebenen Objekte");
         assert_eq!(m.etag.as_deref(), Some("\"abc\""));
+    }
+
+    /// LFH-591: `abgerufen` ist der letzte gelungene Abgleich, auch ohne neuen Extrakt; `stand`
+    /// bleibt der Extrakt.
+    #[tokio::test]
+    async fn abgerufen_ist_der_letzte_abgleich() {
+        let (_d, p) = pool().await;
+        ersetze_bestand(
+            &p,
+            &[objekt(1, 6.95, 50.94)],
+            &meta_mit("2026-09-01T00:00:00Z"),
+        )
+        .await
+        .unwrap();
+        let a = abfrage(&p, &bbox(6.0, 50.0, 7.0, 51.0)).await;
+        // 1_790_000_000 aus `meta_mit`, handgerechnet statt über `zeitpunkt_utc`.
+        assert_eq!(a.abgerufen.as_deref(), Some("2026-09-21T14:13:20Z"));
+
+        bestaetige_unveraendert(&p, 1_790_600_000).await.unwrap();
+        let a = abfrage(&p, &bbox(6.0, 50.0, 7.0, 51.0)).await;
+        assert_eq!(a.abgerufen.as_deref(), Some("2026-09-28T12:53:20Z"));
+        assert_eq!(a.stand.as_deref(), Some("2026-09-01T00:00:00Z"));
     }
 
     /// Ein abgebrochener Lauf hinterlässt eine halbe Staging-Tabelle; der nächste baut nicht darauf

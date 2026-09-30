@@ -19,6 +19,7 @@ import { hochwasserDarstellung } from './hochwasserStil';
 import { luftqualitaetDarstellung } from './luftqualitaetStil';
 import { odlDarstellung, odlGrundlage } from './odlStil';
 import KartenDetailCard from './KartenDetailCard';
+import FachebeneStand from './FachebeneStand';
 
 interface FachebenenInspectorProps {
   quelle: FachebeneQuelle;
@@ -32,6 +33,12 @@ interface FachebenenInspectorProps {
    * Einsatz-Schreibrecht der Lagekarte (im Snapshot-Modus `false`).
    */
   pegelBezug?: { einsatzId: number; darfSchreiben: boolean };
+  /**
+   * Abrufzeitpunkt der Ebene durch den Server (LFH-591). Steht neben den Zeitangaben der Quelle
+   * am Objekt, ersetzt sie nicht: eine Meldeklasse kann frisch gemessen und trotzdem vor zwei
+   * Tagen abgerufen sein.
+   */
+  abgerufen?: string;
 }
 
 /** Nur http(s) zulassen. Die Werte kommen aus fremden Quellen (OSM-Tags, Autobahn-API);
@@ -656,6 +663,7 @@ export default function FachebenenInspector({
   geometrie,
   onSchliessen,
   pegelBezug,
+  abgerufen,
 }: FachebenenInspectorProps) {
   const { token } = theme.useToken();
   const p = properties;
@@ -707,6 +715,16 @@ export default function FachebenenInspector({
       {kennzahlen && (
         <div style={{ marginTop: token.marginSM }}>
           <GeoKennzahlen kennzahlen={kennzahlen} />
+        </div>
+      )}
+      {abgerufen && (
+        <div style={{ marginTop: token.marginSM }}>
+          <FachebeneStand
+            quelle={quelle}
+            abgerufen={abgerufen}
+            form="voll"
+            praefix="Ebene abgerufen"
+          />
         </div>
       )}
     </KartenDetailCard>

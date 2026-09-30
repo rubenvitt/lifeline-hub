@@ -3,13 +3,50 @@
 Die Lagekarte holt externe Lagedaten über den Backend-Aggregator
 `GET /api/karte/fachebenen/{quelle}`. Das Backend ruft die jeweilige Quelle ab,
 normalisiert sie zu einer GeoJSON-`FeatureCollection` und liefert einen einheitlichen
-Umschlag `{ quelle, status, attribution, stand, features }`.
+Umschlag `{ quelle, status, attribution, stand, abgerufen, features }`.
+
+**`stand` und `abgerufen` sind zwei Aussagen (LFH-591).** `stand` ist der Datenstand der
+**Quelle**, wo sie einen liefert: KRITIS das Extrakt-Datum, Energie den MaStR-Abzug,
+Luftqualität den jüngsten Messzeitpunkt. `abgerufen` ist der Zeitpunkt (RFC 3339, UTC), zu dem
+**das System** den ausgelieferten Stand bei der Quelle geholt hat. Das Feld steht bei `ok` und
+`leer` und fehlt bei `offline`. Es reist im Cache-JSON mit: ein veralteter Stand behält seinen
+Abrufzeitpunkt. Bei KRITIS ist es der letzte gelungene Abgleich mit dem Extrakt, auch ohne
+neuen Extrakt; bei Energie der ältere der beiden Teile mit Stand.
 
 **Offline-Verhalten (alle Quellen):** Ist eine Quelle nicht erreichbar (Timeout, DNS,
 HTTP-Fehler), antwortet der Aggregator mit HTTP **200** und `status: "offline"` plus leerer
-Collection — niemals mit einem 5xx-Fehler. Liegt ein noch gültiger Cache-Eintrag vor, wird
-dieser als `status: "ok"` weitergereicht (Stale-Serving). Im Frontend wird eine Ebene mit
-`status: "offline"` ausgegraut/als „offline" markiert; `status: "leer"` zeigt „keine Daten".
+Collection — niemals mit einem 5xx-Fehler. Liegt ein Cache-Eintrag vor, wird er bis zum
+Cache-Deckel von 48 h als `status: "ok"` weitergereicht (Stale-Serving). Im Frontend wird eine
+Ebene mit `status: "offline"` ausgegraut/als „offline" markiert; `status: "leer"` zeigt „keine
+Daten".
+
+**Alter des Stands (LFH-591).** Die Zeile jeder zugeschalteten Ebene im Fachebenen-Panel
+zeigt `abgerufen` als „Stand 1430“, an einem Vortag als „Stand 291430“. Überschreitet das Alter
+die Schwelle der Ebene, steht davor „⧖ veraltet ·“ in der Achtung-Textfarbe. Das Wort ist der
+zweite Kanal neben der Farbe. Das ist eine Marke am Status `ok`/`leer`, kein eigener Status:
+Takt, Attribution und Ausgrauen bleiben unberührt, die Daten bleiben auf der Karte. Die
+Einstufung altert im Minutentakt mit, auch ohne neuen Abruf. Fällt der eigene Server aus und die
+Karte zeigt gehaltene Daten, steht der Stand neben „offline“. Der Inspector nennt denselben
+Zeitpunkt als volle DTG („Ebene abgerufen …“) neben den Zeitangaben der Quelle am Objekt.
+
+| Ebene | Server-TTL | veraltet nach | Begründung |
+|---|---|---|---|
+| NINA | 90 s | 15 min | Warnungen: eine neue muss schnell sichtbar sein; ~10 ausgefallene Erneuerungen |
+| DWD | 300 s | 30 min | Warnungen wie NINA, gröberer Takt |
+| PEGELONLINE | 300 s | 60 min | Messwerte ~15 min, vier verpasst |
+| Hochwasser | 300 s | 60 min | Amtliche Meldeklasse, Anlass von LFH-591 |
+| Autobahn | 600 s | 60 min | Sechs Läufe verpasst |
+| ODL | 600 s | 3 h | Stundenwerte: zwei verpasst, plus Verzug der Quelle |
+| Luftqualität | 900 s | 4 h | Stundenwerte mit ~2 h Verzug; der Verzug zählt nicht als Veraltung |
+| Energie | 24 h | 36 h | 1,5 × TTL, unter dem Cache-Deckel von 48 h |
+| KRITIS | Import 168 h | 14 Tage | Zwei Importläufe im Vorgabe-Intervall verpasst |
+
+Genau auf der Schwelle gilt ein Stand noch nicht als veraltet. Die Schwellen stehen als
+`veraltetNachMin` in `frontend/src/pages/lagekarte/fachebenen.ts`. Sie liegen alle bei
+mindestens 15 min und damit über jedem üblichen Uhrenversatz zwischen Server und Browser; ein
+Zeitpunkt in der Zukunft zählt als Alter 0. **KRITIS:** Das Import-Intervall ist konfigurierbar
+(`--kritis-extrakt-intervall-stunden`), die Schwelle nicht. Wer das Intervall über 14 Tage
+hebt, sieht KRITIS schon vor dem nächsten Lauf als veraltet.
 
 Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Attribution
 (unten rechts) eingeblendet.

@@ -45,6 +45,7 @@ import { ZONE_TYPEN } from './zonenStil';
 import FreiesZeichenPicker from './FreiesZeichenPicker';
 import MarkerSuche from './MarkerSuche';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
+import FachebeneStand from './FachebeneStand';
 import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
 import { istLatLon, type KoordinatenWert } from '../../anzeige/koordinatenWert';
@@ -273,6 +274,11 @@ export interface SidebarProps {
   zoomZuKlein?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */
   fachebenenLaedt?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
+  /**
+   * Abrufzeitpunkt des Servers je sichtbarer Fachebene (LFH-591) — auch neben „offline“, solange
+   * die Karte gehaltene Daten zeichnet (`useFachebenen`).
+   */
+  fachebenenAbgerufen?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, string>>;
   /** Bild-Hintergründe */
   bilder: Hintergrundbild[];
   onBildUpload: (datei: File) => void;
@@ -1051,6 +1057,11 @@ export default function Sidebar(props: SidebarProps) {
                       <Typography.Text type="secondary" style={{ fontSize: 11 }}>
                         {def.geltung}
                       </Typography.Text>
+                    )}
+                    {/* Alter des Stands als eigene Zeile, nicht in der Statusmarke rechts: die
+                        steht nur für einen Zustand, und „offline“ und Stand gelten zusammen. */}
+                    {sichtbar && (
+                      <FachebeneStand quelle={key} abgerufen={props.fachebenenAbgerufen?.[key]} />
                     )}
                   </span>
                   {laedt ? (

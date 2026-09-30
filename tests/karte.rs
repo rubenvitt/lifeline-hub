@@ -532,6 +532,8 @@ async fn fachebenen_kritis_ohne_bestand_offline() {
     let v = json(res).await;
     assert_eq!(v["status"], "offline");
     assert_eq!(v["features"]["features"].as_array().unwrap().len(), 0);
+    // LFH-591: ohne Stand kein Abrufzeitpunkt — der Schlüssel fehlt, statt `null` zu sein.
+    assert!(!v.as_object().unwrap().contains_key("abgerufen"), "{v}");
 }
 
 #[tokio::test]
@@ -571,11 +573,44 @@ async fn fachebenen_kritis_aus_dem_bestand() {
     assert_eq!(v["quelle"], "kritis");
     assert_eq!(v["status"], "ok");
     assert_eq!(v["stand"], "2026-09-20T20:21:44+00:00");
+    // LFH-591: der letzte Abgleich (`importiert_at` = 0), getrennt vom Extrakt-Stand.
+    assert_eq!(v["abgerufen"], "1970-01-01T00:00:00Z");
     assert_eq!(v["attribution"], "© OpenStreetMap-Beitragende (ODbL)");
     assert_eq!(
         v["features"]["features"][0]["properties"]["titel"],
         "Uniklinik"
     );
+}
+
+/// LFH-591: ein Stand aus dem Cache nennt den Zeitpunkt SEINES Abrufs, nicht den der Anfrage —
+/// Status `ok`, HTTP 200. Frisch im Sinne der TTL, damit kein Hintergrundabruf ans Netz geht; das
+/// Alter steckt im gespeicherten Feld.
+#[tokio::test]
+async fn fachebenen_gecachter_stand_nennt_seinen_abrufzeitpunkt() {
+    use lifeline_hub::karte::typen::FachebeneAntwort;
+    let dir = lifeline_hub::db::test_karten_dir();
+    let cache = lifeline_hub::cache_db::cache_pool(&dir).await.unwrap();
+    let gecacht = FachebeneAntwort {
+        abgerufen: Some("2026-09-28T08:15:00Z".into()),
+        ..FachebeneAntwort::ok(
+            "autobahn",
+            "Autobahn GmbH des Bundes",
+            None,
+            serde_json::json!({ "type": "FeatureCollection", "features": [
+                { "type": "Feature",
+                  "geometry": { "type": "Point", "coordinates": [6.86, 50.98] },
+                  "properties": { "titel": "A1", "kategorie": "webcam" } }
+            ]}),
+        )
+    };
+    lifeline_hub::karte::cache::setze(&cache, "autobahn", &gecacht).await;
+
+    let app = app_mit(pool().await, dir);
+    let res = anfrage(&app, "GET", "/api/karte/fachebenen/autobahn", None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    assert_eq!(v["status"], "ok");
+    assert_eq!(v["abgerufen"], "2026-09-28T08:15:00Z");
 }
 
 /// Die Hochwasser-Ebene (LFH-77) muss im Quellen-`match` der Route stehen — sonst

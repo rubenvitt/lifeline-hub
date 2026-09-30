@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useState,
-  useSyncExternalStore,
-  type CSSProperties,
-  type ReactNode,
-} from 'react';
+import { useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { theme } from 'antd';
 import { TbAntennaBars5, TbAntennaBarsOff } from 'react-icons/tb';
 import { Link } from 'react-router';
@@ -14,6 +8,7 @@ import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
 import type { LiveVerbindungsStatus } from '../live/useEinsatzLiveStream';
 import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
 import { useOnline } from '../offline/useOnline';
+import { useMinutenTakt } from './useMinutenTakt';
 import type { OfflineQueueZaehler } from '../offline/queue';
 import { einsaetzePfad } from '../routing/deeplinks';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
@@ -156,30 +151,6 @@ export function Wortmarke() {
       lifeline-hub
     </Link>
   );
-}
-
-/**
- * Ein Takt, der zur vollen Minute tickt — für Uhr und Einsatzdauer.
- *
- * Erst ein `setTimeout` bis zur nächsten Minutengrenze, danach ein Minutenintervall; ein bloßes
- * `setInterval(60 000)` zeigte bis zu 59 s die alte Minute. Liefert Millisekunden (primitiv, für
- * Dependency-Arrays).
- */
-export function useMinutenTakt(): number {
-  const [jetzt, setJetzt] = useState(() => Date.now());
-  useEffect(() => {
-    let intervall: ReturnType<typeof setInterval> | undefined;
-    const bisZurMinute = 60_000 - (Date.now() % 60_000);
-    const start = setTimeout(() => {
-      setJetzt(Date.now());
-      intervall = setInterval(() => setJetzt(Date.now()), 60_000);
-    }, bisZurMinute);
-    return () => {
-      clearTimeout(start);
-      if (intervall) clearInterval(intervall);
-    };
-  }, []);
-  return jetzt;
 }
 
 /** Uhrzeit HH:MM in Browserzeit. */

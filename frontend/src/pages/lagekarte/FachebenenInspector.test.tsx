@@ -165,6 +165,33 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('BB_503050')).toBeInTheDocument();
   });
 
+  it('nennt den Abrufzeitpunkt der Ebene und kennzeichnet einen alten Stand (LFH-591)', () => {
+    const vor40h = new Date(Date.now() - 40 * 3_600_000).toISOString();
+    render(
+      <FachebenenInspector
+        quelle="hochwasser"
+        properties={{ titel: 'Wittenberge / Elbe', pgnr: 'BB_503050', klasse: 'gross' }}
+        abgerufen={vor40h}
+        onSchliessen={() => {}}
+      />,
+    );
+    // Die Meldeklasse bleibt — sie ist nur als alt gekennzeichnet.
+    expect(screen.getByText('großes Hochwasser')).toBeInTheDocument();
+    const zeile = screen.getByText(/Ebene abgerufen/).closest('[data-lfh="fachebene-stand"]')!;
+    expect(zeile).toHaveTextContent(`veraltet · Ebene abgerufen ${taktischeDtgVoll(vor40h)}`);
+  });
+
+  it('ohne Abrufzeitpunkt keine Zeile zur Ebene (LFH-591)', () => {
+    render(
+      <FachebenenInspector
+        quelle="hochwasser"
+        properties={{ titel: 'Wittenberge / Elbe', pgnr: 'BB_503050', klasse: 'gross' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.queryByText(/Ebene abgerufen/)).not.toBeInTheDocument();
+  });
+
   it('Hochwasser: ein Pegel ohne Meldeklassen sagt das, statt einen Rohwert zu zeigen', () => {
     render(
       <FachebenenInspector

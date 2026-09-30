@@ -1647,6 +1647,12 @@ export interface components {
         };
         /** @description Einheitlicher Umschlag für jede Fachebene. */
         FachebeneAntwort: {
+            /**
+             * @description Zeitpunkt (RFC 3339, UTC), zu dem das System den ausgelieferten Stand bei der Quelle
+             *     geholt hat (LFH-591). Reist im Cache-JSON mit, ein veralteter Stand behält also seinen
+             *     Abrufzeitpunkt. Fehlt bei `offline`; Einträge von davor füllt `karte::cache` nach.
+             */
+            abgerufen?: string | null;
             attribution: string;
             /**
              * @description GeoJSON FeatureCollection. Laufzeittyp bleibt `Value` (die Normalisierer bauen sie per
@@ -1655,6 +1661,10 @@ export interface components {
              */
             features: components["schemas"]["GeoJsonFeatureCollection"];
             quelle: string;
+            /**
+             * @description Datenstand der QUELLE, wo sie einen liefert (KRITIS: Extrakt, Energie: MaStR-Abzug,
+             *     Luftqualität: jüngster Messzeitpunkt). Nicht der Abruf — der steht in `abgerufen`.
+             */
             stand?: string | null;
             status: components["schemas"]["FachebeneStatus"];
         };

@@ -107,8 +107,9 @@ bei jeder Quellstörung; Luftqualität träfe ihren eigenen Verzug. Eine Tabelle
 Zeile begründen.
 
 **Offene Stelle KRITIS:** Das Import-Intervall ist konfigurierbar
-(`--kritis-extrakt-intervall-stunden`), die Schwelle nicht. Wer das Intervall über eine
-Woche hebt, sieht KRITIS früher als veraltet. Das steht in `docs/fachebenen-quellen.md`.
+(`--kritis-extrakt-intervall-stunden`), die Schwelle nicht. Wer das Intervall über 14 Tage
+hebt, sieht KRITIS schon vor dem nächsten Lauf als veraltet. Das steht in
+`docs/fachebenen-quellen.md`.
 
 ### D4 — Einstufung als reine Funktion, Takt aus `useMinutenTakt`
 

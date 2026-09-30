@@ -58,12 +58,24 @@ pub struct FachebeneAntwort {
     pub quelle: String,
     pub status: FachebeneStatus,
     pub attribution: String,
+    /// Datenstand der QUELLE, wo sie einen liefert (KRITIS: Extrakt, Energie: MaStR-Abzug,
+    /// Luftqualität: jüngster Messzeitpunkt). Nicht der Abruf — der steht in `abgerufen`.
     pub stand: Option<String>,
+    /// Zeitpunkt (RFC 3339, UTC), zu dem das System den ausgelieferten Stand bei der Quelle
+    /// geholt hat (LFH-591). Reist im Cache-JSON mit, ein veralteter Stand behält also seinen
+    /// Abrufzeitpunkt. Fehlt bei `offline`; Einträge von davor füllt `karte::cache` nach.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub abgerufen: Option<String>,
     /// GeoJSON FeatureCollection. Laufzeittyp bleibt `Value` (die Normalisierer bauen sie per
     /// `json!`); `GeoJsonFeatureCollection` ist der Schema-Anker (LFH-265), belegt durch die
     /// `from_value`-Tests in `karte::normalisierung`.
     #[schema(value_type = GeoJsonFeatureCollection)]
     pub features: Value,
+}
+
+/// Zeitpunkt als RFC 3339 in UTC auf Sekunden — die Form von `FachebeneAntwort.abgerufen`.
+pub fn zeitpunkt_utc(t: chrono::DateTime<chrono::Utc>) -> String {
+    t.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
 }
 
 /// Leere FeatureCollection.
@@ -72,7 +84,8 @@ pub fn leere_collection() -> Value {
 }
 
 impl FachebeneAntwort {
-    /// Erfolg mit Features. `status` wird automatisch `leer`, wenn 0 Features.
+    /// Erfolg mit Features. `status` wird automatisch `leer`, wenn 0 Features. `abgerufen` ist
+    /// jetzt: jede Quelle baut ihre Antwort direkt nach dem Abruf über diesen Konstruktor.
     pub fn ok(quelle: &str, attribution: &str, stand: Option<String>, features: Value) -> Self {
         let leer = features
             .get("features")
@@ -88,6 +101,7 @@ impl FachebeneAntwort {
             },
             attribution: attribution.to_string(),
             stand,
+            abgerufen: Some(zeitpunkt_utc(chrono::Utc::now())),
             features,
         }
     }
@@ -99,6 +113,7 @@ impl FachebeneAntwort {
             status: FachebeneStatus::Offline,
             attribution: attribution.to_string(),
             stand: None,
+            abgerufen: None,
             features: leere_collection(),
         }
     }
@@ -288,6 +303,40 @@ mod tests {
         let a = FachebeneAntwort::offline("nina", "BBK");
         assert_eq!(a.status, FachebeneStatus::Offline);
         assert_eq!(a.features["features"].as_array().unwrap().len(), 0);
+    }
+
+    /// LFH-591: ein Stand mit Daten nennt, wann er bei der Quelle geholt wurde.
+    #[test]
+    fn ok_traegt_den_abrufzeitpunkt() {
+        let vorher = chrono::Utc::now().timestamp();
+        let a = FachebeneAntwort::ok("dwd", "X", None, leere_collection());
+        let abgerufen = a.abgerufen.expect("abgerufen gesetzt");
+        let t = chrono::DateTime::parse_from_rfc3339(&abgerufen).expect("RFC 3339");
+        assert!(abgerufen.ends_with('Z'), "UTC: {abgerufen}");
+        assert!(
+            (vorher - 1..=vorher + 5).contains(&t.timestamp()),
+            "{abgerufen}"
+        );
+    }
+
+    /// LFH-591, LFH-265: `offline` hat keinen Stand, das Feld fehlt statt `null` zu sein.
+    #[test]
+    fn offline_ohne_abrufzeitpunkt_auf_dem_draht() {
+        let a = FachebeneAntwort::offline("nina", "BBK");
+        assert_eq!(a.abgerufen, None);
+        let v = serde_json::to_value(&a).unwrap();
+        assert!(!v.as_object().unwrap().contains_key("abgerufen"), "{v}");
+    }
+
+    /// Einträge von vor LFH-591 tragen das Feld nicht und müssen lesbar bleiben.
+    #[test]
+    fn umschlag_ohne_abrufzeitpunkt_ist_lesbar() {
+        let a: FachebeneAntwort = serde_json::from_value(json!({
+            "quelle": "dwd", "status": "ok", "attribution": "X",
+            "features": leere_collection()
+        }))
+        .unwrap();
+        assert_eq!(a.abgerufen, None);
     }
 
     #[test]
