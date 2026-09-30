@@ -17,12 +17,7 @@ import {
 import { faerbeHochwasser, hochwasserRadius } from './hochwasserStil';
 import { faerbeLuftqualitaet, luftqualitaetRadius } from './luftqualitaetStil';
 import { faerbeOdl, odlRadius } from './odlStil';
-import {
-  hochwasserKlasse,
-  luftqualitaetIndex,
-  odlStufe,
-  type StatusDarstellung,
-} from '../../theme/statusFarben';
+import { hochwasserKlasse, luftqualitaetIndex, odlStufe } from '../../theme/statusFarben';
 
 // Minimaler Feature-Builder für die Merge-Tests.
 const feat = (lon: number, lat: number) => ({
@@ -103,11 +98,11 @@ describe('Fachebenen-Registry', () => {
   it('liest die Legende einer klassenabhängigen Ebene aus dem Vertrag (LFH-592)', () => {
     // Reihenfolge, Wort, Rolle und Durchmesser genau wie die Karte sie zeichnet — nichts neu
     // erfunden.
-    const legende = (vertrag: Record<string, StatusDarstellung>, radius: (k: never) => number) =>
-      Object.entries(vertrag).map(([schluessel, darstellung]) => ({
+    const legende = <K extends string>(vertrag: Record<K, unknown>, radius: (k: K) => number) =>
+      (Object.keys(vertrag) as K[]).map((schluessel) => ({
         schluessel,
-        darstellung,
-        radius: radius(schluessel as never),
+        darstellung: vertrag[schluessel],
+        radius: radius(schluessel),
       }));
     expect(FACHEBENEN.hochwasser.klassenfarben?.legende).toEqual(
       legende(hochwasserKlasse, hochwasserRadius),

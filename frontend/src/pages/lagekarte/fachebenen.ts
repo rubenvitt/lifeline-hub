@@ -6,9 +6,13 @@ import {
   odlStufe,
   type StatusDarstellung,
 } from '../../theme/statusFarben';
-import { faerbeHochwasser, hochwasserRadius } from './hochwasserStil';
-import { faerbeLuftqualitaet, luftqualitaetRadius } from './luftqualitaetStil';
-import { faerbeOdl, odlRadius } from './odlStil';
+import { faerbeHochwasser, hochwasserDarstellung, hochwasserRadius } from './hochwasserStil';
+import {
+  faerbeLuftqualitaet,
+  luftqualitaetDarstellung,
+  luftqualitaetRadius,
+} from './luftqualitaetStil';
+import { faerbeOdl, odlDarstellung, odlRadius } from './odlStil';
 
 type Feature = FeatureCollection['features'][number];
 
@@ -58,14 +62,24 @@ export interface Klassenfarben {
   faerbe: (fc: FeatureCollection, token: GlobalToken) => FeatureCollection;
 }
 
-/** Legende aus einem Vertrag und der Radiusstaffel des Stilmoduls — nichts wird neu erfunden. */
+/** Schlüssel eines Vertrags in seiner Reihenfolge — die Reihenfolge der Legende. */
+function klassenVon<K extends string>(vertrag: Record<K, unknown>): K[] {
+  return Object.keys(vertrag) as K[];
+}
+
+/**
+ * Legende aus den Klassen eines Vertrags und den Lesefunktionen des Stilmoduls — nichts wird neu
+ * erfunden. Wort und Rolle kommen über dieselbe `…Darstellung`-Funktion, die auch der Inspector
+ * liest; die Karte selbst bleibt in `theme/statusFarben.ts` (Guard `statusVertrag.guard.test.ts`).
+ */
 function legendeAus<K extends string>(
-  vertrag: Record<K, StatusDarstellung>,
+  klassen: readonly K[],
+  darstellung: (k: K) => StatusDarstellung,
   radius: (k: K) => number,
 ): KlassenEintrag[] {
-  return (Object.keys(vertrag) as K[]).map((schluessel) => ({
+  return klassen.map((schluessel) => ({
     schluessel,
-    darstellung: vertrag[schluessel],
+    darstellung: darstellung(schluessel),
     radius: radius(schluessel),
   }));
 }
@@ -146,7 +160,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     pollMs: 300_000,
     bboxAbhaengig: false,
     klassenfarben: {
-      legende: legendeAus(hochwasserKlasse, hochwasserRadius),
+      legende: legendeAus(klassenVon(hochwasserKlasse), hochwasserDarstellung, hochwasserRadius),
       faerbe: faerbeHochwasser,
     },
   },
@@ -163,7 +177,11 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     bboxAbhaengig: false,
     geltung: 'Messstationen — keine Aussage zwischen den Stationen',
     klassenfarben: {
-      legende: legendeAus(luftqualitaetIndex, luftqualitaetRadius),
+      legende: legendeAus(
+        klassenVon(luftqualitaetIndex),
+        luftqualitaetDarstellung,
+        luftqualitaetRadius,
+      ),
       faerbe: faerbeLuftqualitaet,
     },
   },
@@ -179,7 +197,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     bboxAbhaengig: false,
     geltung: 'nur ortsfeste BfS-Sonden (Stundenwerte) — keine Einsatzmessungen',
     klassenfarben: {
-      legende: legendeAus(odlStufe, odlRadius),
+      legende: legendeAus(klassenVon(odlStufe), odlDarstellung, odlRadius),
       faerbe: faerbeOdl,
     },
   },
