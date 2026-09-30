@@ -778,3 +778,52 @@ async function oeffnePersonalAuswahl(container: HTMLElement, platzhalter: string
   expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
   await userEvent.click(within(feld!).getByRole('combobox'));
 }
+
+describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
+  const zelleDerSpalte = (titel: string) => {
+    const kopf = [...document.querySelectorAll('th')].map((t) => t.textContent);
+    const i = kopf.indexOf(titel);
+    expect(i).toBeGreaterThan(-1);
+    const zeile = document.querySelector('[data-row-key="10"]') as HTMLElement;
+    return zeile.querySelectorAll('td')[i] as HTMLElement;
+  };
+
+  it('ohne Ereignisse: „—" in Einsatzdauer und Ruhe, nie eine Zahl', async () => {
+    setzeViewportBreite(1440);
+    render(einsatz());
+    await screen.findByText('Thomas Müller');
+    await waitFor(() => expect(zelleDerSpalte('Einsatzdauer')).toHaveTextContent('—'));
+    expect(zelleDerSpalte('Ruhe')).toHaveTextContent('—');
+    expect(zelleDerSpalte('Einsatzdauer').textContent).not.toMatch(/\d/);
+  });
+
+  it('laufende Periode: Einsatzdauer steht, Ruhe fehlt', async () => {
+    setzeViewportBreite(1440);
+    const beginn = new Date(Date.now() - (2 * 60 + 5) * 60_000)
+      .toISOString()
+      .slice(0, 19)
+      .replace('T', ' ');
+    server.use(
+      http.get('/api/einsaetze/7/personal/zeitachse', () =>
+        HttpResponse.json([
+          { personal_id: 10, perioden: [{ beginn_at: beginn, anker: 'alarmierung' }] },
+        ]),
+      ),
+    );
+    render(einsatz());
+    await screen.findByText('Thomas Müller');
+    await waitFor(() => expect(zelleDerSpalte('Einsatzdauer')).toHaveTextContent('2 h 05'));
+    expect(zelleDerSpalte('Ruhe')).toHaveTextContent('—');
+  });
+
+  it('klappt die Zeitachse der Person inline auf', async () => {
+    setzeViewportBreite(1440);
+    render(einsatz());
+    await screen.findByText('Thomas Müller');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Zeitachse zu Thomas Müller' }),
+    );
+    expect(await screen.findByText(/Noch keine Ereignisse/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nachtragen' })).toBeEnabled();
+  });
+});

@@ -243,11 +243,16 @@ test('Personalseite: Weiche und kein Querlauf auch im Nur-Lese-Zweig (Beobachter
   await expect(statusAusloeser, 'Vorbedingung: ohne Schreibrecht kein Statusauslöser').toHaveCount(
     0,
   );
-  // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entfernen".
+  // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entfernen". Einzige
+  // Ausnahme ist der LESENDE Aufklapper der Kräfte-Zeitachse (LFH-552), eigens gezählt.
   await expect(
-    karte.getByRole('button'),
-    'Vorbedingung: die Karte trägt ohne Schreibrecht kein Bedienziel',
+    karte.getByRole('button', { name: /^(?!Zeitachse zu )/ }),
+    'Vorbedingung: die Karte trägt ohne Schreibrecht kein schreibendes Bedienziel',
   ).toHaveCount(0);
+  await expect(
+    karte.getByRole('button', { name: /^Zeitachse zu / }),
+    'Vorbedingung: der lesende Aufklapper der Zeitachse steht',
+  ).toHaveCount(1);
   await expect
     .poll(querlauf, { message: 'Personal (390 px, Beobachter) läuft waagerecht über' })
     .toBeLessThanOrEqual(SUBPIXEL);

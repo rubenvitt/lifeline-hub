@@ -22,6 +22,7 @@ const status: {
   farbe: string | null;
   fms_anker: number | null;
   sortier: number;
+  zeitachse_marke?: string;
 }[] = [
   {
     id: 1,
@@ -368,7 +369,7 @@ describe('StatusKatalogTab', () => {
    * Der Vorrat trägt deshalb in allen drei Feldern echte Werte, und der Weg klappt bewusst
    * NICHT auf.
    */
-  it('behält Farbe, FMS-Anker und Sortierung, wenn niemand aufklappt', async () => {
+  it('behält Farbe, FMS-Anker, Sortierung und Zeitachsen-Marke, wenn niemand aufklappt', async () => {
     let ruempf: Record<string, unknown> | null = null;
     server.use(
       http.patch('/api/fahrzeug-status/1', async ({ request }) => {
@@ -384,6 +385,7 @@ describe('StatusKatalogTab', () => {
         farbe: '#112233',
         fms_anker: 5,
         sortier: 10,
+        zeitachse_marke: 'eintreffen',
       },
     ]);
     await screen.findByText('einsatzbereit');
@@ -402,6 +404,7 @@ describe('StatusKatalogTab', () => {
       farbe: '#112233',
       fms_anker: 5,
       sortier: 10,
+      zeitachse_marke: 'eintreffen',
     });
   });
 
@@ -440,12 +443,13 @@ describe('StatusKatalogTab', () => {
   });
 
   /**
-   * Das Feldbudget: zwei sichtbare Felder statt fünf.
+   * Das Feldbudget: zwei sichtbare Felder statt sechs (die Zeitachsen-Marke, LFH-552, liegt
+   * mit unter „Weitere Angaben").
    *
    * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — die Kategorie ist ein
    * `Select`. Die zweite Hälfte ist Pflicht: „höchstens zwei" erfüllte auch ein Dialog ohne Felder.
    */
-  it('zeigt zwei Felder und deckt drei weitere erst beim Aufklappen auf', async () => {
+  it('zeigt zwei Felder und deckt vier weitere erst beim Aufklappen auf', async () => {
     render(admin);
     await screen.findByText('einsatzbereit');
     await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
@@ -454,6 +458,54 @@ describe('StatusKatalogTab', () => {
     expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(2);
 
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
-    await waitFor(() => expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(5));
+    await waitFor(() => expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(6));
+  });
+
+  describe('Zeitachsen-Marke (LFH-552)', () => {
+    it('zeigt die Marke als Wort und ohne Marke „—"', async () => {
+      render(admin, [{ ...status[0], zeitachse_marke: 'eintreffen' }, status[1]]);
+      await screen.findByText('einsatzbereit');
+      expect(screen.getByText('Eintreffen')).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'Zeitachse' })).toBeInTheDocument();
+    });
+
+    it('Hinweis nur, solange kein Status eine Marke trägt', async () => {
+      const { unmount } = render(admin);
+      await screen.findByText('einsatzbereit');
+      expect(screen.getByText(/Zeitachse: keine Marke gesetzt/)).toBeInTheDocument();
+      unmount();
+      render(admin, [{ ...status[0], zeitachse_marke: 'alarmierung' }, status[1]]);
+      await screen.findByText('einsatzbereit');
+      expect(screen.queryByText(/Zeitachse: keine Marke gesetzt/)).not.toBeInTheDocument();
+    });
+
+    it('kein Hinweis bei leerem Katalog', async () => {
+      render(admin, []);
+      await screen.findByText('Kein Status');
+      expect(screen.queryByText(/Zeitachse: keine Marke gesetzt/)).not.toBeInTheDocument();
+    });
+
+    it('Leeren der Marke schickt null (Vollersatz entfernt sie)', async () => {
+      let ruempf: Record<string, unknown> | null = null;
+      server.use(
+        http.patch('/api/fahrzeug-status/1', async ({ request }) => {
+          ruempf = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json({ id: 1 });
+        }),
+      );
+      render(admin, [{ ...status[0], zeitachse_marke: 'eintreffen' }]);
+      await screen.findByText('einsatzbereit');
+      await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+      const feld = (await within(dialog).findByLabelText('Zeitachse (optional)')).closest(
+        '.ant-select',
+      )!;
+      await userEvent.hover(feld);
+      await userEvent.click(feld.querySelector<HTMLElement>('.ant-select-clear')!);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+      await waitFor(() => expect(ruempf).not.toBeNull());
+      expect(ruempf).toMatchObject({ zeitachse_marke: null });
+    });
   });
 });

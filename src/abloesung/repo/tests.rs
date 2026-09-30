@@ -70,7 +70,7 @@ async fn einheit(pool: &SqlitePool, e: i64, name: &str, abschnitt: Option<i64>) 
 fn beginn(einheit_id: i64, rhythmus: Option<i64>) -> BeginnEingabe {
     BeginnEingabe {
         einheit_id,
-        beginn_at: T0.into(),
+        beginn_at: Some(T0.into()),
         rhythmus_minuten: rhythmus,
     }
 }
@@ -749,4 +749,138 @@ async fn aufgeloeste_einheit_hinterlaesst_keine_frist() {
         "der Scheduler löst nichts mehr aus"
     );
     assert!(liste(&w.pool, w.e, None, T0).await.unwrap().is_empty());
+}
+
+// ── Kräfte-Zeitachse (LFH-552) ──────────────────────────────────────────────────────────────
+
+/// Schreibt ein Eintreffen der Einheit in die Kräfte-Zeitachse (wie ein markierter Status).
+async fn eintreffen(w: &Welt, einheit: i64, zeit: &str) {
+    let mut conn = w.pool.acquire().await.unwrap();
+    crate::zeitachse::repo::schreibe_tx(
+        &mut conn,
+        w.e,
+        w.b,
+        crate::zeitachse::repo::Kraft::Einheit(einheit),
+        crate::zeitachse::repo::Neu {
+            art: crate::zeitachse::ZeitachseArt::Eintreffen,
+            zeitpunkt_at: zeit,
+            quelle: crate::zeitachse::ZeitachseQuelle::Status,
+            notiz: None,
+        },
+    )
+    .await
+    .unwrap();
+}
+
+async fn perioden(w: &Welt, einheit: i64) -> Vec<crate::zeitachse::Einsatzperiode> {
+    crate::zeitachse::repo::laden(
+        &w.pool,
+        w.e,
+        crate::zeitachse::repo::Kraft::Einheit(einheit),
+    )
+    .await
+    .unwrap()
+    .perioden
+}
+
+/// MODIFIED `kraefte-abloesung` „Beginn fehlt, Einheit ist eingetroffen".
+#[tokio::test]
+async fn beginn_fehlt_uebernimmt_das_eintreffen() {
+    let w = welt().await;
+    eintreffen(&w, w.f1, "2026-09-22 06:40:00").await;
+    let eingabe = BeginnEingabe {
+        einheit_id: w.f1,
+        beginn_at: None,
+        rhythmus_minuten: Some(360),
+    };
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &eingabe, "2026-09-22 09:00:00")
+        .await
+        .unwrap();
+    assert_eq!(a.beginn_at, "2026-09-22 06:40:00");
+    assert_eq!(a.faellig_at, "2026-09-22 12:40:00");
+}
+
+/// MODIFIED `kraefte-abloesung` „Beginn fehlt" ohne Eintreffen.
+#[tokio::test]
+async fn beginn_fehlt_ohne_eintreffen_ist_jetzt() {
+    let w = welt().await;
+    let eingabe = BeginnEingabe {
+        einheit_id: w.f1,
+        beginn_at: None,
+        rhythmus_minuten: Some(360),
+    };
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &eingabe, "2026-09-22 09:00:00")
+        .await
+        .unwrap();
+    assert_eq!(a.beginn_at, "2026-09-22 09:00:00");
+}
+
+/// Spec `kraefte-zeitachse` „Vollzug beendet die Periode" und „Rücknahme öffnet die Periode
+/// wieder"; die ablösende Einheit bekommt kein Ereignis.
+#[tokio::test]
+async fn vollzug_und_ruecknahme_fuehren_die_zeitachse() {
+    let w = welt().await;
+    eintreffen(&w, w.f1, T0).await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    vollziehen(&w.pool, w.e, a.id, w.b, jetzt, Some(w.f2), jetzt)
+        .await
+        .unwrap();
+    let p = perioden(&w, w.f1).await;
+    assert_eq!(p[0].ende_at.as_deref(), Some(jetzt));
+    assert_eq!(
+        p[0].ende_art,
+        Some(crate::zeitachse::ZeitachseArt::Abloesung)
+    );
+    assert!(perioden(&w, w.f2).await.is_empty(), "Ablöser bleibt leer");
+
+    zuruecknehmen(&w.pool, w.e, a.id, w.b, "2026-09-22 15:41:00")
+        .await
+        .unwrap();
+    let p = perioden(&w, w.f1).await;
+    assert_eq!(p[0].ende_at, None, "wieder offen");
+}
+
+/// Zweite Ablösung derselben Einheit: die Rücknahme trifft das Ereignis ihres eigenen Vollzugs,
+/// nicht das des ersten (design.md D5, Risiko „Rücknahme über den Zeitpunkt").
+#[tokio::test]
+async fn ruecknahme_nach_zweiter_abloesung_trifft_die_richtige() {
+    let w = welt().await;
+    eintreffen(&w, w.f1, T0).await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    vollziehen(&w.pool, w.e, a.id, w.b, "2026-09-22 15:40:00", None, T0)
+        .await
+        .unwrap();
+    eintreffen(&w, w.f1, "2026-09-22 20:00:00").await;
+    let (b, _) = beginnen(
+        &w.pool,
+        w.e,
+        w.b,
+        &BeginnEingabe {
+            einheit_id: w.f1,
+            beginn_at: None,
+            rhythmus_minuten: Some(360),
+        },
+        "2026-09-22 20:05:00",
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        b.beginn_at, "2026-09-22 20:00:00",
+        "Eintreffen der zweiten Periode"
+    );
+    vollziehen(&w.pool, w.e, b.id, w.b, "2026-09-23 02:00:00", None, T0)
+        .await
+        .unwrap();
+    zuruecknehmen(&w.pool, w.e, b.id, w.b, "2026-09-23 02:01:00")
+        .await
+        .unwrap();
+    let p = perioden(&w, w.f1).await;
+    assert_eq!(p.len(), 2);
+    assert_eq!(p[0].ende_at.as_deref(), Some("2026-09-22 15:40:00"));
+    assert_eq!(p[1].ende_at, None);
 }

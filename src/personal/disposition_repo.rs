@@ -243,6 +243,8 @@ pub async fn disponiere_stamm_tx(
 
 /// Disponiert eine Ad-hoc-externe Person (`personal_id = NULL`); `snap_*` sind die eigentlichen
 /// Daten. Initialstatus ist der erste `gebunden`. Liefert die `ep_id`.
+///
+/// Pool-Hülle um [`disponiere_adhoc_tx`] ohne eigene Transaktion.
 pub async fn disponiere_adhoc(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -250,7 +252,21 @@ pub async fn disponiere_adhoc(
     daten: AdhocDaten<'_>,
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
-    let status_id = status_repo::erster_der_kategorie(pool, org_id, KATEGORIE_GEBUNDEN).await?;
+    let mut conn = pool.acquire().await?;
+    disponiere_adhoc_tx(&mut conn, einsatz_id, org_id, daten, disponiert_von).await
+}
+
+/// Wie [`disponiere_adhoc`] auf einer offenen Verbindung (LFH-552: die Route schreibt die
+/// Zeitachse des Initialstatus in derselben Transaktion).
+pub async fn disponiere_adhoc_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    org_id: i64,
+    daten: AdhocDaten<'_>,
+    disponiert_von: i64,
+) -> Result<i64, AppError> {
+    let status_id =
+        status_repo::erster_der_kategorie(&mut *conn, org_id, KATEGORIE_GEBUNDEN).await?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_personal \
             (einsatz_id, personal_id, status_id, staerke_position, snap_name, snap_funktion, \
@@ -264,7 +280,7 @@ pub async fn disponiere_adhoc(
     .bind(daten.funktion)
     .bind(daten.traegerorganisation)
     .bind(disponiert_von)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
     Ok(id)
 }
@@ -474,6 +490,7 @@ mod tests {
                 kategorie: KATEGORIE_GEBUNDEN,
                 farbe: None,
                 sortier: 20,
+                zeitachse_marke: None,
             },
         )
         .await
@@ -921,6 +938,7 @@ mod tests {
                 kategorie: KATEGORIE_GEBUNDEN,
                 farbe: None,
                 sortier: 40,
+                zeitachse_marke: None,
             },
         )
         .await

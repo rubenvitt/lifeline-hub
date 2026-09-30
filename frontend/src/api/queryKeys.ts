@@ -54,6 +54,10 @@ export const EINSATZ_KEYS = {
   modulZaehler: 'einsatz-modul-zaehler',
   dokumente: 'einsatz-dokumente',
   abloesungen: 'einsatz-abloesungen',
+  // Kräfte-Zeitachse (LFH-552): Perioden je Einheit/Person und Zeitachse einer Kraft unter EINEM
+  // Prefix. Kein eigenes Live-Ereignis — jedes Ereignis entsteht in einer Transaktion, die
+  // `einheit`, `personal`, `fahrzeug` oder `abloesung` ohnehin sendet.
+  kraefteZeitachse: 'einsatz-kraefte-zeitachse',
   betreuung: 'einsatz-betreuung',
   verpflegung: 'einsatz-verpflegung',
   // Presse- und Medienarbeit S5 (LFH-554): Presse-Log und Pressemitteilungen unter EINEM Prefix,
@@ -105,7 +109,13 @@ export const EINSATZ_STREAM_EVENTS = {
   // deshalb mit daran.
   schaden: [EINSATZ_KEYS.schaeden, EINSATZ_KEYS.schadenAnhaenge],
   // Der Status einer Einheit ist aus ihren Fahrzeugen abgeleitet.
-  fahrzeug: [EINSATZ_KEYS.fahrzeuge, EINSATZ_KEYS.einheiten, EINSATZ_KEYS.modulZaehler],
+  // Ein markierter Fahrzeugstatus schreibt die Zeitachse seiner Einheit (LFH-552).
+  fahrzeug: [
+    EINSATZ_KEYS.fahrzeuge,
+    EINSATZ_KEYS.einheiten,
+    EINSATZ_KEYS.modulZaehler,
+    EINSATZ_KEYS.kraefteZeitachse,
+  ],
   material: [EINSATZ_KEYS.material],
   tier: [EINSATZ_KEYS.tiere],
   lage_zone: [EINSATZ_KEYS.zonen, EINSATZ_KEYS.gefahrengebiete],
@@ -122,6 +132,8 @@ export const EINSATZ_STREAM_EVENTS = {
     // Ablösungsschichten tragen den Einheitsnamen per Join, und das Auflösen einer Einheit entfernt
     // ihre Schichten; beides feuert nur `einheit`.
     EINSATZ_KEYS.abloesungen,
+    // Handstatus, Nachtrag und Streichung an einer Einheit (LFH-552).
+    EINSATZ_KEYS.kraefteZeitachse,
   ],
   // Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung; Bezirke und
   // Betreuungsstellen tragen den Abschnittsnamen per Join. Umbenennen oder Löschen eines
@@ -146,6 +158,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.abschnitte,
     EINSATZ_KEYS.fuehrungskraefte,
     EINSATZ_KEYS.modulZaehler,
+    // Statuswechsel, Nachtrag, Streichung und Fan-out an einer Person (LFH-552).
+    EINSATZ_KEYS.kraefteZeitachse,
   ],
   lagebericht: [EINSATZ_KEYS.lageberichte, EINSATZ_KEYS.lagebericht],
   chat: [EINSATZ_KEYS.chatKanaele, EINSATZ_KEYS.chatNachrichten, EINSATZ_KEYS.modulZaehler],
@@ -178,7 +192,8 @@ export const EINSATZ_STREAM_EVENTS = {
   dokument: [EINSATZ_KEYS.dokumente],
   // Schichten und Rhythmus-Vorgaben hängen unter EINEM Prefix (Sub-Keys 'liste'/'vorgaben'). Trägt
   // das Ereignis `art`, stammt es vom Scheduler und alarmiert zusätzlich (Escape-Hatch im Hook).
-  abloesung: [EINSATZ_KEYS.abloesungen],
+  // Der Vollzug beendet die Einsatzperiode der abgelösten Einheit (LFH-552).
+  abloesung: [EINSATZ_KEYS.abloesungen, EINSATZ_KEYS.kraefteZeitachse],
   // Bezirke, Stellen und ihre Meldereihen unter EINEM Prefix, damit ein Ereignis Übersicht und
   // Kopfzahl trifft. Nutzlast nur Kennungen.
   betreuung: [EINSATZ_KEYS.betreuung],
@@ -350,6 +365,17 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.abloesungen, einsatzId, 'liste', status] as const,
   abloesungVorgaben: (einsatzId: number) =>
     [EINSATZ_KEYS.abloesungen, einsatzId, 'vorgaben'] as const,
+  // Kräfte-Zeitachse (LFH-552): argumentlos = Invalidierungs-Prefix; Perioden-Listen je Kraftart
+  // und die Zeitachse einer Kraft hängen als Sub-Keys darunter.
+  kraefteZeitachse: (einsatzId: number) => [EINSATZ_KEYS.kraefteZeitachse, einsatzId] as const,
+  kraefteZeitachseEinheiten: (einsatzId: number) =>
+    [EINSATZ_KEYS.kraefteZeitachse, einsatzId, 'einheiten'] as const,
+  kraefteZeitachsePersonal: (einsatzId: number) =>
+    [EINSATZ_KEYS.kraefteZeitachse, einsatzId, 'personal'] as const,
+  kraefteZeitachseEinheit: (einsatzId: number, einheitId: number) =>
+    [EINSATZ_KEYS.kraefteZeitachse, einsatzId, 'einheit', einheitId] as const,
+  kraefteZeitachsePerson: (einsatzId: number, epId: number) =>
+    [EINSATZ_KEYS.kraefteZeitachse, einsatzId, 'person', epId] as const,
   // Betreuung: argumentlos = Invalidierungs-Prefix (Übersicht, Modulzähler und Kennzahl teilen
   // ihn). Die Kopfzahl hängt als Sub-Key darunter, der Stichtag als Wire-String (UTC ohne
   // Zonenkennung), ohne Stichtag der feste Platzhalter 'jetzt'. Nie „jetzt“ als Zeitstempel: der
@@ -634,6 +660,8 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.material,
     EINSATZ_KEYS.abschnitte,
     EINSATZ_KEYS.auftraege,
+    // Spalte „Im Einsatz" (LFH-552)
+    EINSATZ_KEYS.kraefteZeitachse,
     // Aufträge
     EINSATZ_KEYS.befehle,
     // Betroffene

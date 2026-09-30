@@ -26,7 +26,9 @@ use crate::write_retry;
 #[derive(Debug, Clone)]
 pub struct BeginnEingabe {
     pub einheit_id: i64,
-    pub beginn_at: String,
+    /// `None` = das Eintreffen der offenen Einsatzperiode der Einheit (Kräfte-Zeitachse,
+    /// LFH-552), ohne ein solches der Zeitpunkt der Anlage.
+    pub beginn_at: Option<String>,
     /// `None` = Vorgabe des Abschnitts übernehmen.
     pub rhythmus_minuten: Option<i64>,
 }
@@ -253,13 +255,14 @@ struct Roh {
     abloesende_einheit_id: Option<i64>,
     #[sqlx(try_from = "String")]
     status: AbloesungStatus,
+    vollzogen_at: Option<String>,
     etb_vollzug_id: Option<i64>,
 }
 
 async fn roh_tx(conn: &mut SqliteConnection, einsatz_id: i64, id: i64) -> Result<Roh, AppError> {
     sqlx::query_as(
         "SELECT einheit_id, abschnitt_id, beginn_at, rhythmus_minuten, rhythmus_quelle, \
-                faellig_at, abloesende_einheit_id, status, etb_vollzug_id \
+                faellig_at, abloesende_einheit_id, status, vollzogen_at, etb_vollzug_id \
          FROM einsatz_abloesung WHERE id = ? AND einsatz_id = ?",
     )
     .bind(id)
@@ -427,6 +430,12 @@ pub async fn beginnen(
                 ))
             }
         };
+        let beginn_at = match &eingabe.beginn_at {
+            Some(b) => b.clone(),
+            None => crate::zeitachse::repo::offenes_eintreffen_tx(conn, eingabe.einheit_id)
+                .await?
+                .unwrap_or_else(|| jetzt.to_string()),
+        };
         let id = schicht_anlegen_tx(
             conn,
             einsatz_id,
@@ -434,7 +443,7 @@ pub async fn beginnen(
             eingabe.einheit_id,
             &name,
             abschnitt_id,
-            &eingabe.beginn_at,
+            &beginn_at,
             rhythmus,
             quelle,
             None,
@@ -712,6 +721,16 @@ pub async fn vollziehen(
         .execute(&mut *conn)
         .await?;
         schliesse_fristen_tx(conn, id, jetzt).await?;
+        // LFH-552: der Vollzug beendet die Einsatzperiode der abgelösten Einheit (samt Fan-out);
+        // ohne offene Periode bleibt die Zeitachse unberührt.
+        crate::zeitachse::repo::abloesung_vollzogen_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            roh.einheit_id,
+            vollzogen_at,
+        )
+        .await?;
 
         let folge_id = match &abloeser {
             Some((a, a_name)) => Some(
@@ -817,6 +836,17 @@ pub async fn zuruecknehmen(
             return Err(AppError::UnprocessableEntity(format!(
                 "Einheit «{name}» hat inzwischen eine neue laufende Schicht"
             )));
+        }
+        // LFH-552: das Ablösungsereignis der Zeitachse streichen, die Periode ist wieder offen.
+        if let Some(vollzogen_at) = &roh.vollzogen_at {
+            crate::zeitachse::repo::abloesung_zurueckgenommen_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                roh.einheit_id,
+                vollzogen_at,
+            )
+            .await?;
         }
         sqlx::query(
             "UPDATE einsatz_abloesung SET status = 'laufend', vollzogen_at = NULL, \

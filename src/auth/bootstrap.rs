@@ -3,7 +3,9 @@ use crate::einheit::EINHEIT_TYP_STARTLISTE;
 use crate::error::AppError;
 use crate::etb_baustein::ETB_BAUSTEIN_STARTLISTE;
 use crate::fahrzeug::STATUS_STARTLISTE;
-use crate::personal::{PERSONAL_STATUS_STARTLISTE, QUALIFIKATION_STARTLISTE};
+use crate::personal::{
+    PERSONAL_STATUS_STARTLISTE, PERSONAL_STATUS_STARTMARKEN, QUALIFIKATION_STARTLISTE,
+};
 use argon2::password_hash::rand_core::{OsRng, RngCore};
 use sqlx::SqlitePool;
 
@@ -121,13 +123,19 @@ pub async fn bootstrap_admin(
     }
 
     for (label, kategorie, sortier) in PERSONAL_STATUS_STARTLISTE {
+        let marke = PERSONAL_STATUS_STARTMARKEN
+            .iter()
+            .find(|(l, _)| *l == label)
+            .map(|(_, m)| *m);
         sqlx::query(
-            "INSERT INTO personal_status (org_id, label, kategorie, sortier) VALUES (?, ?, ?, ?)",
+            "INSERT INTO personal_status (org_id, label, kategorie, sortier, zeitachse_marke) \
+             VALUES (?, ?, ?, ?, ?)",
         )
         .bind(org_id)
         .bind(label)
         .bind(kategorie)
         .bind(sortier)
+        .bind(marke)
         .execute(&mut *tx)
         .await?;
     }
@@ -260,6 +268,24 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(kat, "gebunden");
+        // LFH-552: nur die drei eindeutigen Status tragen eine Zeitachsen-Marke.
+        let marken: Vec<(String, Option<String>)> =
+            sqlx::query_as("SELECT label, zeitachse_marke FROM personal_status ORDER BY sortier")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        let erwartet: Vec<(String, Option<String>)> = [
+            ("verfügbar", None),
+            ("alarmiert", Some("alarmierung")),
+            ("auf Anfahrt", None),
+            ("im Einsatz", Some("eintreffen")),
+            ("Pause", None),
+            ("abgemeldet", Some("entlassung")),
+        ]
+        .into_iter()
+        .map(|(l, m)| (l.to_string(), m.map(str::to_string)))
+        .collect();
+        assert_eq!(marken, erwartet);
     }
 
     #[tokio::test]

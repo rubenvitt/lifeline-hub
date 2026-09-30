@@ -145,6 +145,8 @@ Medienarbeit S5; auch `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, die S5-Sei
 **Führungsfunktionen** (Katalog, Codespalte neben Freitext, Besetzung zur Lesezeit; auch
 `src/fuehrung/`): `frontend/src/fuehrung/AGENTS.md`. **Betreuung und Verpflegung** (auch
 `pages/VerpflegungPage.tsx`, `src/betreuung/`, `src/verpflegung/`): `frontend/src/betreuung/AGENTS.md`.
+**Kräfte-Zeitachse** (Einsatzdauer im Meldebild, Personal und Einheit-Detail; auch
+`src/zeitachse/`, Status-Kataloge mit `zeitachse_marke`): `frontend/src/kraefte/AGENTS.md`.
 
 ## Frontend — Bedien-Leitlinie (Einsatzkontexte)
 

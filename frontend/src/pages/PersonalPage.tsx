@@ -20,6 +20,12 @@ import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { kraefteuebersichtPfad, einheitenPfad, fahrzeugePfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
+import KraftZeitachse from '../kraefte/KraftZeitachse';
+import { dauerText, kraftDauern, type KraftDauern } from '../kraefte/zeitachse';
+import { listePersonalPerioden } from '../api/kraefteZeitachse';
+import { abrufZustand } from '../api/abrufZustand';
+import { useUhr } from '../abloesung/useUhr';
+import { monoStil } from '../components/instrument';
 import AdhocPersonModal from '../kraefte/AdhocPersonModal';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition } from '../api/types';
@@ -84,6 +90,13 @@ export default function PersonalPage() {
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
+  // Kräfte-Zeitachse (LFH-552): Perioden je Person für „Einsatzdauer" und „Ruhe". Scheitert der
+  // Abruf, bleiben die Zellen leer — ein „—" behauptete sonst „keine Ereignisse".
+  const periodenQuery = useQuery({
+    queryKey: einsatzKeys.kraefteZeitachsePersonal(einsatzId),
+    queryFn: () => listePersonalPerioden(einsatzId),
+  });
+  const uhr = useUhr(60_000);
 
   // Cross-Modul-Deeplink ?personal=<id> hebt die Zeile hervor und scrollt sie ins Bild
   // (best-effort).
@@ -253,6 +266,18 @@ export default function PersonalPage() {
    * gibt keine Detailroute als Ausweichort. Wer sie weghaben will, nimmt
    * `spaltenAusVoreinstellung`; dann steht sie im Schalter und im Zähler.
    */
+  const periodenBereit = abrufZustand(periodenQuery) === 'daten';
+  const dauernJePerson = new Map<number, KraftDauern>(
+    (periodenQuery.data ?? []).map((p) => [p.personal_id, kraftDauern(p.perioden, uhr.valueOf())]),
+  );
+  /** Dauerzelle: leer ohne Daten, „—" ohne Ereignis (keine erfundene 0). */
+  const dauerZelle = (minuten: number | null | undefined) =>
+    periodenBereit ? (
+      <span style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
+        {minuten == null ? '—' : dauerText(minuten)}
+      </span>
+    ) : null;
+
   const spalten = spaltenFuer<EinsatzPersonal>()([
     {
       title: 'Name',
@@ -342,6 +367,19 @@ export default function PersonalPage() {
           {...statusBedienungVon(ep)}
         />
       ),
+    },
+    // Einsatzwert im Lagevortrag (LFH-552): laufende Dauer bzw. Ruhe seit der letzten Periode.
+    {
+      title: 'Einsatzdauer',
+      key: 'einsatzdauer',
+      width: 104,
+      render: (_, ep) => dauerZelle(dauernJePerson.get(ep.id)?.laufend?.minuten),
+    },
+    {
+      title: 'Ruhe',
+      key: 'ruhe',
+      width: 88,
+      render: (_, ep) => dauerZelle(dauernJePerson.get(ep.id)?.ruheMinuten),
     },
     {
       title: 'Bemerkung',
@@ -481,6 +519,20 @@ export default function PersonalPage() {
               unterEbene: 1,
             }}
             zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
+            // Zeitachse der Person (LFH-552) ohne Seitenwechsel — Inline-Expander statt Drawer.
+            aufklappen={{
+              etikett: 'Zeitachse',
+              zugaenglicherName: (ep) => `Zeitachse zu ${ep.name}`,
+              inhalt: (ep) => (
+                <KraftZeitachse
+                  einsatzId={einsatzId}
+                  art="person"
+                  id={ep.id}
+                  kennung={ep.name}
+                  darfSchreiben={darfSchreiben}
+                />
+              ),
+            }}
             karte={{
               art: 'plan',
               titel: { spalte: 'name' },

@@ -410,6 +410,26 @@ export interface LagebesprechungAbschlussBody {
   naechste_at?: string | null;
 }
 
+// ============================== LFH-552 Kräfte-Zeitachse ==============================
+export type ZeitachseArt = S['ZeitachseArt'];
+export type ZeitachseQuelle = S['ZeitachseQuelle'];
+export type ZeitachseMarke = S['ZeitachseMarke'];
+export type Einsatzperiode = S['Einsatzperiode'];
+export type ZeitachseEreignis = S['ZeitachseEreignis'];
+export type Zeitachse = S['ZeitachseAnzeige'];
+export type EinheitPerioden = S['EinheitPerioden'];
+export type PersonPerioden = S['PersonPerioden'];
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `POST …/{einheiten|personal}/{id}/zeitachse`. Art ohne
+ * `abloesung` (400); Zeitpunkt als UTC 'YYYY-MM-DD HH:mm:ss', nicht in der Zukunft (422).
+ */
+export interface ZeitachseNachtragBody {
+  art: Exclude<ZeitachseArt, 'abloesung'>;
+  zeitpunkt_at: string;
+  notiz?: string;
+}
+
 // ============================== LFH-635 Ablösung ==============================
 export type Abloesung = S['AbloesungAnzeige'];
 export type AbloesungVollzug = S['AbloesungVollzugAnzeige'];

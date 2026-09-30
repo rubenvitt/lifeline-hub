@@ -339,3 +339,45 @@ describe('EinheitDetailPage · Auflösen', () => {
     expect(await screen.findByText('Gliederung')).toBeInTheDocument();
   });
 });
+
+describe('EinheitDetailPage — Zeitachse (LFH-552)', () => {
+  it('Schreibrolle: Paneel „Zeitachse" mit Dauer, Ereignis und offenem Nachtrag', async () => {
+    zeige(
+      http.get('/api/einsaetze/1/einheiten/10/zeitachse', () =>
+        HttpResponse.json({
+          ereignisse: [
+            {
+              id: 5,
+              art: 'eintreffen',
+              zeitpunkt_at: '2026-09-30 04:40:00',
+              quelle: 'status',
+              erfasst_von: 1,
+              erfasst_at: '2026-09-30 04:40:00',
+            },
+          ],
+          perioden: [
+            {
+              beginn_at: '2026-09-30 04:40:00',
+              anker: 'eintreffen',
+              eintreffen_at: '2026-09-30 04:40:00',
+            },
+          ],
+        }),
+      ),
+    );
+    const paneel = await screen.findByRole('region', { name: 'Zeitachse' });
+    await waitFor(() =>
+      expect(paneel.querySelectorAll('[data-lfh="zeitachse-ereignis"]')).toHaveLength(1),
+    );
+    expect(paneel).toHaveTextContent(/seit Eintreffen/);
+    expect(within(paneel).getByRole('button', { name: 'Nachtragen' })).toBeEnabled();
+  });
+
+  it('Leserolle: Grund genannt, Nachtragen gesperrt sichtbar', async () => {
+    server.use(...handlers('beobachter'));
+    rendere();
+    const paneel = await screen.findByRole('region', { name: 'Zeitachse' });
+    expect(within(paneel).getByRole('button', { name: 'Nachtragen' })).toBeDisabled();
+    expect(paneel).toHaveTextContent(/Schreibrecht/);
+  });
+});

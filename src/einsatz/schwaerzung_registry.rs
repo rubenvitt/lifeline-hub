@@ -858,6 +858,31 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angelegt_at", G_ZEIT),
         ],
     },
+    // Kräfte-Zeitachse (LFH-552): Ereignisse je Einheit/Person. Art, Quelle, Zeitpunkte und
+    // FKs sind Skelett — die Person steckt in `einsatz_personal` und wird dort geschwärzt.
+    // Freitext (Notiz, Streichgrund) → weg. `streichgrund` hängt per CHECK an `gestrichen_at`,
+    // deshalb Platzhalter, wenn gesetzt, statt NULL.
+    TabellenRegel {
+        tabelle: "einsatz_kraft_zeitachse",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("einheit_id", G_FK),
+            retain("personal_id", G_FK),
+            retain("art", G_ENUM),
+            retain("zeitpunkt_at", G_ZEIT),
+            retain("quelle", G_ENUM),
+            retain("ursprung_id", G_FK),
+            scrub("notiz", Strategie::NullSetzen),
+            retain("erfasst_von", G_FK),
+            retain("erfasst_at", G_ZEIT),
+            retain("gestrichen_at", G_ZEIT),
+            retain("gestrichen_von", G_FK),
+            scrub("streichgrund", Strategie::PlatzhalterWennGesetzt),
+        ],
+    },
     // Betreuung: Mengen, keine Personen — Anzahlen, Kapazitäten, Zustände und Zeitpunkte bleiben
     // als Statistik-Skelett. Die Bezeichnung trägt oft eine Adresse und wird deshalb, anders als
     // `uhs.bezeichnung`, ersetzt. Sammelstelle, Standort und Notiz → NULL. Die ETB-Texte nennen

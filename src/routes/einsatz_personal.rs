@@ -13,6 +13,7 @@ use crate::routes::support::{
     deserialize_optional_field, parse_enum, pflicht, pruefe_koordinate, trimme, trimme_tri,
 };
 use crate::staerke::StaerkePosition;
+use crate::zeitachse::repo as zeitachse_repo;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -75,38 +76,30 @@ pub async fn disponieren(
     JsonBody(body): JsonBody<DisponierenBody>,
 ) -> Result<(StatusCode, Json<EinsatzPersonalAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let ep_id = match (body.personal_id, body.adhoc) {
+    // Validierung + Aufbereitung VOR der Tx (der Tx-Body kann wiederholt laufen).
+    enum Vorbereitet {
+        Stamm(i64),
+        Adhoc {
+            name: String,
+            funktion: Option<String>,
+            traeger: Option<String>,
+            position: Option<String>,
+        },
+    }
+    let vorbereitet = match (body.personal_id, body.adhoc) {
         (Some(personal_id), None) => {
             pruefe_position(&body.staerke_position)?;
-            disposition_repo::disponiere_stamm(
-                &state.pool,
-                einsatz_id,
-                ctx.einsatz.org_id,
-                personal_id,
-                body.staerke_position.as_deref(),
-                ctx.benutzer.id,
-            )
-            .await?
+            Vorbereitet::Stamm(personal_id)
         }
         (None, Some(adhoc)) => {
             let name = pflicht(&adhoc.name, "Name")?;
             pruefe_position(&adhoc.staerke_position)?;
-            let funktion = trimme(adhoc.funktion);
-            let traeger = trimme(adhoc.traegerorganisation);
-            let position = trimme(adhoc.staerke_position);
-            disposition_repo::disponiere_adhoc(
-                &state.pool,
-                einsatz_id,
-                ctx.einsatz.org_id,
-                AdhocDaten {
-                    name: &name,
-                    funktion: funktion.as_deref(),
-                    traegerorganisation: traeger.as_deref(),
-                    staerke_position: position.as_deref(),
-                },
-                ctx.benutzer.id,
-            )
-            .await?
+            Vorbereitet::Adhoc {
+                name,
+                funktion: trimme(adhoc.funktion),
+                traeger: trimme(adhoc.traegerorganisation),
+                position: trimme(adhoc.staerke_position),
+            }
         }
         (None, None) => {
             return Err(AppError::Validation(
@@ -119,6 +112,61 @@ pub async fn disponieren(
             ))
         }
     };
+
+    // LFH-552: Disposition und die Zeitachse des Initialstatus (Marke) in EINER Tx.
+    let jetzt = crate::zeit::jetzt();
+    let ep_id = crate::write_retry!(&state.pool, |conn| {
+        let ep_id = match &vorbereitet {
+            Vorbereitet::Stamm(personal_id) => {
+                disposition_repo::disponiere_stamm_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.einsatz.org_id,
+                    *personal_id,
+                    body.staerke_position.as_deref(),
+                    ctx.benutzer.id,
+                )
+                .await?
+            }
+            Vorbereitet::Adhoc {
+                name,
+                funktion,
+                traeger,
+                position,
+            } => {
+                disposition_repo::disponiere_adhoc_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.einsatz.org_id,
+                    AdhocDaten {
+                        name,
+                        funktion: funktion.as_deref(),
+                        traegerorganisation: traeger.as_deref(),
+                        staerke_position: position.as_deref(),
+                    },
+                    ctx.benutzer.id,
+                )
+                .await?
+            }
+        };
+        let status_id: Option<i64> =
+            sqlx::query_scalar("SELECT status_id FROM einsatz_personal WHERE id = ?")
+                .bind(ep_id)
+                .fetch_one(&mut *conn)
+                .await?;
+        if let Some(sid) = status_id {
+            zeitachse_repo::aus_personalstatus_tx(
+                conn,
+                einsatz_id,
+                ctx.benutzer.id,
+                ep_id,
+                sid,
+                &jetzt,
+            )
+            .await?;
+        }
+        Ok(ep_id)
+    })?;
 
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
     super::etb_system_degradiert(
@@ -174,6 +222,7 @@ pub async fn aktualisieren(
     // EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische, aufgelöste
     // Anzeige für den ETB-Text UND die Response; SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
     let nachher = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::aktualisiere_tx(
             conn,
@@ -186,6 +235,19 @@ pub async fn aktualisieren(
         .await?;
         let nachher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         if vorher.status_id != nachher.status_id {
+            // LFH-552: ein markierter Status schreibt die Zeitachse mit; ein Verstoß gegen die
+            // Perioden-Regeln wird verschluckt, der Statuswechsel gelingt immer.
+            if let Some(sid) = nachher.status_id {
+                zeitachse_repo::aus_personalstatus_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.benutzer.id,
+                    ep_id,
+                    sid,
+                    &jetzt,
+                )
+                .await?;
+            }
             let alt = vorher.status_label.as_deref().unwrap_or("—");
             let neu = nachher.status_label.as_deref().unwrap_or("—");
             crate::etb::system_audit_tx(

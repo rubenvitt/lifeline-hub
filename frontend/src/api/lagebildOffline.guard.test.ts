@@ -29,6 +29,7 @@ const ERWARTET_EINSATZ = new Set([
   'einsatz-material',
   'einsatz-abschnitte',
   'einsatz-auftraege',
+  'einsatz-kraefte-zeitachse',
   'einsatz-befehle',
   'einsatz-personen',
   'einsatz-uhs',

@@ -21,6 +21,7 @@ import { listeAuftraege } from '../api/auftraege';
 import { ApiError } from '../api/client';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { holeRueckmeldungen } from '../api/meldungen';
+import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte';
@@ -43,6 +44,7 @@ vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../api/auftraege', () => ({ listeAuftraege: vi.fn() }));
 vi.mock('../api/fahrzeugStatus', () => ({ listeFahrzeugStatus: vi.fn() }));
 vi.mock('../api/meldungen', () => ({ holeRueckmeldungen: vi.fn() }));
+vi.mock('../api/kraefteZeitachse', () => ({ listeEinheitenPerioden: vi.fn() }));
 vi.mock('../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 99 })),
   aktualisiereLagebericht: vi.fn(() => Promise.resolve({})),
@@ -208,6 +210,7 @@ beforeEach(() => {
   vi.mocked(listeAuftraege).mockResolvedValue([]);
   vi.mocked(listeFahrzeugStatus).mockResolvedValue(KATALOG);
   vi.mocked(holeRueckmeldungen).mockResolvedValue(KEINE_RUECKMELDUNGEN);
+  vi.mocked(listeEinheitenPerioden).mockResolvedValue([]);
 });
 
 /**
@@ -1009,5 +1012,80 @@ describe('KraefteuebersichtPage — Quelltext', () => {
     const quelle = readFileSync(join(hier, 'KraefteuebersichtPage.tsx'), 'utf-8');
     expect(quelle).not.toMatch(/flexWrap:\s*'nowrap'/);
     expect(quelle).not.toMatch(/overflowX:\s*'auto'/);
+  });
+});
+
+describe('KraefteuebersichtPage — Im Einsatz (LFH-552)', () => {
+  const imEinsatz = (container: HTMLElement) =>
+    zeile(container, 'eh-20')!.querySelector('[data-lfh="im-einsatz"]');
+
+  it('„Meldebild ohne Ereignisse": die Zelle zeigt „—" und keine Zahl', async () => {
+    mitEinheit();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    expect(screen.getByRole('columnheader', { name: 'Im Einsatz' })).toBeInTheDocument();
+    await waitFor(() => expect(listeEinheitenPerioden).toHaveBeenCalled());
+    expect(imEinsatz(container)).toBeNull();
+    // Die Spaltenzelle der Einheit trägt den Strich, keine Dauer.
+    const kopf = [...container.querySelectorAll('th')].map((t) => t.textContent);
+    const spalte = kopf.indexOf('Im Einsatz');
+    const zelle = zeile(container, 'eh-20')!.querySelectorAll('td')[spalte];
+    await waitFor(() => expect(zelle).toHaveTextContent('—'));
+    expect(zelle.textContent).not.toMatch(/\d/);
+  });
+
+  it('„Meldebild mit laufender Periode": Dauer seit dem Anker, Anker zugänglich', async () => {
+    mitEinheit();
+    const beginn = dayjs.utc().subtract(7, 'hour').subtract(40, 'minute');
+    vi.mocked(listeEinheitenPerioden).mockResolvedValue([
+      {
+        einheit_id: 20,
+        perioden: [{ beginn_at: beginn.format('YYYY-MM-DD HH:mm:ss'), anker: 'alarmierung' }],
+      },
+    ]);
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    const zelle = await waitFor(() => {
+      const z = imEinsatz(container);
+      expect(z).not.toBeNull();
+      return z as HTMLElement;
+    });
+    expect(zelle).toHaveTextContent('7 h 40');
+    expect(zelle).toHaveTextContent(/seit Alarmierung/);
+    expect(zelle.getAttribute('title')).toMatch(/^seit Alarmierung /);
+    expect(zelle.style.fontVariantNumeric).toBe('tabular-nums');
+  });
+
+  // Kein `abBreite`: die Spalte hängt nicht an der Fensterbreite und geht deshalb auch aufs
+  // Meldeblatt (der Druck kennt die Fensterbreite nicht, nur `@media print`).
+  it('bleibt auch am schmalen Schirm stehen — Voraussetzung für das Meldeblatt', async () => {
+    setzeViewportBreite(390);
+    mitEinheit();
+    setup();
+    await screen.findByText('1. Zug');
+    expect(screen.getByRole('columnheader', { name: 'Im Einsatz' })).toBeInTheDocument();
+  });
+
+  it('ohne Leserecht auf die Perioden (403) entfällt die Spalte', async () => {
+    mitEinheit();
+    vi.mocked(listeEinheitenPerioden).mockRejectedValue(new ApiError(403, 'gesperrt'));
+    setup();
+    await screen.findByText('1. Zug');
+    await waitFor(() => expect(listeEinheitenPerioden).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.queryByRole('columnheader', { name: 'Im Einsatz' })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('solange die Perioden scheitern, bleibt die Zelle leer — kein „—"', async () => {
+    mitEinheit();
+    vi.mocked(listeEinheitenPerioden).mockRejectedValue(new Error('kaputt'));
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    const kopf = [...container.querySelectorAll('th')].map((t) => t.textContent);
+    const spalte = kopf.indexOf('Im Einsatz');
+    const zelle = zeile(container, 'eh-20')!.querySelectorAll('td')[spalte];
+    await waitFor(() => expect(listeEinheitenPerioden).toHaveBeenCalled());
+    expect(zelle.textContent).toBe('');
   });
 });

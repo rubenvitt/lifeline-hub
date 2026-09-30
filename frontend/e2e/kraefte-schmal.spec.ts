@@ -194,11 +194,17 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
           page.getByRole('button', { name: `Status von ${KRAFT} ändern` }),
           'Vorbedingung: ohne Schreibrecht kein Statusauslöser (PersonalPage `statusBedienung`)',
         ).toHaveCount(0);
-        // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entfernen".
+        // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entfernen". Einzige
+        // Ausnahme ist der LESENDE Aufklapper der Kräfte-Zeitachse (LFH-552) — er steht in jeder
+        // Rolle und wird hier eigens gezählt.
         await expect(
-          karte.getByRole('button'),
-          'Vorbedingung: die Personalkarte trägt ohne Schreibrecht kein Bedienziel',
+          karte.getByRole('button', { name: /^(?!Zeitachse zu )/ }),
+          'Vorbedingung: die Personalkarte trägt ohne Schreibrecht kein schreibendes Bedienziel',
         ).toHaveCount(0);
+        await expect(
+          karte.getByRole('button', { name: `Zeitachse zu ${KRAFT}` }),
+          'Vorbedingung: der lesende Aufklapper der Zeitachse steht',
+        ).toHaveCount(1);
         await expect(page.getByRole('button', { name: 'Ad-hoc-Person' })).toHaveCount(0);
       },
     ],

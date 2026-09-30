@@ -559,10 +559,23 @@ pub async fn status_setzen(
         }
     }
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
     crate::write_retry!(&state.pool, |conn| {
         if let Some(w) =
             einheit_repo::setze_hand_status_tx(conn, einsatz_id, eid, status_id).await?
         {
+            // LFH-552: ein markierter Handstatus wirkt wie ein Wechsel an der Einheit.
+            if let Some(sid) = status_id {
+                crate::zeitachse::repo::aus_einheit_handstatus_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.benutzer.id,
+                    eid,
+                    sid,
+                    &jetzt,
+                )
+                .await?;
+            }
             crate::etb::system_audit_tx(
                 conn,
                 einsatz_id,

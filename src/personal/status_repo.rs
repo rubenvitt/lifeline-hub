@@ -2,7 +2,7 @@ use super::PersonalStatus;
 use crate::error::AppError;
 use sqlx::SqlitePool;
 
-const SPALTEN: &str = "id, label, kategorie, farbe, sortier";
+const SPALTEN: &str = "id, label, kategorie, farbe, sortier, zeitachse_marke";
 
 /// Editierbare Katalog-Felder. `kategorie` ist bereits gegen das Enum validiert.
 #[derive(Debug)]
@@ -11,6 +11,8 @@ pub struct StatusDaten<'a> {
     pub kategorie: &'a str,
     pub farbe: Option<&'a str>,
     pub sortier: i64,
+    /// Bereits gegen [`crate::zeitachse::ZeitachseMarke`] geprüft.
+    pub zeitachse_marke: Option<&'a str>,
 }
 
 fn label_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
@@ -54,14 +56,15 @@ pub async fn anlegen(
     daten: StatusDaten<'_>,
 ) -> Result<PersonalStatus, AppError> {
     let ergebnis = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO personal_status (org_id, label, kategorie, farbe, sortier) \
-         VALUES (?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO personal_status (org_id, label, kategorie, farbe, sortier, zeitachse_marke) \
+         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(org_id)
     .bind(daten.label)
     .bind(daten.kategorie)
     .bind(daten.farbe)
     .bind(daten.sortier)
+    .bind(daten.zeitachse_marke)
     .fetch_one(pool)
     .await;
 
@@ -80,6 +83,8 @@ pub struct StatusPatch<'a> {
     pub kategorie: Option<&'a str>,
     pub farbe: Option<Option<&'a str>>,
     pub sortier: Option<i64>,
+    /// LFH-552: `Some(None)` entfernt die Marke.
+    pub zeitachse_marke: Option<Option<&'a str>>,
 }
 
 /// Teil-Patch der editierbaren Felder (org-scoped); `NotFound`/`Conflict` wie beim Stamm.
@@ -99,7 +104,8 @@ pub async fn patche(
             label = CASE WHEN ?1 IS NULL THEN label ELSE ?2 END, \
             kategorie = CASE WHEN ?3 IS NULL THEN kategorie ELSE ?4 END, \
             farbe = CASE WHEN ?5 IS NULL THEN farbe ELSE ?6 END, \
-            sortier = CASE WHEN ?7 IS NULL THEN sortier ELSE ?8 END \
+            sortier = CASE WHEN ?7 IS NULL THEN sortier ELSE ?8 END, \
+            zeitachse_marke = CASE WHEN ?11 IS NULL THEN zeitachse_marke ELSE ?12 END \
          WHERE id = ?9 AND org_id = ?10",
     )
     .bind(patch.label.map(|_| 1_i64))
@@ -112,6 +118,8 @@ pub async fn patche(
     .bind(patch.sortier)
     .bind(id)
     .bind(org_id)
+    .bind(patch.zeitachse_marke.map(|_| 1_i64))
+    .bind(patch.zeitachse_marke.and_then(|v| v))
     .execute(pool)
     .await;
 
@@ -188,6 +196,7 @@ mod tests {
             kategorie,
             farbe: None,
             sortier,
+            zeitachse_marke: None,
         }
     }
 
@@ -296,6 +305,7 @@ mod tests {
                 kategorie: Some(KATEGORIE_VERFUEGBAR),
                 farbe: Some(Some("#00ff00")),
                 sortier: Some(42),
+                zeitachse_marke: None,
             },
         )
         .await
@@ -320,6 +330,7 @@ mod tests {
                 kategorie: KATEGORIE_GEBUNDEN,
                 farbe: Some("#ff0000"),
                 sortier: 10,
+                zeitachse_marke: None,
             },
         )
         .await
@@ -362,6 +373,7 @@ mod tests {
                 kategorie: KATEGORIE_GEBUNDEN,
                 farbe: Some("#ff0000"),
                 sortier: 10,
+                zeitachse_marke: None,
             },
         )
         .await

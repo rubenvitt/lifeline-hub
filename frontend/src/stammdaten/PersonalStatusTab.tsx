@@ -1,4 +1,4 @@
-import { Form, Input, InputNumber, type TableColumnsType } from 'antd';
+import { Collapse, Form, Input, InputNumber, type TableColumnsType } from 'antd';
 import { monoStil } from '../components/instrument';
 import { Select } from '../components/Select';
 import {
@@ -7,18 +7,20 @@ import {
   legeStatusAn,
   listePersonalStatus,
 } from '../api/personalStatus';
-import type { PersonalStatus, StatusKategorie } from '../api/types';
+import type { PersonalStatus, StatusKategorie, ZeitachseMarke } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import StatusTag from '../components/StatusTag';
 import { statusKategorie } from '../theme/statusFarben';
 import KatalogVerwaltung from './KatalogVerwaltung';
+import { markeFeld, markeHinweis, markeSpalte } from './zeitachseMarke';
 
 interface FormWerte {
   label: string;
   kategorie: StatusKategorie;
   farbe?: string;
   sortier: number;
+  zeitachse_marke?: ZeitachseMarke;
 }
 
 const kategorien = Object.keys(statusKategorie) as StatusKategorie[];
@@ -57,6 +59,7 @@ const spalten: TableColumnsType<PersonalStatus> = [
     // Freitext, sein Kontrast ist nicht zugesichert (siehe `StatusTag`, Mandantenfarbe).
     render: (f: string | null) => (f ? <span style={monoStil(12)}>{f}</span> : '—'),
   },
+  markeSpalte,
   {
     title: 'Sortierung',
     dataIndex: 'sortier',
@@ -70,6 +73,7 @@ const vorbelegung = (s: PersonalStatus): FormWerte => ({
   kategorie: s.kategorie,
   farbe: s.farbe ?? undefined,
   sortier: s.sortier,
+  zeitachse_marke: s.zeitachse_marke ?? undefined,
 });
 
 /**
@@ -85,6 +89,8 @@ const aktualisiere = (id: number, werte: FormWerte) =>
     kategorie: werte.kategorie,
     farbe: leerZuNull(werte.farbe),
     sortier: werte.sortier ?? 0,
+    // Vollersatz: leer entfernt die Marke (LFH-552).
+    zeitachse_marke: werte.zeitachse_marke ?? null,
   });
 
 const felder = (
@@ -101,6 +107,13 @@ const felder = (
     <Form.Item label="Sortierung" name="sortier">
       <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
     </Form.Item>
+    {/* Die Marke (LFH-552) liegt eingeklappt: vier Felder stehen schon offen, ein fünftes sprengte
+        das Feldbudget. Ohne `forceRender` — die Vorbelegung erreicht sie trotzdem. */}
+    <Collapse
+      ghost
+      style={{ marginInline: -8 }}
+      items={[{ key: 'weitere', label: 'Weitere Angaben', children: markeFeld }]}
+    />
   </>
 );
 
@@ -125,6 +138,7 @@ export default function PersonalStatusTab() {
       bearbeitenTitel="Status bearbeiten"
       deaktivierenFrage="Status deaktivieren?"
       felder={felder}
+      vorTabelle={markeHinweis}
     />
   );
 }

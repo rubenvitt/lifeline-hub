@@ -672,6 +672,37 @@ fn abloesung_einstufung_wire() {
     });
 }
 
+/// LFH-552: Kräfte-Zeitachse. Art, Quelle und Marke tragen die DB-CHECK-Werte aus
+/// `migrations/0130_kraefte_zeitachse.sql`; das Frontend (`kraefte/zeitachse.ts`) liest sie.
+#[test]
+fn zeitachse_art_wire() {
+    enum_wire!(lifeline_hub::zeitachse::ZeitachseArt {
+        Alarmierung => "alarmierung",
+        Eintreffen => "eintreffen",
+        Abloesung => "abloesung",
+        Entlassung => "entlassung",
+    } in lifeline_hub::zeitachse::ZeitachseArt::ALLE);
+}
+
+#[test]
+fn zeitachse_quelle_wire() {
+    enum_wire!(lifeline_hub::zeitachse::ZeitachseQuelle {
+        Status => "status",
+        Einheit => "einheit",
+        Abloesung => "abloesung",
+        Nachtrag => "nachtrag",
+    } in lifeline_hub::zeitachse::ZeitachseQuelle::ALLE);
+}
+
+#[test]
+fn zeitachse_marke_wire() {
+    enum_wire!(lifeline_hub::zeitachse::ZeitachseMarke {
+        Alarmierung => "alarmierung",
+        Eintreffen => "eintreffen",
+        Entlassung => "entlassung",
+    } in lifeline_hub::zeitachse::ZeitachseMarke::ALLE);
+}
+
 /// LFH-554: Presse und Medienarbeit S5. Art, Status und Anliegen tragen die DB-CHECK-Werte aus
 /// `migrations/0129_presse.sql`; Vorlage und Status der Pressemitteilung sind Schema-Anker wie
 /// beim Lagebericht.

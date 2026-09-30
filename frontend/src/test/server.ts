@@ -47,6 +47,16 @@ export const server = setupServer(
     HttpResponse.json({ id: 1, name: 'Testorganisation', tz_organisation: null }),
   ),
   /**
+   * Kräfte-Zeitachse (LFH-552) — „keine Ereignisse" als Default, ein echter Serverzustand.
+   * Meldebild, Einheit-Detail und Personal-Seite fragen sie beim Mount ab; Tests mit Perioden
+   * überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/einheiten/zeitachse', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/personal/zeitachse', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/:modul/:kraftId/zeitachse', () =>
+    HttpResponse.json({ ereignisse: [], perioden: [] }),
+  ),
+  /**
    * Demo-Daten: 404 als Default — der echte Zustand ohne `--demo-daten`, aus dem das Frontend
    * „nicht freigeschaltet“ liest. Einsatzliste und Verwaltung fragen ihn für jeden System-Admin ab.
    */

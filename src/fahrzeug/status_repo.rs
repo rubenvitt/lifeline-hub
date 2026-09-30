@@ -2,7 +2,7 @@ use super::FahrzeugStatus;
 use crate::error::AppError;
 use sqlx::SqlitePool;
 
-const SPALTEN: &str = "id, label, kategorie, farbe, fms_anker, sortier";
+const SPALTEN: &str = "id, label, kategorie, farbe, fms_anker, sortier, zeitachse_marke";
 
 /// Editierbare Katalog-Felder (label/kategorie/farbe/fms_anker/sortier).
 /// `kategorie` ist bereits gegen das Enum validiert, `fms_anker` im Bereich 0..=9.
@@ -13,6 +13,8 @@ pub struct StatusDaten<'a> {
     pub farbe: Option<&'a str>,
     pub fms_anker: Option<i64>,
     pub sortier: i64,
+    /// Bereits gegen [`crate::zeitachse::ZeitachseMarke`] geprüft.
+    pub zeitachse_marke: Option<&'a str>,
 }
 
 fn label_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
@@ -56,8 +58,9 @@ pub async fn anlegen(
     daten: StatusDaten<'_>,
 ) -> Result<FahrzeugStatus, AppError> {
     let ergebnis = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO fahrzeug_status (org_id, label, kategorie, farbe, fms_anker, sortier) \
-         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO fahrzeug_status \
+            (org_id, label, kategorie, farbe, fms_anker, sortier, zeitachse_marke) \
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(org_id)
     .bind(daten.label)
@@ -65,6 +68,7 @@ pub async fn anlegen(
     .bind(daten.farbe)
     .bind(daten.fms_anker)
     .bind(daten.sortier)
+    .bind(daten.zeitachse_marke)
     .fetch_one(pool)
     .await;
 
@@ -84,6 +88,8 @@ pub struct StatusPatch<'a> {
     pub farbe: Option<Option<&'a str>>,
     pub fms_anker: Option<Option<i64>>,
     pub sortier: Option<i64>,
+    /// LFH-552: `Some(None)` entfernt die Marke.
+    pub zeitachse_marke: Option<Option<&'a str>>,
 }
 
 /// Teil-Patch der editierbaren Felder (org-scoped); `NotFound`/`Conflict` wie beim Stamm.
@@ -104,7 +110,8 @@ pub async fn patche(
             kategorie = CASE WHEN ?3 IS NULL THEN kategorie ELSE ?4 END, \
             farbe = CASE WHEN ?5 IS NULL THEN farbe ELSE ?6 END, \
             fms_anker = CASE WHEN ?7 IS NULL THEN fms_anker ELSE ?8 END, \
-            sortier = CASE WHEN ?9 IS NULL THEN sortier ELSE ?10 END \
+            sortier = CASE WHEN ?9 IS NULL THEN sortier ELSE ?10 END, \
+            zeitachse_marke = CASE WHEN ?13 IS NULL THEN zeitachse_marke ELSE ?14 END \
          WHERE id = ?11 AND org_id = ?12",
     )
     .bind(patch.label.map(|_| 1_i64))
@@ -119,6 +126,8 @@ pub async fn patche(
     .bind(patch.sortier)
     .bind(id)
     .bind(org_id)
+    .bind(patch.zeitachse_marke.map(|_| 1_i64))
+    .bind(patch.zeitachse_marke.and_then(|v| v))
     .execute(pool)
     .await;
 
@@ -207,6 +216,7 @@ mod tests {
             farbe: None,
             fms_anker: None,
             sortier,
+            zeitachse_marke: None,
         }
     }
 
@@ -322,6 +332,7 @@ mod tests {
                 farbe: Some(Some("#00ff00")),
                 fms_anker: Some(Some(7)),
                 sortier: Some(42),
+                zeitachse_marke: None,
             },
         )
         .await
@@ -348,6 +359,7 @@ mod tests {
                 farbe: Some("#ff0000"),
                 fms_anker: Some(3),
                 sortier: 10,
+                zeitachse_marke: None,
             },
         )
         .await
@@ -391,6 +403,7 @@ mod tests {
                 farbe: Some("#ff0000"),
                 fms_anker: Some(3),
                 sortier: 10,
+                zeitachse_marke: None,
             },
         )
         .await
@@ -428,6 +441,7 @@ mod tests {
                 farbe: None,
                 fms_anker: Some(3),
                 sortier: 10,
+                zeitachse_marke: None,
             },
         )
         .await

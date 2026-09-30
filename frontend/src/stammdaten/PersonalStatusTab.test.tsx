@@ -21,6 +21,7 @@ const status: {
   kategorie: string;
   farbe: string | null;
   sortier: number;
+  zeitachse_marke?: string;
 }[] = [
   { id: 1, label: 'dienstbereit', kategorie: 'verfuegbar', farbe: null, sortier: 10 },
   { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
@@ -238,5 +239,24 @@ describe('PersonalStatusTab', () => {
     await screen.findByText('Label bereits vergeben');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(within(screen.getByRole('dialog')).getByLabelText('Label')).toHaveValue('im Dienst');
+  });
+
+  /** LFH-552: die Marke liegt eingeklappt; der Vollersatz muss sie trotzdem mitschicken. */
+  it('zeigt die Zeitachsen-Marke und behält sie beim Speichern ohne Aufklappen', async () => {
+    let ruempf: Record<string, unknown> | null = null;
+    server.use(
+      http.patch('/api/personal-status/2', async ({ request }) => {
+        ruempf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 2 });
+      }),
+    );
+    render(admin, [status[0], { ...status[1], zeitachse_marke: 'alarmierung' }]);
+    await screen.findByText('dienstbereit');
+    expect(screen.getByText('Alarmierung')).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[1]);
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(ruempf).not.toBeNull());
+    expect(ruempf).toMatchObject({ label: 'alarmiert', zeitachse_marke: 'alarmierung' });
   });
 });

@@ -3009,6 +3009,26 @@
           }
         }
       },
+      "EinheitPerioden": {
+        "type": "object",
+        "description": "Perioden einer Einheit — Zeile der Liste für das Meldebild. Nur Einheiten mit Ereignissen.",
+        "required": [
+          "einheit_id",
+          "perioden"
+        ],
+        "properties": {
+          "einheit_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "perioden": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Einsatzperiode"
+            }
+          }
+        }
+      },
       "EinheitStatus": {
         "type": "object",
         "description": "Status einer Einheit mit „Seit“ (LFH-609). Die Regel steht an\n[`repo::leite_status_ab`].",
@@ -3857,6 +3877,47 @@
           "sanitaetsdienst",
           "bereitstellung"
         ]
+      },
+      "Einsatzperiode": {
+        "type": "object",
+        "description": "Eine Einsatzperiode einer Kraft. Offen, solange `ende_at` fehlt.",
+        "required": [
+          "beginn_at",
+          "anker"
+        ],
+        "properties": {
+          "anker": {
+            "$ref": "#/components/schemas/ZeitachseArt",
+            "description": "`alarmierung` oder `eintreffen`."
+          },
+          "beginn_at": {
+            "type": "string",
+            "description": "Zeitpunkt des Ankers: die Alarmierung, ohne sie das Eintreffen."
+          },
+          "eintreffen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ende_art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ZeitachseArt",
+                "description": "`abloesung` oder `entlassung`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ende_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       },
       "EinstellungenAnzeige": {
         "type": "object",
@@ -4837,6 +4898,17 @@
           "sortier": {
             "type": "integer",
             "format": "int64"
+          },
+          "zeitachse_marke": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ZeitachseMarke",
+                "description": "LFH-552: Zeitachsen-Marke — ein Wechsel auf diesen Status schreibt das Ereignis."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -8024,6 +8096,26 @@
         ],
         "description": "Detail-Antwort: E‑1-Personenfelder (flatten) + E‑2-Verlauf-Arrays. Genau eine\nAntwort, genau ein `detail`-Audit (Spec-Annahme „Lesen / Lese-Audit\")."
       },
+      "PersonPerioden": {
+        "type": "object",
+        "description": "Perioden einer Person — Zeile der Liste für die Personal-Seite. Nur Personen mit\nEreignissen.",
+        "required": [
+          "personal_id",
+          "perioden"
+        ],
+        "properties": {
+          "perioden": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Einsatzperiode"
+            }
+          },
+          "personal_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "PersonStatus": {
         "type": "string",
         "description": "Administrative Status-Maschine einer Person (E‑1). E‑2 ergänzt die\nmedizinische Sichtungskategorie SK I–IV als separates Attribut auf\n`betroffen` — diese Maschine bleibt unangetastet.",
@@ -8137,6 +8229,17 @@
           "sortier": {
             "type": "integer",
             "format": "int64"
+          },
+          "zeitachse_marke": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ZeitachseMarke",
+                "description": "LFH-552: Zeitachsen-Marke — ein Wechsel auf diesen Status schreibt das Ereignis."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -9983,6 +10086,131 @@
             "$ref": "#/components/schemas/WetterTeilZustand"
           }
         }
+      },
+      "ZeitachseAnzeige": {
+        "type": "object",
+        "description": "Zeitachse einer Kraft: alle Ereignisse nach Zeit (gestrichene eingeschlossen) und die\nPerioden aus den nicht gestrichenen.",
+        "required": [
+          "ereignisse",
+          "perioden"
+        ],
+        "properties": {
+          "ereignisse": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZeitachseEreignis"
+            }
+          },
+          "perioden": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Einsatzperiode"
+            }
+          }
+        }
+      },
+      "ZeitachseArt": {
+        "type": "string",
+        "description": "Art eines Ereignisses. Wire == `as_str()`.",
+        "enum": [
+          "alarmierung",
+          "eintreffen",
+          "abloesung",
+          "entlassung"
+        ]
+      },
+      "ZeitachseEreignis": {
+        "type": "object",
+        "description": "Ein Ereignis, wie es die Zeitachse einer Kraft zeigt — auch gestrichen.",
+        "required": [
+          "id",
+          "art",
+          "zeitpunkt_at",
+          "quelle",
+          "erfasst_von",
+          "erfasst_at"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/ZeitachseArt"
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gestrichen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gestrichen_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quelle": {
+            "$ref": "#/components/schemas/ZeitachseQuelle"
+          },
+          "streichgrund": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ursprung_einheit_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fan-out: Name der Einheit („über Einheit «…»\")."
+          },
+          "ursprung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Fan-out: das Ereignis der Einheit, aus dem dieses entstand."
+          },
+          "zeitpunkt_at": {
+            "type": "string"
+          }
+        }
+      },
+      "ZeitachseMarke": {
+        "type": "string",
+        "description": "Zeitachsen-Marke eines Status-Katalogeintrags. Wire == `as_str()`. Keine `abloesung`:\ndie entsteht nur aus dem Vollzug.",
+        "enum": [
+          "alarmierung",
+          "eintreffen",
+          "entlassung"
+        ]
+      },
+      "ZeitachseQuelle": {
+        "type": "string",
+        "description": "Herkunft eines Ereignisses. Wire == `as_str()`.",
+        "enum": [
+          "status",
+          "einheit",
+          "abloesung",
+          "nachtrag"
+        ]
       },
       "ZeitfensterAnzeige": {
         "type": "object",

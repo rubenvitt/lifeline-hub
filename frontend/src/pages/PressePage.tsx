@@ -1,5 +1,5 @@
 import { App, Breadcrumb, Button, Collapse, DatePicker, Flex, Form, Input, Space } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { IkonePlus } from '../ikonen';
 import type { Dayjs } from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -303,7 +303,7 @@ export default function PressePage() {
           </Button>
           <Button
             type="primary"
-            icon={<PlusOutlined />}
+            icon={<IkonePlus />}
             aria-label="Neue Pressemitteilung"
             onClick={() => {
               mitteilungMutation.reset();

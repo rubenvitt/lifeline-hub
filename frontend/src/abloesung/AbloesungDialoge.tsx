@@ -101,7 +101,11 @@ export function SchichtBeginnenDialog({
           notFoundContent="Alle Einheiten haben bereits eine laufende Schicht"
         />
       </Form.Item>
-      <Form.Item<BeginnWerte> name="beginn" label="Im Einsatz seit" extra="Leer: jetzt">
+      <Form.Item<BeginnWerte>
+        name="beginn"
+        label="Im Einsatz seit"
+        extra="Leer: Eintreffen laut Kräfte-Zeitachse, sonst jetzt"
+      >
         <DatePicker showTime format={ZEITFORMAT} style={{ width: '100%' }} />
       </Form.Item>
       {rhythmusFeld(

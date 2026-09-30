@@ -7,12 +7,13 @@ import {
   legeStatusAn,
   listeFahrzeugStatus,
 } from '../api/fahrzeugStatus';
-import type { FahrzeugStatus, StatusKategorie } from '../api/types';
+import type { FahrzeugStatus, StatusKategorie, ZeitachseMarke } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import StatusTag from '../components/StatusTag';
 import { statusKategorie } from '../theme/statusFarben';
 import KatalogVerwaltung from './KatalogVerwaltung';
+import { markeFeld, markeHinweis, markeSpalte } from './zeitachseMarke';
 
 interface FormWerte {
   label: string;
@@ -20,6 +21,7 @@ interface FormWerte {
   farbe?: string;
   fms_anker?: number;
   sortier: number;
+  zeitachse_marke?: ZeitachseMarke;
 }
 
 const kategorien = Object.keys(statusKategorie) as StatusKategorie[];
@@ -70,6 +72,7 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
     // `== null`, nicht Wahrheitswert: 0 ist ein gültiger Anker.
     render: (f: number | null) => (f == null ? '—' : <span style={monoStil(12)}>{f}</span>),
   },
+  markeSpalte,
   {
     title: 'Sortierung',
     dataIndex: 'sortier',
@@ -84,6 +87,7 @@ const vorbelegung = (s: FahrzeugStatus): FormWerte => ({
   farbe: s.farbe ?? undefined,
   fms_anker: s.fms_anker ?? undefined,
   sortier: s.sortier,
+  zeitachse_marke: s.zeitachse_marke ?? undefined,
 });
 
 /**
@@ -103,6 +107,8 @@ const aktualisiere = (id: number, werte: FormWerte) =>
     farbe: leerZuNull(werte.farbe),
     fms_anker: werte.fms_anker ?? null,
     sortier: werte.sortier ?? 0,
+    // Vollersatz: leer entfernt die Marke (LFH-552).
+    zeitachse_marke: werte.zeitachse_marke ?? null,
   });
 
 /**
@@ -136,6 +142,7 @@ const felder = (
               <Form.Item label="Sortierung" name="sortier">
                 <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
               </Form.Item>
+              {markeFeld}
             </>
           ),
         },
@@ -165,6 +172,7 @@ export default function StatusKatalogTab() {
       bearbeitenTitel="Status bearbeiten"
       deaktivierenFrage="Status deaktivieren?"
       felder={felder}
+      vorTabelle={markeHinweis}
     />
   );
 }

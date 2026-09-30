@@ -128,6 +128,11 @@ interface ErfassungsFormularProps<T> {
   /** Beschriftung des Primär-Knopfes. Default `'Erfassen'`. */
   erfassenText?: string;
   /**
+   * Der Primär-Knopf bestätigt eine UNUMKEHRBARE Handlung (LFH-363): rot (`danger`). Nur für
+   * Rückfragen mit Pflichtangabe (z. B. Streichgrund), nie für ein gewöhnliches Erfassen.
+   */
+  unumkehrbar?: boolean;
+  /**
    * Serienmodus: zeigt „Speichern und nächste" und den Zähler. Für Masken, an
    * denen im Minutentakt erfasst wird.
    */
@@ -157,6 +162,7 @@ export function ErfassungsFormular<T extends object>({
   onAbbrechen,
   laeuft = false,
   erfassenText = 'Erfassen',
+  unumkehrbar = false,
   serie = false,
   uebernahme,
   initialValues,
@@ -355,7 +361,7 @@ export function ErfassungsFormular<T extends object>({
                 </span>
               </Button>
             )}
-            <Button type="primary" htmlType="submit" loading={laeuft}>
+            <Button type="primary" htmlType="submit" loading={laeuft} danger={unumkehrbar}>
               {erfassenText}
             </Button>
           </Space>
