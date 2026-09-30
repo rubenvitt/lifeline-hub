@@ -101,7 +101,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 Liste/Karte (`components/Liste.tsx`, `Datensicht` `form="karte"`); Kachel nur für Überblick.
 Karten-Fallback unter `md` (`form="auto"`) ist begründungspflichtig (Dateikopf `Datensicht.tsx`,
 AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
-- **Kein Nutzerschalter Tabelle ↔ Karte** (LFH-507, `openspec/changes/lfh-507-palette-status-setzen/`):
+- **Kein Nutzerschalter Tabelle ↔ Karte** (LFH-507, `openspec/changes/archive/2026-09-30-lfh-507-palette-status-setzen/`):
   die Form bleibt die begründete Entscheidung je Seite, auch in der Palette („Ansicht wechseln“
   gibt es nicht). Wer einen Schalter will, schreibt zuerst diese Regel fort.
 - **FMS-Tableau** (LFH-642, `kraefte/FmsTableau.tsx`): Ansicht `?ansicht=tableau` der

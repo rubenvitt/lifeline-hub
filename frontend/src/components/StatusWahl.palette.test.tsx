@@ -15,7 +15,7 @@ import StatusWahl, { type StatusOption } from './StatusWahl';
 
 /**
  * „Status setzen“ wirkt auf die FOKUSZEILE (LFH-507,
- * `openspec/changes/lfh-507-palette-status-setzen/`).
+ * `openspec/changes/archive/2026-09-30-lfh-507-palette-status-setzen/`).
  *
  * EIGENE DATEI: `vi.mock` hoistet dateiweit, und das echte `useBefehle` fordert `/api/einsaetze`
  * an (MSW mit `onUnhandledRequest: 'error'`). Die Attrappe beschriftet mit der Id, gegriffen wird
