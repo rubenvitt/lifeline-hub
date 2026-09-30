@@ -6,7 +6,7 @@ import { navZeilen, sprungZiel, type Sprungmarke } from './sprungmarken';
 import { form, schrift, type Farbrollen } from '../theme/tokens';
 import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverrides } from '../api/types';
 import type { ModulZaehlerMap } from './useModulZaehler';
-import { useMinutenTakt } from '../components/Kopfleiste';
+import { useMinutenTakt } from '../components/useMinutenTakt';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import { einsatzDauer } from './einsatzDauer';
 import { fussFokusabstandStil, useFussFokusabstand } from './fussFokusabstand';

@@ -238,6 +238,7 @@ export default function LagekartePage() {
     aktiveFachebenen,
     fachebenenStatus,
     fachebenenLaedt,
+    fachebenenAbgerufen,
     fachebenenAttribution,
     zoomZuKlein,
     setViewportBbox,
@@ -719,6 +720,7 @@ export default function LagekartePage() {
             onSchliessen={() => setFachebeneAuswahl(null)}
             // Schnellweg „Als maßgeblichen Pegel festlegen"; wirkt nur an PEGELONLINE-Punkten.
             pegelBezug={{ einsatzId, darfSchreiben: !!darfSchreiben }}
+            abgerufen={fachebenenAbgerufen[fachebeneAuswahl.quelle]}
           />
         )}
         {ausgewaehlteZone && (
@@ -1111,6 +1113,7 @@ export default function LagekartePage() {
         onFachebeneToggle={onFachebeneToggle}
         zoomZuKlein={zoomZuKlein}
         fachebenenLaedt={fachebenenLaedt}
+        fachebenenAbgerufen={fachebenenAbgerufen}
         bilder={bilder}
         onBildUpload={onBildUpload}
         onBildToggle={onBildToggle}

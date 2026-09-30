@@ -204,11 +204,16 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
 
       const fachebenenStatus: Partial<Record<FachebeneQuelle, FachebeneStatus>> = {};
       const fachebenenLaedt: Partial<Record<FachebeneQuelle, boolean>> = {};
+      // Abrufzeitpunkt des Servers (LFH-591) — auch bei `isError`: react-query hält dann die
+      // vorigen `data`, die Karte zeichnet sie weiter, und ihr Alter muss sichtbar bleiben.
+      const fachebenenAbgerufen: Partial<Record<FachebeneQuelle, string>> = {};
       for (const k of fachebeneKeys()) {
         if (!fachebenenSichtbar[k]) continue;
         const q = byKey[k];
         fachebenenStatus[k] = q.isError ? 'offline' : q.data?.status;
         fachebenenLaedt[k] = q.isFetching;
+        const abgerufen = q.data?.abgerufen;
+        if (abgerufen) fachebenenAbgerufen[k] = abgerufen;
       }
 
       const fachebenenAttribution = fachebeneKeys()
@@ -227,6 +232,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         aktiveFachebenen,
         fachebenenStatus,
         fachebenenLaedt,
+        fachebenenAbgerufen,
         fachebenenAttribution,
         // Rohdaten für die Energie-Akkumulation (der Akku selbst geht via `energieAkku` ein).
         energieRoh: byKey.energie.data?.features,
@@ -292,6 +298,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     aktiveFachebenen: kombiniert.aktiveFachebenen,
     fachebenenStatus: kombiniert.fachebenenStatus,
     fachebenenLaedt: kombiniert.fachebenenLaedt,
+    fachebenenAbgerufen: kombiniert.fachebenenAbgerufen,
     fachebenenAttribution: kombiniert.fachebenenAttribution,
     zoomZuKlein,
     setViewportBbox,

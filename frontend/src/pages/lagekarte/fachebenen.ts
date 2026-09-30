@@ -118,6 +118,12 @@ export interface FachebeneDef {
    */
   minZoom?: number;
   /**
+   * Alter in Minuten, ab dem der Stand der Ebene als veraltet gekennzeichnet wird (LFH-591). Aus
+   * dem Takt der Quelle abgeleitet: mehrere reguläre Erneuerungen ausgefallen UND der Inhalt hätte
+   * in dieser Zeit etwas Neues sagen können. Begründung je Ebene in `docs/fachebenen-quellen.md`.
+   */
+  veraltetNachMin: number;
+  /**
    * Nur für Ebenen, deren Punkte die Karte je Klasse einfärbt (heute Hochwasser, ODL,
    * Luftqualität). Dann ist die Ebenenfarbe bloß Rückfall für den Inspector-Akzent, und das Panel zeigt
    * statt des Ebenenpunkts die Legende.
@@ -132,6 +138,8 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     geometrieTyp: 'polygon',
     pollMs: 90_000,
     bboxAbhaengig: false,
+    // Warnungen: eine neue muss schnell sichtbar sein.
+    veraltetNachMin: 15,
   },
   dwd: {
     key: 'dwd',
@@ -139,6 +147,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     geometrieTyp: 'polygon',
     pollMs: 300_000,
     bboxAbhaengig: false,
+    veraltetNachMin: 30,
   },
   pegelonline: {
     key: 'pegelonline',
@@ -146,6 +155,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     geometrieTyp: 'punkt',
     pollMs: 300_000,
     bboxAbhaengig: false,
+    veraltetNachMin: 60,
   },
   hochwasser: {
     key: 'hochwasser',
@@ -153,6 +163,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     geometrieTyp: 'punkt',
     pollMs: 300_000,
     bboxAbhaengig: false,
+    veraltetNachMin: 60,
     klassenfarben: {
       legende: legendeAus(klassenVon(hochwasserKlasse), hochwasserDarstellung, hochwasserRadius),
       faerbe: faerbeHochwasser,
@@ -166,6 +177,8 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     pollMs: 900_000,
     bboxAbhaengig: false,
     geltung: 'Messstationen — keine Aussage zwischen den Stationen',
+    // Der Verzug der Quelle (~2 h) zählt nicht als Veraltung.
+    veraltetNachMin: 4 * 60,
     klassenfarben: {
       legende: legendeAus(
         klassenVon(luftqualitaetIndex),
@@ -183,6 +196,8 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     pollMs: 600_000,
     bboxAbhaengig: false,
     geltung: 'nur ortsfeste BfS-Sonden (Stundenwerte) — keine Einsatzmessungen',
+    // Zwei Stundenwerte verpasst, plus Verzug der Quelle.
+    veraltetNachMin: 3 * 60,
     klassenfarben: {
       legende: legendeAus(klassenVon(odlStufe), odlDarstellung, odlRadius),
       faerbe: faerbeOdl,
@@ -200,6 +215,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     // ist dann eine winzige Leer-Antwort aus dem Backend.
     aufwaermPollMs: 20_000,
     geltung: 'nur Bundesautobahnen — keine Kreis-, Land- oder Ortsstraßen',
+    veraltetNachMin: 60,
   },
   kritis: {
     key: 'kritis',
@@ -213,6 +229,8 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     aufwaermPollMs: 30_000,
     buendeln: true,
     geltung: 'OpenStreetMap-Daten, wöchentlicher Stand — keine amtliche KRITIS-Liste',
+    // Zwei Importläufe im Vorgabe-Intervall (7 Tage) verpasst.
+    veraltetNachMin: 14 * 24 * 60,
   },
   energie: {
     key: 'energie',
@@ -225,8 +243,36 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     // Energie fragt Overpass live je Ausschnitt; das Backend lehnt alles über
     // ENERGIE_MAX_SPANNE_GRAD ab. Erst ab dieser Zoomstufe wird gefragt.
     minZoom: BBOX_MIN_ZOOM,
+    // 1,5 × Server-TTL, unter dem Cache-Deckel von 48 h.
+    veraltetNachMin: 36 * 60,
   },
 };
+
+/** Alter eines Fachebenen-Stands, wie Panel und Inspector es zeigen (LFH-591). */
+export interface FachebeneAlter {
+  /** Abrufzeitpunkt des Servers (RFC 3339, UTC), unverändert. */
+  abgerufen: string;
+  /** Älter als `veraltetNachMin` der Ebene; genau auf der Schwelle noch nicht. */
+  veraltet: boolean;
+}
+
+/**
+ * Stuft den Abrufzeitpunkt einer Ebene gegen ihre Schwelle ein — rein und exportiert, `jetztMs`
+ * kommt vom Aufrufer (`useMinutenTakt`), damit die Einstufung ohne neuen Abruf mitaltert. Ohne
+ * oder mit unlesbarem Zeitpunkt `null`: dann steht keine Angabe da, keine geratene. Ein Zeitpunkt
+ * in der Zukunft (Uhrenversatz Server ↔ Browser) zählt als Alter 0.
+ */
+export function fachebeneAlter(
+  key: FachebeneQuelle,
+  abgerufen: string | undefined,
+  jetztMs: number,
+): FachebeneAlter | null {
+  if (!abgerufen) return null;
+  const t = Date.parse(abgerufen);
+  if (Number.isNaN(t)) return null;
+  const alterMin = Math.max(0, jetztMs - t) / 60_000;
+  return { abgerufen, veraltet: alterMin > FACHEBENEN[key].veraltetNachMin };
+}
 
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {

@@ -47,6 +47,13 @@ diese Zusage.
   Flow-Geschwister mit `bandStil(…)` (`'auto'`, nie `position: 'absolute'`). Der Fuß endet vor der
   Knopfspalte (`fussStil(knopfKante)`) und oben an der Karte; kein `overflow` am Rahmen.
 - **Die Karte kippt nicht** (`touchPitch: false` **und** `maxPitch: 0` in `Kartenflaeche.tsx`).
+- **Fachebenen nennen ihr Alter** (LFH-591,
+  `openspec/changes/archive/2026-09-30-lfh-591-fachebenen-datenalter/design.md`): `abgerufen` im
+  Umschlag ist der Abruf durch den Server, `stand` bleibt der Datenstand der Quelle (KRITIS,
+  Energie, Luftqualität). `ok()` setzt es, der Cache trägt es mit (Rückfall `gespeichert_at`).
+  Veraltet ist eine Marke am `ok`, kein Status; Schwelle `veraltetNachMin` je Ebene
+  (`fachebenen.ts`, Tabelle in `docs/fachebenen-quellen.md`), Anzeige nur über
+  `FachebeneStand.tsx`, Takt `components/useMinutenTakt.ts`.
 - **Fachebenen antworten bedingt** (LFH-594, `fachebene_antwort` in `routes/karte.rs`): ETag =
   Hash der ausgelieferten Bytes (nicht `gespeichert_at`), `private, no-cache`, 304 ohne Body;
   `If-None-Match` vergleicht schwach (`support::if_none_match_matcht`). Das 304 löst der

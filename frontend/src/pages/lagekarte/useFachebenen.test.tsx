@@ -142,6 +142,7 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
           status: 'ok',
           attribution: 'Autobahn GmbH des Bundes',
           stand: null,
+          abgerufen: '2026-09-30T12:30:00Z',
           features: fx.autobahn,
         });
       if (quelle === 'luftqualitaet')
@@ -566,6 +567,49 @@ describe('useFachebenen', () => {
       // nichts, obwohl das Backend längst wieder da wäre.
       await act(() => vi.advanceTimersByTimeAsync(FACHEBENEN.autobahn.aufwaermPollMs! + 1_000));
       expect(rufe).toBeGreaterThan(nachFehlschlag);
+    } finally {
+      vi.useRealTimers();
+      lade.mockImplementation(original);
+    }
+  });
+
+  it('reicht den Abrufzeitpunkt je sichtbarer Ebene durch (LFH-591)', async () => {
+    const { result } = rendere();
+    expect(result.current.fachebenenAbgerufen).toEqual({});
+    act(() => result.current.onFachebeneToggle('autobahn', true));
+    await waitFor(() =>
+      expect(result.current.fachebenenAbgerufen.autobahn).toBe('2026-09-30T12:30:00Z'),
+    );
+    // Eine Antwort ohne Zeitpunkt trägt keinen.
+    act(() => result.current.onFachebeneToggle('nina', true));
+    await waitFor(() => expect(result.current.fachebenenStatus.nina).toBe('ok'));
+    expect(result.current.fachebenenAbgerufen.nina).toBeUndefined();
+    // Ausgeschaltet: keine Angabe mehr.
+    act(() => result.current.onFachebeneToggle('autobahn', false));
+    expect(result.current.fachebenenAbgerufen.autobahn).toBeUndefined();
+  });
+
+  it('behält den Abrufzeitpunkt nach einem gescheiterten Refetch, solange die Daten stehen (LFH-591)', async () => {
+    const lade = vi.mocked(ladeFachebene);
+    const original = lade.getMockImplementation()!;
+    let rufe = 0;
+    lade.mockImplementation((quelle, bbox) => {
+      if (quelle !== 'autobahn') return original(quelle, bbox);
+      rufe += 1;
+      return rufe === 1 ? original(quelle, bbox) : Promise.reject(new Error('Netz weg'));
+    });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { result } = rendere();
+      act(() => result.current.onFachebeneToggle('autobahn', true));
+      await waitFor(() => expect(result.current.fachebenenStatus.autobahn).toBe('ok'));
+      await act(() => vi.advanceTimersByTimeAsync(FACHEBENEN.autobahn.pollMs + 1_000));
+      await waitFor(() => expect(result.current.fachebenenStatus.autobahn).toBe('offline'));
+      // Die Karte zeichnet die gehaltenen Daten weiter — also bleibt auch ihr Alter sichtbar.
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'autobahn')?.daten.features,
+      ).toHaveLength(3);
+      expect(result.current.fachebenenAbgerufen.autobahn).toBe('2026-09-30T12:30:00Z');
     } finally {
       vi.useRealTimers();
       lade.mockImplementation(original);

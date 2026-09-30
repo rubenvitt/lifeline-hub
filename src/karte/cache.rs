@@ -5,7 +5,7 @@
 //! erfolgreiche externe Abfrage scheitert nie am Cache; ein Aufrufer, dessen einziges Ergebnis
 //! der Eintrag ist, erfährt aber, dass er nicht steht (s. `setze`).
 
-use crate::karte::typen::FachebeneAntwort;
+use crate::karte::typen::{zeitpunkt_utc, FachebeneAntwort, FachebeneStatus};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sqlx::SqlitePool;
@@ -19,9 +19,17 @@ const MAX_ALTER_SEKUNDEN: i64 = 2 * 24 * 3600;
 /// Sperrklinken-Gedächtnis weg, obwohl er weiterverwendet werden soll. Ein Eintrag, ~100 KB.
 const DAUERHAFT: &str = crate::karte::odl_grundpegel::CACHE_SCHLUESSEL;
 
-fn deserialisiere(json: &str) -> Option<FachebeneAntwort> {
-    match serde_json::from_str(json) {
-        Ok(a) => Some(a),
+/// Liest einen Umschlag. Fehlt `abgerufen` (Eintrag von vor LFH-591), gilt der Speicherzeitpunkt:
+/// geschrieben wird unmittelbar nach dem Abruf. Ein vorhandener Wert bleibt.
+fn deserialisiere(json: &str, gespeichert_at: i64) -> Option<FachebeneAntwort> {
+    match serde_json::from_str::<FachebeneAntwort>(json) {
+        Ok(mut a) => {
+            if a.abgerufen.is_none() && a.status != FachebeneStatus::Offline {
+                a.abgerufen =
+                    chrono::DateTime::from_timestamp(gespeichert_at, 0).map(zeitpunkt_utc);
+            }
+            Some(a)
+        }
         Err(e) => {
             tracing::warn!("Fachebenen-Cache: JSON nicht lesbar: {e}");
             None
@@ -31,8 +39,8 @@ fn deserialisiere(json: &str) -> Option<FachebeneAntwort> {
 
 /// Liefert den Cache-Eintrag samt Alter in Sekunden (für Stale-while-revalidate), sonst None.
 pub async fn eintrag(pool: &SqlitePool, schluessel: &str) -> Option<(FachebeneAntwort, i64)> {
-    let row: Option<(String, i64)> = sqlx::query_as(
-        "SELECT antwort_json, unixepoch() - gespeichert_at \
+    let row: Option<(String, i64, i64)> = sqlx::query_as(
+        "SELECT antwort_json, unixepoch() - gespeichert_at, gespeichert_at \
          FROM fachebenen_cache WHERE schluessel = ?",
     )
     .bind(schluessel)
@@ -42,7 +50,7 @@ pub async fn eintrag(pool: &SqlitePool, schluessel: &str) -> Option<(FachebeneAn
         tracing::warn!("Fachebenen-Cache: Lesefehler (eintrag): {e}");
         None
     });
-    row.and_then(|(j, alter)| deserialisiere(&j).map(|a| (a, alter)))
+    row.and_then(|(j, alter, gespeichert)| deserialisiere(&j, gespeichert).map(|a| (a, alter)))
 }
 
 /// Frischen Eintrag (jünger als `ttl_sekunden`) liefern, sonst None.
@@ -51,8 +59,8 @@ pub async fn frisch(
     schluessel: &str,
     ttl_sekunden: i64,
 ) -> Option<FachebeneAntwort> {
-    let json: Option<String> = sqlx::query_scalar(
-        "SELECT antwort_json FROM fachebenen_cache \
+    let row: Option<(String, i64)> = sqlx::query_as(
+        "SELECT antwort_json, gespeichert_at FROM fachebenen_cache \
          WHERE schluessel = ? AND unixepoch() - gespeichert_at < ?",
     )
     .bind(schluessel)
@@ -63,21 +71,22 @@ pub async fn frisch(
         tracing::warn!("Fachebenen-Cache: Lesefehler (frisch): {e}");
         None
     });
-    json.and_then(|j| deserialisiere(&j))
+    row.and_then(|(j, gespeichert)| deserialisiere(&j, gespeichert))
 }
 
 /// Letzten (auch abgelaufenen) Eintrag liefern — für Stale-Serving bei Quell-Ausfall.
 pub async fn stale(pool: &SqlitePool, schluessel: &str) -> Option<FachebeneAntwort> {
-    let json: Option<String> =
-        sqlx::query_scalar("SELECT antwort_json FROM fachebenen_cache WHERE schluessel = ?")
-            .bind(schluessel)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or_else(|e| {
-                tracing::warn!("Fachebenen-Cache: Lesefehler (stale): {e}");
-                None
-            });
-    json.and_then(|j| deserialisiere(&j))
+    let row: Option<(String, i64)> = sqlx::query_as(
+        "SELECT antwort_json, gespeichert_at FROM fachebenen_cache WHERE schluessel = ?",
+    )
+    .bind(schluessel)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or_else(|e| {
+        tracing::warn!("Fachebenen-Cache: Lesefehler (stale): {e}");
+        None
+    });
+    row.and_then(|(j, gespeichert)| deserialisiere(&j, gespeichert))
 }
 
 /// Eintrag speichern (Upsert) und überalterte Einträge wegräumen.
@@ -165,7 +174,6 @@ pub async fn eintrag_wert<T: DeserializeOwned>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::karte::typen::{FachebeneAntwort, FachebeneStatus};
     use serde_json::json;
 
     fn antwort() -> FachebeneAntwort {
@@ -201,6 +209,68 @@ mod tests {
         setze(&pool, "dwd", &antwort()).await;
         assert!(frisch(&pool, "dwd", 0).await.is_none());
         assert!(stale(&pool, "dwd").await.is_some());
+    }
+
+    /// Legt einen Eintrag ohne `abgerufen` an, wie er vor LFH-591 geschrieben wurde, gespeichert
+    /// vor `alter` Sekunden. Liefert den Speicherzeitpunkt.
+    async fn alter_eintrag_ohne_abruf(pool: &SqlitePool, schluessel: &str, alter: i64) -> i64 {
+        let json = r#"{"quelle":"dwd","status":"ok","attribution":"X","stand":null,
+            "features":{"type":"FeatureCollection","features":[{"type":"Feature"}]}}"#;
+        sqlx::query(
+            "INSERT INTO fachebenen_cache (schluessel, gespeichert_at, antwort_json) \
+             VALUES (?, unixepoch() - ?, ?)",
+        )
+        .bind(schluessel)
+        .bind(alter)
+        .bind(json)
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query_scalar("SELECT gespeichert_at FROM fachebenen_cache WHERE schluessel = ?")
+            .bind(schluessel)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    fn als_zeitpunkt(unix: i64) -> String {
+        zeitpunkt_utc(chrono::DateTime::from_timestamp(unix, 0).unwrap())
+    }
+
+    /// LFH-591: ein Eintrag ohne Feld gilt als zum Speicherzeitpunkt abgerufen — auf allen drei
+    /// Lesewegen, nicht als „jetzt".
+    #[tokio::test]
+    async fn fehlender_abrufzeitpunkt_kommt_aus_dem_speicherzeitpunkt() {
+        let pool = crate::db::test_pool().await;
+        let gespeichert = alter_eintrag_ohne_abruf(&pool, "dwd", 30 * 3600).await;
+        let erwartet = Some(als_zeitpunkt(gespeichert));
+        let (a, alter) = eintrag(&pool, "dwd").await.expect("eintrag");
+        assert!(alter >= 30 * 3600);
+        assert_eq!(a.abgerufen, erwartet);
+        assert_eq!(stale(&pool, "dwd").await.unwrap().abgerufen, erwartet);
+        assert_eq!(
+            frisch(&pool, "dwd", 31 * 3600).await.unwrap().abgerufen,
+            erwartet
+        );
+    }
+
+    /// Ein gespeicherter Abrufzeitpunkt bleibt, wie er ist.
+    #[tokio::test]
+    async fn vorhandener_abrufzeitpunkt_bleibt() {
+        let pool = crate::db::test_pool().await;
+        let mut a = antwort();
+        a.abgerufen = Some("2026-09-28T08:15:00Z".into());
+        setze(&pool, "dwd", &a).await;
+        let (gelesen, _) = eintrag(&pool, "dwd").await.unwrap();
+        assert_eq!(gelesen.abgerufen.as_deref(), Some("2026-09-28T08:15:00Z"));
+    }
+
+    /// Ein gespeichertes `offline` bekommt keinen Abrufzeitpunkt angedichtet.
+    #[tokio::test]
+    async fn offline_eintrag_bleibt_ohne_abrufzeitpunkt() {
+        let pool = crate::db::test_pool().await;
+        setze(&pool, "nina", &FachebeneAntwort::offline("nina", "BBK")).await;
+        assert_eq!(stale(&pool, "nina").await.unwrap().abgerufen, None);
     }
 
     #[tokio::test]
