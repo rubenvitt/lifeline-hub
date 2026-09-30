@@ -665,6 +665,25 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       },
     },
     {
+      // Stab mit der Arbeitsaufnahme (LFH-551): die sieben Zeilen tragen die längsten Texte der
+      // Seite (Punkt + Quelle + Bemerkung). Datenanker ist die letzte Zeile — sie steht erst,
+      // wenn die Checkliste geladen ist.
+      pfad: `/einsaetze/${einsatzId}/stab`,
+      anker: (p: Page) =>
+        p
+          .getByRole('region', { name: 'Arbeitsaufnahme' })
+          .getByRole('checkbox', { name: 'Einsatzbereitschaft an die Leitstelle gemeldet' }),
+      lesend: {
+        vorbedingung: (p: Page) =>
+          expect(
+            p
+              .getByRole('region', { name: 'Arbeitsaufnahme' })
+              .getByRole('checkbox', { name: 'Einsatzbereitschaft an die Leitstelle gemeldet' }),
+            'Vorbedingung: ohne Schreibrecht ist der Haken gesperrt',
+          ).toBeDisabled(),
+      },
+    },
+    {
       pfad: `/einsaetze/${einsatzId}/auftraege`,
       // Ohne `forceRender` ist die Befehlsliste nach `goto` nicht im Baum (Standardreiter
       // „Aufträge"); der Reiterwechsel läuft deshalb je Breite erneut.

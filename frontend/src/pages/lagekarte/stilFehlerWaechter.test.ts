@@ -49,7 +49,18 @@ describe('neuerStilFehlerWaechter', () => {
     const w = neuerStilFehlerWaechter();
     w.stilGeladen();
     expect(w.meldeFehler(stilFehler)).toBe(false);
-    w.stilAngewandt();
+  });
+
+  // LFH-558, im Browser gemessen: die Karte wird mit dem Blindstil konstruiert, bevor die
+  // Kartenansicht hydriert ist; dessen 'style.load' schloss das Fenster, und der 404 des danach
+  // angewandten Online-Styles ließ die Karte ganz ohne Style (und ohne Lagedaten) stehen.
+  it('jeder angewandte Style öffnet ein eigenes Fenster bis zu SEINEM Laden', () => {
+    const w = neuerStilFehlerWaechter();
+    w.stilGeladen(); // Platzhalter (Blindstil) geladen
+    w.stilAngewandt(); // Online-Style der Ansicht
+    expect(w.meldeFehler(stilFehler)).toBe(true);
+    w.stilAngewandt(); // Ersatz (offline) …
+    w.stilGeladen(); // … geladen: das Fenster ist zu
     expect(w.meldeFehler(stilFehler)).toBe(false);
   });
 });

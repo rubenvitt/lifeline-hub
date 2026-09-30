@@ -72,3 +72,28 @@ describe('ErinnerungKarte — Bezug-Deeplink (F36/LFH-257)', () => {
     expect(screen.queryByRole('link')).toBeNull();
   });
 });
+
+describe('ErinnerungKarte — Empfänger (LFH-549)', () => {
+  it('zeigt Katalogwert mit aufgelöster Besetzung', () => {
+    renderKarte(
+      <ErinnerungKarte
+        erinnerung={erinnerung({
+          empfaenger_funktion_code: 's2',
+          empfaenger_anzeige: 'S2 Lage',
+          aktuelle_besetzung: { zustand: 'extern', name: 'Müller' },
+        })}
+      />,
+    );
+    expect(screen.getByText('für: S2 Lage · Müller')).toBeInTheDocument();
+  });
+
+  it('zeigt ohne Auflösung nur den Empfänger, keinen Platzhalter', () => {
+    renderKarte(
+      <ErinnerungKarte
+        erinnerung={erinnerung({ empfaenger_funktion: 'S2', empfaenger_anzeige: 'S2' })}
+      />,
+    );
+    expect(screen.getByText('für: S2')).toBeInTheDocument();
+    expect(screen.queryByText(/·/)).not.toBeInTheDocument();
+  });
+});

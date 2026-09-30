@@ -187,7 +187,17 @@ pub struct AuftragEmpfaengerAnzeige {
     pub einheit_id: Option<i64>,
     pub person_id: Option<i64>,
     pub fahrzeug_id: Option<i64>,
+    /// Freitext — oder Bezeichnung bei `funktion` Führungshilfspersonal/Fachberater (LFH-549).
     pub funktion_text: Option<String>,
+    /// Katalogcode (LFH-549); fehlt bei Freitext und anderen Empfängertypen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<crate::fuehrung::Fuehrungsfunktion>)]
+    pub funktion: Option<String>,
+    /// Aktuelle Besetzung des Sachgebiets zur Lesezeit (nur s1–s6, nur mit Stab-Recht,
+    /// LFH-549). `snap_anzeige` bleibt die historische Wahrheit.
+    #[sqlx(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aktuelle_besetzung: Option<crate::fuehrung::aufloesung::AktuelleBesetzung>,
     /// Externer Adressat (LFH-87): Kategorie + Bezeichnung (nur bei empfaenger_typ='extern').
     pub extern_kategorie: Option<AdressatKategorie>,
     pub extern_bezeichnung: Option<String>,
@@ -202,4 +212,28 @@ pub struct AuftragDetail {
     #[serde(flatten)]
     pub auftrag: AuftragAnzeige,
     pub empfaenger: Vec<AuftragEmpfaengerAnzeige>,
+}
+
+/// Setzt `aktuelle_besetzung` an Funktionsempfängern mit Sachgebietscode (LFH-549). Die
+/// Besetzung wird einmal je Anfrage geladen, nur mit Stab-Recht (`fuehrung::aufloesung`).
+pub async fn anreichern_alle(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    benutzer: &crate::auth::Benutzer,
+    auftraege: &mut [AuftragDetail],
+) -> Result<(), crate::error::AppError> {
+    let aufloeser =
+        crate::fuehrung::aufloesung::Aufloeser::laden_fuer(pool, einsatz_id, org_id, benutzer)
+            .await?;
+    for d in auftraege.iter_mut() {
+        for e in d.empfaenger.iter_mut() {
+            e.aktuelle_besetzung = aufloeser.aufloesen(
+                e.funktion
+                    .as_deref()
+                    .and_then(crate::fuehrung::Fuehrungsfunktion::parse),
+            );
+        }
+    }
+    Ok(())
 }

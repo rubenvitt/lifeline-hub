@@ -229,6 +229,22 @@ describe('offeneAuftraege', () => {
     ).toBe('EA Nord, S2');
     expect(empfaengerText(auftrag())).toBeNull();
   });
+
+  it('hängt die aufgelöste Besetzung eines Sachgebiets an (LFH-549)', () => {
+    expect(
+      empfaengerText(
+        auftrag({
+          empfaenger: [
+            empfaenger({
+              snap_anzeige: 'S3 Einsatz',
+              funktion: 's3',
+              aktuelle_besetzung: { zustand: 'extern', name: 'Schulz' },
+            }),
+          ],
+        }),
+      ),
+    ).toBe('S3 Einsatz · Schulz');
+  });
 });
 
 describe('folgeText', () => {

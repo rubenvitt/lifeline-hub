@@ -548,6 +548,23 @@ fn einsatz_lagekennzahl_wire() {
     enum_wire_as_str!(lifeline_hub::einsatz::lagekennzahl::Lagekennzahl { Pegel, Evakuiert });
 }
 
+/// LFH-551: Checkliste Arbeitsaufnahme. Die Werte stehen als CHECK in
+/// `migrations/0127_stab_checkliste.sql`, das Frontend führt Text und Quelle je Wert in
+/// `stab/checkliste.ts`. Als Literal gepinnt, damit ein falscher `rename` hart auffällt; `ALLE`
+/// ist zugleich die Anzeigereihenfolge.
+#[test]
+fn stab_checklisten_punkt_wire() {
+    enum_wire!(lifeline_hub::stab::checkliste::ChecklistenPunkt {
+        Aufstellort => "aufstellort",
+        Einweisung => "einweisung",
+        Lageskizze => "lageskizze",
+        Funkarbeitsplaetze => "funkarbeitsplaetze",
+        Sprechgruppen => "sprechgruppen",
+        EtbEroeffnet => "etb_eroeffnet",
+        LeitstelleGemeldet => "leitstelle_gemeldet",
+    } in lifeline_hub::stab::checkliste::ChecklistenPunkt::ALLE);
+}
+
 #[test]
 fn stab_besetzung_art_wire() {
     enum_wire_as_str!(lifeline_hub::stab::BesetzungArt {
@@ -556,6 +573,46 @@ fn stab_besetzung_art_wire() {
         Extern,
         Rueckwaertig,
     });
+}
+
+/// LFH-549: Funktionskatalog. `Fuehrungsfunktion` trägt die DB-CHECK-Werte der vier Spalten
+/// aus `migrations/0128_fuehrungsfunktion.sql`; `FunktionsArt` ist abgeleitet, nie gespeichert,
+/// aber Wire-Vertrag des Katalog-Endpunkts.
+#[test]
+fn fuehrungsfunktion_wire() {
+    enum_wire!(lifeline_hub::fuehrung::Fuehrungsfunktion {
+        El => "el",
+        S1 => "s1",
+        S2 => "s2",
+        S3 => "s3",
+        S4 => "s4",
+        S5 => "s5",
+        S6 => "s6",
+        S7 => "s7",
+        Fuehrungshilfspersonal => "fuehrungshilfspersonal",
+        Fachberater => "fachberater",
+    } in lifeline_hub::fuehrung::Fuehrungsfunktion::ALLE);
+}
+
+#[test]
+fn fuehrungsfunktion_art_wire() {
+    enum_wire!(lifeline_hub::fuehrung::FunktionsArt {
+        Leitung => "leitung",
+        Sachgebiet => "sachgebiet",
+        Fuehrungshilfspersonal => "fuehrungshilfspersonal",
+        Fachberater => "fachberater",
+    } in lifeline_hub::fuehrung::FunktionsArt::ALLE);
+}
+
+#[test]
+fn fuehrungsfunktion_besetzungszustand_wire() {
+    enum_wire!(lifeline_hub::fuehrung::aufloesung::BesetzungsZustand {
+        NichtVergeben => "nicht_vergeben",
+        Einsatzleitung => "einsatzleitung",
+        Personal => "personal",
+        Extern => "extern",
+        Rueckwaertig => "rueckwaertig",
+    } in lifeline_hub::fuehrung::aufloesung::BesetzungsZustand::ALLE);
 }
 
 /// LFH-632: Dokumentenablage. `DokumentKategorie` trägt die DB-CHECK-Werte aus
@@ -616,7 +673,7 @@ fn abloesung_einstufung_wire() {
 }
 
 /// LFH-554: Presse und Medienarbeit S5. Art, Status und Anliegen tragen die DB-CHECK-Werte aus
-/// `migrations/0127_presse.sql`; Vorlage und Status der Pressemitteilung sind Schema-Anker wie
+/// `migrations/0129_presse.sql`; Vorlage und Status der Pressemitteilung sind Schema-Anker wie
 /// beim Lagebericht.
 #[test]
 fn medienkontakt_art_wire() {
@@ -773,6 +830,7 @@ fn live_event_wire() {
         KartenAnsicht => "karten_ansicht",
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",
+        Einsatz => "einsatz",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);
 }

@@ -1,4 +1,5 @@
-//! Routen der Führungsorganisation (LFH-46): Besetzung der Sachgebiete S1–S6.
+//! Routen der Führungsorganisation (LFH-46): Besetzung der Sachgebiete S1–S6, Lagebesprechung
+//! und die Checkliste Arbeitsaufnahme (LFH-551).
 //!
 //! Gates strukturell über die Extractor-Typen — `EinsatzLesezugriff<Stab>` (alle
 //! Einsatzmitglieder inkl. Beobachter) bzw. `EinsatzSchreibzugriff<Stab>` (Einsatzleitung,
@@ -17,6 +18,7 @@ use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
 use crate::routes::support::{self, pflicht};
+use crate::stab::checkliste::{self, ChecklistenEintrag, ChecklistenPunkt, PunktEingabe};
 use crate::stab::repo::{self, AbschlussEingabe, BesetzungEingabe};
 use crate::stab::{BesetzungArt, LagebesprechungAnzeige, Sachgebiet, StabAnzeige, BEZEICHNUNG_MAX};
 use crate::zeit::jetzt;
@@ -232,7 +234,7 @@ pub async fn lagebesprechung_abschliessen(
         }
     }
 
-    let (_lfd_nr, etb_id) = repo::lagebesprechung_abschliessen(
+    let ergebnis = repo::lagebesprechung_abschliessen(
         &state.pool,
         einsatz_id,
         ctx.benutzer.id,
@@ -246,9 +248,87 @@ pub async fn lagebesprechung_abschliessen(
 
     let stab = repo::laden(&state.pool, einsatz_id).await?;
     // Der ETB-Eintrag entstand im selben Commit → ETB-Kurzruf mitschicken.
-    state.live.publiziere(einsatz_id, etb_id);
+    state.live.publiziere(einsatz_id, ergebnis.etb_eintrag_id);
     sse(&state, einsatz_id);
+    // Den Einsatzkopf nur bei geändertem Termin (LFH-555, design.md D3): `einsatz` erreicht auch
+    // Leser ohne Stab-Recht und darf ihnen nicht mehr sagen, als der Kopf-GET ohnehin zeigt.
+    if ergebnis.termin_geaendert {
+        state
+            .live
+            .publiziere_einsatz(einsatz_id, LiveEvent::Einsatz);
+    }
     Ok((StatusCode::CREATED, Json(stab)))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ChecklistenPunktSetzen {
+    /// Fehlt = unverändert. `null` zählt wie „fehlt“: allein (ohne `bemerkung`) ist der Aufruf
+    /// damit leer und scheitert mit 400.
+    #[serde(default)]
+    erledigt: Option<bool>,
+    /// **Tri-State**: fehlt = unverändert, `null` oder leer = Bemerkung löschen.
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    bemerkung: Option<Option<String>>,
+}
+
+/// Validiert die Eingabe (LFH-267: jede Ablehnung scheitert am Feld für sich → 400).
+fn validiere_punkt(req: ChecklistenPunktSetzen) -> Result<PunktEingabe, AppError> {
+    let bemerkung = support::trimme_tri(req.bemerkung);
+    if let Some(Some(b)) = &bemerkung {
+        if b.chars().count() > checkliste::BEMERKUNG_MAX {
+            return Err(AppError::Validation(format!(
+                "bemerkung darf höchstens {} Zeichen lang sein",
+                checkliste::BEMERKUNG_MAX
+            )));
+        }
+    }
+    if req.erledigt.is_none() && bemerkung.is_none() {
+        return Err(AppError::Validation(
+            "erwartet erledigt und/oder bemerkung".into(),
+        ));
+    }
+    Ok(PunktEingabe {
+        erledigt: req.erledigt,
+        bemerkung,
+    })
+}
+
+/// GET /api/einsaetze/{id}/stab/checkliste — gespeicherte Punkte (alle Mitglieder).
+///
+/// Eigener Endpunkt statt eines Felds an `StabAnzeige`: die Checkliste lässt Besetzung und
+/// Lagebesprechung unberührt (Akzeptanzkriterium LFH-551).
+pub async fn checkliste_laden(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Stab>,
+) -> Result<Json<Vec<ChecklistenEintrag>>, AppError> {
+    Ok(Json(checkliste::laden(&state.pool, ctx.einsatz.id).await?))
+}
+
+/// PUT /api/einsaetze/{id}/stab/checkliste/{punkt} — Haken und/oder Bemerkung setzen.
+///
+/// Idempotent und umkehrbar, ohne Rückfrage. Nur ein wirksamer Übergang des Punkts
+/// `leitstelle_gemeldet` schreibt ins ETB (Design D4).
+pub async fn checkliste_setzen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Stab>,
+    PfadParam((_einsatz_id, punkt)): PfadParam<(i64, String)>,
+    JsonBody(req): JsonBody<ChecklistenPunktSetzen>,
+) -> Result<Json<Vec<ChecklistenEintrag>>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let punkt = ChecklistenPunkt::parse(&punkt).ok_or_else(|| {
+        AppError::Validation(format!("Unbekannter Punkt der Checkliste '{punkt}'"))
+    })?;
+    let eingabe = validiere_punkt(req)?;
+    let gesetzt =
+        checkliste::setzen(&state.pool, einsatz_id, punkt, ctx.benutzer.id, &eingabe).await?;
+    if let Some(etb_id) = gesetzt.etb_eintrag_id {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
+    // Ohne Wirkung (nie berührter Punkt, nichts anzulegen) kein Live-Ereignis.
+    if gesetzt.geschrieben {
+        sse(&state, einsatz_id);
+    }
+    Ok(Json(gesetzt.liste))
 }
 
 #[cfg(test)]

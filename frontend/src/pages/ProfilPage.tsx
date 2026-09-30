@@ -22,7 +22,7 @@ import { webauthnRegistrierungAbschliessen, webauthnRegistrierungStarten } from 
 import type { AuthProvider } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import PasswortAendernDialog from '../auth/PasswortAendernDialog';
-import { huelleSperrtPasskey } from '../huelle/faehigkeiten';
+import { huelleAnmeldungImBrowser, huelleSperrtPasskey } from '../huelle/faehigkeiten';
 
 interface TotpCodeWerte {
   code: string;
@@ -221,11 +221,12 @@ export default function ProfilPage() {
                 <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
                   Passkey
                 </Augenbraue>
-                {/* Nicht versprechen, dass ein im Browser eingerichteter Passkey danach in der
-                    Mac-App trägt: das kommt erst mit der Anmeldung im Systembrowser (LFH-818). */}
+                {/* Den Weg in die Mac-App nur nennen, wenn die Hülle „Im Browser anmelden“
+                    anbietet (LFH-818); sonst nichts versprechen (LFH-817). */}
                 <Typography.Paragraph type="secondary">
-                  Passkeys richtest du im Browser ein und meldest dich dort damit an, in der Mac-App
-                  gehen sie nicht.
+                  {huelleAnmeldungImBrowser()
+                    ? 'Passkeys richtest du im Browser ein. In der Mac-App meldest du dich damit über „Im Browser anmelden“ an.'
+                    : 'Passkeys richtest du im Browser ein und meldest dich dort damit an, in der Mac-App gehen sie nicht.'}
                 </Typography.Paragraph>
               </section>
             )}

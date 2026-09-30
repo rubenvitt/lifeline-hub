@@ -6,6 +6,8 @@ interface Props {
   eintrag: EtbEintragAnzeige | null;
   abschnitte: ZielOption[];
   einheiten: ZielOption[];
+  /** Für die Katalogauswahl der Funktionen (LFH-549). */
+  einsatzId?: number;
   senden: boolean;
   onAbbrechen: () => void;
   onAnlegen: (d: NeuerAuftrag) => Promise<unknown>;
@@ -22,6 +24,7 @@ function initialText(e: EtbEintragAnzeige | null): string {
 export default function AuftragAusEtbModal({
   eintrag,
   abschnitte,
+  einsatzId,
   einheiten,
   senden,
   onAbbrechen,
@@ -41,6 +44,7 @@ export default function AuftragAusEtbModal({
         senden={senden}
         abschnitte={abschnitte}
         einheiten={einheiten}
+        einsatzId={einsatzId}
         initialText={initialText(eintrag)}
         zitat={
           eintrag && (

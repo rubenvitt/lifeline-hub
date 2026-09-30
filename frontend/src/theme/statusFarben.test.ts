@@ -6,6 +6,8 @@ import {
   antdToken,
   etbTypFarbenDunkel,
   etbTypFarbenHell,
+  fachebeneFarbenDunkel,
+  fachebeneFarbenHell,
   farbenDunkel,
   farbenHell,
   warnstufeFarbenDunkel,
@@ -13,6 +15,7 @@ import {
   type Farbrollen,
 } from './tokens';
 import type { EinsatzStatus, MaterialStatus } from '../api/types';
+import type { FachebeneQuelle } from '../api/fachebenen';
 
 /** Vollständiger GlobalToken eines Modus — dieselbe Ableitung wie im `ThemeModeProvider`,
  *  damit der Test die echte Kette Rolle → antd-Token prüft und nicht ein Stück davon. */
@@ -183,6 +186,8 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // Eine Fläche ist keine Statusrolle und gehört deshalb nicht in `ALLE_MAPS`.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
+    // Ebenso die Ebenenfarbe der Fachebenen (LFH-593): eine Identität, keine Statusrolle.
+    expect(Object.keys(ALLE_MAPS)).not.toContain('fachebeneFarbe');
     expect(Object.keys(ALLE_MAPS)).toHaveLength(29);
   });
 });
@@ -613,5 +618,114 @@ describe('abschnittLagezustand (LFH-608)', () => {
       angespannt: { rolle: 'achtung', label: 'angespannt' },
       kritisch: { rolle: 'alarm', label: 'kritisch' },
     });
+  });
+});
+
+describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
+  // Handgeschriebene Liste statt `fachebeneKeys()`: eine neue Ebene muss hier eine Farbe belegen.
+  const EBENEN: FachebeneQuelle[] = [
+    'nina',
+    'dwd',
+    'pegelonline',
+    'hochwasser',
+    'luftqualitaet',
+    'odl',
+    'autobahn',
+    'kritis',
+    'energie',
+  ];
+
+  /** Relative Leuchtdichte und Kontrast nach WCAG 2.x — gerechnet, nicht behauptet. */
+  function luminanz(hex: string): number {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const s = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  function kontrast(a: string, b: string): number {
+    const [x, y] = [luminanz(a), luminanz(b)];
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  }
+  /** Farbabstand ΔE (CIE76) in CIELAB, D65. */
+  function abstand(a: string, b: string): number {
+    const lab = (hex: string) => {
+      const [r, g, b2] = [1, 3, 5].map((i) => {
+        const s = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+      const x = f((r * 0.4124 + g * 0.3576 + b2 * 0.1805) / 0.95047);
+      const y = f(r * 0.2126 + g * 0.7152 + b2 * 0.0722);
+      const z = f((r * 0.0193 + g * 0.1192 + b2 * 0.9505) / 1.08883);
+      return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+    };
+    const [p, q] = [lab(a), lab(b)];
+    return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+  }
+
+  it('hält am Tag die bisherigen Töne — keine Umfärbung (Literale)', () => {
+    expect(EBENEN.map((q) => sf.fachebeneFarbe(q, hellToken))).toEqual([
+      '#cf1322',
+      '#d48806',
+      '#096dd9',
+      '#08979c',
+      '#5b6b82',
+      '#7cb305',
+      '#c41d7f',
+      '#531dab',
+      '#d4b106',
+    ]);
+  });
+
+  it('pinnt die Nachttöne als Literale', () => {
+    expect(EBENEN.map((q) => sf.fachebeneFarbe(q, dunkelToken))).toEqual([
+      '#ff4d4f',
+      '#ffa940',
+      '#4096ff',
+      '#36cfc9',
+      '#8c9bb3',
+      '#a0d911',
+      '#f759ab',
+      '#9254de',
+      '#fadb14',
+    ]);
+  });
+
+  it('folgt dem Modus und fällt ohne unsere Tokens auf Hell zurück', () => {
+    for (const q of EBENEN) {
+      expect(sf.fachebeneFarbe(q, hellToken)).toBe(fachebeneFarbenHell[q]);
+      expect(sf.fachebeneFarbe(q, dunkelToken)).toBe(fachebeneFarbenDunkel[q]);
+      expect(sf.fachebeneFarbe(q, theme.getDesignToken({}))).toBe(fachebeneFarbenHell[q]);
+    }
+  });
+
+  it('hebt sich nachts vom hellsten und dunkelsten Leistengrund ab (≥ 3 : 1, WCAG 1.4.11)', () => {
+    // Gegenprobe im Test selbst: der Tageston von KRITIS läge nachts bei 1,79 : 1 — genau das
+    // behob die Achse.
+    expect(kontrast(fachebeneFarbenHell.kritis, farbenDunkel.flaeche3)).toBeLessThan(3);
+    for (const q of EBENEN) {
+      for (const grund of ['paneel', 'flaeche', 'flaeche2', 'flaeche3'] as const) {
+        expect(
+          kontrast(sf.fachebeneFarbe(q, dunkelToken), farbenDunkel[grund]),
+          `${q} auf ${grund}`,
+        ).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it('hält die Ebenen im Panel unterscheidbar — nachts nicht enger als am Tag', () => {
+    // Die Ebenen stehen im Panel untereinander. Das engste Tagespaar (DWD/Energie) liegt bei
+    // ΔE 25,2; nachts darf kein Paar enger stehen.
+    for (const [palette, name] of [
+      [fachebeneFarbenHell, 'Tag'],
+      [fachebeneFarbenDunkel, 'Nacht'],
+    ] as const) {
+      for (const [i, a] of EBENEN.entries()) {
+        for (const b of EBENEN.slice(i + 1)) {
+          expect(abstand(palette[a], palette[b]), `${name}: ${a}/${b}`).toBeGreaterThanOrEqual(25);
+        }
+      }
+    }
   });
 });

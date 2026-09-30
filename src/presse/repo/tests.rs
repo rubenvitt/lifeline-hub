@@ -317,7 +317,7 @@ async fn aendern_leert_kontaktangaben_und_prueft_pflicht() {
     assert_eq!(code(r), StatusCode::BAD_REQUEST);
 }
 
-/// Die Nachtrag-Anweisung aus `0127_presse.sql`: ein offener Lagevortrag-Entwurf von vor der
+/// Die Nachtrag-Anweisung aus `0129_presse.sql`: ein offener Lagevortrag-Entwurf von vor der
 /// Vorlagenerweiterung bekommt „Medienlage“ leer nachgetragen und lässt sich wieder freigeben;
 /// ein freigegebener Bericht und ein Entwurf, der den Abschnitt schon trägt, bleiben unberührt.
 #[tokio::test]
@@ -343,7 +343,7 @@ async fn migration_traegt_medienlage_in_offene_entwuerfe_nach() {
             .unwrap(),
         );
     }
-    let migration = include_str!("../../../migrations/0127_presse.sql");
+    let migration = include_str!("../../../migrations/0129_presse.sql");
     let update = &migration[migration.find("UPDATE lagebericht").unwrap()..];
     sqlx::raw_sql(sqlx::AssertSqlSafe(update))
         .execute(&w.pool)

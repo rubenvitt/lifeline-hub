@@ -136,7 +136,7 @@ Die Fehlercodes:
   Bezug auf eine nicht freigegebene Mitteilung
 - 404: fremder Einsatz
 
-### D3 · Datenmodell: Migration `0127_presse.sql`
+### D3 · Datenmodell: Migration `0129_presse.sql`
 
 - **`medienkontakt`**
   - `id`, `einsatz_id` FK
@@ -362,7 +362,7 @@ mit `PlatzhalterWennGesetzt` (gesetzt → Platzhalter, leer → leer). Das ist d
 **Migration offener Lagevortrag-Entwürfe (_Nachtrag 30.09.2026_):** Die Freigabe verlangt jeden
 Abschnitt der Vorlage (`validiere_freigabe`, gepinnt in
 `freigeben_gerendert_zweimal_ist_422_ohne_zweiten_snapshot`). Ein offener Entwurf von vor der
-Erweiterung ließe sich sonst nicht mehr freigeben. `0127_presse.sql` trägt „Medienlage“ deshalb in
+Erweiterung ließe sich sonst nicht mehr freigeben. `0129_presse.sql` trägt „Medienlage“ deshalb in
 offene Entwürfe der Vorlage `lagebericht` leer nach; freigegebene Berichte bleiben unberührt.
 
 Schwärzungstests für beide Tabellen kommen nach `src/einsatz/purge_scheduler.rs`.
@@ -412,7 +412,7 @@ Change und trägt je Seite ein Verdikt.
 
 ## Migration Plan
 
-- Die Migration `0127_presse.sql` ist rein additiv: neue Tabellen und eine nullable Spalte am
+- Die Migration `0129_presse.sql` ist rein additiv: neue Tabellen und eine nullable Spalte am
   `etb_eintrag`. Sie wird nie geändert (Migrationsvergabe). Ein Rollback erfolgt per Revert des
   Codes. Die leeren Tabellen stören nicht.
 - Kein Datenumzug. Bestehende Lageberichte bleiben gültig (Teilbestand der Schlüssel).

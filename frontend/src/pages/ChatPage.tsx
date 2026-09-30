@@ -557,6 +557,7 @@ export default function ChatPage() {
         }}
       />
       <HeraufstufenAuftragModal
+        einsatzId={einsatzId}
         offen={heraufstufenAuftrag !== null}
         nachricht={heraufstufenAuftrag}
         abschnitte={(abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }))}

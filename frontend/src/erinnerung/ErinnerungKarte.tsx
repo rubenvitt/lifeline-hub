@@ -15,6 +15,7 @@ import { formatZeit } from '../anzeige/format';
 import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 
 const { Text } = Typography;
 
@@ -133,9 +134,13 @@ export default function ErinnerungKarte({
       </Flex>
 
       <Space orientation="vertical" size={2} style={{ marginBottom: aktionen.length ? 8 : 0 }}>
-        {e.empfaenger_funktion && (
+        {(e.empfaenger_anzeige ?? e.empfaenger_funktion) && (
           <Text type="secondary" style={{ fontSize: 13 }}>
-            für: {e.empfaenger_funktion}
+            für:{' '}
+            {mitBesetzung(
+              e.empfaenger_anzeige ?? e.empfaenger_funktion ?? '',
+              e.aktuelle_besetzung,
+            )}
           </Text>
         )}
         {e.beschreibung && <Text style={{ fontSize: 13 }}>{e.beschreibung}</Text>}

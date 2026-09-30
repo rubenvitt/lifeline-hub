@@ -50,7 +50,7 @@ wire_enum! {
 
 impl MedienkontaktArt {
     /// Die Zielstatus, die diese Art von `offen` aus erreichen darf (design.md D3; der CHECK in
-    /// `0127_presse.sql` ist das Netz).
+    /// `0129_presse.sql` ist das Netz).
     pub fn erlaubte_ziele(self) -> &'static [MedienkontaktStatus] {
         match self {
             MedienkontaktArt::Anfrage => &[

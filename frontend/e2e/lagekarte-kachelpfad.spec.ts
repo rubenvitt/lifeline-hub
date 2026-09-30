@@ -1,4 +1,10 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import {
+  kachelnBeantworten,
+  kartenConfigBeantworten,
+  vektorKachel,
+  vektorStilBeantworten,
+} from './kartenFixture';
 
 // Der echte Kachel-Pfad der Lagekarte — die Hälfte, die `lagekarte-smoke.spec.ts` (ohne
 // Basemap, `blindStyle`) nicht abdeckt: „Style-JSON → substituierte Kachel-URL →
@@ -6,7 +12,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 // (root-relative Proxy-URLs ohne Dokument-Base im Tile-Worker, LFH-182).
 //
 // DIE QUELLE STELLT DER TEST SELBST: `page.route` beantwortet `/api/karte/config` mit einem
-// Online-VEKTOR-View, dessen Style-JSON und die Kacheln (33 Bytes Protobuf, `KACHEL_BYTES`).
+// Online-VEKTOR-View, dessen Style-JSON und die Kacheln (33 Bytes Protobuf, `KACHEL_HEX`,
+// gebaut in `kartenFixture.ts`).
 // `page.route` greift auch für die Anfragen des maplibre-Workers. VEKTOR, weil maplibre
 // Raster-Kacheln auf dem Hauptthread lädt — nur eine Vector-Source geht durch den Worker.
 //
@@ -32,33 +39,15 @@ const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
 const KACHEL_LAYER = 'strassen';
 
 /**
- * Eine echte, minimale Mapbox-Vector-Tile: ein Layer `strassen` mit EINER LineString-Geometrie.
- * Nicht leer (eine leere Tile ist gültig und belegte kein Parsen) und ohne Bibliothek: sind
- * die Bytes falsch, findet `querySourceFeatures` nichts und der Test wird rot.
- * Aufbau (vector_tile.proto):
- *   1A 1F                        Tile.layers (Feld 3, Länge 31)
- *     78 02                      Layer.version = 2            (Feld 15)
- *     0A 08 'strassen'           Layer.name                   (Feld 1)
- *     12 0E                      Layer.features (Feld 2, Länge 14)
- *       08 01                    Feature.id = 1               (Feld 1)
- *       18 02                    Feature.type = LINESTRING    (Feld 3)
- *       22 08 …                  Feature.geometry, gepackt    (Feld 4)
- *            09                  MoveTo, 1×
- *            00 00               dx=0, dy=0       (Zickzack)
- *            0A                  LineTo, 1×
- *            C8 01 C8 01         dx=+100, dy=+100 (Zickzack 200)
- *     28 80 20                   Layer.extent = 4096          (Feld 5)
- * Ohne `tags` braucht die Kachel weder `keys` noch `values`.
+ * Die Kachel-Bytes baut `vektorKachel` (`kartenFixture.ts`, Aufbau dort Byte für Byte). Gepinnt
+ * sind sie hier als Hex: ändert sich der Bau, merkt es dieser Test, nicht erst ein fremder.
  */
-const KACHEL_BYTES = Buffer.from([
-  0x1a, 0x1f,
-  // Layer
-  0x78, 0x02, 0x0a, 0x08, 0x73, 0x74, 0x72, 0x61, 0x73, 0x73, 0x65, 0x6e,
-  // Feature
-  0x12, 0x0e, 0x08, 0x01, 0x18, 0x02, 0x22, 0x08, 0x09, 0x00, 0x00, 0x0a, 0xc8, 0x01, 0xc8, 0x01,
-  // extent
-  0x28, 0x80, 0x20,
-]);
+const KACHEL_HEX =
+  '1a1f7802' +
+  '0a08' +
+  '737472617373656e' + // 'strassen'
+  '120e0801180222080900000ac801c801' +
+  '288020';
 
 /** Ausschnitt des DEV-Mitschnitts aus `Kartenflaeche.tsx`, nachgebildet statt importiert:
  *  der Spec-Ordner bindet nicht gegen die Anwendung. */
@@ -107,43 +96,20 @@ test('Lagekarte: Kachel-Pfad — absolutiereProxyAnfrage läuft, der Worker holt
   const seitenFehler: Error[] = [];
   page.on('pageerror', (fehler) => seitenFehler.push(fehler));
 
-  /** Die URLs, mit denen der Worker die Kacheln tatsächlich angefragt hat. */
-  const kachelAnfragen: string[] = [];
-  await page.route('**/api/karte/config', (route: Route) =>
-    route.fulfill({
-      json: {
-        karten_bau_verfuegbar: false,
-        offline_regionen: [],
-        offline_verfuegbar: false,
-        // Ein Online-View macht `defaultModus` zu 'online' — die Karte konstruiert direkt mit
-        // dem Kachel-Style.
-        online_styles: [{ name: 'Kachel-Fixture', typ: 'vektor', url: STIL_PFAD }],
-      },
-    }),
-  );
-  await page.route(`**${STIL_PFAD}`, (route: Route) =>
-    route.fulfill({
-      json: {
-        version: 8,
-        sources: {
-          fixture: { type: 'vector', tiles: [KACHEL_VORLAGE], minzoom: 0, maxzoom: 14 },
-        },
-        layers: [
-          { id: 'fixture-grund', type: 'background', paint: { 'background-color': '#e8e8e8' } },
-          // Ohne einen Layer AUF der Source fragt MapLibre keine Kachel an.
-          { id: 'fixture-linien', type: 'line', source: 'fixture', 'source-layer': KACHEL_LAYER },
-        ],
-      },
-    }),
-  );
-  await page.route(`**${KACHEL_PRAEFIX}**`, (route: Route) => {
-    kachelAnfragen.push(route.request().url());
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/x-protobuf',
-      body: KACHEL_BYTES,
-    });
+  // Die Fixture MUSS die gepinnten 33 Bytes liefern (s. `KACHEL_HEX`).
+  expect(vektorKachel(KACHEL_LAYER).toString('hex')).toBe(KACHEL_HEX);
+  expect(vektorKachel(KACHEL_LAYER).length).toBe(33);
+
+  await kartenConfigBeantworten(page, {
+    online_styles: [{ name: 'Kachel-Fixture', typ: 'vektor', url: STIL_PFAD }],
   });
+  await vektorStilBeantworten(page, STIL_PFAD, {
+    id: 'fixture',
+    kachelVorlage: KACHEL_VORLAGE,
+    layer: KACHEL_LAYER,
+  });
+  /** Die URLs, mit denen der Worker die Kacheln tatsächlich angefragt hat. */
+  const kachelAnfragen = await kachelnBeantworten(page, KACHEL_PRAEFIX, KACHEL_LAYER);
 
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page);
@@ -211,7 +177,7 @@ test('Lagekarte: Kachel-Pfad — absolutiereProxyAnfrage läuft, der Worker holt
   }
 
   // (3) Der Worker hat die Antwort GELESEN: tragend ist das DEKODIERTE MERKMAL, nicht
-  //     `loaded()` (s. `KACHEL_BYTES`).
+  //     `loaded()` (s. `kartenFixture.ts`).
   await expect
     .poll(
       () =>

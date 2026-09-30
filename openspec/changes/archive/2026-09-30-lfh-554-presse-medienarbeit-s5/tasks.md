@@ -5,7 +5,7 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
 
 ## 1. Datenmodell und Schwärzung
 
-- [x] 1.1 Migration `0127_presse.sql` anlegen (D3):
+- [x] 1.1 Migration `0129_presse.sql` anlegen (D3):
   - Tabellen `medienkontakt`, `pressemitteilung` und `infotelefon_anruf` samt CHECKs und Indizes
   - `etb_eintrag.pressemitteilung_id`
   

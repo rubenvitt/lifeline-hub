@@ -1,5 +1,6 @@
 pub mod audit;
 pub mod bootstrap;
+pub mod huelle;
 pub mod oidc;
 pub mod password;
 pub mod provider;

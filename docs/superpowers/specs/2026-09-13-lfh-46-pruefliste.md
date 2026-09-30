@@ -220,3 +220,12 @@ eine Wette mit festgelegtem Prüfpunkt:
   **vor diesem Befund.**
 
 Der Befund gehört als Nachtrag in diese Datei, mit Datum der Übung und den beiden Zählungen.
+
+**Nachtrag (Entscheidung 30.09.2026): Ausbau vor dem Befund freigegeben.** Die Sperre „Kein
+Ausbau vor diesem Befund“ ist aufgehoben. Der Maintainer hat entschieden, dass die Folge-Tickets
+aus Spec Abschnitt 13 nicht auf die Übung warten. Das deckt nachträglich den Funkplan (LFH-548,
+ausgeliefert) und die Checkliste Arbeitsaufnahme (LFH-551), außerdem den Funktionskatalog
+(LFH-549). Die Beobachtungspflicht bleibt: Der Befund wird nach der ersten Übung mit echter
+Fahrzeugbesatzung hier nachgetragen, und die Folgen oben gelten weiter. Bleibt (a) aus, prüft der
+Rückbau der Besetzungsliste auch, was vom Funktionskatalog an der Besetzung hängt (Auflösung
+„Auftrag an S3 → aktuelle Besetzung“).

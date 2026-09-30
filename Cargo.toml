@@ -35,6 +35,7 @@ time = "0.3"
 tokio-stream = { version = "0.1", features = ["sync"] }
 tempfile = "3"
 sha2 = "0.11"
+base64 = "0.22"
 mime_guess = "2"
 # fontstack-/Pfadsegment-Encoding für den Style-/Tile-Proxy.
 percent-encoding = "2"
