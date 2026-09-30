@@ -14,6 +14,15 @@ import {
   mergeEnergieFeatures,
   energieNennung,
 } from './fachebenen';
+import { faerbeHochwasser, hochwasserRadius } from './hochwasserStil';
+import { faerbeLuftqualitaet, luftqualitaetRadius } from './luftqualitaetStil';
+import { faerbeOdl, odlRadius } from './odlStil';
+import {
+  hochwasserKlasse,
+  luftqualitaetIndex,
+  odlStufe,
+  type StatusDarstellung,
+} from '../../theme/statusFarben';
 
 // Minimaler Feature-Builder für die Merge-Tests.
 const feat = (lon: number, lat: number) => ({
@@ -81,6 +90,39 @@ describe('Fachebenen-Registry', () => {
     // Messtrupp-Lücke als „alles unauffällig".
     expect(FACHEBENEN.odl.geltung).toMatch(/ortsfeste/);
     expect(FACHEBENEN.odl.geltung).toMatch(/keine Einsatzmessungen/);
+  });
+  it('führt genau Hochwasser, ODL und Luftqualität als klassenabhängig gefärbt (LFH-592)', () => {
+    // Handgeschrieben: eine neue Ebene mit eigener Einfärbung soll hier auffallen, nicht still
+    // einen Panel-Punkt tragen, den die Karte nicht zeichnet.
+    expect(fachebeneKeys().filter((k) => FACHEBENEN[k].klassenfarben)).toEqual([
+      'hochwasser',
+      'odl',
+      'luftqualitaet',
+    ]);
+  });
+  it('liest die Legende einer klassenabhängigen Ebene aus dem Vertrag (LFH-592)', () => {
+    // Reihenfolge, Wort, Rolle und Durchmesser genau wie die Karte sie zeichnet — nichts neu
+    // erfunden.
+    const legende = (vertrag: Record<string, StatusDarstellung>, radius: (k: never) => number) =>
+      Object.entries(vertrag).map(([schluessel, darstellung]) => ({
+        schluessel,
+        darstellung,
+        radius: radius(schluessel as never),
+      }));
+    expect(FACHEBENEN.hochwasser.klassenfarben?.legende).toEqual(
+      legende(hochwasserKlasse, hochwasserRadius),
+    );
+    expect(FACHEBENEN.odl.klassenfarben?.legende).toEqual(legende(odlStufe, odlRadius));
+    expect(FACHEBENEN.luftqualitaet.klassenfarben?.legende).toEqual(
+      legende(luftqualitaetIndex, luftqualitaetRadius),
+    );
+  });
+  it('färbt über dieselbe Funktion, die auch die Legende trägt (LFH-592)', () => {
+    // Legende und Einfärbung hängen an EINER Eigenschaft: eine Ebene kann nicht färben, ohne dass
+    // das Panel ihre Legende zeigt.
+    expect(FACHEBENEN.hochwasser.klassenfarben?.faerbe).toBe(faerbeHochwasser);
+    expect(FACHEBENEN.odl.klassenfarben?.faerbe).toBe(faerbeOdl);
+    expect(FACHEBENEN.luftqualitaet.klassenfarben?.faerbe).toBe(faerbeLuftqualitaet);
   });
   it('gibt der ODL-Ebene einen eigenen Ebenenton', () => {
     const andere = fachebeneKeys()

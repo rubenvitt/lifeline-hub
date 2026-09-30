@@ -1,4 +1,14 @@
+import type { GlobalToken } from 'antd';
 import type { FachebeneQuelle, FachebeneStatus, FeatureCollection } from '../../api/fachebenen';
+import {
+  hochwasserKlasse,
+  luftqualitaetIndex,
+  odlStufe,
+  type StatusDarstellung,
+} from '../../theme/statusFarben';
+import { faerbeHochwasser, hochwasserRadius } from './hochwasserStil';
+import { faerbeLuftqualitaet, luftqualitaetRadius } from './luftqualitaetStil';
+import { faerbeOdl, odlRadius } from './odlStil';
 
 type Feature = FeatureCollection['features'][number];
 
@@ -26,6 +36,38 @@ export function energieAusschnittPasst(bbox: string): boolean {
   if (t.length !== 4 || t.some((n) => Number.isNaN(n))) return true;
   const [w, s, e, n] = t;
   return e - w <= ENERGIE_MAX_SPANNE_GRAD && n - s <= ENERGIE_MAX_SPANNE_GRAD;
+}
+
+/** Eine Zeile der Panel-Legende: Wort und Rolle aus dem Vertrag, Durchmesser wie auf der Karte. */
+export interface KlassenEintrag {
+  schluessel: string;
+  darstellung: StatusDarstellung;
+  /** Kreisradius in px — derselbe Wert, den die Einfärbung ins Feature schreibt. */
+  radius: number;
+}
+
+/**
+ * Einfärbung je Klasse (LFH-592). Legende und Einfärbung hängen an EINER Eigenschaft: eine Ebene,
+ * die ihre Punkte je Feature färbt, zeigt im Panel ihre Legende statt des Ebenenpunkts — der
+ * Rückfallton `farbe` käme auf der Karte nirgends vor.
+ */
+export interface Klassenfarben {
+  /** In der Reihenfolge des Vertrags (`theme/statusFarben.ts`). */
+  legende: readonly KlassenEintrag[];
+  /** Backt Rollenfarbe und Radius je Feature ein (`useFachebenen`). */
+  faerbe: (fc: FeatureCollection, token: GlobalToken) => FeatureCollection;
+}
+
+/** Legende aus einem Vertrag und der Radiusstaffel des Stilmoduls — nichts wird neu erfunden. */
+function legendeAus<K extends string>(
+  vertrag: Record<K, StatusDarstellung>,
+  radius: (k: K) => number,
+): KlassenEintrag[] {
+  return (Object.keys(vertrag) as K[]).map((schluessel) => ({
+    schluessel,
+    darstellung: vertrag[schluessel],
+    radius: radius(schluessel),
+  }));
 }
 
 export interface FachebeneDef {
@@ -60,6 +102,12 @@ export interface FachebeneDef {
    * (heute Energie); KRITIS fragt in jeder Zoomstufe.
    */
   minZoom?: number;
+  /**
+   * Nur für Ebenen, deren Punkte die Karte je Klasse einfärbt (heute Hochwasser, ODL,
+   * Luftqualität). Dann ist `farbe` bloß Rückfall für den Inspector-Akzent, und das Panel zeigt
+   * statt des Ebenenpunkts die Legende.
+   */
+  klassenfarben?: Klassenfarben;
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -90,38 +138,50 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   hochwasser: {
     key: 'hochwasser',
     label: 'Hochwasser-Meldeklassen (LHP)',
-    // Die Ebenenfarbe ist nur Rückfall für Panel-Punkt und Inspector-Akzent — auf der Karte trägt
-    // jedes Feature seine Rollenfarbe je Meldeklasse (`hochwasserStil.ts`). Nicht das Blau von
-    // `pegelonline`: beide stehen im Panel nebeneinander.
+    // Die Ebenenfarbe ist nur Rückfall für den Inspector-Akzent — auf der Karte trägt jedes Feature
+    // seine Rollenfarbe je Meldeklasse (`hochwasserStil.ts`), im Panel steht die Legende. Nicht das
+    // Blau von `pegelonline`: jede Ebene hat ihren eigenen Rückfallton.
     farbe: '#08979c',
     geometrieTyp: 'punkt',
     pollMs: 300_000,
     bboxAbhaengig: false,
+    klassenfarben: {
+      legende: legendeAus(hochwasserKlasse, hochwasserRadius),
+      faerbe: faerbeHochwasser,
+    },
   },
   luftqualitaet: {
     key: 'luftqualitaet',
     label: 'Luftqualität (UBA)',
-    // Nur der Panel-Punkt: auf der Karte trägt jede Station ihre Rollenfarbe
-    // (`luftqualitaetStil.ts`). Deshalb ein entsättigter Ton, der keine Rollenfarbe ist — Grün
-    // hieße dort schon „gute Luft".
+    // Nur Rückfall für den Inspector-Akzent: auf der Karte trägt jede Station ihre Rollenfarbe
+    // (`luftqualitaetStil.ts`), im Panel steht die Legende. Deshalb ein entsättigter Ton, der keine
+    // Rollenfarbe ist — Grün hieße schon „gute Luft".
     farbe: '#5b6b82',
     geometrieTyp: 'punkt',
     // = serverseitige TTL (900 s); die Quelle liefert Stundenwerte mit ~2 h Verzug.
     pollMs: 900_000,
     bboxAbhaengig: false,
     geltung: 'Messstationen — keine Aussage zwischen den Stationen',
+    klassenfarben: {
+      legende: legendeAus(luftqualitaetIndex, luftqualitaetRadius),
+      faerbe: faerbeLuftqualitaet,
+    },
   },
   odl: {
     key: 'odl',
     label: 'Strahlung / ODL (BfS)',
-    // Nur Rückfall für Panel-Punkt und Inspector-Akzent — auf der Karte trägt jede Sonde ihre
-    // Rollenfarbe (`odlStil.ts`).
+    // Nur Rückfall für den Inspector-Akzent — auf der Karte trägt jede Sonde ihre Rollenfarbe
+    // (`odlStil.ts`), im Panel steht die Legende.
     farbe: '#7cb305',
     geometrieTyp: 'punkt',
     // = serverseitige TTL (600 s); die Quelle liefert Stundenwerte.
     pollMs: 600_000,
     bboxAbhaengig: false,
     geltung: 'nur ortsfeste BfS-Sonden (Stundenwerte) — keine Einsatzmessungen',
+    klassenfarben: {
+      legende: legendeAus(odlStufe, odlRadius),
+      faerbe: faerbeOdl,
+    },
   },
   autobahn: {
     key: 'autobahn',
