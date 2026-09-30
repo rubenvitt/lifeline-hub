@@ -62,26 +62,33 @@ Material (12 von 30 Fachbegriffen). *Plan B,* falls die Stilprobe (D8) durchfäl
 Outline/Filled, sonst eine Suche außerhalb von Icons8. Das entscheidet Ruben.
 
 **D2 Ablage: Quellen unter `scripts/ikonen/`, Erzeugtes unter `frontend/src/ikonen/`.**
-- `scripts/ikonen/ikonen.json` ist das Register: je Eintrag ein deutscher Name
-  (Bildinhalt, nicht Verwendung, also `karte` statt `lage`), Icons8-Kennung und -Name, Stil
-  (`umriss`/`gefuellt`), Herkunft (`icons8` | `ersatz` mit ersetztem Begriff | `eigen`).
+- `scripts/ikonen/ikonen.json` ist das Register: `lizenz` (Grundlage der Ablage) und je Eintrag
+  ein deutscher Name (Bildinhalt, nicht Verwendung, also `karte` statt `lage`), Bedeutung in der
+  App, Icons8-Kennung und -Name, optional der gefüllte Zwilling und die Herkunft (`icons8` |
+  `ersatz` | `eigen`).
 - `scripts/ikonen/quellen/<name>.svg` bzw. `<name>.gefuellt.svg` sind die eingecheckten
-  Originale, `eigen/<name>.svg` die eigenen Zeichnungen.
-- `scripts/ikonen/erzeuge-ikonen.mjs` erzeugt daraus `frontend/src/ikonen/erzeugt.generated.tsx`.
-- `scripts/ikonen/quellen.sha256` ist der Stempel.
-- Der Abruf von Icons8 ist ein eigener, optionaler Schritt (`hole-ikonen.mjs`, persönlicher
-  Schlüssel nur aus der Umgebung, nie im Repo). Maßgeblich sind die eingecheckten SVGs.
+  Originale. Eigene Zeichnungen liegen im selben Ordner und tragen einen Vermerk im Kopf.
+- `scripts/ikonen/erzeuge-ikonen.mjs` erzeugt daraus `frontend/src/ikonen/erzeugt.generated.ts`
+  (Prettier-formatiert, also ohne Ausnahme in `.prettierignore`).
+- `scripts/ikonen/quellen.sha256` ist der Stempel über Register, Quellen und Ausgabe.
+- Neue Ikonen holt der Agent über den Icons8-MCP (Konto mit Abo) als SVG nach `quellen/`.
+  Das Skript selbst geht nicht ins Netz. *Geändert 30.09.2026:* Ein eigenes Abrufskript mit
+  persönlichem Schlüssel entfällt. Es wäre ohne Schlüssel in der Sitzung nicht prüfbar, und die
+  eingecheckten Quellen machen den Betrieb ohnehin unabhängig vom Icons8-Zugang.
 
 *Verworfen:* SVGs zur Laufzeit von `img.icons8.com` laden (bricht offline und im Fükw ohne
 Netz), SVGR als neue Abhängigkeit (das Umformen ist eine Handvoll Zeilen Node ohne Paket).
 
 **D3 Eine Komponente je Ikone, gemeinsamer Rahmen.**
-`erzeugt.generated.tsx` exportiert je Registereintrag eine benannte Komponente (`IkoneTrage`,
+`erzeugt.generated.ts` exportiert je Registereintrag eine benannte Komponente (`IkoneTrage`,
 `IkoneKarte`, `IkoneKarteGefuellt`), alle über einen gemeinsamen Rahmen `IkonenRahmen`
 (`frontend/src/ikonen/IkonenRahmen.tsx`):
 - Vorgabegröße `1em`, `fill="currentColor"`, `aria-hidden`, `focusable="false"`.
-- Die Hülle ist `<span class="lfh-ikone">` mit `display: inline-flex`, ausgerichtet wie
-  antds `anticon`, damit Knöpfe ihre Maße behalten.
+- Die Hülle ist `<span class="anticon lfh-ikone" data-ikone="<name>">`. Die Klasse `anticon`
+  ist Absicht: antd richtet Ikonen in Knöpfen, Menüs, Tags und Eingaben über genau diese Klasse
+  aus. Die Grundausrichtung (`resetIcon` aus `antd/es/style`) steht zusätzlich inline, weil antd
+  die globale Regel erst mit seiner ersten eigenen Ikone einspeist. Tests finden eine Ikone über
+  `data-ikone`.
 - Eine Prop `size` für feste Maße (Rail 20 px).
 
 Der Typ `Ikone` (`ComponentType<IkonenProps>`) ersetzt `IconType`. Der Einstieg ist
@@ -180,6 +187,9 @@ Branches. Daten, API und Server sind nicht betroffen.
 
 ## Open Questions
 
-- Liefern die Icons8-SVGs des Stils Füllflächen oder Striche? Das beeinflusst nur das Umformen
-  im Erzeugungsskript (`fill` vs. `stroke` auf `currentColor`), nicht den Aufgabenschnitt.
-  Es klärt sich beim ersten Abruf.
+(keine offen)
+
+- *Geklärt 30.09.2026:* Die SVGs von iOS 27 Outlined sind Füllflächen, kein Strich (`viewBox
+  0 0 50 50`, ein `<path>`, Konturen 2 Einheiten breit). Das Erzeugungsskript setzt deshalb
+  `fill="currentColor"` am `<svg>`. Bei 20 px ist eine Kontur 0,8 px breit, bei 16 px 0,64 px.
+  Genau das prüft die Stilprobe (D8).

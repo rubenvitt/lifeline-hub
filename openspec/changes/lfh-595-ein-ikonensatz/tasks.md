@@ -19,15 +19,15 @@
   Hülle `lfh-ikone` mit antds Ausrichtung. Nachweis: `IkonenRahmen.test.tsx` grün, Gegenprobe
   (Farbe fest verdrahtet → rot).
 - [ ] 2.2 `scripts/ikonen/erzeuge-ikonen.mjs` schreiben: Register und Quellen einlesen,
-  `erzeugt.generated.tsx` und `quellen.sha256` schreiben. Das Ergebnis ist Prettier-fest und
+  `erzeugt.generated.ts` und `quellen.sha256` schreiben. Das Ergebnis ist Prettier-fest und
   deterministisch. Nachweis: zwei Läufe hintereinander ohne Diff, `pnpm lint` und
   `check-fmt.sh` grün.
-- [ ] 2.3 `scripts/ikonen/hole-ikonen.mjs` schreiben: holt fehlende Quellen zu den
-  Registereinträgen, Schlüssel nur aus der Umgebung, fortsetzbar bei Ratenlimit. Nachweis: Lauf
-  mit zwei Einträgen legt genau zwei SVGs ab, zweiter Lauf holt nichts.
+- [ ] 2.3 Abrufweg festhalten: Neue Quellen holt der Agent über den Icons8-MCP nach
+  `scripts/ikonen/quellen/` (design.md D2, geändert 30.09.2026, kein eigenes Abrufskript). Der
+  Kopf von `erzeuge-ikonen.mjs` beschreibt den Weg. Nachweis: Kopf und D2 stimmen überein.
 - [ ] 2.4 `frontend/src/ikonen/ikonen.guard.test.ts` per TDD: (a) kein Import aus
   `@ant-design/icons`/`react-icons` außerhalb von `ikonen/`, Schuldmenge `OFFEN` = heutige
-  75 Dateien, toter Eintrag rot; (b) Register ↔ Quellen ↔ Erzeugtes ↔ Stempel, keine
+  74 Dateien, toter Eintrag rot; (b) Register ↔ Quellen ↔ Erzeugtes ↔ Stempel, keine
   unbenutzte Ikone, `eigen` trägt ihren Vermerk; (c) Emoji-Scan mit eigener Schuldmenge
   (`FachebenenInspector.tsx`, `FunkErreichbarkeit.tsx`, `Platzhalter.tsx`). Dateikopf nennt,
   was der Guard nicht sieht. Nachweis: Guard grün, Mutationsproben (neuer Fremdimport, Emoji in
