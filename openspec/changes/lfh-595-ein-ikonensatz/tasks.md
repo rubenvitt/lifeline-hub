@@ -56,7 +56,7 @@
   kennzeichnen (u. a. `TbSitemap` → Hierarchy, `MinusCircleOutlined`, `TbHomeHeart` → eigen).
   Tabelle in `openspec/changes/lfh-595-ein-ikonensatz/zuordnung.md`. Nachweis: Jeder Import aus
   `OFFEN` hat eine Zeile (Abgleich per Skript).
-- [ ] 4.2 **Checkpoint:** Ruben prüft die Ersatz- und Eigenzeilen. Nachweis: Freigabe vermerkt
+- [x] 4.2 **Checkpoint:** Ruben prüft die Ersatz- und Eigenzeilen. Nachweis: Freigabe vermerkt
   in `zuordnung.md`.
 - [ ] 4.3 Ikonen abrufen, Notunterkunft als eigene Zeichnung im 50-px-Raster anlegen, erzeugen.
   Nachweis: Guard (b) grün, Eigenzeichnung in einer Aufnahme neben zwei Icons8-Ikonen gleicher

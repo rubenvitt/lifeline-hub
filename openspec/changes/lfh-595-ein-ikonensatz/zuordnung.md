@@ -1,8 +1,8 @@
 # Zuordnung Bestand → iOS 27 Outlined (Aufgabe 4.1)
 
 Stand 30.09.2026. Jeder Import aus `@ant-design/icons` und `react-icons` (außer dem Typ `IconType`)
-und jedes Emoji als Ikone steht in genau einer Zeile (106 Begriffe: 100 direkt aus Icons8,
-5 Ersatz aus demselben Stil, 1 eigene Zeichnung). Name = Bildinhalt, nicht Verwendung.
+und jedes Emoji als Ikone steht in genau einer Zeile (102 Begriffe: 99 direkt aus Icons8,
+2 Ersatz aus demselben Stil, 1 eigene Zeichnung). Name = Bildinhalt, nicht Verwendung.
 Kennung = Icons8-ID im Stil `ios7`, bei „gefüllt“ im Stil `ios_filled`.
 
 **Stil freigegeben (Aufgabe 3.4, Ruben, 30.09.2026): iOS 27 Outlined.** Aus der Stilprobe sind
@@ -11,7 +11,10 @@ bereits nachgezogen, siehe design.md D8.
 
 **Vor der Freigabe zu prüfen (Aufgabe 4.2):** die Zeilen mit Ersatz, eigen oder Notiz.
 
-Freigabe: _offen_
+Freigabe: **Ruben, 30.09.2026** („passt so“), mit den Vorschlägen aus der Prüfung: Ablösung
+`sorting-arrows-horizontal` statt `exchange` ($-Zeichen), Lage-Dashboard `view-module` statt
+`channel-mosaic`, alle fünf Helligkeitsstufen dieselbe `sun` (die Stufe steht als Zahl daneben;
+eine Reihe bis zur Mondsichel kollidierte mit dem Nachtmodus).
 
 | Name | Bestand | Bedeutung in der App | Icons8 | Herkunft / Notiz |
 |---|---|---|---|---|
@@ -43,11 +46,10 @@ Freigabe: _offen_
 | `hand-stopp` | `TbHandStop` | Dichte 'Handschuh' | stop-gesture (KLyXgIpg7AdE) |   |
 | `haus` | `TbHome` | Schäden | home (73) |   |
 | `haus-herz` | `TbHomeHeart` | Betreuung/Notunterkunft | — | **eigen** kein Haus mit Herz in ios7; Eigenzeichnung aus home (73) + like (87) im selben Strich |
-| `helligkeit-gering` | `TbBrightnessDown` | Helligkeit 20 % | astronomical-twilight (22969) | **Ersatz** Dämmerung als geringste Stufe; Bild prüfen; Alternative civil-twilight (22971) |
-| `helligkeit-halb` | `TbBrightnessHalf` | Helligkeit 60 % | contrast (25808) | **Ersatz** halb gefüllter Kreis (Kontrast) statt halbe Sonne |
 | `hierarchie` | `TbHierarchy2` | Kategorie Führung | parallel-tasks (11232); gefüllt parallel-tasks (11269) |   |
 | `hochladen` | `UploadOutlined` | Datei/Bild hochladen | upload (368) |   |
 | `kacheln` | `TbLayoutGrid` | Überblick | tails (1673) |   |
+| `kachelraster` | `TbLayoutDashboard` | Dashboard | view-module (52219) |  Freigabe 30.09.2026: statt channel-mosaic (11487), das wie ein Bildschirm wirkt. |
 | `kamera` | `CameraOutlined` | Kartenstand festhalten (Snapshot) | camera (5376) |   |
 | `karte` | `TbMap2` | Kategorie Lage; Lagekarte | map (343); gefüllt map (7885) |   |
 | `kistenstapel` | `TbPackages` | Material; Nachforderung | stacking (74815) |   |
@@ -69,7 +71,6 @@ Freigabe: _offen_
 | `minus-kreis` | `MinusCircleOutlined` | Abschnitt unvollständig (Lagebericht) | minus (1504) |  Icons8 'minus' ist der eingekreiste Strich; vor Übernahme prüfen |
 | `mond` | `FiMoon`, `TbMoon` | Darstellung 'Dunkel' | crescent-moon (25031) |   |
 | `monitor` | `DesktopOutlined`, `FiMonitor`, `TbDeviceDesktop` | Darstellung 'System'; Desktop-Benachrichtigung | monitor (39210) |   |
-| `mosaik` | `TbLayoutDashboard` | Dashboard | channel-mosaic (11487) |  mehrdeutig; Alternative view-module (52219) |
 | `muelleimer` | `DeleteOutlined` | Löschen/entfernen | trash (1942) |   |
 | `nebel` | `emoji:🌫` | Wetterwarnung Nebel | fog-day (672) |   |
 | `organigramm` | `TbSitemap` | Einsatzabschnitte | tree-structure (11241) |   |
@@ -86,7 +87,7 @@ Freigabe: _offen_
 | `pfeil-zurueck-gebogen` | `RollbackOutlined`, `TbArrowBackUp` | Rückgängig (Zeichnen); zurück in den Wartebereich | undo (3059) |   |
 | `pfeile-auswaerts` | `FiMaximize`, `TbArrowsMaximize` | Dichte 'Komfortabel' | expand (1755) |   |
 | `pfeile-einwaerts` | `FiMinimize`, `TbArrowsMinimize` | Dichte 'Kompakt' | collapse (1757) |   |
-| `pfeile-gegenlaeufig` | `TbArrowsExchange` | Ablösung | exchange (61743) |  mehrdeutig; Alternative sorting-arrows-horizontal (32366) |
+| `pfeile-gegenlaeufig` | `TbArrowsExchange` | Ablösung | sorting-arrows-horizontal (32366) |  Freigabe 30.09.2026: statt exchange (61743), das ein $-Zeichen trägt. |
 | `pfote` | `TbPaw` | Tiere; Schutzgut 'Tier' | dog-footprint (2743) |   |
 | `play-kreis` | `PlayCircleOutlined` | Wiedergabe starten (Zeitachse) | circled-play (25603) |   |
 | `plus` | `PlusOutlined`, `TbPlus` | Anlegen/hinzufügen; hineinzoomen | plus-math (11153) |  Icons8 'plus' (1501) ist eingekreist; 'plus-math' ist das nackte Kreuz |
@@ -100,9 +101,7 @@ Freigabe: _offen_
 | `schraubenschluessel` | `ToolOutlined` | Defekt; Modul in Arbeit | wrench (24551) |   |
 | `seitenleiste-auf` | `TbLayoutSidebarRightExpand` | Kartenleiste einblenden | show-sidepanel (97654) |  Seite (rechts) am Bild prüfen |
 | `seitenleiste-zu` | `TbLayoutSidebarRightCollapse` | Kartenleiste ausblenden | hide-sidepanel (97655) |  Seite (rechts) am Bild prüfen; Alternative show-right-side-panel (108172) |
-| `sonne` | `FiSun`, `TbSun`, `emoji:☀` | Darstellung 'Hell'; Helligkeit 80 %; UV-Warnung | sun (648) |   |
-| `sonne-schwach` | `TbSunLow` | Helligkeit 40 % | sunset (3455) | **Ersatz** Sonnenuntergang als 'schwache Sonne' |
-| `sonne-strahlend` | `TbSunHigh` | Helligkeit 100 % | brightness-settings (51586) |  mehrdeutig: einziges Helligkeits-Bild in ios7; vor Übernahme prüfen, ob es sich von 'sun' abhebt |
+| `sonne` | `FiSun`, `TbSun`, `emoji:☀`, `TbSunHigh`, `TbBrightnessHalf`, `TbSunLow`, `TbBrightnessDown` | Darstellung 'Hell'; Helligkeit 80 %; UV-Warnung; alle fünf Helligkeitsstufen (Freigabe 30.09.2026: eine Sonne, die Stufe steht als Zahl daneben) | sun (648) |   |
 | `sprechblase` | `TbMessage` | Kategorie Kommunikation | chat-message (118377); gefüllt chat-message (118374) |   |
 | `sprechblase-rund` | `TbMessageCircle` | Chat | speech-bubble (143) |   |
 | `spross` | `TbPlant2` | Schutzgut 'Umwelt' | sprout (7414) |   |
