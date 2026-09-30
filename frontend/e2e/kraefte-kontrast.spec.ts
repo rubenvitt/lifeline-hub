@@ -269,9 +269,11 @@ for (const modus of ['light', 'dark']) {
 //     am Tag über `normalText`/`achtungText`/`alarmText`). Hier gilt in BEIDEN Modi der
 //     Zielwert HART.
 //
-// (2) DIE VERDICHTUNGSZEILE der Kräfte-Modulseiten auf SEITENGRUND: Rolle auf Text, im
-//     Hellmodus unter 7 (LFH-538 offen) — dort gilt die absolute Untergrenze, der Zielwert
-//     steht in jeder Meldung. `soft`, damit ein Lauf alle Werte meldet.
+// (2) DIE VERDICHTUNGSZEILE der Kräfte-Modulseiten auf SEITENGRUND: der Ton auf dem Text,
+//     über die Textrollen (`verdichtungsTextfarbe` in `kraefte/Verdichtungszeile.tsx`,
+//     LFH-538). Auch hier gilt in BEIDEN Modi der Zielwert HART.
+//
+// `soft`, damit ein Lauf alle Werte meldet; die absolute Untergrenze steht in jeder Meldung.
 //
 // Kein Randkontrast: Textflächen ohne Rahmen; der Farbpunkt ist Zierde neben Code UND Wort.
 
@@ -365,12 +367,7 @@ for (const modus of ['light', 'dark'] as const) {
     for (const m of ZEILEN_ZAHLEN) {
       const ziel = page.getByRole('main').getByText(m);
       await expect(ziel, `Verdichtungszeile ${m}: genau ein Knoten`).toHaveCount(1);
-      await pruefe(
-        ziel,
-        'Verdichtungszeile (Seitengrund)',
-        String(m),
-        modus === 'dark' ? ZIEL.dark : BODEN,
-      );
+      await pruefe(ziel, 'Verdichtungszeile (Seitengrund)', String(m), ZIEL[modus]);
     }
 
     // Die Gründe müssen sich unterscheiden — sonst hat (2) nur (1) wiederholt.
