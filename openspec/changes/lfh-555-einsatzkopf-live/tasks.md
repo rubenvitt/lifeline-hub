@@ -33,8 +33,8 @@ und `requesting-code-review`.
 
 ## 5. Nachweis Ende zu Ende
 
-- [ ] 5.1 `e2e/einsatzkopf-live.spec.ts`: zwei Seiten im selben Kontext (Muster `sitzung-mehrere-tabs.spec.ts`), Seite B auf Einsatzdaten, Seite A schließt eine Lagebesprechung mit neuem Termin ab → B zeigt den Termin ohne Reload (Inhaltsanker, kein `networkidle`); Gegenrichtung: A ändert Termin auf Einsatzdaten → B auf der Stab-Seite folgt.
-- [ ] 5.2 Mutationsprobe: `einsatz` in `EINSATZ_STREAM_EVENTS` auskommentieren → 5.1 rot; `IS NOT`-Prädikat entfernen → 2.3 rot; zurückdrehen → grün. Befund in `design.md` oder PR festhalten.
+- [x] 5.1 `e2e/einsatzkopf-live.spec.ts`: zwei Seiten im selben Kontext (Muster `sitzung-mehrere-tabs.spec.ts`), Seite B auf Einsatzdaten, Seite A schließt eine Lagebesprechung mit neuem Termin ab → B zeigt den Termin ohne Reload (Inhaltsanker, kein `networkidle`); Gegenrichtung: A ändert Termin auf Einsatzdaten → B auf der Stab-Seite folgt.
+- [x] 5.2 Mutationsprobe: `einsatz` in `EINSATZ_STREAM_EVENTS` auskommentieren → 5.1 rot; `IS NOT`-Prädikat entfernen → 2.3 rot; zurückdrehen → grün. Befund in `design.md` oder PR festhalten.
 
 ## 6. Doku
 

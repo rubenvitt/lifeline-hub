@@ -128,3 +128,14 @@ das Frontend. Die Wire-Kontrakttests auf beiden Seiten laufen im selben Commit r
 
 _keine_ — Die zwei Wahlpunkte (D1 live ja/nein, Emitter-Umfang D5) werden vor `/opsx:apply` vom User
 bestätigt.
+
+## Nachweise (Umsetzung 30.09.2026)
+
+- **Mutationsprobe Backend:** `IS NOT`-Prädikat in `stab/repo.rs` entfernt →
+  `lagebesprechung_ohne_terminaenderung_feuert_kein_einsatz` und
+  `lagebesprechung_die_den_termin_aufhebt_feuert_einsatz` rot; zurückgedreht → grün.
+- **Mutationsprobe Frontend:** Eintrag `einsatz` aus `EINSATZ_STREAM_EVENTS` genommen → beide Fälle
+  in `e2e/einsatzkopf-live.spec.ts` rot (der Termin erscheint ohne Neuladen nicht); zurückgedreht →
+  grün. Ohne den Eintrag bricht zusätzlich `tsc` am Typ-Kontrakt in `liveEvent.contract.test.ts`.
+- **Einsatzdaten-Seite:** offenes Bearbeitungsformular und offene Zeile behalten ihre Eingaben bei
+  einem Refetch des Kopfs (Vitest in `EinsatzdatenPage.test.tsx`); kein Fix nötig (D4).

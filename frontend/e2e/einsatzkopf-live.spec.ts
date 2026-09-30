@@ -1,9 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
 import { einsatzdatenPfad, stabPfad } from '../src/routing/deeplinks';
-
-dayjs.extend(utc);
 
 /**
  * Der Einsatzkopf ist live (LFH-555): ein Termin, den ein anderer Schirm setzt, erscheint ohne
@@ -42,9 +38,11 @@ async function oeffnenMitStrom(page: Page, pfad: string, id: number) {
   await strom;
 }
 
-/** Ein Termin in zwei Stunden als Wire-String (UTC ohne Zone). */
+/** Ein Termin in zwei Stunden, auf die Minute gerundet (RFC 3339; der Server normalisiert). */
 function terminInZweiStunden(): string {
-  return dayjs.utc().add(2, 'hour').startOf('minute').format('YYYY-MM-DD HH:mm:ss');
+  const t = new Date(Date.now() + 2 * 60 * 60 * 1000);
+  t.setUTCSeconds(0, 0);
+  return t.toISOString();
 }
 
 test('LFH-555: der Stab setzt den Termin, die offene Einsatzdaten-Seite folgt', async ({
