@@ -26,4 +26,4 @@
 
 ## 6. Gates
 
-- [ ] 6.1 `pnpm lint`, Prettier-Check, `tsc`, Vitest für `command-palette/` und `components/` sowie das e2e aus 5.1 grün, danach `./scripts/check-all.sh` (bzw. die Schritte, die der Container tragen kann, mit Nennung der übersprungenen).
+- [x] 6.1 `pnpm lint`, Prettier-Check, `tsc`, Vitest für `command-palette/` und `components/` sowie das e2e aus 5.1 grün, danach `./scripts/check-all.sh` (bzw. die Schritte, die der Container tragen kann, mit Nennung der übersprungenen).
