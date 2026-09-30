@@ -1035,6 +1035,12 @@ export interface components {
             name: string;
             staerke_position?: components["schemas"]["StaerkePosition"] | null;
         };
+        /** @description Perioden einer Einheit — Zeile der Liste für das Meldebild. Nur Einheiten mit Ereignissen. */
+        EinheitPerioden: {
+            /** Format: int64 */
+            einheit_id: number;
+            perioden: components["schemas"]["Einsatzperiode"][];
+        };
         /**
          * @description Status einer Einheit mit „Seit“ (LFH-609). Die Regel steht an
          *     [`repo::leite_status_ab`].
@@ -1350,6 +1356,16 @@ export interface components {
          * @enum {string}
          */
         Einsatzart: "realeinsatz" | "uebung" | "sanitaetsdienst" | "bereitstellung";
+        /** @description Eine Einsatzperiode einer Kraft. Offen, solange `ende_at` fehlt. */
+        Einsatzperiode: {
+            /** @description `alarmierung` oder `eintreffen`. */
+            anker: components["schemas"]["ZeitachseArt"];
+            /** @description Zeitpunkt des Ankers: die Alarmierung, ohne sie das Eintreffen. */
+            beginn_at: string;
+            eintreffen_at?: string | null;
+            ende_art?: components["schemas"]["ZeitachseArt"] | null;
+            ende_at?: string | null;
+        };
         /** @description API-Darstellung der Einstellungen (`fachebenen_sichtbar` als Objekt). */
         EinstellungenAnzeige: {
             auftrag_nummer_eingefroren: boolean;
@@ -1696,6 +1712,7 @@ export interface components {
             label: string;
             /** Format: int64 */
             sortier: number;
+            zeitachse_marke?: components["schemas"]["ZeitachseMarke"] | null;
         };
         /**
          * @description Abgeleitete AutoComplete-Vorschläge für die Stamm-Felder (DISTINCT, org-weit).
@@ -2801,6 +2818,15 @@ export interface components {
             verbleib: components["schemas"]["VerbleibAnzeige"][];
         };
         /**
+         * @description Perioden einer Person — Zeile der Liste für die Personal-Seite. Nur Personen mit
+         *     Ereignissen.
+         */
+        PersonPerioden: {
+            perioden: components["schemas"]["Einsatzperiode"][];
+            /** Format: int64 */
+            personal_id: number;
+        };
+        /**
          * @description Administrative Status-Maschine einer Person (E‑1). E‑2 ergänzt die
          *     medizinische Sichtungskategorie SK I–IV als separates Attribut auf
          *     `betroffen` — diese Maschine bleibt unangetastet.
@@ -2832,6 +2858,7 @@ export interface components {
             label: string;
             /** Format: int64 */
             sortier: number;
+            zeitachse_marke?: components["schemas"]["ZeitachseMarke"] | null;
         };
         /**
          * @description Abgeleitete AutoComplete-Vorschläge für die Trägerorganisation (DISTINCT, org-weit).
@@ -3511,6 +3538,53 @@ export interface components {
             daten?: components["schemas"]["WetterWarnung"][] | null;
             zustand: components["schemas"]["WetterTeilZustand"];
         };
+        /**
+         * @description Zeitachse einer Kraft: alle Ereignisse nach Zeit (gestrichene eingeschlossen) und die
+         *     Perioden aus den nicht gestrichenen.
+         */
+        ZeitachseAnzeige: {
+            ereignisse: components["schemas"]["ZeitachseEreignis"][];
+            perioden: components["schemas"]["Einsatzperiode"][];
+        };
+        /**
+         * @description Art eines Ereignisses. Wire == `as_str()`.
+         * @enum {string}
+         */
+        ZeitachseArt: "alarmierung" | "eintreffen" | "abloesung" | "entlassung";
+        /** @description Ein Ereignis, wie es die Zeitachse einer Kraft zeigt — auch gestrichen. */
+        ZeitachseEreignis: {
+            art: components["schemas"]["ZeitachseArt"];
+            erfasst_at: string;
+            /** Format: int64 */
+            erfasst_von: number;
+            gestrichen_at?: string | null;
+            /** Format: int64 */
+            gestrichen_von?: number | null;
+            /** Format: int64 */
+            id: number;
+            notiz?: string | null;
+            quelle: components["schemas"]["ZeitachseQuelle"];
+            streichgrund?: string | null;
+            /** @description Fan-out: Name der Einheit („über Einheit «…»"). */
+            ursprung_einheit_name?: string | null;
+            /**
+             * Format: int64
+             * @description Fan-out: das Ereignis der Einheit, aus dem dieses entstand.
+             */
+            ursprung_id?: number | null;
+            zeitpunkt_at: string;
+        };
+        /**
+         * @description Zeitachsen-Marke eines Status-Katalogeintrags. Wire == `as_str()`. Keine `abloesung`:
+         *     die entsteht nur aus dem Vollzug.
+         * @enum {string}
+         */
+        ZeitachseMarke: "alarmierung" | "eintreffen" | "entlassung";
+        /**
+         * @description Herkunft eines Ereignisses. Wire == `as_str()`.
+         * @enum {string}
+         */
+        ZeitachseQuelle: "status" | "einheit" | "abloesung" | "nachtrag";
         /** @description Ein Zeitfenster mit Deckung und allen Ausgaben (auch zurückgenommenen). */
         ZeitfensterAnzeige: {
             angelegt_at: string;

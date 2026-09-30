@@ -477,6 +477,7 @@ mod tests {
                 farbe: None,
                 fms_anker: Some(3),
                 sortier: 20,
+                zeitachse_marke: None,
             },
         )
         .await
@@ -706,6 +707,7 @@ mod tests {
                 farbe: None,
                 fms_anker: Some(4),
                 sortier: 40,
+                zeitachse_marke: None,
             },
         )
         .await

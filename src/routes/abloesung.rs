@@ -105,7 +105,8 @@ pub async fn beginnen(
     let einsatz_id = ctx.einsatz.id;
     let jetzt = jetzt();
     let rhythmus_minuten = req.rhythmus_minuten.map(pruefe_rhythmus).transpose()?;
-    let beginn_at = zeit(req.beginn_at)?.unwrap_or_else(|| jetzt.clone());
+    // Ohne Beginn: das Eintreffen der offenen Einsatzperiode, sonst jetzt (Repo, LFH-552).
+    let beginn_at = zeit(req.beginn_at)?;
     let (anzeige, etb_id) = repo::beginnen(
         &state.pool,
         einsatz_id,

@@ -78,6 +78,18 @@ wire_enum! {
 }
 
 impl ZeitachseMarke {
+    /// Feldprüfung der Katalog-Routen: unbekannte Marke → 400. Leer/Whitespace = keine Marke.
+    pub fn pruefe(roh: Option<String>) -> Result<Option<String>, crate::error::AppError> {
+        match roh.as_deref().map(str::trim) {
+            None | Some("") => Ok(None),
+            Some(s) => Self::parse(s).map(|m| Some(m.as_str().to_string())).ok_or_else(|| {
+                crate::error::AppError::Validation(format!(
+                    "Unbekannte Zeitachsen-Marke '{s}' (erlaubt: alarmierung, eintreffen, entlassung)"
+                ))
+            }),
+        }
+    }
+
     pub fn art(self) -> ZeitachseArt {
         match self {
             Self::Alarmierung => ZeitachseArt::Alarmierung,

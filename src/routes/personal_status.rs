@@ -21,6 +21,9 @@ pub struct StatusBody {
     pub farbe: Option<String>,
     #[serde(default)]
     pub sortier: i64,
+    /// LFH-552: optionale Zeitachsen-Marke.
+    #[serde(default)]
+    pub zeitachse_marke: Option<String>,
 }
 
 struct Normalisiert {
@@ -28,6 +31,7 @@ struct Normalisiert {
     kategorie: String,
     farbe: Option<String>,
     sortier: i64,
+    zeitachse_marke: Option<String>,
 }
 
 impl Normalisiert {
@@ -37,6 +41,7 @@ impl Normalisiert {
             kategorie: &self.kategorie,
             farbe: self.farbe.as_deref(),
             sortier: self.sortier,
+            zeitachse_marke: self.zeitachse_marke.as_deref(),
         }
     }
 }
@@ -53,6 +58,7 @@ fn normalisiere(body: StatusBody) -> Result<Normalisiert, AppError> {
         kategorie: body.kategorie,
         farbe: trimme(body.farbe),
         sortier: body.sortier,
+        zeitachse_marke: crate::zeitachse::ZeitachseMarke::pruefe(body.zeitachse_marke)?,
     })
 }
 
@@ -71,6 +77,9 @@ pub struct PatchStatus {
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub farbe: Option<Option<String>>,
     pub sortier: Option<i64>,
+    /// LFH-552, Tri-State: fehlt = unverändert, `null`/`""` = Marke entfernen.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub zeitachse_marke: Option<Option<String>>,
 }
 
 struct PatchNormalisiert {
@@ -78,6 +87,7 @@ struct PatchNormalisiert {
     kategorie: Option<String>,
     farbe: Option<Option<String>>,
     sortier: Option<i64>,
+    zeitachse_marke: Option<Option<String>>,
 }
 
 impl PatchNormalisiert {
@@ -87,6 +97,7 @@ impl PatchNormalisiert {
             kategorie: self.kategorie.as_deref(),
             farbe: self.farbe.as_ref().map(|v| v.as_deref()),
             sortier: self.sortier,
+            zeitachse_marke: self.zeitachse_marke.as_ref().map(|v| v.as_deref()),
         }
     }
 }
@@ -112,6 +123,10 @@ fn normalisiere_patch(body: PatchStatus) -> Result<PatchNormalisiert, AppError> 
         kategorie: body.kategorie,
         farbe: trimme_tri(body.farbe),
         sortier: body.sortier,
+        zeitachse_marke: body
+            .zeitachse_marke
+            .map(crate::zeitachse::ZeitachseMarke::pruefe)
+            .transpose()?,
     })
 }
 

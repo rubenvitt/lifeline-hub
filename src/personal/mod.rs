@@ -35,6 +35,14 @@ pub const PERSONAL_STATUS_STARTLISTE: [(&str, &str, i64); 6] = [
     ("abgemeldet", KATEGORIE_NICHT_VERFUEGBAR, 60),
 ];
 
+/// Zeitachsen-Marken der Startliste (LFH-552): nur wo der Status die Art eindeutig benennt.
+/// Gilt nur für neu angelegte Organisationen; der Bestand bleibt ohne Marke (Migration 0127).
+pub const PERSONAL_STATUS_STARTMARKEN: [(&str, &str); 3] = [
+    ("alarmiert", "alarmierung"),
+    ("im Einsatz", "eintreffen"),
+    ("abgemeldet", "entlassung"),
+];
+
 /// Interner Personal-Datensatz (alle Spalten von `personal`).
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct Personal {
@@ -101,6 +109,10 @@ pub struct PersonalStatus {
     pub kategorie: StatusKategorie,
     pub farbe: Option<String>,
     pub sortier: i64,
+    /// LFH-552: Zeitachsen-Marke — ein Wechsel auf diesen Status schreibt das Ereignis.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<crate::zeitachse::ZeitachseMarke>)]
+    pub zeitachse_marke: Option<String>,
 }
 
 /// Aufgelöste Dispositions-Anzeige: Identität nach der Auflösungsregel (Live aus dem
@@ -159,6 +171,13 @@ mod tests {
     fn startlisten_konsistent() {
         assert_eq!(QUALIFIKATION_STARTLISTE.len(), 9);
         assert_eq!(PERSONAL_STATUS_STARTLISTE.len(), 6);
+        // LFH-552: jede Startmarke gehört zu einem Startstatus und ist eine gültige Marke.
+        for (label, marke) in PERSONAL_STATUS_STARTMARKEN {
+            assert!(PERSONAL_STATUS_STARTLISTE
+                .iter()
+                .any(|(l, _, _)| *l == label));
+            assert!(crate::zeitachse::ZeitachseMarke::parse(marke).is_some());
+        }
         // Jede Seed-Kategorie ist gültig, und es gibt mindestens einen 'gebunden'-Status
         // (Initial-Status der Disposition).
         assert!(PERSONAL_STATUS_STARTLISTE

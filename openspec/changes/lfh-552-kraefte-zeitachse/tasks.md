@@ -19,21 +19,21 @@ Code). Vor jedem „fertig“ gelten `verification-before-completion` und `reque
 
 ## 3. Ereignisse aus Statuswechseln
 
-- [ ] 3.1 Personal: Disposition und Status-PATCH in `routes/einsatz_personal.rs` rufen `schreibe_tx`, wenn der neue Status eine Marke trägt. `Ausgelassen` wird verschluckt. Nachweis: Integrationstests „Person wird alarmiert“, „Unpassendes Ereignis bricht den Status nicht“, „Status ohne Marke“.
-- [ ] 3.2 Fahrzeug einer Einheit: Beginn-Marken nach der Regel „erstes Fahrzeug“, Entlassung nach der Regel „alle Fahrzeuge“, jeweils mit Fan-out. Nachweis: Integrationstests „Erstes Fahrzeug trifft ein“, „Entlassung erst mit dem letzten Fahrzeug“, und ein Fahrzeug ohne Einheit schreibt nichts.
-- [ ] 3.3 Handstatus einer Einheit ohne Fahrzeug (`setze_hand_status_tx`) wirkt wie ein Wechsel an der Einheit. Nachweis: Integrationstest mit Fan-out.
-- [ ] 3.4 Katalog: `zeitachse_marke` in den Katalog-DTOs und -Routen (400 bei unbekannter Marke, Rechte wie bisher), Startliste Personal mit den drei Marken, Bestand ohne Marke. Nachweis: Tests „Unbekannte Marke“, „Bestand ohne Marke“ und der erweiterte Bootstrap-Test `seedet_personal_status_startliste_fuer_neue_org`.
+- [x] 3.1 Personal: Disposition und Status-PATCH in `routes/einsatz_personal.rs` rufen `schreibe_tx`, wenn der neue Status eine Marke trägt. `Ausgelassen` wird verschluckt. Nachweis: Integrationstests „Person wird alarmiert“, „Unpassendes Ereignis bricht den Status nicht“, „Status ohne Marke“.
+- [x] 3.2 Fahrzeug einer Einheit: Beginn-Marken nach der Regel „erstes Fahrzeug“, Entlassung nach der Regel „alle Fahrzeuge“, jeweils mit Fan-out. Nachweis: Integrationstests „Erstes Fahrzeug trifft ein“, „Entlassung erst mit dem letzten Fahrzeug“, und ein Fahrzeug ohne Einheit schreibt nichts.
+- [x] 3.3 Handstatus einer Einheit ohne Fahrzeug (`setze_hand_status_tx`) wirkt wie ein Wechsel an der Einheit. Nachweis: Integrationstest mit Fan-out.
+- [x] 3.4 Katalog: `zeitachse_marke` in den Katalog-DTOs und -Routen (400 bei unbekannter Marke, Rechte wie bisher), Startliste Personal mit den drei Marken, Bestand ohne Marke. Nachweis: Tests „Unbekannte Marke“, „Bestand ohne Marke“ und der erweiterte Bootstrap-Test `seedet_personal_status_startliste_fuer_neue_org`.
 
 ## 4. Kopplung an die Ablösung
 
-- [ ] 4.1 `abloesung::repo::vollziehe` schreibt das Ereignis `abloesung` samt Fan-out, und die Rücknahme streicht es mit dem Grund „Ablösung zurückgenommen“. Nachweis: Tests „Vollzug beendet die Periode“, „Rücknahme öffnet die Periode wieder“, „Einheit ohne Periode“ und die Rücknahme nach einer zweiten Ablösung derselben Einheit. Die bestehenden Tests unter `tests/abloesung*.rs` bleiben grün.
-- [ ] 4.2 Eine Schicht ohne Beginn übernimmt das Eintreffen der offenen Periode (MODIFIED `kraefte-abloesung`). Nachweis: Tests „Beginn fehlt, Einheit ist eingetroffen“ und „Beginn fehlt“.
+- [x] 4.1 `abloesung::repo::vollziehe` schreibt das Ereignis `abloesung` samt Fan-out, und die Rücknahme streicht es mit dem Grund „Ablösung zurückgenommen“. Nachweis: Tests „Vollzug beendet die Periode“, „Rücknahme öffnet die Periode wieder“, „Einheit ohne Periode“ und die Rücknahme nach einer zweiten Ablösung derselben Einheit. Die bestehenden Tests unter `tests/abloesung*.rs` bleiben grün.
+- [x] 4.2 Eine Schicht ohne Beginn übernimmt das Eintreffen der offenen Periode (MODIFIED `kraefte-abloesung`). Nachweis: Tests „Beginn fehlt, Einheit ist eingetroffen“ und „Beginn fehlt“.
 
 ## 5. API
 
-- [ ] 5.1 Routen nach D6 (Listen je Modul, Detail, Nachtrag, Streichung) mit `JsonBody`/`PfadParam`, Rechten nach Requirement „Rechte“ und System-ETB für Nachtrag und Streichung. Nachweis: Integrationstests für jedes Szenario von „Nachtrag von Hand“, „Streichung“ und „Rechte“. Die Guards `tests/einsatz_kontext_guard.rs`, `json_extractor_guard.rs`, `path_extractor_guard.rs` und `tests/fehler_vertrag.rs` sind grün.
-- [ ] 5.2 Nachtrag und Streichung senden das Live-Event der Kraft (`einheit` bzw. `personal`). Nachweis: ein Test im Stil der bestehenden Live-Tests empfängt das Event.
-- [ ] 5.3 Response-DTOs mit `ToSchema` in `src/api_doc.rs`, dann `scripts/check-typ-codegen.sh`. Nachweis: das Skript ist grün, und `openapi.json` und `types.generated.ts` sind mitcommittet.
+- [x] 5.1 Routen nach D6 (Listen je Modul, Detail, Nachtrag, Streichung) mit `JsonBody`/`PfadParam`, Rechten nach Requirement „Rechte“ und System-ETB für Nachtrag und Streichung. Nachweis: Integrationstests für jedes Szenario von „Nachtrag von Hand“, „Streichung“ und „Rechte“. Die Guards `tests/einsatz_kontext_guard.rs`, `json_extractor_guard.rs`, `path_extractor_guard.rs` und `tests/fehler_vertrag.rs` sind grün.
+- [x] 5.2 Nachtrag und Streichung senden das Live-Event der Kraft (`einheit` bzw. `personal`). Nachweis: ein Test im Stil der bestehenden Live-Tests empfängt das Event.
+- [x] 5.3 Response-DTOs mit `ToSchema` in `src/api_doc.rs`, dann `scripts/check-typ-codegen.sh`. Nachweis: das Skript ist grün, und `openapi.json` und `types.generated.ts` sind mitcommittet.
 
 ## 6. Frontend: Kern, Query-Keys, Katalog
 

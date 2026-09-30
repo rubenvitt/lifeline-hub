@@ -540,6 +540,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/personal/{ep_id}/position",
             patch(routes::einsatz_personal::position),
         )
+        // Kräfte-Zeitachse (LFH-552) unter dem Personal-Präfix.
+        .route(
+            "/api/einsaetze/{id}/personal/zeitachse",
+            get(routes::zeitachse::personal_perioden),
+        )
+        .route(
+            "/api/einsaetze/{id}/personal/{ep_id}/zeitachse",
+            get(routes::zeitachse::person_laden).post(routes::zeitachse::person_nachtragen),
+        )
+        .route(
+            "/api/einsaetze/{id}/personal/{ep_id}/zeitachse/{zid}/streichen",
+            post(routes::zeitachse::person_streichen),
+        )
         .route(
             "/api/einsaetze/{id}/karte/fuehrungskraefte",
             get(routes::einsatz_personal::karte_fuehrungskraefte),
@@ -1102,6 +1115,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/status",
             put(routes::einsatz_einheit::status_setzen),
+        )
+        // Kräfte-Zeitachse (LFH-552) unter dem Einheiten-Präfix.
+        .route(
+            "/api/einsaetze/{id}/einheiten/zeitachse",
+            get(routes::zeitachse::einheiten_perioden),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/zeitachse",
+            get(routes::zeitachse::einheit_laden).post(routes::zeitachse::einheit_nachtragen),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/zeitachse/{zid}/streichen",
+            post(routes::zeitachse::einheit_streichen),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}",

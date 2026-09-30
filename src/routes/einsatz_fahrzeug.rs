@@ -186,11 +186,26 @@ pub async fn aktualisieren(
     let vorher_status_id = vorher.status_id;
     let vorher_status_label = vorher.status_label.clone();
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
     let nachher = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::aktualisiere_tx(conn, einsatz_id, ef_id, body.status_id, bemerkung)
             .await?;
         let nachher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         if vorher_status_id != nachher.status_id {
+            // LFH-552: ein markierter Status wirkt über die Einheit des Fahrzeugs auf deren
+            // Zeitachse (erstes Fahrzeug bzw. alle für die Entlassung). Das Live-Event
+            // `fahrzeug` lädt die Zeitachse im Client mit neu.
+            if let Some(sid) = nachher.status_id {
+                crate::zeitachse::repo::aus_fahrzeugstatus_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.benutzer.id,
+                    ef_id,
+                    sid,
+                    &jetzt,
+                )
+                .await?;
+            }
             crate::etb::system_audit_tx(
                 conn,
                 einsatz_id,

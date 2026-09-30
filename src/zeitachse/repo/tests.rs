@@ -733,3 +733,52 @@ async fn einheit_loeschen_laesst_personen_zeitachse_stehen() {
     assert_eq!(z.ereignisse.len(), 1);
     assert_eq!(z.ereignisse[0].ursprung_id, None);
 }
+
+/// Spec „Bestand ohne Marke": Migration 0127 trifft auf eine Organisation mit bestehendem
+/// Katalog (auch mit „alarmiert"/„im Einsatz") und setzt keine Marke.
+#[tokio::test]
+async fn migration_laesst_bestand_ohne_marke() {
+    use sqlx::migrate::Migrator;
+    use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+    use std::borrow::Cow;
+
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(SqliteConnectOptions::new().filename(":memory:"))
+        .await
+        .unwrap();
+    let alle = sqlx::migrate!("./migrations");
+    let vorher = Migrator {
+        migrations: Cow::Owned(alle.iter().filter(|m| m.version < 127).cloned().collect()),
+        ..Migrator::DEFAULT
+    };
+    vorher.run(&pool).await.unwrap();
+    sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Bestand')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    for (label, kat) in [("alarmiert", "gebunden"), ("im Einsatz", "gebunden")] {
+        sqlx::query("INSERT INTO personal_status (org_id, label, kategorie) VALUES (1, ?, ?)")
+            .bind(label)
+            .bind(kat)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO fahrzeug_status (org_id, label, kategorie) VALUES (1, ?, ?)")
+            .bind(label)
+            .bind(kat)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    alle.run(&pool).await.unwrap();
+    for tabelle in ["personal_status", "fahrzeug_status"] {
+        let mit_marke: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT COUNT(*) FROM {tabelle} WHERE zeitachse_marke IS NOT NULL"
+        )))
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(mit_marke, 0, "{tabelle}");
+    }
+}

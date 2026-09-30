@@ -124,6 +124,10 @@ pub struct FahrzeugStatus {
     pub farbe: Option<String>,
     pub fms_anker: Option<i64>,
     pub sortier: i64,
+    /// LFH-552: Zeitachsen-Marke — ein Wechsel auf diesen Status schreibt das Ereignis.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<crate::zeitachse::ZeitachseMarke>)]
+    pub zeitachse_marke: Option<String>,
 }
 
 /// Aufgelöste Dispositions-Anzeige: Identität nach der Auflösungsregel

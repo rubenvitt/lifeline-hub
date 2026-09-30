@@ -21,6 +21,9 @@ pub struct StatusBody {
     pub fms_anker: Option<i64>,
     #[serde(default)]
     pub sortier: i64,
+    /// LFH-552: optionale Zeitachsen-Marke.
+    #[serde(default)]
+    pub zeitachse_marke: Option<String>,
 }
 
 struct Normalisiert {
@@ -29,6 +32,7 @@ struct Normalisiert {
     farbe: Option<String>,
     fms_anker: Option<i64>,
     sortier: i64,
+    zeitachse_marke: Option<String>,
 }
 
 impl Normalisiert {
@@ -39,6 +43,7 @@ impl Normalisiert {
             farbe: self.farbe.as_deref(),
             fms_anker: self.fms_anker,
             sortier: self.sortier,
+            zeitachse_marke: self.zeitachse_marke.as_deref(),
         }
     }
 }
@@ -63,6 +68,7 @@ fn normalisiere(body: StatusBody) -> Result<Normalisiert, AppError> {
         farbe: trimme(body.farbe),
         fms_anker: body.fms_anker,
         sortier: body.sortier,
+        zeitachse_marke: crate::zeitachse::ZeitachseMarke::pruefe(body.zeitachse_marke)?,
     })
 }
 
@@ -86,6 +92,9 @@ pub struct PatchStatus {
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub fms_anker: Option<Option<i64>>,
     pub sortier: Option<i64>,
+    /// LFH-552, Tri-State: fehlt = unverändert, `null`/`""` = Marke entfernen.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub zeitachse_marke: Option<Option<String>>,
 }
 
 struct PatchNormalisiert {
@@ -94,6 +103,7 @@ struct PatchNormalisiert {
     farbe: Option<Option<String>>,
     fms_anker: Option<Option<i64>>,
     sortier: Option<i64>,
+    zeitachse_marke: Option<Option<String>>,
 }
 
 impl PatchNormalisiert {
@@ -104,6 +114,7 @@ impl PatchNormalisiert {
             farbe: self.farbe.as_ref().map(|v| v.as_deref()),
             fms_anker: self.fms_anker,
             sortier: self.sortier,
+            zeitachse_marke: self.zeitachse_marke.as_ref().map(|v| v.as_deref()),
         }
     }
 }
@@ -139,6 +150,10 @@ fn normalisiere_patch(body: PatchStatus) -> Result<PatchNormalisiert, AppError> 
         farbe: trimme_tri(body.farbe),
         fms_anker: body.fms_anker,
         sortier: body.sortier,
+        zeitachse_marke: body
+            .zeitachse_marke
+            .map(crate::zeitachse::ZeitachseMarke::pruefe)
+            .transpose()?,
     })
 }
 
