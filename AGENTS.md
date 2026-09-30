@@ -45,8 +45,12 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 Dieses Projekt hat ein eigenes ClickUp-Projekt im Space **Lifeline Hub** (`901511065513`,
 Workspace/Team `9015920204`). Das **Entwicklungsboard** (`901523554968`) ist das
 Task-Board des Projekts, das **Feedbackboard** (`901523554969`) sammelt Feedback.
-Tasks werden selbstständig über den ClickUp-MCP angelegt — wie und wann beschreibt der
-Skill `clickup-task-anlegen`.
+Tasks werden selbstständig über den ClickUp-Connector des claude.ai-Kontos angelegt — wie und
+wann beschreibt der Skill `clickup-task-anlegen`. Das Repo bringt keinen eigenen ClickUp-Server
+mit (kein `.mcp.json`): der Connector wirkt lokal wie in Cloud-Sitzungen, ein Projektserver
+braucht OAuth je Rechner und scheitert in nicht-interaktiven Sitzungen. Skills nennen die
+Werkzeuge ohne Präfix (`clickup_update_task`); der Präfix hängt an der Umgebung
+(`mcp__claude_ai_ClickUp__…` im lokalen CLI, `mcp__ClickUp__…` in Cloud-Sitzungen).
 
 ## Planung und Ausführung — OpenSpec und Superpowers (LFH-588)
 

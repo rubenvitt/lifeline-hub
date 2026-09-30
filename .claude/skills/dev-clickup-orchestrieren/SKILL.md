@@ -39,7 +39,7 @@ Abschluss), damit der Mehrphasen-Lauf nachvollziehbar bleibt.
 
 | Phase | Wer | Werkzeug | Checkpoint? |
 |---|---|---|---|
-| 0 Laden & Statuskontext | Main-Loop | ClickUp-MCP, ggf. Worktree | — |
+| 0 Laden & Statuskontext | Main-Loop | ClickUp-Connector, ggf. Worktree | — |
 | 1 Scope/Verstehen | **Workflow** | parallele Reader über Subtasks/Subsysteme | **ja, bei Unklarheit** |
 | 2 Design/Plan | **Workflow** | Plan je Subtask / Judge-Panel bei Optionen | **ja, bei Unklarheit/Optionen** |
 | 3 Dev (umsetzen) | Main-Loop **oder** Workflow | Moduswahl: sequenziell-interaktiv vs. autonom | nur bei Blocker |
@@ -51,7 +51,7 @@ Konkrete, adaptierbare Workflow-Skripte für Phase 1/2/4 stehen in
 
 ## Phase 0 — Laden & Statuskontext
 
-1. **Parent-Task + Subtasks laden** (`mcp__claude_ai_ClickUp__clickup_get_task`). Subtasks
+1. **Parent-Task + Subtasks laden** (`clickup_get_task` des ClickUp-Connectors). Subtasks
    über die `subtasks` der Antwort bzw. `clickup_filter_tasks` ermitteln. Pro (Sub)Task
    ziehen: `custom_id`, Name/Beschreibung, **aktueller Status**, Abhängigkeiten.
 2. **Statuskontext bilden:** Wo steht jeder (Sub)Task auf der Spur? (Spur und Regeln:

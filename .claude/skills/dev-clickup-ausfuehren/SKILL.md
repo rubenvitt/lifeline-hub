@@ -37,7 +37,7 @@ orchestriert und ruft diesen Skill pro (Sub)Task auf.
 ## Board-Status mitführen
 
 Der Task soll auf dem Board zeigen, wo die Arbeit gerade steht. Status **automatisch**
-(keine Rückfrage) mit `mcp__claude_ai_ClickUp__clickup_update_task` setzen — `task_id` und
+(keine Rückfrage) mit `clickup_update_task` des ClickUp-Connectors setzen — `task_id` und
 `status` wörtlich (case-sensitive).
 
 Status-Spur des Boards:
@@ -55,7 +55,7 @@ Status-Spur des Boards:
 
 ## Schritt 1: Task laden
 
-`mcp__claude_ai_ClickUp__clickup_get_task` mit der genannten ID/URL. Daraus ziehen:
+`clickup_get_task` des ClickUp-Connectors mit der genannten ID/URL. Daraus ziehen:
 
 - **`custom_id`** (z.B. `LH-42`) — für Branch-Name und Commit-Referenzen
 - **Name + Beschreibung** — für Slug, Typ und Komplexität
