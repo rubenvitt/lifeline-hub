@@ -45,7 +45,7 @@ nicht nur das Symbol der Hülle.
 
 - **Frontend:** neue Bildmarke unter `src/marke/`. Angepasst werden `components/Kopfleiste.tsx`
   (`Markenzelle`), `pages/LoginPage.tsx` und `.css`, `index.html` (apple-touch-icon,
-  theme-color) sowie `vite.config.ts`, dessen Manifest in eine eigene Datei wandert.
+  theme-color) sowie `vite.config.ts`, dessen Manifest in eine eigene JSON-Datei wandert.
   `public/` bekommt ein neues `favicon.svg`, `pwa-192.png`, `pwa-512.png`,
   `pwa-maskable-512.png` und `apple-touch-icon.png`.
 - **Desktop-Hülle:** `src-tauri/icons/*` werden neu erzeugt. Die Dateiliste und

@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { farbenDunkel } from '../theme/tokens';
 import { LINIE_PFAD, LINIE_STAERKE, MARKE_RAHMEN, QUADRAT } from './bildmarkeGeometrie';
-import { pwaManifest } from './pwaManifest';
 
 /**
  * Guard der Bildmarke „Lebenslinie“ (LFH-837, Design D6).
@@ -21,6 +20,12 @@ const repo = join(frontend, '..');
 const oeffentlich = join(frontend, 'public');
 const huellenSymbole = join(repo, 'src-tauri', 'icons');
 const quellen = join(repo, 'scripts', 'marke');
+
+const pwaManifest = JSON.parse(readFileSync(join(hier, 'pwaManifest.json'), 'utf8')) as {
+  theme_color: string;
+  background_color: string;
+  icons: { src: string; sizes: string; type: string; purpose: string }[];
+};
 
 const QUELLEN = ['symbol.svg', 'symbol-maskable.svg', 'symbol-macos.svg'] as const;
 const KOPF_SCHWARZ = farbenDunkel.kopf;
@@ -74,7 +79,7 @@ describe('Bildmarke — Manifest (LFH-837)', () => {
   });
 
   it('jeder Eintrag verweist auf eine Datei mit genau seinen Maßen', () => {
-    for (const symbol of pwaManifest.icons ?? []) {
+    for (const symbol of pwaManifest.icons) {
       const [breite, hoehe] = String(symbol.sizes).split('x').map(Number);
       expect(pngMasse(join(oeffentlich, symbol.src)), symbol.src).toEqual({ breite, hoehe });
     }

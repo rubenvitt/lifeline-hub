@@ -101,9 +101,16 @@ Guard-Test prüft sie.
 
 ### D4 Manifest in eine eigene Datei
 
-Das Manifest-Objekt wandert nach `frontend/src/marke/pwaManifest.ts`, und `vite.config.ts`
-importiert es. So kann der Guard-Test in Vitest die Einträge lesen, ohne die Vite-Konfiguration
-zu laden. Das Manifest bekommt die Einträge 192/512 mit `purpose: 'any'` und
+Das Manifest-Objekt wandert nach `frontend/src/marke/pwaManifest.json`. `vite.config.ts` liest es
+per `readFileSync` (wie schon die `package.json`), der Guard-Test ebenso. So prüft Vitest die
+Einträge, ohne die Vite-Konfiguration zu laden.
+
+- *Alternative: TS-Modul `pwaManifest.ts`, von `vite.config.ts` importiert.* Beim Umsetzen
+  verworfen: Die Datei gehörte dann zum Projekt `tsconfig.node.json`, und `tsc -b` legte ihre
+  `.js`-Ausgabe daneben. Vite löst `.js` vor `.ts` auf, also läse ein Test nach einer Änderung
+  eine veraltete Kopie.
+
+Das Manifest bekommt die Einträge 192/512 mit `purpose: 'any'` und
 `pwa-maskable-512.png` mit `purpose: 'maskable'`. Ein gemeinsamer Wert `'any maskable'`
 schiede aus, weil dann ein Symbol beide Formen schlecht bedient. `theme_color` und
 `background_color` werden `#0c0e11`. `includeAssets` bekommt `apple-touch-icon.png` dazu,
@@ -148,8 +155,6 @@ ist und das alte Quadrat fehlt. Sie lesen den Pfad aus derselben Konstante.
   Automatisierung.
 - [Neue Precache-Einträge im Service Worker] → Gezielt `e2e/lagekarte-offline-precache.spec.ts`
   und `check-all.sh` laufen lassen.
-- [Das Manifest in `src/` wird von `vite.config.ts` importiert (tsconfig.node)] → Die Datei
-  bleibt ohne Browser-Importe (nur Daten), damit beide tsconfigs sie übersetzen.
 - [Pfadgleichheit ist textuell] → Die Konstante ist die Quelle. Wer die Geometrie ändert, ändert
   sie dort und lässt das Skript laufen. Der Test nennt beide Schritte in seiner Meldung.
 

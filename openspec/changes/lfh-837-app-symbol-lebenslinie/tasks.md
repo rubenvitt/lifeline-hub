@@ -15,7 +15,7 @@
 - [x] 2.1 `frontend/src/marke/marke.guard.test.ts` nach D6 zuerst rot schreiben. Prüfung: Der
       Test schlägt heute an den 1×1-PWA-Symbolen, am fehlenden maskierbaren Eintrag und am
       alten Favicon fehl.
-- [x] 2.2 `frontend/src/marke/pwaManifest.ts` herauslösen, `vite.config.ts` importiert es.
+- [x] 2.2 `frontend/src/marke/pwaManifest.json` herauslösen, `vite.config.ts` liest es ein (D4).
       Einträge any/maskable und Farben `#0c0e11` (D4). `includeAssets` um
       `apple-touch-icon.png` ergänzen, `index.html` um `apple-touch-icon` und `theme-color`.
       Prüfung: Die Manifest-Fälle des Guard-Tests sind grün, `vite build` erzeugt ein
