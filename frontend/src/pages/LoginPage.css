@@ -154,3 +154,11 @@
     animation: none;
   }
 }
+
+/* Erläuterung unter „Im Browser anmelden“ (LFH-818). `gedaempft` statt `schwach`: Fließtext,
+   der gelesen werden muss, hält den Lesekontrast. */
+.login-hinweis {
+  margin: 8px 0 0;
+  font-size: var(--lfh-typo-text-klein-groesse);
+  color: var(--lfh-gedaempft);
+}

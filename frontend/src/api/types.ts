@@ -17,6 +17,7 @@ type S = components['schemas'];
 
 // ============================== Auth ==============================
 export type AuthProvider = S['AuthProviderAnzeige'];
+export type AppCode = S['AppCode'];
 // TOTP-Enroll-DTOs (`/api/auth/totp/enroll/start|finish`).
 export type TotpEnrollStart = S['TotpEnrollStart'];
 export type TotpEnrollFinish = S['TotpEnrollFinish'];

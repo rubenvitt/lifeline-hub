@@ -28,15 +28,15 @@
   `login_fehlgeschlagen` mit dem Anbieter `systembrowser`, `fehlversuch` bei Scheitern, 429 bei
   gesperrter Adresse. Nachweis: Fälle in `tests/app_anmeldung.rs`, die die `auth_audit`-Zeilen
   und 429 nach zehn Fehlversuchen prüfen.
-- [ ] 1.4 Typ-Codegen nachziehen (`scripts/check-typ-codegen.sh`, `openapi.json` und
+- [x] 1.4 Typ-Codegen nachziehen (`scripts/check-typ-codegen.sh`, `openapi.json` und
   `types.generated.ts` mitcommitten), Request-DTOs von Hand in `frontend/src/api/auth.ts`.
   Nachweis: `check-typ-codegen.sh` grün.
 
 ## 2. Webanwendung: Bestätigungsseite, Anmeldeseite, Profil
 
-- [ ] 2.1 `frontend/src/api/auth.ts` um `appCodeAusstellen(challenge)` erweitern. Nachweis:
+- [x] 2.1 `frontend/src/api/auth.ts` um `appCodeAusstellen(challenge)` erweitern. Nachweis:
   Vitest für Pfad und Body.
-- [ ] 2.2 Seite `pages/AppAnmeldungPage.tsx` und Route `/app-anmeldung` in `App.tsx` anlegen:
+- [x] 2.2 Seite `pages/AppAnmeldungPage.tsx` und Route `/app-anmeldung` in `App.tsx` anlegen:
   - Ohne Sitzung navigiert die Seite zu `/login` mit `von=/app-anmeldung?challenge=…`.
   - Mit Sitzung zeigt sie „In der Mac-App anmelden als <Anzeigename>“ mit „In der App
     anmelden“ (primär) und „Mit anderem Konto“ (Abmelden, dann Anmeldung mit Rückweg).
@@ -46,7 +46,7 @@
   - Ein Fehler beim Ausstellen landet an der Seite, nicht als Toast.
 
   Nachweis: Vitest für jeden dieser Fälle. Der Code erscheint nicht im DOM.
-- [ ] 2.3 Prüfen, dass OIDC (`?von=` über `ziel_pfad_aus_query`), Passwort, TOTP und Passkey
+- [x] 2.3 Prüfen, dass OIDC (`?von=` über `ziel_pfad_aus_query`), Passwort, TOTP und Passkey
   auf `/app-anmeldung?challenge=…` zurückführen. Nachweis: Vitest der `LoginPage` mit
   `location.state.von` inklusive Query, dazu ein Rust-Test `ziel_pfad_aus_query` mit Query.
 - [x] 2.4 `huelle/faehigkeiten.ts` um `huelleAnmeldungImBrowser()` erweitern, einzige
@@ -55,7 +55,7 @@
   - Browser liefert `null`.
   - Mac-Hülle liefert eine Funktion, die `invoke('anmeldung_im_browser')` ruft.
   - Ein Objekt ohne Feld liefert `null`.
-- [ ] 2.5 `LoginPage.tsx` anpassen:
+- [x] 2.5 `LoginPage.tsx` anpassen:
   - „Im Browser anmelden“ (umrandet) unter Formular und SSO, wenn die Hülle es meldet.
   - Ersetzt den LFH-817-Hinweis bei nur-Passkey.
   - Hört auf `lifeline:app-anmeldung`:
@@ -67,7 +67,7 @@
 
   Nachweis: Vitest mit `starteMacHuelle()` für jeden Zweig und die Gegenprobe im Browser (kein
   Knopf). Mutationsprobe: Der Knopf ohne Hüllenbedingung macht den Browserfall rot.
-- [ ] 2.6 Den Profil-Hinweis in `ProfilPage.tsx` auf den Weg „Im Browser anmelden“
+- [x] 2.6 Den Profil-Hinweis in `ProfilPage.tsx` auf den Weg „Im Browser anmelden“
   umschreiben. Die Einrichtung bleibt ausgeblendet. Nachweis: Vitest für den Hinweistext und die
   weiterhin fehlende Einrichtung.
 - [ ] 2.7 Prüfliste Einsatztauglichkeit (15 Kriterien) für `AppAnmeldungPage` (neu),

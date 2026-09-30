@@ -1463,6 +1463,14 @@ mod tests {
         assert_eq!(ziel_pfad_aus_query(Some("/".to_string())), "/");
     }
 
+    /// Die Bestätigung für die Mac-App (LFH-818) trägt ihre `challenge` als Query; OIDC muss sie
+    /// unverändert zurückführen.
+    #[test]
+    fn ziel_pfad_aus_query_behaelt_die_query() {
+        let ziel = "/app-anmeldung?challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
+        assert_eq!(ziel_pfad_aus_query(Some(ziel.to_string())), ziel);
+    }
+
     #[test]
     fn ziel_pfad_aus_query_lehnt_open_redirect_versuche_ab() {
         // Protokoll-relativ.
