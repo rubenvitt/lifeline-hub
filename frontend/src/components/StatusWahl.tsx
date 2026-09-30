@@ -65,6 +65,7 @@ import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
  * beiden Zweige eigenen Code.
  */
 const ZEILE = '[data-row-key], [data-lfh="datensicht-karte"]';
+
 export interface StatusOption<W> {
   wert: W;
   /** Sichtbare Beschriftung. Pflicht — sie IST der zweite Kanal. */
