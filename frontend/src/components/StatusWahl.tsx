@@ -1,5 +1,7 @@
 import { Button, Dropdown, theme } from 'antd';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
+import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import StatusTag from './StatusTag';
 import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
 
@@ -45,7 +47,25 @@ import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
  *   `onClick` am `menu` hat der Riegel genau einen Ort.
  * · **`fms_anker` ist KEINE tragende Bedienform.** Die Spalte ist nullable, ein 0–9-Tastenfeld
  *   darauf hätte Löcher. Der Anker bleibt Sortierachse und optionales Tastenkürzel.
+ *
+ * ── PALETTENWEG „STATUS SETZEN“ (LFH-507) ─────────────────────────────────────────────
+ *
+ * Das Primitiv meldet eine Tastatur-Ebene an, deren Wurzel die UMGEBENDE ZEILE ist
+ * ({@link ZEILE}). Liegt der Fokus irgendwo in der Zeile, bietet die Palette „Status setzen“ an
+ * und öffnet DIESES Menü; gewählt wird dort, es gibt keinen zweiten Weg zum Wert. Die Fokuszeile
+ * ist damit kein eigener Zustand, sondern die Fokus-Kette des Providers. `nurMitFokus` hält die
+ * Aktion aus dem Anzeige-Fallback (sonst wirkte sie auf eine beliebige Zeile). Außerhalb einer
+ * Zeile (FMS-Tableau: eine Kachel ist keine Zeile) bleibt die Wurzel leer und die Ebene wirkungslos.
+ * Herleitung: `openspec/changes/lfh-507-palette-status-setzen/design.md`.
  */
+
+/**
+ * Was als Zeile gilt: eine Tabellenzeile (antd setzt `data-row-key` am `tr`) oder eine Karte der
+ * `Datensicht`. Die Seiten rendern im Tabellenzweig dasselbe Primitiv, deshalb braucht keiner der
+ * beiden Zweige eigenen Code.
+ */
+const ZEILE = '[data-row-key], [data-lfh="datensicht-karte"]';
+
 export interface StatusOption<W> {
   wert: W;
   /** Sichtbare Beschriftung. Pflicht — sie IST der zweite Kanal. */
@@ -136,6 +156,35 @@ export default function StatusWahl<W extends string | number>({
 }: StatusWahlProps<W>): ReactElement {
   const { token } = theme.useToken();
 
+  // Kontrolliert geöffnet, damit die Palette das Menü öffnen kann (Muster: „Spalten“, LFH-391).
+  const [offen, setOffen] = useState(false);
+  const bedienbar = darfSchreiben && !gesperrt && !laeuft;
+
+  /*
+   * Wird der Auslöser gesperrt oder fällt er weg, meldet antd KEIN `onOpenChange(false)`; der
+   * Zustand bliebe `true`, und das Menü klappte beim Wiederfreigeben unaufgefordert auf.
+   */
+  useEffect(() => {
+    if (!bedienbar) setOffen(false);
+  }, [bedienbar]);
+
+  // Die Zeile einmal nach dem Einhängen aus dem Auslöser auflösen. Die Callback-Ref läuft im
+  // Commit, VOR dem Effekt, der die Ebene anmeldet.
+  const zeile = useRef<HTMLElement | null>(null);
+  const merkeZeile = useCallback((knopf: HTMLElement | null) => {
+    zeile.current = knopf?.closest<HTMLElement>(ZEILE) ?? null;
+  }, []);
+  const oeffne = useCallback(() => setOffen(true), []);
+
+  useTastaturEbene({
+    name: `Statuswahl: ${kennung}`,
+    wurzel: zeile,
+    aktionen: { 'status-setzen': oeffne },
+    // Ein gesperrter Knopf nimmt keine Eingabe an; eine Aktion darauf wäre wirkungslos.
+    aktiv: bedienbar,
+    nurMitFokus: true,
+  });
+
   const etikett =
     eigenesEtikett != null ? (
       eigenesEtikett
@@ -176,6 +225,9 @@ export default function StatusWahl<W extends string | number>({
   return (
     <Dropdown
       trigger={['click']}
+      open={offen}
+      // Die Menüwahl schließt über denselben Weg (antd meldet `false` mit `source: 'menu'`).
+      onOpenChange={setOffen}
       menu={{
         items: eintraege,
         selectable: true,
@@ -192,6 +244,7 @@ export default function StatusWahl<W extends string | number>({
       autoFocus
     >
       <Button
+        ref={merkeZeile}
         type="text"
         aria-label={`Status von ${kennung} ändern`}
         loading={laeuft}

@@ -19,6 +19,7 @@ vi.mock('./useBefehle', () => {
     'filter-zuruecksetzen': 'Filter zurücksetzen',
     verwerfen: 'Verwerfen',
     'neue-zeile': 'Neue Zeile',
+    'status-setzen': 'Status setzen',
   };
   return {
     useBefehle: (aktionen: TastaturAktionen = {}) => [
@@ -36,14 +37,16 @@ vi.mock('./useBefehle', () => {
 function Ebene({
   name,
   aktionen,
+  nurMitFokus,
   children,
 }: {
   name: string;
   aktionen: TastaturAktionen;
+  nurMitFokus?: true;
   children?: ReactNode;
 }) {
   const wurzel = useRef<HTMLDivElement>(null);
-  useTastaturEbene({ name, wurzel, aktionen, aktiv: true });
+  useTastaturEbene({ name, wurzel, aktionen, aktiv: true, nurMitFokus });
   return (
     <div ref={wurzel} data-testid={name}>
       <button type="button">{name} fokussieren</button>
@@ -376,6 +379,65 @@ describe('CommandPaletteProvider', () => {
     await u.keyboard('{Control>}k{/Control}');
 
     expect(screen.getByRole('option', { name: 'Speichern' })).toBeInTheDocument();
+  });
+
+  /**
+   * Ebenen „nur mit Fokus“ (LFH-507): eine Zeilenebene wirkt auf GENAU die Zeile, in der der Fokus
+   * lag. Als Anzeige-Fallback böte sie „Status setzen“ für eine beliebige Zeile an. Eine EINZIGE
+   * registrierte Ebene, damit die Aussage nicht an der DOM-Tiefe hängt: ohne die Marke wäre sie der
+   * Fallback.
+   */
+  it('zeigt eine Ebene „nur mit Fokus“ NICHT als Anzeige-Fallback', async () => {
+    const u = userEvent.setup();
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <Ebene name="zeile" aktionen={{ 'status-setzen': vi.fn() }} nurMitFokus />
+        <button type="button">unregistrierte Kopfzeile</button>
+      </CommandPaletteProvider>,
+    );
+
+    screen.getByRole('button', { name: 'unregistrierte Kopfzeile' }).focus();
+    await u.keyboard('{Control>}k{/Control}');
+
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Status setzen' })).not.toBeInTheDocument();
+  });
+
+  it('zeigt eine Ebene „nur mit Fokus“, wenn der Fokus in ihrer Wurzel liegt', async () => {
+    const u = userEvent.setup();
+    const statusSetzen = vi.fn();
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <Ebene name="zeile" aktionen={{ 'status-setzen': statusSetzen }} nurMitFokus />
+        <button type="button">unregistrierte Kopfzeile</button>
+      </CommandPaletteProvider>,
+    );
+
+    screen.getByRole('button', { name: 'zeile fokussieren' }).focus();
+    await u.keyboard('{Control>}k{/Control}');
+    await u.click(screen.getByRole('option', { name: 'Status setzen' }));
+
+    expect(statusSetzen).toHaveBeenCalledTimes(1);
+  });
+
+  // Die Marke nimmt nur SICH aus dem Fallback, sie sperrt ihn nicht: die nächste Ebene rückt nach.
+  it('nimmt für den Fallback die nächste Ebene, wenn die flachste „nur mit Fokus“ gilt', async () => {
+    const u = userEvent.setup();
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <Ebene name="zeile" aktionen={{ 'status-setzen': vi.fn() }} nurMitFokus />
+        <div>
+          <Ebene name="werkzeugzeile" aktionen={{ 'filter-zuruecksetzen': vi.fn() }} />
+        </div>
+        <button type="button">unregistrierte Kopfzeile</button>
+      </CommandPaletteProvider>,
+    );
+
+    screen.getByRole('button', { name: 'unregistrierte Kopfzeile' }).focus();
+    await u.keyboard('{Control>}k{/Control}');
+
+    expect(screen.getByRole('option', { name: 'Filter zurücksetzen' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Status setzen' })).not.toBeInTheDocument();
   });
 
   it('deaktiviert die Ebene, wenn der Fokus in eine unregistrierte Wurzel wechselt', () => {

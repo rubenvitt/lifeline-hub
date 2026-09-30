@@ -25,6 +25,13 @@ interface TastaturEbene {
   wurzel: RefObject<HTMLElement | null>;
   aktionen: () => TastaturAktionen;
   reihenfolge: number;
+  /**
+   * Die Ebene wirkt nur, wenn der Fokus in ihrer Wurzel liegt, und scheidet aus dem
+   * Anzeige-Fallback aus (LFH-507). Träger ist die Zeilenebene von `StatusWahl`: als Fallback böte
+   * sie „Status setzen“ für eine BELIEBIGE Zeile an. `true` statt `boolean` wie `nichtMerkbar`: die
+   * Marke kann nur abziehen.
+   */
+  nurMitFokus?: true;
 }
 
 interface PaletteWert {
@@ -69,6 +76,9 @@ export function verschmelzeAktionen(ketteVonTiefNachFlach: TastaturAktionen[]): 
  *  - **`[hidden]` / `[aria-hidden="true"]` an der Wurzel oder darüber**: antds `Tabs` lassen
  *    verlassene Reiter so im Baum; deren unsichtbare Liste böte sonst „Spalten“ an.
  *  - **keine belegte Aktion**: eine leere Ebene verdrängte die nützliche darunter.
+ *  - **nur mit Fokus** (`nurMitFokus`, LFH-507): eine zeilengebundene Aktion ohne Fokuszeile
+ *    hätte kein Objekt. Das hängt bewusst nicht an der DOM-Tiefe (heute läge die Zeile meist tiefer
+ *    als die Werkzeugzeile); ohne flachere Ebene wäre die Zeile sonst selbst der Fallback.
  *
  * **Was der Filter NICHT sieht** (Vertragsteil): Unsichtbarkeit aus dem LAYOUT (`display: none`
  * aus einer Klasse, Höhe 0, `content-visibility`). jsdom rechnet kein Layout, ein Filter darauf
@@ -76,6 +86,7 @@ export function verschmelzeAktionen(ketteVonTiefNachFlach: TastaturAktionen[]): 
  * absichtlichen Verstecken setzt.
  */
 function fallbackWurzel(ebene: TastaturEbene): HTMLElement | null {
+  if (ebene.nurMitFokus) return null;
   const wurzel = ebene.wurzel.current;
   if (!wurzel?.isConnected) return null;
   if (wurzel.closest('[hidden], [aria-hidden="true"]')) return null;
@@ -384,11 +395,14 @@ export function useTastaturEbene({
   wurzel,
   aktionen,
   aktiv = true,
+  nurMitFokus,
 }: {
   name: string;
   wurzel: RefObject<HTMLElement | null>;
   aktionen: TastaturAktionen;
   aktiv?: boolean;
+  /** Siehe {@link TastaturEbene.nurMitFokus}. */
+  nurMitFokus?: true;
 }) {
   const wert = useContext(PaletteContext);
   // Die Ebene ist progressive Tastaturbedienung: isolierte Komponenten, Tests und
@@ -409,8 +423,9 @@ export function useTastaturEbene({
       name,
       wurzel,
       aktionen: () => aktionenRef.current,
+      nurMitFokus,
     });
-  }, [aktiv, name, registriereTastaturEbene, wurzel]);
+  }, [aktiv, name, nurMitFokus, registriereTastaturEbene, wurzel]);
 
   useEffect(() => {
     if (aktiv) meldeTastaturAktionenAenderung?.();
