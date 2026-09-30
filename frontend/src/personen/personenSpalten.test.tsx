@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { QueryClient } from '@tanstack/react-query';
@@ -294,7 +294,13 @@ describe('Zustand-Spalte (LFH-613)', () => {
 
     const knopf = await screen.findByRole('button', { name: 'Zustand zu R-001 bearbeiten' });
     expect(knopf).toHaveTextContent('gehfähig');
-    expect(knopf).toHaveClass('ant-btn-loading');
+    // Warten auf die Bedingung, nicht auf den Takt (LFH-531): antds Button führt `loading` über
+    // einen eigenen Zustand (`useDelayState`, gesetzt im Layout-Effekt) und trägt die Klasse erst
+    // einen Commit nach Wert und Namen. `findByRole` kann genau dazwischen auflösen — im Volllauf
+    // hing das an der Reihenfolge von Reacts Scheduler und RTLs `setTimeout(0)`. Die Antwort ist
+    // festgehalten, die Ladeanzeige muss also stehen und bleiben.
+    await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
+    expect(knopf).toHaveTextContent('gehfähig');
     expect(screen.queryByRole('button', { name: 'Zustand zu R-001 hinzufügen' })).toBeNull();
     freigeben();
   });
