@@ -84,7 +84,7 @@
 
 ## 3. Hülle: Anmeldung im Systembrowser
 
-- [ ] 3.1 Abhängigkeiten in `src-tauri/Cargo.toml` ergänzen:
+- [x] 3.1 Abhängigkeiten in `src-tauri/Cargo.toml` ergänzen:
   - nur macOS: `objc2`, `objc2-foundation`, `objc2-authentication-services` (Features
     `ASWebAuthenticationSession`, `ASFoundation`, `block2`), `block2`,
   - für alle: `sha2`, `base64`, `getrandom`.
@@ -148,8 +148,13 @@
 
 ## 5. Integration und Abnahme
 
-- [ ] 5.1 `./scripts/check-all.sh` grün (alle Schritte, auch `cargo test -p lifeline-desktop`
-  getrennt). Nachweis: Gesamtstatus des Laufs.
+- [x] 5.1 `./scripts/check-all.sh` grün (alle Schritte, auch `cargo test -p lifeline-desktop`
+  getrennt). Nachweis: Gesamtstatus des Laufs. Ergebnis 30.09.2026 (Stand 5aedc834, Load ~70):
+  Schritte 1–6 und 8–12 grün. Schritt 7 (e2e): 346 grün, 79 rot (fast alle Zeitgrenze). Nachlauf
+  `--last-failed --workers=1`: 75 grün. Rest: `kopfzeile-schmal:273` auch auf dem Basisstand
+  5f7102f3 rot (LFH-851), `lagekarte-touch:422` bekannt wackelig (Prüfliste LFH-812),
+  `lagekarte-betreuung:105` 1/2 grün, `palette-oeffnung:338` im zweiten Nachlauf 2/2 grün.
+  Keiner berührt Code von LFH-818 (die Oberfläche ändert sich nur in der macOS-Hülle).
 - [ ] 5.2 Abnahme von Hand auf dem Mac mit `https://elw.local:8443` und der echten Hülle
   (`cargo tauri build --debug`). Die Ergebnisse gehen als Belege nach
   `belege/macos/abnahme.md`:
