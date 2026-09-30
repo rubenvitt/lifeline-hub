@@ -41,8 +41,8 @@ unabhängig von seinen Modulfreigaben. Die Tür des Stroms und die des Einsatzko
 (Lesezugriff auf den Einsatz ohne Modul). Außer `einsatz` und dem Kontrollereignis `lagged` MUST
 jedes Ereignis mindestens einem Modul zugeordnet bleiben.
 
-#### Scenario: Leser ohne jedes Modulrecht
-- **WHEN** ein Mitglied, das kein Modul des Einsatzes sehen darf, den Strom geöffnet hat und der Kopf geändert wird
+#### Scenario: Leser ohne jedes ausblendbare Modul
+- **WHEN** ein Mitglied, dem jedes ausblendbare Modul des Einsatzes entzogen ist, den Strom geöffnet hat und der Kopf geändert wird
 - **THEN** erhält es das Ereignis `einsatz`
 
 #### Scenario: Leser ohne Stab-Recht bei einer Besprechung ohne neuen Termin

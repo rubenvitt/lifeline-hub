@@ -17,7 +17,7 @@ und `requesting-code-review`.
 - [x] 2.2 `routes/einsatz.rs`: `publiziere_einsatz(id, LiveEvent::Einsatz)` nach Erfolg in `aktualisieren`, `abschliessen`, `aufbewahrungsfrist_setzen` (nach dem Commit, vor der Antwort). Tests aus 2.1 grün.
 - [x] 2.3 `tests/stab.rs` (oder `einsatz_live.rs`): Lagebesprechung mit neuem Termin → `stab`, `etb` UND `einsatz`; mit demselben Termin → kein `einsatz`; ohne Schlüssel `naechste_at` → kein `einsatz`; Termin → `null` bei gesetztem Termin → `einsatz`. Rot belegen.
 - [x] 2.4 `stab/repo.rs` Schritt 6: `… WHERE id = ? AND naechste_lagebesprechung_at IS NOT ?`, Rückgabe `termin_geaendert`; `routes/stab.rs` publiziert `einsatz` nur dann. Tests aus 2.3 grün, übrige `tests/stab.rs` unverändert grün (Atomaritäts-Mutationsprobe inklusive).
-- [x] 2.5 SSE-Filter: Integrationstest, dass ein Mitglied ohne jede Modulfreigabe `einsatz` erhält und bei Lagebesprechung ohne Terminänderung weder `stab` noch `einsatz` (Muster der bestehenden Gate-Tests in `tests/`).
+- [x] 2.5 SSE-Filter: Integrationstest, dass ein Mitglied ohne jedes ausblendbare Modul `einsatz` erhält und bei Lagebesprechung ohne Terminänderung weder `stab` noch `einsatz` (Muster der bestehenden Gate-Tests in `tests/`).
 - [x] 2.6 Besetzung eines Sachgebiets → kein `einsatz` (Abwesenheitstest).
 
 ## 3. Codegen

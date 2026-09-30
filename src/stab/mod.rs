@@ -131,9 +131,9 @@ pub struct LagebesprechungAnzeige {
 /// Zeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu
 /// schicken hiesse, „nicht vergeben" als Datensatz zu erfinden.
 ///
-/// `naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**, damit der
-/// Countdown auf beiden Fahrzeugschirmen live ist, obwohl der Einsatzkopf FE-seitig im
-/// `NICHT_LIVE`-Fach bleibt (Entscheidung 11). Kein zweiter Speicherort.
+/// `naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**
+/// (Entscheidung 11). Kein zweiter Speicherort: ändert sich der Termin, frischt das
+/// Live-Ereignis `einsatz` Kopf und Stab-Anzeige gemeinsam auf (LFH-555).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct StabAnzeige {
     pub besetzung: Vec<StabsfunktionAnzeige>,

@@ -8315,7 +8315,7 @@
       },
       "StabAnzeige": {
         "type": "object",
-        "description": "Die Führungsorganisation eines Einsatzes.\n\n`besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen\nZeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu\nschicken hiesse, „nicht vergeben\" als Datensatz zu erfinden.\n\n`naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**, damit der\nCountdown auf beiden Fahrzeugschirmen live ist, obwohl der Einsatzkopf FE-seitig im\n`NICHT_LIVE`-Fach bleibt (Entscheidung 11). Kein zweiter Speicherort.",
+        "description": "Die Führungsorganisation eines Einsatzes.\n\n`besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen\nZeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu\nschicken hiesse, „nicht vergeben\" als Datensatz zu erfinden.\n\n`naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**\n(Entscheidung 11). Kein zweiter Speicherort: ändert sich der Termin, frischt das\nLive-Ereignis `einsatz` Kopf und Stab-Anzeige gemeinsam auf (LFH-555).",
         "required": [
           "besetzung",
           "anzahl_lagebesprechungen"
