@@ -71,6 +71,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/auth/providers/{id}",
             put(routes::auth::provider_schalten),
         )
+        .route(
+            "/api/auth/app-code",
+            post(routes::auth::app_code_ausstellen),
+        )
+        .route(
+            "/api/auth/app-code/einloesen",
+            post(routes::auth::app_code_einloesen),
+        )
         .route("/api/auth/oidc/start", get(routes::auth::oidc_start))
         .route("/api/auth/oidc/callback", get(routes::auth::oidc_callback))
         .route(

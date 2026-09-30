@@ -87,6 +87,17 @@ mod tests {
         );
     }
 
+    /// Den Rücksprung der Anmeldung nimmt nur die laufende `ASWebAuthenticationSession` an
+    /// (LFH-818). Von außen bewirkt er über den globalen Weg nichts.
+    #[test]
+    fn anmeldung_von_aussen_bewirkt_nichts() {
+        let code = "0123456789abcdef".repeat(4);
+        assert_eq!(
+            deute(&url(&format!("lifeline://anmeldung?code={code}"))),
+            None
+        );
+    }
+
     #[test]
     fn fremdes_schema_wird_verworfen() {
         assert_eq!(

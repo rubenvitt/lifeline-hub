@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-anmeldung-im-browser"
+description = "Enables the anmeldung_im_browser command without any pre-configured scope."
+commands.allow = ["anmeldung_im_browser"]
+
+[[permission]]
+identifier = "deny-anmeldung-im-browser"
+description = "Denies the anmeldung_im_browser command without any pre-configured scope."
+commands.deny = ["anmeldung_im_browser"]

@@ -492,6 +492,149 @@ describe('LoginPage', () => {
     });
   });
 
+  describe('Im Browser anmelden, macOS-Hülle (LFH-818)', () => {
+    const gerda = {
+      id: 4,
+      anzeigename: 'Gerda Maier',
+      benutzername: 'gerda',
+      system_rolle: 'keiner',
+      org_rolle: 'keine',
+      aktiv: true,
+      erstellt_at: '2026-09-30',
+      totp_aktiviert: false,
+    };
+    const urspruenglicheSecureContext = window.isSecureContext;
+
+    beforeEach(() => {
+      Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true });
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+    });
+
+    afterEach(() => {
+      beendeHuelle();
+      Object.defineProperty(window, 'isSecureContext', {
+        configurable: true,
+        value: urspruenglicheSecureContext,
+      });
+    });
+
+    function zeige(provider: unknown[], von?: string) {
+      let sitzung: typeof gerda | null = null;
+      server.use(
+        http.get('/api/auth/me', () =>
+          sitzung ? HttpResponse.json(sitzung) : HttpResponse.json({ error: 'x' }, { status: 401 }),
+        ),
+        http.get('/api/auth/providers', () => HttpResponse.json(provider)),
+      );
+      renderMitProviders(
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/einsaetze" element={<div>Einsatzliste</div>} />
+          <Route path="/app-anmeldung" element={<div>Bestätigung</div>} />
+        </Routes>,
+        { route: von ? { pathname: '/login', state: { von } } : '/login' } as never,
+      );
+      return { anmelden: () => (sitzung = gerda) };
+    }
+
+    const melden = (ergebnis: string) =>
+      act(
+        () =>
+          void window.dispatchEvent(
+            new CustomEvent('lifeline:app-anmeldung', { detail: { ergebnis } }),
+          ),
+      );
+
+    const passwortUndPasskey = [
+      { id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true },
+      { id: 'webauthn', typ: 'webauthn', anzeigename: 'Passkey', aktiviert: true },
+    ];
+
+    it('zeigt im Browser kein „Im Browser anmelden“ (Gegenprobe)', async () => {
+      zeige(passwortUndPasskey);
+      expect(await screen.findByRole('button', { name: 'Mit Passkey anmelden' })).toBeEnabled();
+      expect(screen.queryByRole('button', { name: /Im Browser anmelden/ })).toBeNull();
+    });
+
+    it('bietet in der Hülle „Im Browser anmelden“ neben dem Passwort, ohne Passkey-Knopf', async () => {
+      const invoke = vi.fn().mockResolvedValue(undefined);
+      starteMacHuelle({ invoke });
+      zeige(passwortUndPasskey);
+      const knopf = await screen.findByRole('button', { name: /Im Browser anmelden/ });
+      expect(screen.getByLabelText('Benutzername')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Mit Passkey anmelden' })).toBeNull();
+
+      await userEvent.click(knopf);
+      expect(invoke).toHaveBeenCalledWith('anmeldung_im_browser');
+      await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
+      expect(knopf).toBeEnabled();
+    });
+
+    it('ersetzt bei nur-Passkey den Hinweis aus LFH-817 durch den Weg', async () => {
+      starteMacHuelle({ invoke: vi.fn().mockResolvedValue(undefined) });
+      zeige([{ id: 'webauthn', typ: 'webauthn', anzeigename: 'Passkey', aktiviert: true }]);
+      expect(await screen.findByRole('button', { name: /Im Browser anmelden/ })).toBeEnabled();
+      expect(screen.queryByText(/Passkey geht in der Mac-App nicht/)).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Mit Passkey anmelden' })).toBeNull();
+    });
+
+    it('lädt nach „angemeldet“ den Benutzer und geht zum Ziel', async () => {
+      starteMacHuelle({ invoke: vi.fn().mockResolvedValue(undefined) });
+      const { anmelden } = zeige(passwortUndPasskey);
+      await screen.findByRole('button', { name: /Im Browser anmelden/ });
+      anmelden();
+      melden('angemeldet');
+      expect(await screen.findByText('Einsatzliste')).toBeInTheDocument();
+    });
+
+    it('meldet eine abgelehnte oder gescheiterte Einlösung an der Seite', async () => {
+      starteMacHuelle({ invoke: vi.fn().mockResolvedValue(undefined) });
+      zeige(passwortUndPasskey);
+      await screen.findByRole('button', { name: /Im Browser anmelden/ });
+      melden('abgelehnt');
+      expect(
+        await screen.findByText(
+          'Die Anmeldung aus dem Browser ist nicht mehr gültig. Bitte erneut anmelden.',
+        ),
+      ).toBeInTheDocument();
+      melden('fehler');
+      expect(
+        await screen.findByText('Die Anmeldung aus dem Browser ist fehlgeschlagen.'),
+      ).toBeInTheDocument();
+    });
+
+    it('sagt bei „abgebrochen“, dass die Anmeldung abgebrochen wurde, ohne Fehler', async () => {
+      starteMacHuelle({ invoke: vi.fn().mockResolvedValue(undefined) });
+      zeige(passwortUndPasskey);
+      await screen.findByRole('button', { name: /Im Browser anmelden/ });
+      melden('abgebrochen');
+      expect(
+        await screen.findByText('Die Anmeldung im Browser wurde abgebrochen.'),
+      ).toBeInTheDocument();
+      expect(document.querySelector('.ant-alert-error')).toBeNull();
+      expect(screen.getByRole('button', { name: /Im Browser anmelden/ })).toBeEnabled();
+    });
+
+    it('meldet, wenn die Hülle den Start ablehnt', async () => {
+      starteMacHuelle({ invoke: vi.fn().mockRejectedValue('Es ist kein Server verbunden.') });
+      zeige(passwortUndPasskey);
+      await userEvent.click(await screen.findByRole('button', { name: /Im Browser anmelden/ }));
+      expect(await screen.findByText('Es ist kein Server verbunden.')).toBeInTheDocument();
+    });
+
+    it('führt nach dem Passwort-Login auf ein Ziel mit Query zurück (Bestätigungsseite)', async () => {
+      server.use(http.post('/api/auth/login', () => HttpResponse.json(gerda)));
+      zeige(
+        [{ id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true }],
+        '/app-anmeldung?challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+      );
+      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
+      await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+      expect(await screen.findByText('Bestätigung')).toBeInTheDocument();
+    });
+  });
+
   describe('Zweite Login-Stufe (LFH-43, TOTP)', () => {
     const adminBody = {
       id: 1,

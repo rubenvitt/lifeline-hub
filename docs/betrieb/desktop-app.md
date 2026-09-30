@@ -161,6 +161,29 @@ trotzdem.
 - `latest.json` erzeugt `scripts/release/desktop-manifest.mjs` aus den tatsächlich gebauten
   Paketen. Scheitert eine Plattform, fehlt sie im Manifest, statt ins Leere zu zeigen.
 
+## Im Browser anmelden (macOS, LFH-818)
+
+Auf der Anmeldeseite der Mac-App steht „Im Browser anmelden“. Der Weg trägt jede Anmeldung, die
+der Browser kann, auch den Passkey für Lifeline und den beim Identitätsanbieter. So kommen auch
+Konten hinein, die nur per SSO angelegt wurden und deren Anbieter nur Passkeys kennt (etwa
+PocketID).
+
+1. Die App öffnet ein Anmeldefenster des Standardbrowsers. Beim ersten Mal fragt macOS, ob die
+   App „elw.local“ (bzw. die Serveradresse) zum Anmelden verwenden darf.
+2. Ist man im Browser noch nicht angemeldet, erscheint die gewohnte Anmeldung (Passwort, TOTP,
+   SSO, Passkey).
+3. Die Seite „In der Mac-App anmelden als …“ nennt das Konto. „In der App anmelden“ übergibt die
+   Anmeldung, „Mit anderem Konto“ meldet im Browser ab, damit sich jemand anderes anmelden kann.
+   Auf geteilten Rechnern im ELW ist das die Stelle, an der man prüft, wer im Browser angemeldet
+   ist.
+4. Das Fenster schließt sich, und die App ist angemeldet. Im Browser bleibt man angemeldet, die
+   App hat eine eigene Sitzung.
+
+Die Übergabe läuft über einen Einmalcode: 60 Sekunden gültig, nur einmal einlösbar und an ein
+Geheimnis gebunden, das nur die App kennt. Ein Code, den eine fremde Seite der App unterschiebt,
+ergibt keine Sitzung. Im Auth-Audit steht die Übergabe als `login_ok` mit dem Anbieter
+`systembrowser`. Herleitung: `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`.
+
 ## App-Symbol
 
 Die Symbole in `src-tauri/icons/` zeigen die Bildmarke „Lebenslinie“ (LFH-837). Sie entstehen
@@ -178,13 +201,11 @@ scripts/marke/erzeuge-symbole.sh
   Links, Dateien“).
 - **Anmeldung über einen Neustart:** LFH-779/780. Nach jedem Neustart der App ist eine neue
   Anmeldung nötig.
-- **Passkey auf macOS:** entschieden in LFH-783 (gestaffelt). Im Mac-Fenster geht die Anmeldung
-  per Passwort und OIDC, nicht per Passkey. Seit LFH-817 bietet die Mac-App den Passkey gar nicht
-  erst an: kein Knopf „Mit Passkey anmelden“, im Profil statt der Einrichtung ein Hinweis auf den
-  Browser. Ist nur der Passkey als Anmeldeverfahren aktiv, sagt die Anmeldeseite, dass es im
-  Browser geht. Windows und der Browser bleiben unverändert.
-  **Bekannte Grenze:** Konten, die nur per SSO angelegt wurden (ohne eigenes Passwort), kommen in
-  der Mac-App nur hinein, wenn der Identitätsanbieter einen Weg ohne Passkey kennt. Ein Anbieter,
-  der ausschließlich Passkeys anbietet (etwa PocketID), sperrt sie dort aus. Das schließt erst die
-  Anmeldung im Systembrowser (LFH-818); bis dahin melden sich diese Konten im Browser an.
+- **Passkey auf macOS:** Im Mac-Fenster selbst scheitert jeder Passkey (LFH-783). Die Mac-App
+  bietet ihn dort deshalb nicht an (LFH-817), sondern „Im Browser anmelden“ (LFH-818, siehe
+  unten). Die Einrichtung eines Passkeys geschieht im Browser. Windows und der Browser bleiben
+  unverändert.
+- **Anmeldung im Browser, nicht gemessen:** mit Firefox oder Safari als Standardbrowser und mit
+  signierter App (LFH-722). Gemessen ist Vivaldi als Standardbrowser (Chromium) sowie Safari
+  direkt (`openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/belege/macos/messung.md`).
 - **Linux:** Die Hülle wird dort übersetzt (Tests), aber nicht ausgeliefert.

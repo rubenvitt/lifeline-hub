@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { beendeHuelle, starteMacHuelle } from '../test/huelle';
-import { huelleSperrtPasskey } from './faehigkeiten';
+import { huelleAnmeldungImBrowser, huelleSperrtPasskey } from './faehigkeiten';
 
 describe('huelleSperrtPasskey (LFH-817)', () => {
   afterEach(beendeHuelle);
@@ -28,5 +28,34 @@ describe('huelleSperrtPasskey (LFH-817)', () => {
     expect(huelleSperrtPasskey()).toBe(true);
     beendeHuelle();
     expect(huelleSperrtPasskey()).toBe(false);
+  });
+});
+
+describe('huelleAnmeldungImBrowser (LFH-818)', () => {
+  afterEach(beendeHuelle);
+
+  it('liefert im Browser nichts', () => {
+    expect(huelleAnmeldungImBrowser()).toBeNull();
+  });
+
+  it('ruft in der macOS-Hülle den Command der Hülle (ausgeliefertes Init-Skript)', async () => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    starteMacHuelle({ invoke });
+    const anmelden = huelleAnmeldungImBrowser();
+    expect(anmelden).not.toBeNull();
+    await anmelden!();
+    expect(invoke).toHaveBeenCalledWith('anmeldung_im_browser');
+  });
+
+  it('reicht eine Ablehnung der Hülle weiter', async () => {
+    starteMacHuelle({ invoke: vi.fn().mockRejectedValue('nicht erlaubt') });
+    await expect(huelleAnmeldungImBrowser()!()).rejects.toBe('nicht erlaubt');
+  });
+
+  it('liefert nichts ohne IPC-Brücke oder ohne Feld', () => {
+    starteMacHuelle();
+    expect(huelleAnmeldungImBrowser()).toBeNull();
+    window.__LIFELINE_HUELLE__ = { passkey: false };
+    expect(huelleAnmeldungImBrowser()).toBeNull();
   });
 });

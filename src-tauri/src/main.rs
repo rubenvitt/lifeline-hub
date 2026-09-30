@@ -4,14 +4,18 @@
 //! `openspec/specs/desktop-auslieferung/`; Entscheidungen im Design des Changes LFH-721.
 //!
 //! RECHTE: Die lokale Erststart-Maske darf die Adresse setzen (Capability `lokal`). Die
-//! Serverseite bekommt zur Laufzeit genau für ihre Origin nur `drucken` — sie kann die Hülle
-//! nicht auf einen anderen Server umlenken.
+//! Serverseite bekommt zur Laufzeit genau für ihre Origin nur `drucken` und
+//! `anmeldung_im_browser` (LFH-818) — sie kann die Hülle nicht auf einen anderen Server umlenken.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod adresse;
+mod anmeldung;
+#[cfg(target_os = "macos")]
+mod aswas;
 mod deeplink;
 mod links;
 mod menue;
+mod pkce;
 mod update;
 mod verbindung;
 
@@ -80,6 +84,19 @@ struct Zustand {
     freigegeben: Mutex<HashSet<String>>,
     /// Zähler für die Kennung des nächsten Nebenfensters.
     nebenfenster: AtomicU32,
+    /// Der laufende Vorgang „Im Browser anmelden“ (LFH-818); ein neuer ersetzt ihn.
+    anmeldung: Mutex<Option<Ausstehend>>,
+    /// Zähler der Vorgänge, damit der Handler einer ersetzten Sitzung nichts mehr bewirkt.
+    anmeldungen: AtomicU32,
+}
+
+/// Ein gestarteter Vorgang „Im Browser anmelden“. Der `verifier` verlässt die Hülle nur im
+/// Einlöse-Skript, und das nur an die Seite des Servers, gegen den gestartet wurde.
+struct Ausstehend {
+    nummer: u32,
+    verifier: String,
+    fenster: String,
+    server: Url,
 }
 
 fn konfig_dir(app: &AppHandle) -> PathBuf {
@@ -102,7 +119,10 @@ fn freigabe(server: &Url) -> (String, String) {
     (kennung, format!("{origin}/*"))
 }
 
-/// Gibt der Serverseite zur Laufzeit genau ihre Origin frei — und dort nur `drucken`.
+/// Was die Serverseite aufrufen darf: den Druck und „Im Browser anmelden“ (LFH-818).
+const SERVER_RECHTE: [&str; 2] = ["allow-drucken", "allow-anmeldung-im-browser"];
+
+/// Gibt der Serverseite zur Laufzeit genau ihre Origin frei — und dort nur [`SERVER_RECHTE`].
 fn server_freigeben(app: &AppHandle, server: &Url) {
     let (kennung, muster) = freigabe(server);
     if !app
@@ -114,10 +134,12 @@ fn server_freigeben(app: &AppHandle, server: &Url) {
     {
         return;
     }
-    let capability = tauri::ipc::CapabilityBuilder::new(kennung)
-        .remote(muster.clone())
-        .windows(freigabe_fenster())
-        .permission("allow-drucken");
+    let capability = SERVER_RECHTE.iter().fold(
+        tauri::ipc::CapabilityBuilder::new(kennung)
+            .remote(muster.clone())
+            .windows(freigabe_fenster()),
+        |capability, recht| capability.permission(*recht),
+    );
     if let Err(fehler) = app.add_capability(capability) {
         // Ohne Freigabe fehlt nur der native Druck; die Anwendung selbst läuft.
         log::warn!("Freigabe für {muster} nicht gesetzt: {fehler}");
@@ -329,12 +351,125 @@ fn drucken(fenster: WebviewWindow) -> Result<(), String> {
     fenster.print().map_err(|e| e.to_string())
 }
 
+/// Serverseite (LFH-818): „Im Browser anmelden“. Öffnet die Bestätigungsseite des verbundenen
+/// Servers — nie eine Adresse des Aufrufers — in einer `ASWebAuthenticationSession`; der
+/// `verifier` bleibt in der Hülle.
+#[tauri::command]
+fn anmeldung_im_browser(app: AppHandle, fenster: WebviewWindow) -> Result<(), String> {
+    let server = verbundener_server(&app).ok_or("Es ist kein Server verbunden.")?;
+    let verifier = pkce::neuer_verifier()?;
+    let ziel = anmeldung::bestaetigung_url(&server, &pkce::challenge_aus(&verifier));
+    let zustand = app.state::<Zustand>();
+    let nummer = zustand.anmeldungen.fetch_add(1, Ordering::Relaxed) + 1;
+    *zustand.anmeldung.lock().unwrap() = Some(Ausstehend {
+        nummer,
+        verifier,
+        fenster: fenster.label().to_string(),
+        server,
+    });
+    let erg = im_browser_starten(&app, &fenster, ziel, nummer);
+    if erg.is_err() {
+        zustand.anmeldung.lock().unwrap().take();
+    }
+    erg
+}
+
+#[cfg(target_os = "macos")]
+fn im_browser_starten(
+    app: &AppHandle,
+    fenster: &WebviewWindow,
+    ziel: Url,
+    nummer: u32,
+) -> Result<(), String> {
+    // Synchrone Commands laufen auf dem Hauptthread; AppKit verlangt ihn. Kein Weiterreichen mit
+    // rohem Fensterzeiger: das Fenster könnte dazwischen geschlossen sein.
+    if objc2::MainThreadMarker::new().is_none() {
+        return Err("Die Anmeldung im Browser muss auf dem Hauptthread starten.".to_string());
+    }
+    let ns_window = fenster.ns_window().map_err(|e| e.to_string())?;
+    let (fuer_hauptthread, fuer_ende) = (app.clone(), app.clone());
+    aswas::starten(
+        ns_window,
+        ziel.as_str(),
+        deeplink::SCHEMA,
+        // Geteilte Browsersitzung; gegen die Sitzung einer anderen Person steht die
+        // Bestätigungsseite mit Namen (Design LFH-818, Entscheidung 7).
+        false,
+        // Der Handler der Sitzung läuft auf einer XPC-Queue; das Ende gehört auf den Hauptthread.
+        move |aufgabe| {
+            if let Err(fehler) = fuer_hauptthread.run_on_main_thread(aufgabe) {
+                log::warn!("Ende der Anmeldung nicht an den Hauptthread übergeben: {fehler}");
+            }
+        },
+        move |ergebnis| anmeldung_abschliessen(&fuer_ende, nummer, ergebnis),
+    )
+}
+
+#[cfg(not(target_os = "macos"))]
+fn im_browser_starten(
+    _app: &AppHandle,
+    _fenster: &WebviewWindow,
+    _ziel: Url,
+    _nummer: u32,
+) -> Result<(), String> {
+    Err("Die Anmeldung im Browser gibt es nur in der Mac-App.".to_string())
+}
+
+/// Ende einer Sitzung: nur der aktuelle Vorgang zählt. Eingelöst wird nur im startenden Fenster
+/// und nur auf der Anmeldeseite desselben Servers; Meldungen gehen nur an Seiten des Servers.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn anmeldung_abschliessen(app: &AppHandle, nummer: u32, ergebnis: Result<String, (isize, String)>) {
+    let zustand = app.state::<Zustand>();
+    let offen = {
+        let mut anmeldung = zustand.anmeldung.lock().unwrap();
+        if anmeldung.as_ref().map(|a| a.nummer) != Some(nummer) {
+            return;
+        }
+        anmeldung.take().expect("gerade geprüft")
+    };
+    let Some(fenster) = app.get_webview_window(&offen.fenster) else {
+        return;
+    };
+    let ergebnis = match &ergebnis {
+        Ok(ruecksprung) => Ok(ruecksprung.as_str()),
+        Err((code, text)) => {
+            #[cfg(target_os = "macos")]
+            let abgebrochen = *code == aswas::ABGEBROCHEN;
+            #[cfg(not(target_os = "macos"))]
+            let abgebrochen = false;
+            if !abgebrochen {
+                log::warn!("Anmeldung im Browser gescheitert ({code}): {text}");
+            }
+            Err(abgebrochen)
+        }
+    };
+    let seite = fenster.url().ok();
+    let skript = match anmeldung::folge(ergebnis, seite.as_ref(), &offen.server) {
+        anmeldung::Folge::Einloesen(code) => {
+            anmeldung::einloese_skript(&offen.server, &code, &offen.verifier)
+        }
+        anmeldung::Folge::Melden(ergebnis) => anmeldung::meldung_skript(ergebnis),
+        anmeldung::Folge::Nichts => {
+            log::warn!(
+                "Anmeldung nicht eingelöst: das Fenster zeigt {}",
+                seite.as_ref().map(fuers_protokoll).unwrap_or_default()
+            );
+            return;
+        }
+    };
+    if let Err(fehler) = fenster.eval(skript) {
+        log::warn!("Anmeldung nicht an die Seite übergeben: {fehler}");
+    }
+}
+
 // ── Deeplink ─────────────────────────────────────────────────────────────────────────
 
 fn deeplinks_verarbeiten(app: &AppHandle, links: Vec<Url>) {
     for link in links {
         let Some(ziel) = deute(&link) else {
-            log::info!("Deeplink verworfen: {link}");
+            // Ohne Query: ein `lifeline://anmeldung?code=…` von außen gehört nicht ins
+            // Protokoll (LFH-818), ebenso wenig die Adresse eines verworfenen Links.
+            log::info!("Deeplink verworfen: {}", fuers_protokoll(&link));
             continue;
         };
         let gespeichert = verbindung::lesen(&konfig_dir(app));
@@ -405,7 +540,8 @@ fn main() {
             vorbelegung,
             verbinden,
             abbrechen,
-            drucken
+            drucken,
+            anmeldung_im_browser
         ])
         .menu(menue::bauen)
         .on_menu_event(menue::behandeln)
@@ -502,6 +638,26 @@ mod tests {
             fuers_protokoll(&url("tauri://localhost/index.html?x=1")),
             "tauri://localhost/index.html"
         );
+    }
+
+    /// Die Serverseite bekommt genau Druck und „Im Browser anmelden“; die Maske (`lokal`) nicht
+    /// die Anmeldung. Die Permission entsteht aus dem Manifest in `build.rs`.
+    #[test]
+    fn serverseite_darf_anmelden_die_maske_nicht() {
+        assert_eq!(
+            SERVER_RECHTE,
+            ["allow-drucken", "allow-anmeldung-im-browser"]
+        );
+        let erzeugt = include_str!("../permissions/autogenerated/anmeldung_im_browser.toml");
+        assert!(erzeugt.contains(r#"identifier = "allow-anmeldung-im-browser""#));
+        let lokal = include_str!("../capabilities/lokal.json");
+        assert!(!lokal.contains("anmeldung"), "{lokal}");
+    }
+
+    #[test]
+    fn verworfener_anmeldelink_landet_ohne_code_im_protokoll() {
+        let link = Url::parse(&format!("lifeline://anmeldung?code={}", "ab".repeat(32))).unwrap();
+        assert_eq!(fuers_protokoll(&link), "lifeline://anmeldung");
     }
 
     /// Die URL steht als JSON-Literal im Skript: ein Anführungszeichen oder Zeilenumbruch in der
