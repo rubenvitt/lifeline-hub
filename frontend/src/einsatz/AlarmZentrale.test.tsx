@@ -507,6 +507,68 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
 });
 
 /**
+ * LFH-513: Der gesunde Ton-Zustand trägt keinen Marker. Ein roter Punkt an „Ton bereit" verbrauchte
+ * die Alarmfarbe für eine Nichtmeldung; die Störung trägt ihre Form (durchgestrichene Glocke) und
+ * ihr Wort, das genügt WCAG 1.4.1 ohne Farbe. Mutationsprobe: den `<Badge dot status="error">` um
+ * die gesunde Glocke zurücklegen → die Marker-Aussagen hier werden rot.
+ */
+describe('AlarmZentrale: Ton-Ikone ohne Marker im Ruhezustand (LFH-513)', () => {
+  afterEach(() => setzeViewportBreite(VIEWPORT_STANDARD));
+
+  /** Jeder antd-Badge-Marker, gleich welcher Status — nicht nur der rote. */
+  function marker(wurzel: HTMLElement) {
+    return wurzel.querySelectorAll('.ant-badge, .ant-badge-dot, .ant-badge-status-dot');
+  }
+
+  function ikone(knopf: HTMLElement): string {
+    const svg = knopf.querySelector('svg');
+    expect(svg, 'der Knopf trägt eine Ikone').not.toBeNull();
+    return svg!.innerHTML;
+  }
+
+  it.each([1366, 1024])(
+    'bei %i px: „Ton bereit" ohne Marker, „Ton stumm" mit anderer Form und Wort',
+    async (px) => {
+      setzeViewportBreite(px);
+      stubAudioReady();
+      stubNotification('default');
+      renderAlarm();
+
+      const bereit = await screen.findByRole('button', { name: 'Alarmton stummschalten' });
+      await waitFor(() => expect(bereit).toHaveAttribute('aria-pressed', 'false'));
+      expect(marker(bereit)).toHaveLength(0);
+      const formBereit = ikone(bereit);
+
+      await userEvent.click(bereit);
+      const stumm = screen.getByRole('button', { name: 'Alarmton einschalten' });
+      // Zwei Kanäle ohne Farbe: die Form wechselt, das Wort steht auf jeder Breite.
+      expect(ikone(stumm)).not.toBe(formBereit);
+      expect(stumm).toHaveTextContent('Ton stumm');
+      expect(marker(stumm)).toHaveLength(0);
+    },
+  );
+
+  it('auf dem Handschirm: Marke und Menüeintrag „Ton" ohne Marker', async () => {
+    stubAudioReady();
+    stubNotification('granted');
+    setzeViewportBreite(390);
+    renderAlarm();
+
+    const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
+    await waitFor(() => expect(ziel).toHaveTextContent('Ton bereit'));
+    expect(marker(ziel)).toHaveLength(0);
+
+    await userEvent.click(ziel);
+    const menue = document.querySelector(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    ) as HTMLElement;
+    expect(menue, 'das Menü muss offen sein').not.toBeNull();
+    const ton = within(menue).getByRole('menuitem', { name: /stummschalten/ });
+    expect(marker(ton)).toHaveLength(0);
+  });
+});
+
+/**
  * Führungs-Tablet zwischen `md` und `xl`: zwei Knöpfe, der RUHEZUSTAND nur als Ikone, eine
  * STÖRUNG nennt ihr Wort weiter. Beide Hälften als Paar.
  */
