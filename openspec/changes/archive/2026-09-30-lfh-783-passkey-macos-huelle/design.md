@@ -64,6 +64,26 @@ ist für `.local` nicht belegt.
   Fokus (`belege/macos/passkey-ohne-fokus.json`). Die Einrichtung wird nach Apples
   Regel mit ausgeblendet, sie hängt an derselben Verknüpfung.
 
+#### Umsetzung Stufe 1 (LFH-817, 30.09.2026)
+
+- **Kennung:** `window.__LIFELINE_HUELLE__ = Object.freeze({ passkey: false })`, gesetzt vom
+  Init-Skript `src-tauri/src/faehigkeiten.js`, nur auf macOS (`baue_fenster`, neben `druck.js`,
+  also im Haupt- und in jedem Nebenfenster). Windows setzt nichts.
+- **Eine Lesestelle:** `frontend/src/huelle/faehigkeiten.ts` (`huelleSperrtPasskey()`). Nur ein
+  ausdrückliches `passkey: false` sperrt; fehlt die Kennung oder das Feld, gilt der Bestand. Ein
+  Objekt statt eines Schalters, damit weitere Fähigkeiten dazukommen können, ohne einen zweiten
+  Global.
+- **Ohne Origin-Prüfung:** Das Skript läuft im Hauptframe jeder geladenen Seite, auch beim IdP.
+  Mehr als „diese Hülle kann keinen Passkey“ verrät es nicht.
+- **Anmeldeseite:** Der Passkey-Knopf fehlt still, solange Passwort oder OIDC bleibt. Ist der
+  Passkey das einzige aktive Verfahren, sagt ein Hinweis, dass die Anmeldung im Browser geht (die
+  Karte bliebe sonst leer).
+- **Profil:** An der Stelle der Einrichtung steht ein Satz, der den Browser nennt, ohne zu
+  versprechen, dass ein dort eingerichteter Passkey in der Mac-App trägt (das bringt Stufe 2).
+- **Nachweis:** Die Vitest-Fälle führen das ausgelieferte `faehigkeiten.js` im jsdom aus
+  (`frontend/src/test/huelle.ts`) statt die Kennung von Hand zu setzen; ein Umbenennen auf einer
+  Seite wird rot.
+
 ### Stufe 2 — Anmeldung im Systembrowser (LFH-818)
 
 - **Zuerst messen**, im Spike-Repo: Erscheint die Passkey-Abfrage für `elw.local` (mkcert,

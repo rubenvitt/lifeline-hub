@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beendeHuelle, starteMacHuelle } from '../test/huelle';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import ProfilPage from './ProfilPage';
@@ -186,6 +187,41 @@ describe('ProfilPage — Passkey-Enroll (LFH-275)', () => {
         screen.queryByRole('button', { name: 'Passkey registrieren' }),
       ).not.toBeInTheDocument(),
     );
+  });
+});
+
+// Die macOS-Hülle kann keinen Passkey ausführen und sagt es selbst (LFH-817): keine Einrichtung,
+// stattdessen ein Satz, wo es geht.
+describe('ProfilPage — macOS-Hülle ohne Passkey (LFH-817)', () => {
+  afterEach(beendeHuelle);
+
+  it('bietet in der Hülle keine Einrichtung an und nennt den Browser', async () => {
+    setzeSecureContext(true);
+    starteMacHuelle();
+    setup(false, webauthnProvider);
+
+    expect(await screen.findByText(/Passkeys richtest du im Browser ein/)).toBeInTheDocument();
+    expect(screen.getByText('Passkey')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Passkey registrieren' })).not.toBeInTheDocument();
+  });
+
+  it('zeigt den Hinweis nicht ohne aktiven webauthn-Provider', async () => {
+    setzeSecureContext(true);
+    starteMacHuelle();
+    setup(false, []);
+
+    await screen.findByText('Zwei-Faktor (TOTP)');
+    await waitFor(() =>
+      expect(screen.queryByText(/Passkeys richtest du im Browser ein/)).not.toBeInTheDocument(),
+    );
+  });
+
+  it('bietet ohne Kennung die Einrichtung wie bisher an (Gegenprobe)', async () => {
+    setzeSecureContext(true);
+    setup(false, webauthnProvider);
+
+    expect(await screen.findByRole('button', { name: 'Passkey registrieren' })).toBeInTheDocument();
+    expect(screen.queryByText(/Passkeys richtest du im Browser ein/)).not.toBeInTheDocument();
   });
 });
 
