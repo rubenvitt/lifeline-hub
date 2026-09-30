@@ -444,6 +444,22 @@ describe('LoginPage', () => {
       expect(screen.queryByText(/in der Mac-App/)).not.toBeInTheDocument();
     });
 
+    it('zeigt in der Hülle keinen Hinweis, solange OIDC ohne Passwort bleibt', async () => {
+      starteMacHuelle();
+      server.use(
+        http.get('/api/auth/providers', () =>
+          HttpResponse.json(alleVerfahren.filter((p) => p.typ !== 'passwort')),
+        ),
+      );
+      renderMitProviders(<LoginPage />);
+
+      expect(await screen.findByRole('button', { name: 'Mit PocketID anmelden' })).toBeEnabled();
+      expect(
+        screen.queryByRole('button', { name: 'Mit Passkey anmelden' }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/in der Mac-App/)).not.toBeInTheDocument();
+    });
+
     it('erklärt, wenn in der Hülle kein Anmeldeweg übrig bleibt', async () => {
       starteMacHuelle();
       server.use(
