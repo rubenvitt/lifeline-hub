@@ -388,6 +388,8 @@ describe('modulZuRoute / modulAusPfad', () => {
 
   it('liest das Modul-Segment aus dem Pfad, auch auf einer Sub-Route', () => {
     expect(modulAusPfad('/einsaetze/7/etb')?.key).toBe('etb');
+    // Die Unterroute des Funkplans markiert den Stab (LFH-548), sie ist kein eigenes Modul.
+    expect(modulAusPfad('/einsaetze/7/stab/funkplan')?.key).toBe('stab');
     // Das Segment NACH der Einsatz-ID, nicht das letzte: sonst verlöre eine Unterseite ihr Modul.
     expect(modulAusPfad('/einsaetze/7/unfallhilfsstellen/liste')?.key).toBe('unfallhilfsstellen');
     expect(modulAusPfad('/einsaetze/7/personen/12')?.key).toBe('personen');

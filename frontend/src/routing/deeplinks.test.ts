@@ -21,6 +21,7 @@ import {
   personenPfad,
   schaedenPfad,
   stabPfad,
+  funkplanPfad,
   dokumentePfad,
   abloesungPfad,
   betreuungPfad,
@@ -322,6 +323,9 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
 
   it('stabPfad ohne Optionen', () => {
     expect(stabPfad(E)).toBe('/einsaetze/5/stab');
+  });
+  it('funkplanPfad liegt unter dem Stab (LFH-548)', () => {
+    expect(funkplanPfad(E)).toBe('/einsaetze/5/stab/funkplan');
   });
   it('stabPfad mit neu hängt ?neu=1 an', () => {
     expect(stabPfad(E, { neu: true })).toBe('/einsaetze/5/stab?neu=1');

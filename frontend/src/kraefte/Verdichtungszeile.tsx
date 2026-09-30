@@ -1,10 +1,12 @@
-import { Space, theme } from 'antd';
+import { Space } from 'antd';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { rollenFarbe, statusKategorie } from '../theme/statusFarben';
+import { statusKategorie, type Statusrolle } from '../theme/statusFarben';
+import { statusFlaeche, tonVonRolle } from '../components/instrument/statusFlaeche';
+import { useRollen } from '../components/instrument';
 import { staerkeText, verdichte } from './kraeftebild';
 
 /**
@@ -22,6 +24,20 @@ export function verdichtungsLinkStil(token: { controlHeight: number; paddingSM: 
     minHeight: token.controlHeight,
     padding: `${token.paddingSM}px`,
   } as const;
+}
+
+/**
+ * Textfarbe einer Statuszahl in der Zeile: die TEXTROLLE des Tons (`normalText`/`achtungText`/
+ * `alarmText`, über `statusFlaeche`), nicht die Füllrolle aus `rollenFarbe`. Die Zahlen stehen
+ * als Text auf Seitengrund (`grund`); dort tragen die Füllrollen am Tag den Boden 7 : 1 nicht
+ * (gemessen 5,80 / 5,78 / 5,66), die Textrollen schon (gerechnet 7,68 / 7,72 / 7,51; nachts 11,58 /
+ * 12,45 / 7,18). LFH-538, gemessen in `e2e/kraefte-kontrast.spec.ts`. Rein.
+ */
+export function verdichtungsTextfarbe(
+  rollen: Parameters<typeof statusFlaeche>[0],
+  rolle: Statusrolle,
+): string {
+  return statusFlaeche(rollen, tonVonRolle(rolle) ?? 'neutral').text;
 }
 
 /**
@@ -49,7 +65,7 @@ export default function Verdichtungszeile({
   einsatzId: number;
   pfad: string;
 }) {
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   const personalQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
@@ -71,13 +87,15 @@ export default function Verdichtungszeile({
       <strong>{staerkeText(v.staerke)}</strong>
       <span aria-hidden>·</span>
       <span style={{ color: token.colorTextSecondary }}>Fzg {v.anzahlFahrzeuge}</span>
-      <span style={{ color: rollenFarbe(statusKategorie.verfuegbar.rolle, token) }}>
+      <span style={{ color: verdichtungsTextfarbe(rollen, statusKategorie.verfuegbar.rolle) }}>
         {v.fahrzeugStatus.verfuegbar} frei
       </span>
-      <span style={{ color: rollenFarbe(statusKategorie.gebunden.rolle, token) }}>
+      <span style={{ color: verdichtungsTextfarbe(rollen, statusKategorie.gebunden.rolle) }}>
         {v.fahrzeugStatus.gebunden} gebunden
       </span>
-      <span style={{ color: rollenFarbe(statusKategorie.nicht_verfuegbar.rolle, token) }}>
+      <span
+        style={{ color: verdichtungsTextfarbe(rollen, statusKategorie.nicht_verfuegbar.rolle) }}
+      >
         {v.fahrzeugStatus.nicht_verfuegbar} n. verf.
       </span>
       {/* Der Linktext folgt dem Seitennamen „Meldebild"; die Route bleibt `kraefteuebersicht`. */}

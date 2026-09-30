@@ -184,6 +184,16 @@ Geheimnis gebunden, das nur die App kennt. Ein Code, den eine fremde Seite der A
 ergibt keine Sitzung. Im Auth-Audit steht die Übergabe als `login_ok` mit dem Anbieter
 `systembrowser`. Herleitung: `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`.
 
+## App-Symbol
+
+Die Symbole in `src-tauri/icons/` zeigen die Bildmarke „Lebenslinie“ (LFH-837). Sie entstehen
+zusammen mit Favicon und PWA-Symbolen aus den Quellen in `scripts/marke/`. Für macOS gibt es
+eine eigene Quelle nach dem Raster der Plattform. Neu erzeugen (braucht `cargo tauri`):
+
+```bash
+scripts/marke/erzeuge-symbole.sh
+```
+
 ## Grenzen (offen)
 
 - **Signierung/Notarisierung:** LFH-722. Bis dahin erscheinen die Warnungen oben.
@@ -199,4 +209,3 @@ ergibt keine Sitzung. Im Auth-Audit steht die Übergabe als `login_ok` mit dem A
   signierter App (LFH-722). Gemessen ist Vivaldi als Standardbrowser (Chromium) sowie Safari
   direkt (`openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/belege/macos/messung.md`).
 - **Linux:** Die Hülle wird dort übersetzt (Tests), aber nicht ausgeliefert.
-- **App-Symbol:** Es ist aus dem Favicon abgeleitet, einem Platzhalter.

@@ -3,8 +3,8 @@
 //! Rückverweis-Spalte am `etb_eintrag` kommen aus der Art.
 
 use super::{
-    leere_abschnitte, render_snapshot, validiere_freigabe, vorlage, Dokumentart, STATUS_ENTWURF,
-    STATUS_FREIGEGEBEN,
+    gefuellte_abschnitte, leere_abschnitte, render_snapshot, validiere_freigabe, vorlage,
+    Dokumentart, STATUS_ENTWURF, STATUS_FREIGEGEBEN,
 };
 use crate::error::AppError;
 use crate::etb::repo as etb_repo;
@@ -158,6 +158,7 @@ pub async fn anlegen<T: Dokumentart>(
     titel: &str,
     zeitstand: &str,
     ersteller_id: i64,
+    startinhalt: Option<&[T::Abschnitt]>,
 ) -> Result<Dokument<T::Abschnitt>, AppError> {
     let mut conn = pool.acquire().await?;
     anlegen_tx::<T>(
@@ -167,14 +168,20 @@ pub async fn anlegen<T: Dokumentart>(
         titel,
         zeitstand,
         ersteller_id,
+        startinhalt,
     )
     .await
 }
 
-/// Legt einen Entwurf mit leerem Abschnitts-Skelett der Vorlage auf einer offenen
+/// Legt einen Entwurf mit dem Abschnitts-Skelett der Vorlage auf einer offenen
 /// Verbindung/Transaktion an und lädt ihn dort zurück (LFH-690, Demo-Import in EINER
 /// Transaktion). Öffnet und committet selbst nichts. Erwartet einen normalisierten
 /// `zeitstand`.
+///
+/// Mit `startinhalt` trägt das Skelett gleich Text (LFH-548, Übernahme aus Meldebild und
+/// Funkplan). Es bleibt EIN `INSERT`: der Entwurf entsteht mit Inhalt oder gar nicht, ein leerer
+/// Entwurf nach gescheitertem zweiten Schritt ist damit ausgeschlossen. Die Schlüssel sind
+/// vorher geprüft (`routes::vorlagendokument::pruefe_abschnitts_schluessel`).
 pub async fn anlegen_tx<T: Dokumentart>(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -182,11 +189,16 @@ pub async fn anlegen_tx<T: Dokumentart>(
     titel: &str,
     zeitstand: &str,
     ersteller_id: i64,
+    startinhalt: Option<&[T::Abschnitt]>,
 ) -> Result<Dokument<T::Abschnitt>, AppError> {
     let v = vorlage::<T>(vorlage_key)
         .ok_or_else(|| AppError::Validation("Unbekannte Vorlage".into()))?;
-    let skelett = serde_json::to_string(&leere_abschnitte::<T::Abschnitt>(v))
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let abschnitte = match startinhalt {
+        Some(inhalt) => gefuellte_abschnitte::<T::Abschnitt>(v, inhalt),
+        None => leere_abschnitte::<T::Abschnitt>(v),
+    };
+    let skelett =
+        serde_json::to_string(&abschnitte).map_err(|e| AppError::Internal(e.to_string()))?;
     let id = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(format!(
         "INSERT INTO {} (einsatz_id, vorlage, titel, zeitstand, status, abschnitte, ersteller_id) \
          VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
@@ -563,6 +575,7 @@ mod tests {
             f.titel,
             "2026-06-02 10:00:00",
             ersteller,
+            None,
         )
         .await
         .unwrap();
@@ -762,6 +775,7 @@ mod tests {
                 f.titel,
                 "2026-06-02 10:00:00",
                 ersteller,
+                None,
             )
             .await?;
             sqlx::query(sqlx::AssertSqlSafe(format!(

@@ -26,6 +26,7 @@ import {
   rueckmeldungJeEinheit,
 } from '../meldungen/rueckmeldung';
 import { ApiError } from '../api/client';
+import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import {
   baueKraeftebild,
@@ -52,7 +53,8 @@ import { fmsStatusOptionen } from '../kraefte/fmsTableauKern';
 import Statusband from '../kraefte/Statusband';
 import EinheitZeichen from '../kraefte/EinheitZeichen';
 import { KATEGORIE_WERTE } from '../kraefte/statusAchse';
-import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte';
+import { legeLageberichtAn } from '../api/lageberichte';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 import type { FahrzeugStatus, StatusKategorie } from '../api/types';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { statusKategorie } from '../theme/statusFarben';
@@ -180,16 +182,6 @@ const MITTEL_KURZ = { fahrzeug: 'Fzg.', person: 'Pers.', material: 'Mtl.' } as c
  * Keine Sortierung, kein Spaltenfilter, keine Suche im Primitiv (`VOLLMENGE_PFLICHT`): gefiltert
  * wird außerhalb über die Rohlisten, aus denen Zeilen und Verteilungen neu entstehen.
  */
-/** Abrufzustand eines Zusatzabrufs — `gesperrt` ist 403, kein Defekt. */
-type AbrufZustand = 'daten' | 'laden' | 'fehler' | 'gesperrt';
-
-function abrufZustand(q: { error: unknown; isError: boolean; isLoading: boolean }): AbrufZustand {
-  if (q.error instanceof ApiError && q.error.status === 403) return 'gesperrt';
-  if (q.isError) return 'fehler';
-  if (q.isLoading) return 'laden';
-  return 'daten';
-}
-
 /** Was die Rückmeldungsspalte braucht: Abrufzustand und die Anzeige je Zeilenschlüssel. */
 interface RueckmeldungSpalte {
   zustand: AbrufZustand;
@@ -733,19 +725,18 @@ export default function KraefteuebersichtPage() {
         gefiltertRoh.material,
       );
       const md = rendereMeldebildMarkdown(bild, stand);
+      // EIN Aufruf mit Startinhalt (LFH-548): der Bericht entsteht mit Text oder gar nicht. Das
+      // frühere POST + PATCH ließ bei gescheitertem PATCH einen leeren Entwurf stehen.
       const lb = await legeLageberichtAn(einsatzId, {
         vorlage: 'freitext',
         titel: `Kräftemeldebild ${stand}`,
-      });
-      // Schlägt der PATCH fehl, bleibt ein leerer Entwurf zurück (vom EL löschbar) — atomar wäre
-      // nur ein eigener Backend-Endpunkt.
-      await aktualisiereLagebericht(einsatzId, lb.id, {
         abschnitte: [{ schluessel: 'text', text: md }],
       });
       return lb.id;
     },
     onSuccess: (lbId) => navigate(lageberichtDetailPfad(einsatzId, lbId)),
-    onError: () => message.error('Übernahme fehlgeschlagen'),
+    // Kein `onError`-Toast: der Fehler steht an der Seite (`SpeicherFehler` unter der
+    // Werkzeugzeile) und geht beim nächsten Versuch von selbst.
   });
 
   // Ein Einsatzwechsel setzt Filter und Aufklappzustand zurück — sonst trüge die Filtermarke den
@@ -973,6 +964,15 @@ export default function KraefteuebersichtPage() {
               löst den Dialog nach dem Commit aus. */}
           <DruckKnopf vorbereiten={() => setExpandedKeys(aufklappbareSchluessel(raster))} />
         </div>
+        {uebernehmen.error != null && (
+          <div className="kraefte-no-print" style={{ marginBlockEnd: token.margin }}>
+            <SpeicherFehler
+              fehler={uebernehmen.error}
+              titel="Nicht in den Lagebericht übernommen"
+              fallback="Übernahme fehlgeschlagen"
+            />
+          </div>
+        )}
 
         {/* Das Raster läuft mit `form="tabelle"` — in jeder Breite Tabelle (Vergleichsfläche).
             Die fixierte menschenlesbare Kennung ist die Einheitenspalte.

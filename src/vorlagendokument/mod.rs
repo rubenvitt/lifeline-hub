@@ -69,6 +69,23 @@ pub fn leere_abschnitte<A: Abschnittsart>(v: &VorlageDef) -> Vec<A> {
         .collect()
 }
 
+/// Abschnitts-Skelett gemäß Vorlage, gefüllt mit einem Startinhalt (LFH-548): Reihenfolge und
+/// Schlüsselmenge der Vorlage, der Text aus dem Startinhalt, sonst leer. Die Schlüssel prüft der
+/// Handler vorher (`pruefe_abschnitts_schluessel`); ein fremder Schlüssel fiele hier still weg.
+pub fn gefuellte_abschnitte<A: Abschnittsart>(v: &VorlageDef, startinhalt: &[A]) -> Vec<A> {
+    v.abschnitte
+        .iter()
+        .map(|d| {
+            let text = startinhalt
+                .iter()
+                .find(|a| a.schluessel() == d.schluessel)
+                .map(|a| a.text().to_string())
+                .unwrap_or_default();
+            A::neu(d.schluessel.to_string(), text)
+        })
+        .collect()
+}
+
 /// Deterministisches Markdown-Rendering (Snapshot-Inhalt für das ETB).
 /// Reihenfolge = Vorlage; fehlende Abschnitte werden als leer gerendert.
 pub fn render_snapshot<A: Abschnittsart>(

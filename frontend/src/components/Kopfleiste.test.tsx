@@ -1,9 +1,12 @@
+import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { LINIE_PFAD } from '../marke/bildmarkeGeometrie';
 import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import {
   KOPF_NAME_FLEX,
   KOPF_NAME_FLEX_SCHMAL,
   KOPF_SUCHE_FLEX,
+  Markenzelle,
   SYNC_DARSTELLUNG,
   syncZeigtWort,
   formatiereUhr,
@@ -140,5 +143,20 @@ describe('syncZeigtWort — Wort nur, wo es trägt', () => {
   });
   it('ab xl trägt auch der Ruhezustand sein Wort', () => {
     expect(syncZeigtWort('verbunden', false, false)).toBe(true);
+  });
+});
+
+describe('Markenzelle — Bildmarke „Lebenslinie“ (LFH-837)', () => {
+  it('zeigt die Bildmarke in der Textfarbe des Rahmens statt des einfarbigen Quadrats', () => {
+    const { container } = render(<Markenzelle />);
+    const zelle = container.querySelector('[data-lfh="kopf-marke"]')!;
+    expect(zelle).toHaveAttribute('aria-hidden', 'true');
+    const marke = zelle.querySelector('svg[data-lfh="bildmarke"]');
+    expect(marke).not.toBeNull();
+    expect(marke).toHaveAttribute('height', '22');
+    expect(marke!.querySelector('path')).toHaveAttribute('d', LINIE_PFAD);
+    expect(marke!.querySelector('path')).toHaveAttribute('stroke', rahmenFarben.text);
+    // Das alte 14-px-Quadrat ist fort: die Zelle enthält kein Element außer der Bildmarke.
+    expect(zelle.children).toHaveLength(1);
   });
 });

@@ -4,6 +4,7 @@ import { useLocation } from 'react-router';
 import { appCodeAusstellen } from '../api/auth';
 import { fehlerText } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { Bildmarke } from '../marke/Bildmarke';
 import './LoginPage.css';
 
 /**
@@ -102,7 +103,7 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
       <div className="login-karte">
         <div className="login-marke">
           <div className="login-marke__zeile">
-            <span className="login-marke__quadrat" aria-hidden="true" />
+            <Bildmarke hoehe={20} linienFarbe="var(--lfh-text)" quadratFarbe="var(--lfh-marke)" />
             <h1 className="login-marke__name">lifeline-hub</h1>
           </div>
           <p className="login-marke__untertitel">Anmeldung für die Mac-App</p>
