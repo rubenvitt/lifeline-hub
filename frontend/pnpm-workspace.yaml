@@ -109,13 +109,23 @@ overrides:
   # minimatch@5 → brace-expansion@2.
   # Der Backport ^2.1.4 bleibt im konsumierten Major und wird durch check-typ-codegen.sh
   # sowie check-all.sh geprüft.
-  brace-expansion@>=2.0.0 <2.1.4: ^2.1.4
+  #
+  # NACHGEZOGEN 2026-09-30: dasselbe Muster wie bei js-yaml und fast-uri. Zwei weitere
+  # rekursionsbedingte DoS-Funde (Stack-Erschöpfung): GHSA-6j4f-fj2g-mc7p in parseCommaParts
+  # (betrifft < 2.1.5) und GHSA-qhr7-859c-m2p7 bei verschachtelten Klammergruppen (betrifft
+  # < 2.1.6). Schwelle und Ziel stehen jetzt bei 2.1.6, weiterhin Same-Major-Patch.
+  brace-expansion@>=2.0.0 <2.1.6: ^2.1.6
 
   # GHSA-rgw5-rvv9-x895 (high): dieselbe DoS-Lücke in der 5.x-Linie.
   # Ketten: @eslint/js → eslint → @eslint/config-array → minimatch sowie vite-plugin-pwa →
   # workbox-build → glob → minimatch@10 → brace-expansion@5. ^5.0.9 ist ein
   # Same-Major-Patch und wird durch den Frontend-Produktionsbuild sowie check-all.sh geprüft.
-  brace-expansion@>=5.0.0 <5.0.9: ^5.0.9
+  #
+  # NACHGEZOGEN 2026-09-30: dieselben beiden Funde wie in der 2.x-Linie oben, hier
+  # GHSA-6j4f-fj2g-mc7p (betrifft < 5.0.10) und GHSA-qhr7-859c-m2p7 (betrifft < 5.0.11).
+  # Schwelle und Ziel stehen jetzt bei 5.0.11.
+  brace-expansion@>=5.0.0 <5.0.11: ^5.0.11
+
   # GHSA-2v37-7h3g-55p8 (high): custom-Generatoren von nanoid loopen unbegrenzt bei size 0.
   # Kette: postcss → nanoid, postcss selbst über vite (@vitejs/plugin-react,
   # @vitest/mocker/vitest, vite-plugin-pwa). Reines Build-/Test-Zeit-Tooling (PostCSS läuft
