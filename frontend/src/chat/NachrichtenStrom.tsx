@@ -1,4 +1,4 @@
-import { MoreOutlined, PaperClipOutlined } from '@ant-design/icons';
+import { MoreOutlined } from '@ant-design/icons';
 import {
   Button,
   Dropdown,
@@ -14,6 +14,7 @@ import type { MenuProps } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { formatZeit, formatZeitKurz } from '../anzeige/format';
+import DownloadAnker from '../components/DownloadAnker';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { StatusChip, monoStil } from '../components/instrument';
 import type { BezugKurzinfo } from './bezug';
@@ -304,18 +305,16 @@ export default function NachrichtenStrom({
                       style={{ width: '100%', maxWidth: NACHRICHT_LESEBREITE }}
                     >
                       {n.inhalt && <Typography.Text>{n.inhalt}</Typography.Text>}
+                      {/* Nativer Download wie ETB und Schaden, kein neuer Tab: `target="_blank"`
+                         läuft in der Desktop-Hülle ins Leere (LFH-782). */}
                       {n.anhaenge.map((a) => (
-                        <Typography.Link
+                        <DownloadAnker
                           key={a.id}
                           href={`/api/einsaetze/${n.einsatz_id}/anhaenge/${a.id}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <PaperClipOutlined /> {a.dateiname}{' '}
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                            ({formatGroesse(a.groesse, 0)})
-                          </Typography.Text>
-                        </Typography.Link>
+                          dateiname={a.dateiname}
+                          groesse={a.groesse}
+                          zugaenglicherName={`${a.dateiname}, ${formatGroesse(a.groesse)}, Anhang der Nachricht von ${n.autor_name} herunterladen`}
+                        />
                       ))}
                     </Space>
                   )

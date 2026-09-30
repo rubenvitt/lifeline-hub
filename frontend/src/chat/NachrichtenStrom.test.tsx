@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import NachrichtenStrom from './NachrichtenStrom';
@@ -320,7 +320,7 @@ describe('NachrichtenStrom', () => {
     expect(onBezugLoeschen).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }));
   });
 
-  it('zeigt Anhänge als Download-Link mit Dateiname, href und Größe', () => {
+  it('zeigt Anhänge als nativen Download-Anker mit Dateiname, href und Größe', () => {
     const anhang = {
       id: 42,
       einsatz_id: 7,
@@ -341,9 +341,17 @@ describe('NachrichtenStrom', () => {
         onHeraufstufenAuftrag={vi.fn()}
       />,
     );
-    const link = screen.getByRole('link', { name: /lage\.pdf/ });
+    // Der Name trägt den Nachrichtenbezug: n Anhänge klingen sonst gleich (LFH-782).
+    const link = screen.getByRole('link', {
+      name: 'lage.pdf, 2.0 KB, Anhang der Nachricht von Max herunterladen',
+    });
     expect(link).toHaveAttribute('href', '/api/einsaetze/7/anhaenge/42');
-    expect(screen.getByText('(2 KB)')).toBeInTheDocument();
+    // Nativer Download statt neuem Tab: `target="_blank"` läuft in der Desktop-Hülle ins Leere,
+    // und ein Datei-Link ohne `download` ersetzte in WKWebView die Anwendung (LFH-720).
+    expect(link).toHaveAttribute('download', 'lage.pdf');
+    expect(link).not.toHaveAttribute('target');
+    expect(within(link).getByText('lage.pdf')).toBeInTheDocument();
+    expect(within(link).getByText(/2\.0 KB/)).toBeInTheDocument();
   });
 });
 

@@ -4,7 +4,7 @@ Die Desktop-App „Lifeline Hub“ ist eine **Hülle** um die Webanwendung (LFH-
 aus LFH-720). Sie lädt die https-Adresse des Einsatzservers, genau wie ein Browser. Die
 Anwendung selbst, die Daten und die Anmeldung liegen weiter auf dem Server. Die Hülle bringt
 ein eigenes Fenster, die Serveradresse beim ersten Start, den Deeplink aus „Geräte verbinden“,
-den Druck auf dem Mac und das Update mit.
+den Druck auf dem Mac, die Behandlung neuer Fenster und fremder Links sowie das Update mit.
 
 Anforderungen: `openspec/specs/desktop-huelle/` und `openspec/specs/desktop-auslieferung/`.
 Quellcode: `src-tauri/`.
@@ -75,6 +75,28 @@ Form erzeugen. Das Verhalten:
 Die App läuft immer nur einmal. Ein zweiter Start oder ein Link bei laufender App holt das
 vorhandene Fenster nach vorn.
 
+## Neue Fenster, fremde Links, Dateien (LFH-782)
+
+Ein Webview öffnet von sich aus weder Tabs noch fremde Seiten. Die App entscheidet deshalb
+selbst, wohin ein Link geht:
+
+- **Seite des eigenen Servers in neuem Fenster** (etwa „in neuem Tab öffnen“ in der
+  Sprungpalette, Strg/⌘+↵): Die App öffnet ein **weiteres Fenster**, angemeldet und mit Druck.
+  Das bisherige Fenster bleibt, wo es war. Ein Serverwechsel schließt die weiteren Fenster,
+  ebenso das Schließen des Hauptfensters. „Neu laden“ wirkt auf das Fenster, das vorn ist.
+- **Fremde Website** (Links im Fachebenen-Inspector, Lizenzhinweise): Sie öffnet der
+  **Standardbrowser** des Systems. `mailto:`- und `tel:`-Links gehen an das zuständige
+  Programm.
+- **Datei vom eigenen Server** (Adressen unter `/api/`, etwa Anhänge): Sie wird
+  **heruntergeladen** und landet im Download-Ordner. Die Anwendung bleibt stehen.
+  Ausgenommen ist die Anmeldung (`/api/auth/`), die im Fenster läuft.
+- **Alles andere** (`file:`, `javascript:` …) öffnet nichts und steht im Protokoll, dort
+  ohne Query und bei `mailto:`/`tel:` ohne Adresse.
+
+Führt ein Link **im Fenster** auf eine fremde Seite, bleibt die App dort. Das ist nötig, weil
+die Anmeldung über einen Identitätsanbieter so abläuft. Einen Zurück-Knopf gibt es nicht. Der
+Weg zurück ist „Server wechseln“ → „Abbrechen“.
+
 ## Update
 
 Nach jedem Start prüft die App im Hintergrund, ob es ein neueres **stabiles** Release gibt.
@@ -142,8 +164,8 @@ trotzdem.
 ## Grenzen (offen)
 
 - **Signierung/Notarisierung:** LFH-722. Bis dahin erscheinen die Warnungen oben.
-- **Neue Fenster, externe Links, Datei-Links:** LFH-782. Ein Link mit `target="_blank"` (etwa
-  ein Chat-Anhang) öffnet heute nichts.
+- **Fremde Seite im Fenster:** Die App hat keinen Zurück-Knopf (siehe „Neue Fenster, fremde
+  Links, Dateien“).
 - **Anmeldung über einen Neustart:** LFH-779/780. Nach jedem Neustart der App ist eine neue
   Anmeldung nötig.
 - **Passkey auf macOS:** entschieden in LFH-783 (gestaffelt). Im Mac-Fenster geht die Anmeldung

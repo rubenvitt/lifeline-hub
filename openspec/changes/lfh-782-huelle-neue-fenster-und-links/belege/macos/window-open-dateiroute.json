@@ -1,0 +1,16 @@
+{
+  "datum": "2026-09-29",
+  "plattform": "macOS 27.0 (WKWebView), Debug-Build lifeline-desktop",
+  "server": "https://localhost:8543 (lifeline-hub --tls, dev-seeds, mkcert)",
+  "anhang": "/api/einsaetze/1/anhaenge/1 (Lagebild Übersicht.pdf, 125 B, Content-Disposition attachment)",
+  "ausloeser": "Init-Skript nur im Probe-Lauf (Umgebungsvariable, nicht committet); Ergebnisse aus dem Hüllen-Protokoll ~/Library/Logs/dev.rubeen.lifeline.desktop",
+  "schritt": "window.open(Anhang)",
+  "protokoll": [
+    "16:58:27 Download /api/einsaetze/1/anhaenge/1: fertig"
+  ],
+  "downloads": [
+    "Lagebild Übersicht.pdf",
+    "Lagebild Übersicht (1).pdf"
+  ],
+  "rueckgabe_window_open": "null"
+}

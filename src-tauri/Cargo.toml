@@ -19,6 +19,9 @@ tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-updater = "2"
 tauri-plugin-dialog = "2"
+# Fremde Links und `mailto:`/`tel:` ans System (LFH-782). Nur die Rust-Funktion, kein Plugin im
+# Builder: die Seite bekommt keinen eigenen Weg zum Öffnen.
+tauri-plugin-opener = "2"
 # Protokoll ins Log-Verzeichnis der App (macOS ~/Library/Logs/<id>, Windows %LOCALAPPDATA%\<id>\logs):
 # eine installierte Hülle hat keine Konsole.
 tauri-plugin-log = "2"

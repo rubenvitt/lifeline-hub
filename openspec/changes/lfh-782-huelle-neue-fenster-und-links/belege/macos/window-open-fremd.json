@@ -1,0 +1,14 @@
+{
+  "datum": "2026-09-29",
+  "plattform": "macOS 27.0 (WKWebView), Debug-Build lifeline-desktop",
+  "server": "https://localhost:8543 (lifeline-hub --tls, dev-seeds, mkcert)",
+  "anhang": "/api/einsaetze/1/anhaenge/1 (Lagebild Übersicht.pdf, 125 B, Content-Disposition attachment)",
+  "ausloeser": "Init-Skript nur im Probe-Lauf (Umgebungsvariable, nicht committet); Ergebnisse aus dem Hüllen-Protokoll ~/Library/Logs/dev.rubeen.lifeline.desktop",
+  "schritt": "window.open auf https://example.org/probe-lfh782, mailto:probe@example.org, file:///etc/hosts",
+  "protokoll": [
+    "16:59:08 An das System übergeben: https://example.org/probe-lfh782",
+    "16:59:09 An das System übergeben: mailto:",
+    "16:59:09 Neues Fenster verworfen: file:"
+  ],
+  "ergebnis": "Standardbrowser bzw. Mail öffnen das Ziel (Mail-Entwurf an probe@example.org sichtbar), file: öffnet nichts. Das Protokoll nennt bei mailto keine Adresse."
+}
