@@ -83,7 +83,11 @@ Es gibt keine Umleitung am Ende jedes Anmeldewegs. Stattdessen gibt es eine eige
   - TOTP, OIDC, Passkey und Passwort sind ohne Eingriff in ihre Handler abgedeckt. Alle Wege
     münden weiter in `session::anlegen` (Zusage aus LFH-783).
   - Die Navigation per `location.href` nach einer Nutzergeste ist genau der gemessene
-    Mechanismus.
+    Mechanismus. Auch in der Messung wartete die Seite zwischen Klick und Navigation einen
+    `fetch` ab (`me-vor-ruecksprung`), und Chromium sprang trotzdem zurück (Lauf 1 und 3).
+    Das stützt „POST, dann Navigation“.
+  - Die Navigation auf `lifeline://` ist in eine injizierbare Funktion gekapselt, weil jsdom
+    nicht auf ein fremdes Schema navigieren kann.
   - Eine Umleitung per 303 auf ein eigenes Schema ist mit Chromium-ASWebAuth **nicht**
     gemessen (Messung, „Nicht gemessen“).
   - Die Bestätigung mit Namen verhindert, dass eine im Browser offene Sitzung einer anderen
@@ -144,6 +148,7 @@ Der Ablauf, in dieser Reihenfolge:
 - 409 ist Nebenläufigkeit oder Lebenszyklus, 422 ist ein Zusammenhang von Feldern. Beide würden
   einen Grund verraten („verbraucht“, „falscher verifier“) und damit ein Orakel bilden.
 - 400 bleibt der reinen Form vorbehalten.
+- **Am Checkpoint zu bestätigen:** Das weicht vom Wortlaut des Akzeptanzkriteriums ab.
 
 **Ausstellen:** `POST /api/auth/app-code {challenge}` braucht `CurrentUser` und gibt 401 ohne
 Sitzung, 400 bei falscher Form. Die Antwort ist `{code}` als Response-DTO (`ToSchema`, Codegen).
@@ -155,6 +160,9 @@ Nach dem Rücksprung baut die Hülle ein Skript nach dem Muster von `download_sk
 
 1. prüft `location.origin === <Server-Origin>`. Die Hülle prüft vorher dasselbe über
    `fenster.url()`, doppelt, weil die Seite zwischen Prüfung und `eval` wechseln kann.
+   `fenster` ist das Fenster, aus dem der Command kam. Tauri injiziert es als `WebviewWindow`,
+   die Hülle merkt sich sein Label im ausstehenden Vorgang. Nur dort hängt der Hörer der
+   Anmeldeseite. Die Freigabe gilt wie `drucken` für `main` und `neben-*`.
 2. ruft `fetch('/api/auth/app-code/einloesen', {method: 'POST', …})` auf.
 3. meldet das Ergebnis als `CustomEvent('lifeline:app-anmeldung', {detail: {ergebnis}})`
    (`angemeldet`, `abgelehnt`, `fehler`). Das Ereignis trägt weder Code noch `verifier`.
@@ -164,7 +172,10 @@ auf das Ereignis:
 
 - `angemeldet`: `aktualisiere()` und `navigate(zielPfad)`, wie nach dem Passkey.
 - `abgelehnt` oder `fehler`: ein Hinweis an der Seite (`SpeicherHinweis`-Muster).
-- `abgebrochen`: Der Knopf wird wieder frei.
+- `abgebrochen`: nur ein Signal. Den Knopf sperrt die Seite ohnehin nur, solange der
+  `invoke` läuft, also bis die Sitzung gestartet ist. Ob Chromium beim Schließen den Abbruch
+  meldet, ist nicht gemessen. Ein erneuter Klick startet einen neuen Vorgang, der den alten
+  ersetzt.
 
 - **Warum:** Nur der Webview hat den Cookie-Speicher, in dem die Sitzung entstehen muss. Die
   Hülle setzt keine Cookies selbst (WKHTTPCookieStore wäre Anwendungslogik in der Hülle). Die

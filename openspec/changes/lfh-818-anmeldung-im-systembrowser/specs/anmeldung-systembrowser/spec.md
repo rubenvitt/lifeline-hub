@@ -49,7 +49,8 @@ senden, nicht in den Verlauf der Serveradresse schreiben und nicht anzeigen.
 ### Requirement: Nur der passende verifier löst den Code ein
 Der Server MUST einen Code nur einlösen, wenn der mitgesendete `verifier` zur `challenge`
 passt, an die der Code gebunden wurde. Der `verifier` MUST im Anfragekörper stehen, nie in
-einer URL. Jeder Einlöseversuch MUST den Code verbrauchen, auch ein gescheiterter.
+einer URL. Jeder Einlöseversuch, der die Formprüfung und die Sperre der Adresse passiert, MUST
+den Code verbrauchen, auch ein gescheiterter.
 
 #### Scenario: Passender verifier
 - **WHEN** der Code innerhalb der Frist mit dem passenden `verifier` eingelöst wird

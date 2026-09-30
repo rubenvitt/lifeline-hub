@@ -12,11 +12,13 @@ Beim Start der Handlung MUST die Hülle einen neuen, zufälligen `verifier` erze
 nicht aus der Hülle herausgeben. Sie MUST die Bestätigungsseite des geladenen Servers in einer
 `ASWebAuthenticationSession` öffnen und dabei nur die `challenge` übergeben. Den Rücksprung
 `lifeline://anmeldung?code=…` MUST sie nur aus dieser Sitzung annehmen. Den Code MUST sie mit
-dem `verifier` gegen denselben Server einlösen, und zwar nur, wenn das Hauptfenster gerade eine
-Seite dieses Servers zeigt. Nach erfolgreicher Einlösung MUST das Hauptfenster angemeldet sein,
+dem `verifier` gegen denselben Server einlösen, und zwar nur in dem Fenster, aus dem die
+Anmeldung gestartet wurde, und nur, wenn es gerade eine Seite dieses Servers zeigt. Nach
+erfolgreicher Einlösung MUST dieses Fenster angemeldet sein,
 ohne dass die Hülle neu startet. Bricht die Person ab oder scheitert die Einlösung, MUST die
 Anmeldeseite stehen bleiben und einen Hinweis zeigen. Ein erneuter Start MUST einen laufenden
-ersetzen, und ein alter `verifier` MUST dabei verfallen.
+ersetzen, und ein alter `verifier` MUST dabei verfallen. Die Handlung MUST wieder bedienbar sein,
+sobald der Start zurückgekehrt ist, auch wenn der Browser keinen Abbruch meldet.
 
 #### Scenario: SSO-Konto mit Passkey-only-IdP
 - **WHEN** ein Konto ohne eigenes Passwort, dessen IdP nur Passkeys kennt, in der macOS-Hülle „Im Browser anmelden“ wählt und sich im Browser beim IdP per Passkey anmeldet
@@ -38,8 +40,8 @@ ersetzen, und ein alter `verifier` MUST dabei verfallen.
 - **WHEN** die Anmeldeseite im Browser oder in der Windows-Hülle geöffnet wird
 - **THEN** fehlt „Im Browser anmelden“, und die Seite verhält sich wie bisher
 
-#### Scenario: Fremde Seite im Hauptfenster
-- **WHEN** der Rücksprung eintrifft, während das Hauptfenster eine Seite einer anderen Origin zeigt
+#### Scenario: Fremde Seite im startenden Fenster
+- **WHEN** der Rücksprung eintrifft, während das Fenster, aus dem die Anmeldung gestartet wurde, eine Seite einer anderen Origin zeigt
 - **THEN** löst die Hülle den Code nicht ein und gibt weder Code noch `verifier` an diese Seite
 
 ## MODIFIED Requirements

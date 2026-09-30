@@ -61,8 +61,8 @@
   - Hört auf `lifeline:app-anmeldung`:
     - `angemeldet` → `aktualisiere()` und `navigate(zielPfad)`,
     - `abgelehnt`/`fehler` → Hinweis an der Seite,
-    - `abgebrochen` → Knopf frei.
-  - Doppelklick-Riegel.
+    - `abgebrochen` → Signal ohne Wirkung auf den Knopf.
+  - Doppelklick-Riegel nur, solange der `invoke` läuft.
   - Der Passkey-Knopf bleibt in der Hülle aus.
 
   Nachweis: Vitest mit `starteMacHuelle()` für jeden Zweig und die Gegenprobe im Browser (kein
@@ -70,7 +70,11 @@
 - [ ] 2.6 Den Profil-Hinweis in `ProfilPage.tsx` auf den Weg „Im Browser anmelden“
   umschreiben. Die Einrichtung bleibt ausgeblendet. Nachweis: Vitest für den Hinweistext und die
   weiterhin fehlende Einrichtung.
-- [ ] 2.7 Die neue Route in die Routenlisten der Layout-Gates aufnehmen, sofern sie dort geführt
+- [ ] 2.7 Prüfliste Einsatztauglichkeit (15 Kriterien) für `AppAnmeldungPage` (neu),
+  `LoginPage` und `ProfilPage` (umgebaut), je Zeile ein Verdikt, abgelegt unter
+  `docs/superpowers/specs/2026-09-30-lfh-818-pruefliste.md`. Nachweis: Datei mit 3 × 15
+  Verdikten, keins „nicht geprüft“.
+- [ ] 2.8 Die neue Route in die Routenlisten der Layout-Gates aufnehmen, sofern sie dort geführt
   werden (`e2e/gate1-ueberlauf.spec.ts`, `e2e/gate3-trefflaeche.spec.ts`), andernfalls die
   Abwesenheit begründen. Nachweis: die betroffenen e2e-Specs grün.
 
@@ -104,9 +108,11 @@
   Hauptfenster, `callbackURLScheme = "lifeline"`, Schalter für ephemer, Completion-Handler als
   Rust-Closure. Nachweis: `cargo build -p lifeline-desktop` auf macOS. Das Verhalten prüft 5.2.
 - [ ] 3.6 Command `anmeldung_im_browser` in `main.rs`:
-  - im Zustand `Mutex<Option<Ausstehend>>`, ein neuer Start ersetzt den alten,
+  - im Zustand `Mutex<Option<Ausstehend>>` mit `verifier` und Label des aufrufenden Fensters,
+    ein neuer Start ersetzt den alten,
   - Ziel `<gespeicherter Server>/app-anmeldung?challenge=…`,
-  - Rücksprung → `origin_passt` → `eval(einloese_skript)`, Abbruch → `eval(abbruch_skript)`,
+  - Rücksprung → `origin_passt` für das startende Fenster → `eval(einloese_skript)` dort,
+    Abbruch → `eval(abbruch_skript)`,
   - auf Nicht-macOS ein Fehler.
 
   Eintrag in `build.rs` (`AppManifest`), `.permission("allow-anmeldung-im-browser")` in
@@ -142,7 +148,8 @@
   `belege/macos/abnahme.md`:
   1. PocketID-Konto ohne Passwort kommt per „Im Browser anmelden“ hinein.
   2. Lifeline-Passkey aus dem Browser trägt.
-  3. Abbruch lässt die Anmeldeseite stehen.
+  3. Abbruch lässt die Anmeldeseite stehen. Nach dem Schließen des Vivaldi-Fensters ist der
+     Knopf wieder bedienbar.
   4. Ein von außen geöffneter `lifeline://anmeldung?code=…` bewirkt nichts und steht ohne Code
      im Protokoll.
   5. Zweites Einlösen desselben Codes (per `curl`) ergibt 401.
