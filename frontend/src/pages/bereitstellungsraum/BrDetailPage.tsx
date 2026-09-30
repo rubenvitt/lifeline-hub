@@ -159,7 +159,11 @@ export default function BrDetailPage() {
   // `bereitgestellt` verwirft jede Einheit, die in `einheitenQuery.data` fehlt. Eine Summe darüber
   // wäre zu klein, sähe aber vollständig aus — deshalb entscheidet die Menge, nicht `isSuccess`.
   const unvollstaendig = bereitgestellt.length < br.einheiten.length;
-  const summe = unvollstaendig ? null : summiereStaerke(bereitgestellt);
+  // Die ganze Einheitenliste trägt die Unterstellung auch über Einheiten außerhalb des Raums
+  // (LFH-550): eine Enkeleinheit zählt nicht doppelt, wenn nur ihr Großvater hier steht.
+  const summe = unvollstaendig
+    ? null
+    : summiereStaerke(bereitgestellt, einheitenQuery.data ?? bereitgestellt);
   const fahrzeugZahl = br.fahrzeuge.length;
 
   return (

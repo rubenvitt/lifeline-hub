@@ -1103,9 +1103,17 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern", Kopfaktion und Arb
       STAB_CHECKLISTE_ZEILEN,
     );
 
+    // (6) Die Übernahme der Vorbereitung (LFH-550): erst freigegeben (alle Quellen geladen).
+    const uebernahme = page
+      .getByRole('region', { name: 'Vorbereitung', exact: true })
+      .getByRole('button', { name: 'In Lagebericht übernehmen', exact: true });
+    await expect(uebernahme).toBeEnabled();
+    const vorbereitung = await haeltStufe(uebernahme, soll, `Übernahme (${dichte})`);
+
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Werkzeug-Link ${werkzeug}, ` +
-        `Besetzung ändern ${knopf}, Kopfaktion ${kopf}, Arbeitsaufnahme-Zeile ${checkliste}`,
+        `Besetzung ändern ${knopf}, Kopfaktion ${kopf}, Arbeitsaufnahme-Zeile ${checkliste}, ` +
+        `Übernahme ${vorbereitung}`,
     );
   }
 

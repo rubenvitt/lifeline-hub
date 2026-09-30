@@ -15,13 +15,13 @@ Das System SHALL unter `GET /api/einsaetze/{id}/modul-zaehler` für die folgende
 | `einheiten` | `gesamt`: alle dem Einsatz zugeordneten Einheiten |
 | `einsatzabschnitte` | `gesamt`: alle Einsatzabschnitte |
 | `meldungen` | `offen`: Meldungen mit Status ungleich „erledigt“; `ungesehen`: davon Status „neu“ |
-| `auftraege` | `offen`: Aufträge mit Bearbeitungsstatus „offen“ oder „in Arbeit“; `ueberfaellig`: davon überfällig |
+| `auftraege` | `offen`: Aufträge mit Bearbeitungsstatus „offen“ oder „in Arbeit“; `in_arbeit`: davon mit Bearbeitungsstatus „in Arbeit“; `ueberfaellig`: davon überfällig |
 | `erinnerungen` | `faellig`: fällige Erinnerungen mit Status „offen“ |
 | `chat` | `ungelesen`: für den anfragenden Benutzer ungelesene Nachrichten über alle Kanäle |
 
 Für andere Module MUST die Antwort keinen Zähler enthalten.
 
-Die Bedeutung von „offen“, „überfällig“, „fällig“ und „ungelesen“ MUST mit den gleichnamigen Angaben der jeweiligen Listen-Endpunkte übereinstimmen.
+Die Bedeutung von „offen“, „in Arbeit“, „überfällig“, „fällig“ und „ungelesen“ MUST mit den gleichnamigen Angaben der jeweiligen Listen-Endpunkte übereinstimmen.
 
 #### Scenario: Zähler eines Einsatzes
 - **WHEN** ein Mitglied mit Zugriff auf alle Module den Endpunkt aufruft und der Einsatz 4 Betroffene hat, davon 1 storniert
@@ -30,6 +30,14 @@ Die Bedeutung von „offen“, „überfällig“, „fällig“ und „ungelese
 #### Scenario: Übereinstimmung mit der Meldungsliste
 - **WHEN** die Meldungsliste des Einsatzes 5 Meldungen mit `ist_offen = true` liefert, davon 2 mit Status „neu“
 - **THEN** ist `meldungen.offen: 5` und `meldungen.ungesehen: 2`
+
+#### Scenario: Aufträge in Arbeit
+- **WHEN** der Einsatz je einen Auftrag mit Bearbeitungsstatus „offen“, „in Arbeit“ und „vollzogen“ hat
+- **THEN** ist `auftraege.offen: 2` und `auftraege.in_arbeit: 1`
+
+#### Scenario: Vollzogener Auftrag ist nicht überfällig im Zähler
+- **WHEN** ein vollzogener Auftrag eine abgelaufene Frist und einen unquittierten Empfänger hat
+- **THEN** zählt er weder in `auftraege.offen` noch in `auftraege.ueberfaellig`
 
 #### Scenario: Chat zählt je Benutzer
 - **WHEN** zwei Benutzer denselben Kanal unterschiedlich weit gelesen haben
