@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
-import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -21,7 +21,7 @@ import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useDruckModus } from '../components/druck/useDruckModus';
 import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
-import { SeitenFehler, SeitenSackgasse, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -29,7 +29,6 @@ import {
   einheitDetailPfad,
   einsatzabschnittePfad,
   fahrzeugePfad,
-  einsatzModulPfad,
   lageberichtDetailPfad,
   stabPfad,
 } from '../routing/deeplinks';
@@ -47,6 +46,7 @@ import {
 } from '../stab/funkplan';
 import type { Luecke, Quelle } from '../stab/luecken';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
+import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
 import './funkplanPrint.css';
 
 /**
@@ -268,6 +268,8 @@ function leerTextFuer(quellen: FunkplanQuellen): string {
 }
 
 /** Was der Seitenkopf zählt; eine gesperrte Liste zählt nicht mit (keine „0"). */
+const FUNKPLAN_SEITE = { titel: 'Funkplan', mitArtikel: 'der Funkplan' };
+
 const UMFANG: { quelle: 'abschnitte' | 'einheiten' | 'fahrzeuge'; wort: string }[] = [
   { quelle: 'abschnitte', wort: 'Abschnitte' },
   { quelle: 'einheiten', wort: 'Einheiten' },
@@ -288,11 +290,8 @@ export default function FunkplanPage() {
     queryFn: () => ladeEinsatz(einsatzId),
   });
   // Die Sperre des Stabs gilt auch hier (D1): die Listen des Funkplans hängen an ANDEREN Modulen,
-  // kein Endpunkt dieser Seite prüft den Stab. Ohne Antwort wird nichts gesperrt (wie die Rail).
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId),
-  });
+  // kein Endpunkt dieser Seite prüft den Stab. Fail-closed über `useStabFreigabe`.
+  const stabFreigabe = useStabFreigabe(einsatzId);
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
@@ -366,32 +365,15 @@ export default function FunkplanPage() {
   const einsatz = einsatzQuery.data;
   // Fail-closed: kein Endpunkt dieser Seite prüft den Stab, die Freigabe ist die einzige Sperre.
   // Ohne ermittelte Freigabe wird nichts gezeigt (Review LFH-548).
-  if (overridesQuery.data == null) {
-    if (overridesQuery.isError) {
-      return (
-        <SeitenFehler
-          text="Freigabe des Stabs nicht ermittelbar — der Funkplan bleibt verborgen"
-          ursache={overridesQuery.error}
-          onWiederholen={() => void overridesQuery.refetch()}
-        />
-      );
-    }
-    return <SeitenSkeleton />;
+  if (stabFreigabe.zustand !== 'frei') {
+    return stabFreigabeAnzeige(stabFreigabe, FUNKPLAN_SEITE, einsatzId);
   }
-  if (!istKeyFreigegeben('stab', benutzer, overridesQuery.data)) {
-    return (
-      <SeitenSackgasse
-        titel="Funkplan nicht verfügbar"
-        hinweis="Das Modul Stab ist in diesem Einsatz nicht freigegeben; der Funkplan gehört dazu."
-        rueckweg={{ pfad: einsatzModulPfad(einsatzId, 'ueberblick'), label: 'Zum Überblick' }}
-      />
-    );
-  }
+  const overrides = stabFreigabe.overrides;
   // Die Übernahme legt einen Lagebericht an: Schreibrecht im Einsatz UND das Modul Lageberichte
   // freigegeben. Solange eine Quelle lädt, stünde „lädt“ im unveränderlichen Bericht.
   const darfUebernehmen =
     darfImEinsatzSchreiben(einsatz, benutzer) &&
-    istKeyFreigegeben('lageberichte', benutzer, overridesQuery.data);
+    istKeyFreigegeben('lageberichte', benutzer, overrides);
   const quellenLaden = Object.values(quellen).some((q) => q.zustand === 'laden');
 
   const datenstand = gemeinsamerDatenstand(

@@ -175,6 +175,9 @@ const KONSUMENTEN = [
   '/src/pages/MaterialPage.tsx',
   '/src/pages/PersonalPage.tsx',
   '/src/pages/PersonenPage.tsx',
+  // Das Presse-Log S5 (LFH-554): Karten, weil die Frage „was ist mit diesem?“ lautet; Status an
+  // der Statusanzeige, „Beantworten“ als Primäraktion.
+  '/src/pages/PressePage.tsx',
   '/src/pages/SchaedenPage.tsx',
   '/src/pages/TierePage.tsx',
   '/src/pages/uhs/BewegungenTab.tsx',
@@ -709,7 +712,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     expect(dateien[PRIMITIV]).toContain('KatalogTabelle');
   });
 
-  it('der Scan sieht genau die geplanten Konsumenten (seit LFH-548: fünfzehn)', () => {
+  it('der Scan sieht genau die geplanten Konsumenten (seit LFH-554: sechzehn)', () => {
     /**
      * Die Gleichheit prüft BEIDE Richtungen: eine still herausgefallene Datei bleibt in
      * {@link KONSUMENTEN} stehen, eine ungeplant hinzugekommene fehlt dort.

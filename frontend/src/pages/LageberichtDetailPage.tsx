@@ -41,6 +41,7 @@ import {
 } from '../lageberichte/AbschnittsAkkordeon';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import MedienlageUebernahme from '../stab/MedienlageUebernahme';
 import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -59,6 +60,9 @@ import { useFehlerMeldung } from '../components/useFehlerMeldung';
  * `etb/filterZeit.ts`) und je Abschnitt der Markdown-Text unter seinem Schlüssel.
  */
 type FormWerte = { titel: string; zeitstand?: Dayjs } & Record<string, string | Dayjs | undefined>;
+
+/** Schlüssel des Abschnitts „Medienlage“ im Lagevortrag (LFH-554). */
+const MEDIENLAGE = 'medienlage';
 
 export default function LageberichtDetailPage() {
   const { lbId } = useParams();
@@ -138,30 +142,6 @@ function LageberichtDetail() {
     });
   }
 
-  /**
-   * `useCallback`, nicht inline: eine neue Funktionsidentität je Anschlag höbe die `memo`-Sperre
-   * des Akkordeons auf — ohne Fehlerbild, nur langsam. Abhängig allein von `vorschauNeben`.
-   */
-  const abschnittsEditor = useCallback(
-    (a: AbschnittDef) => (
-      // Die Kopfzeile trägt den Namen sichtbar; das Etikett des Feldes bleibt für die
-      // Label-Verknüpfung, steht aber nicht ein zweites Mal da.
-      <Form.Item label={a.label} name={a.schluessel} labelCol={{ style: { display: 'none' } }}>
-        {/* Direkt unter dem Seitentitel (h1): die Akkordeon-Köpfe sind Schaltflächen, keine
-            Überschriften, und ein Paneel rahmt den Entwurf nicht (s. u.). */}
-        <MarkdownEditor
-          layout={vorschauNeben ? 'split' : 'toggle'}
-          // Ohne sie druckte das Toggle-Layout sein Textfeld (`lageberichtPrint.css`).
-          druckfassung
-          unterEbene={1}
-          variante="dokument"
-          autoSize={{ minRows: 6 }}
-        />
-      </Form.Item>
-    ),
-    [vorschauNeben],
-  );
-
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: einsatzKeys.lagebericht(einsatzId, berichtId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(einsatzId) });
@@ -201,6 +181,44 @@ function LageberichtDetail() {
     speichern,
     onGespeichert: invalidate,
   });
+
+  // Stabil (`useCallback` im Hook): die Übernahme aus S5 meldet ihre Änderung darüber.
+  const { markiereGeaendert } = schutz;
+  /**
+   * `useCallback`, nicht inline: eine neue Funktionsidentität je Anschlag höbe die `memo`-Sperre
+   * des Akkordeons auf — ohne Fehlerbild, nur langsam. Abhängig allein von `vorschauNeben`.
+   */
+  const abschnittsEditor = useCallback(
+    (a: AbschnittDef) => (
+      // Die Kopfzeile trägt den Namen sichtbar; das Etikett des Feldes bleibt für die
+      // Label-Verknüpfung, steht aber nicht ein zweites Mal da.
+      <>
+        {/* LFH-554: Punkt III des Lagevortrags aus S5. Der Baustein fehlt ohne Stab-Freigabe;
+            er steht nur im Schreibzweig, denn nur dort gibt es den Editor. */}
+        {a.schluessel === MEDIENLAGE && (
+          <MedienlageUebernahme
+            einsatzId={einsatzId}
+            form={form}
+            feld={MEDIENLAGE}
+            onGeaendert={markiereGeaendert}
+          />
+        )}
+        <Form.Item label={a.label} name={a.schluessel} labelCol={{ style: { display: 'none' } }}>
+          {/* Direkt unter dem Seitentitel (h1): die Akkordeon-Köpfe sind Schaltflächen, keine
+            Überschriften, und ein Paneel rahmt den Entwurf nicht (s. u.). */}
+          <MarkdownEditor
+            layout={vorschauNeben ? 'split' : 'toggle'}
+            // Ohne sie druckte das Toggle-Layout sein Textfeld (`lageberichtPrint.css`).
+            druckfassung
+            unterEbene={1}
+            variante="dokument"
+            autoSize={{ minRows: 6 }}
+          />
+        </Form.Item>
+      </>
+    ),
+    [vorschauNeben, einsatzId, form, markiereGeaendert],
+  );
 
   /**
    * Ein Klick, ein PATCH: der Klick blurrt zuerst das Feld, der Blur-Autosave ist schon unterwegs,

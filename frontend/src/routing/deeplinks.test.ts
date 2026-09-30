@@ -22,6 +22,9 @@ import {
   schaedenPfad,
   stabPfad,
   funkplanPfad,
+  infotelefonPfad,
+  pressePfad,
+  pressemitteilungPfad,
   dokumentePfad,
   abloesungPfad,
   betreuungPfad,
@@ -324,6 +327,17 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   it('stabPfad ohne Optionen', () => {
     expect(stabPfad(E)).toBe('/einsaetze/5/stab');
   });
+  it('Presse- und Infotelefon-Seiten liegen unter dem Stab (LFH-554)', () => {
+    expect(pressePfad(E)).toBe('/einsaetze/5/stab/presse');
+    expect(pressePfad(E, { kontakt: 12 })).toBe('/einsaetze/5/stab/presse?kontakt=12');
+    expect(pressemitteilungPfad(E, 4)).toBe('/einsaetze/5/stab/presse/mitteilungen/4');
+    expect(infotelefonPfad(E)).toBe('/einsaetze/5/stab/infotelefon');
+    expect(infotelefonPfad(E, { anruf: 9 })).toBe('/einsaetze/5/stab/infotelefon?anruf=9');
+    // Round-Trip: der Query-Wert liest sich über URLSearchParams unverändert zurück.
+    const q = new URLSearchParams(pressePfad(E, { kontakt: 12 }).split('?')[1]);
+    expect(parseRouteId(q.get('kontakt') ?? undefined)).toBe(12);
+  });
+
   it('funkplanPfad liegt unter dem Stab (LFH-548)', () => {
     expect(funkplanPfad(E)).toBe('/einsaetze/5/stab/funkplan');
   });

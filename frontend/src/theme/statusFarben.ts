@@ -22,8 +22,11 @@ import type {
   Dienststatus,
   EinsatzStatus,
   EtbTyp,
+  InfotelefonStatus,
   MaterialStatus,
+  MedienkontaktStatus,
   PersonStatus,
+  PressemitteilungStatus,
   Raeumungszustand,
   SchadenStatus,
   Sichtungskategorie,
@@ -358,6 +361,32 @@ export const aufbewahrungZustand: Record<AufbewahrungZustand, StatusDarstellung>
   vorgemerkt: { rolle: 'achtung', label: 'zur Löschung vorgemerkt' },
   schwaerzung_ausstehend: { rolle: 'alarm', label: 'Schwärzung steht aus' },
   geschwaerzt: { rolle: 'neutral', label: 'geschwärzt' },
+};
+
+/**
+ * Status eines Medienkontakts im Presse-Log (LFH-554). Nur `offen` ist hervorgehoben (`achtung`):
+ * eine Redaktion wartet auf Antwort. Die Endzustände sind `neutral`, „abgelehnt“ ist keine Gefahr.
+ */
+export const medienkontaktStatus: Record<MedienkontaktStatus, StatusDarstellung> = {
+  offen: { rolle: 'achtung', label: 'offen' },
+  beantwortet: { rolle: 'neutral', label: 'beantwortet' },
+  abgelehnt: { rolle: 'neutral', label: 'abgelehnt' },
+  erledigt: { rolle: 'neutral', label: 'erledigt' },
+};
+
+/** Rückrufstatus eines Anrufs am Informationstelefon (LFH-554): ein offener Rückruf wartet. */
+export const infotelefonStatus: Record<InfotelefonStatus, StatusDarstellung> = {
+  offen: { rolle: 'achtung', label: 'Rückruf offen' },
+  erledigt: { rolle: 'neutral', label: 'erledigt' },
+};
+
+/**
+ * Stand einer Pressemitteilung (LFH-554). „freigegeben“ trägt `bedien`: die Mitteilung ist
+ * draußen und verlinkt ihren ETB-Beleg; ein Entwurf ist Arbeitsstand, `neutral`.
+ */
+export const pressemitteilungStatus: Record<PressemitteilungStatus, StatusDarstellung> = {
+  entwurf: { rolle: 'neutral', label: 'Entwurf' },
+  freigegeben: { rolle: 'bedien', label: 'freigegeben' },
 };
 
 export const verpflegungDeckung: Record<VerpflegungDeckung, StatusDarstellung> = {

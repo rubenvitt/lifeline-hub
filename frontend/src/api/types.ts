@@ -716,3 +716,15 @@ export interface FristSetzenBody {
   retention_bis: string | null;
   bestaetigt?: boolean;
 }
+
+// ============================== LFH-554 Presse- und Medienarbeit S5 ==============================
+export type MedienkontaktArt = S['MedienkontaktArt'];
+export type MedienkontaktStatus = S['MedienkontaktStatus'];
+export type Medienkontakt = S['MedienkontaktAnzeige'];
+export type PressemitteilungVorlageKey = S['PressemitteilungVorlage'];
+export type PressemitteilungStatus = S['PressemitteilungStatus'];
+export type PressemitteilungAbschnitt = S['PressemitteilungAbschnitt'];
+export type Pressemitteilung = S['PressemitteilungAnzeige'];
+export type InfotelefonAnliegen = S['InfotelefonAnliegen'];
+export type InfotelefonStatus = S['InfotelefonStatus'];
+export type InfotelefonAnruf = S['InfotelefonAnrufAnzeige'];

@@ -42,6 +42,9 @@ import SchaedenPage from './pages/SchaedenPage';
 import DokumentePage from './pages/DokumentePage';
 import StabPage from './pages/StabPage';
 import FunkplanPage from './pages/FunkplanPage';
+import InfotelefonPage from './pages/InfotelefonPage';
+import PressePage from './pages/PressePage';
+import PressemitteilungDetailPage from './pages/PressemitteilungDetailPage';
 import AbloesungPage from './pages/AbloesungPage';
 import BetreuungPage from './pages/BetreuungPage';
 import VerpflegungPage from './pages/VerpflegungPage';
@@ -260,6 +263,13 @@ export const appRouten = createRoutesFromElements(
           {/* Funkplan S6 (LFH-548): Unterroute des Stabs, kein Modul; `modulAusPfad` markiert den
               Stab, Sperre und Sichtbarkeit kommen vom Stab. */}
           <Route path="stab/funkplan" element={<FunkplanPage />} />
+          {/* Presse- und Medienarbeit S5 (LFH-554): Unterrouten des Stabs wie der Funkplan. */}
+          <Route path="stab/presse" element={<PressePage />} />
+          <Route
+            path="stab/presse/mitteilungen/:mitteilungId"
+            element={<PressemitteilungDetailPage />}
+          />
+          <Route path="stab/infotelefon" element={<InfotelefonPage />} />
           <Route path="personen/:personId" element={<PersonenDetailPage />} />
           <Route path="tiere/:tierId" element={<TiereDetailPage />} />
           <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />

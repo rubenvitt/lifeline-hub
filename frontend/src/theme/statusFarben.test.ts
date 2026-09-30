@@ -39,7 +39,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle sechsundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle neunundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten“, nicht „Enums“: `dringlichkeit` ist über eine Statusrolle geschlüsselt und
     // beschriftet die Stufe selbst.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
@@ -55,10 +55,13 @@ describe('Statusfarb-Vertrag', () => {
       'einsatzStatus',
       'etbTyp',
       'hochwasserKlasse',
+      'infotelefonStatus',
       'luftqualitaetIndex',
       'materialStatus',
+      'medienkontaktStatus',
       'odlStufe',
       'personStatus',
+      'pressemitteilungStatus',
       'raeumungszustand',
       'schadenAusmass',
       'schadenStatus',
@@ -180,7 +183,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // Eine Fläche ist keine Statusrolle und gehört deshalb nicht in `ALLE_MAPS`.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(26);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(29);
   });
 });
 

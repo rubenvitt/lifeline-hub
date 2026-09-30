@@ -78,28 +78,28 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
 
 ## 5. Frontend-Grundlage
 
-- [ ] 5.1 API-Module `api/presse.ts` und `api/infotelefon.ts` anlegen. Die Query-Keys
+- [x] 5.1 API-Module `api/presse.ts` und `api/infotelefon.ts` anlegen. Die Query-Keys
   `medienkontakte`, `pressemitteilungen`, `pressemitteilung(id)` und `infotelefon` kommen in
   `EINSATZ_KEYS` und `EINSATZ_STREAM_EVENTS`. Die Prefixe stehen ausdrücklich außerhalb von
   `LAGEBILD_OFFLINE` (D8). Prüfen: `queryKeys.test.ts`, `queryKeys.guard.test.ts` und
   `lagebildOffline.guard.test.ts` sind grün, und `globalKeys.test.ts` ist unverändert.
-- [ ] 5.2 Deeplink-Bauer `pressePfad`, `pressemitteilungPfad` und `infotelefonPfad` mit Parsern für
+- [x] 5.2 Deeplink-Bauer `pressePfad`, `pressemitteilungPfad` und `infotelefonPfad` mit Parsern für
   `?kontakt=` und `?anruf=` in `routing/deeplinks.ts` anlegen. Prüfen: Die Unit-Tests mit
   Round-Trip sind grün.
-- [ ] 5.3 Hook `useStabFreigabe()` aus `FunkplanPage` herausziehen (fail-closed, Fehler mit
+- [x] 5.3 Hook `useStabFreigabe()` aus `FunkplanPage` herausziehen (fail-closed, Fehler mit
   Wiederholen) und im Funkplan einsetzen. Prüfen: Die bestehenden Funkplan-Tests sind grün, und der
   neue Hook-Test deckt Laden, Fehler, gesperrt und frei ab.
-- [ ] 5.4 Statuskarten `medienkontaktStatus`, `infotelefonStatus` und `pressemitteilungStatus` in
+- [x] 5.4 Statuskarten `medienkontaktStatus`, `infotelefonStatus` und `pressemitteilungStatus` in
   `theme/statusFarben.ts` anlegen (D6). Prüfen: `ALLE_MAPS` steigt von 26 auf 29, und
   `statusVertrag.guard.test.ts` ist grün. Den Stand in CLAUDE.md nachziehen.
-- [ ] 5.5 Die S5-Zeile bekommt die Verweise „Pressearbeit“ und „Informationstelefon“ über die
+- [x] 5.5 Die S5-Zeile bekommt die Verweise „Pressearbeit“ und „Informationstelefon“ über die
   Tabelle `unterseiten` je Sachgebiet (D1). S6 zieht auf dieselbe Tabelle um. Die Routen gehen in
   `App.tsx`. Prüfen: Die Tests in `StabPage.test.tsx` belegen beide Verweise mit Ziel, dass S6
   unverändert ist und dass `modulAusPfad` den Stab markiert.
 
 ## 6. Frontend Presseseite und Pressemitteilung
 
-- [ ] 6.1 `PressePage` mit `EinsatzSeite` bauen:
+- [x] 6.1 `PressePage` mit `EinsatzSeite` bauen:
   - Primäraktion „Neue Pressemitteilung“
   - sekundär „Medienkontakt erfassen“
   - Paneele Medienlage, Pressemitteilungen, Presse-Log
@@ -107,17 +107,17 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
   
   Prüfen: Die Tests zu Stab gesperrt → Sackgasse, Beobachtung liest mit gesperrter Erfassung und
   `?kontakt=` rollt zur Zeile sind grün.
-- [ ] 6.2 Presse-Log als `Datensicht form="karte"` bauen, mit `StatusWahl` am Status-Slot,
+- [x] 6.2 Presse-Log als `Datensicht form="karte"` bauen, mit `StatusWahl` am Status-Slot,
   Segmentleiste „alle/offen“, Kennzahl „offene Anfragen“, Erfassung als `ErfassungsModal` mit
   Serie (drei sichtbare Felder) und „Beantworten“ als `ErfassungsModal`. Prüfen:
   - Feldbudget mit `forceRender` und Gegenprobe
   - Enter sendet
   - Rücknahme ohne Rückfrage, mit Rückgängig-Toast
   - Speicherfehler an der Seite
-- [ ] 6.3 Die Pressemitteilungsliste als Kettenköpfe bauen (Kettenmuster aus
+- [x] 6.3 Die Pressemitteilungsliste als Kettenköpfe bauen (Kettenmuster aus
   `lageberichte/ketten.ts` teilen, nicht kopieren). Prüfen: Die Tests zu Ketten und Zyklen
   bleiben grün, und ein neuer Test belegt die Mitteilungsliste.
-- [ ] 6.4 `PressemitteilungDetailPage` mit `key={mitteilungId}` bauen: Akkordeon, Verlustschutz,
+- [x] 6.4 `PressemitteilungDetailPage` mit `key={mitteilungId}` bauen: Akkordeon, Verlustschutz,
   Autosave, `FreigabeDialog` und Druckwurzel samt `Druckkopf`. Wo die Lageberichtseite Teile hart
   verdrahtet hat, per Prop hereinreichen (D4). Prüfen:
   - Freigabe ohne `darfEinsatzLeiten` gesperrt, mit Grund
@@ -128,7 +128,7 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
 
 ## 7. Frontend Informationstelefon
 
-- [ ] 7.1 `InfotelefonPage` als Zeitachse bauen:
+- [x] 7.1 `InfotelefonPage` als Zeitachse bauen:
   - Kennzahlen Anrufe und offene Rückrufe, `Aufgliederung` nach Anliegen
   - Segmentleiste „alle/offene Rückrufe“
   - Erledigen/Öffnen über `StatusWahl`
@@ -137,7 +137,7 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
   
   Prüfen: Die Tests zu Kennzahlen aus derselben Menge (keine Zahl ohne Daten), fehlendem Sprung
   bei gesperrten Personen und Filter „offene Rückrufe“ sind grün.
-- [ ] 7.2 Die Schnellerfassung als `fuss` von `EinsatzSeite` bauen, mit
+- [x] 7.2 Die Schnellerfassung als `fuss` von `EinsatzSeite` bauen, mit
   `Schnellerfassungszeile`, Hinweiszeile, eingeklappten Feldern, „Rückruf nötig“ und sichtbarer
   Pflicht-Rückrufnummer. Prüfen:
   - Serie mit Enter, Fokus nach dem Speichern im Feld Anliegen
@@ -147,23 +147,23 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
 
 ## 8. Medienlage und Lagebericht
 
-- [ ] 8.1 `stab/medienlage.ts` mit `baueMedienlage` und `rendereMedienlageMarkdown` schreiben
+- [x] 8.1 `stab/medienlage.ts` mit `baueMedienlage` und `rendereMedienlageMarkdown` schreiben
   (D7). Prüfen: Die Unit-Tests pinnen die Abwesenheit von Namen, Nummern, Notizen und Themen und
   zeigen „—“ mit Grund für jede nicht geladene Quelle. Die Mutationsprobe (Name ins Markdown →
   rot) ist belegt.
-- [ ] 8.2 Den Abschnitt `medienlage` vor `zusammenfassung` in `src/lagebericht/mod.rs` und
+- [x] 8.2 Den Abschnitt `medienlage` vor `zusammenfassung` in `src/lagebericht/mod.rs` und
   `frontend/src/lageberichte/vorlagen.ts` einfügen. Prüfen:
   - `vorlagen_haben_erwartete_abschnittszahl` erwartet 8.
   - Ein alter Entwurf ohne den Schlüssel lässt sich per PATCH speichern.
   - Der Snapshot ohne Medienlage enthält keine Überschrift „Medienlage“.
   - Der Paartest der Vorlagen im Frontend ist grün.
-- [ ] 8.3 „Aus S5 übernehmen“ als `zusatz` des Abschnitts im `AbschnittsAkkordeon` bauen, mit
+- [x] 8.3 „Aus S5 übernehmen“ als `zusatz` des Abschnitts im `AbschnittsAkkordeon` bauen, mit
   Abruf per `fetchQuery` beim Klick und `<Modal>`-Rückfrage bei gefülltem Abschnitt. Prüfen:
   - Der Knopf fehlt ohne Stab-Freigabe.
   - Übernahme in einen leeren Abschnitt ohne Rückfrage.
   - Ersetzen erst nach Bestätigung.
   - Der Render-Zähler-Test des Akkordeons bleibt grün.
-- [ ] 8.4 Das Paneel Medienlage auf der Presseseite bauen, aus derselben Ableitung. Prüfen: Der
+- [x] 8.4 Das Paneel Medienlage auf der Presseseite bauen, aus derselben Ableitung. Prüfen: Der
   Test belegt dieselben Zahlen wie in Presse-Log und Informationstelefon.
 
 ## 9. Nachweise und Abschluss
