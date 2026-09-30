@@ -40,3 +40,20 @@ Kontrast = kleinster Wert über alle 18 Aufnahmen, Farbe der Ikone gegen ihren k
 - **Gefüllte Zwillinge:** klar und kräftig, als aktiver Zustand der Rail gut erkennbar.
 - **Kontrast:** alle gemessenen Ikonen ≥ 6,19 : 1 (Plus auf dem blauen Primärknopf), die Rail
   ≥ 8,04 : 1. Der Chevron im Benutzermenü steht mit Deckkraft 0,65 und ist nicht messbar.
+
+## Bundlegröße (Aufgabe 9.1)
+
+`vite build`, Summe aller JS-Dateien unter `dist/assets`, vorher = Planungsstand `73cb82d`,
+nachher = umgestellte App (`fdfa707`):
+
+| | roh | gzip -9 |
+|---|---|---|
+| vorher | 5 464 051 B | 1 603 511 B |
+| nachher | 5 599 516 B | 1 651 801 B |
+| Differenz | +135 465 B (+2,5 %) | +48 290 B (+3,0 %) |
+
+Der Zuwachs kommt aus den Pfaddaten der Icons8-Quellen (Koordinaten mit sechs Nachkommastellen,
+102 Ikonen plus 7 gefüllte). Die Pakete `@ant-design/icons` und `react-icons` fallen als direkte
+Abhängigkeit weg, antd zieht `@ant-design/icons` für seine eigenen Bauteile weiter nach. Mögliche
+Folgearbeit: Koordinaten im Erzeugungsskript auf zwei Nachkommastellen runden (bei 50 Einheiten
+und höchstens 72 px unsichtbar).

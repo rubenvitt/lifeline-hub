@@ -16,13 +16,16 @@ import { kontrast } from './kontrast-kern';
  * Meldungskarten mit Zeit und Aktionsmenü. Je Breite × Betriebsart × Dichte entstehen eine
  * Aufnahme und eine Messung (Kantenlänge und Kontrast jeder sichtbaren Ikone gegen ihren Grund).
  *
- * Ablage: `openspec/changes/lfh-595-ein-ikonensatz/stilprobe/` (Pfad relativ zu dieser Datei).
+ * Ablage: `openspec/changes/archive/2026-09-30-lfh-595-ein-ikonensatz/stilprobe/` (Pfad relativ zu dieser Datei).
  */
 
 test.skip(!process.env.PW_STILPROBE, 'nur mit PW_STILPROBE=1');
 
 const ABLAGE = fileURLToPath(
-  new URL('../../openspec/changes/lfh-595-ein-ikonensatz/stilprobe/', import.meta.url),
+  new URL(
+    '../../openspec/changes/archive/2026-09-30-lfh-595-ein-ikonensatz/stilprobe/',
+    import.meta.url,
+  ),
 );
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
