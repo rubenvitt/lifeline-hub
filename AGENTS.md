@@ -77,6 +77,11 @@ Werkzeuge ohne Präfix (`clickup_update_task`); der Präfix hängt an der Umgebu
   `tasks.md` abgehakt, `/opsx:archive` samt Spec-Sync und Verweisen, dann erst der PR — kein
   Archiv-PR danach. Wächter: `scripts/check-openspec-archiv.sh` (Schritt 13 von `check-all.sh`,
   Bündel `schnell`) macht eine aktive Change ohne offenes Kästchen rot.
+- **Ein Plan allein bekommt keinen PR** (Entscheidung 30.09.2026), außer der Mensch wünscht es
+  ausdrücklich. Ablauf in EINEM Branch: Plan (`/opsx:propose`) → Commit → Freigabe →
+  `/opsx:apply` → `/opsx:archive` → erst dann der PR, mit Plan, Umsetzung und Archiv zusammen.
+  Den Branch zu pushen, um den Stand zu sichern, ist erlaubt; der PR wartet auf die Umsetzung —
+  auch wenn die Umgebung (etwa eine Cloud-Sitzung) nach jedem Push einen PR verlangt.
 - In Codex heißen die OpenSpec-Befehle `$openspec-propose`, `$openspec-apply-change` usw.
   (`.agents/skills/`, erzeugt von `openspec`); Claude Code liest nur `.claude/`.
 
