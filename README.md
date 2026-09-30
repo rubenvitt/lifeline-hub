@@ -83,6 +83,6 @@ mise exec -- pnpm -C frontend dev
 ```
 
 Die Konventionen des Projekts — UI-Form, Bedienleitlinie, Fehlercodes, Query-Keys,
-Typ-Codegen — stehen in [CLAUDE.md](CLAUDE.md). Commits folgen
+Typ-Codegen — stehen in [AGENTS.md](AGENTS.md) und den dort verzeichneten Bereichsdateien. Commits folgen
 [Conventional Commits](https://www.conventionalcommits.org/); daraus ermittelt
 semantic-release die Version.

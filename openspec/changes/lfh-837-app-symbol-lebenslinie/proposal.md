@@ -25,7 +25,7 @@ nicht nur das Symbol der Hülle.
   Betriebsarten.
 - Ein **Erzeugungsskript** baut alle Symbole aus den Quell-SVGs neu. Ein Guard-Test hält
   Geometrie, Nenngrößen und Manifest-Einträge fest.
-- Die Gestaltungsvorgabe (`umsetzung.md`, CLAUDE.md) nennt die Bildmarke statt „Logo-Quadrat“.
+- Die Gestaltungsvorgabe (`umsetzung.md`, `frontend/AGENTS.md`, vormals CLAUDE.md) nennt die Bildmarke statt „Logo-Quadrat“.
   Der Punkt „App-Symbol ist Platzhalter“ entfällt aus den Grenzen in `docs/betrieb/desktop-app.md`.
 
 ## Capabilities

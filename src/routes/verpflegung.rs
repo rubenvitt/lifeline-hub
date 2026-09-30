@@ -6,7 +6,7 @@
 //! Ablösung und Betreuung, NICHT über `fordere_aktiv_in_tx` (design.md D4). Bodies nur über
 //! `JsonBody`, Sub-IDs nur über `PfadParam`.
 //!
-//! **Statuscodes** (design.md D4, CLAUDE.md „Statuscode-Konvention“):
+//! **Statuscodes** (design.md D4, src/AGENTS.md „Statuscode-Konvention“):
 //! - **400** — das Feld für sich: fehlendes Pflichtfeld, leere Bezeichnung, negativer
 //!   Bedarfsteil oder Kostform, Menge ≤ 0, unlesbarer Zeitpunkt.
 //! - **404** — fremdes Zeitfenster, fremde Ausgabe, fremde Nachforderung.

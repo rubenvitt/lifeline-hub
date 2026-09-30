@@ -26,7 +26,7 @@ fi
 
 echo "==> [2/2] prettier --check (Frontend-Baseline, LFH-354)"
 # `--check` listet abweichende Dateien und schreibt nichts. Geprüft wird `frontend/`, nicht
-# das Repo-Root: dort liegen Dateien (release.config.mjs, Workflows, CLAUDE.md), für die keine
+# das Repo-Root: dort liegen Dateien (release.config.mjs, Workflows, AGENTS.md), für die keine
 # Prettier-Baseline hergestellt ist — wer die Grenze verschiebt, fährt erst den Sweep.
 if ! $PNPM -C "$FE" exec prettier --check .; then
   echo "FEHLER: Frontend-Code ist nicht prettier-clean." >&2

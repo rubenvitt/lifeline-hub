@@ -149,7 +149,7 @@ export function InlineAngabe<T>({
   function tasten(e: KeyboardEvent<HTMLFormElement>) {
     if (e.key === 'Escape') {
       // Ein offenes Popup der Eingabe schließt zuerst allein; erst das nächste Escape verwirft die
-      // Zeile. Keine der antd-Eingaben ruft dabei `preventDefault` (CLAUDE.md, LFH-712).
+      // Zeile. Keine der antd-Eingaben ruft dabei `preventDefault` (pages/lagekarte/AGENTS.md, LFH-712).
       if (escSchliesstPopup.current) return;
       e.preventDefault();
       schliessen();
@@ -241,7 +241,7 @@ export function InlineAngabe<T>({
         onClick={oeffnen}
       >
         <span id={wertId}>{anzeige}</span>
-        {/* Ikone ohne eigenes Vorleseziel (CLAUDE.md, „Ein Emoji ist keine Ikone"). */}
+        {/* Ikone ohne eigenes Vorleseziel (frontend/AGENTS.md, „Ein Emoji ist keine Ikone"). */}
         <span aria-hidden="true" style={{ color: token.colorTextSecondary }}>
           <IkoneStift />
         </span>

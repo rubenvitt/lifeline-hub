@@ -416,7 +416,7 @@ pub async fn uebergeben(
         ));
     }
     if !darf_uebergehen(vorher.status.as_str(), "uebergeben") {
-        // Ungültiger Status-Übergang → 422, nicht 409 (CLAUDE.md-Konvention; 409 ist für
+        // Ungültiger Status-Übergang → 422, nicht 409 (Konvention in src/AGENTS.md; 409 ist für
         // Nebenläufigkeit/CAS und Storno reserviert — die vier Storno-Zweige hier bleiben 409).
         return Err(AppError::UnprocessableEntity(format!(
             "Schaden im Status '{}' kann nicht übergeben werden",

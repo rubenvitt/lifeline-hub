@@ -34,7 +34,7 @@ minimumReleaseAgeExclude:
 #
 #   3. KEIN LEERER `auditConfig.ignoreGhsas`-BLOCK „für später". pnpm brächte ihn mit,
 #      aber eine Ausnahmeliste ohne Eintrag ist eine Zusicherung, die nichts zusichert —
-#      dieselbe Linie, aus der CLAUDE.md „ein Eintrag ohne Verstoß gilt selbst als Verstoß"
+#      dieselbe Linie, aus der scripts/AGENTS.md „ein Eintrag ohne Verstoß gilt selbst als Verstoß"
 #      zieht. Wer den ersten echten Fall hat — ein `high`-Advisory, das WEDER über einen
 #      Override noch über ein Upgrade erreichbar ist —, führt den Block dann ein, mit dem
 #      Eintrag, der ihn nötig macht, und nach dem Muster von .cargo/audit.toml: warum kein

@@ -92,7 +92,7 @@ pub fn geometrie_klasse_passt(typ: &str, geometrie_typ: &str) -> bool {
 }
 
 /// Prüft die Eingaben einer neuen Zone (statt DB-CHECK→500), rein und ohne Datenbank.
-/// Statuscodes nach der Konvention aus CLAUDE.md: ein unbekannter Enum-Wert scheitert am Feld
+/// Statuscodes nach der Konvention aus src/AGENTS.md: ein unbekannter Enum-Wert scheitert am Feld
 /// selbst → 400; unpassende Typ-Geometrie-Kombination und kaputtes/abweichendes GeoJSON
 /// bewerten den Zusammenhang → 422.
 ///
