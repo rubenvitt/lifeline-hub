@@ -706,7 +706,7 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   das globale `build.target-dir`; `CARGO_TARGET_DIR` schlägt beide). In einem geteilten Ziel
   teilen sich Worktrees Fingerprints und Binaries (Hash aus dem Pfad relativ zur
   Workspace-Wurzel, Frische per mtime), und Tests liefen still gegen einen fremden Stand.
-  Schritt 4 und 7 prüfen das vorab (`scripts/lib/bauziel.sh`, rot bei fremdem Ziel ohne
+  Schritt 3, 4 und 7 prüfen das vorab (`scripts/lib/bauziel.sh`, rot bei fremdem Ziel ohne
   Umgebungsvariable), Selbsttest `scripts/bauziel.test.sh`; Gate und Playwright nennen das
   gestartete `Backend-Binary:`. Kosten: ~3 min kalt, bis 19 GB je voll gebautem Worktree,
   frei mit dem Worktree. Ein älterer Worktree ohne die Datei erbt unter einem Main-Checkout

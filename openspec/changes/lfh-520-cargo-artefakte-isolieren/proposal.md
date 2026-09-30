@@ -21,7 +21,7 @@ das Playwright startet (siehe Memory „fremdes `frontend/dist`“).
 - Das Repo bringt eine eigene Cargo-Konfiguration mit, die das Build-Ziel **je Checkout** auf
   `<worktree>/target` legt. Sie hat Vorrang vor der globalen Nutzerkonfiguration. Ein explizit
   gesetztes `CARGO_TARGET_DIR` schlägt beide, wie bisher.
-- Das Sammel-Gate prüft vor den Schritten, die Cargo-Artefakte verwenden (Rust-Suite, e2e),
+- Das Sammel-Gate prüft vor den Schritten, die Cargo-Artefakte verwenden (Typ-Drift, Rust-Suite, e2e),
   dass das Build-Ziel dem eigenen Checkout gehört. Andernfalls bricht es mit Erklärung ab.
   Eine ausdrückliche Übersteuerung per Umgebungsvariable bleibt erlaubt und wird angezeigt.
 - Sammel-Gate und alleinstehendes Playwright nennen das verwendete Backend-Binary mit Pfad.

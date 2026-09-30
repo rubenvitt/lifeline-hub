@@ -21,7 +21,7 @@
       Die drei Fälle kommen in `scripts/bauziel.test.sh` dazu. Verifikation: Der Selbsttest
       deckt alle drei Ausgänge ab, jede Mutation (Vergleich umdrehen, Umgebungsvariable
       ignorieren) macht ihn rot.
-- [x] 2.2 `bauziel_pruefen` am Anfang von `schritt_4` und `schritt_7` aufrufen (in Schritt 7
+- [x] 2.2 `bauziel_pruefen` am Anfang von `schritt_3`, `schritt_4` und `schritt_7` aufrufen (in Schritt 7
       nicht bei gesetztem `PW_BINAER`) und `scripts/bauziel.test.sh` in den Selbsttest-Schritt
       des `schnell`-Bündels hängen. Der Dateikopf von `check-all.sh` und die Kommentare in
       Schritt 7, die noch vom „globalen build.target-dir“ sprechen, werden nachgezogen.
@@ -31,7 +31,7 @@
 
 ## 3. Nachvollziehbares Backend-Binary
 
-- [ ] 3.1 `schritt_7` und `frontend/playwright.config.ts` geben `Backend-Binary: <pfad>` aus.
+- [x] 3.1 `schritt_7` und `frontend/playwright.config.ts` geben `Backend-Binary: <pfad>` aus.
       Verifikation: `check-all.sh --nur e2e` und `pnpm e2e --list` zeigen im selben Checkout
       denselben Pfad unter `<worktree>/target`. `strings <binary> | grep frontend/dist` zeigt
       auf den eigenen Worktree.
@@ -60,3 +60,8 @@
       Scratchpads gesichert und im PR zitiert.
 - [ ] 5.2 Vollgate `./scripts/check-all.sh` im eigenen Worktree (per `nohup`) ausführen.
       Verifikation: Exit 0, im Log kein `ÜBERSPRUNGEN` und kein „Backend-Binary fehlt“.
+      Stand 30.09.2026: 11/12 grün, kein `ÜBERSPRUNGEN`. Schritt 7 hatte 424/425 grün; rot war
+      nur `lagekarte-marker-plaketten.spec.ts:82`. Das ist vorbestehend (LFH-844): einzeln
+      3/6 rot, auch mit der `playwright.config.ts` von `alpha`. Nach den Review-Fixes liefen
+      Schritt 3 (`--nur=schnell` grün, ohne Repo-Datei rot) und Schritt 7 (Anteil 85/85 mit
+      relativem `PW_BINAER`, beide Zeilen gleich) erneut. Offen bis LFH-844 behoben ist.

@@ -21,7 +21,7 @@ Umgebungsvariable (`CARGO_TARGET_DIR` oder `CARGO_BUILD_TARGET_DIR`) MUST das Zi
   ohne diese Abweisung trägt, die Quellen von B älter sind als der letzte Bau von A und in
   beiden gleichzeitig `cargo test --test person_aufnahme_uhs` läuft
 - **THEN** meldet A 6/6 bestanden und B genau den Fehlschlag im Abweisungsfall; jeder
-  Checkout kompiliert und führt sein eigenes Testbinary aus
+  Checkout führt das Testbinary aus seinem eigenen Ziel aus, gebaut aus seinen eigenen Quellen
 
 #### Scenario: Globale Nutzerkonfiguration mit gemeinsamem Ziel
 - **WHEN** `~/.cargo/config.toml` `build.target-dir` auf ein gemeinsames Verzeichnis setzt
@@ -37,7 +37,7 @@ Umgebungsvariable (`CARGO_TARGET_DIR` oder `CARGO_BUILD_TARGET_DIR`) MUST das Zi
 - **THEN** liegt das Backend-Binary wie bisher unter `target/debug/lifeline-hub`
 
 ### Requirement: Sammel-Gate prüft die Zugehörigkeit des Build-Ziels
-Bevor das Sammel-Gate Cargo-Artefakte baut oder startet (Rust-Suite, e2e), MUST es das
+Bevor das Sammel-Gate Cargo-Artefakte baut oder startet (Typ-Drift, Rust-Suite, e2e), MUST es das
 wirksame Build-Ziel ermitteln. Liegt das Ziel außerhalb des eigenen Checkouts und ist es
 nicht ausdrücklich per Umgebungsvariable gewählt, MUST der Schritt rot enden. Die Meldung MUST
 das gefundene Ziel und die Ursache nennen. Bei ausdrücklicher Übersteuerung MUST das Gate das
@@ -45,13 +45,18 @@ verwendete Ziel ausgeben und weiterlaufen.
 
 #### Scenario: Ziel im eigenen Checkout
 - **WHEN** das wirksame Ziel `<checkout>/target` ist
-- **THEN** laufen Rust-Suite und e2e ohne zusätzliche Meldung weiter
+- **THEN** laufen Typ-Drift, Rust-Suite und e2e ohne zusätzliche Meldung weiter
 
 #### Scenario: Geerbtes fremdes Ziel
 - **WHEN** das wirksame Ziel aus einer Konfigurationsdatei außerhalb des Checkouts stammt,
   etwa aus der globalen Nutzerkonfiguration oder einem übergeordneten Checkout
 - **THEN** endet der Schritt rot, nennt das Ziel und verweist auf die fehlende oder
   überstimmte Repo-Konfiguration
+
+#### Scenario: Vom übergeordneten Checkout geerbtes Ziel
+- **WHEN** ein Checkout ohne Repo-Konfiguration unter einem Checkout mit ihr liegt und
+  deshalb `<eltern>/target` als Ziel erbt
+- **THEN** endet der Schritt rot und nennt `<eltern>/target`
 
 #### Scenario: Übersteuertes Ziel
 - **WHEN** `CARGO_TARGET_DIR` gesetzt ist

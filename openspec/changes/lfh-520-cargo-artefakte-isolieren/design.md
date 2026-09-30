@@ -82,7 +82,7 @@ erwarten und `.gitignore` ihn schon ausblendet.
   und sind nicht teilbar. B lohnt sich erst, wenn viele Worktrees gleichzeitig voll gebaut
   werden. B ist jederzeit nachrüstbar, ohne D1 zu ändern.
 
-### D3 — Prüfung im Gate als Bibliotheksfunktion vor Schritt 4 und 7, nicht als 13. Schritt
+### D3 — Prüfung im Gate als Bibliotheksfunktion vor Schritt 3, 4 und 7, nicht als 13. Schritt
 
 `scripts/lib/bauziel.sh` ermittelt `target_directory` über `cargo metadata`. Dieselbe Quelle
 verwenden schon Schritt 7 und `playwright.config.ts`, das hält die Pfadlogik von LFH-518
@@ -93,12 +93,21 @@ beisammen. Die Funktion vergleicht mit `$ROOT/target`:
   „ausdrücklich gewählt: <pfad>“, weiter;
 - abweichend ohne Umgebungsvariable → Schritt rot mit Ziel und Hinweis auf `.cargo/config.toml`.
 
-Aufgerufen wird sie am Anfang von `schritt_4` und `schritt_7`, also genau dort, wo
-Cargo-Artefakte entstehen oder gestartet werden. `PW_BINAER` bleibt eine eigene, schon
-vorhandene Übersteuerung für Schritt 7. Mit gesetztem `PW_BINAER` wird nicht geprüft. Ein
-eigener Selbsttest `scripts/bauziel.test.sh` spielt die drei Fälle mit einem Wegwerf-Crate
-durch und läuft im `schnell`-Bündel. Den Schritt dafür nennt die Umsetzung, naheliegend ist
-Schritt 11 neben den anderen Skript-Selbsttests. Die Schrittzahl bleibt 12.
+Aufgerufen wird sie am Anfang von `schritt_3`, `schritt_4` und `schritt_7`, also überall, wo
+Cargo-Artefakte entstehen oder gestartet werden. Schritt 3 gehört dazu, weil
+`check-typ-codegen.sh` den Test `openapi_spec_aktuell` baut und startet. Der kompiliert seinen
+Pfad über `env!("CARGO_MANIFEST_DIR")` ein; ein fremdes Testbinary prüfte oder schriebe also die
+`openapi.json` des anderen Worktrees. Schritt 3 liegt im `schnell`-Bündel, Schritt 4 nicht
+(Review-Befund).
+
+`PW_BINAER` bleibt eine eigene, schon vorhandene Übersteuerung für Schritt 7. Mit gesetztem
+`PW_BINAER` wird nicht geprüft; ein relativer Wert wird gegen die Repo-Wurzel aufgelöst und
+absolut an Playwright weitergereicht, damit Gate und Playwright dasselbe Binary nennen.
+
+Der Selbsttest `scripts/bauziel.test.sh` spielt die Fälle mit Wegwerf-Crates durch. Die
+„globale“ Konfiguration steht dabei als `.cargo/config.toml` über den Checkouts, nicht in einem
+eigenen `CARGO_HOME`, das mise bei jedem Lauf neu einrichtete. Er läuft in Schritt 11 des
+`schnell`-Bündels neben den anderen Skript-Selbsttests. Die Schrittzahl bleibt 12.
 
 Warum kein eigener Schritt: Das kostet eine neue Nummer, `SCHRITTE`, Bündelzuordnung und
 CI-Jobnamen (vgl. Memory „Ruleset pinnt Jobnamen“). Außerdem gehört die Prüfung als

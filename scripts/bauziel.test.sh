@@ -8,22 +8,34 @@
 # die Quellen des einen älter als der letzte Bau des anderen, meldet Cargo „Fresh“ und führt
 # fremden Code aus — ein grünes Gate über den falschen Stand.
 #
-# Hermetisch: Die „globale“ Nutzerkonfiguration kommt aus einem eigenen CARGO_HOME, die zwei
-# Checkouts sind Wegwerf-Crates ohne Abhängigkeiten (kein Netz, Sekunden).
+# Hermetisch: Die „globale“ Nutzerkonfiguration mit gemeinsamem Ziel steht als
+# `.cargo/config.toml` ÜBER den Wegwerf-Checkouts. Sie schlägt `~/.cargo`, verliert aber gegen
+# die Repo-Datei im Checkout — dieselbe Rangfolge wie die globale. Kein eigenes CARGO_HOME:
+# Toolchain-Manager (mise) richteten Rust sonst bei jedem Lauf neu ein, mit Netz. Die Checkouts
+# sind Crates ohne Abhängigkeiten (Sekunden).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_CONFIG="$ROOT/.cargo/config.toml"
 LIB="$ROOT/scripts/lib/bauziel.sh"
 ARBEIT="$(mktemp -d)"
-trap 'rm -rf "$ARBEIT"' EXIT
+# Scheitert ein Kommando unerwartet (set -e), zeigt der Trap dessen Ausgabe, bevor er aufräumt —
+# ein roter Selbsttest ohne Grund wäre dieselbe Stille, gegen die er prüft.
+aufraeumen() {
+  local rc=$?
+  if [ "$rc" != 0 ] && [ -s "$ARBEIT/aus" ]; then
+    echo "bauziel.test.sh: abgebrochen (Exit $rc), letzte Ausgabe:" >&2
+    sed 's/^/     | /' "$ARBEIT/aus" >&2
+  fi
+  rm -rf "$ARBEIT"
+}
+trap aufraeumen EXIT
 fehler=0
 
 # Die Umgebung des Aufrufers darf das Ergebnis nicht färben.
 unset CARGO_TARGET_DIR CARGO_BUILD_TARGET_DIR
-export CARGO_HOME="$ARBEIT/cargo-home"
-mkdir -p "$CARGO_HOME"
-printf '[build]\ntarget-dir = "%s"\n' "$ARBEIT/geteilt" > "$CARGO_HOME/config.toml"
+mkdir -p "$ARBEIT/.cargo"
+printf '[build]\ntarget-dir = "%s"\n' "$ARBEIT/geteilt" > "$ARBEIT/.cargo/config.toml"
 
 ok() { echo "ok   $1"; }
 fail() {
@@ -34,12 +46,12 @@ fail() {
 
 # Legt einen Checkout <name> an, dessen Binary „Quellstand <name>“ ausgibt. Mit <config>=ja
 # bekommt er die ECHTE Repo-Konfiguration: Wer sie ändert oder löscht, macht diesen Test rot.
-checkout() { # <name> <config:ja|nein>
+checkout() { # <name> <config:ja|nein>   (<name> darf einen Unterpfad tragen)
   local d="$ARBEIT/$1"
   rm -rf "$d"
   mkdir -p "$d/src"
   printf '[package]\nname = "demo"\nversion = "0.1.0"\nedition = "2021"\n' > "$d/Cargo.toml"
-  printf 'fn main() { println!("Quellstand %s"); }\n' "$1" > "$d/src/main.rs"
+  printf 'fn main() { println!("Quellstand %s"); }\n' "$(basename "$1")" > "$d/src/main.rs"
   if [ "$2" = ja ]; then
     mkdir -p "$d/.cargo"
     cp "$REPO_CONFIG" "$d/.cargo/config.toml"
@@ -51,12 +63,14 @@ b_aelter_machen() {
   find "$ARBEIT/b" -exec touch -h -t 202001010000 {} +
 }
 
+# Beide Helfer scheitern nie selbst: Ein Cargo-Fehler landet in $ARBEIT/aus, und der Aufrufer
+# meldet ihn über fail — nicht set -e, das den Test stumm abbräche.
 laeuft() { # <checkout> → Ausgabe des Binarys
-  (cd "$ARBEIT/$1" && cargo run -q 2> "$ARBEIT/aus")
+  (cd "$ARBEIT/$1" && cargo run -q 2> "$ARBEIT/aus") || true
 }
 
 ziel() { # <checkout> → target_directory laut Cargo
-  (cd "$ARBEIT/$1" && cargo metadata --no-deps --format-version 1 2> "$ARBEIT/aus") |
+  { (cd "$ARBEIT/$1" && cargo metadata --no-deps --format-version 1 2> "$ARBEIT/aus") || true; } |
     sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p'
 }
 
@@ -75,7 +89,9 @@ else
   if [ "$(laeuft b)" = "Quellstand a" ]; then
     ok "Gegenprobe: ohne Repo-Konfiguration führt b den Code von a aus"
   else
-    fail "Gegenprobe: ohne Repo-Konfiguration hätte b den Code von a ausführen müssen"
+    # Die Gegenprobe hängt an einem Cargo-Verhalten (Hash relativ zur Workspace-Wurzel). Ändert
+    # Cargo das, wird sie rot, obwohl die Isolation weiter trägt.
+    fail "Gegenprobe: ohne Repo-Konfiguration hätte b den Code von a ausführen müssen — trennt Cargo Fingerprints inzwischen nach Workspace-Pfad? Dann Gegenprobe und LFH-520 neu bewerten"
   fi
 
   rm -rf "$ARBEIT/geteilt"
@@ -125,6 +141,11 @@ if [ ! -f "$LIB" ]; then
 else
   checkout eigen ja
   checkout geerbt nein
+  # Übergangsfall: Ein Checkout OHNE die Datei unter einem Checkout MIT ihr (alter Worktree unter
+  # dem Main-Checkout) erbt deren relatives Ziel, also `<eltern>/target`. Endet auf `/target`
+  # und fällt nur einem echten Pfadvergleich auf.
+  checkout eltern ja
+  checkout eltern/kind nein
 
   rc=0; pruefen eigen || rc=$?
   if [ "$rc" = 0 ] && [ ! -s "$ARBEIT/aus" ]; then
@@ -138,6 +159,13 @@ else
     ok "geerbtes fremdes Ziel: rot, nennt Ziel und Repo-Konfiguration"
   else
     fail "geerbtes fremdes Ziel: Exit $rc, erwartet rot mit Ziel und Hinweis auf .cargo/config.toml"
+  fi
+
+  rc=0; pruefen eltern/kind || rc=$?
+  if [ "$rc" != 0 ] && grep -qF "$ARBEIT/eltern/target" "$ARBEIT/aus"; then
+    ok "vom übergeordneten Checkout geerbtes Ziel: rot, nennt <eltern>/target"
+  else
+    fail "vom übergeordneten Checkout geerbtes Ziel: Exit $rc, erwartet rot mit $ARBEIT/eltern/target"
   fi
 
   for var in CARGO_TARGET_DIR CARGO_BUILD_TARGET_DIR; do
