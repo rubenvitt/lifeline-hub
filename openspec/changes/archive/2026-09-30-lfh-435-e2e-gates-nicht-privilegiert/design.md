@@ -143,7 +143,7 @@ nach jeder Probe per `git diff --stat` sauber.
 
 ### D9 Ablage
 
-Inventar und Prüfliste liegen in `openspec/changes/lfh-435-e2e-gates-nicht-privilegiert/`
+Inventar und Prüfliste liegen in `openspec/changes/archive/2026-09-30-lfh-435-e2e-gates-nicht-privilegiert/`
 (`pruefliste.md`), nicht in `docs/superpowers/`. Die Projektregel ist eine Zeile in `CLAUDE.md`
 unter „Qualitäts-Gates“ und verweist auf die Hilfe und diese Change.
 

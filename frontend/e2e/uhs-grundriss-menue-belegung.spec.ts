@@ -21,16 +21,9 @@ async function ziehe(page: Page, quelle: Locator, ziel: Locator) {
   await page.mouse.up();
 }
 
-// Die Platzmenü-Auslöser bleiben während einer laufenden Belegung im Baum: ein
-// Portal-Overlay stirbt mit seinem Auslöser, und `belegMut.isPending` darf nicht als
-// `schreibgeschuetzt` in die Platzkarte fahren (LFH-457).
-//
-// GEMESSEN WIRD DIE URSACHE, NICHT DIE FOLGE: ein Test, der klickt und auf den Menüeintrag
-// wartet, hinge an einer unabhängigen Schwäche (der erste Klick nach einem Drag öffnet das
-// Dropdown unter Last manchmal nicht, LFH-519) und wäre flaky. Ein MutationObserver zählt die
-// Auslöser über die GANZE Belegung; die Antwort wird künstlich verzögert, damit das
-// beobachtete Fenster breit ist.
-test('UHS Grundriss: die Platzmenü-Auslöser überleben eine laufende Belegung', async ({ page }) => {
+/** Einsatz mit einer Person unter „Noch nicht aufgenommen" und einer aktiven UHS mit zwei
+ *  Behandlungsplätzen. Liefert den Personennamen. */
+async function grundrissMitZweiPlaetzen(page: Page): Promise<string> {
   await anmelden(page);
   const einsatzName = `E2E UHS Menue ${Date.now()}`;
   await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
@@ -64,6 +57,19 @@ test('UHS Grundriss: die Platzmenü-Auslöser überleben eine laufende Belegung'
   await page.getByRole('button', { name: 'In Betrieb nehmen' }).click();
   await expect(page.getByRole('button', { name: 'Plätze bearbeiten' })).toBeVisible();
   await expect(page.locator('button[aria-label^="Platzaktionen"]')).toHaveCount(2);
+  return personName;
+}
+
+// Die Platzmenü-Auslöser bleiben während einer laufenden Belegung im Baum: ein
+// Portal-Overlay stirbt mit seinem Auslöser, und `belegMut.isPending` darf nicht als
+// `schreibgeschuetzt` in die Platzkarte fahren (LFH-457).
+//
+// GEMESSEN WIRD DIE URSACHE, NICHT DIE FOLGE: ein Test, der klickt und auf den Menüeintrag
+// wartet, sähe nur den einen Zeitpunkt seines Klicks. Ein MutationObserver zählt die Auslöser
+// über die GANZE Belegung; die Antwort wird künstlich verzögert, damit das beobachtete Fenster
+// breit ist.
+test('UHS Grundriss: die Platzmenü-Auslöser überleben eine laufende Belegung', async ({ page }) => {
+  const personName = await grundrissMitZweiPlaetzen(page);
 
   // Die Belegung hängt künstlich — erst dadurch ist das Fenster breit genug.
   await page.route('**/uhs-belegung', async (route) => {
@@ -107,4 +113,21 @@ test('UHS Grundriss: die Platzmenü-Auslöser überleben eine laufende Belegung'
   // Beobachtung zu haben.
   expect(proben).toBeGreaterThan(1);
   expect(tief).toBe(2);
+});
+
+// Der erste Klick nach einem Drag öffnet das Platzmenü, und die Wahl wirkt (LFH-519). dnd-kit schluckte bis zu
+// seinem 50-ms-Timer JEDEN Klick; unter Last verhungert der Timer, und der nächste echte Klick
+// ging verloren. Hier fällt der Klick ohne Aktionsprüfung sofort nach dem Loslassen — in genau
+// dieses Fenster (mit dem nackten `PointerSensor` gemessen rot, 3 von 3). Die Koordinaten stehen
+// vor dem Zug fest, damit zwischen Loslassen und Klick kein Rundlauf liegt.
+test('UHS Grundriss: der erste Klick nach einem Drag öffnet das Platzmenü', async ({ page }) => {
+  const personName = await grundrissMitZweiPlaetzen(page);
+  const karte = page.locator('[data-testid="platz-karte"]', { hasText: 'Behandlungsplatz 2' });
+  const k = (await karte.locator('button[aria-label^="Platzaktionen"]').boundingBox())!;
+
+  await ziehe(page, page.getByText(personName).first(), page.getByText('Behandlungsplatz 1'));
+  await page.mouse.click(k.x + k.width / 2, k.y + k.height / 2);
+
+  await page.getByRole('menuitem', { name: 'als in Aufbereitung markieren' }).click();
+  await expect(karte.getByText('aufbereitung')).toBeVisible();
 });

@@ -1,7 +1,7 @@
 /**
  * Hub-Vokabular (`TzProps`, die Kennungen des Altpakets taktische-zeichen) → Zeichenbeschreibung
  * von @einsatzzeichen (`SymbolSpec`). EINZIGE Stelle dieser Übersetzung für die Zeichen der
- * Fachobjekte (LFH-835, openspec/changes/lfh-835-fachobjekt-zeichen-einsatzzeichen/design.md).
+ * Fachobjekte (LFH-835, openspec/changes/archive/2026-09-30-lfh-835-fachobjekt-zeichen-einsatzzeichen/design.md).
  *
  * - D1: Übersetzt wird beim Lesen. DB-Spalten `tz_*`, Snapshots und Offline-Stände behalten die
  *   alten Kennungen; eine Migration erreichte Snapshots und Geräte nicht.

@@ -179,17 +179,8 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
   // CSS-Selektor auf das echte <button>: `getByRole` träfe den Karten-Div, den dnd-kit mit
   // `role="button"` versieht.
   //
-  // Gedämpft wird hier ein BEDIENBEFUND (LFH-519): nach einem Drag unter Last öffnet der
-  // erste Klick das Dropdown manchmal nicht, ein zweiter schon. Vertretbar, weil dieser Test
-  // Kartenhöhen misst — das Menü ist Aufbau, nicht Gegenstand. Gedämpft wird über
-  // begrenztes Neu-Öffnen mit kurzen Fristen, damit ein aus anderem Grund fehlendes Menü
-  // schnell mit Diagnose scheitert. Kein `networkidle` (SSE-Strom bleibt offen).
-  await expect(async () => {
-    await bp2.locator('button[aria-label^="Platzaktionen"]').click({ timeout: 5_000 });
-    await page
-      .getByRole('menuitem', { name: 'als in Aufbereitung markieren' })
-      .click({ timeout: 2_000 });
-  }).toPass({ timeout: 20_000, intervals: [500, 1_000, 2_000] });
+  await bp2.locator('button[aria-label^="Platzaktionen"]').click();
+  await page.getByRole('menuitem', { name: 'als in Aufbereitung markieren' }).click();
   await expect(bp2.getByText('aufbereitung')).toBeVisible();
 
   // Alle Karten messen: Höhen + ob Buttons unter die Kartenunterkante ragen (= geclippt).

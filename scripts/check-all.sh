@@ -25,7 +25,8 @@ set -euo pipefail
 #   --nur schnell    rustfmt, Lint, Typ-Drift, Advisories,
 #                    Selbsttests der Gate-Skripte,
 #                    Migrationsnummern gegen origin/alpha,
-#                    Werkzeugversionen aus mise.toml         (Sekunden bis ~1:30)
+#                    Werkzeugversionen aus mise.toml,
+#                    fertige OpenSpec-Changes archiviert     (Sekunden bis ~1:30)
 #   --nur rust       cargo test (Workspace, Hülle getrennt)   (~17 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
@@ -67,7 +68,7 @@ FE="$ROOT/frontend"
 # Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
 # Nachbarn der gepinnten Node-Version ausfallen. Hier steht bewusst KEINE Zahl.
 PNPM="mise exec -- pnpm"
-SCHRITTE=12
+SCHRITTE=13
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
@@ -81,7 +82,7 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die zwölf Schritte, je als Funktion ──────────────────────────────────────────────
+# ── Die dreizehn Schritte, je als Funktion ───────────────────────────────────────────
 # Funktionen, damit die CI sie auf mehreren Runnern einzeln ansprechen kann. Die Nummer in
 # der Ausgabe ist die Position im GESAMTgate, nicht im laufenden Teilstück.
 
@@ -249,16 +250,25 @@ schritt_12() {
   "$ROOT/scripts/check-toolversionen.sh"
 }
 
+schritt_13() {
+  echo "==> [13/$SCHRITTE] Fertige OpenSpec-Changes sind vor dem Merge archiviert"
+  # Erst der Selbsttest, dann die Prüfung: der Wächter irrt in beide Richtungen still (ließe er
+  # eine fertige Change durch, bliebe ihr Spec-Sync aus; schlüge er auf eine laufende an, würde
+  # er abgeschaltet).
+  "$ROOT/scripts/check-openspec-archiv.test.sh"
+  "$ROOT/scripts/check-openspec-archiv.sh"
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Schritte bekommen je einen eigenen Runner.
-BUENDEL_schnell="1 2 3 6 8 9 10 11 12"
+BUENDEL_schnell="1 2 3 6 8 9 10 11 12 13"
 BUENDEL_rust="4"
 BUENDEL_frontend="5"
 BUENDEL_e2e="7"
-BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12"
+BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13"
 
-# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die zwölf Schritte, jeden einmal —
+# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die dreizehn Schritte, jeden einmal —
 # sonst fiele beim Umsortieren still ein Schritt aus der CI.
 _summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e | sort -n | tr '\n' ' ')"
 _soll="$(printf '%s\n' $BUENDEL_alle | sort -n | tr '\n' ' ')"
