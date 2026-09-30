@@ -7,7 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import KoordinatenEingabe from './KoordinatenEingabe';
 import { setzeOverride } from './koordinatenSystemStore';
-import type { LatLon } from './koordinaten';
+import type { KoordinatenWert } from './koordinatenWert';
 
 afterEach(() => localStorage.clear());
 
@@ -42,12 +42,97 @@ describe('KoordinatenEingabe', () => {
     expect(screen.getByRole('textbox')).toHaveValue('51°30\'00"N 010°15\'00"E');
   });
 
-  it('Invalid-State + onChange(null) bei Müll', () => {
+  // LFH-517: Müll ist nicht „leer“ — der Aufrufer erfährt Wortlaut und Format, um das Speichern
+  // zu verhindern, statt eine bestehende Koordinate still zu löschen.
+  it('Invalid-State + onChange(ungültig) bei Müll', () => {
     const onChange = vi.fn();
     render(<KoordinatenEingabe value={null} onChange={onChange} />);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'quatsch' } });
-    expect(onChange).toHaveBeenLastCalledWith(null);
-    expect(screen.getByText(/ungültig/i)).toBeInTheDocument();
+    expect(onChange).toHaveBeenLastCalledWith({
+      ungueltig: true,
+      text: 'quatsch',
+      format: 'wgs84',
+    });
+    expect(screen.getByText('Ungültige Koordinate im Format WGS84 dezimal')).toBeInTheDocument();
+  });
+
+  function Kontrolliert({ start = null }: { start?: KoordinatenWert }) {
+    const [v, setV] = useState<KoordinatenWert>(start);
+    return (
+      <>
+        <KoordinatenEingabe value={v} onChange={setV} />
+        <button type="button" onClick={() => setV(null)}>
+          zurücksetzen
+        </button>
+        <output data-testid="wert">{JSON.stringify(v)}</output>
+      </>
+    );
+  }
+
+  it('ungültiger Text bleibt nach Fokusverlust stehen, der Feldfehler auch (LFH-517)', () => {
+    render(<Kontrolliert start={{ lat: 51.5, lon: 10.25 }} />);
+    const input = screen.getByRole('textbox');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '51.5; 10.25' } });
+    fireEvent.blur(input);
+    expect(input).toHaveValue('51.5; 10.25');
+    expect(screen.getByText(/Ungültige Koordinate/)).toBeInTheDocument();
+    expect(screen.queryByText(/entspricht/)).not.toBeInTheDocument();
+  });
+
+  it('bewusstes Leeren nach ungültiger Eingabe meldet null und nimmt den Fehler zurück', () => {
+    render(<Kontrolliert />);
+    const input = screen.getByRole('textbox');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'quatsch' } });
+    fireEvent.change(input, { target: { value: '  ' } });
+    fireEvent.blur(input);
+    expect(screen.getByTestId('wert')).toHaveTextContent('null');
+    expect(input).toHaveValue('');
+    expect(screen.queryByText(/Ungültige Koordinate/)).not.toBeInTheDocument();
+  });
+
+  it('ein Reset von außen räumt ungültigen Text und Fehler (Formular-Reset)', () => {
+    render(<Kontrolliert />);
+    const input = screen.getByRole('textbox');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'quatsch' } });
+    fireEvent.blur(input);
+    fireEvent.click(screen.getByRole('button', { name: 'zurücksetzen' }));
+    expect(input).toHaveValue('');
+    expect(screen.queryByText(/Ungültige Koordinate/)).not.toBeInTheDocument();
+  });
+
+  it('Systemwechsel liest ungültigen Text im neuen Format neu (LFH-517)', () => {
+    render(<Kontrolliert />);
+    const input = screen.getByRole('textbox');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '51°30\'00"N 010°15\'00"E' } });
+    fireEvent.blur(input);
+    expect(screen.getByText(/Ungültige Koordinate/)).toBeInTheDocument();
+    act(() => setzeOverride('dms'));
+    expect(JSON.parse(screen.getByTestId('wert').textContent ?? '')).toEqual({
+      lat: 51.5,
+      lon: 10.25,
+    });
+    expect(input).toHaveValue('51°30\'00"N 010°15\'00"E');
+    expect(screen.queryByText(/Ungültige Koordinate/)).not.toBeInTheDocument();
+  });
+
+  it('Systemwechsel mit weiterhin ungültigem Text behält Wortlaut und nennt das neue Format', () => {
+    render(<Kontrolliert />);
+    const input = screen.getByRole('textbox');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'quatsch' } });
+    fireEvent.blur(input);
+    act(() => setzeOverride('utm'));
+    expect(input).toHaveValue('quatsch');
+    expect(screen.getByText('Ungültige Koordinate im Format UTM')).toBeInTheDocument();
+    expect(JSON.parse(screen.getByTestId('wert').textContent ?? '')).toEqual({
+      ungueltig: true,
+      text: 'quatsch',
+      format: 'utm',
+    });
   });
 
   it('leeres Feld → onChange(null)', () => {
@@ -61,7 +146,7 @@ describe('KoordinatenEingabe', () => {
   // überschriebe der useEffect die laufende Eingabe.
   it('überschreibt die laufende Eingabe nicht, wenn value zurückgespeist wird (Form-Loop)', () => {
     function Wrapper() {
-      const [v, setV] = useState<LatLon | null>(null);
+      const [v, setV] = useState<KoordinatenWert>(null);
       return <KoordinatenEingabe value={v} onChange={setV} />;
     }
     render(<Wrapper />);

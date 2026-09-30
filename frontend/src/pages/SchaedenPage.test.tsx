@@ -495,6 +495,43 @@ describe('SchaedenPage', () => {
     expect(koerper[1].ort).toBe('Hauptstr. 17');
   });
 
+  /**
+   * LFH-517: eine ungültige Koordinate sperrt das Anlegen. Sie liegt unter „Weitere Angaben“ —
+   * der Abschnitt bleibt deshalb offen, solange sie ungültig ist; sonst schlüge das Anlegen an
+   * einem verborgenen Feld fehl.
+   */
+  it('ungültige Koordinate legt nichts an und hält „Weitere Angaben“ offen', async () => {
+    const koerper: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(basisSchaden(), { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await modalDialog();
+    await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
+    await oeffneWeitereAngaben(dialog);
+    const feld = within(dialog).getByRole('textbox', { name: 'Koordinate' });
+    await userEvent.type(feld, '52.1 8.5');
+    const schalter = within(dialog).getByRole('button', { name: /Weitere Angaben/ });
+    await userEvent.click(schalter);
+    expect(schalter).toHaveAttribute('aria-expanded', 'true');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    expect(
+      await within(dialog).findByText('Ungültige Koordinate im Format WGS84 dezimal'),
+    ).toBeInTheDocument();
+    expect(koerper).toHaveLength(0);
+
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '52.1, 8.5');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    expect(koerper[0]).toMatchObject({ lat: 52.1, lon: 8.5 });
+  });
+
   it('„Anlegen" schließt den Dialog', async () => {
     const koerper: Record<string, unknown>[] = [];
     server.use(

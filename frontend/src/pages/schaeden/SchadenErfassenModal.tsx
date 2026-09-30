@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { App, Collapse, Form, Input } from 'antd';
 import { Select } from '../../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7,8 +7,12 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { legeSchadenAn, type SchadenEingabe } from '../../api/einsatzSchaden';
 import type { Ausmass, SchadenTyp } from '../../api/types';
 import { ErfassungsModal } from '../../components/Erfassung';
-import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
-import type { LatLon } from '../../anzeige/koordinaten';
+import KoordinatenFeld from '../../anzeige/KoordinatenFeld';
+import {
+  alsLatLon,
+  istUngueltigeKoordinate,
+  type KoordinatenWert,
+} from '../../anzeige/koordinatenWert';
 import {
   liesErfassungsSitzungswert,
   schreibeErfassungsSitzungswert,
@@ -27,7 +31,7 @@ interface Props {
 }
 
 type SchadenFormular = Omit<SchadenEingabe, 'lat' | 'lon'> & {
-  koordinaten?: LatLon | null;
+  koordinaten?: KoordinatenWert;
 };
 
 /**
@@ -83,13 +87,14 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
    * nie, der Wert wanderte sonst still auf den nächsten Schaden.
    */
   async function onErfassen(daten: SchadenFormular) {
+    const koord = alsLatLon(daten.koordinaten);
     await anlegenMutation.mutateAsync({
       typ: daten.typ,
       ausmass: daten.ausmass,
       ort: daten.ort,
       beschreibung: daten.beschreibung ?? null,
-      lat: daten.koordinaten?.lat ?? null,
-      lon: daten.koordinaten?.lon ?? null,
+      lat: koord?.lat ?? null,
+      lon: koord?.lon ?? null,
       ...geschaedigtFelder(geschaedigt, orgId),
     });
   }
@@ -142,29 +147,38 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       <Form.Item label="Beschreibung" name="beschreibung">
         <Input.TextArea rows={2} />
       </Form.Item>
-      <Collapse
-        items={[
-          {
-            key: 'weitere',
-            label: 'Weitere Angaben',
-            children: (
-              <>
-                <Form.Item label="Geschädigt">
-                  <GeschaedigtPicker
-                    einsatzId={einsatzId}
-                    orgName={orgName}
-                    value={geschaedigt}
-                    onChange={setGeschaedigt}
-                  />
-                </Form.Item>
-                <Form.Item label="Koordinate" name="koordinaten">
-                  <KoordinatenEingabe />
-                </Form.Item>
-              </>
-            ),
-          },
-        ]}
-      />
+      <WeitereAngaben>
+        <Form.Item label="Geschädigt">
+          <GeschaedigtPicker
+            einsatzId={einsatzId}
+            orgName={orgName}
+            value={geschaedigt}
+            onChange={setGeschaedigt}
+          />
+        </Form.Item>
+        <KoordinatenFeld label="Koordinate" name="koordinaten" />
+      </WeitereAngaben>
     </ErfassungsModal>
+  );
+}
+
+/**
+ * „Weitere Angaben“ unter den Kernfeldern. Eine ungültige Koordinate sperrt das Anlegen
+ * (LFH-517); der Abschnitt lässt sich dann nicht zuklappen, sonst schlüge das Anlegen an einem
+ * verborgenen Feld fehl (Erfassungs-Norm: was eine Ablehnung auslöst, bleibt sichtbar). Der
+ * Zustand liegt hier, im Dialoginhalt, damit er wie zuvor mit dem Dialog neu beginnt.
+ */
+function WeitereAngaben({ children }: { children: ReactNode }) {
+  const form = Form.useFormInstance<SchadenFormular>();
+  const [offen, setOffen] = useState<string[]>([]);
+  return (
+    <Collapse
+      activeKey={offen}
+      onChange={(keys) => {
+        if (keys.length === 0 && istUngueltigeKoordinate(form.getFieldValue('koordinaten'))) return;
+        setOffen(keys);
+      }}
+      items={[{ key: 'weitere', label: 'Weitere Angaben', children }]}
+    />
   );
 }

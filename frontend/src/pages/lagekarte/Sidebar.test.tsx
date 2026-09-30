@@ -352,6 +352,33 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(onBildPlatzierenFertig).toHaveBeenCalled();
   });
 
+  // LFH-517: eine ungültige Eingabe ist kein Mittelpunkt — der Knopf bleibt gesperrt, der
+  // Wortlaut bleibt nach dem Fokusverlust stehen.
+  it('ungültiger Mittelpunkt sperrt „Mittelpunkt setzen" und bleibt stehen', () => {
+    const onBildMittelpunkt = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[bildLageplan]}
+        bildPlatzierenId={1}
+        bildPlatzierZentrum={{ lat: 50, lon: 9 }}
+        onBildMittelpunkt={onBildMittelpunkt}
+      />,
+    );
+    const feld = screen.getByPlaceholderText('Koordinate eingeben');
+    const knopf = screen.getByRole('button', { name: /Mittelpunkt setzen/i });
+    fireEvent.focus(feld);
+    fireEvent.change(feld, { target: { value: '50.2 9.1' } });
+    fireEvent.blur(feld);
+    expect(feld).toHaveValue('50.2 9.1');
+    expect(knopf).toBeDisabled();
+    fireEvent.focus(feld);
+    fireEvent.change(feld, { target: { value: '50.2, 9.1' } });
+    fireEvent.click(knopf);
+    expect(onBildMittelpunkt).toHaveBeenCalledWith(50.2, 9.1);
+  });
+
   it('schaltet die scharfe Griffsorte um und nennt nur die Griffe, die es gibt (LFH-711)', () => {
     const onGriffModus = vi.fn();
     const props = {
@@ -1360,6 +1387,30 @@ describe('Sidebar: Modusbedienung im Kartenfuß (LFH-765)', () => {
     expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
     // Die Koordinateneingabe bleibt Leisteninhalt.
     expect(screen.getByRole('button', { name: 'Übernehmen' })).toBeInTheDocument();
+  });
+
+  it('ungültige Koordinate sperrt „Übernehmen" (LFH-517)', () => {
+    const onKoordinateEingeben = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        nichtVerortet={[einheit]}
+        platzierungZiel={{ typ: 'einheit', id: 4 }}
+        onKoordinateEingeben={onKoordinateEingeben}
+      />,
+    );
+    const feld = screen.getByPlaceholderText('Koordinate eingeben');
+    const knopf = screen.getByRole('button', { name: 'Übernehmen' });
+    fireEvent.focus(feld);
+    fireEvent.change(feld, { target: { value: 'quatsch' } });
+    fireEvent.blur(feld);
+    expect(feld).toHaveValue('quatsch');
+    expect(knopf).toBeDisabled();
+    fireEvent.focus(feld);
+    fireEvent.change(feld, { target: { value: '51.5, 10.25' } });
+    fireEvent.click(knopf);
+    expect(onKoordinateEingeben).toHaveBeenCalledWith(51.5, 10.25);
   });
 
   it('Gegenprobe ohne Prop: dieselbe Zeile trägt „Abbrechen"', () => {
