@@ -179,6 +179,7 @@ use utoipa::OpenApi;
         crate::personal::PersonalVorschlaege,
         crate::personal::Qualifikation,
         crate::personal::QualifikationRef,
+        crate::routes::auth::AppCode,
         crate::routes::auth::TotpEnrollFinish,
         crate::routes::auth::TotpEnrollStart,
         crate::routes::einsatz::EinstellungenMitOrgDefaults,

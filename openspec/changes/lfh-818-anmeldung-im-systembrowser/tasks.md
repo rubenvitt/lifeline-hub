@@ -2,7 +2,7 @@
 
 ## 1. Server: Einmalcode ausstellen und einlösen
 
-- [ ] 1.1 `src/auth/huelle/` anlegen:
+- [x] 1.1 `src/auth/huelle/` anlegen:
   - `pkce.rs`: Formprüfung von `challenge` und `verifier`, `challenge_aus(verifier)`,
     Vergleich in konstanter Zeit.
   - `state.rs`: Code-Speicher nach dem Muster von `oidc/state.rs`, TTL 60 s, `speichere`,
@@ -11,7 +11,7 @@
   Nachweis: Unit-Tests für den RFC-7636-Vektor (Anhang B), die Formgrenzen (42/43/128/129
   Zeichen, fremde Zeichen) sowie für einmaliges Entnehmen, Ablauf und unbekannten Code
   (`cargo test -p lifeline-hub auth::huelle`).
-- [ ] 1.2 `POST /api/auth/app-code` (`CurrentUser`, Body `{challenge}` über `JsonBody`,
+- [x] 1.2 `POST /api/auth/app-code` (`CurrentUser`, Body `{challenge}` über `JsonBody`,
   Antwort-DTO `{code}` mit `ToSchema`) und `POST /api/auth/app-code/einloesen` (Body
   `{code, verifier}`, Ablauf nach design.md Entscheidung 5) in `routes/auth.rs` anlegen und in
   `src/app.rs` registrieren. Nachweis: neuer Integrationstest `tests/app_anmeldung.rs` mit:
@@ -24,7 +24,7 @@
   - Leerer oder fehlender `verifier` → 400.
   - Die Browsersitzung bleibt gültig.
   - Eine alte `lifeline_sid` in der Einlöse-Anfrage wird gelöscht.
-- [ ] 1.3 Audit und Rate-Limit an der Einlösung ergänzen: `login_ok` bzw.
+- [x] 1.3 Audit und Rate-Limit an der Einlösung ergänzen: `login_ok` bzw.
   `login_fehlgeschlagen` mit dem Anbieter `systembrowser`, `fehlversuch` bei Scheitern, 429 bei
   gesperrter Adresse. Nachweis: Fälle in `tests/app_anmeldung.rs`, die die `auth_audit`-Zeilen
   und 429 nach zehn Fehlversuchen prüfen.
