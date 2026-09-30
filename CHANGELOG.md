@@ -1,3 +1,13 @@
+## [1.0.0-alpha.57](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.56...v1.0.0-alpha.57) (2026-09-30)
+
+### Kräfte und Mittel
+
+- **Neue Paletten-Aktion „Status setzen":** Ermöglicht das direkte Setzen des Status der aktuell fokussierten Zeile über die Befehlspalette, unabhängig davon, ob die Ansicht als Tabelle oder Karte dargestellt wird. Die Aktion ist nur verfügbar, wenn eine Zeile den Fokus hat.
+
+### Technische Verbesserungen
+
+- **Robustere Authentifizierung:** Optimierung der Timing-Messungen in der Authentifizierungsschicht für zuverlässigere Sicherheitsprüfungen bei unterschiedlichen Systemlasten.
+
 ## [1.0.0-alpha.56](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.55...v1.0.0-alpha.56) (2026-09-30)
 
 ### Wichtige Änderungen
