@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { modulRegistry } from '../einsatz/modulRegistry';
-import { SACHGEBIETE } from './sachgebiete';
+import { mitWirksamemLabel, SACHGEBIETE } from './sachgebiete';
 
 describe('SACHGEBIETE', () => {
   it('führt genau die sechs Sachgebiete in Anlage-2-Reihenfolge', () => {
@@ -56,5 +56,23 @@ describe('SACHGEBIETE', () => {
 
   it('S5 hat im Bestand kein Werkzeug (Spec 2.2: 0 Treffer im Repo)', () => {
     expect(SACHGEBIETE.find((s) => s.sachgebiet === 's5')!.werkzeuge).toEqual([]);
+  });
+});
+
+describe('mitWirksamemLabel (LFH-549)', () => {
+  it('nimmt das Mandantenlabel aus dem Katalog, sonst das Standardlabel', () => {
+    const zeilen = mitWirksamemLabel([
+      {
+        funktion: 's4',
+        kuerzel: 'S4',
+        label: 'Versorgung (Logistik)',
+        standard_label: 'Versorgung',
+        art: 'sachgebiet',
+        bezeichnung_pflicht: false,
+      },
+    ]);
+    expect(zeilen.find((z) => z.sachgebiet === 's4')?.label).toBe('Versorgung (Logistik)');
+    expect(zeilen.find((z) => z.sachgebiet === 's2')?.label).toBe('Lage');
+    expect(mitWirksamemLabel([]).map((z) => z.label)).toEqual(SACHGEBIETE.map((z) => z.label));
   });
 });

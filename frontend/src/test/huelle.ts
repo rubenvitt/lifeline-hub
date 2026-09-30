@@ -12,11 +12,24 @@ const skript = readFileSync(
   'utf8',
 );
 
-export function starteMacHuelle() {
+/** Stub der IPC-Brücke, die Tauri vor den Init-Skripten der Hülle einhängt. */
+export interface HuellenIpc {
+  invoke: (befehl: string) => Promise<unknown>;
+}
+
+/**
+ * Führt das Init-Skript aus. Mit `ipc` hängt vorher eine IPC-Brücke im `window`, wie in der
+ * echten Hülle; ohne sie bleibt „Im Browser anmelden“ (LFH-818) aus.
+ */
+export function starteMacHuelle(ipc?: HuellenIpc) {
+  if (ipc) {
+    (window as unknown as { __TAURI_INTERNALS__?: HuellenIpc }).__TAURI_INTERNALS__ = ipc;
+  }
   // Das Skript läuft in der Hülle global, hier über `Function` im selben `window`.
   new Function(skript)();
 }
 
 export function beendeHuelle() {
   delete window.__LIFELINE_HUELLE__;
+  delete (window as unknown as { __TAURI_INTERNALS__?: HuellenIpc }).__TAURI_INTERNALS__;
 }

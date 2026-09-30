@@ -6,6 +6,7 @@ import { useSitzungsWache } from './auth/useSitzungsWache';
 import BenutzerKonfliktDialog from './auth/BenutzerKonfliktDialog';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
+import AppAnmeldungPage from './pages/AppAnmeldungPage';
 import EinsaetzePage from './pages/EinsaetzePage';
 import BenutzerPage from './pages/BenutzerPage';
 import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
@@ -194,6 +195,8 @@ export const appRouten = createRoutesFromElements(
   <Route element={<App />}>
     <Route path="/login" element={<LoginPage />} />
     <Route element={<RequireAuth />}>
+      {/* Bestätigung im Systembrowser für die Mac-App (LFH-818): ohne Rahmen, wie die Anmeldung. */}
+      <Route path="/app-anmeldung" element={<AppAnmeldungPage />} />
       <Route element={<BetriebsLayout />}>
         {/* Ebene 1 — globale Shell */}
         <Route element={<AppLayout />}>

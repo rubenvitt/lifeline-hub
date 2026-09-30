@@ -7,6 +7,8 @@ interface Props {
   nachricht: ChatNachricht | null;
   abschnitte: ZielOption[];
   einheiten: ZielOption[];
+  /** Für die Katalogauswahl der Funktionen (LFH-549). */
+  einsatzId?: number;
   senden: boolean;
   onAbbrechen: () => void;
   onAnlegen: (d: NeuerAuftrag) => Promise<unknown>;
@@ -20,6 +22,7 @@ export default function HeraufstufenAuftragModal({
   offen,
   nachricht,
   abschnitte,
+  einsatzId,
   einheiten,
   senden,
   onAbbrechen,
@@ -39,6 +42,7 @@ export default function HeraufstufenAuftragModal({
         senden={senden}
         abschnitte={abschnitte}
         einheiten={einheiten}
+        einsatzId={einsatzId}
         initialText={nachricht?.inhalt ?? ''}
         zitat={
           nachricht && (

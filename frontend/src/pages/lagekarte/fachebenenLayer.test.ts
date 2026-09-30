@@ -29,6 +29,10 @@ function fakeMap() {
       specs.set(l.id, l);
       reihenfolge.push(l.id);
     }),
+    setPaintProperty: vi.fn((id: string, name: string, wert: unknown) => {
+      const spec = specs.get(id);
+      if (spec) spec.paint = { ...spec.paint, [name]: wert };
+    }),
     removeLayer: vi.fn((id: string) => layers.delete(id)),
     removeSource: vi.fn((id: string) => sources.delete(id)),
     _sources: sources,
@@ -38,6 +42,9 @@ function fakeMap() {
     _reihenfolge: reihenfolge,
   };
 }
+
+/** Die Ebenenfarbe kommt vom Aufrufer (`fachebeneFarbe`, LFH-593) — ein Wert, den keine Ebene hat. */
+const FARBE = '#123456';
 
 interface LayerSpec {
   id: string;
@@ -79,8 +86,8 @@ const leer = { type: 'FeatureCollection', features: [] } as const;
 describe('fachebenenLayer', () => {
   it('legt Source + Polygon-Layer für DWD an (idempotent)', () => {
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.dwd, leer as never);
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.dwd, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.dwd, leer as never, FARBE);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.dwd, leer as never, FARBE);
     expect(m._sources.has(fachebeneSourceId('dwd'))).toBe(true);
     expect(m._layers.has('fachebene-dwd-fill')).toBe(true);
     expect(m._layers.has('fachebene-dwd-line')).toBe(true);
@@ -88,11 +95,34 @@ describe('fachebenenLayer', () => {
     expect(m.addSource).toHaveBeenCalledTimes(1);
   });
 
+  it('färbt bestehende Layer beim Moduswechsel um, ohne sie neu anzulegen (LFH-593)', () => {
+    // Die Layer entstehen einmal; ein Wechsel Tag ↔ Nacht ohne neuen Kartenstil (Karten-Theme
+    // überschrieben) liefe sonst mit dem alten Ton weiter.
+    const NACHT = '#654321';
+    for (const def of [FACHEBENEN.dwd, FACHEBENEN.pegelonline, FACHEBENEN.kritis]) {
+      const m = fakeMap();
+      sorgeFuerFachebeneLayer(m as never, def, leer as never, FARBE);
+      const angelegt = m.addLayer.mock.calls.length;
+      sorgeFuerFachebeneLayer(m as never, def, leer as never, NACHT);
+      expect(m.addLayer).toHaveBeenCalledTimes(angelegt);
+      const farben = [...m._specs.values()].flatMap((l) =>
+        Object.entries(l.paint ?? {})
+          .filter(([k]) => ['fill-color', 'line-color', 'circle-color'].includes(k))
+          .map(([, v]) => JSON.stringify(v)),
+      );
+      expect(farben.length, def.key).toBeGreaterThan(0);
+      for (const f of farben) {
+        expect(f, def.key).toContain(NACHT);
+        expect(f, def.key).not.toContain(FARBE);
+      }
+    }
+  });
+
   it('lässt MapLibre die Feature-ID aus dem Index vergeben (LFH-282)', () => {
     // Ohne `generateId` trägt das Klick-Feature keine ID; überlappende Warnungen zeigten dann keine
     // oder fremde Kennzahlen, ohne dass etwas rot wird.
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.dwd, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.dwd, leer as never, FARBE);
     expect(m.addSource).toHaveBeenCalledWith(
       fachebeneSourceId('dwd'),
       expect.objectContaining({ type: 'geojson', generateId: true }),
@@ -101,7 +131,7 @@ describe('fachebenenLayer', () => {
 
   it('legt Circle-Layer für Punkt-Ebene (pegelonline) an', () => {
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.pegelonline, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.pegelonline, leer as never, FARBE);
     expect(m._layers.has('fachebene-pegelonline-circle')).toBe(true);
   });
 
@@ -110,13 +140,9 @@ describe('fachebenenLayer', () => {
     // `circle-color`/`circle-radius` verwürfe sie still; Ebenen ohne die Properties fallen auf ihre
     // Farbe zurück.
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.pegelonline, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.pegelonline, leer as never, FARBE);
     const paint = m._specs.get('fachebene-pegelonline-circle')?.paint;
-    expect(paint?.['circle-color']).toEqual([
-      'coalesce',
-      ['get', 'farbe'],
-      FACHEBENEN.pegelonline.farbe,
-    ]);
+    expect(paint?.['circle-color']).toEqual(['coalesce', ['get', 'farbe'], FARBE]);
     expect(paint?.['circle-radius']).toEqual(['coalesce', ['get', 'radius'], 5]);
   });
 
@@ -125,16 +151,16 @@ describe('fachebenenLayer', () => {
     // kleiner Nachbar über einen großen `stark_erhoeht`-Punkt. Der Radius ist die Stufe, also
     // sortiert er auch.
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.odl, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.odl, leer as never, FARBE);
     const layout = m._specs.get('fachebene-odl-circle')?.layout;
     expect(layout?.['circle-sort-key']).toEqual(['coalesce', ['get', 'radius'], 0]);
   });
 
   it('legt KRITIS als gebündelte Source an, die Sammelpunkte mit Gewicht zählt (LFH-83)', () => {
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never, FARBE);
     // Zweiter Lauf (Re-Anlage nach setStyle): Source-Optionen greifen nur beim Anlegen.
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never, FARBE);
     expect(m.addSource).toHaveBeenCalledTimes(1);
     const opt = m._sourceOptionen.get(fachebeneSourceId('kritis'));
     expect(opt).toMatchObject({ type: 'geojson', cluster: true, clusterMaxZoom: 14 });
@@ -148,14 +174,14 @@ describe('fachebenenLayer', () => {
 
   it('bündelt nur die Ebenen mit `buendeln` — die übrigen Punktebenen bleiben ungebündelt', () => {
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.odl, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.odl, leer as never, FARBE);
     expect(m._sourceOptionen.get(fachebeneSourceId('odl'))?.cluster).toBeUndefined();
     expect(m._layers.has('fachebene-odl-buendel')).toBe(false);
   });
 
   it('teilt die KRITIS-Features überschneidungsfrei auf Bündel und Einzelpunkt auf (LFH-83)', () => {
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never, FARBE);
     const kreis = m._specs.get('fachebene-kritis-buendel')!;
     const zahl = m._specs.get('fachebene-kritis-buendel-zahl')!;
     const einzel = m._specs.get('fachebene-kritis-circle')!;
@@ -176,7 +202,7 @@ describe('fachebenenLayer', () => {
 
   it('beschriftet das Bündel mit seiner Gesamtzahl in fester Schrift (LFH-83)', () => {
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never, FARBE);
     const zahl = m._specs.get('fachebene-kritis-buendel-zahl')!;
     const feld = JSON.stringify(zahl.layout?.['text-field']);
     // `anzahl` trägt Clustersumme und Zahl eines Sammelpunkts; `point_count` fehlte beim
@@ -190,10 +216,10 @@ describe('fachebenenLayer', () => {
 
   it('zeichnet die Bündel in der Ebenenfarbe mit Kontur und Text/Halo aus den Tokens (LFH-83)', () => {
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never, FARBE);
     const kreis = m._specs.get('fachebene-kritis-buendel')!.paint!;
     const zahl = m._specs.get('fachebene-kritis-buendel-zahl')!.paint!;
-    expect(kreis['circle-color']).toBe(FACHEBENEN.kritis.farbe);
+    expect(kreis['circle-color']).toBe(FARBE);
     expect(kreis['circle-stroke-color']).toBe(farbenHell.flaeche);
     expect(zahl['text-color']).toBe(farbenHell.flaeche);
     expect(zahl['text-halo-color']).toBe(farbenHell.text);
@@ -201,7 +227,7 @@ describe('fachebenenLayer', () => {
 
   it('legt die Zahl über ihren Kreis (Zeichenreihenfolge)', () => {
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never, FARBE);
     expect(m._reihenfolge.indexOf('fachebene-kritis-buendel-zahl')).toBeGreaterThan(
       m._reihenfolge.indexOf('fachebene-kritis-buendel'),
     );
@@ -209,19 +235,19 @@ describe('fachebenenLayer', () => {
 
   it('räumt beim Entfernen alle drei KRITIS-Layer und die Source (idempotent)', () => {
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never, FARBE);
     entferneFachebeneLayer(m as never, 'kritis');
     entferneFachebeneLayer(m as never, 'kritis');
     expect(m._layers.size).toBe(0);
     expect(m._sources.size).toBe(0);
     // Wieder anlegen geht — keine Leiche, an der `addLayer` mit „already exists" scheiterte.
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.kritis, leer as never, FARBE);
     expect(m._layers.has('fachebene-kritis-buendel')).toBe(true);
   });
 
   it('entfernt Layer + Source', () => {
     const m = fakeMap();
-    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.dwd, leer as never);
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.dwd, leer as never, FARBE);
     entferneFachebeneLayer(m as never, 'dwd');
     expect(m._sources.has(fachebeneSourceId('dwd'))).toBe(false);
     expect(m._layers.has('fachebene-dwd-fill')).toBe(false);

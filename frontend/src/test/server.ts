@@ -63,4 +63,16 @@ export const server = setupServer(
   http.get('/api/demo-daten', () =>
     HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
   ),
+  /**
+   * Funktionskatalog (LFH-549) — leer als Default; Empfängerfelder und ETB-Vorschläge fragen ihn
+   * beim Mount ab. Tests mit Katalog überschreiben per `server.use()` oder ersetzen den Hook.
+   */
+  http.get('/api/fuehrungsfunktionen', () => HttpResponse.json([])),
+  /**
+   * Stab eines Einsatzes — 403 als Default: der echte Zustand ohne Stab-Freigabe, aus dem die
+   * Vorschläge „keine Besetzung lesbar“ machen. Tests des Stabs überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/stab', () =>
+    HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
+  ),
 );

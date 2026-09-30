@@ -71,6 +71,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/auth/providers/{id}",
             put(routes::auth::provider_schalten),
         )
+        .route(
+            "/api/auth/app-code",
+            post(routes::auth::app_code_ausstellen),
+        )
+        .route(
+            "/api/auth/app-code/einloesen",
+            post(routes::auth::app_code_einloesen),
+        )
         .route("/api/auth/oidc/start", get(routes::auth::oidc_start))
         .route("/api/auth/oidc/callback", get(routes::auth::oidc_callback))
         .route(
@@ -438,6 +446,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/stab/lagebesprechungen",
             get(routes::stab::lagebesprechungen_liste)
                 .post(routes::stab::lagebesprechung_abschliessen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/checkliste",
+            get(routes::stab::checkliste_laden),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/checkliste/{punkt}",
+            put(routes::stab::checkliste_setzen),
         )
         .route("/api/einsaetze/{id}/meldungen", get(routes::meldung::liste))
         .route(
@@ -953,6 +969,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/org-einstellungen",
             get(routes::org_einstellungen::lesen).put(routes::org_einstellungen::setzen),
+        )
+        .route(
+            "/api/fuehrungsfunktionen",
+            get(routes::fuehrungsfunktion::katalog),
+        )
+        .route(
+            "/api/org-fuehrungsfunktionen/{funktion}",
+            put(routes::fuehrungsfunktion::setzen),
         )
         .route(
             "/api/org-modul-einstellungen",

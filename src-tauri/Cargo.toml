@@ -29,6 +29,17 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 url = "2"
 log = "0.4"
+# PKCE der Anmeldung im Systembrowser (LFH-818): verifier aus dem OS-Zufall, challenge per SHA-256.
+getrandom = "0.3"
+sha2 = "0.11"
+base64 = "0.22"
+
+# ASWebAuthenticationSession für „Im Browser anmelden“ (LFH-818), nur macOS.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSURL", "NSString", "NSError"] }
+objc2-authentication-services = { version = "0.3", features = ["ASWebAuthenticationSession", "ASFoundation", "block2"] }
+block2 = "0.6"
 
 [dev-dependencies]
 tempfile = "3"

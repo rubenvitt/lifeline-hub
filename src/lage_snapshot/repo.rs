@@ -249,7 +249,12 @@ pub async fn erzeuge(
         org_default,
         // Der Snapshot hat keinen abfragenden Benutzer, dessen Rolle oder Sachgebiete gemeint
         // wären.
-        einsatz: einsatz.anzeige(None, None, Vec::new()),
+        einsatz: einsatz.anzeige(
+            None,
+            None,
+            Vec::new(),
+            &crate::fuehrung::Labelkarte::standard(),
+        ),
         ansichten: crate::karten_ansicht::repo::liste(pool, einsatz_id).await?,
         uhs: crate::uhs::repo::liste(pool, einsatz_id, None, None).await?,
         // Der Stand spiegelt das sichtbare Lagebild, ohne stornierte Schäden.

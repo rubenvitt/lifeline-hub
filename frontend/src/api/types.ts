@@ -17,6 +17,7 @@ type S = components['schemas'];
 
 // ============================== Auth ==============================
 export type AuthProvider = S['AuthProviderAnzeige'];
+export type AppCode = S['AppCode'];
 // TOTP-Enroll-DTOs (`/api/auth/totp/enroll/start|finish`).
 export type TotpEnrollStart = S['TotpEnrollStart'];
 export type TotpEnrollFinish = S['TotpEnrollFinish'];
@@ -356,12 +357,34 @@ export type WetterWarnstufe = S['WetterWarnstufe'];
 export type Dokument = S['DokumentAnzeige'];
 export type DokumentKategorie = S['DokumentKategorie'];
 
+// ============================== LFH-549 Funktionskatalog ==============================
+export type Fuehrungsfunktion = S['Fuehrungsfunktion'];
+export type FuehrungsfunktionEintrag = S['FuehrungsfunktionAnzeige'];
+export type AktuelleBesetzung = S['AktuelleBesetzung'];
+
+/** Kein Backend-Schema: Eingabe-Body von `PUT /api/org-fuehrungsfunktionen/{funktion}`. */
+export interface FuehrungsfunktionUpdate {
+  /** Leer = Standardlabel. */
+  label?: string | null;
+  /** Nur für `s7`. */
+  aktiv?: boolean;
+}
+
 // ============================== LFH-46 Stab (S1–S6) ==============================
 export type Stab = S['StabAnzeige'];
 export type Stabsfunktion = S['StabsfunktionAnzeige'];
 export type Lagebesprechung = S['LagebesprechungAnzeige'];
 export type Sachgebiet = S['Sachgebiet'];
 export type BesetzungArt = S['BesetzungArt'];
+export type ChecklistenEintrag = S['ChecklistenEintrag'];
+export type ChecklistenPunkt = S['ChecklistenPunkt'];
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `PUT …/stab/checkliste/{punkt}` (LFH-551), FE-lokal.
+ * Beide Felder optional, mindestens eines Pflicht (sonst 400). `bemerkung: ''` oder `null` löscht.
+ * Ein Bedienziel schickt genau SEIN Feld — der Server lässt das andere unverändert.
+ */
+export type ChecklistenPunktBody = { erledigt: boolean } | { bemerkung: string | null };
 
 /**
  * Kein Backend-Schema: Eingabe-Body von `PUT …/stab/besetzung/{sachgebiet}`, FE-lokal.
@@ -612,7 +635,10 @@ export interface NeueErinnerung {
   /** 'YYYY-MM-DD HH:MM' (UTC). */
   faellig_at: string;
   intervall_minuten?: number;
+  /** Freitext — oder die Bezeichnung bei Führungshilfspersonal/Fachberater (LFH-549). */
   empfaenger_funktion?: string;
+  /** Katalogcode (LFH-549). */
+  empfaenger_funktion_code?: Fuehrungsfunktion;
   /** Generischer Sachbezug (z. B. 'etb' + ETB-Eintrag-ID); both-or-neither. */
   bezug_typ?: string;
   bezug_id?: number;
@@ -632,7 +658,10 @@ export interface NeuerEmpfaenger {
   einheit_id?: number;
   person_id?: number;
   fahrzeug_id?: number;
+  /** Freitext — oder die Bezeichnung bei Führungshilfspersonal/Fachberater (LFH-549). */
   funktion_text?: string;
+  /** Katalogcode beim Funktionsempfänger (LFH-549). */
+  funktion?: Fuehrungsfunktion;
   extern_kategorie?: AdressatKategorie;
   extern_bezeichnung?: string;
 }

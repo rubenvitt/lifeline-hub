@@ -11,6 +11,9 @@ pub struct ErinnerungDaten<'a> {
     pub faellig_at: &'a str,
     pub intervall_minuten: Option<i64>,
     pub empfaenger_funktion: Option<&'a str>,
+    /// Katalogcode (LFH-549); der Handler hat Code und Text per `fuehrung::pruefe_funktion`
+    /// geprüft.
+    pub empfaenger_funktion_code: Option<&'a str>,
     /// Generischer Sachbezug (z. B. 'etb' + ETB-Eintrag-ID); beide oder keiner, vom Handler
     /// validiert. Kein FK, nur per Code geführt.
     pub bezug_typ: Option<&'a str>,
@@ -21,7 +24,7 @@ pub struct ErinnerungDaten<'a> {
 /// `?` gebunden (steht vor der WHERE-Klausel), danach die WHERE-Parameter.
 const ANZEIGE_SELECT: &str =
     "SELECT e.id, e.einsatz_id, e.titel, e.beschreibung, e.faellig_at, e.intervall_minuten, \
-            e.empfaenger_funktion, e.bezug_typ, e.bezug_id, e.quelle, e.status, e.erledigt_at, \
+            e.empfaenger_funktion, e.empfaenger_funktion_code, e.bezug_typ, e.bezug_id, e.quelle, e.status, e.erledigt_at, \
             e.erstellt_von_id, e.erstellt_at, \
             (e.faellig_at <= ?) AS ist_faellig, \
             ks.quittiert_at AS quittiert_at, ks.quittiert_von_id AS quittiert_von_id, \
@@ -95,8 +98,9 @@ pub async fn anlegen_tx(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO erinnerung \
            (einsatz_id, titel, beschreibung, faellig_at, intervall_minuten, \
-            empfaenger_funktion, bezug_typ, bezug_id, erstellt_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            empfaenger_funktion, empfaenger_funktion_code, bezug_typ, bezug_id, \
+            erstellt_von_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.titel)
@@ -104,6 +108,7 @@ pub async fn anlegen_tx(
     .bind(daten.faellig_at)
     .bind(daten.intervall_minuten)
     .bind(daten.empfaenger_funktion)
+    .bind(daten.empfaenger_funktion_code)
     .bind(daten.bezug_typ)
     .bind(daten.bezug_id)
     .bind(ersteller_id)
@@ -516,6 +521,7 @@ mod tests {
             faellig_at: faellig,
             intervall_minuten: intervall,
             empfaenger_funktion: None,
+            empfaenger_funktion_code: None,
             bezug_typ: None,
             bezug_id: None,
         }
@@ -559,6 +565,7 @@ mod tests {
                 faellig_at: "2026-06-11 10:00:00",
                 intervall_minuten: None,
                 empfaenger_funktion: None,
+                empfaenger_funktion_code: None,
                 bezug_typ: Some("etb"),
                 bezug_id: Some(3),
             },

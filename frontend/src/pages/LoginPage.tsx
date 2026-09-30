@@ -1,5 +1,5 @@
 import { Alert, Button, Divider, Form, Input, Space, Tag } from 'antd';
-import { KeyOutlined, LoginOutlined } from '@ant-design/icons';
+import { GlobalOutlined, KeyOutlined, LoginOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { startAuthentication } from '@simplewebauthn/browser';
@@ -14,7 +14,13 @@ import {
 } from '../api/webauthn';
 import type { AuthProvider } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
-import { huelleSperrtPasskey } from '../huelle/faehigkeiten';
+import {
+  APP_ANMELDUNG_EREIGNIS,
+  huelleAnmeldungImBrowser,
+  huelleSperrtPasskey,
+  type AppAnmeldungErgebnis,
+} from '../huelle/faehigkeiten';
+import { Bildmarke } from '../marke/Bildmarke';
 import './LoginPage.css';
 
 interface FormWerte {
@@ -35,6 +41,8 @@ export default function LoginPage() {
   // Der OIDC-Callback leitet jeden Fehlschlag generisch auf `/login?fehler=oidc` (bewusst ohne
   // IdP-Detail) — ohne diese Auswertung sähe ein gescheiterter SSO-Login aus, als wäre nichts
   // passiert.
+  // Sachlicher Hinweis ohne Fehlerfarbe (Abbruch der Anmeldung im Browser, LFH-818).
+  const [hinweis, setHinweis] = useState<string | null>(null);
   const [fehler, setFehler] = useState<string | null>(() =>
     new URLSearchParams(location.search).get('fehler') === 'oidc'
       ? 'Die Anmeldung über Single Sign-On ist fehlgeschlagen'
@@ -42,7 +50,7 @@ export default function LoginPage() {
   );
   // Welche Aktion gerade läuft — steuert den Spinner gezielt (nur der geklickte Knopf lädt),
   // während `disabled` über das Form alle Wege sperrt (kein paralleler Doppel-Login).
-  const [laedt, setLaedt] = useState<'passwort' | 'passkey' | 'totp' | null>(null);
+  const [laedt, setLaedt] = useState<'passwort' | 'passkey' | 'totp' | 'browser' | null>(null);
   /** Riegel gegen zwei gleichzeitige `totp/finish` — s. `totpAbsenden`. */
   const sendetRef = useRef(false);
   const [devBenutzer, setDevBenutzer] = useState<DevBenutzer[]>([]);
@@ -83,6 +91,34 @@ export default function LoginPage() {
     }
   }, []);
 
+  // Ergebnis der Anmeldung im Browser (LFH-818): die Hülle löst den Code im Webview ein und meldet
+  // nur das Ergebnis, nie Code oder verifier. Wie nach dem Passkey steht die Sitzung dann per
+  // Cookie, der Benutzer kommt über `aktualisiere()`.
+  useEffect(() => {
+    function ergebnis(ereignis: Event) {
+      const art = (ereignis as CustomEvent<{ ergebnis?: AppAnmeldungErgebnis }>).detail?.ergebnis;
+      setHinweis(null);
+      if (art === 'angemeldet') {
+        setFehler(null);
+        aktualisiere()
+          .then(() => navigate(zielPfad, { replace: true }))
+          .catch((e) =>
+            setFehler(fehlerText(e, 'Die Anmeldung aus dem Browser ist fehlgeschlagen.')),
+          );
+      } else if (art === 'abgelehnt') {
+        setFehler('Die Anmeldung aus dem Browser ist nicht mehr gültig. Bitte erneut anmelden.');
+      } else if (art === 'fehler') {
+        setFehler('Die Anmeldung aus dem Browser ist fehlgeschlagen.');
+      } else if (art === 'abgebrochen') {
+        // Die Person hat das Browserfenster geschlossen: kein Fehler, aber die Seite sagt es.
+        setFehler(null);
+        setHinweis('Die Anmeldung im Browser wurde abgebrochen.');
+      }
+    }
+    window.addEventListener(APP_ANMELDUNG_EREIGNIS, ergebnis);
+    return () => window.removeEventListener(APP_ANMELDUNG_EREIGNIS, ergebnis);
+  }, [aktualisiere, navigate, zielPfad]);
+
   // Aktive Auth-Provider laden, um das Passwort-Formular bedingt zu rendern.
   useEffect(() => {
     providerListe()
@@ -111,6 +147,9 @@ export default function LoginPage() {
   // oder Passkey-Login aktiv ist; die Benutzername-/Passwort-Felder hängen an `passwortAktiv`,
   // damit im reinen Passkey-Betrieb kein leeres Feld übrig bleibt.
   const formSichtbar = passwortAktiv || passkeyAktiv;
+  // „Im Browser anmelden“ (LFH-818): nur die macOS-Hülle meldet den Weg. Er trägt jeden
+  // Anmeldeweg des Browsers, auch den Passkey, den der Webview selbst nicht kann.
+  const imBrowserAnmelden = huelleAnmeldungImBrowser();
 
   // OIDC ist ein Browser-Redirect-Flow (kein fetch/XHR), daher ein echter Full-Page-Redirect. `von`
   // trägt das Redirect-Ziel weiter, damit der Callback dorthin zurückführt.
@@ -118,8 +157,29 @@ export default function LoginPage() {
     window.location.assign(`/api/auth/oidc/start?von=${encodeURIComponent(zielPfad)}`);
   }
 
+  // Gesperrt nur, solange die Hülle startet — ob der Browser einen Abbruch meldet, ist nicht
+  // gemessen; ein neuer Start ersetzt einen laufenden (Design LFH-818, Entscheidung 6).
+  async function imBrowserStarten() {
+    if (!imBrowserAnmelden) return;
+    setFehler(null);
+    setHinweis(null);
+    setLaedt('browser');
+    try {
+      await imBrowserAnmelden();
+    } catch (e) {
+      setFehler(
+        typeof e === 'string'
+          ? e
+          : fehlerText(e, 'Die Anmeldung im Browser ließ sich nicht starten.'),
+      );
+    } finally {
+      setLaedt(null);
+    }
+  }
+
   async function absenden(werte: FormWerte) {
     setFehler(null);
+    setHinweis(null);
     setLaedt('passwort');
     try {
       const ergebnis = await login(werte.benutzername, werte.passwort);
@@ -219,12 +279,13 @@ export default function LoginPage() {
       <div className="login-karte">
         <div className="login-marke">
           <div className="login-marke__zeile">
-            <span className="login-marke__quadrat" aria-hidden="true" />
+            <Bildmarke hoehe={20} linienFarbe="var(--lfh-text)" quadratFarbe="var(--lfh-marke)" />
             <h1 className="login-marke__name">lifeline-hub</h1>
           </div>
           <p className="login-marke__untertitel">Einsatzführung &amp; Einsatztagebuch</p>
         </div>
         {fehler && <Alert type="error" title={fehler} style={{ marginBottom: 20 }} showIcon />}
+        {hinweis && <Alert type="info" title={hinweis} style={{ marginBottom: 20 }} showIcon />}
         {mfaAktiv ? (
           <Form
             layout="vertical"
@@ -319,13 +380,17 @@ export default function LoginPage() {
             )}
             {/* Nur Passkey aktiv, und die Hülle kann ihn nicht: ohne diesen Satz bliebe die Karte
                 leer (LFH-817). Bleibt Passwort oder OIDC, fehlt der Passkey still. */}
-            {passkeyGesperrt && webauthnAktiv && !formSichtbar && ssoProvider.length === 0 && (
-              <Alert
-                type="info"
-                showIcon
-                title="Die Anmeldung per Passkey geht in der Mac-App nicht. Melde dich im Browser an."
-              />
-            )}
+            {passkeyGesperrt &&
+              !imBrowserAnmelden &&
+              webauthnAktiv &&
+              !formSichtbar &&
+              ssoProvider.length === 0 && (
+                <Alert
+                  type="info"
+                  showIcon
+                  title="Die Anmeldung per Passkey geht in der Mac-App nicht. Melde dich im Browser an."
+                />
+              )}
             {ssoProvider.length > 0 && formSichtbar && <Divider>oder</Divider>}
             {formSichtbar && (
               <Form
@@ -378,6 +443,24 @@ export default function LoginPage() {
                   </Button>
                 )}
               </Form>
+            )}
+            {imBrowserAnmelden && (
+              <>
+                {(formSichtbar || ssoProvider.length > 0) && <Divider>oder</Divider>}
+                <Button
+                  size="large"
+                  block
+                  icon={<GlobalOutlined aria-hidden />}
+                  loading={laedt === 'browser'}
+                  disabled={laedt !== null && laedt !== 'browser'}
+                  onClick={imBrowserStarten}
+                >
+                  Im Browser anmelden
+                </Button>
+                <p className="login-hinweis">
+                  Für Passkeys und Konten, die nur über Single Sign-On angemeldet werden.
+                </p>
+              </>
             )}
           </>
         )}

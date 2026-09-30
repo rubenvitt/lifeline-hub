@@ -1,7 +1,14 @@
 import { Alert, Button, Checkbox, Dropdown, Space, Tooltip, Typography } from 'antd';
 import { CloseOutlined, EyeOutlined, PaperClipOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from 'react';
 import { useNavigate } from 'react-router';
 import { DOKUMENT_ACCEPT } from '../api/dokumente';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
@@ -24,6 +31,8 @@ import { Schnellerfassungszeile, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import MetaChip from './MetaChip';
 import { useFunkrufnamen } from './funkrufnamen';
+import { anVorbelegung, etbStabVorschlaege } from '../fuehrung/funktionsOptionenKern';
+import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
 import BausteinPlatzhalterModal from './BausteinPlatzhalterModal';
 import {
@@ -242,9 +251,12 @@ export default function Schnellerfassung({
   const [metadaten, setMetadaten] = useState<MetadatenWerte>(
     () =>
       initialWerte?.metadaten ??
-      (!berichtigungZu && einsatz.meine_fuehrungsstelle?.trim()
-        ? { an: einsatz.meine_fuehrungsstelle.trim() }
-        : {}),
+      (() => {
+        // Vorrangregel (LFH-46 Entscheidung 13, eingelöst mit LFH-549): Führungsstelle →
+        // erstes eigenes Sachgebiet → nichts.
+        const an = berichtigungZu ? undefined : anVorbelegung(einsatz);
+        return an ? { an } : {};
+      })(),
   );
   const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
   // Einzeilige Chip-Zeile unter `md`: den gerade bearbeiteten Chip waagerecht ins Bild holen
@@ -273,6 +285,13 @@ export default function Schnellerfassung({
   // Funkrufnamen disponierter Fahrzeuge/Einheiten als Vorschläge für von/an.
   // Freitext bleibt Fallback (AC#1).
   const funkrufnamen = useFunkrufnamen(einsatz.id);
+  const funktionen = useFunktionsVorschlaege(einsatz.id);
+  // „Von“/„An“: Funkrufnamen plus Sachgebiete (LFH-545/549) — der Stabsvorschlag tritt neben die
+  // Funkrufnamen, er ersetzt sie nicht.
+  const vonAnOptionen = useMemo(
+    () => [...funkrufnamen, ...etbStabVorschlaege(funktionen)],
+    [funkrufnamen, funktionen],
+  );
 
   // onWerteChange in einer Ref: der Autosave-Effekt feuert NUR auf echte Wertänderungen.
   // In den Deps triggerte jede neue Callback-Referenz des Containers den Effekt erneut
@@ -790,7 +809,7 @@ export default function Schnellerfassung({
               feld={feld}
               editing={editFeld === feld}
               wert={metadaten[feld]}
-              optionen={feld === 'von' || feld === 'an' ? funkrufnamen : undefined}
+              optionen={feld === 'von' || feld === 'an' ? vonAnOptionen : undefined}
               onCommit={commitFeld}
               onCancel={() => {
                 setEditFeld(null);
@@ -811,7 +830,7 @@ export default function Schnellerfassung({
               feld={editFeld}
               editing
               wert={undefined}
-              optionen={editFeld === 'von' || editFeld === 'an' ? funkrufnamen : undefined}
+              optionen={editFeld === 'von' || editFeld === 'an' ? vonAnOptionen : undefined}
               onCommit={commitFeld}
               onCancel={() => {
                 setEditFeld(null);

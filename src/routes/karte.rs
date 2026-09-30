@@ -12,7 +12,7 @@ use crate::karte::registry::repo::{
 };
 use crate::karte::tile_cache;
 use crate::karte::typen::{BuildJob, RegionDto};
-use crate::routes::support::{deserialize_optional_field, pflicht};
+use crate::routes::support::{deserialize_optional_field, etag_von, if_none_match_matcht, pflicht};
 use axum::body::Body;
 use axum::extract::{Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
@@ -509,12 +509,58 @@ mod offline_assets_tests {
     }
 }
 
-/// GET /api/karte/fachebenen/{quelle} — externe Lagedaten als GeoJSON-Umschlag.
+/// `Cache-Control` der Fachebenen-Antwort (LFH-594): der Browser darf sie halten, MUSS aber vor
+/// jeder Verwendung per `If-None-Match` nachfragen — der Poll-Takt bestimmt die Aktualität, nicht
+/// eine geratene Frische. `private`: kein geteilter Proxy-Cache dazwischen, über den Stand
+/// entscheidet allein dieser Server.
+const FACHEBENEN_CACHE_CONTROL: &str = "private, no-cache";
+
+/// Antwort einer Fachebene mit ETag, bei passendem `If-None-Match` als `304` ohne Body (LFH-594).
+///
+/// Der ETag ist der Hash der ausgelieferten Bytes, nicht `gespeichert_at` des Cache-Eintrags:
+/// so ändert er sich genau dann, wenn sich die Antwort ändert — auch bei Ebenen, die nicht aus
+/// einem Eintrag, sondern je Anfrage entstehen (KRITIS aus dem Bestand, Energie je Ausschnitt,
+/// Stale- und Offline-Umschläge). Die `bbox` braucht keinen eigenen Anteil: sie steht in der
+/// URL, unter der der Browser speichert und nachfragt, und zwei Ausschnitte mit gleichem Inhalt
+/// dürfen denselben ETag tragen. Serialisiert wird trotzdem bei jedem Abruf; gespart wird die
+/// Leitung (Autobahn ~1,3 MB je Poll), nicht die Serverarbeit.
+fn fachebene_antwort(
+    antwort: &crate::karte::typen::FachebeneAntwort,
+    req_headers: &HeaderMap,
+) -> Result<Response, AppError> {
+    use sha2::{Digest, Sha256};
+    let bytes = serde_json::to_vec(antwort)
+        .map_err(|e| AppError::Internal(format!("Fachebene nicht serialisierbar: {e}")))?;
+    let etag = etag_von(&hex_kurz(&Sha256::digest(&bytes)));
+    if if_none_match_matcht(req_headers, &etag) {
+        return Ok((
+            StatusCode::NOT_MODIFIED,
+            [
+                (header::ETAG, etag),
+                (header::CACHE_CONTROL, FACHEBENEN_CACHE_CONTROL.to_string()),
+            ],
+        )
+            .into_response());
+    }
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/json".to_string()),
+            (header::ETAG, etag),
+            (header::CACHE_CONTROL, FACHEBENEN_CACHE_CONTROL.to_string()),
+        ],
+        bytes,
+    )
+        .into_response())
+}
+
+/// GET /api/karte/fachebenen/{quelle} — externe Lagedaten als GeoJSON-Umschlag, bedingt
+/// abrufbar über `ETag`/`If-None-Match` (LFH-594, s. [`fachebene_antwort`]).
 pub async fn fachebenen(
     State(state): State<AppState>,
+    headers: HeaderMap,
     PfadParam(quelle): PfadParam<String>,
     Query(params): Query<HashMap<String, String>>,
-) -> Result<Json<crate::karte::typen::FachebeneAntwort>, AppError> {
+) -> Result<Response, AppError> {
     let bbox = params.get("bbox").map(|s| s.as_str());
     // Fachebenen-Cache liegt in einer eigenen Cache-DB (F09/LFH-240: keine Konkurrenz um den
     // operativen Writer); Fallback auf den operativen Pool, falls sie nicht anlegbar ist.
@@ -544,7 +590,7 @@ pub async fn fachebenen(
         }
         _ => return Err(AppError::Validation(format!("Unbekannte Quelle: {quelle}"))),
     };
-    Ok(Json(antwort))
+    fachebene_antwort(&antwort, &headers)
 }
 
 // ===== Admin-CRUD der Karten-Registry (alle hinter AdminUser) =====

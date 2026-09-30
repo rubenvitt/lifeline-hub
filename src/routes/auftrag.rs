@@ -1,5 +1,5 @@
 use crate::app::AppState;
-use crate::auftrag::{repo, validiere_neuen_auftrag, AuftragDetail, NeuerAuftrag};
+use crate::auftrag::{anreichern_alle, repo, validiere_neuen_auftrag, AuftragDetail, NeuerAuftrag};
 use crate::einsatz::einstellungen;
 use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Auftraege;
@@ -60,13 +60,21 @@ pub async fn liste(
             return Err(AppError::Validation("Ungültige Richtung".into()));
         }
     }
-    let liste = repo::liste(
+    let mut liste = repo::liste(
         &state.pool,
         einsatz_id,
         params.status.as_deref(),
         richtung,
         filter.as_ref(),
         &jetzt(),
+    )
+    .await?;
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        &mut liste,
     )
     .await?;
     Ok(Json(liste))
@@ -133,6 +141,15 @@ pub async fn anlegen(
     if let Some(etb_id) = d.auftrag.etb_anordnung_id {
         state.live.publiziere(einsatz_id, etb_id);
     }
+    let mut d = d;
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        std::slice::from_mut(&mut d),
+    )
+    .await?;
     sse(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(d)))
 }
@@ -179,6 +196,15 @@ pub async fn quittieren(
         .await?;
     }
 
+    let mut d = d;
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        std::slice::from_mut(&mut d),
+    )
+    .await?;
     sse(&state, einsatz_id);
     Ok(Json(d))
 }
@@ -265,6 +291,15 @@ pub async fn vollzug(
         _ => return Err(AppError::Validation("Ungültiger Vollzug-Status".into())),
     }
     let d = repo::laden(&state.pool, auftrag_id, &now).await?;
+    let mut d = d;
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        std::slice::from_mut(&mut d),
+    )
+    .await?;
     sse(&state, einsatz_id);
     Ok(Json(d))
 }
@@ -285,6 +320,15 @@ pub async fn abnehmen(
     }
     repo::nimm_ab(&state.pool, auftrag_id, ctx.benutzer.id, &now).await?;
     let d = repo::laden(&state.pool, auftrag_id, &now).await?;
+    let mut d = d;
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        std::slice::from_mut(&mut d),
+    )
+    .await?;
     sse(&state, einsatz_id);
     Ok(Json(d))
 }

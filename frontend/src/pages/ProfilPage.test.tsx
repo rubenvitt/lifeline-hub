@@ -205,6 +205,19 @@ describe('ProfilPage — macOS-Hülle ohne Passkey (LFH-817)', () => {
     expect(screen.queryByRole('button', { name: 'Passkey registrieren' })).not.toBeInTheDocument();
   });
 
+  it('nennt in der Hülle mit „Im Browser anmelden“ den Weg in die Mac-App (LFH-818)', async () => {
+    setzeSecureContext(true);
+    starteMacHuelle({ invoke: vi.fn().mockResolvedValue(undefined) });
+    setup(false, webauthnProvider);
+
+    expect(
+      await screen.findByText(
+        'Passkeys richtest du im Browser ein. In der Mac-App meldest du dich damit über „Im Browser anmelden“ an.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Passkey registrieren' })).not.toBeInTheDocument();
+  });
+
   it('zeigt den Hinweis nicht ohne aktiven webauthn-Provider', async () => {
     setzeSecureContext(true);
     starteMacHuelle();

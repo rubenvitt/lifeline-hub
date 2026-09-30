@@ -250,6 +250,17 @@ for (const modus of ['light', 'dark']) {
             await knopf.click();
             const menue = page.getByRole('menuitem', { name: fall.label, exact: true });
             await expect(menue).toBeVisible();
+            /*
+             * Erst messen, wenn die Einblendung steht (LFH-536). rc-motion richtet das Menü im
+             * Takt `appear-prepare` mit `scale(1)` aus, dort ist es schon sichtbar. Danach setzt
+             * `appear-start` es auf `scale(0)`, bevor die Animation läuft. Gemessen am Punkt:
+             * prepare 6,8 px, start 0 px, active wieder 6,8 px. Traf `boundingBox()` den Takt
+             * `start`, maß der Punkt 0 px (in rund 5 von 25 CI-Läufen).
+             */
+            await expect(
+              page.locator('.ant-dropdown').filter({ has: menue }),
+              'Menü fertig eingeblendet',
+            ).not.toHaveClass(/ant-slide-(up|down)-(enter|appear)/);
             await pruefeMandantenpunkt(menue.locator('[aria-hidden="true"]'), fall.farbe);
             await page.keyboard.press('Escape');
             await expect(menue).not.toBeVisible();

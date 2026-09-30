@@ -47,6 +47,7 @@ import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
 import { dauerText } from '../../stab/lagebesprechungZustand';
 import { abloesungsMarken } from '../../abloesung/einstufung';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
+import { mitBesetzung } from '../../fuehrung/funktionsOptionenKern';
 
 dayjs.extend(utc);
 
@@ -212,10 +213,13 @@ export function offeneAuftraege(auftraege: Auftrag[]): Auftrag[] {
 
 /**
  * „an …" — die Empfängernamen, wie beim Erteilen festgehalten; `null`, wenn keiner (die Seite
- * schreibt dann „ohne Empfänger").
+ * schreibt dann „ohne Empfänger"). Ein Sachgebiet trägt dahinter die aktuelle Besetzung, wenn der
+ * Server sie aufgelöst hat (LFH-549).
  */
 export function empfaengerText(a: Auftrag): string | null {
-  const namen = (a.empfaenger ?? []).map((e) => e.snap_anzeige.trim()).filter(Boolean);
+  const namen = (a.empfaenger ?? [])
+    .filter((e) => e.snap_anzeige.trim())
+    .map((e) => mitBesetzung(e.snap_anzeige.trim(), e.aktuelle_besetzung));
   return namen.length > 0 ? namen.join(', ') : null;
 }
 

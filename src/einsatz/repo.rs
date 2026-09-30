@@ -206,20 +206,49 @@ pub async fn rolle_von(
     Ok(rolle.and_then(|s| EinsatzRolle::parse(&s)))
 }
 
-/// Eigene Führungsstelle, ausdrücklich auf Benutzer UND Einsatz begrenzt.
+/// Eigene Führungsstelle, ausdrücklich auf Benutzer UND Einsatz begrenzt — als
+/// Vorbelegungstext der ETB-Erfassung (LFH-549): Kürzel eines Katalogwerts („S2“),
+/// „Fachberater: THW“ oder der Freitext.
 pub async fn fuehrungsstelle_von(
     pool: &SqlitePool,
     einsatz_id: i64,
     benutzer_id: i64,
 ) -> Result<Option<String>, AppError> {
-    let stelle: Option<Option<String>> = sqlx::query_scalar(
-        "SELECT fuehrungsstelle FROM einsatz_mitgliedschaft WHERE einsatz_id = ? AND benutzer_id = ?",
+    let zeile: Option<(Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT fuehrungsfunktion, fuehrungsstelle FROM einsatz_mitgliedschaft \
+         WHERE einsatz_id = ? AND benutzer_id = ?",
     )
     .bind(einsatz_id)
     .bind(benutzer_id)
     .fetch_optional(pool)
     .await?;
-    Ok(stelle.flatten())
+    let Some((code, text)) = zeile else {
+        return Ok(None);
+    };
+    let karte = labelkarte(pool, einsatz_id).await?;
+    Ok(vorbelegung(&karte, code.as_deref(), text))
+}
+
+/// Vorbelegungstext aus Code und Text einer Führungsstelle (LFH-549).
+fn vorbelegung(
+    karte: &crate::fuehrung::Labelkarte,
+    code: Option<&str>,
+    text: Option<String>,
+) -> Option<String> {
+    let angabe = crate::fuehrung::aus_spalten(code, text);
+    match angabe.funktion {
+        Some(f) => Some(karte.vorbelegung(f, angabe.text.as_deref())),
+        None => angabe.text,
+    }
+}
+
+/// Wirksame Mandantenlabels der Org eines Einsatzes (LFH-549).
+pub async fn labelkarte(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<crate::fuehrung::Labelkarte, AppError> {
+    let mut conn = pool.acquire().await?;
+    crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut conn, einsatz_id).await
 }
 
 /// Alle für den Benutzer lesbaren Einsätze, annotiert mit dessen Rolle
@@ -257,6 +286,7 @@ pub async fn liste_fuer(
         geloescht_at: Option<String>,
         meine_rolle: Option<String>,
         meine_fuehrungsstelle: Option<String>,
+        meine_fuehrungsfunktion: Option<String>,
         pegel_festgelegt: bool,
         evakuierung_angeordnet: bool,
     }
@@ -269,6 +299,7 @@ pub async fn liste_fuer(
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
                 e.retention_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
                 m.einsatz_rolle AS meine_rolle, m.fuehrungsstelle AS meine_fuehrungsstelle, \
+                m.fuehrungsfunktion AS meine_fuehrungsfunktion, \
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
@@ -289,6 +320,19 @@ pub async fn liste_fuer(
     // O(1) in der Zahl der Einsätze; genau das sichert `liste_fuer` zu.
     let mut sachgebiete = crate::stab::repo::sachgebiete_je_einsatz(pool, benutzer.id).await?;
 
+    // Labelkarten je Org, einmal geladen (LFH-549): die Liste bleibt O(1) in der Zahl der
+    // Einsätze, weil ein Benutzer nur Einsätze weniger Orgs sieht.
+    let mut karten: std::collections::HashMap<i64, crate::fuehrung::Labelkarte> =
+        std::collections::HashMap::new();
+    {
+        let mut conn = pool.acquire().await?;
+        for r in &rows {
+            if let std::collections::hash_map::Entry::Vacant(v) = karten.entry(r.org_id) {
+                v.insert(crate::fuehrung::repo::labelkarte(&mut conn, r.org_id).await?);
+            }
+        }
+    }
+
     let jetzt = Utc::now();
     Ok(rows
         .into_iter()
@@ -306,13 +350,20 @@ pub async fn liste_fuer(
         })
         .map(|r| {
             let meine_sachgebiete = sachgebiete.remove(&r.id).unwrap_or_default();
+            let karte = karten.get(&r.org_id).cloned().unwrap_or_default();
             // Dieselbe reine Ableitung wie `Einsatz::anzeige` — aus Werten, die diese
             // Funktion ohnehin schon geladen hat, also ohne dritte Abfrage.
             let meine_funktion = super::funktion::ableiten(
                 &meine_sachgebiete,
                 r.meine_rolle.as_deref().and_then(EinsatzRolle::parse),
+                &karte,
             )
             .map(|f| f.bezeichnung);
+            let meine_fuehrungsstelle = vorbelegung(
+                &karte,
+                r.meine_fuehrungsfunktion.as_deref(),
+                r.meine_fuehrungsstelle,
+            );
             EinsatzAnzeige {
                 id: r.id,
                 org_id: r.org_id,
@@ -336,7 +387,7 @@ pub async fn liste_fuer(
                 anzahl_betroffene_initial: r.anzahl_betroffene_initial,
                 retention_bis: r.retention_bis,
                 meine_rolle: r.meine_rolle,
-                meine_fuehrungsstelle: r.meine_fuehrungsstelle,
+                meine_fuehrungsstelle,
                 // `remove` statt `get` (oben): jede Einsatz-id kommt genau einmal vor, der
                 // Eintrag wird also nicht mehr gebraucht — das spart das Klonen des Vec.
                 meine_sachgebiete,
@@ -957,8 +1008,9 @@ pub async fn mitglieder(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<Vec<MitgliedAnzeige>, AppError> {
-    sqlx::query_as::<_, MitgliedAnzeige>(
-        "SELECT m.benutzer_id, b.anzeigename, b.benutzername, m.einsatz_rolle, m.zugewiesen_at, m.fuehrungsstelle \
+    let mut liste = sqlx::query_as::<_, MitgliedAnzeige>(
+        "SELECT m.benutzer_id, b.anzeigename, b.benutzername, m.einsatz_rolle, m.zugewiesen_at, \
+                m.fuehrungsstelle, m.fuehrungsfunktion \
          FROM einsatz_mitgliedschaft m \
          JOIN benutzer b ON b.id = m.benutzer_id \
          WHERE m.einsatz_id = ? \
@@ -966,8 +1018,18 @@ pub async fn mitglieder(
     )
     .bind(einsatz_id)
     .fetch_all(pool)
-    .await
-    .map_err(Into::into)
+    .await?;
+    // Anzeige der Führungsstelle mit wirksamem Label (LFH-549).
+    let karte = labelkarte(pool, einsatz_id).await?;
+    for m in liste.iter_mut() {
+        let angabe =
+            crate::fuehrung::aus_spalten(m.fuehrungsfunktion.as_deref(), m.fuehrungsstelle.clone());
+        m.fuehrungsstelle_anzeige = match angabe.funktion {
+            Some(f) => Some(karte.anzeige(f, angabe.text.as_deref())),
+            None => angabe.text,
+        };
+    }
+    Ok(liste)
 }
 
 /// Setzt (oder aktualisiert) die Einsatz-Rolle eines Benutzers in einem Einsatz.
@@ -987,7 +1049,9 @@ pub async fn setze_mitgliedschaft(
     einsatz_id: i64,
     benutzer_id: i64,
     rolle: EinsatzRolle,
-    fuehrungsstelle: Option<Option<&str>>,
+    // `None` = Bestand behalten; `Some` setzt Code und Text als Paar (LFH-549), eine leere
+    // Angabe leert beide.
+    fuehrungsstelle: Option<&crate::fuehrung::Funktionsangabe>,
 ) -> Result<(), AppError> {
     // Org-Guard IM SQL (F05/LFH-232), nicht im Handler: dies ist einer von nur zwei
     // produktiven INSERTs in `einsatz_mitgliedschaft` und damit ein Chokepoint der
@@ -995,18 +1059,21 @@ pub async fn setze_mitgliedschaft(
     // vollständig aushebeln — `darf_lesen` prüft bei vorhandener Rolle die Org nicht mehr.
     // Als `WHERE EXISTS` kann kein künftiger Aufrufer den Check vergessen.
     let betroffen = sqlx::query(
-        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle, fuehrungsstelle) \
-         SELECT ?1, ?2, ?3, ?4 \
+        "INSERT INTO einsatz_mitgliedschaft \
+            (einsatz_id, benutzer_id, einsatz_rolle, fuehrungsstelle, fuehrungsfunktion) \
+         SELECT ?1, ?2, ?3, ?4, ?6 \
          WHERE EXISTS (SELECT 1 FROM benutzer b JOIN einsatz e ON e.id = ?1 \
                        WHERE b.id = ?2 AND b.org_id = e.org_id) \
          ON CONFLICT(einsatz_id, benutzer_id) DO UPDATE SET einsatz_rolle = excluded.einsatz_rolle, \
-         fuehrungsstelle = CASE WHEN ?5 THEN excluded.fuehrungsstelle ELSE einsatz_mitgliedschaft.fuehrungsstelle END",
+         fuehrungsstelle = CASE WHEN ?5 THEN excluded.fuehrungsstelle ELSE einsatz_mitgliedschaft.fuehrungsstelle END, \
+         fuehrungsfunktion = CASE WHEN ?5 THEN excluded.fuehrungsfunktion ELSE einsatz_mitgliedschaft.fuehrungsfunktion END",
     )
     .bind(einsatz_id)
     .bind(benutzer_id)
     .bind(rolle.as_str())
-    .bind(fuehrungsstelle.flatten())
+    .bind(fuehrungsstelle.and_then(|a| a.text.as_deref()))
     .bind(fuehrungsstelle.is_some())
+    .bind(fuehrungsstelle.and_then(|a| a.funktion).map(|f| f.as_str()))
     .execute(pool)
     .await?
     .rows_affected();
