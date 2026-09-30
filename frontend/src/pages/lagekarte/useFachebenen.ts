@@ -19,6 +19,7 @@ import {
 import type { FachebenenSichtbar } from './fachebenenAuswahl';
 import type { AktiveFachebene } from './kartenLayer';
 import { globalKeys } from '../../api/queryKeys';
+import { fachebeneFarbe } from '../../theme/statusFarben';
 
 type Feature = FeatureCollection['features'][number];
 
@@ -198,7 +199,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
               : def.klassenfarben
                 ? def.klassenfarben.faerbe(roh, token)
                 : roh;
-          return { def, daten };
+          return { def, daten, farbe: fachebeneFarbe(k, token) };
         });
 
       const fachebenenStatus: Partial<Record<FachebeneQuelle, FachebeneStatus>> = {};

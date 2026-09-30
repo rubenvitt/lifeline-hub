@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { defaultFachebenenSichtbar } from './fachebenenAuswahl';
 import {
@@ -49,13 +52,15 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.energie.pollMs).toBe(0);
     expect(FACHEBENEN.energie.bboxAbhaengig).toBe(true);
   });
-  it('Farbe der Energieanlagen fällt mit keiner Bestandsebene zusammen (LFH-81)', () => {
-    // Handgeschriebene Literale der Bestandsfarben, nicht aus FACHEBENEN gelesen.
-    const bestand = ['#cf1322', '#d48806', '#096dd9', '#08979c', '#c41d7f', '#531dab'];
-    expect(bestand).not.toContain(FACHEBENEN.energie.farbe.toLowerCase());
-    // Und über alle Ebenen: jede Farbe genau einmal — gilt auch für eine achte Ebene.
-    const farben = Object.values(FACHEBENEN).map((f) => f.farbe.toLowerCase());
-    expect(new Set(farben).size).toBe(farben.length);
+  it('trägt keinen Farbwert — die Ebenenfarbe steht im Farbvertrag (LFH-593)', () => {
+    // Töne, Modus und Unterscheidbarkeit prüft `theme/statusFarben.test.ts` (`fachebeneFarbe`).
+    const quelle = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'fachebenen.ts'),
+      'utf8',
+    );
+    expect(quelle).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(quelle).not.toMatch(/rgba?\(/);
+    for (const e of Object.values(FACHEBENEN)) expect(e).not.toHaveProperty('farbe');
   });
   it('führt die Hochwasserebene als Punktebene mit Hintergrund-Polling', () => {
     expect(FACHEBENEN.hochwasser.geometrieTyp).toBe('punkt');
@@ -70,10 +75,6 @@ describe('Fachebenen-Registry', () => {
     expect(def.pollMs).toBe(900_000);
     // Messpunkte, keine Fläche — die Einschränkung steht als Text, nicht als Tooltip.
     expect(def.geltung).toMatch(/Messstationen/);
-  });
-  it('gibt jeder Ebene einen eigenen Rückfallton', () => {
-    const farben = fachebeneKeys().map((k) => FACHEBENEN[k].farbe.toLowerCase());
-    expect(new Set(farben).size).toBe(farben.length);
   });
   it('führt die ODL-Ebene bundesweit, im Takt der Quelle und mit sichtbarem Geltungsbereich', () => {
     expect(FACHEBENEN.odl.geometrieTyp).toBe('punkt');
@@ -118,12 +119,6 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.hochwasser.klassenfarben?.faerbe).toBe(faerbeHochwasser);
     expect(FACHEBENEN.odl.klassenfarben?.faerbe).toBe(faerbeOdl);
     expect(FACHEBENEN.luftqualitaet.klassenfarben?.faerbe).toBe(faerbeLuftqualitaet);
-  });
-  it('gibt der ODL-Ebene einen eigenen Ebenenton', () => {
-    const andere = fachebeneKeys()
-      .filter((k) => k !== 'odl')
-      .map((k) => FACHEBENEN[k].farbe);
-    expect(andere).not.toContain(FACHEBENEN.odl.farbe);
   });
   it('markiert genau kritis und energie als bbox-abhängig', () => {
     expect(istBboxAbhaengig('kritis')).toBe(true);
@@ -186,10 +181,9 @@ describe('Fachebenen-Registry', () => {
     const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
     expect(mitGeltung).toEqual(['odl', 'luftqualitaet', 'kritis', 'autobahn']);
   });
-  it('jede Ebene hat Label, Farbe, Geometrietyp und Poll-Intervall', () => {
+  it('jede Ebene hat Label, Geometrietyp und Poll-Intervall', () => {
     for (const e of Object.values(FACHEBENEN)) {
       expect(e.label).toBeTruthy();
-      expect(e.farbe).toMatch(/^#/);
       expect(['polygon', 'punkt']).toContain(e.geometrieTyp);
       expect(e.pollMs).toBeGreaterThanOrEqual(0);
     }

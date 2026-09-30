@@ -506,7 +506,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
       sorgeFuerZonenLayer(map, zonenDatenRef.current);
       for (const fe of fachebenenRef.current) {
-        sorgeFuerFachebeneLayer(map, fe.def, fe.daten);
+        sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe);
       }
       synchronisiereBildLayer(map, bilderRef.current, 'abschnitte-fill');
     });
@@ -896,7 +896,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       }
       // aktive an-/nachlegen + Daten setzen
       for (const fe of aktiv) {
-        sorgeFuerFachebeneLayer(map, fe.def, fe.daten);
+        sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe);
         setzeFachebeneDaten(map, fe.def.key, fe.daten);
       }
       vorherigeFachebenenRef.current = aktivKeys as Set<string>;

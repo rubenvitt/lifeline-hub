@@ -48,6 +48,7 @@ function fakeMap(istGeladen: () => boolean, stil?: unknown) {
       layers.add(spec.id);
     }),
     moveLayer: vi.fn(),
+    setPaintProperty: vi.fn(),
     getStyle: vi.fn(() => stil),
     feuere: (ev: string) => (handler[ev] ?? []).slice().forEach((h) => h()),
   };
@@ -117,7 +118,11 @@ describe('reAnlegenAlles', () => {
   it('reAnlegenAlles legt aktive Fachebenen mit an', () => {
     const { map } = fakeMap(() => true);
     const aktive = [
-      { def: FACHEBENEN.dwd, daten: { type: 'FeatureCollection' as const, features: [] } },
+      {
+        def: FACHEBENEN.dwd,
+        daten: { type: 'FeatureCollection' as const, features: [] },
+        farbe: '#123456',
+      },
     ];
     reAnlegenAlles(map, baueFlaechenFc([]), baueZonenFc([]), aktive as never);
     expect(map.getLayer('fachebene-dwd-fill')).toBeTruthy();
@@ -169,7 +174,7 @@ describe('Luftqualitätsebene nach Stilwechsel (LFH-79)', () => {
       map,
       () => leereFlaechen,
       () => leereZonen,
-      () => [{ def: FACHEBENEN.luftqualitaet, daten: stationen }] as never,
+      () => [{ def: FACHEBENEN.luftqualitaet, daten: stationen, farbe: '#123456' }] as never,
     );
     map.feuere('render');
     expect(addSource).not.toHaveBeenCalledWith('fachebene-luftqualitaet', expect.anything());
