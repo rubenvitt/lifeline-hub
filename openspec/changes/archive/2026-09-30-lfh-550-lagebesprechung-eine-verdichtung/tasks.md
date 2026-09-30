@@ -104,7 +104,7 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development` (erst rot, dann 
   - Als Beobachter über `e2e/rollen-kern.ts`: Die Aktion fehlt, und der Lagestand steht.
   - Die Trefferfläche des Übernahmeknopfs wird geklickt, nicht nur `toBeVisible`.
   - Beleg: `pnpm e2e -- stab-vorbereitung` ist grün.
-- [ ] 6.7 Die Prüfliste Einsatztauglichkeit (15 Kriterien) für die umgebaute Stab-Seite liegt als
+- [x] 6.7 Die Prüfliste Einsatztauglichkeit (15 Kriterien) für die umgebaute Stab-Seite liegt als
   `pruefliste.md` in dieser Change; jede Zeile hat ein Verdikt. Beleg: Die Datei existiert, und
   keine Zeile steht auf „nicht geprüft“.
 
@@ -114,8 +114,13 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development` (erst rot, dann 
   D1 in Kurzform, den Verweis auf das Fixture und den Archivpfad dieser Change. Den Nachzug zum
   Warnton des überfälligen Termins als ClickUp-Ticket anlegen (`clickup-task-anlegen`). Beleg:
   Die Zeile steht, und die Ticketnummer steht im Design unter Non-Goals.
-- [ ] 7.2 `./scripts/check-all.sh` grün (Schritte 1–13). Beleg: Gesamtstatus des Laufs bzw. die
-  CI des PR.
-- [ ] 7.3 `/opsx:archive lfh-550-lagebesprechung-eine-verdichtung` im selben Branch: Spec-Sync
+- [x] 7.2 `./scripts/check-all.sh` grün (Schritte 1–13). Beleg: die CI des PR
+  [rubenvitt/lifeline-hub#261](https://github.com/rubenvitt/lifeline-hub/pull/261) (`ci.yml` ruft
+  das Skript unverändert). Lokal ohne `mise` einzeln gefahren: rustfmt, Prettier, `pnpm lint`,
+  Typ-Codegen + `tsc`, die Rust-Ziele `verdichtung_fixture`/`modul_zaehler`/`openapi_spec_aktuell`
+  und Lib-Tests, die volle Vitest-Suite (`TZ=Europe/Berlin`; die übrigen Ausfälle liegen außerhalb
+  des Diffs und am Container: Node 22 statt 26 bei `kartenbilder.test.ts`, Last-Timeouts, die
+  einzeln grün sind) sowie die e2e-Specs aus pruefliste.md.
+- [x] 7.3 `/opsx:archive lfh-550-lagebesprechung-eine-verdichtung` im selben Branch: Spec-Sync
   nach `openspec/specs/` und Verweise auf den Archivpfad nachziehen. Beleg:
   `scripts/check-openspec-archiv.sh` ist grün.
