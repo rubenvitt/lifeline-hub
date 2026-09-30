@@ -328,6 +328,18 @@
           }
         }
       },
+      "AppCode": {
+        "type": "object",
+        "description": "Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App.",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
+      },
       "ArchivAkteAnzeige": {
         "type": "object",
         "description": "Die pseudonyme Archivakte (`GET /api/aufbewahrung/einsaetze/{id}`). Vor und nach der\nSchwärzung dieselben Felder, weil jede Angabe aus einer Retain-Spalte stammt.",

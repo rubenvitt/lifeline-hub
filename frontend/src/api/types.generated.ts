@@ -135,6 +135,10 @@ export interface components {
             id: number;
             mime: string;
         };
+        /** @description Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App. */
+        AppCode: {
+            code: string;
+        };
         /**
          * @description Die pseudonyme Archivakte (`GET /api/aufbewahrung/einsaetze/{id}`). Vor und nach der
          *     Schwärzung dieselben Felder, weil jede Angabe aus einer Retain-Spalte stammt.

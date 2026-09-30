@@ -807,8 +807,14 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   https-Adresse des Servers. Abhilfen für Webview-Grenzen gehören in die Hülle (Init-Skript,
   Command), nicht ins Frontend.
 - **Rechte:** Adresse setzen nur die lokale Maske (`capabilities/lokal.json`); die Serverseite
-  bekommt zur Laufzeit genau für ihre Origin nur `drucken` (`server_freigeben`). Jeder neue
-  Command steht im `AppManifest` von `build.rs`, sonst wäre er für jede Seite offen.
+  bekommt zur Laufzeit genau für ihre Origin nur `SERVER_RECHTE` (`drucken`,
+  `anmeldung_im_browser`; `server_freigeben`). Jeder neue Command steht im `AppManifest` von
+  `build.rs`, sonst wäre er für jede Seite offen.
+- **Im Browser anmelden** (LFH-818, `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`):
+  `ASWebAuthenticationSession` (`aswas.rs`), PKCE-`verifier` bleibt in der Hülle, Rücksprung nur
+  aus der Sitzung (`anmeldung::folge`); eingelöst per `eval` im startenden Fenster mit doppelter
+  Origin-Prüfung, Server `POST /api/auth/app-code[/einloesen]` (einheitlich 401, Audit
+  `systembrowser`). Ein `lifeline://anmeldung` von außen bleibt wirkungslos.
 - Adresse, Deeplink (`lifeline://verbinden?server=`, Vertrag für LFH-38) und Speicherung sind
   reine, getestete Funktionen (`adresse.rs`, `deeplink.rs`, `verbindung.rs`).
 - **Neue Fenster und Links** (LFH-782) entscheidet `links.rs` rein, den Server liest es bei
