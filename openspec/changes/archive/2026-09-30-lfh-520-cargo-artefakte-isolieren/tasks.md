@@ -58,7 +58,7 @@
       Gleichzeitig laufen `cargo test --test person_aufnahme_uhs`. Verifikation: A 6/6, B
       genau ein Fehlschlag in `aufnahme_vermisst_…_abgewiesen`. Das Log wird außerhalb des
       Scratchpads gesichert und im PR zitiert.
-- [ ] 5.2 Vollgate `./scripts/check-all.sh` im eigenen Worktree (per `nohup`) ausführen.
+- [x] 5.2 Vollgate `./scripts/check-all.sh` im eigenen Worktree (per `nohup`) ausführen.
       Verifikation: Exit 0, im Log kein `ÜBERSPRUNGEN` und kein „Backend-Binary fehlt“.
       Stand 30.09.2026: 11/12 grün, kein `ÜBERSPRUNGEN`. Schritt 7 hatte 424/425 grün; rot war
       nur `lagekarte-marker-plaketten.spec.ts:82`. Das ist vorbestehend (LFH-844): einzeln
@@ -67,4 +67,5 @@
       relativem `PW_BINAER`, beide Zeilen gleich) erneut. Nach dem Merge von `alpha` (LFH-518)
       ist Schritt 11 lokal rot, und zwar durch `backend-binaer.test.sh` aus LFH-518: eigenes
       `CARGO_HOME` löst unter mise eine Rust-Neuinstallation aus, auch auf reinem `alpha` →
-      LFH-847. `bauziel.test.sh` ist grün. Offen bis LFH-844 und LFH-847 behoben sind.
+      LFH-847. `bauziel.test.sh` ist grün. Abgehakt auf Entscheidung des Users (30.09.2026): Die
+      restlichen Rots liegen schon auf `alpha` und sind eigens erfasst (LFH-844, LFH-847).

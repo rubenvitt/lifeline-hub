@@ -720,7 +720,7 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   gestartete `Backend-Binary:`. Kosten: ~3 min kalt, bis 19 GB je voll gebautem Worktree,
   frei mit dem Worktree. Ein älterer Worktree ohne die Datei erbt unter einem Main-Checkout
   mit ihr dessen Ziel, bis er auf `alpha` vorgezogen ist
-  (`openspec/changes/lfh-520-cargo-artefakte-isolieren/design.md`).
+  (`openspec/changes/archive/2026-09-30-lfh-520-cargo-artefakte-isolieren/design.md`).
 - e2e ist selbsttragend, braucht aber das Debug-Binary; Schritt 7 baut bei Bedarf den Prod-Bundle
   (`prod_bundle_bereitstellen`; Service Worker für `e2e/lagekarte-offline-precache.spec.ts`,
   ausgeliefert vom e2e-Backend über `src/static_files.rs`).
