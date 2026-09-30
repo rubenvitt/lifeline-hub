@@ -24,7 +24,7 @@ Lebenszyklus (storniert).
 - **CAS-Baseline beim Öffnen einfrieren** (`components/useEditSitzung.ts`, gebrandete
   `CasBasis`; `starte` nimmt den Datensatz). Test braucht ein gemountetes `<Form form={form}>`.
 - Legitimes 422 bei Sweeps nicht mitkippen (`lage_zone.rs`, `gefahr.rs`, `einsatzabschnitt.rs`,
-  `sprechgruppe/repo.rs`, `auth.rs` „Code ungültig", `einsatz_uhs.rs`).
+  `sprechgruppe/repo.rs:pruefe_zuordenbar`, `auth.rs` „Code ungültig", `einsatz_uhs.rs`).
 - Handler-Prechecks vor der DB bleiben (`einsatz_schaden.rs`/PATCH, `einsatz_tier.rs`/Status) —
   nur die 400-Erwartung belegt sie. Sicherheitsnetz
   `AppError::status()`: UNIQUE/FK → 409, CHECK → 422.
