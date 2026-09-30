@@ -2336,6 +2336,63 @@
           }
         }
       },
+      "ChecklistenEintrag": {
+        "type": "object",
+        "description": "Ein gespeicherter Punkt der Checkliste.\n\n`erledigt_at`/`erledigt_von_id` sind genau dann gesetzt, wenn `erledigt` (CHECK in der\nTabelle); `bemerkung` fehlt, wenn keine gesetzt ist.",
+        "required": [
+          "punkt",
+          "erledigt",
+          "geaendert_von_id",
+          "geaendert_at"
+        ],
+        "properties": {
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "erledigt": {
+            "type": "boolean"
+          },
+          "erledigt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "erledigt_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "geaendert_at": {
+            "type": "string"
+          },
+          "geaendert_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "punkt": {
+            "$ref": "#/components/schemas/ChecklistenPunkt"
+          }
+        }
+      },
+      "ChecklistenPunkt": {
+        "type": "string",
+        "description": "Punkt der Checkliste. Wire == `as_str()`.\n\n`ALLE` ist die Anzeigereihenfolge und Teil des Vertrags: das Frontend prüft seine Vorlage\ngegen den generierten Typ in derselben Reihenfolge.",
+        "enum": [
+          "aufstellort",
+          "einweisung",
+          "lageskizze",
+          "funkarbeitsplaetze",
+          "sprechgruppen",
+          "etb_eroeffnet",
+          "leitstelle_gemeldet"
+        ]
+      },
       "DemoBericht": {
         "type": "object",
         "description": "Ergebnis eines Imports oder eines Entfernens, je Stammdatenart.",

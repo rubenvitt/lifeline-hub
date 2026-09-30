@@ -190,6 +190,32 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   await page.getByRole('button', { name: 'Abbrechen' }).click();
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeHidden();
 
+  // Handschirm 390 × 844: die Lagekarte bedient den Kontext „mobil" (LFH-557). Unter `lg` steht
+  // die Leiste unter der Karte (am Handschirm per Vorgabe zu), und der Zeichenmodus gibt die Karte
+  // frei (LFH-765); Steuerung und Zeitachse stapeln sich im Fuß über der Karte.
+  await page.setViewportSize({ width: 390, height: 844 });
+  // VORBEDINGUNG: die Zeitachse steht ausgeklappt (die Wahl bei 1024 px ist gemerkt).
+  await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
+  await page.getByRole('button', { name: 'Leiste einblenden' }).click();
+  await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+  await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
+  await expect(page.locator('#lagekarte-leiste')).toBeHidden();
+  await ohneUeberdeckung(page, 'Handschirm 390 px');
+  // Die Steuerung steht ganz im Bild, auch waagerecht (`minWidth: min(320px, 100%)`).
+  await expect(page.locator('[data-lfh="karten-fuss"] > .ant-card')).toBeInViewport({ ratio: 1 });
+  // Über dem Fuß bleibt Karte zum Zeichnen: das Ticket maß hier einmal null Kartenfläche.
+  const kartenBox = (await canvas.boundingBox())!;
+  const oberstesBand = (await page.locator('[data-lfh="karten-fuss"] > *').first().boundingBox())!;
+  const frei = oberstesBand.y - Math.max(kartenBox.y, 0);
+  const steuerHoehe = (await page.getByRole('button', { name: 'Abschließen' }).boundingBox())!
+    .height;
+  expect(
+    frei,
+    `Handschirm 390 px: über dem Kartenfuß bleiben ${frei}px Karte (Steuerhöhe ${steuerHoehe}px)`,
+  ).toBeGreaterThanOrEqual(steuerHoehe * 4);
+  await page.getByRole('button', { name: 'Abbrechen' }).click();
+  await expect(page.getByRole('button', { name: 'Abschließen' })).toBeHidden();
+
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
 });
 

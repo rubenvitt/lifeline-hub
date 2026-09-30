@@ -64,6 +64,52 @@ async fn anlegen_ohne_bezeichnung_ist_400() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
+/// LFH-553 (Spec `stab-versorgung`, „Betriebsstoffe als Nachforderung mit freier Art“):
+/// Betriebsstoffe und Verbrauchsgüter laufen als Nachforderung mit frei beschrifteter Art.
+/// Eine feste Artenliste wäre eine neue Entscheidung (Wiedervorlage nur mit Feldbefund) —
+/// dieser Test hält fest, dass die Art heute nicht gegen eine Liste geprüft wird.
+#[tokio::test]
+async fn betriebsstoff_ist_eine_nachforderung_mit_freier_art() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let b = serde_json::json!({
+        "art": "Kraftstoff Diesel", "bezeichnung": "2 × 200 l für Pumpen EA Süd", "anzahl": 2,
+        "adressat_kategorie": "leitstelle"
+    })
+    .to_string();
+    let (status, n) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &admin,
+        Some(&b),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{n:?}");
+    assert_eq!(n["art"], "Kraftstoff Diesel");
+    assert_eq!(n["status"], "angefordert");
+    let etb_id = n["etb_nachforderung_id"].as_i64().expect("ETB-Verweis");
+    let (_, etb) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/etb"),
+        &admin,
+        None,
+    )
+    .await;
+    let eintrag = etb
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["id"] == etb_id)
+        .expect("ETB-Eintrag der Nachforderung");
+    assert!(eintrag["inhalt"]
+        .as_str()
+        .unwrap()
+        .contains("Kraftstoff Diesel"));
+}
+
 #[tokio::test]
 async fn anlegen_ungueltige_adressat_kategorie_ist_400() {
     let app = setup().await;

@@ -18,6 +18,7 @@ import { modulZielRoute } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzModulPfad, funkplanPfad } from '../routing/deeplinks';
 import BesetzungModal from '../stab/BesetzungModal';
+import ChecklistePaneel from '../stab/ChecklistePaneel';
 import LagebesprechungHistorie from '../stab/LagebesprechungHistorie';
 import LagebesprechungModal from '../stab/LagebesprechungModal';
 import LagebesprechungStand from '../stab/LagebesprechungStand';
@@ -32,18 +33,26 @@ import { einsatzStatus } from '../theme/statusFarben';
 /**
  * Modul „Stab" (LFH-46): Lagebesprechung und Führungsorganisation S1–S6.
  *
- * Eine Vollseite, drei Sektionen, zwei Masken. Die dritte ist die Vorbereitung der
- * Lagebesprechung (LFH-550, `stab/VorbereitungPaneel.tsx`): der Lagestand aus denselben Zahlen wie
- * das Lage-Dashboard, mit Quelle je Zeile; sie speichert nichts.
+ * Eine Vollseite, vier Sektionen, zwei Masken. Reihenfolge: Lagebesprechung, Vorbereitung,
+ * Besetzung, Arbeitsaufnahme.
  *
- * Die Besetzung ist eine `Liste` mit sechs festen Zeilen — hier wird nichts verglichen. Die Zeile ist kein Klickziel; genau eine Aktion „Besetzung
- * ändern" je Zeile, ohne Schreibrecht entfällt sie und ein Satz nennt den Grund.
+ * Die Vorbereitung der Lagebesprechung (LFH-550, `stab/VorbereitungPaneel.tsx`) steht direkt unter
+ * der Lagebesprechung: der Lagestand aus denselben Zahlen wie das Lage-Dashboard, mit Quelle je
+ * Zeile; sie speichert nichts.
+ *
+ * Die Besetzung ist eine `Liste` mit sechs festen Zeilen — hier wird nichts verglichen. Die Zeile
+ * ist kein Klickziel; genau eine Aktion „Besetzung ändern" je Zeile, ohne Schreibrecht entfällt sie
+ * und ein Satz nennt den Grund.
  *
  * Der Kopf trägt genau eine Primäraktion „Lagebesprechung abschließen". Sie öffnet ein Modal und
  * gehört deshalb in den Kopf; ohne Schreibrecht steht sie gesperrt da, und `neueZeile` der
  * Kommandopalette trägt denselben Riegel.
  *
- * Live: das `stab`-Ereignis invalidiert `einsatz-stab` samt Historie.
+ * Das Paneel „Arbeitsaufnahme" (LFH-551) steht ganz unten: die Checkliste
+ * ist nach zehn Minuten erledigt und soll dann weder Lagebesprechung noch Besetzung nach unten
+ * drücken. Eigene Abfrage, eigener Endpunkt — die Stab-Antwort bleibt unberührt.
+ *
+ * Live: das `stab`-Ereignis invalidiert `einsatz-stab` samt Historie und Checkliste.
  */
 export default function StabPage() {
   const { id } = useParams();
@@ -284,6 +293,12 @@ export default function StabPage() {
           </>
         )}
       </Paneel>
+
+      <ChecklistePaneel
+        einsatzId={einsatzId}
+        darfSchreiben={darfSchreiben}
+        style={{ marginTop: token.margin }}
+      />
       {offenerEintrag && darfSchreiben && (
         <BesetzungModal
           key={offenerEintrag.sachgebiet}

@@ -848,6 +848,31 @@ export interface components {
             /** Format: int64 */
             ungelesen: number;
         };
+        /**
+         * @description Ein gespeicherter Punkt der Checkliste.
+         *
+         *     `erledigt_at`/`erledigt_von_id` sind genau dann gesetzt, wenn `erledigt` (CHECK in der
+         *     Tabelle); `bemerkung` fehlt, wenn keine gesetzt ist.
+         */
+        ChecklistenEintrag: {
+            bemerkung?: string | null;
+            erledigt: boolean;
+            erledigt_at?: string | null;
+            /** Format: int64 */
+            erledigt_von_id?: number | null;
+            geaendert_at: string;
+            /** Format: int64 */
+            geaendert_von_id: number;
+            punkt: components["schemas"]["ChecklistenPunkt"];
+        };
+        /**
+         * @description Punkt der Checkliste. Wire == `as_str()`.
+         *
+         *     `ALLE` ist die Anzeigereihenfolge und Teil des Vertrags: das Frontend prüft seine Vorlage
+         *     gegen den generierten Typ in derselben Reihenfolge.
+         * @enum {string}
+         */
+        ChecklistenPunkt: "aufstellort" | "einweisung" | "lageskizze" | "funkarbeitsplaetze" | "sprechgruppen" | "etb_eroeffnet" | "leitstelle_gemeldet";
         /** @description Ergebnis eines Imports oder eines Entfernens, je Stammdatenart. */
         DemoBericht: {
             je_art: components["schemas"]["DemoBerichtZeile"][];
