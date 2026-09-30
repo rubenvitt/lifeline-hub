@@ -255,7 +255,8 @@ pub async fn lagebesprechung_abschliessen(
 
 #[derive(Debug, Deserialize)]
 pub struct ChecklistenPunktSetzen {
-    /// Fehlt = unverändert. `null` zählt wie „fehlt“ und ist damit kein gültiger Wunsch.
+    /// Fehlt = unverändert. `null` zählt wie „fehlt“: allein (ohne `bemerkung`) ist der Aufruf
+    /// damit leer und scheitert mit 400.
     #[serde(default)]
     erledigt: Option<bool>,
     /// **Tri-State**: fehlt = unverändert, `null` oder leer = Bemerkung löschen.
@@ -311,13 +312,16 @@ pub async fn checkliste_setzen(
         AppError::Validation(format!("Unbekannter Punkt der Checkliste '{punkt}'"))
     })?;
     let eingabe = validiere_punkt(req)?;
-    let (liste, etb_id) =
+    let gesetzt =
         checkliste::setzen(&state.pool, einsatz_id, punkt, ctx.benutzer.id, &eingabe).await?;
-    if let Some(etb_id) = etb_id {
+    if let Some(etb_id) = gesetzt.etb_eintrag_id {
         state.live.publiziere(einsatz_id, etb_id);
     }
-    sse(&state, einsatz_id);
-    Ok(Json(liste))
+    // Ohne Wirkung (nie berührter Punkt, nichts anzulegen) kein Live-Ereignis.
+    if gesetzt.geschrieben {
+        sse(&state, einsatz_id);
+    }
+    Ok(Json(gesetzt.liste))
 }
 
 #[cfg(test)]

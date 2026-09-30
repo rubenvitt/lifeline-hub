@@ -128,6 +128,8 @@ describe('StabPage', () => {
     const r = await screen.findByRole('region', { name: 'Arbeitsaufnahme' });
     await waitFor(() => expect(within(r).getAllByRole('checkbox')).toHaveLength(7));
     for (const b of within(r).getAllByRole('checkbox')) expect(b).toBeDisabled();
+    // Der Grund steht EINMAL im Kopf der Seite, nicht noch einmal im Paneel.
+    expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(within(r).queryByRole('alert')).toBeNull();
   });
 

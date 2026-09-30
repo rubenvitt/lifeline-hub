@@ -233,6 +233,84 @@ async fn ungueltige_eingaben_sind_400_und_speichern_nichts() {
     assert_eq!(status, StatusCode::OK);
 }
 
+/// Ein Aufruf ohne Wirkung auf einen nie berührten Punkt legt KEINE Zeile an und meldet nichts
+/// live: „offen, ohne Bemerkung“ ist der Normalzustand, eine Leerzeile vom Server wäre erfunden.
+#[tokio::test]
+async fn aufruf_ohne_wirkung_legt_keine_zeile_an() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let mut rx = live.abonniere(einsatz);
+    for body in [
+        r#"{"erledigt":false}"#,
+        r#"{"bemerkung":null}"#,
+        r#"{"bemerkung":"   "}"#,
+        r#"{"erledigt":false,"bemerkung":null}"#,
+    ] {
+        let (status, json) = setzen(&app, &admin, einsatz, "sprechgruppen", body).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(json.as_array().map(Vec::len), Some(0), "{body}: {json:?}");
+    }
+    assert_eq!(
+        laden(&app, &admin, einsatz).await.as_array().map(Vec::len),
+        Some(0)
+    );
+    let mut stab = 0;
+    while let Ok(n) = rx.try_recv() {
+        if n.event.as_str() == "stab" {
+            stab += 1;
+        }
+    }
+    assert_eq!(stab, 0, "ohne Wirkung kein Live-Ereignis");
+}
+
+/// Wer den Haken ZUERST gesetzt hat, bleibt stehen; wer zuletzt schrieb, steht in `geaendert_*`.
+#[tokio::test]
+async fn erneuter_haken_eines_anderen_behaelt_den_ersten_erlediger() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kraft = benutzer_anlegen(&app, &admin, "kraft", "fuehrungskraft").await;
+    rolle_setzen(&app, &admin, einsatz, kraft, "fuehrungspersonal").await;
+    let kraft_cookie = login_cookie(&app, "kraft", "kraftpw1").await;
+
+    let (_, json) = setzen(&app, &admin, einsatz, "einweisung", r#"{"erledigt":true}"#).await;
+    let admin_id = zeile(&json, "einweisung").unwrap()["erledigt_von_id"]
+        .as_i64()
+        .unwrap();
+    assert_ne!(admin_id, kraft);
+
+    let (status, json) = setzen(
+        &app,
+        &kraft_cookie,
+        einsatz,
+        "einweisung",
+        r#"{"erledigt":true}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    let z = zeile(&json, "einweisung").unwrap();
+    assert_eq!(z["erledigt_von_id"], admin_id, "der erste Erlediger bleibt");
+    assert_eq!(
+        z["geaendert_von_id"], kraft,
+        "der letzte Schreiber steht in geaendert_von_id"
+    );
+
+    let (_, json) = setzen(
+        &app,
+        &kraft_cookie,
+        einsatz,
+        "einweisung",
+        r#"{"bemerkung":"x"}"#,
+    )
+    .await;
+    assert_eq!(
+        zeile(&json, "einweisung").unwrap()["erledigt_von_id"],
+        admin_id
+    );
+}
+
 // ---------- ETB ----------
 
 /// Die ersten sechs Punkte schreiben NIE ins ETB — weder beim Haken noch bei der Umkehr noch bei

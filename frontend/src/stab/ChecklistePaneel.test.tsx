@@ -133,6 +133,45 @@ describe('ChecklistePaneel', () => {
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
+  /**
+   * Zwei Zeilen kurz nacheinander: jede Zeile hält IHREN Lade- und Fehlerzustand. Mit einer
+   * gemeinsamen Mutation zeigte der Zustand nur den letzten Aufruf — A verlöre Sperre und Fehler.
+   * Der Server ist hier zustandsbehaftet, damit ein Nachladen den echten Stand liefert.
+   */
+  it('zwei Zeilen kurz nacheinander: A bleibt gesperrt, solange sie läuft, und behält ihren Fehler', async () => {
+    const serverstand: ChecklistenEintrag[] = [];
+    let gibAFrei: () => void = () => {};
+    const aWartet = new Promise<void>((r) => (gibAFrei = r));
+    server.use(
+      http.get(PFAD, () => HttpResponse.json(serverstand)),
+      http.put(`${PFAD}/:punkt`, async ({ params }) => {
+        if (params.punkt === 'aufstellort') {
+          await aWartet;
+          return HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 });
+        }
+        serverstand.push(eintrag(params.punkt as ChecklistenPunkt, true));
+        return HttpResponse.json(serverstand);
+      }),
+    );
+    renderMitProviders(<ChecklistePaneel einsatzId={1} darfSchreiben />);
+
+    const a = await box('Aufstellort des ELW festgelegt');
+    await userEvent.click(a);
+    await userEvent.click(await box('Lageskizze begonnen'));
+    await waitFor(async () => expect(await box('Lageskizze begonnen')).toBeChecked());
+    expect(await box('Aufstellort des ELW festgelegt'), 'A läuft noch').toBeDisabled();
+
+    gibAFrei();
+    const zeileA = (await box('Aufstellort des ELW festgelegt')).closest('li') as HTMLElement;
+    await waitFor(() => expect(zeileA.querySelector('[data-fehler]')).not.toBeNull());
+    expect(zeileA).toHaveTextContent('Einsatz ist abgeschlossen');
+    expect(await box('Aufstellort des ELW festgelegt')).not.toBeChecked();
+    expect(await box('Aufstellort des ELW festgelegt')).toBeEnabled();
+    expect(await box('Lageskizze begonnen'), 'B bleibt erledigt').toBeChecked();
+    const zeileB = (await box('Lageskizze begonnen')).closest('li') as HTMLElement;
+    expect(zeileB.querySelector('[data-fehler]')).toBeNull();
+  });
+
   it('Fehler ≠ leer: ohne Daten steht ein Fehler mit Wiederholen statt sieben offener Punkte', async () => {
     rendere({ getStatus: 500 });
     const r = await paneel();

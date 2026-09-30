@@ -86,6 +86,15 @@ pub struct PunktEingabe {
     pub bemerkung: Option<Option<String>>,
 }
 
+/// Ergebnis von [`setzen`]: die Checkliste nach dem Commit, ob überhaupt geschrieben wurde (nur
+/// dann ein Live-Ereignis), und die id eines ETB-Belegs für den ETB-Kurzruf des Aufrufers.
+#[derive(Debug)]
+pub struct Gesetzt {
+    pub liste: Vec<ChecklistenEintrag>,
+    pub geschrieben: bool,
+    pub etb_eintrag_id: Option<i64>,
+}
+
 const SELECT_EINTRAEGE: &str = "SELECT punkt, erledigt, erledigt_at, erledigt_von_id, bemerkung, \
             geaendert_von_id, geaendert_at \
      FROM einsatz_stab_checkliste WHERE einsatz_id = ?";
@@ -121,28 +130,37 @@ async fn laden_conn(
 /// `erledigt_at` stehen und schreibt keinen zweiten Beleg. Der Zeilen-Write selbst ist
 /// unbedingt (`geaendert_at` hält den Klick fest) — dieselbe Aufteilung wie bei der Besetzung.
 ///
-/// Liefert `(Checkliste, etb_eintrag_id)`; die id trägt den ETB-Kurzruf des Aufrufers.
+/// Ein Aufruf ohne Wirkung auf einen Punkt ohne Zeile (Haken entfernen, Bemerkung leeren)
+/// schreibt nichts — [`Gesetzt::geschrieben`] ist dann `false`.
 pub async fn setzen(
     pool: &SqlitePool,
     einsatz_id: i64,
     punkt: ChecklistenPunkt,
     benutzer_id: i64,
     eingabe: &PunktEingabe,
-) -> Result<(Vec<ChecklistenEintrag>, Option<i64>), AppError> {
+) -> Result<Gesetzt, AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
 
-    let etb_id = write_retry!(pool, |conn| {
+    let wirkung = write_retry!(pool, |conn| {
         super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
 
-        // Vorherstand: nur der Haken entscheidet über den Beleg.
-        let vorher: bool = sqlx::query_scalar(
+        // Vorherstand: nur der Haken entscheidet über den Beleg. `None` = keine Zeile.
+        let vorher_zeile: Option<bool> = sqlx::query_scalar(
             "SELECT erledigt FROM einsatz_stab_checkliste WHERE einsatz_id = ? AND punkt = ?",
         )
         .bind(einsatz_id)
         .bind(punkt.as_str())
         .fetch_optional(&mut *conn)
-        .await?
-        .unwrap_or(false);
+        .await?;
+        let vorher = vorher_zeile.unwrap_or(false);
+
+        // Ohne Zeile legt nur ein Haken oder eine Bemerkung eine an. „Offen, ohne Bemerkung“ ist
+        // der Normalzustand; eine Zeile, die ihn nur wiederholt, wäre ein erfundener Datensatz
+        // (Muster `repo::entfernen`: ohne Wirkung kein Write und kein Live-Ereignis).
+        let legt_an = eingabe.erledigt == Some(true) || matches!(eingabe.bemerkung, Some(Some(_)));
+        if vorher_zeile.is_none() && !legt_an {
+            return Ok(None);
+        }
 
         // Ein fehlendes Feld bleibt unverändert — deshalb je Feld ein Schalter statt eines
         // Vollersatzes: zwei Schirme (A hakt ab, B schreibt eine Bemerkung) überschreiben sich
@@ -191,19 +209,23 @@ pub async fn setzen(
         // Der Beleg ist BEDINGT: nur ein wirksamer Übergang des Hakens. Ein Doppelklick oder ein
         // Retry nach verlorener Antwort schriebe sonst eine scheinbar zweite Meldung ins ETB.
         if erledigt == vorher {
-            return Ok(None);
+            return Ok(Some(None));
         }
         match punkt.etb_beleg(erledigt) {
             Some(inhalt) => {
                 crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, etb_startwert, inhalt)
                     .await
-                    .map(Some)
+                    .map(|id| Some(Some(id)))
             }
-            None => Ok(None),
+            None => Ok(Some(None)),
         }
     })?;
 
-    Ok((laden(pool, einsatz_id).await?, etb_id))
+    Ok(Gesetzt {
+        liste: laden(pool, einsatz_id).await?,
+        geschrieben: wirkung.is_some(),
+        etb_eintrag_id: wirkung.flatten(),
+    })
 }
 
 #[cfg(test)]

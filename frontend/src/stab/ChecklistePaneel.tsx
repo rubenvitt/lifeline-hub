@@ -1,10 +1,10 @@
 import { Checkbox, Flex, Skeleton } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useId, type CSSProperties } from 'react';
+import { useCallback, useId, useRef, type CSSProperties } from 'react';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeCheckliste, setzeChecklistenPunkt } from '../api/stab';
-import type { ChecklistenPunkt, ChecklistenPunktBody } from '../api/types';
+import type { ChecklistenEintrag, ChecklistenPunkt, ChecklistenPunktBody } from '../api/types';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Liste, ListenEintrag } from '../components/Liste';
 import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
@@ -12,11 +12,6 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { Paneel, monoStil, useRollen } from '../components/instrument';
 import type { ChecklistenVorlage } from './checkliste';
 import { CHECKLISTE, checklistenZeileStil, eintragFuer, erledigtAnzahl } from './checkliste';
-
-interface Auftrag {
-  punkt: ChecklistenPunkt;
-  daten: ChecklistenPunktBody;
-}
 
 /**
  * Checkliste Arbeitsaufnahme der Führungseinheit (LFH-551) als drittes Paneel der Stabseite.
@@ -30,6 +25,9 @@ interface Auftrag {
  *   Rückfrage (LFH-363); ins ETB schreibt allein der Meldungspunkt, und das entscheidet der Server.
  * - **Nicht optimistisch:** der Haken zeigt den Serverstand. Während der Anfrage ist die Box
  *   gesperrt; die Quittung ist der Haken selbst, kein Toast.
+ * - **Mutationen je Zeile und je Bedienziel** (Haken, Bemerkung): eine gemeinsame `useMutation`
+ *   zeigte nur den LETZTEN Aufruf — wer zwei Zeilen kurz nacheinander abhakte, verlor an der
+ *   ersten Sperre und Fehler. Die Antworten gleicht {@link useChecklistenAbgleich} ab.
  * - **Fehler an die Zeile** (`data-fehler`), nicht als Toast; der nächste Aufruf räumt ihn.
  * - **Bemerkung** über `BemerkungZelle`; jedes Bedienziel schickt genau SEIN Feld (Design D3).
  * - **Ohne Schreibrecht** sind die Boxen gesperrt; den Grund nennt der `RechteHinweis` im Kopf der
@@ -45,23 +43,15 @@ export default function ChecklistePaneel({
   /** Außenabstand liefert der Einbauort. */
   style?: CSSProperties;
 }) {
-  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: einsatzKeys.stabCheckliste(einsatzId),
     queryFn: () => ladeCheckliste(einsatzId),
   });
-  const mutation = useMutation({
-    mutationFn: ({ punkt, daten }: Auftrag) => setzeChecklistenPunkt(einsatzId, punkt, daten),
-    // Die Antwort ist die ganze Checkliste nach dem Commit — sie IST der neue Stand. Andere
-    // Schirme zieht das `stab`-Ereignis nach.
-    onSuccess: (liste) => queryClient.setQueryData(einsatzKeys.stabCheckliste(einsatzId), liste),
-  });
+  const abgleich = useChecklistenAbgleich(einsatzId);
 
   const daten = query.data;
   const gescheitert = query.isError && !daten;
   const standVeraltet = query.isError && daten != null;
-  const laufend = mutation.isPending ? mutation.variables : undefined;
-  const gescheiterterPunkt = mutation.isError ? mutation.variables?.punkt : undefined;
 
   return (
     <Paneel
@@ -87,12 +77,11 @@ export default function ChecklistePaneel({
             rowKey={(v) => v.punkt}
             renderItem={(v) => (
               <ChecklistenZeile
+                einsatzId={einsatzId}
                 vorlage={v}
                 eintrag={eintragFuer(daten, v.punkt)}
                 darfSchreiben={darfSchreiben}
-                laufend={laufend?.punkt === v.punkt ? laufend.daten : undefined}
-                fehler={gescheiterterPunkt === v.punkt ? mutation.error : undefined}
-                onSetzen={(daten) => mutation.mutate({ punkt: v.punkt, daten })}
+                abgleich={abgleich}
               />
             )}
           />
@@ -102,27 +91,82 @@ export default function ChecklistePaneel({
   );
 }
 
+/**
+ * Gleicht die Antworten mehrerer gleichzeitiger Aufrufe mit dem Cache ab. Jede Antwort ist die
+ * ganze Checkliste nach IHREM Commit — kommen zwei Antworten vertauscht an, überschriebe die
+ * ältere die neuere. Deshalb:
+ * - Läuft sonst nichts, IST die Antwort der neue Stand.
+ * - Überlappen Aufrufe, übernimmt jede Antwort sofort nur den Eintrag IHRES Punkts (die Zeile
+ *   quittiert ohne Warten auf die anderen), und der letzte Abschluss lädt die Liste neu.
+ * - Ein Fehler lädt neu, sobald nichts mehr läuft: der Haken zeigt danach sicher den Serverstand.
+ * Zähler im Ref statt `isMutating`, damit kein zweiter Key-Raum neben der Registry entsteht.
+ */
+function useChecklistenAbgleich(einsatzId: number) {
+  const queryClient = useQueryClient();
+  const laufend = useRef(0);
+  const ueberlappt = useRef(false);
+  const beginn = useCallback(() => {
+    laufend.current += 1;
+    if (laufend.current > 1) ueberlappt.current = true;
+  }, []);
+  const ende = useCallback(
+    (punkt: ChecklistenPunkt, liste: ChecklistenEintrag[] | undefined) => {
+      laufend.current -= 1;
+      const key = einsatzKeys.stabCheckliste(einsatzId);
+      if (laufend.current > 0) {
+        if (liste) {
+          const eigener = liste.find((e) => e.punkt === punkt);
+          queryClient.setQueryData<ChecklistenEintrag[]>(key, (alt) => [
+            ...(alt ?? []).filter((e) => e.punkt !== punkt),
+            ...(eigener ? [eigener] : []),
+          ]);
+        }
+        return;
+      }
+      if (liste && !ueberlappt.current) {
+        queryClient.setQueryData(key, liste);
+        return;
+      }
+      ueberlappt.current = false;
+      void queryClient.invalidateQueries({ queryKey: key });
+    },
+    [einsatzId, queryClient],
+  );
+  return { beginn, ende };
+}
+
+type Abgleich = ReturnType<typeof useChecklistenAbgleich>;
+
 function ChecklistenZeile({
+  einsatzId,
   vorlage,
   eintrag,
   darfSchreiben,
-  laufend,
-  fehler,
-  onSetzen,
+  abgleich,
 }: {
+  einsatzId: number;
   vorlage: ChecklistenVorlage;
   eintrag: ReturnType<typeof eintragFuer>;
   darfSchreiben: boolean;
-  /** Der Body einer laufenden Anfrage für DIESEN Punkt. */
-  laufend: ChecklistenPunktBody | undefined;
-  fehler: unknown;
-  onSetzen: (daten: ChecklistenPunktBody) => void;
+  abgleich: Abgleich;
 }) {
   const { token } = useRollen();
   const beschreibungId = useId();
   const erledigt = eintrag?.erledigt ?? false;
-  const hakenLaeuft = laufend != null && 'erledigt' in laufend;
-  const bemerkungLaeuft = laufend != null && 'bemerkung' in laufend;
+  // Je Bedienziel eine eigene Mutation: Haken und Bemerkung laufen unabhängig, und Sperre,
+  // Ladeanzeige und Fehler gehören genau dem Ziel, das sie ausgelöst hat.
+  const mutationOptionen = {
+    mutationFn: (daten: ChecklistenPunktBody) =>
+      setzeChecklistenPunkt(einsatzId, vorlage.punkt, daten),
+    onMutate: abgleich.beginn,
+    onSettled: (liste: ChecklistenEintrag[] | undefined) => abgleich.ende(vorlage.punkt, liste),
+  };
+  const haken = useMutation(mutationOptionen);
+  const bemerkung = useMutation(mutationOptionen);
+  const bemerkungNeu =
+    bemerkung.isPending && bemerkung.variables && 'bemerkung' in bemerkung.variables
+      ? bemerkung.variables.bemerkung
+      : undefined;
   // Einrücken bis unter den Text: Box + Abstand, damit Quelle und Bemerkung zur Zeile gehören.
   const einzug = token.paddingSM + token.controlInteractiveSize + token.paddingSM;
 
@@ -131,13 +175,13 @@ function ChecklistenZeile({
       <Flex vertical gap={token.marginXXS}>
         <Checkbox
           checked={erledigt}
-          disabled={!darfSchreiben || hakenLaeuft}
+          disabled={!darfSchreiben || haken.isPending}
           aria-describedby={beschreibungId}
-          onChange={(e) => onSetzen({ erledigt: e.target.checked })}
+          onChange={(e) => haken.mutate({ erledigt: e.target.checked })}
           style={{
             ...checklistenZeileStil(token),
             // Gesperrt verspricht die Hand keinen Klick.
-            cursor: darfSchreiben ? 'pointer' : 'default',
+            cursor: darfSchreiben && !haken.isPending ? 'pointer' : 'default',
           }}
         >
           {vorlage.text}
@@ -158,18 +202,22 @@ function ChecklistenZeile({
         </div>
         <div style={{ paddingInlineStart: einzug }}>
           <BemerkungZelle
-            wert={
-              bemerkungLaeuft && 'bemerkung' in laufend ? laufend.bemerkung : eintrag?.bemerkung
-            }
+            // Während des Speicherns den NEUEN Wert zeigen (Vertrag von `laeuft`).
+            wert={bemerkung.isPending ? bemerkungNeu : eintrag?.bemerkung}
             kennung={vorlage.text}
             darfSchreiben={darfSchreiben}
-            laeuft={bemerkungLaeuft}
-            onSpeichern={(wert) => onSetzen({ bemerkung: wert })}
+            laeuft={bemerkung.isPending}
+            onSpeichern={(wert) => bemerkung.mutate({ bemerkung: wert })}
           />
         </div>
-        {fehler != null && (
+        {(haken.isError || bemerkung.isError) && (
           <div data-fehler style={{ paddingInlineStart: einzug }}>
-            <SpeicherFehler fehler={fehler} />
+            <Flex vertical gap={token.marginXXS}>
+              {haken.isError && <SpeicherFehler fehler={haken.error} />}
+              {bemerkung.isError && (
+                <SpeicherFehler fehler={bemerkung.error} titel="Bemerkung nicht gespeichert" />
+              )}
+            </Flex>
           </div>
         )}
       </Flex>

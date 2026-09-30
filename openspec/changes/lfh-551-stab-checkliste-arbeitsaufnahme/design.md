@@ -84,7 +84,9 @@ CREATE TABLE einsatz_stab_checkliste (
 );
 ```
 
-Eine Zeile entsteht beim ersten PUT (Upsert). Wird ein Haken entfernt, bleibt die Zeile mit
+Eine Zeile entsteht beim ersten PUT, der einen Haken setzt oder eine Bemerkung speichert
+(Upsert). Ein Aufruf ohne Wirkung auf einen Punkt ohne Zeile (Haken entfernen, Bemerkung
+leeren) schreibt nichts und meldet nichts live (Nachtrag aus dem Review). Wird ein Haken entfernt, bleibt die Zeile mit
 `erledigt = 0` stehen. Sie wird nicht gelöscht, weil sonst eine Bemerkung verloren ginge. Der GET
 liefert nur vorhandene Zeilen, die sieben festen Zeilen baut das Frontend aus der Vorlage (Muster
 `StabAnzeige.besetzung`). Eine Leerzeile vom Server wäre ein erfundener Datensatz.
@@ -156,7 +158,7 @@ Jede Zeile ist ein `ListenEintrag`:
   ganze Zeilenbreite des Labels ist die Trefffläche. Die antd-Box selbst ist nur
   `controlInteractiveSize` groß (16 px) und erbt `controlHeight` **nicht**. Das Label trägt deshalb
   die zwei Angaben aus LFH-365 über eine reine, exportierte Stilfunktion `checklistenZeileStil(token)`:
-  `minHeight: token.controlHeight` und Polster aus `paddingSM`/`padding`. Der Vitest prüft die
+  `minHeight: token.controlHeight` und Polster aus `paddingXS` (Block) und `paddingSM` (Inline). Der Vitest prüft die
   Stilfunktion mit Literalen für kompakt und Handschuh, Gate 3 misst die gerenderte Höhe.
 - **Zweite Zeile:** Quelle (sekundär) und bei erledigten Punkten „erledigt HH:MM“ (Mono,
   `tabular-nums`, Anzeigezone des Einsatzes).
@@ -166,8 +168,13 @@ Jede Zeile ist ein `ListenEintrag`:
   (`besetzungRechteText`), ein zweiter Hinweis entfällt.
 - **Fehler an die Seite:** Scheitert ein Haken, zeigt die Zeile den Fehler (`data-fehler`, Text
   unter der Zeile), kein Toast. Der Haken springt auf den Serverstand zurück. Optimistisch ist
-  nichts: Der Haken zeigt den Stand der Antwort, während der Anfrage steht die Box auf `loading`
-  bzw. `disabled`. Ein Erfolg bekommt keinen Toast, der Haken selbst ist die Quittung.
+  nichts: Der Haken zeigt den Stand der Antwort, während der Anfrage ist die Box gesperrt. Ein
+  Erfolg bekommt keinen Toast, der Haken selbst ist die Quittung.
+- **Mutation je Zeile und Bedienziel** (Nachtrag aus dem Review): eine gemeinsame `useMutation`
+  zeigte nur den letzten Aufruf; wer zwei Zeilen kurz nacheinander abhakte, verlor an der ersten
+  Sperre und Fehler. Jede Zeile hält deshalb je eine Mutation für Haken und Bemerkung. Weil jede
+  Antwort die ganze Liste nach IHREM Commit trägt, übernimmt bei überlappenden Aufrufen jede
+  Antwort nur ihren eigenen Punkt, und der letzte Abschluss lädt neu (`useChecklistenAbgleich`).
 - **Fehler ≠ leer:** Scheitert der GET, steht dort `SeitenFehler` mit Wiederholen, nicht sieben
   offene Punkte (Muster Besetzung).
 
