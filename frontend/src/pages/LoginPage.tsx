@@ -146,12 +146,16 @@ export default function LoginPage() {
   // nicht. Anders als `AuthContext.login` steht die Session hier bereits nach `totp/finish` per
   // Cookie — der Client lädt den Benutzer nur per `aktualisiere()` (`/api/auth/me`) nach.
   async function totpAbsenden(werte: TotpFormWerte) {
-    // Doppelabsende-Riegel: die sechste Ziffer sendet selbst ab, der Knopf bleibt als Rückfallweg —
-    // zwei Wege zu diesem Aufruf. Wer die letzte Ziffer tippt und sofort „Anmelden" drückt, löste
-    // sonst zwei `totp/finish` aus; der zweite scheitert, weil ein TOTP-Code genau einmal gültig
-    // ist, und meldete „Code ungültig". Der Riegel steht hier und nicht am Knopf: die Eingabetaste
-    // erreicht einen `loading`-Knopf gar nicht erst (wie `sendetRef` in
-    // `components/Erfassung.tsx`).
+    // Doppelabsende-Riegel: die sechste Ziffer sendet selbst ab, der Knopf und die Eingabetaste
+    // bleiben als Rückfallweg — mehrere Wege zu diesem Aufruf. Ein zweites `totp/finish` scheitert,
+    // weil ein TOTP-Code genau einmal gültig ist, und meldete „Code ungültig" für einen Code, der
+    // gerade funktioniert hat.
+    //
+    // Gemessen in Chromium (LFH-533): Tippen, Klicken und Autofill kommen nicht durch. Vor dem Ende
+    // der Validierung entdoppelt rc-field-form selbst (`lastValidatePromise`), danach sperrt
+    // `disabled` die Maske. Offen bleibt das Fenster zwischen dem Aufruf von `onFinish` und dem
+    // Commit von `disabled`: ein Absenden darin ging ohne Riegel 10 von 10 Mal doppelt raus. Der
+    // Riegel steht deshalb hier und nicht am Knopf (wie `sendetRef` in `components/Erfassung.tsx`).
     if (sendetRef.current) return;
     sendetRef.current = true;
     setFehler(null);
