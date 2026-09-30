@@ -33,6 +33,8 @@ function zeitachsePaneel(page: Page) {
 test('Nachtrag an der Einheit wird zur Einsatzdauer im Meldebild — Schreib- und Lesezweig', async ({
   page,
 }) => {
+  // Zwei Rollenwechsel samt Anmeldung: unter der vollen parallelen Suite reichen 30 s nicht.
+  test.setTimeout(90_000);
   await anmeldenAlsAdmin(page);
   const { einsatzId, einheitId } = await seedeEinheit(page);
   const schreiber = await benutzerAnlegen(page, 'fuehrungspersonal', 'E2E Zeitachse FP');
