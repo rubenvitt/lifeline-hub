@@ -1,4 +1,4 @@
-import type { PersonalStatus, StatusKategorie } from './types';
+import type { ZeitachseMarke, PersonalStatus, StatusKategorie } from './types';
 import { katalogApi } from './katalogApi';
 
 export interface StatusEingabe {
@@ -6,6 +6,8 @@ export interface StatusEingabe {
   kategorie: StatusKategorie;
   farbe: string | null;
   sortier: number;
+  /** LFH-552: fehlt = unverändert, `null` = Marke entfernen. */
+  zeitachse_marke?: ZeitachseMarke | null;
 }
 
 const api = katalogApi<PersonalStatus, StatusEingabe>('/api/personal-status');

@@ -41,6 +41,9 @@ export interface KatalogVerwaltungProps<T extends KatalogEintrag, W extends obje
   deaktivierenFrage: string;
   /** Die `Form.Item`s des Bearbeiten-Dialogs. */
   felder: ReactNode;
+  /** Optionaler Hinweis über der Tabelle, abgeleitet aus dem geladenen Katalog (erst nach dem
+   *  Abruf, nie aus einem leeren Ladezustand). */
+  vorTabelle?: (eintraege: readonly T[]) => ReactNode;
 }
 
 export default function KatalogVerwaltung<T extends KatalogEintrag, W extends object>({
@@ -58,6 +61,7 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
   bearbeitenTitel,
   deaktivierenFrage,
   felder,
+  vorTabelle,
 }: KatalogVerwaltungProps<T, W>) {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
@@ -177,16 +181,19 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
           onWiederholen={() => void query.refetch()}
         />
       ) : (
-        <KatalogTabelle
-          rowKey="id"
-          loading={query.isLoading}
-          dataSource={query.data ?? []}
-          columns={[...spalten, ...aktionsSpalte]}
-          // Genannt wird nur das Label: die Suche liest Rohwerte, und nach den übrigen
-          // Spalten tippt niemand (Kategorien bedient ihr Spaltenfilter).
-          suche={{ platzhalter: 'Label' }}
-          locale={{ emptyText: leerText }}
-        />
+        <>
+          {vorTabelle && query.data ? vorTabelle(query.data) : null}
+          <KatalogTabelle
+            rowKey="id"
+            loading={query.isLoading}
+            dataSource={query.data ?? []}
+            columns={[...spalten, ...aktionsSpalte]}
+            // Genannt wird nur das Label: die Suche liest Rohwerte, und nach den übrigen
+            // Spalten tippt niemand (Kategorien bedient ihr Spaltenfilter).
+            suche={{ platzhalter: 'Label' }}
+            locale={{ emptyText: leerText }}
+          />
+        </>
       )}
       {/* Nur Bearbeiten, kein `serie`. */}
       <ErfassungsModal<W>

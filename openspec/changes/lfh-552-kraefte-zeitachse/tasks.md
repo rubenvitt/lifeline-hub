@@ -37,9 +37,9 @@ Code). Vor jedem „fertig“ gelten `verification-before-completion` und `reque
 
 ## 6. Frontend: Kern, Query-Keys, Katalog
 
-- [ ] 6.1 `kraefte/zeitachse.ts`: Dauer aus Perioden und Uhr, Formatierung („7 h 40“, „40 min“), Leerfall `null`, Herkunftswort. Nachweis: Vitest für jedes Szenario von „Einsatzdauer und Ruhezeit“ und für die Herkunftswörter.
-- [ ] 6.2 `einsatzKeys.kraefteZeitachse` in `api/queryKeys.ts`, eingeordnet unter `EINSATZ_STREAM_EVENTS` (`einheit`, `personal`, `fahrzeug`, `abloesung`) und `LAGEBILD_OFFLINE`, dazu der API-Client. Nachweis: `queryKeys.guard.test.ts`, `queryKeys.test.ts` und `lagebildOffline.guard.test.ts` sind grün.
-- [ ] 6.3 `stammdaten/StatusKatalogTab.tsx`: Auswahl „Zeitachse“ je Eintrag (leer = keine) und ein Hinweis, wenn kein Eintrag eine Marke trägt. Nachweis: ein Komponententest für das Setzen und Leeren und für den Hinweis.
+- [x] 6.1 `kraefte/zeitachse.ts`: Dauer aus Perioden und Uhr, Formatierung („7 h 40“, „40 min“), Leerfall `null`, Herkunftswort. Nachweis: Vitest für jedes Szenario von „Einsatzdauer und Ruhezeit“ und für die Herkunftswörter.
+- [x] 6.2 `einsatzKeys.kraefteZeitachse` in `api/queryKeys.ts`, eingeordnet unter `EINSATZ_STREAM_EVENTS` (`einheit`, `personal`, `fahrzeug`, `abloesung`) und `LAGEBILD_OFFLINE`, dazu der API-Client. Nachweis: `queryKeys.guard.test.ts`, `queryKeys.test.ts` und `lagebildOffline.guard.test.ts` sind grün.
+- [x] 6.3 `stammdaten/StatusKatalogTab.tsx`: Auswahl „Zeitachse“ je Eintrag (leer = keine) und ein Hinweis, wenn kein Eintrag eine Marke trägt. Nachweis: ein Komponententest für das Setzen und Leeren und für den Hinweis.
 
 ## 7. Frontend: Anzeige
 

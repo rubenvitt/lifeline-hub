@@ -28,6 +28,7 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.modulZaehler).toBe('einsatz-modul-zaehler');
     expect(EINSATZ_KEYS.dokumente).toBe('einsatz-dokumente');
     expect(EINSATZ_KEYS.abloesungen).toBe('einsatz-abloesungen');
+    expect(EINSATZ_KEYS.kraefteZeitachse).toBe('einsatz-kraefte-zeitachse');
     expect(EINSATZ_KEYS.betreuung).toBe('einsatz-betreuung');
     expect(EINSATZ_KEYS.verpflegung).toBe('einsatz-verpflegung');
     expect(EINSATZ_KEYS.schadenAnhaenge).toBe('einsatz-schaden-anhaenge');
@@ -52,6 +53,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.abschnitte,
       EINSATZ_KEYS.fuehrungskraefte,
       EINSATZ_KEYS.modulZaehler,
+      // Statuswechsel und Nachtrag an einer Person schreiben ihre Zeitachse (LFH-552).
+      EINSATZ_KEYS.kraefteZeitachse,
     ]);
   });
 
@@ -61,6 +64,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.einheiten,
       // Die Einheitenliste ist eine gezählte Menge, wer sie invalidiert, zieht den Modulzähler mit.
       EINSATZ_KEYS.modulZaehler,
+      // Ein markierter Fahrzeugstatus schreibt die Zeitachse der Einheit (LFH-552).
+      EINSATZ_KEYS.kraefteZeitachse,
     ]);
   });
 
@@ -74,6 +79,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.modulZaehler,
       // Einheitsname und Auflösung wirken auf die Ablösungsschichten.
       EINSATZ_KEYS.abloesungen,
+      // Handstatus, Nachtrag und Streichung an einer Einheit (LFH-552).
+      EINSATZ_KEYS.kraefteZeitachse,
     ]);
   });
 
@@ -86,6 +93,13 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.modulZaehler,
       EINSATZ_KEYS.abloesungen,
       EINSATZ_KEYS.betreuung,
+    ]);
+  });
+
+  it('abloesung trifft Schichten und die Kräfte-Zeitachse — der Vollzug beendet die Periode (LFH-552)', () => {
+    expect(EINSATZ_STREAM_EVENTS.abloesung).toEqual([
+      'einsatz-abloesungen',
+      'einsatz-kraefte-zeitachse',
     ]);
   });
 
@@ -258,6 +272,31 @@ describe('einsatzKeys (Factory-Output)', () => {
       'laufend',
     ]);
     expect(einsatzKeys.abloesungVorgaben(1)).toEqual(['einsatz-abloesungen', 1, 'vorgaben']);
+    // Kräfte-Zeitachse (LFH-552): Listen und Einzelsichten UNTER einem Prefix, damit die vier
+    // Ereignisse `einheit`/`personal`/`fahrzeug`/`abloesung` alle treffen.
+    expect(einsatzKeys.kraefteZeitachse(1)).toEqual(['einsatz-kraefte-zeitachse', 1]);
+    expect(einsatzKeys.kraefteZeitachseEinheiten(1)).toEqual([
+      'einsatz-kraefte-zeitachse',
+      1,
+      'einheiten',
+    ]);
+    expect(einsatzKeys.kraefteZeitachsePersonal(1)).toEqual([
+      'einsatz-kraefte-zeitachse',
+      1,
+      'personal',
+    ]);
+    expect(einsatzKeys.kraefteZeitachseEinheit(1, 7)).toEqual([
+      'einsatz-kraefte-zeitachse',
+      1,
+      'einheit',
+      7,
+    ]);
+    expect(einsatzKeys.kraefteZeitachsePerson(1, 9)).toEqual([
+      'einsatz-kraefte-zeitachse',
+      1,
+      'person',
+      9,
+    ]);
     expect(einsatzKeys.betreuung(1)).toEqual(['einsatz-betreuung', 1]);
     // Kopfzahl UNTER dem Betreuungs-Prefix. Der Stichtag ist der Wire-String, kein Objekt.
     expect(einsatzKeys.betreuungKopfzahl(1, '2026-09-23 12:00:00')).toEqual([
