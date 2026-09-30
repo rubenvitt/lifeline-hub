@@ -522,9 +522,13 @@ pub async fn setzen(
             return Ok(None);
         }
 
+        // Wirksames Mandantenlabel (LFH-549): der Text ist ein Snapshot seiner Entstehung.
+        let karte = crate::fuehrung::repo::labelkarte_fuer_einsatz(conn, einsatz_id).await?;
         let inhalt = format!(
             "{}: Besetzung → {} (vorher: {})",
-            sachgebiet.kurz_mit_label(),
+            karte.kurz_mit_label(crate::fuehrung::Fuehrungsfunktion::aus_sachgebiet(
+                sachgebiet
+            )),
             nachher,
             vorher
         );
@@ -572,9 +576,12 @@ pub async fn entfernen(
         if betroffen == 0 {
             return Ok(None);
         }
+        let karte = crate::fuehrung::repo::labelkarte_fuer_einsatz(conn, einsatz_id).await?;
         let inhalt = format!(
             "{}: Besetzung → nicht vergeben (vorher: {})",
-            sachgebiet.kurz_mit_label(),
+            karte.kurz_mit_label(crate::fuehrung::Fuehrungsfunktion::aus_sachgebiet(
+                sachgebiet
+            )),
             vorher
         );
         let etb_id =

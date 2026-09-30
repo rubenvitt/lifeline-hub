@@ -118,6 +118,15 @@ export interface components {
          * @enum {string}
          */
         AdressatKategorie: "leitstelle" | "nachbar_ea" | "uebergeordnet" | "andere_bos";
+        /** @description Die aktuelle Besetzung eines Sachgebiets, zur Lesezeit. */
+        AktuelleBesetzung: {
+            /**
+             * @description Person bzw. Stelle; fehlt bei „nicht vergeben“, „bei der Einsatzleitung“ und nach der
+             *     Schwärzung.
+             */
+            name?: string | null;
+            zustand: components["schemas"]["BesetzungsZustand"];
+        };
         /**
          * @description Öffentliche Darstellung eines Anhangs — ohne die Bytes (`daten`), die nur
          *     über den Download-Endpoint ausgeliefert werden.
@@ -331,6 +340,7 @@ export interface components {
         AuftragEmpfaengerAnzeige: {
             /** Format: int64 */
             abschnitt_id?: number | null;
+            aktuelle_besetzung?: components["schemas"]["AktuelleBesetzung"] | null;
             /** Format: int64 */
             auftrag_id: number;
             /** Format: int64 */
@@ -340,6 +350,8 @@ export interface components {
             extern_kategorie?: components["schemas"]["AdressatKategorie"] | null;
             /** Format: int64 */
             fahrzeug_id?: number | null;
+            funktion?: components["schemas"]["Fuehrungsfunktion"] | null;
+            /** @description Freitext — oder Bezeichnung bei `funktion` Führungshilfspersonal/Fachberater (LFH-549). */
             funktion_text?: string | null;
             /** Format: int64 */
             id: number;
@@ -350,11 +362,20 @@ export interface components {
             quittiert_von_id?: number | null;
             snap_anzeige: string;
         };
-        /** @description Aufträge: offen (offen/in Arbeit), davon überfällig. */
+        /** @description Aufträge: offen (offen/in Arbeit), davon in Arbeit, davon überfällig. */
         AuftragsZaehler: {
+            /**
+             * Format: int64
+             * @description Davon mit Bearbeitungsstatus „in Arbeit" (LFH-550, „davon in Arbeit" im Überblick).
+             */
+            in_arbeit: number;
             /** Format: int64 */
             offen: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Davon überfällig — nur unter den offenen: ein vollzogener Auftrag mit Quittungslücke
+             *     zählt nicht (LFH-550).
+             */
             ueberfaellig: number;
         };
         /** @description Eine Ausgabe gegen ein Zeitfenster. Von der Nachforderung trägt sie NUR die Kennung. */
@@ -595,6 +616,13 @@ export interface components {
          * @enum {string}
          */
         BesetzungArt: "einsatzleitung" | "personal" | "extern" | "rueckwaertig";
+        /**
+         * @description Besetzungszustand eines Sachgebiets aus Sicht eines Empfängers. Anders als
+         *     [`BesetzungArt`] mit „nicht vergeben“ als eigenem Wert — hier ist die Abwesenheit einer
+         *     Zeile eine Auskunft, kein fehlendes Feld.
+         * @enum {string}
+         */
+        BesetzungsZustand: "nicht_vergeben" | "einsatzleitung" | "personal" | "extern" | "rueckwaertig";
         /**
          * @description Die eine Lesequelle der Modulseite (`GET …/betreuung`): alle nicht stornierten Bezirke
          *     und Stellen eines Einsatzes.
@@ -1140,7 +1168,10 @@ export interface components {
              */
             lagekennzahlen: components["schemas"]["Lagekennzahl"][];
             leitstellen_nr?: string | null;
-            /** @description Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung. */
+            /**
+             * @description Eigene Führungsstelle in diesem Einsatz als Vorbelegungstext der ETB-Erfassung
+             *     (LFH-549): Kürzel eines Katalogwerts („S2“), „Fachberater: THW“ oder der Freitext.
+             */
             meine_fuehrungsstelle?: string | null;
             /**
              * @description Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf
@@ -1458,13 +1489,24 @@ export interface components {
          *     damit unabhängig davon korrekt, ob/wann der Scheduler-Tick lief.
          */
         ErinnerungAnzeige: {
+            aktuelle_besetzung?: components["schemas"]["AktuelleBesetzung"] | null;
             beschreibung?: string | null;
             /** Format: int64 */
             bezug_id?: number | null;
             bezug_typ?: string | null;
             /** Format: int64 */
             einsatz_id: number;
+            /**
+             * @description Anzeige des Empfängers: Katalogwert mit wirksamem Label („S3 Einsatz“, „Fachberater:
+             *     THW“) oder der Freitext. Fehlt ohne Empfänger.
+             */
+            empfaenger_anzeige?: string | null;
+            /**
+             * @description Freitext-Empfänger — oder, bei `empfaenger_funktion_code` Führungshilfspersonal/
+             *     Fachberater, dessen Bezeichnung (Doppelrolle, LFH-549).
+             */
             empfaenger_funktion?: string | null;
+            empfaenger_funktion_code?: components["schemas"]["Fuehrungsfunktion"] | null;
             erledigt_at?: string | null;
             erstellt_at: string;
             /** Format: int64 */
@@ -1776,6 +1818,26 @@ export interface components {
             organisation?: string | null;
             symbol?: string | null;
         };
+        /**
+         * @description Führungsfunktion aus dem Katalog. Wire == `as_str()`.
+         *
+         *     Die Reihenfolge ist die Anzeigereihenfolge des Katalogs (Teil des Vertrags). Die
+         *     CHECK-Listen in `migrations/0128_fuehrungsfunktion.sql` spiegeln `ALLE`
+         *     (Guard `check_listen_entsprechen_dem_katalog`).
+         * @enum {string}
+         */
+        Fuehrungsfunktion: "el" | "s1" | "s2" | "s3" | "s4" | "s5" | "s6" | "s7" | "fuehrungshilfspersonal" | "fachberater";
+        /** @description Ein Katalogeintrag, wie ihn `GET /api/fuehrungsfunktionen` liefert. */
+        FuehrungsfunktionAnzeige: {
+            art: components["schemas"]["FunktionsArt"];
+            bezeichnung_pflicht: boolean;
+            funktion: components["schemas"]["Fuehrungsfunktion"];
+            /** @description „EL“, „S3“; fehlt bei Führungshilfspersonal und Fachberater. */
+            kuerzel?: string | null;
+            /** @description Wirksames Label (Mandantenlabel oder Standard). */
+            label: string;
+            standard_label: string;
+        };
         /** @description Schlanke Karten-Sicht einer Führungskraft (Einheits- oder Abschnittsführung). */
         FuehrungskraftKarte: {
             /** Format: int64 */
@@ -1797,6 +1859,12 @@ export interface components {
             tz_fachaufgabe?: string | null;
             tz_organisation?: string | null;
         };
+        /**
+         * @description Art der Führungsfunktion nach FwDV 100 Anlage 1 (Nr. 1.1.4/1.1.5). Aus dem Code
+         *     abgeleitet, nie gespeichert und nie vom Client gesetzt.
+         * @enum {string}
+         */
+        FunktionsArt: "leitung" | "sachgebiet" | "fuehrungshilfspersonal" | "fachberater";
         /**
          * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit
          *     `warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.
@@ -2307,7 +2375,14 @@ export interface components {
             benutzer_id: number;
             benutzername: string;
             einsatz_rolle: components["schemas"]["EinsatzRolle"];
+            fuehrungsfunktion?: components["schemas"]["Fuehrungsfunktion"] | null;
+            /**
+             * @description Führungsstelle als Freitext — oder, bei `fuehrungsfunktion` Führungshilfspersonal/
+             *     Fachberater, deren Bezeichnung (Doppelrolle, LFH-549).
+             */
             fuehrungsstelle?: string | null;
+            /** @description Anzeige der Führungsstelle: „S2 Lage“, „Fachberater: THW“ oder der Freitext. */
+            fuehrungsstelle_anzeige?: string | null;
             zugewiesen_at: string;
         };
         /**

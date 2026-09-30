@@ -17,7 +17,22 @@ pub struct ErinnerungAnzeige {
     pub beschreibung: Option<String>,
     pub faellig_at: String,
     pub intervall_minuten: Option<i64>,
+    /// Freitext-Empfänger — oder, bei `empfaenger_funktion_code` Führungshilfspersonal/
+    /// Fachberater, dessen Bezeichnung (Doppelrolle, LFH-549).
     pub empfaenger_funktion: Option<String>,
+    /// Katalogcode des Empfängers (LFH-549); fehlt bei Freitext.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<crate::fuehrung::Fuehrungsfunktion>)]
+    pub empfaenger_funktion_code: Option<String>,
+    /// Anzeige des Empfängers: Katalogwert mit wirksamem Label („S3 Einsatz“, „Fachberater:
+    /// THW“) oder der Freitext. Fehlt ohne Empfänger.
+    #[sqlx(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub empfaenger_anzeige: Option<String>,
+    /// Aktuelle Besetzung des Sachgebiets zur Lesezeit (nur s1–s6, nur mit Stab-Recht).
+    #[sqlx(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aktuelle_besetzung: Option<crate::fuehrung::aufloesung::AktuelleBesetzung>,
     pub bezug_typ: Option<String>,
     pub bezug_id: Option<i64>,
     pub quelle: String,
@@ -35,6 +50,45 @@ pub struct ErinnerungAnzeige {
     pub vollzug_status: String,
     pub vollzogen_at: Option<String>,
     pub vollzogen_von_id: Option<i64>,
+}
+
+impl ErinnerungAnzeige {
+    /// Setzt die abgeleiteten Felder `empfaenger_anzeige` und `aktuelle_besetzung` (LFH-549).
+    pub fn anreichern(
+        &mut self,
+        karte: &crate::fuehrung::Labelkarte,
+        aufloeser: &crate::fuehrung::aufloesung::Aufloeser,
+    ) {
+        let angabe = crate::fuehrung::aus_spalten(
+            self.empfaenger_funktion_code.as_deref(),
+            self.empfaenger_funktion.clone(),
+        );
+        self.empfaenger_anzeige = match angabe.funktion {
+            Some(f) => Some(karte.anzeige(f, angabe.text.as_deref())),
+            None => angabe.text,
+        };
+        self.aktuelle_besetzung = aufloeser.aufloesen(angabe.funktion);
+    }
+}
+
+/// Reichert Erinnerungen für die Antwort an: Labelkarte der Einsatz-Org, Besetzung nur mit
+/// Stab-Recht (`fuehrung::aufloesung`). Einmal je Anfrage geladen.
+pub async fn anreichern_alle(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    benutzer: &crate::auth::Benutzer,
+    erinnerungen: &mut [ErinnerungAnzeige],
+) -> Result<(), crate::error::AppError> {
+    let aufloeser =
+        crate::fuehrung::aufloesung::Aufloeser::laden_fuer(pool, einsatz_id, org_id, benutzer)
+            .await?;
+    let mut conn = pool.acquire().await?;
+    let karte = crate::fuehrung::repo::labelkarte(&mut conn, org_id).await?;
+    for e in erinnerungen.iter_mut() {
+        e.anreichern(&karte, &aufloeser);
+    }
+    Ok(())
 }
 
 pub const STATUS_OFFEN: &str = ErinnerungStatus::Offen.as_str();

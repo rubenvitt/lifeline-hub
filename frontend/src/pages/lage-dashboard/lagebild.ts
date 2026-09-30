@@ -7,7 +7,6 @@
  * `meldungsstrom.ts`), weil sie an eigenen Abfragen mit eigenem Datenzustand hängen.
  */
 import type {
-  Auftrag,
   Einheit,
   EinsatzAnzeige,
   EinsatzFahrzeug,
@@ -18,7 +17,6 @@ import type {
   Lagekennzahl,
   LageberichtAnzeige,
   LageberichtStatus,
-  Meldung,
   PegelAnzeige,
   Person,
   Schaden,
@@ -31,7 +29,8 @@ import {
   inZone,
   type AnzeigeKonventionen,
 } from '../../anzeige/format';
-import { baueKraeftebild, staerkeText } from '../../kraefte/kraeftebild';
+import { staerkeText } from '../../anzeige/staerke';
+import { baueKraeftebild } from '../../kraefte/kraeftebild';
 import { LAGEBERICHT_STATUS } from '../../kommunikation/phase';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
 import type { KennzahlTon } from '../../components/instrument';
@@ -151,13 +150,11 @@ interface Kennzahl {
   ohneZiel?: boolean;
 }
 
-/** Der Führungsstand unter den drei Paneelen. */
+/**
+ * Der Führungsstand unter den drei Paneelen, soweit er aus den Listen kommt. Aufträge und Meldungen
+ * zählt er NICHT: die kommen aus dem Modulzähler (`fuehrungsZahlen.ts`, LFH-550).
+ */
 interface Fuehrungsstand {
-  auftraegeOffen: number;
-  auftraegeUeberfaellig: number;
-  meldungenOffen: number;
-  meldungenNeu: number;
-  meldungenUeberfaellig: number;
   uhsAktiv: number;
   uhsGeplant: number;
   bericht: {
@@ -170,12 +167,14 @@ interface Fuehrungsstand {
   } | null;
 }
 
-interface Lagebild {
+export interface Lagebild {
   kennzahlen: Kennzahl[];
   /** Für das Sichtungsbild: die Verteilung aus derselben Verdichtung wie die Kennzahlen. */
   sk: SkVerteilung;
   betroffeneGesamt: number;
   hoechsteWarnstufe: Warnstufe;
+  /** Gebiete mit Warnstufe — aus derselben Verdichtung wie `hoechsteWarnstufe`. */
+  gebieteMitWarnstufe: number;
   fuehrung: Fuehrungsstand;
 }
 
@@ -325,8 +324,6 @@ export interface Rohdaten {
   fahrzeuge: EinsatzFahrzeug[];
   material: EinsatzMaterial[];
   abschnitte: Einsatzabschnitt[];
-  auftraege: Auftrag[];
-  meldungen: Meldung[];
   /** Maßgebliche Pegel in Reihenfolge, erster = Leitpegel. */
   pegel: PegelAnzeige[];
   /**
@@ -450,17 +447,8 @@ export function baueLagebild(
     sk: betroffene.sk,
     betroffeneGesamt: betroffene.gesamt,
     hoechsteWarnstufe: gefahren.hoechste,
+    gebieteMitWarnstufe: gefahren.anzahlAktiv,
     fuehrung: {
-      // Alles außer vollzogen/abgenommen.
-      auftraegeOffen: r.auftraege.filter(
-        (a) => a.bearbeitungsstatus !== 'vollzogen' && a.bearbeitungsstatus !== 'abgenommen',
-      ).length,
-      // Unabhängig vom Filter darüber (src/auftrag/repo.rs): auch ein vollzogener Auftrag mit
-      // unquittiertem Empfänger und abgelaufener Frist ist überfällig.
-      auftraegeUeberfaellig: r.auftraege.filter((a) => a.ist_ueberfaellig).length,
-      meldungenOffen: r.meldungen.filter((m) => m.ist_offen).length,
-      meldungenNeu: r.meldungen.filter((m) => m.status === 'neu').length,
-      meldungenUeberfaellig: r.meldungen.filter((m) => m.ist_ueberfaellig).length,
       uhsAktiv: uhs.aktiv,
       uhsGeplant: uhs.geplant,
       bericht: bericht

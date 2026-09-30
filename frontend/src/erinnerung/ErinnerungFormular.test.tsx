@@ -3,6 +3,15 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import ErinnerungFormular from './ErinnerungFormular';
+// Katalog und Besetzung stehen fest, statt über das Netz zu kommen (LFH-549).
+vi.mock('../fuehrung/useFunktionsVorschlaege', async () => ({
+  useFunktionsVorschlaege: (await import('../test/fuehrungsfunktionen')).vorschlaegeFuer,
+}));
+
+/** Der gewählte Wert des Empfängerfelds (Tag im Select). */
+function gewaehlterEmpfaenger(): string | null | undefined {
+  return document.querySelector('.ant-select-selection-item')?.textContent;
+}
 
 /** Serienerfassung: das Formular bleibt nach dem Speichern offen und hält die Wiederholfelder. */
 describe('ErinnerungFormular — Serienerfassung', () => {
@@ -12,14 +21,62 @@ describe('ErinnerungFormular — Serienerfassung', () => {
 
     await userEvent.click(screen.getByRole('checkbox', { name: /Werte behalten/ }));
     await userEvent.type(screen.getByLabelText('Titel'), 'Lagemeldung aller EA');
-    await userEvent.type(screen.getByLabelText('Empfänger'), 'S2');
+    // Freitext bleibt Freitext (LFH-549): „S2“ ist kein Katalogwert, nur weil es so aussieht.
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'S2{enter}');
     await userEvent.click(screen.getByRole('button', { name: /Speichern und n/ }));
 
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({ empfaenger_funktion: 'S2', empfaenger_funktion_code: undefined }),
+    );
     // Der Anlass wechselt, der Adressat bleibt — das ist der Unterschied zwischen
     // „Formular offen lassen" und Serienerfassung.
     await waitFor(() => expect(screen.getByLabelText('Titel')).toHaveValue(''));
-    expect(screen.getByLabelText('Empfänger')).toHaveValue('S2');
+    expect(gewaehlterEmpfaenger()).toBe('S2');
+  });
+
+  it('nimmt einen Katalogwert als Code, nicht als Text (LFH-549)', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue({});
+    renderMitProviders(
+      <ErinnerungFormular card={false} senden={false} onAnlegen={onAnlegen} einsatzId={7} />,
+    );
+
+    await userEvent.type(screen.getByLabelText('Titel'), 'Lage');
+    await userEvent.click(screen.getByLabelText('Empfänger'));
+    await userEvent.click(await screen.findByText('S2 – Lage (Müller)'));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({ empfaenger_funktion_code: 's2', empfaenger_funktion: undefined }),
+    );
+  });
+
+  it('hält den Absende-Knopf im <form>, obwohl der Empfänger ein Select ist (Erfassungs-Norm)', () => {
+    renderMitProviders(<ErinnerungFormular card={false} senden={false} onAnlegen={vi.fn()} />);
+    // Ein Select schluckt Enter; gesendet wird dann nur über den Knopf im Formular.
+    expect(screen.getByRole('button', { name: 'Anlegen' }).closest('form')).not.toBeNull();
+    expect(document.querySelector('.ant-modal-footer')).toBeNull();
+  });
+
+  it('bietet Fachberater aus dem Tipptext als ausdrückliche Wahl an', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue({});
+    renderMitProviders(
+      <ErinnerungFormular card={false} senden={false} onAnlegen={onAnlegen} einsatzId={7} />,
+    );
+
+    await userEvent.type(screen.getByLabelText('Titel'), 'Lage');
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'THW');
+    await userEvent.click(await screen.findByText('Fachberater: THW'));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        empfaenger_funktion_code: 'fachberater',
+        empfaenger_funktion: 'THW',
+      }),
+    );
   });
 
   it('lässt den Wortlaut stehen, wenn der Server ablehnt', async () => {

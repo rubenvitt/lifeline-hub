@@ -1,7 +1,9 @@
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Erinnerungen;
-use crate::erinnerung::{repo, ErinnerungAnzeige, STATUS_ERLEDIGT, STATUS_OFFEN, STATUS_QUITTIERT};
+use crate::erinnerung::{
+    anreichern_alle, repo, ErinnerungAnzeige, STATUS_ERLEDIGT, STATUS_OFFEN, STATUS_QUITTIERT,
+};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -39,9 +41,16 @@ pub async fn liste(
 ) -> Result<Json<Vec<ErinnerungAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let nur_offen = params.nur_offen.unwrap_or(false);
-    Ok(Json(
-        repo::liste(&state.pool, einsatz_id, nur_offen, &jetzt()).await?,
-    ))
+    let mut liste = repo::liste(&state.pool, einsatz_id, nur_offen, &jetzt()).await?;
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        &mut liste,
+    )
+    .await?;
+    Ok(Json(liste))
 }
 
 #[derive(Debug, Deserialize)]
@@ -51,7 +60,11 @@ pub struct NeueErinnerung {
     /// 'YYYY-MM-DD HH:MM' oder mit Sekunden (UTC).
     pub faellig_at: String,
     pub intervall_minuten: Option<i64>,
+    /// Freitext-Empfänger bzw. Bezeichnung bei Führungshilfspersonal/Fachberater (LFH-549).
     pub empfaenger_funktion: Option<String>,
+    /// Katalogcode des Empfängers (LFH-549), optional.
+    #[serde(default)]
+    pub empfaenger_funktion_code: Option<String>,
     /// Generischer Sachbezug (z. B. 'etb' + ETB-Eintrag-ID, LFH-106). Both-or-neither:
     /// beide gesetzt oder beide leer — kein FK, nur code-validiert.
     pub bezug_typ: Option<String>,
@@ -84,11 +97,18 @@ pub async fn anlegen(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty());
-    let empfaenger = req
-        .empfaenger_funktion
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
+    // Katalogcode und Text in ihrer Doppelrolle (LFH-549); Statuscodes in `pruefe_funktion`.
+    let s7_aktiv = {
+        let mut conn = state.pool.acquire().await?;
+        crate::fuehrung::repo::labelkarte(&mut conn, ctx.einsatz.org_id)
+            .await?
+            .s7_aktiv
+    };
+    let empfaenger = crate::fuehrung::pruefe_funktion(
+        req.empfaenger_funktion_code.as_deref(),
+        req.empfaenger_funktion.as_deref(),
+        s7_aktiv,
+    )?;
 
     // Bezug both-or-neither (wie der Chat-Sachbezug): entweder beides oder nichts.
     let bezug_typ = req
@@ -133,13 +153,24 @@ pub async fn anlegen(
             beschreibung,
             faellig_at: &faellig,
             intervall_minuten: req.intervall_minuten,
-            empfaenger_funktion: empfaenger,
+            empfaenger_funktion: empfaenger.text.as_deref(),
+            empfaenger_funktion_code: empfaenger.funktion.map(|f| f.as_str()),
             bezug_typ,
             bezug_id: req.bezug_id,
         },
         &jetzt(),
     )
     .await?;
+    let mut r = [r];
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        &mut r,
+    )
+    .await?;
+    let [r] = r;
     sse(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(r)))
 }
@@ -179,7 +210,9 @@ pub async fn erledigen(
         &now,
     )
     .await?;
-    let r = repo::laden(&state.pool, erinnerung_id, &now).await?;
+    let mut r = [repo::laden(&state.pool, erinnerung_id, &now).await?];
+    anreichern_alle(&state.pool, einsatz_id, org_id, &ctx.benutzer, &mut r).await?;
+    let [r] = r;
     sse(&state, einsatz_id);
     Ok(Json(r))
 }
@@ -205,7 +238,9 @@ pub async fn quittieren(
         &now,
     )
     .await?;
-    let r = repo::laden(&state.pool, erinnerung_id, &now).await?;
+    let mut r = [repo::laden(&state.pool, erinnerung_id, &now).await?];
+    anreichern_alle(&state.pool, einsatz_id, org_id, &ctx.benutzer, &mut r).await?;
+    let [r] = r;
     sse(&state, einsatz_id);
     Ok(Json(r))
 }
@@ -251,7 +286,9 @@ pub async fn oeffnen(
     // NACH den beiden Achsen laden — sonst trüge die Antwort einen Zustand, den es
     // nie gab (dieselbe Regel wie bei der Sichtung in LFH-340/C5). Deshalb wird der
     // Rückgabewert von `wieder_oeffnen` oben verworfen.
-    let r = repo::laden(&state.pool, erinnerung_id, &now).await?;
+    let mut r = [repo::laden(&state.pool, erinnerung_id, &now).await?];
+    anreichern_alle(&state.pool, einsatz_id, org_id, &ctx.benutzer, &mut r).await?;
+    let [r] = r;
     sse(&state, einsatz_id);
     Ok(Json(r))
 }
@@ -294,6 +331,7 @@ mod tests {
                 faellig_at: "2026-06-11 10:00:00",
                 intervall_minuten: None,
                 empfaenger_funktion: None,
+                empfaenger_funktion_code: None,
                 bezug_typ: None,
                 bezug_id: None,
             },

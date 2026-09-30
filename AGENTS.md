@@ -24,7 +24,8 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/druck/AGENTS.md` | Druck (LFH-71/LFH-22) |
 | `frontend/src/entwurf/AGENTS.md` | Entwürfe, Lagebericht-Akkordeon |
 | `frontend/src/personen/AGENTS.md` | Personen und Sichtung |
-| `frontend/src/stab/AGENTS.md` | Stab: Funkplan S6, Checkliste Arbeitsaufnahme |
+| `frontend/src/stab/AGENTS.md` | Stab: Funkplan S6, Checkliste Arbeitsaufnahme, Vorbereitung der Lagebesprechung |
+| `frontend/src/fuehrung/AGENTS.md` | Führungsfunktionen (Katalog, Codespalte, Besetzung), Client und Server |
 | `frontend/e2e/AGENTS.md` | e2e-Suite |
 | `src/AGENTS.md` | Statuscodes, Typ-Codegen, Anhänge, Demo-Daten, Aufbewahrung, ClamAV |
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
@@ -68,6 +69,14 @@ Werkzeuge ohne Präfix (`clickup_update_task`); der Präfix hängt an der Umgebu
   jedem „fertig" `verification-before-completion` und `requesting-code-review`.
 - **Pflicht-Checkpoint:** `/opsx:propose` hält nach den Artefakten an (kein Fehlschlag) —
   vorlegen, Freigabe abwarten, dann `ready for development` und `/opsx:apply`.
+- **Entwurfs-Hoheit** (LFH-589, Spec `entwurfs-hoheit`,
+  `openspec/changes/archive/2026-09-30-lfh-589-entwurfs-hoheit-orchestrierung/design.md`):
+  Workflows besitzen die Menge (Scope-Scan, Judge-Panel als Zulieferer), OpenSpec den einzelnen
+  Task. Eine Change entsteht **genau** auf der Route `entwurf` (E1 Entscheidung · E2 Regel ·
+  E3 mehr als ein Subsystem, nicht bei einem Bugfix, der Bestehendes wiederherstellt, oder
+  einer reinen Textkorrektur; Liste in
+  `dev-clickup-ausfuehren`, Schritt 3), nie bei `trivial`/`klar`/`bug-unklar`. **Kein
+  Workflow ruft `/opsx:*` oder schreibt unter `openspec/changes/`.**
 - **Vier Ablageorte, keine Überschneidung:** `openspec/changes/<name>/` (laufende Änderung, hier
   landet Neues) · `openspec/changes/archive/` (nach `/opsx:archive`) · `openspec/specs/`
   (Fähigkeits-Specs, SHALL/MUST, über `/opsx:sync`/`/opsx:archive`) · `docs/superpowers/`

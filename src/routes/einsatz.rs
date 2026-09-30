@@ -94,6 +94,7 @@ pub async fn anlegen(
             None,
             // Ein frisch angelegter Einsatz hat keine Besetzung — Literal statt Abfrage.
             Vec::new(),
+            &repo::labelkarte(&state.pool, einsatz.id).await?,
         )),
     ))
 }
@@ -118,6 +119,7 @@ pub async fn detail(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
         crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
+        &repo::labelkarte(&state.pool, id).await?,
     )))
 }
 
@@ -135,6 +137,7 @@ pub async fn abschliessen(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
         crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
+        &repo::labelkarte(&state.pool, id).await?,
     )))
 }
 
@@ -198,6 +201,7 @@ pub async fn aufbewahrungsfrist_setzen(
             ctx.rolle.map(|r| r.as_str().to_string()),
             repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
             crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
+            &repo::labelkarte(&state.pool, id).await?,
         );
         return Ok(Json(ohne_kopf_pii_wenn_gesperrt(
             anzeige,
@@ -231,6 +235,7 @@ pub async fn aufbewahrungsfrist_setzen(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
         crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
+        &repo::labelkarte(&state.pool, id).await?,
     );
     Ok(Json(ohne_kopf_pii_wenn_gesperrt(
         anzeige,
@@ -608,6 +613,9 @@ pub struct MitgliedRolle {
     pub einsatz_rolle: String,
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     pub fuehrungsstelle: Option<Option<String>>,
+    /// Katalogcode der Führungsstelle (LFH-549); tri-state wie `fuehrungsstelle`.
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub fuehrungsfunktion: Option<Option<String>>,
 }
 
 /// GET /api/einsaetze/{id}/mitglieder — Mitgliederliste; gemäß DSGVO-Lese-Policy.
@@ -632,16 +640,19 @@ pub async fn mitglied_setzen(
 
     let neue_rolle = EinsatzRolle::parse(&req.einsatz_rolle)
         .ok_or_else(|| AppError::Validation("Ungültige einsatz_rolle".into()))?;
-    let fuehrungsstelle = support::trimme_tri(req.fuehrungsstelle);
-    if fuehrungsstelle
-        .as_ref()
-        .and_then(|s| s.as_ref())
-        .is_some_and(|s| s.chars().count() > 200)
-    {
-        return Err(AppError::Validation(
-            "Führungsstelle darf höchstens 200 Zeichen haben".into(),
-        ));
-    }
+    // Führungsstelle als Katalogwert oder Freitext (LFH-549): Code und Text werden als PAAR
+    // gesetzt, sobald eines der beiden Felder im Body steht; fehlen beide, bleibt der Bestand.
+    // Explizites null (oder leer) auf beiden leert die Stelle.
+    let fuehrungsstelle = if req.fuehrungsstelle.is_some() || req.fuehrungsfunktion.is_some() {
+        let s7_aktiv = repo::labelkarte(&state.pool, id).await?.s7_aktiv;
+        Some(crate::fuehrung::pruefe_funktion(
+            req.fuehrungsfunktion.flatten().as_deref(),
+            req.fuehrungsstelle.flatten().as_deref(),
+            s7_aktiv,
+        )?)
+    } else {
+        None
+    };
 
     // Ziel-Benutzer muss existieren, zur Organisation DIESES Einsatzes gehören und aktiv
     // sein. Der Org-Bezug gehört schon hierher (F05/LFH-232): der eigentliche Guard sitzt
@@ -680,7 +691,7 @@ pub async fn mitglied_setzen(
         id,
         ziel_id,
         neue_rolle,
-        fuehrungsstelle.as_ref().map(|s| s.as_deref()),
+        fuehrungsstelle.as_ref(),
     )
     .await?;
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
@@ -833,5 +844,6 @@ pub async fn aktualisieren(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
         crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
+        &repo::labelkarte(&state.pool, id).await?,
     )))
 }

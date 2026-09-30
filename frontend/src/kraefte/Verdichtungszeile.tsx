@@ -7,7 +7,8 @@ import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { statusKategorie, type Statusrolle } from '../theme/statusFarben';
 import { statusFlaeche, tonVonRolle } from '../components/instrument/statusFlaeche';
 import { useRollen } from '../components/instrument';
-import { staerkeText, verdichte } from './kraeftebild';
+import { staerkeText } from '../anzeige/staerke';
+import { verdichte } from './kraeftebild';
 
 /**
  * Der Meldebild-Link als Bedienziel auf der Dichte-Staffel: ein `<a>` erbt keine Steuerhöhe

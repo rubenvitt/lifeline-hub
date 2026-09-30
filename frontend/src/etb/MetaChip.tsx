@@ -15,8 +15,9 @@ interface Props {
   editing: boolean;
   wert: Wert;
   /** Optionale Vorschläge (z. B. Funkrufnamen für von/an) → AutoComplete statt Input.
-   *  Freitext bleibt erlaubt (AC#1). */
-  optionen?: string[];
+   *  Freitext bleibt erlaubt (AC#1). Ein Objekt trägt ein eigenes Label; eingesetzt wird der
+   *  Wert (Sachgebiet „S2 – Lage (Müller)“ → „S2“, LFH-549). */
+  optionen?: readonly (string | { value: string; label: string })[];
   onCommit: (feld: MetaFeld, wert: string | dayjs.Dayjs | MeldeWeg) => void;
   onCancel: (feld: MetaFeld) => void;
   onRemove: (feld: MetaFeld) => void;
@@ -75,7 +76,7 @@ export default function MetaChip({
             onChange={(v) => setText(v)}
             // Klick auf Vorschlag feuert nur onChange → onSelect committet sofort.
             onSelect={(v) => onCommit(feld, v)}
-            options={optionen.map((o) => ({ value: o }))}
+            options={optionen.map((o) => (typeof o === 'string' ? { value: o } : o))}
             showSearch={teilwortSuche}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {

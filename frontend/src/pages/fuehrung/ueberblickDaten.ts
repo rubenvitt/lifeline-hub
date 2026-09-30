@@ -31,12 +31,12 @@ import type {
   Rueckmeldungen,
   Warnstufe,
 } from '../../api/types';
+import { staerkeText } from '../../anzeige/staerke';
 import type { KennzahlTon } from '../../components/instrument';
 import {
   OHNE_ABSCHNITT_KEY,
   OHNE_EINHEIT_KEY_PREFIX,
   baueKraeftebild,
-  staerkeText,
   verdichte,
   type MeldebildZeile,
   type StaerkeSumme,
@@ -47,6 +47,7 @@ import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
 import { dauerText } from '../../stab/lagebesprechungZustand';
 import { abloesungsMarken } from '../../abloesung/einstufung';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
+import { mitBesetzung } from '../../fuehrung/funktionsOptionenKern';
 
 dayjs.extend(utc);
 
@@ -157,15 +158,20 @@ interface AuftraegeKennzahl {
   ton: KennzahlTon;
 }
 
-export function auftraegeKennzahl(auftraege: Auftrag[]): AuftraegeKennzahl {
-  const offen = auftraege.filter(istOffen);
-  const ueberfaellig = offen.filter((a) => a.ist_ueberfaellig).length;
-  const inArbeit = offen.filter((a) => a.bearbeitungsstatus === 'in_arbeit').length;
+/**
+ * Die Kennzahl „Offene Aufträge" aus dem Modulzähler des Servers (LFH-550): dieselbe Zahl wie im
+ * Modulpanel und im Führungsstand des Lage-Dashboards. Hier wird nichts gezählt, nur benannt.
+ */
+export function auftraegeKennzahl(z: {
+  offen: number;
+  in_arbeit: number;
+  ueberfaellig: number;
+}): AuftraegeKennzahl {
   return {
-    offen: offen.length,
-    inArbeit,
-    ueberfaellig,
-    ton: ueberfaellig > 0 ? 'alarm' : 'neutral',
+    offen: z.offen,
+    inArbeit: z.in_arbeit,
+    ueberfaellig: z.ueberfaellig,
+    ton: z.ueberfaellig > 0 ? 'alarm' : 'neutral',
   };
 }
 
@@ -184,9 +190,10 @@ function sortiereAbschnitte(abschnitte: Einsatzabschnitt[]): Einsatzabschnitt[] 
 
 // ── Aufträge ────────────────────────────────────────────────────────────────────
 
-/** Offen im Sinne des Überblicks: `offen` oder `in_arbeit` — dieselbe Menge wie
- *  `auftraegeOffen` im Lage-Dashboard (alles außer vollzogen/abgenommen). */
-function istOffen(a: Auftrag): boolean {
+/** Offen im Sinne des Überblicks: `offen` oder `in_arbeit` — dieselbe Menge wie `ist_offen()`
+ *  im Modulzähler des Servers (`src/auftrag/mod.rs`). Das gemeinsame Fixture
+ *  `tests/fixtures/verdichtung/regeln.json` hält beide gleich (LFH-550). */
+export function istOffen(a: Pick<Auftrag, 'bearbeitungsstatus'>): boolean {
   return a.bearbeitungsstatus === 'offen' || a.bearbeitungsstatus === 'in_arbeit';
 }
 
@@ -212,10 +219,13 @@ export function offeneAuftraege(auftraege: Auftrag[]): Auftrag[] {
 
 /**
  * „an …" — die Empfängernamen, wie beim Erteilen festgehalten; `null`, wenn keiner (die Seite
- * schreibt dann „ohne Empfänger").
+ * schreibt dann „ohne Empfänger"). Ein Sachgebiet trägt dahinter die aktuelle Besetzung, wenn der
+ * Server sie aufgelöst hat (LFH-549).
  */
 export function empfaengerText(a: Auftrag): string | null {
-  const namen = (a.empfaenger ?? []).map((e) => e.snap_anzeige.trim()).filter(Boolean);
+  const namen = (a.empfaenger ?? [])
+    .filter((e) => e.snap_anzeige.trim())
+    .map((e) => mitBesetzung(e.snap_anzeige.trim(), e.aktuelle_besetzung));
   return namen.length > 0 ? namen.join(', ') : null;
 }
 
