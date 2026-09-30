@@ -56,7 +56,7 @@ function umschaltEintrag(
  * gleich nutzbar ist.
  *
  * DIE INITIALEN STEHEN NEUTRAL: eine 24-px-Kachel auf `flaeche3`. Rot ist im Rahmen genau
- * zweimal vergeben (Logo-Quadrat, aktive Rail-Marke). Neben der Kachel steht ab `xl` die
+ * zweimal vergeben (Quadrat der Bildmarke, aktive Rail-Marke). Neben der Kachel steht ab `xl` die
  * FUNKTION (`funktion`, z. B. „S2 Lage"), sonst der Anzeigename. Die Funktion leitet das Backend
  * ab (`EinsatzAnzeige.meine_funktion`, LFH-615), dieselbe Ableitung wie im ETB-Snapshot.
  *

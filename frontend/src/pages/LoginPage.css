@@ -49,8 +49,8 @@
   }
 }
 
-/* Markenbereich: rotes Quadrat + Wortmarke Mono (wie die Markenzelle der Kopfleiste),
-   darunter die Augenbraue. Rot ist hier MARKE, nicht Bedienung — es bedient nichts. */
+/* Markenbereich: Bildmarke „Lebenslinie“ + Wortmarke Mono (wie die Markenzelle der Kopfleiste,
+   LFH-837), darunter die Augenbraue. Das Rot der Marke ist MARKE, nicht Bedienung. */
 .login-marke {
   margin-bottom: 28px;
   padding-bottom: 20px;
@@ -61,14 +61,6 @@
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.login-marke__quadrat {
-  display: block;
-  flex: 0 0 14px;
-  width: 14px;
-  height: 14px;
-  background: var(--lfh-marke);
 }
 
 .login-marke__name {

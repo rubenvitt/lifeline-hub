@@ -161,6 +161,16 @@ trotzdem.
 - `latest.json` erzeugt `scripts/release/desktop-manifest.mjs` aus den tatsächlich gebauten
   Paketen. Scheitert eine Plattform, fehlt sie im Manifest, statt ins Leere zu zeigen.
 
+## App-Symbol
+
+Die Symbole in `src-tauri/icons/` zeigen die Bildmarke „Lebenslinie“ (LFH-837). Sie entstehen
+zusammen mit Favicon und PWA-Symbolen aus den Quellen in `scripts/marke/`. Für macOS gibt es
+eine eigene Quelle nach dem Raster der Plattform. Neu erzeugen (braucht `cargo tauri`):
+
+```bash
+scripts/marke/erzeuge-symbole.sh
+```
+
 ## Grenzen (offen)
 
 - **Signierung/Notarisierung:** LFH-722. Bis dahin erscheinen die Warnungen oben.
@@ -178,4 +188,3 @@ trotzdem.
   der ausschließlich Passkeys anbietet (etwa PocketID), sperrt sie dort aus. Das schließt erst die
   Anmeldung im Systembrowser (LFH-818); bis dahin melden sich diese Konten im Browser an.
 - **Linux:** Die Hülle wird dort übersetzt (Tests), aber nicht ausgeliefert.
-- **App-Symbol:** Es ist aus dem Favicon abgeleitet, einem Platzhalter.
