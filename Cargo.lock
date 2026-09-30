@@ -3297,7 +3297,7 @@ dependencies = [
 
 [[package]]
 name = "lifeline-desktop"
-version = "1.0.0-alpha.58"
+version = "1.0.0-alpha.59"
 dependencies = [
  "base64 0.22.1",
  "block2",
@@ -3323,7 +3323,7 @@ dependencies = [
 
 [[package]]
 name = "lifeline-hub"
-version = "1.0.0-alpha.58"
+version = "1.0.0-alpha.59"
 dependencies = [
  "anyhow",
  "argon2",

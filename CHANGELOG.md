@@ -1,3 +1,13 @@
+## [1.0.0-alpha.59](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.58...v1.0.0-alpha.59) (2026-09-30)
+
+### Benutzeroberfläche
+
+Die gesamte Anwendung verwendet nun einen einheitlichen Ikonensatz (Icons8 iOS 27) für alle Symbole und Bedienelemente. Dadurch wirkt die Oberfläche konsistenter und professioneller. Die Navigation, Kopfleiste, Formulare und alle Funktionsbereiche zeigen jetzt durchgängig denselben visuellen Stil.
+
+In der Seitenleiste wird die aktuell aktive Kategorie durch ein gefülltes Symbol hervorgehoben, wodurch die Orientierung in der Anwendung erleichtert wird.
+
+Die Verbindungsanzeige in der Kopfleiste zeigt den Netzwerkstatus nun klarer mit WLAN-Symbol und entsprechenden Status-Symbolen (Haken für verbunden, Kreuz für getrennt).
+
 ## [1.0.0-alpha.58](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.57...v1.0.0-alpha.58) (2026-09-30)
 
 ### Wichtige Änderungen
