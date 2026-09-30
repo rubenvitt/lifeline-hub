@@ -118,6 +118,31 @@ describe('entwurfStore', () => {
       expect((await entwuerfeLaden(7)).map((e) => e.inhalt)).toEqual(['Sofort']);
     });
 
+    it('ein früher Abschluss streicht keinen jüngeren Auftrag desselben Entwurfs', async () => {
+      // Zwei Tastenanschläge kurz hintereinander: der erste Schreibvorgang gelingt, der zweite
+      // wird vom Neuladen abgebrochen. Die Quittung des ersten darf den Vorlauf des zweiten
+      // nicht streichen.
+      const put = IDBObjectStore.prototype.put;
+      let aufruf = 0;
+      const spion = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+        this: IDBObjectStore,
+        ...args: Parameters<IDBObjectStore['put']>
+      ) {
+        const anfrage = put.apply(this, args);
+        if (++aufruf === 2) this.transaction.abort();
+        return anfrage;
+      });
+      const erster = entwurfSpeichern(entwurf({ id: 'a', inhalt: 'Ang' }));
+      const zweiter = entwurfSpeichern(
+        entwurf({ id: 'a', inhalt: 'Angefangen', geaendert_at: '2026-06-22T10:00:05.000Z' }),
+      );
+      await erster;
+      await zweiter.catch(() => {});
+      spion.mockRestore();
+
+      expect((await entwuerfeLaden(7)).map((e) => e.inhalt)).toEqual(['Angefangen']);
+    });
+
     it('ein Entfernen, dessen Transaktion abbricht, holt den Entwurf nicht zurück', async () => {
       await entwurfSpeichern(entwurf({ id: 'a' }));
       const spione = schreibenBrichtAb();
@@ -151,12 +176,28 @@ describe('entwurfStore', () => {
     it('ein beschädigter Vorlauf sperrt das Laden nicht', async () => {
       await entwurfSpeichern(entwurf({ id: 'a', inhalt: 'Bestand' }));
       localStorage.setItem(
-        'lifeline-etb-entwuerfe-ausstehend',
-        JSON.stringify({ kaputt: { stand: 's', entwurf: { inhalt: 'ohne id' } } }),
+        'lifeline-etb-entwuerfe-ausstehend:kaputt',
+        JSON.stringify({ stand: 's', entwurf: { inhalt: 'ohne id' } }),
       );
       vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       expect((await entwuerfeLaden(7)).map((e) => e.inhalt)).toEqual(['Bestand']);
+    });
+
+    it('jeder Entwurf hat seinen eigenen Vorlauf — ein zweiter Tab schreibt keinen fremden zurück', async () => {
+      const spione = schreibenBrichtAb();
+      await entwurfSpeichern(entwurf({ id: 'x', inhalt: 'X' })).catch(() => {});
+      await entwurfSpeichern(entwurf({ id: 'y', inhalt: 'Y' })).catch(() => {});
+      neuStarten(spione);
+
+      expect(Object.keys(localStorage).sort()).toEqual([
+        'lifeline-etb-entwuerfe-ausstehend:x',
+        'lifeline-etb-entwuerfe-ausstehend:y',
+      ]);
+      // Tab A sendet X und entfernt ihn; Tab B speichert Y — ohne X je anzufassen.
+      await entwurfEntfernen('x');
+      await entwurfSpeichern(entwurf({ id: 'y', inhalt: 'Y2' }));
+      expect((await entwuerfeLaden(7)).map((e) => e.inhalt)).toEqual(['Y2']);
     });
 
     it('ein älterer Vorlauf überschreibt keine jüngere Fassung auf der Platte', async () => {

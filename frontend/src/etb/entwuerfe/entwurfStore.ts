@@ -18,48 +18,57 @@ interface EntwurfDB extends DBSchema {
  * `entwuerfeLaden` Übriggebliebenes nach. Die Persistenzgrenze liegt damit am Aufruf, nicht
  * am Ende der Transaktion.
  *
- * Je Entwurf steht nur der LETZTE Auftrag (Fassung oder `null` = entfernen), markiert mit
- * einem `stand`: ein früher Abschluss darf einen jüngeren Auftrag nicht streichen.
+ * Je Entwurf ein eigener Schlüssel mit nur dem LETZTEN Auftrag (Fassung oder `null` = entfernen),
+ * markiert mit einem `stand`: ein früher Abschluss darf einen jüngeren Auftrag nicht streichen.
+ * Kein gemeinsamer Eintrag für alle Entwürfe — `localStorage` teilen sich alle Tabs, und ein Tab,
+ * der eine ganze Tabelle zurückschreibt, holte einen anderswo gesendeten Entwurf zurück.
  */
-const VORLAUF_KEY = 'lifeline-etb-entwuerfe-ausstehend';
+const VORLAUF_PRAEFIX = 'lifeline-etb-entwuerfe-ausstehend:';
 
 interface Vorlaufeintrag {
   stand: string;
   entwurf: EtbEntwurf | null;
 }
-type Vorlauf = Record<string, Vorlaufeintrag>;
 
-function vorlaufLesen(): Vorlauf {
+function vorlaufLesen(id: string): Vorlaufeintrag | null {
   try {
-    const roh = localStorage.getItem(VORLAUF_KEY);
+    const roh = localStorage.getItem(VORLAUF_PRAEFIX + id);
     const wert: unknown = roh ? JSON.parse(roh) : null;
-    return wert && typeof wert === 'object' ? (wert as Vorlauf) : {};
+    return wert && typeof wert === 'object' ? (wert as Vorlaufeintrag) : null;
   } catch {
-    return {};
+    return null;
   }
 }
 
-function vorlaufSchreiben(vorlauf: Vorlauf): void {
+/** Alle Entwurfs-ids mit offenem Vorlauf, gleich aus welchem Tab. */
+function vorlaufIds(): string[] {
   try {
-    if (Object.keys(vorlauf).length === 0) localStorage.removeItem(VORLAUF_KEY);
-    else localStorage.setItem(VORLAUF_KEY, JSON.stringify(vorlauf));
+    return Object.keys(localStorage)
+      .filter((k) => k.startsWith(VORLAUF_PRAEFIX))
+      .map((k) => k.slice(VORLAUF_PRAEFIX.length));
   } catch {
-    // Speicher voll oder gesperrt: dann trägt allein die IndexedDB, wie vor LFH-521.
+    return [];
   }
 }
 
 /** Synchron — muss vor dem ersten `await` des Schreibauftrags stehen. */
 function vormerken(id: string, entwurf: EtbEntwurf | null): string {
   const stand = crypto.randomUUID();
-  vorlaufSchreiben({ ...vorlaufLesen(), [id]: { stand, entwurf } });
+  try {
+    localStorage.setItem(VORLAUF_PRAEFIX + id, JSON.stringify({ stand, entwurf }));
+  } catch {
+    // Speicher voll oder gesperrt: dann trägt allein die IndexedDB, wie vor LFH-521.
+  }
   return stand;
 }
 
 function quittieren(id: string, stand: string): void {
-  const vorlauf = vorlaufLesen();
-  if (vorlauf[id]?.stand !== stand) return;
-  delete vorlauf[id];
-  vorlaufSchreiben(vorlauf);
+  if (vorlaufLesen(id)?.stand !== stand) return;
+  try {
+    localStorage.removeItem(VORLAUF_PRAEFIX + id);
+  } catch {
+    // s. vormerken
+  }
 }
 
 let dbPromise: Promise<IDBPDatabase<EntwurfDB>> | null = null;
@@ -81,10 +90,13 @@ function db(): Promise<IDBPDatabase<EntwurfDB>> {
  * jüngere Fassung auf der Platte (zweiter Tab) gewinnt gegen eine ältere aus dem Vorlauf.
  */
 async function vorlaufNachtragen(d: IDBPDatabase<EntwurfDB>): Promise<void> {
-  const offen = Object.entries(vorlaufLesen());
+  const offen = vorlaufIds().flatMap((id) => {
+    const eintrag = vorlaufLesen(id);
+    return eintrag ? [{ id, ...eintrag }] : [];
+  });
   if (offen.length === 0) return;
   const tx = d.transaction('entwuerfe', 'readwrite');
-  for (const [id, { entwurf }] of offen) {
+  for (const { id, entwurf } of offen) {
     if (entwurf === null) {
       await tx.store.delete(id);
       continue;
@@ -93,7 +105,7 @@ async function vorlaufNachtragen(d: IDBPDatabase<EntwurfDB>): Promise<void> {
     if (!platte || platte.geaendert_at <= entwurf.geaendert_at) await tx.store.put(entwurf);
   }
   await tx.done;
-  for (const [id, { stand }] of offen) quittieren(id, stand);
+  for (const { id, stand } of offen) quittieren(id, stand);
 }
 
 /** Entwürfe eines Einsatzes, aufsteigend nach erstellt_at (älteste zuerst → stabile Tab-Reihenfolge). */
@@ -125,7 +137,7 @@ export async function entwurfEntfernen(id: string): Promise<void> {
 
 /** Nur für Tests: leert den Store (fake-indexeddb persistiert sonst zwischen Tests). */
 export async function entwuerfeLeerenFuerTests(): Promise<void> {
-  vorlaufSchreiben({});
+  for (const id of vorlaufIds()) localStorage.removeItem(VORLAUF_PRAEFIX + id);
   const d = await db();
   await d.clear('entwuerfe');
 }

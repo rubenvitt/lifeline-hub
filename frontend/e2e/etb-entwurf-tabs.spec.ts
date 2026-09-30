@@ -126,7 +126,8 @@ test('ETB-Entwurf-Autosave: bereits gespeicherter Entwurf kommt nach dem Reload 
   // Hier IST der Wartepunkt die Aussage: der Entwurf liegt auf der Platte, und kein Vorlauf
   // (LFH-521) steht mehr aus — die Wiederherstellung trägt allein die IndexedDB.
   await page.waitForFunction(async (text) => {
-    if (localStorage.getItem('lifeline-etb-entwuerfe-ausstehend') !== null) return false;
+    if (Object.keys(localStorage).some((k) => k.startsWith('lifeline-etb-entwuerfe-ausstehend')))
+      return false;
     const db = await new Promise<IDBDatabase>((ok, fehler) => {
       const anfrage = indexedDB.open('lifeline-etb-entwuerfe');
       anfrage.onsuccess = () => ok(anfrage.result);
