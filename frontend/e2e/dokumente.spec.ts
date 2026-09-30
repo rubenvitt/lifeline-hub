@@ -413,6 +413,14 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   const dialog = ablegenDialog(page);
   const dateiKnopf = dialog.locator('button.ant-btn', { hasText: 'Datei wählen' });
   await expect(dateiKnopf).toBeFocused();
+  /*
+   * Erst tabben, wenn die Einblendung steht (LFH-536). Ein Tab während `ant-zoom-appear` verlor
+   * den Fokus an `<body>`, obwohl alle Folgeziele fokussierbar waren. Am Ende der Einblendung
+   * holte rc-dialog (`focusDialogContent`) ihn auf die Dialoghülle zurück, und die Reihe begann
+   * bei „Schließen“ neu. Gemessen mit 8-fach gedrosselter CPU: ohne dieses Tor 15 von 20 rot,
+   * mit Tor 0 von 20.
+   */
+  await expect(dialog, 'Dialog fertig eingeblendet').not.toHaveClass(/ant-zoom-(enter|appear)/);
 
   // Tab-Reihenfolge im Dialog, gemessen: rc-upload hüllt den Knopf in ein `span[role=button]`
   // — wäre das ein eigener Tab-Stopp, stünde er hier doppelt.

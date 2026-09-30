@@ -92,8 +92,9 @@ test('ETB-Entwurf-Autosave: getippter Entwurf überlebt einen Reload', async ({ 
   /*
    * Erst neu laden, wenn der Entwurf in IndexedDB steht (LFH-536). Der Autosave schreibt ohne
    * Verzögerung, aber asynchron, und ein Reload direkt nach `fill` kam ihm zuvor: in rund 4 von
-   * 25 CI-Läufen war das Feld danach leer. Gemessen mit 6-fach gedrosselter CPU: 4 von 10 rot,
-   * und jedes Mal war der Entwurfsspeicher nach dem Reload leer. Das Schreiben kam also nie an.
+   * 25 CI-Läufen war das Feld danach leer. Gemessen mit 6-fach gedrosselter CPU: ohne dieses Tor
+   * 15 von 15 rot, jedes Mal mit leerem Entwurfsspeicher (das Schreiben kam nie an), mit Tor
+   * 0 von 15.
    * Kein Mensch lädt binnen Millisekunden nach dem letzten Tastendruck neu. Das Tor liest
    * deshalb den gespeicherten Stand selbst. Das Tab-Label wäre kein Beleg, es spiegelt nur den
    * React-State.
