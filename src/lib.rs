@@ -28,6 +28,7 @@ pub mod etb_baustein;
 pub mod extract;
 pub mod fahrzeug;
 pub mod freies_zeichen;
+pub mod fuehrung;
 pub mod gefahr;
 pub mod geocoding;
 pub mod karte;

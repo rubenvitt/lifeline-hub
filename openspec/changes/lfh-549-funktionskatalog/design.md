@@ -155,10 +155,11 @@ worden, und `0089` zeigt den Aufwand):
     bzw. `funktion:<code>:<Bezeichnung>`.
   - Für einen nichtleeren Suchtext zusätzlich „Fachberater: <Text>“ und
     „Führungshilfspersonal: <Text>“ als ausdrückliche Wahl. Der Freitext bleibt der Rohwert.
-  - `dekodiere(wert)` liefert `{ funktion?, text? }` und ist die einzige Umkehr.
-  - Es gibt keine Erkennung von „S3“ im Rohtext. Die Kodierung verlangt das Präfix `funktion:`,
-    und ein Rohtext mit diesem Präfix (Tipp „funktion:…“) wird als Freitext behandelt, weil er nicht
-    aus einer Option stammt: Der Kern prüft gegen die angebotenen Werte.
+  - `dekodiere(wert, katalog)` liefert `{ funktion?, text? }` und ist die einzige Umkehr.
+  - Es gibt keine Erkennung von „S3“ im Rohtext. Die Kodierung verlangt das Präfix `funktion:`
+    und einen Code aus dem Katalog; alles andere ist Freitext. (Nachtrag Umsetzung: geprüft wird
+    gegen den Katalog, nicht gegen die gerade angebotenen Optionen — eine Wahl „Fachberater: THW“
+    stammt aus dem Tipptext und steht nach dem Leeren der Suche nicht mehr in den Optionen.)
 - **Masken:**
   - **Auftrag:** Die Optionsgruppe „Funktionen“ kommt neben „Einsatzabschnitte“/„Einheiten“ in den
     bestehenden Tags-Select. `baueEmpfaenger` erkennt `funktion:`.
@@ -172,9 +173,9 @@ worden, und `0089` zeigt den Aufwand):
 - **ETB:** `etb/funkrufnamen.ts` nimmt die Sachgebiete als Vorschläge mit Wert = Kürzel auf.
 - **Vorbelegung:** Eine reine Funktion `anVorbelegung(einsatz)` (Führungsstelle → erstes
   `meine_sachgebiete` → nichts) ersetzt die beiden Lesestellen von `meine_fuehrungsstelle` in
-  `Schnellerfassung.tsx` und `useEtbEntwuerfe.ts`. `EinsatzAnzeige` bekommt dafür
-  `meine_fuehrungsfunktion`, und der Server liefert die Führungsstelle als fertigen Anzeigetext
-  (`meine_fuehrungsstelle` behält seine Bedeutung als Vorbelegungstext).
+  `Schnellerfassung.tsx` und `useEtbEntwuerfe.ts`. Der Server liefert `meine_fuehrungsstelle` als
+  fertigen Vorbelegungstext (Kürzel, „Fachberater: THW“ oder Freitext); ein zusätzliches Feld
+  `meine_fuehrungsfunktion` braucht kein Konsument und entfällt (Nachtrag Umsetzung).
 - **Anzeige:** Die Karten von Auftrag und Erinnerung zeigen den Snapshot und, falls vorhanden, die
   Auflösung als zweite Angabe, z. B. „S3 Einsatz · Schulz“ bzw. „· nicht vergeben“ neutral. Die
   Stabseite nimmt das wirksame Label aus dem Katalog statt aus `stab/sachgebiete.ts`; der

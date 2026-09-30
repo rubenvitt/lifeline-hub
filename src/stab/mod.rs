@@ -38,7 +38,8 @@ wire_enum! {
 }
 
 impl Sachgebiet {
-    /// Bezeichnung des Sachgebiets nach FwDV 100 Anlage 2 (S. 54–60).
+    /// Standardbezeichnung des Sachgebiets nach FwDV 100 Anlage 2 (S. 54–60). Texte nehmen das
+    /// wirksame Mandantenlabel über `fuehrung::Labelkarte` (LFH-549), nicht diese Funktion direkt.
     ///
     /// Liegt im Backend, weil der System-ETB-Eintrag sie trägt („S2 Lage: Besetzung → …") —
     /// ein ETB-Text ist ein Führungsnachweis und darf nicht davon abhängen, welches
@@ -53,11 +54,6 @@ impl Sachgebiet {
             Sachgebiet::S5 => "Presse- und Medienarbeit",
             Sachgebiet::S6 => "Information und Kommunikation",
         }
-    }
-
-    /// Kurzform für Texte: „S2 Lage".
-    pub fn kurz_mit_label(&self) -> String {
-        format!("{} {}", self.as_str().to_uppercase(), self.label())
     }
 }
 

@@ -19,6 +19,7 @@
 
 use super::EinsatzRolle;
 use crate::error::AppError;
+use crate::fuehrung::{Fuehrungsfunktion, Labelkarte};
 use crate::stab::Sachgebiet;
 use sqlx::SqliteConnection;
 
@@ -36,7 +37,14 @@ pub struct Funktion {
 /// Mehrere Sachgebiete werden alle genannt, in S1–S6-Folge ohne Dubletten („S2/S3“): ein still
 /// weggelassenes S3 wäre im Nachweis eine Lücke. Der Klartext entfällt dann, weil er die
 /// Kopfzeile sprengte.
-pub fn ableiten(sachgebiete: &[Sachgebiet], rolle: Option<EinsatzRolle>) -> Option<Funktion> {
+///
+/// Der Klartext trägt das wirksame Mandantenlabel (LFH-549, `karte`): THW sieht „S4 Versorgung
+/// (Logistik)“. Die Kurzform ist labelunabhängig.
+pub fn ableiten(
+    sachgebiete: &[Sachgebiet],
+    rolle: Option<EinsatzRolle>,
+    karte: &Labelkarte,
+) -> Option<Funktion> {
     let mut sg: Vec<Sachgebiet> = sachgebiete.to_vec();
     sg.sort();
     sg.dedup();
@@ -44,13 +52,13 @@ pub fn ableiten(sachgebiete: &[Sachgebiet], rolle: Option<EinsatzRolle>) -> Opti
         [] => match rolle {
             Some(EinsatzRolle::Einsatzleitung) => Some(Funktion {
                 kurz: "EL".into(),
-                bezeichnung: "Einsatzleitung".into(),
+                bezeichnung: karte.label(Fuehrungsfunktion::El).to_string(),
             }),
             _ => None,
         },
         [einziges] => Some(Funktion {
             kurz: kuerzel(*einziges),
-            bezeichnung: einziges.kurz_mit_label(),
+            bezeichnung: karte.kurz_mit_label(Fuehrungsfunktion::aus_sachgebiet(*einziges)),
         }),
         mehrere => {
             let kurz = mehrere
@@ -86,12 +94,34 @@ pub async fn kurz_fuer(
     .await?;
     let sachgebiete =
         crate::stab::repo::sachgebiete_von_conn(&mut *conn, einsatz_id, benutzer_id).await?;
-    Ok(ableiten(&sachgebiete, rolle.as_deref().and_then(EinsatzRolle::parse)).map(|f| f.kurz))
+    // Nur die Kurzform — sie ist labelunabhängig, die Standardkarte genügt.
+    Ok(ableiten(
+        &sachgebiete,
+        rolle.as_deref().and_then(EinsatzRolle::parse),
+        &Labelkarte::standard(),
+    )
+    .map(|f| f.kurz))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn std() -> Labelkarte {
+        Labelkarte::standard()
+    }
+
+    #[test]
+    fn mandantenlabel_gilt_im_klartext_nicht_in_der_kurzform() {
+        let mut karte = Labelkarte::standard();
+        karte
+            .ueberschrieben
+            .insert(Fuehrungsfunktion::S4, "Versorgung (Logistik)".into());
+        assert_eq!(
+            ableiten(&[Sachgebiet::S4], None, &karte),
+            f("S4", "S4 Versorgung (Logistik)")
+        );
+    }
 
     fn f(kurz: &str, bezeichnung: &str) -> Option<Funktion> {
         Some(Funktion {
@@ -102,13 +132,20 @@ mod tests {
 
     #[test]
     fn ein_sachgebiet_traegt_klartext() {
-        assert_eq!(ableiten(&[Sachgebiet::S2], None), f("S2", "S2 Lage"));
+        assert_eq!(
+            ableiten(&[Sachgebiet::S2], None, &std()),
+            f("S2", "S2 Lage")
+        );
     }
 
     #[test]
     fn sachgebiet_gewinnt_gegen_einsatzleitung() {
         assert_eq!(
-            ableiten(&[Sachgebiet::S3], Some(EinsatzRolle::Einsatzleitung)),
+            ableiten(
+                &[Sachgebiet::S3],
+                Some(EinsatzRolle::Einsatzleitung),
+                &std()
+            ),
             f("S3", "S3 Einsatz")
         );
     }
@@ -116,7 +153,7 @@ mod tests {
     #[test]
     fn einsatzleitung_ohne_sachgebiet_ist_el() {
         assert_eq!(
-            ableiten(&[], Some(EinsatzRolle::Einsatzleitung)),
+            ableiten(&[], Some(EinsatzRolle::Einsatzleitung), &std()),
             f("EL", "Einsatzleitung")
         );
     }
@@ -126,7 +163,8 @@ mod tests {
         assert_eq!(
             ableiten(
                 &[Sachgebiet::S3, Sachgebiet::S2, Sachgebiet::S3],
-                Some(EinsatzRolle::Fuehrungspersonal)
+                Some(EinsatzRolle::Fuehrungspersonal),
+                &std()
             ),
             f("S2/S3", "S2/S3")
         );
@@ -134,8 +172,11 @@ mod tests {
 
     #[test]
     fn ohne_besetzung_und_ohne_leitung_keine_funktion() {
-        assert_eq!(ableiten(&[], Some(EinsatzRolle::Fuehrungspersonal)), None);
-        assert_eq!(ableiten(&[], Some(EinsatzRolle::Beobachter)), None);
-        assert_eq!(ableiten(&[], None), None);
+        assert_eq!(
+            ableiten(&[], Some(EinsatzRolle::Fuehrungspersonal), &std()),
+            None
+        );
+        assert_eq!(ableiten(&[], Some(EinsatzRolle::Beobachter), &std()), None);
+        assert_eq!(ableiten(&[], None, &std()), None);
     }
 }

@@ -139,10 +139,12 @@ impl Einsatz {
         meine_rolle: Option<String>,
         meine_fuehrungsstelle: Option<String>,
         meine_sachgebiete: Vec<Sachgebiet>,
+        karte: &crate::fuehrung::Labelkarte,
     ) -> EinsatzAnzeige {
         let meine_funktion = funktion::ableiten(
             &meine_sachgebiete,
             meine_rolle.as_deref().and_then(EinsatzRolle::parse),
+            karte,
         )
         .map(|f| f.bezeichnung);
         EinsatzAnzeige {
@@ -209,7 +211,8 @@ pub struct EinsatzAnzeige {
     pub retention_bis: Option<String>,
     #[schema(value_type = Option<EinsatzRolle>)]
     pub meine_rolle: Option<String>,
-    /// Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung.
+    /// Eigene Führungsstelle in diesem Einsatz als Vorbelegungstext der ETB-Erfassung
+    /// (LFH-549): Kürzel eines Katalogwerts („S2“), „Fachberater: THW“ oder der Freitext.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meine_fuehrungsstelle: Option<String>,
     /// Sachgebiete, die der mit dem abfragenden Benutzer verknüpfte Personaldatensatz in
@@ -246,8 +249,18 @@ pub struct MitgliedAnzeige {
     #[sqlx(try_from = "String")]
     pub einsatz_rolle: EinsatzRolle,
     pub zugewiesen_at: String,
+    /// Führungsstelle als Freitext — oder, bei `fuehrungsfunktion` Führungshilfspersonal/
+    /// Fachberater, deren Bezeichnung (Doppelrolle, LFH-549).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fuehrungsstelle: Option<String>,
+    /// Katalogcode der Führungsstelle (LFH-549); fehlt bei Freitext.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<crate::fuehrung::Fuehrungsfunktion>)]
+    pub fuehrungsfunktion: Option<String>,
+    /// Anzeige der Führungsstelle: „S2 Lage“, „Fachberater: THW“ oder der Freitext.
+    #[sqlx(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fuehrungsstelle_anzeige: Option<String>,
 }
 
 #[cfg(test)]

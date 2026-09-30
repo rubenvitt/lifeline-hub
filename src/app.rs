@@ -942,6 +942,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::org_einstellungen::lesen).put(routes::org_einstellungen::setzen),
         )
         .route(
+            "/api/fuehrungsfunktionen",
+            get(routes::fuehrungsfunktion::katalog),
+        )
+        .route(
+            "/api/org-fuehrungsfunktionen/{funktion}",
+            put(routes::fuehrungsfunktion::setzen),
+        )
+        .route(
             "/api/org-modul-einstellungen",
             get(routes::org_einstellungen::modul_einstellungen_lesen),
         )
