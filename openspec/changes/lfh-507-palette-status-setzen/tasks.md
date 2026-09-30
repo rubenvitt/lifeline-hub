@@ -21,7 +21,7 @@
 
 ## 5. Nachweis im Browser und Dokumentation
 
-- [ ] 5.1 e2e in `e2e/command-palette.spec.ts` auf der Fahrzeugseite, analog zu „Spalten öffnet die Spaltenwahl UND legt den Fokus hinein“: Fokus in einer Fahrzeugzeile, Strg+K, „Status setzen“, danach ist das Statusmenü dieser Zeile sichtbar und hat den Fokus (`fokusImOffenenMenue`). Gegenprobe über den „Suchen“-Knopf: Die Aktion fehlt (Anzahl 0). Verifikation: `pnpm e2e -- command-palette` grün.
+- [x] 5.1 e2e in `e2e/command-palette.spec.ts` auf der Fahrzeugseite, analog zu „Spalten öffnet die Spaltenwahl UND legt den Fokus hinein“: Fokus in einer Fahrzeugzeile, Strg+K, „Status setzen“, danach ist das Statusmenü dieser Zeile sichtbar und hat den Fokus (`fokusImOffenenMenue`). Gegenprobe über den „Suchen“-Knopf: Die Aktion fehlt (Anzahl 0). Verifikation: `pnpm e2e -- command-palette` grün.
 - [x] 5.2 `CLAUDE.md` im Abschnitt „Sprungpalette“: eine Zeile zur Fokuszeile (Ebene am Primitiv `StatusWahl`, Wurzel ist die Zeile, `nurMitFokus` hält die Aktion aus dem Anzeige-Fallback). Den Dateikopf von `StatusWahl.tsx` um den Palettenweg ergänzen. Verifikation: Beides steht im Diff.
 
 ## 6. Gates
