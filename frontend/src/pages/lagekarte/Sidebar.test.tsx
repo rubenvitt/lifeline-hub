@@ -514,6 +514,80 @@ describe('Sidebar Bild-Hintergründe', () => {
     ).toBeInTheDocument();
   });
 
+  describe('Alter des Stands (LFH-591)', () => {
+    const vor = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+
+    it('zeigt den Stand in der Zeile jeder zugeschalteten Ebene, ohne Klick', () => {
+      paneeleOffen();
+      renderMitProviders(
+        <Sidebar
+          {...basisProps}
+          fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, hochwasser: true, dwd: true }}
+          fachebenenStatus={{ hochwasser: 'ok', dwd: 'leer' }}
+          fachebenenAbgerufen={{ hochwasser: vor(5), dwd: vor(5) }}
+        />,
+      );
+      const zeile = fachebenenZeile('Hochwasser-Meldeklassen (LHP)');
+      expect(within(zeile).getByText(/^Stand/)).toBeInTheDocument();
+      expect(within(zeile).queryByText(/veraltet/)).not.toBeInTheDocument();
+      // `leer` hat auch einen Stand: „keine Daten, Stand 1430“ ist eine Aussage.
+      const dwd = fachebenenZeile('Wetterwarnungen (DWD)');
+      expect(within(dwd).getByText('keine Daten')).toBeInTheDocument();
+      expect(within(dwd).getByText(/^Stand/)).toBeInTheDocument();
+    });
+
+    it('kennzeichnet einen Stand jenseits der Schwelle als veraltet', () => {
+      paneeleOffen();
+      renderMitProviders(
+        <Sidebar
+          {...basisProps}
+          fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, hochwasser: true }}
+          fachebenenStatus={{ hochwasser: 'ok' }}
+          fachebenenAbgerufen={{ hochwasser: vor(40 * 60) }}
+        />,
+      );
+      expect(
+        within(fachebenenZeile('Hochwasser-Meldeklassen (LHP)')).getByText(/veraltet/),
+      ).toBeInTheDocument();
+    });
+
+    it('eine ausgeschaltete Ebene zeigt keinen Stand', () => {
+      paneeleOffen();
+      renderMitProviders(<Sidebar {...basisProps} fachebenenAbgerufen={{ hochwasser: vor(5) }} />);
+      expect(screen.queryByText(/^Stand/)).not.toBeInTheDocument();
+    });
+
+    it('offline ohne Stand: nur „offline“', () => {
+      paneeleOffen();
+      renderMitProviders(
+        <Sidebar
+          {...basisProps}
+          fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, nina: true }}
+          fachebenenStatus={{ nina: 'offline' }}
+          fachebenenAbgerufen={{}}
+        />,
+      );
+      const zeile = fachebenenZeile('Amtliche Warnungen (NINA)');
+      expect(within(zeile).getByText('offline')).toBeInTheDocument();
+      expect(within(zeile).queryByText(/^Stand/)).not.toBeInTheDocument();
+    });
+
+    it('offline mit gehaltenem Stand (eigener Server weg): „offline“ und der Stand', () => {
+      paneeleOffen();
+      renderMitProviders(
+        <Sidebar
+          {...basisProps}
+          fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, autobahn: true }}
+          fachebenenStatus={{ autobahn: 'offline' }}
+          fachebenenAbgerufen={{ autobahn: vor(90) }}
+        />,
+      );
+      const zeile = fachebenenZeile('Autobahn-Lage (BAB)');
+      expect(within(zeile).getByText('offline')).toBeInTheDocument();
+      expect(within(zeile).getByText(/veraltet/)).toBeInTheDocument();
+    });
+  });
+
   it('eine ausgeschaltete Ebene zeigt keinen Zoom-Hinweis', () => {
     renderMitProviders(<Sidebar {...basisProps} zoomZuKlein={{ energie: true }} />);
     expect(screen.queryByText('näher heranzoomen')).not.toBeInTheDocument();

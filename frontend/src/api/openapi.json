@@ -4736,6 +4736,13 @@
           "features"
         ],
         "properties": {
+          "abgerufen": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt (RFC 3339, UTC), zu dem das System den ausgelieferten Stand bei der Quelle\ngeholt hat (LFH-591). Reist im Cache-JSON mit, ein veralteter Stand behält also seinen\nAbrufzeitpunkt. Fehlt bei `offline`; Einträge von davor füllt `karte::cache` nach."
+          },
           "attribution": {
             "type": "string"
           },
@@ -4750,7 +4757,8 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Datenstand der QUELLE, wo sie einen liefert (KRITIS: Extrakt, Energie: MaStR-Abzug,\nLuftqualität: jüngster Messzeitpunkt). Nicht der Abruf — der steht in `abgerufen`."
           },
           "status": {
             "$ref": "#/components/schemas/FachebeneStatus"

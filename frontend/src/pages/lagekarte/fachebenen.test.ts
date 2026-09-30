@@ -16,6 +16,7 @@ import {
   rasterWeite,
   mergeEnergieFeatures,
   energieNennung,
+  fachebeneAlter,
 } from './fachebenen';
 import { faerbeHochwasser, hochwasserRadius } from './hochwasserStil';
 import { faerbeLuftqualitaet, luftqualitaetRadius } from './luftqualitaetStil';
@@ -448,5 +449,58 @@ describe('energieNennung (LFH-81)', () => {
 
   it('ohne Punkte keine Nennung', () => {
     expect(energieNennung([OSM, MASTR], [])).toEqual([]);
+  });
+});
+
+describe('fachebeneAlter (LFH-591)', () => {
+  const MIN = 60_000;
+  const jetzt = Date.parse('2026-09-30T12:00:00Z');
+  const vorMin = (min: number) => new Date(jetzt - min * MIN).toISOString();
+
+  it('schreibt die Schwellen je Ebene fest (Tabelle in design.md, D3)', () => {
+    // Literale statt Rechnung: wer eine Schwelle ändert, ändert auch die Doku-Tabelle.
+    expect(
+      Object.fromEntries(fachebeneKeys().map((k) => [k, FACHEBENEN[k].veraltetNachMin])),
+    ).toEqual({
+      nina: 15,
+      dwd: 30,
+      pegelonline: 60,
+      hochwasser: 60,
+      odl: 180,
+      luftqualitaet: 240,
+      kritis: 14 * 24 * 60,
+      energie: 36 * 60,
+      autobahn: 60,
+    });
+  });
+
+  it('genau auf der Schwelle ist noch nicht veraltet, eine Minute darüber schon', () => {
+    expect(fachebeneAlter('hochwasser', vorMin(60), jetzt)?.veraltet).toBe(false);
+    expect(fachebeneAlter('hochwasser', vorMin(61), jetzt)?.veraltet).toBe(true);
+    expect(fachebeneAlter('nina', vorMin(15), jetzt)?.veraltet).toBe(false);
+    expect(fachebeneAlter('nina', vorMin(16), jetzt)?.veraltet).toBe(true);
+  });
+
+  it('bewertet je Ebene gegen ihre eigene Schwelle', () => {
+    // 40 h: Hochwasser längst veraltet, KRITIS nicht.
+    expect(fachebeneAlter('hochwasser', vorMin(40 * 60), jetzt)?.veraltet).toBe(true);
+    expect(fachebeneAlter('kritis', vorMin(40 * 60), jetzt)?.veraltet).toBe(false);
+  });
+
+  it('reicht den Abrufzeitpunkt unverändert durch', () => {
+    expect(fachebeneAlter('dwd', '2026-09-30T11:50:00Z', jetzt)).toEqual({
+      abgerufen: '2026-09-30T11:50:00Z',
+      veraltet: false,
+    });
+  });
+
+  it('ein Zeitpunkt in der Zukunft (Uhrenversatz) zählt als frisch', () => {
+    expect(fachebeneAlter('nina', vorMin(-90), jetzt)?.veraltet).toBe(false);
+  });
+
+  it('ohne oder mit unlesbarem Zeitpunkt gibt es keine Angabe', () => {
+    expect(fachebeneAlter('dwd', undefined, jetzt)).toBeNull();
+    expect(fachebeneAlter('dwd', '', jetzt)).toBeNull();
+    expect(fachebeneAlter('dwd', 'gestern', jetzt)).toBeNull();
   });
 });

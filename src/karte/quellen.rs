@@ -1169,12 +1169,23 @@ pub(crate) fn baue_energie_antwort(
     // `stand` ist der Zeitpunkt des MaStR-Abzugs aus dessen eigenem Eintrag, damit ein veralteter
     // Stand seinen echten Zeitpunkt behält.
     let stand = if mastr_da { mastr.stand.clone() } else { None };
-    FachebeneAntwort::ok(
-        "energie",
-        &energie_attribution(osm_traegt_bei, mastr_traegt_bei),
-        stand,
-        serde_json::json!({ "type": "FeatureCollection", "features": punkte }),
-    )
+    // Abgerufen ist die Ebene so alt wie ihr ältester Teil mit Stand (LFH-591), gleich ob er im
+    // Ausschnitt beiträgt. Der String-Vergleich ist ein Zeitvergleich: beide Teile tragen die feste
+    // Form aus `zeitpunkt_utc`.
+    let abgerufen = [osm, mastr]
+        .into_iter()
+        .filter(|a| a.status != FachebeneStatus::Offline)
+        .filter_map(|a| a.abgerufen.clone())
+        .min();
+    FachebeneAntwort {
+        abgerufen,
+        ..FachebeneAntwort::ok(
+            "energie",
+            &energie_attribution(osm_traegt_bei, mastr_traegt_bei),
+            stand,
+            serde_json::json!({ "type": "FeatureCollection", "features": punkte }),
+        )
+    }
 }
 
 async fn erneuere_energie_osm(
@@ -1699,6 +1710,40 @@ mod energie_tests {
         assert_eq!(a.stand.as_deref(), Some("2026-09-21T10:00:00Z"));
     }
 
+    fn abgerufen_vor(a: FachebeneAntwort, stunden: i64) -> FachebeneAntwort {
+        let t = chrono::Utc::now() - chrono::Duration::hours(stunden);
+        FachebeneAntwort {
+            abgerufen: Some(crate::karte::typen::zeitpunkt_utc(t)),
+            ..a
+        }
+    }
+
+    /// LFH-591: die Ebene ist so alt wie ihr ältester Teil mit Stand.
+    #[test]
+    fn abgerufen_ist_der_aeltere_teil() {
+        let bbox = Bbox::parse(BBOX).unwrap();
+        let osm = abgerufen_vor(osm_teil(), 2);
+        let mastr = abgerufen_vor(mastr_teil(), 20);
+        let offline = FachebeneAntwort::offline("energie", "");
+        let beide = baue_energie_antwort(&osm, &mastr, &bbox);
+        assert_eq!(beide.abgerufen, mastr.abgerufen);
+        // Andersherum gilt ebenso der ältere.
+        let beide = baue_energie_antwort(&abgerufen_vor(osm_teil(), 30), &mastr, &bbox);
+        assert!(beide.abgerufen < mastr.abgerufen);
+        assert_eq!(
+            baue_energie_antwort(&osm, &offline, &bbox).abgerufen,
+            osm.abgerufen
+        );
+        assert_eq!(
+            baue_energie_antwort(&offline, &mastr, &bbox).abgerufen,
+            mastr.abgerufen
+        );
+        assert_eq!(
+            baue_energie_antwort(&offline, &offline, &bbox).abgerufen,
+            None
+        );
+    }
+
     #[tokio::test]
     async fn keine_quelle_erreichbar_ist_offline() {
         let pool = crate::db::test_pool().await;
@@ -2043,6 +2088,34 @@ mod swr_tests {
         .await;
         assert_eq!(a.quelle, "alt"); // sofort der alte Stand
         assert_eq!(calls.load(Ordering::SeqCst), 1); // Refresh wurde angestoßen
+    }
+
+    /// LFH-591: der Stale-Serving-Vertrag bleibt (`ok`, alte Features), und der ausgelieferte Stand
+    /// nennt seinen damaligen Abruf, nicht die Anfrage.
+    #[tokio::test]
+    async fn veralteter_stand_behaelt_seinen_abrufzeitpunkt() {
+        let pool = crate::db::test_pool().await;
+        let mut alt = antwort("alt");
+        let vor_30_h =
+            crate::karte::typen::zeitpunkt_utc(chrono::Utc::now() - chrono::Duration::hours(30));
+        alt.abgerufen = Some(vor_30_h.clone());
+        cache::setze(&pool, "k", &alt).await;
+        sqlx::query("UPDATE fachebenen_cache SET gespeichert_at = unixepoch() - 30 * 3600")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let a = liefere_mit_swr(
+            &pool,
+            &inflight(),
+            "k",
+            Duration::from_secs(300),
+            || FachebeneAntwort::offline("k", "o"),
+            move || async { None }, // Quelle nicht erreichbar
+        )
+        .await;
+        assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Ok);
+        assert_eq!(a.quelle, "alt");
+        assert_eq!(a.abgerufen, Some(vor_30_h));
     }
 }
 
