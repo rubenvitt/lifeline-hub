@@ -135,7 +135,7 @@ Code. Vor jedem „fertig“ gelten `verification-before-completion` und `reques
 - [x] 7.3 `FuehrungsstelleModal` mit derselben Auswahl, `extra` nennt den Vorrang. Nachweis:
   `MitgliederAbschnitt.test.tsx` für Setzen, Leeren und Anzeige „S2 Lage“.
 - [x] 7.4 Prüfliste Einsatztauglichkeit (15 Kriterien) für die drei Masken als
-  `openspec/changes/lfh-549-funktionskatalog/pruefliste.md`, jede Zeile mit Verdikt. Nachweis:
+  `openspec/changes/archive/2026-09-30-lfh-549-funktionskatalog/pruefliste.md`, jede Zeile mit Verdikt. Nachweis:
   Datei vollständig, `dichte.guard.test.ts` grün (kein neues `size="small"`).
 
 ## 8. Frontend: ETB-Vorschläge und Vorbelegung (Nachzug LFH-545)
@@ -189,7 +189,10 @@ Code. Vor jedem „fertig“ gelten `verification-before-completion` und `reques
   dem Archivieren auf eine existierende Datei.
 - [x] 11.3 ClickUp: an LFH-545 vermerken, dass Vorschläge und Vorrangregel hier eingelöst werden.
   Nachweis: Kommentar am Task.
-- [ ] 11.4 `./scripts/check-all.sh` grün (Nachweis: der Lauf lokal oder der CI-Lauf des PRs).
-- [ ] 11.5 `/opsx:archive lfh-549-funktionskatalog` im selben Branch mit Spec-Sync nach
+- [x] 11.4 `./scripts/check-all.sh` grün (Nachweis: der Lauf lokal oder der CI-Lauf des PRs).
+  Belegt durch den CI-Lauf von rubenvitt/lifeline-hub#258 (ruft `check-all.sh` unverändert);
+  lokal vorab: Rust-Lib + betroffene Suiten, volle Vitest-Suite, Lint, Prettier, Typecheck,
+  betroffene e2e.
+- [x] 11.5 `/opsx:archive lfh-549-funktionskatalog` im selben Branch mit Spec-Sync nach
   `openspec/specs/fuehrungsfunktionen/`, Verweise nachgezogen. Nachweis:
   `scripts/check-openspec-archiv.sh` grün.

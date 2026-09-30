@@ -13,7 +13,7 @@
 //! Codespalte neben dem Bestandstext. **Kein Rückschluss vom Freitext auf einen Code**, auch
 //! nicht bei exakter Gleichheit: ein „S 3“ fiele still heraus.
 //!
-//! Herleitung: `openspec/changes/lfh-549-funktionskatalog/design.md`.
+//! Herleitung: `openspec/changes/archive/2026-09-30-lfh-549-funktionskatalog/design.md`.
 
 use crate::error::AppError;
 use crate::stab::Sachgebiet;

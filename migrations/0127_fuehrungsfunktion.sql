@@ -1,5 +1,5 @@
 -- LFH-549: Funktionskatalog für Führungsfunktionen (FwDV 100 Anlage 1/2).
--- Herleitung: openspec/changes/lfh-549-funktionskatalog/design.md (D1–D3).
+-- Herleitung: openspec/changes/archive/2026-09-30-lfh-549-funktionskatalog/design.md (D1–D3).
 --
 -- Drei Freitext-Funktionsfelder bekommen in EINEM Zug eine Codespalte neben den Bestandstext
 -- (keine halbe Migration, Stab-Spec LFH-46 Entscheidung 14). Die Codeliste ist

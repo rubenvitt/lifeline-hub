@@ -1,6 +1,6 @@
 //! Integrationstests des Funktionskatalogs (LFH-549).
 //!
-//! Spec: `openspec/changes/lfh-549-funktionskatalog/specs/fuehrungsfunktionen/spec.md`.
+//! Spec: `openspec/changes/archive/2026-09-30-lfh-549-funktionskatalog/specs/fuehrungsfunktionen/spec.md`.
 
 use axum::http::StatusCode;
 use serde_json::Value;

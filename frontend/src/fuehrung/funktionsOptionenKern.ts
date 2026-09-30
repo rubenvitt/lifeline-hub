@@ -16,7 +16,7 @@ import type {
  * fiele sonst still heraus. Führungshilfspersonal und Fachberater entstehen nur als
  * ausdrückliche Wahl aus dem Tipptext („Fachberater: THW“).
  *
- * Herleitung: `openspec/changes/lfh-549-funktionskatalog/design.md` (D5).
+ * Herleitung: `openspec/changes/archive/2026-09-30-lfh-549-funktionskatalog/design.md` (D5).
  */
 
 export const FUNKTIONS_PRAEFIX = 'funktion:';
