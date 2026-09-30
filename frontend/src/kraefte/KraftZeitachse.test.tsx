@@ -227,7 +227,8 @@ describe('KraftZeitachse (LFH-552)', () => {
         // Der Öffner steht im Dokument vor jedem Dialog (dessen Knopf heißt ebenso).
         await userEvent.click(screen.getAllByRole('button', { name: 'Nachtragen' })[0]);
         // Der zuletzt geöffnete Dialog; der vorige kann noch in seiner Schließanimation stehen.
-        const dialog = (await screen.findAllByRole('dialog')).at(-1)!;
+        const offen = await screen.findAllByRole('dialog');
+        const dialog = offen[offen.length - 1];
         await userEvent.click(within(dialog).getByRole('combobox', { name: 'Ereignis' }));
         const option = await waitFor(() => {
           const k = document.querySelector<HTMLElement>(
