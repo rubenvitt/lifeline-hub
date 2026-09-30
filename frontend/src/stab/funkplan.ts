@@ -21,7 +21,7 @@ import {
  * geladenen Listen. Keine eigene Datenhaltung: was hier steht, steht so an Abschnitt, Einheit,
  * Fahrzeug und Personal (Migrationen 0047/0073/0086).
  *
- * Herleitung: `openspec/changes/lfh-548-funkplan/design.md` (D3, D6).
+ * Herleitung: `openspec/changes/archive/2026-09-30-lfh-548-funkplan/design.md` (D3, D6).
  */
 
 export type FunkplanArt = 'abschnitt' | 'einheit' | 'fahrzeug' | 'sammel';

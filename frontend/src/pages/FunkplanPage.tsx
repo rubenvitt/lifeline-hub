@@ -52,7 +52,7 @@ import './funkplanPrint.css';
 /**
  * Funkplan des Sachgebiets S6 (FwDV 100 Anlage 5, LFH-548): eine schreibgeschützte, aus dem
  * Bestand abgeleitete Tabelle Abschnitt → Einheit → Fahrzeug. Herleitung:
- * `openspec/changes/lfh-548-funkplan/design.md`.
+ * `openspec/changes/archive/2026-09-30-lfh-548-funkplan/design.md`.
  *
  * - **Ort:** Unterroute des Stabs (`funkplanPfad`), Einstieg in der S6-Zeile der Stabseite. Kein
  *   eigenes Modul; Sperre und Sichtbarkeit erbt die Seite vom Stab (D1).

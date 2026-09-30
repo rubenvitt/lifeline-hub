@@ -37,7 +37,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Demo-Import übergibt `None`
   - Lagebericht- und Befehlsroute auf `AnlegenBody<T::Abschnitt>`
   - Nachweis: Tests aus 2.1 grün, `cargo test` im Workspace grün (Server ohne Hülle).
-- [ ] 2.3 Frontend-API:
+- [x] 2.3 Frontend-API:
   - `NeuerLagebericht.abschnitte?` (`api/lageberichte.ts`) und `NeuerBefehl.abschnitte?`
     (`api/befehle.ts`)
   - Nachweis: `pnpm exec tsc -b` grün.
@@ -164,7 +164,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 8. Prüfliste, Doku, Folgeticket
 
-- [x] 8.1 `openspec/changes/lfh-548-funkplan/pruefliste.md`: 15 Kriterien der
+- [x] 8.1 `openspec/changes/archive/2026-09-30-lfh-548-funkplan/pruefliste.md`: 15 Kriterien der
   Einsatztauglichkeit, je Zeile ein Verdikt (erfüllt / offen → Ticket / nicht anwendbar),
   Mutationsprobe aus 7.2, Messwerte aus 1.1.
 - [x] 8.2 Folgeticket „Eigene Gegenstelle (Führungsstelle) am Einsatz erfassen“ über
@@ -190,8 +190,12 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 9. Integration
 
-- [ ] 9.1 `./scripts/check-all.sh` grün (bzw. die CI des PRs), vorher `openspec validate
+- [x] 9.1 `./scripts/check-all.sh` grün (bzw. die CI des PRs), vorher `openspec validate
   lfh-548-funkplan --strict`.
-- [ ] 9.2 `/opsx:archive lfh-548-funkplan` im selben Branch: Spec-Sync nach `openspec/specs/`,
+  - Nachweis: `openspec validate --strict` grün. Lokal grün: Format, Lint, `tsc`, betroffene
+    Vitest- und Rust-Tests sowie die Funkplan-, Druck- und Gate-1/3-e2e. Der Workspace-weite
+    `cargo test` passte nicht auf die Platte der Sitzung und läuft in der CI von
+    rubenvitt/lifeline-hub#251, die diesen Haken trägt.
+- [x] 9.2 `/opsx:archive lfh-548-funkplan` im selben Branch: Spec-Sync nach `openspec/specs/`,
   Verweise auf den Change-Pfad (CLAUDE.md, Code-Kommentare) nachziehen, dann erst der PR gegen
   `alpha`.
