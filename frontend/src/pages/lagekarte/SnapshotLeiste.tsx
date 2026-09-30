@@ -1,12 +1,12 @@
+import {
+  IkoneChevronRunter,
+  IkoneKamera,
+  IkonePause,
+  IkonePlayKreis,
+  IkoneUhrRueckwaerts,
+} from '../../ikonen';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { App, Button, Input, Slider, Space, theme, Tooltip } from 'antd';
-import {
-  CameraOutlined,
-  DownOutlined,
-  HistoryOutlined,
-  PauseOutlined,
-  PlayCircleOutlined,
-} from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
@@ -215,7 +215,7 @@ export function SnapshotLeiste({
     return (
       <Tooltip title="Zeitachse einblenden">
         <Button
-          icon={<HistoryOutlined />}
+          icon={<IkoneUhrRueckwaerts />}
           aria-label="Zeitachse einblenden"
           onClick={() => klappeUm(false)}
           style={{
@@ -266,7 +266,7 @@ export function SnapshotLeiste({
             // Hülle `aria-hidden`: das Symbol brächte sonst „camera" in den zugänglichen Namen.
             icon={
               <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                <CameraOutlined />
+                <IkoneKamera />
               </span>
             }
             loading={sichertGerade}
@@ -284,7 +284,7 @@ export function SnapshotLeiste({
           </Button>
           <Tooltip title={spielt ? 'Pause' : 'Replay abspielen'}>
             <Button
-              icon={spielt ? <PauseOutlined /> : <PlayCircleOutlined />}
+              icon={spielt ? <IkonePause /> : <IkonePlayKreis />}
               onClick={aufPlayPause}
               disabled={chrono.length < 2}
               aria-label={spielt ? 'Pause' : 'Abspielen'}
@@ -339,7 +339,7 @@ export function SnapshotLeiste({
       <Tooltip title="Zeitachse ausblenden">
         <Button
           type="text"
-          icon={<DownOutlined />}
+          icon={<IkoneChevronRunter />}
           aria-label="Zeitachse ausblenden"
           onClick={() => klappeUm(true)}
           style={{ marginLeft: 'auto' }}

@@ -1,6 +1,6 @@
+import { IkoneChevronHoch, IkoneKreuz, IkonePlus } from '../ikonen';
 import { Alert, App, Button } from 'antd';
 import { Select } from '../components/Select';
-import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
@@ -288,7 +288,7 @@ export default function AuftraegeListe({
           darfSchreiben && (
             <Button
               type="primary"
-              icon={formOffen ? <UpOutlined /> : <PlusOutlined />}
+              icon={formOffen ? <IkoneChevronHoch /> : <IkonePlus />}
               onClick={() => setFormOffen((o) => !o)}
             >
               {formOffen ? 'Formular schließen' : 'Auftrag erteilen'}
@@ -305,7 +305,7 @@ export default function AuftraegeListe({
           aktion={
             <Button
               type="text"
-              icon={<CloseOutlined />}
+              icon={<IkoneKreuz />}
               onClick={() => setFormOffen(false)}
               aria-label="Formular schließen"
             />

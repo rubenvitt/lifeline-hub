@@ -1,4 +1,4 @@
-import { MoreOutlined } from '@ant-design/icons';
+import { IkonePunkteSenkrecht } from '../ikonen';
 import { Button, Dropdown, Flex, Space, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import type { Dayjs } from 'dayjs';
@@ -147,7 +147,7 @@ export default function AbloesungKarte({
                 <Button
                   type="text"
                   aria-label={`Aktionen zu ${s.einheit_name}`}
-                  icon={<MoreOutlined />}
+                  icon={<IkonePunkteSenkrecht />}
                 />
               </Dropdown>
             )}

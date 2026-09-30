@@ -30,7 +30,7 @@ export interface IkonenProps {
 }
 
 /** Eine Ikone des Satzes. Ersetzt `IconType` aus `react-icons`. */
-export type Ikone = ((props: IkonenProps) => JSX.Element) & { displayName?: string };
+export type Ikone = ((props: IkonenProps) => JSX.Element | null) & { displayName?: string };
 
 /** Umriss für inaktiv, Füllung für aktiv (Spec: „Aktiver Zustand über die gefüllte Ikone“). */
 export interface IkonenPaar {

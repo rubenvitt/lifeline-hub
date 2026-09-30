@@ -34,11 +34,11 @@
  * Datenzustände: jede Kennzahl und jedes Paneel hängt an seinen Abfragen und unterscheidet `laden`
  * / `fehler` / `leer` sichtbar; fällt die Gefahrenmatrix aus, bleibt der Rest lesbar.
  */
+import { IkoneWarndreieck } from '../../ikonen';
 import { useMemo, useState, useSyncExternalStore, useEffect } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Alert, Breadcrumb } from 'antd';
-import { TbAlertTriangle } from 'react-icons/tb';
 import { einsatzKeys } from '../../api/queryKeys';
 import {
   auftraegePfad,
@@ -445,7 +445,7 @@ export default function LageDashboardPage() {
                 }}
               >
                 <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                  <TbAlertTriangle size={14} />
+                  <IkoneWarndreieck size={14} />
                 </span>
                 Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
               </span>

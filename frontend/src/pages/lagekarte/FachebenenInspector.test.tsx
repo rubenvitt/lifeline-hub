@@ -24,7 +24,13 @@ describe('FachebenenInspector', () => {
         onSchliessen={() => {}}
       />,
     );
-    expect(screen.getByText('🌧️ Dauerregen')).toBeInTheDocument(); // Icon + Ereignis im Titel
+    // Ereignis im Titel, davor die Ikone des Satzes statt eines Emojis (LFH-595).
+    const titel = screen.getByText('Dauerregen');
+    expect(titel.closest('*:has([data-ikone])')?.querySelector('[data-ikone]')).toHaveAttribute(
+      'data-ikone',
+      'regen',
+    );
+    expect(document.body.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(screen.getByText('Amtliche Warnung vor Dauerregen')).toBeInTheDocument(); // volle Headline im Body
     expect(screen.getByText('Mäßig')).toBeInTheDocument();
     expect(screen.getByText('Sofort')).toBeInTheDocument();
@@ -375,6 +381,35 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
       [8, 50],
     ],
   ];
+
+  it.each([
+    ['GEWITTER', 'gewitterwolke'],
+    ['DAUERREGEN', 'regen'],
+    ['ORKANBÖEN', 'wind'],
+    ['GLÄTTE', 'schneeflocke'],
+    ['NEBEL', 'nebel'],
+    ['HITZE', 'thermometer'],
+    ['UV-INDEX', 'sonne'],
+    ['UNBEKANNT', 'warndreieck'],
+  ])('Warnung (DWD) %s trägt die Wetterikone %s, kein Emoji (LFH-595)', (event, ikone) => {
+    const { container } = render(
+      <FachebenenInspector quelle="dwd" properties={{ EVENT: event }} onSchliessen={() => {}} />,
+    );
+    expect(container.querySelector(`[data-ikone="${ikone}"]`)).not.toBeNull();
+    expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+
+  it('Warnung (NINA) trägt das Warndreieck des Satzes statt ⚠️ (LFH-595)', () => {
+    const { container } = render(
+      <FachebenenInspector
+        quelle="nina"
+        properties={{ HEADLINE: 'Bombenfund' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-ikone="warndreieck"]')).not.toBeNull();
+    expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
 
   it('Warnung mit Polygon-Geometrie zeigt Fläche und Umfang', () => {
     render(

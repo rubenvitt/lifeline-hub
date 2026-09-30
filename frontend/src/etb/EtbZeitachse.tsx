@@ -1,4 +1,4 @@
-import { MoreOutlined } from '@ant-design/icons';
+import { IkonePunkteSenkrecht } from '../ikonen';
 import { Button, Dropdown, Space } from 'antd';
 import {
   useCallback,
@@ -248,7 +248,7 @@ export default function EtbZeitachse({
           aria-label={`Aktionen zu Eintrag ${e.lfd_nr}`}
           icon={
             <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-              <MoreOutlined />
+              <IkonePunkteSenkrecht />
             </span>
           }
         />

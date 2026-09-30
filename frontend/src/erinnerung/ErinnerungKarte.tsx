@@ -1,5 +1,5 @@
+import { IkoneUhr } from '../ikonen';
 import { Button, Flex, Space, Tooltip, Typography } from 'antd';
-import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import type { Erinnerung } from '../api/types';
@@ -123,7 +123,7 @@ export default function ErinnerungKarte({
             <Text type={faellig ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
               {faellig && (
                 <span aria-hidden="true">
-                  <ClockCircleOutlined />
+                  <IkoneUhr />
                 </span>
               )}{' '}
               fällig: {formatZeit(e.faellig_at)}

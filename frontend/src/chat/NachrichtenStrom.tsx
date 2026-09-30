@@ -1,4 +1,4 @@
-import { MoreOutlined } from '@ant-design/icons';
+import { IkonePunkteSenkrecht } from '../ikonen';
 import {
   Button,
   Dropdown,
@@ -222,7 +222,7 @@ export default function NachrichtenStrom({
                 menuItems && menuItems.length > 0
                   ? [
                       <Dropdown key="aktionen" trigger={['click']} menu={{ items: menuItems }}>
-                        <Button type="text" aria-label="Aktionen" icon={<MoreOutlined />} />
+                        <Button type="text" aria-label="Aktionen" icon={<IkonePunkteSenkrecht />} />
                       </Dropdown>,
                     ]
                   : []

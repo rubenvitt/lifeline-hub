@@ -1,6 +1,5 @@
-import { IkoneAbmelden, IkoneChevronRunter, IkonePerson } from '../ikonen';
+import { IkoneAbmelden, IkoneChevronRunter, IkonePerson, type Ikone } from '../ikonen';
 import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
-import type { IconType } from 'react-icons';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import {
@@ -40,7 +39,7 @@ function umschaltEintrag(
   praefix: string,
   wert: string,
   titel: string,
-  Icon: IconType,
+  Icon: Ikone,
   aktiv: boolean,
 ) {
   return {

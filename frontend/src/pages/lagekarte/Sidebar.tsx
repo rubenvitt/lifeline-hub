@@ -1,4 +1,14 @@
 import {
+  IkoneEbenen,
+  IkoneFadenkreuz,
+  IkoneHochladen,
+  IkoneLupe,
+  IkoneMuelleimer,
+  IkonePunkteSenkrecht,
+  IkoneSchloss,
+  IkoneVollbildEcken,
+} from '../../ikonen';
+import {
   Button,
   Dropdown,
   Input,
@@ -14,17 +24,7 @@ import {
 } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenFehler, SeitenLeer, SeitenStandVeraltet } from '../../components/SeitenZustand';
-import {
-  AimOutlined,
-  DeleteOutlined,
-  FullscreenOutlined,
-  LockOutlined,
-  MoreOutlined,
-  SearchOutlined,
-  UploadOutlined,
-} from '@ant-design/icons';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { TbLayersIntersect } from 'react-icons/tb';
 import { monoStil, Segmentleiste, useRollen } from '../../components/instrument';
 import { griffHinweis, type GriffModus, type KantenAus } from './bildGriffe';
 import { KlappPaneel, LeistenAbschnitt, usePaneelZustand } from './KlappPaneel';
@@ -436,7 +436,7 @@ function GesperrteEbenenZeile({ zeile, grund }: { zeile: EbenenZeile; grund: str
           color: rollen.schwach,
         }}
       >
-        <LockOutlined />
+        <IkoneSchloss />
       </span>
       <span style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{zeile.name}</span>
       <span style={{ fontSize: 11 }}>{grund}</span>
@@ -672,7 +672,7 @@ export default function Sidebar(props: SidebarProps) {
         </div>
       )}
 
-      <LeistenAbschnitt titel="Ebenen" kennung="ebenen" zeichen={<TbLayersIntersect size={16} />}>
+      <LeistenAbschnitt titel="Ebenen" kennung="ebenen" zeichen={<IkoneEbenen size={16} />}>
         <div role="group" aria-label="Ebenen ein- und ausblenden">
           {ebenen.map((z) => (
             <EbenenZeilenKnopf
@@ -729,7 +729,7 @@ export default function Sidebar(props: SidebarProps) {
                   allowClear
                   prefix={
                     <span aria-hidden="true" style={{ color: rollen.schwach }}>
-                      <SearchOutlined />
+                      <IkoneLupe />
                     </span>
                   }
                   value={nvSuche}
@@ -1154,12 +1154,12 @@ export default function Sidebar(props: SidebarProps) {
                             items: [
                               {
                                 key: 'zentrieren',
-                                icon: <FullscreenOutlined />,
+                                icon: <IkoneVollbildEcken />,
                                 label: 'Auf Bild zentrieren',
                               },
                               {
                                 key: 'platzieren',
-                                icon: <AimOutlined />,
+                                icon: <IkoneFadenkreuz />,
                                 label: imPlatzieren
                                   ? 'Platzieren beenden'
                                   : 'Auf der Karte platzieren',
@@ -1171,7 +1171,7 @@ export default function Sidebar(props: SidebarProps) {
                               { type: 'divider' as const },
                               {
                                 key: 'loeschen',
-                                icon: <DeleteOutlined />,
+                                icon: <IkoneMuelleimer />,
                                 label: 'Bild entfernen …',
                                 danger: true,
                               },
@@ -1189,14 +1189,14 @@ export default function Sidebar(props: SidebarProps) {
                           {/* Der Name trägt die Bild-Kennung. Kein `size`. */}
                           <Button
                             type="text"
-                            icon={<MoreOutlined />}
+                            icon={<IkonePunkteSenkrecht />}
                             aria-label={`Aktionen zu ${b.name}`}
                           />
                         </Dropdown>
                       ) : (
                         <Tooltip title="Auf Bild zentrieren">
                           <Button
-                            icon={<FullscreenOutlined />}
+                            icon={<IkoneVollbildEcken />}
                             onClick={() => props.onBildZentrieren(b.id)}
                             aria-label={`${b.name} zentrieren`}
                           />
@@ -1302,7 +1302,7 @@ export default function Sidebar(props: SidebarProps) {
                 return false;
               }}
             >
-              <Button icon={<UploadOutlined />}>Bild hochladen</Button>
+              <Button icon={<IkoneHochladen />}>Bild hochladen</Button>
             </Upload>
           )}
         </Space>

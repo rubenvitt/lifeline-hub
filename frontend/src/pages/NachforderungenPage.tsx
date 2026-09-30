@@ -1,5 +1,5 @@
+import { IkoneChevronHoch, IkoneKreuz, IkonePlus } from '../ikonen';
 import { Alert, App, Breadcrumb, Button, Input, Modal, Spin } from 'antd';
-import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -220,7 +220,7 @@ export default function NachforderungenPage() {
         darfSchreiben && (
           <Button
             type="primary"
-            icon={formOffen ? <UpOutlined /> : <PlusOutlined />}
+            icon={formOffen ? <IkoneChevronHoch /> : <IkonePlus />}
             onClick={() => (formOffen ? schliesseFormular() : setFormOffen(true))}
           >
             {formOffen ? 'Formular schließen' : 'Nachforderung anlegen'}
@@ -236,7 +236,7 @@ export default function NachforderungenPage() {
           aktion={
             <Button
               type="text"
-              icon={<CloseOutlined />}
+              icon={<IkoneKreuz />}
               onClick={schliesseFormular}
               aria-label="Formular schließen"
             />

@@ -1,5 +1,5 @@
+import { IkonePlus } from '../ikonen';
 import { Button, Form, Input, Modal } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -131,7 +131,7 @@ export default function BefehlListe({
             // sonst hieße der Knopf „plus Befehl erteilen".
             <Button
               type="primary"
-              icon={<PlusOutlined />}
+              icon={<IkonePlus />}
               aria-label="Befehl erteilen"
               onClick={() => setAnlegenOffen(true)}
             >

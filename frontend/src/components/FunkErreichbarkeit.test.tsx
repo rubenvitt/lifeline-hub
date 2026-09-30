@@ -36,7 +36,10 @@ describe('FunkErreichbarkeit', () => {
     expect(box).toHaveTextContent('TMO: 412_F_DRK');
     expect(box).toHaveTextContent('DMO: DMO 31');
     expect(box).toHaveTextContent('Digitalfunk'); // Label statt Roh-Schlüssel
-    expect(box).toHaveTextContent('☎ 0151 23456');
+    expect(box).toHaveTextContent('0151 23456');
+    // Telefonikone des Satzes statt ☎ (LFH-595).
+    expect(box.querySelector('[data-ikone="telefon"]')).not.toBeNull();
+    expect(box.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 
   it('rendert nichts, wenn keine Funk-Daten vorliegen (ohne leerText)', () => {

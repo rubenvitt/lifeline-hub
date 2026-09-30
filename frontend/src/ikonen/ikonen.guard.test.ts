@@ -42,89 +42,16 @@ const AUSGABE = join(SRC, 'ikonen', 'erzeugt.generated.ts');
 const EIGEN_VERMERK = '<!-- eigene Zeichnung (LFH-595) im Raster von iOS 27 Outlined -->';
 
 /**
- * SCHULDMENGE: Dateien, die noch aus `@ant-design/icons` oder `react-icons` importieren. Stand
- * 30.09.2026. Ein Eintrag fällt im selben Commit wie die Umstellung der Datei.
+ * SCHULDMENGE: Dateien, die noch aus `@ant-design/icons` oder `react-icons` importieren. Leer seit
+ * 30.09.2026 (LFH-595 abgeschlossen); bleibt als Stelle für eine begründete Ausnahme stehen.
  */
-const OFFEN = new Set<string>([
-  'abloesung/AbloesungKarte.tsx',
-  'admin/AdminLayout.tsx',
-  'auftraege/AuftraegeListe.tsx',
-  'auftraege/AuftragKarte.tsx',
-  'auftraege/BefehlListe.tsx',
-  'betreuung/StellenBlock.tsx',
-  'chat/NachrichtEingabe.tsx',
-  'chat/NachrichtenStrom.tsx',
-  'command-palette/CommandPalette.tsx',
-  'command-palette/befehle.ts',
-  'command-palette/koordinatenSprung.ts',
-  'command-palette/typen.ts',
-  'components/BemerkungZelle.tsx',
-  'components/BenutzerMenu.tsx',
-  'components/DateiFeld.tsx',
-  'components/Datensicht.tsx',
-  'components/EinsatzSeite.tsx',
-  'components/EinstiegSwitcher.tsx',
-  'components/InlineAngabe.tsx',
-  'components/MarkdownEditor.tsx',
-  'components/SprechgruppenPicker.tsx',
-  'components/instrument/Sammelbanner.tsx',
-  'einsatz/AlarmZentrale.tsx',
-  'einsatz/EinsatzSwitcher.tsx',
-  'einsatz/ModulPanel.tsx',
-  'einsatz/modulRegistry.ts',
-  'erinnerung/ErinnerungKarte.tsx',
-  'etb/BuchstabierHilfe.tsx',
-  'etb/EtbBilanz.tsx',
-  'etb/EtbZeitachse.tsx',
-  'etb/MetaChip.tsx',
-  'etb/Schnellerfassung.tsx',
-  'karten/OfflineKartenVerwaltung.tsx',
-  'kraefte/AmpelZelle.tsx',
-  'lageberichte/AbschnittsAkkordeon.tsx',
-  'meldungen/MeldungFormular.tsx',
-  'pages/AbloesungPage.tsx',
-  'pages/DokumentePage.tsx',
-  'pages/EinheitenPage.tsx',
-  'pages/EinsaetzePage.tsx',
-  'pages/ErinnerungenPage.tsx',
-  'pages/KraefteuebersichtPage.tsx',
-  'pages/LageberichtePage.tsx',
-  'pages/LoginPage.tsx',
-  'pages/NachforderungenPage.tsx',
-  'pages/PersonenDetailPage.tsx',
-  'pages/PersonenPage.tsx',
-  'pages/SchaedenPage.tsx',
-  'pages/einsatzabschnitte/AbschnittKnoten.tsx',
-  'pages/einstellungen/EinsatzPegel.tsx',
-  'pages/fuehrung/UeberblickPage.tsx',
-  'pages/gefahren/GefahrenMatrix.tsx',
-  'pages/lage-dashboard/LageDashboardPage.tsx',
-  'pages/lagekarte/AnsichtSwitcher.tsx',
-  'pages/lagekarte/FreiesZeichenPicker.tsx',
-  'pages/lagekarte/KartenDetailCard.tsx',
-  'pages/lagekarte/KartenUeberlagerung.tsx',
-  'pages/lagekarte/KlappPaneel.tsx',
-  'pages/lagekarte/MarkerSuche.tsx',
-  'pages/lagekarte/Sidebar.tsx',
-  'pages/lagekarte/SnapshotLeiste.tsx',
-  'pages/lagekarte/ZeichnenSteuerung.tsx',
-  'pages/schaeden/SchadenAnhaenge.tsx',
-  'pages/uhs/Grundriss.tsx',
-  'pages/uhs/UhsDetailPage.tsx',
-  'stab/werkzeuge.test.ts',
-  'theme/darstellungOptionen.ts',
-  'verpflegung/ZeitfensterKarte.tsx',
-]);
+const OFFEN = new Set<string>([]);
 
 /** Textzeichen, die keine Ikone vertreten (Spec „Ein Emoji ist keine Ikone“). */
 const ERLAUBTE_ZEICHEN = new Set(['↗', '↔', '©']);
 
-/** SCHULDMENGE Emojis: Dateien, die noch ein Emoji als Ikone zeigen. */
-const OFFEN_EMOJI = new Set<string>([
-  'components/FunkErreichbarkeit.tsx',
-  'components/Platzhalter.tsx',
-  'pages/lagekarte/FachebenenInspector.tsx',
-]);
+/** SCHULDMENGE Emojis: Dateien, die noch ein Emoji als Ikone zeigen. Leer seit 30.09.2026. */
+const OFFEN_EMOJI = new Set<string>([]);
 
 const FREMDIMPORT =
   /(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"](?:@ant-design\/icons|react-icons)(?:\/[^'"]*)?['"]/;

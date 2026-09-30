@@ -1,3 +1,4 @@
+import { IkoneBaustelle } from '../ikonen';
 import { Button } from 'antd';
 import { useNavigate } from 'react-router';
 import Paneel from './instrument/Paneel';
@@ -44,10 +45,8 @@ const ERWARTUNGSHORIZONT_EINSATZ = ' Der Einsatz läuft davon unberührt weiter.
  * einen gibt — dem Rückweg als EINER Primäraktion. Die Breite ist gedeckelt
  * (`flaeche.seiteSchmal`), damit der Satz auf dem Fükw nicht über 1400 px läuft.
  *
- * DAS 🚧 IM TITEL BLEIBT vorerst, obwohl „Ein Emoji ist keine Ikone" (CLAUDE.md) es für
- * Angefasstes abträgt: `App.test.tsx` und `einsatz/ModulStub.test.tsx` greifen die Seite über
- * genau dieses Zeichen. Der Abtrag gehört in denselben Commit wie die Umstellung jener Abfragen
- * auf `title`/Klasse.
+ * Der Marker vor dem Titel ist die Ikone „Baustelle“ des Satzes (LFH-595; vorher das Emoji 🚧).
+ * Tests finden den Titel über `data-lfh="platzhalter-titel"`, nicht über ein Zeichen im Text.
  */
 export default function Platzhalter({ titel, beschreibung, rueckweg }: Props) {
   const navigate = useNavigate();
@@ -65,7 +64,19 @@ export default function Platzhalter({ titel, beschreibung, rueckweg }: Props) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
         {/* Kein <h1>: die Überschrift der Fläche ist die Augenbraue im Paneelkopf, und die
             Seite um den Platzhalter trägt ihre eigene — zwei Hauptüberschriften wären falsch. */}
-        <div style={{ ...schriftStil('seitentitel'), color: rollen.text }}>{`🚧 ${titel}`}</div>
+        <div
+          data-lfh="platzhalter-titel"
+          style={{
+            ...schriftStil('seitentitel'),
+            color: rollen.text,
+            display: 'flex',
+            alignItems: 'center',
+            gap: token.marginXS,
+          }}
+        >
+          <IkoneBaustelle />
+          {titel}
+        </div>
         {beschreibung && (
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
             {beschreibung}

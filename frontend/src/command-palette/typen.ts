@@ -1,4 +1,4 @@
-import type { IconType } from 'react-icons';
+import type { Ikone } from '../ikonen';
 import type {
   BenutzerAnzeige,
   EinsatzAnzeige,
@@ -38,7 +38,7 @@ export interface Befehl {
   gruppe: BefehlGruppe;
   label: string;
   schlagworte?: string[];
-  icon?: IconType;
+  icon?: Ikone;
   /**
    * Kontext rechts neben dem Label: wo der Treffer wohnt (Kategorie eines Moduls, Modul eines
    * Datensatzes).

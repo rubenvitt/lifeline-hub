@@ -1,8 +1,8 @@
+import { IkoneBlitz, IkonePapierflieger } from '../ikonen';
 import { Button, Col, DatePicker, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular } from '../components/Erfassung';
-import { ThunderboltOutlined, SendOutlined } from '@ant-design/icons';
 import { useEffect } from 'react';
 import dayjs from 'dayjs';
 import type {
@@ -173,10 +173,10 @@ export default function MeldungFormular({
     >
       {/* Fast-Path im Formularkörper statt Card-extra, damit er auch bei `card={false}` erhalten bleibt. */}
       <Space style={{ marginBottom: 16 }} wrap>
-        <Button danger icon={<ThunderboltOutlined />} onClick={sofortVorbelegen}>
+        <Button danger icon={<IkoneBlitz />} onClick={sofortVorbelegen}>
           Sofortmeldung
         </Button>
-        <Button icon={<SendOutlined />} onClick={lagemeldungVorbelegen}>
+        <Button icon={<IkonePapierflieger />} onClick={lagemeldungVorbelegen}>
           Lagemeldung (extern)
         </Button>
       </Space>

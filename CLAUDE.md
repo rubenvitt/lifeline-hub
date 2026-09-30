@@ -444,13 +444,20 @@ anwendbar), „nicht geprüft" ist keins.
 - **Destruktiv ist nicht gleich destruktiv** (LFH-363): Umkehrbares („Außer Dienst",
   „Deaktivieren", eine gelöste Zuordnung) → Abstand + `danger`, keine Rückfrage; Unumkehrbares →
   Rückfrage, `Popconfirm` mit `okButtonProps={{ danger: true }}`.
-- **Ein Emoji ist keine Ikone:** `@ant-design/icons` in `aria-hidden`-Hülle, Zuordnung per
-  `Record` in der Komponente (`kraefte/AmpelZelle.tsx`), in Text-/Druckausgaben ein Kurzwort
-  (`Pers.`/`Fzg.`/`Mtl.`). Kein Guard (Bestandsliste u. a. `pages/EinheitenPage.tsx`,
-  `pages/EinsatzabschnittePage.tsx`, `components/FunkErreichbarkeit.tsx`,
-  `components/Platzhalter.tsx`, `pages/lagekarte/FachebenenInspector.tsx`), verbindlich für
-  Neues und Angefasstes; Emoji-Testabfragen umstellen, nicht löschen. Erlaubt als
-  `aria-hidden`-Textzeichen neben einem Wort: ⧖ und ↗.
+- **Ein Ikonensatz** (LFH-595, Spec `ikonensatz`,
+  `openspec/changes/archive/2026-09-30-lfh-595-ein-ikonensatz/design.md`): Icons8
+  „iOS 27 Outlined“, für aktive Zustände „iOS 27 Filled“ (`IkonenPaar`, heute Rail und Stern).
+  Import nur über `ikonen/index.ts`; Register, SVG-Quellen und Stempel in `scripts/ikonen/`
+  (`erzeuge-ikonen.mjs`, Abschreibprüfung gegen das Icons8-PNG `vergleiche-png.mjs`). Auswählen
+  mit PNG, SVG erst nach Freigabe abrufen (Kontingent des Abos). Lücke: Ersatz aus demselben Stil,
+  sonst eigene Zeichnung im 50er-Raster mit Vermerk; **nie ein zweiter Katalog**. Jede Ikone ist
+  `aria-hidden`, `1em`, `currentColor`, Hülle `anticon` (antds Ausrichtung); antds eigene
+  Bauteil-Ikonen (Auswahlpfeil, Schließkreuz, `loading`) bleiben. Taktische Zeichen und die
+  Bildmarke sind keine Ikonen.
+- **Ein Emoji ist keine Ikone:** Guard `ikonen/ikonen.guard.test.ts` (kein Import aus
+  `@ant-design/icons`/`react-icons`, Stempel, keine unbenutzte Ikone, kein Emoji im Code); in
+  Text-/Druckausgaben ein Kurzwort (`Pers.`/`Fzg.`/`Mtl.`). Erlaubt als Textzeichen: ⧖ und ↗
+  (`aria-hidden` neben einem Wort), ✓ im Wortlaut, © in Quellenangaben.
 
 **Personen und Sichtung**
 - **Sichtung geht mit dem Anlegen mit** (`POST …/personen` mit `sichtung`, eine Transaktion,

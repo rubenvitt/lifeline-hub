@@ -1,3 +1,4 @@
+import { IkoneMinus } from '../../ikonen';
 import {
   memo,
   useEffect,
@@ -8,7 +9,6 @@ import {
   type MouseEvent,
 } from 'react';
 import { Collapse, Input, Space, Tooltip, Typography } from 'antd';
-import { MinusOutlined } from '@ant-design/icons';
 import { Select } from '../../components/Select';
 import TaktischesZeichen, {
   einheiten,
@@ -217,7 +217,7 @@ const Kachel = memo(function Kachel(p: KachelProps) {
     >
       <span aria-hidden style={{ display: 'flex', height: KACHEL_BILD, alignItems: 'center' }}>
         {p.id == null ? (
-          <MinusOutlined style={{ fontSize: KACHEL_BILD / 2 }} />
+          <IkoneMinus style={{ fontSize: KACHEL_BILD / 2 }} />
         ) : (
           <TaktischesZeichen
             {...(p.art === 'grundzeichen'

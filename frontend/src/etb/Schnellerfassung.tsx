@@ -1,5 +1,5 @@
+import { IkoneAuge, IkoneBueroklammer, IkoneKreuz, IkonePlus } from '../ikonen';
 import { Alert, Button, Checkbox, Dropdown, Space, Tooltip, Typography } from 'antd';
-import { CloseOutlined, EyeOutlined, PaperClipOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
@@ -643,7 +643,7 @@ export default function Schnellerfassung({
       disabled={sendet}
       icon={
         <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-          <PlusOutlined />
+          <IkonePlus />
         </span>
       }
       onClick={() => {
@@ -670,7 +670,7 @@ export default function Schnellerfassung({
         disabled={!online || sendet || anGrenze}
         icon={
           <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-            <PaperClipOutlined />
+            <IkoneBueroklammer />
           </span>
         }
         onClick={() => dateiEingabe.current?.click()}
@@ -726,7 +726,7 @@ export default function Schnellerfassung({
                 type="text"
                 icon={
                   <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                    <EyeOutlined />
+                    <IkoneAuge />
                   </span>
                 }
                 aria-pressed={vorschauOffen}
@@ -872,7 +872,7 @@ export default function Schnellerfassung({
                 }
                 icon={
                   <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                    <CloseOutlined />
+                    <IkoneKreuz />
                   </span>
                 }
                 onClick={() => setzeDateien(dateien.filter((x) => x !== d))}

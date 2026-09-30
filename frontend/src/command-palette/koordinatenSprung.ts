@@ -1,5 +1,5 @@
+import { IkoneOrtsmarke } from '../ikonen';
 import { forward as mgrsVorwaerts } from 'mgrs';
-import { TbMapPin } from 'react-icons/tb';
 import { formatiere, parse, type LatLon } from '../anzeige/koordinaten';
 import type { Koordinatenformat } from '../api/types';
 import { lagekartePfad } from '../routing/deeplinks';
@@ -118,7 +118,7 @@ export function koordinatenBefehl({
     gruppe: 'koordinate',
     label: `Auf Lagekarte zeigen · ${formatiere(punkt.lat, punkt.lon, format)}`,
     kontext: 'Koordinate',
-    icon: TbMapPin,
+    icon: IkoneOrtsmarke,
     ...sprungZu(lagekartePfad(einsatzId, { zentrum: punkt }), navigate),
   };
 }

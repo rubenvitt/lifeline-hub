@@ -1,4 +1,4 @@
-import { MoreOutlined } from '@ant-design/icons';
+import { IkonePunkteSenkrecht } from '../ikonen';
 import { AutoComplete, Button, DatePicker, Dropdown, Input, Space, Tag } from 'antd';
 import { Select } from '../components/Select';
 import dayjs from 'dayjs';
@@ -190,7 +190,7 @@ export default function MetaChip({
           type="text"
           disabled={gesperrt}
           aria-label={`Aktionen zu ${d.label}`}
-          icon={<MoreOutlined />}
+          icon={<IkonePunkteSenkrecht />}
         />
       </Dropdown>
     </Tag>

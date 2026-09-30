@@ -1,8 +1,8 @@
+import { IkoneMuelleimer } from '../ikonen';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Breadcrumb, Button, Popconfirm, Space, Typography } from 'antd';
-import { DeleteOutlined } from '@ant-design/icons';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { dokumentDownloadPfad, entferneDokument, listeDokumente } from '../api/dokumente';
@@ -149,7 +149,7 @@ const dokumentSpalten = (
                 <Button
                   danger
                   type="text"
-                  icon={<DeleteOutlined />}
+                  icon={<IkoneMuelleimer />}
                   aria-label={`Dokument ${d.titel} entfernen`}
                 />
               </Popconfirm>

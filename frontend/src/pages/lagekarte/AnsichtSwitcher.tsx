@@ -1,14 +1,14 @@
+import {
+  IkoneMuelleimer,
+  IkonePlus,
+  IkonePunkteSenkrecht,
+  IkoneStern,
+  IkoneSternGefuellt,
+  IkoneStift,
+} from '../../ikonen';
 import { useState } from 'react';
 import { Button, Dropdown, Input, Modal, Radio, Space, Typography, theme } from 'antd';
 import { Select } from '../../components/Select';
-import {
-  DeleteOutlined,
-  EditOutlined,
-  MoreOutlined,
-  PlusOutlined,
-  StarFilled,
-  StarOutlined,
-} from '@ant-design/icons';
 import type { KartenAnsicht } from '../../api/types';
 
 interface AnsichtSwitcherProps {
@@ -84,18 +84,18 @@ export default function AnsichtSwitcher({
   const loeschenGesperrt = nurEineAnsicht || aktiveIstStandard;
 
   const menuItems = [
-    { key: 'neu', icon: <PlusOutlined />, label: 'Neue Ansicht …' },
-    { key: 'umbenennen', icon: <EditOutlined />, label: 'Umbenennen …', disabled: !aktive },
+    { key: 'neu', icon: <IkonePlus />, label: 'Neue Ansicht …' },
+    { key: 'umbenennen', icon: <IkoneStift />, label: 'Umbenennen …', disabled: !aktive },
     {
       key: 'standard',
-      icon: <StarOutlined />,
+      icon: <IkoneStern />,
       label: 'Als Standard',
       disabled: !aktive || aktiveIstStandard,
     },
     { type: 'divider' as const },
     {
       key: 'loeschen',
-      icon: <DeleteOutlined />,
+      icon: <IkoneMuelleimer />,
       label: 'Löschen …',
       danger: true,
       disabled: loeschenGesperrt,
@@ -129,7 +129,7 @@ export default function AnsichtSwitcher({
             value: a.id,
             label: (
               <Space size={token.marginXS}>
-                {a.ist_standard && <StarFilled style={{ color: '#faad14' }} />}
+                {a.ist_standard && <IkoneSternGefuellt />}
                 {a.name}
               </Space>
             ),
@@ -140,7 +140,7 @@ export default function AnsichtSwitcher({
             trigger={['click']}
             menu={{ items: menuItems, onClick: ({ key }) => onMenu(key) }}
           >
-            <Button icon={<MoreOutlined />} aria-label="Ansichts-Aktionen" loading={busy} />
+            <Button icon={<IkonePunkteSenkrecht />} aria-label="Ansichts-Aktionen" loading={busy} />
           </Dropdown>
         )}
       </Space.Compact>

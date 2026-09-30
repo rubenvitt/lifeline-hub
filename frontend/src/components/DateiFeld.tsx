@@ -1,5 +1,5 @@
+import { IkoneHochladen } from '../ikonen';
 import { Button, Form, Upload, type UploadFile } from 'antd';
-import { UploadOutlined } from '@ant-design/icons';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
 
 /** Wortgleich mit der Server-Absage (`src/anhang/mod.rs`, `pruefe_groesse`): eine Absage, ein
@@ -64,7 +64,7 @@ export default function DateiFeld({ accept, name = 'datei', onDateiWahl }: Props
             // `aria-hidden`-Hülle: der Icon-Knoten brächte `role="img"` mit englischem Namen
             // („upload“) in den zugänglichen Namen des Knopfs.
             <span aria-hidden="true">
-              <UploadOutlined />
+              <IkoneHochladen />
             </span>
           }
         >

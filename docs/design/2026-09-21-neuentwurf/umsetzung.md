@@ -91,6 +91,14 @@ Desktop-Symbole: `frontend/src/marke/bildmarkeGeometrie.ts`, Quellen und Erzeugu
 `scripts/marke/`, Guard `frontend/src/marke/marke.guard.test.ts`. Titelleiste und Startbildschirm
 der PWA sind Kopf-Schwarz.
 
+## Ikonensatz (LFH-595, Entscheidung 30.09.2026)
+
+Eine Ikone stammt aus Icons8 „iOS 27 Outlined“, der aktive Zustand (Rail) aus „iOS 27 Filled“.
+Linien sind im 50-px-Raster 2 Einheiten breit, bei 20 px also 0,8 px; das ist nach der Stilprobe
+angenommen (`openspec/changes/archive/2026-09-30-lfh-595-ein-ikonensatz/stilprobe/`). Chevrons sind einfache Striche (`expand-arrow`,
+`collapse-arrow`, `forward`), die Verbindungsanzeige ist das WLAN-Paar mit Haken/Kreuz. Die
+Ikonen des Entwurfs (Tabler) gelten nur noch als Bildidee, nicht als Quelle.
+
 ## Form & Typografie
 
 - Radius 0 überall (einzige Ausnahme: das macOS-Symbol der Desktop-Hülle folgt dem Raster der

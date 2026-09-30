@@ -15,6 +15,89 @@
       }
     },
     {
+      "name": "anmelden",
+      "bedeutung": "Anmelden",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "26218",
+        "commonName": "login-rounded-right"
+      }
+    },
+    {
+      "name": "arzttasche",
+      "bedeutung": "Unfallhilfsstellen",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "9145",
+        "commonName": "doctors-bag"
+      },
+      "notiz": "kein 'first aid kit' in ios7; Arzttasche mit Kreuz ist das nächste Bild"
+    },
+    {
+      "name": "auge",
+      "bedeutung": "Vorschau anzeigen",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "986",
+        "commonName": "visible"
+      }
+    },
+    {
+      "name": "auto",
+      "bedeutung": "Fahrzeuge (Ampel); Verbleib/Entlassung erfassen (UHS)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "12666",
+        "commonName": "car"
+      }
+    },
+    {
+      "name": "baustelle",
+      "bedeutung": "Platzhalter 'noch nicht umgesetzt'",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "12687",
+        "commonName": "under-construction"
+      }
+    },
+    {
+      "name": "bericht",
+      "bedeutung": "Lageberichte (Modul und Kopfknopf 'Lagebericht')",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "123846",
+        "commonName": "business-report"
+      },
+      "notiz": "mehrdeutig: zwei Tabler-Bilder, eine Bedeutung; Alternative file (11651)"
+    },
+    {
+      "name": "besteck",
+      "bedeutung": "Verpflegung",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "4724",
+        "commonName": "cutlery"
+      }
+    },
+    {
+      "name": "blitz",
+      "bedeutung": "Sofortmeldung vorbelegen",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "6703",
+        "commonName": "lightning-bolt"
+      }
+    },
+    {
+      "name": "bueroklammer",
+      "bedeutung": "Anhang",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "11321",
+        "commonName": "attach"
+      }
+    },
+    {
       "name": "chevron-hoch",
       "bedeutung": "Zuklappen",
       "herkunft": "icons8",
@@ -23,6 +106,16 @@
         "commonName": "collapse-arrow"
       },
       "notiz": "Einfacher Strich statt chevron-up (40023), Grund wie chevron-runter."
+    },
+    {
+      "name": "chevron-rechts",
+      "bedeutung": "Zugeklappt/weiter/Vorschau öffnen (Palette), Brotkrumen",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "61",
+        "commonName": "forward"
+      },
+      "notiz": "Einfacher Strich statt chevron-right (40022), Grund wie chevron-runter."
     },
     {
       "name": "chevron-runter",
@@ -35,6 +128,139 @@
       "notiz": "Einfacher Strich statt chevron-down (40026), das im Outlined-Stil als Umriss gezeichnet ist und bei 16 px doppelt wirkte (Stilprobe 30.09.2026)."
     },
     {
+      "name": "dokument",
+      "bedeutung": "Einsatzdaten",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "1395",
+        "commonName": "document"
+      }
+    },
+    {
+      "name": "dokumente",
+      "bedeutung": "Dokumente",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "37930",
+        "commonName": "documents"
+      }
+    },
+    {
+      "name": "ebenen",
+      "bedeutung": "Kartenebenen",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "727",
+        "commonName": "layers"
+      }
+    },
+    {
+      "name": "extern-pfeil",
+      "bedeutung": "Verweis auf anderes Modul (Sprungmarke)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "742",
+        "commonName": "external-link"
+      }
+    },
+    {
+      "name": "fadenkreuz",
+      "bedeutung": "Auf der Karte platzieren; Zeiger-Koordinate in der Kartenüberlagerung",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "1304",
+        "commonName": "define-location"
+      }
+    },
+    {
+      "name": "gebaeudegruppe",
+      "bedeutung": "Stab; Schutzgut 'Sache'",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "45075",
+        "commonName": "city-buildings"
+      }
+    },
+    {
+      "name": "gewitterwolke",
+      "bedeutung": "Wetter & Pegel; Gewitterwarnung",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "670",
+        "commonName": "storm"
+      }
+    },
+    {
+      "name": "globus",
+      "bedeutung": "Organisation/global (Sprungpalette)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "3685",
+        "commonName": "globe"
+      }
+    },
+    {
+      "name": "glocke",
+      "bedeutung": "Erinnerungen; Ton bereit",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "11642",
+        "commonName": "appointment-reminders"
+      }
+    },
+    {
+      "name": "glocke-aus",
+      "bedeutung": "Ton stumm/blockiert",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "39074",
+        "commonName": "no-reminders"
+      }
+    },
+    {
+      "name": "haken",
+      "bedeutung": "Bestätigt (ETB-Bilanz)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "3061",
+        "commonName": "checkmark"
+      }
+    },
+    {
+      "name": "haken-kreis",
+      "bedeutung": "Erledigt/frei/erlaubt (Platz frei, Abschnitt voll, Desktop-Meldung erlaubt)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "11658",
+        "commonName": "ok"
+      },
+      "notiz": "Icons8 nennt den Kreis-Haken 'ok' (Check Mark); vor Übernahme Bild prüfen"
+    },
+    {
+      "name": "hand-stopp",
+      "bedeutung": "Dichte 'Handschuh'",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "KLyXgIpg7AdE",
+        "commonName": "stop-gesture"
+      }
+    },
+    {
+      "name": "haus",
+      "bedeutung": "Schäden",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "73",
+        "commonName": "home"
+      }
+    },
+    {
+      "name": "haus-herz",
+      "bedeutung": "Betreuung/Notunterkunft",
+      "herkunft": "eigen",
+      "notiz": "Eigene Zeichnung: Haus aus Icons8 „home“ (73) ohne Tür, darin die Außenkontur von „like“ (87) als gefülltes Herz, Faktor 0,4. Kein Haus mit Herz im Stil (Freigabe 30.09.2026)."
+    },
+    {
       "name": "hierarchie",
       "bedeutung": "Kategorie Führung",
       "herkunft": "icons8",
@@ -45,6 +271,43 @@
       "gefuellt": {
         "id": "11269",
         "commonName": "parallel-tasks"
+      }
+    },
+    {
+      "name": "hochladen",
+      "bedeutung": "Datei/Bild hochladen",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "368",
+        "commonName": "upload"
+      }
+    },
+    {
+      "name": "kacheln",
+      "bedeutung": "Überblick",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "1673",
+        "commonName": "tails"
+      }
+    },
+    {
+      "name": "kachelraster",
+      "bedeutung": "Dashboard",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "52219",
+        "commonName": "view-module"
+      },
+      "notiz": "Freigabe 30.09.2026: statt channel-mosaic (11487), das wie ein Bildschirm wirkt."
+    },
+    {
+      "name": "kamera",
+      "bedeutung": "Kartenstand festhalten (Snapshot)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "5376",
+        "commonName": "camera"
       }
     },
     {
@@ -61,6 +324,15 @@
       }
     },
     {
+      "name": "kistenstapel",
+      "bedeutung": "Material; Nachforderung",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "74815",
+        "commonName": "stacking"
+      }
+    },
+    {
       "name": "klemmbrett",
       "bedeutung": "Kategorie Erfassung; ETB",
       "herkunft": "icons8",
@@ -74,12 +346,94 @@
       }
     },
     {
+      "name": "klemmbrett-liste",
+      "bedeutung": "Aufträge/Befehle",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "4023",
+        "commonName": "todo-list"
+      }
+    },
+    {
+      "name": "kompass",
+      "bedeutung": "Karte nach Norden ausrichten",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "9672",
+        "commonName": "compass"
+      }
+    },
+    {
+      "name": "kreispfeile",
+      "bedeutung": "Platz in Aufbereitung",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "11680",
+        "commonName": "synchronize"
+      }
+    },
+    {
       "name": "kreuz",
       "bedeutung": "Schließen/Formular einklappen/Detailkarte schließen",
       "herkunft": "icons8",
       "icons8": {
         "id": "46",
         "commonName": "delete-sign"
+      }
+    },
+    {
+      "name": "ladekreis",
+      "bedeutung": "Lädt (Offline-Karten)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "11334",
+        "commonName": "spinner-frame-4"
+      },
+      "notiz": "statisches Einzelbild; drehen per CSS wie antd. Bewegte Varianten nur animiert (spinner SYOcualEVLca)"
+    },
+    {
+      "name": "lagerhalle",
+      "bedeutung": "Bereitstellungsräume",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "5364",
+        "commonName": "warehouse"
+      }
+    },
+    {
+      "name": "lautsprecher",
+      "bedeutung": "Buchstabierhilfe (Vorlesen)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "2795",
+        "commonName": "high-volume"
+      }
+    },
+    {
+      "name": "lineal",
+      "bedeutung": "Messen auf der Karte",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "11677",
+        "commonName": "ruler"
+      }
+    },
+    {
+      "name": "liste",
+      "bedeutung": "Liste öffnen (Sprungpalette)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "774",
+        "commonName": "list"
+      }
+    },
+    {
+      "name": "liste-details",
+      "bedeutung": "Meldebild (Kräfteübersicht)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "1675",
+        "commonName": "details"
       }
     },
     {
@@ -114,12 +468,213 @@
       }
     },
     {
+      "name": "minus",
+      "bedeutung": "Verkleinern/herauszoomen",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "11152",
+        "commonName": "minus-math"
+      }
+    },
+    {
+      "name": "minus-kreis",
+      "bedeutung": "Abschnitt unvollständig (Lagebericht)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "1504",
+        "commonName": "minus"
+      },
+      "notiz": "Icons8 'minus' ist der eingekreiste Strich; vor Übernahme prüfen"
+    },
+    {
+      "name": "mond",
+      "bedeutung": "Darstellung 'Dunkel'",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "25031",
+        "commonName": "crescent-moon"
+      }
+    },
+    {
+      "name": "monitor",
+      "bedeutung": "Darstellung 'System'; Desktop-Benachrichtigung",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "39210",
+        "commonName": "monitor"
+      }
+    },
+    {
+      "name": "muelleimer",
+      "bedeutung": "Löschen/entfernen",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "1942",
+        "commonName": "trash"
+      }
+    },
+    {
+      "name": "nebel",
+      "bedeutung": "Wetterwarnung Nebel",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "672",
+        "commonName": "fog-day"
+      }
+    },
+    {
+      "name": "organigramm",
+      "bedeutung": "Einsatzabschnitte",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "11241",
+        "commonName": "tree-structure"
+      }
+    },
+    {
+      "name": "ortsmarke",
+      "bedeutung": "Einsatzort/Ort; Sprung zu Koordinate",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "3723",
+        "commonName": "marker"
+      }
+    },
+    {
+      "name": "papierflieger",
+      "bedeutung": "Als Lagemeldung vorbelegen/senden",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "2837",
+        "commonName": "sent"
+      }
+    },
+    {
+      "name": "pause",
+      "bedeutung": "Wiedergabe anhalten (Zeitachse)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "403",
+        "commonName": "pause"
+      }
+    },
+    {
       "name": "person",
       "bedeutung": "Personal; Benutzer; Person öffnen",
       "herkunft": "icons8",
       "icons8": {
         "id": "23264",
         "commonName": "user"
+      }
+    },
+    {
+      "name": "person-plus",
+      "bedeutung": "Patient aufnehmen/Platz belegen",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "3",
+        "commonName": "add-user-male"
+      }
+    },
+    {
+      "name": "personen",
+      "bedeutung": "Personen/Betroffene; Schutzgut 'Mensch'",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "11168",
+        "commonName": "conference-call"
+      },
+      "notiz": "mehrdeutig: kein reines Zwei-Personen-Bild gefunden; Personenzahl gegen 'groups' prüfen"
+    },
+    {
+      "name": "personengruppe",
+      "bedeutung": "Einheiten",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "3734",
+        "commonName": "groups"
+      }
+    },
+    {
+      "name": "pfeil-hoch",
+      "bedeutung": "Nach oben verschieben (Pegel)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "39966",
+        "commonName": "long-arrow-up"
+      }
+    },
+    {
+      "name": "pfeil-links",
+      "bedeutung": "Zurück zur Liste (Sprungpalette)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "39944",
+        "commonName": "long-arrow-left"
+      }
+    },
+    {
+      "name": "pfeil-runter",
+      "bedeutung": "Nach unten verschieben (Pegel); neue Einträge unten (Sammelbanner)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "41189",
+        "commonName": "long-arrow-down"
+      }
+    },
+    {
+      "name": "pfeil-zurueck-gebogen",
+      "bedeutung": "Rückgängig (Zeichnen); zurück in den Wartebereich",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "3059",
+        "commonName": "undo"
+      }
+    },
+    {
+      "name": "pfeile-auswaerts",
+      "bedeutung": "Dichte 'Komfortabel'",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "1755",
+        "commonName": "expand"
+      }
+    },
+    {
+      "name": "pfeile-einwaerts",
+      "bedeutung": "Dichte 'Kompakt'",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "1757",
+        "commonName": "collapse"
+      }
+    },
+    {
+      "name": "pfeile-gegenlaeufig",
+      "bedeutung": "Ablösung",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "32366",
+        "commonName": "sorting-arrows-horizontal"
+      },
+      "notiz": "Freigabe 30.09.2026: statt exchange (61743), das ein $-Zeichen trägt."
+    },
+    {
+      "name": "pfote",
+      "bedeutung": "Tiere; Schutzgut 'Tier'",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "2743",
+        "commonName": "dog-footprint"
+      }
+    },
+    {
+      "name": "play-kreis",
+      "bedeutung": "Wiedergabe starten (Zeitachse)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "25603",
+        "commonName": "circled-play"
       }
     },
     {
@@ -133,12 +688,40 @@
       "notiz": "Icons8 'plus' (1501) ist eingekreist; 'plus-math' ist das nackte Kreuz"
     },
     {
+      "name": "posteingang",
+      "bedeutung": "Lagemeldungen; Meldungen (eingehend)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "2879",
+        "commonName": "inbox"
+      }
+    },
+    {
       "name": "punkte-senkrecht",
       "bedeutung": "Weitere Aktionen (Zeilenmenü)",
       "herkunft": "icons8",
       "icons8": {
         "id": "21618",
         "commonName": "menu-2"
+      },
+      "notiz": "In iOS 27 Outlined sind die Punkte in jeder Fassung Ringe (menu-2, more); bleibt."
+    },
+    {
+      "name": "regen",
+      "bedeutung": "Wetterwarnung Regen",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "656",
+        "commonName": "rain"
+      }
+    },
+    {
+      "name": "schild",
+      "bedeutung": "Schutzgut 'Einsatzkräfte'",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "852",
+        "commonName": "shield"
       }
     },
     {
@@ -148,6 +731,62 @@
       "icons8": {
         "id": "94",
         "commonName": "lock"
+      }
+    },
+    {
+      "name": "schluessel",
+      "bedeutung": "Anmelden mit Passkey/Schlüssel",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "555",
+        "commonName": "key"
+      }
+    },
+    {
+      "name": "schneeflocke",
+      "bedeutung": "Wetterwarnung Schnee/Glätte/Frost",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "7518",
+        "commonName": "snowflake"
+      }
+    },
+    {
+      "name": "schraubenschluessel",
+      "bedeutung": "Defekt; Modul in Arbeit",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "24551",
+        "commonName": "wrench"
+      }
+    },
+    {
+      "name": "seitenleiste-auf",
+      "bedeutung": "Kartenleiste einblenden",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "97654",
+        "commonName": "show-sidepanel"
+      },
+      "notiz": "Seite (rechts) am Bild prüfen"
+    },
+    {
+      "name": "seitenleiste-zu",
+      "bedeutung": "Kartenleiste ausblenden",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "97655",
+        "commonName": "hide-sidepanel"
+      },
+      "notiz": "Seite (rechts) am Bild prüfen; Alternative show-right-side-panel (108172)"
+    },
+    {
+      "name": "sonne",
+      "bedeutung": "Darstellung 'Hell'; Helligkeit 80 %; UV-Warnung; alle fünf Helligkeitsstufen (Freigabe 30.09.2026: eine Sonne, die Stufe steht als Zahl daneben)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "648",
+        "commonName": "sun"
       }
     },
     {
@@ -164,12 +803,135 @@
       }
     },
     {
+      "name": "sprechblase-rund",
+      "bedeutung": "Chat",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "143",
+        "commonName": "speech-bubble"
+      }
+    },
+    {
+      "name": "spross",
+      "bedeutung": "Schutzgut 'Umwelt'",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "7414",
+        "commonName": "sprout"
+      }
+    },
+    {
+      "name": "standort-ziel",
+      "bedeutung": "Eigener Standort",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "3396",
+        "commonName": "center-direction"
+      }
+    },
+    {
+      "name": "stern",
+      "bedeutung": "Kartenansicht als Standard markieren (leer/gesetzt)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "104",
+        "commonName": "star"
+      },
+      "gefuellt": {
+        "id": "7856",
+        "commonName": "star"
+      }
+    },
+    {
+      "name": "stift",
+      "bedeutung": "Bearbeiten; Zeichnen auf der Karte",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "49",
+        "commonName": "edit"
+      }
+    },
+    {
+      "name": "telefon",
+      "bedeutung": "Erreichbarkeit hinterlegt",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "9659",
+        "commonName": "phone"
+      }
+    },
+    {
+      "name": "thermometer",
+      "bedeutung": "Wetterwarnung Hitze",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "37802",
+        "commonName": "thermometer"
+      }
+    },
+    {
+      "name": "trichter",
+      "bedeutung": "Filter (Meldebild)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "3004",
+        "commonName": "filter"
+      }
+    },
+    {
       "name": "uhr",
       "bedeutung": "Frist/Zeitpunkt an Auftrag, Erinnerung, Meldung",
       "herkunft": "icons8",
       "icons8": {
         "id": "34",
         "commonName": "clock"
+      }
+    },
+    {
+      "name": "uhr-rueckwaerts",
+      "bedeutung": "Zeitachse der Kartenstände einblenden",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "6904",
+        "commonName": "time-machine"
+      }
+    },
+    {
+      "name": "verbotsschild",
+      "bedeutung": "Vom Browser blockiert (Desktop-Meldung)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "11694",
+        "commonName": "cancel-2"
+      }
+    },
+    {
+      "name": "vollbild-ecken",
+      "bedeutung": "Karte auf Hintergrundbild zentrieren",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "54496",
+        "commonName": "toggle-full-screen"
+      },
+      "notiz": "mehrdeutig: Bild ist 'Vollbild'; Alternative fit-to-page (59084)"
+    },
+    {
+      "name": "warndreieck",
+      "bedeutung": "Gefahren; allgemeine Wetter-/NINA-Warnung",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "360",
+        "commonName": "error"
+      },
+      "notiz": "Icons8 nennt das Warndreieck 'error'"
+    },
+    {
+      "name": "wind",
+      "bedeutung": "Wetterwarnung Sturm/Wind",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "31842",
+        "commonName": "wind"
       }
     },
     {
@@ -180,7 +942,7 @@
         "id": "wo7f3jFSsno5",
         "commonName": "wi-fi-disconnected"
       },
-      "notiz": "Gegenstück zu wlan-verbunden, Grund dort."
+      "notiz": "Gegenstück zu wlan-verbunden."
     },
     {
       "name": "wlan-verbunden",
@@ -190,7 +952,7 @@
         "id": "oAN6-f02oQ7l",
         "commonName": "wi-fi-connected"
       },
-      "notiz": "Ersetzt Funkbalken (Tabler antenna-bars-5). In iOS 27 Outlined hat „keine Verbindung“ keine Durchstreichung (no-connection zeigt nur leere Balken, Stilprobe); das WLAN-Paar trägt den Zustand mit Haken/Kreuz."
+      "notiz": "WLAN-Paar statt Funkbalken: iOS no-connection hat keine Durchstreichung."
     },
     {
       "name": "zahnrad",
