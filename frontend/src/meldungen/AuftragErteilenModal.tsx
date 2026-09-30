@@ -6,6 +6,8 @@ interface Props {
   meldung: Meldung | null;
   abschnitte: ZielOption[];
   einheiten: ZielOption[];
+  /** Für die Katalogauswahl der Funktionen (LFH-549). */
+  einsatzId?: number;
   senden: boolean;
   onAbbrechen: () => void;
   onAnlegen: (d: NeuerAuftrag) => Promise<unknown>;
@@ -25,6 +27,7 @@ function initialText(m: Meldung | null): string {
 export default function AuftragErteilenModal({
   meldung,
   abschnitte,
+  einsatzId,
   einheiten,
   senden,
   onAbbrechen,
@@ -44,6 +47,7 @@ export default function AuftragErteilenModal({
         senden={senden}
         abschnitte={abschnitte}
         einheiten={einheiten}
+        einsatzId={einsatzId}
         initialText={initialText(meldung)}
         zitat={
           meldung && (

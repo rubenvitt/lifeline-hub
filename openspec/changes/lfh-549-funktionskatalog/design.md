@@ -139,8 +139,8 @@ worden, und `0089` zeigt den Aufwand):
 - **Modulrecht:** Die Routen reichen ein `darf_stab_lesen` (aus `berechtigung::erlaubte_module`)
   in den Lesepfad. Ohne dieses Recht wird nicht aufgelöst, das Feld fehlt. Dasselbe Muster wie
   beim Modulzähler: Ohne Recht fehlt es.
-- **Live:** `EINSATZ_STREAM_EVENTS.stab` invalidiert zusätzlich `auftraege` und `erinnerungen`
-  (`queryKeys.ts`). Der Stab-Strom erreicht nur Personen mit Stab-Recht, und nur die sehen die
+- **Live:** `EINSATZ_STREAM_EVENTS.stab` invalidiert zusätzlich `auftraege`, `erinnerungen` und —
+  weil beide gezählte Listen sind — `modulZaehler` (`queryKeys.ts`, Regel aus `queryKeys.test.ts`). Der Stab-Strom erreicht nur Personen mit Stab-Recht, und nur die sehen die
   Auflösung, das passt zusammen.
 - **Verworfen:** Auflösung im Client aus der Stab-Query. Dann hinge jede Auftragskarte von einer
   zweiten Query ab, das Modulrecht müsste der Client prüfen, und die Offline-Lesefassung der
@@ -163,9 +163,13 @@ worden, und `0089` zeigt den Aufwand):
 - **Masken:**
   - **Auftrag:** Die Optionsgruppe „Funktionen“ kommt neben „Einsatzabschnitte“/„Einheiten“ in den
     bestehenden Tags-Select. `baueEmpfaenger` erkennt `funktion:`.
-  - **Erinnerung:** `Select mode="tags" maxCount={1}` bzw. `AutoComplete` mit denselben Optionen
-    (Wahl in der Umsetzung, Kriterium: Enter sendet weiterhin; `Select` schluckt Enter, siehe
-    Erfassungs-Norm). `UEBERNAHME` behält `empfaenger`.
+  - **Erinnerung und Führungsstelle:** `fuehrung/EinWertAuswahl.tsx`, ein Tags-Select mit EINEM
+    Wert (die jüngste Wahl ersetzt die alte über `getValueFromEvent`, kein `maxCount`: der sperrte
+    jede neue Eingabe, solange ein Wert stand). Nach einer Wahl schließt die Liste (Blur einen Frame
+    später, sonst übernähme der Tags-Modus den Tipptext als zweiten Wert), damit sie nicht über dem
+    Absende-Knopf liegt; Verlassen übernimmt getippten Freitext. Enter wählt, gesendet wird über den
+    Knopf im `<form>` (Erfassungs-Norm: ein Select schluckt Enter). `UEBERNAHME` behält `empfaenger`.
+    (Nachtrag Umsetzung.)
   - **Führungsstelle:** Dieselbe Auswahl im `FuehrungsstelleModal`. Der `extra`-Text nennt den
     Vorrang (Stab-Spec, Entscheidung 13).
 - **Besetzung für die Vorschläge:** kommt aus der bestehenden Stab-Query, nur wenn das Stab-Modul

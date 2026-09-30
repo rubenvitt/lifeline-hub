@@ -264,6 +264,18 @@ jede Liste mit eigener Weiche (`api/abrufZustand.ts`), fehlend = „—“ mit G
 `stab/luecken.ts` (auch für ST6). Erreichbarkeit: Schirm ab `xl`, Druck immer (`useDruckModus`),
 Lagebericht nie. Eigene Gegenstelle fehlt als benannte Lücke (LFH-849).
 
+**Führungsfunktionen** (LFH-549, `openspec/changes/archive/2026-09-30-lfh-549-funktionskatalog/design.md`):
+geschlossener Katalog `fuehrung::Fuehrungsfunktion` (EL, S1–S7, Führungshilfspersonal, Fachberater;
+`art` abgeleitet), Mandantenlabels und S7-Schalter in `org_fuehrungsfunktion`, Client liest nur
+`GET /api/fuehrungsfunktionen` (keine zweite Labelliste). Erinnerung, Auftragsempfänger und
+Führungsstelle tragen eine **Codespalte neben dem Text** (Text = Freitext ohne Code bzw.
+Bezeichnung bei FHP/FB, Prüfung `fuehrung::pruefe_funktion`); **kein Rückschluss vom Freitext auf
+einen Code**, auch nicht „S3“ (Kodierung `funktion:<code>` nur über `fuehrung/funktionsOptionenKern.ts`).
+Der Snapshot trägt nur das Label, **nie einen Personennamen** (Retain vs. Scrub); die Besetzung löst
+der Server zur Lesezeit auf (`fuehrung::aufloesung`, nur mit Stab-Recht, `stab`-Ereignis invalidiert
+Aufträge und Erinnerungen). ETB-Vorbelegung „An“: Führungsstelle → erstes eigenes Sachgebiet → nichts
+(`anVorbelegung`); `etb_eintrag.von`/`an` bleiben Freitext.
+
 **Betreuung und Verpflegung**
 - **Verbleib → Betreuungsstelle** (LFH-674,
   `openspec/changes/archive/2026-09-29-lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`): nur die Kennung

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
-import { einsatzKeys } from '../api/queryKeys';
+import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
 import type { Sachgebiet } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
@@ -22,7 +22,8 @@ import LagebesprechungModal from '../stab/LagebesprechungModal';
 import LagebesprechungStand from '../stab/LagebesprechungStand';
 import { zeigeAbschlussToast } from '../stab/abschlussToast';
 import { besetzungDarstellung, besetzungRechteText, zeileFuer } from '../stab/besetzung';
-import { SACHGEBIETE } from '../stab/sachgebiete';
+import { mitWirksamemLabel } from '../stab/sachgebiete';
+import { ladeFuehrungsfunktionen } from '../api/fuehrungsfunktionen';
 import { werkzeugeFuer } from '../stab/werkzeuge';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { einsatzStatus } from '../theme/statusFarben';
@@ -62,6 +63,12 @@ export default function StabPage() {
   const overridesQuery = useQuery({
     queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId),
+  });
+  // Wirksame Mandantenlabels der Zeilen (LFH-549); ohne Katalog das Standardlabel.
+  const katalogQuery = useQuery({
+    queryKey: globalKeys.fuehrungsfunktionen(),
+    queryFn: ladeFuehrungsfunktionen,
+    staleTime: 5 * 60_000,
   });
 
   // Vor den frühen Returns (Hook-Reihenfolge): der `?neu=1`-Leser darunter braucht das Recht, bevor
@@ -115,8 +122,9 @@ export default function StabPage() {
   // wären sonst eine Aussage über eine Menge, die nie ankam.
   const stabGescheitert = stabQuery.isError && !stabQuery.data;
   const standVeraltet = stabQuery.isError && stabQuery.data != null;
-  const offenerEintrag = SACHGEBIETE.find((s) => s.sachgebiet === offenFuer);
-  const vergeben = SACHGEBIETE.filter((s) => zeileFuer(stabQuery.data, s.sachgebiet)).length;
+  const sachgebiete = mitWirksamemLabel(katalogQuery.data ?? []);
+  const offenerEintrag = sachgebiete.find((s) => s.sachgebiet === offenFuer);
+  const vergeben = sachgebiete.filter((s) => zeileFuer(stabQuery.data, s.sachgebiet)).length;
 
   return (
     <EinsatzSeite
@@ -174,7 +182,7 @@ export default function StabPage() {
 
       <Paneel
         titel="Besetzung S1–S6"
-        meta={stabQuery.data ? `${vergeben}/${SACHGEBIETE.length} vergeben` : undefined}
+        meta={stabQuery.data ? `${vergeben}/${sachgebiete.length} vergeben` : undefined}
         koerperPolster
       >
         {stabGescheitert ? (
@@ -189,7 +197,7 @@ export default function StabPage() {
               <SeitenStandVeraltet onWiederholen={() => void stabQuery.refetch()} />
             )}
             <Liste
-              dataSource={SACHGEBIETE}
+              dataSource={sachgebiete}
               rowKey={(s) => s.sachgebiet}
               loading={stabQuery.isLoading}
               renderItem={(s) => {

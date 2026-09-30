@@ -94,6 +94,31 @@ function primaerImKopf(): number {
 }
 
 describe('StabPage', () => {
+  it('trägt das Mandantenlabel aus dem Funktionskatalog (LFH-549)', async () => {
+    server.use(
+      http.get('/api/fuehrungsfunktionen', () =>
+        HttpResponse.json([
+          {
+            funktion: 's4',
+            kuerzel: 'S4',
+            label: 'Versorgung (Logistik)',
+            standard_label: 'Versorgung',
+            art: 'sachgebiet',
+            bezeichnung_pflicht: false,
+          },
+        ]),
+      ),
+    );
+    rendere();
+    const sektion = await besetzungsSektion();
+    expect(
+      await within(sektion).findByRole('heading', {
+        level: 4,
+        name: /S4 · Versorgung \(Logistik\)/,
+      }),
+    ).toBeInTheDocument();
+  });
+
   it('zeigt sechs feste Zeilen auch ohne jede Besetzung', async () => {
     rendere();
     const sektion = await besetzungsSektion();

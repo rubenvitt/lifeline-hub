@@ -102,18 +102,18 @@ Code. Vor jedem „fertig“ gelten `verification-before-completion` und `reques
 
 ## 5. Typ-Codegen
 
-- [ ] 5.1 `#[derive(ToSchema)]` für alle neuen DTOs, Eintrag in `src/api_doc.rs`, dann
+- [x] 5.1 `#[derive(ToSchema)]` für alle neuen DTOs, Eintrag in `src/api_doc.rs`, dann
   `scripts/check-typ-codegen.sh`. `openapi.json` und `types.generated.ts` werden mitcommittet.
   Handgepflegte Request-Typen in `frontend/src/api/types.ts` (`NeueErinnerung`, `NeuerEmpfaenger`)
   werden ergänzt. Nachweis: Codegen-Skript grün, `pnpm tsc -b` grün.
 
 ## 6. Frontend: Katalog, Kodierung, Query-Keys
 
-- [ ] 6.1 `globalKeys.fuehrungsfunktionen()` samt Klassifikation (`NICHT_LIVE`). Im
+- [x] 6.1 `globalKeys.fuehrungsfunktionen()` samt Klassifikation (`NICHT_LIVE`). Im
   `lagebildOffline`-Guard ausdrücklich draußen, mit Begründung. `EINSATZ_STREAM_EVENTS.stab` um
   `auftraege` und `erinnerungen` erweitert. Nachweis: `queryKeys.test.ts`, `globalKeys.test.ts`,
   `lagebildOffline.guard.test.ts` grün. Mutationsprobe am Stream-Eintrag → rot.
-- [ ] 6.2 `fuehrung/useFuehrungsfunktionen.ts` und `fuehrung/funktionsOptionenKern.ts`
+- [x] 6.2 `fuehrung/useFuehrungsfunktionen.ts` und `fuehrung/funktionsOptionenKern.ts`
   (`funktionsOptionen`, `dekodiere`, Anzeigetext). Nachweis: Vitest:
   - Reihenfolge, Besetzungsname im Optionslabel
   - Tipptext ergibt „Fachberater: <Text>“, „Führungshilfspersonal: <Text>“ und Freitext
@@ -122,28 +122,28 @@ Code. Vor jedem „fertig“ gelten `verification-before-completion` und `reques
 
 ## 7. Frontend: Masken
 
-- [ ] 7.1 `AuftragFormular`: Optionsgruppe „Funktionen“, `baueEmpfaenger` mit `funktion:`.
+- [x] 7.1 `AuftragFormular`: Optionsgruppe „Funktionen“, `baueEmpfaenger` mit `funktion:`.
   Nachweis: `AuftragFormular.test.tsx` deckt ab:
   - Wahl „S3 – Einsatz (Müller)“ ergibt `{empfaenger_typ:'funktion', funktion:'s3'}`
   - Tipp „S3“ + Enter ergibt Freitext
   - Fachberater aus dem Tipptext
 
   Die vier Aufrufer bleiben grün.
-- [ ] 7.2 `ErinnerungFormular`: Auswahl mit denselben Optionen, Enter sendet weiter (Erfassungs-Norm).
+- [x] 7.2 `ErinnerungFormular`: Auswahl mit denselben Optionen, Enter sendet weiter (Erfassungs-Norm).
   Nachweis: Test für Wahl, Freitext und Strukturprüfung „Knopf im `<form>`“. „Werte behalten“
   übernimmt den Empfänger.
-- [ ] 7.3 `FuehrungsstelleModal` mit derselben Auswahl, `extra` nennt den Vorrang. Nachweis:
+- [x] 7.3 `FuehrungsstelleModal` mit derselben Auswahl, `extra` nennt den Vorrang. Nachweis:
   `MitgliederAbschnitt.test.tsx` für Setzen, Leeren und Anzeige „S2 Lage“.
-- [ ] 7.4 Prüfliste Einsatztauglichkeit (15 Kriterien) für die drei Masken als
+- [x] 7.4 Prüfliste Einsatztauglichkeit (15 Kriterien) für die drei Masken als
   `openspec/changes/lfh-549-funktionskatalog/pruefliste.md`, jede Zeile mit Verdikt. Nachweis:
   Datei vollständig, `dichte.guard.test.ts` grün (kein neues `size="small"`).
 
 ## 8. Frontend: ETB-Vorschläge und Vorbelegung (Nachzug LFH-545)
 
-- [ ] 8.1 `etb/funkrufnamen.ts` nimmt die Sachgebiete als Vorschläge (Wert = Kürzel) neben die
+- [x] 8.1 `etb/funkrufnamen.ts` nimmt die Sachgebiete als Vorschläge (Wert = Kürzel) neben die
   Funkrufnamen. Nachweis: Vitest, dass die Funkrufnamen weiter vorhanden sind und „S2 – Lage
   (Müller)“ „S2“ einsetzt.
-- [ ] 8.2 Reine Funktion `anVorbelegung(einsatz)`, eingesetzt in `Schnellerfassung.tsx` und
+- [x] 8.2 Reine Funktion `anVorbelegung(einsatz)`, eingesetzt in `Schnellerfassung.tsx` und
   `useEtbEntwuerfe.ts`. Nachweis: Paar-Tests:
   - Führungsstelle gewinnt
   - Ableitung „S2“ aus `meine_sachgebiete` [s2, s3]
@@ -155,27 +155,27 @@ Code. Vor jedem „fertig“ gelten `verification-before-completion` und `reques
 
 ## 9. Frontend: Anzeige
 
-- [ ] 9.1 `AuftragKarte`, Auftragsvorschau, `ueberblickDaten.empfaengerText` und `ErinnerungKarte`
+- [x] 9.1 `AuftragKarte`, Auftragsvorschau, `ueberblickDaten.empfaengerText` und `ErinnerungKarte`
   zeigen Snapshot und, falls vorhanden, die Besetzung („S3 Einsatz · Schulz“, „· nicht vergeben“
   neutral). Nachweis: Vitest mit und ohne `aktuelle_besetzung`. Ohne Feld steht kein Platzhalter
   (Abwesenheit getestet).
-- [ ] 9.2 Die Stabseite nimmt das wirksame Label aus dem Katalog. Der Aufgaben-Kurztext bleibt in
+- [x] 9.2 Die Stabseite nimmt das wirksame Label aus dem Katalog. Der Aufgaben-Kurztext bleibt in
   `stab/sachgebiete.ts`, dessen Labelfeld entfällt oder wird Rückfall bis zum Laden. Nachweis:
   `StabPage`-Test mit THW-Label. `sachgebiete.test.ts` wird angepasst, nicht gelöscht.
 
 ## 10. Frontend: Admin-Sektion „Führungsfunktionen“
 
-- [ ] 10.1 Sektion in `admin/adminNav.tsx` nach design.md D6 (Liste, `InlineAngabe`, S7-Schalter,
+- [x] 10.1 Sektion in `admin/adminNav.tsx` nach design.md D6 (Liste, `InlineAngabe`, S7-Schalter,
   `RechteHinweis`). Nachweis:
   - `adminNav.test.tsx` (Drift)
   - Komponententest für Label setzen, leeren und S7
   - `e2e/gate3-trefflaeche.spec.ts` erfasst die Route
-- [ ] 10.2 Prüfliste Einsatztauglichkeit der Sektion in derselben `pruefliste.md`. Nachweis: Zeilen
+- [x] 10.2 Prüfliste Einsatztauglichkeit der Sektion in derselben `pruefliste.md`. Nachweis: Zeilen
   mit Verdikt.
 
 ## 11. Integration, Doku, Abschluss
 
-- [ ] 11.1 e2e `frontend/e2e/fuehrungsfunktionen.spec.ts`, ohne `networkidle`:
+- [x] 11.1 e2e `frontend/e2e/fuehrungsfunktionen.spec.ts`, ohne `networkidle`:
   - S3 besetzen
   - Auftrag an „S3 – Einsatz (…)“ erteilen
   - Karte zeigt die Besetzung
@@ -183,11 +183,11 @@ Code. Vor jedem „fertig“ gelten `verification-before-completion` und `reques
   - Rollenzweig nicht-privilegiert über `e2e/rollen-kern.ts` (ohne Stab-Recht keine Besetzung)
 
   Nachweis: grün. Mutationsprobe „Auflösung liefert Snapshot-Namen“ → rot.
-- [ ] 11.2 CLAUDE.md: kurzer Absatz „Führungsfunktionen (LFH-549)“ unter dem Stab-Kontext
+- [x] 11.2 CLAUDE.md: kurzer Absatz „Führungsfunktionen (LFH-549)“ unter dem Stab-Kontext
   (Katalog im Backend, Codespalte neben Text, Snapshot ohne Person, Auflösung zur Lesezeit mit
   Modulrecht, kein Regex). Verweis auf den Archivpfad dieser Change. Nachweis: Verweis zeigt nach
   dem Archivieren auf eine existierende Datei.
-- [ ] 11.3 ClickUp: an LFH-545 vermerken, dass Vorschläge und Vorrangregel hier eingelöst werden.
+- [x] 11.3 ClickUp: an LFH-545 vermerken, dass Vorschläge und Vorrangregel hier eingelöst werden.
   Nachweis: Kommentar am Task.
 - [ ] 11.4 `./scripts/check-all.sh` grün (Nachweis: der Lauf lokal oder der CI-Lauf des PRs).
 - [ ] 11.5 `/opsx:archive lfh-549-funktionskatalog` im selben Branch mit Spec-Sync nach

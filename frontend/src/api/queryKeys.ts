@@ -160,7 +160,15 @@ export const EINSATZ_STREAM_EVENTS = {
   lage_snapshot: [EINSATZ_KEYS.lageSnapshot],
   // Führungsorganisation (Besetzung S1–S6, Lagebesprechungen). Die Lagebesprechungs-Historie hängt
   // als Sub-Key unter DEMSELBEN Prefix, sonst entstünde die Lücke der Detail-Keys oben.
-  stab: [EINSATZ_KEYS.stab],
+  // Aufträge und Erinnerungen an ein Sachgebiet lösen zur Lesezeit auf die Besetzung auf
+  // (LFH-549): ein Besetzungswechsel ändert ihre Anzeige. Beide sind gezählte Listen, deshalb geht
+  // der Modulzähler mit (Regel aus `queryKeys.test.ts`), auch wenn sich die Zahl hier nicht ändert.
+  stab: [
+    EINSATZ_KEYS.stab,
+    EINSATZ_KEYS.auftraege,
+    EINSATZ_KEYS.erinnerungen,
+    EINSATZ_KEYS.modulZaehler,
+  ],
   // Der ETB-Nachweis kommt über das eigene `etb`-Ereignis.
   dokument: [EINSATZ_KEYS.dokumente],
   // Schichten und Rhythmus-Vorgaben hängen unter EINEM Prefix (Sub-Keys 'liste'/'vorgaben'). Trägt
@@ -450,6 +458,9 @@ export const GLOBAL_KEYS = {
   einheitTypen: 'einheit-typen',
   etbBausteine: 'etb-bausteine',
   stichwortVorschlaege: 'stichwort-vorschlaege',
+  // Katalog der Führungsfunktionen mit Mandantenlabels (LFH-549). Nicht im Lagebild: gelesen
+  // werden Snapshot und Auflösung, die im Auftrag stecken.
+  fuehrungsfunktionen: 'fuehrungsfunktionen',
 
   // Instanz / Betrieb — NICHT mandantenbezogen
   adminKarte: 'admin-karte',
@@ -522,6 +533,7 @@ export const globalKeys = {
   einheitTypen: () => [GLOBAL_KEYS.einheitTypen] as const,
   etbBausteine: () => [GLOBAL_KEYS.etbBausteine] as const,
   stichwortVorschlaege: () => [GLOBAL_KEYS.stichwortVorschlaege] as const,
+  fuehrungsfunktionen: () => [GLOBAL_KEYS.fuehrungsfunktionen] as const,
 
   // Dienstfilter-Listen: barer Prefix (= Invalidierung beider Fächer) + adressiertes Fach
   personal: () => [GLOBAL_KEYS.personal] as const,
@@ -574,7 +586,8 @@ export const globalKeys = {
  * Fahrzeugstatus-Katalog). Von den Meldungen nur die Rückmeldungen, nicht die Liste.
  *
  * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit, Chat, Dokumente,
- * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys.
+ * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys, der
+ * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst).
  * `lagebildOffline.guard.test.ts` vergleicht die Liste mit JEDEM verwalteten Prefix.
  */
 export const LAGEBILD_OFFLINE = {

@@ -184,6 +184,7 @@ export default function ErinnerungenPage() {
           {/* mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn die Erinnerung
               angekommen ist. */}
           <ErinnerungFormular
+            einsatzId={einsatzId}
             card={false}
             senden={anlegenMutation.isPending}
             onAnlegen={(d) => anlegenMutation.mutateAsync(d)}

@@ -1,11 +1,19 @@
-import { Alert, App, Button, Form, Input, Popconfirm, Space } from 'antd';
+import { Alert, App, Button, Form, Popconfirm, Space } from 'antd';
 import { Select } from '../components/Select';
 import type { ColumnsType } from 'antd/es/table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { EinsatzRolle, MitgliedAnzeige } from '../api/types';
 import { ApiError, fehlerText } from '../api/client';
-import { entferneMitglied, ladeMitglieder, setzeMitglied } from '../api/einsaetze';
+import {
+  entferneMitglied,
+  ladeMitglieder,
+  setzeMitglied,
+  type FuehrungsstelleUpdate,
+} from '../api/einsaetze';
+import { EinWertAuswahl, letzterWert } from '../fuehrung/EinWertAuswahl';
+import { dekodiere, kodiere } from '../fuehrung/funktionsOptionenKern';
+import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import { listeBenutzer } from '../api/benutzer';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import KatalogTabelle from '../components/KatalogTabelle';
@@ -26,7 +34,16 @@ interface Props {
 }
 
 type StellenZiel = MitgliedAnzeige & { einsatzId: number };
-type StellenWerte = { fuehrungsstelle: string };
+/** Höchstens EIN Wert: Katalogwahl `funktion:<code>[:<Bezeichnung>]` oder Freitext (LFH-549). */
+type StellenWerte = { fuehrungsstelle: string[] };
+
+/** Der gespeicherte Stand eines Mitglieds als Feldwert. */
+function stellenWert(m: MitgliedAnzeige): string | undefined {
+  return kodiere({
+    funktion: m.fuehrungsfunktion ?? undefined,
+    text: m.fuehrungsstelle ?? undefined,
+  });
+}
 
 function FuehrungsstelleModal({
   mitglied,
@@ -42,12 +59,18 @@ function FuehrungsstelleModal({
   fehler: Error | null;
 }) {
   const [form] = Form.useForm<StellenWerte>();
+  const funktionen = useFunktionsVorschlaege(mitglied.einsatzId);
+  const bisher = stellenWert(mitglied);
+  // Der gespeicherte Wert trägt seine Anzeige selbst — auch bevor der Katalog geladen ist.
+  const zusatz = bisher
+    ? [{ value: bisher, label: mitglied.fuehrungsstelle_anzeige ?? bisher }]
+    : [];
   return (
     <ErfassungsModal
       offen
       titel={`Führungsstelle für ${mitglied.anzeigename}`}
       form={form}
-      initialValues={{ fuehrungsstelle: mitglied.fuehrungsstelle ?? '' }}
+      initialValues={{ fuehrungsstelle: bisher ? [bisher] : [] }}
       onErfassen={speichern}
       onFertig={schliessen}
       onAbbrechen={schliessen}
@@ -57,9 +80,17 @@ function FuehrungsstelleModal({
       <Form.Item
         name="fuehrungsstelle"
         label="Führungsstelle"
-        extra="Wird beim ersten neuen ETB-Eintrag als Empfänger vorbelegt. Leer lassen entfernt die Vorbelegung."
+        // EIN Wert: eine neue Wahl ersetzt die alte, statt sich daneben zu stellen.
+        getValueFromEvent={letzterWert}
+        extra="Wird beim ersten neuen ETB-Eintrag als Empfänger vorbelegt und hat Vorrang vor dem eigenen Sachgebiet aus der Stab-Besetzung. Leer lassen entfernt die Vorbelegung."
       >
-        <Input maxLength={200} disabled={laeuft} />
+        <EinWertAuswahl
+          vorschlaege={funktionen}
+          zusatz={zusatz}
+          aria-label="Führungsstelle"
+          placeholder="Funktion (z. B. S2) oder Freitext"
+          disabled={laeuft}
+        />
       </Form.Item>
       {fehler && <Alert type="error" title={fehler.message} showIcon />}
     </ErfassungsModal>
@@ -89,7 +120,7 @@ export default function MitgliederAbschnitt({
   const [stelleZiel, setStelleZiel] = useState<StellenZiel | null>(null);
 
   const stelleSetzen = useMutation({
-    mutationFn: ({ mitglied, wert }: { mitglied: StellenZiel; wert: string | null }) =>
+    mutationFn: ({ mitglied, wert }: { mitglied: StellenZiel; wert: FuehrungsstelleUpdate }) =>
       setzeMitglied(mitglied.einsatzId, mitglied.benutzer_id, mitglied.einsatz_rolle, wert),
     onSuccess: (liste, { mitglied }) => {
       qc.setQueryData(einsatzKeys.mitglieder(mitglied.einsatzId), liste);
@@ -97,6 +128,7 @@ export default function MitgliederAbschnitt({
     },
   });
 
+  const katalog = useFunktionsVorschlaege(stelleZiel?.einsatzId).katalog;
   const stelleSpeichern = async ({ fuehrungsstelle }: StellenWerte) => {
     if (
       !stelleZiel ||
@@ -105,9 +137,18 @@ export default function MitgliederAbschnitt({
       stelleSetzen.isPending
     )
       return;
-    const wert = fuehrungsstelle.trim() || null;
-    if (wert === (stelleZiel.fuehrungsstelle ?? null)) return;
-    await stelleSetzen.mutateAsync({ mitglied: stelleZiel, wert });
+    const roh = fuehrungsstelle?.[0] ?? '';
+    if (roh === (stellenWert(stelleZiel) ?? '')) return;
+    // Eine neue Katalogwahl stammt aus den Optionen, also aus dem geladenen Katalog; der
+    // unveränderte gespeicherte Wert ist oben schon ausgestiegen.
+    const angabe = dekodiere(roh, katalog);
+    await stelleSetzen.mutateAsync({
+      mitglied: stelleZiel,
+      wert: {
+        fuehrungsfunktion: angabe.funktion ?? null,
+        fuehrungsstelle: angabe.text ?? null,
+      },
+    });
   };
 
   const mitgliederQuery = useQuery({
@@ -155,10 +196,10 @@ export default function MitgliederAbschnitt({
               setStelleZiel({ ...m, einsatzId });
             }}
           >
-            {m.fuehrungsstelle || 'Führungsstelle festlegen'}
+            {m.fuehrungsstelle_anzeige || m.fuehrungsstelle || 'Führungsstelle festlegen'}
           </Button>
         ) : (
-          m.fuehrungsstelle || '—'
+          m.fuehrungsstelle_anzeige || m.fuehrungsstelle || '—'
         ),
     },
     {
