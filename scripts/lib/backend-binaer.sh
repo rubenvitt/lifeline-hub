@@ -12,8 +12,9 @@
 # nehmen dann denselben Pfad, statt zweimal zu fragen.
 
 # Gibt den Pfad des Debug-Binarys aus.
-#   PW_BINAER gesetzt → dieser Pfad, absolut gemacht gegen das Arbeitsverzeichnis (ein e2e-Shard
-#                       der CI lädt das Binary als Artefakt und hat kein Cargo-Target)
+#   PW_BINAER gesetzt → dieser Pfad, absolut gemacht gegen das Arbeitsverzeichnis — im Gate die
+#                       Repo-Wurzel (ein e2e-Shard der CI lädt das Binary als Artefakt und hat
+#                       kein Cargo-Target)
 #   sonst             → <target_directory laut cargo metadata>/debug/lifeline-hub
 # Scheitert die Cargo-Abfrage, gibt es keinen Pfad, sondern Exit 1.
 backend_binaer_pfad() { # <repo-wurzel>
@@ -49,6 +50,14 @@ backend_binaer_pruefen() { # <pfad>
   local pfad="$1"
   if [ -x "$pfad" ] && [ -f "$pfad" ]; then
     return 0
+  fi
+  if [ -L "$pfad" ] && [ ! -e "$pfad" ]; then
+    echo "FEHLER: '$pfad' ist ein Verweis ins Leere (toter Symlink)." >&2
+    return 1
+  fi
+  if [ -d "$pfad" ]; then
+    echo "FEHLER: '$pfad' ist ein Verzeichnis, kein Binary." >&2
+    return 1
   fi
   if [ -e "$pfad" ]; then
     # Ein Binary ohne Bit ist kein fehlendes Binary: still zu überspringen meldete einen grünen
