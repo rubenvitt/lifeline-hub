@@ -591,7 +591,9 @@ export const globalKeys = {
  * Fahrzeugstatus-Katalog). Von den Meldungen nur die Rückmeldungen, nicht die Liste.
  *
  * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit, Chat, Dokumente,
- * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys.
+ * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys, dazu S5
+ * (Presse-Log, Pressemitteilungen, Informationstelefon: Kontaktdaten und Rückrufnummern,
+ * LFH-554 design.md D8, offen mit LFH-767).
  * `lagebildOffline.guard.test.ts` vergleicht die Liste mit JEDEM verwalteten Prefix.
  */
 export const LAGEBILD_OFFLINE = {

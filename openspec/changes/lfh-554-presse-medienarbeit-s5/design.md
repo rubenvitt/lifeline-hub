@@ -64,7 +64,8 @@ Stand im Code (Scope-Lauf vom 30.09.2026):
   `termin`.
 - Kein Abgleich von Anrufen mit Betroffenen oder der Personenauskunft, nur der Sprung „Vermisste ↗“.
 - Pressemitteilungs-Vorlagen, die je Organisation änderbar sind. Mandanten-Labels (THW
-  „Öffentlichkeitsarbeit“) kommen erst nach dem Feldbefund (LFH-46, Abschnitt 6).
+  „Öffentlichkeitsarbeit“) kommen erst nach dem Feldbefund (LFH-46, Abschnitt 6):
+  [LFH-863](https://app.clickup.com/t/123zgec62qg), wartet auf LFH-852.
 - Kein Modulzähler, keine Sprungmarke, kein Palettenbefehl, keine Offline-Schreibqueue.
 - Kein Druck von Presse-Log oder Anrufprotokoll. Nachweis ist die Datenhaltung. Die freigegebene
   Mitteilung steht zusätzlich im ETB.
@@ -100,6 +101,13 @@ Verworfen:
   Gewonnen wäre damit nur eine getrennte Sperre, und die braucht heute niemand.
 - **Reiter auf einer Seite:** Das Bürgertelefon ist ein eigener Platz mit Serienerfassung. Ein
   Reiter wäre kein Lesezeichen und teilte die Fußleiste der Erfassung mit dem Presse-Log.
+
+_Nachtrag 30.09.2026 (Umsetzung):_ Die Tabelle steht in `stab/unterseiten.ts` (S6 → Funkplan,
+S5 → Pressearbeit und Informationstelefon), `StabPage` rendert sie ohne Sachgebietszweig. Der Hook
+heißt `useStabFreigabe` (`stab/useStabFreigabe.tsx`) und liefert einen Zustand (`laden`, `fehler`,
+`gesperrt`, `frei`); `stabFreigabeAnzeige` baut daraus die Seite für jeden Zustand außer `frei`.
+Funkplan, Presse, Pressemitteilung, Informationstelefon und der Knopf „Aus S5 übernehmen“ lesen
+denselben Hook.
 
 ### D2 · Backend: Endpunkte unter `…/stab/…`, Gate über den Stab
 
@@ -215,6 +223,15 @@ Lagebericht davon hart verdrahtet hat (Queries, Pfade), wird per Prop hereingere
 kopiert. Wo das eine Umstellung der Lageberichtseite verlangt, gehört sie in dieselbe Aufgabe,
 samt ihren Tests.
 
+_Nachtrag 30.09.2026 (Umsetzung):_ `PressemitteilungDetailPage` ist ein **Zwilling** der
+Lagebericht-Detailseite, keine gemeinsame Hülle. Geteilt sind die Bauteile (`AbschnittsAkkordeon`,
+`useEntwurfVerlustschutz`, `EntwurfNavigationSchutz`, `Einstiegsfokus`, `FreigabeDialog`,
+`DruckKnopf`), dazu das Kettenmuster, das jetzt generisch ist (`lageberichte/ketten.ts`,
+`KettenKopf<T>`), und `AbschnittsText` aus `lageberichte/LageberichtText.tsx`. Die Seitenkörper
+von Lagebericht und Befehl verdrahten Queries, Pfade und Freigaberegel so eng, dass eine Hülle für
+alle drei ein eigener Umbau mit eigenem Risiko wäre, nicht Teil dieser Change. Die Abweichungen
+stehen im Dateikopf der Seite.
+
 ### D5 · Medienkontakt: Freigabeangabe als Freitext, Statusweg mit Rückweg
 
 Im Stabsraum gibt S5 eine Antwort oft nach mündlicher Rücksprache mit der Einsatzleitung. Ein
@@ -265,6 +282,11 @@ Die Erfassung eines Medienkontakts ist ein `ErfassungsModal` mit Serienmodus.
   
   Jede Karte trägt das Wort als zweiten Kanal.
 
+_Nachtrag 30.09.2026 (Prüfliste, Kriterium 12):_ Die Presseseite ordnet **Presse-Log, dann
+Pressemitteilungen, dann Medienlage** (nicht wie in D1 aufgezählt). Die Medienlage wächst mit
+jedem Kontakt live. Stünde sie oben, schöbe sie die Arbeitsliste unter dem Cursor weg. Unten
+stehend schiebt sie nichts, und „offene Anfragen“ steht im ersten Bild.
+
 ### D7 · Medienlage im Client, Übernahme in den Lagevortrag
 
 `stab/medienlage.ts` exportiert `baueMedienlage(quellen): Medienlage` und
@@ -304,6 +326,21 @@ Verworfen:
   stehen in der Draußen-Liste.
 - Neue Einträge erscheinen ohne Sprung. Die Zeitachse des Informationstelefons folgt dem
   Einschiebemuster des ETB (Sammelbanner bei neuen Einträgen außerhalb des Sichtbereichs).
+
+_Nachtrag 30.09.2026 (Umsetzung):_
+- **Offline:** `LAGEBILD_OFFLINE` ist eine **Allowlist**, es gibt keine Draußen-Liste. Neue Keys
+  bleiben also schon dadurch draußen, dass sie nicht aufgenommen werden. Der Guard setzt jeden
+  verwalteten Prefix und erwartet genau die Allowlist, damit ist die Abwesenheit von `presse` und
+  `infotelefon` gepinnt. Der Grund steht im Kommentar „Bewusst draußen“ in `api/queryKeys.ts`.
+- **Zufluss im Informationstelefon:** Die Zeitachse ist keine `Datensicht`, deshalb hat sie eine
+  eigene Schleuse (`infotelefon/zufluss.ts`, `einfrieren`/`teileZufluss`). Solange der Fokus in
+  der Liste liegt, hält sie fremde neue Anrufe zurück (id über der Wassermarke). Das Sammelbanner
+  liegt als Überlagerung mit Nullhöhe darüber, „anzeigen“ friert neu ein. Eigene Anrufe gehen
+  sofort durch, Portal-Menüs der Statuswahl zählen nicht als Verlassen. Die Kennzahlen zählen die
+  volle Menge.
+- **Fokus über der Erfassung:** Die angepinnte Erfassung misst ihre Höhe wie im ETB
+  (`useFokusabstandUnten`, `--lfh-etb-fokusabstand`). Nachweis in
+  `e2e/fokus-verdeckung.spec.ts`.
 
 ### D9 · Schwärzung
 
@@ -349,13 +386,15 @@ Change und trägt je Seite ein Verdikt.
 
 - **Kein Feldbefund, keine Stabsraum-Version.** Die Sperre im Ticket wurde vom User bewusst
   aufgehoben. → Der Schnitt bleibt klein: drei Tabellen, keine neue Achse, keine Stammdaten. Die
-  Aufgabe LFH-852 (Feldbefund Stab) nimmt eine S5-Beobachtung auf. Bleibt die Nutzung aus, lässt
+  Aufgabe [LFH-852](https://app.clickup.com/t/123zgec5zy7) (Feldbefund Stab) nimmt eine
+  S5-Beobachtung auf (_Nachtrag 30.09.2026:_ ergänzt um Zählpunkte je Seite und die Entscheidung
+  behalten/umschneiden/zurückbauen). Bleibt die Nutzung aus, lässt
   sich S5 zurückbauen, ohne dass andere Module etwas verlieren: Einstiege weg, Tabellen bleiben
   lesbar.
 - **Das Bürgertelefon wächst über die volle Liste hinaus.** Bei einer Großlage mit tausenden
   Anrufen trägt die Vollabfrage nicht mehr. → Die Kennzahlen rechnen aus derselben Menge wie die
   Liste. Die Umstellung auf eine serverseitige Zählung (Muster LFH-612) ist ein eigener Schritt
-  mit Zielticket.
+  mit Zielticket: [LFH-862](https://app.clickup.com/t/123zgec62qf).
 - **Personenbezug in Freitexten.** Thema und Antwort bleiben erhalten und könnten Namen tragen. →
   Das ist dieselbe Abwägung wie beim Lagebericht (`G_FUEHRUNG`): Nachweis der Pressearbeit. Die
   Medienlage und der Lagebericht übernehmen kein Thema.

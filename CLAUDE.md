@@ -268,6 +268,18 @@ jede Liste mit eigener Weiche (`api/abrufZustand.ts`), fehlend = „—“ mit G
 `stab/luecken.ts` (auch für ST6). Erreichbarkeit: Schirm ab `xl`, Druck immer (`useDruckModus`),
 Lagebericht nie. Eigene Gegenstelle fehlt als benannte Lücke (LFH-849).
 
+**Presse und Medienarbeit S5** (LFH-554, `openspec/changes/archive/2026-09-30-lfh-554-presse-medienarbeit-s5/design.md`):
+Unterrouten `stab/presse` (Presse-Log, Pressemitteilungen, Medienlage), `stab/presse/mitteilungen/:id`,
+`stab/infotelefon`, kein Modul; Einstiege über `stab/unterseiten.ts`, jede Seite prüft
+`useStabFreigabe` selbst (auch Funkplan). Die Pressemitteilung ist die dritte `Dokumentart`
+(Snapshot, Fortschreibung, ETB `meldung`), **freigeben darf nur die Einsatzleitung**
+(`EinsatzLeitungszugriff<Stab>`, Paar-Test gegen Lagebericht/Befehl), die Seite ist Zwilling von
+`LageberichtDetailPage`. Personenbezug (Ansprechperson, Erreichbarkeit, Anrufer, Rückruf, Notiz)
+wird geschwärzt, `rueckruf` per `PlatzhalterWennGesetzt`; die Medienlage (`stab/medienlage.ts`,
+„Aus S5 übernehmen“ im Lagevortrag) nimmt nie Namen, Nummern oder Thema. **Nicht offline**: die
+Keys fehlen in `LAGEBILD_OFFLINE` (LFH-767). Informationstelefon: Vollliste mit eigener
+Zufluss-Schleuse (`infotelefon/zufluss.ts`), Zählung aus derselben Menge (serverseitig LFH-862).
+
 **Betreuung und Verpflegung**
 - **Verbleib → Betreuungsstelle** (LFH-674,
   `openspec/changes/archive/2026-09-29-lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`): nur die Kennung

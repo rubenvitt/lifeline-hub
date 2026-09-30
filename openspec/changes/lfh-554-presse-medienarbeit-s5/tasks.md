@@ -173,13 +173,13 @@ Vor jedem „fertig“ gelten `verification-before-completion` und `requesting-c
   (`e2e/rollen-kern.ts`, Rollenzweig als Vorbedingung). Den Druckfluss der Pressemitteilung mit
   ausgelöstem `beforeprint` in `e2e/druck-fluss.spec.ts` prüfen. Prüfen: `pnpm e2e` für diese
   Specs ist grün.
-- [ ] 9.2 Die Prüfliste Einsatztauglichkeit (15 Kriterien) als `pruefliste.md` in dieser Change
+- [x] 9.2 Die Prüfliste Einsatztauglichkeit (15 Kriterien) als `pruefliste.md` in dieser Change
   anlegen, mit einem Verdikt je Seite und Kriterium (erfüllt / offen → Zielticket / nicht
   anwendbar). Prüfen: Keine Zeile steht auf „nicht geprüft“.
-- [ ] 9.3 Folgetickets auf dem Entwicklungsboard anlegen: serverseitige Zählung des
+- [x] 9.3 Folgetickets auf dem Entwicklungsboard anlegen: serverseitige Zählung des
   Informationstelefons und Mandanten-Labels für S5. Außerdem die S5-Beobachtung in LFH-852
   ergänzen. Prüfen: Die Tickets sind verlinkt und im Design-Nachtrag genannt.
-- [ ] 9.4 CLAUDE.md fortschreiben: ein Absatz „Presse und Medienarbeit S5“ mit Ort, Freigaberegel,
+- [x] 9.4 CLAUDE.md fortschreiben: ein Absatz „Presse und Medienarbeit S5“ mit Ort, Freigaberegel,
   Datenschutz und Offline-Entscheidung, dazu `ALLE_MAPS` = 29. Prüfen: Der Abschnitt nennt die
   Change und den Archivpfad.
 - [ ] 9.5 `./scripts/check-all.sh` vollständig grün ausführen, danach `/opsx:archive` im selben
