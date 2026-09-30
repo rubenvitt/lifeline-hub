@@ -324,7 +324,9 @@ describe('FunkplanPage — Baum', () => {
 
 describe('FunkplanPage — Sperre des Stabs', () => {
   it('ist nicht erreichbar, wenn der Stab im Einsatz ausgeblendet ist', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({ stab: { sichtbar: false } });
+    vi.mocked(ladeModulOverrides).mockResolvedValue({
+      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
+    });
     const { container } = setup();
     expect(
       await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
