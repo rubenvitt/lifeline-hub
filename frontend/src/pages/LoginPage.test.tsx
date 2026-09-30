@@ -572,7 +572,9 @@ describe('LoginPage', () => {
     // Knopfes. Ein Klick im selben Takt wie die sechste Ziffer bewiese ebenso wenig — zwei
     // gleichzeitige Validierungen entdoppelt rc-field-form selbst (`lastValidatePromise`).
     //
-    // Der Riegel trägt genau dann, wenn ein zweites Absenden eintrifft, während das erste LÄUFT.
+    // Der Riegel trägt genau dann, wenn ein zweites Absenden eintrifft, während das erste LÄUFT —
+    // im Browser das Fenster zwischen `onFinish` und dem Commit von `disabled` (LFH-533, dort
+    // gemessen; Tippen, Klicken und Autofill erreichen es nicht).
     // Die Antwort auf `totp/finish` hängt deshalb an einer Schranke, die der Test selbst öffnet
     // (keine Frist, die auf langsamer Hardware reißt), und das zweite Absenden geht direkt an das
     // `<form>` — unabhängig davon, ob und wie der Knopf gerade dasteht.
