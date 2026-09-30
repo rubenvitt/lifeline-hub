@@ -1,3 +1,42 @@
+## [1.0.0-alpha.56](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.55...v1.0.0-alpha.56) (2026-09-30)
+
+### Wichtige Änderungen
+
+- **Desktop-App verfügbar**: Die Anwendung wird für macOS (arm64) und Windows (x64) als ausführbare Desktop-App ausgeliefert. Sie verbindet sich mit einem Server über HTTPS, merkt sich die Adresse und prüft automatisch nach Updates. Ein Deeplink-Schema `lifeline://verbinden` erlaubt das Vorbelegen der Serveradresse.
+
+### Lagekarte
+
+- **Fachobjekt-Zeichen aktualisiert**: Kartenmarker und taktische Zeichen nutzen nun die aktuelle Einsatzzeichen-Bibliothek mit verbesserter Darstellung und Symbolauflösung.
+- **Bildgriffe nur mit ausreichend Platz**: Beim Anpassen von Bildern auf der Karte werden Kantengriffe nur angezeigt, wenn sie sich nicht mit Eckgriffen oder anderen Kanten überschneiden. Ein Hinweis weist auf das Heranzoomen hin, wenn Griffe ausgeblendet sind.
+- **Eindeutige Klickziele**: Ein Tipp auf die Karte gehört eindeutig zu genau einem Ziel. Gezeichnete Markierungen haben Vorrang vor Trefferzonen, diese vor Flächen. Eigene Flächen werden dabei vor Warnflächen des DWD oder NINA angeboten.
+- **Kartenmodi geben die Karte frei**: Auf Tablets und größeren Bildschirmen schließt die Werkzeugleiste automatisch, solange ein Kartenmodus aktiv ist (Platzieren, Zeichnen, Messen, Bild einpassen). Die Bedienung erscheint in einem Band am unteren Bildschirmrand. Nach dem Modus stellt sich der vorherige Zustand der Leiste wieder her.
+
+### Kräfte und Mittel
+
+- **Meldebild-Spalte aktualisiert**: Die taktischen Zeichen in der Meldebild-Spalte nutzen die aktuelle Einsatzzeichen-Bibliothek. Ungültige Werte führen nicht mehr zum Absturz der Anzeige.
+
+### Führung
+
+- **Schnellerfassung per Link**: Tiere, Bereitstellungsräume und Einsatzabschnitte lassen sich über einen Link mit `?neu=1` direkt zur Erfassung öffnen – wie bereits bei anderen Modulen.
+- **Zuletzt besuchte Module merken sich mehr Zugänge**: Die Palettengruppe „Zuletzt besucht" füllt sich jetzt auch über die Startseite Führung · Überblick, das Lage-Dashboard und Schnellaktionen. Einträge verfallen nach 12 Stunden und gelten je Benutzer und Einsatz.
+
+### Kommunikation
+
+- **Chat-Anhänge als Download**: Chat-Anhänge werden als native Downloads angeboten statt in einem neuen Fenster zu öffnen. Die Hülle öffnet neue Fenster, fremde Links und Datei-Links nach klaren Regeln: eigene Inhalte in Nebenfenstern, fremde Links im Systembrowser.
+
+### Verwaltung
+
+- **Anmeldeverfahren für Org-Führungskraft lesbar**: Die Verwaltungssektion „Anmeldeverfahren" zeigt der Org-Führungskraft die konfigurierten Verfahren in einer Nur-Lese-Ansicht.
+
+### Bedienung
+
+- **Detailköpfe brechen bei langem Namen um**: Lange Namen in Unterstützende Stellen und Bereitstellungsräumen brechen auf schmalen Bildschirmen um, statt über den Rand zu ragen.
+- **Gruppenköpfe als Überschriften**: Listen mit Gruppenköpfen (z.B. Marker-Suche, Befehle) verwenden echte Überschriften, die per Screenreader anspringbar sind.
+
+### Betrieb und Installation
+
+- **Abhängigkeiten aktualisiert**: Sicherheitslücken in der Bibliothek `brace-expansion` wurden durch Aktualisierung der Versionen behoben.
+
 ## [1.0.0-alpha.55](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.54...v1.0.0-alpha.55) (2026-09-29)
 
 ### Wichtige Änderungen
