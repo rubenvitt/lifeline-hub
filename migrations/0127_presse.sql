@@ -1,7 +1,7 @@
 -- LFH-554: Presse- und Medienarbeit (S5) im Stabsraum. Drei einsatzgebundene Tabellen:
 -- Medienkontakte (Presse-Log), Pressemitteilungen (dritte Vorlagendokument-Art neben
 -- lagebericht/befehl) und Anrufe am Informationstelefon. Herleitung:
--- openspec/changes/lfh-554-presse-medienarbeit-s5/design.md (D3).
+-- openspec/changes/archive/2026-09-30-lfh-554-presse-medienarbeit-s5/design.md (D3).
 --
 -- Die Kopplung von Art und Status steht als CHECK hier UND im Repo: das Repo antwortet mit einer
 -- lesbaren 422, der CHECK ist das Netz (AppError::status bildet CHECK auf 422 ab).

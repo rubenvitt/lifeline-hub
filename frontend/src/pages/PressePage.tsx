@@ -53,7 +53,7 @@ import { medienkontaktStatus, pressemitteilungStatus } from '../theme/statusFarb
 
 /**
  * Pressearbeit des Sachgebiets S5 (LFH-554), Zielkontext Stabsraum. Herleitung:
- * `openspec/changes/lfh-554-presse-medienarbeit-s5/design.md`.
+ * `openspec/changes/archive/2026-09-30-lfh-554-presse-medienarbeit-s5/design.md`.
  *
  * - **Ort:** Unterroute des Stabs, Einstieg aus der S5-Zeile. Kein Modul; die Seite prüft die
  *   Stab-Freigabe selbst (`useStabFreigabe`, D1).

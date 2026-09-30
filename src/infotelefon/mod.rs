@@ -8,7 +8,7 @@
 //!
 //! Die Routen liegen unter `/api/einsaetze/{id}/stab/infotelefon` und erben die Stab-Sperre.
 //!
-//! Spec: `openspec/changes/lfh-554-presse-medienarbeit-s5/specs/stab-infotelefon/`
+//! Spec: `openspec/changes/archive/2026-09-30-lfh-554-presse-medienarbeit-s5/specs/stab-infotelefon/`
 
 use crate::wire_enum::wire_enum;
 use serde::Serialize;

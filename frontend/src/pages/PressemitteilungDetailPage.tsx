@@ -62,7 +62,7 @@ import './lageberichtPrint.css';
 /**
  * Pressemitteilung des Sachgebiets S5 (LFH-554): Entwurf nach Vorlage, Freigabe nur durch die
  * Einsatzleitung, ETB-Snapshot, Fortschreibung und Druck. Herleitung:
- * `openspec/changes/lfh-554-presse-medienarbeit-s5/design.md` (D4).
+ * `openspec/changes/archive/2026-09-30-lfh-554-presse-medienarbeit-s5/design.md` (D4).
  *
  * Zwilling von `LageberichtDetailPage` und `BefehlDetailPage` (dasselbe Muster: Verlustschutz,
  * Einstiegsfokus, Akkordeon, Freigabedialog). Eine gemeinsame Hülle für alle drei ist ein eigener

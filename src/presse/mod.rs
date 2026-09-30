@@ -12,7 +12,7 @@
 //! Die Routen liegen unter `/api/einsaetze/{id}/stab/…` und erben damit die Sperre des
 //! Stab-Moduls (`PFAD_KEY`, Längster-Präfix). Ein Sachgebiet ist kein Modul (LFH-46).
 //!
-//! Spec: `openspec/changes/lfh-554-presse-medienarbeit-s5/`
+//! Spec: `openspec/changes/archive/2026-09-30-lfh-554-presse-medienarbeit-s5/`
 
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
