@@ -102,10 +102,10 @@ ein live frischer Kopf verschiebt die Kennzahlreihe also nicht.
 
 - **`meine_*`** ist benutzerbezogen. Ein Ereignis bei der Stab-Besetzung verriete Lesern ohne
   Stab-Recht Besetzungsaktivität, obwohl sich *ihr* Kopf nicht ändert. Das wäre genau das Leck aus
-  Entscheidung 11. Mitgliedschaftswechsel (`meine_rolle`) bekommen ein Folge-Ticket, denn der Wechsel
+  Entscheidung 11. Mitgliedschaftswechsel (`meine_rolle`) bekommen ein Folge-Ticket (**LFH-854**), denn der Wechsel
   des Schreibrechts auf dem Schirm der betroffenen Person ist eine eigene Frage.
 - **`lagekennzahlen`** stammt aus Pegel bzw. Evakuierung. Ein Ereignis beim Festlegen feuerte bei
-  jeder Pegeländerung, nicht nur beim Umschalten der Kennzahl. Das bekommt ein Folge-Ticket mit
+  jeder Pegeländerung, nicht nur beim Umschalten der Kennzahl. Das bekommt ein Folge-Ticket (**LFH-855**) mit
   derselben Technik wie in D3 (nur beim Umschalten).
 - **Scheduler-Wege** (Soft-Delete, Purge, Schwärzung) laufen an abgeschlossenen Einsätzen. Die Fehlernaht
   räumt beim nächsten 403/404 ohnehin.

@@ -39,7 +39,7 @@ und `requesting-code-review`.
 ## 6. Doku
 
 - [x] 6.1 `CLAUDE.md`, Abschnitt Query-Key-Registry: eine Zeile „Einsatzkopf ist live (`einsatz`, Gate leer = Tür des Stroms, LFH-555); benutzerbezogene Kopffelder und `lagekennzahlen` nicht".
-- [ ] 6.2 Folge-Tickets anlegen (`clickup-task-anlegen`): Mitgliedschaftswechsel live (`meine_rolle`), Lagekennzahl-Umschalten live (D5).
+- [x] 6.2 Folge-Tickets anlegen (`clickup-task-anlegen`): Mitgliedschaftswechsel live (`meine_rolle`, LFH-854), Lagekennzahl-Umschalten live (LFH-855) (D5).
 
 ## 7. Integration
 
