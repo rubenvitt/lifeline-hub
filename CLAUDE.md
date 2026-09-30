@@ -33,6 +33,10 @@ Skill `clickup-task-anlegen`.
   (Fähigkeits-Specs, SHALL/MUST, über `/opsx:sync`/`/opsx:archive`) · `docs/superpowers/`
   (Herleitungen und Messprotokolle, **eingefrorenes Archiv**, wird nicht nach OpenSpec migriert).
   Wer dort etwas verschiebt, greppt zuerst die Verweise (sie brechen still).
+- **Archiviert wird vor dem Merge, im selben Branch** (Entscheidung 30.09.2026): ist die
+  `tasks.md` abgehakt, `/opsx:archive` samt Spec-Sync und Verweisen, dann erst der PR — kein
+  Archiv-PR danach. Wächter: `scripts/check-openspec-archiv.sh` (Schritt 13 von `check-all.sh`,
+  Bündel `schnell`) macht eine aktive Change ohne offenes Kästchen rot.
 
 ## Frontend — Gestaltungssprache Neuentwurf „Instrumententafel“ (22.09.2026)
 
@@ -684,7 +688,8 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
-`check-migrationen.sh` → `check-all.test.sh` → `check-toolversionen.sh`.
+`check-migrationen.sh` → `check-all.test.sh` → `check-toolversionen.sh` →
+`check-openspec-archiv.sh`.
 - **Das Skript ist die Wahrheit**; `.github/workflows/ci.yml` ruft es unverändert. Neue Schritte
   gehören ins Skript.
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
