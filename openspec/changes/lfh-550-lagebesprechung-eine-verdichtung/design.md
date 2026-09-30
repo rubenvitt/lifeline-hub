@@ -117,8 +117,10 @@ kenntlich.
 
 ### D5 — Stärke: Wurzeln der Menge, Abschnitte nach Unterstellung
 
-- `summiereStaerke(einheiten)` addiert `ist_kumuliert` nur für Einheiten, deren
-  `ueber_einheit_id` nicht in der übergebenen Menge liegt. Das ist die Regel für den
+- `summiereStaerke(einheiten, alle)` addiert `ist_kumuliert` nur für Einheiten, von denen kein
+  Vorfahr (nicht nur der direkte) in der übergebenen Menge liegt; die Kette läuft über `alle`,
+  damit ein fehlendes Zwischenglied sie nicht abreißt (Review-Befund: A und Enkel G ohne B zählten
+  G doppelt). Ein korrupter Zyklus zählt über seine kleinste Kennung genau einmal. Das ist die Regel für den
   Bereitstellungsraum: Wer dort mit seiner Untereinheit steht, zählt einmal.
 - `abschnittStaerken` übergibt nur die **obersten Einheiten** (`ueber_einheit_id` leer), genau
   wie `baueKraeftebild` seine Abschnitte bestückt. Damit zählt eine unterstellte Einheit beim

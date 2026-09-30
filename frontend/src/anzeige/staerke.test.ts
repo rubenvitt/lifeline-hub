@@ -32,4 +32,35 @@ describe('summiereStaerke', () => {
     // Ohne ihre Einheit ist die Untereinheit eine Wurzel der Menge und zählt selbst.
     expect(summiereStaerke([b])).toEqual({ fuehrer: 0, unterfuehrer: 1, mannschaft: 3 });
   });
+
+  it('zählt eine Enkeleinheit nicht, wenn nur ihr Großvater in der Menge steht (LFH-550)', () => {
+    // A → B → G; im Bereitstellungsraum stehen A und G, nicht B. A kumuliert G schon mit.
+    const a = {
+      id: 1,
+      ueber_einheit_id: null,
+      ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 6 },
+    };
+    const b = {
+      id: 2,
+      ueber_einheit_id: 1,
+      ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 4 },
+    };
+    const g = {
+      id: 3,
+      ueber_einheit_id: 2,
+      ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 1 },
+    };
+    expect(summiereStaerke([a, g], [a, b, g])).toEqual({
+      fuehrer: 1,
+      unterfuehrer: 2,
+      mannschaft: 6,
+    });
+  });
+
+  it('ein korrupter Zyklus zählt genau einmal, über die kleinste Kennung', () => {
+    const s = { fuehrer: 1, unterfuehrer: 1, mannschaft: 1 };
+    const x = { id: 7, ueber_einheit_id: 8, ist_kumuliert: s };
+    const y = { id: 8, ueber_einheit_id: 7, ist_kumuliert: s };
+    expect(summiereStaerke([y, x])).toEqual(s);
+  });
 });

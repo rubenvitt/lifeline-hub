@@ -145,7 +145,8 @@ describe('Fixture: Stärke', () => {
     'Bereitstellungsraum: %s',
     (_n, b) => {
       const menge = b.einheiten.map((id) => einheiten.find((e) => e.id === id)!);
-      expect(summiereStaerke(menge)).toEqual(b.erwartet && alsStaerke(b.erwartet));
+      // Die ganze Einheitenliste liefert die Unterstellung auch über fehlende Zwischenglieder.
+      expect(summiereStaerke(menge, einheiten)).toEqual(b.erwartet && alsStaerke(b.erwartet));
     },
   );
 

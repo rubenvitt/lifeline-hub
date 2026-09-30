@@ -73,7 +73,7 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development` (erst rot, dann 
   Modulzähler (offen, `in_arbeit`, überfällig). `auftraegeKennzahl` entfällt oder wird zur reinen
   Darstellung. Beleg: `ueberblickDaten.test.ts` und `UeberblickPage.test.tsx` zu gleichen Werten
   wie der Führungsstand.
-- [ ] 5.4 Offline-Registry prüfen: Es kommt kein neuer Prefix; `lagebildOffline.guard.test.ts`
+- [x] 5.4 Offline-Registry prüfen: Es kommt kein neuer Prefix; `lagebildOffline.guard.test.ts`
   bleibt grün. Beleg: Testlauf.
 
 ## 6. Vorbereitung der Lagebesprechung
