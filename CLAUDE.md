@@ -148,6 +148,12 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `?eintrag=`). Ein neuer `KARTEN_EIGENBAU` wird gegen den Plan-Modus begründet (Titel, Status,
   ≤ 3 Sekundärfelder, eine Primäraktion, optional Menü `weitere`) und setzt Marke/Klasse selbst.
 - ≥ 50 % Meldungstext im Fükw: `e2e/etb-chronologie.spec.ts`, gegen die **Contentbreite**.
+- **ETB-Entwürfe schreiben nur über `etb/entwuerfe/entwurfStore.ts`** (LFH-521): ein Neuladen
+  bricht offene IndexedDB-Transaktionen ab, deshalb steht jeder Auftrag vor dem ersten `await`
+  synchron im Vorlauf (`localStorage`, ein Schlüssel `lifeline-etb-entwuerfe-ausstehend:<id>` je
+  Entwurf, nie eine gemeinsame Tabelle — Tabs überschrieben sich; Quittung per `stand`);
+  `entwuerfeLaden` trägt nach, jüngere Plattenfassung gewinnt.
+  Nachweis `e2e/etb-entwurf-tabs.spec.ts`: ausstehend beim Reload und gespeichert getrennt.
 
 **ETB-Anhänge (LFH-117)** (`docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`)
 - **Jeder modulgebundene Linker auf `anhang` ist EIN Eintrag in `anhang::repo::MODUL_LINKER`**;
