@@ -46,34 +46,57 @@ export function pascal(name) {
     .join('');
 }
 
-/** Liest viewBox und Pfade. Alles außer `<path d fill-rule>` (und Kommentaren) ist ein Fehler. */
+/**
+ * Liest viewBox und Pfade. Zugelassen sind nach dem `<svg>`-Kopf nur `<path d fill-rule>`,
+ * `</path>`, Kommentare und Leerraum; alles andere ist ein Fehler. Bewusst ein Leser über die
+ * Zeichen statt eines Regex-Filters: Die Quelle wird nicht bereinigt, sondern abgelehnt, wenn
+ * sie etwas enthält, das nicht in dieses enge Raster passt.
+ */
 export function zerlegeSvg(svg, datei) {
-  const kopf = svg.match(/<svg\b[^>]*>/);
-  if (!kopf) throw new Error(`${datei}: kein <svg>`);
-  const viewBox = kopf[0].match(/viewBox="([^"]+)"/)?.[1];
+  const kopfStart = svg.indexOf('<svg');
+  const kopfEnde = kopfStart === -1 ? -1 : svg.indexOf('>', kopfStart);
+  if (kopfEnde === -1) throw new Error(`${datei}: kein <svg>`);
+  const viewBox = svg.slice(kopfStart, kopfEnde).match(/viewBox="([^"]+)"/)?.[1];
   if (!viewBox) throw new Error(`${datei}: <svg> ohne viewBox`);
-  const inhalt = svg
-    .slice(svg.indexOf(kopf[0]) + kopf[0].length, svg.lastIndexOf('</svg>'))
-    .replace(/<!--[\s\S]*?-->/g, '');
   const pfade = [];
-  const rest = inhalt.replace(/<path\b([^>]*?)\/?>(?:<\/path>)?/g, (_, attribute) => {
-    const unbekannt = [...attribute.matchAll(/([a-zA-Z:-]+)=/g)]
-      .map((m) => m[1])
-      .filter((a) => a !== 'd' && a !== 'fill-rule');
-    if (unbekannt.length) throw new Error(`${datei}: Pfad mit ${unbekannt.join(', ')}`);
-    const d = attribute.match(/\bd="([^"]+)"/)?.[1];
-    if (!d) throw new Error(`${datei}: Pfad ohne d`);
-    const fillRule = attribute.match(/fill-rule="(evenodd|nonzero)"/)?.[1];
-    pfade.push(fillRule ? { d, fillRule } : { d });
-    return '';
-  });
-  if (rest.trim()) throw new Error(`${datei}: nicht unterstützter Inhalt: ${rest.trim().slice(0, 80)}`);
+  let i = kopfEnde + 1;
+  for (;;) {
+    while (i < svg.length && /\s/.test(svg[i])) i++;
+    if (i >= svg.length) throw new Error(`${datei}: </svg> fehlt`);
+    if (svg.startsWith('</svg>', i)) break;
+    if (svg.startsWith('<!--', i)) {
+      const schluss = svg.indexOf('-->', i + 4);
+      if (schluss === -1) throw new Error(`${datei}: Kommentar ohne Ende`);
+      i = schluss + 3;
+      continue;
+    }
+    if (svg.startsWith('</path>', i)) {
+      i += '</path>'.length;
+      continue;
+    }
+    if (svg.startsWith('<path', i) && /[\s/>]/.test(svg[i + 5] ?? '')) {
+      const schluss = svg.indexOf('>', i);
+      if (schluss === -1) throw new Error(`${datei}: <path> ohne Ende`);
+      const attribute = svg.slice(i + 5, schluss).replace(/\/$/, '');
+      const namen = [...attribute.matchAll(/([a-zA-Z:-]+)=/g)].map((m) => m[1]);
+      const unbekannt = namen.filter((a) => a !== 'd' && a !== 'fill-rule');
+      if (unbekannt.length) throw new Error(`${datei}: Pfad mit ${unbekannt.join(', ')}`);
+      const d = attribute.match(/\bd="([^"]+)"/)?.[1];
+      if (!d) throw new Error(`${datei}: Pfad ohne d`);
+      const fillRule = attribute.match(/fill-rule="(evenodd|nonzero)"/)?.[1];
+      pfade.push(fillRule ? { d, fillRule } : { d });
+      i = schluss + 1;
+      continue;
+    }
+    throw new Error(`${datei}: nicht unterstützter Inhalt: ${svg.slice(i, i + 80)}`);
+  }
   if (!pfade.length) throw new Error(`${datei}: keine Pfade`);
   return { viewBox, pfade };
 }
 
+/** JS-Literal über `JSON.stringify` (vollständig maskiert); Prettier setzt danach die Anführung. */
 function literal(wert) {
-  return `'${wert.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  return JSON.stringify(wert);
 }
 
 function komponente(exportName, name, quelle, kommentar) {
