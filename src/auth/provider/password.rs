@@ -186,20 +186,30 @@ mod tests {
         .unwrap();
     }
 
-    /// Der schnellste von drei Anmeldeversuchen — Störungen können einen Lauf nur verlangsamen.
-    async fn schnellster_versuch(
+    /// Ein abgewiesener Anmeldeversuch, gemessen.
+    async fn versuch(pool: &SqlitePool, name: &str, schranken: &Schranken) -> std::time::Duration {
+        let start = std::time::Instant::now();
+        let err = anmelden_mit_schranken(pool, name, "egal", schranken)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::Unauthorized), "war: {err:?}");
+        start.elapsed()
+    }
+
+    /// Der schnellste von fünf Versuchen je Name, ABWECHSELND gemessen. Störungen können einen
+    /// Lauf nur verlangsamen; im Wechsel trifft eine Lastspitze beide Seiten statt nur die, die
+    /// gerade an der Reihe ist. Nacheinander gemessen stand in der Coverage-CI (llvm-cov, volle
+    /// Suite parallel) einmal 352 ms gegen 72 ms bei gleichem Code.
+    async fn schnellste_versuche(
         pool: &SqlitePool,
-        name: &str,
+        namen: [&str; 2],
         schranken: &Schranken,
-    ) -> std::time::Duration {
-        let mut bestzeit = std::time::Duration::MAX;
-        for _ in 0..3 {
-            let start = std::time::Instant::now();
-            let err = anmelden_mit_schranken(pool, name, "egal", schranken)
-                .await
-                .unwrap_err();
-            assert!(matches!(err, AppError::Unauthorized), "war: {err:?}");
-            bestzeit = bestzeit.min(start.elapsed());
+    ) -> [std::time::Duration; 2] {
+        let mut bestzeit = [std::time::Duration::MAX; 2];
+        for _ in 0..5 {
+            for (i, name) in namen.iter().enumerate() {
+                bestzeit[i] = bestzeit[i].min(versuch(pool, name, schranken).await);
+            }
         }
         bestzeit
     }
@@ -284,7 +294,12 @@ mod tests {
 
     /// Ein Versuch gegen ein SSO-only-Konto darf nicht schneller antworten als einer gegen einen
     /// erfundenen Namen, sonst sind die SSO-Konten aufzählbar. Verglichen wird der schnellste von
-    /// drei Läufen je Seite als Verhältnis, nicht gegen ein Millisekunden-Literal.
+    /// fünf abwechselnd gemessenen Läufen je Seite als Verhältnis, nicht gegen ein
+    /// Millisekunden-Literal.
+    ///
+    /// Die Schwelle 10 prüft die Größenordnung: Der Fehler, den der Test fängt, ist ein Zweig ganz
+    /// OHNE Argon2 (Mikrosekunden gegen einen vollen KDF-Lauf, Faktor weit über 100). Eine
+    /// engere Schwelle fängt nichts zusätzlich, sie misst nur die Last des Runners.
     #[tokio::test]
     async fn sso_only_konto_antwortet_nicht_schneller_als_ein_unbekannter_name() {
         let pool = crate::db::test_pool().await;
@@ -292,11 +307,10 @@ mod tests {
         sso_only_benutzer(&pool).await;
         let s = schranken(1, std::time::Duration::from_secs(60));
 
-        let unbekannt = schnellster_versuch(&pool, "gibtesnicht", &s).await;
-        let sso_only = schnellster_versuch(&pool, "sina", &s).await;
+        let [unbekannt, sso_only] = schnellste_versuche(&pool, ["gibtesnicht", "sina"], &s).await;
 
         assert!(
-            sso_only * 4 >= unbekannt,
+            sso_only * 10 >= unbekannt,
             "SSO-only-Konto antwortete in {sso_only:?}, unbekannter Name in {unbekannt:?} — \
              dieser Abstand ist ein Timing-Orakel, das die SSO-Konten aufzählbar macht \
              (LFH-310)"

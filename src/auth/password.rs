@@ -72,28 +72,31 @@ mod tests {
     }
 
     /// Ein unparsbarer Hash darf nicht schneller antworten als eine echte Prüfung. Geprüft werden
-    /// Sentinel und kaputter Hash; verglichen wird der schnellste von drei Läufen je Seite als
+    /// Sentinel und kaputter Hash; verglichen wird der schnellste von fünf Läufen je Seite als
     /// Verhältnis.
+    ///
+    /// Gemessen wird ABWECHSELND, damit eine Lastspitze des Runners (llvm-cov, volle Suite
+    /// parallel) beide Seiten trifft statt nur die, die gerade an der Reihe ist. Die Schwelle 10
+    /// prüft die Größenordnung: Gefangen wird ein Zweig ganz OHNE Argon2 (Mikrosekunden gegen
+    /// einen vollen KDF-Lauf); eine engere Schwelle misst nur die Last.
     #[test]
     fn unparsbarer_hash_kostet_dieselbe_groessenordnung_wie_eine_echte_pruefung() {
         let echter_hash = hash("geheim123").unwrap();
-        let schnellster = |gespeichert: &str| {
-            (0..3)
-                .map(|_| {
-                    let start = std::time::Instant::now();
-                    assert!(!verifizieren("falsch", gespeichert));
-                    start.elapsed()
-                })
-                .min()
-                .unwrap()
+        let messe = |gespeichert: &str| {
+            let start = std::time::Instant::now();
+            assert!(!verifizieren("falsch", gespeichert));
+            start.elapsed()
         };
 
-        let echte_pruefung = schnellster(&echter_hash);
-
         for unparsbar in [crate::auth::PASSWORT_HASH_SSO_ONLY, "kein-gueltiger-hash"] {
-            let gemessen = schnellster(unparsbar);
+            let mut echte_pruefung = std::time::Duration::MAX;
+            let mut gemessen = std::time::Duration::MAX;
+            for _ in 0..5 {
+                echte_pruefung = echte_pruefung.min(messe(&echter_hash));
+                gemessen = gemessen.min(messe(unparsbar));
+            }
             assert!(
-                gemessen * 4 >= echte_pruefung,
+                gemessen * 10 >= echte_pruefung,
                 "`{unparsbar}` muss KDF-Arbeit brennen: echte Prüfung {echte_pruefung:?}, \
                  unparsbarer Hash {gemessen:?} — so weit darunter liegt nur ein Zweig, der \
                  ohne Argon2 zurückkehrt (Timing-Orakel, LFH-310)"
