@@ -70,13 +70,15 @@
 - [x] 2.6 Den Profil-Hinweis in `ProfilPage.tsx` auf den Weg „Im Browser anmelden“
   umschreiben. Die Einrichtung bleibt ausgeblendet. Nachweis: Vitest für den Hinweistext und die
   weiterhin fehlende Einrichtung.
-- [ ] 2.7 Prüfliste Einsatztauglichkeit (15 Kriterien) für `AppAnmeldungPage` (neu),
+- [x] 2.7 Prüfliste Einsatztauglichkeit (15 Kriterien) für `AppAnmeldungPage` (neu),
   `LoginPage` und `ProfilPage` (umgebaut), je Zeile ein Verdikt, abgelegt unter
   `docs/superpowers/specs/2026-09-30-lfh-818-pruefliste.md`. Nachweis: Datei mit 3 × 15
   Verdikten, keins „nicht geprüft“.
-- [ ] 2.8 Die neue Route in die Routenlisten der Layout-Gates aufnehmen, sofern sie dort geführt
-  werden (`e2e/gate1-ueberlauf.spec.ts`, `e2e/gate3-trefflaeche.spec.ts`), andernfalls die
-  Abwesenheit begründen. Nachweis: die betroffenen e2e-Specs grün.
+- [x] 2.8 Die neue Route in die Routenlisten der Layout-Gates aufnehmen, sofern sie dort geführt
+  werden. Ergebnis: Gate 1 und Gate 3 führen Einsatz- und Verwaltungsrouten, auch `/login` steht
+  in keiner Liste (Gate 3 nutzt es nur zum Anmelden). `/app-anmeldung` teilt die Login-Karte
+  (`LoginPage.css`) und bleibt deshalb wie `/login` draußen. Die Trefflächen stehen in der
+  Prüfliste (2.7) [abgeleitet].
 
 ## 3. Hülle: Anmeldung im Systembrowser
 
@@ -126,19 +128,20 @@
 
 ## 4. Doku
 
-- [ ] 4.1 `docs/betrieb/desktop-app.md` aktualisieren:
+- [x] 4.1 `docs/betrieb/desktop-app.md` aktualisieren:
   - Die Grenze „SSO-Konten mit Passkey-only-IdP“ entfernen.
   - Den Ablauf „Im Browser anmelden“ beschreiben, einschließlich der macOS-Rückfrage „…
     möchte ‚elw.local‘ zum Anmelden verwenden“ und der Bestätigungsseite.
   - Den Standardbrowser-Hinweis aufnehmen.
 
   Nachweis: Review gegen `messung.md` und dieses Design.
-- [ ] 4.2 `CLAUDE.md`, Abschnitt Desktop-Hülle: der neue Command als zweite Freigabe der
+- [x] 4.2 `CLAUDE.md`, Abschnitt Desktop-Hülle: der neue Command als zweite Freigabe der
   Serverseite (neben `drucken`) und die Einlösung per `eval` mit doppelter Origin-Prüfung, in
   einer Zeile mit Verweis auf dieses Design. In `openspec/changes/lfh-783-passkey-macos-huelle/design.md`
   bei Stufe 2 auf diesen Change verweisen. Nachweis: Verweise greppen, Pfade existieren.
-- [ ] 4.3 Folgeticket für die fehlenden Audit-Einträge im Browser (OIDC, `totp_finish`,
-  `webauthn_auth_finish`) über `clickup-task-anlegen`. Nachweis: Ticket-ID im PR.
+- [x] 4.3 Folgeticket für die fehlenden Audit-Einträge im Browser (OIDC, `totp_finish`,
+  `webauthn_auth_finish`) über `clickup-task-anlegen`. Nachweis: Ticket-ID im PR. Angelegt als
+  LFH-846.
 
 ## 5. Integration und Abnahme
 
