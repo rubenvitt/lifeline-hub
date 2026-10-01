@@ -6736,6 +6736,24 @@
           }
         }
       },
+      "ModulFreigabe": {
+        "type": "object",
+        "description": "Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von\n`GET /api/einsaetze/{id}/modul-freigaben` und die EINE Auswertung hinter\n[`fordere_modul_zugriff`] und [`erlaubte_module`].",
+        "required": [
+          "sichtbar",
+          "zugriff"
+        ],
+        "properties": {
+          "sichtbar": {
+            "type": "boolean",
+            "description": "Das Modul erscheint in der Navigation. `false` nur, wenn der Einsatz ein ausblendbares\nModul ausblendet — auch für System-Admins, die es dennoch erreichen (`zugriff`)."
+          },
+          "zugriff": {
+            "type": "boolean",
+            "description": "Der Benutzer darf die Endpunkte des Moduls aufrufen: genau die Entscheidung des\nModul-Gates der Listen-Endpunkte."
+          }
+        }
+      },
       "ModulZaehlerAnzeige": {
         "type": "object",
         "description": "Antwort von `GET /api/einsaetze/{id}/modul-zaehler`. Feldnamen = Modul-Keys\n(`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt\".",

@@ -199,6 +199,9 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // wirken als Filter über die Felder der Antwort — ein nicht erlaubtes Modul fehlt —,
     // nicht als Türsteher der Route.
     ("/api/einsaetze/{id}/modul-zaehler", None),
+    // Modulfreigaben (LFH-669): modul-los wie die Zähler. Die Antwort IST die Auskunft über
+    // die Modulrechte des Benutzers; ein Modul-Gate davor wäre ein Zirkel.
+    ("/api/einsaetze/{id}/modul-freigaben", None),
     // Kopfdaten, Abschluss, Frist, Einstellungen, Modul-Overrides und Mitglieder
     // (`routes::einsatz`): modul-los. Die Wurzel selbst trifft nur exakt, siehe
     // [`EINSATZ_WURZEL`].

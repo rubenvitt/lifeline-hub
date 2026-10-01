@@ -130,6 +130,13 @@ export type ModulOverride = S['EinsatzModulOverride'];
  *  Kein Backend-Schema, FE-lokal. */
 export type ModulOverrides = Record<string, ModulOverride>;
 
+/** Effektive Freigabe eines Moduls für den angemeldeten Benutzer (LFH-669). */
+export type ModulFreigabe = S['ModulFreigabe'];
+
+/** Antwort von `GET /api/einsaetze/{id}/modul-freigaben`: ein Eintrag je Modul-Key der Registry.
+ *  Die Map selbst ist kein Backend-Schema, FE-lokal. */
+export type ModulFreigaben = Record<string, ModulFreigabe>;
+
 /** PUT-Eingabe eines einzelnen Modul-Overrides. Kein Backend-Schema, FE-lokal. */
 export interface ModulOverrideUpdate {
   sichtbar: boolean;
