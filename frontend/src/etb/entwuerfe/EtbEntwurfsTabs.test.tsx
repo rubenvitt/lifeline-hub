@@ -580,4 +580,15 @@ describe('Entwurfstab schließen — Trefffläche (LFH-724)', () => {
       expect(stil.minHeight).toBe(boden);
     });
   }
+
+  // Der Kartentab hat ein FESTES senkrechtes Polster aus `cardHeight` (antd `cardPadding`): ein
+  // 72-px-Inhalt streckte ihn in handschuh von 90 auf rund 141 px und risse den Deckel der
+  // ETB-Erfassungsleiste (`e2e/leisten-flaeche.spec.ts`). Der negative Rand nimmt die Fläche
+  // aus dem Layout — Margin-Box-Höhe 0 —, die Trefffläche bleibt.
+  it('ist für das Layout höhenneutral: der senkrechte Rand hebt die Höhe genau auf', () => {
+    for (const controlHeightSM of [24, 48, 72]) {
+      const stil = entfernenStil({ controlHeightSM });
+      expect(stil.minHeight + 2 * stil.marginBlock, String(controlHeightSM)).toBe(0);
+    }
+  });
 });

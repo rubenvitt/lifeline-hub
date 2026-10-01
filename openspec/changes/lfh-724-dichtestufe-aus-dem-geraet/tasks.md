@@ -24,7 +24,7 @@ Rollen-Geschwister in `handschuh` mit Vorbedingung Rechtehinweis. Neue Tests in
 `e2e/trefflaeche-pruefflaechen.spec.ts`, sofern nicht anders genannt. Ein rotes Ziel wird nach
 D6 behandelt (lokal beheben mit Vitest/e2e-Beleg, sonst Folgeticket).
 
-- [x] 4.1 C7 · ETB: Textfeld und Senden-Knopf der Schnellerfassung (der Rest ist durch LFH-373 gemessen). Beobachter-Geschwister: Schnellerfassung abwesend oder gesperrt, Rechtehinweis steht. Grün.
+- [x] 4.1 C7 · ETB: Textfeld und Senden-Knopf der Schnellerfassung (der Rest ist durch LFH-373 gemessen). Beobachter-Geschwister: Schnellerfassung abwesend (Vorbedingung: Benutzermenü und Einsatz geladen, design.md D5), der Typfilter hält 72 px; Entwurfstab mit Deckel 1,25 × Steuerhöhe (design.md D8, B1). Grün.
 - [x] 4.2 C8 · Meldungen, Erinnerungen, Nachforderungen: Primäraktion des Seitenkopfs und die Aktionsknöpfe je Karte (Seed je eine Meldung, Erinnerung, Nachforderung über die API). Beobachter-Geschwister. Grün.
 - [x] 4.3 C8 · Aufträge (Tab „Aufträge“ und Tab „Befehle“) und Chat (Eingabefeld, Senden-Knopf). Seed: ein Auftrag, ein Befehl, eine Chatnachricht. Beobachter-Geschwister. Grün.
 - [x] 4.4 C10 · Einsatz-Einstellungen (Sektionen allgemein, verhalten, aufbewahrung, pegel: Felder und Speichern-Knopf) und Einsatzdaten. Beobachter-Geschwister. Grün.

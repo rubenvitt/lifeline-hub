@@ -6,9 +6,9 @@ import { anmeldenAlsAdmin, anmeldenAls, benutzerAnlegen } from './rollen-kern';
  * `bedien-dichte`). Vitest belegt die Regel als Wahrheitstafel (`theme/dichte.test.ts`) mit
  * gemocktem `matchMedia`; erst hier meldet ein Browser selbst die Zeigerart.
  *
- * `hasTouch` geht nur dateiweit über `test.use` — deshalb eine eigene Datei (in
- * `dichte.spec.ts` kippte es dessen Vorgabe-Test, und der Gegenfall „feiner Zeiger ohne Wahl
- * → kompakt“ steht dort und wird hier nicht verdoppelt).
+ * `hasTouch` liegt über `test.use` auf der ganzen Datei: jeder Fall hier ist ein Touchgerät.
+ * Der Gegenfall „feiner Zeiger ohne Wahl → kompakt“ steht in `dichte.spec.ts` und wird hier
+ * nicht verdoppelt.
  *
  * Gemessen am Anmelde-Knopf (`size="large"` = 1,25 × Steuerhöhe), Muster `dichte.spec.ts`:
  * ein FENSTER je Stufe statt „mindestens“, damit eine falsch angekommene Nachbarstufe auffällt.

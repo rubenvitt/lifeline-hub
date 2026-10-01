@@ -21,9 +21,10 @@ interface Props {
 
 /**
  * Stil des Wechslers — rein und exportiert (Muster `bedienzielStil`). Er sieht aus wie der
- * Seitentitel (kein Innenabstand, Höhe folgt der 20-px-Schrift) und ist trotzdem ein
- * Bedienziel: `minHeight` hält die Steuerhöhe der Stufe (LFH-724; ohne sie maß er in
- * `handschuh` 33 px).
+ * Seitentitel und ist trotzdem ein Bedienziel: `minHeight` hält die Steuerhöhe der Stufe
+ * (LFH-724; ohne sie maß er in `handschuh` 33 px). BENANNTE AUSNAHME von „Handgebautes
+ * Bedienziel“ (`frontend/AGENTS.md`): kein Polster aus `paddingSM`, denn der Titel steht
+ * bündig an der Seitenkante; die Breite trägt die 20-px-Bezeichnung.
  */
 export function wechslerStil(token: { controlHeight: number }) {
   return { padding: 0, height: 'auto', minHeight: token.controlHeight } as const;

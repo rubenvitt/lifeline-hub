@@ -38,6 +38,11 @@ const KEINE_DATEIEN: File[] = [];
  * Stil des Schließen-Kreuzes je Entwurfstab — rein und exportiert (Muster `bedienzielStil`).
  * Ein unbeschriftetes Ziel hält den Boden auf BEIDEN Achsen (A1 Gate 3); antds Vorgabe maß
  * 15 × 24 px in jeder Stufe (LFH-724).
+ *
+ * HÖHENNEUTRAL: der Kartentab rechnet sein senkrechtes Polster fest aus `cardHeight`, jeder
+ * höhere Inhalt streckte ihn (handschuh 90 → rund 141 px) und risse den Deckel der
+ * angepinnten Erfassungsleiste. Der negative Rand nimmt die Fläche aus dem Layout; sie ragt
+ * zentriert über den Knopf hinaus und bleibt sein Kind, ein Klick darauf ist ein Klick auf ihn.
  */
 export function entfernenStil(token: { controlHeightSM: number }) {
   return {
@@ -46,6 +51,7 @@ export function entfernenStil(token: { controlHeightSM: number }) {
     justifyContent: 'center',
     minWidth: token.controlHeightSM,
     minHeight: token.controlHeightSM,
+    marginBlock: -token.controlHeightSM / 2,
   } as const;
 }
 

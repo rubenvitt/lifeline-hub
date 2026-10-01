@@ -83,8 +83,8 @@ späterer „hilfreicher“ Zuhörer wird so rot.
 
 ### D4 — Browser-Beleg der Ableitung in eigener Datei
 
-`e2e/dichte-ableitung.spec.ts` mit `test.use({ hasTouch: true })`, denn `hasTouch` geht nur
-dateiweit. Der Beleg läuft auf `/login`, ohne Anmeldung, wie `dichte.spec.ts`:
+`e2e/dichte-ableitung.spec.ts` mit `test.use({ hasTouch: true })` für die ganze Datei, damit
+jeder Fall ein Touchgerät ist. Der Beleg läuft auf `/login`, ohne Anmeldung, wie `dichte.spec.ts`:
 
 - ohne Wahl → `komfortabel`,
 - Wahl `kompakt` → `kompakt` (die Gegenprobe zur Zeigerart),
@@ -112,9 +112,13 @@ Wahl gehört zum Gerät).
   Eintrag in `STAFFEL`“ von `verwaltung-vereinheitlicht.spec.ts` ist. Das wird genau so
   umgesetzt, nicht in der neuen Datei.
 - **Rollenzweig (LFH-435, `e2e/AGENTS.md`):** Jede Fläche mit rollenabhängigen Aktionen
-  bekommt ein Geschwister in `handschuh`. Kommunikation, Einsatz-Einstellungen,
-  Einsatzabschnitte, Bereitstellungsraum und Lagebericht laufen als Beobachter, die Verwaltung
-  als Führungskraft. Der Rechtehinweis ist Vorbedingung vor der Messung.
+  bekommt ein Geschwister in `handschuh`. Die Einsatzmodule laufen als Beobachter, die
+  Verwaltung als Führungskraft. Vorbedingung vor der Messung sind zwei Positivanker: das
+  Benutzermenü nennt die gewechselte Person, und auf Einsatzrouten steht die Statusmarke des
+  Einsatzes im Kopf. Sie lebt aus derselben Abfrage wie das Schreibrecht. Erst danach wird
+  geprüft, dass die Schreibaktion fehlt oder gesperrt ist. Den Hinweistext verlangt der Test
+  nur, wo die Seite einen trägt (Einsatz-Einstellungen, Chat); die übrigen gemessenen
+  Modulseiten nutzen `RechteHinweis` nicht.
 - **Ziele werden benannt, nicht gefegt.** Jeder Test wählt seine Ziele über Rolle bzw. Name und
   fordert eine Mindestanzahl (`alleHaltenStufe(…, mindestens)`). Ein pauschaler Fang aller
   `button, a, input` im Inhalt hätte Fließtext-Links und Tag-Schließer mitgezählt. Für die gilt
@@ -168,6 +172,14 @@ Zwei Annahmen aus D5 trafen nicht zu und sind in den Tests angepasst: Die Segmen
 Beobachter bekommt den Lagebericht als Leseansicht ohne Akkordeon. Gemessen wird dort die
 Druckaktion. Die „Aktionen der Belegungsliste“ im BR-Detail fallen aus der Delta-Spec heraus,
 weil sie ohne vorherige Zuweisung nicht stehen und die Zuweisung selbst gemessen ist.
+
+**Nachtrag aus dem Review (01.10.2026, B1):** Das 72-px-× streckte zunächst den Kartentab.
+antd rechnet dessen senkrechtes Polster fest aus `cardHeight`, und der Tab wuchs in
+`handschuh` von 90 auf rund 141 px. Damit hätte die angepinnte ETB-Erfassungsleiste ihren Deckel
+aus `leisten-flaeche.spec.ts` gerissen. `entfernenStil` setzt deshalb einen negativen
+senkrechten Rand von halber Höhe: Die Fläche bleibt 72 × 72, ist für das Layout aber
+höhenneutral. Gemessen wird die Fläche selbst (das Kind des Knopfs), und der Entwurfstab trägt
+einen Deckel von 1,25 × Steuerhöhe (37,5 / 90 px).
 
 ## Risks / Trade-offs
 

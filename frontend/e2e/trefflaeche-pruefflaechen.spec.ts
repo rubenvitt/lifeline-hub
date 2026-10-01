@@ -3,6 +3,7 @@ import { wechsleZuRolle } from './rollen-kern';
 import {
   FUEKW,
   STAFFEL,
+  SUBPIXEL,
   alleHaltenStufe,
   anlegen,
   anmelden,
@@ -56,6 +57,11 @@ interface Ziel {
   kurz?: boolean;
   /** Keine Gegenprobe: das Ziel ist in jeder Stufe gleich groß (mehrzeiliges Textfeld). */
   ohneGegenprobe?: boolean;
+  /**
+   * Obergrenze je Stufe, wo ein zu großes Ziel einen Nachbarn bricht: der Kartentab trägt
+   * `cardHeight` = 1,25 × Steuerhöhe; höher risse er den Deckel der ETB-Erfassungsleiste.
+   */
+  deckel?: { kompakt: number; handschuh: number };
 }
 
 interface Flaeche {
@@ -80,10 +86,19 @@ async function messeZiel(page: Page, ziel: Ziel, dichte: 'kompakt' | 'handschuh'
   const name = `${ziel.sorte} (${dichte})`;
   const knoten = ziel.ziele(page);
   await expect(knoten.first(), `${name}: Ziel steht`).toBeVisible();
-  if (ziel.kurz) {
-    return (await kurzeAchseHaelt(knoten, BODEN_KLEIN[dichte], name, ziel.mindestens)).kleinstes;
+  const kleinstes = ziel.kurz
+    ? (await kurzeAchseHaelt(knoten, BODEN_KLEIN[dichte], name, ziel.mindestens)).kleinstes
+    : await alleHaltenStufe(knoten, soll, name, ziel.mindestens);
+  if (ziel.deckel) {
+    const deckel = ziel.deckel[dichte];
+    for (let i = 0; i < (await knoten.count()); i += 1) {
+      const hoehe = (await knoten.nth(i).boundingBox())!.height;
+      expect(hoehe, `${name} #${i + 1}: höchstens ${deckel} px hoch`).toBeLessThanOrEqual(
+        deckel + SUBPIXEL,
+      );
+    }
   }
-  return alleHaltenStufe(knoten, soll, name, ziel.mindestens);
+  return kleinstes;
 }
 
 /**
@@ -112,18 +127,46 @@ async function messeFlaechen(page: Page, flaechen: Flaeche[]) {
   test.info().annotations.push({ type: 'messwert', description: notiz.join(' | ') });
 }
 
-/** Der Rollenzweig als Vorbedingung: die Schreibaktion fehlt ODER steht gesperrt. */
-type Rollenzweig =
+/**
+ * Der Rollenzweig als Vorbedingung, VOR der Messung: die Schreibaktion fehlt ODER steht
+ * gesperrt. Ein `toHaveCount(0)` allein wäre auch grün, solange die Rechte noch nicht geladen
+ * sind — deshalb erst zwei Positivanker: das Benutzermenü nennt die gewechselte Person, und auf
+ * einer Einsatzroute steht die Statusmarke des Einsatzes im Kopf (sie lebt aus derselben
+ * Einsatz-Abfrage wie `darfImEinsatzSchreiben`). Wo die Seite einen Rechtehinweis trägt, wird
+ * sein Text verlangt (`hinweis`); die gemessenen Modulseiten nutzen `RechteHinweis` nicht.
+ */
+type Rollenzweig = { hinweis?: RegExp } & (
   | { fehlt: (page: Page) => Locator; gesperrt?: never }
-  | { gesperrt: (page: Page) => Locator; fehlt?: never };
+  | { gesperrt: (page: Page) => Locator; fehlt?: never }
+);
 
 /** Nur `handschuh`, für das Rollen-Geschwister: Vorbedingung, dann Messung. */
-async function messeImRollenzweig(page: Page, flaechen: (Flaeche & Rollenzweig)[]) {
+async function messeImRollenzweig(
+  page: Page,
+  rolle: 'beobachter' | 'fuehrungskraft',
+  flaechen: (Flaeche & Rollenzweig)[],
+) {
   for (const [i, f] of flaechen.entries()) {
     await page.goto(f.pfad);
     if (i === 0) await stelleDichte(page, 'handschuh');
     await expect(f.anker(page), `${f.pfad}: Datenanker`).toBeVisible();
     await f.vorbereiten?.(page);
+    await expect(
+      page.getByRole('button', { name: 'Benutzermenü' }),
+      `${f.pfad}: Vorbedingung — die Sitzung gehört der Rolle ${rolle}`,
+    ).toContainText(`E2E ${rolle}`);
+    if (f.pfad.startsWith('/einsaetze/')) {
+      await expect(
+        page.getByRole('banner').getByRole('img', { name: /^Einsatzstatus:/ }),
+        `${f.pfad}: Vorbedingung — der Einsatz und damit die Rechte sind geladen`,
+      ).toBeVisible();
+    }
+    if (f.hinweis) {
+      await expect(
+        page.getByRole('alert').filter({ hasText: f.hinweis }),
+        `${f.pfad}: Vorbedingung — der Rechtehinweis steht`,
+      ).toBeVisible();
+    }
     if (f.fehlt) {
       await expect(f.fehlt(page), `${f.pfad}: Vorbedingung — die Schreibaktion fehlt`).toHaveCount(
         0,
@@ -171,10 +214,12 @@ function etbFlaeche(einsatzId: string): Flaeche {
         sorte: 'ETB Entwurfstab',
         ziele: (page) => inMain(page).locator('.ant-tabs-tab'),
         mindestens: 1,
+        deckel: { kompakt: 37.5, handschuh: 90 },
       },
       {
         sorte: 'ETB Entwurfstab schließen',
-        ziele: (page) => inMain(page).locator('.ant-tabs-tab-remove'),
+        // Gemessen wird die Trefffläche selbst, das Kind des Knopfs (`entfernenStil`).
+        ziele: (page) => inMain(page).locator('.ant-tabs-tab-remove > span'),
         mindestens: 1,
         kurz: true,
       },
@@ -194,6 +239,34 @@ test('C7 · ETB: Schnellerfassung und Entwurfstab halten 72 px, kompakt bleibt k
     'ETB-Eintrag',
   );
   await messeFlaechen(page, [etbFlaeche(einsatzId)]);
+});
+
+test('C7 · ETB (Beobachter): die Schnellerfassung fehlt, der Typfilter hält 72 px', async ({
+  page,
+}) => {
+  const einsatzId = await einsatzAnlegen(page, `E2E 724 EtbB ${Date.now()}`);
+  await anlegen(
+    page,
+    einsatzId,
+    'etb',
+    { typ: 'meldung', inhalt: 'Lage ruhig, keine Besonderheiten', von: 'EL', an: 'S2' },
+    'ETB-Eintrag',
+  );
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+  await messeImRollenzweig(page, 'beobachter', [
+    {
+      pfad: `/einsaetze/${einsatzId}/etb`,
+      anker: (page) => inMain(page).getByText('Lage ruhig, keine Besonderheiten').first(),
+      fehlt: knopf('Erfassen'),
+      ziele: [
+        {
+          sorte: 'ETB Typfilter',
+          ziele: segment(/^(Alle|Meldung|Anordnung|Entscheidung|Lage|Berichtigung)$/),
+          mindestens: 6,
+        },
+      ],
+    },
+  ]);
 });
 
 // ── C8 · Kommunikation (LFH-343) ───────────────────────────────────────────────────────
@@ -332,12 +405,25 @@ test('C8 · Kommunikation (Beobachter): Schreibaktionen fehlen, was bleibt, häl
   await kommunikationSaeen(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
   const R = `/einsaetze/${einsatzId}`;
-  await messeImRollenzweig(page, [
+  const filter = { sorte: 'Filter', ziele: segment(/^Offen/), mindestens: 1 };
+  await messeImRollenzweig(page, 'beobachter', [
     {
       pfad: `${R}/meldungen`,
       anker: (page) => inMain(page).getByText('Brücke Nord gesperrt').first(),
       fehlt: knopf('Meldung erfassen'),
-      ziele: [{ sorte: 'Meldung Filter', ziele: segment(/^Offen/), mindestens: 1 }],
+      ziele: [filter],
+    },
+    {
+      pfad: `${R}/erinnerungen`,
+      anker: (page) => inMain(page).getByText('Lagemeldung an die Leitstelle').first(),
+      fehlt: knopf('Erinnerung anlegen'),
+      ziele: [filter],
+    },
+    {
+      pfad: `${R}/nachforderungen`,
+      anker: (page) => inMain(page).getByText('RTW').first(),
+      fehlt: knopf('Nachforderung anlegen'),
+      ziele: [filter],
     },
     {
       pfad: `${R}/auftraege`,
@@ -355,6 +441,33 @@ test('C8 · Kommunikation (Beobachter): Schreibaktionen fehlen, was bleibt, häl
           mindestens: 1,
         },
       ],
+    },
+    {
+      pfad: `${R}/auftraege`,
+      anker: (page) => inMain(page).getByRole('tab', { name: /Befehle/ }),
+      vorbereiten: async (page) => {
+        await inMain(page)
+          .getByRole('tab', { name: /Befehle/ })
+          .click();
+        await expect(inMain(page).getByText('Befehl Brücke Nord').first()).toBeVisible();
+      },
+      fehlt: knopf('Befehl erteilen'),
+      ziele: [
+        {
+          sorte: 'Befehl Karte',
+          ziele: (page) => inMain(page).getByRole('link', { name: 'Befehl Brücke Nord' }),
+          mindestens: 1,
+        },
+      ],
+    },
+    {
+      pfad: `${R}/chat`,
+      anker: (page) => inMain(page).getByText('Funkprobe').first(),
+      hinweis: /^Schreiben ist der Einsatzleitung und dem Führungspersonal vorbehalten/,
+      fehlt: knopf('Senden'),
+      // Die Eingabe weicht dem Hinweis; der Zweig wird als Vorbedingung belegt, ein eigenes
+      // Bedienziel bleibt im Nachrichtenbereich nicht.
+      ziele: [],
     },
   ]);
 });
@@ -477,14 +590,31 @@ test('C10 · Einstellungen, Einsatzdaten, Profil und Anzeige halten 72 px, kompa
   await messeFlaechen(page, einstellungenFlaechen(einsatzId));
 });
 
-test('C10 · Einsatzdaten (Beobachter): Bearbeiten fehlt, der Akkordeon-Kopf hält 72 px', async ({
+test('C10 · Einstellungen und Einsatzdaten (Beobachter): Schreibaktionen fehlen oder sind gesperrt, was bleibt, hält 72 px', async ({
   page,
 }) => {
   const einsatzId = await einsatzAnlegen(page, `E2E 724 EinstB ${Date.now()}`);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
-  await messeImRollenzweig(page, [
+  const R = `/einsaetze/${einsatzId}`;
+  await messeImRollenzweig(page, 'beobachter', [
     {
-      pfad: `/einsaetze/${einsatzId}/einsatzdaten`,
+      pfad: `${R}/einstellungen/allgemein`,
+      anker: segment(/^Allgemein$/, 'tab'),
+      hinweis:
+        /^Nur die Einsatzleitung, Führungspersonal oder ein System-Admin darf die Einstellungen/,
+      gesperrt: knopf('Speichern'),
+      ziele: [
+        {
+          sorte: 'Einstellungen Sektionen',
+          ziele: segment(/^(Allgemein|Verhalten & Automatik|Aufbewahrung|Module|Pegel)$/, 'tab'),
+          mindestens: 5,
+        },
+        // Gesperrt statt versteckt: ein gesperrtes Ziel ist ein sichtbares Ziel.
+        { sorte: 'Einstellungen Speichern', ziele: knopf('Speichern'), mindestens: 1 },
+      ],
+    },
+    {
+      pfad: `${R}/einsatzdaten`,
       anker: (page) => inMain(page).locator('.ant-collapse-header').first(),
       fehlt: knopf('Bearbeiten'),
       ziele: [
@@ -555,7 +685,7 @@ test('C11 · Einsatz-Vorgaben (Führungskraft): Speichern ist gesperrt, Modulzei
   page,
 }) => {
   await wechsleZuRolle(page, 'fuehrungskraft');
-  await messeImRollenzweig(page, [
+  await messeImRollenzweig(page, 'fuehrungskraft', [
     {
       pfad: '/admin/einstellungen/einsatz',
       anker: (page) => inMain(page).locator('.ant-select').first(),
@@ -641,7 +771,7 @@ test('C12 · Gliederung und Bereitstellungsraum (Beobachter): Schreibaktionen fe
   const { brId } = await gliederungSaeen(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
   const R = `/einsaetze/${einsatzId}`;
-  await messeImRollenzweig(page, [
+  await messeImRollenzweig(page, 'beobachter', [
     {
       pfad: `${R}/einsatzabschnitte`,
       anker: (page) => inMain(page).locator('.ant-tree-node-content-wrapper').first(),
@@ -746,20 +876,35 @@ test('C13 · Lagebericht, Berichtsliste und Lagemeldungen halten 72 px, kompakt 
   await messeFlaechen(page, lageFlaechen(einsatzId, berichtId));
 });
 
-test('C13 · Lagebericht (Beobachter): Freigeben fehlt, der Lesezweig hält 72 px', async ({
+test('C13 · Lagebericht und Berichtsliste (Beobachter): Schreibaktionen fehlen, der Lesezweig hält 72 px', async ({
   page,
 }) => {
   const einsatzId = await einsatzAnlegen(page, `E2E 724 LageB ${Date.now()}`);
   const berichtId = await lageSaeen(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
-  await messeImRollenzweig(page, [
+  const R = `/einsaetze/${einsatzId}`;
+  await messeImRollenzweig(page, 'beobachter', [
     {
-      pfad: `/einsaetze/${einsatzId}/lageberichte/${berichtId}`,
+      pfad: `${R}/lageberichte/${berichtId}`,
       // Der Lesezweig rendert ohne Akkordeon (`LageberichtDetailPage`: nur Entwurf UND
       // Schreibrecht zeigen das Formular); es bleibt die Druckaktion.
       anker: (page) => inMain(page).getByText('Zeitstand:'),
       fehlt: knopf('Freigeben'),
       ziele: [{ sorte: 'Lagebericht Drucken', ziele: knopf('Drucken / als PDF'), mindestens: 1 }],
+    },
+    {
+      pfad: `${R}/lageberichte`,
+      anker: (page) =>
+        inMain(page).getByRole('link', { name: 'Lagevortrag zur Entscheidung 1000' }),
+      fehlt: knopf('Neuer Bericht'),
+      ziele: [
+        {
+          sorte: 'Berichtsliste Karte',
+          ziele: (page) =>
+            inMain(page).getByRole('link', { name: 'Lagevortrag zur Entscheidung 1000' }),
+          mindestens: 1,
+        },
+      ],
     },
   ]);
 });

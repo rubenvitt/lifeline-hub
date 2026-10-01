@@ -46,7 +46,7 @@ ist das gleichwertige Ziel).
 
 #### Scenario: Die Stufe schlägt tatsächlich durch
 - **WHEN** dieselben Ziele in `kompakt` gemessen werden
-- **THEN** ist ihre Höhe kleiner als in `handschuh`, und keine Matrixzelle ist in `kompakt` 48 px oder breiter
+- **THEN** ist ihre Höhe kleiner als in `handschuh` (ausgenommen das mehrzeilige Textfeld der Schnellerfassung, dessen Höhe der Inhalt bestimmt), und keine Matrixzelle ist in `kompakt` 48 px oder breiter
 
 #### Scenario: Abspielknopf der Zeitachse
 - **WHEN** die Zeitachse der Lagekarte auf dem Handschirm ausgeklappt ist
@@ -54,5 +54,5 @@ ist das gleichwertige Ziel).
 
 #### Scenario: Nur-Lese-Zweig im Handschuh-Betrieb
 - **WHEN** eine Person ohne Schreibrecht (Beobachter bzw. Führungskraft in der Verwaltung) eine der neu genannten Flächen in `handschuh` öffnet
-- **THEN** steht der Rechtehinweis bzw. ist die Aktion gesperrt oder abwesend
+- **THEN** steht der Rechtehinweis, wo die Seite einen trägt, und die Aktion ist gesperrt oder abwesend
 - **AND** misst jedes verbleibende genannte Ziel mindestens 72 px in der Höhe

@@ -16,9 +16,15 @@ import { describe, expect, it } from 'vitest';
 const hier = dirname(fileURLToPath(import.meta.url));
 const lies = (datei: string) => readFileSync(join(hier, datei), 'utf-8');
 
-/** Alle Modulpfade aus `import … from '…'` und `import '…'`, auch mehrzeilig. */
+/**
+ * Alle Modulpfade aus `import … from '…'`, `import '…'` und `export … from '…'` (auch
+ * mehrzeilig) sowie aus dynamischem `import('…')`.
+ */
 function importe(quelltext: string): string[] {
-  return [...quelltext.matchAll(/^import\s[^;]*?['"]([^'"]+)['"]/gms)].map((t) => t[1]);
+  const statisch = [...quelltext.matchAll(/^(?:import|export)\s[^;]*?from\s*['"]([^'"]+)['"]/gms)];
+  const nackt = [...quelltext.matchAll(/^import\s*['"]([^'"]+)['"]/gm)];
+  const dynamisch = [...quelltext.matchAll(/\bimport\(\s*['"]([^'"]+)['"]/g)];
+  return [...statisch, ...nackt, ...dynamisch].map((t) => t[1]);
 }
 
 /** Die Personen- und Einsatzachse, als handgeschriebene Liste. */

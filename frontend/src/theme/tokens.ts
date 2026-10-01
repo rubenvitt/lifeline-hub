@@ -657,6 +657,8 @@ export function antdKomponenten(
   farben: Farbrollen,
   dichte: Dichte,
 ): NonNullable<ThemeConfig['components']> {
+  const stufe = dichten[dichte];
+  const kopfPolster = kopfzeilenMasse(stufe).polsterVertikal;
   return {
     Button: {
       primaryColor: farben.aufBedien,
@@ -669,11 +671,9 @@ export function antdKomponenten(
       colorError: farben.alarmText,
       colorWarning: farben.achtungText,
     },
-    Switch: switchMasse(dichten[dichte]),
-    Collapse: {
-      headerPadding: `${kopfzeilenMasse(dichten[dichte]).polsterVertikal}px ${dichten[dichte].abstand.md}px`,
-    },
-    Tabs: { horizontalItemPadding: `${kopfzeilenMasse(dichten[dichte]).polsterVertikal}px 0` },
+    Switch: switchMasse(stufe),
+    Collapse: { headerPadding: `${kopfPolster}px ${stufe.abstand.md}px` },
+    Tabs: { horizontalItemPadding: `${kopfPolster}px 0` },
   };
 }
 
