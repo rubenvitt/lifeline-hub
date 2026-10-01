@@ -128,7 +128,10 @@ export async function pruefe(tag: Locator, minimum: number, name: string) {
   }).toPass({ timeout: 10_000 });
 }
 
-/** WCAG-Verhältnis zweier opaker Farben, für Paare, die nicht an EINEM Element hängen. */
+/**
+ * WCAG-Verhältnis zweier opaker Farben, für Paare, die nicht an EINEM Element hängen. Dieselbe
+ * Formel wie in `messe` — dort läuft sie im Browser (`evaluate`) und kann nicht hierher zeigen.
+ */
 export function verhaeltnis(a: Farbe, b: Farbe): number {
   const luminanz = (f: Farbe) => {
     const linear = f.slice(0, 3).map((n) => {
@@ -142,11 +145,45 @@ export function verhaeltnis(a: Farbe, b: Farbe): number {
 }
 
 /**
+ * Die Form der Schattenlinie: GENAU zwei `inset`-Schatten ohne Weichzeichnung und ohne
+ * waagerechten Versatz, einer nach unten (Oberlinie), einer nach oben (Unterlinie), je mindestens
+ * 1 px. Ein Ring (`0 0 0 2px`, die Form des Fokusrings), ein äußerer Schatten, eine einzelne Linie
+ * oder eine Nulllinie wären unsichtbar oder etwas anderes, aber farblich messbar — deshalb vorab.
+ */
+async function pruefeLinienform(ziel: Locator) {
+  const wert = await ziel.evaluate((el) => getComputedStyle(el).boxShadow);
+  // Kommas innerhalb von `rgb(…)` trennen keine Schatten.
+  const schatten = wert.split(/,(?![^(]*\))/).map((t) => t.trim());
+  const form = schatten.map((t) => {
+    const laengen = t
+      .replace(/rgba?\([^)]*\)/, '')
+      .replace('inset', '')
+      .trim()
+      .split(/\s+/)
+      .map((l) => parseFloat(l));
+    const [x = NaN, y = NaN, unschaerfe = 0, ausdehnung = 0] = laengen;
+    return { inset: /\binset\b/.test(t), x, y, unschaerfe, ausdehnung };
+  });
+  const beschreibung = `box-shadow: ${wert}`;
+  expect(form, beschreibung).toHaveLength(2);
+  for (const f of form) {
+    expect(f.inset, beschreibung).toBe(true);
+    expect(f.x, beschreibung).toBe(0);
+    expect(f.unschaerfe, beschreibung).toBe(0);
+    expect(f.ausdehnung, beschreibung).toBe(0);
+  }
+  const ys = form.map((f) => f.y).sort((a, b) => a - b);
+  expect(ys[0], `Unterlinie fehlt — ${beschreibung}`).toBeLessThanOrEqual(-1);
+  expect(ys[1], `Oberlinie fehlt — ${beschreibung}`).toBeGreaterThanOrEqual(1);
+}
+
+/**
  * Kontrast einer Schattenlinie (`box-shadow: inset …`, LFH-698) gegen die Fläche, auf der sie
  * liegt, UND gegen die Fläche eines Nachbarn — die Linie trennt die Zeile von beiden. Ein Element
- * ohne Schatten ist ein Fehler, keine Messung.
+ * ohne Schatten oder mit einer anderen Schattenform ist ein Fehler, keine Messung.
  */
 export async function schattenKontrast(ziel: Locator, nachbar: Locator) {
+  await pruefeLinienform(ziel);
   const innen = await messe(ziel, { vordergrund: 'box-shadow', grund: 'selbst' });
   const { grund: nachbarGrund } = await messe(nachbar, { vordergrund: 'color', grund: 'selbst' });
   return {

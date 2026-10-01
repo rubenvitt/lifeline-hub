@@ -2,7 +2,8 @@
 
 ## Purpose
 
-Legt fest, wie eine per Deeplink angesteuerte Zeile oder Karte einer Datensicht markiert wird:
+Legt fest, wie eine per Deeplink angesteuerte Zeile oder Karte einer Datensicht oder ein
+Eintrag einer Zeitachse (ETB, Infotelefon) markiert wird:
 aus vorhandenen Farbrollen, in beiden Modi sichtbar und unterscheidbar von Hover, Fokus und
 Statustönungen, ohne den Kontrastboden des Zeilentexts zu unterschreiten.
 
@@ -10,7 +11,8 @@ Statustönungen, ohne den Kontrastboden des Zeilentexts zu unterschreiten.
 
 ### Requirement: Hervorhebung aus vorhandenen Rollen
 
-Die Markierung einer per Deeplink angesteuerten Zeile oder Karte MUST ihre Farben ausschließlich
+Die Markierung einer per Deeplink angesteuerten Zeile oder Karte einer Datensicht oder eines
+Zeitachseneintrags MUST ihre Farben ausschließlich
 aus vorhandenen Farbrollen beziehen. Sie MUST NOT eine Statusrolle (`achtung`, `alarm`, `normal`)
 oder eine Statustönung einer Zeile verwenden, weil die angesprungene Zeile kein Zustand ist.
 

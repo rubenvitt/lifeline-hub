@@ -8,7 +8,9 @@ import { flaeche, kontrast, schattenKontrast } from './kontrast-kern';
  *
  * Böden als Literale (Kriterium 5 und WCAG 1.4.11): Text Tag ≥ 7, Nacht ≥ 5; Linie ≥ 3 gegen
  * die Fläche, auf der sie liegt, und gegen die Nachbarzeile. Keine Farbwerte aus dem Produkt
- * importieren: eine schlechte Palette muss rot werden.
+ * importieren: eine schlechte Palette muss rot werden. Dass Fläche und Linie die Bedienrollen SIND
+ * (Scenario „Keine Farbe außerhalb der Rollen“, damit auch „Kein Warnton“), prüft der Abgleich mit
+ * den Rollen-Properties, die die laufende Seite selbst auflöst (`rolle`).
  */
 const TEXT = { light: 7, dark: 5 } as const;
 const LINIE = 3;
@@ -41,6 +43,29 @@ async function seede(page: Page, modus: string) {
     ids.push(kraft.id);
   }
   return { einsatzId, ziel: ids[1], nachbar: ids[0] };
+}
+
+/** Eine Rollen-Property (`--lfh-…`), vom Browser aufgelöst, als `r,g,b`. */
+async function rolle(page: Page, name: string): Promise<string> {
+  return page.evaluate((n) => {
+    const probe = document.createElement('div');
+    probe.style.color = `var(${n})`;
+    document.body.append(probe);
+    const wert = getComputedStyle(probe).color;
+    probe.remove();
+    return (wert.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).join();
+  }, name);
+}
+
+const rgb = (f: number[]) => f.slice(0, 3).map(Math.round).join();
+
+/** Fläche = `bedien-flaeche`, Linie = `bedien`: dieselben Rollen in jedem Zweig. */
+async function pruefeRollen(page: Page, ziel: Locator, nachbar: Locator, name: string) {
+  const m = await schattenKontrast(ziel, nachbar);
+  expect(rgb(m.linie), `${name}: Linie`).toBe(await rolle(page, '--lfh-bedien'));
+  expect(rgb(await flaeche(ziel)), `${name}: Fläche`).toBe(
+    await rolle(page, '--lfh-bedien-flaeche'),
+  );
 }
 
 /** Zeiger aus der Tabelle, damit antds Hover die Ruhemessung nicht verfälscht. */
@@ -85,6 +110,7 @@ for (const modus of ['light', 'dark'] as const) {
         const text = `Zelle ${i}: ${JSON.stringify(m)}`;
         expect(m.gegenFlaeche, text).toBeGreaterThanOrEqual(LINIE);
         expect(m.gegenNachbar, text).toBeGreaterThanOrEqual(LINIE);
+        await pruefeRollen(page, zellen.nth(i), nachbarZellen.nth(i), `Zelle ${i}`);
       }
       await pruefeText(zellen, TEXT[modus], 'markierte Zeile');
       // Die Fläche deckt jede Zelle, auch die fixierte, sortierte Kennung: dort verlor das alte
@@ -113,10 +139,15 @@ for (const modus of ['light', 'dark'] as const) {
       'none',
     );
 
-    // Markierte Zeile unter dem Zeiger: die Linie bleibt.
+    // Markierte Zeile unter dem Zeiger: die Linie bleibt, an jeder Zelle.
     await zeile.hover();
-    const unterZeiger = await schattenKontrast(zellen.first(), nachbarZellen.first());
-    expect(unterZeiger.gegenFlaeche, JSON.stringify(unterZeiger)).toBeGreaterThanOrEqual(LINIE);
+    for (let i = 0; i < (await zellen.count()); i += 1) {
+      const unterZeiger = await schattenKontrast(zellen.nth(i), nachbarZellen.nth(i));
+      expect(
+        unterZeiger.gegenFlaeche,
+        `Zelle ${i}: ${JSON.stringify(unterZeiger)}`,
+      ).toBeGreaterThanOrEqual(LINIE);
+    }
   });
 
   test(`${modus}: Karte per Deeplink auf 390 px`, async ({ page }) => {
@@ -141,6 +172,8 @@ for (const modus of ['light', 'dark'] as const) {
       expect((await flaeche(karte)).join(), 'Karte ohne Tönung').not.toBe(
         (await flaeche(nachbarKarte)).join(),
       );
+      // Dieselben Rollen wie die Tabellenzeile.
+      await pruefeRollen(page, karte, nachbarKarte, 'Karte');
       await pruefeText(karte.getByText('Brandt, Bernd'), TEXT[modus], 'markierte Karte');
     }).toPass({ timeout: 10_000 });
   });
@@ -174,6 +207,8 @@ for (const modus of ['light', 'dark'] as const) {
       expect(m.gegenFlaeche, JSON.stringify(m)).toBeGreaterThanOrEqual(LINIE);
       expect(m.gegenNachbar, JSON.stringify(m)).toBeGreaterThanOrEqual(LINIE);
       await pruefeText(zeile.getByText('Angesprungene Meldung'), TEXT[modus], 'ETB-Zeile');
+      // Fläche inline aus `rollen.bedienFlaeche`, Linie aus `index.css`: dieselben Rollen.
+      await pruefeRollen(page, zeile, nachbar, 'ETB-Zeile');
     }).toPass({ timeout: 10_000 });
   });
 }

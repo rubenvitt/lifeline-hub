@@ -68,7 +68,8 @@ trägt. (3) Keine markierte Stelle trägt einen `box-shadow`.
 - Kein Ausblenden der Hervorhebung nach einer Zeit (bleibt wie in LFH-25).
 - Die Schuld in `Markdown.css` / `MarkdownEditor.css` wird nicht getilgt, nur eingefroren
   (Nachzug als eigener Task, s. Aufgabe 2).
-- Keine Änderung an `gate5.guard.test.ts`; der neue Guard ergänzt ihn.
+- Keine Verhaltensänderung an `gate5.guard.test.ts`; der neue Guard ergänzt ihn. Gate 5 gibt nur
+  `ohneKommentare` an das geteilte Modul `test/ohneKommentare.ts` ab (E3).
 
 ## Decisions
 
@@ -105,8 +106,10 @@ Verworfene Alternativen:
 
 Selektoren: `.ant-table-wrapper .ant-table-tbody > tr.zeile-hervorgehoben > td` (0,3,2) und
 `[data-lfh='datensicht-karte'].zeile-hervorgehoben`, die Form der Lückentönung. Sie liegt über
-antds Sortierspalte (`.ant-table-wrapper .ant-table td.ant-table-column-sort`, (0,3,1),
-`antd/es/table/style/sorter.js`), an der die alte Regel (0,1,1) am Tag verlor (gemessen, s. o.).
+antds Sortierspalte (`.ant-table-wrapper td.ant-table-column-sort`, (0,2,1), weil
+`:where(.css-…)` null zählt; `antd/es/table/style/sorter.js`). An ihr verlor die alte Regel
+(0,1,1) am Tag, während die alte Nachtregel (0,2,1) den Gleichstand als spätere Regel gewann
+(gemessen, s. o.).
 Eine zusätzliche Zellklasse (0,4,2) war erwogen und bringt nichts: die Gegenprobe mit (0,3,2) hält
 die Fläche in jeder Zelle einschließlich der fixierten, sortierten Kennung (e2e, „uneinheitliche
 Fläche“). Die Linien liegen im `box-shadow`, den antd an der Zelle nicht setzt; unter dem Zeiger
@@ -137,15 +140,25 @@ LFH-698), und der Guard ist grün geboren bis auf eine benannte Schuld.
 ## Risks / Trade-offs
 
 - [Nachts trägt die Fläche fast nichts, die Linie allein markiert] → gewollt; die Linie hält
-  ≥ 5,48 : 1 und ist der Nachweis im e2e-Spec. Der Spec misst die Linie, nicht die Fläche.
+  ≥ 5,48 : 1. Der e2e-Spec misst die Linie (Form, Kontrast, Rolle) und die Fläche (Rolle,
+  einheitlich über alle Zellen, verschieden vom Hover).
 - [Schatten an jeder `td` zeigt kleine Fugen, wenn antd Zellabstände setzt] → antd-Tabellen
   stehen auf `border-spacing: 0`; der Screenshot-Blick in Aufgabe 3 bestätigt es.
 - [`box-shadow` am `td` einer fixierten Spalte konkurriert mit antds Schatten der Fixkante] →
   geprüft: antd zeichnet den Fixschatten an `::after` der Zelle (`ant-table-cell-fix-start-shadow`,
   in Ruhe `none`), nicht an der Zelle selbst.
-- [Eine ETB-Zeile mit Statustönung (Berichtigung) verlöre ihre Tönung] → geprüft: die Tönung und
-  die Hervorhebung setzt `Zeitachseneintrag` inline; eine Klassenregel kommt an den Grund nicht
-  heran, nur die Linie kommt hinzu.
+- [Eine angesprungene ETB-Berichtigung verliert ihre Zeilentönung] → geprüft, besteht, aber nicht
+  durch diese Änderung: `etb/EtbZeitachse.tsx` setzt bei Hervorhebung inline
+  `{ background: bedienFlaeche }`, und `Zeitachseneintrag` spreizt das nach dem Grund der Tönung.
+  Typkante und Typwort „Berichtigung“ bleiben als Kanäle stehen; die Klassenregel fügt nur die
+  Linie hinzu. Verhalten unverändert gegenüber vorher.
+- [Infotelefon setzt die Klasse an einem `Zeitachseneintrag` ohne Inline-Grund] → die Klassenregel
+  erreicht den Grund des Bausteins nicht, der Anruf trug nur die Linie (Review). Behoben wie im
+  ETB: `pages/InfotelefonPage.tsx` setzt `bedienFlaeche` inline, Nachweis in
+  `InfotelefonPage.test.tsx`.
+- [Meldungs- und Auftragskarten (`kommunikation/KommKarte.tsx`) markieren mit einem Ring in
+  `bedien`] → liegen außerhalb von `.zeile-hervorgehoben` und damit außerhalb dieser Change; die
+  Spec gilt für Datensicht und Zeitachse. Nachzug LFH-896.
 - [`schwach` (Platzhalter, Ikonen) liegt am Tag auf `bedienFlaeche` bei 5,39] → `schwach` ist
   keine Textstufe mit Tagesboden (LFH-643/LFH-652); dieselbe Lage wie auf `flaeche3`. Kein
   Handlungsbedarf, aber im Spec nicht als Text gemessen.

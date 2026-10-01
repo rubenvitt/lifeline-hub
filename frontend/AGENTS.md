@@ -147,9 +147,11 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
 - **Kein eigener Knopfboden** (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung des
   Primärknopfs hält den Textboden in Ruhe und unter dem Zeiger; Werte und Messung am Wert in
   `theme/tokens.ts`. Ein Kontrast-Spec führt den Primärknopf nie unter einer Ausnahme.
-- **Deeplink-Hervorhebung** (LFH-698, Spec `deeplink-hervorhebung`): `bedienFlaeche` plus
-  Ober- und Unterlinie in `bedien` (`box-shadow`, `index.css`), nie `flaeche3` (= Hover) und
-  nie eine Statusfläche; Nachweis `e2e/deeplink-hervorhebung-kontrast.spec.ts`. **Farbliterale
+- **Deeplink-Hervorhebung** (LFH-698, Spec `deeplink-hervorhebung`; `.zeile-hervorgehoben` an
+  Datensicht und Zeitachse): `bedienFlaeche` plus Ober- und Unterlinie in `bedien` (`box-shadow`,
+  `index.css`); ein `Zeitachseneintrag` setzt die Fläche inline mit. Nie `flaeche3` (das ist der
+  Hover; die Tagmodus-Regel unten meint Hover und aktive Segmente) und nie eine Statusfläche;
+  Nachweis `e2e/deeplink-hervorhebung-kontrast.spec.ts`. **Farbliterale
   in CSS nur in `theme/rollen.css`** (Spec `css-farbquelle`, `theme/cssFarbquelle.guard.test.ts`,
   Schuldmenge `OFFEN` schrumpft nur).
 - **Tagmodus** (LFH-618, `docs/superpowers/specs/2026-09-22-lfh-618-hellmodus-pruefliste.md`):

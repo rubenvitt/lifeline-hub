@@ -69,7 +69,7 @@ export default function InfotelefonPage() {
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const { token } = useRollen();
+  const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const stabFreigabe = useStabFreigabe(einsatzId);
   const frei = stabFreigabe.zustand === 'frei';
@@ -266,6 +266,9 @@ export default function InfotelefonPage() {
                   data-anruf={a.id}
                   data-lfh="datensicht-karte"
                   className={a.id === hervorgehoben ? HERVORGEHOBEN : undefined}
+                  // Die Fläche inline wie im ETB: der Baustein setzt seinen Grund selbst, die
+                  // Klassenregel in `index.css` erreicht ihn nicht und liefert nur die Linie (LFH-698).
+                  style={a.id === hervorgehoben ? { background: rollen.bedienFlaeche } : undefined}
                   zeit={<ZeitAnzeige wert={a.eingang_at} />}
                   typwort={ANLIEGEN_LABEL[a.anliegen]}
                   meta={[a.anrufer_name, a.rueckruf].filter(Boolean).join(' · ') || undefined}

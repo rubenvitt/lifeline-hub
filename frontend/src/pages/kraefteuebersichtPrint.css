@@ -1,11 +1,11 @@
 /* Problemzeile des Meldebilds (Neuentwurf S6): eine Einheit mit Ausfall. Die Tönung ist
    Verstärkung, der zweite Kanal ist die Ausfall-Zahl in der Statusspalte.
    An die `td`, nicht an die `tr`: antd färbt die Zellen, ein Hintergrund am `tr` bliebe
-   verdeckt — die fixierte Kennungsspalte trägt sogar einen eigenen deckenden Grund. Die
-   Zellform teilt sie mit der Deeplink-Hervorhebung (`index.css`); das Präfix
-   `.kraefte-print-root` hebt die Spezifität über die Grundregel der fixierten Spalte, der
-   Hover von antd bleibt darüber (eine alte Form `.zeile-hervorgehoben > td` verlor an der
-   sortierten Kennung, LFH-698). Ein Karten-Zweitselektor wie bei `.zeile-hervorgehoben` ist hier NICHT nötig:
+   verdeckt — die fixierte Kennungsspalte trägt sogar einen eigenen deckenden Grund (dieselbe
+   Lage wie bei der Deeplink-Hervorhebung in `index.css`). Das Präfix `.kraefte-print-root` hebt
+   die Spezifität über die Grundregel der fixierten Spalte, der Hover von antd bleibt darüber;
+   eine sortierbare Spalte gibt es im Meldebild nicht (an der Sortierspalte verlor eine schwächere
+   Form, LFH-698). Ein Karten-Zweitselektor wie bei `.zeile-hervorgehoben` ist hier NICHT nötig:
    das Meldebild ist in jeder Breite Tabelle (`form="tabelle"`). */
 .kraefte-print-root tr.meldebild-problemzeile > td {
   background-color: var(--lfh-problem-zeile);

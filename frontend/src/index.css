@@ -16,9 +16,9 @@ body {
    Zwei Selektoren, weil `Datensicht` unter `md` Karten statt Zeilen rendert. Im Tabellenzweig
    gehört die Farbe an die `td` (antd färbt die Zellen, ein Hintergrund am `tr` bliebe verdeckt),
    in der Spezifität der Lückentönung (`personen/betroffene.css`, (0,3,2)): sie liegt über antds
-   Sortierspalte (`.ant-table-wrapper .ant-table td.ant-table-column-sort`, (0,3,1)). Die alte
-   Form `.zeile-hervorgehoben > td` (0,1,1) verlor dort, die fixierte Kennung blieb am Tag ohne
-   Hervorhebung (gemessen, LFH-698). */
+   Sortierspalte (`.ant-table-wrapper td.ant-table-column-sort`, (0,2,1); `:where(.css-…)` zählt
+   null). Die alte Form `.zeile-hervorgehoben > td` (0,1,1) verlor dort, die fixierte Kennung
+   blieb am Tag ohne Hervorhebung (gemessen, LFH-698). */
 .ant-table-wrapper .ant-table-tbody > tr.zeile-hervorgehoben > td,
 [data-lfh='datensicht-karte'].zeile-hervorgehoben {
   background-color: var(--lfh-bedien-flaeche);

@@ -2,7 +2,7 @@
 
 ## 1. Ist-Stand messen (vor dem Fix)
 
-- [x] 1.1 Im Browser (Prod-Bundle wie `e2e/`) für beide Modi festhalten, welche Fläche die markierte Zelle heute wirklich trägt (normale und fixierte Kennungsspalte, Fahrzeugtabelle per `?fahrzeug=<id>`, ETB-Zeile per `?eintrag=<id>`); Ergebnis als Absatz „Gemessen vor dem Fix“ in `design.md` unter Context. Verifikation: der Absatz nennt die gemessenen `rgb()`-Werte je Modus und Zelle.
+- [x] 1.1 Im Browser (Prod-Bundle wie `e2e/`) für beide Modi festhalten, welche Fläche die markierte Zelle heute wirklich trägt (normale und fixierte Kennungsspalte, Personaltabelle per `?personal=<id>` (statt der zuerst genannten Fahrzeugtabelle: die Personalseite lässt sich per API ohne Stammdaten säen), ETB-Zeile per `?eintrag=<id>`); Ergebnis als Absatz „Gemessen vor dem Fix“ in `design.md` unter Context. Verifikation: der Absatz nennt die gemessenen `rgb()`-Werte je Modus und Zelle.
 - [x] 1.2 Prüfen, ob antds Fixkanten-Schatten an der Zelle oder an `::after` hängt und ob ETB-Karten ihre Statustönung (Berichtigung) inline oder per Klasse setzen; Befund in `design.md` (Risiken) nachziehen. Verifikation: beide Risiken tragen „geprüft: …“.
 
 ## 2. CSS-Farbgate (zuerst rot, dann grün)
@@ -19,6 +19,8 @@
 - [x] 3.3 Verweise nachziehen: Kommentare in `personen/betroffene.css` und `pages/kraefteuebersichtPrint.css`, die `.zeile-hervorgehoben > td` als Präzedenzfall nennen, auf die neue Form anpassen. Verifikation: `grep -rn "zeile-hervorgehoben > td" frontend/src` leer oder stimmig.
 - [x] 3.4 `frontend/AGENTS.md`, Farbachsen: eine Zeile „Deeplink-Hervorhebung = `bedienFlaeche` + Ober-/Unterlinie `bedien` (LFH-698); Farbliterale in CSS nur in `theme/rollen.css` (`theme/cssFarbquelle.guard.test.ts`)“. Verifikation: `prettier --check frontend/AGENTS.md` grün.
 - [x] 3.5 Screenshots beider Modi (Tabelle mit Hover auf Nachbarzeile, Karte) dem Menschen übergeben und im PR beschrieben (aus der Cloud-Sitzung lassen sich keine Bilder in den PR laden). Verifikation: vier Bilder in der Sitzung, Beschreibung im PR-Body.
+
+- [x] 3.6 Review-Befunde: Infotelefon setzt die Fläche inline wie das ETB (Test zuerst rot in `InfotelefonPage.test.tsx`); Messkern prüft die Linienform (genau zwei `inset`-Linien oben/unten, kein Ring); e2e gleicht Fläche und Linie mit den Rollen-Properties ab (Tabelle, Karte, ETB) und prüft „unter dem Zeiger“ an jeder Zelle; Design, Spec-Geltung und Kommentare berichtigt; Nachzug LFH-896 für den Ring der Kommunikationskarten. Verifikation: Gegenproben Ring, nur Oberlinie und Linie in `alarmText` jeweils rot; e2e-Spec in beiden Modi grün.
 
 ## 4. Abschluss
 
