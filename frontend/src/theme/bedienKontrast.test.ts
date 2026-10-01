@@ -1,5 +1,6 @@
+import { theme as antdTheme } from 'antd';
 import { describe, expect, it } from 'vitest';
-import { farbenDunkel, farbenHell } from './tokens';
+import { antdAlgorithmus, antdKomponenten, antdToken, farbenDunkel, farbenHell } from './tokens';
 
 /**
  * Beschriftung auf satter Bedienfläche (Primärknopf), GERECHNET statt behauptet (WCAG-Formel).
@@ -33,5 +34,54 @@ describe.each([
 
   it('die Fläche unter dem Zeiger unterscheidet sich von der Ruhe', () => {
     expect(farben.bedienHover.toLowerCase()).not.toBe(farben.bedien.toLowerCase());
+  });
+});
+
+/**
+ * Der Fokusring (LFH-737): antd zeichnet ihn als `outline` in `colorPrimaryBorder`
+ * (`genFocusOutline`, auch Upload-Dragger), und das leitet die Palette aus `bedien` als
+ * HELLE Stufe ab: Tag 2,57–3,28, Nacht 1,51–1,70 gegen die Flächen, unter dem Boden aus
+ * Kriterium 5 (WCAG 1.4.11, ≥ 3 : 1). Der Ring trägt deshalb die Rolle `bedien`, wie die eigenen
+ * Klassen in `sprache.css` (`--lfh-bedien`). Geprüft wird der AUFGELÖSTE Token mit dem echten
+ * Algorithmus je Modus; der Boden steht als Literal. Browser-Nachweis:
+ * `e2e/fokusring-kontrast.spec.ts`.
+ */
+describe.each([
+  ['Tag', farbenHell, false],
+  ['Nacht', farbenDunkel, true],
+] as const)('Fokusring — %s (LFH-737)', (_modus, farben, dunkel) => {
+  const aufgeloest = () =>
+    antdTheme.getDesignToken({ token: antdToken(farben), algorithm: antdAlgorithmus(dunkel) });
+
+  it('antds Fokusumriss trägt die Rolle bedien', () => {
+    expect(aufgeloest().colorPrimaryBorder).toBe(farben.bedien);
+  });
+
+  // Jede DECKENDE Fläche, auf der ein Bedienziel stehen kann; Füllungen mit Alpha sind keine.
+  it.each([
+    'grund',
+    'flaeche',
+    'flaeche2',
+    'kopf',
+    'paneel',
+    'flaeche3',
+    'normalFlaeche',
+    'achtungFlaeche',
+    'alarmFlaeche',
+    'bedienFlaeche',
+    'bannerGrund',
+  ] as const)('der Ring hält auf %s ≥ 3 : 1', (flaeche) => {
+    expect(kontrast(aufgeloest().colorPrimaryBorder, farben[flaeche])).toBeGreaterThanOrEqual(3);
+  });
+
+  // `colorPrimaryBorder` ist auch die Ruhefarbe von Spur und Griff des Schiebereglers; antd
+  // färbt den Griff unter dem Zeiger in `colorPrimary` = `bedien`, die Spur in der abgeleiteten
+  // Hover-Stufe (nachts DUNKLER als `bedien`). Beide nehmen `bedienHover` wie der Primärknopf.
+  it('der Schieberegler zeigt den Zeiger in bedienHover, nicht in seiner Ruhefarbe', () => {
+    expect(antdKomponenten(farben, 'kompakt').Slider).toMatchObject({
+      trackHoverBg: farben.bedienHover,
+      handleActiveColor: farben.bedienHover,
+    });
+    expect(farben.bedienHover).not.toBe(aufgeloest().colorPrimaryBorder);
   });
 });

@@ -1,7 +1,7 @@
-import { IkoneChevronRechts, IkoneChevronRunter, IkonePunkteSenkrecht } from '../ikonen';
-import { Button, Dropdown, Popconfirm, Space, Typography, theme } from 'antd';
+import { IkoneChevronRechts, IkoneChevronRunter } from '../ikonen';
+import { Button, Popconfirm, Space, Typography, theme } from 'antd';
 import type { Key, ReactNode } from 'react';
-import type { MenuProps, TableColumnType } from 'antd';
+import type { TableColumnType } from 'antd';
 import {
   isValidElement,
   useCallback,
@@ -22,6 +22,7 @@ import StatusWahl, { type StatusBedienung } from './StatusWahl';
 import Augenbraue from './instrument/Augenbraue';
 import { monoStil, rollenwerte } from './instrument/rollenwerte';
 import { useViewport, type AbBreitePunkt } from './useViewport';
+import { MenueAusloeser, type MenueEintrag } from './MenueAusloeser';
 import {
   etikettVon,
   hatWaehlbareSpalten,
@@ -198,21 +199,9 @@ export interface PrimaerAktion<T> {
   sichtbar?: (zeile: T) => boolean;
 }
 
-/** Ein Eintrag des gebündelten Menüs ({@link WeitereAktionen}). */
-export interface MenueEintrag {
-  key: string;
-  label: string;
-  /**
-   * Unumkehrbares (Stornieren): der Eintrag wird rot und steht hinter einem Trenner, der Trennung,
-   * die in einer Knopfreihe der Abstand wäre.
-   */
-  gefahr?: true;
-}
-
 /**
  * Weitere Zeilenaktionen, GEBÜNDELT (LFH-365): die EINE Primäraktion bleibt sichtbar, alles
- * Weitere steht in einem Menü, dessen Auslöser das Primitiv baut (icon-only `type="text"`,
- * `trigger={['click']}`, `autoFocus`, Zuordnung am `menu`).
+ * Weitere steht in einem Menü hinter dem Baustein {@link MenueAusloeser} (LFH-683).
  *
  * `eintraege` wird NACH der Rechte- und Zustandsprüfung ausgewertet: liefert es nichts, gibt es
  * keinen Auslöser, auch keinen deaktivierten.
@@ -228,17 +217,6 @@ export interface WeitereAktionen<T> {
    * Löschung. Die Kennzeichnung der Zeile als Text bleibt Sache des Spalten-`render` (Kriterium 6).
    */
   laeuft?: (zeile: T) => boolean;
-}
-
-/** Menüeinträge für antd: die Gefahr hinter einem Trenner, sonst in Lieferreihenfolge. */
-export function menueEintraege(eintraege: readonly MenueEintrag[]): MenuProps['items'] {
-  const neutral = eintraege.filter((e) => !e.gefahr);
-  const gefahr = eintraege.filter((e) => e.gefahr);
-  return [
-    ...neutral.map((e) => ({ key: e.key, label: e.label })),
-    ...(neutral.length > 0 && gefahr.length > 0 ? [{ type: 'divider' as const }] : []),
-    ...gefahr.map((e) => ({ key: e.key, label: e.label, danger: true })),
-  ];
 }
 
 /**
@@ -1336,31 +1314,21 @@ export default function Datensicht<T extends object, const K extends string>(
     ) : null;
 
     const weitere = karte.weitere;
+    // Vorab ausgewertet: `aktionen.length` entscheidet unten über die Aktionsleiste, und ein
+    // Baustein, der `null` rendert, zählte dort mit.
     const weitereEintraege = weitere?.eintraege(zeile) ?? [];
     const weitereLaeuft = weitere?.laeuft?.(zeile) ?? false;
     const menueKnopf =
       weitere && weitereEintraege.length > 0 ? (
-        <Dropdown
+        <MenueAusloeser
           key="weitere"
-          trigger={['click']}
-          autoFocus
-          disabled={weitereLaeuft}
-          menu={{
-            items: menueEintraege(weitereEintraege),
-            onClick: ({ key }) => weitere.onWahl(key, zeile),
-          }}
-        >
-          <Button
-            type="text"
-            aria-label={weitere.zugaenglicherName(zeile)}
-            loading={weitereLaeuft}
-            icon={
-              <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                <IkonePunkteSenkrecht />
-              </span>
-            }
-          />
-        </Dropdown>
+          eintraege={weitereEintraege}
+          zugaenglicherName={weitere.zugaenglicherName(zeile)}
+          // Eine laufende Aktion sperrt den Auslöser und zeigt sich an ihm (LFH-654).
+          gesperrt={weitereLaeuft}
+          laeuft={weitereLaeuft}
+          onWahl={(key) => weitere.onWahl(key, zeile)}
+        />
       ) : null;
     const aktionen = [knopf, menueKnopf].filter((k) => k != null);
 

@@ -30,12 +30,43 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
+/// LFH-725, vor dem ersten Request: einen nach einem Absturz liegengebliebenen WAL
+/// zurückschreiben (er kann den Vorzustand einer Schwärzung tragen) und den Altbestand aus der
+/// Zeit vor `secure_delete` einmal per `VACUUM` neu aufbauen. Fehler halten den Start nicht auf;
+/// der Neuaufbau wird dann beim nächsten Start erneut versucht.
+async fn physisch_bereinigen(pool: &sqlx::SqlitePool) {
+    match db::wal_zurueckschreiben(pool).await {
+        Ok(true) => {}
+        // Den Rest holt der erste Purge-Tick nach.
+        Ok(false) => {
+            tracing::warn!("Start: WAL-Rückschrieb von einer anderen Verbindung blockiert")
+        }
+        Err(e) => tracing::error!("Start: WAL-Rückschrieb fehlgeschlagen: {e}"),
+    }
+
+    let beginn = std::time::Instant::now();
+    match db::bereinige_altbestand_einmalig(pool).await {
+        Ok(true) => tracing::info!(
+            dauer_ms = beginn.elapsed().as_millis() as u64,
+            "Altbestand einmalig neu aufgebaut (VACUUM, LFH-725)"
+        ),
+        Ok(false) => {}
+        Err(e) => tracing::error!(
+            dauer_ms = beginn.elapsed().as_millis() as u64,
+            "Einmaliger Neuaufbau des Altbestands (VACUUM, LFH-725) fehlgeschlagen, nächster \
+             Start versucht es erneut. Braucht freien Platz bis zur doppelten \
+             Datenbankgröße: {e}"
+        ),
+    }
+}
+
 /// Startet den HTTP-Server (Standardlauf ohne Subkommando).
 async fn run_server(config: Config) -> anyhow::Result<()> {
     tracing::info!(db_path = %config.db_path, bind = %config.bind, "Starte lifeline-hub");
 
     let pool = db::connect(&config.db_path).await?;
     db::migrate(&pool).await?;
+    physisch_bereinigen(&pool).await;
 
     // `bootstrap_admin` läuft ZUERST: es legt auf leerer DB Organisation, Admin und
     // Default-Kataloge an. Nach `dev_seed` gäbe es schon Benutzer, und der Bootstrap wäre ein

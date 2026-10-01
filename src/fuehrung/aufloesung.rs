@@ -1,10 +1,10 @@
 //! Auflösung zur Lesezeit (LFH-549, design.md D4): ein Empfänger mit Sachgebietscode zeigt die
 //! **aktuelle** Besetzung dieses Sachgebiets im Einsatz.
 //!
-//! Der Snapshot (`auftrag_empfaenger.snap_anzeige`) bleibt die historische Wahrheit und trägt nur
+//! Der Snapshot (`auftrag_empfaenger.snap_anzeige`) ist die historische Wahrheit und trägt nur
 //! das Funktionslabel — der Personenname kommt ausschließlich hier, zur Lesezeit, aus
-//! `einsatz_stabsfunktion` (Scrub): nach der Schwärzung ist er weg, ohne dass ein Retain-Feld
-//! ihn festhielte.
+//! `einsatz_stabsfunktion` (Scrub): nach der Schwärzung ist er weg. Der Snapshot selbst wird
+//! seit LFH-701 mitgeschwärzt; sein Wortlaut bleibt im ETB der Anordnung.
 //!
 //! Wer das Stab-Modul im Einsatz nicht lesen darf, bekommt keine Auflösung (das Feld fehlt) —
 //! dieselbe Filterlogik wie beim Modulzähler.
