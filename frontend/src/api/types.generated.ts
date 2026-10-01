@@ -607,6 +607,17 @@ export interface components {
             geaendert_at?: string | null;
         };
         /**
+         * @description Verweis auf eine Berichtigung eines ETB-Eintrags (LFH-689): `id` für den Deeplink, `lfd_nr`
+         *     für den Namen („berichtigt durch Nr. 9“). Anders als beim Auftrag ist die Nummer eines
+         *     ETB-Eintrags nie leer.
+         */
+        BerichtigungVerweis: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            lfd_nr: number;
+        };
+        /**
          * @description Besetzungszustand eines Sachgebiets (Entscheidung 3 der Spec). Wire == `as_str()`.
          *
          *     **Keine Zeile = „nicht vergeben"** — das ist der im Fükw der Führungsstufe B
@@ -1599,6 +1610,14 @@ export interface components {
              * @description Gesetzt, wenn dieser Eintrag der Freigabe-Snapshot eines Befehls ist (LFH-64). Sonst `None`.
              */
             befehl_id?: number | null;
+            /**
+             * @description Berichtigungen, die auf DIESEN Eintrag zeigen (LFH-689) — die Rückrichtung zu
+             *     `berichtigt_eintrag_id`. Aufsteigend nach `lfd_nr`, leer statt fehlend, unabhängig von
+             *     Seite und Listenfilter: die Palette-Vorschau liest einen Eintrag allein und muss trotzdem
+             *     sagen, dass er überholt ist. Nicht Teil des SELECT: `repo::laden`/`repo::abfrage` füllen
+             *     die Liste je Seite mit einer gebündelten Abfrage nach, wie `folgeauftraege`.
+             */
+            berichtigt_durch: components["schemas"]["BerichtigungVerweis"][];
             /** Format: int64 */
             berichtigt_eintrag_id?: number | null;
             ereigniszeit: string;

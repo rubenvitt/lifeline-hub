@@ -34,11 +34,15 @@ import { verfasserText } from './verfasser';
  *
  * ── WAS FEHLT, MIT ABSICHT ───────────────────────────────────────────────────────────
  *
- * Die Berichtigung in RÜCKRICHTUNG („berichtigt durch Nr. …"): sie braucht den
- * Berichtigungsindex über die ganze Liste, und die ETB-API filtert nicht nach
- * `berichtigt_eintrag_id` (LFH-689). Die VORWÄRTSRICHTUNG steht da, ohne Nummer des
- * Grundeintrags („berichtigt einen älteren Eintrag", wie der Rückfall der Zeitachse). Keine
- * Aktionen — die Vorschau liest nur. Leere optionale Angaben fehlen statt als Platzhalter.
+ * Die Nummer des Grundeintrags einer Berichtigung: der Eintrag trägt nur dessen `id`, die
+ * VORWÄRTSRICHTUNG heißt deshalb „berichtigt einen älteren Eintrag" wie der Rückfall der
+ * Zeitachse. Keine Aktionen — die Vorschau liest nur. Leere optionale Angaben fehlen statt als
+ * Platzhalter.
+ *
+ * Die RÜCKRICHTUNG („berichtigt durch Nr. …") liefert der Server am Eintrag
+ * (`berichtigt_durch`, LFH-689), unabhängig von Seite und Filter — ohne sie wäre ein überholter
+ * Eintrag hier nicht als überholt erkennbar. Die Zeitachse bildet sie weiter aus der geladenen
+ * Liste (`berichtigungsindex`).
  *
  * Die Verweise auf Befehl, Lagebericht, Auftrag und Folgeaufträge bleiben: sie ändern nichts,
  * brauchen nur diesen Eintrag (`EtbBacklinkBadges`), und ein Klick darauf schließt die Palette.
@@ -108,16 +112,33 @@ function EintragInhalt({
         {e.meldeweg && <Datenfeld label="Meldeweg">{MELDEWEG_LABEL[e.meldeweg]}</Datenfeld>}
         {e.veranlassung && <Datenfeld label="Veranlassung">{e.veranlassung}</Datenfeld>}
         <Datenfeld label="Verfasser">{verfasserText(e)}</Datenfeld>
-        {e.berichtigt_eintrag_id != null && (
+        {(e.berichtigt_eintrag_id != null || e.berichtigt_durch.length > 0) && (
           <Datenfeld label="Berichtigung" breit>
-            {/* Blau, nicht rot: Rot bedient nichts — wie der Verweis der Zeitachse. */}
-            berichtigt einen älteren Eintrag —{' '}
-            <Link
-              to={etbPfad(einsatzId, { eintrag: e.berichtigt_eintrag_id })}
-              style={verweisStil(token)}
-            >
-              Grundeintrag anzeigen<span aria-hidden="true"> ↗</span>
-            </Link>
+            {/* Beide Richtungen in EINEM Feld: ein Feld „Berichtigt durch“ trüge das Wort doppelt.
+                Blau, nicht rot: Rot bedient nichts — Wortlaut und Ziel wie in der Zeitachse. */}
+            <span style={{ display: 'inline-flex', flexWrap: 'wrap', columnGap: token.marginSM }}>
+              {e.berichtigt_eintrag_id != null && (
+                <span>
+                  berichtigt einen älteren Eintrag —{' '}
+                  <Link
+                    to={etbPfad(einsatzId, { eintrag: e.berichtigt_eintrag_id })}
+                    style={verweisStil(token)}
+                  >
+                    Grundeintrag anzeigen<span aria-hidden="true"> ↗</span>
+                  </Link>
+                </span>
+              )}
+              {e.berichtigt_durch.map((b) => (
+                <Link
+                  key={b.id}
+                  to={etbPfad(einsatzId, { eintrag: b.id })}
+                  style={verweisStil(token)}
+                >
+                  berichtigt durch Nr. {b.lfd_nr}
+                  <span aria-hidden="true"> ↗</span>
+                </Link>
+              ))}
+            </span>
           </Datenfeld>
         )}
         {istNachgetragen(e.ereigniszeit, e.received_at) && (

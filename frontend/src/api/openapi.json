@@ -1701,6 +1701,24 @@
           }
         }
       },
+      "BerichtigungVerweis": {
+        "type": "object",
+        "description": "Verweis auf eine Berichtigung eines ETB-Eintrags (LFH-689): `id` für den Deeplink, `lfd_nr`\nfür den Namen („berichtigt durch Nr. 9“). Anders als beim Auftrag ist die Nummer eines\nETB-Eintrags nie leer.",
+        "required": [
+          "id",
+          "lfd_nr"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lfd_nr": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "BesetzungArt": {
         "type": "string",
         "description": "Besetzungszustand eines Sachgebiets (Entscheidung 3 der Spec). Wire == `as_str()`.\n\n**Keine Zeile = „nicht vergeben\"** — das ist der im Fükw der Führungsstufe B\ndokumentierte Normalzustand von S1/S4/S5/S6 und deshalb *kein* eigener Enum-Wert.\nDer Unterschied zu [`BesetzungArt::Einsatzleitung`] ist die Anregungsfunktion\n(„haben wir S4 bedacht?\").",
@@ -4383,7 +4401,8 @@
           "ereigniszeit",
           "received_at",
           "folgeauftraege",
-          "anhaenge"
+          "anhaenge",
+          "berichtigt_durch"
         ],
         "properties": {
           "an": {
@@ -4414,6 +4433,13 @@
             ],
             "format": "int64",
             "description": "Gesetzt, wenn dieser Eintrag der Freigabe-Snapshot eines Befehls ist (LFH-64). Sonst `None`."
+          },
+          "berichtigt_durch": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BerichtigungVerweis"
+            },
+            "description": "Berichtigungen, die auf DIESEN Eintrag zeigen (LFH-689) — die Rückrichtung zu\n`berichtigt_eintrag_id`. Aufsteigend nach `lfd_nr`, leer statt fehlend, unabhängig von\nSeite und Listenfilter: die Palette-Vorschau liest einen Eintrag allein und muss trotzdem\nsagen, dass er überholt ist. Nicht Teil des SELECT: `repo::laden`/`repo::abfrage` füllen\ndie Liste je Seite mit einer gebündelten Abfrage nach, wie `folgeauftraege`."
           },
           "berichtigt_eintrag_id": {
             "type": [

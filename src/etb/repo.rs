@@ -1,4 +1,4 @@
-use super::{EtbEintragAnzeige, FolgeauftragVerweis};
+use super::{BerichtigungVerweis, EtbEintragAnzeige, FolgeauftragVerweis};
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::error::AppError;
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
@@ -318,6 +318,7 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
     .ok_or(AppError::NotFound)?;
     folgeauftraege_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     anhaenge_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
+    berichtigungen_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     Ok(eintrag)
 }
 
@@ -356,6 +357,48 @@ async fn folgeauftraege_nachladen(
             eintraege[i]
                 .folgeauftraege
                 .push(FolgeauftragVerweis { id, lfd_nr });
+        }
+    }
+    Ok(())
+}
+
+/// Füllt `berichtigt_durch` (LFH-689) für alle übergebenen Einträge mit EINER Abfrage nach —
+/// kein N+1 je Zeile, Index `idx_etb_berichtigt` (Migration 0131). Ohne Listenfilter und ohne
+/// Cursor: eine Berichtigung zählt auch, wenn sie auf einer anderen Seite stünde oder nicht zum
+/// Filter passt. Die Zuordnung braucht keinen Einsatz-Filter: die Einträge sind bereits
+/// einsatzgefiltert, und eine Berichtigung wird beim Erfassen gegen denselben Einsatz geprüft
+/// (`routes::etb`, `gehoert_zu_einsatz`). `typ = 'berichtigung'` wie der Client-Index
+/// (`etb/zeitachseModell.ts`, `berichtigungsindex`).
+async fn berichtigungen_nachladen(
+    pool: &SqlitePool,
+    eintraege: &mut [EtbEintragAnzeige],
+) -> Result<(), AppError> {
+    if eintraege.is_empty() {
+        return Ok(());
+    }
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT berichtigt_eintrag_id, id, lfd_nr FROM etb_eintrag \
+         WHERE typ = 'berichtigung' AND berichtigt_eintrag_id IN (",
+    );
+    let mut ids = qb.separated(", ");
+    for e in eintraege.iter() {
+        ids.push_bind(e.id);
+    }
+    qb.push(") ORDER BY lfd_nr");
+    let zeilen: Vec<(i64, i64, i64)> = qb.build_query_as().fetch_all(pool).await?;
+    if zeilen.is_empty() {
+        return Ok(());
+    }
+    let index: HashMap<i64, usize> = eintraege
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (e.id, i))
+        .collect();
+    for (grund, id, lfd_nr) in zeilen {
+        if let Some(&i) = index.get(&grund) {
+            eintraege[i]
+                .berichtigt_durch
+                .push(BerichtigungVerweis { id, lfd_nr });
         }
     }
     Ok(())
@@ -617,6 +660,7 @@ pub async fn abfrage(
         .await?;
     folgeauftraege_nachladen(pool, &mut eintraege).await?;
     anhaenge_nachladen(pool, &mut eintraege).await?;
+    berichtigungen_nachladen(pool, &mut eintraege).await?;
     Ok(eintraege)
 }
 

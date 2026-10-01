@@ -99,6 +99,7 @@ use utoipa::OpenApi;
         crate::erinnerung::ErinnerungStatus,
         crate::etb::EtbEintragAnzeige,
         crate::etb::FolgeauftragVerweis,
+        crate::etb::BerichtigungVerweis,
         crate::etb::lesemarke::EtbLesemarkeAnzeige,
         crate::etb::zaehler::EtbZaehlerAnzeige,
         crate::etb::zaehler::EtbTypZaehler,
