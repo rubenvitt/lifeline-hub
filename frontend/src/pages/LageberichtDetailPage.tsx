@@ -41,6 +41,7 @@ import {
 } from '../lageberichte/AbschnittsAkkordeon';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import FormularEingehaengt from '../components/FormularEingehaengt';
 import MedienlageUebernahme from '../stab/MedienlageUebernahme';
 import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
@@ -462,6 +463,9 @@ function LageberichtDetail() {
             onBlur={schutz.autosaveJetzt}
             onFinish={(werte) => speichernMutation.mutate(werte as FormWerte)}
           >
+            {/* Erst wenn das `<Form>` hängt, übernimmt der Verlustschutz den Serverstand
+                (LFH-627, `entwurf/useEntwurfVerlustschutz.ts` (4)). */}
+            <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
             <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
               <Input />
             </Form.Item>

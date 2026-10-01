@@ -41,6 +41,11 @@ interface Verlustschutz<W extends object> {
   speichereJetzt: (werte: W) => Promise<void>;
   /** Läuft gerade ein Speichern — Autosave ODER expliziter Pfad. */
   speichertGerade: boolean;
+  /**
+   * An `<FormularEingehaengt onWechsel={…} />` IM `<Form>`. Ohne den Marker übernimmt das
+   * Formular den Serverstand nie (s. (4)).
+   */
+  formularEingehaengt: (da: boolean) => void;
 }
 
 /**
@@ -72,6 +77,12 @@ interface Verlustschutz<W extends object> {
  * Der Befehlsentwurf nutzt zusätzlich `EntwurfNavigationSchutz` (`useBlocker`), der denselben
  * Merker liest; dieser Hook selbst bleibt routerunabhängig.
  *
+ * **(4) GESCHRIEBEN WIRD NUR INS GERENDERTE FORMULAR** (LFH-627). Die Seiten rendern ihr `<Form>`
+ * nur im bearbeitbaren Entwurf, dieser Hook läuft immer. Ein `setFieldsValue` ohne `<Form>` meldet
+ * rc-field-form als „not connected"; deshalb meldet `FormularEingehaengt` im Formular, ob es hängt,
+ * und der Sync-Effekt wartet darauf. Hängt es später ein (Freigabe zurück, Schreibrecht), holt er
+ * den Serverstand nach.
+ *
  * DER MERKER GEHÖRT ZU EINEM DATENSATZ: die Seiten rendern ihren Inhalt mit `key={id}`, sonst
  * hielte der Riegel des alten Berichts nach „Fortschreiben" den neuen Serverstand fern.
  */
@@ -87,6 +98,7 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   const [zuletztGespeichert, setZuletztGespeichert] = useState<string | null>(null);
   const [speichertGerade, setSpeichertGerade] = useState(false);
   const [speicherFehler, setSpeicherFehler] = useState<unknown>(null);
+  const [formularDa, setFormularDa] = useState(false);
 
   // Inline-Callbacks in Refs: der Sync-Effekt hängt an `daten` und `ungespeichert`, nicht an der
   // Identität von `werteAus`; `speichern`/`onGespeichert` in Refs, damit `speichereMit` stabil bleibt.
@@ -99,9 +111,10 @@ export function useEntwurfVerlustschutz<D, W extends object>({
 
   useEffect(() => {
     if (!daten) return;
+    if (!formularDa) return; // (4)
     if (ungespeichert) return; // DER RIEGEL (1)
     form.setFieldsValue(werteAusRef.current(daten) as Parameters<typeof form.setFieldsValue>[0]);
-  }, [daten, form, ungespeichert]);
+  }, [daten, form, formularDa, ungespeichert]);
 
   /**
    * Ein abgebrochener Auftrag (`AbortError` beim Verlassen des Befehlseditors) ist kein
@@ -241,5 +254,6 @@ export function useEntwurfVerlustschutz<D, W extends object>({
     autosaveJetzt,
     speichereJetzt,
     speichertGerade,
+    formularEingehaengt: setFormularDa,
   };
 }

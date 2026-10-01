@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { App, Collapse, Form, Input } from 'antd';
 import { Select } from '../../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7,6 +7,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { legeSchadenAn, type SchadenEingabe } from '../../api/einsatzSchaden';
 import type { Ausmass, SchadenTyp } from '../../api/types';
 import { ErfassungsModal } from '../../components/Erfassung';
+import FormularEingehaengt from '../../components/FormularEingehaengt';
 import KoordinatenFeld from '../../anzeige/KoordinatenFeld';
 import {
   alsLatLon,
@@ -51,11 +52,22 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
   const geladeneOeffnung = useRef<string | null>(null);
   const formularEinsatzId = useRef(einsatzId);
   const [geschaedigt, setGeschaedigt] = useState<GeschaedigtWert>(null);
+  /**
+   * Hängt das `<Form>` des Dialogs (LFH-627, `components/FormularEingehaengt.tsx`)? `jeDa` hält
+   * fest, ob es je hing: vorher hält die Instanz nichts, was ein Einsatzwechsel räumen müsste, und
+   * `resetFields()` an ihr meldete „not connected".
+   */
+  const [formularDa, setFormularDa] = useState(false);
+  const formularJeDa = useRef(false);
+  const meldeFormular = useCallback((da: boolean) => {
+    if (da) formularJeDa.current = true;
+    setFormularDa(da);
+  }, []);
 
   useEffect(() => {
     if (formularEinsatzId.current !== einsatzId) {
       formularEinsatzId.current = einsatzId;
-      form.resetFields();
+      if (formularJeDa.current) form.resetFields();
       setGeschaedigt(null);
       geladeneOeffnung.current = null;
     }
@@ -64,11 +76,13 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       geladeneOeffnung.current = null;
       return;
     }
+    // antds `Modal` hängt sein `<Form>` erst nach `open` ein.
+    if (!formularDa) return;
     if (geladeneOeffnung.current === oeffnung) return;
     geladeneOeffnung.current = oeffnung;
     const ort = liesErfassungsSitzungswert(einsatzId, 'schaden', 'ort');
     form.setFieldValue('ort', ort);
-  }, [einsatzId, form, open]);
+  }, [einsatzId, form, formularDa, open]);
 
   const anlegenMutation = useMutation({
     mutationFn: (v: SchadenEingabe) => legeSchadenAn(einsatzId, v),
@@ -121,6 +135,7 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       serie
       uebernahme={['ort']}
     >
+      <FormularEingehaengt onWechsel={meldeFormular} />
       <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ ist Pflicht' }]}>
         <Select
           options={(Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
