@@ -29,7 +29,9 @@ Windows-Installer ist **noch nicht signiert** (LFH-875).
 - **macOS:** `.dmg` öffnen und „Lifeline Hub“ nach „Programme“ ziehen. Beim ersten Start
   fragt macOS einmal, ob die aus dem Internet geladene App geöffnet werden soll, und nennt sie
   dabei „von Apple auf Schadsoftware geprüft“. „Öffnen“ bestätigen, mehr ist nicht nötig. Das
-  geht auch ohne Internet, weil das Prüfergebnis im Paket steckt.
+  geht auch ohne Internet, weil das Prüfergebnis im Paket steckt. Die App immer aus
+  „Programme“ starten, nicht direkt aus dem `.dmg` oder aus „Downloads“: Dort führt macOS sie
+  aus einer schreibgeschützten Kopie aus, und ein Update scheitert mit „Read-only file system“.
   Beim ersten Verbinden fragt macOS nach dem Zugriff aufs **lokale Netzwerk**. Ohne diese
   Freigabe erreicht die App `elw.local` nicht.
 - **Windows:** Installer starten. SmartScreen warnt, dann „Weitere Informationen“ →

@@ -227,3 +227,21 @@ verlangt.
 
 Unterwegs behoben: `codesign … | grep -q` schlug unter `pipefail` fälschlich an (grep endet
 früh, codesign bekommt SIGPIPE). Die Prüfungen lesen die Ausgabe jetzt erst in eine Variable.
+
+### Update-Kette mit notarisierten Bauten (Task 5.2, 01.10.2026)
+
+Testpaar 1.0.0 und 1.0.1 aus dem Stand dieses Branches, beide über `APPLE_CERTIFICATE`
+signiert und von Tauri notarisiert (Einreichungen `7e73ebb3-…` und `1683a1d3-…`, Accepted),
+Endpunkt vorübergehend `http://127.0.0.1:8765/latest.json` (`dangerousInsecureTransportProtocol`),
+Updater-Schlüssel wie im Release. Die Dateien sind danach aus git wiederhergestellt.
+
+| Zeit | Ereignis |
+|---|---|
+| 11:15:26 | 1.0.0 mit Quarantäne aus einem Ordner gestartet, den der Finder nicht verschoben hat: macOS führt sie aus einer schreibgeschützten Kopie aus (App Translocation). Das Update wird geladen, die Installation scheitert: „Update auf 1.0.1 gescheitert: Read-only file system (os error 30)“, die App läuft als 1.0.0 weiter |
+| 11:16:15 | 1.0.0 ohne Translocation gestartet, `latest.json` abgerufen, Angebot „1.0.1“ |
+| 11:16:18 | „Laden“: Archiv geladen (Zugriffsprotokoll des Endpunkts) |
+| 11:16:20 | „Jetzt neu starten“: läuft als 1.0.1 (`CFBundleShortVersionString`), keine Gatekeeper-Rückfrage; die ersetzte App ist `accepted`, `Notarized Developer ID`, Ticket gültig, ohne Quarantäne |
+
+Befund Translocation: Das betrifft jede Mac-App, die sich selbst ersetzt, und nicht die
+Signierung. Es trifft nur, wer die App direkt aus „Downloads“ oder aus dem geöffneten `.dmg`
+startet statt aus „Programme“. Die Betriebsdoku sagt das jetzt ausdrücklich.
