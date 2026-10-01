@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { Einheit, Einsatzabschnitt } from '../../api/types';
+import { createElement } from 'react';
+import { render } from '@testing-library/react';
+import Markdown from '../../components/Markdown';
+import type { Einheit, Einsatzabschnitt, Stabsfunktion } from '../../api/types';
 import { baueFunkplan, type FunkplanZeile } from '../../stab/funkplan';
 import { abschnittStaerken } from './abschnittStaerke';
-import { baueFuehrungsorganisation, type OrgKnoten } from './fuehrungsorganisation';
+import {
+  baueFuehrungsorganisation,
+  rendereFuehrungsorganisationMarkdown,
+  type OrgKnoten,
+} from './fuehrungsorganisation';
 
 function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
   return { id, einsatz_id: 1, name: `Abschnitt ${id}`, sortier: id, sprechgruppen: [], ...p };
@@ -236,5 +243,112 @@ describe('baueFuehrungsorganisation — dieselbe Platzierung wie der Funkplan', 
     });
     const org = baueFuehrungsorganisation(abschnitte, einheiten);
     expect(org.wurzeln.map(schluessel)).toEqual(funkplan.map(funkplanSchluessel));
+  });
+});
+
+describe('rendereFuehrungsorganisationMarkdown', () => {
+  const abschnitte = [
+    abschnitt(1, { name: 'EA Nord', kurzbezeichnung: 'EA-N', leiter_name: 'Anna Leiter' }),
+    abschnitt(2, { name: 'UA Deich', ueber_abschnitt_id: 1 }),
+  ];
+  const einheiten = [
+    einheit(
+      10,
+      {
+        name: '1. Zug',
+        abschnitt_id: 2,
+        funkrufname: 'Florian 1/10',
+        fuehrer_name: 'Bernd Führer',
+        erreichbarkeit: '0160 GEHEIM',
+      },
+      [1, 2, 6],
+    ),
+    einheit(20, { name: 'Lose Gruppe' }),
+  ];
+
+  it('schreibt Kopf, Einsatzleitung und die Gliederung in Baumtiefe', () => {
+    const md = rendereFuehrungsorganisationMarkdown(
+      baueFuehrungsorganisation(abschnitte, einheiten),
+      {
+        stand: '011200Okt26',
+        stab: null,
+        einheitenZustand: 'daten',
+      },
+    );
+    expect(md.startsWith('# Führungsorganisation\n')).toBe(true);
+    expect(md).toContain('**Stand:** 011200Okt26');
+    expect(md).toContain('## Einsatzleitung\n\n- Leitung nicht erfasst\n');
+    expect(md).not.toContain('Stab:');
+    expect(md).not.toContain('## Quellen');
+    expect(md).toContain('- **EA Nord** · Rufname EA-N · Leitung Anna Leiter · Stärke 1/2/6//9');
+    expect(md).toContain(
+      '  - **UA Deich** · kein Rufname · Leitung nicht besetzt · Stärke 1/2/6//9',
+    );
+    expect(md).toContain(
+      '    - **1. Zug** · Rufname Florian 1/10 · Leitung Bernd Führer · Stärke 1/2/6//9',
+    );
+    expect(md).toContain(
+      '- Ohne Abschnitt\n  - **Lose Gruppe** · kein Rufname · Leitung nicht besetzt · Stärke 0/0/0//0',
+    );
+    // Personenbezogen: nie im Lagebericht.
+    expect(md).not.toContain('GEHEIM');
+  });
+
+  it('nennt den Stab nur, wenn er übergeben wird, in S-Folge mit Besetzung', () => {
+    const org = baueFuehrungsorganisation(abschnitte, einheiten);
+    const besetzung = [
+      {
+        sachgebiet: 's2',
+        besetzung_art: 'personal',
+        name: 'Clara Lage',
+        personal_noch_disponiert: true,
+      },
+      { sachgebiet: 's1', besetzung_art: 'einsatzleitung', personal_noch_disponiert: false },
+    ] as unknown as Stabsfunktion[];
+    const md = rendereFuehrungsorganisationMarkdown(org, {
+      stand: 'x',
+      stab: besetzung,
+      einheitenZustand: 'daten',
+    });
+    expect(md).toContain('- Stab: S1 Einsatzleitung · S2 Clara Lage\n');
+    const leer = rendereFuehrungsorganisationMarkdown(org, {
+      stand: 'x',
+      stab: [],
+      einheitenZustand: 'daten',
+    });
+    expect(leer).toContain('- Stab: kein Sachgebiet besetzt\n');
+  });
+
+  it('nennt fehlende Einheiten als Quelle und schreibt die Stärke als „—“', () => {
+    const md = rendereFuehrungsorganisationMarkdown(baueFuehrungsorganisation(abschnitte, null), {
+      stand: 'x',
+      stab: null,
+      einheitenZustand: 'gesperrt',
+    });
+    expect(md).toContain(
+      '## Quellen\n\n- Einheiten: nicht freigegeben — Einheiten und Stärken fehlen',
+    );
+    expect(md).toContain('- **EA Nord** · Rufname EA-N · Leitung Anna Leiter · Stärke —');
+  });
+
+  it('schreibt ohne Abschnitte einen Leervermerk statt einer leeren Liste', () => {
+    const md = rendereFuehrungsorganisationMarkdown(baueFuehrungsorganisation([], []), {
+      stand: 'x',
+      stab: null,
+      einheitenZustand: 'daten',
+    });
+    expect(md).toContain('## Gliederung\n\n_(keine Abschnitte und keine Einheiten erfasst)_');
+  });
+
+  it('übernimmt Namen als Text, nie als Auszeichnung', () => {
+    const md = rendereFuehrungsorganisationMarkdown(
+      baueFuehrungsorganisation([abschnitt(1, { name: '*Nord* [alt]', leiter_name: '_Kai_' })], []),
+      { stand: 'x', stab: null, einheitenZustand: 'daten' },
+    );
+    const { container } = render(createElement(Markdown, { unterEbene: 1, children: md }));
+    expect(container.textContent).toContain('*Nord* [alt]');
+    expect(container.textContent).toContain('_Kai_');
+    expect(container.querySelector('em')).toBeNull();
+    expect(container.querySelector('a')).toBeNull();
   });
 });

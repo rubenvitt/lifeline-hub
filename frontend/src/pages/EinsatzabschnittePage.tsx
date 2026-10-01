@@ -433,7 +433,15 @@ export default function EinsatzabschnittePage() {
             {standVeraltet && (
               <SeitenStandVeraltet onWiederholen={() => void abschnitteQuery.refetch()} />
             )}
-            <Organigramm einsatz={einsatz} abschnitte={abschnitte} einheiten={einheitenQuelle} />
+            <Organigramm
+              einsatz={einsatz}
+              abschnitte={abschnitte}
+              einheiten={einheitenQuelle}
+              datenstand={gemeinsamerDatenstand(
+                abschnitteQuery.dataUpdatedAt,
+                einheitenQuery.dataUpdatedAt,
+              )}
+            />
           </>
         )
       ) : (

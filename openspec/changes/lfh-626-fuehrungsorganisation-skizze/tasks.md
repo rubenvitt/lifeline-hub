@@ -95,7 +95,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 4. Druck und Übernahme (D6, D8, Spec „Druck als eigenes Druckstück“, „In Lagebericht übernehmen“)
 
-- [ ] 4.1 Test zuerst: `rendereFuehrungsorganisationMarkdown` in `fuehrungsorganisation.test.ts`
+- [x] 4.1 Test zuerst: `rendereFuehrungsorganisationMarkdown` in `fuehrungsorganisation.test.ts`
   deckt ab:
   - Überschriftzeile mit Stand
   - „Einsatzleitung: Leitung nicht erfasst“
@@ -106,7 +106,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - keine Erreichbarkeit
 
   Nachweis: rot belegt.
-- [ ] 4.2 Test zuerst, Seite:
+- [x] 4.2 Test zuerst, Seite:
   - „In Lagebericht übernehmen“ ruft `legeLageberichtAn` genau einmal mit `vorlage:'freitext'`,
     Titel „Führungsorganisation <DTG>“ und `abschnitte:[{schluessel:'text'}]`, ohne PATCH.
   - Ohne Schreibrecht oder ohne Freigabe der Lageberichte fehlt die Aktion.
@@ -115,7 +115,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Der `DruckKnopf` klappt vor dem Druck alles auf.
 
   Nachweis: rot belegt.
-- [ ] 4.3 Umsetzung:
+- [x] 4.3 Umsetzung:
   - Druckwurzel um das Organigramm-Paneel, `Druckkopf dokumentart="Führungsorganisation"`
   - `DruckKnopf vorbereiten`
   - `organigrammPrint.css` mit zwei Spalten fest, Bedienziele aus, `break-inside: avoid` je Knoten

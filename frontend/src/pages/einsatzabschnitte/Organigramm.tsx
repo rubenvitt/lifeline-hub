@@ -1,27 +1,42 @@
 import { Button, Space } from 'antd';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
+import { taktischeDtgVoll } from '../../anzeige/format';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
+import { ladeModulOverrides } from '../../api/einsaetze';
+import { legeLageberichtAn } from '../../api/lageberichte';
 import { ladeStab } from '../../api/stab';
 import { einsatzKeys } from '../../api/queryKeys';
+import { useAuth } from '../../auth/AuthContext';
+import DruckKnopf from '../../components/druck/DruckKnopf';
+import Druckkopf from '../../components/druck/Druckkopf';
+import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
+import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import type { Einheit, EinsatzAnzeige, Einsatzabschnitt, Stabsfunktion } from '../../api/types';
 import { staerkeText } from '../../anzeige/staerke';
 import { monoStil, useRollen } from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
 import { IkoneChevronRechts, IkoneChevronRunter } from '../../ikonen';
-import { einheitDetailPfad, einsatzabschnittePfad } from '../../routing/deeplinks';
-import { besetzungDarstellung } from '../../stab/besetzung';
+import {
+  einheitDetailPfad,
+  einsatzabschnittePfad,
+  lageberichtDetailPfad,
+} from '../../routing/deeplinks';
 import { ZUSTAND_GRUND } from '../../stab/funkplan';
 import type { Quelle } from '../../stab/luecken';
-import { SACHGEBIETE } from '../../stab/sachgebiete';
 import { useStabFreigabe } from '../../stab/useStabFreigabe';
 import EinsatzZeichen from '../../zeichen/EinsatzZeichen';
 import {
   baueFuehrungsorganisation,
   klappbareSchluessel,
+  rendereFuehrungsorganisationMarkdown,
+  stabZeilen,
   type Fuehrungsorganisation,
   type OrgKnoten,
 } from './fuehrungsorganisation';
+import './organigrammPrint.css';
 
 /**
  * Organigramm der Führungsorganisation (FwDV 100, LFH-626) — die zweite Ansicht der Seite
@@ -157,10 +172,7 @@ function Stabsstelle({ stab, stil }: { stab: StabsstelleZustand; stil: CSSProper
     inhalt = <div style={{ color: rollen.gedaempft }}>Besetzung nicht geladen</div>;
   } else if (stab.zustand === 'daten') {
     // S-Folge aus der einen Liste; unbesetzte Sachgebiete erscheinen nicht.
-    const zeilen = SACHGEBIETE.flatMap((s) => {
-      const zeile = stab.besetzung.find((b) => b.sachgebiet === s.sachgebiet);
-      return zeile ? [{ kuerzel: s.kuerzel, text: besetzungDarstellung(zeile).label }] : [];
-    });
+    const zeilen = stabZeilen(stab.besetzung);
     inhalt =
       zeilen.length === 0 ? (
         <div style={{ color: rollen.gedaempft }}>Kein Sachgebiet besetzt</div>
@@ -216,7 +228,11 @@ function Zweig({ knoten, tiefe, einsatzId, zugeklappt, onUmschalten }: ZweigProp
         />
       ) : (
         // Platzhalter in Knopfbreite, damit Zeichen und Namen einer Ebene fluchten.
-        <span aria-hidden style={{ flex: `0 0 ${token.controlHeightSM}px` }} />
+        <span
+          aria-hidden
+          data-lfh="org-klappen-platz"
+          style={{ flex: `0 0 ${token.controlHeightSM}px` }}
+        />
       )}
       {knoten.art === 'sammel' ? (
         <div style={{ fontWeight: 600, paddingBlock: token.paddingXXS }}>Ohne Abschnitt</div>
@@ -331,6 +347,8 @@ interface Props {
   einsatz: EinsatzAnzeige;
   abschnitte: readonly Einsatzabschnitt[];
   einheiten: Quelle<Einheit>;
+  /** Ältester Stand der Quellen (`gemeinsamerDatenstand`) für den Druckkopf; ms seit Epoche. */
+  datenstand?: number;
 }
 
 /**
@@ -338,8 +356,11 @@ interface Props {
  * ZUGEklappten Schlüssel: es startet offen, und was live hinzukommt, steht offen da (Muster
  * `FunkplanPage`).
  */
-export default function Organigramm({ einsatz, abschnitte, einheiten }: Props) {
+export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand }: Props) {
   const { token, rollen } = useRollen();
+  const { benutzer } = useAuth();
+  const navigate = useNavigate();
+  const { konventionen } = useAnzeigeKonventionen();
   const org = useMemo(
     () =>
       baueFuehrungsorganisation(abschnitte, einheiten.zustand === 'daten' ? einheiten.daten : null),
@@ -364,6 +385,43 @@ export default function Organigramm({ einsatz, abschnitte, einheiten }: Props) {
         ? { zustand: 'fehler' }
         : { zustand: 'aus' };
 
+  // Dieselbe Abfrage wie `useStabFreigabe` (gemeinsamer Cache): die Übernahme legt einen
+  // Lagebericht an, also braucht es Schreibrecht UND das freigegebene Modul Lageberichte.
+  const overridesQuery = useQuery({
+    queryKey: einsatzKeys.modulOverrides(einsatz.id),
+    queryFn: () => ladeModulOverrides(einsatz.id),
+  });
+  const darfUebernehmen =
+    overridesQuery.data != null &&
+    darfImEinsatzSchreiben(einsatz, benutzer) &&
+    istKeyFreigegeben('lageberichte', benutzer, overridesQuery.data);
+  // Solange eine Quelle lädt, stünde „lädt“ im unveränderlichen Bericht.
+  const quellenLaden = einheiten.zustand === 'laden' || (stabFrei && stabQuery.isPending);
+
+  const uebernehmen = useMutation({
+    mutationFn: async () => {
+      const stand = taktischeDtgVoll(new Date().toISOString(), konventionen);
+      // EIN Aufruf mit Startinhalt (Spec `dokument-uebernahme`): der Bericht entsteht mit Text
+      // oder gar nicht.
+      const lb = await legeLageberichtAn(einsatz.id, {
+        vorlage: 'freitext',
+        titel: `Führungsorganisation ${stand}`,
+        abschnitte: [
+          {
+            schluessel: 'text',
+            text: rendereFuehrungsorganisationMarkdown(org, {
+              stand,
+              stab: stab.zustand === 'daten' ? stab.besetzung : null,
+              einheitenZustand: einheiten.zustand,
+            }),
+          },
+        ],
+      });
+      return lb.id;
+    },
+    onSuccess: (lbId) => navigate(lageberichtDetailPfad(einsatz.id, lbId)),
+  });
+
   const umschalten = (key: string) =>
     setZugeklappt((alt) => {
       const neu = new Set(alt);
@@ -373,15 +431,55 @@ export default function Organigramm({ einsatz, abschnitte, einheiten }: Props) {
     });
 
   return (
-    <>
-      <Space wrap style={{ marginBlockEnd: token.margin }} data-lfh="org-werkzeuge">
+    // Druckwurzel (LFH-22): Mechanik in `druck/druck.css`, Eigenheiten in `organigrammPrint.css`.
+    // Nur diese Ansicht trägt eine; die Gliederung hat keine — eine Wurzel je Seite.
+    <div className="organigramm-print-root" data-lfh="druckwurzel">
+      <Druckkopf
+        dokumentart="Führungsorganisation"
+        einsatz={einsatz}
+        sichtbarkeit="druck"
+        zeilen={[
+          {
+            etikett: 'Stand',
+            wert: taktischeDtgVoll(new Date(datenstand || Date.now()).toISOString(), konventionen),
+          },
+        ]}
+      />
+      <Space
+        wrap
+        className="organigramm-no-print"
+        style={{ marginBlockEnd: token.margin }}
+        data-lfh="org-werkzeuge"
+      >
         <Button disabled={klappbar.length === 0} onClick={() => setZugeklappt(new Set())}>
           Alle aufklappen
         </Button>
         <Button disabled={klappbar.length === 0} onClick={() => setZugeklappt(new Set(klappbar))}>
           Alle zuklappen
         </Button>
+        {darfUebernehmen && (
+          <Button
+            loading={uebernehmen.isPending}
+            disabled={quellenLaden}
+            title={quellenLaden ? 'Erst wenn alle Angaben geladen sind' : undefined}
+            onClick={() => uebernehmen.mutate()}
+          >
+            In Lagebericht übernehmen
+          </Button>
+        )}
+        {/* Erst nach committetem Aufklappen drucken — `useDrucken` löst den Dialog nach dem
+            Commit aus. */}
+        <DruckKnopf vorbereiten={() => setZugeklappt(new Set())} />
       </Space>
+      {uebernehmen.error != null && (
+        <div className="organigramm-no-print" style={{ marginBlockEnd: token.margin }}>
+          <SpeicherFehler
+            fehler={uebernehmen.error}
+            titel="Nicht in den Lagebericht übernommen"
+            fallback="Übernahme fehlgeschlagen"
+          />
+        </div>
+      )}
       {einheiten.zustand !== 'daten' && (
         <div style={{ color: rollen.gedaempft, marginBlockEnd: token.marginSM }}>
           {`Einheiten: ${ZUSTAND_GRUND[einheiten.zustand]}`}
@@ -394,6 +492,6 @@ export default function Organigramm({ einsatz, abschnitte, einheiten }: Props) {
         zugeklappt={zugeklappt}
         onUmschalten={umschalten}
       />
-    </>
+    </div>
   );
 }

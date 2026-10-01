@@ -284,11 +284,14 @@ Rechteachse und kann mehrere Personen tragen, auch einen Führungsassistenten
 - `rendereFuehrungsorganisationMarkdown(org, stab, stand)` in `fuehrungsorganisation.ts`
   erzeugt:
   - die Überschriftzeile „Führungsorganisation, Stand <DTG>“
-  - „Einsatzleitung: Leitung nicht erfasst“
-  - falls geladen, den Stab als Zeile „Stab: S1 Name · S2 …“
+  - den Abschnitt „Einsatzleitung“ mit „Leitung nicht erfasst“
+  - falls freigegeben und geladen, den Stab als Zeile „Stab: S1 Name · S2 …“ (Wortlaut über
+    `stabZeilen`, dieselbe Funktion wie die Stabsstelle am Bildschirm)
+  - bei fehlenden Einheiten einen Abschnitt „Quellen“ mit dem Grund
   - dann die verschachtelte Liste, je Knoten
-    `**Name** (Rufname) · Leitung: … · Stärke F/UF/M//Σ`
-  - Fehlende Werte erscheinen als Wort wie am Bildschirm.
+    `**Name** · Rufname … · Leitung … · Stärke F/UF/M//Σ` (Format wie der Funkplan)
+  - Fehlende Werte erscheinen als Wort wie am Bildschirm („kein Rufname“, „Leitung nicht
+    besetzt“, „Stärke —“), auch bei Einheiten „Leitung“ statt „Führer“, wie in der Spec.
 - Namen laufen durch `md()` aus `stab/funkplan.ts`, die eine Maskierung.
 - **Aufruf und Rechte:**
   - `legeLageberichtAn(einsatzId, {vorlage:'freitext', titel:'Führungsorganisation <DTG>',

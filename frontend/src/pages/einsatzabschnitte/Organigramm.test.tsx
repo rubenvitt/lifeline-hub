@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
 import { ladeModulOverrides } from '../../api/einsaetze';
 import { ladeStab } from '../../api/stab';
+import { legeLageberichtAn } from '../../api/lageberichte';
+import { ApiError } from '../../api/client';
 import type {
   Einheit,
   EinsatzAnzeige,
@@ -17,6 +19,11 @@ import { baueFuehrungsorganisation } from './fuehrungsorganisation';
 
 vi.mock('../../api/einsaetze', () => ({ ladeModulOverrides: vi.fn() }));
 vi.mock('../../api/stab', () => ({ ladeStab: vi.fn() }));
+vi.mock('../../api/lageberichte', () => ({
+  legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 77 })),
+}));
+const { navigiere } = vi.hoisted(() => ({ navigiere: vi.fn() }));
+vi.mock('react-router', async (orig) => ({ ...(await orig()), useNavigate: () => navigiere }));
 
 const EINSATZ = {
   id: 1,
@@ -319,5 +326,127 @@ describe('Organigramm — Stabsstelle', () => {
     container();
     const stab = await screen.findByRole('group', { name: 'Stab' });
     expect(await within(stab).findByText('Besetzung nicht geladen')).toBeInTheDocument();
+  });
+});
+
+describe('Organigramm — In Lagebericht übernehmen', () => {
+  beforeEach(() => {
+    navigiere.mockReset();
+    vi.mocked(legeLageberichtAn).mockClear();
+    vi.mocked(ladeModulOverrides).mockResolvedValue({
+      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
+    });
+    vi.mocked(ladeStab).mockReset();
+  });
+
+  function container(einsatz = EINSATZ, einheiten: Quelle<Einheit> = daten(EINHEITEN)) {
+    return renderMitProviders(
+      <Organigramm einsatz={einsatz} abschnitte={ABSCHNITTE} einheiten={einheiten} />,
+    );
+  }
+
+  it('legt EINEN Freitext-Bericht mit der Gliederung an und öffnet ihn', async () => {
+    container();
+    const knopf = await screen.findByRole('button', { name: 'In Lagebericht übernehmen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    await waitFor(() => expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/lageberichte/77'));
+    expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1);
+    const [einsatzId, eingabe] = vi.mocked(legeLageberichtAn).mock.calls[0];
+    expect(einsatzId).toBe(1);
+    expect(eingabe.vorlage).toBe('freitext');
+    expect(eingabe.titel).toMatch(/^Führungsorganisation \S+/);
+    expect(eingabe.abschnitte).toHaveLength(1);
+    expect(eingabe.abschnitte![0].schluessel).toBe('text');
+    expect(eingabe.abschnitte![0].text).toContain('**EA Nord** · Rufname EA-N');
+  });
+
+  it('übernimmt den Stab nur, wenn er freigegeben und geladen ist', async () => {
+    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(ladeStab).mockResolvedValue({
+      besetzung: [besetzung({ sachgebiet: 's3', name: 'Dora Einsatz' })],
+    } as Stab);
+    container();
+    await screen.findByRole('group', { name: 'Stab' });
+    const knopf = screen.getByRole('button', { name: 'In Lagebericht übernehmen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text).toContain(
+      '- Stab: S3 Dora Einsatz',
+    );
+  });
+
+  it('sperrt die Übernahme, solange die Einheiten laden', async () => {
+    container(EINSATZ, { zustand: 'laden', daten: [] });
+    expect(await screen.findByRole('button', { name: 'In Lagebericht übernehmen' })).toBeDisabled();
+  });
+
+  it('sperrt die Übernahme, solange die freigegebene Stabsbesetzung lädt', async () => {
+    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(ladeStab).mockReturnValue(new Promise(() => {}));
+    container();
+    await waitFor(() => expect(ladeStab).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: 'In Lagebericht übernehmen' })).toBeDisabled();
+  });
+
+  it('zeigt einen Fehler an der Seite und navigiert nicht', async () => {
+    vi.mocked(legeLageberichtAn).mockRejectedValueOnce(
+      new ApiError(422, 'Einsatz ist abgeschlossen'),
+    );
+    container();
+    const knopf = await screen.findByRole('button', { name: 'In Lagebericht übernehmen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    expect(await screen.findByText('Einsatz ist abgeschlossen')).toBeInTheDocument();
+    expect(navigiere).not.toHaveBeenCalled();
+  });
+
+  it('fehlt ohne Schreibrecht', async () => {
+    container({ ...EINSATZ, meine_rolle: 'beobachter' } as EinsatzAnzeige);
+    expect(await screen.findByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
+  });
+
+  it('fehlt, wenn das Modul Lageberichte nicht freigegeben ist', async () => {
+    vi.mocked(ladeModulOverrides).mockResolvedValue({
+      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
+      lageberichte: { sichtbar: false, einsatz_id: 1, modul_key: 'lageberichte' },
+    });
+    container();
+    await waitFor(() => expect(ladeModulOverrides).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
+  });
+});
+
+describe('Organigramm — Druck', () => {
+  beforeEach(() => {
+    vi.mocked(ladeModulOverrides).mockResolvedValue({
+      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
+    });
+  });
+
+  it('ist eine Druckwurzel mit Druckkopf „Führungsorganisation“', () => {
+    const { container } = renderMitProviders(
+      <Organigramm einsatz={EINSATZ} abschnitte={ABSCHNITTE} einheiten={daten(EINHEITEN)} />,
+    );
+    const wurzel = container.querySelector('[data-lfh="druckwurzel"]');
+    expect(wurzel).not.toBeNull();
+    expect(within(wurzel as HTMLElement).getByText('Führungsorganisation')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-lfh="druckwurzel"]')).toHaveLength(1);
+  });
+
+  it('klappt vor dem Druck alles auf', async () => {
+    const drucke = vi.spyOn(window, 'print').mockImplementation(() => {});
+    renderMitProviders(
+      <Organigramm einsatz={EINSATZ} abschnitte={ABSCHNITTE} einheiten={daten(EINHEITEN)} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Alle zuklappen' }));
+    expect(screen.queryByRole('link', { name: '1. Zug' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Drucken / als PDF' }));
+    expect(await screen.findByRole('link', { name: '1. Zug' })).toBeInTheDocument();
+    await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+    drucke.mockRestore();
   });
 });

@@ -1,5 +1,9 @@
-import type { Einheit, Einsatzabschnitt, Staerke } from '../../api/types';
-import { summiereStaerke } from '../../anzeige/staerke';
+import type { AbrufZustand } from '../../api/abrufZustand';
+import type { Einheit, Einsatzabschnitt, Staerke, Stabsfunktion } from '../../api/types';
+import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
+import { besetzungDarstellung } from '../../stab/besetzung';
+import { md, ZUSTAND_GRUND } from '../../stab/funkplan';
+import { SACHGEBIETE } from '../../stab/sachgebiete';
 import { baueTzProps, type TzProps } from '../lagekarte/taktischesZeichen';
 import { abschnittStaerken } from './abschnittStaerke';
 
@@ -183,4 +187,89 @@ export function klappbareSchluessel(knoten: readonly OrgKnoten[]): string[] {
   return knoten.flatMap((k) =>
     k.kinder.length > 0 ? [k.key, ...klappbareSchluessel(k.kinder)] : [],
   );
+}
+
+// ── Markdown für den Lagebericht (D8) ──────────────────────────────────────────────────────────
+
+/** Der Stab in S-Folge mit dem Wortlaut der Stabseite; unbesetzte Sachgebiete fehlen. */
+export function stabZeilen(
+  besetzung: readonly Stabsfunktion[],
+): { kuerzel: string; text: string }[] {
+  return SACHGEBIETE.flatMap((s) => {
+    const zeile = besetzung.find((b) => b.sachgebiet === s.sachgebiet);
+    return zeile ? [{ kuerzel: s.kuerzel, text: besetzungDarstellung(zeile).label }] : [];
+  });
+}
+
+function knotenMarkdown(k: OrgKnoten, tiefe: number): string[] {
+  const einzug = '  '.repeat(tiefe);
+  const kopf =
+    k.art === 'sammel'
+      ? `${einzug}- Ohne Abschnitt`
+      : `${einzug}- ${[
+          `**${md(k.name)}**`,
+          k.rufname != null ? `Rufname ${md(k.rufname)}` : 'kein Rufname',
+          k.leitung != null ? `Leitung ${md(k.leitung)}` : 'Leitung nicht besetzt',
+          `Stärke ${staerkeText(k.staerke)}`,
+        ].join(' · ')}`;
+  return [kopf, ...k.kinder.flatMap((c) => knotenMarkdown(c, tiefe + 1))];
+}
+
+/**
+ * Die Führungsorganisation als Freitext für „In Lagebericht übernehmen“: Kopf, Einsatzleitung
+ * (mit Stab nur, wenn übergeben — also freigegeben und geladen), fehlende Quellen, dann die
+ * Gliederung als verschachtelte Liste. Namen laufen durch `md()`: im Bericht stehen sie als Text,
+ * nie als Auszeichnung. Erreichbarkeit führt das Organigramm nicht, also auch nicht hier.
+ */
+export function rendereFuehrungsorganisationMarkdown(
+  org: Fuehrungsorganisation,
+  opts: {
+    stand: string;
+    stab: readonly Stabsfunktion[] | null;
+    einheitenZustand: AbrufZustand;
+  },
+): string {
+  const stab =
+    opts.stab == null
+      ? []
+      : [
+          `- Stab: ${
+            opts.stab.length === 0 || stabZeilen(opts.stab).length === 0
+              ? 'kein Sachgebiet besetzt'
+              : stabZeilen(opts.stab)
+                  .map((z) => `${z.kuerzel} ${md(z.text)}`)
+                  .join(' · ')
+          }`,
+        ];
+  // Der Bericht geht bei Freigabe unveränderlich ins ETB: was fehlt, steht darin.
+  const quellen =
+    opts.einheitenZustand !== 'daten'
+      ? [
+          '## Quellen',
+          '',
+          `- Einheiten: ${ZUSTAND_GRUND[opts.einheitenZustand]} — Einheiten und Stärken fehlen`,
+          '',
+        ]
+      : [];
+  const gliederung =
+    org.wurzeln.length > 0
+      ? org.wurzeln.flatMap((k) => knotenMarkdown(k, 0))
+      : ['_(keine Abschnitte und keine Einheiten erfasst)_'];
+  return [
+    '# Führungsorganisation',
+    '',
+    `**Stand:** ${opts.stand}`,
+    '',
+    '## Einsatzleitung',
+    '',
+    // LFH-849: die eigene Führungsstelle ist kein Datum.
+    '- Leitung nicht erfasst',
+    ...stab,
+    '',
+    ...quellen,
+    '## Gliederung',
+    '',
+    ...gliederung,
+    '',
+  ].join('\n');
 }
