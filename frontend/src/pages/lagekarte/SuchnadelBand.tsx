@@ -1,5 +1,5 @@
 import { Button, Card, Typography } from 'antd';
-import { useRollen } from '../../components/instrument';
+import { monoStil, useRollen } from '../../components/instrument';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import { bandStil } from './KartenFuss';
 
@@ -31,7 +31,13 @@ export default function SuchnadelBand({
           Suchnadel
         </Typography.Text>
         {/* Lange Adressen brechen um, statt die Karte zu überdecken oder abgeschnitten zu werden. */}
-        <Typography.Text style={{ display: 'block', overflowWrap: 'anywhere' }}>
+        <Typography.Text
+          style={{
+            display: 'block',
+            overflowWrap: 'anywhere',
+            ...(ort.art === 'koordinate' ? monoStil(token.fontSize) : {}),
+          }}
+        >
           {ort.beschriftung}
         </Typography.Text>
       </section>

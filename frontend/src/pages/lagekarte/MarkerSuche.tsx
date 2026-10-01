@@ -43,6 +43,12 @@ interface Ortssuche {
    * denselben Text ein zweites Mal wirksam.
    */
   vorbelegung?: { text: string; nonce: number } | null;
+  /**
+   * Die Vorbelegung mit dieser Nonce ist übernommen. Der Aufrufer räumt sie dann: sonst übernähme
+   * eine neu eingehängte Suche (Paneel „Verortet“ zu und wieder auf) sie ein zweites Mal und flöge
+   * erneut.
+   */
+  onVorbelegungVerbraucht?: (nonce: number) => void;
 }
 
 interface MarkerSucheProps {
@@ -60,7 +66,10 @@ interface AdressAnfrage {
   nr: number;
 }
 
-/** Frische der Adresstreffer im Client: ein zweites Enter auf denselben Begriff fragt nicht. */
+/**
+ * Frische der Adresstreffer im Client: ein zweites Enter auf denselben Begriff fragt nicht. Nur für
+ * `ok` — „ausgelastet“ und „nicht erreichbar“ verlangen ausdrücklich einen neuen Versuch.
+ */
 const ADRESSE_FRISCH_MS = 10 * 60_000;
 
 /** Die eine Aussage der Gruppe „Adresse“, wenn sie keine Treffer zeigt. */
@@ -107,11 +116,20 @@ export default function MarkerSuche({
   // Beschriftet im eingestellten Format (Einsatz, Org, Anwender-Override), wie überall auf der Karte.
   const { formatKoordinate } = useAnzeigeKonventionen();
   const mitOrtssuche = ortssuche != null;
+  const onVorbelegungVerbraucht = ortssuche?.onVorbelegungVerbraucht;
+  useEffect(() => {
+    if (vorbelegungNonce != null) onVorbelegungVerbraucht?.(vorbelegungNonce);
+  }, [vorbelegungNonce, onVorbelegungVerbraucht]);
+
   const koordinate = useMemo<GefundenerOrt | null>(() => {
     if (!mitOrtssuche) return null;
     const punkt = erkenneKoordinate(suche);
     if (!punkt) return null;
-    return { ...punkt, beschriftung: formatKoordinate(punkt.lat, punkt.lon) };
+    return {
+      ...punkt,
+      beschriftung: formatKoordinate(punkt.lat, punkt.lon),
+      art: 'koordinate',
+    };
   }, [mitOrtssuche, suche, formatKoordinate]);
 
   const adresseSichtbar = ortssuche != null && anfrage != null && anfrage.begriff === begriff;
@@ -126,9 +144,13 @@ export default function MarkerSuche({
   };
 
   const ortsGruppen = koordinate != null || adresseSichtbar;
-  const ortEintrag = (ort: GefundenerOrt, mono: boolean) => (
+  const ortEintrag = (ort: GefundenerOrt) => (
     <ListenEintrag style={bedienzielStil(token)} onClick={() => ortssuche?.onOrtWaehlen(ort)}>
-      {mono ? <span style={monoStil(token.fontSize)}>{ort.beschriftung}</span> : ort.beschriftung}
+      {ort.art === 'koordinate' ? (
+        <span style={monoStil(token.fontSize)}>{ort.beschriftung}</span>
+      ) : (
+        ort.beschriftung
+      )}
     </ListenEintrag>
   );
 
@@ -159,7 +181,7 @@ export default function MarkerSuche({
           dataSource={[koordinate]}
           rowKey={(o) => `${o.lat},${o.lon}`}
           style={{ marginBottom: token.marginXS }}
-          renderItem={(o) => ortEintrag(o, true)}
+          renderItem={ortEintrag}
         />
       )}
 
@@ -169,7 +191,7 @@ export default function MarkerSuche({
           anfrage={anfrage}
           onOrtWaehlen={ortssuche.onOrtWaehlen}
           erledigtRef={erledigtRef}
-          eintrag={(o) => ortEintrag(o, false)}
+          eintrag={ortEintrag}
         />
       )}
 
@@ -253,24 +275,42 @@ function AdressGruppe({
   const adresse = useQuery({
     queryKey: einsatzKeys.ortSuche(einsatzId, anfrage.begriff),
     queryFn: () => sucheOrt(einsatzId, anfrage.begriff),
-    staleTime: ADRESSE_FRISCH_MS,
+    // Ein Fehlzustand ist sofort veraltet: beim nächsten Einhängen fragt die Gruppe neu.
+    staleTime: (q) => (q.state.data?.zustand === 'ok' ? ADRESSE_FRISCH_MS : 0),
     retry: false,
   });
+  const { refetch, isError, data } = adresse;
+
+  // Ein neues Enter auf denselben Begriff (gleicher Key, Gruppe bleibt eingehängt) fragt nach einem
+  // Fehlzustand neu — „in einer Sekunde erneut Enter drücken“ muss stimmen. Treffer kommen aus dem
+  // Cache.
+  const gefragtFuerRef = useRef(anfrage.nr);
+  useEffect(() => {
+    if (gefragtFuerRef.current === anfrage.nr) return;
+    gefragtFuerRef.current = anfrage.nr;
+    if (isError || (data != null && data.zustand !== 'ok')) void refetch();
+  }, [anfrage.nr, isError, data, refetch]);
   const orte = useMemo<GefundenerOrt[]>(
     () =>
       adresse.data?.zustand === 'ok'
-        ? adresse.data.treffer.map((t) => ({ lat: t.lat, lon: t.lon, beschriftung: t.name }))
+        ? adresse.data.treffer.map((t) => ({
+            lat: t.lat,
+            lon: t.lon,
+            beschriftung: t.name,
+            art: 'adresse' as const,
+          }))
         : [],
     [adresse.data],
   );
 
   // Genau ein Treffer fliegt ohne Klick hin — einmal je Enter, auch aus dem Cache. Ein Nachladen
-  // derselben Antwort fliegt nicht noch einmal.
+  // derselben Antwort fliegt nicht noch einmal. Ein Fehlzustand verbraucht das Enter nicht: kommt
+  // nach dem neuen Versuch ein Treffer, fliegt die Karte.
   useEffect(() => {
-    if (!adresse.data || erledigtRef.current === anfrage.nr) return;
+    if (data?.zustand !== 'ok' || erledigtRef.current === anfrage.nr) return;
     erledigtRef.current = anfrage.nr;
     if (orte.length === 1) onOrtWaehlen(orte[0]);
-  }, [adresse.data, anfrage.nr, erledigtRef, orte, onOrtWaehlen]);
+  }, [data, anfrage.nr, erledigtRef, orte, onOrtWaehlen]);
 
   return (
     <Liste

@@ -89,7 +89,15 @@ pub async fn ort_suche(
         .as_deref()
         .unwrap_or(geocoding::NOMINATIM_DEFAULT);
 
-    let antwort = match geocoding::suche(base, &q, ausschnitt).await {
+    Ok(Json(antwort_aus(
+        geocoding::suche(base, &q, ausschnitt).await,
+    )))
+}
+
+/// Ergebnis des Geocoders → Antwort. Rein und ohne `Result`: kein Ausgang des Geocoders wird zum
+/// Fehlerstatus, das schließt schon der Typ aus.
+fn antwort_aus(ergebnis: suche::SuchErgebnis) -> OrtSucheAntwort {
+    match ergebnis {
         suche::SuchErgebnis::Ok(treffer) => OrtSucheAntwort {
             zustand: OrtSucheZustand::Ok,
             treffer: treffer
@@ -109,8 +117,7 @@ pub async fn ort_suche(
             zustand: OrtSucheZustand::NichtErreichbar,
             treffer: vec![],
         },
-    };
-    Ok(Json(antwort))
+    }
 }
 
 #[cfg(test)]
@@ -126,5 +133,39 @@ mod tests {
         assert!(pruefe_suchtext(Some("äöü".into())).is_ok());
         assert!(pruefe_suchtext(Some("x".repeat(200))).is_ok());
         assert!(pruefe_suchtext(Some("x".repeat(201))).is_err());
+    }
+
+    #[test]
+    fn jeder_ausgang_des_geocoders_wird_ein_zustand() {
+        let ok = antwort_aus(suche::SuchErgebnis::Ok(vec![suche::OrtTreffer {
+            lat: 51.0,
+            lon: 10.0,
+            name: "Rathaus".into(),
+        }]));
+        assert_eq!(ok.zustand, OrtSucheZustand::Ok);
+        assert_eq!(ok.treffer.len(), 1);
+        assert_eq!(
+            (
+                ok.treffer[0].lat,
+                ok.treffer[0].lon,
+                ok.treffer[0].name.as_str()
+            ),
+            (51.0, 10.0, "Rathaus")
+        );
+
+        let leer = antwort_aus(suche::SuchErgebnis::Ok(vec![]));
+        assert_eq!((leer.zustand, leer.treffer.len()), (OrtSucheZustand::Ok, 0));
+
+        let ausgelastet = antwort_aus(suche::SuchErgebnis::Ausgelastet);
+        assert_eq!(
+            (ausgelastet.zustand, ausgelastet.treffer.len()),
+            (OrtSucheZustand::Ausgelastet, 0)
+        );
+
+        let tot = antwort_aus(suche::SuchErgebnis::NichtErreichbar);
+        assert_eq!(
+            (tot.zustand, tot.treffer.len()),
+            (OrtSucheZustand::NichtErreichbar, 0)
+        );
     }
 }

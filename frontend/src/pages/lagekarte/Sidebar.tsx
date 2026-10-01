@@ -211,6 +211,7 @@ export interface SidebarProps {
   ortssuche?: {
     onOrtWaehlen: (ort: GefundenerOrt) => void;
     vorbelegung?: { text: string; nonce: number } | null;
+    onVorbelegungVerbraucht?: (nonce: number) => void;
   };
   darfSchreiben: boolean;
   platzierungZiel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } | null;

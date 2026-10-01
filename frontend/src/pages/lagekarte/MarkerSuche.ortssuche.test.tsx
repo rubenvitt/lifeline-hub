@@ -62,6 +62,7 @@ describe('MarkerSuche — Koordinate (LFH-638)', () => {
       lat: BERLIN.lat,
       lon: BERLIN.lon,
       beschriftung,
+      art: 'koordinate',
     });
     // Eine Koordinate verlässt den Browser nicht — auch nicht nach Enter.
     await userEvent.keyboard('{Enter}');
@@ -145,6 +146,7 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
       lat: 48.1,
       lon: 11.5,
       beschriftung: 'Hauptstraße 12, Anderswo',
+      art: 'adresse',
     });
   });
 
@@ -157,6 +159,7 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
       lat: 51.1604,
       lon: 10.4514,
       beschriftung: 'Rathaus',
+      art: 'adresse',
     });
     // Ein zweites Enter auf denselben Begriff fliegt erneut (aus dem Cache).
     await userEvent.keyboard('{Enter}');
@@ -205,6 +208,45 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
     expect(screen.getByText(/erneut Enter/)).toBeInTheDocument();
   });
 
+  it('nach „ausgelastet“ fragt ein zweites Enter neu — und ein einzelner Treffer fliegt dann hin', async () => {
+    let runde = 0;
+    const anfragen: string[] = [];
+    server.use(
+      http.get(PFAD, ({ request }) => {
+        anfragen.push(new URL(request.url).searchParams.get('q') ?? '');
+        runde += 1;
+        return HttpResponse.json(
+          runde === 1
+            ? { zustand: 'ausgelastet', treffer: [] }
+            : { zustand: 'ok', treffer: [{ lat: 51, lon: 10, name: 'Rathaus' }] },
+        );
+      }),
+    );
+    const { onOrtWaehlen } = zeige();
+    await userEvent.type(suchfeld(), 'Rathaus{Enter}');
+    expect(await screen.findByText(/^Adresssuche gerade ausgelastet/)).toBeInTheDocument();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(onOrtWaehlen).toHaveBeenCalledTimes(1));
+    expect(anfragen).toEqual(['Rathaus', 'Rathaus']);
+  });
+
+  it('nach einem Serverfehler fragt ein zweites Enter neu', async () => {
+    let runde = 0;
+    server.use(
+      http.get(PFAD, () => {
+        runde += 1;
+        return runde === 1
+          ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+          : HttpResponse.json({ zustand: 'ok', treffer: [] });
+      }),
+    );
+    zeige();
+    await userEvent.type(suchfeld(), 'Rathaus{Enter}');
+    expect(await screen.findByText(/^Adresssuche nicht erreichbar/)).toBeInTheDocument();
+    await userEvent.keyboard('{Enter}');
+    expect(await screen.findByText('Keine Adresse zu „Rathaus“ gefunden')).toBeInTheDocument();
+  });
+
   it('nicht erreichbar — Objekte bleiben darunter stehen', async () => {
     geocoder({ zustand: 'nicht_erreichbar', treffer: [] });
     zeige({ marker: [marker('uhs', 1, 'Hauptwache')] });
@@ -222,6 +264,21 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
 });
 
 describe('MarkerSuche — Vorbelegung von außen (`?ort=`, LFH-638)', () => {
+  it('meldet die übernommene Vorbelegung als verbraucht — einmal je Nonce', async () => {
+    geocoder({ zustand: 'ok', treffer: [] });
+    const onVorbelegungVerbraucht = vi.fn();
+    zeige({
+      ortssuche: {
+        einsatzId: 7,
+        onOrtWaehlen: vi.fn(),
+        vorbelegung: { text: 'Hauptstraße 12', nonce: 3 },
+        onVorbelegungVerbraucht,
+      },
+    });
+    await waitFor(() => expect(onVorbelegungVerbraucht).toHaveBeenCalledWith(3));
+    expect(onVorbelegungVerbraucht).toHaveBeenCalledTimes(1);
+  });
+
   it('übernimmt den Text und löst die Adresssuche aus', async () => {
     const anfragen = geocoder({
       zustand: 'ok',

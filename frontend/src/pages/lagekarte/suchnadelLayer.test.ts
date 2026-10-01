@@ -22,7 +22,7 @@ function fakeMap() {
   return { map, quellen, layers, moves };
 }
 
-const ORT = { lat: 51.16, lon: 10.45, beschriftung: 'Hauptstraße 12' };
+const ORT = { lat: 51.16, lon: 10.45, beschriftung: 'Hauptstraße 12', art: 'adresse' as const };
 
 describe('suchnadelFc (LFH-638)', () => {
   it('ohne Ort leer, mit Ort ein Punkt in [lon, lat]', () => {

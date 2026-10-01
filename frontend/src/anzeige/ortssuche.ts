@@ -15,6 +15,8 @@ export interface GefundenerOrt {
   lon: number;
   /** Adresse bzw. Koordinate im eingestellten Format. */
   beschriftung: string;
+  /** Eine Koordinate steht in Mono mit `tabular-nums` (`frontend/AGENTS.md`, `schriftskala`). */
+  art: 'koordinate' | 'adresse';
 }
 
 /**

@@ -1463,6 +1463,36 @@ describe('LagekartePage', () => {
     );
   });
 
+  it('Deeplink ?ort= mit genau einem Treffer: Zu- und Aufklappen von „Verortet“ fliegt nicht erneut (LFH-638)', async () => {
+    let anfragen = 0;
+    basisHandler([
+      http.get('/api/einsaetze/1/karte/ort-suche', () => {
+        anfragen += 1;
+        return HttpResponse.json({
+          zustand: 'ok',
+          treffer: [{ lat: 51.1, lon: 10.4, name: 'Rathaus, Musterstadt' }],
+        });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?ort=Rathaus');
+    await waitFor(() =>
+      expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":10.4,"lat":51.1}'),
+    );
+    // Die Person sucht danach selbst weiter …
+    const feld = screen.getByLabelText('Kartenobjekte suchen');
+    await user.clear(feld);
+    await user.type(feld, '48.13743, 11.57549');
+    await user.click(screen.getByRole('button', { name: formatiere(48.13743, 11.57549, 'wgs84') }));
+    // … und klappt „Verortet“ zu und wieder auf: die Suche hängt neu ein.
+    const kopf = screen.getByRole('button', { name: /^Verortet/ });
+    await user.click(kopf);
+    await user.click(kopf);
+    expect(await screen.findByLabelText('Kartenobjekte suchen')).toHaveValue('');
+    expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":11.57549,"lat":48.13743}');
+    expect(anfragen).toBe(1);
+  });
+
   it('Deeplink ?zentrum=: ein unbrauchbarer Wert fliegt nichts an und wird trotzdem geräumt', async () => {
     basisHandler();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?zentrum=52.52');

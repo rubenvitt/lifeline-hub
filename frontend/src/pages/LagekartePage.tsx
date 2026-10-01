@@ -445,9 +445,20 @@ export default function LagekartePage() {
     },
     [setFlyToZiel],
   );
+  // Die Nonce zählt in einer Ref weiter: die Vorbelegung wird nach der Übernahme geräumt, und der
+  // nächste `?ort=` braucht trotzdem eine neue Nonce.
+  const ortNonceRef = useRef(0);
+  const vorbelegungVerbraucht = useCallback(
+    (nonce: number) => setOrtVorbelegung((v) => (v?.nonce === nonce ? null : v)),
+    [],
+  );
   const ortssuche = useMemo(
-    () => ({ onOrtWaehlen: zeigeOrt, vorbelegung: ortVorbelegung }),
-    [zeigeOrt, ortVorbelegung],
+    () => ({
+      onOrtWaehlen: zeigeOrt,
+      vorbelegung: ortVorbelegung,
+      onVorbelegungVerbraucht: vorbelegungVerbraucht,
+    }),
+    [zeigeOrt, ortVorbelegung, vorbelegungVerbraucht],
   );
 
   const {
@@ -694,6 +705,7 @@ export default function LagekartePage() {
         lat: zentrum.lat,
         lon: zentrum.lon,
         beschriftung: formatKoordinate(zentrum.lat, zentrum.lon),
+        art: 'koordinate',
       });
     }
     const naechste = new URLSearchParams(searchParams);
@@ -712,7 +724,8 @@ export default function LagekartePage() {
     if (ladt) return;
     const text = roh.trim();
     if (text) {
-      setOrtVorbelegung((alt) => ({ text, nonce: (alt?.nonce ?? 0) + 1 }));
+      ortNonceRef.current += 1;
+      setOrtVorbelegung({ text, nonce: ortNonceRef.current });
       zeigeLeiste();
     }
     const naechste = new URLSearchParams(searchParams);
