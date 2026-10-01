@@ -65,6 +65,8 @@ import {
 import { einsatzStatus, statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
+import DemoMarke from '../components/DemoMarke';
+import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
 import { fahrzeugStatusDarstellung } from '../kraefte/mittelStatus';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import {
@@ -419,12 +421,11 @@ export default function FahrzeugePage() {
   const disponierteIds = new Set(
     efs.map((e) => e.fahrzeug_id).filter((x): x is number => x != null),
   );
-  const poolOptionen = (poolQuery.data ?? [])
-    .filter((f) => !disponierteIds.has(f.id))
-    .map((f) => ({
-      value: f.id,
-      label: `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}`,
-    }));
+  // LFH-733: Demo-Stammdaten bleiben wählbar, stehen aber als Gruppe hinter den echten.
+  const poolOptionen = demoGruppierteOptionen(
+    (poolQuery.data ?? []).filter((f) => !disponierteIds.has(f.id)),
+    (f) => `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}`,
+  );
 
   /**
    * Was ein leeres Auswahlfeld bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,
@@ -487,6 +488,7 @@ export default function FahrzeugePage() {
           {/* Funkrufname in Mono. */}
           <span style={monoStil(13)}>{ef.funkrufname}</span>
           {ef.ist_adhoc && <Tag color="blue">ad-hoc</Tag>}
+          {ef.ist_demo && <DemoMarke />}
         </Space>
       ),
     },

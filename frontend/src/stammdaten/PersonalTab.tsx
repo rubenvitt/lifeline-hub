@@ -1,4 +1,5 @@
 import { Button, Space, Tag, type TableColumnsType } from 'antd';
+import DemoMarke from '../components/DemoMarke';
 import { Link } from 'react-router';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -57,7 +58,12 @@ export default function PersonalTab() {
        * Der `dataIndex` bleibt: die Freitextsuche liest die ROHWERTE der Spalten mit `dataIndex`,
        * ohne ihn fiele der Name aus dem Suchkorpus.
        */
-      render: (_, p) => <Link to={personalDetailPfad(p.id)}>{p.name}</Link>,
+      render: (_, p) => (
+        <Space size={4}>
+          <Link to={personalDetailPfad(p.id)}>{p.name}</Link>
+          {p.ist_demo && <DemoMarke />}
+        </Space>
+      ),
     },
     {
       title: 'Personalnr.',

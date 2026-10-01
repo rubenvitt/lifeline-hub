@@ -47,6 +47,7 @@ function fahrzeug(over: Partial<EinsatzFahrzeug> = {}): EinsatzFahrzeug {
     fahrzeug_id: null,
     einheit_id: null,
     ist_adhoc: true,
+    ist_demo: false,
     funkrufname: 'Florian 1',
     kennzeichen: null,
     fahrzeugtyp: null,

@@ -562,3 +562,80 @@ async function oeffneMaterialAuswahl(container: HTMLElement, platzhalter: string
   expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
   await userEvent.click(within(feld!).getByRole('combobox'));
 }
+
+/**
+ * LFH-733 (Spec `demo-daten`): Demo-Material bleibt in der Stamm-Auswahl, steht aber gesammelt in
+ * der Gruppe „Demo-Daten“ hinter allem echten Material; disponiertes Demo-Material trägt die
+ * Marke „Demo“ in der Tabelle.
+ */
+describe('MaterialPage · Demo-Marke', () => {
+  const stamm = (id: number, bezeichnung: string, ist_demo: boolean) => ({
+    id,
+    bezeichnung,
+    kategorie: 'Betreuung',
+    bestandsnummer: null,
+    traegerorganisation: null,
+    standort: null,
+    bemerkung: null,
+    dienststatus: 'in_dienst',
+    angelegt_at: '2026-05-26 09:00:00',
+    ist_demo,
+  });
+
+  function zeige(ems: unknown[], pool: ReturnType<typeof stamm>[]) {
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/material', () => HttpResponse.json(ems)),
+      http.get('/api/material', () => HttpResponse.json(pool)),
+      http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+    return renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/material' },
+    );
+  }
+
+  it('Auswahl: echtes Material vorn, die Gruppe „Demo-Daten“ dahinter, Demo wählbar', async () => {
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/material', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...em, id: 30, material_id: 2, ist_demo: true });
+      }),
+    );
+    const { container } = zeige([], [stamm(2, 'Demo-Decke', true), stamm(1, 'Echte Decke', false)]);
+    await screen.findByText('Noch kein Material disponiert');
+    await oeffneMaterialAuswahl(container, 'Stamm-Material wählen …');
+    await screen.findByText('Echte Decke (Betreuung)');
+    const eintraege = [
+      ...document.querySelectorAll<HTMLElement>('.ant-select-dropdown .ant-select-item'),
+    ].map((e) => e.textContent);
+    expect(eintraege).toEqual([
+      'Echte Decke (Betreuung)',
+      'Demo-Daten',
+      'Demo-Decke (Betreuung)Demo',
+    ]);
+
+    await userEvent.click(screen.getByText('Demo-Decke (Betreuung)'));
+    await userEvent.click(screen.getByRole('button', { name: 'Disponieren' }));
+    await waitFor(() => expect(gesendet).toEqual([{ material_id: 2, menge: 1 }]));
+  });
+
+  it('Tabelle: nur die Demo-Disposition trägt „Demo“', async () => {
+    zeige(
+      [
+        { ...em, id: 10, material_id: 1, bezeichnung: 'Echte Decke', ist_demo: false },
+        { ...em, id: 11, material_id: 2, bezeichnung: 'Demo-Decke', ist_demo: true },
+      ],
+      [],
+    );
+    const demoZeile = (await screen.findByText('Demo-Decke')).closest('tr')!;
+    const echteZeile = screen.getByText('Echte Decke').closest('tr')!;
+    expect(within(demoZeile).getByText('Demo')).toBeInTheDocument();
+    expect(within(echteZeile).queryByText('Demo')).not.toBeInTheDocument();
+  });
+});

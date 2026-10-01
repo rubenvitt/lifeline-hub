@@ -827,3 +827,87 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
     expect(screen.getByRole('button', { name: 'Nachtragen' })).toBeEnabled();
   });
 });
+
+/**
+ * LFH-733 (Spec `demo-daten`): Demo-Personal bleibt in der Pool-Auswahl, steht aber gesammelt in
+ * der Gruppe „Demo-Daten“ hinter allen echten Personen; disponiertes Demo-Personal trägt die
+ * Marke „Demo“ in der Tabelle.
+ */
+describe('PersonalPage · Demo-Marke', () => {
+  const stamm = (id: number, name: string, personalnummer: string, ist_demo: boolean) => ({
+    id,
+    benutzer_id: null,
+    name,
+    personalnummer,
+    traegerorganisation: null,
+    telefon: null,
+    staerke_position: null,
+    bemerkung: null,
+    dienststatus: 'in_dienst',
+    angelegt_at: '2026-05-26 09:00:00',
+    qualifikationen: [],
+    ist_demo,
+  });
+
+  // Eigener Handler-Satz statt `render()`: dessen Pool-Handler stünde vor jedem vorher
+  // registrierten (`server.use` reiht vorn ein).
+  function zeige(eps: unknown[], pool: ReturnType<typeof stamm>[]) {
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/7/personal', () => HttpResponse.json(eps)),
+      http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
+      http.get('/api/personal-status', () =>
+        HttpResponse.json([
+          { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
+        ]),
+      ),
+      http.get('/api/personal', () => HttpResponse.json(pool)),
+    );
+    return renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
+      </Routes>,
+      { route: '/einsaetze/7/personal' },
+    );
+  }
+
+  it('Auswahl: echte Personen vorn, die Gruppe „Demo-Daten“ dahinter, Demo wählbar', async () => {
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/personal', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...disponiert[0], id: 30, personal_id: 2, ist_demo: true });
+      }),
+    );
+    const { container } = zeige(
+      [],
+      [stamm(2, 'Dora Demo', 'DEMO-P-001', true), stamm(1, 'Erna Echt', 'P-1', false)],
+    );
+    await screen.findByText('Noch kein Personal disponiert');
+    await oeffnePersonalAuswahl(container, 'Person aus Pool disponieren …');
+    await screen.findByText('Erna Echt (P-1)');
+    const eintraege = [
+      ...document.querySelectorAll<HTMLElement>('.ant-select-dropdown .ant-select-item'),
+    ].map((e) => e.textContent);
+    expect(eintraege).toEqual(['Erna Echt (P-1)', 'Demo-Daten', 'Dora Demo (DEMO-P-001)Demo']);
+
+    await userEvent.click(screen.getByText('Dora Demo (DEMO-P-001)'));
+    await waitFor(() => expect(gesendet).toEqual([{ personal_id: 2, staerke_position: null }]));
+  });
+
+  it('Tabelle: nur die Demo-Disposition trägt „Demo“', async () => {
+    zeige(
+      [
+        { ...disponiert[0], id: 10, personal_id: 1, name: 'Erna Echt', ist_demo: false },
+        { ...disponiert[0], id: 11, personal_id: 2, name: 'Dora Demo', ist_demo: true },
+      ],
+      [],
+    );
+    const demoZeile = (await screen.findByText('Dora Demo')).closest('tr')!;
+    const echteZeile = screen.getByText('Erna Echt').closest('tr')!;
+    expect(within(demoZeile).getByText('Demo')).toBeInTheDocument();
+    expect(within(echteZeile).queryByText('Demo')).not.toBeInTheDocument();
+  });
+});

@@ -21,6 +21,9 @@ pub struct Material {
     pub bemerkung: Option<String>,
     pub dienststatus: String,
     pub angelegt_at: String,
+    /// Demo-Herkunft (LFH-733): wahr, solange `demo_herkunft` die Zeile markiert. Live gelesen
+    /// über `SPALTEN`, kein gespeichertes Flag.
+    pub ist_demo: bool,
 }
 
 impl Material {
@@ -36,6 +39,7 @@ impl Material {
             bemerkung: self.bemerkung.clone(),
             dienststatus: self.dienststatus.clone(),
             angelegt_at: self.angelegt_at.clone(),
+            ist_demo: self.ist_demo,
         }
     }
 }
@@ -53,6 +57,8 @@ pub struct MaterialAnzeige {
     #[schema(value_type = crate::katalog::Dienststatus)]
     pub dienststatus: String,
     pub angelegt_at: String,
+    /// Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`.
+    pub ist_demo: bool,
 }
 
 wire_enum! {
@@ -96,6 +102,9 @@ pub struct EinsatzMaterialAnzeige {
     pub bemerkung: Option<String>,
     pub disponiert_at: String,
     pub disponiert_von: Option<i64>,
+    /// Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
+    /// `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
+    pub ist_demo: bool,
 }
 
 #[cfg(test)]
@@ -129,6 +138,7 @@ mod tests {
             bemerkung: None,
             dienststatus: DIENSTSTATUS_IN_DIENST.into(),
             angelegt_at: "2026-05-27 10:00:00".into(),
+            ist_demo: false,
         };
         let a = m.anzeige();
         assert_eq!(a.id, 7);
