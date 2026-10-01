@@ -1,0 +1,30 @@
+/* Druckregeln des hängenden Organigramm-Gerüsts (LFH-626 D6, geteilt seit LFH-625 D4). Sie gelten
+   in jeder Druckwurzel, die das Gerüst trägt (Organigramm, Fernmeldeskizze). Die Mechanik
+   (Ausblenden des Rahmens, Fluss, Papierfarben, Umbruch der Grundelemente) liegt in
+   `druck/druck.css`. Nachweis der Wirkung: `e2e/fuehrungsorganisation.spec.ts` und
+   `e2e/funkplan.spec.ts` (ausgelöstes `beforeprint`, A4-Breite). */
+@media print {
+  /* A4 hoch: zwei feste Spalten statt `auto-fill` nach Fensterbreite. */
+  .haengender-baum [data-lfh='org-ebene1'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    /* Auch das Grid selbst ist ein `ul`, das `druck.css` zusammenhielte: sonst rutschte es ganz
+       auf Seite 2 (Review LFH-626). */
+    break-inside: auto;
+  }
+
+  /* Die Klappknöpfe sind Bedienung. Mit ihnen fällt der Platzhalter der Blätter, damit alle
+     Knoten einer Ebene bündig bleiben. */
+  .haengender-baum [data-lfh='org-klappen'],
+  .haengender-baum [data-lfh='org-klappen-platz'] {
+    display: none !important;
+  }
+
+  /* `druck.css` hält jede Liste zusammen. Eine lange Spalte ist aber eine verschachtelte Liste
+     und schöbe sonst ganze Seiten leer vor sich her: hier bricht die Liste, der Knoten nicht. */
+  .haengender-baum [data-lfh='org-ebene1'] ul {
+    break-inside: auto;
+  }
+  .haengender-baum [data-lfh='org-knoten'] {
+    break-inside: avoid;
+  }
+}

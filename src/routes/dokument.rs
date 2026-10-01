@@ -6,17 +6,18 @@ use axum::extract::{Multipart, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::Json;
+use serde::Deserialize;
 
 use crate::anhang;
 use crate::app::AppState;
-use crate::dokument::repo::{self, Ablage};
+use crate::dokument::repo::{self, Ablage, Aenderung};
 use crate::dokument::{Bezug, DokumentAnzeige, DokumentKategorie, TITEL_MAX};
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Dokumente;
 use crate::error::AppError;
-use crate::extract::PfadParam;
+use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
-use crate::routes::support::pflicht;
+use crate::routes::support::{deserialize_optional_field, pflicht};
 
 use super::support::anhang_antwort;
 
@@ -34,6 +35,46 @@ pub async fn liste(
     Ok(Json(repo::liste(&state.pool, ctx.einsatz.id).await?))
 }
 
+/// Titel: Pflicht, nach `trim` nicht leer, höchstens [`TITEL_MAX`] Zeichen (400).
+fn pruefe_titel(titel: &str) -> Result<String, AppError> {
+    let titel = pflicht(titel, "Titel")?;
+    if titel.chars().count() > TITEL_MAX {
+        return Err(AppError::Validation(format!(
+            "Titel ist länger als {TITEL_MAX} Zeichen"
+        )));
+    }
+    Ok(titel)
+}
+
+/// Kategorie: Pflicht, bekannter Wire-Wert (400).
+fn pruefe_kategorie(kategorie: &str) -> Result<DokumentKategorie, AppError> {
+    let roh = kategorie.trim();
+    if roh.is_empty() {
+        return Err(AppError::Validation("Kategorie fehlt".into()));
+    }
+    DokumentKategorie::parse(roh)
+        .ok_or_else(|| AppError::Validation(format!("Unbekannte Kategorie '{roh}'")))
+}
+
+/// Bezugstyp + id → [`Bezug`]. Unbekannter Typ → 400. Die Paarregel („nur gemeinsam“, 422)
+/// prüft der Aufrufer, weil Ablegen und Ändern das Fehlen verschieden ausdrücken.
+fn pruefe_bezug(typ: &str, id: i64) -> Result<Bezug, AppError> {
+    Ok(match typ.trim() {
+        "abschnitt" => Bezug::Abschnitt(id),
+        "einheit" => Bezug::Einheit(id),
+        "etb_eintrag" => Bezug::EtbEintrag(id),
+        typ => {
+            return Err(AppError::Validation(format!(
+                "Unbekannter bezug_typ '{typ}'"
+            )))
+        }
+    })
+}
+
+fn nur_gemeinsam() -> AppError {
+    AppError::UnprocessableEntity("bezug_typ und bezug_id nur gemeinsam".into())
+}
+
 /// Validiert die Textfelder. 400 = Feld für sich, 422 = Zusammenhang (LFH-267).
 fn validiere(
     titel: Option<String>,
@@ -41,40 +82,17 @@ fn validiere(
     bezug_typ: Option<String>,
     bezug_id: Option<String>,
 ) -> Result<(String, DokumentKategorie, Option<Bezug>), AppError> {
-    let titel = pflicht(titel.as_deref().unwrap_or_default(), "Titel")?;
-    if titel.chars().count() > TITEL_MAX {
-        return Err(AppError::Validation(format!(
-            "Titel ist länger als {TITEL_MAX} Zeichen"
-        )));
-    }
-    let roh = kategorie.map(|k| k.trim().to_string()).unwrap_or_default();
-    if roh.is_empty() {
-        return Err(AppError::Validation("Kategorie fehlt".into()));
-    }
-    let kategorie = DokumentKategorie::parse(&roh)
-        .ok_or_else(|| AppError::Validation(format!("Unbekannte Kategorie '{roh}'")))?;
+    let titel = pruefe_titel(titel.as_deref().unwrap_or_default())?;
+    let kategorie = pruefe_kategorie(kategorie.as_deref().unwrap_or_default())?;
     let leer = |o: Option<String>| o.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
     let bezug = match (leer(bezug_typ), leer(bezug_id)) {
         (None, None) => None,
-        (Some(_), None) | (None, Some(_)) => {
-            return Err(AppError::UnprocessableEntity(
-                "bezug_typ und bezug_id nur gemeinsam".into(),
-            ))
-        }
+        (Some(_), None) | (None, Some(_)) => return Err(nur_gemeinsam()),
         (Some(typ), Some(id)) => {
             let id: i64 = id
                 .parse()
                 .map_err(|_| AppError::Validation(format!("bezug_id ist keine Zahl: {id}")))?;
-            Some(match typ.as_str() {
-                "abschnitt" => Bezug::Abschnitt(id),
-                "einheit" => Bezug::Einheit(id),
-                "etb_eintrag" => Bezug::EtbEintrag(id),
-                _ => {
-                    return Err(AppError::Validation(format!(
-                        "Unbekannter bezug_typ '{typ}'"
-                    )))
-                }
-            })
+            Some(pruefe_bezug(&typ, id)?)
         }
     };
     Ok((titel, kategorie, bezug))
@@ -155,6 +173,66 @@ pub async fn datei(
     // soft-gelöschte id → 404. Danach dieselbe Header-Sequenz wie der Anhang-Download.
     let anhang_id = repo::anhang_id(&state.pool, ctx.einsatz.id, dokument_id).await?;
     anhang_antwort(&state.pool, anhang_id, &req_headers).await
+}
+
+/// Body von PATCH. `titel`/`kategorie`: fehlt oder `null` = bleibt (Pflichtangaben lassen sich
+/// nicht leeren). Bezug dreiwertig je Feld: beide fehlen = bleibt, beide `null` = entfernen,
+/// beide gesetzt = setzen, jede Mischung 422 (LFH-656, D1).
+#[derive(Debug, Deserialize)]
+pub struct PatchBody {
+    pub titel: Option<String>,
+    pub kategorie: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bezug_typ: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bezug_id: Option<Option<i64>>,
+}
+
+/// PATCH /api/einsaetze/{id}/dokumente/{did} — Titel, Kategorie und Bezug ändern (LFH-656).
+/// Die Datei bleibt; eine wirksame Änderung schreibt einen ETB-Nachweis (D2), eine wirkungslose
+/// antwortet 200 ohne ETB und ohne Live-Hinweis.
+pub async fn aendern(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Dokumente>,
+    PfadParam((_einsatz_id, dokument_id)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<PatchBody>,
+) -> Result<Json<DokumentAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let bezug = match (body.bezug_typ, body.bezug_id) {
+        (None, None) => None,
+        (Some(None), Some(None)) => Some(None),
+        (Some(Some(typ)), Some(Some(id))) => Some(Some(pruefe_bezug(&typ, id)?)),
+        _ => return Err(nur_gemeinsam()),
+    };
+    if body.titel.is_none() && body.kategorie.is_none() && bezug.is_none() {
+        return Err(AppError::Validation(
+            "Nichts zu ändern: titel, kategorie oder bezug angeben".into(),
+        ));
+    }
+    let aenderung = Aenderung {
+        titel: body.titel.as_deref().map(pruefe_titel).transpose()?,
+        kategorie: body
+            .kategorie
+            .as_deref()
+            .map(pruefe_kategorie)
+            .transpose()?,
+        bezug,
+    };
+    let etb_id = repo::aendern(
+        &state.pool,
+        einsatz_id,
+        dokument_id,
+        ctx.benutzer.id,
+        &aenderung,
+    )
+    .await?;
+    if let Some(etb_id) = etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
+        sse(&state, einsatz_id);
+    }
+    Ok(Json(
+        repo::laden(&state.pool, einsatz_id, dokument_id).await?,
+    ))
 }
 
 /// DELETE /api/einsaetze/{id}/dokumente/{did} — Soft-Delete mit ETB-Nachweis (E1).

@@ -1,8 +1,8 @@
-import { IkoneMuelleimer } from '../ikonen';
+import { IkoneMuelleimer, IkoneStift } from '../ikonen';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Breadcrumb, Button, Popconfirm, Space, Typography } from 'antd';
+import { App, Breadcrumb, Button, Modal, Popconfirm, Space, Typography } from 'antd';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { dokumentDownloadPfad, entferneDokument, listeDokumente } from '../api/dokumente';
@@ -19,6 +19,7 @@ import { formatGroesse } from '../karten/formatGroesse';
 import { einsatzStatus } from '../theme/statusFarben';
 import { DOKUMENT_KATEGORIEN, DOKUMENT_KATEGORIE_REIHENFOLGE } from '../dokumente/kategorien';
 import DokumentAblegenModal from '../dokumente/DokumentAblegenModal';
+import DokumentBearbeitenModal from '../dokumente/DokumentBearbeitenModal';
 import DownloadAnker from '../components/DownloadAnker';
 
 /**
@@ -39,26 +40,35 @@ import DownloadAnker from '../components/DownloadAnker';
  * Der Anker trägt die Höhe aus `controlHeight` selbst (`components/DownloadAnker`): ein
  * Inline-`<a>` erbt keine Steuerhöhe.
  *
- * ── Entfernen ──
+ * ── Bearbeiten und Entfernen ──
  *
- * Eine einzige Zeilenaktion, also keine Bündelung. Für die Oberfläche unumkehrbar (kein
- * Wiederherstellen-Weg), deshalb Rückfrage mit rotem OK-Knopf. Im Kartenzweig trägt die Aktion das
- * Primitiv (`PrimaerAktion` mit `bestaetigung` und `bestaetigungGefahr`): der Auslöser bleibt
- * neutral („Rot bedient nichts"). `zugaenglicherName` trägt den Titel, damit n Karten nicht n
- * gleichnamige „Entfernen"-Knöpfe liefern.
+ * Zwei ändernde Zeilenaktionen, also noch keine Bündelung (sie greift ab drei, LFH-365). In der
+ * Tabelle stehen „Bearbeiten“ (neutral) und „Entfernen“ (rot) in `<Space size="middle">` — Rot
+ * steht nicht bündig neben Neutralem. „Bearbeiten“ öffnet `DokumentBearbeitenModal` (LFH-656):
+ * Titel, Kategorie und Bezug, die Datei bleibt.
+ *
+ * Entfernen ist für die Oberfläche unumkehrbar (kein Wiederherstellen-Weg), deshalb Rückfrage mit
+ * rotem OK-Knopf. Der Kartenplan kennt genau eine Primäraktion: das ist „Bearbeiten“ (häufiger,
+ * umkehrbar); „Entfernen“ steht als Gefahr-Eintrag in `weitere`. Dessen Rückfrage ist ein
+ * `<Modal>` auf Seitenebene, außerhalb der Zeilen-`map` (Bündelungsregel), nicht ein
+ * `Popconfirm` im Menü. `zugaenglicherName` trägt je Aktion den Titel, damit n Karten nicht n
+ * gleichnamige Knöpfe liefern.
  *
  * Zwischen Bestätigung und Serverantwort (LFH-654, Prüfliste LFH-632 Zeile 1 · 3) bleibt die Zeile
- * stehen: ihr Auslöser lädt (Tabelle und Karte, `PrimaerAktion.laeuft`), und neben dem Titel steht
- * „wird entfernt“ als Text — NEBEN dem Anker, damit sein zugänglicher Name gleich bleibt. Kein
- * optimistisches Ausblenden: die Zeilen darunter rückten unter dem Zeiger weg (Kriterium 12).
- * Die Menge `entferntGerade` räumt erst, wenn die Liste nach dem Erfolg neu geladen ist
- * (`onSuccess` wartet auf die Invalidierung), sonst stünde die Zeile kurz ohne Zusatz da.
+ * stehen: ihr Entfernen-Auslöser lädt — in der Tabelle der Mülleimer, in der Karte der Menü-Knopf
+ * (`WeitereAktionen.laeuft`) —, und neben dem Titel steht „wird entfernt“ als Text — NEBEN dem
+ * Anker, damit sein zugänglicher Name gleich bleibt. Kein optimistisches Ausblenden: die Zeilen
+ * darunter rückten unter dem Zeiger weg (Kriterium 12). Die Menge `entferntGerade` räumt erst,
+ * wenn die Liste nach dem Erfolg neu geladen ist (`onSuccess` wartet auf die Invalidierung), sonst
+ * stünde die Zeile kurz ohne Zusatz da.
  */
 
 const rechteText = (status: EinsatzStatus) =>
   status !== 'aktiv'
     ? 'Der Einsatz ist abgeschlossen — die Dokumente stehen nur noch zum Nachlesen bereit.'
     : 'Nur Einsatzleitung und Führungspersonal können Dokumente ablegen und entfernen — zum Nachlesen und Herunterladen stehen sie hier bereit.';
+
+const ENTFERNEN_TEXT = 'Es verschwindet aus der Liste; der ETB-Nachweis bleibt.';
 
 function bezugText(d: Dokument): string | null {
   return (
@@ -76,6 +86,7 @@ function bezugText(d: Dokument): string | null {
 const dokumentSpalten = (
   einsatzId: number,
   darfSchreiben: boolean,
+  onBearbeiten: (d: Dokument) => void,
   onEntfernen: (d: Dokument) => void,
   entferntGerade: ReadonlySet<number>,
 ) =>
@@ -157,22 +168,30 @@ const dokumentSpalten = (
             key: 'aktionen' as const,
             immerSichtbar: true,
             render: (_: unknown, d: Dokument) => (
-              <Popconfirm
-                title="Dokument entfernen?"
-                description="Es verschwindet aus der Liste; der ETB-Nachweis bleibt."
-                okText="Entfernen"
-                okButtonProps={{ danger: true }}
-                onConfirm={() => onEntfernen(d)}
-                disabled={entferntGerade.has(d.id)}
-              >
+              <Space size="middle">
                 <Button
-                  danger
                   type="text"
-                  icon={<IkoneMuelleimer />}
-                  loading={entferntGerade.has(d.id)}
-                  aria-label={`Dokument ${d.titel} entfernen`}
+                  icon={<IkoneStift />}
+                  aria-label={`Dokument ${d.titel} bearbeiten`}
+                  onClick={() => onBearbeiten(d)}
                 />
-              </Popconfirm>
+                <Popconfirm
+                  title="Dokument entfernen?"
+                  description={ENTFERNEN_TEXT}
+                  okText="Entfernen"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => onEntfernen(d)}
+                  disabled={entferntGerade.has(d.id)}
+                >
+                  <Button
+                    danger
+                    type="text"
+                    icon={<IkoneMuelleimer />}
+                    loading={entferntGerade.has(d.id)}
+                    aria-label={`Dokument ${d.titel} entfernen`}
+                  />
+                </Popconfirm>
+              </Space>
             ),
           },
         ]
@@ -183,7 +202,8 @@ type DokumentSpaltenKey = ReturnType<typeof dokumentSpalten>[number]['key'];
 
 const dokumentKarte = (
   darfSchreiben: boolean,
-  onEntfernen: (d: Dokument) => void,
+  onBearbeiten: (d: Dokument) => void,
+  onEntfernenWahl: (d: Dokument) => void,
   entferntGerade: ReadonlySet<number>,
 ): Kartenplan<Dokument, DokumentSpaltenKey> => ({
   art: 'plan',
@@ -193,15 +213,19 @@ const dokumentKarte = (
   sekundaer: ['bezug', 'datei', 'abgelegt'],
   aktion: darfSchreiben
     ? {
-        etikett: 'Entfernen',
-        bestaetigung: 'Dokument entfernen?',
-        // Unumkehrbar: OK der Rückfrage rot, der Auslöser bleibt neutral (Datensicht-Vertrag).
-        bestaetigungGefahr: true,
-        zugaenglicherName: (d) => `Dokument ${d.titel} entfernen`,
-        laeuft: (d) => entferntGerade.has(d.id),
-        onKlick: onEntfernen,
+        etikett: 'Bearbeiten',
+        zugaenglicherName: (d) => `Dokument ${d.titel} bearbeiten`,
+        onKlick: onBearbeiten,
       }
     : undefined,
+  // Ohne Schreibrecht liefert `eintraege` nichts — dann gibt es keinen Auslöser (Datensicht).
+  weitere: {
+    eintraege: () =>
+      darfSchreiben ? [{ key: 'entfernen', label: 'Entfernen', gefahr: true }] : [],
+    zugaenglicherName: (d) => `Aktionen zu Dokument ${d.titel}`,
+    onWahl: (_key, d) => onEntfernenWahl(d),
+    laeuft: (d) => entferntGerade.has(d.id),
+  },
 });
 
 export default function DokumentePage() {
@@ -213,6 +237,9 @@ export default function DokumentePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [ablegenOffen, setAblegenOffen] = useState(false);
   const [entferntGerade, setEntferntGerade] = useState<ReadonlySet<number>>(() => new Set());
+  const [inBearbeitung, setInBearbeitung] = useState<Dokument | null>(null);
+  /** Rückfrage „Entfernen“ aus dem Kartenmenü (die Tabelle fragt per `Popconfirm`). */
+  const [zuEntfernen, setZuEntfernen] = useState<Dokument | null>(null);
 
   // Live gehalten über den Einsatz-Stream (`dokument`-Ereignis → 'einsatz-dokumente').
   const einsatzQuery = useQuery({
@@ -244,12 +271,19 @@ export default function DokumentePage() {
 
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
   const spalten = useMemo(
-    () => dokumentSpalten(einsatzId, darfSchreibenRoh, (d) => entfernen(d.id), entferntGerade),
+    () =>
+      dokumentSpalten(
+        einsatzId,
+        darfSchreibenRoh,
+        setInBearbeitung,
+        (d) => entfernen(d.id),
+        entferntGerade,
+      ),
     [einsatzId, darfSchreibenRoh, entfernen, entferntGerade],
   );
   const karte = useMemo(
-    () => dokumentKarte(darfSchreibenRoh, (d) => entfernen(d.id), entferntGerade),
-    [darfSchreibenRoh, entfernen, entferntGerade],
+    () => dokumentKarte(darfSchreibenRoh, setInBearbeitung, setZuEntfernen, entferntGerade),
+    [darfSchreibenRoh, entferntGerade],
   );
 
   // Schnellaktion: ?neu=1 öffnet den Dialog (Command-Palette). Param immer löschen, Dialog nur mit
@@ -354,6 +388,24 @@ export default function DokumentePage() {
         offen={ablegenOffen}
         onSchliessen={() => setAblegenOffen(false)}
       />
+      <DokumentBearbeitenModal
+        einsatzId={einsatzId}
+        dokument={darfSchreiben ? inBearbeitung : null}
+        onSchliessen={() => setInBearbeitung(null)}
+      />
+      <Modal
+        open={zuEntfernen !== null}
+        title="Dokument entfernen?"
+        okText="Entfernen"
+        okButtonProps={{ danger: true }}
+        onOk={() => {
+          if (zuEntfernen) entfernen(zuEntfernen.id);
+          setZuEntfernen(null);
+        }}
+        onCancel={() => setZuEntfernen(null)}
+      >
+        {zuEntfernen && `„${zuEntfernen.titel}“: ${ENTFERNEN_TEXT}`}
+      </Modal>
     </EinsatzSeite>
   );
 }

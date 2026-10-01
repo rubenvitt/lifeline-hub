@@ -41,6 +41,7 @@ import {
   parseFahrzeugeAnsicht,
   einsatzabschnittePfad,
   parseAbschnitteAnsicht,
+  parseFunkplanAnsicht,
   meldungenPfad,
   nachforderungenPfad,
   parseNachforderungVorbelegung,
@@ -341,6 +342,18 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
 
   it('funkplanPfad liegt unter dem Stab (LFH-548)', () => {
     expect(funkplanPfad(E)).toBe('/einsaetze/5/stab/funkplan');
+  });
+  it('funkplanPfad mit ?ansicht= (Fernmeldeskizze, LFH-625)', () => {
+    expect(funkplanPfad(E, { ansicht: 'skizze' })).toBe(
+      '/einsaetze/5/stab/funkplan?ansicht=skizze',
+    );
+  });
+  it('parseFunkplanAnsicht liest beide Darstellungen und verwirft einen unbekannten Wert GANZ', () => {
+    expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=skizze'))).toBe('skizze');
+    expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=tabelle'))).toBe('tabelle');
+    expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=quatsch'))).toBeUndefined();
+    expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=toString'))).toBeUndefined();
+    expect(parseFunkplanAnsicht(new URLSearchParams(''))).toBeUndefined();
   });
   it('stabPfad mit neu hängt ?neu=1 an', () => {
     expect(stabPfad(E, { neu: true })).toBe('/einsaetze/5/stab?neu=1');

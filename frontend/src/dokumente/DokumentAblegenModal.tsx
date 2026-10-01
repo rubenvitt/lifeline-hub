@@ -8,17 +8,13 @@ import UploadFortschrittAnzeige from '../components/UploadFortschritt';
 import { AusgangUnbekannt, NetzFehler, fehlerText, type UploadFortschritt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import DateiFeld from '../components/DateiFeld';
-import {
-  DOKUMENT_ACCEPT,
-  legeDokumentAb,
-  type DokumentAblage,
-  type DokumentBezugTyp,
-} from '../api/dokumente';
+import { DOKUMENT_ACCEPT, legeDokumentAb, type DokumentAblage } from '../api/dokumente';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEtb } from '../api/etb';
 import type { DokumentKategorie, EtbEintragAnzeige } from '../api/types';
 import { DOKUMENT_KATEGORIEN, DOKUMENT_KATEGORIE_REIHENFOLGE } from './kategorien';
+import { bezugAusWert } from './bezug';
 import {
   ETB_BEZUG_DECKEL,
   sucheEtbBezuege,
@@ -61,7 +57,6 @@ interface AblageFormular {
 
 /** Frist, nach der ein getippter Bezug-Suchbegriff an den Server geht. */
 const ENTPRELLUNG_MS = 300;
-const BEZUG_TYPEN: readonly DokumentBezugTyp[] = ['abschnitt', 'einheit', 'etb_eintrag'];
 const kuerze = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
@@ -90,17 +85,13 @@ function fehlerKopf(fehler: unknown): { titel: string; fallback?: string } {
   return { titel: 'Nicht abgelegt' };
 }
 
-/** Formularwerte → API-Eingabe. Ein unbekannter Präfix fällt weg, statt einen halben Bezug
- *  zu senden. */
+/** Formularwerte → API-Eingabe. Ein unbekannter Präfix fällt weg (`bezugAusWert`), statt einen
+ *  halben Bezug zu senden. */
 function zuAblage(werte: AblageFormular): DokumentAblage {
   const datei = werte.datei?.[0]?.originFileObj as File;
   const ablage: DokumentAblage = { datei, titel: werte.titel, kategorie: werte.kategorie };
-  if (werte.bezug) {
-    const trenner = werte.bezug.lastIndexOf(':');
-    const typ = werte.bezug.slice(0, trenner) as DokumentBezugTyp;
-    const id = Number(werte.bezug.slice(trenner + 1));
-    if (BEZUG_TYPEN.includes(typ) && Number.isInteger(id) && id > 0) ablage.bezug = { typ, id };
-  }
+  const bezug = bezugAusWert(werte.bezug);
+  if (bezug) ablage.bezug = bezug;
   return ablage;
 }
 

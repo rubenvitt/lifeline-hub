@@ -1,7 +1,7 @@
 import { Breadcrumb, Button, Flex, Space, Typography } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useMemo, useState, type Key, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useEffect, useMemo, useState, type Key, type ReactNode } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
@@ -20,7 +20,8 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useDruckModus } from '../components/druck/useDruckModus';
-import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
+import { Paneel, PaneelZeile, Segmentleiste, monoStil, useRollen } from '../components/instrument';
+import { klappbareSchluessel } from '../components/organigramm/baum';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
@@ -30,8 +31,12 @@ import {
   einsatzabschnittePfad,
   fahrzeugePfad,
   lageberichtDetailPfad,
+  parseFunkplanAnsicht,
   stabPfad,
+  type FunkplanAnsicht,
 } from '../routing/deeplinks';
+import { baueFernmeldeskizze, type Fernmeldeskizze } from '../stab/fernmeldeskizze';
+import FernmeldeskizzeBild from '../stab/FernmeldeskizzeBild';
 import {
   GEGENSTELLE_HINWEIS,
   ZUSTAND_GRUND,
@@ -44,7 +49,7 @@ import {
   type FunkplanQuellen,
   type FunkplanZeile,
 } from '../stab/funkplan';
-import type { Luecke, Quelle } from '../stab/luecken';
+import type { Luecke, Quelle, Verbindung } from '../stab/luecken';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
 import './funkplanPrint.css';
@@ -63,6 +68,10 @@ import './funkplanPrint.css';
  *   Zeile führt über ihre Kennung dorthin (D7).
  * - **Erreichbarkeit** ist personenbezogen: am Schirm ab `xl`, im Druck immer, im Lagebericht nie
  *   (D5, Entscheidung 30.09.2026).
+ * - **Zwei Darstellungen** (LFH-625, `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` D1, D6):
+ *   „Tabelle“ und „Skizze“ (Fernmeldeskizze, `stab/FernmeldeskizzeBild.tsx`). Dieselben Quellen,
+ *   dasselbe Lücken-Paneel, dieselbe Übernahme; eine Druckwurzel, der Druckkopf nennt die aktive
+ *   Darstellung. Die Klappzustände sind getrennt: die Tabelle kennt Fahrzeuge, die Skizze nicht.
  */
 
 type SpalteKey =
@@ -270,11 +279,63 @@ function leerTextFuer(quellen: FunkplanQuellen): string {
 /** Was der Seitenkopf zählt; eine gesperrte Liste zählt nicht mit (keine „0"). */
 const FUNKPLAN_SEITE = { titel: 'Funkplan', mitArtikel: 'der Funkplan' };
 
+const DARSTELLUNG_OPTIONEN = [
+  { wert: 'tabelle', label: 'Tabelle' },
+  { wert: 'skizze', label: 'Skizze' },
+] as const satisfies readonly { wert: FunkplanAnsicht; label: string }[];
+
 const UMFANG: { quelle: 'abschnitte' | 'einheiten' | 'fahrzeuge'; wort: string }[] = [
   { quelle: 'abschnitte', wort: 'Abschnitte' },
   { quelle: 'einheiten', wort: 'Einheiten' },
   { quelle: 'fahrzeuge', wort: 'Fahrzeuge' },
 ];
+
+/**
+ * Die Skizze mit ihren Quellzuständen (design.md D5): ohne Abschnitte gibt es keinen Baum, nur
+ * den Grund; fehlende Einheiten stehen als Hinweis über den Abschnitten.
+ */
+function SkizzenBereich({
+  einsatzId,
+  abschnitte,
+  einheiten,
+  skizze,
+  zugeklappt,
+  onUmschalten,
+}: {
+  einsatzId: number;
+  abschnitte: AbrufZustand;
+  einheiten: AbrufZustand;
+  skizze: Fernmeldeskizze | null;
+  zugeklappt: ReadonlySet<string>;
+  onUmschalten: (key: string) => void;
+}) {
+  const { token, rollen } = useRollen();
+  if (abschnitte === 'laden') return <SeitenSkeleton />;
+  if (abschnitte !== 'daten') {
+    return (
+      <Typography.Paragraph style={{ color: rollen.gedaempft }}>
+        {`Keine Skizze darstellbar — Abschnitte: ${ZUSTAND_GRUND[abschnitte]}`}
+      </Typography.Paragraph>
+    );
+  }
+  // Mit geladenen Abschnitten und gewählter Skizze ist sie gebaut.
+  if (skizze == null) return null;
+  return (
+    <>
+      {einheiten !== 'daten' && (
+        <div style={{ color: rollen.gedaempft, marginBlockEnd: token.marginSM }}>
+          {`Einheiten: ${ZUSTAND_GRUND[einheiten]}`}
+        </div>
+      )}
+      <FernmeldeskizzeBild
+        einsatzId={einsatzId}
+        skizze={skizze}
+        zugeklappt={zugeklappt}
+        onUmschalten={onUmschalten}
+      />
+    </>
+  );
+}
 
 export default function FunkplanPage() {
   const { id } = useParams();
@@ -352,6 +413,55 @@ export default function FunkplanPage() {
 
   const spalten = useMemo(() => funkplanSpalten(druckt), [druckt]);
 
+  // ── Darstellung (LFH-625 D1, D6) ────────────────────────────────────────────────────────────
+  // Sichtvorgabe ?ansicht= apply-then-clean wie auf der Abschnittsseite. Schon der erste Zustand
+  // liest sie, sonst stünde mit warmem Cache für ein Bild die Tabelle da (Review LFH-625). Geräumt
+  // wird auch ein unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [ansichtNachEinsatz, setAnsichtNachEinsatz] = useState<Record<number, FunkplanAnsicht>>(
+    () => {
+      const vorgabe = parseFunkplanAnsicht(searchParams);
+      return vorgabe ? { [einsatzId]: vorgabe } : {};
+    },
+  );
+  const ansicht = ansichtNachEinsatz[einsatzId] ?? 'tabelle';
+  const setzeAnsicht = (a: FunkplanAnsicht) =>
+    setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: a }));
+  useEffect(() => {
+    if (!searchParams.has('ansicht')) return;
+    const vorgabe = parseFunkplanAnsicht(searchParams);
+    if (vorgabe) setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: vorgabe }));
+    const rest = new URLSearchParams(searchParams);
+    rest.delete('ansicht');
+    setSearchParams(rest, { replace: true });
+  }, [searchParams, setSearchParams, einsatzId]);
+
+  // Ohne Abschnitte gibt es keine Skizze: ihre Einheiten stünden sonst fälschlich „Ohne
+  // Abschnitt“ (design.md D5). Fehlen nur die Einheiten, zeigt sie die Abschnitte. Gebaut wird
+  // sie nur, solange sie gezeigt wird: das Modell rechnet je Abschnitt die Stärke mit.
+  const skizze = useMemo(
+    () =>
+      ansicht === 'skizze' && abschnitte.zustand === 'daten'
+        ? baueFernmeldeskizze(
+            abschnitte.daten,
+            einheiten.zustand === 'daten' ? einheiten.daten : null,
+          )
+        : null,
+    [ansicht, abschnitte, einheiten],
+  );
+  const [skizzeZugeklappt, setSkizzeZugeklappt] = useState<ReadonlySet<string>>(new Set());
+  const skizzeKlappbar = useMemo(
+    () => (skizze ? klappbareSchluessel(skizze.wurzeln) : []),
+    [skizze],
+  );
+  const umschaltenSkizze = (key: string) =>
+    setSkizzeZugeklappt((alt) => {
+      const neu = new Set(alt);
+      if (neu.has(key)) neu.delete(key);
+      else neu.add(key);
+      return neu;
+    });
+
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -384,7 +494,11 @@ export default function FunkplanPage() {
     sprechgruppenQuery.dataUpdatedAt,
   );
 
-  const umfang = UMFANG.filter((u) => quellen[u.quelle].zustand === 'daten')
+  // Die Skizze zeigt keine Fahrzeuge, also zählt ihr Umfang sie auch nicht (Review LFH-625).
+  const umfang = UMFANG.filter(
+    (u) =>
+      quellen[u.quelle].zustand === 'daten' && !(ansicht === 'skizze' && u.quelle === 'fahrzeuge'),
+  )
     .map((u) => `${quellen[u.quelle].daten.length} ${u.wort}`)
     .join(' · ');
 
@@ -392,6 +506,16 @@ export default function FunkplanPage() {
   const fehlend = fehlendeQuellen(quellen).filter((f) => f.zustand !== 'laden');
 
   const abschnittZiel = (aid: number) => einsatzabschnittePfad(einsatzId, { abschnitt: aid });
+  // Beide Enden stehen da, sonst läse sich der Treffer wie „ohne Sprechgruppe“. Der Verweis führt
+  // zur unteren Stelle: dort wird die Sprechgruppe zugeordnet.
+  const verbindungTreffer = (v: Verbindung) => ({
+    key: `${v.unten.art}-${v.unten.id}`,
+    name: `${v.unten.name} → ${v.oben.name}`,
+    ziel:
+      v.unten.art === 'abschnitt'
+        ? abschnittZiel(v.unten.id)
+        : einheitDetailPfad(einsatzId, v.unten.id),
+  });
 
   return (
     // Druckwurzel (LFH-22): Mechanik in `druck/druck.css`, Eigenheiten in `funkplanPrint.css`.
@@ -411,9 +535,18 @@ export default function FunkplanPage() {
             ]}
           />
         }
+        aktionen={
+          // Auch ohne Schreibrecht: lesen kann jeder beide Darstellungen.
+          <Segmentleiste<FunkplanAnsicht>
+            beschriftung="Darstellung"
+            optionen={DARSTELLUNG_OPTIONEN}
+            wert={ansicht}
+            onWechsel={setzeAnsicht}
+          />
+        }
       >
         <Druckkopf
-          dokumentart="Funkplan"
+          dokumentart={ansicht === 'skizze' ? 'Fernmeldeskizze' : 'Funkplan'}
           einsatz={einsatz}
           sichtbarkeit="druck"
           zeilen={[
@@ -447,6 +580,11 @@ export default function FunkplanPage() {
             treffer={(e) => ({ key: e.id, name: e.name, ziel: einheitDetailPfad(einsatzId, e.id) })}
           />
           <LueckenZeile
+            titel="Verbindungen ohne gemeinsame Sprechgruppe"
+            luecke={luecken.verbindungenOhneGemeinsameSprechgruppe}
+            treffer={verbindungTreffer}
+          />
+          <LueckenZeile
             titel="Einsatzlokale Sprechgruppen ohne Zuordnung"
             luecke={luecken.lokaleSprechgruppenOhneZuordnung}
             // Kein Ziel: eine Sprechgruppe hat keine eigene Seite, zugeordnet wird am Abschnitt
@@ -473,6 +611,22 @@ export default function FunkplanPage() {
 
         {/* ── Werkzeugzeile ── außerhalb des Primitivs, nur hier trägt `.funkplan-no-print`. */}
         <Space className="funkplan-no-print" wrap style={{ marginBlockEnd: token.margin }}>
+          {ansicht === 'skizze' && (
+            <>
+              <Button
+                disabled={skizzeKlappbar.length === 0}
+                onClick={() => setSkizzeZugeklappt(new Set())}
+              >
+                Alle aufklappen
+              </Button>
+              <Button
+                disabled={skizzeKlappbar.length === 0}
+                onClick={() => setSkizzeZugeklappt(new Set(skizzeKlappbar))}
+              >
+                Alle zuklappen
+              </Button>
+            </>
+          )}
           {darfUebernehmen && (
             <Button
               loading={uebernehmen.isPending}
@@ -485,7 +639,11 @@ export default function FunkplanPage() {
           )}
           {/* Erst nach committetem Aufklappen drucken — `useDrucken` löst den Dialog nach dem
               Commit aus. */}
-          <DruckKnopf vorbereiten={() => setZugeklappt(new Set())} />
+          <DruckKnopf
+            vorbereiten={() =>
+              ansicht === 'skizze' ? setSkizzeZugeklappt(new Set()) : setZugeklappt(new Set())
+            }
+          />
         </Space>
         {uebernehmen.error != null && (
           <div className="funkplan-no-print" style={{ marginBlockEnd: token.margin }}>
@@ -497,42 +655,53 @@ export default function FunkplanPage() {
           </div>
         )}
 
-        <Datensicht
-          bezeichnung="Funkplan"
-          form="tabelle"
-          spalten={spalten}
-          daten={zeilen}
-          zeilenSchluessel="key"
-          ladend={
-            quellen.abschnitte.zustand === 'laden' ||
-            quellen.einheiten.zustand === 'laden' ||
-            quellen.fahrzeuge.zustand === 'laden'
-          }
-          leerText={leerTextFuer(quellen)}
-          baum={{
-            kinder: 'children',
-            aufgeklappt,
-            onAufgeklappt: (offen) =>
-              setZugeklappt(new Set(aufklappbar.filter((k) => !offen.includes(k)))),
-          }}
-          karte={{
-            art: 'plan',
-            titel: {
-              spalte: 'stelle',
-              ziel: (z) =>
-                z.id == null
-                  ? null
-                  : z.art === 'abschnitt'
-                    ? abschnittZiel(z.id)
-                    : z.art === 'einheit'
-                      ? einheitDetailPfad(einsatzId, z.id)
-                      : z.art === 'fahrzeug'
-                        ? fahrzeugePfad(einsatzId, { fahrzeug: z.id })
-                        : null,
-            },
-            sekundaer: ['rufname', 'tmo', 'dmo'],
-          }}
-        />
+        {ansicht === 'skizze' ? (
+          <SkizzenBereich
+            einsatzId={einsatzId}
+            abschnitte={quellen.abschnitte.zustand}
+            einheiten={quellen.einheiten.zustand}
+            skizze={skizze}
+            zugeklappt={skizzeZugeklappt}
+            onUmschalten={umschaltenSkizze}
+          />
+        ) : (
+          <Datensicht
+            bezeichnung="Funkplan"
+            form="tabelle"
+            spalten={spalten}
+            daten={zeilen}
+            zeilenSchluessel="key"
+            ladend={
+              quellen.abschnitte.zustand === 'laden' ||
+              quellen.einheiten.zustand === 'laden' ||
+              quellen.fahrzeuge.zustand === 'laden'
+            }
+            leerText={leerTextFuer(quellen)}
+            baum={{
+              kinder: 'children',
+              aufgeklappt,
+              onAufgeklappt: (offen) =>
+                setZugeklappt(new Set(aufklappbar.filter((k) => !offen.includes(k)))),
+            }}
+            karte={{
+              art: 'plan',
+              titel: {
+                spalte: 'stelle',
+                ziel: (z) =>
+                  z.id == null
+                    ? null
+                    : z.art === 'abschnitt'
+                      ? abschnittZiel(z.id)
+                      : z.art === 'einheit'
+                        ? einheitDetailPfad(einsatzId, z.id)
+                        : z.art === 'fahrzeug'
+                          ? fahrzeugePfad(einsatzId, { fahrzeug: z.id })
+                          : null,
+              },
+              sekundaer: ['rufname', 'tmo', 'dmo'],
+            }}
+          />
+        )}
       </EinsatzSeite>
     </div>
   );

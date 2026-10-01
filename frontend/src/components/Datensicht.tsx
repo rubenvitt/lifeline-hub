@@ -196,12 +196,6 @@ export interface PrimaerAktion<T> {
   zugaenglicherName?: (zeile: T) => string;
   /** Zeilenweise Ausblendung (Schreibrecht, Zustand). Fehlt = immer sichtbar. */
   sichtbar?: (zeile: T) => boolean;
-  /**
-   * Läuft die Aktion für diese Zeile gerade (z. B. Entfernen bis zur Serverantwort, LFH-654)?
-   * Dann trägt der Auslöser den Ladezustand und öffnet keine zweite Rückfrage. Die
-   * Kennzeichnung der Zeile als Text bleibt Sache des Spalten-`render` (Kriterium 6).
-   */
-  laeuft?: (zeile: T) => boolean;
 }
 
 /** Ein Eintrag des gebündelten Menüs ({@link WeitereAktionen}). */
@@ -228,6 +222,12 @@ export interface WeitereAktionen<T> {
   /** Zugänglicher Name des Auslösers MIT Zeilenkennung („Aktionen zu Bezirk X"). */
   zugaenglicherName: (zeile: T) => string;
   onWahl: (key: string, zeile: T) => void;
+  /**
+   * Läuft eine Aktion aus dem Menü für diese Zeile gerade (z. B. Entfernen bis zur Serverantwort,
+   * LFH-654)? Dann trägt der Auslöser den Ladezustand und öffnet das Menü nicht — keine zweite
+   * Löschung. Die Kennzeichnung der Zeile als Text bleibt Sache des Spalten-`render` (Kriterium 6).
+   */
+  laeuft?: (zeile: T) => boolean;
 }
 
 /** Menüeinträge für antd: die Gefahr hinter einem Trenner, sonst in Lieferreihenfolge. */
@@ -1333,7 +1333,6 @@ export default function Datensicht<T extends object, const K extends string>(
       .filter((s): s is DatensichtSpalte<T, K> => s != null);
     const aktion = karte.aktion;
     const zeigeAktion = aktion != null && (aktion.sichtbar?.(zeile) ?? true);
-    const aktionLaeuft = zeigeAktion && (aktion!.laeuft?.(zeile) ?? false);
 
     const knopf = zeigeAktion ? (
       // Kein `size`-Prop und kein `danger`: die Höhe kommt aus `controlHeight`, Rot bedient nichts.
@@ -1344,17 +1343,13 @@ export default function Datensicht<T extends object, const K extends string>(
           title={aktion!.bestaetigung}
           onConfirm={() => aktion!.onKlick(zeile)}
           okButtonProps={aktion!.bestaetigungGefahr ? { danger: true } : undefined}
-          disabled={aktionLaeuft}
         >
-          <Button aria-label={aktion!.zugaenglicherName?.(zeile)} loading={aktionLaeuft}>
-            {aktion!.etikett}
-          </Button>
+          <Button aria-label={aktion!.zugaenglicherName?.(zeile)}>{aktion!.etikett}</Button>
         </Popconfirm>
       ) : (
         <Button
           key="aktion"
           aria-label={aktion!.zugaenglicherName?.(zeile)}
-          loading={aktionLaeuft}
           onClick={() => aktion!.onKlick(zeile)}
         >
           {aktion!.etikett}
@@ -1364,12 +1359,14 @@ export default function Datensicht<T extends object, const K extends string>(
 
     const weitere = karte.weitere;
     const weitereEintraege = weitere?.eintraege(zeile) ?? [];
+    const weitereLaeuft = weitere?.laeuft?.(zeile) ?? false;
     const menueKnopf =
       weitere && weitereEintraege.length > 0 ? (
         <Dropdown
           key="weitere"
           trigger={['click']}
           autoFocus
+          disabled={weitereLaeuft}
           menu={{
             items: menueEintraege(weitereEintraege),
             onClick: ({ key }) => weitere.onWahl(key, zeile),
@@ -1378,6 +1375,7 @@ export default function Datensicht<T extends object, const K extends string>(
           <Button
             type="text"
             aria-label={weitere.zugaenglicherName(zeile)}
+            loading={weitereLaeuft}
             icon={
               <span aria-hidden="true" style={{ display: 'inline-flex' }}>
                 <IkonePunkteSenkrecht />

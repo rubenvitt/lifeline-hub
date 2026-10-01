@@ -656,6 +656,27 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       },
     },
     {
+      // Fernmeldeskizze (LFH-625): Darstellung „Skizze“ des Funkplans, über die Sichtvorgabe
+      // geöffnet. Datenanker ist die gesäte Einheit mit langem Namen IN der Skizze (sie steht
+      // auch in den Lücken, deshalb auf die Skizze verengt).
+      pfad: `/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`,
+      anker: (p: Page) =>
+        p.getByRole('region', { name: 'Fernmeldeskizze' }).getByRole('link', {
+          name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
+        }),
+      lesend: {
+        anker: (p: Page) =>
+          p.getByRole('region', { name: 'Fernmeldeskizze' }).getByRole('link', {
+            name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
+          }),
+        vorbedingung: (p: Page) =>
+          expect(
+            p.getByRole('button', { name: 'In Lagebericht übernehmen' }),
+            'Vorbedingung: ohne Schreibrecht keine Übernahme',
+          ).toHaveCount(0),
+      },
+    },
+    {
       // Organigramm der Führungsorganisation (LFH-626): Ansicht der Seite Einsatzabschnitte, über
       // die Sichtvorgabe geöffnet. Datenanker ist die gesäte Einheit mit langem Namen IM
       // Organigramm (die Gliederung zeigt sie nicht).
