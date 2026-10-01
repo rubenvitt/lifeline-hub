@@ -61,7 +61,7 @@ diese Zusage.
   (`fachebenen.ts`, Tabelle in `docs/fachebenen-quellen.md`), Anzeige nur über
   `FachebeneStand.tsx`, Takt `components/useMinutenTakt.ts`.
 - **Warnebenen enden nach 6 h, DWD-Warnungen nach ihrem Ende** (LFH-662,
-  `openspec/changes/lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md`): NINA und DWD liefern
+  `openspec/changes/archive/2026-10-01-lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md`): NINA und DWD liefern
   einen Cache-Stand über `WARN_OBERGRENZE` nicht mehr aus (`swr_weg`, kalt → `offline`), die
   übrigen Ebenen bleiben bei 48 h. `EXPIRES ≤ jetzt` filtern **beide** Seiten: der Server bei
   jeder Auslieferung (`dwd_gueltige`, der Cache hält den Rohstand), der Client im Minutentakt

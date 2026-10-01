@@ -261,7 +261,7 @@ anwendbar), „nicht geprüft" ist keins.
   Karte ist eine begründete Entscheidung (Beispiele: `odlStufe` in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`, `aufbewahrungZustand` in
   `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4, `capSchwere` in
-  `openspec/changes/lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md` D5). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
+  `openspec/changes/archive/2026-10-01-lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md` D5). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
   der Datei, kein `<Tag color={…}>` auf Vertrags-Enums (dafür `components/StatusTag.tsx`).
 
 **Farbe und Zeichen**
