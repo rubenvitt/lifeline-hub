@@ -93,6 +93,23 @@ describe('InfotelefonPage (LFH-554)', () => {
     expect(screen.queryByText('2')).toBeNull();
   });
 
+  it('hebt den per ?anruf= angesprungenen Anruf mit Fläche hervor, nicht nur mit der Klasse (LFH-698)', async () => {
+    // `Zeitachseneintrag` setzt seinen Grund inline; die Klassenregel in `index.css` liefert nur
+    // die Linie. Ohne eigenen Inline-Grund bliebe der Anruf ohne `bedienFlaeche` (Spec
+    // `deeplink-hervorhebung`, zwei Kanäle) — so wie im ETB gelöst.
+    setup('/einsaetze/1/stab/infotelefon?anruf=1');
+    const ziel = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-anruf="1"]');
+      expect(el).toHaveClass('zeile-hervorgehoben');
+      return el!;
+    });
+    const nachbar = document.querySelector<HTMLElement>('[data-anruf="2"]')!;
+    expect(nachbar).not.toHaveClass('zeile-hervorgehoben');
+    expect(nachbar.style.background).toBe('transparent');
+    expect(ziel.style.background).not.toBe('transparent');
+    expect(ziel.style.background).not.toBe('');
+  });
+
   it('filtert auf offene Rückrufe', async () => {
     setup();
     await screen.findByText('Sperrung B 3');
