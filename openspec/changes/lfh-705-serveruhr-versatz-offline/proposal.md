@@ -22,6 +22,13 @@ Fehlchronologie, gegen die die Nachtragsregel (LFH-639 D2) gebaut ist.
   gilt wie bisher die Geräteuhr.
 - Ein von Hand eingetragener Zeitpunkt bleibt unangetastet, ebenso der Online-Versuch (der
   sendet weiter keinen Zeitpunkt, und es gilt die Serveruhr).
+- **Mitbehoben (Befund beim e2e-Test, Entscheidung 01.10.2026):** Die fünf offline-fähigen
+  Erfassungen (Stand- und Belegungsmeldung, Person auf Personen- und Aufnahmeseite, Meldung)
+  liefen als TanStack-Mutation mit der Vorgabe `networkMode: 'online'`. Ohne Netz hielt
+  TanStack sie an. „Offline vorgemerkt“ erschien nie, der Knopf drehte sich bis zur
+  Rückkehr des Netzes, und dann ging die Erfassung online hinaus. Bei der Betreuung bekam sie
+  dabei den Sendezeitpunkt. Vorgemerkt wurde nur bei „WLAN ohne Server“. Diese Mutationen
+  laufen jetzt mit `networkMode: 'always'` (`design.md`, D6).
 - Der Server bleibt unverändert: Zeitpunkte über 60 s in der Zukunft lehnt er weiter ab.
   Verworfen ist die Gegenrichtung, solche Zeitpunkte für Queue-Meldungen auf „jetzt“ zu
   kappen (Begründung in `design.md`, D1).
@@ -42,6 +49,8 @@ _keine_
 
 - Frontend: `api/client.ts` (Versatz aus `apiGet`/`apiSend` messen), neues Modul für den
   Versatz unter `offline/`, `offline/schreiben.ts` (`betreuungsmeldungOfflineFaehig`).
+  Dazu `networkMode` der offline-fähigen Mutationen in `pages/BetreuungPage.tsx`,
+  `pages/PersonenPage.tsx`, `pages/personen/AufnahmePage.tsx` und `pages/MeldungenPage.tsx`.
 - Backend, API, Schema, Migrationen: keine Änderung. Der `Date`-Header kommt von hyper.
 - Nicht betroffen, aber geprüft: ETB-Ereigniszeit und Meldungs-Ereigniszeit stammen
   ebenfalls aus der Geräteuhr. Der Server lehnt dort keine Zukunft ab, die Meldung scheitert

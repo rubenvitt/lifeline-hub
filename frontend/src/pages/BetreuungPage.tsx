@@ -226,6 +226,9 @@ export default function BetreuungPage() {
   // mit dem Erfassungszeitpunkt vorgemerkt und später gesendet. „Vorgemerkt" ist ein Erfolg ohne
   // Rückweg (noch keine `meldung_id`); der Dialog schließt, weil der Wortlaut in IndexedDB liegt.
   const standMut = useMutation({
+    // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
+    // (LFH-705, design.md D6).
+    networkMode: 'always',
     mutationFn: ({ bezirk, body }: { bezirk: Evakuierungsbezirk; body: StandmeldungEingabe }) => {
       if (!benutzer) throw new Error('Nicht angemeldet');
       return erfasseStandOfflineFaehig(benutzer.id, einsatzId, bezirk, body);
@@ -280,6 +283,9 @@ export default function BetreuungPage() {
     },
   });
   const belegungMut = useMutation({
+    // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
+    // (LFH-705, design.md D6).
+    networkMode: 'always',
     mutationFn: ({ stelle, body }: { stelle: Betreuungsstelle; body: BelegungsmeldungEingabe }) => {
       if (!benutzer) throw new Error('Nicht angemeldet');
       return erfasseBelegungOfflineFaehig(benutzer.id, einsatzId, stelle, body);

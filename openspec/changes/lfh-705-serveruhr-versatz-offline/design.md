@@ -125,6 +125,30 @@ unberührt. Ihn hat die Person bewusst gewählt, und eine stille Umrechnung mach
 „09:30“ eine Zeit, die sie nie eingegeben hat. Geht ihr Gerät vor und trägt sie eine
 Zukunftszeit ein, ist die 400 die richtige Antwort.
 
+### D6 — Offline-fähige Mutationen laufen auch ohne Netz (`networkMode: 'always'`)
+
+Gefunden beim e2e-Test zu 3.1, nicht beim Entwurf. Die Seiten rufen die offline-fähigen
+Funktionen aus `offline/schreiben.ts` in einer `useMutation` auf. TanStacks Vorgabe
+`networkMode: 'online'` hält eine Mutation an, solange `onlineManager` offline meldet, und
+das ist im Browser genau dann der Fall, wenn `navigator.onLine` falsch ist. Damit kam der
+Zweig `!navigator.onLine` in `offline/schreiben.ts` nie zum Zug. Die Mutation lief erst nach
+der Rückkehr des Netzes an, und zwar online. Die Seitentests sahen das nicht: Sie setzten nur
+`navigator.onLine`, nicht `onlineManager`. Ein Browser setzt beides über das Ereignis
+`offline`.
+
+Die fünf Mutationen, deren `mutationFn` eine `erfasse…OfflineFaehig`-Funktion ruft, bekommen
+`networkMode: 'always'`. Die Funktionen entscheiden selbst, ob sie senden oder vormerken. Das
+Anhalten durch TanStack ist bei ihnen also falsch und nicht nur überflüssig. Die übrigen
+Mutationen bleiben bei der Vorgabe. Für sie ist Anhalten richtig, denn sie haben keine Queue.
+
+Die Seitentests schalten künftig offline wie ein Browser: `navigator.onLine` und das
+Fensterereignis `offline` zusammen (`setzeOnline` in `test/utils.tsx`). Mit dem alten
+Testaufbau wären sie gegen den Fehler grün geblieben.
+
+**Verworfen:** die Vorgabe global auf `'always'` zu setzen. Dann liefen alle Mutationen ohne
+Netz los und scheiterten mit `NetzFehler`, statt zu warten. Das wäre eine eigene Entscheidung
+über ein Dutzend Seiten.
+
 ## Risks / Trade-offs
 
 - [Ein Proxy entfernt `Date`] → Dann gibt es keine Messung, und es gilt das heutige

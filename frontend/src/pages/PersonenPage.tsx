@@ -218,6 +218,9 @@ export default function PersonenPage() {
   const fehler = useFehlerMeldung();
 
   const anlegenMutation = useMutation({
+    // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
+    // (LFH-705, design.md D6).
+    networkMode: 'always',
     mutationFn: async (v: {
       benutzerId: number;
       einsatzId: number;

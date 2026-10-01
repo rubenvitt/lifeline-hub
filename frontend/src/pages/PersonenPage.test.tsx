@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, setzeOnline } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, Person } from '../api/types';
 import PersonenPage from './PersonenPage';
@@ -80,7 +80,7 @@ beforeEach(async () => {
   FakeBroadcastChannel.instanzen = [];
   vi.stubGlobal('EventSource', FakeEventSource);
   vi.stubGlobal('BroadcastChannel', FakeBroadcastChannel);
-  Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  setzeOnline(true);
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
   // Die Seite lädt die Unfallhilfsstellen für `@UHS` und die Verbleib-Spalte; ohne eigene Angabe
   // gibt es keine.
@@ -512,7 +512,6 @@ describe('PersonenPage', () => {
   });
 
   it('ersetzt die Offline-Warnung nach korreliertem Flush durch Registriernummer und Highlight', async () => {
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     const vermisst = {
       ...person,
       id: 48,
@@ -521,7 +520,10 @@ describe('PersonenPage', () => {
       name: 'Offline Neu',
     };
     const { client } = render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    const vermisstMelden = await screen.findByRole('button', { name: 'Vermisst melden' });
+    // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
+    setzeOnline(false);
+    await userEvent.click(vermisstMelden);
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Offline Neu');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
@@ -549,7 +551,6 @@ describe('PersonenPage', () => {
   });
 
   it('liefert die Personen-Quittung nach Unmount und globalem Flush beim Remount genau einmal aus', async () => {
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     const vermisst = {
       ...person,
       id: 49,
@@ -567,13 +568,16 @@ describe('PersonenPage', () => {
     );
 
     const ersteSeite = render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    const vermisstMelden = await screen.findByRole('button', { name: 'Vermisst melden' });
+    // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
+    setzeOnline(false);
+    await userEvent.click(vermisstMelden);
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Nach Reload');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     ersteSeite.unmount();
 
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    setzeOnline(true);
     const globalerSync = renderMitProviders(<OfflineSyncTest benutzerId={nutzer.id} />);
     await vi.waitFor(() => expect(post).toHaveBeenCalledOnce());
     await vi.waitFor(async () =>
@@ -744,7 +748,6 @@ describe('PersonenPage', () => {
   });
 
   it('ordnet auch einen Offline-Abschluss nach dem Routewechsel ausschließlich Einsatz A zu', async () => {
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     const personA = {
       ...person,
       id: 78,
@@ -773,13 +776,18 @@ describe('PersonenPage', () => {
       ),
     );
     const { container } = renderMitEinsatzNavigation();
-    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    const vermisstMelden = await screen.findByRole('button', { name: 'Vermisst melden' });
+    // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
+    setzeOnline(false);
+    await userEvent.click(vermisstMelden);
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Offline A');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     const [vorgemerkt] = await schreibaktionenLaden(1, 1);
     if (vorgemerkt.aktion.art !== 'person') throw new Error('Personenaktion erwartet');
 
+    // Das Netz ist zurück, bevor Einsatz B geladen wird.
+    setzeOnline(true);
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
     expect(await screen.findByText('Person B')).toBeInTheDocument();
     await act(async () => {
@@ -1432,12 +1440,11 @@ describe('PersonenPage', () => {
     });
 
     it('merkt offline vor (client_id, Sichtung in der vorgemerkten Anlage) und leert das Feld', async () => {
-      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
       render(einsatzAktiv, []);
-      await userEvent.type(
-        await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
-        'Neumann, Ilse w 84 sk2{Enter}',
-      );
+      const kurzeingabe = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
+      // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
+      setzeOnline(false);
+      await userEvent.type(kurzeingabe, 'Neumann, Ilse w 84 sk2{Enter}');
       await vi.waitFor(() => expect(feld()).toHaveValue(''));
       expect(document.querySelector('[data-lfh="zuletzt"]')).toHaveTextContent(
         'Zuletzt: offline vorgemerkt · Neumann, Ilse · SK II',

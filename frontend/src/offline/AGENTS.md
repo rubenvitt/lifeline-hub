@@ -60,3 +60,18 @@ draußen gelassen werden.
 - **Offen:** die übrigen personenbezogenen Daten auf dem Gerät (LFH-767). Herleitung und
   Prüfspur: `openspec/changes/archive/2026-09-30-lfh-723-lagebild-offline-lesen/design.md`, Prüfliste
   `docs/superpowers/specs/2026-09-28-lfh-723-pruefliste.md`.
+
+## Schreiben ohne Netz (LFH-705)
+
+- **Eine Mutation, die eine `erfasse…OfflineFaehig`-Funktion aus `offline/schreiben.ts` ruft,
+  läuft mit `networkMode: 'always'`.** Die Funktion entscheidet selbst, ob sie sendet oder
+  vormerkt. TanStacks Vorgabe `'online'` hielte die Mutation ohne Netz an: Dann erschiene
+  nie „Offline vorgemerkt“, und nach der Rückkehr des Netzes ginge die Erfassung online
+  hinaus. Bis LFH-705 galt das für alle fünf solchen Mutationen.
+- **Seitentests schalten offline über `setzeOnline` (`test/utils.tsx`)**, nicht nur über
+  `navigator.onLine`. Ein Browser führt beim Ereignis `offline` auch TanStacks `onlineManager`
+  nach. Der alte Testaufbau blieb gegen den Fehler grün. Geladen wird dabei online, dann fällt
+  das Netz weg.
+- **Zeitpunkte einer vorgemerkten Erfassung nach der Serveruhr** (`serverJetzt()` aus
+  `offline/serveruhr.ts`, Versatz aus dem `Date`-Header jeder Antwort von `apiGet`, `apiSend`
+  und `apiUpload`). Herleitung: `openspec/changes/lfh-705-serveruhr-versatz-offline/design.md`.
