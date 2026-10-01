@@ -92,6 +92,10 @@ export const EINSATZ_KEYS = {
   wetter: 'einsatz-wetter',
   // ETB-Druckansicht: Schnappschuss, eigener Prefix außerhalb von `etb`.
   etbDruck: 'einsatz-etb-druck',
+  // Druck der Modul-Listen (LFH-727): Schnappschüsse, eigene Prefixe außerhalb der Listen.
+  personenDruck: 'einsatz-personen-druck',
+  tiereDruck: 'einsatz-tiere-druck',
+  schaedenDruck: 'einsatz-schaeden-druck',
   // Einsatzbericht: ein Schnappschuss über alle Quellen (LFH-726).
   einsatzberichtDruck: 'einsatz-einsatzbericht-druck',
 } as const;
@@ -243,6 +247,9 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  * - `etbDruck`: ein Druckbeleg ist ein Schnappschuss; ein neuer Eintrag darf ihn nicht still
  *   ergänzen („Neu laden“ ist eine ausdrückliche Handlung). Deshalb der eigene Prefix: unter
  *   `etb` zöge ihn das `etb`-Ereignis per Präfix mit.
+ * - `personenDruck`/`tiereDruck`/`schaedenDruck` (LFH-727): dieselbe Begründung wie `etbDruck`
+ *   für die Druckansichten der Modul-Listen. Beim Personendruck kommt hinzu: jeder Abruf ist ein
+ *   Eintrag im Zugriffsprotokoll, ein Live-Refetch schriebe also Protokollzeilen ohne Handlung.
  * - `einsatzberichtDruck`: derselbe Schnappschuss-Grundsatz für den Einsatzbericht (LFH-726): EIN
  *   Stand über alle Quellen; ein Modul-Ereignis darf den geöffneten Bericht nicht still ändern.
  */
@@ -263,6 +270,9 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.pegel,
   EINSATZ_KEYS.wetter,
   EINSATZ_KEYS.etbDruck,
+  EINSATZ_KEYS.personenDruck,
+  EINSATZ_KEYS.tiereDruck,
+  EINSATZ_KEYS.schaedenDruck,
   EINSATZ_KEYS.einsatzberichtDruck,
 ] as const satisfies readonly EinsatzKey[];
 
@@ -375,6 +385,11 @@ export const einsatzKeys = {
   // ETB-Druckansicht: Vollabruf einer Auswahl, nicht live (siehe NICHT_LIVE_KEYS).
   etbDruck: <F>(einsatzId: number, filter: F) =>
     [EINSATZ_KEYS.etbDruck, einsatzId, filter] as const,
+  // Druck der Modul-Listen (LFH-727): Vollabruf ohne Filter im Key, nicht live (siehe
+  // NICHT_LIVE_KEYS). Der Filter wählt im Client aus der geladenen Menge.
+  personenDruck: (einsatzId: number) => [EINSATZ_KEYS.personenDruck, einsatzId] as const,
+  tiereDruck: (einsatzId: number) => [EINSATZ_KEYS.tiereDruck, einsatzId] as const,
+  schaedenDruck: (einsatzId: number) => [EINSATZ_KEYS.schaedenDruck, einsatzId] as const,
   // Einsatzbericht: alle Quellen in einem Abruf, nicht live (siehe NICHT_LIVE_KEYS).
   einsatzberichtDruck: (einsatzId: number) =>
     [EINSATZ_KEYS.einsatzberichtDruck, einsatzId] as const,

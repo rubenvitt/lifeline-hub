@@ -3,7 +3,8 @@ import StatusTag from '../components/StatusTag';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { schadenDetailPfad } from '../routing/deeplinks';
+import { schadenDetailPfad, schaedenDruckPfad } from '../routing/deeplinks';
+import DruckAnsichtKnopf from '../druck/DruckAnsichtKnopf';
 import { Alert, Breadcrumb, Button, Space, Tag, Typography } from 'antd';
 import { Segmentleiste, monoStil } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
@@ -18,6 +19,8 @@ import {
   TYP_LABEL,
   filterSchaeden,
   geschaedigtAnzeige,
+  SCHAEDEN_SICHTEN,
+  type SchaedenSicht,
 } from './schaeden/schadenHelfer';
 import SchadenErfassenModal from './schaeden/SchadenErfassenModal';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
@@ -25,14 +28,6 @@ import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components
 import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { einsatzStatus } from '../theme/statusFarben';
-
-type Sicht = 'offen' | 'uebergeben' | 'abgeschlossen' | 'alle';
-const SICHTEN: { key: Sicht; label: string }[] = [
-  { key: 'offen', label: 'Offen' },
-  { key: 'uebergeben', label: 'Übergeben' },
-  { key: 'abgeschlossen', label: 'Abgeschlossen' },
-  { key: 'alle', label: 'Alle' },
-];
 
 /**
  * Das eine Spaltenregister der Schadensliste. Funktion von `einsatzId`, weil die Geschädigt-Spalte
@@ -178,7 +173,7 @@ export default function SchaedenPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [sicht, setSicht] = useState<Sicht>('offen');
+  const [sicht, setSicht] = useState<SchaedenSicht>('offen');
 
   const [erfassenOffen, setErfassenOffen] = useState(false);
 
@@ -268,11 +263,14 @@ export default function SchaedenPage() {
         />
       }
       aktionen={
-        darfSchreiben && (
-          <Button type="primary" onClick={() => setErfassenOffen(true)}>
-            Schnellerfassung
-          </Button>
-        )
+        <>
+          <DruckAnsichtKnopf pfad={schaedenDruckPfad(einsatzId, { sicht })} />
+          {darfSchreiben && (
+            <Button type="primary" onClick={() => setErfassenOffen(true)}>
+              Schnellerfassung
+            </Button>
+          )}
+        </>
       }
       // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette) — mit demselben
       // Rechte-Riegel wie der Knopf.
@@ -290,7 +288,7 @@ export default function SchaedenPage() {
         beschriftung="Schäden nach Status filtern"
         wert={sicht}
         onWechsel={setSicht}
-        optionen={SICHTEN.map((s) => ({ wert: s.key, label: s.label }))}
+        optionen={SCHAEDEN_SICHTEN.map((s) => ({ wert: s.key, label: s.label }))}
         style={{ marginBottom: 12 }}
       />
 
