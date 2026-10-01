@@ -183,8 +183,8 @@ describe('Switch-Maße (LFH-380)', () => {
 });
 
 /**
- * Der gewählte Radio-Knopf (Knopfform) schreibt seinen TEXT in antds `colorPrimary`, am Tag
- * 6,59 : 1 und damit unter dem Tagesboden 7 : 1. Blauer Bedien-TEXT nimmt `bedienText`.
+ * Der gewählte Radio-Knopf (Knopfform) schreibt seinen TEXT in antds `colorPrimary`, am Tag bis
+ * LFH-661 6,59 : 1 und damit unter dem Tagesboden 7 : 1. Blauer Bedien-TEXT nimmt `bedienText`.
  *
  * Die Regel sitzt im global geladenen `index.css` und trifft NUR den Text. Ein Token
  * `Radio.colorPrimary` färbte auch Scheibe, `solid`-Fläche und Hover-Fläche.
