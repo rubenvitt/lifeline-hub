@@ -260,10 +260,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # `apple`: Developer ID und Notarisierung (LFH-722). Nur dieser Eintrag bekommt die
+          # APPLE_*-Secrets; Windows signiert noch nicht (LFH-875).
           - name: desktop-macos-arm64
             runs-on: macos-latest
             target: aarch64-apple-darwin
             bundles: app,dmg
+            apple: true
           - name: desktop-windows-x86_64
             runs-on: windows-latest
             target: x86_64-pc-windows-msvc
@@ -298,6 +301,15 @@ jobs:
           # Ohne den privaten Schlüssel entstehen keine .sig-Dateien und damit kein Update.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # macOS (LFH-722): Tauri importiert das Zertifikat selbst in einen Wegwerf-Schlüsselbund
+          # und notarisiert die App. Die Identität schlägt `"-"` aus tauri.conf.json, lokale Bauten
+          # bleiben ad hoc. Ohne sie bräche Tauri ab, weil "-" nicht im Zertifikat vorkommt.
+          APPLE_SIGNING_IDENTITY: "${{ matrix.apple && 'Developer ID Application: Ruben Vitt (H95J852PKP)' || '' }}"
+          APPLE_CERTIFICATE: ${{ matrix.apple && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.apple && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_API_ISSUER: ${{ matrix.apple && secrets.APPLE_API_ISSUER || '' }}
+          APPLE_API_KEY: ${{ matrix.apple && secrets.APPLE_API_KEY || '' }}
+          APPLE_API_KEY_P8: ${{ matrix.apple && secrets.APPLE_API_KEY_P8 || '' }}
           VERSION: ${{ needs.vorbereiten.outputs.version }}
           ZIEL: ${{ matrix.target }}
           BUNDLES: ${{ matrix.bundles }}
@@ -307,6 +319,21 @@ jobs:
             echo "FEHLER: Secret TAURI_SIGNING_PRIVATE_KEY fehlt (docs/betrieb/desktop-app.md)." >&2
             exit 1
           fi
+          # Fehlen die Zugangsdaten der Notarisierung, warnt Tauri nur und baut ein nicht
+          # notarisiertes Paket. Das darf nie ans Release.
+          if [[ "$ZIEL" == *apple-darwin ]]; then
+            fehlt=()
+            for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_API_ISSUER APPLE_API_KEY APPLE_API_KEY_P8; do
+              [ -n "${!v}" ] || fehlt+=("$v")
+            done
+            if [ "${#fehlt[@]}" -gt 0 ]; then
+              echo "FEHLER: Secrets für Signierung/Notarisierung fehlen: ${fehlt[*]} (docs/betrieb/desktop-app.md)." >&2
+              exit 1
+            fi
+            export APPLE_API_KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+            ( umask 077; printf '%s\n' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY_PATH" )
+            unset APPLE_API_KEY_P8
+          fi
           # Die Hülle muss die Release-Version tragen, sonst vergleicht ihr Updater falsch. Sie
           # erbt sie aus [workspace.package] (gesetzt von release.config.mjs); gefragt wird Cargo,
           # nicht die Datei — die trägt nur `version.workspace = true` und unter Windows CRLF.
@@ -314,6 +341,87 @@ jobs:
           [ "$ist" = "$VERSION" ] \
             || { echo "FEHLER: lifeline-desktop trägt $ist, erwartet $VERSION." >&2; exit 1; }
           cargo tauri build --ci --target "$ZIEL" --bundles "$BUNDLES"
+
+      # Tauri notarisiert nur die App, das .dmg signiert es bloß. Gatekeeper beurteilt beim ersten
+      # Öffnen aber das geladene Image (LFH-722, D5). Vor dem Einsammeln, weil Stapling die Bytes
+      # und damit die .sha256 ändert.
+      - name: Disk-Image notarisieren (macOS)
+        if: matrix.apple
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          ZIEL: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          trap 'rm -f "$RUNNER_TEMP/AuthKey.p8"' EXIT
+          target_dir="$(cargo metadata --format-version 1 --no-deps | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
+          dmgs=("$target_dir/$ZIEL/release/bundle/dmg"/*.dmg)
+          [ "${#dmgs[@]}" -eq 1 ] && [ -f "${dmgs[0]}" ] \
+            || { echo "FEHLER: erwartet genau ein .dmg, gefunden: ${dmgs[*]}" >&2; exit 1; }
+          # `--wait` endet auch bei „Invalid“ mit 0; maßgeblich ist der Status im JSON.
+          ergebnis="$(xcrun notarytool submit "${dmgs[0]}" --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait --timeout 30m --output-format json)"
+          echo "$ergebnis"
+          status="$(node -p 'JSON.parse(process.argv[1]).status' "$ergebnis")"
+          if [ "$status" != "Accepted" ]; then
+            id="$(node -p 'JSON.parse(process.argv[1]).id' "$ergebnis")"
+            xcrun notarytool log "$id" --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" || true
+            echo "FEHLER: Notarisierung des .dmg: $status" >&2
+            exit 1
+          fi
+          xcrun stapler staple "${dmgs[0]}"
+
+      # Belegt vor dem Einsammeln, was ans Release geht: Developer ID, Hardened Runtime und
+      # angeheftetes Ticket für App, .dmg und die App im Update-Archiv (LFH-722, D6). Inline statt
+      # Repo-Skript, weil der Job den Tag auscheckt und ein neues Skript dort fehlte.
+      - name: Signatur und Notarisierung prüfen (macOS)
+        if: matrix.apple
+        env:
+          ZIEL: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          target_dir="$(cargo metadata --format-version 1 --no-deps | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
+          bundle="$target_dir/$ZIEL/release/bundle"
+          team="H95J852PKP"
+          # Gatekeeper-Urteil nur, wenn der Runner es fällt; sonst tragen Ticket und Signatur.
+          gatekeeper=1
+          [[ "$(spctl --status 2>&1)" == *"assessments enabled"* ]] \
+            || { gatekeeper=0; echo "::warning::Gatekeeper auf dem Runner aus, spctl entfällt"; }
+          gatekeeper_urteil() {
+            local datei="$1" urteil; shift
+            urteil="$(spctl -a -vv "$@" "$datei" 2>&1)" || { echo "$urteil" >&2; exit 1; }
+            echo "$urteil"
+            grep -q 'source=Notarized Developer ID' <<<"$urteil" \
+              || { echo "FEHLER: $datei nicht als notarisiert anerkannt" >&2; exit 1; }
+          }
+          pruefe_app() {
+            local app="$1" info
+            codesign --verify --deep --strict --verbose=2 "$app"
+            info="$(codesign -dv --verbose=4 "$app" 2>&1)"
+            grep -qx "Authority=Developer ID Application: .* ($team)" <<<"$info" \
+              || { echo "FEHLER: $app nicht mit Developer ID ($team) signiert" >&2; exit 1; }
+            grep -q 'flags=0x10000(runtime)' <<<"$info" \
+              || { echo "FEHLER: $app ohne Hardened Runtime" >&2; exit 1; }
+            xcrun stapler validate "$app"
+            [ "$gatekeeper" = 0 ] || gatekeeper_urteil "$app" -t exec
+          }
+          apps=("$bundle"/macos/*.app)
+          [ "${#apps[@]}" -eq 1 ] && [ -d "${apps[0]}" ] || { echo "FEHLER: erwartet genau eine .app" >&2; exit 1; }
+          pruefe_app "${apps[0]}"
+          dmg="$(ls "$bundle"/dmg/*.dmg)"
+          # In eine Variable statt `| grep -q`: grep endet früh, und pipefail wertete das SIGPIPE
+          # von codesign als Fehler.
+          info="$(codesign -dv --verbose=4 "$dmg" 2>&1)"
+          grep -qx "TeamIdentifier=$team" <<<"$info" \
+            || { echo "FEHLER: .dmg nicht mit Team $team signiert" >&2; exit 1; }
+          xcrun stapler validate "$dmg"
+          [ "$gatekeeper" = 0 ] || gatekeeper_urteil "$dmg" -t open --context context:primary-signature
+          entpackt="$(mktemp -d)"
+          tar -xzf "$(ls "$bundle"/macos/*.app.tar.gz)" -C "$entpackt"
+          archiv_apps=("$entpackt"/*.app)
+          [ "${#archiv_apps[@]}" -eq 1 ] && [ -d "${archiv_apps[0]}" ] || { echo "FEHLER: Update-Archiv ohne genau eine .app" >&2; exit 1; }
+          pruefe_app "${archiv_apps[0]}"
+          echo "macOS-Pakete signiert (Developer ID $team) und notarisiert."
 
       # Kanonische Dateinamen: Tauris eigene tragen Leerzeichen, die GitHub beim Hochladen still
       # durch Punkte ersetzt — die URL in latest.json zeigte dann ins Leere.

@@ -203,3 +203,27 @@ halbe Minute).
 Offen bleiben der Erststart auf einem fremden Mac (5.1), die Update-Kette mit notarisierten
 Bauten (5.2), Druck, Deeplink und „Im Browser anmelden“ an der signierten App (5.3) und der
 Lauf auf dem GitHub-Runner (4.1).
+
+### Nachweise der Umsetzung (lokal, 01.10.2026)
+
+Die `run`-Blöcke des Jobs `desktop` wurden aus `artefakte.yml` gelesen (PyYAML) und unverändert
+in `bash` ausgeführt; `actionlint` 1.7.12 grün (samt shellcheck der Blöcke).
+
+| Schritt | Fall | Ergebnis |
+|---|---|---|
+| Wächter (Bauen) | alle fünf Secrets leer / eines leer | Abbruch, Meldung nennt genau die fehlenden |
+| Wächter (Bauen) | alle gesetzt | weiter; `.p8` in `$RUNNER_TEMP/AuthKey.p8`, Rechte 600 |
+| Wächter (Bauen) | Windows, alle leer | weiter (kein Abbruch) |
+| Disk-Image notarisieren | Kopie des gebauten `.dmg` | Einreichung `50112a49-…` Accepted, gestapelt; `.p8` danach gelöscht |
+| Prüfen | notarisiertes Bundle | grün: App, `.dmg`, App im Archiv je `Notarized Developer ID` |
+| Prüfen | App ad hoc nachsigniert | rot: „nicht mit Developer ID (H95J852PKP) signiert“ |
+| Prüfen | App ohne angeheftetes Ticket | rot: `stapler validate` (Exit 65) |
+
+Befund: Apple nimmt auch ein **unsigniertes** `.dmg` ohne Code an (Einreichung `b73fafa4-…`
+Accepted). Die Signatur des `.dmg` sichert also allein der Prüfschritt (`TeamIdentifier`), nicht
+die Notarisierung. Der Zweig „Status ≠ Accepted“ des DMG-Schritts ließ sich lokal nicht
+auslösen. Ein Fehler darin hält den Lauf trotzdem an, weil auch der Prüfschritt das Ticket
+verlangt.
+
+Unterwegs behoben: `codesign … | grep -q` schlug unter `pipefail` fälschlich an (grep endet
+früh, codesign bekommt SIGPIPE). Die Prüfungen lesen die Ausgabe jetzt erst in eine Variable.

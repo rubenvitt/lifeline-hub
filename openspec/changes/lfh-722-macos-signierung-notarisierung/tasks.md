@@ -2,13 +2,13 @@
 
 ## 1. Secrets
 
-- [ ] 1.1 Die fünf Secrets aus D3 im Repository `rubenvitt/lifeline-hub` setzen: per `op read … | gh secret set …`, `APPLE_CERTIFICATE` als einzeiliges base64 der `.p12`, ohne dass ein Wert im Terminal erscheint. Prüfen: `gh secret list` nennt alle fünf mit heutigem Datum.
+- [x] 1.1 Die fünf Secrets aus D3 im Repository `rubenvitt/lifeline-hub` setzen: per `op read … | gh secret set …`, `APPLE_CERTIFICATE` als einzeiliges base64 der `.p12`, ohne dass ein Wert im Terminal erscheint. Prüfen: `gh secret list` nennt alle fünf mit heutigem Datum.
 
 ## 2. Release-Lauf (`.github/workflows/artefakte.yml`, Job `desktop`)
 
-- [ ] 2.1 Umgebung und Wächter: auf `*apple-darwin` die fünf Secrets plus `APPLE_SIGNING_IDENTITY` (Literal) an den Bauschritt geben, die `.p8` nach `$RUNNER_TEMP` schreiben (Rechte 600) und `APPLE_API_KEY_PATH` setzen. Fehlt ein Wert, mit Meldung abbrechen. Windows bekommt keine `APPLE_*`-Umgebung. Prüfen: `actionlint` grün; der Wächter-Block, lokal in `bash` mit leerem und gefülltem Satz ausgeführt, bricht genau beim leeren ab.
-- [ ] 2.2 `.dmg` notarisieren und stapeln (D5), als eigener Schritt nach dem Bau und vor „Pakete einsammeln“, nur auf macOS. Prüfen: Die Befehle laufen lokal am selbst gebauten `.dmg` grün (siehe Nachweise in `design.md`), die Reihenfolge steht im Workflow vor der `.sha256`-Berechnung.
-- [ ] 2.3 Prüfschritt (D6) mit den Prüfungen für App, `.dmg` und die entpackte App aus dem `.app.tar.gz`. Prüfen: Derselbe Block läuft lokal grün gegen das notarisierte Bundle und rot gegen ein ad-hoc-Bundle (`cargo tauri build --bundles app` ohne `APPLE_*`).
+- [x] 2.1 Umgebung und Wächter: auf `*apple-darwin` die fünf Secrets plus `APPLE_SIGNING_IDENTITY` (Literal) an den Bauschritt geben, die `.p8` nach `$RUNNER_TEMP` schreiben (Rechte 600) und `APPLE_API_KEY_PATH` setzen. Fehlt ein Wert, mit Meldung abbrechen. Windows bekommt keine `APPLE_*`-Umgebung. Prüfen: `actionlint` grün; der Wächter-Block, lokal in `bash` mit leerem und gefülltem Satz ausgeführt, bricht genau beim leeren ab.
+- [x] 2.2 `.dmg` notarisieren und stapeln (D5), als eigener Schritt nach dem Bau und vor „Pakete einsammeln“, nur auf macOS. Prüfen: Die Befehle laufen lokal am selbst gebauten `.dmg` grün (siehe Nachweise in `design.md`), die Reihenfolge steht im Workflow vor der `.sha256`-Berechnung.
+- [x] 2.3 Prüfschritt (D6) mit den Prüfungen für App, `.dmg` und die entpackte App aus dem `.app.tar.gz`. Prüfen: Derselbe Block läuft lokal grün gegen das notarisierte Bundle und rot gegen eine ad hoc nachsignierte Kopie und gegen eine Kopie ohne angeheftetes Ticket.
 
 ## 3. Doku
 
