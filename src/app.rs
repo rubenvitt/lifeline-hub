@@ -270,7 +270,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/dokumente/{did}",
-            delete(routes::dokument::entfernen),
+            delete(routes::dokument::entfernen).patch(routes::dokument::aendern),
         )
         .route(
             "/api/einsaetze/{id}/dokumente/{did}/datei",

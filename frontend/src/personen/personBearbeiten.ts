@@ -94,8 +94,8 @@ export function bearbeitenZuPatch(
 
 /**
  * „Auf Lagekarte verorten" ist ein handgebautes Bedienziel (ein `<a>` erbt keine Steuerhöhe):
- * `minHeight` aus der Dichtestufe plus Polsterung. Farbe `bedienText`, nicht antds
- * `colorLink` — der Linkton hielt auf dem Seitengrund 7 : 1 (Tag) bzw. 5 : 1 (Nacht) nicht.
+ * `minHeight` aus der Dichtestufe plus Polsterung. Farbe `bedienText`, die Rolle für blauen
+ * TEXT; seit LFH-652 wertgleich mit antds `colorLink`.
  */
 export function verortenLinkStil(
   token: { controlHeight: number; paddingSM: number },

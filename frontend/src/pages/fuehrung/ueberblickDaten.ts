@@ -30,6 +30,7 @@ import type {
   Person,
   Rueckmeldungen,
   Warnstufe,
+  WetterWarnstufe,
 } from '../../api/types';
 import { staerkeText } from '../../anzeige/staerke';
 import type { KennzahlTon } from '../../components/instrument';
@@ -46,6 +47,7 @@ import { letzteImTeilbaum } from '../../meldungen/rueckmeldung';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
 import { dauerText } from '../../stab/lagebesprechungZustand';
 import { abloesungsMarken } from '../../abloesung/einstufung';
+import { istUnwetter, paarSchluessel, unwetterMarkenText } from '../../wetter/unwetter';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 import { mitBesetzung } from '../../fuehrung/funktionsOptionenKern';
 
@@ -468,14 +470,14 @@ export function entscheidungenAuswahl(
 
 export type MarkenTon = 'neutral' | 'achtung' | 'alarm';
 export type MarkenArt =
-  'auftrag' | 'erinnerung' | 'lagebesprechung' | 'pegelprognose' | 'abloesung';
+  'auftrag' | 'erinnerung' | 'lagebesprechung' | 'pegelprognose' | 'abloesung' | 'unwetter';
 
 export interface Marke {
   key: string;
   art: MarkenArt;
   /**
-   * id des Auftrags, der Erinnerung bzw. des Pegels; `null` bei Lagebesprechung und Ablösung (eine
-   * Ablösungsmarke fasst mehrere Schichten zusammen).
+   * id des Auftrags, der Erinnerung bzw. des Pegels; `null` bei Lagebesprechung, Ablösung (eine
+   * Ablösungsmarke fasst mehrere Schichten zusammen) und Unwetter (Warnungen tragen keine id).
    */
   id: number | null;
   zeit: string;
@@ -506,12 +508,13 @@ function pegelBezeichnung(p: Pick<PegelAnzeige, 'name' | 'gewaesser'>): string {
 }
 
 /**
- * Anstehende Fristen aus fünf Quellen: offene Aufträge, offene Erinnerungen, nächste
- * Lagebesprechung, erwarteter Höchststand an einem maßgeblichen Pegel, fällige Ablösungen.
- * Aufsteigend nach Zeit, Überfälliges also oben.
+ * Anstehende Fristen aus sechs Quellen: offene Aufträge, offene Erinnerungen, nächste
+ * Lagebesprechung, erwarteter Höchststand an einem maßgeblichen Pegel, fällige Ablösungen,
+ * Beginn angekündigter Unwetterwarnungen. Aufsteigend nach Zeit, Überfälliges also oben.
  *
- * Die Pegel-Prognose ist keine Frist, sondern eine Erwartung: verstrichen ist sie vorbei, nicht
- * „überfällig", und fällt vor dem Sortieren heraus. Ablösungen kommen als eigene Quelle (je
+ * Pegel-Prognose und Unwetterbeginn sind keine Fristen, sondern Erwartungen: verstrichen sind
+ * sie vorbei, nicht „überfällig", und fallen vor dem Sortieren heraus. Ein begonnenes Unwetter
+ * trägt der Modulzähler weiter (LFH-663). Ablösungen kommen als eigene Quelle (je
  * Abschnitt und Minute zusammengefasst); ihre Auto-Fristen in den Erinnerungen werden deshalb
  * übersprungen, sonst stünde dieselbe Ablösung doppelt.
  */
@@ -522,6 +525,11 @@ export function naechsteMarken(
   jetzt: Dayjs,
   pegel: readonly PegelAnzeige[] = [],
   abloesungen: readonly Abloesung[] = [],
+  unwetter: readonly {
+    stufe: WetterWarnstufe;
+    ereignis: string;
+    beginn?: string | null;
+  }[] = [],
 ): MarkenAuswahl {
   const roh: { key: string; art: MarkenArt; id: number | null; zeit: string; text: string }[] = [];
   for (const a of auftraege) {
@@ -572,6 +580,14 @@ export function naechsteMarken(
         text: `Erwarteter Höchststand Pegel ${pegelBezeichnung(p)}: ${wasserstandMeter(prognose.hoechststand_cm)} m`,
       });
     }
+  }
+  for (const w of unwetter) {
+    const beginn = zeitpunkt(w.beginn);
+    if (!istUnwetter(w.stufe) || !beginn || !beginn.isAfter(jetzt)) continue;
+    const key = `u-${paarSchluessel(w)}-${beginn.valueOf()}`;
+    // Zwei Ausgaben derselben Warnung zum selben Beginn sind eine Marke.
+    if (roh.some((m) => m.key === key)) continue;
+    roh.push({ key, art: 'unwetter', id: null, zeit: w.beginn!, text: unwetterMarkenText(w) });
   }
   const sortiert = roh.sort(
     (a, b) => (ms(a.zeit) ?? 0) - (ms(b.zeit) ?? 0) || a.key.localeCompare(b.key),

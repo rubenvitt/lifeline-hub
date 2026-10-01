@@ -21,7 +21,16 @@ import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
 import type { EnergieAnlagenart, FachebeneQuelle } from '../../api/fachebenen';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
 import StatusTag from '../../components/StatusTag';
-import { fachebeneFarbe, rollenFarbe } from '../../theme/statusFarben';
+import { useMinutenTakt } from '../../components/useMinutenTakt';
+import {
+  capSchwereVon,
+  dwdStufeAusSeverity,
+  dwdWarnstufe,
+  fachebeneFarbe,
+  rollenFarbe,
+  type StatusDarstellung,
+} from '../../theme/statusFarben';
+import { istAngekuendigt } from './dwdGueltigkeit';
 import { alsText as s, fachebeneTitel, pick } from './fachebeneTitel';
 import { kategorieLabel } from './fachebenenLayer';
 import { geoKennzahlen } from './geo';
@@ -81,12 +90,16 @@ function wetterIkone(group: string | null, event: string | null): Ikone {
   return IkoneWarndreieck;
 }
 
-const SCHWERE: Record<string, { label: string; color: string }> = {
-  Extreme: { label: 'Extrem', color: 'red' },
-  Severe: { label: 'Schwer', color: 'volcano' },
-  Moderate: { label: 'Mäßig', color: 'gold' },
-  Minor: { label: 'Gering', color: 'blue' },
-};
+/**
+ * Schwere einer Warnung aus dem Statusfarb-Vertrag (LFH-662): DWD mit der amtlichen Bezeichnung
+ * (`dwdWarnstufe`, dieselbe wie im Wetter-Paneel), NINA mit dem CAP-Wort (`capSchwere`). Keine
+ * Stufe ist Blau. Unbekannt → `null`, der Aufrufer zeigt dann den Rohwert ohne Rollenfarbe.
+ */
+function schwereDarstellung(ebene: 'nina' | 'dwd', schwere: string): StatusDarstellung | null {
+  if (ebene === 'nina') return capSchwereVon(schwere);
+  const stufe = dwdStufeAusSeverity(schwere);
+  return stufe ? dwdWarnstufe[stufe] : null;
+}
 
 const DRINGLICHKEIT: Record<string, string> = {
   Immediate: 'Sofort',
@@ -103,11 +116,17 @@ const ZUSTAND: Record<string, { label: string; color: string }> = {
   low: { label: 'Niedrig', color: 'gold' },
 };
 
-function WarnungInhalt({ p }: { p: Record<string, unknown> }) {
+function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina' | 'dwd' }) {
+  const jetzt = useMinutenTakt();
   const headline = pick(p, 'HEADLINE', 'titel', 'headline');
   const schwere = pick(p, 'SEVERITY', 'schwere', 'severity');
-  const sev = schwere ? SCHWERE[schwere] : undefined;
+  const sev = schwere ? schwereDarstellung(ebene, schwere) : null;
   const dring = pick(p, 'URGENCY', 'dringlichkeit', 'urgency');
+  // Angekündigt (LFH-662): aus `ONSET` gegen die laufende Uhr, mit derselben Funktion wie die Karte
+  // (`dwdGueltigkeit`). Nicht aus der Property `angekuendigt`: `p` ist die Momentaufnahme vom Klick
+  // und behielte die Markierung, nachdem die Warnung begonnen hat. NINA kennt keine Ankündigung.
+  const angekuendigt = ebene === 'dwd' && istAngekuendigt(p, jetzt);
+  const beginn = fmtZeit(pick(p, 'ONSET'));
   const von = fmtZeit(pick(p, 'ONSET', 'EFFECTIVE', 'beginn'));
   const bis = fmtZeit(pick(p, 'EXPIRES'));
   const quelle = pick(p, 'SENDERNAME') ?? 'BBK / MoWaS';
@@ -122,13 +141,18 @@ function WarnungInhalt({ p }: { p: Record<string, unknown> }) {
         </Typography.Paragraph>
       )}
       {sev ? (
-        <Tag color={sev.color} style={{ marginBottom: 8 }}>
-          {sev.label}
-        </Tag>
+        <span style={{ display: 'inline-block', marginBottom: 8 }}>
+          <StatusTag darstellung={sev} />
+        </span>
       ) : schwere ? (
         <Tag style={{ marginBottom: 8 }}>{schwere}</Tag>
       ) : null}
       <Descriptions column={1}>
+        {angekuendigt && (
+          <Descriptions.Item label="Status">
+            {beginn ? `angekündigt · ab ${beginn}` : 'angekündigt'}
+          </Descriptions.Item>
+        )}
         {dring && (
           <Descriptions.Item label="Dringlichkeit">
             {DRINGLICHKEIT[dring] ?? dring}
@@ -715,7 +739,7 @@ export default function FachebenenInspector({
       onSchliessen={onSchliessen}
     >
       {istWarnung ? (
-        <WarnungInhalt p={p} />
+        <WarnungInhalt p={p} ebene={quelle} />
       ) : quelle === 'pegelonline' ? (
         <PegelInhalt p={p} pegelBezug={pegelBezug} />
       ) : quelle === 'hochwasser' ? (

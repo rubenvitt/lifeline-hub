@@ -76,8 +76,10 @@ Aussperren im Einsatz ist ein echter Betriebsschaden. Zwei Sicherungen dagegen:
 Der Zähler liegt im Prozessspeicher und ist nach einem Neustart leer. Für den Zweck
 (automatisiertes Raten ausbremsen) reicht das; die dauerhafte Spur liegt in `auth_audit`.
 
-Die Quell-IP ist die **Socket-Adresse**. `X-Forwarded-For` wird bewusst **nicht**
-ausgewertet: ohne vertrauenswürdigen Reverse-Proxy ist der Header frei fälschbar, und ein
-fälschbares Rate-Limit ist keins. Läuft lifeline-hub später hinter einem Proxy, muss das
-bewusst und mit definiertem Vertrauensanker nachgezogen werden — sonst sieht der Server
-ohnehin nur noch die Proxy-IP.
+Die Quell-IP ist die **Socket-Adresse**. `X-Forwarded-For` wird nur ausgewertet, wenn
+die Gegenstelle ein ausdrücklich genannter Proxy ist (`LIFELINE_TRUSTED_PROXIES`, LFH-604;
+Einzelheiten in `docs/betrieb/env-registry.md`): von jeder anderen Gegenstelle ist der
+Header frei fälschbar, und ein fälschbares Rate-Limit ist keins. **Hinter einem
+Reverse-Proxy muss die Liste gesetzt sein** — sonst sieht der Server nur die Proxy-IP, und
+zehn Fehlversuche von beliebiger Seite sperren den Passwort-Login für alle. Dieselbe
+Quell-IP gilt für Passwortwechsel, App-Code-Einlösung und `auth_audit`.

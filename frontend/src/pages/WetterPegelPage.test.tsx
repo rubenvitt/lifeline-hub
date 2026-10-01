@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -87,6 +87,21 @@ const wetterOk = (over: Partial<WetterAnzeige> = {}): WetterAnzeige => ({
       })),
     },
   },
+  aktuell: {
+    zustand: 'ok',
+    abgerufen_at: vor(3 * MIN),
+    daten: {
+      gemessen_at: vor(10 * MIN),
+      station: { name: 'Bremen', entfernung_m: 3887 },
+      symbol: 'regen',
+      temperatur_c: 15.3,
+      wind_kmh: 10.8,
+      windrichtung_grad: 140,
+      boeen_kmh: 16.6,
+      niederschlag_mm: 0.4,
+      ergaenzt: [],
+    },
+  },
   ...over,
 });
 
@@ -128,6 +143,11 @@ function renderPage() {
       </AntApp>
     </QueryClientProvider>,
   );
+}
+
+async function waitForPaneel(): Promise<HTMLElement> {
+  await screen.findByText('Aktuelle Bedingungen');
+  return document.querySelector('[data-lfh="wetter-aktuell"]') as HTMLElement;
 }
 
 const pegelZeilen = () => document.querySelectorAll('[data-lfh="pegel-zeile"]');
@@ -318,14 +338,18 @@ describe('WetterPegelPage (LFH-633)', () => {
   describe('Ausfall und kein Ort', () => {
     it('Wetterquelle ausgefallen: „Stand unbekannt" ohne Liste, die Pegel bleiben unberührt', async () => {
       antworten({
-        wetter: { warnungen: { zustand: 'ausfall' }, vorhersage: { zustand: 'ausfall' } },
+        wetter: {
+          warnungen: { zustand: 'ausfall' },
+          vorhersage: { zustand: 'ausfall' },
+          aktuell: { zustand: 'ausfall' },
+        },
       });
       renderPage();
       const hinweise = await screen.findAllByRole('status');
       const unbekannt = hinweise.filter(
         (h) => h.getAttribute('data-lfh') === 'wetter-stand-unbekannt',
       );
-      expect(unbekannt).toHaveLength(2);
+      expect(unbekannt).toHaveLength(3);
       expect(document.querySelectorAll('[data-lfh="wetter-warnung"]')).toHaveLength(0);
       expect(document.querySelectorAll('[data-lfh="wetter-stunde"]')).toHaveLength(0);
       expect(screen.getByText('6,84')).toBeInTheDocument();
@@ -333,16 +357,55 @@ describe('WetterPegelPage (LFH-633)', () => {
 
     it('kein Einsatzort: Erklärung und EIN Weg zu den Einsatzdaten', async () => {
       antworten({
-        wetter: { warnungen: { zustand: 'kein_ort' }, vorhersage: { zustand: 'kein_ort' } },
+        wetter: {
+          warnungen: { zustand: 'kein_ort' },
+          vorhersage: { zustand: 'kein_ort' },
+          aktuell: { zustand: 'kein_ort' },
+        },
       });
       renderPage();
-      expect(await screen.findAllByText(/brauchen einen verorteten Einsatzort/)).toHaveLength(2);
+      expect(await screen.findAllByText(/brauchen einen verorteten Einsatzort/)).toHaveLength(3);
       const wege = screen.getAllByRole('button', {
         name: 'Einsatzort in den Einsatzdaten verorten',
       });
       expect(wege).toHaveLength(1);
       await userEvent.click(wege[0]);
       expect(await screen.findByText('Einsatzdaten')).toBeInTheDocument();
+    });
+  });
+
+  describe('Aktuelle Bedingungen (LFH-864)', () => {
+    it('steht nach den Pegeln und vor Warnungen und Vorhersage', async () => {
+      antworten();
+      renderPage();
+      await screen.findByText('Aktuelle Bedingungen');
+      const titel = Array.from(document.querySelectorAll('h2')).map((h) => h.textContent);
+      const i = (t: string) => titel.findIndex((x) => x?.startsWith(t));
+      expect(i('Aktuelle Bedingungen')).toBeGreaterThan(i('Pegel'));
+      expect(i('Aktuelle Bedingungen')).toBeLessThan(i('Warnungen'));
+      expect(i('Warnungen')).toBeLessThan(i('Vorhersage'));
+    });
+
+    it('zeigt die Messung der Station mit Messzeit', async () => {
+      antworten();
+      renderPage();
+      const paneel = await waitForPaneel();
+      expect(paneel).toHaveTextContent('Station Bremen, 3,9 km · Messung');
+      expect(paneel).toHaveTextContent('15,3');
+      expect(paneel).toHaveTextContent('Regen');
+    });
+
+    it('Ausfall reißt die anderen Teile nicht mit', async () => {
+      antworten({ wetter: wetterOk({ aktuell: { zustand: 'ausfall' } }) });
+      renderPage();
+      const paneel = await waitForPaneel();
+      await waitFor(() =>
+        expect(paneel.querySelector('[data-lfh="wetter-stand-unbekannt"]')).not.toBeNull(),
+      );
+      expect(paneel).not.toHaveTextContent('15,3');
+      expect(screen.getByText('Sturmböen')).toBeInTheDocument();
+      expect(document.querySelectorAll('[data-lfh="wetter-stunde"]')).toHaveLength(8);
+      expect(screen.getByText('6,84')).toBeInTheDocument();
     });
   });
 
@@ -358,7 +421,7 @@ describe('WetterPegelPage (LFH-633)', () => {
       expect(zeilen[1]).toHaveTextContent('18,6 °C');
       expect(zeilen[1]).toHaveTextContent('S 11 km/h · Böen 19 km/h');
       expect(screen.getByText(/Station Bremen, 4,2 km/)).toBeInTheDocument();
-      expect(screen.getAllByText(/Datenbasis: Deutscher Wetterdienst/).length).toBe(2);
+      expect(screen.getAllByText(/Datenbasis: Deutscher Wetterdienst/).length).toBe(3);
     });
   });
 });

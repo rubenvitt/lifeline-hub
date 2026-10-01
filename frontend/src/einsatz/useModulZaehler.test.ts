@@ -6,6 +6,7 @@ import { modulRegistry } from './modulRegistry';
 import {
   berechneAbloesungZaehler,
   berechneBetreuungZaehler,
+  berechneUnwetterZaehler,
   bildeZaehler,
   darfZaehlerZeigen,
   ZAEHLER_QUELLEN,
@@ -120,6 +121,46 @@ describe('Modul-Zähler', () => {
       },
     };
     expect(darfZaehlerZeigen('betreuung', benutzer, versteckt)).toBe(false);
+  });
+
+  it('zählt Unwetterwarnungen am Einsatzort — nur schwer/extrem, nie 0 ohne Stand (LFH-663)', () => {
+    const jetzt = Date.UTC(2026, 8, 22, 12, 30);
+    const um = (ms: number) => new Date(jetzt + ms).toISOString();
+    const h = 3_600_000;
+    const w = (stufe: 'gering' | 'maessig' | 'schwer' | 'extrem', beginn: number) => ({
+      stufe,
+      ereignis: 'X',
+      ueberschrift: 'X',
+      beginn: um(beginn),
+      ende: um(beginn + 3 * h),
+    });
+    const teil = (daten: ReturnType<typeof w>[], alter = 60_000) => ({
+      zustand: 'ok' as const,
+      abgerufen_at: um(-alter),
+      daten,
+    });
+    expect(
+      berechneUnwetterZaehler(teil([w('schwer', -h), w('extrem', 2 * h), w('maessig', -h)]), jetzt),
+    ).toEqual({
+      wert: 2,
+      beschreibung: '2 Unwetterwarnungen für den Einsatzort, davon 1 angekündigt',
+    });
+    expect(berechneUnwetterZaehler(teil([w('schwer', -h)]), jetzt)).toEqual({
+      wert: 1,
+      beschreibung: '1 Unwetterwarnung für den Einsatzort',
+    });
+    expect(berechneUnwetterZaehler(teil([w('gering', -h)]), jetzt)).toEqual({
+      wert: 0,
+      beschreibung: '0 Unwetterwarnungen für den Einsatzort',
+    });
+    // Stand unbekannt / kein Ort: keine Zahl, auch keine 0.
+    expect(berechneUnwetterZaehler(teil([w('schwer', -h)], 7 * h), jetzt)).toBeUndefined();
+    expect(berechneUnwetterZaehler({ zustand: 'kein_ort' }, jetzt)).toBeUndefined();
+  });
+
+  it('der Unwetterzähler hängt am Modul „Wetter & Pegel" (LFH-663)', () => {
+    expect(modulRegistry.find((m) => m.zaehlerQuelle === 'wetter-pegel')?.key).toBe('wetter-pegel');
+    expect(darfZaehlerZeigen('wetter-pegel', benutzer)).toBe(true);
   });
 
   it('bildet die Gesamtmengen mit Einzahl und Mehrzahl ab', () => {

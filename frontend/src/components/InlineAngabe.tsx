@@ -214,7 +214,7 @@ export function InlineAngabe<T>({
         <Button
           ref={knopfRef}
           type="link"
-          // `bedienText` statt antds `colorLink`, wie in `BemerkungZelle`: die Rolle für blauen TEXT.
+          // `bedienText`, die Rolle für blauen TEXT; seit LFH-652 wertgleich mit antds `colorLink`.
           style={{ color: rollen.bedienText, paddingInline: 0 }}
           onClick={oeffnen}
         >

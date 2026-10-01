@@ -101,10 +101,12 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
 - **Organigramm der Führungsorganisation** (LFH-626, `pages/einsatzabschnitte/Organigramm.tsx`,
   `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`): Ansicht
   `?ansicht=organigramm` der Seite Einsatzabschnitte, kein Modul; rein abgeleitet über
-  `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan, LFH-625 setzt seine
-  Kommunikationsebene darauf); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
-  „Einsatzleitung“ trägt keine Zahl; Stab nur mit Stab-Freigabe; Layout aus CSS, erste Ebene als
-  Spalten-Grid (`SPALTE_MIN_PX`, gemessen), tiefer senkrecht — keine Graph-Bibliothek.
+  `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan, die Fernmeldeskizze
+  LFH-625 baut darauf); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
+  „Einsatzleitung“ trägt keine Zahl; Stab nur mit Stab-Freigabe. Layout und Druckregeln nur über
+  das Gerüst `components/organigramm/HaengenderBaum` (erste Ebene als Spalten-Grid,
+  `SPALTE_MIN_PX` gemessen, tiefer senkrecht), geteilt mit der Fernmeldeskizze — keine
+  Graph-Bibliothek, kein zweites Gerüst.
 - `Datensicht` bricht fest bei `md`; die Prop `tabelleAb` hält `datensicht.guard.test.ts` fern.
   `naechste_lagebesprechung_at` = absolute Wiedervorlage-Schnellwahl, kein berechneter Rhythmus
   (`docs/superpowers/specs/2026-09-08-lfh-463-464-pruefliste.md`).
@@ -132,10 +134,19 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   Tote schwarz, „unverletzt" ohne Farbe; die Umrandung macht Gelb auf hellem und Schwarz auf
   dunklem Grund sichtbar. Nie `color="black"` an antds `Tag`. Übergabe, Geschädigt-Bezug,
   UHS-Verortung tragen `bedien`. Personenstatus und Sichtung sind unabhängig.
-- **Blauer Bedien-TEXT nimmt `rollen.bedienText`**, nicht `colorLink`; Radio-Text im Stil
-  `outline` über `index.css` (`--lfh-bedien-text`), kein `Radio.colorPrimary`
-  (`docs/superpowers/specs/2026-09-22-lfh-613-pruefliste.md`).
+- **Blauer Bedien-TEXT nimmt `rollen.bedienText`**; antds `colorLink` (Ruhe, Zeiger, gedrückt)
+  **ist** `bedienText`, ein Link braucht kein eigenes `style`, Zeiger-Rückmeldung ist die
+  Unterstreichung. Radio-Text im Stil `outline` über `index.css` (`--lfh-bedien-text`), kein
+  `Radio.colorPrimary` (`docs/superpowers/specs/2026-09-22-lfh-613-pruefliste.md`).
+- **Geerbter Text auf Textrollen** (LFH-652, Spec `textkontrast-rollen`): Beschreibung
+  (`colorTextDescription`) und Kopf der `KatalogTabelle` lesen `gedaempft`, nie `schwach`;
+  Formularmeldung über `Form`-Token in `alarmText`/`achtungText`, das globale `colorError` bleibt
+  Füllfarbe; Standardknopf unter dem Zeiger in `bedienText`. Alles in `tokens.ts:antdToken`/
+  `antdKomponenten`, nicht je Stelle.
 - Kontrast: `e2e/betroffene-kontrast.spec.ts` (Tag ≥ 7:1, Nacht ≥ 5:1, Alpha mitgerechnet).
+- **Kein eigener Knopfboden** (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung des
+  Primärknopfs hält den Textboden in Ruhe und unter dem Zeiger; Werte und Messung am Wert in
+  `theme/tokens.ts`. Ein Kontrast-Spec führt den Primärknopf nie unter einer Ausnahme.
 - **Tagmodus** (LFH-618, `docs/superpowers/specs/2026-09-22-lfh-618-hellmodus-pruefliste.md`):
   `achtung`/`alarm` als Text über `achtungText`/`alarmText`; Hervorhebung auf `flaeche3`, nicht
   `flaeche2`; Kontrast gegen den tatsächlichen Grund (`e2e/hellmodus-kontrast.spec.ts`,
@@ -257,10 +268,11 @@ anwendbar), „nicht geprüft" ist keins.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`pruefeVerlassen`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in
-  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 29 am 30.09.2026, LFH-554); jede weitere
+  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 30 am 01.10.2026, LFH-662); jede weitere
   Karte ist eine begründete Entscheidung (Beispiele: `odlStufe` in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`, `aufbewahrungZustand` in
-  `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
+  `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4, `capSchwere` in
+  `openspec/changes/archive/2026-10-01-lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md` D5). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
   der Datei, kein `<Tag color={…}>` auf Vertrags-Enums (dafür `components/StatusTag.tsx`).
 
 **Farbe und Zeichen**

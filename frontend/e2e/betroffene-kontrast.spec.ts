@@ -292,20 +292,19 @@ for (const modus of ['light', 'dark'] as const) {
       .filter({ has: koordinate })
       .locator('.ant-form-item-explain-error');
     await expect(grund).toHaveCount(1);
-    // Feldmeldungen färbt antd app-weit mit `colorError`; am Tag unter dem Tagesboden
-    // (LFH-667). Gesichert bis dahin nur der absolute Boden 4,5 : 1.
-    await misst(grund, 4.5, `${modus}/Koordinatengrund (LFH-667)`, werte);
+    // Feldmeldungen lesen am Formular `colorError` = `alarmText` (LFH-667, `antdKomponenten`).
+    await misst(grund, minimum, `${modus}/Koordinatengrund`, werte);
 
     // ── Modal „Vermisst melden": Hinweis und Zukunftsgrenze ──
     await page.goto(`${basis}/personen`);
     await page.getByRole('button', { name: 'Vermisst melden' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
-    // `extra` steht in `colorTextDescription` = `schwach` (LFH-643). Nur der absolute Boden.
+    // `extra` steht in `colorTextDescription` = `gedaempft` (LFH-652): voller Boden.
     await misst(
       dialog.getByText('Ohne Angabe gilt der Zeitpunkt der Meldung.'),
-      4.5,
-      `${modus}/Hinweis vermisst seit (LFH-643)`,
+      minimum,
+      `${modus}/Hinweis vermisst seit`,
       werte,
     );
     const seit = dialog.getByLabel('vermisst seit', { exact: true });
@@ -314,7 +313,7 @@ for (const modus of ['light', 'dark'] as const) {
     await seit.press('Enter');
     const zukunft = dialog.getByText('Liegt in der Zukunft', { exact: true });
     await expect(zukunft).toBeVisible();
-    await misst(zukunft, 4.5, `${modus}/Liegt in der Zukunft (LFH-667)`, werte);
+    await misst(zukunft, minimum, `${modus}/Liegt in der Zukunft`, werte);
 
     test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
   });
