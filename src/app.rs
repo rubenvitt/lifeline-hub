@@ -175,6 +175,9 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // statt
         // als Gate der Route.
         .route("/api/einsaetze/{id}/live", get(routes::live::stream))
+        // Org-Strom für Tabs außerhalb eines Einsatzes (LFH-734); bewusst NICHT unter
+        // `/api/einsaetze/`, damit er weder mit `{id}` noch mit `PFAD_KEY` kollidiert.
+        .route("/api/live", get(routes::live::org_stream))
         // Modulzähler: modul-lose Gate-Route wie `/live`, die Modulrechte filtern die Felder.
         .route(
             "/api/einsaetze/{id}/modul-zaehler",

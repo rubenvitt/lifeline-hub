@@ -8,6 +8,7 @@
 
 use crate::anhang;
 use crate::error::AppError;
+use crate::live::org::{OrgAbonnent, OrgNachricht, ORG_NUTZLAST};
 use crate::live::{LiveEvent, LiveNachricht, Replay};
 use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::sse::Event;
@@ -264,6 +265,28 @@ pub fn sse_event_stream(
             .id(n.id)
             .event(n.event.as_str())
             .data(n.data))),
+        Err(_) => Some(Ok(Event::default()
+            .event(LiveEvent::Lagged.as_str())
+            .data("resync"))),
+    })
+}
+
+/// Baut den SSE-Stromteil der Org-Ereignisse (LFH-734) für einen Abonnenten.
+///
+/// Gefiltert wird hier, pro Verbindung, gegen den Schnappschuss `abonnent`
+/// ([`OrgAbonnent::sieht`]). Org-Ereignisse gehen **ohne** `id:` hinaus: so bleibt die
+/// `Last-Event-ID` des Browsers die des letzten Einsatz-Ereignisses, und der Replay des
+/// Einsatz-Kanals bleibt unberührt (design.md D4). Ein Überlauf wird wie im Einsatz-Kanal zu
+/// `lagged`, der Client lädt dann alles nach.
+pub fn sse_org_stream(
+    rx: Receiver<OrgNachricht>,
+    abonnent: OrgAbonnent,
+) -> impl Stream<Item = Result<Event, Infallible>> {
+    BroadcastStream::new(rx).filter_map(move |res| match res {
+        Ok(n) if abonnent.sieht(&n) => Some(Ok(Event::default()
+            .event(n.event.as_str())
+            .data(ORG_NUTZLAST))),
+        Ok(_) => None,
         Err(_) => Some(Ok(Event::default()
             .event(LiveEvent::Lagged.as_str())
             .data("resync"))),

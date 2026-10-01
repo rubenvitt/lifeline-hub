@@ -161,6 +161,8 @@ pub async fn wiederherstellen(
         jetzt,
     )
     .await?;
+    // Der Einsatz erscheint wieder in den Listen seiner Leser (LFH-734).
+    crate::live::org::einsatzliste_melden(&state.pool, &state.live, einsatz_id, &[]).await;
     let kopf = archivkopf(&state, &benutzer, einsatz_id).await?;
     Ok(Json(repo::akte(&state.pool, &kopf, Utc::now()).await?))
 }

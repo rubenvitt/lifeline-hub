@@ -349,7 +349,12 @@ async fn nach_schwaerzung_regulaer_403_archiv_200() {
     let aid = anhang(&pool, id).await;
     setze(&pool, id, Some(&vor_tagen(50)), Some(&vor_tagen(31)), None).await;
     assert_eq!(
-        lifeline_hub::einsatz::purge_scheduler::tick_einmal(&pool, Utc::now()).await,
+        lifeline_hub::einsatz::purge_scheduler::tick_einmal(
+            &pool,
+            &lifeline_hub::live::LiveHub::new(),
+            Utc::now()
+        )
+        .await,
         1,
         "Tick schwärzt"
     );
@@ -439,7 +444,12 @@ async fn wiederherstellen_mit_frist_oeffnet_den_einsatz_wieder() {
     assert!(inhalt.contains("Löschvormerkung"), "{inhalt}");
 
     // Kein Wiedervormerken im nächsten Purge-Lauf.
-    lifeline_hub::einsatz::purge_scheduler::tick_einmal(&pool, Utc::now()).await;
+    lifeline_hub::einsatz::purge_scheduler::tick_einmal(
+        &pool,
+        &lifeline_hub::live::LiveHub::new(),
+        Utc::now(),
+    )
+    .await;
     let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
         .bind(id)
         .fetch_one(&pool)
@@ -460,7 +470,12 @@ async fn wiederherstellen_unbegrenzt_mit_null() {
     let (s, v) = wiederherstellen(&app, &admin, id, r#"{"retention_bis":null}"#).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["zustand"], "ohne_frist");
-    lifeline_hub::einsatz::purge_scheduler::tick_einmal(&pool, Utc::now()).await;
+    lifeline_hub::einsatz::purge_scheduler::tick_einmal(
+        &pool,
+        &lifeline_hub::live::LiveHub::new(),
+        Utc::now(),
+    )
+    .await;
     let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
         .bind(id)
         .fetch_one(&pool)

@@ -774,6 +774,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
     assert_eq!(
         lifeline_hub::einsatz::purge_scheduler::tick_einmal(
             &pool,
+            &lifeline_hub::live::LiveHub::new(),
             zeit(&frist) + Duration::seconds(1)
         )
         .await,
@@ -813,6 +814,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
     assert_eq!(
         lifeline_hub::einsatz::purge_scheduler::tick_einmal(
             &pool,
+            &lifeline_hub::live::LiveHub::new(),
             zeit(&geloescht) + Duration::days(30)
         )
         .await,

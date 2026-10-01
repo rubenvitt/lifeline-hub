@@ -91,7 +91,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     // Zeitbasierte Erinnerungen: Hintergrund-Scheduler starten (nur im Server-Lauf).
     lifeline_hub::erinnerung::scheduler::starte_scheduler(pool.clone(), live.clone());
     // Purge-Scheduler (Soft-Delete + PII-Schwärzung).
-    lifeline_hub::einsatz::purge_scheduler::starte_purge_scheduler(pool.clone());
+    lifeline_hub::einsatz::purge_scheduler::starte_purge_scheduler(pool.clone(), live.clone());
     // Automatische Sicherungen; No-op ohne `--backup-verzeichnis`.
     lifeline_hub::backup::scheduler::starte_backup_scheduler(
         pool.clone(),

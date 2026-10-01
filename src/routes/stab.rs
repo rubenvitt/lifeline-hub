@@ -252,10 +252,9 @@ pub async fn lagebesprechung_abschliessen(
     sse(&state, einsatz_id);
     // Den Einsatzkopf nur bei geändertem Termin (LFH-555, design.md D3): `einsatz` erreicht auch
     // Leser ohne Stab-Recht und darf ihnen nicht mehr sagen, als der Kopf-GET ohnehin zeigt.
+    // Mit `einsatz` geht auch `einsatzliste` (LFH-734): die Liste zeigt den Termin.
     if ergebnis.termin_geaendert {
-        state
-            .live
-            .publiziere_einsatz(einsatz_id, LiveEvent::Einsatz);
+        crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
     }
     Ok((StatusCode::CREATED, Json(stab)))
 }

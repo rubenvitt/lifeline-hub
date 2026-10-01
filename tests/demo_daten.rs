@@ -823,6 +823,117 @@ async fn entfernen_sendet_lagged_an_den_kanal_des_demo_einsatzes() {
     assert!(naechste(&mut rx_nachbar).await.is_none());
 }
 
+// ---------------------------------------------------------------------------------------------
+// Org-Ereignisse (LFH-734): andere Schirme sehen Liste und Kataloge ohne Refetch
+// ---------------------------------------------------------------------------------------------
+
+/// Schnappschuss eines Abonnenten des Org-Kanals, wie ihn die SSE-Route beim Aufbau nimmt.
+async fn org_abonnent(
+    pool: &sqlx::SqlitePool,
+    benutzername: &str,
+) -> lifeline_hub::live::org::OrgAbonnent {
+    let b: lifeline_hub::auth::Benutzer =
+        sqlx::query_as("SELECT * FROM benutzer WHERE benutzername = ?")
+            .bind(benutzername)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    lifeline_hub::live::org::OrgAbonnent::aus(&b)
+}
+
+/// Welche Org-Ereignisse `wer` aus dem bisher Publizierten erhält, in Reihenfolge.
+fn org_erreicht(
+    rx: &mut tokio::sync::broadcast::Receiver<lifeline_hub::live::org::OrgNachricht>,
+    wer: &[&lifeline_hub::live::org::OrgAbonnent],
+) -> Vec<Vec<&'static str>> {
+    let mut alle = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        alle.push(n);
+    }
+    wer.iter()
+        .map(|a| {
+            alle.iter()
+                .filter(|n| a.sieht(n))
+                .map(|n| n.event.as_str())
+                .collect()
+        })
+        .collect()
+}
+
+/// Import, Neu-Import und Entfernen melden `einsatzliste` an die Leser des Demo-Einsatzes und
+/// `stammdaten` an die eigene Organisation (Fahrzeuge, Personal, Material). Ein Mitglied des
+/// alten Demo-Einsatzes erfährt auch dessen Entfernen, obwohl die Mitgliedschaft mit dem
+/// Einsatz verschwindet. Eine fremde Organisation erfährt nichts.
+#[tokio::test]
+async fn import_neuimport_und_entfernen_melden_liste_und_stammdaten() {
+    let (app, pool, live) = common::setup_mit_optionen_und_live(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let mitglied_id = common::benutzer_anlegen(&app, &admin, "mitglied", "keine").await;
+    common::fremde_org_anlegen(
+        &pool,
+        "Fremd-Org",
+        "fremdfk",
+        "fremdfkpw1",
+        "fuehrungskraft",
+    )
+    .await;
+    let a = org_abonnent(&pool, "admin").await;
+    let m = org_abonnent(&pool, "mitglied").await;
+    let fremd = org_abonnent(&pool, "fremdfk").await;
+    let mut rx = live.abonniere_org();
+
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::CREATED, "{v}");
+    assert_eq!(
+        org_erreicht(&mut rx, &[&a, &m, &fremd]),
+        vec![
+            vec!["einsatzliste", "stammdaten"],
+            vec!["stammdaten"],
+            vec![]
+        ],
+        "Import"
+    );
+
+    common::rolle_setzen(&app, &admin, einsatz_id(&v), mitglied_id, "beobachter").await;
+    org_erreicht(&mut rx, &[]);
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/neu").await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+    assert_eq!(
+        org_erreicht(&mut rx, &[&a, &m, &fremd]),
+        vec![
+            vec!["einsatzliste", "einsatzliste", "stammdaten"],
+            vec!["einsatzliste", "stammdaten"],
+            vec![]
+        ],
+        "Neu-Import: alter und neuer Einsatz"
+    );
+
+    common::rolle_setzen(&app, &admin, einsatz_id(&v), mitglied_id, "beobachter").await;
+    org_erreicht(&mut rx, &[]);
+    let (status, v) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+    assert_eq!(
+        org_erreicht(&mut rx, &[&a, &m, &fremd]),
+        vec![
+            vec!["einsatzliste", "stammdaten"],
+            vec!["einsatzliste", "stammdaten"],
+            vec![]
+        ],
+        "Entfernen"
+    );
+}
+
+/// Scheitert der Vorgang (409: nichts importiert), meldet er nichts.
+#[tokio::test]
+async fn abgelehntes_entfernen_meldet_nichts() {
+    let (app, _pool, live) = common::setup_mit_optionen_und_live(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let mut rx = live.abonniere_org();
+    let (status, _) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert!(rx.try_recv().is_err());
+}
+
 /// Keine Wiederverwendung der Einsatz-ID: der Demo-Einsatz ist der jüngste (frische DB, kein
 /// anderer Einsatz), wird entfernt, und der danach über `POST /api/einsaetze` angelegte echte
 /// Einsatz liegt über seiner ID.
