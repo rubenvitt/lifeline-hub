@@ -99,6 +99,42 @@ wire_enum! {
     }
 }
 
+/// Testhilfe (LFH-733): markiert eine Stammdatenzeile, als hätte ein Import der Org sie
+/// angelegt. Nutzt den aktiven Kopf der Org oder legt einen an; `tabelle` ist ein Wire-Wert
+/// von [`DemoStammdatenArt`].
+#[cfg(test)]
+pub(crate) async fn test_markieren(
+    pool: &sqlx::SqlitePool,
+    org_id: i64,
+    tabelle: &str,
+    datensatz_id: i64,
+) {
+    let kopf: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM demo_import WHERE org_id = ? AND entfernt_at IS NULL")
+            .bind(org_id)
+            .fetch_optional(pool)
+            .await
+            .unwrap();
+    let kopf = match kopf {
+        Some(id) => id,
+        None => sqlx::query_scalar(
+            "INSERT INTO demo_import (org_id, einsatz_id, bericht) VALUES (?, 0, '{}') \
+             RETURNING id",
+        )
+        .bind(org_id)
+        .fetch_one(pool)
+        .await
+        .unwrap(),
+    };
+    sqlx::query("INSERT INTO demo_herkunft (import_id, tabelle, datensatz_id) VALUES (?, ?, ?)")
+        .bind(kopf)
+        .bind(tabelle)
+        .bind(datensatz_id)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

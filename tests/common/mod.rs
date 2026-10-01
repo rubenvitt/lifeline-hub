@@ -145,6 +145,41 @@ pub async fn fremde_org_anlegen(
     (org_id, benutzer_id)
 }
 
+/// LFH-733: markiert eine Stammdatenzeile der Org des Bootstrap-Admins, als hätte ein
+/// Demo-Import sie angelegt (aktiver Kopf wird bei Bedarf angelegt). `tabelle` ist
+/// `fahrzeug`, `personal` oder `material`.
+pub async fn demo_markieren(pool: &sqlx::SqlitePool, tabelle: &str, datensatz_id: i64) {
+    let org_id: i64 =
+        sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    let kopf: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM demo_import WHERE org_id = ? AND entfernt_at IS NULL")
+            .bind(org_id)
+            .fetch_optional(pool)
+            .await
+            .unwrap();
+    let kopf = match kopf {
+        Some(id) => id,
+        None => sqlx::query_scalar(
+            "INSERT INTO demo_import (org_id, einsatz_id, bericht) VALUES (?, 0, '{}') \
+             RETURNING id",
+        )
+        .bind(org_id)
+        .fetch_one(pool)
+        .await
+        .unwrap(),
+    };
+    sqlx::query("INSERT INTO demo_herkunft (import_id, tabelle, datensatz_id) VALUES (?, ?, ?)")
+        .bind(kopf)
+        .bind(tabelle)
+        .bind(datensatz_id)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
 pub async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
     let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
     let resp = app

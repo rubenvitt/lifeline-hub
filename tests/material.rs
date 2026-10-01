@@ -1,7 +1,7 @@
 use axum::http::StatusCode;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, login_cookie, setup};
+use common::{anfrage, benutzer_anlegen, demo_markieren, login_cookie, setup, setup_mit_pool};
 
 // ---------- Tests ----------
 
@@ -373,4 +373,65 @@ async fn kategorien_endpunkt_liefert_distinct() {
         2,
         "DISTINCT: Betreuung, Hochwasser"
     );
+}
+
+// ---------- LFH-733: Demo-Marke im Lese-Vertrag ----------
+
+/// `demo` folgt der Herkunftsmarke in Liste, `PATCH`-Antwort und Dienststatuswechsel.
+#[tokio::test]
+async fn demo_marke_in_liste_patch_und_dienststatus() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, demo) = anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Wolldecke"}"#),
+    )
+    .await;
+    let (_, echt) = anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Feldbett"}"#),
+    )
+    .await;
+    assert_eq!(demo["demo"], false, "Anlage ohne Marke");
+    let id = demo["id"].as_i64().unwrap();
+    demo_markieren(&pool, "material", id).await;
+
+    let (_, liste) = anfrage(&app, "GET", "/api/material", &admin, None).await;
+    let marke = |json: &serde_json::Value, gesucht: &serde_json::Value| {
+        json.as_array()
+            .unwrap()
+            .iter()
+            .find(|m| m["id"] == *gesucht)
+            .unwrap()["demo"]
+            .clone()
+    };
+    assert_eq!(marke(&liste, &demo["id"]), true);
+    assert_eq!(marke(&liste, &echt["id"]), false);
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/material/{id}"),
+        &admin,
+        Some(r#"{"standort":"Halle 2"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["demo"], true);
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/material/{id}/ausser-dienst"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["demo"], true);
 }

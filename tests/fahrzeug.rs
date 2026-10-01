@@ -370,3 +370,74 @@ async fn kein_delete_endpunkt() {
     .await;
     assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
 }
+
+// ---------- LFH-733: Demo-Marke im Lese-Vertrag ----------
+
+/// `demo` folgt der Herkunftsmarke in Liste (auch für Nicht-Admins und in der
+/// Dispositions-Auswahl), `PATCH`-Antwort und Dienststatuswechsel.
+#[tokio::test]
+async fn demo_marke_in_liste_patch_und_dienststatus() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    let (_, demo) = anfrage(
+        &app,
+        "POST",
+        "/api/fahrzeuge",
+        &admin,
+        Some(r#"{"funkrufname":"Musterstadt 83-1"}"#),
+    )
+    .await;
+    let (_, echt) = anfrage(
+        &app,
+        "POST",
+        "/api/fahrzeuge",
+        &admin,
+        Some(r#"{"funkrufname":"Florian 1"}"#),
+    )
+    .await;
+    assert_eq!(demo["demo"], false, "Anlage ohne Marke");
+    let id = demo["id"].as_i64().unwrap();
+    demo_markieren(&pool, "fahrzeug", id).await;
+
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        "/api/fahrzeuge?nur_im_dienst=true",
+        &erika,
+        None,
+    )
+    .await;
+    let marke = |json: &serde_json::Value, gesucht: &serde_json::Value| {
+        json.as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["id"] == *gesucht)
+            .unwrap()["demo"]
+            .clone()
+    };
+    assert_eq!(marke(&liste, &demo["id"]), true);
+    assert_eq!(marke(&liste, &echt["id"]), false);
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/fahrzeuge/{id}"),
+        &admin,
+        Some(r#"{"standort":"Wache 2"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["demo"], true);
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/fahrzeuge/{id}/ausser-dienst"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["demo"], true);
+}

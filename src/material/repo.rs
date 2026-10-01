@@ -3,8 +3,13 @@ use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
 /// Spaltenliste für `SELECT` in der Reihenfolge von `Material` (FromRow).
+///
+/// `demo` ist abgeleitet aus der Herkunftsmarke des Demo-Imports (LFH-733, design.md D2). Jede
+/// Abfrage über `SPALTEN` liest `FROM material` ohne Alias.
 const SPALTEN: &str = "id, org_id, bezeichnung, kategorie, bestandsnummer, \
-     traegerorganisation, standort, bemerkung, dienststatus, angelegt_at";
+     traegerorganisation, standort, bemerkung, dienststatus, angelegt_at, \
+     EXISTS (SELECT 1 FROM demo_herkunft h \
+             WHERE h.tabelle = 'material' AND h.datensatz_id = material.id) AS demo";
 
 /// Editierbare Stammfelder. Optional-Strings sind bereits getrimmt; leer → `None`.
 #[derive(Debug)]
@@ -280,6 +285,36 @@ mod tests {
         assert_eq!(m.bezeichnung, "Wolldecke");
         assert_eq!(m.dienststatus, "in_dienst");
         assert_eq!(laden(&pool, 1, m.id).await.unwrap().id, m.id);
+    }
+
+    /// LFH-733: `demo` folgt der Herkunftsmarke, in Liste, `laden` und Dienststatuswechsel.
+    /// Die Marke einer anderen Art mit derselben ID zählt nicht.
+    #[tokio::test]
+    async fn demo_folgt_der_herkunftsmarke() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let echt = anlegen(&pool, 1, daten("Feldbett")).await.unwrap();
+        let demo = anlegen(&pool, 1, daten("Wolldecke")).await.unwrap();
+        assert!(!demo.demo, "vor der Marke");
+        crate::demo::test_markieren(&pool, 1, "material", demo.id).await;
+        crate::demo::test_markieren(&pool, 1, "fahrzeug", echt.id).await;
+
+        let marken: Vec<(i64, bool)> = liste(&pool, 1, false)
+            .await
+            .unwrap()
+            .iter()
+            .map(|m| (m.id, m.demo))
+            .collect();
+        assert_eq!(marken, vec![(echt.id, false), (demo.id, true)]);
+        assert!(laden(&pool, 1, demo.id).await.unwrap().demo);
+        assert!(!laden(&pool, 1, echt.id).await.unwrap().demo);
+        assert!(laden(&pool, 1, demo.id).await.unwrap().anzeige().demo);
+        assert!(
+            setze_dienststatus(&pool, 1, demo.id, false)
+                .await
+                .unwrap()
+                .demo
+        );
     }
 
     #[tokio::test]

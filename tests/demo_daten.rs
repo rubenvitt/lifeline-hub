@@ -1067,3 +1067,133 @@ async fn dauer_import_und_neu_import() {
         "Demo-Dauer Datei/WAL (Median aus {MESSLAEUFE}): Import {import:.1} ms, Neu-Import {neu:.1} ms"
     );
 }
+
+// ---------------------------------------------------------------------------------------------
+// LFH-733: Demo-Marke im Lese-Vertrag der Stammdaten
+// ---------------------------------------------------------------------------------------------
+
+/// `demo` je Zeile einer Stammdatenliste, nach Kennung.
+async fn demo_marken(
+    app: &axum::Router,
+    cookie: &str,
+    pfad: &str,
+    kennung: &str,
+) -> Vec<(String, bool)> {
+    let (status, v) = common::anfrage(app, "GET", pfad, cookie, None).await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+    let mut marken: Vec<(String, bool)> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|z| {
+            let demo = z["demo"]
+                .as_bool()
+                .unwrap_or_else(|| panic!("demo fehlt: {z}"));
+            (z[kennung].as_str().unwrap().to_string(), demo)
+        })
+        .collect();
+    marken.sort();
+    marken
+}
+
+/// Angelegte Zeilen tragen nach dem Import `demo: true`, mitbenutzte `demo: false`. Ein in einem
+/// echten Einsatz disponiertes Demo-Fahrzeug bleibt beim Entfernen stehen und trägt danach
+/// `demo: false`. Die Marke liest auch ein Server ohne Freischaltung.
+#[tokio::test]
+async fn demo_marke_folgt_import_und_entfernen() {
+    let (app, pool) = common::setup_mit_optionen(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let vorhanden = |pfad: &'static str, body: &'static str| {
+        let app = app.clone();
+        let admin = admin.clone();
+        async move {
+            let (status, v) = common::anfrage(&app, "POST", pfad, &admin, Some(body)).await;
+            assert!(status.is_success(), "POST {pfad}: {status} {v}");
+        }
+    };
+    // Drei echte Personen vorab: die IDs von Personal und Fahrzeug laufen sonst gleich, und eine
+    // vertauschte `tabelle` im Lesepfad fiele nicht auf.
+    for body in [
+        r#"{"name":"Echt A"}"#,
+        r#"{"name":"Echt B"}"#,
+        r#"{"name":"Echt C"}"#,
+    ] {
+        vorhanden("/api/personal", body).await;
+    }
+    vorhanden("/api/fahrzeuge", r#"{"funkrufname":"Musterstadt 11-1"}"#).await;
+    vorhanden(
+        "/api/personal",
+        r#"{"name":"Vorhandene Person","personalnummer":"DEMO-P-001"}"#,
+    )
+    .await;
+    vorhanden(
+        "/api/material",
+        r#"{"bezeichnung":"Vorhandenes Material","bestandsnummer":"DEMO-M-001"}"#,
+    )
+    .await;
+
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::CREATED, "{v}");
+
+    let fahrzeuge = demo_marken(&app, &admin, "/api/fahrzeuge", "funkrufname").await;
+    assert!(fahrzeuge.len() > 2, "{fahrzeuge:?}");
+    for (name, demo) in &fahrzeuge {
+        assert_eq!(*demo, name != "Musterstadt 11-1", "{name}");
+    }
+    let personal = demo_marken(&app, &admin, "/api/personal", "name").await;
+    assert!(personal.iter().any(|(_, d)| *d), "{personal:?}");
+    assert!(
+        personal.contains(&("Vorhandene Person".to_string(), false)),
+        "{personal:?}"
+    );
+    let material = demo_marken(&app, &admin, "/api/material", "bezeichnung").await;
+    assert!(material.iter().any(|(_, d)| *d), "{material:?}");
+    assert!(
+        material.contains(&("Vorhandenes Material".to_string(), false)),
+        "{material:?}"
+    );
+
+    // Ohne Freischaltung auf derselben Datenbank: die Marke bleibt sichtbar.
+    let ohne = lifeline_hub::app::build_router_mit(
+        common::test_state(&pool, &lifeline_hub::live::LiveHub::new()),
+        RouterOptionen::default(),
+    );
+    let admin_ohne = common::login_cookie(&ohne, "admin", "startpw12").await;
+    assert_eq!(
+        demo_marken(&ohne, &admin_ohne, "/api/fahrzeuge", "funkrufname").await,
+        fahrzeuge
+    );
+
+    // Ein Demo-Fahrzeug in einen echten Einsatz disponieren, dann entfernen.
+    let (_, liste) = common::anfrage(&app, "GET", "/api/fahrzeuge", &admin, None).await;
+    let demo_fz = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["demo"] == true)
+        .unwrap()
+        .clone();
+    let echt = common::einsatz_anlegen(&app, &admin).await;
+    let (status, v) = common::anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{echt}/fahrzeuge"),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{}}}"#, demo_fz["id"])),
+    )
+    .await;
+    assert!(status.is_success(), "{status} {v}");
+    let (status, v) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+
+    let nachher = demo_marken(&app, &admin, "/api/fahrzeuge", "funkrufname").await;
+    let behalten = demo_fz["funkrufname"].as_str().unwrap().to_string();
+    assert_eq!(
+        nachher,
+        vec![(behalten, false), ("Musterstadt 11-1".to_string(), false)]
+            .into_iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>(),
+    );
+}

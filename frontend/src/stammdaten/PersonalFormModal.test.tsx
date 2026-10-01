@@ -31,6 +31,7 @@ const person: Personal = {
   dienststatus: 'ausser_dienst',
   qualifikationen: [{ id: 1, label: 'Sanitäter' }],
   angelegt_at: '2026-05-26 09:00:00',
+  demo: false,
 };
 
 function handler(onPost: (body: unknown) => void = () => {}) {

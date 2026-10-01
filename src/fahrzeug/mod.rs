@@ -49,6 +49,8 @@ pub struct Fahrzeug {
     pub bemerkung: Option<String>,
     pub dienststatus: String,
     pub angelegt_at: String,
+    /// Trägt eine Herkunftsmarke des Demo-Imports (LFH-733), abgeleitet beim Lesen.
+    pub demo: bool,
 }
 
 impl Fahrzeug {
@@ -81,6 +83,7 @@ impl Fahrzeug {
             bemerkung: self.bemerkung.clone(),
             dienststatus: self.dienststatus.clone(),
             angelegt_at: self.angelegt_at.clone(),
+            demo: self.demo,
         }
     }
 }
@@ -103,6 +106,8 @@ pub struct FahrzeugAnzeige {
     #[schema(value_type = crate::katalog::Dienststatus)]
     pub dienststatus: String,
     pub angelegt_at: String,
+    /// `true`, solange der Demo-Import die Zeile angelegt hat und sie markiert ist (LFH-733).
+    pub demo: bool,
 }
 
 /// Abgeleitete AutoComplete-Vorschläge für die Stamm-Felder (DISTINCT, org-weit).
@@ -193,6 +198,7 @@ mod tests {
             bemerkung: None,
             dienststatus: DIENSTSTATUS_IN_DIENST.into(),
             angelegt_at: "2026-05-26 10:00:00".into(),
+            demo: false,
         }
     }
 

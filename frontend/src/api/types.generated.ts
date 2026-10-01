@@ -1764,6 +1764,8 @@ export interface components {
         FahrzeugAnzeige: {
             angelegt_at: string;
             bemerkung?: string | null;
+            /** @description `true`, solange der Demo-Import die Zeile angelegt hat und sie markiert ist (LFH-733). */
+            demo: boolean;
             dienststatus: components["schemas"]["Dienststatus"];
             fahrzeugtyp?: string | null;
             fms_issi?: string | null;
@@ -2299,6 +2301,8 @@ export interface components {
             bemerkung?: string | null;
             bestandsnummer?: string | null;
             bezeichnung: string;
+            /** @description `true`, solange der Demo-Import die Zeile angelegt hat und sie markiert ist (LFH-733). */
+            demo: boolean;
             dienststatus: components["schemas"]["Dienststatus"];
             /** Format: int64 */
             id: number;
@@ -3043,6 +3047,8 @@ export interface components {
             bemerkung?: string | null;
             /** Format: int64 */
             benutzer_id?: number | null;
+            /** @description `true`, solange der Demo-Import die Zeile angelegt hat und sie markiert ist (LFH-733). */
+            demo: boolean;
             dienststatus: components["schemas"]["Dienststatus"];
             /** Format: int64 */
             id: number;

@@ -4,9 +4,15 @@ use crate::staerke::Staerke;
 use sqlx::{SqliteConnection, SqlitePool};
 
 /// Spaltenliste für `SELECT` in der Reihenfolge von `Fahrzeug` (FromRow).
+///
+/// `demo` ist abgeleitet aus der Herkunftsmarke des Demo-Imports (LFH-733, design.md D2): keine
+/// Spalte, eine Wahrheit. Jede Abfrage über `SPALTEN` liest `FROM fahrzeug` ohne Alias, sonst
+/// zeigte `fahrzeug.id` ins Leere.
 const SPALTEN: &str = "id, org_id, funkrufname, fahrzeugtyp, traegerorganisation, kennzeichen, \
      opta, standort, fms_issi, sondersignal, tragenkapazitaet, staerke_fuehrer, \
-     staerke_unterfuehrer, staerke_mannschaft, bemerkung, dienststatus, angelegt_at";
+     staerke_unterfuehrer, staerke_mannschaft, bemerkung, dienststatus, angelegt_at, \
+     EXISTS (SELECT 1 FROM demo_herkunft h \
+             WHERE h.tabelle = 'fahrzeug' AND h.datensatz_id = fahrzeug.id) AS demo";
 
 /// Editierbare Stammfelder. Optional-Strings sind bereits getrimmt; leer → `None`.
 /// `staerke` ist bereits validiert (alle drei oder keiner).
@@ -445,6 +451,36 @@ mod tests {
         assert_eq!(
             laden(&pool, 1, f.id).await.unwrap().dienststatus,
             "ausser_dienst"
+        );
+    }
+
+    /// LFH-733: `demo` folgt der Herkunftsmarke, in Liste, `laden` und Dienststatuswechsel.
+    /// Die Marke einer anderen Art mit derselben ID zählt nicht.
+    #[tokio::test]
+    async fn demo_folgt_der_herkunftsmarke() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let demo = anlegen(&pool, 1, daten("Musterstadt 83-1")).await.unwrap();
+        let echt = anlegen(&pool, 1, daten("Florian 1")).await.unwrap();
+        assert!(!demo.demo, "vor der Marke");
+        crate::demo::test_markieren(&pool, 1, "fahrzeug", demo.id).await;
+        crate::demo::test_markieren(&pool, 1, "personal", echt.id).await;
+
+        let marken: Vec<(i64, bool)> = liste(&pool, 1, false)
+            .await
+            .unwrap()
+            .iter()
+            .map(|f| (f.id, f.demo))
+            .collect();
+        assert_eq!(marken, vec![(echt.id, false), (demo.id, true)]);
+        assert!(laden(&pool, 1, demo.id).await.unwrap().demo);
+        assert!(!laden(&pool, 1, echt.id).await.unwrap().demo);
+        assert!(laden(&pool, 1, demo.id).await.unwrap().anzeige().demo);
+        assert!(
+            setze_dienststatus(&pool, 1, demo.id, false)
+                .await
+                .unwrap()
+                .demo
         );
     }
 

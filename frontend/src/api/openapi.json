@@ -4782,7 +4782,8 @@
           "funkrufname",
           "sondersignal",
           "dienststatus",
-          "angelegt_at"
+          "angelegt_at",
+          "demo"
         ],
         "properties": {
           "angelegt_at": {
@@ -4793,6 +4794,10 @@
               "string",
               "null"
             ]
+          },
+          "demo": {
+            "type": "boolean",
+            "description": "`true`, solange der Demo-Import die Zeile angelegt hat und sie markiert ist (LFH-733)."
           },
           "dienststatus": {
             "$ref": "#/components/schemas/Dienststatus"
@@ -6243,7 +6248,8 @@
           "id",
           "bezeichnung",
           "dienststatus",
-          "angelegt_at"
+          "angelegt_at",
+          "demo"
         ],
         "properties": {
           "angelegt_at": {
@@ -6263,6 +6269,10 @@
           },
           "bezeichnung": {
             "type": "string"
+          },
+          "demo": {
+            "type": "boolean",
+            "description": "`true`, solange der Demo-Import die Zeile angelegt hat und sie markiert ist (LFH-733)."
           },
           "dienststatus": {
             "$ref": "#/components/schemas/Dienststatus"
@@ -8184,7 +8194,8 @@
           "name",
           "dienststatus",
           "angelegt_at",
-          "qualifikationen"
+          "qualifikationen",
+          "demo"
         ],
         "properties": {
           "angelegt_at": {
@@ -8202,6 +8213,10 @@
               "null"
             ],
             "format": "int64"
+          },
+          "demo": {
+            "type": "boolean",
+            "description": "`true`, solange der Demo-Import die Zeile angelegt hat und sie markiert ist (LFH-733)."
           },
           "dienststatus": {
             "$ref": "#/components/schemas/Dienststatus"

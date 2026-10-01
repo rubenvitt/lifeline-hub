@@ -4,8 +4,13 @@ use crate::katalog::{DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST};
 use sqlx::{SqliteConnection, SqlitePool};
 
 /// Spaltenliste für `SELECT` in der Reihenfolge von `Personal` (FromRow).
+///
+/// `demo` ist abgeleitet aus der Herkunftsmarke des Demo-Imports (LFH-733, design.md D2). Jede
+/// Abfrage über `SPALTEN` liest `FROM personal` ohne Alias.
 const SPALTEN: &str = "id, org_id, benutzer_id, name, personalnummer, traegerorganisation, \
-     telefon, staerke_position, bemerkung, dienststatus, angelegt_at";
+     telefon, staerke_position, bemerkung, dienststatus, angelegt_at, \
+     EXISTS (SELECT 1 FROM demo_herkunft h \
+             WHERE h.tabelle = 'personal' AND h.datensatz_id = personal.id) AS demo";
 
 /// Editierbare Stammfelder. Optional-Strings sind bereits getrimmt (leer → `None`),
 /// `staerke_position` bereits gegen das Enum validiert.
@@ -163,6 +168,7 @@ fn zu_anzeige(p: Personal, qualifikationen: Vec<QualifikationRef>) -> PersonalAn
         dienststatus: p.dienststatus,
         angelegt_at: p.angelegt_at,
         qualifikationen,
+        demo: p.demo,
     }
 }
 
@@ -478,6 +484,37 @@ mod tests {
         assert_eq!(a.name, "Thomas Müller");
         assert_eq!(a.staerke_position.as_deref(), Some("fuehrer"));
         assert_eq!(a.dienststatus, "in_dienst");
+    }
+
+    /// LFH-733: `demo` folgt der Herkunftsmarke, in Liste, Anzeige und Dienststatuswechsel.
+    /// Die Marke einer anderen Art mit derselben ID zählt nicht.
+    #[tokio::test]
+    async fn demo_folgt_der_herkunftsmarke() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let demo = anlegen(&pool, 1, daten("Berta Beispiel"), &[])
+            .await
+            .unwrap();
+        let echt = anlegen(&pool, 1, daten("Anton Echt"), &[]).await.unwrap();
+        assert!(!demo.demo, "vor der Marke");
+        crate::demo::test_markieren(&pool, 1, "personal", demo.id).await;
+        crate::demo::test_markieren(&pool, 1, "material", echt.id).await;
+
+        let marken: Vec<(i64, bool)> = liste_anzeige(&pool, 1, false)
+            .await
+            .unwrap()
+            .iter()
+            .map(|p| (p.id, p.demo))
+            .collect();
+        assert_eq!(marken, vec![(echt.id, false), (demo.id, true)]);
+        assert!(laden_anzeige(&pool, 1, demo.id).await.unwrap().demo);
+        assert!(!laden_anzeige(&pool, 1, echt.id).await.unwrap().demo);
+        assert!(
+            setze_dienststatus(&pool, 1, demo.id, false)
+                .await
+                .unwrap()
+                .demo
+        );
     }
 
     #[tokio::test]

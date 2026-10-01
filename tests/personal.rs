@@ -479,3 +479,64 @@ async fn kein_delete_endpunkt() {
     let (status, _) = anfrage(&app, "DELETE", &format!("/api/personal/{id}"), &admin, None).await;
     assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
 }
+
+// ---------- LFH-733: Demo-Marke im Lese-Vertrag ----------
+
+/// `demo` folgt der Herkunftsmarke in Liste, `PATCH`-Antwort und Dienststatuswechsel.
+#[tokio::test]
+async fn demo_marke_in_liste_patch_und_dienststatus() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, demo) = anfrage(
+        &app,
+        "POST",
+        "/api/personal",
+        &admin,
+        Some(r#"{"name":"Berta Beispiel"}"#),
+    )
+    .await;
+    let (_, echt) = anfrage(
+        &app,
+        "POST",
+        "/api/personal",
+        &admin,
+        Some(r#"{"name":"Anton Echt"}"#),
+    )
+    .await;
+    assert_eq!(demo["demo"], false, "Anlage ohne Marke");
+    let id = demo["id"].as_i64().unwrap();
+    demo_markieren(&pool, "personal", id).await;
+
+    let (_, liste) = anfrage(&app, "GET", "/api/personal", &admin, None).await;
+    let marke = |json: &serde_json::Value, gesucht: &serde_json::Value| {
+        json.as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == *gesucht)
+            .unwrap()["demo"]
+            .clone()
+    };
+    assert_eq!(marke(&liste, &demo["id"]), true);
+    assert_eq!(marke(&liste, &echt["id"]), false);
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/personal/{id}"),
+        &admin,
+        Some(r#"{"telefon":"0123"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["demo"], true);
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/personal/{id}/ausser-dienst"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["demo"], true);
+}

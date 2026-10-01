@@ -57,6 +57,8 @@ pub struct Personal {
     pub bemerkung: Option<String>,
     pub dienststatus: String,
     pub angelegt_at: String,
+    /// Trägt eine Herkunftsmarke des Demo-Imports (LFH-733), abgeleitet beim Lesen.
+    pub demo: bool,
 }
 
 /// Aufgelöste Qualifikation einer Person (id + label), inkl. deaktivierter
@@ -83,6 +85,8 @@ pub struct PersonalAnzeige {
     pub dienststatus: String,
     pub angelegt_at: String,
     pub qualifikationen: Vec<QualifikationRef>,
+    /// `true`, solange der Demo-Import die Zeile angelegt hat und sie markiert ist (LFH-733).
+    pub demo: bool,
 }
 
 /// Abgeleitete AutoComplete-Vorschläge für die Trägerorganisation (DISTINCT, org-weit).
