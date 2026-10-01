@@ -42,7 +42,7 @@ import './organigrammPrint.css';
 /**
  * Organigramm der Führungsorganisation (FwDV 100, LFH-626) — die zweite Ansicht der Seite
  * Einsatzabschnitte. Liest, druckt und übernimmt; bearbeitet wird am Datensatz (Namen sind
- * Deeplinks). Herleitung: `openspec/changes/lfh-626-fuehrungsorganisation-skizze/design.md`.
+ * Deeplinks). Herleitung: `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`.
  *
  * - **Hängendes Layout ohne Bibliothek** (D3): die erste Ebene unter der Einsatzleitung bricht in
  *   Spalten um (`auto-fill`), tiefere Ebenen hängen senkrecht. So bleibt es in jeder Breite ohne

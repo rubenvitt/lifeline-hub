@@ -21,7 +21,7 @@ import { abschnittStaerken } from './abschnittStaerke';
  *   Wurzel „Einsatzleitung“ gehört nicht ins Modell: sie trägt keine Zahl, die Einsatzstärke hat
  *   ihre Heimat im Meldebild.
  *
- * Herleitung: `openspec/changes/lfh-626-fuehrungsorganisation-skizze/design.md` (D2, D4).
+ * Herleitung: `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md` (D2, D4).
  */
 
 interface KnotenBasis {

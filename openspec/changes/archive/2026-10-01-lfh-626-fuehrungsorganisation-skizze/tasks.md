@@ -154,5 +154,8 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 - [x] 5.4 `pruefliste.md` in dieser Change: die 15 Kriterien der Prüfliste Einsatztauglichkeit,
   jede Zeile mit Verdikt (erfüllt mit Beleg, offen → Zielticket, nicht anwendbar mit Grund).
   Nachweis: Die Datei liegt vor, keine Zeile steht auf „nicht geprüft“.
-- [ ] 5.5 `./scripts/check-all.sh` (Bündel `schnell` lokal, voll in der CI des PRs). Nachweis:
-  grün bzw. Verweis auf den grünen CI-Lauf des PRs.
+- [x] 5.5 `./scripts/check-all.sh` (Bündel `schnell` lokal, voll in der CI des PRs). Nachweis:
+  grün bzw. Verweis auf den grünen CI-Lauf des PRs. Lokal am 01.10.2026: `--nur schnell` grün
+  (10/10 Schritte), `--nur frontend` grün (568 Dateien, 7830 Tests). Dazu einzeln grün:
+  `e2e/fuehrungsorganisation.spec.ts` (8), `e2e/gate1-ueberlauf.spec.ts` (25/25) und
+  `e2e/gate3-trefflaeche.spec.ts` („Organigramm“, beide Rollen). `rust` und `e2e` voll: CI des PRs.
