@@ -1,9 +1,6 @@
-# modul-zaehler Specification
+# Spec Delta
 
-## Purpose
-Der Server liefert Zähler je Modul für den Navigationsrahmen eines Einsatzes. Die Antwort enthält nur die Module, die der anfragende Benutzer sehen darf. Jede Zahl hat eine festgelegte, aus dem Entwurf belegte Bedeutung, damit das Modulpanel keine Zahl zeigt, die niemand definiert hat.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Modulzähler mit festgelegter Bedeutung
 Das System SHALL unter `GET /api/einsaetze/{id}/modul-zaehler` für die folgenden Module je einen Zähler liefern. Die Bedeutung ist genau diese:
@@ -51,27 +48,6 @@ Die Bedeutung von „offen“, „in Arbeit“, „überfällig“, „fällig�
 #### Scenario: Leerer Einsatz
 - **WHEN** ein Modul erlaubt ist, aber keine Datensätze hat
 - **THEN** ist sein Zähler vorhanden und steht auf 0
-
-### Requirement: Nur erlaubte Module werden gezählt
-Der Endpunkt MUST Lesezugriff auf den Einsatz verlangen und gehört selbst keinem Modul. Ein Zähler MUST nur für Module enthalten sein, auf die der Benutzer nach denselben Regeln zugreifen darf wie auf den Listen-Endpunkt des Moduls: Sichtbarkeit, Rollensperre aus dem Einsatz-Override, sonst aus der Org-Vorgabe, und die Ausnahme für System-Admins.
-- Ein nicht erlaubtes Modul MUST in der Antwort **fehlen**. Es DARF NICHT als 0 erscheinen.
-- Für einen unbekannten Einsatz antwortet das System mit HTTP 404, ohne Lesezugriff mit HTTP 403.
-
-#### Scenario: Ausgeblendetes Modul
-- **WHEN** das Modul `meldungen` für den Einsatz ausgeblendet ist und ein Mitglied ohne Admin-Rechte anfragt
-- **THEN** enthält die Antwort keinen Eintrag `meldungen`; die übrigen erlaubten Module sind enthalten
-
-#### Scenario: Rollengesperrtes Modul
-- **WHEN** die Org-Vorgabe das Modul `personen` auf Führungskräfte beschränkt und ein Mitglied ohne diese Berechtigung anfragt
-- **THEN** enthält die Antwort keinen Eintrag `personen`
-
-#### Scenario: System-Admin
-- **WHEN** ein System-Admin anfragt und Module ausgeblendet sind
-- **THEN** enthält die Antwort Zähler für alle Module der Tabelle
-
-#### Scenario: Kein Lesezugriff
-- **WHEN** ein Benutzer ohne Lesezugriff auf den Einsatz anfragt
-- **THEN** antwortet das System mit HTTP 403
 
 ### Requirement: Der Navigationsrahmen zeigt die Modulzähler
 Der Navigationsrahmen des Einsatzes (Modulpanel und Akkordeon) SHALL die Zähler dieses Endpunkts an den Modulen ETB, Betroffene, Einheiten, Einsatzabschnitte, Meldungen, Aufträge, Erinnerungen, Chat und Dokumente anzeigen.
