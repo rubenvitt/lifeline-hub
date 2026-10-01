@@ -23,6 +23,10 @@ Code. LFH-689.
 - [x] 1.5 Mutationsprobe: Aufruf von `berichtigungen_nachladen` in `abfrage` auskommentieren →
   mindestens ein Test aus 1.1 rot; `ORDER BY lfd_nr` umdrehen → der Reihenfolge-Test rot.
   Ergebnis im Commit-Text nennen.
+- [x] 1.6 Review-Befunde: Unit-Tests in `src/etb/repo.rs` für das Einzelladen mit Berichtigung
+  und für eine Berichtigung aus einem fremden Einsatz (rot gesehen); die Nachlade-Abfrage hält die
+  Einsatzgrenze per Join selbst (D3). Prüfung: `cargo test --lib etb::repo::tests::` grün,
+  Mutationsprobe „Nachladen in `laden` auskommentiert“ → rot.
 
 ## 2. Typ-Codegen und Fixtures
 

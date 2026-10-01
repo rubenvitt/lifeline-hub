@@ -116,7 +116,7 @@ function EintragInhalt({
           <Datenfeld label="Berichtigung" breit>
             {/* Beide Richtungen in EINEM Feld: ein Feld „Berichtigt durch“ trüge das Wort doppelt.
                 Blau, nicht rot: Rot bedient nichts — Wortlaut und Ziel wie in der Zeitachse. */}
-            <span style={{ display: 'inline-flex', flexWrap: 'wrap', columnGap: token.marginSM }}>
+            <span style={{ display: 'inline-flex', flexWrap: 'wrap', columnGap: token.marginXS }}>
               {e.berichtigt_eintrag_id != null && (
                 <span>
                   berichtigt einen älteren Eintrag —{' '}

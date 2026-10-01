@@ -65,12 +65,16 @@ required, die generierte TS-Form ist ein Pflichtfeld. Eigener Typ statt Wiederve
 `FolgeauftragVerweis`: der hat `lfd_nr` optional und meint Aufträge.
 
 **D3 — Gebündelte Nachlade-Abfrage `berichtigungen_nachladen`, wie `folgeauftraege_nachladen`.**
-`SELECT berichtigt_eintrag_id, id, lfd_nr FROM etb_eintrag WHERE typ = 'berichtigung' AND
-berichtigt_eintrag_id IN (…) ORDER BY lfd_nr`, aufgerufen in `laden` und `abfrage`. Sie
-läuft ohne Listenfilter und ohne Cursor: das macht das Feld seiten- und filterunabhängig
-(Spec `etb-berichtigung`). Die Einsatzgrenze hält der Erfassen-Handler
-(`repo::gehoert_zu_einsatz` vor dem Anlegen einer Berichtigung); die Seite ist bereits
-einsatzgefiltert. `typ = 'berichtigung'` hält das Feld deckungsgleich mit dem Client-Index.
+`SELECT b.berichtigt_eintrag_id, b.id, b.lfd_nr FROM etb_eintrag b JOIN etb_eintrag g ON
+g.id = b.berichtigt_eintrag_id AND g.einsatz_id = b.einsatz_id WHERE b.typ = 'berichtigung'
+AND b.berichtigt_eintrag_id IN (…) ORDER BY b.lfd_nr`, aufgerufen in `laden` und `abfrage`.
+Sie läuft ohne Listenfilter und ohne Cursor: das macht das Feld seiten- und filterunabhängig
+(Spec `etb-berichtigung`). Die Einsatzgrenze hält die Abfrage selbst (Join über den
+Primärschlüssel des Grundeintrags). Die Schreiber prüfen sie heute ebenfalls (Erfassen-Route mit
+`gehoert_zu_einsatz`, Betreuung und Ablösung über einsatzgefilterte Zeilen), die Datenbank aber
+nicht (nur der FK aus 0004); ohne den Join legte ein künftiger Schreiber ohne Prüfung id und
+Nummer eines fremden Einsatzes offen (Review-Befund). `typ = 'berichtigung'` hält das Feld
+deckungsgleich mit dem Client-Index.
 Alternative korrelierte Subquery mit `json_group_array`: verworfen aus denselben Gründen wie in
 LFH-636 D2 (sqlx-JSON, Null-Behandlung, schwerer zu testen).
 
