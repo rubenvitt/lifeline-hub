@@ -46,6 +46,7 @@ import { einsatzStatus, materialStatus, type StatusDarstellung } from '../theme/
 import StatusTag from '../components/StatusTag';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
+import { dispositionsOptionen } from '../stammdaten/demoMarke';
 
 /**
  * Die Farbentscheidung für den Materialstatus liegt in `theme/statusFarben.ts` (`materialStatus`).
@@ -242,11 +243,12 @@ export default function MaterialPage() {
   const standVeraltet = emQuery.isError && ems.length > 0;
 
   // Kein Dedup wie bei Fahrzeugen: dieselbe Material-Art darf mehrfach als getrennte Position
-  // disponiert werden (Mengen-Splitting auf Einheiten).
-  const poolOptionen = (poolQuery.data ?? []).map((m) => ({
-    value: m.id,
-    label: `${m.bezeichnung}${m.kategorie ? ` (${m.kategorie})` : ''}`,
-  }));
+  // disponiert werden (Mengen-Splitting auf Einheiten). Demo-Stammdaten gekennzeichnet und
+  // hinten, nie ausgeblendet (LFH-733, `stammdaten/demoMarke.ts`).
+  const poolOptionen = dispositionsOptionen(
+    poolQuery.data ?? [],
+    (m) => `${m.bezeichnung}${m.kategorie ? ` (${m.kategorie})` : ''}`,
+  );
 
   /**
    * Was ein leeres Auswahlfeld bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,

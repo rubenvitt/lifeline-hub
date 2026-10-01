@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { MitDemoMarke } from '../components/DemoMarke';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -57,7 +58,11 @@ export default function PersonalTab() {
        * Der `dataIndex` bleibt: die Freitextsuche liest die ROHWERTE der Spalten mit `dataIndex`,
        * ohne ihn fiele der Name aus dem Suchkorpus.
        */
-      render: (_, p) => <Link to={personalDetailPfad(p.id)}>{p.name}</Link>,
+      render: (_, p) => (
+        <MitDemoMarke demo={p.demo}>
+          <Link to={personalDetailPfad(p.id)}>{p.name}</Link>
+        </MitDemoMarke>
+      ),
     },
     {
       title: 'Personalnr.',

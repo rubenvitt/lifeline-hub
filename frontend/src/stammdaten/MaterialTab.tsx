@@ -3,6 +3,7 @@ import AdminPage from '../components/AdminPage';
 import { monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { MitDemoMarke } from '../components/DemoMarke';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -45,6 +46,7 @@ export default function MaterialTab() {
        * ist ein Angebot — absteigend und mit `de`-Kollation statt SQLites BINARY-Vergleich.
        */
       sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de', { numeric: true }),
+      render: (_, m) => <MitDemoMarke demo={m.demo}>{m.bezeichnung}</MitDemoMarke>,
     },
     { title: 'Kategorie', dataIndex: 'kategorie', key: 'kategorie', render: (t) => t ?? '—' },
     {

@@ -71,6 +71,7 @@ import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
+import { dispositionsOptionen } from '../stammdaten/demoMarke';
 
 /**
  * Ist-Besatzungsstärke aus den Stärke-Positionen der zugeordneten Kräfte, clientseitig gezählt und
@@ -419,12 +420,11 @@ export default function FahrzeugePage() {
   const disponierteIds = new Set(
     efs.map((e) => e.fahrzeug_id).filter((x): x is number => x != null),
   );
-  const poolOptionen = (poolQuery.data ?? [])
-    .filter((f) => !disponierteIds.has(f.id))
-    .map((f) => ({
-      value: f.id,
-      label: `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}`,
-    }));
+  // Demo-Stammdaten gekennzeichnet und hinten, nie ausgeblendet (LFH-733, `stammdaten/demoMarke.ts`).
+  const poolOptionen = dispositionsOptionen(
+    (poolQuery.data ?? []).filter((f) => !disponierteIds.has(f.id)),
+    (f) => `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}`,
+  );
 
   /**
    * Was ein leeres Auswahlfeld bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,

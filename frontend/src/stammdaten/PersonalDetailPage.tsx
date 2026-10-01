@@ -2,6 +2,7 @@ import { App, AutoComplete, Breadcrumb, Button, Col, Form, Input, Row, theme } f
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
+import { MitDemoMarke } from '../components/DemoMarke';
 import { Select } from '../components/Select';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -131,7 +132,7 @@ export default function PersonalDetailPage() {
       />
       <AdminPage
         breite="schmal"
-        titel={person.name}
+        titel={<MitDemoMarke demo={person.demo}>{person.name}</MitDemoMarke>}
         beschreibung="Vollständige Stammdaten. Die Schnellerfassung in der Liste trägt nur die vier Felder, ohne die eine Person nicht auffindbar ist."
         hinweis={
           <SeitenHinweise

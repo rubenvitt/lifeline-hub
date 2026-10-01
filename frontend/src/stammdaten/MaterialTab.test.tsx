@@ -21,6 +21,7 @@ const material = {
   bemerkung: null,
   dienststatus: 'in_dienst',
   angelegt_at: '2026-05-27 10:00:00',
+  demo: false,
 };
 
 // Voreinstellung bleibt EIN Posten: die Prüfungen unten greifen „Bearbeiten" per `getByRole`
@@ -35,6 +36,22 @@ function render(benutzer: typeof admin, posten = [material]) {
 }
 
 describe('MaterialTab', () => {
+  // LFH-733: die Demo-Marke steht neben der Kennung, nur an markierten Zeilen, neben der
+  // Bezeichnung.
+  it('kennzeichnet Demo-Stammdaten neben der Kennung', async () => {
+    const { container } = render(nichtAdmin, [
+      material,
+      { ...material, id: 2, bezeichnung: 'Feldbett', demo: true },
+    ]);
+    await screen.findByText('Wolldecke');
+    const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
+    const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
+    expect(within(erste).queryByText('Demo')).not.toBeInTheDocument();
+    const marke = within(zweite).getByText('Demo');
+    expect(marke.closest('a')).toBeNull();
+    expect(marke.closest('td')).toBe(within(zweite).getByText('Feldbett').closest('td'));
+  });
+
   it('zeigt Material', async () => {
     render(admin);
     expect(await screen.findByText('Wolldecke')).toBeInTheDocument();

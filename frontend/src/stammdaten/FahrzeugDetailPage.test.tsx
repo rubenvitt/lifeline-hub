@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
@@ -37,6 +37,7 @@ const fahrzeug = {
   bemerkung: 'Reserve',
   dienststatus: 'in_dienst',
   angelegt_at: '2026-05-26 10:00:00',
+  demo: false,
 };
 
 /** Zweiter Datensatz derselben Route — Ziel des Detail→Detail-Wechsels. */
@@ -108,6 +109,21 @@ function renderMitWechsel() {
 }
 
 describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
+  // LFH-733: die Demo-Marke steht im Kopf, nur an markierten Datensätzen.
+  it('zeigt die Demo-Marke im Kopf eines Demo-Datensatzes', async () => {
+    handler(admin, [{ ...fahrzeug, demo: true }]);
+    renderRoute('/admin/stammdaten/fahrzeuge/7');
+    const kopf = await screen.findByRole('heading', { level: 1, name: /Florian 1/ });
+    expect(within(kopf).getByText('Demo')).toBeInTheDocument();
+  });
+
+  it('zeigt ohne Marke kein „Demo“ im Kopf', async () => {
+    handler();
+    renderRoute('/admin/stammdaten/fahrzeuge/7');
+    const kopf = await screen.findByRole('heading', { level: 1, name: 'Florian 1' });
+    expect(within(kopf).queryByText('Demo')).not.toBeInTheDocument();
+  });
+
   it('zeigt das Fahrzeug aus der Listen-Query — alle elf Felder, kein Einzel-GET', async () => {
     let abrufe = 0;
     handler();

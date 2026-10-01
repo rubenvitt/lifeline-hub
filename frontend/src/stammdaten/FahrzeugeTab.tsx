@@ -4,6 +4,7 @@ import AdminPage from '../components/AdminPage';
 import { monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { MitDemoMarke } from '../components/DemoMarke';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -56,9 +57,11 @@ export default function FahrzeugeTab() {
        * gleichzeitig feuern könnten.
        */
       render: (_, f) => (
-        <Link to={fahrzeugDetailPfad(f.id)} style={monoStil(13)}>
-          {f.funkrufname}
-        </Link>
+        <MitDemoMarke demo={f.demo}>
+          <Link to={fahrzeugDetailPfad(f.id)} style={monoStil(13)}>
+            {f.funkrufname}
+          </Link>
+        </MitDemoMarke>
       ),
     },
     { title: 'Typ', dataIndex: 'fahrzeugtyp', key: 'fahrzeugtyp', render: (t) => t ?? '—' },

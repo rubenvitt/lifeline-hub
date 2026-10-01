@@ -79,7 +79,12 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
 `src/demo/`, `src/routes/demo_daten.rs`; Schalter `--demo-daten`/`LIFELINE_DEMO_DATEN=true`
 (Vorgabe aus). Herleitung: `openspec/changes/archive/2026-09-29-lfh-690-demo-daten-laufzeit-import/`.
 - 404 ohne Schalter kommt aus der Registrierung (`RouterOptionen { demo_daten }`,
-  `build_router_mit`); das Frontend liest nur `GET /api/demo-daten` (`admin/useDemoDaten.ts`).
+  `build_router_mit`); den Demo-Status liest das Frontend nur über `GET /api/demo-daten`
+  (`admin/useDemoDaten.ts`).
+- **Demo-Marke an Stammdaten** (LFH-733): `demo` der Fahrzeug-/Personal-/Material-DTOs kommt beim
+  Lesen aus `demo_herkunft` (`EXISTS` in `SPALTEN`), nie aus einer eigenen Spalte. Die Oberfläche
+  kennzeichnet Demo-Stammdaten und blendet sie nie aus (`components/DemoMarke.tsx`,
+  Auswahllisten über `stammdaten/demoMarke.ts`).
 - **Import ist eine Transaktion nur über `…_tx(conn)`-Funktionen** (eine Pool-Funktion unter
   offener `BEGIN IMMEDIATE` endet in 503); kein rohes SQL.
 - **Löschen erreicht strukturell nur Demo-Daten** (Einsatz-ID aus `demo_import`, `org_id` in jedem

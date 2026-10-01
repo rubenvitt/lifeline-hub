@@ -636,6 +636,46 @@ describe('PersonalPage · Datenzustände', () => {
     expect(await screen.findByText('Keine freien Personen')).toBeInTheDocument();
     expect(screen.queryByText('Personalliste konnte nicht geladen werden')).not.toBeInTheDocument();
   });
+
+  // LFH-733, design.md D5: „Demo“ steht im Wortlaut, also findet die Suche es.
+  it('Tippen von „Demo“ lässt nur die Demo-Personen in der Auswahl', async () => {
+    const { container } = zeige(
+      http.get('/api/personal', () =>
+        HttpResponse.json([
+          {
+            id: 31,
+            name: 'Berta Beispiel',
+            personalnummer: 'DEMO-P-002',
+            demo: true,
+            qualifikationen: [],
+          },
+          { id: 32, name: 'Anton Echt', personalnummer: '4711', demo: false, qualifikationen: [] },
+          {
+            id: 33,
+            name: 'Dora Demo-Frei',
+            personalnummer: null,
+            demo: false,
+            qualifikationen: [],
+          },
+        ]),
+      ),
+    );
+    await screen.findByText('Noch kein Personal disponiert');
+    await oeffnePersonalAuswahl(container, 'Person aus Pool disponieren …');
+    await screen.findByText('Anton Echt (4711)');
+    expect(sichtbareOptionen()).toEqual([
+      'Anton Echt (4711)',
+      'Dora Demo-Frei',
+      'Berta Beispiel (DEMO-P-002) · Demo',
+    ]);
+    const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
+      s.textContent?.includes('Person aus Pool disponieren …'),
+    );
+    await userEvent.type(within(feld!).getByRole('combobox'), '· Demo');
+    await waitFor(() =>
+      expect(sichtbareOptionen()).toEqual(['Berta Beispiel (DEMO-P-002) · Demo']),
+    );
+  });
 });
 
 /**
@@ -771,6 +811,13 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
  * dessen Knoten trägt `pointer-events: none`. Gegriffen wird die Combobox — der Knoten, den auch
  * die Tastatur fokussiert.
  */
+/** Die Optionen eines geöffneten Auswahlfelds in Anzeigereihenfolge (LFH-733). */
+function sichtbareOptionen(): string[] {
+  return [...document.querySelectorAll<HTMLElement>('.ant-select-item-option-content')].map(
+    (o) => o.textContent ?? '',
+  );
+}
+
 async function oeffnePersonalAuswahl(container: HTMLElement, platzhalter: string) {
   const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
     s.textContent?.includes(platzhalter),

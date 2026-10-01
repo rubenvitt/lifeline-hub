@@ -694,6 +694,27 @@ describe('FahrzeugePage · Datenzustände', () => {
     expect(screen.queryByText('Fahrzeugliste konnte nicht geladen werden')).not.toBeInTheDocument();
   });
 
+  // LFH-733, design.md D1/D5: gekennzeichnet, nicht ausgeblendet, und hinter allen ohne Marke.
+  it('Demo-Fahrzeuge stehen mit „Demo“ hinter allen anderen in der Auswahl', async () => {
+    const { container } = zeige(
+      http.get('/api/fahrzeuge', () =>
+        HttpResponse.json([
+          { id: 21, funkrufname: 'Musterstadt 11-1', fahrzeugtyp: 'ELW 1', demo: true },
+          { id: 22, funkrufname: 'Florian 1', fahrzeugtyp: 'LF 20', demo: false },
+          { id: 23, funkrufname: 'Florian 2', fahrzeugtyp: null, demo: false },
+        ]),
+      ),
+    );
+    await screen.findByText('Noch keine Fahrzeuge disponiert');
+    await oeffneAuswahl(container, 'Stamm-Fahrzeug disponieren …');
+    await screen.findByText('Florian 1 (LF 20)');
+    expect(sichtbareOptionen()).toEqual([
+      'Florian 1 (LF 20)',
+      'Florian 2',
+      'Musterstadt 11-1 (ELW 1) · Demo',
+    ]);
+  });
+
   /**
    * Derselbe Fehlermodus eine Ebene tiefer: scheitert die Personalliste, filtert der
    * Besatzungs-Pool auf die leere Menge und behauptete „Keine freien Kräfte".
@@ -1017,6 +1038,13 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     ).toBeChecked();
   });
 });
+
+/** Die Optionen eines geöffneten Auswahlfelds in Anzeigereihenfolge (LFH-733). */
+function sichtbareOptionen(): string[] {
+  return [...document.querySelectorAll<HTMLElement>('.ant-select-item-option-content')].map(
+    (o) => o.textContent ?? '',
+  );
+}
 
 /**
  * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den Platzhalter:

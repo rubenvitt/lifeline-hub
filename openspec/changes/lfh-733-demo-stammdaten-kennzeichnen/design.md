@@ -120,7 +120,8 @@ führen Zustände ohne Präfix (`sondersignal`, `dienststatus`).
 ### D4 — Eine Marke, Wortlaut trägt
 
 Eine kleine Komponente `components/DemoMarke.tsx` rendert `StatusTag` mit der Darstellung
-`DEMO_MARKE = { rolle: 'neutral', label: 'Demo' }` und `darstellungsart="rand"`. Der
+`DEMO_MARKE = { rolle: 'neutral', label: 'Demo' }` und `darstellungsart="rand"`. Neben einer Kennung
+steht sie über `MitDemoMarke` (ein `Space`, die Marke außerhalb eines Links in der Kennung). Der
 Wortlaut trägt die Bedeutung, der Rahmen ist der zweite Kanal, eine Farbe ist nicht nötig.
 
 - **`neutral`, nicht `achtung`:** Die Herkunft ist kein Warnzustand. Im Katalog stünde
@@ -140,8 +141,8 @@ Das geschlossene Feld zeigt nach der Wahl dasselbe, und ein Screenreader liest d
 Ein `optionRender` mit `DemoMarke` verworfen: Die Suche fände „Demo“ dann nicht, und das
 geschlossene Feld zeigte die Marke nicht.
 
-Kennzeichnen und Sortieren übernimmt eine reine Funktion in `stammdaten/demoMarke.ts` (Name
-in 2.4 festgelegt), die alle drei Seiten rufen. Sie sortiert stabil um: zuerst alle ohne
+Kennzeichnen und Sortieren übernimmt die reine Funktion `dispositionsOptionen` in
+`stammdaten/demoMarke.ts`, die alle drei Seiten rufen. Sie sortiert stabil um: zuerst alle ohne
 Marke, dann alle mit Marke, die Serverreihenfolge bleibt in beiden Gruppen. Eine Funktion
 statt drei Kopien, weil die Regel „Demo hinten“ sonst in drei Seiten auseinanderläuft.
 

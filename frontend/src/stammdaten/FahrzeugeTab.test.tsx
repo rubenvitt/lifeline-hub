@@ -26,6 +26,7 @@ const fahrzeug = {
   bemerkung: null,
   dienststatus: 'in_dienst',
   angelegt_at: '2026-05-26 10:00:00',
+  demo: false,
 };
 
 // Voreinstellung bleibt EIN Fahrzeug: die Prüfungen unten greifen „Bearbeiten" per
@@ -42,6 +43,23 @@ function render(benutzer: typeof admin, fahrzeuge = [fahrzeug]) {
 }
 
 describe('FahrzeugeTab', () => {
+  // LFH-733: die Demo-Marke steht neben der Kennung, nur an markierten Zeilen, außerhalb des
+  // Links (dessen zugänglicher Name bleibt die Kennung).
+  it('kennzeichnet Demo-Stammdaten neben der Kennung', async () => {
+    const { container } = render(nichtAdmin, [
+      fahrzeug,
+      { ...fahrzeug, id: 2, funkrufname: 'Musterstadt 83-1', demo: true },
+    ]);
+    await screen.findByText('Florian 1');
+    const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
+    const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
+    expect(within(erste).queryByText('Demo')).not.toBeInTheDocument();
+    const marke = within(zweite).getByText('Demo');
+    expect(marke.closest('a')).toBeNull();
+    expect(marke.closest('td')).toBe(within(zweite).getByText('Musterstadt 83-1').closest('td'));
+    expect(within(zweite).getByRole('link', { name: 'Musterstadt 83-1' })).toBeInTheDocument();
+  });
+
   it('zeigt Fahrzeuge inkl. Stärke', async () => {
     render(admin);
     expect(await screen.findByText('Florian 1')).toBeInTheDocument();

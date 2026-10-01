@@ -95,7 +95,6 @@ describe('MaterialPage', () => {
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     const feld = container.querySelector('[data-row-key="10"] .ant-input-number');
-    expect(feld).not.toBeNull();
     expect(feld!.className).not.toMatch(/ant-input-number-sm\b/);
   });
 
@@ -399,6 +398,29 @@ describe('MaterialPage · Datenzustände', () => {
     expect(await screen.findByText('Kein Material im Dienst')).toBeInTheDocument();
     expect(screen.queryByText('Materialliste konnte nicht geladen werden')).not.toBeInTheDocument();
   });
+
+  // LFH-733, design.md D5: nach der Wahl trägt auch das geschlossene Feld „Demo“.
+  it('ein gewähltes Demo-Material zeigt „Demo“ im geschlossenen Feld', async () => {
+    const { container } = zeige(
+      http.get('/api/material', () =>
+        HttpResponse.json([
+          { id: 41, bezeichnung: 'Wolldecke', kategorie: 'Betreuung', demo: true },
+          { id: 42, bezeichnung: 'Feldbett', kategorie: null, demo: false },
+        ]),
+      ),
+    );
+    await screen.findByText('Noch kein Material disponiert');
+    await oeffneMaterialAuswahl(container, 'Stamm-Material wählen …');
+    await screen.findByText('Feldbett');
+    expect(sichtbareOptionen()).toEqual(['Feldbett', 'Wolldecke (Betreuung) · Demo']);
+    await userEvent.click(screen.getByText('Wolldecke (Betreuung) · Demo'));
+    // Das Feld selbst liegt im Container, die Optionsliste im Portal außerhalb.
+    await waitFor(() =>
+      expect(
+        [...container.querySelectorAll<HTMLElement>('.ant-select')].map((f) => f.textContent),
+      ).toContain('Wolldecke (Betreuung) · Demo'),
+    );
+  });
 });
 
 /**
@@ -550,6 +572,13 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     await waitFor(() => expect(screen.getByRole('dialog')).toHaveClass('ant-zoom-leave'));
   });
 });
+
+/** Die Optionen eines geöffneten Auswahlfelds in Anzeigereihenfolge (LFH-733). */
+function sichtbareOptionen(): string[] {
+  return [...document.querySelectorAll<HTMLElement>('.ant-select-item-option-content')].map(
+    (o) => o.textContent ?? '',
+  );
+}
 
 /**
  * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den Platzhalter:

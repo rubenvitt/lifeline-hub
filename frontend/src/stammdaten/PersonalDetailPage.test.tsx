@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
@@ -30,6 +30,7 @@ const person = {
   dienststatus: 'in_dienst',
   qualifikationen: [{ id: 1, label: 'Sanitäter' }],
   angelegt_at: '2026-05-26 09:00:00',
+  demo: false,
 };
 
 /** Zweiter Datensatz derselben Route — Ziel des Detail→Detail-Wechsels. */
@@ -93,6 +94,20 @@ function renderMitWechsel() {
 }
 
 describe('PersonalDetailPage (LFH-346 · A7)', () => {
+  // LFH-733: die Demo-Marke steht im Kopf, nur an markierten Datensätzen.
+  it('zeigt die Demo-Marke im Kopf eines Demo-Datensatzes', async () => {
+    handler(admin, [{ ...person, demo: true }]);
+    renderRoute('/admin/stammdaten/personal/5');
+    const kopf = await screen.findByRole('heading', { level: 1, name: /Thomas Müller/ });
+    expect(within(kopf).getByText('Demo')).toBeInTheDocument();
+  });
+
+  it('zeigt ohne Marke kein „Demo“ im Kopf', async () => {
+    handler();
+    renderRoute('/admin/stammdaten/personal/5');
+    const kopf = await screen.findByRole('heading', { level: 1, name: 'Thomas Müller' });
+    expect(within(kopf).queryByText('Demo')).not.toBeInTheDocument();
+  });
   /**
    * `PersonalAnzeige` trägt jedes editierbare Feld von `PersonalEingabe` — deshalb genügt
    * die Listen-Query und es gibt keinen Einzel-GET. Der Abrufzähler ist die zweite Hälfte

@@ -54,6 +54,7 @@ import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
+import { dispositionsOptionen } from '../stammdaten/demoMarke';
 
 export default function PersonalPage() {
   const { id } = useParams();
@@ -218,12 +219,11 @@ export default function PersonalPage() {
   const disponierteIds = new Set(
     eps.map((e) => e.personal_id).filter((x): x is number => x != null),
   );
-  const poolOptionen = (poolQuery.data ?? [])
-    .filter((p) => !disponierteIds.has(p.id))
-    .map((p) => ({
-      value: p.id,
-      label: `${p.name}${p.personalnummer ? ` (${p.personalnummer})` : ''}`,
-    }));
+  // Demo-Stammdaten gekennzeichnet und hinten, nie ausgeblendet (LFH-733, `stammdaten/demoMarke.ts`).
+  const poolOptionen = dispositionsOptionen(
+    (poolQuery.data ?? []).filter((p) => !disponierteIds.has(p.id)),
+    (p) => `${p.name}${p.personalnummer ? ` (${p.personalnummer})` : ''}`,
+  );
 
   /**
    * Was ein leeres Auswahlfeld bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,
