@@ -143,7 +143,7 @@ ist nachgezogen.
   `e2e/dichte-ableitung.spec.ts`).
 - **Messung:** `e2e/trefflaeche-pruefflaechen.spec.ts` misst `kompakt` und `handschuh`, mit der Gegenprobe
   „kompakt < handschuh“ je Zielsorte und einem Geschwister ohne Schreibrecht.
-  Herleitung und Befundtabelle: `openspec/changes/lfh-724-dichtestufe-aus-dem-geraet/design.md`
+  Herleitung und Befundtabelle: `openspec/changes/archive/2026-10-01-lfh-724-dichtestufe-aus-dem-geraet/design.md`
   (D5, D8).
 - **Zeile 2:** erfüllt nach Fix. Sektionswahl, Auswahl- und Zahlfelder, Speichern, Modulzeilen, Einsatzdaten, Profil und „Anzeige“ halten 72 px. Der Akkordeon-Kopf „Technische Angaben“ maß 55 px und folgt jetzt `kopfzeilenMasse`. Tests: „C10 · Einstellungen, Einsatzdaten, Profil und Anzeige halten 72 px, kompakt bleibt kleiner“ und „C10 · Einsatzdaten (Beobachter): …“.
 - Querschnittlich, auf keiner Fläche dieser Prüfliste eigens: die Brotkrume im Seitenkopf misst 20 px → **LFH-909**.

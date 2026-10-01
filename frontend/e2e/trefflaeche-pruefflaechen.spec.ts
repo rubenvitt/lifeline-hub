@@ -22,7 +22,8 @@ import {
  * ZWEI STUFEN STATT DREI: `handschuh` mit dem Boden 72, `kompakt` für die Gegenprobe
  * („kompakt < handschuh“ je Zielsorte, `gegenprobe` aus dem Kern) — eine Untergrenze allein
  * bliebe grün, wenn jedes Ziel in jeder Stufe 72 px mäße. `komfortabel` belegt der Mechanismus
- * (`trefflaeche-tablet.spec.ts`). Herleitung: design.md der Change LFH-724, D5.
+ * (`trefflaeche-tablet.spec.ts`). Herleitung: D5 und D8 in
+ * `openspec/changes/archive/2026-10-01-lfh-724-dichtestufe-aus-dem-geraet/design.md`.
  *
  * ZIELE WERDEN BENANNT, NICHT GEFEGT: jede Zielsorte nennt ihre Knoten über Rolle, Name oder
  * die antd-Hülle (`.ant-select`, `.ant-input-number`, nicht deren inneres `input`) und fordert

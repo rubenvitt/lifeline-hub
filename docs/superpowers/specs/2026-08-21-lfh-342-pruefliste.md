@@ -174,7 +174,7 @@ ist nachgezogen.
   `e2e/dichte-ableitung.spec.ts`).
 - **Messung:** `e2e/trefflaeche-pruefflaechen.spec.ts` misst `kompakt` und `handschuh`, mit der Gegenprobe
   „kompakt < handschuh“ je Zielsorte und einem Geschwister ohne Schreibrecht.
-  Herleitung und Befundtabelle: `openspec/changes/lfh-724-dichtestufe-aus-dem-geraet/design.md`
+  Herleitung und Befundtabelle: `openspec/changes/archive/2026-10-01-lfh-724-dichtestufe-aus-dem-geraet/design.md`
   (D5, D8).
 - **Zeile 2:** erfüllt. Zu den LFH-373-Zielen kommen Knopf „Erfassen“, Textfeld und Entwurfstab der Schnellerfassung. Das Schließen-× des Entwurfstabs maß 15 × 24 px in jeder Stufe und hält jetzt die kleine Steuerhöhe auf beiden Achsen (`entfernenStil`, `EtbEntwurfsTabs.tsx`). Test: „C7 · ETB: Schnellerfassung und Entwurfstab halten 72 px, kompakt bleibt kleiner“. „Werte behalten“ (Checkbox, 36 px) → **LFH-907**.
 - Querschnittlich, auf keiner Fläche dieser Prüfliste eigens: die Brotkrume im Seitenkopf misst 20 px → **LFH-909**.

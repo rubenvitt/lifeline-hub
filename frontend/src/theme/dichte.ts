@@ -1,6 +1,6 @@
 /**
  * Woraus die Bediendichte beim Sitzungsstart folgt (LFH-724, Spec `bedien-dichte`).
- * Herleitung: `openspec/changes/lfh-724-dichtestufe-aus-dem-geraet/design.md`.
+ * Herleitung: `openspec/changes/archive/2026-10-01-lfh-724-dichtestufe-aus-dem-geraet/design.md`.
  *
  * DER EINSATZKONTEXT IST DAS GERÄT, NICHT DIE PERSON (Entscheidung 01.10.2026). Die
  * Bedien-Leitlinie schneidet ihre vier Kontexte nach Gerät, Hand und Haltung; eine S-Funktion

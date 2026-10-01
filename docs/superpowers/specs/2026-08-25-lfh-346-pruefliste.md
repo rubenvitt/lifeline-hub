@@ -168,7 +168,7 @@ ist nachgezogen.
   `e2e/dichte-ableitung.spec.ts`).
 - **Messung:** `e2e/trefflaeche-pruefflaechen.spec.ts` misst `kompakt` und `handschuh`, mit der Gegenprobe
   „kompakt < handschuh“ je Zielsorte und einem Geschwister ohne Schreibrecht.
-  Herleitung und Befundtabelle: `openspec/changes/lfh-724-dichtestufe-aus-dem-geraet/design.md`
+  Herleitung und Befundtabelle: `openspec/changes/archive/2026-10-01-lfh-724-dichtestufe-aus-dem-geraet/design.md`
   (D5, D8).
 - **Tabelle 1, Zeile 2:** die Zeilenknöpfe erfüllt (dritter `STAFFEL`-Eintrag in `verwaltung-vereinheitlicht.spec.ts`, wie hier vorgesehen). Der Funkrufname-Link misst 17 px → **LFH-908**.
 - **Tabelle 2, Zeile 2:** erfüllt. Löschkreuz eines Auswahlfelds benannt ausgenommen.

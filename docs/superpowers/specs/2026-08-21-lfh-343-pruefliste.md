@@ -118,7 +118,7 @@ ist nachgezogen.
   `e2e/dichte-ableitung.spec.ts`).
 - **Messung:** `e2e/trefflaeche-pruefflaechen.spec.ts` misst `kompakt` und `handschuh`, mit der Gegenprobe
   „kompakt < handschuh“ je Zielsorte und einem Geschwister ohne Schreibrecht.
-  Herleitung und Befundtabelle: `openspec/changes/lfh-724-dichtestufe-aus-dem-geraet/design.md`
+  Herleitung und Befundtabelle: `openspec/changes/archive/2026-10-01-lfh-724-dichtestufe-aus-dem-geraet/design.md`
   (D5, D8).
 - **Zeile 2:** erfüllt nach Fix. Kopfaktion, Kartenaktionen und -auswahl, Tabs, Befehlskarte und Chat halten 72 px. Die Tabs und der Kopf „Befehlsdetails“ maßen 55 px (antd rechnet beide aus der Schrift) und folgen jetzt `kopfzeilenMasse` in `theme/tokens.ts`. Tests: „C8 · Kommunikation: Kopfaktionen, Kartenaktionen, Tabs und Chat halten 72 px, kompakt bleibt kleiner“ und „C8 · Kommunikation (Beobachter): …“.
 - Querschnittlich, auf keiner Fläche dieser Prüfliste eigens: die Brotkrume im Seitenkopf misst 20 px → **LFH-909**.

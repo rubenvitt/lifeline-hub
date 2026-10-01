@@ -43,5 +43,5 @@ D6 behandelt (lokal beheben mit Vitest/e2e-Beleg, sonst Folgeticket).
 
 ## 6. Abschluss
 
-- [ ] 6.1 `./scripts/check-all.sh` grün (bzw. Bündel `schnell` lokal plus e2e der neuen und geänderten Dateien; Volllauf belegt die CI des PRs).
-- [ ] 6.2 Review-Workflow (Bugs, Konventionen, Tests) und `superpowers:requesting-code-review`; bestätigte Findings abgearbeitet.
+- [x] 6.1 `./scripts/check-all.sh` grün (bzw. Bündel `schnell` lokal plus e2e der neuen und geänderten Dateien; Volllauf belegt die CI des PRs). Lokal 01.10.2026: `--nur schnell` grün, `--nur frontend` grün (603 Dateien, 8225 Tests), `--nur e2e` 511 grün / 22 rot. Alle 22 sind auf `origin/alpha` mit demselben Binary ebenso rot oder unter Last wackelig und mit `--workers=1` auf beiden Ständen grün (Container-Chromium 1194 statt 1234; `fokus-verdeckung` ×9, `etb-anhang`, `etb-chronologie` ×3, `leisten-flaeche` „drei gesetzte Felder“, `schaden-anhaenge`, gate3 „Führungsfunktionen“). Der Volllauf mit dem richtigen Browser liegt bei der CI des PRs.
+- [x] 6.2 Review-Workflow (Bugs, Konventionen, Tests) und `superpowers:requesting-code-review`; bestätigte Findings abgearbeitet. (Review-Agent: B1 Kartentab-Höhe behoben, S1 Rollenzweig ergänzt, S2 Spec-Szenario präzisiert, O1–O3/O5 umgesetzt; O4 `dokumente.spec.ts`-Kommentar bleibt, weil außerhalb des Umfangs.)
