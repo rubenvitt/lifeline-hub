@@ -1,3 +1,26 @@
+## [1.0.0-alpha.61](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.60...v1.0.0-alpha.61) (2026-10-01)
+
+### Wichtige Änderungen
+
+- **Neue Konfigurationsoption für TLS-Proxys**: Bei Betrieb hinter einem TLS-terminierenden Reverse-Proxy (z.B. Traefik) können Sitzungs-Cookies jetzt über die Umgebungsvariable `LIFELINE_COOKIE_SECURE=true` oder den Parameter `--cookie-secure` als „Secure" markiert werden. Die Anwendung erkennt den `X-Forwarded-Proto`-Header automatisch und setzt das Secure-Flag entsprechend.
+
+### Lagekarte
+
+- **Verbesserte Bedienbarkeit von Fachebenen-Punkten**: Punkt-Symbole auf Fachebenen (z.B. KRITIS-Standorte) erhalten jetzt größere, unsichtbare Trefferzonen für einfacheres Anklicken – die Größe passt sich der gewählten Bedienkomfort-Stufe an (30/48/72 Pixel)
+- **Bessere Erkennbarkeit von Fachebenen-Punkten**: Punkt-Symbole auf Fachebenen und gebündelte Punkte werden jetzt mit einer zweifarbigen Kontur (weiß/schwarz) dargestellt, die bei allen Kartentypen und in beiden Farbmodi gut sichtbar ist
+- **Stabilerer Mauszeiger**: Der Mauszeiger bleibt beim Überfahren von Fachebenen-Punkten zuverlässig als Zeiger erhalten, auch wenn mehrere Ebenen übereinander liegen
+
+### Führung
+
+- **Führungsorganisation als Organigramm**: Die Seite „Einsatzabschnitte" zeigt jetzt neben der bisherigen Gliederung auch ein Organigramm der Führungsorganisation. Die Darstellung wird automatisch aus den erfassten Einsatzabschnitten und Einheiten aufgebaut und zeigt Zeichen, Rufnamen, Leitungen und Stärken übersichtlich in Spalten an
+- **Organigramm drucken**: Das Organigramm kann als PDF gedruckt werden – die Darstellung wird automatisch auf zwei Spalten im A4-Format optimiert
+- **Organigramm in Lagebericht übernehmen**: Die Führungsorganisation kann mit einem Klick als formatierter Text in einen neuen Lagebericht übernommen werden
+
+### Bedienung und Benutzerfreundlichkeit
+
+- **Größere Abstände zwischen klickbaren Kennzahlen**: Im Handschuh-Betrieb liegen klickbare Kennzahlen (z.B. im Lage-Dashboard) jetzt mindestens 16 Pixel auseinander, in der komfortablen Ansicht mindestens 8 Pixel – das verhindert Fehlklicks bei der Bedienung mit Handschuhen oder auf Touchscreens
+- **Stabilere Formularverarbeitung**: Fehlermeldungen beim Bearbeiten von Personen, Schäden, Tieren und bei der Entwurfsverwaltung wurden behoben – Formulare werden nur noch angesprochen, wenn sie tatsächlich dargestellt werden
+
 ## [1.0.0-alpha.60](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.59...v1.0.0-alpha.60) (2026-10-01)
 
 ### Wichtige Änderungen
