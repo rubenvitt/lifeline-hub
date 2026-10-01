@@ -60,14 +60,16 @@ function merkeEingeklappt(wert: boolean): void {
  * 120 statt 160: unter Linux-Schriften sind Feld und „Stand sichern" breiter als unter macOS, bei
  * 1440 px rutschte der Einklapp-Pfeil sonst in eine dritte Reihe.
  */
-export const standLeisteStil: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  flex: '1 1 120px',
-  minWidth: 0,
-  overflowX: 'auto',
-};
+export function standLeisteStil(luecke: number): CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: luecke,
+    flex: '1 1 120px',
+    minWidth: 0,
+    overflowX: 'auto',
+  };
+}
 
 /**
  * Das Bezeichnungsfeld neben „Stand sichern": bevorzugt 180 px, schrumpfbar. Fest 180 px ragte das
@@ -80,14 +82,16 @@ export const sichernFeldStil: CSSProperties = { flex: '0 1 180px', minWidth: 0 }
  * Der Zeitleisten-Block (Aktuell · Abspielen · Schieber · Stand) darf umbrechen: seine
  * Mindestbreite lag sonst über der Bandbreite.
  */
-export const zeitleisteStil: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  flexWrap: 'wrap',
-  gap: 8,
-  flex: '1 1 260px',
-  minWidth: 0,
-};
+export function zeitleisteStil(luecke: number): CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: luecke,
+    flex: '1 1 260px',
+    minWidth: 0,
+  };
+}
 
 /** Der Abspielknopf schrumpft nicht: als Flex-Kind fiel er auf 16 px Breite. */
 export const abspielenStil: CSSProperties = { flexShrink: 0 };
@@ -243,9 +247,10 @@ export function SnapshotLeiste({
         ...bandStil('voll', true),
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
+        // Zwischen den Gruppen (Sichern · Zeitleiste · Stände) `margin`, in ihnen `marginSM`.
+        gap: token.margin,
         flexWrap: 'wrap',
-        padding: '8px 12px',
+        padding: `${token.paddingSM}px ${token.padding}px`,
         borderRadius: token.borderRadiusLG,
         background: token.colorBgElevated,
         boxShadow: token.boxShadow,
@@ -278,7 +283,7 @@ export function SnapshotLeiste({
       )}
 
       {chrono.length > 0 && (
-        <div style={zeitleisteStil}>
+        <div style={zeitleisteStil(token.marginSM)}>
           <Button type={aktiverSnapshotId == null ? 'primary' : 'default'} onClick={zurueckAktuell}>
             Aktuell
           </Button>
@@ -292,7 +297,7 @@ export function SnapshotLeiste({
             />
           </Tooltip>
           <Slider
-            style={{ flex: 1, margin: '0 8px', minWidth: 120 }}
+            style={{ flex: 1, margin: `0 ${token.marginSM}px`, minWidth: 120 }}
             min={0}
             max={Math.max(0, chrono.length - 1)}
             value={aktiverIndex >= 0 ? aktiverIndex : 0}
@@ -317,7 +322,7 @@ export function SnapshotLeiste({
       )}
 
       {chrono.length > 0 && (
-        <div data-lfh="zeitachse-staende" style={standLeisteStil}>
+        <div data-lfh="zeitachse-staende" style={standLeisteStil(token.marginSM)}>
           {chrono.map((s) => (
             <Tooltip key={s.id} title={s.notiz ?? undefined}>
               <Button
