@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react';
-import { Space } from 'antd';
+import type { CSSProperties, ReactNode } from 'react';
 import DemoMarke from '../components/DemoMarke';
 
 /**
@@ -14,6 +13,19 @@ import DemoMarke from '../components/DemoMarke';
  */
 
 export const DEMO_GRUPPE = 'Demo-Daten';
+
+/**
+ * Das Auswahlfeld ist schmal (`minWidth: 260`), die Liste so breit wie das Feld. Gekürzt wird
+ * deshalb der Text, nie die Marke: ohne `flex: none` an der Marke schnitt antds Ellipse beim
+ * längsten Demo-Eintrag „Demo“ zu „De“ ab (gesehen im Stack-Durchgang zu LFH-733).
+ */
+const demoLabelStil: CSSProperties = { display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 };
+const demoTextStil: CSSProperties = {
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
 
 export interface AuswahlOption {
   value: number;
@@ -37,10 +49,12 @@ export function demoGruppierteOptionen<T extends { id: number; ist_demo: boolean
       demo.push({
         value: e.id,
         label: (
-          <Space size={4}>
-            {label(e)}
-            <DemoMarke />
-          </Space>
+          <span style={demoLabelStil}>
+            <span style={demoTextStil}>{label(e)}</span>
+            <span style={{ flex: 'none' }}>
+              <DemoMarke />
+            </span>
+          </span>
         ),
       });
     } else {

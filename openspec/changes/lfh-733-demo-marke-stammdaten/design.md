@@ -120,6 +120,9 @@ Kopf von `src/AGENTS.md` verlangt: Die Server-Hälfte (live per `EXISTS`, kein F
 - [ReactNode-Label in `Select`] → keins der drei Felder filtert nach Text. Würde später
   `showSearch` ergänzt, bräuchte es `optionFilterProp` auf ein Textfeld. Das steht als Hinweis
   am Helfer.
+- [Das Auswahlfeld ist schmal (`minWidth: 260`), die Liste so breit wie das Feld; antds Ellipse
+  schnitt beim längsten Demo-Eintrag die Marke zu „De“ ab (Stack-Durchgang, Aufgabe 7.3)] → das
+  Label ist ein Flex-Paar: der Text kürzt sich, die Marke trägt `flex: none` und bleibt ganz.
 - [Die Marke in den Einsatz-Tabellen erscheint auch im Demo-Einsatz an jeder Kraft] →
   gewollt und harmlos: Dort sind alle Kräfte Demo, und die Marke ist wahr.
 
