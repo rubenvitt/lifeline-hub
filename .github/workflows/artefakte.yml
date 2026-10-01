@@ -255,7 +255,8 @@ jobs:
     needs: vorbereiten
     if: needs.vorbereiten.outputs.desktop == 'true'
     runs-on: ${{ matrix.runs-on }}
-    timeout-minutes: 60
+    # Bau plus zwei Wartezeiten bei Apple (Notarisierung von App und .dmg, LFH-722).
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -324,7 +325,7 @@ jobs:
           if [[ "$ZIEL" == *apple-darwin ]]; then
             fehlt=()
             for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_API_ISSUER APPLE_API_KEY APPLE_API_KEY_P8; do
-              [ -n "${!v}" ] || fehlt+=("$v")
+              [ -n "${!v:-}" ] || fehlt+=("$v")
             done
             if [ "${#fehlt[@]}" -gt 0 ]; then
               echo "FEHLER: Secrets für Signierung/Notarisierung fehlen: ${fehlt[*]} (docs/betrieb/desktop-app.md)." >&2
@@ -343,8 +344,9 @@ jobs:
           cargo tauri build --ci --target "$ZIEL" --bundles "$BUNDLES"
 
       # Tauri notarisiert nur die App, das .dmg signiert es bloß. Gatekeeper beurteilt beim ersten
-      # Öffnen aber das geladene Image (LFH-722, D5). Vor dem Einsammeln, weil Stapling die Bytes
-      # und damit die .sha256 ändert.
+      # Öffnen aber das geladene Image (LFH-722, D5 in
+      # openspec/changes/archive/2026-10-01-lfh-722-macos-signierung-notarisierung/design.md). Vor dem Einsammeln, weil
+      # Stapling die Bytes und damit die .sha256 ändert.
       - name: Disk-Image notarisieren (macOS)
         if: matrix.apple
         env:
@@ -358,21 +360,25 @@ jobs:
           dmgs=("$target_dir/$ZIEL/release/bundle/dmg"/*.dmg)
           [ "${#dmgs[@]}" -eq 1 ] && [ -f "${dmgs[0]}" ] \
             || { echo "FEHLER: erwartet genau ein .dmg, gefunden: ${dmgs[*]}" >&2; exit 1; }
-          # `--wait` endet auch bei „Invalid“ mit 0; maßgeblich ist der Status im JSON.
+          # `--wait` endet auch bei „Invalid“ mit 0; maßgeblich ist der Status im JSON. Endet es doch
+          # einmal anders, soll das Protokoll trotzdem folgen.
+          rc=0
           ergebnis="$(xcrun notarytool submit "${dmgs[0]}" --key "$RUNNER_TEMP/AuthKey.p8" \
-            --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait --timeout 30m --output-format json)"
+            --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait --timeout 30m --output-format json)" || rc=$?
           echo "$ergebnis"
-          status="$(node -p 'JSON.parse(process.argv[1]).status' "$ergebnis")"
+          status="$(node -p 'try { JSON.parse(process.argv[1]).status } catch { "unlesbar" }' "$ergebnis")"
+          [ "$rc" = 0 ] || status="$status (notarytool Exit $rc)"
           if [ "$status" != "Accepted" ]; then
-            id="$(node -p 'JSON.parse(process.argv[1]).id' "$ergebnis")"
-            xcrun notarytool log "$id" --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" || true
+            id="$(node -p 'try { JSON.parse(process.argv[1]).id } catch { "" }' "$ergebnis")"
+            [ -z "$id" ] || xcrun notarytool log "$id" --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" || true
             echo "FEHLER: Notarisierung des .dmg: $status" >&2
             exit 1
           fi
           xcrun stapler staple "${dmgs[0]}"
 
       # Belegt vor dem Einsammeln, was ans Release geht: Developer ID, Hardened Runtime und
-      # angeheftetes Ticket für App, .dmg und die App im Update-Archiv (LFH-722, D6). Inline statt
+      # angeheftetes Ticket für App, .dmg, die App darin und die App im Update-Archiv (LFH-722, D6
+      # in openspec/changes/archive/2026-10-01-lfh-722-macos-signierung-notarisierung/design.md). Inline statt
       # Repo-Skript, weil der Job den Tag auscheckt und ein neues Skript dort fehlte.
       - name: Signatur und Notarisierung prüfen (macOS)
         if: matrix.apple
@@ -400,28 +406,40 @@ jobs:
             info="$(codesign -dv --verbose=4 "$app" 2>&1)"
             grep -qx "Authority=Developer ID Application: .* ($team)" <<<"$info" \
               || { echo "FEHLER: $app nicht mit Developer ID ($team) signiert" >&2; exit 1; }
-            grep -q 'flags=0x10000(runtime)' <<<"$info" \
+            grep -Eq 'flags=0x[0-9a-f]+\([^)]*runtime' <<<"$info" \
               || { echo "FEHLER: $app ohne Hardened Runtime" >&2; exit 1; }
             xcrun stapler validate "$app"
             [ "$gatekeeper" = 0 ] || gatekeeper_urteil "$app" -t exec
           }
-          apps=("$bundle"/macos/*.app)
-          [ "${#apps[@]}" -eq 1 ] && [ -d "${apps[0]}" ] || { echo "FEHLER: erwartet genau eine .app" >&2; exit 1; }
-          pruefe_app "${apps[0]}"
-          dmg="$(ls "$bundle"/dmg/*.dmg)"
+          genau_eine() {
+            local treffer=("$@")
+            [ "${#treffer[@]}" -eq 1 ] && [ -e "${treffer[0]}" ] \
+              || { echo "FEHLER: erwartet genau eine Datei, gefunden: ${treffer[*]}" >&2; exit 1; }
+            printf '%s' "${treffer[0]}"
+          }
+          pruefe_app "$(genau_eine "$bundle"/macos/*.app)"
+          dmg="$(genau_eine "$bundle"/dmg/*.dmg)"
+          codesign --verify --strict --verbose=2 "$dmg"
           # In eine Variable statt `| grep -q`: grep endet früh, und pipefail wertete das SIGPIPE
           # von codesign als Fehler.
           info="$(codesign -dv --verbose=4 "$dmg" 2>&1)"
-          grep -qx "TeamIdentifier=$team" <<<"$info" \
-            || { echo "FEHLER: .dmg nicht mit Team $team signiert" >&2; exit 1; }
+          grep -qx "Authority=Developer ID Application: .* ($team)" <<<"$info" \
+            || { echo "FEHLER: .dmg nicht mit Developer ID ($team) signiert" >&2; exit 1; }
           xcrun stapler validate "$dmg"
           [ "$gatekeeper" = 0 ] || gatekeeper_urteil "$dmg" -t open --context context:primary-signature
+          eingehaengt="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "$eingehaengt" "$dmg" > /dev/null
+          trap 'hdiutil detach -quiet "$eingehaengt" || true' EXIT
+          pruefe_app "$(genau_eine "$eingehaengt"/*.app)"
           entpackt="$(mktemp -d)"
-          tar -xzf "$(ls "$bundle"/macos/*.app.tar.gz)" -C "$entpackt"
-          archiv_apps=("$entpackt"/*.app)
-          [ "${#archiv_apps[@]}" -eq 1 ] && [ -d "${archiv_apps[0]}" ] || { echo "FEHLER: Update-Archiv ohne genau eine .app" >&2; exit 1; }
-          pruefe_app "${archiv_apps[0]}"
+          tar -xzf "$(genau_eine "$bundle"/macos/*.app.tar.gz)" -C "$entpackt"
+          pruefe_app "$(genau_eine "$entpackt"/*.app)"
           echo "macOS-Pakete signiert (Developer ID $team) und notarisiert."
+
+      # Scheitert der Bau nach dem Schreiben der .p8, läuft der DMG-Schritt mit seinem `trap` nicht.
+      - name: API-Schlüssel entfernen (macOS)
+        if: always() && matrix.apple
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
 
       # Kanonische Dateinamen: Tauris eigene tragen Leerzeichen, die GitHub beim Hochladen still
       # durch Punkte ersetzt — die URL in latest.json zeigte dann ins Leere.

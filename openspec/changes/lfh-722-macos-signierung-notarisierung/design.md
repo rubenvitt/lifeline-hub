@@ -270,8 +270,8 @@ Bedient hat Ruben.
 | Deeplink, gleiche Adresse | keine sichtbare Wirkung, so gewollt (`Aktion::Nichts`, nur Fokus) | erster Versuch von Ruben; der Testschritt nannte fälschlich eine Wirkung |
 | Deeplink, andere Adresse (`lifeline://verbinden?server=https://lfh722-test.local:8443`), Kaltstart | Rückfrage „Server wechseln“ mit beiden Adressen; „Verbinden“ speichert die neue Adresse | Ruben sah den Dialog und bestätigte; `verbindung.json` trug danach `https://lfh722-test.local:8443/` (danach von Hand auf `elw.local` zurückgesetzt) |
 
-Den Standardbrowser bei der Messung hat niemand festgehalten. In der Umgebung von LFH-818 war
-es Vivaldi.
+Standardbrowser bei der Messung: Vivaldi (`com.vivaldi.vivaldi` für `http`/`https` in den
+LaunchServices-Einstellungen des Messrechners, nachträglich gelesen).
 
 ### Prüflauf in der CI (Task 4.1, 01.10.2026)
 
@@ -297,3 +297,39 @@ geladen, `.sha256` passt. Die Quarantäne wie bei einem Browser-Download von Han
 Developer ID`, Ticket gültig; die App im eingehängten Image ebenso. Den Erststart aus einem
 Browser-Download in einer frischen VM belegt 5.1 mit dem lokal gebauten, gleich entstandenen
 `.dmg`.
+
+### Nachzug aus dem Review (01.10.2026)
+
+Ein Review (eigener Subagent, Diff `f25a52ec..2948d275`) fand nichts Kritisches. Umgesetzt:
+
+- Der Prüfschritt hängt das `.dmg` ein und prüft auch die App darin, wie die Spec es verlangt.
+  Für das `.dmg` selbst kommen `codesign --verify --strict` und die Authority „Developer ID
+  Application“ statt nur `TeamIdentifier` dazu, weil Apple auch ein unsigniertes `.dmg`
+  notarisiert.
+- Dateisuche überall nach dem Muster „genau eine“ (`genau_eine`), Hardened Runtime per Muster
+  statt festem Flag-Wert, `timeout-minutes` 60 → 90 (Bau plus zwei Wartezeiten bei Apple).
+- DMG-Schritt: Endet `notarytool` mit Fehler, folgt trotzdem eine klare Meldung, und das
+  Protokoll wird abgerufen, wenn es eine Einreichungs-ID gibt. Ein eigener Schritt
+  (`if: always() && matrix.apple`) entfernt die `.p8`, auch wenn der Bau scheitert.
+- Doku: Wortlaut der Gatekeeper-Rückfrage als sinngemäß gekennzeichnet, Browser der Messung
+  nachgetragen, Hinweis, dass der Secrets-Block `bash`/`zsh` braucht.
+
+Lokal geprüft wie oben (Blöcke aus der YAML, `actionlint` grün), diesmal gegen die Artefakte
+des CI-Laufs vom Release `v1.0.0-alpha.60`:
+
+| Schritt | Fall | Ergebnis |
+|---|---|---|
+| Prüfen | Release-Artefakte | grün: App, `.dmg`, App im eingehängten `.dmg`, App im Archiv je `accepted`; Image danach wieder ausgehängt |
+| Prüfen | `.dmg` unsigniert | rot: „code object is not signed at all“ |
+| Prüfen | App ad hoc | rot: „nicht mit Developer ID (H95J852PKP) signiert“ |
+| Prüfen | App ohne Ticket | rot: `stapler validate` (Exit 65) |
+| Disk-Image notarisieren | Kopie des Release-`.dmg` | Einreichung `75aeb2e9-…` Accepted, gestapelt |
+| Disk-Image notarisieren | falsche Schlüssel-ID | rot: „Notarisierung des .dmg: unlesbar (notarytool Exit 1)“ nach Apples 401; `.p8` entfernt |
+
+Nicht übernommen: `APPLE_CERTIFICATE` liegt während des ganzen `cargo tauri build` in der
+Umgebung und ist damit für Build-Skripte fremder Crates sichtbar. So ist Tauri gebaut, und für
+`TAURI_SIGNING_PRIVATE_KEY` gilt es schon heute; ein eigener Schlüsselbund-Schritt verschöbe das
+Risiko nur (D1).
+
+Den CI-Lauf mit dem geänderten Prüfschritt gibt es noch nicht. Der Lauf vom 01.10. (Run
+36840664489) lief mit dem Stand vor dem Review.

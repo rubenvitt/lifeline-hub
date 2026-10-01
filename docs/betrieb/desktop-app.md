@@ -27,8 +27,9 @@ Das macOS-Paket ist mit Developer ID signiert und von Apple notarisiert (LFH-722
 Windows-Installer ist **noch nicht signiert** (LFH-875).
 
 - **macOS:** `.dmg` öffnen und „Lifeline Hub“ nach „Programme“ ziehen. Beim ersten Start
-  fragt macOS einmal, ob die aus dem Internet geladene App geöffnet werden soll, und nennt sie
-  dabei „von Apple auf Schadsoftware geprüft“. „Öffnen“ bestätigen, mehr ist nicht nötig. Das
+  fragt macOS einmal sinngemäß, ob die aus dem Internet geladene App geöffnet werden soll, und
+  nennt sie dabei von Apple auf Schadsoftware geprüft. „Öffnen“ bestätigen, mehr ist nicht
+  nötig. Das
   geht auch ohne Internet, weil das Prüfergebnis im Paket steckt. Die App immer aus
   „Programme“ starten, nicht direkt aus dem `.dmg` oder aus „Downloads“: Dort führt macOS sie
   aus einer schreibgeschützten Kopie aus, und ein Update scheitert mit „Read-only file system“.
@@ -172,7 +173,7 @@ Identität setzt nur der Release-Lauf.
 (App Store Connect API)“ (`aqf66xquxzvnanz7nz4tleiwua`, Datei, `Issuer-ID`, `username` =
 Schlüssel-ID). Die Secrets sind gesetzt (01.10.2026). Neu setzen, ohne dass ein Wert im
 Terminal erscheint. Die Dateien nur über `--out-file` lesen, weil `op read` nach stdout
-Binärdaten verfälscht:
+Binärdaten verfälscht. Der Block braucht `bash` oder `zsh` (in `fish` vorher `bash` starten):
 
 ```bash
 d=$(mktemp -d) && chmod 700 "$d" \
@@ -275,6 +276,6 @@ scripts/marke/erzeuge-symbole.sh
 - **Anmeldung im Browser, nicht gemessen:** mit Firefox oder Safari als Standardbrowser.
   Gemessen ist Vivaldi als Standardbrowser (Chromium) sowie Safari direkt
   (`openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/belege/macos/messung.md`),
-  mit der signierten und notarisierten App zusätzlich der Standardbrowser des Messrechners
-  (LFH-722, `openspec/changes/lfh-722-macos-signierung-notarisierung/design.md`).
+  mit der signierten und notarisierten App erneut Vivaldi als Standardbrowser (LFH-722,
+  `openspec/changes/lfh-722-macos-signierung-notarisierung/design.md`).
 - **Linux:** Die Hülle wird dort übersetzt (Tests), aber nicht ausgeliefert.
