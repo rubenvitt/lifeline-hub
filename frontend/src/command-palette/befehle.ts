@@ -1,5 +1,6 @@
 import {
   IkoneAbmelden,
+  IkoneDokument,
   IkoneGlobus,
   IkoneHandStopp,
   IkoneListe,
@@ -26,6 +27,7 @@ import {
   dokumentePfad,
   einsaetzePfad,
   einsatzabschnittePfad,
+  einsatzberichtPfad,
   einsatzModulPfad,
   einsatzPfad,
   etbPfad,
@@ -319,6 +321,19 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         ...sprungZu(ziel, k.navigate, () => k.merkeModulBesuch?.(m.key)),
       });
     }
+
+    // 3a. Einsatzbericht (LFH-726): Unterroute der Einsatzdaten, kein Modul und keine
+    //     Schnellaktion (er legt nichts an). Für jedes Mitglied, auch Beobachter: welche Teile es
+    //     lesen darf, prüft der Bericht je Quelle selbst.
+    befehle.push({
+      id: 'sprung:einsatzbericht',
+      gruppe: 'module',
+      label: 'Einsatzbericht drucken',
+      kontext: kategorieKontext('fuehrung'),
+      icon: IkoneDokument,
+      schlagworte: ['einsatzbericht', 'abschlussbericht', 'nachbereitung', 'pdf', 'drucken'],
+      ...sprungZu(einsatzberichtPfad(k.einsatzId), k.navigate),
+    });
 
     // 4. Schnellaktionen, nur mit Schreibrecht (kein Beobachter, aktiver Einsatz). Modulfilter ist
     //    die LESEACHSE `istModulFreigegeben` wie in 2. und 3., sonst zeigte eine Schnellaktion auf

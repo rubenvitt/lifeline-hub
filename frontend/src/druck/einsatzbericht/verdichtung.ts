@@ -16,7 +16,7 @@ import type {
   Stab,
   Verpflegung,
 } from '../../api/types';
-import { taktischeDtgVoll, type AnzeigeKonventionen } from '../../anzeige/format';
+import { inZone, taktischeDtgVoll, type AnzeigeKonventionen } from '../../anzeige/format';
 import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
 import { evakuierungKennzahl } from '../../betreuung/evakuierungKennzahl';
 import { einsatzDauer } from '../../einsatz/einsatzDauer';
@@ -112,6 +112,15 @@ const vermerk = (text: string): Inhalt => ({ art: 'vermerk', text });
 const textOder = (s: string | null | undefined): string => (s && s.trim() ? s : LEER);
 const zahl = (n: number): string => String(n);
 
+/**
+ * Zeitangabe im Berichtstext wie im ETB-Druck („29.03.2026 01:30“, Zone der Organisation): der
+ * Bericht geht auch an Behörden. Die taktische DTG trägt nur der Stand im Druckkopf.
+ */
+function zeit(wire: string | null | undefined, konv: AnzeigeKonventionen): string {
+  if (!wire) return LEER;
+  return inZone(wire, konv).format('DD.MM.YYYY HH:mm');
+}
+
 /** Ein Abschnitt, dessen Quelle ausgeblendet ist oder leer: dann nur der Vermerk. */
 function abschnittAus<T>(
   titel: string | undefined,
@@ -153,8 +162,8 @@ function zeiten(e: EinsatzAnzeige, standMs: number, konv: AnzeigeKonventionen): 
     {
       inhalt: [
         zeilen([
-          { etikett: 'Beginn', wert: textOder(taktischeDtgVoll(e.begonnen_at, konv)) },
-          { etikett: 'Ende', wert: laeuft ? 'läuft' : textOder(taktischeDtgVoll(ende, konv)) },
+          { etikett: 'Beginn', wert: zeit(e.begonnen_at, konv) },
+          { etikett: 'Ende', wert: laeuft ? 'läuft' : zeit(ende, konv) },
           {
             etikett: 'Dauer',
             wert: dauer == null ? LEER : laeuft ? `${dauer} (bis Stand)` : dauer,
@@ -212,7 +221,7 @@ function fuehrung(
           kopf: ['Nr.', 'Zeit', 'Entschluss'],
           zeilen: [...b]
             .sort((x, y) => x.lfd_nr - y.lfd_nr)
-            .map((x) => [zahl(x.lfd_nr), taktischeDtgVoll(x.abgehalten_at, konv), x.entschluss]),
+            .map((x) => [zahl(x.lfd_nr), zeit(x.abgehalten_at, konv), x.entschluss]),
         },
       ],
     ),
@@ -315,7 +324,7 @@ function lage(berichte: LageberichtAnzeige[] | null, konv: AnzeigeKonventionen):
           art: 'tabelle',
           kopf: ['Zeitstand', 'Titel', 'Version', 'Freigegeben von'],
           zeilen: koepfe.map((b) => [
-            taktischeDtgVoll(b.zeitstand, konv),
+            zeit(b.zeitstand, konv),
             b.titel,
             `v${b.version}`,
             textOder(b.freigegeben_von_name),
@@ -469,7 +478,7 @@ function etbAuszug(
                 const durch = berichtigtDurch(x.id);
                 return [
                   zahl(x.lfd_nr),
-                  taktischeDtgVoll(x.ereigniszeit, konv),
+                  zeit(x.ereigniszeit, konv),
                   x.inhalt,
                   durch.length > 0 ? `berichtigt durch Nr. ${durch.join(', ')}` : '',
                 ];

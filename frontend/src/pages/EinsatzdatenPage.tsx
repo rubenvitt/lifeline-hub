@@ -25,7 +25,8 @@ import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import KoordinatenFeld from '../anzeige/KoordinatenFeld';
 import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
+import { einsatzberichtPfad } from '../routing/deeplinks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -276,6 +277,7 @@ function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] })
 export default function EinsatzdatenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const navigate = useNavigate();
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -411,11 +413,29 @@ export default function EinsatzdatenPage() {
       }
       dataUpdatedAt={einsatzQuery.dataUpdatedAt}
       aktionen={
-        !bearbeiten && darfBearbeiten ? (
-          <Button type="primary" onClick={bearbeitenStarten}>
-            Bearbeiten
-          </Button>
-        ) : undefined
+        bearbeiten ? undefined : (
+          <>
+            {/* Einsatzbericht (LFH-726): öffnet die Druckansicht und sendet nichts ab, gehört also
+                in den Kopf — sekundär, „genau eine Primäraktion" bleibt. Link mit Knopfgestalt
+                (Strg/⌘+Klick öffnet einen Tab). Auch für Beobachter: die Rechte prüft der
+                Bericht je Quelle. */}
+            <Button
+              href={einsatzberichtPfad(einsatzId)}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                e.preventDefault();
+                navigate(einsatzberichtPfad(einsatzId));
+              }}
+            >
+              Einsatzbericht drucken
+            </Button>
+            {darfBearbeiten && (
+              <Button type="primary" onClick={bearbeitenStarten}>
+                Bearbeiten
+              </Button>
+            )}
+          </>
+        )
       }
     >
       {bearbeiten ? (

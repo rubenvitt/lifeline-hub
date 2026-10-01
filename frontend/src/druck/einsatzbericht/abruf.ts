@@ -12,7 +12,7 @@ import { listeLageberichte } from '../../api/lageberichte';
 import { ladeLagebesprechungen, ladeStab } from '../../api/stab';
 import { ladeVerpflegung } from '../../api/verpflegung';
 import { ladeEtbVollstaendig } from '../../etb/druckAbruf';
-import type { QuellenFreigabe, QuellenSchluessel } from './quellen';
+import { QUELLEN, modulLabel, type QuellenFreigabe, type QuellenSchluessel } from './quellen';
 
 /**
  * Abruf des Einsatzberichts (LFH-726, design.md D4): alle freigegebenen Quellen parallel, EIN
@@ -93,4 +93,33 @@ export async function ladeEinsatzbericht(
     schluessel.map((k, i) => [k, ergebnisse[i]]),
   ) as BerichtQuellen;
   return { quellen, geladenAt };
+}
+
+export type BerichtZustand =
+  | { art: 'bereit' }
+  /** Mindestens eine Quelle antwortete 403 — Drucken ausgeschlossen, ein neuer Versuch hilft nicht. */
+  | { art: 'kein-zugriff'; module: string[] }
+  /** Mindestens eine Quelle scheiterte — Drucken gesperrt bis zum gelungenen neuen Versuch. */
+  | { art: 'fehler'; module: string[] };
+
+/**
+ * Darf gedruckt werden? Nur wenn jede Quelle `daten` oder `nicht-genutzt` trägt (Spec „Vollständig
+ * oder gar nicht“). „Kein Zugriff“ geht dem Fehler vor: der Grund gilt auch nach einem neuen
+ * Versuch (wie `schlechtesterZustand` in `api/abrufZustand.ts`).
+ */
+export function berichtZustand(roh: EinsatzberichtRoh): BerichtZustand {
+  const module = (art: 'kein-zugriff' | 'fehler') => {
+    const namen: string[] = [];
+    for (const q of QUELLEN) {
+      if (roh.quellen[q.schluessel].zustand !== art) continue;
+      const name = modulLabel(q.modul);
+      if (!namen.includes(name)) namen.push(name);
+    }
+    return namen;
+  };
+  const ohneZugriff = module('kein-zugriff');
+  if (ohneZugriff.length > 0) return { art: 'kein-zugriff', module: ohneZugriff };
+  const gescheitert = module('fehler');
+  if (gescheitert.length > 0) return { art: 'fehler', module: gescheitert };
+  return { art: 'bereit' };
 }

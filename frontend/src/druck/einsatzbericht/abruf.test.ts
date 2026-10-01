@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../api/client';
-import { ladeEinsatzbericht } from './abruf';
+import { berichtZustand, ladeEinsatzbericht } from './abruf';
+import { rohBericht } from './testdaten';
 import { QUELLEN, type QuellenFreigabe, type QuellenSchluessel } from './quellen';
 
 const api = vi.hoisted(() => ({
@@ -99,5 +100,26 @@ describe('ladeEinsatzbericht', () => {
     expect(bericht.quellen.lageberichte).toEqual({ zustand: 'fehler', fehler });
     expect(bericht.quellen.personen.zustand).toBe('daten');
     expect(bericht.quellen.einsatz.zustand).toBe('daten');
+  });
+});
+
+describe('berichtZustand', () => {
+  it('bereit, wenn jede Quelle daten oder nicht-genutzt ist', () => {
+    const roh = rohBericht({ betreuung: { zustand: 'nicht-genutzt' } });
+    expect(berichtZustand(roh)).toEqual({ art: 'bereit' });
+  });
+
+  it('kein Zugriff nennt die Module, je Modul einmal, und geht dem Fehler vor', () => {
+    const roh = rohBericht({
+      personal: { zustand: 'kein-zugriff' },
+      personalPerioden: { zustand: 'kein-zugriff' },
+      lageberichte: { zustand: 'fehler', fehler: new Error('x') },
+    });
+    expect(berichtZustand(roh)).toEqual({ art: 'kein-zugriff', module: ['Personal'] });
+  });
+
+  it('ein Fehler nennt die betroffenen Module', () => {
+    const roh = rohBericht({ lageberichte: { zustand: 'fehler', fehler: new Error('x') } });
+    expect(berichtZustand(roh)).toEqual({ art: 'fehler', module: ['Lageberichte'] });
   });
 });

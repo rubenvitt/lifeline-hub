@@ -104,7 +104,7 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
     const b = verdichteEinsatzbericht(rohBericht(), konv);
     expect(b.vorlaeufig).toBe(true);
     const a = block(b, 'zeiten').abschnitte[0];
-    expect(wert(a, 'Beginn')).toBe('290130MÄR2026');
+    expect(wert(a, 'Beginn')).toBe('29.03.2026 01:30');
     expect(wert(a, 'Ende')).toBe('läuft');
     expect(wert(a, 'Dauer')).toBe('01:30 h (bis Stand)');
     expect(b.stand).toBe('290400MÄR2026');
@@ -119,7 +119,7 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
     );
     expect(b.vorlaeufig).toBe(false);
     const a = block(b, 'zeiten').abschnitte[0];
-    expect(wert(a, 'Ende')).toBe('290310MÄR2026');
+    expect(wert(a, 'Ende')).toBe('29.03.2026 03:10');
     expect(wert(a, 'Dauer')).toBe('00:40 h');
   });
 
@@ -131,7 +131,7 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
     expect(wert(stab, 'S2')).toBe('Sven Lage');
     expect(wert(stab, 'S6')).toBe('nicht vergeben');
     const lb = tabelle(abschnitt(b, 'fuehrung', 'Lagebesprechungen'));
-    expect(lb.zeilen).toEqual([['1', '290315MÄR2026', 'Riegelstellung halten']]);
+    expect(lb.zeilen).toEqual([['1', '29.03.2026 03:15', 'Riegelstellung halten']]);
   });
 
   it('Stab im Einsatz ausgeblendet: Vermerk statt Besetzung', () => {
@@ -249,7 +249,7 @@ describe('3.3 Lage', () => {
     );
     const verzeichnis = tabelle(abschnitt(b, 'lage', 'Verzeichnis der Lageberichte'));
     expect(verzeichnis.zeilen.map((z) => z[1])).toEqual(['Erstlage', 'Lage 2', 'Lage 3']);
-    expect(verzeichnis.zeilen[0]).toEqual(['290145MÄR2026', 'Erstlage', 'v1', 'Max Leiter']);
+    expect(verzeichnis.zeilen[0]).toEqual(['29.03.2026 01:45', 'Erstlage', 'v1', 'Max Leiter']);
     const voll = abschnitt(b, 'lage', 'Letzter Lagebericht: Lage 3');
     const md = voll.inhalt.find((i) => i.art === 'markdown');
     expect(md && md.art === 'markdown' ? md.abschnitte.map((x) => x.text) : []).toEqual([
