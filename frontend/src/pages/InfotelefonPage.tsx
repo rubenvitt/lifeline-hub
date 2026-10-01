@@ -158,7 +158,7 @@ export default function InfotelefonPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
-  const personenFrei = istKeyFreigegeben('personen', benutzer, stabFreigabe.overrides);
+  const personenFrei = istKeyFreigegeben('personen', stabFreigabe.freigaben);
   const zustand: KennzahlZustand = anrufeQuery.isPending
     ? 'laden'
     : anrufeQuery.isError

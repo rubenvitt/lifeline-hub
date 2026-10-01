@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { abrufZustand } from '../api/abrufZustand';
-import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
 import type { Sachgebiet } from '../api/types';
@@ -75,9 +75,11 @@ export default function StabPage() {
     queryKey: einsatzKeys.stab(einsatzId),
     queryFn: () => ladeStab(einsatzId),
   });
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId),
+  // Modul-Freigaben vom Server (LFH-669): filtern die Werkzeuge der Zeilen und die Übernahme der
+  // Vorbereitung in einen Lagebericht.
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
   });
   // Wirksame Mandantenlabels der Zeilen (LFH-549); ohne Katalog das Standardlabel.
   const katalogQuery = useQuery({
@@ -199,7 +201,7 @@ export default function StabPage() {
         einsatzId={einsatzId}
         einsatz={einsatz}
         benutzer={benutzer}
-        overrides={overridesQuery.data}
+        freigaben={freigabenQuery.data}
         stab={stabQuery.data}
         stabZustand={abrufZustand(stabQuery)}
         stabStand={stabQuery.dataUpdatedAt}
@@ -227,7 +229,7 @@ export default function StabPage() {
               loading={stabQuery.isLoading}
               renderItem={(s) => {
                 const zeile = zeileFuer(stabQuery.data, s.sachgebiet);
-                const werkzeuge = werkzeugeFuer(s.werkzeuge, benutzer, overridesQuery.data);
+                const werkzeuge = werkzeugeFuer(s.werkzeuge, freigabenQuery.data);
                 // Arbeitsergebnisse als Unterroute des Stabs, kein Modul (S6 Funkplan LFH-548,
                 // S5 Pressearbeit und Informationstelefon LFH-554). Deshalb nicht über
                 // `werkzeugeFuer`, und sie bleiben stehen, wenn die Modul-Werkzeuge der Zeile

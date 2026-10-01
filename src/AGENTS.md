@@ -43,7 +43,8 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
   (`Option<Enum>` bei `Option<String>`). **Enum-Wire-Kontrakt** in `tests/enum_wire_kontrakt.rs`
   (`enum_wire_as_str!`/`enum_wire!`, voll qualifizierte Pfade, bei `LiveEvent::ALLE` `contains`
   und Länge).
-- **Noch handgepflegt:** Request-/Input-DTOs (`NeuerX`/`PatchX`) und zwei `Record<>`-Maps.
+- **Noch handgepflegt:** Request-/Input-DTOs (`NeuerX`/`PatchX`) und drei `Record<>`-Maps
+  (`OrgModulEinstellungen`, `ModulOverrides`, `ModulFreigaben` in `frontend/src/api/types.ts`).
 - **Optionalität ehrlich machen** (Norm LFH-265, kein Sweep): `Option<T>` in Response-DTOs mit
   `skip_serializing_if = "Option::is_none"`; `#[serde(default)]`-Felder stattdessen
   `#[schema(required)]`. **Testfalle:** Presence per `contains_key`, nicht `== Value::Null`

@@ -3,7 +3,7 @@ import { baueBefehle } from './befehle';
 import { modulRegistry } from '../einsatz/modulRegistry';
 import type { ModulEintrag } from '../einsatz/modulRegistry';
 import type { BefehlKontext } from './typen';
-import { benutzerFixture } from '../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 
 /**
  * Der Schnellaktions-Filter folgt der LESEACHSE `istModulFreigegeben` (inkl.
@@ -11,7 +11,7 @@ import { benutzerFixture } from '../test/fixtures';
  *
  * Eigene Datei, weil der Unterschied nur über einen Registry-Stub beobachtbar ist, und `vi.mock`
  * hoistet dateiweit (er verfälschte `befehle.test.ts` und `schnellaktionen.guard.test.ts`).
- * `ModulOverrides` tragen keinen Status. Gestubbt wird NUR die Datentabelle, die
+ * Die `ModulFreigaben` des Servers tragen keinen Status. Gestubbt wird NUR die Datentabelle, die
  * Freigabefunktionen bleiben echt.
  */
 vi.mock('../einsatz/modulRegistry', async (importOriginal) => {
@@ -33,7 +33,7 @@ function kontext(over: Partial<BefehlKontext> = {}): BefehlKontext {
     einsatzId: 5,
     benutzer: fuehrungskraft,
     einsaetze: [],
-    overrides: undefined,
+    freigaben: freigabenFixture(),
     darfSchreibenImEinsatz: true,
     navigate: vi.fn(),
     setThemeModus: vi.fn(),

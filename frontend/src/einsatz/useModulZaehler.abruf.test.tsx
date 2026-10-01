@@ -5,39 +5,28 @@ import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
-import type { ModulOverrides } from '../api/types';
+import type { ModulFreigaben } from '../api/types';
 import { useModulZaehler } from './useModulZaehler';
-import { benutzerFixture } from '../test/fixtures';
+import { freigabenFixture } from '../test/fixtures';
 
 /**
  * Der Hook des Modulzählers am Draht (LFH-639). Der Test von `darfZaehlerZeigen` sieht NICHT,
  * ob die Entscheidung an der `useQuery` ankommt — fiele `enabled: betreuungAktiv` weg, fragte
  * die Navigation ein verstecktes Modul ab (403-Rauschen, Seitenkanal). Deshalb der
- * MSW-Anfragezähler als Paar: versteckt → 0 Anfragen, sichtbar → genau 1.
+ * MSW-Anfragezähler als Paar: versteckt, gesperrt oder Freigaben unbekannt → 0 Anfragen,
+ * sichtbar und frei → genau 1. Die Freigaben kommen vom Server (LFH-669).
  *
  * Die anderen Zählermodule sind ausgeblendet; `modul-zaehler` beantwortet der Vorgabe-Handler
  * aus `test/server.ts`.
  */
 
-const benutzer = benutzerFixture({ anzeigename: 'E' });
-
 const PFAD = '/api/einsaetze/7/betreuung';
 
 const ANDERE = ['meldungen', 'auftraege', 'erinnerungen', 'chat', 'dokumente', 'abloesung'];
 
-function ausgeblendet(keys: readonly string[]): ModulOverrides {
-  return Object.fromEntries(
-    keys.map((modul_key) => [
-      modul_key,
-      {
-        einsatz_id: 7,
-        modul_key,
-        sichtbar: false,
-        benoetigte_rolle: null,
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    ]),
+function ausgeblendet(keys: readonly string[]): ModulFreigaben {
+  return freigabenFixture(
+    Object.fromEntries(keys.map((key) => [key, { sichtbar: false, zugriff: false }])),
   );
 }
 
@@ -78,8 +67,7 @@ describe('useModulZaehler am Draht — Betreuung (LFH-639)', () => {
       () =>
         useModulZaehler({
           einsatzId: 7,
-          benutzer,
-          overrides: ausgeblendet([...ANDERE, 'betreuung']),
+          freigaben: ausgeblendet([...ANDERE, 'betreuung']),
         }),
       { wrapper: wrapper(neuerQueryClient()) },
     );
@@ -92,7 +80,7 @@ describe('useModulZaehler am Draht — Betreuung (LFH-639)', () => {
   it('Modul sichtbar → genau eine Anfrage, Zähler der aktiven Bezirke', async () => {
     const abrufe = zaehleAbrufe();
     const { result } = renderHook(
-      () => useModulZaehler({ einsatzId: 7, benutzer, overrides: ausgeblendet(ANDERE) }),
+      () => useModulZaehler({ einsatzId: 7, freigaben: ausgeblendet(ANDERE) }),
       { wrapper: wrapper(neuerQueryClient()) },
     );
     await waitFor(() => expect(result.current.betreuung).toBeDefined());
@@ -101,6 +89,27 @@ describe('useModulZaehler am Draht — Betreuung (LFH-639)', () => {
       beschreibung: '1 aktiver Evakuierungsbezirk',
     });
     expect(abrufe.anzahl).toBe(1);
+  });
+
+  it('Modul gesperrt (zugriff: false) → keine Anfrage an …/betreuung, kein Zähler', async () => {
+    const abrufe = zaehleAbrufe();
+    const gesperrt = { ...ausgeblendet(ANDERE), betreuung: { sichtbar: true, zugriff: false } };
+    const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, freigaben: gesperrt }), {
+      wrapper: wrapper(neuerQueryClient()),
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(abrufe.anzahl).toBe(0);
+    expect(result.current.betreuung).toBeUndefined();
+  });
+
+  it('Freigaben unbekannt (laden noch/gescheitert) → keine Anfrage an …/betreuung', async () => {
+    const abrufe = zaehleAbrufe();
+    const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, freigaben: undefined }), {
+      wrapper: wrapper(neuerQueryClient()),
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(abrufe.anzahl).toBe(0);
+    expect(result.current.betreuung).toBeUndefined();
   });
 });
 
@@ -150,8 +159,7 @@ describe('useModulZaehler am Draht — Wetter & Pegel (LFH-663)', () => {
       () =>
         useModulZaehler({
           einsatzId: 7,
-          benutzer,
-          overrides: ausgeblendet([...ALLE_ANDEREN, 'wetter-pegel']),
+          freigaben: ausgeblendet([...ALLE_ANDEREN, 'wetter-pegel']),
         }),
       { wrapper: wrapper(neuerQueryClient()) },
     );
@@ -163,7 +171,7 @@ describe('useModulZaehler am Draht — Wetter & Pegel (LFH-663)', () => {
   it('Modul sichtbar → genau eine Anfrage, Zahl der Unwetterwarnungen ohne „mäßig"', async () => {
     const abrufe = zaehleWetterAbrufe();
     const { result } = renderHook(
-      () => useModulZaehler({ einsatzId: 7, benutzer, overrides: ausgeblendet(ALLE_ANDEREN) }),
+      () => useModulZaehler({ einsatzId: 7, freigaben: ausgeblendet(ALLE_ANDEREN) }),
       { wrapper: wrapper(neuerQueryClient()) },
     );
     await waitFor(() => expect(result.current['wetter-pegel']).toBeDefined());
@@ -174,9 +182,9 @@ describe('useModulZaehler am Draht — Wetter & Pegel (LFH-663)', () => {
     expect(abrufe.anzahl).toBe(1);
   });
 
-  it('solange die Overrides laden → keine Anfrage an …/wetter (kein 403 bei ausgeblendetem Modul)', async () => {
+  it('solange die Freigaben laden → keine Anfrage an …/wetter (kein 403 bei ausgeblendetem Modul)', async () => {
     const abrufe = zaehleWetterAbrufe();
-    renderHook(() => useModulZaehler({ einsatzId: 7, benutzer, overrides: undefined }), {
+    renderHook(() => useModulZaehler({ einsatzId: 7, freigaben: undefined }), {
       wrapper: wrapper(neuerQueryClient()),
     });
     await new Promise((r) => setTimeout(r, 20));

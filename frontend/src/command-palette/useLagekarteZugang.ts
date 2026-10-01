@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
-import { ladeEinstellungen, ladeModulOverrides } from '../api/einsaetze';
+import { ladeEinstellungen, ladeModulFreigaben } from '../api/einsaetze';
 import { istModulFreigegeben, modulRegistry } from '../einsatz/modulRegistry';
 import type { Koordinatenformat } from '../api/types';
 
@@ -25,10 +24,9 @@ export function useLagekarteZugang(
   einsatzFormat: Koordinatenformat | null | undefined;
   orgFormat: Koordinatenformat | null | undefined;
 } {
-  const { benutzer } = useAuth();
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId!),
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId!),
     enabled: aktiv && einsatzId != null,
     staleTime: FRISCH_MS,
   });
@@ -39,12 +37,13 @@ export function useLagekarteZugang(
     staleTime: FRISCH_MS,
   });
 
-  // `isFetched` statt `isSuccess`, wie beim Datensatz-Finder: ein Fehlschlag legt den Sprung
-  // nicht dauerhaft still, dann gilt der Registry-Default.
+  // Die Freigaben des Servers entscheiden (LFH-669, Spec `modul-freigabe`). Nach einem
+  // Fehlschlag sind sie unbekannt, und `istModulFreigegeben` gibt Unbekanntes nicht frei: kein
+  // Sprung, bis ein Neuabruf gelingt.
   let frei: boolean | null = null;
-  if (overridesQuery.isFetched) {
+  if (freigabenQuery.isFetched) {
     const lagekarte = modulRegistry.find((m) => m.key === 'lagekarte');
-    frei = !!lagekarte && istModulFreigegeben(lagekarte, benutzer, overridesQuery.data);
+    frei = !!lagekarte && istModulFreigegeben(lagekarte, freigabenQuery.data);
   }
   return {
     frei,

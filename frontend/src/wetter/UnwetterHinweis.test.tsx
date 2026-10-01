@@ -3,7 +3,7 @@ import { render, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { benutzerFixture } from '../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import UnwetterHinweis from './UnwetterHinweis';
@@ -53,7 +53,11 @@ describe('UnwetterHinweis', () => {
     render(
       <QueryClientProvider client={client}>
         <EinsatzAnzeigeProvider einsatzId={7}>
-          <UnwetterHinweis einsatzId={7} benutzer={benutzerFixture()} overrides={{}} />
+          <UnwetterHinweis
+            einsatzId={7}
+            benutzer={benutzerFixture()}
+            freigaben={freigabenFixture()}
+          />
         </EinsatzAnzeigeProvider>
       </QueryClientProvider>,
     );

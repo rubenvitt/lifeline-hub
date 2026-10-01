@@ -2524,6 +2524,23 @@ export interface components {
             zugewiesen_at: string;
         };
         /**
+         * @description Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von
+         *     `GET /api/einsaetze/{id}/modul-freigaben` und die EINE Auswertung hinter
+         *     [`fordere_modul_zugriff`] und [`erlaubte_module`].
+         */
+        ModulFreigabe: {
+            /**
+             * @description Das Modul erscheint in der Navigation. `false` nur, wenn der Einsatz ein ausblendbares
+             *     Modul ausblendet — auch für System-Admins, die es dennoch erreichen (`zugriff`).
+             */
+            sichtbar: boolean;
+            /**
+             * @description Der Benutzer darf die Endpunkte des Moduls aufrufen: genau die Entscheidung des
+             *     Modul-Gates der Listen-Endpunkte.
+             */
+            zugriff: boolean;
+        };
+        /**
          * @description Antwort von `GET /api/einsaetze/{id}/modul-zaehler`. Feldnamen = Modul-Keys
          *     (`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt".
          */

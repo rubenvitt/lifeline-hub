@@ -295,7 +295,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     for (const key of k.zuletztModulKeys ?? []) {
       if (key === k.aktuellerModulKey) continue;
       const m = modulRegistry.find((x) => x.key === key);
-      if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
+      if (!m || !istModulFreigegeben(m, k.freigaben)) continue;
       const ziel = einsatzModulPfad(k.einsatzId, modulZielRoute(m));
       befehle.push({
         id: `zuletzt:${m.key}`,
@@ -309,7 +309,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
 
     // 3. Module
     for (const m of modulRegistry) {
-      if (!istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
+      if (!istModulFreigegeben(m, k.freigaben)) continue;
       const ziel = einsatzModulPfad(k.einsatzId, modulZielRoute(m));
       befehle.push({
         id: `modul:${m.key}`,
@@ -341,7 +341,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     if (k.darfSchreibenImEinsatz) {
       for (const a of SCHNELLAKTIONEN) {
         const m = modulRegistry.find((x) => x.key === a.modulKey);
-        if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
+        if (!m || !istModulFreigegeben(m, k.freigaben)) continue;
         const ziel = a.pfad(k.einsatzId);
         befehle.push({
           id: `aktion:${a.modulKey}`,
